@@ -564,7 +564,11 @@ static TreeElement *outliner_add_element(SpaceOops *soops, ListBase *lb, void *i
 	ID *id= idv;
 	int a = 0;
 	int tot;
-    
+	
+    /* Are we looking for something - we want to expand parents to filter child matches 
+       - NOT in datablocks view - expanding all datablocks takes way too long to be useful */
+	int searching= (soops->search_string[0]!=0 && soops->outlinevis!=SO_DATABLOCKS);
+
 	if(ELEM3(type, TSE_RNA_STRUCT, TSE_RNA_PROPERTY, TSE_RNA_ARRAY_ELEM)) {
 		id= ((PointerRNA*)idv)->id.data;
 		if(!id) id= ((PointerRNA*)idv)->data;
@@ -579,6 +583,10 @@ static TreeElement *outliner_add_element(SpaceOops *soops, ListBase *lb, void *i
 	check_persistant(soops, te, id, type, index);
 	tselem= TREESTORE(te);	
 	
+    /* if we are searching for something expand to see child elements
+       - user prefs need individual treatment later to not expand rna entries */
+	if(searching && soops->outlinevis!=SO_USERDEF) tselem->flag &= ~TSE_CLOSED;
+
 	te->parent= parent;
 	te->index= index;	// for data arays
 	if(ELEM3(type, TSE_SEQUENCE, TSE_SEQ_STRIP, TSE_SEQUENCE_DUP));
@@ -1038,6 +1046,9 @@ static TreeElement *outliner_add_element(SpaceOops *soops, ListBase *lb, void *i
 			else
 				te->name= (char*)RNA_struct_ui_name(ptr->type);
 
+            /* If searching don't expand RNA entries - it wil create infinite recursion */
+            if(searching && BLI_strcasecmp("RNA",te->name)!=0) tselem->flag &= ~TSE_CLOSED;
+
 			iterprop= RNA_struct_iterator_property(ptr->type);
 			tot= RNA_property_collection_length(ptr, iterprop);
 
@@ -1066,6 +1077,9 @@ static TreeElement *outliner_add_element(SpaceOops *soops, ListBase *lb, void *i
 			te->name= (char*)RNA_property_ui_name(prop);
 			te->directdata= prop;
 			te->rnaptr= *ptr;
+
+            /* If searching don't expand RNA entries - it wil create infinite recursion */
+            if(searching && BLI_strcasecmp("RNA",te->name)!=0) tselem->flag &= ~TSE_CLOSED;
 
 			if(proptype == PROP_POINTER) {
 				pptr= RNA_property_pointer_get(ptr, prop);

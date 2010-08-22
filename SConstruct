@@ -67,6 +67,7 @@ VERSION = btools.VERSION # This is used in creating the local config directories
 platform = sys.platform
 quickie = None
 quickdebug = None
+Decider('MD5-timestamp')
 
 ##### BEGIN SETUP #####
 

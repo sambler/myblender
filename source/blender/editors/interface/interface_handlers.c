@@ -4161,6 +4161,20 @@ static int ui_but_menu(bContext *C, uiBut *but)
 		
 		uiItemS(layout);
 		
+        /*  add layer visibility options to the bone layers menu */
+        if( BLI_strcasecmp(name, "Visible Layers")==0 )
+        {
+            uiItemO(layout, "Togglle All Bone Layers Visibility", 0, "ARMATURE_OT_all_bone_layers");
+            uiItemS(layout);
+        }
+                               
+        if( BLI_strcasecmp(name, "Layer Proxy Protection")==0 )
+        {
+            uiItemO(layout, "Toggle All Protected Layers Visibility", 0, "ARMATURE_OT_all_bone_protected_layers");
+            uiItemS(layout);
+        }
+        
+
 		/* Property Operators */
 		
 		//Copy Property Value

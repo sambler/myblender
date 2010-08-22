@@ -84,6 +84,8 @@ void ED_operatortypes_armature(void)
 	
 	WM_operatortype_append(ARMATURE_OT_armature_layers);
 	WM_operatortype_append(ARMATURE_OT_bone_layers);
+    WM_operatortype_append(ARMATURE_OT_all_bone_layers);
+    WM_operatortype_append(ARMATURE_OT_all_bone_protected_layers);
 
 	/* SKETCH */	
 	WM_operatortype_append(SKETCH_OT_gesture);

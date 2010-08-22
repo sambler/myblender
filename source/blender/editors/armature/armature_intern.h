@@ -78,6 +78,8 @@ void ARMATURE_OT_flags_set(struct wmOperatorType *ot);
 
 void ARMATURE_OT_armature_layers(struct wmOperatorType *ot);
 void ARMATURE_OT_bone_layers(struct wmOperatorType *ot);
+void ARMATURE_OT_all_bone_layers(struct wmOperatorType *ot);
+void ARMATURE_OT_all_bone_protected_layers(struct wmOperatorType *ot);
 
 /* ******************************************************* */
 /* Pose-Mode Operators */

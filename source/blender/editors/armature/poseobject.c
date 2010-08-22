@@ -1600,6 +1600,10 @@ static int pose_armature_layers_exec (bContext *C, wmOperator *op)
 	PointerRNA ptr;
 	int layers[32]; /* hardcoded for now - we can only have 32 armature layers, so this should be fine... */
 	
+	/* sanity checking */
+    if (arm == NULL)
+        return OPERATOR_CANCELLED;
+
 	/* get the values set in the operator properties */
 	RNA_boolean_get_array(op->ptr, "layers", layers);
 	
@@ -1650,6 +1654,124 @@ void ARMATURE_OT_armature_layers (wmOperatorType *ot)
 	
 	/* properties */
 	RNA_def_boolean_layer_member(ot->srna, "layers", 32, NULL, "Layer", "Armature layers to make visible");
+}
+
+/* change visiblilty of all armature layers */
+static int armature_all_layers_poll(bContext *C)
+{
+    return 1; /* we always want to say yes as the menu decides if it exsists which means it is always active */
+}
+
+static int armature_all_layers_toggle_exec (bContext *C, wmOperator *op)
+{
+    Object *ob= CTX_data_active_object(C);
+    bArmature *arm= (ob)? ob->data : NULL;
+    PointerRNA ptr;
+    int x, vis, layers[32]; /* hardcoded for now - we can only have 32 armature layers, so this should be fine... */
+               
+    /* sanity checking */
+    if (arm == NULL)
+        return OPERATOR_CANCELLED;
+    
+    /* get pointer for armature */
+    RNA_id_pointer_create((ID *)arm, &ptr);
+    
+    /* get the current layer values */
+    RNA_boolean_get_array(&ptr, "layers", layers);
+    
+    /* add up the number of layers that are visible */
+    vis= 0;
+    for(x=0;x<32;x++)
+        vis= vis+(layers[x]>0);
+    
+    if(vis < 16)
+        vis= 1; /* less than 50% visible make them all visible */
+    else
+        vis= 0; /* more than 50% visible make them all invisible */
+    
+    /* set the layers visibility */
+    for(x=0;x<32;x++)
+        layers[x]= vis;
+    
+    if(!vis) layers[0]= 1; /* make sure one layer is visible */
+    /* could we have an active armature layer/s that can be restored in the event of turning off layers? */
+    
+    /* save visibility settings to the armature */
+    RNA_boolean_set_array(&ptr, "layers", layers);
+               
+    /* note, notifier might evolve */
+    WM_event_add_notifier(C, NC_OBJECT|ND_POSE, ob);
+    
+    return OPERATOR_FINISHED;
+}
+
+void ARMATURE_OT_all_bone_layers (wmOperatorType *ot)
+{
+    /* identifiers */
+    ot->name= "Toggle Armature Layers Visibility";
+    ot->idname= "ARMATURE_OT_all_bone_layers";
+    ot->description= "Toggle all armature layers visibility";
+           
+    /* callbacks */
+    ot->exec= armature_all_layers_toggle_exec;
+    ot->poll= armature_all_layers_poll;
+    
+    /* flags */
+    ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+}
+
+static int armature_all_proxy_layers_toggle_exec (bContext *C, wmOperator *op)
+{
+    Object *ob= CTX_data_active_object(C);
+    bArmature *arm= (ob)? ob->data : NULL;
+    PointerRNA ptr;
+    int x, vis, layers[32]; /* hardcoded for now - we can only have 32 armature layers, so this should be fine... */
+           
+    /* sanity checking */
+    if (arm == NULL)
+        return OPERATOR_CANCELLED;
+    
+    /* get pointer for armature */
+    RNA_id_pointer_create((ID *)arm, &ptr);
+    
+    /* get the current layer values */
+    RNA_boolean_get_array(&ptr, "layer_protection", layers);
+    
+    /* add up the number of layers that are visible */
+    vis= 0;
+    for(x=0;x<32;x++)
+        vis= vis+(layers[x]>0);
+    
+    if(vis < 16)
+        vis= 1; /* less than 50% visible make them all visible */
+    else
+        vis= 0; /* more than 50% visible make them all invisible */
+    
+    /* set the layers visibility */
+    for(x=0;x<32;x++)
+        layers[x]= vis;
+    
+    /* save visibility settings to the armature */
+    RNA_boolean_set_array(&ptr, "layer_protection", layers);
+           
+    /* note, notifier might evolve */
+    WM_event_add_notifier(C, NC_OBJECT|ND_POSE, ob);
+    
+    return OPERATOR_FINISHED;
+}
+
+void ARMATURE_OT_all_bone_protected_layers (wmOperatorType *ot)
+{
+    /* identifiers */
+    ot->name= "Toggle Protected Armature Layers Visibility";
+    ot->idname= "ARMATURE_OT_all_bone_protected_layers";
+    ot->description= "Toggle all armature protected layers visibility";
+           
+    /* callbacks */
+    ot->exec= armature_all_proxy_layers_toggle_exec;
+    ot->poll= armature_all_layers_poll;
+    /* flags */
+    ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 }
 
 /* ------------------- */

@@ -78,6 +78,7 @@ void IMAGE_OT_pack(struct wmOperatorType *ot);
 void IMAGE_OT_unpack(struct wmOperatorType *ot);
 
 void IMAGE_OT_cycle_render_slot(struct wmOperatorType *ot);
+void IMAGE_OT_select_render_slot(struct wmOperatorType *ot);
 
 void IMAGE_OT_sample(struct wmOperatorType *ot);
 void IMAGE_OT_sample_line(struct wmOperatorType *ot);

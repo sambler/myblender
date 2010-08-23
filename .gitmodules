@@ -1,0 +1,3 @@
+[submodule "release/scripts/addons"]
+	path = release/scripts/addons
+	url = /Volumes/Booter/Users/shane/Projects/blender-bits/blender-svn/blender/../externals/addons

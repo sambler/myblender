@@ -1,5 +1,6 @@
 myblender is a copy of current blender development with branches for
 patches and additions that I have developed.
+Submodule myblenderaddons is also needed http://github.com/sambler/myblenderaddons
 
 Some of these are developed from ideas at http://blenderstorm.org
 

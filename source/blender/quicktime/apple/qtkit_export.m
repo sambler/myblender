@@ -62,10 +62,11 @@
 #import <QTKit/QTKit.h>
 #include <AudioToolbox/AudioToolbox.h>
 
+/* -- qtkit exists in 10.3 - 32bit isn't a valid reason to prevent qtkit from being used
 #if (MAC_OS_X_VERSION_MIN_REQUIRED <= MAC_OS_X_VERSION_10_4) || !__LP64__
 #error 64 bit build & OSX 10.5 minimum are needed for QTKit
 #endif
-
+*/
 #include "quicktime_import.h"
 #include "quicktime_export.h"
 

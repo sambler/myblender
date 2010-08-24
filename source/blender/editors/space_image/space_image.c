@@ -495,7 +495,9 @@ void image_keymap(struct wmKeyConfig *keyconf)
 	WM_keymap_add_item(keymap, "IMAGE_OT_properties", NKEY, KM_PRESS, 0, 0);
 	WM_keymap_add_item(keymap, "IMAGE_OT_scopes", PKEY, KM_PRESS, 0, 0);
 
-	WM_keymap_add_item(keymap, "IMAGE_OT_cycle_render_slot", JKEY, KM_PRESS, 0, 0);
+	RNA_int_set(WM_keymap_add_item(keymap, "IMAGE_OT_cycle_render_slot", JKEY, KM_PRESS, 0, 0)->ptr, "slot_cycle", 1);
+	RNA_int_set(WM_keymap_add_item(keymap, "IMAGE_OT_cycle_render_slot", KKEY, KM_PRESS, 0, 0)->ptr, "slot_cycle", -1);
+
     RNA_int_set(WM_keymap_add_item(keymap, "IMAGE_OT_select_render_slot", ONEKEY, KM_PRESS, 0, 0)->ptr, "render_slot", 0);
 	RNA_int_set(WM_keymap_add_item(keymap, "IMAGE_OT_select_render_slot", TWOKEY, KM_PRESS, 0, 0)->ptr, "render_slot", 1);
 	RNA_int_set(WM_keymap_add_item(keymap, "IMAGE_OT_select_render_slot", THREEKEY, KM_PRESS, 0, 0)->ptr, "render_slot", 2);

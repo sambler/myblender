@@ -2054,25 +2054,19 @@ static int cycle_render_slot_exec(bContext *C, wmOperator *op)
 {
 	Image *ima= CTX_data_edit_image(C);
 	int a, slot, cur= ima->render_slot;
-    int direction =  RNA_int_get(op->ptr, "slot_cycle");
+    int direction= (RNA_int_get(op->ptr, "slot_cycle")>=0)?1:-1;
 
-    if(direction >= 0) {
-        for(a=1; a<IMA_MAX_RENDER_SLOT; a++) {
-            slot= (cur+a)%IMA_MAX_RENDER_SLOT;
-
-            if(ima->renders[slot] || slot == ima->last_render_slot) {
-                ima->render_slot= slot;
-                break;
-            }
-        }
-    }else{
-        for(a=IMA_MAX_RENDER_SLOT-1; a>=0; a--) {
-            slot= (cur-a)%IMA_MAX_RENDER_SLOT;
-            
-            if(ima->renders[slot] || slot == ima->last_render_slot) {
-                ima->render_slot= slot;
-                break;
-            }
+    for(a=1; a<IMA_MAX_RENDER_SLOT; a++) {
+        slot= (cur+(a*direction));
+        
+        if(slot >= IMA_MAX_RENDER_SLOT) 
+            slot= 0;
+        else if(slot < 0)
+            slot= IMA_MAX_RENDER_SLOT+slot;
+        
+        if(ima->renders[slot] || slot == ima->last_render_slot) {
+            ima->render_slot= slot;
+            break;
         }
     }
 

@@ -2054,15 +2054,27 @@ static int cycle_render_slot_exec(bContext *C, wmOperator *op)
 {
 	Image *ima= CTX_data_edit_image(C);
 	int a, slot, cur= ima->render_slot;
+    int direction =  RNA_int_get(op->ptr, "slot_cycle");
 
-	for(a=1; a<IMA_MAX_RENDER_SLOT; a++) {
-		slot= (cur+a)%IMA_MAX_RENDER_SLOT;
+    if(direction >= 0) {
+        for(a=1; a<IMA_MAX_RENDER_SLOT; a++) {
+            slot= (cur+a)%IMA_MAX_RENDER_SLOT;
 
-		if(ima->renders[slot] || slot == ima->last_render_slot) {
-			ima->render_slot= slot;
-			break;
-		}
-	}
+            if(ima->renders[slot] || slot == ima->last_render_slot) {
+                ima->render_slot= slot;
+                break;
+            }
+        }
+    }else{
+        for(a=IMA_MAX_RENDER_SLOT-1; a>=0; a--) {
+            slot= (cur-a)%IMA_MAX_RENDER_SLOT;
+            
+            if(ima->renders[slot] || slot == ima->last_render_slot) {
+                ima->render_slot= slot;
+                break;
+            }
+        }
+    }
 
 	if(a == IMA_MAX_RENDER_SLOT)
 		ima->render_slot= ((cur == 1)? 0: 1);
@@ -2084,6 +2096,10 @@ void IMAGE_OT_cycle_render_slot(wmOperatorType *ot)
 
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	
+	/* properties */
+	RNA_def_int(ot->srna, "slot_cycle", 1, -1, 1,
+                  "Slot Cycle Direction", "Render Slot cycle direction.", -1, 1);
 }
 
 /******************** goto specific render slot *********************/

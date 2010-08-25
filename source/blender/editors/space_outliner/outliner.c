@@ -134,6 +134,10 @@ static int group_select_flag(Group *gr);
 
 /* ******************** PERSISTANT DATA ***************** */
 
+/* are we searching through the outliner contents?
+   see outliner_build_tree for more info */
+static int searching=0;
+
 static void outliner_storage_cleanup(SpaceOops *soops)
 {
 	TreeStore *ts= soops->treestore;
@@ -250,7 +254,7 @@ static void outliner_height(SpaceOops *soops, ListBase *lb, int *h)
 	TreeElement *te= lb->first;
 	while(te) {
 		TreeStoreElem *tselem= TREESTORE(te);
-		if((tselem->flag & TSE_CLOSED)==0) 
+		if( (tselem->flag & TSE_CLOSED)==0 || (searching && (tselem->flag & TSE_CHILDSEARCH)) )
 			outliner_height(soops, &te->subtree, h);
 		(*h) += OL_H;
 		te= te->next;
@@ -265,7 +269,7 @@ static void outliner_width(SpaceOops *soops, ListBase *lb, int *w)
 //		TreeStoreElem *tselem= TREESTORE(te);
 		
 		// XXX fixme... te->xend is not set yet
-		if(tselem->flag & TSE_CLOSED) {
+		if((tselem->flag & TSE_CLOSED) && !(searching && (tselem->flag & TSE_CHILDSEARCH))) { // not tested this searching addition
 			if (te->xend > *w)
 				*w = te->xend;
 		}
@@ -288,7 +292,7 @@ static void outliner_rna_width(SpaceOops *soops, ListBase *lb, int *w, int start
 		if(startx+100 > *w)
 			*w = startx+100;
 
-		if((tselem->flag & TSE_CLOSED)==0)
+		if( (tselem->flag & TSE_CLOSED)==0 || (searching && (tselem->flag & TSE_CHILDSEARCH)) )
 			outliner_rna_width(soops, &te->subtree, w, startx+OL_X);
 		te= te->next;
 	}
@@ -448,7 +452,7 @@ static void outliner_add_passes(SpaceOops *soops, TreeElement *tenla, ID *id, Sc
 	
 	/* save cpu cycles, but we add the first to invoke an open/close triangle */
 	tselem = TREESTORE(tenla);
-	if(tselem->flag & TSE_CLOSED)
+	if( (tselem->flag & TSE_CLOSED) && !(searching && (tselem->flag & TSE_CHILDSEARCH)) )
 		return;
 	
 	te= outliner_add_element(soops, &tenla->subtree, id, tenla, TSE_R_PASS, LOG2I(SCE_PASS_Z));
@@ -564,10 +568,6 @@ static TreeElement *outliner_add_element(SpaceOops *soops, ListBase *lb, void *i
 	ID *id= idv;
 	int a = 0;
 	int tot;
-	
-    /* Are we looking for something - we want to expand parents to filter child matches 
-       - NOT in datablocks view - expanding all datablocks takes way too long to be useful */
-	int searching= (soops->search_string[0]!=0 && soops->outlinevis!=SO_DATABLOCKS);
 
 	if(ELEM3(type, TSE_RNA_STRUCT, TSE_RNA_PROPERTY, TSE_RNA_ARRAY_ELEM)) {
 		id= ((PointerRNA*)idv)->id.data;
@@ -585,7 +585,8 @@ static TreeElement *outliner_add_element(SpaceOops *soops, ListBase *lb, void *i
 	
     /* if we are searching for something expand to see child elements
        - user prefs need individual treatment later to not expand rna entries */
-	if(searching && soops->outlinevis!=SO_USERDEF) tselem->flag &= ~TSE_CLOSED;
+	if(searching && soops->outlinevis!=SO_USERDEF && soops->outlinevis!=SO_DATABLOCKS)
+        tselem->flag |= TSE_CHILDSEARCH;
 
 	te->parent= parent;
 	te->index= index;	// for data arays
@@ -1046,8 +1047,8 @@ static TreeElement *outliner_add_element(SpaceOops *soops, ListBase *lb, void *i
 			else
 				te->name= (char*)RNA_struct_ui_name(ptr->type);
 
-            /* If searching don't expand RNA entries - it wil create infinite recursion */
-            if(searching && BLI_strcasecmp("RNA",te->name)!=0) tselem->flag &= ~TSE_CLOSED;
+            /* If searching don't expand RNA entries */
+            if(searching && BLI_strcasecmp("RNA",te->name)!=0) tselem->flag &= ~TSE_CHILDSEARCH;
 
 			iterprop= RNA_struct_iterator_property(ptr->type);
 			tot= RNA_property_collection_length(ptr, iterprop);
@@ -1057,7 +1058,7 @@ static TreeElement *outliner_add_element(SpaceOops *soops, ListBase *lb, void *i
 				if(!tselem->used)
 					tselem->flag &= ~TSE_CLOSED;
 
-			if(!(tselem->flag & TSE_CLOSED)) {
+			if(!(tselem->flag & TSE_CLOSED) || (searching && (tselem->flag & TSE_CHILDSEARCH)) ) {
 				for(a=0; a<tot; a++)
 					outliner_add_element(soops, &te->subtree, (void*)ptr, te, TSE_RNA_PROPERTY, a);
 			}
@@ -1078,14 +1079,14 @@ static TreeElement *outliner_add_element(SpaceOops *soops, ListBase *lb, void *i
 			te->directdata= prop;
 			te->rnaptr= *ptr;
 
-            /* If searching don't expand RNA entries - it wil create infinite recursion */
-            if(searching && BLI_strcasecmp("RNA",te->name)!=0) tselem->flag &= ~TSE_CLOSED;
+            /* If searching don't expand RNA entries */
+            if(searching && BLI_strcasecmp("RNA",te->name)!=0) tselem->flag &= ~TSE_CHILDSEARCH;
 
 			if(proptype == PROP_POINTER) {
 				pptr= RNA_property_pointer_get(ptr, prop);
 
 				if(pptr.data) {
-					if(!(tselem->flag & TSE_CLOSED))
+					if(!(tselem->flag & TSE_CLOSED) || (searching && (tselem->flag & TSE_CHILDSEARCH)) )
 						outliner_add_element(soops, &te->subtree, (void*)&pptr, te, TSE_RNA_STRUCT, -1);
 					else
 						te->flag |= TE_LAZY_CLOSED;
@@ -1094,7 +1095,7 @@ static TreeElement *outliner_add_element(SpaceOops *soops, ListBase *lb, void *i
 			else if(proptype == PROP_COLLECTION) {
 				tot= RNA_property_collection_length(ptr, prop);
 
-				if(!(tselem->flag & TSE_CLOSED)) {
+				if(!(tselem->flag & TSE_CLOSED) || (searching && (tselem->flag & TSE_CHILDSEARCH)) ) {
 					for(a=0; a<tot; a++) {
 						RNA_property_collection_lookup_int(ptr, prop, a, &pptr);
 						outliner_add_element(soops, &te->subtree, (void*)&pptr, te, TSE_RNA_STRUCT, -1);
@@ -1106,7 +1107,7 @@ static TreeElement *outliner_add_element(SpaceOops *soops, ListBase *lb, void *i
 			else if(ELEM3(proptype, PROP_BOOLEAN, PROP_INT, PROP_FLOAT)) {
 				tot= RNA_property_array_length(ptr, prop);
 
-				if(!(tselem->flag & TSE_CLOSED)) {
+				if(!(tselem->flag & TSE_CLOSED) || (searching && (tselem->flag & TSE_CHILDSEARCH)) ) {
 					for(a=0; a<tot; a++)
 						outliner_add_element(soops, &te->subtree, (void*)ptr, te, TSE_RNA_ARRAY_ELEM, a);
 				}
@@ -1139,7 +1140,7 @@ static TreeElement *outliner_add_element(SpaceOops *soops, ListBase *lb, void *i
 		te->directdata= idv;
 		te->name= km->idname;
 		
-		if(!(tselem->flag & TSE_CLOSED)) {
+		if(!(tselem->flag & TSE_CLOSED) || (searching && (tselem->flag & TSE_CHILDSEARCH)) ) {
 			a= 0;
 			
 			for (kmi= km->items.first; kmi; kmi= kmi->next, a++) {
@@ -1318,7 +1319,10 @@ static int outliner_filter_tree(SpaceOops *soops, ListBase *lb)
 			 */
 			tselem= TREESTORE(te);
 			
-			if ((tselem->flag & TSE_CLOSED) || outliner_filter_tree(soops, &te->subtree)==0) { 
+            /* flag as not a found item */
+            tselem->flag &= ~TSE_SEARCHMATCH;
+            
+			if ( ((tselem->flag & TSE_CLOSED) && !(searching && (tselem->flag & TSE_CHILDSEARCH))) || outliner_filter_tree(soops, &te->subtree)==0) {
 				outliner_free_tree(&te->subtree);
 				BLI_remlink(lb, te);
 				
@@ -1327,6 +1331,11 @@ static int outliner_filter_tree(SpaceOops *soops, ListBase *lb)
 			}
 		}
 		else {
+            tselem= TREESTORE(te);
+            
+            /* flag as a found item - we can then highlight it */
+            tselem->flag |= TSE_SEARCHMATCH;
+            
 			/* filter subtree too */
 			outliner_filter_tree(soops, &te->subtree);
 		}
@@ -1344,6 +1353,11 @@ static void outliner_build_tree(Main *mainvar, Scene *scene, SpaceOops *soops)
 	TreeElement *te=NULL, *ten;
 	TreeStoreElem *tselem;
 	int show_opened= (soops->treestore==NULL); /* on first view, we open scenes */
+
+    /* Are we looking for something - we want to tag parents to filter child matches
+     - NOT in datablocks view - searching all datablocks takes way too long to be useful
+     - this variable is static so we only set it once per tree build */
+	searching= (soops->search_string[0]!=0 && soops->outlinevis!=SO_DATABLOCKS);
 
 	if(soops->tree.first && (soops->storeflag & SO_TREESTORE_REDRAW))
 	   return;
@@ -2681,7 +2695,7 @@ static void outliner_set_coordinates_element(SpaceOops *soops, TreeElement *te, 
 	te->ys= (float)(*starty);
 	*starty-= OL_H;
 	
-	if((tselem->flag & TSE_CLOSED)==0) {
+	if( (tselem->flag & TSE_CLOSED)==0 || (searching && (tselem->flag & TSE_CHILDSEARCH)) ) {
 		TreeElement *ten;
 		for(ten= te->subtree.first; ten; ten= ten->next) {
 			outliner_set_coordinates_element(soops, ten, startx+OL_X, starty);
@@ -2936,7 +2950,8 @@ static void tree_element_show_hierarchy(Scene *scene, SpaceOops *soops, ListBase
 		}
 		else tselem->flag |= TSE_CLOSED;
 		
-		if(tselem->flag & TSE_CLOSED); else tree_element_show_hierarchy(scene, soops, &te->subtree);
+		if( !(tselem->flag & TSE_CLOSED) || (searching && (tselem->flag & TSE_CHILDSEARCH)) )
+            tree_element_show_hierarchy(scene, soops, &te->subtree);
 	}
 }
 
@@ -2996,7 +3011,7 @@ void outliner_select(SpaceOops *soops, ListBase *lb, int *index, short *selectin
 					tselem->flag &= ~TSE_SELECTED;
 			}
 		}
-		else if ((tselem->flag & TSE_CLOSED)==0) {
+		else if ( (tselem->flag & TSE_CLOSED)==0 || (searching && (tselem->flag & TSE_CHILDSEARCH)) ) {
 			/* Only try selecting sub-elements if we haven't hit the right element yet
 			 *
 			 * Hack warning:
@@ -3052,7 +3067,7 @@ static void set_operation_types(SpaceOops *soops, ListBase *lb,
 				}
 			}
 		}
-		if((tselem->flag & TSE_CLOSED)==0) {
+		if( (tselem->flag & TSE_CLOSED)==0 || (searching && (tselem->flag & TSE_CHILDSEARCH)) ) {
 			set_operation_types(soops, &te->subtree,
 								scenelevel, objectlevel, idlevel, datalevel);
 		}
@@ -3151,7 +3166,7 @@ static void outliner_do_libdata_operation(bContext *C, Scene *scene, SpaceOops *
 				operation_cb(C, scene, te, tsep, tselem);
 			}
 		}
-		if((tselem->flag & TSE_CLOSED)==0) {
+		if( (tselem->flag & TSE_CLOSED)==0 || (searching && (tselem->flag & TSE_CHILDSEARCH)) ) {
 			outliner_do_libdata_operation(C, scene, soops, &te->subtree, operation_cb);
 		}
 	}
@@ -3255,7 +3270,7 @@ static void outliner_do_object_operation(bContext *C, Scene *scene_act, SpaceOop
 				operation_cb(C, scene_owner ? scene_owner : scene_act, te, NULL, tselem);
 			}
 		}
-		if((tselem->flag & TSE_CLOSED)==0) {
+		if( (tselem->flag & TSE_CLOSED)==0 || (searching && (tselem->flag & TSE_CHILDSEARCH)) ) {
 			outliner_do_object_operation(C, scene_act, soops, &te->subtree, operation_cb);
 		}
 	}
@@ -3332,7 +3347,7 @@ static void outliner_do_data_operation(SpaceOops *soops, int type, int event, Li
 				operation_cb(event, te, tselem);
 			}
 		}
-		if((tselem->flag & TSE_CLOSED)==0) {
+		if( (tselem->flag & TSE_CLOSED)==0 || (searching && (tselem->flag & TSE_CHILDSEARCH)) ) {
 			outliner_do_data_operation(soops, type, event, &te->subtree, operation_cb);
 		}
 	}
@@ -3952,7 +3967,7 @@ static void do_outliner_drivers_editop(SpaceOops *soops, ListBase *tree, short m
 		}
 		
 		/* go over sub-tree */
-		if ((tselem->flag & TSE_CLOSED)==0)
+		if ( (tselem->flag & TSE_CLOSED)==0 || (searching && (tselem->flag & TSE_CHILDSEARCH)) )
 			do_outliner_drivers_editop(soops, &te->subtree, mode);
 	}
 }
@@ -4122,7 +4137,7 @@ static void do_outliner_keyingset_editop(SpaceOops *soops, KeyingSet *ks, ListBa
 		}
 		
 		/* go over sub-tree */
-		if ((tselem->flag & TSE_CLOSED)==0)
+		if ( (tselem->flag & TSE_CLOSED)==0 || (searching && (tselem->flag & TSE_CHILDSEARCH)) )
 			do_outliner_keyingset_editop(soops, ks, &te->subtree, mode);
 	}
 }
@@ -4531,13 +4546,19 @@ static void outliner_draw_tree_element(bContext *C, uiBlock *block, Scene *scene
 
 	if(*starty+2*OL_H >= ar->v2d.cur.ymin && *starty<= ar->v2d.cur.ymax) {
 		int xmax= ar->v2d.cur.xmax;
-		
+
 		/* icons can be ui buts, we dont want it to overlap with restrict */
 		if((soops->flag & SO_HIDE_RESTRICTCOLS)==0)
 			xmax-= OL_TOGW+ICON_DEFAULT_WIDTH;
 		
 		glEnable(GL_BLEND);
 
+        /* start by highlighting search matches */
+        if(searching && (tselem->flag & TSE_SEARCHMATCH) ) {
+            glColor4f(0.0f, 0.8f, 0.0f, 0.3f); /* TODO - add search highlight colour to theme? */
+            glRecti(startx, *starty, xmax, *starty+OL_H);
+        }
+        
 		/* colors for active/selected data */
 		if(tselem->type==0) {
 			if(te->idcode==ID_SCE) {
@@ -4610,7 +4631,7 @@ static void outliner_draw_tree_element(bContext *C, uiBlock *block, Scene *scene
 				icon_x = startx+5;
 
 				// icons a bit higher
-			if(tselem->flag & TSE_CLOSED) 
+			if( (tselem->flag & TSE_CLOSED) && !(searching && (tselem->flag & TSE_CHILDSEARCH)) )
 				UI_icon_draw((float)icon_x, (float)*starty+2, ICON_DISCLOSURE_TRI_RIGHT);
 			else
 				UI_icon_draw((float)icon_x, (float)*starty+2, ICON_DISCLOSURE_TRI_DOWN);
@@ -4649,7 +4670,7 @@ static void outliner_draw_tree_element(bContext *C, uiBlock *block, Scene *scene
 		offsx+= (int)(OL_X + UI_GetStringWidth(te->name));
 		
 		/* closed item, we draw the icons, not when it's a scene, or master-server list though */
-		if(tselem->flag & TSE_CLOSED) {
+		if( (tselem->flag & TSE_CLOSED) && !(searching && (tselem->flag & TSE_CHILDSEARCH)) ) {
 			if(te->subtree.first) {
 				if(tselem->type==0 && te->idcode==ID_SCE);
 				else if(tselem->type!=TSE_R_LAYER) { /* this tree element always has same amount of branches, so dont draw */
@@ -4677,7 +4698,7 @@ static void outliner_draw_tree_element(bContext *C, uiBlock *block, Scene *scene
 		
 	*starty-= OL_H;
 
-	if((tselem->flag & TSE_CLOSED)==0) {
+	if( (tselem->flag & TSE_CLOSED)==0 || (searching && (tselem->flag & TSE_CHILDSEARCH)) ) {
 		for(ten= te->subtree.first; ten; ten= ten->next) {
 			outliner_draw_tree_element(C, block, scene, ar, soops, ten, startx+OL_X, starty);
 		}
@@ -4703,7 +4724,7 @@ static void outliner_draw_hierarchy(SpaceOops *soops, ListBase *lb, int startx, 
 			
 		*starty-= OL_H;
 		
-		if((tselem->flag & TSE_CLOSED)==0)
+		if( (tselem->flag & TSE_CLOSED)==0 || (searching && (tselem->flag & TSE_CHILDSEARCH)) )
 			outliner_draw_hierarchy(soops, &te->subtree, startx+OL_X, starty);
 	}
 	
@@ -4727,12 +4748,12 @@ static void outliner_draw_struct_marks(ARegion *ar, SpaceOops *soops, ListBase *
 		tselem= TREESTORE(te);
 		
 		/* selection status */
-		if((tselem->flag & TSE_CLOSED)==0)
+		if( (tselem->flag & TSE_CLOSED)==0 || (searching && (tselem->flag & TSE_CHILDSEARCH)) )
 			if(tselem->type == TSE_RNA_STRUCT)
 				glRecti(0, *starty+1, (int)ar->v2d.cur.xmax+V2D_SCROLL_WIDTH, *starty+OL_H-1);
 
 		*starty-= OL_H;
-		if((tselem->flag & TSE_CLOSED)==0) {
+		if( (tselem->flag & TSE_CLOSED)==0 || (searching && (tselem->flag & TSE_CHILDSEARCH)) ) {
 			outliner_draw_struct_marks(ar, soops, &te->subtree, starty);
 			if(tselem->type == TSE_RNA_STRUCT)
 				fdrawline(0, (float)*starty+OL_H, ar->v2d.cur.xmax+V2D_SCROLL_WIDTH, (float)*starty+OL_H);
@@ -4744,7 +4765,7 @@ static void outliner_draw_selection(ARegion *ar, SpaceOops *soops, ListBase *lb,
 {
 	TreeElement *te;
 	TreeStoreElem *tselem;
-	
+
 	for(te= lb->first; te; te= te->next) {
 		tselem= TREESTORE(te);
 		
@@ -4753,7 +4774,8 @@ static void outliner_draw_selection(ARegion *ar, SpaceOops *soops, ListBase *lb,
 			glRecti(0, *starty+1, (int)ar->v2d.cur.xmax, *starty+OL_H-1);
 		}
 		*starty-= OL_H;
-		if((tselem->flag & TSE_CLOSED)==0) outliner_draw_selection(ar, soops, &te->subtree, starty);
+		if( (tselem->flag & TSE_CLOSED)==0 || (searching && (tselem->flag & TSE_CHILDSEARCH)) )
+            outliner_draw_selection(ar, soops, &te->subtree, starty);
 	}
 }
 
@@ -5226,7 +5248,8 @@ static void outliner_draw_restrictbuts(uiBlock *block, Scene *scene, ARegion *ar
 			}
 		}
 		
-		if((tselem->flag & TSE_CLOSED)==0) outliner_draw_restrictbuts(block, scene, ar, soops, &te->subtree);
+		if( (tselem->flag & TSE_CLOSED)==0 || (searching && (tselem->flag & TSE_CHILDSEARCH)) )
+            outliner_draw_restrictbuts(block, scene, ar, soops, &te->subtree);
 	}
 }
 
@@ -5267,7 +5290,7 @@ static void outliner_draw_rnabuts(uiBlock *block, Scene *scene, ARegion *ar, Spa
 				ptr= &te->rnaptr;
 				prop= te->directdata;
 				
-				if(!(RNA_property_type(prop) == PROP_POINTER && (tselem->flag & TSE_CLOSED)==0))
+				if(!(RNA_property_type(prop) == PROP_POINTER && ((tselem->flag & TSE_CLOSED)==0 || (searching && (tselem->flag & TSE_CHILDSEARCH)))) )
 					uiDefAutoButR(block, ptr, prop, -1, "", 0, sizex, (int)te->ys, OL_RNA_COL_SIZEX, OL_H-1);
 			}
 			else if(tselem->type == TSE_RNA_ARRAY_ELEM) {
@@ -5278,7 +5301,8 @@ static void outliner_draw_rnabuts(uiBlock *block, Scene *scene, ARegion *ar, Spa
 			}
 		}
 		
-		if((tselem->flag & TSE_CLOSED)==0) outliner_draw_rnabuts(block, scene, ar, soops, sizex, &te->subtree);
+		if( (tselem->flag & TSE_CLOSED)==0 || (searching && (tselem->flag & TSE_CHILDSEARCH)) )
+                   outliner_draw_rnabuts(block, scene, ar, soops, sizex, &te->subtree);
 	}
 }
 
@@ -5542,7 +5566,8 @@ static void outliner_draw_keymapbuts(uiBlock *block, ARegion *ar, SpaceOops *soo
 			}
 		}
 		
-		if((tselem->flag & TSE_CLOSED)==0) outliner_draw_keymapbuts(block, ar, soops, &te->subtree);
+		if( (tselem->flag & TSE_CLOSED)==0 || (searching && (tselem->flag & TSE_CHILDSEARCH)) )
+                   outliner_draw_keymapbuts(block, ar, soops, &te->subtree);
 	}
 }
 
@@ -5585,7 +5610,8 @@ static void outliner_buttons(const bContext *C, uiBlock *block, ARegion *ar, Spa
 			}
 		}
 		
-		if((tselem->flag & TSE_CLOSED)==0) outliner_buttons(C, block, ar, soops, &te->subtree);
+		if( (tselem->flag & TSE_CLOSED)==0 || (searching && (tselem->flag & TSE_CHILDSEARCH)) )
+                   outliner_buttons(C, block, ar, soops, &te->subtree);
 	}
 }
 

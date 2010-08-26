@@ -252,6 +252,10 @@ typedef struct Object {
 	ListBase gpulamp;		/* runtime, for lamps only */
 	ListBase pc_ids;
 	ListBase *duplilist;	/* for temporary dupli list storage, only for use by RNA API */
+
+    int use_cust_wire_colour;             /* Use Custom Wire Colour - use int for alignment? need padding? */
+    float cust_wire_colour[4];      /* custom wireframe colour */
+    int pad3;
 } Object;
 
 /* Warning, this is not used anymore because hooks are now modifiers */
@@ -404,6 +408,8 @@ extern Object workob;
 #define OB_BOUND_DYN_MESH   6
 #define OB_BOUND_CAPSULE	7
 
+/* custom wire frame colour drawing */
+#define OB_CUSTOM_WIRE      1
 
 /* **************** BASE ********************* */
 

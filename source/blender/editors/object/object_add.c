@@ -176,7 +176,7 @@ void ED_object_add_generic_props(wmOperatorType *ot, int do_editmode)
 		RNA_def_property_flag(prop, PROP_HIDDEN);
 	}
 	
-	RNA_def_float_vector(ot->srna, "location", 3, NULL, -FLT_MAX, FLT_MAX, "Location", "Location for the newly added object.", -FLT_MAX, FLT_MAX);
+	RNA_def_float_vector_xyz(ot->srna, "location", 3, NULL, -FLT_MAX, FLT_MAX, "Location", "Location for the newly added object.", -FLT_MAX, FLT_MAX);
 	RNA_def_float_rotation(ot->srna, "rotation", 3, NULL, -FLT_MAX, FLT_MAX, "Rotation", "Rotation for the newly added object", -FLT_MAX, FLT_MAX);
 	
 	prop = RNA_def_boolean_layer_member(ot->srna, "layers", 20, NULL, "Layer", "");
@@ -256,7 +256,9 @@ int ED_object_add_generic_get_opts(bContext *C, wmOperator *op, float *loc, floa
 	if(v3d && v3d->localvd)
 		*layer |= v3d->lay;
 
-	if (RNA_property_is_set(op->ptr, "view_align"))
+	if(RNA_property_is_set(op->ptr, "rotation"))
+		view_align = FALSE;
+	else if (RNA_property_is_set(op->ptr, "view_align"))
 		view_align = RNA_boolean_get(op->ptr, "view_align");
 	else
 		view_align = U.flag & USER_ADD_VIEWALIGNED;

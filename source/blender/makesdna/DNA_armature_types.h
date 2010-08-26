@@ -69,6 +69,7 @@ typedef struct Bone {
 	int				layer;			/* layers that bone appears on */
 	short			segments;		/*  for B-bones */
 	short 			pad[3];
+//    float           cust_wire_colour[4];    /* custom colour to use for bone drawing */
 } Bone;
 
 typedef struct bArmature {
@@ -182,6 +183,7 @@ typedef enum eBone_Flag {
 	BONE_TRANSFORM_CHILD		= (1<<20),	/* Indicates that a parent is also being transformed */
 	BONE_UNSELECTABLE			= (1<<21),	/* bone cannot be selected */
 	BONE_NO_LOCAL_LOCATION		= (1<<22),	/* bone location is in armature space */
+    BONE_CUST_COLOUR            = (1<<23),  /* use custom colour for bone drawing */
 } eBone_Flag;
 
 #endif

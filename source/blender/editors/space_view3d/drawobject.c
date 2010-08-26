@@ -2667,8 +2667,12 @@ static void draw_mesh_fancy(Scene *scene, ARegion *ar, View3D *v3d, RegionView3D
 			else {
 				if(ob->dtx & OB_DRAWWIRE && flag==DRAW_CONSTCOLOR)
 					glColor3ub(80,80,80);
-				else
-					UI_ThemeColor(TH_WIRE);
+				else {
+                    if(ob->use_cust_wire_colour == OB_CUSTOM_WIRE)
+                        glColor3fv(ob->cust_wire_colour);
+                    else
+                        UI_ThemeColor(TH_WIRE);
+                }
 			}
 		}
 	}

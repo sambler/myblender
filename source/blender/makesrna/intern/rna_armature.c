@@ -443,7 +443,17 @@ static void rna_def_bone_common(StructRNA *srna, int editbone)
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", BONE_DRAWWIRE);
 	RNA_def_property_ui_text(prop, "Draw Wire", "Bone is always drawn as Wireframe regardless of viewport draw mode. Useful for non-obstructive custom bone shapes");
 	RNA_def_property_update(prop, 0, "rna_Armature_redraw_data");
-	
+
+    prop= RNA_def_property(srna, "bone_wire_custom", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", BONE_CUST_COLOUR);
+	RNA_def_property_ui_text(prop, "Bone Wire Colour", "Use custom colour for bone wire drawing.");
+	RNA_def_property_update(prop, 0, "rna_Armature_redraw_data");
+    
+//    prop= RNA_def_property(srna, "bone_wire_colour", PROP_FLOAT, PROP_COLOR);
+//	RNA_def_property_float_sdna(prop, NULL, "cust_wire_colour");
+//	RNA_def_property_ui_text(prop, "Wire Color", "Custom wire color and alpha, used when Draw Wire and Use Wire Colour are enabled");
+//	RNA_def_property_update(prop, NC_OBJECT|ND_DRAW, NULL);
+    
 	prop= RNA_def_property(srna, "use_cyclic_offset", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_negative_sdna(prop, NULL, "flag", BONE_NO_CYCLICOFFSET);
 	RNA_def_property_ui_text(prop, "Cyclic Offset", "When bone doesn't have a parent, it receives cyclic offset effects");

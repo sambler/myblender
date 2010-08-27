@@ -379,7 +379,7 @@ int WM_read_homefile(bContext *C, wmOperator *op)
 	WM_check(C); /* opens window(s), checks keymaps */
 
 	strcpy(G.sce, scestr); /* restore */
-	strcpy(G.main->name, tstr); /* this is wrong when loading from memory but better then leaving as-is */
+	G.main->name[0]= '\0';
 
 	wm_init_userdef(C);
 	
@@ -526,7 +526,7 @@ static ImBuf *blend_file_thumb(const char *path, Scene *scene, int **thumb_pt)
 		return NULL;
 
 	/* gets scaled to BLEN_THUMB_SIZE */
-	ibuf= ED_view3d_draw_offscreen_imbuf_simple(scene, BLEN_THUMB_SIZE * 2, BLEN_THUMB_SIZE * 2, OB_SOLID);
+	ibuf= ED_view3d_draw_offscreen_imbuf_simple(scene, BLEN_THUMB_SIZE * 2, BLEN_THUMB_SIZE * 2, IB_rect, OB_SOLID);
 	
 	if(ibuf) {		
 		float aspect= (scene->r.xsch*scene->r.xasp) / (scene->r.ysch*scene->r.yasp);

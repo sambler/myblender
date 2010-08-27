@@ -187,10 +187,10 @@ class OBJECT_PT_display(ObjectButtonsPanel, bpy.types.Panel):
         col.prop(ob, "show_name", text="Name")
         col.prop(ob, "show_axis", text="Axis")
         col.prop(ob, "show_wire", text="Wire")
-        col.prop(ob, "show_wire_custom", text="Use Wire Colour")
+        col.prop(ob, "show_wire_custom", text="Wire Colour")
         sub = col.row()
         sub.active = ob.show_wire_custom
-        col.prop(ob, "wire_colour", text="Wire Colour")
+        col.prop(ob, "wire_colour", text="")
 
         col.prop(ob, "color", text="Object Color")
 

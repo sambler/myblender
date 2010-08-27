@@ -1237,7 +1237,7 @@ static void draw_bone(int dt, int armflag, int boneflag, int constflag, unsigned
 	/* wire? */
 	if (dt <= OB_WIRE) {
 		/* colors */
-		if (armflag & ARM_EDITMODE) {
+		if (!(armflag & ARM_POSEMODE)) { /* edit or object mode */
 			if (boneflag & BONE_DRAW_ACTIVE) UI_ThemeColor(TH_EDGE_SELECT);
 			else if (boneflag & BONE_SELECTED) UI_ThemeColorShade(TH_EDGE_SELECT, -20);
 			else UI_ThemeColor(TH_WIRE);
@@ -1282,9 +1282,20 @@ static void draw_custom_bone(Scene *scene, View3D *v3d, RegionView3D *rv3d, Obje
 	glScalef(length, length, length);
 	
 	/* colors for posemode */
-	if (armflag & ARM_POSEMODE) {
-		set_pchan_glColor(PCHAN_COLOR_NORMAL, armflag, boneflag, 0);
-	}
+	if(armflag & ARM_POSEMODE) {
+        if( (ob->use_cust_wire_colour == OB_CUSTOM_WIRE) && !(boneflag & BONE_SELECTED))
+            glColor3fv(ob->cust_wire_colour);
+        else
+            set_pchan_glColor(PCHAN_COLOR_NORMAL, armflag, boneflag, 0);
+	}else if( (armflag & ARM_GHOST_ONLYSEL) || (armflag & ARM_COL_CUSTOM) ) { /* ghost poses seem to get ARM_COL_CUSTOM */
+        if( (ob->use_cust_wire_colour == OB_CUSTOM_WIRE) && !(boneflag & BONE_SELECTED) )
+                glColor3fv(ob->cust_wire_colour);
+        else
+            set_pchan_glColor(PCHAN_COLOR_NORMAL, armflag, boneflag, 0);
+    }else if(!(armflag & ARM_EDITMODE)) { /* object mode */
+        if( (ob->use_cust_wire_colour == OB_CUSTOM_WIRE) )
+            glColor3fv(ob->cust_wire_colour);
+    }
 	
 	if (id != -1) {
 		glLoadName((GLuint) id|BONESEL_BONE);

@@ -2131,7 +2131,7 @@ static void rna_def_object(BlenderRNA *brna)
     
     prop= RNA_def_property(srna, "wire_colour", PROP_FLOAT, PROP_COLOR);
 	RNA_def_property_float_sdna(prop, NULL, "cust_wire_colour");
-	RNA_def_property_ui_text(prop, "Wire Colour", "Custom wire colour and alpha, used when Draw Wire and Use Wire Colour are enabled");
+	RNA_def_property_ui_text(prop, "Wire Colour", "Custom wire colour, used when Wire Colour is enabled");
 	RNA_def_property_update(prop, NC_OBJECT|ND_DRAW, NULL);
     
 	/* Grease Pencil */

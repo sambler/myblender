@@ -194,16 +194,9 @@ class BONE_PT_display(BoneButtonsPanel, bpy.types.Panel):
             split = layout.split()
 
             col = split.column()
-            col.prop(bone, "show_wire", text="Wireframe")
-            col = split.column()
-            row = col.row()
-            row.prop(bone, "bone_wire_custom", text="Use Wire Colour")
-            sub = row.row()
-            sub.active = ob.bone_wire_custom
-            sub.prop(bone, "bone_wire_colour", text="Wire Colour")
-            col = split.column()
             col.prop(bone, "hide", text="Hide")
 
+            col.prop(bone, "show_wire", text="Wireframe")
             col = split.column()
 
             col.label(text="Custom Shape:")

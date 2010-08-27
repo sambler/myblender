@@ -2481,6 +2481,8 @@ static void draw_mesh_fancy(Scene *scene, ARegion *ar, View3D *v3d, RegionView3D
 	}
 	else if(dt==OB_WIRE || totface==0) {
 		draw_wire = 1; /* draw wire only, no depth buffer stuff  */
+        if(ob->use_cust_wire_colour == OB_CUSTOM_WIRE)
+            glColor3fv(ob->cust_wire_colour);
 	}
 	else if(	(ob==OBACT && (ob->mode & OB_MODE_TEXTURE_PAINT || paint_facesel_test(ob))) ||
 				CHECK_OB_DRAWTEXTURE(v3d, dt))
@@ -2662,9 +2664,12 @@ static void draw_mesh_fancy(Scene *scene, ARegion *ar, View3D *v3d, RegionView3D
 			else
 				glColor3ub(80,80,80);
 		} else {
-			if (ob->flag & OB_FROMGROUP) 
-				UI_ThemeColor(TH_GROUP);
-			else {
+			if (ob->flag & OB_FROMGROUP) {
+                if(ob->use_cust_wire_colour == OB_CUSTOM_WIRE)
+                    glColor3fv(ob->cust_wire_colour);
+                else
+                    UI_ThemeColor(TH_GROUP);
+			} else {
 				if(ob->dtx & OB_DRAWWIRE && flag==DRAW_CONSTCOLOR)
 					glColor3ub(80,80,80);
 				else {

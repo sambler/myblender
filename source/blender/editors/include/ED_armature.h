@@ -76,7 +76,6 @@ typedef struct EditBone
 	float oldlength;				/* for envelope scaling */
 	
 	short segments;
-//    float cust_wire_colour[4];
 } EditBone;
 
 #define	BONESEL_ROOT	(1<<28)

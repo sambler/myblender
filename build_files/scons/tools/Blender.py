@@ -282,7 +282,7 @@ def buildinfo(lenv, build_type):
 		lenv.Append (CPPDEFINES = ['BUILD_TIME=\'"%s"\''%(build_time),
 									'BUILD_DATE=\'"%s"\''%(build_date),
 									'BUILD_TYPE=\'"dynamic"\'',
-									'BUILD_REV=\'"%s"\''%(build_rev),
+									'BUILD_REV=\'31642\'',
 									'NAN_BUILDINFO',
 									'BUILD_PLATFORM=\'"%s"\''%(sys.platform)])
 		obj = [lenv.Object (root_build_dir+'source/creator/%s_buildinfo'%build_type,

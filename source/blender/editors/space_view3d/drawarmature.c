@@ -1300,7 +1300,7 @@ static void draw_custom_bone(Scene *scene, View3D *v3d, RegionView3D *rv3d, Obje
             if( !(armflag & ARM_DRAWGHOST) )
                 if (dt <= OB_WIRE) set_pchan_glColor(PCHAN_COLOR_NORMAL, armflag, boneflag, 0);
                 else set_pchan_glColor(PCHAN_COLOR_SOLID, armflag, boneflag, 0);
-    }
+        }
     }
 	
 	if (id != -1) {
@@ -2358,7 +2358,7 @@ static void draw_ghost_poses(Scene *scene, View3D *v3d, ARegion *ar, Base *base)
 	flago= arm->flag;
 	arm->flag &= ~(ARM_DRAWNAMES|ARM_DRAWAXES);
 	arm->flag |= ARM_DRAWGHOST;
-	
+    
 	/* copy the pose */
 	poseo= ob->pose;
 	copy_pose(&posen, ob->pose, 1);

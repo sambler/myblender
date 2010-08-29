@@ -76,6 +76,7 @@ static EnumPropertyItem collision_bounds_items[] = {
 	{OB_BOUND_CONE, "CONE", 0, "Cone", ""},
 	{OB_BOUND_POLYT, "CONVEX_HULL", 0, "Convex Hull", ""},
 	{OB_BOUND_POLYH, "TRIANGLE_MESH", 0, "Triangle Mesh", ""},
+	{OB_BOUND_CAPSULE, "CAPSULE", 0, "Capsule", ""},
 	//{OB_DYN_MESH, "DYNAMIC_MESH", 0, "Dynamic Mesh", ""},
 	{0, NULL, 0, NULL, NULL}};
 
@@ -257,6 +258,8 @@ static void rna_Object_layer_update(Main *bmain, Scene *scene, PointerRNA *ptr)
 
 	rna_Object_layer_update__internal(bmain, scene, base, ob);
 	ob->lay= base->lay;
+
+	WM_main_add_notifier(NC_SCENE|ND_LAYER_CONTENT, scene);
 }
 
 static void rna_Base_layer_update(Main *bmain, Scene *scene, PointerRNA *ptr)
@@ -266,6 +269,8 @@ static void rna_Base_layer_update(Main *bmain, Scene *scene, PointerRNA *ptr)
 
 	rna_Object_layer_update__internal(bmain, scene, base, ob);
 	ob->lay= base->lay;
+
+	WM_main_add_notifier(NC_SCENE|ND_LAYER_CONTENT, scene);
 }
 
 static int rna_Object_data_editable(PointerRNA *ptr)
@@ -380,6 +385,7 @@ static EnumPropertyItem *rna_Object_collision_bounds_itemf(bContext *C, PointerR
 		RNA_enum_items_add_value(&item, &totitem, collision_bounds_items, OB_BOUND_CYLINDER);
 		RNA_enum_items_add_value(&item, &totitem, collision_bounds_items, OB_BOUND_SPHERE);
 		RNA_enum_items_add_value(&item, &totitem, collision_bounds_items, OB_BOUND_BOX);
+		RNA_enum_items_add_value(&item, &totitem, collision_bounds_items, OB_BOUND_CAPSULE);
 	}
 
 	RNA_enum_item_end(&item, &totitem);
@@ -1595,6 +1601,7 @@ static void rna_def_object(BlenderRNA *brna)
 		{OB_BOUND_CYLINDER, "CYLINDER", 0, "Cylinder", ""},
 		{OB_BOUND_CONE, "CONE", 0, "Cone", ""},
 		{OB_BOUND_POLYH, "POLYHEDRON", 0, "Polyhedron", ""},
+		{OB_BOUND_CAPSULE, "CAPSULE", 0, "Capsule", ""},
 		{0, NULL, 0, NULL, NULL}};
 
 	static EnumPropertyItem dupli_items[] = {
@@ -2227,4 +2234,3 @@ void RNA_def_object(BlenderRNA *brna)
 }
 
 #endif
-

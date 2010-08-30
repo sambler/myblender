@@ -2126,7 +2126,7 @@ static void rna_def_object(BlenderRNA *brna)
 
     prop= RNA_def_property(srna, "show_wire_custom", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "use_cust_wire_colour", OB_CUSTOM_WIRE);
-	RNA_def_property_ui_text(prop, "Custom Wire", "Use a custom colour for the object's wireframe over solid drawing");
+	RNA_def_property_ui_text(prop, "Custom Wire", "Use a custom colour for the object's wireframe drawing");
 	RNA_def_property_update(prop, NC_OBJECT|ND_DRAW, NULL);
     
     prop= RNA_def_property(srna, "wire_colour", PROP_FLOAT, PROP_COLOR);

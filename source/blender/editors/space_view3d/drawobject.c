@@ -2484,8 +2484,6 @@ static void draw_mesh_fancy(Scene *scene, ARegion *ar, View3D *v3d, RegionView3D
 	}
 	else if(dt==OB_WIRE || totface==0) {
 		draw_wire = 1; /* draw wire only, no depth buffer stuff  */
-        //if(ob->use_cust_wire_colour == OB_CUSTOM_WIRE)
-        //    glColor3fv(ob->cust_wire_colour);
 	}
 	else if(	(ob==OBACT && (ob->mode & OB_MODE_TEXTURE_PAINT || paint_facesel_test(ob))) ||
 				CHECK_OB_DRAWTEXTURE(v3d, dt))

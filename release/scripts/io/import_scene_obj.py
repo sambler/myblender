@@ -860,7 +860,7 @@ def strip_slash(line_split):
 def get_float_func(filepath):
     '''
     find the float function for this obj file
-    - weather to replace commas or not
+    - whether to replace commas or not
     '''
     file= open(filepath, 'rU')
     for line in file: #.xreadlines():
@@ -882,7 +882,6 @@ def load_obj(filepath,
              CREATE_EDGES= True,
              SPLIT_OBJECTS= True,
              SPLIT_GROUPS= True,
-             SPLIT_MATERIALS= True,
              ROTATE_X90= True,
              IMAGE_SEARCH=True,
              POLYGROUPS=False):
@@ -892,9 +891,9 @@ def load_obj(filepath,
     This function passes the file and sends the data off
         to be split into objects and then converted into mesh objects
     '''
-    print('\nimporting obj "%s"' % filepath)
+    print('\nimporting obj %r' % filepath)
 
-    if SPLIT_OBJECTS or SPLIT_GROUPS or SPLIT_MATERIALS:
+    if SPLIT_OBJECTS or SPLIT_GROUPS:
         POLYGROUPS = False
 
     time_main= time.time()
@@ -932,10 +931,10 @@ def load_obj(filepath,
     # when there are faces that end with \
     # it means they are multiline-
     # since we use xreadline we cant skip to the next line
-    # so we need to know weather
+    # so we need to know whether
     context_multi_line= ''
 
-    print('\tparsing obj file "%s"...' % filepath)
+    print("\tparsing obj file...")
     time_sub= time.time()
 # 	time_sub= sys.time()
 
@@ -1220,7 +1219,7 @@ def load_obj(filepath,
 # 	time_new= sys.time()
 
     print('%.4f sec' % (time_new-time_sub))
-    print('finished importing: "%s" in %.4f sec.' % (filepath, (time_new-time_main)))
+    print('finished importing: %r in %.4f sec.' % (filepath, (time_new-time_main)))
 
 
 DEBUG= True
@@ -1467,7 +1466,7 @@ class IMPORT_OT_obj(bpy.types.Operator):
     # to the class instance from the operator settings before calling.
 
 
-    filepath = StringProperty(name="File Path", description="Filepath used for importing the OBJ file", maxlen= 1024, default= "")
+    filepath = StringProperty(name="File Path", description="Filepath used for importing the OBJ file", maxlen= 1024, default= "", subtype='FILE_PATH')
 
     CREATE_SMOOTH_GROUPS = BoolProperty(name="Smooth Groups", description="Surround smooth groups by sharp edges", default= True)
     CREATE_FGONS = BoolProperty(name="NGons as FGons", description="Import faces with more then 4 verts as fgons", default= True)

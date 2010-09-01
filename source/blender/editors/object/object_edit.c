@@ -2246,3 +2246,7 @@ void OBJECT_OT_logic_bricks_copy(wmOperatorType *ot)
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 }
+
+
+/* operators for wire and wire colour settings. */
+

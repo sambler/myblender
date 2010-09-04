@@ -161,7 +161,7 @@ class InputKeyMapPanel(bpy.types.Panel):
     def draw_km(self, display_keymaps, kc, km, children, layout, level):
         km = km.active()
 
-        layout.set_context_pointer("keymap", km)
+        layout.context_pointer_set("keymap", km)
 
         col = self.indented_layout(layout, level)
 
@@ -315,12 +315,12 @@ class InputKeyMapPanel(bpy.types.Panel):
                 kmm = kc.keymaps.find_modal(kmi.idname)
                 if kmm:
                     self.draw_km(display_keymaps, kc, kmm, None, layout, level + 1)
-                    layout.set_context_pointer("keymap", km)
+                    layout.context_pointer_set("keymap", km)
 
     def draw_filtered(self, display_keymaps, filter_text, layout):
         for km, kc in display_keymaps:
             km = km.active()
-            layout.set_context_pointer("keymap", km)
+            layout.context_pointer_set("keymap", km)
 
             filtered_items = [kmi for kmi in km.items if filter_text in kmi.name.lower()]
 
@@ -352,7 +352,7 @@ class InputKeyMapPanel(bpy.types.Panel):
             self.draw_entry(display_keymaps, entry, layout)
 
     def draw_keymaps(self, context, layout):
-        wm = context.manager
+        wm = context.window_manager
         kc = wm.keyconfigs.active
         defkc = wm.keyconfigs.default
 
@@ -364,7 +364,7 @@ class InputKeyMapPanel(bpy.types.Panel):
 
         row = subcol.row()
         row.prop_search(wm.keyconfigs, "active", wm, "keyconfigs", text="Key Config:")
-        layout.set_context_pointer("keyconfig", wm.keyconfigs.active)
+        layout.context_pointer_set("keyconfig", wm.keyconfigs.active)
         row.operator("wm.keyconfig_remove", text="", icon='X')
 
         row.prop(context.space_data, "filter_text", icon="VIEWZOOM")
@@ -486,7 +486,7 @@ class WM_OT_keyconfig_test(bpy.types.Operator):
         return result
 
     def execute(self, context):
-        wm = context.manager
+        wm = context.window_manager
         kc = wm.keyconfigs.default
 
         if self.testConfig(kc):
@@ -552,23 +552,23 @@ class WM_OT_keyconfig_import(bpy.types.Operator):
             shutil.move(self.properties.filepath, path)
 
         # sneaky way to check we're actually running the code.
-        wm = context.manager
+        wm = context.window_manager
         while config_name in wm.keyconfigs:
             wm.keyconfigs.remove(wm.keyconfigs[config_name])
 
-        wm = context.manager
+        wm = context.window_manager
         totmap = len(wm.keyconfigs)
         mod = __import__(config_name)
         if totmap == len(wm.keyconfigs):
             reload(mod)
 
-        wm = bpy.context.manager
+        wm = bpy.context.window_manager
         wm.keyconfigs.active = wm.keyconfigs[config_name]
 
         return {'FINISHED'}
 
     def invoke(self, context, event):
-        wm = context.manager
+        wm = context.window_manager
         wm.add_fileselect(self)
         return {'RUNNING_MODAL'}
 
@@ -594,7 +594,7 @@ class WM_OT_keyconfig_export(bpy.types.Operator):
         if not f:
             raise Exception("Could not open file")
 
-        wm = context.manager
+        wm = context.window_manager
         kc = wm.keyconfigs.active
 
         if self.properties.kc_name != '':
@@ -607,7 +607,7 @@ class WM_OT_keyconfig_export(bpy.types.Operator):
         f.write("# Configuration %s\n" % name)
 
         f.write("import bpy\n\n")
-        f.write("wm = bpy.context.manager\n")
+        f.write("wm = bpy.context.window_manager\n")
         f.write("kc = wm.keyconfigs.new('%s')\n\n" % name)
 
         # Generate a list of keymaps to export:
@@ -667,7 +667,7 @@ class WM_OT_keyconfig_export(bpy.types.Operator):
         return {'FINISHED'}
 
     def invoke(self, context, event):
-        wm = context.manager
+        wm = context.window_manager
         wm.add_fileselect(self)
         return {'RUNNING_MODAL'}
 
@@ -678,7 +678,7 @@ class WM_OT_keymap_edit(bpy.types.Operator):
     bl_label = "Edit Key Map"
 
     def execute(self, context):
-        wm = context.manager
+        wm = context.window_manager
         km = context.keymap
         km.copy_to_user()
         return {'FINISHED'}
@@ -692,7 +692,7 @@ class WM_OT_keymap_restore(bpy.types.Operator):
     all = BoolProperty(attr="all", name="All Keymaps", description="Restore all keymaps to default")
 
     def execute(self, context):
-        wm = context.manager
+        wm = context.window_manager
 
         if self.properties.all:
             for km in wm.keyconfigs.default.keymaps:
@@ -712,7 +712,7 @@ class WM_OT_keyitem_restore(bpy.types.Operator):
     item_id = IntProperty(attr="item_id", name="Item Identifier", description="Identifier of the item to remove")
 
     def execute(self, context):
-        wm = context.manager
+        wm = context.window_manager
         km = context.keymap
         kmi = km.items.from_id(self.properties.item_id)
 
@@ -727,7 +727,7 @@ class WM_OT_keyitem_add(bpy.types.Operator):
     bl_label = "Add Key Map Item"
 
     def execute(self, context):
-        wm = context.manager
+        wm = context.window_manager
         km = context.keymap
         kc = wm.keyconfigs.default
 
@@ -753,7 +753,7 @@ class WM_OT_keyitem_remove(bpy.types.Operator):
     item_id = IntProperty(attr="item_id", name="Item Identifier", description="Identifier of the item to remove")
 
     def execute(self, context):
-        wm = context.manager
+        wm = context.window_manager
         km = context.keymap
         kmi = km.items.from_id(self.properties.item_id)
         km.items.remove(kmi)
@@ -767,12 +767,12 @@ class WM_OT_keyconfig_remove(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        wm = context.manager
+        wm = context.window_manager
         return wm.keyconfigs.active.is_user_defined
 
     def execute(self, context):
         import sys
-        wm = context.manager
+        wm = context.window_manager
 
         keyconfig = wm.keyconfigs.active
 

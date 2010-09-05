@@ -4059,9 +4059,9 @@ static void direct_link_object(FileData *fd, Object *ob)
 
 		hook->indexar= newdataadr(fd, hook->indexar);
 		if(fd->flags & FD_FLAGS_SWITCH_ENDIAN) {
-			int a;
-			for(a=0; a<hook->totindex; a++) {
-				SWITCH_INT(hook->indexar[a]);
+			int x;
+			for(x=0; x<hook->totindex; x++) {
+				SWITCH_INT(hook->indexar[x]);
 			}
 		}
 
@@ -8066,7 +8066,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 					ArmatureModifierData *amd = (ArmatureModifierData*) md;
 					if(amd->object && amd->deformflag==0) {
 						Object *oba= newlibadr(fd, lib, amd->object);
-						bArmature *arm= newlibadr(fd, lib, oba->data);
+						arm= newlibadr(fd, lib, oba->data);
 						amd->deformflag= arm->deformflag;
 					}
 				}
@@ -8214,7 +8214,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 			int a;
 			for(a=0; a<MAX_MTEX; a++) {
 				if(ma->mtex[a] && ma->mtex[a]->tex) {
-					Tex *tex= newlibadr(fd, lib, ma->mtex[a]->tex);
+					tex= newlibadr(fd, lib, ma->mtex[a]->tex);
 					if(tex && tex->type==TEX_STUCCI)
 						ma->mtex[a]->mapto &= ~(MAP_COL|MAP_SPEC|MAP_REF);
 				}
@@ -8406,7 +8406,6 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 				
 		/* now, subversion control! */
 		if(main->subversionfile < 3) {
-			bScreen *sc;
 			Image *ima;
 			Tex *tex;
 			
@@ -9843,7 +9842,6 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 			}
 
 			if(ob->totcol && ob->matbits == NULL) {
-				int a;
 
 				ob->matbits= MEM_callocN(sizeof(char)*ob->totcol, "ob->matbits");
 				for(a=0; a<ob->totcol; a++)

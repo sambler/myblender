@@ -746,7 +746,6 @@ static void calc_shapeKeys(Object *obedit)
 			}
 
 			if(act_is_basis) { /* active key is a base */
-				int j;
 				int totvec= 0;
 
 				/* Calculate needed memory to store offset */

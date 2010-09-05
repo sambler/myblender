@@ -802,8 +802,6 @@ void pose_copy_menu(Scene *scene)
 				 */
 				copy_constraints(&tmp_constraints, &const_copy, TRUE);
 				if ((ob->proxy) && (pchan->bone->layer & arm->layer_protected)) {
-					bConstraint *con;
-					
 					/* add proxy-local tags */
 					for (con= tmp_constraints.first; con; con= con->next)
 						con->flag |= CONSTRAINT_PROXY_LOCAL;

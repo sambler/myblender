@@ -1600,7 +1600,8 @@ static void sample_apply(bContext *C, wmOperator *op, wmEvent *event)
 	if(fx>=0.0 && fy>=0.0 && fx<1.0 && fy<1.0) {
 		float *fp;
 		char *cp;
-		int x= (int)(fx*ibuf->x), y= (int)(fy*ibuf->y);
+		x= (int)(fx*ibuf->x);
+        y= (int)(fy*ibuf->y);
 
 		CLAMP(x, 0, ibuf->x-1);
 		CLAMP(y, 0, ibuf->y-1);

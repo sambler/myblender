@@ -205,7 +205,7 @@ static int vertex_parent_set_exec(bContext *C, wmOperator *op)
 				BKE_report(op->reports, RPT_ERROR, "Loop in parents");
 			}
 			else {
-				Object workob;
+				Object myworkob;
 				
 				ob->parent= BASACT->object;
 				if(v3) {
@@ -215,16 +215,16 @@ static int vertex_parent_set_exec(bContext *C, wmOperator *op)
 					ob->par3= v3-1;
 
 					/* inverse parent matrix */
-					what_does_parent(scene, ob, &workob);
-					invert_m4_m4(ob->parentinv, workob.obmat);
+					what_does_parent(scene, ob, &myworkob);
+					invert_m4_m4(ob->parentinv, myworkob.obmat);
 				}
 				else {
 					ob->partype= PARVERT1;
 					ob->par1= v1-1;
 
 					/* inverse parent matrix */
-					what_does_parent(scene, ob, &workob);
-					invert_m4_m4(ob->parentinv, workob.obmat);
+					what_does_parent(scene, ob, &myworkob);
+					invert_m4_m4(ob->parentinv, myworkob.obmat);
 				}
 			}
 		}
@@ -566,7 +566,7 @@ static int parent_set_exec(bContext *C, wmOperator *op)
 				BKE_report(op->reports, RPT_ERROR, "Loop in parents");
 			}
 			else {
-				Object workob;
+				Object myworkob;
 				
 				/* apply transformation of previous parenting */
 				object_apply_mat4(ob, ob->obmat);
@@ -646,14 +646,14 @@ static int parent_set_exec(bContext *C, wmOperator *op)
 					
 					/* get corrected inverse */
 					ob->partype= PAROBJECT;
-					what_does_parent(scene, ob, &workob);
+					what_does_parent(scene, ob, &myworkob);
 					
-					invert_m4_m4(ob->parentinv, workob.obmat);
+					invert_m4_m4(ob->parentinv, myworkob.obmat);
 				}
 				else {
 					/* calculate inverse parent matrix */
-					what_does_parent(scene, ob, &workob);
-					invert_m4_m4(ob->parentinv, workob.obmat);
+					what_does_parent(scene, ob, &myworkob);
+					invert_m4_m4(ob->parentinv, myworkob.obmat);
 				}
 				
 				ob->recalc |= OB_RECALC_OB|OB_RECALC_DATA;

@@ -102,7 +102,7 @@ static void waitcursor(int val) {}
 static int pupmenu(const char *msg) {return 0;}
 
 /* port over here */
-static bContext *C;
+//static bContext *C;
 static void error_libdata() {}
 
 
@@ -1105,26 +1105,26 @@ static void copymenu_modifiers(Main *bmain, Scene *scene, View3D *v3d, Object *o
 						copy_object_softbody(base->object, ob);
 					} else {
 						/* copy specific types */
-						ModifierData *md, *mdn;
+						ModifierData *md2, *mdn;
 						
 						/* remove all with type 'event' */
-						for (md=base->object->modifiers.first; md; md=mdn) {
-							mdn= md->next;
-							if(md->type==event) {
-								BLI_remlink(&base->object->modifiers, md);
-								modifier_free(md);
+						for (md2=base->object->modifiers.first; md2; md2=mdn) {
+							mdn= md2->next;
+							if(md2->type==event) {
+								BLI_remlink(&base->object->modifiers, md2);
+								modifier_free(md2);
 							}
 						}
 						
 						/* copy all with type 'event' */
-						for (md=ob->modifiers.first; md; md=md->next) {
-							if (md->type==event) {
+						for (md2=ob->modifiers.first; md2; md2=md2->next) {
+							if (md2->type==event) {
 								
 								mdn = modifier_new(event);
 								BLI_addtail(&base->object->modifiers, mdn);
 								modifier_unique_name(&base->object->modifiers, mdn);
 
-								modifier_copyData(md, mdn);
+								modifier_copyData(md2, mdn);
 							}
 						}
 
@@ -1807,6 +1807,7 @@ void ofs_timeoffs(Scene *scene, View3D *v3d)
 // XXX	if(fbutton(&offset, -10000.0f, 10000.0f, 10, 10, "Offset")==0) return;
 
 	/* make array of all bases, xco yco (screen) */
+    static bContext *C; /* was declared global static to this file - only used here */
 	CTX_DATA_BEGIN(C, Object*, ob, selected_editable_objects) {
 		ob->sf += offset;
 		if (ob->sf < -MAXFRAMEF)		ob->sf = -MAXFRAMEF;

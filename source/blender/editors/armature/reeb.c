@@ -2747,7 +2747,6 @@ int weightToHarmonic(EditMesh *em, EdgeIndex *indexed_edges)
 	{
 		if (eve->h == 0)
 		{
-			EditEdge *eed;
 			int maximum = 1;
 			int minimum = 1;
 			

@@ -1067,19 +1067,19 @@ static void ui_but_copy_paste(bContext *C, uiBut *but, uiHandleButtonData *data,
 
 	/* text/string and ID data */
 	else if(ELEM3(but->type, TEX, IDPOIN, SEARCH_MENU)) {
-		uiHandleButtonData *data= but->active;
+		uiHandleButtonData *data2= but->active;
 
 		if(but->poin==NULL && but->rnapoin.data==NULL);
 		else if(mode=='c') {
 			button_activate_state(C, but, BUTTON_STATE_TEXT_EDITING);
-			BLI_strncpy(buf, data->str, UI_MAX_DRAW_STR);
-			WM_clipboard_text_set(data->str, 0);
-			data->cancel= 1;
+			BLI_strncpy(buf, data2->str, UI_MAX_DRAW_STR);
+			WM_clipboard_text_set(data2->str, 0);
+			data2->cancel= 1;
 			button_activate_state(C, but, BUTTON_STATE_EXIT);
 		}
 		else {
 			button_activate_state(C, but, BUTTON_STATE_TEXT_EDITING);
-			BLI_strncpy(data->str, buf, data->maxlen);
+			BLI_strncpy(data2->str, buf, data2->maxlen);
 			button_activate_state(C, but, BUTTON_STATE_EXIT);
 		}
 	}

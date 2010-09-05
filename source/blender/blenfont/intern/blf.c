@@ -317,24 +317,24 @@ void BLF_aspect(int fontid, float aspect)
 void BLF_position(int fontid, float x, float y, float z)
 {
 	FontBLF *font;
-	float remainder;
+	float remain;
 
 	font= BLF_get(fontid);
 	if (font) {
-		remainder= x - floor(x);
-		if (remainder > 0.4 && remainder < 0.6) {
-			if (remainder < 0.5)
-				x -= 0.1 * font->aspect;
+		remain= x - floor(x);
+		if (remain > 0.4 && remain < 0.6) {
+			if (remain < 0.5)
+				x -= 0.1f * font->aspect;
 			else
-				x += 0.1 * font->aspect;
+				x += 0.1f * font->aspect;
 		}
 
-		remainder= y - floor(y);
-		if (remainder > 0.4 && remainder < 0.6) {
-			if (remainder < 0.5)
-				y -= 0.1 * font->aspect;
+		remain= y - floor(y);
+		if (remain > 0.4 && remain < 0.6) {
+			if (remain < 0.5)
+				y -= 0.1f * font->aspect;
 			else
-				y += 0.1 * font->aspect;
+				y += 0.1f * font->aspect;
 		}
 
 		font->pos[0]= x;

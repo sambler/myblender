@@ -2711,18 +2711,18 @@ int setcurr_tab_spaces (Text *text, int space)
 	if(strstr(text->curl->line, word))
 	{
 		//if we find a : then add a tab but not if it is in a comment
-		int a, indent = 0;
+		int a, doindent = 0;
 		for(a=0; text->curl->line[a] != '\0'; a++)
 		{
 			if (text->curl->line[a]=='#') {
 				break;
 			} else if (text->curl->line[a]==':') {
-				indent = 1;
+				doindent = 1;
 			} else if (text->curl->line[a]==']') {
-				indent = 0;
+				doindent = 0;
 			}
 		}
-		if (indent) {
+		if (doindent) {
 			i += space;
 		}
 	}

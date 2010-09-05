@@ -2148,7 +2148,7 @@ static void actcon_get_tarmat (bConstraint *con, bConstraintOb *cob, bConstraint
 		
 		/* Get the appropriate information from the action */
 		if (cob->type == CONSTRAINT_OBTYPE_BONE) {
-			Object workob;
+			Object myworkob;
 			bPose *pose;
 			bPoseChannel *pchan, *tchan;
 			
@@ -2164,7 +2164,7 @@ static void actcon_get_tarmat (bConstraint *con, bConstraintOb *cob, bConstraint
 			tchan->rotmode= pchan->rotmode;
 			
 			/* evaluate action using workob (it will only set the PoseChannel in question) */
-			what_does_obaction(cob->scene, cob->ob, &workob, pose, data->act, pchan->name, t);
+			what_does_obaction(cob->scene, cob->ob, &myworkob, pose, data->act, pchan->name, t);
 			
 			/* convert animation to matrices for use here */
 			chan_calc_mat(tchan);
@@ -2174,12 +2174,12 @@ static void actcon_get_tarmat (bConstraint *con, bConstraintOb *cob, bConstraint
 			free_pose(pose);
 		}
 		else if (cob->type == CONSTRAINT_OBTYPE_OBJECT) {
-			Object workob;
+			Object myworkob;
 			
 			/* evaluate using workob */
 			// FIXME: we don't have any consistent standards on limiting effects on object...
-			what_does_obaction(cob->scene, cob->ob, &workob, NULL, data->act, NULL, t);
-			object_to_mat4(&workob, ct->matrix);
+			what_does_obaction(cob->scene, cob->ob, &myworkob, NULL, data->act, NULL, t);
+			object_to_mat4(&myworkob, ct->matrix);
 		}
 		else {
 			/* behaviour undefined... */

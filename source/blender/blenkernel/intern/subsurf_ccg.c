@@ -2646,7 +2646,7 @@ struct DerivedMesh *subsurf_make_derived_from_derived(
 		result->freeSS = 1;
 	} else {
 		int useIncremental = (smd->flags & eSubsurfModifierFlag_Incremental);
-		int useAging = smd->flags & eSubsurfModifierFlag_DebugIncr;
+		useAging = smd->flags & eSubsurfModifierFlag_DebugIncr;
 		int levels= (smd->modifier.scene)? get_render_subsurf_level(&smd->modifier.scene->r, smd->levels): smd->levels;
 		CCGSubSurf *ss;
 		

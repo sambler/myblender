@@ -2314,8 +2314,8 @@ static void dxf_read(Scene *scene, char *filename)
 		} else if (group_is(2, "ENTITIES")) {			
 			while(group_isnt(0, "ENDSEC")) {
 				char obname[32]="";
-				char layname[32]="";
-				float cent[3]={0.0, 0.0, 0.0};
+				char laylname[32]="";
+				float centl[3]={0.0, 0.0, 0.0};
 				float obsize[3]={1.0, 1.0, 1.0};
 				float obrot[3]={0.0, 0.0, 0.0};
 				
@@ -2332,13 +2332,13 @@ static void dxf_read(Scene *scene, char *filename)
 						if(id==2) {
 							BLI_strncpy(obname, val, sizeof(obname));
 						} else if (id==8) {
-							BLI_strncpy(layname, val, sizeof(layname));
+							BLI_strncpy(laylname, val, sizeof(laylname));
 						} else if (id==10) {
-							cent[0]= (float) atof(val);
+							centl[0]= (float) atof(val);
 						} else if (id==20) {
-							cent[1]= (float) atof(val);
+							centl[1]= (float) atof(val);
 						} else if (id==30) {
-							cent[2]= (float) atof(val);
+							centl[2]= (float) atof(val);
 						} else if (id==41) {
 							obsize[0]= (float) atof(val);
 						} else if (id==42) {
@@ -2382,7 +2382,7 @@ static void dxf_read(Scene *scene, char *filename)
 						ob->data= obdata;
 						((ID*)ob->data)->us++;
 						
-						VECCOPY(ob->loc, cent);
+						VECCOPY(ob->loc, centl);
 						VECCOPY(ob->size, obsize);
 						VECCOPY(ob->rot, obrot);
 						
@@ -2396,7 +2396,7 @@ static void dxf_read(Scene *scene, char *filename)
 							I leave it commented out here as warning (ton) */
 						//for (i=0; i<ob->totcol; i++) ob->mat[i]= ((Mesh*)ob->data)->mat[i];
 						
-						if (strlen(layname)) ob->lay= dxf_get_layer_num(scene, layname);
+						if (strlen(laylname)) ob->lay= dxf_get_layer_num(scene, laylname);
 						else ob->lay= scene->lay;
 	
 						/* link to scene */

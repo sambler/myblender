@@ -766,13 +766,13 @@ void bglBegin(int mode)
 
 int bglPointHack() {
 	float value[4];
-	int pointhack;
+	int mypointhack; /* is this meant to be for this function or use the file static above? */
 	glGetFloatv(GL_POINT_SIZE_RANGE, value);
 	if(value[1]<2.0) {
 		glGetFloatv(GL_POINT_SIZE, value);
-		pointhack= floor(value[0]+0.5);
-		if(pointhack>4) pointhack= 4;
-		return pointhack;
+		mypointhack= floor(value[0]+0.5);
+		if(mypointhack>4) mypointhack= 4;
+		return mypointhack;
 	}
 	return 0;
 }

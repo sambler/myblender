@@ -137,10 +137,10 @@ public:
 				btVector3 edge = pb-pa;
 				btVector3 edgeNormal = edge.cross(normal);
 				edgeNormal.normalize();
-				btScalar dist = pt.dot( edgeNormal);
+				btScalar dist2 = pt.dot( edgeNormal);
 				btScalar edgeConst = pa.dot(edgeNormal);
-				dist -= edgeConst;
-				if (dist < -tolerance)
+				dist2 -= edgeConst;
+				if (dist2 < -tolerance)
 					return false;
 			}
 			

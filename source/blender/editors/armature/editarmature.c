@@ -541,7 +541,7 @@ void unique_editbone_name (ListBase *edbo, char *name, EditBone *bone)
 /* helper for apply_armature_pose2bones - fixes parenting of objects that are bone-parented to armature */
 static void applyarmature_fix_boneparents (Scene *scene, Object *armob)
 {
-	Object workob, *ob;
+	Object myworkob, *ob;
 	
 	/* go through all objects in database */
 	for (ob= G.main->object.first; ob; ob= ob->id.next) {
@@ -552,8 +552,8 @@ static void applyarmature_fix_boneparents (Scene *scene, Object *armob)
 			 */
 			object_apply_mat4(ob, ob->obmat);
 			
-			what_does_parent(scene, ob, &workob);
-			invert_m4_m4(ob->parentinv, workob.obmat);
+			what_does_parent(scene, ob, &myworkob);
+			invert_m4_m4(ob->parentinv, myworkob.obmat);
 		}
 	}
 }
@@ -1818,9 +1818,9 @@ static int armature_delete_selected_exec(bContext *C, wmOperator *op)
 	
 	/*  First erase any associated pose channel */
 	if (obedit->pose) {
-		bPoseChannel *pchan, *next;
-		for (pchan=obedit->pose->chanbase.first; pchan; pchan=next) {
-			next= pchan->next;
+		bPoseChannel *pchan, *nextpc;
+		for (pchan=obedit->pose->chanbase.first; pchan; pchan=nextpc) {
+			nextpc= pchan->next;
 			curBone = editbone_name_exists(arm->edbo, pchan->name);
 			
 			if (curBone && (curBone->flag & BONE_SELECTED) && (arm->layer & curBone->layer)) {

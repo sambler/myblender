@@ -745,7 +745,6 @@ static int texture_slot_move(bContext *C, wmOperator *op)
 				BKE_animdata_fix_paths_rename(id, ma->adt, "texture_slots", NULL, NULL, -1, act, 0);
 
 				if(GS(id->name)==ID_MA) {
-					Material *ma= (Material *)id;
 					int mtexuse = ma->septex & (1<<act);
 					ma->septex &= ~(1<<act);
 					ma->septex |= (ma->septex & (1<<(act-1))) << 1;
@@ -767,7 +766,6 @@ static int texture_slot_move(bContext *C, wmOperator *op)
 				BKE_animdata_fix_paths_rename(id, ma->adt, "texture_slots", NULL, NULL, -1, act, 0);
 
 				if(GS(id->name)==ID_MA) {
-					Material *ma= (Material *)id;
 					int mtexuse = ma->septex & (1<<act);
 					ma->septex &= ~(1<<act);
 					ma->septex |= (ma->septex & (1<<(act+1))) >> 1;

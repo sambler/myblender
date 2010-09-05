@@ -138,7 +138,7 @@ void EM_automerge(Scene *scene, Object *obedit, int update)
 		(obedit && obedit->type==OB_MESH && (obedit->mode & OB_MODE_EDIT)) &&
 		(me->mr==NULL)
 	  ) {
-		Mesh *me= (Mesh*)obedit->data;
+		me= (Mesh*)obedit->data;
 		EditMesh *em= me->edit_mesh;
 
 		len = removedoublesflag(em, 1, 1, scene->toolsettings->doublimit);

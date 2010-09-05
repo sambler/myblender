@@ -928,7 +928,7 @@ void load_editMesh(Scene *scene, Object *ob)
 	EditEdge *eed;
 	EditSelection *ese;
 	float *fp, *newkey, *oldkey, nor[3];
-	int i, a, ototvert;
+	int i, j, a, ototvert;
 	
 	/* this one also tests of edges are not in faces: */
 	/* eed->f2==0: not in face, f2==1: draw it */
@@ -1104,13 +1104,12 @@ void load_editMesh(Scene *scene, Object *ob)
 
 	/* patch hook indices and vertex parents */
 	{
-		Object *ob;
+		Object *ob2;
 		ModifierData *md;
 		EditVert **vertMap = NULL;
-		int i,j;
 
-		for (ob=G.main->object.first; ob; ob=ob->id.next) {
-			if (ob->parent==ob && ELEM(ob->partype, PARVERT1,PARVERT3)) {
+		for (ob2=G.main->object.first; ob2; ob2=ob2->id.next) {
+			if (ob2->parent==ob2 && ELEM(ob2->partype, PARVERT1,PARVERT3)) {
 				
 				/* duplicate code from below, make it function later...? */
 				if (!vertMap) {
@@ -1121,22 +1120,22 @@ void load_editMesh(Scene *scene, Object *ob)
 							vertMap[eve->keyindex] = eve;
 					}
 				}
-				if(ob->par1 < ototvert) {
-					eve = vertMap[ob->par1];
-					if(eve) ob->par1= eve->tmp.l;
+				if(ob2->par1 < ototvert) {
+					eve = vertMap[ob2->par1];
+					if(eve) ob2->par1= eve->tmp.l;
 				}
-				if(ob->par2 < ototvert) {
-					eve = vertMap[ob->par2];
-					if(eve) ob->par2= eve->tmp.l;
+				if(ob2->par2 < ototvert) {
+					eve = vertMap[ob2->par2];
+					if(eve) ob2->par2= eve->tmp.l;
 				}
-				if(ob->par3 < ototvert) {
-					eve = vertMap[ob->par3];
-					if(eve) ob->par3= eve->tmp.l;
+				if(ob2->par3 < ototvert) {
+					eve = vertMap[ob2->par3];
+					if(eve) ob2->par3= eve->tmp.l;
 				}
 				
 			}
-			if (ob->data==me) {
-				for (md=ob->modifiers.first; md; md=md->next) {
+			if (ob2->data==me) {
+				for (md=ob2->modifiers.first; md; md=md->next) {
 					if (md->type==eModifierType_Hook) {
 						HookModifierData *hmd = (HookModifierData*) md;
 

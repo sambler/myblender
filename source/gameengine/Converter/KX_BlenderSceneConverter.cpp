@@ -1081,7 +1081,7 @@ bool KX_BlenderSceneConverter::FreeBlendFile(struct Main *maggie)
 			{
 				GEN_Map<STR_HashedString,void*> &mapStringToMeshes = scene->GetLogicManager()->GetMeshMap();
 				
-				for(int i=0; i<mapStringToMeshes.size(); i++)
+				for(i=0; i<mapStringToMeshes.size(); i++)
 				{
 					RAS_MeshObject *meshobj= (RAS_MeshObject *) *mapStringToMeshes.at(i);
 					if(meshobj && IS_TAGGED(meshobj->GetMesh()))
@@ -1374,7 +1374,7 @@ RAS_MeshObject *KX_BlenderSceneConverter::ConvertMeshSpecial(KX_Scene* kx_scene,
 			/* if its tagged its a replaced material */
 			if(mat_old && (mat_old->id.flag & LIB_DOIT)==0)
 			{
-				Material *mat_old= mesh->mat[i];
+				mat_old= mesh->mat[i];
 				Material *mat_new= copy_material( mat_old );
 				
 				mat_new->id.flag |= LIB_DOIT;

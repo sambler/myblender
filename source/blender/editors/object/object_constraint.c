@@ -676,12 +676,12 @@ static int childof_set_inverse_exec (bContext *C, wmOperator *op)
 		where_is_pose(scene, ob);
 	}
 	else if (ob) {
-		Object workob;
+		Object myworkob;
 		/* use what_does_parent to find inverse - just like for normal parenting.
 		 * NOTE: what_does_parent uses a static workob defined in object.c 
 		 */
-		what_does_parent(scene, ob, &workob);
-		invert_m4_m4(data->invmat, workob.obmat);
+		what_does_parent(scene, ob, &myworkob);
+		invert_m4_m4(data->invmat, myworkob.obmat);
 	}
 	else
 		unit_m4(data->invmat);

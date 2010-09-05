@@ -685,11 +685,11 @@ static void multiresModifier_update(DerivedMesh *dm)
 		int totlvl = ccgdm->multires.totlvl;
 		
 		if(lvl < totlvl) {
-			Mesh *me = ob->data;
 			DerivedMesh *lowdm, *cddm, *highdm;
 			DMGridData **highGridData, **lowGridData, **subGridData, **gridData, *diffGrid;
 			CCGSubSurf *ss;
 			int i, j, numGrids, highGridSize, lowGridSize;
+            me = ob->data;
 
 			/* create subsurf DM from original mesh at high level */
 			if (ob->derivedDeform) cddm = CDDM_copy(ob->derivedDeform);
@@ -1189,10 +1189,10 @@ static void multires_load_old_dm(DerivedMesh *dm, Mesh *me, int totlvl)
 		for(j = 2; j <= mr->level_count; ++j) {
 			int base = multires_side_tot[totlvl - j + 1] - 2;
 			int skip = multires_side_tot[totlvl - j + 2] - 1;
-			int st = multires_side_tot[j - 1] - 1;
+			int st2 = multires_side_tot[j - 1] - 1;
 
-			for(x = 0; x < st; ++x)
-				vvmap[ldst + base + x * skip] = lsrc + st * i + x;
+			for(x = 0; x < st2; ++x)
+				vvmap[ldst + base + x * skip] = lsrc + st2 * i + x;
 
 			lsrc += lvl->totvert - lvl->prev->totvert;
 			lvl = lvl->next;
@@ -1227,12 +1227,12 @@ static void multires_load_old_dm(DerivedMesh *dm, Mesh *me, int totlvl)
 			for(j = 3; j <= mr->level_count; ++j) {
 				int base = multires_side_tot[totlvl - j + 1] - 2;
 				int skip = multires_side_tot[totlvl - j + 2] - 1;
-				int st = pow(2, j - 2);
+				int st3 = pow(2, j - 2);
 				int st2 = pow(2, j - 3);
 				int lsrc = lvl->prev->totvert;
 
 				/* Skip exterior edge verts */
-				lsrc += lvl1->totedge * st;
+				lsrc += lvl1->totedge * st3;
 
 				/* Skip earlier face edge crosses */
 				lsrc += st2 * (tottri * 3 + totquad * 4);

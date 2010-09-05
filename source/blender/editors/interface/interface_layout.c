@@ -716,7 +716,6 @@ void uiItemsFullEnumO(uiLayout *layout, char *opname, char *propname, IDProperty
 		for(i=0; i<totitem; i++) {
 			if(item[i].identifier[0]) {
 				if(properties) {
-					PointerRNA ptr;
 
 					WM_operator_properties_create(&ptr, opname);
 					if(ptr.data) {

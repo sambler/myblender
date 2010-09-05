@@ -1404,7 +1404,7 @@ static void widget_state_blend(char *cp, char *cpstate, float fac)
 /* copy colors from theme, and set changes in it based on state */
 static void widget_state(uiWidgetType *wt, int state)
 {
-	uiWidgetStateColors *wcol_state= wt->wcol_state;
+	uiWidgetStateColors *mywcol_state= wt->wcol_state;
 
 	wt->wcol= *(wt->wcol_theme);
 	
@@ -1412,11 +1412,11 @@ static void widget_state(uiWidgetType *wt, int state)
 		QUATCOPY(wt->wcol.inner, wt->wcol.inner_sel)
 
 		if(state & UI_BUT_ANIMATED_KEY)
-			widget_state_blend(wt->wcol.inner, wcol_state->inner_key_sel, wcol_state->blend);
+			widget_state_blend(wt->wcol.inner, mywcol_state->inner_key_sel, mywcol_state->blend);
 		else if(state & UI_BUT_ANIMATED)
-			widget_state_blend(wt->wcol.inner, wcol_state->inner_anim_sel, wcol_state->blend);
+			widget_state_blend(wt->wcol.inner, mywcol_state->inner_anim_sel, mywcol_state->blend);
 		else if(state & UI_BUT_DRIVEN)
-			widget_state_blend(wt->wcol.inner, wcol_state->inner_driven_sel, wcol_state->blend);
+			widget_state_blend(wt->wcol.inner, mywcol_state->inner_driven_sel, mywcol_state->blend);
 
 		VECCOPY(wt->wcol.text, wt->wcol.text_sel);
 		
@@ -1425,11 +1425,11 @@ static void widget_state(uiWidgetType *wt, int state)
 	}
 	else {
 		if(state & UI_BUT_ANIMATED_KEY)
-			widget_state_blend(wt->wcol.inner, wcol_state->inner_key, wcol_state->blend);
+			widget_state_blend(wt->wcol.inner, mywcol_state->inner_key, mywcol_state->blend);
 		else if(state & UI_BUT_ANIMATED)
-			widget_state_blend(wt->wcol.inner, wcol_state->inner_anim, wcol_state->blend);
+			widget_state_blend(wt->wcol.inner, mywcol_state->inner_anim, mywcol_state->blend);
 		else if(state & UI_BUT_DRIVEN)
-			widget_state_blend(wt->wcol.inner, wcol_state->inner_driven, wcol_state->blend);
+			widget_state_blend(wt->wcol.inner, mywcol_state->inner_driven, mywcol_state->blend);
 
 		if(state & UI_ACTIVE) { /* mouse over? */
 			wt->wcol.inner[0]= wt->wcol.inner[0]>=240? 255 : wt->wcol.inner[0]+15;
@@ -1447,8 +1447,8 @@ static void widget_state(uiWidgetType *wt, int state)
 /* sliders use special hack which sets 'item' as inner when drawing filling */
 static void widget_state_numslider(uiWidgetType *wt, int state)
 {
-	uiWidgetStateColors *wcol_state= wt->wcol_state;
-	float blend= wcol_state->blend - 0.2f; // XXX special tweak to make sure that bar will still be visible
+	uiWidgetStateColors *mywcol_state= wt->wcol_state;
+	float blend= mywcol_state->blend - 0.2f; // XXX special tweak to make sure that bar will still be visible
 
 	/* call this for option button */
 	widget_state(wt, state);
@@ -1458,22 +1458,22 @@ static void widget_state_numslider(uiWidgetType *wt, int state)
 	if(state & UI_SELECT) {
 		
 		if(state & UI_BUT_ANIMATED_KEY)
-			widget_state_blend(wt->wcol.item, wcol_state->inner_key_sel, blend);
+			widget_state_blend(wt->wcol.item, mywcol_state->inner_key_sel, blend);
 		else if(state & UI_BUT_ANIMATED)
-			widget_state_blend(wt->wcol.item, wcol_state->inner_anim_sel, blend);
+			widget_state_blend(wt->wcol.item, mywcol_state->inner_anim_sel, blend);
 		else if(state & UI_BUT_DRIVEN)
-			widget_state_blend(wt->wcol.item, wcol_state->inner_driven_sel, blend);
+			widget_state_blend(wt->wcol.item, mywcol_state->inner_driven_sel, blend);
 		
 		if(state & UI_SELECT)
 			SWAP(short, wt->wcol.shadetop, wt->wcol.shadedown);
 	}
 	else {
 		if(state & UI_BUT_ANIMATED_KEY)
-			widget_state_blend(wt->wcol.item, wcol_state->inner_key, blend);
+			widget_state_blend(wt->wcol.item, mywcol_state->inner_key, blend);
 		else if(state & UI_BUT_ANIMATED)
-			widget_state_blend(wt->wcol.item, wcol_state->inner_anim, blend);
+			widget_state_blend(wt->wcol.item, mywcol_state->inner_anim, blend);
 		else if(state & UI_BUT_DRIVEN)
-			widget_state_blend(wt->wcol.item, wcol_state->inner_driven, blend);
+			widget_state_blend(wt->wcol.item, mywcol_state->inner_driven, blend);
 	}
 }
 

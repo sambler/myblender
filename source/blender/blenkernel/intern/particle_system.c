@@ -2350,11 +2350,11 @@ void particle_fluidsim(ParticleSystem *psys, ParticleData *pa, ParticleSettings 
 
 	/* Hooke's spring force  */
 	if (fluid->spring_k > 0.f) {
-		float D, L = fluid->rest_length;
+		float D2, L = fluid->rest_length;
 		for(n=1; n<neighbours; n++) {
 			/* L is a factor of radius */
-			D = dtime * 10.f * fluid->spring_k * (1.f - L) * (L - ptn[n].dist/radius);
-			madd_v3_v3fl(v, ptn[n].co, -D * massfactor);
+			D2 = dtime * 10.f * fluid->spring_k * (1.f - L) * (L - ptn[n].dist/radius);
+			madd_v3_v3fl(v, ptn[n].co, -D2 * massfactor);
 		}
 	}
 	/* Update particle position */	

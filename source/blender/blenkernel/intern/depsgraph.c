@@ -366,7 +366,6 @@ static void build_dag_object(DagForest *dag, DagNode *scenenode, Scene *scene, O
 	if (ob->type == OB_ARMATURE) {
 		if (ob->pose){
 			bPoseChannel *pchan;
-			bConstraint *con;
 			
 			for (pchan = ob->pose->chanbase.first; pchan; pchan=pchan->next) {
 				for (con = pchan->constraints.first; con; con=con->next) {
@@ -2476,7 +2475,7 @@ void DAG_id_update_flags(ID *id)
 		/* now we clear recalcs, unless color is set */
 		for(node = sce->theDag->DagNode.first; node; node= node->next) {
 			if(node->type==ID_OB && node->color==DAG_WHITE) {
-				Object *ob= node->ob;
+				ob= node->ob;
 				ob->recalc= 0;
 			}
 		}

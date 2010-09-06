@@ -568,7 +568,7 @@ static void defocus_blur(bNode *node, CompBuf *new, CompBuf *img, CompBuf *zbuf,
 				else {
 					// n-agonal
 					int ov, nv;
-					float mind, maxd, lwt;
+					float mind, maxd;
 					ys = MAX2((int)floor(bkh_b[2]*ct_crad + y), 0);
 					ye = MIN2((int)ceil(bkh_b[3]*ct_crad + y), new->y - 1);
 					for (sy=ys; sy<=ye; sy++) {

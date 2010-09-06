@@ -119,12 +119,12 @@ static void lensDistort(CompBuf* dst, CompBuf* src, float kr, float kg, float kb
 					}
 					// GB
 					{
-						const int dx = ln[4] - ln[2], dy = ln[5] - ln[3];
-						const float dsf = sqrtf(dx*dx + dy*dy) + 1.f;
-						const int ds = (int)(jit ? ((dsf < 4.f) ? 2.f : sqrtf(dsf)) : dsf);
-						const float sd = 1.f/(float)ds;
-						for (z=0; z<ds; ++z) {
-							const float tz = ((float)z + (jit ? BLI_frand() : 0.5f))*sd;
+						const int dxb = ln[4] - ln[2], dyb = ln[5] - ln[3];
+						const float dsfb = sqrtf(dxb*dxb + dyb*dyb) + 1.f;
+						const int dsb = (int)(jit ? ((dsfb < 4.f) ? 2.f : sqrtf(dsfb)) : dsfb);
+						const float sdb = 1.f/(float)dsb;
+						for (z=0; z<dsb; ++z) {
+							const float tz = ((float)z + (jit ? BLI_frand() : 0.5f))*sdb;
 							t = 1.f - (kg + tz*dgb)*(u*u + v*v);
 							d = 1.f / (1.f + sqrtf(t));
 							qd_getPixelLerp(src, (u*d + 0.5f)*dst->x - 0.5f, (v*d + 0.5f)*dst->y - 0.5f, c1);

@@ -215,7 +215,6 @@ static void deformVerts(
 
 		if(defgrp_index >= 0 && use_dverts) {
 			MDeformVert *dvert = me->dvert;
-			int i;
 			float fac;
 
 			for(i = 0; i < maxVerts; i++, dvert++) {

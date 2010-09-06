@@ -291,7 +291,7 @@ static DerivedMesh *applyModifier(ModifierData *md,
 
 		ehi= BLI_edgehashIterator_new(edgehash);
 		for(; !BLI_edgehashIterator_isDone(ehi); BLI_edgehashIterator_step(ehi)) {
-			int eidx= GET_INT_FROM_POINTER(BLI_edgehashIterator_getValue(ehi));
+			eidx= GET_INT_FROM_POINTER(BLI_edgehashIterator_getValue(ehi));
 			if(edge_users[eidx] >= 0) {
 				BLI_edgehashIterator_getKey(ehi, &v1, &v2);
 				orig_mvert[v1].flag |= ME_VERT_TMP_TAG;
@@ -408,7 +408,7 @@ static DerivedMesh *applyModifier(ModifierData *md,
 		float *vert_angles= MEM_callocN(sizeof(float) * numVerts * 2, "mod_solid_pair"); /* 2 in 1 */
 		float *vert_accum= vert_angles + numVerts;
 		float face_angles[4];
-		int i, j, vidx;
+		int j, vidx;
 
 		face_nors = CustomData_get_layer(&dm->faceData, CD_NORMAL);
 		if(!face_nors) {

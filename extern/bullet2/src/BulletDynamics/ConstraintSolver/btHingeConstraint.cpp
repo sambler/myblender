@@ -534,7 +534,7 @@ void	btHingeConstraint::solveConstraintObsolete(btSolverBody& bodyA,btSolverBody
 				
 
 				//solve orthogonal angular velocity correction
-				btScalar relaxation = btScalar(1.);
+				//btScalar relaxation = btScalar(1.);
 				btScalar len = velrelOrthog.length();
 				if (len > btScalar(0.00001))
 				{

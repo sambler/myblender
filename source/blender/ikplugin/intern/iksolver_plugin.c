@@ -316,8 +316,8 @@ static void execute_posetree(struct Scene *scene, Object *ob, PoseTree *tree)
 		IK_SetStiffness(seg, IK_Z, pchan->stiffness[2]);
 		
 		if(tree->stretch && (pchan->ikstretch > 0.0)) {
-			float ikstretch = pchan->ikstretch*pchan->ikstretch;
-			IK_SetStiffness(seg, IK_TRANS_Y, MIN2(1.0-ikstretch, 0.99));
+			float ikstretchamnt = pchan->ikstretch*pchan->ikstretch;
+			IK_SetStiffness(seg, IK_TRANS_Y, MIN2(1.0-ikstretchamnt, 0.99));
 			IK_SetLimit(seg, IK_TRANS_Y, 0.001, 1e10);
 		}
 	}
@@ -446,12 +446,12 @@ static void execute_posetree(struct Scene *scene, Object *ob, PoseTree *tree)
 			parentstretch= (tree->parent[a] >= 0)? ikstretch[tree->parent[a]]: 1.0;
 			
 			if(tree->stretch && (pchan->ikstretch > 0.0)) {
-				float trans[3], length;
+				float trans[3], length2;
 				
 				IK_GetTranslationChange(iktree[a], trans);
-				length= pchan->bone->length*len_v3(pchan->pose_mat[1]);
+				length2= pchan->bone->length*len_v3(pchan->pose_mat[1]);
 				
-				ikstretch[a]= (length == 0.0)? 1.0: (trans[1]+length)/length;
+				ikstretch[a]= (length2 == 0.0)? 1.0: (trans[1]+length2)/length2;
 			}
 			else
 				ikstretch[a] = 1.0;

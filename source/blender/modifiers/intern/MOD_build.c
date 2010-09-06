@@ -118,7 +118,6 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 
 	/* if there's at least one face, build based on faces */
 	if(numFaces) {
-		int maxEdges;
 
 		if(bmd->randomize)
 			BLI_array_randomize(faceMap, sizeof(*faceMap),

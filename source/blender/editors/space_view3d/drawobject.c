@@ -410,8 +410,8 @@ void drawaxes(float size, int flag, char drawtype)
 	
 	case OB_PLAINAXES:
 		for (axis=0; axis<3; axis++) {
-			float v1[3]= {0.0, 0.0, 0.0};
-			float v2[3]= {0.0, 0.0, 0.0};
+			v1[0]= v1[1]= v1[2]= 0.0f;
+			v2[0]= v2[1]= v2[2]= 0.0f;
 			
 			glBegin(GL_LINES);
 			
@@ -475,10 +475,10 @@ void drawaxes(float size, int flag, char drawtype)
 	case OB_ARROWS:
 	default:
 		for (axis=0; axis<3; axis++) {
-			float v1[3]= {0.0, 0.0, 0.0};
-			float v2[3]= {0.0, 0.0, 0.0};
 			int arrow_axis= (axis==0)?1:0;
-			
+			v1[0]= v1[1]= v1[2]= 0.0f;
+			v2[0]= v2[1]= v2[2]= 0.0f;
+            
 			glBegin(GL_LINES);
 			
 			v2[axis]= size;
@@ -6217,10 +6217,10 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, int flag)
 		if (list) {
 			bConstraint *curcon;
 			bConstraintOb *cob;
-			char col[4], col2[4];
+			char col1[4], col2[4];
 			
-			UI_GetThemeColor3ubv(TH_GRID, col);
-			UI_make_axis_color(col, col2, 'z');
+			UI_GetThemeColor3ubv(TH_GRID, col1);
+			UI_make_axis_color(col1, col2, 'z');
 			glColor3ubv((GLubyte *)col2);
 			
 			cob= constraints_make_evalob(scene, ob, NULL, CONSTRAINT_OBTYPE_OBJECT);

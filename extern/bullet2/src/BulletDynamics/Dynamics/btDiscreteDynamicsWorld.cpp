@@ -606,14 +606,14 @@ void	btDiscreteDynamicsWorld::solveConstraints(btContactSolverInfo& solverInfo)
 		btDispatcher*			m_dispatcher;
 
 		InplaceSolverIslandCallback(
-			btContactSolverInfo& solverInfo,
+			btContactSolverInfo& solverInfo2,
 			btConstraintSolver*	solver,
 			btTypedConstraint** sortedConstraints,
 			int	numConstraints,
 			btIDebugDraw*	debugDrawer,
 			btStackAlloc*			stackAlloc,
 			btDispatcher* dispatcher)
-			:m_solverInfo(solverInfo),
+			:m_solverInfo(solverInfo2),
 			m_solver(solver),
 			m_sortedConstraints(sortedConstraints),
 			m_numConstraints(numConstraints),
@@ -854,7 +854,7 @@ void	btDiscreteDynamicsWorld::integrateTransforms(btScalar timeStep)
 						gNumClampedCcdMotions++;
 						
 						btClosestNotMeConvexResultCallback sweepResults(body,body->getWorldTransform().getOrigin(),predictedTrans.getOrigin(),getBroadphase()->getOverlappingPairCache(),getDispatcher());
-						btConvexShape* convexShape = static_cast<btConvexShape*>(body->getCollisionShape());
+						//btConvexShape* convexShape = static_cast<btConvexShape*>(body->getCollisionShape());
 						btSphereShape tmpSphere(body->getCcdSweptSphereRadius());//btConvexShape* convexShape = static_cast<btConvexShape*>(body->getCollisionShape());
 
 						sweepResults.m_collisionFilterGroup = body->getBroadphaseProxy()->m_collisionFilterGroup;
@@ -1354,7 +1354,7 @@ void btDiscreteDynamicsWorld::debugDrawConstraint(btTypedConstraint* constraint)
 				if(drawFrames) getDebugDrawer()->drawTransform(tr, dbgDrawSize);
 				if(drawLimits)
 				{
-					btTransform tr = pSlider->getCalculatedTransformA();
+					tr = pSlider->getCalculatedTransformA();
 					btVector3 li_min = tr * btVector3(pSlider->getLowerLinLimit(), 0.f, 0.f);
 					btVector3 li_max = tr * btVector3(pSlider->getUpperLinLimit(), 0.f, 0.f);
 					getDebugDrawer()->drawLine(li_min, li_max, btVector3(0, 0, 0));

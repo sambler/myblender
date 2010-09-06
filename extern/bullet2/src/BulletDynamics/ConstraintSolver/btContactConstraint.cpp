@@ -372,9 +372,9 @@ btScalar resolveSingleCollisionCombined(
 
 	{
 		//friction
-		btVector3 vel1 = body1.getVelocityInLocalPoint(rel_pos1);
-		btVector3 vel2 = body2.getVelocityInLocalPoint(rel_pos2);
-		btVector3 vel = vel1 - vel2;
+		vel1 = body1.getVelocityInLocalPoint(rel_pos1);
+		vel2 = body2.getVelocityInLocalPoint(rel_pos2);
+		vel = vel1 - vel2;
 	  
 		rel_vel = normal.dot(vel);
 

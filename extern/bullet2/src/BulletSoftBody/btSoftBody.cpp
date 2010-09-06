@@ -817,7 +817,6 @@ int				btSoftBody::generateClusters(int k,int maxiterations)
 		/* Initialize		*/ 
 		btAlignedObjectArray<btVector3>	centers;
 		btVector3						cog(0,0,0);
-		int								i;
 		for(i=0;i<m_nodes.size();++i)
 		{
 			cog+=m_nodes[i].m_x;
@@ -833,7 +832,6 @@ int				btSoftBody::generateClusters(int k,int maxiterations)
 			const btScalar	w=2-btMin<btScalar>(1,iterations/slope);
 			changed=false;
 			iterations++;	
-			int i;
 
 			for(i=0;i<k;++i)
 			{
@@ -905,7 +903,7 @@ int				btSoftBody::generateClusters(int k,int maxiterations)
 			Cluster*	pmaster=new(btAlignedAlloc(sizeof(Cluster),16)) Cluster();
 			pmaster->m_collide	=	false;
 			pmaster->m_nodes.reserve(m_nodes.size());
-			for(int i=0;i<m_nodes.size();++i) pmaster->m_nodes.push_back(&m_nodes[i]);
+			for(i=0;i<m_nodes.size();++i) pmaster->m_nodes.push_back(&m_nodes[i]);
 			m_clusters.push_back(pmaster);
 			btSwap(m_clusters[0],m_clusters[m_clusters.size()-1]);
 		}
@@ -933,7 +931,7 @@ int				btSoftBody::generateClusters(int k,int maxiterations)
 					bool connected=false;
 					Cluster* cla = m_clusters[c0];
 					Cluster* clb = m_clusters[c1];
-					for (int i=0;!connected&&i<cla->m_nodes.size();i++)
+					for (i=0;!connected&&i<cla->m_nodes.size();i++)
 					{
 						for (int j=0;j<clb->m_nodes.size();j++)
 						{
@@ -1043,7 +1041,7 @@ void			btSoftBody::refine(ImplicitFn* ifn,btScalar accurary,bool cut)
 			int(feat.m_n[1]-nbase)};
 		if((idx[0]<ncount)&&(idx[1]<ncount))
 		{
-			const int ni=edges(idx[0],idx[1]);
+			ni=edges(idx[0],idx[1]);
 			if(ni>0)
 			{
 				appendLink(i);
@@ -1067,7 +1065,7 @@ void			btSoftBody::refine(ImplicitFn* ifn,btScalar accurary,bool cut)
 		{
 			if((idx[j]<ncount)&&(idx[k]<ncount))
 			{
-				const int ni=edges(idx[j],idx[k]);
+				ni=edges(idx[j],idx[k]);
 				if(ni>0)
 				{
 					appendFace(i);
@@ -1091,7 +1089,6 @@ void			btSoftBody::refine(ImplicitFn* ifn,btScalar accurary,bool cut)
 	{	
 		btAlignedObjectArray<int>	cnodes;
 		const int					pcount=ncount;
-		int							i;
 		ncount=m_nodes.size();
 		cnodes.resize(ncount,0);
 		/* Nodes		*/ 
@@ -1129,7 +1126,7 @@ void			btSoftBody::refine(ImplicitFn* ifn,btScalar accurary,bool cut)
 			if(todetach)
 			{
 				Link&	l=m_links[todetach];
-				for(int j=0;j<2;++j)
+				for(j=0;j<2;++j)
 				{
 					int cn=cnodes[int(l.m_n[j]-nbase)];
 					if(cn) l.m_n[j]=&m_nodes[cn];
@@ -1144,7 +1141,7 @@ void			btSoftBody::refine(ImplicitFn* ifn,btScalar accurary,bool cut)
 				(ifn->Eval(n[1]->m_x)<accurary)&&
 				(ifn->Eval(n[2]->m_x)<accurary))
 			{
-				for(int j=0;j<3;++j)
+				for(j=0;j<3;++j)
 				{
 					int cn=cnodes[int(n[j]-nbase)];
 					if(cn) n[j]=&m_nodes[cn];
@@ -1158,11 +1155,11 @@ void			btSoftBody::refine(ImplicitFn* ifn,btScalar accurary,bool cut)
 		ranks.resize(nnodes,0);
 		for(i=0,ni=m_links.size();i<ni;++i)
 		{
-			for(int j=0;j<2;++j) ranks[int(m_links[i].m_n[j]-nbase)]++;
+			for(j=0;j<2;++j) ranks[int(m_links[i].m_n[j]-nbase)]++;
 		}
 		for(i=0,ni=m_faces.size();i<ni;++i)
 		{
-			for(int j=0;j<3;++j) ranks[int(m_faces[i].m_n[j]-nbase)]++;
+			for(j=0;j<3;++j) ranks[int(m_faces[i].m_n[j]-nbase)]++;
 		}
 		for(i=0;i<m_links.size();++i)
 		{
@@ -1361,7 +1358,7 @@ void			btSoftBody::predictMotion(btScalar dt)
 	/* Faces				*/ 
 	if(!m_fdbvt.empty())
 	{
-		for(int i=0;i<m_faces.size();++i)
+		for(i=0;i<m_faces.size();++i)
 		{
 			Face&			f=m_faces[i];
 			const btVector3	v=(	f.m_n[0]->m_v+
@@ -1380,7 +1377,7 @@ void			btSoftBody::predictMotion(btScalar dt)
 	if(m_pose.m_bframe&&(m_cfg.kMT>0))
 	{
 		const btMatrix3x3	posetrs=m_pose.m_rot;
-		for(int i=0,ni=m_nodes.size();i<ni;++i)
+		for(i=0,ni=m_nodes.size();i<ni;++i)
 		{
 			Node&	n=m_nodes[i];
 			if(n.m_im>0)
@@ -1481,7 +1478,7 @@ void			btSoftBody::solveConstraints()
 				getSolver(m_cfg.m_dsequence[iseq])(this,1,0);
 			}
 		}
-		for(int i=0,ni=m_nodes.size();i<ni;++i)
+		for(i=0,ni=m_nodes.size();i<ni;++i)
 		{
 			Node&	n=m_nodes[i];
 			n.m_v	+=	(n.m_x-n.m_q)*vcf;
@@ -1953,8 +1950,7 @@ void					btSoftBody::initializeClusters()
 		btMatrix3x3&	ii=c.m_locii;
 		ii[0]=ii[1]=ii[2]=btVector3(0,0,0);
 		{
-			int i,ni;
-
+            int ni;
 			for(i=0,ni=c.m_nodes.size();i<ni;++i)
 			{
 				const btVector3	k=c.m_nodes[i]->m_x-c.m_com;
@@ -1977,7 +1973,6 @@ void					btSoftBody::initializeClusters()
 		c.m_framexform.setOrigin(c.m_com);
 		c.m_framerefs.resize(c.m_nodes.size());
 		{
-			int i;
 			for(i=0;i<c.m_framerefs.size();++i)
 			{
 				c.m_framerefs[i]=c.m_nodes[i]->m_x-c.m_com;
@@ -2007,7 +2002,7 @@ void					btSoftBody::updateClusters()
 			m[1][1]=eps*2;
 			m[2][2]=eps*3;
 			c.m_com=clusterCom(&c);
-			for(int i=0;i<c.m_nodes.size();++i)
+			for(i=0;i<c.m_nodes.size();++i)
 			{
 				const btVector3		a=c.m_nodes[i]->m_x-c.m_com;
 				const btVector3&	b=c.m_framerefs[i];
@@ -2052,8 +2047,6 @@ void					btSoftBody::updateClusters()
 			c.m_lv=btVector3(0,0,0);
 			c.m_av=btVector3(0,0,0);
 			{
-				int i;
-
 				for(i=0;i<n;++i)
 				{
 					const btVector3	v=c.m_nodes[i]->m_v*c.m_masses[i];
@@ -2074,9 +2067,9 @@ void					btSoftBody::updateClusters()
 			{
 				for(int j=0;j<c.m_nodes.size();++j)
 				{
-					Node&			n=*c.m_nodes[j];
+					Node&			nd=*c.m_nodes[j];
 					const btVector3	x=c.m_framexform*c.m_framerefs[j];
-					n.m_x=Lerp(n.m_x,x,c.m_matching);
+					nd.m_x=Lerp(nd.m_x,x,c.m_matching);
 				}
 			}			
 			/* Dbvt					*/ 

@@ -726,14 +726,14 @@ static PyObject *pyrna_enum_to_py(PointerRNA *ptr, PropertyRNA *prop, int val)
 		if (RNA_property_enum_identifier(BPy_GetContext(), ptr, prop, val, &identifier)) {
 			ret = PyUnicode_FromString(identifier);
 		} else {
-			EnumPropertyItem *item;
+			EnumPropertyItem *epitem;
 			int free= FALSE;
 
 			/* don't throw error here, can't trust blender 100% to give the
 			 * right values, python code should not generate error for that */
-			RNA_property_enum_items(BPy_GetContext(), ptr, prop, &item, NULL, &free);
-			if(item && item->identifier) {
-				ret= PyUnicode_FromString(item->identifier);
+			RNA_property_enum_items(BPy_GetContext(), ptr, prop, &epitem, NULL, &free);
+			if(epitem && epitem->identifier) {
+				ret= PyUnicode_FromString(epitem->identifier);
 			}
 			else {
 				char *ptr_name= RNA_struct_name_get_alloc(ptr, NULL, FALSE);
@@ -754,7 +754,7 @@ static PyObject *pyrna_enum_to_py(PointerRNA *ptr, PropertyRNA *prop, int val)
 			}
 
 			if(free)
-				MEM_freeN(item);
+				MEM_freeN(epitem);
 
 			/*PyErr_Format(PyExc_AttributeError, "RNA Error: Current value \"%d\" matches no enum", val);
 			ret = NULL;*/
@@ -3497,21 +3497,21 @@ PyObject *pyrna_param_to_py(PointerRNA *ptr, ParameterList *parms, PropertyRNA *
 		case PROP_POINTER:
 		{
 			PointerRNA newptr;
-			StructRNA *type= RNA_property_pointer_type(ptr, prop);
+			StructRNA *rnatype= RNA_property_pointer_type(ptr, prop);
 
 			if(flag & PROP_RNAPTR) {
 				/* in this case we get the full ptr */
 				newptr= *(PointerRNA*)data;
 			}
 			else {
-				if(RNA_struct_is_ID(type)) {
+				if(RNA_struct_is_ID(rnatype)) {
 					RNA_id_pointer_create(*(void**)data, &newptr);
 				} else {
 					/* note: this is taken from the function's ID pointer
 					 * and will break if a function returns a pointer from
 					 * another ID block, watch this! - it should at least be
 					 * easy to debug since they are all ID's */
-					RNA_pointer_create(ptr->id.data, type, *(void**)data, &newptr);
+					RNA_pointer_create(ptr->id.data, rnatype, *(void**)data, &newptr);
 				}
 			}
 

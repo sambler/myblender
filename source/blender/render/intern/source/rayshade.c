@@ -141,7 +141,7 @@ RayCounter re_rc_counter[BLENDER_MAX_THREADS];
 
 void freeraytree(Render *re)
 {
-	ObjectInstanceRen *obi;
+	ObjectInstanceRen *myobi;
 	
 	if(re->raytree)
 	{
@@ -159,9 +159,9 @@ void freeraytree(Render *re)
 		re->rayprimitives = NULL;
 	}
 
-	for(obi=re->instancetable.first; obi; obi=obi->next)
+	for(myobi=re->instancetable.first; myobi; myobi=myobi->next)
 	{
-		ObjectRen *obr = obi->obr;
+		ObjectRen *obr = myobi->obr;
 		if(obr->raytree)
 		{
 			RE_rayobject_free(obr->raytree);
@@ -172,10 +172,10 @@ void freeraytree(Render *re)
 			MEM_freeN(obr->rayfaces);
 			obr->rayfaces = NULL;
 		}
-		if(obi->raytree)
+		if(myobi->raytree)
 		{
-			RE_rayobject_free(obi->raytree);
-			obi->raytree = NULL;
+			RE_rayobject_free(myobi->raytree);
+			myobi->raytree = NULL;
 		}
 	}
 	
@@ -200,10 +200,10 @@ static int is_raytraceable_vlr(Render *re, VlakRen *vlr)
 	return 0;
 }
 
-static int is_raytraceable(Render *re, ObjectInstanceRen *obi)
+static int is_raytraceable(Render *re, ObjectInstanceRen *myobi)
 {
 	int v;
-	ObjectRen *obr = obi->obr;
+	ObjectRen *obr = myobi->obr;
 
 	if(re->excludeob && obr->ob == re->excludeob)
 		return 0;
@@ -218,13 +218,13 @@ static int is_raytraceable(Render *re, ObjectInstanceRen *obi)
 }
 
 
-RayObject* makeraytree_object(Render *re, ObjectInstanceRen *obi)
+RayObject* makeraytree_object(Render *re, ObjectInstanceRen *myobi)
 {
 	//TODO
 	// out-of-memory safeproof
 	// break render
 	// update render stats
-	ObjectRen *obr = obi->obr;
+	ObjectRen *obr = myobi->obr;
 	
 	if(obr->raytree == NULL)
 	{
@@ -252,7 +252,7 @@ RayObject* makeraytree_object(Render *re, ObjectInstanceRen *obi)
 		else
 			face = obr->rayfaces = (RayFace*)MEM_callocN(faces*sizeof(RayFace), "ObjectRen faces");
 
-		obr->rayobi = obi;
+		obr->rayobi = myobi;
 		
 		for(v=0;v<obr->totvlak;v++)
 		{
@@ -261,12 +261,12 @@ RayObject* makeraytree_object(Render *re, ObjectInstanceRen *obi)
 			{
 				if(  (re->r.raytrace_options & R_RAYTRACE_USE_LOCAL_COORDS) )
 				{
-					RE_rayobject_add( raytree, RE_vlakprimitive_from_vlak( vlakprimitive, obi, vlr ) );
+					RE_rayobject_add( raytree, RE_vlakprimitive_from_vlak( vlakprimitive, myobi, vlr ) );
 					vlakprimitive++;
 				}
 				else
 				{
-					RE_rayface_from_vlak( face, obi, vlr );				
+					RE_rayface_from_vlak( face, myobi, vlr );				
 					RE_rayobject_add( raytree, RE_rayobject_unalignRayFace(face) );
 					face++;
 				}
@@ -282,22 +282,22 @@ RayObject* makeraytree_object(Render *re, ObjectInstanceRen *obi)
 	}
 
 	if(obr->raytree) {
-		if((obi->flag & R_TRANSFORMED) && obi->raytree == NULL)
+		if((myobi->flag & R_TRANSFORMED) && myobi->raytree == NULL)
 		{
-			obi->transform_primitives = 0;
-			obi->raytree = RE_rayobject_instance_create( obr->raytree, obi->mat, obi, obi->obr->rayobi );
+			myobi->transform_primitives = 0;
+			myobi->raytree = RE_rayobject_instance_create( obr->raytree, myobi->mat, myobi, myobi->obr->rayobi );
 		}
 	}
 	
-	if(obi->raytree) return obi->raytree;
-	return obi->obr->raytree;
+	if(myobi->raytree) return myobi->raytree;
+	return myobi->obr->raytree;
 }
 
-static int has_special_rayobject(Render *re, ObjectInstanceRen *obi)
+static int has_special_rayobject(Render *re, ObjectInstanceRen *myobi)
 {
-	if( (obi->flag & R_TRANSFORMED) && (re->r.raytrace_options & R_RAYTRACE_USE_INSTANCES) )
+	if( (myobi->flag & R_TRANSFORMED) && (re->r.raytrace_options & R_RAYTRACE_USE_INSTANCES) )
 	{
-		ObjectRen *obr = obi->obr;
+		ObjectRen *obr = myobi->obr;
 		int v, faces = 0;
 		
 		for(v=0;v<obr->totvlak;v++)
@@ -318,20 +318,20 @@ static int has_special_rayobject(Render *re, ObjectInstanceRen *obi)
  */
 static void makeraytree_single(Render *re)
 {
-	ObjectInstanceRen *obi;
+	ObjectInstanceRen *myobi;
 	RayObject *raytree;
 	RayFace *face = NULL;
 	VlakPrimitive *vlakprimitive = NULL;
 	int faces = 0, obs = 0, special = 0;
 
-	for(obi=re->instancetable.first; obi; obi=obi->next)
-	if(is_raytraceable(re, obi))
+	for(myobi=re->instancetable.first; myobi; myobi=myobi->next)
+	if(is_raytraceable(re, myobi))
 	{
 		int v;
-		ObjectRen *obr = obi->obr;
+		ObjectRen *obr = myobi->obr;
 		obs++;
 		
-		if(has_special_rayobject(re, obi))
+		if(has_special_rayobject(re, myobi))
 		{
 			special++;
 		}
@@ -364,15 +364,15 @@ static void makeraytree_single(Render *re)
 		face = re->rayfaces	= (RayFace*)MEM_callocN(faces*sizeof(RayFace), "Render ray faces");
 	}
 	
-	for(obi=re->instancetable.first; obi; obi=obi->next)
-	if(is_raytraceable(re, obi))
+	for(myobi=re->instancetable.first; myobi; myobi=myobi->next)
+	if(is_raytraceable(re, myobi))
 	{
 		if(test_break(re))
 			break;
 
-		if(has_special_rayobject(re, obi))
+		if(has_special_rayobject(re, myobi))
 		{
-			RayObject *obj = makeraytree_object(re, obi);
+			RayObject *obj = makeraytree_object(re, myobi);
 
 			if(test_break(re))
 				break;
@@ -383,11 +383,11 @@ static void makeraytree_single(Render *re)
 		else
 		{
 			int v;
-			ObjectRen *obr = obi->obr;
+			ObjectRen *obr = myobi->obr;
 			
-			if(obi->flag & R_TRANSFORMED)
+			if(myobi->flag & R_TRANSFORMED)
 			{
-				obi->transform_primitives = 1;
+				myobi->transform_primitives = 1;
 			}
 
 			for(v=0;v<obr->totvlak;v++)
@@ -397,20 +397,20 @@ static void makeraytree_single(Render *re)
 				{
 					if( (re->r.raytrace_options & R_RAYTRACE_USE_LOCAL_COORDS) )
 					{
-						RayObject *obj = RE_vlakprimitive_from_vlak( vlakprimitive, obi, vlr );
+						RayObject *obj = RE_vlakprimitive_from_vlak( vlakprimitive, myobi, vlr );
 						RE_rayobject_add( raytree, obj );
 						vlakprimitive++;
 					}
 					else
 					{
-						RE_rayface_from_vlak(face, obi, vlr);
-						if((obi->flag & R_TRANSFORMED))
+						RE_rayface_from_vlak(face, myobi, vlr);
+						if((myobi->flag & R_TRANSFORMED))
 						{
-							mul_m4_v3(obi->mat, face->v1);
-							mul_m4_v3(obi->mat, face->v2);
-							mul_m4_v3(obi->mat, face->v3);
+							mul_m4_v3(myobi->mat, face->v1);
+							mul_m4_v3(myobi->mat, face->v2);
+							mul_m4_v3(myobi->mat, face->v3);
 							if(RE_rayface_isQuad(face))
-								mul_m4_v3(obi->mat, face->v4);
+								mul_m4_v3(myobi->mat, face->v4);
 						}
 
 						RE_rayobject_add( raytree, RE_rayobject_unalignRayFace(face) );
@@ -483,7 +483,7 @@ void makeraytree(Render *re)
 
 void shade_ray(Isect *is, ShadeInput *shi, ShadeResult *shr)
 {
-	ObjectInstanceRen *obi= (ObjectInstanceRen*)is->hit.ob;
+	ObjectInstanceRen *myobi= (ObjectInstanceRen*)is->hit.ob;
 	VlakRen *vlr= (VlakRen*)is->hit.face;
 	int osatex= 0;
 	
@@ -497,8 +497,8 @@ void shade_ray(Isect *is, ShadeInput *shi, ShadeResult *shr)
 	
 	normalize_v3(shi->view);
 
-	shi->obi= obi;
-	shi->obr= obi->obr;
+	shi->obi= myobi;
+	shi->obr= myobi->obr;
 	shi->vlr= vlr;
 	shi->mat= vlr->mat;
 	shade_input_init_material(shi);
@@ -517,12 +517,12 @@ void shade_ray(Isect *is, ShadeInput *shi, ShadeResult *shr)
 
 	if(vlr->v4) {
 		if(is->isect==2) 
-			shade_input_set_triangle_i(shi, obi, vlr, 2, 1, 3);
+			shade_input_set_triangle_i(shi, myobi, vlr, 2, 1, 3);
 		else
-			shade_input_set_triangle_i(shi, obi, vlr, 0, 1, 3);
+			shade_input_set_triangle_i(shi, myobi, vlr, 0, 1, 3);
 	}
 	else {
-		shade_input_set_triangle_i(shi, obi, vlr, 0, 1, 2);
+		shade_input_set_triangle_i(shi, myobi, vlr, 0, 1, 2);
 	}
 
 	shi->u= is->u;
@@ -695,7 +695,7 @@ static void ray_fadeout(Isect *is, ShadeInput *shi, float *col, float *blendcol,
 
 /* the main recursive tracer itself
  * note: 'col' must be initialized */
-static void traceray(ShadeInput *origshi, ShadeResult *origshr, short depth, float *start, float *vec, float *col, ObjectInstanceRen *obi, VlakRen *vlr, int traflag)
+static void traceray(ShadeInput *origshi, ShadeResult *origshr, short depth, float *start, float *vec, float *col, ObjectInstanceRen *myobi, VlakRen *vlr, int traflag)
 {
 	ShadeInput shi;
 	ShadeResult shr;
@@ -716,7 +716,7 @@ static void traceray(ShadeInput *origshi, ShadeResult *origshr, short depth, flo
 	isec.skip = RE_SKIP_VLR_NEIGHBOUR | RE_SKIP_VLR_RENDER_CHECK;
 	isec.hint = 0;
 
-	isec.orig.ob   = obi;
+	isec.orig.ob   = myobi;
 	isec.orig.face = vlr;
 	RE_RC_INIT(isec, shi);
 
@@ -746,7 +746,7 @@ static void traceray(ShadeInput *origshi, ShadeResult *origshr, short depth, flo
 		if(depth>0) {
 
 			if((shi.mat->mode_l & MA_TRANSP) && shr.alpha < 1.0f) {
-				float nf, f, f1, refract[3], tracol[4];
+				float nf, refract[3], tracol[4];
 				
 				tracol[0]= shi.r;
 				tracol[1]= shi.g;

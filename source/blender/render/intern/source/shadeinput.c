@@ -250,13 +250,13 @@ void vlr_set_uv_indices(VlakRen *vlr, int *i1, int *i2, int *i3)
 
 /* copy data from face to ShadeInput, general case */
 /* indices 0 1 2 3 only */
-void shade_input_set_triangle_i(ShadeInput *shi, ObjectInstanceRen *obi, VlakRen *vlr, short i1, short i2, short i3)
+void shade_input_set_triangle_i(ShadeInput *shi, ObjectInstanceRen *myobi, VlakRen *vlr, short i1, short i2, short i3)
 {
 	VertRen **vpp= &vlr->v1;
 	
 	shi->vlr= vlr;
-	shi->obi= obi;
-	shi->obr= obi->obr;
+	shi->obi= myobi;
+	shi->obr= myobi->obr;
 
 	shi->v1= vpp[i1];
 	shi->v2= vpp[i2];
@@ -274,7 +274,7 @@ void shade_input_set_triangle_i(ShadeInput *shi, ObjectInstanceRen *obi, VlakRen
 
 	/* facenormal copy, can get flipped */
 	shi->flippednor= 0;
-	RE_vlakren_get_normal(&R, obi, vlr, shi->facenor);
+	RE_vlakren_get_normal(&R, myobi, vlr, shi->facenor);
 	
 	/* calculate vertexnormals */
 	if(vlr->flag & R_SMOOTH) {
@@ -282,10 +282,10 @@ void shade_input_set_triangle_i(ShadeInput *shi, ObjectInstanceRen *obi, VlakRen
 		VECCOPY(shi->n2, shi->v2->n);
 		VECCOPY(shi->n3, shi->v3->n);
 
-		if(obi->flag & R_TRANSFORMED) {
-			mul_m3_v3(obi->nmat, shi->n1);
-			mul_m3_v3(obi->nmat, shi->n2);
-			mul_m3_v3(obi->nmat, shi->n3);
+		if(myobi->flag & R_TRANSFORMED) {
+			mul_m3_v3(myobi->nmat, shi->n1);
+			mul_m3_v3(myobi->nmat, shi->n2);
+			mul_m3_v3(myobi->nmat, shi->n3);
 		}
 	}
 }
@@ -295,10 +295,10 @@ void shade_input_set_triangle_i(ShadeInput *shi, ObjectInstanceRen *obi, VlakRen
  */
 
 /* copy data from face to ShadeInput, scanline case */
-void shade_input_set_triangle(ShadeInput *shi, volatile int obi, volatile int facenr, int normal_flip)
+void shade_input_set_triangle(ShadeInput *shi, volatile int myobi, volatile int facenr, int normal_flip)
 {
 	if(facenr>0) {
-		shi->obi= &R.objectinstance[obi];
+		shi->obi= &R.objectinstance[myobi];
 		shi->obr= shi->obi->obr;
 		shi->facenr= (facenr-1) & RE_QUAD_MASK;
 		if( shi->facenr < shi->obr->totvlak ) {
@@ -851,7 +851,7 @@ void shade_input_flip_normals(ShadeInput *shi)
 
 void shade_input_set_shade_texco(ShadeInput *shi)
 {
-	ObjectInstanceRen *obi= shi->obi;
+	ObjectInstanceRen *myobi= shi->obi;
 	ObjectRen *obr= shi->obr;
 	VertRen *v1= shi->v1, *v2= shi->v2, *v3= shi->v3;
 	float u= shi->u, v= shi->v;
@@ -908,8 +908,8 @@ void shade_input_set_shade_texco(ShadeInput *shi)
 				shi->tang[1]= (tl*s3[1] - tu*s1[1] - tv*s2[1]);
 				shi->tang[2]= (tl*s3[2] - tu*s1[2] - tv*s2[2]);
 
-				if(obi->flag & R_TRANSFORMED)
-					mul_m3_v3(obi->nmat, shi->tang);
+				if(myobi->flag & R_TRANSFORMED)
+					mul_m3_v3(myobi->nmat, shi->tang);
 
 				normalize_v3(shi->tang);
 				VECCOPY(shi->nmaptang, shi->tang);
@@ -932,8 +932,8 @@ void shade_input_set_shade_texco(ShadeInput *shi)
 				shi->nmaptang[1]= (tl*s3[1] - tu*s1[1] - tv*s2[1]);
 				shi->nmaptang[2]= (tl*s3[2] - tu*s1[2] - tv*s2[2]);
 
-				if(obi->flag & R_TRANSFORMED)
-					mul_m3_v3(obi->nmat, shi->nmaptang);
+				if(myobi->flag & R_TRANSFORMED)
+					mul_m3_v3(myobi->nmat, shi->nmaptang);
 
 				normalize_v3(shi->nmaptang);
 			}
@@ -945,8 +945,8 @@ void shade_input_set_shade_texco(ShadeInput *shi)
 
 		if(surfnor) {
 			VECCOPY(shi->surfnor, surfnor)
-			if(obi->flag & R_TRANSFORMED)
-				mul_m3_v3(obi->nmat, shi->surfnor);
+			if(myobi->flag & R_TRANSFORMED)
+				mul_m3_v3(myobi->nmat, shi->surfnor);
 		}
 		else
 			VECCOPY(shi->surfnor, shi->vn)
@@ -957,9 +957,9 @@ void shade_input_set_shade_texco(ShadeInput *shi)
 	if(R.r.mode & R_SPEED) {
 		float *s1, *s2, *s3;
 		
-		s1= RE_vertren_get_winspeed(obi, v1, 0);
-		s2= RE_vertren_get_winspeed(obi, v2, 0);
-		s3= RE_vertren_get_winspeed(obi, v3, 0);
+		s1= RE_vertren_get_winspeed(myobi, v1, 0);
+		s2= RE_vertren_get_winspeed(myobi, v2, 0);
+		s3= RE_vertren_get_winspeed(myobi, v3, 0);
 		if(s1 && s2 && s3) {
 			shi->winspeed[0]= (l*s3[0] - u*s1[0] - v*s2[0]);
 			shi->winspeed[1]= (l*s3[1] - u*s1[1] - v*s2[1]);
@@ -1002,7 +1002,7 @@ void shade_input_set_shade_texco(ShadeInput *shi)
 				}
 			}
 
-			VECCOPY(shi->duplilo, obi->dupliorco);
+			VECCOPY(shi->duplilo, myobi->dupliorco);
 		}
 		
 		if(texco & TEXCO_GLOB) {
@@ -1122,8 +1122,8 @@ void shade_input_set_shade_texco(ShadeInput *shi)
 
 			}
 
-			shi->dupliuv[0]= -1.0f + 2.0f*obi->dupliuv[0];
-			shi->dupliuv[1]= -1.0f + 2.0f*obi->dupliuv[1];
+			shi->dupliuv[0]= -1.0f + 2.0f*myobi->dupliuv[0];
+			shi->dupliuv[1]= -1.0f + 2.0f*myobi->dupliuv[1];
 			shi->dupliuv[2]= 0.0f;
 
 			if(shi->totuv == 0) {
@@ -1204,7 +1204,7 @@ void shade_input_set_shade_texco(ShadeInput *shi)
 			if(s1 && s2 && s3) {
 				float obwinmat[4][4], winmat[4][4], ho1[4], ho2[4], ho3[4];
 				float Zmulx, Zmuly;
-				float hox, hoy, l, dl, u, v;
+				float hox, hoy, l2, dl2, u2, vl;
 				float s00, s01, s10, s11, detsh;
 				
 				/* old globals, localized now */
@@ -1212,7 +1212,7 @@ void shade_input_set_shade_texco(ShadeInput *shi)
 
 				zbuf_make_winmat(&R, winmat);
 				if(shi->obi->flag & R_TRANSFORMED)
-					mul_m4_m4m4(obwinmat, obi->mat, winmat);
+					mul_m4_m4m4(obwinmat, myobi->mat, winmat);
 				else
 					copy_m4_m4(obwinmat, winmat);
 
@@ -1232,12 +1232,12 @@ void shade_input_set_shade_texco(ShadeInput *shi)
 				/* recalc u and v again */
 				hox= x/Zmulx -1.0f;
 				hoy= y/Zmuly -1.0f;
-				u= (hox - ho3[0]/ho3[3])*s11 - (hoy - ho3[1]/ho3[3])*s10;
-				v= (hoy - ho3[1]/ho3[3])*s00 - (hox - ho3[0]/ho3[3])*s01;
-				l= 1.0f+u+v;
+				u2= (hox - ho3[0]/ho3[3])*s11 - (hoy - ho3[1]/ho3[3])*s10;
+				vl= (hoy - ho3[1]/ho3[3])*s00 - (hox - ho3[0]/ho3[3])*s01;
+				l2= 1.0f+u2+vl;
 				
-				shi->sticky[0]= l*s3[0]-u*s1[0]-v*s2[0];
-				shi->sticky[1]= l*s3[1]-u*s1[1]-v*s2[1];
+				shi->sticky[0]= l2*s3[0]-u2*s1[0]-vl*s2[0];
+				shi->sticky[1]= l2*s3[1]-u2*s1[1]-vl*s2[1];
 				shi->sticky[2]= 0.0f;
 				
 				if(shi->osatex) {
@@ -1247,12 +1247,12 @@ void shade_input_set_shade_texco(ShadeInput *shi)
 					dyuv[0]=  - s10/Zmuly;
 					dyuv[1]=  s00/Zmuly;
 					
-					dl= dxuv[0] + dxuv[1];
-					shi->dxsticky[0]= dl*s3[0] - dxuv[0]*s1[0] - dxuv[1]*s2[0];
-					shi->dxsticky[1]= dl*s3[1] - dxuv[0]*s1[1] - dxuv[1]*s2[1];
-					dl= dyuv[0] + dyuv[1];
-					shi->dysticky[0]= dl*s3[0] - dyuv[0]*s1[0] - dyuv[1]*s2[0];
-					shi->dysticky[1]= dl*s3[1] - dyuv[0]*s1[1] - dyuv[1]*s2[1];
+					dl2= dxuv[0] + dxuv[1];
+					shi->dxsticky[0]= dl2*s3[0] - dxuv[0]*s1[0] - dxuv[1]*s2[0];
+					shi->dxsticky[1]= dl2*s3[1] - dxuv[0]*s1[1] - dxuv[1]*s2[1];
+					dl2= dyuv[0] + dyuv[1];
+					shi->dysticky[0]= dl2*s3[0] - dyuv[0]*s1[0] - dyuv[1]*s2[0];
+					shi->dysticky[1]= dl2*s3[1] - dyuv[0]*s1[1] - dyuv[1]*s2[1];
 				}
 			}
 		}

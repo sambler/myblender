@@ -253,11 +253,11 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 	if(amd->fit_type == MOD_ARR_FITCURVE && amd->curve_ob) {
 		Curve *cu = amd->curve_ob->data;
 		if(cu) {
-			float tmp_mat[3][3];
+			float tmp_mat3[3][3];
 			float scale;
 			
-			object_to_mat3(amd->curve_ob, tmp_mat);
-			scale = mat3_to_scale(tmp_mat);
+			object_to_mat3(amd->curve_ob, tmp_mat3);
+			scale = mat3_to_scale(tmp_mat3);
 				
 			if(!cu->path) {
 				cu->flag |= CU_PATH; // needed for path & bevlist
@@ -547,7 +547,6 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 				  if(amd->flags & MOD_ARR_MERGE) {
 					  float tmp_co[3];
 					  MVert *in_mv;
-					  int j;
 
 					  copy_v3_v3(tmp_co, mv->co);
 					  mul_m4_v3(startoffset, tmp_co);
@@ -648,7 +647,6 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 				  if(amd->flags & MOD_ARR_MERGE) {
 					  float tmp_co[3];
 					  MVert *in_mv;
-					  int j;
 
 					  copy_v3_v3(tmp_co, mv->co);
 					  mul_m4_v3(offset, tmp_co);

@@ -363,7 +363,6 @@ static int sequencer_select_invoke(bContext *C, wmOperator *op, wmEvent *event)
 		{
 			SpaceSeq *sseq= CTX_wm_space_seq(C);
 			if (sseq && sseq->flag & SEQ_MARKER_TRANS) {
-				TimeMarker *marker;
 
 				for (marker= scene->markers.first; marker; marker= marker->next) {
 					if(	((x < CFRA) && marker->frame < CFRA) ||

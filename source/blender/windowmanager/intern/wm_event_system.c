@@ -248,7 +248,6 @@ void wm_event_do_notifiers(bContext *C)
 	
 	/* the notifiers are sent without context, to keep it clean */
 	while( (note=wm_notifier_next(wm)) ) {
-		wmWindow *win;
 		
 		for(win= wm->windows.first; win; win= win->next) {
 			
@@ -364,9 +363,9 @@ int WM_operator_poll(bContext *C, wmOperatorType *ot)
 	wmOperatorTypeMacro *otmacro;
 	
 	for(otmacro= ot->macro.first; otmacro; otmacro= otmacro->next) {
-		wmOperatorType *ot= WM_operatortype_find(otmacro->idname, 0);
+		wmOperatorType *ot2= WM_operatortype_find(otmacro->idname, 0);
 		
-		if(0==WM_operator_poll(C, ot))
+		if(0==WM_operator_poll(C, ot2))
 			return 0;
 	}
 	
@@ -1769,11 +1768,11 @@ void wm_event_do_handlers(bContext *C)
 		
 		/* only add mousemove when queue was read entirely */
 		if(win->addmousemove && win->eventstate) {
-			wmEvent event= *(win->eventstate);
-			event.type= MOUSEMOVE;
-			event.prevx= event.x;
-			event.prevy= event.y;
-			wm_event_add(win, &event);
+			wmEvent event2= *(win->eventstate);
+			event2.type= MOUSEMOVE;
+			event2.prevx= event2.x;
+			event2.prevy= event2.y;
+			wm_event_add(win, &event2);
 			win->addmousemove= 0;
 		}
 		

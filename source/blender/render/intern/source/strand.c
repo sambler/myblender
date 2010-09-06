@@ -59,7 +59,7 @@
 /* to be removed */
 void hoco_to_zco(ZSpan *zspan, float *zco, float *hoco);
 void zspan_scanconvert_strand(ZSpan *zspan, void *handle, float *v1, float *v2, float *v3, void (*func)(void *, int, int, float, float, float) );
-void zbufsinglewire(ZSpan *zspan, int obi, int zvlnr, float *ho1, float *ho2);
+void zbufsinglewire(ZSpan *zspan, int myobi, int zvlnr, float *ho1, float *ho2);
 
 /* *************** */
 
@@ -503,10 +503,10 @@ static void do_strand_fillac(void *handle, int x, int y, float u, float v, float
 	StrandSegment *sseg= spart->segment;
 	APixstrand *apn, *apnew;
 	float t, s;
-	int offset, mask, obi, strnr, seg, zverg, bufferz, maskz=0;
+	int offset, mask, myobi, strnr, seg, zverg, bufferz, maskz=0;
 
 	offset = y*spart->rectx + x;
-	obi= sseg->obi - spart->re->objectinstance;
+	myobi= sseg->obi - spart->re->objectinstance;
 	strnr= sseg->strand->index + 1;
 	seg= sseg->v[1] - sseg->strand->vert;
 	mask= (1<<spart->sample);
@@ -540,11 +540,11 @@ static void do_strand_fillac(void *handle, int x, int y, float u, float v, float
 	}
 
 #define CHECK_ADD(n) \
-	if(apn->p[n]==strnr && apn->obi[n]==obi && apn->seg[n]==seg) \
+	if(apn->p[n]==strnr && apn->obi[n]==myobi && apn->seg[n]==seg) \
 	{ if(!(apn->mask[n] & mask)) { apn->mask[n] |= mask; apn->v[n] += t; apn->u[n] += s; } break; }
 #define CHECK_ASSIGN(n) \
 	if(apn->p[n]==0) \
-	{apn->obi[n]= obi; apn->p[n]= strnr; apn->z[n]= zverg; apn->mask[n]= mask; apn->v[n]= t; apn->u[n]= s; apn->seg[n]= seg; break; }
+	{apn->obi[n]= myobi; apn->p[n]= strnr; apn->z[n]= zverg; apn->mask[n]= mask; apn->v[n]= t; apn->u[n]= s; apn->seg[n]= seg; break; }
 
 	/* add to pixel list */
 	if(zverg < bufferz && (spart->totapixbuf[offset] < MAX_ZROW)) {
@@ -653,9 +653,9 @@ static void strand_render(Render *re, StrandSegment *sseg, float winmat[][4], St
 	}
 	else {
 		float hoco1[4], hoco2[4];
-		int a, obi, index;
+		int a, myobi, index;
   
-		obi= sseg->obi - re->objectinstance;
+		myobi= sseg->obi - re->objectinstance;
 		index= sseg->strand->index;
 
 		  projectvert(p1->co, winmat, hoco1);
@@ -664,11 +664,11 @@ static void strand_render(Render *re, StrandSegment *sseg, float winmat[][4], St
 		for(a=0; a<totzspan; a++) {
 #if 0
 			/* render both strand and single pixel wire to counter aliasing */
-			zbufclip4(re, &zspan[a], obi, index, p1->hoco2, p1->hoco1, p2->hoco1, p2->hoco2, p1->clip2, p1->clip1, p2->clip1, p2->clip2);
+			zbufclip4(re, &zspan[a], myobi, index, p1->hoco2, p1->hoco1, p2->hoco1, p2->hoco2, p1->clip2, p1->clip1, p2->clip1, p2->clip2);
 #endif
 			/* only render a line for now, which makes the shadow map more
 			   similiar across frames, and so reduces flicker */
-			zbufsinglewire(&zspan[a], obi, index, hoco1, hoco2);
+			zbufsinglewire(&zspan[a], myobi, index, hoco1, hoco2);
 		}
 	}
 }
@@ -763,7 +763,7 @@ void render_strand_segment(Render *re, float winmat[][4], StrandPart *spart, ZSp
 int zbuffer_strands_abuf(Render *re, RenderPart *pa, APixstrand *apixbuf, ListBase *apsmbase, unsigned int lay, int negzmask, float winmat[][4], int winx, int winy, int sample, float (*jit)[2], float clipcrop, int shadow, StrandShadeCache *cache)
 {
 	ObjectRen *obr;
-	ObjectInstanceRen *obi;
+	ObjectInstanceRen *myobi;
 	ZSpan zspan;
 	StrandRen *strand=0;
 	StrandVert *svert;
@@ -824,19 +824,19 @@ int zbuffer_strands_abuf(Render *re, RenderPart *pa, APixstrand *apixbuf, ListBa
 	totsegment= 0;
 
 	/* for all object instances */
-	for(obi=re->instancetable.first, i=0; obi; obi=obi->next, i++) {
-		obr= obi->obr;
+	for(myobi=re->instancetable.first, i=0; myobi; myobi=myobi->next, i++) {
+		obr= myobi->obr;
 
 		if(!obr->strandbuf || !(obr->strandbuf->lay & lay))
 			continue;
 
 		/* compute matrix and try clipping whole object */
-		if(obi->flag & R_TRANSFORMED)
-			mul_m4_m4m4(obwinmat, obi->mat, winmat);
+		if(myobi->flag & R_TRANSFORMED)
+			mul_m4_m4m4(obwinmat, myobi->mat, winmat);
 		else
 			copy_m4_m4(obwinmat, winmat);
 
-		if(clip_render_object(obi->obr->boundbox, bounds, winmat))
+		if(clip_render_object(myobi->obr->boundbox, bounds, winmat))
 			continue;
 
 		/* for each bounding box containing a number of strands */
@@ -906,15 +906,15 @@ int zbuffer_strands_abuf(Render *re, RenderPart *pa, APixstrand *apixbuf, ListBa
 			if(re->test_break(re->tbh))
 				break;
 
-			obi= &re->objectinstance[sortseg->obi];
-			obr= obi->obr;
+			myobi= &re->objectinstance[sortseg->obi];
+			obr= myobi->obr;
 
-			if(obi->flag & R_TRANSFORMED)
-				mul_m4_m4m4(obwinmat, obi->mat, winmat);
+			if(myobi->flag & R_TRANSFORMED)
+				mul_m4_m4m4(obwinmat, myobi->mat, winmat);
 			else
 				copy_m4_m4(obwinmat, winmat);
 
-			sseg.obi= obi;
+			sseg.obi= myobi;
 			sseg.strand= RE_findOrAddStrand(obr, sortseg->strand);
 			sseg.buffer= sseg.strand->buffer;
 			sseg.sqadaptcos= sseg.buffer->adaptcos;

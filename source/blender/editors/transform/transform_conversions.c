@@ -445,7 +445,7 @@ static short apply_targetless_ik(Object *ob)
 
 				/* apply and decompose, doesn't work for constraints or non-uniform scale well */
 				{
-					float rmat3[3][3], qrmat[3][3], imat[3][3], smat[3][3];
+					float rmat3[3][3], qrmat[3][3], imat2[3][3], smat[3][3];
 
 					copy_m3_m4(rmat3, rmat);
 					
@@ -467,8 +467,8 @@ static short apply_targetless_ik(Object *ob)
 						else
 							quat_to_mat3( qrmat,parchan->quat);
 						
-						invert_m3_m3(imat, qrmat);
-						mul_m3_m3m3(smat, rmat3, imat);
+						invert_m3_m3(imat2, qrmat);
+						mul_m3_m3m3(smat, rmat3, imat2);
 						mat3_to_size( parchan->size,smat);
 					}
 					
@@ -815,7 +815,7 @@ static short pose_grab_with_ik_add(bPoseChannel *pchan)
 	/* Rule: not if there's already an IK on this channel */
 	for (con= pchan->constraints.first; con; con= con->next) {
 		if (con->type==CONSTRAINT_TYPE_KINEMATIC) {
-			bKinematicConstraint *data= con->data;
+			data= con->data;
 			if(data->tar==NULL || (data->tar->type==OB_ARMATURE && data->subtarget[0]==0)) {
 				targetless = con;
 				/* but, if this is a targetless IK, we make it auto anyway (for the children loop) */
@@ -5005,10 +5005,10 @@ void special_aftertrans_update(bContext *C, TransInfo *t)
 		int i, recalcObPaths=0;
 
 		for (i = 0; i < t->total; i++) {
-			TransData *td = t->data + i;
-			Object *ob = td->ob;
 			ListBase pidlist;
 			PTCacheID *pid;
+            TransData *td = t->data + i;
+			ob = td->ob;
 			
 			if (td->flag & TD_NOACTION)
 				break;

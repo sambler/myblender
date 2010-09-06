@@ -775,7 +775,7 @@ static void material_lights(GPUShadeInput *shi, GPUShadeResult *shr)
 			ListBase *lb = object_duplilist(shi->gpumat->scene, ob);
 			
 			for(dob=lb->first; dob; dob=dob->next) {
-				Object *ob = dob->ob;
+				ob = dob->ob;
 				
 				if(ob->type==OB_LAMP) {
 					copy_m4_m4(ob->obmat, dob->mat);

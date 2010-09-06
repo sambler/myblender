@@ -41,6 +41,7 @@ struct bNodeTree;
 struct CSG_FaceIteratorDescriptor;
 struct CSG_VertexIteratorDescriptor;
 struct ColorBand;
+struct Curve;
 struct CurveMapping;
 struct EditBone;
 struct EditFace;

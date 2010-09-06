@@ -535,7 +535,7 @@ void btGeneric6DofConstraint::getInfo2 (btConstraintInfo2* info)
 
 int btGeneric6DofConstraint::setLinearLimits(btConstraintInfo2* info)
 {
-	btGeneric6DofConstraint * d6constraint = this;
+	//btGeneric6DofConstraint * d6constraint = this;
 	int row = 0;
 	//solve linear limits
 	btRotationalLimitMotor limot;

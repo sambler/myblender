@@ -61,7 +61,6 @@ void btSphereBoxCollisionAlgorithm::processCollision (btCollisionObject* body0,b
 
 	btSphereShape* sphere0 = (btSphereShape*)sphereObj->getCollisionShape();
 
-	btVector3 normalOnSurfaceB;
 	btVector3 pOnBox,pOnSphere;
 	btVector3 sphereCenter = sphereObj->getWorldTransform().getOrigin();
 	btScalar radius = sphere0->getRadius();

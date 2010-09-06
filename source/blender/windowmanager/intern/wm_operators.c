@@ -2296,18 +2296,18 @@ static void tweak_gesture_modal(bContext *C, wmEvent *event)
 			rect->ymax= event->y - sy;
 			
 			if((val= wm_gesture_evaluate(C, gesture))) {
-				wmEvent event;
+				wmEvent event2;
 
-				event= *(window->eventstate);
+				event2= *(window->eventstate);
 				if(gesture->event_type==LEFTMOUSE)
-					event.type= EVT_TWEAK_L;
+					event2.type= EVT_TWEAK_L;
 				else if(gesture->event_type==RIGHTMOUSE)
-					event.type= EVT_TWEAK_R;
+					event2.type= EVT_TWEAK_R;
 				else
-					event.type= EVT_TWEAK_M;
-				event.val= val;
+					event2.type= EVT_TWEAK_M;
+				event2.val= val;
 				/* mouse coords! */
-				wm_event_add(window, &event);
+				wm_event_add(window, &event2);
 				
 				WM_gesture_end(C, gesture);	/* frees gesture itself, and unregisters from window */
 			}

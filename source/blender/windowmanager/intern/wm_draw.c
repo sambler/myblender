@@ -79,13 +79,13 @@ static void wm_paintcursor_draw(bContext *C, ARegion *ar)
 		if(screen->subwinactive == ar->swinid) {
 			for(pc= wm->paintcursors.first; pc; pc= pc->next) {
 				if(pc->poll == NULL || pc->poll(C)) {
-					ARegion *ar= CTX_wm_region(C);
+					ARegion *argn= CTX_wm_region(C);
 					if (ELEM(win->grabcursor, GHOST_kGrabWrap, GHOST_kGrabHide)) {
 						int x = 0, y = 0;
 						wm_get_cursor_position(win, &x, &y);
-						pc->draw(C, x - ar->winrct.xmin, y - ar->winrct.ymin, pc->customdata);
+						pc->draw(C, x - argn->winrct.xmin, y - argn->winrct.ymin, pc->customdata);
 					} else {
-						pc->draw(C, win->eventstate->x - ar->winrct.xmin, win->eventstate->y - ar->winrct.ymin, pc->customdata);
+						pc->draw(C, win->eventstate->x - argn->winrct.xmin, win->eventstate->y - argn->winrct.ymin, pc->customdata);
 					}
 				}
 			}

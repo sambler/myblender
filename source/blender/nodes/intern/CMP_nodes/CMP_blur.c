@@ -573,11 +573,11 @@ static void node_composit_exec_blur(void *data, bNode *node, bNodeStack **in, bN
 	}
 
 	if (((NodeBlurData *)node->storage)->filtertype == R_FILTER_FAST_GAUSS) {
-		CompBuf *new, *img = in[0]->data;
-		/*from eeshlo's original patch, removed to fit in with the existing blur node */
+        int c;
+        /*from eeshlo's original patch, removed to fit in with the existing blur node */
 		/*const float sx = in[1]->vec[0], sy = in[2]->vec[0];*/
 		const float sx = ((float)nbd->sizex)/2.0f, sy = ((float)nbd->sizey)/2.0f;
-		int c;
+		img = in[0]->data;
 
 		if ((img==NULL) || (out[0]->hasoutput==0)) return;
 
@@ -633,8 +633,8 @@ static void node_composit_exec_blur(void *data, bNode *node, bNodeStack **in, bN
 				new= pass_on_compbuf(img);
 			}
 			else {
-				NodeBlurData *nbd= node->storage;
-				CompBuf *gammabuf;
+                CompBuf *gammabuf;
+				nbd= node->storage;
 				
 				/* make output size of input image */
 				new= alloc_compbuf(img->x, img->y, img->type, 1); /* allocs */

@@ -704,7 +704,7 @@ void CalcSnapGeometry(TransInfo *t, float *vec)
 			ListBase depth_peels;
 			DepthPeel *p1, *p2;
 			float *last_p = NULL;
-			float dist = FLT_MAX;
+			float distf = FLT_MAX;
 			float p[3] = {0.0f, 0.0f, 0.0f};
 			
 			depth_peels.first = depth_peels.last = NULL;
@@ -725,7 +725,7 @@ void CalcSnapGeometry(TransInfo *t, float *vec)
 			{
 				if (p1->flag == 0)
 				{
-					float vec[3];
+					float vec2[3];
 					float new_dist;
 					
 					p2 = NULL;
@@ -757,32 +757,32 @@ void CalcSnapGeometry(TransInfo *t, float *vec)
 					{
 						p2->flag = 1;
 						
-						add_v3_v3v3(vec, p1->p, p2->p);
-						mul_v3_fl(vec, 0.5f);
+						add_v3_v3v3(vec2, p1->p, p2->p);
+						mul_v3_fl(vec2, 0.5f);
 					}
 					else
 					{
-						VECCOPY(vec, p1->p);
+						VECCOPY(vec2, p1->p);
 					}
 					
 					if (last_p == NULL)
 					{
-						VECCOPY(p, vec);
-						dist = 0;
+						VECCOPY(p, vec2);
+						distf = 0;
 						break;
 					}
 					
-					new_dist = len_v3v3(last_p, vec);
+					new_dist = len_v3v3(last_p, vec2);
 					
-					if (new_dist < dist)
+					if (new_dist < distf)
 					{
-						VECCOPY(p, vec);
-						dist = new_dist;
+						VECCOPY(p, vec2);
+						distf = new_dist;
 					}
 				}
 			}
 			
-			if (dist != FLT_MAX)
+			if (distf != FLT_MAX)
 			{
 				VECCOPY(loc, p);
 				found = 1;
@@ -1591,9 +1591,9 @@ int snapObjects(Scene *scene, View3D *v3d, ARegion *ar, Object *obedit, float mv
 				
 				for(dupli_ob = lb->first; dupli_ob; dupli_ob = dupli_ob->next)
 				{
-					Object *ob = dupli_ob->ob;
+					Object *ob2 = dupli_ob->ob;
 					
-					retval |= snapObject(scene, ar, ob, 0, dupli_ob->mat, ray_start, ray_normal, mval, loc, no, dist, &depth);
+					retval |= snapObject(scene, ar, ob2, 0, dupli_ob->mat, ray_start, ray_normal, mval, loc, no, dist, &depth);
 				}
 				
 				free_object_duplilist(lb);
@@ -1803,25 +1803,25 @@ int peelObjects(Scene *scene, View3D *v3d, ARegion *ar, Object *obedit, ListBase
 				
 				for(dupli_ob = lb->first; dupli_ob; dupli_ob = dupli_ob->next)
 				{
-					Object *ob = dupli_ob->ob;
+					Object *ob2 = dupli_ob->ob;
 					
-					if (ob->type == OB_MESH) {
+					if (ob2->type == OB_MESH) {
 						EditMesh *em;
 						DerivedMesh *dm = NULL;
 						int val;
 
-						if (ob != obedit)
+						if (ob2 != obedit)
 						{
-							dm = mesh_get_derived_final(scene, ob, CD_MASK_BAREMESH);
+							dm = mesh_get_derived_final(scene, ob2, CD_MASK_BAREMESH);
 							
-							val = peelDerivedMesh(ob, dm, ob->obmat, ray_start, ray_normal, mval, depth_peels);
+							val = peelDerivedMesh(ob2, dm, ob2->obmat, ray_start, ray_normal, mval, depth_peels);
 						}
 						else
 						{
-							em = ((Mesh *)ob->data)->edit_mesh;
+							em = ((Mesh *)ob2->data)->edit_mesh;
 							dm = editmesh_get_derived_cage(scene, obedit, em, CD_MASK_BAREMESH);
 							
-							val = peelDerivedMesh(ob, dm, ob->obmat, ray_start, ray_normal, mval, depth_peels);
+							val = peelDerivedMesh(ob2, dm, ob2->obmat, ray_start, ray_normal, mval, depth_peels);
 						}
 
 						retval = retval || val;

@@ -806,14 +806,14 @@ int getTransformOrientation(const bContext *C, float normal[3], float plane[3], 
 			
 			if (ml_sel)
 			{	
-				float mat[4][4];
+				float mat2[4][4];
 
 				/* Rotation of MetaElem is stored in quat */
-				 quat_to_mat4( mat,ml_sel->quat);
+				 quat_to_mat4( mat2,ml_sel->quat);
 
-				VECCOPY(normal, mat[2]);
+				VECCOPY(normal, mat2[2]);
 
-				negate_v3_v3(plane, mat[1]);
+				negate_v3_v3(plane, mat2[1]);
 				
 				result = ORIENTATION_NORMAL;
 			}
@@ -830,14 +830,15 @@ int getTransformOrientation(const bContext *C, float normal[3], float plane[3], 
 				{
 					if (ebone->flag & BONE_SELECTED)
 					{
-						float mat[3][3];
+						float mat3[3][3];
 						float vec[3];
+                        
 						sub_v3_v3v3(vec, ebone->tail, ebone->head);
 						normalize_v3(vec);
 						add_v3_v3(normal, vec);
 						
-						vec_roll_to_mat3(vec, ebone->roll, mat);
-						add_v3_v3(plane, mat[2]);
+						vec_roll_to_mat3(vec, ebone->roll, mat3);
+						add_v3_v3(plane, mat3[2]);
 					}
 				}
 			}

@@ -4488,7 +4488,7 @@ static int createSlideVerts(TransInfo *t)
 			sv = BLI_ghash_lookup(vertgh, ev);
 
 			if(sv) {
-				float co[3], co2[3], vec[3];
+				float co[3], co2[3], vec2[3];
 
 				ev = (EditVert*)look->link;
 
@@ -4505,12 +4505,12 @@ static int createSlideVerts(TransInfo *t)
 				}
 
 				if (ev == tempsv->up->v1) {
-					sub_v3_v3v3(vec, co, co2);
+					sub_v3_v3v3(vec2, co, co2);
 				} else {
-					sub_v3_v3v3(vec, co2, co);
+					sub_v3_v3v3(vec2, co2, co);
 				}
 
-				add_v3_v3(start, vec);
+				add_v3_v3(start, vec2);
 
 				if (v3d) {
 					view3d_project_float(t->ar, tempsv->down->v1->co, co, projectMat);
@@ -4518,12 +4518,12 @@ static int createSlideVerts(TransInfo *t)
 				}
 
 				if (ev == tempsv->down->v1) {
-					sub_v3_v3v3(vec, co2, co);
+					sub_v3_v3v3(vec2, co2, co);
 				} else {
-					sub_v3_v3v3(vec, co, co2);
+					sub_v3_v3v3(vec2, co, co2);
 				}
 
-				add_v3_v3(end, vec);
+				add_v3_v3(end, vec2);
 
 				totvec += 1.0f;
 				nearest = (EditVert*)look->link;

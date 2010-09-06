@@ -158,7 +158,7 @@ void			btSoftBodyHelpers::Draw(	btSoftBody* psb,
 										btIDebugDraw* idraw,
 										int drawflags)
 {
-	const btScalar		scl=(btScalar)0.1;
+	btScalar		scl=(btScalar)0.1;
 	const btScalar		nscl=scl*5;
 	const btVector3		lcolor=btVector3(0,0,0);
 	const btVector3		ncolor=btVector3(1,1,1);
@@ -241,7 +241,7 @@ void			btSoftBodyHelpers::Draw(	btSoftBody* psb,
 	/* Faces	*/ 
 	if(0!=(drawflags&fDrawFlags::Faces))
 	{
-		const btScalar	scl=(btScalar)0.8;
+		scl=(btScalar)0.8;
 		const btScalar	alp=(btScalar)1;
 		const btVector3	col(0,(btScalar)0.7,0);
 		for(i=0;i<psb->m_faces.size();++i)
@@ -317,7 +317,7 @@ void			btSoftBodyHelpers::Draw(	btSoftBody* psb,
 		{
 			const btSoftBody::Note&	n=psb->m_notes[i];
 			btVector3				p=n.m_offset;
-			for(int j=0;j<n.m_rank;++j)
+			for(j=0;j<n.m_rank;++j)
 			{
 				p+=n.m_nodes[j]->m_x*n.m_coords[j];
 			}
@@ -816,7 +816,8 @@ btSoftBody*		btSoftBodyHelpers::CreateFromTriMesh(btSoftBodyWorldInfo& worldInfo
 	{
 		const int idx[]={triangles[i],triangles[i+1],triangles[i+2]};
 #define IDX(_x_,_y_) ((_y_)*maxidx+(_x_))
-		for(int j=2,k=0;k<3;j=k++)
+        int k;
+		for(j=2,k=0;k<3;j=k++)
 		{
 			if(!chks[IDX(idx[j],idx[k])])
 			{

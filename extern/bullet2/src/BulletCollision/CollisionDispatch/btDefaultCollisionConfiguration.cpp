@@ -112,7 +112,7 @@ btDefaultCollisionConfiguration::btDefaultCollisionConfiguration(const btDefault
 	} else
 	{
 		m_ownsStackAllocator = true;
-		void* mem = btAlignedAlloc(sizeof(btStackAlloc),16);
+		mem = btAlignedAlloc(sizeof(btStackAlloc),16);
 		m_stackAlloc = new(mem)btStackAlloc(constructionInfo.m_defaultStackAllocatorSize);
 	}
 		
@@ -123,7 +123,7 @@ btDefaultCollisionConfiguration::btDefaultCollisionConfiguration(const btDefault
 	} else
 	{
 		m_ownsPersistentManifoldPool = true;
-		void* mem = btAlignedAlloc(sizeof(btPoolAllocator),16);
+		mem = btAlignedAlloc(sizeof(btPoolAllocator),16);
 		m_persistentManifoldPool = new (mem) btPoolAllocator(sizeof(btPersistentManifold),constructionInfo.m_defaultMaxPersistentManifoldPoolSize);
 	}
 	
@@ -134,7 +134,7 @@ btDefaultCollisionConfiguration::btDefaultCollisionConfiguration(const btDefault
 	} else
 	{
 		m_ownsCollisionAlgorithmPool = true;
-		void* mem = btAlignedAlloc(sizeof(btPoolAllocator),16);
+		mem = btAlignedAlloc(sizeof(btPoolAllocator),16);
 		m_collisionAlgorithmPool = new(mem) btPoolAllocator(collisionAlgorithmMaxElementSize,constructionInfo.m_defaultMaxCollisionAlgorithmPoolSize);
 	}
 

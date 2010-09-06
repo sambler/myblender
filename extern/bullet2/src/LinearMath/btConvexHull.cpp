@@ -275,8 +275,8 @@ int maxdirsterid(const T *p,int count,const T &dir,btAlignedObjectArray<int> &al
 				int mc = ma;
 				for(btScalar xx = x-btScalar(40.0) ; xx <= x ; xx+= btScalar(5.0))
 				{
-					btScalar s = btSin(SIMD_RADS_PER_DEG*(xx));
-					btScalar c = btCos(SIMD_RADS_PER_DEG*(xx));
+					s = btSin(SIMD_RADS_PER_DEG*(xx));
+					c = btCos(SIMD_RADS_PER_DEG*(xx));
 					int md = maxdirfiltered(p,count,dir+(u*s+v*c)*btScalar(0.025),allow);
 					if(mc==m && md==m)
 					{
@@ -1011,9 +1011,9 @@ bool  HullLibrary::CleanupVertices(unsigned int svcount,
 				btScalar y = v[1];
 				btScalar z = v[2];
 
-				btScalar dx = fabsf(x - px );
-				btScalar dy = fabsf(y - py );
-				btScalar dz = fabsf(z - pz );
+				dx = fabsf(x - px );
+				dy = fabsf(y - py );
+				dz = fabsf(z - pz );
 
 				if ( dx < normalepsilon && dy < normalepsilon && dz < normalepsilon )
 				{
@@ -1051,28 +1051,28 @@ bool  HullLibrary::CleanupVertices(unsigned int svcount,
 	// ok..now make sure we didn't prune so many vertices it is now invalid.
 //	if ( 1 )
 	{
-		btScalar bmin[3] = {  FLT_MAX,  FLT_MAX,  FLT_MAX };
-		btScalar bmax[3] = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
+		btScalar bmin2[3] = {  FLT_MAX,  FLT_MAX,  FLT_MAX };
+		btScalar bmax2[3] = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
 
 		for (unsigned int i=0; i<vcount; i++)
 		{
 			const btVector3& p = vertices[i];
 			for (int j=0; j<3; j++)
 			{
-				if ( p[j] < bmin[j] ) bmin[j] = p[j];
-				if ( p[j] > bmax[j] ) bmax[j] = p[j];
+				if ( p[j] < bmin2[j] ) bmin2[j] = p[j];
+				if ( p[j] > bmax2[j] ) bmax2[j] = p[j];
 			}
 		}
 
-		btScalar dx = bmax[0] - bmin[0];
-		btScalar dy = bmax[1] - bmin[1];
-		btScalar dz = bmax[2] - bmin[2];
+		dx = bmax2[0] - bmin2[0];
+		dy = bmax2[1] - bmin2[1];
+		dz = bmax2[2] - bmin2[2];
 
 		if ( dx < EPSILON || dy < EPSILON || dz < EPSILON || vcount < 3)
 		{
-			btScalar cx = dx*btScalar(0.5) + bmin[0];
-			btScalar cy = dy*btScalar(0.5) + bmin[1];
-			btScalar cz = dz*btScalar(0.5) + bmin[2];
+			btScalar cx = dx*btScalar(0.5) + bmin2[0];
+			btScalar cy = dy*btScalar(0.5) + bmin2[1];
+			btScalar cz = dz*btScalar(0.5) + bmin2[2];
 
 			btScalar len = FLT_MAX;
 

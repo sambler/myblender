@@ -342,9 +342,10 @@ static btDbvtNode*			topdown(btDbvt* pdbvt,
 			}
 			else
 			{
+                int ni;
 				sets[0].reserve(leaves.size()/2+1);
 				sets[1].reserve(leaves.size()/2);
-				for(int i=0,ni=leaves.size();i<ni;++i)
+				for(i=0,ni=leaves.size();i<ni;++i)
 				{
 					sets[i&1].push_back(leaves[i]);
 				}

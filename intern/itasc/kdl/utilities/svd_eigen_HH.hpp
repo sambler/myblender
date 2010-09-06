@@ -288,9 +288,9 @@ namespace KDL
             }
             if (i_max != i){
                 /* swap eigenvalues */
-                e_scalar tmp = S(i);
+                e_scalar tmp2 = S(i);
                 S(i)=S(i_max);
-                S(i_max)=tmp;
+                S(i_max)=tmp2;
                 
                 /* swap eigenvectors */
                 U.col(i).swap(U.col(i_max));

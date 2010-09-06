@@ -340,10 +340,10 @@ static int treesort_alpha(const void *v1, const void *v2)
 	if(comp==1) return 1;
 	else if(comp==2) return -1;
 	else if(comp==3) {
-		int comp= strcmp(x1->name, x2->name);
+		int comp2= strcmp(x1->name, x2->name);
 		
-		if( comp>0 ) return 1;
-		else if( comp<0) return -1;
+		if( comp2>0 ) return 1;
+		else if( comp2<0) return -1;
 		return 0;
 	}
 	return 0;
@@ -563,7 +563,8 @@ static TreeElement *outliner_add_element(SpaceOops *soops, ListBase *lb, void *i
 	TreeStoreElem *tselem;
 	ID *id= idv;
 	int a = 0;
-	
+	int tot;
+    
 	if(ELEM3(type, TSE_RNA_STRUCT, TSE_RNA_PROPERTY, TSE_RNA_ARRAY_ELEM)) {
 		id= ((PointerRNA*)idv)->id.data;
 		if(!id) id= ((PointerRNA*)idv)->data;
@@ -622,7 +623,8 @@ static TreeElement *outliner_add_element(SpaceOops *soops, ListBase *lb, void *i
 					tenla->name= "Pose";
 					
 					if(arm->edbo==NULL && (ob->mode & OB_MODE_POSE)) {	// channels undefined in editmode, but we want the 'tenla' pose icon itself
-						int a= 0, const_index= 1000;	/* ensure unique id for bone constraints */
+						int const_index= 1000;	/* ensure unique id for bone constraints */
+                        a= 0;
 						
 						for(pchan= ob->pose->chanbase.first; pchan; pchan= pchan->next, a++) {
 							ten= outliner_add_element(soops, &tenla->subtree, ob, tenla, TSE_POSE_CHANNEL, a);
@@ -679,9 +681,8 @@ static TreeElement *outliner_add_element(SpaceOops *soops, ListBase *lb, void *i
 					/* Pose Groups */
 					if(ob->pose->agroups.first) {
 						bActionGroup *agrp;
-						TreeElement *ten;
-						TreeElement *tenla= outliner_add_element(soops, &te->subtree, ob, te, TSE_POSEGRP_BASE, 0);
-						int a= 0;
+						tenla= outliner_add_element(soops, &te->subtree, ob, te, TSE_POSEGRP_BASE, 0);
+						a= 0;
 						
 						tenla->name= "Bone Groups";
 						for (agrp=ob->pose->agroups.first; agrp; agrp=agrp->next, a++) {
@@ -700,7 +701,7 @@ static TreeElement *outliner_add_element(SpaceOops *soops, ListBase *lb, void *i
 					bConstraint *con;
 					TreeElement *ten;
 					TreeElement *tenla= outliner_add_element(soops, &te->subtree, ob, te, TSE_CONSTRAINT_BASE, 0);
-					int a= 0;
+					a= 0;
 					//char *str;
 					
 					tenla->name= "Constraints";
@@ -721,11 +722,11 @@ static TreeElement *outliner_add_element(SpaceOops *soops, ListBase *lb, void *i
 				if(ob->modifiers.first) {
 					ModifierData *md;
 					TreeElement *temod = outliner_add_element(soops, &te->subtree, ob, te, TSE_MODIFIER_BASE, 0);
-					int index;
+					int idx;
 
 					temod->name = "Modifiers";
-					for (index=0,md=ob->modifiers.first; md; index++,md=md->next) {
-						TreeElement *te = outliner_add_element(soops, &temod->subtree, ob, temod, TSE_MODIFIER, index);
+					for (idx=0,md=ob->modifiers.first; md; idx++,md=md->next) {
+						te = outliner_add_element(soops, &temod->subtree, ob, temod, TSE_MODIFIER, idx);
 						te->name= md->name;
 						te->directdata = md;
 
@@ -751,7 +752,7 @@ static TreeElement *outliner_add_element(SpaceOops *soops, ListBase *lb, void *i
 					bDeformGroup *defgroup;
 					TreeElement *ten;
 					TreeElement *tenla= outliner_add_element(soops, &te->subtree, ob, te, TSE_DEFGROUP_BASE, 0);
-					int a= 0;
+					a= 0;
 					
 					tenla->name= "Vertex Groups";
 					for (defgroup=ob->defbase.first; defgroup; defgroup=defgroup->next, a++) {
@@ -859,7 +860,7 @@ static TreeElement *outliner_add_element(SpaceOops *soops, ListBase *lb, void *i
 		case ID_AR:
 			{
 				bArmature *arm= (bArmature *)id;
-				int a= 0;
+				a= 0;
 				
 				if(arm->edbo) {
 					EditBone *ebone;
@@ -942,7 +943,7 @@ static TreeElement *outliner_add_element(SpaceOops *soops, ListBase *lb, void *i
 		if (adt->nla_tracks.first) {
 			TreeElement *tenla= outliner_add_element(soops, &te->subtree, adt, te, TSE_NLA, 0);
 			NlaTrack *nlt;
-			int a= 0;
+			a= 0;
 			
 			tenla->name= "NLA Tracks";
 			
@@ -1022,7 +1023,6 @@ static TreeElement *outliner_add_element(SpaceOops *soops, ListBase *lb, void *i
 		PointerRNA pptr, propptr, *ptr= (PointerRNA*)idv;
 		PropertyRNA *prop, *iterprop;
 		PropertyType proptype;
-		int a, tot;
 
 		/* we do lazy build, for speed and to avoid infinite recusion */
 
@@ -1421,7 +1421,7 @@ static void outliner_build_tree(Main *mainvar, Scene *scene, SpaceOops *soops)
 		}
 	}
 	else if(soops->outlinevis == SO_SAME_TYPE) {
-		Object *ob= OBACT;
+		ob= OBACT;
 		if(ob) {
 			for(base= scene->base.first; base; base= base->next) {
 				if(base->object->type==ob->type) {

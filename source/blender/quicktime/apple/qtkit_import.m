@@ -36,6 +36,7 @@
 #include "BLO_sys_types.h"
 #include "BKE_global.h"
 #include "BLI_dynstr.h"
+#include "MEM_guardedalloc.h"
 
 #import <Cocoa/Cocoa.h>
 #import <QTKit/QTKit.h>

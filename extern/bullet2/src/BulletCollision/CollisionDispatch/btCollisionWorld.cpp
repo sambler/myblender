@@ -298,12 +298,12 @@ void	btCollisionWorld::rayTestSingle(const btTransform& rayFromTrans,const btTra
 					btTriangleMeshShape*	m_triangleMesh;
 
 					BridgeTriangleRaycastCallback( const btVector3& from,const btVector3& to,
-						btCollisionWorld::RayResultCallback* resultCallback, btCollisionObject* collisionObject,btTriangleMeshShape*	triangleMesh):
+						btCollisionWorld::RayResultCallback* resultCallback2, btCollisionObject* collisionObject2,btTriangleMeshShape*	triangleMesh2):
                   //@BP Mod
-						btTriangleRaycastCallback(from,to, resultCallback->m_flags),
-							m_resultCallback(resultCallback),
-							m_collisionObject(collisionObject),
-							m_triangleMesh(triangleMesh)
+						btTriangleRaycastCallback(from,to, resultCallback2->m_flags),
+							m_resultCallback(resultCallback2),
+							m_collisionObject(collisionObject2),
+							m_triangleMesh(triangleMesh2)
 						{
 						}
 
@@ -348,12 +348,12 @@ void	btCollisionWorld::rayTestSingle(const btTransform& rayFromTrans,const btTra
 					btConcaveShape*	m_triangleMesh;
 
 					BridgeTriangleRaycastCallback( const btVector3& from,const btVector3& to,
-						btCollisionWorld::RayResultCallback* resultCallback, btCollisionObject* collisionObject,btConcaveShape*	triangleMesh):
+						btCollisionWorld::RayResultCallback* resultCallback2, btCollisionObject* collisionObject2,btConcaveShape*	triangleMesh2):
                   //@BP Mod
-                  btTriangleRaycastCallback(from,to, resultCallback->m_flags),
-							m_resultCallback(resultCallback),
-							m_collisionObject(collisionObject),
-							m_triangleMesh(triangleMesh)
+                  btTriangleRaycastCallback(from,to, resultCallback2->m_flags),
+							m_resultCallback(resultCallback2),
+							m_collisionObject(collisionObject2),
+							m_triangleMesh(triangleMesh2)
 						{
 						}
 
@@ -485,12 +485,12 @@ void	btCollisionWorld::objectQuerySingle(const btConvexShape* castShape,const bt
 					btCollisionObject*	m_collisionObject;
 					btTriangleMeshShape*	m_triangleMesh;
 
-					BridgeTriangleConvexcastCallback(const btConvexShape* castShape, const btTransform& from,const btTransform& to,
-						btCollisionWorld::ConvexResultCallback* resultCallback, btCollisionObject* collisionObject,btTriangleMeshShape*	triangleMesh, const btTransform& triangleToWorld):
-						btTriangleConvexcastCallback(castShape, from,to, triangleToWorld, triangleMesh->getMargin()),
-							m_resultCallback(resultCallback),
-							m_collisionObject(collisionObject),
-							m_triangleMesh(triangleMesh)
+					BridgeTriangleConvexcastCallback(const btConvexShape* castShape2, const btTransform& from,const btTransform& to,
+						btCollisionWorld::ConvexResultCallback* resultCallback2, btCollisionObject* collisionObject2,btTriangleMeshShape*	triangleMesh2, const btTransform& triangleToWorld2):
+						btTriangleConvexcastCallback(castShape2, from,to, triangleToWorld2, triangleMesh2->getMargin()),
+							m_resultCallback(resultCallback2),
+							m_collisionObject(collisionObject2),
+							m_triangleMesh(triangleMesh2)
 						{
 						}
 

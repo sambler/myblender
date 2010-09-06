@@ -306,7 +306,7 @@ void	CProfileManager::dumpRecursive(CProfileIterator* profileIterator, int spaci
 		accumulated_time += current_total_time;
 		float fraction = parent_time > SIMD_EPSILON ? (current_total_time / parent_time) * 100 : 0.f;
 		{
-			int i;	for (i=0;i<spacing;i++)	printf(".");
+			for (int x=0;x<spacing;x++)	printf(".");
 		}
 		printf("%d -- %s (%.2f %%) :: %.3f ms / frame (%d calls)\n",i, profileIterator->Get_Current_Name(), fraction,(current_total_time / (double)frames_since_reset),profileIterator->Get_Current_Total_Calls());
 		totalTime += current_total_time;

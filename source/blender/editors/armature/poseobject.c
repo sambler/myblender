@@ -1700,7 +1700,7 @@ static int armature_all_layers_toggle_exec (bContext *C, wmOperator *op)
     RNA_boolean_set_array(&ptr, "layers", layers);
                
     /* note, notifier might evolve */
-    WM_event_add_notifier(C, NC_OBJECT|ND_POSE, ob);
+    WM_event_add_notifier(C, NC_OBJECT|ND_POSE|ND_SPACE_PROPERTIES, ob);
     
     return OPERATOR_FINISHED;
 }
@@ -1735,7 +1735,7 @@ static int armature_all_proxy_layers_toggle_exec (bContext *C, wmOperator *op)
     RNA_id_pointer_create((ID *)arm, &ptr);
     
     /* get the current layer values */
-    RNA_boolean_get_array(&ptr, "layer_protection", layers);
+    RNA_boolean_get_array(&ptr, "layers_protected", layers);
     
     /* add up the number of layers that are visible */
     vis= 0;
@@ -1752,10 +1752,10 @@ static int armature_all_proxy_layers_toggle_exec (bContext *C, wmOperator *op)
         layers[x]= vis;
     
     /* save visibility settings to the armature */
-    RNA_boolean_set_array(&ptr, "layer_protection", layers);
+    RNA_boolean_set_array(&ptr, "layers_protected", layers);
            
     /* note, notifier might evolve */
-    WM_event_add_notifier(C, NC_OBJECT|ND_POSE, ob);
+    WM_event_add_notifier(C, NC_OBJECT|ND_POSE|ND_SPACE_PROPERTIES, ob);
     
     return OPERATOR_FINISHED;
 }

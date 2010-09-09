@@ -1291,17 +1291,17 @@ typedef struct RegionMoveData {
 	int bigger, smaller, origval;
 	int origx, origy;
 	int maxsize;
-	char edge;
+	AZEdge edge;
 	
 } RegionMoveData;
 
 
-static int area_max_regionsize(ScrArea *sa, ARegion *scalear, char edge)
+static int area_max_regionsize(ScrArea *sa, ARegion *scalear, AZEdge edge)
 {
 	ARegion *ar;
 	int dist;
 	
-	if(edge=='l' || edge=='r') {
+	if(edge==AE_RIGHT_TOP || edge==AE_LEFT_TOP) {
 		dist = sa->totrct.xmax - sa->totrct.xmin;
 	} else {	/* t, b */
 		dist = sa->totrct.ymax - sa->totrct.ymin;
@@ -1367,7 +1367,7 @@ static int region_scale_invoke(bContext *C, wmOperator *op, wmEvent *event)
 			rmd->ar->sizey= rmd->ar->type->prefsizey;
 		
 		/* now copy to regionmovedata */
-		if(rmd->edge=='l' || rmd->edge=='r') {
+		if(rmd->edge==AE_RIGHT_TOP || rmd->edge==AE_LEFT_TOP) {
 			rmd->origval= rmd->ar->sizex;
 		} else {
 			rmd->origval= rmd->ar->sizey;
@@ -1399,9 +1399,9 @@ static int region_scale_modal(bContext *C, wmOperator *op, wmEvent *event)
 	switch(event->type) {
 		case MOUSEMOVE:
 			
-			if(rmd->edge=='l' || rmd->edge=='r') {
+            if(rmd->edge==AE_RIGHT_TOP || rmd->edge==AE_LEFT_TOP) {
 				delta= event->x - rmd->origx;
-				if(rmd->edge=='l') delta= -delta;
+				if(rmd->edge==AE_RIGHT_TOP) delta= -delta;
 				
 				rmd->ar->sizex= rmd->origval + delta;
 				CLAMP(rmd->ar->sizex, 0, rmd->maxsize);
@@ -1417,7 +1417,7 @@ static int region_scale_modal(bContext *C, wmOperator *op, wmEvent *event)
 			else {
 				int maxsize=0;
 				delta= event->y - rmd->origy;
-				if(rmd->edge=='b') delta= -delta;
+				if(rmd->edge==AE_TOP_LEFT) delta= -delta;
 				
 				rmd->ar->sizey= rmd->origval + delta;
 				CLAMP(rmd->ar->sizey, 0, rmd->maxsize);

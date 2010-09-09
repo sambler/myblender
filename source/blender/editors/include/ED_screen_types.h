@@ -68,13 +68,20 @@ typedef struct ScreenFrameRateInfo {
 
 /* ----------------------------------------------------- */
 
+typedef enum {
+    AE_LEFT_TOP,       /* -r- located on the left - minimised to the top left */
+    AE_RIGHT_TOP,      /* -l- located on the right - minimised to the top right */
+    AE_BOTTOM_RIGHT,   /* -t- located at the bottom - minimised to the bottom right */
+    AE_TOP_LEFT        /* -b- located at the top - minimised to the top left */
+}AZEdge;
+
 /* for editing areas/regions */
 typedef struct AZone {
 	struct AZone *next, *prev;
 	ARegion *ar;
 	int type;
 	/* region-azone, which of the edges */
-	short edge;
+	AZEdge edge;
 	/* internal */
 	short do_draw;
 	/* for draw */

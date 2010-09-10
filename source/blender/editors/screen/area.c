@@ -469,7 +469,7 @@ static void area_azone_initialize(ScrArea *sa)
 #define AZONEPAD_ICON	8
 static void region_azone_edge(AZone *az, ARegion *ar)
 {
-	if(az->edge==AE_BOTTOM_RIGHT) {
+	if(az->edge==AE_BOTTOM_RIGHT || az->edge==AE_BOTTOM_LEFT) {
 		az->x1= ar->winrct.xmin;
 		az->y1= ar->winrct.ymax - AZONEPAD_EDGE;
 		az->x2= ar->winrct.xmax;
@@ -519,11 +519,17 @@ static void region_azone_icon(ScrArea *sa, AZone *az, ARegion *ar)
 		az->x2= ar->winrct.xmin - AZONEPAD_ICON;
 		az->y2= ar->winrct.ymax - AZONEPAD_ICON;
 	}
-	else { // if(az->edge==AE_LEFT_TOP) {
+	else if(az->edge==AE_LEFT_TOP) {
 		az->x1= ar->winrct.xmax + AZONEPAD_ICON;
 		az->y1= ar->winrct.ymax - 2*AZONEPAD_ICON;
 		az->x2= ar->winrct.xmax + 2*AZONEPAD_ICON;
 		az->y2= ar->winrct.ymax - AZONEPAD_ICON;
+	}
+    else if(az->edge==AE_BOTTOM_LEFT) {
+		az->x1= ar->winrct.xmin + AZONEPAD_ICON;
+		az->y1= ar->winrct.ymax + AZONEPAD_ICON;
+		az->x2= ar->winrct.xmin + 2*AZONEPAD_ICON;
+		az->y2= ar->winrct.ymax + 2*AZONEPAD_ICON;
 	}
 
 	BLI_init_rcti(&az->rect, az->x1, az->x2, az->y1, az->y2);
@@ -570,7 +576,9 @@ static void region_azone_add(ScrArea *sa, ARegion *ar, int alignment)
 {
 	 /* edge code (t b l r) is where azone will be drawn */
 	
-	if(alignment==RGN_ALIGN_TOP)
+    if(ar->regiontype==RGN_TYPE_TOOL_PROPS)
+        region_azone_initialize(sa, ar, AE_BOTTOM_LEFT); /* minimise the operator panel to the left */
+	else if(alignment==RGN_ALIGN_TOP)
 		region_azone_initialize(sa, ar, AE_TOP_LEFT);
 	else if(alignment==RGN_ALIGN_BOTTOM)
 		region_azone_initialize(sa, ar, AE_BOTTOM_RIGHT);

@@ -72,7 +72,8 @@ typedef enum {
     AE_LEFT_TOP,       /* -r- located on the left - minimised to the top left */
     AE_RIGHT_TOP,      /* -l- located on the right - minimised to the top right */
     AE_BOTTOM_RIGHT,   /* -t- located at the bottom - minimised to the bottom right */
-    AE_TOP_LEFT        /* -b- located at the top - minimised to the top left */
+    AE_TOP_LEFT,       /* -b- located at the top - minimised to the top left */
+    AE_BOTTOM_LEFT     /*     located at the bottom - minimised to the bottom left - only for operator panel */
 }AZEdge;
 
 /* for editing areas/regions */

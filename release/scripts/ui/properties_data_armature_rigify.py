@@ -22,13 +22,13 @@ from bpy.props import *
 
 
 class PoseTemplate(bpy.types.IDPropertyGroup):
-    name = StringProperty(attr="name", name="Name of the slave", description="", maxlen=64, default="")
-    active_template_index = IntProperty(name="Index of the active slave", description="", default=-1, min=-1, max=65535) 
-    use_generate_deform_rig = BoolProperty(name="Create Deform Rig", description="Create a copy of the metarig, constrainted by the generated rig", default=False)
+    name = StringProperty(name="Name of the slave", description="", maxlen=64, default="")
 
 
 class PoseTemplateSettings(bpy.types.IDPropertyGroup):
     templates = CollectionProperty(type=PoseTemplate, name="Templates", description="")
+    active_template_index = IntProperty(name="Index of the active slave", description="", default=-1, min=-1, max=65535)
+    use_generate_deform_rig = BoolProperty(name="Create Deform Rig", description="Create a copy of the metarig, constrainted by the generated rig", default=False)
 
 
 def metarig_templates():
@@ -187,8 +187,8 @@ class Sample(bpy.types.Operator):
     def execute(self, context):
         import rigify
         reload(rigify)
-        final = (self.properties.metarig_type == "")
-        objects = rigify.generate_test(context, metarig_type=self.properties.metarig_type, GENERATE_FINAL=final)
+        final = (self.metarig_type == "")
+        objects = rigify.generate_test(context, metarig_type=self.metarig_type, GENERATE_FINAL=final)
 
         if len(objects) > 1:
             for i, (obj_meta, obj_gen) in enumerate(objects):
@@ -238,7 +238,7 @@ class AsScript(bpy.types.Operator):
         reload(rigify_utils)
         obj = context.object
         code = rigify_utils.write_meta_rig(obj)
-        path = self.properties.filepath
+        path = self.filepath
         file = open(path, "w")
         file.write(code)
         file.close()
@@ -248,7 +248,7 @@ class AsScript(bpy.types.Operator):
     def invoke(self, context, event):
         import os
         obj = context.object
-        self.properties.filepath = os.path.splitext(bpy.data.filepath)[0] + "-" + bpy.path.clean_name(obj.name) + ".py"
+        self.filepath = os.path.splitext(bpy.data.filepath)[0] + "-" + bpy.path.clean_name(obj.name) + ".py"
         wm = context.window_manager
         wm.add_fileselect(self)
         return {'RUNNING_MODAL'}

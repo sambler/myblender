@@ -278,7 +278,7 @@ def buildinfo(lenv, build_type):
     build_time = time.strftime ("%H:%M:%S")
     build_rev = os.popen('svnversion').read()[:-1] # remove \n
     if build_rev == '': 
-        build_rev = '31868'
+        build_rev = '31880'
     if lenv['BF_DEBUG']:
         build_type = "Debug"
     else:

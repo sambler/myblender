@@ -240,6 +240,9 @@ class DATA_PT_modifiers(ModifierButtonsPanel, bpy.types.Panel):
         col = split.column()
         col.prop(md, "strength")
 
+    def DYNAMIC_PAINT(self, layout, ob, md):
+        layout.label(text="See Dynamic Paint Panel.")
+
     def EDGE_SPLIT(self, layout, ob, md):
         split = layout.split()
 

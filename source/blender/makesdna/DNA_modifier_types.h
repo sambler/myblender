@@ -69,6 +69,8 @@ typedef enum ModifierType {
 	/* placeholder, keep this so durian files load in
 	 * trunk with the correct modifier once its merged */
 	eModifierType_Warp,
+
+	eModifierType_DynamicPaint,
 	NUM_MODIFIER_TYPES
 } ModifierType;
 
@@ -724,6 +726,22 @@ typedef struct ScrewModifierData {
 #define MOD_SCREW_NORMAL_CALC	(1<<1)
 #define MOD_SCREW_OBJECT_OFFSET	(1<<2)
 // #define MOD_SCREW_OBJECT_ANGLE	(1<<4)
+
+/* Mesh paint modifier flags */
+#define MOD_DYNAMICPAINT_TYPE_CANVAS (1 << 0)
+#define MOD_DYNAMICPAINT_TYPE_PAINT (1 << 1)
+
+typedef struct DynamicPaintModifierData {
+	ModifierData modifier;
+
+	struct DynamicPaintCanvasSettings *canvas;
+	struct DynamicPaintPainterSettings *paint;
+	float time;
+	int type;  /* canvas / painter */
+	short baking;
+	short pad;
+	int pad2;
+} DynamicPaintModifierData;
 
 
 #endif

@@ -198,6 +198,10 @@ static void action_main_area_draw(const bContext *C, ARegion *ar)
 	/* reset view matrix */
 	UI_view2d_view_restore(C);
 	
+    if( v2d->cur.ymin > v2d->tot.ymax ) {
+        v2d->cur.ymax= v2d->tot.ymax;
+    }
+    
 	/* scrollers */
 	scrollers= UI_view2d_scrollers_calc(C, v2d, unit, V2D_GRID_CLAMP, V2D_ARG_DUMMY, V2D_ARG_DUMMY);
 	UI_view2d_scrollers_draw(C, v2d, scrollers);

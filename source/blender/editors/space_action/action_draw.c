@@ -91,7 +91,7 @@ void draw_channel_names(bContext *C, bAnimContext *ac, SpaceAction *saction, ARe
 		v2d->tot.ymin= (float)(-height);
 	}
 	/* need to do a view-sync here, so that the keys area doesn't jump around */
-	UI_view2d_sync(NULL, ac->sa, v2d, V2D_VIEWSYNC_AREA_VERTICAL);
+	UI_view2d_sync(NULL, ac->sa, v2d, V2D_LOCK_COPY);
 	
 	/* loop through channels, and set up drawing depending on their type  */	
 	{ 	/* first pass: just the standard GL-drawing for backdrop + text */

@@ -1174,8 +1174,8 @@ static uiBlock *wm_block_create_splash(bContext *C, ARegion *ar, void *arg_unuse
 	version_str = &version_buf[0];
 	revision_str = &revision_buf[0];
 	
-	sprintf(version_str, "%d.%02d.%d", BLENDER_VERSION/100, BLENDER_VERSION%100, BLENDER_SUBVERSION);
-	sprintf(revision_str, "r%s", build_rev);
+	sprintf(version_str, "Graphicall build   %d.%02d.%d", BLENDER_VERSION/100, BLENDER_VERSION%100, BLENDER_SUBVERSION);
+	sprintf(revision_str, "by sambler  r%s", build_rev);
 	
 	BLF_size(style->widgetlabel.uifont_id, style->widgetlabel.points, U.dpi);
 	ver_width = BLF_width(style->widgetlabel.uifont_id, version_str)+5;

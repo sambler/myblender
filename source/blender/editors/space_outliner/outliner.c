@@ -3271,7 +3271,7 @@ static void outliner_do_object_operation(bContext *C, Scene *scene_act, SpaceOop
 			}
 		}
 		if( (tselem->flag & TSE_CLOSED)==0 || (searching && (tselem->flag & TSE_CHILDSEARCH)) ) {
-			outliner_do_object_operation(C, scene, soops, &te->subtree, operation_cb);
+			outliner_do_object_operation(C, scene_act, soops, &te->subtree, operation_cb);
 		}
 	}
 }

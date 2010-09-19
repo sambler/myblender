@@ -25,8 +25,6 @@
 #ifndef PY_CAPI_UTILS_H
 #define PY_CAPI_UTILS_H
 
-struct PyObject;
-
 void			PyC_ObSpit(char *name, PyObject *var);
 void			PyC_LineSpit(void);
 PyObject *		PyC_ExceptionBuffer(void);
@@ -37,5 +35,8 @@ int				PyC_AsArray(void *array, PyObject *value, int length, PyTypeObject *type,
 /* follow http://www.python.org/dev/peps/pep-0383/ */
 PyObject *		PyC_UnicodeFromByte(const char *str);
 const char *	PuC_UnicodeAsByte(PyObject *py_str, PyObject **coerce); /* coerce must be NULL */
+
+/* name namespace function for bpy & bge */
+PyObject *		PyC_DefaultNameSpace(const char *filename);
 
 #endif // PY_CAPI_UTILS_H

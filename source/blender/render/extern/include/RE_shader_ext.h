@@ -193,6 +193,8 @@ int	multitex_ext(struct Tex *tex, float *texvec, float *dxt, float *dyt, int osa
 int multitex_nodes(struct Tex *tex, float *texvec, float *dxt, float *dyt, int osatex, struct TexResult *texres,
 	short thread, short which_output, struct ShadeInput *shi, struct MTex *mtex);
 
+void texco_mapping_ext(float *facenor, struct Tex* tex, struct MTex* mtex, float* co, float* dx, float* dy, float* texvec);
+
 /* shaded view and bake */
 struct Render;
 struct Image;

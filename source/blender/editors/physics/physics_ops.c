@@ -152,6 +152,13 @@ static void operatortypes_pointcache(void)
 	WM_operatortype_append(PTCACHE_OT_remove);
 }
 
+/********************************* mesh paint ***********************************/
+
+static void operatortypes_dynamicpaint(void)
+{
+	WM_operatortype_append(DPAINT_OT_bake);
+}
+
 //static void keymap_pointcache(wmWindowManager *wm)
 //{
 //	wmKeyMap *keymap= WM_keymap_find(wm, "Pointcache", 0, 0);
@@ -170,6 +177,7 @@ void ED_operatortypes_physics(void)
 	operatortypes_boids();
 	operatortypes_fluid();
 	operatortypes_pointcache();
+	operatortypes_dynamicpaint();
 }
 
 void ED_keymap_physics(wmKeyConfig *keyconf)

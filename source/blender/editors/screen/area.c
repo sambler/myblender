@@ -502,7 +502,6 @@ static void region_azone_edge(AZone *az, ARegion *ar)
 static void region_azone_icon(ScrArea *sa, AZone *az, ARegion *ar)
 {
 	AZone *azt;
-	int tot=0;
 	
 	/* count how many actionzones with along same edge are available.
 	   This allows for adding more action zones in the future without

@@ -568,7 +568,7 @@ static TreeElement *outliner_add_element(SpaceOops *soops, ListBase *lb, void *i
 	ID *id= idv;
 	int a = 0;
 	int tot;
-
+    
 	if(ELEM3(type, TSE_RNA_STRUCT, TSE_RNA_PROPERTY, TSE_RNA_ARRAY_ELEM)) {
 		id= ((PointerRNA*)idv)->id.data;
 		if(!id) id= ((PointerRNA*)idv)->data;
@@ -585,8 +585,7 @@ static TreeElement *outliner_add_element(SpaceOops *soops, ListBase *lb, void *i
 	
     /* if we are searching for something expand to see child elements
        - user prefs need individual treatment later to not expand rna entries */
-	if(searching && soops->outlinevis!=SO_USERDEF && soops->outlinevis!=SO_DATABLOCKS)
-        tselem->flag |= TSE_CHILDSEARCH;
+	if(searching && soops->outlinevis!=SO_USERDEF) tselem->flag |= TSE_CHILDSEARCH;
 
 	te->parent= parent;
 	te->index= index;	// for data arays
@@ -4546,7 +4545,7 @@ static void outliner_draw_tree_element(bContext *C, uiBlock *block, Scene *scene
 
 	if(*starty+2*OL_H >= ar->v2d.cur.ymin && *starty<= ar->v2d.cur.ymax) {
 		int xmax= ar->v2d.cur.xmax;
-
+		
 		/* icons can be ui buts, we dont want it to overlap with restrict */
 		if((soops->flag & SO_HIDE_RESTRICTCOLS)==0)
 			xmax-= OL_TOGW+ICON_DEFAULT_WIDTH;
@@ -4765,7 +4764,7 @@ static void outliner_draw_selection(ARegion *ar, SpaceOops *soops, ListBase *lb,
 {
 	TreeElement *te;
 	TreeStoreElem *tselem;
-
+	
 	for(te= lb->first; te; te= te->next) {
 		tselem= TREESTORE(te);
 		

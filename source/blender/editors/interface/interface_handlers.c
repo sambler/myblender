@@ -5407,15 +5407,10 @@ int ui_handle_menu_event(bContext *C, wmEvent *event, uiPopupBlockHandle *menu, 
                                 /* is there a situation where UI_LEFT or UI_RIGHT would also change navigation direction? */
                                 /* UI_TOP and UI_DOWN are inconsistant - should be UI_UP and UI_DOWN or UI_TOP and UI_BOTTOM */
 								if( ((ELEM(event->type, DOWNARROWKEY, WHEELDOWNMOUSE)) && (block->direction & UI_DOWN))
-                                       || ((ELEM(event->type, UPARROWKEY, WHEELUPMOUSE)) && (block->direction & UI_TOP)) ) {
-                                    /* the following is just a hack - uiBut->type set to BUT and BUTM have there menus built 
-                                     opposite ways - this should be changed so that all popup-menus use the same uiBlock->direction */
-									if(but->type & BUT) but= ui_but_next(but);
-                                    else but= ui_but_prev(but);
-                                }else{
-                                    if(but->type & BUT) but= ui_but_prev(but);
-                                    else but= ui_but_next(but);
-                                }
+                                       || ((ELEM(event->type, UPARROWKEY, WHEELUPMOUSE)) && (block->direction & UI_TOP)) )
+                                    but= ui_but_next(but);
+                                else
+                                    but= ui_but_prev(but);
 
 								if(but)
 									ui_handle_button_activate(C, ar, but, BUTTON_ACTIVATE);
@@ -5423,13 +5418,10 @@ int ui_handle_menu_event(bContext *C, wmEvent *event, uiPopupBlockHandle *menu, 
 
 							if(!but) {
                                    if( ((ELEM(event->type, UPARROWKEY, WHEELUPMOUSE)) && (block->direction & UI_DOWN))
-                                          || ((ELEM(event->type, DOWNARROWKEY, WHEELDOWNMOUSE)) && (block->direction & UI_TOP)) ) {
-                                        if(ui_but_first(block)->type & BUT) bt= ui_but_last(block);
-                                        else bt= ui_but_first(block);
-                                   }else{
-                                        if(ui_but_first(block)->type & BUT) bt= ui_but_first(block);
-                                        else bt= ui_but_last(block);
-                                   }
+                                          || ((ELEM(event->type, DOWNARROWKEY, WHEELDOWNMOUSE)) && (block->direction & UI_TOP)) )
+                                        bt= ui_but_last(block);
+                                   else
+                                        bt= ui_but_first(block);
 
 								if(bt)
 									ui_handle_button_activate(C, ar, bt, BUTTON_ACTIVATE);

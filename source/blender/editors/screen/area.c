@@ -534,14 +534,19 @@ static void region_azone_icon(ScrArea *sa, AZone *az, ARegion *ar)
 	
 	/* if more azones on 1 spot, set offset */
 	for(azt= sa->actionzones.first; azt; azt= azt->next) {
-		if(az!=azt) {
-			if(ABS((az->y1 - AZONESPOT) - ar->winrct.ymin) < (AZONEPAD_ICON/2)+1) {
-                az->y1+= AZONESPOT;
-                az->y2+= AZONESPOT;
-            }
-            else{
-                az->y1-= AZONESPOT;
-                az->y2-= AZONESPOT;
+		if( (az!=azt)
+				&& ((az->ar!=NULL) && (az->ar->flag & RGN_FLAG_HIDDEN))
+					&& ((azt->ar!=NULL) && (azt->ar->flag & RGN_FLAG_HIDDEN)) )
+        {
+            if( (ABS(az->y1-azt->y1) < 2) && (ABS(az->x1-azt->x1) < 2) ) {
+                if(az->edge == AE_TOP_TO_BOTTOMRIGHT) {
+                    az->y1+= AZONESPOT;
+                    az->y2+= AZONESPOT;
+                }
+                else {
+                    az->y1-= AZONESPOT;
+                    az->y2-= AZONESPOT;
+                }
             }
             BLI_init_rcti(&az->rect, az->x1, az->x2, az->y1, az->y2);
         }

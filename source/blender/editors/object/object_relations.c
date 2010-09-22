@@ -421,6 +421,9 @@ static int parent_clear_exec(bContext *C, wmOperator *op)
 	
 	CTX_DATA_BEGIN(C, Object*, ob, selected_editable_objects) {
 
+		if(ob->parent == NULL)
+			continue;
+		
 		if(type == 0) {
 			ob->parent= NULL;
 		}			
@@ -569,8 +572,8 @@ static int parent_set_exec(bContext *C, wmOperator *op)
 				Object myworkob;
 				
 				/* apply transformation of previous parenting */
-				object_apply_mat4(ob, ob->obmat);
-				
+				/* object_apply_mat4(ob, ob->obmat); */ /* removed because of bug [#23577] */
+
 				/* set the parent (except for follow-path constraint option) */
 				if(partype != PAR_PATH_CONST)
 					ob->parent= par;

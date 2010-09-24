@@ -1065,6 +1065,26 @@ static int pyrna_py_to_prop(PointerRNA *ptr, PropertyRNA *prop, ParameterList *p
 			StructRNA *ptype= RNA_property_pointer_type(ptr, prop);
 			int flag = RNA_property_flag(prop);
 
+			/* this is really nasty!, so we can fake the operator having direct properties eg:
+			 * layout.prop(self, "filepath")
+			 * ... which infact should be
+			 * layout.prop(self.properties, "filepath")
+			 * 
+			 * we need to do this trick.
+			 * if the prop is not an operator type and the pyobject is an operator, use its properties in place of its self.
+			 * 
+			 * this is so bad that its almost a good reason to do away with fake 'self.properties -> self' class mixing
+			 * if this causes problems in the future it should be removed.
+			 */
+			if(	(ptype == &RNA_AnyType) &&
+				(BPy_StructRNA_Check(value)) &&
+				(RNA_struct_is_a(((BPy_StructRNA *)value)->ptr.type, &RNA_Operator))
+			) {
+				value= PyObject_GetAttrString(value, "properties");
+				value_new= value;
+			}
+
+
 			/* if property is an OperatorProperties pointer and value is a map, forward back to pyrna_pydict_to_props */
 			if (RNA_struct_is_a(ptype, &RNA_OperatorProperties) && PyDict_Check(value)) {
 				PointerRNA opptr = RNA_property_pointer_get(ptr, prop);
@@ -1140,6 +1160,8 @@ static int pyrna_py_to_prop(PointerRNA *ptr, PropertyRNA *prop, ParameterList *p
 					Py_XDECREF(value_new); return -1;
 				}
 			}
+			
+			Py_XDECREF(value_new);
 
 			break;
 		}
@@ -2262,17 +2284,29 @@ static PyObject *pyrna_struct_path_resolve(BPy_StructRNA *self, PyObject *args)
 	PyObject *coerce= Py_True;
 	PointerRNA r_ptr;
 	PropertyRNA *r_prop;
+	int index= -1;
 
 	if (!PyArg_ParseTuple(args, "s|O!:path_resolve", &path, &PyBool_Type, &coerce))
 		return NULL;
 
-	if (RNA_path_resolve(&self->ptr, path, &r_ptr, &r_prop)) {
+	if (RNA_path_resolve_full(&self->ptr, path, &r_ptr, &r_prop, &index)) {
 		if(r_prop) {
-			if(coerce == Py_False) {
-				return pyrna_prop_CreatePyObject(&r_ptr, r_prop);
+			if(index != -1) {
+				if(index >= RNA_property_array_length(&r_ptr, r_prop) || index < 0) {
+					PyErr_Format(PyExc_TypeError, "%.200s.path_resolve(\"%.200s\") index out of range", RNA_struct_identifier(self->ptr.type), path);
+					return NULL;
+				}
+				else {
+					return pyrna_array_index(&r_ptr, r_prop, index);
+				}
 			}
 			else {
-				return pyrna_prop_to_py(&r_ptr, r_prop);
+				if(coerce == Py_False) {
+					return pyrna_prop_CreatePyObject(&r_ptr, r_prop);
+				}
+				else {
+					return pyrna_prop_to_py(&r_ptr, r_prop);
+				}
 			}
 		}
 		else {

@@ -78,21 +78,21 @@ static CompBuf *node_composit_get_image(RenderData *rd, Image *ima, ImageUser *i
 	/* now we need a float buffer from the image
 	 * with matching color management */
 	if(rd->color_mgt_flag & R_COLOR_MANAGEMENT) {
-		if(ibuf->profile == IB_PROFILE_LINEAR_RGB) {
+		if(ibuf->profile != IB_PROFILE_NONE) {
 			rect= ibuf->rect_float;
 		}
 		else {
-			rect= MEM_mallocN(sizeof(float) * 4 * ibuf->x * ibuf->y, "node_composit_get_image");
+			rect= MEM_mapallocN(sizeof(float) * 4 * ibuf->x * ibuf->y, "node_composit_get_image");
 			srgb_to_linearrgb_rgba_rgba_buf(rect, ibuf->rect_float, ibuf->x * ibuf->y);
 			alloc= TRUE;
 		}
 	}
 	else {
-		if(ibuf->profile != IB_PROFILE_LINEAR_RGB) {
+		if(ibuf->profile == IB_PROFILE_NONE) {
 			rect= ibuf->rect_float;
 		}
 		else {
-			rect= MEM_mallocN(sizeof(float) * 4 * ibuf->x * ibuf->y, "node_composit_get_image");
+			rect= MEM_mapallocN(sizeof(float) * 4 * ibuf->x * ibuf->y, "node_composit_get_image");
 			linearrgb_to_srgb_rgba_rgba_buf(rect, ibuf->rect_float, ibuf->x * ibuf->y);
 			alloc= TRUE;
 		}
@@ -109,8 +109,9 @@ static CompBuf *node_composit_get_image(RenderData *rd, Image *ima, ImageUser *i
 	}
 	else {
 		/* we put imbuf copy on stack, cbuf knows rect is from other ibuf when freed! */
-		stackbuf= alloc_compbuf(ibuf->x, ibuf->y, type, alloc);
+		stackbuf= alloc_compbuf(ibuf->x, ibuf->y, type, FALSE);
 		stackbuf->rect= rect;
+		stackbuf->malloc= alloc;
 	}
 	
 	/*code to respect the premul flag of images; I'm

@@ -981,7 +981,7 @@ class USERPREF_PT_addons(bpy.types.Panel):
                     if info["version"]:
                         split = colsub.row().split(percentage=0.15)
                         split.label(text='Version:')
-                        split.label(text='.'.join([str(x) for x in info["version"]]))
+                        split.label(text='.'.join(str(x) for x in info["version"]))
                     if info["warning"]:
                         split = colsub.row().split(percentage=0.15)
                         split.label(text="Warning:")
@@ -1085,6 +1085,7 @@ class WM_OT_addon_install(bpy.types.Operator):
     filepath = StringProperty(name="File Path", description="File path to write file to")
     filter_folder = BoolProperty(name="Filter folders", description="", default=True, options={'HIDDEN'})
     filter_python = BoolProperty(name="Filter python", description="", default=True, options={'HIDDEN'})
+    filter_glob = StringProperty(default="*.py;*.zip", options={'HIDDEN'})
 
     def execute(self, context):
         import traceback

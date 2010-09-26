@@ -2020,14 +2020,9 @@ static ImBuf *image_get_ibuf_threadsafe(Image *ima, ImageUser *iuser, int *frame
 		ibuf= image_get_ibuf(ima, IMA_NO_INDEX, 0);
 	}
 	else if(ima->source == IMA_SRC_VIEWER) {
-		if(ima->type==IMA_TYPE_R_RESULT) {
-			/* always verify entirely, not that this shouldn't happen
-			 * during render anyway */
-		}
-		else if(ima->type==IMA_TYPE_COMPOSITE) {
-			frame= iuser?iuser->framenr:0;
-			ibuf= image_get_ibuf(ima, 0, frame);
-		}
+		/* always verify entirely, not that this shouldn't happen
+		 * as part of texture sampling in rendering anyway, so not
+		 * a big bottleneck */
 	}
 
 	*frame_r = frame;
@@ -2144,10 +2139,15 @@ ImBuf *BKE_image_acquire_ibuf(Image *ima, ImageUser *iuser, void **lock_r)
 						BLI_lock_thread(LOCK_VIEWER);
 						*lock_r= ima;
 
-						/* Composite Viewer, all handled in compositor */
-						/* fake ibuf, will be filled in compositor */
-						ibuf= IMB_allocImBuf(256, 256, 32, IB_rect, 0);
-						image_assign_ibuf(ima, ibuf, 0, frame);
+						frame= iuser?iuser->framenr:0;
+						ibuf= image_get_ibuf(ima, 0, frame);
+
+						if(!ibuf) {
+							/* Composite Viewer, all handled in compositor */
+							/* fake ibuf, will be filled in compositor */
+							ibuf= IMB_allocImBuf(256, 256, 32, IB_rect, 0);
+							image_assign_ibuf(ima, ibuf, 0, frame);
+						}
 					}
 				}
 			}

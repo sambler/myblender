@@ -4661,7 +4661,7 @@ static void button_tooltip_timer_reset(bContext *C, uiBut *but)
 		data->tooltiptimer= NULL;
 	}
 
-	if(U.flag & USER_TOOLTIPS)
+	if(U.flag & (USER_TOOLTIPS|USER_OPTION_TOOLTIPS) )
 		if(!but->block->tooltipdisabled)
 			if(!wm->drags.first)
 				data->tooltiptimer= WM_event_add_timer(data->wm, data->window, TIMER, BUTTON_TOOLTIP_DELAY);
@@ -5019,6 +5019,11 @@ static int ui_handle_button_over(bContext *C, wmEvent *event, ARegion *ar)
 	wmWindow *win= CTX_wm_window(C);
 	uiBut *but;
 
+	if(event->alt)
+		U.flag |= USER_OPTION_TOOLTIPS;
+	else
+		U.flag &= ~USER_OPTION_TOOLTIPS;
+	
 	if(event->type == MOUSEMOVE) {
 		but= ui_but_find_mouse_over(win, ar, event->x, event->y);
 		if(but)

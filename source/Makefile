@@ -55,7 +55,7 @@ ifdef NAN_BUILDINFO
     BUILDINFO_C = $(SRCHOME)/creator/buildinfo.c
     BUILD_DATE := $(shell date "+%Y-%m-%d")
     BUILD_TIME := $(shell date "+%H:%M:%S")
-    BUILD_REV := 32135
+    BUILD_REV := 32175
 endif
 
 ############# set pyplayerlib ##################

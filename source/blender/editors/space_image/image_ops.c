@@ -2057,19 +2057,23 @@ static int cycle_render_slot_exec(bContext *C, wmOperator *op)
 	int a, slot, cur= ima->render_slot;
     int direction= (RNA_int_get(op->ptr, "slot_cycle")>=0)?1:-1;
 
-    for(a=1; a<IMA_MAX_RENDER_SLOT; a++) {
+	for(a=1; a<IMA_MAX_RENDER_SLOT; a++) {
         slot= (cur+(a*direction));
-        
+
         if(slot >= IMA_MAX_RENDER_SLOT) 
             slot= 0;
         else if(slot < 0)
             slot= IMA_MAX_RENDER_SLOT+slot;
         
-        if(ima->renders[slot] || slot == ima->last_render_slot) {
-            ima->render_slot= slot;
-            break;
-        }
-    }
+		if(ima->renders[slot] || slot == ima->last_render_slot) {
+			ima->render_slot= slot;
+			break;
+		}
+		else if((slot - direction) == ima->last_render_slot && slot < IMA_MAX_RENDER_SLOT) {
+			ima->render_slot= slot;
+			break;
+		}
+	}
 
 	if(a == IMA_MAX_RENDER_SLOT)
 		ima->render_slot= ((cur == 1)? 0: 1);

@@ -406,7 +406,7 @@ extern UserDef U; /* from blenkernel blender.c */
 #define USER_MAT_ON_OB			(1 << 8)
 /*#define USER_NO_CAPSLOCK		(1 << 9)*/ /* not used anywhere */
 #define USER_VIEWMOVE			(1 << 10)
-#define USER_TOOLTIPS			(1 << 11)
+#define USER_TOOLTIPS			(1 << 11)	/* this always shows tooltips based on the prefs settings */
 #define USER_TWOBUTTONMOUSE		(1 << 12)
 #define USER_NONUMPAD			(1 << 13)
 #define USER_LMOUSESELECT		(1 << 14)
@@ -421,6 +421,7 @@ extern UserDef U; /* from blenkernel blender.c */
 #define USER_FILENOUI			(1 << 23)
 #define USER_NONEGFRAMES		(1 << 24)
 #define USER_TXT_TABSTOSPACES_DISABLE	(1 << 25)
+#define USER_OPTION_TOOLTIPS	(1<<26)		/* this shows tooltips when holding option/alt if USER_TOOLTIPS is off */
 
 /* helper macro for checking frame clamping */
 #define FRAMENUMBER_MIN_CLAMP(cfra) \

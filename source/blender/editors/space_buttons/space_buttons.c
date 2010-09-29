@@ -181,6 +181,7 @@ void buttons_operatortypes(void)
 {
 	WM_operatortype_append(BUTTONS_OT_toolbox);
 	WM_operatortype_append(BUTTONS_OT_file_browse);
+	WM_operatortype_append(BUTTONS_OT_resflip);
 }
 
 void buttons_keymap(struct wmKeyConfig *keyconf)
@@ -188,6 +189,7 @@ void buttons_keymap(struct wmKeyConfig *keyconf)
 	wmKeyMap *keymap= WM_keymap_find(keyconf, "Property Editor", SPACE_BUTS, 0);
 	
 	WM_keymap_add_item(keymap, "BUTTONS_OT_toolbox", RIGHTMOUSE, KM_PRESS, 0, 0);
+	WM_keymap_add_item(keymap, "BUTTONS_OT_resflip", FKEY, KM_PRESS, 0, 0);
 }
 
 /* add handlers, stuff you only do once or on area/region changes */

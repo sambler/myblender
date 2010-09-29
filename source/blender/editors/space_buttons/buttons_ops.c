@@ -31,6 +31,7 @@
 #include "MEM_guardedalloc.h"
 
 #include "DNA_userdef_types.h"
+#include "DNA_scene_types.h"
 
 #include "BLI_fileops.h"
 #include "BLI_path_util.h"
@@ -80,6 +81,34 @@ void BUTTONS_OT_toolbox(wmOperatorType *ot)
 	
 	/* api callbacks */
 	ot->invoke= toolbox_invoke;
+	ot->poll= ED_operator_buttons_active;
+}
+
+/********************** resflip operator *********************/
+
+static int resflip_invoke(bContext *C, wmOperator *op, wmEvent *event)
+{
+	Scene *sce= CTX_data_scene(C);
+	int tmpres;
+	
+	tmpres= sce->r.xsch;
+	sce->r.xsch= sce->r.ysch;
+	sce->r.ysch= tmpres;
+	
+	WM_event_add_notifier(C, NC_SCENE|ND_SPACE_PROPERTIES, CTX_data_active_object(C));
+	
+	return OPERATOR_FINISHED;
+}
+
+void BUTTONS_OT_resflip(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name= "Resolution Flip";
+	ot->description="Swap horiz and vert resolutions - switch portrait/landscape.";
+	ot->idname= "BUTTONS_OT_resflip";
+	
+	/* api callbacks */
+	ot->invoke= resflip_invoke;
 	ot->poll= ED_operator_buttons_active;
 }
 

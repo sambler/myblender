@@ -48,6 +48,12 @@
 
 #include "GHOST_Path-api.h"
 
+#if defined WIN32 && !defined _LIBC
+# include "BLI_fnmatch.h" /* use fnmatch included in blenlib */
+#else
+# define _GNU_SOURCE
+# include <fnmatch.h>
+#endif
 
 #ifdef WIN32
 #include <io.h>
@@ -1285,6 +1291,36 @@ int BLI_testextensie_array(const char *str, const char **ext_array)
 	return 0;
 }
 
+/* semicolon separated wildcards, eg:
+ *  '*.zip;*.py;*.exe' */
+int BLI_testextensie_glob(const char *str, const char *ext_fnmatch)
+{
+	const char *ext_step= ext_fnmatch;
+	char pattern[16];
+
+	while(ext_step[0]) {
+		char *ext_next;
+		int len_ext;
+
+		if((ext_next=strchr(ext_step, ';'))) {
+			len_ext= (int)(ext_next - ext_step) + 1;
+		}
+		else {
+			len_ext= sizeof(pattern);
+		}
+
+		BLI_strncpy(pattern, ext_step, len_ext);
+
+		if(fnmatch(pattern, str, FNM_CASEFOLD)==0) {
+			return 1;
+		}
+		ext_step += len_ext;
+	}
+
+	return 0;
+}
+
+
 int BLI_replace_extension(char *path, int maxlen, const char *ext)
 {
 	int a;
@@ -1620,6 +1656,9 @@ void BLI_where_is_temp(char *fullname, int usertemp)
 	} else {
 		/* add a trailing slash if needed */
 		BLI_add_slash(fullname);
+#ifdef WIN32
+		strcpy(U.tempdir, fullname); /* also set user pref to show %TEMP%. /tmp/ is just plain confusing for Windows users. */
+#endif
 	}
 }
 

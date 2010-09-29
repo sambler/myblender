@@ -4255,6 +4255,7 @@ static int ui_but_menu(bContext *C, uiBut *but)
 
 static int ui_do_button(bContext *C, uiBlock *block, uiBut *but, wmEvent *event)
 {
+//	Scene *scene= CTX_data_scene(C);
 	uiHandleButtonData *data;
 	int retval;
 
@@ -4906,6 +4907,98 @@ void ui_button_active_free(const bContext *C, uiBut *but)
 	}
 }
 
+/* helper function for insert keyframe, reset to default, etc operators */
+void uiContextActiveProperty(const bContext *C, struct PointerRNA *ptr, struct PropertyRNA **prop, int *index)
+{
+	ARegion *ar= CTX_wm_region(C);
+	uiBlock *block;
+	uiBut *but, *activebut;
+
+	memset(ptr, 0, sizeof(*ptr));
+	*prop= NULL;
+	*index= 0;
+
+	while(ar) {
+		/* find active button */
+		activebut= NULL;
+
+		for(block=ar->uiblocks.first; block; block=block->next) {
+			for(but=block->buttons.first; but; but= but->next) {
+				if(but->active)
+					activebut= but;
+				else if(!activebut && (but->flag & UI_BUT_LAST_ACTIVE))
+					activebut= but;
+			}
+		}
+
+		if(activebut) {
+			if(activebut->rnapoin.data) {
+				/* found RNA button */
+				*ptr= activebut->rnapoin;
+				*prop= activebut->rnaprop;
+				*index= activebut->rnaindex;
+				return;
+			}
+			else {
+				/* recurse into opened menu */
+				uiHandleButtonData *data= activebut->active;
+				if(data && data->menu)
+					ar = data->menu->region;
+				else
+					return;
+			}
+		}
+		else {
+			/* no active button */
+			return;
+		}
+	}
+}
+
+/* helper function for insert keyframe, reset to default, etc operators */
+void uiContextAnimUpdate(const bContext *C)
+{
+	Scene *scene= CTX_data_scene(C);
+	ARegion *ar= CTX_wm_region(C);
+	uiBlock *block;
+	uiBut *but, *activebut;
+
+	while(ar) {
+		/* find active button */
+		activebut= NULL;
+
+		for(block=ar->uiblocks.first; block; block=block->next) {
+			for(but=block->buttons.first; but; but= but->next) {
+				ui_but_anim_flag(but, (scene)? scene->r.cfra: 0.0f);
+
+				if(but->active)
+					activebut= but;
+				else if(!activebut && (but->flag & UI_BUT_LAST_ACTIVE))
+					activebut= but;
+			}
+		}
+
+		if(activebut) {
+			if(activebut->rnapoin.data) {
+				/* found RNA button */
+				return;
+			}
+			else {
+				/* recurse into opened menu */
+				uiHandleButtonData *data= activebut->active;
+				if(data && data->menu)
+					ar = data->menu->region;
+				else
+					return;
+			}
+		}
+		else {
+			/* no active button */
+			return;
+		}
+	}
+}
+
 /************** handle activating a button *************/
 
 static uiBut *uit_but_find_open_event(ARegion *ar, wmEvent *event)
@@ -5404,20 +5497,45 @@ int ui_handle_menu_event(bContext *C, wmEvent *event, uiPopupBlockHandle *menu, 
 						if(event->val==KM_PRESS) {
 							but= ui_but_find_activated(ar);
 							if(but) {
-								if(ELEM(event->type, DOWNARROWKEY, WHEELDOWNMOUSE)) 
-									but= ui_but_next(but);
-								else
-									but= ui_but_prev(but);
+								/* is there a situation where UI_LEFT or UI_RIGHT would also change navigation direction? */
+								if(	((ELEM(event->type, DOWNARROWKEY, WHEELDOWNMOUSE)) && (block->direction & UI_DOWN)) ||
+									((ELEM(event->type, DOWNARROWKEY, WHEELDOWNMOUSE)) && (block->direction & UI_RIGHT)) ||
+									((ELEM(event->type, UPARROWKEY, WHEELUPMOUSE)) && (block->direction & UI_TOP))
+								) {
+									/* the following is just a hack - uiBut->type set to BUT and BUTM have there menus built 
+									 * opposite ways - this should be changed so that all popup-menus use the same uiBlock->direction */
+									if(but->type & BUT)
+										but= ui_but_next(but);
+									else
+										but= ui_but_prev(but);
+								}
+								else {
+									if(but->type & BUT)
+										but= ui_but_prev(but);
+									else
+										but= ui_but_next(but);
+								}
 
 								if(but)
 									ui_handle_button_activate(C, ar, but, BUTTON_ACTIVATE);
 							}
 
 							if(!but) {
-								if(ELEM(event->type, UPARROWKEY, WHEELUPMOUSE))
-									bt= ui_but_last(block);
-								else
-									bt= ui_but_first(block);
+								if(	((ELEM(event->type, UPARROWKEY, WHEELUPMOUSE)) && (block->direction & UI_DOWN)) ||
+									((ELEM(event->type, UPARROWKEY, WHEELUPMOUSE)) && (block->direction & UI_RIGHT)) ||
+									((ELEM(event->type, DOWNARROWKEY, WHEELDOWNMOUSE)) && (block->direction & UI_TOP))
+								) {
+									if(ui_but_first(block)->type & BUT)
+										bt= ui_but_last(block);
+									else
+										bt= ui_but_first(block);
+								}
+								else {
+									if(ui_but_first(block)->type & BUT)
+										bt= ui_but_first(block);
+									else
+										bt= ui_but_last(block);
+								}
 
 								if(bt)
 									ui_handle_button_activate(C, ar, bt, BUTTON_ACTIVATE);
@@ -5429,25 +5547,25 @@ int ui_handle_menu_event(bContext *C, wmEvent *event, uiPopupBlockHandle *menu, 
 
 					break;
 
-				case ONEKEY: 	case PAD1: 
+				case ONEKEY:	case PAD1:
 					act= 1;
-				case TWOKEY: 	case PAD2: 
+				case TWOKEY:	case PAD2:
 					if(act==0) act= 2;
-				case THREEKEY: 	case PAD3: 
+				case THREEKEY:	case PAD3:
 					if(act==0) act= 3;
-				case FOURKEY: 	case PAD4: 
+				case FOURKEY:	case PAD4:
 					if(act==0) act= 4;
-				case FIVEKEY: 	case PAD5: 
+				case FIVEKEY:	case PAD5:
 					if(act==0) act= 5;
-				case SIXKEY: 	case PAD6: 
+				case SIXKEY:	case PAD6:
 					if(act==0) act= 6;
-				case SEVENKEY: 	case PAD7: 
+				case SEVENKEY:	case PAD7:
 					if(act==0) act= 7;
-				case EIGHTKEY: 	case PAD8: 
+				case EIGHTKEY:	case PAD8:
 					if(act==0) act= 8;
-				case NINEKEY: 	case PAD9: 
+				case NINEKEY:	case PAD9:
 					if(act==0) act= 9;
-				case ZEROKEY: 	case PAD0: 
+				case ZEROKEY:	case PAD0:
 					if(act==0) act= 10;
 				
 					if((block->flag & UI_BLOCK_NUMSELECT) && event->val==KM_PRESS) {

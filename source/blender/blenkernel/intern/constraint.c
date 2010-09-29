@@ -1636,8 +1636,9 @@ static void rotlike_evaluate (bConstraint *con, bConstraintOb *cob, ListBase *ta
 		mat4_to_size(size, cob->matrix);
 		
 		/* to allow compatible rotations, must get both rotations in the order of the owner... */
-		mat4_to_eulO(eul, cob->rotOrder, ct->matrix);
 		mat4_to_eulO(obeul, cob->rotOrder, cob->matrix);
+		/* we must get compatible eulers from the beginning because some of them can be modified below (see bug #21875) */
+		mat4_to_compatible_eulO(eul, obeul, cob->rotOrder, ct->matrix);
 		
 		if ((data->flag & ROTLIKE_X)==0)
 			eul[0] = obeul[0];
@@ -1669,6 +1670,7 @@ static void rotlike_evaluate (bConstraint *con, bConstraintOb *cob, ListBase *ta
 				eul[2] *= -1;
 		}
 		
+		/* good to make eulers compatible again, since we don't know how much they were changed above */
 		compatible_eul(eul, obeul);
 		loc_eulO_size_to_mat4(cob->matrix, loc, eul, size, cob->rotOrder);
 	}
@@ -4356,8 +4358,7 @@ void get_constraint_target_matrix (struct Scene *scene, bConstraint *con, int n,
 void solve_constraints (ListBase *conlist, bConstraintOb *cob, float ctime)
 {
 	bConstraint *con;
-	float solution[4][4], delta[4][4];
-	float oldmat[4][4], imat[4][4];
+	float oldmat[4][4];
 	float enf;
 
 	/* check that there is a valid constraint object to evaluate */
@@ -4409,7 +4410,7 @@ void solve_constraints (ListBase *conlist, bConstraintOb *cob, float ctime)
 			}
 		}
 		
-		/* Solve the constraint */
+		/* Solve the constraint and put result in cob->matrix */
 		cti->evaluate_constraint(con, cob, &targets);
 		
 		/* clear targets after use 
@@ -4421,22 +4422,12 @@ void solve_constraints (ListBase *conlist, bConstraintOb *cob, float ctime)
 		}
 		
 		/* Interpolate the enforcement, to blend result of constraint into final owner transform */
-		/* 1. Remove effects of original matrix from constraint solution ==> delta */
-		invert_m4_m4(imat, oldmat);
-		copy_m4_m4(solution, cob->matrix);
-		mul_m4_m4m4(delta, solution, imat);
-		
-		/* 2. If constraint influence is not full strength, then interpolate
-		 * 	identity_matrix --> delta_matrix to get the effect the constraint actually exerts
-		 */
+		/* Note: all kind of stuff here before (caused trouble), much easier to just interpolate, or did I miss something? -jahka */
 		if (enf < 1.0) {
-			float identity[4][4];
-			unit_m4(identity);
-			blend_m4_m4m4(delta, identity, delta, enf);
+			float solution[4][4];
+			copy_m4_m4(solution, cob->matrix);
+			blend_m4_m4m4(cob->matrix, oldmat, solution, enf);
 		}
-		
-		/* 3. Now multiply the delta by the matrix in use before the evaluation */
-		mul_m4_m4m4(cob->matrix, delta, oldmat);
 		
 		/* move owner back into worldspace for next constraint/other business */
 		if ((con->flag & CONSTRAINT_SPACEONCE) == 0) 

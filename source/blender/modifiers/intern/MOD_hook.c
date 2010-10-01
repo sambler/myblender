@@ -273,6 +273,7 @@ ModifierTypeInfo modifierType_Hook = {
 	/* isDisabled */        isDisabled,
 	/* updateDepgraph */    updateDepgraph,
 	/* dependsOnTime */     0,
+	/* dependsOnNormals */	0,
 	/* foreachObjectLink */ foreachObjectLink,
 	/* foreachIDLink */     0,
 };

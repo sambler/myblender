@@ -111,6 +111,7 @@ static SpaceLink *action_new(const bContext *C)
 	ar->v2d.scroll = (V2D_SCROLL_BOTTOM|V2D_SCROLL_SCALE_HORIZONTAL);
 	ar->v2d.scroll |= (V2D_SCROLL_RIGHT);
 	ar->v2d.keepzoom= V2D_LOCKZOOM_Y;
+	ar->v2d.keepofs= V2D_KEEPOFS_Y;
 	ar->v2d.align= V2D_ALIGN_NO_POS_Y;
 	ar->v2d.flag = V2D_VIEWSYNC_AREA_VERTICAL;
 	

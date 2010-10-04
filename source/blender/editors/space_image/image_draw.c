@@ -50,6 +50,10 @@
 #include "BKE_paint.h"
 #include "BKE_colortools.h" /* for colorcorrection_do_ibuf() */
 
+#ifdef WITH_LCMS
+#include "BKE_colortools.h"
+#endif
+
 #include "BIF_gl.h"
 #include "BIF_glutil.h"
 

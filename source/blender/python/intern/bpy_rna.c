@@ -28,6 +28,7 @@
 #include "bpy_rna_callback.h"
 //#include "blendef.h"
 #include "BLI_dynstr.h"
+#include "BLI_string.h"
 #include "BLI_listbase.h"
 #include "float.h" /* FLT_MIN/MAX */
 
@@ -961,7 +962,7 @@ static int pyrna_py_to_prop(PointerRNA *ptr, PropertyRNA *prop, ParameterList *p
 			if(RNA_property_flag(prop) & PROP_OUTPUT)
 				param = PyObject_IsTrue( value );
 			else
-				param = PyLong_AsSsize_t( value );
+				param = PyLong_AsLong( value );
 			
 			if( param < 0 || param > 1) {
 				PyErr_Format(PyExc_TypeError, "%.200s %.200s.%.200s expected True/False or 0/1", error_prefix, RNA_struct_identifier(ptr->type), RNA_property_identifier(prop));
@@ -974,14 +975,20 @@ static int pyrna_py_to_prop(PointerRNA *ptr, PropertyRNA *prop, ParameterList *p
 		}
 		case PROP_INT:
 		{
-			int param = PyLong_AsSsize_t(value);
-			if (param==-1 && PyErr_Occurred()) {
+			int overflow;
+			long param= PyLong_AsLongAndOverflow(value, &overflow);
+			if(overflow || (param > INT_MAX) || (param < INT_MIN)) {
+				PyErr_Format(PyExc_TypeError, "%.200s %.200s.%.200s value not in 'int' range (" STRINGIFY(INT_MIN) ", " STRINGIFY(INT_MAX) ")", error_prefix, RNA_struct_identifier(ptr->type), RNA_property_identifier(prop));
+				return -1;
+			}
+			else if (param==-1 && PyErr_Occurred()) {
 				PyErr_Format(PyExc_TypeError, "%.200s %.200s.%.200s expected an int type", error_prefix, RNA_struct_identifier(ptr->type), RNA_property_identifier(prop));
 				return -1;
 			} else {
-				RNA_property_int_clamp(ptr, prop, &param);
-				if(data)	*((int*)data)= param;
-				else		RNA_property_int_set(ptr, prop, param);
+				int param_i= (int)param;
+				RNA_property_int_clamp(ptr, prop, &param_i);
+				if(data)	*((int*)data)= param_i;
+				else		RNA_property_int_set(ptr, prop, param_i);
 			}
 			break;
 		}
@@ -1005,7 +1012,7 @@ static int pyrna_py_to_prop(PointerRNA *ptr, PropertyRNA *prop, ParameterList *p
 			PyObject *value_coerce= NULL;
 			int subtype= RNA_property_subtype(prop);
 			if(ELEM3(subtype, PROP_FILEPATH, PROP_DIRPATH, PROP_FILENAME)) {
-				param= PuC_UnicodeAsByte(value, &value_coerce);
+				param= PyC_UnicodeAsByte(value, &value_coerce);
 			}
 			else {
 				param= _PyUnicode_AsString(value);
@@ -1260,7 +1267,7 @@ static int pyrna_py_to_prop_array_index(BPy_PropertyArrayRNA *self, int index, P
 		switch (type) {
 		case PROP_BOOLEAN:
 			{
-				int param = PyLong_AsSsize_t( value );
+				int param = PyLong_AsLong( value );
 		
 				if( param < 0 || param > 1) {
 					PyErr_SetString(PyExc_TypeError, "expected True/False or 0/1");
@@ -1272,7 +1279,7 @@ static int pyrna_py_to_prop_array_index(BPy_PropertyArrayRNA *self, int index, P
 			}
 		case PROP_INT:
 			{
-				int param = PyLong_AsSsize_t(value);
+				int param = PyLong_AsLong(value);
 				if (param==-1 && PyErr_Occurred()) {
 					PyErr_SetString(PyExc_TypeError, "expected an int type");
 					ret = -1;
@@ -1528,7 +1535,7 @@ static PyObject *pyrna_prop_array_subscript(BPy_PropertyArrayRNA *self, PyObject
 		Py_ssize_t i = PyNumber_AsSsize_t(key, PyExc_IndexError);
 		if (i == -1 && PyErr_Occurred())
 			return NULL;
-		return pyrna_prop_array_subscript_int(self, PyLong_AsSsize_t(key));
+		return pyrna_prop_array_subscript_int(self, PyLong_AsLong(key));
 	}
 	else if (PySlice_Check(key)) {
 		Py_ssize_t start, stop, step, slicelength;
@@ -1612,7 +1619,7 @@ static int prop_subscript_ass_array_slice(PointerRNA *ptr, PropertyRNA *prop, in
 				RNA_property_boolean_get_array(ptr, prop, values);
 	
 			for(count=start; count<stop; count++)
-				values[count] = PyLong_AsSsize_t(PySequence_Fast_GET_ITEM(value, count-start));
+				values[count] = PyLong_AsLong(PySequence_Fast_GET_ITEM(value, count-start));
 
 			if(PyErr_Occurred())	ret= -1;
 			else					RNA_property_boolean_set_array(ptr, prop, values);
@@ -1633,7 +1640,7 @@ static int prop_subscript_ass_array_slice(PointerRNA *ptr, PropertyRNA *prop, in
 				RNA_property_int_get_array(ptr, prop, values);
 
 			for(count=start; count<stop; count++) {
-				ival = PyLong_AsSsize_t(PySequence_Fast_GET_ITEM(value, count-start));
+				ival = PyLong_AsLong(PySequence_Fast_GET_ITEM(value, count-start));
 				CLAMP(ival, min, max);
 				values[count] = ival;
 			}
@@ -1979,26 +1986,46 @@ static PyObject *pyrna_struct_values(BPy_PropertyRNA *self)
 static int pyrna_struct_anim_args_parse(PointerRNA *ptr, const char *error_prefix, const char *path,
 	char **path_full, int *index)
 {
+	const int is_idbase= RNA_struct_is_ID(ptr->type);
 	PropertyRNA *prop;
+	PointerRNA r_ptr;
 	
 	if (ptr->data==NULL) {
 		PyErr_Format(PyExc_TypeError, "%.200s this struct has no data, can't be animated", error_prefix);
 		return -1;
 	}
 	
-	prop = RNA_struct_find_property(ptr, path);
-	
+	/* full paths can only be given from ID base */
+	if(is_idbase) {
+		int r_index= -1;
+		if(RNA_path_resolve_full(ptr, path, &r_ptr, &prop, &r_index)==0) {
+			prop= NULL;
+		}
+		else if(r_index != -1) {
+			PyErr_Format(PyExc_ValueError, "%.200s path includes index, must be a separate argument", error_prefix, path);
+			return -1;
+		}
+		else if(ptr->id.data != r_ptr.id.data) {
+			PyErr_Format(PyExc_ValueError, "%.200s path spans ID blocks", error_prefix, path);
+			return -1;
+		}
+	}
+    else {
+		prop = RNA_struct_find_property(ptr, path);
+		r_ptr= *ptr;
+    }
+
 	if (prop==NULL) {
 		PyErr_Format( PyExc_TypeError, "%.200s property \"%s\" not found", error_prefix, path);
 		return -1;
 	}
 
-	if (!RNA_property_animateable(ptr, prop)) {
+	if (!RNA_property_animateable(&r_ptr, prop)) {
 		PyErr_Format(PyExc_TypeError, "%.200s property \"%s\" not animatable", error_prefix, path);
 		return -1;
 	}
 
-	if(RNA_property_array_check(ptr, prop) == 0) {
+	if(RNA_property_array_check(&r_ptr, prop) == 0) {
 		if((*index) == -1) {
 			*index= 0;
 		}
@@ -2008,18 +2035,23 @@ static int pyrna_struct_anim_args_parse(PointerRNA *ptr, const char *error_prefi
 		}
 	}
 	else {
-		int array_len= RNA_property_array_length(ptr, prop);
+		int array_len= RNA_property_array_length(&r_ptr, prop);
 		if((*index) < -1 || (*index) >= array_len) {
 			PyErr_Format( PyExc_TypeError, "%.200s index out of range \"%s\", given %d, array length is %d", error_prefix, path, *index, array_len);
 			return -1;
 		}
 	}
 	
-	*path_full= RNA_path_from_ID_to_property(ptr, prop);
-
-	if (*path_full==NULL) {
-		PyErr_Format( PyExc_TypeError, "%.200s could not make path to \"%s\"", error_prefix, path);
-		return -1;
+	if(is_idbase) {
+		*path_full= BLI_strdup(path);
+	}
+	else {
+		*path_full= RNA_path_from_ID_to_property(&r_ptr, prop);
+	
+		if (*path_full==NULL) {
+			PyErr_Format( PyExc_TypeError, "%.200s could not make path to \"%s\"", error_prefix, path);
+			return -1;
+		}
 	}
 
 	return 0;
@@ -2828,7 +2860,7 @@ static PyObject *pyrna_prop_collection_idprop_add(BPy_PropertyRNA *self)
 
 static PyObject *pyrna_prop_collection_idprop_remove(BPy_PropertyRNA *self, PyObject *value)
 {
-	int key= PyLong_AsSsize_t(value);
+	int key= PyLong_AsLong(value);
 
 	if (key==-1 && PyErr_Occurred()) {
 		PyErr_SetString( PyExc_TypeError, "bpy_prop_collection.remove(): expected one int argument");
@@ -3175,13 +3207,13 @@ static PyObject *foreach_getset(BPy_PropertyRNA *self, PyObject *args, int set)
 				item= PySequence_GetItem(seq, i);
 				switch(raw_type) {
 				case PROP_RAW_CHAR:
-					((char *)array)[i]= (char)PyLong_AsSsize_t(item);
+					((char *)array)[i]= (char)PyLong_AsLong(item);
 					break;
 				case PROP_RAW_SHORT:
-					((short *)array)[i]= (short)PyLong_AsSsize_t(item);
+					((short *)array)[i]= (short)PyLong_AsLong(item);
 					break;
 				case PROP_RAW_INT:
-					((int *)array)[i]= (int)PyLong_AsSsize_t(item);
+					((int *)array)[i]= (int)PyLong_AsLong(item);
 					break;
 				case PROP_RAW_FLOAT:
 					((float *)array)[i]= (float)PyFloat_AsDouble(item);
@@ -4794,10 +4826,10 @@ static int pyrna_deferred_register_props(StructRNA *srna, PyObject *class_dict)
 	Py_ssize_t pos = 0;
 	int ret;
 
-	if(	!PyDict_CheckExact(class_dict) &&
-		(order= PyDict_GetItemString(class_dict, "order")) &&
-		PyList_CheckExact(order)
-	) {
+	/* in both cases PyDict_CheckExact(class_dict) will be true even
+	 * though Operators have a metaclass dict namespace */
+
+	if((order= PyDict_GetItemString(class_dict, "order")) && PyList_CheckExact(order)) {
 		for(pos= 0; pos<PyList_GET_SIZE(order); pos++) {
 			key= PyList_GET_ITEM(order, pos);
 			item= PyDict_GetItem(class_dict, key);
@@ -4945,7 +4977,7 @@ static int bpy_class_validate(PointerRNA *dummyptr, void *py_data, int *have_fun
 
 			if (func_arg_count >= 0) { /* -1 if we dont care*/
 				py_arg_count = PyObject_GetAttrString(PyFunction_GET_CODE(item), "co_argcount");
-				arg_count = PyLong_AsSsize_t(py_arg_count);
+				arg_count = PyLong_AsLong(py_arg_count);
 				Py_DECREF(py_arg_count);
 
 				/* note, the number of args we check for and the number of args we give to

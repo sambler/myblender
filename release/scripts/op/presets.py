@@ -63,11 +63,16 @@ class AddPresetBase():
             else:
                 file_preset = open(filepath, 'w')
                 file_preset.write("import bpy\n")
-                file_preset.write("from mathutils import *\n")
 
                 for rna_path in self.preset_values:
                     value = eval(rna_path)
-                    file_preset.write("%s = %s\n" % (rna_path, repr(value)))
+                    # convert thin wrapped sequences to simple lists to repr()
+                    try:
+                        value = value[:]
+                    except:
+                        pass
+
+                    file_preset.write("%s = %r\n" % (rna_path, value))
 
                 file_preset.close()
             
@@ -251,7 +256,7 @@ class AddPresetKeyconfig(AddPresetBase, bpy.types.Operator):
     '''Add a Keyconfig Preset'''
     bl_idname = "wm.keyconfig_preset_add"
     bl_label = "Add Keyconfig Preset"
-    preset_menu = "PREFS_MT_keyconfigs"
+    preset_menu = "USERPREF_MT_keyconfigs"
     preset_subdir = "keyconfig"
 
     def add(self, context, filepath):

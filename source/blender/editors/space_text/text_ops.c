@@ -2322,9 +2322,8 @@ static int insert_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	// if(!RNA_property_is_set(op->ptr, "text")) { /* always set from keymap XXX */
 	if(!RNA_string_length(op->ptr, "text")) {
 		char str[2] = {event->ascii, '\0'};
-
 		/* if alt/ctrl/super are pressed pass through */
-		if(event->alt || event->ctrl || event->oskey)
+		if(event->ctrl || event->oskey)
 			return OPERATOR_PASS_THROUGH;
 
 		RNA_string_set(op->ptr, "text", str);

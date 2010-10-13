@@ -56,6 +56,7 @@
 #include "ED_util.h"
 #include "ED_screen.h"
 #include "ED_object.h"
+#include "ED_armature.h"
 #include "ED_screen_types.h"
 #include "ED_keyframes_draw.h"
 
@@ -243,7 +244,11 @@ int ED_operator_editmesh_view3d(bContext *C)
 
 int ED_operator_editmesh_region_view3d(bContext *C)
 {
-	return ED_operator_editmesh(C) && CTX_wm_region_view3d(C);
+	if(ED_operator_editmesh(C) && CTX_wm_region_view3d(C))
+		return 1;
+
+	CTX_wm_operator_poll_msg_set(C, "expected a view3d region & editmesh");
+	return 0;
 }
 
 int ED_operator_editarmature(bContext *C)
@@ -259,8 +264,8 @@ int ED_operator_posemode(bContext *C)
 	Object *obact= CTX_data_active_object(C);
 	Object *obedit= CTX_data_edit_object(C);
 	
-	if ((obact != obedit) && (obact) && (obact->type==OB_ARMATURE))
-		return (obact->mode & OB_MODE_POSE)!=0;
+	if ((obact != obedit) && ED_object_pose_armature(obact))
+		return 1;
 	
 	return 0;
 }
@@ -1548,15 +1553,32 @@ static void SCREEN_OT_frame_offset(wmOperatorType *ot)
 static int frame_jump_exec(bContext *C, wmOperator *op)
 {
 	Scene *scene= CTX_data_scene(C);
-	
-	if (RNA_boolean_get(op->ptr, "end"))
-		CFRA= PEFRA;
-	else
-		CFRA= PSFRA;
-	
-	sound_seek_scene(C);
+	wmTimer *animtimer= CTX_wm_screen(C)->animtimer;
 
-	WM_event_add_notifier(C, NC_SCENE|ND_FRAME, scene);
+	/* Don't change CFRA directly if animtimer is running as this can cause
+	 * first/last frame not to be actually shown (bad since for example physics
+	 * simulations aren't reset properly).
+	 */
+	if(animtimer) {
+		ScreenAnimData *sad = animtimer->customdata;
+		
+		sad->flag |= ANIMPLAY_FLAG_USE_NEXT_FRAME;
+		
+		if (RNA_boolean_get(op->ptr, "end"))
+			sad->nextfra= PEFRA;
+		else
+			sad->nextfra= PSFRA;
+	}
+	else {
+		if (RNA_boolean_get(op->ptr, "end"))
+			CFRA= PEFRA;
+		else
+			CFRA= PSFRA;
+		
+		sound_seek_scene(C);
+
+		WM_event_add_notifier(C, NC_SCENE|ND_FRAME, scene);
+	}
 	
 	return OPERATOR_FINISHED;
 }
@@ -2507,6 +2529,13 @@ static int screen_animation_step(bContext *C, wmOperator *op, wmEvent *event)
 					sad->flag |= ANIMPLAY_FLAG_JUMPED;
 				}
 			}
+		}
+
+		/* next frame overriden by user action (pressed jump to first/last frame) */
+		if(sad->flag & ANIMPLAY_FLAG_USE_NEXT_FRAME) {
+			scene->r.cfra = sad->nextfra;
+			sad->flag &= ~ANIMPLAY_FLAG_USE_NEXT_FRAME;
+			sad->flag |= ANIMPLAY_FLAG_JUMPED;
 		}
 		
 		if (sad->flag & ANIMPLAY_FLAG_JUMPED)

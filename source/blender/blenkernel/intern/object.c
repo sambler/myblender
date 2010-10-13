@@ -1264,6 +1264,17 @@ static void copy_object_pose(Object *obn, Object *ob)
 	}
 }
 
+static void copy_object_transform(Object *ob_tar, Object *ob_src)
+{
+	copy_v3_v3(ob_tar->loc, ob_src->loc);
+	copy_v3_v3(ob_tar->rot, ob_src->rot);
+	copy_v3_v3(ob_tar->quat, ob_src->quat);
+	copy_v3_v3(ob_tar->rotAxis, ob_src->rotAxis);
+	ob_tar->rotAngle= ob_src->rotAngle;
+	ob_tar->rotmode= ob_src->rotmode;
+	copy_v3_v3(ob_tar->size, ob_src->size);
+}
+
 Object *copy_object(Object *ob)
 {
 	Object *obn;
@@ -1530,22 +1541,22 @@ void object_make_proxy(Object *ob, Object *target, Object *gob)
 	
 	ob->recalc= target->recalc= OB_RECALC_ALL;
 	
-	/* copy transform */
+	/* copy transform
+	 * - gob means this proxy comes from a group, just apply the matrix
+	 *   so the object wont move from its dupli-transform.
+	 *
+	 * - no gob means this is being made from a linked object,
+	 *   this is closer to making a copy of the object - in-place. */
 	if(gob) {
-		VECCOPY(ob->loc, gob->loc);
-		VECCOPY(ob->rot, gob->rot);
-		VECCOPY(ob->size, gob->size);
-		
-		group_tag_recalc(gob->dup_group);
+		ob->rotmode= target->rotmode;
+		mul_m4_m4m4(ob->obmat, target->obmat, gob->obmat);
+		object_apply_mat4(ob, ob->obmat);
 	}
 	else {
-		VECCOPY(ob->loc, target->loc);
-		VECCOPY(ob->rot, target->rot);
-		VECCOPY(ob->size, target->size);
+		copy_object_transform(ob, target);
+		ob->parent= target->parent;	/* libdata */
+		copy_m4_m4(ob->parentinv, target->parentinv);
 	}
-	
-	ob->parent= target->parent;	/* libdata */
-	copy_m4_m4(ob->parentinv, target->parentinv);
 	
 	/* copy animdata stuff - drivers only for now... */
 	object_copy_proxy_drivers(ob, target);
@@ -1743,7 +1754,7 @@ int enable_cu_speed= 1;
 static void ob_parcurve(Scene *scene, Object *ob, Object *par, float mat[][4])
 {
 	Curve *cu;
-	float q[4], vec[4], dir[3], quat[4], radius, x1, ctime;
+	float vec[4], dir[3], quat[4], radius, ctime;
 	float timeoffs = 0.0, sf_orig = 0.0;
 	
 	unit_m4(mat);
@@ -1791,9 +1802,11 @@ static void ob_parcurve(Scene *scene, Object *ob, Object *par, float mat[][4])
 	
 	
 	/* vec: 4 items! */
-	 if( where_on_path(par, ctime, vec, dir, NULL, &radius, NULL) ) {
+	if( where_on_path(par, ctime, vec, dir, cu->flag & CU_FOLLOW ? quat:NULL, &radius, NULL) ) {
 
 		if(cu->flag & CU_FOLLOW) {
+#if 0
+			float x1, q[4];
 			vec_to_quat( quat,dir, ob->trackflag, ob->upflag);
 			
 			/* the tilt */
@@ -1804,8 +1817,11 @@ static void ob_parcurve(Scene *scene, Object *ob, Object *par, float mat[][4])
 			q[2]= -x1*dir[1];
 			q[3]= -x1*dir[2];
 			mul_qt_qtqt(quat, q, quat);
-			
-			quat_to_mat4( mat,quat);
+#else
+			quat_apply_track(quat, ob->trackflag, ob->upflag);
+#endif
+
+			quat_to_mat4(mat,quat);			
 		}
 		
 		if(cu->flag & CU_PATH_RADIUS) {

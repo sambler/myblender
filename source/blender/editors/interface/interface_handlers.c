@@ -4280,7 +4280,7 @@ static int ui_do_button(bContext *C, uiBlock *block, uiBut *but, wmEvent *event)
 	if(but->flag & UI_BUT_DISABLED)
 		return WM_UI_HANDLER_CONTINUE;
 
-	if(data->state == BUTTON_STATE_HIGHLIGHT) {
+	if(data->state == BUTTON_STATE_HIGHLIGHT && event->prevval != KM_PRESS) { /* check prevval because of modal operators [#24016] */
 		/* handle copy-paste */
 		if(ELEM(event->type, CKEY, VKEY) && event->val==KM_PRESS && (event->ctrl || event->oskey)) {
 			ui_but_copy_paste(C, but, data, (event->type == CKEY)? 'c': 'v');
@@ -5545,16 +5545,20 @@ int ui_handle_menu_event(bContext *C, wmEvent *event, uiPopupBlockHandle *menu, 
 									((ELEM(event->type, UPARROWKEY, WHEELUPMOUSE)) && (block->direction & UI_RIGHT)) ||
 									((ELEM(event->type, DOWNARROWKEY, WHEELDOWNMOUSE)) && (block->direction & UI_TOP))
 								) {
-									if(ui_but_first(block)->type & BUT)
+									if((bt= ui_but_first(block)) && (bt->type & BUT)) {
 										bt= ui_but_last(block);
-									else
-										bt= ui_but_first(block);
+									}
+									else {
+										/* keep ui_but_first() */
+									}
 								}
 								else {
-									if(ui_but_first(block)->type & BUT)
-										bt= ui_but_first(block);
-									else
+									if((bt= ui_but_first(block)) && (bt->type & BUT)) {
+										/* keep ui_but_first() */
+									}
+									else {
 										bt= ui_but_last(block);
+									}
 								}
 
 								if(bt)

@@ -732,7 +732,7 @@ static void calc_shapeKeys(Object *obedit)
 		int totvert= count_curveverts(&editnurb->nurbs);
 
 		float (*ofs)[3] = NULL;
-		float *oldkey, *newkey, *fp, *ofp;
+		float *oldkey, *newkey, *ofp;
 
 		/* editing the base key should update others */
 		if(cu->key->type==KEY_RELATIVE) {
@@ -775,7 +775,7 @@ static void calc_shapeKeys(Object *obedit)
 								for (j= 0; j < 3; ++j) {
 									VECSUB(ofs[i], bezt->vec[j], oldbezt->vec[j]);
 									i++;
-									fp+= 3;
+									// fp+= 3; // unused
 								}
 								ofs[i++][0]= bezt->alfa - oldbezt->alfa;
 							} else {
@@ -795,7 +795,7 @@ static void calc_shapeKeys(Object *obedit)
 							}
 							i += 2;
 							++bp;
-							fp += 4;
+							// fp += 4; //unused
 						}
 					}
 
@@ -808,7 +808,7 @@ static void calc_shapeKeys(Object *obedit)
 		while(currkey) {
 			int apply_offset = (ofs && (currkey != actkey) && (editnurb->shapenr-1 == currkey->relative));
 
-			fp= newkey= MEM_callocN(cu->key->elemsize * totvert,  "currkey->data");
+			float *fp= newkey= MEM_callocN(cu->key->elemsize * totvert,  "currkey->data");
 			ofp= oldkey = currkey->data;
 
 			nu= editnurb->nurbs.first;

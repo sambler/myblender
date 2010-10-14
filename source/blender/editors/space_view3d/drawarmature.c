@@ -1291,15 +1291,15 @@ static void draw_custom_bone(Scene *scene, View3D *v3d, RegionView3D *rv3d, Obje
                         && !(boneflag & BONE_DRAW_ACTIVE) && !(boneflag & BONE_SELECTED) )
             glColor3fv(ob->cust_wire_colour);
         else
-            set_pchan_glColor(PCHAN_COLOR_NORMAL, armflag, boneflag, 0);
+            set_pchan_glColor(PCHAN_COLOR_NORMAL, boneflag, 0);
 	}else{ /* object mode?? or ghost drawing - edit mode doesn't draw custom bones */
         if( ((ob->use_cust_wire_colour == OB_CUSTOM_WIRE) && (!(boneflag & BONE_DRAW_ACTIVE) || (armflag & ARM_COL_CUSTOM)) 
                         && !(armflag & ARM_DRAWGHOST)) )
             glColor3fv(ob->cust_wire_colour);
         else{
             if( !(armflag & ARM_DRAWGHOST) )
-                if (dt <= OB_WIRE) set_pchan_glColor(PCHAN_COLOR_NORMAL, armflag, boneflag, 0);
-                else set_pchan_glColor(PCHAN_COLOR_SOLID, armflag, boneflag, 0);
+                if (dt <= OB_WIRE) set_pchan_glColor(PCHAN_COLOR_NORMAL, boneflag, 0);
+                else set_pchan_glColor(PCHAN_COLOR_SOLID, boneflag, 0);
 	}
     }
 	

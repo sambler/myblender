@@ -97,11 +97,14 @@ static void outliner_main_area_listener(ARegion *ar, wmNotifier *wmn)
 			switch(wmn->data) {
 				case ND_OB_ACTIVE:
 				case ND_OB_SELECT:
+				case ND_OB_VISIBLE:
+				case ND_OB_RENDER:
 				case ND_MODE:
 				case ND_KEYINGSET:
 				case ND_FRAME:
 				case ND_RENDER_OPTIONS:
 				case ND_LAYER:
+				case ND_WORLD:
 					ED_region_tag_redraw(ar);
 					break;
 			}
@@ -114,6 +117,7 @@ static void outliner_main_area_listener(ARegion *ar, wmNotifier *wmn)
 				case ND_BONE_ACTIVE:
 				case ND_BONE_SELECT:
 				case ND_PARENT:
+				case ND_OB_SHADING:
 					ED_region_tag_redraw(ar);
 					break;
 				case ND_CONSTRAINT:
@@ -147,6 +151,25 @@ static void outliner_main_area_listener(ARegion *ar, wmNotifier *wmn)
 		case NC_ID:
 			if(wmn->action == NA_RENAME)
 				ED_region_tag_redraw(ar);
+			break;
+		case NC_MATERIAL:
+			switch(wmn->data) {
+				case ND_SHADING:
+				case ND_SHADING_DRAW:
+					ED_region_tag_redraw(ar);
+					break;
+			}
+			break;
+		case NC_TEXTURE:
+			ED_region_tag_redraw(ar);
+			break;
+		case NC_GEOM:
+			switch(wmn->data) {
+				case ND_DATA:
+					/* needed for vertex groups only, no special notifier atm so use NC_GEOM|ND_DATA */
+					ED_region_tag_redraw(ar);
+					break;
+			}
 			break;
 	}
 	

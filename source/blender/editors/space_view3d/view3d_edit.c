@@ -783,7 +783,7 @@ static int view3d_camera_active_poll(bContext *C)
 
 static int view3d_rotate_poll(bContext *C)
 {
-	if (!ED_operator_view3d_active(C)) {
+	if (!ED_operator_region_view3d_active(C)) {
 		return 0;
 	} else {
 		RegionView3D *rv3d= CTX_wm_region_view3d(C);
@@ -1264,7 +1264,7 @@ void VIEW3D_OT_zoom(wmOperatorType *ot)
 	ot->invoke= viewzoom_invoke;
 	ot->exec= viewzoom_exec;
 	ot->modal= viewzoom_modal;
-	ot->poll= ED_operator_view3d_active;
+	ot->poll= ED_operator_region_view3d_active;
 
 	/* flags */
 	ot->flag= OPTYPE_BLOCKING|OPTYPE_GRAB_POINTER;
@@ -1274,7 +1274,7 @@ void VIEW3D_OT_zoom(wmOperatorType *ot)
 	RNA_def_int(ot->srna, "my", 0, 0, INT_MAX, "Zoom Position Y", "", 0, INT_MAX);
 }
 
-static int viewhome_exec(bContext *C, wmOperator *op) /* was view3d_home() in 2.4x */
+static int view3d_all_exec(bContext *C, wmOperator *op) /* was view3d_home() in 2.4x */
 {
 	ARegion *ar= CTX_wm_region(C);
 	View3D *v3d = CTX_wm_view3d(C);
@@ -1289,12 +1289,11 @@ static int viewhome_exec(bContext *C, wmOperator *op) /* was view3d_home() in 2.
 	int ok= 1, onedone=0;
 
 	if(center) {
-		min[0]= min[1]= min[2]= 0.0f;
-		max[0]= max[1]= max[2]= 0.0f;
-
 		/* in 2.4x this also move the cursor to (0, 0, 0) (with shift+c). */
 		curs= give_cursor(scene, v3d);
-		curs[0]= curs[1]= curs[2]= 0.0;
+		zero_v3(min);
+		zero_v3(max);
+		zero_v3(curs);
 	}
 	else {
 		INIT_MINMAX(min, max);
@@ -1318,9 +1317,7 @@ static int viewhome_exec(bContext *C, wmOperator *op) /* was view3d_home() in 2.
 		return OPERATOR_FINISHED;
 	}
 
-	afm[0]= (max[0]-min[0]);
-	afm[1]= (max[1]-min[1]);
-	afm[2]= (max[2]-min[2]);
+	sub_v3_v3v3(afm, max, min);
 	size= 0.7f*MAX3(afm[0], afm[1], afm[2]);
 	if(size==0.0) ok= 0;
 
@@ -1342,7 +1339,7 @@ static int viewhome_exec(bContext *C, wmOperator *op) /* was view3d_home() in 2.
 
 		if (rv3d->persp==RV3D_CAMOB) {
 			rv3d->persp= RV3D_PERSP;
-			smooth_view(C, NULL, v3d->camera, new_ofs, NULL, &new_dist, NULL);
+			smooth_view(C, v3d->camera, NULL, new_ofs, NULL, &new_dist, NULL);
 		}
 		else {
 			smooth_view(C, NULL, NULL, new_ofs, NULL, &new_dist, NULL);
@@ -1358,17 +1355,6 @@ static int viewhome_exec(bContext *C, wmOperator *op) /* was view3d_home() in 2.
 	return OPERATOR_FINISHED;
 }
 
-static int viewhome_poll(bContext *C)
-{
-	if(ED_operator_view3d_active(C)) {
-		RegionView3D *rv3d= CTX_wm_region_view3d(C); //XXX, when accessed from a header menu this doesnt work!
-		if(rv3d && rv3d->persp!=RV3D_CAMOB) {
-			return 1;
-		}
-	}
-
-	return 0;
-}
 
 void VIEW3D_OT_view_all(wmOperatorType *ot)
 {
@@ -1378,8 +1364,8 @@ void VIEW3D_OT_view_all(wmOperatorType *ot)
 	ot->idname= "VIEW3D_OT_view_all";
 
 	/* api callbacks */
-	ot->exec= viewhome_exec;
-	ot->poll= viewhome_poll;
+	ot->exec= view3d_all_exec;
+	ot->poll= ED_operator_view3d_active;
 
 	/* flags */
 	ot->flag= 0;
@@ -1522,7 +1508,7 @@ void VIEW3D_OT_view_selected(wmOperatorType *ot)
 
 	/* api callbacks */
 	ot->exec= viewselected_exec;
-	ot->poll= ED_operator_view3d_active;
+	ot->poll= ED_operator_region_view3d_active;
 
 	/* flags */
 	ot->flag= 0;
@@ -1811,7 +1797,6 @@ static int view3d_zoom_border_invoke(bContext *C, wmOperator *op, wmEvent *event
 
 void VIEW3D_OT_zoom_border(wmOperatorType *ot)
 {
-
 	/* identifiers */
 	ot->name= "Border Zoom";
 	ot->description = "Zoom in the view to the nearest object contained in the border";
@@ -1822,7 +1807,7 @@ void VIEW3D_OT_zoom_border(wmOperatorType *ot)
 	ot->exec= view3d_zoom_border_exec;
 	ot->modal= WM_border_select_modal;
 
-	ot->poll= ED_operator_view3d_active;
+	ot->poll= ED_operator_region_view3d_active;
 
 	/* flags */
 	ot->flag= 0;
@@ -2044,7 +2029,7 @@ void VIEW3D_OT_viewnumpad(wmOperatorType *ot)
 
 	/* api callbacks */
 	ot->exec= viewnumpad_exec;
-	ot->poll= ED_operator_view3d_active;
+	ot->poll= ED_operator_region_view3d_active;
 
 	/* flags */
 	ot->flag= 0;
@@ -2136,14 +2121,11 @@ static int viewpan_exec(bContext *C, wmOperator *op)
 	pandir = RNA_enum_get(op->ptr, "type");
 
 	initgrabz(rv3d, 0.0, 0.0, 0.0);
-
 	if(pandir == V3D_VIEW_PANRIGHT) window_to_3d_delta(ar, vec, -32, 0);
 	else if(pandir == V3D_VIEW_PANLEFT) window_to_3d_delta(ar, vec, 32, 0);
 	else if(pandir == V3D_VIEW_PANUP) window_to_3d_delta(ar, vec, 0, -25);
 	else if(pandir == V3D_VIEW_PANDOWN) window_to_3d_delta(ar, vec, 0, 25);
-	rv3d->ofs[0]+= vec[0];
-	rv3d->ofs[1]+= vec[1];
-	rv3d->ofs[2]+= vec[2];
+	add_v3_v3(rv3d->ofs, vec);
 
 	if(rv3d->viewlock & RV3D_BOXVIEW)
 		view3d_boxview_sync(CTX_wm_area(C), ar);
@@ -2162,7 +2144,7 @@ void VIEW3D_OT_view_pan(wmOperatorType *ot)
 
 	/* api callbacks */
 	ot->exec= viewpan_exec;
-	ot->poll= ED_operator_view3d_active;
+	ot->poll= ED_operator_region_view3d_active;
 
 	/* flags */
 	ot->flag= 0;
@@ -2194,7 +2176,7 @@ void VIEW3D_OT_view_persportho(wmOperatorType *ot)
 
 	/* api callbacks */
 	ot->exec= viewpersportho_exec;
-	ot->poll= ED_operator_view3d_active;
+	ot->poll= ED_operator_region_view3d_active;
 
 	/* flags */
 	ot->flag= 0;
@@ -2413,7 +2395,7 @@ void VIEW3D_OT_clip_border(wmOperatorType *ot)
 	ot->exec= view3d_clipping_exec;
 	ot->modal= WM_border_select_modal;
 
-	ot->poll= ED_operator_view3d_active;
+	ot->poll= ED_operator_region_view3d_active;
 
 	/* flags */
 	ot->flag= 0;

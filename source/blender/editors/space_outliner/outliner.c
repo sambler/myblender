@@ -1553,10 +1553,37 @@ static void outliner_set_flag(SpaceOops *soops, ListBase *lb, short flag, short 
 
 /* --- */
 
+/* same check needed for both object operation and restrict column button func
+ * return 0 when in edit mode (cannot restrict view or select)
+ * otherwise return 1 */
+static int common_restrict_check(bContext *C, Scene *scene, Object *ob)
+{
+	/* Don't allow hide an object in edit mode,
+	 * check the bug #22153 and #21609, #23977
+	 */
+	Object *obedit= CTX_data_edit_object(C);
+	if (obedit && obedit == ob) {
+		/* found object is hidden, reset */
+		if (ob->restrictflag & OB_RESTRICT_VIEW)
+			ob->restrictflag &= ~OB_RESTRICT_VIEW;
+		/* found object is unselectable, reset */
+		if (ob->restrictflag & OB_RESTRICT_SELECT)
+			ob->restrictflag &= ~OB_RESTRICT_SELECT;
+		return 0;
+	}
+	
+	return 1;
+}
+
 void object_toggle_visibility_cb(bContext *C, Scene *scene, TreeElement *te, TreeStoreElem *tsep, TreeStoreElem *tselem)
 {
 	Base *base= (Base *)te->directdata;
-	if(base || (base= object_in_scene((Object *)tselem->id, scene))) {
+	Object *ob = (Object *)tselem->id;
+	
+	/* add check for edit mode */
+	if(!common_restrict_check(C, scene, ob)) return;
+	
+	if(base || (base= object_in_scene(ob, scene))) {
 		if((base->object->restrictflag ^= OB_RESTRICT_VIEW)) {
 			ED_base_object_select(base, BA_DESELECT);
 		}
@@ -1586,7 +1613,7 @@ void OUTLINER_OT_visibility_toggle(wmOperatorType *ot)
 	
 	/* callbacks */
 	ot->exec= outliner_toggle_visibility_exec;
-	ot->poll= ED_operator_outliner_active;
+	ot->poll= ED_operator_outliner_active_no_editobject;
 	
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 }
@@ -1626,7 +1653,7 @@ void OUTLINER_OT_selectability_toggle(wmOperatorType *ot)
 	
 	/* callbacks */
 	ot->exec= outliner_toggle_selectability_exec;
-	ot->poll= ED_operator_outliner_active;
+	ot->poll= ED_operator_outliner_active_no_editobject;
 	
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 }
@@ -1904,15 +1931,14 @@ static void tree_element_set_active_object(bContext *C, Scene *scene, SpaceOops 
 			scene_deselect_all(scene);
 			ED_base_object_select(base, BA_SELECT);
 		}
-		if(C)
+		if(C) {
 			ED_base_object_activate(C, base); /* adds notifier */
+			WM_event_add_notifier(C, NC_SCENE|ND_OB_SELECT, scene);
+		}
 	}
 	
 	if(ob!=scene->obedit) 
 		ED_object_exit_editmode(C, EM_FREEDATA|EM_FREEUNDO|EM_WAITCURSOR|EM_DO_UNDO);
-	
-	WM_event_add_notifier(C, NC_SCENE|ND_OB_ACTIVE, scene);
-
 }
 
 static int tree_element_active_material(bContext *C, Scene *scene, SpaceOops *soops, TreeElement *te, int set)
@@ -2023,7 +2049,9 @@ static int tree_element_active_texture(bContext *C, Scene *scene, SpaceOops *soo
 		}
 	}
 	
-	WM_event_add_notifier(C, NC_TEXTURE, NULL);
+	if(set)
+		WM_event_add_notifier(C, NC_TEXTURE, NULL);
+
 	return 0;
 }
 
@@ -3403,6 +3431,7 @@ static int outliner_object_operation_exec(bContext *C, wmOperator *op)
 	else if(event==8) {
 		outliner_do_object_operation(C, scene, soops, &soops->tree, object_toggle_renderability_cb);
 		str= "Toggle Renderability";
+		WM_event_add_notifier(C, NC_SCENE|ND_OB_RENDER, scene);
 	}
 
 	ED_undo_push(C, str);
@@ -4843,16 +4872,8 @@ static void restrictbutton_view_cb(bContext *C, void *poin, void *poin2)
 {
 	Scene *scene = (Scene *)poin;
 	Object *ob = (Object *)poin2;
-	Object *obedit= CTX_data_edit_object(C);
 
-	/* Don't allow hide an objet in edit mode,
-	 * check the bug #22153 and #21609
-	 */
-	if (obedit && obedit == ob) {
-		if (ob->restrictflag & OB_RESTRICT_VIEW)
-			ob->restrictflag &= ~OB_RESTRICT_VIEW;
-		return;
-	}
+	if(!common_restrict_check(C, scene, ob)) return;
 	
 	/* deselect objects that are invisible */
 	if (ob->restrictflag & OB_RESTRICT_VIEW) {
@@ -4869,6 +4890,8 @@ static void restrictbutton_sel_cb(bContext *C, void *poin, void *poin2)
 	Scene *scene = (Scene *)poin;
 	Object *ob = (Object *)poin2;
 	
+	if(!common_restrict_check(C, scene, ob)) return;
+	
 	/* if select restriction has just been turned on */
 	if (ob->restrictflag & OB_RESTRICT_SELECT) {
 		/* Ouch! There is no backwards pointer from Object to Base, 
@@ -4881,7 +4904,7 @@ static void restrictbutton_sel_cb(bContext *C, void *poin, void *poin2)
 
 static void restrictbutton_rend_cb(bContext *C, void *poin, void *poin2)
 {
-	WM_event_add_notifier(C, NC_SCENE|ND_OB_SELECT, poin);
+	WM_event_add_notifier(C, NC_SCENE|ND_OB_RENDER, poin);
 }
 
 static void restrictbutton_r_lay_cb(bContext *C, void *poin, void *poin2)
@@ -5521,7 +5544,7 @@ static void outliner_draw_keymapbuts(uiBlock *block, ARegion *ar, SpaceOops *soo
 				uiDefButS(block, OPTION, 0, "Shift",	xstart, (int)te->ys+1, butw3+5, OL_H-1, &kmi->shift, 0, 0, 0, 0, "Modifier"); xstart+= butw3+5;
 				uiDefButS(block, OPTION, 0, "Ctrl",	xstart, (int)te->ys+1, butw3, OL_H-1, &kmi->ctrl, 0, 0, 0, 0, "Modifier"); xstart+= butw3;
 				uiDefButS(block, OPTION, 0, "Alt",	xstart, (int)te->ys+1, butw3, OL_H-1, &kmi->alt, 0, 0, 0, 0, "Modifier"); xstart+= butw3;
-				uiDefButS(block, OPTION, 0, "Cmd",	xstart, (int)te->ys+1, butw3, OL_H-1, &kmi->oskey, 0, 0, 0, 0, "Modifier"); xstart+= butw3;
+				uiDefButS(block, OPTION, 0, "OS",	xstart, (int)te->ys+1, butw3, OL_H-1, &kmi->oskey, 0, 0, 0, 0, "Modifier"); xstart+= butw3;
 				xstart+= 5;
 				uiDefKeyevtButS(block, 0, "", xstart, (int)te->ys+1, butw3, OL_H-1, &kmi->keymodifier, "Key Modifier code");
 				xstart+= butw3+5;
@@ -5636,7 +5659,7 @@ void draw_outliner(const bContext *C)
 	UI_view2d_totRect_set(v2d, sizex, sizey);
 
 	/* set matrix for 2d-view controls */
-	UI_view2d_view_ortho(C, v2d);
+	UI_view2d_view_ortho(v2d);
 
 	/* draw outliner stuff (background, hierachy lines and names) */
 	outliner_back(ar, soops);

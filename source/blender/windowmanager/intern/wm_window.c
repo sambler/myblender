@@ -307,7 +307,7 @@ static void wm_window_add_ghostwindow(bContext *C, wmWindowManager *wm, char *ti
 #if defined(__APPLE__) && !defined(GHOST_COCOA)
 	{
 		extern int macPrefState; /* creator.c */
-		inital_state += macPrefState;
+		initial_state += macPrefState;
 	}
 #endif
 	/* Disable AA for now, as GL_SELECT (used for border, lasso, ... select)
@@ -528,7 +528,7 @@ static int query_qual(char qual)
 		left= GHOST_kModifierKeyLeftControl;
 		right= GHOST_kModifierKeyRightControl;
 	} else if (qual=='C') {
-		left= right= GHOST_kModifierKeyCommand;
+		left= right= GHOST_kModifierKeyOS;
 	} else {
 		left= GHOST_kModifierKeyLeftAlt;
 		right= GHOST_kModifierKeyRightAlt;
@@ -613,7 +613,7 @@ static int ghost_event_proc(GHOST_EventHandle evt, GHOST_TUserDataPtr private)
 					wm_event_add_ghostevent(wm, win, GHOST_kEventKeyUp, time, &kdata);
 				}
 				if (win->eventstate->oskey && !query_qual('C')) {
-					kdata.key= GHOST_kKeyCommand;
+					kdata.key= GHOST_kKeyOS;
 					wm_event_add_ghostevent(wm, win, GHOST_kEventKeyUp, time, &kdata);
 				}
 				/* keymodifier zero, it hangs on hotkeys that open windows otherwise */

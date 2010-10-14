@@ -64,6 +64,7 @@
 #include "ED_keyframing.h"
 #include "ED_screen.h"
 #include "ED_armature.h"
+#include "ED_space_api.h"
 
 #include "GPU_draw.h"
 
@@ -204,7 +205,7 @@ void smooth_view(bContext *C, Object *oldcamera, Object *camera, float *ofs, flo
 	if(quat) copy_qt_qt(sms.new_quat, quat);
 	if(dist) sms.new_dist= *dist;
 	if(lens) sms.new_lens= *lens;
-	
+
 	if (camera) {
 		view3d_settings_from_ob(camera, sms.new_ofs, sms.new_quat, &sms.new_dist, &sms.new_lens);
 		sms.to_camera= 1; /* restore view3d values in end */
@@ -213,15 +214,15 @@ void smooth_view(bContext *C, Object *oldcamera, Object *camera, float *ofs, flo
 	if (C && U.smooth_viewtx) {
 		int changed = 0; /* zero means no difference */
 		
-		if (sms.new_dist != rv3d->dist)
+		if (oldcamera != camera)
 			changed = 1;
-		if (sms.new_lens != v3d->lens)
+		else if (sms.new_dist != rv3d->dist)
 			changed = 1;
-		
-		if (!equals_v3v3(sms.new_ofs, rv3d->ofs))
+		else if (sms.new_lens != v3d->lens)
 			changed = 1;
-
-		if (!equals_v4v4(sms.new_quat, rv3d->viewquat))
+		else if (!equals_v3v3(sms.new_ofs, rv3d->ofs))
+			changed = 1;
+		else if (!equals_v4v4(sms.new_quat, rv3d->viewquat))
 			changed = 1;
 		
 		/* The new view is different from the old one
@@ -448,16 +449,20 @@ static int view3d_setobjectascamera_exec(bContext *C, wmOperator *op)
 	View3D *v3d = CTX_wm_view3d(C);
 	RegionView3D *rv3d= CTX_wm_region_view3d(C);
 	Scene *scene= CTX_data_scene(C);
-	
-	if(BASACT) {
+	Object *ob = CTX_data_active_object(C);
+
+	if(ob) {
+		Object *camera_old= (rv3d->persp == RV3D_CAMOB && scene->camera) ? scene->camera : NULL;
 		rv3d->persp= RV3D_CAMOB;
-		v3d->camera= OBACT;
+		v3d->camera= ob;
 		if(v3d->scenelock)
-			scene->camera= OBACT;
-		smooth_view(C, NULL, v3d->camera, rv3d->ofs, rv3d->viewquat, &rv3d->dist, &v3d->lens);
+			scene->camera= ob;
+
+		if(camera_old != ob) /* unlikely but looks like a glitch when set to the same */
+			smooth_view(C, camera_old, v3d->camera, rv3d->ofs, rv3d->viewquat, &rv3d->dist, &v3d->lens);
+
+		WM_event_add_notifier(C, NC_SCENE|ND_RENDER_OPTIONS|NC_OBJECT|ND_DRAW, CTX_data_scene(C));
 	}
-	
-	WM_event_add_notifier(C, NC_SCENE|ND_RENDER_OPTIONS|NC_OBJECT|ND_DRAW, CTX_data_scene(C));
 	
 	return OPERATOR_FINISHED;
 }
@@ -472,7 +477,7 @@ void VIEW3D_OT_object_as_camera(wmOperatorType *ot)
 	
 	/* api callbacks */
 	ot->exec= view3d_setobjectascamera_exec;	
-	ot->poll= ED_operator_view3d_active;
+	ot->poll= ED_operator_region_view3d_active;
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
@@ -1662,6 +1667,7 @@ static void RestoreState(bContext *C)
 	win->queue= queue_back;
 	
 	GPU_state_init();
+	GPU_set_tpage(NULL, 0);
 
 	glPopAttrib();
 }
@@ -1973,10 +1979,58 @@ typedef struct FlyInfo {
 	double time_lastwheel; /* used to accelerate when using the mousewheel a lot */
 	double time_lastdraw; /* time between draws */
 
+	void *draw_handle_pixel;
+
 	/* use for some lag */
 	float dvec_prev[3]; /* old for some lag */
 
 } FlyInfo;
+
+static void drawFlyPixel(const struct bContext *C, struct ARegion *ar, void *arg)
+{
+	FlyInfo *fly = arg;
+
+	/* draws 4 edge brackets that frame the safe area where the
+	mouse can move during fly mode without spinning the view */
+	float x1, x2, y1, y2;
+	
+	x1= 0.45*(float)fly->ar->winx;
+	y1= 0.45*(float)fly->ar->winy;
+	x2= 0.55*(float)fly->ar->winx;
+	y2= 0.55*(float)fly->ar->winy;
+	cpack(0);
+	
+	
+	glBegin(GL_LINES);
+	/* bottom left */
+	glVertex2f(x1,y1); 
+	glVertex2f(x1,y1+5);
+	
+	glVertex2f(x1,y1); 
+	glVertex2f(x1+5,y1);
+	
+	/* top right */
+	glVertex2f(x2,y2); 
+	glVertex2f(x2,y2-5);
+	
+	glVertex2f(x2,y2); 
+	glVertex2f(x2-5,y2);
+	
+	/* top left */
+	glVertex2f(x1,y2); 
+	glVertex2f(x1,y2-5);
+	
+	glVertex2f(x1,y2); 
+	glVertex2f(x1+5,y2);
+	
+	/* bottom right */
+	glVertex2f(x2,y1); 
+	glVertex2f(x2,y1+5);
+	
+	glVertex2f(x2,y1); 
+	glVertex2f(x2-5,y1);
+	glEnd();
+}
 
 /* FlyInfo->state */
 #define FLY_RUNNING		0
@@ -2029,7 +2083,9 @@ static int initFlyInfo (bContext *C, FlyInfo *fly, wmOperator *op, wmEvent *even
 
 	fly->time_lastdraw= fly->time_lastwheel= PIL_check_seconds_timer();
 
-	fly->rv3d->rflag |= RV3D_FLYMODE|RV3D_NAVIGATING; /* so we draw the corner margins */
+	fly->draw_handle_pixel = ED_region_draw_cb_activate(fly->ar->type, drawFlyPixel, fly, REGION_DRAW_POST_PIXEL);
+
+	fly->rv3d->rflag |= RV3D_NAVIGATING; /* so we draw the corner margins */
 
 	/* detect weather to start with Z locking */
 	upvec[0]=1.0f; upvec[1]=0.0f; upvec[2]=0.0f;
@@ -2094,6 +2150,8 @@ static int flyEnd(bContext *C, FlyInfo *fly)
 
 	WM_event_remove_timer(CTX_wm_manager(C), CTX_wm_window(C), fly->timer);
 
+	ED_region_draw_cb_exit(fly->ar->type, fly->draw_handle_pixel);
+
 	rv3d->dist= fly->dist_backup;
 
 	if (fly->state == FLY_CANCEL) {
@@ -2124,15 +2182,6 @@ static int flyEnd(bContext *C, FlyInfo *fly)
 			object_mat3_to_rot(v3d->camera, mat3, TRUE);
 			DAG_id_flush_update(&v3d->camera->id, OB_RECALC_OB);
 		}
-
-#if 0 //XXX2.5
-		if (IS_AUTOKEY_MODE(NORMAL)) {
-			allqueue(REDRAWIPO, 0);
-			allspace(REMAKEIPO, 0);
-			allqueue(REDRAWNLA, 0);
-			allqueue(REDRAWTIME, 0);
-		}
-#endif
 	}
 	else { /* not camera */
 		/* Apply the fly mode view */
@@ -2146,7 +2195,7 @@ static int flyEnd(bContext *C, FlyInfo *fly)
 		/*Done with correcting for the dist */
 	}
 
-	rv3d->rflag &= ~(RV3D_FLYMODE|RV3D_NAVIGATING);
+	rv3d->rflag &= ~RV3D_NAVIGATING;
 //XXX2.5	BIF_view3d_previewrender_signal(fly->sa, PR_DBASE|PR_DISPRECT); /* not working at the moment not sure why */
 
 	if(fly->obtfm)

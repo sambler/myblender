@@ -382,7 +382,7 @@ Image *BKE_add_image_file(const char *name, int frame)
 	return ima;
 }
 
-static ImBuf *add_ibuf_size(int width, int height, char *name, int depth, int floatbuf, short uvtestgrid, float color[4])
+static ImBuf *add_ibuf_size(unsigned int width, unsigned int height, char *name, int depth, int floatbuf, short uvtestgrid, float color[4])
 {
 	ImBuf *ibuf;
 	unsigned char *rect= NULL;
@@ -415,7 +415,7 @@ static ImBuf *add_ibuf_size(int width, int height, char *name, int depth, int fl
 }
 
 /* adds new image block, creates ImBuf and initializes color */
-Image *BKE_add_image_size(int width, int height, char *name, int depth, int floatbuf, short uvtestgrid, float color[4])
+Image *BKE_add_image_size(unsigned int width, unsigned int height, char *name, int depth, int floatbuf, short uvtestgrid, float color[4])
 {
 	/* on save, type is changed to FILE in editsima.c */
 	Image *ima= image_alloc(name, IMA_SRC_GENERATED, IMA_TYPE_UV_TEST);
@@ -596,7 +596,7 @@ void BKE_image_free_all_textures(void)
 {
 	Tex *tex;
 	Image *ima;
-	unsigned int totsize= 0;
+	/* unsigned int totsize= 0; */
 	
 	for(ima= G.main->image.first; ima; ima= ima->id.next)
 		ima->id.flag &= ~LIB_DOIT;
@@ -607,13 +607,14 @@ void BKE_image_free_all_textures(void)
 	
 	for(ima= G.main->image.first; ima; ima= ima->id.next) {
 		if(ima->ibufs.first && (ima->id.flag & LIB_DOIT)) {
+			/*
 			ImBuf *ibuf;
 			for(ibuf= ima->ibufs.first; ibuf; ibuf= ibuf->next) {
 				if(ibuf->mipmap[0]) 
 					totsize+= 1.33*ibuf->x*ibuf->y*4;
 				else
 					totsize+= ibuf->x*ibuf->y*4;
-			}
+			} */
 			image_free_buffers(ima);
 		}
 	}
@@ -1684,6 +1685,7 @@ static ImBuf *image_load_sequence_multilayer(Image *ima, ImageUser *iuser, int f
 			ibuf->flags |= IB_rectfloat;
 			ibuf->mall= IB_rectfloat;
 			ibuf->channels= rpass->channels;
+			ibuf->profile = IB_PROFILE_LINEAR_RGB;
 			
 			image_initialize_after_load(ima, ibuf);
 			image_assign_ibuf(ima, ibuf, iuser?iuser->multi_index:0, frame);
@@ -2020,14 +2022,9 @@ static ImBuf *image_get_ibuf_threadsafe(Image *ima, ImageUser *iuser, int *frame
 		ibuf= image_get_ibuf(ima, IMA_NO_INDEX, 0);
 	}
 	else if(ima->source == IMA_SRC_VIEWER) {
-		if(ima->type==IMA_TYPE_R_RESULT) {
-			/* always verify entirely, not that this shouldn't happen
-			 * during render anyway */
-		}
-		else if(ima->type==IMA_TYPE_COMPOSITE) {
-			frame= iuser?iuser->framenr:0;
-			ibuf= image_get_ibuf(ima, 0, frame);
-		}
+		/* always verify entirely, not that this shouldn't happen
+		 * as part of texture sampling in rendering anyway, so not
+		 * a big bottleneck */
 	}
 
 	*frame_r = frame;
@@ -2144,10 +2141,15 @@ ImBuf *BKE_image_acquire_ibuf(Image *ima, ImageUser *iuser, void **lock_r)
 						BLI_lock_thread(LOCK_VIEWER);
 						*lock_r= ima;
 
-						/* Composite Viewer, all handled in compositor */
-						/* fake ibuf, will be filled in compositor */
-						ibuf= IMB_allocImBuf(256, 256, 32, IB_rect, 0);
-						image_assign_ibuf(ima, ibuf, 0, frame);
+						frame= iuser?iuser->framenr:0;
+						ibuf= image_get_ibuf(ima, 0, frame);
+
+						if(!ibuf) {
+							/* Composite Viewer, all handled in compositor */
+							/* fake ibuf, will be filled in compositor */
+							ibuf= IMB_allocImBuf(256, 256, 32, IB_rect, 0);
+							image_assign_ibuf(ima, ibuf, 0, frame);
+						}
 					}
 				}
 			}
@@ -2183,7 +2185,7 @@ ImBuf *BKE_image_get_ibuf(Image *ima, ImageUser *iuser)
 
 void BKE_image_user_calc_frame(ImageUser *iuser, int cfra, int fieldnr)
 {
-	int imanr, len;
+	int len;
 	
 	/* here (+fie_ima/2-1) makes sure that division happens correctly */
 	len= (iuser->fie_ima*iuser->frames)/2;
@@ -2192,8 +2194,9 @@ void BKE_image_user_calc_frame(ImageUser *iuser, int cfra, int fieldnr)
 		iuser->framenr= 0;
 	}
 	else {
+		int imanr;
 		cfra= cfra - iuser->sfra+1;
-		
+
 		/* cyclic */
 		if(iuser->cycl) {
 			cfra= ( (cfra) % len );

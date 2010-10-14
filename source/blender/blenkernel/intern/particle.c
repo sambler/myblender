@@ -272,7 +272,7 @@ int psys_check_enabled(Object *ob, ParticleSystem *psys)
 	}
 
 	psmd= psys_get_modifier(ob, psys);
-	if(psys->renderdata) {
+	if(psys->renderdata || G.rendering) {
 		if(!(psmd->modifier.mode & eModifierMode_Render))
 			return 0;
 	}
@@ -402,6 +402,7 @@ void free_hair(Object *ob, ParticleSystem *psys, int dynamics)
 			modifier_free((ModifierData*)psys->clmd);
 			
 			psys->clmd = NULL;
+			psys->pointcache = BKE_ptcache_add(&psys->ptcaches);
 		}
 		else {
 			cloth_free_modifier(ob, psys->clmd);

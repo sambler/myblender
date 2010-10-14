@@ -40,12 +40,16 @@ def write_mtl(scene, filepath, copy_images, mtl_dict):
 
     def copy_image(image):
         fn = bpy.path.abspath(image.filepath)
+        fn = os.path.normpath(fn)
         fn_strip = os.path.basename(fn)
+
         if copy_images:
             rel = fn_strip
             fn_abs_dest = os.path.join(dest_dir, fn_strip)
             if not os.path.exists(fn_abs_dest):
                 shutil.copy(fn, fn_abs_dest)
+        elif bpy.path.is_subdir(fn, dest_dir):
+            rel = os.path.relpath(fn, dest_dir)
         else:
             rel = fn
 
@@ -746,7 +750,7 @@ def _write(context, filepath,
 
         # Export an animation?
         if EXPORT_ANIMATION:
-            scene_frames = range(scene.frame_start, context.frame_end + 1) # Up to and including the end frame.
+            scene_frames = range(scene.frame_start, scene.frame_end + 1) # Up to and including the end frame.
         else:
             scene_frames = [orig_frame] # Dont export an animation.
 

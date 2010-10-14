@@ -1534,7 +1534,7 @@ int initTransform(bContext *C, TransInfo *t, wmOperator *op, wmEvent *event, int
 				if ((ELEM(kmi->type, LEFTCTRLKEY, RIGHTCTRLKEY) && event->ctrl) ||
 					(ELEM(kmi->type, LEFTSHIFTKEY, RIGHTSHIFTKEY) && event->shift) ||
 					(ELEM(kmi->type, LEFTALTKEY, RIGHTALTKEY) && event->alt) ||
-					(kmi->type == COMMANDKEY && event->oskey)) {
+					(kmi->type == OSKEY && event->oskey)) {
 					t->modifiers |= MOD_SNAP_INVERT;
 				}
 				break;
@@ -2180,7 +2180,7 @@ void initWarp(TransInfo *t)
 		mul_m4_v3(t->viewmat, center);
 		sub_v3_v3(center, t->viewmat[3]);
 		if (i)
-			minmax_v3_v3v3(min, max, center);
+			minmax_v3v3_v3(min, max, center);
 		else {
 			copy_v3_v3(max, center);
 			copy_v3_v3(min, center);

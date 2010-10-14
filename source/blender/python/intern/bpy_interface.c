@@ -43,6 +43,7 @@
 #include "BLI_math_base.h"
 #include "BLI_string.h"
 
+#include "BKE_utildefines.h"
 #include "BKE_context.h"
 #include "BKE_text.h"
 #include "BKE_font.h" /* only for utf8towchar */
@@ -104,7 +105,8 @@ void bpy_context_set(bContext *C, PyGILState_STATE *gilstate)
 	}
 }
 
-void bpy_context_clear(bContext *C, PyGILState_STATE *gilstate)
+/* context should be used but not now because it causes some bugs */
+void bpy_context_clear(bContext *UNUSED(C), PyGILState_STATE *gilstate)
 {
 	py_call_level--;
 
@@ -213,25 +215,10 @@ void BPY_start_python( int argc, char **argv )
 	/* sigh, why do python guys not have a char** version anymore? :( */
 	{
 		int i;
-#if 0
 		PyObject *py_argv= PyList_New(argc);
 		for (i=0; i<argc; i++)
-			PyList_SET_ITEM(py_argv, i, PyUnicode_FromString(argv[i]));
+			PyList_SET_ITEM(py_argv, i, PyC_UnicodeFromByte(argv[i])); /* should fix bug #20021 - utf path name problems, by replacing PyUnicode_FromString */
 
-#else	// should fix bug #20021 - utf path name problems
-		PyObject *py_argv= PyList_New(0);
-		for (i=0; i<argc; i++) {
-			PyObject *item= PyUnicode_Decode(argv[i], strlen(argv[i]), Py_FileSystemDefaultEncoding, NULL);
-			if(item==NULL) { // should never happen
-				PyErr_Print();
-				PyErr_Clear();
-			}
-			else {
-				PyList_Append(py_argv, item);
-				Py_DECREF(item);
-			}
-		}
-#endif
 		PySys_SetObject("argv", py_argv);
 		Py_DECREF(py_argv);
 	}
@@ -248,8 +235,8 @@ void BPY_start_python( int argc, char **argv )
 		//PyObject *m = PyImport_AddModule("__builtin__");
 		//PyObject *d = PyModule_GetDict(m);
 		PyObject *d = PyEval_GetBuiltins(  );
-		PyDict_SetItemString(d, "reload",		item=PyCFunction_New(bpy_reload_meth, NULL));	Py_DECREF(item);
-		PyDict_SetItemString(d, "__import__",	item=PyCFunction_New(bpy_import_meth, NULL));	Py_DECREF(item);
+		PyDict_SetItemString(d, "reload",		item=PyCFunction_New(&bpy_reload_meth, NULL));	Py_DECREF(item);
+		PyDict_SetItemString(d, "__import__",	item=PyCFunction_New(&bpy_import_meth, NULL));	Py_DECREF(item);
 	}
 	
 	pyrna_alloc_types();

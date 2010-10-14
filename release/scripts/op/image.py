@@ -32,13 +32,17 @@ class EditExternally(bpy.types.Operator):
 
     def _editor_guess(self, context):
         import platform
-        system = platform.system()
+        try:
+            system = platform.system()
+        except UnicodeDecodeError:
+            import sys
+            system = sys.platform
 
         image_editor = context.user_preferences.filepaths.image_editor
 
         # use image editor in the preferences when available.
         if not image_editor:
-            if system == 'Windows':
+            if system in ('Windows', 'win32'):
                 image_editor = ["start"]  # not tested!
             elif system == 'Darwin':
                 image_editor = ["open"]
@@ -139,7 +143,7 @@ class ProjectEdit(bpy.types.Operator):
         # filepath = bpy.path.clean_name(filepath) # fixes <memory> rubbish, needs checking
 
         if filepath.startswith(".") or filepath == "":
-            # TODO, have a way to check if the file is saved, assume .B25.blend
+            # TODO, have a way to check if the file is saved, assume startup.blend
             tmpdir = context.user_preferences.filepaths.temporary_directory
             filepath = os.path.join(tmpdir, "project_edit")
         else:

@@ -466,6 +466,8 @@ static int wm_operator_exec(bContext *C, wmOperator *op, int repeat)
 	wmWindowManager *wm= CTX_wm_manager(C);
 	int retval= OPERATOR_CANCELLED;
 	
+	CTX_wm_operator_poll_msg_set(C, NULL);
+	
 	if(op==NULL || op->type==NULL)
 		return retval;
 	
@@ -697,6 +699,8 @@ static int wm_operator_call_internal(bContext *C, wmOperatorType *ot, int contex
 	wmEvent *event;
 	
 	int retval;
+
+	CTX_wm_operator_poll_msg_set(C, NULL);
 
 	/* dummie test */
 	if(ot && C) {
@@ -2063,7 +2067,7 @@ static int convert_key(GHOST_TKey key)
 			case GHOST_kKeyRightShift:		return RIGHTSHIFTKEY;
 			case GHOST_kKeyLeftControl:		return LEFTCTRLKEY;
 			case GHOST_kKeyRightControl:	return RIGHTCTRLKEY;
-			case GHOST_kKeyCommand:			return COMMANDKEY;
+			case GHOST_kKeyOS:				return OSKEY;
 			case GHOST_kKeyLeftAlt:			return LEFTALTKEY;
 			case GHOST_kKeyRightAlt:		return RIGHTALTKEY;
 				
@@ -2320,7 +2324,7 @@ void wm_event_add_ghostevent(wmWindowManager *wm, wmWindow *win, int type, int t
 				if(event.val==KM_PRESS && (evt->ctrl || evt->shift || evt->oskey))
 				   event.alt= evt->alt = 3;		// define?
 			} 
-			else if (event.type==COMMANDKEY) {
+			else if (event.type==OSKEY) {
 				event.oskey= evt->oskey= (event.val==KM_PRESS);
 				if(event.val==KM_PRESS && (evt->ctrl || evt->alt || evt->shift))
 				   event.oskey= evt->oskey = 3;		// define?

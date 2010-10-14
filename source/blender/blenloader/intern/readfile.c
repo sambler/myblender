@@ -1384,8 +1384,8 @@ static void test_pointer_array(FileData *fd, void **mat)
 
 /* ************ READ ID Properties *************** */
 
-void IDP_DirectLinkProperty(IDProperty *prop, int switch_endian, FileData *fd);
-void IDP_LibLinkProperty(IDProperty *prop, int switch_endian, FileData *fd);
+static void IDP_DirectLinkProperty(IDProperty *prop, int switch_endian, FileData *fd);
+static void IDP_LibLinkProperty(IDProperty *prop, int switch_endian, FileData *fd);
 
 static void IDP_DirectLinkIDPArray(IDProperty *prop, int switch_endian, FileData *fd)
 {
@@ -2735,7 +2735,7 @@ static void direct_link_curve(FileData *fd, Curve *cu)
 	cu->strinfo= newdataadr(fd, cu->strinfo);	
 	cu->tb= newdataadr(fd, cu->tb);
 
-	if(cu->vfont==0) link_list(fd, &(cu->nurb));
+	if(cu->vfont == NULL) link_list(fd, &(cu->nurb));
 	else {
 		cu->nurb.first=cu->nurb.last= 0;
 
@@ -2766,7 +2766,7 @@ static void direct_link_curve(FileData *fd, Curve *cu)
 		nu->bp= newdataadr(fd, nu->bp);
 		nu->knotsu= newdataadr(fd, nu->knotsu);
 		nu->knotsv= newdataadr(fd, nu->knotsv);
-		if (cu->vfont==0) nu->charidx= nu->mat_nr;
+		if (cu->vfont == NULL) nu->charidx= nu->mat_nr;
 
 		if(fd->flags & FD_FLAGS_SWITCH_ENDIAN) {
 			switch_endian_knots(nu);
@@ -2937,6 +2937,7 @@ static void direct_link_pointcache(FileData *fd, PointCache *cache)
 	cache->simframe= 0;
 	cache->edit= NULL;
 	cache->free_edit= NULL;
+	cache->cached_frames= NULL;
 }
 
 static void direct_link_pointcache_list(FileData *fd, ListBase *ptcaches, PointCache **ocache)
@@ -4099,8 +4100,10 @@ static void direct_link_object(FileData *fd, Object *ob)
 	ob->gpulamp.first= ob->gpulamp.last= NULL;
 	link_list(fd, &ob->pc_ids);
 
-	if(ob->sculpt)
+	if(ob->sculpt) {
 		ob->sculpt= MEM_callocN(sizeof(SculptSession), "reload sculpt session");
+		ob->sculpt->ob= ob;
+	}
 }
 
 /* ************ READ SCENE ***************** */
@@ -4643,6 +4646,7 @@ static void lib_link_screen(FileData *fd, Main *main)
 						SpaceText *st= (SpaceText *)sl;
 
 						st->text= newlibadr(fd, sc->id.lib, st->text);
+						st->drawcache= NULL;
 
 					}
 					else if(sl->spacetype==SPACE_SCRIPT) {
@@ -4874,6 +4878,8 @@ void lib_link_screen_restore(Main *newmain, bScreen *curscreen, Scene *curscene)
 
 					st->text= restore_pointer_by_name(newmain, (ID *)st->text, 1);
 					if(st->text==NULL) st->text= newmain->text.first;
+
+					st->drawcache= NULL;
 				}
 				else if(sl->spacetype==SPACE_SCRIPT) {
 					SpaceScript *scpt= (SpaceScript *)sl;
@@ -12430,25 +12436,29 @@ static void library_append_end(const bContext *C, Main *mainl, FileData **fd, in
 {
 	Main *mainvar= CTX_data_main(C);
 	Scene *scene= CTX_data_scene(C);
+	Library *curlib;
 
 	/* make main consistent */
 	expand_main(*fd, mainl);
 
 	/* do this when expand found other libs */
 	read_libraries(*fd, &(*fd)->mainlist);
+	
+	curlib= mainl->curlib;
 
 	/* make the lib path relative if required */
 	if(flag & FILE_RELPATH) {
 
 		/* use the full path, this could have been read by other library even */
-		BLI_strncpy(mainl->curlib->name, mainl->curlib->filepath, sizeof(mainl->curlib->name));
+		BLI_strncpy(curlib->name, curlib->filepath, sizeof(curlib->name));
 		
 		/* uses current .blend file as reference */
-		BLI_path_rel(mainl->curlib->name, G.sce);
+		BLI_path_rel(curlib->name, G.sce);
 	}
 
 	blo_join_main(&(*fd)->mainlist);
 	mainvar= (*fd)->mainlist.first;
+	mainl= NULL; /* blo_join_main free's mainl, cant use anymore */
 
 	lib_link_all(*fd, mainvar);
 	lib_verify_nodetree(mainvar, 0);
@@ -12463,7 +12473,7 @@ static void library_append_end(const bContext *C, Main *mainl, FileData **fd, in
 			if (flag & FILE_LINK) {
 				give_base_to_objects(mainvar, scene, NULL, 0);
 			} else {
-				give_base_to_objects(mainvar, scene, mainl->curlib, 1);
+				give_base_to_objects(mainvar, scene, curlib, 1);
 			}
 
 			if (flag & FILE_GROUP_INSTANCE) {
@@ -12483,7 +12493,7 @@ static void library_append_end(const bContext *C, Main *mainl, FileData **fd, in
 		*fd = NULL;
 	}	
 
-	append_do_cursor(scene, mainl->curlib, flag);
+	append_do_cursor(scene, curlib, flag);
 }
 
 void BLO_library_append_end(const bContext *C, struct Main *mainl, BlendHandle** bh, int idcode, short flag)

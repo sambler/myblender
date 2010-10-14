@@ -60,6 +60,7 @@
 #include "IMB_imbuf_types.h"
 
 #include "BIF_gl.h"
+#include "BIF_glutil.h"
 
 #include "ED_datafiles.h"
 #include "ED_render.h"
@@ -621,20 +622,30 @@ static void init_iconfile_list(struct ListBase *list)
 			char *filename = dir[i].relname;
 			
 			if(BLI_testextensie(filename, ".png")) {
-			
+
 				/* check to see if the image is the right size, continue if not */
 				/* copying strings here should go ok, assuming that we never get back
 				   a complete path to file longer than 256 chars */
 				sprintf(iconfilestr, "%s/%s", icondirstr, filename);
-				if(BLI_exists(iconfilestr)) bbuf = IMB_loadiffname(iconfilestr, IB_rect);
+				if(BLI_exists(iconfilestr))
+					bbuf= IMB_loadiffname(iconfilestr, IB_rect);
+				else
+					bbuf= NULL;
+
+
+				if(bbuf) {
+					ifilex = bbuf->x;
+					ifiley = bbuf->y;
+					IMB_freeImBuf(bbuf);
+				}
+				else {
+					ifilex= ifiley= 0;
+				}
 				
-				ifilex = bbuf->x;
-				ifiley = bbuf->y;
-				IMB_freeImBuf(bbuf);
-				
+				/* bad size or failed to load */
 				if ((ifilex != ICON_IMAGE_W) || (ifiley != ICON_IMAGE_H))
 					continue;
-			
+
 				/* found a potential icon file, so make an entry for it in the cache list */
 				ifile = MEM_callocN(sizeof(IconFile), "IconFile");
 				
@@ -843,10 +854,6 @@ static void icon_draw_rect(float x, float y, int w, int h, float aspect, int rw,
 		glPixelTransferf(GL_GREEN_SCALE, rgb[1]);
 		glPixelTransferf(GL_BLUE_SCALE, rgb[2]);
 	}
-
-	/* position */
-	glRasterPos2f(x, y);
-	// XXX ui_rasterpos_safe(x, y, aspect);
 	
 	/* draw */
 	if((w<1 || h<1)) {
@@ -869,13 +876,13 @@ static void icon_draw_rect(float x, float y, int w, int h, float aspect, int rw,
 			
 			/* scale it */
 			IMB_scaleImBuf(ima, w, h);
-			glDrawPixels(w, h, GL_RGBA, GL_UNSIGNED_BYTE, ima->rect);
+			glaDrawPixelsSafe(x, y, w, h, w, GL_RGBA, GL_UNSIGNED_BYTE, ima->rect);
 			
 			IMB_freeImBuf(ima);
 		}
 	}
 	else
-		glDrawPixels(w, h, GL_RGBA, GL_UNSIGNED_BYTE, rect);
+		glaDrawPixelsSafe(x, y, w, h, w, GL_RGBA, GL_UNSIGNED_BYTE, rect);
 
 	/* restore color */
 	if(alpha != 0.0f)

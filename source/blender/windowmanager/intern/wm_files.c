@@ -259,8 +259,7 @@ static void wm_init_userdef(bContext *C)
 	/* set the python auto-execute setting from user prefs */
 	/* disabled by default, unless explicitly enabled in the command line */
 	if ((U.flag & USER_SCRIPT_AUTOEXEC_DISABLE) == 0) G.f |=  G_SCRIPT_AUTOEXEC;
-
-	if(U.tempdir[0]) strncpy(btempdir, U.tempdir, FILE_MAXDIR+FILE_MAXFILE);
+	if(U.tempdir[0]) BLI_where_is_temp(btempdir, 1);
 }
 
 void WM_read_file(bContext *C, char *name, ReportList *reports)
@@ -343,7 +342,7 @@ int WM_read_homefile(bContext *C, wmOperator *op)
 {
 	ListBase wmbase;
 	char tstr[FILE_MAXDIR+FILE_MAXFILE], scestr[FILE_MAXDIR];
-	int from_memory= op?RNA_boolean_get(op->ptr, "factory"):0;
+	int from_memory= op && strcmp(op->type->idname, "WM_OT_read_factory_settings")==0;
 	int success;
 	
 	free_ttfont(); /* still weird... what does it here? */
@@ -527,7 +526,7 @@ static void do_history(char *name, ReportList *reports)
 		BKE_report(reports, RPT_ERROR, "Unable to make version backup");
 }
 
-static ImBuf *blend_file_thumb(const char *path, Scene *scene, int **thumb_pt)
+static ImBuf *blend_file_thumb(Scene *scene, int **thumb_pt)
 {
 	/* will be scaled down, but gives some nice oversampling */
 	ImBuf *ibuf;
@@ -628,7 +627,7 @@ int WM_write_file(bContext *C, const char *target, int fileflags, ReportList *re
 	ED_sculpt_force_update(C);
 
 	/* blend file thumbnail */
-	ibuf_thumb= blend_file_thumb(di, CTX_data_scene(C), &thumb);
+	ibuf_thumb= blend_file_thumb(CTX_data_scene(C), &thumb);
 
 	/* rename to .blend1, do this as last before write */
 	do_history(di, reports);
@@ -681,15 +680,20 @@ int WM_write_homefile(bContext *C, wmOperator *op)
 		wm_window_close(C, wm, win);
 	
 	BLI_make_file_string("/", tstr, BLI_get_folder_create(BLENDER_USER_CONFIG, NULL), BLENDER_STARTUP_FILE);
-	printf("trying to save homefile at %s \n", tstr);
+	printf("trying to save homefile at %s ", tstr);
 	
 	/*  force save as regular blend file */
 	fileflags = G.fileflags & ~(G_FILE_COMPRESS | G_FILE_AUTOPLAY | G_FILE_LOCK | G_FILE_SIGN);
 
-	BLO_write_file(CTX_data_main(C), tstr, fileflags, op->reports, NULL);
+	if(BLO_write_file(CTX_data_main(C), tstr, fileflags, op->reports, NULL) == 0) {
+		printf("fail\n");
+		return OPERATOR_CANCELLED;
+	}
 	
+	printf("ok\n");
+
 	G.save_over= 0;
-	
+
 	return OPERATOR_FINISHED;
 }
 

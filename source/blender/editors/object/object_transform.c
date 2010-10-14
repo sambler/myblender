@@ -68,16 +68,9 @@ static int object_location_clear_exec(bContext *C, wmOperator *op)
 {
 	Main *bmain = CTX_data_main(C);
 	Scene *scene = CTX_data_scene(C);
-	KeyingSet *ks;
 	
-	/* get KeyingSet to use 
-	 *	- use the active KeyingSet if defined (and user wants to use it for all autokeying), 
-	 * 	  or otherwise key transforms only
-	 */
-	if (IS_AUTOKEY_FLAG(ONLYKEYINGSET) && (scene->active_keyingset))
-		ks = ANIM_scene_get_active_keyingset(scene);
-	else 
-		ks = ANIM_builtin_keyingset_get_named(NULL, "Location");
+	/* get KeyingSet to use */
+	KeyingSet *ks = ANIM_get_keyingset_for_autokeying(scene, "Location");
 	
 	/* clear location of selected objects if not in weight-paint mode */
 	CTX_DATA_BEGIN(C, Object*, ob, selected_editable_objects) {
@@ -136,16 +129,9 @@ static int object_rotation_clear_exec(bContext *C, wmOperator *op)
 {
 	Main *bmain= CTX_data_main(C);
 	Scene *scene= CTX_data_scene(C);
-	KeyingSet *ks;
 	
-	/* get KeyingSet to use 
-	 *	- use the active KeyingSet if defined (and user wants to use it for all autokeying), 
-	 * 	  or otherwise key transforms only
-	 */
-	if (IS_AUTOKEY_FLAG(ONLYKEYINGSET) && (scene->active_keyingset))
-		ks = ANIM_scene_get_active_keyingset(scene);
-	else 
-		ks = ANIM_builtin_keyingset_get_named(NULL, "Rotation");
+	/* get KeyingSet to use */
+	KeyingSet *ks = ANIM_get_keyingset_for_autokeying(scene, "Rotation");
 	
 	/* clear rotation of selected objects if not in weight-paint mode */
 	CTX_DATA_BEGIN(C, Object*, ob, selected_editable_objects) {
@@ -288,16 +274,9 @@ static int object_scale_clear_exec(bContext *C, wmOperator *op)
 {
 	Main *bmain= CTX_data_main(C);
 	Scene *scene= CTX_data_scene(C);
-	KeyingSet *ks;
 	
-	/* get KeyingSet to use 
-	 *	- use the active KeyingSet if defined (and user wants to use it for all autokeying), 
-	 * 	  or otherwise key transforms only
-	 */
-	if (IS_AUTOKEY_FLAG(ONLYKEYINGSET) && (scene->active_keyingset))
-		ks = ANIM_scene_get_active_keyingset(scene);
-	else 
-		ks = ANIM_builtin_keyingset_get_named(NULL, "Scaling");
+	/* get KeyingSet to use */
+	KeyingSet *ks = ANIM_get_keyingset_for_autokeying(scene, "Scaling");
 	
 	/* clear scales of selected objects if not in weight-paint mode */
 	CTX_DATA_BEGIN(C, Object*, ob, selected_editable_objects) {
@@ -478,8 +457,18 @@ static int apply_objects_internal(bContext *C, ReportList *reports, int apply_lo
 			object_to_mat3(ob, rsmat);
 		else if(apply_scale)
 			object_scale_to_mat3(ob, rsmat);
-		else if(apply_rot)
+		else if(apply_rot) {
+			float tmat[3][3], timat[3][3];
+
+			/* simple rotation matrix */
 			object_rot_to_mat3(ob, rsmat);
+
+			/* correct for scale, note mul_m3_m3m3 has swapped args! */
+			object_scale_to_mat3(ob, tmat);
+			invert_m3_m3(timat, tmat);
+			mul_m3_m3m3(rsmat, timat, rsmat);
+			mul_m3_m3m3(rsmat, rsmat, tmat);
+		}
 		else
 			unit_m3(rsmat);
 

@@ -146,7 +146,7 @@ TEST_SSE_SUPPORT()
 # On Macs: 
 #   cmake -D PYTHON_INC=/System/Library/Frameworks/Python.framework/Versions/3.1/include/python3.1 -D PYTHON_LIBPATH=/System/Library/Frameworks/Python.framework/Versions/3.1/lib/python3.1/config -G Xcode ../blender
 #
-# When changing any of this remember to update the notes in doc/blender-cmake.txt
+# When changing any of this remember to update the notes in doc/build_systems/cmake.txt
 
 #-----------------------------------------------------------------------------
 #Platform specifics
@@ -871,7 +871,7 @@ IF(WITH_BUILDINFO)
 	# my mod to manually place avn revision as git doesn't repond properly
 		#EXEC_PROGRAM("svnversion ${CMAKE_SOURCE_DIR}" OUTPUT_VARIABLE BUILD_REV RETURN_VALUE BUILD_REV_RETURN)
 		#IF(BUILD_REV_RETURN)
-			SET(BUILD_REV "32440")
+			SET(BUILD_REV "32461")
 		#ENDIF(BUILD_REV_RETURN)
 	ENDIF(UNIX)
 	
@@ -880,7 +880,7 @@ IF(WITH_BUILDINFO)
 		EXEC_PROGRAM("cmd /c time /t" OUTPUT_VARIABLE BUILD_TIME)  
 		#EXEC_PROGRAM("svnversion ${CMAKE_SOURCE_DIR}" OUTPUT_VARIABLE BUILD_REV RETURN_VALUE BUILD_REV_RETURN)
 		#IF(BUILD_REV_RETURN)
-			SET(BUILD_REV "32440")
+			SET(BUILD_REV "32461")
 		#ENDIF(BUILD_REV_RETURN)
 	ENDIF(WIN32)
 ENDIF(WITH_BUILDINFO)

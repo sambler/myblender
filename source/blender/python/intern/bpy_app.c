@@ -26,9 +26,12 @@
 
 #include "BLI_path_util.h"
 
+#include "BKE_utildefines.h"
 #include "BKE_blender.h"
 #include "BKE_global.h"
 #include "structseq.h"
+
+#include "../generic/py_capi_utils.h"
 
 #ifdef BUILD_DATE
 extern char build_date[];
@@ -114,20 +117,14 @@ static PyObject *make_app_info(void)
 
 /* a few getsets because it makes sense for them to be in bpy.app even though
  * they are not static */
-static PyObject *bpy_app_debug_get(PyObject *self, void *closure)
+static PyObject *bpy_app_debug_get(PyObject *UNUSED(self), void *UNUSED(closure))
 {
-	(void)(self);
-	(void)(closure);
-
 	return PyBool_FromLong(G.f & G_DEBUG);
 }
 
-static int bpy_app_debug_set(PyObject *self, PyObject *value, void *closure)
+static int bpy_app_debug_set(PyObject *UNUSED(self), PyObject *value, void *UNUSED(closure))
 {
 	int param= PyObject_IsTrue(value);
-
-	(void)(self);
-	(void)(closure);
 
 	if(param < 0) {
 		PyErr_SetString(PyExc_TypeError, "bpy.app.debug can only be True/False");
@@ -140,13 +137,10 @@ static int bpy_app_debug_set(PyObject *self, PyObject *value, void *closure)
 	return 0;
 }
 
-static PyObject *bpy_app_tempdir_get(PyObject *self, void *closure)
+static PyObject *bpy_app_tempdir_get(PyObject *UNUSED(self), void *UNUSED(closure))
 {
 	extern char btempdir[];
-	(void)(self);
-	(void)(closure);
-
-	return PyUnicode_FromString(btempdir);
+	return PyC_UnicodeFromByte(btempdir);
 }
 
 PyGetSetDef bpy_app_debug_getset= {"debug", bpy_app_debug_get, bpy_app_debug_set, "Boolean, set when blender is running in debug mode (started with -d)", NULL};

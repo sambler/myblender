@@ -856,7 +856,7 @@ static void icon_draw_rect(float x, float y, int w, int h, float aspect, int rw,
 	}
 	
 	// this places icons in the right place
-	glRasterPos2f(x,y);
+	//glRasterPos2f(x,y);
 	/* draw */
 	if((w<1 || h<1)) {
 		// XXX - TODO 2.5 verify whether this case can happen
@@ -878,15 +878,15 @@ static void icon_draw_rect(float x, float y, int w, int h, float aspect, int rw,
 			
 			/* scale it */
 			IMB_scaleImBuf(ima, w, h);
-			glDrawPixels(w, h, GL_RGBA, GL_UNSIGNED_BYTE, ima->rect); // orig
-			//glaDrawPixelsSafe(x, y, (x>0)?w:-w, (y>0)?h:-h, w, GL_RGBA, GL_UNSIGNED_BYTE, ima->rect); //new - preferred
+			//glDrawPixels(w, h, GL_RGBA, GL_UNSIGNED_BYTE, ima->rect); // orig
+			glaDrawPixelsSafe(x, y, w, h, w, GL_RGBA, GL_UNSIGNED_BYTE, ima->rect); //new - preferred
 			
 			IMB_freeImBuf(ima);
 		}
 	}
 	else {
-		glDrawPixels(w, h, GL_RGBA, GL_UNSIGNED_BYTE, rect); // orig
-		//glaDrawPixelsSafe(x, y, (x>0)?w:-w, (y>0)?h:-h, w, GL_RGBA, GL_UNSIGNED_BYTE, rect); //new - preferred
+		//glDrawPixels(w, h, GL_RGBA, GL_UNSIGNED_BYTE, rect); // orig
+		glaDrawPixelsSafe(x, y, w, h, w, GL_RGBA, GL_UNSIGNED_BYTE, rect); //new - preferred
 	}
 
 	/* restore color */

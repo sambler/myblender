@@ -63,7 +63,7 @@ typedef struct bNodeStack {
 typedef struct bNodeSocket {
 	struct bNodeSocket *next, *prev, *new_sock;
 	
-	char name[32];
+	char name[256];
 	bNodeStack ns;				/* custom data for inputs, only UI writes in this */
 	
 	short type, flag;			/* type is copy from socket type struct */
@@ -107,7 +107,7 @@ typedef struct bNodePreview {
 typedef struct bNode {
 	struct bNode *next, *prev, *new_node;
 	
-	char name[32];
+	char name[256];
 	short type, flag;
 	short done, level;		/* both for dependency and sorting */
 	short lasty, menunr;	/* lasty: check preview render status, menunr: browse ID blocks */
@@ -263,12 +263,12 @@ typedef struct NodeTwoFloats {
 } NodeTwoFloats;
 
 typedef struct NodeGeometry {
-	char uvname[32];
-	char colname[32];
+	char uvname[256];
+	char colname[256];
 } NodeGeometry;
 
 typedef struct NodeVertexCol {
-	char name[32];
+	char name[256];
 } NodeVertexCol;
 
 /* qdn: Defocus blur node */
@@ -326,7 +326,7 @@ typedef struct NodeColorspill {
 
 /* TEX_output */
 typedef struct TexNodeOutput {
-	char name[32];
+	char name[256];
 } TexNodeOutput;
 
 

@@ -38,12 +38,12 @@ struct bSensor;
 /* ****************** CONTROLLERS ********************* */
 
 typedef struct bExpressionCont {
-	char str[128];
+	char str[256];
 } bExpressionCont;
 
 typedef struct bPythonCont {
 	struct Text *text;
-	char module[64];
+	char module[256];
 	int mode;
 	int flag; /* only used for debug now */
 } bPythonCont;
@@ -53,7 +53,7 @@ typedef struct bController {
 	short type, flag, inputs, totlinks;
 	short otype, totslinks, pad2, pad3;
 	
-	char name[32];
+	char name[256];
 	void *data;
 	
 	struct bActuator **links;

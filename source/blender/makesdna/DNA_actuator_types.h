@@ -49,8 +49,8 @@ typedef struct bActionActuator {
 	struct bAction *act;	/* Pointer to action */				
 	short	type, flag;		/* Playback type */  // not in use
 	int	sta, end;		/* Start & End frames */			
-	char	name[32];		/* For property-driven playback */	
-	char	frameProp[32];	/* Set this property to the actions current frame */
+	char	name[256];		/* For property-driven playback */	
+	char	frameProp[256];	/* Set this property to the actions current frame */
 	short	blendin;		/* Number of frames of blending */
 	short	priority;		/* Execution priority */
 	short	end_reset;	/* Ending the actuator (negative pulse) wont reset the the action to its starting frame */
@@ -86,7 +86,7 @@ typedef struct bEditObjectActuator {
 	short type, flag;
 	struct Object *ob;
 	struct Mesh *me;
-	char name[32];
+	char name[256];
 	float linVelocity[3]; /* initial lin. velocity on creation */
 	float angVelocity[3]; /* initial ang. velocity on creation */
 	float mass;
@@ -103,7 +103,7 @@ typedef struct bSceneActuator {
 
 typedef struct bPropertyActuator {
 	int pad, type;
-	char name[32], value[32];
+	char name[256], value[256];
 	struct Object *ob;
 } bPropertyActuator;
 
@@ -120,8 +120,8 @@ typedef struct bObjectActuator {
 typedef struct bIpoActuator {
 	short flag, type;
 	int sta, end;
-	char name[32];
-	char frameProp[32];	/* Set this property to the actions current frame */
+	char name[256];
+	char frameProp[256];	/* Set this property to the actions current frame */
 	
 	short pad1, pad2, pad3, pad4;
 	
@@ -142,13 +142,13 @@ typedef struct bConstraintActuator {
 	int pad;
 	float minloc[3], maxloc[3];
 	float minrot[3], maxrot[3];
-	char matprop[32];
+	char matprop[256];
 } bConstraintActuator;
 
 typedef struct bGroupActuator {
 	short flag, type;
 	int sta, end;
-	char name[32];		/* property or groupkey */
+	char name[256];		/* property or groupkey */
 	
 	short pad[3], cur, butsta, butend;/* not referenced, can remove? */
 	/* struct Group *group;		not used, remove */
@@ -163,23 +163,23 @@ typedef struct bRandomActuator {
 	int int_arg_2;
 	float float_arg_1;
 	float float_arg_2;
-	char  propname[32];
+	char  propname[256];
 } bRandomActuator;
 
 typedef struct bMessageActuator {
-	char toPropName[32];	/* Send to all objects with this propertyname. Empty to broadcast. */
+	char toPropName[256];	/* Send to all objects with this propertyname. Empty to broadcast. */
 	struct Object *toObject;/* (Possible future use) pointer to a single destination object. */
-	char subject[32];		/* Message Subject to send. */
+	char subject[256];		/* Message Subject to send. */
 	short bodyType, pad1;	/* bodyType is either 'User defined text' or PropName */
 	int pad2;
-	char body[32];			/* Either User Defined Text or our PropName to send value of */
+	char body[256];			/* Either User Defined Text or our PropName to send value of */
 } bMessageActuator;
 
 typedef struct bGameActuator {
 	short flag, type;
 	int sta, end;
-	char filename[64];
-	char loadaniname[64];
+	char filename[256];
+	char loadaniname[256];
 } bGameActuator;
 
 typedef struct bVisibilityActuator {
@@ -215,8 +215,8 @@ typedef struct bStateActuator {
 } bStateActuator;
 
 typedef struct bArmatureActuator {
-	char posechannel[32];
-	char constraint[32];
+	char posechannel[256];
+	char constraint[256];
 	int type;		/* 0=run, 1=enable, 2=disable, 3=set target, 4=set weight */
 	float weight;
 	struct Object *target;
@@ -231,7 +231,7 @@ typedef struct bActuator {
 	 */
 	short flag;
 	short otype, go;
-	char name[32];
+	char name[256];
 
 	/**
 	 * Data must point to an object actuator type struct.

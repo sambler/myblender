@@ -54,7 +54,7 @@ typedef struct MTex {
 	short texco, mapto, maptoneg, blendtype;
 	struct Object *object;
 	struct Tex *tex;
-	char uvname[32];
+	char uvname[256];	/* matches MAX_ID_NAME as defined in DNA_ID.h */
 	
 	char projx, projy, projz, mapping;
 	float ofs[3], size[3], rot;
@@ -99,7 +99,7 @@ typedef unsigned short dna_ushort_fix;
 #endif
 
 typedef struct PluginTex {
-	char name[160];
+	char name[256];	/* matches MAX_ID_NAME as defined in DNA_ID.h */
 	void *handle;
 	
 	char *pname;

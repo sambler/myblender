@@ -181,7 +181,7 @@ static void wavemod_get_texture_coords(WaveModifierData *wmd, Object *ob,
 			char *done = MEM_callocN(sizeof(*done) * numVerts,
 					"get_texture_coords done");
 			int numFaces = dm->getNumFaces(dm);
-			char uvname[32];
+			char uvname[256];
 			MTFace *tf;
 
 			validate_layer_name(&dm->faceData, CD_MTFACE, wmd->uvlayer_name, uvname);

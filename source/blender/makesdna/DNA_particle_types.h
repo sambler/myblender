@@ -228,7 +228,7 @@ typedef struct ParticleSystem{				/* note, make sure all (runtime) are NULL's in
 
 	struct ListBase targets;				/* used for keyed and boid physics */
 
-	char name[32];							/* particle system name */
+	char name[256];							/* particle system name */
 	
 	float imat[4][4];	/* used for duplicators */
 	float cfra, tree_frame;
@@ -236,7 +236,7 @@ typedef struct ParticleSystem{				/* note, make sure all (runtime) are NULL's in
 	int flag, totpart, totchild, totcached, totchildcache;
 	short recalc, target_psys, totkeyed, bakespace;
 
-	char bb_uvname[3][32];					/* billboard uv name */
+	char bb_uvname[3][256];					/* billboard uv name */
 
 	/* if you change these remember to update array lengths to PSYS_TOT_VG! */
 	short vgroup[12], vg_neg, rt3;			/* vertex groups, 0==disable, 1==starting index */

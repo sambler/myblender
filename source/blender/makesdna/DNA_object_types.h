@@ -60,9 +60,9 @@ struct bGPdata;
 /* Vertex Groups - Name Info */
 typedef struct bDeformGroup {
 	struct bDeformGroup *next, *prev;
-	char name[32];
+	char name[256];
 } bDeformGroup;
-#define MAX_VGROUP_NAME 32
+#define MAX_VGROUP_NAME 256
 
 /**
  * The following illustrates the orientation of the 
@@ -264,7 +264,7 @@ typedef struct ObHook {
 	float cent[3];			/* visualization of hook */
 	float falloff;			/* if not zero, falloff is distance where influence zero */
 	
-	char name[32];
+	char name[256];
 
 	int *indexar;
 	int totindex, curindex; /* curindex is cache for fast lookup */

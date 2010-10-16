@@ -157,11 +157,11 @@ typedef struct SpaceSeq {
 } SpaceSeq;
 
 typedef struct FileSelectParams {
-	char title[24]; /* title, also used for the text of the execute button */
+	char title[256]; /* title, also used for the text of the execute button */
 	char dir[240]; /* directory */
-	char file[80]; /* file */
-	char renamefile[80];
-	char renameedit[80]; /* annoying but the first is only used for initialization */
+	char file[256]; /* file */
+	char renamefile[256];
+	char renameedit[256]; /* annoying but the first is only used for initialization */
 
 	char filter_glob[64]; /* list of filetypes to filter */
 
@@ -229,7 +229,7 @@ typedef struct SpaceOops {
 	struct TreeStore *treestore;
 	
 	/* search stuff */
-	char search_string[32];
+	char search_string[256];
 	struct TreeStoreElem search_tse;
 	int search_flags, do_;
 	
@@ -442,9 +442,9 @@ typedef struct SpaceImaSel {
 	struct FileList *files;
 
 	/* specific stuff for drawing */
-	char title[24];
+	char title[256];
 	char dir[240];
-	char file[80];
+	char file[256];
 
 	short type, menu, flag, sort;
 
@@ -553,7 +553,7 @@ typedef struct SpaceUserPref {
 
 	int pad;
 	
-	char filter[64];		/* search term for filtering in the UI */
+	char filter[256];		/* search term for filtering in the UI */
 
 } SpaceUserPref;
 
@@ -686,7 +686,7 @@ enum FileSortTypeE {
 /* these values need to be hardcoded in structs, dna does not recognize defines */
 /* also defined in BKE */
 #define FILE_MAXDIR			160
-#define FILE_MAXFILE		80
+#define FILE_MAXFILE		256
 #define FILE_MAX			240
 
 /* filesel types */

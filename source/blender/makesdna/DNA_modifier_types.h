@@ -87,7 +87,7 @@ typedef struct ModifierData {
 
 	int type, mode;
 	int stackindex, pad;
-	char name[32];
+	char name[256];	/* matches MAX_ID_NAME as defined in DNA_ID.h */
 	
 	/* XXX for timing info set by caller... solve later? (ton) */
 	struct Scene *scene;
@@ -114,14 +114,14 @@ typedef struct LatticeModifierData {
 	ModifierData modifier;
 
 	struct Object *object;
-	char name[32];			/* optional vertexgroup name */
+	char name[256];	/* optional vertexgroup name */
 } LatticeModifierData;
 
 typedef struct CurveModifierData {
 	ModifierData modifier;
 
 	struct Object *object;
-	char name[32];			/* optional vertexgroup name */
+	char name[256];			/* optional vertexgroup name */
 	short defaxis;			/* axis along which curve deforms */
 	char pad[6];
 } CurveModifierData;
@@ -146,7 +146,7 @@ typedef struct MaskModifierData {
 	ModifierData modifier;
 	
 	struct Object *ob_arm;	/* armature to use to in place of hardcoded vgroup */
-	char vgroup[32];		/* name of vertex group to use to mask */
+	char vgroup[256];		/* name of vertex group to use to mask */
 	
 	int mode;				/* using armature or hardcoded vgroup */
 	int flag;				/* flags for various things */
@@ -256,7 +256,7 @@ typedef struct BevelModifierData {
 	short lim_flags;      /* flags to tell the tool how to limit the bevel */
 	short e_flags;        /* flags to direct how edge weights are applied to verts */
 	float bevel_angle;    /* if the BME_BEVEL_ANGLE is set, this will be how "sharp" an edge must be before it gets beveled */
-	char defgrp_name[32]; /* if the BME_BEVEL_VWEIGHT option is set, this will be the name of the vert group */
+	char defgrp_name[256]; /* if the BME_BEVEL_VWEIGHT option is set, this will be the name of the vert group */
 } BevelModifierData;
 
 typedef struct BMeshModifierData {
@@ -288,11 +288,11 @@ typedef struct DisplaceModifierData {
 	struct Tex *texture;
 	float strength;
 	int direction;
-	char defgrp_name[32];
+	char defgrp_name[256];
 	float midlevel;
 	int texmapping;
 	struct Object *map_object;
-	char uvlayer_name[32];
+	char uvlayer_name[256];
 	int uvlayer_tmp, pad;
 } DisplaceModifierData;
 
@@ -323,7 +323,7 @@ typedef struct UVProjectModifierData {
 	int num_projectors;
 	float aspectx, aspecty;
 	float scalex, scaley;												
-	char uvlayer_name[32];
+	char uvlayer_name[256];
 	int uvlayer_tmp, pad;
 } UVProjectModifierData;
 
@@ -347,7 +347,7 @@ typedef struct DecimateModifierData {
 typedef struct SmoothModifierData {
 	ModifierData modifier;
 	float fac;
-	char defgrp_name[32];
+	char defgrp_name[256];
 	short flag, repeat;
 
 } SmoothModifierData;
@@ -371,7 +371,7 @@ typedef struct CastModifierData {
 	float fac;
 	float radius;
 	float size;
-	char defgrp_name[32];
+	char defgrp_name[256];
 	short flag, type;
 } CastModifierData;
 
@@ -395,7 +395,7 @@ typedef struct WaveModifierData {
 	ModifierData modifier;
 
 	struct Object *objectcenter;
-	char defgrp_name[32];
+	char defgrp_name[256];
 	struct Tex *texture;
 	struct Object *map_object;
 
@@ -406,7 +406,7 @@ typedef struct WaveModifierData {
 
 	int texmapping, uvlayer_tmp;
 
-	char uvlayer_name[32];
+	char uvlayer_name[256];
 
 	float timeoffs, lifetime;
 	float pad1;
@@ -419,14 +419,14 @@ typedef struct ArmatureModifierData {
 	int pad2;
 	struct Object *object;
 	float *prevCos;		/* stored input of previous modifier, for vertexgroup blending */
-	char defgrp_name[32];
+	char defgrp_name[256];
 } ArmatureModifierData;
 
 typedef struct HookModifierData {
 	ModifierData modifier;
 
 	struct Object *object;
-	char subtarget[32];		/* optional name of bone target */
+	char subtarget[256];		/* optional name of bone target */
 	
 	float parentinv[4][4];	/* matrix making current transform unmodified */
 	float cent[3];			/* visualization of hook */
@@ -435,7 +435,7 @@ typedef struct HookModifierData {
 	int *indexar;			/* if NULL, it's using vertexgroup */
 	int totindex;
 	float force;
-	char name[32];			/* optional vertexgroup name */
+	char name[256];			/* optional vertexgroup name */
 } HookModifierData;
 
 typedef struct SoftbodyModifierData {
@@ -516,7 +516,7 @@ typedef struct MeshDeformModifierData {
 	ModifierData modifier;
 
 	struct Object *object;			/* mesh object */
-	char defgrp_name[32];			/* optional vertexgroup name */
+	char defgrp_name[256];			/* optional vertexgroup name */
 
 	short gridsize, flag, mode, pad;
 
@@ -620,7 +620,7 @@ typedef struct ShrinkwrapModifierData {
 
 	struct Object *target;	/* shrink target */
 	struct Object *auxTarget; /* additional shrink target */
-	char vgroup_name[32];	/* optional vertexgroup name */
+	char vgroup_name[256];	/* optional vertexgroup name */
 	float keepDist;			/* distance offset to keep from mesh/projection point */
 	short shrinkType;		/* shrink type projection */
 	short shrinkOpts;		/* shrink options */
@@ -661,7 +661,7 @@ typedef struct SimpleDeformModifierData {
 	ModifierData modifier;
 
 	struct Object *origin;	/* object to control the origin of modifier space coordinates */
-	char vgroup_name[32];	/* optional vertexgroup name */
+	char vgroup_name[256];	/* optional vertexgroup name */
 	float factor;			/* factors to control simple deforms */
 	float limit[2];			/* lower and upper limit */		
 
@@ -693,7 +693,7 @@ typedef struct ShapeKeyModifierData {
 typedef struct SolidifyModifierData {
 	ModifierData modifier;
 
-	char defgrp_name[32];		/* name of vertex group to use */
+	char defgrp_name[256];		/* name of vertex group to use */
 	float offset;			/* new surface offset level*/
 	float offset_fac;		/* midpoint of the offset  */
 	float crease_inner;

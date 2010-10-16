@@ -148,7 +148,7 @@ typedef struct AudioData {
 typedef struct SceneRenderLayer {
 	struct SceneRenderLayer *next, *prev;
 	
-	char name[32];
+	char name[256];
 	
 	struct Material *mat_override;
 	struct Group *light_override;
@@ -394,7 +394,7 @@ typedef struct RenderData {
 /* control render convert and shading engine */
 typedef struct RenderProfile {
 	struct RenderProfile *next, *prev;
-	char name[32];
+	char name[256];
 	
 	short particle_perc;
 	short subsurf_max;
@@ -501,7 +501,7 @@ typedef struct GameData {
 typedef struct TimeMarker {
 	struct TimeMarker *next, *prev;
 	int frame;
-	char name[64];
+	char name[256];
 	unsigned int flag;
 	struct Object *camera;
 } TimeMarker;
@@ -559,7 +559,7 @@ typedef struct ParticleEditSettings {
 
 typedef struct TransformOrientation {
 	struct TransformOrientation *next, *prev;
-	char name[36];
+	char name[256];
 	float mat[3][3];
 } TransformOrientation;
 

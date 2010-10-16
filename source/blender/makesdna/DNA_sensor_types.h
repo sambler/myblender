@@ -37,7 +37,7 @@ struct Material;
 /* ****************** SENSORS ********************* */
 
 typedef struct bNearSensor {
-	char name[32];
+	char name[256];
 	float dist, resetdist;
 	int lastval, pad;
 } bNearSensor;
@@ -56,7 +56,7 @@ typedef struct bMouseSensor {
 } bMouseSensor;
 
 typedef struct bTouchSensor {
-	char name[32];
+	char name[256];
 	struct Material *ma;
 	float dist, pad;
 } bTouchSensor;
@@ -67,25 +67,25 @@ typedef struct bKeyboardSensor {
 	/**
 	 * Name of the target property
 	 */
-	char targetName[32];
+	char targetName[256];
 	/**
 	 * Name of the toggle property
 	 */
-	char toggleName[32];
+	char toggleName[256];
 } bKeyboardSensor;
 
 typedef struct bPropertySensor {
 	int type;
 	int pad;
-	char name[32];
-	char value[32];
-	char maxvalue[32];
+	char name[256];
+	char value[256];
+	char maxvalue[256];
 } bPropertySensor;
 
 typedef struct bActuatorSensor {
 	int type;
 	int pad;
-	char name[32];
+	char name[256];
 } bActuatorSensor;
 
 typedef struct bDelaySensor {
@@ -96,8 +96,8 @@ typedef struct bDelaySensor {
 } bDelaySensor;
 
 typedef struct bCollisionSensor {
-	char name[32];          /* property name */
-	char materialName[32];  /* material      */
+	char name[256];          /* property name */
+	char materialName[256];  /* material      */
 	// struct Material *ma; // XXX remove materialName
 	short damptimer, damp;
 	short mode;             /* flag to choose material or property */
@@ -105,23 +105,23 @@ typedef struct bCollisionSensor {
 } bCollisionSensor;
 
 typedef struct bRadarSensor {
-	char name[32];
+	char name[256];
 	float angle;
 	float range;
 	short flag, axis;
 } bRadarSensor;
 
 typedef struct bRandomSensor {
-	char name[32];
+	char name[256];
 	int seed;
 	int delay;
 } bRandomSensor;
 
 typedef struct bRaySensor {
-	char name[32];
+	char name[256];
 	float range;
-	char propname[32];
-	char matname[32];
+	char propname[256];
+	char matname[256];
 	//struct Material *ma; // XXX remove materialName
 	short mode;
 	short pad1;
@@ -129,8 +129,8 @@ typedef struct bRaySensor {
 } bRaySensor;
 
 typedef struct bArmatureSensor {
-	char posechannel[32];
-	char constraint[32];
+	char posechannel[256];
+	char constraint[256];
 	int  type;
 	float value;
 } bArmatureSensor;
@@ -144,12 +144,12 @@ typedef struct bMessageSensor {
 	/**
 	 * Can be used to filter on subjects like this
 	 */
-	char subject[32];
+	char subject[256];
 
 	/**
 	 * (Possible future use) body to filter on
 	 */
-	char body[32];
+	char body[256];
 } bMessageSensor;
 
 typedef struct bSensor {
@@ -157,7 +157,7 @@ typedef struct bSensor {
 	/* pulse and freq are the bool toggle and frame count for pulse mode */
 	short type, otype, flag, pulse;
 	short freq, totlinks, pad1, pad2;
-	char name[32];
+	char name[256];
 	void *data;
 	
 	struct bController **links;
@@ -172,7 +172,7 @@ typedef struct bSensor {
 } bSensor;
 
 typedef struct bJoystickSensor {
-	char name[32];
+	char name[256];
 	char type;
 	char joyindex;
 	short flag;

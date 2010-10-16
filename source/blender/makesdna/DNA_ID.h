@@ -53,7 +53,7 @@ typedef struct IDProperty {
 	struct IDProperty *next, *prev;
 	char type, subtype;
 	short flag;
-	char name[32];
+	char name[256]; /* matches MAX_ID_NAME (and MAX_IDPROP_NAME) as defined below */
 	int saved; /*saved is used to indicate if this struct has been saved yet.
 				seemed like a good idea as a pad var was needed anyway :)*/
 	IDPropertyData data;	/* note, alignment for 64 bits */
@@ -65,7 +65,7 @@ typedef struct IDProperty {
 					saved.*/
 } IDProperty;
 
-#define MAX_IDPROP_NAME	32
+#define MAX_IDPROP_NAME	256
 #define DEFAULT_ALLOC_FOR_NULL_STRINGS	64
 
 /*->type*/
@@ -89,7 +89,7 @@ typedef struct IDProperty {
  * provides a common handle to place all data in double-linked lists.
  * */
 
-#define MAX_ID_NAME	24
+#define MAX_ID_NAME	256
 
 /* There's a nasty circular dependency here.... void* to the rescue! I
  * really wonder why this is needed. */
@@ -97,7 +97,7 @@ typedef struct ID {
 	void *next, *prev;
 	struct ID *newid;
 	struct Library *lib;
-	char name[24];
+	char name[256]; /* matches MAX_ID_NAME above */
 	short us;
 	/**
 	 * LIB_... flags report on status of the datablock this ID belongs

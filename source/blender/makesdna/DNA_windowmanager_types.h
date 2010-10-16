@@ -162,7 +162,7 @@ typedef struct wmWindow {
 	
 	struct bScreen *screen;		/* active screen */
 	struct bScreen *newscreen;	/* temporary when switching */
-	char screenname[32];	/* MAX_ID_NAME for matching window with active screen after file read */
+	char screenname[256];	/* MAX_ID_NAME for matching window with active screen after file read */
 	
 	short posx, posy, sizex, sizey;	/* window coords */
 	short windowstate;	/* borderless, full */
@@ -211,7 +211,7 @@ typedef struct wmKeyMapItem {
 	struct wmKeyMapItem *next, *prev;
 	
 	/* operator */
-	char idname[64];	/* used to retrieve operator type pointer */
+	char idname[256];	/* used to retrieve operator type pointer */
 	IDProperty *properties;			/* operator properties, assigned to ptr->data and can be written to a file */
 	
 	/* modal */
@@ -243,7 +243,7 @@ typedef struct wmKeyMap {
 	
 	ListBase items;
 	
-	char idname[64];	/* global editor keymaps, or for more per space/region */
+	char idname[256];	/* global editor keymaps, or for more per space/region */
 	short spaceid;		/* same IDs as in DNA_space_types.h */
 	short regionid;		/* see above */
 	
@@ -264,8 +264,8 @@ typedef struct wmKeyMap {
 typedef struct wmKeyConfig {
 	struct wmKeyConfig *next, *prev;
 
-	char idname[64];		/* unique name */
-	char basename[64];		/* idname of configuration this is derives from, "" if none */
+	char idname[256];		/* unique name */
+	char basename[256];		/* idname of configuration this is derives from, "" if none */
 	
 	ListBase keymaps;
 	int actkeymap, flag;
@@ -280,7 +280,7 @@ typedef struct wmOperator {
 	struct wmOperator *next, *prev;
 
 	/* saved */
-	char idname[64];/* used to retrieve type pointer */
+	char idname[256];/* used to retrieve type pointer */
 	IDProperty *properties;		/* saved, user-settable properties */
 
 	/* runtime */

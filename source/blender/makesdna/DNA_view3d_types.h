@@ -151,7 +151,7 @@ typedef struct View3D {
 
 	struct View3D *localvd;
 	
-	char ob_centre_bone[32];		/* optional string for armature bone to define center */
+	char ob_centre_bone[256];		/* optional string for armature bone to define center */
 	
 	int lay, layact;
 	

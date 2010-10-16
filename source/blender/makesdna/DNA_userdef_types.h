@@ -147,7 +147,7 @@ typedef struct ThemeUI {
 	
 	uiWidgetStateColors wcol_state;
 	
-	char iconfile[80];	// FILE_MAXFILE length
+	char iconfile[256];	// FILE_MAXFILE length
 	
 } ThemeUI;
 
@@ -251,7 +251,7 @@ typedef struct ThemeWireColor {
 /* A theme */
 typedef struct bTheme {
 	struct bTheme *next, *prev;
-	char name[32];
+	char name[64];
 	
 	ThemeUI tui;
 	
@@ -286,7 +286,7 @@ typedef struct bTheme {
 /* for the moment only the name. may want to store options with this later */
 typedef struct bAddon {
 	struct bAddon *next, *prev;
-	char module[64];
+	char module[256];
 } bAddon;
 
 typedef struct SolidLight {

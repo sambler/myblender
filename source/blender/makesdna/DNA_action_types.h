@@ -183,7 +183,7 @@ typedef struct bPoseChannel {
 	IDProperty 			*prop;		/* User-Defined Properties on this PoseChannel */			
 	
 	ListBase			constraints;/* Constraints that act on this PoseChannel */
-	char				name[32];	/* Channels need longer names than normal blender objects */
+	char				name[256];	/* Channels need longer names than normal blender objects */
 	
 	short				flag;		/* dynamic, for detecting transform changes */
 	short				constflag;  /* for quick detecting which constraints affect this channel */
@@ -345,7 +345,7 @@ typedef struct bPose {
 	void *ikparam;				/* IK solver parameters, structure depends on iksolver */ 
 	
 	bAnimVizSettings avs;		/* settings for visualisation of bone animation */
-	char proxy_act_bone[32];           /*proxy active bone name*/
+	char proxy_act_bone[256];           /*proxy active bone name*/
 } bPose;
 
 
@@ -435,7 +435,7 @@ typedef struct bActionGroup {
 	
 	int flag;					/* settings for this action-group */
 	int customCol;				/* index of custom color set to use when used for bones (0=default - used for all old files, -1=custom set) */				
-	char name[64];				/* name of the group */
+	char name[256];				/* name of the group */
 	
 	ThemeWireColor cs;			/* color set to use when customCol == -1 */
 } bActionGroup;
@@ -657,7 +657,7 @@ typedef struct bActionChannel {
 	ListBase				constraintChannels;		/* Constraint Channels (when Action Channel represents an Object or Bone) */
 	
 	int		flag;			/* settings accessed via bitmapping */
-	char	name[32];		/* channel name */
+	char	name[256];		/* channel name */
 	int		temp;			/* temporary setting - may be used to indicate group that channel belongs to during syncing  */
 } bActionChannel;
 

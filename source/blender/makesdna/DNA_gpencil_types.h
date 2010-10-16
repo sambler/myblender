@@ -97,7 +97,7 @@ typedef struct bGPDlayer {
 	
 	float color[4];			/* color that should be used to draw all the strokes in this layer */
 	
-	char info[128];			/* optional reference info about this layer (i.e. "director's comments, 12/3") */
+	char info[256];			/* optional reference info about this layer (i.e. "director's comments, 12/3") */
 } bGPDlayer;
 
 /* bGPDlayer->flag */

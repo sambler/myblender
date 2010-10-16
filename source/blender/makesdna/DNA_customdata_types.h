@@ -44,7 +44,7 @@ typedef struct CustomDataLayer {
 	int active_clone; /* number of the layer to render*/
 	int active_mask; /* number of the layer to render*/
 	char pad[4];
-	char name[32];  /* layer name */
+	char name[256];  /* layer name */
 	void *data;     /* layer data */
 } CustomDataLayer;
 

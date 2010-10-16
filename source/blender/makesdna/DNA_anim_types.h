@@ -53,7 +53,7 @@ typedef struct FModifier {
 	void *data;			/* pointer to modifier data */
 	void *edata;		/* pointer to temporary data used during evaluation */
 	
-	char name[64];		/* user-defined description for the modifier */
+	char name[256];		/* user-defined description for the modifier */
 	short type;			/* type of f-curve modifier */
 	short flag;			/* settings for the modifier */
 	
@@ -261,7 +261,7 @@ typedef struct DriverTarget {
 	
 	char *rna_path;			/* RNA path defining the setting to use (for DVAR_TYPE_SINGLE_PROP) */
 	
-	char pchan_name[32];	/* name of the posebone to use (for vars where DTAR_FLAG_STRUCT_REF is used) */
+	char pchan_name[256];	/* name of the posebone to use (for vars where DTAR_FLAG_STRUCT_REF is used) */
 	short transChan;		/* transform channel index (for DVAR_TYPE_TRANSFORM_CHAN)*/
 	
 	short flag;				/* flags for the validity of the target (NOTE: these get reset everytime the types change) */
@@ -311,7 +311,7 @@ typedef enum eDriverTarget_TransformChannels {
 typedef struct DriverVar {
 	struct DriverVar *next, *prev;
 	
-	char name[64];				/* name of the variable to use in py-expression (must be valid python identifier) */
+	char name[256];				/* name of the variable to use in py-expression (must be valid python identifier) */
 	
 	DriverTarget targets[8];	/* MAX_DRIVER_TARGETS, target slots */	
 	short num_targets;			/* number of targets actually used by this variable */
@@ -544,7 +544,7 @@ typedef struct NlaStrip {
 	ListBase fcurves;			/* F-Curves for controlling this strip's influence and timing */	// TODO: move out?
 	ListBase modifiers;			/* F-Curve modifiers to be applied to the entire strip's referenced F-Curves */
 	
-	char name[64];				/* User-Visible Identifier for Strip */
+	char name[256];				/* User-Visible Identifier for Strip */
 	
 	float influence;			/* Influence of strip */
 	float strip_time;			/* Current 'time' within action being used (automatically evaluated, but can be overridden) */
@@ -649,7 +649,7 @@ typedef struct NlaTrack {
 	int flag;				/* settings for this track */
 	int index;				/* index of the track in the stack (NOTE: not really useful, but we need a pad var anyways!) */
 	
-	char name[64];			/* short user-description of this track */
+	char name[256];			/* short user-description of this track */
 } NlaTrack;
 
 /* settings for track */
@@ -685,7 +685,7 @@ typedef struct KS_Path {
 	struct KS_Path *next, *prev;
 	
 	ID *id;					/* ID block that keyframes are for */
-	char group[64];			/* name of the group to add to */
+	char group[256];		/* name of the group to add to */
 	
 	int idtype;				/* ID-type that path can be used on */
 	
@@ -753,8 +753,8 @@ typedef struct KeyingSet {
 	
 	ListBase paths;			/* (KS_Path) paths to keyframe to */
 	
-	char name[64];			/* user-viewable name for KeyingSet (for menus, etc.) */
-	char typeinfo[64];		/* name of the typeinfo data used for the relative paths */
+	char name[256];			/* user-viewable name for KeyingSet (for menus, etc.) */
+	char typeinfo[256];		/* name of the typeinfo data used for the relative paths */
 	
 	short flag;				/* settings for KeyingSet */
 	short keyingflag;		/* settings to supply insertkey() with */

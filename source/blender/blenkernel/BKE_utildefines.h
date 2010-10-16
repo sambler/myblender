@@ -54,7 +54,7 @@
 /* also defined in DNA_space_types.h */
 #ifndef FILE_MAXDIR
 #define FILE_MAXDIR			160
-#define FILE_MAXFILE		80
+#define FILE_MAXFILE		256
 #define FILE_MAX			240
 #endif
 

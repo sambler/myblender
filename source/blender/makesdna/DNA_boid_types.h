@@ -58,7 +58,7 @@ typedef enum BoidRuleType {
 typedef struct BoidRule {
 	struct BoidRule *next, *prev;
 	int type, flag;
-	char name[32];
+	char name[256];
 } BoidRule;
 #define BRULE_GOAL_AVOID_PREDICT	1
 #define BRULE_GOAL_AVOID_ARRIVE		2
@@ -150,7 +150,7 @@ typedef struct BoidState {
 	ListBase rules;
 	ListBase conditions;
 	ListBase actions;
-	char name[32];
+	char name[256];
 	int id, flag;
 	
 	/* rules */

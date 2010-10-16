@@ -62,7 +62,8 @@ typedef struct IpoDriver {
 	short blocktype, adrcode;	/* sub-channel to use */
 	
 	short type, flag;			/* driver settings */
-	char name[128];	 			/* bone, or python expression here */
+	char name[256];	/* matches MAX_ID_NAME as defined in DNA_ID.h */
+					/* bone, or python expression here */
 } IpoDriver;
 
 /* --- IPO Curve --- */

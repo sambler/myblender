@@ -38,7 +38,7 @@
 
 typedef struct bProperty {
 	struct bProperty *next, *prev;
-	char name[32];
+	char name[256];
 	short type, flag;
 	int data;				/* data should be 4 bytes to store int,float stuff */
 	void *poin;				/* references data unless its a string which is malloc'd */

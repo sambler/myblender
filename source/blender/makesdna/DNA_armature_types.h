@@ -47,7 +47,7 @@ typedef struct Bone {
 	IDProperty 		*prop;			/* User-Defined Properties on this Bone */
 	struct Bone		*parent;		/*	Parent (ik parent if appropriate flag is set		*/
 	ListBase		childbase;		/*	Children	*/
-	char			name[32];		/*  Name of the bone - must be unique within the armature */
+	char			name[256];		/*  Name of the bone - must be unique within the armature */
 
 	float			roll;   /*  roll is input for editmode, length calculated */
 	float			head[3];		

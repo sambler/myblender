@@ -94,8 +94,8 @@ typedef struct Panel {		/* the part from uiBlock that needs saved in file */
 	struct PanelType *type;			/* runtime */
 	struct uiLayout *layout;		/* runtime for drawing */
 
-	char panelname[64], tabname[64];	/* defined as UI_MAX_NAME_STR */
-	char drawname[64];					/* panelname is identifier for restoring location */
+	char panelname[128], tabname[128];	/* defined as UI_MAX_NAME_STR */
+	char drawname[128];					/* panelname is identifier for restoring location */
 	short ofsx, ofsy, sizex, sizey;
 	short labelofs, pad;
 	short flag, runtime_flag;
@@ -107,7 +107,7 @@ typedef struct Panel {		/* the part from uiBlock that needs saved in file */
 
 	int list_scroll, list_size;
 	int list_last_len, list_grip_size;
-	char list_search[64];
+	char list_search[256];
 } Panel;
 
 typedef struct ScrArea {

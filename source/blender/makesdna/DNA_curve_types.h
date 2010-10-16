@@ -216,7 +216,7 @@ typedef struct Curve {
 	struct SelBox *selboxes;
 	struct EditFont *editfont;
 	
-	char family[24];
+	char family[256];	/* matches MAX_ID_NAME as defined in DNA_ID.h */
 	struct VFont *vfont;
 	struct VFont *vfontb;
 	struct VFont *vfonti;

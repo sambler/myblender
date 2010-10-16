@@ -50,7 +50,7 @@ typedef struct {
 	unsigned int 	min;
 	unsigned int 	max;
 	unsigned int	wastebytes;	
-	char 		name[80];
+	char 		name[256];
 	unsigned int	colormap;
 
 	int 		file;		/* stuff used in core only */

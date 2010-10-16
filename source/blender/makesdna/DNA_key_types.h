@@ -47,8 +47,8 @@ typedef struct KeyBlock {
 	
 	void *data;
 	float *weights;
-	char  name[32];
-	char vgroup[32];
+	char  name[256];	/* matches MAX_ID_NAME as defined in DNA_ID.h */
+	char vgroup[256];	/* matches MAX_ID_NAME as defined in DNA_ID.h */
 
 	float slidermin;
 	float slidermax;

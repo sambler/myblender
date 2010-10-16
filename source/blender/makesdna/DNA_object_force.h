@@ -163,9 +163,9 @@ typedef struct PointCache {
 	int totpoint;   /* number of cached points */
 	int index, rt;	/* modifier stack index */
 	
-	char name[64];
-	char prev_name[64];
-	char info[64];
+	char name[256];
+	char prev_name[256];
+	char info[256];
 	char path[240]; /* file path */
 	char *cached_frames;	/* array of length endframe-startframe+1 with flags to indicate cached frames */
 							/* can be later used for other per frame flags too if needed */
@@ -245,7 +245,7 @@ typedef struct SoftBody {
 	
 	/* general options */
 	float nodemass;		/* softbody mass of *vertex* */
-	char  namedVG_Mass[32]; /* along with it introduce mass painting
+	char  namedVG_Mass[256]; /* along with it introduce mass painting
 							starting to fix old bug .. nastyness that VG are indexes 
 								rather find them by name tag to find it -> jow20090613 */
 	float grav;			/* softbody amount of gravitaion to apply */
@@ -260,7 +260,7 @@ typedef struct SoftBody {
 	float maxgoal;
 	float defgoal;		/* default goal for vertices without vgroup */
 	short vertgroup;	/* index starting at 1 */
-	char  namedVG_Softgoal[32]; /* starting to fix old bug .. nastyness that VG are indexes 
+	char  namedVG_Softgoal[256]; /* starting to fix old bug .. nastyness that VG are indexes 
 								rather find them by name tag to find it -> jow20090613 */
   
 	short fuzzyness;      /* */
@@ -268,7 +268,7 @@ typedef struct SoftBody {
 	/* springs */
 	float inspring;		/* softbody inner springs */
 	float infrict;		/* softbody inner springs friction */
-	 char  namedVG_Spring_K[32]; /* along with it introduce Spring_K painting
+	 char  namedVG_Spring_K[256]; /* along with it introduce Spring_K painting
 							starting to fix old bug .. nastyness that VG are indexes 
 								rather find them by name tag to find it -> jow20090613 */
 	

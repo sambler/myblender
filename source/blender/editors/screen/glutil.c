@@ -624,16 +624,6 @@ void glaDrawPixelsSafe(float x, float y, int img_w, int img_h, int row_w, int fo
 		
 		glPixelStorei(GL_UNPACK_ROW_LENGTH,  old_row_length);
 	}
-	else if(xzoom==1.0f && yzoom==1.0f && ((scissor[0]+scissor[2])>=(x+img_w)) && ((scissor[1]+scissor[3])>=(y+img_h)) ) {
-			/*  scissor[0] is context_x
-				scissor[1] is context_y
-				scissor[2] is context_width
-				scissor[3] is context_height */
-		/* we aren't scaling or cropping anything - just draw it */
-		glRasterPos2f(x, y);
-		glDrawPixels(img_w, img_h, format, type, rect);
-		return;
-	}
 }
 
 /* 2D Drawing Assistance */

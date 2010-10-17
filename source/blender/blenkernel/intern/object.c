@@ -320,7 +320,7 @@ static void unlink_object__unlinkModifierLinks(void *userData, Object *ob, Objec
 	}
 }
 
-void unlink_object(Scene *scene, Object *ob)
+void unlink_object(Object *ob)
 {
 	Main *bmain= G.main;
 	Object *obt;
@@ -1617,7 +1617,7 @@ void disable_speed_curve(int val)
 
 // XXX THIS CRUFT NEEDS SERIOUS RECODING ASAP!
 /* ob can be NULL */
-float bsystem_time(struct Scene *scene, Object *ob, float cfra, float ofs)
+float bsystem_time(struct Scene *scene, Object *UNUSED(ob), float cfra, float ofs)
 {
 	/* returns float ( see BKE_curframe in scene.c) */
 	cfra += scene->r.subframe;
@@ -1646,7 +1646,7 @@ void object_scale_to_mat3(Object *ob, float mat[][3])
 	size_to_mat3( mat,vec);
 }
 
-// TODO: this should take rotation orders into account later...
+
 void object_rot_to_mat3(Object *ob, float mat[][3])
 {
 	float rmat[3][3], dmat[3][3];
@@ -1675,7 +1675,6 @@ void object_rot_to_mat3(Object *ob, float mat[][3])
 	}
 	
 	/* combine these rotations */
-	// XXX is this correct? if errors, change the order of multiplication...
 	mul_m3_m3m3(mat, dmat, rmat);
 }
 

@@ -126,12 +126,9 @@ IF(APPLE)
 	OPTION(WITH_LIBS10.5  "Use 10.5 libs (needed for 64bit builds)" OFF)
 ENDIF(APPLE)
 
-IF(NOT WITH_BULLET AND WITH_GAMEENGINE)
-	MESSAGE("WARNING: WITH_GAMEENGINE needs WITH_BULLET")
-ENDIF(NOT WITH_BULLET AND WITH_GAMEENGINE)
 
 IF(NOT WITH_GAMEENGINE AND WITH_PLAYER)
-	MESSAGE("WARNING: WITH_PLAYER needs WITH_GAMEENGINE")
+	MESSAGE(FATAL_ERROR "WITH_PLAYER needs WITH_GAMEENGINE")
 ENDIF(NOT WITH_GAMEENGINE AND WITH_PLAYER)
 
 IF(NOT WITH_INSTALL AND WITH_PYTHON_INSTALL)
@@ -149,7 +146,7 @@ TEST_SSE_SUPPORT()
 # On Macs: 
 #   cmake -D PYTHON_INC=/System/Library/Frameworks/Python.framework/Versions/3.1/include/python3.1 -D PYTHON_LIBPATH=/System/Library/Frameworks/Python.framework/Versions/3.1/lib/python3.1/config -G Xcode ../blender
 #
-# When changing any of this remember to update the notes in doc/blender-cmake.txt
+# When changing any of this remember to update the notes in doc/build_systems/cmake.txt
 
 #-----------------------------------------------------------------------------
 #Platform specifics
@@ -321,6 +318,7 @@ IF(UNIX AND NOT APPLE)
 	SET(PLATFORM_LINKFLAGS "-pthread")
 
 	# Better warnings
+	# note: -Wunused-parameter should be added but for now only apply to ./source/blender
 	SET(C_WARNINGS "-Wall -Wno-char-subscripts -Wpointer-arith -Wcast-align -Wdeclaration-after-statement -Wno-unknown-pragmas")
 	SET(CXX_WARNINGS "-Wall -Wno-invalid-offsetof -Wno-sign-compare")
 
@@ -337,7 +335,7 @@ IF(WIN32)
 
 	# Setup 64bit and 64bit windows systems
 	IF(CMAKE_CL_64)
-		message("64 bit compiler detected.")
+		MESSAGE("64 bit compiler detected.")
 		SET(LIBDIR ${CMAKE_SOURCE_DIR}/../lib/win64)
 	ENDIF(CMAKE_CL_64)
 	
@@ -478,13 +476,15 @@ IF(WIN32)
 			SET(OPENCOLLADA_INC ${OPENCOLLADA}/include)
 			SET(OPENCOLLADA_LIBPATH ${OPENCOLLADA}/lib)
 			SET(OPENCOLLADA_LIB OpenCOLLADASaxFrameworkLoader OpenCOLLADAFramework OpenCOLLADABaseUtils OpenCOLLADAStreamWriter MathMLSolver GeneratedSaxParser xml2 buffer ftoa)
-			#pcre is bundled with openCollada
-			#SET(PCRE ${LIBDIR}/pcre)
-			#SET(PCRE_LIBPATH ${PCRE}/lib)
 			SET(PCRE_LIB pcre)
 		ENDIF(WITH_OPENCOLLADA)
 		
-		# TODO: IF(WITH_LCMS)
+		IF(WITH_LCMS)
+			SET(LCMS ${LIBDIR}/lcms)
+			SET(LCMS_INCLUDE_DIR ${LCMS}/include)
+			SET(LCMS_LIBPATH ${LCMS}/lib)
+			SET(LCMS_LIB lcms)
+		ENDIF(WITH_LCMS)
         
 		IF(WITH_FFMPEG)
 			SET(FFMPEG ${LIBDIR}/ffmpeg)
@@ -606,9 +606,6 @@ IF(WIN32)
 			SET(OPENCOLLADA_INC ${OPENCOLLADA}/include)
 			SET(OPENCOLLADA_LIBPATH ${OPENCOLLADA}/lib ${OPENCOLLADA}/lib)
 			SET(OPENCOLLADA_LIB OpenCOLLADAStreamWriter OpenCOLLADASaxFrameworkLoader OpenCOLLADAFramework OpenCOLLADABaseUtils GeneratedSaxParser UTF MathMLSolver expat pcre buffer ftoa)
-			#pcre is bundled with openCollada
-			#SET(PCRE ${LIBDIR}/pcre)
-			#SET(PCRE_LIBPATH ${PCRE}/lib)
 			SET(PCRE_LIB pcre)
 		ENDIF(WITH_OPENCOLLADA)
 		
@@ -875,7 +872,7 @@ IF(WITH_BUILDINFO)
 	# my mod to manually place avn revision as git doesn't repond properly
 		#EXEC_PROGRAM("svnversion ${CMAKE_SOURCE_DIR}" OUTPUT_VARIABLE BUILD_REV RETURN_VALUE BUILD_REV_RETURN)
 		#IF(BUILD_REV_RETURN)
-			SET(BUILD_REV "32307")
+			SET(BUILD_REV "32531")
 		#ENDIF(BUILD_REV_RETURN)
 	ENDIF(UNIX)
 	
@@ -884,7 +881,7 @@ IF(WITH_BUILDINFO)
 		EXEC_PROGRAM("cmd /c time /t" OUTPUT_VARIABLE BUILD_TIME)  
 		#EXEC_PROGRAM("svnversion ${CMAKE_SOURCE_DIR}" OUTPUT_VARIABLE BUILD_REV RETURN_VALUE BUILD_REV_RETURN)
 		#IF(BUILD_REV_RETURN)
-			SET(BUILD_REV "32307")
+			SET(BUILD_REV "32531")
 		#ENDIF(BUILD_REV_RETURN)
 	ENDIF(WIN32)
 ENDIF(WITH_BUILDINFO)
@@ -944,9 +941,9 @@ ENDIF(WITH_CXX_GUARDEDALLOC)
 #-----------------------------------------------------------------------------
 # Libraries
 FILE(WRITE ${CMAKE_BINARY_DIR}/cmake_blender_libs.txt "")
+ADD_SUBDIRECTORY(source)
 ADD_SUBDIRECTORY(intern)
 ADD_SUBDIRECTORY(extern)
-ADD_SUBDIRECTORY(source)
 
 
 #-----------------------------------------------------------------------------

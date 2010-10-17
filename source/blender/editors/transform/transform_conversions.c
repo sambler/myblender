@@ -232,7 +232,7 @@ static void set_prop_dist(TransInfo *t, short with_dist)
 
 /* ********************* texture space ********* */
 
-static void createTransTexspace(bContext *C, TransInfo *t)
+static void createTransTexspace(TransInfo *t)
 {
 	Scene *scene = t->scene;
 	TransData *td;
@@ -277,7 +277,7 @@ static void createTransTexspace(bContext *C, TransInfo *t)
 
 /* ********************* edge (for crease) ***** */
 
-static void createTransEdge(bContext *C, TransInfo *t) {
+static void createTransEdge(TransInfo *t) {
 	EditMesh *em = ((Mesh *)t->obedit->data)->edit_mesh;
 	TransData *td = NULL;
 	EditEdge *eed;
@@ -930,7 +930,7 @@ static short pose_grab_with_ik(Object *ob)
 
 
 /* only called with pose mode active object now */
-static void createTransPose(bContext *C, TransInfo *t, Object *ob)
+static void createTransPose(TransInfo *t, Object *ob)
 {
 	bArmature *arm;
 	bPoseChannel *pchan;
@@ -995,7 +995,7 @@ static void createTransPose(bContext *C, TransInfo *t, Object *ob)
 
 /* ********************* armature ************** */
 
-static void createTransArmatureVerts(bContext *C, TransInfo *t)
+static void createTransArmatureVerts(TransInfo *t)
 {
 	EditBone *ebo;
 	bArmature *arm= t->obedit->data;
@@ -1195,7 +1195,7 @@ static void createTransArmatureVerts(bContext *C, TransInfo *t)
 
 /* ********************* meta elements ********* */
 
-static void createTransMBallVerts(bContext *C, TransInfo *t)
+static void createTransMBallVerts(TransInfo *t)
 {
 	MetaBall *mb = (MetaBall*)t->obedit->data;
 	 MetaElem *ml;
@@ -1530,7 +1530,7 @@ static void createTransCurveVerts(bContext *C, TransInfo *t)
 
 /* ********************* lattice *************** */
 
-static void createTransLatticeVerts(bContext *C, TransInfo *t)
+static void createTransLatticeVerts(TransInfo *t)
 {
 	Lattice *latt = ((Lattice*)t->obedit->data)->editlatt->latt;
 	TransData *td = NULL;
@@ -1896,7 +1896,7 @@ static void VertsToTransData(TransInfo *t, TransData *td, EditMesh *em, EditVert
 
 /* *********************** CrazySpace correction. Now without doing subsurf optimal ****************** */
 
-static void make_vertexcos__mapFunc(void *userData, int index, float *co, float *no_f, short *no_s)
+static void make_vertexcos__mapFunc(void *userData, int index, float *co, float *UNUSED(no_f), short *UNUSED(no_s))
 {
 	float *vec = userData;
 
@@ -2145,7 +2145,7 @@ static void createTransEditVerts(bContext *C, TransInfo *t)
 	/* detect CrazySpace [tm] */
 	if(propmode==0) {
 		if(modifiers_getCageIndex(t->scene, t->obedit, NULL, 1)>=0) {
-			if(modifiers_isCorrectableDeformed(t->scene, t->obedit)) {
+			if(modifiers_isCorrectableDeformed(t->obedit)) {
 				/* check if we can use deform matrices for modifier from the
 				   start up to stack, they are more accurate than quats */
 				totleft= editmesh_get_first_deform_matrices(t->scene, t->obedit, em, &defmats, &defcos);
@@ -3978,7 +3978,7 @@ static int SeqTransCount(TransInfo *t, ListBase *seqbase, int depth)
 }
 
 
-static TransData *SeqToTransData(TransInfo *t, TransData *td, TransData2D *td2d, TransDataSeq *tdsq, Sequence *seq, int flag, int sel_flag)
+static TransData *SeqToTransData(TransData *td, TransData2D *td2d, TransDataSeq *tdsq, Sequence *seq, int flag, int sel_flag)
 {
 	int start_left;
 
@@ -4063,16 +4063,16 @@ static int SeqToTransData_Recursive(TransInfo *t, ListBase *seqbase, TransData *
 		if (flag & SELECT) {
 			if (flag & (SEQ_LEFTSEL|SEQ_RIGHTSEL)) {
 				if (flag & SEQ_LEFTSEL) {
-					SeqToTransData(t, td++, td2d++, tdsq++, seq, flag, SEQ_LEFTSEL);
+					SeqToTransData(td++, td2d++, tdsq++, seq, flag, SEQ_LEFTSEL);
 					tot++;
 				}
 				if (flag & SEQ_RIGHTSEL) {
-					SeqToTransData(t, td++, td2d++, tdsq++, seq, flag, SEQ_RIGHTSEL);
+					SeqToTransData(td++, td2d++, tdsq++, seq, flag, SEQ_RIGHTSEL);
 					tot++;
 				}
 			}
 			else {
-				SeqToTransData(t, td++, td2d++, tdsq++, seq, flag, SELECT);
+				SeqToTransData(td++, td2d++, tdsq++, seq, flag, SELECT);
 				tot++;
 			}
 		}
@@ -4232,7 +4232,7 @@ static void createTransSeqData(bContext *C, TransInfo *t)
 
 
 /* transcribe given object into TransData for Transforming */
-static void ObjectToTransData(bContext *C, TransInfo *t, TransData *td, Object *ob)
+static void ObjectToTransData(TransInfo *t, TransData *td, Object *ob)
 {
 	Scene *scene = t->scene;
 	float obmtx[3][3];
@@ -4342,7 +4342,7 @@ static void ObjectToTransData(bContext *C, TransInfo *t, TransData *td, Object *
 
 /* sets flags in Bases to define whether they take part in transform */
 /* it deselects Bases, so we have to call the clear function always after */
-static void set_trans_object_base_flags(bContext *C, TransInfo *t)
+static void set_trans_object_base_flags(TransInfo *t)
 {
 	Scene *scene = t->scene;
 	View3D *v3d = t->view;
@@ -4720,7 +4720,7 @@ void autokeyframe_pose_cb_func(bContext *C, Scene *scene, View3D *v3d, Object *o
 		 */
 		if (C && (ob->pose->avs.path_bakeflag & MOTIONPATH_BAKE_HAS_PATHS)) {
 			//ED_pose_clear_paths(C, ob); // XXX for now, don't need to clear
-			ED_pose_recalculate_paths(C, scene, ob);
+			ED_pose_recalculate_paths(scene, ob);
 		}
 	}
 	else {
@@ -5091,7 +5091,7 @@ static void createTransObject(bContext *C, TransInfo *t)
 	TransDataExtension *tx;
 	int propmode = t->flag & T_PROP_EDIT;
 
-	set_trans_object_base_flags(C, t);
+	set_trans_object_base_flags(t);
 
 	/* count */
 	t->total= CTX_DATA_COUNT(C, selected_objects);
@@ -5130,7 +5130,7 @@ static void createTransObject(bContext *C, TransInfo *t)
 			td->flag |= TD_SKIP;
 		}
 		
-		ObjectToTransData(C, t, td, ob);
+		ObjectToTransData(t, td, ob);
 		td->val = NULL;
 		td++;
 		tx++;
@@ -5153,7 +5153,7 @@ static void createTransObject(bContext *C, TransInfo *t)
 				td->ext = tx;
 				td->rotOrder= ob->rotmode;
 				
-				ObjectToTransData(C, t, td, ob);
+				ObjectToTransData(t, td, ob);
 				td->val = NULL;
 				td++;
 				tx++;
@@ -5210,12 +5210,12 @@ void createTransData(bContext *C, TransInfo *t)
 
 	if (t->options & CTX_TEXTURE) {
 		t->flag |= T_TEXTURE;
-		createTransTexspace(C, t);
+		createTransTexspace(t);
 	}
 	else if (t->options & CTX_EDGE) {
 		t->ext = NULL;
 		t->flag |= T_EDIT;
-		createTransEdge(C, t);
+		createTransEdge(t);
 		if(t->data && t->flag & T_PROP_EDIT) {
 			sort_trans_data(t);	// makes selected become first in array
 			set_prop_dist(t, 1);
@@ -5277,14 +5277,14 @@ void createTransData(bContext *C, TransInfo *t)
 			createTransCurveVerts(C, t);
 		}
 		else if (t->obedit->type==OB_LATTICE) {
-			createTransLatticeVerts(C, t);
+			createTransLatticeVerts(t);
 		}
 		else if (t->obedit->type==OB_MBALL) {
-			createTransMBallVerts(C, t);
+			createTransMBallVerts(t);
 		}
 		else if (t->obedit->type==OB_ARMATURE) {
 			t->flag &= ~T_PROP_EDIT;
-			createTransArmatureVerts(C, t);
+			createTransArmatureVerts(t);
 		  }
 		else {
 			printf("edit type not implemented!\n");
@@ -5315,22 +5315,22 @@ void createTransData(bContext *C, TransInfo *t)
 	else if (ob && (ob->mode & OB_MODE_POSE)) {
 		// XXX this is currently limited to active armature only...
 		// XXX active-layer checking isn't done as that should probably be checked through context instead
-		createTransPose(C, t, ob);
+		createTransPose(t, ob);
 	}
 	else if (ob && (ob->mode & OB_MODE_WEIGHT_PAINT)) {
-		/* exception, we look for the one selected armature */
-		CTX_DATA_BEGIN(C, Object*, ob_armature, selected_objects)
-		{
-			if(ob_armature->type==OB_ARMATURE)
-			{
-				if((ob_armature->mode & OB_MODE_POSE) && ob_armature == modifiers_isDeformedByArmature(ob))
-				{
-					createTransPose(C, t, ob_armature);
-					break;
+		/* important that ob_armature can be set even when its not selected [#23412]
+		 * lines below just check is also visible */
+		Object *ob_armature= modifiers_isDeformedByArmature(ob);
+		if(ob_armature && ob_armature->mode & OB_MODE_POSE) {
+			Base *base_arm= object_in_scene(ob_armature, t->scene);
+			if(base_arm) {
+				View3D *v3d = t->view;
+				if(BASE_VISIBLE(v3d, base_arm)) {
+					createTransPose(t, ob_armature);
 				}
 			}
+			
 		}
-		CTX_DATA_END;
 	}
 	else if (ob && (ob->mode & OB_MODE_PARTICLE_EDIT) 
 		&& PE_start_edit(PE_get_current(scene, ob))) {

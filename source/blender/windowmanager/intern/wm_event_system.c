@@ -1893,7 +1893,7 @@ wmEventHandler *WM_event_add_keymap_handler(ListBase *handlers, wmKeyMap *keymap
 }
 
 /* priorities not implemented yet, for time being just insert in begin of list */
-wmEventHandler *WM_event_add_keymap_handler_priority(ListBase *handlers, wmKeyMap *keymap, int priority)
+wmEventHandler *WM_event_add_keymap_handler_priority(ListBase *handlers, wmKeyMap *keymap, int UNUSED(priority))
 {
 	wmEventHandler *handler;
 	
@@ -2066,7 +2066,7 @@ static int convert_key(GHOST_TKey key)
 			case GHOST_kKeyRightShift:		return RIGHTSHIFTKEY;
 			case GHOST_kKeyLeftControl:		return LEFTCTRLKEY;
 			case GHOST_kKeyRightControl:	return RIGHTCTRLKEY;
-			case GHOST_kKeyCommand:			return COMMANDKEY;
+			case GHOST_kKeyOS:				return OSKEY;
 			case GHOST_kKeyLeftAlt:			return LEFTALTKEY;
 			case GHOST_kKeyRightAlt:		return RIGHTALTKEY;
 				
@@ -2166,7 +2166,7 @@ static wmWindow *wm_event_cursor_other_windows(wmWindowManager *wm, wmWindow *wi
 
 /* windows store own event queues, no bContext here */
 /* time is in 1000s of seconds, from ghost */
-void wm_event_add_ghostevent(wmWindowManager *wm, wmWindow *win, int type, int time, void *customdata)
+void wm_event_add_ghostevent(wmWindowManager *wm, wmWindow *win, int type, int UNUSED(time), void *customdata)
 {
 	wmWindow *owin;
 	wmEvent event, *evt= win->eventstate;
@@ -2323,7 +2323,7 @@ void wm_event_add_ghostevent(wmWindowManager *wm, wmWindow *win, int type, int t
 				if(event.val==KM_PRESS && (evt->ctrl || evt->shift || evt->oskey))
 				   event.alt= evt->alt = 3;		// define?
 			} 
-			else if (event.type==COMMANDKEY) {
+			else if (event.type==OSKEY) {
 				event.oskey= evt->oskey= (event.val==KM_PRESS);
 				if(event.val==KM_PRESS && (evt->ctrl || evt->alt || evt->shift))
 				   event.oskey= evt->oskey = 3;		// define?

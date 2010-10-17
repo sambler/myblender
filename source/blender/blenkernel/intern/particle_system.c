@@ -1437,7 +1437,7 @@ static void distribute_particles_on_dm(ParticleSimulationData *sim, int from)
 }
 
 /* ready for future use, to emit particles without geometry */
-static void distribute_particles_on_shape(ParticleSimulationData *sim, int from)
+static void distribute_particles_on_shape(ParticleSimulationData *sim, int UNUSED(from))
 {
 	ParticleSystem *psys = sim->psys;
 	PARTICLE_P;
@@ -2289,7 +2289,7 @@ static void psys_update_effectors(ParticleSimulationData *sim)
  In theory, there could be unlimited implementation
                     of SPH simulators
 **************************************************/
-void particle_fluidsim(ParticleSystem *psys, ParticleData *pa, ParticleSettings *part, ParticleSimulationData *sim, float dfra, float cfra, float mass){
+void particle_fluidsim(ParticleSystem *psys, ParticleData *pa, ParticleSettings *part, ParticleSimulationData *sim, float dfra, float UNUSED(cfra), float mass){
 /****************************************************************************************************************
 * 	This code uses in some parts adapted algorithms from the pseduo code as outlined in the Research paper
 *	Titled: Particle-based Viscoelastic Fluid Simulation.
@@ -3284,7 +3284,7 @@ static void hair_step(ParticleSimulationData *sim, float cfra)
 		psys_calc_dmcache(sim->ob, sim->psmd->dm, psys);
 
 		if(psys->clmd)
-			cloth_free_modifier(sim->ob, psys->clmd);
+			cloth_free_modifier(psys->clmd);
 	}
 
 	/* dynamics with cloth simulation */
@@ -3298,7 +3298,7 @@ static void hair_step(ParticleSimulationData *sim, float cfra)
 	psys->flag |= PSYS_HAIR_UPDATED;
 }
 
-static void save_hair(ParticleSimulationData *sim, float cfra){
+static void save_hair(ParticleSimulationData *sim, float UNUSED(cfra)){
 	Object *ob = sim->ob;
 	ParticleSystem *psys = sim->psys;
 	HairKey *key, *root;
@@ -3574,7 +3574,7 @@ static void cached_step(ParticleSimulationData *sim, float cfra)
 	}
 }
 
-static void particles_fluid_step(ParticleSimulationData *sim, int cfra)
+static void particles_fluid_step(ParticleSimulationData *sim, int UNUSED(cfra))
 {	
 	ParticleSystem *psys = sim->psys;
 	if(psys->particles){
@@ -3682,7 +3682,7 @@ static void particles_fluid_step(ParticleSimulationData *sim, int cfra)
 	#endif // DISABLE_ELBEEM
 }
 
-static int emit_particles(ParticleSimulationData *sim, PTCacheID *pid, float cfra)
+static int emit_particles(ParticleSimulationData *sim, PTCacheID *pid, float UNUSED(cfra))
 {
 	ParticleSystem *psys = sim->psys;
 	ParticleSettings *part = psys->part;
@@ -4016,8 +4016,13 @@ void particle_system_update(Scene *scene, Object *ob, ParticleSystem *psys)
 	switch(part->type) {
 		case PART_HAIR:
 		{
+			/* nothing to do so bail out early */
+			if(psys->totpart == 0 && part->totpart == 0) {
+				psys_free_path_cache(psys, NULL);
+				free_hair(ob, psys, 0);
+			}
 			/* (re-)create hair */
-			if(hair_needs_recalc(psys)) {
+			else if(hair_needs_recalc(psys)) {
 				float hcfra=0.0f;
 				int i, recalc = psys->recalc;
 

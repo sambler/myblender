@@ -82,6 +82,12 @@ void delete_fcurve_key(FCurve *fcu, int index, short do_recalc)
 	/* Delete this keyframe */
 	memmove(&fcu->bezt[index], &fcu->bezt[index+1], sizeof(BezTriple)*(fcu->totvert-index-1));
 	fcu->totvert--;
+
+	if (fcu->totvert == 0) {
+		if (fcu->bezt)
+			MEM_freeN(fcu->bezt);
+		fcu->bezt= NULL;
+	}
 	
 	/* recalc handles - only if it won't cause problems */
 	if (do_recalc)
@@ -480,7 +486,7 @@ void free_anim_copybuf (void)
 /* ------------------- */
 
 /* This function adds data to the keyframes copy/paste buffer, freeing existing data first */
-short copy_animedit_keys (bAnimContext *ac, ListBase *anim_data)
+short copy_animedit_keys (bAnimContext *UNUSED(ac), ListBase *anim_data)
 {	
 	bAnimListElem *ale;
 	

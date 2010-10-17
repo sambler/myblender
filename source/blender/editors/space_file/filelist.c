@@ -108,6 +108,7 @@ typedef struct FileList
 	short prv_h;
 	short hide_dot;
 	unsigned int filter;
+	char filter_glob[64];
 	short changed;
 
 	struct BlendHandle *libfiledata;
@@ -294,7 +295,7 @@ static int is_hidden_file(const char* filename, short hide_dot)
 	return is_hidden;
 }
 
-static int is_filtered_file(struct direntry* file, const char* dir, unsigned int filter, short hide_dot)
+static int is_filtered_file(struct direntry* file, const char* UNUSED(dir), unsigned int filter, short hide_dot)
 {
 	int is_filtered=0;
 	if (filter) {
@@ -323,7 +324,7 @@ static int is_filtered_lib(struct direntry* file, const char* dir, unsigned int 
 	return is_filtered;
 }
 
-static int is_filtered_main(struct direntry* file, const char* dir, unsigned int filter, short hide_dot)
+static int is_filtered_main(struct direntry* file, const char* UNUSED(dir), unsigned int UNUSED(filter), short hide_dot)
 {
 	return !is_hidden_file(file->relname, hide_dot);
 }
@@ -370,7 +371,7 @@ void filelist_init_icons()
 			for (x=0; x<SPECIAL_IMG_COLS; x++) {
 				int tile = SPECIAL_IMG_COLS*y + x; 
 				if (tile < SPECIAL_IMG_MAX) {
-					ibuf = IMB_allocImBuf(SPECIAL_IMG_SIZE, SPECIAL_IMG_SIZE, 32, IB_rect, 0);
+					ibuf = IMB_allocImBuf(SPECIAL_IMG_SIZE, SPECIAL_IMG_SIZE, 32, IB_rect);
 					for (k=0; k<SPECIAL_IMG_SIZE; k++) {
 						memcpy(&ibuf->rect[k*SPECIAL_IMG_SIZE], &bbuf->rect[(k+y*SPECIAL_IMG_SIZE)*SPECIAL_IMG_SIZE*SPECIAL_IMG_COLS+x*SPECIAL_IMG_SIZE], SPECIAL_IMG_SIZE*sizeof(int));
 					}
@@ -547,6 +548,7 @@ void filelist_free(struct FileList* filelist)
 	free(filelist->filelist);
 	filelist->filelist = 0;	
 	filelist->filter = 0;
+	filelist->filter_glob[0] = '\0';
 	filelist->numfiltered =0;
 	filelist->hide_dot =0;
 }
@@ -713,6 +715,11 @@ void filelist_setfilter(struct FileList* filelist, unsigned int filter)
 	filelist->filter = filter;
 }
 
+void filelist_setfilter_types(struct FileList* filelist, const char *filter_glob)
+{
+	BLI_strncpy(filelist->filter_glob, filter_glob, sizeof(filelist->filter_glob));
+}
+
 static void filelist_read_dir(struct FileList* filelist)
 {
 	char wdir[FILE_MAX];
@@ -824,6 +831,9 @@ void filelist_setfiletypes(struct FileList* filelist, short has_quicktime)
 			file->flags |= MOVIEFILE;			
 		} else if(BLI_testextensie_array(file->relname, imb_ext_audio)) {
 			file->flags |= SOUNDFILE;
+		} else if(filelist->filter_glob
+					&& BLI_testextensie_glob(file->relname, filelist->filter_glob)) {
+			file->flags |= OPERATORFILE;
 		}
 	}
 }
@@ -955,7 +965,7 @@ void filelist_from_library(struct FileList* filelist)
 
 				/* first allocate imbuf for copying preview into it */
 				if (w > 0 && h > 0 && rect) {
-					ima = IMB_allocImBuf(w, h, 32, IB_rect, 0);
+					ima = IMB_allocImBuf(w, h, 32, IB_rect);
 					memcpy(ima->rect, rect, w*h*sizeof(unsigned int));
 					filelist->filelist[i + 1].image = ima;
 					filelist->filelist[i + 1].flags = IMAGEFILE;
@@ -1135,7 +1145,7 @@ static void thumbnail_joblist_free(ThumbnailJob *tj)
 	BLI_freelistN(&tj->loadimages);
 }
 
-static void thumbnails_startjob(void *tjv, short *stop, short *do_update, float *progress)
+static void thumbnails_startjob(void *tjv, short *stop, short *do_update, float *UNUSED(progress))
 {
 	ThumbnailJob *tj= tjv;
 	FileImage* limg = tj->loadimages.first;

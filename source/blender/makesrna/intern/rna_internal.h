@@ -233,6 +233,7 @@ void RNA_api_keyconfig(struct StructRNA *srna);
 void RNA_api_keyingset(struct StructRNA *srna);
 void RNA_api_keymap(struct StructRNA *srna);
 void RNA_api_keymapitem(struct StructRNA *srna);
+void RNA_api_area(struct StructRNA *srna);
 void RNA_api_main(struct StructRNA *srna);
 void RNA_api_material(StructRNA *srna);
 void RNA_api_mesh(struct StructRNA *srna);
@@ -285,6 +286,7 @@ extern FloatPropertyRNA rna_IDProperty_float;
 extern FloatPropertyRNA rna_IDProperty_float_array;
 extern PointerPropertyRNA rna_IDProperty_group;
 extern CollectionPropertyRNA rna_IDProperty_collection;
+extern CollectionPropertyRNA rna_IDProperty_idp_array;
 extern FloatPropertyRNA rna_IDProperty_double;
 extern FloatPropertyRNA rna_IDProperty_double_array;
 

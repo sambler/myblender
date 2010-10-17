@@ -239,6 +239,15 @@ void DM_to_mesh(DerivedMesh *dm, Mesh *me)
 	if(!CustomData_has_layer(&tmp.fdata, CD_MFACE))
 		CustomData_add_layer(&tmp.fdata, CD_MFACE, CD_ASSIGN, dm->dupFaceArray(dm), totface);
 
+	/* object had got displacement layer, should copy this layer to save sculpted data */
+	/* NOTE: maybe some other layers should be copied? nazgul */
+	if(CustomData_has_layer(&me->fdata, CD_MDISPS)) {
+		if (totface == me->totface) {
+			MDisps *mdisps = CustomData_get_layer(&me->fdata, CD_MDISPS);
+			CustomData_add_layer(&tmp.fdata, CD_MDISPS, CD_DUPLICATE, mdisps, totface);
+		}
+	}
+
 	mesh_update_customdata_pointers(&tmp);
 
 	CustomData_free(&me->vdata, me->totvert);
@@ -508,7 +517,7 @@ static void emDM_drawMappedEdges(DerivedMesh *dm, int (*setDrawOptions)(void *us
 		glEnd();
 	}
 }
-static void emDM_drawEdges(DerivedMesh *dm, int drawLooseEdges, int drawAllEdges)
+static void emDM_drawEdges(DerivedMesh *dm, int UNUSED(drawLooseEdges), int UNUSED(drawAllEdges))
 {
 	emDM_drawMappedEdges(dm, NULL, NULL);
 }
@@ -617,7 +626,9 @@ static void emDM_foreachMappedFaceCenter(DerivedMesh *dm, void (*func)(void *use
 		func(userData, i, cent, emdm->vertexCos?emdm->faceNos[i]:efa->n);
 	}
 }
-static void emDM_drawMappedFaces(DerivedMesh *dm, int (*setDrawOptions)(void *userData, int index, int *drawSmooth_r), void *userData, int useColors)
+
+/* note, material function is ignored for now. */
+static void emDM_drawMappedFaces(DerivedMesh *dm, int (*setDrawOptions)(void *userData, int index, int *drawSmooth_r), void *userData, int UNUSED(useColors), int (*setMaterial)(int, void *attribs))
 {
 	EditMeshDerivedMesh *emdm= (EditMeshDerivedMesh*) dm;
 	EditFace *efa;
@@ -1315,8 +1326,7 @@ static void emDM_release(DerivedMesh *dm)
 	}
 }
 
-static DerivedMesh *getEditMeshDerivedMesh(EditMesh *em, Object *ob,
-										   float (*vertexCos)[3])
+static DerivedMesh *getEditMeshDerivedMesh(EditMesh *em, float (*vertexCos)[3])
 {
 	EditMeshDerivedMesh *emdm = MEM_callocN(sizeof(*emdm), "emdm");
 
@@ -1661,8 +1671,20 @@ static void mesh_calc_modifiers(Scene *scene, Object *ob, float (*inputVertexCos
 	DerivedMesh *dm, *orcodm, *clothorcodm, *finaldm;
 	int numVerts = me->totvert;
 	int required_mode;
+	int isPrevDeform= FALSE;
+	int skipVirtualArmature = (useDeform < 0);
 
-	md = firstmd = (useDeform<0) ? ob->modifiers.first : modifiers_getVirtualModifierList(ob);
+	if(!skipVirtualArmature) {
+		firstmd = modifiers_getVirtualModifierList(ob);
+	}
+	else {
+		/* game engine exception */
+		firstmd = ob->modifiers.first;
+		if(firstmd && firstmd->type == eModifierType_Armature)
+			firstmd = firstmd->next;
+	}
+
+	md = firstmd;
 
 	modifiers_clearErrors(ob);
 
@@ -1778,6 +1800,16 @@ static void mesh_calc_modifiers(Scene *scene, Object *ob, float (*inputVertexCos
 				}
 			}
 
+			/* if this is not the last modifier in the stack then recalculate the normals
+			 * to avoid giving bogus normals to the next modifier see: [#23673] */
+			if(isPrevDeform &&  mti->dependsOnNormals && mti->dependsOnNormals(md)) {
+				/* XXX, this covers bug #23673, but we may need normal calc for other types */
+				if(dm->type == DM_TYPE_CDDM) {
+					CDDM_apply_vert_coords(dm, deformedVerts);
+					CDDM_calc_normals(dm);
+				}
+			}
+
 			mti->deformVerts(md, ob, dm, deformedVerts, numVerts, useRenderParams, useDeform);
 		} else {
 			DerivedMesh *ndm;
@@ -1888,6 +1920,8 @@ static void mesh_calc_modifiers(Scene *scene, Object *ob, float (*inputVertexCos
 			}
 		}
 
+		isPrevDeform= (mti->type == eModifierTypeType_OnlyDeform);
+
 		/* grab modifiers until index i */
 		if((index >= 0) && (modifiers_indexInObject(ob, md) >= index))
 			break;
@@ -1988,7 +2022,7 @@ static void editmesh_calc_modifiers(Scene *scene, Object *ob, EditMesh *em, Deri
 	modifiers_clearErrors(ob);
 
 	if(cage_r && cageIndex == -1) {
-		*cage_r = getEditMeshDerivedMesh(em, ob, NULL);
+		*cage_r = getEditMeshDerivedMesh(em, NULL);
 	}
 
 	dm = NULL;
@@ -2121,7 +2155,7 @@ static void editmesh_calc_modifiers(Scene *scene, Object *ob, EditMesh *em, Deri
 				*cage_r = dm;
 			} else {
 				*cage_r =
-					getEditMeshDerivedMesh(em, ob,
+					getEditMeshDerivedMesh(em,
 						deformedVerts ? MEM_dupallocN(deformedVerts) : NULL);
 			}
 		}
@@ -2145,7 +2179,7 @@ static void editmesh_calc_modifiers(Scene *scene, Object *ob, EditMesh *em, Deri
 	} else if (!deformedVerts && cage_r && *cage_r) {
 		*final_r = *cage_r;
 	} else {
-		*final_r = getEditMeshDerivedMesh(em, ob, deformedVerts);
+		*final_r = getEditMeshDerivedMesh(em, deformedVerts);
 		deformedVerts = NULL;
 	}
 
@@ -2202,7 +2236,7 @@ static void mesh_build_data(Scene *scene, Object *ob, CustomDataMask dataMask)
 	Object *obact = scene->basact?scene->basact->object:NULL;
 	int editing = paint_facesel_test(ob);
 	/* weight paint and face select need original indicies because of selection buffer drawing */
-	int needMapping = (ob==obact) && (editing || (ob->mode & (OB_MODE_WEIGHT_PAINT|OB_MODE_VERTEX_PAINT)) || editing);
+	int needMapping = (ob==obact) && (editing || (ob->mode & (OB_MODE_WEIGHT_PAINT|OB_MODE_VERTEX_PAINT)));
 
 	clear_mesh_caches(ob);
 
@@ -2361,9 +2395,9 @@ DerivedMesh *editmesh_get_derived_cage(Scene *scene, Object *obedit, EditMesh *e
 	return em->derivedCage;
 }
 
-DerivedMesh *editmesh_get_derived_base(Object *obedit, EditMesh *em)
+DerivedMesh *editmesh_get_derived_base(Object *UNUSED(obedit), EditMesh *em)
 {
-	return getEditMeshDerivedMesh(em, obedit, NULL);
+	return getEditMeshDerivedMesh(em, NULL);
 }
 
 
@@ -2449,7 +2483,7 @@ int editmesh_get_first_deform_matrices(Scene *scene, Object *ob, EditMesh *em, f
 
 		if(mti->type==eModifierTypeType_OnlyDeform && mti->deformMatricesEM) {
 			if(!defmats) {
-				dm= getEditMeshDerivedMesh(em, ob, NULL);
+				dm= getEditMeshDerivedMesh(em, NULL);
 				deformedVerts= editmesh_getVertexCos(em, &numVerts);
 				defmats= MEM_callocN(sizeof(*defmats)*numVerts, "defmats");
 

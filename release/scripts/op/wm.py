@@ -266,9 +266,9 @@ class WM_OT_context_cycle_int(bpy.types.Operator):
         if value != eval("context.%s" % data_path):
             # relies on rna clamping int's out of the range
             if self.reverse:
-                value = (1 << 32)
+                value = (1 << 31) - 1
             else:
-                value = - (1 << 32)
+                value = -1 << 31
 
             exec("context.%s=value" % data_path)
 
@@ -542,7 +542,7 @@ class WM_OT_doc_view(bpy.types.Operator):
         while class_obj:
             ls.insert(0, class_obj)
             class_obj = class_obj.nested
-        return '.'.join([class_obj.identifier for class_obj in ls])
+        return '.'.join(class_obj.identifier for class_obj in ls)
 
     def execute(self, context):
         id_split = self.doc_id.split('.')
@@ -779,6 +779,15 @@ class WM_OT_keyconfig_activate(bpy.types.Operator):
         bpy.utils.keyconfig_set(self.filepath)
         return {'FINISHED'}
 
+class WM_OT_sysinfo(bpy.types.Operator):
+    '''Generate System Info'''
+    bl_idname = "wm.sysinfo"
+    bl_label = "System Info"
+
+    def execute(self, context):
+        import sys_info
+        sys_info.write_sysinfo(self)
+        return {'FINISHED'}
 
 def register():
     pass

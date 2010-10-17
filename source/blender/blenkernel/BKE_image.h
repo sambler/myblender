@@ -112,10 +112,10 @@ struct ImBuf *BKE_image_acquire_ibuf(struct Image *ima, struct ImageUser *iuser,
 void BKE_image_release_ibuf(struct Image *ima, void *lock);
 
 /* returns existing Image when filename/type is same (frame optional) */
-struct Image *BKE_add_image_file(const char *name, int frame);
+struct Image *BKE_add_image_file(const char *name);
 
 /* adds image, adds ibuf, generates color or pattern */
-struct Image *BKE_add_image_size(int width, int height, char *name, int depth, int floatbuf, short uvtestgrid, float color[4]);
+struct Image *BKE_add_image_size(unsigned int width, unsigned int height, char *name, int depth, int floatbuf, short uvtestgrid, float color[4]);
 /* adds image from imbuf, owns imbuf */
 struct Image *BKE_add_image_imbuf(struct ImBuf *ibuf);
 

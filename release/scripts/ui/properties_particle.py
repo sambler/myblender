@@ -27,7 +27,11 @@ from properties_physics_common import basic_force_field_falloff_ui
 
 
 def particle_panel_enabled(context, psys):
-    return (psys.point_cache.is_baked is False) and (not psys.is_edited) and (not context.particle_system_editable)
+    phystype = psys.settings.physics_type
+    if psys.settings.type in ('EMITTER', 'REACTOR') and phystype in ('NO', 'KEYED'):
+        return True
+    else:
+        return (psys.point_cache.is_baked is False) and (not psys.is_edited) and (not context.particle_system_editable)
 
 
 def particle_panel_poll(cls, context):

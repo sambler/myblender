@@ -60,6 +60,7 @@
 #include "IMB_imbuf_types.h"
 
 #include "BIF_gl.h"
+#include "BIF_glutil.h"
 
 #include "ED_datafiles.h"
 #include "ED_render.h"
@@ -330,7 +331,7 @@ static void vicon_editmode_hlt_draw(int x, int y, int w, int h, float alpha)
 	viconutil_draw_points(pts, 3, 1);
 }
 
-static void vicon_editmode_dehlt_draw(int x, int y, int w, int h, float alpha)
+static void vicon_editmode_dehlt_draw(int x, int y, int w, int h, float UNUSED(alpha))
 {
 	GLint pts[3][2];
 
@@ -345,7 +346,7 @@ static void vicon_editmode_dehlt_draw(int x, int y, int w, int h, float alpha)
 	viconutil_draw_points(pts, 3, 1);
 }
 
-static void vicon_disclosure_tri_right_draw(int x, int y, int w, int h, float alpha)
+static void vicon_disclosure_tri_right_draw(int x, int y, int w, int UNUSED(h), float alpha)
 {
 	GLint pts[3][2];
 	int cx = x+w/2;
@@ -370,7 +371,7 @@ static void vicon_disclosure_tri_right_draw(int x, int y, int w, int h, float al
 	viconutil_draw_lineloop_smooth(pts, 3);
 }
 
-static void vicon_small_tri_right_draw(int x, int y, int w, int h, float alpha)
+static void vicon_small_tri_right_draw(int x, int y, int w, int UNUSED(h), float alpha)
 {
 	GLint pts[3][2];
 	int cx = x+w/2-4;
@@ -392,7 +393,7 @@ static void vicon_small_tri_right_draw(int x, int y, int w, int h, float alpha)
 	glShadeModel(GL_FLAT);
 }
 
-static void vicon_disclosure_tri_down_draw(int x, int y, int w, int h, float alpha)
+static void vicon_disclosure_tri_down_draw(int x, int y, int w, int UNUSED(h), float alpha)
 {
 	GLint pts[3][2];
 	int cx = x+w/2;
@@ -417,7 +418,7 @@ static void vicon_disclosure_tri_down_draw(int x, int y, int w, int h, float alp
 	viconutil_draw_lineloop_smooth(pts, 3);
 }
 
-static void vicon_move_up_draw(int x, int y, int w, int h, float alpha)
+static void vicon_move_up_draw(int x, int y, int w, int h, float UNUSED(alpha))
 {
 	int d=-2;
 
@@ -435,7 +436,7 @@ static void vicon_move_up_draw(int x, int y, int w, int h, float alpha)
 	glDisable(GL_LINE_SMOOTH);
 }
 
-static void vicon_move_down_draw(int x, int y, int w, int h, float alpha)
+static void vicon_move_down_draw(int x, int y, int w, int h, float UNUSED(alpha))
 {
 	int d=2;
 
@@ -621,20 +622,30 @@ static void init_iconfile_list(struct ListBase *list)
 			char *filename = dir[i].relname;
 			
 			if(BLI_testextensie(filename, ".png")) {
-			
+
 				/* check to see if the image is the right size, continue if not */
 				/* copying strings here should go ok, assuming that we never get back
 				   a complete path to file longer than 256 chars */
 				sprintf(iconfilestr, "%s/%s", icondirstr, filename);
-				if(BLI_exists(iconfilestr)) bbuf = IMB_loadiffname(iconfilestr, IB_rect);
+				if(BLI_exists(iconfilestr))
+					bbuf= IMB_loadiffname(iconfilestr, IB_rect);
+				else
+					bbuf= NULL;
+
+
+				if(bbuf) {
+					ifilex = bbuf->x;
+					ifiley = bbuf->y;
+					IMB_freeImBuf(bbuf);
+				}
+				else {
+					ifilex= ifiley= 0;
+				}
 				
-				ifilex = bbuf->x;
-				ifiley = bbuf->y;
-				IMB_freeImBuf(bbuf);
-				
+				/* bad size or failed to load */
 				if ((ifilex != ICON_IMAGE_W) || (ifiley != ICON_IMAGE_H))
 					continue;
-			
+
 				/* found a potential icon file, so make an entry for it in the cache list */
 				ifile = MEM_callocN(sizeof(IconFile), "IconFile");
 				
@@ -832,7 +843,7 @@ static void icon_set_image(bContext *C, ID *id, PreviewImage* prv_img, int miple
 		prv_img->w[miplevel], prv_img->h[miplevel]);
 }
 
-static void icon_draw_rect(float x, float y, int w, int h, float aspect, int rw, int rh, unsigned int *rect, float alpha, float *rgb)
+static void icon_draw_rect(float x, float y, int w, int h, float UNUSED(aspect), int rw, int rh, unsigned int *rect, float alpha, float *rgb, short is_preview)
 {
 	/* modulate color */
 	if(alpha != 1.0f)
@@ -843,11 +854,12 @@ static void icon_draw_rect(float x, float y, int w, int h, float aspect, int rw,
 		glPixelTransferf(GL_GREEN_SCALE, rgb[1]);
 		glPixelTransferf(GL_BLUE_SCALE, rgb[2]);
 	}
-
-	/* position */
-	glRasterPos2f(x, y);
-	// XXX ui_rasterpos_safe(x, y, aspect);
 	
+	if(is_preview == 0) {
+		/* position */
+		glRasterPos2f(x,y);
+	}
+
 	/* draw */
 	if((w<1 || h<1)) {
 		// XXX - TODO 2.5 verify whether this case can happen
@@ -864,18 +876,30 @@ static void icon_draw_rect(float x, float y, int w, int h, float aspect, int rw,
 			ImBuf *ima;
 
 			/* first allocate imbuf for scaling and copy preview into it */
-			ima = IMB_allocImBuf(rw, rh, 32, IB_rect, 0);
+			ima = IMB_allocImBuf(rw, rh, 32, IB_rect);
 			memcpy(ima->rect, rect, rw*rh*sizeof(unsigned int));	
 			
 			/* scale it */
 			IMB_scaleImBuf(ima, w, h);
-			glDrawPixels(w, h, GL_RGBA, GL_UNSIGNED_BYTE, ima->rect);
-			
+
+			if(is_preview) {
+				glaDrawPixelsSafe(x, y, w, h, w, GL_RGBA, GL_UNSIGNED_BYTE, ima->rect);
+			}
+			else {
+				glDrawPixels(w, h, GL_RGBA, GL_UNSIGNED_BYTE, ima->rect);
+			}
+
 			IMB_freeImBuf(ima);
 		}
 	}
-	else
-		glDrawPixels(w, h, GL_RGBA, GL_UNSIGNED_BYTE, rect);
+	else {
+		if(is_preview) {
+			glaDrawPixelsSafe(x, y, w, h, w, GL_RGBA, GL_UNSIGNED_BYTE, rect);
+		}
+		else {
+			glDrawPixels(w, h, GL_RGBA, GL_UNSIGNED_BYTE, rect);
+		}
+	}
 
 	/* restore color */
 	if(alpha != 0.0f)
@@ -888,7 +912,7 @@ static void icon_draw_rect(float x, float y, int w, int h, float aspect, int rw,
 	}
 }
 
-static void icon_draw_texture(float x, float y, float w, float h, int ix, int iy, int iw, int ih, float alpha, float *rgb)
+static void icon_draw_texture(float x, float y, float w, float h, int ix, int iy, int UNUSED(iw), int ih, float alpha, float *rgb)
 {
 	float x1, x2, y1, y2;
 
@@ -931,7 +955,7 @@ static int preview_size(int miplevel)
 	return 0;
 }
 
-static void icon_draw_size(float x, float y, int icon_id, float aspect, float alpha, float *rgb, int miplevel, int draw_size, int nocreate)
+static void icon_draw_size(float x, float y, int icon_id, float aspect, float alpha, float *rgb, int miplevel, int draw_size, int UNUSED(nocreate), int is_preview)
 {
 	Icon *icon = NULL;
 	DrawInfo *di = NULL;
@@ -974,7 +998,7 @@ static void icon_draw_size(float x, float y, int icon_id, float aspect, float al
 
 		if(!iimg->rect) return; /* something has gone wrong! */
 
-		icon_draw_rect(x, y, w, h, aspect, iimg->w, iimg->h, iimg->rect, alpha, rgb);
+		icon_draw_rect(x, y, w, h, aspect, iimg->w, iimg->h, iimg->rect, alpha, rgb, is_preview);
 	}
 	else if(di->type == ICON_TYPE_PREVIEW) {
 		PreviewImage* pi = BKE_previewimg_get((ID*)icon->obj); 
@@ -985,7 +1009,7 @@ static void icon_draw_size(float x, float y, int icon_id, float aspect, float al
 			
 			/* preview images use premul alpha ... */
 			glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-			icon_draw_rect(x, y, w, h, aspect, pi->w[miplevel], pi->h[miplevel], pi->rect[miplevel], 1.0f, NULL);
+			icon_draw_rect(x, y, w, h, aspect, pi->w[miplevel], pi->h[miplevel], pi->rect[miplevel], 1.0f, NULL, is_preview);
 			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		}
 	}
@@ -1075,7 +1099,7 @@ int ui_id_icon_get(bContext *C, ID *id, int preview)
 static void icon_draw_mipmap(float x, float y, int icon_id, float aspect, float alpha, int miplevel, int nocreate)
 {
 	int draw_size = preview_size(miplevel);
-	icon_draw_size(x, y, icon_id, aspect, alpha, NULL, miplevel, draw_size, nocreate);
+	icon_draw_size(x, y, icon_id, aspect, alpha, NULL, miplevel, draw_size, nocreate, FALSE);
 }
 
 void UI_icon_draw_aspect(float x, float y, int icon_id, float aspect, float alpha)
@@ -1086,7 +1110,7 @@ void UI_icon_draw_aspect(float x, float y, int icon_id, float aspect, float alph
 void UI_icon_draw_aspect_color(float x, float y, int icon_id, float aspect, float *rgb)
 {
 	int draw_size = preview_size(PREVIEW_MIPMAP_ZERO);
-	icon_draw_size(x, y, icon_id, aspect, 1.0f, rgb, PREVIEW_MIPMAP_ZERO, draw_size, 0);
+	icon_draw_size(x, y, icon_id, aspect, 1.0f, rgb, PREVIEW_MIPMAP_ZERO, draw_size, FALSE, FALSE);
 }
 
 void UI_icon_draw(float x, float y, int icon_id)
@@ -1096,7 +1120,7 @@ void UI_icon_draw(float x, float y, int icon_id)
 
 void UI_icon_draw_size(float x, float y, int size, int icon_id, float alpha)
 {
-	icon_draw_size(x, y, icon_id, 1.0f, alpha, NULL, 0, size, 1);
+	icon_draw_size(x, y, icon_id, 1.0f, alpha, NULL, PREVIEW_MIPMAP_ZERO, size, TRUE, FALSE);
 }
 
 void UI_icon_draw_preview(float x, float y, int icon_id)
@@ -1111,6 +1135,6 @@ void UI_icon_draw_preview_aspect(float x, float y, int icon_id, float aspect)
 
 void UI_icon_draw_preview_aspect_size(float x, float y, int icon_id, float aspect, int size)
 {
-	icon_draw_size(x, y, icon_id, aspect, 1.0f, NULL, PREVIEW_MIPMAP_LARGE, size, 0);
+	icon_draw_size(x, y, icon_id, aspect, 1.0f, NULL, PREVIEW_MIPMAP_LARGE, size, FALSE, TRUE);
 }
 

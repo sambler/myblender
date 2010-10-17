@@ -77,25 +77,31 @@ static CompBuf *node_composit_get_image(RenderData *rd, Image *ima, ImageUser *i
 
 	/* now we need a float buffer from the image
 	 * with matching color management */
-	if(rd->color_mgt_flag & R_COLOR_MANAGEMENT) {
-		if(ibuf->profile == IB_PROFILE_LINEAR_RGB) {
-			rect= ibuf->rect_float;
+	if(ibuf->channels == 4) {
+		if(rd->color_mgt_flag & R_COLOR_MANAGEMENT) {
+			if(ibuf->profile != IB_PROFILE_NONE) {
+				rect= ibuf->rect_float;
+			}
+			else {
+				rect= MEM_mapallocN(sizeof(float) * 4 * ibuf->x * ibuf->y, "node_composit_get_image");
+				srgb_to_linearrgb_rgba_rgba_buf(rect, ibuf->rect_float, ibuf->x * ibuf->y);
+				alloc= TRUE;
+			}
 		}
 		else {
-			rect= MEM_mallocN(sizeof(float) * 4 * ibuf->x * ibuf->y, "node_composit_get_image");
-			srgb_to_linearrgb_rgba_rgba_buf(rect, ibuf->rect_float, ibuf->x * ibuf->y);
-			alloc= TRUE;
+			if(ibuf->profile == IB_PROFILE_NONE) {
+				rect= ibuf->rect_float;
+			}
+			else {
+				rect= MEM_mapallocN(sizeof(float) * 4 * ibuf->x * ibuf->y, "node_composit_get_image");
+				linearrgb_to_srgb_rgba_rgba_buf(rect, ibuf->rect_float, ibuf->x * ibuf->y);
+				alloc= TRUE;
+			}
 		}
 	}
 	else {
-		if(ibuf->profile != IB_PROFILE_LINEAR_RGB) {
-			rect= ibuf->rect_float;
-		}
-		else {
-			rect= MEM_mallocN(sizeof(float) * 4 * ibuf->x * ibuf->y, "node_composit_get_image");
-			linearrgb_to_srgb_rgba_rgba_buf(rect, ibuf->rect_float, ibuf->x * ibuf->y);
-			alloc= TRUE;
-		}
+		/* non-rgba passes can't use color profiles */
+		rect= ibuf->rect_float;
 	}
 	/* done coercing into the correct color management */
 
@@ -109,8 +115,9 @@ static CompBuf *node_composit_get_image(RenderData *rd, Image *ima, ImageUser *i
 	}
 	else {
 		/* we put imbuf copy on stack, cbuf knows rect is from other ibuf when freed! */
-		stackbuf= alloc_compbuf(ibuf->x, ibuf->y, type, alloc);
+		stackbuf= alloc_compbuf(ibuf->x, ibuf->y, type, FALSE);
 		stackbuf->rect= rect;
+		stackbuf->malloc= alloc;
 	}
 	
 	/*code to respect the premul flag of images; I'm
@@ -208,7 +215,7 @@ void outputs_multilayer_get(RenderData *rd, RenderLayer *rl, bNodeStack **out, I
 };
 
 
-static void node_composit_exec_image(void *data, bNode *node, bNodeStack **in, bNodeStack **out)
+static void node_composit_exec_image(void *data, bNode *node, bNodeStack **UNUSED(in), bNodeStack **out)
 {
 	
 	/* image assigned to output */
@@ -371,7 +378,7 @@ void node_composit_rlayers_out(RenderData *rd, RenderLayer *rl, bNodeStack **out
 	   out[RRES_OUT_ENV]->data= compbuf_from_pass(rd, rl, rectx, recty, SCE_PASS_ENVIRONMENT);
 };
 
-static void node_composit_exec_rlayers(void *data, bNode *node, bNodeStack **in, bNodeStack **out)
+static void node_composit_exec_rlayers(void *data, bNode *node, bNodeStack **UNUSED(in), bNodeStack **out)
 {
    Scene *sce= (Scene *)node->id;
    Render *re= (sce)? RE_GetRender(sce->id.name): NULL;

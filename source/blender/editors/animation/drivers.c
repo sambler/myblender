@@ -115,7 +115,7 @@ FCurve *verify_driver_fcurve (ID *id, const char rna_path[], const int array_ind
 /* Main Driver Management API calls:
  * 	Add a new driver for the specified property on the given ID block
  */
-short ANIM_add_driver (ID *id, const char rna_path[], int array_index, short flag, int type)
+short ANIM_add_driver (ID *id, const char rna_path[], int array_index, short UNUSED(flag), int type)
 {	
 	PointerRNA id_ptr, ptr;
 	PropertyRNA *prop;
@@ -193,7 +193,7 @@ short ANIM_add_driver (ID *id, const char rna_path[], int array_index, short fla
 /* Main Driver Management API calls:
  * 	Remove the driver for the specified property on the given ID block (if available)
  */
-short ANIM_remove_driver (struct ID *id, const char rna_path[], int array_index, short flag)
+short ANIM_remove_driver (struct ID *id, const char rna_path[], int array_index, short UNUSED(flag))
 {
 	AnimData *adt;
 	FCurve *fcu;
@@ -262,7 +262,7 @@ short ANIM_driver_can_paste (void)
 /* Main Driver Management API calls:
  * 	Make a copy of the driver for the specified property on the given ID block
  */
-short ANIM_copy_driver (ID *id, const char rna_path[], int array_index, short flag)
+short ANIM_copy_driver (ID *id, const char rna_path[], int array_index, short UNUSED(flag))
 {
 	PointerRNA id_ptr, ptr;
 	PropertyRNA *prop;
@@ -307,7 +307,7 @@ short ANIM_copy_driver (ID *id, const char rna_path[], int array_index, short fl
  * 	Add a new driver for the specified property on the given ID block or replace an existing one
  *	with the driver + driver-curve data from the buffer 
  */
-short ANIM_paste_driver (ID *id, const char rna_path[], int array_index, short flag)
+short ANIM_paste_driver (ID *id, const char rna_path[], int array_index, short UNUSED(flag))
 {	
 	PointerRNA id_ptr, ptr;
 	PropertyRNA *prop;
@@ -372,12 +372,12 @@ static int add_driver_button_exec (bContext *C, wmOperator *op)
 	
 	/* try to create driver using property retrieved from UI */
 	memset(&ptr, 0, sizeof(PointerRNA));
-	uiAnimContextProperty(C, &ptr, &prop, &index);
+	uiContextActiveProperty(C, &ptr, &prop, &index);
 
 	if (all)
 		index= -1;
 
-	if (ptr.data && prop && RNA_property_animateable(&ptr, prop)) {
+	if (ptr.id.data && ptr.data && prop && RNA_property_animateable(&ptr, prop)) {
 		path= RNA_path_from_ID_to_property(&ptr, prop);
 		
 		if (path) {			
@@ -389,6 +389,8 @@ static int add_driver_button_exec (bContext *C, wmOperator *op)
 	
 	if (success) {
 		/* send updates */
+		uiContextAnimUpdate(C);
+
 		DAG_ids_flush_update(CTX_data_main(C), 0);
 		
 		WM_event_add_notifier(C, NC_ANIMATION|ND_FCURVES_ORDER, NULL); // XXX
@@ -427,12 +429,12 @@ static int remove_driver_button_exec (bContext *C, wmOperator *op)
 	
 	/* try to find driver using property retrieved from UI */
 	memset(&ptr, 0, sizeof(PointerRNA));
-	uiAnimContextProperty(C, &ptr, &prop, &index);
+	uiContextActiveProperty(C, &ptr, &prop, &index);
 	
 	if (all)
 		index= -1;
 
-	if (ptr.data && prop) {
+	if (ptr.id.data && ptr.data && prop) {
 		path= RNA_path_from_ID_to_property(&ptr, prop);
 		success= ANIM_remove_driver(ptr.id.data, path, index, 0);
 		MEM_freeN(path);
@@ -440,6 +442,8 @@ static int remove_driver_button_exec (bContext *C, wmOperator *op)
 	
 	if (success) {
 		/* send updates */
+		uiContextAnimUpdate(C);
+
 		DAG_ids_flush_update(CTX_data_main(C), 0);
 		
 		WM_event_add_notifier(C, NC_ANIMATION|ND_FCURVES_ORDER, NULL);  // XXX
@@ -468,7 +472,7 @@ void ANIM_OT_driver_button_remove (wmOperatorType *ot)
 
 /* Copy Driver Button Operator ------------------------ */
 
-static int copy_driver_button_exec (bContext *C, wmOperator *op)
+static int copy_driver_button_exec (bContext *C, wmOperator *UNUSED(op))
 {
 	PointerRNA ptr;
 	PropertyRNA *prop= NULL;
@@ -478,14 +482,16 @@ static int copy_driver_button_exec (bContext *C, wmOperator *op)
 	
 	/* try to create driver using property retrieved from UI */
 	memset(&ptr, 0, sizeof(PointerRNA));
-	uiAnimContextProperty(C, &ptr, &prop, &index);
+	uiContextActiveProperty(C, &ptr, &prop, &index);
 	
-	if (ptr.data && prop && RNA_property_animateable(&ptr, prop)) {
+	if (ptr.id.data && ptr.data && prop && RNA_property_animateable(&ptr, prop)) {
 		path= RNA_path_from_ID_to_property(&ptr, prop);
 		
 		if (path) {
 			/* only copy the driver for the button that this was involved for */
 			success= ANIM_copy_driver(ptr.id.data, path, index, 0);
+
+			uiContextAnimUpdate(C);
 			
 			MEM_freeN(path);
 		}
@@ -512,7 +518,7 @@ void ANIM_OT_copy_driver_button (wmOperatorType *ot)
 
 /* Paste Driver Button Operator ------------------------ */
 
-static int paste_driver_button_exec (bContext *C, wmOperator *op)
+static int paste_driver_button_exec (bContext *C, wmOperator *UNUSED(op))
 {
 	PointerRNA ptr;
 	PropertyRNA *prop= NULL;
@@ -522,14 +528,16 @@ static int paste_driver_button_exec (bContext *C, wmOperator *op)
 	
 	/* try to create driver using property retrieved from UI */
 	memset(&ptr, 0, sizeof(PointerRNA));
-	uiAnimContextProperty(C, &ptr, &prop, &index);
+	uiContextActiveProperty(C, &ptr, &prop, &index);
 	
-	if (ptr.data && prop && RNA_property_animateable(&ptr, prop)) {
+	if (ptr.id.data && ptr.data && prop && RNA_property_animateable(&ptr, prop)) {
 		path= RNA_path_from_ID_to_property(&ptr, prop);
 		
 		if (path) {
 			/* only copy the driver for the button that this was involved for */
 			success= ANIM_paste_driver(ptr.id.data, path, index, 0);
+
+			uiContextAnimUpdate(C);
 			
 			MEM_freeN(path);
 		}

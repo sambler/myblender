@@ -40,12 +40,16 @@ def write_mtl(scene, filepath, copy_images, mtl_dict):
 
     def copy_image(image):
         fn = bpy.path.abspath(image.filepath)
+        fn = os.path.normpath(fn)
         fn_strip = os.path.basename(fn)
+
         if copy_images:
             rel = fn_strip
             fn_abs_dest = os.path.join(dest_dir, fn_strip)
             if not os.path.exists(fn_abs_dest):
                 shutil.copy(fn, fn_abs_dest)
+        elif bpy.path.is_subdir(fn, dest_dir):
+            rel = os.path.relpath(fn, dest_dir)
         else:
             rel = fn
 
@@ -303,18 +307,6 @@ def write_file(filepath, objects, scene,
         else:
             return '(null)'
 
-    # TODO: implement this in C? dunno how it should be called...
-    def getVertsFromGroup(me, group_index):
-        ret = []
-
-        for i, v in enumerate(me.vertices):
-            for g in v.groups:
-                if g.group == group_index:
-                    ret.append((i, g.weight))
-
-        return ret
-
-
     print('OBJ Export path: %r' % filepath)
     temp_mesh_name = '~tmp-mesh'
 
@@ -402,27 +394,6 @@ def write_file(filepath, objects, scene,
                 faceuv = False
 
             me_verts = me.vertices[:]
-
-            # XXX - todo, find a better way to do triangulation
-            # ...removed convert_to_triface because it relies on editmesh
-            '''
-            # We have a valid mesh
-            if EXPORT_TRI and me.faces:
-                # Add a dummy object to it.
-                has_quads = False
-                for f in me.faces:
-                    if f.vertices[3] != 0:
-                        has_quads = True
-                        break
-
-                if has_quads:
-                    newob = bpy.data.objects.new('temp_object', me)
-                    # if we forget to set Object.data - crash
-                    scene.objects.link(newob)
-                    newob.convert_to_triface(scene)
-                    # mesh will still be there
-                    scene.objects.unlink(newob)
-            '''
 
             # Make our own list so it can be sorted to reduce context switching
             face_index_pairs = [ (face, index) for index, face in enumerate(me.faces)]
@@ -560,25 +531,16 @@ def write_file(filepath, objects, scene,
             # XXX
             if EXPORT_POLYGROUPS:
                 # Retrieve the list of vertex groups
-#               vertGroupNames = me.getVertGroupNames()
+                vertGroupNames = [g.name for g in ob.vertex_groups]
 
                 currentVGroup = ''
                 # Create a dictionary keyed by face id and listing, for each vertex, the vertex groups it belongs to
                 vgroupsMap = [[] for _i in range(len(me_verts))]
-#               vgroupsMap = [[] for _i in xrange(len(me_verts))]
-                for g in ob.vertex_groups:
-#               for vertexGroupName in vertGroupNames:
-                    for v_idx, vWeight in getVertsFromGroup(me, g.index):
-#                   for v_idx, vWeight in me.getVertsFromGroup(vertexGroupName, 1):
-                        vgroupsMap[v_idx].append((g.name, vWeight))
+                for v_idx, v in enumerate(me.vertices):
+                    for g in v.groups:
+                        vgroupsMap[v_idx].append((vertGroupNames[g.group], g.weight))
 
             for f, f_index in face_index_pairs:
-                f_v = [me_verts[v_idx] for v_idx in f.vertices]
-
-                # if f.vertices[3] == 0:
-                #   f_v.pop()
-
-#               f_v= f.v
                 f_smooth= f.use_smooth
                 f_mat = min(f.material_index, len(materialNames)-1)
 #               f_mat = min(f.mat, len(materialNames)-1)
@@ -602,20 +564,12 @@ def write_file(filepath, objects, scene,
 
                 # Write the vertex group
                 if EXPORT_POLYGROUPS:
-                    if len(ob.vertex_groups):
+                    if ob.vertex_groups:
                         # find what vertext group the face belongs to
                         theVGroup = findVertexGroupName(f,vgroupsMap)
                         if  theVGroup != currentVGroup:
                             currentVGroup = theVGroup
                             file.write('g %s\n' % theVGroup)
-#               # Write the vertex group
-#               if EXPORT_POLYGROUPS:
-#                   if vertGroupNames:
-#                       # find what vertext group the face belongs to
-#                       theVGroup = findVertexGroupName(f,vgroupsMap)
-#                       if  theVGroup != currentVGroup:
-#                           currentVGroup = theVGroup
-#                           file.write('g %s\n' % theVGroup)
 
                 # CHECK FOR CONTEXT SWITCH
                 if key == contextMat:
@@ -657,46 +611,56 @@ def write_file(filepath, objects, scene,
                         file.write('s off\n')
                         contextSmooth = f_smooth
 
-                file.write('f')
-                if faceuv:
-                    if EXPORT_NORMALS:
-                        if f_smooth: # Smoothed, use vertex normals
+                f_v_orig = [me_verts[v_idx] for v_idx in f.vertices]
+                
+                if not EXPORT_TRI or len(f_v_orig) == 3:
+                    f_v_iter = (f_v_orig, )
+                else:
+                    f_v_iter = (f_v_orig[0], f_v_orig[1], f_v_orig[2]), (f_v_orig[0], f_v_orig[2], f_v_orig[3])
+
+                # support for triangulation
+                for f_v in f_v_iter:
+                    file.write('f')
+
+                    if faceuv:
+                        if EXPORT_NORMALS:
+                            if f_smooth: # Smoothed, use vertex normals
+                                for vi, v in enumerate(f_v):
+                                    file.write( ' %d/%d/%d' % \
+                                                    (v.index + totverts,
+                                                     totuvco + uv_face_mapping[f_index][vi],
+                                                     globalNormals[ veckey3d(v.normal) ]) ) # vert, uv, normal
+
+                            else: # No smoothing, face normals
+                                no = globalNormals[ veckey3d(f.normal) ]
+                                for vi, v in enumerate(f_v):
+                                    file.write( ' %d/%d/%d' % \
+                                                    (v.index + totverts,
+                                                     totuvco + uv_face_mapping[f_index][vi],
+                                                     no) ) # vert, uv, normal
+                        else: # No Normals
                             for vi, v in enumerate(f_v):
-                                file.write( ' %d/%d/%d' % \
-                                                (v.index + totverts,
-                                                 totuvco + uv_face_mapping[f_index][vi],
-                                                 globalNormals[ veckey3d(v.normal) ]) ) # vert, uv, normal
+                                file.write( ' %d/%d' % (\
+                                  v.index + totverts,\
+                                  totuvco + uv_face_mapping[f_index][vi])) # vert, uv
 
-                        else: # No smoothing, face normals
-                            no = globalNormals[ veckey3d(f.normal) ]
-                            for vi, v in enumerate(f_v):
-                                file.write( ' %d/%d/%d' % \
-                                                (v.index + totverts,
-                                                 totuvco + uv_face_mapping[f_index][vi],
-                                                 no) ) # vert, uv, normal
-                    else: # No Normals
-                        for vi, v in enumerate(f_v):
-                            file.write( ' %d/%d' % (\
-                              v.index + totverts,\
-                              totuvco + uv_face_mapping[f_index][vi])) # vert, uv
+                        face_vert_index += len(f_v)
 
-                    face_vert_index += len(f_v)
-
-                else: # No UV's
-                    if EXPORT_NORMALS:
-                        if f_smooth: # Smoothed, use vertex normals
+                    else: # No UV's
+                        if EXPORT_NORMALS:
+                            if f_smooth: # Smoothed, use vertex normals
+                                for v in f_v:
+                                    file.write( ' %d//%d' %
+                                                (v.index + totverts, globalNormals[ veckey3d(v.normal) ]) )
+                            else: # No smoothing, face normals
+                                no = globalNormals[ veckey3d(f.normal) ]
+                                for v in f_v:
+                                    file.write( ' %d//%d' % (v.index + totverts, no) )
+                        else: # No Normals
                             for v in f_v:
-                                file.write( ' %d//%d' %
-                                            (v.index + totverts, globalNormals[ veckey3d(v.normal) ]) )
-                        else: # No smoothing, face normals
-                            no = globalNormals[ veckey3d(f.normal) ]
-                            for v in f_v:
-                                file.write( ' %d//%d' % (v.index + totverts, no) )
-                    else: # No Normals
-                        for v in f_v:
-                            file.write( ' %d' % (v.index + totverts) )
+                                file.write( ' %d' % (v.index + totverts) )
 
-                file.write('\n')
+                    file.write('\n')
 
             # Write edges.
             if EXPORT_EDGES:
@@ -786,7 +750,7 @@ def _write(context, filepath,
 
         # Export an animation?
         if EXPORT_ANIMATION:
-            scene_frames = range(scene.frame_start, context.frame_end + 1) # Up to and including the end frame.
+            scene_frames = range(scene.frame_start, scene.frame_end + 1) # Up to and including the end frame.
         else:
             scene_frames = [orig_frame] # Dont export an animation.
 
@@ -839,7 +803,7 @@ Currently the exporter lacks these features:
 
 def save(operator, context, filepath="",
          use_triangles=False,
-         use_edges=False,
+         use_edges=True,
          use_normals=False,
          use_hq_normals=False,
          use_uvs=True,

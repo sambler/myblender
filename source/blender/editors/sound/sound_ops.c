@@ -180,7 +180,7 @@ static int pack_exec(bContext *C, wmOperator *op)
 		return OPERATOR_CANCELLED;
 
 	sound->packedfile= newPackedFile(op->reports, sound->name);
-	sound_load(CTX_data_main(C), sound);
+	sound_load(sound);
 
 	return OPERATOR_FINISHED;
 }
@@ -280,7 +280,7 @@ static int unpack_exec(bContext *C, wmOperator *op)
 	return OPERATOR_FINISHED;
 }
 
-static int unpack_invoke(bContext *C, wmOperator *op, wmEvent *event)
+static int unpack_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 {
 	Editing* ed = CTX_data_scene(C)->ed;
 	bSound* sound;

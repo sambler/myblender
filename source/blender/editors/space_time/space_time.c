@@ -61,11 +61,8 @@
 
 /* ************************ main time area region *********************** */
 
-static void time_draw_sfra_efra(const bContext *C, SpaceTime *stime, ARegion *ar)
-{
-	View2D *v2d= UI_view2d_fromcontext(C);
-	Scene *scene= CTX_data_scene(C);
-	
+static void time_draw_sfra_efra(Scene *scene, View2D *v2d)
+{	
 	/* draw darkened area outside of active timeline 
 	 * frame range used is preview range or scene range */
 	UI_ThemeColorShade(TH_BACK, -25);
@@ -86,7 +83,7 @@ static void time_draw_sfra_efra(const bContext *C, SpaceTime *stime, ARegion *ar
 
 #define CACHE_DRAW_HEIGHT	3.0f
 
-static void time_draw_cache(const bContext *C, SpaceTime *stime, ARegion *ar)
+static void time_draw_cache(SpaceTime *stime)
 {
 	SpaceTimeCache *stc;
 	float yoffs=0.f;
@@ -162,7 +159,7 @@ static void time_cache_free(SpaceTime *stime)
 	BLI_freelistN(&stime->caches);
 }
 
-static void time_cache_refresh(const bContext *C, SpaceTime *stime, ARegion *ar)
+static void time_cache_refresh(const bContext *C, SpaceTime *stime)
 {
 	Object *ob = CTX_data_active_object(C);
 	PTCacheID *pid;
@@ -181,6 +178,7 @@ static void time_cache_refresh(const bContext *C, SpaceTime *stime, ARegion *ar)
 		SpaceTimeCache *stc;
 		float *fp, *array;
 		int i, len;
+		int sta, end;
 		
 		switch(pid->type) {
 			case PTCACHE_TYPE_SOFTBODY:
@@ -197,6 +195,11 @@ static void time_cache_refresh(const bContext *C, SpaceTime *stime, ARegion *ar)
 				if (!(stime->cache_display & TIME_CACHE_SMOKE))	continue;
 				break;
 		}
+
+		BKE_ptcache_id_time(pid, CTX_data_scene(C), 0, &sta, &end, NULL);
+		
+		if(pid->cache->cached_frames==NULL)
+			continue;
 		
 		stc= MEM_callocN(sizeof(SpaceTimeCache), "spacetimecache");
 		
@@ -208,14 +211,15 @@ static void time_cache_refresh(const bContext *C, SpaceTime *stime, ARegion *ar)
 			stc->flag |= PTCACHE_DISK_CACHE;
 		
 		/* first allocate with maximum number of frames needed */
-		BKE_ptcache_id_time(pid, CTX_data_scene(C), 0, &stc->startframe, &stc->endframe, NULL);
-		len = (stc->endframe - stc->startframe + 1)*4;
+		stc->startframe = sta;
+		stc->endframe = end;
+		len = (end - sta + 1)*4;
 		fp = array = MEM_callocN(len*2*sizeof(float), "temporary timeline cache array");
 		
 		/* fill the vertex array with a quad for each cached frame */
-		for (i=stc->startframe; i<=stc->endframe; i++) {
+		for (i=sta; i<=end; i++) {
 			
-			if (BKE_ptcache_id_exist(pid, i)) {
+			if (pid->cache->cached_frames[i-sta]) {
 				fp[0] = (float)i;
 				fp[1] = 0.0;
 				fp+=2;
@@ -382,7 +386,7 @@ static void time_refresh(const bContext *C, ScrArea *sa)
 	/* find the main timeline region and refresh cache display*/
 	for (ar= sa->regionbase.first; ar; ar= ar->next) {
 		if (ar->regiontype==RGN_TYPE_WINDOW) {
-			time_cache_refresh(C, stime, ar);
+			time_cache_refresh(C, stime);
 			break;
 		}
 	}
@@ -404,7 +408,7 @@ static void time_listener(ScrArea *sa, wmNotifier *wmn)
 			}
 			break;
 		case NC_SCENE:
-			switch (wmn->data) {	
+			switch (wmn->data) {
 				case ND_OB_ACTIVE:
 				case ND_FRAME:
 					ED_area_tag_refresh(sa);
@@ -425,7 +429,7 @@ static void time_listener(ScrArea *sa, wmNotifier *wmn)
 					break;
 			}
 		case NC_SPACE:
-			switch (wmn->data) {	
+			switch (wmn->data) {
 				case ND_SPACE_CHANGED:
 					ED_area_tag_refresh(sa);
 					break;
@@ -450,6 +454,7 @@ static void time_main_area_init(wmWindowManager *wm, ARegion *ar)
 static void time_main_area_draw(const bContext *C, ARegion *ar)
 {
 	/* draw entirely, view changes should be handled here */
+	Scene *scene= CTX_data_scene(C);
 	SpaceTime *stime= CTX_wm_space_time(C);
 	View2D *v2d= &ar->v2d;
 	View2DGrid *grid;
@@ -460,15 +465,15 @@ static void time_main_area_draw(const bContext *C, ARegion *ar)
 	UI_ThemeClearColor(TH_BACK);
 	glClear(GL_COLOR_BUFFER_BIT);
 	
-	UI_view2d_view_ortho(C, v2d);
+	UI_view2d_view_ortho(v2d);
 
 	/* start and end frame */
-	time_draw_sfra_efra(C, stime, ar);
+	time_draw_sfra_efra(scene, v2d);
 	
 	/* grid */
 	unit= (stime->flag & TIME_DRAWFRAMES)? V2D_UNIT_FRAMES: V2D_UNIT_SECONDS;
-	grid= UI_view2d_grid_calc(C, v2d, unit, V2D_GRID_CLAMP, V2D_ARG_DUMMY, V2D_ARG_DUMMY, ar->winx, ar->winy);
-	UI_view2d_grid_draw(C, v2d, grid, (V2D_VERTICAL_LINES|V2D_VERTICAL_AXIS));
+	grid= UI_view2d_grid_calc(scene, v2d, unit, V2D_GRID_CLAMP, V2D_ARG_DUMMY, V2D_ARG_DUMMY, ar->winx, ar->winy);
+	UI_view2d_grid_draw(v2d, grid, (V2D_VERTICAL_LINES|V2D_VERTICAL_AXIS));
 	UI_view2d_grid_free(grid);
 	
 	/* keyframes */
@@ -481,11 +486,11 @@ static void time_main_area_draw(const bContext *C, ARegion *ar)
 	ANIM_draw_cfra(C, v2d, flag);
 	
 	/* markers */
-	UI_view2d_view_orthoSpecial(C, v2d, 1);
+	UI_view2d_view_orthoSpecial(ar, v2d, 1);
 	draw_markers_time(C, 0);
 	
 	/* caches */
-	time_draw_cache(C, stime, ar);
+	time_draw_cache(stime);
 	
 	/* reset view matrix */
 	UI_view2d_view_restore(C);
@@ -511,6 +516,8 @@ static void time_main_area_listener(ARegion *ar, wmNotifier *wmn)
 		
 		case NC_SCENE:
 			switch (wmn->data) {
+				case ND_OB_SELECT:
+				case ND_OB_ACTIVE:
 				case ND_FRAME:
 				case ND_FRAME_RANGE:
 				case ND_KEYINGSET:
@@ -524,7 +531,7 @@ static void time_main_area_listener(ARegion *ar, wmNotifier *wmn)
 /* ************************ header time area region *********************** */
 
 /* add handlers, stuff you only do once or on area/region changes */
-static void time_header_area_init(wmWindowManager *wm, ARegion *ar)
+static void time_header_area_init(wmWindowManager *UNUSED(wm), ARegion *ar)
 {
 	ED_region_header_init(ar);
 }
@@ -545,6 +552,7 @@ static void time_header_area_listener(ARegion *ar, wmNotifier *wmn)
 
 		case NC_SCENE:
 			switch (wmn->data) {
+				case ND_OB_SELECT:
 				case ND_FRAME:
 				case ND_FRAME_RANGE:
 				case ND_KEYINGSET:
@@ -622,7 +630,7 @@ static void time_free(SpaceLink *sl)
 /* spacetype; init callback in ED_area_initialize() */
 /* init is called to (re)initialize an existing editor (file read, screen changes) */
 /* validate spacedata, add own area level handlers */
-static void time_init(wmWindowManager *wm, ScrArea *sa)
+static void time_init(wmWindowManager *UNUSED(wm), ScrArea *sa)
 {
 	SpaceTime *stime= (SpaceTime *)sa->spacedata.first;
 	

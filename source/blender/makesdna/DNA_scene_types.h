@@ -561,6 +561,7 @@ typedef struct TransformOrientation {
 	struct TransformOrientation *next, *prev;
 	char name[256];
 	float mat[3][3];
+	char pad[4];
 } TransformOrientation;
 
 typedef struct Sculpt {

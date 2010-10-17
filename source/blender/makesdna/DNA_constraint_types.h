@@ -44,7 +44,7 @@ typedef struct bConstraintChannel {
 	struct bConstraintChannel *next, *prev;
 	struct Ipo			*ipo;
 	short		flag;
-	char		name[256];
+	char		name[30];
 } bConstraintChannel;
 
 /* A Constraint */
@@ -59,10 +59,11 @@ typedef struct bConstraint {
 	char		tarspace;	/* 	Space that target should be evaluated in (only used if 1 target) */
 	
 	char		name[256];	/*	Constraint name */
+	char		pad2[2];
 	
 	float		enforce;	/* 	Amount of influence exherted by constraint (0.0-1.0) */
 	float		headtail;	/*	Point along subtarget bone where the actual target is. 0=head (default for all), 1=tail*/
-	int			pad;
+	/*int			pad;*/
 	
 	struct Ipo *ipo;		/* local influence ipo or driver */ // XXX depreceated for 2.5... old animation system hack
 	

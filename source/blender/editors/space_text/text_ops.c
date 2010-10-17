@@ -66,7 +66,7 @@
 
 /************************ poll ***************************/
 
-static int text_new_poll(bContext *C)
+static int text_new_poll(bContext *UNUSED(C))
 {
 	return 1;
 }
@@ -125,7 +125,7 @@ static int text_region_edit_poll(bContext *C)
 
 /********************** updates *********************/
 
-void text_update_line_edited(Text *text, TextLine *line)
+void text_update_line_edited(TextLine *line)
 {
 	if(!line)
 		return;
@@ -142,12 +142,12 @@ void text_update_edited(Text *text)
 	TextLine *line;
 
 	for(line=text->lines.first; line; line=line->next)
-		text_update_line_edited(text, line);
+		text_update_line_edited(line);
 }
 
 /******************* new operator *********************/
 
-static int new_exec(bContext *C, wmOperator *op)
+static int new_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	SpaceText *st= CTX_wm_space_text(C);
 	Text *text;
@@ -204,7 +204,7 @@ static void open_init(bContext *C, wmOperator *op)
 	uiIDContextProperty(C, &pprop->ptr, &pprop->prop);
 }
 
-static int open_cancel(bContext *C, wmOperator *op)
+static int open_cancel(bContext *UNUSED(C), wmOperator *op)
 {
 	MEM_freeN(op->customdata);
 	return OPERATOR_CANCELLED;
@@ -263,7 +263,7 @@ static int open_exec(bContext *C, wmOperator *op)
 	return OPERATOR_FINISHED;
 }
 
-static int open_invoke(bContext *C, wmOperator *op, wmEvent *event)
+static int open_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 {
 	Text *text= CTX_data_edit_text(C);
 	char *path= (text && text->name)? text->name: G.sce;
@@ -338,7 +338,7 @@ void TEXT_OT_reload(wmOperatorType *ot)
 
 /******************* delete operator *********************/
 
-static int unlink_exec(bContext *C, wmOperator *op)
+static int unlink_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	Main *bmain= CTX_data_main(C);
 	SpaceText *st= CTX_wm_space_text(C);
@@ -385,7 +385,7 @@ void TEXT_OT_unlink(wmOperatorType *ot)
 
 /******************* make internal operator *********************/
 
-static int make_internal_exec(bContext *C, wmOperator *op)
+static int make_internal_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	Text *text= CTX_data_edit_text(C);
 
@@ -511,7 +511,7 @@ static int save_as_exec(bContext *C, wmOperator *op)
 	return OPERATOR_FINISHED;
 }
 
-static int save_as_invoke(bContext *C, wmOperator *op, wmEvent *event)
+static int save_as_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 {
 	Text *text= CTX_data_edit_text(C);
 	char *str;
@@ -593,7 +593,7 @@ void TEXT_OT_run_script(wmOperatorType *ot)
 
 /******************* refresh pyconstraints operator *********************/
 
-static int refresh_pyconstraints_exec(bContext *C, wmOperator *op)
+static int refresh_pyconstraints_exec(bContext *UNUSED(C), wmOperator *UNUSED(op))
 {
 #ifndef DISABLE_PYTHON
 #if 0
@@ -789,7 +789,7 @@ static void txt_copy_clipboard(Text *text)
 	}
 }
 
-static int copy_exec(bContext *C, wmOperator *op)
+static int copy_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	Text *text= CTX_data_edit_text(C);
 
@@ -845,7 +845,7 @@ void TEXT_OT_cut(wmOperatorType *ot)
 
 /******************* indent operator *********************/
 
-static int indent_exec(bContext *C, wmOperator *op)
+static int indent_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	Text *text= CTX_data_edit_text(C);
 
@@ -880,7 +880,7 @@ void TEXT_OT_indent(wmOperatorType *ot)
 
 /******************* unindent operator *********************/
 
-static int unindent_exec(bContext *C, wmOperator *op)
+static int unindent_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	Text *text= CTX_data_edit_text(C);
 
@@ -915,7 +915,7 @@ void TEXT_OT_unindent(wmOperatorType *ot)
 
 /******************* line break operator *********************/
 
-static int line_break_exec(bContext *C, wmOperator *op)
+static int line_break_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	SpaceText *st= CTX_wm_space_text(C);
 	Text *text= CTX_data_edit_text(C);
@@ -938,8 +938,8 @@ static int line_break_exec(bContext *C, wmOperator *op)
 
 	if(text->curl) {
 		if(text->curl->prev)
-			text_update_line_edited(text, text->curl->prev);
-		text_update_line_edited(text, text->curl);
+			text_update_line_edited(text->curl->prev);
+		text_update_line_edited(text->curl);
 	}
 
 	text_update_cursor_moved(C);
@@ -962,7 +962,7 @@ void TEXT_OT_line_break(wmOperatorType *ot)
 
 /******************* comment operator *********************/
 
-static int comment_exec(bContext *C, wmOperator *op)
+static int comment_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	Text *text= CTX_data_edit_text(C);
 
@@ -995,7 +995,7 @@ void TEXT_OT_comment(wmOperatorType *ot)
 
 /******************* uncomment operator *********************/
 
-static int uncomment_exec(bContext *C, wmOperator *op)
+static int uncomment_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	Text *text= CTX_data_edit_text(C);
 
@@ -1172,7 +1172,7 @@ void TEXT_OT_convert_whitespace(wmOperatorType *ot)
 
 /******************* select all operator *********************/
 
-static int select_all_exec(bContext *C, wmOperator *op)
+static int select_all_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	Text *text= CTX_data_edit_text(C);
 
@@ -1198,7 +1198,7 @@ void TEXT_OT_select_all(wmOperatorType *ot)
 
 /******************* select line operator *********************/
 
-static int select_line_exec(bContext *C, wmOperator *op)
+static int select_line_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	Text *text= CTX_data_edit_text(C);
 
@@ -1224,7 +1224,7 @@ void TEXT_OT_select_line(wmOperatorType *ot)
 
 /******************* previous marker operator *********************/
 
-static int previous_marker_exec(bContext *C, wmOperator *op)
+static int previous_marker_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	Text *text= CTX_data_edit_text(C);
 	TextMarker *mrk;
@@ -1260,7 +1260,7 @@ void TEXT_OT_previous_marker(wmOperatorType *ot)
 
 /******************* next marker operator *********************/
 
-static int next_marker_exec(bContext *C, wmOperator *op)
+static int next_marker_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	Text *text= CTX_data_edit_text(C);
 	TextMarker *mrk;
@@ -1296,7 +1296,7 @@ void TEXT_OT_next_marker(wmOperatorType *ot)
 
 /******************* clear all markers operator *********************/
 
-static int clear_all_markers_exec(bContext *C, wmOperator *op)
+static int clear_all_markers_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	Text *text= CTX_data_edit_text(C);
 
@@ -1417,7 +1417,7 @@ static int text_get_cursor_rel(SpaceText* st, ARegion *ar, TextLine *linein, int
   return selc;
 }
 
-static int cursor_skip_find_line(SpaceText* st, ARegion *ar, Text *text,
+static int cursor_skip_find_line(SpaceText* st, ARegion *ar,
 	int lines, TextLine **linep, int *charp, int *rell, int *relc)
 {
 	int offl, offc, visible_lines;
@@ -1713,7 +1713,7 @@ static void cursor_skip(SpaceText* st, ARegion *ar, Text *text, int lines, int s
 		int rell, relc;
 
 		/* find line and offsets inside it needed to set cursor position */
-		if(cursor_skip_find_line(st, ar, text, lines, linep, charp, &rell, &relc))
+		if(cursor_skip_find_line(st, ar, lines, linep, charp, &rell, &relc))
 		  *charp= text_get_cursor_rel (st, ar, *linep, rell, relc);
 	} else {
 		while (lines>0 && (*linep)->next) {
@@ -1871,7 +1871,7 @@ static int jump_exec(bContext *C, wmOperator *op)
 	return OPERATOR_FINISHED;
 }
 
-static int jump_invoke(bContext *C, wmOperator *op, wmEvent *event)
+static int jump_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 {
 	return WM_operator_props_dialog_popup(C,op,200,100);
 
@@ -1918,7 +1918,7 @@ static int delete_exec(bContext *C, wmOperator *op)
 	else if(type == DEL_NEXT_CHAR)
 		txt_delete_char(text);
 
-	text_update_line_edited(text, text->curl);
+	text_update_line_edited(text->curl);
 
 	text_update_cursor_moved(C);
 	WM_event_add_notifier(C, NC_TEXT|NA_EDITED, text);
@@ -1947,7 +1947,7 @@ void TEXT_OT_delete(wmOperatorType *ot)
 
 /******************* toggle overwrite operator **********************/
 
-static int toggle_overwrite_exec(bContext *C, wmOperator *op)
+static int toggle_overwrite_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	SpaceText *st= CTX_wm_space_text(C);
 
@@ -2512,7 +2512,7 @@ void TEXT_OT_cursor_set(wmOperatorType *ot)
 
 /******************* line number operator **********************/
 
-static int line_number_invoke(bContext *C, wmOperator *op, wmEvent *event)
+static int line_number_invoke(bContext *C, wmOperator *UNUSED(op), wmEvent *event)
 {
 	SpaceText *st= CTX_wm_space_text(C);
 	Text *text= CTX_data_edit_text(C);
@@ -2587,7 +2587,7 @@ static int insert_exec(bContext *C, wmOperator *op)
 	if(!done)
 		return OPERATOR_CANCELLED;
 
-	text_update_line_edited(text, text->curl);
+	text_update_line_edited(text->curl);
 
 	text_update_cursor_moved(C);
 	WM_event_add_notifier(C, NC_TEXT|NA_EDITED, text);
@@ -2810,7 +2810,7 @@ void TEXT_OT_find_set_selected(wmOperatorType *ot)
 
 /******************* replace set selected *********************/
 
-static int replace_set_selected_exec(bContext *C, wmOperator *op)
+static int replace_set_selected_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	SpaceText *st= CTX_wm_space_text(C);
 	Text *text= CTX_data_edit_text(C);
@@ -2920,7 +2920,7 @@ static int resolve_conflict_exec(bContext *C, wmOperator *op)
 	return OPERATOR_CANCELLED;
 }
 
-static int resolve_conflict_invoke(bContext *C, wmOperator *op, wmEvent *event)
+static int resolve_conflict_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 {
 	Text *text= CTX_data_edit_text(C);
 	uiPopupMenu *pup;

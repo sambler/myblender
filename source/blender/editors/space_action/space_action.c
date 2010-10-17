@@ -101,10 +101,10 @@ static SpaceLink *action_new(const bContext *C)
 	ar->v2d.cur = ar->v2d.tot;
 	
 	ar->v2d.min[0]= 0.0f;
-	 ar->v2d.min[1]= 0.0f;
+	ar->v2d.min[1]= 0.0f;
 	
 	ar->v2d.max[0]= MAXFRAMEF;
-	 ar->v2d.max[1]= FLT_MAX;
+	ar->v2d.max[1]= FLT_MAX;
  	
 	ar->v2d.minzoom= 0.01f;
 	ar->v2d.maxzoom= 50;
@@ -119,7 +119,7 @@ static SpaceLink *action_new(const bContext *C)
 }
 
 /* not spacelink itself */
-static void action_free(SpaceLink *sl)
+static void action_free(SpaceLink *UNUSED(sl))
 {	
 //	SpaceAction *saction= (SpaceAction*) sl;
 	
@@ -127,7 +127,7 @@ static void action_free(SpaceLink *sl)
 
 
 /* spacetype; init callback */
-static void action_init(struct wmWindowManager *wm, ScrArea *sa)
+static void action_init(struct wmWindowManager *UNUSED(wm), ScrArea *sa)
 {
 	SpaceAction *saction = sa->spacedata.first;
 	saction->flag |= SACTION_TEMP_NEEDCHANSYNC;
@@ -224,7 +224,6 @@ static void action_channel_area_init(wmWindowManager *wm, ARegion *ar)
 static void action_channel_area_draw(const bContext *C, ARegion *ar)
 {
 	/* draw entirely, view changes should be handled here */
-	SpaceAction *saction= CTX_wm_space_action(C);
 	bAnimContext ac;
 	View2D *v2d= &ar->v2d;
 	View2DScrollers *scrollers;
@@ -237,7 +236,7 @@ static void action_channel_area_draw(const bContext *C, ARegion *ar)
 	
 	/* data */
 	if (ANIM_animdata_get_context(C, &ac)) {
-		draw_channel_names((bContext *)C, &ac, saction, ar);
+		draw_channel_names((bContext *)C, &ac, ar);
 	}
 	
 	/* reset view matrix */
@@ -251,7 +250,7 @@ static void action_channel_area_draw(const bContext *C, ARegion *ar)
 
 
 /* add handlers, stuff you only do once or on area/region changes */
-static void action_header_area_init(wmWindowManager *wm, ARegion *ar)
+static void action_header_area_init(wmWindowManager *UNUSED(wm), ARegion *ar)
 {
 	ED_region_header_init(ar);
 }
@@ -422,7 +421,7 @@ static void action_header_area_listener(ARegion *ar, wmNotifier *wmn)
 
 static void action_refresh(const bContext *C, ScrArea *sa)
 {
-	SpaceAction *saction= CTX_wm_space_action(C);
+	SpaceAction *saction= (SpaceAction *)sa->spacedata.first;
 	
 	/* update the state of the animchannels in response to changes from the data they represent 
 	 * NOTE: the temp flag is used to indicate when this needs to be done, and will be cleared once handled

@@ -113,9 +113,15 @@ static int dupli_extrude_cursor(bContext *C, wmOperator *op, wmEvent *event)
 	EditVert *eve;
 	float min[3], max[3];
 	int done= 0;
-	int rot_src= RNA_boolean_get(op->ptr, "rotate_source");
-	
+	short use_proj;
+	wmWindow *win= CTX_wm_window(C);
+
 	em_setup_viewcontext(C, &vc);
+
+	printf("\n%d %d\n", event->x, event->y);
+	printf("%d %d\n", win->eventstate->x, win->eventstate->y);
+
+	use_proj= (vc.scene->toolsettings->snap_flag & SCE_SNAP) &&	(vc.scene->toolsettings->snap_mode==SCE_SNAP_MODE_FACE);
 	
 	invert_m4_m4(vc.obedit->imat, vc.obedit->obmat); 
 	
@@ -130,14 +136,13 @@ static int dupli_extrude_cursor(bContext *C, wmOperator *op, wmEvent *event)
 
 	/* call extrude? */
 	if(done) {
+		short rot_src= RNA_boolean_get(op->ptr, "rotate_source");
 		EditEdge *eed;
 		float vec[3], cent[3], mat[3][3];
 		float nor[3]= {0.0, 0.0, 0.0};
 		
 		/* 2D normal calc */
 		float mval_f[2]= {(float)event->mval[0], (float)event->mval[1]};
-
-#define SIDE_OF_LINE(pa,pb,pp)	((pa[0]-pp[0])*(pb[1]-pp[1]))-((pb[0]-pp[0])*(pa[1]-pp[1]))
 		
 		done= 0;
 
@@ -150,12 +155,12 @@ static int dupli_extrude_cursor(bContext *C, wmOperator *op, wmEvent *event)
 				project_float_noclip(vc.ar, co1, co1);
 				project_float_noclip(vc.ar, co2, co2);
 				
-				/* 2D rotate by 90d while subtracting
+				/* 2D rotate by 90d while adding.
 				 *  (x, y) = (y, -x)
 				 *
 				 * accumulate the screenspace normal in 2D,
 				 * with screenspace edge length weighting the result. */
-				if(SIDE_OF_LINE(co1, co2, mval_f) >= 0.0f) {
+				if(line_point_side_v2(co1, co2, mval_f) >= 0.0f) {
 					nor[0] +=  (co1[1] - co2[1]);
 					nor[1] += -(co1[0] - co2[0]);
 				}
@@ -166,8 +171,6 @@ static int dupli_extrude_cursor(bContext *C, wmOperator *op, wmEvent *event)
 				done= 1;
 			}
 		}
-
-#undef SIDE_OF_LINE
 
 		if(done) {
 			float view_vec[3], cross[3];
@@ -182,14 +185,11 @@ static int dupli_extrude_cursor(bContext *C, wmOperator *op, wmEvent *event)
 			cross_v3_v3v3(cross, nor, view_vec);
 			cross_v3_v3v3(nor, view_vec, cross);
 			normalize_v3(nor);
-			
-			/* correct for flipping */
 		}
 		
 		/* center */
-		add_v3_v3v3(cent, min, max);
-		mul_v3_fl(cent, 0.5f);
-		VECCOPY(min, cent);
+		mid_v3_v3v3(cent, min, max);
+		copy_v3_v3(min, cent);
 		
 		mul_m4_v3(vc.obedit->obmat, min);	// view space
 		view3d_get_view_aligned_coordinate(&vc, min, event->mval);
@@ -202,7 +202,7 @@ static int dupli_extrude_cursor(bContext *C, wmOperator *op, wmEvent *event)
 		if(done) {
 			float dot;
 			
-			VECCOPY(vec, min);
+			copy_v3_v3(vec, min);
 			normalize_v3(vec);
 			dot= INPR(vec, nor);
 
@@ -225,8 +225,12 @@ static int dupli_extrude_cursor(bContext *C, wmOperator *op, wmEvent *event)
 			}
 		}
 		
-		if(rot_src)
+		if(rot_src) {
 			rotateflag(vc.em, SELECT, cent, mat);
+			/* also project the source, for retopo workflow */
+			if(use_proj)
+				EM_project_snap_verts(C, vc.ar, vc.obedit, vc.em);
+		}
 		
 		extrudeflag(vc.obedit, vc.em, SELECT, nor, 0);
 		rotateflag(vc.em, SELECT, cent, mat);
@@ -238,7 +242,7 @@ static int dupli_extrude_cursor(bContext *C, wmOperator *op, wmEvent *event)
 		float mat[3][3],imat[3][3];
 		float *curs= give_cursor(vc.scene, vc.v3d);
 		
-		VECCOPY(min, curs);
+		copy_v3_v3(min, curs);
 		view3d_get_view_aligned_coordinate(&vc, min, event->mval);
 		
 		eve= addvertlist(vc.em, 0, NULL);
@@ -246,18 +250,15 @@ static int dupli_extrude_cursor(bContext *C, wmOperator *op, wmEvent *event)
 		copy_m3_m4(mat, vc.obedit->obmat);
 		invert_m3_m3(imat, mat);
 		
-		VECCOPY(eve->co, min);
+		copy_v3_v3(eve->co, min);
 		mul_m3_v3(imat, eve->co);
 		sub_v3_v3v3(eve->co, eve->co, vc.obedit->obmat[3]);
 		
 		eve->f= SELECT;
 	}
 
-	if(	((vc.scene->toolsettings->snap_flag & (SCE_SNAP|SCE_SNAP_PROJECT))==(SCE_SNAP|SCE_SNAP_PROJECT)) &&
-		(vc.scene->toolsettings->snap_mode==SCE_SNAP_MODE_FACE)
-	) {
+	if(use_proj)
 		EM_project_snap_verts(C, vc.ar, vc.obedit, vc.em);
-	}
 
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, vc.obedit->data); 
 	DAG_id_flush_update(vc.obedit->data, OB_RECALC_DATA);
@@ -1712,7 +1713,7 @@ void MESH_OT_primitive_ico_sphere_add(wmOperatorType *ot)
 
 /****************** add duplicate operator ***************/
 
-static int mesh_duplicate_exec(bContext *C, wmOperator *op)
+static int mesh_duplicate_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	Object *ob= CTX_data_edit_object(C);
 	EditMesh *em= BKE_mesh_get_editmesh(ob->data);
@@ -1727,7 +1728,7 @@ static int mesh_duplicate_exec(bContext *C, wmOperator *op)
 	return OPERATOR_FINISHED;
 }
 
-static int mesh_duplicate_invoke(bContext *C, wmOperator *op, wmEvent *event)
+static int mesh_duplicate_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 {
 	WM_cursor_wait(1);
 	mesh_duplicate_exec(C, op);

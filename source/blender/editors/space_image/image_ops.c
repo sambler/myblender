@@ -2067,11 +2067,7 @@ static int cycle_render_slot_exec(bContext *C, wmOperator *UNUSED(op))
         else if(slot < 0)
             slot= IMA_MAX_RENDER_SLOT+slot;
         
-		if(ima->renders[slot] || slot == ima->last_render_slot) {
-			ima->render_slot= slot;
-			break;
-		}
-		else if((slot - direction) == ima->last_render_slot && slot < IMA_MAX_RENDER_SLOT) {
+		if(ima->renders[slot]) {
 			ima->render_slot= slot;
 			break;
 		}

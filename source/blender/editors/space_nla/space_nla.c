@@ -148,16 +148,17 @@ static SpaceLink *nla_new(const bContext *C)
 	ar->v2d.cur = ar->v2d.tot;
 	
 	ar->v2d.min[0]= 0.0f;
-	 ar->v2d.min[1]= 0.0f;
+	ar->v2d.min[1]= 0.0f;
 	
 	ar->v2d.max[0]= MAXFRAMEF;
-	 ar->v2d.max[1]= 10000.0f;
+	ar->v2d.max[1]= 10000.0f;
  	
 	ar->v2d.minzoom= 0.01f;
 	ar->v2d.maxzoom= 50;
 	ar->v2d.scroll = (V2D_SCROLL_BOTTOM|V2D_SCROLL_SCALE_HORIZONTAL);
 	ar->v2d.scroll |= (V2D_SCROLL_RIGHT);
 	ar->v2d.keepzoom= V2D_LOCKZOOM_Y;
+	ar->v2d.keepofs= V2D_KEEPOFS_Y;
 	ar->v2d.align= V2D_ALIGN_NO_POS_Y;
 	ar->v2d.flag = V2D_VIEWSYNC_AREA_VERTICAL;
 	
@@ -177,7 +178,7 @@ static void nla_free(SpaceLink *sl)
 
 
 /* spacetype; init callback */
-static void nla_init(struct wmWindowManager *wm, ScrArea *sa)
+static void nla_init(struct wmWindowManager *UNUSED(wm), ScrArea *sa)
 {
 	SpaceNla *snla= (SpaceNla *)sa->spacedata.first;
 	
@@ -218,7 +219,6 @@ static void nla_channel_area_init(wmWindowManager *wm, ARegion *ar)
 /* draw entirely, view changes should be handled here */
 static void nla_channel_area_draw(const bContext *C, ARegion *ar)
 {
-	SpaceNla *snla= CTX_wm_space_nla(C);
 	bAnimContext ac;
 	View2D *v2d= &ar->v2d;
 	View2DScrollers *scrollers;
@@ -231,7 +231,7 @@ static void nla_channel_area_draw(const bContext *C, ARegion *ar)
 	
 	/* data */
 	if (ANIM_animdata_get_context(C, &ac)) {
-		draw_nla_channel_list((bContext *)C, &ac, snla, ar);
+		draw_nla_channel_list((bContext *)C, &ac, ar);
 	}
 	
 	/* reset view matrix */
@@ -315,7 +315,7 @@ static void nla_main_area_draw(const bContext *C, ARegion *ar)
 
 
 /* add handlers, stuff you only do once or on area/region changes */
-static void nla_header_area_init(wmWindowManager *wm, ARegion *ar)
+static void nla_header_area_init(wmWindowManager *UNUSED(wm), ARegion *ar)
 {
 	ED_region_header_init(ar);
 }

@@ -318,6 +318,7 @@ IF(UNIX AND NOT APPLE)
 	SET(PLATFORM_LINKFLAGS "-pthread")
 
 	# Better warnings
+	# note: -Wunused-parameter should be added but for now only apply to ./source/blender
 	SET(C_WARNINGS "-Wall -Wno-char-subscripts -Wpointer-arith -Wcast-align -Wdeclaration-after-statement -Wno-unknown-pragmas")
 	SET(CXX_WARNINGS "-Wall -Wno-invalid-offsetof -Wno-sign-compare")
 
@@ -940,9 +941,9 @@ ENDIF(WITH_CXX_GUARDEDALLOC)
 #-----------------------------------------------------------------------------
 # Libraries
 FILE(WRITE ${CMAKE_BINARY_DIR}/cmake_blender_libs.txt "")
+ADD_SUBDIRECTORY(source)
 ADD_SUBDIRECTORY(intern)
 ADD_SUBDIRECTORY(extern)
-ADD_SUBDIRECTORY(source)
 
 
 #-----------------------------------------------------------------------------

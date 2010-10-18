@@ -114,12 +114,8 @@ static int dupli_extrude_cursor(bContext *C, wmOperator *op, wmEvent *event)
 	float min[3], max[3];
 	int done= 0;
 	short use_proj;
-	wmWindow *win= CTX_wm_window(C);
-
+printf("%d\n", event->val);
 	em_setup_viewcontext(C, &vc);
-
-	printf("\n%d %d\n", event->x, event->y);
-	printf("%d %d\n", win->eventstate->x, win->eventstate->y);
 
 	use_proj= (vc.scene->toolsettings->snap_flag & SCE_SNAP) &&	(vc.scene->toolsettings->snap_mode==SCE_SNAP_MODE_FACE);
 	
@@ -1053,15 +1049,13 @@ static void make_prim(Object *obedit, int type, float mat[4][4], int tot, int se
 		/* one segment first: the X axis */		
 		phi = (2*dia)/(float)(tot-1);
 		phid = (2*dia)/(float)(seg-1);
-		for(a=0;a<tot;a++) {
+		for(a=tot-1;a>=0;a--) {
 			vec[0] = (phi*a) - dia;
 			vec[1]= - dia;
 			vec[2]= 0.0f;
 			eve= addvertlist(em, vec, NULL);
 			eve->f= 1+2+4;
-			if (a) {
-				addedgelist(em, eve->prev, eve, NULL);
-			}
+			addedgelist(em, eve->prev, eve, NULL);
 		}
 		/* extrude and translate */
 		vec[0]= vec[2]= 0.0;

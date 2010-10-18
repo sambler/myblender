@@ -43,6 +43,7 @@ struct CSG_VertexIteratorDescriptor;
 struct ColorBand;
 struct Curve;
 struct CurveMapping;
+struct Curve;
 struct EditBone;
 struct EditFace;
 struct EditMesh;

@@ -66,7 +66,6 @@ GET_BLENDER_VERSION()
 
 # Blender internal features
 OPTION(WITH_INTERNATIONAL "Enable I18N   (International fonts and text)" ON)
-OPTION(WITH_LCMS          "Enable color correction with lcms" OFF)
 OPTION(WITH_PYTHON        "Enable Embedded Python API" ON)
 OPTION(WITH_BUILDINFO     "Include extra build details" ON)
 OPTION(WITH_FLUID        "Enable Elbeem (Fluid Simulation)" ON)
@@ -126,6 +125,8 @@ IF(APPLE)
 	OPTION(WITH_LIBS10.5  "Use 10.5 libs (needed for 64bit builds)" OFF)
 ENDIF(APPLE)
 
+# only for developers who want to make this functional
+# OPTION(WITH_LCMS          "Enable color correction with lcms" OFF)
 
 IF(NOT WITH_GAMEENGINE AND WITH_PLAYER)
 	MESSAGE(FATAL_ERROR "WITH_PLAYER needs WITH_GAMEENGINE")
@@ -318,7 +319,7 @@ IF(UNIX AND NOT APPLE)
 	SET(PLATFORM_LINKFLAGS "-pthread")
 
 	# Better warnings
-	# note: -Wunused-parameter should be added but for now only apply to ./source/blender
+	# note: -Wunused-parameter is added below for all GCC compilers
 	SET(C_WARNINGS "-Wall -Wno-char-subscripts -Wpointer-arith -Wcast-align -Wdeclaration-after-statement -Wno-unknown-pragmas")
 	SET(CXX_WARNINGS "-Wall -Wno-invalid-offsetof -Wno-sign-compare")
 
@@ -930,6 +931,10 @@ INCLUDE_DIRECTORIES(${OPENGL_INCLUDE_DIR})
 
 #-----------------------------------------------------------------------------
 # Extra compile flags
+IF(CMAKE_COMPILER_IS_GNUCC)
+	SET(C_WARNINGS "${C_WARNINGS} -Wunused-parameter -Werror=declaration-after-statement -Werror=implicit-function-declaration -Werror=return-type")
+ENDIF(CMAKE_COMPILER_IS_GNUCC)
+
 SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${PLATFORM_CFLAGS} ${C_WARNINGS}")
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${PLATFORM_CFLAGS} ${CXX_WARNINGS}")
 

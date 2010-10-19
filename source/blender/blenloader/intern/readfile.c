@@ -3251,6 +3251,17 @@ static void direct_link_mdisps(FileData *fd, int count, MDisps *mdisps, int exte
 
 		for(i = 0; i < count; ++i) {
 			mdisps[i].disps = newdataadr(fd, mdisps[i].disps);
+            
+            if( (fd->flags & FD_FLAGS_SWITCH_ENDIAN) && (mdisps[i].disps) ) {
+                /* DNA_struct_switch_endian doesn't do endian swap for (*disps)[] */
+                /* this does swap for data written at write_mdisps() - readfile.c */
+                int x;
+                float *tmpdisps= mdisps[i].disps;
+                for(x=0;x<mdisps[i].totdisp*3;x++) {
+                    SWITCH_INT(*tmpdisps);
+                    tmpdisps++;
+                }
+            }
 			if(!external && !mdisps[i].disps)
 				mdisps[i].totdisp = 0;
 		}

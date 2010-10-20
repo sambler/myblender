@@ -1403,7 +1403,7 @@ static void createTransCurveVerts(bContext *C, TransInfo *t)
 					  ) {
 						VECCOPY(td->iloc, bezt->vec[0]);
 						td->loc= bezt->vec[0];
-						VECCOPY(td->center, bezt->vec[1]);
+						VECCOPY(td->center, bezt->vec[(hide_handles || bezt->f2 & SELECT) ? 1:0]);
 						if (hide_handles) {
 							if(bezt->f2 & SELECT) td->flag= TD_SELECTED;
 							else td->flag= 0;
@@ -1462,7 +1462,7 @@ static void createTransCurveVerts(bContext *C, TransInfo *t)
 					  ) {
 						VECCOPY(td->iloc, bezt->vec[2]);
 						td->loc= bezt->vec[2];
-						VECCOPY(td->center, bezt->vec[1]);
+						VECCOPY(td->center, bezt->vec[(hide_handles || bezt->f2 & SELECT) ? 1:2]);
 						if (hide_handles) {
 							if(bezt->f2 & SELECT) td->flag= TD_SELECTED;
 							else td->flag= 0;
@@ -2284,11 +2284,10 @@ void flushTransNodes(TransInfo *t)
 }
 
 /* *** SEQUENCE EDITOR *** */
-#define XXX_DURIAN_ANIM_TX_HACK
 void flushTransSeq(TransInfo *t)
 {
 	ListBase *seqbasep= seq_give_editing(t->scene, FALSE)->seqbasep; /* Editing null check already done */
-	int a, new_frame;
+	int a, new_frame, old_start;
 	TransData *td= NULL;
 	TransData2D *td2d= NULL;
 	TransDataSeq *tdsq= NULL;
@@ -2305,16 +2304,11 @@ void flushTransSeq(TransInfo *t)
 	for(a=0, td= t->data, td2d= t->data2d; a<t->total; a++, td++, td2d++) {
 		tdsq= (TransDataSeq *)td->extra;
 		seq= tdsq->seq;
+		old_start = seq->start;
 		new_frame= (int)floor(td2d->loc[0] + 0.5f);
 
 		switch (tdsq->sel_flag) {
 		case SELECT:
-#ifdef XXX_DURIAN_ANIM_TX_HACK
-			if (seq != seq_prev) {
-				int ofs = (new_frame - tdsq->start_offset) - seq->start; // breaks for single strips - color/image
-				seq_offset_animdata(t->scene, seq, ofs);
-			}
-#endif
 			if (seq->type != SEQ_META && (seq->depth != 0 || seq_tx_test(seq))) /* for meta's, their children move */
 				seq->start= new_frame - tdsq->start_offset;
 
@@ -2345,6 +2339,9 @@ void flushTransSeq(TransInfo *t)
 			else {
 				calc_sequence_disp(t->scene, seq);
 			}
+
+			if(tdsq->sel_flag == SELECT)
+				seq_offset_animdata(t->scene, seq, seq->start - old_start);
 		}
 		seq_prev= seq;
 	}
@@ -3851,6 +3848,7 @@ static short constraints_list_needinv(TransInfo *t, ListBase *list)
  * seq->depth must be set before running this function so we know if the strips
  * are root level or not
  */
+#define XXX_DURIAN_ANIM_TX_HACK
 static void SeqTransInfo(TransInfo *t, Sequence *seq, int *recursive, int *count, int *flag)
 {
  
@@ -4300,8 +4298,8 @@ static void ObjectToTransData(TransInfo *t, TransData *td, Object *ob)
 		
 		td->ext->irotAngle= ob->rotAngle;
 		VECCOPY(td->ext->irotAxis, ob->rotAxis);
-		td->ext->drotAngle= ob->drotAngle;
-		VECCOPY(td->ext->drotAxis, ob->drotAxis);
+		// td->ext->drotAngle= ob->drotAngle;			// XXX, not implimented
+		// VECCOPY(td->ext->drotAxis, ob->drotAxis);	// XXX, not implimented
 	}
 	else {
 		td->ext->rot= NULL;

@@ -40,6 +40,7 @@
 
 #include "BKE_context.h"
 #include "BKE_global.h"
+#include "BKE_main.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
@@ -133,7 +134,7 @@ static int file_browse_exec(bContext *C, wmOperator *op)
 	/* add slash for directories, important for some properties */
 	if(RNA_property_subtype(fbo->prop) == PROP_DIRPATH) {
 		id = fbo->ptr.id.data;
-		base = (id && id->lib)? id->lib->filepath: G.sce;
+		base = (id && id->lib)? id->lib->filepath: G.main->name;
 
 		BLI_strncpy(path, str, FILE_MAX);
 		BLI_path_abs(path, base);

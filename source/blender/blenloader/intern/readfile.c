@@ -831,8 +831,8 @@ static int fd_read_gzip_from_file(FileData *filedata, void *buffer, unsigned int
 
 static int fd_read_from_memory(FileData *filedata, void *buffer, unsigned int size)
 {
-		// don't read more bytes then there are available in the buffer
-	int readsize = MIN2(size, filedata->buffersize - filedata->seek);
+	// don't read more bytes then there are available in the buffer
+	int readsize = (int)MIN2(size, (unsigned int)(filedata->buffersize - filedata->seek));
 
 	memcpy(buffer, filedata->buffer + filedata->seek, readsize);
 	filedata->seek += readsize;
@@ -3141,6 +3141,7 @@ static void direct_link_particlesystems(FileData *fd, ListBase *particles)
 		psys->childcachebufs.first = psys->childcachebufs.last = NULL;
 		psys->frand = NULL;
 		psys->pdd = NULL;
+		psys->renderdata = NULL;
 		
 		direct_link_pointcache_list(fd, &psys->ptcaches, &psys->pointcache);
 
@@ -3251,10 +3252,21 @@ static void direct_link_mdisps(FileData *fd, int count, MDisps *mdisps, int exte
 
 		for(i = 0; i < count; ++i) {
 			mdisps[i].disps = newdataadr(fd, mdisps[i].disps);
+
+			if( (fd->flags & FD_FLAGS_SWITCH_ENDIAN) && (mdisps[i].disps) ) {
+				/* DNA_struct_switch_endian doesn't do endian swap for (*disps)[] */
+				/* this does swap for data written at write_mdisps() - readfile.c */
+				int x;
+				float *tmpdisps= *mdisps[i].disps;
+				for(x=0;x<mdisps[i].totdisp*3;x++) {
+					SWITCH_INT(*tmpdisps);
+					tmpdisps++;
+				}
+			}
 			if(!external && !mdisps[i].disps)
 				mdisps[i].totdisp = 0;
 		}
-	}       
+	}
 }
 
 static void direct_link_customdata(FileData *fd, CustomData *data, int count)
@@ -6504,23 +6516,23 @@ static void do_version_constraints_radians_degrees_250(ListBase *lb)
 	for	(con=lb->first; con; con=con->next) {
 		if(con->type==CONSTRAINT_TYPE_RIGIDBODYJOINT) {
 			bRigidBodyJointConstraint *data = con->data;
-			data->axX *= M_PI/180.0;
-			data->axY *= M_PI/180.0;
-			data->axZ *= M_PI/180.0;
+			data->axX *= (float)(M_PI/180.0);
+			data->axY *= (float)(M_PI/180.0);
+			data->axZ *= (float)(M_PI/180.0);
 		}
 		else if(con->type==CONSTRAINT_TYPE_KINEMATIC) {
 			bKinematicConstraint *data = con->data;
-			data->poleangle *= M_PI/180.0;
+			data->poleangle *= (float)(M_PI/180.0);
 		}
 		else if(con->type==CONSTRAINT_TYPE_ROTLIMIT) {
 			bRotLimitConstraint *data = con->data;
 
-			data->xmin *= M_PI/180.0;
-			data->xmax *= M_PI/180.0;
-			data->ymin *= M_PI/180.0;
-			data->ymax *= M_PI/180.0;
-			data->zmin *= M_PI/180.0;
-			data->zmax *= M_PI/180.0;
+			data->xmin *= (float)(M_PI/180.0);
+			data->xmax *= (float)(M_PI/180.0);
+			data->ymin *= (float)(M_PI/180.0);
+			data->ymax *= (float)(M_PI/180.0);
+			data->zmin *= (float)(M_PI/180.0);
+			data->zmax *= (float)(M_PI/180.0);
 		}
 	}
 }
@@ -9544,7 +9556,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 		/* Adjustments needed after Bullets update */
 		for(ob = main->object.first; ob; ob= ob->id.next) {
 			ob->damping *= 0.635f;
-			ob->rdamping = 0.1 + (0.8f * ob->rdamping);
+			ob->rdamping = 0.1f + (0.8f * ob->rdamping);
 		}
 	}
 	
@@ -9624,8 +9636,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 							seq->strip->proxy->size
 								= sce->r.size;
 						} else {
-							seq->strip->proxy->size
-								= 25.0;
+							seq->strip->proxy->size = 25;
 						}
 						seq->strip->proxy->quality =90;
 					}
@@ -9706,7 +9717,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 					{
 						char str[FILE_MAX];
 						BLI_join_dirfile(str, seq->strip->dir, seq->strip->stripdata->name);
-						BLI_path_abs(str, G.sce);
+						BLI_path_abs(str, G.main->name);
 						seq->sound = sound_new_file(main, str);
 					}
 					/* don't know, if anybody used that
@@ -10074,14 +10085,14 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 		
 		for(sce= main->scene.first; sce; sce= sce->id.next)
 		{
-			if(sce->audio.main == 0.0)
-				sce->audio.main = 1.0;
+			if(sce->audio.main == 0.0f)
+				sce->audio.main = 1.0f;
 
 			sce->r.ffcodecdata.audio_mixrate = sce->audio.mixrate;
 			sce->r.ffcodecdata.audio_volume = sce->audio.main;
-			sce->audio.distance_model = 2.0;
-			sce->audio.doppler_factor = 1.0;
-			sce->audio.speed_of_sound = 343.3;
+			sce->audio.distance_model = 2;
+			sce->audio.doppler_factor = 1.0f;
+			sce->audio.speed_of_sound = 343.3f;
 		}
 
 		/* Add default gravity to scenes */
@@ -10107,11 +10118,11 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 				for(md= ob->modifiers.first; md; md= md->next) {
 					ClothModifierData *clmd = (ClothModifierData *)modifiers_findByType(ob, eModifierType_Cloth);
 					if(clmd)
-						clmd->sim_parms->effector_weights->global_gravity = clmd->sim_parms->gravity[2]/-9.81;
+						clmd->sim_parms->effector_weights->global_gravity = clmd->sim_parms->gravity[2]/-9.81f;
 				}
 
 				if(ob->soft)
-					ob->soft->effector_weights->global_gravity = ob->soft->grav/9.81;
+					ob->soft->effector_weights->global_gravity = ob->soft->grav/9.81f;
 			}
 
 			/* Normal wind shape is plane */
@@ -10496,7 +10507,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 		
 		/* game engine changes */
 		for(sce = main->scene.first; sce; sce = sce->id.next) {
-			sce->gm.eyeseparation = 0.10;
+			sce->gm.eyeseparation = 0.10f;
 		}
 		
 		/* anim viz changes */
@@ -10601,12 +10612,12 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 
 			if (ob->pose) {
 				for (pchan=ob->pose->chanbase.first; pchan; pchan=pchan->next) {
-					pchan->limitmin[0] *= M_PI/180.0;
-					pchan->limitmin[1] *= M_PI/180.0;
-					pchan->limitmin[2] *= M_PI/180.0;
-					pchan->limitmax[0] *= M_PI/180.0;
-					pchan->limitmax[1] *= M_PI/180.0;
-					pchan->limitmax[2] *= M_PI/180.0;
+					pchan->limitmin[0] *= (float)(M_PI/180.0);
+					pchan->limitmin[1] *= (float)(M_PI/180.0);
+					pchan->limitmin[2] *= (float)(M_PI/180.0);
+					pchan->limitmax[0] *= (float)(M_PI/180.0);
+					pchan->limitmax[1] *= (float)(M_PI/180.0);
+					pchan->limitmax[2] *= (float)(M_PI/180.0);
 
 					do_version_constraints_radians_degrees_250(&pchan->constraints);
 				}
@@ -10705,7 +10716,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 			int a;
 
 			for(a=0; a<PE_TOT_BRUSH; a++)
-				pset->brush[a].strength /= 100.0;
+				pset->brush[a].strength /= 100.0f;
 		}
 
 		for(ma = main->mat.first; ma; ma=ma->id.next)
@@ -10986,7 +10997,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 
 			// bad radius
 			if (brush->unprojected_radius == 0)
-				brush->unprojected_radius = 0.125;
+				brush->unprojected_radius = 0.125f;
 
 			// unusable size
 			if (brush->size == 0)
@@ -11028,18 +11039,18 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 					brush->add_col[1] == 0 &&
 					brush->add_col[2] == 0)
 				{
-					brush->add_col[0] = 1.00;
-					brush->add_col[1] = 0.39;
-					brush->add_col[2] = 0.39;
+					brush->add_col[0] = 1.00f;
+					brush->add_col[1] = 0.39f;
+					brush->add_col[2] = 0.39f;
 				}
 
 				if (brush->sub_col[0] == 0 &&
 					brush->sub_col[1] == 0 &&
 					brush->sub_col[2] == 0)
 				{
-					brush->sub_col[0] = 0.39;
-					brush->sub_col[1] = 0.39;
-					brush->sub_col[2] = 1.00;
+					brush->sub_col[0] = 0.39f;
+					brush->sub_col[1] = 0.39f;
+					brush->sub_col[2] = 1.00f;
 				}
 			}
 		}
@@ -12367,7 +12378,7 @@ static Main* library_append_begin(const bContext *C, FileData **fd, char *dir)
 	blo_split_main(&(*fd)->mainlist, mainvar);
 
 	/* which one do we need? */
-	mainl = blo_find_main(*fd, &(*fd)->mainlist, dir, G.sce);
+	mainl = blo_find_main(*fd, &(*fd)->mainlist, dir, G.main->name);
 	
 	/* needed for do_version */
 	mainl->versionfile= (*fd)->fileversion;
@@ -12451,7 +12462,7 @@ static void library_append_end(const bContext *C, Main *mainl, FileData **fd, in
 		BLI_strncpy(curlib->name, curlib->filepath, sizeof(curlib->name));
 		
 		/* uses current .blend file as reference */
-		BLI_path_rel(curlib->name, G.sce);
+		BLI_path_rel(curlib->name, G.main->name);
 	}
 
 	blo_join_main(&(*fd)->mainlist);
@@ -12460,7 +12471,7 @@ static void library_append_end(const bContext *C, Main *mainl, FileData **fd, in
 
 	lib_link_all(*fd, mainvar);
 	lib_verify_nodetree(mainvar, FALSE);
-	fix_relpaths_library(G.sce, mainvar); /* make all relative paths, relative to the open blend file */
+	fix_relpaths_library(G.main->name, mainvar); /* make all relative paths, relative to the open blend file */
 
 	/* give a base to loose objects. If group append, do it for objects too */
 	if(scene) {
@@ -12576,7 +12587,7 @@ static void read_libraries(FileData *basefd, ListBase *mainlist)
 						while(fd==NULL) {
 							char newlib_path[240] = { 0 };
 							printf("Missing library...'\n");
-							printf("	current file: %s\n", G.sce);
+							printf("	current file: %s\n", G.main->name);
 							printf("	absolute lib: %s\n", mainptr->curlib->filepath);
 							printf("	relative lib: %s\n", mainptr->curlib->name);
 							printf("  enter a new path:\n");
@@ -12584,7 +12595,7 @@ static void read_libraries(FileData *basefd, ListBase *mainlist)
 							if(scanf("%s", newlib_path) > 0) {
 								strcpy(mainptr->curlib->name, newlib_path);
 								strcpy(mainptr->curlib->filepath, newlib_path);
-								cleanup_path(G.sce, mainptr->curlib->filepath);
+								cleanup_path(G.main->name, mainptr->curlib->filepath);
 								
 								fd= blo_openblenderfile(mainptr->curlib->filepath, basefd->reports);
 

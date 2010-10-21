@@ -196,7 +196,7 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 						int UNUSED(useRenderParams),
 						int UNUSED(isFinalCalc))
 {
-	int i;
+	int i, *index;
 	DerivedMesh *result;
 	SolidifyModifierData *smd = (SolidifyModifierData*) md;
 
@@ -321,7 +321,7 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 		dm_calc_normal(dm, vert_nors);
 	}
 
-	result = CDDM_from_template(dm, numVerts * 2, (numEdges * 2) + newEdges, (numFaces * 2) + newFaces);
+	result = CDDM_from_template(dm, numVerts * 2, (numEdges * 2) + newEdges, (numFaces * 2) + newFaces);	
 
 	mface = result->getFaceArray(result);
 	medge = result->getEdgeArray(result);

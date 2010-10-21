@@ -31,7 +31,10 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <stddef.h>
-
+#ifdef WIN32
+#include <windows.h>
+#include <io.h>
+#endif
 
 #include "DNA_ID.h"
 #include "DNA_object_types.h"
@@ -1440,7 +1443,7 @@ static void open_set_use_scripts(wmOperator *op)
 
 static int wm_open_mainfile_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 {
-	RNA_string_set(op->ptr, "filepath", G.sce);
+	RNA_string_set(op->ptr, "filepath", G.main->name);
 	open_set_load_ui(op);
 	open_set_use_scripts(op);
 
@@ -1773,7 +1776,7 @@ static int wm_save_as_mainfile_invoke(bContext *C, wmOperator *op, wmEvent *UNUS
 
 	save_set_compress(op);
 	
-	BLI_strncpy(name, G.sce, FILE_MAX);
+	BLI_strncpy(name, G.main->name, FILE_MAX);
 	untitled(name);
 	RNA_string_set(op->ptr, "filepath", name);
 	
@@ -1794,7 +1797,7 @@ static int wm_save_as_mainfile_exec(bContext *C, wmOperator *op)
 	if(RNA_property_is_set(op->ptr, "filepath"))
 		RNA_string_get(op->ptr, "filepath", path);
 	else {
-		BLI_strncpy(path, G.sce, FILE_MAX);
+		BLI_strncpy(path, G.main->name, FILE_MAX);
 		untitled(path);
 	}
 
@@ -1859,7 +1862,7 @@ static int wm_save_mainfile_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(
 
 	save_set_compress(op);
 	
-	BLI_strncpy(name, G.sce, FILE_MAX);
+	BLI_strncpy(name, G.main->name, FILE_MAX);
 	untitled(name);
 	RNA_string_set(op->ptr, "filepath", name);
 	
@@ -1905,7 +1908,7 @@ static int wm_collada_export_invoke(bContext *C, wmOperator *op, wmEvent *event)
 {	
 	if(!RNA_property_is_set(op->ptr, "filepath")) {
 		char filepath[FILE_MAX];
-		BLI_strncpy(filepath, G.sce, sizeof(filepath));
+		BLI_strncpy(filepath, G.main->name, sizeof(filepath));
 		BLI_replace_extension(filepath, sizeof(filepath), ".dae");
 		RNA_string_set(op->ptr, "filepath", filepath);
 	}
@@ -2006,6 +2009,60 @@ static void WM_OT_quit_blender(wmOperatorType *ot)
 	ot->exec= wm_exit_blender_op;
 	ot->poll= WM_operator_winactive;
 }
+
+/* *********************** */
+#ifdef WIN32
+static int console= 1;
+void WM_toggle_console(bContext *C, short show)
+{
+	if(show) {
+		FILE *fp;
+		char fn[FILE_MAX];
+		char tmp[FILE_MAXDIR];
+		BLI_where_is_temp(tmp, 1);
+		BLI_make_file_string("/", fn, tmp, "blenderlog.txt");
+		/* open the console */
+		AllocConsole();
+		
+		/* redirect stdin */
+		fp= freopen(fn, "r", stdin);
+		SetStdHandle(STD_INPUT_HANDLE, (HANDLE)_get_osfhandle(_fileno(stdin)));
+		/* redirect stdout */
+		fp= freopen(fn, "w", stdout);
+		SetStdHandle(STD_OUTPUT_HANDLE, (HANDLE)_get_osfhandle(_fileno(stdout)));
+		/* redirect stderr */
+		fp= freopen(fn, "w", stderr);
+		SetStdHandle(STD_ERROR_HANDLE, (HANDLE)_get_osfhandle(_fileno(stderr)));
+		
+		console= 1;
+	}
+	else {
+		FreeConsole();
+		console= 0;
+	}
+}
+
+static int wm_toggle_console_op(bContext *C, wmOperator *op)
+{
+	if(console) {
+		WM_toggle_console(C, 0);
+	}
+	else {
+		WM_toggle_console(C, 1);
+	}
+	return OPERATOR_FINISHED;
+}
+
+static void WM_OT_toggle_console(wmOperatorType *ot)
+{
+	ot->name= "Toggle System Console";
+	ot->idname= "WM_OT_toggle_console";
+	ot->description= "Toggle System Console";
+	
+	ot->exec= wm_toggle_console_op;
+	ot->poll= WM_operator_winactive;
+}
+#endif
 
 /* ************ default paint cursors, draw always around cursor *********** */
 /*
@@ -3079,6 +3136,9 @@ void wm_operatortype_init(void)
 	WM_operatortype_append(WM_OT_splash);
 	WM_operatortype_append(WM_OT_search_menu);
 	WM_operatortype_append(WM_OT_call_menu);
+#ifdef WIN32
+	WM_operatortype_append(WM_OT_toggle_console);
+#endif
 
 #ifdef WITH_COLLADA
 	/* XXX: move these */

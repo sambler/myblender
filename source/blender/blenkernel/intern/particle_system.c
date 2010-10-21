@@ -63,6 +63,7 @@
 #include "BLI_listbase.h"
 #include "BLI_threads.h"
 
+#include "BKE_main.h"
 #include "BKE_animsys.h"
 #include "BKE_boids.h"
 #include "BKE_cdderivedmesh.h"
@@ -3259,7 +3260,7 @@ static void do_hair_dynamics(ParticleSimulationData *sim)
 	psys->clmd->point_cache = psys->pointcache;
 	psys->clmd->sim_parms->effector_weights = psys->part->effector_weights;
 
-	psys->hair_out_dm = clothModifier_do(psys->clmd, sim->scene, sim->ob, dm, 0, 0);
+	psys->hair_out_dm = clothModifier_do(psys->clmd, sim->scene, sim->ob, dm);
 
 	psys->clmd->sim_parms->effector_weights = NULL;
 }
@@ -3607,7 +3608,7 @@ static void particles_fluid_step(ParticleSimulationData *sim, int UNUSED(cfra))
 			// ok, start loading
 			strcpy(filename, fss->surfdataPath);
 			strcat(filename, suffix);
-			BLI_path_abs(filename, G.sce);
+			BLI_path_abs(filename, G.main->name);
 			BLI_path_frame(filename, curFrame, 0); // fixed #frame-no 
 			strcat(filename, suffix2);
 	

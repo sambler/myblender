@@ -40,6 +40,7 @@
 
 #include "BKE_context.h"
 #include "BKE_global.h"
+#include "BKE_main.h"
 #include "BKE_report.h"
 #include "BKE_scene.h"
 
@@ -494,7 +495,7 @@ void filepath_qt(char *string, RenderData *rd) {
 	if (string==0) return;
 
 	strcpy(string, rd->pic);
-	BLI_path_abs(string, G.sce);
+	BLI_path_abs(string, G.main->name);
 
 	BLI_make_existing_file(string);
 
@@ -620,7 +621,9 @@ void end_qt(void) {
 		//printf("Finished QuickTime movie.\n");
 	}
 
-	ExitMoviesOnThread();
+#ifdef __APPLE__
+		ExitMoviesOnThread();
+#endif
 	
 	if(qtexport) {
 		MEM_freeN(qtexport);

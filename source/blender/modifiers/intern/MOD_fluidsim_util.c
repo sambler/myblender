@@ -43,10 +43,11 @@
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
 
+#include "BKE_main.h"
 #include "BKE_cdderivedmesh.h"
 #include "BKE_mesh.h"
 #include "BKE_utildefines.h"
-#include "BKE_global.h" /* G.sce only */
+#include "BKE_global.h" /* G.main->name only */
 
 #include "MOD_modifiertypes.h"
 
@@ -482,7 +483,7 @@ DerivedMesh *fluidsim_read_cache(DerivedMesh *orgdm, FluidsimModifierData *fluid
 		strcat(targetDir,"fluidsurface_final_####");
 	}
 
-	BLI_path_abs(targetDir, G.sce);
+	BLI_path_abs(targetDir, G.main->name);
 	BLI_path_frame(targetDir, curFrame, 0); // fixed #frame-no
 
 	strcpy(targetFile,targetDir);
@@ -545,8 +546,7 @@ DerivedMesh *fluidsim_read_cache(DerivedMesh *orgdm, FluidsimModifierData *fluid
 DerivedMesh *fluidsimModifier_do(FluidsimModifierData *fluidmd, Scene *scene,
 						Object *UNUSED(ob),
 						DerivedMesh *dm,
-						int useRenderParams,
-						int UNUSED(isFinalCalc))
+						int useRenderParams)
 {
 #ifndef DISABLE_ELBEEM
 	DerivedMesh *result = NULL;

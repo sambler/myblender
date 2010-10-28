@@ -24,19 +24,26 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-FILE(GLOB SRC intern/*.c)
-
 SET(INC
 	.
 	../blenlib
 	../blenkernel
-	../include
 	../imbuf
 	../makesdna
 	../makesrna
 	../../../extern/glew/include
 	../../../intern/guardedalloc
 	../../../intern/smoke/extern
+)
+
+SET(SRC
+	intern/gpu_buffers.c
+	intern/gpu_codegen.c
+	intern/gpu_draw.c
+	intern/gpu_extensions.c
+	intern/gpu_material.c
+	intern/gpu_shader_material.glsl.c
+	intern/gpu_shader_vertex.glsl.c
 )
 
 IF(WIN32)

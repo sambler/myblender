@@ -91,6 +91,7 @@ void where_is_armature_bone(struct Bone *bone, struct Bone *prevbone);
 void armature_rebuild_pose(struct Object *ob, struct bArmature *arm);
 void where_is_pose (struct Scene *scene, struct Object *ob);
 void where_is_pose_bone(struct Scene *scene, struct Object *ob, struct bPoseChannel *pchan, float ctime, int do_extra);
+void where_is_pose_bone_tail(struct bPoseChannel *pchan);
 
 /* get_objectspace_bone_matrix has to be removed still */
 void get_objectspace_bone_matrix (struct Bone* bone, float M_accumulatedMatrix[][4], int root, int posed);
@@ -104,7 +105,8 @@ void armature_mat_pose_to_bone(struct bPoseChannel *pchan, float inmat[][4], flo
 void armature_loc_pose_to_bone(struct bPoseChannel *pchan, float *inloc, float *outloc);
 void armature_mat_pose_to_delta(float delta_mat[][4], float pose_mat[][4], float arm_mat[][4]);
 
-void pchan_apply_mat4(struct bPoseChannel *pchan, float mat[][4]);
+void pchan_mat3_to_rot(struct bPoseChannel *pchan, float mat[][3], short use_compat);
+void pchan_apply_mat4(struct bPoseChannel *pchan, float mat[][4], short use_comat);
 void pchan_to_mat4(struct bPoseChannel *pchan, float chan_mat[4][4]);
 
 /* Rotation Mode Conversions - Used for PoseChannels + Objects... */

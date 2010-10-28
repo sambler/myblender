@@ -57,6 +57,7 @@
 #include "BKE_depsgraph.h"
 #include "BKE_displist.h"
 #include "BKE_global.h"
+#include "BKE_fcurve.h"
 #include "BKE_lattice.h"
 #include "BKE_library.h"
 #include "BKE_main.h"
@@ -82,6 +83,7 @@
 
 #include "ED_armature.h"
 #include "ED_curve.h"
+#include "ED_keyframing.h"
 #include "ED_object.h"
 #include "ED_screen.h"
 #include "ED_view3d.h"
@@ -429,7 +431,7 @@ static int parent_clear_exec(bContext *C, wmOperator *op)
 		}			
 		else if(type == 1) {
 			ob->parent= NULL;
-			object_apply_mat4(ob, ob->obmat);
+			object_apply_mat4(ob, ob->obmat, TRUE);
 		}
 		else if(type == 2)
 			unit_m4(ob->parentinv);
@@ -545,6 +547,17 @@ static int parent_set_exec(bContext *C, wmOperator *op)
 				makeDispListCurveTypes(scene, par, 0);  /* force creation of path data */
 			}
 			else cu->flag |= CU_FOLLOW;
+			
+			/* if follow, add F-Curve for ctime (i.e. "eval_time") so that path-follow works */
+			if(partype == PAR_FOLLOW) {
+				/* get or create F-Curve */
+				bAction *act = verify_adt_action(&cu->id, 1);
+				FCurve *fcu = verify_fcurve(act, NULL, "eval_time", 0, 1);
+				
+				/* setup dummy 'generator' modifier here to get 1-1 correspondance still working */
+				if (!fcu->bezt && !fcu->fpt && !fcu->modifiers.first)
+					add_fmodifier(&fcu->modifiers, FMODIFIER_TYPE_GENERATOR);
+			}
 			
 			/* fall back on regular parenting now (for follow only) */
 			if(partype == PAR_FOLLOW)
@@ -893,7 +906,7 @@ static int object_track_clear_exec(bContext *C, wmOperator *op)
 		}
 		
 		if(type == 1)
-			object_apply_mat4(ob, ob->obmat);
+			object_apply_mat4(ob, ob->obmat, TRUE);
 	}
 	CTX_DATA_END;
 

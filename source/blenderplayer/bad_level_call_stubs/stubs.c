@@ -90,6 +90,7 @@ struct wmKeyMap;
 struct wmOperator;
 struct wmWindowManager;
 struct View3D;
+struct ToolSettings;
 
 
 /*new render funcs */

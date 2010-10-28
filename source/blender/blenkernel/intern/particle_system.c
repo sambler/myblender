@@ -62,6 +62,7 @@
 #include "BLI_kdopbvh.h"
 #include "BLI_listbase.h"
 #include "BLI_threads.h"
+#include "BLI_storage.h" /* For _LARGEFILE64_SOURCE;  zlib needs this on some systems */
 
 #include "BKE_main.h"
 #include "BKE_animsys.h"
@@ -3075,8 +3076,8 @@ static void deflect_particle(ParticleSimulationData *sim, int p, float dfra, flo
 					col.t = df;
 				}
 				else {
-					/* final chance to prevent failure, so don't do anything fancy */
-					copy_v3_v3(pa->state.co, co);
+					/* final chance to prevent failure, so stick to the surface and hope for the best */
+					madd_v3_v3v3fl(pa->state.co, co, col.vel, dt2);
 					copy_v3_v3(pa->state.vel, v0);
 				}
 			}

@@ -546,7 +546,7 @@ static void applyarmature_fix_boneparents (Scene *scene, Object *armob)
 			/* apply current transform from parent (not yet destroyed), 
 			 * then calculate new parent inverse matrix
 			 */
-			object_apply_mat4(ob, ob->obmat);
+			object_apply_mat4(ob, ob->obmat, FALSE);
 			
 			what_does_parent(scene, ob, &workob);
 			invert_m4_m4(ob->parentinv, workob.obmat);
@@ -681,7 +681,7 @@ static int pose_visual_transform_apply_exec (bContext *C, wmOperator *UNUSED(op)
 		invert_m4_m4(imat, pchan->pose_mat);
 		mul_m4_m4m4(delta_mat, mat, imat);
 
-		pchan_apply_mat4(pchan, delta_mat);
+		pchan_apply_mat4(pchan, delta_mat, TRUE);
 
 		where_is_pose_bone(scene, ob, pchan, CFRA, 1);
 	}

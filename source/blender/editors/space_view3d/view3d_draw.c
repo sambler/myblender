@@ -843,7 +843,7 @@ static void view3d_get_viewborder_size(Scene *scene, ARegion *ar, float size_r[2
 	}
 }
 
-void view3d_calc_camera_border(Scene *scene, ARegion *ar, RegionView3D *rv3d, View3D *v3d, rctf *viewborder_r)
+void view3d_calc_camera_border(Scene *scene, ARegion *ar, RegionView3D *rv3d, View3D *v3d, rctf *viewborder_r, short do_shift)
 {
 	float zoomfac, size[2];
 	float dx= 0.0f, dy= 0.0f;
@@ -882,12 +882,13 @@ void view3d_calc_camera_border(Scene *scene, ARegion *ar, RegionView3D *rv3d, Vi
 	viewborder_r->xmax-= dx;
 	viewborder_r->ymax-= dy;
 	
-	if(v3d->camera && v3d->camera->type==OB_CAMERA) {
+	if(do_shift && v3d->camera && v3d->camera->type==OB_CAMERA) {
 		Camera *cam= v3d->camera->data;
 		float w = viewborder_r->xmax - viewborder_r->xmin;
 		float h = viewborder_r->ymax - viewborder_r->ymin;
 		float side = MAX2(w, h);
-		
+
+		if(do_shift == -1) side *= -1;
 		viewborder_r->xmin+= cam->shiftx*side;
 		viewborder_r->xmax+= cam->shiftx*side;
 		viewborder_r->ymin+= cam->shifty*side;
@@ -922,7 +923,7 @@ static void drawviewborder(Scene *scene, ARegion *ar, View3D *v3d)
 	if(v3d->camera->type==OB_CAMERA)
 		ca = v3d->camera->data;
 	
-	view3d_calc_camera_border(scene, ar, rv3d, v3d, &viewborder);
+	view3d_calc_camera_border(scene, ar, rv3d, v3d, &viewborder, FALSE);
 	/* the offsets */
 	x1= viewborder.xmin;
 	y1= viewborder.ymin;
@@ -1259,7 +1260,7 @@ static void draw_bgpic(Scene *scene, ARegion *ar, View3D *v3d)
 			if(rv3d->persp==RV3D_CAMOB) {
 				rctf vb;
 
-				view3d_calc_camera_border(scene, ar, rv3d, v3d, &vb);
+				view3d_calc_camera_border(scene, ar, rv3d, v3d, &vb, FALSE);
 
 				x1= vb.xmin;
 				y1= vb.ymin;
@@ -1459,7 +1460,7 @@ static void draw_dupli_objects_color(Scene *scene, ARegion *ar, View3D *v3d, Bas
 {
 	RegionView3D *rv3d= ar->regiondata;
 	ListBase *lb;
-	DupliObject *dob_prev= NULL, *dob, *dob_next;
+	DupliObject *dob_prev= NULL, *dob, *dob_next= NULL;
 	Base tbase;
 	BoundBox bb, *bb_tmp; /* use a copy because draw_object, calls clear_mesh_caches */
 	GLuint displist=0;
@@ -1569,7 +1570,56 @@ static void draw_dupli_objects(Scene *scene, ARegion *ar, View3D *v3d, Base *bas
 	draw_dupli_objects_color(scene, ar, v3d, base, color);
 }
 
+void view3d_update_depths_rect(ARegion *ar, ViewDepths *d, rcti *rect)
+{
+	int x, y, w, h;	
+	rcti r= {0, ar->winx-1, 0, ar->winy-1};
+	/* clamp rect by area */
 
+	/* Constrain rect to depth bounds */
+	BLI_isect_rcti(&r, rect, rect);
+
+	/* assign values to compare with the ViewDepths */
+	x= rect->xmin;
+	y= rect->ymin;
+
+	w= rect->xmax - rect->xmin;
+	h= rect->ymax - rect->ymin;
+
+	if(w <= 0 || h <= 0) {
+		if(d->depths)
+			MEM_freeN(d->depths);
+		d->depths= NULL;
+
+		d->damaged= FALSE;
+	}
+	else if(	d->w != w ||
+		d->h != h ||
+		d->x != x ||
+		d->y != y ||
+		d->depths==NULL
+	) {
+		d->x= x;
+		d->y= y;
+		d->w= w;
+		d->h= h;
+
+		if(d->depths)
+			MEM_freeN(d->depths);
+
+		d->depths= MEM_mallocN(sizeof(float)*d->w*d->h,"View depths Subset");
+		
+		d->damaged= TRUE;
+	}
+
+	if(d->damaged) {
+		glReadPixels(ar->winrct.xmin+d->x,ar->winrct.ymin+d->y, d->w,d->h, GL_DEPTH_COMPONENT,GL_FLOAT, d->depths);
+		glGetDoublev(GL_DEPTH_RANGE,d->depth_range);
+		d->damaged= FALSE;
+	}
+}
+
+/* note, with nouveau drivers the glReadPixels() is very slow. [#24339] */
 void view3d_update_depths(ARegion *ar)
 {
 	RegionView3D *rv3d= ar->regiondata;
@@ -1598,6 +1648,30 @@ void view3d_update_depths(ARegion *ar)
 			d->damaged= 0;
 		}
 	}
+}
+
+/* utility function to find the closest Z value, use for autodepth */
+float view3d_depth_near(ViewDepths *d)
+{
+	/* convert to float for comparisons */
+	const float near= (float)d->depth_range[0];
+	const float far_real= (float)d->depth_range[1];
+	float far= far_real;
+
+	const float *depths= d->depths;
+	float depth= FLT_MAX;
+	int i= (int)d->w * (int)d->h; /* cast to avoid short overflow */
+
+	/* far is both the starting 'far' value
+	 * and the closest value found. */	
+	while(i--) {
+		depth= *depths++;
+		if((depth < far) && (depth > near)) {
+			far= depth;
+		}
+	}
+
+	return far == far_real ? FLT_MAX : far;
 }
 
 void draw_depth_gpencil(Scene *scene, ARegion *ar, View3D *v3d)

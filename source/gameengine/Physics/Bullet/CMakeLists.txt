@@ -24,7 +24,8 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-SET(SRC CcdPhysicsEnvironment.cpp CcdPhysicsController.cpp CcdGraphicController.cpp)
+# since this includes bullet we get errors from the headers too
+REMOVE_STRICT_FLAGS()
 
 SET(INC
 	.
@@ -44,6 +45,12 @@ SET(INC
 	../../../../source/blender/blenlib
 	../../../../source/blender/blenkernel
 	${PYTHON_INC}
+)
+
+SET(SRC
+	CcdPhysicsEnvironment.cpp
+	CcdPhysicsController.cpp
+	CcdGraphicController.cpp
 )
 
 IF(WITH_BULLET)

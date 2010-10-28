@@ -33,6 +33,7 @@
 #include "DNA_screen_types.h"
 
 #include "BLI_math.h"
+#include "BLI_rect.h"
 
 #include "BKE_colortools.h"
 #include "BKE_texture.h"
@@ -517,7 +518,7 @@ static void ui_draw_but_CHARTAB(uiBut *but)
 	int charmax = G.charmax;
 	
 	/* <builtin> font in use. There are TTF <builtin> and non-TTF <builtin> fonts */
-	if(!strcmp(G.selfont->name, "<builtin>"))
+	if(!strcmp(G.selfont->name, FO_BUILTIN_NAME))
 	{
 		if(G.ui_international == TRUE)
 		{
@@ -548,8 +549,8 @@ static void ui_draw_but_CHARTAB(uiBut *but)
 
 	cs = G.charstart;
 
-	/* Set the font, in case it is not <builtin> font */
-	if(G.selfont && strcmp(G.selfont->name, "<builtin>"))
+	/* Set the font, in case it is not FO_BUILTIN_NAME font */
+	if(G.selfont && strcmp(G.selfont->name, FO_BUILTIN_NAME))
 	{
 		char tmpStr[256];
 
@@ -605,9 +606,9 @@ static void ui_draw_but_CHARTAB(uiBut *but)
 			memset(wstr, 0, sizeof(wchar_t)*2);
 			memset(ustr, 0, 16);
 
-			// Set the font to be either unicode or <builtin>				
+			// Set the font to be either unicode or FO_BUILTIN_NAME	
 			wstr[0] = cs;
-			if(strcmp(G.selfont->name, "<builtin>"))
+			if(strcmp(G.selfont->name, FO_BUILTIN_NAME))
 			{
 				wcs2utf8s((char *)ustr, (wchar_t *)wstr);
 			}
@@ -624,7 +625,7 @@ static void ui_draw_but_CHARTAB(uiBut *but)
 				}
 			}
 
-			if((G.selfont && strcmp(G.selfont->name, "<builtin>")) || (G.selfont && !strcmp(G.selfont->name, "<builtin>") && G.ui_international == TRUE))
+			if((G.selfont && strcmp(G.selfont->name, FO_BUILTIN_NAME)) || (G.selfont && !strcmp(G.selfont->name, FO_BUILTIN_NAME) && G.ui_international == TRUE))
 			{
 				float wid;
 				float llx, lly, llz, urx, ury, urz;
@@ -1355,6 +1356,7 @@ void ui_draw_but_CURVE(ARegion *ar, uiBut *but, uiWidgetColors *wcol, rcti *rect
 	CurveMapPoint *cmp;
 	float fx, fy, fac[2], zoomx, zoomy, offsx, offsy;
 	GLint scissor[4];
+	rcti scissor_new;
 	int a;
 
 	cumap= (CurveMapping *)(but->editcumap? but->editcumap: but->poin);
@@ -1362,7 +1364,12 @@ void ui_draw_but_CURVE(ARegion *ar, uiBut *but, uiWidgetColors *wcol, rcti *rect
 	
 	/* need scissor test, curve can draw outside of boundary */
 	glGetIntegerv(GL_VIEWPORT, scissor);
-	glScissor(ar->winrct.xmin + rect->xmin, ar->winrct.ymin+rect->ymin, rect->xmax-rect->xmin, rect->ymax-rect->ymin);
+	scissor_new.xmin= ar->winrct.xmin + rect->xmin;
+	scissor_new.ymin= ar->winrct.ymin + rect->ymin;
+	scissor_new.xmax= ar->winrct.xmin + rect->xmax;
+	scissor_new.ymax= ar->winrct.ymin + rect->ymax;
+	BLI_isect_rcti(&scissor_new, &ar->winrct, &scissor_new);
+	glScissor(scissor_new.xmin, scissor_new.ymin, scissor_new.xmax-scissor_new.xmin, scissor_new.ymax-scissor_new.ymin);
 	
 	/* calculate offset and zoom */
 	zoomx= (rect->xmax-rect->xmin-2.0*but->aspect)/(cumap->curr.xmax - cumap->curr.xmin);

@@ -24,14 +24,6 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-SET(SRC 
-	GPG_Application.cpp
-	GPG_Canvas.cpp
-	GPG_ghost.cpp
-	GPG_KeyboardDevice.cpp
-	GPG_System.cpp
-)
-
 SET(INC
 	.
 	../../../../intern/string
@@ -48,7 +40,6 @@ SET(INC
 	../../../../source/blender/blenkernel
 	../../../../source/blender/readblenfile
 	../../../../source/blender
-	../../../../source/blender/include
 	../../../../source/blender/makesdna
 	../../../../source/blender/makesrna
 	../../../../source/gameengine/Rasterizer
@@ -59,11 +50,18 @@ SET(INC
 	../../../../source/gameengine/Physics/common
 	../../../../source/gameengine/Network/LoopBackNetwork
 	../../../../source/gameengine/GamePlayer/common
-	../../../../source/blender/misc
 	../../../../source/blender/blenloader
 	../../../../source/blender/gpu
 	../../../../extern/glew/include
 	${PYTHON_INC}
+)
+
+SET(SRC 
+	GPG_Application.cpp
+	GPG_Canvas.cpp
+	GPG_ghost.cpp
+	GPG_KeyboardDevice.cpp
+	GPG_System.cpp
 )
 
 ADD_DEFINITIONS(-DGLEW_STATIC)

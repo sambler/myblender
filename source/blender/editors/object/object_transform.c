@@ -47,6 +47,7 @@
 #include "BKE_mesh.h"
 #include "BKE_object.h"
 #include "BKE_report.h"
+#include "BKE_multires.h"
 
 #include "RNA_define.h"
 #include "RNA_access.h"
@@ -390,7 +391,7 @@ static void ignore_parent_tx(Main *bmain, Scene *scene, Object *ob )
 	/* a change was made, adjust the children to compensate */
 	for(ob_child=bmain->object.first; ob_child; ob_child=ob_child->id.next) {
 		if(ob_child->parent == ob) {
-			object_apply_mat4(ob_child, ob_child->obmat);
+			object_apply_mat4(ob_child, ob_child->obmat, TRUE);
 			what_does_parent(scene, ob_child, &workob);
 			invert_m4_m4(ob_child->parentinv, workob.obmat);
 		}
@@ -491,6 +492,8 @@ static int apply_objects_internal(bContext *C, ReportList *reports, int apply_lo
 		if(ob->type==OB_MESH) {
 			me= ob->data;
 			
+			multiresModifier_scale_disp(scene, ob);
+			
 			/* adjust data */
 			mvert= me->mvert;
 			for(a=0; a<me->totvert; a++, mvert++)
@@ -574,7 +577,7 @@ static int visual_transform_apply_exec(bContext *C, wmOperator *UNUSED(op))
 	
 	CTX_DATA_BEGIN(C, Object*, ob, selected_editable_objects) {
 		where_is_object(scene, ob);
-		object_apply_mat4(ob, ob->obmat);
+		object_apply_mat4(ob, ob->obmat, TRUE);
 		where_is_object(scene, ob);
 		
 		change = 1;

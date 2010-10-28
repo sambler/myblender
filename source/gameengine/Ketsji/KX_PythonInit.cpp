@@ -36,11 +36,20 @@
 
 #ifndef DISABLE_PYTHON
 
+#ifdef _POSIX_C_SOURCE
+#undef _POSIX_C_SOURCE
+#endif
+
+#ifdef _XOPEN_SOURCE
+#undef _XOPEN_SOURCE
+#endif
+
+#include <Python.h>
+
 extern "C" {
 	#include "bpy_internal_import.h"  /* from the blender python api, but we want to import text too! */
 	#include "py_capi_utils.h"
 	#include "mathutils.h" // Blender.Mathutils module copied here so the blenderlayer can use.
-	#include "geometry.h" // Blender.Geometry module copied here so the blenderlayer can use.
 	#include "bgl.h"
 	#include "blf_api.h"
 

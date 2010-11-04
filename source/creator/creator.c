@@ -57,8 +57,7 @@
 
 #include "BLI_args.h"
 #include "BLI_threads.h"
-
-#include "GEN_messaging.h"
+#include "BLI_scanfill.h" // for BLI_setErrorCallBack, TODO, move elsewhere
 
 #include "DNA_ID.h"
 #include "DNA_scene_types.h"
@@ -80,7 +79,7 @@
 
 #include "IMB_imbuf.h"	// for IMB_init
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 #include "BPY_extern.h"
 #endif
 
@@ -97,7 +96,12 @@
 #include "GPU_extensions.h"
 
 /* for passing information between creator and gameengine */
+#ifdef WITH_GAMEENGINE
+#include "GEN_messaging.h"
 #include "SYS_System.h"
+#else /* dummy */
+#define SYS_SystemHandle int
+#endif
 
 #include <signal.h>
 
@@ -444,6 +448,9 @@ static int register_extension(int UNUSED(argc), char **UNUSED(argv), void *data)
 
 static int no_joystick(int UNUSED(argc), char **UNUSED(argv), void *data)
 {
+#ifndef WITH_GAMEENGINE
+	(void)data;
+#else
 	SYS_SystemHandle *syshandle = data;
 
 	/**
@@ -452,6 +459,7 @@ static int no_joystick(int UNUSED(argc), char **UNUSED(argv), void *data)
 	*/
 	SYS_WriteCommandLineInt(*syshandle, "nojoystick",1);
 	if (G.f & G_DEBUG) printf("disabling nojoystick\n");
+#endif
 
 	return 0;
 }
@@ -633,8 +641,13 @@ static int set_extension(int argc, char **argv, void *data)
 
 static int set_ge_parameters(int argc, char **argv, void *data)
 {
-	SYS_SystemHandle syshandle = *(SYS_SystemHandle*)data;
 	int a = 0;
+#ifdef WITH_GAMEENGINE
+	SYS_SystemHandle syshandle = *(SYS_SystemHandle*)data;
+#else
+	(void)data;
+#endif
+
 /**
 gameengine parameters are automaticly put into system
 -g [paramname = value]
@@ -655,7 +668,9 @@ example:
 			{
 				a++;
 				/* assignment */
+#ifdef WITH_GAMEENGINE
 				SYS_WriteCommandLineString(syshandle,paramname,argv[a]);
+#endif
 			}  else
 			{
 				printf("error: argument assignment (%s) without value.\n",paramname);
@@ -664,8 +679,9 @@ example:
 			/* name arg eaten */
 
 		} else {
+#ifdef WITH_GAMEENGINE
 			SYS_WriteCommandLineInt(syshandle,argv[a],1);
-
+#endif
 			/* doMipMap */
 			if (!strcmp(argv[a],"nomipmap"))
 			{
@@ -813,7 +829,7 @@ static int set_skip_frame(int argc, char **argv, void *data)
 }
 
 /* macro for ugly context setup/reset */
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 #define BPY_CTX_SETUP(_cmd) \
 { \
 	wmWindowManager *wm= CTX_wm_manager(C); \
@@ -831,11 +847,11 @@ static int set_skip_frame(int argc, char **argv, void *data)
 	CTX_data_scene_set(C, prevscene); \
 } \
 
-#endif /* DISABLE_PYTHON */
+#endif /* WITH_PYTHON */
 
 static int run_python(int argc, char **argv, void *data)
 {
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 	bContext *C = data;
 
 	/* workaround for scripts not getting a bpy.context.scene, causes internal errors elsewhere */
@@ -856,12 +872,12 @@ static int run_python(int argc, char **argv, void *data)
 	(void)argc; (void)argv; (void)data; /* unused */
 	printf("This blender was built without python support\n");
 	return 0;
-#endif /* DISABLE_PYTHON */
+#endif /* WITH_PYTHON */
 }
 
 static int run_python_console(int UNUSED(argc), char **argv, void *data)
 {
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 	bContext *C = data;	
 	const char *expr= "__import__('code').interact()";
 
@@ -872,7 +888,7 @@ static int run_python_console(int UNUSED(argc), char **argv, void *data)
 	(void)argv; (void)data; /* unused */
 	printf("This blender was built without python support\n");
 	return 0;
-#endif /* DISABLE_PYTHON */
+#endif /* WITH_PYTHON */
 }
 
 static int load_file(int UNUSED(argc), char **argv, void *data)
@@ -898,7 +914,7 @@ static int load_file(int UNUSED(argc), char **argv, void *data)
 		}
 
 		/* WM_read_file() runs normally but since we're in background mode do here */
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 		/* run any texts that were loaded in and flagged as modules */
 		BPY_load_user_modules(C);
 #endif
@@ -1077,8 +1093,12 @@ int main(int argc, char **argv)
 
 	IMB_init();
 
+#ifdef WITH_GAMEENGINE
 	syshandle = SYS_GetSystem();
 	GEN_init_messaging_system();
+#else
+	syshandle= 0;
+#endif
 
 	/* first test for background */
 	ba = BLI_argsInit(argc, argv); /* skip binary path */
@@ -1130,7 +1150,7 @@ int main(int argc, char **argv)
 
 		BLI_where_is_temp( btempdir, 0 ); /* call after loading the startup.blend so we can read U.tempdir */
 	}
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 	/**
 	 * NOTE: the U.pythondir string is NULL until WM_init() is executed,
 	 * so we provide the BPY_ function below to append the user defined

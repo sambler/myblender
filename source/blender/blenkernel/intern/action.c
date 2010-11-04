@@ -1134,10 +1134,9 @@ void what_does_obaction (Scene *UNUSED(scene), Object *ob, Object *myworkob, bPo
 		animsys_evaluate_action_group(&id_ptr, act, agrp, NULL, cframe);
 	}
 	else {
-		AnimData adt;
+		AnimData adt= {0};
 		
 		/* init animdata, and attach to workob */
-		memset(&adt, 0, sizeof(AnimData));
 		myworkob->adt= &adt;
 		
 		adt.recalc= ADT_RECALC_ANIM;

@@ -241,13 +241,14 @@ void wm_event_do_notifiers(bContext *C)
 			if(!G.rendering) {
 
 				/* depsgraph gets called, might send more notifiers */
-				ED_update_for_newframe(C, 1);
+				ED_update_for_newframe(CTX_data_main(C), win->screen->scene, win->screen, 1);
 			}
 		}
 	}
 	
 	/* the notifiers are sent without context, to keep it clean */
 	while( (note=wm_notifier_next(wm)) ) {
+		wmWindow *win;
 		
 		for(win= wm->windows.first; win; win= win->next) {
 			
@@ -363,9 +364,9 @@ int WM_operator_poll(bContext *C, wmOperatorType *ot)
 	wmOperatorTypeMacro *otmacro;
 	
 	for(otmacro= ot->macro.first; otmacro; otmacro= otmacro->next) {
-		wmOperatorType *ot2= WM_operatortype_find(otmacro->idname, 0);
+		wmOperatorType *ot_macro= WM_operatortype_find(otmacro->idname, 0);
 		
-		if(0==WM_operator_poll(C, ot2))
+		if(0==WM_operator_poll(C, ot_macro))
 			return 0;
 	}
 	
@@ -1635,7 +1636,7 @@ void wm_event_do_handlers(bContext *C)
 						int ncfra = sound_sync_scene(scene) * FPS + 0.5;
 						if(ncfra != scene->r.cfra)	{
 							scene->r.cfra = ncfra;
-							ED_update_for_newframe(C, 1);
+							ED_update_for_newframe(CTX_data_main(C), scene, win->screen, 1);
 							WM_event_add_notifier(C, NC_WINDOW, NULL);
 						}
 					}

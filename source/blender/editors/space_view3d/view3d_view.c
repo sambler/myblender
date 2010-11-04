@@ -56,7 +56,7 @@
 #include "ED_screen.h"
 #include "ED_armature.h"
 
-#if GAMEBLENDER == 1
+#ifdef WITH_GAMEENGINE
 #include "SYS_System.h"
 #endif
 
@@ -139,8 +139,12 @@ void view3d_settings_from_ob(Object *ob, float *ofs, float *quat, float *dist, f
 	}
 
 	if (dist) {
-		float vec[3] = {0.0f, 0.0f, -(*dist)};
 		float tquat[4];
+		float vec[3];
+
+		vec[0]= 0.0f;
+		vec[1]= 0.0f;
+		vec[2]= -(*dist);
 
 		mat4_to_quat(tquat, ob->obmat);
 
@@ -175,10 +179,9 @@ void smooth_view(bContext *C, Object *oldcamera, Object *camera, float *ofs, flo
 {
 	View3D *v3d = CTX_wm_view3d(C);
 	RegionView3D *rv3d= CTX_wm_region_view3d(C);
-	struct SmoothViewStore sms;
+	struct SmoothViewStore sms= {0};
 	
 	/* initialize sms */
-	memset(&sms,0,sizeof(struct SmoothViewStore));
 	copy_v3_v3(sms.new_ofs, rv3d->ofs);
 	copy_qt_qt(sms.new_quat, rv3d->viewquat);
 	sms.new_dist= rv3d->dist;
@@ -1205,6 +1208,11 @@ void setviewmatrixview3d(Scene *scene, View3D *v3d, RegionView3D *rv3d)
 			}
 			translate_m4( rv3d->viewmat,-vec[0], -vec[1], -vec[2]);
 		}
+		else if (v3d->ob_centre_cursor) {
+			float vec[3];
+			copy_v3_v3(vec, give_cursor(scene, v3d));
+			translate_m4(rv3d->viewmat, -vec[0], -vec[1], -vec[2]);
+		}
 		else translate_m4( rv3d->viewmat,rv3d->ofs[0], rv3d->ofs[1], rv3d->ofs[2]);
 	}
 }
@@ -1604,7 +1612,7 @@ void VIEW3D_OT_localview(wmOperatorType *ot)
 	ot->poll= ED_operator_view3d_active;
 }
 
-#if GAMEBLENDER == 1
+#ifdef WITH_GAMEENGINE
 
 static ListBase queue_back;
 static void SaveState(bContext *C)
@@ -1696,7 +1704,7 @@ void game_set_commmandline_options(GameData *gm)
 /* maybe we need this defined somewhere else */
 extern void StartKetsjiShell(struct bContext *C, struct ARegion *ar, rcti *cam_frame, int always_use_expand_framing);
 
-#endif // GAMEBLENDER == 1
+#endif // WITH_GAMEENGINE
 
 int game_engine_poll(bContext *C)
 {
@@ -1748,7 +1756,7 @@ int ED_view3d_context_activate(bContext *C)
 
 static int game_engine_exec(bContext *C, wmOperator *op)
 {
-#if GAMEBLENDER == 1
+#ifdef WITH_GAMEENGINE
 	Scene *startscene = CTX_data_scene(C);
 	ScrArea *sa, *prevsa= CTX_wm_area(C);
 	ARegion *ar, *prevar= CTX_wm_region(C);

@@ -1432,7 +1432,7 @@ static int viewselected_exec(bContext *C, wmOperator *UNUSED(op)) /* like a loca
 		}
 	}
 	else if (paint_facesel_test(ob)) {
-		ok= minmax_tface(ob, min, max);
+		ok= paintface_minmax(ob, min, max);
 	}
 	else if (ob && (ob->mode & OB_MODE_PARTICLE_EDIT)) {
 		ok= PE_minmax(scene, min, max);
@@ -2423,7 +2423,9 @@ static int set_3dcursor_invoke(bContext *C, wmOperator *UNUSED(op), wmEvent *eve
 		short depth_used = 0;
 
 		if (U.uiflag & USER_ORBIT_ZBUF) { /* maybe this should be accessed some other way */
-			short mval_depth[2] = {mx, my};
+			short mval_depth[2];
+			mval_depth[0]= mx;
+			mval_depth[1]= my;
 			view3d_operator_needs_opengl(C);
 			if (view_autodist(scene, ar, v3d, mval_depth, fp))
 				depth_used= 1;

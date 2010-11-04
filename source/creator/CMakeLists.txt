@@ -40,8 +40,6 @@ INCLUDE_DIRECTORIES(
 	../blender/makesdna
 	../blender/gpu
 	../blender/windowmanager
-	../kernel/gen_messaging
-	../kernel/gen_system
 )
 
 IF(WIN32)
@@ -74,9 +72,17 @@ ENDIF(WITH_IMAGE_HDR)
 
 IF(WITH_PYTHON)
 	INCLUDE_DIRECTORIES(../blender/python)
-ELSE(WITH_PYTHON)
-	ADD_DEFINITIONS(-DDISABLE_PYTHON)
+	ADD_DEFINITIONS(-DWITH_PYTHON)
 ENDIF(WITH_PYTHON)
+
+IF(WITH_GAMEENGINE)
+	INCLUDE_DIRECTORIES(
+		../kernel/gen_messaging
+		../kernel/gen_system
+	)
+
+	ADD_DEFINITIONS(-DWITH_GAMEENGINE)
+ENDIF(WITH_GAMEENGINE)
 
 IF(NOT WITH_SDL)
 	ADD_DEFINITIONS(-DDISABLE_SDL)
@@ -534,13 +540,13 @@ ENDIF(WITH_MOD_FLUID)
 		bf_intern_ctr 
 		bf_blroutines 
 		bf_converter 
-		bf_dummy 
+		bf_dummy
 		bf_bullet 
 		bf_intern_smoke
 		extern_minilzo
 		extern_lzma
-		bf_common 
 		bf_ketsji 
+		bf_common
 		bf_logic 
 		bf_rasterizer 
 		bf_oglrasterizer 

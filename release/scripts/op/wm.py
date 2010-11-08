@@ -632,7 +632,7 @@ class WM_OT_doc_edit(bpy.types.Operator):
 
     def draw(self, context):
         layout = self.layout
-        layout.label(text="Descriptor ID: '%s'" % props.doc_id)
+        layout.label(text="Descriptor ID: '%s'" % self.doc_id)
         layout.prop(self, "doc_new", text="")
 
     def invoke(self, context, event):
@@ -661,6 +661,7 @@ class WM_OT_properties_edit(bpy.types.Operator):
     '''Internal use (edit a property data_path)'''
     bl_idname = "wm.properties_edit"
     bl_label = "Edit Property"
+    bl_options = {'REGISTER'} # only because invoke_props_popup requires.
 
     data_path = rna_path
     property = rna_property
@@ -721,11 +722,7 @@ class WM_OT_properties_edit(bpy.types.Operator):
             self.description = prop_ui.get("description", "")
 
         wm = context.window_manager
-        # This crashes, TODO - fix
-        #return wm.invoke_props_popup(self, event)
-
-        wm.invoke_props_popup(self, event)
-        return {'RUNNING_MODAL'}
+        return wm.invoke_props_popup(self, event)
 
 
 class WM_OT_properties_add(bpy.types.Operator):

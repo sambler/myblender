@@ -70,7 +70,7 @@
 #include "BKE_shrinkwrap.h"
 #include "BKE_mesh.h"
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 #include "BPY_extern.h"
 #endif
 
@@ -1381,16 +1381,14 @@ static bConstraintTypeInfo CTI_LOCLIMIT = {
 static void rotlimit_evaluate (bConstraint *con, bConstraintOb *cob, ListBase *UNUSED(targets))
 {
 	bRotLimitConstraint *data = con->data;
-	float eul_zero[3]= {0.0f, 0.0f, 0.0f};
 	float loc[3];
 	float eul[3];
 	float size[3];
 	
 	copy_v3_v3(loc, cob->matrix[3]);
 	mat4_to_size(size, cob->matrix);
-	
-	/* use compat function because it uses the rotation without axis flipping [#24002] */
-	mat4_to_compatible_eulO(eul, eul_zero, cob->rotOrder, cob->matrix);
+
+	mat4_to_eulO(eul, cob->rotOrder, cob->matrix);
 
 	/* constraint data uses radians internally */
 	
@@ -1985,7 +1983,7 @@ static void pycon_id_looper (bConstraint *con, ConstraintIDFunc func, void *user
 /* Whether this approach is maintained remains to be seen (aligorith) */
 static void pycon_get_tarmat (bConstraint *con, bConstraintOb *cob, bConstraintTarget *ct, float UNUSED(ctime))
 {
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 	bPythonConstraint *data= con->data;
 #endif
 
@@ -2005,7 +2003,7 @@ static void pycon_get_tarmat (bConstraint *con, bConstraintOb *cob, bConstraintT
 		constraint_target_to_mat4(cob->scene, ct->tar, ct->subtarget, ct->matrix, CONSTRAINT_SPACE_WORLD, ct->space, con->headtail);
 		
 		/* only execute target calculation if allowed */
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 		if (G.f & G_SCRIPT_AUTOEXEC)
 			BPY_pyconstraint_target(data, ct);
 #endif
@@ -2016,7 +2014,7 @@ static void pycon_get_tarmat (bConstraint *con, bConstraintOb *cob, bConstraintT
 
 static void pycon_evaluate (bConstraint *con, bConstraintOb *cob, ListBase *targets)
 {
-#ifdef DISABLE_PYTHON
+#ifndef WITH_PYTHON
 	(void)con; (void)cob; (void)targets; /* unused */
 	return;
 #else
@@ -2036,7 +2034,7 @@ static void pycon_evaluate (bConstraint *con, bConstraintOb *cob, ListBase *targ
 	
 	/* Now, run the actual 'constraint' function, which should only access the matrices */
 	BPY_pyconstraint_eval(data, cob, targets);
-#endif /* DISABLE_PYTHON */
+#endif /* WITH_PYTHON */
 }
 
 static bConstraintTypeInfo CTI_PYTHON = {
@@ -3429,8 +3427,7 @@ static void shrinkwrap_get_tarmat (bConstraint *con, bConstraintOb *cob, bConstr
 		BVHTreeRayHit hit;
 		BVHTreeNearest nearest;
 		
-		BVHTreeFromMesh treeData;
-		memset(&treeData, 0, sizeof(treeData));
+		BVHTreeFromMesh treeData= {0};
 		
 		nearest.index = -1;
 		nearest.dist = FLT_MAX;
@@ -3812,6 +3809,10 @@ static void pivotcon_evaluate (bConstraint *con, bConstraintOb *cob, ListBase *t
 	
 	float pivot[3], vec[3];
 	float rotMat[3][3];
+
+	/* pivot correction */
+	float axis[3], angle;
+	float dvec[3];
 	
 	/* firstly, check if pivoting should take place based on the current rotation */
 	if (data->rotAxis != PIVOTCON_AXIS_NONE) {
@@ -3854,7 +3855,15 @@ static void pivotcon_evaluate (bConstraint *con, bConstraintOb *cob, ListBase *t
 	// TODO: perhaps we might want to include scaling based on the pivot too?
 	copy_m3_m4(rotMat, cob->matrix);
 	normalize_m3(rotMat);
-	
+
+
+	/* correct the pivot by the rotation axis otherwise the pivot translates when it shouldnt */
+	mat3_to_axis_angle(axis, &angle, rotMat);
+	sub_v3_v3v3(vec, pivot, cob->matrix[3]);
+	project_v3_v3v3(dvec, vec, axis);
+	sub_v3_v3(pivot, dvec);
+
+
 	/* perform the pivoting... */
 		/* 1. take the vector from owner to the pivot */
 	sub_v3_v3v3(vec, pivot, cob->matrix[3]);

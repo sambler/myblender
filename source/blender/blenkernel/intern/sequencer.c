@@ -610,6 +610,8 @@ void reload_sequence_new_file(Scene *scene, Sequence * seq, int lock_range)
 		}
 		seq->strip->len = seq->len;
 	case SEQ_SOUND:
+		if(!seq->sound)
+			return;
 		seq->len = ceil(AUD_getInfo(seq->sound->playback_handle).length * FPS);
 		seq->len -= seq->anim_startofs;
 		seq->len -= seq->anim_endofs;
@@ -2848,7 +2850,7 @@ int seq_test_overlap(ListBase * seqbasep, Sequence *test)
 }
 
 
-static void seq_translate(Scene *evil_scene, Sequence *seq, int delta)
+void seq_translate(Scene *evil_scene, Sequence *seq, int delta)
 {
 	seq_offset_animdata(evil_scene, seq, delta);
 	seq->start += delta;

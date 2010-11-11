@@ -199,12 +199,16 @@ short ED_fileselect_set_params(SpaceFile *sfile)
 			params->flag |= RNA_boolean_get(op->ptr, "autoselect") ? FILE_AUTOSELECT : 0;
 			params->flag |= RNA_boolean_get(op->ptr, "active_layer") ? FILE_ACTIVELAY : 0;
 		}
-
-		if(params->filter & (IMAGEFILE|MOVIEFILE))
-			params->display= FILE_IMGDISPLAY;
-		else
-			params->display= FILE_SHORTDISPLAY;
 		
+		if (U.uiflag & USER_SHOW_THUMBNAILS) {
+			if(params->filter & (IMAGEFILE|MOVIEFILE))
+				params->display= FILE_IMGDISPLAY;
+			else
+				params->display= FILE_SHORTDISPLAY;
+		} else {
+			params->display= FILE_SHORTDISPLAY;
+		}
+
 	} else {
 		/* default values, if no operator */
 		params->type = FILE_UNIX;
@@ -283,11 +287,72 @@ void ED_fileselect_layout_tilepos(FileLayout* layout, int tile, int *x, int *y)
 	}
 }
 
+/* Shorten a string to a given width w. 
+   If front is set, shorten from the front,
+   otherwise shorten from the end. */
+float file_shorten_string(char* string, float w, int front)
+{	
+	char temp[FILE_MAX];
+	short shortened = 0;
+	float sw = 0;
+	float pad = 0;
+
+	if (w <= 0) {
+		*string = '\0';
+		return 0.0;
+	}
+
+	sw = file_string_width(string);
+	if (front == 1) {
+		char *s = string;
+		BLI_strncpy(temp, "...", 4);
+		pad = file_string_width(temp);
+		while ((*s) && (sw+pad>w)) {
+			s++;
+			sw = file_string_width(s);
+			shortened = 1;
+		}
+		if (shortened) {
+			int slen = strlen(s);			
+			BLI_strncpy(temp+3, s, slen+1);
+			temp[slen+4] = '\0';
+			BLI_strncpy(string, temp, slen+4);
+		}
+	} else {
+		char *s = string;
+		while (sw>w) {
+			int slen = strlen(string);
+			string[slen-1] = '\0';
+			sw = file_string_width(s);
+			shortened = 1;
+		}
+
+		if (shortened) {
+			int slen = strlen(string);
+			if (slen > 3) {
+				BLI_strncpy(string+slen-3, "...", 4);				
+			}
+		}
+	}
+	
+	return sw;
+}
+
 float file_string_width(const char* str)
 {
 	uiStyle *style= U.uistyles.first;
 	uiStyleFontSet(&style->widget);
 	return BLF_width(style->widget.uifont_id, (char *)str);
+}
+
+/* gives the exact width of the string after being shortened to
+   the maximum width. Assumes shortening from the end of the string. */
+float file_string_width_shortened(const char* str, float width)
+{
+	char fname[FILE_MAXFILE];
+
+	BLI_strncpy(fname, str, FILE_MAXFILE);
+	return file_shorten_string(fname, width, 0 );
 }
 
 float file_font_pointsize()

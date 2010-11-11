@@ -674,7 +674,7 @@ static void default_get_tarmat (bConstraint *con, bConstraintOb *cob, bConstrain
 		ct= MEM_callocN(sizeof(bConstraintTarget), "tempConstraintTarget"); \
 		 \
 		ct->tar= datatar; \
-		strcpy(ct->subtarget, datasubtarget); \
+		BLI_strncpy(ct->subtarget, datasubtarget, sizeof(ct->subtarget)); \
 		ct->space= con->tarspace; \
 		ct->flag= CONSTRAINT_TAR_TEMP; \
 		 \
@@ -3462,7 +3462,9 @@ static void shrinkwrap_get_tarmat (bConstraint *con, bConstraintOb *cob, bConstr
 					BLI_bvhtree_find_nearest(treeData.tree, co, &nearest, treeData.nearest_callback, &treeData);
 					
 					dist = len_v3v3(co, nearest.co);
-					interp_v3_v3v3(co, co, nearest.co, (dist - scon->dist)/dist);	/* linear interpolation */
+					if(dist != 0.0f) {
+						interp_v3_v3v3(co, co, nearest.co, (dist - scon->dist)/dist);	/* linear interpolation */
+					}
 					space_transform_invert(&transform, co);
 				break;
 				

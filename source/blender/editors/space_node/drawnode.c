@@ -58,6 +58,8 @@
 
 #include "RNA_access.h"
 
+#include "ED_node.h"
+
 #include "WM_api.h"
 #include "WM_types.h"
 
@@ -169,16 +171,27 @@ static void node_buts_curvecol(uiLayout *layout, bContext *UNUSED(C), PointerRNA
 	uiTemplateCurveMapping(layout, ptr, "mapping", 'c', 0, 0);
 }
 
+static void node_normal_cb(bContext *C, void *ntree_v, void *node_v)
+{
+	Main *bmain = CTX_data_main(C);
+
+	ED_node_generic_update(bmain, ntree_v, node_v);
+	WM_event_add_notifier(C, NC_NODE|NA_EDITED, ntree_v);
+}
+
 static void node_buts_normal(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
 	uiBlock *block= uiLayoutAbsoluteBlock(layout);
+	bNodeTree *ntree= ptr->id.data;
 	bNode *node= ptr->data;
 	rctf *butr= &node->butr;
 	bNodeSocket *sock= node->outputs.first;		/* first socket stores normal */
+	uiBut *bt;
 	
-	uiDefButF(block, BUT_NORMAL, B_NODE_EXEC, "", 
+	bt= uiDefButF(block, BUT_NORMAL, B_NODE_EXEC, "", 
 			  (short)butr->xmin, (short)butr->xmin, butr->xmax-butr->xmin, butr->xmax-butr->xmin, 
 			  sock->ns.vec, 0.0f, 1.0f, 0, 0, "");
+	uiButSetFunc(bt, node_normal_cb, ntree, node);
 }
 #if 0 // not used in 2.5x yet
 static void node_browse_tex_cb(bContext *C, void *ntree_v, void *node_v)
@@ -198,7 +211,7 @@ static void node_browse_tex_cb(bContext *C, void *ntree_v, void *node_v)
 
 	node->id= &tex->id;
 	id_us_plus(node->id);
-	BLI_strncpy(node->name, node->id->name+2, 21);
+	BLI_strncpy(node->name, node->id->name+2, sizeof(node->name));
 	
 	nodeSetActive(ntree, node);
 	
@@ -285,7 +298,7 @@ static void node_browse_text_cb(bContext *C, void *ntree_v, void *node_v)
 	oldid= node->id;
 	node->id= BLI_findlink(&bmain->text, node->menunr-1);
 	id_us_plus(node->id);
-	BLI_strncpy(node->name, node->id->name+2, 21); /* huh? why 21? */
+	BLI_strncpy(node->name, node->id->name+2, sizeof(node->name));
 
 	node->custom1= BSET(node->custom1, NODE_DYNAMIC_NEW);
 	

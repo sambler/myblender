@@ -3224,10 +3224,12 @@ static int brush_add(PEData *data, short number)
 				point->flag |= PEP_TAG; /* signal for duplicate */
 			
 			framestep= pa->lifetime/(float)(pset->totaddkey-1);
-
+            
+            HairKey *myhkey;
+			
 			if(tree) {
 				ParticleData *ppa;
-				HairKey *myhkey;
+				
 				ParticleKey mykey[3];
 				KDTreeNearest ptn[3];
 				int w, maxw;
@@ -3262,7 +3264,7 @@ static int brush_add(PEData *data, short number)
 					mul_v3_fl(mykey[0].co, weight[0]);
 					
 					/* TODO: interpolatint the weight would be nicer */
-					mymhkey->weight= (ppa->hair+MIN2(k, ppa->totkey-1))->weight;
+					myhkey->weight= (ppa->hair+MIN2(k, ppa->totkey-1))->weight;
 					
 					if(maxw>1) {
 						mykey[1].time= mykey[0].time;
@@ -3997,7 +3999,7 @@ static void PE_create_particle_edit(Scene *scene, Object *ob, PointCache *cache,
 	ParticleSystemModifierData *psmd= (psys)? psys_get_modifier(ob, psys): NULL;
 	POINT_P; KEY_K;
 	ParticleData *pa = NULL;
-	HairKey *hkey;
+	HairKey *myhkey;
 	int totpoint;
 
 	/* no psmd->dm happens in case particle system modifier is not enabled */
@@ -4029,11 +4031,11 @@ static void PE_create_particle_edit(Scene *scene, Object *ob, PointCache *cache,
 				point->keys= MEM_callocN(point->totkey*sizeof(PTCacheEditKey),"ParticleEditKeys");
 				point->flag |= PEP_EDIT_RECALC;
 
-				hkey = pa->hair;
+				myhkey = pa->hair;
 				LOOP_KEYS {
-					key->co= hkey->co;
-					key->time= &hkey->time;
-					key->flag= hkey->editflag;
+					key->co= myhkey->co;
+					key->time= &myhkey->time;
+					key->flag= myhkey->editflag;
 					if(!(psys->flag & PSYS_GLOBAL_HAIR)) {
 						key->flag |= PEK_USE_WCO;
 						myhkey->editflag |= PEK_USE_WCO;

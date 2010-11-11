@@ -136,9 +136,12 @@ void psys_reset(ParticleSystem *psys, int mode)
 
 	if(ELEM(mode, PSYS_RESET_ALL, PSYS_RESET_DEPSGRAPH)) {
 		if(mode == PSYS_RESET_ALL || !(psys->flag & PSYS_EDITED)) {
-			psys_free_particles(psys);
+			/* don't free if not absolutely necessary */
+			if(psys->totpart != psys->part->totpart) {
+				psys_free_particles(psys);
+				psys->totpart= 0;
+			}
 
-			psys->totpart= 0;
 			psys->totkeyed= 0;
 			psys->flag &= ~(PSYS_HAIR_DONE|PSYS_KEYED);
 
@@ -1705,9 +1708,10 @@ void reset_particle(ParticleSimulationData *sim, ParticleData *pa, float dtime, 
 	r_phase = PSYS_FRAND(p + 20);
 	
 	if(part->from==PART_FROM_PARTICLE){
-		ParticleSimulationData tsim = {sim->scene, psys->target_ob ? psys->target_ob : ob, NULL, NULL};
 		float speed;
-
+		ParticleSimulationData tsim= {0};
+		tsim.scene= sim->scene;
+		tsim.ob= psys->target_ob ? psys->target_ob : ob;
 		tsim.psys = BLI_findlink(&tsim.ob->particlesystem, sim->psys->target_psys-1);
 
 		state.time = pa->time;
@@ -2057,12 +2061,14 @@ void psys_count_keyed_targets(ParticleSimulationData *sim)
 static void set_keyed_keys(ParticleSimulationData *sim)
 {
 	ParticleSystem *psys = sim->psys;
-	ParticleSimulationData ksim = {sim->scene, NULL, NULL, NULL};
+	ParticleSimulationData ksim= {0};
 	ParticleTarget *pt;
 	PARTICLE_P;
 	ParticleKey *key;
 	int totpart = psys->totpart, k, totkeys = psys->totkeyed;
 
+	ksim.scene= sim->scene;
+	
 	/* no proper targets so let's clear and bail out */
 	if(psys->totkeyed==0) {
 		free_keyed_keys(psys);
@@ -3747,14 +3753,14 @@ static void system_step(ParticleSimulationData *sim, float cfra)
 
 		/* simulation is only active during a specific period */
 		if(framenr < startframe) {
-			psys_reset(psys, PSYS_RESET_CACHE_MISS);
+			/* set correct particle state and reset particles */
+			cached_step(sim, cfra);
 			return;
 		}
 		else if(framenr > endframe) {
 			framenr= endframe;
 		}
-		
-		if(framenr == startframe) {
+		else if(framenr == startframe) {
 			BKE_ptcache_id_reset(sim->scene, use_cache, PTCACHE_RESET_OUTDATED);
 			BKE_ptcache_validate(cache, framenr);
 			cache->flag &= ~PTCACHE_REDO_NEEDED;
@@ -3989,7 +3995,7 @@ static int hair_needs_recalc(ParticleSystem *psys)
  * then advances in to actual particle calculations depending on particle type */
 void particle_system_update(Scene *scene, Object *ob, ParticleSystem *psys)
 {
-	ParticleSimulationData sim = {scene, ob, psys, NULL, NULL};
+	ParticleSimulationData sim= {0};
 	ParticleSettings *part = psys->part;
 	float cfra;
 
@@ -4000,6 +4006,10 @@ void particle_system_update(Scene *scene, Object *ob, ParticleSystem *psys)
 		return;
 
 	cfra= BKE_curframe(scene);
+
+	sim.scene= scene;
+	sim.ob= ob;
+	sim.psys= psys;
 	sim.psmd= psys_get_modifier(ob, psys);
 
 	/* system was already updated from modifier stack */

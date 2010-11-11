@@ -688,9 +688,10 @@ static int open_cancel(bContext *UNUSED(C), wmOperator *op)
 
 static int open_exec(bContext *C, wmOperator *op)
 {
-	SpaceImage *sima= CTX_wm_space_image(C);
+	SpaceImage *sima= CTX_wm_space_image(C); /* XXX other space types can call */
 	Scene *scene= CTX_data_scene(C);
 	Object *obedit= CTX_data_edit_object(C);
+	ImageUser *iuser= NULL;
 	PropertyPointerRNA *pprop;
 	PointerRNA idptr;
 	Image *ima= NULL;
@@ -724,11 +725,25 @@ static int open_exec(bContext *C, wmOperator *op)
 		RNA_property_pointer_set(&pprop->ptr, pprop->prop, idptr);
 		RNA_property_update(C, &pprop->ptr, pprop->prop);
 	}
-	else if(sima)
+	else if(sima) {
 		ED_space_image_set(C, sima, scene, obedit, ima);
+		iuser= &sima->iuser;
+	}
+	else {
+		Tex *tex= CTX_data_pointer_get_type(C, "texture", &RNA_Texture).data;
+		if(tex && tex->type==TEX_IMAGE)
+			iuser= &tex->iuser;
+		
+	}
+	
+	/* initialize because of new image */
+	if(iuser) {
+		iuser->sfra= 1;
+		iuser->offset= 0;
+		iuser->fie_ima= 2;
+	}
 
-	// XXX other users?
-	BKE_image_signal(ima, (sima)? &sima->iuser: NULL, IMA_SIGNAL_RELOAD);
+	BKE_image_signal(ima, iuser, IMA_SIGNAL_RELOAD);
 	WM_event_add_notifier(C, NC_IMAGE|NA_EDITED, ima);
 	
 	MEM_freeN(op->customdata);
@@ -738,7 +753,7 @@ static int open_exec(bContext *C, wmOperator *op)
 
 static int open_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 {
-	SpaceImage *sima= CTX_wm_space_image(C);
+	SpaceImage *sima= CTX_wm_space_image(C); /* XXX other space types can call */
 	char *path=U.textudir;
 	Image *ima= NULL;
 
@@ -769,6 +784,7 @@ static int open_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 	return OPERATOR_RUNNING_MODAL;
 }
 
+/* called by other space types too */
 void IMAGE_OT_open(wmOperatorType *ot)
 {
 	/* identifiers */
@@ -798,7 +814,7 @@ static int replace_exec(bContext *C, wmOperator *op)
 		return OPERATOR_CANCELLED;
 	
 	RNA_string_get(op->ptr, "filepath", str);
-	BLI_strncpy(sima->image->name, str, sizeof(sima->image->name)-1); /* we cant do much if the str is longer then 240 :/ */
+	BLI_strncpy(sima->image->name, str, sizeof(sima->image->name)); /* we cant do much if the str is longer then 240 :/ */
 
 	BKE_image_signal(sima->image, &sima->iuser, IMA_SIGNAL_RELOAD);
 	WM_event_add_notifier(C, NC_IMAGE|NA_EDITED, sima->image);
@@ -875,8 +891,15 @@ static void save_image_doit(bContext *C, SpaceImage *sima, Scene *scene, wmOpera
 			if(rr) {
 				RE_WriteRenderResult(rr, path, scene->r.quality);
 
+				BLI_strncpy(G.ima, path, sizeof(G.ima));
+
 				if(relative)
 					BLI_path_rel(path, G.main->name); /* only after saving */
+
+				if(ibuf->name[0]==0) {
+					BLI_strncpy(ibuf->name, path, sizeof(ibuf->name));
+					BLI_strncpy(ima->name, path, sizeof(ima->name));
+				}
 
 				if(!save_copy) {
 					if(do_newpath) {
@@ -894,10 +917,17 @@ static void save_image_doit(bContext *C, SpaceImage *sima, Scene *scene, wmOpera
 			BKE_image_release_renderresult(scene, ima);
 		}
 		else if (BKE_write_ibuf(scene, ibuf, path, sima->imtypenr, scene->r.subimtype, scene->r.quality)) {
+			
+			BLI_strncpy(G.ima, path, sizeof(G.ima));
 
 			if(relative)
 				BLI_path_rel(path, G.main->name); /* only after saving */
 
+			if(ibuf->name[0]==0) {
+				BLI_strncpy(ibuf->name, path, sizeof(ibuf->name));
+				BLI_strncpy(ima->name, path, sizeof(ima->name));
+			}
+			
 			if(!save_copy) {
 				if(do_newpath) {
 					BLI_strncpy(ima->name, path, sizeof(ima->name));
@@ -978,6 +1008,8 @@ static int save_as_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 	Image *ima = ED_space_image(sima);
 	Scene *scene= CTX_data_scene(C);
 	ImBuf *ibuf;
+	char filename[FILE_MAX];
+	
 	void *lock;
 
 	if(!RNA_property_is_set(op->ptr, "relative_path"))
@@ -1006,15 +1038,21 @@ static int save_as_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 		RNA_enum_set(op->ptr, "file_type", sima->imtypenr);
 		
 		if(ibuf->name[0]==0)
-			BLI_strncpy(ibuf->name, G.ima, FILE_MAX);
-
+			if ( (G.ima[0] == '/') && (G.ima[1] == '/') && (G.ima[2] == '\0') ) {
+				BLI_strncpy(filename, "//untitled", FILE_MAX);
+			} else {
+				BLI_strncpy(filename, G.ima, FILE_MAX);
+			}
+		else
+			BLI_strncpy(filename, ibuf->name, FILE_MAX);
+		
 		/* enable save_copy by default for render results */
 		if(ELEM(ima->type, IMA_TYPE_R_RESULT, IMA_TYPE_COMPOSITE) && !RNA_property_is_set(op->ptr, "copy")) {
 			RNA_boolean_set(op->ptr, "copy", TRUE);
 		}
 
 		// XXX note: we can give default menu enums to operator for this 
-		image_filesel(C, op, ibuf->name);
+		image_filesel(C, op, filename);
 
 		ED_space_image_release_buffer(sima, lock);
 		

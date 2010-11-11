@@ -39,7 +39,6 @@
 
 #ifndef WIN32
 	#include <unistd.h> // for read close
-	#include <sys/param.h> // for MAXPATHLEN
 #else
 	#include <io.h> // for open close read
 #include "winsock2.h"
@@ -1976,9 +1975,13 @@ static void direct_link_animdata(FileData *fd, AnimData *adt)
 	link_list(fd, &adt->nla_tracks);
 	direct_link_nladata(fd, &adt->nla_tracks);
 	
-	/* clear temp pointers that may have been set... */
-	// TODO: it's probably only a small cost to reload this anyway...
-	adt->actstrip= NULL;
+	/* relink active strip - even though strictly speaking this should only be used
+	 * if we're in 'tweaking mode', we need to be able to have this loaded back for
+	 * undo, but also since users may not exit tweakmode before saving (#24535)
+	 */
+	// TODO: it's not really nice that anyone should be able to save the file in this
+	//		state, but it's going to be too hard to enforce this single case...
+	adt->actstrip= newdataadr(fd, adt->actstrip);
 }	
 
 /* ************ READ MOTION PATHS *************** */
@@ -4155,7 +4158,6 @@ static void lib_link_scene(FileData *fd, Main *main)
 			sce->camera= newlibadr(fd, sce->id.lib, sce->camera);
 			sce->world= newlibadr_us(fd, sce->id.lib, sce->world);
 			sce->set= newlibadr(fd, sce->id.lib, sce->set);
-			sce->ima= newlibadr_us(fd, sce->id.lib, sce->ima);
 			sce->gpd= newlibadr_us(fd, sce->id.lib, sce->gpd);
 			
 			link_paint(fd, sce, &sce->toolsettings->sculpt->paint);
@@ -8163,7 +8165,6 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 			if(arm->layer==0) arm->layer= 1;
 		}
 		for(sce= main->scene.first; sce; sce= sce->id.next) {
-			if(sce->jumpframe==0) sce->jumpframe= 10;
 			if(sce->audio.mixrate==0) sce->audio.mixrate= 44100;
 
 			if(sce->r.xparts<2) sce->r.xparts= 4;
@@ -10338,31 +10339,6 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 					srgb_to_linearrgb_v3_v3(&wo->horr, &wo->horr);
 					srgb_to_linearrgb_v3_v3(&wo->zenr, &wo->zenr);
 					wo=wo->id.next;
-				}
-			}
-		}
-		/* clear hanging 'temp' screens from older 2.5 files*/
-		if (main->versionfile == 250) {
-			bScreen *screen, *nextscreen;
-			wmWindowManager *wm;
-			wmWindow *win, *nextwin;
-
-			for(screen= main->screen.first; screen; screen= nextscreen) {
-				nextscreen= screen->id.next;
-
-				if (screen->full == SCREENTEMP) {
-					/* remove corresponding windows */
-					for(wm= main->wm.first; wm; wm=wm->id.next) {
-						for(win= wm->windows.first; win; win=nextwin) {
-							nextwin= win->next;
-
-							if(newlibadr(fd, wm->id.lib, win->screen) == screen)
-								BLI_freelinkN(&wm->windows, win);
-						}
-					}
-
-					/* remove screen itself */
-					free_libblock(&main->screen, screen);
 				}
 			}
 		}

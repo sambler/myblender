@@ -1636,7 +1636,7 @@ static EditBone *add_editbonetolist(char *name, ListBase *list)
 {
 	EditBone *bone= MEM_callocN(sizeof(EditBone), "eBone");
 	
-	BLI_strncpy(bone->name, name, 32);
+	BLI_strncpy(bone->name, name, sizeof(bone->name));
 	unique_editbone_name(list, bone->name, NULL);
 	
 	BLI_addtail(list, bone);
@@ -1923,8 +1923,6 @@ static RetargetMode detectArcRetargetMode(RigArc *iarc)
 	{
 		mode = RETARGET_LENGTH;
 	}
-	
-	mode = RETARGET_AGGRESSIVE;
 	
 	return mode;
 }

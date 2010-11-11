@@ -180,6 +180,7 @@ void smooth_view(bContext *C, Object *oldcamera, Object *camera, float *ofs, flo
 	View3D *v3d = CTX_wm_view3d(C);
 	RegionView3D *rv3d= CTX_wm_region_view3d(C);
 	struct SmoothViewStore sms= {0};
+	short ok= FALSE;
 	
 	/* initialize sms */
 	copy_v3_v3(sms.new_ofs, rv3d->ofs);
@@ -269,18 +270,26 @@ void smooth_view(bContext *C, Object *oldcamera, Object *camera, float *ofs, flo
 			/* TIMER1 is hardcoded in keymap */
 			rv3d->smooth_timer= WM_event_add_timer(CTX_wm_manager(C), CTX_wm_window(C), TIMER1, 1.0/100.0);	/* max 30 frs/sec */
 			
-			return;
+			ok= TRUE;
 		}
 	}
 	
 	/* if we get here nothing happens */
-	if(sms.to_camera==0) {
-		copy_v3_v3(rv3d->ofs, sms.new_ofs);
-		copy_qt_qt(rv3d->viewquat, sms.new_quat);
-		rv3d->dist = sms.new_dist;
-		v3d->lens = sms.new_lens;
+	if(ok == FALSE) {
+		ARegion *ar= CTX_wm_region(C);
+
+		if(sms.to_camera==0) {
+			copy_v3_v3(rv3d->ofs, sms.new_ofs);
+			copy_qt_qt(rv3d->viewquat, sms.new_quat);
+			rv3d->dist = sms.new_dist;
+			v3d->lens = sms.new_lens;
+		}
+
+		if(rv3d->viewlock & RV3D_BOXVIEW)
+			view3d_boxview_copy(CTX_wm_area(C), ar);
+
+		ED_region_tag_redraw(ar);
 	}
-	ED_region_tag_redraw(CTX_wm_region(C));
 }
 
 /* only meant for timer usage */
@@ -346,6 +355,9 @@ static int view3d_smoothview_invoke(bContext *C, wmOperator *UNUSED(op), wmEvent
 		rv3d->dist = sms->new_dist*step + sms->orig_dist*step_inv;
 		v3d->lens = sms->new_lens*step + sms->orig_lens*step_inv;
 	}
+	
+	if(rv3d->viewlock & RV3D_BOXVIEW)
+		view3d_boxview_copy(CTX_wm_area(C), CTX_wm_region(C));
 	
 	WM_event_add_notifier(C, NC_SPACE|ND_SPACE_VIEW3D, v3d);
 	
@@ -1872,4 +1884,13 @@ void view3d_align_axis_to_vector(View3D *v3d, RegionView3D *rv3d, int axisidx, f
 int view3d_is_ortho(View3D *v3d, RegionView3D *rv3d)
 {
 	return (rv3d->persp == RV3D_ORTHO || (v3d->camera && ((Camera *)v3d->camera->data)->type == CAM_ORTHO));
+}
+
+float view3d_pixel_size(struct RegionView3D *rv3d, const float co[3])
+{
+	return  (rv3d->persmat[3][3] + (
+				rv3d->persmat[0][3]*co[0] +
+				rv3d->persmat[1][3]*co[1] +
+				rv3d->persmat[2][3]*co[2])
+			) * rv3d->pixsize;
 }

@@ -617,6 +617,7 @@ void WM_operator_properties_free(PointerRNA *ptr)
 	if(properties) {
 		IDP_FreeProperty(properties);
 		MEM_freeN(properties);
+		ptr->data= NULL; /* just incase */
 	}
 }
 
@@ -3005,7 +3006,8 @@ static int redraw_timer_exec(bContext *C, wmOperator *op)
 
 	for(a=0; a<iter; a++) {
 		if (type==0) {
-			ED_region_do_draw(C, ar);
+			if(ar)
+				ED_region_do_draw(C, ar);
 		} 
 		else if (type==1) {
 			wmWindow *win= CTX_wm_window(C);

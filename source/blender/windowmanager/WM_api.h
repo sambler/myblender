@@ -130,7 +130,7 @@ wmKeyMap	*WM_keymap_guess_opname(const struct bContext *C, char *opname);
 int			 WM_keymap_user_init(struct wmWindowManager *wm, struct wmKeyMap *keymap);
 wmKeyMap	*WM_keymap_copy_to_user(struct wmKeyMap *keymap);
 void		WM_keymap_restore_to_default(struct wmKeyMap *keymap);
-void		WM_keymap_properties_reset(struct wmKeyMapItem *kmi);
+void		WM_keymap_properties_reset(struct wmKeyMapItem *kmi, struct IDProperty *properties);
 void		WM_keymap_restore_item_to_default(struct bContext *C, struct wmKeyMap *keymap, struct wmKeyMapItem *kmi);
 
 wmKeyMapItem *WM_keymap_item_find_id(struct wmKeyMap *keymap, int id);
@@ -218,6 +218,7 @@ struct wmOperatorTypeMacro *WM_operatortype_macro_define(struct wmOperatorType *
 
 
 int			WM_operator_poll		(struct bContext *C, struct wmOperatorType *ot);
+int			WM_operator_poll_context(struct bContext *C, struct wmOperatorType *ot, int context);
 int			WM_operator_call		(struct bContext *C, struct wmOperator *op);
 int			WM_operator_repeat		(struct bContext *C, struct wmOperator *op);
 int			WM_operator_name_call	(struct bContext *C, const char *opstring, int context, struct PointerRNA *properties);

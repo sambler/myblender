@@ -34,6 +34,7 @@
 #include "DNA_armature_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
+#include "DNA_camera_types.h"
 
 #include "MEM_guardedalloc.h"
 
@@ -158,6 +159,7 @@ static void view3d_boxview_sync(ScrArea *sa, ARegion *ar)
 {
 	ARegion *artest;
 	RegionView3D *rv3d= ar->regiondata;
+	short clip= 0;
 
 	for(artest= sa->regionbase.first; artest; artest= artest->next) {
 		if(artest!=ar && artest->regiontype==RGN_TYPE_WINDOW) {
@@ -185,11 +187,16 @@ static void view3d_boxview_sync(ScrArea *sa, ARegion *ar)
 						rv3dtest->ofs[2]= rv3d->ofs[2];
 				}
 
+				clip |= rv3dtest->viewlock & RV3D_BOXCLIP;
+
 				ED_region_tag_redraw(artest);
 			}
 		}
 	}
-	view3d_boxview_clip(sa);
+
+	if(clip) {
+		view3d_boxview_clip(sa);
+	}
 }
 
 /* for home, center etc */
@@ -197,6 +204,7 @@ void view3d_boxview_copy(ScrArea *sa, ARegion *ar)
 {
 	ARegion *artest;
 	RegionView3D *rv3d= ar->regiondata;
+	short clip= 0;
 
 	for(artest= sa->regionbase.first; artest; artest= artest->next) {
 		if(artest!=ar && artest->regiontype==RGN_TYPE_WINDOW) {
@@ -206,17 +214,23 @@ void view3d_boxview_copy(ScrArea *sa, ARegion *ar)
 				rv3dtest->dist= rv3d->dist;
 				copy_v3_v3(rv3dtest->ofs, rv3d->ofs);
 				ED_region_tag_redraw(artest);
+
+				clip |= rv3dtest->viewlock & RV3D_BOXCLIP;
 			}
 		}
 	}
-	view3d_boxview_clip(sa);
+
+	if(clip) {
+		view3d_boxview_clip(sa);
+	}
 }
 
-void ED_view3d_quadview_update(ScrArea *sa, ARegion *ar)
+/* 'clip' is used to know if our clip setting has changed */
+void ED_view3d_quadview_update(ScrArea *sa, ARegion *ar, short do_clip)
 {
+	ARegion *arsync= NULL;
 	RegionView3D *rv3d= ar->regiondata;
 	short viewlock;
-
 	/* this function copies flags from the first of the 3 other quadview
 	   regions to the 2 other, so it assumes this is the region whose
 	   properties are always being edited, weak */
@@ -224,18 +238,30 @@ void ED_view3d_quadview_update(ScrArea *sa, ARegion *ar)
 
 	if((viewlock & RV3D_LOCKED)==0)
 		viewlock= 0;
-	else if((viewlock & RV3D_BOXVIEW)==0)
+	else if((viewlock & RV3D_BOXVIEW)==0) {
 		viewlock &= ~RV3D_BOXCLIP;
+		do_clip= TRUE;
+	}
 
 	for(; ar; ar= ar->prev) {
 		if(ar->alignment==RGN_ALIGN_QSPLIT) {
 			rv3d= ar->regiondata;
 			rv3d->viewlock= viewlock;
+
+			if(do_clip && (viewlock & RV3D_BOXCLIP)==0) {
+				rv3d->rflag &= ~RV3D_BOXCLIP;
+			}
+
+			/* use arsync so we sync with one of the aligned views below
+			 * else the view jumps on changing view settings like 'clip'
+			 * since it copies from the perspective view */
+			arsync= ar;
 		}
 	}
 
-	if(rv3d->viewlock & RV3D_BOXVIEW)
-		view3d_boxview_copy(sa, sa->regionbase.last);
+	if(rv3d->viewlock & RV3D_BOXVIEW) {
+		view3d_boxview_copy(sa, arsync ? arsync : sa->regionbase.last);
+	}
 
 	ED_area_tag_redraw(sa);
 }
@@ -731,16 +757,21 @@ static int viewrotate_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	/* switch from camera view when: */
 	if(vod->rv3d->persp != RV3D_PERSP) {
 
-		if (U.uiflag & USER_AUTOPERSP)
+		if (U.uiflag & USER_AUTOPERSP) {
 			vod->rv3d->persp= RV3D_PERSP;
+		}
 		else if(vod->rv3d->persp==RV3D_CAMOB) {
 
 			/* changed since 2.4x, use the camera view */
 			View3D *v3d = CTX_wm_view3d(C);
-			if(v3d->camera)
-				view3d_settings_from_ob(v3d->camera, rv3d->ofs, rv3d->viewquat, &rv3d->dist, NULL);
 
-			vod->rv3d->persp= RV3D_PERSP;
+			if(v3d->camera) {
+				view3d_settings_from_ob(v3d->camera, rv3d->ofs, rv3d->viewquat, &rv3d->dist, NULL);
+			}
+
+			if(vod->rv3d->persp==RV3D_CAMOB) {
+				vod->rv3d->persp= vod->rv3d->lpersp;
+			}
 		}
 		ED_region_tag_redraw(vod->ar);
 	}
@@ -1348,9 +1379,6 @@ static int view3d_all_exec(bContext *C, wmOperator *op) /* was view3d_home() in 
 	}
 // XXX	BIF_view3d_previewrender_signal(curarea, PR_DBASE|PR_DISPRECT);
 
-	if(rv3d->viewlock & RV3D_BOXVIEW)
-		view3d_boxview_copy(CTX_wm_area(C), ar);
-		
 	WM_event_add_notifier(C, NC_SPACE|ND_SPACE_VIEW3D, v3d);
 
 	return OPERATOR_FINISHED;
@@ -1366,7 +1394,7 @@ void VIEW3D_OT_view_all(wmOperatorType *ot)
 
 	/* api callbacks */
 	ot->exec= view3d_all_exec;
-	ot->poll= ED_operator_view3d_active;
+	ot->poll= ED_operator_region_view3d_active;
 
 	/* flags */
 	ot->flag= 0;
@@ -1492,9 +1520,9 @@ static int viewselected_exec(bContext *C, wmOperator *UNUSED(op)) /* like a loca
 		smooth_view(C, NULL, NULL, new_ofs, NULL, ok_dist ? &new_dist : NULL, NULL);
 	}
 
+	/* smooth view does viewlock RV3D_BOXVIEW copy */
+	
 // XXX	BIF_view3d_previewrender_signal(curarea, PR_DBASE|PR_DISPRECT);
-	if(rv3d->viewlock & RV3D_BOXVIEW)
-		view3d_boxview_copy(CTX_wm_area(C), ar);
 
 	return OPERATOR_FINISHED;
 }
@@ -1527,8 +1555,7 @@ static int viewcenter_cursor_exec(bContext *C, wmOperator *UNUSED(op))
 		negate_v3_v3(new_ofs, give_cursor(scene, v3d));
 		smooth_view(C, NULL, NULL, new_ofs, NULL, NULL, NULL);
 		
-		if (rv3d->viewlock & RV3D_BOXVIEW)
-			view3d_boxview_copy(CTX_wm_area(C), CTX_wm_region(C));
+		/* smooth view does viewlock RV3D_BOXVIEW copy */
 	}
 	
 	return OPERATOR_FINISHED;

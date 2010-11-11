@@ -825,6 +825,8 @@ int zbuffer_strands_abuf(Render *re, RenderPart *pa, APixstrand *apixbuf, ListBa
 
 	/* for all object instances */
 	for(myobi=re->instancetable.first, i=0; myobi; myobi=myobi->next, i++) {
+		Material *ma;
+
 		obr= myobi->obr;
 
 		if(!obr->strandbuf || !(obr->strandbuf->lay & lay))
@@ -835,6 +837,14 @@ int zbuffer_strands_abuf(Render *re, RenderPart *pa, APixstrand *apixbuf, ListBa
 			mul_m4_m4m4(obwinmat, myobi->mat, winmat);
 		else
 			copy_m4_m4(obwinmat, winmat);
+
+		/* test if we should skip it */
+		ma = obr->strandbuf->ma;
+
+		if(shadow && !(ma->mode & MA_SHADBUF))
+			continue;
+		else if(!shadow && (ma->mode & MA_ONLYCAST))
+			continue;
 
 		if(clip_render_object(myobi->obr->boundbox, bounds, winmat))
 			continue;

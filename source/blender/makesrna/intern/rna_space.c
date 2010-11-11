@@ -348,7 +348,18 @@ static void rna_RegionView3D_quadview_update(Main *main, Scene *scene, PointerRN
 
 	rna_area_region_from_regiondata(ptr, &sa, &ar);
 	if(sa && ar && ar->alignment==RGN_ALIGN_QSPLIT)
-		ED_view3d_quadview_update(sa, ar);
+		ED_view3d_quadview_update(sa, ar, FALSE);
+}
+
+/* same as above but call clip==TRUE */
+static void rna_RegionView3D_quadview_clip_update(Main *main, Scene *scene, PointerRNA *ptr)
+{
+	ScrArea *sa;
+	ARegion *ar;
+
+	rna_area_region_from_regiondata(ptr, &sa, &ar);
+	if(sa && ar && ar->alignment==RGN_ALIGN_QSPLIT)
+		ED_view3d_quadview_update(sa, ar, TRUE);
 }
 
 static void rna_RegionView3D_view_location_get(PointerRNA *ptr, float *values)
@@ -721,6 +732,18 @@ static void rna_Sequencer_display_mode_update(bContext *C, PointerRNA *ptr)
 	ED_sequencer_update_view(C, view);
 }
 
+static float rna_BackgroundImage_opacity_get(PointerRNA *ptr)
+{
+	BGpic *bgpic= (BGpic *)ptr->data;
+	return 1.0f-bgpic->blend;
+}
+
+static void rna_BackgroundImage_opacity_set(PointerRNA *ptr, float value)
+{
+	BGpic *bgpic= (BGpic *)ptr->data;
+	bgpic->blend = 1.0f - value;
+}
+
 #else
 
 static void rna_def_space(BlenderRNA *brna)
@@ -956,9 +979,10 @@ static void rna_def_background_image(BlenderRNA *brna)
 	RNA_def_property_range(prop, 0.0, FLT_MAX);
 	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_VIEW3D, NULL);
 	
-	prop= RNA_def_property(srna, "transparency", PROP_FLOAT, PROP_NONE);
+	prop= RNA_def_property(srna, "opacity", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "blend");
-	RNA_def_property_ui_text(prop, "Transparency", "Amount to blend the image against the background color");
+	RNA_def_property_float_funcs(prop, "rna_BackgroundImage_opacity_get", "rna_BackgroundImage_opacity_set", NULL);
+	RNA_def_property_ui_text(prop, "Opacity", "Image opacity to blend the image against the background color");
 	RNA_def_property_range(prop, 0.0, 1.0);
 	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_VIEW3D, NULL);
 
@@ -1233,7 +1257,7 @@ static void rna_def_space_view3d(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "use_box_clip", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "viewlock", RV3D_BOXCLIP);
 	RNA_def_property_ui_text(prop, "Clip", "Clip objects based on what's visible in other side views");
-	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_VIEW3D, "rna_RegionView3D_quadview_update");
+	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_VIEW3D, "rna_RegionView3D_quadview_clip_update");
 	
 	prop= RNA_def_property(srna, "perspective_matrix", PROP_FLOAT, PROP_MATRIX);
 	RNA_def_property_float_sdna(prop, NULL, "persmat");

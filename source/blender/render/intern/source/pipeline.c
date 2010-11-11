@@ -1247,6 +1247,9 @@ void RE_InitState(Render *re, Render *source, RenderData *rd, SceneRenderLayer *
 		return;
 	}
 
+	if((re->r.mode & (R_OSA))==0)
+		re->r.scemode &= ~R_FULL_SAMPLE;
+
 #ifdef WITH_OPENEXR
 	if(re->r.scemode & R_FULL_SAMPLE)
 		re->r.scemode |= R_EXR_TILE_FILE;	/* enable automatic */
@@ -1528,10 +1531,10 @@ static RenderPart *find_next_pano_slice(Render *re, int *minx, rctf *viewplane)
 			
 	if(best) {
 		float phi= panorama_pixel_rot(re);
-
+		/* R.disprect.xmax - R.disprect.xmin rather then R.winx for border render */
 		R.panodxp= (re->winx - (best->disprect.xmin + best->disprect.xmax) )/2;
-		R.panodxv= ((viewplane->xmax-viewplane->xmin)*R.panodxp)/(float)R.winx;
-		
+		R.panodxv= ((viewplane->xmax-viewplane->xmin)*R.panodxp)/(float)(R.disprect.xmax - R.disprect.xmin);
+
 		/* shift viewplane */
 		R.viewplane.xmin = viewplane->xmin + R.panodxv;
 		R.viewplane.xmax = viewplane->xmax + R.panodxv;
@@ -2524,6 +2527,12 @@ static void do_render_seq(Render * re)
 			/* 	if (R.rectz) freeN(R.rectz); */
 			/* 	R.rectz = BLI_dupallocN(ibuf->zbuf); */
 			/* } */
+
+			/* Same things as above, old rectf can hang around from previous render. */
+			if(rr->rectf) {
+				MEM_freeN(rr->rectf);
+				rr->rectf= NULL;
+			}
 		}
 		
 		if (recurs_depth == 0) { /* with nested scenes, only free on toplevel... */
@@ -2654,10 +2663,6 @@ int RE_is_rendering_allowed(Scene *scene, void *erh, void (*error)(void *handle,
 	
 	/* forbidden combinations */
 	if(scene->r.mode & R_PANORAMA) {
-		if(scene->r.mode & R_BORDER) {
-			error(erh, "No border supported for Panorama");
-			return 0;
-		}
 		if(scene->r.mode & R_ORTHO) {
 			error(erh, "No Ortho render possible for Panorama");
 			return 0;

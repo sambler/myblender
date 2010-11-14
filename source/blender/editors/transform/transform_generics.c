@@ -581,7 +581,7 @@ void recalcData(TransInfo *t)
 							BKE_nlatrack_add_strip(track, strip);
 							
 							tdn->nlt= track;
-							tdn->trackIndex += (n + 1); /* + 1, since n==0 would mean that we didn't change track */
+							tdn->trackIndex++;
 						}
 						else /* can't move any further */
 							break;
@@ -599,7 +599,7 @@ void recalcData(TransInfo *t)
 							BKE_nlatrack_add_strip(track, strip);
 							
 							tdn->nlt= track;
-							tdn->trackIndex -= (n - 1); /* - 1, since n==0 would mean that we didn't change track */
+							tdn->trackIndex--;
 						}
 						else /* can't move any further */
 							break;

@@ -56,7 +56,7 @@ ifdef NAN_BUILDINFO
     BUILDINFO_INC = -I$(SRCHOME)/blender/blenkernel
     BUILD_DATE := $(shell date "+%Y-%m-%d")
     BUILD_TIME := $(shell date "+%H:%M:%S")
-    BUILD_REV := 32991
+    BUILD_REV := 33052
 endif
 
 ############# set pyplayerlib ##################
@@ -265,6 +265,7 @@ PULIB += $(OCGDIR)/blender/ed_text/$(DEBUG_DIR)libed_text.a
 PULIB += $(OCGDIR)/blender/ed_logic/$(DEBUG_DIR)libed_logic.a
 PULIB += $(OCGDIR)/blender/ed_sequencer/$(DEBUG_DIR)libed_sequencer.a
 PULIB += $(OCGDIR)/blender/ed_file/$(DEBUG_DIR)libed_file.a
+PULIB += $(OCGDIR)/blender/ed_console/$(DEBUG_DIR)libed_console.a
 PULIB += $(OCGDIR)/blender/ed_info/$(DEBUG_DIR)libed_info.a
 PULIB += $(OCGDIR)/blender/ed_buttons/$(DEBUG_DIR)libed_buttons.a
 PULIB += $(OCGDIR)/blender/ed_graph/$(DEBUG_DIR)libed_graph.a
@@ -288,7 +289,6 @@ PULIB += $(OCGDIR)/blender/ed_datafiles/$(DEBUG_DIR)libed_datafiles.a
 PULIB += $(OCGDIR)/blender/ed_image/$(DEBUG_DIR)libed_image.a
 PULIB += $(OCGDIR)/blender/ed_uvedit/$(DEBUG_DIR)libed_uvedit.a
 PULIB += $(OCGDIR)/blender/ed_screen/$(DEBUG_DIR)libed_screen.a
-PULIB += $(OCGDIR)/blender/ed_console/$(DEBUG_DIR)libed_console.a
 PULIB += $(OCGDIR)/blender/ed_userpref/$(DEBUG_DIR)libed_userpref.a
 PULIB += $(OCGDIR)/blender/ed_gpencil/$(DEBUG_DIR)libed_gpencil.a
 PULIB += $(OCGDIR)/blender/ed_opsound/$(DEBUG_DIR)libed_opsound.a

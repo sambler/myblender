@@ -163,6 +163,11 @@ void RNA_def_camera(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Show Title Safe", "Show indicators for the title safe zone in Camera view");
 	RNA_def_property_update(prop, NC_OBJECT|ND_DRAW, NULL);
 
+	prop= RNA_def_property(srna, "show_thirds", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", CAM_SHOWTHIRDS);
+	RNA_def_property_ui_text(prop, "Show Thirds", "Show indicators for thirds areas in Camera View.");
+	RNA_def_property_update(prop, NC_OBJECT|ND_DRAW, NULL);
+
 	prop= RNA_def_property(srna, "show_name", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", CAM_SHOWNAME);
 	RNA_def_property_ui_text(prop, "Show Name", "Show the active Camera's name in Camera view");

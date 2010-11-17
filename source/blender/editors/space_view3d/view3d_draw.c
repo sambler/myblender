@@ -1002,6 +1002,27 @@ static void drawviewborder(Scene *scene, ARegion *ar, View3D *v3d)
 		uiDrawBox(GL_LINE_LOOP, x1, y1, x2, y2, 12.0);
 	}
 
+	/* thirds */
+	if (ca && (ca->flag & CAM_SHOWTHIRDS)) {
+		float x1third, x2third, y1third, y2third;
+		fac= 0.333333;
+		
+		a= fac*(x2-x1);
+		x1third= x1 + a;
+		x2third= x2 - a;
+		
+		a= fac*(y2-y1);
+		y1third= y1 + a;
+		y2third= y2 - a;
+		
+		UI_ThemeColorBlendShade(TH_REDALERT, TH_BACK, 0.25, 0);
+		
+		fdrawline(x1third,y1, x1third, y2);
+		fdrawline(x2third,y1, x2third, y2);
+		fdrawline(x1,y1third, x2,y1third);
+		fdrawline(x1,y2third, x2,y2third);
+	}
+
 	setlinestyle(0);
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 

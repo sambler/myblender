@@ -79,6 +79,7 @@
 #include "RNA_access.h"
 
 #include "UI_interface.h"
+#include "UI_interface_icons.h"
 
 #include "file_intern.h"
 #include "filelist.h"
@@ -345,16 +346,6 @@ float file_string_width(const char* str)
 	return BLF_width(style->widget.uifont_id, str);
 }
 
-/* gives the exact width of the string after being shortened to
-   the maximum width. Assumes shortening from the end of the string. */
-float file_string_width_shortened(const char* str, float width)
-{
-	char fname[FILE_MAXFILE];
-
-	BLI_strncpy(fname, str, FILE_MAXFILE);
-	return file_shorten_string(fname, width, 0 );
-}
-
 float file_font_pointsize()
 {
 	float s;
@@ -380,7 +371,7 @@ static void column_widths(struct FileList* files, struct FileLayout* layout)
 		if (file) {
 			int len;
 			len = file_string_width(file->relname);
-			if (len > layout->column_widths[COLUMN_NAME]) layout->column_widths[COLUMN_NAME] = len + 20;
+			if (len > layout->column_widths[COLUMN_NAME]) layout->column_widths[COLUMN_NAME] = len;
 			len = file_string_width(file->date);
 			if (len > layout->column_widths[COLUMN_DATE]) layout->column_widths[COLUMN_DATE] = len;
 			len = file_string_width(file->time);
@@ -452,11 +443,12 @@ void ED_fileselect_init_layout(struct SpaceFile *sfile, struct ARegion *ar)
 		column_widths(sfile->files, layout);
 
 		if (params->display == FILE_SHORTDISPLAY) {
-			maxlen = layout->column_widths[COLUMN_NAME] + 12 +
-					 layout->column_widths[COLUMN_SIZE];
-			maxlen += 20; // for icon
+			maxlen = ICON_DEFAULT_WIDTH + 4 +
+					 layout->column_widths[COLUMN_NAME] + 12 +
+					 layout->column_widths[COLUMN_SIZE] + 12;
 		} else {
-			maxlen = layout->column_widths[COLUMN_NAME] + 12 +
+			maxlen = ICON_DEFAULT_WIDTH + 4 +
+					 layout->column_widths[COLUMN_NAME] + 12 +
 #ifndef WIN32
 					 layout->column_widths[COLUMN_MODE1] + 12 +
 					 layout->column_widths[COLUMN_MODE2] + 12 +
@@ -465,8 +457,8 @@ void ED_fileselect_init_layout(struct SpaceFile *sfile, struct ARegion *ar)
 #endif
 					 layout->column_widths[COLUMN_DATE] + 12 +
 					 layout->column_widths[COLUMN_TIME] + 12 +
-					 layout->column_widths[COLUMN_SIZE];
-			maxlen += 20; // for icon
+					 layout->column_widths[COLUMN_SIZE] + 12;
+
 		}
 		layout->tile_w = maxlen;
 		if(layout->rows > 0)

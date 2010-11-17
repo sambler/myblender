@@ -4061,6 +4061,8 @@ void particle_system_update(Scene *scene, Object *ob, ParticleSystem *psys)
 				psys->flag |= PSYS_HAIR_DONE;
 				psys->recalc = recalc;
 			}
+			else if(psys->flag & PSYS_EDITED)
+				psys->flag |= PSYS_HAIR_DONE;
 
 			if(psys->flag & PSYS_HAIR_DONE)
 				hair_step(&sim, cfra);
@@ -4078,12 +4080,13 @@ void particle_system_update(Scene *scene, Object *ob, ParticleSystem *psys)
 				case PART_PHYS_KEYED:
 				{
 					PARTICLE_P;
+					float disp = (float)psys_get_current_display_percentage(psys)/100.0f;
 
 					/* Particles without dynamics haven't been reset yet because they don't use pointcache */
 					if(psys->recalc & PSYS_RECALC_RESET)
 						psys_reset(psys, PSYS_RESET_ALL);
 
-					if(emit_particles(&sim, NULL, cfra)) {
+					if(emit_particles(&sim, NULL, cfra) || (psys->recalc & PSYS_RECALC_RESET)) {
 						free_keyed_keys(psys);
 						distribute_particles(&sim, part->from);
 						initialize_all_particles(&sim);
@@ -4095,6 +4098,11 @@ void particle_system_update(Scene *scene, Object *ob, ParticleSystem *psys)
 							pa->size *= 1.0f - part->randsize * PSYS_FRAND(p + 1);
 
 						reset_particle(&sim, pa, 0.0, cfra);
+
+						if(PSYS_FRAND(p) > disp)
+							pa->flag |= PARS_NO_DISP;
+						else
+							pa->flag &= ~PARS_NO_DISP;
 					}
 
 					if(part->phystype == PART_PHYS_KEYED) {

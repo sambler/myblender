@@ -615,9 +615,18 @@ int BLI_path_frame_range(char *path, int sta, int end, int digits)
 
 	if (stringframe_chars(path, &ch_sta, &ch_end)) { /* warning, ch_end is the last # +1 */
 		char tmp[FILE_MAX], format[64];
+#if 0	// neat but breaks on non ascii strings.
 		sprintf(format, "%%.%ds%%.%dd_%%.%dd%%s", ch_sta, ch_end-ch_sta, ch_end-ch_sta); /* example result: "%.12s%.5d-%.5d%s" */
 		sprintf(tmp, format, path, sta, end, path+ch_end);
 		strcpy(path, tmp);
+#else
+		char *tmp_pt;
+		BLI_snprintf(format, sizeof(format), "%%.%dd-%%.%dd%%s", digits, digits);
+		memcpy(tmp, path, ch_sta * sizeof(char));
+		tmp_pt = &tmp[ch_sta];
+		tmp_pt += BLI_snprintf(tmp_pt, sizeof(tmp)-ch_sta, format, sta, end, &path[ch_end]);
+		memcpy(path, tmp, (int)(tmp_pt - tmp) + 1);
+#endif
 		return 1;
 	}
 	return 0;
@@ -845,7 +854,7 @@ static char *blender_version_decimal(void)
 	return version_str;
 }
 
-static int test_path(char *targetpath, char *path_base, char *path_sep, char *folder_name)
+static int test_path(char *targetpath, const char *path_base, const char *path_sep, const char *folder_name)
 {
 	char tmppath[FILE_MAX];
 	
@@ -869,7 +878,7 @@ static int test_path(char *targetpath, char *path_base, char *path_sep, char *fo
 	}
 }
 
-static int test_env_path(char *path, char *envvar)
+static int test_env_path(char *path, const char *envvar)
 {
 	char *env = envvar?getenv(envvar):NULL;
 	if (!env) return 0;
@@ -883,7 +892,7 @@ static int test_env_path(char *path, char *envvar)
 	}
 }
 
-static int get_path_local(char *targetpath, char *folder_name, char *subfolder_name)
+static int get_path_local(char *targetpath, const char *folder_name, const char *subfolder_name)
 {
 	extern char bprogname[]; /* argv[0] from creator.c */
 	char bprogdir[FILE_MAX];
@@ -909,7 +918,7 @@ static int get_path_local(char *targetpath, char *folder_name, char *subfolder_n
 	return 0;
 }
 
-static int get_path_user(char *targetpath, char *folder_name, char *subfolder_name, char *envvar)
+static int get_path_user(char *targetpath, const char *folder_name, const char *subfolder_name, const char *envvar)
 {
 	char user_path[FILE_MAX];
 	const char *user_base_path;
@@ -946,7 +955,7 @@ static int get_path_user(char *targetpath, char *folder_name, char *subfolder_na
 	}
 }
 
-static int get_path_system(char *targetpath, char *folder_name, char *subfolder_name, char *envvar)
+static int get_path_system(char *targetpath, const char *folder_name, const char *subfolder_name, const char *envvar)
 {
 	char system_path[FILE_MAX];
 	const char *system_base_path;
@@ -1013,7 +1022,7 @@ static int get_path_system(char *targetpath, char *folder_name, char *subfolder_
 
 /* get a folder out of the 'folder_id' presets for paths */
 /* returns the path if found, NULL string if not */
-char *BLI_get_folder(int folder_id, char *subfolder)
+char *BLI_get_folder(int folder_id, const char *subfolder)
 {
 	static char path[FILE_MAX] = "";
 	
@@ -1085,7 +1094,7 @@ char *BLI_get_folder(int folder_id, char *subfolder)
 	return path;
 }
 
-char *BLI_get_user_folder_notest(int folder_id, char *subfolder)
+char *BLI_get_user_folder_notest(int folder_id, const char *subfolder)
 {
 	static char path[FILE_MAX] = "";
 
@@ -1109,7 +1118,7 @@ char *BLI_get_user_folder_notest(int folder_id, char *subfolder)
 	return path;
 }
 
-char *BLI_get_folder_create(int folder_id, char *subfolder)
+char *BLI_get_folder_create(int folder_id, const char *subfolder)
 {
 	char *path;
 
@@ -1217,7 +1226,7 @@ void BLI_make_exist(char *dir) {
 	}
 }
 
-void BLI_make_existing_file(char *name)
+void BLI_make_existing_file(const char *name)
 {
 	char di[FILE_MAXDIR+FILE_MAXFILE], fi[FILE_MAXFILE];
 

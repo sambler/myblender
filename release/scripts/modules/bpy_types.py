@@ -660,6 +660,12 @@ class Operator(StructRNA, metaclass=OrderedMeta):
             return delattr(properties, attr)
         return super().__delattr__(attr)
 
+    def as_keywords(self, ignore=()):
+        """ Return a copy of the properties as a dictionary.
+        """
+        ignore = ignore + ("rna_type",)
+        return {attr: getattr(self, attr) for attr in self.properties.rna_type.properties.keys() if attr not in ignore}
+
 
 class Macro(StructRNA, metaclass=OrderedMeta):
     # bpy_types is imported before ops is defined
@@ -722,12 +728,6 @@ class _GenericUI:
 
 class Panel(StructRNA, _GenericUI, metaclass=RNAMeta):
     __slots__ = ()
-
-    @classmethod
-    def poll(cls, context):
-        # super class might not have a poll function, better be careful
-        cls = super()
-        return not hasattr(cls, "poll") or cls.poll(context)
 
 
 class Header(StructRNA, _GenericUI, metaclass=RNAMeta):

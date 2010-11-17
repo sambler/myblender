@@ -121,6 +121,7 @@ class DATA_PT_camera_display(CameraButtonsPanel, bpy.types.Panel):
         col.prop(cam, "show_limits", text="Limits")
         col.prop(cam, "show_mist", text="Mist")
         col.prop(cam, "show_title_safe", text="Title Safe")
+        col.prop(cam, "show_thirds", text="Thirds")
         col.prop(cam, "show_name", text="Name")
 
         col = split.column()

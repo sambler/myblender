@@ -93,7 +93,7 @@ static void rna_Armature_act_edit_bone_set(PointerRNA *ptr, PointerRNA value)
 	}
 }
 
-EditBone *rna_Armature_edit_bone_new(bArmature *arm, ReportList *reports, char *name)
+EditBone *rna_Armature_edit_bone_new(bArmature *arm, ReportList *reports, const char *name)
 {
 	if(arm->edbo==NULL) {
 		BKE_reportf(reports, RPT_ERROR, "Armature '%s' not in editmode, cant add an editbone.", arm->id.name+2);
@@ -785,6 +785,7 @@ static void rna_def_armature(BlenderRNA *brna)
 	RNA_def_property_enum_items(prop, prop_pose_position_items);
 	RNA_def_property_ui_text(prop, "Pose Position", "Show armature in binding pose or final posed state");
 	RNA_def_property_update(prop, 0, "rna_Armature_update_data");
+	RNA_def_property_flag(prop, PROP_LIB_EXCEPTION);
 	
 	prop= RNA_def_property(srna, "draw_type", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "drawtype");

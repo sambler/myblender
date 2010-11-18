@@ -95,15 +95,17 @@ static Nurb *curve_nurb_from_point(Curve *cu, const void *point, int *nu_index, 
 				break;
 			}
 		}
-	}	
-
-	if(nu_index) {
-		*nu_index= i;
 	}
 
-	if(pt_index) {
-		if(nu->type == CU_BEZIER)	*pt_index= (int)((BezTriple *)point - nu->bezt);
-		else						*pt_index= (int)((BPoint *)point - nu->bp);
+	if(nu) {
+		if(nu_index) {
+			*nu_index= i;
+		}
+	
+		if(pt_index) {
+			if(nu->type == CU_BEZIER)	*pt_index= (int)((BezTriple *)point - nu->bezt);
+			else						*pt_index= (int)((BPoint *)point - nu->bp);
+		}
 	}
 
 	return nu;
@@ -689,8 +691,7 @@ static void rna_def_bpoint(BlenderRNA *brna)
 
 	prop= RNA_def_property(srna, "radius", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "radius");
-	/*RNA_def_property_range(prop, 0.0f, 1.0f);*/
-	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+	RNA_def_property_range(prop, 0.0f, FLT_MAX);
 	RNA_def_property_ui_text(prop, "Bevel Radius", "Radius for bevelling");
 	RNA_def_property_update(prop, 0, "rna_Curve_update_data");
 
@@ -773,8 +774,7 @@ static void rna_def_beztriple(BlenderRNA *brna)
 
 	prop= RNA_def_property(srna, "radius", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "radius");
-	/*RNA_def_property_range(prop, 0.0f, 1.0f);*/
-	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+	RNA_def_property_range(prop, 0.0f, FLT_MAX);
 	RNA_def_property_ui_text(prop, "Bevel Radius", "Radius for bevelling");
 	RNA_def_property_update(prop, 0, "rna_Curve_update_data");
 

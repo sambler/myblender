@@ -5379,10 +5379,12 @@ static void draw_bounding_volume(Scene *scene, Object *ob)
 		bb= ob->bb ? ob->bb : ( (Curve *)ob->data )->bb;
 	}
 	else if(ob->type==OB_MBALL) {
-		bb= ob->bb;
-		if(bb==0) {
-			makeDispListMBall(scene, ob);
+		if(is_basis_mball(ob)) {
 			bb= ob->bb;
+			if(bb==0) {
+				makeDispListMBall(scene, ob);
+				bb= ob->bb;
+			}
 		}
 	}
 	else {
@@ -5462,8 +5464,10 @@ static void drawSolidSelect(Scene *scene, View3D *v3d, ARegion *ar, Base *base)
 			draw_index_wire= 1;
 		}
 	} else if (ob->type==OB_MBALL) {
-		if((base->flag & OB_FROMDUPLI)==0) 
-			drawDispListwire(&ob->disp);
+		if(is_basis_mball(ob)) {
+			if((base->flag & OB_FROMDUPLI)==0)
+				drawDispListwire(&ob->disp);
+		}
 	}
 	else if(ob->type==OB_ARMATURE) {
 		if(!(ob->mode & OB_MODE_POSE))
@@ -5523,7 +5527,9 @@ static void drawWireExtra(Scene *scene, RegionView3D *rv3d, Object *ob)
 				draw_index_wire= 1;
 		}
 	} else if (ob->type==OB_MBALL) {
-		drawDispListwire(&ob->disp);
+		if(is_basis_mball(ob)) {
+			drawDispListwire(&ob->disp);
+		}
 	}
 
 	glDepthMask(1);

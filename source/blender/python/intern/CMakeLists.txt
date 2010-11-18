@@ -1,4 +1,3 @@
-# $Id$
 # ***** BEGIN GPL LICENSE BLOCK *****
 #
 # This program is free software; you can redistribute it and/or
@@ -20,22 +19,41 @@
 #
 # The Original Code is: all of this file.
 #
-# Contributor(s): Jacques Beaurain.
+# Contributor(s): Jacques Beaurainm, Campbell Barton
 #
 # ***** END GPL LICENSE BLOCK *****
 
-SET(INC
-	.
-	../Dummy
+SET(INC 
+	../
+	../../blenlib
+	../../makesdna
+	../../makesrna
+	../../blenkernel
+	../../windowmanager
+	../../editors/include
+	../../../../intern/guardedalloc
+	../../../../intern/audaspace/intern
+	${PYTHON_INC}
 )
 
 SET(SRC
-	PHY_IMotionState.cpp
-	PHY_IController.cpp
-	PHY_IPhysicsController.cpp
-	PHY_IGraphicController.cpp
-	PHY_IPhysicsEnvironment.cpp
-	PHY_IVehicle.cpp
+	bpy.c
+	bpy_app.c
+	bpy_driver.c
+	bpy_interface.c
+	bpy_operator.c
+	bpy_operator_wrap.c
+	bpy_props.c
+	bpy_rna.c
+	bpy_rna_array.c
+	bpy_rna_callback.c
+	bpy_util.c
+	stubs.c
 )
 
-BLENDERLIB(ge_phys_common "${SRC}" "${INC}")
+# only to check if buildinfo is available
+IF(WITH_BUILDINFO)
+	ADD_DEFINITIONS(-DBUILD_DATE)
+ENDIF(WITH_BUILDINFO)
+
+BLENDERLIB(bf_python "${SRC}" "${INC}")

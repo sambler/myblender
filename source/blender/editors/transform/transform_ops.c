@@ -306,6 +306,7 @@ static int transformops_data(bContext *C, wmOperator *op, wmEvent *event)
 			op->customdata = t;
 		}
 		else {
+			postTrans(C, t);
 			MEM_freeN(t);
 		}
 	}

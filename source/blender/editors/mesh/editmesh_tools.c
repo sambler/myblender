@@ -1375,6 +1375,48 @@ void MESH_OT_delete(wmOperatorType *ot)
 	ot->prop= RNA_def_enum(ot->srna, "type", prop_mesh_delete_types, 10, "Type", "Method used for deleting mesh data");
 }
 
+static int delete_edgeloop_exec(bContext *C, wmOperator *op)
+{
+	PointerRNA opRNA;
+	int slideRes;
+	Object *obedit= CTX_data_edit_object(C);
+	EditMesh *em= BKE_mesh_get_editmesh((Mesh *)obedit->data);
+	wmOperatorType *ES_Op= WM_operatortype_find("TRANSFORM_OT_edge_slide", 1);
+	
+	WM_operator_properties_create_ptr(&opRNA, ES_Op);
+	RNA_float_set(&opRNA, "value", 1.0f);
+	slideRes= WM_operator_name_call(C, "TRANSFORM_OT_edge_slide", WM_OP_EXEC_DEFAULT, &opRNA);
+	if(slideRes != OPERATOR_CANCELLED) {
+		WM_operator_name_call(C, "MESH_OT_select_more", WM_OP_EXEC_DEFAULT, NULL);
+		WM_operator_name_call(C, "MESH_OT_remove_doubles", WM_OP_EXEC_DEFAULT, NULL);
+	} else {
+		BKE_report(op->reports, RPT_INFO, "Requires a single edge loop."); 
+	}
+	
+	WM_operator_properties_free(&opRNA);
+	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
+	
+	BKE_mesh_end_editmesh(obedit->data, em);
+	return OPERATOR_FINISHED;
+}
+
+void MESH_OT_delete_edgeloop(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name= "Delete Edge Loop";
+	ot->description= "Delete an edge loop by merging the faces on each side to a single face loop.";
+	ot->idname= "MESH_OT_delete_edgeloop";
+	
+	/* api callbacks */
+	ot->invoke= WM_menu_invoke;
+	ot->exec= delete_edgeloop_exec;
+	
+	ot->poll= ED_operator_editmesh;
+	
+	/* flags */
+	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+}
 
 /*GB*/
 /*-------------------------------------------------------------------------------*/

@@ -1631,6 +1631,8 @@ int initTransform(bContext *C, TransInfo *t, wmOperator *op, wmEvent *event, int
 		break;
 	case TFM_EDGE_SLIDE:
 		initEdgeSlide(t);
+		if(t->state == TRANS_CANCEL)
+			return 0;
 		break;
 	case TFM_BONE_ROLL:
 		initBoneRoll(t);
@@ -4766,7 +4768,11 @@ void initEdgeSlide(TransInfo *t)
 	t->mode = TFM_EDGE_SLIDE;
 	t->transform = EdgeSlide;
 	
-	createSlideVerts(t);
+	if(!createSlideVerts(t)) {
+		t->state= TRANS_CANCEL;
+		return;
+	}
+	
 	sld = t->customData;
 
 	if (!sld)

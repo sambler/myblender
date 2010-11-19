@@ -112,6 +112,7 @@ void ED_operatortypes_mesh(void)
 	WM_operatortype_append(MESH_OT_sort_faces);
 
 	WM_operatortype_append(MESH_OT_delete);
+	WM_operatortype_append(MESH_OT_delete_edgeloop);
 
 	WM_operatortype_append(MESH_OT_separate);
 	WM_operatortype_append(MESH_OT_dupli_extrude_cursor);

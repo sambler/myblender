@@ -23,19 +23,6 @@ import bpy
 from bpy.props import *
 from rna_prop_ui import rna_idprop_ui_prop_get, rna_idprop_ui_prop_clear
 
-
-#class MESH_OT_delete_edgeloop(bpy.types.Operator):
-#    '''Delete an edge loop by merging the faces on each side to a single face loop'''
-#    bl_idname = "mesh.delete_edgeloop"
-#    bl_label = "Delete Edge Loop"
-#
-#    def execute(self, context):
-#        bpy.ops.transform.edge_slide(value=1.0)
-#        bpy.ops.mesh.select_more()
-#        bpy.ops.mesh.remove_doubles()
-#
-#        return {'FINISHED'}
-
 rna_path_prop = StringProperty(name="Context Attributes",
         description="rna context string", maxlen=1024, default="")
 

@@ -5878,8 +5878,13 @@ void NDofTransform()
 
 	if (mode != 0)
 	{
-		initTransform(mode, CTX_NDOF);
-		Transform();
+		int retval= initTransform(mode, CTX_NDOF);
+		if(retval)
+			Transform();
+		else {
+			postTrans(C, t);
+			MEM_freeN(t);
+		}
 	}
 #endif
 }

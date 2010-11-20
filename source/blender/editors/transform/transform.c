@@ -4273,7 +4273,7 @@ static int createSlideVerts(TransInfo *t)
 			efa->e1->f1++;
 			if(efa->e1->f1 > 2) {
 				//BKE_report(op->reports, RPT_ERROR, "3+ face edge");
-				if(sld) MEM_freeN(sld);
+				MEM_freeN(sld);
 				return 0;
 			}
 		}
@@ -4282,7 +4282,7 @@ static int createSlideVerts(TransInfo *t)
 			efa->e2->f1++;
 			if(efa->e2->f1 > 2) {
 				//BKE_report(op->reports, RPT_ERROR, "3+ face edge");
-				if(sld) MEM_freeN(sld);
+				MEM_freeN(sld);
 				return 0;
 			}
 		}
@@ -4291,7 +4291,7 @@ static int createSlideVerts(TransInfo *t)
 			efa->e3->f1++;
 			if(efa->e3->f1 > 2) {
 				//BKE_report(op->reports, RPT_ERROR, "3+ face edge");
-				if(sld) MEM_freeN(sld);
+				MEM_freeN(sld);
 				return 0;
 			}
 		}
@@ -4300,14 +4300,14 @@ static int createSlideVerts(TransInfo *t)
 			efa->e4->f1++;
 			if(efa->e4->f1 > 2) {
 				//BKE_report(op->reports, RPT_ERROR, "3+ face edge");
-				if(sld) MEM_freeN(sld);
+				MEM_freeN(sld);
 				return 0;
 			}
 		}
 		// Make sure loop is not 2 edges of same face
 		if(ct > 1) {
 		   //BKE_report(op->reports, RPT_ERROR, "Loop crosses itself");
-			if(sld) MEM_freeN(sld);
+			MEM_freeN(sld);
 			return 0;
 		}
 	}
@@ -4320,7 +4320,7 @@ static int createSlideVerts(TransInfo *t)
 	// Test for multiple segments
 	if(vertsel > numsel+1) {
 		//BKE_report(op->reports, RPT_ERROR, "Please choose a single edge loop");
-		if(sld) MEM_freeN(sld);
+		MEM_freeN(sld);
 		return 0;
 	}
 
@@ -4357,7 +4357,7 @@ static int createSlideVerts(TransInfo *t)
 		if(timesthrough >= numsel*2) {
 			BLI_linklist_free(edgelist,NULL);
 			//BKE_report(op->reports, RPT_ERROR, "Could not order loop");
-			if(sld) MEM_freeN(sld);
+			MEM_freeN(sld);
 			return 0;
 		}
 	}
@@ -5886,11 +5886,11 @@ void NDofTransform()
 	{
 		int retval= initTransform(mode, CTX_NDOF);
 		if(retval)
-			Transform();
+		Transform();
 		else {
 			postTrans(C, t);
 			MEM_freeN(t);
-		}
+	}
 	}
 #endif
 }

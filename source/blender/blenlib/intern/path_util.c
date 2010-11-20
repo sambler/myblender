@@ -897,6 +897,9 @@ static int get_path_local(char *targetpath, const char *folder_name, const char 
 	extern char bprogname[]; /* argv[0] from creator.c */
 	char bprogdir[FILE_MAX];
 	char relfolder[FILE_MAX];
+#if __APPLE__
+	char osxprogfolder[FILE_MAX]; /* prevent osx extra test from messing with current tests */
+#endif
 	
 #ifdef PATH_DEBUG2
 	printf("get_path_local...\n");
@@ -910,6 +913,15 @@ static int get_path_local(char *targetpath, const char *folder_name, const char 
 	
 	/* use argv[0] (bprogname) to get the path to the executable */
 	BLI_split_dirfile(bprogname, bprogdir, NULL);
+#if __APPLE__
+	/* on osx EXECUTABLE_DIR is buried inside the .app bundle which is partially hidden by the finder
+		let's back up and allow the config to be in the same dir as the .app bundle.
+		blender exe is in blender.app/Contents/MacOS so up three gives us the app bundle's parent folder */
+	BLI_join_dirfile(osxprogfolder, bprogdir, "../../../");
+	if(test_path(targetpath, osxprogfolder, blender_version_decimal(), relfolder))
+		return 1;
+	/* if not there check normally */
+#endif /* __APPLE__ */
 	
 	/* try EXECUTABLE_DIR/2.5x/folder_name - new default directory for local blender installed files */
 	if(test_path(targetpath, bprogdir, blender_version_decimal(), relfolder))

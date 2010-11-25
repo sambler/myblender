@@ -115,24 +115,23 @@ class property_group_renderer(object):
 					supercontext=None, property_group=None):
 		"""Draw a column's worth of UI controls in this Panel"""
 		if type(control_list_item) is list:
-			do_split = False
+			draw_row = False
 			
 			found_percent = None
 			for sp in control_list_item:
 				if type(sp) is float:
 					found_percent = sp
 				elif type(sp) is list:
-					for ssp in control_list_item:
-						do_split = do_split and self.check_visibility(ssp,
+					for ssp in sp:
+						draw_row = draw_row or self.check_visibility(ssp,
 							property_group)
 				else:
-					do_split = do_split or self.check_visibility(sp,
+					draw_row = draw_row or self.check_visibility(sp,
 						property_group)
 			
-			if do_split:
+			if draw_row:
 				if found_percent is not None:
-					fp = {'percentage': found_percent}
-					splt = layout.split(**fp)
+					splt = layout.split(percentage=found_percent)
 				else:
 					splt = layout.row(True)
 				for sp in [s for s in control_list_item if type(s) in \

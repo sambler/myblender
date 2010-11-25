@@ -759,6 +759,7 @@ void uiDrawBlock(const bContext *C, uiBlock *block)
 	/* widgets */
 	for(but= block->buttons.first; but; but= but->next) {
 		ui_but_to_pixelrect(&rect, ar, block, but);
+		
 		if(!(but->flag & UI_HIDDEN) &&
 			/* XXX: figure out why invalid coordinates happen when closing render window */
 			/* and material preview is redrawn in main window (temp fix for bug #23848) */
@@ -2212,7 +2213,7 @@ static void ui_block_do_align_but(uiBut *first, int nr)
 
 		/* clear old flag */
 		but->flag &= ~UI_BUT_ALIGN;
-		
+			
 		if(flag==0) {	/* first case */
 			if(next) {
 				if(buts_are_horiz(but, next)) {
@@ -2261,14 +2262,19 @@ static void ui_block_do_align_but(uiBut *first, int nr)
 			else {	/* next button switches to new row */
 				
 				if(prev && buts_are_horiz(prev, but))
-				   flag |= UI_BUT_ALIGN_LEFT;
+					flag |= UI_BUT_ALIGN_LEFT;
+				else {
+					flag &= ~UI_BUT_ALIGN_LEFT;
+					flag |= UI_BUT_ALIGN_TOP;
+				}
 				
 				if( (flag & UI_BUT_ALIGN_TOP)==0) {	/* stil top row */
 					if(prev) {
-						if(next && buts_are_horiz(next, but))
-							flag = UI_BUT_ALIGN_DOWN|UI_BUT_ALIGN_LEFT;
-						else {
+						if(next && buts_are_horiz(but, next))
 							flag = UI_BUT_ALIGN_DOWN|UI_BUT_ALIGN_LEFT|UI_BUT_ALIGN_RIGHT;
+						else {
+							/* last button in top row */
+							flag = UI_BUT_ALIGN_DOWN|UI_BUT_ALIGN_LEFT;
 						}
 					}
 					else 
@@ -2303,6 +2309,10 @@ static void ui_block_do_align_but(uiBut *first, int nr)
 					/* the previous button is a single one in its row */
 					but->y2= (prev->y1+but->y2)/2.0;
 					prev->y1= but->y2;
+					
+					but->x1= prev->x1;
+					if(next && buts_are_horiz(but, next)==0)
+						but->x2= prev->x2;
 				}
 				else {
 					/* the previous button is not a single one in its row */

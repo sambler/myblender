@@ -360,7 +360,9 @@ EnumPropertyItem *rna_Actuator_type_itemf(bContext *C, PointerRNA *ptr, int *fre
 	Object *ob= NULL;
 	int totitem= 0;
 	
-	if (ptr->type == &RNA_Actuator) {
+	/* hardcoded exceptions, for these cases code below needs to find the id.data */
+	/* otherwise buttons never give all options for selected */
+	if (ptr->type==&RNA_Actuator || ptr->type==&RNA_ArmatureActuator || ptr->type==&RNA_ShapeActionActuator) {
 		ob = (Object *)ptr->id.data;
 	} else {
 		/* can't use ob from ptr->id.data because that enum is also used by operators */
@@ -669,7 +671,7 @@ static void rna_def_object_actuator(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Loc", "Sets the location");
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 
-	prop= RNA_def_property(srna, "offset_rotation", PROP_FLOAT, PROP_XYZ);
+	prop= RNA_def_property(srna, "offset_rotation", PROP_FLOAT, PROP_EULER);
 	RNA_def_property_float_sdna(prop, NULL, "drot");
 	RNA_def_property_array(prop, 3);
 	RNA_def_property_ui_range(prop, -10000.0, 10000.0, 10, 2);

@@ -585,12 +585,12 @@ void WM_operator_properties_alloc(PointerRNA **ptr, IDProperty **properties, con
 
 }
 
-void WM_operator_properties_sanitize(PointerRNA *ptr, int val)
+void WM_operator_properties_sanitize(PointerRNA *ptr, const short no_context)
 {
 	RNA_STRUCT_BEGIN(ptr, prop) {
 		switch(RNA_property_type(prop)) {
 		case PROP_ENUM:
-			if (val)
+			if (no_context)
 				RNA_def_property_flag(prop, PROP_ENUM_NO_CONTEXT);
 			else
 				RNA_def_property_clear_flag(prop, PROP_ENUM_NO_CONTEXT);
@@ -602,7 +602,7 @@ void WM_operator_properties_sanitize(PointerRNA *ptr, int val)
 				/* recurse into operator properties */
 				if (RNA_struct_is_a(ptype, &RNA_OperatorProperties)) {
 					PointerRNA opptr = RNA_property_pointer_get(ptr, prop);
-					WM_operator_properties_sanitize(&opptr, val);
+					WM_operator_properties_sanitize(&opptr, no_context);
 				}
 				break;
 			}
@@ -2041,7 +2041,7 @@ static void WM_OT_quit_blender(wmOperatorType *ot)
 /* *********************** */
 #if defined(WIN32)
 static int console= 1;
-void WM_toggle_console(bContext *C, short show)
+void WM_toggle_console(bContext *UNUSED(C), short show)
 {
 	if(show) {
 		ShowWindow(GetConsoleWindow(),SW_SHOW);
@@ -2053,7 +2053,7 @@ void WM_toggle_console(bContext *C, short show)
 	}
 }
 
-static int wm_toggle_console_op(bContext *C, wmOperator *op)
+static int wm_toggle_console_op(bContext *C, wmOperator *UNUSED(op))
 {
 	if(console) {
 		WM_toggle_console(C, 0);
@@ -3426,11 +3426,9 @@ void wm_window_keymap(wmKeyConfig *keyconf)
 /* Generic itemf's for operators that take library args */
 static EnumPropertyItem *rna_id_itemf(bContext *UNUSED(C), PointerRNA *UNUSED(ptr), int *free, ID *id, int local)
 {
-	EnumPropertyItem *item= NULL, item_tmp;
+	EnumPropertyItem item_tmp= {0}, *item= NULL;
 	int totitem= 0;
 	int i= 0;
-
-	memset(&item_tmp, 0, sizeof(item_tmp));
 
 	for( ; id; id= id->next) {
 		if(local==FALSE || id->lib==NULL) {

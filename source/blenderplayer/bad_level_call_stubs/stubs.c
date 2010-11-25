@@ -139,6 +139,7 @@ void WM_menutype_free(void){}
 void WM_menutype_freelink(struct MenuType* mt){}
 int WM_menutype_add(struct MenuType *mt) {return 0;}
 int WM_operator_props_dialog_popup (struct bContext *C, struct wmOperator *op, int width, int height){return 0;}
+int WM_operator_confirm(struct bContext *C, struct wmOperator *op, struct wmEvent *event){return 0;}
 struct MenuType *WM_menutype_find(const char *idname, int quiet){return (struct MenuType *) NULL;}
 void WM_operator_stack_clear(struct bContext *C) {}
 
@@ -362,6 +363,7 @@ int WM_operator_props_popup(struct bContext *C, struct wmOperator *op, struct wm
 void WM_operator_properties_free(struct PointerRNA *ptr){}
 void WM_operator_properties_create(struct PointerRNA *ptr, const char *opstring){}
 void WM_operator_properties_create_ptr(struct PointerRNA *ptr, struct wmOperatorType *ot){}
+void WM_operator_properties_sanitize(struct PointerRNA *ptr, const short no_context){};
 void WM_operatortype_append_ptr(void (*opfunc)(struct wmOperatorType*, void*), void *userdata){}
 void WM_operatortype_append_macro_ptr(void (*opfunc)(struct wmOperatorType*, void*), void *userdata){}
 void WM_operator_bl_idname(char *to, const char *from){}

@@ -677,6 +677,7 @@ ELSEIF(WIN32)
 	# used in many places so include globally, like OpenGL
 	INCLUDE_DIRECTORIES(${PTHREADS_INC})
 
+ELSEIF(APPLE)
     IF(${CMAKE_GENERATOR} MATCHES "Xcode")
         set(CMAKE_XCODE_ATTRIBUTE_GCC_VERSION "com.apple.compilers.llvmgcc42")
         #set(CMAKE_XCODE_ATTRIBUTE_GCC_VERSION "4.2")
@@ -693,7 +694,7 @@ ELSEIF(WIN32)
         #set(CMAKE_XCODE_ATTRIBUTE_
         
     ENDIF(${CMAKE_GENERATOR} MATCHES "Xcode")
-    
+
 	IF(WITH_LIBS10.5)
 		SET(LIBDIR ${CMAKE_SOURCE_DIR}/../lib/darwin-9.x.universal)
 	ELSE(WITH_LIBS10.5)

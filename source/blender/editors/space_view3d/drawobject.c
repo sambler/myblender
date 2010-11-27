@@ -2509,7 +2509,7 @@ static void draw_mesh_fancy(Scene *scene, ARegion *ar, View3D *v3d, RegionView3D
 	else if(dt==OB_WIRE || totface==0) {
 		draw_wire = 1; /* draw wire only, no depth buffer stuff  */
 	}
-	else if(	(is_paint_sel && (ob->mode & OB_MODE_TEXTURE_PAINT)) ||
+	else if(	(is_paint_sel || (ob==OBACT && ob->mode & OB_MODE_TEXTURE_PAINT)) ||
 				CHECK_OB_DRAWTEXTURE(v3d, dt))
 	{
 		if ((v3d->flag&V3D_SELECT_OUTLINE) && ((v3d->flag2 & V3D_RENDER_OVERRIDE)==0) && (base->flag&SELECT) && !(G.f&G_PICKSEL || is_paint_sel) && !draw_wire) {
@@ -4105,8 +4105,8 @@ static void draw_ptcache_edit(Scene *scene, View3D *v3d, PTCacheEdit *edit)
 	glEnableClientState(GL_VERTEX_ARRAY);
 	glEnableClientState(GL_COLOR_ARRAY);
 
-	glEnable(GL_COLOR_MATERIAL);
 	glColorMaterial(GL_FRONT_AND_BACK, GL_DIFFUSE);
+	glEnable(GL_COLOR_MATERIAL);
 	glShadeModel(GL_SMOOTH);
 
 	if(pset->brushtype == PE_BRUSH_WEIGHT) {

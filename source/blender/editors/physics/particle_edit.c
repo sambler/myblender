@@ -30,6 +30,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
+#include <assert.h>
 
 #include "MEM_guardedalloc.h"
 
@@ -369,8 +370,18 @@ static void PE_set_view3d_data(bContext *C, PEData *data)
 	/* note, the object argument means the modelview matrix does not account for the objects matrix, use viewmat rather then (obmat * viewmat) */
 	view3d_get_transformation(data->vc.ar, data->vc.rv3d, NULL, &data->mats);
 
-	if((data->vc.v3d->drawtype>OB_WIRE) && (data->vc.v3d->flag & V3D_ZBUF_SELECT))
-		view3d_validate_backbuf(&data->vc);
+	if((data->vc.v3d->drawtype>OB_WIRE) && (data->vc.v3d->flag & V3D_ZBUF_SELECT)) {
+		if(data->vc.v3d->flag & V3D_INVALID_BACKBUF) {
+			/* needed or else the draw matrix can be incorrect */
+			view3d_operator_needs_opengl(C);
+
+			view3d_validate_backbuf(&data->vc);
+			/* we may need to force an update here by setting the rv3d as dirty
+			 * for now it seems ok, but take care!:
+			 * rv3d->depths->dirty = 1; */
+			view3d_update_depths(data->vc.ar);
+		}
+	}
 }
 
 /*************************** selection utilities *******************************/
@@ -397,14 +408,23 @@ static int key_test_depth(PEData *data, float co[3])
 	x=wco[0];
 	y=wco[1];
 
+#if 0 /* works well but too slow on some systems [#23118] */
 	x+= (short)data->vc.ar->winrct.xmin;
 	y+= (short)data->vc.ar->winrct.ymin;
 
 	/* PE_set_view3d_data calls this. no need to call here */
 	/* view3d_validate_backbuf(&data->vc); */
 	glReadPixels(x, y, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &depth);
+#else /* faster to use depths, these are calculated in PE_set_view3d_data */
+	{
+		ViewDepths *vd = data->vc.rv3d->depths;
+		assert(vd && vd->depths);
+		/* we know its not clipped */
+		depth= vd->depths[y * vd->w + x];
+	}
+#endif
 
-	if((float)uz - 0.0001 > depth)
+	if((float)uz - 0.00001 > depth)
 		return 0;
 	else
 		return 1;
@@ -1467,8 +1487,6 @@ static int select_linked_exec(bContext *C, wmOperator *op)
 	mval[0]= location[0];
 	mval[1]= location[1];
 
-	view3d_operator_needs_opengl(C);
-
 	PE_set_view3d_data(C, &data);
 	data.mval= mval;
 	data.rad=75.0f;
@@ -1590,12 +1608,17 @@ int PE_lasso_select(bContext *C, short mcords[][2], short moves, short extend, s
 	float co[3], mat[4][4];
 	short vertco[2];
 
+	PEData data;
+
 	if(!PE_start_edit(edit))
 		return OPERATOR_CANCELLED;
 
 	if (extend == 0 && select)
 		PE_deselect_all_visible(edit);
-	
+
+	/* only for depths */
+	PE_set_view3d_data(C, &data);
+
 	unit_m4(mat);
 
 	LOOP_VISIBLE_POINTS {
@@ -1607,7 +1630,7 @@ int PE_lasso_select(bContext *C, short mcords[][2], short moves, short extend, s
 				VECCOPY(co, key->co);
 				mul_m4_v3(mat, co);
 				project_short(ar, co, vertco);
-				if((vertco[0] != IS_CLIPPED) && lasso_inside(mcords,moves,vertco[0],vertco[1])) {
+				if((vertco[0] != IS_CLIPPED) && lasso_inside(mcords,moves,vertco[0],vertco[1]) && key_test_depth(&data, co)) {
 					if(select && !(key->flag & PEK_SELECT)) {
 						key->flag |= PEK_SELECT;
 						point->flag |= PEP_EDIT_RECALC;
@@ -1625,7 +1648,7 @@ int PE_lasso_select(bContext *C, short mcords[][2], short moves, short extend, s
 			VECCOPY(co, key->co);
 			mul_m4_v3(mat, co);
 			project_short(ar, co,vertco);
-			if((vertco[0] != IS_CLIPPED) && lasso_inside(mcords,moves,vertco[0],vertco[1])) {
+			if((vertco[0] != IS_CLIPPED) && lasso_inside(mcords,moves,vertco[0],vertco[1]) && key_test_depth(&data, co)) {
 				if(select && !(key->flag & PEK_SELECT)) {
 					key->flag |= PEK_SELECT;
 					point->flag |= PEP_EDIT_RECALC;
@@ -3323,6 +3346,9 @@ typedef struct BrushEdit {
 
 	int first;
 	int lastmouse[2];
+
+	/* optional cached view settings to avoid setting on every mousemove */
+	PEData data;
 } BrushEdit;
 
 static int brush_edit_init(bContext *C, wmOperator *op)
@@ -3346,6 +3372,9 @@ static int brush_edit_init(bContext *C, wmOperator *op)
 	bedit->scene= scene;
 	bedit->ob= ob;
 	bedit->edit= edit;
+
+	/* cache view depths and settings for re-use */
+	PE_set_view3d_data(C, &bedit->data);
 
 	return 1;
 }
@@ -3394,6 +3423,7 @@ static void brush_edit_apply(bContext *C, wmOperator *op, PointerRNA *itemptr)
 	if(((pset->brushtype == PE_BRUSH_ADD) ?
 		(sqrt(dx * dx + dy * dy) > pset->brush[PE_BRUSH_ADD].step) : (dx != 0 || dy != 0))
 		|| bedit->first) {
+		PEData data= bedit->data;
 
 		view3d_operator_needs_opengl(C);
 		selected= (short)count_selected_keys(scene, edit);
@@ -3401,9 +3431,6 @@ static void brush_edit_apply(bContext *C, wmOperator *op, PointerRNA *itemptr)
 		switch(pset->brushtype) {
 			case PE_BRUSH_COMB:
 			{
-				PEData data;
-
-				PE_set_view3d_data(C, &data);
 				data.mval= mval;
 				data.rad= (float)brush->size;
 
@@ -3423,10 +3450,7 @@ static void brush_edit_apply(bContext *C, wmOperator *op, PointerRNA *itemptr)
 			}
 			case PE_BRUSH_CUT:
 			{
-				PEData data;
-				
 				if(edit->psys && edit->pathcache) {
-					PE_set_view3d_data(C, &data);
 					data.mval= mval;
 					data.rad= (float)brush->size;
 					data.cutfac= brush->strength;
@@ -3447,9 +3471,6 @@ static void brush_edit_apply(bContext *C, wmOperator *op, PointerRNA *itemptr)
 			}
 			case PE_BRUSH_LENGTH:
 			{
-				PEData data;
-				
-				PE_set_view3d_data(C, &data);
 				data.mval= mval;
 				
 				data.rad= (float)brush->size;
@@ -3468,10 +3489,7 @@ static void brush_edit_apply(bContext *C, wmOperator *op, PointerRNA *itemptr)
 			}
 			case PE_BRUSH_PUFF:
 			{
-				PEData data;
-
 				if(edit->psys) {
-					PE_set_view3d_data(C, &data);
 					data.dm= psmd->dm;
 					data.mval= mval;
 					data.rad= (float)brush->size;
@@ -3492,10 +3510,7 @@ static void brush_edit_apply(bContext *C, wmOperator *op, PointerRNA *itemptr)
 			}
 			case PE_BRUSH_ADD:
 			{
-				PEData data;
-
 				if(edit->psys && edit->psys->part->from==PART_FROM_FACE) {
-					PE_set_view3d_data(C, &data);
 					data.mval= mval;
 
 					added= brush_add(&data, brush->count);
@@ -3509,9 +3524,6 @@ static void brush_edit_apply(bContext *C, wmOperator *op, PointerRNA *itemptr)
 			}
 			case PE_BRUSH_SMOOTH:
 			{
-				PEData data;
-
-				PE_set_view3d_data(C, &data);
 				data.mval= mval;
 				data.rad= (float)brush->size;
 
@@ -3533,9 +3545,6 @@ static void brush_edit_apply(bContext *C, wmOperator *op, PointerRNA *itemptr)
 			}
 			case PE_BRUSH_WEIGHT:
 			{
-				PEData data;
-				PE_set_view3d_data(C, &data);
-
 				if(edit->psys) {
 					data.dm= psmd->dm;
 					data.mval= mval;

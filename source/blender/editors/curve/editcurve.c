@@ -2596,7 +2596,7 @@ void CURVE_OT_select_inverse(wmOperatorType *ot)
 static void subdividenurb(Object *obedit, int number_cuts)
 {
 	Curve *cu= obedit->data;
-	ListBase *editnurb= curve_get_editcurve(obedit);
+	EditNurb *editnurb= cu->editnurb;
 	Nurb *nu;
 	BezTriple *prevbezt, *bezt, *beztnew, *beztn;
 	BPoint *bp, *prevbp, *bpnew, *bpn;
@@ -2606,7 +2606,7 @@ static void subdividenurb(Object *obedit, int number_cuts)
 
    // printf("*** subdivideNurb: entering subdivide\n");
 
-	for(nu= editnurb->first; nu; nu= nu->next) {
+	for(nu= editnurb->nurbs.first; nu; nu= nu->next) {
 		amount= 0;
 		if(nu->type == CU_BEZIER) {
 		/* 
@@ -2648,6 +2648,7 @@ static void subdividenurb(Object *obedit, int number_cuts)
 				}
 				while(a--) {
 					memcpy(beztn, prevbezt, sizeof(BezTriple));
+					keyIndex_updateBezt(editnurb, prevbezt, beztn, 1, 1);
 					beztn++;
 
 					if( BEZSELECTED_HIDDENHANDLES(cu, prevbezt) && BEZSELECTED_HIDDENHANDLES(cu, bezt) ) {
@@ -2690,7 +2691,10 @@ static void subdividenurb(Object *obedit, int number_cuts)
 					bezt++;
 				}
 				/* last point */
-				if((nu->flagu & CU_NURB_CYCLIC)==0) memcpy(beztn, prevbezt, sizeof(BezTriple));
+				if((nu->flagu & CU_NURB_CYCLIC)==0) {
+					memcpy(beztn, prevbezt, sizeof(BezTriple));
+					keyIndex_updateBezt(editnurb, prevbezt, beztn, 1, 1);
+				}
 
 				MEM_freeN(nu->bezt);
 				nu->bezt= beztnew;
@@ -2741,6 +2745,7 @@ static void subdividenurb(Object *obedit, int number_cuts)
 				}
 				while(a--) {
 					memcpy(bpn, prevbp, sizeof(BPoint));
+					keyIndex_updateBP(editnurb, prevbp, bpn, 1, 1);
 					bpn++;
 
 					if( (bp->f1 & SELECT) && (prevbp->f1 & SELECT) ) {
@@ -2757,7 +2762,10 @@ static void subdividenurb(Object *obedit, int number_cuts)
 					prevbp= bp;
 					bp++;
 				}
-				if((nu->flagu & CU_NURB_CYCLIC)==0) memcpy(bpn, prevbp, sizeof(BPoint));	/* last point */
+				if((nu->flagu & CU_NURB_CYCLIC)==0) { /* last point */
+					memcpy(bpn, prevbp, sizeof(BPoint));
+					keyIndex_updateBP(editnurb, prevbp, bpn, 1, 1);
+				}
 
 				MEM_freeN(nu->bp);
 				nu->bp= bpnew;
@@ -2844,6 +2852,7 @@ static void subdividenurb(Object *obedit, int number_cuts)
 				for(a=0; a<nu->pntsv; a++) {
 					for(b=0; b<nu->pntsu; b++) {
 						*bpn= *bp;
+						keyIndex_updateBP(editnurb, bp, bpn, 1, 1);
 						bpn++; 
 						bp++;
 						if(b<nu->pntsu-1) {
@@ -2900,6 +2909,7 @@ static void subdividenurb(Object *obedit, int number_cuts)
 					for(a=0; a<nu->pntsv; a++) {
 						for(b=0; b<nu->pntsu; b++) {
 							*bpn= *bp;
+							keyIndex_updateBP(editnurb, bp, bpn, 1, 1);
 							bpn++;
 							bp++;
 						}
@@ -2946,6 +2956,7 @@ static void subdividenurb(Object *obedit, int number_cuts)
 						for(a=0; a<nu->pntsv; a++) {
 							for(b=0; b<nu->pntsu; b++) {
 								*bpn= *bp;
+								keyIndex_updateBP(editnurb, bp, bpn, 1, 1);
 								bpn++; 
 								bp++;
 								if( (b<nu->pntsu-1) && usel[b]==nu->pntsv && usel[b+1]==nu->pntsv ) {

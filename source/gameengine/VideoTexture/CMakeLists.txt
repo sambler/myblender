@@ -65,6 +65,24 @@ SET(SRC
 	VideoBase.cpp
 	VideoFFmpeg.cpp
 	blendVideoTex.cpp
+
+	BlendType.h
+	Common.h
+	Exception.h
+	FilterBase.h
+	FilterBlueScreen.h
+	FilterColor.h
+	FilterNormal.h
+	FilterSource.h
+	ImageBase.h
+	ImageBuff.h
+	ImageMix.h
+	ImageRender.h
+	ImageViewport.h
+	PyTypeList.h
+	Texture.h
+	VideoBase.h
+	VideoFFmpeg.h
 )
 
 IF(WITH_FFMPEG)
@@ -72,10 +90,5 @@ IF(WITH_FFMPEG)
 	ADD_DEFINITIONS(-DWITH_FFMPEG)
 	ADD_DEFINITIONS(-D__STDC_CONSTANT_MACROS)
 ENDIF(WITH_FFMPEG)
-
-IF(WITH_PYTHON)
-	LIST(APPEND INC ${PYTHON_INC})
-	ADD_DEFINITIONS(-DWITH_PYTHON)
-ENDIF(WITH_PYTHON)
 
 BLENDERLIB(ge_videotex "${SRC}" "${INC}")

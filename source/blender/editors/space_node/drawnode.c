@@ -1227,6 +1227,15 @@ static void node_texture_buts_proc(uiLayout *layout, bContext *UNUSED(C), Pointe
 			uiItemR(row, &tex_ptr, "noise_type", UI_ITEM_R_EXPAND, NULL, 0);
 			uiItemR(col, &tex_ptr, "noise_depth", UI_ITEM_R_EXPAND, "Depth", 0);
 			break;
+
+		case TEX_PLANET:
+			uiItemR(col, &tex_ptr, "noise_basis", 0, "", 0);
+			row= uiLayoutRow(col, 0);
+			uiItemR(row, &tex_ptr, "stype", UI_ITEM_R_EXPAND, NULL, 0);
+			row= uiLayoutRow(col, 0);
+			uiItemR(row, &tex_ptr, "noise_type", UI_ITEM_R_EXPAND, NULL, 0);
+			uiItemR(col, &tex_ptr, "noise_depth", UI_ITEM_R_EXPAND, "Depth", 0);
+			break;
 			
 		case TEX_DISTNOISE:
 			uiItemR(col, &tex_ptr, "noise_basis", 0, "", 0);

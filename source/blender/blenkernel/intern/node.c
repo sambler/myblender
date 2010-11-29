@@ -3203,6 +3203,7 @@ static void registerTextureNodes(ListBase *ntypelist)
 	nodeRegisterType(ntypelist, &tex_node_proc_noise);
 	nodeRegisterType(ntypelist, &tex_node_proc_stucci);
 	nodeRegisterType(ntypelist, &tex_node_proc_distnoise);
+	nodeRegisterType(ntypelist, &tex_node_proc_planet);
 }
 
 static void remove_dynamic_typeinfos(ListBase *list)

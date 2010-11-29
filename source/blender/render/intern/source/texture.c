@@ -234,12 +234,11 @@ static int blend(Tex *tex, float *texvec, TexResult *texres)
 
 /* ------------------------------------------------------------------------- */
 /* ************************************************************************* */
-
 /* newnoise: all noisebased types now have different noisebases to choose from */
 
 static int clouds(Tex *tex, float *texvec, TexResult *texres)
-{
-	int rv = TEX_INT;
+{	
+	int rv = TEX_INT; 
 	
 	texres->tin = BLI_gTurbulence(tex->noisesize, texvec[0], texvec[1], texvec[2], tex->noisedepth, (tex->noisetype!=TEX_NOISESOFT), tex->noisebasis);
 
@@ -259,6 +258,70 @@ static int clouds(Tex *tex, float *texvec, TexResult *texres)
 		texres->tr = texres->tin;
 		texres->tg = BLI_gTurbulence(tex->noisesize, texvec[1], texvec[0], texvec[2], tex->noisedepth, (tex->noisetype!=TEX_NOISESOFT), tex->noisebasis);
 		texres->tb = BLI_gTurbulence(tex->noisesize, texvec[1], texvec[2], texvec[0], tex->noisedepth, (tex->noisetype!=TEX_NOISESOFT), tex->noisebasis);
+		BRICONTRGB;
+		texres->ta = 1.0;
+		return (rv | TEX_RGB);
+	}
+
+	BRICONT;
+
+	return rv;
+
+}
+
+/* planet procedural noise */
+static void planet_noise(float *result, float noisesize, float x, float y, float z, int oct, int hard, int noisebasis, float nabla){
+	float xdy, xdz, ydx, ydz, zdx, zdy;
+	float d = 0.001f;
+	float offset = nabla * 1000.f; 
+
+	float dx[3], dy[3], xo , yo, zo;
+		
+	x = BLI_gTurbulence(noisesize, x, y, z, oct, hard, noisebasis);
+	y = BLI_gTurbulence(noisesize, x + offset, y , z, oct, hard, noisebasis);
+	z = BLI_gTurbulence(noisesize, x, y + offset, z , oct, hard, noisebasis);
+	
+	//-------------------------------
+	xdy = x - BLI_gTurbulence(noisesize, x , y + d, z, oct, hard, noisebasis);
+	xdz = x - BLI_gTurbulence(noisesize, x, y, z + d, oct, hard, noisebasis);
+
+	ydx = y - BLI_gTurbulence(noisesize, x + d, y, z, oct, hard, noisebasis);
+	ydz = y - BLI_gTurbulence(noisesize, x, y, z + d, oct, hard, noisebasis);
+
+	zdx = z - BLI_gTurbulence(noisesize, x + d, y, z, oct, hard, noisebasis);
+	zdy = z - BLI_gTurbulence(noisesize, x, y + d, z, oct, hard, noisebasis);
+
+	result[0] = (zdy - ydz);
+	result[1] = (zdx - xdz);
+	result[2] = (ydx - xdy);
+
+}
+
+static int planet(Tex *tex, float *texvec, TexResult *texres)
+{
+	float result[3] = {0.f,0.f,0.f};
+	int rv = TEX_INT; 
+
+	planet_noise(result, tex->noisesize, texvec[0], texvec[1], texvec[2], tex->noisedepth, (tex->noisetype!=TEX_NOISESOFT), tex->noisebasis, tex->nabla);
+
+	texres->tin = result[0];
+
+	if (texres->nor!=NULL) {
+		// calculate bumpnormal
+		texres->nor[0] = result[0];
+		texres->nor[1] = result[1];
+		texres->nor[2] = result[2];
+		
+		tex_normal_derivate(tex, texres);
+		rv |= TEX_NOR;
+	}
+
+	if (tex->stype==TEX_COLOR) {
+		// in this case, int. value should really be computed from color,
+		// and bumpnormal from that, would be too slow, looks ok as is
+		texres->tr = result[0];
+		texres->tg = result[1];
+		texres->tb = result[2];
 		BRICONTRGB;
 		texres->ta = 1.0;
 		return (rv | TEX_RGB);
@@ -1257,6 +1320,8 @@ static int multitex(Tex *tex, float *texvec, float *dxt, float *dyt, int osatex,
 	case TEX_VOXELDATA:
 		retval= voxeldatatex(tex, texvec, texres);  
 		break;
+	case TEX_PLANET:
+		retval= planet(tex, texvec, texres);
 
 	}
 

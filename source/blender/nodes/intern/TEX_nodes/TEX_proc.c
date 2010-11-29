@@ -202,6 +202,18 @@ static void clouds_map_inputs(Tex *tex, bNodeStack **in, TexParams *p, short thr
 }
 ProcDef(clouds)
 
+/* --- Planet --- */
+static bNodeSocketType planet_inputs[]= {
+	COMMON_INPUTS,
+	{ SOCK_VALUE, 1, "Size",       0.25f, 0.0f, 0.0f, 0.0f,   0.0001f, 2.0f },
+	{ -1, 0, "" }
+};
+static void planet_map_inputs(Tex *tex, bNodeStack **in, TexParams *p, short thread)
+{
+	tex->noisesize = tex_input_value(in[I+0], p, thread);
+}
+ProcDef(planet)
+
 /* --- DISTORTED NOISE --- */
 static bNodeSocketType distnoise_inputs[]= {
 	COMMON_INPUTS,
@@ -307,4 +319,5 @@ bNodeType tex_node_proc_musgrave  = TexDef(TEX_MUSGRAVE,  CV, musgrave,  "Musgra
 bNodeType tex_node_proc_noise     = TexDef(TEX_NOISE,     C,  noise,     "Noise"    );
 bNodeType tex_node_proc_stucci    = TexDef(TEX_STUCCI,    CV, stucci,    "Stucci"   );
 bNodeType tex_node_proc_distnoise = TexDef(TEX_DISTNOISE, CV, distnoise, "Distorted Noise" );
+bNodeType tex_node_proc_planet    = TexDef(TEX_PLANET,    CV, planet,    "Planet"   );
 

@@ -74,5 +74,6 @@ extern bNodeType tex_node_proc_musgrave;
 extern bNodeType tex_node_proc_noise;
 extern bNodeType tex_node_proc_stucci;
 extern bNodeType tex_node_proc_distnoise;
+extern bNodeType tex_node_proc_planet;
 
 #endif

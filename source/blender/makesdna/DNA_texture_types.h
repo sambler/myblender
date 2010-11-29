@@ -298,6 +298,7 @@ typedef struct TexMapping {
 #define TEX_DISTNOISE	13
 #define TEX_POINTDENSITY	14
 #define TEX_VOXELDATA		15
+#define TEX_PLANET			16
 
 /* musgrave stype */
 #define TEX_MFRACTAL		0

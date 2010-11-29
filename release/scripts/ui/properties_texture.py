@@ -444,6 +444,31 @@ class TEXTURE_PT_clouds(TextureTypePanel, bpy.types.Panel):
 
         col = split.column()
         col.prop(tex, "nabla", text="Nabla")
+	
+class TEXTURE_PT_planet(TextureTypePanel, bpy.types.Panel):
+    bl_label = "Planet"
+    tex_type = 'PLANET'
+    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
+
+    def draw(self, context):
+        layout = self.layout
+
+        tex = context.texture
+
+        layout.prop(tex, "planet_type", expand=True)
+        layout.label(text="Noise:")
+        layout.prop(tex, "noise_type", text="Type", expand=True)
+        layout.prop(tex, "noise_basis", text="Basis")
+
+        split = layout.split()
+
+        col = split.column()
+        col.prop(tex, "noise_scale", text="Size")
+        col.prop(tex, "noise_depth", text="Depth")
+
+        col = split.column()
+        col.prop(tex, "nabla", text="Nabla")
+
 
 
 class TEXTURE_PT_wood(TextureTypePanel, bpy.types.Panel):

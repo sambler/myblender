@@ -62,7 +62,7 @@ typedef struct BlendFileData {
 	int fileflags;
 	int displaymode;
 	int globalf;
-	char filename[240];	/* 240 = FILE_MAX */
+	char filename[256];	/* 256 = FILE_MAX */
 	
 	struct bScreen*	curscreen;
 	struct Scene*	curscene;

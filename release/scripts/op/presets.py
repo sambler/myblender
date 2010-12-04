@@ -31,7 +31,7 @@ class AddPresetBase():
     # bl_label = "Add a Python Preset"
     bl_options = {'REGISTER'} # only because invoke_props_popup requires.
 
-    name = bpy.props.StringProperty(name="Name", description="Name of the preset, used to make the path name", maxlen=64, default="")
+    name = bpy.props.StringProperty(name="Name", description="Name of the preset, used to make the path name", maxlen=256, default="")
     remove_active = bpy.props.BoolProperty(default=False, options={'HIDDEN'})
 
     @staticmethod

@@ -56,7 +56,7 @@ typedef struct bProperty {
 /* property->flag */
 #define PROP_DEBUG		1
 
-#define MAX_PROPSTRING	128
+#define MAX_PROPSTRING	256
 
 #endif
 

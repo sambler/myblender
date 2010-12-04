@@ -825,7 +825,7 @@ static int calculate_structlens(int firststruct)
 	return(dna_error);
 }
 
-#define MAX_DNA_LINE_LENGTH 20
+#define MAX_DNA_LINE_LENGTH 256
 
 void dna_write(FILE *file, void *pntr, int size)
 {

@@ -79,7 +79,7 @@ void error(const char *UNUSED(arg)) {}
 /* ****** XXX ***** */
 
 
-#define MAXUNDONAME	64
+#define MAXUNDONAME	256
 typedef struct UndoElem {
 	struct UndoElem *next, *prev;
 	ID id;			// copy of editmode object ID

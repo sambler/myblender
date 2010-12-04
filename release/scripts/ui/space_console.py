@@ -145,7 +145,7 @@ class ConsoleLanguage(bpy.types.Operator):
     '''Set the current language for this console'''
     bl_idname = "console.language"
     bl_label = "Console Language"
-    language = StringProperty(name="Language", maxlen=32, default="")
+    language = StringProperty(name="Language", maxlen=256, default="")
 
     def execute(self, context):
         sc = context.space_data

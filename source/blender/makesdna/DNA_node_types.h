@@ -43,7 +43,7 @@ struct AnimData;
 struct bGPdata;
 struct uiBlock;
 
-#define NODE_MAXSTR 32
+#define NODE_MAXSTR 256
 
 
 typedef struct bNodeStack {

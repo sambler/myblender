@@ -57,8 +57,8 @@ struct ReportList;
 struct Report;
 struct uiLayout;
 
-#define OP_MAX_TYPENAME	64
-#define KMAP_MAX_NAME	64
+#define OP_MAX_TYPENAME	256
+#define KMAP_MAX_NAME	256
 
 /* keep in sync with 'wm_report_items' in wm_rna.c */
 typedef enum ReportType {

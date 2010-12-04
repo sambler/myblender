@@ -112,8 +112,8 @@ char *BLI_getwdN(char *dir)
 			strcpy(dir, pwd);
 			return(dir);
 		}
-		/* 160 is FILE_MAXDIR in filesel.c */
-		return( getcwd(dir, 160) );
+		/* 256 is FILE_MAXDIR in filesel.c */
+		return( getcwd(dir, 256) );
 	}
 	return(0);
 }

@@ -77,7 +77,7 @@
 #endif /* WIN32 */
 
 /* local */
-#define UNIQUE_NAME_MAX 128
+#define UNIQUE_NAME_MAX 256
 
 static int add_win32_extension(char *name);
 static char *blender_version_decimal(void);

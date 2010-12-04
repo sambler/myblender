@@ -698,7 +698,7 @@ static int screen_render_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	if(RNA_property_is_set(op->ptr, "layer")) {
 		SceneRenderLayer *rl;
 		Scene *scn;
-		char scene_name[19], rl_name[RE_MAXNAME];
+		char scene_name[256], rl_name[RE_MAXNAME];
 
 		RNA_string_get(op->ptr, "layer", rl_name);
 		RNA_string_get(op->ptr, "scene", scene_name);

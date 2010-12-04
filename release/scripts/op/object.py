@@ -28,7 +28,7 @@ class SelectPattern(bpy.types.Operator):
     bl_label = "Select Pattern"
     bl_options = {'REGISTER', 'UNDO'}
 
-    pattern = StringProperty(name="Pattern", description="Name filter using '*' and '?' wildcard chars", maxlen=32, default="*")
+    pattern = StringProperty(name="Pattern", description="Name filter using '*' and '?' wildcard chars", maxlen=256, default="*")
     case_sensitive = BoolProperty(name="Case Sensitive", description="Do a case sensitive compare", default=False)
     extend = BoolProperty(name="Extend", description="Extend the existing selection", default=True)
 

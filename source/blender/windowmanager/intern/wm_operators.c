@@ -1178,14 +1178,14 @@ static uiBlock *wm_block_create_splash(bContext *C, ARegion *ar, void *UNUSED(ar
 	struct RecentFile *recent;
 	int i;
 	MenuType *mt= WM_menutype_find("USERPREF_MT_splash", TRUE);
-	char url[64];
+	char url[256];
 	
 #ifdef NAN_BUILDINFO
 	int ver_width, rev_width;
 	char *version_str = NULL;
 	char *revision_str = NULL;
-	char version_buf[128];
-	char revision_buf[128];
+	char version_buf[256];
+	char revision_buf[256];
 	extern char build_rev[];
 	
 	version_str = &version_buf[0];

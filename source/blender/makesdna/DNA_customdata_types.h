@@ -49,7 +49,7 @@ typedef struct CustomDataLayer {
 } CustomDataLayer;
 
 typedef struct CustomDataExternal {
-	char filename[240]; /* FILE_MAX */
+	char filename[256]; /* FILE_MAX */
 } CustomDataExternal;
 
 /* structure which stores custom element data associated with mesh elements

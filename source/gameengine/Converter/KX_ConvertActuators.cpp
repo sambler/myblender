@@ -73,7 +73,7 @@
 #include "BKE_text.h"
 #include "BLI_blenlib.h"
 
-#define FILE_MAX 240 // repeated here to avoid dependency from BKE_utildefines.h
+#define FILE_MAX 256 // repeated here to avoid dependency from BKE_utildefines.h
 
 #include "KX_NetworkMessageActuator.h"
 

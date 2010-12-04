@@ -84,8 +84,8 @@ typedef struct FluidsimSettings {
 	struct Mesh *meshBB;
 
 	/* store output path, and file prefix for baked fluid surface */
-	/* strlens; 80= FILE_MAXFILE, 160= FILE_MAXDIR */
-	char surfdataPath[240];
+	/* strlens; 256= FILE_MAXFILE, 256= FILE_MAXDIR */
+	char surfdataPath[512];
 
 	/* store start coords of axis aligned bounding box together with size */
 	/* values are inited during derived mesh display */

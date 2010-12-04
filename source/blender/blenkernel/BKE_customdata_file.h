@@ -26,7 +26,7 @@
 #define CDF_TYPE_IMAGE	0
 #define CDF_TYPE_MESH	1
 
-#define CDF_LAYER_NAME_MAX	64
+#define CDF_LAYER_NAME_MAX	256
 
 typedef struct CDataFile CDataFile;
 typedef struct CDataFileLayer CDataFileLayer;

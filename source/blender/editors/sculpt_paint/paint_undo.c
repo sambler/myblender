@@ -39,7 +39,7 @@
 
 #include "paint_intern.h"
 
-#define MAXUNDONAME	64
+#define MAXUNDONAME	256
 
 typedef struct UndoElem {
 	struct UndoElem *next, *prev;

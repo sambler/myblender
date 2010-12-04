@@ -673,9 +673,9 @@ enum FileSortTypeE {
 
 /* these values need to be hardcoded in structs, dna does not recognize defines */
 /* also defined in BKE */
-#define FILE_MAXDIR			160
+#define FILE_MAXDIR			256
 #define FILE_MAXFILE		256
-#define FILE_MAX			(160+256)
+#define FILE_MAX			512
 
 /* filesel types */
 #define FILE_UNIX			8

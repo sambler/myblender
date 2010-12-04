@@ -76,7 +76,7 @@
 #include "filelist.h"
 
 /* max length of library group name within filesel */
-#define GROUP_MAX 32
+#define GROUP_MAX 256
 
 struct FileList;
 

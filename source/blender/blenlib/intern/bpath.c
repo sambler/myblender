@@ -65,7 +65,7 @@
 //XXX #include "BSE_sequence.h"
 //XXX define below from BSE_sequence.h - otherwise potentially odd behaviour
 
-#define FILE_MAX			240
+#define FILE_MAX			256
 
 /* TODO - BPATH_PLUGIN, BPATH_SEQ */
 enum BPathTypes {

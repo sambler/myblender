@@ -49,7 +49,7 @@ typedef struct FileGlobal {
 	int globalf;
 	
 	/* file path where this was saved, for recover */
-	char filename[240]; /* 240 = FILE_MAX */
+	char filename[256]; /* 256 = FILE_MAX */
 } FileGlobal;
 
 

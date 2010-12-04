@@ -5397,7 +5397,7 @@ void unique_bone_name(bArmature *arm, char *name)
 }
 
 
-#define MAXBONENAME 32
+#define MAXBONENAME 256
 /* helper call for armature_bone_rename */
 static void constraint_bone_name_fix(Object *ob, ListBase *conlist, char *oldname, char *newname)
 {

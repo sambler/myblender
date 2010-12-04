@@ -55,7 +55,7 @@ struct uiMenuItem;
    ED_spacetypes_init() in editors/area/spacetypes.c   */
 /* an editor in Blender is a combined ScrArea + SpaceType + SpaceData */
 
-#define BKE_ST_MAXNAME	64
+#define BKE_ST_MAXNAME	256
 
 typedef struct SpaceType {
 	struct SpaceType *next, *prev;

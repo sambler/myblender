@@ -68,7 +68,6 @@ GET_BLENDER_VERSION()
 OPTION(WITH_INTERNATIONAL "Enable I18N   (International fonts and text)" ON)
 OPTION(WITH_PYTHON        "Enable Embedded Python API" ON)
 OPTION(WITH_BUILDINFO     "Include extra build details" ON)
-OPTION(WITH_FLUID        "Enable Elbeem (Fluid Simulation)" ON)
 OPTION(WITH_IK_ITASC      "Enable ITASC IK solver" ON)
 OPTION(WITH_FFTW3         "Enable FFTW3 support (Used for smoke and audio effects)" OFF)
 OPTION(WITH_BULLET        "Enable Bullet (Physics Engine)" ON)
@@ -81,33 +80,40 @@ ELSE()
 	OPTION(WITH_OPENMP        "Enable OpenMP (has to be supported by the compiler)" OFF)
 ENDIF()
 
+# Modifiers
+OPTION(WITH_MOD_FLUID        	"Enable Elbeem Modifier (Fluid Simulation)" ON)
+OPTION(WITH_MOD_DECIMATE       	"Enable Decimate Modifier" ON)
+OPTION(WITH_MOD_BOOLEAN        	"Enable Boolean Modifier" ON)
+
 # Image format support
 OPTION(WITH_IMAGE_OPENEXR       "Enable OpenEXR Support (http://www.openexr.com)" ON)
-OPTION(WITH_IMAGE_OPENJPEG      "Enable OpenJpeg Support (http://www.openjpeg.org/)" OFF)
+OPTION(WITH_IMAGE_OPENJPEG      "Enable OpenJpeg Support (http://www.openjpeg.org)" ON)
 OPTION(WITH_IMAGE_TIFF          "Enable LibTIFF Support" ON)
 OPTION(WITH_IMAGE_DDS           "Enable DDS Image Support" ON)
 OPTION(WITH_IMAGE_CINEON        "Enable CINEON and DPX Image Support" ON)
 OPTION(WITH_IMAGE_HDR           "Enable HDR Image Support" ON)
+OPTION(WITH_IMAGE_REDCODE       "Enable RedCode Image Support" ON)
 
-# Audio format support
-OPTION(WITH_FFMPEG        "Enable FFMPeg Support (http://ffmpeg.mplayerhq.hu/)" OFF)
-OPTION(WITH_SNDFILE       "Enable libsndfile Support (http://www.mega-nerd.com/libsndfile)" OFF)
-IF(APPLE OR WIN32)
-	OPTION(WITH_QUICKTIME     "Enable Quicktime Support" OFF)
-ENDIF(APPLE OR WIN32)
+# Audio/Video format support
+OPTION(WITH_CODEC_FFMPEG        "Enable FFMPeg Support (http://ffmpeg.mplayerhq.hu)" OFF)
+OPTION(WITH_CODEC_SNDFILE       "Enable libsndfile Support (http://www.mega-nerd.com/libsndfile)" OFF)
+IF(APPLE OR (WIN32 AND NOT UNIX))
+	OPTION(WITH_CODEC_QUICKTIME     "Enable Quicktime Support" OFF)
+ENDIF(APPLE OR (WIN32 AND NOT UNIX))
 
 # 3D format support
 # disable opencollada on non-apple unix because opencollada has no package for debian
 IF(UNIX AND NOT APPLE)
-	OPTION(WITH_OPENCOLLADA		"Enable OpenCollada Support (http://www.opencollada.org/)"	OFF)
+	OPTION(WITH_OPENCOLLADA		"Enable OpenCollada Support (http://www.opencollada.org)"	OFF)
 ELSE()
-	OPTION(WITH_OPENCOLLADA		"Enable OpenCollada Support (http://www.opencollada.org/)"	OFF)
+	OPTION(WITH_OPENCOLLADA		"Enable OpenCollada Support (http://www.opencollada.org)"	OFF)
 ENDIF()
 
 # Sound output
 OPTION(WITH_SDL           "Enable SDL for sound and joystick support" ON)
 OPTION(WITH_OPENAL        "Enable OpenAL Support (http://www.openal.org)" ON)
 OPTION(WITH_JACK          "Enable Jack Support (http://www.jackaudio.org)" OFF)
+OPTION(WITH_SAMPLERATE    "Enable samplerate conversion" ON)
 
 # Compression
 OPTION(WITH_LZO           "Enable fast LZO compression (used for pointcache)" ON)
@@ -129,12 +135,20 @@ ENDIF(APPLE)
 # OPTION(WITH_LCMS          "Enable color correction with lcms" OFF)
 
 IF(NOT WITH_GAMEENGINE AND WITH_PLAYER)
-	MESSAGE(FATAL_ERROR "WITH_PLAYER needs WITH_GAMEENGINE")
+	MESSAGE(FATAL_ERROR "WITH_PLAYER requires WITH_GAMEENGINE")
 ENDIF(NOT WITH_GAMEENGINE AND WITH_PLAYER)
 
 IF(NOT WITH_INSTALL AND WITH_PYTHON_INSTALL)
-	MESSAGE("WARNING: WITH_PYTHON_INSTALL needs WITH_INSTALL")
+	MESSAGE("WARNING: WITH_PYTHON_INSTALL requires WITH_INSTALL")
 ENDIF(NOT WITH_INSTALL AND WITH_PYTHON_INSTALL)
+
+IF(NOT WITH_SAMPLERATE AND (WITH_OPENAL OR WITH_SDL OR WITH_JACK))
+	MESSAGE(FATAL_ERROR "WITH_OPENAL/WITH_SDL/WITH_JACK require WITH_SAMPLERATE")
+ENDIF(NOT WITH_SAMPLERATE AND (WITH_OPENAL OR WITH_SDL OR WITH_JACK))
+
+IF(NOT WITH_IMAGE_OPENJPEG AND WITH_IMAGE_REDCODE)
+	MESSAGE(FATAL_ERROR "WITH_IMAGE_REDCODE requires WITH_IMAGE_OPENJPEG")
+ENDIF(NOT WITH_IMAGE_OPENJPEG AND WITH_IMAGE_REDCODE)
 
 TEST_SSE_SUPPORT()
 
@@ -168,12 +182,12 @@ IF(UNIX AND NOT APPLE)
 		SET(JACK_LIBPATH ${JACK}/lib)
 	ENDIF(WITH_JACK)
 
-	IF(WITH_SNDFILE)
-	SET(SNDFILE /usr)
-	SET(SNDFILE_INC ${SNDFILE}/include)
-	SET(SNDFILE_LIB sndfile)
-	SET(SNDFILE_LIBPATH ${SNDFILE}/lib)
-	ENDIF(WITH_SNDFILE)
+	IF(WITH_CODEC_SNDFILE)
+		SET(SNDFILE /usr)
+		SET(SNDFILE_INC ${SNDFILE}/include)
+		SET(SNDFILE_LIB sndfile)
+		SET(SNDFILE_LIBPATH ${SNDFILE}/lib)
+	ENDIF(WITH_CODEC_SNDFILE)
 
 	IF(WITH_INTERNATIONAL)
 		FIND_LIBRARY(INTL_LIBRARY
@@ -260,13 +274,13 @@ IF(UNIX AND NOT APPLE)
 		SET(LCMS_LIBPATH ${LCMS}/lib)
 	ENDIF(WITH_LCMS)
 
-	IF(WITH_FFMPEG)
+	IF(WITH_CODEC_FFMPEG)
 		SET(FFMPEG /usr CACHE FILEPATH "FFMPEG Directory")
 		SET(FFMPEG_INC ${FFMPEG}/include)
 		SET(FFMPEG_LIB avformat avcodec avutil avdevice swscale CACHE STRING "FFMPEG Libraries")
 		SET(FFMPEG_LIBPATH ${FFMPEG}/lib)
 		SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D__STDC_CONSTANT_MACROS")
-	ENDIF(WITH_FFMPEG)
+	ENDIF(WITH_CODEC_FFMPEG)
 
 	IF(WITH_FFTW3)
 		SET(FFTW3 /usr)
@@ -275,15 +289,17 @@ IF(UNIX AND NOT APPLE)
 		SET(FFTW3_LIBPATH ${FFTW3}/lib)
 	ENDIF(WITH_FFTW3)
 
-	SET(LIBSAMPLERATE /usr)
-	SET(LIBSAMPLERATE_INC ${LIBSAMPLERATE}/include)
-	SET(LIBSAMPLERATE_LIB samplerate)
-	SET(LIBSAMPLERATE_LIBPATH ${LIBSAMPLERATE}/lib)
+	IF(WITH_SAMPLERATE)
+		SET(LIBSAMPLERATE /usr)
+		SET(LIBSAMPLERATE_INC ${LIBSAMPLERATE}/include)
+		SET(LIBSAMPLERATE_LIB samplerate)
+		SET(LIBSAMPLERATE_LIBPATH ${LIBSAMPLERATE}/lib)
+	ENDIF(WITH_SAMPLERATE)
 
 	IF (WITH_OPENCOLLADA)
 		SET(OPENCOLLADA /usr/local/opencollada CACHE FILEPATH "OpenCollada Directory")
 		SET(OPENCOLLADA_LIBPATH ${OPENCOLLADA}/lib)
-		SET(OPENCOLLADA_LIB OpenCOLLADAStreamWriter OpenCOLLADASaxFrameworkLoader OpenCOLLADAFramework OpenCOLLADABaseUtils GeneratedSaxParser UTF MathMLSolver pcre ftoa buffer)
+		SET(OPENCOLLADA_LIB OpenCOLLADAStreamWriter OpenCOLLADASaxFrameworkLoader OpenCOLLADAFramework OpenCOLLADABaseUtils GeneratedSaxParser UTF MathMLSolver pcre ftoa buffer xml2)
 		SET(OPENCOLLADA_INC ${OPENCOLLADA})
 		SET(PCRE /usr CACHE FILEPATH "PCRE Directory")
 		SET(PCRE_LIBPATH ${PCRE}/lib)
@@ -307,26 +323,49 @@ IF(UNIX AND NOT APPLE)
 		SET(BINRELOC_INC ${BINRELOC}/include)
 	ENDIF(CMAKE_SYSTEM_NAME MATCHES "Linux")
 
-	IF(WITH_OPENMP)
-		LIST(APPEND LLIBS -lgomp)
-		SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fopenmp")
-		SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp")
-	ENDIF(WITH_OPENMP)
-
-	SET(PLATFORM_CFLAGS "-pipe -fPIC -funsigned-char -fno-strict-aliasing")
-
 	SET(PLATFORM_LINKFLAGS "-pthread")
 
-	# Better warnings
-	# note: -Wunused-parameter is added below for all GCC compilers
-	SET(C_WARNINGS "-Wall -Wno-char-subscripts -Wpointer-arith -Wcast-align -Wdeclaration-after-statement -Wno-unknown-pragmas")
-	SET(CXX_WARNINGS "-Wall -Wno-invalid-offsetof -Wno-sign-compare")
+	SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE")
+	SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE")
 
-	INCLUDE_DIRECTORIES(${JPEG_INCLUDE_DIR} ${PNG_INCLUDE_DIR} ${ZLIB_INCLUDE_DIR} )
-ENDIF(UNIX AND NOT APPLE)
+	# GNU Compiler
+	IF(CMAKE_COMPILER_IS_GNUCC)
+		SET(PLATFORM_CFLAGS "-pipe -fPIC -funsigned-char -fno-strict-aliasing")
+	
+		# Better warnings
+		# note: -Wunused-parameter is added below for all GCC compilers
+		SET(C_WARNINGS "-Wall -Wno-char-subscripts -Wpointer-arith -Wcast-align -Wdeclaration-after-statement -Wno-unknown-pragmas")
+		SET(CXX_WARNINGS "-Wall -Wno-invalid-offsetof -Wno-sign-compare")
 
+	# Intel C++ Compiler
+	ELSEIF(CMAKE_C_COMPILER_ID MATCHES "Intel")
+		# think these next two are broken
+		FIND_PROGRAM(XIAR xiar) 
+		IF(XIAR) 
+			SET(CMAKE_AR "${XIAR}")
+		ENDIF(XIAR) 
+		MARK_AS_ADVANCED(XIAR)
 
-IF(WIN32)
+		FIND_PROGRAM(XILD xild) 
+		IF(XILD) 
+			SET(CMAKE_LINKER "${XILD}")
+		ENDIF(XILD) 
+		MARK_AS_ADVANCED(XILD)
+
+		SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fp-model precise -prec_div -parallel")
+		SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fp-model precise -prec_div -parallel")
+
+		SET(PLATFORM_CFLAGS "-pipe -fPIC -funsigned-char -fno-strict-aliasing")
+
+		# SET(PLATFORM_CFLAGS "${PLATFORM_CFLAGS} -diag-enable sc3")
+
+		SET(C_WARNINGS "-Wall -Wpointer-arith -Wno-unknown-pragmas")
+		SET(CXX_WARNINGS "-Wall -Wno-invalid-offsetof -Wno-sign-compare")
+
+		SET(PLATFORM_LINKFLAGS "${PLATFORM_LINKFLAGS} -static-intel")
+	ENDIF(CMAKE_COMPILER_IS_GNUCC)
+
+ELSEIF(WIN32)
 
 	# this file is included anyway when building under Windows with cl.exe
 	#  INCLUDE(${CMAKE_ROOT}/Modules/Platform/Windows-cl.cmake)
@@ -348,10 +387,12 @@ IF(WIN32)
 		SET(ICONV_LIBPATH ${ICONV}/lib)
 	ENDIF(WITH_INTERNATIONAL)
 
-	SET(LIBSAMPLERATE ${LIBDIR}/samplerate)
-	SET(LIBSAMPLERATE_INC ${LIBSAMPLERATE}/include)
-	SET(LIBSAMPLERATE_LIB libsamplerate)
-	SET(LIBSAMPLERATE_LIBPATH ${LIBSAMPLERATE}/lib)
+	IF(WITH_SAMPLERATE)
+		SET(LIBSAMPLERATE ${LIBDIR}/samplerate)
+		SET(LIBSAMPLERATE_INC ${LIBSAMPLERATE}/include)
+		SET(LIBSAMPLERATE_LIB libsamplerate)
+		SET(LIBSAMPLERATE_LIBPATH ${LIBSAMPLERATE}/lib)
+	ENDIF(WITH_SAMPLERATE)
 
 	SET(PNG "${LIBDIR}/png")
 	SET(PNG_INC "${PNG}/include")
@@ -370,12 +411,12 @@ IF(WIN32)
 		SET(OPENAL_LIBPATH ${OPENAL}/lib)
 	ENDIF(WITH_OPENAL)
 
-	IF(WITH_SNDFILE)
+	IF(WITH_CODEC_SNDFILE)
 		SET(SNDFILE ${LIBDIR}/sndfile)
 		SET(SNDFILE_INC ${SNDFILE}/include)
 		SET(SNDFILE_LIB libsndfile-1)
 		SET(SNDFILE_LIBPATH ${SNDFILE}/lib)
-	ENDIF(WITH_SNDFILE)
+	ENDIF(WITH_CODEC_SNDFILE)
 
 	IF(WITH_SDL)
 		SET(SDL ${LIBDIR}/sdl)
@@ -384,12 +425,12 @@ IF(WIN32)
 		SET(SDL_LIBPATH ${SDL}/lib)
 	ENDIF(WITH_SDL)
 
-	IF(WITH_QUICKTIME)
+	IF(WITH_CODEC_QUICKTIME)
 		SET(QUICKTIME ${LIBDIR}/QTDevWin)
 		SET(QUICKTIME_INC ${QUICKTIME}/CIncludes)
 		SET(QUICKTIME_LIB qtmlClient)
 		SET(QUICKTIME_LIBPATH ${QUICKTIME}/Libraries)
-	ENDIF(WITH_QUICKTIME)
+	ENDIF(WITH_CODEC_QUICKTIME)
 
 	IF(WITH_RAYOPTIMIZATION AND SUPPORT_SSE_BUILD)
 		ADD_DEFINITIONS(-D__SSE__ -D__MMX__)
@@ -402,8 +443,8 @@ IF(WIN32)
 			SET(LLIBS kernel32 user32 gdi32 comdlg32 advapi32 shell32 ole32 oleaut32 uuid ws2_32 vfw32 winmm)
 		ENDIF(CMAKE_CL_64)
 		
-		SET(CMAKE_CXX_FLAGS "/D_CRT_NONSTDC_NO_DEPRECATE /D_CRT_SECURE_NO_DEPRECATE /D_SCL_SECURE_NO_DEPRECATE /we4013 /wd4800 /wd4244 /wd4305" CACHE STRING "MSVC MT C++ flags " FORCE)
-		SET(CMAKE_C_FLAGS   "/D_CRT_NONSTDC_NO_DEPRECATE /D_CRT_SECURE_NO_DEPRECATE /D_SCL_SECURE_NO_DEPRECATE /we4013 /wd4800 /wd4244 /wd4305" CACHE STRING "MSVC MT C++ flags " FORCE)
+		SET(CMAKE_CXX_FLAGS "/D_CRT_NONSTDC_NO_DEPRECATE /D_CRT_SECURE_NO_DEPRECATE /D_SCL_SECURE_NO_DEPRECATE /we4013 /wd4018 /wd4800 /wd4244 /wd4305 /wd4065 /wd4267" CACHE STRING "MSVC MT C++ flags " FORCE)
+		SET(CMAKE_C_FLAGS   "/D_CRT_NONSTDC_NO_DEPRECATE /D_CRT_SECURE_NO_DEPRECATE /D_SCL_SECURE_NO_DEPRECATE /we4013 /wd4018 /wd4800 /wd4244 /wd4305 /wd4065 /wd4267" CACHE STRING "MSVC MT C++ flags " FORCE)
 
 		IF(CMAKE_CL_64)
 			SET(CMAKE_CXX_FLAGS_DEBUG "/D_DEBUG /Od /Gm /EHsc /RTC1 /MTd /W3 /nologo /Zi /J" CACHE STRING "MSVC MT flags " FORCE)
@@ -421,12 +462,7 @@ IF(WIN32)
 		SET(CMAKE_C_FLAGS_RELEASE "/O2 /Ob2 /DNDEBUG /EHsc /MT /W3 /nologo /J" CACHE STRING "MSVC MT flags " FORCE)
 		SET(CMAKE_C_FLAGS_MINSIZEREL "/O1 /Ob1 /DNDEBUG /EHsc /MT /W3 /nologo /J" CACHE STRING "MSVC MT flags " FORCE)
 		SET(CMAKE_C_FLAGS_RELWITHDEBINFO "/O2 /Ob1 /DNDEBUG /EHsc /MT /W3 /nologo /Zi /J" CACHE STRING "MSVC MT flags " FORCE)
-		
-		IF(WITH_OPENMP)
-			SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /openmp ")
-			SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /openmp ")
-		ENDIF(WITH_OPENMP)
-		
+
 		IF(WITH_INTERNATIONAL)
 			SET(GETTEXT ${LIBDIR}/gettext)
 			SET(GETTEXT_INC ${GETTEXT}/include)
@@ -486,12 +522,12 @@ IF(WIN32)
 			SET(LCMS_LIB lcms)
 		ENDIF(WITH_LCMS)
 
-		IF(WITH_FFMPEG)
+		IF(WITH_CODEC_FFMPEG)
 			SET(FFMPEG ${LIBDIR}/ffmpeg)
 			SET(FFMPEG_INC ${FFMPEG}/include ${FFMPEG}/include/msvc)
 			SET(FFMPEG_LIB avcodec-52 avformat-52 avdevice-52 avutil-50 swscale-0)
 			SET(FFMPEG_LIBPATH ${FFMPEG}/lib)
-		ENDIF(WITH_FFMPEG)
+		ENDIF(WITH_CODEC_FFMPEG)
 
 		IF(WITH_IMAGE_OPENEXR)
 			SET(OPENEXR ${LIBDIR}/openexr)
@@ -532,31 +568,31 @@ IF(WIN32)
 
 		# MSVC only, Mingw doesnt need
 		IF(CMAKE_CL_64)
-			SET(PLATFORM_LINKFLAGS "/MACHINE:X64 /NODEFAULTLIB:libc.lib;MSVCRT.lib ")
+			SET(PLATFORM_LINKFLAGS "/MACHINE:X64 /NODEFAULTLIB:libc.lib ")
 		ELSE(CMAKE_CL_64)
 			SET(PLATFORM_LINKFLAGS "/NODEFAULTLIB:libc.lib ")
 		ENDIF(CMAKE_CL_64)
 
 		SET(CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG} /NODEFAULTLIB:libcmt.lib;libc.lib ")
 
-	ELSE(MSVC) # MINGW
-		SET(LLIBS "-lshell32 -lshfolder -lgdi32 -lmsvcrt -lwinmm -lmingw32 -lm -lws2_32 -lz -lstdc++ -lole32 -luuid")
-		SET(PLATFORM_CFLAGS "-pipe -funsigned-char -fno-strict-aliasing")
+	ELSE(MSVC)
+		# keep GCC spesific stuff here
+		IF(CMAKE_COMPILER_IS_GNUCC)
+			SET(LLIBS "-lshell32 -lshfolder -lgdi32 -lmsvcrt -lwinmm -lmingw32 -lm -lws2_32 -lz -lstdc++ -lole32 -luuid")
+			SET(PLATFORM_CFLAGS "-pipe -funsigned-char -fno-strict-aliasing")
 
-		# Better warnings
-		SET(C_WARNINGS "-Wall -Wno-char-subscripts -Wpointer-arith -Wcast-align -Wdeclaration-after-statement -Wno-unknown-pragmas")
-		SET(CXX_WARNINGS "-Wall -Wno-invalid-offsetof -Wno-sign-compare")
+			# Better warnings
+			SET(C_WARNINGS "-Wall -Wno-char-subscripts -Wpointer-arith -Wcast-align -Wdeclaration-after-statement -Wno-unknown-pragmas")
+			SET(CXX_WARNINGS "-Wall -Wno-invalid-offsetof -Wno-sign-compare")
+
+			SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE")
+			SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE")
+		ENDIF(CMAKE_COMPILER_IS_GNUCC)
 
 		ADD_DEFINITIONS(-DFREE_WINDOWS)
 
 		SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -D_DEBUG")
 		SET(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -D_DEBUG")
-
-		IF(WITH_OPENMP)
-			SET(LLIBS "${LLIBS} -lgomp")
-			SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fopenmp")
-			SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp")
-		ENDIF(WITH_OPENMP)
 
 		IF(WITH_INTERNATIONAL)
 			SET(GETTEXT ${LIBDIR}/gcc/gettext)
@@ -598,12 +634,12 @@ IF(WIN32)
 			SET(PCRE_LIB pcre)
 		ENDIF(WITH_OPENCOLLADA)
 		
-		IF(WITH_FFMPEG)
+		IF(WITH_CODEC_FFMPEG)
 			SET(FFMPEG ${LIBDIR}/ffmpeg)
 			SET(FFMPEG_INC ${FFMPEG}/include ${FFMPEG}/include)
 			SET(FFMPEG_LIB avcodec-52 avformat-52 avdevice-52 avutil-50 swscale-0)
 			SET(FFMPEG_LIBPATH ${FFMPEG}/lib)
-		ENDIF(WITH_FFMPEG)
+		ENDIF(WITH_CODEC_FFMPEG)
 
 		IF(WITH_IMAGE_OPENEXR)
 			SET(OPENEXR ${LIBDIR}/gcc/openexr)
@@ -643,19 +679,27 @@ IF(WIN32)
 
 	ENDIF(MSVC)
 
-ENDIF(WIN32)
+	# used in many places so include globally, like OpenGL
+	INCLUDE_DIRECTORIES(${PTHREADS_INC})
 
-
-IF(APPLE)
+ELSEIF(APPLE)
     IF(${CMAKE_GENERATOR} MATCHES "Xcode")
         set(CMAKE_XCODE_ATTRIBUTE_GCC_VERSION "com.apple.compilers.llvmgcc42")
         #set(CMAKE_XCODE_ATTRIBUTE_GCC_VERSION "4.2")
         set(CMAKE_XCODE_ATTRIBUTE_ENABLE_OPENMP_SUPPORT "YES")
         set(CMAKE_XCODE_ATTRIBUTE_GCC_MODEL_TUNING "G4")
         set(CMAKE_XCODE_ATTRIBUTE_GCC_WARN_INHIBIT_ALL_WARNINGS "YES")
+        set(CMAKE_XCODE_ATTRIBUTE_GCC_ENABLE_SSE3_EXTENSIONS "YES")
+        set(CMAKE_XCODE_ATTRIBUTE_GCC_ENABLE_SUPPLEMENTAL_SSE3_INSTRUCTIONS "YES")
+        set(CMAKE_XCODE_ATTRIBUTE_GCC_ALTIVEC_EXTENSIONS "YES")
+        set(CMAKE_XCODE_ATTRIBUTE_GCC_AUTO_VECTORIZATION "YES")
+        set(CMAKE_XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL "-O0")
+        
+        
+        #set(CMAKE_XCODE_ATTRIBUTE_
         
     ENDIF(${CMAKE_GENERATOR} MATCHES "Xcode")
-    
+
 	IF(WITH_LIBS10.5)
 		SET(LIBDIR ${CMAKE_SOURCE_DIR}/../lib/darwin-9.x.universal)
 	ELSE(WITH_LIBS10.5)
@@ -684,12 +728,12 @@ IF(APPLE)
 		SET(JACK_LIBPATH ${JACK}/lib)
 	ENDIF(WITH_JACK)
 
-	IF(WITH_SNDFILE)
+	IF(WITH_CODEC_SNDFILE)
 		SET(SNDFILE ${LIBDIR}/sndfile)
 		SET(SNDFILE_INC ${SNDFILE}/include)
 		SET(SNDFILE_LIB sndfile FLAC ogg vorbis vorbisenc)
 		SET(SNDFILE_LIBPATH ${SNDFILE}/lib ${FFMPEG}/lib)
-	ENDIF(WITH_SNDFILE)
+	ENDIF(WITH_CODEC_SNDFILE)
 
 	SET(PYTHON_VERSION 3.1)
 
@@ -754,18 +798,20 @@ IF(APPLE)
 		SET(LCMS_LIBPATH ${LCMS}/lib)
 	ENDIF(WITH_LCMS)
 
-	IF(WITH_FFMPEG)
+	IF(WITH_CODEC_FFMPEG)
 		SET(FFMPEG ${LIBDIR}/ffmpeg)
 		SET(FFMPEG_INC ${FFMPEG}/include)
 		SET(FFMPEG_LIB avcodec avdevice avformat avutil mp3lame swscale x264 xvidcore theora theoradec theoraenc vorbis vorbisenc vorbisfile ogg)
 		SET(FFMPEG_LIBPATH ${FFMPEG}/lib)
 		SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D__STDC_CONSTANT_MACROS")
-	ENDIF(WITH_FFMPEG)
+	ENDIF(WITH_CODEC_FFMPEG)
 
-	SET(LIBSAMPLERATE ${LIBDIR}/samplerate)
-	SET(LIBSAMPLERATE_INC ${LIBSAMPLERATE}/include)
-	SET(LIBSAMPLERATE_LIB samplerate)
-	SET(LIBSAMPLERATE_LIBPATH ${LIBSAMPLERATE}/lib)
+	IF(WITH_SAMPLERATE)
+		SET(LIBSAMPLERATE ${LIBDIR}/samplerate)
+		SET(LIBSAMPLERATE_INC ${LIBSAMPLERATE}/include)
+		SET(LIBSAMPLERATE_LIB samplerate)
+		SET(LIBSAMPLERATE_LIBPATH ${LIBSAMPLERATE}/lib)
+	ENDIF(WITH_SAMPLERATE)
 
 	SET(LLIBS stdc++ SystemStubs)
 
@@ -779,19 +825,13 @@ IF(APPLE)
 				SET(PLATFORM_LINKFLAGS "${PLATFORM_LINKFLAGS} -framework QuickTime")
 				#libSDL still needs 32bit carbon quicktime 
 			ENDIF(CMAKE_OSX_ARCHITECTURES MATCHES i386)
-		ELSEIF(WITH_QUICKTIME)
+		ELSEIF(WITH_CODEC_QUICKTIME)
 			SET(PLATFORM_LINKFLAGS "${PLATFORM_LINKFLAGS} -framework QuickTime")
 		ENDIF(USE_QTKIT)
 	ELSE (WITH_COCOA)
 		SET(PLATFORM_CFLAGS "-pipe -funsigned-char")
 		SET(PLATFORM_LINKFLAGS "-fexceptions -framework CoreServices -framework Foundation -framework IOKit -framework AppKit -framework Carbon -framework AGL -framework AudioUnit -framework AudioToolbox -framework CoreAudio -framework QuickTime")
 	ENDIF (WITH_COCOA)
-
-	IF(WITH_OPENMP)
-		SET(LLIBS "${LLIBS} -lgomp")
-		SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fopenmp")
-		SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp")
-	ENDIF(WITH_OPENMP)
 
 	IF (WITH_OPENCOLLADA)
 		SET(OPENCOLLADA ${LIBDIR}/opencollada)
@@ -849,7 +889,7 @@ IF(APPLE)
 	SET(C_WARNINGS "-Wall -Wno-char-subscripts -Wpointer-arith -Wcast-align -Wdeclaration-after-statement -Wno-unknown-pragmas")
 	SET(CXX_WARNINGS "-Wall -Wno-invalid-offsetof -Wno-sign-compare")
 
-ENDIF(APPLE)
+ENDIF(UNIX AND NOT APPLE)
 
 
 # buildinfo
@@ -861,7 +901,7 @@ IF(WITH_BUILDINFO)
 	# my mod to manually place avn revision as git doesn't repond properly
 		#EXEC_PROGRAM("svnversion ${CMAKE_SOURCE_DIR}" OUTPUT_VARIABLE BUILD_REV RETURN_VALUE BUILD_REV_RETURN)
 		#IF(BUILD_REV_RETURN)
-			SET(BUILD_REV "32618")
+			SET(BUILD_REV "33405")
 		#ENDIF(BUILD_REV_RETURN)
 	ENDIF(UNIX)
 	
@@ -870,7 +910,7 @@ IF(WITH_BUILDINFO)
 		EXEC_PROGRAM("cmd /c time /t" OUTPUT_VARIABLE BUILD_TIME)  
 		#EXEC_PROGRAM("svnversion ${CMAKE_SOURCE_DIR}" OUTPUT_VARIABLE BUILD_REV RETURN_VALUE BUILD_REV_RETURN)
 		#IF(BUILD_REV_RETURN)
-			SET(BUILD_REV "32618")
+			SET(BUILD_REV "33405")
 		#ENDIF(BUILD_REV_RETURN)
 	ENDIF(WIN32)
 ENDIF(WITH_BUILDINFO)
@@ -896,8 +936,12 @@ ENDIF(WITH_RAYOPTIMIZATION)
 IF(WITH_IMAGE_OPENJPEG)
 	set(OPENJPEG ${CMAKE_SOURCE_DIR}/extern/libopenjpeg)
 	set(OPENJPEG_INC ${OPENJPEG})
-	set(OPENJPEG_LIb extern_openjpeg)
 ENDIF(WITH_IMAGE_OPENJPEG)
+
+IF(WITH_IMAGE_REDCODE)
+	set(REDCODE ${CMAKE_SOURCE_DIR}/extern)
+	set(REDCODE_INC ${REDCODE})
+ENDIF(WITH_IMAGE_REDCODE)
 
 #-----------------------------------------------------------------------------
 # Blender WebPlugin
@@ -916,6 +960,22 @@ FIND_PACKAGE(OpenGL)
 INCLUDE_DIRECTORIES(${OPENGL_INCLUDE_DIR})
 # UNSET(OPENGL_LIBRARIES CACHE) # not compat with older cmake 
 # UNSET(OPENGL_xmesa_INCLUDE_DIR CACHE) # not compat with older cmake 
+
+#-----------------------------------------------------------------------------
+# Configure OpenMP.
+IF(WITH_OPENMP)
+	FIND_PACKAGE(OpenMP)	
+	IF(OPENMP_FOUND)
+		SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+		SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+
+		IF(APPLE AND ${CMAKE_GENERATOR} MATCHES "Xcode")
+			SET(CMAKE_XCODE_ATTRIBUTE_ENABLE_OPENMP_SUPPORT "YES")
+		ENDIF(APPLE AND ${CMAKE_GENERATOR} MATCHES "Xcode")
+	ELSE(OPENMP_FOUND)
+		SET(WITH_OPENMP OFF)
+	ENDIF(OPENMP_FOUND)
+ENDIF(WITH_OPENMP) 
 
 #-----------------------------------------------------------------------------
 # Extra compile flags

@@ -117,8 +117,12 @@ static void rna_Cache_change(Main *bmain, Scene *scene, PointerRNA *ptr)
 			break;
 	}
 
-	if(pid)
+	if(pid) {
+		/* Just make sure this wasn't changed. */
+		if(pid->type == PTCACHE_TYPE_SMOKE_DOMAIN)
+			cache->step = 1;
 		BKE_ptcache_update_info(pid);
+	}
 
 	BLI_freelistN(&pidlist);
 }
@@ -140,8 +144,11 @@ static void rna_Cache_toggle_disk_cache(Main *bmain, Scene *scene, PointerRNA *p
 			break;
 	}
 
-	if(pid)
+	/* smoke can only use disk cache */
+	if(pid && pid->type != PTCACHE_TYPE_SMOKE_DOMAIN)
 		BKE_ptcache_toggle_disk_cache(pid);
+	else
+		cache->flag ^= PTCACHE_DISK_CACHE;
 
 	BLI_freelistN(&pidlist);
 }
@@ -152,8 +159,7 @@ static void rna_Cache_idname_change(Main *bmain, Scene *scene, PointerRNA *ptr)
 	PointCache *cache = (PointCache*)ptr->data;
 	PTCacheID *pid = NULL, *pid2= NULL;
 	ListBase pidlist;
-	int new_name = 1;
-	char name[256];
+	int rename = 1;
 
 	if(!ob)
 		return;
@@ -171,10 +177,8 @@ static void rna_Cache_idname_change(Main *bmain, Scene *scene, PointerRNA *ptr)
 		if(!pid)
 			return;
 
-		cache->flag |= (PTCACHE_BAKED|PTCACHE_DISK_CACHE|PTCACHE_SIMULATION_VALID);
-		cache->flag &= ~(PTCACHE_OUTDATED|PTCACHE_FRAMES_SKIPPED);
-
 		BKE_ptcache_load_external(pid);
+
 		DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
 	}
 	else {
@@ -184,25 +188,19 @@ static void rna_Cache_idname_change(Main *bmain, Scene *scene, PointerRNA *ptr)
 			else if(strcmp(cache->name, "") && strcmp(cache->name,pid->cache->name)==0) {
 				/*TODO: report "name exists" to user */
 				strcpy(cache->name, cache->prev_name);
-				new_name = 0;
+				rename = 0;
 			}
 		}
 
-		if(new_name) {
+		if(rename) {
 			if(pid2 && cache->flag & PTCACHE_DISK_CACHE) {
-				/* TODO: change to simple file rename */
-				strcpy(name, cache->name);
-				strcpy(cache->name, cache->prev_name);
+				char old_name[256];
+				char new_name[256];
 
-				cache->flag &= ~PTCACHE_DISK_CACHE;
+				strcpy(old_name, cache->prev_name);
+				strcpy(new_name, cache->name);
 
-				BKE_ptcache_toggle_disk_cache(pid2);
-
-				strcpy(cache->name, name);
-
-				cache->flag |= PTCACHE_DISK_CACHE;
-
-				BKE_ptcache_toggle_disk_cache(pid2);
+				BKE_ptcache_disk_cache_rename(pid2, old_name, new_name);
 			}
 
 			strcpy(cache->prev_name, cache->name);
@@ -1439,7 +1437,7 @@ static void rna_def_softbody(BlenderRNA *brna)
 {
 	StructRNA *srna;
 	PropertyRNA *prop;
-	int matrix_dimsize[]= {3, 3};
+	const int matrix_dimsize[]= {3, 3};
 
 	
 	static EnumPropertyItem collision_type_items[] = {

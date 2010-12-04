@@ -24,8 +24,10 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-# this warning on generated files gets annoying
-STRING(REGEX REPLACE "-Wunused-parameter" "" CMAKE_C_FLAGS ${CMAKE_C_FLAGS})
+# Generated code has some unused vars we can ignore.
+REMOVE_STRICT_FLAGS()
+
+MESSAGE(STATUS "Configuring makesrna")
 
 FILE(GLOB DEFSRC RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "*.c")
 FILE(GLOB APISRC RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "*_api.c")
@@ -33,6 +35,8 @@ LIST(REMOVE_ITEM DEFSRC rna_access.c rna_define.c makesrna.c)
 LIST(REMOVE_ITEM DEFSRC ${APISRC})
  
 STRING(REGEX REPLACE "rna_([a-zA-Z0-9_-]*).c" "${CMAKE_CURRENT_BINARY_DIR}/rna_\\1_gen.c" GENSRC "${DEFSRC}")
+SET_SOURCE_FILES_PROPERTIES(GENSRC PROPERTIES GENERATED true)
+
 
 SET(SRC
 	makesrna.c
@@ -40,7 +44,8 @@ SET(SRC
 	${DEFSRC}
 	${APISRC}
 	../../../../intern/guardedalloc/intern/mallocn.c
-	../../../../intern/guardedalloc/intern/mmap_win.c)
+	../../../../intern/guardedalloc/intern/mmap_win.c
+)
 
 INCLUDE_DIRECTORIES(
 	../../../../intern/audaspace/intern
@@ -50,6 +55,7 @@ INCLUDE_DIRECTORIES(
 	../../makesdna
 	../../blenkernel
 	../../blenlib
+	../../blenfont
 	../../ikplugin
 	../../windowmanager
 	../../editors/include
@@ -57,20 +63,17 @@ INCLUDE_DIRECTORIES(
 	../../imbuf
 	../../render/extern/include
 	../../../../extern/glew/include
-	. )
+	.
+)
 
 FILE(GLOB INC_FILES ../*.h ../../makesdna/*.h)
 
-IF(NOT WITH_PYTHON)
-	ADD_DEFINITIONS(-DDISABLE_PYTHON)
-ENDIF(NOT WITH_PYTHON)
-
-IF(WIN32)
-	LIST(APPEND INC ${PTHREADS_INC})
-ENDIF(WIN32)
+IF(WITH_PYTHON)
+	ADD_DEFINITIONS(-DWITH_PYTHON)
+ENDIF(WITH_PYTHON)
 
 IF(WITH_GAMEENGINE)
-	ADD_DEFINITIONS(-DGAMEBLENDER)
+	ADD_DEFINITIONS(-DWITH_GAMEENGINE)
 ENDIF(WITH_GAMEENGINE)
 
 IF(WITH_IMAGE_OPENEXR)
@@ -97,24 +100,24 @@ IF(WITH_IMAGE_HDR)
 	ADD_DEFINITIONS(-DWITH_HDR)
 ENDIF(WITH_IMAGE_HDR)
 
-IF(WITH_QUICKTIME)
+IF(WITH_CODEC_QUICKTIME)
 	LIST(APPEND INC ../../quicktime)
 	ADD_DEFINITIONS(-DWITH_QUICKTIME)
-ENDIF(WITH_QUICKTIME)
+ENDIF(WITH_CODEC_QUICKTIME)
 
-IF(WITH_FFMPEG)
+IF(WITH_CODEC_FFMPEG)
 	LIST(APPEND INC ${FFMPEG_INC})
 	ADD_DEFINITIONS(-DWITH_FFMPEG)
-ENDIF(WITH_FFMPEG)
+ENDIF(WITH_CODEC_FFMPEG)
 
 IF(WITH_LCMS)
 	LIST(APPEND INC ${LCMS_INCLUDE_DIR})
 	ADD_DEFINITIONS(-DWITH_LCMS)
 ENDIF(WITH_LCMS)
 
-IF(NOT WITH_FLUID)
+IF(NOT WITH_MOD_FLUID)
 	ADD_DEFINITIONS(-DDISABLE_ELBEEM)
-ENDIF(NOT WITH_FLUID)
+ENDIF(NOT WITH_MOD_FLUID)
 
 IF(WITH_FFTW3)
 	ADD_DEFINITIONS(-DFFTW3=1)
@@ -132,6 +135,10 @@ IF(WITH_JACK)
 	ADD_DEFINITIONS(-DWITH_JACK)
 ENDIF(WITH_JACK)
 
+IF(WITH_OPENCOLLADA)
+	ADD_DEFINITIONS(-DWITH_COLLADA)
+ENDIF(WITH_OPENCOLLADA)
+
 # Build makesrna executable
 ADD_EXECUTABLE(makesrna ${SRC} ${INC_FILES})
 TARGET_LINK_LIBRARIES(makesrna bf_dna)
@@ -145,7 +152,18 @@ ADD_CUSTOM_COMMAND(
 )
 
 # Build bf_rna
-SET(SRC rna_access.c ${GENSRC})
-BLENDERLIB(bf_rna "${SRC}" "${INC}")
+SET(SRC
+	rna_access.c
+	${GENSRC}
 
-MESSAGE(STATUS "Configuring makesrna")
+	../RNA_access.h
+	../RNA_define.h
+	../RNA_enum_types.h
+	../RNA_types.h
+
+	rna_internal.h
+	rna_internal_types.h
+	rna_nodetree_types.h
+)
+
+BLENDERLIB(bf_rna "${SRC}" "${INC}")

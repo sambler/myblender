@@ -24,14 +24,6 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-SET(SRC 
-	GPG_Application.cpp
-	GPG_Canvas.cpp
-	GPG_ghost.cpp
-	GPG_KeyboardDevice.cpp
-	GPG_System.cpp
-)
-
 SET(INC
 	.
 	../../../../intern/string
@@ -44,11 +36,11 @@ SET(INC
 	../../../../source/gameengine/Converter
 	../../../../source/blender/imbuf
 	../../../../source/gameengine/Ketsji
+	../../../../source/blender/blenfont
 	../../../../source/blender/blenlib
 	../../../../source/blender/blenkernel
 	../../../../source/blender/readblenfile
 	../../../../source/blender
-	../../../../source/blender/include
 	../../../../source/blender/makesdna
 	../../../../source/blender/makesrna
 	../../../../source/gameengine/Rasterizer
@@ -59,17 +51,29 @@ SET(INC
 	../../../../source/gameengine/Physics/common
 	../../../../source/gameengine/Network/LoopBackNetwork
 	../../../../source/gameengine/GamePlayer/common
-	../../../../source/blender/misc
 	../../../../source/blender/blenloader
 	../../../../source/blender/gpu
 	../../../../extern/glew/include
 	${PYTHON_INC}
 )
 
+SET(SRC 
+	GPG_Application.cpp
+	GPG_Canvas.cpp
+	GPG_ghost.cpp
+	GPG_KeyboardDevice.cpp
+	GPG_System.cpp
+
+	GPG_Application.h
+	GPG_Canvas.h
+	GPG_KeyboardDevice.h
+	GPG_System.h
+)
+
 ADD_DEFINITIONS(-DGLEW_STATIC)
 
-IF(WITH_FFMPEG)
+IF(WITH_CODEC_FFMPEG)
 	ADD_DEFINITIONS(-DWITH_FFMPEG)
-ENDIF(WITH_FFMPEG)
+ENDIF(WITH_CODEC_FFMPEG)
 
-BLENDERLIB_NOLIST(gp_ghost "${SRC}" "${INC}")
+BLENDERLIB_NOLIST(ge_player_ghost "${SRC}" "${INC}")

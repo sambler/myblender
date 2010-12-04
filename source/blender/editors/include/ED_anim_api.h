@@ -35,6 +35,7 @@ struct AnimData;
 
 struct bContext;
 struct wmKeyConfig;
+struct ReportList;
 struct ScrArea;
 struct ARegion;
 struct View2D;
@@ -73,7 +74,8 @@ typedef struct bAnimContext {
 	struct Scene *scene;	/* active scene */
 	struct Object *obact;	/* active object */
 	ListBase *markers;		/* active set of markers */
-	ListBase *reports;		/* pointer to current reports list */			// XXX not yet used
+	
+	struct ReportList *reports;	/* pointer to current reports list */
 } bAnimContext;
 
 /* Main Data container types */
@@ -330,7 +332,7 @@ typedef enum eAnimChannels_SetFlag {
 
 /* types of settings for AnimChannels */
 typedef enum eAnimChannel_Settings {
-	 ACHANNEL_SETTING_SELECT = 0,
+	ACHANNEL_SETTING_SELECT = 0,
 	ACHANNEL_SETTING_PROTECT,			// warning: for drawing UI's, need to check if this is off (maybe inverse this later)
 	ACHANNEL_SETTING_MUTE,
 	ACHANNEL_SETTING_EXPAND,

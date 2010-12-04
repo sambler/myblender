@@ -25,6 +25,7 @@
 /* This file defines the '_bpy' module which is used by python's 'bpy' package.
  * a script writer should never directly access this module */
  
+#define WITH_PYTHON /* for AUD_PyInit.h, possibly others */
 
 #include "bpy_util.h" 
 #include "bpy_rna.h"
@@ -38,7 +39,7 @@
 #include "BKE_utildefines.h"
 
  /* external util modules */
-#include "../generic/geometry.h"
+#include "../generic/mathutils.h"
 #include "../generic/bgl.h"
 #include "../generic/blf_api.h"
 #include "../generic/IDProp.h"
@@ -81,7 +82,7 @@ static PyObject *bpy_blend_paths(PyObject *UNUSED(self), PyObject *args, PyObjec
 	PyObject *list = PyList_New(0), *st; /* stupidly big string to be safe */
 	/* be sure there is low chance of the path being too short */
 	char filepath_expanded[1024];
-	char *lib;
+	const char *lib;
 
 	int absolute = 0;
 	static char *kwlist[] = {"absolute", NULL};
@@ -195,13 +196,7 @@ void BPy_init_modules( void )
 		printf("bpy: couldnt find 'scripts/modules', blender probably wont start.\n");
 	}
 	/* stand alone utility modules not related to blender directly */
-	Geometry_Init();
-	Mathutils_Init();
-	Noise_Init();
-	BGL_Init();
-	BLF_Init();
-	IDProp_Init_Types();
-	AUD_initPython();
+	IDProp_Init_Types(); /* not actually a submodule, just types */
 
 	mod = PyModule_New("_bpy");
 

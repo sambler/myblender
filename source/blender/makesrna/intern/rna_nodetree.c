@@ -281,7 +281,8 @@ static void rna_Node_image_layer_update(Main *bmain, Scene *scene, PointerRNA *p
 	ImageUser *iuser= node->storage;
 	
 	BKE_image_multilayer_index(ima->rr, iuser);
-	BKE_image_signal(ima, iuser, IMA_SIGNAL_SRC_CHANGE);
+	/* do not call below function, it frees the multilayer exr */
+	/* BKE_image_signal(ima, iuser, IMA_SIGNAL_SRC_CHANGE); */
 	
 	rna_Node_update(bmain, scene, ptr);
 }
@@ -1128,7 +1129,7 @@ static void def_cmp_output_file(StructRNA *srna)
 		{0, "NONE",  0, "None",           ""},
 		{1, "PXR24", 0, "Pxr24 (lossy)",  ""},
 		{2, "ZIP",   0, "ZIP (lossless)", ""},
-		{3, "PIZ",   0, "PIX (lossless)", ""},
+		{3, "PIZ",   0, "PIZ (lossless)", ""},
 		{4, "RLE",   0, "RLE (lossless)", ""},
 		{0, NULL, 0, NULL, NULL}};
 	
@@ -2034,6 +2035,16 @@ static void def_cmp_huecorrect(StructRNA *srna)
 	RNA_def_property_update(prop, NC_NODE|NA_EDITED, "rna_Node_update");
 }
 
+static void def_cmp_zcombine(StructRNA *srna)
+{
+	PropertyRNA *prop;
+	
+	prop = RNA_def_property(srna, "use_alpha", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "custom1", 0);
+	RNA_def_property_ui_text(prop, "Use Alpha", "Takes Alpha channel into account when doing the Z operation");
+	RNA_def_property_update(prop, NC_NODE|NA_EDITED, "rna_Node_update");
+}
+
 
 /* -- Texture Nodes --------------------------------------------------------- */
 
@@ -2277,6 +2288,37 @@ static void rna_def_node(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Outputs", "");
 }
 
+static void rna_def_node_link(BlenderRNA *brna)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+	
+	srna = RNA_def_struct(brna, "NodeLink", NULL);
+	RNA_def_struct_ui_text(srna, "NodeLink", "Link between nodes in a node tree");
+	RNA_def_struct_sdna(srna, "bNodeLink");
+	RNA_def_struct_ui_icon(srna, ICON_NODE);
+
+	prop = RNA_def_property(srna, "from_node", PROP_POINTER, PROP_NONE);
+	RNA_def_property_pointer_sdna(prop, NULL, "fromnode");
+	RNA_def_property_struct_type(prop, "Node");
+	RNA_def_property_ui_text(prop, "From node", "");
+
+	prop = RNA_def_property(srna, "to_node", PROP_POINTER, PROP_NONE);
+	RNA_def_property_pointer_sdna(prop, NULL, "tonode");
+	RNA_def_property_struct_type(prop, "Node");
+	RNA_def_property_ui_text(prop, "To node", "");
+
+	prop = RNA_def_property(srna, "from_socket", PROP_POINTER, PROP_NONE);
+	RNA_def_property_pointer_sdna(prop, NULL, "fromsock");
+	RNA_def_property_struct_type(prop, "NodeSocket");
+	RNA_def_property_ui_text(prop, "From socket", "");
+
+	prop = RNA_def_property(srna, "to_socket", PROP_POINTER, PROP_NONE);
+	RNA_def_property_pointer_sdna(prop, NULL, "tosock");
+	RNA_def_property_struct_type(prop, "NodeSocket");
+	RNA_def_property_ui_text(prop, "To socket", "");
+}
+
 static void rna_def_nodetree(BlenderRNA *brna)
 {
 	StructRNA *srna;
@@ -2295,6 +2337,12 @@ static void rna_def_nodetree(BlenderRNA *brna)
 	RNA_def_property_collection_sdna(prop, NULL, "nodes", NULL);
 	RNA_def_property_struct_type(prop, "Node");
 	RNA_def_property_ui_text(prop, "Nodes", "");
+
+	/* NodeLinks Collection */
+	prop = RNA_def_property(srna, "links", PROP_COLLECTION, PROP_NONE);
+	RNA_def_property_collection_sdna(prop, NULL, "links", NULL);
+	RNA_def_property_struct_type(prop, "NodeLink");
+	RNA_def_property_ui_text(prop, "Links", "");
 	
 	/* Grease Pencil */
 	prop= RNA_def_property(srna, "grease_pencil", PROP_POINTER, PROP_NONE);
@@ -2321,6 +2369,7 @@ void RNA_def_nodetree(BlenderRNA *brna)
 	rna_def_node_socket_vector(brna);
 	rna_def_node_socket_rgba(brna);
 	rna_def_node(brna);
+	rna_def_node_link(brna);
 	rna_def_shader_node(brna);
 	rna_def_compositor_node(brna);
 	rna_def_texture_node(brna);

@@ -19,8 +19,6 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-FILE(GLOB SRC *.c)
-
 SET(INC
 	../include
 	../../blenkernel
@@ -32,6 +30,21 @@ SET(INC
 	../../render/extern/include
 	../../../../intern/guardedalloc
 )
+
+SET(SRC
+	image_buttons.c
+	image_draw.c
+	image_header.c
+	image_ops.c
+	image_render.c
+	space_image.c
+
+	image_intern.h
+)
+
+IF(WITH_IMAGE_OPENJPEG)
+	ADD_DEFINITIONS(-DWITH_OPENJPEG)
+ENDIF(WITH_IMAGE_OPENJPEG)
 
 IF(WITH_IMAGE_OPENEXR)
 	ADD_DEFINITIONS(-DWITH_OPENEXR)
@@ -49,9 +62,5 @@ IF(WITH_LCMS)
 	SET(INC ${INC} ${LCMS_INCLUDE_DIR})
 	ADD_DEFINITIONS(-DWITH_LCMS)
 ENDIF(WITH_LCMS)
-
-IF(WIN32)
-	LIST(APPEND INC ${PTHREADS_INC})
-ENDIF(WIN32)
 
 BLENDERLIB(bf_editor_space_image "${SRC}" "${INC}")

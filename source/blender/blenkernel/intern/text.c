@@ -53,7 +53,7 @@
 #include "BKE_text.h"
 #include "BKE_utildefines.h"
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 #include "BPY_extern.h"
 #endif
 
@@ -167,12 +167,12 @@ void free_text(Text *text)
 
 	if(text->name) MEM_freeN(text->name);
 	MEM_freeN(text->undo_buf);
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 	if (text->compiled) BPY_free_compiled_text(text);
 #endif
 }
 
-Text *add_empty_text(char *name) 
+Text *add_empty_text(const char *name) 
 {
 	Main *bmain= G.main;
 	Text *ta;
@@ -325,7 +325,7 @@ int reopen_text(Text *text)
 	return 1;
 }
 
-Text *add_text(char *file, const char *relpath) 
+Text *add_text(const char *file, const char *relpath) 
 {
 	Main *bmain= G.main;
 	FILE *fp;
@@ -559,7 +559,7 @@ void clear_text(Text *text) /* called directly from rna */
 	txt_make_dirty(text);
 }
 
-void write_text(Text *text, char *str) /* called directly from rna */
+void write_text(Text *text, const char *str) /* called directly from rna */
 {
 	int oldstate;
 
@@ -683,7 +683,7 @@ int txt_get_span (TextLine *from, TextLine *to)
 static void txt_make_dirty (Text *text)
 {
 	text->flags |= TXT_ISDIRTY;
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 	if (text->compiled) BPY_free_compiled_text(text);
 #endif
 }
@@ -991,8 +991,8 @@ void txt_move_to (Text *text, unsigned int line, unsigned int ch, short sel)
 		if ((*linep)->next) *linep= (*linep)->next;
 		else break;
 	}
-	if (ch>(*linep)->len)
-		ch= (*linep)->len;
+	if (ch>(unsigned int)((*linep)->len))
+		ch= (unsigned int)((*linep)->len);
 	*charp= ch;
 	
 	if(!sel) txt_pop_sel(text);

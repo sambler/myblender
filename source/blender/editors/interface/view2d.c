@@ -57,6 +57,9 @@
 
 /* *********************************************************************** */
 
+/* XXX still unresolved: scrolls hide/unhide vs region mask handling */
+/* XXX there's V2D_SCROLL_HORIZONTAL_HIDE and V2D_SCROLL_HORIZONTAL_FULLR ... */
+
 /* helper to allow scrollbars to dynamically hide
  * 	- returns a copy of the scrollbar settings with the flags to display 
  *	  horizontal/vertical scrollbars removed
@@ -83,6 +86,7 @@ static void view2d_masks(View2D *v2d)
 	v2d->mask.ymax= v2d->winy - 1;
 
 #if 0
+	// XXX see above
 	v2d->scroll &= ~(V2D_SCROLL_HORIZONTAL_HIDE|V2D_SCROLL_VERTICAL_HIDE);
 	/* check size if: */
 	if (v2d->scroll & V2D_SCROLL_HORIZONTAL)
@@ -1069,7 +1073,7 @@ static void step_to_grid(float *step, int *power, int unit)
 		/* for frames, we want 1.0 frame intervals only */
 		if (unit == V2D_UNIT_FRAMES) {
 			rem = 1.0f;
-			*step = 1.0f;
+			*step = 2.0f; /* use 2 since there are grid lines drawn inbetween, this way to get 1 line per frane */
 		}
 		
 		/* prevents printing 1.0 2.0 3.0 etc */
@@ -1525,7 +1529,7 @@ static void scroll_printstr(Scene *scene, float x, float y, float val, int power
 	}
 	
 	/* draw it */
-	BLF_draw_default(x, y, 0.0f, str);
+	BLF_draw_default(x, y, 0.0f, str, sizeof(str)-1);
 }
 
 /* Draw scrollbars in the given 2d-region */
@@ -2054,7 +2058,7 @@ void UI_view2d_text_cache_draw(ARegion *ar)
 	for(v2s= strings.first; v2s; v2s= v2s->next) {
 		glColor3fv(v2s->col);
 		if(v2s->rect.xmin==v2s->rect.xmax)
-			BLF_draw_default((float)v2s->mval[0], (float)v2s->mval[1], 0.0, v2s->str);
+			BLF_draw_default((float)v2s->mval[0], (float)v2s->mval[1], 0.0, v2s->str, sizeof(v2s->str)-1);
 		else {
 			int xofs=0, yofs;
 			
@@ -2063,7 +2067,7 @@ void UI_view2d_text_cache_draw(ARegion *ar)
 			
 			BLF_clipping_default(v2s->rect.xmin-4, v2s->rect.ymin-4, v2s->rect.xmax+4, v2s->rect.ymax+4);
 			BLF_enable_default(BLF_CLIPPING);
-			BLF_draw_default(v2s->rect.xmin+xofs, v2s->rect.ymin+yofs, 0.0f, v2s->str);
+			BLF_draw_default(v2s->rect.xmin+xofs, v2s->rect.ymin+yofs, 0.0f, v2s->str, sizeof(v2s->str)-1);
 			BLF_disable_default(BLF_CLIPPING);
 		}
 	}

@@ -57,6 +57,7 @@ editmesh_tool.c: UI called tools for editmesh, geometry changes here, otherwise 
 #include "BLI_ghash.h"
 #include "BLI_linklist.h"
 #include "BLI_heap.h"
+#include "BLI_scanfill.h"
 
 #include "BKE_context.h"
 #include "BKE_depsgraph.h"
@@ -5840,6 +5841,7 @@ static int merge_exec(bContext *C, wmOperator *op)
 	Object *obedit= CTX_data_edit_object(C);
 	EditMesh *em= BKE_mesh_get_editmesh((Mesh *)obedit->data);
 	int count= 0, uvs= RNA_boolean_get(op->ptr, "uvs");
+	EditSelection *ese;
 
 	switch(RNA_enum_get(op->ptr, "type")) {
 		case 3:
@@ -5849,10 +5851,21 @@ static int merge_exec(bContext *C, wmOperator *op)
 			count = merge_target(C, em, 1, uvs);
 			break;
 		case 1:
-			count = merge_firstlast(em, 0, uvs);
+			ese= (EditSelection *)em->selected.last;
+			if(ese && ese->type == EDITVERT) {
+				count = merge_firstlast(em, 0, uvs);
+			} else {
+				BKE_report(op->reports, RPT_ERROR, "no last selected vertex set");
+			}
 			break;
 		case 6:
-			count = merge_firstlast(em, 1, uvs);
+			ese= (EditSelection *)em->selected.first;
+			if(ese && ese->type == EDITVERT) {
+				count = merge_firstlast(em, 1, uvs);
+			}
+			else {
+				BKE_report(op->reports, RPT_ERROR, "no last selected vertex set");
+			}
 			break;
 		case 5:
 			count = collapseEdges(em);
@@ -6769,7 +6782,7 @@ void MESH_OT_subdivide(wmOperatorType *ot)
 
 	/* properties */
 	RNA_def_int(ot->srna, "number_cuts", 1, 1, INT_MAX, "Number of Cuts", "", 1, 10);
-	RNA_def_float(ot->srna, "smoothness", 0.0f, 0.0f, FLT_MAX, "Smoothness", "Smoothness factor.", 0.0f, 1000.0f);
+	RNA_def_float(ot->srna, "smoothness", 0.0f, 0.0f, FLT_MAX, "Smoothness", "Smoothness factor.", 0.0f, 1.0f);
 	RNA_def_float(ot->srna, "fractal", 0.0, 0.0f, FLT_MAX, "Fractal", "Fractal randomness factor.", 0.0f, 1000.0f);
 	RNA_def_enum(ot->srna, "corner_cut_pattern", corner_type_items, SUBDIV_CORNER_INNERVERT, "Corner Cut Pattern", "Topology pattern to use to fill a face after cutting across its corner");
 }

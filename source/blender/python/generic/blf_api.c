@@ -141,12 +141,13 @@ static char py_blf_draw_doc[] =
 static PyObject *py_blf_draw(PyObject *UNUSED(self), PyObject *args)
 {
 	char *text;
+	int text_length;
 	int fontid;
 
-	if (!PyArg_ParseTuple(args, "is:blf.draw", &fontid, &text))
+	if (!PyArg_ParseTuple(args, "is#:blf.draw", &fontid, &text, &text_length))
 		return NULL;
 
-	BLF_draw(fontid, text);
+	BLF_draw(fontid, text, (unsigned int)text_length);
 
 	Py_RETURN_NONE;
 }
@@ -390,17 +391,16 @@ static struct PyModuleDef BLF_module_def = {
 	0,  /* m_free */
 };
 
-PyObject *BLF_Init(void)
+PyObject *BPyInit_blf(void)
 {
 	PyObject *submodule;
 
 	submodule = PyModule_Create(&BLF_module_def);
-	PyDict_SetItemString(PyImport_GetModuleDict(), BLF_module_def.m_name, submodule);
 
 	PyModule_AddIntConstant(submodule, "ROTATION", BLF_ROTATION);
 	PyModule_AddIntConstant(submodule, "CLIPPING", BLF_CLIPPING);
 	PyModule_AddIntConstant(submodule, "SHADOW", BLF_SHADOW);
 	PyModule_AddIntConstant(submodule, "KERNING_DEFAULT", BLF_KERNING_DEFAULT);
 
-	return (submodule);
+	return submodule;
 }

@@ -3221,7 +3221,12 @@ void psys_cache_edit_paths(Scene *scene, Object *ob, PTCacheEdit *edit, float cf
 	edit->totcached = totpart;
 
 	if(psys) {
-		ParticleSimulationData sim = {scene, ob, psys, psys_get_modifier(ob, psys), NULL};
+		ParticleSimulationData sim= {0};
+		sim.scene= scene;
+		sim.ob= ob;
+		sim.psys= psys;
+		sim.psmd= psys_get_modifier(ob, psys);
+
 		psys_cache_child_paths(&sim, cfra, 1);
 	}
 
@@ -3381,7 +3386,7 @@ void psys_mat_hair_to_global(Object *ob, DerivedMesh *dm, short from, ParticleDa
 /************************************************/
 /*			ParticleSettings handling			*/
 /************************************************/
-ModifierData *object_add_particle_system(Scene *scene, Object *ob, char *name)
+ModifierData *object_add_particle_system(Scene *scene, Object *ob, const char *name)
 {
 	ParticleSystem *psys;
 	ModifierData *md;
@@ -3538,7 +3543,7 @@ static void default_particle_settings(ParticleSettings *part)
 }
 
 
-ParticleSettings *psys_new_settings(char *name, Main *main)
+ParticleSettings *psys_new_settings(const char *name, Main *main)
 {
 	ParticleSettings *part;
 
@@ -4354,7 +4359,7 @@ void psys_get_dupli_path_transform(ParticleSimulationData *sim, ParticleData *pa
 		normalize_v3(side);
 		cross_v3_v3v3(nor, vec, side);
 
-		 unit_m4(mat);
+		unit_m4(mat);
 		VECCOPY(mat[0], vec);
 		VECCOPY(mat[1], side);
 		VECCOPY(mat[2], nor);
@@ -4449,7 +4454,11 @@ void psys_make_billboard(ParticleBillboardData *bb, float xvec[3], float yvec[3]
 
 
 void psys_apply_hair_lattice(Scene *scene, Object *ob, ParticleSystem *psys) {
-	ParticleSimulationData sim = {scene, ob, psys, psys_get_modifier(ob, psys)};
+	ParticleSimulationData sim= {0};
+	sim.scene= scene;
+	sim.ob= ob;
+	sim.psys= psys;
+	sim.psmd= psys_get_modifier(ob, psys);
 
 	psys->lattice = psys_get_lattice(&sim);
 

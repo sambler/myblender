@@ -34,6 +34,7 @@
 
 #include <math.h>
 #include <string.h>
+#include <assert.h>
 
 #include "MEM_guardedalloc.h"
 
@@ -41,6 +42,7 @@
 #include "DNA_ID.h"
 
 #include "BLI_blenlib.h"
+#include "BLI_path_util.h"
 #include "BLI_linklist.h"
 #include "BLI_math.h"
 #include "BLI_mempool.h"
@@ -50,6 +52,7 @@
 #include "BKE_global.h"
 #include "BKE_main.h"
 #include "BKE_utildefines.h"
+#include "BKE_multires.h"
 
 /* number of layers to add when growing a CustomData object */
 #define CUSTOMDATA_GROW 5
@@ -441,19 +444,6 @@ static void mdisps_bilinear(float out[3], float (*disps)[3], int st, float u, fl
 }
 #endif
 
-static int mdisp_corners(MDisps *s)
-{
-	int lvl= 13;
-
-	while(lvl > 0) {
-		int side = (1 << (lvl-1)) + 1;
-		if ((s->totdisp % (side*side)) == 0) return s->totdisp / (side*side);
-		lvl--;
-	}
-
-	return 0;
-}
-
 static void layerSwap_mdisps(void *data, const int *ci)
 {
 	MDisps *s = data;
@@ -462,7 +452,7 @@ static void layerSwap_mdisps(void *data, const int *ci)
 
 	if(s->disps) {
 		int nverts= (ci[1] == 3) ? 4 : 3; /* silly way to know vertex count of face */
-		corners= mdisp_corners(s);
+		corners= multires_mdisp_corners(s);
 		cornersize= s->totdisp/corners;
 
 		if(corners!=nverts) {
@@ -470,8 +460,8 @@ static void layerSwap_mdisps(void *data, const int *ci)
 			   if it happened, just forgot displacement */
 
 			MEM_freeN(s->disps);
-			s->disps= NULL;
-			s->totdisp= 0; /* flag to update totdisp */
+			s->totdisp= (s->totdisp/corners)*nverts;
+			s->disps= MEM_callocN(s->totdisp*sizeof(float)*3, "mdisp swap");
 			return;
 		}
 
@@ -994,7 +984,7 @@ int CustomData_get_layer_index(const CustomData *data, int type)
 	return -1;
 }
 
-int CustomData_get_named_layer_index(const CustomData *data, int type, char *name)
+int CustomData_get_named_layer_index(const CustomData *data, int type, const char *name)
 {
 	int i;
 
@@ -1381,7 +1371,7 @@ void *CustomData_duplicate_referenced_layer(struct CustomData *data, int type)
 }
 
 void *CustomData_duplicate_referenced_layer_named(struct CustomData *data,
-												  int type, char *name)
+												  int type, const char *name)
 {
 	CustomDataLayer *layer;
 	int layer_index;
@@ -1613,7 +1603,7 @@ void *CustomData_get_layer_n(const CustomData *data, int type, int n)
 }
 
 void *CustomData_get_layer_named(const struct CustomData *data, int type,
-								 char *name)
+								 const char *name)
 {
 	int layer_index = CustomData_get_named_layer_index(data, type, name);
 	if(layer_index < 0) return NULL;
@@ -2249,69 +2239,50 @@ static int  CustomData_is_property_layer(int type)
 	return 0;
 }
 
-void CustomData_set_layer_unique_name(CustomData *data, int index)
+static int cd_layer_find_dupe(CustomData *data, const char *name, int type, int index)
 {
-	char tempname[64];
-	int number, i, type;
-	char *dot, *name;
-	CustomDataLayer *layer, *nlayer= &data->layers[index];
+	int i;
+	/* see if there is a duplicate */
+	for(i=0; i<data->totlayer; i++) {
+		if(i != index) {
+			CustomDataLayer *layer= &data->layers[i];
+			
+			if(CustomData_is_property_layer(type)) {
+				if(CustomData_is_property_layer(layer->type) && strcmp(layer->name, name)==0) {
+					return 1;
+				}
+			}
+			else{
+				if(i!=index && layer->type==type && strcmp(layer->name, name)==0) {
+					return 1;
+				}
+			}
+		}
+	}
+	
+	return 0;
+}
+
+static int customdata_unique_check(void *arg, const char *name)
+{
+	struct {CustomData *data; int type; int index;} *data_arg= arg;
+	return cd_layer_find_dupe(data_arg->data, name, data_arg->type, data_arg->index);
+}
+
+void CustomData_set_layer_unique_name(CustomData *data, int index)
+{	
+	CustomDataLayer *nlayer= &data->layers[index];
 	const LayerTypeInfo *typeInfo= layerType_getInfo(nlayer->type);
+
+	struct {CustomData *data; int type; int index;} data_arg;
+	data_arg.data= data;
+	data_arg.type= nlayer->type;
+	data_arg.index= index;
 
 	if (!typeInfo->defaultname)
 		return;
-
-	type = nlayer->type;
-	name = nlayer->name;
-
-	if (name[0] == '\0')
-		BLI_strncpy(nlayer->name, typeInfo->defaultname, sizeof(nlayer->name));
 	
-	/* see if there is a duplicate */
-	for(i=0; i<data->totlayer; i++) {
-		layer = &data->layers[i];
-		
-		if(CustomData_is_property_layer(type)){
-			if(i!=index && CustomData_is_property_layer(layer->type) && 
-				strcmp(layer->name, name)==0)
-					break;	
-		
-		}
-		else{
-			if(i!=index && layer->type==type && strcmp(layer->name, name)==0)
-				break;
-		}
-	}
-
-	if(i == data->totlayer)
-		return;
-
-	/* strip off the suffix */
-	dot = strchr(nlayer->name, '.');
-	if(dot) *dot=0;
-	
-	for(number=1; number <=999; number++) {
-		sprintf(tempname, "%s.%03d", nlayer->name, number);
-
-		for(i=0; i<data->totlayer; i++) {
-			layer = &data->layers[i];
-			
-			if(CustomData_is_property_layer(type)){
-				if(i!=index && CustomData_is_property_layer(layer->type) && 
-					strcmp(layer->name, tempname)==0)
-
-				break;
-			}
-			else{
-				if(i!=index && layer->type==type && strcmp(layer->name, tempname)==0)
-					break;
-			}
-		}
-
-		if(i == data->totlayer) {
-			BLI_strncpy(nlayer->name, tempname, sizeof(nlayer->name));
-			return;
-		}
-	}	
+	BLI_uniquename_cb(customdata_unique_check, &data_arg, typeInfo->defaultname, '.', nlayer->name, sizeof(nlayer->name));
 }
 
 int CustomData_verify_versions(struct CustomData *data, int index)

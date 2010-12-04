@@ -19,8 +19,6 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-FILE(GLOB SRC *.c)
-
 SET(INC
 	../include
 	../../blenkernel
@@ -32,8 +30,17 @@ SET(INC
 	../../../../intern/guardedalloc
 )
 
+SET(SRC
+	logic_buttons.c
+	logic_ops.c
+	logic_window.c
+	space_logic.c
+
+	logic_intern.h
+)
+
 IF(WITH_GAMEENGINE)
-	ADD_DEFINITIONS(-DGAMEBLENDER)
+	ADD_DEFINITIONS(-DWITH_GAMEENGINE)
 ENDIF(WITH_GAMEENGINE)
 
 BLENDERLIB(bf_editor_space_logic "${SRC}" "${INC}")

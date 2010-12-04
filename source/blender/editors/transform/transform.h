@@ -146,6 +146,8 @@ typedef struct TransDataExtension {
 	float *size;         /* Size of the data to transform (Faculative)                                     */
 	float  isize[3];	 /* Initial size                                                                   */
 	float  obmat[4][4];	 /* Object matrix */
+	float  l_smtx[3][3]; /* use instead of td->smtx, It is the same but without the 'bone->bone_mat', see TD_PBONE_LOCAL_MTX_C */
+	int    rotOrder;	/* rotation mode,  as defined in eRotationModes (DNA_action_types.h) */
 } TransDataExtension;
 
 typedef struct TransData2D {
@@ -232,7 +234,6 @@ typedef struct TransData {
 	void  *extra;		 /* extra data (mirrored element pointer, in editmode mesh to EditVert) (editbone for roll fixing) (...) */
 	int  flag;         /* Various flags */
 	short  protectflag;	 /* If set, copy of Object or PoseChannel protection */
-	int    rotOrder;	/* rotation mode,  as defined in eRotationModes (DNA_action_types.h) */
 } TransData;
 
 typedef struct MouseInput {
@@ -313,8 +314,10 @@ typedef struct TransInfo {
 	float		values[4];
 	float		auto_values[4];
 	float		axis[3];
+	float		axis_orig[3];	/* TransCon can change 'axis', store the original value here */
 
 	void		*view;
+	struct bContext *context; /* Only valid (non null) during an operator called function. */
 	struct ScrArea	*sa;
 	struct ARegion	*ar;
 	struct Scene	*scene;
@@ -432,6 +435,8 @@ typedef struct TransInfo {
 #define TD_MIRROR_EDGE	 	(1 << 16) 	/* For editmode mirror, clamp to x = 0 */
 #define TD_MOVEHANDLE1		(1 << 17)	/* For fcurve handles, move them along with their keyframes */
 #define TD_MOVEHANDLE2		(1 << 18)
+#define TD_PBONE_LOCAL_MTX_P (1 << 19)	/* exceptional case with pose bone rotating when a parent bone has 'Local Location' option enabled and rotating also transforms it. */
+#define TD_PBONE_LOCAL_MTX_C (1 << 20)	/* same as above but for a child bone */
 
 /* transsnap->status */
 #define SNAP_FORCED		1
@@ -444,7 +449,7 @@ void TRANSFORM_OT_transform(struct wmOperatorType *ot);
 int initTransform(struct bContext *C, struct TransInfo *t, struct wmOperator *op, struct wmEvent *event, int mode);
 void saveTransform(struct bContext *C, struct TransInfo *t, struct wmOperator *op);
 int  transformEvent(TransInfo *t, struct wmEvent *event);
-void transformApply(const struct bContext *C, TransInfo *t);
+void transformApply(struct bContext *C, TransInfo *t);
 int  transformEnd(struct bContext *C, TransInfo *t);
 
 void setTransformViewMatrices(TransInfo *t);
@@ -553,7 +558,6 @@ void flushTransSeq(TransInfo *t);
 /*********************** exported from transform_manipulator.c ********** */
 int gimbal_axis(struct Object *ob, float gmat[][3]); /* return 0 when no gimbal for selection */
 int calc_manipulator_stats(const struct bContext *C);
-float get_drawsize(struct ARegion *ar, float *co);
 
 /*********************** TransData Creation and General Handling *********** */
 void createTransData(struct bContext *C, TransInfo *t);

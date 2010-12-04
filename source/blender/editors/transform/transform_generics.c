@@ -334,15 +334,13 @@ void recalcData(TransInfo *t)
 		Scene *scene= t->scene;
 		SpaceAction *saction= (SpaceAction *)t->sa->spacedata.first;
 		
-		bAnimContext ac;
+		bAnimContext ac= {0};
 		ListBase anim_data = {NULL, NULL};
 		bAnimListElem *ale;
 		int filter;
 		
 		/* initialise relevant anim-context 'context' data from TransInfo data */
 			/* NOTE: sync this with the code in ANIM_animdata_get_context() */
-		memset(&ac, 0, sizeof(bAnimContext));
-		
 		ac.scene= t->scene;
 		ac.obact= OBACT;
 		ac.sa= t->sa;
@@ -584,7 +582,7 @@ void recalcData(TransInfo *t)
 							BKE_nlatrack_add_strip(track, strip);
 							
 							tdn->nlt= track;
-							tdn->trackIndex += (n + 1); /* + 1, since n==0 would mean that we didn't change track */
+							tdn->trackIndex++;
 						}
 						else /* can't move any further */
 							break;
@@ -602,7 +600,7 @@ void recalcData(TransInfo *t)
 							BKE_nlatrack_add_strip(track, strip);
 							
 							tdn->nlt= track;
-							tdn->trackIndex -= (n - 1); /* - 1, since n==0 would mean that we didn't change track */
+							tdn->trackIndex--;
 						}
 						else /* can't move any further */
 							break;
@@ -624,11 +622,6 @@ void recalcData(TransInfo *t)
 	}
 	else if (t->spacetype == SPACE_VIEW3D) {
 		
-		/* project */
-		if(t->state != TRANS_CANCEL) {
-			applyProject(t);
-		}
-		
 		if (t->obedit) {
 			if ELEM(t->obedit->type, OB_CURVE, OB_SURF) {
 				Curve *cu= t->obedit->data;
@@ -637,6 +630,7 @@ void recalcData(TransInfo *t)
 
 				if(t->state != TRANS_CANCEL) {
 					clipMirrorModifier(t, t->obedit);
+					applyProject(t);
 				}
 
 				DAG_id_flush_update(t->obedit->data, OB_RECALC_DATA);  /* sets recalc flags */
@@ -657,6 +651,11 @@ void recalcData(TransInfo *t)
 			}
 			else if(t->obedit->type==OB_LATTICE) {
 				Lattice *la= t->obedit->data;
+
+				if(t->state != TRANS_CANCEL) {
+					applyProject(t);
+				}
+
 				DAG_id_flush_update(t->obedit->data, OB_RECALC_DATA);  /* sets recalc flags */
 	
 				if(la->editlatt->latt->flag & LT_OUTSIDE) outside_lattice(la->editlatt->latt);
@@ -666,6 +665,7 @@ void recalcData(TransInfo *t)
 				/* mirror modifier clipping? */
 				if(t->state != TRANS_CANCEL) {
 					clipMirrorModifier(t, t->obedit);
+					applyProject(t);
 				}
 				if((t->options & CTX_NO_MIRROR) == 0 && (t->flag & T_MIRROR))
 					editmesh_apply_to_mirror(t);
@@ -681,6 +681,10 @@ void recalcData(TransInfo *t)
 				TransData *td = t->data;
 				int i;
 				
+				if(t->state != TRANS_CANCEL) {
+					applyProject(t);
+				}
+
 				/* Ensure all bones are correctly adjusted */
 				for (ebo = edbo->first; ebo; ebo = ebo->next){
 					
@@ -743,7 +747,7 @@ void recalcData(TransInfo *t)
 								mul_m3_v3(t->mat, up_axis);
 							}
 							
-							ebo->roll = ED_rollBoneToVector(ebo, up_axis);
+							ebo->roll = ED_rollBoneToVector(ebo, up_axis, FALSE);
 						}
 					}
 				}
@@ -753,7 +757,12 @@ void recalcData(TransInfo *t)
 				
 			}
 			else
+			{
+				if(t->state != TRANS_CANCEL) {
+					applyProject(t);
+				}
 				DAG_id_flush_update(t->obedit->data, OB_RECALC_DATA);  /* sets recalc flags */
+			}
 		}
 		else if( (t->flag & T_POSE) && t->poseobj) {
 			Object *ob= t->poseobj;
@@ -779,11 +788,18 @@ void recalcData(TransInfo *t)
 				where_is_pose(scene, ob);
 		}
 		else if(base && (base->object->mode & OB_MODE_PARTICLE_EDIT) && PE_get_current(scene, base->object)) {
+			if(t->state != TRANS_CANCEL) {
+				applyProject(t);
+			}
 			flushTransParticles(t);
 		}
 		else {
 			int i;
 			
+			if(t->state != TRANS_CANCEL) {
+				applyProject(t);
+			}
+
 			for (i = 0; i < t->total; i++) {
 				TransData *td = t->data + i;
 				Object *ob = td->ob;
@@ -801,7 +817,7 @@ void recalcData(TransInfo *t)
 				// TODO: autokeyframe calls need some setting to specify to add samples (FPoints) instead of keyframes?
 				if ((t->animtimer) && IS_AUTOKEY_ON(t->scene)) {
 					animrecord_check_state(t->scene, &ob->id, t->animtimer);
-					autokeyframe_ob_cb_func(NULL, t->scene, (View3D *)t->view, ob, t->mode);
+					autokeyframe_ob_cb_func(t->context, t->scene, (View3D *)t->view, ob, t->mode);
 				}
 				
 				/* sets recalc flags fully, instead of flushing existing ones 
@@ -1068,8 +1084,9 @@ int initTransInfo (bContext *C, TransInfo *t, wmOperator *op, wmEvent *event)
 		
 		
 		/* TRANSFORM_FIX_ME rna restrictions */
-		if (t->prop_size <= 0)
+		if (t->prop_size <= 0.00001f)
 		{
+			printf("Proportional size (%f) under 0.00001, reseting to 1!\n", t->prop_size);
 			t->prop_size = 1.0f;
 		}
 		
@@ -1569,13 +1586,4 @@ void calculatePropRatio(TransInfo *t)
 		}
 		strcpy(t->proptext, "");
 	}
-}
-
-float get_drawsize(ARegion *ar, float *co)
-{
-	RegionView3D *rv3d= ar->regiondata;
-	float vec[3]= {rv3d->persmat[0][3], rv3d->persmat[1][3], rv3d->persmat[2][3]};
-	float size= rv3d->pixsize * 5;
-	size *= dot_v3v3(vec, co) + rv3d->persmat[3][3];
-	return size;
 }

@@ -325,6 +325,7 @@ extern StructRNA RNA_NlaStrip;
 extern StructRNA RNA_NlaTrack;
 extern StructRNA RNA_Node;
 extern StructRNA RNA_NodeGroup;
+extern StructRNA RNA_NodeLink;
 extern StructRNA RNA_NodeSocket;
 extern StructRNA RNA_NodeTree;
 extern StructRNA RNA_NoiseTexture;
@@ -582,7 +583,7 @@ void RNA_pointer_create(struct ID *id, StructRNA *type, void *data, PointerRNA *
 void RNA_blender_rna_pointer_create(PointerRNA *r_ptr);
 void RNA_pointer_recast(PointerRNA *ptr, PointerRNA *r_ptr);
 
-extern PointerRNA PointerRNA_NULL;
+extern const PointerRNA PointerRNA_NULL;
 
 /* Structs */
 
@@ -681,6 +682,7 @@ int RNA_property_animated(PointerRNA *ptr, PropertyRNA *prop);
 
 void RNA_property_update(struct bContext *C, PointerRNA *ptr, PropertyRNA *prop);
 void RNA_property_update_main(struct Main *bmain, struct Scene *scene, PointerRNA *ptr, PropertyRNA *prop);
+int RNA_property_update_check(struct PropertyRNA *prop);
 
 /* Property Data */
 

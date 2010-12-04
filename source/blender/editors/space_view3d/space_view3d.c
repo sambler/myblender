@@ -191,7 +191,7 @@ static SpaceLink *view3d_new(const bContext *C)
 		v3d->lay= v3d->layact= scene->lay;
 		v3d->camera= scene->camera;
 	}
-	v3d->scenelock= 1;
+	v3d->scenelock= TRUE;
 	v3d->grid= 1.0f;
 	v3d->gridlines= 16;
 	v3d->gridsubdiv = 10;
@@ -206,6 +206,7 @@ static SpaceLink *view3d_new(const bContext *C)
 	v3d->near= 0.01f;
 	v3d->far= 500.0f;
 
+	v3d->twflag |= U.tw_flag & V3D_USE_MANIPULATOR;
 	v3d->twtype= V3D_MANIP_TRANSLATE;
 	v3d->around= V3D_CENTROID;
 	
@@ -249,8 +250,8 @@ static SpaceLink *view3d_new(const bContext *C)
 	ar->regiondata= MEM_callocN(sizeof(RegionView3D), "region view3d");
 	rv3d= ar->regiondata;
 	rv3d->viewquat[0]= 1.0f;
-	rv3d->persp= 1;
-	rv3d->view= 7;
+	rv3d->persp= RV3D_PERSP;
+	rv3d->view= RV3D_VIEW_PERSPORTHO;
 	rv3d->dist= 10.0;
 	
 	return (SpaceLink *)v3d;
@@ -316,6 +317,10 @@ static void view3d_main_area_init(wmWindowManager *wm, ARegion *ar)
 
 	/* object ops. */
 	
+	/* important to be before Pose keymap since they can both be enabled at once */
+	keymap= WM_keymap_find(wm->defaultconf, "Face Mask", 0, 0);
+	WM_event_add_keymap_handler(&ar->handlers, keymap);
+	
 	/* pose is not modal, operator poll checks for this */
 	keymap= WM_keymap_find(wm->defaultconf, "Pose", 0, 0);
 	WM_event_add_keymap_handler(&ar->handlers, keymap);
@@ -330,9 +335,6 @@ static void view3d_main_area_init(wmWindowManager *wm, ARegion *ar)
 	WM_event_add_keymap_handler(&ar->handlers, keymap);
 
 	keymap= WM_keymap_find(wm->defaultconf, "Weight Paint", 0, 0);
-	WM_event_add_keymap_handler(&ar->handlers, keymap);
-	
-	keymap= WM_keymap_find(wm->defaultconf, "Face Mask", 0, 0);
 	WM_event_add_keymap_handler(&ar->handlers, keymap);
 
 	keymap= WM_keymap_find(wm->defaultconf, "Sculpt", 0, 0);
@@ -619,6 +621,11 @@ static void view3d_main_area_listener(ARegion *ar, wmNotifier *wmn)
 					ED_region_tag_redraw(ar);
 					break;
 			}
+			switch(wmn->action) {
+				case NA_ADDED:
+					ED_region_tag_redraw(ar);
+					break;
+			}
 			break;
 		case NC_GEOM:
 			switch(wmn->data) {
@@ -653,6 +660,13 @@ static void view3d_main_area_listener(ARegion *ar, wmNotifier *wmn)
 				case ND_WORLD_DRAW:
 					/* handled by space_view3d_listener() for v3d access */
 					break;
+				case ND_WORLD_STARS:
+				{
+					RegionView3D *rv3d= ar->regiondata;
+					if(rv3d->persp == RV3D_CAMOB) {
+						ED_region_tag_redraw(ar);
+					}
+				}
 			}
 			break;
 		case NC_LAMP:

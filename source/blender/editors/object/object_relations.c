@@ -57,6 +57,7 @@
 #include "BKE_depsgraph.h"
 #include "BKE_displist.h"
 #include "BKE_global.h"
+#include "BKE_fcurve.h"
 #include "BKE_lattice.h"
 #include "BKE_library.h"
 #include "BKE_main.h"
@@ -82,6 +83,7 @@
 
 #include "ED_armature.h"
 #include "ED_curve.h"
+#include "ED_keyframing.h"
 #include "ED_object.h"
 #include "ED_screen.h"
 #include "ED_view3d.h"
@@ -260,7 +262,7 @@ void OBJECT_OT_vertex_parent_set(wmOperatorType *ot)
 static int make_proxy_invoke (bContext *C, wmOperator *op, wmEvent *evt)
 {
 	Scene *scene= CTX_data_scene(C);
-	Object *ob= CTX_data_active_object(C);
+	Object *ob= ED_object_active_context(C);
 	
 	/* sanity checks */
 	if (!scene || scene->id.lib || !ob)
@@ -297,7 +299,7 @@ static int make_proxy_invoke (bContext *C, wmOperator *op, wmEvent *evt)
 static int make_proxy_exec (bContext *C, wmOperator *op)
 {
 	Main *bmain= CTX_data_main(C);
-	Object *ob, *gob= CTX_data_active_object(C);
+	Object *ob, *gob= ED_object_active_context(C);
 	GroupObject *go;
 	Scene *scene= CTX_data_scene(C);
 
@@ -355,16 +357,14 @@ static int make_proxy_exec (bContext *C, wmOperator *op)
 /* Generic itemf's for operators that take library args */
 static EnumPropertyItem *proxy_group_object_itemf(bContext *C, PointerRNA *UNUSED(ptr), int *free)
 {
-	EnumPropertyItem *item= NULL, item_tmp;
+	EnumPropertyItem item_tmp= {0}, *item= NULL;
 	int totitem= 0;
 	int i= 0;
-	Object *ob= CTX_data_active_object(C);
+	Object *ob= ED_object_active_context(C);
 	GroupObject *go;
 
 	if(!ob || !ob->dup_group)
 		return DummyRNA_DEFAULT_items;
-
-	memset(&item_tmp, 0, sizeof(item_tmp));
 
 	/* find the object to affect */
 	for (go= ob->dup_group->gobject.first; go; go= go->next) {
@@ -429,7 +429,7 @@ static int parent_clear_exec(bContext *C, wmOperator *op)
 		}			
 		else if(type == 1) {
 			ob->parent= NULL;
-			object_apply_mat4(ob, ob->obmat);
+			object_apply_mat4(ob, ob->obmat, TRUE, FALSE);
 		}
 		else if(type == 2)
 			unit_m4(ob->parentinv);
@@ -526,7 +526,7 @@ static int parent_set_exec(bContext *C, wmOperator *op)
 {
 	Main *bmain= CTX_data_main(C);
 	Scene *scene= CTX_data_scene(C);
-	Object *par= CTX_data_active_object(C);
+	Object *par= ED_object_active_context(C);
 	bPoseChannel *pchan= NULL;
 	int partype= RNA_enum_get(op->ptr, "type");
 	int pararm= ELEM4(partype, PAR_ARMATURE, PAR_ARMATURE_NAME, PAR_ARMATURE_ENVELOPE, PAR_ARMATURE_AUTO);
@@ -545,6 +545,17 @@ static int parent_set_exec(bContext *C, wmOperator *op)
 				makeDispListCurveTypes(scene, par, 0);  /* force creation of path data */
 			}
 			else cu->flag |= CU_FOLLOW;
+			
+			/* if follow, add F-Curve for ctime (i.e. "eval_time") so that path-follow works */
+			if(partype == PAR_FOLLOW) {
+				/* get or create F-Curve */
+				bAction *act = verify_adt_action(&cu->id, 1);
+				FCurve *fcu = verify_fcurve(act, NULL, "eval_time", 0, 1);
+				
+				/* setup dummy 'generator' modifier here to get 1-1 correspondance still working */
+				if (!fcu->bezt && !fcu->fpt && !fcu->modifiers.first)
+					add_fmodifier(&fcu->modifiers, FMODIFIER_TYPE_GENERATOR);
+			}
 			
 			/* fall back on regular parenting now (for follow only) */
 			if(partype == PAR_FOLLOW)
@@ -675,7 +686,7 @@ static int parent_set_exec(bContext *C, wmOperator *op)
 
 static int parent_set_invoke(bContext *C, wmOperator *UNUSED(op), wmEvent *UNUSED(event))
 {
-	Object *ob= CTX_data_active_object(C);
+	Object *ob= ED_object_active_context(C);
 	uiPopupMenu *pup= uiPupMenuBegin(C, "Set Parent To", 0);
 	uiLayout *layout= uiPupMenuLayout(pup);
 	
@@ -716,7 +727,7 @@ void OBJECT_OT_parent_set(wmOperatorType *ot)
 	ot->invoke= parent_set_invoke;
 	ot->exec= parent_set_exec;
 	
-	ot->poll= ED_operator_object_active_editable;
+	ot->poll= ED_operator_object_active;
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
@@ -729,7 +740,7 @@ void OBJECT_OT_parent_set(wmOperatorType *ot)
 static int parent_noinv_set_exec(bContext *C, wmOperator *op)
 {
 	Main *bmain= CTX_data_main(C);
-	Object *par= CTX_data_active_object(C);
+	Object *par= ED_object_active_context(C);
 	
 	par->recalc |= OB_RECALC_OB;
 	
@@ -893,7 +904,7 @@ static int object_track_clear_exec(bContext *C, wmOperator *op)
 		}
 		
 		if(type == 1)
-			object_apply_mat4(ob, ob->obmat);
+			object_apply_mat4(ob, ob->obmat, TRUE, TRUE);
 	}
 	CTX_DATA_END;
 
@@ -915,7 +926,7 @@ void OBJECT_OT_track_clear(wmOperatorType *ot)
 	ot->invoke= WM_menu_invoke;
 	ot->exec= object_track_clear_exec;
 	
-	ot->poll= ED_operator_scene_editable;
+	ot->poll= ED_operator_objectmode;
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
@@ -936,7 +947,7 @@ static int track_set_exec(bContext *C, wmOperator *op)
 {
 	Main *bmain= CTX_data_main(C);
 	Scene *scene= CTX_data_scene(C);
-	Object *obact= CTX_data_active_object(C); 
+	Object *obact= ED_object_active_context(C); 
 	
 	int type= RNA_enum_get(op->ptr, "type");
 	
@@ -1020,7 +1031,7 @@ void OBJECT_OT_track_set(wmOperatorType *ot)
 	ot->invoke= WM_menu_invoke;
 	ot->exec= track_set_exec;
 	
-	ot->poll= ED_operator_scene_editable;
+	ot->poll= ED_operator_objectmode;
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
@@ -1130,7 +1141,7 @@ void OBJECT_OT_move_to_layer(wmOperatorType *ot)
 	/* api callbacks */
 	ot->invoke= move_to_layer_invoke;
 	ot->exec= move_to_layer_exec;
-	ot->poll= ED_operator_scene_editable;
+	ot->poll= ED_operator_objectmode;
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
@@ -1239,7 +1250,7 @@ static int make_links_data_exec(bContext *C, wmOperator *op)
 	ID *id;
 	int a;
 
-	ob= CTX_data_active_object(C);
+	ob= ED_object_active_context(C);
 
 	CTX_DATA_BEGIN(C, Object*, obt, selected_editable_objects) {
 		if(ob != obt) {
@@ -1266,8 +1277,8 @@ static int make_links_data_exec(bContext *C, wmOperator *op)
 					}
 					break;
 				case MAKE_LINKS_ANIMDATA:
-					BKE_copy_animdata_id((ID *)obt, (ID *)ob);
-					BKE_copy_animdata_id((ID *)obt->data, (ID *)ob->data);
+					BKE_copy_animdata_id((ID *)obt, (ID *)ob, FALSE);
+					BKE_copy_animdata_id((ID *)obt->data, (ID *)ob->data, FALSE);
 					break;
 				case MAKE_LINKS_DUPLIGROUP:
 					obt->dup_group= ob->dup_group;
@@ -1333,7 +1344,7 @@ void OBJECT_OT_make_links_data(wmOperatorType *ot)
 
 	/* api callbacks */
 	ot->exec= make_links_data_exec;
-	ot->poll= ED_operator_scene_editable;
+	ot->poll= ED_operator_objectmode;
 
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
@@ -1560,6 +1571,8 @@ void single_ipo_users(Scene *UNUSED(scene), int UNUSED(flag))
 		}
 	}
 #endif // XXX old animation system
+	// TODO, something like this but must check users first.
+	// BKE_copy_animdata_id_action((ID *)obn->data);
 }
 
 static void single_mat_users(Scene *scene, int flag, int do_textures)
@@ -1835,7 +1848,7 @@ void OBJECT_OT_make_local(wmOperatorType *ot)
 	/* api callbacks */
 	ot->invoke= WM_menu_invoke;
 	ot->exec= make_local_exec;
-	ot->poll= ED_operator_scene_editable;
+	ot->poll= ED_operator_objectmode;
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
@@ -1887,7 +1900,7 @@ void OBJECT_OT_make_single_user(wmOperatorType *ot)
 	/* api callbacks */
 	ot->invoke= WM_menu_invoke;
 	ot->exec= make_single_user_exec;
-	ot->poll= ED_operator_scene_editable;
+	ot->poll= ED_operator_objectmode;
 
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
@@ -1934,7 +1947,7 @@ void OBJECT_OT_drop_named_material(wmOperatorType *ot)
 	
 	/* api callbacks */
 	ot->invoke= drop_named_material_invoke;
-	ot->poll= ED_operator_scene_editable;
+	ot->poll= ED_operator_objectmode;
 	
 	/* flags */
 	ot->flag= OPTYPE_UNDO;

@@ -19,8 +19,6 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-FILE(GLOB SRC *.c)
-
 SET(INC
 	../include
 	../../blenkernel
@@ -30,6 +28,18 @@ SET(INC
 	../../windowmanager
 	../../../../intern/guardedalloc
 	../../../../intern/audaspace/intern
+)
+
+SET(SRC
+	graph_buttons.c
+	graph_draw.c
+	graph_edit.c
+	graph_ops.c
+	graph_select.c
+	graph_utils.c
+	space_graph.c
+
+	graph_intern.h
 )
 
 BLENDERLIB(bf_editor_space_graph "${SRC}" "${INC}")

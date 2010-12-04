@@ -19,8 +19,6 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-FILE(GLOB SRC *.c)
-
 SET(INC
 	../include
 	../../blenkernel
@@ -32,8 +30,24 @@ SET(INC
 	../../../../intern/opennl/extern
 )
 
-IF(WIN32)
-	LIST(APPEND INC ${PTHREADS_INC})
-ENDIF(WIN32)
+SET(SRC
+	armature_ops.c
+	editarmature.c
+	editarmature_generate.c
+	editarmature_retarget.c
+	editarmature_sketch.c
+	meshlaplacian.c
+	poseSlide.c
+	poseUtils.c
+	poselib.c
+	poseobject.c
+	reeb.c
+
+	BIF_generate.h
+	BIF_retarget.h
+	armature_intern.h
+	meshlaplacian.h
+	reeb.h
+)
 
 BLENDERLIB(bf_editor_armature "${SRC}" "${INC}")

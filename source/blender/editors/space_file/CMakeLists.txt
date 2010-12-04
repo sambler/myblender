@@ -19,8 +19,6 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-FILE(GLOB SRC *.c)
-
 SET(INC
 	../include
 	../../blenfont
@@ -33,6 +31,20 @@ SET(INC
 	../../windowmanager
 	../../render/extern/include
 	../../../../intern/guardedalloc
+)
+
+SET(SRC
+	file_draw.c
+	file_ops.c
+	file_panels.c
+	filelist.c
+	filesel.c
+	fsmenu.c
+	space_file.c
+
+	file_intern.h
+	filelist.h
+	fsmenu.h
 )
 
 IF(WITH_IMAGE_OPENEXR)
@@ -58,9 +70,5 @@ ENDIF(WITH_IMAGE_CINEON)
 IF(WITH_IMAGE_HDR)
 	ADD_DEFINITIONS(-DWITH_HDR)
 ENDIF(WITH_IMAGE_HDR)
-
-IF(WIN32)
-	LIST(APPEND INC ${PTHREADS_INC})
-ENDIF(WIN32)
 
 BLENDERLIB(bf_editor_space_file "${SRC}" "${INC}")

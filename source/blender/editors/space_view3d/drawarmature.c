@@ -1772,7 +1772,7 @@ static void draw_pose_bones(Scene *scene, View3D *v3d, ARegion *ar, Base *base, 
 			
 			if ((bone) && !(bone->flag & (BONE_HIDDEN_P|BONE_HIDDEN_PG))) {
 				if (bone->layer & arm->layer) {
-					if ((do_dashed & 1) && (bone->parent)) {
+					if ((do_dashed & 1) && (pchan->parent)) {
 						/* Draw a line from our root to the parent's tip 
 						 *	- only if V3D_HIDE_HELPLINES is enabled...
 						 */
@@ -1979,7 +1979,7 @@ static void draw_ebones(View3D *v3d, ARegion *ar, Object *ob, int dt)
 					
 					/* catch exception for bone with hidden parent */
 					flag= eBone->flag;
-					if ( (eBone->parent) && ((eBone->parent->flag & BONE_HIDDEN_A) || (eBone->parent->layer & arm->layer)==0) )
+					if ( (eBone->parent) && !EBONE_VISIBLE(arm, eBone->parent))
 						flag &= ~BONE_CONNECTED;
 						
 					/* set temporary flag for drawing bone as active, but only if selected */
@@ -2018,7 +2018,7 @@ static void draw_ebones(View3D *v3d, ARegion *ar, Object *ob, int dt)
 				
 				/* catch exception for bone with hidden parent */
 				flag= eBone->flag;
-				if ( (eBone->parent) && ((eBone->parent->flag & BONE_HIDDEN_A) || (eBone->parent->layer & arm->layer)==0) )
+				if ( (eBone->parent) && !EBONE_VISIBLE(arm, eBone->parent))
 					flag &= ~BONE_CONNECTED;
 					
 				/* set temporary flag for drawing bone as active, but only if selected */

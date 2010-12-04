@@ -257,7 +257,6 @@ static void wm_method_draw_overlap_all(bContext *C, wmWindow *win, int exchange)
 						CTX_wm_region_set(C, NULL);
 
 						ar->swap= WIN_BOTH_OK;
-						printf("draws swap exchange %d\n", ar->swinid);
 					}
 					else if(ar->swap == WIN_BACK_OK)
 						ar->swap= WIN_FRONT_OK;
@@ -621,7 +620,8 @@ static void wm_method_draw_triple(bContext *C, wmWindow *win)
 		}
 	}
 
-	if(screen->do_draw_gesture)
+	/* always draw, not only when screen tagged */
+	if(win->gesture.first)
 		wm_gesture_draw(win);
 
 	if(wm->paintcursors.first) {

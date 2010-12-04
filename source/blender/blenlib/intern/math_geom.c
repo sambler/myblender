@@ -1651,11 +1651,21 @@ void window_translate_m4(float winmat[][4], float perspmat[][4], float x, float 
 {
 	if(winmat[2][3] == -1.0f) {
 		/* in the case of a win-matrix, this means perspective always */
-		float v1[3]= {perspmat[0][0], perspmat[1][0], perspmat[2][0]};
-		float v2[3]= {perspmat[0][1], perspmat[1][1], perspmat[2][1]};
-		float len1= (1.0f / len_v3(v1));
-		float len2= (1.0f / len_v3(v2));
-		
+		float v1[3];
+		float v2[3];
+		float len1, len2;
+
+		v1[0]= perspmat[0][0];
+		v1[1]= perspmat[1][0];
+		v1[2]= perspmat[2][0];
+
+		v2[0]= perspmat[0][1];
+		v2[1]= perspmat[1][1];
+		v2[2]= perspmat[2][1];
+
+		len1= (1.0f / len_v3(v1));
+		len2= (1.0f / len_v3(v2));
+
 		winmat[2][0] += len1 * winmat[0][0] * x;
 		winmat[2][1] += len2 * winmat[1][1] * y;
 	}
@@ -1694,10 +1704,9 @@ void polarview_m4(float Vm[][4],float dist, float azimuth, float incidence, floa
 void lookat_m4(float mat[][4],float vx, float vy, float vz, float px, float py, float pz, float twist)
 {
 	float sine, cosine, hyp, hyp1, dx, dy, dz;
-	float mat1[4][4];
+	float mat1[4][4]= MAT4_UNITY;
 	
 	unit_m4(mat);
-	unit_m4(mat1);
 
 	rotate_m4(mat, 'Z', -twist);
 

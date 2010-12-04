@@ -61,6 +61,7 @@ static void copyData(ModifierData *md, ModifierData *target)
 
 	tamd->object = amd->object;
 	tamd->deformflag = amd->deformflag;
+	tamd->multi = amd->multi;
 	strncpy(tamd->defgrp_name, amd->defgrp_name, 32);
 }
 
@@ -69,7 +70,7 @@ static CustomDataMask requiredDataMask(Object *UNUSED(ob), ModifierData *UNUSED(
 	CustomDataMask dataMask = 0;
 
 	/* ask for vertexgroups */
-	dataMask |= (1 << CD_MDEFORMVERT);
+	dataMask |= CD_MASK_MDEFORMVERT;
 
 	return dataMask;
 }

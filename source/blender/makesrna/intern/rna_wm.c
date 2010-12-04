@@ -588,7 +588,7 @@ static void rna_wmKeyMapItem_idname_set(PointerRNA *ptr, const char *value)
 	if(strcmp(idname, kmi->idname) != 0) {
 		BLI_strncpy(kmi->idname, idname, sizeof(kmi->idname));
 
-		WM_keymap_properties_reset(kmi);
+		WM_keymap_properties_reset(kmi, NULL);
 	}
 }
 
@@ -649,10 +649,10 @@ static void rna_wmClipboard_set(PointerRNA *ptr, const char *value)
 	WM_clipboard_text_set((void *) value, FALSE);
 }
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 static void rna_Operator_unregister(const bContext *C, StructRNA *type)
 {
-	char *idname;
+	const char *idname;
 	wmOperatorType *ot= RNA_struct_blender_type_get(type);
 
 	if(!ot)
@@ -668,7 +668,7 @@ static void rna_Operator_unregister(const bContext *C, StructRNA *type)
 
 	idname= ot->idname;
 	WM_operatortype_remove(ot->idname);
-	MEM_freeN(idname);
+	MEM_freeN((void *)idname);
 
 	/* not to be confused with the RNA_struct_free that WM_operatortype_remove calls, they are 2 different srna's */
 	RNA_struct_free(&BLENDER_RNA, type);
@@ -829,6 +829,9 @@ static StructRNA *rna_Operator_register(const bContext *C, ReportList *reports, 
 	dummyot.description= _operator_descr; /* only assigne the pointer, string is NULL'd */
 	RNA_pointer_create(NULL, &RNA_Operator, &dummyop, &dummyotr);
 
+	/* clear incase they are left unset */
+	_operator_idname[0]= _operator_name[0]= _operator_descr[0]= '\0';
+
 	/* validate the python class */
 	if(validate(&dummyotr, data, have_function) != 0)
 		return NULL;
@@ -949,7 +952,7 @@ static StructRNA *rna_MacroOperator_register(const bContext *C, ReportList *repo
 
 	return dummyot.ext.srna;
 }
-#endif /* DISABLE_PYTHON */
+#endif /* WITH_PYTHON */
 
 static StructRNA* rna_Operator_refine(PointerRNA *opr)
 {
@@ -963,7 +966,7 @@ static StructRNA* rna_MacroOperator_refine(PointerRNA *opr)
 	return (op->type && op->type->ext.srna)? op->type->ext.srna: &RNA_Macro;
 }
 
-static wmKeyMapItem *rna_KeyMap_item_new(wmKeyMap *km, ReportList *reports, char *idname, int type, int value, int any, int shift, int ctrl, int alt, int oskey, int keymodifier)
+static wmKeyMapItem *rna_KeyMap_item_new(wmKeyMap *km, ReportList *reports, const char *idname, int type, int value, int any, int shift, int ctrl, int alt, int oskey, int keymodifier)
 {
 //	wmWindowManager *wm = CTX_wm_manager(C);
 	int modifier= 0;
@@ -984,7 +987,7 @@ static wmKeyMapItem *rna_KeyMap_item_new(wmKeyMap *km, ReportList *reports, char
 	return WM_keymap_add_item(km, idname, type, value, modifier, keymodifier);
 }
 
-static wmKeyMapItem *rna_KeyMap_item_new_modal(wmKeyMap *km, bContext *C, ReportList *reports, char* propvalue_str, int type, int value, int any, int shift, int ctrl, int alt, int oskey, int keymodifier)
+static wmKeyMapItem *rna_KeyMap_item_new_modal(wmKeyMap *km, bContext *C, ReportList *reports, const char *propvalue_str, int type, int value, int any, int shift, int ctrl, int alt, int oskey, int keymodifier)
 {
 	wmWindowManager *wm = CTX_wm_manager(C);
 	int modifier= 0;
@@ -1023,7 +1026,7 @@ static wmKeyMapItem *rna_KeyMap_item_new_modal(wmKeyMap *km, bContext *C, Report
 	return WM_modalkeymap_add_item(km, type, value, modifier, keymodifier, propvalue);
 }
 
-static wmKeyMap *rna_keymap_new(wmKeyConfig *keyconf, char *idname, int spaceid, int regionid, int modal)
+static wmKeyMap *rna_keymap_new(wmKeyConfig *keyconf, const char *idname, int spaceid, int regionid, int modal)
 {
 	if (modal == 0) {
 		return WM_keymap_find(keyconf, idname, spaceid, regionid);
@@ -1032,12 +1035,12 @@ static wmKeyMap *rna_keymap_new(wmKeyConfig *keyconf, char *idname, int spaceid,
 	}
 }
 
-static wmKeyMap *rna_keymap_find(wmKeyConfig *keyconf, char *idname, int spaceid, int regionid)
+static wmKeyMap *rna_keymap_find(wmKeyConfig *keyconf, const char *idname, int spaceid, int regionid)
 {
 	return WM_keymap_list_find(&keyconf->keymaps, idname, spaceid, regionid);
 }
 
-static wmKeyMap *rna_keymap_find_modal(wmKeyConfig *keyconf, char *idname)
+static wmKeyMap *rna_keymap_find_modal(wmKeyConfig *keyconf, const char *idname)
 {
 	wmOperatorType *ot = WM_operatortype_find(idname, 0);
 
@@ -1058,7 +1061,7 @@ static void rna_def_operator(BlenderRNA *brna)
 	RNA_def_struct_ui_text(srna, "Operator", "Storage of an operator being executed, or registered after execution");
 	RNA_def_struct_sdna(srna, "wmOperator");
 	RNA_def_struct_refine_func(srna, "rna_Operator_refine");
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 	RNA_def_struct_register_funcs(srna, "rna_Operator_register", "rna_Operator_unregister");
 #endif
 
@@ -1085,18 +1088,21 @@ static void rna_def_operator(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "bl_idname", PROP_STRING, PROP_NONE);
 	RNA_def_property_string_sdna(prop, NULL, "type->idname");
 	RNA_def_property_string_maxlength(prop, OP_MAX_TYPENAME); /* else it uses the pointer size! */
+	// RNA_def_property_clear_flag(prop, PROP_EDITABLE);
 	RNA_def_property_flag(prop, PROP_REGISTER);
 	RNA_def_struct_name_property(srna, prop);
 
 	prop= RNA_def_property(srna, "bl_label", PROP_STRING, PROP_NONE);
 	RNA_def_property_string_sdna(prop, NULL, "type->name");
 	RNA_def_property_string_maxlength(prop, 1024); /* else it uses the pointer size! */
+	// RNA_def_property_clear_flag(prop, PROP_EDITABLE);
 	RNA_def_property_flag(prop, PROP_REGISTER);
 
 	prop= RNA_def_property(srna, "bl_description", PROP_STRING, PROP_NONE);
 	RNA_def_property_string_sdna(prop, NULL, "type->description");
 	RNA_def_property_string_maxlength(prop, 1024); /* else it uses the pointer size! */
-	RNA_def_property_flag(prop, PROP_REGISTER);
+	// RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+	RNA_def_property_flag(prop, PROP_REGISTER_OPTIONAL);
 
 	prop= RNA_def_property(srna, "bl_options", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "type->flag");
@@ -1121,7 +1127,7 @@ static void rna_def_macro_operator(BlenderRNA *brna)
 	RNA_def_struct_ui_text(srna, "Macro Operator", "Storage of a macro operator being executed, or registered after execution");
 	RNA_def_struct_sdna(srna, "wmOperator");
 	RNA_def_struct_refine_func(srna, "rna_MacroOperator_refine");
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 	RNA_def_struct_register_funcs(srna, "rna_MacroOperator_register", "rna_Operator_unregister");
 #endif
     
@@ -1140,18 +1146,21 @@ static void rna_def_macro_operator(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "bl_idname", PROP_STRING, PROP_NONE);
 	RNA_def_property_string_sdna(prop, NULL, "type->idname");
 	RNA_def_property_string_maxlength(prop, OP_MAX_TYPENAME); /* else it uses the pointer size! */
+	// RNA_def_property_clear_flag(prop, PROP_EDITABLE);
 	RNA_def_property_flag(prop, PROP_REGISTER);
 	RNA_def_struct_name_property(srna, prop);
 
 	prop= RNA_def_property(srna, "bl_label", PROP_STRING, PROP_NONE);
 	RNA_def_property_string_sdna(prop, NULL, "type->name");
 	RNA_def_property_string_maxlength(prop, 1024); /* else it uses the pointer size! */
+	// RNA_def_property_clear_flag(prop, PROP_EDITABLE);
 	RNA_def_property_flag(prop, PROP_REGISTER);
 
 	prop= RNA_def_property(srna, "bl_description", PROP_STRING, PROP_NONE);
 	RNA_def_property_string_sdna(prop, NULL, "type->description");
 	RNA_def_property_string_maxlength(prop, 1024); /* else it uses the pointer size! */
-	RNA_def_property_flag(prop, PROP_REGISTER);
+	// RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+	RNA_def_property_flag(prop, PROP_REGISTER_OPTIONAL);
 
 	prop= RNA_def_property(srna, "bl_options", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "type->flag");

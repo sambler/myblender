@@ -511,15 +511,15 @@ float calc_overlap(StrokeCache *cache, const char symm, const char axis, const f
 {
 	float mirror[3];
 	float distsq;
-	float mat[4][4];
 	
 	//flip_coord(mirror, cache->traced_location, symm);
 	flip_coord(mirror, cache->true_location, symm);
 
-	unit_m4(mat);
-	rotate_m4(mat, axis, angle);
-
-	mul_m4_v3(mat, mirror);
+	if(axis != 0) {
+		float mat[4][4]= MAT4_UNITY;
+		rotate_m4(mat, axis, angle);
+		mul_m4_v3(mat, mirror);
+	}
 
 	//distsq = len_squared_v3v3(mirror, cache->traced_location);
 	distsq = len_squared_v3v3(mirror, cache->true_location);
@@ -2562,8 +2562,11 @@ static void calc_brushdata_symm(Sculpt *sd, StrokeCache *cache, const char symm,
 
 	unit_m4(cache->symm_rot_mat);
 	unit_m4(cache->symm_rot_mat_inv);
-	rotate_m4(cache->symm_rot_mat, axis, angle);
-	rotate_m4(cache->symm_rot_mat_inv, axis, -angle);
+
+	if(axis) { /* expects XYZ */
+		rotate_m4(cache->symm_rot_mat, axis, angle);
+		rotate_m4(cache->symm_rot_mat_inv, axis, -angle);
+	}
 
 	mul_m4_v3(cache->symm_rot_mat, cache->location);
 	mul_m4_v3(cache->symm_rot_mat, cache->grab_delta_symmetry);
@@ -3658,7 +3661,7 @@ static void SCULPT_OT_sculptmode_toggle(wmOperatorType *ot)
 	
 	/* api callbacks */
 	ot->exec= sculpt_toggle_mode;
-	ot->poll= ED_operator_object_active;
+	ot->poll= ED_operator_object_active_editable_mesh;
 	
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 }

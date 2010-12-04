@@ -138,12 +138,12 @@ static char Quaternion_Cross_doc[] =
 "   :return: The cross product.\n"
 "   :rtype: :class:`Quaternion`\n";
 
-static PyObject *Quaternion_Cross(QuaternionObject * self, QuaternionObject * value)
+static PyObject *Quaternion_Cross(QuaternionObject *self, QuaternionObject *value)
 {
 	float quat[QUAT_SIZE];
 	
 	if (!QuaternionObject_Check(value)) {
-		PyErr_SetString( PyExc_TypeError, "quat.cross(value): expected a quaternion argument" );
+		PyErr_Format(PyExc_TypeError, "quat.cross(value): expected a quaternion argument, not %.200s", Py_TYPE(value)->tp_name);
 		return NULL;
 	}
 	
@@ -151,7 +151,7 @@ static PyObject *Quaternion_Cross(QuaternionObject * self, QuaternionObject * va
 		return NULL;
 
 	mul_qt_qtqt(quat, self->quat, value->quat);
-	return newQuaternionObject(quat, Py_NEW, NULL);
+	return newQuaternionObject(quat, Py_NEW, Py_TYPE(self));
 }
 
 //----------------------------Quaternion.dot(other)------------------
@@ -168,7 +168,7 @@ static char Quaternion_Dot_doc[] =
 static PyObject *Quaternion_Dot(QuaternionObject * self, QuaternionObject * value)
 {
 	if (!QuaternionObject_Check(value)) {
-		PyErr_SetString( PyExc_TypeError, "quat.dot(value): expected a quaternion argument" );
+		PyErr_Format(PyExc_TypeError, "quat.dot(value): expected a quaternion argument, not %.200s", Py_TYPE(value)->tp_name);
 		return NULL;
 	}
 
@@ -193,7 +193,7 @@ static PyObject *Quaternion_Difference(QuaternionObject * self, QuaternionObject
 	float quat[QUAT_SIZE];
 
 	if (!QuaternionObject_Check(value)) {
-		PyErr_SetString( PyExc_TypeError, "quat.difference(value): expected a quaternion argument" );
+		PyErr_Format(PyExc_TypeError, "quat.difference(value): expected a quaternion argument, not %.200s", Py_TYPE(value)->tp_name);
 		return NULL;
 	}
 
@@ -202,7 +202,7 @@ static PyObject *Quaternion_Difference(QuaternionObject * self, QuaternionObject
 
 	rotation_between_quats_to_quat(quat, self->quat, value->quat);
 
-	return newQuaternionObject(quat, Py_NEW, NULL);
+	return newQuaternionObject(quat, Py_NEW, Py_TYPE(self));
 }
 
 static char Quaternion_Slerp_doc[] =
@@ -237,7 +237,7 @@ static PyObject *Quaternion_Slerp(QuaternionObject *self, PyObject *args)
 
 	interp_qt_qtqt(quat, self->quat, value->quat, fac);
 
-	return newQuaternionObject(quat, Py_NEW, NULL);
+	return newQuaternionObject(quat, Py_NEW, Py_TYPE(self));
 }
 
 //----------------------------Quaternion.normalize()----------------
@@ -440,7 +440,7 @@ static PyObject *Quaternion_item(QuaternionObject * self, int i)
 	if(i<0)	i= QUAT_SIZE-i;
 
 	if(i < 0 || i >= QUAT_SIZE) {
-		PyErr_SetString(PyExc_IndexError, "quaternion[attribute]: array index out of range\n");
+		PyErr_SetString(PyExc_IndexError, "quaternion[attribute]: array index out of range");
 		return NULL;
 	}
 
@@ -456,14 +456,14 @@ static int Quaternion_ass_item(QuaternionObject * self, int i, PyObject * ob)
 {
 	float scalar= (float)PyFloat_AsDouble(ob);
 	if(scalar==-1.0f && PyErr_Occurred()) { /* parsed item not a number */
-		PyErr_SetString(PyExc_TypeError, "quaternion[index] = x: index argument not a number\n");
+		PyErr_SetString(PyExc_TypeError, "quaternion[index] = x: index argument not a number");
 		return -1;
 	}
 
 	if(i<0)	i= QUAT_SIZE-i;
 
 	if(i < 0 || i >= QUAT_SIZE){
-		PyErr_SetString(PyExc_IndexError, "quaternion[attribute] = x: array assignment index out of range\n");
+		PyErr_SetString(PyExc_IndexError, "quaternion[attribute] = x: array assignment index out of range");
 		return -1;
 	}
 	self->quat[i] = scalar;
@@ -490,8 +490,7 @@ static PyObject *Quaternion_slice(QuaternionObject * self, int begin, int end)
 
 	list = PyList_New(end - begin);
 	for(count = begin; count < end; count++) {
-		PyList_SetItem(list, count - begin,
-				PyFloat_FromDouble(self->quat[count]));
+		PyList_SET_ITEM(list, count - begin, PyFloat_FromDouble(self->quat[count]));
 	}
 
 	return list;
@@ -556,9 +555,7 @@ static PyObject *Quaternion_subscript(QuaternionObject *self, PyObject *item)
 		}
 	}
 	else {
-		PyErr_Format(PyExc_TypeError,
-				 "quaternion indices must be integers, not %.200s",
-				 item->ob_type->tp_name);
+		PyErr_Format(PyExc_TypeError, "quaternion indices must be integers, not %.200s", Py_TYPE(item)->tp_name);
 		return NULL;
 	}
 }
@@ -588,9 +585,7 @@ static int Quaternion_ass_subscript(QuaternionObject *self, PyObject *item, PyOb
 		}
 	}
 	else {
-		PyErr_Format(PyExc_TypeError,
-				 "quaternion indices must be integers, not %.200s",
-				 item->ob_type->tp_name);
+		PyErr_Format(PyExc_TypeError, "quaternion indices must be integers, not %.200s", Py_TYPE(item)->tp_name);
 		return -1;
 	}
 }
@@ -604,7 +599,7 @@ static PyObject *Quaternion_add(PyObject * q1, PyObject * q2)
 	QuaternionObject *quat1 = NULL, *quat2 = NULL;
 
 	if(!QuaternionObject_Check(q1) || !QuaternionObject_Check(q2)) {
-		PyErr_SetString(PyExc_AttributeError, "Quaternion addition: arguments not valid for this operation....\n");
+		PyErr_SetString(PyExc_AttributeError, "Quaternion addition: arguments not valid for this operation");
 		return NULL;
 	}
 	quat1 = (QuaternionObject*)q1;
@@ -614,7 +609,7 @@ static PyObject *Quaternion_add(PyObject * q1, PyObject * q2)
 		return NULL;
 
 	add_qt_qtqt(quat, quat1->quat, quat2->quat, 1.0f);
-	return newQuaternionObject(quat, Py_NEW, NULL);
+	return newQuaternionObject(quat, Py_NEW, Py_TYPE(q1));
 }
 //------------------------obj - obj------------------------------
 //subtraction
@@ -625,7 +620,7 @@ static PyObject *Quaternion_sub(PyObject * q1, PyObject * q2)
 	QuaternionObject *quat1 = NULL, *quat2 = NULL;
 
 	if(!QuaternionObject_Check(q1) || !QuaternionObject_Check(q2)) {
-		PyErr_SetString(PyExc_AttributeError, "Quaternion addition: arguments not valid for this operation....\n");
+		PyErr_SetString(PyExc_AttributeError, "Quaternion addition: arguments not valid for this operation");
 		return NULL;
 	}
 	
@@ -639,7 +634,7 @@ static PyObject *Quaternion_sub(PyObject * q1, PyObject * q2)
 		quat[x] = quat1->quat[x] - quat2->quat[x];
 	}
 
-	return newQuaternionObject(quat, Py_NEW, NULL);
+	return newQuaternionObject(quat, Py_NEW, Py_TYPE(q1));
 }
 //------------------------obj * obj------------------------------
 //mulplication
@@ -647,7 +642,6 @@ static PyObject *Quaternion_mul(PyObject * q1, PyObject * q2)
 {
 	float quat[QUAT_SIZE], scalar;
 	QuaternionObject *quat1 = NULL, *quat2 = NULL;
-	VectorObject *vec = NULL;
 
 	if(QuaternionObject_Check(q1)) {
 		quat1 = (QuaternionObject*)q1;
@@ -662,7 +656,7 @@ static PyObject *Quaternion_mul(PyObject * q1, PyObject * q2)
 
 	if(quat1 && quat2) { /* QUAT*QUAT (cross product) */
 		mul_qt_qtqt(quat, quat1->quat, quat2->quat);
-		return newQuaternionObject(quat, Py_NEW, NULL);
+		return newQuaternionObject(quat, Py_NEW, Py_TYPE(q1));
 	}
 	
 	/* the only case this can happen (for a supported type is "FLOAT*QUAT" ) */
@@ -671,37 +665,26 @@ static PyObject *Quaternion_mul(PyObject * q1, PyObject * q2)
 		if ((scalar == -1.0 && PyErr_Occurred())==0) { /* FLOAT*QUAT */
 			QUATCOPY(quat, quat2->quat);
 			mul_qt_fl(quat, scalar);
-			return newQuaternionObject(quat, Py_NEW, NULL);
+			return newQuaternionObject(quat, Py_NEW, Py_TYPE(q2));
 		}
 		PyErr_SetString(PyExc_TypeError, "Quaternion multiplication: val * quat, val is not an acceptable type");
 		return NULL;
 	}
 	else { /* QUAT*SOMETHING */
 		if(VectorObject_Check(q2)){  /* QUAT*VEC */
-			float tvec[3];
-			vec = (VectorObject*)q2;
-			if(vec->size != 3){
-				PyErr_SetString(PyExc_TypeError, "Quaternion multiplication: only 3D vector rotations currently supported\n");
-				return NULL;
-			}
-			if(!BaseMath_ReadCallback(vec)) {
-				return NULL;
-			}
-
-			copy_v3_v3(tvec, vec->vec);
-			mul_qt_v3(quat1->quat, tvec);
-			return newVectorObject(tvec, 3, Py_NEW, NULL);
+			PyErr_SetString(PyExc_TypeError, "Quaternion multiplication: Only 'vector * quaternion' is supported, not the reverse");
+			return NULL;
 		}
 		
 		scalar= PyFloat_AsDouble(q2);
 		if ((scalar == -1.0 && PyErr_Occurred())==0) { /* QUAT*FLOAT */
 			QUATCOPY(quat, quat1->quat);
 			mul_qt_fl(quat, scalar);
-			return newQuaternionObject(quat, Py_NEW, NULL);
+			return newQuaternionObject(quat, Py_NEW, Py_TYPE(q1));
 		}
 	}
 	
-	PyErr_SetString(PyExc_TypeError, "Quaternion multiplication: arguments not acceptable for this operation\n");
+	PyErr_SetString(PyExc_TypeError, "Quaternion multiplication: arguments not acceptable for this operation");
 	return NULL;
 }
 
@@ -872,7 +855,7 @@ static int Quaternion_setAxisVec(QuaternionObject *self, PyObject *value, void *
 }
 
 //----------------------------------mathutils.Quaternion() --------------
-static PyObject *Quaternion_new(PyTypeObject *UNUSED(type), PyObject *args, PyObject *kwds)
+static PyObject *Quaternion_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
 	PyObject *seq= NULL;
 	float angle = 0.0f;
@@ -901,7 +884,7 @@ static PyObject *Quaternion_new(PyTypeObject *UNUSED(type), PyObject *args, PyOb
 		break;
 	/* PyArg_ParseTuple assures no more then 2 */
 	}
-	return newQuaternionObject(quat, Py_NEW, NULL);
+	return newQuaternionObject(quat, Py_NEW, type);
 }
 
 
@@ -945,7 +928,7 @@ static char quaternion_doc[] =
 
 PyTypeObject quaternion_Type = {
 	PyVarObject_HEAD_INIT(NULL, 0)
-	"quaternion",						//tp_name
+	"mathutils.Quaternion",						//tp_name
 	sizeof(QuaternionObject),			//tp_basicsize
 	0,								//tp_itemsize
 	(destructor)BaseMathObject_dealloc,		//tp_dealloc

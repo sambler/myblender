@@ -46,12 +46,15 @@ static PyObject *pyop_poll(PyObject *UNUSED(self), PyObject *args)
 	char		*opname;
 	PyObject	*context_dict= NULL; /* optional args */
 	PyObject	*context_dict_back;
+	char		*context_str= NULL;
 	PyObject	*ret;
+
+	int context= WM_OP_EXEC_DEFAULT;
 
 	// XXX Todo, work out a better solution for passing on context, could make a tuple from self and pack the name and Context into it...
 	bContext *C = BPy_GetContext();
 	
-	if (!PyArg_ParseTuple(args, "s|O:_bpy.ops.poll", &opname, &context_dict))
+	if (!PyArg_ParseTuple(args, "s|Os:_bpy.ops.poll", &opname, &context_dict, &context_str))
 		return NULL;
 	
 	ot= WM_operatortype_find(opname, TRUE);
@@ -61,8 +64,22 @@ static PyObject *pyop_poll(PyObject *UNUSED(self), PyObject *args)
 		return NULL;
 	}
 
-	if(!PyDict_Check(context_dict))
+	if(context_str) {
+		if(RNA_enum_value_from_id(operator_context_items, context_str, &context)==0) {
+			char *enum_str= BPy_enum_as_string(operator_context_items);
+			PyErr_Format(PyExc_TypeError, "Calling operator \"bpy.ops.%s.poll\" error, expected a string enum in (%.200s)", opname, enum_str);
+			MEM_freeN(enum_str);
+			return NULL;
+		}
+	}
+	
+	if(context_dict==NULL || context_dict==Py_None) {
 		context_dict= NULL;
+	}
+	else if (!PyDict_Check(context_dict)) {
+		PyErr_Format(PyExc_TypeError, "Calling operator \"bpy.ops.%s.poll\" error, custom context expected a dict or None, got a %.200s", opname, Py_TYPE(context_dict)->tp_name);
+		return NULL;
+	}
 
 	context_dict_back= CTX_py_dict_get(C);
 
@@ -70,7 +87,7 @@ static PyObject *pyop_poll(PyObject *UNUSED(self), PyObject *args)
 	Py_XINCREF(context_dict); /* so we done loose it */
 	
 	/* main purpose of thsi function */
-	ret= WM_operator_poll((bContext*)C, ot) ? Py_True : Py_False;
+	ret= WM_operator_poll_context((bContext*)C, ot, context) ? Py_True : Py_False;
 	
 	/* restore with original context dict, probably NULL but need this for nested operator calls */
 	Py_XDECREF(context_dict);
@@ -118,22 +135,28 @@ static PyObject *pyop_call(PyObject *UNUSED(self), PyObject *args)
 		}
 	}
 
-	if(!PyDict_Check(context_dict))
+	if(context_dict==NULL || context_dict==Py_None) {
 		context_dict= NULL;
+	}
+	else if (!PyDict_Check(context_dict)) {
+		PyErr_Format(PyExc_TypeError, "Calling operator \"bpy.ops.%s\" error, custom context expected a dict or None, got a %.200s", opname, Py_TYPE(context_dict)->tp_name);
+		return NULL;
+	}
 
 	context_dict_back= CTX_py_dict_get(C);
 
 	CTX_py_dict_set(C, (void *)context_dict);
 	Py_XINCREF(context_dict); /* so we done loose it */
 
-	if(WM_operator_poll((bContext*)C, ot) == FALSE) {
+	if(WM_operator_poll_context((bContext*)C, ot, context) == FALSE) {
 		const char *msg= CTX_wm_operator_poll_msg_get(C);
-		PyErr_Format( PyExc_SystemError, "Operator bpy.ops.%.200s.poll() %s", opname, msg ? msg : "failed, context is incorrect");
+		PyErr_Format(PyExc_SystemError, "Operator bpy.ops.%.200s.poll() %.200s", opname, msg ? msg : "failed, context is incorrect");
 		CTX_wm_operator_poll_msg_set(C, NULL); /* better set to NULL else it could be used again */
 		error_val= -1;
 	}
 	else {
 		WM_operator_properties_create_ptr(&ptr, ot);
+		WM_operator_properties_sanitize(&ptr, 0);
 
 		if(kw && PyDict_Size(kw))
 			error_val= pyrna_pydict_to_props(&ptr, kw, 0, "Converting py args to operator properties: ");
@@ -217,7 +240,7 @@ static PyObject *pyop_as_string(PyObject *UNUSED(self), PyObject *args)
 	ot= WM_operatortype_find(opname, TRUE);
 
 	if (ot == NULL) {
-		PyErr_Format( PyExc_SystemError, "_bpy.ops.as_string: operator \"%s\"could not be found", opname);
+		PyErr_Format(PyExc_SystemError, "_bpy.ops.as_string: operator \"%.200s\"could not be found", opname);
 		return NULL;
 	}
 
@@ -284,6 +307,7 @@ static PyObject *pyop_getrna(PyObject *UNUSED(self), PyObject *value)
 
 	/* XXX - should call WM_operator_properties_free */
 	WM_operator_properties_create_ptr(&ptr, ot);
+	WM_operator_properties_sanitize(&ptr, 0);
 
 	
 	pyrna= (BPy_StructRNA *)pyrna_struct_CreatePyObject(&ptr);
@@ -313,14 +337,8 @@ static struct PyModuleDef bpy_ops_module = {
 PyObject *BPY_operator_module(void)
 {
 	PyObject *submodule;
-	
-	submodule= PyModule_Create(&bpy_ops_module);
-	PyDict_SetItemString(PyImport_GetModuleDict(), bpy_ops_module.m_name, submodule);
 
-	/* INCREF since its its assumed that all these functions return the
-	 * module with a new ref like PyDict_New, since they are passed to
-	  * PyModule_AddObject which steals a ref */
-	Py_INCREF(submodule);
+	submodule= PyModule_Create(&bpy_ops_module);
 
 	return submodule;
 }

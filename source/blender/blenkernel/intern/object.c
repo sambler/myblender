@@ -96,7 +96,7 @@
 
 #include "LBM_fluidsim.h"
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 #include "BPY_extern.h"
 #endif
 
@@ -693,7 +693,7 @@ int exist_object(Object *obtest)
 	return 0;
 }
 
-void *add_camera(char *name)
+void *add_camera(const char *name)
 {
 	Camera *cam;
 	
@@ -715,7 +715,6 @@ Camera *copy_camera(Camera *cam)
 	Camera *camn;
 	
 	camn= copy_libblock(cam);
-	camn->adt= BKE_copy_animdata(cam->adt);
 	
 	return camn;
 }
@@ -795,7 +794,7 @@ float dof_camera(Object *ob)
 	return cam->YF_dofdist;
 }
 
-void *add_lamp(char *name)
+void *add_lamp(const char *name)
 {
 	Lamp *la;
 	
@@ -990,7 +989,7 @@ static char *get_obdata_defname(int type)
 }
 
 /* more general add: creates minimum required data, but without vertices etc. */
-Object *add_only_object(int type, char *name)
+Object *add_only_object(int type, const char *name)
 {
 	Object *ob;
 
@@ -1550,7 +1549,7 @@ void object_make_proxy(Object *ob, Object *target, Object *gob)
 	if(gob) {
 		ob->rotmode= target->rotmode;
 		mul_m4_m4m4(ob->obmat, target->obmat, gob->obmat);
-		object_apply_mat4(ob, ob->obmat);
+		object_apply_mat4(ob, ob->obmat, FALSE, TRUE);
 	}
 	else {
 		copy_object_transform(ob, target);
@@ -1678,54 +1677,49 @@ void object_rot_to_mat3(Object *ob, float mat[][3])
 	mul_m3_m3m3(mat, dmat, rmat);
 }
 
-void object_mat3_to_rot(Object *ob, float mat[][3], int use_compat)
+void object_mat3_to_rot(Object *ob, float mat[][3], short use_compat)
 {
-	if (ob->rotmode == ROT_MODE_QUAT)
+	switch(ob->rotmode) {
+	case ROT_MODE_QUAT:
 		mat3_to_quat(ob->quat, mat);
-	else if (ob->rotmode == ROT_MODE_AXISANGLE)
+		sub_v4_v4(ob->quat, ob->dquat);
+		break;
+	case ROT_MODE_AXISANGLE:
 		mat3_to_axis_angle(ob->rotAxis, &ob->rotAngle, mat);
-	else {
-		if(use_compat) {
-			float eul[3];
-			VECCOPY(eul, ob->rot);
-			mat3_to_compatible_eulO(ob->rot, eul, ob->rotmode, mat);
-		}
-		else
-			mat3_to_eulO(ob->rot, ob->rotmode, mat);
+		sub_v3_v3(ob->rotAxis, ob->drotAxis);
+		ob->rotAngle -= ob->drotAngle;
+		break;
+	default: /* euler */
+		if(use_compat)	mat3_to_compatible_eulO(ob->rot, ob->rot, ob->rotmode, mat);
+		else			mat3_to_eulO(ob->rot, ob->rotmode, mat);
+		sub_v3_v3(ob->rot, ob->drot);
 	}
 }
 
 /* see pchan_apply_mat4() for the equivalent 'pchan' function */
-void object_apply_mat4(Object *ob, float mat[][4])
+void object_apply_mat4(Object *ob, float mat[][4], const short use_compat, const short use_parent)
 {
-	float mat3[3][3];    /* obmat -> 3x3 */
-	float mat3_n[3][3];  /* obmat -> normalized, 3x3 */
-	float imat3_n[3][3]; /* obmat -> normalized & inverted, 3x3 */
+	float rot[3][3];
 
-	/* location */
-	copy_v3_v3(ob->loc, mat[3]);
+	if(use_parent && ob->parent) {
+		float rmat[4][4], diff_mat[4][4], imat[4][4];
+		mul_m4_m4m4(diff_mat, ob->parentinv, ob->parent->obmat);
+		invert_m4_m4(imat, diff_mat);
+		mul_m4_m4m4(rmat, mat, imat); /* get the parent relative matrix */
+		object_apply_mat4(ob, rmat, use_compat, FALSE);
 
-	/* rotation & scale are linked, we need to create the mat's
-	 * for these together since they are related. */
-	copy_m3_m4(mat3, mat);
-	/* so scale doesnt interfear with rotation [#24291] */
-	normalize_m3_m3(mat3_n, (const float(*)[3])mat3);
-	if(mat3_n[0][0] < 0.0f) negate_v3(mat3_n[0]);
-	if(mat3_n[1][1] < 0.0f) negate_v3(mat3_n[1]);
-	if(mat3_n[2][2] < 0.0f) negate_v3(mat3_n[2]);
-
-
-	/* rotation */
-	object_mat3_to_rot(ob, mat3_n, 0);
-
-	/* scale */
-	/* note: mat4_to_size(ob->size, mat) fails for negative scale */
-	invert_m3_m3(imat3_n, mat3_n);
-	mul_m3_m3m3(mat3, imat3_n, mat3);
-
-	ob->size[0]= mat3[0][0];
-	ob->size[1]= mat3[1][1];
-	ob->size[2]= mat3[2][2];
+		/* same as below, use rmat rather then mat */
+		mat4_to_loc_rot_size(ob->loc, rot, ob->size, rmat);
+		object_mat3_to_rot(ob, rot, use_compat);
+	}
+	else {
+		mat4_to_loc_rot_size(ob->loc, rot, ob->size, mat);
+		object_mat3_to_rot(ob, rot, use_compat);
+	}
+	
+	sub_v3_v3(ob->loc, ob->dloc);
+	sub_v3_v3(ob->size, ob->dsize);
+	/* object_mat3_to_rot handles delta rotations */
 }
 
 void object_to_mat3(Object *ob, float mat[][3])	/* no parent */
@@ -2154,7 +2148,7 @@ static void solve_parenting (Scene *scene, Object *ob, Object *par, float obmat[
 		copy_m3_m4(originmat, tmat);
 		
 		// origin, voor help line
-		if( (ob->partype & 15)==PARSKEL ) {
+		if( (ob->partype & PARTYPE)==PARSKEL ) {
 			VECCOPY(ob->orig, par->obmat[3]);
 		}
 		else {
@@ -2540,47 +2534,52 @@ void object_handle_update(Scene *scene, Object *ob)
 			
 			if (G.f & G_DEBUG)
 				printf("recalcdata %s\n", ob->id.name+2);
-			
+
+			if(adt) {
+				/* evaluate drivers */
+				// XXX: for mesh types, should we push this to derivedmesh instead?
+				BKE_animsys_evaluate_animdata(data_id, adt, ctime, ADT_RECALC_DRIVERS);
+			}
+
 			/* includes all keys and modifiers */
-			if(ob->type==OB_MESH) {
-				EditMesh *em = (ob == scene->obedit)? BKE_mesh_get_editmesh(ob->data): NULL;
-				
-				/* evaluate drivers */
-				// XXX: should we push this to derivedmesh instead?
-				BKE_animsys_evaluate_animdata(data_id, adt, ctime, ADT_RECALC_DRIVERS);
-				
-					// here was vieweditdatamask? XXX
-				if(em) {
-					makeDerivedMesh(scene, ob, em, CD_MASK_BAREMESH);
-					BKE_mesh_end_editmesh(ob->data, em);
-				} else
-					makeDerivedMesh(scene, ob, NULL, CD_MASK_BAREMESH);
-			}
-			else if(ob->type==OB_MBALL) {
-				makeDispListMBall(scene, ob);
-			} 
-			else if(ELEM3(ob->type, OB_CURVE, OB_SURF, OB_FONT)) {
-				makeDispListCurveTypes(scene, ob, 0);
-			}
-			else if(ELEM(ob->type, OB_CAMERA, OB_LAMP)) {
-				/* evaluate drivers */
-				BKE_animsys_evaluate_animdata(data_id, adt, ctime, ADT_RECALC_DRIVERS);
-			}
-			else if(ob->type==OB_LATTICE) {
-				lattice_calc_modifiers(scene, ob);
-			}
-			else if(ob->type==OB_ARMATURE) {
-				/* evaluate drivers */
-				BKE_animsys_evaluate_animdata(data_id, adt, ctime, ADT_RECALC_DRIVERS);
-				
+			switch(ob->type) {
+			case OB_MESH:
+				{
+					EditMesh *em = (ob == scene->obedit)? BKE_mesh_get_editmesh(ob->data): NULL;
+						// here was vieweditdatamask? XXX
+					if(em) {
+						makeDerivedMesh(scene, ob, em, CD_MASK_BAREMESH);
+						BKE_mesh_end_editmesh(ob->data, em);
+					} else
+						makeDerivedMesh(scene, ob, NULL, CD_MASK_BAREMESH);
+				}
+				break;
+
+			case OB_ARMATURE:
 				if(ob->id.lib && ob->proxy_from) {
-					copy_pose_result(ob->pose, ob->proxy_from->pose);
 					// printf("pose proxy copy, lib ob %s proxy %s\n", ob->id.name, ob->proxy_from->id.name);
+					copy_pose_result(ob->pose, ob->proxy_from->pose);
 				}
 				else {
 					where_is_pose(scene, ob);
 				}
+				break;
+
+			case OB_MBALL:
+				makeDispListMBall(scene, ob);
+				break;
+
+			case OB_CURVE:
+			case OB_SURF:
+			case OB_FONT:
+				makeDispListCurveTypes(scene, ob, 0);
+				break;
+				
+			case OB_LATTICE:
+				lattice_calc_modifiers(scene, ob);
+				break;
 			}
+
 
 			if(ob->particlesystem.first) {
 				ParticleSystem *tpsys, *psys;
@@ -2905,7 +2904,7 @@ void object_delete_ptcache(Object *ob, int index)
 /* shape key utility function */
 
 /************************* Mesh ************************/
-static KeyBlock *insert_meshkey(Scene *scene, Object *ob, char *name, int from_mix)
+static KeyBlock *insert_meshkey(Scene *scene, Object *ob, const char *name, int from_mix)
 {
 	Mesh *me= ob->data;
 	Key *key= me->key;
@@ -2936,7 +2935,7 @@ static KeyBlock *insert_meshkey(Scene *scene, Object *ob, char *name, int from_m
 	return kb;
 }
 /************************* Lattice ************************/
-static KeyBlock *insert_lattkey(Scene *scene, Object *ob, char *name, int from_mix)
+static KeyBlock *insert_lattkey(Scene *scene, Object *ob, const char *name, int from_mix)
 {
 	Lattice *lt= ob->data;
 	Key *key= lt->key;
@@ -2968,7 +2967,7 @@ static KeyBlock *insert_lattkey(Scene *scene, Object *ob, char *name, int from_m
 	return kb;
 }
 /************************* Curve ************************/
-static KeyBlock *insert_curvekey(Scene *scene, Object *ob, char *name, int from_mix)
+static KeyBlock *insert_curvekey(Scene *scene, Object *ob, const char *name, int from_mix)
 {
 	Curve *cu= ob->data;
 	Key *key= cu->key;
@@ -3004,7 +3003,7 @@ static KeyBlock *insert_curvekey(Scene *scene, Object *ob, char *name, int from_
 	return kb;
 }
 
-KeyBlock *object_insert_shape_key(Scene *scene, Object *ob, char *name, int from_mix)
+KeyBlock *object_insert_shape_key(Scene *scene, Object *ob, const char *name, int from_mix)
 {
 	if(ob->type==OB_MESH)					 return insert_meshkey(scene, ob, name, from_mix);
 	else if ELEM(ob->type, OB_CURVE, OB_SURF)return insert_curvekey(scene, ob, name, from_mix);

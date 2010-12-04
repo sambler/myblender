@@ -24,8 +24,6 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-FILE(GLOB SRC intern/*.c)
-
 SET(INC
 	.
 	../nodes
@@ -35,7 +33,6 @@ SET(INC
 	../makesdna
 	../makesrna
 	../blenkernel
-	../include
 	../imbuf
 	../blenloader
 	../editors/include
@@ -50,6 +47,34 @@ SET(INC
 	${OPENGL_INCLUDE_DIR}
 )
 
+SET(SRC
+	intern/wm.c
+	intern/wm_apple.c
+	intern/wm_cursors.c
+	intern/wm_dragdrop.c
+	intern/wm_draw.c
+	intern/wm_event_system.c
+	intern/wm_files.c
+	intern/wm_gesture.c
+	intern/wm_init_exit.c
+	intern/wm_jobs.c
+	intern/wm_keymap.c
+	intern/wm_operators.c
+	intern/wm_subwindow.c
+	intern/wm_window.c
+
+	WM_api.h
+	WM_types.h
+	wm.h
+	wm_cursors.h
+	wm_draw.h
+	wm_event_system.h
+	wm_event_types.h
+	wm_files.h
+	wm_subwindow.h
+	wm_window.h
+)
+
 ADD_DEFINITIONS(-DGLEW_STATIC)
 
 IF(WITH_INTERNATIONAL)
@@ -60,25 +85,24 @@ IF(WITH_OPENCOLLADA)
 	ADD_DEFINITIONS(-DWITH_COLLADA)
 ENDIF(WITH_OPENCOLLADA)
 
-IF(WITH_QUICKTIME)
+IF(WITH_CODEC_QUICKTIME)
 	LIST(APPEND INC ../quicktime ${QUICKTIME_INC})
 	ADD_DEFINITIONS(-DWITH_QUICKTIME)
-ENDIF(WITH_QUICKTIME)
+ENDIF(WITH_CODEC_QUICKTIME)
 
-IF(WITH_FFMPEG)
+IF(WITH_CODEC_FFMPEG)
 	LIST(APPEND INC ${FFMPEG_INC})
 	ADD_DEFINITIONS(-DWITH_FFMPEG)
-ENDIF(WITH_FFMPEG)
+ENDIF(WITH_CODEC_FFMPEG)
 
 IF(WITH_PYTHON)
 	LIST(APPEND INC ../python ${PYTHON_INC})
-ELSE(WITH_PYTHON)
-	ADD_DEFINITIONS(-DDISABLE_PYTHON)
+	ADD_DEFINITIONS(-DWITH_PYTHON)
 ENDIF(WITH_PYTHON)
 
-IF(WIN32)
-	LIST(APPEND INC ${PTHREADS_INC})
-ENDIF(WIN32)
+IF(WITH_GAMEENGINE)
+	ADD_DEFINITIONS(-DWITH_GAMEENGINE)
+ENDIF(WITH_GAMEENGINE)
 
 IF(WITH_COCOA)
 	LIST(REMOVE_ITEM SRC "${CMAKE_CURRENT_SOURCE_DIR}/intern/wm_apple.c")

@@ -410,6 +410,7 @@ static void insert_action_keys(bAnimContext *ac, short mode)
 	bAnimListElem *ale;
 	int filter;
 	
+	ReportList *reports = ac->reports;
 	Scene *scene= ac->scene;
 	float cfra= (float)CFRA;
 	short flag = 0;
@@ -437,7 +438,7 @@ static void insert_action_keys(bAnimContext *ac, short mode)
 			
 		/* if there's an id */
 		if (ale->id)
-			insert_keyframe(ale->id, NULL, ((fcu->grp)?(fcu->grp->name):(NULL)), fcu->rna_path, fcu->array_index, cfra, flag);
+			insert_keyframe(reports, ale->id, NULL, ((fcu->grp)?(fcu->grp->name):(NULL)), fcu->rna_path, fcu->array_index, cfra, flag);
 		else
 			insert_vert_fcurve(fcu, cfra, fcu->curval, 0);
 	}
@@ -1102,15 +1103,13 @@ static int actkeys_framejump_exec(bContext *C, wmOperator *UNUSED(op))
 	ListBase anim_data= {NULL, NULL};
 	bAnimListElem *ale;
 	int filter;
-	KeyframeEditData ked;
+	KeyframeEditData ked= {{0}};
 	
 	/* get editor data */
 	if (ANIM_animdata_get_context(C, &ac) == 0)
 		return OPERATOR_CANCELLED;
 	
-	/* init edit data */
-	memset(&ked, 0, sizeof(KeyframeEditData));
-	
+	/* init edit data */	
 	/* loop over action data, averaging values */
 	filter= (ANIMFILTER_VISIBLE | ANIMFILTER_CURVESONLY | ANIMFILTER_NODUPLIS);
 	ANIM_animdata_filter(&ac, &anim_data, filter, ac.data, ac.datatype);
@@ -1174,7 +1173,7 @@ static void snap_action_keys(bAnimContext *ac, short mode)
 	bAnimListElem *ale;
 	int filter;
 	
-	KeyframeEditData ked;
+	KeyframeEditData ked= {{0}};
 	KeyframeEditFunc edit_cb;
 	
 	/* filter data */
@@ -1186,8 +1185,7 @@ static void snap_action_keys(bAnimContext *ac, short mode)
 	
 	/* get beztriple editing callbacks */
 	edit_cb= ANIM_editkeyframes_snap(mode);
-	
-	memset(&ked, 0, sizeof(KeyframeEditData)); 
+
 	ked.scene= ac->scene;
 	if (mode == ACTKEYS_SNAP_NEAREST_MARKER) {
 		ked.list.first= (ac->markers) ? ac->markers->first : NULL;
@@ -1274,13 +1272,12 @@ static void mirror_action_keys(bAnimContext *ac, short mode)
 	bAnimListElem *ale;
 	int filter;
 	
-	KeyframeEditData ked;
+	KeyframeEditData ked= {{0}};
 	KeyframeEditFunc edit_cb;
 	
 	/* get beztriple editing callbacks */
 	edit_cb= ANIM_editkeyframes_mirror(mode);
-	
-	memset(&ked, 0, sizeof(KeyframeEditData)); 
+
 	ked.scene= ac->scene;
 	
 	/* for 'first selected marker' mode, need to find first selected marker first! */

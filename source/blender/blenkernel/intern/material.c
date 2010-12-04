@@ -185,7 +185,7 @@ void init_material(Material *ma)
 	ma->preview = NULL;
 }
 
-Material *add_material(char *name)
+Material *add_material(const char *name)
 {
 	Material *ma;
 
@@ -492,6 +492,7 @@ Material *material_pop_id(ID *id, int index)
 		short *totcol= give_totcolp_id(id);
 		if(index >= 0 && index < (*totcol)) {
 			ret= (*matar)[index];
+			id_us_min((ID *)ret);			
 			if(*totcol <= 1) {
 				*totcol= 0;
 				MEM_freeN(*matar);

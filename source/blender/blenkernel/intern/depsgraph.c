@@ -1858,7 +1858,7 @@ static void flush_pointcache_reset(Scene *scene, DagNode *node, int curtime, int
 	for(itA = node->child; itA; itA= itA->next) {
 		if(itA->node->type==ID_OB) {
 			if(itA->node->lasttime!=curtime) {
-				ob= (Object*)(node->ob);
+				ob= (Object*)(itA->node->ob);
 
 				if(reset || (ob->recalc & OB_RECALC_ALL)) {
 					if(BKE_ptcache_object_reset(scene, ob, PTCACHE_RESET_DEPSGRAPH))
@@ -2350,8 +2350,10 @@ void DAG_id_flush_update(ID *id, short flag)
 		/* set flags based on textures - can influence depgraph via modifiers */
 		if(idtype == ID_TE) {
 			for(obt=bmain->object.first; obt; obt= obt->id.next) {
-				struct { ID *id; int is_dependent; } data = {id, 0};
-				
+				struct { ID *id; int is_dependent; } data;
+				data.id= id;
+				data.is_dependent= 0;
+
 				modifiers_foreachIDLink(obt, dag_id_flush_update__isDependentTexture, &data);
 				if (data.is_dependent)
 					obt->recalc |= OB_RECALC_DATA;

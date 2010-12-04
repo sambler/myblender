@@ -162,8 +162,19 @@ static int rna_Brush_mode_poll(PointerRNA *ptr, PointerRNA value)
 	Scene *scene= (Scene *)ptr->id.data;
 	Object *ob = OBACT;
 	Brush *brush= value.id.data;
-	return ob->mode & brush->ob_mode;
+	
+	/* weak, for object painting we need to check against the object mode
+	 * but for 2D view image painting we always want texture brushes 
+	 * this is not quite correct since you could be in object weightpaint
+	 * mode at the same time as the 2D image view, but for now its *good enough* */
+	if(ob && ob->mode & OB_MODE_ALL_PAINT) {
+		return ob->mode & brush->ob_mode;
+	}
+	else {
+		return OB_MODE_TEXTURE_PAINT & brush->ob_mode;
+	}
 }
+
 #else
 
 static void rna_def_paint(BlenderRNA *brna)
@@ -409,7 +420,7 @@ static void rna_def_particle_edit(BlenderRNA *brna)
 
 	prop= RNA_def_property(srna, "default_key_count", PROP_INT, PROP_NONE);
 	RNA_def_property_int_sdna(prop, NULL, "totaddkey");
-	RNA_def_property_range(prop, 2, INT_MAX);
+	RNA_def_property_range(prop, 2, SHRT_MAX);
 	RNA_def_property_ui_range(prop, 2, 20, 10, 3);
 	RNA_def_property_ui_text(prop, "Keys", "How many keys to make new particles with");
 
@@ -456,7 +467,7 @@ static void rna_def_particle_edit(BlenderRNA *brna)
 	RNA_def_struct_ui_text(srna, "Particle Brush", "Particle editing brush");
 
 	prop= RNA_def_property(srna, "size", PROP_INT, PROP_NONE);
-	RNA_def_property_range(prop, 1, INT_MAX);
+	RNA_def_property_range(prop, 1, SHRT_MAX);
 	RNA_def_property_ui_range(prop, 1, 100, 10, 3);
 	RNA_def_property_ui_text(prop, "Size", "Brush size");
 
@@ -471,7 +482,7 @@ static void rna_def_particle_edit(BlenderRNA *brna)
 
 	prop= RNA_def_property(srna, "steps", PROP_INT, PROP_NONE);
 	RNA_def_property_int_sdna(prop, NULL, "step");
-	RNA_def_property_range(prop, 1, INT_MAX);
+	RNA_def_property_range(prop, 1, SHRT_MAX);
 	RNA_def_property_ui_range(prop, 1, 50, 10, 3);
 	RNA_def_property_ui_text(prop, "Steps", "Brush steps");
 

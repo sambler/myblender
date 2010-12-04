@@ -63,7 +63,7 @@
 
 /* ***************** generic undo system ********************* */
 
-void ED_undo_push(bContext *C, char *str)
+void ED_undo_push(bContext *C, const char *str)
 {
 	wmWindowManager *wm= CTX_wm_manager(C);
 	Object *obedit= CTX_data_edit_object(C);
@@ -156,9 +156,10 @@ static int ed_undo_step(bContext *C, int step, const char *undoname)
 		
 		if(do_glob_undo) {
 			if(U.uiflag & USER_GLOBALUNDO) {
-#ifndef DISABLE_PYTHON
+				// note python defines not valid here anymore.
+				//#ifdef WITH_PYTHON
 				// XXX		BPY_scripts_clear_pyobjects();
-#endif
+				//#endif
 				if(undoname)
 					BKE_undo_name(C, undoname);
 				else

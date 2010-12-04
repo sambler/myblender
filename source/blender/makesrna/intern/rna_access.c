@@ -56,6 +56,8 @@
 
 #include "rna_internal.h"
 
+const PointerRNA PointerRNA_NULL= {{0}};
+
 /* Init/Exit */
 
 void RNA_init()
@@ -90,8 +92,6 @@ void RNA_exit()
 
 /* Pointer */
 
-PointerRNA PointerRNA_NULL = {{0}, 0, 0};
-
 void RNA_main_pointer_create(struct Main *main, PointerRNA *r_ptr)
 {
 	r_ptr->id.data= NULL;
@@ -101,11 +101,10 @@ void RNA_main_pointer_create(struct Main *main, PointerRNA *r_ptr)
 
 void RNA_id_pointer_create(ID *id, PointerRNA *r_ptr)
 {
-	PointerRNA tmp;
 	StructRNA *type, *idtype= NULL;
 
 	if(id) {
-		memset(&tmp, 0, sizeof(tmp));
+		PointerRNA tmp= {{0}};
 		tmp.data= id;
 		idtype= rna_ID_refine(&tmp);
 		
@@ -126,11 +125,10 @@ void RNA_id_pointer_create(ID *id, PointerRNA *r_ptr)
 
 void RNA_pointer_create(ID *id, StructRNA *type, void *data, PointerRNA *r_ptr)
 {
-	PointerRNA tmp;
 	StructRNA *idtype= NULL;
 
 	if(id) {
-		memset(&tmp, 0, sizeof(tmp));
+		PointerRNA tmp= {{0}};
 		tmp.data= id;
 		idtype= rna_ID_refine(&tmp);
 	}
@@ -170,9 +168,8 @@ void RNA_blender_rna_pointer_create(PointerRNA *r_ptr)
 
 PointerRNA rna_pointer_inherit_refine(PointerRNA *ptr, StructRNA *type, void *data)
 {
-	PointerRNA result;
-
 	if(data) {
+		PointerRNA result;
 		result.data= data;
 		result.type= type;
 		rna_pointer_inherit_id(type, ptr, &result);
@@ -185,11 +182,11 @@ PointerRNA rna_pointer_inherit_refine(PointerRNA *ptr, StructRNA *type, void *da
 			else
 				result.type= type;
 		}
+		return result;
 	}
-	else
-		memset(&result, 0, sizeof(result));
-	
-	return result;
+	else {
+		return PointerRNA_NULL;
+	}
 }
 
 /**/
@@ -533,7 +530,7 @@ int RNA_struct_is_a(StructRNA *type, StructRNA *srna)
 
 PropertyRNA *RNA_struct_find_property(PointerRNA *ptr, const char *identifier)
 {
-	if(identifier[0]=='[' && ELEM(identifier[1], '"', '\'')) { // "  (dummy comment to avoid confusing some function lists in text editors)
+	if(identifier[0]=='[' && identifier[1]=='"') { // "  (dummy comment to avoid confusing some function lists in text editors)
 		/* id prop lookup, not so common */
 		PropertyRNA *r_prop= NULL;
 		PointerRNA r_ptr; /* only support single level props */
@@ -1268,6 +1265,14 @@ static void rna_property_update(bContext *C, Main *bmain, Scene *scene, PointerR
 
 }
 
+/* must keep in sync with 'rna_property_update'
+ * note, its possible this returns a false positive in the case of PROP_CONTEXT_UPDATE
+ * but this isnt likely to be a performance problem. */
+int RNA_property_update_check(PropertyRNA *prop)
+{
+	return (prop->magic != RNA_MAGIC || prop->update || prop->noteflag);
+}
+
 void RNA_property_update(bContext *C, PointerRNA *ptr, PropertyRNA *prop)
 {
 	rna_property_update(C, CTX_data_main(C), CTX_data_scene(C), ptr, prop);
@@ -1966,10 +1971,7 @@ PointerRNA RNA_property_pointer_get(PointerRNA *ptr, PropertyRNA *prop)
 		return RNA_property_pointer_get(ptr, prop);
 	}
 	else {
-		PointerRNA result;
-
-		memset(&result, 0, sizeof(result));
-		return result;
+		return PointerRNA_NULL;
 	}
 }
 
@@ -2792,6 +2794,10 @@ void rna_iterator_array_begin(CollectionPropertyIterator *iter, void *ptr, int i
 
 	if(ptr == NULL)
 		length= 0;
+	else if (length == 0) {
+		ptr= NULL;
+		itemsize= 0;
+	}
 
 	internal= MEM_callocN(sizeof(ArrayIterator), "ArrayIterator");
 	internal->ptr= ptr;
@@ -2879,7 +2885,7 @@ static char *rna_path_token(const char **path, char *fixedbuf, int fixedlen, int
 		/* 2 kinds of lookups now, quoted or unquoted */
 		quote= *p;
 
-		if(quote != '\'' && quote != '"')
+		if(quote != '"')
 			quote= 0;
 
 		if(quote==0) {
@@ -2953,14 +2959,6 @@ static int rna_token_strip_quotes(char *token)
 	if(token[0]=='"') {
 		int len = strlen(token);
 		if (len >= 2 && token[len-1]=='"') {
-			/* strip away "" */
-			token[len-1]= '\0';
-			return 1;
-		}
-	}
-	else if(token[0]=='\'') {
-		int len = strlen(token);
-		if (len >= 2 && token[len-1]=='\'') {
 			/* strip away "" */
 			token[len-1]= '\0';
 			return 1;
@@ -3557,12 +3555,9 @@ PointerRNA RNA_pointer_get(PointerRNA *ptr, const char *name)
 		return RNA_property_pointer_get(ptr, prop);
 	}
 	else {
-		PointerRNA result;
-
 		printf("RNA_pointer_get: %s.%s not found.\n", ptr->type->identifier, name);
 
-		memset(&result, 0, sizeof(result));
-		return result;
+		return PointerRNA_NULL;
 	}
 }
 
@@ -3768,7 +3763,10 @@ char *RNA_property_as_string(bContext *C, PointerRNA *ptr, PropertyRNA *prop)
 	}
 	case PROP_POINTER:
 	{
-		BLI_dynstr_append(dynstr, "'<POINTER>'"); /* TODO */
+		PointerRNA tptr= RNA_property_pointer_get(ptr, prop);
+		cstring= RNA_pointer_as_string(&tptr);
+		BLI_dynstr_append(dynstr, cstring);
+		MEM_freeN(cstring);
 		break;
 	}
 	case PROP_COLLECTION:

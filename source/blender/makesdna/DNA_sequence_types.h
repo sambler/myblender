@@ -42,6 +42,7 @@ struct bSound;
 
 typedef struct StripElem {
 	char name[256];
+	int orig_width, orig_height;
 } StripElem;
 
 typedef struct StripCrop {
@@ -81,7 +82,6 @@ typedef struct Strip {
 	int startstill, endstill;
 	StripElem *stripdata;
 	char dir[240];
-	int orx, ory;
 	StripProxy *proxy;
 	StripCrop *crop;
 	StripTransform *transform;

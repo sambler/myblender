@@ -156,6 +156,7 @@ class USERPREF_PT_interface(bpy.types.Panel):
         col = row.column()
         col.label(text="Display:")
         col.prop(view, "show_tooltips")
+        col.prop(view, "show_tooltips_python")
         col.prop(view, "show_object_info", text="Object Info")
         col.prop(view, "show_large_cursors")
         col.prop(view, "show_view_name", text="View Name")
@@ -428,6 +429,8 @@ class USERPREF_PT_system(bpy.types.Panel):
         #col.prop(system, "use_antialiasing")
         col.label(text="Window Draw Method:")
         col.prop(system, "window_draw_method", text="")
+        col.label(text="Text Draw Options:")
+        col.prop(system, "use_text_antialiasing")
         col.label(text="Textures:")
         col.prop(system, "gl_texture_limit", text="Limit Size")
         col.prop(system, "texture_time_out", text="Time Out")
@@ -696,6 +699,8 @@ class USERPREF_PT_file(bpy.types.Panel):
         col.prop(paths, "use_load_ui")
         col.prop(paths, "use_filter_files")
         col.prop(paths, "show_hidden_files_datablocks")
+        col.prop(paths, "hide_recent_locations")
+        col.prop(paths, "show_thumbnails")
 
         col.separator()
         col.separator()
@@ -804,6 +809,19 @@ class USERPREF_PT_input(InputKeyMapPanel):
 
         #print("runtime", time.time() - start)
 
+class USERPREF_MT_addons_dev_guides(bpy.types.Menu):
+    bl_label = "Addons develoment guides"
+
+    # menu to open webpages with addons development guides
+    def draw(self, context):
+        layout = self.layout
+        layout.operator('wm.url_open', text='API Concepts'
+            ).url = 'http://wiki.blender.org/index.php/Dev:2.5/Py/API/Intro'
+        layout.operator('wm.url_open', text='Addons guidelines',
+            ).url = 'http://wiki.blender.org/index.php/Dev:2.5/Py/Scripts/Guidelines/Addons'
+        layout.operator('wm.url_open', text='How to share your addon',
+            ).url = 'http://wiki.blender.org/index.php/Dev:Py/Sharing'
+
 
 class USERPREF_PT_addons(bpy.types.Panel):
     bl_space_type = 'USER_PREFERENCES'
@@ -831,22 +849,31 @@ class USERPREF_PT_addons(bpy.types.Panel):
 
         modules = []
         loaded_modules = set()
+        
+        # RELEASE SCRIPTS: official scripts distributed in Blender releases
         paths = bpy.utils.script_paths("addons")
-        # if folder addons_contrib/ exists, scripts in there will be loaded
+        
+        # CONTRIB SCRIPTS: good for testing but not official scripts yet
+        # if folder addons_contrib/ exists, scripts in there will be loaded too
         paths += bpy.utils.script_paths("addons_contrib")
+        
+        # EXTERN SCRIPTS: external projects scripts
+        # if folder addons_extern/ exists, scripts in there will be loaded too
+        paths += bpy.utils.script_paths("addons_extern")
 
         if bpy.app.debug:
             t_main = time.time()
-
+        
         # fake module importing
         def fake_module(mod_name, mod_path, speedy=True):
             if bpy.app.debug:
                 print("fake_module", mod_name, mod_path)
             import ast
             ModuleType = type(ast)
+            file_mod = open(mod_path, "r", encoding='UTF-8')
             if speedy:
                 lines = []
-                line_iter = iter(open(mod_path, "r", encoding='UTF-8'))
+                line_iter = iter(file_mod)
                 l = ""
                 while not l.startswith("bl_addon_info"):
                     l = line_iter.readline()
@@ -855,11 +882,12 @@ class USERPREF_PT_addons(bpy.types.Panel):
                 while l.rstrip():
                     lines.append(l)
                     l = line_iter.readline()
-                del line_iter
                 data = "".join(lines)
 
             else:
-                data = open(mod_path, "r").read()
+                data = file_mod.read()
+
+            file_mod.close()
 
             ast_data = ast.parse(data, filename=mod_path)
             body_info = None
@@ -926,6 +954,11 @@ class USERPREF_PT_addons(bpy.types.Panel):
         col = split.column()
         col.prop(context.window_manager, "addon_search", text="", icon='VIEWZOOM')
         col.prop(context.window_manager, "addon_filter", text="Filter", expand=True)
+        
+        # menu to open webpages with addons development guides
+        col.separator()
+        col.label(text = ' Online Documentation', icon = 'INFO')
+        col.menu('USERPREF_MT_addons_dev_guides', text='Addons Developer Guides')
 
         col = split.column()
 

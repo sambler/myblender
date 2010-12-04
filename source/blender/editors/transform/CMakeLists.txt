@@ -19,8 +19,6 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-FILE(GLOB SRC *.c)
-
 SET(INC
 	../include
 	../../blenkernel
@@ -29,6 +27,21 @@ SET(INC
 	../../makesrna
 	../../windowmanager
 	../../../../intern/guardedalloc
+)
+
+SET(SRC
+	transform.c
+	transform_constraints.c
+	transform_conversions.c
+	transform_generics.c
+	transform_input.c
+	transform_manipulator.c
+	transform_ndofinput.c
+	transform_ops.c
+	transform_orientations.c
+	transform_snap.c
+
+	transform.h
 )
 
 BLENDERLIB(bf_editor_transform "${SRC}" "${INC}")

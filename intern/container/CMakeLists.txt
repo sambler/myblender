@@ -24,8 +24,18 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-SET(INC .)
+SET(INC
+	.
+)
 
-FILE(GLOB SRC intern/*.cpp)
+SET(SRC
+	intern/CTR_List.cpp
+
+	CTR_List.h
+	CTR_Map.h
+	CTR_TaggedIndex.h
+	CTR_TaggedSetOps.h
+	CTR_UHeap.h
+)
 
 BLENDERLIB(bf_intern_ctr "${SRC}" "${INC}")

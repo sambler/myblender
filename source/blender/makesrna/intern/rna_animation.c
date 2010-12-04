@@ -60,12 +60,6 @@ static int rna_AnimData_action_editable(PointerRNA *ptr)
 		return 1;
 }
 
-static void rna_AnimData_action_set(PointerRNA *ptr, PointerRNA value)
-{
-	AnimData *adt= (AnimData*)(ptr->data);
-	adt->action= value.data;
-}
-
 /* ****************************** */
 
 /* wrapper for poll callback */
@@ -327,7 +321,7 @@ static PointerRNA rna_KeyingSet_typeinfo_get(PointerRNA *ptr)
 
 
 static KS_Path *rna_KeyingSet_paths_add(KeyingSet *keyingset, ReportList *reports, 
-		ID *id, char rna_path[], int index, int group_method, char group_name[])
+		ID *id, const char rna_path[], int index, int group_method, const char group_name[])
 {
 	KS_Path *ksp = NULL;
 	short flag = 0;
@@ -657,7 +651,6 @@ void rna_def_animdata(BlenderRNA *brna)
 	
 	/* Active Action */
 	prop= RNA_def_property(srna, "action", PROP_POINTER, PROP_NONE);
-	RNA_def_property_pointer_funcs(prop, NULL, "rna_AnimData_action_set", NULL, NULL);
 	RNA_def_property_flag(prop, PROP_EDITABLE); /* this flag as well as the dynamic test must be defined for this to be editable... */
 	RNA_def_property_editable_func(prop, "rna_AnimData_action_editable");
 	RNA_def_property_ui_text(prop, "Action", "Active Action for this datablock");

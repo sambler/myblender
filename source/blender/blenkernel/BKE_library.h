@@ -46,7 +46,7 @@ struct bContext;
 
 void *alloc_libblock(struct ListBase *lb, short type, const char *name);
 void *copy_libblock(void *rt);
-void copy_libblock_data(struct ID *id, const struct ID *id_from);
+void copy_libblock_data(struct ID *id, const struct ID *id_from, const short do_action);
 
 void id_lib_extern(struct ID *id);
 void id_us_plus(struct ID *id);
@@ -67,13 +67,12 @@ void free_libblock_us(struct ListBase *lb, void *idv);
 void free_main(struct Main *mainvar);
 void tag_main(struct Main *mainvar, int tag);
 
-int splitIDname(char *name, char *left, int *nr);
 void rename_id(struct ID *id, char *name);
 void name_uiprefix_id(char *name, struct ID *id);
 void test_idbutton(char *name);
 void text_idbutton(struct ID *id, char *text);
 void all_local(struct Library *lib, int untagged_only);
-struct ID *find_id(char *type, char *name);
+struct ID *find_id(char *type, const char *name);
 void clear_id_newpoins(void);
 
 void IDnames_to_pupstring(char **str, char *title, char *extraops, struct ListBase *lb,struct ID* link, short *nr);

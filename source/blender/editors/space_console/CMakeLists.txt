@@ -19,8 +19,6 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-FILE(GLOB SRC *.c)
-
 SET(INC
 	../include
 	../../blenfont
@@ -33,8 +31,16 @@ SET(INC
 	../../../../intern/guardedalloc
 )
 
-IF(NOT WITH_PYTHON)
-	ADD_DEFINITIONS(-DDISABLE_PYTHON)
-ENDIF(NOT WITH_PYTHON)
+SET(SRC
+	console_draw.c
+	console_ops.c
+	space_console.c
+
+	console_intern.h
+)
+
+IF(WITH_PYTHON)
+	ADD_DEFINITIONS(-DWITH_PYTHON)
+ENDIF(WITH_PYTHON)
 
 BLENDERLIB(bf_editor_space_console "${SRC}" "${INC}")

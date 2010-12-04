@@ -1011,8 +1011,11 @@ static void uv_image_outset(float (*orig_uv)[2], float (*outset_uv)[2], const fl
 	float puv[4][2]; /* pixelspace uv's */
 	float no1[2], no2[2], no3[2], no4[2]; /* normals */
 	float dir1[2], dir2[2], dir3[2], dir4[2];
-	float ibuf_inv[2] = {1.0f / (float)ibuf_x, 1.0f / (float)ibuf_y};
-	
+	float ibuf_inv[2];
+
+	ibuf_inv[0]= 1.0f / (float)ibuf_x;
+	ibuf_inv[1]= 1.0f / (float)ibuf_y;
+
 	/* make UV's in pixel space so we can */
 	puv[0][0] = orig_uv[0][0] * ibuf_x;
 	puv[0][1] = orig_uv[0][1] * ibuf_y;
@@ -4178,7 +4181,7 @@ static void imapaint_lift_smear(ImBuf *ibuf, ImBuf *ibufb, int *pos)
 	int a, tot;
 
 	imapaint_set_region(region, 0, 0, pos[0], pos[1], ibufb->x, ibufb->y);
-	tot= imapaint_torus_split_region(region, ibuf, ibufb);
+	tot= imapaint_torus_split_region(region, ibufb, ibuf);
 
 	for(a=0; a<tot; a++)
 		IMB_rectblend(ibufb, ibuf, region[a].destx, region[a].desty,
@@ -4523,6 +4526,8 @@ typedef struct PaintOperation {
 
 	ViewContext vc;
 	wmTimer *timer;
+
+	short restore_projection;
 } PaintOperation;
 
 static void paint_redraw(bContext *C, ImagePaintState *s, int final)
@@ -4608,6 +4613,13 @@ static int texture_paint_init(bContext *C, wmOperator *op)
 	pop->first= 1;
 	op->customdata= pop;
 	
+	/* XXX: Soften tool does not support projection painting atm, so just disable
+	        projection for this brush */
+	if(brush->imagepaint_tool == PAINT_TOOL_SOFTEN) {
+		settings->imapaint.flag |= IMAGEPAINT_PROJECT_DISABLE;
+		pop->restore_projection = 1;
+	}
+
 	/* initialize from context */
 	if(CTX_wm_region_view3d(C)) {
 		pop->mode= PAINT_MODE_3D;
@@ -4727,6 +4739,9 @@ static void paint_exit(bContext *C, wmOperator *op)
 
 	if(pop->timer)
 		WM_event_remove_timer(CTX_wm_manager(C), CTX_wm_window(C), pop->timer);
+
+	if(pop->restore_projection)
+		settings->imapaint.flag &= ~IMAGEPAINT_PROJECT_DISABLE;
 
 	settings->imapaint.flag &= ~IMAGEPAINT_DRAWING;
 	imapaint_canvas_free(&pop->s);
@@ -5397,12 +5412,10 @@ static int texture_paint_camera_project_exec(bContext *C, wmOperator *op)
 {
 	Image *image= BLI_findlink(&CTX_data_main(C)->image, RNA_enum_get(op->ptr, "image"));
 	Scene *scene= CTX_data_scene(C);
-	ProjPaintState ps;
+	ProjPaintState ps= {0};
 	int orig_brush_size;
 	IDProperty *idgroup;
 	IDProperty *view_data= NULL;
-
-	memset(&ps, 0, sizeof(ps));
 
 	project_state_init(C, OBACT, &ps);
 
@@ -5584,6 +5597,7 @@ void PAINT_OT_image_from_view(wmOperatorType *ot)
 
 	/* api callbacks */
 	ot->exec= texture_paint_image_from_view_exec;
+	ot->poll= ED_operator_region_view3d_active;
 
 	/* flags */
 	ot->flag= OPTYPE_REGISTER;

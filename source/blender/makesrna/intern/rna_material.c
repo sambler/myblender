@@ -695,8 +695,8 @@ static void rna_def_material_colors(StructRNA *srna)
 		{MA_RAMP_SAT, "SATURATION", 0, "Saturation", ""},
 		{MA_RAMP_VAL, "VALUE", 0, "Value", ""},
 		{MA_RAMP_COLOR, "COLOR", 0, "Color", ""},
-		{MA_RAMP_SOFT, "SOFT LIGHT", 0, "Soft Light", ""}, 
-		{MA_RAMP_LINEAR, "LINEAR LIGHT", 0, "Linear Light", ""}, 
+		{MA_RAMP_SOFT, "SOFT_LIGHT", 0, "Soft Light", ""}, 
+		{MA_RAMP_LINEAR, "LINEAR_LIGHT", 0, "Linear Light", ""}, 
 		{0, NULL, 0, NULL, NULL}};
 
 	static EnumPropertyItem prop_ramp_input_items[] = {
@@ -1063,7 +1063,7 @@ static void rna_def_material_volume(BlenderRNA *brna)
 	
 	prop= RNA_def_property(srna, "cache_resolution", PROP_INT, PROP_NONE);
 	RNA_def_property_int_sdna(prop, NULL, "precache_resolution");
-	RNA_def_property_range(prop, 0, 1024);
+	RNA_def_property_range(prop, 1, 1024);
 	RNA_def_property_ui_text(prop, "Resolution", "Resolution of the voxel grid, low resolutions are faster, high resolutions use more memory");
 	RNA_def_property_update(prop, 0, "rna_Material_update");
 	
@@ -1403,7 +1403,7 @@ static void rna_def_material_specularity(StructRNA *srna)
 	RNA_def_property_ui_text(prop, "Specular Toon Smooth", "Smoothness of specular toon area");
 	RNA_def_property_update(prop, 0, "rna_Material_update");
 
-	prop= RNA_def_property(srna, "specular_slope", PROP_FLOAT, PROP_NONE);
+	prop= RNA_def_property(srna, "specular_slope", PROP_FLOAT, PROP_FACTOR);
 	RNA_def_property_float_sdna(prop, NULL, "rms");
 	RNA_def_property_range(prop, 0, 0.4);
 	RNA_def_property_ui_text(prop, "Specular Slope", "The standard deviation of surface slope");
@@ -1425,8 +1425,10 @@ static void rna_def_material_strand(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Tangent Shading", "Uses direction of strands as normal for tangent-shading");
 	RNA_def_property_update(prop, 0, "rna_Material_update");
 	
+	/* this flag is only set when rendering, not to be edited manually */
 	prop= RNA_def_property(srna, "use_surface_diffuse", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "mode", MA_STR_SURFDIFF);
+	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
 	RNA_def_property_ui_text(prop, "Surface Diffuse", "Make diffuse shading more similar to shading the surface");
 	RNA_def_property_update(prop, 0, "rna_Material_update");
 

@@ -72,13 +72,12 @@ void BIF_clearTransformOrientation(bContext *C)
 	}
 }
 
-TransformOrientation* findOrientationName(bContext *C, char *name)
+static TransformOrientation* findOrientationName(ListBase *lb, const char *name)
 {
-	ListBase *transform_spaces = &CTX_data_scene(C)->transform_spaces;
 	TransformOrientation *ts= NULL;
 
-	for (ts = transform_spaces->first; ts; ts = ts->next) {
-		if (strncmp(ts->name, name, 35) == 0) {
+	for (ts= lb->first; ts; ts = ts->next) {
+		if (strncmp(ts->name, name, sizeof(ts->name)-1) == 0) {
 			return ts;
 		}
 	}
@@ -86,34 +85,14 @@ TransformOrientation* findOrientationName(bContext *C, char *name)
 	return NULL;
 }
 
-void uniqueOrientationName(bContext *C, char *name)
+static int uniqueOrientationNameCheck(void *arg, const char *name)
 {
-	if (findOrientationName(C, name) != NULL)
-	{
-		char		tempname[64];
-		int			number;
-		char		*dot;
+	return findOrientationName((ListBase *)arg, name) != NULL;
+}
 
-		
-		number = strlen(name);
-
-		if (number && isdigit(name[number-1]))
-		{
-			dot = strrchr(name, '.');	// last occurrence
-			if (dot)
-				*dot=0;
-		}
-
-		for (number = 1; number <= 999; number++)
-		{
-			sprintf(tempname, "%s.%03d", name, number);
-			if (findOrientationName(C, tempname) == NULL)
-			{
-				BLI_strncpy(name, tempname, 32);
-				break;
-			}
-		}
-	}
+static void uniqueOrientationName(ListBase *lb, char *name)
+{
+	BLI_uniquename_cb(uniqueOrientationNameCheck, lb, "Space", '.', name, sizeof(((TransformOrientation *)NULL)->name));
 }
 
 void BIF_createTransformOrientation(bContext *C, ReportList *reports, char *name, int use, int overwrite)
@@ -287,11 +266,11 @@ TransformOrientation* addMatrixSpace(bContext *C, float mat[3][3], char name[], 
 
 	if (overwrite)
 	{
-		ts = findOrientationName(C, name);
+		ts = findOrientationName(transform_spaces, name);
 	}
 	else
 	{
-		uniqueOrientationName(C, name);
+		uniqueOrientationName(transform_spaces, name);
 	}
 
 	/* if not, create a new one */
@@ -894,7 +873,7 @@ int getTransformOrientation(const bContext *C, float normal[3], float plane[3], 
 			result = ORIENTATION_EDGE;
 		}
 	}
-	else if(ob && (ob->mode & (OB_MODE_SCULPT|OB_MODE_VERTEX_PAINT|OB_MODE_WEIGHT_PAINT|OB_MODE_TEXTURE_PAINT|OB_MODE_PARTICLE_EDIT)))
+	else if(ob && (ob->mode & (OB_MODE_ALL_PAINT|OB_MODE_PARTICLE_EDIT)))
 	{
 	}
 	else {

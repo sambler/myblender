@@ -27,7 +27,7 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 #include <Python.h>
 #endif
 
@@ -1077,7 +1077,7 @@ bNodeTree *ntreeCopyTree(bNodeTree *ntree, int internal_select)
 			newtree= copy_libblock(ntree);
 		} else {
 			newtree= MEM_dupallocN(ntree);
-			copy_libblock_data(&newtree->id, &ntree->id); /* copy animdata and ID props */
+			copy_libblock_data(&newtree->id, &ntree->id, TRUE); /* copy animdata and ID props */
 		}
 		newtree->nodes.first= newtree->nodes.last= NULL;
 		newtree->links.first= newtree->links.last= NULL;
@@ -1803,7 +1803,7 @@ int NodeTagIDChanged(bNodeTree *ntree, ID *id)
 {
 	int change = FALSE;
 
-	if(id==NULL)
+	if(ELEM(NULL, id, ntree))
 		return change;
 	
 	if(ntree->type==NTREE_COMPOSIT) {
@@ -2718,7 +2718,7 @@ static void gpu_from_node_stack(ListBase *sockets, bNodeStack **ns, GPUNodeStack
 
 		gs[i].name = "";
 		gs[i].hasinput= ns[i]->hasinput && ns[i]->data;
-		gs[i].hasoutput= ns[i]->hasinput && ns[i]->data;
+		gs[i].hasoutput= ns[i]->hasoutput && ns[i]->data;
 		gs[i].sockettype= ns[i]->sockettype;
 	}
 
@@ -2732,8 +2732,6 @@ static void data_from_gpu_stack(ListBase *sockets, bNodeStack **ns, GPUNodeStack
 
 	for (sock=sockets->first, i=0; sock; sock=sock->next, i++) {
 		ns[i]->data= gs[i].link;
-		ns[i]->hasinput= gs[i].hasinput && gs[i].link;
-		ns[i]->hasoutput= gs[i].hasoutput;
 		ns[i]->sockettype= gs[i].sockettype;
 	}
 }
@@ -2908,6 +2906,8 @@ void ntreeCompositTagRender(Scene *curscene)
 			
 			for(node= sce->nodetree->nodes.first; node; node= node->next) {
 				if(node->id==(ID *)curscene || node->type==CMP_NODE_COMPOSITE)
+					NodeTagChanged(sce->nodetree, node);
+				else if(node->type==CMP_NODE_TEXTURE) /* uses scene sizex/sizey */
 					NodeTagChanged(sce->nodetree, node);
 			}
 		}

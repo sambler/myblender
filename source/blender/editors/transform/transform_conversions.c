@@ -68,6 +68,7 @@
 #include "BKE_pointcache.h"
 #include "BKE_bmesh.h"
 #include "BKE_scene.h"
+#include "BKE_report.h"
 
 
 #include "ED_anim_api.h"
@@ -548,13 +549,13 @@ static void add_pose_transdata(TransInfo *t, bPoseChannel *pchan, Object *ob, Tr
 		
 		QUATCOPY(td->ext->iquat, pchan->quat);
 	}
-	td->rotOrder= pchan->rotmode;
+	td->ext->rotOrder= pchan->rotmode;
 	
 
 	/* proper way to get parent transform + own transform + constraints transform */
 	copy_m3_m4(omat, ob->obmat);
 
-	if (t->mode==TFM_TRANSLATION && (pchan->bone->flag & BONE_NO_LOCAL_LOCATION))
+	if (ELEM(t->mode, TFM_TRANSLATION, TFM_RESIZE) && (pchan->bone->flag & BONE_NO_LOCAL_LOCATION))
 		unit_m3(bmat);
 	else
 		copy_m3_m3(bmat, pchan->bone->bone_mat);
@@ -585,6 +586,19 @@ static void add_pose_transdata(TransInfo *t, bPoseChannel *pchan, Object *ob, Tr
 
 	invert_m3_m3(td->smtx, td->mtx);
 
+	/* exceptional case: rotate the pose bone which also applies transformation
+	 * when a parentless bone has BONE_NO_LOCAL_LOCATION [] */
+	if (!ELEM(t->mode, TFM_TRANSLATION, TFM_RESIZE) && (pchan->bone->flag & BONE_NO_LOCAL_LOCATION)) {
+		if(pchan->parent) {
+			/* same as td->smtx but without pchan->bone->bone_mat */
+			td->flag |= TD_PBONE_LOCAL_MTX_C;
+			mul_m3_m3m3(td->ext->l_smtx, pchan->bone->bone_mat, td->smtx);
+		}
+		else {
+			td->flag |= TD_PBONE_LOCAL_MTX_P;
+		}
+	}
+	
 	/* for axismat we use bone's own transform */
 	copy_m3_m4(pmat, pchan->pose_mat);
 	mul_m3_m3m3(td->axismtx, omat, pmat);
@@ -665,7 +679,7 @@ int count_set_pose_transflags(int *out_mode, short around, Object *ob)
 
 	for (pchan = ob->pose->chanbase.first; pchan; pchan = pchan->next) {
 		bone = pchan->bone;
-		if ((bone->layer & arm->layer) && !(pchan->bone->flag & BONE_HIDDEN_P)) {
+		if (PBONE_VISIBLE(arm, bone)) {
 			if ((bone->flag & BONE_SELECTED) && !(ob->proxy && pchan->bone->layer & arm->layer_protected))
 				bone->flag |= BONE_TRANSFORM;
 			else
@@ -2649,6 +2663,7 @@ static void createTransNlaData(bContext *C, TransInfo *t)
 	for (ale= anim_data.first; ale; ale= ale->next) {
 		/* only if a real NLA-track */
 		if (ale->type == ANIMTYPE_NLATRACK) {
+			AnimData *adt = ale->adt;
 			NlaTrack *nlt= (NlaTrack *)ale->data;
 			NlaStrip *strip;
 			
@@ -2673,7 +2688,7 @@ static void createTransNlaData(bContext *C, TransInfo *t)
 						tdn->id= ale->id;
 						tdn->oldTrack= tdn->nlt= nlt;
 						tdn->strip= strip;
-						tdn->trackIndex= BLI_findindex(&nlt->strips, strip);
+						tdn->trackIndex= BLI_findindex(&adt->nla_tracks, nlt);
 						
 						yval= (float)(tdn->trackIndex * NLACHANNEL_STEP);
 						
@@ -3855,8 +3870,13 @@ static void SeqTransInfo(TransInfo *t, Sequence *seq, int *recursive, int *count
 #ifdef XXX_DURIAN_ANIM_TX_HACK
 	/* hack */
 	if((seq->flag & SELECT)==0 && seq->type & SEQ_EFFECT) {
-		Sequence *seq_t[3] = {seq->seq1, seq->seq2, seq->seq3};
+		Sequence *seq_t[3];
 		int i;
+
+		seq_t[0]= seq->seq1;
+		seq_t[1]= seq->seq2;
+		seq_t[2]= seq->seq3;
+
 		for(i=0; i<3; i++) {
 			if (seq_t[i] && ((seq_t[i])->flag & SELECT) && !(seq_t[i]->flag & SEQ_LOCK) && !(seq_t[i]->flag & (SEQ_LEFTSEL|SEQ_RIGHTSEL)))
 				seq->flag |= SELECT;
@@ -4310,7 +4330,7 @@ static void ObjectToTransData(TransInfo *t, TransData *td, Object *ob)
 		QUATCOPY(td->ext->iquat, ob->quat);
 		QUATCOPY(td->ext->dquat, ob->dquat);
 	}
-	td->rotOrder=ob->rotmode;
+	td->ext->rotOrder=ob->rotmode;
 
 	td->ext->size = ob->size;
 	VECCOPY(td->ext->isize, ob->size);
@@ -4385,8 +4405,11 @@ static void set_trans_object_base_flags(TransInfo *t)
 			while(parsel) {
 				if(parsel->flag & SELECT) {
 					Base *parbase = object_in_scene(parsel, scene);
-					if TESTBASELIB_BGMODE(v3d, scene, parbase)
+					if(parbase) { /* in rare cases this can fail */
+						if TESTBASELIB_BGMODE(v3d, scene, parbase) {
 							break;
+						}
+					}
 				}
 				parsel= parsel->parent;
 			}
@@ -4524,6 +4547,7 @@ void autokeyframe_ob_cb_func(bContext *C, Scene *scene, View3D *v3d, Object *ob,
 	
 	// TODO: this should probably be done per channel instead...
 	if (autokeyframe_cfra_can_key(scene, id)) {
+		ReportList *reports = CTX_wm_reports(C);
 		KeyingSet *active_ks = ANIM_scene_get_active_keyingset(scene);
 		ListBase dsources = {NULL, NULL};
 		float cfra= (float)CFRA; // xxx this will do for now
@@ -4548,7 +4572,7 @@ void autokeyframe_ob_cb_func(bContext *C, Scene *scene, View3D *v3d, Object *ob,
 			if (adt && adt->action) {
 				for (fcu= adt->action->curves.first; fcu; fcu= fcu->next) {
 					fcu->flag &= ~FCURVE_SELECTED;
-					insert_keyframe(id, adt->action, ((fcu->grp)?(fcu->grp->name):(NULL)), fcu->rna_path, fcu->array_index, cfra, flag);
+					insert_keyframe(reports, id, adt->action, ((fcu->grp)?(fcu->grp->name):(NULL)), fcu->rna_path, fcu->array_index, cfra, flag);
 				}
 			}
 		}
@@ -4623,6 +4647,7 @@ void autokeyframe_pose_cb_func(bContext *C, Scene *scene, View3D *v3d, Object *o
 	
 	// TODO: this should probably be done per channel instead...
 	if (autokeyframe_cfra_can_key(scene, id)) {
+		ReportList *reports = CTX_wm_reports(C);
 		KeyingSet *active_ks = ANIM_scene_get_active_keyingset(scene);
 		float cfra= (float)CFRA;
 		short flag= 0;
@@ -4664,7 +4689,7 @@ void autokeyframe_pose_cb_func(bContext *C, Scene *scene, View3D *v3d, Object *o
 								 * NOTE: this will do constraints too, but those are ok to do here too?
 								 */
 								if (pchanName && strcmp(pchanName, pchan->name) == 0) 
-									insert_keyframe(id, act, ((fcu->grp)?(fcu->grp->name):(NULL)), fcu->rna_path, fcu->array_index, cfra, flag);
+									insert_keyframe(reports, id, act, ((fcu->grp)?(fcu->grp->name):(NULL)), fcu->rna_path, fcu->array_index, cfra, flag);
 									
 								if (pchanName) MEM_freeN(pchanName);
 							}
@@ -4860,6 +4885,9 @@ void special_aftertrans_update(bContext *C, TransInfo *t)
 					scene_marker_tfm_translate(t->scene, floor(t->vec[0] + 0.5f), SELECT);
 				else if (ELEM(t->frame_side, 'L', 'R'))
 					scene_marker_tfm_extend(t->scene, floor(t->vec[0] + 0.5f), SELECT, t->scene->r.cfra, t->frame_side);
+			}
+			else if(t->mode == TFM_TIME_SCALE) {
+				scene_marker_tfm_scale(t->scene, t->vec[0], SELECT);
 			}
 		}
 
@@ -5067,6 +5095,17 @@ void special_aftertrans_update(bContext *C, TransInfo *t)
 		if (C && recalcObPaths) {
 			//ED_objects_clear_paths(C); // XXX for now, don't need to clear
 			ED_objects_recalculate_paths(C, t->scene);
+
+			/* recalculating the frame positions means we loose our original transform if its not auto-keyed [#24451]
+			 * this hack re-applies it, which is annoying, only alternatives are...
+			 * - dont recalc paths.
+			 * - have an object_handle_update() which gives is the new transform without touching the objects.
+			 * - only recalc paths on auto-keying.
+			 * - ED_objects_recalculate_paths could backup/restore transforms.
+			 * - re-apply the transform which is simplest in this case. (2 lines below)
+			 */
+			t->redraw |= TREDRAW_HARD;
+			transformApply(C, t);
 		}
 	}
 
@@ -5125,7 +5164,7 @@ static void createTransObject(bContext *C, TransInfo *t)
 		td->flag = TD_SELECTED;
 		td->protectflag= ob->protectflag;
 		td->ext = tx;
-		td->rotOrder= ob->rotmode;
+		td->ext->rotOrder= ob->rotmode;
 		
 		if (base->flag & BA_TRANSFORM_CHILD)
 		{
@@ -5159,7 +5198,7 @@ static void createTransObject(bContext *C, TransInfo *t)
 			{
 				td->protectflag= ob->protectflag;
 				td->ext = tx;
-				td->rotOrder= ob->rotmode;
+				td->ext->rotOrder= ob->rotmode;
 				
 				ObjectToTransData(t, td, ob);
 				td->val = NULL;

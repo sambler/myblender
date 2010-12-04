@@ -19,8 +19,6 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-FILE(GLOB SRC *.c)
-
 SET(INC
 	../include
 	../../blenkernel
@@ -33,8 +31,20 @@ SET(INC
 	../../../../intern/guardedalloc
 )
 
-IF(WIN32)
-	LIST(APPEND INC ${PTHREADS_INC})
-ENDIF(WIN32)
+SET(SRC
+	editface.c
+	editmesh.c
+	editmesh_add.c
+	editmesh_lib.c
+	editmesh_loop.c
+	editmesh_mods.c
+	editmesh_tools.c
+	loopcut.c
+	mesh_data.c
+	mesh_ops.c
+	meshtools.c
+
+	mesh_intern.h
+)
 
 BLENDERLIB(bf_editor_mesh "${SRC}" "${INC}")

@@ -146,7 +146,7 @@ static void fcm_generator_verify (FModifier *fcm)
 				nc= MEM_callocN(sizeof(float)*(data->poly_order+1), "FMod_Generator_Coefs");
 				
 				if (data->coefficients) {
-					if (data->arraysize > (data->poly_order+1))
+					if ((int)data->arraysize > (data->poly_order+1))
 						memcpy(nc, data->coefficients, sizeof(float)*(data->poly_order+1));
 					else
 						memcpy(nc, data->coefficients, sizeof(float)*data->arraysize);
@@ -172,7 +172,7 @@ static void fcm_generator_verify (FModifier *fcm)
 				nc= MEM_callocN(sizeof(float)*(data->poly_order*2), "FMod_Generator_Coefs");
 				
 				if (data->coefficients) {
-					if (data->arraysize > (data->poly_order * 2))
+					if (data->arraysize > (unsigned int)(data->poly_order * 2))
 						memcpy(nc, data->coefficients, sizeof(float)*(data->poly_order * 2));
 					else
 						memcpy(nc, data->coefficients, sizeof(float)*data->arraysize);
@@ -240,7 +240,7 @@ static void fcm_generator_evaluate (FCurve *UNUSED(fcu), FModifier *fcm, float *
 			unsigned int i;
 			
 			/* for each coefficient pair, solve for that bracket before accumulating in value by multiplying */
-			for (cp=data->coefficients, i=0; (cp) && (i < data->poly_order); cp+=2, i++) 
+			for (cp=data->coefficients, i=0; (cp) && (i < (unsigned int)data->poly_order); cp+=2, i++) 
 				value *= (cp[0]*evaltime + cp[1]);
 				
 			/* only if something changed, write *cvalue in one go */
@@ -802,13 +802,13 @@ static void fcm_python_copy (FModifier *fcm, FModifier *src)
 
 static void fcm_python_evaluate (FCurve *UNUSED(fcu), FModifier *UNUSED(fcm), float *UNUSED(cvalue), float UNUSED(evaltime))
 {
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 	//FMod_Python *data= (FMod_Python *)fcm->data;
 	
 	/* FIXME... need to implement this modifier...
 	 *	It will need it execute a script using the custom properties 
 	 */
-#endif /* DISABLE_PYTHON */
+#endif /* WITH_PYTHON */
 }
 
 static FModifierTypeInfo FMI_PYTHON = {

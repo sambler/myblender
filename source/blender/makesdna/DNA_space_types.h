@@ -84,10 +84,19 @@ typedef struct SpaceInfo {
 
 	short blockhandler[8];		/* XXX depricate this */
 	
-	struct bScreen *screen;		/* browse screen */
-	struct Scene *scene;		/* browse scene */
+	char rpt_mask;
+	char pad[7];
 	
 } SpaceInfo;
+
+/* SpaceInfo.rpt_mask */
+enum {
+	INFO_RPT_DEBUG	= 1<<0,
+	INFO_RPT_INFO	= 1<<1,
+	INFO_RPT_OP		= 1<<2,
+	INFO_RPT_WARN	= 1<<3,
+	INFO_RPT_ERR		= 1<<4,
+};
 
 /* 'Graph' Editor (formerly known as the IPO Editor) */
 typedef struct SpaceIpo {
@@ -241,34 +250,30 @@ typedef struct SpaceImage {
 	ListBase regionbase;		/* storage of regions for inactive spaces */
 	int spacetype;
 
-	float blockscale;
-	short blockhandler[8];
-	
+	int flag;
+
 	struct Image *image;
 	struct ImageUser iuser;
+	struct CurveMapping *cumap;		
 	
-	struct CurveMapping *cumap;
-	short menunr, imanr, pad2;
+	struct Scopes scopes;			/* histogram waveform and vectorscope */
+	struct Histogram sample_line_hist;	/* sample line histogram */
+
+	struct bGPdata *gpd;			/* grease pencil data */
+
+	float cursor[2];				/* UV editor 2d cursor */
+	float xof, yof;					/* user defined offset, image is centered */
+	float zoom;						/* user defined zoom level */
+	float centx, centy;				/* storage for offset while render drawing */
+
 	short curtile; /* the currently active tile of the image when tile is enabled, is kept in sync with the active faces tile */
-	int flag;
-	short imtypenr, lock;
-	short pin, pad3;
+	short imtypenr;
+	short lock;
+	short pin;
 	char dt_uv; /* UV draw type */
 	char sticky; /* sticky selection type */
 	char dt_uvstretch;
 	char around;
-	float cursor[2];				/* UV editor 2d cursor */
-	
-	float xof, yof;					/* user defined offset, image is centered */
-	float zoom, pad4;				/* user defined zoom level */
-	float centx, centy;				/* storage for offset while render drawing */
-	
-	struct bGPdata *gpd;			/* grease pencil data */
-	
-	struct Scopes scopes;			/* histogram waveform and vectorscope */
-
-	struct Histogram sample_line_hist;	/* sample line histogram */
-	
 } SpaceImage;
 
 typedef struct SpaceNla {
@@ -509,21 +514,6 @@ enum {
 	CONSOLE_LINE_ERROR
 };
 
-/* SpaceConsole.rpt_mask */
-enum {
-	CONSOLE_TYPE_PYTHON=0,
-	CONSOLE_TYPE_REPORT,
-};
-
-/* SpaceConsole.type see BKE_report.h */
-enum {
-	CONSOLE_RPT_DEBUG	= 1<<0,
-	CONSOLE_RPT_INFO	= 1<<1,
-	CONSOLE_RPT_OP		= 1<<2,
-	CONSOLE_RPT_WARN	= 1<<3,
-	CONSOLE_RPT_ERR		= 1<<4,
-};
-
 typedef struct SpaceConsole {
 	SpaceLink *next, *prev;
 	ListBase regionbase;		/* storage of regions for inactive spaces */
@@ -533,9 +523,7 @@ typedef struct SpaceConsole {
 	short blockhandler[8];		// XXX are these needed?
 	
 	/* space vars */
-	int type; /* console/report/..? */
-	int rpt_mask; /* which reports to display */
-	int flag, lheight;
+	int lheight, pad;
 
 	ListBase scrollback; /* ConsoleLine; output */
 	ListBase history; /* ConsoleLine; command history, current edited line is the first */
@@ -687,7 +675,7 @@ enum FileSortTypeE {
 /* also defined in BKE */
 #define FILE_MAXDIR			160
 #define FILE_MAXFILE		256
-#define FILE_MAX			240
+#define FILE_MAX			(160+256)
 
 /* filesel types */
 #define FILE_UNIX			8
@@ -935,6 +923,7 @@ enum {
 
 
 /* space types, moved from DNA_screen_types.h */
+/* Do NOT change order, append on end. types are hardcoded needed */
 enum {
 	SPACE_EMPTY,
 	SPACE_VIEW3D,

@@ -884,14 +884,14 @@ static void v3d_posearmature_buts(uiLayout *layout, Object *ob)
 void validate_editbonebutton_cb(bContext *C, void *bonev, void *namev)
 {
 	EditBone *eBone= bonev;
-	char oldname[32], newname[32];
-	
+	char oldname[sizeof(eBone->name)], newname[sizeof(eBone->name)];
+
 	/* need to be on the stack */
-	BLI_strncpy(newname, eBone->name, 32);
-	BLI_strncpy(oldname, (char *)namev, 32);
+	BLI_strncpy(newname, eBone->name, sizeof(eBone->name));
+	BLI_strncpy(oldname, (char *)namev, sizeof(eBone->name));
 	/* restore */
-	BLI_strncpy(eBone->name, oldname, 32);
-	
+	BLI_strncpy(eBone->name, oldname, sizeof(eBone->name));
+
 	ED_armature_bone_rename(CTX_data_edit_object(C)->data, oldname, newname); // editarmature.c
 	WM_event_add_notifier(C, NC_OBJECT|ND_BONE_SELECT, CTX_data_edit_object(C)); // XXX fix
 }
@@ -919,7 +919,7 @@ static void v3d_editarmature_buts(uiLayout *layout, Object *ob)
 	uiItemR(col, &eboneptr, "head", 0, "Head", 0);
 	if (ebone->parent && ebone->flag & BONE_CONNECTED ) {
 		PointerRNA parptr = RNA_pointer_get(&eboneptr, "parent");
-		uiItemR(col, &parptr, "tail_radius", 0, "Radius", 0);
+		uiItemR(col, &parptr, "tail_radius", 0, "Radius (Parent)", 0);
 	} else {
 		uiItemR(col, &eboneptr, "head_radius", 0, "Radius", 0);
 	}
@@ -946,7 +946,7 @@ static void v3d_editmetaball_buts(uiLayout *layout, Object *ob)
 	RNA_pointer_create(&mball->id, &RNA_MetaElement, mball->lastelem, &ptr);
 	
 	col= uiLayoutColumn(layout, 0);
-	uiItemR(col, &ptr, "location", 0, "Location", 0);
+	uiItemR(col, &ptr, "co", 0, "Location", 0);
 	
 	uiItemR(col, &ptr, "radius", 0, "Radius", 0);
 	uiItemR(col, &ptr, "stiffness", 0, "Stiffness", 0);

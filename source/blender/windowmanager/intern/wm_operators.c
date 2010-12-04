@@ -31,8 +31,12 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <stddef.h>
+#include <assert.h>
+
 #ifdef WIN32
-#include <windows.h>
+#include "BLI_winstuff.h"
+#include <windows.h>  
+
 #include <io.h>
 #endif
 
@@ -313,7 +317,7 @@ static int wm_macro_cancel(bContext *C, wmOperator *op)
 }
 
 /* Names have to be static for now */
-wmOperatorType *WM_operatortype_append_macro(char *idname, char *name, int flag)
+wmOperatorType *WM_operatortype_append_macro(const char *idname, const char *name, int flag)
 {
 	wmOperatorType *ot;
 	
@@ -581,12 +585,12 @@ void WM_operator_properties_alloc(PointerRNA **ptr, IDProperty **properties, con
 
 }
 
-void WM_operator_properties_sanitize(PointerRNA *ptr, int val)
+void WM_operator_properties_sanitize(PointerRNA *ptr, const short no_context)
 {
 	RNA_STRUCT_BEGIN(ptr, prop) {
 		switch(RNA_property_type(prop)) {
 		case PROP_ENUM:
-			if (val)
+			if (no_context)
 				RNA_def_property_flag(prop, PROP_ENUM_NO_CONTEXT);
 			else
 				RNA_def_property_clear_flag(prop, PROP_ENUM_NO_CONTEXT);
@@ -598,7 +602,7 @@ void WM_operator_properties_sanitize(PointerRNA *ptr, int val)
 				/* recurse into operator properties */
 				if (RNA_struct_is_a(ptype, &RNA_OperatorProperties)) {
 					PointerRNA opptr = RNA_property_pointer_get(ptr, prop);
-					WM_operator_properties_sanitize(&opptr, val);
+					WM_operator_properties_sanitize(&opptr, no_context);
 				}
 				break;
 			}
@@ -616,6 +620,7 @@ void WM_operator_properties_free(PointerRNA *ptr)
 	if(properties) {
 		IDP_FreeProperty(properties);
 		MEM_freeN(properties);
+		ptr->data= NULL; /* just incase */
 	}
 }
 
@@ -649,7 +654,7 @@ int WM_menu_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 
 
 /* generic enum search invoke popup */
-static void operator_enum_search_cb(const struct bContext *C, void *arg_ot, char *str, uiSearchItems *items)
+static void operator_enum_search_cb(const struct bContext *C, void *arg_ot, const char *str, uiSearchItems *items)
 {
 	wmOperatorType *ot = (wmOperatorType *)arg_ot;
 	PropertyRNA *prop= ot->prop;
@@ -864,7 +869,7 @@ int WM_operator_winactive(bContext *C)
 	return 1;
 }
 
-/* op->invoke */
+/* op->exec */
 static void redo_cb(bContext *C, void *arg_op, int UNUSED(event))
 {
 	wmOperator *lastop= arg_op;
@@ -889,6 +894,11 @@ static uiBlock *wm_block_create_redo(bContext *C, ARegion *ar, void *arg_op)
 	block= uiBeginBlock(C, ar, "redo_popup", UI_EMBOSS);
 	uiBlockClearFlag(block, UI_BLOCK_LOOP);
 	uiBlockSetFlag(block, UI_BLOCK_KEEP_OPEN|UI_BLOCK_RET_1|UI_BLOCK_MOVEMOUSE_QUIT);
+
+	/* if register is not enabled, the operator gets freed on OPERATOR_FINISHED
+	 * ui_apply_but_funcs_after calls redo_cb and crashes */
+	assert(op->type->flag & OPTYPE_REGISTER);
+
 	uiBlockSetHandleFunc(block, redo_cb, arg_op);
 
 	if(!op->properties) {
@@ -977,7 +987,8 @@ static uiBlock *wm_block_create_dialog(bContext *C, ARegion *ar, void *userData)
 	btn= uiDefBut(block, BUT, 0, "OK", 0, 0, 0, 20, NULL, 0, 0, 0, 0, "");
 	uiButSetFunc(btn, dialog_exec_cb, op, block);
 
-	uiPopupBoundsBlock(block, 4.0f, 0, 0);
+	/* center around the mouse */
+	uiPopupBoundsBlock(block, 4.0f, data->width/-2, data->height/2);
 	uiEndBlock(C, block);
 
 	return block;
@@ -1021,6 +1032,11 @@ int WM_operator_props_popup(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 {
 	int retval= OPERATOR_CANCELLED;
 	
+	if((op->type->flag & OPTYPE_REGISTER)==0) {
+		BKE_reportf(op->reports, RPT_ERROR, "Operator '%s' does not have register enabled, incorrect invoke function.", op->type->idname);
+		return OPERATOR_CANCELLED;
+	}
+	
 	if(op->type->exec) {
 		retval= op->type->exec(C, op);
 
@@ -1059,6 +1075,11 @@ int WM_operator_ui_popup(bContext *C, wmOperator *op, int width, int height)
 
 int WM_operator_redo_popup(bContext *C, wmOperator *op)
 {
+	if((op->type->flag & OPTYPE_REGISTER)==0) {
+		BKE_reportf(op->reports, RPT_ERROR, "Operator '%s' does not have register enabled, incorrect invoke function.", op->type->idname);
+		return OPERATOR_CANCELLED;
+	}
+	
 	uiPupBlock(C, wm_block_create_redo, op);
 
 	return OPERATOR_CANCELLED;
@@ -1261,7 +1282,7 @@ static void operator_call_cb(struct bContext *C, void *UNUSED(arg1), void *arg2)
 		WM_operator_name_call(C, ot->idname, WM_OP_INVOKE_DEFAULT, NULL);
 }
 
-static void operator_search_cb(const struct bContext *C, void *UNUSED(arg), char *str, uiSearchItems *items)
+static void operator_search_cb(const struct bContext *C, void *UNUSED(arg), const char *str, uiSearchItems *items)
 {
 	wmOperatorType *ot = WM_operatortype_first();
 	
@@ -1443,7 +1464,15 @@ static void open_set_use_scripts(wmOperator *op)
 
 static int wm_open_mainfile_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 {
-	RNA_string_set(op->ptr, "filepath", G.main->name);
+	const char *openname= G.main->name;
+
+	/* if possible, get the name of the most recently used .blend file */
+	if (G.recent_files.first) {
+		struct RecentFile *recent = G.recent_files.first;
+		openname = recent->filepath;
+	}
+
+	RNA_string_set(op->ptr, "filepath", openname);
 	open_set_load_ui(op);
 	open_set_use_scripts(op);
 
@@ -1904,7 +1933,7 @@ static void WM_OT_save_mainfile(wmOperatorType *ot)
 
 #include "../../collada/collada.h"
 
-static int wm_collada_export_invoke(bContext *C, wmOperator *op, wmEvent *event)
+static int wm_collada_export_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 {	
 	if(!RNA_property_is_set(op->ptr, "filepath")) {
 		char filepath[FILE_MAX];
@@ -2011,38 +2040,21 @@ static void WM_OT_quit_blender(wmOperatorType *ot)
 }
 
 /* *********************** */
-#ifdef WIN32
+#if defined(WIN32)
 static int console= 1;
-void WM_toggle_console(bContext *C, short show)
+void WM_toggle_console(bContext *UNUSED(C), short show)
 {
 	if(show) {
-		FILE *fp;
-		char fn[FILE_MAX];
-		char tmp[FILE_MAXDIR];
-		BLI_where_is_temp(tmp, 1);
-		BLI_make_file_string("/", fn, tmp, "blenderlog.txt");
-		/* open the console */
-		AllocConsole();
-		
-		/* redirect stdin */
-		fp= freopen(fn, "r", stdin);
-		SetStdHandle(STD_INPUT_HANDLE, (HANDLE)_get_osfhandle(_fileno(stdin)));
-		/* redirect stdout */
-		fp= freopen(fn, "w", stdout);
-		SetStdHandle(STD_OUTPUT_HANDLE, (HANDLE)_get_osfhandle(_fileno(stdout)));
-		/* redirect stderr */
-		fp= freopen(fn, "w", stderr);
-		SetStdHandle(STD_ERROR_HANDLE, (HANDLE)_get_osfhandle(_fileno(stderr)));
-		
+		ShowWindow(GetConsoleWindow(),SW_SHOW);
 		console= 1;
 	}
 	else {
-		FreeConsole();
+		ShowWindow(GetConsoleWindow(),SW_HIDE);
 		console= 0;
 	}
 }
 
-static int wm_toggle_console_op(bContext *C, wmOperator *op)
+static int wm_toggle_console_op(bContext *C, wmOperator *UNUSED(op))
 {
 	if(console) {
 		WM_toggle_console(C, 0);
@@ -2850,7 +2862,10 @@ int WM_radial_control_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	int mode = RNA_int_get(op->ptr, "mode");
 	float initial_value = RNA_float_get(op->ptr, "initial_value");
 	//float initial_size = RNA_float_get(op->ptr, "initial_size");
-	int mouse[2] = {event->x, event->y};
+	int mouse[2];
+
+	mouse[0]= event->x;
+	mouse[1]= event->y;
 
 	//if (initial_size == 0)
 	//	initial_size = WM_RADIAL_CONTROL_DISPLAY_SIZE;
@@ -2986,7 +3001,8 @@ static int redraw_timer_exec(bContext *C, wmOperator *op)
 
 	for(a=0; a<iter; a++) {
 		if (type==0) {
-			ED_region_do_draw(C, ar);
+			if(ar)
+				ED_region_do_draw(C, ar);
 		} 
 		else if (type==1) {
 			wmWindow *win= CTX_wm_window(C);
@@ -3109,7 +3125,7 @@ void wm_operatortype_free(void)
 			wm_operatortype_free_macro(ot);
 
 		if(ot->ext.srna) /* python operator, allocs own string */
-			MEM_freeN(ot->idname);
+			MEM_freeN((void *)ot->idname);
 	}
 	
 	BLI_freelistN(&global_ops);
@@ -3136,7 +3152,7 @@ void wm_operatortype_init(void)
 	WM_operatortype_append(WM_OT_splash);
 	WM_operatortype_append(WM_OT_search_menu);
 	WM_operatortype_append(WM_OT_call_menu);
-#ifdef WIN32
+#if defined(WIN32)
 	WM_operatortype_append(WM_OT_toggle_console);
 #endif
 
@@ -3265,7 +3281,7 @@ static void gesture_border_modal_keymap(wmKeyConfig *keyconf)
 	WM_modalkeymap_assign(keymap, "ACTION_OT_select_border");
 	WM_modalkeymap_assign(keymap, "ANIM_OT_channels_select_border");
 	WM_modalkeymap_assign(keymap, "ANIM_OT_previewrange_set");
-	WM_modalkeymap_assign(keymap, "CONSOLE_OT_select_border");
+	WM_modalkeymap_assign(keymap, "INFO_OT_select_border");
 	WM_modalkeymap_assign(keymap, "FILE_OT_select_border");
 	WM_modalkeymap_assign(keymap, "GRAPH_OT_select_border");
 	WM_modalkeymap_assign(keymap, "MARKER_OT_select_border");
@@ -3411,11 +3427,9 @@ void wm_window_keymap(wmKeyConfig *keyconf)
 /* Generic itemf's for operators that take library args */
 static EnumPropertyItem *rna_id_itemf(bContext *UNUSED(C), PointerRNA *UNUSED(ptr), int *free, ID *id, int local)
 {
-	EnumPropertyItem *item= NULL, item_tmp;
+	EnumPropertyItem item_tmp= {0}, *item= NULL;
 	int totitem= 0;
 	int i= 0;
-
-	memset(&item_tmp, 0, sizeof(item_tmp));
 
 	for( ; id; id= id->next) {
 		if(local==FALSE || id->lib==NULL) {

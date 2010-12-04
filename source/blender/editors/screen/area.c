@@ -338,7 +338,7 @@ void ED_region_do_draw(bContext *C, ARegion *ar)
 		glClear(GL_COLOR_BUFFER_BIT);
 		
 		UI_ThemeColor(TH_TEXT);
-		BLF_draw_default(20, 8, 0.0f, ar->headerstr);
+		BLF_draw_default(20, 8, 0.0f, ar->headerstr, 65535); /* XXX, use real length */
 	}
 	else if(at->draw) {
 		at->draw(C, ar);
@@ -427,7 +427,7 @@ void ED_area_tag_refresh(ScrArea *sa)
 /* *************************************************************** */
 
 /* use NULL to disable it */
-void ED_area_headerprint(ScrArea *sa, char *str)
+void ED_area_headerprint(ScrArea *sa, const char *str)
 {
 	ARegion *ar;
 	
@@ -1165,7 +1165,7 @@ static char *editortype_pup(void)
 		   
 		   "|%l"
 		   
-		   "|Console %x18"
+		   "|Python Console %x18"
 		   );
 }
 

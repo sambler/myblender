@@ -24,8 +24,6 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-FILE(GLOB SRC *.cpp)
-
 SET(INC
 	../../../../source/kernel/gen_system
 	../../../../intern/string
@@ -41,6 +39,18 @@ SET(INC
 	../../../../source/blender/blenloader
 )
 
+SET(SRC
+	RAS_GLExtensionManager.cpp
+	RAS_ListRasterizer.cpp
+	RAS_OpenGLRasterizer.cpp
+	RAS_VAOpenGLRasterizer.cpp
+
+	RAS_GLExtensionManager.h
+	RAS_ListRasterizer.h
+	RAS_OpenGLRasterizer.h
+	RAS_VAOpenGLRasterizer.h
+)
+
 ADD_DEFINITIONS(-DGLEW_STATIC)
 
-BLENDERLIB(bf_oglrasterizer "${SRC}" "${INC}")
+BLENDERLIB(ge_oglrasterizer "${SRC}" "${INC}")

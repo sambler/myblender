@@ -37,6 +37,8 @@ struct Multires;
 struct MultiresModifierData;
 struct ModifierData;
 struct Object;
+struct Scene;
+struct MDisps;
 
 void multires_mark_as_modified(struct Object *ob);
 
@@ -53,7 +55,6 @@ struct MultiresModifierData *find_multires_modifier_before(struct Scene *scene,
 	struct ModifierData *lastmd);
 struct DerivedMesh *get_multires_dm(struct Scene *scene, struct MultiresModifierData *mmd,
 				struct Object *ob);
-void multiresModifier_join(struct Object *);
 void multiresModifier_del_levels(struct MultiresModifierData *, struct Object *, int direction);
 void multiresModifier_subdivide(struct MultiresModifierData *mmd, struct Object *ob,
 				int updateblock, int simple);
@@ -70,6 +71,14 @@ void multires_stitch_grids(struct Object *);
 void multires_free(struct Multires *mr);
 void multires_load_old(struct Object *ob, struct Mesh *me);
 void multires_load_old_250(struct Mesh *);
+
+void multiresModifier_scale_disp(struct Scene *scene, struct Object *ob);
+void multiresModifier_prepare_join(struct Scene *scene, struct Object *ob, struct Object *to_ob);
+
+int multires_mdisp_corners(struct MDisps *s);
+
+/* update multires data after topology changing */
+void multires_topology_changed(struct Object *ob);
 
 #endif
 

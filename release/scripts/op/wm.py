@@ -74,6 +74,33 @@ def execute_context_assign(self, context):
     return {'FINISHED'}
 
 
+class BRUSH_OT_set_active_number(bpy.types.Operator):
+    '''Set active sculpt/paint brush from it's number'''
+    bl_idname = "brush.set_active_number"
+    bl_label = "Set Brush Number"
+
+    mode = StringProperty(name="mode",
+            description="Paint mode to set brush for", maxlen=1024)
+    number = IntProperty(name="number",
+            description="Brush number")
+
+    _attr_dict = {"sculpt"      : "use_paint_sculpt",
+                  "vertex_paint": "use_paint_vertex",
+                  "weight_paint": "use_paint_weight",
+                  "image_paint" : "use_paint_texture"}
+
+    def execute(self, context):
+        attr = self._attr_dict.get(self.mode)
+        if attr is None:
+            return {'CANCELLED'}
+
+        for i, brush in enumerate((cur for cur in bpy.data.brushes if getattr(cur, attr))):
+            if i == self.number:
+                getattr(context.tool_settings, self.mode).brush = brush
+                return {'FINISHED'}
+
+        return {'CANCELLED'}
+
 class WM_OT_context_set_boolean(bpy.types.Operator):
     '''Set a context value.'''
     bl_idname = "wm.context_set_boolean"
@@ -241,8 +268,8 @@ class WM_OT_context_toggle_enum(bpy.types.Operator):
 
 
 class WM_OT_context_cycle_int(bpy.types.Operator):
-    '''Set a context value. Useful for cycling active material,
-    vertex keys, groups' etc.'''
+    '''Set a context value. Useful for cycling active material, '''
+    '''vertex keys, groups' etc.'''
     bl_idname = "wm.context_cycle_int"
     bl_label = "Context Int Cycle"
     bl_options = {'UNDO'}
@@ -632,9 +659,8 @@ class WM_OT_doc_edit(bpy.types.Operator):
 
     def draw(self, context):
         layout = self.layout
-        props = self.properties # XXX, this should not be needed, api problem!
-        layout.label(text="Descriptor ID: '%s'" % props.doc_id)
-        layout.prop(props, "doc_new", text="")
+        layout.label(text="Descriptor ID: '%s'" % self.doc_id)
+        layout.prop(self, "doc_new", text="")
 
     def invoke(self, context, event):
         wm = context.window_manager
@@ -662,6 +688,7 @@ class WM_OT_properties_edit(bpy.types.Operator):
     '''Internal use (edit a property data_path)'''
     bl_idname = "wm.properties_edit"
     bl_label = "Edit Property"
+    bl_options = {'REGISTER'} # only because invoke_props_popup requires.
 
     data_path = rna_path
     property = rna_property
@@ -722,11 +749,7 @@ class WM_OT_properties_edit(bpy.types.Operator):
             self.description = prop_ui.get("description", "")
 
         wm = context.window_manager
-        # This crashes, TODO - fix
-        #return wm.invoke_props_popup(self, event)
-
-        wm.invoke_props_popup(self, event)
-        return {'RUNNING_MODAL'}
+        return wm.invoke_props_popup(self, event)
 
 
 class WM_OT_properties_add(bpy.types.Operator):

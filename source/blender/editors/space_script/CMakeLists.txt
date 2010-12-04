@@ -19,8 +19,6 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-FILE(GLOB SRC *.c)
-
 SET(INC
 	../include
 	../../blenkernel
@@ -31,10 +29,18 @@ SET(INC
 	../../../../intern/guardedalloc
 )
 
+SET(SRC
+	script_edit.c
+	script_header.c
+	script_ops.c
+	space_script.c
+
+	script_intern.h
+)
+
 IF(WITH_PYTHON)
 	LIST(APPEND INC ${PYTHON_INC} ../../python)
-ELSE(WITH_PYTHON)
-	ADD_DEFINITIONS(-DDISABLE_PYTHON)
+	ADD_DEFINITIONS(-DWITH_PYTHON)
 ENDIF(WITH_PYTHON)
 
 BLENDERLIB(bf_editor_space_script "${SRC}" "${INC}")

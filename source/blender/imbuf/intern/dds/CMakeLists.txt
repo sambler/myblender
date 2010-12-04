@@ -24,8 +24,6 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-FILE (GLOB SRC *.cpp)
-
 SET(INC 
 	.
 	..
@@ -37,8 +35,17 @@ SET(INC
 	../../../../../intern/guardedalloc
 )
 
+SET(SRC
+	BlockDXT.cpp
+	ColorBlock.cpp
+	DirectDrawSurface.cpp
+	Image.cpp
+	Stream.cpp
+	dds_api.cpp
+)
+
 if(WITH_IMAGE_DDS)
 	ADD_DEFINITIONS(-DWITH_DDS)
 ENDIF(WITH_IMAGE_DDS)
 
-BLENDERLIB(bf_dds "${SRC}" "${INC}")                 
+BLENDERLIB(bf_imbuf_dds "${SRC}" "${INC}")                 

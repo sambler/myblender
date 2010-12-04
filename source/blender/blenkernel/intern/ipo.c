@@ -111,27 +111,26 @@ typedef struct AdrBit2Path {
 
 /* Object layers */
 static AdrBit2Path ob_layer_bits[]= {
-	{(1<<0), "layer", 0},
-	{(1<<1), "layer", 1},
-	{(1<<2), "layer", 2},
-	{(1<<3), "layer", 3},
-	{(1<<4), "layer", 4},
-	{(1<<5), "layer", 5},
-	{(1<<6), "layer", 6},
-	{(1<<7), "layer", 7},
-	{(1<<8), "layer", 8},
-	{(1<<9), "layer", 9},
-	{(1<<10), "layer", 10},
-	{(1<<11), "layer", 11},
-	{(1<<12), "layer", 12},
-	{(1<<13), "layer", 13},
-	{(1<<14), "layer", 14},
-	{(1<<15), "layer", 15},
-	{(1<<16), "layer", 16},
-	{(1<<17), "layer", 17},
-	{(1<<18), "layer", 18},
-	{(1<<19), "layer", 19},
-	{(1<<20), "layer", 20}
+	{(1<<0), "layers", 0},
+	{(1<<1), "layers", 1},
+	{(1<<2), "layers", 2},
+	{(1<<3), "layers", 3},
+	{(1<<4), "layers", 4},
+	{(1<<5), "layers", 5},
+	{(1<<6), "layers", 6},
+	{(1<<7), "layers", 7},
+	{(1<<8), "layers", 8},
+	{(1<<9), "layers", 9},
+	{(1<<10), "layers", 10},
+	{(1<<11), "layers", 11},
+	{(1<<12), "layers", 12},
+	{(1<<13), "layers", 13},
+	{(1<<14), "layers", 14},
+	{(1<<15), "layers", 15},
+	{(1<<16), "layers", 16},
+	{(1<<17), "layers", 17},
+	{(1<<18), "layers", 18},
+	{(1<<19), "layers", 19}
 };
 
 /* Material mode */
@@ -1017,13 +1016,13 @@ static ChannelDriver *idriver_to_cdriver (IpoDriver *idriver)
 				dtar= &dvar->targets[0];
 				dtar->id= (ID *)idriver->ob;
 				if (idriver->name[0])
-					BLI_strncpy(dtar->pchan_name, idriver->name, 32);
+					BLI_strncpy(dtar->pchan_name, idriver->name, sizeof(dtar->pchan_name));
 				
 					/* second bone target (name was stored in same var as the first one) */
 				dtar= &dvar->targets[1];
 				dtar->id= (ID *)idriver->ob;
 				if (idriver->name[0]) // xxx... for safety
-					BLI_strncpy(dtar->pchan_name, idriver->name+DRIVER_NAME_OFFS, 32);
+					BLI_strncpy(dtar->pchan_name, idriver->name+DRIVER_NAME_OFFS, sizeof(dtar->pchan_name));
 			}
 			else {
 				/* only a single variable, of type 'transform channel' */
@@ -1034,7 +1033,7 @@ static ChannelDriver *idriver_to_cdriver (IpoDriver *idriver)
 				dtar= &dvar->targets[0];
 				dtar->id= (ID *)idriver->ob;
 				if (idriver->name[0])
-					BLI_strncpy(dtar->pchan_name, idriver->name, 32);
+					BLI_strncpy(dtar->pchan_name, idriver->name, sizeof(dtar->pchan_name));
 				dtar->transChan= adrcode_to_dtar_transchan(idriver->adrcode);
 				dtar->flag |= DTAR_FLAG_LOCALSPACE; /* old drivers took local space */
 			}
@@ -1123,7 +1122,7 @@ static void icu_to_fcurves (ID *id, ListBase *groups, ListBase *list, IpoCurve *
 {
 	AdrBit2Path *abp;
 	FCurve *fcu;
-	int i=0, totbits;
+	int totbits;
 	
 	/* allocate memory for a new F-Curve */
 	fcu= MEM_callocN(sizeof(FCurve), "FCurve");
@@ -1188,6 +1187,8 @@ static void icu_to_fcurves (ID *id, ListBase *groups, ListBase *list, IpoCurve *
 		 * 3) filter the keyframes for the flag of interest
 		 */
 		for (b=0; b < totbits; b++, abp++) {
+			unsigned int i=0;
+			
 			/* make a copy of existing base-data if not the last curve */
 			if (b < (totbits-1))
 				fcurve= copy_fcurve(fcu);
@@ -1211,7 +1212,7 @@ static void icu_to_fcurves (ID *id, ListBase *groups, ListBase *list, IpoCurve *
 				fcurve->bezt= MEM_callocN(sizeof(BezTriple)*fcurve->totvert, "BezTriples");
 				
 				/* loop through copying all BezTriples individually, as we need to modify a few things */
-				for (dst=fcurve->bezt, src=icu->bezt; i < fcurve->totvert; i++, dst++, src++) {
+				for (dst=fcurve->bezt, src=icu->bezt, i=0; i < fcurve->totvert; i++, dst++, src++) {
 					/* firstly, copy BezTriple data */
 					*dst= *src;
 					
@@ -1239,6 +1240,8 @@ static void icu_to_fcurves (ID *id, ListBase *groups, ListBase *list, IpoCurve *
 		}
 	}
 	else {
+		unsigned int i=0;
+		
 		/* get rna-path
 		 *	- we will need to set the 'disabled' flag if no path is able to be made (for now)
 		 */
@@ -1259,7 +1262,7 @@ static void icu_to_fcurves (ID *id, ListBase *groups, ListBase *list, IpoCurve *
 			fcu->bezt= MEM_callocN(sizeof(BezTriple)*fcu->totvert, "BezTriples");
 			
 			/* loop through copying all BezTriples individually, as we need to modify a few things */
-			for (dst=fcu->bezt, src=icu->bezt; i < fcu->totvert; i++, dst++, src++) {
+			for (dst=fcu->bezt, src=icu->bezt, i=0; i < fcu->totvert; i++, dst++, src++) {
 				/* firstly, copy BezTriple data */
 				*dst= *src;
 				

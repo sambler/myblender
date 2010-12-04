@@ -22,8 +22,6 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-FILE(GLOB SRC intern/*.c)
-
 SET(INC
 	.
 	../blenlib
@@ -35,14 +33,28 @@ SET(INC
 	${FREETYPE_INCLUDE_DIRS}
 )
 
+SET(SRC
+	intern/blf.c
+	intern/blf_dir.c
+	intern/blf_font.c
+	intern/blf_glyph.c
+	intern/blf_lang.c
+	intern/blf_util.c
+
+	BLF_api.h
+	BLF_types.h
+	intern/blf_internal.h
+	intern/blf_internal_types.h
+)
+
 IF(WITH_INTERNATIONAL)
 	LIST(APPEND INC ${GETTEXT_INC})
 	ADD_DEFINITIONS(-DINTERNATIONAL)
 ENDIF(WITH_INTERNATIONAL)
 
-IF(WIN32)
-	ADD_DEFINITIONS(-D_WIN32 -DUSE_GETTEXT_DLL)
-ENDIF(WIN32)
+IF(WIN32 AND NOT UNIX)
+	ADD_DEFINITIONS(-DUSE_GETTEXT_DLL)
+ENDIF(WIN32 AND NOT UNIX)
 
 BLENDERLIB(bf_blenfont "${SRC}" "${INC}")
 

@@ -70,7 +70,7 @@ static void rna_Pose_update(Main *bmain, Scene *scene, PointerRNA *ptr)
 {
 	// XXX when to use this? ob->pose->flag |= (POSE_LOCKED|POSE_DO_UNLOCK);
 
-	DAG_id_flush_update(ptr->id.data, OB_RECALC_DATA);
+	DAG_id_tag_update(ptr->id.data, OB_RECALC_DATA);
 }
 
 static void rna_Pose_IK_update(Main *bmain, Scene *scene, PointerRNA *ptr)
@@ -78,7 +78,7 @@ static void rna_Pose_IK_update(Main *bmain, Scene *scene, PointerRNA *ptr)
 	// XXX when to use this? ob->pose->flag |= (POSE_LOCKED|POSE_DO_UNLOCK);
 	Object *ob= ptr->id.data;
 
-	DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	BIK_clear_data(ob->pose);
 }
 
@@ -91,13 +91,13 @@ static void rna_BoneGroup_color_set_set(PointerRNA *ptr, int value)
 {
 	bActionGroup *grp= ptr->data;
 	
-	/* if valid value, set the new enum value, then copy the relevant colours? */
+	/* if valid value, set the new enum value, then copy the relevant colors? */
 	if ((value >= -1) && (value < 21))
 		grp->customCol= value;
 	else
 		return;
 	
-	/* only do color copying if using a custom color (i.e. not default colour)  */
+	/* only do color copying if using a custom color (i.e. not default color)  */
 	if (grp->customCol) {
 		if (grp->customCol > 0) {
 			/* copy theme colors on-to group's custom color in case user tries to edit color */
@@ -162,7 +162,7 @@ static void rna_Pose_ik_solver_update(Main *bmain, Scene *scene, PointerRNA *ptr
 	
 	object_test_constraints(ob);
 
-	DAG_id_flush_update(&ob->id, OB_RECALC_DATA|OB_RECALC_OB);
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA|OB_RECALC_OB);
 }
 
 /* rotation - axis-angle */
@@ -271,7 +271,7 @@ static void rna_Itasc_update(Main *bmain, Scene *scene, PointerRNA *ptr)
 		itasc->maxvel = 100.f;
 	BIK_update_param(ob->pose);
 
-	DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 }
 
 static void rna_Itasc_update_rebuild(Main *bmain, Scene *scene, PointerRNA *ptr)

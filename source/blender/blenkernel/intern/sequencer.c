@@ -263,7 +263,7 @@ SeqRenderData seq_new_render_data(
 	return rval;
 }
 
-int seq_cmp_render_data(SeqRenderData * a, SeqRenderData * b)
+int seq_cmp_render_data(const SeqRenderData * a, const SeqRenderData * b)
 {
 	if (a->preview_render_size < b->preview_render_size) {
 		return -1;
@@ -317,7 +317,7 @@ int seq_cmp_render_data(SeqRenderData * a, SeqRenderData * b)
 	return 0;
 }
 
-unsigned int seq_hash_render_data(SeqRenderData * a)
+unsigned int seq_hash_render_data(const SeqRenderData * a)
 {
 	unsigned int rval = a->rectx + a->recty;
 
@@ -875,7 +875,7 @@ void seqbase_unique_name_recursive(ListBase *seqbasep, struct Sequence *seq)
 	strcpy(seq->name+2, sui.name_dest);
 }
 
-static char *give_seqname_by_type(int type)
+static const char *give_seqname_by_type(int type)
 {
 	switch(type) {
 	case SEQ_META:	     return "Meta";
@@ -902,9 +902,9 @@ static char *give_seqname_by_type(int type)
 	}
 }
 
-char *give_seqname(Sequence *seq)
+const char *give_seqname(Sequence *seq)
 {
-	char * name = give_seqname_by_type(seq->type);
+	const char *name = give_seqname_by_type(seq->type);
 
 	if (!name) {
 		if(seq->type<SEQ_EFFECT) {
@@ -2084,6 +2084,9 @@ static ImBuf * seq_render_strip(SeqRenderData context, Sequence * seq, float cfr
 		case SEQ_SCENE:
 		{	// scene can be NULL after deletions
 			ibuf = seq_render_scene_strip_impl(context, seq, nr);
+
+			/* Scene strips update all animation, so we need to restore original state.*/
+			BKE_animsys_evaluate_all_animation(context.bmain, cfra);
 
 			copy_to_ibuf_still(context, seq, nr, ibuf);
 			break;

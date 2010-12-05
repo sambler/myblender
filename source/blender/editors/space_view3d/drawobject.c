@@ -316,7 +316,7 @@ static float cosval[32] ={
 	1.00000000
 };
 
-static void draw_xyz_wire(float *c, float size, int axis)
+static void draw_xyz_wire(const float c[3], float size, int axis)
 {
 	float v1[3]= {0.f, 0.f, 0.f}, v2[3] = {0.f, 0.f, 0.f};
 	float dim = size * 0.1;
@@ -413,16 +413,16 @@ void drawaxes(float size, char drawtype)
 	
 	case OB_PLAINAXES:
 		for (axis=0; axis<3; axis++) {
-			v1[0]= v1[1]= v1[2]= 0.0f;
-			v2[0]= v2[1]= v2[2]= 0.0f;
-			
 			glBegin(GL_LINES);
 			
 			v1[axis]= size;
 			v2[axis]= -size;
 			glVertex3fv(v1);
 			glVertex3fv(v2);
-			
+
+			/* reset v1 & v2 to zero */
+			v1[axis]= v2[axis]= 0.0f;
+
 			glEnd();
 		}
 		break;
@@ -478,10 +478,8 @@ void drawaxes(float size, char drawtype)
 	case OB_ARROWS:
 	default:
 		for (axis=0; axis<3; axis++) {
-			int arrow_axis= (axis==0)?1:0;
-			v1[0]= v1[1]= v1[2]= 0.0f;
-			v2[0]= v2[1]= v2[2]= 0.0f;
-            
+			const int arrow_axis= (axis==0) ? 1:0;
+
 			glBegin(GL_LINES);
 			
 			v2[axis]= size;
@@ -502,12 +500,16 @@ void drawaxes(float size, char drawtype)
 			v2[axis]+= size*0.125;
 			
 			draw_xyz_wire(v2, size, axis);
+			
+			
+			/* reset v1 & v2 to zero */
+			v1[arrow_axis]= v1[axis]= v2[axis]= 0.0f;
 		}
 		break;
 	}
 }
 
-void drawcircball(int mode, float *cent, float rad, float tmat[][4])
+void drawcircball(int mode, const float cent[3], float rad, float tmat[][4])
 {
 	float vec[3], vx[3], vy[3];
 	int a, tot=32;
@@ -526,7 +528,7 @@ void drawcircball(int mode, float *cent, float rad, float tmat[][4])
 }
 
 /* circle for object centers, special_color is for library or ob users */
-static void drawcentercircle(View3D *v3d, RegionView3D *rv3d, float *co, int selstate, int special_color)
+static void drawcentercircle(View3D *v3d, RegionView3D *rv3d, const float co[3], int selstate, int special_color)
 {
 	const float size= view3d_pixel_size(rv3d, co) * (float)U.obcenter_dia * 0.5f;
 
@@ -1256,13 +1258,22 @@ static void drawcamera(Scene *scene, View3D *v3d, RegionView3D *rv3d, Object *ob
 		/* that way it's always visible - clipsta+0.1 */
 		float fac;
 		drawsize= cam->drawsize / ((scax + scay + scaz) / 3.0f);
-		fac= is_view ? (cam->clipsta + 0.1f) : drawsize;
-		depth= - fac*cam->lens/16.0 * scaz;
+
+		if(is_view) {
+			/* fixed depth, variable size (avoids exceeding clipping range) */
+			depth = -(cam->clipsta + 0.1);
+			fac = depth / (cam->lens/-16.0f * scaz);
+		}
+		else {
+			/* fixed size, variable depth (stays a reasonable size in the 3D view) */
+			depth= drawsize * cam->lens/-16.0f * scaz;
+			fac= drawsize;
+		}
+
 		facx= fac * caspx * scax;
 		facy= fac * caspy * scay;
 		shx= cam->shiftx*fac*2 * scax;
 		shy= cam->shifty*fac*2 * scay;
-		
 	}
 	
 	vec[0][0]= 0.0; vec[0][1]= 0.0; vec[0][2]= 0.0;

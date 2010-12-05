@@ -706,7 +706,7 @@ void CalcSnapGeometry(TransInfo *t, float *UNUSED(vec))
 			ListBase depth_peels;
 			DepthPeel *p1, *p2;
 			float *last_p = NULL;
-			float distf = FLT_MAX;
+			float max_dist = FLT_MAX;
 			float p[3] = {0.0f, 0.0f, 0.0f};
 			
 			depth_peels.first = depth_peels.last = NULL;
@@ -770,21 +770,21 @@ void CalcSnapGeometry(TransInfo *t, float *UNUSED(vec))
 					if (last_p == NULL)
 					{
 						VECCOPY(p, vec2);
-						distf = 0;
+						max_dist = 0;
 						break;
 					}
 					
 					new_dist = len_v3v3(last_p, vec2);
 					
-					if (new_dist < distf)
+					if (new_dist < max_dist)
 					{
 						VECCOPY(p, vec2);
-						distf = new_dist;
+						max_dist = new_dist;
 					}
 				}
 			}
 			
-			if (distf != FLT_MAX)
+			if (max_dist != FLT_MAX)
 			{
 				VECCOPY(loc, p);
 				/* XXX, is there a correct normal in this case ???, for now just z up */
@@ -1814,25 +1814,25 @@ int peelObjects(Scene *scene, View3D *v3d, ARegion *ar, Object *obedit, ListBase
 				
 				for(dupli_ob = lb->first; dupli_ob; dupli_ob = dupli_ob->next)
 				{
-					Object *ob2 = dupli_ob->ob;
+					Object *dob = dupli_ob->ob;
 					
-					if (ob2->type == OB_MESH) {
+					if (dob->type == OB_MESH) {
 						EditMesh *em;
 						DerivedMesh *dm = NULL;
 						int val;
 
-						if (ob2 != obedit)
+						if (dob != obedit)
 						{
-							dm = mesh_get_derived_final(scene, ob2, CD_MASK_BAREMESH);
+							dm = mesh_get_derived_final(scene, dob, CD_MASK_BAREMESH);
 							
-							val = peelDerivedMesh(ob2, dm, ob2->obmat, ray_start, ray_normal, mval, depth_peels);
+							val = peelDerivedMesh(dob, dm, dob->obmat, ray_start, ray_normal, mval, depth_peels);
 						}
 						else
 						{
-							em = ((Mesh *)ob2->data)->edit_mesh;
+							em = ((Mesh *)dob->data)->edit_mesh;
 							dm = editmesh_get_derived_cage(scene, obedit, em, CD_MASK_BAREMESH);
 							
-							val = peelDerivedMesh(ob2, dm, ob2->obmat, ray_start, ray_normal, mval, depth_peels);
+							val = peelDerivedMesh(dob, dm, dob->obmat, ray_start, ray_normal, mval, depth_peels);
 						}
 
 						retval = retval || val;

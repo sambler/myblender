@@ -81,9 +81,6 @@
 #define TEST_EDITMESH	if(obedit==0) return; \
 						if( (v3d->lay & obedit->lay)==0 ) return;
 
-/* XXX port over */	
-extern void borderselect();
-
 /* view3d handler codes */
 #define VIEW3D_HANDLER_BACKGROUND	1
 #define VIEW3D_HANDLER_PROPERTIES	2
@@ -463,7 +460,7 @@ void uiTemplateHeader3D(uiLayout *layout, struct bContext *C)
 		RNA_pointer_create(&ob->id, &RNA_Mesh, ob->data, &meshptr);
 		uiItemR(layout, &meshptr, "use_paint_mask", UI_ITEM_R_ICON_ONLY, "", 0);
 	} else {
-		char *str_menu;
+		const char *str_menu;
 
 		row= uiLayoutRow(layout, 1);
 		uiItemR(row, &v3dptr, "pivot_point", UI_ITEM_R_ICON_ONLY, "", 0);
@@ -497,7 +494,7 @@ void uiTemplateHeader3D(uiLayout *layout, struct bContext *C)
 			
 		str_menu = BIF_menustringTransformOrientation(C, "Orientation");
 		uiDefButS(block, MENU, B_MAN_MODE, str_menu,0,0,70,YIC, &v3d->twmode, 0, 0, 0, 0, "Transform Orientation");
-		MEM_freeN(str_menu);
+		MEM_freeN((void *)str_menu);
 	}
  		
 	if(obedit==NULL && v3d->localvd==NULL) {

@@ -226,7 +226,7 @@ typedef struct OldNewMap {
 
 
 /* local prototypes */
-static void *read_struct(FileData *fd, BHead *bh, char *blockname);
+static void *read_struct(FileData *fd, BHead *bh, const char *blockname);
 
 
 static OldNewMap *oldnewmap_new(void) 
@@ -1263,7 +1263,7 @@ static void switch_endian_structs(struct SDNA *filesdna, BHead *bhead)
 	}
 }
 
-static void *read_struct(FileData *fd, BHead *bh, char *blockname)
+static void *read_struct(FileData *fd, BHead *bh, const char *blockname)
 {
 	void *temp= NULL;
 
@@ -2931,9 +2931,24 @@ static void direct_link_pointcache(FileData *fd, PointCache *cache)
 			if(pm->index_array)
 				pm->index_array = newdataadr(fd, pm->index_array);
 			
+			/* writedata saved array of ints */
+			if(pm->index_array && (fd->flags & FD_FLAGS_SWITCH_ENDIAN)) {
+				for(i=0; i<pm->totpoint; i++)
+					SWITCH_INT(pm->index_array[i]);
+			}
+			
 			for(i=0; i<BPHYS_TOT_DATA; i++) {
-				if(pm->data[i] && pm->data_types & (1<<i))
-					pm->data[i] = newdataadr(fd, pm->data[i]);
+				pm->data[i] = newdataadr(fd, pm->data[i]);
+				
+				/* XXX the cache saves structs and data without DNA */
+				if(pm->data[i] && (fd->flags & FD_FLAGS_SWITCH_ENDIAN)) {
+					int j, tot= (BKE_ptcache_data_size (i) * pm->totpoint)/4; /* data_size returns bytes */
+					int *poin= pm->data[i];
+					
+					/* XXX fails for boid struct, it has 2 shorts */
+					for(j= 0; j<tot; j++)
+						SWITCH_INT(poin[j]);
+				}
 			}
 		}
 	}
@@ -4867,10 +4882,6 @@ void lib_link_screen_restore(Main *newmain, bScreen *curscreen, Scene *curscene)
 				else if(sl->spacetype==SPACE_FILE) {
 					
 					SpaceFile *sfile= (SpaceFile *)sl;
-					sfile->files= NULL;
-					sfile->folders_prev= NULL;
-					sfile->folders_next= NULL;
-					sfile->params= NULL;
 					sfile->op= NULL;
 				}
 				else if(sl->spacetype==SPACE_IMASEL) {
@@ -5399,7 +5410,7 @@ static void lib_link_group(FileData *fd, Main *main)
 /* ************** GENERAL & MAIN ******************** */
 
 
-static char *dataname(short id_code)
+static const char *dataname(short id_code)
 {
 	
 	switch( id_code ) {
@@ -5434,7 +5445,7 @@ static char *dataname(short id_code)
 	
 }
 
-static BHead *read_data_into_oldnewmap(FileData *fd, BHead *bhead, char *allocname)
+static BHead *read_data_into_oldnewmap(FileData *fd, BHead *bhead, const char *allocname)
 {
 	bhead = blo_nextbhead(fd, bhead);
 
@@ -5470,7 +5481,7 @@ static BHead *read_libblock(FileData *fd, Main *main, BHead *bhead, int flag, ID
 
 	ID *id;
 	ListBase *lb;
-	char *allocname;
+	const char *allocname;
 	
 	/* read libblock */
 	id = read_struct(fd, bhead, "lib block");
@@ -5497,6 +5508,7 @@ static BHead *read_libblock(FileData *fd, Main *main, BHead *bhead, int flag, ID
 	if(id->flag & LIB_FAKEUSER) id->us= 1;
 	else id->us= 0;
 	id->icon_id = 0;
+	id->flag &= ~LIB_ID_RECALC;
 
 	/* this case cannot be direct_linked: it's just the ID part */
 	if(bhead->code==ID_ID) {
@@ -6398,7 +6410,7 @@ static void do_versions_windowmanager_2_50(bScreen *screen)
 	}
 }
 
-static void versions_gpencil_add_main(ListBase *lb, ID *id, char *name)
+static void versions_gpencil_add_main(ListBase *lb, ID *id, const char *name)
 {
 	
 	BLI_addtail(lb, id);
@@ -11468,7 +11480,11 @@ static void expand_doit(FileData *fd, Main *mainvar, void *old)
 					 * lib_indirect.blend but lib.blend does too, linking in a Scene or Group from lib.blend can result in an
 					 * empty without the dupli group referenced. Once you save and reload the group would appier. - Campbell */
 					/* This crashes files, must look further into it */
-					/*oldnewmap_insert(fd->libmap, bhead->old, id, 1);*/
+					
+					/* Update: the issue is that in file reading, the oldnewmap is OK, but for existing data, it has to be
+					   inserted in the map to be found! */
+					if(id->flag & LIB_PRE_EXISTING)
+						oldnewmap_insert(fd->libmap, bhead->old, id, 1);
 					
 					change_idid_adr_fd(fd, bhead->old, id);
 					// commented because this can print way too much

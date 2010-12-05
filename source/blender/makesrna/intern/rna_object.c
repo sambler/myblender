@@ -148,7 +148,7 @@ EnumPropertyItem object_type_curve_items[] = {
 
 static void rna_Object_internal_update(Main *bmain, Scene *scene, PointerRNA *ptr)
 {
-	DAG_id_flush_update(ptr->id.data, OB_RECALC_OB);
+	DAG_id_tag_update(ptr->id.data, OB_RECALC_OB);
 }
 
 static void rna_Object_matrix_world_update(Main *bmain, Scene *scene, PointerRNA *ptr)
@@ -206,7 +206,7 @@ static void rna_Object_matrix_basis_set(PointerRNA *ptr, const float values[16])
 
 void rna_Object_internal_update_data(Main *bmain, Scene *scene, PointerRNA *ptr)
 {
-	DAG_id_flush_update(ptr->id.data, OB_RECALC_DATA);
+	DAG_id_tag_update(ptr->id.data, OB_RECALC_DATA);
 	WM_main_add_notifier(NC_OBJECT|ND_DRAW, ptr->id.data);
 }
 
@@ -238,7 +238,7 @@ void rna_Object_active_shape_update(Main *bmain, Scene *scene, PointerRNA *ptr)
 
 static void rna_Object_dependency_update(Main *bmain, Scene *scene, PointerRNA *ptr)
 {
-	DAG_id_flush_update(ptr->id.data, OB_RECALC_OB);
+	DAG_id_tag_update(ptr->id.data, OB_RECALC_OB);
 	DAG_scene_sort(bmain, scene);
 	WM_main_add_notifier(NC_OBJECT|ND_PARENT, ptr->id.data);
 }
@@ -2159,7 +2159,7 @@ static void rna_def_object(BlenderRNA *brna)
 	
 	prop= RNA_def_property(srna, "show_transparent", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "dtx", OB_DRAWTRANSP);
-	RNA_def_property_ui_text(prop, "Draw Transparent", "Enables transparent materials for the object (Mesh only)");
+	RNA_def_property_ui_text(prop, "Draw Transparent", "Displays material transparency in the object");
 	RNA_def_property_update(prop, NC_OBJECT|ND_DRAW, NULL);
 	
 	prop= RNA_def_property(srna, "show_x_ray", PROP_BOOLEAN, PROP_NONE);

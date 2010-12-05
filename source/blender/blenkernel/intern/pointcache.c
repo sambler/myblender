@@ -652,6 +652,7 @@ static int ptcache_totpoint_smoke(void *smoke_v, int UNUSED(cfra))
 }
 
 /* Smoke functions */
+#if 0
 static int ptcache_totpoint_smoke_turbulence(void *smoke_v, int UNUSED(cfra))
 {
 	SmokeModifierData *smd= (SmokeModifierData *)smoke_v;
@@ -663,6 +664,7 @@ static int ptcache_totpoint_smoke_turbulence(void *smoke_v, int UNUSED(cfra))
 	else
 		return 0;
 }
+#endif
 
 // forward decleration
 static int ptcache_file_write(PTCacheFile *pf, void *f, size_t tot, int size);
@@ -1231,7 +1233,7 @@ static int ptcache_file_read_header_begin(PTCacheFile *pf)
 
 static int ptcache_file_write_header_begin(PTCacheFile *pf)
 {
-	char *bphysics = "BPHYSICS";
+	const char *bphysics = "BPHYSICS";
 	
 	if(fwrite(bphysics, sizeof(char), 8, pf->fp) != 8)
 		return 0;
@@ -2311,7 +2313,7 @@ void BKE_ptcache_set_continue_physics(Main *bmain, Scene *scene, int enable)
 		if(CONTINUE_PHYSICS == 0) {
 			for(ob=bmain->object.first; ob; ob=ob->id.next)
 				if(BKE_ptcache_object_reset(scene, ob, PTCACHE_RESET_OUTDATED))
-					DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+					DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 		}
 	}
 }

@@ -92,7 +92,7 @@ OPTION(WITH_IMAGE_TIFF          "Enable LibTIFF Support" ON)
 OPTION(WITH_IMAGE_DDS           "Enable DDS Image Support" ON)
 OPTION(WITH_IMAGE_CINEON        "Enable CINEON and DPX Image Support" ON)
 OPTION(WITH_IMAGE_HDR           "Enable HDR Image Support" ON)
-OPTION(WITH_IMAGE_REDCODE       "Enable RedCode Image Support" ON)
+OPTION(WITH_IMAGE_REDCODE       "Enable RedCode Image Support" OFF)
 
 # Audio/Video format support
 OPTION(WITH_CODEC_FFMPEG        "Enable FFMPeg Support (http://ffmpeg.mplayerhq.hu)" OFF)
@@ -996,7 +996,7 @@ IF((NOT WIN32) AND (NOT MSVC))
 ENDIF((NOT WIN32) AND (NOT MSVC))
 
 IF(CMAKE_COMPILER_IS_GNUCC)
-	SET(C_WARNINGS "${C_WARNINGS} -Wunused-parameter -Werror=declaration-after-statement -Werror=implicit-function-declaration -Werror=return-type")
+	SET(C_WARNINGS "${C_WARNINGS} -Wunused-parameter -Wwrite-strings -Werror=strict-prototypes -Werror=declaration-after-statement -Werror=implicit-function-declaration -Werror=return-type")
 ENDIF(CMAKE_COMPILER_IS_GNUCC)
 
 SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${PLATFORM_CFLAGS} ${C_WARNINGS}")

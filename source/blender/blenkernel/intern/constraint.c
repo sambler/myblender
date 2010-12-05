@@ -2996,6 +2996,7 @@ static void rbj_id_looper (bConstraint *con, ConstraintIDFunc func, void *userda
 	
 	/* target only */
 	func(con, (ID**)&data->tar, userdata);
+	func(con, (ID**)&data->child, userdata);
 }
 
 static int rbj_get_tars (bConstraint *con, ListBase *list)
@@ -3902,7 +3903,7 @@ static bConstraintTypeInfo *constraintsTypeInfo[NUM_CONSTRAINT_TYPES];
 static short CTI_INIT= 1; /* when non-zero, the list needs to be updated */
 
 /* This function only gets called when CTI_INIT is non-zero */
-static void constraints_init_typeinfo () {
+static void constraints_init_typeinfo (void) {
 	constraintsTypeInfo[0]=  NULL; 					/* 'Null' Constraint */
 	constraintsTypeInfo[1]=  &CTI_CHILDOF; 			/* ChildOf Constraint */
 	constraintsTypeInfo[2]=  &CTI_TRACKTO;			/* TrackTo Constraint */

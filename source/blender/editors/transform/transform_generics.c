@@ -322,6 +322,7 @@ static int fcu_test_selected(FCurve *fcu)
 void recalcData(TransInfo *t)
 {
 	Base *base = t->scene->basact;
+	Scene *scene;
 
 	if (t->spacetype==SPACE_NODE) {
 		flushTransNodes(t);
@@ -330,8 +331,8 @@ void recalcData(TransInfo *t)
 		flushTransSeq(t);
 	}
 	else if (t->spacetype == SPACE_ACTION) {
-        scene= t->scene;
 		SpaceAction *saction= (SpaceAction *)t->sa->spacedata.first;
+		scene= t->scene;
 		
 		bAnimContext ac= {0};
 		ListBase anim_data = {NULL, NULL};

@@ -2455,6 +2455,7 @@ void DAG_id_tag_update(ID *id, short flag)
 	}
 }
 
+#if 0 // UNUSED
 /* recursively descends tree, each node only checked once */
 /* node is checked to be of type object */
 static int parent_check_node(DagNode *node, int curtime)
@@ -2484,6 +2485,7 @@ static int parent_check_node(DagNode *node, int curtime)
 	
 	return DAG_WHITE;
 }
+#endif
 
 /* ******************* DAG FOR ARMATURE POSE ***************** */
 

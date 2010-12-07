@@ -106,6 +106,7 @@
 #include "BKE_lattice.h"
 #include "BKE_library.h" // for which_libbase
 #include "BKE_idcode.h"
+#include "BKE_material.h"
 #include "BKE_main.h" // for Main
 #include "BKE_mesh.h" // for ME_ defines (patching)
 #include "BKE_modifier.h"
@@ -3507,7 +3508,7 @@ static void lib_link_object(FileData *fd, Main *main)
 			
 			poin= ob->data;
 			ob->data= newlibadr_us(fd, ob->id.lib, ob->data);
-			   
+
 			if(ob->data==NULL && poin!=NULL) {
 				if(ob->id.lib)
 					printf("Can't find obdata of %s lib %s\n", ob->id.name+2, ob->id.lib->name);
@@ -3525,6 +3526,17 @@ static void lib_link_object(FileData *fd, Main *main)
 			}
 			for(a=0; a<ob->totcol; a++) ob->mat[a]= newlibadr_us(fd, ob->id.lib, ob->mat[a]);
 			
+			/* When the object is local and the data is library its possible
+			 * the material list size gets out of sync. [#22663] */
+			if(ob->data && ob->id.lib != ((ID *)ob->data)->lib) {
+				short *totcol_data= give_totcolp(ob);
+				/* Only expand so as not to loose any object materials that might be set. */
+				if(totcol_data && *totcol_data > ob->totcol) {
+					/* printf("'%s' %d -> %d\n", ob->id.name, ob->totcol, *totcol_data); */
+					resize_object_material(ob, *totcol_data);
+				}
+			}
+
 			ob->gpd= newlibadr_us(fd, ob->id.lib, ob->gpd);
 			ob->duplilist= NULL;
             
@@ -9491,7 +9503,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 			for(act= ob->actuators.first; act; act= act->next) {
 				if (act->type == ACT_MESSAGE) {
 					bMessageActuator *msgAct = (bMessageActuator *) act->data;
-					if (strlen(msgAct->toPropName) > 2) {
+					if (BLI_strnlen(msgAct->toPropName, 3) > 2) {
 						/* strip first 2 chars, would have only worked if these were OB anyway */
 						memmove( msgAct->toPropName, msgAct->toPropName+2, sizeof(msgAct->toPropName)-2 );
 					} else {
@@ -11141,24 +11153,22 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 		}
 
 	/* put compatibility code here until next subversion bump */
-	{
+	if (main->versionfile < 255 || (main->versionfile == 255 && main->subversionfile < 1)) {
 		Brush *br;
+		ParticleSettings *part;
+		bScreen *sc;
+		Object *ob;
+
 		for(br= main->brush.first; br; br= br->id.next) {
 			if(br->ob_mode==0)
 				br->ob_mode= OB_MODE_ALL_PAINT;
 		}
-		
-	}
-	{
-		ParticleSettings *part;
+
 		for(part = main->particle.first; part; part = part->id.next) {
 			if(part->boids)
 				part->boids->pitch = 1.0f;
 		}
-	}
 
-	{
-		bScreen *sc;
 		for (sc= main->screen.first; sc; sc= sc->id.next) {
 			ScrArea *sa;
 			for (sa= sc->areabase.first; sa; sa= sa->next) {
@@ -11184,8 +11194,22 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 				}
 			}
 		}
+
+		/* fix rotation actuators for objects so they use real angles (radians)
+		 * since before blender went opensource this strange scalar was used: (1 / 0.02) * 2 * math.pi/360 */
+		for(ob= main->object.first; ob; ob= ob->id.next) {
+			bActuator *act= ob->actuators.first;
+			while(act) {
+				if (act->type==ACT_OBJECT) {
+					/* multiply velocity with 50 in old files */
+					bObjectActuator *oa= act->data;
+					mul_v3_fl(oa->drot, 0.8726646259971648f);
+				}
+				act= act->next;
+			}
+		}
 	}
-	
+
 	/* WATCH IT!!!: pointers from libdata have not been converted yet here! */
 	/* WATCH IT 2!: Userdef struct init has to be in editors/interface/resources.c! */
 

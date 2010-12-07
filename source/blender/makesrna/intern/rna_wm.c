@@ -612,6 +612,12 @@ static int rna_wmKeyMapItem_name_length(PointerRNA *ptr)
 		return 0;
 }
 
+static int rna_KeyMapItem_userdefined_get(PointerRNA *ptr)
+{
+	wmKeyMapItem *kmi= ptr->data;
+	return kmi->id < 0;
+}
+
 static void rna_wmClipboard_get(PointerRNA *ptr, char *value)
 {
 	char *pbuf;
@@ -687,7 +693,7 @@ static int operator_poll(bContext *C, wmOperatorType *ot)
 
 	RNA_parameter_list_create(&list, &ptr, func);
 	RNA_parameter_set_lookup(&list, "context", &C);
-	ot->ext.call(&ptr, func, &list);
+	ot->ext.call(C, &ptr, func, &list);
 
 	RNA_parameter_get_lookup(&list, "visible", &ret);
 	visible= *(int*)ret;
@@ -710,7 +716,7 @@ static int operator_execute(bContext *C, wmOperator *op)
 
 	RNA_parameter_list_create(&list, &opr, func);
 	RNA_parameter_set_lookup(&list, "context", &C);
-	op->type->ext.call(&opr, func, &list);
+	op->type->ext.call(C, &opr, func, &list);
 
 	RNA_parameter_get_lookup(&list, "result", &ret);
 	result= *(int*)ret;
@@ -734,7 +740,7 @@ static int operator_check(bContext *C, wmOperator *op)
 
 	RNA_parameter_list_create(&list, &opr, func);
 	RNA_parameter_set_lookup(&list, "context", &C);
-	op->type->ext.call(&opr, func, &list);
+	op->type->ext.call(C, &opr, func, &list);
 
 	RNA_parameter_get_lookup(&list, "result", &ret);
 	result= *(int*)ret;
@@ -758,7 +764,7 @@ static int operator_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	RNA_parameter_list_create(&list, &opr, func);
 	RNA_parameter_set_lookup(&list, "context", &C);
 	RNA_parameter_set_lookup(&list, "event", &event);
-	op->type->ext.call(&opr, func, &list);
+	op->type->ext.call(C, &opr, func, &list);
 
 	RNA_parameter_get_lookup(&list, "result", &ret);
 	result= *(int*)ret;
@@ -783,7 +789,7 @@ static int operator_modal(bContext *C, wmOperator *op, wmEvent *event)
 	RNA_parameter_list_create(&list, &opr, func);
 	RNA_parameter_set_lookup(&list, "context", &C);
 	RNA_parameter_set_lookup(&list, "event", &event);
-	op->type->ext.call(&opr, func, &list);
+	op->type->ext.call(C, &opr, func, &list);
 
 	RNA_parameter_get_lookup(&list, "result", &ret);
 	result= *(int*)ret;
@@ -804,7 +810,7 @@ static void operator_draw(bContext *C, wmOperator *op)
 
 	RNA_parameter_list_create(&list, &opr, func);
 	RNA_parameter_set_lookup(&list, "context", &C);
-	op->type->ext.call(&opr, func, &list);
+	op->type->ext.call(C, &opr, func, &list);
 
 	RNA_parameter_list_free(&list);
 }
@@ -815,7 +821,7 @@ void macro_wrapper(wmOperatorType *ot, void *userdata);
 static char _operator_idname[OP_MAX_TYPENAME];
 static char _operator_name[OP_MAX_TYPENAME];
 static char _operator_descr[1024];
-static StructRNA *rna_Operator_register(const bContext *C, ReportList *reports, void *data, const char *identifier, StructValidateFunc validate, StructCallbackFunc call, StructFreeFunc free)
+static StructRNA *rna_Operator_register(bContext *C, ReportList *reports, void *data, const char *identifier, StructValidateFunc validate, StructCallbackFunc call, StructFreeFunc free)
 {
 	wmOperatorType dummyot = {0};
 	wmOperator dummyop= {0};
@@ -888,7 +894,7 @@ static StructRNA *rna_Operator_register(const bContext *C, ReportList *reports, 
 }
 
 
-static StructRNA *rna_MacroOperator_register(const bContext *C, ReportList *reports, void *data, const char *identifier, StructValidateFunc validate, StructCallbackFunc call, StructFreeFunc free)
+static StructRNA *rna_MacroOperator_register(bContext *C, ReportList *reports, void *data, const char *identifier, StructValidateFunc validate, StructCallbackFunc call, StructFreeFunc free)
 {
 	wmOperatorType dummyot = {0};
 	wmOperator dummyop= {0};
@@ -1678,6 +1684,11 @@ static void rna_def_keyconfig(BlenderRNA *brna)
 	RNA_def_property_boolean_negative_sdna(prop, NULL, "flag", KMI_INACTIVE);
 	RNA_def_property_ui_text(prop, "Active", "Activate or deactivate item");
 	RNA_def_property_ui_icon(prop, ICON_CHECKBOX_DEHLT, 1);
+
+	prop= RNA_def_property(srna, "is_user_defined", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+	RNA_def_property_ui_text(prop, "User Defined", "Is this keymap item user defined (doesn't just override a builtin item)");
+	RNA_def_property_boolean_funcs(prop, "rna_KeyMapItem_userdefined_get", NULL);
 
 	RNA_api_keymapitem(srna);
 }

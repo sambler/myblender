@@ -474,8 +474,10 @@ GPUTexture *GPU_texture_create_3D(int w, int h, int depth, float *fpixels)
 		if(!GPU_non_power_of_two_support() && (w != tex->w || h != tex->h || depth != tex->depth)) {
 			/* clear first to avoid unitialized pixels */
 			float *zero= MEM_callocN(sizeof(float)*tex->w*tex->h*tex->depth, "zero");
-			glTexSubImage3D(tex->target, 0, 0, 0, 0, tex->w, tex->h, tex->depth, format, type, zero);
-			MEM_freeN(zero);
+			if(zero) {
+				glTexSubImage3D(tex->target, 0, 0, 0, 0, tex->w, tex->h, tex->depth, format, type, zero);
+				MEM_freeN(zero);
+			}
 		}
 
 		glTexSubImage3D(tex->target, 0, 0, 0, 0, w, h, depth, format, type, fpixels);

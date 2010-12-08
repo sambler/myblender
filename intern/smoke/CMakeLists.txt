@@ -27,6 +27,7 @@
 SET(INC
 	intern
 	../memutil
+	../guardedalloc
 	../../extern/bullet2/src
 	${PNG_INC}
 	${ZLIB_INC}

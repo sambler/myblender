@@ -34,6 +34,7 @@
 #include "SPHERE.h"
 #include <zlib.h>
 #include <math.h>
+#include "MEM_guardedalloc.h"
 
 // needed to access static advection functions
 #include "FLUID_3D.h"
@@ -749,16 +750,30 @@ void WTURBULENCE::stepTurbulenceFull(float dtOrg, float* xvel, float* yvel, floa
 	// enlarge timestep to match grid
 	const float dt = dtOrg * _amplify;
 	const float invAmp = 1.0f / _amplify;
-	float *tempBig1 = (float *)calloc(_totalCellsBig, sizeof(float));
-	float *tempBig2 = (float *)calloc(_totalCellsBig, sizeof(float));
-	float *bigUx = (float *)calloc(_totalCellsBig, sizeof(float));
-	float *bigUy = (float *)calloc(_totalCellsBig, sizeof(float));
-	float *bigUz = (float *)calloc(_totalCellsBig, sizeof(float)); 
-	float *_energy = (float *)calloc(_totalCellsSm, sizeof(float));
-	float *highFreqEnergy = (float *)calloc(_totalCellsSm, sizeof(float));
-	float *eigMin  = (float *)calloc(_totalCellsSm, sizeof(float));
-	float *eigMax  = (float *)calloc(_totalCellsSm, sizeof(float));
+	float *tempBig1 = (float *)MEM_callocN(_totalCellsBig*sizeof(float), "WTURBULENCE::stepTurbulenceFull-tempBig1");
+	float *tempBig2 = (float *)MEM_callocN(_totalCellsBig*sizeof(float), "WTURBULENCE::stepTurbulenceFull-tempBig2");
+	float *bigUx = (float *)MEM_callocN(_totalCellsBig*sizeof(float), "WTURBULENCE::stepTurbulenceFull-bigUx");
+	float *bigUy = (float *)MEM_callocN(_totalCellsBig*sizeof(float), "WTURBULENCE::stepTurbulenceFull-bigUy");
+	float *bigUz = (float *)MEM_callocN(_totalCellsBig*sizeof(float), "WTURBULENCE::stepTurbulenceFull-bigUz");
+	float *_energy = (float *)MEM_callocN(_totalCellsSm*sizeof(float), "WTURBULENCE::stepTurbulenceFull-_energy");
+	float *highFreqEnergy = (float *)MEM_callocN(_totalCellsSm*sizeof(float), "WTURBULENCE::stepTurbulenceFull-highFreqEnergy");
+	float *eigMin  = (float *)MEM_callocN(_totalCellsSm*sizeof(float), "WTURBULENCE::stepTurbulenceFull-eigMin");
+	float *eigMax  = (float *)MEM_callocN(_totalCellsSm*sizeof(float), "WTURBULENCE::stepTurbulenceFull-eigMax");
 
+	/* check that we got all the memory we want */
+	if(!tempBig1 || !tempBig2 || !bigUx || !bigUy || !bigUz || !_energy || !highFreqEnergy || !eigMin || !eigMax) {
+		if(tempBig1) MEM_freeN(tempBig1);
+		if(tempBig2) MEM_freeN(tempBig2);
+		if(bigUx) MEM_freeN(bigUx);
+		if(bigUy) MEM_freeN(bigUy);
+		if(bigUz) MEM_freeN(bigUz);
+		if(_energy) MEM_freeN(_energy);
+		if(highFreqEnergy) MEM_freeN(highFreqEnergy);
+		if(eigMin) MEM_freeN(eigMin);
+		if(eigMax) MEM_freeN(eigMax);
+		return;
+	}
+	
 	memset(_tcTemp, 0, sizeof(float)*_totalCellsSm);
 
 

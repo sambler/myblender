@@ -54,6 +54,7 @@
 #include "GHOST_WindowCocoa.h"
 #include "GHOST_NDOFManager.h"
 #include "AssertMacros.h"
+#include "MEM_guardedalloc.h"
 
 #pragma mark KeyMap, mouse converters
 #if MAC_OS_X_VERSION_MIN_REQUIRED <= MAC_OS_X_VERSION_10_4
@@ -571,7 +572,7 @@ GHOST_SystemCocoa::GHOST_SystemCocoa()
 	mib[0] = CTL_HW;
 	mib[1] = HW_MODEL;
 	sysctl( mib, 2, NULL, &len, NULL, 0 );
-	rstring = (char*)malloc( len );
+	rstring = (char*)MEM_mallocN( len , "GHOST_SystemCocoa::GHOST_SystemCocoa" );
 	sysctl( mib, 2, rstring, &len, NULL, 0 );
 	
 	//Hack on MacBook revision, as multitouch avail. function missing
@@ -580,7 +581,7 @@ GHOST_SystemCocoa::GHOST_SystemCocoa()
 		m_hasMultiTouchTrackpad = true;
 	else m_hasMultiTouchTrackpad = false;
 	
-	free( rstring );
+	MEM_freeN( rstring );
 	rstring = NULL;
 	
 	m_ignoreWindowSizedMessages = false;
@@ -1104,20 +1105,20 @@ GHOST_TSuccess GHOST_SystemCocoa::handleDraggingEvent(GHOST_TEventType eventType
 				case GHOST_kDragnDropTypeFilenames:
 					droppedArray = (NSArray*)data;
 					
-					strArray = (GHOST_TStringArray*)malloc(sizeof(GHOST_TStringArray));
+					strArray = (GHOST_TStringArray*)MEM_mallocN(sizeof(GHOST_TStringArray),"GHOST_SystemCocoa::handleDraggingEvent-strArray");
 					if (!strArray) return GHOST_kFailure;
 					
 					strArray->count = [droppedArray count];
 					if (strArray->count == 0) return GHOST_kFailure;
 					
-					strArray->strings = (GHOST_TUns8**) malloc(strArray->count*sizeof(GHOST_TUns8*));
+					strArray->strings = (GHOST_TUns8**) MEM_mallocN(strArray->count*sizeof(GHOST_TUns8*),"GHOST_SystemCocoa::handleDraggingEvent-strArray->strings");
 					
 					for (i=0;i<strArray->count;i++)
 					{
 						droppedStr = [droppedArray objectAtIndex:i];
 						
 						pastedTextSize = [droppedStr lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
-						temp_buff = (GHOST_TUns8*) malloc(pastedTextSize+1); 
+						temp_buff = (GHOST_TUns8*) MEM_mallocN(pastedTextSize+1,"GHOST_SystemCocoa::handleDraggingEvent-temp_buff");
 					
 						if (!temp_buff) {
 							strArray->count = i;
@@ -1137,7 +1138,7 @@ GHOST_TSuccess GHOST_SystemCocoa::handleDraggingEvent(GHOST_TEventType eventType
 					droppedStr = (NSString*)data;
 					pastedTextSize = [droppedStr lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
 					
-					temp_buff = (GHOST_TUns8*) malloc(pastedTextSize+1); 
+					temp_buff = (GHOST_TUns8*) MEM_mallocN(pastedTextSize+1,"GHOST_SystemCocoa::handleDraggingEvent-temp_buff2");
 					
 					if (temp_buff == NULL) {
 						return GHOST_kFailure;
@@ -1358,7 +1359,7 @@ bool GHOST_SystemCocoa::handleOpenDocumentRequest(void *filepathStr)
 	{
 		filenameTextSize = [filepath lengthOfBytesUsingEncoding:NSISOLatin1StringEncoding];
 		
-		temp_buff = (char*) malloc(filenameTextSize+1); 
+		temp_buff = (char*) MEM_mallocN(filenameTextSize+1,"GHOST_SystemCocoa::handleOpenDocumentRequest");
 		
 		if (temp_buff == NULL) {
 			return GHOST_kFailure;
@@ -1750,7 +1751,7 @@ GHOST_TUns8* GHOST_SystemCocoa::getClipboard(bool selection) const
 	
 	pastedTextSize = [textPasted lengthOfBytesUsingEncoding:NSISOLatin1StringEncoding];
 	
-	temp_buff = (GHOST_TUns8*) malloc(pastedTextSize+1); 
+	temp_buff = (GHOST_TUns8*) MEM_mallocN(pastedTextSize+1,"GHOST_SystemCocoa::getClipboard");
 
 	if (temp_buff == NULL) {
 		[pool drain];

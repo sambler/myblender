@@ -687,7 +687,7 @@ int PyObjectPlus::py_set_attrdef(PyObject *self_py, PyObject *value, const PyAtt
 				if (undoBuffer)
 				{
 					memcpy(sourceBuffer, undoBuffer, bufferSize);
-					free(undoBuffer);
+					MEM_freeN(undoBuffer);
 				}
 				if (item)
 					Py_DECREF(item);
@@ -695,7 +695,7 @@ int PyObjectPlus::py_set_attrdef(PyObject *self_py, PyObject *value, const PyAtt
 			}
 		}
 		if (undoBuffer)
-			free(undoBuffer);
+			MEM_freeN(undoBuffer);
 		return PY_SET_ATTR_SUCCESS;
 	}
 	else	// simple attribute value
@@ -1080,7 +1080,7 @@ int PyObjectPlus::py_set_attrdef(PyObject *self_py, PyObject *value, const PyAtt
 		}
 	}
 	if (undoBuffer)
-		free(undoBuffer);
+		MEM_freeN(undoBuffer);
 	return 0;	
 }
 

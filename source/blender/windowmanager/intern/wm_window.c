@@ -1021,7 +1021,7 @@ char *WM_clipboard_text_get(int selection)
 	}
 	*p2= '\0';
 
-	free(buf); /* ghost uses regular malloc */
+	MEM_freeN(buf);
 	
 	return newbuf;
 }

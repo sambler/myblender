@@ -668,7 +668,7 @@ static void init_iconfile_list(struct ListBase *list)
 		MEM_freeN(dir[i].path);
 		if (dir[i].string) MEM_freeN(dir[i].string);
 	}
-	free(dir);
+	MEM_freeN(dir);
 	dir= 0;
 }
 

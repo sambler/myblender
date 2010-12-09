@@ -58,7 +58,7 @@ public:
 
 	~GHOST_EventString()
 	{
-		if (m_data) free(m_data);
+		if (m_data) MEM_freeN(m_data);
 	}
 };
 

@@ -33,6 +33,7 @@
 extern "C" {
 #include "IMB_imbuf.h"
 #include "IMB_imbuf_types.h"
+#include "MEM_guardedalloc.h"
 };
 
 /**
@@ -101,13 +102,13 @@ public:
 				int i;
 				
 				for (i=0;i<strArray->count;i++)
-					free(strArray->strings[i]);
+					MEM_freeN(strArray->strings[i]);
 				
-				free(strArray);
+				MEM_freeN(strArray);
 			}
 				break;
 			case GHOST_kDragnDropTypeString:
-				free(m_dragnDropEventData.data);
+				MEM_freeN(m_dragnDropEventData.data);
 			break;
 
 			default:

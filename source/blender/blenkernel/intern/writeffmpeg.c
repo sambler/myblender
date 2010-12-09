@@ -180,7 +180,7 @@ static AVFrame* alloc_picture(int pix_fmt, int width, int height)
 	/* allocate the actual picture buffer */
 	buf = MEM_mallocN(size, "AVFrame buffer");
 	if (!buf) {
-		free(f);
+		free(f); /* allocated within ext libs - use free() */
 		return NULL;
 	}
 	avpicture_fill((AVPicture*)f, buf, pix_fmt, width, height);

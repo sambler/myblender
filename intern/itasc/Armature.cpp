@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <string.h>
 #include <stdlib.h>
+#include "MEM_guardedalloc.h"
 
 namespace iTaSC {
 
@@ -125,7 +126,7 @@ Armature::JointConstraint_struct::JointConstraint_struct(SegmentMap::const_itera
 Armature::JointConstraint_struct::~JointConstraint_struct()
 {
 	if (freeParam && param)
-		free(param);
+		MEM_freeN(param);
 }
 
 void Armature::initCache(Cache *_cache)
@@ -296,7 +297,7 @@ int Armature::addConstraint(const std::string& segment_name, ConstraintCallback 
 	// not suitable for NDof joints
 	if (segment_it == m_tree.getSegments().end()) {
 		if (_freeParam && _param)
-			free(_param);
+			MEM_freeN(_param);
 		return -1;
 	}
 	JointConstraintList::iterator constraint_it;
@@ -307,7 +308,7 @@ int Armature::addConstraint(const std::string& segment_name, ConstraintCallback 
 		if (pConstraint->segment == segment_it) {
 			// redefining a constraint
 			if (pConstraint->freeParam && pConstraint->param) {
-				free(pConstraint->param);
+				MEM_freeN(pConstraint->param);
 			}
 			pConstraint->function = _function;
 			pConstraint->param = _param;
@@ -318,7 +319,7 @@ int Armature::addConstraint(const std::string& segment_name, ConstraintCallback 
 	}
 	if (m_finalized)  {
 		if (_freeParam && _param)
-			free(_param);
+			MEM_freeN(_param);
 		return -1;
 	}
 	// new constraint, append

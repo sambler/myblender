@@ -529,10 +529,10 @@ extern void GHOST_SetTitle(GHOST_WindowHandle windowhandle,
 
 /**
  * Returns the title displayed in the title bar. The title
- * should be free'd with free().
+ * should be free'd with MEM_freeN().
  * 
  * @param windowhandle The handle to the window
- * @return The title, free with free().
+ * @return The title, free with MEM_freeN().
  */
 extern char* GHOST_GetTitle(GHOST_WindowHandle windowhandle);
 

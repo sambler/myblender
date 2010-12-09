@@ -1323,7 +1323,7 @@ struct OcclusionBuffer
 			// see if we can reuse
 			if (newsize > m_bufferSize)
 			{
-				free(m_buffer);
+				MEM_freeN(m_buffer);
 				m_buffer = NULL;
 				m_bufferSize = 0;
 			}

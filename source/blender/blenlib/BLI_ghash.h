@@ -176,7 +176,7 @@ extern unsigned int hashsizes[];
 				_e= _n;\
 			}\
 		}\
-		free(_old); } }
+		MEM_freeN(_old); } }
 #endif
 
 /*---------inlined functions---------*/

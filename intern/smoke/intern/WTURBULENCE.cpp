@@ -1047,13 +1047,13 @@ void WTURBULENCE::stepTurbulenceFull(float dtOrg, float* xvel, float* yvel, floa
       SWAP_POINTERS(_densityBig, _densityBigOld);
   } // substep
 
-  free(tempBig1);
-  free(tempBig2);
-  free(bigUx);
-  free(bigUy);
-  free(bigUz);
-  free(_energy);
-  free(highFreqEnergy);
+  MEM_freeN(tempBig1);
+  MEM_freeN(tempBig2);
+  MEM_freeN(bigUx);
+  MEM_freeN(bigUy);
+  MEM_freeN(bigUz);
+  MEM_freeN(_energy);
+  MEM_freeN(highFreqEnergy);
   
   // wipe the density borders
   FLUID_3D::setZeroBorder(_densityBig, _resBig, 0 , _resBig[2]);
@@ -1063,8 +1063,8 @@ void WTURBULENCE::stepTurbulenceFull(float dtOrg, float* xvel, float* yvel, floa
   // eigenvalues stored do not reflect the underlying texture coordinates
   resetTextureCoordinates(eigMin, eigMax);
 
-  free(eigMin);
-  free(eigMax);
+  MEM_freeN(eigMin);
+  MEM_freeN(eigMax);
   
   // output files
   // string prefix = string("./amplified.preview/density_bigxy_");

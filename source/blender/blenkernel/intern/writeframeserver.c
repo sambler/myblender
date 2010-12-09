@@ -315,7 +315,7 @@ int frameserver_loop(RenderData *rd, ReportList *UNUSED(reports))
 static void serve_ppm(int *pixels, int rectx, int recty)
 {
 	unsigned char* rendered_frame;
-	unsigned char* row = (unsigned char*) malloc(render_width * 3);
+	unsigned char* row = (unsigned char*) MEM_mallocN(render_width * 3,"serve_ppm");
 	int y;
 	char header[1024];
 
@@ -348,7 +348,7 @@ static void serve_ppm(int *pixels, int rectx, int recty)
 		}
 		safe_write((char*)row, 3 * rectx);
 	}
-	free(row);
+	MEM_freeN(row);
 	closesocket(connsock);
 	connsock = -1;
 }

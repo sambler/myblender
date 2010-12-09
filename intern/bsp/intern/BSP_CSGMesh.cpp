@@ -79,7 +79,7 @@ NewCopy(
 	if (m_verts != NULL) {
                 mesh->m_verts = new vector<BSP_MVertex>(*m_verts);
 		if (mesh->m_verts == NULL) {
-			if (m_edges != NULL) free(mesh->m_edges);
+			if (m_edges != NULL) delete mesh->m_edges;
 			delete mesh;
 			return NULL;
 		}

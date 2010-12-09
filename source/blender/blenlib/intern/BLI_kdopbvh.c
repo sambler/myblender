@@ -1307,7 +1307,6 @@ POP_HEAP_BODY(NodeDistance, NodeDistance_priority, heap, heap_size)
 //It may make sense to use this function if the callback queries are very slow.. or if its impossible
 //to get a nice heuristic
 //
-//this function uses "malloc/free" instead of the MEM_* because it intends to be openmp safe
 static void bfs_find_nearest(BVHNearestData *data, BVHNode *node)
 {
 	int i;
@@ -1347,7 +1346,7 @@ static void bfs_find_nearest(BVHNearestData *data, BVHNode *node)
 					printf("WARNING: bvh_find_nearest got out of memory\n");
 
 					if(heap != default_heap)
-						free(heap);
+						MEM_freeN(heap);
 
 					return;
 				}
@@ -1375,7 +1374,7 @@ static void bfs_find_nearest(BVHNearestData *data, BVHNode *node)
 //	printf("hsize=%d, callbacks=%d, pushs=%d\n", heap_size, callbacks, push_heaps);
 
 	if(heap != default_heap)
-		free(heap);
+		MEM_freeN(heap);
 }
 #endif
 

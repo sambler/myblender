@@ -26,6 +26,7 @@
 
 SET(INC
 	../../extern/Eigen2
+	../guardedalloc
 )
 
 SET(SRC

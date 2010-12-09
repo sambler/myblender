@@ -9,6 +9,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include "Cache.hpp"
+#include "MEM_guardedalloc.h"
 
 namespace iTaSC {
 
@@ -17,7 +18,7 @@ CacheEntry::~CacheEntry()
    for (unsigned int id=0; id < m_count; id++)
 		m_channelArray[id].clear();
    if (m_channelArray)
-	   free(m_channelArray);
+	   MEM_freeN(m_channelArray);
 }
 
 CacheItem *CacheChannel::_findBlock(CacheBuffer *buffer, unsigned short timeOffset, unsigned int *retBlock)
@@ -73,12 +74,12 @@ void CacheChannel::clear()
 	CacheBuffer *buffer, *next;
 	for (buffer=m_firstBuffer; buffer != 0; buffer = next) {
 		next = buffer->m_next;
-		free(buffer);
+		MEM_freeN(buffer);
 	}
 	m_firstBuffer = NULL;
 	m_lastBuffer = NULL;
 	if (initItem) {
-		free(initItem);
+		MEM_freeN(initItem);
 		initItem = NULL;
 	}
 }
@@ -88,7 +89,7 @@ CacheBuffer* CacheChannel::allocBuffer()
 	CacheBuffer* buffer;
 	if (!m_busy)
 		return NULL;
-	buffer = (CacheBuffer*)malloc(CACHE_BUFFER_HEADER_SIZE+(m_bufferSizeW<<2));
+	buffer = (CacheBuffer*)MEM_mallocN(CACHE_BUFFER_HEADER_SIZE+(m_bufferSizeW<<2),"CacheChannel::allocBuffer");
 	if (buffer) {
 		memset(buffer, 0, CACHE_BUFFER_HEADER_SIZE);
 	}
@@ -234,7 +235,7 @@ int Cache::addChannel(const void *device, const char *name, unsigned int maxItem
 	if (id == entry->m_count) {
 		// no channel free, create new channels
 		int newcount = entry->m_count + CACHE_CHANNEL_EXTEND_SIZE;
-		channel = (CacheChannel*)realloc(entry->m_channelArray, newcount*sizeof(CacheChannel));
+		channel = (CacheChannel*)MEM_reallocN(entry->m_channelArray, newcount*sizeof(CacheChannel));
 		if (channel == NULL)
 			return -1;
 		entry->m_channelArray = channel;
@@ -340,7 +341,7 @@ void Cache::clearCacheFrom(const void *device, CacheTS timestamp)
 						// this item and all later items will be removed, clear any later buffer
 						while ((nextBuffer = buffer->m_next) != NULL) {
 							buffer->m_next = nextBuffer->m_next;
-							free(nextBuffer);
+							MEM_freeN(nextBuffer);
 						}
 						positionW = CACHE_ITEM_POSITIONW(buffer,item);
 						if (positionW == 0) {
@@ -354,7 +355,7 @@ void Cache::clearCacheFrom(const void *device, CacheTS timestamp)
 								// we must quit this loop before reaching the end of the list
 								assert(nextBuffer);
 							}
-							free(buffer);
+							MEM_freeN(buffer);
 							buffer = prevBuffer;
 							if (buffer == NULL)
 								// this was also the first buffer
@@ -426,7 +427,7 @@ void *Cache::addCacheItem(const void *device, int id, unsigned int timestamp, vo
 		// we will allocate the memory, which is always pointer aligned => compute size
 		// with NULL will give same result.
 		sizeW = CACHE_ITEM_SIZEW(item,length);
-		item = (CacheItem*)calloc(sizeW, 4);
+		item = (CacheItem*)MEM_callocN(sizeW*4,"Cache::addCacheItem");
 		item->m_sizeW = sizeW;
 		channel->initItem = item;
 	} else {
@@ -457,7 +458,7 @@ void *Cache::addCacheItem(const void *device, int id, unsigned int timestamp, vo
 			// this item will become the last one of this channel, clear any later buffer
 			while ((next = buffer->m_next) != NULL) {
 				buffer->m_next = next->m_next;
-				free(next);
+				MEM_freeN(next);
 			}
 			// no need to update the buffer, this will be done when the item is written
 			positionW = CACHE_ITEM_POSITIONW(buffer,item);

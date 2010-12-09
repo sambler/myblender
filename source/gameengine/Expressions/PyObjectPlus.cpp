@@ -900,15 +900,15 @@ int PyObjectPlus::py_set_attrdef(PyObject *self_py, PyObject *value, const PyAtt
 					}
 					for (int i=0; i<attrdef->m_imin; i++)
 					{
-						PyObject *list = PySequence_GetItem(value, i); /* new ref */
-						if (!PySequence_Check(list) || PySequence_Size(list) != attrdef->m_imax) 
+						PyObject *mlist = PySequence_GetItem(value, i); /* new ref */
+						if (!PySequence_Check(mlist) || PySequence_Size(mlist) != attrdef->m_imax) 
 						{
 							PyErr_Format(PyExc_TypeError, "expected a sequence of [%d][%d] floats for attribute \"%s\"", attrdef->m_imin, attrdef->m_imax, attrdef->m_name);
 							goto RESTORE_AND_ERROR;
 						}
 						for (int j=0; j<attrdef->m_imax; j++)
 						{
-							item = PySequence_GetItem(list, j); /* new ref */
+							item = PySequence_GetItem(mlist, j); /* new ref */
 							if (!py_check_attr_float(var, item, attrdef))
 							{
 								PyErr_Format(PyExc_TypeError, "expected a sequence of [%d][%d] floats for attribute \"%s\"", attrdef->m_imin, attrdef->m_imax, attrdef->m_name);
@@ -918,8 +918,8 @@ int PyObjectPlus::py_set_attrdef(PyObject *self_py, PyObject *value, const PyAtt
 							item = NULL;
 							++var;
 						}
-						Py_DECREF(list);
-						list = NULL;
+						Py_DECREF(mlist);
+						mlist = NULL;
 					}
 				} 
 				else if (attrdef->m_imax != 0) 

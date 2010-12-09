@@ -81,7 +81,7 @@ void BLF_lang_set(const char *str)
 	if (locreturn == NULL) {
 		char *lang;
 
-		lang= (char*)malloc(sizeof(char)*(strlen(str)+7));
+		lang= (char*)MEM_mallocN(sizeof(char)*(strlen(str)+7),"BLF_lang_set");
 
 		lang[0]= '\0';
 		strcat(lang, str);
@@ -92,7 +92,7 @@ void BLF_lang_set(const char *str)
 			printf("could not change language to %s nor %s\n", str, lang);
 		}
 
-		free(lang);
+		MEM_freeN(lang);
 	}
 
 	setlocale(LC_NUMERIC, "C");

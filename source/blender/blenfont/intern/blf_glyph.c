@@ -83,7 +83,7 @@ GlyphCacheBLF *blf_glyph_cache_new(FontBLF *font)
 		gc->bucket[i].last= NULL;
 	}
 
-	gc->textures= (GLuint *)malloc(sizeof(GLuint)*256);
+	gc->textures= (GLuint *)MEM_mallocN(sizeof(GLuint)*256,"blf_glyph_cache_new");
 	gc->ntex= 256;
 	gc->cur_tex= -1;
 	gc->x_offs= 0;
@@ -148,7 +148,7 @@ void blf_glyph_cache_free(GlyphCacheBLF *gc)
 
 	if (gc->cur_tex+1 > 0)
 		glDeleteTextures(gc->cur_tex+1, gc->textures);
-	free((void *)gc->textures);
+	MEM_freeN(gc->textures);
 	MEM_freeN(gc);
 }
 
@@ -162,7 +162,7 @@ static void blf_glyph_cache_texture(FontBLF *font, GlyphCacheBLF *gc)
 
 	if (gc->cur_tex >= gc->ntex) {
 		gc->ntex *= 2;
-		gc->textures= (GLuint *)realloc((void *)gc->textures, sizeof(GLuint)*gc->ntex);
+		gc->textures= (GLuint *)MEM_reallocN((void *)gc->textures, sizeof(GLuint)*gc->ntex);
 	}
 
 	gc->p2_width= blf_next_p2((gc->rem_glyphs * gc->max_glyph_width) + (gc->pad * 2));
@@ -176,7 +176,7 @@ static void blf_glyph_cache_texture(FontBLF *font, GlyphCacheBLF *gc)
 		gc->p2_height= font->max_tex_size;
 
 	tot_mem= gc->p2_width * gc->p2_height;
-	buf= (unsigned char *)malloc(tot_mem);
+	buf= (unsigned char *)MEM_mallocN(tot_mem,"blf_glyph_cache_texture-buf");
 	memset((void *)buf, 0, tot_mem);
 
 	glGenTextures(1, &gc->textures[gc->cur_tex]);
@@ -187,7 +187,7 @@ static void blf_glyph_cache_texture(FontBLF *font, GlyphCacheBLF *gc)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, gc->p2_width, gc->p2_height, 0, GL_ALPHA, GL_UNSIGNED_BYTE, buf);
-	free((void *)buf);
+	MEM_freeN(buf);
 }
 
 GlyphBLF *blf_glyph_search(GlyphCacheBLF *gc, unsigned int c)

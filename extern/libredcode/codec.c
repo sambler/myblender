@@ -68,7 +68,7 @@ struct redcode_frame_raw * redcode_decode_video_raw(
 
 	/* open a byte stream */
 	cio = opj_cio_open((opj_common_ptr)dinfo, 
-			   frame->data + frame->offset, frame->length);
+			   frame->data + frame->offset, (int)frame->length);
 
 	image = opj_decode(dinfo, cio);			
 

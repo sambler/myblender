@@ -74,7 +74,7 @@ static unsigned char* read_packet(FILE * fp, char * expect)
 static unsigned int * read_index_packet(FILE * fp, char * expect)
 {
 	unsigned int * rv = (unsigned int*) read_packet(fp, expect);
-	int i;
+	unsigned int i;
 
 	if (!rv) {
 		return NULL;
@@ -111,7 +111,7 @@ struct redcode_handle * redcode_open(const char * fname)
 {
 	struct redcode_handle * rv = NULL;
 	struct red_reob * reob = NULL;
-	int i;
+	unsigned int i;
 
 	FILE * fp = fopen(fname, "rb");
 

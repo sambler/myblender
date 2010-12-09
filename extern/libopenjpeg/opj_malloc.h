@@ -26,6 +26,9 @@
  */
 #ifndef __OPJ_MALLOC_H
 #define __OPJ_MALLOC_H
+
+#include "MEM_guardedalloc.h"
+
 /**
 @file opj_malloc.h
 @brief Internal functions
@@ -45,7 +48,7 @@ Allocate an uninitialized memory block
 @param size Bytes to allocate
 @return Returns a void pointer to the allocated space, or NULL if there is insufficient memory available
 */
-#define opj_malloc(size) malloc(size)
+#define opj_malloc(size) MEM_mallocN(size,"opj_malloc")
 
 /**
 Allocate a memory block with elements initialized to 0
@@ -53,7 +56,7 @@ Allocate a memory block with elements initialized to 0
 @param size Bytes per block to allocate
 @return Returns a void pointer to the allocated space, or NULL if there is insufficient memory available
 */
-#define opj_calloc(num, size) calloc(num, size)
+#define opj_calloc(num, size) MEM_callocN((num*size),"opj_calloc")
 
 /**
 Allocate memory aligned to a 16 byte boundry
@@ -89,8 +92,8 @@ Allocate memory aligned to a 16 byte boundry
 
 
 
-#define opj_aligned_malloc(size) malloc(size)
-#define opj_aligned_free(m) free(m)
+#define opj_aligned_malloc(size) MEM_mallocN(size,"opj_aligned_malloc")
+#define opj_aligned_free(m) MEM_freeN(m)
 
 #ifdef HAVE_MM_MALLOC
 	#undef opj_aligned_malloc
@@ -126,13 +129,13 @@ Reallocate memory blocks.
 @param size New size in bytes
 @return Returns a void pointer to the reallocated (and possibly moved) memory block
 */
-#define opj_realloc(m, s) realloc(m, s)
+#define opj_realloc(m, s) MEM_reallocN(m, s)
 
 /**
 Deallocates or frees a memory block.
 @param memblock Previously allocated memory block to be freed
 */
-#define opj_free(m) free(m)
+#define opj_free(m) MEM_freeN(m)
 
 #ifdef __GNUC__
 #pragma GCC poison malloc calloc realloc free

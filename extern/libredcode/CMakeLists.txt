@@ -27,6 +27,7 @@
 SET(INC
 	.
 	../libopenjpeg
+	../../intern/guardedalloc
 )
 
 SET(SRC

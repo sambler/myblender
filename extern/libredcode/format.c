@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "format.h"
+#include "MEM_guardedalloc.h"
 
 struct red_reob {
 	unsigned int len;
@@ -60,7 +61,7 @@ static unsigned char* read_packet(FILE * fp, char * expect)
 		return NULL;
 	}
 
-	rv = (unsigned char*) malloc(len + 8);
+	rv = (unsigned char*) MEM_mallocN(len + 8,"format.c-read_packet");
 
 	memcpy(rv, &len, 4);
 	memcpy(rv + 4, &head, 4);
@@ -124,7 +125,7 @@ struct redcode_handle * redcode_open(const char * fname)
 		return NULL;
 	}
 
-	rv = (struct redcode_handle*) calloc(1, sizeof(struct redcode_handle));
+	rv = (struct redcode_handle*) MEM_callocN(sizeof(struct redcode_handle),"format.c-redcode_open");
 
 	rv->fp = fp;
 	rv->reob = reob;
@@ -150,22 +151,22 @@ struct redcode_handle * redcode_open(const char * fname)
 void redcode_close(struct redcode_handle * handle)
 {
 	if (handle->reob) {
-		free(handle->reob);
+		MEM_freeN(handle->reob);
 	}
 	if (handle->rdvo) {
-		free(handle->rdvo);
+		MEM_freeN(handle->rdvo);
 	}
 	if (handle->rdvs) {
-		free(handle->rdvs);
+		MEM_freeN(handle->rdvs);
 	}
 	if (handle->rdao) {
-		free(handle->rdao);
+		MEM_freeN(handle->rdao);
 	}
 	if (handle->rdas) {
-		free(handle->rdas);
+		MEM_freeN(handle->rdas);
 	}
 	fclose(handle->fp);
-	free(handle);
+	MEM_freeN(handle);
 }
 
 long redcode_get_length(struct redcode_handle * handle)
@@ -187,7 +188,7 @@ struct redcode_frame * redcode_read_video_frame(
 		return NULL;
 	}
 
-	rv = (struct redcode_frame*) calloc(1, sizeof(struct redcode_frame));
+	rv = (struct redcode_frame*) MEM_callocN(sizeof(struct redcode_frame),"format.c-redcode_read_video_frame");
 
 	rv->offset = 12+8;
 	rv->length = *(unsigned int*)data - rv->offset;
@@ -210,7 +211,7 @@ struct redcode_frame * redcode_read_audio_frame(
 		return NULL;
 	}
 
-	rv = (struct redcode_frame*) calloc(1, sizeof(struct redcode_frame));
+	rv = (struct redcode_frame*) MEM_callocN(sizeof(struct redcode_frame),"format.c-redcode_read_audio_frame");
 
 	rv->offset = 24+8;
 	rv->length = *(unsigned int*)data - rv->offset;
@@ -221,6 +222,6 @@ struct redcode_frame * redcode_read_audio_frame(
 
 void redcode_free_frame(struct redcode_frame * frame)
 {
-	free(frame->data);
-	free(frame);
+	MEM_freeN(frame->data);
+	MEM_freeN(frame);
 }

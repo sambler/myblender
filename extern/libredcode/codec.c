@@ -1,6 +1,7 @@
 #include "codec.h"
 #include "format.h"
 #include "debayer.h"
+#include "MEM_guardedalloc.h"
 
 #include <openjpeg.h>
 #include <stdlib.h>
@@ -92,8 +93,7 @@ struct redcode_frame_raw * redcode_decode_video_raw(
 		return 0;
 	}
 		
-	rv = (struct redcode_frame_raw *) calloc(
-		1, sizeof(struct redcode_frame_raw));
+	rv = (struct redcode_frame_raw *) MEM_callocN(sizeof(struct redcode_frame_raw),"redcode_decode_video_raw");
 
 	rv->data = image;
 	rv->width = image->comps[0].w;
@@ -132,7 +132,7 @@ int redcode_decode_video_float(struct redcode_frame_raw * frame,
 
 	opj_image_destroy(image);
 
-	free(frame);
+	MEM_freeN(frame);
 
 	return 1;
 }

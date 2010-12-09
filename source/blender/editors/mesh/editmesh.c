@@ -95,7 +95,7 @@ static void error(const char *UNUSED(arg)) {}
 
 static void *calloc_em(EditMesh *UNUSED(em), size_t size, size_t nr)
 {
-	return calloc(size, nr);
+	return MEM_callocN(size, nr);
 }
 
 /* used to bypass normal calloc with fast one */
@@ -139,7 +139,7 @@ void free_editvert (EditMesh *em, EditVert *eve)
 	EM_remove_selection(em, eve, EDITVERT);
 	CustomData_em_free_block(&em->vdata, &eve->data);
 	if(eve->fast==0)
-		free(eve);
+		MEM_freeN(eve);
 	
 	em->totvert--;
 }
@@ -275,7 +275,7 @@ void free_editedge(EditMesh *em, EditEdge *eed)
 {
 	EM_remove_selection(em, eed, EDITEDGE);
 	if(eed->fast==0){ 
-		free(eed);
+		MEM_freeN(eed);
 	}
 }
 
@@ -289,7 +289,7 @@ void free_editface(EditMesh *em, EditFace *efa)
 		
 	CustomData_em_free_block(&em->fdata, &efa->data);
 	if(efa->fast==0)
-		free(efa);
+		MEM_freeN(efa);
 	
 	em->totface--;
 }

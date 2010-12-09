@@ -226,7 +226,7 @@ void BLI_builddir(const char *dirname, const char *relname)
 		while ((fname = (struct dirent*) readdir(dir)) != NULL) {
 			len= strlen(fname->d_name);
 			
-			dlink = (struct dirlink *)malloc(sizeof(struct dirlink));
+			dlink = (struct dirlink *)MEM_mallocN(sizeof(struct dirlink),"BLI_builddir-dlink");
 			if (dlink){
 				strcpy(buf+rellen,fname->d_name);
 				dlink->name = BLI_strdup(buf);
@@ -238,18 +238,18 @@ void BLI_builddir(const char *dirname, const char *relname)
 		if (newnum){
 
 			if(files) {
-				void *tmp= realloc(files, (totnum+newnum) * sizeof(struct direntry));
+				void *tmp= MEM_reallocN(files, (totnum+newnum) * sizeof(struct direntry));
 				if(tmp) {
 					files= (struct direntry *)tmp;
 				}
 				else { /* realloc fail */
-					free(files);
+					MEM_freeN(files);
 					files= NULL;
 				}
 			}
 			
 			if(files==NULL)
-				files=(struct direntry *)malloc(newnum * sizeof(struct direntry));
+				files=(struct direntry *)MEM_mallocN(newnum * sizeof(struct direntry),"BLI_builddir-files");
 
 			if (files){
 				dlink = (struct dirlink *) dirbase->first;
@@ -414,7 +414,7 @@ unsigned int BLI_getdir(const char *dirname,  struct direntry **filelist)
 	} else {
 		// keep blender happy. Blender stores this in a variable
 		// where 0 has special meaning.....
-		*(filelist) = files = malloc(sizeof(struct direntry));
+		*(filelist) = files = MEM_mallocN(sizeof(struct direntry),"BLI_getdir");
 	}
 
 	return(actnum);

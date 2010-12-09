@@ -14,7 +14,7 @@ subject to the following restrictions:
 */
 
 
-
+#include "MEM_guardedalloc.h"
 
 #include "CcdPhysicsEnvironment.h"
 #include "CcdPhysicsController.h"
@@ -1330,7 +1330,8 @@ struct OcclusionBuffer
 		}
 		if (!m_buffer)
 		{
-			m_buffer = (btScalar*)calloc(1, newsize);
+			//m_buffer = (btScalar*)calloc(1, newsize);
+			m_buffer = (btScalar*)MEM_callocN(newsize,"OcclusionBuffer-initialize");
 			m_bufferSize = newsize;
 		} else
 		{

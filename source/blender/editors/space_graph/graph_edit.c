@@ -1085,7 +1085,7 @@ static int graphkeys_sound_bake_exec(bContext *C, wmOperator *op)
 	}
 
 	/* free sample data */
-	free(sbi.samples);
+	MEM_freeN(sbi.samples);
 
 	/* admin and redraws */
 	BLI_freelistN(&anim_data);

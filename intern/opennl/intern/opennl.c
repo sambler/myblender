@@ -37,6 +37,7 @@
  */
 
 #include "ONL_opennl.h"
+#include "MEM_guardedalloc.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -135,11 +136,11 @@ static void __nl_should_not_have_reached(char* file, int line) {
 /************************************************************************************/
 /* memory management */
 
-#define __NL_NEW(T)				(T*)(calloc(1, sizeof(T))) 
-#define __NL_NEW_ARRAY(T,NB)	   (T*)(calloc((NB),sizeof(T))) 
-#define __NL_RENEW_ARRAY(T,x,NB)   (T*)(realloc(x,(NB)*sizeof(T))) 
-#define __NL_DELETE(x)			 free(x); x = NULL 
-#define __NL_DELETE_ARRAY(x)	   free(x); x = NULL
+#define __NL_NEW(T)					(T*)(MEM_callocN(sizeof(T),"__NL_NEW")) 
+#define __NL_NEW_ARRAY(T,NB)		(T*)(MEM_callocN((NB*sizeof(T)),"__NL_NEW_ARRAY")) 
+#define __NL_RENEW_ARRAY(T,x,NB)	(T*)(MEM_reallocN(x,(NB)*sizeof(T))) 
+#define __NL_DELETE(x)				MEM_freeN(x); x = NULL 
+#define __NL_DELETE_ARRAY(x)		MEM_freeN(x); x = NULL
 
 #define __NL_CLEAR(T, x)		   memset(x, 0, sizeof(T)) 
 #define __NL_CLEAR_ARRAY(T,x,NB)   memset(x, 0, (NB)*sizeof(T)) 
@@ -1182,7 +1183,7 @@ void nlPrintMatrix(void) {
 	NLuint m = context->m;
 	NLuint n = context->n;
 	__NLRowColumn* Ri = NULL;
-	float *value = malloc(sizeof(*value)*(n+m));
+	float *value = MEM_mallocN(sizeof(*value)*(n+m),"opennl-nlPrintMatrix");
 
 	printf("A:\n");
 	for(i=0; i<m; i++) {
@@ -1227,7 +1228,7 @@ void nlPrintMatrix(void) {
 		printf("\n");
 	}
 
-	free(value);
+	MEM_freeN(value);
 }
 
 /************************************************************************/

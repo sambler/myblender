@@ -1,4 +1,5 @@
 #include "ssp_defs.h"
+#include "MEM_guardedalloc.h"
 
 int check_perm(char *, int , int *);
 
@@ -188,19 +189,19 @@ sp_preorder(superlu_options_t *options,  SuperMatrix *A, int *perm_c,
 
 int check_perm(char *what, int n, int *perm)
 {
-    register int i;
-    int          *marker;
-    marker = (int *) calloc(n, sizeof(int));
+	register int i;
+	int *marker;
+	marker= (int *) MEM_callocN((n*sizeof(int)),"superlu-check_perm");
 
-    for (i = 0; i < n; ++i) {
-	if ( marker[perm[i]] == 1 || perm[i] >= n ) {
-	    printf("%s: Not a valid PERM[%d] = %d\n", what, i, perm[i]);
-	    ABORT("check_perm");
-	} else {
-	    marker[perm[i]] = 1;
+	for (i = 0; i < n; ++i) {
+		if ( marker[perm[i]] == 1 || perm[i] >= n ) {
+			printf("%s: Not a valid PERM[%d] = %d\n", what, i, perm[i]);
+			ABORT("check_perm");
+		} else {
+			marker[perm[i]] = 1;
+		}
 	}
-    }
 
-    SUPERLU_FREE(marker);
-    return 0;
+	SUPERLU_FREE(marker);
+	return 0;
 }

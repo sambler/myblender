@@ -30,6 +30,7 @@ REMOVE_STRICT_FLAGS()
 SET(INC
 	extern
 	superlu
+	../guardedalloc
 )
 
 SET(SRC

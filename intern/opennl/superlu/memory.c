@@ -9,6 +9,7 @@
     (Shared by [sdcz]memory.c) **/
 
 #include "ssp_defs.h"
+#include "MEM_guardedalloc.h"
 
 /* prototypes --------------------------------- */
 void copy_mem_int(int, void *, void *);
@@ -25,7 +26,7 @@ void *superlu_malloc(size_t size)
 {
     char *buf;
 
-    buf = (char *) malloc(size + DWORD);
+    buf = (char *) MEM_mallocN(size + DWORD,"superlu_malloc");
     if ( !buf ) {
 	printf("superlu_malloc fails: malloc_total %.0f MB, size %d\n",
 	       superlu_malloc_total*1e-6, size);
@@ -67,7 +68,7 @@ void superlu_free(void *addr)
 	    ABORT("superlu_malloc_total went negative!");
 	
 	/*free (addr);*/
-	free (p);
+	MEM_freeN (p);
     }
 
 }
@@ -77,13 +78,13 @@ void superlu_free(void *addr)
 void *superlu_malloc(size_t size)
 {
     void *buf;
-    buf = (void *) malloc(size);
+    buf = (void *) MEM_mallocN(size,"superlu_malloc");
     return (buf);
 }
 
 void superlu_free(void *addr)
 {
-    free (addr);
+    MEM_freeN (addr);
 }
 
 #endif

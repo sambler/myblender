@@ -35,6 +35,7 @@
 #include <string.h>			 /* memset */
 #include "cin_debug_stuff.h"
 #include "logmemfile.h"
+#include "MEM_guardedalloc.h"
 
 static void
 fillDpxChannelInfo(DpxFile* dpx, DpxChannelInformation* chan, int des) {
@@ -384,7 +385,7 @@ intern_dpxOpen(int mode, const char* bytestuff, int bufsize) {
 
 	DpxMainHeader header;
 	const char *filename = bytestuff;
-	DpxFile* dpx = (DpxFile*)malloc(sizeof(DpxFile));
+	DpxFile* dpx = (DpxFile*)MEM_mallocN(sizeof(DpxFile),"intern_dpxOpen-dpx");
 	
 	if (dpx == 0) {
 		if (verbose) d_printf("Failed to malloc dpx file structure.\n");
@@ -458,7 +459,7 @@ intern_dpxOpen(int mode, const char* bytestuff, int bufsize) {
 
 	dpx->imageOffset = ntohl(header.fileInfo.offset);
 	dpx->lineBufferLength = pixelsToLongs(dpx->width * dpx->depth);
-	dpx->lineBuffer = malloc(dpx->lineBufferLength * 4);
+	dpx->lineBuffer = MEM_mallocN(dpx->lineBufferLength * 4,"intern_dpxOpen-linebuffer");
 	if (dpx->lineBuffer == 0) {
 		if (verbose) d_printf("Couldn't malloc line buffer of size %d\n", dpx->lineBufferLength * 4);
 		dpxClose(dpx);
@@ -466,7 +467,7 @@ intern_dpxOpen(int mode, const char* bytestuff, int bufsize) {
 	}
 
 	/* could have 2 pixels left over */
-	dpx->pixelBuffer = malloc((dpx->lineBufferLength * 3 + 2) * sizeof(unsigned short));
+	dpx->pixelBuffer = MEM_mallocN((dpx->lineBufferLength * 3 + 2) * sizeof(unsigned short),"intern_dpxOpen-pixelbuffer");
 	if (dpx->pixelBuffer == 0) {
 		if (verbose) d_printf("Couldn't malloc pixel buffer of size %d\n",
 				(dpx->width * dpx->depth + 2 + 2) * (int)sizeof(unsigned short));
@@ -573,7 +574,7 @@ dpxCreate(const char* filename, int width, int height, int depth) {
 	DpxMainHeader header;
 	const char* shortFilename = 0;
 
-	DpxFile* dpx = (DpxFile*)malloc(sizeof(DpxFile));
+	DpxFile* dpx = (DpxFile*)MEM_mallocN(sizeof(DpxFile),"dpxCreate-dpx");
 	if (dpx == 0) {
 		if (verbose) d_printf("Failed to malloc dpx file structure.\n");
 		return 0;
@@ -601,14 +602,14 @@ dpxCreate(const char* filename, int width, int height, int depth) {
 	dpx->imageOffset = sizeof(DpxMainHeader);
 
 	dpx->lineBufferLength = pixelsToLongs(dpx->width * dpx->depth);
-	dpx->lineBuffer = malloc(dpx->lineBufferLength * 4);
+	dpx->lineBuffer = MEM_mallocN(dpx->lineBufferLength * 4,"dpxCreate-linebuffer");
 	if (dpx->lineBuffer == 0) {
 		if (verbose) d_printf("Couldn't malloc line buffer of size %d\n", dpx->lineBufferLength * 4);
 		dpxClose(dpx);
 		return 0;
 	}
 
-	dpx->pixelBuffer = malloc((dpx->lineBufferLength * 3 + 2) * sizeof(unsigned short));
+	dpx->pixelBuffer = MEM_mallocN((dpx->lineBufferLength * 3 + 2) * sizeof(unsigned short),"dpxCreate-pixelBuffer");
 	if (dpx->pixelBuffer == 0) {
 		if (verbose) d_printf("Couldn't malloc pixel buffer of size %d\n",
 				(dpx->width * dpx->depth + 2 + 2) * (int)sizeof(unsigned short));
@@ -666,16 +667,16 @@ dpxClose(DpxFile* dpx) {
 	}
 
 	if (dpx->lineBuffer) {
-		free(dpx->lineBuffer);
+		MEM_freeN(dpx->lineBuffer);
 		dpx->lineBuffer = 0;
 	}
 
 	if (dpx->pixelBuffer) {
-		free(dpx->pixelBuffer);
+		MEM_freeN(dpx->pixelBuffer);
 		dpx->pixelBuffer = 0;
 	}
 
-	free(dpx);
+	MEM_freeN(dpx);
 }
 
 void

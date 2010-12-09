@@ -35,6 +35,7 @@
 #include <string.h>			 /* memset */
 #include "cin_debug_stuff.h"
 #include "logmemfile.h"
+#include "MEM_guardedalloc.h"
 
 static void
 fillCineonFileInfo(CineonFile* cineon, CineonFileInformation* fileInfo, const char* filename) {
@@ -502,7 +503,7 @@ cineonOpen(const char* filename) {
 
 	CineonGenericHeader header;
 
-	CineonFile* cineon = (CineonFile* )malloc(sizeof(CineonFile));
+	CineonFile* cineon = (CineonFile* )MEM_mallocN(sizeof(CineonFile),"cineonOpen");
 	if (cineon == 0) {
 		if (verbose) d_printf("Failed to malloc cineon file structure.\n");
 		return 0;
@@ -552,14 +553,14 @@ cineonOpen(const char* filename) {
 	cineon->imageOffset = ntohl(header.fileInfo.image_offset);
 
 	cineon->lineBufferLength = pixelsToLongs(cineon->width * cineon->depth);
-	cineon->lineBuffer = malloc(cineon->lineBufferLength * 4);
+	cineon->lineBuffer = MEM_mallocN(cineon->lineBufferLength * 4,"cineonOpen-lineBuffer");
 	if (cineon->lineBuffer == 0) {
 		if (verbose) d_printf("Couldn't malloc line buffer of size %d\n", cineon->lineBufferLength * 4);
 		cineonClose(cineon);
 		return 0;
 	}
 
-	cineon->pixelBuffer = malloc(cineon->lineBufferLength * 3 * sizeof(unsigned short));
+	cineon->pixelBuffer = MEM_mallocN(cineon->lineBufferLength * 3 * sizeof(unsigned short),"cineonOpen-pixelbuffer");
 	if (cineon->pixelBuffer == 0) {
 		if (verbose) d_printf("Couldn't malloc pixel buffer of size %d\n",
 				(cineon->width * cineon->depth) * (int)sizeof(unsigned short));
@@ -605,7 +606,7 @@ cineonOpenFromMem(unsigned char *mem, unsigned int size) {
 	CineonGenericHeader header;
 	int i;
 	
-	CineonFile* cineon = (CineonFile* )malloc(sizeof(CineonFile));
+	CineonFile* cineon = (CineonFile* )MEM_mallocN(sizeof(CineonFile),"cineonOpenFromMem");
 	if (cineon == 0) {
 		if (verbose) d_printf("Failed to malloc cineon file structure.\n");
 		return 0;
@@ -652,14 +653,14 @@ cineonOpenFromMem(unsigned char *mem, unsigned int size) {
 	cineon->imageOffset = ntohl(header.fileInfo.image_offset);
 
 	cineon->lineBufferLength = pixelsToLongs(cineon->width * cineon->depth);
-	cineon->lineBuffer = malloc(cineon->lineBufferLength * 4);
+	cineon->lineBuffer = MEM_mallocN(cineon->lineBufferLength * 4,"cineonOpenFromMem-lineBuffer");
 	if (cineon->lineBuffer == 0) {
 		if (verbose) d_printf("Couldn't malloc line buffer of size %d\n", cineon->lineBufferLength * 4);
 		cineonClose(cineon);
 		return 0;
 	}
 
-	cineon->pixelBuffer = malloc(cineon->lineBufferLength * 3 * sizeof(unsigned short));
+	cineon->pixelBuffer = MEM_mallocN(cineon->lineBufferLength * 3 * sizeof(unsigned short),"cineonOpenFromMem-pixelBuffer");
 	if (cineon->pixelBuffer == 0) {
 		if (verbose) d_printf("Couldn't malloc pixel buffer of size %d\n",
 				(cineon->width * cineon->depth) * (int)sizeof(unsigned short));
@@ -710,7 +711,7 @@ cineonCreate(const char* filename, int width, int height, int depth) {
 	CineonGenericHeader header;
 	const char* shortFilename = 0;
 
-	CineonFile* cineon = (CineonFile*)malloc(sizeof(CineonFile));
+	CineonFile* cineon = (CineonFile*)MEM_mallocN(sizeof(CineonFile),"cineonCreate");
 	if (cineon == 0) {
 		if (verbose) d_printf("Failed to malloc cineon file structure.\n");
 		return 0;
@@ -738,14 +739,14 @@ cineonCreate(const char* filename, int width, int height, int depth) {
 	cineon->imageOffset = sizeof(CineonGenericHeader);
 
 	cineon->lineBufferLength = pixelsToLongs(cineon->width * cineon->depth);
-	cineon->lineBuffer = malloc(cineon->lineBufferLength * 4);
+	cineon->lineBuffer = MEM_mallocN(cineon->lineBufferLength * 4,"cineonCreate-lineBuffer");
 	if (cineon->lineBuffer == 0) {
 		if (verbose) d_printf("Couldn't malloc line buffer of size %d\n", cineon->lineBufferLength * 4);
 		cineonClose(cineon);
 		return 0;
 	}
 
-	cineon->pixelBuffer = malloc(cineon->lineBufferLength * 3 * sizeof(unsigned short));
+	cineon->pixelBuffer = MEM_mallocN(cineon->lineBufferLength * 3 * sizeof(unsigned short),"cineonCreate-pixelBuffer");
 	if (cineon->pixelBuffer == 0) {
 		if (verbose) d_printf("Couldn't malloc pixel buffer of size %d\n",
 				(cineon->width * cineon->depth) * (int)sizeof(unsigned short));
@@ -797,14 +798,14 @@ cineonClose(CineonFile* cineon) {
 	}
 
 	if (cineon->lineBuffer) {
-		free(cineon->lineBuffer);
+		MEM_freeN(cineon->lineBuffer);
 		cineon->lineBuffer = 0;
 	}
 
 	if (cineon->pixelBuffer) {
-		free(cineon->pixelBuffer);
+		MEM_freeN(cineon->pixelBuffer);
 		cineon->pixelBuffer = 0;
 	}
 
-	free(cineon);
+	MEM_freeN(cineon);
 }

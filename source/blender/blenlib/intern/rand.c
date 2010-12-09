@@ -103,7 +103,7 @@ float rng_getFloat(RNG *rng) {
 void rng_shuffleArray(RNG *rng, void *data, int elemSize, int numElems)
 {
 	int i = numElems;
-	void *temp = malloc(elemSize);
+	void *temp = MEM_mallocN(elemSize,"rng_shuffleArray");
 
 	while (--i) {
 		int j = rng_getInt(rng)%numElems;
@@ -116,7 +116,7 @@ void rng_shuffleArray(RNG *rng, void *data, int elemSize, int numElems)
 		}
 	}
 
-	free(temp);
+	MEM_freeN(temp);
 }
 
 void rng_skip(RNG *rng, int n)

@@ -169,11 +169,11 @@ int ADJUST_MEMORY(void *local_memblock, void **memblock, int new_size, int *max_
 
 	if(*memblock == local_memblock)
 	{
-		new_memblock = malloc( size_per_item * new_max_size );
+		new_memblock = MEM_mallocN( size_per_item * new_max_size ,"ADJUST_MEMORY");
 		memcpy( new_memblock, *memblock, size_per_item * *max_size );
 	}
 	else
-		new_memblock = realloc(*memblock, size_per_item * new_max_size );
+		new_memblock = MEM_reallocN(*memblock, size_per_item * new_max_size );
 
 	if(new_memblock)
 	{
@@ -1088,7 +1088,7 @@ static void traverse(BVHOverlapData *data, BVHNode *node1, BVHNode *node2)
 				if(data->i >= data->max_overlap)
 				{	
 					// try to make alloc'ed memory bigger
-					data->overlap = realloc(data->overlap, sizeof(BVHTreeOverlap)*data->max_overlap*2);
+					data->overlap = MEM_reallocN(data->overlap, sizeof(BVHTreeOverlap)*data->max_overlap*2);
 					
 					if(!data->overlap)
 					{
@@ -1148,7 +1148,7 @@ BVHTreeOverlap *BLI_bvhtree_overlap(BVHTree *tree1, BVHTree *tree2, unsigned int
 		data[j] = (BVHOverlapData *)MEM_callocN(sizeof(BVHOverlapData), "BVHOverlapData");
 		
 		// init BVHOverlapData
-		data[j]->overlap = (BVHTreeOverlap *)malloc(sizeof(BVHTreeOverlap)*MAX2(tree1->totleaf, tree2->totleaf));
+		data[j]->overlap = (BVHTreeOverlap *)MEM_mallocN(sizeof(BVHTreeOverlap)*MAX2(tree1->totleaf, tree2->totleaf),"BVHTreeOverlap1");
 		data[j]->tree1 = tree1;
 		data[j]->tree2 = tree2;
 		data[j]->max_overlap = MAX2(tree1->totleaf, tree2->totleaf);
@@ -1176,7 +1176,7 @@ BVHTreeOverlap *BLI_bvhtree_overlap(BVHTree *tree1, BVHTree *tree2, unsigned int
 	
 	for(j = 0; j < tree1->tree_type; j++)
 	{
-		free(data[j]->overlap);
+		MEM_freeN(data[j]->overlap);
 		MEM_freeN(data[j]);
 	}
 	MEM_freeN(data);

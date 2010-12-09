@@ -66,10 +66,10 @@ DynStr *BLI_dynstr_new(void) {
 }
 
 void BLI_dynstr_append(DynStr *ds, const char *cstr) {
-	DynStrElem *dse= malloc(sizeof(*dse));
+	DynStrElem *dse= MEM_mallocN(sizeof(*dse),"BLI_dynstr_append-dse");
 	int cstrlen= strlen(cstr);
 	
-	dse->str= malloc(cstrlen+1);
+	dse->str= MEM_mallocN(cstrlen+1,"BLI_dynstr_append-dse->str");
 	memcpy(dse->str, cstr, cstrlen+1);
 	dse->next= NULL;
 	
@@ -82,10 +82,10 @@ void BLI_dynstr_append(DynStr *ds, const char *cstr) {
 }
 
 void BLI_dynstr_nappend(DynStr *ds, const char *cstr, int len) {
-	DynStrElem *dse= malloc(sizeof(*dse));
+	DynStrElem *dse= MEM_mallocN(sizeof(*dse),"BLI_dynstr_nappend-dse");
 	int cstrlen= BLI_strnlen(cstr, len);
 
-	dse->str= malloc(cstrlen+1);
+	dse->str= MEM_mallocN(cstrlen+1,"BLI_dynstr_nappend-dse->str");
 	memcpy(dse->str, cstr, cstrlen);
 	dse->str[cstrlen] = '\0';
 	dse->next= NULL;
@@ -223,8 +223,8 @@ void BLI_dynstr_free(DynStr *ds) {
 	for (dse= ds->elems; dse; ) {
 		DynStrElem *n= dse->next;
 		
-		free(dse->str);
-		free(dse);
+		MEM_freeN(dse->str);
+		MEM_freeN(dse);
 		
 		dse= n;
 	}

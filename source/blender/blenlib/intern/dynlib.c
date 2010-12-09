@@ -30,15 +30,11 @@
 #include <stdlib.h>
 
 #include "../PIL_dynlib.h"
+#include "MEM_guardedalloc.h"
 
 #if !defined(CHAR_MAX)
 #define CHAR_MAX 255
 #endif
-
-/*
- * XXX, should use mallocN so we can see
- * handle's not being released. fixme zr
- */
  
 #ifdef WIN32
 #include <string.h>
@@ -54,7 +50,7 @@ PILdynlib *PIL_dynlib_open(char *name) {
 	void *handle= LoadLibrary(name);
 
 	if (handle) {	
-		PILdynlib *lib= malloc(sizeof(*lib));
+		PILdynlib *lib= MEM_mallocN(sizeof(*lib),"PIL_dynlib_open");
 		lib->handle= handle;
 		
 		return lib;
@@ -93,7 +89,7 @@ char *PIL_dynlib_get_error_as_string(PILdynlib* lib) {
 void PIL_dynlib_close(PILdynlib *lib) {
 	FreeLibrary(lib->handle);
 	
-	free(lib);
+	MEM_freeN(lib);
 }
 
 #else	/* Unix */
@@ -108,7 +104,7 @@ PILdynlib *PIL_dynlib_open(char *name) {
 	void *handle= dlopen(name, RTLD_LAZY);
 
 	if (handle) {	
-		PILdynlib *lib= malloc(sizeof(*lib));
+		PILdynlib *lib= MEM_mallocN(sizeof(*lib),"PIL_dynlib_open");
 		lib->handle= handle;
 		
 		return lib;
@@ -129,7 +125,7 @@ char *PIL_dynlib_get_error_as_string(PILdynlib* lib) {
 void PIL_dynlib_close(PILdynlib *lib) {
 	dlclose(lib->handle);
 	
-	free(lib);
+	MEM_freeN(lib);
 }
 
 #endif

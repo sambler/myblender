@@ -832,7 +832,7 @@ static void free_tree(node_tree* tree)
         tree->right = 0;
     }
 
-    free(tree);
+    MEM_freeN(tree);
 }
 
 float BLI_pbvh_node_get_tmin(PBVHNode* node)
@@ -852,7 +852,7 @@ void BLI_pbvh_search_callback_occluded(PBVH *bvh,
 
 	while((node=pbvh_iter_next_occluded(&iter))) {
 		if(node->flag & PBVH_Leaf) {
-			node_tree* new_node = malloc(sizeof(node_tree));
+			node_tree* new_node = MEM_mallocN(sizeof(node_tree),"BLI_pbvh_search_callback_occluded");
 
 			new_node->data = node;
 

@@ -27,6 +27,7 @@
 SET(INC
 	.
 	../string
+	../guardedalloc
 	../../extern/glew/include
 	../../source/blender/imbuf
 	../../source/blender/makesdna

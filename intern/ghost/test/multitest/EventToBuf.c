@@ -205,7 +205,7 @@ void event_to_buf(GHOST_EventHandle evt, char buf[128]) {
 	if (win) {
 		char *s= GHOST_GetTitle(win);
 		pos+= sprintf(pos, " - win: %s", s);
-		free(s);
+		MEM_freeN(s);
 	} else {
 		pos+= sprintf(pos, " - sys evt");
 	}

@@ -393,13 +393,13 @@ int processEvent(GHOST_EventHandle hEvent, GHOST_TUserDataPtr userData)
 					if (sMainWindow)
 					{
 						char *title = GHOST_GetTitle(sMainWindow);
-						char *ntitle = malloc(strlen(title)+2);
+						char *ntitle = MEM_mallocN(strlen(title)+2,"GHOSTTEST-processEvent");
 
 						sprintf(ntitle, "%s-", title);
 						GHOST_SetTitle(sMainWindow, ntitle);
 						
-						free(ntitle);
-						free(title);
+						MEM_freeN(ntitle);
+						MEM_freeN(title);
 					}
 				}
 				break;

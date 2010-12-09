@@ -43,6 +43,7 @@
 #include "GHOST_IEvent.h"
 #include "GHOST_IEventConsumer.h"
 #include "intern/GHOST_CallbackEventConsumer.h"
+#include "MEM_guardedalloc.h"
 
 GHOST_SystemHandle GHOST_CreateSystem(void)
 {
@@ -540,7 +541,7 @@ char* GHOST_GetTitle(GHOST_WindowHandle windowhandle)
 
 	window->getTitle(title);
 
-	char *ctitle = (char*) malloc(title.Length() + 1);
+	char *ctitle = (char*) MEM_mallocN(title.Length() + 1,"GHOST_GetTitle");
 
 	if (ctitle == NULL) return NULL;
 	strcpy(ctitle, title.Ptr());

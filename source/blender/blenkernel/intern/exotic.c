@@ -295,7 +295,7 @@ static void read_stl_mesh_binary(Scene *scene, const char *str)
 #define STLBAILOUT(message) { \
 	char error_msg[255]; \
 	fclose(fpSTL); \
-	free(vertdata); \
+	MEM_freeN(vertdata); \
 	sprintf(error_msg, "Line %d: %s", linenum, message); \
 	return; \
 }
@@ -342,7 +342,7 @@ static void read_stl_mesh_ascii(Scene *scene, const char *str)
 	 * i.e. 30000 verts, i.e., 90000 floats.
 	 */
 	numtenthousand = 1;
-	vertdata = malloc(numtenthousand*3*30000*sizeof(float));	// uses realloc!
+	vertdata = MEM_mallocN(numtenthousand*3*30000*sizeof(float),"read_stl_mesh_ascii");	// uses realloc!
 	if (!vertdata) { STLALLOCERROR; }
 
 	linenum = 1;
@@ -364,8 +364,7 @@ static void read_stl_mesh_ascii(Scene *scene, const char *str)
 		 */
 		if ( (totface) && ( (totface % 10000) == 0 ) ) {
 			++numtenthousand;
-			vertdata = realloc(vertdata, 
-							   numtenthousand*3*30000*sizeof(float));
+			vertdata = MEM_reallocN(vertdata, numtenthousand*3*30000*sizeof(float));
 			if (!vertdata) { STLALLOCERROR; }
 		}
 		
@@ -439,7 +438,7 @@ static void read_stl_mesh_ascii(Scene *scene, const char *str)
 
 		mface++;
 	}
-	free(vertdata);
+	MEM_freeN(vertdata);
 
 	mesh_add_normals_flags(me);
 	make_edges(me, 0);

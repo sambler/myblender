@@ -193,13 +193,13 @@ static int _ehashIterator_isStopped(EHashIterator *ehi) {
 /***/
 
 static void *_stdAllocator_alloc(CCGAllocatorHDL UNUSED(a), int numBytes) {
-	return malloc(numBytes);
+	return MEM_mallocN(numBytes,"_stdAllocator_alloc");
 }
 static void *_stdAllocator_realloc(CCGAllocatorHDL UNUSED(a), void *ptr, int newSize, int UNUSED(oldSize)) {
-	return realloc(ptr, newSize);
+	return MEM_reallocN(ptr, newSize);
 }
 static void _stdAllocator_free(CCGAllocatorHDL UNUSED(a), void *ptr) {
-	free(ptr);
+	MEM_freeN(ptr);
 }
 
 static CCGAllocatorIFC *_getStandardAllocatorIFC(void) {

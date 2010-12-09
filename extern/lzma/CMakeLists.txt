@@ -26,6 +26,7 @@
 
 SET(INC
 	.
+	../../intern/guardedalloc
 )
 
 SET(SRC

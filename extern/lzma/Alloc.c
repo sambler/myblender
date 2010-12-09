@@ -9,6 +9,7 @@ Public domain */
 #include <stdlib.h>
 
 #include "Alloc.h"
+#include "MEM_guardedalloc.h"
 
 /* #define _SZ_ALLOC_DEBUG */
 
@@ -26,12 +27,12 @@ void *MyAlloc(size_t size)
     return 0;
   #ifdef _SZ_ALLOC_DEBUG
   {
-    void *p = malloc(size);
+    void *p = MEM_mallocN(size,"Alloc.c-MyAlloc");
     fprintf(stderr, "\nAlloc %10d bytes, count = %10d,  addr = %8X", size, g_allocCount++, (unsigned)p);
     return p;
   }
   #else
-  return malloc(size);
+  return MEM_mallocN(size,"Alloc.c-MyAlloc");
   #endif
 }
 
@@ -41,7 +42,7 @@ void MyFree(void *address)
   if (address != 0)
     fprintf(stderr, "\nFree; count = %10d,  addr = %8X", --g_allocCount, (unsigned)address);
   #endif
-  free(address);
+  MEM_freeN(address);
 }
 
 #ifdef _WIN32

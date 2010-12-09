@@ -62,6 +62,7 @@ bool g_pyinitialized = false;
 #include "AUD_IReader.h"
 #include "AUD_SequencerFactory.h"
 #include "AUD_SilenceFactory.h"
+#include "MEM_guardedalloc.h"
 
 #ifdef WITH_SDL
 #include "AUD_SDLDevice.h"
@@ -826,7 +827,7 @@ float* AUD_readSoundBuffer(const char* filename, float low, float high,
 	} while(len != 0);
 	delete reader;
 
-	float* result = (float*)malloc(position * sizeof(float));
+	float* result = (float*)MEM_mallocN(position * sizeof(float),"AUD_readSoundBuffer");
 	memcpy(result, buffer.getBuffer(), position * sizeof(float));
 	*length = position;
 	return result;

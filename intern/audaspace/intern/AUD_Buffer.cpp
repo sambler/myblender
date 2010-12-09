@@ -25,6 +25,7 @@
 
 #include "AUD_Buffer.h"
 #include "AUD_Space.h"
+#include "MEM_guardedalloc.h"
 
 #include <cstring>
 #include <cstdlib>
@@ -34,12 +35,12 @@
 AUD_Buffer::AUD_Buffer(int size)
 {
 	m_size = size;
-	m_buffer = (data_t*) malloc(size+16);
+	m_buffer = (data_t*) MEM_mallocN(size+16,"AUD_Buffer::AUD_Buffer");
 }
 
 AUD_Buffer::~AUD_Buffer()
 {
-	free(m_buffer);
+	MEM_freeN(m_buffer);
 }
 
 sample_t* AUD_Buffer::getBuffer() const
@@ -56,15 +57,15 @@ void AUD_Buffer::resize(int size, bool keep)
 {
 	if(keep)
 	{
-		data_t* buffer = (data_t*) malloc(size + 16);
+		data_t* buffer = (data_t*) MEM_mallocN(size + 16,"AUD_Buffer::resize");
 
 		memcpy(AUD_ALIGN(buffer), AUD_ALIGN(m_buffer), AUD_MIN(size, m_size));
 
-		free(m_buffer);
+		MEM_freeN(m_buffer);
 		m_buffer = buffer;
 	}
 	else
-		m_buffer = (data_t*) realloc(m_buffer, size + 16);
+		m_buffer = (data_t*) MEM_reallocN(m_buffer, size + 16);
 
 	m_size = size;
 }

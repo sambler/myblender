@@ -23,6 +23,7 @@
 SET(INC
 	.
 	intern
+	../guardedalloc
 	FX SRC
 	${PTHREADS_INC}
 	${LIBSAMPLERATE_INC}

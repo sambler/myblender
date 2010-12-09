@@ -26,6 +26,7 @@
 
 SET(INC
 	./include
+	../../intern/guardedalloc
 )
 
 IF(UNIX)

@@ -545,7 +545,7 @@ int PyObjectPlus::py_set_attrdef(PyObject *self_py, PyObject *value, const PyAtt
 		}
 		// let's implement a smart undo method
 		bufferSize *= attrdef->m_length;
-		undoBuffer = malloc(bufferSize);
+		undoBuffer = MEM_mallocN(bufferSize,"PyObjectPlus::py_set_attrdef");
 		sourceBuffer = ptr;
 		if (undoBuffer)
 		{
@@ -750,7 +750,7 @@ int PyObjectPlus::py_set_attrdef(PyObject *self_py, PyObject *value, const PyAtt
 			}
 			if (bufferSize)
 			{
-				undoBuffer = malloc(bufferSize);
+				undoBuffer = MEM_mallocN(bufferSize,"PyObjectPlus::py_set_attrdef");
 				if (undoBuffer)
 				{
 					memcpy(undoBuffer, sourceBuffer, bufferSize);
@@ -1071,7 +1071,7 @@ int PyObjectPlus::py_set_attrdef(PyObject *self_py, PyObject *value, const PyAtt
 			}
 		FREE_AND_ERROR:
 			if (undoBuffer)
-				free(undoBuffer);
+				MEM_freeN(undoBuffer);
 			if (list)
 				Py_DECREF(list);
 			if (item)

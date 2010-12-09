@@ -24,9 +24,11 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
+# relative path from src needed to handle nested folders
 SET(INC
 	.
 	src
+	src/../../../intern/guardedalloc
 )
 
 SET(SRC

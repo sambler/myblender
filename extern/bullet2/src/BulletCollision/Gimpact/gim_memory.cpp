@@ -30,6 +30,7 @@ email: projectileman@yahoo.com
 
 #include "gim_memory.h"
 #include "stdlib.h"
+#include "MEM_guardedalloc.h"
 
 #ifdef GIM_SIMD_MEMORY
 #include "LinearMath/btAlignedAllocator.h"
@@ -95,7 +96,7 @@ void * gim_alloc(size_t size)
 #ifdef GIM_SIMD_MEMORY
 		ptr = btAlignedAlloc(size,16);
 #else
-		ptr = malloc(size);
+		ptr = MEM_mallocN(size,"gim_alloc");
 #endif
 	}
   	return ptr;
@@ -128,7 +129,7 @@ void gim_free(void *ptr)
 	#ifdef GIM_SIMD_MEMORY
 		btAlignedFree(ptr);
 	#else
-		free(ptr);
+		MEM_freeN(ptr);
 	#endif
 	}
 }

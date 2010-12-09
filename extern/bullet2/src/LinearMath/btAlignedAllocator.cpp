@@ -14,6 +14,7 @@ subject to the following restrictions:
 */
 
 #include "btAlignedAllocator.h"
+#include "MEM_guardedalloc.h"
 
 int gNumAlignedAllocs = 0;
 int gNumAlignedFree = 0;
@@ -21,12 +22,12 @@ int gTotalBytesAlignedAllocs = 0;//detect memory leaks
 
 static void *btAllocDefault(size_t size)
 {
-	return malloc(size);
+	return MEM_mallocN(size,"btAlignedAllocator");
 }
 
 static void btFreeDefault(void *ptr)
 {
-	free(ptr);
+	MEM_freeN(ptr);
 }
 
 static btAllocFunc *sAllocFunc = btAllocDefault;

@@ -681,9 +681,12 @@ static int graphkeys_paste_exec(bContext *C, wmOperator *op)
 	if (ANIM_animdata_get_context(C, &ac) == 0)
 		return OPERATOR_CANCELLED;
 	
+	if(ac.reports==NULL) {
+		ac.reports= op->reports;
+	}
+
 	/* paste keyframes */
 	if (paste_graph_keys(&ac)) {
-		BKE_report(op->reports, RPT_ERROR, "No keyframes to paste");
 		return OPERATOR_CANCELLED;
 	}
 	
@@ -1430,7 +1433,6 @@ static int graphkeys_handletype_exec(bContext *C, wmOperator *op)
 	ot->description= "Set type of handle for selected keyframes";
 	
 	/* api callbacks */
-	ot->invoke= WM_menu_invoke;
 	ot->exec= graphkeys_handletype_exec;
 	ot->poll= graphop_editable_keyframes_poll;
 	

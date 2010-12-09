@@ -24,13 +24,13 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-SET(INC
+set(INC
 	.
 	../libopenjpeg
 	../../intern/guardedalloc
 )
 
-SET(SRC
+set(SRC
 	codec.c
 	debayer.c
 	format.c
@@ -40,4 +40,4 @@ SET(SRC
 	format.h
 )
 
-BLENDERLIB(extern_redcode "${SRC}" "${INC}")
+blenderlib(extern_redcode "${SRC}" "${INC}")

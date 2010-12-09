@@ -24,12 +24,12 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-SET(INC
+set(INC
 	.
 	../../intern/guardedalloc
 )
 
-SET(SRC
+set(SRC
 	bio.c
 	cio.c
 	dwt.c
@@ -74,4 +74,4 @@ SET(SRC
 	tgt.h
 )
 
-BLENDERLIB(extern_openjpeg "${SRC}" "${INC}")
+blenderlib(extern_openjpeg "${SRC}" "${INC}")

@@ -23,7 +23,7 @@
  */
 
 #include <Python.h>
-#include "blf_api.h"
+#include "blf_py_api.h"
 
 #include "../../blenfont/BLF_api.h"
 #include "BKE_utildefines.h"
@@ -99,7 +99,7 @@ static PyObject *py_blf_aspect(PyObject *UNUSED(self), PyObject *args)
 	if (!PyArg_ParseTuple(args, "if:blf.aspect", &fontid, &aspect))
 		return NULL;
 
-	BLF_aspect(fontid, aspect);
+	BLF_aspect(fontid, aspect, aspect, 1.0);
 
 	Py_RETURN_NONE;
 }

@@ -545,7 +545,7 @@ void filelist_free(struct FileList* filelist)
 	}
 	
 	filelist->numfiles = 0;
-	free(filelist->filelist);
+	MEM_freeN(filelist->filelist);
 	filelist->filelist = 0;	
 	filelist->filter = 0;
 	filelist->filter_glob[0] = '\0';
@@ -940,8 +940,7 @@ void filelist_from_library(struct FileList* filelist)
 	nnames= BLI_linklist_length(names);
 
 	filelist->numfiles= nnames + 1;
-	filelist->filelist= malloc(filelist->numfiles * sizeof(*filelist->filelist));
-	memset(filelist->filelist, 0, filelist->numfiles * sizeof(*filelist->filelist));
+	filelist->filelist= MEM_callocN(filelist->numfiles * sizeof(*filelist->filelist),"filelist_from_library");
 
 	filelist->filelist[0].relname= BLI_strdup("..");
 	filelist->filelist[0].type |= S_IFDIR;
@@ -1010,12 +1009,10 @@ void filelist_from_main(struct FileList *filelist)
 		
 		/* make directories */
 		filelist->numfiles= 23;
-		filelist->filelist= (struct direntry *)malloc(filelist->numfiles * sizeof(struct direntry));
+		filelist->filelist= (struct direntry *)MEM_callocN(filelist->numfiles * sizeof(struct direntry),"filelist_from_main");
 		
-		for(a=0; a<filelist->numfiles; a++) {
-			memset( &(filelist->filelist[a]), 0 , sizeof(struct direntry));
+		for(a=0; a<filelist->numfiles; a++)
 			filelist->filelist[a].type |= S_IFDIR;
-		}
 		
 		filelist->filelist[0].relname= BLI_strdup("..");
 		filelist->filelist[2].relname= BLI_strdup("Scene");
@@ -1061,12 +1058,11 @@ void filelist_from_main(struct FileList *filelist)
 		
 		/* XXXXX TODO: if databrowse F4 or append/link filelist->hide_parent has to be set */
 		if (!filelist->hide_parent) filelist->numfiles+= 1;
-		filelist->filelist= (struct direntry *)malloc(filelist->numfiles * sizeof(struct direntry));
+		filelist->filelist= (struct direntry *)MEM_callocN(filelist->numfiles * sizeof(struct direntry),"filelist_from_main2");
 		
 		files = filelist->filelist;
 		
 		if (!filelist->hide_parent) {
-			memset( &(filelist->filelist[0]), 0 , sizeof(struct direntry));
 			filelist->filelist[0].relname= BLI_strdup("..");
 			filelist->filelist[0].type |= S_IFDIR;
 		

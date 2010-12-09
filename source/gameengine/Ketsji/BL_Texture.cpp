@@ -181,7 +181,7 @@ void BL_Texture::InitNonPow2Tex(unsigned int *pix,int x,int y,bool mipmap)
 	int nx= smaller_pow2(x);
 	int ny= smaller_pow2(y);
 
-	unsigned int *newPixels = (unsigned int *)malloc(nx*ny*sizeof(unsigned int));
+	unsigned int *newPixels = (unsigned int *)MEM_mallocN(nx*ny*sizeof(unsigned int),"BL_Texture::InitNonPow2Tex");
 	
 	gluScaleImage(GL_RGBA, x, y, GL_UNSIGNED_BYTE, pix, nx,ny, GL_UNSIGNED_BYTE, newPixels);
 	glBindTexture(GL_TEXTURE_2D, mTexture );
@@ -197,7 +197,7 @@ void BL_Texture::InitNonPow2Tex(unsigned int *pix,int x,int y,bool mipmap)
 		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, nx, ny, 0, GL_RGBA, GL_UNSIGNED_BYTE, newPixels );
 	}
 	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-	free(newPixels);
+	MEM_freeN(newPixels);
 }
 
 

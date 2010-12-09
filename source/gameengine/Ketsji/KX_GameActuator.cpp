@@ -35,6 +35,7 @@
 #include "KX_Scene.h"
 #include "KX_KetsjiEngine.h"
 #include "KX_PythonInit.h" /* for config load/saving */
+#include "MEM_guardedalloc.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -174,7 +175,7 @@ bool KX_GameActuator::Update()
 					marshal_length = ftell(fp);
 					rewind(fp);
 					
-					marshal_buffer = (char*) malloc (sizeof(char)*marshal_length);
+					marshal_buffer = (char*) MEM_mallocN(sizeof(char)*marshal_length,"KX_GameActuator::Update");
 					
 					result = fread (marshal_buffer, 1, marshal_length, fp);
 					
@@ -184,7 +185,7 @@ bool KX_GameActuator::Update()
 						printf("warning: could not read all of '%s'\n", mashal_path);
 					}
 					
-					free(marshal_buffer);
+					MEM_freeN(marshal_buffer);
 					fclose(fp);
 				} else {
 					printf("warning: could not open '%s'\n", mashal_path);

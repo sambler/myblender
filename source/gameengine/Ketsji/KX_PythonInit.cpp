@@ -336,7 +336,7 @@ static PyObject* gPyLoadGlobalDict(PyObject*)
 		marshal_length = ftell(fp);
 		rewind(fp);
 
-		marshal_buffer = (char*)malloc (sizeof(char)*marshal_length);
+		marshal_buffer = (char*)MEM_mallocN(sizeof(char)*marshal_length,"gPyLoadGlobalDict");
 
 		result = fread(marshal_buffer, 1, marshal_length, fp);
 
@@ -346,7 +346,7 @@ static PyObject* gPyLoadGlobalDict(PyObject*)
 			printf("Warning: could not read all of '%s'\n", marshal_path);
 		}
 
-		free(marshal_buffer);
+		MEM_freeN(marshal_buffer);
 		fclose(fp);
 	} else {
 		printf("Warning: could not open '%s'\n", marshal_path);

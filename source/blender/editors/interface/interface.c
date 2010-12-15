@@ -29,6 +29,7 @@
 #include <limits.h>
 #include <math.h>
 #include <string.h>
+#include <ctype.h>
  
 #include "MEM_guardedalloc.h"
 
@@ -585,6 +586,77 @@ int uiButActiveOnly(const bContext *C, uiBlock *block, uiBut *but)
 	return 1;
 }
 
+/* assigns automatic keybindings to menu items for fast access
+ * (underline key in menu) */
+static void ui_menu_block_set_keyaccels(uiBlock *block)
+{
+	uiBut *but;
+
+	unsigned int meny_key_mask= 0;
+	unsigned char menu_key;
+	const char *str_pt;
+	int pass;
+	int tot_missing= 0;
+
+	/* only do it before bounding */
+	if(block->minx != block->maxx)
+		return;
+
+	for(pass=0; pass<2; pass++) {
+		/* 2 Passes, on for first letter only, second for any letter if first fails
+		 * fun first pass on all buttons so first word chars always get first priority */
+
+		for(but=block->buttons.first; but; but=but->next) {
+			if(!ELEM4(but->type, BUT, MENU, BLOCK, PULLDOWN) || (but->flag & UI_HIDDEN)) {
+				/* pass */
+			}
+			else if(but->menu_key=='\0') {
+				if(but->str) {
+					for(str_pt= but->str; *str_pt; ) {
+						menu_key= tolower(*str_pt);
+						if((menu_key >= 'a' && menu_key <= 'z') && !(meny_key_mask & 1<<(menu_key-'a'))) {
+							meny_key_mask |= 1<<(menu_key-'a');
+							break;
+						}
+
+						if(pass==0) {
+							/* Skip to next delimeter on first pass (be picky) */
+							while(isalpha(*str_pt))
+								str_pt++;
+
+							if(*str_pt)
+								str_pt++;
+						}
+						else {
+							/* just step over every char second pass and find first usable key */
+							str_pt++;
+						}
+					}
+
+					if(*str_pt) {
+						but->menu_key= menu_key;
+					}
+					else {
+						/* run second pass */
+						tot_missing++;
+					}
+
+					/* if all keys have been used just exit, unlikely */
+					if(meny_key_mask == (1<<26)-1) {
+						return;
+					}
+				}
+			}
+		}
+
+		/* check if second pass is needed */
+		if(!tot_missing) {
+			break;
+		}
+	}
+}
+
+
 void ui_menu_block_set_keymaps(const bContext *C, uiBlock *block)
 {
 	uiBut *but;
@@ -658,6 +730,7 @@ void uiEndBlock(const bContext *C, uiBlock *block)
 	/* handle pending stuff */
 	if(block->layouts.first) uiBlockLayoutResolve(block, NULL, NULL);
 	ui_block_do_align(block);
+	if((block->flag & UI_BLOCK_LOOP) && (block->flag & UI_BLOCK_NUMSELECT)) ui_menu_block_set_keyaccels(block); /* could use a different flag to check */
 	if(block->flag & UI_BLOCK_LOOP) ui_menu_block_set_keymaps(C, block);
 	
 	/* after keymaps! */
@@ -1246,12 +1319,10 @@ int ui_is_but_float(uiBut *but)
 int ui_is_but_unit(uiBut *but)
 {
 	Scene *scene= CTX_data_scene((bContext *)but->block->evil_C);
-	int unit_type;
-	
-	if(but->rnaprop==NULL)
-		return 0;
+	int unit_type= uiButGetUnitType(but);
 
-	unit_type = RNA_SUBTYPE_UNIT(RNA_property_subtype(but->rnaprop));
+	if(unit_type == PROP_UNIT_NONE)
+		return 0;
 
 #if 1 // removed so angle buttons get correct snapping
 	if (scene->unit.system_rotation == USER_UNIT_ROT_RADIANS && unit_type == PROP_UNIT_ROTATION)
@@ -1263,12 +1334,10 @@ int ui_is_but_unit(uiBut *but)
 		return 0;
 
 	if (scene->unit.system == USER_UNIT_NONE) {
-	   if (unit_type != PROP_UNIT_ROTATION)
+		if (unit_type != PROP_UNIT_ROTATION) {
 			return 0;
+		}
 	}
-
-	if(unit_type == PROP_UNIT_NONE)
-		return 0;
 
 	return 1;
 }
@@ -1449,18 +1518,18 @@ int ui_get_but_string_max_length(uiBut *but)
 static double ui_get_but_scale_unit(uiBut *but, double value)
 {
 	Scene *scene= CTX_data_scene((bContext *)but->block->evil_C);
-	int subtype= RNA_SUBTYPE_UNIT(RNA_property_subtype(but->rnaprop));
+	int unit_type= uiButGetUnitType(but);
 
-	if(subtype == PROP_UNIT_LENGTH) {
+	if(unit_type == PROP_UNIT_LENGTH) {
 		return value * scene->unit.scale_length;
 	}
-	else if(subtype == PROP_UNIT_AREA) {
+	else if(unit_type == PROP_UNIT_AREA) {
 		return value * pow(scene->unit.scale_length, 2);
 	}
-	else if(subtype == PROP_UNIT_VOLUME) {
+	else if(unit_type == PROP_UNIT_VOLUME) {
 		return value * pow(scene->unit.scale_length, 3);
 	}
-	else if(subtype == PROP_UNIT_TIME) { /* WARNING - using evil_C :| */
+	else if(unit_type == PROP_UNIT_TIME) { /* WARNING - using evil_C :| */
 		return FRA2TIME(value);
 	}
 	else {
@@ -1472,14 +1541,14 @@ static double ui_get_but_scale_unit(uiBut *but, double value)
 void ui_convert_to_unit_alt_name(uiBut *but, char *str, int maxlen)
 {
 	if(ui_is_but_unit(but)) {
-		int unit_type= RNA_SUBTYPE_UNIT_VALUE(RNA_property_subtype(but->rnaprop));
+		int unit_type= uiButGetUnitType(but);
 		char *orig_str;
 		Scene *scene= CTX_data_scene((bContext *)but->block->evil_C);
 		
 		orig_str= MEM_callocN(sizeof(char)*maxlen + 1, "textedit sub str");
 		memcpy(orig_str, str, maxlen);
 		
-		bUnit_ToUnitAltName(str, maxlen, orig_str, scene->unit.system, unit_type);
+		bUnit_ToUnitAltName(str, maxlen, orig_str, scene->unit.system, unit_type>>16);
 		
 		MEM_freeN(orig_str);
 	}
@@ -1489,7 +1558,7 @@ static void ui_get_but_string_unit(uiBut *but, char *str, int len_max, double va
 {
 	Scene *scene= CTX_data_scene((bContext *)but->block->evil_C);
 	int do_split= scene->unit.flag & USER_UNIT_OPT_SPLIT;
-	int unit_type=  RNA_SUBTYPE_UNIT_VALUE(RNA_property_subtype(but->rnaprop));
+	int unit_type= uiButGetUnitType(but);
 	int precision= but->a2;
 
 	if(scene->unit.scale_length<0.0001) scene->unit.scale_length= 1.0; // XXX do_versions
@@ -1498,13 +1567,13 @@ static void ui_get_but_string_unit(uiBut *but, char *str, int len_max, double va
 	if(precision>4)		precision= 4;
 	else if(precision==0)	precision= 2;
 
-	bUnit_AsString(str, len_max, ui_get_but_scale_unit(but, value), precision, scene->unit.system, unit_type, do_split, pad);
+	bUnit_AsString(str, len_max, ui_get_but_scale_unit(but, value), precision, scene->unit.system, unit_type>>16, do_split, pad);
 }
 
 static float ui_get_but_step_unit(uiBut *but, float step_default)
 {
 	Scene *scene= CTX_data_scene((bContext *)but->block->evil_C);
-	int unit_type=  RNA_SUBTYPE_UNIT_VALUE(RNA_property_subtype(but->rnaprop));
+	int unit_type= uiButGetUnitType(but)>>16;
 	float step;
 
 	step = bUnit_ClosestScalar(ui_get_but_scale_unit(but, step_default), scene->unit.system, unit_type);
@@ -1655,19 +1724,14 @@ int ui_set_but_string(bContext *C, uiBut *but, const char *str)
 #ifdef WITH_PYTHON
 		{
 			char str_unit_convert[256];
-			int unit_type;
+			int unit_type= uiButGetUnitType(but);
 			Scene *scene= CTX_data_scene((bContext *)but->block->evil_C);
-
-			if(but->rnaprop)
-				unit_type= RNA_SUBTYPE_UNIT_VALUE(RNA_property_subtype(but->rnaprop));
-			else
-				unit_type= 0;
 
 			BLI_strncpy(str_unit_convert, str, sizeof(str_unit_convert));
 
 			if(ui_is_but_unit(but)) {
 				/* ugly, use the draw string to get the value, this could cause problems if it includes some text which resolves to a unit */
-				bUnit_ReplaceString(str_unit_convert, sizeof(str_unit_convert), but->drawstr, ui_get_but_scale_unit(but, 1.0), scene->unit.system, unit_type);
+				bUnit_ReplaceString(str_unit_convert, sizeof(str_unit_convert), but->drawstr, ui_get_but_scale_unit(but, 1.0), scene->unit.system, unit_type>>16);
 			}
 
 			if(BPY_eval_button(C, str_unit_convert, &value)) {
@@ -3181,6 +3245,21 @@ PointerRNA *uiButGetOperatorPtrRNA(uiBut *but)
 	}
 
 	return but->opptr;
+}
+
+void uiButSetUnitType(uiBut *but, const int unit_type)
+{
+	but->unit_type= (unsigned char)(unit_type>>16);
+}
+
+int uiButGetUnitType(uiBut *but)
+{
+	if(but->rnaprop) {
+		return RNA_SUBTYPE_UNIT(RNA_property_subtype(but->rnaprop));
+	}
+	else {
+		return ((int)but->unit_type)<<16;
+	}
 }
 
 void uiBlockSetHandleFunc(uiBlock *block, uiBlockHandleFunc func, void *arg)

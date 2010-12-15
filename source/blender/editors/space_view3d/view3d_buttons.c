@@ -281,6 +281,7 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 		mul_m4_v3(ob->obmat, median);
 	
 	if(block) {	// buttons
+		uiBut *but;
 		int but_y;
 		if((ob->parent) && (ob->partype == PARBONE))	but_y = 135;
 		else											but_y = 150;
@@ -293,10 +294,14 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 		if(tot==1) {
 			uiDefBut(block, LABEL, 0, "Vertex:",					0, 130, 200, 20, 0, 0, 0, 0, 0, "");
 			uiBlockBeginAlign(block);
-			uiDefButF(block, NUM, B_OBJECTPANELMEDIAN, "X:",		0, 110, 200, 20, &(tfp->ve_median[0]), -lim, lim, 10, 3, "");
-			uiDefButF(block, NUM, B_OBJECTPANELMEDIAN, "Y:",		0, 90, 200, 20, &(tfp->ve_median[1]), -lim, lim, 10, 3, "");
-			uiDefButF(block, NUM, B_OBJECTPANELMEDIAN, "Z:",		0, 70, 200, 20, &(tfp->ve_median[2]), -lim, lim, 10, 3, "");
-			
+
+			but= uiDefButF(block, NUM, B_OBJECTPANELMEDIAN, "X:",		0, 110, 200, 20, &(tfp->ve_median[0]), -lim, lim, 10, 3, "");
+			uiButSetUnitType(but, PROP_UNIT_LENGTH);
+			but= uiDefButF(block, NUM, B_OBJECTPANELMEDIAN, "Y:",		0, 90, 200, 20, &(tfp->ve_median[1]), -lim, lim, 10, 3, "");
+			uiButSetUnitType(but, PROP_UNIT_LENGTH);
+			but= uiDefButF(block, NUM, B_OBJECTPANELMEDIAN, "Z:",		0, 70, 200, 20, &(tfp->ve_median[2]), -lim, lim, 10, 3, "");
+			uiButSetUnitType(but, PROP_UNIT_LENGTH);
+
 			if(totw==1) {
 				uiDefButF(block, NUM, B_OBJECTPANELMEDIAN, "W:",	0, 50, 200, 20, &(tfp->ve_median[3]), 0.01, 100.0, 10, 3, "");
 				uiBlockBeginAlign(block);
@@ -322,9 +327,12 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 		else {
 			uiDefBut(block, LABEL, 0, "Median:",					0, 130, 200, 20, 0, 0, 0, 0, 0, "");
 			uiBlockBeginAlign(block);
-			uiDefButF(block, NUM, B_OBJECTPANELMEDIAN, "X:",		0, 110, 200, 20, &(tfp->ve_median[0]), -lim, lim, 10, 3, "");
-			uiDefButF(block, NUM, B_OBJECTPANELMEDIAN, "Y:",		0, 90, 200, 20, &(tfp->ve_median[1]), -lim, lim, 10, 3, "");
-			uiDefButF(block, NUM, B_OBJECTPANELMEDIAN, "Z:",		0, 70, 200, 20, &(tfp->ve_median[2]), -lim, lim, 10, 3, "");
+			but= uiDefButF(block, NUM, B_OBJECTPANELMEDIAN, "X:",		0, 110, 200, 20, &(tfp->ve_median[0]), -lim, lim, 10, 3, "");
+			uiButSetUnitType(but, PROP_UNIT_LENGTH);
+			but= uiDefButF(block, NUM, B_OBJECTPANELMEDIAN, "Y:",		0, 90, 200, 20, &(tfp->ve_median[1]), -lim, lim, 10, 3, "");
+			uiButSetUnitType(but, PROP_UNIT_LENGTH);
+			but= uiDefButF(block, NUM, B_OBJECTPANELMEDIAN, "Z:",		0, 70, 200, 20, &(tfp->ve_median[2]), -lim, lim, 10, 3, "");
+			uiButSetUnitType(but, PROP_UNIT_LENGTH);
 			if(totw==tot) {
 				uiDefButF(block, NUM, B_OBJECTPANELMEDIAN, "W:",	0, 50, 200, 20, &(tfp->ve_median[3]), 0.01, 100.0, 10, 3, "");
 				uiBlockEndAlign(block);
@@ -803,6 +811,7 @@ static void v3d_posearmature_buts(uiLayout *layout, Object *ob)
 	PointerRNA pchanptr;
 	uiLayout *col;
 //	uiLayout *row;
+//	uiBut *but;
 
 	pchan= get_active_posechannel(ob);
 
@@ -841,9 +850,13 @@ static void v3d_posearmature_buts(uiLayout *layout, Object *ob)
 	
 	uiDefBut(block, LABEL, 0, "Location:",			0, 240, 100, 20, 0, 0, 0, 0, 0, "");
 	uiBlockBeginAlign(block);
-	uiDefButF(block, NUM, B_ARMATUREPANEL2, "X:",	0, 220, 120, 19, pchan->loc, -lim, lim, 100, 3, "");
-	uiDefButF(block, NUM, B_ARMATUREPANEL2, "Y:",	0, 200, 120, 19, pchan->loc+1, -lim, lim, 100, 3, "");
-	uiDefButF(block, NUM, B_ARMATUREPANEL2, "Z:",	0, 180, 120, 19, pchan->loc+2, -lim, lim, 100, 3, "");
+	
+	but= uiDefButF(block, NUM, B_ARMATUREPANEL2, "X:",	0, 220, 120, 19, pchan->loc, -lim, lim, 100, 3, "");
+	uiButSetUnitType(but, PROP_UNIT_LENGTH);
+	but= uiDefButF(block, NUM, B_ARMATUREPANEL2, "Y:",	0, 200, 120, 19, pchan->loc+1, -lim, lim, 100, 3, "");
+	uiButSetUnitType(but, PROP_UNIT_LENGTH);
+	but= uiDefButF(block, NUM, B_ARMATUREPANEL2, "Z:",	0, 180, 120, 19, pchan->loc+2, -lim, lim, 100, 3, "");
+	uiButSetUnitType(but, PROP_UNIT_LENGTH);
 	uiBlockEndAlign(block);
 	
 	uiBlockBeginAlign(block);
@@ -1379,26 +1392,6 @@ static void view3d_panel_bonesketch_spaces(const bContext *C, Panel *pa)
 	uiBlockEndAlign(block);
 }
 
-/* op->invoke */
-static void redo_cb(bContext *C, void *arg_op, void *arg2)
-{
-	wmOperator *lastop= arg_op;
-	
-	if(lastop) {
-		int retval;
-		
-		if (G.f & G_DEBUG)
-			printf("operator redo %s\n", lastop->type->name);
-		ED_undo_pop(C);
-		retval= WM_operator_repeat(C, lastop);
-		if((retval & OPERATOR_FINISHED)==0) {
-			if (G.f & G_DEBUG)
-				printf("operator redo failed %s\n", lastop->type->name);
-			ED_undo_redo(C);
-		}
-	}
-}
-
 static void view3d_panel_operator_redo(const bContext *C, Panel *pa)
 {
 	wmWindowManager *wm= CTX_wm_manager(C);
@@ -1416,7 +1409,7 @@ static void view3d_panel_operator_redo(const bContext *C, Panel *pa)
 	if(op==NULL)
 		return;
 	
-	uiBlockSetFunc(block, redo_cb, op, NULL);
+	uiBlockSetFunc(block, ED_undo_operator_repeat_cb, op, NULL);
 	
 	if(!op->properties) {
 		IDPropertyTemplate val = {0};

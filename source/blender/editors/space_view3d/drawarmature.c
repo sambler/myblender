@@ -1604,6 +1604,9 @@ static void draw_pose_bones(Scene *scene, View3D *v3d, ARegion *ar, Base *base, 
 	short do_dashed= 3, draw_wire= 0;
 	short flag, constflag;
 	
+	/* being set below */
+	arm->layer_used= 0;
+	
 	/* hacky... prevent outline select from drawing dashed helplines */
 	glGetFloatv(GL_LINE_WIDTH, &tmp);
 	if (tmp > 1.1) do_dashed &= ~1;
@@ -1650,6 +1653,7 @@ static void draw_pose_bones(Scene *scene, View3D *v3d, ARegion *ar, Base *base, 
 		
 		for (pchan= ob->pose->chanbase.first; pchan; pchan= pchan->next) {
 			bone= pchan->bone;
+			arm->layer_used |= bone->layer;
 			
 			if ( (bone) && !(bone->flag & (BONE_HIDDEN_P|BONE_HIDDEN_PG)) ) {
 				if (bone->layer & arm->layer) {
@@ -1768,8 +1772,8 @@ static void draw_pose_bones(Scene *scene, View3D *v3d, ARegion *ar, Base *base, 
 			if (index != -1) 
 				index+= 0x10000;	// pose bones count in higher 2 bytes only
 		}
-		
-		if (draw_wire) {
+		/* stick bones have not been drawn yet so dont clear object selection in this case */
+		if ((arm->drawtype != ARM_LINE) && draw_wire) {
 			/* object tag, for bordersel optim */
 			glLoadName(index & 0xFFFF);	
 			index= -1;
@@ -1795,6 +1799,7 @@ static void draw_pose_bones(Scene *scene, View3D *v3d, ARegion *ar, Base *base, 
 		
 		for (pchan= ob->pose->chanbase.first; pchan; pchan= pchan->next) {
 			bone= pchan->bone;
+			arm->layer_used |= bone->layer;
 			
 			if ((bone) && !(bone->flag & (BONE_HIDDEN_P|BONE_HIDDEN_PG))) {
 				if (bone->layer & arm->layer) {
@@ -1967,6 +1972,9 @@ static void draw_ebones(View3D *v3d, ARegion *ar, Object *ob, int dt)
 	unsigned int index;
 	int flag;
 	
+	/* being set in code below */
+	arm->layer_used= 0;
+	
 	/* envelope (deform distance) */
 	if(arm->drawtype==ARM_ENVELOPE) {
 		/* precalc inverse matrix for drawing screen aligned */
@@ -2039,6 +2047,7 @@ static void draw_ebones(View3D *v3d, ARegion *ar, Object *ob, int dt)
 		index= 0;	/* do selection codes */
 	
 	for (eBone=arm->edbo->first; eBone; eBone=eBone->next) {
+		arm->layer_used |= eBone->layer;
 		if (eBone->layer & arm->layer) {
 			if ((eBone->flag & BONE_HIDDEN_A)==0) {
 				

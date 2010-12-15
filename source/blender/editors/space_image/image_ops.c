@@ -2113,7 +2113,7 @@ static int cycle_render_slot_exec(bContext *C, wmOperator *op)
 			ima->render_slot= slot;
 			break;
 		}
-	}
+		}
 
 	if(a == IMA_MAX_RENDER_SLOT)
 		ima->render_slot= ((cur == 1)? 0: 1);

@@ -148,10 +148,9 @@ void wm_window_free(bContext *C, wmWindowManager *wm, wmWindow *win)
 			CTX_wm_window_set(C, NULL);
 	}	
 
-	if(wm->windrawable==win)
-		wm->windrawable= NULL;
-	if(wm->winactive==win)
-		wm->winactive= NULL;
+	/* always set drawable and active to NULL, prevents non-drawable state of main windows (bugs #22967 and #25071, possibly #22477 too) */
+	wm->windrawable= NULL;
+	wm->winactive= NULL;
 
 	/* end running jobs, a job end also removes its timer */
 	for(wt= wm->timers.first; wt; wt= wtnext) {
@@ -1008,6 +1007,9 @@ char *WM_clipboard_text_get(int selection)
 {
 	char *p, *p2, *buf, *newbuf;
 
+	if(G.background)
+		return NULL;
+
 	buf= (char*)GHOST_getClipboard(selection);
 	if(!buf)
 		return NULL;
@@ -1028,33 +1030,35 @@ char *WM_clipboard_text_get(int selection)
 
 void WM_clipboard_text_set(char *buf, int selection)
 {
+	if(!G.background) {
 #ifdef _WIN32
-	/* do conversion from \n to \r\n on Windows */
-	char *p, *p2, *newbuf;
-	int newlen= 0;
-	
-	for(p= buf; *p; p++) {
-		if(*p == '\n')
-			newlen += 2;
-		else
-			newlen++;
-	}
-	
-	newbuf= MEM_callocN(newlen+1, "WM_clipboard_text_set");
-
-	for(p= buf, p2= newbuf; *p; p++, p2++) {
-		if(*p == '\n') { 
-			*(p2++)= '\r'; *p2= '\n';
+		/* do conversion from \n to \r\n on Windows */
+		char *p, *p2, *newbuf;
+		int newlen= 0;
+		
+		for(p= buf; *p; p++) {
+			if(*p == '\n')
+				newlen += 2;
+			else
+				newlen++;
 		}
-		else *p2= *p;
-	}
-	*p2= '\0';
-
-	GHOST_putClipboard((GHOST_TInt8*)newbuf, selection);
-	MEM_freeN(newbuf);
+		
+		newbuf= MEM_callocN(newlen+1, "WM_clipboard_text_set");
+	
+		for(p= buf, p2= newbuf; *p; p++, p2++) {
+			if(*p == '\n') { 
+				*(p2++)= '\r'; *p2= '\n';
+			}
+			else *p2= *p;
+		}
+		*p2= '\0';
+	
+		GHOST_putClipboard((GHOST_TInt8*)newbuf, selection);
+		MEM_freeN(newbuf);
 #else
-	GHOST_putClipboard((GHOST_TInt8*)buf, selection);
+		GHOST_putClipboard((GHOST_TInt8*)buf, selection);
 #endif
+	}
 }
 
 /* ******************* progress bar **************** */

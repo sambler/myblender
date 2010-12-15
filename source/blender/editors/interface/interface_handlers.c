@@ -2210,7 +2210,7 @@ static float ui_numedit_apply_snapf(uiBut *but, float tempf, float softmin, floa
 		
 		if(ui_is_but_unit(but)) {
 			Scene *scene= CTX_data_scene((bContext *)but->block->evil_C);
-			int unit_type = RNA_SUBTYPE_UNIT_VALUE(RNA_property_subtype(but->rnaprop));
+			int unit_type= uiButGetUnitType(but)>>16;
 
 			if(bUnit_IsValid(scene->unit.system, unit_type)) {
 				fac= (float)bUnit_BaseScalar(scene->unit.system, unit_type);
@@ -4116,6 +4116,11 @@ static int ui_but_menu(bContext *C, uiBut *but)
 	uiLayoutSetOperatorContext(layout, WM_OP_INVOKE_DEFAULT);
 
 	if(but->rnapoin.data && but->rnaprop) {
+		short is_anim= RNA_property_animateable(&but->rnapoin, but->rnaprop);
+
+		/* second slower test, saved people finding keyframe items in menus when its not possible */
+		if(is_anim)
+			is_anim= RNA_property_path_from_ID_check(&but->rnapoin, but->rnaprop);
 
 		length= RNA_property_array_length(&but->rnapoin, but->rnaprop);
 		
@@ -4133,7 +4138,7 @@ static int ui_but_menu(bContext *C, uiBut *but)
 			}
 		}
 		else if(but->flag & UI_BUT_DRIVEN);
-		else if(RNA_property_animateable(&but->rnapoin, but->rnaprop)) {
+		else if(is_anim) {
 			if(length) {
 				uiItemBooleanO(layout, "Insert Keyframes", 0, "ANIM_OT_keyframe_insert_button", "all", 1);
 				uiItemBooleanO(layout, "Insert Single Keyframe", 0, "ANIM_OT_keyframe_insert_button", "all", 0);
@@ -4158,7 +4163,7 @@ static int ui_but_menu(bContext *C, uiBut *but)
 				uiItemO(layout, "Paste Driver", 0, "ANIM_OT_paste_driver_button");
 		}
 		else if(but->flag & (UI_BUT_ANIMATED_KEY|UI_BUT_ANIMATED));
-		else if(RNA_property_animateable(&but->rnapoin, but->rnaprop)) {
+		else if(is_anim) {
 			uiItemS(layout);
 
 			if(length) {
@@ -4173,7 +4178,7 @@ static int ui_but_menu(bContext *C, uiBut *but)
 		}
 		
 		/* Keying Sets */
-		if(RNA_property_animateable(&but->rnapoin, but->rnaprop)) {
+		if(is_anim) {
 			uiItemS(layout);
 
 			if(length) {
@@ -5630,8 +5635,65 @@ int ui_handle_menu_event(bContext *C, wmEvent *event, uiPopupBlockHandle *menu, 
 
 						retval= WM_UI_HANDLER_BREAK;
 					}
-
 					break;
+
+				/* Handle keystrokes on menu items */
+				case AKEY:
+				case BKEY:
+				case CKEY:
+				case DKEY:
+				case EKEY:
+				case FKEY:
+				case GKEY:
+				case HKEY:
+				case IKEY:
+				case JKEY:
+				case KKEY:
+				case LKEY:
+				case MKEY:
+				case NKEY:
+				case OKEY:
+				case PKEY:
+				case QKEY:
+				case RKEY:
+				case SKEY:
+				case TKEY:
+				case UKEY:
+				case VKEY:
+				case WKEY:
+				case XKEY:
+				case YKEY:
+				case ZKEY:
+				{
+					if(event->val == KM_PRESS) {
+						count= 0;
+						for(but= block->buttons.first; but; but= but->next) {
+
+							if(but->menu_key==event->type) {
+								if(but->type == BUT) {
+									/* mainly for operator buttons */
+									ui_handle_button_activate(C, ar, but, BUTTON_ACTIVATE_APPLY);
+								}
+								else if(ELEM(but->type, BLOCK, PULLDOWN)) {
+									/* open submenus (like right arrow key) */
+									ui_handle_button_activate(C, ar, but, BUTTON_ACTIVATE_OPEN);
+								}
+								else if (but->type == MENU) {
+									/* activate menu items */
+									ui_handle_button_activate(C, ar, but, BUTTON_ACTIVATE);
+								}
+								else {
+									printf("Error, but->menu_key type: %d\n", but->type);
+								}
+
+								break;
+							}
+						}
+
+						retval= WM_UI_HANDLER_BREAK;
+					}
+					break;
+				}
 			}
 		}
 		

@@ -3392,7 +3392,7 @@ static void dynamics_step(ParticleSimulationData *sim, float cfra)
 	psys_update_effectors(sim);
 
 	if(part->type != PART_HAIR)
-		sim->colliders = get_collider_cache(sim->scene, NULL, NULL);
+		sim->colliders = get_collider_cache(sim->scene, sim->ob, NULL);
 
 	/* initialize physics type specific stuff */
 	switch(part->phystype) {
@@ -3555,8 +3555,12 @@ static void update_children(ParticleSimulationData *sim)
 	if((sim->psys->part->type == PART_HAIR) && (sim->psys->flag & PSYS_HAIR_DONE)==0)
 	/* don't generate children while growing hair - waste of time */
 		psys_free_children(sim->psys);
-	else if(sim->psys->part->childtype && sim->psys->totchild != get_psys_tot_child(sim->scene, sim->psys))
-		distribute_particles(sim, PART_FROM_CHILD);
+	else if(sim->psys->part->childtype) {
+		if(sim->psys->totchild != get_psys_tot_child(sim->scene, sim->psys))
+			distribute_particles(sim, PART_FROM_CHILD);
+		else
+			; /* Children are up to date, nothing to do. */
+	}
 	else
 		psys_free_children(sim->psys);
 }
@@ -3772,6 +3776,7 @@ static void system_step(ParticleSimulationData *sim, float cfra)
 
 		/* simulation is only active during a specific period */
 		if(framenr < startframe) {
+			BKE_ptcache_read_cache(use_cache, startframe, sim->scene->r.frs_sec);
 			/* set correct particle state and reset particles */
 			cached_step(sim, cfra);
 			return;
@@ -3876,8 +3881,7 @@ static void system_step(ParticleSimulationData *sim, float cfra)
 			BKE_ptcache_write_cache(use_cache, framenr);
 	}
 
-	if(init)
-		update_children(sim);
+	update_children(sim);
 
 /* cleanup */
 	if(psys->lattice){
@@ -4003,7 +4007,7 @@ static void psys_prepare_physics(ParticleSimulationData *sim)
 static int hair_needs_recalc(ParticleSystem *psys)
 {
 	if(!(psys->flag & PSYS_EDITED) && (!psys->edit || !psys->edit->edited) &&
-		((psys->flag & PSYS_HAIR_DONE)==0 || psys->recalc & PSYS_RECALC_RESET)) {
+		((psys->flag & PSYS_HAIR_DONE)==0 || psys->recalc & PSYS_RECALC_RESET || (psys->part->flag & PART_HAIR_REGROW && !psys->edit))) {
 		return 1;
 	}
 

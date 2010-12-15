@@ -441,6 +441,9 @@ uiBut *uiDefIconTextButO(uiBlock *block, int type, const char *opname, int opcon
 /* for passing inputs to ButO buttons */
 struct PointerRNA *uiButGetOperatorPtrRNA(uiBut *but);
 
+void uiButSetUnitType(uiBut *but, const int unit_type);
+int uiButGetUnitType(uiBut *but);
+
 /* Special Buttons
  *
  * Butons with a more specific purpose:
@@ -746,6 +749,8 @@ void uiIDContextProperty(struct bContext *C, struct PointerRNA *ptr, struct Prop
 
 /* Styled text draw */
 void uiStyleFontSet(struct uiFontStyle *fs);
+void uiStyleFontDrawExt(struct uiFontStyle *fs, struct rcti *rect, const char *str,
+	float *r_xofs, float *r_yofs);
 void uiStyleFontDraw(struct uiFontStyle *fs, struct rcti *rect, const char *str);
 void uiStyleFontDrawRotated(struct uiFontStyle *fs, struct rcti *rect, const char *str);
 

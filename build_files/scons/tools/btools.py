@@ -92,8 +92,7 @@ def validate_arguments(args, bc):
             'WITH_BF_RAYOPTIMIZATION',
             'BF_RAYOPTIMIZATION_SSE_FLAGS',
             'BF_NO_ELBEEM',
-	    'WITH_BF_CXX_GUARDEDALLOC',
-            'BF_VCREDIST' # Windows-only, and useful only when creating installer
+	    'WITH_BF_CXX_GUARDEDALLOC'
             ]
     
     # Have options here that scons expects to be lists
@@ -387,33 +386,33 @@ def read_opts(env, cfg, args):
         (BoolVariable('WITH_BF_PLAYER', 'Build blenderplayer if true', False)),
         (BoolVariable('WITH_BF_NOBLENDER', 'Do not build blender if true', False)),
 
-        ('CFLAGS', 'C only flags', ''),
-        ('CCFLAGS', 'Generic C and C++ flags', ''),
-        ('CXXFLAGS', 'C++ only flags', ''),
-        ('BGE_CXXFLAGS', 'C++ only flags for BGE', ''),
-        ('CPPFLAGS', 'Defines', ''),
-        ('REL_CFLAGS', 'C only release flags', ''),
-        ('REL_CCFLAGS', 'Generic C and C++ release flags', ''),
-        ('REL_CXXFLAGS', 'C++ only release flags', ''),
+        ('CFLAGS', 'C only flags', []),
+        ('CCFLAGS', 'Generic C and C++ flags', []),
+        ('CXXFLAGS', 'C++ only flags', []),
+        ('BGE_CXXFLAGS', 'C++ only flags for BGE', []),
+        ('CPPFLAGS', 'Defines', []),
+        ('REL_CFLAGS', 'C only release flags', []),
+        ('REL_CCFLAGS', 'Generic C and C++ release flags', []),
+        ('REL_CXXFLAGS', 'C++ only release flags', []),
 
-        ('C_WARN', 'C warning flags', ''),
-        ('CC_WARN', 'Generic C and C++ warning flags', ''),
-        ('CXX_WARN', 'C++ only warning flags', ''),
+        ('C_WARN', 'C warning flags', []),
+        ('CC_WARN', 'Generic C and C++ warning flags', []),
+        ('CXX_WARN', 'C++ only warning flags', []),
 
-        ('LLIBS', 'Platform libs', ''),
-        ('PLATFORM_LINKFLAGS', 'Platform linkflags', ''),
+        ('LLIBS', 'Platform libs', []),
+        ('PLATFORM_LINKFLAGS', 'Platform linkflags', []),
         ('MACOSX_ARCHITECTURE', 'python_arch.zip select', ''),
 
         (BoolVariable('BF_PROFILE', 'Add profiling information if true', False)),
-        ('BF_PROFILE_CFLAGS', 'C only profiling flags', ''),
-        ('BF_PROFILE_CCFLAGS', 'C and C++ profiling flags', ''),
-        ('BF_PROFILE_CXXFLAGS', 'C++ only profiling flags', ''),
-        ('BF_PROFILE_LINKFLAGS', 'Profile linkflags', ''),
+        ('BF_PROFILE_CFLAGS', 'C only profiling flags', []),
+        ('BF_PROFILE_CCFLAGS', 'C and C++ profiling flags', []),
+        ('BF_PROFILE_CXXFLAGS', 'C++ only profiling flags', []),
+        ('BF_PROFILE_LINKFLAGS', 'Profile linkflags', []),
 
         (BoolVariable('BF_DEBUG', 'Add debug flags if true', False)),
-        ('BF_DEBUG_CFLAGS', 'C only debug flags', ''),
-        ('BF_DEBUG_CCFLAGS', 'C and C++ debug flags', ''),
-        ('BF_DEBUG_CXXFLAGS', 'C++ only debug flags', ''),
+        ('BF_DEBUG_CFLAGS', 'C only debug flags', []),
+        ('BF_DEBUG_CCFLAGS', 'C and C++ debug flags', []),
+        ('BF_DEBUG_CXXFLAGS', 'C++ only debug flags', []),
 
         (BoolVariable('BF_BSC', 'Create .bsc files (msvc only)', False)),
 
@@ -454,8 +453,7 @@ def read_opts(env, cfg, args):
         
         (BoolVariable('WITH_BF_RAYOPTIMIZATION', 'Enable raytracer SSE/SIMD optimization.', False)),
         ('BF_RAYOPTIMIZATION_SSE_FLAGS', 'SSE flags', ''),
-        (BoolVariable('WITH_BF_CXX_GUARDEDALLOC', 'Enable GuardedAlloc for C++ memory allocation tracking.', False)),
-        ('BF_VCREDIST', 'Full path to vcredist', '')
+        (BoolVariable('WITH_BF_CXX_GUARDEDALLOC', 'Enable GuardedAlloc for C++ memory allocation tracking.', False))
     ) # end of opts.AddOptions()
 
     return localopts
@@ -546,12 +544,6 @@ def NSIS_Installer(target=None, source=None, env=None):
     ns_cnt = string.replace(ns_cnt, "[DELROOTDIRCONTS]", delrootstring)
 
     ns_cnt = string.replace(ns_cnt, "[DODATAFILES]", datafiles)
-
-    # Setup vcredist part
-    vcredist = "File \""+env['BF_VCREDIST'] + "\"\n"
-    vcredist += "  ExecWait '\"$TEMP\\" + os.path.basename(env['BF_VCREDIST']) + "\" /q'\n"
-    vcredist += "  Delete \"$TEMP\\" + os.path.basename(env['BF_VCREDIST'])+"\""
-    ns_cnt = string.replace(ns_cnt, "[VCREDIST]", vcredist)
 
     tmpnsi = os.path.normpath(install_base_dir+os.sep+env['BF_BUILDDIR']+os.sep+"00.blender_tmp.nsi")
     new_nsis = open(tmpnsi, 'w')

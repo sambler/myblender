@@ -41,6 +41,7 @@
 #include "AUD_C-API.h"
 
 #include "BKE_global.h"
+#include "BKE_main.h"
 #include "BKE_scene.h"
 #include "BKE_report.h"
 
@@ -119,9 +120,10 @@ static QuicktimeCodecTypeDesc qtVideoCodecList[] = {
 	{kMPEG4VisualCodecType, 10, "MPEG4"},
 	{kH263CodecType, 11, "H.263"},
 	{kH264CodecType, 12, "H.264"},
+	{kAnimationCodecType, 13, "Animation"},
 	{0,0,NULL}};
 
-static int qtVideoCodecCount = 12;
+static int qtVideoCodecCount = 13;
 
 int quicktime_get_num_videocodecs() {
 	return qtVideoCodecCount;
@@ -209,7 +211,7 @@ void makeqtstring (RenderData *rd, char *string) {
 	char txt[64];
 
 	strcpy(string, rd->pic);
-	BLI_path_abs(string, G.sce);
+	BLI_path_abs(string, G.main->name);
 
 	BLI_make_existing_file(string);
 
@@ -223,7 +225,7 @@ void filepath_qt(char *string, RenderData *rd) {
 	if (string==NULL) return;
 	
 	strcpy(string, rd->pic);
-	BLI_path_abs(string, G.sce);
+	BLI_path_abs(string, G.main->name);
 	
 	BLI_make_existing_file(string);
 	

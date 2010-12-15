@@ -29,6 +29,7 @@
 #include "RNA_define.h"
 
 #include "DNA_ID.h"
+#include "DNA_vfont_types.h"
 
 #include "WM_types.h"
 
@@ -98,7 +99,8 @@ static int rna_ID_name_editable(PointerRNA *ptr)
 	ID *id= (ID*)ptr->data;
 	
 	if (GS(id->name) == ID_VF) {
-		if (strcmp(id->name+2, "<builtin>")==0)
+		VFont *vf= (VFont *)id;
+		if (strcmp(vf->name, FO_BUILTIN_NAME)==0)
 			return 0;
 	}
 	
@@ -206,7 +208,7 @@ void rna_IDPropertyGroup_unregister(const bContext *C, StructRNA *type)
 	RNA_struct_free(&BLENDER_RNA, type);
 }
 
-StructRNA *rna_IDPropertyGroup_register(const bContext *C, ReportList *reports, void *data, const char *identifier, StructValidateFunc validate, StructCallbackFunc call, StructFreeFunc free)
+StructRNA *rna_IDPropertyGroup_register(bContext *C, ReportList *reports, void *data, const char *identifier, StructValidateFunc validate, StructCallbackFunc call, StructFreeFunc free)
 {
 	PointerRNA dummyptr;
 
@@ -221,8 +223,8 @@ StructRNA *rna_IDPropertyGroup_register(const bContext *C, ReportList *reports, 
 	 * just a char pointer, but take care here, also be careful that python
 	 * owns the string pointer which it could potentually free while blender
 	 * is running. */
-	if(strlen(identifier) >= sizeof(((IDProperty *)NULL)->name)) {
-		BKE_reportf(reports, RPT_ERROR, "registering id property class: '%s' is too long, maximum length is %d.", identifier, sizeof(((IDProperty *)NULL)->name));
+	if(BLI_strnlen(identifier, MAX_IDPROP_NAME) == MAX_IDPROP_NAME) {
+		BKE_reportf(reports, RPT_ERROR, "registering id property class: '%s' is too long, maximum length is " STRINGIFY(MAX_IDPROP_NAME) ".", identifier);
 		return NULL;
 	}
 

@@ -168,6 +168,7 @@ static int draw_tfaces3D__setSelectOpts(void *userData, int index)
 	return flags & eEdge_Select;
 }
 
+#if 0
 static int draw_tfaces3D__setActiveOpts(void *userData, int index)
 {
 	struct { Mesh *me; EdgeHash *eh; } *data = userData;
@@ -191,8 +192,21 @@ static int draw_tfaces3D__drawFaceOpts(void *userData, int index)
 	else
 		return 0;
 }
+#endif
 
-static void draw_tfaces3D(RegionView3D *rv3d, Mesh *me, DerivedMesh *dm)
+/* draws unselected */
+static int draw_tfaces3D__drawFaceOptsInv(void *userData, int index)
+{
+	Mesh *me = (Mesh*)userData;
+
+	MFace *mface = &me->mface[index];
+	if (!(mface->flag&ME_HIDE) && !(mface->flag&ME_FACE_SEL))
+		return 2; /* Don't set color */
+	else
+		return 0;
+}
+
+static void draw_tfaces3D(RegionView3D *rv3d, Mesh *me, DerivedMesh *dm, short draw_seams)
 {
 	struct { Mesh *me; EdgeHash *eh; } data;
 
@@ -203,17 +217,17 @@ static void draw_tfaces3D(RegionView3D *rv3d, Mesh *me, DerivedMesh *dm)
 	glDisable(GL_LIGHTING);
 	bglPolygonOffset(rv3d->dist, 1.0);
 
-		/* Draw (Hidden) Edges */
+	/* Draw (Hidden) Edges */
+	setlinestyle(1);
 	UI_ThemeColor(TH_EDGE_FACESEL);
 	dm->drawMappedEdges(dm, draw_tfaces3D__setHiddenOpts, &data);
+	setlinestyle(0);
 
-		/* Draw Seams */
-	if(me->drawflag & ME_DRAWSEAMS) {
+	/* Draw Seams */
+	if(draw_seams && me->drawflag & ME_DRAWSEAMS) {
 		UI_ThemeColor(TH_EDGE_SEAM);
 		glLineWidth(2);
-
 		dm->drawMappedEdges(dm, draw_tfaces3D__setSeamOpts, &data);
-
 		glLineWidth(1);
 	}
 
@@ -221,10 +235,16 @@ static void draw_tfaces3D(RegionView3D *rv3d, Mesh *me, DerivedMesh *dm)
 	if(me->drawflag & ME_DRAWFACES) {
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+#if 0
 		UI_ThemeColor4(TH_FACE_SELECT);
 
 		dm->drawMappedFacesTex(dm, draw_tfaces3D__drawFaceOpts, (void*)me);
-
+#else
+		/* dull unselected faces so as not to get in the way of seeing color */
+		glColor4ub(96, 96, 96, 64);
+		dm->drawMappedFacesTex(dm, draw_tfaces3D__drawFaceOptsInv, (void*)me);
+#endif
+		
 		glDisable(GL_BLEND);
 	}
 	
@@ -235,8 +255,6 @@ static void draw_tfaces3D(RegionView3D *rv3d, Mesh *me, DerivedMesh *dm)
 	setlinestyle(1);
 	dm->drawMappedEdges(dm, draw_tfaces3D__setSelectOpts, &data);
 	setlinestyle(0);
-
-	dm->drawMappedEdges(dm, draw_tfaces3D__setActiveOpts, &data);
 
 	bglPolygonOffset(rv3d->dist, 0.0);	// resets correctly now, even after calling accumulated offsets
 
@@ -365,7 +383,7 @@ static void draw_textured_begin(Scene *scene, View3D *v3d, RegionView3D *rv3d, O
 	glShadeModel(GL_SMOOTH);
 }
 
-static void draw_textured_end()
+static void draw_textured_end(void)
 {
 	/* switch off textures */
 	GPU_set_tpage(NULL, 0);
@@ -508,10 +526,10 @@ static int draw_tface_mapped__set_draw(void *userData, int index)
 {
 	Mesh *me = (Mesh*)userData;
 	MTFace *tface = (me->mtface)? &me->mtface[index]: NULL;
-	MFace *mface = (me->mface)? &me->mface[index]: NULL;
+	MFace *mface = &me->mface[index];
 	MCol *mcol = (me->mcol)? &me->mcol[index]: NULL;
-	int matnr = me->mface[index].mat_nr;
-	if (mface && mface->flag&ME_HIDE) return 0;
+	const int matnr = mface->mat_nr;
+	if (mface->flag & ME_HIDE) return 0;
 	return draw_tface__set_draw(tface, mcol, matnr);
 }
 
@@ -643,20 +661,20 @@ void draw_mesh_textured(Scene *scene, View3D *v3d, RegionView3D *rv3d, Object *o
 	/* draw the textured mesh */
 	draw_textured_begin(scene, v3d, rv3d, ob);
 
+	glColor4f(1.0f,1.0f,1.0f,1.0f);
+
 	if(ob->mode & OB_MODE_EDIT) {
-		glColor4f(1.0f,1.0f,1.0f,1.0f);
 		dm->drawMappedFacesTex(dm, draw_em_tf_mapped__set_draw, me->edit_mesh);
 	} else if(faceselect) {
 		if(ob->mode & OB_MODE_WEIGHT_PAINT)
 			dm->drawMappedFaces(dm, wpaint__setSolidDrawOptions, me, 1, GPU_enable_material);
 		else
-			dm->drawMappedFacesTex(dm, draw_tface_mapped__set_draw, me);
+			dm->drawMappedFacesTex(dm, me->mface ? draw_tface_mapped__set_draw : NULL, me);
 	}
 	else {
 		if( GPU_buffer_legacy(dm) )
 			dm->drawFacesTex(dm, draw_tface__set_draw_legacy);
 		else {
-			glColor4f(1.0f,1.0f,1.0f,1.0f);
 			if( !CustomData_has_layer(&dm->faceData,CD_TEXTURE_MCOL) )
 				add_tface_color_layer(dm);
 			dm->drawFacesTex(dm, draw_tface__set_draw);
@@ -671,7 +689,7 @@ void draw_mesh_textured(Scene *scene, View3D *v3d, RegionView3D *rv3d, Object *o
 	
 	/* draw edges and selected faces over textured mesh */
 	if(!(ob == scene->obedit) && faceselect)
-		draw_tfaces3D(rv3d, me, dm);
+		draw_tfaces3D(rv3d, me, dm, ob->mode & OB_MODE_WEIGHT_PAINT);
 
 	/* reset from negative scale correction */
 	glFrontFace(GL_CCW);

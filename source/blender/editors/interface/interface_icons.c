@@ -28,6 +28,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 #ifndef WIN32
 #include <unistd.h>
@@ -454,7 +455,7 @@ static void vicon_move_down_draw(int x, int y, int w, int h, float UNUSED(alpha)
 	glDisable(GL_LINE_SMOOTH);
 }
 
-static void init_brush_icons()
+static void init_brush_icons(void)
 {
 
 #define INIT_BRUSH_ICON(icon_id, name)					     \
@@ -499,14 +500,14 @@ static void init_brush_icons()
 #undef INIT_BRUSH_ICON
 }
 
-static void init_internal_icons()
+static void init_internal_icons(void)
 {
 	bTheme *btheme= U.themes.first;
 	ImBuf *bbuf= NULL;
 	int x, y, icontype;
 	char iconfilestr[FILE_MAXDIR+FILE_MAXFILE];
 	
-	if ((btheme!=NULL) && (strlen(btheme->tui.iconfile) > 0)) {
+	if ((btheme!=NULL) && btheme->tui.iconfile[0]) {
 		char *datadir= BLI_get_folder(BLENDER_DATAFILES, NULL);
 		if (datadir) {
 			BLI_make_file_string("/", iconfilestr, datadir, btheme->tui.iconfile);
@@ -681,7 +682,7 @@ static void free_iconfile_list(struct ListBase *list)
 	}
 }
 
-int UI_iconfile_get_index(char *filename)
+int UI_iconfile_get_index(const char *filename)
 {
 	IconFile *ifile;
 	ListBase *list=&(iconfilelist);
@@ -730,7 +731,7 @@ void UI_icons_free_drawinfo(void *drawinfo)
 	}
 }
 
-static DrawInfo *icon_create_drawinfo()
+static DrawInfo *icon_create_drawinfo(void)
 {
 	DrawInfo *di = NULL;
 
@@ -845,6 +846,15 @@ static void icon_set_image(bContext *C, ID *id, PreviewImage* prv_img, int miple
 
 static void icon_draw_rect(float x, float y, int w, int h, float UNUSED(aspect), int rw, int rh, unsigned int *rect, float alpha, float *rgb, short is_preview)
 {
+	ImBuf *ima= NULL;
+
+	/* sanity check */
+	if(w<=0 || h<=0 || w>2000 || h>2000) {
+		printf("icon_draw_rect: icons are %i x %i pixels?\n", w, h);
+		assert(!"invalid icon size");
+		return;
+	}
+
 	/* modulate color */
 	if(alpha != 1.0f)
 		glPixelTransferf(GL_ALPHA_SCALE, alpha);
@@ -854,52 +864,27 @@ static void icon_draw_rect(float x, float y, int w, int h, float UNUSED(aspect),
 		glPixelTransferf(GL_GREEN_SCALE, rgb[1]);
 		glPixelTransferf(GL_BLUE_SCALE, rgb[2]);
 	}
-	
-	if(is_preview == 0) {
-		/* position */
-		glRasterPos2f(x,y);
+
+	/* rect contains image in 'rendersize', we only scale if needed */
+	if(rw!=w && rh!=h) {
+		/* first allocate imbuf for scaling and copy preview into it */
+		ima = IMB_allocImBuf(rw, rh, 32, IB_rect);
+		memcpy(ima->rect, rect, rw*rh*sizeof(unsigned int));	
+		IMB_scaleImBuf(ima, w, h); /* scale it */
+		rect= ima->rect;
 	}
 
 	/* draw */
-	if((w<1 || h<1)) {
-		// XXX - TODO 2.5 verify whether this case can happen
-		if (G.f & G_DEBUG)
-			printf("what the heck! - icons are %i x %i pixels?\n", w, h);
-	}
-	/* rect contains image in 'rendersize', we only scale if needed */
-	else if(rw!=w && rh!=h) {
-		if(w>2000 || h>2000) { /* something has gone wrong! */
-			if (G.f & G_DEBUG)
-				printf("insane icon size w=%d h=%d\n",w,h);
-		}
-		else {
-			ImBuf *ima;
-
-			/* first allocate imbuf for scaling and copy preview into it */
-			ima = IMB_allocImBuf(rw, rh, 32, IB_rect);
-			memcpy(ima->rect, rect, rw*rh*sizeof(unsigned int));	
-			
-			/* scale it */
-			IMB_scaleImBuf(ima, w, h);
-
-			if(is_preview) {
-				glaDrawPixelsSafe(x, y, w, h, w, GL_RGBA, GL_UNSIGNED_BYTE, ima->rect);
-			}
-			else {
-				glDrawPixels(w, h, GL_RGBA, GL_UNSIGNED_BYTE, ima->rect);
-			}
-
-			IMB_freeImBuf(ima);
-		}
+	if(is_preview) {
+		glaDrawPixelsSafe(x, y, w, h, w, GL_RGBA, GL_UNSIGNED_BYTE, rect);
 	}
 	else {
-		if(is_preview) {
-			glaDrawPixelsSafe(x, y, w, h, w, GL_RGBA, GL_UNSIGNED_BYTE, rect);
-		}
-		else {
-			glDrawPixels(w, h, GL_RGBA, GL_UNSIGNED_BYTE, rect);
-		}
+		glRasterPos2f(x, y);
+		glDrawPixels(w, h, GL_RGBA, GL_UNSIGNED_BYTE, rect);
 	}
+
+	if(ima)
+		IMB_freeImBuf(ima);
 
 	/* restore color */
 	if(alpha != 0.0f)
@@ -1041,30 +1026,46 @@ static int ui_id_brush_get_icon(bContext *C, ID *id, int preview)
 		BKE_icon_getid(id);
 		ui_id_icon_render(C, id, preview);
 	}
-	else if(!id->icon_id) {
-		/* no icon found, reset it */
-		
-		/* this is not nice, should probably make
-		   brushes be strictly in one paint mode only
-		   to avoid this kind of thing */
+	else {
 		Object *ob = CTX_data_active_object(C);
 		EnumPropertyItem *items;
-		int tool;
-		
-		if(ob && (ob->mode & OB_MODE_SCULPT)) {
+		int tool, mode = 0;
+
+		/* this is not nice, should probably make brushes be
+		   strictly in one paint mode only to avoid checking
+		   object mode here */
+
+		if(ob) {
+			if(ob->mode & OB_MODE_SCULPT)
+				mode = OB_MODE_SCULPT;
+			else if(ob->mode & (OB_MODE_VERTEX_PAINT|OB_MODE_WEIGHT_PAINT))
+				mode = OB_MODE_VERTEX_PAINT;
+			else if(ob->mode & OB_MODE_TEXTURE_PAINT)
+				mode = OB_MODE_TEXTURE_PAINT;
+		}
+
+		/* check if cached icon is OK */
+		if(!mode || (id->icon_id && mode == br->icon_mode))
+			return id->icon_id;
+
+		br->icon_mode = mode;
+
+		/* reset the icon */
+		if(mode == OB_MODE_SCULPT) {
 			items = brush_sculpt_tool_items;
 			tool = br->sculpt_tool;
 		}
-		else if(ob && (ob->mode & (OB_MODE_VERTEX_PAINT|OB_MODE_WEIGHT_PAINT))) {
+		else if(mode == OB_MODE_VERTEX_PAINT) {
 			items = brush_vertexpaint_tool_items;
 			tool = br->vertexpaint_tool;
 		}
-		else {
+		else if(mode == OB_MODE_TEXTURE_PAINT) {
 			items = brush_imagepaint_tool_items;
 			tool = br->imagepaint_tool;
 		}
 
-		RNA_enum_icon_from_value(items, tool, &id->icon_id);
+		if(!RNA_enum_icon_from_value(items, tool, &id->icon_id))
+			id->icon_id = 0;
 	}
 
 	return id->icon_id;

@@ -43,7 +43,7 @@
 
 #include "BKE_colortools.h"
 #include "BKE_curve.h"
-#include "BKE_ipo.h"
+#include "BKE_fcurve.h"
 #include "BKE_utildefines.h"
 
 #include "BLI_blenlib.h"
@@ -869,7 +869,7 @@ void curvemapping_do_ibuf(CurveMapping *cumap, ImBuf *ibuf)
 	if(ibuf->channels)
 		stride= ibuf->channels;
 	
-	for(pixel= ibuf->x*ibuf->y; pixel>0; pixel--, pix_in+=stride, pix_out+=4) {
+	for(pixel= ibuf->x*ibuf->y; pixel>0; pixel--, pix_in+=stride, pix_out+=stride) {
 		if(stride<3) {
 			col[0]= curvemap_evaluateF(cumap->cm, *pix_in);
 			
@@ -956,13 +956,11 @@ void curvemapping_table_RGBA(CurveMapping *cumap, float **array, int *size)
 
 DO_INLINE int get_bin_float(float f)
 {
-	int bin= (int)(f*255);
+	int bin= (int)((f*255) + 0.5);	/* 0.5 to prevent quantisation differences */
 
 	/* note: clamp integer instead of float to avoid problems with NaN */
 	CLAMP(bin, 0, 255);
-	
-	//return (int) (((f + 0.25) / 1.5) * 255);
-	
+
 	return bin;
 }
 
@@ -1004,7 +1002,8 @@ DO_INLINE void save_sample_line(Scopes *scopes, const int idx, const float fx, f
 
 void scopes_update(Scopes *scopes, ImBuf *ibuf, int use_color_management)
 {
-	int x, y, c, n, nl;
+	int x, y, c;
+	unsigned int n, nl;
 	double div, divl;
 	float *rf=NULL;
 	unsigned char *rc=NULL;

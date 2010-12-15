@@ -83,7 +83,7 @@ static CustomDataMask requiredDataMask(Object *UNUSED(ob), ModifierData *md)
 	CustomDataMask dataMask = 0;
 
 	/* ask for vertexgroups if we need them */
-	if(mmd->defgrp_name[0]) dataMask |= (1 << CD_MDEFORMVERT);
+	if(mmd->defgrp_name[0]) dataMask |= CD_MASK_MDEFORMVERT;
 
 	return dataMask;
 }
@@ -347,7 +347,7 @@ static void deformVerts(ModifierData *md, Object *ob,
 						int UNUSED(useRenderParams),
 						int UNUSED(isFinalCalc))
 {
-	DerivedMesh *dm= get_dm(ob, NULL, derivedData, NULL, 0);;
+	DerivedMesh *dm= get_dm(ob, NULL, derivedData, NULL, 0);
 
 	modifier_vgroup_cache(md, vertexCos); /* if next modifier needs original vertices */
 	
@@ -363,7 +363,7 @@ static void deformVertsEM(ModifierData *md, Object *ob,
 						float (*vertexCos)[3],
 						int numVerts)
 {
-	DerivedMesh *dm= get_dm(ob, NULL, derivedData, NULL, 0);;
+	DerivedMesh *dm= get_dm(ob, NULL, derivedData, NULL, 0);
 
 	meshdeformModifier_do(md, ob, dm, vertexCos, numVerts);
 

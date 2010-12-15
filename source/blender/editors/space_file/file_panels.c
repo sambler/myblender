@@ -33,6 +33,7 @@
 
 #include "DNA_screen_types.h"
 #include "DNA_space_types.h"
+#include "DNA_userdef_types.h"
 
 #include "MEM_guardedalloc.h"
 
@@ -67,7 +68,6 @@ static void file_panel_category(const bContext *C, Panel *pa, FSMenuCategory cat
 	uiBut *but;
 	uiLayout *box, *col;
 	struct FSMenu* fsmenu = fsmenu_get();
-	char *curdir= (sfile->params)? sfile->params->dir: "";
 	int i, i_iter, nentries = fsmenu_get_nentries(fsmenu, category);
 
 	/* reset each time */
@@ -94,8 +94,11 @@ static void file_panel_category(const bContext *C, Panel *pa, FSMenuCategory cat
 		entry = fsmenu_get_entry(fsmenu, category, i);
 		
 		/* set this list item as active if we have a match */
-		if(strcmp(curdir, entry) == 0)
-			*nr= i;
+		if(sfile->params) {
+			if(strcmp(sfile->params->dir, entry) == 0) {
+				*nr= i;
+			}
+		}
 
 		/* create nice bookmark name, shows last directory in the full path currently */
 		BLI_strncpy(temp, entry, FILE_MAX);
@@ -146,8 +149,11 @@ static void file_panel_recent(const bContext *C, Panel *pa)
 {
 	SpaceFile *sfile= CTX_wm_space_file(C);
 
-	if(sfile)
-		file_panel_category(C, pa, FS_CATEGORY_RECENT, &sfile->recentnr, ICON_FILE_FOLDER, 0, 1);
+	if(sfile) {
+		if ( !(U.uiflag & USER_HIDE_RECENT) ) {
+			file_panel_category(C, pa, FS_CATEGORY_RECENT, &sfile->recentnr, ICON_FILE_FOLDER, 0, 1);
+		}
+	}
 }
 
 

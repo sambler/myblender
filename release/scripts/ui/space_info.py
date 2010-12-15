@@ -28,6 +28,7 @@ class INFO_HT_header(bpy.types.Header):
 
         wm = context.window_manager
         window = context.window
+        sinfo = context.space_data
         scene = context.scene
         rd = scene.render
 
@@ -69,6 +70,35 @@ class INFO_HT_header(bpy.types.Header):
         layout.operator("wm.window_fullscreen_toggle", icon='FULLSCREEN_ENTER', text="")
 
 
+        # XXX: BEFORE RELEASE, MOVE FILE MENU OUT OF INFO!!!
+        """
+        row = layout.row(align=True)
+        row.prop(sinfo, "show_report_debug", text="Debug")
+        row.prop(sinfo, "show_report_info", text="Info")
+        row.prop(sinfo, "show_report_operator", text="Operators")
+        row.prop(sinfo, "show_report_warning", text="Warnings")
+        row.prop(sinfo, "show_report_error", text="Errors")
+
+        row = layout.row()
+        row.enabled = sinfo.show_report_operator
+        row.operator("info.report_replay")
+        
+        row.menu("INFO_MT_report")
+        """
+
+
+class INFO_MT_report(bpy.types.Menu):
+    bl_label = "Report"
+
+    def draw(self, context):
+        layout = self.layout
+        layout.column()
+        layout.operator("console.select_all_toggle")
+        layout.operator("console.select_border")
+        layout.operator("console.report_delete")
+        layout.operator("console.report_copy")
+
+
 class INFO_MT_file(bpy.types.Menu):
     bl_label = "File"
 
@@ -97,6 +127,7 @@ class INFO_MT_file(bpy.types.Menu):
         layout.operator("screen.userpref_show", text="User Preferences...", icon='PREFERENCES')
 
         layout.operator_context = 'EXEC_AREA'
+        layout.operator("wm.save_homefile")
         layout.operator("wm.read_factory_settings")
 
         layout.separator()
@@ -219,18 +250,6 @@ class INFO_MT_surface_add(bpy.types.Menu):
         layout.operator("surface.primitive_nurbs_surface_sphere_add", icon='SURFACE_NSPHERE', text="NURBS Sphere")
         layout.operator("surface.primitive_nurbs_surface_torus_add", icon='SURFACE_NTORUS', text="NURBS Torus")
 
-class INFO_MT_curve_handle_type_set(bpy.types.Menu):
-    bl_idname = "INFO_MT_curve_handle_type_set"
-    bl_label = "Handle Type"
-
-    def draw(self, context):
-        layout = self.layout
-        layout.operator_context = 'INVOKE_REGION_WIN'
-        layout.operator("curve.handle_type_set", text="Automatic").type = "AUTOMATIC"
-        layout.operator("curve.handle_type_set", text="Vector").type = "VECTOR"
-        layout.operator("curve.handle_type_set", text="Align").type = "ALIGN"
-        layout.operator("curve.handle_type_set", text="Free Align").type = "FREE_ALIGN"
-
 
 class INFO_MT_armature_add(bpy.types.Menu):
     bl_idname = "INFO_MT_armature_add"
@@ -347,6 +366,9 @@ class INFO_MT_help(bpy.types.Menu):
         layout.operator("help.operator_cheat_sheet", icon='TEXT')
         layout.operator("wm.sysinfo", icon='TEXT')
         layout.separator()
+        if bpy.app.build_platform[0:7] == 'Windows':
+            layout.operator("wm.toggle_console", icon='CONSOLE')
+            layout.separator()
         layout.operator("anim.update_data_paths", text="FCurve/Driver 2.54 fix", icon='HELP')
         layout.separator()
         layout.operator("wm.splash")

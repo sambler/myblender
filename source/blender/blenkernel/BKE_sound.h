@@ -38,16 +38,16 @@ struct ListBase;
 struct Main;
 struct Sequence;
 
-void sound_init_once();
+void sound_init_once(void);
 
 void sound_init(struct Main *main);
 
-void sound_exit();
+void sound_exit(void);
 
 void sound_force_device(int device);
 int sound_define_from_str(char *str);
 
-struct bSound* sound_new_file(struct Main *main, char* filename);
+struct bSound* sound_new_file(struct Main *main, const char *filename);
 
 // XXX unused currently
 #if 0
@@ -62,7 +62,7 @@ void sound_cache(struct bSound* sound, int ignore);
 
 void sound_delete_cache(struct bSound* sound);
 
-void sound_load(struct bSound* sound);
+void sound_load(struct Main *main, struct bSound* sound);
 
 void sound_free(struct bSound* sound);
 

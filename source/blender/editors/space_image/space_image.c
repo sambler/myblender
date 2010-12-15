@@ -225,9 +225,18 @@ void ED_space_image_uv_aspect(SpaceImage *sima, float *aspx, float *aspy)
 	
 	ED_space_image_aspect(sima, aspx, aspy);
 	ED_space_image_size(sima, &w, &h);
+
+	*aspx *= (float)w;
+	*aspy *= (float)h;
 	
-	*aspx *= (float)w/256.0f;
-	*aspy *= (float)h/256.0f;
+	if(*aspx < *aspy) {
+		*aspy= *aspy / *aspx;
+		*aspx= 1.0f;
+	}
+	else {
+		*aspx= *aspx / *aspy;
+		*aspy= 1.0f;		
+	}
 }
 
 void ED_image_uv_aspect(Image *ima, float *aspx, float *aspy)
@@ -471,7 +480,7 @@ void image_operatortypes(void)
 
 	WM_operatortype_append(IMAGE_OT_cycle_render_slot);
     WM_operatortype_append(IMAGE_OT_select_render_slot);
-    
+
 	WM_operatortype_append(IMAGE_OT_sample);
 	WM_operatortype_append(IMAGE_OT_sample_line);
 	WM_operatortype_append(IMAGE_OT_curves_point_set);
@@ -497,8 +506,9 @@ void image_keymap(struct wmKeyConfig *keyconf)
 	WM_keymap_add_item(keymap, "IMAGE_OT_scopes", PKEY, KM_PRESS, 0, 0);
 
 	RNA_int_set(WM_keymap_add_item(keymap, "IMAGE_OT_cycle_render_slot", JKEY, KM_PRESS, 0, 0)->ptr, "slot_cycle", 1);
+	RNA_int_set(WM_keymap_add_item(keymap, "IMAGE_OT_cycle_render_slot", JKEY, KM_PRESS, KM_ALT, 0)->ptr, "slot_cycle", -1);
 	RNA_int_set(WM_keymap_add_item(keymap, "IMAGE_OT_cycle_render_slot", HKEY, KM_PRESS, 0, 0)->ptr, "slot_cycle", -1);
-
+	
     RNA_int_set(WM_keymap_add_item(keymap, "IMAGE_OT_select_render_slot", ONEKEY, KM_PRESS, 0, 0)->ptr, "render_slot", 0);
 	RNA_int_set(WM_keymap_add_item(keymap, "IMAGE_OT_select_render_slot", TWOKEY, KM_PRESS, 0, 0)->ptr, "render_slot", 1);
 	RNA_int_set(WM_keymap_add_item(keymap, "IMAGE_OT_select_render_slot", THREEKEY, KM_PRESS, 0, 0)->ptr, "render_slot", 2);
@@ -646,19 +656,24 @@ static void image_listener(ScrArea *sa, wmNotifier *wmn)
 			switch(wmn->data) {
 				case ND_DATA:
 				case ND_SELECT:
+					image_scopes_tag_refresh(sa);
 					ED_area_tag_refresh(sa);
 					ED_area_tag_redraw(sa);
 					break;
 			}
 		case NC_OBJECT:
+		{
+			Object *ob= (Object *)wmn->reference;
 			switch(wmn->data) {
 				case ND_TRANSFORM:
-					if(sima->lock && (sima->flag & SI_DRAWSHADOW)) {
+				case ND_MODIFIER:
+					if(ob && (ob->mode & OB_MODE_EDIT) && sima->lock && (sima->flag & SI_DRAWSHADOW)) {
 						ED_area_tag_refresh(sa);
 						ED_area_tag_redraw(sa);
 					}
 					break;
 			}
+		}
 	}
 }
 

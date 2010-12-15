@@ -30,5 +30,4 @@
 
 SOURCEDIR = source/blender/modifiers
 DIRS = intern
-
 include nan_subdirs.mk

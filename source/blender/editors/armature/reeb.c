@@ -442,7 +442,7 @@ void flipArc(ReebArc *arc)
 }
 
 #ifdef DEBUG_REEB_NODE
-void NodeDegreeDecrement(ReebGraph *rg, ReebNode *node)
+void NodeDegreeDecrement(ReebGraph *UNUSED(rg), ReebNode *node)
 {
 	node->degree--;
 
@@ -452,7 +452,7 @@ void NodeDegreeDecrement(ReebGraph *rg, ReebNode *node)
 //	}
 }
 
-void NodeDegreeIncrement(ReebGraph *rg, ReebNode *node)
+void NodeDegreeIncrement(ReebGraph *UNUSED(rg), ReebNode *node)
 {
 //	if (node->degree == 0)
 //	{
@@ -523,7 +523,7 @@ void verifyNodeDegree(ReebGraph *rg)
 #endif
 }
 
-void verifyBucketsArc(ReebGraph *rg, ReebArc *arc)
+void verifyBucketsArc(ReebGraph *UNUSED(rg), ReebArc *arc)
 {
 	ReebNode *head = (ReebNode*)arc->head;
 	ReebNode *tail = (ReebNode*)arc->tail;
@@ -603,7 +603,7 @@ void verifyMultiResolutionLinks(ReebGraph *rg, int level)
 		{
 			if (BLI_findindex(&lower_rg->arcs, arc->link_up) == -1)
 			{
-				printf("missing arc %p for level %i\n", arc->link_up, level);
+				printf("missing arc %p for level %i\n", (void *)arc->link_up, level);
 				printf("Source arc was ---\n");
 				printArc(arc);
 
@@ -1723,7 +1723,7 @@ int filterCyclesReebGraph(ReebGraph *rg, float UNUSED(distance_threshold))
 	return filtered;
 }
 
-int filterSmartReebGraph(ReebGraph *rg, float UNUSED(threshold))
+int filterSmartReebGraph(ReebGraph *UNUSED(rg), float UNUSED(threshold))
 {
 	int value = 0;
 #if 0 //XXX
@@ -2018,7 +2018,7 @@ void spreadWeight(EditMesh *em)
 
 /******************************************** EXPORT ***************************************************/
 
-void exportNode(FILE *f, char *text, ReebNode *node)
+void exportNode(FILE *f, const char *text, ReebNode *node)
 {
 	fprintf(f, "%s i:%i w:%f d:%i %f %f %f\n", text, node->index, node->weight, node->degree, node->p[0], node->p[1], node->p[2]);
 }
@@ -2180,7 +2180,7 @@ void addFacetoArc(ReebArc *arc, EditFace *efa)
 	BLI_ghash_insert(arc->faces, efa, efa);
 }
 
-void mergeArcFaces(ReebGraph *rg, ReebArc *aDst, ReebArc *aSrc)
+void mergeArcFaces(ReebGraph *UNUSED(rg), ReebArc *aDst, ReebArc *aSrc)
 {
 	GHashIterator ghi;
 	

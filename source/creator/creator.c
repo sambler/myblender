@@ -57,8 +57,7 @@
 
 #include "BLI_args.h"
 #include "BLI_threads.h"
-
-#include "GEN_messaging.h"
+#include "BLI_scanfill.h" // for BLI_setErrorCallBack, TODO, move elsewhere
 
 #include "DNA_ID.h"
 #include "DNA_scene_types.h"
@@ -80,7 +79,7 @@
 
 #include "IMB_imbuf.h"	// for IMB_init
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 #include "BPY_extern.h"
 #endif
 
@@ -97,7 +96,12 @@
 #include "GPU_extensions.h"
 
 /* for passing information between creator and gameengine */
+#ifdef WITH_GAMEENGINE
+#include "GEN_messaging.h"
 #include "SYS_System.h"
+#else /* dummy */
+#define SYS_SystemHandle int
+#endif
 
 #include <signal.h>
 
@@ -118,6 +122,10 @@ extern char build_time[];
 extern char build_rev[];
 extern char build_platform[];
 extern char build_type[];
+extern char build_cflags[];
+extern char build_cxxflags[];
+extern char build_linkflags[];
+extern char build_system[];
 #endif
 
 /*	Local Function prototypes */
@@ -138,7 +146,7 @@ static void setCallbacks(void);
 
 /* set breakpoints here when running in debug mode, useful to catch floating point errors */
 #if defined(__sgi) || defined(__linux__) || defined(_WIN32) || OSX_SSE_FPE
-static void fpe_handler(int sig)
+static void fpe_handler(int UNUSED(sig))
 {
 	// printf("SIGFPE trapped\n");
 }
@@ -175,7 +183,7 @@ static void strip_quotes(char *str)
 }
 #endif
 
-static int print_version(int argc, char **argv, void *data)
+static int print_version(int UNUSED(argc), char **UNUSED(argv), void *UNUSED(data))
 {
 	printf (BLEND_VERSION_STRING_FMT);
 #ifdef BUILD_DATE
@@ -184,13 +192,17 @@ static int print_version(int argc, char **argv, void *data)
 	printf ("\tbuild revision: %s\n", build_rev);
 	printf ("\tbuild platform: %s\n", build_platform);
 	printf ("\tbuild type: %s\n", build_type);
+	printf ("\tbuild c flags: %s\n", build_cflags);
+	printf ("\tbuild c++ flags: %s\n", build_cxxflags);
+	printf ("\tbuild link flags: %s\n", build_linkflags);
+	printf ("\tbuild system: %s\n", build_system);
 #endif
 	exit(0);
 
 	return 0;
 }
 
-static int print_help(int argc, char **argv, void *data)
+static int print_help(int UNUSED(argc), char **UNUSED(argv), void *data)
 {
 	bArgs *ba = (bArgs*)data;
 
@@ -317,30 +329,30 @@ double PIL_check_seconds_timer(void);
 	}
 }*/
 
-static int end_arguments(int argc, char **argv, void *data)
+static int end_arguments(int UNUSED(argc), char **UNUSED(argv), void *UNUSED(data))
 {
 	return -1;
 }
 
-static int enable_python(int argc, char **argv, void *data)
+static int enable_python(int UNUSED(argc), char **UNUSED(argv), void *UNUSED(data))
 {
 	G.f |= G_SCRIPT_AUTOEXEC;
 	return 0;
 }
 
-static int disable_python(int argc, char **argv, void *data)
+static int disable_python(int UNUSED(argc), char **UNUSED(argv), void *UNUSED(data))
 {
 	G.f &= ~G_SCRIPT_AUTOEXEC;
 	return 0;
 }
 
-static int background_mode(int argc, char **argv, void *data)
+static int background_mode(int UNUSED(argc), char **UNUSED(argv), void *UNUSED(data))
 {
 	G.background = 1;
 	return 0;
 }
 
-static int debug_mode(int argc, char **argv, void *data)
+static int debug_mode(int UNUSED(argc), char **UNUSED(argv), void *data)
 {
 	G.f |= G_DEBUG;		/* std output printf's */
 	printf(BLEND_VERSION_STRING_FMT);
@@ -354,7 +366,7 @@ static int debug_mode(int argc, char **argv, void *data)
 	return 0;
 }
 
-static int set_fpe(int argc, char **argv, void *data)
+static int set_fpe(int UNUSED(argc), char **UNUSED(argv), void *UNUSED(data))
 {
 #if defined(__sgi) || defined(__linux__) || defined(_WIN32) || OSX_SSE_FPE
 	/* zealous but makes float issues a heck of a lot easier to find!
@@ -379,7 +391,7 @@ static int set_fpe(int argc, char **argv, void *data)
 	return 0;
 }
 
-static int playback_mode(int argc, char **argv, void *data)
+static int playback_mode(int UNUSED(argc), char **UNUSED(argv), void *UNUSED(data))
 {
 	/* not if -b was given first */
 	if (G.background == 0) {
@@ -391,7 +403,7 @@ static int playback_mode(int argc, char **argv, void *data)
 	return -2;
 }
 
-static int prefsize(int argc, char **argv, void *data)
+static int prefsize(int argc, char **argv, void *UNUSED(data))
 {
 	int stax, stay, sizx, sizy;
 
@@ -410,30 +422,35 @@ static int prefsize(int argc, char **argv, void *data)
 	return 4;
 }
 
-static int with_borders(int argc, char **argv, void *data)
+static int with_borders(int UNUSED(argc), char **UNUSED(argv), void *UNUSED(data))
 {
 	WM_setinitialstate_normal();
 	return 0;
 }
 
-static int without_borders(int argc, char **argv, void *data)
+static int without_borders(int UNUSED(argc), char **UNUSED(argv), void *UNUSED(data))
 {
 	WM_setinitialstate_fullscreen();
 	return 0;
 }
 
-static int register_extension(int argc, char **argv, void *data)
+static int register_extension(int UNUSED(argc), char **UNUSED(argv), void *data)
 {
 #ifdef WIN32
 	char *path = BLI_argsArgv(data)[0];
 	RegisterBlendExtension(path);
+#else
+	(void)data; /* unused */
 #endif
 
 	return 0;
 }
 
-static int no_joystick(int argc, char **argv, void *data)
+static int no_joystick(int UNUSED(argc), char **UNUSED(argv), void *data)
 {
+#ifndef WITH_GAMEENGINE
+	(void)data;
+#else
 	SYS_SystemHandle *syshandle = data;
 
 	/**
@@ -442,23 +459,24 @@ static int no_joystick(int argc, char **argv, void *data)
 	*/
 	SYS_WriteCommandLineInt(*syshandle, "nojoystick",1);
 	if (G.f & G_DEBUG) printf("disabling nojoystick\n");
+#endif
 
 	return 0;
 }
 
-static int no_glsl(int argc, char **argv, void *data)
+static int no_glsl(int UNUSED(argc), char **UNUSED(argv), void *UNUSED(data))
 {
 	GPU_extensions_disable();
 	return 0;
 }
 
-static int no_audio(int argc, char **argv, void *data)
+static int no_audio(int UNUSED(argc), char **UNUSED(argv), void *UNUSED(data))
 {
 	sound_force_device(0);
 	return 0;
 }
 
-static int set_audio(int argc, char **argv, void *data)
+static int set_audio(int argc, char **argv, void *UNUSED(data))
 {
 	if (argc < 1) {
 		printf("-setaudio require one argument\n");
@@ -583,7 +601,7 @@ static int set_image_type(int argc, char **argv, void *data)
 	}
 }
 
-static int set_threads(int argc, char **argv, void *data)
+static int set_threads(int argc, char **argv, void *UNUSED(data))
 {
 	if (argc >= 1) {
 		if(G.background) {
@@ -623,8 +641,13 @@ static int set_extension(int argc, char **argv, void *data)
 
 static int set_ge_parameters(int argc, char **argv, void *data)
 {
-	SYS_SystemHandle syshandle = *(SYS_SystemHandle*)data;
 	int a = 0;
+#ifdef WITH_GAMEENGINE
+	SYS_SystemHandle syshandle = *(SYS_SystemHandle*)data;
+#else
+	(void)data;
+#endif
+
 /**
 gameengine parameters are automaticly put into system
 -g [paramname = value]
@@ -645,7 +668,9 @@ example:
 			{
 				a++;
 				/* assignment */
+#ifdef WITH_GAMEENGINE
 				SYS_WriteCommandLineString(syshandle,paramname,argv[a]);
+#endif
 			}  else
 			{
 				printf("error: argument assignment (%s) without value.\n",paramname);
@@ -654,8 +679,9 @@ example:
 			/* name arg eaten */
 
 		} else {
+#ifdef WITH_GAMEENGINE
 			SYS_WriteCommandLineInt(syshandle,argv[a],1);
-
+#endif
 			/* doMipMap */
 			if (!strcmp(argv[a],"nomipmap"))
 			{
@@ -714,7 +740,7 @@ static int render_frame(int argc, char **argv, void *data)
 	}
 }
 
-static int render_animation(int argc, char **argv, void *data)
+static int render_animation(int UNUSED(argc), char **UNUSED(argv), void *data)
 {
 	bContext *C = data;
 	if (CTX_data_scene(C)) {
@@ -803,7 +829,7 @@ static int set_skip_frame(int argc, char **argv, void *data)
 }
 
 /* macro for ugly context setup/reset */
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 #define BPY_CTX_SETUP(_cmd) \
 { \
 	wmWindowManager *wm= CTX_wm_manager(C); \
@@ -821,11 +847,11 @@ static int set_skip_frame(int argc, char **argv, void *data)
 	CTX_data_scene_set(C, prevscene); \
 } \
 
-#endif /* DISABLE_PYTHON */
+#endif /* WITH_PYTHON */
 
 static int run_python(int argc, char **argv, void *data)
 {
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 	bContext *C = data;
 
 	/* workaround for scripts not getting a bpy.context.scene, causes internal errors elsewhere */
@@ -843,14 +869,15 @@ static int run_python(int argc, char **argv, void *data)
 		return 0;
 	}
 #else
+	(void)argc; (void)argv; (void)data; /* unused */
 	printf("This blender was built without python support\n");
 	return 0;
-#endif /* DISABLE_PYTHON */
+#endif /* WITH_PYTHON */
 }
 
-static int run_python_console(int argc, char **argv, void *data)
+static int run_python_console(int UNUSED(argc), char **argv, void *data)
 {
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 	bContext *C = data;	
 	const char *expr= "__import__('code').interact()";
 
@@ -858,12 +885,13 @@ static int run_python_console(int argc, char **argv, void *data)
 
 	return 0;
 #else
+	(void)argv; (void)data; /* unused */
 	printf("This blender was built without python support\n");
 	return 0;
-#endif /* DISABLE_PYTHON */
+#endif /* WITH_PYTHON */
 }
 
-static int load_file(int argc, char **argv, void *data)
+static int load_file(int UNUSED(argc), char **argv, void *data)
 {
 	bContext *C = data;
 
@@ -879,6 +907,16 @@ static int load_file(int argc, char **argv, void *data)
 		pointcache works */
 		if (retval!=0) {
 			wmWindowManager *wm= CTX_wm_manager(C);
+
+			/* special case, 2.4x files */
+			if(wm==NULL && CTX_data_main(C)->wm.first==NULL) {
+				extern void wm_add_default(bContext *C);
+
+				/* wm_add_default() needs the screen to be set. */
+				CTX_wm_screen_set(C, CTX_data_main(C)->screen.first);
+				wm_add_default(C);
+			}
+
 			CTX_wm_manager_set(C, NULL); /* remove wm to force check */
 			WM_check(C);
 			G.relbase_valid = 1;
@@ -886,8 +924,9 @@ static int load_file(int argc, char **argv, void *data)
 		}
 
 		/* WM_read_file() runs normally but since we're in background mode do here */
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 		/* run any texts that were loaded in and flagged as modules */
+		BPY_reset_driver();
 		BPY_load_user_modules(C);
 #endif
 
@@ -938,9 +977,9 @@ void setupArguments(bContext *C, bArgs *ba, SYS_SystemHandle *syshandle)
 
 	static char game_doc[] = "Game Engine specific options"
 		"\n\t-g fixedtime\t\tRun on 50 hertz without dropping frames"
-		"\n\t-g vertexarrays\tUse Vertex Arrays for rendering (usually faster)"
+		"\n\t-g vertexarrays\t\tUse Vertex Arrays for rendering (usually faster)"
 		"\n\t-g nomipmap\t\tNo Texture Mipmapping"
-		"\n\t-g linearmipmap\tLinear Texture Mipmapping instead of Nearest (default)";
+		"\n\t-g linearmipmap\t\tLinear Texture Mipmapping instead of Nearest (default)";
 
 	static char debug_doc[] = "\n\tTurn debugging on\n"
 		"\n\t* Prints every operator call and their arguments"
@@ -972,7 +1011,7 @@ void setupArguments(bContext *C, bArgs *ba, SYS_SystemHandle *syshandle)
 	/* second pass: custom window stuff */
 	BLI_argsAdd(ba, 2, "-p", "--window-geometry", "<sx> <sy> <w> <h>\n\tOpen with lower left corner at <sx>, <sy> and width and height as <w>, <h>", prefsize, NULL);
 	BLI_argsAdd(ba, 2, "-w", "--window-border", "\n\tForce opening with borders (default)", with_borders, NULL);
-	BLI_argsAdd(ba, 2, "-W", "--window-borderless", "\n\tForce opening with without borders", without_borders, NULL);
+	BLI_argsAdd(ba, 2, "-W", "--window-borderless", "\n\tForce opening without borders", without_borders, NULL);
 	BLI_argsAdd(ba, 2, "-R", NULL, "\n\tRegister .blend extension (windows only)", register_extension, ba);
 
 	/* third pass: disabling things and forcing settings */
@@ -1038,11 +1077,15 @@ int main(int argc, char **argv)
 	BLI_where_am_i(bprogname, argv[0]);
 	
 #ifdef BUILD_DATE	
-    strip_quotes(build_date);
-    strip_quotes(build_time);
-    strip_quotes(build_rev);
-    strip_quotes(build_platform);
-    strip_quotes(build_type);
+	strip_quotes(build_date);
+	strip_quotes(build_time);
+	strip_quotes(build_rev);
+	strip_quotes(build_platform);
+	strip_quotes(build_type);
+	strip_quotes(build_cflags);
+	strip_quotes(build_cxxflags);
+	strip_quotes(build_linkflags);
+	strip_quotes(build_system);
 #endif
 
 	BLI_threadapi_init();
@@ -1061,8 +1104,12 @@ int main(int argc, char **argv)
 
 	IMB_init();
 
+#ifdef WITH_GAMEENGINE
 	syshandle = SYS_GetSystem();
 	GEN_init_messaging_system();
+#else
+	syshandle= 0;
+#endif
 
 	/* first test for background */
 	ba = BLI_argsInit(argc, argv); /* skip binary path */
@@ -1098,13 +1145,6 @@ int main(int argc, char **argv)
 
 #ifndef DISABLE_SDL
 	BLI_setenv("SDL_VIDEODRIVER", "dummy");
-/* I think this is not necessary anymore (04-24-2010 neXyon)
-#ifdef __linux__
-	// On linux the default SDL driver dma often would not play
-	// use alsa if none is set
-	setenv("SDL_AUDIODRIVER", "alsa", 0);
-#endif
-*/
 #endif
 	}
 	else {
@@ -1114,7 +1154,7 @@ int main(int argc, char **argv)
 
 		BLI_where_is_temp( btempdir, 0 ); /* call after loading the startup.blend so we can read U.tempdir */
 	}
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 	/**
 	 * NOTE: the U.pythondir string is NULL until WM_init() is executed,
 	 * so we provide the BPY_ function below to append the user defined
@@ -1125,7 +1165,8 @@ int main(int argc, char **argv)
 	 */
 
 	// TODO - U.pythondir
-
+#else
+	printf("\n* WARNING * - Blender compiled without Python!\nthis is not intended for typical usage\n\n");
 #endif
 	
 	CTX_py_init_set(C, 1);

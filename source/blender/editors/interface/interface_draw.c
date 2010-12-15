@@ -33,6 +33,7 @@
 #include "DNA_screen_types.h"
 
 #include "BLI_math.h"
+#include "BLI_rect.h"
 
 #include "BKE_colortools.h"
 #include "BKE_texture.h"
@@ -385,7 +386,7 @@ void uiRoundRectFakeAA(float minx, float miny, float maxx, float maxy, float rad
 	float raddiff;
 	int i, passes=4;
 	
-	/* get the colour and divide up the alpha */
+	/* get the color and divide up the alpha */
 	glGetFloatv(GL_CURRENT_COLOR, color);
 	alpha = 1; //color[3];
 	color[3]= 0.5*alpha/(float)passes;
@@ -517,7 +518,7 @@ static void ui_draw_but_CHARTAB(uiBut *but)
 	int charmax = G.charmax;
 	
 	/* <builtin> font in use. There are TTF <builtin> and non-TTF <builtin> fonts */
-	if(!strcmp(G.selfont->name, "<builtin>"))
+	if(!strcmp(G.selfont->name, FO_BUILTIN_NAME))
 	{
 		if(G.ui_international == TRUE)
 		{
@@ -548,8 +549,8 @@ static void ui_draw_but_CHARTAB(uiBut *but)
 
 	cs = G.charstart;
 
-	/* Set the font, in case it is not <builtin> font */
-	if(G.selfont && strcmp(G.selfont->name, "<builtin>"))
+	/* Set the font, in case it is not FO_BUILTIN_NAME font */
+	if(G.selfont && strcmp(G.selfont->name, FO_BUILTIN_NAME))
 	{
 		char tmpStr[256];
 
@@ -564,7 +565,7 @@ static void ui_draw_but_CHARTAB(uiBut *but)
 			int err;
 
 			strcpy(tmpStr, G.selfont->name);
-			BLI_path_abs(tmpStr, G.sce);
+			BLI_path_abs(tmpStr, G.main->name);
 			err = FTF_SetFont((unsigned char *)tmpStr, 0, 14.0);
 		}
 	}
@@ -605,9 +606,9 @@ static void ui_draw_but_CHARTAB(uiBut *but)
 			memset(wstr, 0, sizeof(wchar_t)*2);
 			memset(ustr, 0, 16);
 
-			// Set the font to be either unicode or <builtin>				
+			// Set the font to be either unicode or FO_BUILTIN_NAME	
 			wstr[0] = cs;
-			if(strcmp(G.selfont->name, "<builtin>"))
+			if(strcmp(G.selfont->name, FO_BUILTIN_NAME))
 			{
 				wcs2utf8s((char *)ustr, (wchar_t *)wstr);
 			}
@@ -624,7 +625,7 @@ static void ui_draw_but_CHARTAB(uiBut *but)
 				}
 			}
 
-			if((G.selfont && strcmp(G.selfont->name, "<builtin>")) || (G.selfont && !strcmp(G.selfont->name, "<builtin>") && G.ui_international == TRUE))
+			if((G.selfont && strcmp(G.selfont->name, FO_BUILTIN_NAME)) || (G.selfont && !strcmp(G.selfont->name, FO_BUILTIN_NAME) && G.ui_international == TRUE))
 			{
 				float wid;
 				float llx, lly, llz, urx, ury, urz;
@@ -807,7 +808,7 @@ void ui_draw_but_WAVEFORM(ARegion *ar, uiBut *but, uiWidgetColors *UNUSED(wcol),
 	int i, c;
 	float w, w3, h, alpha, yofs;
 	GLint scissor[4];
-	float colors[3][3] = {{1,0,0},{0,1,0},{0,0,1}};
+	float colors[3][3]= MAT3_UNITY;
 	float colorsycc[3][3] = {{1,0,1},{1,1,0},{0,1,1}};
 	float colors_alpha[3][3], colorsycc_alpha[3][3]; /* colors  pre multiplied by alpha for speed up */
 	float min, max;
@@ -855,7 +856,7 @@ void ui_draw_but_WAVEFORM(ARegion *ar, uiBut *but, uiWidgetColors *UNUSED(wcol),
 		sprintf(str,"%-3d",i*20);
 		str[3]='\0';
 		fdrawline(rect.xmin+22, yofs+(i/5.f)*h, rect.xmax+1, yofs+(i/5.f)*h);
-		BLF_draw_default(rect.xmin+1, yofs-5+(i/5.f)*h, 0, str);
+		BLF_draw_default(rect.xmin+1, yofs-5+(i/5.f)*h, 0, str, sizeof(str)-1);
 		/* in the loop because blf_draw reset it */
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
@@ -1355,6 +1356,7 @@ void ui_draw_but_CURVE(ARegion *ar, uiBut *but, uiWidgetColors *wcol, rcti *rect
 	CurveMapPoint *cmp;
 	float fx, fy, fac[2], zoomx, zoomy, offsx, offsy;
 	GLint scissor[4];
+	rcti scissor_new;
 	int a;
 
 	cumap= (CurveMapping *)(but->editcumap? but->editcumap: but->poin);
@@ -1362,7 +1364,12 @@ void ui_draw_but_CURVE(ARegion *ar, uiBut *but, uiWidgetColors *wcol, rcti *rect
 	
 	/* need scissor test, curve can draw outside of boundary */
 	glGetIntegerv(GL_VIEWPORT, scissor);
-	glScissor(ar->winrct.xmin + rect->xmin, ar->winrct.ymin+rect->ymin, rect->xmax-rect->xmin, rect->ymax-rect->ymin);
+	scissor_new.xmin= ar->winrct.xmin + rect->xmin;
+	scissor_new.ymin= ar->winrct.ymin + rect->ymin;
+	scissor_new.xmax= ar->winrct.xmin + rect->xmax;
+	scissor_new.ymax= ar->winrct.ymin + rect->ymax;
+	BLI_isect_rcti(&scissor_new, &ar->winrct, &scissor_new);
+	glScissor(scissor_new.xmin, scissor_new.ymin, scissor_new.xmax-scissor_new.xmin, scissor_new.ymax-scissor_new.ymin);
 	
 	/* calculate offset and zoom */
 	zoomx= (rect->xmax-rect->xmin-2.0*but->aspect)/(cumap->curr.xmax - cumap->curr.xmin);

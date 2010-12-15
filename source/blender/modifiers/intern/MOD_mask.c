@@ -53,11 +53,12 @@ static void copyData(ModifierData *md, ModifierData *target)
 	MaskModifierData *tmmd = (MaskModifierData*) target;
 	
 	strcpy(tmmd->vgroup, mmd->vgroup);
+	tmmd->flag = mmd->flag;
 }
 
 static CustomDataMask requiredDataMask(Object *UNUSED(ob), ModifierData *UNUSED(md))
 {
-	return (1 << CD_MDEFORMVERT);
+	return CD_MASK_MDEFORMVERT;
 }
 
 static void foreachObjectLink(

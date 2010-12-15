@@ -41,7 +41,7 @@
 #include "BKE_packedFile.h"
 #include "BKE_main.h"
 #include "BKE_utildefines.h"
-#include "BKE_global.h" /* grr: G.sce */
+#include "BKE_global.h" /* grr: G.main->name */
 
 #include "IMB_imbuf.h"
 
@@ -53,7 +53,7 @@
 
 #include "MEM_guardedalloc.h"
 
-static void rna_Image_save_render(Image *image, bContext *C, ReportList *reports, char *path, Scene *scene)
+static void rna_Image_save_render(Image *image, bContext *C, ReportList *reports, const char *path, Scene *scene)
 {
 	ImBuf *ibuf;
 
@@ -73,9 +73,17 @@ static void rna_Image_save_render(Image *image, bContext *C, ReportList *reports
 		if (ibuf == NULL) {
 			BKE_reportf(reports, RPT_ERROR, "Couldn't acquire buffer from image");
 		}
-
-		if (!BKE_write_ibuf(NULL, ibuf, path, scene->r.imtype, scene->r.subimtype, scene->r.quality)) {
-			BKE_reportf(reports, RPT_ERROR, "Couldn't write image: %s", path);
+		else {
+			/* temp swap out the color */
+			const unsigned char imb_depth_back= ibuf->depth;
+			const float dither_back= ibuf->dither; 
+			ibuf->depth= scene->r.planes;
+			ibuf->dither= scene->r.dither_intensity;
+			if (!BKE_write_ibuf(NULL, ibuf, path, scene->r.imtype, scene->r.subimtype, scene->r.quality)) {
+				BKE_reportf(reports, RPT_ERROR, "Couldn't write image: %s", path);
+			}
+			ibuf->depth= imb_depth_back;
+			ibuf->dither= dither_back;
 		}
 
 		BKE_image_release_ibuf(image, lock);
@@ -90,7 +98,7 @@ static void rna_Image_save(Image *image, ReportList *reports)
 	if(ibuf) {
 		char filename[FILE_MAXDIR + FILE_MAXFILE];
 		BLI_strncpy(filename, image->name, sizeof(filename));
-		BLI_path_abs(filename, G.sce);
+		BLI_path_abs(filename, G.main->name);
 
 		if(image->packedfile) {
 			if (writePackedFile(reports, image->name, image->packedfile, 0) != RET_OK) {

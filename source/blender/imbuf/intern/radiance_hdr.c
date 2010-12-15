@@ -333,12 +333,14 @@ static void writeHeader(FILE *file, int width, int height)
 	fputc(10, file);
 }
 
-int imb_savehdr(struct ImBuf *ibuf, char *name, int flags)
+int imb_savehdr(struct ImBuf *ibuf, const char *name, int flags)
 {
 	FILE* file = fopen(name, "wb");
 	float *fp= NULL;
 	int y, width=ibuf->x, height=ibuf->y;
 	unsigned char *cp= NULL;
+	
+	(void)flags; /* unused */
 	
 	if (file==NULL) return 0;
 

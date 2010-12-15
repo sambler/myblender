@@ -132,6 +132,7 @@ typedef my_source_mgr * my_src_ptr;
 
 static void init_source(j_decompress_ptr cinfo)
 {
+	(void)cinfo; /* unused */
 }
 
 
@@ -165,6 +166,7 @@ static void skip_input_data(j_decompress_ptr cinfo, long num_bytes)
 
 static void term_source(j_decompress_ptr cinfo)
 {
+	(void)cinfo; /* unused */
 }
 
 static void memory_source(j_decompress_ptr cinfo, unsigned char *buffer, size_t size)
@@ -620,7 +622,7 @@ static int init_jpeg(FILE * outfile, struct jpeg_compress_struct * cinfo, struct
 }
 
 
-static int save_stdjpeg(char * name, struct ImBuf * ibuf)
+static int save_stdjpeg(const char *name, struct ImBuf *ibuf)
 {
 	FILE * outfile;
 	struct jpeg_compress_struct _cinfo, *cinfo = &_cinfo;
@@ -654,7 +656,7 @@ static int save_stdjpeg(char * name, struct ImBuf * ibuf)
 }
 
 
-static int save_vidjpeg(char * name, struct ImBuf * ibuf)
+static int save_vidjpeg(const char *name, struct ImBuf *ibuf)
 {
 	FILE * outfile;
 	struct jpeg_compress_struct _cinfo, *cinfo = &_cinfo;
@@ -693,7 +695,7 @@ static int save_vidjpeg(char * name, struct ImBuf * ibuf)
 	return 1;
 }
 
-static int save_jstjpeg(char * name, struct ImBuf * ibuf)
+static int save_jstjpeg(const char *name, struct ImBuf *ibuf)
 {
 	char fieldname[1024];
 	struct ImBuf * tbuf;
@@ -724,7 +726,7 @@ static int save_jstjpeg(char * name, struct ImBuf * ibuf)
 	return returnval;
 }
 
-static int save_maxjpeg(char * name, struct ImBuf * ibuf)
+static int save_maxjpeg(const char *name, struct ImBuf *ibuf)
 {
 	FILE * outfile;
 	struct jpeg_compress_struct _cinfo, *cinfo = &_cinfo;
@@ -763,7 +765,7 @@ static int save_maxjpeg(char * name, struct ImBuf * ibuf)
 	return 1;
 }
 
-int imb_savejpeg(struct ImBuf * ibuf, char * name, int flags)
+int imb_savejpeg(struct ImBuf *ibuf, const char *name, int flags)
 {
 	
 	ibuf->flags = flags;

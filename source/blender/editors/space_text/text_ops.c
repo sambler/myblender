@@ -58,7 +58,7 @@
 #include "RNA_access.h"
 #include "RNA_define.h"
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 #include "BPY_extern.h"
 #endif
 
@@ -162,7 +162,9 @@ static int new_exec(bContext *C, wmOperator *UNUSED(op))
 	if(prop) {
 		/* when creating new ID blocks, use is already 1, but RNA
 		 * pointer se also increases user, so this compensates it */
-		text->id.us--;
+		/* doesnt always seem to happen... (ton) */
+		if(text->id.us>1)
+			text->id.us--;
 
 		RNA_id_pointer_create(&text->id, &idptr);
 		RNA_property_pointer_set(&ptr, prop, idptr);
@@ -171,9 +173,9 @@ static int new_exec(bContext *C, wmOperator *UNUSED(op))
 	else if(st) {
 		st->text= text;
 		st->top= 0;
+		text_drawcache_tag_update(st, 1);
 	}
 
-	text_drawcache_tag_update(st, 1);
 	WM_event_add_notifier(C, NC_TEXT|NA_ADDED, text);
 
 	return OPERATOR_FINISHED;
@@ -221,7 +223,7 @@ static int open_exec(bContext *C, wmOperator *op)
 
 	RNA_string_get(op->ptr, "filepath", str);
 
-	text= add_text(str, G.sce);
+	text= add_text(str, G.main->name);
 
 	if(!text) {
 		if(op->customdata) MEM_freeN(op->customdata);
@@ -266,7 +268,7 @@ static int open_exec(bContext *C, wmOperator *op)
 static int open_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 {
 	Text *text= CTX_data_edit_text(C);
-	char *path= (text && text->name)? text->name: G.sce;
+	char *path= (text && text->name)? text->name: G.main->name;
 
 	if(RNA_property_is_set(op->ptr, "filepath"))
 		return open_exec(C, op);
@@ -310,7 +312,7 @@ static int reload_exec(bContext *C, wmOperator *op)
 		return OPERATOR_CANCELLED;
 	}
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 	if(text->compiled)
 		BPY_free_compiled_text(text);
 #endif
@@ -438,7 +440,7 @@ static void txt_write_file(Text *text, ReportList *reports)
 	char file[FILE_MAXDIR+FILE_MAXFILE];
 	
 	BLI_strncpy(file, text->name, FILE_MAXDIR+FILE_MAXFILE);
-	BLI_path_abs(file, G.sce);
+	BLI_path_abs(file, G.main->name);
 	
 	fp= fopen(file, "w");
 	if(fp==NULL) {
@@ -524,7 +526,7 @@ static int save_as_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 	else if(text->flags & TXT_ISMEM)
 		str= text->id.name+2;
 	else
-		str= G.sce;
+		str= G.main->name;
 	
 	RNA_string_set(op->ptr, "filepath", str);
 	WM_event_add_fileselect(C, op); 
@@ -557,7 +559,9 @@ static int run_script_poll(bContext *C)
 
 static int run_script_exec(bContext *C, wmOperator *op)
 {
-#ifdef DISABLE_PYTHON
+#ifndef WITH_PYTHON
+	(void)C; /* unused */
+
 	BKE_report(op->reports, RPT_ERROR, "Python disabled in this build");
 
 	return OPERATOR_CANCELLED;
@@ -595,7 +599,7 @@ void TEXT_OT_run_script(wmOperatorType *ot)
 
 static int refresh_pyconstraints_exec(bContext *UNUSED(C), wmOperator *UNUSED(op))
 {
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 #if 0
 	Text *text= CTX_data_edit_text(C);
 	Object *ob;
@@ -627,7 +631,7 @@ static int refresh_pyconstraints_exec(bContext *UNUSED(C), wmOperator *UNUSED(op
 		}
 		
 		if(update) {
-			DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+			DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 		}
 	}
 #endif
@@ -2601,12 +2605,16 @@ static int insert_invoke(bContext *C, wmOperator *op, wmEvent *event)
 
 	// if(!RNA_property_is_set(op->ptr, "text")) { /* always set from keymap XXX */
 	if(!RNA_string_length(op->ptr, "text")) {
-		char str[2] = {event->ascii, '\0'};
 		/* if alt/ctrl/super are pressed pass through */
-		if(event->ctrl || event->oskey)
+		if(event->ctrl || event->oskey) {
 			return OPERATOR_PASS_THROUGH;
-
-		RNA_string_set(op->ptr, "text", str);
+		}
+		else {
+			char str[2];
+			str[0]= event->ascii;
+			str[1]= '\0';
+			RNA_string_set(op->ptr, "text", str);
+		}
 	}
 
 	ret = insert_exec(C, op);
@@ -2860,7 +2868,7 @@ int text_file_modified(Text *text)
 		return 0;
 
 	BLI_strncpy(file, text->name, FILE_MAXDIR+FILE_MAXFILE);
-	BLI_path_abs(file, G.sce);
+	BLI_path_abs(file, G.main->name);
 
 	if(!BLI_exists(file))
 		return 2;
@@ -2888,7 +2896,7 @@ static void text_ignore_modified(Text *text)
 	if(!text || !text->name) return;
 
 	BLI_strncpy(file, text->name, FILE_MAXDIR+FILE_MAXFILE);
-	BLI_path_abs(file, G.sce);
+	BLI_path_abs(file, G.main->name);
 
 	if(!BLI_exists(file)) return;
 

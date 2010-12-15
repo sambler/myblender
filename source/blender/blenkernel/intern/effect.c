@@ -264,6 +264,9 @@ static void add_object_to_effectors(ListBase **effectors, Scene *scene, Effector
 
 	eff = new_effector_cache(scene, ob, NULL, ob->pd);
 
+	/* make sure imat is up to date */
+	invert_m4_m4(ob->imat, ob->obmat);
+
 	BLI_addtail(*effectors, eff);
 }
 static void add_particles_to_effectors(ListBase **effectors, Scene *scene, EffectorWeights *weights, Object *ob, ParticleSystem *psys, ParticleSystem *psys_src)
@@ -429,7 +432,7 @@ static float eff_calc_visibility(ListBase *colliders, EffectorCache *eff, Effect
 		return visibility;
 
 	if(!colls)
-		colls = get_collider_cache(eff->scene, NULL, NULL);
+		colls = get_collider_cache(eff->scene, eff->ob, NULL);
 
 	if(!colls)
 		return visibility;
@@ -625,7 +628,6 @@ int get_effector_data(EffectorCache *eff, EffectorData *efd, EffectedPoint *poin
 		}
 	}
 	else if(eff->psys) {
-		ParticleSimulationData sim = {eff->scene, eff->ob, eff->psys, NULL, NULL};
 		ParticleData *pa = eff->psys->particles + *efd->index;
 		ParticleKey state;
 
@@ -633,6 +635,11 @@ int get_effector_data(EffectorCache *eff, EffectorData *efd, EffectedPoint *poin
 		if(eff->psys == point->psys && *efd->index == point->index)
 			;
 		else {
+			ParticleSimulationData sim= {0};
+			sim.scene= eff->scene;
+			sim.ob= eff->ob;
+			sim.psys= eff->psys;
+
 			/* TODO: time from actual previous calculated frame (step might not be 1) */
 			state.time = cfra - 1.0;
 			ret = psys_get_particle_state(&sim, *efd->index, &state, 0);
@@ -774,7 +781,7 @@ static void do_texture_effector(EffectorCache *eff, EffectorData *efd, EffectedP
 	}
 
 	if(eff->pd->flag & PFIELD_TEX_OBJECT) {
-		mul_m4_v3(eff->ob->obmat, tex_co);
+		mul_m4_v3(eff->ob->imat, tex_co);
 	}
 
 	hasrgb = multitex_ext(eff->pd->tex, tex_co, NULL,NULL, 0, result);

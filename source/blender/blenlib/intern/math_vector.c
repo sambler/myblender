@@ -231,6 +231,16 @@ void angle_quad_v3(float angles[4], const float v1[3], const float v2[3], const 
 /********************************* Geometry **********************************/
 
 /* Project v1 on v2 */
+void project_v2_v2v2(float c[2], const float v1[2], const float v2[2])
+{
+	float mul;
+	mul = dot_v2v2(v1, v2) / dot_v2v2(v2, v2);
+
+	c[0] = mul * v2[0];
+	c[1] = mul * v2[1];
+}
+
+/* Project v1 on v2 */
 void project_v3_v3v3(float c[3], const float v1[3], const float v2[3])
 {
 	float mul;
@@ -354,3 +364,43 @@ void minmax_v3v3_v3(float min[3], float max[3], const float vec[3])
 	if(max[2]<vec[2]) max[2]= vec[2];
 }
 
+
+/***************************** Array Functions *******************************/
+
+void range_vni(int *array_tar, const int size, const int start)
+{
+	int *array_pt= array_tar + (size-1);
+	int j= start + (size-1);
+	int i= size;
+	while(i--) { *(array_pt--) = j--; }
+}
+
+void mul_vn_fl(float *array_tar, const int size, const float f)
+{
+	float *array_pt= array_tar + (size-1);
+	int i= size;
+	while(i--) { *(array_pt--) *= f; }
+}
+
+void mul_vn_vn_fl(float *array_tar, const float *array_src, const int size, const float f)
+{
+	float *tar= array_tar + (size-1);
+	const float *src= array_src + (size-1);
+	int i= size;
+	while(i--) { *(tar--) = *(src--) * f; }
+}
+
+void add_vn_vn(float *array_tar, const float *array_src, const int size)
+{
+	float *tar= array_tar + (size-1);
+	const float *src= array_src + (size-1);
+	int i= size;
+	while(i--) { *(tar--) += *(src--); }
+}
+
+void fill_vni(int *array_tar, const int size, const int val)
+{
+	int *tar= array_tar + (size-1);
+	int i= size;
+	while(i--) { *(tar--) = val; }
+}

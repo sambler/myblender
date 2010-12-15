@@ -95,24 +95,24 @@ static CustomDataMask requiredDataMask(Object *ob, ModifierData *md)
 			mtex=ma->mtex[i];
 			if(mtex && (ma->septex & (1<<i))==0)
 				if(mtex->pmapto && (mtex->texco & TEXCO_UV))
-					dataMask |= (1 << CD_MTFACE);
+					dataMask |= CD_MASK_MTFACE;
 		}
 	}
 
 	if(psmd->psys->part->tanfac!=0.0)
-		dataMask |= (1 << CD_MTFACE);
+		dataMask |= CD_MASK_MTFACE;
 
 	/* ask for vertexgroups if we need them */
 	for(i=0; i<PSYS_TOT_VG; i++){
 		if(psmd->psys->vgroup[i]){
-			dataMask |= (1 << CD_MDEFORMVERT);
+			dataMask |= CD_MASK_MDEFORMVERT;
 			break;
 		}
 	}
 	
 	/* particles only need this if they are after a non deform modifier, and
 	* the modifier stack will only create them in that case. */
-	dataMask |= CD_MASK_ORIGSPACE;
+	dataMask |= CD_MASK_ORIGSPACE|CD_MASK_ORIGINDEX;
 
 	dataMask |= CD_MASK_ORCO;
 	
@@ -154,6 +154,10 @@ static void deformVerts(ModifierData *md, Object *ob,
 		psmd->dm->needsFree = 1;
 		psmd->dm->release(psmd->dm);
 	}
+	else {
+		/* no dm before, so recalc particles fully */
+		psys->recalc |= PSYS_RECALC_RESET;
+	}
 
 	/* make new dm */
 	psmd->dm=CDDM_copy(dm);
@@ -175,7 +179,6 @@ static void deformVerts(ModifierData *md, Object *ob,
 		/* in file read dm hasn't really changed but just wasn't saved in file */
 
 		psys->recalc |= PSYS_RECALC_RESET;
-		psmd->flag |= eParticleSystemFlag_DM_changed;
 
 		psmd->totdmvert= psmd->dm->getNumVerts(psmd->dm);
 		psmd->totdmedge= psmd->dm->getNumEdges(psmd->dm);
@@ -186,7 +189,6 @@ static void deformVerts(ModifierData *md, Object *ob,
 		psmd->flag &= ~eParticleSystemFlag_psys_updated;
 		particle_system_update(md->scene, ob, psys);
 		psmd->flag |= eParticleSystemFlag_psys_updated;
-		psmd->flag &= ~eParticleSystemFlag_DM_changed;
 	}
 }
 

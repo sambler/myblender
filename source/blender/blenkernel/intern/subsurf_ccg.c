@@ -83,13 +83,13 @@ static void *arena_realloc(CCGAllocatorHDL a, void *ptr, int newSize, int oldSiz
 	}
 	return p2;
 }
-static void arena_free(CCGAllocatorHDL a, void *ptr) {
+static void arena_free(CCGAllocatorHDL UNUSED(a), void *UNUSED(ptr)) {
 }
 static void arena_release(CCGAllocatorHDL a) {
 	BLI_memarena_free(a);
 }
 
-static CCGSubSurf *_getSubSurf(CCGSubSurf *prevSS, int subdivLevels, int useAging, int useArena, int useFlatSubdiv) {
+static CCGSubSurf *_getSubSurf(CCGSubSurf *prevSS, int subdivLevels, int useAging, int useArena, int UNUSED(useFlatSubdiv)) {
 	CCGMeshIFC ifc;
 	CCGSubSurf *ccgSS;
 
@@ -1146,7 +1146,7 @@ static void ccgDM_drawVerts(DerivedMesh *dm) {
 	ccgFaceIterator_free(fi);
 	glEnd();
 }
-static void ccgDM_drawEdges(DerivedMesh *dm, int drawLooseEdges, int drawAllEdges) {
+static void ccgDM_drawEdges(DerivedMesh *dm, int drawLooseEdges, int UNUSED(drawAllEdges)) {
 	CCGDerivedMesh *ccgdm = (CCGDerivedMesh*) dm;
 	CCGSubSurf *ss = ccgdm->ss;
 	CCGEdgeIterator *ei = ccgSubSurf_getEdgeIterator(ss);
@@ -1245,7 +1245,7 @@ static void ccgDM_glNormalFast(float *a, float *b, float *c, float *d)
 	no[1] = b_dZ*a_cX - b_dX*a_cZ;
 	no[2] = b_dX*a_cY - b_dY*a_cX;
 
-	/* don't normalize, GL_NORMALIZE is be enabled */
+	/* don't normalize, GL_NORMALIZE is enabled */
 	glNormal3fv(no);
 }
 
@@ -1357,7 +1357,7 @@ static void ccgDM_drawMappedFacesGLSL(DerivedMesh *dm, int (*setMaterial)(int, v
 	CCGSubSurf *ss = ccgdm->ss;
 	CCGFaceIterator *fi = ccgSubSurf_getFaceIterator(ss);
 	GPUVertexAttribs gattribs;
-	DMVertexAttribs attribs;
+	DMVertexAttribs attribs= {{{0}}};
 	MTFace *tf = dm->getFaceDataArray(dm, CD_MTFACE);
 	int gridSize = ccgSubSurf_getGridSize(ss);
 	int gridFaces = gridSize - 1;
@@ -1373,8 +1373,6 @@ static void ccgDM_drawMappedFacesGLSL(DerivedMesh *dm, int (*setMaterial)(int, v
 	matnr = -1;
 	transp = GPU_get_material_blend_mode();
 	orig_transp = transp;
-
-	memset(&attribs, 0, sizeof(attribs));
 
 #define PASSATTRIB(dx, dy, vert) {												\
 	if(attribs.totorco) {														\
@@ -1514,7 +1512,7 @@ static void ccgDM_drawFacesGLSL(DerivedMesh *dm, int (*setMaterial)(int, void *a
 	dm->drawMappedFacesGLSL(dm, setMaterial, NULL, NULL);
 }
 
-static void ccgDM_drawFacesColored(DerivedMesh *dm, int useTwoSided, unsigned char *col1, unsigned char *col2) {
+static void ccgDM_drawFacesColored(DerivedMesh *dm, int UNUSED(useTwoSided), unsigned char *col1, unsigned char *col2) {
 	CCGDerivedMesh *ccgdm = (CCGDerivedMesh*) dm;
 	CCGSubSurf *ss = ccgdm->ss;
 	CCGFaceIterator *fi = ccgSubSurf_getFaceIterator(ss);

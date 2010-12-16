@@ -128,6 +128,9 @@ option(WITH_PYTHON_INSTALL       "Copy system python into the blender install fo
 option(WITH_CXX_GUARDEDALLOC "Enable GuardedAlloc for C++ memory allocation tracking" OFF)
 mark_as_advanced(WITH_CXX_GUARDEDALLOC)
 
+option(WITH_ASSERT_ABORT "Call abort() when raising an assertion through BKE_assert()" OFF)
+mark_as_advanced(WITH_ASSERT_ABORT)
+
 if(APPLE)
 	option(WITH_COCOA	  "Use Cocoa framework instead of deprecated Carbon" ON)
 	option(USE_QTKIT	  "Use QtKit instead of Carbon quicktime (needed for having partial quicktime for 64bit)" OFF)
@@ -922,7 +925,7 @@ if(WITH_BUILDINFO)
 	# my mod to manually place avn revision as git doesn't repond properly
 		#EXEC_PROGRAM("svnversion ${CMAKE_SOURCE_DIR}" OUTPUT_VARIABLE BUILD_REV RETURN_VALUE BUILD_REV_RETURN)
 		#IF(BUILD_REV_RETURN)
-			SET(BUILD_REV "33675")
+			SET(BUILD_REV "33699")
 		#ENDIF(BUILD_REV_RETURN)
 	ENDIF(UNIX)
 	
@@ -931,7 +934,7 @@ if(WITH_BUILDINFO)
 		EXEC_PROGRAM("cmd /c time /t" OUTPUT_VARIABLE BUILD_TIME)  
 		#EXEC_PROGRAM("svnversion ${CMAKE_SOURCE_DIR}" OUTPUT_VARIABLE BUILD_REV RETURN_VALUE BUILD_REV_RETURN)
 		#IF(BUILD_REV_RETURN)
-			SET(BUILD_REV "33675")
+			SET(BUILD_REV "33699")
 		#ENDIF(BUILD_REV_RETURN)
 	ENDIF(WIN32)
 ENDIF(WITH_BUILDINFO)
@@ -1026,6 +1029,10 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${PLATFORM_CFLAGS} ${CXX_WARNINGS}")
 # better not define flags here but this is a debugging option thats off by default.
 if(WITH_CXX_GUARDEDALLOC)
 	set(CMAKE_CXX_FLAGS " -DWITH_CXX_GUARDEDALLOC -I${CMAKE_SOURCE_DIR}/intern/guardedalloc ${CMAKE_CXX_FLAGS}")
+endif()
+
+if(WITH_ASSERT_ABORT)
+	add_definitions(-DWITH_ASSERT_ABORT)
 endif()
 
 #-----------------------------------------------------------------------------

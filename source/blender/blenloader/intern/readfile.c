@@ -4947,8 +4947,6 @@ void lib_link_screen_restore(Main *newmain, bScreen *curscreen, Scene *curscene)
 
 					st->text= restore_pointer_by_name(newmain, (ID *)st->text, 1);
 					if(st->text==NULL) st->text= newmain->text.first;
-
-					st->drawcache= NULL;
 				}
 				else if(sl->spacetype==SPACE_SCRIPT) {
 					SpaceScript *scpt= (SpaceScript *)sl;
@@ -11156,7 +11154,6 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 			}
 		}
 
-	/* put compatibility code here until next subversion bump */
 	if (main->versionfile < 255 || (main->versionfile == 255 && main->subversionfile < 1)) {
 		Brush *br;
 		ParticleSettings *part;
@@ -11214,6 +11211,10 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 				act= act->next;
 			}
 		}
+	}
+
+	/* put compatibility code here until next subversion bump */
+	{
 	}
 
 	/* WATCH IT!!!: pointers from libdata have not been converted yet here! */

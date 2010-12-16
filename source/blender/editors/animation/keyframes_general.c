@@ -515,7 +515,7 @@ short copy_animedit_keys (bAnimContext *ac, ListBase *anim_data)
 	for (ale= anim_data->first; ale; ale= ale->next) {
 		FCurve *fcu= (FCurve *)ale->key_data;
 		tAnimCopybufItem *aci;
-		BezTriple *bezt, *newbuf;
+		BezTriple *bezt, *nbezt, *newbuf;
 		int i;
 		
 		/* firstly, check if F-Curve has any selected keyframes
@@ -546,8 +546,14 @@ short copy_animedit_keys (bAnimContext *ac, ListBase *anim_data)
 					memcpy(newbuf, aci->bezt, sizeof(BezTriple)*(aci->totvert));
 				
 				/* copy current beztriple across too */
-				*(newbuf + aci->totvert)= *bezt; 
-				
+				nbezt= &newbuf[aci->totvert];
+				*nbezt= *bezt;
+
+				/* ensure copy buffer is selected so pasted keys are selected */
+				nbezt->f1 |= SELECT;
+				nbezt->f2 |= SELECT;
+				nbezt->f3 |= SELECT;
+
 				/* free old array and set the new */
 				if (aci->bezt) MEM_freeN(aci->bezt);
 				aci->bezt= newbuf;
@@ -753,11 +759,16 @@ short paste_animedit_keys (bAnimContext *ac, ListBase *anim_data,
 	int pass;
 
 	/* check if buffer is empty */
-	if (ELEM(NULL, animcopybuf.first, animcopybuf.last)) {
+	if (animcopybuf.first == NULL) {
 		BKE_report(ac->reports, RPT_WARNING, "No data in buffer to paste");
 		return -1;
 	}
 
+	if (anim_data->first == NULL) {
+		BKE_report(ac->reports, RPT_WARNING, "No FCurves to paste into");
+		return -1;
+	}
+	
 	/* mathods of offset */
 	switch(offset_mode) {
 		case KEYFRAME_PASTE_OFFSET_CFRA_START:

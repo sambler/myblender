@@ -2081,6 +2081,12 @@ static int ui_do_but_HOTKEYEVT(bContext *C, uiBut *but, uiHandleButtonData *data
 				button_activate_state(C, but, BUTTON_STATE_EXIT);
 				return WM_UI_HANDLER_BREAK;
 			}
+			else if(event->type == ESCKEY) {
+				data->cancel= 1;
+				data->escapecancel= 1;
+				button_activate_state(C, but, BUTTON_STATE_EXIT);
+			}
+			
 		}
 	}
 	
@@ -4011,14 +4017,14 @@ static uiBlock *menu_change_shortcut(bContext *C, ARegion *ar, void *arg)
 	
 	block= uiBeginBlock(C, ar, "_popup", UI_EMBOSS);
 	uiBlockSetHandleFunc(block, but_shortcut_name_func, but);
-	uiBlockSetFlag(block, UI_BLOCK_RET_1|UI_BLOCK_MOVEMOUSE_QUIT);
+	uiBlockSetFlag(block, UI_BLOCK_MOVEMOUSE_QUIT);
 	uiBlockSetDirection(block, UI_CENTER);
 	
 	layout= uiBlockLayout(block, UI_LAYOUT_VERTICAL, UI_LAYOUT_PANEL, 0, 0, 200, 20, style);
 	
 	uiItemR(layout, &ptr, "type", UI_ITEM_R_FULL_EVENT|UI_ITEM_R_IMMEDIATE, "", 0);
 	
-	uiPopupBoundsBlock(block, 6, 100, 10);
+	uiPopupBoundsBlock(block, 6, -50, 26);
 	uiEndBlock(C, block);
 	
 	return block;
@@ -4056,7 +4062,7 @@ static uiBlock *menu_add_shortcut(bContext *C, ARegion *ar, void *arg)
 
 	uiItemR(layout, &ptr, "type", UI_ITEM_R_FULL_EVENT|UI_ITEM_R_IMMEDIATE, "", 0);
 	
-	uiPopupBoundsBlock(block, 6, 100, 10);
+	uiPopupBoundsBlock(block, 6, -50, 26);
 	uiEndBlock(C, block);
 	
 	return block;
@@ -5720,10 +5726,10 @@ int ui_handle_menu_event(bContext *C, wmEvent *event, uiPopupBlockHandle *menu, 
 				menu->menuretval= UI_RETURN_CANCEL;
 			}
 			else if(ELEM(event->type, RETKEY, PADENTER) && event->val==KM_PRESS) {
-				/* enter will always close this block, but we let the event
-				 * get handled by the button if it is activated */
+				/* enter will always close this block, we let the event
+				 * get handled by the button if it is activated, otherwise we cancel */
 				if(!ui_but_find_activated(ar))
-					menu->menuretval= UI_RETURN_OK;
+					menu->menuretval= UI_RETURN_CANCEL;
 			}
 			else {
 				ui_mouse_motion_towards_check(block, menu, mx, my);

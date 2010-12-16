@@ -381,30 +381,66 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 		if(ob->type==OB_MESH) {
 			Mesh *me= ob->data;
 			EditMesh *em = BKE_mesh_get_editmesh(me);
-			EditVert *eve;
-			EditEdge *eed;
-			
-			eve= em->verts.first;
-			while(eve) {
-				if(eve->f & SELECT) {
-					add_v3_v3(eve->co, median);
+
+			/* allow for some rounding error becasue of matrix transform */
+			if(len_v3(median) > 0.000001) {
+				EditVert *eve;
+
+				for(eve= em->verts.first; eve; eve= eve->next) {
+					if(eve->f & SELECT) {
+						add_v3_v3(eve->co, median);
+					}
 				}
-				eve= eve->next;
+
+				recalc_editnormals(em);
 			}
-			
-			for(eed= em->edges.first; eed; eed= eed->next) {
-				if(eed->f & SELECT) {
-					/* ensure the median can be set to zero or one */
-					if(ve_median[3]==0.0f) eed->crease= 0.0f;
-					else if(ve_median[3]==1.0f) eed->crease= 1.0f;
+
+			if(median[3] != 0.0f) {
+				EditEdge *eed;
+				const float fixed_crease= (ve_median[3] <= 0.0f ? 0.0 : (ve_median[3] >= 1.0f ? 1.0 : FLT_MAX));
+				
+				if(fixed_crease != FLT_MAX) {
+					/* simple case */
+
+					for(eed= em->edges.first; eed; eed= eed->next) {
+						if(eed->f & SELECT) {
+							eed->crease= fixed_crease;
+						}
+					}
+				}
+				else {
+					/* scale crease to target median */
+					float median_new= ve_median[3];
+					float median_orig= ve_median[3] - median[3]; /* previous median value */
+
+					/* incase of floating point error */
+					CLAMP(median_orig, 0.0, 1.0);
+					CLAMP(median_new, 0.0, 1.0);
+
+					if(median_new < median_orig) {
+						/* scale down */
+						const float sca= median_new / median_orig;
+						
+						for(eed= em->edges.first; eed; eed= eed->next) {
+							if(eed->f & SELECT) {
+								eed->crease *= sca;
+								CLAMP(eed->crease, 0.0, 1.0);
+							}
+						}
+					}
 					else {
-						eed->crease+= median[3];
-						CLAMP(eed->crease, 0.0, 1.0);
+						/* scale up */
+						const float sca= (1.0f - median_new) / (1.0f - median_orig);
+
+						for(eed= em->edges.first; eed; eed= eed->next) {
+							if(eed->f & SELECT) {
+								eed->crease = 1.0f - ((1.0f - eed->crease) * sca);
+								CLAMP(eed->crease, 0.0, 1.0);
+							}
+						}
 					}
 				}
 			}
-			
-			recalc_editnormals(em);
 
 			BKE_mesh_end_editmesh(me, em);
 		}
@@ -1392,33 +1428,6 @@ static void view3d_panel_bonesketch_spaces(const bContext *C, Panel *pa)
 	uiBlockEndAlign(block);
 }
 
-static void view3d_panel_operator_redo(const bContext *C, Panel *pa)
-{
-	wmWindowManager *wm= CTX_wm_manager(C);
-	wmOperator *op;
-	PointerRNA ptr;
-	uiBlock *block;
-	
-	block= uiLayoutGetBlock(pa->layout);
-
-	/* only for operators that are registered and did an undo push */
-	for(op= wm->operators.last; op; op= op->prev)
-		if((op->type->flag & OPTYPE_REGISTER) && (op->type->flag & OPTYPE_UNDO))
-			break;
-	
-	if(op==NULL)
-		return;
-	
-	uiBlockSetFunc(block, ED_undo_operator_repeat_cb, op, NULL);
-	
-	if(!op->properties) {
-		IDPropertyTemplate val = {0};
-		op->properties= IDP_New(IDP_GROUP, val, "wmOperatorProperties");
-	}
-	
-	RNA_pointer_create(&wm->id, op->type->srna, op->properties, &ptr);
-	uiDefAutoButsRNA(pa->layout, &ptr, 2);
-}
 #endif // XXX not used
 
 void view3d_buttons_register(ARegionType *art)

@@ -121,7 +121,7 @@ if(WITH_BUILDINFO)
 	)
 endif()
 
-message(STATUS "Configuring blender")
+# message(STATUS "Configuring blender")
 
 add_executable(blender ${EXETYPE} ${SRC})
 
@@ -313,8 +313,8 @@ if(WITH_INSTALL)
 					COMMAND if \"$(ConfigurationName)\" == \"\" xcopy /E /Y \"${LIBDIR}\\release\\python31\\*.*\" \"${TARGETDIR}\\${BLENDER_VERSION}\\python\\lib\\\"
 					COMMAND if \"$(ConfigurationName)\" == \"Debug\" copy /Y \"${LIBDIR}\\python\\lib\\python31_d.dll\" \"${TARGETDIR}\\\"
 					COMMAND if \"$(ConfigurationName)\" == \"Debug\" xcopy /E /Y \"${LIBDIR}\\release\\python31_d\\*.*\" \"${TARGETDIR}\\${BLENDER_VERSION}\\python\\lib\\\"
-					COMMAND if \"$(ConfigurationName)\" == \"RelWithDebInfo\" copy /Y \"${LIBDIR}\\python\\lib\\python31_d.dll\" \"${TARGETDIR}\\\"
-					COMMAND if \"$(ConfigurationName)\" == \"RelWithDebInfo\" xcopy /E /Y \"${LIBDIR}\\release\\python31_d\\*.*\" \"${TARGETDIR}\\${BLENDER_VERSION}\\python\\lib\\\"
+					COMMAND if \"$(ConfigurationName)\" == \"RelWithDebInfo\" copy /Y \"${LIBDIR}\\python\\lib\\python31.dll\" \"${TARGETDIR}\\\"
+					COMMAND if \"$(ConfigurationName)\" == \"RelWithDebInfo\" xcopy /E /Y \"${LIBDIR}\\release\\python31\\*.*\" \"${TARGETDIR}\\${BLENDER_VERSION}\\python\\lib\\\"
 					COMMAND if \"$(ConfigurationName)\" == \"Release\" copy /Y \"${LIBDIR}\\python\\lib\\python31.dll\" \"${TARGETDIR}\\\"
 					COMMAND if \"$(ConfigurationName)\" == \"Release\" xcopy /E /Y \"${LIBDIR}\\release\\python31\\*.*\" \"${TARGETDIR}\\${BLENDER_VERSION}\\python\\lib\\\"
 					COMMAND if \"$(ConfigurationName)\" == \"MinSizeRel\" copy /Y \"${LIBDIR}\\python\\lib\\python31.dll\" \"${TARGETDIR}\\\"
@@ -586,7 +586,6 @@ endif()
 		list(APPEND BLENDER_SORTED_LIBS bf_quicktime)
 	endif()
 
-
 	foreach(SORTLIB ${BLENDER_SORTED_LIBS})
 		set(REMLIB ${SORTLIB})
 		foreach(SEARCHLIB ${BLENDER_LINK_LIBS})
@@ -595,10 +594,15 @@ endif()
 			endif()
 		endforeach()
 		if(REMLIB)
-			message(STATUS "Removing library ${REMLIB} from blender linking because: not configured")
+			# message(STATUS "Removing library ${REMLIB} from blender linking because: not configured")
+			list(APPEND REM_MSG ${REMLIB})
 			list(REMOVE_ITEM BLENDER_SORTED_LIBS ${REMLIB})
 		endif()
 	endforeach()
+	if(REM_MSG)
+		list(SORT REM_MSG)
+		message(STATUS "Blender Skipping: (${REM_MSG})")
+	endif()
 	target_link_libraries(blender ${BLENDER_SORTED_LIBS})
 #else()
 #	target_link_libraries(blender ${BLENDER_LINK_LIBS})

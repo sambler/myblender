@@ -133,9 +133,10 @@ void drawSnapping(const struct bContext *C, TransInfo *t)
 	if (validSnap(t) && activeSnap(t))
 		{
 		
-		char col[4] = {1, 0, 1};
+		unsigned char col[4];
 		UI_GetThemeColor3ubv(TH_TRANSFORM, col);
-		glColor4ub(col[0], col[1], col[2], 128);
+		col[3]= 128;
+		glColor4ubv(col);
 		
 		if (t->spacetype == SPACE_VIEW3D) {
 			TransSnapPoint *p;
@@ -261,7 +262,7 @@ void applyProject(TransInfo *t)
 			}
 			else if (t->flag & T_OBJECT)
 			{
-				td->ob->recalc |= OB_RECALC_ALL;
+				td->ob->recalc |= OB_RECALC_OB|OB_RECALC_DATA|OB_RECALC_TIME;
 				object_handle_update(t->scene, td->ob);
 				VECCOPY(iloc, td->ob->obmat[3]);
 			}

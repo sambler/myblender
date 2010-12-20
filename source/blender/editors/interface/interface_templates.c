@@ -33,6 +33,7 @@
 
 #include "BLI_string.h"
 
+#include "BKE_animsys.h"
 #include "BKE_colortools.h"
 #include "BKE_context.h"
 #include "BKE_global.h"
@@ -252,8 +253,8 @@ static void template_id_cb(bContext *C, void *arg_litem, void *arg_event)
 			break;
 		case UI_ID_FAKE_USER:
 			if(id) {
-				if(id->flag & LIB_FAKEUSER) id->us++;
-				else id->us--;
+				if(id->flag & LIB_FAKEUSER) id_us_plus(id);
+				else id_us_min(id);
 			}
 			else return;
 			break;
@@ -271,6 +272,8 @@ static void template_id_cb(bContext *C, void *arg_litem, void *arg_event)
 			if(id) {
 				/* make copy */
 				if(id_copy(id, &newid, 0) && newid) {
+					/* copy animation actions too */
+					BKE_copy_animdata_id_action(id);
 					/* us is 1 by convention, but RNA_property_pointer_set
 					   will also incremement it, so set it to zero */
 					newid->us= 0;
@@ -2305,7 +2308,7 @@ void uiTemplateRunningJobs(uiLayout *layout, bContext *C)
 	wmWindowManager *wm= CTX_wm_manager(C);
 	ScrArea *sa= CTX_wm_area(C);
 	uiBlock *block;
-	void *owner;
+	void *owner= NULL;
 	int handle_event;
 	
 	block= uiLayoutGetBlock(layout);
@@ -2314,14 +2317,20 @@ void uiTemplateRunningJobs(uiLayout *layout, bContext *C)
 	uiBlockSetHandleFunc(block, do_running_jobs, NULL);
 
 	if(sa->spacetype==SPACE_NODE) {
-		owner = sa;
+		if(WM_jobs_test(wm, sa))
+		   owner = sa;
 		handle_event= B_STOPCOMPO;
-	} else {
+	} 
+	else {
+		/* another scene can be rendering too, for example via compositor */
+		for(scene= CTX_data_main(C)->scene.first; scene; scene= scene->id.next)
+			if(WM_jobs_test(wm, scene))
+				break;
 		owner = scene;
 		handle_event= B_STOPRENDER;
 	}
 
-	if(WM_jobs_test(wm, owner)) {
+	if(owner) {
 		uiLayout *ui_abs;
 		
 		ui_abs= uiLayoutAbsolute(layout, 0);

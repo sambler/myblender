@@ -224,7 +224,7 @@ static Base *rna_Scene_object_link(Scene *scene, bContext *C, ReportList *report
 	if(scene == scene_act)
 		ob->lay= base->lay;
 
-	ob->recalc |= OB_RECALC_ALL;
+	ob->recalc |= OB_RECALC_OB|OB_RECALC_DATA|OB_RECALC_TIME;
 
 	/* slows down importers too much, run scene.update() */
 	/* DAG_scene_sort(G.main, scene); */
@@ -874,10 +874,10 @@ static void object_simplify_update(Object *ob)
 
 static void rna_Scene_use_simplify_update(Main *bmain, Scene *scene, PointerRNA *ptr)
 {
-	Scene *sce;
+	Scene *sce_iter;
 	Base *base;
 
-	for(SETLOOPER(scene, base))
+	for(SETLOOPER(scene, sce_iter, base))
 		object_simplify_update(base->object);
 	
 	DAG_ids_flush_update(bmain, 0);
@@ -2681,7 +2681,7 @@ static void rna_def_scene_render_data(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Display", "Select where rendered images will be displayed");
 	RNA_def_property_update(prop, NC_SCENE|ND_RENDER_OPTIONS, NULL);
 	
-	prop= RNA_def_property(srna, "filepath", PROP_STRING, PROP_DIRPATH);
+	prop= RNA_def_property(srna, "filepath", PROP_STRING, PROP_FILEPATH);
 	RNA_def_property_string_sdna(prop, NULL, "pic");
 	RNA_def_property_ui_text(prop, "Output Path", "Directory/name to save animations, # characters defines the position and length of frame numbers");
 	RNA_def_property_update(prop, NC_SCENE|ND_RENDER_OPTIONS, NULL);

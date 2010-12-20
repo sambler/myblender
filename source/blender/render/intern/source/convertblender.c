@@ -924,7 +924,7 @@ static Material *give_render_material(Render *re, Object *ob, int nr)
 	if((ma->mode & MA_TRANSP) && (ma->mode & MA_ZTRANSP))
 		re->flag |= R_ZTRA;
 	
-	/* for light groups */
+	/* for light groups and SSS */
 	ma->flag |= MA_IS_USED;
 
 	if(ma->nodetree && ma->use_nodes)
@@ -1930,6 +1930,9 @@ static int render_new_particle_system(Render *re, ObjectRen *obr, ParticleSystem
 				int trail_count = part->trail_count * (1.0 - part->randlength * r_length);
 				float ct = (part->draw & PART_ABS_PATH_TIME) ? cfra : pa_time;
 				float dt = length / (trail_count ? (float)trail_count : 1.0f);
+
+				/* make sure we have pointcache in memory before getting particle on path */
+				psys_make_temp_pointcache(ob, psys);
 
 				for(i=0; i < trail_count; i++, ct -= dt) {
 					if(part->draw & PART_ABS_PATH_TIME) {
@@ -4676,7 +4679,7 @@ static void database_init_objects(Render *re, unsigned int renderlay, int nolamp
 	Object *ob;
 	Group *group;
 	ObjectInstanceRen *obi;
-	Scene *sce;
+	Scene *sce_iter;
 	float mat[4][4];
 	int lay, vectorlay, redoimat= 0;
 
@@ -4685,7 +4688,7 @@ static void database_init_objects(Render *re, unsigned int renderlay, int nolamp
 	 * NULL is just for init */
 	set_dupli_tex_mat(NULL, NULL, NULL);
 
-	for(SETLOOPER(re->scene, base)) {
+	for(SETLOOPER(re->scene, sce_iter, base)) {
 		ob= base->object;
 		/* imat objects has to be done here, since displace can have texture using Object map-input */
 		mul_m4_m4m4(mat, ob->obmat, re->viewmat);
@@ -4695,7 +4698,7 @@ static void database_init_objects(Render *re, unsigned int renderlay, int nolamp
 		ob->transflag &= ~OB_RENDER_DUPLI;
 	}
 
-	for(SETLOOPER(re->scene, base)) {
+	for(SETLOOPER(re->scene, sce_iter, base)) {
 		ob= base->object;
 
 		/* in the prev/next pass for making speed vectors, avoid creating
@@ -4833,7 +4836,7 @@ static void database_init_objects(Render *re, unsigned int renderlay, int nolamp
 
 	/* imat objects has to be done again, since groups can mess it up */
 	if(redoimat) {
-		for(SETLOOPER(re->scene, base)) {
+		for(SETLOOPER(re->scene, sce_iter, base)) {
 			ob= base->object;
 			mul_m4_m4m4(mat, ob->obmat, re->viewmat);
 			invert_m4_m4(ob->imat, mat);

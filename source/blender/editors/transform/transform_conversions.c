@@ -2444,7 +2444,7 @@ static void createTransUVs(bContext *C, TransInfo *t)
 	EditMesh *em = ((Mesh *)t->obedit->data)->edit_mesh;
 	EditFace *efa;
 
-	if(!ED_uvedit_test(t->obedit)) return;
+	if(!ED_space_image_show_uvedit(sima, t->obedit)) return;
 
 	/* count */
 	for (efa= em->faces.first; efa; efa= efa->next) {
@@ -4872,7 +4872,7 @@ void special_aftertrans_update(bContext *C, TransInfo *t)
 			// fixme... some of this stuff is not good
 			if (ob) {
 				if (ob->pose || ob_get_key(ob))
-					DAG_id_tag_update(&ob->id, OB_RECALC_ALL);
+					DAG_id_tag_update(&ob->id, OB_RECALC_OB|OB_RECALC_DATA|OB_RECALC_TIME);
 				else
 					DAG_id_tag_update(&ob->id, OB_RECALC_OB);
 			}
@@ -5121,16 +5121,6 @@ void special_aftertrans_update(bContext *C, TransInfo *t)
 	}
 
 	clear_trans_object_base_flags(t);
-
-	if(t->spacetype == SPACE_VIEW3D)
-	{
-		View3D *v3d = t->view;
-
-		/* restore manipulator */
-		if (t->flag & T_MODAL) {
-			v3d->twtype = t->twtype;
-		}
-	}
 
 
 #if 0 // TRANSFORM_FIX_ME
@@ -5400,6 +5390,13 @@ void createTransData(bContext *C, TransInfo *t)
 			set_prop_dist(t, 1);
 			sort_trans_data_dist(t);
 		}
+	}
+	else if (ob && (ob->mode & (OB_MODE_SCULPT|OB_MODE_TEXTURE_PAINT))) {
+		/* sculpt mode and project paint have own undo stack
+		 * transform ops redo clears sculpt/project undo stack.
+		 *
+		 * Could use 'OB_MODE_ALL_PAINT' since there are key conflicts,
+		 * transform + paint isnt well supported. */
 	}
 	else {
 		createTransObject(C, t);

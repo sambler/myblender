@@ -56,7 +56,7 @@ ifdef NAN_BUILDINFO
     BUILDINFO_INC = -I$(SRCHOME)/blender/blenkernel
     BUILD_DATE := $(shell date "+%Y-%m-%d")
     BUILD_TIME := $(shell date "+%H:%M:%S")
-    BUILD_REV := 33699
+    BUILD_REV := 33800
 endif
 
 ############# set pyplayerlib ##################

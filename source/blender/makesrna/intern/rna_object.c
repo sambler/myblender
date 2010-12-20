@@ -34,6 +34,7 @@
 #include "DNA_action_types.h"
 #include "DNA_customdata_types.h"
 #include "DNA_controller_types.h"
+#include "DNA_group_types.h"
 #include "DNA_material_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_object_force.h"
@@ -41,6 +42,8 @@
 #include "DNA_property_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_meta_types.h"
+
+#include "BKE_group.h" /* needed for object_in_group() */
 
 #include "BLO_sys_types.h" /* needed for intptr_t used in ED_mesh.h */
 #include "ED_mesh.h"
@@ -92,14 +95,14 @@ EnumPropertyItem metaelem_type_items[] = {
 /* used for 2 enums */
 #define OBTYPE_CU_CURVE {OB_CURVE, "CURVE", 0, "Curve", ""}
 #define OBTYPE_CU_SURF {OB_SURF, "SURFACE", 0, "Surface", ""}
-#define OBTYPE_CU_TEXT {OB_FONT, "TEXT", 0, "Text", ""}
+#define OBTYPE_CU_FONT {OB_FONT, "FONT", 0, "Font", ""}
     
 EnumPropertyItem object_type_items[] = {
 	{OB_MESH, "MESH", 0, "Mesh", ""},
 	OBTYPE_CU_CURVE,
 	OBTYPE_CU_SURF,
 	{OB_MBALL, "META", 0, "Meta", ""},
-	OBTYPE_CU_TEXT,
+	OBTYPE_CU_FONT,
 	{0, "", 0, NULL, NULL},
 	{OB_ARMATURE, "ARMATURE", 0, "Armature", ""},
 	{OB_LATTICE, "LATTICE", 0, "Lattice", ""},
@@ -112,7 +115,7 @@ EnumPropertyItem object_type_items[] = {
 EnumPropertyItem object_type_curve_items[] = {
 	OBTYPE_CU_CURVE,
 	OBTYPE_CU_SURF,
-	OBTYPE_CU_TEXT,
+	OBTYPE_CU_FONT,
 	{0, NULL, 0, NULL, NULL}};
 
 
@@ -424,6 +427,20 @@ static void rna_Object_parent_bone_set(PointerRNA *ptr, const char *value)
 	Object *ob= (Object*)ptr->data;
 
 	ED_object_parent(ob, ob->parent, ob->partype, value);
+}
+
+static void rna_Object_dup_group_set(PointerRNA *ptr, PointerRNA value)
+{
+	Object *ob= (Object *)ptr->data;
+	Group *grp = (Group *)value.data;
+	
+	/* must not let this be set if the object belongs in this group already,
+	 * thus causing a cycle/infinite-recursion leading to crashes on load [#25298]
+	 */
+	if (object_in_group(ob, grp) == 0)
+		ob->dup_group = grp;
+	else
+		BKE_report(NULL, RPT_ERROR, "Cannot set dupli-group as object belongs in group being instanced thus causing a cycle");
 }
 
 static int rna_VertexGroup_index_get(PointerRNA *ptr)
@@ -1091,7 +1108,7 @@ static void rna_Object_boundbox_get(PointerRNA *ptr, float *values)
 		memcpy(values, bb->vec, sizeof(bb->vec));
 	}
 	else {
-		memset(values, -1.0f, sizeof(bb->vec));
+		fill_vn(values, sizeof(bb->vec)/sizeof(float), 0.0f);
 	}
 
 }
@@ -1586,19 +1603,6 @@ static void rna_def_object(BlenderRNA *brna)
 	StructRNA *srna;
 	PropertyRNA *prop;
 
-	static EnumPropertyItem object_type_items[] = {
-		{OB_EMPTY, "EMPTY", 0, "Empty", ""},
-		{OB_MESH, "MESH", 0, "Mesh", ""},
-		{OB_CURVE, "CURVE", 0, "Curve", ""},
-		{OB_SURF, "SURFACE", 0, "Surface", ""},
-		{OB_FONT, "FONT", 0, "Font", ""},
-		{OB_MBALL, "META", 0, "Meta", ""},
-		{OB_LAMP, "LAMP", 0, "Lamp", ""},
-		{OB_CAMERA, "CAMERA", 0, "Camera", ""},
-		{OB_LATTICE, "LATTICE", 0, "Lattice", ""},
-		{OB_ARMATURE, "ARMATURE", 0, "Armature", ""},
-		{0, NULL, 0, NULL, NULL}};
-
 	static EnumPropertyItem empty_drawtype_items[] = {
 		{OB_ARROWS, "ARROWS", 0, "Arrows", ""},
 		{OB_SINGLE_ARROW, "SINGLE_ARROW", 0, "Single Arrow", ""},
@@ -1709,7 +1713,7 @@ static void rna_def_object(BlenderRNA *brna)
 	RNA_def_property_multi_array(prop, 2, boundbox_dimsize);
 	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
 	RNA_def_property_float_funcs(prop, "rna_Object_boundbox_get", NULL, NULL);
-	RNA_def_property_ui_text(prop, "Bound Box", "Objects bound box in object-space coordinates");
+	RNA_def_property_ui_text(prop, "Bound Box", "Objects bound box in object-space coordinates, all values are -1.0 when not available.");
 
 	/* parent */
 	prop= RNA_def_property(srna, "parent", PROP_POINTER, PROP_NONE);
@@ -2056,6 +2060,7 @@ static void rna_def_object(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "dupli_group", PROP_POINTER, PROP_NONE);
 	RNA_def_property_pointer_sdna(prop, NULL, "dup_group");
 	RNA_def_property_flag(prop, PROP_EDITABLE);
+	RNA_def_property_pointer_funcs(prop, NULL, "rna_Object_dup_group_set", NULL, NULL);
 	RNA_def_property_ui_text(prop, "Dupli Group", "Instance an existing group");
 	RNA_def_property_update(prop, NC_OBJECT|ND_DRAW, "rna_Object_dependency_update");
 

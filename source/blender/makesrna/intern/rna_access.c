@@ -1282,7 +1282,7 @@ static void rna_property_update(bContext *C, Main *bmain, Scene *scene, PointerR
 	else {
 		/* WARNING! This is so property drivers update the display!
 		 * not especially nice  */
-		DAG_id_tag_update(ptr->id.data, OB_RECALC_ALL);
+		DAG_id_tag_update(ptr->id.data, OB_RECALC_OB|OB_RECALC_DATA|OB_RECALC_TIME);
 		WM_main_add_notifier(NC_WINDOW, NULL);
 	}
 
@@ -4122,7 +4122,7 @@ void RNA_parameter_get_lookup(ParameterList *parms, const char *identifier, void
 		RNA_parameter_get(parms, parm, value);
 }
 
-void RNA_parameter_set(ParameterList *parms, PropertyRNA *parm, void *value)
+void RNA_parameter_set(ParameterList *parms, PropertyRNA *parm, const void *value)
 {
 	ParameterIterator iter;
 
@@ -4138,7 +4138,7 @@ void RNA_parameter_set(ParameterList *parms, PropertyRNA *parm, void *value)
 	RNA_parameter_list_end(&iter);
 }
 
-void RNA_parameter_set_lookup(ParameterList *parms, const char *identifier, void *value)
+void RNA_parameter_set_lookup(ParameterList *parms, const char *identifier, const void *value)
 {
 	PropertyRNA *parm;
 

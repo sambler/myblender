@@ -54,6 +54,7 @@
 #include "WM_types.h"
 
 #include "ED_util.h"
+#include "ED_image.h"
 #include "ED_screen.h"
 #include "ED_object.h"
 #include "ED_armature.h"
@@ -64,6 +65,7 @@
 #include "RNA_define.h"
 
 #include "UI_interface.h"
+#include "UI_resources.h"
 
 #include "wm_window.h"
 
@@ -319,23 +321,12 @@ int ED_operator_posemode(bContext *C)
 	return 0;
 }
 
-
+/* wrapper for ED_space_image_show_uvedit */
 int ED_operator_uvedit(bContext *C)
 {
+	SpaceImage *sima= CTX_wm_space_image(C);
 	Object *obedit= CTX_data_edit_object(C);
-	EditMesh *em= NULL;
-	
-	if(obedit && obedit->type==OB_MESH)
-		em= BKE_mesh_get_editmesh((Mesh *)obedit->data);
-	
-	if(em && (em->faces.first) && (CustomData_has_layer(&em->fdata, CD_MTFACE))) {
-		BKE_mesh_end_editmesh(obedit->data, em);
-		return 1;
-	}
-	
-	if(obedit)
-		BKE_mesh_end_editmesh(obedit->data, em);
-	return 0;
+	return ED_space_image_show_uvedit(sima, obedit);
 }
 
 int ED_operator_uvmap(bContext *C)
@@ -1663,6 +1654,7 @@ static int keyframe_jump_exec(bContext *C, wmOperator *op)
 {
 	Scene *scene= CTX_data_scene(C);
 	Object *ob= CTX_data_active_object(C);
+	bDopeSheet ads= {0};
 	DLRBT_Tree keys;
 	ActKeyColumn *ak;
 	float cfra= (scene)? (float)(CFRA) : 0.0f;
@@ -1677,10 +1669,10 @@ static int keyframe_jump_exec(bContext *C, wmOperator *op)
 	BLI_dlrbTree_init(&keys);
 	
 	/* populate tree with keyframe nodes */
-	if (scene && scene->adt)
-		scene_to_keylist(NULL, scene, &keys, NULL);
-	if (ob && ob->adt)
-		ob_to_keylist(NULL, ob, &keys, NULL);
+	if (scene)
+		scene_to_keylist(&ads, scene, &keys, NULL);
+	if (ob)
+		ob_to_keylist(&ads, ob, &keys, NULL);
 	
 	/* build linked-list for searching */
 	BLI_dlrbTree_linkedlist_sync(&keys);
@@ -3014,6 +3006,7 @@ void SCENE_OT_delete(wmOperatorType *ot)
 
 /* ****************  Assigning operatortypes to global list, adding handlers **************** */
 
+
 /* called in spacetypes.c */
 void ED_operatortypes_screen(void)
 {
@@ -3087,9 +3080,27 @@ static void keymap_modal_set(wmKeyConfig *keyconf)
 	
 }
 
+static int open_file_drop_poll(bContext *UNUSED(C), wmDrag *drag, wmEvent *UNUSED(event))
+{
+	if(drag->type==WM_DRAG_PATH) {
+		if(drag->icon==ICON_FILE_BLEND)
+		   return 1;
+	}
+	return 0;
+}
+
+static void open_file_drop_copy(wmDrag *drag, wmDropBox *drop)
+{
+	/* copy drag path to properties */
+	RNA_string_set(drop->ptr, "filepath", drag->path);
+	drop->opcontext= WM_OP_EXEC_DEFAULT;
+}
+
+
 /* called in spacetypes.c */
 void ED_keymap_screen(wmKeyConfig *keyconf)
 {
+	ListBase *lb;
 	wmKeyMap *keymap;
 	//wmKeyMapItem *kmi;
 	
@@ -3203,6 +3214,10 @@ void ED_keymap_screen(wmKeyConfig *keyconf)
 	WM_keymap_add_item(keymap, "SCREEN_OT_animation_play", DOWNARROWKEY, KM_PRESS, KM_ALT, 0);
 #endif
 
+	/* dropbox for entire window */
+	lb= WM_dropboxmap_find("Window", 0, 0);
+	WM_dropbox_add(lb, "WM_OT_open_mainfile", open_file_drop_poll, open_file_drop_copy);
+	
 	keymap_modal_set(keyconf);
 }
 

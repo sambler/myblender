@@ -836,7 +836,7 @@ void recalcData(TransInfo *t)
 void drawLine(TransInfo *t, float *center, float *dir, char axis, short options)
 {
 	float v1[3], v2[3], v3[3];
-	char col[3], col2[3];
+	unsigned char col[3], col2[3];
 
 	if (t->spacetype == SPACE_VIEW3D)
 	{
@@ -860,7 +860,7 @@ void drawLine(TransInfo *t, float *center, float *dir, char axis, short options)
 			UI_GetThemeColor3ubv(TH_GRID, col);
 		}
 		UI_make_axis_color(col, col2, axis);
-		glColor3ubv((GLubyte *)col2);
+		glColor3ubv(col2);
 		
 		setlinestyle(0);
 		glBegin(GL_LINE_STRIP);
@@ -1158,6 +1158,13 @@ void postTrans (bContext *C, TransInfo *t)
 		SpaceImage *sima= t->sa->spacedata.first;
 		if(sima->flag & SI_LIVE_UNWRAP)
 			ED_uvedit_live_unwrap_end(t->state == TRANS_CANCEL);
+	}
+	else if(t->spacetype==SPACE_VIEW3D) {
+		View3D *v3d = t->sa->spacedata.first;
+		/* restore manipulator */
+		if (t->flag & T_MODAL) {
+			v3d->twtype = t->twtype;
+		}
 	}
 	
 	if (t->mouse.data)

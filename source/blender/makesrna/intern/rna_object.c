@@ -587,11 +587,12 @@ static void rna_Object_active_material_index_range(PointerRNA *ptr, int *min, in
 	*max= MAX2(ob->totcol-1, 0);
 }
 
+/* returns active base material */
 static PointerRNA rna_Object_active_material_get(PointerRNA *ptr)
 {
 	Object *ob= (Object*)ptr->id.data;
 	Material *ma;
-
+	
 	ma= (ob->totcol)? give_current_material(ob, ob->actcol): NULL;
 	return rna_pointer_inherit_refine(ptr, &RNA_Material, ma);
 }

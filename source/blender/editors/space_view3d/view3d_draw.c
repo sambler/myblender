@@ -397,13 +397,15 @@ static void drawgrid(UnitSettings *unit, ARegion *ar, View3D *v3d, const char **
 	setlinestyle(0);
 	
 	/* center cross */
+	/* horizontal line */
 	if( ELEM(rv3d->view, RV3D_VIEW_RIGHT, RV3D_VIEW_LEFT)) 
 		UI_make_axis_color(col, col2, 'Y');
-	else UI_make_axis_color(col, col2, 'Z');
+	else UI_make_axis_color(col, col2, 'X');
 	glColor3ubv(col2);
 	
 	fdrawline(0.0,  y,  (float)ar->winx,  y); 
 	
+	/* vertical line */
 	if( ELEM(rv3d->view, RV3D_VIEW_TOP, RV3D_VIEW_BOTTOM)) 
 		UI_make_axis_color(col, col2, 'Y');
 	else UI_make_axis_color(col, col2, 'Z');
@@ -1948,8 +1950,10 @@ static void gpu_update_lamps_shadows(Scene *scene, View3D *v3d)
 /* *********************** customdata **************** */
 
 /* goes over all modes and view3d settings */
-static CustomDataMask get_viewedit_datamask(bScreen *screen, Scene *scene, Object *ob)
+CustomDataMask ED_viewedit_datamask(bScreen *screen)
 {
+	Scene *scene= screen->scene;
+	Object *ob= scene->basact ? scene->basact->object : NULL;
 	CustomDataMask mask = CD_MASK_BAREMESH;
 	ScrArea *sa;
 	
@@ -2299,11 +2303,7 @@ void view3d_main_area_draw(const bContext *C, ARegion *ar)
 	Object *ob;
 	float backcol[3];
 	unsigned int lay_used;
-	Object *obact = OBACT;
 	const char *grid_unit= NULL;
-
-	/* from now on all object derived meshes check this */
-	v3d->customdata_mask= get_viewedit_datamask(CTX_wm_screen(C), scene, obact);
 
 	/* shadow buffers, before we setup matrices */
 	if(draw_glsl_material(scene, NULL, v3d, v3d->drawtype))

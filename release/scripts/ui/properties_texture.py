@@ -419,9 +419,10 @@ class TEXTURE_PT_image_sampling(TextureTypePanel, bpy.types.Panel):
 
     def draw(self, context):
         layout = self.layout
-
+        
+        idblock = context_tex_datablock(context)
         tex = context.texture
-        # slot = context.texture_slot
+        slot = context.texture_slot
 
         split = layout.split()
 
@@ -434,11 +435,13 @@ class TEXTURE_PT_image_sampling(TextureTypePanel, bpy.types.Panel):
         col.prop(tex, "use_flip_axis", text="Flip X/Y Axis")
 
         col = split.column()
-
-        col.prop(tex, "use_normal_map")
-        row = col.row()
-        row.active = tex.use_normal_map
-        row.prop(tex, "normal_space", text="")
+        
+        #Only for Material based textures, not for Lamp/World...
+        if isinstance(idblock, bpy.types.Material):
+            col.prop(tex, "use_normal_map")
+            row = col.row()
+            row.active = tex.use_normal_map
+            row.prop(slot, "normal_map_space", text="")
 
         col.prop(tex, "use_mipmap")
         row = col.row()

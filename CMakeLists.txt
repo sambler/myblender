@@ -906,7 +906,7 @@ if(WITH_BUILDINFO)
 	# my mod to manually place avn revision as git doesn't repond properly
 		#EXEC_PROGRAM("svnversion ${CMAKE_SOURCE_DIR}" OUTPUT_VARIABLE BUILD_REV RETURN_VALUE BUILD_REV_RETURN)
 		#IF(BUILD_REV_RETURN)
-			SET(BUILD_REV "33894")
+			SET(BUILD_REV "33943")
 		#ENDIF(BUILD_REV_RETURN)
 	ENDIF(UNIX)
 	
@@ -915,7 +915,7 @@ if(WITH_BUILDINFO)
 		EXEC_PROGRAM("cmd /c time /t" OUTPUT_VARIABLE BUILD_TIME)  
 		#EXEC_PROGRAM("svnversion ${CMAKE_SOURCE_DIR}" OUTPUT_VARIABLE BUILD_REV RETURN_VALUE BUILD_REV_RETURN)
 		#IF(BUILD_REV_RETURN)
-			SET(BUILD_REV "33894")
+			SET(BUILD_REV "33943")
 		#ENDIF(BUILD_REV_RETURN)
 	ENDIF(WIN32)
 ENDIF(WITH_BUILDINFO)
@@ -962,7 +962,11 @@ endif()
 #-----------------------------------------------------------------------------
 # Configure OpenGL.
 find_package(OpenGL)
-blender_include_dirs(${OPENGL_INCLUDE_DIR})
+if(MSVC)
+	include_directories(${OPENGL_INCLUDE_DIR})
+else()
+	blender_include_dirs(${OPENGL_INCLUDE_DIR})
+endif()
 # unset(OPENGL_LIBRARIES CACHE) # not compat with older cmake 
 # unset(OPENGL_xmesa_INCLUDE_DIR CACHE) # not compat with older cmake 
 

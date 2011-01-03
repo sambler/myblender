@@ -405,10 +405,10 @@ void BKE_animdata_separate_by_basepath (ID *srcID, ID *dstID, ListBase *basepath
 		}
 		else if (dstAdt->action == srcAdt->action) {
 			printf("Argh! Source and Destination share animation! ('%s' and '%s' both use '%s') Making new empty action\n",
-				srcID, dstID, srcAdt->action);
+				srcID->name, dstID->name, srcAdt->action->id.name);
 			
 			// TODO: review this...
-			id_us_min(dstAdt->action);
+			id_us_min(&dstAdt->action->id);
 			dstAdt->action = add_empty_action(dstAdt->action->id.name+2);
 		}
 			
@@ -886,7 +886,7 @@ KS_Path *BKE_keyingset_add_path (KeyingSet *ks, ID *id, const char group_name[],
 	/* just store absolute info */
 	ksp->id= id;
 	if (group_name)
-		BLI_snprintf(ksp->group, 64, group_name);
+		BLI_strncpy(ksp->group, group_name, sizeof(ksp->group));
 	else
 		ksp->group[0]= '\0';
 	

@@ -2496,19 +2496,7 @@ static int do_outliner_item_activate(bContext *C, Scene *scene, ARegion *ar, Spa
 					WM_event_add_notifier(C, NC_SCENE|ND_OB_SELECT, scene);
 				}
 				else if(ELEM5(te->idcode, ID_ME, ID_CU, ID_MB, ID_LT, ID_AR)) {
-					Object *obedit= CTX_data_edit_object(C);
-					if(obedit) 
-						ED_object_exit_editmode(C, EM_FREEDATA|EM_FREEUNDO|EM_WAITCURSOR|EM_DO_UNDO);
-					else {
-						Object *ob= CTX_data_active_object(C);
-
-						/* Don't allow edit mode if the object is hide!
-						 * check the bug #22153 and #21609
-						 */
-						if (ob && (!(ob->restrictflag & OB_RESTRICT_VIEW)))
-							ED_object_enter_editmode(C, EM_WAITCURSOR);
-						// XXX extern_set_butspace(F9KEY, 0);
-					}
+					WM_operator_name_call(C, "OBJECT_OT_editmode_toggle", WM_OP_INVOKE_REGION_WIN, NULL);
 				} else {	// rest of types
 					tree_element_active(C, scene, soops, te, 1);
 				}
@@ -4144,12 +4132,9 @@ static void do_outliner_keyingset_editop(SpaceOops *soops, KeyingSet *ks, ListBa
 						
 						if (ksp) {
 							/* free path's data */
-							// TODO: we probably need an API method for this 
-							if (ksp->rna_path) MEM_freeN(ksp->rna_path);
+							BKE_keyingset_free_path(ks, ksp);
+
 							ks->active_path= 0;
-							
-							/* remove path from set */
-							BLI_freelinkN(&ks->paths, ksp);
 						}
 					}
 						break;

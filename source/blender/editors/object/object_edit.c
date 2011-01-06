@@ -524,7 +524,10 @@ static int editmode_toggle_poll(bContext *C)
 	if(ELEM(NULL, ob, ob->data) || ((ID *)ob->data)->lib)
 		return 0;
 
-	return ob && (ob->type == OB_MESH || ob->type == OB_ARMATURE ||
+	if (ob->restrictflag & OB_RESTRICT_VIEW)
+		return 0;
+
+	return (ob->type == OB_MESH || ob->type == OB_ARMATURE ||
 			  ob->type == OB_FONT || ob->type == OB_MBALL ||
 			  ob->type == OB_LATTICE || ob->type == OB_SURF ||
 			  ob->type == OB_CURVE);

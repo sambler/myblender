@@ -786,6 +786,13 @@ int object_add_material_slot(Object *ob)
 	
 	ma= give_current_material(ob, ob->actcol);
 
+    if(ma == NULL)
+		ma= add_material("Material");
+	else
+		ma= copy_material(ma);
+
+	id_us_min(&ma->id);
+
 	assign_material(ob, ma, ob->totcol+1);
 	ob->actcol= ob->totcol;
 	return TRUE;
@@ -1341,7 +1348,6 @@ void ramp_blend(int type, float *r, float *g, float *b, float fac, float *col)
 
 /* copy/paste buffer, if we had a propper py api that would be better */
 Material matcopybuf;
-// MTex mtexcopybuf;
 static short matcopied=0;
 
 void clear_matcopybuf(void)
@@ -1352,7 +1358,6 @@ void clear_matcopybuf(void)
 
 void free_matcopybuf(void)
 {
-//	extern MTex mtexcopybuf;	/* buttons.c */
 	int a;
 
 	for(a=0; a<MAX_MTEX; a++) {
@@ -1373,7 +1378,6 @@ void free_matcopybuf(void)
 		MEM_freeN(matcopybuf.nodetree);
 		matcopybuf.nodetree= NULL;
 	}
-//	default_mtex(&mtexcopybuf);
 
 	matcopied= 0;
 }
@@ -1442,10 +1446,4 @@ void paste_matcopybuf(Material *ma)
 	}
 
 	ma->nodetree= ntreeCopyTree(matcopybuf.nodetree, 0);
-
-	/*
-	BIF_preview_changed(ID_MA);
-	BIF_undo_push("Paste material settings");
-	scrarea_queue_winredraw(curarea);
-	*/
 }

@@ -91,6 +91,7 @@
 #include "ED_util.h"
 
 #include "GHOST_C-api.h"
+#include "GHOST_Path-api.h"
 
 #include "UI_interface.h"
 
@@ -305,9 +306,6 @@ void WM_read_file(bContext *C, const char *name, ReportList *reports)
 				write_history();
 		}
 
-// XXX		undo_editmode_clear();
-		BKE_reset_undo();
-		BKE_write_undo(C, "original");	/* save current state */
 
 		WM_event_add_notifier(C, NC_WM|ND_FILEREAD, NULL);
 //		refresh_interface_font();
@@ -319,10 +317,15 @@ void WM_read_file(bContext *C, const char *name, ReportList *reports)
 
 #ifdef WITH_PYTHON
 		/* run any texts that were loaded in and flagged as modules */
-		BPY_reset_driver();
-		BPY_load_user_modules(C);
+		BPY_driver_reset();
+		BPY_modules_load_user(C);
 #endif
 		CTX_wm_window_set(C, NULL); /* exits queues */
+
+		// XXX		undo_editmode_clear();
+		BKE_reset_undo();
+		BKE_write_undo(C, "original");	/* save current state */
+		
 	}
 	else if(retval==1)
 		BKE_write_undo(C, "Import file");
@@ -413,10 +416,10 @@ int WM_read_homefile(bContext *C, wmOperator *op)
 #ifdef WITH_PYTHON
 	if(CTX_py_init_get(C)) {
 		/* sync addons, these may have changed from the defaults */
-		BPY_eval_string(C, "__import__('bpy').utils.addon_reset_all()");
+		BPY_string_exec(C, "__import__('bpy').utils.addon_reset_all()");
 
-		BPY_reset_driver();
-		BPY_load_user_modules(C);
+		BPY_driver_reset();
+		BPY_modules_load_user(C);
 	}
 #endif
 	
@@ -509,6 +512,9 @@ static void write_history(void)
 			}
 			fclose(fp);
 		}
+
+		/* also update most recent files on System */
+		GHOST_addToSystemRecentFiles(G.main->name);
 	}
 }
 

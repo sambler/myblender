@@ -704,8 +704,8 @@ int RNA_property_array_dimension(PointerRNA *ptr, PropertyRNA *prop, int length[
 {
 	PropertyRNA *rprop= rna_ensure_property(prop);
 
-	if(length && rprop->arraydimension > 1)
-		rna_ensure_property_multi_array_length(ptr, prop, length);
+	if(length)
+			rna_ensure_property_multi_array_length(ptr, prop, length);
 
 	return rprop->arraydimension;
 }
@@ -2302,8 +2302,7 @@ int RNA_property_collection_lookup_int(PointerRNA *ptr, PropertyRNA *prop, int k
 
 	if(cprop->lookupint) {
 		/* we have a callback defined, use it */
-		*r_ptr= cprop->lookupint(ptr, key);
-		return (r_ptr->data != NULL);
+		return cprop->lookupint(ptr, key, r_ptr);
 	}
 	else {
 		/* no callback defined, just iterate and find the nth item */
@@ -2332,8 +2331,7 @@ int RNA_property_collection_lookup_string(PointerRNA *ptr, PropertyRNA *prop, co
 
 	if(cprop->lookupstring) {
 		/* we have a callback defined, use it */
-		*r_ptr= cprop->lookupstring(ptr, key);
-		return (r_ptr->data != NULL);
+		return cprop->lookupstring(ptr, key, r_ptr);
 	}
 	else {
 		/* no callback defined, compare with name properties if they exist */

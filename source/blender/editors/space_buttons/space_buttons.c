@@ -69,7 +69,7 @@ static SpaceLink *buttons_new(const bContext *UNUSED(C))
 	
 	BLI_addtail(&sbuts->regionbase, ar);
 	ar->regiontype= RGN_TYPE_HEADER;
-	ar->alignment= RGN_ALIGN_BOTTOM;
+	ar->alignment= RGN_ALIGN_TOP;
 	
 #if 0
 	/* context area */
@@ -261,6 +261,7 @@ static void buttons_area_listener(ScrArea *sa, wmNotifier *wmn)
 			switch(wmn->data) {
 				case ND_TRANSFORM:
 					buttons_area_redraw(sa, BCONTEXT_OBJECT);
+					buttons_area_redraw(sa, BCONTEXT_DATA);	/* autotexpace flag */
 					break;
 				case ND_POSE:
 				case ND_BONE_ACTIVE:
@@ -348,6 +349,10 @@ static void buttons_area_listener(ScrArea *sa, wmNotifier *wmn)
 						ED_area_tag_redraw(sa);
 					break;
 			}
+			break;
+		case NC_NODE:
+			if(wmn->action==NA_SELECTED)
+				ED_area_tag_redraw(sa);
 			break;
 		/* Listener for preview render, when doing an global undo. */
 		case NC_WINDOW:

@@ -827,7 +827,7 @@ int isect_sweeping_sphere_tri_v3(float p1[3], float p2[3], float radius, float v
 	sub_v3_v3v3(bv,v0,p1);
 	elen2 = dot_v3v3(e1,e1);
 	edotv = dot_v3v3(e1,vel);
-	edotbv = dot_v3v3(e1,bv);
+	/* edotbv = dot_v3v3(e1,bv); */ /* UNUSED */
 
 	sub_v3_v3v3(bv,v1,p1);
 	elen2 = dot_v3v3(e3,e3);
@@ -972,7 +972,6 @@ int isect_line_line_strict_v3(float v1[3], float v2[3], float v3[3], float v4[3]
 {
 	float a[3], b[3], c[3], ab[3], cb[3], ca[3], dir1[3], dir2[3];
 	float d;
-	float d1;
 	
 	sub_v3_v3v3(c, v3, v1);
 	sub_v3_v3v3(a, v2, v1);
@@ -985,8 +984,6 @@ int isect_line_line_strict_v3(float v1[3], float v2[3], float v3[3], float v4[3]
 		/* colinear or one vector is zero-length*/
 		return 0;
 	}
-	
-	d1 = d;
 
 	cross_v3_v3v3(ab, a, b);
 	d = dot_v3v3(c, ab);
@@ -1033,7 +1030,7 @@ int isect_aabb_aabb_v3(float min1[3], float max1[3], float min2[3], float max2[3
 /* find closest point to p on line through l1,l2 and return lambda,
  * where (0 <= lambda <= 1) when cp is in the line segement l1,l2
  */
-float closest_to_line_v3(float cp[3],float p[3], float l1[3], float l2[3])
+float closest_to_line_v3(float cp[3], const float p[3], const float l1[3], const float l2[3])
 {
 	float h[3],u[3],lambda;
 	sub_v3_v3v3(u, l2, l1);
@@ -1042,6 +1039,17 @@ float closest_to_line_v3(float cp[3],float p[3], float l1[3], float l2[3])
 	cp[0] = l1[0] + u[0] * lambda;
 	cp[1] = l1[1] + u[1] * lambda;
 	cp[2] = l1[2] + u[2] * lambda;
+	return lambda;
+}
+
+float closest_to_line_v2(float cp[2],const float p[2], const float l1[2], const float l2[2])
+{
+	float h[2],u[2],lambda;
+	sub_v2_v2v2(u, l2, l1);
+	sub_v2_v2v2(h, p, l1);
+	lambda =dot_v2v2(u,h)/dot_v2v2(u,u);
+	cp[0] = l1[0] + u[0] * lambda;
+	cp[1] = l1[1] + u[1] * lambda;
 	return lambda;
 }
 

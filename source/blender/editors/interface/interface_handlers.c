@@ -38,6 +38,8 @@
 
 #include "BLI_math.h"
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
+
 #include "PIL_time.h"
 
 #include "BKE_colortools.h"
@@ -3755,13 +3757,13 @@ static int ui_numedit_but_VECTORSCOPE(uiBut *but, uiHandleButtonData *data, int 
 	Scopes *scopes = (Scopes *)but->poin;
 	rcti rect;
 	int changed= 1;
-	float dx, dy;
+	/* float dx, dy; */
 
 	rect.xmin= but->x1; rect.xmax= but->x2;
 	rect.ymin= but->y1; rect.ymax= but->y2;
 
-	dx = mx - data->draglastx;
-	dy = my - data->draglasty;
+	/* dx = mx - data->draglastx; */
+	/* dy = my - data->draglasty; */
 
 	if (in_scope_resize_zone(but, data->dragstartx, data->dragstarty)) {
 		 /* resize vectorscope widget itself */
@@ -5677,7 +5679,6 @@ int ui_handle_menu_event(bContext *C, wmEvent *event, uiPopupBlockHandle *menu, 
 						(event->ctrl == FALSE) &&
 						(event->oskey == FALSE)
 					) {
-						count= 0;
 						for(but= block->buttons.first; but; but= but->next) {
 
 							if(but->menu_key==event->type) {

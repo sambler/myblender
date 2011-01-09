@@ -40,6 +40,11 @@
 #include "DNA_node_types.h"
 #include "DNA_scene_types.h"
 
+#include "BLI_math.h"
+#include "BLI_blenlib.h"
+#include "BLI_storage_types.h"
+#include "BLI_utildefines.h"
+
 #include "BKE_context.h"
 #include "BKE_global.h"
 #include "BKE_image.h"
@@ -50,11 +55,6 @@
 #include "BKE_paint.h"
 #include "BKE_texture.h"
 #include "BKE_report.h"
-
-
-#include "BLI_math.h"
-#include "BLI_blenlib.h"
-#include "BLI_storage_types.h"
 
 #include "RE_pipeline.h"
 
@@ -330,6 +330,7 @@ void ED_node_texture_default(Tex *tx)
 	ntreeSolveOrder(tx->nodetree);	/* needed for pointers */
 }
 
+/* id is supposed to contain a node tree */
 void node_tree_from_ID(ID *id, bNodeTree **ntree, bNodeTree **edittree, int *treetype)
 {
 	bNode *node= NULL;
@@ -346,6 +347,10 @@ void node_tree_from_ID(ID *id, bNodeTree **ntree, bNodeTree **edittree, int *tre
 	else if(idtype == ID_TE) {
 		*ntree= ((Tex*)id)->nodetree;
 		if(treetype) *treetype= NTREE_TEXTURE;
+	}
+	else {
+		if(treetype) *treetype= 0;
+		return;
 	}
 
 	/* find editable group */
@@ -1521,7 +1526,7 @@ static int node_duplicate_exec(bContext *C, wmOperator *UNUSED(op))
 	for(node= snode->edittree->nodes.first; node; node= node->next)
 		if(node->flag & SELECT)
 			if(node->id)
-				ED_node_changed_update(node->id, node);
+				ED_node_changed_update(snode->id, node);
 	
 	ntreeSolveOrder(snode->edittree);
 	node_tree_verify_groups(snode->nodetree);

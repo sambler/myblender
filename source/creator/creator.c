@@ -58,6 +58,7 @@
 #include "BLI_args.h"
 #include "BLI_threads.h"
 #include "BLI_scanfill.h" // for BLI_setErrorCallBack, TODO, move elsewhere
+#include "BLI_utildefines.h"
 
 #include "DNA_ID.h"
 #include "DNA_scene_types.h"
@@ -904,7 +905,7 @@ static int load_file(int UNUSED(argc), char **argv, void *data)
 
 		/*we successfully loaded a blend file, get sure that
 		pointcache works */
-		if (retval!=0) {
+		if (retval != BKE_READ_FILE_FAIL) {
 			wmWindowManager *wm= CTX_wm_manager(C);
 
 			/* special case, 2.4x files */

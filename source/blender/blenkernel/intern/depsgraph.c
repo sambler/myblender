@@ -29,7 +29,11 @@
 #include <string.h>
 #include <math.h>
 
+#include "MEM_guardedalloc.h"
+
 #include "BLI_winstuff.h"
+#include "BLI_utildefines.h"
+#include "BLI_ghash.h"
 
 #include "DNA_anim_types.h"
 #include "DNA_camera_types.h"
@@ -40,10 +44,6 @@
 #include "DNA_scene_types.h"
 #include "DNA_screen_types.h"
 #include "DNA_windowmanager_types.h"
-
-#include "MEM_guardedalloc.h"
-
-#include "BLI_ghash.h"
 
 #include "BKE_animsys.h"
 #include "BKE_action.h"
@@ -61,6 +61,7 @@
 #include "BKE_pointcache.h"
 #include "BKE_scene.h"
 #include "BKE_screen.h"
+#include "BKE_utildefines.h"
 
 #include "depsgraph_private.h"
  
@@ -2264,7 +2265,7 @@ void DAG_on_load_update(Main *bmain, const short do_time)
 			oblay= (node)? node->lay: ob->lay;
 
 			if(oblay & lay) {
-				if(ELEM5(ob->type, OB_MESH, OB_CURVE, OB_SURF, OB_FONT, OB_MBALL))
+				if(ELEM6(ob->type, OB_MESH, OB_CURVE, OB_SURF, OB_FONT, OB_MBALL, OB_LATTICE))
 					ob->recalc |= OB_RECALC_DATA;
 				if(ob->dup_group) 
 					ob->dup_group->id.flag |= LIB_DOIT;
@@ -2274,7 +2275,7 @@ void DAG_on_load_update(Main *bmain, const short do_time)
 		for(group= bmain->group.first; group; group= group->id.next) {
 			if(group->id.flag & LIB_DOIT) {
 				for(go= group->gobject.first; go; go= go->next) {
-					if(ELEM5(go->ob->type, OB_MESH, OB_CURVE, OB_SURF, OB_FONT, OB_MBALL))
+					if(ELEM6(go->ob->type, OB_MESH, OB_CURVE, OB_SURF, OB_FONT, OB_MBALL, OB_LATTICE))
 						go->ob->recalc |= OB_RECALC_DATA;
 					if(go->ob->proxy_from)
 						go->ob->recalc |= OB_RECALC_OB;

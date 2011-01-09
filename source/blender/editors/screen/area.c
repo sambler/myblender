@@ -36,6 +36,7 @@
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
 #include "BLI_rand.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_context.h"
 #include "BKE_global.h"
@@ -959,7 +960,6 @@ void ED_region_toggle_hidden(bContext *C, ARegion *ar)
 	ScrArea *sa= CTX_wm_area(C);
 
 	ar->flag ^= RGN_FLAG_HIDDEN;
-	ar->v2d.flag &= ~V2D_IS_INITIALISED; /* XXX should become hide/unhide api? */
 
 	if(ar->flag & RGN_FLAG_HIDDEN)
 		WM_event_remove_handlers(C, &ar->handlers);

@@ -41,8 +41,9 @@
 #include "BLI_jitter.h"
 #include "BLI_rand.h"
 #include "BLI_threads.h"
+#include "BLI_utildefines.h"
 
-#include "BKE_utildefines.h"
+
 
 #include "DNA_image_types.h"
 #include "DNA_lamp_types.h"

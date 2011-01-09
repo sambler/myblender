@@ -30,8 +30,9 @@
 
 #include "BLI_math.h"
 #include "BLI_memarena.h"
+#include "BLI_utildefines.h"
 
-#include "BKE_utildefines.h"
+
 
 /********************************** Polygons *********************************/
 
@@ -629,7 +630,7 @@ static int getLowestRoot(float a, float b, float c, float maxR, float* root)
 	if (determinant >= 0.0f)
 	{
 		// calculate the two roots: (if determinant == 0 then
-		// x1==x2 but let’s disregard that slight optimization)
+		// x1==x2 but lets disregard that slight optimization)
 		float sqrtD = (float)sqrt(determinant);
 		float r1 = (-b - sqrtD) / (2.0f*a);
 		float r2 = (-b + sqrtD) / (2.0f*a);
@@ -661,7 +662,7 @@ int isect_sweeping_sphere_tri_v3(float p1[3], float p2[3], float radius, float v
 {
 	float e1[3], e2[3], e3[3], point[3], vel[3], /*dist[3],*/ nor[3], temp[3], bv[3];
 	float a, b, c, d, e, x, y, z, radius2=radius*radius;
-	float elen2,edotv,edotbv,nordotv,vel2;
+	float elen2,edotv,edotbv,nordotv;
 	float newLambda;
 	int found_by_sweep=0;
 
@@ -735,7 +736,7 @@ int isect_sweeping_sphere_tri_v3(float p1[3], float p2[3], float radius, float v
 	*lambda=1.0f;
 
 /*---test points---*/
-	a=vel2=dot_v3v3(vel,vel);
+	a=dot_v3v3(vel,vel);
 
 	/*v0*/
 	sub_v3_v3v3(temp,p1,v0);
@@ -824,9 +825,9 @@ int isect_sweeping_sphere_tri_v3(float p1[3], float p2[3], float radius, float v
 	}
 
 	/*e3*/
-	sub_v3_v3v3(bv,v0,p1);
-	elen2 = dot_v3v3(e1,e1);
-	edotv = dot_v3v3(e1,vel);
+	/* sub_v3_v3v3(bv,v0,p1); */ /* UNUSED */
+	/* elen2 = dot_v3v3(e1,e1); */ /* UNUSED */
+	/* edotv = dot_v3v3(e1,vel); */ /* UNUSED */
 	/* edotbv = dot_v3v3(e1,bv); */ /* UNUSED */
 
 	sub_v3_v3v3(bv,v1,p1);

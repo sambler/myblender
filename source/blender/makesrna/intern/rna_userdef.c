@@ -38,7 +38,7 @@
 #include "WM_api.h"
 #include "WM_types.h"
 
-#include "BKE_utildefines.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_sound.h"
 

@@ -31,12 +31,11 @@
 #include <string.h>
 #include <limits.h>
 
-
-
 #include "MEM_guardedalloc.h"
 
 #include "BLI_math.h"
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 #include "BLI_rand.h"
 #include "BLI_memarena.h"
 #include "BLI_ghash.h"
@@ -92,7 +91,7 @@
 #include "BKE_scene.h"
 #include "BKE_subsurf.h"
 #include "BKE_texture.h"
-#include "BKE_utildefines.h"
+
 #include "BKE_world.h"
 
 #include "PIL_time.h"

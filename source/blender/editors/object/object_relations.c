@@ -47,6 +47,7 @@
 #include "BLI_editVert.h"
 #include "BLI_listbase.h"
 #include "BLI_string.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_action.h"
 #include "BKE_animsys.h"
@@ -279,10 +280,9 @@ static int make_proxy_invoke (bContext *C, wmOperator *op, wmEvent *evt)
 	else if (ob->id.lib) {
 		uiPopupMenu *pup= uiPupMenuBegin(C, "OK?", ICON_QUESTION);
 		uiLayout *layout= uiPupMenuLayout(pup);
-		PointerRNA props_ptr;
 		
 		/* create operator menu item with relevant properties filled in */
-		props_ptr= uiItemFullO(layout, op->idname, op->type->name, ICON_NULL, NULL, WM_OP_EXEC_REGION_WIN, UI_ITEM_O_RETURN_PROPS);
+		uiItemFullO(layout, op->idname, op->type->name, ICON_NULL, NULL, WM_OP_EXEC_REGION_WIN, UI_ITEM_O_RETURN_PROPS);
 		
 		/* present the menu and be done... */
 		uiPupMenuEnd(C, pup);

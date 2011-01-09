@@ -34,6 +34,7 @@
 #include "DNA_windowmanager_types.h"
 
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 #include "BLI_dynstr.h"
 #include "BLI_ghash.h"
 
@@ -42,7 +43,7 @@
 #include "BKE_idprop.h"
 #include "BKE_main.h"
 #include "BKE_report.h"
-#include "BKE_utildefines.h"
+
 
 #include "WM_api.h"
 
@@ -4206,8 +4207,6 @@ void RNA_parameter_list_begin(ParameterList *parms, ParameterIterator *iter)
 
 void RNA_parameter_list_next(ParameterIterator *iter)
 {
-	PropertyType ptype;
-
 	iter->offset+= iter->size;
 	iter->parm= iter->parm->next;
 	iter->valid= iter->parm != NULL;
@@ -4215,7 +4214,6 @@ void RNA_parameter_list_next(ParameterIterator *iter)
 	if(iter->valid) {
 		iter->size= rna_parameter_size_alloc(iter->parm);
 		iter->data= (((char*)iter->parms->data)+iter->offset);
-		ptype= RNA_property_type(iter->parm);
 	}
 }
 

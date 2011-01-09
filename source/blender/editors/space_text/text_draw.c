@@ -36,6 +36,7 @@
 #include "BLF_api.h"
 
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 
 #include "DNA_text_types.h"
 #include "DNA_space_types.h"
@@ -45,7 +46,7 @@
 #include "BKE_context.h"
 #include "BKE_suggestions.h"
 #include "BKE_text.h"
-#include "BKE_utildefines.h"
+
 
 #include "BIF_gl.h"
 
@@ -601,7 +602,6 @@ void wrap_offset_in_line(SpaceText *st, ARegion *ar, TextLine *linein, int cursi
 	start= 0;
 	end= max;
 	chop= 1;
-	chars= 0;
 	*offc= 0;
 
 	for(i=0, j=0; linein->line[j]!='\0'; j++) {

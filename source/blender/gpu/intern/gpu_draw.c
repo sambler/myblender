@@ -35,6 +35,7 @@
 #include "GL/glew.h"
 
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
 #include "DNA_lamp_types.h"
 #include "DNA_material_types.h"
@@ -58,7 +59,7 @@
 #include "BKE_material.h"
 #include "BKE_node.h"
 #include "BKE_object.h"
-#include "BKE_utildefines.h"
+
 
 #include "BLI_threads.h"
 #include "BLI_blenlib.h"

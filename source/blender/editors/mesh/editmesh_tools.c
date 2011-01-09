@@ -52,6 +52,7 @@ editmesh_tool.c: UI called tools for editmesh, geometry changes here, otherwise 
 
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 #include "BLI_editVert.h"
 #include "BLI_rand.h"
 #include "BLI_ghash.h"
@@ -1197,13 +1198,13 @@ static void delete_mesh(EditMesh *em, wmOperator *op, int event)
 	EditVert *eve,*nextve;
 	EditEdge *eed,*nexted;
 	int count;
-	const char *str="Erase";
+	/* const char *str="Erase"; */
 
 
 	if(event<1) return;
 
 	if(event==10 ) {
-		str= "Erase Vertices";
+		/* str= "Erase Vertices"; */
 		erase_edges(em, &em->edges);
 		erase_faces(em, &em->faces);
 		erase_vertices(em, &em->verts);
@@ -1212,10 +1213,10 @@ static void delete_mesh(EditMesh *em, wmOperator *op, int event)
 		if(!EdgeLoopDelete(em, op))
 			return;
 
-		str= "Erase Edge Loop";
+		/* str= "Erase Edge Loop"; */
 	}
 	else if(event==4) {
-		str= "Erase Edges & Faces";
+		/* str= "Erase Edges & Faces"; */
 		efa= em->faces.first;
 		while(efa) {
 			nextvl= efa->next;
@@ -1257,7 +1258,7 @@ static void delete_mesh(EditMesh *em, wmOperator *op, int event)
 		}
 	}
 	else if(event==1) {
-		str= "Erase Edges";
+		/* str= "Erase Edges"; */
 		// faces first
 		efa= em->faces.first;
 		while(efa) {
@@ -1302,18 +1303,18 @@ static void delete_mesh(EditMesh *em, wmOperator *op, int event)
 
 	}
 	else if(event==2) {
-		str="Erase Faces";
+		/* str="Erase Faces"; */
 		delfaceflag(em, SELECT);
 	}
 	else if(event==3) {
-		str= "Erase All";
+		/* str= "Erase All"; */
 		if(em->verts.first) free_vertlist(em, &em->verts);
 		if(em->edges.first) free_edgelist(em, &em->edges);
 		if(em->faces.first) free_facelist(em, &em->faces);
 		if(em->selected.first) BLI_freelistN(&(em->selected));
 	}
 	else if(event==5) {
-		str= "Erase Only Faces";
+		/* str= "Erase Only Faces"; */
 		efa= em->faces.first;
 		while(efa) {
 			nextvl= efa->next;
@@ -1684,7 +1685,7 @@ static void fill_quad_double_op(EditMesh *em, EditFace *efa, struct GHash *gh, i
 	EditEdge *cedge[2]={NULL, NULL};
 	EditVert *v[4], **verts[2];
 	EditFace *hold;
-	short start=0, end, left, right, vertsize,i;
+	short start=0, /*end,*/ left, /* right,*/ vertsize,i;
 
 	v[0] = efa->v1;
 	v[1] = efa->v2;
@@ -1705,9 +1706,9 @@ static void fill_quad_double_op(EditMesh *em, EditFace *efa, struct GHash *gh, i
 	// the array to the correct direction
 
 	if(verts[0][0] != v[start]) {flipvertarray(verts[0],numcuts+2);}
-	end	= (start+1)%4;
+	/* end	= (start+1)%4; */ /* UNUSED */
 	left   = (start+2)%4;
-	right  = (start+3)%4;
+	/* right  = (start+3)%4; */ /* UNUSED */
 	if(verts[1][0] != v[left]) {flipvertarray(verts[1],numcuts+2);}
 	/*
 	We should have something like this now

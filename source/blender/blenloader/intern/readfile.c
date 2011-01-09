@@ -88,6 +88,7 @@
 
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_anim.h"
 #include "BKE_action.h"
@@ -2935,15 +2936,6 @@ static void direct_link_pointcache(FileData *fd, PointCache *cache)
 		pm = cache->mem_cache.first;
 
 		for(; pm; pm=pm->next) {
-			if(pm->index_array)
-				pm->index_array = newdataadr(fd, pm->index_array);
-			
-			/* writedata saved array of ints */
-			if(pm->index_array && (fd->flags & FD_FLAGS_SWITCH_ENDIAN)) {
-				for(i=0; i<pm->totpoint; i++)
-					SWITCH_INT(pm->index_array[i]);
-			}
-			
 			for(i=0; i<BPHYS_TOT_DATA; i++) {
 				pm->data[i] = newdataadr(fd, pm->data[i]);
 				
@@ -3927,9 +3919,10 @@ static void direct_link_modifiers(FileData *fd, ListBase *lb)
 		} else if (md->type==eModifierType_ParticleSystem) {
 			ParticleSystemModifierData *psmd = (ParticleSystemModifierData*) md;
 
-			psmd->dm=0;
-			psmd->psys=newdataadr(fd, psmd->psys);
+			psmd->dm= NULL;
+			psmd->psys= newdataadr(fd, psmd->psys);
 			psmd->flag &= ~eParticleSystemFlag_psys_updated;
+			psmd->flag |= eParticleSystemFlag_file_loaded;
 		} else if (md->type==eModifierType_Explode) {
 			ExplodeModifierData *psmd = (ExplodeModifierData*) md;
 
@@ -11179,6 +11172,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 				part->boids->pitch = 1.0f;
 
 			part->flag &= ~PART_HAIR_REGROW; /* this was a deprecated flag before */
+			part->kink_amp_clump = 1.f; /* keep old files looking similar */
 		}
 
 		for (sc= main->screen.first; sc; sc= sc->id.next) {

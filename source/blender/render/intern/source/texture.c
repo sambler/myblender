@@ -30,11 +30,10 @@
 #include <string.h>
 #include <math.h>
 
-
-
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
 #include "BLI_rand.h"
+#include "BLI_utildefines.h"
 
 #include "DNA_texture_types.h"
 #include "DNA_object_types.h"
@@ -52,7 +51,7 @@
 #include "BKE_image.h"
 #include "BKE_node.h"
 #include "BKE_plugin_types.h"
-#include "BKE_utildefines.h"
+
 
 #include "BKE_global.h"
 #include "BKE_main.h"

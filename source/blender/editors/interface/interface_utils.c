@@ -30,8 +30,10 @@
 
 #include "DNA_object_types.h"
 
+#include "BLI_utildefines.h"
+
 #include "BKE_context.h"
-#include "BKE_utildefines.h"
+
 
 #include "RNA_access.h"
 

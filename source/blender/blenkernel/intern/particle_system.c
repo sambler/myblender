@@ -2380,7 +2380,7 @@ static void particle_fluidsim(ParticleSystem *psys, int own_psys, ParticleData *
 				}
 				else { /* PART_SPRING_HOOKES - Hooke's spring force */
 					/* L is a factor of radius */
-					D2 = 0.5 * dtime * dtime * 10.f * fluid->spring_k * (1.f - L/h) * (L - rij);
+					float D2 = 0.5 * dtime * dtime * 10.f * fluid->spring_k * (1.f - L/h) * (L - rij);
  
 				madd_v3_v3fl(pa->state.co, ptn[n].co, -D2 * massfactor);
 					if(own_psys)

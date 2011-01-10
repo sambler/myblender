@@ -97,7 +97,7 @@
 /* could be made into a pointcache option */
 #define DURIAN_POINTCACHE_LIB_OK 1
 
-int ptcache_data_size[] = {	
+static int ptcache_data_size[] = {	
 		sizeof(unsigned int), // BPHYS_DATA_INDEX
 		3 * sizeof(float), // BPHYS_DATA_LOCATION
 		3 * sizeof(float), // BPHYS_DATA_VELOCITY
@@ -106,6 +106,11 @@ int ptcache_data_size[] = {
 		sizeof(float), // BPHYS_DATA_SIZE
 		3 * sizeof(float), // BPHYS_DATA_TIMES
 		sizeof(BoidData) // case BPHYS_DATA_BOIDS
+};
+
+static int ptcache_extra_datasize[] = {
+	0,
+	sizeof(ParticleSpring)
 };
 
 /* forward declerations */
@@ -411,7 +416,7 @@ static void ptcache_particle_extra_write(void *psys_v, PTCacheMem *pm, int UNUSE
 	}
 }
 
-static int ptcache_particle_extra_read(void *psys_v, PTCacheMem *pm, float UNUSED(cfra))
+static void ptcache_particle_extra_read(void *psys_v, PTCacheMem *pm, float UNUSED(cfra))
 {
 	ParticleSystem *psys = psys_v;
 	PTCacheExtra *extra = pm->extradata.first;
@@ -429,7 +434,6 @@ static int ptcache_particle_extra_read(void *psys_v, PTCacheMem *pm, float UNUSE
 			}
 		}
 	}
-	return 1;
 }
 
 /* Cloth functions */
@@ -1213,7 +1217,7 @@ int BKE_ptcache_mem_index_find(PTCacheMem *pm, unsigned int index)
 			return -1;
 
 		/* check simple case for continuous indexes first */
-		if(data[index-*data]==index)
+		if(index-*data < high && data[index-*data] == index)
 			return index-*data;
 
 		while(low <= high) {

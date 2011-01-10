@@ -129,7 +129,7 @@ option(WITH_PYTHON_INSTALL       "Copy system python into the blender install fo
 option(WITH_CXX_GUARDEDALLOC "Enable GuardedAlloc for C++ memory allocation tracking" OFF)
 mark_as_advanced(WITH_CXX_GUARDEDALLOC)
 
-option(WITH_ASSERT_ABORT "Call abort() when raising an assertion through BKE_assert()" OFF)
+option(WITH_ASSERT_ABORT "Call abort() when raising an assertion through BLI_assert()" OFF)
 mark_as_advanced(WITH_ASSERT_ABORT)
 
 if(APPLE)
@@ -906,7 +906,7 @@ if(WITH_BUILDINFO)
 		# my mods to manually place an svn revision as git doesn't respond properly
 		#execute_process(COMMAND svnversion ${CMAKE_SOURCE_DIR} OUTPUT_VARIABLE BUILD_REV RESULT_VARIABLE BUILD_REV_RETURN OUTPUT_STRIP_TRAILING_WHITESPACE)
 		#if(BUILD_REV_RETURN)
-			set(BUILD_REV "34188")
+			set(BUILD_REV "34212")
 		#endif()
 	endif()
 	
@@ -915,7 +915,7 @@ if(WITH_BUILDINFO)
 		execute_process(COMMAND cmd /c time /t OUTPUT_VARIABLE BUILD_TIME OUTPUT_STRIP_TRAILING_WHITESPACE)  
 		#execute_process(COMMAND svnversion ${CMAKE_SOURCE_DIR} OUTPUT_VARIABLE BUILD_REV RESULT_VARIABLE BUILD_REV_RETURN OUTPUT_STRIP_TRAILING_WHITESPACE)
 		#if(BUILD_REV_RETURN)
-			set(BUILD_REV "34188")
+			set(BUILD_REV "34212")
 		#endif()
 	endif()
 endif()

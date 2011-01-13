@@ -10210,6 +10210,8 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 					ob->pd->shape = PFIELD_SHAPE_PLANE;
 				else if(ob->pd->flag & PFIELD_SURFACE)
 					ob->pd->shape = PFIELD_SHAPE_SURFACE;
+
+				ob->pd->flag |= PFIELD_DO_LOCATION;
 			}
 		}
 	}

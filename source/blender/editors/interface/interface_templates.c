@@ -1893,15 +1893,12 @@ void uiTemplateLayers(uiLayout *layout, PointerRNA *ptr, const char *propname,
 	int groups, cols, layers;
 	int group, col, layer, row;
 	int cols_per_group = 5;
-	const char *desc;
-	
+
 	prop= RNA_struct_find_property(ptr, propname);
 	if (!prop) {
 		printf("uiTemplateLayer: layers property not found: %s.%s\n", RNA_struct_identifier(ptr->type), propname);
 		return;
 	}
-
-	desc= RNA_property_description(prop);
 	
 	/* the number of layers determines the way we group them 
 	 *	- we want 2 rows only (for now)
@@ -2334,7 +2331,6 @@ static void do_running_jobs(bContext *C, void *UNUSED(arg), int event)
 void uiTemplateRunningJobs(uiLayout *layout, bContext *C)
 {
 	bScreen *screen= CTX_wm_screen(C);
-	Scene *scene= CTX_data_scene(C);
 	wmWindowManager *wm= CTX_wm_manager(C);
 	ScrArea *sa= CTX_wm_area(C);
 	uiBlock *block;
@@ -2352,6 +2348,7 @@ void uiTemplateRunningJobs(uiLayout *layout, bContext *C)
 		handle_event= B_STOPCOMPO;
 	} 
 	else {
+		Scene *scene;
 		/* another scene can be rendering too, for example via compositor */
 		for(scene= CTX_data_main(C)->scene.first; scene; scene= scene->id.next)
 			if(WM_jobs_test(wm, scene))

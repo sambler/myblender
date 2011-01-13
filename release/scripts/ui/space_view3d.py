@@ -1241,7 +1241,7 @@ class VIEW3D_MT_pose_transform(bpy.types.Menu):
     def draw(self, context):
         layout = self.layout
 
-        layout.label(text="User Transform")
+        layout.operator("pose.transforms_clear", text="All")
 
         layout.operator("pose.loc_clear", text="Location")
         layout.operator("pose.rot_clear", text="Rotation")
@@ -1695,7 +1695,7 @@ class VIEW3D_MT_edit_curve_ctrlpoints(bpy.types.Menu):
         edit_object = context.edit_object
 
         if edit_object.type == 'CURVE':
-            layout.operator("transform.transform").mode = 'TILT'
+            layout.operator("transform.transform", text="Tilt").mode = 'TILT'
             layout.operator("curve.tilt_clear")
             layout.operator("curve.separate")
 
@@ -2131,7 +2131,7 @@ class VIEW3D_PT_view3d_meshdisplay(bpy.types.Panel):
         col.separator()
         col.label(text="Numerics:")
         col.prop(mesh, "show_extra_edge_length")
-        col.prop(mesh, "show_extra_edge_angle")
+        col.prop(mesh, "show_extra_face_angle")
         col.prop(mesh, "show_extra_face_area")
 
 

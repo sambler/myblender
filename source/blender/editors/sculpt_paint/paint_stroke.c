@@ -766,17 +766,24 @@ static int paint_space_stroke(bContext *C, wmOperator *op, wmEvent *event, const
 		if(length > FLT_EPSILON) {
 			int steps;
 			int i;
-			float pressure;
+			float pressure= 1.0f;
 
-			pressure = event_tablet_data(event, NULL);
-			scale = (brush_size(stroke->brush)*pressure*stroke->brush->spacing/50.0f) / length;
-			mul_v2_fl(vec, scale);
+			/* XXX mysterious :) what has 'use size' do with this here... if you don't check for it, pressure fails */
+			if(brush_use_size_pressure(stroke->brush))
+				pressure = event_tablet_data(event, NULL);
+			
+			if(pressure > FLT_EPSILON) {
+				scale = (brush_size(stroke->brush)*pressure*stroke->brush->spacing/50.0f) / length;
+				if(scale > FLT_EPSILON) {
+					mul_v2_fl(vec, scale);
 
-			steps = (int)(1.0f / scale);
+					steps = (int)(1.0f / scale);
 
-			for(i = 0; i < steps; ++i, ++cnt) {
-				add_v2_v2(mouse, vec);
-				paint_brush_stroke_add_step(C, op, event, mouse);
+					for(i = 0; i < steps; ++i, ++cnt) {
+						add_v2_v2(mouse, vec);
+						paint_brush_stroke_add_step(C, op, event, mouse);
+					}
+				}
 			}
 		}
 	}

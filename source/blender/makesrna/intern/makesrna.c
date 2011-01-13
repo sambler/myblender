@@ -948,6 +948,8 @@ static char *rna_def_property_begin_func(FILE *f, StructRNA *srna, PropertyRNA *
 
 static char *rna_def_property_lookup_int_func(FILE *f, StructRNA *srna, PropertyRNA *prop, PropertyDefRNA *dp, char *manualfunc, char *nextfunc)
 {
+	/* note on indicies, this is for external functions and ignores skipped values.
+	 * so the the index can only be checked against the length when there is no 'skip' funcion. */
 	char *func;
 
 	if(prop->flag & PROP_IDPROPERTY && manualfunc==NULL)
@@ -978,24 +980,22 @@ static char *rna_def_property_lookup_int_func(FILE *f, StructRNA *srna, Property
 	fprintf(f, "	CollectionPropertyIterator iter;\n\n");
 
 	fprintf(f, "	%s_%s_begin(&iter, ptr);\n\n", srna->identifier, prop->identifier);
-	fprintf(f, "	{\n");
+	fprintf(f, "	if(iter.valid){\n");
 
 	if(strcmp(nextfunc, "rna_iterator_array_next") == 0) {
 		fprintf(f, "		ArrayIterator *internal= iter.internal;\n");
 		fprintf(f, "		if(index < 0 || index >= internal->length) {\n");
 		fprintf(f, "#ifdef __GNUC__\n");
-		fprintf(f, "			printf(\"Array iterator out of range: %%s (index %%d range %%d)\\n\", __func__, index, internal->length);  \n");
+		fprintf(f, "			printf(\"Array iterator out of range: %%s (index %%d)\\n\", __func__, index);\n");
 		fprintf(f, "#else\n");
-		fprintf(f, "			printf(\"Array iterator out of range: (index %%d range %%d)\\n\", index, internal->length);  \n");
+		fprintf(f, "			printf(\"Array iterator out of range: (index %%d)\\n\", index);\n");
 		fprintf(f, "#endif\n");
 		fprintf(f, "		}\n");
 		fprintf(f, "		else if(internal->skip) {\n");
-		fprintf(f, "			while(index-- > 0) {\n");
-		fprintf(f, "				do {\n");
-		fprintf(f, "					internal->ptr += internal->itemsize;\n");
-		fprintf(f, "				} while(internal->skip(&iter, internal->ptr));\n");
+		fprintf(f, "			while(index-- > 0 && iter.valid) {\n");
+		fprintf(f, "				rna_iterator_array_next(&iter);\n");
 		fprintf(f, "			}\n");
-		fprintf(f, "			found= 1;\n");
+		fprintf(f, "			found= (index == -1 && iter.valid);\n");
 		fprintf(f, "		}\n");
 		fprintf(f, "		else {\n");
 		fprintf(f, "			internal->ptr += internal->itemsize*index;\n");
@@ -1005,22 +1005,20 @@ static char *rna_def_property_lookup_int_func(FILE *f, StructRNA *srna, Property
 	else if(strcmp(nextfunc, "rna_iterator_listbase_next") == 0) {
 		fprintf(f, "		ListBaseIterator *internal= iter.internal;\n");
 		fprintf(f, "		if(internal->skip) {\n");
-		fprintf(f, "			while(index-- > 0) {\n");
-		fprintf(f, "				do {\n");
-		fprintf(f, "					internal->link= internal->link->next;\n");
-		fprintf(f, "				} while(internal->skip(&iter, internal->link));\n");
+		fprintf(f, "			while(index-- > 0 && iter.valid) {\n");
+		fprintf(f, "				rna_iterator_listbase_next(&iter);\n");
 		fprintf(f, "			}\n");
+		fprintf(f, "			found= (index == -1 && iter.valid);\n");
 		fprintf(f, "		}\n");
 		fprintf(f, "		else {\n");
 		fprintf(f, "			while(index-- > 0 && internal->link)\n");
 		fprintf(f, "				internal->link= internal->link->next;\n");
+		fprintf(f, "			found= 1;\n");
 		fprintf(f, "		}\n");
-		fprintf(f, "		found= (index == -1);\n");
 	}
 
+	fprintf(f, "		if(found) *r_ptr = %s_%s_get(&iter);\n", srna->identifier, prop->identifier);
 	fprintf(f, "	}\n\n");
-
-	fprintf(f, "	if(found) *r_ptr = %s_%s_get(&iter);\n", srna->identifier, prop->identifier);
 	fprintf(f, "	%s_%s_end(&iter);\n\n", srna->identifier, prop->identifier);
 
 	fprintf(f, "	return found;\n");

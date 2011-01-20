@@ -5741,7 +5741,7 @@ int ui_handle_menu_event(bContext *C, wmEvent *event, uiPopupBlockHandle *menu, 
 
 				if(ELEM3(event->type, LEFTMOUSE, MIDDLEMOUSE, RIGHTMOUSE) && event->val==KM_PRESS) {
 					if(saferct && !BLI_in_rctf(&saferct->parent, event->x, event->y)) {
-						if(block->flag & (UI_BLOCK_OUT_1|UI_BLOCK_KEEP_OPEN))
+						if(block->flag & (UI_BLOCK_OUT_1))
 							menu->menuretval= UI_RETURN_OK;
 						else
 							menu->menuretval= UI_RETURN_OUT;
@@ -5782,7 +5782,7 @@ int ui_handle_menu_event(bContext *C, wmEvent *event, uiPopupBlockHandle *menu, 
 
 					/* strict check, and include the parent rect */
 					if(!menu->dotowards && !saferct) {
-						if(block->flag & (UI_BLOCK_OUT_1|UI_BLOCK_KEEP_OPEN))
+						if(block->flag & (UI_BLOCK_OUT_1))
 							menu->menuretval= UI_RETURN_OK;
 						else
 							menu->menuretval= UI_RETURN_OUT;

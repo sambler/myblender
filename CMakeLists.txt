@@ -50,6 +50,8 @@ cmake_minimum_required(VERSION 2.6)
 
 project(Blender)
 
+enable_testing()
+
 #-----------------------------------------------------------------------------
 # Redirect output files
 
@@ -906,7 +908,7 @@ if(WITH_BUILDINFO)
 		# my mods to manually place an svn revision as git doesn't respond properly
 		#execute_process(COMMAND svnversion ${CMAKE_SOURCE_DIR} OUTPUT_VARIABLE BUILD_REV RESULT_VARIABLE BUILD_REV_RETURN OUTPUT_STRIP_TRAILING_WHITESPACE)
 		#if(BUILD_REV_RETURN)
-			set(BUILD_REV "34410")
+			set(BUILD_REV "34476")
 		#endif()
 	endif()
 	
@@ -915,7 +917,7 @@ if(WITH_BUILDINFO)
 		execute_process(COMMAND cmd /c time /t OUTPUT_VARIABLE BUILD_TIME OUTPUT_STRIP_TRAILING_WHITESPACE)  
 		#execute_process(COMMAND svnversion ${CMAKE_SOURCE_DIR} OUTPUT_VARIABLE BUILD_REV RESULT_VARIABLE BUILD_REV_RETURN OUTPUT_STRIP_TRAILING_WHITESPACE)
 		#if(BUILD_REV_RETURN)
-			set(BUILD_REV "34410")
+			set(BUILD_REV "34476")
 		#endif()
 	endif()
 endif()

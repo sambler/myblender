@@ -3264,7 +3264,8 @@ static void draw_sensor_armature(uiLayout *layout, PointerRNA *ptr)
 	}
 	row = uiLayoutRow(layout, 1);
 	uiItemR(row, ptr, "test_type", 0, NULL, ICON_NULL);
-	uiItemR(row, ptr, "value", 0, NULL, ICON_NULL);
+	if (RNA_enum_get(ptr, "test_type") != SENS_ARM_STATE_CHANGED)
+		uiItemR(row, ptr, "value", 0, NULL, ICON_NULL);
 }
 
 static void draw_sensor_collision(uiLayout *layout, PointerRNA *ptr, bContext *C)
@@ -4097,14 +4098,19 @@ static void draw_actuator_motion(uiLayout *layout, PointerRNA *ptr)
 
 static void draw_actuator_parent(uiLayout *layout, PointerRNA *ptr)
 {
-	uiLayout *row;
+	uiLayout *row, *subrow;
 
 	uiItemR(layout, ptr, "mode", 0, NULL, ICON_NULL);
-	uiItemR(layout, ptr, "object", 0, NULL, ICON_NULL);
 
-	row = uiLayoutRow(layout, 0);
-	uiItemR(row, ptr, "use_compound", 0, NULL, ICON_NULL);
-	uiItemR(row, ptr, "use_ghost", 0, NULL, ICON_NULL);
+	if (RNA_enum_get(ptr, "mode") == ACT_PARENT_SET) {
+		uiItemR(layout, ptr, "object", 0, NULL, ICON_NULL);
+
+		row = uiLayoutRow(layout, 0);
+		uiItemR(row, ptr, "use_compound", 0, NULL, ICON_NULL);
+		subrow= uiLayoutRow(row, 0);
+		uiLayoutSetActive(subrow, RNA_boolean_get(ptr, "use_compound")==1);
+		uiItemR(subrow, ptr, "use_ghost", 0, NULL, ICON_NULL);
+	}
 }
 
 static void draw_actuator_property(uiLayout *layout, PointerRNA *ptr)

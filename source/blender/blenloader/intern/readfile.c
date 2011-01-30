@@ -1039,7 +1039,7 @@ void blo_freefiledata(FileData *fd)
 
 int BLO_has_bfile_extension(char *str)
 {
-	return (BLI_testextensie(str, ".ble") || BLI_testextensie(str, ".blend")||BLI_testextensie(str, ".blend.gz"));
+	return (BLI_testextensie(str, ".ble") || BLI_testextensie(str, ".blend*")||BLI_testextensie(str, ".blend.gz"));
 }
 
 int BLO_is_a_library(const char *path, char *dir, char *group)
@@ -9989,12 +9989,15 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 			for(a=0; a<MAX_MTEX; a++) {
 				if(ma->mtex[a]) {
 					tex= ma->mtex[a]->tex;
-					if(!tex)
-						ma->mtex[a]->texflag |= MTEX_NEW_BUMP;
-					else {
+					if(!tex) {
+						ma->mtex[a]->texflag |= MTEX_3TAP_BUMP;
+						ma->mtex[a]->texflag |= MTEX_BUMP_OBJECTSPACE;
+					} else {
 						tex= (Tex*)newlibadr(fd, ma->id.lib, tex);
-						if(tex && tex->type == 0) /* invalid type */
-							ma->mtex[a]->texflag |= MTEX_NEW_BUMP;
+						if(tex && tex->type == 0) { /* invalid type */
+							ma->mtex[a]->texflag |= MTEX_3TAP_BUMP;
+							ma->mtex[a]->texflag |= MTEX_BUMP_OBJECTSPACE;
+						}
 					}
 				}
 			}

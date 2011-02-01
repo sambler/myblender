@@ -405,6 +405,8 @@ typedef struct SpaceNode {
 /* snode->flag */
 #define SNODE_BACKDRAW		2
 #define SNODE_DISPGP		4
+#define SNODE_USE_ALPHA		8
+#define SNODE_SHOW_ALPHA	16
 
 /* snode->texfrom */
 #define SNODE_TEX_OBJECT	0
@@ -698,7 +700,7 @@ enum FileSortTypeE {
 #define EDITING				(1<<0)
 #define ACTIVEFILE			(1<<1)
 #define BLENDERFILE			(1<<2)
-#define PSXFILE				(1<<3)
+#define BLENDERFILE_BACKUP	(1<<3)
 #define IMAGEFILE			(1<<4)
 #define MOVIEFILE			(1<<5)
 #define PYSCRIPTFILE		(1<<6)

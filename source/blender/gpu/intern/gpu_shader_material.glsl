@@ -1138,6 +1138,12 @@ void mtex_bump_init_objspace( vec3 surf_pos, vec3 surf_norm,
 	vR1 = cross( vSigmaT , vN );
 	vR2 = cross( vN , vSigmaS ) ;
 	fDet = dot ( vSigmaS , vR1 );
+	
+		/* transform back */
+	vR1 = vR1 * view2obj;
+	vR2 = vR2 * view2obj;
+	vN = vN * view2obj;
+
 }
 
 void mtex_bump_tap3( vec3 texco, sampler2D ima, float hScale, 
@@ -1179,32 +1185,21 @@ void mtex_bump_tap5( vec3 texco, sampler2D ima, float hScale,
 	dBt = hScale * (Hu - Hd);
 }
 
-void mtex_bump_apply_viewspace( float fDet, float dBs, float dBt, vec3 vR1, vec3 vR2, vec3 vN,
+void mtex_bump_apply( float fDet, float dBs, float dBt, vec3 vR1, vec3 vR2, vec3 vN,
                       out vec3 perturbed_norm ) 
 {
 	vec3 vSurfGrad = sign(fDet) * ( dBs * vR1 + dBt * vR2 );
 	perturbed_norm = normalize( abs(fDet) * vN - vSurfGrad );
 	
 }
-void mtex_bump_apply_objspace( float fDet, float dBs, float dBt, vec3 vR1in, vec3 vR2in, vec3 vNin,
-                                mat4 mViewInv, mat4 mObjInv,
-                      out vec3 perturbed_norm, out vec3 vR1, out vec3 vR2, out vec3 vN ) 
-{
-	vec3 vSurfGrad = sign(fDet) * ( dBs * vR1in + dBt * vR2in );
-	perturbed_norm = normalize( abs(fDet) * vNin - vSurfGrad );
-	/* tranform back */
-	mat3 view2obj = to_mat3(mObjInv * mViewInv);
-	vR1 = vR1in * view2obj;
-	vR2 = vR2in * view2obj;
-	vN = vNin * view2obj;
-}
+
 void mtex_bump_apply_texspace( float fDet, float dBs, float dBt, vec3 vR1, vec3 vR2, vec3 vN,
-                               sampler2D ima, vec3 texco, float scale, float ima_x, float ima_y, out vec3 perturbed_norm ) 
+                               sampler2D ima, vec3 texco, float ima_x, float ima_y, out vec3 perturbed_norm ) 
 {
 	vec2 TexDx = dFdx(texco.xy);
 	vec2 TexDy = dFdy(texco.xy);
 
-	vec3 vSurfGrad = sign(fDet) * scale * ( 
+	vec3 vSurfGrad = sign(fDet) * ( 
 	            dBs / length( vec2(ima_x*TexDx.x, ima_y*TexDx.y) ) * normalize(vR1) + 
 	            dBt / length( vec2(ima_x*TexDy.x, ima_y*TexDy.y) ) * normalize(vR2) );
 	perturbed_norm = normalize( vN - vSurfGrad );

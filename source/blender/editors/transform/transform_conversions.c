@@ -827,9 +827,9 @@ static void pose_grab_with_ik_clear(Object *ob)
 /* adds the IK to pchan - returns if added */
 static short pose_grab_with_ik_add(bPoseChannel *pchan)
 {
+	bKinematicConstraint *targetless = NULL;
 	bKinematicConstraint *data;
 	bConstraint *con;
-	bConstraint *targetless = 0;
 
 	/* Sanity check */
 	if (pchan == NULL)
@@ -838,15 +838,31 @@ static short pose_grab_with_ik_add(bPoseChannel *pchan)
 	/* Rule: not if there's already an IK on this channel */
 	for (con= pchan->constraints.first; con; con= con->next) {
 		if (con->type==CONSTRAINT_TYPE_KINEMATIC) {
-			bKinematicConstraint *data= con->data;
-			if(data->tar==NULL || (data->tar->type==OB_ARMATURE && data->subtarget[0]==0)) {
-				targetless = con;
+			data= con->data;
+			
+			if (data->tar==NULL || (data->tar->type==OB_ARMATURE && data->subtarget[0]=='\0')) {
+				/* make reference to constraint to base things off later (if it's the last targetless constraint encountered) */
+				targetless = (bKinematicConstraint *)con->data;
+				
 				/* but, if this is a targetless IK, we make it auto anyway (for the children loop) */
 				if (con->enforce!=0.0f) {
-					targetless->flag |= CONSTRAINT_IK_AUTO;
-					return 0;
+					data->flag |= CONSTRAINT_IK_AUTO;
+					
+					/* if no chain length has been specified, just make things obey standard rotation locks too */
+					if (data->rootbone == 0) {
+						for (; pchan; pchan=pchan->parent) {
+							/* here, we set ik-settings for bone from pchan->protectflag */
+							// XXX: careful with quats/axis-angle rotations where we're locking 4d components
+							if (pchan->protectflag & OB_LOCK_ROTX) pchan->ikflag |= BONE_IK_NO_XDOF_TEMP;
+							if (pchan->protectflag & OB_LOCK_ROTY) pchan->ikflag |= BONE_IK_NO_YDOF_TEMP;
+							if (pchan->protectflag & OB_LOCK_ROTZ) pchan->ikflag |= BONE_IK_NO_ZDOF_TEMP;
+						}
+					}
+					
+					return 0; 
 				}
 			}
+			
 			if ((con->flag & CONSTRAINT_DISABLE)==0 && (con->enforce!=0.0f))
 				return 0;
 		}
@@ -855,22 +871,24 @@ static short pose_grab_with_ik_add(bPoseChannel *pchan)
 	con = add_pose_constraint(NULL, pchan, "TempConstraint", CONSTRAINT_TYPE_KINEMATIC);
 	pchan->constflag |= (PCHAN_HAS_IK|PCHAN_HAS_TARGET);	/* for draw, but also for detecting while pose solving */
 	data= con->data;
-	if (targetless) { /* if exists use values from last targetless IK-constraint as base */
-		*data = *((bKinematicConstraint*)targetless->data);
+	if (targetless) { 
+		/* if exists, use values from last targetless (but disabled) IK-constraint as base */
+		*data = *targetless;
 	}
 	else
 		data->flag= CONSTRAINT_IK_TIP;
 	data->flag |= CONSTRAINT_IK_TEMP|CONSTRAINT_IK_AUTO;
 	VECCOPY(data->grabtarget, pchan->pose_tail);
-	data->rootbone= 1;
+	data->rootbone= 0; /* watch-it! has to be 0 here, since we're still on the same bone for the first time through the loop [#25885] */
 	
 	/* we only include bones that are part of a continual connected chain */
 	while (pchan) {
 		/* here, we set ik-settings for bone from pchan->protectflag */
+		// XXX: careful with quats/axis-angle rotations where we're locking 4d components
 		if (pchan->protectflag & OB_LOCK_ROTX) pchan->ikflag |= BONE_IK_NO_XDOF_TEMP;
 		if (pchan->protectflag & OB_LOCK_ROTY) pchan->ikflag |= BONE_IK_NO_YDOF_TEMP;
 		if (pchan->protectflag & OB_LOCK_ROTZ) pchan->ikflag |= BONE_IK_NO_ZDOF_TEMP;
-
+		
 		/* now we count this pchan as being included */
 		data->rootbone++;
 		

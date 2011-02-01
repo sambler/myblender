@@ -1315,25 +1315,22 @@ void BLI_make_file_string(const char *relabase, char *string,  const char *dir, 
 	BLI_clean(string);
 }
 
-/* if ext is .blend*, it doesn't compare last char */
 int BLI_testextensie(const char *str, const char *ext)
 {
 	short a, b;
 	int retval;
-
+	
 	a= strlen(str);
 	b= strlen(ext);
-
+	
 	if(a==0 || b==0 || b>=a) {
 		retval = 0;
-	} 
-	else {
-		if(ext[b-1]=='*')
-			retval= 0==BLI_strncasecmp(ext, str + a - b, b-1);
-		else
-			retval= 0==BLI_strcasecmp(ext, str + a - b);
+	} else if (BLI_strcasecmp(ext, str + a - b)) {
+		retval = 0;	
+	} else {
+		retval = 1;
 	}
-
+	
 	return (retval);
 }
 

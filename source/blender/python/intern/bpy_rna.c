@@ -83,7 +83,19 @@ static int rna_id_write_error(PointerRNA *ptr, PyObject *key)
 	}
 	return FALSE;
 }
+#endif // USE_PEDANTIC_WRITE
 
+
+#ifdef USE_PEDANTIC_WRITE
+int pyrna_write_check(void)
+{
+	return !rna_disallow_writes;
+}
+#else // USE_PEDANTIC_WRITE
+int pyrna_write_check(void)
+{
+	return TRUE;
+}
 #endif // USE_PEDANTIC_WRITE
 
 static Py_ssize_t pyrna_prop_collection_length(BPy_PropertyRNA *self);
@@ -5304,8 +5316,6 @@ static int bpy_class_validate(PointerRNA *dummyptr, void *py_data, int *have_fun
 	return 0;
 }
 
-extern void BPY_modules_update(bContext *C); //XXX temp solution
-
 /* TODO - multiple return values like with rna functions */
 static int bpy_class_call(bContext *C, PointerRNA *ptr, FunctionRNA *func, ParameterList *parms)
 {
@@ -5324,8 +5334,9 @@ static int bpy_class_call(bContext *C, PointerRNA *ptr, FunctionRNA *func, Param
 	PyGILState_STATE gilstate;
 
 #ifdef USE_PEDANTIC_WRITE
+	const char *func_id= RNA_function_identifier(func);
 	/* testing, for correctness, not operator and not draw function */
-	const short is_readonly= strstr("draw", RNA_function_identifier(func)) || !RNA_struct_is_a(ptr->type, &RNA_Operator);
+	const short is_readonly= strstr("draw", func_id) || strstr("render", func_id) || !RNA_struct_is_a(ptr->type, &RNA_Operator);
 #endif
 
 	py_class= RNA_struct_py_type_get(ptr->type);

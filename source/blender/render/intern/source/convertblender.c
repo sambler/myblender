@@ -4820,7 +4820,7 @@ static void database_init_objects(Render *re, unsigned int renderlay, int nolamp
 							}
 						}
 
-						if(obi==NULL)
+						if(myobi==NULL)
 							/* can't instance, just create the object */
 							init_render_object(re, obd, ob, dob, timeoffset, vectorlay);
 						

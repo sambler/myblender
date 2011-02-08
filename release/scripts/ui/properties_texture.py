@@ -99,7 +99,7 @@ class TEXTURE_PT_context_texture(TextureButtonsPanel, bpy.types.Panel):
         if not isinstance(pin_id, bpy.types.Material):
             pin_id = None
 
-        tex_collection = (pin_id is None) and (node is None) and (not isinstance(idblock, bpy.types.Brush))
+        tex_collection = (pin_id is None) and (idblock is not None) and (node is None) and (not isinstance(idblock, bpy.types.Brush))
 
         if tex_collection:
             row = layout.row()
@@ -799,6 +799,59 @@ class TEXTURE_PT_pointdensity_turbulence(TextureButtonsPanel, bpy.types.Panel):
         col.prop(pd, "turbulence_depth")
         col.prop(pd, "turbulence_strength")
 
+class TEXTURE_PT_ocean(TextureTypePanel, bpy.types.Panel):
+    bl_label = "Ocean"
+    tex_type = 'OCEAN'
+    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
+
+    def draw(self, context):
+        layout = self.layout
+        tex = context.texture
+        col = layout.column()
+
+        ot = tex.ocean
+
+        col = layout.column()
+        
+        col.prop(ot, "ocean_object")
+        
+        col.prop(ot, "output")
+        
+        '''
+        col.prop(ot, "xz")
+        
+        col.separator()
+        
+        col.prop(ot, "resolution")
+        col.prop(ot, "spatial_size")
+        
+        col.separator()
+        
+        col.prop(ot, "wave_alignment")
+        sub = col.column()
+        sub.active = ot.wave_alignment > 0
+        sub.prop(ot, "wave_direction")
+        col.prop(ot, "wave_scale")
+        
+        col.separator()
+        
+        col.prop(ot, "wind_velocity")
+        col.prop(ot, "damp")
+        col.prop(ot, "smallest_wave")
+        col.prop(ot, "depth")
+        
+        col.separator()
+        
+        col.prop(ot, "chop_amount")
+        if ot.output == 'FOAM':
+            col.prop(ot, "foam_coverage")
+        
+        col.separator()
+        
+        col.prop(ot, "time")
+        
+        # col.prop(ot, "generate_normals")
+        '''
 
 class TEXTURE_PT_mapping(TextureSlotPanel, bpy.types.Panel):
     bl_label = "Mapping"

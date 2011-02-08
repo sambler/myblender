@@ -226,7 +226,7 @@ static void draw_fcurve_vertices_handles (FCurve *fcu, View2D *v2d, short sel, s
 	else UI_ThemeColor(TH_HANDLE_VERTEX);
 	
 	/* anti-aliased lines for more consistent appearance */
-	glEnable(GL_LINE_SMOOTH);
+	//glEnable(GL_LINE_SMOOTH);
 	glEnable(GL_BLEND);
 	
 	for (i=0; i < fcu->totvert; i++, prevbezt=bezt, bezt++) {
@@ -251,7 +251,7 @@ static void draw_fcurve_vertices_handles (FCurve *fcu, View2D *v2d, short sel, s
 		}
 	}
 	
-	glDisable(GL_LINE_SMOOTH);
+	//glDisable(GL_LINE_SMOOTH);
 	glDisable(GL_BLEND);
 }
 
@@ -476,14 +476,14 @@ static void draw_fcurve_samples (ARegion *ar, FCurve *fcu)
 	/* draw */
 	if (first && last) {
 		/* anti-aliased lines for more consistent appearance */
-		glEnable(GL_LINE_SMOOTH);
+		//glEnable(GL_LINE_SMOOTH);
 		glEnable(GL_BLEND);
 		
 		draw_fcurve_sample_control(first->vec[0], first->vec[1], xscale, yscale, hsize);
 		draw_fcurve_sample_control(last->vec[0], last->vec[1], xscale, yscale, hsize);
 		
 		glDisable(GL_BLEND);
-		glDisable(GL_LINE_SMOOTH);
+		//glDisable(GL_LINE_SMOOTH);
 	}
 }
 
@@ -794,7 +794,7 @@ void graph_draw_ghost_curves (bAnimContext *ac, SpaceIpo *sipo, ARegion *ar)
 	glLineWidth(3.0f);
 	
 	/* anti-aliased lines for less jagged appearance */
-	glEnable(GL_LINE_SMOOTH);
+	//glEnable(GL_LINE_SMOOTH);
 	glEnable(GL_BLEND);
 	
 	/* the ghost curves are simply sampled F-Curves stored in sipo->ghostCurves */
@@ -813,7 +813,7 @@ void graph_draw_ghost_curves (bAnimContext *ac, SpaceIpo *sipo, ARegion *ar)
 	setlinestyle(0);
 	glLineWidth(1.0f);
 	
-	glDisable(GL_LINE_SMOOTH);
+	//glDisable(GL_LINE_SMOOTH);
 	glDisable(GL_BLEND);
 }
 
@@ -871,7 +871,7 @@ void graph_draw_curves (bAnimContext *ac, SpaceIpo *sipo, ARegion *ar, View2DGri
 			}
 			
 			/* anti-aliased lines for less jagged appearance */
-			glEnable(GL_LINE_SMOOTH);
+			//glEnable(GL_LINE_SMOOTH);
 			glEnable(GL_BLEND);
 			
 			/* draw F-Curve */
@@ -892,7 +892,7 @@ void graph_draw_curves (bAnimContext *ac, SpaceIpo *sipo, ARegion *ar, View2DGri
 			/* restore settings */
 			setlinestyle(0);
 			
-			glDisable(GL_LINE_SMOOTH);
+			//glDisable(GL_LINE_SMOOTH);
 			glDisable(GL_BLEND);
 		}
 		

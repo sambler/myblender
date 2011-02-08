@@ -193,6 +193,7 @@ void			nodeClearActiveID(struct bNodeTree *ntree, short idtype);
 
 void			NodeTagChanged(struct bNodeTree *ntree, struct bNode *node);
 int				NodeTagIDChanged(struct bNodeTree *ntree, struct ID *id);
+void			ntreeClearTags(struct bNodeTree *ntree);
 
 /* ************** Groups ****************** */
 
@@ -207,12 +208,12 @@ void			nodeCopyGroup(struct bNode *gnode);
 /* ************** COMMON NODES *************** */
 
 /* Init a new node type struct with default values and callbacks */
-void			node_type_init(struct bNodeType *ntype, int type, const char *name, short nclass, short flag,
+void			node_type_base(struct bNodeType *ntype, int type, const char *name, short nclass, short flag,
 							   struct bNodeSocketType *inputs, struct bNodeSocketType *outputs);
 void			node_type_size(struct bNodeType *ntype, int width, int minwidth, int maxwidth);
+void			node_type_init(struct bNodeType *ntype, void (*initfunc)(struct bNode *));
 void			node_type_storage(struct bNodeType *ntype,
 								  const char *storagename,
-								  void (*initfunc)(struct bNode *),
 								  void (*freestoragefunc)(struct bNode *),
 								  void (*copystoragefunc)(struct bNode *, struct bNode *));
 void			node_type_exec(struct bNodeType *ntype, void (*execfunc)(void *data, struct bNode *, struct bNodeStack **, struct bNodeStack **));
@@ -222,8 +223,7 @@ void			node_type_gpu(struct bNodeType *ntype, int (*gpufunc)(struct GPUMaterial 
 #define NODE_GROUP_MENU		1000
 #define NODE_DYNAMIC_MENU	4000
 
-extern bNodeType node_group_typeinfo;
-
+void register_node_type_group(ListBase *lb);
 
 /* ************** SHADER NODES *************** */
 

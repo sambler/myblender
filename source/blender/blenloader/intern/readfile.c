@@ -113,6 +113,7 @@
 #include "BKE_modifier.h"
 #include "BKE_multires.h"
 #include "BKE_node.h" // for tree type defines
+#include "BKE_ocean.h"
 #include "BKE_object.h"
 #include "BKE_paint.h"
 #include "BKE_particle.h"
@@ -2812,6 +2813,8 @@ static void lib_link_texture(FileData *fd, Main *main)
 			if(tex->pd)
 				tex->pd->object= newlibadr(fd, tex->id.lib, tex->pd->object);
 			if(tex->vd) tex->vd->object= newlibadr(fd, tex->id.lib, tex->vd->object);
+			if(tex->ot) tex->ot->object= newlibadr(fd, tex->id.lib, tex->ot->object);
+				
 
 			if(tex->nodetree)
 				lib_link_ntree(fd, &tex->id, tex->nodetree);
@@ -2854,6 +2857,14 @@ static void direct_link_texture(FileData *fd, Tex *tex)
 	if(tex->vd) {
 		tex->vd->dataset = NULL;
 		tex->vd->ok = 0;
+	}
+	
+	tex->ot= newdataadr(fd, tex->ot);
+	if(tex->ot) {
+		tex->ot->ocean = NULL;
+		//tex->ot->ocean = BKE_add_ocean();
+		//BKE_init_ocean_fromtex(tex->ot);
+		//BKE_simulate_ocean_fromtex(tex->ot);
 	}
 	
 	tex->nodetree= newdataadr(fd, tex->nodetree);
@@ -3980,6 +3991,12 @@ static void direct_link_modifiers(FileData *fd, ListBase *lb)
 					for(a=0; a<mmd->totcagevert*3; a++)
 						SWITCH_INT(mmd->bindcos[a])
 			}
+		}
+		else if (md->type==eModifierType_Ocean) {
+			OceanModifierData *omd = (OceanModifierData*) md;
+			omd->oceancache = NULL;
+			omd->ocean = NULL;
+			omd->refresh = (MOD_OCEAN_REFRESH_ADD|MOD_OCEAN_REFRESH_RESET|MOD_OCEAN_REFRESH_SIM);
 		}
 	}
 }
@@ -11283,6 +11300,32 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 			}
 		}
 	}
+
+	/* put compatibility code here until next subversion bump */
+	if (main->versionfile < 255 || (main->versionfile == 255 && main->subversionfile < 3)) {
+		Object *ob;
+		Tex *tex;
+		
+		
+		/* ocrean res is now squared, reset old ones - will be massive */
+		for(ob = main->object.first; ob; ob = ob->id.next) {
+			ModifierData *md;
+			for(md= ob->modifiers.first; md; md= md->next) {
+				if (md->type == eModifierType_Ocean) {
+					OceanModifierData *omd = (OceanModifierData *)md;
+					omd->resolution = 7;
+					omd->oceancache = NULL;
+				}
+			}
+		}
+		for(tex= main->tex.first; tex; tex= tex->id.next) {
+			if(tex->type == TEX_OCEAN && tex->ot)
+				tex->ot->resolution = 7;
+		}
+		
+	}
+
+	/* put compatibility code here until next subversion bump */
 	
 	if (main->versionfile < 256) {
 		bScreen *sc;

@@ -44,6 +44,7 @@ struct Lamp;
 struct LampRen;
 struct Material;
 struct MTex;
+struct OceanTex;
 struct PluginTex;
 struct PointDensity;
 struct Tex;
@@ -114,6 +115,12 @@ void BKE_free_voxeldata(struct VoxelData *vd);
 struct VoxelData *BKE_add_voxeldata(void);
 struct VoxelData *BKE_copy_voxeldata(struct VoxelData *vd);
 
+void BKE_init_ocean_fromtex(struct OceanTex *ot);
+void BKE_simulate_ocean_fromtex(struct OceanTex *ot);
+void BKE_free_oceantex(struct OceanTex *ot);
+struct OceanTex *BKE_add_oceantex(void);
+struct OceanTex *BKE_copy_oceantex(struct OceanTex *ot);
+	
 int     BKE_texture_dependsOnTime(const struct Tex *texture);
 
 #ifdef __cplusplus

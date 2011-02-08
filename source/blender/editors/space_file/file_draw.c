@@ -26,9 +26,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+#include <math.h>
 #include <string.h>
 
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 #include "BLI_dynstr.h"
 #include "BLI_storage_types.h"
 #ifdef WIN32
@@ -135,7 +137,7 @@ void file_draw_buttons(const bContext *C, ARegion *ar)
 	ARegion*		  artmp;
 	
 	/* Initialize UI block. */
-	sprintf(name, "win %p", ar);
+	sprintf(name, "win %p", (void *)ar);
 	block = uiBeginBlock(C, ar, name, UI_EMBOSS);
 	uiBlockSetHandleFunc(block, do_file_buttons, NULL);
 
@@ -254,6 +256,8 @@ static int get_file_icon(struct direntry *file)
 	}
 	else if (file->flags & BLENDERFILE)
 		return ICON_FILE_BLEND;
+	else if (file->flags & BLENDERFILE_BACKUP)
+		return ICON_FILE_BLEND;
 	else if (file->flags & IMAGEFILE)
 		return ICON_FILE_IMAGE;
 	else if (file->flags & MOVIEFILE)
@@ -278,12 +282,12 @@ static void file_draw_icon(uiBlock *block, char *path, int sx, int sy, int icon,
 {
 	uiBut *but;
 	float x,y;
-	float alpha=1.0f;
+	/*float alpha=1.0f;*/
 	
 	x = (float)(sx);
 	y = (float)(sy-height);
 	
-	if (icon == ICON_FILE_BLANK) alpha = 0.375f;
+	/*if (icon == ICON_FILE_BLANK) alpha = 0.375f;*/
 		
 	but= uiDefIconBut(block, LABEL, 0, icon, x, y, width, height, NULL, 0.0, 0.0, 0, 0, "");
 	uiButSetDragPath(but, path);
@@ -292,20 +296,19 @@ static void file_draw_icon(uiBlock *block, char *path, int sx, int sy, int icon,
 
 static void file_draw_string(int sx, int sy, const char* string, float width, int height, short align)
 {
-	char fname[FILE_MAXFILE];
-	rcti rect;
-	float sw;
 	uiStyle *style= U.uistyles.first;
 	uiFontStyle fs = style->widgetlabel;
+	rcti rect;
+	char fname[FILE_MAXFILE];
 
 	fs.align = align;
 
 	BLI_strncpy(fname,string, FILE_MAXFILE);
-	sw = file_shorten_string(fname, width+1, 0 );
+	file_shorten_string(fname, width+1.0, 0);
 
-
+	/* no text clipping needed, uiStyleFontDraw does it but is a bit too strict (for buttons it works) */
 	rect.xmin = sx;
-	rect.xmax = sx + width;
+	rect.xmax = sx + ceil(width+4.0f);
 	rect.ymin = sy - height;
 	rect.ymax = sy;
 	

@@ -32,6 +32,7 @@
 
 #include "BLI_math.h"
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_context.h"
 #include "BKE_object.h"
@@ -368,7 +369,7 @@ static int flyEnd(bContext *C, FlyInfo *fly)
 			/* store the original camera loc and rot */
 			object_tfm_restore(ob_back, fly->obtfm);
 
-			DAG_id_flush_update(&ob_back->id, OB_RECALC_OB);
+			DAG_id_tag_update(&ob_back->id, OB_RECALC_OB);
 		} else {
 			/* Non Camera we need to reset the view back to the original location bacause the user canceled*/
 			copy_qt_qt(rv3d->viewquat, fly->rot_backup);
@@ -377,7 +378,7 @@ static int flyEnd(bContext *C, FlyInfo *fly)
 		}
 	}
 	else if (fly->persp_backup==RV3D_CAMOB) {	/* camera */
-		DAG_id_flush_update(fly->root_parent ? &fly->root_parent->id : &v3d->camera->id, OB_RECALC_OB);
+		DAG_id_tag_update(fly->root_parent ? &fly->root_parent->id : &v3d->camera->id, OB_RECALC_OB);
 	}
 	else { /* not camera */
 		/* Apply the fly mode view */
@@ -800,7 +801,7 @@ static int flyApply(bContext *C, FlyInfo *fly)
 
 					ob_update= v3d->camera->parent;
 					while(ob_update) {
-						DAG_id_flush_update(&ob_update->id, OB_RECALC_OB);
+						DAG_id_tag_update(&ob_update->id, OB_RECALC_OB);
 						ob_update= ob_update->parent;
 					}
 

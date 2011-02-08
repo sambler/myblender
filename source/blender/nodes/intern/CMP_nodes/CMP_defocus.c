@@ -378,10 +378,12 @@ static void defocus_blur(bNode *node, CompBuf *new, CompBuf *img, CompBuf *zbuf,
 
 	//------------------------------------------------------------------
 	// main loop
+#ifndef __APPLE__ /* can crash on Mac, see bug #22856, disabled for now */
 #ifdef __INTEL_COMPILER /* icc doesn't like the compound statement -- internal error: 0_1506 */
 	#pragma omp parallel for private(y) if(!nqd->preview) schedule(guided)
 #else
 	#pragma omp parallel for private(y) if(!nqd->preview && img->y*img->x > 16384) schedule(guided)
+#endif
 #endif
 	for (y=0; y<img->y; y++) {
 		unsigned int p, p4, zp, cp, cp4;
@@ -867,21 +869,19 @@ static void node_composit_init_defocus(bNode* node)
    node->storage = nbd;
 }
 
-bNodeType cmp_node_defocus = {
-	/* *next,*prev */	NULL, NULL,
-	/* type code   */	CMP_NODE_DEFOCUS,
-	/* name        */	"Defocus",
-	/* width+range */	150, 120, 200,
-	/* class+opts  */	NODE_CLASS_OP_FILTER, NODE_OPTIONS,
-	/* input sock  */	cmp_node_defocus_in,
-	/* output sock */	cmp_node_defocus_out,
-	/* storage     */	"NodeDefocus",
-	/* execfunc    */	node_composit_exec_defocus,
-	/* butfunc     */	NULL,
-	/* initfunc    */	node_composit_init_defocus,
-	/* freestoragefunc    */	node_free_standard_storage,
-	/* copystoragefunc    */	node_copy_standard_storage,
-	/* id          */	NULL
-};
+void register_node_type_cmp_defocus(ListBase *lb)
+{
+	static bNodeType ntype;
+
+	node_type_base(&ntype, CMP_NODE_DEFOCUS, "Defocus", NODE_CLASS_OP_FILTER, NODE_OPTIONS,
+		cmp_node_defocus_in, cmp_node_defocus_out);
+	node_type_size(&ntype, 150, 120, 200);
+	node_type_init(&ntype, node_composit_init_defocus);
+	node_type_storage(&ntype, "NodeDefocus", node_free_standard_storage, node_copy_standard_storage);
+	node_type_exec(&ntype, node_composit_exec_defocus);
+
+	nodeRegisterType(lb, &ntype);
+}
+
 
 

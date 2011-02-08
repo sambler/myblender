@@ -37,6 +37,7 @@
 #include "MEM_guardedalloc.h"
 
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_blender.h"
 #include "BKE_context.h"
@@ -44,7 +45,7 @@
 #include "BKE_library.h"
 #include "BKE_main.h"
 #include "BKE_screen.h"
-#include "BKE_utildefines.h"
+
 
 #include "RNA_access.h"
 #include "RNA_enum_types.h"
@@ -196,8 +197,18 @@ static void keymap_event_set(wmKeyMapItem *kmi, short type, short val, int modif
 	}
 }
 
+static void keymap_item_set_id(wmKeyMap *keymap, wmKeyMapItem *kmi)
+{
+	keymap->kmi_id++;
+	if ((keymap->flag & KEYMAP_USER) == 0) {
+		kmi->id = keymap->kmi_id;
+	} else {
+		kmi->id = -keymap->kmi_id; // User defined keymap entries have negative ids
+	}
+}
+
 /* if item was added, then bail out */
-wmKeyMapItem *WM_keymap_verify_item(wmKeyMap *keymap, char *idname, int type, int val, int modifier, int keymodifier)
+wmKeyMapItem *WM_keymap_verify_item(wmKeyMap *keymap, const char *idname, int type, int val, int modifier, int keymodifier)
 {
 	wmKeyMapItem *kmi;
 	
@@ -210,10 +221,7 @@ wmKeyMapItem *WM_keymap_verify_item(wmKeyMap *keymap, char *idname, int type, in
 		BLI_addtail(&keymap->items, kmi);
 		BLI_strncpy(kmi->idname, idname, OP_MAX_TYPENAME);
 		
-		if ((keymap->flag & KEYMAP_USER) == 0) {
-			keymap->kmi_id++;
-			kmi->id = keymap->kmi_id;
-		}
+		keymap_item_set_id(keymap, kmi);
 
 		keymap_event_set(kmi, type, val, modifier, keymodifier);
 		keymap_properties_set(kmi);
@@ -232,16 +240,13 @@ wmKeyMapItem *WM_keymap_add_item(wmKeyMap *keymap, const char *idname, int type,
 	keymap_event_set(kmi, type, val, modifier, keymodifier);
 	keymap_properties_set(kmi);
 
-	if ((keymap->flag & KEYMAP_USER) == 0) {
-		keymap->kmi_id++;
-		kmi->id = keymap->kmi_id;
-	}
+	keymap_item_set_id(keymap, kmi);
 
 	return kmi;
 }
 
 /* menu wrapper for WM_keymap_add_item */
-wmKeyMapItem *WM_keymap_add_menu(wmKeyMap *keymap, char *idname, int type, int val, int modifier, int keymodifier)
+wmKeyMapItem *WM_keymap_add_menu(wmKeyMap *keymap, const char *idname, int type, int val, int modifier, int keymodifier)
 {
 	wmKeyMapItem *kmi= WM_keymap_add_item(keymap, "WM_OT_call_menu", type, val, modifier, keymodifier);
 	RNA_string_set(kmi->ptr, "name", idname);
@@ -354,10 +359,7 @@ wmKeyMapItem *WM_modalkeymap_add_item(wmKeyMap *km, int type, int val, int modif
 	
 	keymap_event_set(kmi, type, val, modifier, keymodifier);
 
-	if ((km->flag & KEYMAP_USER) == 0) {
-		km->kmi_id++;
-		kmi->id = km->kmi_id;
-	}
+	keymap_item_set_id(km, kmi);
 
 	return kmi;
 }
@@ -651,6 +653,10 @@ wmKeyMap *WM_keymap_copy_to_user(wmKeyMap *keymap)
 
 	usermap= WM_keymap_list_find(&U.keymaps, keymap->idname, keymap->spaceid, keymap->regionid);
 
+	/* XXX this function is only used by RMB setting hotkeys, and it clears maps on 2nd try this way */
+	if(keymap==usermap)
+		return keymap;
+	
 	if(!usermap) {
 		/* not saved yet, duplicate existing */
 		usermap= MEM_dupallocN(keymap);

@@ -34,13 +34,14 @@
 #include "DNA_object_types.h"
 
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_cdderivedmesh.h"
 #include "BKE_lattice.h"
 #include "BKE_modifier.h"
 #include "BKE_deform.h"
 #include "BKE_shrinkwrap.h"
-#include "BKE_utildefines.h"
+
 
 #include "depsgraph_private.h"
 
@@ -374,6 +375,7 @@ ModifierTypeInfo modifierType_SimpleDeform = {
 
 	/* copyData */          copyData,
 	/* deformVerts */       deformVerts,
+	/* deformMatrices */    0,
 	/* deformVertsEM */     deformVertsEM,
 	/* deformMatricesEM */  0,
 	/* applyModifier */     0,

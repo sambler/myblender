@@ -39,6 +39,8 @@
 #include <io.h>
 #endif
 
+#include "MEM_guardedalloc.h"
+
 #include "DNA_anim_types.h"
 #include "DNA_group_types.h"
 #include "DNA_object_types.h"
@@ -46,7 +48,9 @@
 #include "DNA_screen_types.h"
 #include "DNA_sequence_types.h"
 
-#include "MEM_guardedalloc.h"
+#include "BLI_math.h"
+#include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_anim.h"
 #include "BKE_animsys.h"
@@ -63,14 +67,11 @@
 #include "BKE_scene.h"
 #include "BKE_sequencer.h"
 #include "BKE_world.h"
-#include "BKE_utildefines.h"
+
 #include "BKE_sound.h"
 
 //XXX #include "BIF_previewrender.h"
 //XXX #include "BIF_editseq.h"
-
-#include "BLI_math.h"
-#include "BLI_blenlib.h"
 
 //XXX #include "nla.h"
 
@@ -373,6 +374,7 @@ Scene *add_scene(const char *name)
 	sce->r.fg_stamp[3]= 1.0f;
 	sce->r.bg_stamp[0]= sce->r.bg_stamp[1]= sce->r.bg_stamp[2]= 0.0f;
 	sce->r.bg_stamp[3]= 0.25f;
+	sce->r.raytrace_options = R_RAYTRACE_USE_INSTANCES;
 
 	sce->r.seq_prev_type= OB_SOLID;
 	sce->r.seq_rend_type= OB_SOLID;
@@ -579,7 +581,7 @@ void set_scene_bg(Main *bmain, Scene *scene)
 }
 
 /* called from creator.c */
-Scene *set_scene_name(Main *bmain, char *name)
+Scene *set_scene_name(Main *bmain, const char *name)
 {
 	Scene *sce= (Scene *)find_id("SC", name);
 	if(sce) {
@@ -943,31 +945,75 @@ float BKE_curframe(Scene *scene)
 	return ctime;
 }
 
+/* drivers support/hacks 
+ * 	- this method is called from scene_update_tagged_recursive(), so gets included in viewport + render
+ *	- these are always run since the depsgraph can't handle non-object data
+ *	- these happen after objects are all done so that we can read in their final transform values,
+ *	  though this means that objects can't refer to scene info for guidance...
+ */
+static void scene_update_drivers(Main *UNUSED(bmain), Scene *scene)
+{
+	float ctime = BKE_curframe(scene);
+	
+	/* scene itself */
+	if (scene->adt && scene->adt->drivers.first) {
+		BKE_animsys_evaluate_animdata(&scene->id, scene->adt, ctime, ADT_RECALC_DRIVERS);
+	}
+	
+	/* world */
+	// TODO: what about world textures? but then those have nodes too...
+	if (scene->world) {
+		ID *wid = (ID *)scene->world;
+		AnimData *adt= BKE_animdata_from_id(wid);
+		
+		if (adt && adt->drivers.first)
+			BKE_animsys_evaluate_animdata(wid, adt, ctime, ADT_RECALC_DRIVERS);
+	}
+	
+	/* nodes */
+	if (scene->nodetree) {
+		ID *nid = (ID *)scene->nodetree;
+		AnimData *adt= BKE_animdata_from_id(nid);
+		
+		if (adt && adt->drivers.first)
+			BKE_animsys_evaluate_animdata(nid, adt, ctime, ADT_RECALC_DRIVERS);
+	}
+}
+
 static void scene_update_tagged_recursive(Main *bmain, Scene *scene, Scene *scene_parent)
 {
 	Base *base;
+	
+	
+	scene->customdata_mask= scene_parent->customdata_mask;
 
 	/* sets first, we allow per definition current scene to have
 	   dependencies on sets, but not the other way around. */
-	if(scene->set)
+	if (scene->set)
 		scene_update_tagged_recursive(bmain, scene->set, scene_parent);
-
-	for(base= scene->base.first; base; base= base->next) {
+	
+	/* scene objects */
+	for (base= scene->base.first; base; base= base->next) {
 		Object *ob= base->object;
-
+		
 		object_handle_update(scene_parent, ob);
-
+		
 		if(ob->dup_group && (ob->transflag & OB_DUPLIGROUP))
 			group_handle_recalc_and_update(scene_parent, ob, ob->dup_group);
 			
 		/* always update layer, so that animating layers works */
 		base->lay= ob->lay;
 	}
+	
+	/* scene drivers... */
+	scene_update_drivers(bmain, scene);
 }
 
 /* this is called in main loop, doing tagged updates before redraw */
 void scene_update_tagged(Main *bmain, Scene *scene)
 {
+	DAG_ids_flush_tagged(bmain);
+
 	scene->physics_settings.quick_cache_step= 0;
 
 	/* update all objects: drivers, matrices, displists, etc. flags set
@@ -977,14 +1023,14 @@ void scene_update_tagged(Main *bmain, Scene *scene)
 
 	/* recalc scene animation data here (for sequencer) */
 	{
-		float ctime = BKE_curframe(scene); 
 		AnimData *adt= BKE_animdata_from_id(&scene->id);
-
-		if(adt && (adt->recalc & ADT_RECALC_ANIM))
+		float ctime = BKE_curframe(scene);
+		
+		if (adt && (adt->recalc & ADT_RECALC_ANIM))
 			BKE_animsys_evaluate_animdata(&scene->id, adt, ctime, 0);
 	}
-
-	if(scene->physics_settings.quick_cache_step)
+	
+	if (scene->physics_settings.quick_cache_step)
 		BKE_ptcache_quick_cache_all(bmain, scene);
 
 	/* in the future this should handle updates for all datablocks, not
@@ -1008,7 +1054,7 @@ void scene_update_for_newframe(Main *bmain, Scene *sce, unsigned int lay)
 
 	/* Following 2 functions are recursive
 	 * so dont call within 'scene_update_tagged_recursive' */
-	DAG_scene_update_flags(bmain, sce, lay);   // only stuff that moves or needs display still
+	DAG_scene_update_flags(bmain, sce, lay, TRUE);   // only stuff that moves or needs display still
 
 	/* All 'standard' (i.e. without any dependencies) animation is handled here,
 	 * with an 'local' to 'macro' order of evaluation. This should ensure that
@@ -1075,20 +1121,20 @@ float get_render_aosss_error(RenderData *r, float error)
 }
 
 /* helper function for the SETLOOPER macro */
-Base *_setlooper_base_step(Scene **sce, Base *base)
+Base *_setlooper_base_step(Scene **sce_iter, Base *base)
 {
     if(base && base->next) {
         /* common case, step to the next */
         return base->next;
     }
-    else if(base==NULL && (*sce)->base.first) {
+	else if(base==NULL && (*sce_iter)->base.first) {
         /* first time looping, return the scenes first base */
-        return (Base *)(*sce)->base.first;
+		return (Base *)(*sce_iter)->base.first;
     }
     else {
         /* reached the end, get the next base in the set */
-        while((*sce= (*sce)->set)) {
-            base= (Base *)(*sce)->base.first;
+		while((*sce_iter= (*sce_iter)->set)) {
+			base= (Base *)(*sce_iter)->base.first;
             if(base) {
                 return base;
             }

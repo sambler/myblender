@@ -24,7 +24,7 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-SET(INC 
+set(INC 
 	.
 	../blenlib
 	../blenkernel
@@ -33,10 +33,10 @@ SET(INC
 	../makesrna
 	../render/extern/include
 	../../../intern/guardedalloc
-	${ZLIB_INC}
+	${ZLIB_INCLUDE_DIRS}
 )
 
-SET(SRC
+set(SRC
 	intern/readblenentry.c
 	intern/readfile.c
 	intern/undofile.c
@@ -50,4 +50,8 @@ SET(SRC
 	intern/readfile.h
 )
 
-BLENDERLIB(bf_blenloader "${SRC}" "${INC}")
+if(WITH_BUILDINFO)
+	add_definitions(-DNAN_BUILDINFO)
+endif()
+
+blender_add_lib(bf_blenloader "${SRC}" "${INC}")

@@ -24,18 +24,18 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-SET(INC 
+set(INC 
 	.
 	..
+	../..
 	./intern/include
-	../../
 	../../../blenlib
 	../../../blenkernel
 	../../../makesdna
 	../../../../../intern/guardedalloc
 )
 
-SET(SRC
+set(SRC
 	BlockDXT.cpp
 	ColorBlock.cpp
 	DirectDrawSurface.cpp
@@ -45,7 +45,7 @@ SET(SRC
 )
 
 if(WITH_IMAGE_DDS)
-	ADD_DEFINITIONS(-DWITH_DDS)
-ENDIF(WITH_IMAGE_DDS)
+	add_definitions(-DWITH_DDS)
+endif()
 
-BLENDERLIB(bf_imbuf_dds "${SRC}" "${INC}")                 
+blender_add_lib(bf_imbuf_dds "${SRC}" "${INC}")                 

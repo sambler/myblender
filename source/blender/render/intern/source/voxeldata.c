@@ -35,6 +35,7 @@
 #include "BLI_math.h"
 #include "BLI_blenlib.h"
 #include "BLI_voxel.h"
+#include "BLI_utildefines.h"
 
 #include "IMB_imbuf.h"
 #include "IMB_imbuf_types.h"
@@ -47,6 +48,7 @@
 #include "smoke_API.h"
 
 #include "DNA_texture_types.h"
+#include "DNA_object_force.h"
 #include "DNA_object_types.h"
 #include "DNA_modifier_types.h"
 #include "DNA_smoke_types.h"
@@ -179,7 +181,7 @@ static int read_voxeldata_header(FILE *fp, struct VoxelData *vd)
 	return 1;
 }
 
-static void init_frame_smoke(VoxelData *vd)
+static void init_frame_smoke(VoxelData *vd, float cfra)
 {
 	Object *ob;
 	ModifierData *md;
@@ -195,8 +197,9 @@ static void init_frame_smoke(VoxelData *vd)
 
 		
 		if(smd->domain && smd->domain->fluid) {
-			
-			if (vd->smoked_type == TEX_VD_SMOKEHEAT) {
+			if(cfra < smd->domain->point_cache[0]->startframe)
+				; /* don't show smoke before simulation starts, this could be made an option in the future */
+			else if (vd->smoked_type == TEX_VD_SMOKEHEAT) {
 				int totRes;
 				float *heat;
 				int i;
@@ -268,9 +271,7 @@ static void cache_voxeldata(struct Render *re, Tex *tex)
 	VoxelData *vd = tex->vd;
 	FILE *fp;
 	int curframe;
-	char path[FILE_MAX];
-	
-	if (!vd) return;
+	char path[sizeof(vd->source_path)];
 	
 	/* only re-cache if dataset needs updating */
 	if ((vd->flag & TEX_VD_STILL) || (vd->cachedframe == re->r.cfra))
@@ -287,14 +288,14 @@ static void cache_voxeldata(struct Render *re, Tex *tex)
 	else
 		curframe = re->r.cfra;
 	
-	BLI_strncpy(path, vd->source_path, FILE_MAX);
+	BLI_strncpy(path, vd->source_path, sizeof(path));
 	
 	switch(vd->file_format) {
 		case TEX_VD_IMAGE_SEQUENCE:
 			load_frame_image_sequence(vd, tex);
 			return;
 		case TEX_VD_SMOKE:
-			init_frame_smoke(vd);
+			init_frame_smoke(vd, re->r.cfra);
 			return;
 		case TEX_VD_BLENDERVOXEL:
 			BLI_path_abs(path, G.main->name);

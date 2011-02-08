@@ -82,9 +82,9 @@ def get_console(console_id):
         namespace["__builtins__"] = sys.modules["builtins"]
         namespace["bpy"] = bpy
         namespace["C"] = bpy.context
-        
-        namespace.update(__import__("mathutils").__dict__) # from mathutils import *
-        namespace.update(__import__("math").__dict__) # from math import *
+
+        namespace.update(__import__("mathutils").__dict__)  # from mathutils import *
+        namespace.update(__import__("math").__dict__)  # from math import *
 
         console = InteractiveConsole(locals=namespace, filename="<blender_console>")
 
@@ -186,7 +186,7 @@ def execute(context):
 
     # restore the stdin
     sys.stdin = stdin_backup
-    
+
     # execute any hooks
     for func, args in execute.hooks:
         func(*args)
@@ -264,7 +264,8 @@ def banner(context):
     sc = context.space_data
     version_string = sys.version.strip().replace('\n', ' ')
 
-    add_scrollback(" * Python Interactive Console %s *" % version_string, 'OUTPUT')
+    add_scrollback("PYTHON INTERACTIVE CONSOLE %s" % version_string, 'OUTPUT')
+    add_scrollback("", 'OUTPUT')
     add_scrollback("Command History:     Up/Down Arrow", 'OUTPUT')
     add_scrollback("Cursor:              Left/Right Home/End", 'OUTPUT')
     add_scrollback("Remove:              Backspace/Delete", 'OUTPUT')

@@ -39,6 +39,7 @@
 #include "BLI_editVert.h"
 #include "BLI_math.h"
 #include "BLI_rand.h"
+#include "BLI_utildefines.h"
 
 #include "DNA_anim_types.h"
 #include "DNA_armature_types.h"
@@ -296,7 +297,7 @@ static void motionpaths_calc_update_scene(Scene *scene)
 	Base *base, *last=NULL;
 	
 	/* only stuff that moves or needs display still */
-	DAG_scene_update_flags(G.main, scene, scene->lay);
+	DAG_scene_update_flags(G.main, scene, scene->lay, TRUE);
 	
 	/* find the last object with the tag 
 	 *	- all those afterwards are assumed to not be relevant for our calculations
@@ -1155,7 +1156,7 @@ static void face_duplilist(ListBase *lb, ID *id, Scene *scene, Object *par, floa
 	dm->release(dm);
 }
 
-static void new_particle_duplilist(ListBase *lb, ID *UNUSED(id), Scene *scene, Object *par, float par_space_mat[][4], ParticleSystem *psys, int level, int animated)
+static void new_particle_duplilist(ListBase *lb, ID *id, Scene *scene, Object *par, float par_space_mat[][4], ParticleSystem *psys, int level, int animated)
 {
 	GroupObject *go;
 	Object *ob=0, **oblist=0, obcopy, *obcopylist=0;
@@ -1171,7 +1172,6 @@ static void new_particle_duplilist(ListBase *lb, ID *UNUSED(id), Scene *scene, O
 	float (*obmat)[4], (*oldobmat)[4];
 	int a, b, counter, hair = 0;
 	int totpart, totchild, totgroup=0, pa_num;
-	unsigned int lay;
 
 	if(psys==0) return;
 	
@@ -1192,8 +1192,7 @@ static void new_particle_duplilist(ListBase *lb, ID *UNUSED(id), Scene *scene, O
 	totchild = psys->totchild;
 
 	BLI_srandom(31415926 + psys->seed);
-	
-	lay= scene->lay;
+
 	if((psys->renderdata || part->draw_as==PART_DRAW_REND) && ELEM(part->ren_as, PART_DRAW_OB, PART_DRAW_GR)) {
 		ParticleSimulationData sim= {0};
 		sim.scene= scene;
@@ -1339,12 +1338,16 @@ static void new_particle_duplilist(ListBase *lb, ID *UNUSED(id), Scene *scene, O
 			else {
 				/* first key */
 				state.time = ctime;
-				if(psys_get_particle_state(&sim, a, &state, 0) == 0)
+				if(psys_get_particle_state(&sim, a, &state, 0) == 0) {
 					continue;
-
-				quat_to_mat4( pamat,state.rot);
-				VECCOPY(pamat[3], state.co);
-				pamat[3][3]= 1.0f;
+				}
+				else {
+					float tquat[4];
+					normalize_qt_qt(tquat, state.rot);
+					quat_to_mat4(pamat, tquat);
+					copy_v3_v3(pamat[3], state.co);
+					pamat[3][3]= 1.0f;
+				}
 			}
 
 			if(part->ren_as==PART_DRAW_GR && psys->part->draw & PART_DRAW_WHOLE_GR) {
@@ -1372,7 +1375,7 @@ static void new_particle_duplilist(ListBase *lb, ID *UNUSED(id), Scene *scene, O
 				/* Normal particles and cached hair live in global space so we need to
 				 * remove the real emitter's transformation before 2nd order duplication.
 				 */
-				if(par_space_mat)
+				if(par_space_mat && GS(id->name) != ID_GR)
 					mul_m4_m4m4(mat, pamat, psys->imat);
 				else
 					copy_m4_m4(mat, pamat);
@@ -1388,7 +1391,7 @@ static void new_particle_duplilist(ListBase *lb, ID *UNUSED(id), Scene *scene, O
 				if(part->draw & PART_DRAW_GLOBAL_OB)
 					VECADD(mat[3], mat[3], vec);
 
-				dob= new_dupli_object(lb, ob, mat, ob->lay, counter, OB_DUPLIPARTS, animated);
+				dob= new_dupli_object(lb, ob, mat, ob->lay, counter, GS(id->name) == ID_GR ? OB_DUPLIGROUP : OB_DUPLIPARTS, animated);
 				copy_m4_m4(dob->omat, oldobmat);
 				if(G.rendering)
 					psys_get_dupli_texture(par, part, sim.psmd, pa, cpa, dob->uv, dob->orco);

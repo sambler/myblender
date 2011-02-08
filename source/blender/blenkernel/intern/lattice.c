@@ -40,6 +40,7 @@
 
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
@@ -49,6 +50,7 @@
 #include "DNA_curve_types.h"
 #include "DNA_key_types.h"
 
+#include "BKE_animsys.h"
 #include "BKE_anim.h"
 #include "BKE_cdderivedmesh.h"
 #include "BKE_displist.h"
@@ -59,7 +61,7 @@
 #include "BKE_main.h"
 #include "BKE_mesh.h"
 #include "BKE_modifier.h"
-#include "BKE_utildefines.h"
+
 #include "BKE_deform.h"
 
 //XXX #include "BIF_editdeform.h"
@@ -203,10 +205,6 @@ Lattice *copy_lattice(Lattice *lt)
 
 	ltn= copy_libblock(lt);
 	ltn->def= MEM_dupallocN(lt->def);
-		
-#if 0 // XXX old animation system
-	id_us_plus((ID *)ltn->ipo);
-#endif // XXX old animation system
 
 	ltn->key= copy_key(ltn->key);
 	if(ltn->key) ltn->key->from= (ID *)ltn;
@@ -232,6 +230,12 @@ void free_lattice(Lattice *lt)
 
 		MEM_freeN(editlt);
 		MEM_freeN(lt->editlatt);
+	}
+	
+	/* free animation data */
+	if (lt->adt) {
+		BKE_free_animdata(&lt->id);
+		lt->adt= NULL;
 	}
 }
 

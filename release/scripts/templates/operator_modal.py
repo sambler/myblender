@@ -1,6 +1,7 @@
 import bpy
 from bpy.props import *
 
+
 class ModalOperator(bpy.types.Operator):
     '''Move an object with the mouse, example.'''
     bl_idname = "object.modal_operator"
@@ -25,7 +26,7 @@ class ModalOperator(bpy.types.Operator):
 
     def invoke(self, context, event):
         if context.object:
-            context.window_manager.add_modal_handler(self)
+            context.window_manager.modal_handler_add(self)
             self.first_mouse_x = event.mouse_x
             self.first_value = context.object.location.x
             return {'RUNNING_MODAL'}

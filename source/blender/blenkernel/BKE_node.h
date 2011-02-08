@@ -61,7 +61,7 @@ struct uiLayout;
 
 typedef struct bNodeSocketType {
 	int type, limit;
-	char *name;
+	const char *name;
 	float val1, val2, val3, val4;	/* default alloc value for inputs */
 	float min, max;					/* default range for inputs */
 	
@@ -75,7 +75,7 @@ typedef struct bNodeSocketType {
 typedef struct bNodeType {
 	void *next,*prev;
 	int type;
-	char *name;
+	const char *name; /* can be allocated too */
 	float width, minwidth, maxwidth;
 	short nclass, flag;
 	
@@ -129,7 +129,7 @@ typedef struct bNodeType {
 
 void			ntreeVerifyTypes(struct bNodeTree *ntree);
 
-struct bNodeTree *ntreeAddTree(int type);
+struct bNodeTree *ntreeAddTree(const char *name, int type, const short is_group);
 void			ntreeInitTypes(struct bNodeTree *ntree);
 
 void			ntreeMakeOwnType(struct bNodeTree *ntree);
@@ -193,6 +193,7 @@ void			nodeClearActiveID(struct bNodeTree *ntree, short idtype);
 
 void			NodeTagChanged(struct bNodeTree *ntree, struct bNode *node);
 int				NodeTagIDChanged(struct bNodeTree *ntree, struct ID *id);
+void			ntreeClearTags(struct bNodeTree *ntree);
 
 /* ************** Groups ****************** */
 
@@ -206,12 +207,23 @@ void			nodeCopyGroup(struct bNode *gnode);
 
 /* ************** COMMON NODES *************** */
 
+/* Init a new node type struct with default values and callbacks */
+void			node_type_base(struct bNodeType *ntype, int type, const char *name, short nclass, short flag,
+							   struct bNodeSocketType *inputs, struct bNodeSocketType *outputs);
+void			node_type_size(struct bNodeType *ntype, int width, int minwidth, int maxwidth);
+void			node_type_init(struct bNodeType *ntype, void (*initfunc)(struct bNode *));
+void			node_type_storage(struct bNodeType *ntype,
+								  const char *storagename,
+								  void (*freestoragefunc)(struct bNode *),
+								  void (*copystoragefunc)(struct bNode *, struct bNode *));
+void			node_type_exec(struct bNodeType *ntype, void (*execfunc)(void *data, struct bNode *, struct bNodeStack **, struct bNodeStack **));
+void			node_type_gpu(struct bNodeType *ntype, int (*gpufunc)(struct GPUMaterial *mat, struct bNode *node, struct GPUNodeStack *in, struct GPUNodeStack *out));
+
 #define NODE_GROUP		2
 #define NODE_GROUP_MENU		1000
 #define NODE_DYNAMIC_MENU	4000
 
-extern bNodeType node_group_typeinfo;
-
+void register_node_type_group(ListBase *lb);
 
 /* ************** SHADER NODES *************** */
 
@@ -399,7 +411,6 @@ int ntreeCompositTagAnimated(struct bNodeTree *ntree);
 void ntreeCompositTagGenerators(struct bNodeTree *ntree);
 void ntreeCompositForceHidden(struct bNodeTree *ntree, struct Scene *scene);
 
-void free_compbuf(struct CompBuf *cbuf); /* internal...*/
 
 
 /* ************** TEXTURE NODES *************** */

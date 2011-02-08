@@ -31,6 +31,8 @@
 */
 #include "MEM_guardedalloc.h"
 
+#include "BLI_utildefines.h"
+
 #include "BKE_bmesh.h"
 #include "BKE_cdderivedmesh.h"
 #include "BKE_modifier.h"
@@ -127,6 +129,7 @@ ModifierTypeInfo modifierType_Bevel = {
 
 	/* copyData */          copyData,
 	/* deformVerts */       0,
+	/* deformMatrices */    0,
 	/* deformVertsEM */     0,
 	/* deformMatricesEM */  0,
 	/* applyModifier */     applyModifier,

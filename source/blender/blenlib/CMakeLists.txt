@@ -24,18 +24,18 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-SET(INC 
+set(INC 
 	.
 	../makesdna
 	../blenkernel
 	../gpu
 	../../../intern/ghost
 	../../../intern/guardedalloc
-	${ZLIB_INC}
+	${ZLIB_INCLUDE_DIRS}
 	${FREETYPE_INCLUDE_DIRS}
 )
 
-SET(SRC
+set(SRC
 	intern/BLI_args.c
 	intern/BLI_dynstr.c
 	intern/BLI_ghash.c
@@ -121,6 +121,7 @@ SET(SRC
 	BLI_storage_types.h
 	BLI_string.h
 	BLI_threads.h
+	BLI_utildefines.h
 	BLI_uvproject.h
 	BLI_vfontdata.h
 	BLI_voxel.h
@@ -131,12 +132,12 @@ SET(SRC
 	intern/dynamiclist.h
 )
 
-IF(CMAKE_SYSTEM_NAME MATCHES "Linux")
-	LIST(APPEND INC "${BINRELOC_INC}")
-ENDIF(CMAKE_SYSTEM_NAME MATCHES "Linux")
+if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+	list(APPEND INC "${BINRELOC_INC}")
+endif()
 
-IF(WITH_OPENMP)
-	ADD_DEFINITIONS(-DPARALLEL=1)
-ENDIF(WITH_OPENMP)
+if(WITH_OPENMP)
+	add_definitions(-DPARALLEL=1)
+endif()
 
-BLENDERLIB(bf_blenlib "${SRC}" "${INC}")
+blender_add_lib(bf_blenlib "${SRC}" "${INC}")

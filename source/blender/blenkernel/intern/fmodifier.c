@@ -38,10 +38,11 @@
 
 #include "BLI_blenlib.h"
 #include "BLI_math.h" /* windows needs for M_PI */
+#include "BLI_utildefines.h"
 
 #include "BKE_fcurve.h"
 #include "BKE_idprop.h"
-#include "BKE_utildefines.h"
+
 
 #define SMALL -1.0e-10
 #define SELECT 1
@@ -932,7 +933,7 @@ static FModifierTypeInfo *fmodifiersTypeInfo[FMODIFIER_NUM_TYPES];
 static short FMI_INIT= 1; /* when non-zero, the list needs to be updated */
 
 /* This function only gets called when FMI_INIT is non-zero */
-static void fmods_init_typeinfo () 
+static void fmods_init_typeinfo (void) 
 {
 	fmodifiersTypeInfo[0]=  NULL; 					/* 'Null' F-Curve Modifier */
 	fmodifiersTypeInfo[1]=  &FMI_GENERATOR; 		/* Generator F-Curve Modifier */
@@ -1009,9 +1010,13 @@ FModifier *add_fmodifier (ListBase *modifiers, int type)
 	fcm->flag = FMODIFIER_FLAG_EXPANDED;
 	BLI_addtail(modifiers, fcm);
 	
+	/* tag modifier as "active" if no other modifiers exist in the stack yet */
+	if (modifiers->first == modifiers->last)
+		fcm->flag |= FMODIFIER_FLAG_ACTIVE;
+	
 	/* add modifier's data */
 	fcm->data= MEM_callocN(fmi->size, fmi->structName);
-		
+	
 	/* init custom settings if necessary */
 	if (fmi->new_data)	
 		fmi->new_data(fcm->data);

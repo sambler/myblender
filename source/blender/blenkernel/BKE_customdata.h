@@ -144,6 +144,7 @@ void CustomData_em_copy_data(const struct CustomData *source,
 void CustomData_bmesh_copy_data(const struct CustomData *source, 
 							struct CustomData *dest,void *src_block, 
 							void **dest_block);
+void CustomData_em_validate_data(struct CustomData *data, void *block, int sub_elements);
 
 /* frees data in a CustomData object
  * return 1 on success, 0 on failure
@@ -266,7 +267,7 @@ void CustomData_from_bmesh_block(const struct CustomData *source,
 
 
 /* query info over types */
-void CustomData_file_write_info(int type, char **structname, int *structnum);
+void CustomData_file_write_info(int type, const char **structname, int *structnum);
 int CustomData_sizeof(int type);
 
 /* get the name of a layer type */

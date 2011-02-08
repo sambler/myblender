@@ -36,6 +36,7 @@
 
 #include "BLI_math.h"
 #include "BLI_listbase.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_context.h"
 #include "BKE_depsgraph.h"
@@ -45,7 +46,7 @@
 #include "BKE_main.h"
 #include "BKE_particle.h"
 #include "BKE_pointcache.h"
-#include "BKE_utildefines.h"
+
 
 #include "RNA_access.h"
 #include "RNA_define.h"
@@ -167,7 +168,7 @@ static int new_particle_settings_exec(bContext *C, wmOperator *UNUSED(op))
 	psys_check_boid_data(psys);
 
 	DAG_scene_sort(bmain, scene);
-	DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 
 	WM_event_add_notifier(C, NC_OBJECT|ND_PARTICLE, ob);
 	
@@ -216,7 +217,7 @@ static int new_particle_target_exec(bContext *C, wmOperator *UNUSED(op))
 	BLI_addtail(&psys->targets, pt);
 
 	DAG_scene_sort(bmain, scene);
-	DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 
 	WM_event_add_notifier(C, NC_OBJECT|ND_PARTICLE, ob);
 	
@@ -265,7 +266,7 @@ static int remove_particle_target_exec(bContext *C, wmOperator *UNUSED(op))
 		pt->flag |= PTARGET_CURRENT;
 
 	DAG_scene_sort(bmain, scene);
-	DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 
 	WM_event_add_notifier(C, NC_OBJECT|ND_PARTICLE, ob);
 	
@@ -304,7 +305,7 @@ static int target_move_up_exec(bContext *C, wmOperator *UNUSED(op))
 			BLI_remlink(&psys->targets, pt);
 			BLI_insertlink(&psys->targets, pt->prev->prev, pt);
 
-			DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+			DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 			WM_event_add_notifier(C, NC_OBJECT|ND_PARTICLE, ob);
 			break;
 		}
@@ -342,7 +343,7 @@ static int target_move_down_exec(bContext *C, wmOperator *UNUSED(op))
 			BLI_remlink(&psys->targets, pt);
 			BLI_insertlink(&psys->targets, pt->next, pt);
 
-			DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+			DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 			WM_event_add_notifier(C, NC_OBJECT|ND_PARTICLE, ob);
 			break;
 		}
@@ -595,7 +596,7 @@ static int disconnect_hair_exec(bContext *C, wmOperator *op)
 		disconnect_hair(scene, ob, psys);
 	}
 
-	DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	WM_event_add_notifier(C, NC_OBJECT|ND_PARTICLE, ob);
 
 	return OPERATOR_FINISHED;
@@ -733,7 +734,7 @@ static int connect_hair_exec(bContext *C, wmOperator *op)
 		connect_hair(scene, ob, psys);
 	}
 
-	DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	WM_event_add_notifier(C, NC_OBJECT|ND_PARTICLE, ob);
 
 	return OPERATOR_FINISHED;

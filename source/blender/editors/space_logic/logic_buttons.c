@@ -23,20 +23,17 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
-
 #include <string.h>
 #include <stdio.h>
 
-
-
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_context.h"
 #include "BKE_screen.h"
 
 #include "ED_screen.h"
-
 
 #include "RNA_access.h"
 #include "RNA_define.h"
@@ -199,6 +196,7 @@ void LOGIC_OT_links_cut(wmOperatorType *ot)
 	
 	ot->name= "Cut links";
 	ot->idname= "LOGIC_OT_links_cut";
+	ot->description= "Remove logic brick connections";
 	
 	ot->invoke= WM_gesture_lines_invoke;
 	ot->modal= WM_gesture_lines_modal;

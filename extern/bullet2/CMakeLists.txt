@@ -24,12 +24,12 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-SET(INC
+set(INC
 	.
 	src
 )
 
-SET(SRC
+set(SRC
 	src/BulletCollision/BroadphaseCollision/btAxisSweep3.cpp
 	src/BulletCollision/BroadphaseCollision/btBroadphaseProxy.cpp
 	src/BulletCollision/BroadphaseCollision/btCollisionAlgorithm.cpp
@@ -319,4 +319,9 @@ SET(SRC
 	src/btBulletDynamicsCommon.h
 )
 
-BLENDERLIB(extern_bullet "${SRC}" "${INC}")
+if(CMAKE_COMPILER_IS_GNUCC)
+	# needed for gcc 4.6+
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fpermissive")
+endif()
+
+blender_add_lib(extern_bullet "${SRC}" "${INC}")

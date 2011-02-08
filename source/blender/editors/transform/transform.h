@@ -424,7 +424,7 @@ typedef struct TransInfo {
 #define	TD_USEQUAT			(1 << 3)
 #define TD_NOTCONNECTED		(1 << 4)
 #define TD_SINGLESIZE		(1 << 5)	/* used for scaling of MetaElem->rad */
-#define TD_TIMEONLY			(1 << 8)
+/*#define TD_TIMEONLY			(1 << 8) */ /*UNUSED*/
 #define TD_NOCENTER			(1 << 9)
 #define TD_NO_EXT			(1 << 10)	/* ext abused for particle key timing */
 #define TD_SKIP				(1 << 11)	/* don't transform this data */
@@ -584,7 +584,6 @@ void setUserConstraint(TransInfo *t, short orientation, int mode, const char tex
 
 void constraintNumInput(TransInfo *t, float vec[3]);
 
-void getConstraintMatrix(TransInfo *t);
 int isLockConstraint(TransInfo *t);
 int getConstraintSpaceDimension(TransInfo *t);
 char constraintModeToChar(TransInfo *t);
@@ -661,8 +660,6 @@ TransDataCurveHandleFlags *initTransDataCurveHandes(TransData *td, struct BezTri
 
 /* DRAWLINE options flags */
 #define DRAWLIGHT	1
-#define DRAWDASHED	2
-#define DRAWBOLD	4
 
 void applyTransObjects(TransInfo *t);
 void restoreTransObjects(TransInfo *t);
@@ -717,9 +714,6 @@ void applyTransformOrientation(const struct bContext *C, float mat[3][3], char *
 #define ORIENTATION_FACE	4
 
 int getTransformOrientation(const struct bContext *C, float normal[3], float plane[3], int activeOnly);
-
-int createSpaceNormal(float mat[3][3], float normal[3]);
-int createSpaceNormalTangent(float mat[3][3], float normal[3], float tangent[3]);
 
 void freeSlideVerts(TransInfo *t);
 

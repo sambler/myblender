@@ -448,7 +448,7 @@ void flip_side_name (char *name, const char *from_name, int strip_number)
 	sprintf (name, "%s%s%s%s", prefix, replace, suffix, number);
 }
 
-float defvert_find_weight(const struct MDeformVert *dvert, int group_num)
+float defvert_find_weight(const struct MDeformVert *dvert, const int group_num)
 {
 	MDeformWeight *dw= defvert_find_index(dvert, group_num);
 	return dw ? dw->weight : 0.0f;
@@ -463,7 +463,7 @@ float defvert_array_find_weight_safe(const struct MDeformVert *dvert, int index,
 }
 
 
-MDeformWeight *defvert_find_index(const MDeformVert *dvert, int defgroup)
+MDeformWeight *defvert_find_index(const MDeformVert *dvert, const int defgroup)
 {
 	if(dvert && defgroup >= 0) {
 		MDeformWeight *dw = dvert->dw;
@@ -479,7 +479,7 @@ MDeformWeight *defvert_find_index(const MDeformVert *dvert, int defgroup)
 
 /* Ensures that mv has a deform weight entry for the specified defweight group */
 /* Note this function is mirrored in editmesh_tools.c, for use for editvertices */
-MDeformWeight *defvert_verify_index(MDeformVert *dv, int defgroup)
+MDeformWeight *defvert_verify_index(MDeformVert *dv, const int defgroup)
 {
 	MDeformWeight *newdw;
 

@@ -38,11 +38,10 @@
 
 #include "PIL_dynlib.h"
 
-
-
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
 #include "BLI_kdopbvh.h"
+#include "BLI_utildefines.h"
 
 #include "DNA_key_types.h"
 #include "DNA_object_types.h"
@@ -631,7 +630,7 @@ void default_mtex(MTex *mtex)
 	mtex->size[1]= 1.0;
 	mtex->size[2]= 1.0;
 	mtex->tex= 0;
-	mtex->texflag= MTEX_NEW_BUMP;
+	mtex->texflag= MTEX_3TAP_BUMP | MTEX_BUMP_OBJECTSPACE;
 	mtex->colormodel= 0;
 	mtex->r= 1.0;
 	mtex->g= 0.0;

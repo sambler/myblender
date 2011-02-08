@@ -30,7 +30,9 @@
 
 #include "BLF_api.h"
 
-#include "BKE_utildefines.h"
+#include "BLI_utildefines.h"
+
+
 
 #include "BIF_gl.h"
 #include "BIF_glutil.h"
@@ -41,7 +43,6 @@
 
 static void console_font_begin(TextViewContext *sc)
 {
-	BLF_aspect(blf_mono_font, 1.0);
 	BLF_size(blf_mono_font, sc->lheight-2, 72);
 }
 

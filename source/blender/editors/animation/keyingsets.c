@@ -38,6 +38,7 @@
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
 #include "BLI_dynstr.h"
+#include "BLI_utildefines.h"
 
 #include "DNA_anim_types.h"
 #include "DNA_scene_types.h"
@@ -59,6 +60,7 @@
 
 #include "RNA_access.h"
 #include "RNA_define.h"
+#include "RNA_enum_types.h"
 
 #include "anim_intern.h"
 
@@ -306,7 +308,7 @@ static int add_keyingset_button_exec (bContext *C, wmOperator *op)
 		
 		keyingflag |= ANIM_get_keyframing_flags(scene, 0);
 		
-		if (IS_AUTOKEY_FLAG(XYZ2RGB)) 
+		if (IS_AUTOKEY_FLAG(scene, XYZ2RGB)) 
 			keyingflag |= INSERTKEY_XYZ2RGB;
 			
 		/* call the API func, and set the active keyingset index */
@@ -417,12 +419,9 @@ static int remove_keyingset_button_exec (bContext *C, wmOperator *op)
 			
 			/* try to find a path matching this description */
 			ksp= BKE_keyingset_find_path(ks, ptr.id.data, ks->name, path, index, KSP_GROUP_KSNAME);
-			
+
 			if (ksp) {
-				/* just free it... */
-				MEM_freeN(ksp->rna_path);
-				BLI_freelinkN(&ks->paths, ksp);
-				
+				BKE_keyingset_free_path(ks, ksp);
 				success= 1;
 			}
 			
@@ -501,7 +500,7 @@ void ANIM_OT_keying_set_active_set (wmOperatorType *ot)
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 	
 	/* keyingset to use
-	 *	- here the type is int not enum, since many of the indicies here are determined dynamically
+	 *	- here the type is int not enum, since many of the indices here are determined dynamically
 	 */
 	RNA_def_int(ot->srna, "type", 0, INT_MIN, INT_MAX, "Keying Set Number", "Index (determined internally) of the Keying Set to use", 0, 1);
 }
@@ -603,7 +602,7 @@ void ANIM_keyingset_info_unregister (const bContext *C, KeyingSetInfo *ksi)
 
 /* --------------- */
 
-void ANIM_keyingset_infos_exit ()
+void ANIM_keyingset_infos_exit (void)
 {
 	KeyingSetInfo *ksi, *next;
 	
@@ -681,15 +680,76 @@ KeyingSet *ANIM_get_keyingset_for_autokeying(Scene *scene, const char *tranformK
 	 *	- use the active KeyingSet if defined (and user wants to use it for all autokeying), 
 	 * 	  or otherwise key transforms only
 	 */
-	if (IS_AUTOKEY_FLAG(ONLYKEYINGSET) && (scene->active_keyingset))
+	if (IS_AUTOKEY_FLAG(scene, ONLYKEYINGSET) && (scene->active_keyingset))
 		return ANIM_scene_get_active_keyingset(scene);
-	else if (IS_AUTOKEY_FLAG(INSERTAVAIL))
+	else if (IS_AUTOKEY_FLAG(scene, INSERTAVAIL))
 		return ANIM_builtin_keyingset_get_named(NULL, "Available");
 	else 
 		return ANIM_builtin_keyingset_get_named(NULL, tranformKSName);
 }
 
 /* Menu of All Keying Sets ----------------------------- */
+
+/* Dynamically populate an enum of Keying Sets */
+EnumPropertyItem *ANIM_keying_sets_enum_itemf (bContext *C, PointerRNA *UNUSED(ptr), int *free)
+{
+	Scene *scene = CTX_data_scene(C);
+	KeyingSet *ks;
+	EnumPropertyItem *item= NULL, item_tmp= {0};
+	int totitem= 0;
+	int i= 0;
+
+	if (C == NULL) {
+		return DummyRNA_DEFAULT_items;
+	}
+	
+	/* active Keying Set 
+	 *	- only include entry if it exists
+	 */
+	if (scene->active_keyingset) {
+		/* active Keying Set */
+		item_tmp.identifier= item_tmp.name= "Active Keying Set";
+		item_tmp.value= i++;
+		RNA_enum_item_add(&item, &totitem, &item_tmp);
+		
+		/* separator */
+		RNA_enum_item_add_separator(&item, &totitem);
+	}
+	else
+		i++;
+		
+	/* user-defined Keying Sets 
+	 *	- these are listed in the order in which they were defined for the active scene
+	 */
+	if (scene->keyingsets.first) {
+		for (ks= scene->keyingsets.first; ks; ks= ks->next) {
+			if (ANIM_keyingset_context_ok_poll(C, ks)) {
+				item_tmp.identifier= item_tmp.name= ks->name;
+				item_tmp.value= i++;
+				RNA_enum_item_add(&item, &totitem, &item_tmp);
+			}
+		}
+		
+		/* separator */
+		RNA_enum_item_add_separator(&item, &totitem);
+	}
+	
+	/* builtin Keying Sets */
+	i= -1;
+	for (ks= builtin_keyingsets.first; ks; ks= ks->next) {
+		/* only show KeyingSet if context is suitable */
+		if (ANIM_keyingset_context_ok_poll(C, ks)) {
+			item_tmp.identifier= item_tmp.name= ks->name;
+			item_tmp.value= i--;
+			RNA_enum_item_add(&item, &totitem, &item_tmp);
+		}
+	}
+
+	RNA_enum_item_end(&item, &totitem);
+	*free= 1;
+
+	return item;
+}
 
 /* Create (and show) a menu containing all the Keying Sets which can be used in the current context */
 void ANIM_keying_sets_menu_setup (bContext *C, const char title[], const char op_name[])
@@ -700,14 +760,14 @@ void ANIM_keying_sets_menu_setup (bContext *C, const char title[], const char op
 	uiLayout *layout;
 	int i = 0;
 	
-	pup= uiPupMenuBegin(C, title, 0);
+	pup= uiPupMenuBegin(C, title, ICON_NULL);
 	layout= uiPupMenuLayout(pup);
 	
 	/* active Keying Set 
 	 *	- only include entry if it exists
 	 */
 	if (scene->active_keyingset) {
-		uiItemIntO(layout, "Active Keying Set", 0, op_name, "type", i++);
+		uiItemIntO(layout, "Active Keying Set", ICON_NULL, op_name, "type", i++);
 		uiItemS(layout);
 	}
 	else
@@ -719,7 +779,7 @@ void ANIM_keying_sets_menu_setup (bContext *C, const char title[], const char op
 	if (scene->keyingsets.first) {
 		for (ks= scene->keyingsets.first; ks; ks= ks->next) {
 			if (ANIM_keyingset_context_ok_poll(C, ks))
-				uiItemIntO(layout, ks->name, 0, op_name, "type", i++);
+				uiItemIntO(layout, ks->name, ICON_NULL, op_name, "type", i++);
 		}
 		uiItemS(layout);
 	}
@@ -729,7 +789,7 @@ void ANIM_keying_sets_menu_setup (bContext *C, const char title[], const char op
 	for (ks= builtin_keyingsets.first; ks; ks= ks->next) {
 		/* only show KeyingSet if context is suitable */
 		if (ANIM_keyingset_context_ok_poll(C, ks))
-			uiItemIntO(layout, ks->name, 0, op_name, "type", i--);
+			uiItemIntO(layout, ks->name, ICON_NULL, op_name, "type", i--);
 	}
 	
 	uiPupMenuEnd(C, pup);
@@ -926,7 +986,7 @@ int ANIM_apply_keyingset (bContext *C, ListBase *dsources, bAction *act, KeyingS
 				{
 					Object *ob= (Object *)ksp->id;
 					
-					ob->recalc |= OB_RECALC_ALL; // XXX: only object transforms only?
+					ob->recalc |= OB_RECALC_OB|OB_RECALC_DATA|OB_RECALC_TIME; // XXX: only object transforms only?
 				}
 					break;
 			}

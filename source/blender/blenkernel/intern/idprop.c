@@ -440,7 +440,6 @@ void IDP_SyncGroupValues(IDProperty *dest, IDProperty *src)
 
 							BLI_insertlinkafter(&dest->data.group, loop, copy);
 							BLI_remlink(&dest->data.group, tmp);
-							loop = copy;
 
 							IDP_FreeProperty(tmp);
 							MEM_freeN(tmp);
@@ -534,6 +533,12 @@ void IDP_RemFromGroup(IDProperty *group, IDProperty *prop)
 IDProperty *IDP_GetPropertyFromGroup(IDProperty *prop, const char *name)
 {
 	return (IDProperty *)BLI_findstring(&prop->data.group, name, offsetof(IDProperty, name));
+}
+
+IDProperty *IDP_GetPropertyTypeFromGroup(IDProperty *prop, const char *name, const char type)
+{
+	IDProperty *idprop= IDP_GetPropertyFromGroup(prop, name);
+	return (idprop && idprop->type == type) ? idprop : NULL;
 }
 
 typedef struct IDPIter {

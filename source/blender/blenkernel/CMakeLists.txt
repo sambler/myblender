@@ -24,7 +24,7 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-SET(INC 
+set(INC 
 	.
 	../avi
 	../blenlib
@@ -49,10 +49,10 @@ SET(INC
 	../../../intern/opennl/extern
 	../../../intern/smoke/extern
     ../../../source/blender/windowmanager # XXX - BAD LEVEL CALL WM_api.h
-	${ZLIB_INC}
+	${ZLIB_INCLUDE_DIRS}
 )
 
-SET(SRC
+set(SRC
 	intern/BME_Customdata.c
 	intern/BME_conversions.c
 	intern/BME_eulers.c
@@ -144,6 +144,7 @@ SET(SRC
 	BKE_anim.h
 	BKE_animsys.h
 	BKE_armature.h
+	BKE_array_mallocn.h
 	BKE_blender.h
 	BKE_bmesh.h
 	BKE_bmeshCustomData.h
@@ -225,81 +226,81 @@ SET(SRC
 	nla_private.h
 )
 
-ADD_DEFINITIONS(-DGLEW_STATIC)
+add_definitions(-DGLEW_STATIC)
 
-IF(WITH_BULLET)
-	LIST(APPEND INC ../../../extern/bullet2/src)
-	ADD_DEFINITIONS(-DUSE_BULLET)
-ENDIF(WITH_BULLET)
+if(WITH_BULLET)
+	list(APPEND INC ../../../extern/bullet2/src)
+	add_definitions(-DUSE_BULLET)
+endif()
 
-IF(WITH_IMAGE_OPENEXR)
-	ADD_DEFINITIONS(-DWITH_OPENEXR)
-ENDIF(WITH_IMAGE_OPENEXR)
+if(WITH_IMAGE_OPENEXR)
+	add_definitions(-DWITH_OPENEXR)
+endif()
 
-IF(WITH_IMAGE_TIFF)
-	ADD_DEFINITIONS(-DWITH_TIFF)
-ENDIF(WITH_IMAGE_TIFF)
+if(WITH_IMAGE_TIFF)
+	add_definitions(-DWITH_TIFF)
+endif()
 
-IF(WITH_IMAGE_OPENJPEG)
-	ADD_DEFINITIONS(-DWITH_OPENJPEG)
-ENDIF(WITH_IMAGE_OPENJPEG)
+if(WITH_IMAGE_OPENJPEG)
+	add_definitions(-DWITH_OPENJPEG)
+endif()
 
-IF(WITH_IMAGE_DDS)
-	ADD_DEFINITIONS(-DWITH_DDS)
-ENDIF(WITH_IMAGE_DDS)
+if(WITH_IMAGE_DDS)
+	add_definitions(-DWITH_DDS)
+endif()
 
-IF(WITH_IMAGE_CINEON)
-	ADD_DEFINITIONS(-DWITH_CINEON)
-ENDIF(WITH_IMAGE_CINEON)
+if(WITH_IMAGE_CINEON)
+	add_definitions(-DWITH_CINEON)
+endif()
 
-IF(WITH_IMAGE_HDR)
-	ADD_DEFINITIONS(-DWITH_HDR)
-ENDIF(WITH_IMAGE_HDR)
+if(WITH_IMAGE_HDR)
+	add_definitions(-DWITH_HDR)
+endif()
 
-IF(WITH_QUICKTIME)
-	LIST(APPEND INC ../quicktime ${QUICKTIME_INC})
-	ADD_DEFINITIONS(-DWITH_QUICKTIME)
-ENDIF(WITH_QUICKTIME)
+if(WITH_CODEC_QUICKTIME)
+	list(APPEND INC ../quicktime ${QUICKTIME_INC})
+	add_definitions(-DWITH_QUICKTIME)
+endif()
 
-IF(WITH_FFMPEG)
-	LIST(APPEND INC ${FFMPEG_INC})
-	ADD_DEFINITIONS(-DWITH_FFMPEG)
-ENDIF(WITH_FFMPEG)
+if(WITH_CODEC_FFMPEG)
+	list(APPEND INC ${FFMPEG_INC})
+	add_definitions(-DWITH_FFMPEG)
+endif()
 
-IF(WITH_LCMS)
-	LIST(APPEND INC ${LCMS_INCLUDE_DIR})
-	ADD_DEFINITIONS(-DWITH_LCMS)
-ENDIF(WITH_LCMS)
+if(WITH_LCMS)
+	list(APPEND INC ${LCMS_INCLUDE_DIR})
+	add_definitions(-DWITH_LCMS)
+endif()
 
-IF(WITH_PYTHON)
-	LIST(APPEND INC ../python ${PYTHON_INC})
-	ADD_DEFINITIONS(-DWITH_PYTHON)
-ENDIF(WITH_PYTHON)
+if(WITH_PYTHON)
+	list(APPEND INC ../python ${PYTHON_INCLUDE_DIRS})
+	add_definitions(-DWITH_PYTHON)
+endif()
 
-IF(WITH_OPENMP)
-	ADD_DEFINITIONS(-DPARALLEL=1)
-ENDIF(WITH_OPENMP)
+if(WITH_OPENMP)
+	add_definitions(-DPARALLEL=1)
+endif()
 
-IF(NOT WITH_MOD_FLUID)
-	ADD_DEFINITIONS(-DDISABLE_ELBEEM)
-ENDIF(NOT WITH_MOD_FLUID)
+if(NOT WITH_MOD_FLUID)
+	add_definitions(-DDISABLE_ELBEEM)
+endif()
 
-IF(WITH_JACK)
-	ADD_DEFINITIONS(-DWITH_JACK)
-ENDIF(WITH_JACK)
+if(WITH_JACK)
+	add_definitions(-DWITH_JACK)
+endif()
 
-IF(WITH_LZO)
-	LIST(APPEND INC ../../../extern/lzo/minilzo)
-	ADD_DEFINITIONS(-DWITH_LZO)
-ENDIF(WITH_LZO)
+if(WITH_LZO)
+	list(APPEND INC ../../../extern/lzo/minilzo)
+	add_definitions(-DWITH_LZO)
+endif()
 
-IF(WITH_LZMA)
-	LIST(APPEND INC ../../../extern/lzma)
-	ADD_DEFINITIONS(-DWITH_LZMA)
-ENDIF(WITH_LZMA)
+if(WITH_LZMA)
+	list(APPEND INC ../../../extern/lzma)
+	add_definitions(-DWITH_LZMA)
+endif()
 
-IF(MSVC)
-    SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /WX")
-ENDIF(MSVC)
+if(MSVC)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /WX")
+endif()
 
-BLENDERLIB(bf_blenkernel "${SRC}" "${INC}")
+blender_add_lib(bf_blenkernel "${SRC}" "${INC}")

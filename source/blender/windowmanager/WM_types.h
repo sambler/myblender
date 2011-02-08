@@ -55,6 +55,7 @@ struct ImBuf;
 #define OPTYPE_BLOCKING		4	/* let blender grab all input from the WM (X11) */
 #define OPTYPE_MACRO		8
 #define OPTYPE_GRAB_POINTER	16	/* */
+#define OPTYPE_PRESET		32	/* show preset menu */
 
 /* context to call operator in for WM_operator_name_call */
 /* rna_ui.c contains EnumPropertyItem's of these, keep in sync */
@@ -172,6 +173,7 @@ typedef struct wmNotifier {
 #define ND_GPENCIL			(5<<16)
 #define ND_EDITOR_CHANGED	(6<<16) /*sent to new editors after switching to them*/
 #define ND_SCREENSET		(7<<16)
+#define ND_SKETCH			(8<<16)
 
 	/* NC_SCENE Scene */
 #define ND_SCENEBROWSE		(1<<16)
@@ -191,6 +193,7 @@ typedef struct wmNotifier {
 #define ND_TOOLSETTINGS		(15<<16)
 #define ND_LAYER			(16<<16)
 #define ND_FRAME_RANGE		(17<<16)
+#define ND_TRANSFORM_DONE	(18<<16)
 #define ND_WORLD			(92<<16)
 #define ND_LAYER_CONTENT	(101<<16)
 
@@ -460,9 +463,9 @@ enum {
 
 typedef struct wmReport {
 	struct wmReport *next, *prev;
-	int type;
 	const char *typestr;
 	char *message;
+	int type;
 } wmReport;
 
 /* *************** Drag and drop *************** */
@@ -480,14 +483,14 @@ typedef struct wmDrag {
 	
 	int icon, type;					/* type, see WM_DRAG defines above */
 	void *poin;
-	char path[FILE_MAX];
+	char path[240]; /* FILE_MAX */
 	double value;
 	
 	struct ImBuf *imb;						/* if no icon but imbuf should be drawn around cursor */
 	float scale;
 	short sx, sy;
 	
-	char opname[FILE_MAX];			/* if set, draws operator name*/
+	char opname[240]; /* FILE_MAX */			/* if set, draws operator name*/
 } wmDrag;
 
 /* dropboxes are like keymaps, part of the screen/area/region definition */
@@ -503,7 +506,8 @@ typedef struct wmDropBox {
 	
 	/* if poll survives, operator is called */
 	wmOperatorType *ot;				/* not saved in file, so can be pointer */
-
+	short opcontext;				/* default invoke */
+	
 	struct IDProperty *properties;			/* operator properties, assigned to ptr->data and can be written to a file */
 	struct PointerRNA *ptr;			/* rna pointer to access properties */
 

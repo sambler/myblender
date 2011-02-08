@@ -24,7 +24,7 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-SET(INC 
+set(INC 
 	.
 	../avi
 	../blenlib
@@ -32,12 +32,12 @@ SET(INC
 	../makesdna
 	../../../intern/memutil
 	../../../intern/guardedalloc
-	${JPEG_INC}
-	${PNG_INC}
-	${ZLIB_INC}
+	${JPEG_INCLUDE_DIR}
+	${PNG_INCLUDE_DIR}
+	${ZLIB_INCLUDE_DIRS}
 )
 
-SET(SRC
+set(SRC
 	intern/allocimbuf.c
 	intern/anim_movie.c
 	intern/bmp.c
@@ -96,40 +96,48 @@ SET(SRC
 	intern/openexr/openexr_multi.h
 )
 
-IF(WITH_IMAGE_OPENEXR)
-	ADD_DEFINITIONS(-DWITH_OPENEXR)
-ENDIF(WITH_IMAGE_OPENEXR)
+if(WITH_IMAGE_OPENEXR)
+	add_definitions(-DWITH_OPENEXR)
+endif()
 
-IF(WITH_IMAGE_TIFF)
-	SET(INC ${INC} ${TIFF_INCLUDE_DIR})
-	ADD_DEFINITIONS(-DWITH_TIFF)
-ENDIF(WITH_IMAGE_TIFF)
+if(WITH_IMAGE_TIFF)
+	list(APPEND INC ${TIFF_INCLUDE_DIR})
+	add_definitions(-DWITH_TIFF)
+endif()
 
-IF(WITH_IMAGE_OPENJPEG)
-	SET(INC ${INC} ${OPENJPEG_INC})
-	ADD_DEFINITIONS(-DWITH_OPENJPEG)
-ENDIF(WITH_IMAGE_OPENJPEG)
+if(WITH_IMAGE_OPENJPEG)
+	list(APPEND INC ${OPENJPEG_INC})
+	add_definitions(-DWITH_OPENJPEG)
+endif()
 
-IF(WITH_QUICKTIME)
-	SET(INC ${INC} ../quicktime ${QUICKTIME_INC})
-	ADD_DEFINITIONS(-DWITH_QUICKTIME)
-ENDIF(WITH_QUICKTIME)
+if(WITH_IMAGE_REDCODE)
+	list(APPEND INC ${REDCODE_INC})
+	add_definitions(-DWITH_REDCODE)
+endif()
 
-IF(WITH_FFMPEG)
-	SET(INC ${INC} ${FFMPEG_INC})
-	ADD_DEFINITIONS(-DWITH_FFMPEG)
-ENDIF(WITH_FFMPEG)
+if(WITH_CODEC_QUICKTIME)
+	list(APPEND INC
+		../quicktime
+		${QUICKTIME_INC}
+	)
+	add_definitions(-DWITH_QUICKTIME)
+endif()
 
-IF(WITH_IMAGE_DDS)
-	ADD_DEFINITIONS(-DWITH_DDS)
-ENDIF(WITH_IMAGE_DDS)
+if(WITH_CODEC_FFMPEG)
+	list(APPEND INC ${FFMPEG_INC})
+	add_definitions(-DWITH_FFMPEG)
+endif()
 
-IF(WITH_IMAGE_CINEON)
-	ADD_DEFINITIONS(-DWITH_CINEON)
-ENDIF(WITH_IMAGE_CINEON)
+if(WITH_IMAGE_DDS)
+	add_definitions(-DWITH_DDS)
+endif()
 
-IF(WITH_IMAGE_HDR)
-	ADD_DEFINITIONS(-DWITH_HDR)
-ENDIF(WITH_IMAGE_HDR)
+if(WITH_IMAGE_CINEON)
+	add_definitions(-DWITH_CINEON)
+endif()
 
-BLENDERLIB(bf_imbuf "${SRC}" "${INC}")
+if(WITH_IMAGE_HDR)
+	add_definitions(-DWITH_HDR)
+endif()
+
+blender_add_lib(bf_imbuf "${SRC}" "${INC}")

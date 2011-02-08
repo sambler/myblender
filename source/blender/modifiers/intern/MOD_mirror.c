@@ -34,12 +34,13 @@
 #include "DNA_object_types.h"
 
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_cdderivedmesh.h"
 #include "BKE_mesh.h"
 #include "BKE_modifier.h"
 #include "BKE_deform.h"
-#include "BKE_utildefines.h"
+
 
 #include "MEM_guardedalloc.h"
 #include "depsgraph_private.h"
@@ -61,7 +62,7 @@ static void copyData(ModifierData *md, ModifierData *target)
 	tmmd->axis = mmd->axis;
 	tmmd->flag = mmd->flag;
 	tmmd->tolerance = mmd->tolerance;
-	tmmd->mirror_ob = mmd->mirror_ob;;
+	tmmd->mirror_ob = mmd->mirror_ob;
 }
 
 static void foreachObjectLink(
@@ -337,6 +338,7 @@ ModifierTypeInfo modifierType_Mirror = {
 
 	/* copyData */          copyData,
 	/* deformVerts */       0,
+	/* deformMatrices */    0,
 	/* deformVertsEM */     0,
 	/* deformMatricesEM */  0,
 	/* applyModifier */     applyModifier,

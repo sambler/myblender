@@ -24,15 +24,15 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-SET(INC
+set(INC
 	intern
 	../memutil
 	../../extern/bullet2/src
-	${PNG_INC}
-	${ZLIB_INC}
+	${PNG_INCLUDE_DIR}
+	${ZLIB_INCLUDE_DIRS}
 )
 
-SET(SRC
+set(SRC
 	intern/EIGENVALUE_HELPER.cpp
 	intern/FLUID_3D.cpp
 	intern/FLUID_3D_SOLVERS.cpp
@@ -80,14 +80,14 @@ SET(SRC
 	intern/tnt/tnt_version.h
 )
 
-IF(WITH_OPENMP)
-		ADD_DEFINITIONS(-DPARALLEL=1)
-ENDIF(WITH_OPENMP)
+if(WITH_OPENMP)
+		add_definitions(-DPARALLEL=1)
+endif()
 
-IF(WITH_FFTW3)
-	ADD_DEFINITIONS(-DFFTW3=1)
-	LIST(APPEND INC ${FFTW3_INC})
-ENDIF(WITH_FFTW3)
+if(WITH_FFTW3)
+	add_definitions(-DFFTW3=1)
+	list(APPEND INC ${FFTW3_INC})
+endif()
 
-BLENDERLIB(bf_intern_smoke "${SRC}" "${INC}")
+blender_add_lib(bf_intern_smoke "${SRC}" "${INC}")
 

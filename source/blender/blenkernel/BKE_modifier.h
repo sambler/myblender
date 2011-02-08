@@ -134,6 +134,12 @@ typedef struct ModifierTypeInfo {
 						float (*vertexCos)[3], int numVerts,
 						int useRenderParams, int isFinalCalc);
 
+	/* Like deformMatricesEM but called from object mode (for supporting modifiers in sculpt mode) */
+	void (*deformMatrices)(
+				struct ModifierData *md, struct Object *ob,
+				struct DerivedMesh *derivedData,
+				float (*vertexCos)[3], float (*defMats)[3][3], int numVerts);
+
 	/* Like deformVerts but called during editmode (for supporting modifiers)
 	 */
 	void (*deformVertsEM)(
@@ -294,7 +300,11 @@ int           modifier_couldBeCage(struct Scene *scene, struct ModifierData *md)
 int           modifier_isCorrectableDeformed(struct ModifierData *md);
 int			  modifier_sameTopology(ModifierData *md);
 int           modifier_isEnabled(struct Scene *scene, struct ModifierData *md, int required_mode);
-void          modifier_setError(struct ModifierData *md, char *format, ...);
+void          modifier_setError(struct ModifierData *md, const char *format, ...)
+#ifdef __GNUC__
+__attribute__ ((format (printf, 2, 3)));
+#endif
+;
 
 void          modifiers_foreachObjectLink(struct Object *ob,
 										  ObjectWalkFunc walk,

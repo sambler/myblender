@@ -37,7 +37,9 @@
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
 #include "BLI_rand.h"
+#include "BLI_utildefines.h"
 
+#include "BKE_object.h"
 #include "BKE_context.h"
 #include "BKE_screen.h"
 
@@ -195,12 +197,14 @@ static SpaceLink *view3d_new(const bContext *C)
 	v3d->grid= 1.0f;
 	v3d->gridlines= 16;
 	v3d->gridsubdiv = 10;
-	v3d->drawtype= OB_WIRE;
+	v3d->drawtype= OB_SOLID;
 	
 	v3d->gridflag |= V3D_SHOW_X;
 	v3d->gridflag |= V3D_SHOW_Y;
 	v3d->gridflag |= V3D_SHOW_FLOOR;
 	v3d->gridflag &= ~V3D_SHOW_Z;
+	
+	v3d->flag |= V3D_SELECT_OUTLINE;
 	
 	v3d->lens= 35.0f;
 	v3d->near= 0.01f;
@@ -317,6 +321,10 @@ static void view3d_main_area_init(wmWindowManager *wm, ARegion *ar)
 
 	/* object ops. */
 	
+	/* important to be before Pose keymap since they can both be enabled at once */
+	keymap= WM_keymap_find(wm->defaultconf, "Face Mask", 0, 0);
+	WM_event_add_keymap_handler(&ar->handlers, keymap);
+	
 	/* pose is not modal, operator poll checks for this */
 	keymap= WM_keymap_find(wm->defaultconf, "Pose", 0, 0);
 	WM_event_add_keymap_handler(&ar->handlers, keymap);
@@ -331,9 +339,6 @@ static void view3d_main_area_init(wmWindowManager *wm, ARegion *ar)
 	WM_event_add_keymap_handler(&ar->handlers, keymap);
 
 	keymap= WM_keymap_find(wm->defaultconf, "Weight Paint", 0, 0);
-	WM_event_add_keymap_handler(&ar->handlers, keymap);
-	
-	keymap= WM_keymap_find(wm->defaultconf, "Face Mask", 0, 0);
 	WM_event_add_keymap_handler(&ar->handlers, keymap);
 
 	keymap= WM_keymap_find(wm->defaultconf, "Sculpt", 0, 0);
@@ -478,7 +483,7 @@ static void view3d_dropboxes(void)
 	WM_dropbox_add(lb, "OBJECT_OT_add_named_cursor", view3d_ob_drop_poll, view3d_ob_drop_copy);
 	WM_dropbox_add(lb, "OBJECT_OT_drop_named_material", view3d_mat_drop_poll, view3d_id_drop_copy);
 	WM_dropbox_add(lb, "MESH_OT_drop_named_image", view3d_ima_ob_drop_poll, view3d_id_path_drop_copy);
-	WM_dropbox_add(lb, "VIEW3D_OT_add_background_image", view3d_ima_bg_drop_poll, view3d_id_path_drop_copy);
+	WM_dropbox_add(lb, "VIEW3D_OT_background_image_add", view3d_ima_bg_drop_poll, view3d_id_path_drop_copy);
 }
 
 
@@ -701,6 +706,7 @@ static void view3d_main_area_listener(ARegion *ar, wmNotifier *wmn)
 			switch(wmn->data) {
 				case ND_GPENCIL:
 				case ND_ANIMPLAY:
+				case ND_SKETCH:
 					ED_region_tag_redraw(ar);
 					break;
 				case ND_SCREENBROWSE:

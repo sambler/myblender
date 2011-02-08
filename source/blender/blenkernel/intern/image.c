@@ -54,12 +54,14 @@
 
 #include "DNA_packedFile_types.h"
 #include "DNA_scene_types.h"
+#include "DNA_object_types.h"
 #include "DNA_camera_types.h"
 #include "DNA_sequence_types.h"
 #include "DNA_userdef_types.h"
 
 #include "BLI_blenlib.h"
 #include "BLI_threads.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_bmfont.h"
 #include "BKE_global.h"
@@ -70,6 +72,7 @@
 #include "BKE_packedFile.h"
 #include "BKE_scene.h"
 #include "BKE_node.h"
+#include "BKE_utildefines.h"
 
 //XXX #include "BIF_editseq.h"
 
@@ -607,15 +610,21 @@ void BKE_image_free_all_textures(void)
 	
 	for(ima= G.main->image.first; ima; ima= ima->id.next) {
 		if(ima->ibufs.first && (ima->id.flag & LIB_DOIT)) {
-			/*
 			ImBuf *ibuf;
+			
 			for(ibuf= ima->ibufs.first; ibuf; ibuf= ibuf->next) {
-				if(ibuf->mipmap[0]) 
+				/* escape when image is painted on */
+				if(ibuf->userflags & IB_BITMAPDIRTY)
+					break;
+				
+				/* if(ibuf->mipmap[0]) 
 					totsize+= 1.33*ibuf->x*ibuf->y*4;
 				else
-					totsize+= ibuf->x*ibuf->y*4;
-			} */
-			image_free_buffers(ima);
+					totsize+= ibuf->x*ibuf->y*4;*/
+				
+			}
+			if(ibuf==NULL)
+				image_free_buffers(ima);
 		}
 	}
 	/* printf("freed total %d MB\n", totsize/(1024*1024)); */
@@ -760,7 +769,7 @@ int BKE_imtype_is_movie(int imtype)
 
 int BKE_add_image_extension(char *string, int imtype)
 {
-	char *extension= NULL;
+	const char *extension= NULL;
 	
 	if(imtype== R_IRIS) {
 		if(!BLI_testextensie(string, ".rgb"))
@@ -851,6 +860,7 @@ typedef struct StampData {
 	char 	time[512];
 	char 	frame[512];
 	char 	camera[64];
+	char 	cameralens[64];
 	char 	scene[64];
 	char 	strip[64];
 	char 	rendertime[64];
@@ -906,10 +916,10 @@ static void stampdata(Scene *scene, StampData *stamp_data, int do_prefix)
 	}
 	
 	if (scene->r.stamp & R_STAMP_TIME) {
-		int h, m, s, f;
-		h= m= s= f= 0;
-		f = (int)(scene->r.cfra % scene->r.frs_sec);
-		s = (int)(scene->r.cfra / scene->r.frs_sec);
+		int f = (int)(scene->r.cfra % scene->r.frs_sec);
+		int s = (int)(scene->r.cfra / scene->r.frs_sec);
+		int h= 0;
+		int m= 0;
 
 		if (s) {
 			m = (int)(s / 60);
@@ -934,21 +944,38 @@ static void stampdata(Scene *scene, StampData *stamp_data, int do_prefix)
 	
 	if (scene->r.stamp & R_STAMP_FRAME) {
 		char format[32];
-		if (do_prefix)		sprintf(format, "Frame %%0%di", 1 + (int) log10(scene->r.efra));
-		else				sprintf(format, "%%0%di", 1 + (int) log10(scene->r.efra));
+		int digits= 1;
+		
+		if(scene->r.efra>9)
+			digits= 1 + (int) log10(scene->r.efra);
+		
+		if (do_prefix)		sprintf(format, "Frame %%0%di", digits);
+		else				sprintf(format, "%%0%di", digits);
 		sprintf (stamp_data->frame, format, scene->r.cfra);
 	} else {
 		stamp_data->frame[0] = '\0';
 	}
 
 	if (scene->r.stamp & R_STAMP_CAMERA) {
-		if (scene->camera) strcpy(text, ((Camera *) scene->camera)->id.name+2);
+		if (scene->camera) strcpy(text, scene->camera->id.name+2);
 		else 		strcpy(text, "<none>");
 		
 		if (do_prefix)		sprintf(stamp_data->camera, "Camera %s", text);
 		else				sprintf(stamp_data->camera, "%s", text);
 	} else {
 		stamp_data->camera[0] = '\0';
+	}
+
+	if (scene->r.stamp & R_STAMP_CAMERALENS) {
+		if (scene->camera && scene->camera->type == OB_CAMERA) {
+			sprintf(text, "%.2f", ((Camera *)scene->camera->data)->lens);
+		}
+		else 		strcpy(text, "<none>");
+
+		if (do_prefix)		sprintf(stamp_data->cameralens, "Lens %s", text);
+		else				sprintf(stamp_data->cameralens, "%s", text);
+	} else {
+		stamp_data->cameralens[0] = '\0';
 	}
 
 	if (scene->r.stamp & R_STAMP_SCENE) {
@@ -1003,7 +1030,6 @@ void BKE_stamp_buf(Scene *scene, unsigned char *rect, float *rectf, int width, i
 		scene->r.stamp_font_id= 12;
 
 	/* set before return */
-	BLF_aspect(mono, 1.0);
 	BLF_size(mono, scene->r.stamp_font_id, 72);
 	
 	BLF_buffer(mono, rectf, rect, width, height, channels);
@@ -1133,6 +1159,18 @@ void BKE_stamp_buf(Scene *scene, unsigned char *rect, float *rectf, int width, i
 		buf_rectfill_area(rect, rectf, width, height, scene->r.bg_stamp, x, y, x+w+2, y+h+2);
 		BLF_position(mono, x, y+3, 0.0);
 		BLF_draw_buffer(mono, stamp_data.camera);
+
+		/* space width. */
+		x += w + pad;
+	}
+
+	if (stamp_data.cameralens[0]) {
+		BLF_width_and_height(mono, stamp_data.cameralens, &w, &h); h= h_fixed;
+
+		/* extra space for background. */
+		buf_rectfill_area(rect, rectf, width, height, scene->r.bg_stamp, x, y, x+w+2, y+h+2);
+		BLF_position(mono, x, y+3, 0.0);
+		BLF_draw_buffer(mono, stamp_data.cameralens);
 	}
 	
 	if (stamp_data.scene[0]) {
@@ -1183,9 +1221,33 @@ void BKE_stamp_info(Scene *scene, struct ImBuf *ibuf)
 	if (stamp_data.time[0])		IMB_metadata_change_field (ibuf, "Time",		stamp_data.time);
 	if (stamp_data.frame[0])	IMB_metadata_change_field (ibuf, "Frame",	stamp_data.frame);
 	if (stamp_data.camera[0])	IMB_metadata_change_field (ibuf, "Camera",	stamp_data.camera);
+	if (stamp_data.cameralens[0]) IMB_metadata_change_field (ibuf, "Lens",	stamp_data.cameralens);
 	if (stamp_data.scene[0])	IMB_metadata_change_field (ibuf, "Scene",	stamp_data.scene);
 	if (stamp_data.strip[0])	IMB_metadata_change_field (ibuf, "Strip",	stamp_data.strip);
 	if (stamp_data.rendertime[0]) IMB_metadata_change_field (ibuf, "RenderTime", stamp_data.rendertime);
+}
+
+int BKE_alphatest_ibuf(ImBuf *ibuf)
+{
+	int tot;
+	if(ibuf->rect_float) {
+		float *buf= ibuf->rect_float;
+		for(tot= ibuf->x * ibuf->y; tot--; buf+=4) {
+			if(buf[3] < 1.0f) {
+				return TRUE;
+			}
+		}
+	}
+	else if (ibuf->rect) {
+		unsigned char *buf= (unsigned char *)ibuf->rect;
+		for(tot= ibuf->x * ibuf->y; tot--; buf+=4) {
+			if(buf[3] != 255) {
+				return TRUE;
+			}
+		}
+	}
+
+	return FALSE;
 }
 
 int BKE_write_ibuf(Scene *scene, ImBuf *ibuf, const char *name, int imtype, int subimtype, int quality)
@@ -1407,7 +1469,9 @@ void BKE_image_signal(Image *ima, ImageUser *iuser, int signal)
 			}
 		}
 
-		image_free_buffers(ima);
+		/* force reload on first use, but not for multilayer, that makes nodes and buttons in ui drawing fail */
+		if(ima->type!=IMA_TYPE_MULTILAYER)
+			image_free_buffers(ima);
 
 		ima->ok= 1;
 		if(iuser)
@@ -1954,6 +2018,9 @@ static ImBuf *image_get_render_result(Image *ima, ImageUser *iuser, void **lock_
 		ibuf->flags &= ~IB_zbuffloat;
 	}
 
+	/* since its possible to access the buffer from the image directly, set the profile [#25073] */
+	ibuf->profile= (iuser->scene->r.color_mgt_flag & R_COLOR_MANAGEMENT) ? IB_PROFILE_LINEAR_RGB : IB_PROFILE_NONE;
+
 	ibuf->dither= dither;
 
 	ima->ok= IMA_OK_LOADED;
@@ -2118,7 +2185,8 @@ ImBuf *BKE_image_acquire_ibuf(Image *ima, ImageUser *iuser, void **lock_r)
 						BLI_lock_thread(LOCK_VIEWER);
 						*lock_r= ima;
 
-						frame= iuser?iuser->framenr:0;
+						/* XXX anim play for viewer nodes not yet supported */
+						frame= 0; // XXX iuser?iuser->framenr:0;
 						ibuf= image_get_ibuf(ima, 0, frame);
 
 						if(!ibuf) {
@@ -2182,7 +2250,7 @@ void BKE_image_user_calc_frame(ImageUser *iuser, int cfra, int fieldnr)
 			if(cfra==0) cfra= len;
 		}
 		
-		if(cfra<1) cfra= 1;
+		if(cfra<0) cfra= 0;
 		else if(cfra>len) cfra= len;
 		
 		/* convert current frame to current field */

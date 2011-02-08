@@ -89,10 +89,10 @@
 
 #include "BLI_math.h"
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 #include "BLI_editVert.h"
 #include "BLI_ghash.h"
 #include "BLI_linklist.h"
-
 
 #include "UI_resources.h"
 
@@ -103,6 +103,7 @@
 #include "transform.h"
 
 void drawTransformApply(const struct bContext *C, struct ARegion *ar, void *arg);
+int doEdgeSlide(TransInfo *t, float perc);
 
 /* ************************** SPACE DEPENDANT CODE **************************** */
 
@@ -337,7 +338,7 @@ static void viewRedrawForce(const bContext *C, TransInfo *t)
 	}
 }
 
-static void viewRedrawPost(TransInfo *t)
+static void viewRedrawPost(bContext *C, TransInfo *t)
 {
 	ED_area_headerprint(t->sa, NULL);
 	
@@ -345,6 +346,10 @@ static void viewRedrawPost(TransInfo *t)
 		/* if autokeying is enabled, send notifiers that keyframes were added */
 		if (IS_AUTOKEY_ON(t->scene))
 			WM_main_add_notifier(NC_ANIMATION|ND_KEYFRAME|NA_EDITED, NULL);
+		
+		/* XXX temp, first hack to get auto-render in compositor work (ton) */
+		WM_event_add_notifier(C, NC_SCENE|ND_TRANSFORM_DONE, CTX_data_scene(C));
+
 	}
 	
 #if 0 // TRANSFORM_FIX_ME
@@ -606,20 +611,22 @@ int transformEvent(TransInfo *t, wmEvent *event)
 				break;
 			case TFM_MODAL_ROTATE:
 				/* only switch when... */
-				if( ELEM4(t->mode, TFM_ROTATION, TFM_RESIZE, TFM_TRACKBALL, TFM_TRANSLATION) ) {
-					
-					resetTransRestrictions(t);
-					
-					if (t->mode == TFM_ROTATION) {
-						restoreTransObjects(t);
-						initTrackball(t);
+				if(!(t->options & CTX_TEXTURE)) {
+					if( ELEM4(t->mode, TFM_ROTATION, TFM_RESIZE, TFM_TRACKBALL, TFM_TRANSLATION) ) {
+						
+						resetTransRestrictions(t);
+						
+						if (t->mode == TFM_ROTATION) {
+							restoreTransObjects(t);
+							initTrackball(t);
+						}
+						else {
+							restoreTransObjects(t);
+							initRotation(t);
+						}
+						initSnapping(t, NULL); // need to reinit after mode change
+						t->redraw |= TREDRAW_HARD;
 					}
-					else {
-						restoreTransObjects(t);
-						initRotation(t);
-					}
-					initSnapping(t, NULL); // need to reinit after mode change
-					t->redraw |= TREDRAW_HARD;
 				}
 				break;
 			case TFM_MODAL_RESIZE:
@@ -738,6 +745,8 @@ int transformEvent(TransInfo *t, wmEvent *event)
 			case TFM_MODAL_PROPSIZE_UP:
 				if(t->flag & T_PROP_EDIT) {
 					t->prop_size*= 1.1f;
+					if(t->spacetype==SPACE_VIEW3D && t->persp != RV3D_ORTHO)
+						t->prop_size= MIN2(t->prop_size, ((View3D *)t->view)->far);
 					calculatePropRatio(t);
 				}
 				t->redraw |= TREDRAW_HARD;
@@ -857,20 +866,22 @@ int transformEvent(TransInfo *t, wmEvent *event)
 			break;
 		case RKEY:
 			/* only switch when... */
-			if( ELEM4(t->mode, TFM_ROTATION, TFM_RESIZE, TFM_TRACKBALL, TFM_TRANSLATION) ) {
+			if(!(t->options & CTX_TEXTURE)) {
+				if( ELEM4(t->mode, TFM_ROTATION, TFM_RESIZE, TFM_TRACKBALL, TFM_TRANSLATION) ) {
 
-				resetTransRestrictions(t);
+					resetTransRestrictions(t);
 
-				if (t->mode == TFM_ROTATION) {
-					restoreTransObjects(t);
-					initTrackball(t);
+					if (t->mode == TFM_ROTATION) {
+						restoreTransObjects(t);
+						initTrackball(t);
+					}
+					else {
+						restoreTransObjects(t);
+						initRotation(t);
+					}
+					initSnapping(t, NULL); // need to reinit after mode change
+					t->redraw |= TREDRAW_HARD;
 				}
-				else {
-					restoreTransObjects(t);
-					initRotation(t);
-				}
-				initSnapping(t, NULL); // need to reinit after mode change
-				t->redraw |= TREDRAW_HARD;
 			}
 			break;
 		case CKEY:
@@ -974,6 +985,8 @@ int transformEvent(TransInfo *t, wmEvent *event)
 		case PADPLUSKEY:
 			if(event->alt && t->flag & T_PROP_EDIT) {
 				t->prop_size *= 1.1f;
+				if(t->spacetype==SPACE_VIEW3D && t->persp != RV3D_ORTHO)
+					t->prop_size= MIN2(t->prop_size, ((View3D *)t->view)->far);
 				calculatePropRatio(t);
 			}
 			t->redraw= 1;
@@ -1333,20 +1346,20 @@ static void drawHelpline(bContext *UNUSED(C), int x, int y, void *customdata)
 				}
 				case HLP_TRACKBALL:
 				{
-					char col[3], col2[3];
+					unsigned char col[3], col2[3];
 					UI_GetThemeColor3ubv(TH_GRID, col);
 
 					glTranslatef(mval[0], mval[1], 0);
 
 					glLineWidth(3.0);
 
-					UI_make_axis_color(col, col2, 'x');
+					UI_make_axis_color(col, col2, 'X');
 					glColor3ubv((GLubyte *)col2);
 
 					drawArrow(RIGHT, 5, 10, 5);
 					drawArrow(LEFT, 5, 10, 5);
 
-					UI_make_axis_color(col, col2, 'y');
+					UI_make_axis_color(col, col2, 'Y');
 					glColor3ubv((GLubyte *)col2);
 
 					drawArrow(UP, 5, 10, 5);
@@ -1498,6 +1511,10 @@ int initTransform(bContext *C, TransInfo *t, wmOperator *op, wmEvent *event, int
 
 	t->state = TRANS_STARTING;
 
+	if(RNA_struct_find_property(op->ptr, "texture_space"))
+		if(RNA_boolean_get(op->ptr, "texture_space"))
+			options |= CTX_TEXTURE;
+	
 	t->options = options;
 
 	t->mode = mode;
@@ -1785,6 +1802,10 @@ int transformEnd(bContext *C, TransInfo *t)
 		/* handle restoring objects */
 		if(t->state == TRANS_CANCEL)
 		{
+			/* exception, edge slide transformed UVs too */
+			if(t->mode==TFM_EDGE_SLIDE)
+				doEdgeSlide(t, 0.0f);
+			
 			exit_code = OPERATOR_CANCELLED;
 			restoreTransObjects(t);	// calls recalcData()
 		}
@@ -1800,7 +1821,7 @@ int transformEnd(bContext *C, TransInfo *t)
 		postTrans(C, t);
 
 		/* send events out for redraws */
-		viewRedrawPost(t);
+		viewRedrawPost(C, t);
 
 		/*  Undo as last, certainly after special_trans_update! */
 
@@ -1917,23 +1938,29 @@ static void protectedQuaternionBits(short protectflag, float *quat, float *oldqu
 	}
 	else {
 		/* quaternions get limited with euler... (compatability mode) */
-		float eul[3], oldeul[3], quat1[4];
-		
-		QUATCOPY(quat1, quat);
-		quat_to_eul( eul,quat);
-		quat_to_eul( oldeul,oldquat);
-		
+		float eul[3], oldeul[3], nquat[4], noldquat[4];
+		float qlen;
+
+		qlen= normalize_qt_qt(nquat, quat);
+		normalize_qt_qt(noldquat, oldquat);
+
+		quat_to_eul(eul, nquat);
+		quat_to_eul(oldeul, noldquat);
+
 		if (protectflag & OB_LOCK_ROTX)
 			eul[0]= oldeul[0];
 		if (protectflag & OB_LOCK_ROTY)
 			eul[1]= oldeul[1];
 		if (protectflag & OB_LOCK_ROTZ)
 			eul[2]= oldeul[2];
-		
+
 		eul_to_quat( quat,eul);
+
+		/* restore original quat size */
+		mul_qt_fl(quat, qlen);
 		
 		/* quaternions flip w sign to accumulate rotations correctly */
-		if ( (quat1[0]<0.0f && quat[0]>0.0f) || (quat1[0]>0.0f && quat[0]<0.0f) ) {
+		if ( (nquat[0]<0.0f && quat[0]>0.0f) || (nquat[0]>0.0f && quat[0]<0.0f) ) {
 			mul_qt_fl(quat, -1.0f);
 		}
 	}
@@ -2013,8 +2040,7 @@ static void constraintob_from_transdata(bConstraintOb *cob, TransData *td)
 			   we don't necessarily end up with a rotation matrix, and
 			   then conversion back to quat gives a different result */
 			float quat[4];
-			copy_qt_qt(quat, td->ext->quat);
-			normalize_qt(quat);
+			normalize_qt_qt(quat, td->ext->quat);
 			quat_to_mat4(cob->matrix, quat);
 		}
 		else if (td->ext->rotOrder == ROT_MODE_AXISANGLE) {
@@ -2526,6 +2552,9 @@ static void headerResize(TransInfo *t, float vec[3], char *str) {
 		else
 			sprintf(str, "Scale X: %s   Y: %s  Z: %s%s %s", &tvec[0], &tvec[20], &tvec[40], t->con.text, t->proptext);
 	}
+	
+	if (t->flag & (T_PROP_EDIT|T_PROP_CONNECTED))
+		sprintf(str, "%s Proportional size: %.2f", str, t->prop_size);
 }
 
 #define SIGN(a)		(a<-FLT_EPSILON?1:a>FLT_EPSILON?2:3)
@@ -3111,9 +3140,7 @@ int Rotation(TransInfo *t, short UNUSED(mval[2]))
 	char str[64];
 	
 	float final;
-	
-	float mat[3][3];
-	
+
 	final = t->values[0];
 	
 	applyNDofInput(&t->ndof, &final);
@@ -3151,9 +3178,10 @@ int Rotation(TransInfo *t, short UNUSED(mval[2]))
 		sprintf(str, "Rot: %.2f%s %s", 180.0*final/M_PI, t->con.text, t->proptext);
 	}
 	
+	if (t->flag & (T_PROP_EDIT|T_PROP_CONNECTED))
+		sprintf(str, "%s Proportional size: %.2f", str, t->prop_size);
+	
 	t->values[0] = final;
-
-	vec_rot_to_mat3( mat, t->axis, final);
 	
 	applyRotation(t, final, t->axis);
 	
@@ -3325,7 +3353,7 @@ static void headerTranslation(TransInfo *t, float vec[3], char *str) {
 		applyAspectRatio(t, dvec);
 
 		dist = len_v3(vec);
-		if(t->scene->unit.system) {
+		if(!(t->flag & T_2D_EDIT) && t->scene->unit.system) {
 			int i, do_split= t->scene->unit.flag & USER_UNIT_OPT_SPLIT ? 1:0;
 
 			for(i=0; i<3; i++)
@@ -3338,7 +3366,7 @@ static void headerTranslation(TransInfo *t, float vec[3], char *str) {
 		}
 	}
 
-	if(t->scene->unit.system)
+	if(!(t->flag & T_2D_EDIT) && t->scene->unit.system)
 		bUnit_AsString(distvec, sizeof(distvec), dist*t->scene->unit.scale_length, 4, t->scene->unit.system, B_UNIT_LENGTH, t->scene->unit.flag & USER_UNIT_OPT_SPLIT, 0);
 	else if( dist > 1e10 || dist < -1e10 )	/* prevent string buffer overflow */
 		sprintf(distvec, "%.4e", dist);
@@ -3374,6 +3402,9 @@ static void headerTranslation(TransInfo *t, float vec[3], char *str) {
 		else
 			sprintf(str, "Dx: %s   Dy: %s  Dz: %s (%s)%s %s  %s", &tvec[0], &tvec[20], &tvec[40], distvec, t->con.text, t->proptext, &autoik[0]);
 	}
+	
+	if (t->flag & (T_PROP_EDIT|T_PROP_CONNECTED))
+		sprintf(str, "%s Proportional size: %.2f", str, t->prop_size);
 }
 
 static void applyTranslation(TransInfo *t, float vec[3]) {
@@ -3858,7 +3889,7 @@ int Bevel(TransInfo *t, short UNUSED(mval[2]))
 	float distance,d;
 	int i;
 	char str[128];
-	char *mode;
+	const char *mode;
 	TransData *td = t->data;
 
 	mode = (G.editBMesh->options & BME_BEVEL_VERT) ? "verts only" : "normal";
@@ -4507,7 +4538,7 @@ static int createSlideVerts(TransInfo *t)
 		look = look->next;
 	}
 
-	// make sure the UPs nad DOWNs are 'faceloops'
+	// make sure the UPs and DOWNs are 'faceloops'
 	// Also find the nearest slidevert to the cursor
 
 	look = vertlist;
@@ -4524,7 +4555,7 @@ static int createSlideVerts(TransInfo *t)
 			return 0;
 		}
 
-		if(me->drawflag & ME_DRAW_EDGELEN) {
+		if(me->drawflag & ME_DRAWEXTRA_EDGELEN) {
 			if(!(tempsv->up->f & SELECT)) {
 				tempsv->up->f |= SELECT;
 				tempsv->up->f2 |= 16;
@@ -4546,7 +4577,7 @@ static int createSlideVerts(TransInfo *t)
 			sv = BLI_ghash_lookup(vertgh, ev);
 
 			if(sv) {
-				float co[3], co2[3], vec[3];
+				float co[3], co2[3], tvec[3];
 
 				ev = (EditVert*)look->link;
 
@@ -4563,12 +4594,12 @@ static int createSlideVerts(TransInfo *t)
 				}
 
 				if (ev == tempsv->up->v1) {
-					sub_v3_v3v3(vec, co, co2);
+					sub_v3_v3v3(tvec, co, co2);
 				} else {
-					sub_v3_v3v3(vec, co2, co);
+					sub_v3_v3v3(tvec, co2, co);
 				}
 
-				add_v3_v3(start, vec);
+				add_v3_v3(start, tvec);
 
 				if (v3d) {
 					view3d_project_float(t->ar, tempsv->down->v1->co, co, projectMat);
@@ -4576,12 +4607,12 @@ static int createSlideVerts(TransInfo *t)
 				}
 
 				if (ev == tempsv->down->v1) {
-					sub_v3_v3v3(vec, co2, co);
+					sub_v3_v3v3(tvec, co2, co);
 				} else {
-					sub_v3_v3v3(vec, co, co2);
+					sub_v3_v3v3(tvec, co, co2);
 				}
 
-				add_v3_v3(end, vec);
+				add_v3_v3(end, tvec);
 
 				totvec += 1.0f;
 				nearest = (EditVert*)look->link;
@@ -4663,7 +4694,7 @@ static int createSlideVerts(TransInfo *t)
 							uv_new = tf->uv[k];
 
 							if (ev->tmp.l) {
-								if (fabs(suv->origuv[0]-uv_new[0]) > 0.0001 || fabs(suv->origuv[1]-uv_new[1])) {
+								if (fabs(suv->origuv[0]-uv_new[0]) > 0.0001f || fabs(suv->origuv[1]-uv_new[1]) > 0.0001f) {
 									ev->tmp.l = -1; /* Tag as invalid */
 									BLI_linklist_free(suv->fuv_list,NULL);
 									suv->fuv_list = NULL;
@@ -4738,7 +4769,7 @@ void freeSlideVerts(TransInfo *t)
 	Mesh *me = t->obedit->data;
 	int uvlay_idx;
 
-	if(me->drawflag & ME_DRAW_EDGELEN) {
+	if(me->drawflag & ME_DRAWEXTRA_EDGELEN) {
 		TransDataSlideVert *tempsv;
 		LinkNode *look = sld->vertlist;
 		GHash *vertgh = sld->vhash;
@@ -4822,17 +4853,15 @@ int doEdgeSlide(TransInfo *t, float perc)
 	LinkNode *vertlist=sld->vertlist, *look;
 	GHash *vertgh = sld->vhash;
 	TransDataSlideVert *tempsv;
-	float len = 0.0f;
+	float len;
 	int prop=1, flip=0;
 	/* UV correction vars */
 	GHash **uvarray= sld->uvhash;
 	int  uvlay_tot= CustomData_number_of_layers(&em->fdata, CD_MTFACE);
 	int uvlay_idx;
-	TransDataSlideUv *suv=sld->slideuv;
+	TransDataSlideUv *suv;
 	float uv_tmp[2];
 	LinkNode *fuv_link;
-
-	len = 0.0f;
 
 	tempsv = BLI_ghash_lookup(vertgh,nearest);
 
@@ -5857,7 +5886,7 @@ void BIF_TransformSetUndo(char *UNUSED(str))
 }
 
 
-void NDofTransform()
+void NDofTransform(void)
 {
 #if 0 // TRANSFORM_FIX_ME
 	float fval[7];

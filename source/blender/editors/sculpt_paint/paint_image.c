@@ -44,8 +44,10 @@
 #include "BLI_dynstr.h"
 #include "BLI_linklist.h"
 #include "BLI_memarena.h"
-#include "PIL_time.h"
 #include "BLI_threads.h"
+#include "BLI_utildefines.h"
+
+#include "PIL_time.h"
 
 #include "IMB_imbuf.h"
 #include "IMB_imbuf_types.h"
@@ -163,17 +165,17 @@ typedef struct ImagePaintRegion {
 #define PROJ_DEBUG_WINCLIP 1
 
 /* projectFaceSeamFlags options */
-//#define PROJ_FACE_IGNORE	1<<0	/* When the face is hidden, backfacing or occluded */
-//#define PROJ_FACE_INIT	1<<1	/* When we have initialized the faces data */
-#define PROJ_FACE_SEAM1	1<<0	/* If this face has a seam on any of its edges */
-#define PROJ_FACE_SEAM2	1<<1
-#define PROJ_FACE_SEAM3	1<<2
-#define PROJ_FACE_SEAM4	1<<3
+//#define PROJ_FACE_IGNORE	(1<<0)	/* When the face is hidden, backfacing or occluded */
+//#define PROJ_FACE_INIT	(1<<1)	/* When we have initialized the faces data */
+#define PROJ_FACE_SEAM1	(1<<0)	/* If this face has a seam on any of its edges */
+#define PROJ_FACE_SEAM2	(1<<1)
+#define PROJ_FACE_SEAM3	(1<<2)
+#define PROJ_FACE_SEAM4	(1<<3)
 
-#define PROJ_FACE_NOSEAM1	1<<4
-#define PROJ_FACE_NOSEAM2	1<<5
-#define PROJ_FACE_NOSEAM3	1<<6
-#define PROJ_FACE_NOSEAM4	1<<7
+#define PROJ_FACE_NOSEAM1	(1<<4)
+#define PROJ_FACE_NOSEAM2	(1<<5)
+#define PROJ_FACE_NOSEAM3	(1<<6)
+#define PROJ_FACE_NOSEAM4	(1<<7)
 
 #define PROJ_SRC_VIEW		1
 #define PROJ_SRC_IMAGE_CAM	2
@@ -189,8 +191,8 @@ typedef struct ImagePaintRegion {
 #define PROJ_FACE_SCALE_SEAM	0.99f
 
 #define PROJ_BUCKET_NULL		0
-#define PROJ_BUCKET_INIT		1<<0
-// #define PROJ_BUCKET_CLONE_INIT	1<<1
+#define PROJ_BUCKET_INIT		(1<<0)
+// #define PROJ_BUCKET_CLONE_INIT	(1<<1)
 
 /* used for testing doubles, if a point is on a line etc */
 #define PROJ_GEOM_TOLERANCE 0.00075f
@@ -430,7 +432,8 @@ static void image_undo_restore(bContext *C, ListBase *lb)
 
 		GPU_free_image(ima); /* force OpenGL reload */
 		if(ibuf->rect_float)
-			imb_freerectImBuf(ibuf); /* force recreate of char rect */
+			ibuf->userflags |= IB_RECT_INVALID; /* force recreate of char rect */
+
 	}
 
 	IMB_freeImBuf(tmpibuf);
@@ -637,9 +640,8 @@ static int project_paint_PickColor(const ProjPaintState *ps, float pt[2], float 
 		}
 	}
 	else {
-		xi = (int)((uv[0]*ibuf->x) + 0.5f);
-		yi = (int)((uv[1]*ibuf->y) + 0.5f);
-		
+		//xi = (int)((uv[0]*ibuf->x) + 0.5f);
+		//yi = (int)((uv[1]*ibuf->y) + 0.5f);
 		//if (xi<0 || xi>=ibuf->x  ||  yi<0 || yi>=ibuf->y) return 0;
 		
 		/* wrap */
@@ -934,7 +936,7 @@ static int pixel_bounds_array(float (* uv)[2], rcti *bounds_px, const int ibuf_x
 
 #ifndef PROJ_DEBUG_NOSEAMBLEED
 
-/* This function returns 1 if this face has a seam along the 2 face-vert indicies
+/* This function returns 1 if this face has a seam along the 2 face-vert indices
  * 'orig_i1_fidx' and 'orig_i2_fidx' */
 static int check_seam(const ProjPaintState *ps, const int orig_face, const int orig_i1_fidx, const int orig_i2_fidx, int *other_face, int *orig_fidx)
 {
@@ -947,7 +949,7 @@ static int check_seam(const ProjPaintState *ps, const int orig_face, const int o
 	const MFace *orig_mf = ps->dm_mface + orig_face;  
 	const MTFace *orig_tf = ps->dm_mtface + orig_face;
 	
-	/* vert indicies from face vert order indicies */
+	/* vert indices from face vert order indices */
 	i1 = (*(&orig_mf->v1 + orig_i1_fidx));
 	i2 = (*(&orig_mf->v1 + orig_i2_fidx));
 	
@@ -1140,6 +1142,7 @@ static void project_face_seams_init(const ProjPaintState *ps, const int face_ind
 /* TODO - move to arithb.c */
 
 /* little sister we only need to know lambda */
+#ifndef PROJ_DEBUG_NOSEAMBLEED
 static float lambda_cp_line2(const float p[2], const float l1[2], const float l2[2])
 {
 	float h[2], u[2];
@@ -1152,6 +1155,7 @@ static float lambda_cp_line2(const float p[2], const float l1[2], const float l2
 	
 	return(dot_v2v2(u, h)/dot_v2v2(u, u));
 }
+#endif // PROJ_DEBUG_NOSEAMBLEED
 
 
 /* Converts a UV location to a 3D screenspace location
@@ -1624,6 +1628,7 @@ static int line_clip_rect2f(
 /* scale the quad & tri about its center
  * scaling by PROJ_FACE_SCALE_SEAM (0.99x) is used for getting fake UV pixel coords that are on the
  * edge of the face but slightly inside it occlusion tests dont return hits on adjacent faces */
+#ifndef PROJ_DEBUG_NOSEAMBLEED
 static void scale_quad(float insetCos[4][3], float *origCos[4], const float inset)
 {
 	float cent[3];
@@ -1667,7 +1672,7 @@ static void scale_tri(float insetCos[4][3], float *origCos[4], const float inset
 	add_v3_v3(insetCos[1], cent);
 	add_v3_v3(insetCos[2], cent);
 }
-
+#endif //PROJ_DEBUG_NOSEAMBLEED
 
 static float Vec2Lenf_nosqrt(const float *v1, const float *v2)
 {
@@ -2497,26 +2502,32 @@ static void project_paint_face_init(const ProjPaintState *ps, const int thread_i
 											
 											/* Only bother calculating the weights if we intersect */
 											if (ps->do_mask_normal || ps->dm_mtface_clone) {
-#if 0
-												/* This is not QUITE correct since UV is not inside the UV's but good enough for seams */
+#if 1
+												/* get the UV on the line since we want to copy the pixels from there for bleeding */
+												float uv_close[2];
+												float fac= closest_to_line_v2(uv_close, uv, tf_uv_pxoffset[fidx1], tf_uv_pxoffset[fidx2]);
+												if		(fac < 0.0f) copy_v2_v2(uv_close, tf_uv_pxoffset[fidx1]);
+												else if	(fac > 1.0f) copy_v2_v2(uv_close, tf_uv_pxoffset[fidx2]);
+
 												if (side) {
-													barycentric_weights_v2(tf_uv_pxoffset[0], tf_uv_pxoffset[2], tf_uv_pxoffset[3], uv, w);
+													barycentric_weights_v2(tf_uv_pxoffset[0], tf_uv_pxoffset[2], tf_uv_pxoffset[3], uv_close, w);
 												}
 												else {
-													barycentric_weights_v2(tf_uv_pxoffset[0], tf_uv_pxoffset[1], tf_uv_pxoffset[2], uv, w);
+													barycentric_weights_v2(tf_uv_pxoffset[0], tf_uv_pxoffset[1], tf_uv_pxoffset[2], uv_close, w);
 												}
-#endif
-#if 1
+#else											/* this is buggy with quads, dont use for now */
+
 												/* Cheat, we know where we are along the edge so work out the weights from that */
 												fac = fac1 + (fac * (fac2-fac1));
+
 												w[0]=w[1]=w[2]= 0.0;
 												if (side) {
-													w[fidx1?fidx1-1:0] = fac;
-													w[fidx2?fidx2-1:0] = 1.0f-fac;
+													w[fidx1?fidx1-1:0] = 1.0f-fac;
+													w[fidx2?fidx2-1:0] = fac;
 												}
 												else {
-													w[fidx1] = fac;
-													w[fidx2] = 1.0f-fac;
+													w[fidx1] = 1.0f-fac;
+													w[fidx2] = fac;
 												}
 #endif
 											}
@@ -2566,7 +2577,7 @@ static void project_paint_face_init(const ProjPaintState *ps, const int thread_i
 }
 
 
-/* takes floating point screenspace min/max and returns int min/max to be used as indicies for ps->bucketRect, ps->bucketFlags */
+/* takes floating point screenspace min/max and returns int min/max to be used as indices for ps->bucketRect, ps->bucketFlags */
 static void project_paint_bucket_bounds(const ProjPaintState *ps, const float min[2], const float max[2], int bucketMin[2], int bucketMax[2])
 {
 	/* divide by bucketWidth & bucketHeight so the bounds are offset in bucket grid units */
@@ -2819,7 +2830,7 @@ static void project_paint_begin(ProjPaintState *ps)
 	/* Workaround for subsurf selection, try the display mesh first */
 	if (ps->source==PROJ_SRC_IMAGE_CAM) {
 		/* using render mesh, assume only camera was rendered from */
-		ps->dm = mesh_create_derived_render(ps->scene, ps->ob, ps->v3d->customdata_mask | CD_MASK_MTFACE);
+		ps->dm = mesh_create_derived_render(ps->scene, ps->ob, ps->scene->customdata_mask | CD_MASK_MTFACE);
 		ps->dm_release= TRUE;
 	}
 	else if(ps->ob->derivedFinal && CustomData_has_layer( &ps->ob->derivedFinal->faceData, CD_MTFACE)) {
@@ -2827,7 +2838,7 @@ static void project_paint_begin(ProjPaintState *ps)
 		ps->dm_release= FALSE;
 	}
 	else {
-		ps->dm = mesh_get_derived_final(ps->scene, ps->ob, ps->v3d->customdata_mask | CD_MASK_MTFACE);
+		ps->dm = mesh_get_derived_final(ps->scene, ps->ob, ps->scene->customdata_mask | CD_MASK_MTFACE);
 		ps->dm_release= TRUE;
 	}
 	
@@ -3964,7 +3975,7 @@ static int project_paint_stroke(ProjPaintState *ps, BrushPainter *painter, int *
 
 /* Imagepaint Partial Redraw & Dirty Region */
 
-static void imapaint_clear_partial_redraw()
+static void imapaint_clear_partial_redraw(void)
 {
 	memset(&imapaintpartial, 0, sizeof(imapaintpartial));
 }
@@ -4012,9 +4023,10 @@ static void imapaint_image_update(SpaceImage *sima, Image *image, ImBuf *ibuf, s
 {
 	if(ibuf->rect_float)
 		/* TODO - should just update a portion from imapaintpartial! */
-		imb_freerectImBuf(ibuf); /* force recreate of char rect */
+		ibuf->userflags |= IB_RECT_INVALID; /* force recreate of char rect */
+	
 	if(ibuf->mipmap[0])
-		imb_freemipmapImBuf(ibuf);
+		ibuf->userflags |= IB_MIPMAP_INVALID;
 
 	/* todo: should set_tpage create ->rect? */
 	if(texpaint || (sima && sima->lock)) {
@@ -5329,7 +5341,7 @@ static int texture_paint_toggle_exec(bContext *C, wmOperator *op)
 		toggle_paint_cursor(C, 1);
 	}
 
-	DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	WM_event_add_notifier(C, NC_SCENE|ND_MODE, scene);
 
 	return OPERATOR_FINISHED;
@@ -5440,10 +5452,10 @@ static int texture_paint_camera_project_exec(bContext *C, wmOperator *op)
 	idgroup= IDP_GetProperties(&image->id, 0);
 
 	if(idgroup) {
-		view_data= IDP_GetPropertyFromGroup(idgroup, PROJ_VIEW_DATA_ID);
+		view_data= IDP_GetPropertyTypeFromGroup(idgroup, PROJ_VIEW_DATA_ID, IDP_ARRAY);
 
 		/* type check to make sure its ok */
-		if(view_data->len != PROJ_VIEW_DATA_SIZE || view_data->type != IDP_ARRAY || view_data->subtype != IDP_FLOAT) {
+		if(view_data->len != PROJ_VIEW_DATA_SIZE || view_data->subtype != IDP_FLOAT) {
 			BKE_report(op->reports, RPT_ERROR, "Image project data invalid.");
 			return OPERATOR_CANCELLED;
 		}

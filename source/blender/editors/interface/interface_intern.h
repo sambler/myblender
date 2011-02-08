@@ -96,7 +96,6 @@ typedef enum {
 
 #define UI_MAX_DRAW_STR	400
 #define UI_MAX_NAME_STR	128
-#define UI_ARRAY	29
 
 /* panel limits */
 #define UI_PANEL_MINX	100
@@ -104,7 +103,7 @@ typedef enum {
 
 /* uiBut->flag */
 #define UI_SELECT		1 /* use when the button is pressed */
-#define UI_MOUSE_OVER	2
+/*#define UI_MOUSE_OVER	2*/  /*UNUSED, free flag*/
 #define UI_ACTIVE		4
 #define UI_HAS_ICON		8
 #define UI_TEXTINPUT	16
@@ -120,7 +119,7 @@ typedef enum {
 #define PNL_CLOSEDX	2
 #define PNL_CLOSEDY	4
 #define PNL_CLOSED	6
-#define PNL_TABBED	8
+/*#define PNL_TABBED	8*/ /*UNUSED*/
 #define PNL_OVERLAP	16
 
 /* Button text selection:
@@ -209,7 +208,8 @@ struct uiBut {
 	BIFIconID icon;
 	char lock;
 	char dt;
-	short changed; /* could be made into a single flag */
+	char changed; /* could be made into a single flag */
+	unsigned char unit_type; /* so buttons can support unit systems which are not RNA */
 	short modifier_key;
 	short iconadd;
 
@@ -236,9 +236,10 @@ struct uiBut {
 	struct IDProperty *opproperties;
 	struct PointerRNA *opptr;
 	short opcontext;
-	
+	unsigned char menu_key; /* 'a'-'z', always lower case */
+
 	/* Draggable data, type is WM_DRAG_... */
-	short dragtype;
+	char dragtype;
 	void *dragpoin;
 	struct ImBuf *imb;
 	float imb_scale;
@@ -303,7 +304,7 @@ struct uiBlock {
 	short auto_open;
 	double auto_open_last;
 
-	char *lockstr;
+	const char *lockstr;
 
 	char lock;
 	char active;					// to keep blocks while drawing and free them afterwards
@@ -436,9 +437,6 @@ void ui_set_name_menu(uiBut *but, int value);
 int ui_step_name_menu(uiBut *but, int step);
 
 struct AutoComplete;
-struct AutoComplete *autocomplete_begin(char *startname, int maxlen);
-void autocomplete_do_name(struct AutoComplete *autocpl, const char *name);
-void autocomplete_end(struct AutoComplete *autocpl, char *autoname);
 
 /* interface_panel.c */
 extern int ui_handler_panel_region(struct bContext *C, struct wmEvent *event);
@@ -474,14 +472,13 @@ extern void ui_draw_but(const struct bContext *C, ARegion *ar, struct uiStyle *s
 struct ThemeUI;
 void ui_widget_color_init(struct ThemeUI *tui);
 
-void ui_draw_menu_item(struct uiFontStyle *fstyle, rcti *rect, char *name, int iconid, int state);
-void ui_draw_preview_item(struct uiFontStyle *fstyle, rcti *rect, char *name, int iconid, int state);
+void ui_draw_menu_item(struct uiFontStyle *fstyle, rcti *rect, const char *name, int iconid, int state);
+void ui_draw_preview_item(struct uiFontStyle *fstyle, rcti *rect, const char *name, int iconid, int state);
 
 /* interface_style.c */
 void uiStyleInit(void);
 
 /* interface_icons.c */
-void ui_id_icon_render(struct bContext *C, struct ID *id, int preview);
 int ui_id_icon_get(struct bContext *C, struct ID *id, int preview);
 
 /* resources.c */

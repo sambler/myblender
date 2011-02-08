@@ -39,6 +39,7 @@ class GRAPH_HT_header(bpy.types.Header):
 
             sub.menu("GRAPH_MT_view")
             sub.menu("GRAPH_MT_select")
+            sub.menu("GRAPH_MT_marker")
             sub.menu("GRAPH_MT_channel")
             sub.menu("GRAPH_MT_key")
 
@@ -133,6 +134,27 @@ class GRAPH_MT_select(bpy.types.Menu):
         layout.operator("graph.select_linked")
 
 
+class GRAPH_MT_marker(bpy.types.Menu):
+    bl_label = "Marker"
+
+    def draw(self, context):
+        layout = self.layout
+
+        #layout.operator_context = 'EXEC_REGION_WIN'
+
+        layout.column()
+        layout.operator("marker.add", "Add Marker")
+        layout.operator("marker.duplicate", text="Duplicate Marker")
+        layout.operator("marker.delete", text="Delete Marker")
+
+        layout.separator()
+
+        layout.operator("marker.rename", text="Rename Marker")
+        layout.operator("marker.move", text="Grab/Move Marker")
+
+        # TODO: pose markers for action edit mode only?
+
+
 class GRAPH_MT_channel(bpy.types.Menu):
     bl_label = "Channel"
 
@@ -152,6 +174,7 @@ class GRAPH_MT_channel(bpy.types.Menu):
         layout.separator()
         layout.operator("anim.channels_editable_toggle")
         layout.operator("anim.channels_visibility_set")
+        layout.operator_menu_enum("graph.extrapolation_type", "type", text="Extrapolation Mode")
 
         layout.separator()
         layout.operator("anim.channels_expand")
@@ -187,10 +210,10 @@ class GRAPH_MT_key(bpy.types.Menu):
         layout.separator()
         layout.operator_menu_enum("graph.handle_type", "type", text="Handle Type")
         layout.operator_menu_enum("graph.interpolation_type", "type", text="Interpolation Mode")
-        layout.operator_menu_enum("graph.extrapolation_type", "type", text="Extrapolation Mode")
 
         layout.separator()
         layout.operator("graph.clean")
+        layout.operator("graph.smooth")
         layout.operator("graph.sample")
         layout.operator("graph.bake")
 

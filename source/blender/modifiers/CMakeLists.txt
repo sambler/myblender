@@ -24,7 +24,7 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-SET(INC 
+set(INC 
 	. ./intern
 	../blenlib
 	../makesdna
@@ -33,10 +33,10 @@ SET(INC
 	../render/extern/include
 	../../../intern/guardedalloc
 	../../../intern/elbeem/extern
-	${ZLIB_INC}
+	${ZLIB_INCLUDE_DIRS}
 )
 
-SET(SRC
+set(SRC
 	intern/MOD_armature.c
 	intern/MOD_array.c
 	intern/MOD_bevel.c
@@ -81,21 +81,21 @@ SET(SRC
 	intern/MOD_util.h
 )
 
-IF(WITH_MOD_BOOLEAN)
-	ADD_DEFINITIONS(-DWITH_MOD_BOOLEAN)
-	LIST(APPEND SRC
+if(WITH_MOD_BOOLEAN)
+	add_definitions(-DWITH_MOD_BOOLEAN)
+	list(APPEND SRC
 		intern/MOD_boolean_util.c
 	)
-	LIST(APPEND INC ../../../intern/bsp/extern)
-ENDIF(WITH_MOD_BOOLEAN)
+	list(APPEND INC ../../../intern/bsp/extern)
+endif()
 
-IF(WITH_MOD_DECIMATE)
-	ADD_DEFINITIONS(-DWITH_MOD_DECIMATE)
-	LIST(APPEND INC ../../../intern/decimation/extern)
-ENDIF(WITH_MOD_DECIMATE)
+if(WITH_MOD_DECIMATE)
+	add_definitions(-DWITH_MOD_DECIMATE)
+	list(APPEND INC ../../../intern/decimation/extern)
+endif()
 
-IF(NOT WITH_MOD_FLUID)
-	ADD_DEFINITIONS(-DDISABLE_ELBEEM)
-ENDIF(NOT WITH_MOD_FLUID)
+if(NOT WITH_MOD_FLUID)
+	add_definitions(-DDISABLE_ELBEEM)
+endif()
 
-BLENDERLIB(bf_modifiers "${SRC}" "${INC}")
+blender_add_lib(bf_modifiers "${SRC}" "${INC}")

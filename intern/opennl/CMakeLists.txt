@@ -24,12 +24,15 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-SET(INC
+# External project, better not fix warnings.
+remove_strict_flags()
+
+set(INC
 	extern
 	superlu
 )
 
-SET(SRC
+set(SRC
 	intern/opennl.c
 	superlu/colamd.c
 	superlu/get_perm_c.c
@@ -72,4 +75,4 @@ SET(SRC
 	superlu/util.h
 )
 
-BLENDERLIB(bf_intern_opennl "${SRC}" "${INC}")
+blender_add_lib(bf_intern_opennl "${SRC}" "${INC}")

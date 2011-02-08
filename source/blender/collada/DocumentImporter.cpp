@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -30,16 +30,9 @@
 #include <algorithm> // sort()
 
 #include "COLLADAFWRoot.h"
-#include "COLLADAFWIWriter.h"
 #include "COLLADAFWStableHeaders.h"
-#include "COLLADAFWCamera.h"
 #include "COLLADAFWColorOrTexture.h"
-#include "COLLADAFWEffect.h"
-#include "COLLADAFWImage.h"
 #include "COLLADAFWIndexList.h"
-#include "COLLADAFWInstanceGeometry.h"
-#include "COLLADAFWLight.h"
-#include "COLLADAFWMaterial.h"
 #include "COLLADAFWMeshPrimitiveWithFaceVertexCount.h"
 #include "COLLADAFWPolygons.h"
 #include "COLLADAFWSampler.h"
@@ -47,8 +40,15 @@
 #include "COLLADAFWVisualScene.h"
 #include "COLLADAFWArrayPrimitiveType.h"
 #include "COLLADAFWLibraryNodes.h"
+#include "COLLADAFWCamera.h"
+#include "COLLADAFWLight.h"
 
 #include "COLLADASaxFWLLoader.h"
+
+#include "BLI_listbase.h"
+#include "BLI_math.h"
+#include "BLI_string.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_main.h"
 #include "BKE_library.h"
@@ -58,14 +58,9 @@
 #include "BLI_path_util.h"
 #include "BKE_scene.h"
 #include "BKE_global.h"
-#include "BKE_object.h"
 #include "BKE_material.h"
 #include "BKE_utildefines.h"
 #include "BKE_image.h"
-
-#include "BLI_listbase.h"
-#include "BLI_math.h"
-#include "BLI_string.h"
 
 #include "DNA_camera_types.h"
 #include "DNA_lamp_types.h"
@@ -77,10 +72,6 @@
 #include "DocumentImporter.h"
 #include "collada_internal.h"
 
-#include "TransformReader.h"
-#include "AnimationImporter.h"
-#include "ArmatureImporter.h"
-#include "MeshImporter.h"
 #include "collada_utils.h"
 
 
@@ -95,8 +86,7 @@
 
 /** Class that needs to be implemented by a writer. 
 	IMPORTANT: The write functions are called in arbitrary order.*/
-class Writer: public COLLADAFW::IWriter
-{
+/*
 private:
 	std::string mFilename;
 	
@@ -118,41 +108,54 @@ private:
 	std::vector<const COLLADAFW::VisualScene*> vscenes;
 	std::vector<Object*> libnode_ob;
 
-	std::map<COLLADAFW::UniqueId, COLLADAFW::Node*> root_map; // find root joint by child joint uid, for bone tree evaluation during resampling
+	std::map<COLLADAFW::UniqueId, COLLADAFW::Node*> root_map; 
+	*/
+	// find root joint by child joint uid, for bone tree evaluation during resampling
 
 	// animation
 	// std::map<COLLADAFW::UniqueId, std::vector<FCurve*> > uid_fcurve_map;
 	// Nodes don't share AnimationLists (Arystan)
 	// std::map<COLLADAFW::UniqueId, Animation> uid_animated_map; // AnimationList->uniqueId to AnimatedObject map
 
-public:
+//public:
 
 	/** Constructor. */
-	Writer(bContext *C, const char *filename) : mFilename(filename), mContext(C),
-												armature_importer(&unit_converter, &mesh_importer, &anim_importer, CTX_data_scene(C)),
-												mesh_importer(&unit_converter, &armature_importer, CTX_data_scene(C)),
-												anim_importer(&unit_converter, &armature_importer, CTX_data_scene(C)) {}
+	DocumentImporter::DocumentImporter(bContext *C, const char *filename) :
+		mImportStage(General),
+		mFilename(filename),
+		mContext(C),
+		armature_importer(&unit_converter, &mesh_importer, &anim_importer, CTX_data_scene(C)),
+		mesh_importer(&unit_converter, &armature_importer, CTX_data_scene(C)),
+		anim_importer(&unit_converter, &armature_importer, CTX_data_scene(C))
+	{}
 
 	/** Destructor. */
-	~Writer() {}
+	DocumentImporter::~DocumentImporter() {}
 
-	bool write()
+	bool DocumentImporter::import()
 	{
+		/** TODO Add error handler (implement COLLADASaxFWL::IErrorHandler */
 		COLLADASaxFWL::Loader loader;
 		COLLADAFW::Root root(&loader, this);
 
-		// XXX report error
 		if (!root.loadDocument(mFilename))
 			return false;
+		
+		/** TODO set up scene graph and such here */
+		
+		mImportStage = Controller;
+		
+		COLLADASaxFWL::Loader loader2;
+		COLLADAFW::Root root2(&loader2, this);
+		
+		if (!root2.loadDocument(mFilename))
+			return false;
+		
 
 		return true;
 	}
-
-	/** This method will be called if an error in the loading process occurred and the loader cannot
-		continue to load. The writer should undo all operations that have been performed.
-		@param errorMessage A message containing informations about the error that occurred.
-	*/
-	virtual void cancel(const COLLADAFW::String& errorMessage)
+	
+	void DocumentImporter::cancel(const COLLADAFW::String& errorMessage)
 	{
 		// TODO: if possible show error info
 		//
@@ -162,14 +165,15 @@ public:
 		// The latter sounds better.
 	}
 
-	/** This is the method called. The writer hast to prepare to receive data.*/
-	virtual void start()
-	{
-	}
+	void DocumentImporter::start(){}
 
 	/** This method is called after the last write* method. No other methods will be called after this.*/
-	virtual void finish()
+	void DocumentImporter::finish()
 	{
+		if(mImportStage!=General)
+			return;
+			
+		/** TODO Break up and put into 2-pass parsing of DAE */
 		std::vector<const COLLADAFW::VisualScene*>::iterator it;
 		for (it = vscenes.begin(); it != vscenes.end(); it++) {
 			PointerRNA sceneptr, unit_settings;
@@ -213,7 +217,7 @@ public:
 			const COLLADAFW::NodePointerArray& roots = (*it)->getRootNodes();
 
 			for (unsigned int i = 0; i < roots.getCount(); i++)
-				translate_anim_recursive(roots[i]);
+				translate_anim_recursive(roots[i],NULL,NULL);
 		}
 
 		if (libnode_ob.size()) {
@@ -242,7 +246,7 @@ public:
 	}
 
 
-	void translate_anim_recursive(COLLADAFW::Node *node, COLLADAFW::Node *par = NULL, Object *parob = NULL)
+	void DocumentImporter::translate_anim_recursive(COLLADAFW::Node *node, COLLADAFW::Node *par = NULL, Object *parob = NULL)
 	{
 		if (par && par->getType() == COLLADAFW::Node::JOINT) {
 			// par is root if there's no corresp. key in root_map
@@ -273,7 +277,7 @@ public:
 
 	/** When this method is called, the writer must write the global document asset.
 		@return The writer should return true, if writing succeeded, false otherwise.*/
-	virtual bool writeGlobalAsset ( const COLLADAFW::FileInfo* asset ) 
+	bool DocumentImporter::writeGlobalAsset ( const COLLADAFW::FileInfo* asset ) 
 	{
 		unit_converter.read_asset(asset);
 
@@ -282,12 +286,12 @@ public:
 
 	/** When this method is called, the writer must write the scene.
 		@return The writer should return true, if writing succeeded, false otherwise.*/
-	virtual bool writeScene ( const COLLADAFW::Scene* scene ) 
+	bool DocumentImporter::writeScene ( const COLLADAFW::Scene* scene ) 
 	{
 		// XXX could store the scene id, but do nothing for now
 		return true;
 	}
-	Object *create_camera_object(COLLADAFW::InstanceCamera *camera, Scene *sce)
+	Object* DocumentImporter::create_camera_object(COLLADAFW::InstanceCamera *camera, Scene *sce)
 	{
 		const COLLADAFW::UniqueId& cam_uid = camera->getInstanciatedObjectId();
 		if (uid_camera_map.find(cam_uid) == uid_camera_map.end()) {	
@@ -304,7 +308,7 @@ public:
 		return ob;
 	}
 	
-	Object *create_lamp_object(COLLADAFW::InstanceLight *lamp, Scene *sce)
+	Object* DocumentImporter::create_lamp_object(COLLADAFW::InstanceLight *lamp, Scene *sce)
 	{
 		const COLLADAFW::UniqueId& lamp_uid = lamp->getInstanciatedObjectId();
 		if (uid_lamp_map.find(lamp_uid) == uid_lamp_map.end()) {	
@@ -321,10 +325,10 @@ public:
 		return ob;
 	}
 
-	Object *create_instance_node(Object *source_ob, COLLADAFW::Node *source_node, COLLADAFW::Node *instance_node, Scene *sce, bool is_library_node)
+	Object* DocumentImporter::create_instance_node(Object *source_ob, COLLADAFW::Node *source_node, COLLADAFW::Node *instance_node, Scene *sce, bool is_library_node)
 	{
 		Object *obn = copy_object(source_ob);
-		obn->recalc |= OB_RECALC_ALL;
+		obn->recalc |= OB_RECALC_OB|OB_RECALC_DATA|OB_RECALC_TIME;
 		scene_add_base(sce, obn);
 
 		if (instance_node)
@@ -361,7 +365,7 @@ public:
 		return obn;
 	}
 	
-	void write_node (COLLADAFW::Node *node, COLLADAFW::Node *parent_node, Scene *sce, Object *par, bool is_library_node)
+	void DocumentImporter::write_node (COLLADAFW::Node *node, COLLADAFW::Node *parent_node, Scene *sce, Object *par, bool is_library_node)
 	{
 		Object *ob = NULL;
 		bool is_joint = node->getType() == COLLADAFW::Node::JOINT;
@@ -452,8 +456,11 @@ public:
 
 	/** When this method is called, the writer must write the entire visual scene.
 		@return The writer should return true, if writing succeeded, false otherwise.*/
-	virtual bool writeVisualScene ( const COLLADAFW::VisualScene* visualScene ) 
+	bool DocumentImporter::writeVisualScene ( const COLLADAFW::VisualScene* visualScene ) 
 	{
+		if(mImportStage!=General)
+			return true;
+			
 		// this method called on post process after writeGeometry, writeMaterial, etc.
 
 		// for each <node> in <visual_scene>:
@@ -472,8 +479,11 @@ public:
 	/** When this method is called, the writer must handle all nodes contained in the 
 		library nodes.
 		@return The writer should return true, if writing succeeded, false otherwise.*/
-	virtual bool writeLibraryNodes ( const COLLADAFW::LibraryNodes* libraryNodes ) 
+	bool DocumentImporter::writeLibraryNodes ( const COLLADAFW::LibraryNodes* libraryNodes ) 
 	{
+		if(mImportStage!=General)
+			return true;
+			
 		Scene *sce = CTX_data_scene(mContext);
 
 		const COLLADAFW::NodePointerArray& nodes = libraryNodes->getNodes();
@@ -487,15 +497,21 @@ public:
 
 	/** When this method is called, the writer must write the geometry.
 		@return The writer should return true, if writing succeeded, false otherwise.*/
-	virtual bool writeGeometry ( const COLLADAFW::Geometry* geom ) 
+	bool DocumentImporter::writeGeometry ( const COLLADAFW::Geometry* geom ) 
 	{
+		if(mImportStage!=General)
+			return true;
+			
 		return mesh_importer.write_geometry(geom);
 	}
 
 	/** When this method is called, the writer must write the material.
 		@return The writer should return true, if writing succeeded, false otherwise.*/
-	virtual bool writeMaterial( const COLLADAFW::Material* cmat ) 
+	bool DocumentImporter::writeMaterial( const COLLADAFW::Material* cmat ) 
 	{
+		if(mImportStage!=General)
+			return true;
+			
 		const std::string& str_mat_id = cmat->getOriginalId();
 		Material *ma = add_material((char*)str_mat_id.c_str());
 		
@@ -506,7 +522,7 @@ public:
 	}
 	
 	// create mtex, create texture, set texture image
-	MTex *create_texture(COLLADAFW::EffectCommon *ef, COLLADAFW::Texture &ctex, Material *ma,
+	MTex* DocumentImporter::create_texture(COLLADAFW::EffectCommon *ef, COLLADAFW::Texture &ctex, Material *ma,
 						 int i, TexIndexTextureArrayMap &texindex_texarray_map)
 	{
 		COLLADAFW::SamplerPointerArray& samp_array = ef->getSamplerPointerArray();
@@ -531,7 +547,7 @@ public:
 		return ma->mtex[i];
 	}
 	
-	void write_profile_COMMON(COLLADAFW::EffectCommon *ef, Material *ma)
+	void DocumentImporter::write_profile_COMMON(COLLADAFW::EffectCommon *ef, Material *ma)
 	{
 		COLLADAFW::EffectCommon::ShaderType shader = ef->getShaderType();
 		
@@ -668,8 +684,10 @@ public:
 	/** When this method is called, the writer must write the effect.
 		@return The writer should return true, if writing succeeded, false otherwise.*/
 	
-	virtual bool writeEffect( const COLLADAFW::Effect* effect ) 
+	bool DocumentImporter::writeEffect( const COLLADAFW::Effect* effect ) 
 	{
+		if(mImportStage!=General)
+			return true;
 		
 		const COLLADAFW::UniqueId& uid = effect->getUniqueId();
 		if (uid_effect_map.find(uid) == uid_effect_map.end()) {
@@ -695,8 +713,11 @@ public:
 	
 	/** When this method is called, the writer must write the camera.
 		@return The writer should return true, if writing succeeded, false otherwise.*/
-	virtual bool writeCamera( const COLLADAFW::Camera* camera ) 
+	bool DocumentImporter::writeCamera( const COLLADAFW::Camera* camera ) 
 	{
+		if(mImportStage!=General)
+			return true;
+			
 		Camera *cam = NULL;
 		std::string cam_id, cam_name;
 		
@@ -807,8 +828,11 @@ public:
 
 	/** When this method is called, the writer must write the image.
 		@return The writer should return true, if writing succeeded, false otherwise.*/
-	virtual bool writeImage( const COLLADAFW::Image* image ) 
+	bool DocumentImporter::writeImage( const COLLADAFW::Image* image ) 
 	{
+		if(mImportStage!=General)
+			return true;
+			
 		// XXX maybe it is necessary to check if the path is absolute or relative
 	    const std::string& filepath = image->getImageURI().toNativePath();
 		const char *filename = (const char*)mFilename.c_str();
@@ -829,8 +853,11 @@ public:
 
 	/** When this method is called, the writer must write the light.
 		@return The writer should return true, if writing succeeded, false otherwise.*/
-	virtual bool writeLight( const COLLADAFW::Light* light ) 
+	bool DocumentImporter::writeLight( const COLLADAFW::Light* light ) 
 	{
+		if(mImportStage!=General)
+			return true;
+			
 		Lamp *lamp = NULL;
 		std::string la_id, la_name;
 		
@@ -924,45 +951,50 @@ public:
 	}
 	
 	// this function is called only for animations that pass COLLADAFW::validate
-	virtual bool writeAnimation( const COLLADAFW::Animation* anim ) 
+	bool DocumentImporter::writeAnimation( const COLLADAFW::Animation* anim ) 
 	{
+		if(mImportStage!=General)
+			return true;
+			
 		// return true;
 		return anim_importer.write_animation(anim);
 	}
 	
 	// called on post-process stage after writeVisualScenes
-	virtual bool writeAnimationList( const COLLADAFW::AnimationList* animationList ) 
+	bool DocumentImporter::writeAnimationList( const COLLADAFW::AnimationList* animationList ) 
 	{
+		if(mImportStage!=General)
+			return true;
+			
 		// return true;
 		return anim_importer.write_animation_list(animationList);
 	}
 	
 	/** When this method is called, the writer must write the skin controller data.
 		@return The writer should return true, if writing succeeded, false otherwise.*/
-	virtual bool writeSkinControllerData( const COLLADAFW::SkinControllerData* skin ) 
+	bool DocumentImporter::writeSkinControllerData( const COLLADAFW::SkinControllerData* skin ) 
 	{
 		return armature_importer.write_skin_controller_data(skin);
 	}
 
 	// this is called on postprocess, before writeVisualScenes
-	virtual bool writeController( const COLLADAFW::Controller* controller ) 
+	bool DocumentImporter::writeController( const COLLADAFW::Controller* controller ) 
 	{
+		if(mImportStage!=General)
+			return true;
+			
 		return armature_importer.write_controller(controller);
 	}
 
-	virtual bool writeFormulas( const COLLADAFW::Formulas* formulas )
+	bool DocumentImporter::writeFormulas( const COLLADAFW::Formulas* formulas )
 	{
 		return true;
 	}
 
-	virtual bool writeKinematicsScene( const COLLADAFW::KinematicsScene* kinematicsScene )
+	bool DocumentImporter::writeKinematicsScene( const COLLADAFW::KinematicsScene* kinematicsScene )
 	{
 		return true;
 	}
-};
 
-void DocumentImporter::import(bContext *C, const char *filename)
-{
-	Writer w(C, filename);
-	w.write();
-}
+
+

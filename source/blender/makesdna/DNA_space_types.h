@@ -240,9 +240,8 @@ typedef struct SpaceOops {
 	/* search stuff */
 	char search_string[32];
 	struct TreeStoreElem search_tse;
-	int search_flags, do_;
-	
-	short flag, outlinevis, storeflag, pad;
+
+	short flag, outlinevis, storeflag, search_flags;
 } SpaceOops;
 
 typedef struct SpaceImage {
@@ -341,9 +340,6 @@ typedef struct Script {
 	char scriptarg[256];
 } Script;
 #define SCRIPT_SET_NULL(_script) _script->py_draw = _script->py_event = _script->py_button = _script->py_browsercallback = _script->py_globaldict = NULL; _script->flags = 0;
-#define SCRIPT_RUNNING	0x01
-#define SCRIPT_GUI		0x02
-#define SCRIPT_FILESEL	0x04
 
 typedef struct SpaceScript {
 	SpaceLink *next, *prev;
@@ -358,15 +354,11 @@ typedef struct SpaceScript {
 	void *but_refs;
 } SpaceScript;
 
+# /* Only store the data array in the cache to avoid constant reallocation. */
+# /* No need to store when saved. */
 typedef struct SpaceTimeCache {
 	struct SpaceTimeCache *next, *prev;
-	int type;
-	int flag;
-	
 	float *array;
-	int len;
-	int startframe, endframe;
-	int ok;
 } SpaceTimeCache;
 
 typedef struct SpaceTime {
@@ -380,7 +372,7 @@ typedef struct SpaceTime {
 	ListBase caches;
 	int cache_display, pad;
 	
-	int flag, redraws;
+	int flag, redraws; /* redraws is deprecated... moved to screen */
 	
 } SpaceTime;
 
@@ -404,8 +396,9 @@ typedef struct SpaceNode {
 	float mx, my;		/* mousepos for drawing socketless link */
 	
 	struct bNodeTree *nodetree, *edittree;
-	int treetype;			/* treetype: as same nodetree->type */
-	short texfrom, pad;		/* texfrom object, world or brush */
+	int treetype;		/* treetype: as same nodetree->type */
+	short texfrom;		/* texfrom object, world or brush */
+	short recalc;		/* currently on 0/1, for auto compo */
 	
 	struct bGPdata *gpd;		/* grease-pencil data */
 } SpaceNode;
@@ -413,6 +406,9 @@ typedef struct SpaceNode {
 /* snode->flag */
 #define SNODE_BACKDRAW		2
 #define SNODE_DISPGP		4
+#define SNODE_USE_ALPHA		8
+#define SNODE_SHOW_ALPHA	16
+#define SNODE_AUTO_RENDER	32
 
 /* snode->texfrom */
 #define SNODE_TEX_OBJECT	0
@@ -706,7 +702,7 @@ enum FileSortTypeE {
 #define EDITING				(1<<0)
 #define ACTIVEFILE			(1<<1)
 #define BLENDERFILE			(1<<2)
-#define PSXFILE				(1<<3)
+#define BLENDERFILE_BACKUP	(1<<3)
 #define IMAGEFILE			(1<<4)
 #define MOVIEFILE			(1<<5)
 #define PYSCRIPTFILE		(1<<6)
@@ -737,35 +733,35 @@ enum FileSortTypeE {
 #define SI_STICKY_VERTEX	2
 
 /* SpaceImage->flag */
-#define SI_BE_SQUARE	1<<0
-#define SI_EDITTILE		1<<1
-#define SI_CLIP_UV		1<<2
-#define SI_DRAWTOOL		1<<3
-#define SI_DEPRECATED1  1<<4	/* stick UVs to others in the same location */
-#define SI_DRAWSHADOW   1<<5
-#define SI_SELACTFACE   1<<6	/* deprecated */
-#define SI_DEPRECATED2	1<<7
-#define SI_DEPRECATED3  1<<8	/* stick UV selection to mesh vertex (UVs wont always be touching) */
-#define SI_COORDFLOATS  1<<9
-#define SI_PIXELSNAP	1<<10
-#define SI_LIVE_UNWRAP	1<<11
-#define SI_USE_ALPHA	1<<12
-#define SI_SHOW_ALPHA	1<<13
-#define SI_SHOW_ZBUF	1<<14
+#define SI_BE_SQUARE	(1<<0)
+#define SI_EDITTILE		(1<<1)
+#define SI_CLIP_UV		(1<<2)
+#define SI_DRAWTOOL		(1<<3)
+#define SI_DEPRECATED1  (1<<4)	/* stick UVs to others in the same location */
+#define SI_DRAWSHADOW   (1<<5)
+#define SI_SELACTFACE   (1<<6)	/* deprecated */
+#define SI_DEPRECATED2	(1<<7)
+#define SI_DEPRECATED3  (1<<8)	/* stick UV selection to mesh vertex (UVs wont always be touching) */
+#define SI_COORDFLOATS  (1<<9)
+#define SI_PIXELSNAP	(1<<10)
+#define SI_LIVE_UNWRAP	(1<<11)
+#define SI_USE_ALPHA	(1<<12)
+#define SI_SHOW_ALPHA	(1<<13)
+#define SI_SHOW_ZBUF	(1<<14)
 		/* next two for render window dislay */
-#define SI_PREVSPACE	1<<15
-#define SI_FULLWINDOW	1<<16
-#define SI_DEPRECATED4	1<<17
-#define SI_DEPRECATED5	1<<18
+#define SI_PREVSPACE	(1<<15)
+#define SI_FULLWINDOW	(1<<16)
+#define SI_DEPRECATED4	(1<<17)
+#define SI_DEPRECATED5	(1<<18)
 		/* this means that the image is drawn until it reaches the view edge,
 		 * in the image view, its unrelated to the 'tile' mode for texface */
-#define SI_DRAW_TILE	1<<19 
-#define SI_SMOOTH_UV	1<<20
-#define SI_DRAW_STRETCH	1<<21
-#define SI_DISPGP		1<<22
-#define SI_DRAW_OTHER	1<<23
+#define SI_DRAW_TILE	(1<<19)
+#define SI_SMOOTH_UV	(1<<20)
+#define SI_DRAW_STRETCH	(1<<21)
+#define SI_DISPGP		(1<<22)
+#define SI_DRAW_OTHER	(1<<23)
 
-#define SI_COLOR_CORRECTION	1<<24
+#define SI_COLOR_CORRECTION	(1<<24)
 
 /* SpaceIpo->flag (Graph Editor Settings) */
 	/* OLD DEPRECEATED SETTING */
@@ -850,12 +846,6 @@ enum {
 #define B_IMASELHOME		451
 #define B_IMASELREMOVEBIP	452
 
-#define C_BACK  0xBAAAAA
-#define C_DARK  0x665656
-#define C_DERK  0x766666
-#define C_HI	0xCBBBBB
-#define C_LO	0x544444
-
 /* nla->flag */
 /* flags (1<<0), (1<<1), and (1<<3) are depreceated flags from old blenders */
 	/* draw timing in seconds instead of frames */
@@ -875,7 +865,7 @@ enum {
 	/* only keyframes from active/selected channels get shown */
 #define TIME_ONLYACTSEL		4
 
-/* time->redraws */
+/* time->redraws (now screen->redraws_flag) */
 #define TIME_REGION				1
 #define TIME_ALL_3D_WIN			2
 #define TIME_ALL_ANIM_WIN		4

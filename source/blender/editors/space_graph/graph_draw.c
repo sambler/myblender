@@ -38,6 +38,7 @@
 
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
 #include "DNA_anim_types.h"
 #include "DNA_object_types.h"
@@ -48,7 +49,7 @@
 #include "BKE_context.h"
 #include "BKE_curve.h"
 #include "BKE_fcurve.h"
-#include "BKE_utildefines.h"
+
 
 #include "BIF_gl.h"
 #include "BIF_glutil.h"
@@ -70,7 +71,7 @@
  */
 #define drawFCurveFade(fcu) ( ((fcu)->flag & FCURVE_SELECTED)? 1.0f : 0.25f )
 
-/* set the colour for some point from some value given packed into an int 
+/* set the color for some point from some value given packed into an int 
  *	- intV: integer value containing color info packed into an int
  *	- alpha: float value describing the 
  */
@@ -346,7 +347,7 @@ static void draw_fcurve_handles (SpaceIpo *sipo, FCurve *fcu)
 		BezTriple *bezt=fcu->bezt, *prevbezt=NULL;
 		int basecol= (sel)? TH_HANDLE_SEL_FREE : TH_HANDLE_FREE;
 		float *fp;
-		char col[4];
+		unsigned char col[4];
 		
 		/* if only selected keyframes have handles shown, skip the first round */
 		if ((sel == 0) && (sipo->flag & SIPO_SELVHANDLESONLY))

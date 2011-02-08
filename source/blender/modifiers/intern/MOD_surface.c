@@ -35,8 +35,9 @@
 #include "DNA_meshdata_types.h"
 
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
-#include "BKE_utildefines.h"
+
 #include "BKE_cdderivedmesh.h"
 
 #include "MOD_modifiertypes.h"
@@ -172,6 +173,7 @@ ModifierTypeInfo modifierType_Surface = {
 
 	/* copyData */          0,
 	/* deformVerts */       deformVerts,
+	/* deformMatrices */    0,
 	/* deformVertsEM */     0,
 	/* deformMatricesEM */  0,
 	/* applyModifier */     0,

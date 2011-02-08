@@ -32,6 +32,10 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "BLI_math.h"
+#include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
+
 #include "DNA_object_types.h"
 #include "DNA_node_types.h"
 #include "DNA_packedFile_types.h"
@@ -48,9 +52,6 @@
 #include "BKE_report.h"
 #include "BKE_screen.h"
 
-#include "BLI_math.h"
-#include "BLI_blenlib.h"
-
 #include "IMB_imbuf.h"
 #include "IMB_imbuf_types.h"
 
@@ -64,6 +65,7 @@
 #include "ED_screen.h"
 #include "ED_space_api.h"
 #include "ED_uvedit.h"
+#include "ED_util.h"
 
 #include "UI_interface.h"
 #include "UI_resources.h"
@@ -437,16 +439,12 @@ static int view_all_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	SpaceImage *sima;
 	ARegion *ar;
-	Scene *scene;
-	Object *obedit;
 	float aspx, aspy, zoomx, zoomy, w, h;
 	int width, height;
 
 	/* retrieve state */
 	sima= CTX_wm_space_image(C);
 	ar= CTX_wm_region(C);
-	scene= (Scene*)CTX_data_scene(C);
-	obedit= CTX_data_edit_object(C);
 
 	ED_space_image_size(sima, &width, &height);
 	ED_space_image_aspect(sima, &aspx, &aspy);
@@ -876,15 +874,28 @@ static void save_image_doit(bContext *C, SpaceImage *sima, Scene *scene, wmOpera
 		short ok= FALSE;
 
 		BLI_path_abs(path, bmain->name);
-		
+		/* old global to ensure a 2nd save goes to same dir */
+		BLI_strncpy(G.ima, path, sizeof(G.ima));
+
 		WM_cursor_wait(1);
 
-		/* enforce user setting for RGB or RGBA, but skip BW */
-		if(scene->r.planes==32)
-			ibuf->depth= 32;
-		else if(scene->r.planes==24)
-			ibuf->depth= 24;
-		
+		if(ima->type == IMA_TYPE_R_RESULT) {
+			/* enforce user setting for RGB or RGBA, but skip BW */
+			if(scene->r.planes==32) {
+				ibuf->depth= 32;
+			}
+			else if(scene->r.planes==24) {
+				ibuf->depth= 24;
+			}
+		}
+		else {
+			/* TODO, better solution, if a 24bit image is painted onto it may contain alpha */
+			if(ibuf->userflags & IB_BITMAPDIRTY) { /* it has been painted onto */
+				/* checks each pixel, not ideal */
+				ibuf->depth= BKE_alphatest_ibuf(ibuf) ? 32 : 24;
+			}
+		}
+
 		if(scene->r.scemode & R_EXTENSION)  {
 			BKE_add_image_extension(path, sima->imtypenr);
 		}
@@ -946,9 +957,8 @@ static void save_image_doit(bContext *C, SpaceImage *sima, Scene *scene, wmOpera
 		else {
 			BKE_reportf(op->reports, RPT_ERROR, "Couldn't write image: %s", path);
 		}
-		
-		
-		
+
+
 		WM_event_add_notifier(C, NC_IMAGE|NA_EDITED, sima->image);
 
 		WM_cursor_wait(0);
@@ -1393,7 +1403,7 @@ static int pack_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 	if(!as_png && (ibuf && (ibuf->userflags & IB_BITMAPDIRTY))) {
 		pup= uiPupMenuBegin(C, "OK", ICON_QUESTION);
 		layout= uiPupMenuLayout(pup);
-		uiItemBooleanO(layout, "Can't pack edited image from disk. Pack as internal PNG?", 0, op->idname, "as_png", 1);
+		uiItemBooleanO(layout, "Can't pack edited image from disk. Pack as internal PNG?", ICON_NULL, op->idname, "as_png", 1);
 		uiPupMenuEnd(C, pup);
 
 		return OPERATOR_CANCELLED;
@@ -1422,101 +1432,15 @@ void IMAGE_OT_pack(wmOperatorType *ot)
 
 /********************* unpack operator *********************/
 
-void unpack_menu(bContext *C, char *opname, Image *ima, char *folder, PackedFile *pf)
-{
-	PointerRNA props_ptr;
-	uiPopupMenu *pup;
-	uiLayout *layout;
-	char line[FILE_MAXDIR + FILE_MAXFILE + 100];
-	char local_name[FILE_MAXDIR + FILE_MAX], fi[FILE_MAX];
-	char *abs_name = ima->name;
-	
-	strcpy(local_name, abs_name);
-	BLI_splitdirstring(local_name, fi);
-	sprintf(local_name, "//%s/%s", folder, fi);
-
-	pup= uiPupMenuBegin(C, "Unpack file", 0);
-	layout= uiPupMenuLayout(pup);
-
-	uiItemEnumO(layout, opname, "Remove Pack", 0, "method", PF_REMOVE);
-
-	if(strcmp(abs_name, local_name)) {
-		switch(checkPackedFile(local_name, pf)) {
-			case PF_NOFILE:
-				sprintf(line, "Create %s", local_name);
-				props_ptr= uiItemFullO(layout, opname, line, 0, NULL, WM_OP_EXEC_DEFAULT, UI_ITEM_O_RETURN_PROPS);
-				RNA_enum_set(&props_ptr, "method", PF_WRITE_LOCAL);
-				RNA_string_set(&props_ptr, "image", ima->id.name+2);
-	
-				break;
-			case PF_EQUAL:
-				sprintf(line, "Use %s (identical)", local_name);
-				//uiItemEnumO(layout, opname, line, 0, "method", PF_USE_LOCAL);
-				props_ptr= uiItemFullO(layout, opname, line, 0, NULL, WM_OP_EXEC_DEFAULT, UI_ITEM_O_RETURN_PROPS);
-				RNA_enum_set(&props_ptr, "method", PF_USE_LOCAL);
-				RNA_string_set(&props_ptr, "image", ima->id.name+2);
-				
-				break;
-			case PF_DIFFERS:
-				sprintf(line, "Use %s (differs)", local_name);
-				//uiItemEnumO(layout, opname, line, 0, "method", PF_USE_LOCAL);
-				props_ptr= uiItemFullO(layout, opname, line, 0, NULL, WM_OP_EXEC_DEFAULT, UI_ITEM_O_RETURN_PROPS);
-				RNA_enum_set(&props_ptr, "method", PF_USE_LOCAL);
-				RNA_string_set(&props_ptr, "image", ima->id.name);
-				
-				sprintf(line, "Overwrite %s", local_name);
-				//uiItemEnumO(layout, opname, line, 0, "method", PF_WRITE_LOCAL);
-				props_ptr= uiItemFullO(layout, opname, line, 0, NULL, WM_OP_EXEC_DEFAULT, UI_ITEM_O_RETURN_PROPS);
-				RNA_enum_set(&props_ptr, "method", PF_WRITE_LOCAL);
-				RNA_string_set(&props_ptr, "image", ima->id.name+2);
-				
-				
-				break;
-		}
-	}
-	
-	switch(checkPackedFile(abs_name, pf)) {
-		case PF_NOFILE:
-			sprintf(line, "Create %s", abs_name);
-			//uiItemEnumO(layout, opname, line, 0, "method", PF_WRITE_ORIGINAL);
-			props_ptr= uiItemFullO(layout, opname, line, 0, NULL, WM_OP_EXEC_DEFAULT, UI_ITEM_O_RETURN_PROPS);
-			RNA_enum_set(&props_ptr, "method", PF_WRITE_ORIGINAL);
-			RNA_string_set(&props_ptr, "image", ima->id.name+2);
-			break;
-		case PF_EQUAL:
-			sprintf(line, "Use %s (identical)", abs_name);
-			//uiItemEnumO(layout, opname, line, 0, "method", PF_USE_ORIGINAL);
-			props_ptr= uiItemFullO(layout, opname, line, 0, NULL, WM_OP_EXEC_DEFAULT, UI_ITEM_O_RETURN_PROPS);
-			RNA_enum_set(&props_ptr, "method", PF_USE_ORIGINAL);
-			RNA_string_set(&props_ptr, "image", ima->id.name+2);
-			break;
-		case PF_DIFFERS:
-			sprintf(line, "Use %s (differs)", local_name);
-			//uiItemEnumO(layout, opname, line, 0, "method", PF_USE_ORIGINAL);
-			props_ptr= uiItemFullO(layout, opname, line, 0, NULL, WM_OP_EXEC_DEFAULT, UI_ITEM_O_RETURN_PROPS);
-			RNA_enum_set(&props_ptr, "method", PF_USE_ORIGINAL);
-			RNA_string_set(&props_ptr, "image", ima->id.name+2);
-			
-			sprintf(line, "Overwrite %s", local_name);
-			//uiItemEnumO(layout, opname, line, 0, "method", PF_WRITE_ORIGINAL);
-			props_ptr= uiItemFullO(layout, opname, line, 0, NULL, WM_OP_EXEC_DEFAULT, UI_ITEM_O_RETURN_PROPS);
-			RNA_enum_set(&props_ptr, "method", PF_WRITE_ORIGINAL);
-			RNA_string_set(&props_ptr, "image", ima->id.name+2);
-			break;
-	}
-
-	uiPupMenuEnd(C, pup);
-}
-
-static int unpack_exec(bContext *C, wmOperator *op)
+static int image_unpack_exec(bContext *C, wmOperator *op)
 {
 	Image *ima= CTX_data_edit_image(C);
 	int method= RNA_enum_get(op->ptr, "method");
 
 	/* find the suppplied image by name */
-	if (RNA_property_is_set(op->ptr, "image")) {
+	if (RNA_property_is_set(op->ptr, "id")) {
 		char imaname[22];
-		RNA_string_get(op->ptr, "image", imaname);
+		RNA_string_get(op->ptr, "id", imaname);
 		ima = BLI_findstring(&CTX_data_main(C)->image, imaname, offsetof(ID, name) + 2);
 		if (!ima) ima = CTX_data_edit_image(C);
 	}
@@ -1539,12 +1463,12 @@ static int unpack_exec(bContext *C, wmOperator *op)
 	return OPERATOR_FINISHED;
 }
 
-static int unpack_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
+static int image_unpack_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 {
 	Image *ima= CTX_data_edit_image(C);
 
-	if(RNA_property_is_set(op->ptr, "image"))
-		return unpack_exec(C, op);
+	if(RNA_property_is_set(op->ptr, "id"))
+		return image_unpack_exec(C, op);
 		
 	if(!ima || !ima->packedfile)
 		return OPERATOR_CANCELLED;
@@ -1556,8 +1480,8 @@ static int unpack_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 
 	if(G.fileflags & G_AUTOPACK)
 		BKE_report(op->reports, RPT_WARNING, "AutoPack is enabled, so image will be packed again on file save.");
-	
-	unpack_menu(C, "IMAGE_OT_unpack", ima, "textures", ima->packedfile);
+
+	unpack_menu(C, "IMAGE_OT_unpack", ima->id.name+2, ima->name, "textures", ima->packedfile);
 
 	return OPERATOR_FINISHED;
 }
@@ -1570,15 +1494,15 @@ void IMAGE_OT_unpack(wmOperatorType *ot)
 	ot->idname= "IMAGE_OT_unpack";
 	
 	/* api callbacks */
-	ot->exec= unpack_exec;
-	ot->invoke= unpack_invoke;
+	ot->exec= image_unpack_exec;
+	ot->invoke= image_unpack_invoke;
 
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 
 	/* properties */
 	RNA_def_enum(ot->srna, "method", unpack_method_items, PF_USE_LOCAL, "Method", "How to unpack.");
-	RNA_def_string(ot->srna, "image", "", 21, "Image Name", "Image datablock name to unpack.");
+	RNA_def_string(ot->srna, "id", "", 21, "Image Name", "Image datablock name to unpack."); /* XXX, weark!, will fail with library, name collisions */
 }
 
 /******************** sample image operator ********************/
@@ -1618,16 +1542,16 @@ static void sample_apply(bContext *C, wmOperator *op, wmEvent *event)
 	ImBuf *ibuf= ED_space_image_acquire_buffer(sima, &lock);
 	ImageSampleInfo *info= op->customdata;
 	float fx, fy;
-	int x, y;
+	int mx, my;
 	
 	if(ibuf == NULL) {
 		ED_space_image_release_buffer(sima, lock);
 		return;
 	}
 
-	x= event->x - ar->winrct.xmin;
-	y= event->y - ar->winrct.ymin;
-	UI_view2d_region_to_view(&ar->v2d, x, y, &fx, &fy);
+	mx= event->x - ar->winrct.xmin;
+	my= event->y - ar->winrct.ymin;
+	UI_view2d_region_to_view(&ar->v2d, mx, my, &fx, &fy);
 
 	if(fx>=0.0 && fy>=0.0 && fx<1.0 && fy<1.0) {
 		float *fp;
@@ -2019,7 +1943,7 @@ static int record_composite_exec(bContext *C, wmOperator *op)
 
 static int record_composite_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 {
-	RecordCompositeData *rcd= op->customdata;
+	RecordCompositeData *rcd;
 	
 	if(!record_composite_init(C, op))
 		return OPERATOR_CANCELLED;
@@ -2084,13 +2008,15 @@ static int cycle_render_slot_poll(bContext *C)
 	return (ima && ima->type == IMA_TYPE_R_RESULT);
 }
 
-static int cycle_render_slot_exec(bContext *C, wmOperator *UNUSED(op))
+static int cycle_render_slot_exec(bContext *C, wmOperator *op)
 {
 	Image *ima= CTX_data_edit_image(C);
 	int a, slot, cur= ima->render_slot;
+	const short use_reverse= RNA_boolean_get(op->ptr, "reverse");
 
 	for(a=1; a<IMA_MAX_RENDER_SLOT; a++) {
-		slot= (cur+a)%IMA_MAX_RENDER_SLOT;
+		slot= (cur + (use_reverse ? -a:a))%IMA_MAX_RENDER_SLOT;
+		if(slot<0) slot+=IMA_MAX_RENDER_SLOT;
 
 		if(ima->renders[slot] || slot == ima->last_render_slot) {
 			ima->render_slot= slot;
@@ -2122,6 +2048,8 @@ void IMAGE_OT_cycle_render_slot(wmOperatorType *ot)
 
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+
+	RNA_def_boolean(ot->srna, "reverse", 0, "Cycle in Reverse", "");
 }
 
 /******************** TODO ********************/

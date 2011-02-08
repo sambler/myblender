@@ -51,6 +51,13 @@ void	ED_undo_redo			(struct bContext *C);
 void	ED_OT_undo				(struct wmOperatorType *ot);
 void	ED_OT_redo				(struct wmOperatorType *ot);
 
+int		ED_undo_operator_repeat(struct bContext *C, struct wmOperator *op);
+	/* convenience since UI callbacks use this mostly*/
+void	ED_undo_operator_repeat_cb(struct bContext *C, void *arg_op, void *arg_unused);
+void	ED_undo_operator_repeat_cb_evt(struct bContext *C, void *arg_op, int arg_unused);
+
+int		ED_undo_valid			(const struct bContext *C, const char *undoname);
+
 /* undo_editmode.c */
 void undo_editmode_push(struct bContext *C, const char *name, 
 						void * (*getdata)(struct bContext *C),
@@ -66,11 +73,13 @@ void	undo_editmode_menu			(struct bContext *C);
 void	undo_editmode_clear			(void);
 void	undo_editmode_step			(struct bContext *C, int step);
 
-
 /* ************** XXX OLD CRUFT WARNING ************* */
 
 void apply_keyb_grid(int shift, int ctrl, float *val, float fac1, float fac2, float fac3, int invert);
-int GetButStringLength(char *str);
+int GetButStringLength(const char *str);
+
+/* where else to go ? */
+void unpack_menu(struct bContext *C, const char *opname, const char *id_name, const char *abs_name, const char *folder, struct PackedFile *pf);
 
 #endif /* ED_UTIL_H */
 

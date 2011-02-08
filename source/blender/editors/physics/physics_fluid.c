@@ -53,6 +53,7 @@
 #include "BLI_blenlib.h"
 #include "BLI_threads.h"
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_animsys.h"
 #include "BKE_armature.h"
@@ -633,7 +634,7 @@ static int fluid_init_filepaths(Object *fsDomain, char *targetDir, char *targetF
 	FILE *fileCfg;
 	int dirExist = 0;
 	char newSurfdataPath[FILE_MAXDIR+FILE_MAXFILE]; // modified output settings
-	char *suffixConfig = FLUID_SUFFIX_CONFIG;
+	const char *suffixConfig = FLUID_SUFFIX_CONFIG;
 	int outStringsChanged = 0;
 	
 	// prepare names...
@@ -665,7 +666,7 @@ static int fluid_init_filepaths(Object *fsDomain, char *targetDir, char *targetF
 		// invalid dir, reset to current/previous
 		strcpy(blendDir, G.main->name);
 		BLI_splitdirstring(blendDir, blendFile);
-		if(strlen(blendFile)>6){
+		if(BLI_strnlen(blendFile, 7) > 6){
 			int len = strlen(blendFile);
 			if( (blendFile[len-6]=='.')&& (blendFile[len-5]=='b')&& (blendFile[len-4]=='l')&&
 			   (blendFile[len-3]=='e')&& (blendFile[len-2]=='n')&& (blendFile[len-1]=='d') ){
@@ -813,8 +814,8 @@ int fluidsimBake(bContext *C, ReportList *reports, Object *fsDomain)
 	
 	int gridlevels = 0;
 	const char *strEnvName = "BLENDER_ELBEEMDEBUG"; // from blendercall.cpp
-	char *suffixConfig = FLUID_SUFFIX_CONFIG;
-	char *suffixSurface = FLUID_SUFFIX_SURFACE;
+	const char *suffixConfig = FLUID_SUFFIX_CONFIG;
+	const char *suffixSurface = FLUID_SUFFIX_SURFACE;
 
 	char targetDir[FILE_MAXDIR+FILE_MAXFILE];  // store & modify output settings
 	char targetFile[FILE_MAXDIR+FILE_MAXFILE]; // temp. store filename from targetDir for access

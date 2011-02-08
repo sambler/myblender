@@ -36,6 +36,7 @@
 
 #include "BLI_math.h"
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 
 #include "DNA_anim_types.h"
 #include "DNA_armature_types.h"
@@ -63,7 +64,7 @@
 #include "BKE_lattice.h"
 #include "BKE_main.h"
 #include "BKE_object.h"
-#include "BKE_utildefines.h"
+
 #include "BIK_api.h"
 #include "BKE_sketch.h"
 
@@ -936,19 +937,15 @@ void armature_deform_verts(Object *armOb, Object *target, DerivedMesh *dm,
 			dvert = NULL;
 
 		if(armature_def_nr >= 0 && dvert) {
-			armature_weight = 0.0f; /* a def group was given, so default to 0 */
-			for(j = 0; j < dvert->totweight; j++) {
-				if(dvert->dw[j].def_nr == armature_def_nr) {
-					armature_weight = dvert->dw[j].weight;
-					break;
-				}
+			armature_weight= defvert_find_weight(dvert, armature_def_nr);
+
+			if(invert_vgroup) {
+				armature_weight= 1.0f-armature_weight;
 			}
+
 			/* hackish: the blending factor can be used for blending with prevCos too */
 			if(prevCos) {
-				if(invert_vgroup)
-					prevco_weight= 1.0f-armature_weight;
-				else
-					prevco_weight= armature_weight;
+				prevco_weight= armature_weight;
 				armature_weight= 1.0f;
 			}
 		}
@@ -1248,6 +1245,7 @@ void BKE_rotMode_change_values (float quat[4], float eul[3], float axis[3], floa
 		}
 		else if (oldMode == ROT_MODE_QUAT) {
 			/* quat to euler */
+			normalize_qt(quat);
 			quat_to_eulO( eul, newMode,quat);
 		}
 		/* else { no conversion needed } */
@@ -1270,6 +1268,7 @@ void BKE_rotMode_change_values (float quat[4], float eul[3], float axis[3], floa
 		}
 		else if (oldMode == ROT_MODE_QUAT) {
 			/* quat to axis angle */
+			normalize_qt(quat);
 			quat_to_axis_angle( axis, angle,quat);
 		}
 		
@@ -1402,13 +1401,6 @@ void where_is_armature_bone(Bone *bone, Bone *prevbone)
 		VECCOPY(bone->arm_mat[3], bone->head);
 	}
 	
-	/* head */
-	VECCOPY(bone->arm_head, bone->arm_mat[3]);
-	/* tail is in current local coord system */
-	VECCOPY(vec, bone->arm_mat[1]);
-	mul_v3_fl(vec, bone->length);
-	add_v3_v3v3(bone->arm_tail, bone->arm_head, vec);
-	
 	/* and the kiddies */
 	prevbone= bone;
 	for(bone= bone->childbase.first; bone; bone= bone->next) {
@@ -1498,7 +1490,7 @@ static void pose_proxy_synchronize(Object *ob, Object *from, int layer_protected
 			 */
 			extract_proxylocal_constraints(&proxylocal_constraints, &pchan->constraints);
 			copy_constraints(&pchanw.constraints, &pchanp->constraints, FALSE);
-			addlisttolist(&pchanw.constraints, &proxylocal_constraints);
+			BLI_movelisttolist(&pchanw.constraints, &proxylocal_constraints);
 			
 			/* constraints - set target ob pointer to own object */
 			for (con= pchanw.constraints.first; con; con= con->next) {
@@ -2092,8 +2084,7 @@ void pchan_to_mat4(bPoseChannel *pchan, float chan_mat[4][4])
 		 * but if this proves to be too problematic, switch back to the old system of operating directly on 
 		 * the stored copy
 		 */
-		QUATCOPY(quat, pchan->quat);
-		normalize_qt(quat);
+		normalize_qt_qt(quat, pchan->quat);
 		quat_to_mat3(rmat, quat);
 	}
 	

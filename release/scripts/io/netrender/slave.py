@@ -26,6 +26,7 @@ import bpy
 from netrender.utils import *
 import netrender.model
 import netrender.repath
+import netrender.thumbnail as thumbnail
 
 BLENDER_PATH = sys.argv[0]
 
@@ -169,6 +170,10 @@ def render_slave(engine, netsettings, threads):
                 if not os.path.exists(JOB_PREFIX):
                     os.mkdir(JOB_PREFIX)
 
+                # set tempdir for fsaa temp files
+                # have to set environ var because render is done in a subprocess and that's the easiest way to propagate the setting
+                os.environ["TMP"] = JOB_PREFIX
+
 
                 if job.type == netrender.model.JOB_BLENDER:
                     job_path = job.files[0].filepath # path of main file
@@ -304,7 +309,7 @@ def render_slave(engine, netsettings, threads):
 
                             # thumbnail first
                             if netsettings.use_slave_thumb:
-                                thumbname = thumbnail(filename)
+                                thumbname = thumbnail.generate(filename)
                                 
                                 if thumbname:
                                     f = open(thumbname, 'rb')

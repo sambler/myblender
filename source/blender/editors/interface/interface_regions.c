@@ -35,6 +35,7 @@
 
 #include "BLI_math.h"
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 #include "BLI_dynstr.h"
 #include "BLI_ghash.h"
 
@@ -71,7 +72,7 @@
 /*********************** Menu Data Parsing ********************* */
 
 typedef struct MenuEntry {
-	char *str;
+	const char *str;
 	int retval;
 	int icon;
 	int sepr;
@@ -79,7 +80,7 @@ typedef struct MenuEntry {
 
 typedef struct MenuData {
 	char *instr;
-	char *title;
+	const char *title;
 	int titleicon;
 	
 	MenuEntry *items;
@@ -99,7 +100,7 @@ static MenuData *menudata_new(char *instr)
 	return md;
 }
 
-static void menudata_set_title(MenuData *md, char *title, int titleicon)
+static void menudata_set_title(MenuData *md, const char *title, int titleicon)
 {
 	if (!md->title)
 		md->title= title;
@@ -107,7 +108,7 @@ static void menudata_set_title(MenuData *md, char *title, int titleicon)
 		md->titleicon= titleicon;
 }
 
-static void menudata_add_item(MenuData *md, char *str, int retval, int icon, int sepr)
+static void menudata_add_item(MenuData *md, const char *str, int retval, int icon, int sepr)
 {
 	if (md->nitems==md->itemssize) {
 		int nsize= md->itemssize?(md->itemssize<<1):1;
@@ -154,7 +155,8 @@ MenuData *decompose_menu_string(char *str)
 {
 	char *instr= BLI_strdup(str);
 	MenuData *md= menudata_new(instr);
-	char *nitem= NULL, *s= instr;
+	const char *nitem= NULL;
+	char *s= instr;
 	int nicon=0, nretval= 1, nitem_is_title= 0, nitem_is_sepr= 0;
 	
 	while (1) {
@@ -383,7 +385,7 @@ ARegion *ui_tooltip_create(bContext *C, ARegion *butregion, uiBut *but)
 	}
 
 	if(but->rnaprop) {
-		int unit_type = RNA_SUBTYPE_UNIT(RNA_property_subtype(but->rnaprop));
+		int unit_type= uiButGetUnitType(but);
 		
 		if (unit_type == PROP_UNIT_ROTATION) {
 			if (RNA_property_type(but->rnaprop) == PROP_FLOAT) {
@@ -1081,28 +1083,35 @@ void ui_searchbox_free(bContext *C, ARegion *ar)
 }
 
 /* sets red alert if button holds a string it can't find */
+/* XXX weak: search_func adds all partial matches... */
 void ui_but_search_test(uiBut *but)
 {
 	uiSearchItems *items= MEM_callocN(sizeof(uiSearchItems), "search items");
-	char *strp[2], str[256];
+	int x1;
 	
-	items->maxitem= 1;
+	/* setup search struct */
+	items->maxitem= 10;
 	items->maxstrlen= 256;
-	strp[0]= str;
-	items->names= strp;
+	items->names= MEM_callocN(items->maxitem*sizeof(void *), "search names");
+	for(x1=0; x1<items->maxitem; x1++)
+		items->names[x1]= MEM_callocN(but->hardmax+1, "search names");
 	
-	/* changed flag makes search only find name */
-	but->changed= TRUE;
 	but->search_func(but->block->evil_C, but->search_arg, but->drawstr, items);
-	but->changed= 0;
 	
+	/* only redalert when we are sure of it, this can miss cases when >10 matches */
 	if(items->totitem==0)
 		uiButSetFlag(but, UI_BUT_REDALERT);
-	else if(items->totitem==1) {
-		if(strcmp(but->drawstr, str)!=0)
+	else if(items->more==0) {
+		for(x1= 0; x1<items->totitem; x1++)
+			if(strcmp(but->drawstr, items->names[x1])==0)
+				break;
+		if(x1==items->totitem)
 			uiButSetFlag(but, UI_BUT_REDALERT);
 	}
-				  
+	
+	for(x1=0; x1<items->maxitem; x1++)
+		MEM_freeN(items->names[x1]);
+	MEM_freeN(items->names);
 	MEM_freeN(items);
 }
 
@@ -1486,7 +1495,7 @@ static void ui_block_func_MENUSTR(bContext *UNUSED(C), uiLayout *layout, void *a
 			uiItemL(layout, md->title, md->titleicon);
 		}
 		else {
-			uiItemL(layout, md->title, 0);
+			uiItemL(layout, md->title, ICON_NULL);
 			bt= block->buttons.last;
 			bt->flag= UI_TEXT_LEFT;
 		}
@@ -1833,7 +1842,7 @@ static void uiBlockPicker(uiBlock *block, float *rgb, PointerRNA *ptr, PropertyR
 	width= PICKER_TOTAL_W;
 	butwidth = width - UI_UNIT_X - 10;
 	
-	/* existence of profile means storage is in linear colour space, with display correction */
+	/* existence of profile means storage is in linear color space, with display correction */
 	if (block->color_profile == BLI_PR_NONE) {
 		sprintf(tip, "Value in Display Color Space");
 		copy_v3_v3(rgb_gamma, rgb);
@@ -1886,7 +1895,7 @@ static void uiBlockPicker(uiBlock *block, float *rgb, PointerRNA *ptr, PropertyR
 	bt= uiDefButR(block, NUMSLI, 0, "B ",	0, -100, butwidth, UI_UNIT_Y, ptr, propname, 2, 0.0, 0.0, 0, 3, "Blue");
 	uiButSetFunc(bt, do_picker_rna_cb, bt, NULL);
 
-	// could use uiItemFullR(col, ptr, prop, -1, 0, UI_ITEM_R_EXPAND|UI_ITEM_R_SLIDER, "", 0);
+	// could use uiItemFullR(col, ptr, prop, -1, 0, UI_ITEM_R_EXPAND|UI_ITEM_R_SLIDER, "", ICON_NULL);
 	// but need to use uiButSetFunc for updating other fake buttons
 	
 	/* HSV values */
@@ -1975,7 +1984,7 @@ uiBlock *ui_block_func_COL(bContext *C, uiPopupBlockHandle *handle, void *arg_bu
 	
 	uiBlockPicker(block, handle->retvec, &but->rnapoin, but->rnaprop);
 	
-	block->flag= UI_BLOCK_LOOP|UI_BLOCK_REDRAW|UI_BLOCK_KEEP_OPEN;
+	block->flag= UI_BLOCK_LOOP|UI_BLOCK_REDRAW|UI_BLOCK_KEEP_OPEN|UI_BLOCK_OUT_1;
 	uiBoundsBlock(block, 10);
 	
 	block->block_event_func= ui_picker_small_wheel_cb;
@@ -2222,7 +2231,7 @@ uiPopupMenu *uiPupMenuBegin(bContext *C, const char *title, int icon)
 			uiDefIconTextBut(pup->block, LABEL, 0, icon, titlestr, 0, 0, 200, MENU_BUTTON_HEIGHT, NULL, 0.0, 0.0, 0, 0, "");
 		}
 		else {
-			but= uiDefBut(pup->block, LABEL, 0, (char*)title, 0, 0, 200, MENU_BUTTON_HEIGHT, NULL, 0.0, 0.0, 0, 0, "");
+			but= uiDefBut(pup->block, LABEL, 0, title, 0, 0, 200, MENU_BUTTON_HEIGHT, NULL, 0.0, 0.0, 0, 0, "");
 			but->flag= UI_TEXT_LEFT;
 		}
 	}
@@ -2279,7 +2288,7 @@ static void confirm_cancel_operator(void *opv)
 	WM_operator_free(opv);
 }
 
-static void vconfirm_opname(bContext *C, const char *opname, char *title, char *itemfmt, va_list ap)
+static void vconfirm_opname(bContext *C, const char *opname, const char *title, const char *itemfmt, va_list ap)
 {
 	uiPopupBlockHandle *handle;
 	char *s, buf[512];
@@ -2294,7 +2303,7 @@ static void vconfirm_opname(bContext *C, const char *opname, char *title, char *
 	handle->popup_arg= (void *)opname;
 }
 
-static void confirm_operator(bContext *C, wmOperator *op, char *title, char *item)
+static void confirm_operator(bContext *C, wmOperator *op, const char *title, const char *item)
 {
 	uiPopupBlockHandle *handle;
 	char *s, buf[512];
@@ -2309,7 +2318,7 @@ static void confirm_operator(bContext *C, wmOperator *op, char *title, char *ite
 	handle->cancel_func= confirm_cancel_operator;
 }
 
-void uiPupMenuOkee(bContext *C, const char *opname, char *str, ...)
+void uiPupMenuOkee(bContext *C, const char *opname, const char *str, ...)
 {
 	va_list ap;
 	char titlestr[256];
@@ -2321,7 +2330,7 @@ void uiPupMenuOkee(bContext *C, const char *opname, char *str, ...)
 	va_end(ap);
 }
 
-void uiPupMenuSaveOver(bContext *C, wmOperator *op, char *filename)
+void uiPupMenuSaveOver(bContext *C, wmOperator *op, const char *filename)
 {
 	size_t len= strlen(filename);
 
@@ -2339,7 +2348,7 @@ void uiPupMenuSaveOver(bContext *C, wmOperator *op, char *filename)
 		confirm_operator(C, op, "Save Over", filename);
 }
 
-void uiPupMenuNotice(bContext *C, char *str, ...)
+void uiPupMenuNotice(bContext *C, const char *str, ...)
 {
 	va_list ap;
 
@@ -2348,7 +2357,7 @@ void uiPupMenuNotice(bContext *C, char *str, ...)
 	va_end(ap);
 }
 
-void uiPupMenuError(bContext *C, char *str, ...)
+void uiPupMenuError(bContext *C, const char *str, ...)
 {
 	va_list ap;
 	char nfmt[256];
@@ -2410,7 +2419,7 @@ void uiPupMenuInvoke(bContext *C, const char *idname)
 	if(mt->poll && mt->poll(C, mt)==0)
 		return;
 
-	pup= uiPupMenuBegin(C, mt->label, 0);
+	pup= uiPupMenuBegin(C, mt->label, ICON_NULL);
 	layout= uiPupMenuLayout(pup);
 
 	menu.layout= layout;

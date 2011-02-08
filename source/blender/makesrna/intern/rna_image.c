@@ -79,7 +79,7 @@ static void rna_Image_source_update(Main *bmain, Scene *scene, PointerRNA *ptr)
 {
 	Image *ima= ptr->id.data;
 	BKE_image_signal(ima, NULL, IMA_SIGNAL_SRC_CHANGE);
-	DAG_id_flush_update(&ima->id, 0);
+	DAG_id_tag_update(&ima->id, 0);
 }
 
 static void rna_Image_fields_update(Main *bmain, Scene *scene, PointerRNA *ptr)
@@ -107,7 +107,7 @@ static void rna_Image_reload_update(Main *bmain, Scene *scene, PointerRNA *ptr)
 {
 	Image *ima= ptr->id.data;
 	BKE_image_signal(ima, NULL, IMA_SIGNAL_RELOAD);
-	DAG_id_flush_update(&ima->id, 0);
+	DAG_id_tag_update(&ima->id, 0);
 }
 
 static void rna_Image_generated_update(Main *bmain, Scene *scene, PointerRNA *ptr)
@@ -275,7 +275,7 @@ static void rna_def_imageuser(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "frame_start", PROP_INT, PROP_TIME);
 	RNA_def_property_int_sdna(prop, NULL, "sfra");
 	RNA_def_property_range(prop, MINAFRAMEF, MAXFRAMEF);
-	RNA_def_property_ui_text(prop, "Start Frame", "Sets the global starting frame of the movie");
+	RNA_def_property_ui_text(prop, "Start Frame", "Sets the global starting frame of the movie/sequence, assuming first picture has a #1");
 	RNA_def_property_update(prop, 0, "rna_ImageUser_update");
 
 	prop= RNA_def_property(srna, "fields_per_frame", PROP_INT, PROP_NONE);

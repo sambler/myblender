@@ -179,7 +179,7 @@ void CTX_py_init_set(bContext *C, int value)
 	C->data.py_init= value;
 }
 
-void *CTX_py_dict_get(bContext *C)
+void *CTX_py_dict_get(const bContext *C)
 {
 	return C->data.py_context;
 }
@@ -427,8 +427,8 @@ static int ctx_data_get(bContext *C, const char *member, bContextDataResult *res
 	memset(result, 0, sizeof(bContextDataResult));
 #ifdef WITH_PYTHON
 	if(CTX_py_dict_get(C)) {
-		return BPY_context_get(C, member, result);
-//		if (BPY_context_get(C, member, result))
+		return BPY_context_member_get(C, member, result);
+//		if (BPY_context_member_get(C, member, result))
 //			return 1;
 	}
 #endif
@@ -773,7 +773,7 @@ int CTX_data_mode_enum(const bContext *C)
 
 /* would prefer if we can use the enum version below over this one - Campbell */
 /* must be aligned with above enum  */
-static char *data_mode_strings[] = {
+static const char *data_mode_strings[] = {
 	"mesh_edit",
 	"curve_edit",
 	"surface_edit",
@@ -790,7 +790,7 @@ static char *data_mode_strings[] = {
 	"objectmode",
 	0
 };
-char *CTX_data_mode_string(const bContext *C)
+const char *CTX_data_mode_string(const bContext *C)
 {
 	return data_mode_strings[CTX_data_mode_enum(C)];
 }

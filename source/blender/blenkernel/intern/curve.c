@@ -35,8 +35,10 @@
 #include <stdlib.h>  
 
 #include "MEM_guardedalloc.h"
+
 #include "BLI_blenlib.h"  
 #include "BLI_math.h"  
+#include "BLI_utildefines.h"
 
 #include "DNA_curve_types.h"  
 #include "DNA_material_types.h"  
@@ -57,7 +59,7 @@
 #include "BKE_library.h"  
 #include "BKE_main.h"  
 #include "BKE_object.h"  
-#include "BKE_utildefines.h"  // VECCOPY
+
 
 #include "ED_curve.h"
 
@@ -139,7 +141,7 @@ Curve *add_curve(const char *name, int type)
 	cu->size[0]= cu->size[1]= cu->size[2]= 1.0;
 	cu->flag= CU_FRONT|CU_BACK|CU_DEFORM_BOUNDS_OFF|CU_PATH_RADIUS;
 	cu->pathlen= 100;
-	cu->resolu= cu->resolv= 12;
+	cu->resolu= cu->resolv= (type == OB_SURF) ? 4 : 12;
 	cu->width= 1.0;
 	cu->wordspace = 1.0;
 	cu->spacing= cu->linedist= 1.0;
@@ -1266,10 +1268,10 @@ void makebevelcurve(Scene *scene, Object *ob, ListBase *disp, int forRender)
 				makeDispListCurveTypes_forRender(scene, cu->bevobj, &bevdisp, NULL, 0);
 				dl= bevdisp.first;
 			} else {
-				dl= bevcu->disp.first;
+				dl= cu->bevobj->disp.first;
 				if(dl==0) {
 					makeDispListCurveTypes(scene, cu->bevobj, 0);
-					dl= bevcu->disp.first;
+					dl= cu->bevobj->disp.first;
 				}
 			}
 
@@ -1744,7 +1746,7 @@ static void bevel_list_smooth(BevList *bl, int smooth_iter)
 
 		if(bl->poly== -1) { /* check its not cyclic */
 			/* skip the first point */
-			bevp0= bevp1;
+			/* bevp0= bevp1; */
 			bevp1= bevp2;
 			bevp2++;
 			nr--;
@@ -1775,7 +1777,7 @@ static void bevel_list_smooth(BevList *bl, int smooth_iter)
 			normalize_qt(bevp1->quat);
 
 
-			bevp0= bevp1;
+			/* bevp0= bevp1; */ /* UNUSED */
 			bevp1= bevp2;
 			bevp2++;
 		}
@@ -1954,7 +1956,7 @@ static void make_bevel_list_3D_tangent(BevList *bl)
 		normalize_v3(cross_tmp);
 		tri_to_quat( bevp1->quat,zero, cross_tmp, bevp1->tan); /* XXX - could be faster */
 
-		bevp0= bevp1;
+		/* bevp0= bevp1; */ /* UNUSED */
 		bevp1= bevp2;
 		bevp2++;
 	}
@@ -2906,38 +2908,41 @@ void switchdirectionNurb(Nurb *nu)
 			bp2--;
 		}
 		if(nu->type == CU_NURBS) {
-			/* inverse knots */
-			a= KNOTSU(nu);
-			fp1= nu->knotsu;
-			fp2= fp1+(a-1);
-			a/= 2;
-			while(fp1!=fp2 && a>0) {
-				SWAP(float, *fp1, *fp2);
-				a--;
-				fp1++; 
-				fp2--;
-			}
-			/* and make in increasing order again */
-			a= KNOTSU(nu);
-			fp1= nu->knotsu;
-			fp2=tempf= MEM_mallocN(sizeof(float)*a, "switchdirect");
-			while(a--) {
-				fp2[0]= fabs(fp1[1]-fp1[0]);
+			/* no knots for too short paths */
+			if(nu->knotsu) {
+				/* inverse knots */
+				a= KNOTSU(nu);
+				fp1= nu->knotsu;
+				fp2= fp1+(a-1);
+				a/= 2;
+				while(fp1!=fp2 && a>0) {
+					SWAP(float, *fp1, *fp2);
+					a--;
+					fp1++; 
+					fp2--;
+				}
+				/* and make in increasing order again */
+				a= KNOTSU(nu);
+				fp1= nu->knotsu;
+				fp2=tempf= MEM_mallocN(sizeof(float)*a, "switchdirect");
+				while(a--) {
+					fp2[0]= fabs(fp1[1]-fp1[0]);
+					fp1++;
+					fp2++;
+				}
+		
+				a= KNOTSU(nu)-1;
+				fp1= nu->knotsu;
+				fp2= tempf;
+				fp1[0]= 0.0;
 				fp1++;
-				fp2++;
+				while(a--) {
+					fp1[0]= fp1[-1]+fp2[0];
+					fp1++;
+					fp2++;
+				}
+				MEM_freeN(tempf);
 			}
-	
-			a= KNOTSU(nu)-1;
-			fp1= nu->knotsu;
-			fp2= tempf;
-			fp1[0]= 0.0;
-			fp1++;
-			while(a--) {
-				fp1[0]= fp1[-1]+fp2[0];
-				fp1++;
-				fp2++;
-			}
-			MEM_freeN(tempf);
 		}
 	}
 	else {
@@ -3056,7 +3061,7 @@ void curve_applyKeyVertexTilts(Curve *UNUSED(cu), ListBase *lb, float *key)
 			for(i=0; i<nu->pntsu; i++,bezt++) {
 				key+=3*3;
 				bezt->alfa= *key;
-				key++;
+				key+=3;
 			}
 		}
 		else {

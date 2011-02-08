@@ -58,6 +58,7 @@
 #include "BLI_blenlib.h"
 #include "BLI_rand.h"
 #include "BLI_threads.h"
+#include "BLI_utildefines.h"
 
 #include "PIL_time.h"
 #include "IMB_imbuf.h"
@@ -133,7 +134,7 @@ static void result_nothing(void *UNUSED(arg), RenderResult *UNUSED(rr)) {}
 static void result_rcti_nothing(void *UNUSED(arg), RenderResult *UNUSED(rr), volatile struct rcti *UNUSED(rect)) {}
 static void stats_nothing(void *UNUSED(arg), RenderStats *UNUSED(rs)) {}
 static void float_nothing(void *UNUSED(arg), float UNUSED(val)) {}
-static void print_error(void *UNUSED(arg), char *str) {printf("ERROR: %s\n", str);}
+static void print_error(void *UNUSED(arg), const char *str) {printf("ERROR: %s\n", str);}
 static int default_break(void *UNUSED(arg)) {return G.afbreek == 1;}
 
 static void stats_background(void *UNUSED(arg), RenderStats *rs)
@@ -278,7 +279,7 @@ static void pop_render_result(Render *re)
 
 /* NOTE: OpenEXR only supports 32 chars for layer+pass names
    In blender we now use max 10 chars for pass, max 20 for layer */
-static char *get_pass_name(int passtype, int channel)
+static const char *get_pass_name(int passtype, int channel)
 {
 	
 	if(passtype == SCE_PASS_COMBINED) {
@@ -471,7 +472,7 @@ static void render_unique_exr_name(Render *re, char *str, int sample)
 
 static void render_layer_add_pass(RenderResult *rr, RenderLayer *rl, int channels, int passtype)
 {
-	char *typestr= get_pass_name(passtype, 0);
+	const char *typestr= get_pass_name(passtype, 0);
 	RenderPass *rpass= MEM_callocN(sizeof(RenderPass), typestr);
 	int rectsize= rr->rectx*rr->recty*channels;
 	
@@ -1403,7 +1404,7 @@ void RE_test_break_cb(Render *re, void *handle, int (*f)(void *handle))
 	re->test_break= f;
 	re->tbh= handle;
 }
-void RE_error_cb(Render *re, void *handle, void (*f)(void *handle, char *str))
+void RE_error_cb(Render *re, void *handle, void (*f)(void *handle, const char *str))
 {
 	re->error= f;
 	re->erh= handle;
@@ -1494,14 +1495,15 @@ static void *do_part_thread(void *pa_v)
 float panorama_pixel_rot(Render *re)
 {
 	float psize, phi, xfac;
+	float borderfac= (float)(re->disprect.xmax - re->disprect.xmin) / (float)re->winx;
 	
 	/* size of 1 pixel mapped to viewplane coords */
-	psize= (re->viewplane.xmax-re->viewplane.xmin)/(float)re->winx;
+	psize= (re->viewplane.xmax-re->viewplane.xmin)/(float)(re->winx);
 	/* angle of a pixel */
 	phi= atan(psize/re->clipsta);
 	
 	/* correction factor for viewplane shifting, first calculate how much the viewplane angle is */
-	xfac= ((re->viewplane.xmax-re->viewplane.xmin))/(float)re->xparts;
+	xfac= borderfac*((re->viewplane.xmax-re->viewplane.xmin))/(float)re->xparts;
 	xfac= atan(0.5f*xfac/re->clipsta); 
 	/* and how much the same viewplane angle is wrapped */
 	psize= 0.5f*phi*((float)re->partx);
@@ -1532,9 +1534,9 @@ static RenderPart *find_next_pano_slice(Render *re, int *minx, rctf *viewplane)
 			
 	if(best) {
 		float phi= panorama_pixel_rot(re);
-		/* R.disprect.xmax - R.disprect.xmin rather then R.winx for border render */
+
 		R.panodxp= (re->winx - (best->disprect.xmin + best->disprect.xmax) )/2;
-		R.panodxv= ((viewplane->xmax-viewplane->xmin)*R.panodxp)/(float)(R.disprect.xmax - R.disprect.xmin);
+		R.panodxv= ((viewplane->xmax-viewplane->xmin)*R.panodxp)/(float)(re->winx);
 
 		/* shift viewplane */
 		R.viewplane.xmin = viewplane->xmin + R.panodxv;
@@ -2049,7 +2051,7 @@ static void load_backbuffer(Render *re)
 		char name[256];
 		
 		strcpy(name, re->r.backbuf);
-		BLI_path_abs(name, G.main->name);
+		BLI_path_abs(name, re->main->name);
 		BLI_path_frame(name, re->r.cfra, 0);
 		
 		if(re->backbuf) {
@@ -2205,6 +2207,7 @@ static void ntree_render_scenes(Render *re)
 {
 	bNode *node;
 	int cfra= re->scene->r.cfra;
+	int restore_scene= 0;
 	
 	if(re->scene->nodetree==NULL) return;
 	
@@ -2216,12 +2219,19 @@ static void ntree_render_scenes(Render *re)
 		if(node->type==CMP_NODE_R_LAYERS) {
 			if(node->id && node->id != (ID *)re->scene) {
 				if(node->id->flag & LIB_DOIT) {
-					render_scene(re, (Scene *)node->id, cfra);
+					Scene *scene = (Scene*)node->id;
+
+					render_scene(re, scene, cfra);
+					restore_scene= (scene != re->scene);
 					node->id->flag &= ~LIB_DOIT;
 				}
 			}
 		}
 	}
+
+	/* restore scene if we rendered another last */
+	if(restore_scene)
+		set_scene_bg(re->main, re->scene);
 }
 
 /* helper call to detect if theres a composite with render-result node */
@@ -2329,12 +2339,17 @@ static void do_merge_fullsample(Render *re, bNodeTree *ntree)
 	BLI_rw_mutex_unlock(&re->resultmutex);
 }
 
+/* called externally, via compositor */
 void RE_MergeFullSample(Render *re, Main *bmain, Scene *sce, bNodeTree *ntree)
 {
 	Scene *scene;
 	bNode *node;
 
+	/* default start situation */
+	G.afbreek= 0;
+	
 	re->main= bmain;
+	re->scene= sce;
 	
 	/* first call RE_ReadRenderResult on every renderlayer scene. this creates Render structs */
 	
@@ -2663,7 +2678,7 @@ static int check_valid_camera(Scene *scene)
 	return 1;
 }
 
-int RE_is_rendering_allowed(Scene *scene, void *erh, void (*error)(void *handle, char *str))
+int RE_is_rendering_allowed(Scene *scene, void *erh, void (*error)(void *handle, const char *str))
 {
 	SceneRenderLayer *srl;
 	
@@ -2717,10 +2732,16 @@ int RE_is_rendering_allowed(Scene *scene, void *erh, void (*error)(void *handle,
 				if(node->type==CMP_NODE_COMPOSITE)
 					break;
 			
-			
 			if(node==NULL) {
 				error(erh, "No Render Output Node in Scene");
 				return 0;
+			}
+			
+			if(scene->r.scemode & R_FULL_SAMPLE) {
+				if(composite_needs_render(scene)==0) {
+					error(erh, "Full Sample AA not supported without 3d rendering");
+					return 0;
+				}
 			}
 		}
 	}
@@ -2779,7 +2800,7 @@ static void update_physics_cache(Render *re, Scene *scene, int UNUSED(anim_init)
 	baker.break_data = re->tbh;
 	baker.progressbar = NULL;
 
-	BKE_ptcache_make_cache(&baker);
+	BKE_ptcache_bake(&baker);
 }
 /* evaluating scene options for general Blender render */
 static int render_initialize_from_main(Render *re, Main *bmain, Scene *scene, SceneRenderLayer *srl, unsigned int lay, int anim, int anim_init)

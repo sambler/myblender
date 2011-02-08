@@ -126,6 +126,7 @@ const char *imb_ext_movie[] = {
 	".flv",
 	".divx",
 	".xvid",
+	".mxf",
 	NULL};
 
 /* sort of wrong being here... */
@@ -219,8 +220,8 @@ void silence_log_ffmpeg(int quiet)
 	}
 }
 
-extern void do_init_ffmpeg();
-void do_init_ffmpeg()
+extern void do_init_ffmpeg(void);
+void do_init_ffmpeg(void)
 {
 	static int ffmpeg_init = 0;
 	if (!ffmpeg_init) {
@@ -319,7 +320,7 @@ static int isffmpeg (const char *filename) {
 #endif
 
 #ifdef WITH_REDCODE
-static int isredcode(char * filename)
+static int isredcode(const char * filename)
 {
 	struct redcode_handle * h = redcode_open(filename);
 	if (!h) {

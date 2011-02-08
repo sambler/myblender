@@ -35,6 +35,7 @@
 #include "PIL_dynlib.h"
 
 #include "BLI_math.h" /* windows needs for M_PI */
+#include "BLI_utildefines.h"
 
 #include "DNA_scene_types.h"
 #include "DNA_sequence_types.h"
@@ -119,8 +120,8 @@ static struct ImBuf * prepare_effect_imbufs(
 
 static void open_plugin_seq(PluginSeq *pis, const char *seqname)
 {
-	int (*version)();
-	void* (*alloc_private)();
+	int (*version)(void);
+	void* (*alloc_private)(void);
 	char *cp;
 
 	/* to be sure: (is tested for) */
@@ -143,7 +144,7 @@ static void open_plugin_seq(PluginSeq *pis, const char *seqname)
 
 	if (pis->handle != 0) {
 		/* find the address of the version function */
-		version= (int (*)())PIL_dynlib_find_symbol(pis->handle, "plugin_seq_getversion");
+		version= (int (*)(void))PIL_dynlib_find_symbol(pis->handle, "plugin_seq_getversion");
 		if (test_dlerr(pis->name, "plugin_seq_getversion")) return;
 
 		if (version != 0) {
@@ -177,7 +178,7 @@ static void open_plugin_seq(PluginSeq *pis, const char *seqname)
 				return;
 			}
 		}
-		alloc_private = (void* (*)())PIL_dynlib_find_symbol(
+		alloc_private = (void* (*)(void))PIL_dynlib_find_symbol(
 			pis->handle, "plugin_seq_alloc_private_data");
 		if (alloc_private) {
 			pis->instance_private_data = alloc_private();
@@ -246,7 +247,7 @@ static void init_plugin(Sequence * seq, const char * fname)
 /* 
  * FIXME: should query plugin! Could be generator, that needs zero inputs...
  */
-static int num_inputs_plugin()
+static int num_inputs_plugin(void)
 {
 	return 1;
 }
@@ -969,7 +970,7 @@ static void gamtabs(float gamma)
 
 }
 
-static void build_gammatabs()
+static void build_gammatabs(void)
 {
 	if (gamma_tabs_init == FALSE) {
 		gamtabs(2.0f);
@@ -1591,15 +1592,10 @@ static void precalc_wipe_zone(WipeZone *wipezone, WipeVars *wipe, int xo, int yo
 // This function calculates the blur band for the wipe effects
 static float in_band(WipeZone *wipezone,float width,float dist,float perc,int side,int dir)
 {
-	float t1,t2,alpha,percwidth;
+	float t1,t2,alpha;
 
 	if(width == 0)
 		return (float)side;
-
-	if(side == 1)
-		percwidth = width * perc;
-	else
-		percwidth = width * (1 - perc);
 	
 	if(width < dist)
 		return side;
@@ -1860,7 +1856,7 @@ static void init_wipe_effect(Sequence *seq)
 	seq->effectdata = MEM_callocN(sizeof(struct WipeVars), "wipevars");
 }
 
-static int num_inputs_wipe()
+static int num_inputs_wipe(void)
 {
 	return 1;
 }
@@ -2044,7 +2040,7 @@ static void init_transform_effect(Sequence *seq)
 	transform->uniform_scale=0;
 }
 
-static int num_inputs_transform()
+static int num_inputs_transform(void)
 {
 	return 1;
 }
@@ -2613,7 +2609,7 @@ static void init_glow_effect(Sequence *seq)
 	glow->bNoComp = 0;
 }
 
-static int num_inputs_glow()
+static int num_inputs_glow(void)
 {
 	return 1;
 }
@@ -2700,7 +2696,7 @@ static void init_solid_color(Sequence *seq)
 	cv->col[0] = cv->col[1] = cv->col[2] = 0.5;
 }
 
-static int num_inputs_color()
+static int num_inputs_color(void)
 {
 	return 0;
 }
@@ -2734,8 +2730,8 @@ static struct ImBuf * do_solid_color(
 
 	unsigned char *rect;
 	float *rect_float;
-	int x = context.rectx;
-	int y = context.recty;
+	int x; /*= context.rectx;*/ /*UNUSED*/
+	int y; /*= context.recty;*/ /*UNUSED*/
 
 	if (out->rect) {
 		unsigned char col0[3];
@@ -2809,7 +2805,7 @@ static struct ImBuf * do_solid_color(
    ********************************************************************** */
 
 /* no effect inputs for multicam, we use give_ibuf_seq */
-static int num_inputs_multicam()
+static int num_inputs_multicam(void)
 {
 	return 0;
 }
@@ -2884,7 +2880,7 @@ static void load_speed_effect(Sequence * seq)
 	v->length = 0;
 }
 
-static int num_inputs_speed()
+static int num_inputs_speed(void)
 {
 	return 1;
 }
@@ -3059,7 +3055,7 @@ static void free_noop(struct Sequence *UNUSED(seq))
 
 }
 
-static int num_inputs_default()
+static int num_inputs_default(void)
 {
 	return 2;
 }

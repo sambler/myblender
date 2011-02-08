@@ -31,8 +31,8 @@
 #include "../generic/py_capi_utils.h"
 
 bContext*	__py_context = NULL;
-bContext*	BPy_GetContext(void) { return __py_context; };
-void		BPy_SetContext(bContext *C) { __py_context= C; };
+bContext*	BPy_GetContext(void) { return __py_context; }
+void		BPy_SetContext(bContext *C) { __py_context= C; }
 
 int BPY_class_validate(const char *class_type, PyObject *class, PyObject *base_class, BPY_class_attr_check* class_attrs, PyObject **py_class_attrs)
 {
@@ -138,11 +138,15 @@ char *BPy_enum_as_string(EnumPropertyItem *item)
 	return cstring;
 }
 
-int BPy_reports_to_error(ReportList *reports)
+short BPy_reports_to_error(ReportList *reports, const short clear)
 {
 	char *report_str;
 
 	report_str= BKE_reports_string(reports, RPT_ERROR);
+
+	if(clear) {
+		BKE_reports_clear(reports);
+	}
 
 	if(report_str) {
 		PyErr_SetString(PyExc_SystemError, report_str);
@@ -153,7 +157,7 @@ int BPy_reports_to_error(ReportList *reports)
 }
 
 
-int BPy_errors_to_report(ReportList *reports)
+short BPy_errors_to_report(ReportList *reports)
 {
 	PyObject *pystring;
 	PyObject *pystring_format= NULL; // workaround, see below
@@ -201,7 +205,7 @@ int BPy_errors_to_report(ReportList *reports)
 }
 
 /* array utility function */
-int PyC_AsArray(void *array, PyObject *value, int length, PyTypeObject *type, char *error_prefix)
+int PyC_AsArray(void *array, PyObject *value, int length, PyTypeObject *type, const char *error_prefix)
 {
 	PyObject *value_fast;
 	int value_len;

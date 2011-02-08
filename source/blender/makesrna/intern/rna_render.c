@@ -30,8 +30,9 @@
 
 #include "rna_internal.h"
 
-
 #include "RE_pipeline.h"
+
+#include "BKE_utildefines.h"
 
 #ifdef RNA_RUNTIME
 
@@ -41,7 +42,6 @@
 
 #include "BKE_context.h"
 #include "BKE_report.h"
-
 
 /* RenderEngine */
 
@@ -91,7 +91,7 @@ static void engine_render(RenderEngine *engine, struct Scene *scene)
 
 	RNA_parameter_list_create(&list, &ptr, func);
 	RNA_parameter_set_lookup(&list, "scene", &scene);
-	engine->type->ext.call(&ptr, func, &list);
+	engine->type->ext.call(NULL, &ptr, func, &list);
 
 	RNA_parameter_list_free(&list);
 }
@@ -108,7 +108,7 @@ static void rna_RenderEngine_unregister(const bContext *C, StructRNA *type)
 	RNA_struct_free(&BLENDER_RNA, type);
 }
 
-static StructRNA *rna_RenderEngine_register(const bContext *C, ReportList *reports, void *data, const char *identifier, StructValidateFunc validate, StructCallbackFunc call, StructFreeFunc free)
+static StructRNA *rna_RenderEngine_register(bContext *C, ReportList *reports, void *data, const char *identifier, StructValidateFunc validate, StructCallbackFunc call, StructFreeFunc free)
 {
 	RenderEngineType *et, dummyet = {0};
 	RenderEngine dummyengine= {0};
@@ -124,7 +124,7 @@ static StructRNA *rna_RenderEngine_register(const bContext *C, ReportList *repor
 		return NULL;
 
 	if(strlen(identifier) >= sizeof(dummyet.idname)) {
-		BKE_reportf(reports, RPT_ERROR, "registering render engine class: '%s' is too long, maximum length is %d.", identifier, sizeof(dummyet.idname));
+		BKE_reportf(reports, RPT_ERROR, "registering render engine class: '%s' is too long, maximum length is %d.", identifier, (int)sizeof(dummyet.idname));
 		return NULL;
 	}
 
@@ -271,7 +271,7 @@ static void rna_def_render_engine(BlenderRNA *brna)
 
 	prop= RNA_def_property(srna, "bl_idname", PROP_STRING, PROP_NONE);
 	RNA_def_property_string_sdna(prop, NULL, "type->idname");
-	RNA_def_property_flag(prop, PROP_REGISTER);
+	RNA_def_property_flag(prop, PROP_REGISTER|PROP_NEVER_CLAMP);
 
 	prop= RNA_def_property(srna, "bl_label", PROP_STRING, PROP_NONE);
 	RNA_def_property_string_sdna(prop, NULL, "type->name");

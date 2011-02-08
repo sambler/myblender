@@ -35,6 +35,7 @@
 #include "MEM_guardedalloc.h"
 
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 #include "BLI_ghash.h"
 #include "BLI_edgehash.h"
 
@@ -443,7 +444,13 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 			  }
 
 			  if(med.v1 == med.v2) continue;
-
+			  
+			  /* XXX Unfortunately the calc_mapping returns sometimes numVerts... leads to bad crashes */
+			  if(med.v1 >= numVerts)
+				  med.v1= numVerts-1;
+			  if(med.v2 >= numVerts)
+				  med.v2= numVerts-1;
+			  
 			  if (initFlags) {
 				  med.flag |= ME_EDGEDRAW | ME_EDGERENDER;
 			  }
@@ -460,9 +467,15 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 			  {
 				  vert1 = calc_mapping(indexMap, inMED.v1, j);
 				  vert2 = calc_mapping(indexMap, inMED.v2, j);
-
+				  
 				  /* edge could collapse to single point after mapping */
 				  if(vert1 == vert2) continue;
+				  
+				  /* XXX Unfortunately the calc_mapping returns sometimes numVerts... leads to bad crashes */
+				  if(vert1 >= numVerts)
+					  vert1= numVerts-1;
+				  if(vert2 >= numVerts)
+					  vert2= numVerts-1;
 
 				  /* avoid duplicate edges */
 				  if(!BLI_edgehash_haskey(edges, vert1, vert2)) {
@@ -794,6 +807,7 @@ ModifierTypeInfo modifierType_Array = {
 
 	/* copyData */          copyData,
 	/* deformVerts */       0,
+	/* deformMatrices */    0,
 	/* deformVertsEM */     0,
 	/* deformMatricesEM */  0,
 	/* applyModifier */     applyModifier,

@@ -32,7 +32,9 @@
 
 #include "DNA_object_types.h"
 
-#include "BKE_utildefines.h"
+#include "BLI_utildefines.h"
+
+
 #include "BKE_cdderivedmesh.h"
 #include "BKE_modifier.h"
 
@@ -137,6 +139,7 @@ ModifierTypeInfo modifierType_Boolean = {
 
 	/* copyData */          copyData,
 	/* deformVerts */       0,
+	/* deformMatrices */    0,
 	/* deformVertsEM */     0,
 	/* deformMatricesEM */  0,
 	/* applyModifier */     applyModifier,

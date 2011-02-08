@@ -41,7 +41,7 @@
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
 #include "BLI_storage_types.h"
-
+#include "BLI_utildefines.h"
 
 #include "DNA_scene_types.h"
 #include "DNA_userdef_types.h"
@@ -71,7 +71,7 @@
 
 static void error(const char *UNUSED(dummy)) {}
 static void waitcursor(int UNUSED(val)) {}
-static void activate_fileselect(int UNUSED(d1), char *UNUSED(d2), char *UNUSED(d3), void *UNUSED(d4)) {}
+static void activate_fileselect(int UNUSED(d1), const char *UNUSED(d2), const char *UNUSED(d3), void *UNUSED(d4)) {}
 static int pupmenu(const char *UNUSED(dummy)) {return 0;}
 static int okee(const char *UNUSED(dummy)) {return 0;}
 
@@ -603,7 +603,7 @@ void change_sequence(Scene *scene)
 
 }
 
-int seq_effect_find_selected(Scene *scene, Sequence *activeseq, int type, Sequence **selseq1, Sequence **selseq2, Sequence **selseq3, char **error_str)
+int seq_effect_find_selected(Scene *scene, Sequence *activeseq, int type, Sequence **selseq1, Sequence **selseq2, Sequence **selseq3, const char **error_str)
 {
 	Editing *ed = seq_give_editing(scene, FALSE);
 	Sequence *seq1= 0, *seq2= 0, *seq3= 0, *seq;
@@ -923,12 +923,12 @@ static int cut_seq_list(Scene *scene, ListBase *old, ListBase *new, int cutframe
 			Sequence * (*cut_seq)(Scene *, Sequence *, int))
 {
 	int did_something = FALSE;
-	Sequence *seq, *seq_next;
+	Sequence *seq, *seq_next_iter;
 	
 	seq= old->first;
 	
 	while(seq) {
-		seq_next = seq->next; /* we need this because we may remove seq */
+		seq_next_iter = seq->next; /* we need this because we may remove seq */
 		
 		seq->tmp= NULL;
 		if(seq->flag & SELECT) {
@@ -947,7 +947,7 @@ static int cut_seq_list(Scene *scene, ListBase *old, ListBase *new, int cutframe
 				BLI_addtail(new, seq);
 			}
 		}
-		seq = seq_next;
+		seq = seq_next_iter;
 	}
 	return did_something;
 }
@@ -1441,7 +1441,7 @@ static int sequencer_reassign_inputs_exec(bContext *C, wmOperator *op)
 {
 	Scene *scene= CTX_data_scene(C);
 	Sequence *seq1, *seq2, *seq3, *last_seq = seq_active_get(scene);
-	char *error_msg;
+	const char *error_msg;
 
 	if(!seq_effect_find_selected(scene, last_seq, last_seq->type, &seq1, &seq2, &seq3, &error_msg)) {
 		BKE_report(op->reports, RPT_ERROR, error_msg);
@@ -1564,7 +1564,7 @@ static int sequencer_cut_exec(bContext *C, wmOperator *op)
 	
 	if (newlist.first) { /* got new strips ? */
 		Sequence *seq;
-		addlisttolist(ed->seqbasep, &newlist);
+		BLI_movelisttolist(ed->seqbasep, &newlist);
 
 		if (cut_side != SEQ_SIDE_BOTH) {
 			SEQP_BEGIN(ed, seq) {
@@ -1658,7 +1658,7 @@ static int sequencer_add_duplicate_exec(bContext *C, wmOperator *UNUSED(op))
 	if(nseqbase.first) {
 		Sequence * seq= nseqbase.first;
 		/* rely on the nseqbase list being added at the end */
-		addlisttolist(ed->seqbasep, &nseqbase);
+		BLI_movelisttolist(ed->seqbasep, &nseqbase);
 
 		for( ; seq; seq= seq->next)
 			seq_recursive_apply(seq, apply_unique_name_cb, scene);
@@ -1781,7 +1781,7 @@ static int sequencer_separate_images_exec(bContext *C, wmOperator *op)
 	Scene *scene= CTX_data_scene(C);
 	Editing *ed= seq_give_editing(scene, FALSE);
 	
-	Sequence *seq, *seq_new, *seq_next;
+	Sequence *seq, *seq_new;
 	Strip *strip_new;
 	StripElem *se, *se_new;
 	int start_ofs, cfra, frame_end;
@@ -1793,7 +1793,6 @@ static int sequencer_separate_images_exec(bContext *C, wmOperator *op)
 		if((seq->flag & SELECT) && (seq->type == SEQ_IMAGE) && (seq->len > 1)) {
 			/* remove seq so overlap tests dont conflict,
 			see seq_free_sequence below for the real free'ing */
-			seq_next = seq->next;
 			BLI_remlink(ed->seqbasep, seq);
 			/* if(seq->ipo) seq->ipo->id.us--; */
 			/* XXX, remove fcurve and assign to split image strips */
@@ -1818,7 +1817,7 @@ static int sequencer_separate_images_exec(bContext *C, wmOperator *op)
 
 				/* new stripdata */
 				strip_new->stripdata= se_new= MEM_callocN(sizeof(StripElem)*1, "stripelem");
-				strncpy(se_new->name, se->name, FILE_MAXFILE-1);
+				BLI_strncpy(se_new->name, se->name, sizeof(se_new->name));
 				calc_sequence(scene, seq_new);
 
 				if(step > 1) {
@@ -2029,7 +2028,7 @@ static int sequencer_meta_separate_exec(bContext *C, wmOperator *UNUSED(op))
 	if(last_seq==NULL || last_seq->type!=SEQ_META)
 		return OPERATOR_CANCELLED;
 
-	addlisttolist(ed->seqbasep, &last_seq->seqbase);
+	BLI_movelisttolist(ed->seqbasep, &last_seq->seqbase);
 
 	last_seq->seqbase.first= 0;
 	last_seq->seqbase.last= 0;
@@ -2203,6 +2202,7 @@ void SEQUENCER_OT_view_zoom_ratio(wmOperatorType *ot)
 	/* identifiers */
 	ot->name= "Sequencer View Zoom Ratio";
 	ot->idname= "SEQUENCER_OT_view_zoom_ratio";
+	ot->description = "Change zoom ratio of sequencer preview";
 
 	/* api callbacks */
 	ot->exec= sequencer_view_zoom_ratio_exec;
@@ -2701,7 +2701,7 @@ static int sequencer_paste_exec(bContext *C, wmOperator *UNUSED(op))
 		}
 	}
 
-	addlisttolist(ed->seqbasep, &nseqbase);
+	BLI_movelisttolist(ed->seqbasep, &nseqbase);
 
 	WM_event_add_notifier(C, NC_SCENE|ND_SEQUENCER, scene);
 

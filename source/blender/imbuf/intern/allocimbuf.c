@@ -277,7 +277,8 @@ short imb_addrectfloatImBuf(ImBuf *ibuf)
 	
 	if(ibuf==NULL) return FALSE;
 	
-	imb_freerectfloatImBuf(ibuf);
+	if(ibuf->rect_float)
+		imb_freerectfloatImBuf(ibuf); /* frees mipmap too, hrm */
 	
 	size = ibuf->x *ibuf->y;
 	size = size *4 *sizeof(float);
@@ -443,7 +444,7 @@ static void imbuf_cache_destructor(void *data)
 	ibuf->c_handle = 0;
 }
 
-static MEM_CacheLimiterC **get_imbuf_cache_limiter()
+static MEM_CacheLimiterC **get_imbuf_cache_limiter(void)
 {
 	static MEM_CacheLimiterC *c = 0;
 

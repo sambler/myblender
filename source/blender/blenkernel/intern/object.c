@@ -57,12 +57,11 @@
 #include "BLI_editVert.h"
 #include "BLI_math.h"
 #include "BLI_pbvh.h"
-
-#include "BKE_utildefines.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_main.h"
 #include "BKE_global.h"
-
+#include "BKE_idprop.h"
 #include "BKE_armature.h"
 #include "BKE_action.h"
 #include "BKE_bullet.h"
@@ -245,6 +244,13 @@ void free_sculptsession(Object *ob)
 		if(ss->layer_co)
 			MEM_freeN(ss->layer_co);
 
+		if(ss->orig_cos)
+			MEM_freeN(ss->orig_cos);
+		if(ss->deform_cos)
+			MEM_freeN(ss->deform_cos);
+		if(ss->deform_imats)
+			MEM_freeN(ss->deform_imats);
+
 		MEM_freeN(ss);
 
 		ob->sculpt = NULL;
@@ -316,7 +322,7 @@ static void unlink_object__unlinkModifierLinks(void *userData, Object *ob, Objec
 
 	if (*obpoin==unlinkOb) {
 		*obpoin = NULL;
-		ob->recalc |= OB_RECALC_ALL; // XXX: should this just be OB_RECALC_DATA?
+		ob->recalc |= OB_RECALC_OB|OB_RECALC_DATA|OB_RECALC_TIME; // XXX: should this just be OB_RECALC_DATA?
 	}
 }
 
@@ -357,7 +363,7 @@ void unlink_object(Object *ob)
 		
 		if(obt->parent==ob) {
 			obt->parent= NULL;
-			obt->recalc |= OB_RECALC_ALL;
+			obt->recalc |= OB_RECALC_OB|OB_RECALC_DATA|OB_RECALC_TIME;
 		}
 		
 		modifiers_foreachObjectLink(obt, unlink_object__unlinkModifierLinks, ob);
@@ -367,15 +373,15 @@ void unlink_object(Object *ob)
 
 			if(cu->bevobj==ob) {
 				cu->bevobj= NULL;
-				obt->recalc |= OB_RECALC_ALL;
+				obt->recalc |= OB_RECALC_OB|OB_RECALC_DATA|OB_RECALC_TIME;
 			}
 			if(cu->taperobj==ob) {
 				cu->taperobj= NULL;
-				obt->recalc |= OB_RECALC_ALL;
+				obt->recalc |= OB_RECALC_OB|OB_RECALC_DATA|OB_RECALC_TIME;
 			}
 			if(cu->textoncurve==ob) {
 				cu->textoncurve= NULL;
-				obt->recalc |= OB_RECALC_ALL;
+				obt->recalc |= OB_RECALC_OB|OB_RECALC_DATA|OB_RECALC_TIME;
 			}
 		}
 		else if(obt->type==OB_ARMATURE && obt->pose) {
@@ -969,7 +975,7 @@ static void *add_obdata_from_type(int type)
 	}
 }
 
-static char *get_obdata_defname(int type)
+static const char *get_obdata_defname(int type)
 {
 	switch (type) {
 	case OB_MESH: return "Mesh";
@@ -1007,10 +1013,13 @@ Object *add_only_object(int type, const char *name)
 	 * but rotations default to quaternions 
 	 */
 	ob->rotmode= ROT_MODE_EUL;
-	/* axis-angle must not have a 0,0,0 axis, so set y-axis as default... */
-	ob->rotAxis[1]= ob->drotAxis[1]= 1.0f;
-	/* quaternions should be 1,0,0,0 by default.... */
-	ob->quat[0]= ob->dquat[0]= 1.0f;
+
+	unit_axis_angle(ob->rotAxis, &ob->rotAngle);
+	unit_axis_angle(ob->drotAxis, &ob->drotAngle);
+
+	unit_qt(ob->quat);
+	unit_qt(ob->dquat);
+
 	/* rotation locks should be 4D for 4 component rotations by default... */
 	ob->protectflag = OB_LOCK_ROT4D;
 	
@@ -1018,7 +1027,7 @@ Object *add_only_object(int type, const char *name)
 	unit_m4(ob->parentinv);
 	unit_m4(ob->obmat);
 	ob->dt= OB_TEXTURE;
-	ob->empty_drawtype= OB_ARROWS;
+	ob->empty_drawtype= OB_PLAINAXES;
 	ob->empty_drawsize= 1.0;
 
 	if(type==OB_CAMERA || type==OB_LAMP) {
@@ -1078,7 +1087,7 @@ Object *add_object(struct Scene *scene, int type)
 	
 	base= scene_add_base(scene, ob);
 	scene_select_base(scene, base);
-	ob->recalc |= OB_RECALC_ALL;
+	ob->recalc |= OB_RECALC_OB|OB_RECALC_DATA|OB_RECALC_TIME;
 
 	return ob;
 }
@@ -1322,8 +1331,8 @@ Object *copy_object(Object *ob)
 
 	/* increase user numbers */
 	id_us_plus((ID *)obn->data);
+	id_us_plus((ID *)obn->gpd);
 	id_lib_extern((ID *)obn->dup_group);
-	
 
 	for(a=0; a<obn->totcol; a++) id_us_plus((ID *)obn->mat[a]);
 	
@@ -1538,7 +1547,7 @@ void object_make_proxy(Object *ob, Object *target, Object *gob)
 	ob->proxy_group= gob;
 	id_lib_extern(&target->id);
 	
-	ob->recalc= target->recalc= OB_RECALC_ALL;
+	ob->recalc= target->recalc= OB_RECALC_OB|OB_RECALC_DATA|OB_RECALC_TIME;
 	
 	/* copy transform
 	 * - gob means this proxy comes from a group, just apply the matrix
@@ -1597,7 +1606,17 @@ void object_make_proxy(Object *ob, Object *target, Object *gob)
 		
 		armature_set_id_extern(ob);
 	}
-	
+
+	/* copy IDProperties */
+	if(ob->id.properties) {
+		IDP_FreeProperty(ob->id.properties);
+		MEM_freeN(ob->id.properties);
+		ob->id.properties= NULL;
+	}
+	if(target->id.properties) {
+		ob->id.properties= IDP_CopyProperty(target->id.properties);
+	}
+
 	/* copy drawtype info */
 	ob->dt= target->dt;
 }
@@ -1668,9 +1687,13 @@ void object_rot_to_mat3(Object *ob, float mat[][3])
 	}
 	else {
 		/* quats are normalised before use to eliminate scaling issues */
-		normalize_qt(ob->quat);
-		quat_to_mat3( rmat,ob->quat);
-		quat_to_mat3( dmat,ob->dquat);
+		float tquat[4];
+
+		normalize_qt_qt(tquat, ob->quat);
+		quat_to_mat3(rmat, tquat);
+
+		normalize_qt_qt(tquat, ob->dquat);
+		quat_to_mat3(dmat, tquat);
 	}
 	
 	/* combine these rotations */
@@ -1681,8 +1704,13 @@ void object_mat3_to_rot(Object *ob, float mat[][3], short use_compat)
 {
 	switch(ob->rotmode) {
 	case ROT_MODE_QUAT:
-		mat3_to_quat(ob->quat, mat);
-		sub_v4_v4(ob->quat, ob->dquat);
+		{
+			float dquat[4];
+			mat3_to_quat(ob->quat, mat);
+			normalize_qt_qt(dquat, ob->dquat);
+			invert_qt(dquat);
+			mul_qt_qtqt(ob->quat, dquat, ob->quat);
+		}
 		break;
 	case ROT_MODE_AXISANGLE:
 		mat3_to_axis_angle(ob->rotAxis, &ob->rotAngle, mat);
@@ -1818,8 +1846,8 @@ static void ob_parcurve(Scene *scene, Object *ob, Object *par, float mat[][4])
 #else
 			quat_apply_track(quat, ob->trackflag, ob->upflag);
 #endif
-
-			quat_to_mat4(mat,quat);			
+			normalize_qt(quat);
+			quat_to_mat4(mat, quat);
 		}
 		
 		if(cu->flag & CU_PATH_RADIUS) {
@@ -2063,7 +2091,7 @@ void where_is_object_time(Scene *scene, Object *ob, float ctime)
 	}
 
 	/* solve constraints */
-	if (ob->constraints.first && !(ob->flag & OB_NO_CONSTRAINTS)) {
+	if (ob->constraints.first && !(ob->transflag & OB_NO_CONSTRAINTS)) {
 		bConstraintOb *cob;
 		
 		cob= constraints_make_evalob(scene, ob, NULL, CONSTRAINT_OBTYPE_OBJECT);
@@ -2545,13 +2573,24 @@ void object_handle_update(Scene *scene, Object *ob)
 			switch(ob->type) {
 			case OB_MESH:
 				{
+#if 0				// XXX, comment for 2.56a release, background wont set 'scene->customdata_mask'
 					EditMesh *em = (ob == scene->obedit)? BKE_mesh_get_editmesh(ob->data): NULL;
-						// here was vieweditdatamask? XXX
+					BLI_assert((scene->customdata_mask & CD_MASK_BAREMESH) == CD_MASK_BAREMESH);
 					if(em) {
-						makeDerivedMesh(scene, ob, em, CD_MASK_BAREMESH);
+						makeDerivedMesh(scene, ob, em,  scene->customdata_mask); /* was CD_MASK_BAREMESH */
 						BKE_mesh_end_editmesh(ob->data, em);
 					} else
-						makeDerivedMesh(scene, ob, NULL, CD_MASK_BAREMESH);
+						makeDerivedMesh(scene, ob, NULL, scene->customdata_mask);
+
+#else				/* ensure CD_MASK_BAREMESH for now */
+					EditMesh *em = (ob == scene->obedit)? BKE_mesh_get_editmesh(ob->data): NULL;
+					if(em) {
+						makeDerivedMesh(scene, ob, em,  scene->customdata_mask | CD_MASK_BAREMESH); /* was CD_MASK_BAREMESH */
+						BKE_mesh_end_editmesh(ob->data, em);
+					} else
+						makeDerivedMesh(scene, ob, NULL, scene->customdata_mask | CD_MASK_BAREMESH);
+#endif
+
 				}
 				break;
 

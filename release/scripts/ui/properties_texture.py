@@ -99,7 +99,10 @@ class TEXTURE_PT_context_texture(TextureButtonsPanel, bpy.types.Panel):
         if not isinstance(pin_id, bpy.types.Material):
             pin_id = None
 
-        tex_collection = (pin_id is None) and (node is None) and (not isinstance(idblock, bpy.types.Brush))
+        if not space.use_pin_id:
+            layout.prop(space, "texture_context", expand=True)
+
+        tex_collection = (not space.use_pin_id) and (node is None) and (not isinstance(idblock, bpy.types.Brush))
 
         if tex_collection:
             row = layout.row()
@@ -125,9 +128,6 @@ class TEXTURE_PT_context_texture(TextureButtonsPanel, bpy.types.Panel):
             col.template_ID(space, "pin_id")
 
         col = split.column()
-
-        if not space.pin_id:
-            col.prop(space, "show_brush_texture", text="Brush", toggle=True)
 
         if tex:
             split = layout.split(percentage=0.2)

@@ -74,5 +74,6 @@ void register_node_type_tex_proc_musgrave(ListBase *lb);
 void register_node_type_tex_proc_noise(ListBase *lb);
 void register_node_type_tex_proc_stucci(ListBase *lb);
 void register_node_type_tex_proc_distnoise(ListBase *lb);
+void register_node_type_tex_proc_planet(ListBase *lb);
 
 #endif

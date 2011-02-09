@@ -328,4 +328,4 @@ TexDef(TEX_MUSGRAVE,  CV, musgrave,  "Musgrave" );
 TexDef(TEX_NOISE,     C,  noise,     "Noise"    );
 TexDef(TEX_STUCCI,    CV, stucci,    "Stucci"   );
 TexDef(TEX_DISTNOISE, CV, distnoise, "Distorted Noise" );
-TexDef(TEX_PLANET, CV, planet, "Planet" );
+TexDef(TEX_PLANET,    CV, planet, "Planet" );

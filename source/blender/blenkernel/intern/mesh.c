@@ -444,7 +444,7 @@ int test_index_face(MFace *mface, CustomData *fdata, int mfindex, int nr)
 		mface->v4= 0;
 		nr--;
 	}
-	if(mface->v2 && mface->v2==mface->v3) {
+	if((mface->v2 || mface->v4) && mface->v2==mface->v3) {
 		mface->v3= mface->v4;
 		mface->v4= 0;
 		nr--;
@@ -454,6 +454,32 @@ int test_index_face(MFace *mface, CustomData *fdata, int mfindex, int nr)
 		mface->v3= mface->v4;
 		mface->v4= 0;
 		nr--;
+	}
+
+	/* check corrupt cases, bowtie geometry, cant handle these because edge data wont exist so just return 0 */
+	if(nr==3) {
+		if(
+		/* real edges */
+			mface->v1==mface->v2 ||
+			mface->v2==mface->v3 ||
+			mface->v3==mface->v1
+		) {
+			return 0;
+		}
+	}
+	else if(nr==4) {
+		if(
+		/* real edges */
+			mface->v1==mface->v2 ||
+			mface->v2==mface->v3 ||
+			mface->v3==mface->v4 ||
+			mface->v4==mface->v1 ||
+		/* across the face */
+			mface->v1==mface->v3 ||
+			mface->v2==mface->v4
+		) {
+			return 0;
+		}
 	}
 
 	/* prevent a zero at wrong index location */

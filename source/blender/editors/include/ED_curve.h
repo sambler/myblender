@@ -63,9 +63,9 @@ void	free_curve_editNurb	(struct Curve *cu);
 
 int 	mouse_nurb		(struct bContext *C, short mval[2], int extend);
 
-struct Nurb *add_nurbs_primitive(struct bContext *C, float mat[4][4], int type, int newname);
+struct Nurb *add_nurbs_primitive(struct bContext *C, float mat[4][4], int type, int newob);
 
-int		isNurbsel		(struct Nurb *nu);;
+int		isNurbsel		(struct Nurb *nu);
 
 int		join_curve_exec	(struct bContext *C, struct wmOperator *op);
 
@@ -82,6 +82,11 @@ ListBase *ED_curve_editnurbs(struct Curve *cu);
 
 void ED_curve_beztcpy(struct EditNurb *editnurb, struct BezTriple *dst, struct BezTriple *src, int count);
 void ED_curve_bpcpy(struct EditNurb *editnurb, struct BPoint *dst, struct BPoint *src, int count);
+
+int ED_curve_updateAnimPaths(struct Object *obedit);
+
+/* debug only */
+void printknots(struct Object *obedit);
 
 #endif /* ED_CURVE_H */
 

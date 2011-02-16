@@ -115,7 +115,7 @@ int ED_do_pose_selectbuffer(struct Scene *scene, struct Base *base, unsigned int
 int mouse_armature(struct bContext *C, short mval[2], int extend);
 int join_armature_exec(struct bContext *C, struct wmOperator *op);
 struct Bone *get_indexed_bone (struct Object *ob, int index);
-float ED_rollBoneToVector(EditBone *bone, float new_up_axis[3]);
+float ED_rollBoneToVector(EditBone *bone, const float new_up_axis[3], const short axis_only);
 EditBone *ED_armature_bone_get_mirrored(struct ListBase *edbo, EditBone *ebo); // XXX this is needed for populating the context iterators
 void ED_armature_sync_selection(struct ListBase *edbo);
 void ED_armature_validate_active(struct bArmature *arm);
@@ -166,7 +166,7 @@ int   BIF_currentTemplate(const struct bContext *C);
 void  BIF_freeTemplates(struct bContext *C);
 void  BIF_setTemplate(struct bContext *C, int index);
 int   BIF_nbJointsTemplate(const struct bContext *C);
-char * BIF_nameBoneTemplate(const struct bContext *C);
+const char * BIF_nameBoneTemplate(const struct bContext *C);
 
 void BDR_drawSketch(const struct bContext *vc);
 int BDR_drawSketchNames(struct ViewContext *vc);

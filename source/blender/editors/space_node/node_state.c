@@ -31,10 +31,11 @@
 #include "DNA_node_types.h"
 #include "DNA_scene_types.h"
 
+#include "BLI_rect.h"
+#include "BLI_utildefines.h"
+
 #include "BKE_context.h"
 #include "BKE_node.h"
-
-#include "BLI_rect.h"
 
 #include "ED_screen.h"
 
@@ -295,6 +296,7 @@ void NODE_OT_view_all(wmOperatorType *ot)
 	/* identifiers */
 	ot->name= "View All";
 	ot->idname= "NODE_OT_view_all";
+	ot->description= "Resize view so you can see all nodes";
 	
 	/* api callbacks */
 	ot->exec= node_view_all_exec;

@@ -21,8 +21,7 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
- 
- #include <string.h>
+#include <string.h>
 #include <stdio.h>
 
 #ifdef WIN32
@@ -33,15 +32,16 @@
 
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_context.h"
 #include "BKE_screen.h"
 #include "BKE_idcode.h"
 
+#include "ED_space_api.h"
 #include "ED_screen.h"
 
 #include "BIF_gl.h"
-
 
 #include "RNA_access.h"
 
@@ -52,14 +52,6 @@
 #include "UI_view2d.h"
 
 #include "console_intern.h"	// own include
-
-static void console_textview_update_rect(const bContext *C, ARegion *ar)
-{
-	SpaceConsole *sc= CTX_wm_space_console(C);
-	View2D *v2d= &ar->v2d;
-
-	UI_view2d_totRect_set(v2d, ar->winx-1, console_textview_height(sc, ar, CTX_wm_reports(C)));
-}
 
 /* ******************** default callbacks for console space ***************** */
 
@@ -208,7 +200,7 @@ static void console_main_area_draw(const bContext *C, ARegion *ar)
 	SpaceConsole *sc= CTX_wm_space_console(C);
 	View2D *v2d= &ar->v2d;
 	View2DScrollers *scrollers;
-	
+
 	if(sc->scrollback.first==NULL)
 		WM_operator_name_call((bContext *)C, "CONSOLE_OT_banner", WM_OP_EXEC_DEFAULT, NULL);
 
@@ -216,15 +208,13 @@ static void console_main_area_draw(const bContext *C, ARegion *ar)
 	UI_ThemeClearColor(TH_BACK);
 	glClear(GL_COLOR_BUFFER_BIT);
 
-	console_textview_update_rect(C, ar);
-
 	/* worlks best with no view2d matrix set */
 	UI_view2d_view_ortho(v2d);
 
 	/* data... */
 
 	console_history_verify(C); /* make sure we have some command line */
-	console_textview_main(sc, ar, CTX_wm_reports(C));
+	console_textview_main(sc, ar);
 	
 	/* reset view matrix */
 	UI_view2d_view_restore(C);
@@ -235,7 +225,7 @@ static void console_main_area_draw(const bContext *C, ARegion *ar)
 	UI_view2d_scrollers_free(scrollers);
 }
 
-void console_operatortypes(void)
+static void console_operatortypes(void)
 {
 	/* console_ops.c */
 	WM_operatortype_append(CONSOLE_OT_move);
@@ -253,7 +243,7 @@ void console_operatortypes(void)
 	WM_operatortype_append(CONSOLE_OT_select_set);
 }
 
-void console_keymap(struct wmKeyConfig *keyconf)
+static void console_keymap(struct wmKeyConfig *keyconf)
 {
 	wmKeyMap *keymap= WM_keymap_find(keyconf, "Console", SPACE_CONSOLE, 0);
 	wmKeyMapItem *kmi;

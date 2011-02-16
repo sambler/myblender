@@ -38,6 +38,7 @@
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
 #include "BLI_dynstr.h"
+#include "BLI_utildefines.h"
 
 #include "DNA_anim_types.h"
 #include "DNA_armature_types.h"
@@ -49,6 +50,7 @@
 
 #include "BKE_animsys.h"
 #include "BKE_action.h"
+#include "BKE_armature.h"
 #include "BKE_constraint.h"
 #include "BKE_depsgraph.h"
 #include "BKE_fcurve.h"
@@ -72,6 +74,7 @@
 
 #include "RNA_access.h"
 #include "RNA_define.h"
+#include "RNA_enum_types.h"
 
 #include "anim_intern.h"
 
@@ -86,15 +89,15 @@ short ANIM_get_keyframing_flags (Scene *scene, short incl_mode)
 	/* standard flags */
 	{
 		/* visual keying */
-		if (IS_AUTOKEY_FLAG(AUTOMATKEY)) 
+		if (IS_AUTOKEY_FLAG(scene, AUTOMATKEY)) 
 			flag |= INSERTKEY_MATRIX;
 		
 		/* only needed */
-		if (IS_AUTOKEY_FLAG(INSERTNEEDED)) 
+		if (IS_AUTOKEY_FLAG(scene, INSERTNEEDED)) 
 			flag |= INSERTKEY_NEEDED;
 		
-		/* default F-Curve color mode - RGB from XYZ indicies */
-		if (IS_AUTOKEY_FLAG(XYZ2RGB)) 
+		/* default F-Curve color mode - RGB from XYZ indices */
+		if (IS_AUTOKEY_FLAG(scene, XYZ2RGB)) 
 			flag |= INSERTKEY_XYZ2RGB;
 	}
 		
@@ -230,6 +233,10 @@ int insert_bezt_fcurve (FCurve *fcu, BezTriple *bezt, short flag)
 				dst->vec[1][1] += dy;
 				dst->vec[2][1] += dy;
 				
+				dst->f1= bezt->f1;
+				dst->f2= bezt->f2;
+				dst->f3= bezt->f3;
+				
 				// TODO: perform some other operations?
 			}
 		}
@@ -287,13 +294,12 @@ int insert_bezt_fcurve (FCurve *fcu, BezTriple *bezt, short flag)
  */
 int insert_vert_fcurve (FCurve *fcu, float x, float y, short flag)
 {
-	BezTriple beztr;
+	BezTriple beztr= {{{0}}};
 	int a;
 	
 	/* set all three points, for nicer start position 
 	 * NOTE: +/- 1 on vec.x for left and right handles is so that 'free' handles work ok...
 	 */
-	memset(&beztr, 0, sizeof(BezTriple));
 	beztr.vec[0][0]= x-1.0f; 
 	beztr.vec[0][1]= y;
 	beztr.vec[1][0]= x;
@@ -343,7 +349,7 @@ int insert_vert_fcurve (FCurve *fcu, float x, float y, short flag)
 
 /* -------------- 'Smarter' Keyframing Functions -------------------- */
 /* return codes for new_key_needed */
-enum {
+static enum {
 	KEYNEEDED_DONTADD = 0,
 	KEYNEEDED_JUSTADD,
 	KEYNEEDED_DELPREV,
@@ -569,6 +575,7 @@ static short visualkey_can_use (PointerRNA *ptr, PropertyRNA *prop)
 				case CONSTRAINT_TYPE_CHILDOF:
 					return 1;
 				case CONSTRAINT_TYPE_TRANSFORM:
+				case CONSTRAINT_TYPE_TRANSLIKE:
 					return 1;
 				case CONSTRAINT_TYPE_FOLLOWPATH:
 					return 1;
@@ -636,51 +643,48 @@ static float visualkey_get_value (PointerRNA *ptr, PropertyRNA *prop, int array_
 			if (strstr(identifier, "location")) {
 				return ob->obmat[3][array_index];
 			}
-			else if (strstr(identifier, "rotation")) {
+			else if (strstr(identifier, "rotation_euler")) {
 				float eul[3];
 				
-				mat4_to_eul( eul,ob->obmat);
+				mat4_to_eulO(eul, ob->rotmode, ob->obmat);
 				return eul[array_index];
 			}
+			// FIXME: other types of rotation don't work
 		}
 	}
 	else if (ptr->type == &RNA_PoseBone) {
-		Object *ob= (Object *)ptr->id.data; /* we assume that this is always set, and is an object */
 		bPoseChannel *pchan= (bPoseChannel *)ptr->data;
-		float tmat[4][4];
+		bPoseChannel tchan;
 		
-		/* Although it is not strictly required for this particular space conversion, 
-		 * arg1 must not be null, as there is a null check for the other conversions to
-		 * be safe. Therefore, the active object is passed here, and in many cases, this
-		 * will be what owns the pose-channel that is getting this anyway.
+		/* make a copy of pchan so that we can apply and decompose its chan_mat, thus getting the 
+		 * rest-pose to pose-mode transform that got stored there at the end of posing calculations
+		 * for B-Bone deforms to use
+		 *	- it should be safe to just make a local copy like this, since we're not doing anything with the copied pointers
 		 */
-		copy_m4_m4(tmat, pchan->pose_mat);
-		constraint_mat_convertspace(ob, pchan, tmat, CONSTRAINT_SPACE_POSE, CONSTRAINT_SPACE_LOCAL);
+		memcpy(&tchan, pchan, sizeof(bPoseChannel));
+		pchan_apply_mat4(&tchan, pchan->chan_mat, TRUE);
 		
 		/* Loc, Rot/Quat keyframes are supported... */
 		if (strstr(identifier, "location")) {
 			/* only use for non-connected bones */
 			if ((pchan->bone->parent) && !(pchan->bone->flag & BONE_CONNECTED))
-				return tmat[3][array_index];
+				return tchan.loc[array_index];
 			else if (pchan->bone->parent == NULL)
-				return tmat[3][array_index];
+				return tchan.loc[array_index];
 		}
 		else if (strstr(identifier, "rotation_euler")) {
-			float eul[3];
-			
-			/* euler-rotation test before standard rotation, as standard rotation does quats */
-			mat4_to_eulO( eul, pchan->rotmode,tmat);
-			return eul[array_index];
+			return tchan.eul[array_index];
 		}
 		else if (strstr(identifier, "rotation_quaternion")) {
-			float trimat[3][3], quat[4];
-			
-			copy_m3_m4(trimat, tmat);
-			mat3_to_quat_is_ok( quat,trimat);
-			
-			return quat[array_index];
+			return tchan.quat[array_index];
 		}
-		// TODO: axis-angle...
+		else if (strstr(identifier, "rotation_axisangle")) {
+			/* w = 0, x,y,z = 1,2,3 */
+			if (array_index == 0)
+				return tchan.rotAngle;
+			else
+				return tchan.rotAxis[array_index - 1];
+		}
 	}
 	
 	/* as the function hasn't returned yet, read value from system in the default way */
@@ -725,7 +729,7 @@ short insert_keyframe_direct (ReportList *reports, PointerRNA ptr, PropertyRNA *
 		/* try to get property we should be affecting */
 		if ((RNA_path_resolve(&ptr, fcu->rna_path, &tmp_ptr, &prop) == 0) || (prop == NULL)) {
 			/* property not found... */
-			char *idname= (ptr.id.data) ? ((ID *)ptr.id.data)->name : "<No ID-Pointer>";
+			const char *idname= (ptr.id.data) ? ((ID *)ptr.id.data)->name : "<No ID-Pointer>";
 			
 			BKE_reportf(reports, RPT_ERROR,
 				"Could not insert keyframe, as RNA Path is invalid for the given ID (ID = %s, Path = %s)", 
@@ -1030,7 +1034,7 @@ short delete_keyframe (ReportList *reports, ID *id, bAction *act, const char gro
 /* KEYFRAME MODIFICATION */
 
 /* mode for commonkey_modifykey */
-enum {
+static enum {
 	COMMONKEY_MODE_INSERT = 0,
 	COMMONKEY_MODE_DELETE,
 } eCommonModifyKey_Modes;
@@ -1070,7 +1074,7 @@ static int insert_key_exec (bContext *C, wmOperator *op)
 	Main *bmain= CTX_data_main(C);
 	Scene *scene= CTX_data_scene(C);
 	KeyingSet *ks= NULL;
-	int type= RNA_int_get(op->ptr, "type");
+	int type= RNA_enum_get(op->ptr, "type");
 	float cfra= (float)CFRA; // XXX for now, don't bother about all the yucky offset crap
 	short success;
 	
@@ -1135,11 +1139,12 @@ void ANIM_OT_keyframe_insert (wmOperatorType *ot)
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 	
-	/* keyingset to use
-	 *	- here the type is int not enum, since many of the indicies here are determined dynamically
-	 */
-	prop= RNA_def_int(ot->srna, "type", 0, INT_MIN, INT_MAX, "Keying Set Number", "Index (determined internally) of the Keying Set to use", 0, 1);
+	/* keyingset to use (dynamic enum) */
+	prop= RNA_def_enum(ot->srna, "type", DummyRNA_DEFAULT_items, 0, "Keying Set", "The Keying Set to use");
+	RNA_def_enum_funcs(prop, ANIM_keying_sets_enum_itemf);
 	RNA_def_property_flag(prop, PROP_HIDDEN);
+	ot->prop= prop;
+	
 	/* confirm whether a keyframe was added by showing a popup 
 	 *	- by default, this is enabled, since this operator is assumed to be called independently
 	 */
@@ -1164,7 +1169,7 @@ static int insert_key_menu_invoke (bContext *C, wmOperator *op, wmEvent *UNUSED(
 	}
 	else {
 		/* just call the exec() on the active keyingset */
-		RNA_int_set(op->ptr, "type", 0);
+		RNA_enum_set(op->ptr, "type", 0);
 		RNA_boolean_set(op->ptr, "confirm_success", 1);
 		
 		return op->type->exec(C, op);
@@ -1178,6 +1183,7 @@ void ANIM_OT_keyframe_insert_menu (wmOperatorType *ot)
 	/* identifiers */
 	ot->name= "Insert Keyframe Menu";
 	ot->idname= "ANIM_OT_keyframe_insert_menu";
+	ot->description= "Insert Keyframes for specified Keying Set, with menu of available Keying Sets if undefined";
 	
 	/* callbacks */
 	ot->invoke= insert_key_menu_invoke;
@@ -1187,17 +1193,19 @@ void ANIM_OT_keyframe_insert_menu (wmOperatorType *ot)
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 	
-	/* keyingset to use
-	 *	- here the type is int not enum, since many of the indicies here are determined dynamically
-	 */
-	prop= RNA_def_int(ot->srna, "type", 0, INT_MIN, INT_MAX, "Keying Set Number", "Index (determined internally) of the Keying Set to use", 0, 1);
+	/* keyingset to use (dynamic enum) */
+	prop= RNA_def_enum(ot->srna, "type", DummyRNA_DEFAULT_items, 0, "Keying Set", "The Keying Set to use");
+	RNA_def_enum_funcs(prop, ANIM_keying_sets_enum_itemf);
 	RNA_def_property_flag(prop, PROP_HIDDEN);
+	ot->prop= prop;
+	
 	/* confirm whether a keyframe was added by showing a popup 
 	 *	- by default, this is disabled so that if a menu is shown, this doesn't come up too
 	 */
 	// XXX should this just be always on?
 	prop= RNA_def_boolean(ot->srna, "confirm_success", 0, "Confirm Successful Insert", "Show a popup when the keyframes get successfully added");
 	RNA_def_property_flag(prop, PROP_HIDDEN);
+	
 	/* whether the menu should always be shown 
 	 *	- by default, the menu should only be shown when there is no active Keying Set (2.5 behaviour),
 	 *	  although in some cases it might be useful to always shown (pre 2.5 behaviour)
@@ -1213,7 +1221,7 @@ static int delete_key_exec (bContext *C, wmOperator *op)
 	Main *bmain= CTX_data_main(C);
 	Scene *scene= CTX_data_scene(C);
 	KeyingSet *ks= NULL;	
-	int type= RNA_int_get(op->ptr, "type");
+	int type= RNA_enum_get(op->ptr, "type");
 	float cfra= (float)CFRA; // XXX for now, don't bother about all the yucky offset crap
 	short success;
 	
@@ -1264,6 +1272,8 @@ static int delete_key_exec (bContext *C, wmOperator *op)
 
 void ANIM_OT_keyframe_delete (wmOperatorType *ot)
 {
+	PropertyRNA *prop;
+	
 	/* identifiers */
 	ot->name= "Delete Keyframe";
 	ot->idname= "ANIM_OT_keyframe_delete";
@@ -1276,10 +1286,12 @@ void ANIM_OT_keyframe_delete (wmOperatorType *ot)
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 	
-	/* keyingset to use
-	 *	- here the type is int not enum, since many of the indicies here are determined dynamically
-	 */
-	RNA_def_int(ot->srna, "type", 0, INT_MIN, INT_MAX, "Keying Set Number", "Index (determined internally) of the Keying Set to use", 0, 1);
+	/* keyingset to use (dynamic enum) */
+	prop= RNA_def_enum(ot->srna, "type", DummyRNA_DEFAULT_items, 0, "Keying Set", "The Keying Set to use");
+	RNA_def_enum_funcs(prop, ANIM_keying_sets_enum_itemf);
+	RNA_def_property_flag(prop, PROP_HIDDEN);
+	ot->prop= prop;
+	
 	/* confirm whether a keyframe was added by showing a popup 
 	 *	- by default, this is enabled, since this operator is assumed to be called independently
 	 */
@@ -1355,7 +1367,7 @@ static int insert_key_button_exec (bContext *C, wmOperator *op)
 {
 	Main *bmain= CTX_data_main(C);
 	Scene *scene= CTX_data_scene(C);
-	PointerRNA ptr;
+	PointerRNA ptr= {{NULL}};
 	PropertyRNA *prop= NULL;
 	char *path;
 	float cfra= (float)CFRA; // XXX for now, don't bother about all the yucky offset crap
@@ -1367,7 +1379,6 @@ static int insert_key_button_exec (bContext *C, wmOperator *op)
 	flag = ANIM_get_keyframing_flags(scene, 1);
 	
 	/* try to insert keyframe using property retrieved from UI */
-	memset(&ptr, 0, sizeof(PointerRNA));
 	uiContextActiveProperty(C, &ptr, &prop, &index);
 	
 	if ((ptr.id.data && ptr.data && prop) && RNA_property_animateable(&ptr, prop)) {
@@ -1402,8 +1413,8 @@ static int insert_key_button_exec (bContext *C, wmOperator *op)
 		}
 	}
 	else if (G.f & G_DEBUG) {
-		printf("ptr.data = %p, prop = %p,", ptr.data, prop);
-		if(prop)
+		printf("ptr.data = %p, prop = %p,", (void *)ptr.data, (void *)prop);
+		if (prop)
 			printf("animateable = %d \n", RNA_property_animateable(&ptr, prop));
 		else
 			printf("animateable = NULL \n");
@@ -1412,7 +1423,7 @@ static int insert_key_button_exec (bContext *C, wmOperator *op)
 	if (success) {
 		/* send updates */
 		uiContextAnimUpdate(C);
-
+		
 		DAG_ids_flush_update(bmain, 0);
 		
 		/* send notifiers that keyframes have been changed */
@@ -1445,7 +1456,7 @@ static int delete_key_button_exec (bContext *C, wmOperator *op)
 {
 	Main *bmain= CTX_data_main(C);
 	Scene *scene= CTX_data_scene(C);
-	PointerRNA ptr= {{0}};
+	PointerRNA ptr= {{NULL}};
 	PropertyRNA *prop= NULL;
 	char *path;
 	float cfra= (float)CFRA; // XXX for now, don't bother about all the yucky offset crap
@@ -1477,14 +1488,14 @@ static int delete_key_button_exec (bContext *C, wmOperator *op)
 			printf("Button Delete-Key: no path to property \n");
 	}
 	else if (G.f & G_DEBUG) {
-		printf("ptr.data = %p, prop = %p \n", ptr.data, prop);
+		printf("ptr.data = %p, prop = %p \n", (void *)ptr.data, (void *)prop);
 	}
 	
 	
 	if (success) {
 		/* send updates */
 		uiContextAnimUpdate(C);
-
+		
 		DAG_ids_flush_update(bmain, 0);
 		
 		/* send notifiers that keyframes have been changed */
@@ -1567,7 +1578,7 @@ short fcurve_frame_has_keyframe (FCurve *fcu, float frame, short filter)
 /* Checks whether an Action has a keyframe for a given frame 
  * Since we're only concerned whether a keyframe exists, we can simply loop until a match is found...
  */
-short action_frame_has_keyframe (bAction *act, float frame, short filter)
+static short action_frame_has_keyframe (bAction *act, float frame, short filter)
 {
 	FCurve *fcu;
 	
@@ -1595,7 +1606,7 @@ short action_frame_has_keyframe (bAction *act, float frame, short filter)
 }
 
 /* Checks whether an Object has a keyframe for a given frame */
-short object_frame_has_keyframe (Object *ob, float frame, short filter)
+static short object_frame_has_keyframe (Object *ob, float frame, short filter)
 {
 	/* error checking */
 	if (ob == NULL)

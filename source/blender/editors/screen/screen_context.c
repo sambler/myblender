@@ -33,8 +33,11 @@
 #include "DNA_scene_types.h"
 #include "DNA_screen_types.h"
 
+#include "BLI_utildefines.h"
+
+
 #include "BKE_context.h"
-#include "BKE_utildefines.h"
+#include "BKE_object.h"
 #include "BKE_action.h"
 #include "BKE_armature.h"
 #include "BKE_sequencer.h"
@@ -43,6 +46,20 @@
 
 #include "ED_object.h"
 #include "ED_armature.h"
+
+#include "screen_intern.h"
+
+const char *screen_context_dir[] = {
+	"scene", "visible_objects", "visible_bases", "selectable_objects", "selectable_bases",
+	"selected_objects", "selected_bases",
+	"selected_editable_objects", "selected_editable_bases",
+	"visible_bones", "editable_bones", "selected_bones", "selected_editable_bones",
+	"visible_pose_bones", "selected_pose_bones", "active_bone", "active_pose_bone",
+	"active_base", "active_object", "object", "edit_object",
+	"sculpt_object", "vertex_paint_object", "weight_paint_object",
+	"texture_paint_object", "particle_edit_object",
+	"sequences", "selected_sequences", "selected_editable_sequences", /* sequencer */
+	NULL};
 
 int ed_screen_context(const bContext *C, const char *member, bContextDataResult *result)
 {
@@ -62,19 +79,7 @@ int ed_screen_context(const bContext *C, const char *member, bContextDataResult 
 #endif
 
 	if(CTX_data_dir(member)) {
-		static const char *dir[] = {
-			"scene", "visible_objects", "visible_bases", "selectable_objects", "selectable_bases",
-			"selected_objects", "selected_bases",
-			"selected_editable_objects", "selected_editable_bases",
-			"visible_bones", "editable_bones", "selected_bones", "selected_editable_bones",
-			"visible_pose_bones", "selected_pose_bones", "active_bone", "active_pose_bone",
-			"active_base", "active_object", "object", "edit_object",
-			"sculpt_object", "vertex_paint_object", "weight_paint_object",
-			"texture_paint_object", "particle_edit_object",
-			"sequences", "selected_sequences", "selected_editable_sequences", /* sequencer */
-			NULL};
-
-		CTX_data_dir_set(result, dir);
+		CTX_data_dir_set(result, screen_context_dir);
 		return 1;
 	}
 	else if(CTX_data_equals(member, "scene")) {
@@ -252,7 +257,7 @@ int ed_screen_context(const bContext *C, const char *member, bContextDataResult 
 			for (pchan= obpose->pose->chanbase.first; pchan; pchan= pchan->next) {
 				/* ensure that PoseChannel is on visible layer and is not hidden in PoseMode */
 				if (PBONE_VISIBLE(arm, pchan->bone)) {
-					if (pchan->bone->flag & BONE_SELECTED || pchan->bone == arm->act_bone)
+					if (pchan->bone->flag & BONE_SELECTED)
 						CTX_data_list_add(result, &obpose->id, &RNA_PoseBone, pchan);
 				}
 			}

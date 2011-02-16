@@ -323,7 +323,10 @@ list<class KX_Camera*>* KX_Scene::GetCameras()
 	return &m_cameras;
 }
 
-
+list<class KX_FontObject*>* KX_Scene::GetFonts()
+{
+	return &m_fonts;
+}
 
 void KX_Scene::SetFramingType(RAS_FrameSettings & frame_settings)
 {
@@ -1014,6 +1017,9 @@ int KX_Scene::NewRemoveObject(class CValue* gameobj)
 	// in case this is a camera
 	m_cameras.remove((KX_Camera*)newobj);
 
+	// in case this is a font
+	m_fonts.remove((KX_FontObject*)newobj);
+
 	/* currently does nothing, keep incase we need to Unregister something */
 #if 0
 	if (m_sceneConverter)
@@ -1188,6 +1194,27 @@ void KX_Scene::ReplaceMesh(class CValue* obj,void* meshobj, bool use_gfx, bool u
 #endif
 }
 
+/* Font Object routines */
+void KX_Scene::AddFont(KX_FontObject* font)
+{
+	if (!FindFont(font))
+		m_fonts.push_back(font);
+}
+
+KX_FontObject* KX_Scene::FindFont(KX_FontObject* font)
+{
+	list<KX_FontObject*>::iterator it = m_fonts.begin();
+
+	while ( (it != m_fonts.end()) 
+			&& ((*it) != font) ) {
+	  ++it;
+	}
+
+	return ((it == m_fonts.end()) ? NULL : (*it));
+}
+
+
+/* Camera Object routines */
 KX_Camera* KX_Scene::FindCamera(KX_Camera* cam)
 {
 	list<KX_Camera*>::iterator it = m_cameras.begin();
@@ -1722,6 +1749,11 @@ static void MergeScene_GameObject(KX_GameObject* gameobj, KX_Scene *to, KX_Scene
 	if(sg) {
 		if(sg->GetSGClientInfo() == from) {
 			sg->SetSGClientInfo(to);
+
+			/* Make sure to grab the children too since they might not be tied to a game object */
+			NodeList children = sg->GetSGChildren();
+			for (int i=0; i<children.size(); i++)
+					children[i]->SetSGClientInfo(to);
 		}
 #ifdef USE_BULLET
 		SGControllerList::iterator contit;
@@ -2087,8 +2119,7 @@ PyObject* KX_Scene::pyattr_get_drawing_callback_pre(void *self_v, const KX_PYATT
 
 	if(self->m_draw_call_pre==NULL)
 		self->m_draw_call_pre= PyList_New(0);
-	else
-		Py_INCREF(self->m_draw_call_pre);
+	Py_INCREF(self->m_draw_call_pre);
 	return self->m_draw_call_pre;
 }
 
@@ -2098,8 +2129,7 @@ PyObject* KX_Scene::pyattr_get_drawing_callback_post(void *self_v, const KX_PYAT
 
 	if(self->m_draw_call_post==NULL)
 		self->m_draw_call_post= PyList_New(0);
-	else
-		Py_INCREF(self->m_draw_call_post);
+	Py_INCREF(self->m_draw_call_post);
 	return self->m_draw_call_post;
 }
 

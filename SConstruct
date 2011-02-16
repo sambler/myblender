@@ -28,6 +28,8 @@
 # Main entry-point for the SCons building system
 # Set up some custom actions and target/argument handling
 # Then read all SConscripts and build
+#
+# TODO: fix /FORCE:MULTIPLE on windows to get proper debug builds.
 
 import platform as pltfrm
 
@@ -71,7 +73,7 @@ Decider('MD5-timestamp')
 
 ##### BEGIN SETUP #####
 
-B.possible_types = ['core', 'player', 'intern', 'extern']
+B.possible_types = ['core', 'player', 'player2', 'intern', 'extern']
 
 B.binarykind = ['blender' , 'blenderplayer']
 ##################################
@@ -140,7 +142,6 @@ else:
 if not env:
     print "Could not create a build environment"
     Exit()
-
 
 cc = B.arguments.get('CC', None)
 cxx = B.arguments.get('CXX', None)
@@ -396,7 +397,7 @@ SConscript(B.root_build_dir+'/source/SConscript')
 # libraries to give as objects to linking phase
 mainlist = []
 for tp in B.possible_types:
-    if not tp == 'player':
+    if (not tp == 'player') and (not tp == 'player2'):
         mainlist += B.create_blender_liblist(env, tp)
 
 if B.arguments.get('BF_PRIORITYLIST', '0')=='1':
@@ -410,9 +411,10 @@ if 'blender' in B.targets or not env['WITH_BF_NOBLENDER']:
     env.BlenderProg(B.root_build_dir, "blender", mainlist + thestatlibs + dobj, thesyslibs, [B.root_build_dir+'/lib'] + thelibincs, 'blender')
 if env['WITH_BF_PLAYER']:
     playerlist = B.create_blender_liblist(env, 'player')
+    playerlist += B.create_blender_liblist(env, 'player2')
     playerlist += B.create_blender_liblist(env, 'intern')
     playerlist += B.create_blender_liblist(env, 'extern')
-    env.BlenderProg(B.root_build_dir, "blenderplayer",  playerlist, thestatlibs + dobj + thesyslibs, [B.root_build_dir+'/lib'] + thelibincs, 'blenderplayer')
+    env.BlenderProg(B.root_build_dir, "blenderplayer",  playerlist + thestatlibs + dobj, thesyslibs, [B.root_build_dir+'/lib'] + thelibincs, 'blenderplayer')
 
 ##### Now define some targets
 
@@ -488,11 +490,13 @@ if  env['OURPLATFORM']!='darwin':
                         dn.remove('.svn')
                     if '_svn' in dn:
                         dn.remove('_svn')
-                    
+                    if '__pycache__' in dn:  # py3.2 cache dir
+                        dn.remove('__pycache__')
+
                     dir = os.path.join(env['BF_INSTALLDIR'], VERSION)
                     dir += os.sep + os.path.basename(scriptpath) + dp[len(scriptpath):]
-                    
-                    source=[os.path.join(dp, f) for f in df if f[-3:]!='pyc']
+
+                    source=[os.path.join(dp, f) for f in df if not f.endswith(".pyc")]
                     # To ensure empty dirs are created too
                     if len(source)==0:
                         env.Execute(Mkdir(dir))

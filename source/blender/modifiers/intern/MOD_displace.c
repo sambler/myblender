@@ -34,8 +34,9 @@
 #include "DNA_object_types.h"
 
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
-#include "BKE_utildefines.h"
+
 #include "BKE_cdderivedmesh.h"
 #include "BKE_modifier.h"
 #include "BKE_texture.h"
@@ -148,6 +149,12 @@ static void updateDepgraph(ModifierData *md, DagForest *forest,
 		dag_add_relation(forest, curNode, obNode,
 				 DAG_RL_DATA_DATA | DAG_RL_OB_DATA, "Displace Modifier");
 	}
+	
+
+	if(dmd->texmapping == MOD_DISP_MAP_GLOBAL)
+		dag_add_relation(forest, obNode, obNode,
+						 DAG_RL_DATA_DATA | DAG_RL_OB_DATA, "Displace Modifier");
+	
 }
 
 static void get_texture_coords(DisplaceModifierData *dmd, Object *ob,
@@ -350,6 +357,7 @@ ModifierTypeInfo modifierType_Displace = {
 
 	/* copyData */          copyData,
 	/* deformVerts */       deformVerts,
+	/* deformMatrices */    0,
 	/* deformVertsEM */     deformVertsEM,
 	/* deformMatricesEM */  0,
 	/* applyModifier */     0,

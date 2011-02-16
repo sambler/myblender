@@ -46,12 +46,13 @@
 
 #include "BLI_vfontdata.h"
 #include "BLI_blenlib.h"
-#include "BLI_math.h"  
+#include "BLI_math.h"
+#include "BLI_utildefines.h"
 
 //XXX #include "BIF_toolbox.h"
 
 #include "BKE_font.h"
-#include "BKE_utildefines.h"
+
 
 #include "DNA_vfont_types.h"
 #include "DNA_packedFile_types.h"
@@ -126,7 +127,6 @@ static void freetypechar_to_vchar(FT_Face face, FT_ULong charcode, VFontData *vf
 
 		// get number of on-curve points for beziertriples (including conic virtual on-points) 
 		for(j = 0; j < ftoutline.n_contours; j++) {
-			l = 0;
 			for(k = 0; k < npoints[j]; k++) {
 				if(j > 0) l = k + ftoutline.contours[j - 1] + 1; else l = k;
 					if(ftoutline.tags[l] == FT_Curve_Tag_On)
@@ -367,7 +367,7 @@ static VFontData *objfnt_to_ftvfontdata(PackedFile * pf)
 	// No charmap found from the ttf so we need to figure it out
 	if(glyph_index == 0)
 	{
-		FT_CharMap  found = 0;
+		FT_CharMap  found = NULL;
 		FT_CharMap  charmap;
 		int n;
 
@@ -477,7 +477,7 @@ VFontData *BLI_vfontdata_from_freetypefont(PackedFile *pf)
 	err = FT_Init_FreeType( &library);
 	if(err) {
 		//XXX error("Failed to load the Freetype font library");
-		return 0;
+		return NULL;
 	}
 
 	success = check_freetypefont(pf);

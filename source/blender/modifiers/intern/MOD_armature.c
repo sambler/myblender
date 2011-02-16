@@ -34,8 +34,11 @@
 
 #include "DNA_armature_types.h"
 #include "DNA_object_types.h"
+#include "DNA_mesh_types.h"
 
-#include "BKE_utildefines.h"
+#include "BLI_utildefines.h"
+
+
 #include "BKE_cdderivedmesh.h"
 #include "BKE_lattice.h"
 #include "BKE_modifier.h"
@@ -159,6 +162,19 @@ static void deformMatricesEM(
 	if(!derivedData) dm->release(dm);
 }
 
+static void deformMatrices(ModifierData *md, Object *ob, DerivedMesh *derivedData,
+						   float (*vertexCos)[3], float (*defMats)[3][3], int numVerts)
+{
+	ArmatureModifierData *amd = (ArmatureModifierData*) md;
+	DerivedMesh *dm = derivedData;
+
+	if(!derivedData) dm = CDDM_from_mesh((Mesh*)ob->data, ob);
+
+	armature_deform_verts(amd->object, ob, dm, vertexCos, defMats, numVerts,
+				  amd->deformflag, NULL, amd->defgrp_name);
+
+	if(!derivedData) dm->release(dm);
+}
 
 ModifierTypeInfo modifierType_Armature = {
 	/* name */              "Armature",
@@ -170,6 +186,7 @@ ModifierTypeInfo modifierType_Armature = {
 
 	/* copyData */          copyData,
 	/* deformVerts */       deformVerts,
+	/* deformMatrices */    deformMatrices,
 	/* deformVertsEM */     deformVertsEM,
 	/* deformMatricesEM */  deformMatricesEM,
 	/* applyModifier */     0,

@@ -36,6 +36,7 @@
 #include "BLI_heap.h"
 #include "BLI_edgehash.h"
 #include "BLI_editVert.h"
+#include "BLI_utildefines.h"
 
 #include "IMB_imbuf_types.h"
 #include "IMB_imbuf.h"
@@ -50,12 +51,6 @@
 #include "BKE_context.h"
 
 #include "BIF_gl.h"
-
-
-#ifdef WITH_PYTHON
-//#include "BPY_extern.h"
-//#include "BPY_menus.h"
-#endif
 
 #include "ED_mesh.h"
 #include "ED_screen.h"
@@ -93,12 +88,12 @@ void paintface_flush_flags(Object *ob)
 	
 	for (i= 0; i<totface; i++, mf++) { /* loop over derived mesh faces */
 		mf_orig= me->mface + index_array[i];
-		mf->flag= mf_orig->flag;;
+		mf->flag= mf_orig->flag;
 	}
 }
 
 /* returns 0 if not found, otherwise 1 */
-int facesel_face_pick(struct bContext *C, Mesh *me, short *mval, unsigned int *index, short rect)
+static int facesel_face_pick(struct bContext *C, Mesh *me, short *mval, unsigned int *index, short rect)
 {
 	ViewContext vc;
 	view3d_set_viewcontext(C, &vc);
@@ -157,7 +152,7 @@ MTFace *EM_get_active_mtface(EditMesh *em, EditFace **act_efa, MCol **mcol, int 
 	return NULL;
 }
 
-void paintface_unhide(Scene *scene)
+static void paintface_unhide(Scene *scene)
 {
 	Mesh *me;
 	MFace *mface;
@@ -179,7 +174,7 @@ void paintface_unhide(Scene *scene)
 	paintface_flush_flags(OBACT);
 }
 
-void paintface_hide(Scene *scene)
+static void paintface_hide(Scene *scene)
 {
 	Mesh *me;
 	MFace *mface;
@@ -402,7 +397,7 @@ void paintface_deselect_all_visible(Object *ob, int action, short flush_flags)
 	}
 }
 
-void paintface_select_swap(Scene *scene)
+static void paintface_select_swap(Scene *scene)
 {
 	Mesh *me;
 	MFace *mface;

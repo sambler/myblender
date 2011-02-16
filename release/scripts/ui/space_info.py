@@ -50,8 +50,7 @@ class INFO_HT_header(bpy.types.Header):
             layout.separator()
         else:
             layout.template_ID(context.window, "screen", new="screen.new", unlink="screen.delete")
-
-        layout.template_ID(context.screen, "scene", new="scene.new", unlink="scene.delete")
+            layout.template_ID(context.screen, "scene", new="scene.new", unlink="scene.delete")
 
         layout.separator()
 
@@ -69,7 +68,6 @@ class INFO_HT_header(bpy.types.Header):
         # XXX: this should be right-aligned to the RHS of the region
         layout.operator("wm.window_fullscreen_toggle", icon='FULLSCREEN_ENTER', text="")
 
-
         # XXX: BEFORE RELEASE, MOVE FILE MENU OUT OF INFO!!!
         """
         row = layout.row(align=True)
@@ -82,7 +80,7 @@ class INFO_HT_header(bpy.types.Header):
         row = layout.row()
         row.enabled = sinfo.show_report_operator
         row.operator("info.report_replay")
-        
+
         row.menu("INFO_MT_report")
         """
 
@@ -220,6 +218,7 @@ class INFO_MT_curve_add(bpy.types.Menu):
         layout.operator("curve.primitive_nurbs_circle_add", icon='CURVE_NCIRCLE', text="Nurbs Circle")
         layout.operator("curve.primitive_nurbs_path_add", icon='CURVE_PATH', text="Path")
 
+
 class INFO_MT_edit_curve_add(bpy.types.Menu):
     bl_idname = "INFO_MT_edit_curve_add"
     bl_label = "Add"
@@ -231,9 +230,9 @@ class INFO_MT_edit_curve_add(bpy.types.Menu):
         layout.operator_context = 'INVOKE_REGION_WIN'
 
         if is_surf:
-          INFO_MT_surface_add.draw(self, context)
+            INFO_MT_surface_add.draw(self, context)
         else:
-          INFO_MT_curve_add.draw(self, context)
+            INFO_MT_curve_add.draw(self, context)
 
 
 class INFO_MT_surface_add(bpy.types.Menu):
@@ -249,18 +248,6 @@ class INFO_MT_surface_add(bpy.types.Menu):
         layout.operator("surface.primitive_nurbs_surface_cylinder_add", icon='SURFACE_NCYLINDER', text="NURBS Cylinder")
         layout.operator("surface.primitive_nurbs_surface_sphere_add", icon='SURFACE_NSPHERE', text="NURBS Sphere")
         layout.operator("surface.primitive_nurbs_surface_torus_add", icon='SURFACE_NTORUS', text="NURBS Torus")
-
-class INFO_MT_curve_handle_type_set(bpy.types.Menu):
-    bl_idname = "INFO_MT_curve_handle_type_set"
-    bl_label = "Handle Type"
-
-    def draw(self, context):
-        layout = self.layout
-        layout.operator_context = 'INVOKE_REGION_WIN'
-        layout.operator("curve.handle_type_set", text="Automatic").type = "AUTOMATIC"
-        layout.operator("curve.handle_type_set", text="Vector").type = "VECTOR"
-        layout.operator("curve.handle_type_set", text="Align").type = "ALIGN"
-        layout.operator("curve.handle_type_set", text="Free Align").type = "FREE_ALIGN"
 
 
 class INFO_MT_armature_add(bpy.types.Menu):
@@ -360,10 +347,12 @@ class INFO_MT_help(bpy.types.Menu):
     bl_label = "Help"
 
     def draw(self, context):
+        import sys
+
         layout = self.layout
 
         layout.operator("wm.url_open", text="Manual", icon='HELP').url = 'http://wiki.blender.org/index.php/Doc:Manual'
-        layout.operator("wm.url_open", text="Release Log", icon='URL').url = 'http://www.blender.org/development/release-logs/blender-254-beta/'
+        layout.operator("wm.url_open", text="Release Log", icon='URL').url = 'http://www.blender.org/development/release-logs/blender-256-beta/'
 
         layout.separator()
 
@@ -378,7 +367,7 @@ class INFO_MT_help(bpy.types.Menu):
         layout.operator("help.operator_cheat_sheet", icon='TEXT')
         layout.operator("wm.sysinfo", icon='TEXT')
         layout.separator()
-        if bpy.app.build_platform[0:7] == 'Windows':
+        if sys.platform == "win32":
             layout.operator("wm.toggle_console", icon='CONSOLE')
             layout.separator()
         layout.operator("anim.update_data_paths", text="FCurve/Driver 2.54 fix", icon='HELP')
@@ -415,11 +404,11 @@ class HELP_OT_operator_cheat_sheet(bpy.types.Operator):
 
 
 def register():
-    pass
+    bpy.utils.register_module(__name__)
 
 
 def unregister():
-    pass
+    bpy.utils.unregister_module(__name__)
 
 if __name__ == "__main__":
     register()

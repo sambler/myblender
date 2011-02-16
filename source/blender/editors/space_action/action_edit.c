@@ -35,8 +35,10 @@
 
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
 #include "DNA_anim_types.h"
+#include "DNA_gpencil_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 
@@ -53,10 +55,12 @@
 #include "UI_view2d.h"
 
 #include "ED_anim_api.h"
+#include "ED_gpencil.h"
 #include "ED_keyframing.h"
 #include "ED_keyframes_edit.h"
 #include "ED_screen.h"
 #include "ED_transform.h"
+#include "ED_markers.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
@@ -72,26 +76,42 @@
 
 static int act_new_exec(bContext *C, wmOperator *UNUSED(op))
 {
-	bAction *action;
 	PointerRNA ptr, idptr;
 	PropertyRNA *prop;
 
-	// XXX need to restore behaviour to copy old actions...
-	action= add_empty_action("Action");
-
 	/* hook into UI */
 	uiIDContextProperty(C, &ptr, &prop);
-
-	if(prop) {
-		/* when creating new ID blocks, use is already 1, but RNA
-		 * pointer se also increases user, so this compensates it */
+	
+	if (prop) {
+		bAction *action=NULL, *oldact=NULL;
+		PointerRNA oldptr;
+		
+		/* create action - the way to do this depends on whether we've got an
+		 * existing one there already, in which case we make a copy of it
+		 * (which is useful for "versioning" actions within the same file)
+		 */
+		oldptr = RNA_property_pointer_get(&ptr, prop);
+		oldact = (bAction *)oldptr.id.data;
+		
+		if (oldact && GS(oldact->id.name)==ID_AC) {
+			/* make a copy of the existing action */
+			action= copy_action(oldact);
+		}
+		else {
+			/* just make a new (empty) action */
+			action= add_empty_action("Action");
+		}
+		
+		/* when creating new ID blocks, use is already 1 (fake user), 
+		 * but RNA pointer use also increases user, so this compensates it 
+		 */
 		action->id.us--;
-
+		
 		RNA_id_pointer_create(&action->id, &idptr);
 		RNA_property_pointer_set(&ptr, prop, idptr);
 		RNA_property_update(C, &ptr, prop);
 	}
-
+	
 	/* set notifier that keyframes have changed */
 	WM_event_add_notifier(C, NC_ANIMATION|ND_KEYFRAME|NA_EDITED, NULL);
 	
@@ -291,7 +311,8 @@ static short copy_action_keys (bAnimContext *ac)
 }
 
 
-static short paste_action_keys (bAnimContext *ac)
+static short paste_action_keys (bAnimContext *ac,
+	const eKeyPasteOffset offset_mode, const eKeyMergeMode merge_mode)
 {	
 	ListBase anim_data = {NULL, NULL};
 	int filter, ok=0;
@@ -301,7 +322,7 @@ static short paste_action_keys (bAnimContext *ac)
 	ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 	
 	/* paste keyframes */
-	ok= paste_animedit_keys(ac, &anim_data);
+	ok= paste_animedit_keys(ac, &anim_data, offset_mode, merge_mode);
 	
 	/* clean up */
 	BLI_freelistN(&anim_data);
@@ -341,29 +362,35 @@ void ACTION_OT_copy (wmOperatorType *ot)
 	ot->description= "Copy selected keyframes to the copy/paste buffer";
 	
 	/* api callbacks */
+//	ot->invoke= WM_operator_props_popup; // better wait for graph redo panel
 	ot->exec= actkeys_copy_exec;
 	ot->poll= ED_operator_action_active;
-	
+
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 }
 
-
-
 static int actkeys_paste_exec(bContext *C, wmOperator *op)
 {
 	bAnimContext ac;
+
+	const eKeyPasteOffset offset_mode= RNA_enum_get(op->ptr, "offset");
+	const eKeyMergeMode merge_mode= RNA_enum_get(op->ptr, "merge");
 	
 	/* get editor data */
 	if (ANIM_animdata_get_context(C, &ac) == 0)
 		return OPERATOR_CANCELLED;
+	
+	if(ac.reports==NULL) {
+		ac.reports= op->reports;
+	}
 	
 	/* paste keyframes */
 	if (ac.datatype == ANIMCONT_GPENCIL) {
 		// FIXME...
 	}
 	else {
-		if (paste_action_keys(&ac)) {
+		if (paste_action_keys(&ac, offset_mode, merge_mode)) {
 			BKE_report(op->reports, RPT_ERROR, "No keyframes to paste");
 			return OPERATOR_CANCELLED;
 		}
@@ -391,12 +418,15 @@ void ACTION_OT_paste (wmOperatorType *ot)
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+
+	RNA_def_enum(ot->srna, "offset", keyframe_paste_offset_items, KEYFRAME_PASTE_OFFSET_CFRA_START, "Offset", "Paste time offset of keys");
+	RNA_def_enum(ot->srna, "merge", keyframe_paste_merge_items, KEYFRAME_PASTE_MERGE_MIX, "Type", "Method of merking pasted keys and existing");
 }
 
 /* ******************** Insert Keyframes Operator ************************* */
 
 /* defines for insert keyframes tool */
-EnumPropertyItem prop_actkeys_insertkey_types[] = {
+static EnumPropertyItem prop_actkeys_insertkey_types[] = {
 	{1, "ALL", 0, "All Channels", ""},
 	{2, "SEL", 0, "Only Selected Channels", ""},
 	{3, "GROUP", 0, "In Active Group", ""}, // xxx not in all cases
@@ -412,7 +442,6 @@ static void insert_action_keys(bAnimContext *ac, short mode)
 	
 	ReportList *reports = ac->reports;
 	Scene *scene= ac->scene;
-	float cfra= (float)CFRA;
 	short flag = 0;
 	
 	/* filter data */
@@ -429,7 +458,8 @@ static void insert_action_keys(bAnimContext *ac, short mode)
 	for (ale= anim_data.first; ale; ale= ale->next) {
 		AnimData *adt= ANIM_nla_mapping_get(ac, ale);
 		FCurve *fcu= (FCurve *)ale->key_data;
-		
+		float cfra;
+
 		/* adjust current frame for NLA-scaling */
 		if (adt)
 			cfra= BKE_nla_tweakedit_remap(adt, (float)CFRA, NLATIME_CONVERT_UNMAP);
@@ -510,10 +540,10 @@ static void duplicate_action_keys (bAnimContext *ac)
 	
 	/* loop through filtered data and delete selected keys */
 	for (ale= anim_data.first; ale; ale= ale->next) {
-		//if (ale->type == ANIMTYPE_GPLAYER)
-		//	delete_gplayer_frames((bGPDlayer *)ale->data);
-		//else
+		if (ale->type == ANIMTYPE_FCURVE)
 			duplicate_fcurve_keys((FCurve *)ale->key_data);
+		else
+			duplicate_gplayer_frames((bGPDlayer *)ale->data);
 	}
 	
 	/* free filtered list */
@@ -599,8 +629,8 @@ static void delete_action_keys (bAnimContext *ac)
 			if ((fcu->totvert == 0) && (list_has_suitable_fmodifier(&fcu->modifiers, 0, FMI_TYPE_GENERATE_CURVE) == 0))
 				ANIM_fcurve_delete_from_animdata(ac, adt, fcu);
 		}
-		//else
-		//	delete_gplayer_frames((bGPDlayer *)ale->data);
+		else
+			delete_gplayer_frames((bGPDlayer *)ale->data);
 	}
 	
 	/* free filtered list */
@@ -778,7 +808,7 @@ void ACTION_OT_sample (wmOperatorType *ot)
 /* ******************** Set Extrapolation-Type Operator *********************** */
 
 /* defines for set extrapolation-type for selected keyframes tool */
-EnumPropertyItem prop_actkeys_expo_types[] = {
+static EnumPropertyItem prop_actkeys_expo_types[] = {
 	{FCURVE_EXTRAPOLATE_CONSTANT, "CONSTANT", 0, "Constant Extrapolation", ""},
 	{FCURVE_EXTRAPOLATE_LINEAR, "LINEAR", 0, "Linear Extrapolation", ""},
 	{0, NULL, 0, NULL, NULL}
@@ -925,7 +955,7 @@ void ACTION_OT_interpolation_type (wmOperatorType *ot)
 
 /* ******************** Set Handle-Type Operator *********************** */
 
-EnumPropertyItem actkeys_handle_type_items[] = {
+static EnumPropertyItem actkeys_handle_type_items[] = {
 	{HD_FREE, "FREE", 0, "Free", ""},
 	{HD_VECT, "VECTOR", 0, "Vector", ""},
 	{HD_ALIGN, "ALIGNED", 0, "Aligned", ""},
@@ -1158,7 +1188,7 @@ void ACTION_OT_frame_jump (wmOperatorType *ot)
 /* ******************** Snap Keyframes Operator *********************** */
 
 /* defines for snap keyframes tool */
-EnumPropertyItem prop_actkeys_snap_types[] = {
+static EnumPropertyItem prop_actkeys_snap_types[] = {
 	{ACTKEYS_SNAP_CFRA, "CFRA", 0, "Current frame", ""},
 	{ACTKEYS_SNAP_NEAREST_FRAME, "NEAREST_FRAME", 0, "Nearest Frame", ""}, // XXX as single entry?
 	{ACTKEYS_SNAP_NEAREST_SECOND, "NEAREST_SECOND", 0, "Nearest Second", ""}, // XXX as single entry?
@@ -1258,7 +1288,7 @@ void ACTION_OT_snap (wmOperatorType *ot)
 /* ******************** Mirror Keyframes Operator *********************** */
 
 /* defines for mirror keyframes tool */
-EnumPropertyItem prop_actkeys_mirror_types[] = {
+static EnumPropertyItem prop_actkeys_mirror_types[] = {
 	{ACTKEYS_MIRROR_CFRA, "CFRA", 0, "By Times over Current frame", ""},
 	{ACTKEYS_MIRROR_XAXIS, "XAXIS", 0, "By Values over Value=0", ""},
 	{ACTKEYS_MIRROR_MARKER, "MARKER", 0, "By Times over First Selected Marker", ""},
@@ -1286,13 +1316,7 @@ static void mirror_action_keys(bAnimContext *ac, short mode)
 		TimeMarker *marker= NULL;
 		
 		/* find first selected marker */
-		if (ac->markers) {
-			for (marker= ac->markers->first; marker; marker=marker->next) {
-				if (marker->flag & SELECT) {
-					break;
-				}
-			}
-		}
+		marker= ED_markers_get_first_selected(ac->markers);
 		
 		/* store marker's time (if available) */
 		if (marker)

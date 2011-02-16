@@ -109,6 +109,20 @@ void copy_m4_m3(float m1[][4], float m2[][3])	/* no clear */
 
 }
 
+void swap_m3m3(float m1[][3], float m2[][3])
+{
+	float t;
+	int i, j;
+
+	for(i = 0; i < 3; i++) {
+		for (j = 0; j < 3; j++) {
+			t        = m1[i][j];
+			m1[i][j] = m2[i][j];
+			m2[i][j] = t;
+		}
+	}
+}
+
 void swap_m4m4(float m1[][4], float m2[][4])
 {
 	float t;
@@ -228,7 +242,7 @@ void mul_serie_m3(float answ[][3],
 {
 	float temp[3][3];
 	
-	if(m1==0 || m2==0) return;
+	if(m1==NULL || m2==NULL) return;
 	
 	mul_m3_m3m3(answ, m2, m1);
 	if(m3) {
@@ -261,7 +275,7 @@ void mul_serie_m4(float answ[][4], float m1[][4],
 {
 	float temp[4][4];
 	
-	if(m1==0 || m2==0) return;
+	if(m1==NULL || m2==NULL) return;
 	
 	mul_m4_m4m4(answ, m2, m1);
 	if(m3) {
@@ -976,17 +990,15 @@ float mat4_to_scale(float mat[][4])
 	return mat3_to_scale(tmat);
 }
 
-void mat4_to_loc_rot_size(float loc[3], float rot[3][3], float size[3], float wmat[][4])
+
+void mat3_to_rot_size(float rot[3][3], float size[3], float mat3[3][3])
 {
-	float mat3[3][3];    /* wmat -> 3x3 */
-	float mat3_n[3][3];  /* wmat -> normalized, 3x3 */
-	float imat3_n[3][3]; /* wmat -> normalized & inverted, 3x3 */
-	/* location */
-	copy_v3_v3(loc, wmat[3]);
+	float mat3_n[3][3];  /* mat3 -> normalized, 3x3 */
+	float imat3_n[3][3]; /* mat3 -> normalized & inverted, 3x3 */
 
 	/* rotation & scale are linked, we need to create the mat's
 	 * for these together since they are related. */
-	copy_m3_m4(mat3, wmat);
+
 	/* so scale doesnt interfear with rotation [#24291] */
 	/* note: this is a workaround for negative matrix not working for rotation conversion, FIXME */
 	normalize_m3_m3(mat3_n, mat3);
@@ -1008,6 +1020,17 @@ void mat4_to_loc_rot_size(float loc[3], float rot[3][3], float size[3], float wm
 	size[0]= mat3[0][0];
 	size[1]= mat3[1][1];
 	size[2]= mat3[2][2];
+}
+
+void mat4_to_loc_rot_size(float loc[3], float rot[3][3], float size[3], float wmat[][4])
+{
+	float mat3[3][3];    /* wmat -> 3x3 */
+
+	copy_m3_m4(mat3, wmat);
+	mat3_to_rot_size(rot, size, mat3);
+
+	/* location */
+	copy_v3_v3(loc, wmat[3]);
 }
 
 void scale_m3_fl(float m[][3], float scale)
@@ -1075,18 +1098,19 @@ void rotate_m4(float mat[][4], const char axis, const float angle)
 	}
 }
 
-void blend_m3_m3m3(float out[][3], float dst[][3], float src[][3], float srcweight)
+void blend_m3_m3m3(float out[][3], float dst[][3], float src[][3], const float srcweight)
 {
+	float srot[3][3], drot[3][3];
 	float squat[4], dquat[4], fquat[4];
 	float ssize[3], dsize[3], fsize[3];
 	float rmat[3][3], smat[3][3];
 	
-	mat3_to_quat(dquat,dst);
-	mat3_to_size(dsize,dst);
+	mat3_to_rot_size(drot, dsize, dst);
+	mat3_to_rot_size(srot, ssize, src);
 
-	mat3_to_quat(squat,src);
-	mat3_to_size(ssize,src);
-	
+	mat3_to_quat(dquat, drot);
+	mat3_to_quat(squat, srot);
+
 	/* do blending */
 	interp_qt_qtqt(fquat, dquat, squat, srcweight);
 	interp_v3_v3v3(fsize, dsize, ssize, srcweight);
@@ -1097,20 +1121,19 @@ void blend_m3_m3m3(float out[][3], float dst[][3], float src[][3], float srcweig
 	mul_m3_m3m3(out, rmat, smat);
 }
 
-void blend_m4_m4m4(float out[][4], float dst[][4], float src[][4], float srcweight)
+void blend_m4_m4m4(float out[][4], float dst[][4], float src[][4], const float srcweight)
 {
+	float sloc[3], dloc[3], floc[3];
+	float srot[3][3], drot[3][3];
 	float squat[4], dquat[4], fquat[4];
 	float ssize[3], dsize[3], fsize[3];
-	float sloc[3], dloc[3], floc[3];
-	
-	mat4_to_quat(dquat,dst);
-	mat4_to_size(dsize,dst);
-	copy_v3_v3(dloc, dst[3]);
 
-	mat4_to_quat(squat,src);
-	mat4_to_size(ssize,src);
-	copy_v3_v3(sloc, src[3]);
-	
+	mat4_to_loc_rot_size(dloc, drot, dsize, dst);
+	mat4_to_loc_rot_size(sloc, srot, ssize, src);
+
+	mat3_to_quat(dquat, drot);
+	mat3_to_quat(squat, srot);
+
 	/* do blending */
 	interp_v3_v3v3(floc, dloc, sloc, srcweight);
 	interp_qt_qtqt(fquat, dquat, squat, srcweight);
@@ -1215,7 +1238,7 @@ void loc_axisangle_size_to_mat4(float mat[4][4], const float loc[3], const float
 
 /*********************************** Other ***********************************/
 
-void print_m3(char *str, float m[][3])
+void print_m3(const char *str, float m[][3])
 {
 	printf("%s\n", str);
 	printf("%f %f %f\n",m[0][0],m[1][0],m[2][0]);
@@ -1224,7 +1247,7 @@ void print_m3(char *str, float m[][3])
 	printf("\n");
 }
 
-void print_m4(char *str, float m[][4])
+void print_m4(const char *str, float m[][4])
 {
 	printf("%s\n", str);
 	printf("%f %f %f %f\n",m[0][0],m[1][0],m[2][0],m[3][0]);
@@ -1448,7 +1471,6 @@ void svd_m4(float U[4][4], float s[4], float V[4][4], float A_[4][4])
 	eps = powf(2.0f,-52.0f);
 	while (p > 0) {
 		int kase=0;
-		k=0;
 
 		// Test for maximum iterations to avoid infinite loop
 		if(maxiter == 0)
@@ -1686,5 +1708,5 @@ void pseudoinverse_m4_m4(float Ainv[4][4], float A[4][4], float epsilon)
 
 	transpose_m4(V);
 
-	mul_serie_m4(Ainv, U, Wm, V, 0, 0, 0, 0, 0);
+	mul_serie_m4(Ainv, U, Wm, V, NULL, NULL, NULL, NULL, NULL);
 }

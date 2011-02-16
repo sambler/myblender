@@ -66,7 +66,7 @@ struct KeyBlock *key_get_keyblock(struct Key *key, int index);
 struct KeyBlock *key_get_named_keyblock(struct Key *key, const char name[]);
 char *key_get_curValue_rnaPath(struct Key *key, struct KeyBlock *kb);
 // needed for the GE
-void do_rel_key(int start, int end, int tot, char *basispoin, struct Key *key, struct KeyBlock *actkb, int mode);
+void do_rel_key(const int start, int end, const int tot, char *basispoin, struct Key *key, struct KeyBlock *actkb, const int mode);
 
 /* conversion functions */
 void key_to_mesh(struct KeyBlock *kb, struct Mesh *me);
@@ -79,9 +79,11 @@ float (*key_to_vertcos(struct Object *ob, struct KeyBlock *kb))[3];
 void vertcos_to_key(struct Object *ob, struct KeyBlock *kb, float (*vertCos)[3]);
 void offset_to_key(struct Object *ob, struct KeyBlock *kb, float (*ofs)[3]);
 
+/* key.c */
+extern int slurph_opt;
+
 #ifdef __cplusplus
 };
 #endif
 
-#endif
-
+#endif // BKE_KEY_H

@@ -58,6 +58,7 @@
 #include "BLI_args.h"
 #include "BLI_threads.h"
 #include "BLI_scanfill.h" // for BLI_setErrorCallBack, TODO, move elsewhere
+#include "BLI_utildefines.h"
 
 #include "DNA_ID.h"
 #include "DNA_scene_types.h"
@@ -67,6 +68,7 @@
 #include "BKE_utildefines.h"
 #include "BKE_blender.h"
 #include "BKE_context.h"
+#include "BKE_depsgraph.h" // for DAG_on_load_update
 #include "BKE_font.h"
 #include "BKE_global.h"
 #include "BKE_main.h"
@@ -136,8 +138,8 @@ static int print_version(int argc, char **argv, void *data);
 
 extern int pluginapi_force_ref(void);  /* from blenpluginapi:pluginapi.c */
 
-char bprogname[FILE_MAXDIR+FILE_MAXFILE]; /* from blenpluginapi:pluginapi.c */
-char btempdir[FILE_MAXDIR+FILE_MAXFILE];
+char bprogname[FILE_MAX]; /* from blenpluginapi:pluginapi.c */
+char btempdir[FILE_MAX];
 
 #define BLEND_VERSION_STRING_FMT "Blender %d.%02d (sub %d) Build\n", BLENDER_VERSION/100, BLENDER_VERSION%100, BLENDER_SUBVERSION
 
@@ -244,9 +246,15 @@ static int print_help(int UNUSED(argc), char **UNUSED(argv), void *data)
 	printf ("Misc Options:\n");
 	BLI_argsPrintArgDoc(ba, "--debug");
 	BLI_argsPrintArgDoc(ba, "--debug-fpe");
-
 	printf("\n");
-
+	BLI_argsPrintArgDoc(ba, "--factory-startup");
+	printf("\n");
+	BLI_argsPrintArgDoc(ba, "--env-system-config");
+	BLI_argsPrintArgDoc(ba, "--env-system-datafiles");
+	BLI_argsPrintArgDoc(ba, "--env-system-scripts");
+	BLI_argsPrintArgDoc(ba, "--env-system-plugins");
+	BLI_argsPrintArgDoc(ba, "--env-system-python");
+	printf("\n");
 	BLI_argsPrintArgDoc(ba, "-nojoystick");
 	BLI_argsPrintArgDoc(ba, "-noglsl");
 	BLI_argsPrintArgDoc(ba, "-noaudio");
@@ -265,6 +273,7 @@ static int print_help(int UNUSED(argc), char **UNUSED(argv), void *data)
 
 	BLI_argsPrintArgDoc(ba, "--python");
 	BLI_argsPrintArgDoc(ba, "--python-console");
+	BLI_argsPrintArgDoc(ba, "--addons");
 
 #ifdef WIN32
 	BLI_argsPrintArgDoc(ba, "-R");
@@ -389,6 +398,34 @@ static int set_fpe(int UNUSED(argc), char **UNUSED(argv), void *UNUSED(data))
 #endif
 
 	return 0;
+}
+
+static int set_factory_startup(int UNUSED(argc), char **UNUSED(argv), void *UNUSED(data))
+{
+	G.factory_startup= 1;
+	return 0;
+}
+
+static int set_env(int argc, char **argv, void *UNUSED(data))
+{
+	/* "--env-system-scripts" --> "BLENDER_SYSTEM_SCRIPTS" */
+
+	char env[64]= "BLENDER";
+	char *ch_dst= env + 7; /* skip BLENDER */
+	char *ch_src= argv[0] + 5; /* skip --env */
+
+	if (argc < 2) {
+		printf("%s requires one argument\n", argv[0]);
+		exit(1);
+	}
+
+	for(; *ch_src; ch_src++, ch_dst++) {
+		*ch_dst= (*ch_src == '-') ? '_' : (*ch_src)-32; /* toupper() */
+	}
+
+	*ch_dst= '\0';
+	BLI_setenv(env, argv[1]);
+	return 1;
 }
 
 static int playback_mode(int UNUSED(argc), char **UNUSED(argv), void *UNUSED(data))
@@ -861,7 +898,7 @@ static int run_python(int argc, char **argv, void *data)
 		BLI_strncpy(filename, argv[1], sizeof(filename));
 		BLI_path_cwd(filename);
 
-		BPY_CTX_SETUP( BPY_run_python_script(C, filename, NULL, NULL) )
+		BPY_CTX_SETUP(BPY_filepath_exec(C, filename, NULL))
 
 		return 1;
 	} else {
@@ -878,10 +915,9 @@ static int run_python(int argc, char **argv, void *data)
 static int run_python_console(int UNUSED(argc), char **argv, void *data)
 {
 #ifdef WITH_PYTHON
-	bContext *C = data;	
-	const char *expr= "__import__('code').interact()";
+	bContext *C = data;
 
-	BPY_CTX_SETUP( BPY_eval_string(C, expr) )
+	BPY_CTX_SETUP(BPY_string_exec(C, "__import__('code').interact()"))
 
 	return 0;
 #else
@@ -890,6 +926,29 @@ static int run_python_console(int UNUSED(argc), char **argv, void *data)
 	return 0;
 #endif /* WITH_PYTHON */
 }
+
+static int set_addons(int argc, char **argv, void *data)
+{
+	/* workaround for scripts not getting a bpy.context.scene, causes internal errors elsewhere */
+	if (argc > 1) {
+#ifdef WITH_PYTHON
+		const int slen= strlen(argv[1]) + 10;
+		char *str= malloc(slen);
+		bContext *C= data;
+		BLI_snprintf(str, slen, "[__import__('bpy').utils.addon_enable(i) for i in '%s'.split(',')]", argv[1]);
+		BPY_CTX_SETUP(BPY_string_exec(C, str));
+		free(str);
+#else
+		(void)argv; (void)data; /* unused */
+#endif /* WITH_PYTHON */
+		return 1;
+	}
+	else {
+		printf("\nError: you must specify a comma separated list after '--addons'.\n");
+		return 0;
+	}
+}
+
 
 static int load_file(int UNUSED(argc), char **argv, void *data)
 {
@@ -905,18 +964,31 @@ static int load_file(int UNUSED(argc), char **argv, void *data)
 
 		/*we successfully loaded a blend file, get sure that
 		pointcache works */
-		if (retval!=0) {
+		if (retval != BKE_READ_FILE_FAIL) {
 			wmWindowManager *wm= CTX_wm_manager(C);
+
+			/* special case, 2.4x files */
+			if(wm==NULL && CTX_data_main(C)->wm.first==NULL) {
+				extern void wm_add_default(bContext *C);
+
+				/* wm_add_default() needs the screen to be set. */
+				CTX_wm_screen_set(C, CTX_data_main(C)->screen.first);
+				wm_add_default(C);
+			}
+
 			CTX_wm_manager_set(C, NULL); /* remove wm to force check */
 			WM_check(C);
 			G.relbase_valid = 1;
 			if (CTX_wm_manager(C) == NULL) CTX_wm_manager_set(C, wm); /* reset wm */
+
+			DAG_on_load_update(CTX_data_main(C), TRUE);
 		}
 
 		/* WM_read_file() runs normally but since we're in background mode do here */
 #ifdef WITH_PYTHON
 		/* run any texts that were loaded in and flagged as modules */
-		BPY_load_user_modules(C);
+		BPY_driver_reset();
+		BPY_modules_load_user(C);
 #endif
 
 		/* happens for the UI on file reading too (huh? (ton))*/
@@ -936,7 +1008,7 @@ static int load_file(int UNUSED(argc), char **argv, void *data)
 	return 0;
 }
 
-void setupArguments(bContext *C, bArgs *ba, SYS_SystemHandle *syshandle)
+static void setupArguments(bContext *C, bArgs *ba, SYS_SystemHandle *syshandle)
 {
 	static char output_doc[] = "<path>"
 		"\n\tSet the render path and file name."
@@ -995,7 +1067,16 @@ void setupArguments(bContext *C, bArgs *ba, SYS_SystemHandle *syshandle)
 	BLI_argsAdd(ba, 1, "-a", NULL, playback_doc, playback_mode, NULL);
 
 	BLI_argsAdd(ba, 1, "-d", "--debug", debug_doc, debug_mode, ba);
-    BLI_argsAdd(ba, 1, NULL, "--debug-fpe", "\n\tEnable floating point exceptions", set_fpe, NULL);
+	BLI_argsAdd(ba, 1, NULL, "--debug-fpe", "\n\tEnable floating point exceptions", set_fpe, NULL);
+
+	BLI_argsAdd(ba, 1, NULL, "--factory-startup", "\n\tSkip reading the "STRINGIFY(BLENDER_STARTUP_FILE)" in the users home directory", set_factory_startup, NULL);
+
+	/* TODO, add user env vars? */
+	BLI_argsAdd(ba, 1, NULL, "--env-system-config",		"\n\tSet the "STRINGIFY_ARG(BLENDER_SYSTEM_CONFIG)" environment variable", set_env, NULL);
+	BLI_argsAdd(ba, 1, NULL, "--env-system-datafiles",	"\n\tSet the "STRINGIFY_ARG(BLENDER_SYSTEM_DATAFILES)" environment variable", set_env, NULL);
+	BLI_argsAdd(ba, 1, NULL, "--env-system-scripts",	"\n\tSet the "STRINGIFY_ARG(BLENDER_SYSTEM_SCRIPTS)" environment variable", set_env, NULL);
+	BLI_argsAdd(ba, 1, NULL, "--env-system-plugins",	"\n\tSet the "STRINGIFY_ARG(BLENDER_SYSTEM_PLUGINS)" environment variable", set_env, NULL);
+	BLI_argsAdd(ba, 1, NULL, "--env-system-python",		"\n\tSet the "STRINGIFY_ARG(BLENDER_SYSTEM_PYTHON)" environment variable", set_env, NULL);
 
 	/* second pass: custom window stuff */
 	BLI_argsAdd(ba, 2, "-p", "--window-geometry", "<sx> <sy> <w> <h>\n\tOpen with lower left corner at <sx>, <sy> and width and height as <w>, <h>", prefsize, NULL);
@@ -1019,6 +1100,7 @@ void setupArguments(bContext *C, bArgs *ba, SYS_SystemHandle *syshandle)
 	BLI_argsAdd(ba, 4, "-j", "--frame-jump", "<frames>\n\tSet number of frames to step forward after each rendered frame", set_skip_frame, C);
 	BLI_argsAdd(ba, 4, "-P", "--python", "<filename>\n\tRun the given Python script (filename or Blender Text)", run_python, C);
 	BLI_argsAdd(ba, 4, NULL, "--python-console", "\n\tRun blender with an interactive console", run_python_console, C);
+	BLI_argsAdd(ba, 4, NULL, "--addons", "\n\tComma separated list of addons (no spaces)", set_addons, C);
 
 	BLI_argsAdd(ba, 4, "-o", "--render-output", output_doc, set_output, C);
 	BLI_argsAdd(ba, 4, "-E", "--engine", "<engine>\n\tSpecify the render engine\n\tuse -E help to list available engines", set_engine, C);
@@ -1063,7 +1145,7 @@ int main(int argc, char **argv)
 	// copy path to executable in bprogname. playanim and creting runtimes
 	// need this.
 
-	BLI_where_am_i(bprogname, argv[0]);
+	BLI_where_am_i(bprogname, sizeof(bprogname), argv[0]);
 	
 #ifdef BUILD_DATE	
 	strip_quotes(build_date);
@@ -1128,9 +1210,9 @@ int main(int argc, char **argv)
 		BLI_argsParse(ba, 3, NULL, NULL);
 
 		WM_init(C, argc, argv);
-		
+
 		/* this is properly initialized with user defs, but this is default */
-		BLI_where_is_temp( btempdir, 1 ); /* call after loading the startup.blend so we can read U.tempdir */
+		BLI_where_is_temp(btempdir, FILE_MAX, 1); /* call after loading the startup.blend so we can read U.tempdir */
 
 #ifndef DISABLE_SDL
 	BLI_setenv("SDL_VIDEODRIVER", "dummy");
@@ -1141,14 +1223,14 @@ int main(int argc, char **argv)
 
 		WM_init(C, argc, argv);
 
-		BLI_where_is_temp( btempdir, 0 ); /* call after loading the startup.blend so we can read U.tempdir */
+		BLI_where_is_temp(btempdir, FILE_MAX, 0); /* call after loading the startup.blend so we can read U.tempdir */
 	}
 #ifdef WITH_PYTHON
 	/**
 	 * NOTE: the U.pythondir string is NULL until WM_init() is executed,
 	 * so we provide the BPY_ function below to append the user defined
 	 * pythondir to Python's sys.path at this point.  Simply putting
-	 * WM_init() before BPY_start_python() crashes Blender at startup.
+	 * WM_init() before BPY_python_start() crashes Blender at startup.
 	 * Update: now this function also inits the bpymenus, which also depend
 	 * on U.pythondir.
 	 */
@@ -1193,7 +1275,7 @@ int main(int argc, char **argv)
 	return 0;
 } /* end of int main(argc,argv)	*/
 
-static void error_cb(char *err)
+static void error_cb(const char *err)
 {
 	
 	printf("%s\n", err);	/* XXX do this in WM too */

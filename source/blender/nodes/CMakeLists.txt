@@ -23,7 +23,7 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-SET(INC 
+set(INC 
 	.
 	../blenkernel
 	../blenlib
@@ -37,7 +37,7 @@ SET(INC
 	../../../extern/glew/include
 )
 
-SET(SRC
+set(SRC
 	intern/CMP_nodes/CMP_alphaOver.c
 	intern/CMP_nodes/CMP_bilateralblur.c
 	intern/CMP_nodes/CMP_blur.c
@@ -138,16 +138,20 @@ SET(SRC
 	intern/TEX_nodes/TEX_viewer.c
 	intern/TEX_util.c
 	intern/node_util.c
+
+	CMP_node.h
+	SHD_node.h
+	TEX_node.h
+	intern/CMP_util.h
+	intern/SHD_util.h
+	intern/TEX_util.h
+	intern/node_util.h
 )
 
-IF(WIN32)
-	LIST(APPEND INC ${PTHREADS_INC})
-ENDIF(WIN32)
+if(WITH_PYTHON)
+	set(INC ${INC} ../python ${PYTHON_INCLUDE_DIRS})
+	add_definitions(-DWITH_PYTHON)
+endif()
 
-IF(WITH_PYTHON)
-	SET(INC ${INC} ../python ${PYTHON_INC})
-	ADD_DEFINITIONS(-DWITH_PYTHON)
-ENDIF(WITH_PYTHON)
-
-BLENDERLIB(bf_nodes "${SRC}" "${INC}")
+blender_add_lib(bf_nodes "${SRC}" "${INC}")
 

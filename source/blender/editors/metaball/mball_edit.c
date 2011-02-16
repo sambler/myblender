@@ -35,6 +35,7 @@
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
 #include "BLI_rand.h"
+#include "BLI_utildefines.h"
 
 #include "DNA_meta_types.h"
 #include "DNA_object_types.h"
@@ -47,6 +48,7 @@
 #include "BKE_context.h"
 #include "BKE_mball.h"
 
+#include "ED_mball.h"
 #include "ED_screen.h"
 #include "ED_view3d.h"
 #include "ED_transform.h"
@@ -54,6 +56,8 @@
 
 #include "WM_api.h"
 #include "WM_types.h"
+
+#include "mball_intern.h"
 
 /* This function is used to free all MetaElems from MetaBall */
 void free_editMball(Object *obedit)
@@ -94,8 +98,6 @@ MetaElem *add_metaball_primitive(bContext *C, float mat[4][4], int type, int UNU
 	Object *obedit= CTX_data_edit_object(C);
 	MetaBall *mball = (MetaBall*)obedit->data;
 	MetaElem *ml;
-
-	if(!obedit) return NULL;
 
 	/* Deselect all existing metaelems */
 	ml= mball->editelems->first;
@@ -284,7 +286,7 @@ static int duplicate_metaelems_exec(bContext *C, wmOperator *UNUSED(op))
 			ml= ml->prev;
 		}
 		WM_event_add_notifier(C, NC_GEOM|ND_DATA, mb);
-		DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+		DAG_id_tag_update(obedit->data, 0);
 	}
 
 	return OPERATOR_FINISHED;
@@ -343,7 +345,7 @@ static int delete_metaelems_exec(bContext *C, wmOperator *UNUSED(op))
 			ml= next;
 		}
 		WM_event_add_notifier(C, NC_GEOM|ND_DATA, mb);
-		DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+		DAG_id_tag_update(obedit->data, 0);
 	}
 
 	return OPERATOR_FINISHED;
@@ -393,7 +395,7 @@ static int hide_metaelems_exec(bContext *C, wmOperator *op)
 			}
 		}
 		WM_event_add_notifier(C, NC_GEOM|ND_DATA, mb);
-		DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+		DAG_id_tag_update(obedit->data, 0);
 	}
 
 	return OPERATOR_FINISHED;
@@ -434,7 +436,7 @@ static int reveal_metaelems_exec(bContext *C, wmOperator *UNUSED(op))
 			ml= ml->next;
 		}
 		WM_event_add_notifier(C, NC_GEOM|ND_DATA, mb);
-		DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+		DAG_id_tag_update(obedit->data, 0);
 	}
 	
 	return OPERATOR_FINISHED;
@@ -606,7 +608,7 @@ static void free_undoMball(void *lbv)
 	MEM_freeN(lb);
 }
 
-ListBase *metaball_get_editelems(Object *ob)
+static ListBase *metaball_get_editelems(Object *ob)
 {
 	if(ob && ob->type==OB_MBALL) {
 		struct MetaBall *mb= (struct MetaBall*)ob->data;

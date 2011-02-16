@@ -41,6 +41,7 @@
 
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_fcurve.h"
 #include "BKE_animsys.h"
@@ -166,7 +167,7 @@ void copy_fcurves (ListBase *dst, ListBase *src)
 /* ----------------- Finding F-Curves -------------------------- */
 
 /* high level function to get an fcurve from C without having the rna */
-FCurve *id_data_find_fcurve(ID *id, void *data, StructRNA *type, char *prop_name, int index)
+FCurve *id_data_find_fcurve(ID *id, void *data, StructRNA *type, const char *prop_name, int index)
 {
 	/* anim vars */
 	AnimData *adt= BKE_animdata_from_id(id);
@@ -220,7 +221,7 @@ FCurve *list_find_fcurve (ListBase *list, const char rna_path[], const int array
 	for (fcu= list->first; fcu; fcu= fcu->next) {
 		/* simple string-compare (this assumes that they have the same root...) */
 		if (fcu->rna_path && !strcmp(fcu->rna_path, rna_path)) {
-			/* now check indicies */
+			/* now check indices */
 			if (fcu->array_index == array_index)
 				return fcu;
 		}
@@ -471,11 +472,7 @@ void calc_fcurve_bounds (FCurve *fcu, float *xmin, float *xmax, float *ymin, flo
 		foundvert=1;
 	}
 	
-	/* minimum sizes are 1.0f */
 	if (foundvert) {
-		if (xminv == xmaxv) xmaxv += 1.0f;
-		if (yminv == ymaxv) ymaxv += 1.0f;
-		
 		if (xmin) *xmin= xminv;
 		if (xmax) *xmax= xmaxv;
 		
@@ -483,10 +480,13 @@ void calc_fcurve_bounds (FCurve *fcu, float *xmin, float *xmax, float *ymin, flo
 		if (ymax) *ymax= ymaxv;
 	}
 	else {
+		if (G.f & G_DEBUG)
+			printf("F-Curve calc bounds didn't find anything, so assuming minimum bounds of 1.0\n");
+			
 		if (xmin) *xmin= 0.0f;
-		if (xmax) *xmax= 0.0f;
+		if (xmax) *xmax= 1.0f;
 		
-		if (ymin) *ymin= 1.0f;
+		if (ymin) *ymin= 0.0f;
 		if (ymax) *ymax= 1.0f;
 	}
 }
@@ -884,7 +884,7 @@ typedef struct DriverVarTypeInfo {
 	
 	/* allocation of target slots */
 	int num_targets; 						/* number of target slots required */
-	char *target_names[MAX_DRIVER_TARGETS];	/* UI names that should be given to the slots */
+	const char *target_names[MAX_DRIVER_TARGETS];	/* UI names that should be given to the slots */
 	int target_flags[MAX_DRIVER_TARGETS];	/* flags defining the requirements for each slot */
 } DriverVarTypeInfo;
 
@@ -934,31 +934,44 @@ static float dtar_get_prop_val (ChannelDriver *driver, DriverTarget *dtar)
 	
 	/* get property to read from, and get value as appropriate */
 	if (RNA_path_resolve_full(&id_ptr, dtar->rna_path, &ptr, &prop, &index)) {
-		switch (RNA_property_type(prop)) {
-			case PROP_BOOLEAN:
-				if (RNA_property_array_length(&ptr, prop))
+		if(RNA_property_array_check(&ptr, prop)) {
+			/* array */
+			if (index < RNA_property_array_length(&ptr, prop)) {	
+				switch (RNA_property_type(prop)) {
+				case PROP_BOOLEAN:
 					value= (float)RNA_property_boolean_get_index(&ptr, prop, index);
-				else
-					value= (float)RNA_property_boolean_get(&ptr, prop);
+					break;
+				case PROP_INT:
+					value= (float)RNA_property_int_get_index(&ptr, prop, index);
+					break;
+				case PROP_FLOAT:
+					value= RNA_property_float_get_index(&ptr, prop, index);
+					break;
+				default:
+					break;
+				}
+			}
+		}
+		else {
+			/* not an array */
+			switch (RNA_property_type(prop)) {
+			case PROP_BOOLEAN:
+				value= (float)RNA_property_boolean_get(&ptr, prop);
 				break;
 			case PROP_INT:
-				if (RNA_property_array_length(&ptr, prop))
-					value= (float)RNA_property_int_get_index(&ptr, prop, index);
-				else
-					value= (float)RNA_property_int_get(&ptr, prop);
+				value= (float)RNA_property_int_get(&ptr, prop);
 				break;
 			case PROP_FLOAT:
-				if (RNA_property_array_length(&ptr, prop))
-					value= RNA_property_float_get_index(&ptr, prop, index);
-				else
-					value= RNA_property_float_get(&ptr, prop);
+				value= RNA_property_float_get(&ptr, prop);
 				break;
 			case PROP_ENUM:
 				value= (float)RNA_property_enum_get(&ptr, prop);
 				break;
 			default:
 				break;
+			}
 		}
+
 	}
 	else {
 		if (G.f & G_DEBUG)
@@ -1189,7 +1202,7 @@ static float dvar_eval_transChan (ChannelDriver *driver, DriverVar *dvar)
 /* ......... */
 
 /* Table of Driver Varaiable Type Info Data */
-DriverVarTypeInfo dvar_types[MAX_DVAR_TYPES] = {
+static DriverVarTypeInfo dvar_types[MAX_DVAR_TYPES] = {
 	BEGIN_DVAR_TYPEDEF(DVAR_TYPE_SINGLE_PROP)
 		dvar_eval_singleProp, /* eval callback */
 		1, /* number of targets used */
@@ -1220,7 +1233,7 @@ DriverVarTypeInfo dvar_types[MAX_DVAR_TYPES] = {
 };
 
 /* Get driver variable typeinfo */
-DriverVarTypeInfo *get_dvar_typeinfo (int type)
+static DriverVarTypeInfo *get_dvar_typeinfo (int type)
 {
 	/* check if valid type */
 	if ((type >= 0) && (type < MAX_DVAR_TYPES))
@@ -1316,7 +1329,7 @@ DriverVar *driver_add_new_variable (ChannelDriver *driver)
 	
 #ifdef WITH_PYTHON
 	/* since driver variables are cached, the expression needs re-compiling too */
-	if(driver->type==DRIVER_TYPE_PYTHON)
+	if (driver->type==DRIVER_TYPE_PYTHON)
 		driver->flag |= DRIVER_FLAG_RENAMEVAR;
 #endif
 
@@ -1501,7 +1514,7 @@ static float evaluate_driver (ChannelDriver *driver, float UNUSED(evaltime))
 				/* this evaluates the expression using Python,and returns its result:
 				 * 	- on errors it reports, then returns 0.0f
 				 */
-				driver->curval= BPY_eval_driver(driver);
+				driver->curval= BPY_driver_exec(driver);
 			}
 #endif /* WITH_PYTHON*/
 		}

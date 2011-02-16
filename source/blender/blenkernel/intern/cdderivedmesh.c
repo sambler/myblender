@@ -36,17 +36,18 @@
 #include <string.h>
 #include "BIF_gl.h"
 
-#include "BKE_cdderivedmesh.h"
-#include "BKE_global.h"
-#include "BKE_mesh.h"
-#include "BKE_paint.h"
-#include "BKE_utildefines.h"
-
 #include "BLI_blenlib.h"
 #include "BLI_edgehash.h"
 #include "BLI_editVert.h"
 #include "BLI_math.h"
 #include "BLI_pbvh.h"
+#include "BLI_utildefines.h"
+
+#include "BKE_cdderivedmesh.h"
+#include "BKE_global.h"
+#include "BKE_mesh.h"
+#include "BKE_paint.h"
+
 
 #include "DNA_meshdata_types.h"
 #include "DNA_object_types.h"
@@ -75,6 +76,7 @@ typedef struct {
 	/* Cached */
 	struct PBVH *pbvh;
 	int pbvh_draw;
+
 	/* Mesh connectivity */
 	struct ListBase *fmap;
 	struct IndexNode *fmap_mem;
@@ -189,7 +191,7 @@ static ListBase *cdDM_getFaceMap(Object *ob, DerivedMesh *dm)
 static int can_pbvh_draw(Object *ob, DerivedMesh *dm)
 {
 	CDDerivedMesh *cddm = (CDDerivedMesh*) dm;
-	Mesh *me= (ob)? ob->data: NULL;
+	Mesh *me= ob->data;
 
 	if(ob->sculpt->modifiers_active) return 0;
 
@@ -199,7 +201,6 @@ static int can_pbvh_draw(Object *ob, DerivedMesh *dm)
 static struct PBVH *cdDM_getPBVH(Object *ob, DerivedMesh *dm)
 {
 	CDDerivedMesh *cddm = (CDDerivedMesh*) dm;
-	Mesh *me= (ob)? ob->data: NULL;
 
 	if(!ob) {
 		cddm->pbvh= NULL;
@@ -217,13 +218,40 @@ static struct PBVH *cdDM_getPBVH(Object *ob, DerivedMesh *dm)
 	   this derivedmesh is just original mesh. it's the multires subsurf dm
 	   that this is actually for, to support a pbvh on a modified mesh */
 	if(!cddm->pbvh && ob->type == OB_MESH) {
+		Mesh *me= ob->data;
 		cddm->pbvh = BLI_pbvh_new();
 		cddm->pbvh_draw = can_pbvh_draw(ob, dm);
 		BLI_pbvh_build_mesh(cddm->pbvh, me->mface, me->mvert,
 				   me->totface, me->totvert);
+
+		if(ob->sculpt->modifiers_active) {
+			float (*vertCos)[3];
+			int totvert;
+
+			totvert= dm->getNumVerts(dm);
+			vertCos= MEM_callocN(3*totvert*sizeof(float), "cdDM_getPBVH vertCos");
+			dm->getVertCos(dm, vertCos);
+			BLI_pbvh_apply_vertCos(cddm->pbvh, vertCos);
+			MEM_freeN(vertCos);
+		}
 	}
 
 	return cddm->pbvh;
+}
+
+/* update vertex normals so that drawing smooth faces works during sculpt
+   TODO: proper fix is to support the pbvh in all drawing modes */
+static void cdDM_update_normals_from_pbvh(DerivedMesh *dm)
+{
+	CDDerivedMesh *cddm = (CDDerivedMesh*) dm;
+	float (*face_nors)[3];
+
+	if(!cddm->pbvh || !cddm->pbvh_draw || !dm->numFaceData)
+		return;
+
+	face_nors = CustomData_get_layer(&dm->faceData, CD_NORMAL);
+
+	BLI_pbvh_update(cddm->pbvh, PBVH_UpdateNormals, face_nors);
 }
 
 static void cdDM_drawVerts(DerivedMesh *dm)
@@ -538,6 +566,8 @@ static void cdDM_drawFacesColored(DerivedMesh *dm, int useTwoSided, unsigned cha
 	if(col1 && col2)
 		glEnable(GL_CULL_FACE);
 
+	cdDM_update_normals_from_pbvh(dm);
+
 	if( GPU_buffer_legacy(dm) ) {
 		DEBUG_VBO( "Using legacy code. cdDM_drawFacesColored\n" );
 		glShadeModel(GL_SMOOTH);
@@ -616,6 +646,8 @@ static void cdDM_drawFacesTex_common(DerivedMesh *dm,
 	MCol *mcol = dm->getFaceDataArray(dm, CD_WEIGHT_MCOL);
 	if(!mcol)
 		mcol = dm->getFaceDataArray(dm, CD_MCOL);
+
+	cdDM_update_normals_from_pbvh(dm);
 
 	if( GPU_buffer_legacy(dm) ) {
 		DEBUG_VBO( "Using legacy code. cdDM_drawFacesTex_common\n" );
@@ -697,7 +729,7 @@ static void cdDM_drawFacesTex_common(DerivedMesh *dm,
 		GPU_vertex_setup( dm );
 		GPU_normal_setup( dm );
 		GPU_uv_setup( dm );
-		if( col != 0 ) {
+		if( col != NULL ) {
 			/*if( realcol && dm->drawObject->colType == CD_TEXTURE_MCOL )  {
 				col = 0;
 			} else if( mcol && dm->drawObject->colType == CD_MCOL ) {
@@ -725,6 +757,7 @@ static void cdDM_drawFacesTex_common(DerivedMesh *dm,
 
 		if( !GPU_buffer_legacy(dm) ) {
 			glShadeModel( GL_SMOOTH );
+			lastFlag = 0;
 			for(i = 0; i < dm->drawObject->nelements/3; i++) {
 				int actualFace = dm->drawObject->faceRemap[i];
 				int flag = 1;
@@ -735,6 +768,7 @@ static void cdDM_drawFacesTex_common(DerivedMesh *dm,
 				else {
 					if(index) {
 						orig = index[actualFace];
+						if(orig == ORIGINDEX_NONE) continue;
 						if(drawParamsMapped)
 							flag = drawParamsMapped(userData, orig);
 					}
@@ -791,6 +825,8 @@ static void cdDM_drawMappedFaces(DerivedMesh *dm, int (*setDrawOptions)(void *us
 		mc = DM_get_face_data_layer(dm, CD_WEIGHT_MCOL);
 	if(!mc)
 		mc = DM_get_face_data_layer(dm, CD_MCOL);
+
+	cdDM_update_normals_from_pbvh(dm);
 
 	/* back-buffer always uses legacy since VBO's would need the
 	 * color array temporarily overwritten for drawing, then reset. */
@@ -934,25 +970,27 @@ static void cdDM_drawMappedFacesGLSL(DerivedMesh *dm, int (*setMaterial)(int, vo
 	MFace *mface = cddm->mface;
 	MTFace *tf = dm->getFaceDataArray(dm, CD_MTFACE);
 	float (*nors)[3] = dm->getFaceDataArray(dm, CD_NORMAL);
-	int a, b, dodraw, smoothnormal, matnr, new_matnr;
+	int a, b, dodraw, matnr, new_matnr;
 	int transp, new_transp, orig_transp;
 	int orig, *index = dm->getFaceDataArray(dm, CD_ORIGINDEX);
 
+	cdDM_update_normals_from_pbvh(dm);
+
 	matnr = -1;
-	smoothnormal = 0;
 	dodraw = 0;
 	transp = GPU_get_material_blend_mode();
 	orig_transp = transp;
 
 	glShadeModel(GL_SMOOTH);
 
-	if( GPU_buffer_legacy(dm) || setDrawOptions != 0 ) {
+	if( GPU_buffer_legacy(dm) || setDrawOptions != NULL ) {
 		DEBUG_VBO( "Using legacy code. cdDM_drawMappedFacesGLSL\n" );
 		memset(&attribs, 0, sizeof(attribs));
 
 		glBegin(GL_QUADS);
 
 		for(a = 0; a < dm->numFaceData; a++, mface++) {
+			const int smoothnormal = (mface->flag & ME_SMOOTH);
 			new_matnr = mface->mat_nr + 1;
 
 			if(new_matnr != matnr) {
@@ -997,8 +1035,6 @@ static void cdDM_drawMappedFacesGLSL(DerivedMesh *dm, int (*setMaterial)(int, vo
 				}
 			}
 
-			smoothnormal = (mface->flag & ME_SMOOTH);
-
 			if(!smoothnormal) {
 				if(nors) {
 					glNormal3fv(nors[a]);
@@ -1030,7 +1066,7 @@ static void cdDM_drawMappedFacesGLSL(DerivedMesh *dm, int (*setMaterial)(int, vo
 		}																			\
 		if(attribs.tottang) {														\
 			float *tang = attribs.tang.array[a*4 + vert];							\
-			glVertexAttrib3fvARB(attribs.tang.glIndex, tang);						\
+			glVertexAttrib4fvARB(attribs.tang.glIndex, tang);						\
 		}																			\
 		if(smoothnormal)															\
 			glNormal3sv(mvert[index].no);											\
@@ -1050,8 +1086,8 @@ static void cdDM_drawMappedFacesGLSL(DerivedMesh *dm, int (*setMaterial)(int, vo
 		glEnd();
 	}
 	else {
-		GPUBuffer *buffer = 0;
-		char *varray = 0;
+		GPUBuffer *buffer = NULL;
+		char *varray = NULL;
 		int numdata = 0, elementsize = 0, offset;
 		int start = 0, numfaces = 0, prevdraw = 0, curface = 0;
 		int i;
@@ -1088,9 +1124,9 @@ static void cdDM_drawMappedFacesGLSL(DerivedMesh *dm, int (*setMaterial)(int, vo
 
 							if( numdata != 0 ) {
 
-								GPU_buffer_free(buffer,0);
+								GPU_buffer_free(buffer, NULL);
 
-								buffer = 0;
+								buffer = NULL;
 							}
 
 						}
@@ -1122,22 +1158,22 @@ static void cdDM_drawMappedFacesGLSL(DerivedMesh *dm, int (*setMaterial)(int, vo
 						}	
 						if(attribs.tottang) {
 							datatypes[numdata].index = attribs.tang.glIndex;
-							datatypes[numdata].size = 3;
+							datatypes[numdata].size = 4;
 							datatypes[numdata].type = GL_FLOAT;
 							numdata++;
 						}
 						if( numdata != 0 ) {
 							elementsize = GPU_attrib_element_size( datatypes, numdata );
-							buffer = GPU_buffer_alloc( elementsize*dm->drawObject->nelements, 0 );
-							if( buffer == 0 ) {
+							buffer = GPU_buffer_alloc( elementsize*dm->drawObject->nelements, NULL );
+							if( buffer == NULL ) {
 								GPU_buffer_unbind();
 								dm->drawObject->legacy = 1;
 								return;
 							}
 							varray = GPU_buffer_lock_stream(buffer);
-							if( varray == 0 ) {
+							if( varray == NULL ) {
 								GPU_buffer_unbind();
-								GPU_buffer_free(buffer, 0);
+								GPU_buffer_free(buffer, NULL);
 								dm->drawObject->legacy = 1;
 								return;
 							}
@@ -1212,12 +1248,12 @@ static void cdDM_drawMappedFacesGLSL(DerivedMesh *dm, int (*setMaterial)(int, vo
 					}	
 					if(attribs.tottang) {
 						float *tang = attribs.tang.array[a*4 + 0];
-						VECCOPY((float *)&varray[elementsize*curface*3+offset], tang);
+						QUATCOPY((float *)&varray[elementsize*curface*3+offset], tang);
 						tang = attribs.tang.array[a*4 + 1];
-						VECCOPY((float *)&varray[elementsize*curface*3+offset+elementsize], tang);
+						QUATCOPY((float *)&varray[elementsize*curface*3+offset+elementsize], tang);
 						tang = attribs.tang.array[a*4 + 2];
-						VECCOPY((float *)&varray[elementsize*curface*3+offset+elementsize*2], tang);
-						offset += sizeof(float)*3;
+						QUATCOPY((float *)&varray[elementsize*curface*3+offset+elementsize*2], tang);
+						offset += sizeof(float)*4;
 					}
 				}
 				curface++;
@@ -1252,12 +1288,12 @@ static void cdDM_drawMappedFacesGLSL(DerivedMesh *dm, int (*setMaterial)(int, vo
 						}	
 						if(attribs.tottang) {
 							float *tang = attribs.tang.array[a*4 + 2];
-							VECCOPY((float *)&varray[elementsize*curface*3+offset], tang);
+							QUATCOPY((float *)&varray[elementsize*curface*3+offset], tang);
 							tang = attribs.tang.array[a*4 + 3];
-							VECCOPY((float *)&varray[elementsize*curface*3+offset+elementsize], tang);
+							QUATCOPY((float *)&varray[elementsize*curface*3+offset+elementsize], tang);
 							tang = attribs.tang.array[a*4 + 0];
-							VECCOPY((float *)&varray[elementsize*curface*3+offset+elementsize*2], tang);
-							offset += sizeof(float)*3;
+							QUATCOPY((float *)&varray[elementsize*curface*3+offset+elementsize*2], tang);
+							offset += sizeof(float)*4;
 						}
 					}
 					curface++;
@@ -1276,7 +1312,7 @@ static void cdDM_drawMappedFacesGLSL(DerivedMesh *dm, int (*setMaterial)(int, vo
 			}
 			GPU_buffer_unbind();
 		}
-		GPU_buffer_free( buffer, 0 );
+		GPU_buffer_free( buffer, NULL );
 	}
 
 	glShadeModel(GL_FLAT);
@@ -1568,7 +1604,6 @@ DerivedMesh *CDDM_from_editmesh(EditMesh *em, Mesh *UNUSED(me))
 		mv->no[2] = eve->no[2] * 32767.0;
 		mv->bweight = (unsigned char) (eve->bweight * 255.0f);
 
-		mv->mat_nr = 0;
 		mv->flag = 0;
 
 		*index = i;
@@ -1619,7 +1654,7 @@ DerivedMesh *CDDM_from_editmesh(EditMesh *em, Mesh *UNUSED(me))
 
 DerivedMesh *CDDM_from_curve(Object *ob)
 {
-	return CDDM_from_curve_customDB(ob, &((Curve *)ob->data)->disp);
+	return CDDM_from_curve_customDB(ob, &ob->disp);
 }
 
 DerivedMesh *CDDM_from_curve_customDB(Object *ob, ListBase *dispbase)

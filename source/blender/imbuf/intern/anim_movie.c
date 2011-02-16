@@ -60,10 +60,13 @@
 
 #include "BLI_blenlib.h" /* BLI_remlink BLI_filesize BLI_addtail
 							BLI_countlist BLI_stringdec */
+#include "BLI_utildefines.h"
+
 #include "MEM_guardedalloc.h"
 
 #include "DNA_userdef_types.h"
-#include "BKE_utildefines.h"
+
+
 #include "BKE_global.h"
 #include "BKE_depsgraph.h"
 
@@ -215,7 +218,7 @@ int ismovie(char *name) {
 
 #else
 
-int ismovie(char *UNUSED(name)) {
+int ismovie(const char *UNUSED(name)) {
 	return 0;
 }
 
@@ -510,7 +513,7 @@ static ImBuf * avi_fetchibuf (struct anim *anim, int position) {
 
 #ifdef WITH_FFMPEG
 
-extern void do_init_ffmpeg();
+extern void do_init_ffmpeg(void);
 
 #ifdef FFMPEG_CODEC_IS_POINTER
 static AVCodecContext* get_codec_from_stream(AVStream* stream)

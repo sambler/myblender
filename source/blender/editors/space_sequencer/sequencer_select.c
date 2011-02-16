@@ -35,9 +35,9 @@
 #endif
 #include <sys/types.h>
 
-
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
 #include "DNA_scene_types.h"
 
@@ -60,7 +60,7 @@
 #include "sequencer_intern.h"
 static void *find_nearest_marker(int UNUSED(d1), int UNUSED(d2)) {return NULL;}
 	
-void select_surrounding_handles(Scene *scene, Sequence *test) /* XXX BRING BACK */
+static void select_surrounding_handles(Scene *scene, Sequence *test) /* XXX BRING BACK */
 {
 	Sequence *neighbor;
 	
@@ -154,7 +154,7 @@ void select_surround_from_last(Scene *scene)
 #endif
 
 
-void select_single_seq(Scene *scene, Sequence *seq, int deselect_all) /* BRING BACK */
+static void select_single_seq(Scene *scene, Sequence *seq, int deselect_all) /* BRING BACK */
 {
 	Editing *ed= seq_give_editing(scene, FALSE);
 	
@@ -177,7 +177,7 @@ void select_single_seq(Scene *scene, Sequence *seq, int deselect_all) /* BRING B
 // remove this function, replace with invert operator
 //void swap_select_seq(Scene *scene)
 
-void select_neighbor_from_last(Scene *scene, int lr)
+static void select_neighbor_from_last(Scene *scene, int lr)
 {
 	Sequence *seq= seq_active_get(scene);
 	Sequence *neighbor;
@@ -363,16 +363,16 @@ static int sequencer_select_invoke(bContext *C, wmOperator *op, wmEvent *event)
 		{
 			SpaceSeq *sseq= CTX_wm_space_seq(C);
 			if (sseq && sseq->flag & SEQ_MARKER_TRANS) {
-				TimeMarker *marker;
+				TimeMarker *tmarker;
 
-				for (marker= scene->markers.first; marker; marker= marker->next) {
-					if(	((x < CFRA) && marker->frame < CFRA) ||
-						((x >= CFRA) && marker->frame >= CFRA)
+				for (tmarker= scene->markers.first; tmarker; tmarker= tmarker->next) {
+					if(	((x < CFRA) && tmarker->frame < CFRA) ||
+						((x >= CFRA) && tmarker->frame >= CFRA)
 					) {
-						marker->flag |= SELECT;
+						tmarker->flag |= SELECT;
 					}
 					else {
-						marker->flag &= ~SELECT;
+						tmarker->flag &= ~SELECT;
 					}
 				}
 			}

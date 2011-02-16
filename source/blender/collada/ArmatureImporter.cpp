@@ -22,6 +22,9 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/* COLLADABU_ASSERT, may be able to remove later */
+#include "COLLADABUPlatform.h"
+
 #include <algorithm>
 
 #include "COLLADAFWUniqueId.h"
@@ -200,6 +203,7 @@ void ArmatureImporter::fix_leaf_bones()
 	}
 }
 
+#if 0
 void ArmatureImporter::set_leaf_bone_shapes(Object *ob_arm)
 {
 	bPose *pose = ob_arm->pose;
@@ -218,7 +222,6 @@ void ArmatureImporter::set_leaf_bone_shapes(Object *ob_arm)
 	}
 }
 
-#if 0
 void ArmatureImporter::set_euler_rotmode()
 {
 	// just set rotmode = ROT_MODE_EUL on pose channel for each joint
@@ -373,7 +376,7 @@ void ArmatureImporter::create_armature_bones(SkinInfo& skin)
 	leaf_bones.clear();
 	totbone = 0;
 	// bone_direction_row = 1; // TODO: don't default to Y but use asset and based on it decide on default row
-	leaf_bone_length = 0.1f;
+	leaf_bone_length = FLT_MAX;
 	// min_angle = 360.0f;		// minimum angle between bone head-tail and a row of bone matrix
 
 	// create bones
@@ -402,10 +405,9 @@ void ArmatureImporter::create_armature_bones(SkinInfo& skin)
 	// exit armature edit mode
 	ED_armature_from_edit(ob_arm);
 	ED_armature_edit_free(ob_arm);
-	DAG_id_flush_update(&ob_arm->id, OB_RECALC_OB|OB_RECALC_DATA);
+	DAG_id_tag_update(&ob_arm->id, OB_RECALC_OB|OB_RECALC_DATA);
 
-	set_leaf_bone_shapes(ob_arm);
-
+	// set_leaf_bone_shapes(ob_arm);
 	// set_euler_rotmode();
 }
 

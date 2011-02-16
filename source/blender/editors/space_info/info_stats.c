@@ -34,14 +34,16 @@
 #include "DNA_meta_types.h"
 #include "DNA_scene_types.h"
 
+#include "BLI_utildefines.h"
+
 #include "BKE_anim.h"
 #include "BKE_displist.h"
 #include "BKE_DerivedMesh.h"
 #include "BKE_key.h"
 #include "BKE_mesh.h"
 #include "BKE_particle.h"
-#include "BKE_utildefines.h"
 
+#include "ED_info.h"
 #include "ED_armature.h"
 #include "ED_mesh.h"
 #include "ED_curve.h" /* for ED_curve_editnurbs */
@@ -91,13 +93,12 @@ static void stats_object(Object *ob, int sel, int totob, SceneStats *stats)
 	case OB_SURF:
 	case OB_CURVE:
 	case OB_FONT: {
-		Curve *cu= ob->data;
 		int tot= 0, totf= 0;
 
 		stats->totcurve += totob;
 
-		if(cu->disp.first)
-			count_displist(&cu->disp, &tot, &totf);
+		if(ob->disp.first)
+			count_displist(&ob->disp, &tot, &totf);
 
 		tot *= totob;
 		totf *= totob;
@@ -368,9 +369,9 @@ static void stats_string(Scene *scene)
 	mmap_in_use= MEM_get_mapped_memory_in_use();
 
 	/* get memory statistics */
-	s= memstr + sprintf(memstr, " | Mem:%.2fM", ((mem_in_use-mmap_in_use)>>10)/1024.0);
+	s= memstr + sprintf(memstr, " | Mem:%.2fM", (double)((mem_in_use-mmap_in_use)>>10)/1024.0);
 	if(mmap_in_use)
-		sprintf(s, " (%.2fM)", ((mmap_in_use)>>10)/1024.0);
+		sprintf(s, " (%.2fM)", (double)((mmap_in_use)>>10)/1024.0);
 
 	s= stats->infostr;
 
@@ -418,7 +419,7 @@ void ED_info_stats_clear(Scene *scene)
 	}
 }
 
-char *ED_info_stats_string(Scene *scene)
+const char *ED_info_stats_string(Scene *scene)
 {
 	if(!scene->stats)
 		stats_update(scene);

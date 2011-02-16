@@ -75,7 +75,8 @@ typedef struct wmDropBoxMap {
 	
 } wmDropBoxMap;
 
-ListBase *WM_dropboxmap_find(char *idname, int spaceid, int regionid)
+/* spaceid/regionid is zero for window drop maps */
+ListBase *WM_dropboxmap_find(const char *idname, int spaceid, int regionid)
 {
 	wmDropBoxMap *dm;
 	
@@ -103,6 +104,7 @@ wmDropBox *WM_dropbox_add(ListBase *lb, const char *idname, int (*poll)(bContext
 	drop->poll= poll;
 	drop->copy= copy;
 	drop->ot= WM_operatortype_find(idname, 0);
+	drop->opcontext= WM_OP_INVOKE_DEFAULT;
 	
 	if(drop->ot==NULL) {
 		MEM_freeN(drop);
@@ -256,7 +258,7 @@ static void wm_drop_operator_draw(char *name, int x, int y)
 	UI_DrawString(x+4, y+4, name);
 }
 
-static char *wm_drag_name(wmDrag *drag)
+static const char *wm_drag_name(wmDrag *drag)
 {
 	switch(drag->type) {
 		case WM_DRAG_ID:

@@ -25,8 +25,8 @@
  * ***** END GPL LICENSE BLOCK *****
  * */
 
-#ifndef BLI_MATH_VECTOR
-#define BLI_MATH_VECTOR
+#ifndef BLI_MATH_VECTOR_H
+#define BLI_MATH_VECTOR_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -34,7 +34,7 @@ extern "C" {
 
 #include "BLI_math_inline.h"
 
-#ifdef BLI_MATH_INLINE
+#ifdef BLI_MATH_INLINE_H
 #include "intern/math_vector_inline.c"
 #endif
 
@@ -84,6 +84,8 @@ MINLINE void madd_v4_v4fl(float r[4], const float a[4], float f);
 
 MINLINE void negate_v3(float r[3]);
 MINLINE void negate_v3_v3(float r[3], const float a[3]);
+MINLINE void negate_v4(float r[4]);
+MINLINE void negate_v4_v4(float r[4], const float a[3]);
 
 MINLINE float dot_v2v2(const float a[2], const float b[2]);
 MINLINE float dot_v3v3(const float a[3], const float b[3]);
@@ -121,15 +123,17 @@ void mid_v3_v3v3(float r[3], const float a[3], const float b[3]);
 
 /********************************* Comparison ********************************/
 
-MINLINE int is_zero_v3(float a[3]);
-MINLINE int is_one_v3(float a[3]);
+MINLINE int is_zero_v3(const float a[3]);
+MINLINE int is_zero_v4(const float a[4]);
+MINLINE int is_one_v3(const float a[3]);
 
-MINLINE int equals_v3v3(float a[3], float b[3]);
-MINLINE int compare_v3v3(float a[3], float b[3], float limit);
-MINLINE int compare_len_v3v3(float a[3], float b[3], float limit);
+MINLINE int equals_v2v2(const float *v1, const float *v2);
+MINLINE int equals_v3v3(const float a[3], const float b[3]);
+MINLINE int compare_v3v3(const float a[3], const float b[3], const float limit);
+MINLINE int compare_len_v3v3(const float a[3], const float b[3], const float limit);
 
-MINLINE int compare_v4v4(float a[4], float b[4], float limit);
-MINLINE int equals_v4v4(float a[4], float b[4]);
+MINLINE int compare_v4v4(const float a[4], const float b[4], const float limit);
+MINLINE int equals_v4v4(const float a[4], const float b[4]);
 
 MINLINE float line_point_side_v2(const float l1[2], const float l2[2], const float pt[2]);
 
@@ -149,6 +153,7 @@ void angle_quad_v3(float angles[4], const float v1[3], const float v2[3], const 
 
 /********************************* Geometry **********************************/
 
+void project_v2_v2v2(float c[2], const float v1[2], const float v2[2]);
 void project_v3_v3v3(float r[3], const float p[3], const float n[3]);
 void reflect_v3_v3v3(float r[3], const float v[3], const float n[3]);
 void ortho_basis_v3v3_v3(float r1[3], float r2[3], const float a[3]);
@@ -170,14 +175,20 @@ void minmax_v3v3_v3(float min[3], float max[3], const float vec[3]);
 /***************************** Array Functions *******************************/
 /* attempted to follow fixed length vertex functions. names could be improved*/
 void range_vni(int *array, const int size, const int start);
+void negate_vn(float *array_tar, const int size);
+void negate_vn_vn(float *array_tar, const float *array_src, const int size);
 void mul_vn_fl(float *array, const int size, const float f);
 void mul_vn_vn_fl(float *array_tar, const float *array_src, const int size, const float f);
 void add_vn_vn(float *array_tar, const float *array_src, const int size);
+void add_vn_vnvn(float *array_tar, const float *array_src_a, const float *array_src_b, const int size);
+void sub_vn_vn(float *array_tar, const float *array_src, const int size);
+void sub_vn_vnvn(float *array_tar, const float *array_src_a, const float *array_src_b, const int size);
 void fill_vni(int *array_tar, const int size, const int val);
+void fill_vn(float *array_tar, const int size, const float val);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* BLI_MATH_VECTOR */
+#endif /* BLI_MATH_VECTOR_H */
 

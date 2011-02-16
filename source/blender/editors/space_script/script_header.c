@@ -29,24 +29,21 @@
 #include <string.h>
 #include <stdio.h>
 
-
-
 #include "BLI_blenlib.h"
-#include "BKE_utildefines.h"
+#include "BLI_utildefines.h"
+
+
 #include "BKE_context.h"
 
 #include "ED_screen.h"
 #include "ED_types.h"
 #include "ED_util.h"
 
-
-
 #include "UI_interface.h"
 #include "UI_resources.h"
 #include "UI_view2d.h"
 
 #include "script_intern.h"
-
 
 /* ************************ header area region *********************** */
 
@@ -81,10 +78,10 @@ static uiBlock *dummy_viewmenu(bContext *C, ARegion *ar, void *UNUSED(arg))
 	return block;
 }
 
-static void do_script_buttons(bContext *UNUSED(C), void *UNUSED(arg), int event)
+static void do_script_buttons(bContext *UNUSED(C), void *UNUSED(arg), int UNUSED(event))
 {
-	switch(event) {
-	}
+	//switch(event) {
+	//}
 }
 
 

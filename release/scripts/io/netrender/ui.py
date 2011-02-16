@@ -71,11 +71,11 @@ def verify_address(netsettings):
     global LAST_ADDRESS_TEST
     init_file()
 
-    if LAST_ADDRESS_TEST + 5 < time.time():
+    if LAST_ADDRESS_TEST + 30 < time.time():
         LAST_ADDRESS_TEST = time.time()
 
         try:
-            conn = clientConnection(netsettings.server_address, netsettings.server_port, scan = False)
+            conn = clientConnection(netsettings.server_address, netsettings.server_port, scan = False, timeout = 1)
         except:
             conn = None
 
@@ -84,13 +84,15 @@ def verify_address(netsettings):
             conn.close()
         else:
             netrender.valid_address = False
+            
+    return netrender.valid_address
 
 class NeedValidAddress():
     @classmethod
     def poll(cls, context):
-        return netrender.valid_address and super(NeedValidAddress, cls).poll(context)
+        return super().poll(context) and verify_address(context.scene.network_render)
 
-class RenderButtonsPanel():
+class NetRenderButtonsPanel():
     bl_space_type = "PROPERTIES"
     bl_region_type = "WINDOW"
     bl_context = "render"
@@ -99,10 +101,10 @@ class RenderButtonsPanel():
     @classmethod
     def poll(cls, context):
         rd = context.scene.render
-        return rd.use_game_engine == False and rd.engine in cls.COMPAT_ENGINES and super().poll(context)
+        return rd.engine == 'NET_RENDER' and rd.use_game_engine == False 
 
 # Setting panel, use in the scene for now.
-class RENDER_PT_network_settings(RenderButtonsPanel, bpy.types.Panel):
+class RENDER_PT_network_settings(NetRenderButtonsPanel, bpy.types.Panel):
     bl_label = "Network Settings"
     COMPAT_ENGINES = {'NET_RENDER'}
 
@@ -143,7 +145,7 @@ class RENDER_PT_network_settings(RenderButtonsPanel, bpy.types.Panel):
 
         layout.operator("render.netclientweb", icon='QUESTION')
 
-class RENDER_PT_network_slave_settings(RenderButtonsPanel, bpy.types.Panel):
+class RENDER_PT_network_slave_settings(NetRenderButtonsPanel, bpy.types.Panel):
     bl_label = "Slave Settings"
     COMPAT_ENGINES = {'NET_RENDER'}
 
@@ -168,7 +170,7 @@ class RENDER_PT_network_slave_settings(RenderButtonsPanel, bpy.types.Panel):
         sub.enabled = rd.threads_mode == 'FIXED'
         sub.prop(rd, "threads")
 
-class RENDER_PT_network_master_settings(RenderButtonsPanel, bpy.types.Panel):
+class RENDER_PT_network_master_settings(NetRenderButtonsPanel, bpy.types.Panel):
     bl_label = "Master Settings"
     COMPAT_ENGINES = {'NET_RENDER'}
 
@@ -186,7 +188,7 @@ class RENDER_PT_network_master_settings(RenderButtonsPanel, bpy.types.Panel):
         layout.prop(netsettings, "use_master_broadcast")
         layout.prop(netsettings, "use_master_clear")
 
-class RENDER_PT_network_job(RenderButtonsPanel, bpy.types.Panel):
+class RENDER_PT_network_job(NetRenderButtonsPanel, bpy.types.Panel):
     bl_label = "Job Settings"
     COMPAT_ENGINES = {'NET_RENDER'}
 
@@ -228,7 +230,7 @@ class RENDER_PT_network_job(RenderButtonsPanel, bpy.types.Panel):
         row.prop(netsettings, "priority")
         row.prop(netsettings, "chunks")
 
-class RENDER_PT_network_job_vcs(RenderButtonsPanel, bpy.types.Panel):
+class RENDER_PT_network_job_vcs(NetRenderButtonsPanel, bpy.types.Panel):
     bl_label = "VCS Job Settings"
     COMPAT_ENGINES = {'NET_RENDER'}
 
@@ -252,18 +254,14 @@ class RENDER_PT_network_job_vcs(RenderButtonsPanel, bpy.types.Panel):
         layout.prop(netsettings, "vcs_rpath")
         layout.prop(netsettings, "vcs_wpath")
 
-class RENDER_PT_network_slaves(RenderButtonsPanel, NeedValidAddress, bpy.types.Panel):
+class RENDER_PT_network_slaves(NeedValidAddress, NetRenderButtonsPanel, bpy.types.Panel):
     bl_label = "Slaves Status"
     COMPAT_ENGINES = {'NET_RENDER'}
 
     @classmethod
     def poll(cls, context):
-        scene = context.scene
-        netsettings = scene.network_render
-        if netsettings.mode != "RENDER_CLIENT":
-            return False
-        verify_address(netsettings)
-        return super().poll(context)
+        netsettings = context.scene.network_render
+        return super().poll(context) and netsettings.mode == "RENDER_CLIENT"
 
     def draw(self, context):
         layout = self.layout
@@ -278,9 +276,7 @@ class RENDER_PT_network_slaves(RenderButtonsPanel, NeedValidAddress, bpy.types.P
         sub.operator("render.netclientslaves", icon='FILE_REFRESH', text="")
         sub.operator("render.netclientblacklistslave", icon='ZOOMOUT', text="")
 
-        init_data(netsettings)
-
-        if netsettings.active_slave_index >= 0 and len(netsettings.slaves) > 0:
+        if len(netrender.slaves) > netsettings.active_slave_index >= 0:
             layout.separator()
 
             slave = netrender.slaves[netsettings.active_slave_index]
@@ -290,18 +286,14 @@ class RENDER_PT_network_slaves(RenderButtonsPanel, NeedValidAddress, bpy.types.P
             layout.label(text="Seen: " + time.ctime(slave.last_seen))
             layout.label(text="Stats: " + slave.stats)
 
-class RENDER_PT_network_slaves_blacklist(RenderButtonsPanel, NeedValidAddress, bpy.types.Panel):
+class RENDER_PT_network_slaves_blacklist(NeedValidAddress, NetRenderButtonsPanel, bpy.types.Panel):
     bl_label = "Slaves Blacklist"
     COMPAT_ENGINES = {'NET_RENDER'}
 
     @classmethod
     def poll(cls, context):
-        scene = context.scene
-        netsettings = scene.network_render
-        if netsettings.mode != "RENDER_CLIENT":
-            return False
-        verify_address(netsettings)
-        return super().poll(context)
+        netsettings = context.scene.network_render
+        return super().poll(context) and netsettings.mode == "RENDER_CLIENT"
 
     def draw(self, context):
         layout = self.layout
@@ -315,9 +307,7 @@ class RENDER_PT_network_slaves_blacklist(RenderButtonsPanel, NeedValidAddress, b
         sub = row.column(align=True)
         sub.operator("render.netclientwhitelistslave", icon='ZOOMOUT', text="")
 
-        init_data(netsettings)
-
-        if netsettings.active_blacklisted_slave_index >= 0 and len(netsettings.slaves_blacklist) > 0:
+        if len(netrender.blacklist) > netsettings.active_blacklisted_slave_index >= 0:
             layout.separator()
 
             slave = netrender.blacklist[netsettings.active_blacklisted_slave_index]
@@ -327,18 +317,14 @@ class RENDER_PT_network_slaves_blacklist(RenderButtonsPanel, NeedValidAddress, b
             layout.label(text="Seen: " + time.ctime(slave.last_seen))
             layout.label(text="Stats: " + slave.stats)
 
-class RENDER_PT_network_jobs(RenderButtonsPanel, NeedValidAddress, bpy.types.Panel):
+class RENDER_PT_network_jobs(NeedValidAddress, NetRenderButtonsPanel, bpy.types.Panel):
     bl_label = "Jobs"
     COMPAT_ENGINES = {'NET_RENDER'}
 
     @classmethod
     def poll(cls, context):
-        scene = context.scene
-        netsettings = scene.network_render
-        if netsettings.mode != "RENDER_CLIENT":
-            return False
-        verify_address(netsettings)
-        return super().poll(context)
+        netsettings = context.scene.network_render
+        return super().poll(context) and netsettings.mode == "RENDER_CLIENT"
 
     def draw(self, context):
         layout = self.layout
@@ -355,9 +341,7 @@ class RENDER_PT_network_jobs(RenderButtonsPanel, NeedValidAddress, bpy.types.Pan
         sub.operator("render.netclientcancelall", icon='PANEL_CLOSE', text="")
         sub.operator("render.netclientdownload", icon='RENDER_ANIMATION', text="")
 
-        init_data(netsettings)
-
-        if netsettings.active_job_index >= 0 and len(netsettings.jobs) > 0:
+        if len(netrender.jobs) > netsettings.active_job_index >= 0:
             layout.separator()
 
             job = netrender.jobs[netsettings.active_job_index]
@@ -367,16 +351,33 @@ class RENDER_PT_network_jobs(RenderButtonsPanel, NeedValidAddress, bpy.types.Pan
             layout.label(text="Done: %04i" % job.results[DONE])
             layout.label(text="Error: %04i" % job.results[ERROR])
 
-class NetRenderSettings(bpy.types.IDPropertyGroup):
-    pass
+import properties_render
+class RENDER_PT_network_output(NeedValidAddress, NetRenderButtonsPanel, bpy.types.Panel):
+    bl_label = "Output"
+    COMPAT_ENGINES = {'NET_RENDER'}
 
-class NetRenderSlave(bpy.types.IDPropertyGroup):
-    pass
+    @classmethod
+    def poll(cls, context):
+        netsettings = context.scene.network_render
+        return super().poll(context) and netsettings.mode == "RENDER_CLIENT"
+    
+    draw = properties_render.RENDER_PT_output.draw
 
-class NetRenderJob(bpy.types.IDPropertyGroup):
-    pass
 
 def addProperties():
+    class NetRenderSettings(bpy.types.PropertyGroup):
+        pass
+
+    class NetRenderSlave(bpy.types.PropertyGroup):
+        pass
+
+    class NetRenderJob(bpy.types.PropertyGroup):
+        pass
+
+    bpy.utils.register_class(NetRenderSettings)
+    bpy.utils.register_class(NetRenderSlave)
+    bpy.utils.register_class(NetRenderJob)
+
     from bpy.props import PointerProperty, StringProperty, BoolProperty, EnumProperty, IntProperty, CollectionProperty
     bpy.types.Scene.network_render = PointerProperty(type=NetRenderSettings, name="Network Render", description="Network Render Settings")
     

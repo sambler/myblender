@@ -32,7 +32,9 @@
 
 #include <string.h>
 
-#include "BKE_utildefines.h"
+#include "BLI_string.h"
+#include "BLI_utildefines.h"
+
 #include "BKE_cdderivedmesh.h"
 #include "BKE_modifier.h"
 #include "BKE_shrinkwrap.h"
@@ -63,7 +65,7 @@ static void copyData(ModifierData *md, ModifierData *target)
 	tsmd->target	= smd->target;
 	tsmd->auxTarget = smd->auxTarget;
 
-	strcpy(tsmd->vgroup_name, smd->vgroup_name);
+	BLI_strncpy(tsmd->vgroup_name, smd->vgroup_name, sizeof(tsmd->vgroup_name));
 
 	tsmd->keepDist	= smd->keepDist;
 	tsmd->shrinkType= smd->shrinkType;
@@ -117,7 +119,7 @@ static void deformVerts(ModifierData *md, Object *ob,
 	if(dataMask)
 		dm= get_cddm(ob, NULL, dm, vertexCos);
 
-	shrinkwrapModifier_deform((ShrinkwrapModifierData*)md, md->scene, ob, dm, vertexCos, numVerts);
+	shrinkwrapModifier_deform((ShrinkwrapModifierData*)md, ob, dm, vertexCos, numVerts);
 
 	if(dm != derivedData)
 		dm->release(dm);
@@ -132,7 +134,7 @@ static void deformVertsEM(ModifierData *md, Object *ob, struct EditMesh *editDat
 	if(dataMask)
 		dm= get_cddm(ob, editData, dm, vertexCos);
 
-	shrinkwrapModifier_deform((ShrinkwrapModifierData*)md, md->scene, ob, dm, vertexCos, numVerts);
+	shrinkwrapModifier_deform((ShrinkwrapModifierData*)md, ob, dm, vertexCos, numVerts);
 
 	if(dm != derivedData)
 		dm->release(dm);
@@ -165,6 +167,7 @@ ModifierTypeInfo modifierType_Shrinkwrap = {
 
 	/* copyData */          copyData,
 	/* deformVerts */       deformVerts,
+	/* deformMatrices */    0,
 	/* deformVertsEM */     deformVertsEM,
 	/* deformMatricesEM */  0,
 	/* applyModifier */     0,

@@ -19,7 +19,7 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-SET(INC
+set(INC
 	../include
 	../../blenkernel
 	../../blenlib
@@ -34,7 +34,7 @@ SET(INC
 	../../../../intern/guardedalloc
 )
 
-SET(SRC
+set(SRC
 	object_add.c
 	object_bake.c
 	object_constraint.c
@@ -49,14 +49,12 @@ SET(SRC
 	object_shapekey.c
 	object_transform.c
 	object_vgroup.c
+
+	object_intern.h
 )
 
-IF(WIN32)
-	LIST(APPEND INC ${PTHREADS_INC})
-ENDIF(WIN32)
+if(WITH_PYTHON)
+	add_definitions(-DWITH_PYTHON)
+endif()
 
-IF(WITH_PYTHON)
-	ADD_DEFINITIONS(-DWITH_PYTHON)
-ENDIF(WITH_PYTHON)
-
-BLENDERLIB(bf_editor_object "${SRC}" "${INC}")
+blender_add_lib(bf_editor_object "${SRC}" "${INC}")

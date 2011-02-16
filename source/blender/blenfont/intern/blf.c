@@ -56,15 +56,19 @@
 #define BLF_MAX_FONT 16
 
 /* Font array. */
-FontBLF *global_font[BLF_MAX_FONT];
+static FontBLF *global_font[BLF_MAX_FONT];
 
 /* Number of font. */
-int global_font_num= 0;
+static int global_font_num= 0;
 
 /* Default size and dpi, for BLF_draw_default. */
-int global_font_default= -1;
-int global_font_points= 11;
-int global_font_dpi= 72;
+static int global_font_default= -1;
+static int global_font_points= 11;
+static int global_font_dpi= 72;
+
+// XXX, should these be made into global_font_'s too?
+int blf_mono_font= -1;
+int blf_mono_font_render= -1;
 
 static FontBLF *BLF_get(int fontid)
 {
@@ -99,6 +103,18 @@ void BLF_exit(void)
 	blf_font_exit();
 }
 
+void BLF_cache_clear(void)
+{
+	FontBLF *font;
+	int i;
+
+	for (i= 0; i < global_font_num; i++) {
+		font= global_font[i];
+		if (font)
+			blf_glyph_cache_clear(font);
+	}
+}
+
 static int blf_search(const char *name)
 {
 	FontBLF *font;
@@ -124,7 +140,7 @@ int BLF_load(const char *name)
 	/* check if we already load this font. */
 	i= blf_search(name);
 	if (i >= 0) {
-		font= global_font[i];
+		/*font= global_font[i];*/ /*UNUSED*/
 		return(i);
 	}
 
@@ -209,7 +225,7 @@ int BLF_load_mem(const char *name, unsigned char *mem, int mem_size)
 
 	i= blf_search(name);
 	if (i >= 0) {
-		font= global_font[i];
+		/*font= global_font[i];*/ /*UNUSED*/
 		return(i);
 	}
 
@@ -305,36 +321,71 @@ void BLF_disable_default(int option)
 		font->flags &= ~option;
 }
 
-void BLF_aspect(int fontid, float aspect)
+void BLF_aspect(int fontid, float x, float y, float z)
 {
 	FontBLF *font;
 
 	font= BLF_get(fontid);
-	if (font)
-		font->aspect= aspect;
+	if (font) {
+		font->aspect[0]= x;
+		font->aspect[1]= y;
+		font->aspect[2]= z;
+	}
+}
+
+void BLF_matrix(int fontid, double *m)
+{
+	FontBLF *font;
+	int i;
+
+	font= BLF_get(fontid);
+	if (font) {
+		for (i= 0; i < 16; i++)
+			font->m[i]= m[i];
+	}
 }
 
 void BLF_position(int fontid, float x, float y, float z)
 {
 	FontBLF *font;
 	float remainder;
+	float xa, ya, za;
 
 	font= BLF_get(fontid);
 	if (font) {
+		if (font->flags & BLF_ASPECT) {
+			xa= font->aspect[0];
+			ya= font->aspect[1];
+			za= font->aspect[2];
+		}
+		else {
+			xa= 1.0f;
+			ya= 1.0f;
+			za= 1.0f;
+		}
+
 		remainder= x - floor(x);
 		if (remainder > 0.4 && remainder < 0.6) {
 			if (remainder < 0.5)
-				x -= 0.1 * font->aspect;
+				x -= 0.1 * xa;
 			else
-				x += 0.1 * font->aspect;
+				x += 0.1 * xa;
 		}
 
 		remainder= y - floor(y);
 		if (remainder > 0.4 && remainder < 0.6) {
 			if (remainder < 0.5)
-				y -= 0.1 * font->aspect;
+				y -= 0.1 * ya;
 			else
-				y += 0.1 * font->aspect;
+				y += 0.1 * ya;
+		}
+
+		remainder= z - floor(z);
+		if (remainder > 0.4 && remainder < 0.6) {
+			if (remainder < 0.5)
+				z -= 0.1 * za;
+			else
+				z += 0.1 * za;
 		}
 
 		font->pos[0]= x;
@@ -378,6 +429,7 @@ void BLF_draw_default(float x, float y, float z, const char *str, size_t len)
 	BLF_position(global_font_default, x, y, z);
 	BLF_draw(global_font_default, str, len);
 }
+
 /* same as above but call 'BLF_draw_ascii' */
 void BLF_draw_default_ascii(float x, float y, float z, const char *str, size_t len)
 {
@@ -406,7 +458,6 @@ void BLF_rotation_default(float angle)
 		font->angle= angle;
 }
 
-
 static void blf_draw__start(FontBLF *font)
 {
 	/*
@@ -419,12 +470,19 @@ static void blf_draw__start(FontBLF *font)
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	glPushMatrix();
+
+	if (font->flags & BLF_MATRIX)
+		glMultMatrixd((GLdouble *)&font->m);
+
 	glTranslatef(font->pos[0], font->pos[1], font->pos[2]);
-	glScalef(font->aspect, font->aspect, 1.0);
+
+	if (font->flags & BLF_ASPECT)
+		glScalef(font->aspect[0], font->aspect[1], font->aspect[2]);
 
 	if (font->flags & BLF_ROTATION)
 		glRotatef(font->angle, 0.0f, 0.0f, 1.0f);
 }
+
 static void blf_draw__end(void)
 {
 	glPopMatrix();

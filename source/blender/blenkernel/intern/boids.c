@@ -41,11 +41,13 @@
 #include "BLI_math.h"
 #include "BLI_blenlib.h"
 #include "BLI_kdtree.h"
+#include "BLI_utildefines.h"
+
 #include "BKE_collision.h"
 #include "BKE_effect.h"
 #include "BKE_boids.h"
 #include "BKE_particle.h"
-#include "BKE_utildefines.h"
+
 #include "BKE_modifier.h"
 
 #include "RNA_enum_types.h"
@@ -1468,7 +1470,7 @@ BoidRule *boid_new_rule(int type)
 
 	rule->type = type;
 	rule->flag |= BOIDRULE_IN_AIR|BOIDRULE_ON_LAND;
-	strcpy(rule->name, boidrule_type_items[type-1].name);
+	BLI_strncpy(rule->name, boidrule_type_items[type-1].name, sizeof(rule->name));
 
 	return rule;
 }

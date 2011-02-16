@@ -51,8 +51,8 @@ struct Text;
 #define SCE_COPY_LINK_DATA	2
 #define SCE_COPY_FULL		3
 
-#define SETLOOPER(s, b) sce= s, b= _setlooper_base_step(&sce, NULL); b; b= _setlooper_base_step(&sce, b)
-struct Base *_setlooper_base_step(struct Scene **sce, struct Base *base);
+#define SETLOOPER(_sce_basis, _sce_iter, _base) _sce_iter= _sce_basis, _base= _setlooper_base_step(&_sce_iter, NULL); _base; _base= _setlooper_base_step(&_sce_iter, _base)
+struct Base *_setlooper_base_step(struct Scene **sce_iter, struct Base *base);
 
 void free_avicodecdata(struct AviCodecData *acd);
 void free_qtcodecdata(struct QuicktimeCodecData *acd);
@@ -62,7 +62,7 @@ struct Scene *add_scene(const char *name);
 struct Base *object_in_scene(struct Object *ob, struct Scene *sce);
 
 void set_scene_bg(struct Main *bmain, struct Scene *sce);
-struct Scene *set_scene_name(struct Main *bmain, char *name);
+struct Scene *set_scene_name(struct Main *bmain, const char *name);
 
 struct Scene *copy_scene(struct Scene *sce, int type);
 void unlink_scene(struct Main *bmain, struct Scene *sce, struct Scene *newsce);

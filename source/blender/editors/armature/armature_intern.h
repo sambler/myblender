@@ -76,6 +76,7 @@ void ARMATURE_OT_flip_names(struct wmOperatorType *ot);
 
 void ARMATURE_OT_flags_set(struct wmOperatorType *ot);
 
+void ARMATURE_OT_layers_show_all(struct wmOperatorType *ot);
 void ARMATURE_OT_armature_layers(struct wmOperatorType *ot);
 void ARMATURE_OT_bone_layers(struct wmOperatorType *ot);
 
@@ -90,6 +91,7 @@ void POSE_OT_visual_transform_apply(struct wmOperatorType *ot);
 void POSE_OT_rot_clear(struct wmOperatorType *ot);
 void POSE_OT_loc_clear(struct wmOperatorType *ot);
 void POSE_OT_scale_clear(struct wmOperatorType *ot);
+void POSE_OT_transforms_clear(struct wmOperatorType *ot);
 
 void POSE_OT_copy(struct wmOperatorType *ot);
 void POSE_OT_paste(struct wmOperatorType *ot);
@@ -103,7 +105,6 @@ void POSE_OT_select_constraint_target(struct wmOperatorType *ot);
 void POSE_OT_select_grouped(struct wmOperatorType *ot);
 
 void POSE_OT_group_add(struct wmOperatorType *ot);
-void POSE_OT_group_remove(struct wmOperatorType *ot);
 void POSE_OT_group_remove(struct wmOperatorType *ot);
 void POSE_OT_group_assign(struct wmOperatorType *ot);
 void POSE_OT_group_unassign(struct wmOperatorType *ot);
@@ -170,10 +171,15 @@ LinkData *poseAnim_mapping_getNextFCurve(ListBase *fcuLinks, LinkData *prev, cha
 /* PoseLib */
 /* poselib.c */
 
+void POSELIB_OT_new(struct wmOperatorType *ot);
+void POSELIB_OT_unlink(struct wmOperatorType *ot);
+
 void POSELIB_OT_pose_add(struct wmOperatorType *ot);
 void POSELIB_OT_pose_remove(struct wmOperatorType *ot);
 void POSELIB_OT_pose_rename(struct wmOperatorType *ot);
+
 void POSELIB_OT_browse_interactive(struct wmOperatorType *ot);
+void POSELIB_OT_apply_pose(struct wmOperatorType *ot);
 
 /* ******************************************************* */
 /* Pose Sliding Tools */

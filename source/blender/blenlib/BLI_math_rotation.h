@@ -25,8 +25,8 @@
  * ***** END GPL LICENSE BLOCK *****
  * */
 
-#ifndef BLI_MATH_ROTATION
-#define BLI_MATH_ROTATION
+#ifndef BLI_MATH_ROTATION_H
+#define BLI_MATH_ROTATION_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -39,6 +39,7 @@ extern "C" {
 /* stored in (w, x, y, z) order                                              */
 
 /* init */
+void unit_axis_angle(float axis[3], float *angle);
 void unit_qt(float q[4]);
 void copy_qt_qt(float q[4], const float a[4]);
 
@@ -51,10 +52,11 @@ void mul_fac_qt_fl(float q[4], const float f);
 void sub_qt_qtqt(float q[4], const float a[4], const float b[4]);
 
 void invert_qt(float q[4]);
-void invert_qt_qt(float *q1, const float *q2);
+void invert_qt_qt(float q1[4], const float q2[4]);
 void conjugate_qt(float q[4]);
 float dot_qtqt(const float a[4], const float b[4]);
-void normalize_qt(float q[4]);
+float normalize_qt(float q[4]);
+float normalize_qt_qt(float q1[4], const float q2[4]);
 
 /* comparison */
 int is_zero_qt(float q[4]);
@@ -131,7 +133,7 @@ typedef enum eEulerRotationOrders {
 	EULER_ORDER_YXZ,
 	EULER_ORDER_YZX,
 	EULER_ORDER_ZXY,
-	EULER_ORDER_ZYX,
+	EULER_ORDER_ZYX
 	/* there are 6 more entries with dulpicate entries included */
 } eEulerRotationOrders;
 
@@ -179,5 +181,5 @@ float angle_to_lens(float angle);
 }
 #endif
 
-#endif /* BLI_MATH_ROTATION */
+#endif /* BLI_MATH_ROTATION_H */
 

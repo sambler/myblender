@@ -62,6 +62,7 @@
 #include "BLI_path_util.h"
 #include "BLI_storage_types.h"
 #include "BLI_dynstr.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_context.h"
 #include "BKE_global.h"
@@ -346,14 +347,20 @@ float file_string_width(const char* str)
 	return BLF_width(style->widget.uifont_id, str);
 }
 
-float file_font_pointsize()
+float file_font_pointsize(void)
 {
+#if 0
 	float s;
 	char tmp[2] = "X";
 	uiStyle *style= U.uistyles.first;
 	uiStyleFontSet(&style->widget);
 	s = BLF_height(style->widget.uifont_id, tmp);
 	return style->widget.points;
+#else
+	uiStyle *style= U.uistyles.first;
+	uiStyleFontSet(&style->widget);
+	return style->widget.points;
+#endif
 }
 
 static void column_widths(struct FileList* files, struct FileLayout* layout)
@@ -548,7 +555,7 @@ void autocomplete_directory(struct bContext *C, char *str, void *UNUSED(arg_v))
 					char path[FILE_MAX];
 					struct stat status;
 					
-					BLI_join_dirfile(path, dirname, de->d_name);
+					BLI_join_dirfile(path, sizeof(path), dirname, de->d_name);
 
 					if (stat(path, &status) == 0) {
 						if (S_ISDIR(status.st_mode)) { /* is subdir */

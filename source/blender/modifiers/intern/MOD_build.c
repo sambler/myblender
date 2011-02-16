@@ -32,6 +32,7 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "BLI_utildefines.h"
 #include "BLI_rand.h"
 #include "BLI_ghash.h"
 
@@ -45,6 +46,7 @@
 #include "BKE_particle.h"
 #include "BKE_scene.h"
 
+#include "MOD_util.h"
 
 static void initData(ModifierData *md)
 {
@@ -286,6 +288,7 @@ ModifierTypeInfo modifierType_Build = {
 							| eModifierTypeFlag_AcceptsCVs,
 	/* copyData */          copyData,
 	/* deformVerts */       0,
+	/* deformMatrices */    0,
 	/* deformVertsEM */     0,
 	/* deformMatricesEM */  0,
 	/* applyModifier */     applyModifier,

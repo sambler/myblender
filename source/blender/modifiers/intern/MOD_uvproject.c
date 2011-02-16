@@ -38,8 +38,9 @@
 
 #include "BLI_math.h"
 #include "BLI_uvproject.h"
+#include "BLI_utildefines.h"
 
-#include "BKE_utildefines.h"
+
 #include "BKE_DerivedMesh.h"
 
 #include "MOD_modifiertypes.h"
@@ -412,6 +413,7 @@ ModifierTypeInfo modifierType_UVProject = {
 
 	/* copyData */          copyData,
 	/* deformVerts */       0,
+	/* deformMatrices */    0,
 	/* deformVertsEM */     0,
 	/* deformMatricesEM */  0,
 	/* applyModifier */     applyModifier,

@@ -77,7 +77,7 @@ extern "C" {
 #include "BKE_global.h"
 #include "BKE_report.h"
 
-#include "BKE_utildefines.h"
+
 //XXX #include "BIF_screen.h"
 //XXX #include "BIF_scrarea.h"
 
@@ -176,11 +176,18 @@ extern "C" void StartKetsjiShell(struct bContext *C, struct ARegion *ar, rcti *c
 		bool nodepwarnings = (SYS_GetCommandLineInt(syshandle, "ignore_deprecation_warnings", 0) != 0);
 #endif
 		bool novertexarrays = (SYS_GetCommandLineInt(syshandle, "novertexarrays", 0) != 0);
+		bool mouse_state = startscene->gm.flag & GAME_SHOW_MOUSE;
+
 		if(animation_record) usefixed= true; /* override since you's always want fixed time for sim recording */
 
 		// create the canvas, rasterizer and rendertools
 		RAS_ICanvas* canvas = new KX_BlenderCanvas(win, area_rect, ar);
-		canvas->SetMouseState(RAS_ICanvas::MOUSE_INVISIBLE);
+		
+		// default mouse state set on render panel
+		if (mouse_state)
+			canvas->SetMouseState(RAS_ICanvas::MOUSE_NORMAL);
+		else
+			canvas->SetMouseState(RAS_ICanvas::MOUSE_INVISIBLE);
 		RAS_IRenderTools* rendertools = new KX_BlenderRenderTools();
 		RAS_IRasterizer* rasterizer = NULL;
 		
@@ -235,21 +242,7 @@ extern "C" void StartKetsjiShell(struct bContext *C, struct ARegion *ar, rcti *c
 		}
 
 		// some blender stuff
-		MT_CmMatrix4x4 projmat;
-		MT_CmMatrix4x4 viewmat;
 		float camzoom;
-		int i;
-
-		for (i = 0; i < 16; i++)
-		{
-			float *viewmat_linear= (float*) rv3d->viewmat;
-			viewmat.setElem(i, viewmat_linear[i]);
-		}
-		for (i = 0; i < 16; i++)
-		{
-			float *projmat_linear= (float*) rv3d->winmat;
-			projmat.setElem(i, projmat_linear[i]);
-		}
 		
 		if(rv3d->persp==RV3D_CAMOB) {
 			if(startscene->gm.framing.type == SCE_GAMEFRAMING_BARS) { /* Letterbox */
@@ -265,7 +258,6 @@ extern "C" void StartKetsjiShell(struct bContext *C, struct ARegion *ar, rcti *c
 			camzoom = 2.0;
 		}
 
-		
 
 		ketsjiengine->SetDrawType(v3d->drawtype);
 		ketsjiengine->SetCameraZoom(camzoom);
@@ -347,8 +339,8 @@ extern "C" void StartKetsjiShell(struct bContext *C, struct ARegion *ar, rcti *c
 			{
 				ketsjiengine->EnableCameraOverride(startscenename);
 				ketsjiengine->SetCameraOverrideUseOrtho((rv3d->persp == RV3D_ORTHO));
-				ketsjiengine->SetCameraOverrideProjectionMatrix(projmat);
-				ketsjiengine->SetCameraOverrideViewMatrix(viewmat);
+				ketsjiengine->SetCameraOverrideProjectionMatrix(MT_CmMatrix4x4(rv3d->winmat));
+				ketsjiengine->SetCameraOverrideViewMatrix(MT_CmMatrix4x4(rv3d->viewmat));
 				ketsjiengine->SetCameraOverrideClipping(v3d->near, v3d->far);
 				ketsjiengine->SetCameraOverrideLens(v3d->lens);
 			}
@@ -432,7 +424,7 @@ extern "C" void StartKetsjiShell(struct bContext *C, struct ARegion *ar, rcti *c
 					exitrequested = ketsjiengine->GetExitCode();
 					
 					// kick the engine
-					bool render = ketsjiengine->NextFrame(); // XXX 2.5 Bug, This is never true! FIXME-  Campbell
+					bool render = ketsjiengine->NextFrame();
 					
 					if (render)
 					{
@@ -471,6 +463,9 @@ extern "C" void StartKetsjiShell(struct bContext *C, struct ARegion *ar, rcti *c
 						wm_event_free(event);
 					}
 					
+					if(win != CTX_wm_window(C)) {
+						exitrequested= KX_EXIT_REQUEST_OUTSIDE; /* window closed while bge runs */
+					}
 				}
 				printf("Blender Game Engine Finished\n");
 				exitstring = ketsjiengine->GetExitString();
@@ -521,8 +516,11 @@ extern "C" void StartKetsjiShell(struct bContext *C, struct ARegion *ar, rcti *c
 			startscene->camera= tmp_camera;
 		}
 
-		// set the cursor back to normal
-		canvas->SetMouseState(RAS_ICanvas::MOUSE_NORMAL);
+		if(exitrequested != KX_EXIT_REQUEST_OUTSIDE)
+		{
+			// set the cursor back to normal
+			canvas->SetMouseState(RAS_ICanvas::MOUSE_NORMAL);
+		}
 		
 		// clean up some stuff
 		if (ketsjiengine)

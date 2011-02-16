@@ -32,6 +32,7 @@
 
 #include "BLI_math.h"
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 
 #include "DNA_curve_types.h"
 #include "DNA_group_types.h"
@@ -40,7 +41,7 @@
 #include "DNA_material_types.h"
 
 #include "BKE_colortools.h"
-#include "BKE_utildefines.h"
+
 #include "BKE_node.h"
 
 /* local include */
@@ -141,7 +142,12 @@ void shade_material_loop(ShadeInput *shi, ShadeResult *shr)
 		if((shi->mat->mode & MA_TRANSP) && (shi->mat->mode & MA_RAYTRANSP))
 			if((shi->layflag & SCE_LAY_SKY) && (R.r.alphamode==R_ADDSKY))
 				shr->alpha= 1.0f;
-	}	
+	}
+	
+	if(R.r.mode & R_RAYTRACE) {
+		if (R.render_volumes_inside.first)
+			shade_volume_inside(shi, shr);
+	}
 }
 
 
@@ -163,11 +169,8 @@ void shade_input_do_shade(ShadeInput *shi, ShadeResult *shr)
 		shade_input_init_material(shi);
 		
 		if (shi->mat->material_type == MA_TYPE_VOLUME) {
-			if(R.r.mode & R_RAYTRACE) {			
-				if (R.render_volumes_inside.first)
-					shade_volume_inside(shi, shr);
-				else
-					shade_volume_outside(shi, shr);
+			if(R.r.mode & R_RAYTRACE) {
+				shade_volume_outside(shi, shr);
 			}
 		} else { /* MA_TYPE_SURFACE, MA_TYPE_WIRE */
 			shade_material_loop(shi, shr);
@@ -283,9 +286,9 @@ void shade_input_set_triangle_i(ShadeInput *shi, ObjectInstanceRen *obi, VlakRen
 		VECCOPY(shi->n3, shi->v3->n);
 
 		if(obi->flag & R_TRANSFORMED) {
-			mul_m3_v3(obi->nmat, shi->n1);
-			mul_m3_v3(obi->nmat, shi->n2);
-			mul_m3_v3(obi->nmat, shi->n3);
+			mul_m3_v3(obi->nmat, shi->n1); normalize_v3(shi->n1);
+			mul_m3_v3(obi->nmat, shi->n2); normalize_v3(shi->n2);
+			mul_m3_v3(obi->nmat, shi->n3); normalize_v3(shi->n3);
 		}
 	}
 }
@@ -427,10 +430,10 @@ void shade_input_set_strand_texco(ShadeInput *shi, StrandRen *strand, StrandVert
 			mul_m4_v3(R.viewinv, shi->gl);
 			
 			if(shi->osatex) {
-				VECCOPY(shi->dxgl, shi->dxco);
-				mul_m3_v3(R.imat, shi->dxco);
-				VECCOPY(shi->dygl, shi->dyco);
-				mul_m3_v3(R.imat, shi->dyco);
+				VECCOPY(shi->dxgl, shi->dxco); 
+				mul_mat3_m4_v3(R.viewinv, shi->dxgl); 
+				VECCOPY(shi->dygl, shi->dyco); 
+				mul_mat3_m4_v3(R.viewinv, shi->dygl);
 			}
 		}
 
@@ -816,11 +819,17 @@ void shade_input_set_normals(ShadeInput *shi)
 		shi->vn[0]= l*n3[0]-u*n1[0]-v*n2[0];
 		shi->vn[1]= l*n3[1]-u*n1[1]-v*n2[1];
 		shi->vn[2]= l*n3[2]-u*n1[2]-v*n2[2];
+
+		// use unnormalized normal (closer to games)
+		VECCOPY(shi->nmapnorm, shi->vn);
 		
 		normalize_v3(shi->vn);
 	}
 	else
+	{
 		VECCOPY(shi->vn, shi->facenor);
+		VECCOPY(shi->nmapnorm, shi->vn);
+	}
 	
 	/* used in nodes */
 	VECCOPY(shi->vno, shi->vn);
@@ -845,6 +854,10 @@ void shade_input_flip_normals(ShadeInput *shi)
 	shi->vno[0]= -shi->vno[0];
 	shi->vno[1]= -shi->vno[1];
 	shi->vno[2]= -shi->vno[2];
+
+	shi->nmapnorm[0] = -shi->nmapnorm[0];
+	shi->nmapnorm[1] = -shi->nmapnorm[1];
+	shi->nmapnorm[2] = -shi->nmapnorm[2];
 
 	shi->flippednor= !shi->flippednor;
 }
@@ -921,21 +934,32 @@ void shade_input_set_shade_texco(ShadeInput *shi)
 
 			if(tangent) {
 				int j1= shi->i1, j2= shi->i2, j3= shi->i3;
+				float c0[3], c1[3], c2[3];
 
 				vlr_set_uv_indices(shi->vlr, &j1, &j2, &j3);
 
-				s1= &tangent[j1*3];
-				s2= &tangent[j2*3];
-				s3= &tangent[j3*3];
+				VECCOPY(c0, &tangent[j1*4]);
+				VECCOPY(c1, &tangent[j2*4]);
+				VECCOPY(c2, &tangent[j3*4]);
 
-				shi->nmaptang[0]= (tl*s3[0] - tu*s1[0] - tv*s2[0]);
-				shi->nmaptang[1]= (tl*s3[1] - tu*s1[1] - tv*s2[1]);
-				shi->nmaptang[2]= (tl*s3[2] - tu*s1[2] - tv*s2[2]);
-
+				// keeping tangents normalized at vertex level
+				// corresponds better to how it's done in game engines
 				if(obi->flag & R_TRANSFORMED)
-					mul_m3_v3(obi->nmat, shi->nmaptang);
+				{
+					mul_mat3_m4_v3(obi->mat, c0); normalize_v3(c0);
+					mul_mat3_m4_v3(obi->mat, c1); normalize_v3(c1);
+					mul_mat3_m4_v3(obi->mat, c2); normalize_v3(c2);
+				}
+				
+				// we don't normalize the interpolated TBN tangent
+				// corresponds better to how it's done in game engines
+				shi->nmaptang[0]= (tl*c2[0] - tu*c0[0] - tv*c1[0]);
+				shi->nmaptang[1]= (tl*c2[1] - tu*c0[1] - tv*c1[1]);
+				shi->nmaptang[2]= (tl*c2[2] - tu*c0[2] - tv*c1[2]);
 
-				normalize_v3(shi->nmaptang);
+				// the sign is the same for all 3 vertices of any
+				// non degenerate triangle.
+				shi->nmaptang[3]= tangent[j1*4+3];
 			}
 		}
 	}
@@ -1009,13 +1033,10 @@ void shade_input_set_shade_texco(ShadeInput *shi)
 			VECCOPY(shi->gl, shi->co);
 			mul_m4_v3(R.viewinv, shi->gl);
 			if(shi->osatex) {
-				VECCOPY(shi->dxgl, shi->dxco);
-				// TXF: bug was here, but probably should be in convertblender.c, R.imat only valid if there is a world
-				//mul_m3_v3(R.imat, shi->dxco);
-				mul_mat3_m4_v3(R.viewinv, shi->dxco);
-				VECCOPY(shi->dygl, shi->dyco);
-				//mul_m3_v3(R.imat, shi->dyco);
-				mul_mat3_m4_v3(R.viewinv, shi->dyco);
+				VECCOPY(shi->dxgl, shi->dxco); 
+				mul_mat3_m4_v3(R.viewinv, shi->dxgl); 
+				VECCOPY(shi->dygl, shi->dyco); 
+				mul_mat3_m4_v3(R.viewinv, shi->dygl);
 			}
 		}
 		

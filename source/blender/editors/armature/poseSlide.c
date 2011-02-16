@@ -38,6 +38,7 @@
 #include "BLI_blenlib.h"
 #include "BLI_dynstr.h"
 #include "BLI_dlrbTree.h"
+#include "BLI_utildefines.h"
 
 #include "DNA_anim_types.h"
 #include "DNA_armature_types.h"
@@ -187,7 +188,7 @@ static void pose_slide_refresh (bContext *C, tPoseSlideOp *pso)
 }
 
 /* helper for apply() - perform sliding for some 3-element vector */
-static void pose_slide_apply_vec3 (tPoseSlideOp *pso, tPChanFCurveLink *pfl, float vec[3], char *propName)
+static void pose_slide_apply_vec3 (tPoseSlideOp *pso, tPChanFCurveLink *pfl, float vec[3], const char *propName)
 {
 	LinkData *ld=NULL;
 	char *path=NULL;

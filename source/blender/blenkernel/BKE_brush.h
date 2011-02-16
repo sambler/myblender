@@ -56,6 +56,9 @@ int brush_texture_delete(struct Brush *brush);
 int brush_clone_image_set_nr(struct Brush *brush, int nr);
 int brush_clone_image_delete(struct Brush *brush);
 
+/* jitter */
+void brush_jitter_pos(struct Brush *brush, float *pos, float *jitterpos);
+
 /* brush curve */
 void brush_curve_preset(struct Brush *b, /*enum CurveMappingPreset*/int preset);
 float brush_curve_strength_clamp(struct Brush *br, float p, const float len);
@@ -105,6 +108,9 @@ void  brush_set_unprojected_radius(struct Brush *brush, float value);
 
 float brush_alpha(struct Brush *brush);
 void  brush_set_alpha(struct Brush *brush, float value);
+
+/* debugging only */
+void brush_debug_print_state(struct Brush *br);
 
 #endif
 

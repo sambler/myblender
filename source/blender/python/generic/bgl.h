@@ -33,10 +33,8 @@
  * writers to make OpenGL calls in their Python scripts for Blender.  The
  * more important original comments are marked with an @ symbol. */
 
-#ifndef EXPP_BGL_H
-#define EXPP_BGL_H
-
-#include <Python.h>
+#ifndef BGL_H
+#define BGL_H
 
 PyObject *BPyInit_bgl(void);
 
@@ -215,19 +213,19 @@ extern PyTypeObject BGL_bufferType;
 #define GLsizei_def(num)    int GLsizei_var(num)
 
 /* typedef unsigned char GLubyte; */
-#define GLubyte_str       "b"
+#define GLubyte_str       "B"
 #define GLubyte_var(num)    bgl_var##num
 #define GLubyte_ref(num)    &bgl_var##num
 #define GLubyte_def(num)    /* unsigned */ char GLubyte_var(num)
 
 /* typedef unsigned short GLushort; */
-#define GLushort_str      "h"
+#define GLushort_str      "H"
 #define GLushort_var(num)   bgl_var##num
 #define GLushort_ref(num)   &bgl_var##num
 #define GLushort_def(num)   /* unsigned */ short GLushort_var(num)
 
 /* typedef unsigned int GLuint; */
-#define GLuint_str        "i"
+#define GLuint_str        "I"
 #define GLuint_var(num)     bgl_var##num
 #define GLuint_ref(num)     &bgl_var##num
 #define GLuint_def(num)     /* unsigned */ int GLuint_var(num)
@@ -337,4 +335,4 @@ extern PyTypeObject BGL_bufferType;
 		return NULL;\
 	}
 
-#endif  /*  EXPP_BGL_H */
+#endif /* BGL_H */

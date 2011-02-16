@@ -37,10 +37,10 @@
 #include "MEM_guardedalloc.h"
 
 #include "BKE_global.h"
-#include "BKE_utildefines.h"
 
 
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 
 #include "GPU_draw.h"
 #include "GPU_extensions.h"
@@ -66,8 +66,8 @@ static struct GPUGlobal {
 	GLuint currentfb;
 	int glslsupport;
 	int extdisabled;
-	unsigned int texturevram; // An approximation of how much vram is being used for textures
 	int colordepth;
+	int npotdisabled; /* ATI 3xx-5xx (and more) chipsets support NPoT partially (== not enough) */
 	GPUDeviceType device;
 	GPUOSType os;
 	GPUDriverType driver;
@@ -82,17 +82,17 @@ int GPU_type_matches(GPUDeviceType device, GPUOSType os, GPUDriverType driver)
 
 /* GPU Extensions */
 
-void GPU_extensions_disable()
+void GPU_extensions_disable(void)
 {
 	GG.extdisabled = 1;
 }
 
-void GPU_extensions_init()
+void GPU_extensions_init(void)
 {
 	GLint r, g, b;
 	const char *vendor, *renderer;
 
-	/* can't avoid calling this multiple times, see wm_window_add_ghostwindow */	
+	/* can't avoid calling this multiple times, see wm_window_add_ghostwindow */
 	static char init= 0;
 	if(init) return;
 	init= 1;
@@ -120,6 +120,12 @@ void GPU_extensions_init()
 	if(strstr(vendor, "ATI")) {
 		GG.device = GPU_DEVICE_ATI;
 		GG.driver = GPU_DRIVER_OFFICIAL;
+
+		/* ATI X1xxx cards (R500 chipset) lack full support for npot textures
+		 * although they report the GLEW_ARB_texture_non_power_of_two extension.
+		 */
+		if(strstr(renderer, "X1"))
+			GG.npotdisabled = 1;
 	}
 	else if(strstr(vendor, "NVIDIA")) {
 		GG.device = GPU_DEVICE_NVIDIA;
@@ -132,9 +138,20 @@ void GPU_extensions_init()
 		GG.device = GPU_DEVICE_INTEL;
 		GG.driver = GPU_DRIVER_OFFICIAL;
 	}
-	else if(strstr(renderer, "Mesa DRI R")) {
+	else if(strstr(renderer, "Mesa DRI R") || (strstr(renderer, "Gallium ") && strstr(renderer, " on ATI "))) {
 		GG.device = GPU_DEVICE_ATI;
 		GG.driver = GPU_DRIVER_OPENSOURCE;
+		/* ATI 9500 to X2300 cards support NPoT textures poorly
+		 * Incomplete list http://dri.freedesktop.org/wiki/ATIRadeon
+		 * New IDs from MESA's src/gallium/drivers/r300/r300_screen.c
+		 */
+		if(strstr(renderer, "R3") || strstr(renderer, "RV3") ||
+		   strstr(renderer, "R4") || strstr(renderer, "RV4") ||
+		   strstr(renderer, "RS4") || strstr(renderer, "RC4") ||
+		   strstr(renderer, "R5") || strstr(renderer, "RV5") ||
+		   strstr(renderer, "RS600") || strstr(renderer, "RS690") ||
+		   strstr(renderer, "RS740"))
+			GG.npotdisabled = 1;
 	}
 	else if(strstr(renderer, "Nouveau") || strstr(vendor, "nouveau")) {
 		GG.device = GPU_DEVICE_NVIDIA;
@@ -166,42 +183,30 @@ void GPU_extensions_init()
 #endif
 }
 
-int GPU_glsl_support()
+int GPU_glsl_support(void)
 {
 	return !GG.extdisabled && GG.glslsupport;
 }
 
-int GPU_non_power_of_two_support()
+int GPU_non_power_of_two_support(void)
 {
 	/* Exception for buggy ATI/Apple driver in Mac OS X 10.5/10.6,
 	 * they claim to support this but can cause system freeze */
 	if(GPU_type_matches(GPU_DEVICE_ATI, GPU_OS_MAC, GPU_DRIVER_OFFICIAL))
 		return 0;
 
+	if(GG.npotdisabled)
+		return 0;
+
 	return GLEW_ARB_texture_non_power_of_two;
 }
 
-int GPU_color_depth()
+int GPU_color_depth(void)
 {
     return GG.colordepth;
 }
 
-unsigned int GPU_texture_vram_usage()
-{
-	return GG.texturevram;
-}
-
-void GPU_texture_vram_add(unsigned int amount)
-{
-	GG.texturevram += amount;
-}
-
-void GPU_texture_vram_subtract(unsigned int amount)
-{
-	GG.texturevram -= amount;
-}
-
-int GPU_print_error(char *str)
+int GPU_print_error(const char *str)
 {
 	GLenum errCode;
 
@@ -359,8 +364,6 @@ static GPUTexture *GPU_texture_create_nD(int w, int h, int n, float *fpixels, in
 	if (tex->target == GL_TEXTURE_1D) {
 		glTexImage1D(tex->target, 0, internalformat, tex->w, 0, format, type, 0);
 
-		GPU_texture_vram_add(tex->w*4);
-
 		if (fpixels) {
 			glTexSubImage1D(tex->target, 0, 0, w, format, type,
 				pixels? pixels: fpixels);
@@ -373,8 +376,6 @@ static GPUTexture *GPU_texture_create_nD(int w, int h, int n, float *fpixels, in
 	else {
 		glTexImage2D(tex->target, 0, internalformat, tex->w, tex->h, 0,
 			format, type, 0);
-
-		GPU_texture_vram_add(tex->w*tex->h*4);
 
 		if (fpixels) {
 			glTexSubImage2D(tex->target, 0, 0, 0, w, h,
@@ -640,14 +641,7 @@ void GPU_texture_free(GPUTexture *tex)
 		if (tex->fb)
 			GPU_framebuffer_texture_detach(tex->fb, tex);
 		if (tex->bindcode && !tex->fromblender)
-		{
 			glDeleteTextures(1, &tex->bindcode);
-
-			if (tex->target == GL_TEXTURE_2D)
-				GPU_texture_vram_subtract(tex->w*tex->h*4);
-			else
-				GPU_texture_vram_subtract(tex->w*4);
-		}
 
 		MEM_freeN(tex);
 	}
@@ -686,7 +680,7 @@ struct GPUFrameBuffer {
 	GPUTexture *depthtex;
 };
 
-GPUFrameBuffer *GPU_framebuffer_create()
+GPUFrameBuffer *GPU_framebuffer_create(void)
 {
 	GPUFrameBuffer *fb;
 
@@ -831,7 +825,7 @@ void GPU_framebuffer_free(GPUFrameBuffer *fb)
 	MEM_freeN(fb);
 }
 
-void GPU_framebuffer_restore()
+void GPU_framebuffer_restore(void)
 {
 	if (GG.currentfb != 0) {
 		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
@@ -847,7 +841,7 @@ struct GPUOffScreen {
 	GPUTexture *depth;
 };
 
-GPUOffScreen *GPU_offscreen_create(int width, int height)
+GPUOffScreen *GPU_offscreen_create(int *width, int *height)
 {
 	GPUOffScreen *ofs;
 
@@ -859,18 +853,24 @@ GPUOffScreen *GPU_offscreen_create(int width, int height)
 		return NULL;
 	}
 
-	ofs->depth = GPU_texture_create_depth(width, height);
+	ofs->depth = GPU_texture_create_depth(*width, *height);
 	if(!ofs->depth) {
 		GPU_offscreen_free(ofs);
 		return NULL;
 	}
 
+	if(*width!=ofs->depth->w || *height!=ofs->depth->h) {
+		*width= ofs->depth->w;
+		*height= ofs->depth->h;
+		printf("Offscreen size differs from given size!\n");
+	}
+	
 	if(!GPU_framebuffer_texture_attach(ofs->fb, ofs->depth)) {
 		GPU_offscreen_free(ofs);
 		return NULL;
 	}
 
-	ofs->color = GPU_texture_create_2D(width, height, NULL);
+	ofs->color = GPU_texture_create_2D(*width, *height, NULL);
 	if(!ofs->color) {
 		GPU_offscreen_free(ofs);
 		return NULL;
@@ -921,7 +921,7 @@ struct GPUShader {
 	int totattrib;			/* total number of attributes */
 };
 
-static void shader_print_errors(char *task, char *log, const char *code)
+static void shader_print_errors(const char *task, char *log, const char *code)
 {
 	const char *c, *pos, *end = code + strlen(code);
 	int line = 1;
@@ -1070,7 +1070,7 @@ void GPU_shader_bind(GPUShader *shader)
 	GPU_print_error("Post Shader Bind");
 }
 
-void GPU_shader_unbind()
+void GPU_shader_unbind(GPUShader *UNUSED(shader))
 {
 	GPU_print_error("Pre Shader Unbind");
 	glUseProgramObjectARB(0);
@@ -1090,7 +1090,7 @@ void GPU_shader_free(GPUShader *shader)
 	MEM_freeN(shader);
 }
 
-int GPU_shader_get_uniform(GPUShader *shader, char *name)
+int GPU_shader_get_uniform(GPUShader *shader, const char *name)
 {
 	return glGetUniformLocationARB(shader->object, name);
 }

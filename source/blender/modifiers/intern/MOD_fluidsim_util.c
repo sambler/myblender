@@ -42,13 +42,16 @@
 
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_main.h"
+#include "BKE_fluidsim.h" /* ensure definitions here match */
 #include "BKE_cdderivedmesh.h"
 #include "BKE_mesh.h"
 #include "BKE_utildefines.h"
 #include "BKE_global.h" /* G.main->name only */
 
+#include "MOD_fluidsim_util.h"
 #include "MOD_modifiertypes.h"
 
 #include "MEM_guardedalloc.h"
@@ -166,17 +169,17 @@ void fluidsim_free(FluidsimModifierData *fluidmd)
 
 #ifndef DISABLE_ELBEEM
 /* read .bobj.gz file into a fluidsimDerivedMesh struct */
-DerivedMesh *fluidsim_read_obj(char *filename)
+static DerivedMesh *fluidsim_read_obj(const char *filename)
 {
-	int wri,i,j;
-	float wrf;
+	int wri = 0,i;
 	int gotBytes;
 	gzFile gzf;
 	int numverts = 0, numfaces = 0;
 	DerivedMesh *dm = NULL;
-	MFace *mface;
-	MVert *mvert;
-	short *normals;
+	MFace *mf;
+	MVert *mv;
+	short *normals, *no_s;
+	float no[3];
 
 	// ------------------------------------------------
 	// get numverts + numfaces first
@@ -192,28 +195,25 @@ DerivedMesh *fluidsim_read_obj(char *filename)
 	numverts = wri;
 
 	// skip verts
-	for(i=0; i<numverts*3; i++)
-	{
-		gotBytes = gzread(gzf, &wrf, sizeof( wrf ));
-	}
+	gotBytes = gzseek(gzf, numverts * 3 * sizeof(float), SEEK_CUR) != -1;
+
 
 	// read number of normals
-	gotBytes = gzread(gzf, &wri, sizeof(wri));
+	if(gotBytes)
+		gotBytes = gzread(gzf, &wri, sizeof(wri));
 
 	// skip normals
-	for(i=0; i<numverts*3; i++)
-	{
-		gotBytes = gzread(gzf, &wrf, sizeof( wrf ));
-	}
+	gotBytes = gzseek(gzf, numverts * 3 * sizeof(float), SEEK_CUR) != -1;
 
 	/* get no. of triangles */
-	gotBytes = gzread(gzf, &wri, sizeof(wri));
+	if(gotBytes)
+		gotBytes = gzread(gzf, &wri, sizeof(wri));
 	numfaces = wri;
 
 	gzclose( gzf );
 	// ------------------------------------------------
 
-	if(!numfaces || !numverts)
+	if(!numfaces || !numverts || !gotBytes)
 		return NULL;
 
 	gzf = gzopen(filename, "rb");
@@ -234,17 +234,10 @@ DerivedMesh *fluidsim_read_obj(char *filename)
 	gotBytes = gzread(gzf, &wri, sizeof(wri));
 
 	// read vertex position from file
-	mvert = CDDM_get_verts(dm);
-	for(i=0; i<numverts; i++)
-	{
-		MVert *mv = &mvert[i];
+	mv = CDDM_get_verts(dm);
 
-		for(j=0; j<3; j++)
-		{
-			gotBytes = gzread(gzf, &wrf, sizeof( wrf ));
-			mv->co[j] = wrf;
-		}
-	}
+	for(i=0; i<numverts; i++, mv++)
+		gotBytes = gzread(gzf, mv->co, sizeof(float) * 3);
 
 	// should be the same as numverts
 	gotBytes = gzread(gzf, &wri, sizeof(wri));
@@ -266,29 +259,31 @@ DerivedMesh *fluidsim_read_obj(char *filename)
 	}
 
 	// read normals from file (but don't save them yet)
-	for(i=0; i<numverts*3; i++)
+	for(i=numverts, no_s= normals; i>0; i--, no_s += 3)
 	{
-		gotBytes = gzread(gzf, &wrf, sizeof( wrf ));
-		normals[i] = (short)(wrf*32767.0f);
+		gotBytes = gzread(gzf, no, sizeof(float) * 3);
+		normal_float_to_short_v3(no_s, no);
 	}
 
 	/* read no. of triangles */
 	gotBytes = gzread(gzf, &wri, sizeof(wri));
 
-	if(wri!=numfaces)
+	if(wri!=numfaces) {
 		printf("Fluidsim: error in reading data from file.\n");
+		if(dm)
+			dm->release(dm);
+		gzclose( gzf );
+		MEM_freeN(normals);
+		return NULL;
+	}
 
 	// read triangles from file
-	mface = CDDM_get_faces(dm);
-	for(i=0; i<numfaces; i++)
+	mf = CDDM_get_faces(dm);
+	for(i=numfaces; i>0; i--, mf++)
 	{
-		int face[4];
-		MFace *mf = &mface[i];
+		int face[3];
 
-		gotBytes = gzread(gzf, &(face[0]), sizeof( face[0] ));
-		gotBytes = gzread(gzf, &(face[1]), sizeof( face[1] ));
-		gotBytes = gzread(gzf, &(face[2]), sizeof( face[2] ));
-		face[3] = 0;
+		gotBytes = gzread(gzf, face, sizeof(int) * 3);
 
 		// check if 3rd vertex has index 0 (not allowed in blender)
 		if(face[2])
@@ -303,7 +298,7 @@ DerivedMesh *fluidsim_read_obj(char *filename)
 			mf->v2 = face[2];
 			mf->v3 = face[0];
 		}
-		mf->v4 = face[3];
+		mf->v4 = 0;
 
 		test_index_face(mf, NULL, 0, 3);
 	}
@@ -386,7 +381,7 @@ void fluid_estimate_memory(Object *ob, FluidsimSettings *fss, char *value)
 
 
 /* read zipped fluidsim velocities into the co's of the fluidsimsettings normals struct */
-void fluidsim_read_vel_cache(FluidsimModifierData *fluidmd, DerivedMesh *dm, char *filename)
+static void fluidsim_read_vel_cache(FluidsimModifierData *fluidmd, DerivedMesh *dm, char *filename)
 {
 	int wri, i, j;
 	float wrf;
@@ -449,7 +444,7 @@ void fluidsim_read_vel_cache(FluidsimModifierData *fluidmd, DerivedMesh *dm, cha
 	gzclose(gzf);
 }
 
-DerivedMesh *fluidsim_read_cache(DerivedMesh *orgdm, FluidsimModifierData *fluidmd, int framenr, int useRenderParams)
+static DerivedMesh *fluidsim_read_cache(DerivedMesh *orgdm, FluidsimModifierData *fluidmd, int framenr, int useRenderParams)
 {
 	int displaymode = 0;
 	int curFrame = framenr - 1 /*scene->r.sfra*/; /* start with 0 at start frame */
@@ -466,7 +461,7 @@ DerivedMesh *fluidsim_read_cache(DerivedMesh *orgdm, FluidsimModifierData *fluid
 		displaymode = fss->renderDisplayMode;
 	}
 
-	strncpy(targetDir, fss->surfdataPath, FILE_MAXDIR);
+	BLI_strncpy(targetDir, fss->surfdataPath, sizeof(targetDir));
 
 	// use preview or final mesh?
 	if(displaymode==1)
@@ -486,8 +481,7 @@ DerivedMesh *fluidsim_read_cache(DerivedMesh *orgdm, FluidsimModifierData *fluid
 	BLI_path_abs(targetDir, G.main->name);
 	BLI_path_frame(targetDir, curFrame, 0); // fixed #frame-no
 
-	strcpy(targetFile,targetDir);
-	strcat(targetFile, ".bobj.gz");
+	BLI_snprintf(targetFile, sizeof(targetFile), "%s.bobj.gz", targetDir);
 
 	dm = fluidsim_read_obj(targetFile);
 
@@ -540,13 +534,12 @@ DerivedMesh *fluidsim_read_cache(DerivedMesh *orgdm, FluidsimModifierData *fluid
 
 	return dm;
 }
-
 #endif // DISABLE_ELBEEM
 
 DerivedMesh *fluidsimModifier_do(FluidsimModifierData *fluidmd, Scene *scene,
 						Object *UNUSED(ob),
 						DerivedMesh *dm,
-						int useRenderParams)
+						int useRenderParams, int UNUSED(isFinalCalc))
 {
 #ifndef DISABLE_ELBEEM
 	DerivedMesh *result = NULL;
@@ -567,7 +560,7 @@ DerivedMesh *fluidsimModifier_do(FluidsimModifierData *fluidmd, Scene *scene,
 	
 	// timescale not supported yet
 	// clmd->sim_parms->timescale= timescale;
-	
+
 	// support reversing of baked fluid frames here
 	if((fss->flag & OB_FLUIDSIM_REVERSE) && (fss->lastgoodframe >= 0))
 	{
@@ -576,39 +569,9 @@ DerivedMesh *fluidsimModifier_do(FluidsimModifierData *fluidmd, Scene *scene,
 	}
 	
 	/* try to read from cache */
-	if(((fss->lastgoodframe >= framenr) || (fss->lastgoodframe < 0)) && (result = fluidsim_read_cache(dm, fluidmd, framenr, useRenderParams)))
-	{
-		// fss->lastgoodframe = framenr; // set also in src/fluidsim.c
+	/* if the frame is there, fine, otherwise don't do anything */
+	if((result = fluidsim_read_cache(dm, fluidmd, framenr, useRenderParams)))
 		return result;
-	}
-	else
-	{	
-		// display last known good frame
-		if(fss->lastgoodframe >= 0)
-		{
-			if((result = fluidsim_read_cache(dm, fluidmd, fss->lastgoodframe, useRenderParams))) 
-			{
-				return result;
-			}
-			
-			// it was supposed to be a valid frame but it isn't!
-			fss->lastgoodframe = framenr - 1;
-			
-			
-			// this could be likely the case when you load an old fluidsim
-			if((result = fluidsim_read_cache(dm, fluidmd, fss->lastgoodframe, useRenderParams))) 
-			{
-				return result;
-			}
-		}
-		
-		result = CDDM_copy(dm);
-
-		if(result) 
-		{
-			return result;
-		}
-	}
 	
 	return dm;
 #else

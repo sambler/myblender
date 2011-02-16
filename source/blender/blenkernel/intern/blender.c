@@ -55,8 +55,10 @@
 #include "DNA_sound_types.h"
 
 #include "BLI_blenlib.h"
+#include "BLI_bpath.h"
 #include "BLI_dynstr.h"
 #include "BLI_path_util.h"
+#include "BLI_utildefines.h"
 
 #include "IMB_imbuf.h"
 
@@ -80,16 +82,16 @@
 #include "BLO_readfile.h" 
 #include "BLO_writefile.h" 
 
-#include "BKE_utildefines.h" // O_BINARY FALSE
+#include "BKE_utildefines.h"
 
 #include "WM_api.h" // XXXXX BAD, very BAD dependency (bad level call) - remove asap, elubie
 
 Global G;
 UserDef U;
-ListBase WMlist= {NULL, NULL};
+/* ListBase = {NULL, NULL}; */
 short ENDIAN_ORDER;
 
-char versionstr[48]= "";
+static char versionstr[48]= "";
 
 /* ********** free ********** */
 
@@ -122,9 +124,9 @@ void initglobals(void)
 	ENDIAN_ORDER= (((char*)&ENDIAN_ORDER)[0])? L_ENDIAN: B_ENDIAN;
 
 	if(BLENDER_SUBVERSION)
-		sprintf(versionstr, "www.blender.org %d.%d", BLENDER_VERSION, BLENDER_SUBVERSION);
+		BLI_snprintf(versionstr, sizeof(versionstr), "www.blender.org %d.%d", BLENDER_VERSION, BLENDER_SUBVERSION);
 	else
-		sprintf(versionstr, "www.blender.org %d", BLENDER_VERSION);
+		BLI_snprintf(versionstr, sizeof(versionstr), "www.blender.org %d", BLENDER_VERSION);
 
 #ifdef _WIN32	// FULLSCREEN
 	G.windowstate = G_WINDOWSTATE_USERDEF;
@@ -154,48 +156,31 @@ static void clear_global(void)
 /* make sure path names are correct for OS */
 static void clean_paths(Main *main)
 {
-	Image *image= main->image.first;
-	bSound *sound= main->sound.first;
-	Scene *scene= main->scene.first;
-	Editing *ed;
-	Sequence *seq;
-	Strip *strip;
-	
-	while(image) {
-		BLI_clean(image->name);
-		image= image->id.next;
+	struct BPathIterator *bpi;
+	char filepath_expanded[1024];
+	Scene *scene;
+
+	for(BLI_bpathIterator_init(&bpi, main, main->name, BPATH_USE_PACKED); !BLI_bpathIterator_isDone(bpi); BLI_bpathIterator_step(bpi)) {
+		BLI_bpathIterator_getPath(bpi, filepath_expanded);
+
+		BLI_clean(filepath_expanded);
+
+		BLI_bpathIterator_setPath(bpi, filepath_expanded);
 	}
-	
-	while(sound) {
-		BLI_clean(sound->name);
-		sound= sound->id.next;
-	}
-	
-	while(scene) {
-		ed= seq_give_editing(scene, 0);
-		if(ed) {
-			seq= ed->seqbasep->first;
-			while(seq) {
-				if(seq->plugin) {
-					BLI_clean(seq->plugin->name);
-				}
-				strip= seq->strip;
-				while(strip) {
-					BLI_clean(strip->dir);
-					strip= strip->next;
-				}
-				seq= seq->next;
-			}
-		}
+
+	BLI_bpathIterator_free(bpi);
+
+	for(scene= main->scene.first; scene; scene= scene->id.next) {
 		BLI_clean(scene->r.backbuf);
 		BLI_clean(scene->r.pic);
-		
-		scene= scene->id.next;
 	}
 }
 
 /* context matching */
 /* handle no-ui case */
+
+/* note, this is called on Undo so any slow conversion functions here
+ * should be avoided or check (mode!='u') */
 
 static void setup_app_data(bContext *C, BlendFileData *bfd, const char *filename) 
 {
@@ -210,9 +195,12 @@ static void setup_app_data(bContext *C, BlendFileData *bfd, const char *filename
 	else mode= 0;
 
 	recover= (G.fileflags & G_FILE_RECOVER);
-	
-	clean_paths(bfd->main);
-	
+
+	/* Only make filepaths compatible when loading for real (not undo) */
+	if(mode != 'u') {
+		clean_paths(bfd->main);
+	}
+
 	/* XXX here the complex windowmanager matching */
 	
 	/* no load screens? */
@@ -237,6 +225,7 @@ static void setup_app_data(bContext *C, BlendFileData *bfd, const char *filename
 	}
 	
 	/* free G.main Main database */
+//	CTX_wm_manager_set(C, NULL);
 	clear_global();	
 	
 	G.main= bfd->main;
@@ -261,7 +250,7 @@ static void setup_app_data(bContext *C, BlendFileData *bfd, const char *filename
 		G.winpos= bfd->winpos;
 		G.displaymode= bfd->displaymode;
 		G.fileflags= bfd->fileflags;
-		
+		CTX_wm_manager_set(C, bfd->main->wm.first);
 		CTX_wm_screen_set(C, bfd->curscreen);
 		CTX_data_scene_set(C, bfd->curscreen->scene);
 		CTX_wm_area_set(C, NULL);
@@ -310,8 +299,6 @@ static void setup_app_data(bContext *C, BlendFileData *bfd, const char *filename
 	/* these are the same at times, should never copy to the same location */
 	if(G.main->name != filename)
 		BLI_strncpy(G.main->name, filename, FILE_MAX);
-	
-	BLI_strncpy(G.main->name, filename, FILE_MAX); /* is guaranteed current file */
 
 	/* baseflags, groups, make depsgraph, etc */
 	set_scene_bg(G.main, CTX_data_scene(C));
@@ -327,7 +314,7 @@ static int handle_subversion_warning(Main *main)
 		
 		char str[128];
 		
-		sprintf(str, "File written by newer Blender binary: %d.%d , expect loss of data!", main->minversionfile, main->minsubversionfile);
+		BLI_snprintf(str, sizeof(str), "File written by newer Blender binary: %d.%d , expect loss of data!", main->minversionfile, main->minsubversionfile);
 // XXX		error(str);
 	}
 	return 1;
@@ -358,18 +345,12 @@ void BKE_userdef_free(void)
 	BLI_freelistN(&U.addons);
 }
 
-/* returns:
-   0: no load file
-   1: OK
-   2: OK, and with new user settings
-*/
-
 int BKE_read_file(bContext *C, const char *dir, ReportList *reports) 
 {
 	BlendFileData *bfd;
 	int retval= 1;
 
-	if(strstr(dir, BLENDER_STARTUP_FILE)==0) /* dont print user-pref loading */
+	if(strstr(dir, BLENDER_STARTUP_FILE)==NULL) /* dont print user-pref loading */
 		printf("read blend: %s\n", dir);
 
 	bfd= BLO_read_from_file(dir, reports);
@@ -471,16 +452,18 @@ static int read_undosave(bContext *C, UndoElem *uel)
 	G.fileflags |= G_FILE_NO_UI;
 
 	if(UNDO_DISK) 
-		success= BKE_read_file(C, uel->str, NULL);
+		success= (BKE_read_file(C, uel->str, NULL) != BKE_READ_FILE_FAIL);
 	else
 		success= BKE_read_file_from_memfile(C, &uel->memfile, NULL);
 
 	/* restore */
-	strcpy(G.main->name, mainstr); /* restore */
+	BLI_strncpy(G.main->name, mainstr, sizeof(G.main->name)); /* restore */
 	G.fileflags= fileflags;
 
-	if(success)
-		DAG_on_load_update(G.main);
+	if(success) {
+		/* important not to update time here, else non keyed tranforms are lost */
+		DAG_on_load_update(G.main, FALSE);
+	}
 
 	return success;
 }
@@ -537,12 +520,12 @@ void BKE_write_undo(bContext *C, const char *name)
 		counter++;
 		counter= counter % U.undosteps;	
 	
-		sprintf(numstr, "%d.blend", counter);
+		BLI_snprintf(numstr, sizeof(numstr), "%d.blend", counter);
 		BLI_make_file_string("/", tstr, btempdir, numstr);
 	
 		success= BLO_write_file(CTX_data_main(C), tstr, G.fileflags, NULL, NULL);
 		
-		strcpy(curundo->str, tstr);
+		BLI_strncpy(curundo->str, tstr, sizeof(curundo->str));
 	}
 	else {
 		MemFile *prevfile=NULL;
@@ -651,6 +634,22 @@ void BKE_undo_name(bContext *C, const char *name)
 		curundo= uel->prev;
 		BKE_undo_step(C, 0);
 	}
+}
+
+/* name optional */
+int BKE_undo_valid(const char *name)
+{
+	if(name) {
+		UndoElem *uel;
+		
+		for(uel= undobase.last; uel; uel= uel->prev)
+			if(strcmp(name, uel->name)==0)
+				break;
+		
+		return uel && uel->prev;
+	}
+	
+	return undobase.last != undobase.first;
 }
 
 

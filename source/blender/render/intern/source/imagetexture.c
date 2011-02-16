@@ -51,13 +51,15 @@
 #include "BLI_math.h"
 #include "BLI_blenlib.h"
 #include "BLI_threads.h"
+#include "BLI_utildefines.h"
 
-#include "BKE_utildefines.h"
 #include "BKE_global.h"
 #include "BKE_main.h"
 #include "BKE_image.h"
 #include "BKE_texture.h"
 #include "BKE_library.h"
+
+#include "RE_render_ext.h"
 
 #include "renderpipeline.h"
 #include "render_types.h"
@@ -808,7 +810,7 @@ static void imp2radangle(float A, float B, float C, float F, float* a, float* b,
 static void ewa_eval(TexResult* texr, ImBuf* ibuf, float fx, float fy, afdata_t* AFD)
 {
 	// scaling dxt/dyt by full resolution can cause overflow because of huge A/B/C and esp. F values,
-	// scaling by aspect ratio alone does the opposite, so try something inbetween instead...
+	// scaling by aspect ratio alone does the opposite, so try something in between instead...
 	const float ff2 = ibuf->x, ff = sqrtf(ff2), q = ibuf->y / ff;
 	const float Ux = AFD->dxt[0]*ff, Vx = AFD->dxt[1]*q, Uy = AFD->dyt[0]*ff, Vy = AFD->dyt[1]*q;
 	float A = Vx*Vx + Vy*Vy;
@@ -960,6 +962,30 @@ static void alpha_clip_aniso(ImBuf *ibuf, float minx, float miny, float maxx, fl
 	}
 }
 
+static void image_mipmap_test(Tex *tex, ImBuf *ibuf)
+{
+	if (tex->imaflag & TEX_MIPMAP) {
+		if ((ibuf->flags & IB_fields) == 0) {
+			
+			if (ibuf->mipmap[0] && (ibuf->userflags & IB_MIPMAP_INVALID)) {
+				BLI_lock_thread(LOCK_IMAGE);
+				if (ibuf->userflags & IB_MIPMAP_INVALID) {
+					IMB_remakemipmap(ibuf, tex->imaflag & TEX_GAUSS_MIP);
+					ibuf->userflags &= ~IB_MIPMAP_INVALID;
+				}				
+				BLI_unlock_thread(LOCK_IMAGE);
+			}
+			if (ibuf->mipmap[0] == NULL) {
+				BLI_lock_thread(LOCK_IMAGE);
+				if (ibuf->mipmap[0] == NULL) 
+					IMB_makemipmap(ibuf, tex->imaflag & TEX_GAUSS_MIP);
+				BLI_unlock_thread(LOCK_IMAGE);
+			}
+		}
+	}
+	
+}
+
 static int imagewraposa_aniso(Tex *tex, Image *ima, ImBuf *ibuf, float *texvec, float *dxt, float *dyt, TexResult *texres)
 {
 	TexResult texr;
@@ -996,15 +1022,9 @@ static int imagewraposa_aniso(Tex *tex, Image *ima, ImBuf *ibuf, float *texvec, 
 
 	if ((ibuf == NULL) || ((ibuf->rect == NULL) && (ibuf->rect_float == NULL))) return retval;
 
-	// mipmap test
-	if (tex->imaflag & TEX_MIPMAP) {
-		if (((ibuf->flags & IB_fields) == 0) && (ibuf->mipmap[0] == NULL)) {
-			BLI_lock_thread(LOCK_IMAGE);
-			if (ibuf->mipmap[0] == NULL) IMB_makemipmap(ibuf, tex->imaflag & TEX_GAUSS_MIP);
-			BLI_unlock_thread(LOCK_IMAGE);
-		}
-	}
-
+	/* mipmap test */
+	image_mipmap_test(tex, ibuf);
+	
 	if ((tex->imaflag & TEX_USEALPHA) && ((tex->imaflag & TEX_CALCALPHA) == 0)) texres->talpha = 1;
 	texr.talpha = texres->talpha;
 
@@ -1388,17 +1408,7 @@ int imagewraposa(Tex *tex, Image *ima, ImBuf *ibuf, float *texvec, float *DXT, f
 	   return retval;
 	
 	/* mipmap test */
-	if (tex->imaflag & TEX_MIPMAP) {
-		if(ibuf->flags & IB_fields);
-		else if(ibuf->mipmap[0]==NULL) {
-			BLI_lock_thread(LOCK_IMAGE);
-			
-			if(ibuf->mipmap[0]==NULL)
-				IMB_makemipmap(ibuf, tex->imaflag & TEX_GAUSS_MIP);
-
-			BLI_unlock_thread(LOCK_IMAGE);
-		}
-	}
+	image_mipmap_test(tex, ibuf);
 
 	if(tex->imaflag & TEX_USEALPHA) {
 		if(tex->imaflag & TEX_CALCALPHA);

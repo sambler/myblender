@@ -107,6 +107,7 @@ void ibuf_sample(struct ImBuf *ibuf, float fx, float fy, float dx, float dy, flo
 /* texture.c */
 int multitex_thread(struct Tex *tex, float *texvec, float *dxt, float *dyt, int osatex, struct TexResult *texres, short thread, short which_output) {return 0;}
 int multitex_ext(struct Tex *tex, float *texvec, float *dxt, float *dyt, int osatex, struct TexResult *texres){return 0;}
+int multitex_ext_safe(struct Tex *tex, float *texvec, struct TexResult *texres){return 0;}
 int multitex_nodes(struct Tex *tex, float *texvec, float *dxt, float *dyt, int osatex, struct TexResult *texres, short thread, short which_output, struct ShadeInput *shi, struct MTex *mtex) {return 0;}
 
 /* nodes */
@@ -139,6 +140,7 @@ void WM_menutype_free(void){}
 void WM_menutype_freelink(struct MenuType* mt){}
 int WM_menutype_add(struct MenuType *mt) {return 0;}
 int WM_operator_props_dialog_popup (struct bContext *C, struct wmOperator *op, int width, int height){return 0;}
+int WM_operator_confirm(struct bContext *C, struct wmOperator *op, struct wmEvent *event){return 0;}
 struct MenuType *WM_menutype_find(const char *idname, int quiet){return (struct MenuType *) NULL;}
 void WM_operator_stack_clear(struct bContext *C) {}
 
@@ -216,6 +218,7 @@ char *ED_info_stats_string(struct Scene *scene){return (char *) NULL;}
 void ED_area_tag_redraw(struct ScrArea *sa){}
 void ED_area_tag_refresh(struct ScrArea *sa){}
 void ED_area_newspace(struct bContext *C, struct ScrArea *sa, int type){} 
+void ED_region_tag_redraw(struct ARegion *ar){}
 void WM_event_add_fileselect(struct bContext *C, struct wmOperator *op){}
 void WM_cursor_wait (int val) {}
 void ED_node_texture_default(struct Tex *tx){}
@@ -260,6 +263,11 @@ void ED_object_constraint_dependency_update(struct Scene *scene, struct Object *
 void ED_object_constraint_update(struct Object *ob){}
 struct bDeformGroup *ED_vgroup_add_name(struct Object *ob, char *name){return (struct bDeformGroup *) NULL;}
 void ED_vgroup_vert_add(struct Object *ob, struct bDeformGroup *dg, int vertnum, float weight, int assignmode){}
+void ED_vgroup_vert_remove(struct Object *ob, struct bDeformGroup *dg, int vertnum){}
+void ED_vgroup_vert_weight(struct Object *ob, struct bDeformGroup *dg, int vertnum){}
+void ED_vgroup_delete(struct Object *ob, struct bDeformGroup *defgroup){}
+void ED_vgroup_object_is_edit_mode(struct Object *ob){}
+
 void ED_sequencer_update_view(struct bContext *C, int view){}
 float ED_rollBoneToVector(struct EditBone *bone, float new_up_axis[3]){return 0.0f;}
 void ED_space_image_size(struct SpaceImage *sima, int *width, int *height){}
@@ -288,6 +296,8 @@ struct uiLayout *uiLayoutColumn(struct uiLayout *layout, int align){return (stru
 struct uiLayout *uiLayoutColumnFlow(struct uiLayout *layout, int number, int align){return (struct uiLayout *) NULL;}
 struct uiLayout *uiLayoutBox(struct uiLayout *layout){return (struct uiLayout *) NULL;}
 struct uiLayout *uiLayoutSplit(struct uiLayout *layout, float percentage, int align){return (struct uiLayout *) NULL;}
+int uiLayoutGetRedAlert(struct uiLayout *layout){return 0;}
+void uiLayoutSetRedAlert(struct uiLayout *layout, int redalert){}
 void uiItemsEnumR(struct uiLayout *layout, struct PointerRNA *ptr, char *propname){}
 void uiItemMenuEnumR(struct uiLayout *layout, struct PointerRNA *ptr, char *propname, char *name, int icon){}
 void uiItemEnumR_string(struct uiLayout *layout, struct PointerRNA *ptr, char *propname, char *value, char *name, int icon){}
@@ -314,7 +324,7 @@ void uiTemplateHeader(struct uiLayout *layout, struct bContext *C, int menus){}
 void uiTemplateID(struct uiLayout *layout, struct bContext *C, struct PointerRNA *ptr, char *propname, char *newop, char *unlinkop){}
 struct uiLayout *uiTemplateModifier(struct uiLayout *layout, struct PointerRNA *ptr){return (struct uiLayout *) NULL;}
 struct uiLayout *uiTemplateConstraint(struct uiLayout *layout, struct PointerRNA *ptr){return (struct uiLayout *) NULL;}
-void uiTemplatePreview(struct uiLayout *layout, struct ID *id, struct ID *parent, struct MTex *slot){}
+void uiTemplatePreview(struct uiLayout *layout, struct ID *id, int show_buttons, struct ID *parent, struct MTex *slot){}
 void uiTemplateIDPreview(struct uiLayout *layout, struct bContext *C, struct PointerRNA *ptr, char *propname, char *newop, char *openop, char *unlinkop, int rows, int cols){}
 void uiTemplateCurveMapping(struct uiLayout *layout, struct CurveMapping *cumap, int type, int compact){}
 void uiTemplateColorRamp(struct uiLayout *layout, struct ColorBand *coba, int expand){}
@@ -361,6 +371,7 @@ int WM_operator_props_popup(struct bContext *C, struct wmOperator *op, struct wm
 void WM_operator_properties_free(struct PointerRNA *ptr){}
 void WM_operator_properties_create(struct PointerRNA *ptr, const char *opstring){}
 void WM_operator_properties_create_ptr(struct PointerRNA *ptr, struct wmOperatorType *ot){}
+void WM_operator_properties_sanitize(struct PointerRNA *ptr, const short no_context){};
 void WM_operatortype_append_ptr(void (*opfunc)(struct wmOperatorType*, void*), void *userdata){}
 void WM_operatortype_append_macro_ptr(void (*opfunc)(struct wmOperatorType*, void*), void *userdata){}
 void WM_operator_bl_idname(char *to, const char *from){}
@@ -372,15 +383,13 @@ char *WM_operator_pystring(struct bContext *C, struct wmOperatorType *ot, struct
 struct wmKeyMapItem *WM_modalkeymap_add_item(struct wmKeyMap *km, int type, int val, int modifier, int keymodifier, int value){return (struct wmKeyMapItem *)NULL;}
 struct wmKeyMap *WM_modalkeymap_add(struct wmKeyConfig *keyconf, char *idname, EnumPropertyItem *items){return (struct wmKeyMap *) NULL;}
 
-/* RNA Collada dependency */
-int collada_export(struct Scene *sce, const char *filepath){return 0;}
-
-
 /* intern/decimation */
+#if 1
 int LOD_FreeDecimationData(struct LOD_Decimation_Info *info){return 0;}
 int LOD_CollapseEdge(struct LOD_Decimation_Info *info){return 0;}
 int LOD_PreprocessMesh(struct LOD_Decimation_Info *info){return 0;}
 int LOD_LoadMesh(struct LOD_Decimation_Info *info){return 0;}
+#endif
 
 /* smoke */
 void LzmaCompress(void) { return; }
@@ -422,10 +431,12 @@ float sculpt_get_brush_unprojected_radius(struct Brush *brush){return 0.0f;}
 void sculpt_set_brush_unprojected_radius(struct Brush *brush, float unprojected_radius){}
 float sculpt_get_brush_alpha(struct Brush *brush){return 0.0f;}
 void sculpt_set_brush_alpha(struct Brush *brush, float alpha){}
+void ED_sculpt_modifiers_changed(struct Object *ob){};
 
 char blender_path[] = "";
 
 /* CSG */
+#if 1
 struct CSG_BooleanOperation * CSG_NewBooleanFunction( void ){return (struct CSG_BooleanOperation *) NULL;}
 void CSG_FreeBooleanOperation(struct CSG_BooleanOperation *operation){return;}
 void CSG_FreeFaceDescriptor(struct CSG_FaceIteratorDescriptor * f_descriptor){return;}
@@ -446,4 +457,5 @@ int CSG_PerformBooleanOperation(
 	CSG_VertexIteratorDescriptor	obBVertices)
 	{ return 0;}
 
+#endif
 #endif // WITH_GAMEENGINE

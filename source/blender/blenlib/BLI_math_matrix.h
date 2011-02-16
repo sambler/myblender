@@ -25,8 +25,8 @@
  * ***** END GPL LICENSE BLOCK *****
  * */
 
-#ifndef BLI_MATH_MATRIX
-#define BLI_MATH_MATRIX
+#ifndef BLI_MATH_MATRIX_H
+#define BLI_MATH_MATRIX_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -144,6 +144,8 @@ void mat4_to_size(float r[3], float M[4][4]);
 void translate_m4(float mat[4][4], float tx, float ty, float tz);
 void rotate_m4(float mat[4][4], const char axis, const float angle);
 
+
+void mat3_to_rot_size(float rot[3][3], float size[3], float mat3[][3]);
 void mat4_to_loc_rot_size(float loc[3], float rot[3][3], float size[3], float wmat[][4]);
 
 void loc_eul_size_to_mat4(float R[4][4],
@@ -155,20 +157,20 @@ void loc_quat_size_to_mat4(float R[4][4],
 void loc_axisangle_size_to_mat4(float R[4][4],
 	const float loc[3], const float axis[4], const float angle, const float size[3]);
 
-void blend_m3_m3m3(float R[3][3], float A[3][3], float B[3][3], float t);
-void blend_m4_m4m4(float R[4][4], float A[4][4], float B[4][4], float t);
+void blend_m3_m3m3(float R[3][3], float A[3][3], float B[3][3], const float t);
+void blend_m4_m4m4(float R[4][4], float A[4][4], float B[4][4], const float t);
 
 int is_negative_m3(float mat[3][3]);
 int is_negative_m4(float mat[4][4]);
 
 /*********************************** Other ***********************************/
 
-void print_m3(char *str, float M[3][3]);
-void print_m4(char *str, float M[3][4]);
+void print_m3(const char *str, float M[3][3]);
+void print_m4(const char *str, float M[3][4]);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* BLI_MATH_MATRIX */
+#endif /* BLI_MATH_MATRIX_H */
 

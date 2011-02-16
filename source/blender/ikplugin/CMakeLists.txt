@@ -24,7 +24,7 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-SET(INC 
+set(INC 
 	../blenlib
 	../makesdna
 	../blenkernel
@@ -33,16 +33,23 @@ SET(INC
 	../../../intern/iksolver/extern
 )
 
-SET(SRC
-	./intern/ikplugin_api.c
-	./intern/iksolver_plugin.c
+set(SRC
+	intern/ikplugin_api.c
+	intern/iksolver_plugin.c
+
+	BIK_api.h
+	intern/ikplugin_api.h
+	intern/iksolver_plugin.h
+	intern/itasc_plugin.h
 )
 
-IF(WITH_IK_ITASC)
-	ADD_DEFINITIONS(-DWITH_IK_ITASC)
-	LIST(APPEND INC ../../../extern/Eigen2)
-	LIST(APPEND INC ../../../intern/itasc)
-	LIST(APPEND SRC ./intern/itasc_plugin.cpp)
-ENDIF(WITH_IK_ITASC)
+if(WITH_IK_ITASC)
+	add_definitions(-DWITH_IK_ITASC)
+	list(APPEND INC ../../../extern/Eigen2)
+	list(APPEND INC ../../../intern/itasc)
+	list(APPEND SRC
+		./intern/itasc_plugin.cpp
+	)
+endif()
 
-BLENDERLIB(bf_ikplugin "${SRC}" "${INC}")
+blender_add_lib(bf_ikplugin "${SRC}" "${INC}")

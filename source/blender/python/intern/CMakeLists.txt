@@ -23,8 +23,8 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-SET(INC 
-	../
+set(INC 
+	..
 	../../blenlib
 	../../makesdna
 	../../makesrna
@@ -33,10 +33,10 @@ SET(INC
 	../../editors/include
 	../../../../intern/guardedalloc
 	../../../../intern/audaspace/intern
-	${PYTHON_INC}
+	${PYTHON_INCLUDE_DIRS}
 )
 
-SET(SRC
+set(SRC
 	bpy.c
 	bpy_app.c
 	bpy_driver.c
@@ -49,11 +49,22 @@ SET(SRC
 	bpy_rna_callback.c
 	bpy_util.c
 	stubs.c
+
+	bpy.h
+	bpy_app.h
+	bpy_driver.h
+	bpy_operator.h
+	bpy_operator_wrap.h
+	bpy_props.h
+	bpy_rna.h
+	bpy_rna_callback.h
+	bpy_util.h
+	../BPY_extern.h
 )
 
 # only to check if buildinfo is available
-IF(WITH_BUILDINFO)
-	ADD_DEFINITIONS(-DBUILD_DATE)
-ENDIF(WITH_BUILDINFO)
+if(WITH_BUILDINFO)
+	add_definitions(-DBUILD_DATE)
+endif()
 
-BLENDERLIB(bf_python "${SRC}" "${INC}")
+blender_add_lib(bf_python "${SRC}" "${INC}")

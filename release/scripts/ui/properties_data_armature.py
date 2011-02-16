@@ -42,13 +42,10 @@ class DATA_PT_context_arm(ArmatureButtonsPanel, bpy.types.Panel):
         arm = context.armature
         space = context.space_data
 
-        split = layout.split(percentage=0.65)
         if ob:
-            split.template_ID(ob, "data")
-            split.separator()
+            layout.template_ID(ob, "data")
         elif arm:
-            split.template_ID(space, "pin_id")
-            split.separator()
+            layout.template_ID(space, "pin_id")
 
 
 class DATA_PT_skeleton(ArmatureButtonsPanel, bpy.types.Panel):
@@ -101,7 +98,8 @@ class DATA_PT_display(ArmatureButtonsPanel, bpy.types.Panel):
 
         col = split.column()
         col.prop(arm, "show_group_colors", text="Colors")
-        col.prop(ob, "show_x_ray", text="X-Ray")
+        if ob:
+            col.prop(ob, "show_x_ray", text="X-Ray")
         col.prop(arm, "use_deform_delay", text="Delay Refresh")
 
 
@@ -154,6 +152,49 @@ class DATA_PT_bone_groups(ArmatureButtonsPanel, bpy.types.Panel):
         sub = row.row(align=True)
         sub.operator("pose.group_select", text="Select")
         sub.operator("pose.group_deselect", text="Deselect")
+
+
+class DATA_PT_pose_library(ArmatureButtonsPanel, bpy.types.Panel):
+    bl_label = "Pose Library"
+    bl_options = {'DEFAULT_CLOSED'}
+    
+    @classmethod
+    def poll(cls, context):
+        return (context.object and context.object.type == 'ARMATURE' and context.object.pose)
+        
+    def draw(self, context):
+        layout = self.layout
+        
+        ob = context.object
+        poselib = ob.pose_library
+        
+        row = layout.row()
+        row.template_ID(ob, "pose_library", new="poselib.new", unlink="poselib.unlink")
+        
+        if poselib:
+            activePoseIndex = poselib.pose_markers.active_index
+            if poselib.pose_markers.active:
+                activePoseName = poselib.pose_markers.active.name
+            else:
+                activePoseName = ""
+            
+            row = layout.row()
+            row.template_list(poselib, "pose_markers", poselib.pose_markers, "active_index", rows=5)
+            
+            col = row.column(align=True)
+            col.active = (poselib.library is None)
+            
+            # invoke should still be used for 'add', as it is needed to allow 
+            # add/replace options to be used properly
+            col.operator("poselib.pose_add", icon='ZOOMIN', text="")
+            
+            col.operator_context = 'EXEC_DEFAULT' # exec not invoke, so that menu doesn't need showing
+            col.operator("poselib.pose_remove", icon='ZOOMOUT', text="").pose = activePoseName
+
+            col.operator("poselib.apply_pose", icon='ZOOM_SELECTED', text="").pose_index = activePoseIndex
+            
+            row = layout.row()
+            row.operator("poselib.action_sanitise")
 
 
 # TODO: this panel will soon be depreceated too
@@ -287,14 +328,15 @@ class DATA_PT_onion_skinning(OnionSkinButtonsPanel):  # , bpy.types.Panel): # in
 class DATA_PT_custom_props_arm(ArmatureButtonsPanel, PropertyPanel, bpy.types.Panel):
     COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
     _context_path = "object.data"
+    _property_type = bpy.types.Armature
 
 
 def register():
-    pass
+    bpy.utils.register_module(__name__)
 
 
 def unregister():
-    pass
+    bpy.utils.unregister_module(__name__)
 
 if __name__ == "__main__":
     register()

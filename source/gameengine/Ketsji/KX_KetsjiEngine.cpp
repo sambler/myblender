@@ -55,6 +55,7 @@
 #include "KX_Scene.h"
 #include "MT_CmMatrix4x4.h"
 #include "KX_Camera.h"
+#include "KX_FontObject.h"
 #include "KX_Dome.h"
 #include "KX_Light.h"
 #include "KX_PythonInit.h"
@@ -74,8 +75,6 @@
 #include "stdio.h"
 #include "DNA_world_types.h"
 #include "DNA_scene_types.h"
-
-#include "GPU_extensions.h"
 
 // If define: little test for Nzc: guarded drawing. If the canvas is
 // not valid, skip rendering this frame.
@@ -948,6 +947,14 @@ int KX_KetsjiEngine::GetExitCode()
 		if (m_scenes.begin()==m_scenes.end())
 			m_exitcode = KX_EXIT_REQUEST_NO_SCENES_LEFT;
 	}
+	
+	// check if the window has been closed.
+	if(!m_exitcode)
+	{
+		//if(!m_canvas->Check()) {
+		//	m_exitcode = KX_EXIT_REQUEST_OUTSIDE;
+		//}
+	}
 
 	return m_exitcode;
 }
@@ -1295,10 +1302,26 @@ void KX_KetsjiEngine::RenderFrame(KX_Scene* scene, KX_Camera* cam)
 #endif
 
 	scene->RenderBuckets(camtrans, m_rasterizer, m_rendertools);
+
+	//render all the font objects for this scene
+	RenderFonts(scene);
 	
 	if (scene->GetPhysicsEnvironment())
 		scene->GetPhysicsEnvironment()->debugDrawWorld();
 }
+
+void KX_KetsjiEngine::RenderFonts(KX_Scene* scene)
+{
+	list<class KX_FontObject*>* fonts = scene->GetFonts();
+	
+	list<KX_FontObject*>::iterator it = fonts->begin();
+	while(it != fonts->end())
+	{
+		(*it)->DrawText();
+		++it;
+	}
+}
+
 /*
 To run once per scene
 */
@@ -1441,18 +1464,6 @@ void KX_KetsjiEngine::RenderDebugProperties()
 										m_canvas->GetHeight());
 			ycoord += 14;
 		}
-
-		// Put an extra gap in the printed results
-		ycoord += 14;
-
-		/* Print texture vram usage */
-		debugtxt.Format("Texture VRAM: %.2f MB", GPU_texture_vram_usage()/1048576.f);
-		m_rendertools->RenderText2D(RAS_IRenderTools::RAS_TEXT_PADDED,
-										debugtxt.Ptr(),
-										xcoord, ycoord,
-										m_canvas->GetWidth(),
-										m_canvas->GetHeight());
-		ycoord += 14;
 	}
 
 	/* Property display*/

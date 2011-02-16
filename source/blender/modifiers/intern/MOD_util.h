@@ -28,6 +28,9 @@
 #ifndef MOD_UTIL_H
 #define MOD_UTIL_H
 
+/* so modifier types match their defines */
+#include "MOD_modifiertypes.h"
+
 struct Tex;
 struct TexResult;
 struct CustomData;
@@ -42,7 +45,5 @@ void modifier_vgroup_cache(struct ModifierData *md, float (*vertexCos)[3]);
 void validate_layer_name(const struct CustomData *data, int type, char *name, char *outname);
 struct DerivedMesh *get_cddm(struct Object *ob, struct EditMesh *em, struct DerivedMesh *dm, float (*vertexCos)[3]);
 struct DerivedMesh *get_dm(struct Object *ob, struct EditMesh *em, struct DerivedMesh *dm, float (*vertexCos)[3], int orco);
-
-void modifier_type_init(struct ModifierTypeInfo *types[]);
 
 #endif /* MOD_UTIL_H */

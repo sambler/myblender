@@ -31,7 +31,20 @@
 
 /******************************** Quaternions ********************************/
 
-void unit_qt(float *q)
+/* used to test is a quat is not normalized */
+#define QUAT_EPSILON 0.0001
+
+/* convenience, avoids setting Y axis everywhere */
+void unit_axis_angle(float axis[3], float *angle)
+{
+	axis[0]= 0.0f;
+	axis[1]= 1.0f;
+	axis[2]= 0.0f;
+	*angle= 0.0f;
+}
+
+
+void unit_qt(float q[4])
 {
 	q[0]= 1.0f;
 	q[1]= q[2]= q[3]= 0.0f;
@@ -144,7 +157,8 @@ void mul_fac_qt_fl(float *q, const float fac)
 	mul_v3_fl(q+1, si);
 }
 
-void quat_to_mat3(float m[][3], const float q[4])
+/* skip error check, currently only needed by mat3_to_quat_is_ok */
+static void quat_to_mat3_no_error(float m[][3], const float q[4])
 {
 	double q0, q1, q2, q3, qda,qdb,qdc,qaa,qab,qac,qbb,qbc,qcc;
 
@@ -176,9 +190,28 @@ void quat_to_mat3(float m[][3], const float q[4])
 	m[2][2]= (float)(1.0-qaa-qbb);
 }
 
+
+void quat_to_mat3(float m[][3], const float q[4])
+{
+#ifdef DEBUG
+	float f;
+	if(!((f=dot_qtqt(q, q))==0.0 || (fabs(f-1.0) < QUAT_EPSILON))) {
+		fprintf(stderr, "Warning! quat_to_mat3() called with non-normalized: size %.8f *** report a bug ***\n", f);
+	}
+#endif
+
+	quat_to_mat3_no_error(m, q);
+}
+
 void quat_to_mat4(float m[][4], const float q[4])
 {
 	double q0, q1, q2, q3, qda,qdb,qdc,qaa,qab,qac,qbb,qbc,qcc;
+
+#ifdef DEBUG
+	if(!((q0=dot_qtqt(q, q))==0.0 || (fabs(q0-1.0) < QUAT_EPSILON))) {
+		fprintf(stderr, "Warning! quat_to_mat4() called with non-normalized: size %.8f *** report a bug ***\n", (float)q0);
+	}
+#endif
 
 	q0= M_SQRT2 * q[0];
 	q1= M_SQRT2 * q[1];
@@ -300,7 +333,7 @@ void mat3_to_quat_is_ok(float q[4], float wmat[3][3])
 	q1[3]= -nor[2]*si;
 
 	/* rotate back x-axis from mat, using inverse q1 */
-	quat_to_mat3( matr,q1);
+	quat_to_mat3_no_error( matr,q1);
 	invert_m3_m3(matn, matr);
 	mul_m3_v3(matn, mat[0]);
 	
@@ -318,7 +351,7 @@ void mat3_to_quat_is_ok(float q[4], float wmat[3][3])
 }
 
 
-void normalize_qt(float *q)
+float normalize_qt(float *q)
 {
 	float len;
 	
@@ -330,6 +363,14 @@ void normalize_qt(float *q)
 		q[1]= 1.0f;
 		q[0]= q[2]= q[3]= 0.0f;			
 	}
+
+	return len;
+}
+
+float normalize_qt_qt(float r[4], const float q[4])
+{
+	copy_qt_qt(r, q);
+	return normalize_qt(r);
 }
 
 /* note: expects vectors to be normalized */
@@ -619,7 +660,13 @@ void axis_angle_to_quat(float q[4], const float axis[3], float angle)
 void quat_to_axis_angle(float axis[3], float *angle, const float q[4])
 {
 	float ha, si;
-	
+
+#ifdef DEBUG
+	if(!((ha=dot_qtqt(q, q))==0.0 || (fabs(ha-1.0) < QUAT_EPSILON))) {
+		fprintf(stderr, "Warning! quat_to_axis_angle() called with non-normalized: size %.8f *** report a bug ***\n", ha);
+	}
+#endif
+
 	/* calculate angle/2, and sin(angle/2) */
 	ha= (float)acos(q[0]);
 	si= (float)sin(ha);
@@ -925,7 +972,7 @@ void mat4_to_eul(float *eul,float tmat[][4])
 void quat_to_eul(float *eul, const float quat[4])
 {
 	float mat[3][3];
-	
+
 	quat_to_mat3(mat,quat);
 	mat3_to_eul(eul,mat);
 }
@@ -1384,7 +1431,7 @@ void mat4_to_dquat(DualQuat *dq,float basemat[][4], float mat[][4])
 		mul_m4_m4m4(S, baseRS, baseRinv);
 
 		/* set scaling part */
-		mul_serie_m4(dq->scale, basemat, S, baseinv, 0, 0, 0, 0, 0);
+		mul_serie_m4(dq->scale, basemat, S, baseinv, NULL, NULL, NULL, NULL, NULL);
 		dq->scale_weight= 1.0f;
 	}
 	else {
@@ -1613,7 +1660,7 @@ void vec_apply_track(float vec[3], short axis)
 	}
 }
 
-/* lense/angle conversion (radians) */
+/* lens/angle conversion (radians) */
 float lens_to_angle(float lens)
 {
 	return 2.0f * atan(16.0f/lens);

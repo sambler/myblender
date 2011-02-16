@@ -31,10 +31,6 @@
 
 #include "MEM_guardedalloc.h"
 
-
-
-
-
 #include "DNA_scene_types.h"
 #include "DNA_screen_types.h"
 #include "DNA_view3d_types.h"
@@ -44,6 +40,7 @@
 #include "BLI_editVert.h"
 #include "BLI_edgehash.h"
 #include "BLI_rand.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_curve.h"
 #include "BKE_constraint.h" // for the get_constraint_target function
@@ -65,7 +62,7 @@
 #include "BKE_particle.h"
 #include "BKE_property.h"
 #include "BKE_smoke.h"
-#include "BKE_utildefines.h"
+
 #include "smoke_API.h"
 
 #include "BIF_gl.h"
@@ -100,7 +97,7 @@ static void tend ( void )
 {
 	QueryPerformanceCounter ( &liCurrentTime );
 }
-static double tval()
+static double tval( void )
 {
 	return ((double)( (liCurrentTime.QuadPart - liStartTime.QuadPart)* (double)1000.0/(double)liFrequency.QuadPart ));
 }
@@ -129,7 +126,7 @@ static double tval()
 
 struct GPUTexture;
 
-int intersect_edges(float *points, float a, float b, float c, float d, float edges[12][2][3])
+static int intersect_edges(float *points, float a, float b, float c, float d, float edges[12][2][3])
 {
 	int i;
 	float t;

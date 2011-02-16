@@ -1,5 +1,6 @@
 import bpy
 
+
 def write_some_data(context, filepath, use_some_setting):
     print("running write_some_data...")
     f = open(filepath, 'w')
@@ -18,9 +19,9 @@ from bpy.props import *
 
 class ExportSomeData(bpy.types.Operator, ExportHelper):
     '''This appiers in the tooltip of the operator and in the generated docs.'''
-    bl_idname = "export.some_data" # this is important since its how bpy.ops.export.some_data is constructed
+    bl_idname = "export.some_data"  # this is important since its how bpy.ops.export.some_data is constructed
     bl_label = "Export Some Data"
-    
+
     # ExportHelper mixin class uses this
     filename_ext = ".txt"
 
@@ -28,7 +29,7 @@ class ExportSomeData(bpy.types.Operator, ExportHelper):
 
     # List of operator properties, the attributes will be assigned
     # to the class instance from the operator settings before calling.
-    use_setting = BoolProperty(name="Example Boolean", description="Example Tooltip", default= True)
+    use_setting = BoolProperty(name="Example Boolean", description="Example Tooltip", default=True)
 
     type = bpy.props.EnumProperty(items=(('OPT_A', "First Option", "Description one"), ('OPT_B', "Second Option", "Description two.")),
                         name="Example Enum",
@@ -47,7 +48,19 @@ class ExportSomeData(bpy.types.Operator, ExportHelper):
 def menu_func_export(self, context):
     self.layout.operator(ExportSomeData.bl_idname, text="Text Export Operator")
 
-bpy.types.INFO_MT_file_export.append(menu_func_export)
+
+def register():
+    bpy.utils.register_class(ExportSomeData)
+    bpy.types.INFO_MT_file_export.append(menu_func_export)
+
+
+def unregister():
+    bpy.utils.unregister_class(ExportSomeData)
+    bpy.types.INFO_MT_file_export.remove(menu_func_export)
+
 
 if __name__ == "__main__":
+    register()
+
+    # test call
     bpy.ops.export.some_data('INVOKE_DEFAULT')

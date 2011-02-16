@@ -69,6 +69,8 @@ typedef struct GPUBuffer
 	unsigned int id;	/* used with vertex buffer objects */
 } GPUBuffer;
 
+/* stores deleted buffers so that new buffers wouldn't have to 
+be recreated that often. */
 typedef struct GPUBufferPool
 {
 	int size;		/* number of allocated buffers stored */
@@ -114,6 +116,7 @@ typedef struct GPUDrawObject
 
 } GPUDrawObject;
 
+/* used for GLSL materials */
 typedef struct GPUAttrib
 {
 	int index;
@@ -121,7 +124,7 @@ typedef struct GPUAttrib
 	int type;
 } GPUAttrib;
 
-GPUBufferPool *GPU_buffer_pool_new();
+GPUBufferPool *GPU_buffer_pool_new(void);
 void GPU_buffer_pool_free( GPUBufferPool *pool );
 void GPU_buffer_pool_free_unused( GPUBufferPool *pool );
 
@@ -171,8 +174,9 @@ void GPU_color_switch( int mode );
 void GPU_buffer_draw_elements( GPUBuffer *elements, unsigned int mode, int start, int count );
 
 /* called after drawing */
-void GPU_buffer_unbind();
+void GPU_buffer_unbind(void);
 
+/* used to check whether to use the old (without buffers) code */
 int GPU_buffer_legacy( struct DerivedMesh *dm );
 
 #endif

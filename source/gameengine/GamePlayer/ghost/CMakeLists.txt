@@ -24,7 +24,7 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-SET(INC
+set(INC
 	.
 	../../../../intern/string
 	../../../../intern/ghost
@@ -54,26 +54,26 @@ SET(INC
 	../../../../source/blender/blenloader
 	../../../../source/blender/gpu
 	../../../../extern/glew/include
-	${PYTHON_INC}
+	${PYTHON_INCLUDE_DIRS}
 )
 
-SET(SRC 
+set(SRC 
 	GPG_Application.cpp
 	GPG_Canvas.cpp
 	GPG_ghost.cpp
 	GPG_KeyboardDevice.cpp
 	GPG_System.cpp
+
+	GPG_Application.h
+	GPG_Canvas.h
+	GPG_KeyboardDevice.h
+	GPG_System.h
 )
 
-ADD_DEFINITIONS(-DGLEW_STATIC)
+add_definitions(-DGLEW_STATIC)
 
-IF(WITH_FFMPEG)
-	ADD_DEFINITIONS(-DWITH_FFMPEG)
-ENDIF(WITH_FFMPEG)
+if(WITH_CODEC_FFMPEG)
+	add_definitions(-DWITH_FFMPEG)
+endif()
 
-IF(WITH_PYTHON)
-	LIST(APPEND INC ${PYTHON_INC})
-	ADD_DEFINITIONS(-DWITH_PYTHON)
-ENDIF(WITH_PYTHON)
-
-BLENDERLIB_NOLIST(ge_player_ghost "${SRC}" "${INC}")
+blender_add_lib_nolist(ge_player_ghost "${SRC}" "${INC}")

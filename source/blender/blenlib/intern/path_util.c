@@ -919,7 +919,7 @@ static int get_path_local(char *targetpath, const char *folder_name, const char 
 	/* on osx EXECUTABLE_DIR is buried inside the .app bundle which is partially hidden by the finder
 		let's back up and allow the config to be in the same dir as the .app bundle.
 		blender exe is in blender.app/Contents/MacOS so up three gives us the app bundle's parent folder */
-	BLI_join_dirfile(osxprogfolder, bprogdir, "../../../");
+	BLI_join_dirfile(osxprogfolder, sizeof(osxprogfolder), bprogdir, "../../../");
 	if(test_path(targetpath, osxprogfolder, blender_version_decimal(), relfolder))
 		return 1;
 	/* if not there check normally */

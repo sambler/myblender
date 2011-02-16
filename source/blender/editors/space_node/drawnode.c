@@ -150,7 +150,7 @@ static void node_buts_curvevec(uiLayout *layout, bContext *UNUSED(C), PointerRNA
 }
 
 static float *_sample_col= NULL;	// bad bad, 2.5 will do better?
-void node_curvemap_sample(float *col)
+static void node_curvemap_sample(float *col)
 {
 	_sample_col= col;
 }
@@ -538,7 +538,7 @@ static void node_composit_buts_renderlayers(uiLayout *layout, bContext *C, Point
 
 static void node_composit_buts_blur(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
-	uiLayout *col;
+	uiLayout *col, *row;
 	
 	col= uiLayoutColumn(layout, 0);
 	
@@ -549,12 +549,18 @@ static void node_composit_buts_blur(uiLayout *layout, bContext *UNUSED(C), Point
 	}
 	
 	uiItemR(col, ptr, "use_relative", 0, NULL, ICON_NULL);
-	col= uiLayoutColumn(layout, 1);
+	
 	if (RNA_boolean_get(ptr, "use_relative")) {
+		uiItemL(col, "Aspect Correction", 0);
+		row= uiLayoutRow(layout, 1);
+		uiItemR(row, ptr, "aspect_correction", UI_ITEM_R_EXPAND, NULL, 0);
+		
+		col= uiLayoutColumn(layout, 1);
 		uiItemR(col, ptr, "factor_x", 0, "X", ICON_NULL);
 		uiItemR(col, ptr, "factor_y", 0, "Y", ICON_NULL);
 	}
 	else {
+		col= uiLayoutColumn(layout, 1);
 		uiItemR(col, ptr, "size_x", 0, "X", ICON_NULL);
 		uiItemR(col, ptr, "size_y", 0, "Y", ICON_NULL);
 	}

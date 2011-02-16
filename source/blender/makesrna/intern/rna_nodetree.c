@@ -915,7 +915,7 @@ static void def_sh_mapping(StructRNA *srna)
 	RNA_def_property_ui_range(prop, -10.f, 10.f, 0.1f, 2);
 	RNA_def_property_update(prop, NC_NODE|NA_EDITED, "rna_Node_mapping_update");
 	
-	prop= RNA_def_property(srna, "rotation", PROP_FLOAT, PROP_EULER);
+	prop= RNA_def_property(srna, "rotation", PROP_FLOAT, PROP_XYZ); /* Not PROP_EUL, this is already in degrees, not radians */
 	RNA_def_property_float_sdna(prop, NULL, "rot");
 	RNA_def_property_ui_text(prop, "Rotation", "Rotation offset for the input coordinate");
 	RNA_def_property_ui_range(prop, -360.f, 360.f, 1.f, 2);
@@ -1029,6 +1029,12 @@ static void def_cmp_blur(StructRNA *srna)
 		{R_FILTER_MITCH,      "MITCH",      0, "Mitch",         ""},
 		{0, NULL, 0, NULL, NULL}};
 
+	static EnumPropertyItem aspect_correction_type_items[] = {
+		{CMP_NODE_BLUR_ASPECT_NONE,	"NONE",	0,	"None",	""},
+		{CMP_NODE_BLUR_ASPECT_Y,	"Y",	0,	"Y",	""},
+		{CMP_NODE_BLUR_ASPECT_X,	"X",	0,	"X",	""},
+		{0, NULL, 0, NULL, NULL}};
+
 	RNA_def_struct_sdna_from(srna, "NodeBlurData", "storage");
 	
 	prop = RNA_def_property(srna, "size_x", PROP_INT, PROP_NONE);
@@ -1048,21 +1054,27 @@ static void def_cmp_blur(StructRNA *srna)
 	RNA_def_property_ui_text(prop, "Relative", "Use relative (percent) values to define blur radius");
 	RNA_def_property_update(prop, NC_NODE|NA_EDITED, "rna_Node_update");
 	
+	prop = RNA_def_property(srna, "aspect_correction", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "aspect");
+	RNA_def_property_enum_items(prop, aspect_correction_type_items);
+	RNA_def_property_ui_text(prop, "Aspect Correction", "Type of aspect correction to use");
+	RNA_def_property_update(prop, NC_NODE|NA_EDITED, "rna_Node_update");
+
 	prop = RNA_def_property(srna, "factor", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "fac");
 	RNA_def_property_range(prop, 0.0f, 2.0f);
 	RNA_def_property_ui_text(prop, "Factor", "");
 	RNA_def_property_update(prop, NC_NODE|NA_EDITED, "rna_Node_update");
 	
-	prop = RNA_def_property(srna, "factor_x", PROP_FLOAT, PROP_NONE);
+	prop = RNA_def_property(srna, "factor_x", PROP_FLOAT, PROP_PERCENTAGE);
 	RNA_def_property_float_sdna(prop, NULL, "percentx");
-	RNA_def_property_range(prop, 0.0f, 1.0f);
+	RNA_def_property_range(prop, 0.0f, 100.0f);
 	RNA_def_property_ui_text(prop, "Relative Size X", "");
 	RNA_def_property_update(prop, NC_NODE|NA_EDITED, "rna_Node_update");
 	
-	prop = RNA_def_property(srna, "factor_y", PROP_FLOAT, PROP_NONE);
+	prop = RNA_def_property(srna, "factor_y", PROP_FLOAT, PROP_PERCENTAGE);
 	RNA_def_property_float_sdna(prop, NULL, "percenty");
-	RNA_def_property_range(prop, 0.0f, 1.0f);
+	RNA_def_property_range(prop, 0.0f, 100.0f);
 	RNA_def_property_ui_text(prop, "Relative Size Y", "");
 	RNA_def_property_update(prop, NC_NODE|NA_EDITED, "rna_Node_update");
 	

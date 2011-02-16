@@ -1,4 +1,4 @@
-/*
+/**
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -17,33 +17,20 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- *
- * The Original Code is: all of this file.
- *
- * Contributor(s): Willian P. Germano & Joseph Gilbert
+ * Contributor(s): Campbell Barton
  *
  * ***** END GPL LICENSE BLOCK *****
- *
  */
+#ifndef BPY_DRIVER_H
+#define BPY_DRIVER_H
 
-#ifndef MATHUTILS_VECTOR_H
-#define MATHUTILS_VECTOR_H
+struct ChannelDriver;
 
-#include <Python.h>
+int bpy_pydriver_create_dict(void);
+extern PyObject *bpy_pydriver_Dict;
 
-extern PyTypeObject vector_Type;
-#define VectorObject_Check(_v) PyObject_TypeCheck((_v), &vector_Type)
+/* externals */
+float BPY_driver_exec(struct ChannelDriver *driver);
+void BPY_driver_reset(void);
 
-typedef struct {
-	BASE_MATH_MEMBERS(vec)
-
-	unsigned char size;			/* vec size 2,3 or 4 */
-} VectorObject;
-
-/*prototypes*/
-PyObject *newVectorObject(float *vec, const int size, const int type, PyTypeObject *base_type);
-PyObject *newVectorObject_cb(PyObject *user, int size, int callback_type, int subtype);
-
-#endif				/* MATHUTILS_VECTOR_H */
+#endif // BPY_DRIVER_H

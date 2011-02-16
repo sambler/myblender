@@ -187,6 +187,10 @@ class DOPESHEET_MT_select(bpy.types.Menu):
         layout.operator("action.select_column", text="Columns on Selected Markers").mode = 'MARKERS_COLUMN'
         layout.operator("action.select_column", text="Between Selected Markers").mode = 'MARKERS_BETWEEN'
 
+        layout.separator()
+        layout.operator("action.select_leftright", text="Before Current Frame").mode = 'LEFT'
+        layout.operator("action.select_leftright", text="After Current Frame").mode = 'RIGHT'
+
         # FIXME: grease pencil mode isn't supported for these yet, so skip for that mode only
         if context.space_data.mode != 'GPENCIL':
             layout.separator()
@@ -243,6 +247,7 @@ class DOPESHEET_MT_channel(bpy.types.Menu):
 
         layout.separator()
         layout.operator("anim.channels_editable_toggle")
+        layout.operator_menu_enum("action.extrapolation_type", "type", text="Extrapolation Mode")
 
         layout.separator()
         layout.operator("anim.channels_expand")
@@ -278,7 +283,6 @@ class DOPESHEET_MT_key(bpy.types.Menu):
         layout.operator_menu_enum("action.keyframe_type", "type", text="Keyframe Type")
         layout.operator_menu_enum("action.handle_type", "type", text="Handle Type")
         layout.operator_menu_enum("action.interpolation_type", "type", text="Interpolation Mode")
-        layout.operator_menu_enum("action.extrapolation_type", "type", text="Extrapolation Mode")
 
         layout.separator()
         layout.operator("action.clean")
@@ -355,11 +359,11 @@ class DOPESHEET_MT_gpencil_frame(bpy.types.Menu):
 
 
 def register():
-    pass
+    bpy.utils.register_module(__name__)
 
 
 def unregister():
-    pass
+    bpy.utils.unregister_module(__name__)
 
 if __name__ == "__main__":
     register()

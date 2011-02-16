@@ -548,6 +548,8 @@ void	uiButSetCompleteFunc(uiBut *but,		uiButCompleteFunc func, void *arg);
 
 void 	uiBlockSetDrawExtraFunc(uiBlock *block, void (*func)(const struct bContext *C, void *, void *, void *, struct rcti *rect), void *arg1, void *arg2);
 
+void uiButSetFocusOnEnter	(struct wmWindow *win, uiBut *but);
+
 /* Autocomplete
  *
  * Tab complete helper functions, for use in uiButCompleteFunc callbacks.
@@ -760,6 +762,10 @@ void uiStyleFontDrawRotated(struct uiFontStyle *fs, struct rcti *rect, const cha
 
 int UI_GetStringWidth(const char *str); // XXX temp
 void UI_DrawString(float x, float y, const char *str); // XXX temp
+void UI_DrawTriIcon(float x, float y, char dir);
+
+/* linker workaround ack! */
+void UI_template_fix_linking(void);
 
 #endif /*  UI_INTERFACE_H */
 

@@ -56,6 +56,12 @@
 #include "../generic/bpy_internal_import.h" // our own imports
 #include "../generic/py_capi_utils.h"
 
+/* inittab initialization functions */
+#include "../generic/noise_py_api.h"
+#include "../generic/mathutils.h"
+#include "../generic/bgl.h"
+#include "../generic/blf_py_api.h"
+
 /* for internal use, when starting and ending python scripts */
 
 /* incase a python script triggers another python call, stop bpy_context_clear from invalidating */
@@ -151,7 +157,7 @@ void BPY_modules_update(bContext *C)
 }
 
 /* must be called before Py_Initialize */
-void BPY_python_start_path(void)
+static void bpy_python_start_path(void)
 {
 	char *py_path_bundle= BLI_get_folder(BLENDER_PYTHON, NULL);
 
@@ -197,12 +203,7 @@ void BPY_context_set(bContext *C)
 	BPy_SetContext(C);
 }
 
-/* init-tab */
-extern PyObject *BPyInit_noise(void);
-extern PyObject *BPyInit_mathutils(void);
-// extern PyObject *BPyInit_mathutils_geometry(void); // BPyInit_mathutils calls, py doesnt work with thos :S
-extern PyObject *BPyInit_bgl(void);
-extern PyObject *BPyInit_blf(void);
+/* defined in AUD_C-API.cpp */
 extern PyObject *AUD_initPython(void);
 
 static struct _inittab bpy_internal_modules[]= {
@@ -228,7 +229,7 @@ void BPY_python_start( int argc, char **argv )
 	/* builtin modules */
 	PyImport_ExtendInittab(bpy_internal_modules);
 
-	BPY_python_start_path(); /* allow to use our own included python */
+	bpy_python_start_path(); /* allow to use our own included python */
 
 	/* Python 3.2 now looks for '2.56/python/include/python3.2d/pyconfig.h' to parse
 	 * from the 'sysconfig' module which is used by 'site', so for now disable site.

@@ -51,7 +51,7 @@
 #include "blf_internal_types.h"
 #include "blf_internal.h"
 
-FT_Library global_ft_lib;
+static FT_Library global_ft_lib;
 
 GlyphCacheBLF *blf_glyph_cache_find(FontBLF *font, int size, int dpi)
 {
@@ -205,7 +205,7 @@ GlyphBLF *blf_glyph_search(GlyphCacheBLF *gc, unsigned int c)
 	return(NULL);
 }
 
-GlyphBLF *blf_glyph_add(FontBLF *font, FT_UInt idx, unsigned int c)
+GlyphBLF *blf_glyph_add(FontBLF *font, unsigned int idx, unsigned int c)
 {
 	FT_GlyphSlot slot;
 	GlyphBLF *g;
@@ -220,9 +220,9 @@ GlyphBLF *blf_glyph_add(FontBLF *font, FT_UInt idx, unsigned int c)
 		return(g);
 
 	if (sharp)
-		err = FT_Load_Glyph(font->face, idx, FT_LOAD_TARGET_MONO);
+		err = FT_Load_Glyph(font->face, (FT_UInt)idx, FT_LOAD_TARGET_MONO);
 	else
-		err = FT_Load_Glyph(font->face, idx, FT_LOAD_TARGET_NORMAL | FT_LOAD_NO_HINTING | FT_LOAD_NO_BITMAP); /* Sure about NO_* flags? */
+		err = FT_Load_Glyph(font->face, (FT_UInt)idx, FT_LOAD_TARGET_NORMAL | FT_LOAD_NO_HINTING | FT_LOAD_NO_BITMAP); /* Sure about NO_* flags? */
 	if (err)
 		return(NULL);
 
@@ -249,7 +249,7 @@ GlyphBLF *blf_glyph_add(FontBLF *font, FT_UInt idx, unsigned int c)
 	g->next= NULL;
 	g->prev= NULL;
 	g->c= c;
-	g->idx= idx;
+	g->idx= (FT_UInt)idx;
 	g->tex= 0;
 	g->build_tex= 0;
 	g->bitmap= NULL;

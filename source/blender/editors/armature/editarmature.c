@@ -2198,10 +2198,8 @@ static int armature_calc_roll_exec(bContext *C, wmOperator *op)
 			mul_m3_v3(imat, vec);
 		}
 		else if (type==5) {
-			bArmature *arm= ob->data;
-			EditBone *ebone= (EditBone *)arm->act_edbone;
 			float mat[3][3], nor[3];
-
+			ebone= (EditBone *)arm->act_edbone;
 			if(ebone==NULL) {
 				BKE_report(op->reports, RPT_ERROR, "No active bone set");
 				return OPERATOR_CANCELLED;
@@ -3396,7 +3394,7 @@ void ARMATURE_OT_reveal(wmOperatorType *ot)
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 }
 
-void hide_selected_armature_bones(Scene *scene)
+static void hide_selected_armature_bones(Scene *scene)
 {
 	Object *obedit= scene->obedit; // XXX get from context
 	bArmature *arm= obedit->data;
@@ -4714,7 +4712,7 @@ static void envelope_bone_weighting(Object *ob, Mesh *mesh, float (*verts)[3], i
 	}
 }
 
-void add_verts_to_dgroups(ReportList *reports, Scene *scene, Object *ob, Object *par, int heat, int mirror)
+static void add_verts_to_dgroups(ReportList *reports, Scene *scene, Object *ob, Object *par, int heat, int mirror)
 {
 	/* This functions implements the automatic computation of vertex group
 	 * weights, either through envelopes or using a heat equilibrium.
@@ -5434,13 +5432,11 @@ static int bone_unique_check(void *arg, const char *name)
 	return get_named_bone((bArmature *)arg, name) != NULL;
 }
 
-void unique_bone_name(bArmature *arm, char *name)
+static void unique_bone_name(bArmature *arm, char *name)
 {
 	BLI_uniquename_cb(bone_unique_check, (void *)arm, "Bone", '.', name, sizeof(((Bone *)NULL)->name));
 }
 
-
-#define MAXBONENAME 32
 /* helper call for armature_bone_rename */
 static void constraint_bone_name_fix(Object *ob, ListBase *conlist, char *oldname, char *newname)
 {

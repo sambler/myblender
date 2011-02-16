@@ -596,7 +596,7 @@ static void do_specular_ramp(GPUShadeInput *shi, GPUNodeLink *is, GPUNodeLink *t
 	}
 }
 
-void add_user_list(ListBase *list, void *data)
+static void add_user_list(ListBase *list, void *data)
 {
 	LinkData *link = MEM_callocN(sizeof(LinkData), "GPULinkData");
 	link->data = data;
@@ -894,6 +894,7 @@ static void do_material_tex(GPUShadeInput *shi)
 	int tex_nr, rgbnor, talpha;
 	int init_done = 0, iBumpSpacePrev;
 	GPUNodeLink *vNorg, *vNacc, *fPrevMagnitude;
+	int iFirstTimeNMap=1;
 
 	GPU_link(mat, "set_value", GPU_uniform(&one), &stencil);
 
@@ -902,7 +903,7 @@ static void do_material_tex(GPUShadeInput *shi)
 	GPU_link(mat, "texco_object", GPU_builtin(GPU_INVERSE_VIEW_MATRIX),
 		GPU_builtin(GPU_INVERSE_OBJECT_MATRIX),
 		GPU_builtin(GPU_VIEW_POSITION), &texco_object);
-	GPU_link(mat, "texco_tangent", GPU_attribute(CD_TANGENT, ""), &texco_tangent);
+	//GPU_link(mat, "texco_tangent", GPU_attribute(CD_TANGENT, ""), &texco_tangent);
 	GPU_link(mat, "texco_global", GPU_builtin(GPU_INVERSE_VIEW_MATRIX),
 		GPU_builtin(GPU_VIEW_POSITION), &texco_global);
 
@@ -1037,7 +1038,20 @@ static void do_material_tex(GPUShadeInput *shi)
 							GPU_link(mat, "mtex_negate_texnormal", tnor, &tnor);
 
 						if(mtex->normapspace == MTEX_NSPACE_TANGENT)
-							GPU_link(mat, "mtex_nspace_tangent", GPU_attribute(CD_TANGENT, ""), shi->vn, tnor, &newnor);
+						{
+							if(iFirstTimeNMap!=0)
+							{
+								// use unnormalized normal (this is how we bake it - closer to gamedev)
+								GPUNodeLink *vNegNorm;
+								GPU_link(mat, "vec_math_negate", GPU_builtin(GPU_VIEW_NORMAL), &vNegNorm);
+								GPU_link(mat, "mtex_nspace_tangent", GPU_attribute(CD_TANGENT, ""), vNegNorm, tnor, &newnor);
+								iFirstTimeNMap = 0;
+							}
+							else	// otherwise use accumulated perturbations
+							{
+								GPU_link(mat, "mtex_nspace_tangent", GPU_attribute(CD_TANGENT, ""), shi->vn, tnor, &newnor);
+							}
+						}
 						else
 							newnor = tnor;
 						
@@ -1130,8 +1144,10 @@ static void do_material_tex(GPUShadeInput *shi)
 						if( mtex->texflag & MTEX_BUMP_TEXTURESPACE ) {
 							float ima_x= 512.0f, ima_y= 512.f;		// prevent calling textureSize, glsl 1.3 only
 							ImBuf *ibuf= BKE_image_get_ibuf(tex->ima, &tex->iuser);
-							if(ibuf) 
-								ima_x= ibuf->x; ima_y= ibuf->y;
+							if(ibuf) {
+								ima_x= ibuf->x;
+								ima_y= ibuf->y;
+							}
 							
 							GPU_link( mat, "mtex_bump_apply_texspace",
 							          fDet, dBs, dBt, vR1, vR2, 
@@ -1346,7 +1362,7 @@ void GPU_shaderesult_set(GPUShadeInput *shi, GPUShadeResult *shr)
 		GPU_link(mat, "linearrgb_to_srgb", shr->combined, &shr->combined);
 }
 
-GPUNodeLink *GPU_blender_material(GPUMaterial *mat, Material *ma)
+static GPUNodeLink *GPU_blender_material(GPUMaterial *mat, Material *ma)
 {
 	GPUShadeInput shi;
 	GPUShadeResult shr;

@@ -24,8 +24,6 @@
 #ifndef BPY_RNA_H
 #define BPY_RNA_H
 
-#include <Python.h>
-
 #include "RNA_access.h"
 #include "RNA_types.h"
 #include "BKE_idprop.h"
@@ -111,5 +109,9 @@ int pyrna_array_contains_py(PointerRNA *ptr, PropertyRNA *prop, PyObject *value)
 int pyrna_write_check(void);
 
 void BPY_modules_update(struct bContext *C); //XXX temp solution
+
+/* bpy.utils.(un)register_class */
+extern PyMethodDef meth_bpy_register_class;
+extern PyMethodDef meth_bpy_unregister_class;
 
 #endif

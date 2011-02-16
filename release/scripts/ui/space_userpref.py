@@ -635,7 +635,29 @@ class USERPREF_PT_theme(bpy.types.Panel):
 
             layout.separator()
             layout.separator()
+        elif theme.theme_area == 'COLOR_SETS':
+            col = split.column()
 
+            for i, ui in enumerate(theme.bone_color_sets):
+                col.label(text="Color Set %d:" % (i + 1))  # i starts from 0
+
+                row = col.row()
+
+                subsplit = row.split(percentage=0.95)
+
+                padding = subsplit.split(percentage=0.15)
+                colsub = padding.column()
+                colsub = padding.column()
+                colsub.row().prop(ui, "normal")
+                colsub.row().prop(ui, "select")
+                colsub.row().prop(ui, "active")
+
+                subsplit = row.split(percentage=0.85)
+
+                padding = subsplit.split(percentage=0.15)
+                colsub = padding.column()
+                colsub = padding.column()
+                colsub.row().prop(ui, "show_colored_constraints")
         else:
             self._theme_generic(split, getattr(theme, theme.theme_area.lower()))
 
@@ -869,7 +891,7 @@ class USERPREF_PT_addons(bpy.types.Panel):
         # fake module importing
         def fake_module(mod_name, mod_path, speedy=True):
             if bpy.app.debug:
-                print("fake_module", mod_name, mod_path)
+                print("fake_module", mod_path, mod_name)
             import ast
             ModuleType = type(ast)
             file_mod = open(mod_path, "r", encoding='UTF-8')
@@ -1169,7 +1191,6 @@ class WM_OT_addon_install(bpy.types.Operator):
                 else:
                     os.remove(f_full)
 
-
     def execute(self, context):
         import traceback
         import zipfile
@@ -1216,7 +1237,6 @@ class WM_OT_addon_install(bpy.types.Operator):
             elif os.path.exists(path_dest):
                 self.report({'WARNING'}, "File already installed to %r\n" % path_dest)
                 return {'CANCELLED'}
-                
 
             #if not compressed file just copy into the addon path
             try:
@@ -1278,11 +1298,11 @@ class WM_OT_addon_expand(bpy.types.Operator):
 
 
 def register():
-    pass
+    bpy.utils.register_module(__name__)
 
 
 def unregister():
-    pass
+    bpy.utils.unregister_module(__name__)
 
 if __name__ == "__main__":
     register()

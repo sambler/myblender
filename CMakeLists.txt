@@ -227,6 +227,7 @@ if(UNIX AND NOT APPLE)
 		# find_package(PythonLibs)
 		set(PYTHON /usr)
 		set(PYTHON_VERSION 3.1 CACHE STRING "")
+		mark_as_advanced(PYTHON_VERSION)
 		set(PYTHON_INCLUDE_DIRS "${PYTHON}/include/python${PYTHON_VERSION}" CACHE STRING "")
 		mark_as_advanced(PYTHON_INCLUDE_DIRS)
 		# set(PYTHON_BINARY python) # not used yet
@@ -949,8 +950,15 @@ if(WITH_RAYOPTIMIZATION)
 endif()
 
 if(WITH_IMAGE_OPENJPEG)
-	set(OPENJPEG ${CMAKE_SOURCE_DIR}/extern/libopenjpeg)
-	set(OPENJPEG_INC ${OPENJPEG})
+	if(UNIX AND NOT APPLE)
+		set(OPENJPEG /usr)
+		set(OPENJPEG_INC ${OPENJPEG}/include)
+		set(OPENJPEG_LIB openjpeg)
+		set(OPENJPEG_LIBPATH ${OPENJPEG}/lib)
+	else()
+		set(OPENJPEG ${CMAKE_SOURCE_DIR}/extern/libopenjpeg)
+		set(OPENJPEG_INC ${OPENJPEG})
+	endif()
 endif()
 
 if(WITH_IMAGE_REDCODE)
@@ -1077,3 +1085,7 @@ add_subdirectory(source/creator)
 if(WITH_PLAYER)
 	add_subdirectory(source/blenderplayer)
 endif()
+
+#-----------------------------------------------------------------------------
+# CPack for generating packages
+include(build_files/cmake/packaging.cmake)

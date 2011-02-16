@@ -1114,7 +1114,7 @@ typedef struct CollItemSearch {
 	int iconid;
 } CollItemSearch;
 
-int sort_search_items_list(void *a, void *b)
+static int sort_search_items_list(void *a, void *b)
 {
 	CollItemSearch *cis1 = (CollItemSearch *)a;
 	CollItemSearch *cis2 = (CollItemSearch *)b;
@@ -2576,8 +2576,7 @@ void uiBlockLayoutResolve(uiBlock *block, int *x, int *y)
 	/* XXX silly trick, interface_templates.c doesn't get linked
 	 * because it's not used by other files in this module? */
 	{
-		void ui_template_fix_linking(void);
-		ui_template_fix_linking();
+		UI_template_fix_linking();
 	}
 }
 
@@ -2734,11 +2733,20 @@ void uiLayoutOperatorButs(const bContext *C, uiLayout *layout, wmOperator *op,in
 		}
 	}
 	
-	/* no undo for buttons for operator redo panels */
+	/* set various special settings for buttons */
 	{
 		uiBut *but;
 		
-		for(but= uiLayoutGetBlock(layout)->buttons.first; but; but= but->next)
+		for(but= uiLayoutGetBlock(layout)->buttons.first; but; but= but->next) {
+			/* no undo for buttons for operator redo panels */
 			uiButClearFlag(but, UI_BUT_UNDO);
+			
+			/* if button is operator's default property, and a text-field, enable focus for it
+			 *	- this is used for allowing operators with popups to rename stuff with fewer clicks
+			 */
+			if ((but->rnaprop == op->type->prop) && (but->type == TEX)) {
+				uiButSetFocusOnEnter(CTX_wm_window(C), but);
+			}
+		}
 	}
 }

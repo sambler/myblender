@@ -177,7 +177,7 @@ static CompBuf *compbuf_multilayer_get(RenderData *rd, RenderLayer *rl, Image *i
 	return NULL;
 };
 
-void outputs_multilayer_get(RenderData *rd, RenderLayer *rl, bNodeStack **out, Image *ima, ImageUser *iuser)
+static void outputs_multilayer_get(RenderData *rd, RenderLayer *rl, bNodeStack **out, Image *ima, ImageUser *iuser)
 {
 	if(out[RRES_OUT_Z]->hasoutput)
 		out[RRES_OUT_Z]->data= compbuf_multilayer_get(rd, rl, ima, iuser, SCE_PASS_Z);
@@ -339,7 +339,7 @@ static CompBuf *compbuf_from_pass(RenderData *rd, RenderLayer *rl, int rectx, in
    return NULL;
 };
 
-void node_composit_rlayers_out(RenderData *rd, RenderLayer *rl, bNodeStack **out, int rectx, int recty)
+static void node_composit_rlayers_out(RenderData *rd, RenderLayer *rl, bNodeStack **out, int rectx, int recty)
 {
    if(out[RRES_OUT_Z]->hasoutput)
 	  out[RRES_OUT_Z]->data= compbuf_from_pass(rd, rl, rectx, recty, SCE_PASS_Z);

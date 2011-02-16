@@ -1679,7 +1679,7 @@ static void rna_def_function_funcs(FILE *f, StructDefRNA *dsrna, FunctionDefRNA 
 	dfunc->gencall= funcname;
 }
 
-static void rna_auto_types()
+static void rna_auto_types(void)
 {
 	StructDefRNA *ds;
 	PropertyDefRNA *dp;
@@ -2357,7 +2357,7 @@ typedef struct RNAProcessItem {
 	void (*define)(BlenderRNA *brna);
 } RNAProcessItem;
 
-RNAProcessItem PROCESS_ITEMS[]= {
+static RNAProcessItem PROCESS_ITEMS[]= {
 	{"rna_rna.c", NULL, RNA_def_rna},
 	{"rna_ID.c", NULL, RNA_def_ID},
 	{"rna_texture.c", NULL, RNA_def_texture},

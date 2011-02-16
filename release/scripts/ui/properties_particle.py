@@ -177,7 +177,7 @@ class PARTICLE_PT_emission(ParticleButtonsPanel, bpy.types.Panel):
         if part.type == 'HAIR' and not part.use_advanced_hair:
             row.prop(part, "hair_length")
             return
-            
+
         if part.type != 'HAIR':
             split = layout.split()
 
@@ -197,6 +197,7 @@ class PARTICLE_PT_emission(ParticleButtonsPanel, bpy.types.Panel):
         row = layout.row()
         if part.distribution == 'GRID':
             row.prop(part, "invert_grid")
+            row.prop(part, "hexagonal_grid")
         else:
             row.prop(part, "use_emit_random")
             row.prop(part, "use_even_distribution")
@@ -821,6 +822,8 @@ class PARTICLE_PT_render(ParticleButtonsPanel, bpy.types.Panel):
                     row.prop(weight, "count")
 
         elif part.render_type == 'BILLBOARD':
+            ob = context.object
+
             sub.label(text="Align:")
 
             row = layout.row()
@@ -833,21 +836,22 @@ class PARTICLE_PT_render(ParticleButtonsPanel, bpy.types.Panel):
             col = row.column(align=True)
             col.label(text="Tilt:")
             col.prop(part, "billboard_tilt", text="Angle", slider=True)
-            col.prop(part, "billboard_tilt_random", slider=True)
+            col.prop(part, "billboard_tilt_random", text="Random", slider=True)
             col = row.column()
             col.prop(part, "billboard_offset")
 
-            row = layout.row()
-            row.prop(psys, "billboard_normal_uv")
-            row = layout.row()
-            row.prop(psys, "billboard_time_index_uv")
+            col = layout.column()
+            col.prop_search(psys, "billboard_normal_uv", ob.data, "uv_textures")
+            col.prop_search(psys, "billboard_time_index_uv", ob.data, "uv_textures")
 
-            row = layout.row()
-            row.label(text="Split uv's:")
-            row.prop(part, "billboard_uv_split", text="Number of splits")
-            row = layout.row()
-            row.prop(psys, "billboard_split_uv")
-            row = layout.row()
+            split = layout.split(percentage=0.33)
+            split.label(text="Split uv's:")
+            split.prop(part, "billboard_uv_split", text="Number of splits")
+            col = layout.column()
+            col.active = part.billboard_uv_split > 1
+            col.prop_search(psys, "billboard_split_uv", ob.data, "uv_textures")
+
+            row = col.row()
             row.label(text="Animate:")
             row.prop(part, "billboard_animation", text="")
             row.label(text="Offset:")
@@ -1034,7 +1038,7 @@ class PARTICLE_PT_field_weights(ParticleButtonsPanel, bpy.types.Panel):
     bl_label = "Field Weights"
     bl_options = {'DEFAULT_CLOSED'}
     COMPAT_ENGINES = {'BLENDER_RENDER'}
-    
+
     @classmethod
     def poll(cls, context):
         return particle_panel_poll(cls, context)
@@ -1061,12 +1065,16 @@ class PARTICLE_PT_force_fields(ParticleButtonsPanel, bpy.types.Panel):
 
         part = context.particle_system.settings
 
-        layout.prop(part, "use_self_effect")
+        row = layout.row()
+        row.prop(part, "use_self_effect")
+        row.prop(part, "effector_amount", text="Amount")
 
         split = layout.split(percentage=0.2)
         split.label(text="Type 1:")
         split.prop(part.force_field_1, "type", text="")
         basic_force_field_settings_ui(self, context, part.force_field_1)
+        if part.force_field_1.type != 'NONE':
+            layout.label(text="Falloff:")
         basic_force_field_falloff_ui(self, context, part.force_field_1)
 
         if part.force_field_1.type != 'NONE':
@@ -1076,6 +1084,8 @@ class PARTICLE_PT_force_fields(ParticleButtonsPanel, bpy.types.Panel):
         split.label(text="Type 2:")
         split.prop(part.force_field_2, "type", text="")
         basic_force_field_settings_ui(self, context, part.force_field_2)
+        if part.force_field_2.type != 'NONE':
+            layout.label(text="Falloff:")
         basic_force_field_falloff_ui(self, context, part.force_field_2)
 
 
@@ -1083,7 +1093,7 @@ class PARTICLE_PT_vertexgroups(ParticleButtonsPanel, bpy.types.Panel):
     bl_label = "Vertexgroups"
     bl_options = {'DEFAULT_CLOSED'}
     COMPAT_ENGINES = {'BLENDER_RENDER'}
-    
+
     @classmethod
     def poll(cls, context):
         return particle_panel_poll(cls, context)
@@ -1158,11 +1168,11 @@ class PARTICLE_PT_custom_props(ParticleButtonsPanel, PropertyPanel, bpy.types.Pa
 
 
 def register():
-    pass
+    bpy.utils.register_module(__name__)
 
 
 def unregister():
-    pass
+    bpy.utils.unregister_module(__name__)
 
 if __name__ == "__main__":
     register()

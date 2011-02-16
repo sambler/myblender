@@ -765,6 +765,14 @@ static EnumPropertyItem *rna_SpaceProperties_texture_context_itemf(bContext *C, 
 			tmp.icon = ICON_MATERIAL;
 			RNA_enum_item_add(&item, &totitem, &tmp);
 		}
+
+		if(ob->particlesystem.first) {
+			tmp.value = SB_TEXC_PARTICLES;
+			tmp.description = "Show Particle Textures";
+			tmp.identifier = "PARTICLE";
+			tmp.icon = ICON_PARTICLES;
+			RNA_enum_item_add(&item, &totitem, &tmp);
+		}
 	}
 
 	if(scene && scene->world) {
@@ -2325,6 +2333,7 @@ static void rna_def_space_node(BlenderRNA *brna)
 	
 	prop= RNA_def_property(srna, "backdrop_zoom", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "zoom");
+	RNA_def_property_float_default(prop, 1.0f);
 	RNA_def_property_range(prop, 0.01f, FLT_MAX);
     RNA_def_property_ui_range(prop, 0.01, 100, 1, 2);
 	RNA_def_property_ui_text(prop, "Backdrop Zoom", "Backdrop zoom factor");

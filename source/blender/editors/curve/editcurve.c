@@ -4559,20 +4559,7 @@ static int addvert_Nurb(bContext *C, short mode, float location[3])
 	}
 	else if(!ok && nu->pntsv==1) {
 		/* which b-point? */
-		if(bp== nu->bp) {   /* first */
-			bp->f1= 0;
-			newbp =
-				(BPoint*)MEM_callocN((nu->pntsu+1) * sizeof(BPoint), "addvert_Nurb3");
-			ED_curve_bpcpy(editnurb, newbp+1, bp, nu->pntsu);
-			*newbp= *bp;
-			newbp->f1|= SELECT;
-			cu->lastsel= newbp;
-			MEM_freeN(nu->bp);
-			nu->bp= newbp;
-			bp= newbp + 1;
-			ok= 1;
-		}
-		else if(bp== (nu->bp+nu->pntsu-1)) {  /* last */
+		if(bp== (nu->bp+nu->pntsu-1)) {  /* last */
 			bp->f1= 0;
 			newbp =
 				(BPoint*)MEM_callocN((nu->pntsu+1) * sizeof(BPoint), "addvert_Nurb4");
@@ -4584,6 +4571,19 @@ static int addvert_Nurb(bContext *C, short mode, float location[3])
 			newbp->f1|= SELECT;
 			cu->lastsel= newbp;
 			bp= newbp - 1;
+			ok= 1;
+		}
+		else if(bp== nu->bp) {   /* first */
+			bp->f1= 0;
+			newbp =
+				(BPoint*)MEM_callocN((nu->pntsu+1) * sizeof(BPoint), "addvert_Nurb3");
+			ED_curve_bpcpy(editnurb, newbp+1, bp, nu->pntsu);
+			*newbp= *bp;
+			newbp->f1|= SELECT;
+			cu->lastsel= newbp;
+			MEM_freeN(nu->bp);
+			nu->bp= newbp;
+			bp= newbp + 1;
 			ok= 1;
 		}
 		else if(mode!='e') {

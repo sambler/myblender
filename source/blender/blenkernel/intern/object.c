@@ -1688,10 +1688,10 @@ void object_rot_to_mat3(Object *ob, float mat[][3])
 	else {
 		/* quats are normalised before use to eliminate scaling issues */
 		float tquat[4];
-
+		
 		normalize_qt_qt(tquat, ob->quat);
 		quat_to_mat3(rmat, tquat);
-
+		
 		normalize_qt_qt(tquat, ob->dquat);
 		quat_to_mat3(dmat, tquat);
 	}
@@ -1735,7 +1735,7 @@ void object_apply_mat4(Object *ob, float mat[][4], const short use_compat, const
 		invert_m4_m4(imat, diff_mat);
 		mul_m4_m4m4(rmat, mat, imat); /* get the parent relative matrix */
 		object_apply_mat4(ob, rmat, use_compat, FALSE);
-
+		
 		/* same as below, use rmat rather then mat */
 		mat4_to_loc_rot_size(ob->loc, rot, ob->size, rmat);
 		object_mat3_to_rot(ob, rot, use_compat);
@@ -1809,12 +1809,17 @@ static void ob_parcurve(Scene *scene, Object *ob, Object *par, float mat[][4])
 		 * we divide the curvetime calculated in the previous step by the length of the path, to get a time
 		 * factor, which then gets clamped to lie within 0.0 - 1.0 range
 		 */
-		ctime= cu->ctime / cu->pathlen;
+		if (IS_EQ(cu->pathlen, 0.0f) == 0)
+			ctime= cu->ctime / cu->pathlen;
+		else
+			ctime= cu->ctime;
+		
 		CLAMP(ctime, 0.0, 1.0);
 	}
 	else {
 		ctime= scene->r.cfra - give_timeoffset(ob);
-		ctime /= cu->pathlen;
+		if (IS_EQ(cu->pathlen, 0.0f) == 0)
+			ctime /= cu->pathlen;
 		
 		CLAMP(ctime, 0.0, 1.0);
 	}

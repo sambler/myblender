@@ -28,8 +28,7 @@
 #-----------------------------------------------------------------------------
 # We don't allow in-source builds. This causes no end of troubles because 
 # all out-of-source builds will use the CMakeCache.txt file there and even 
-# build the libs and objects in it. It will also conflict with the current 
-# Makefile system for Blender
+# build the libs and objects in it.
 
 if(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR})
 message(FATAL_ERROR "CMake generation for blender is not allowed within the source directory! 
@@ -39,11 +38,11 @@ Remove the CMakeCache.txt file and try again from another folder, e.g.:
 	cd ..
 	mkdir cmake-make 
 	cd cmake-make
-	cmake -G \"Unix Makefiles\" ../blender
+	cmake ../blender
 ")
 endif()
 
-cmake_minimum_required(VERSION 2.6)
+cmake_minimum_required(VERSION 2.8)
 
 # quiet output for Makefiles, 'make -s' helps too
 # set_property(GLOBAL PROPERTY RULE_MESSAGES OFF)
@@ -339,6 +338,7 @@ if(UNIX AND NOT APPLE)
 	endif()
 
 	find_package(X11 REQUIRED)
+	find_path(X11_XF86keysym_INCLUDE_PATH X11/XF86keysym.h ${X11_INC_SEARCH_PATH})
 
 	# OpenSuse needs lutil, ArchLinux not, for now keep, can avoid by using --as-needed
 	set(LLIBS "-lutil -lc -lm -lpthread -lstdc++ ${X11_X11_LIB} ${X11_Xinput_LIB}")

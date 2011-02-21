@@ -99,16 +99,15 @@ uiBut *uiDefAutoButR(uiBlock *block, PointerRNA *ptr, PropertyRNA *prop, int ind
 			break;
 		case PROP_POINTER: {
 			PointerRNA pptr;
-			int icon2;
 
 			pptr= RNA_property_pointer_get(ptr, prop);
 			if(!pptr.type)
 				pptr.type= RNA_property_pointer_type(ptr, prop);
-			icon2= RNA_struct_ui_icon(pptr.type);
-			if(icon2 == ICON_DOT)
-				icon2= 0;
+			icon= RNA_struct_ui_icon(pptr.type);
+			if(icon == ICON_DOT)
+				icon= 0;
 
-			but= uiDefIconTextButR(block, IDPOIN, 0, icon2, name, x1, y1, x2, y2, ptr, propname, index, 0, 0, -1, -1, NULL);
+			but= uiDefIconTextButR(block, IDPOIN, 0, icon, name, x1, y1, x2, y2, ptr, propname, index, 0, 0, -1, -1, NULL);
 			break;
 		}
 		case PROP_COLLECTION: {

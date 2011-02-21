@@ -69,6 +69,7 @@ get_blender_version()
 # Blender internal features
 option(WITH_INTERNATIONAL "Enable I18N   (International fonts and text)" ON)
 option(WITH_PYTHON        "Enable Embedded Python API" ON)
+option(WITH_PYTHON_MODULE "Enable building as a python module (experemental)" OFF)
 option(WITH_BUILDINFO     "Include extra build details" ON)
 option(WITH_IK_ITASC      "Enable ITASC IK solver" ON)
 option(WITH_FFTW3         "Enable FFTW3 support (Used for smoke and audio effects)" OFF)
@@ -339,6 +340,7 @@ if(UNIX AND NOT APPLE)
 
 	find_package(X11 REQUIRED)
 	find_path(X11_XF86keysym_INCLUDE_PATH X11/XF86keysym.h ${X11_INC_SEARCH_PATH})
+	mark_as_advanced(X11_XF86keysym_INCLUDE_PATH)
 
 	# OpenSuse needs lutil, ArchLinux not, for now keep, can avoid by using --as-needed
 	set(LLIBS "-lutil -lc -lm -lpthread -lstdc++ ${X11_X11_LIB} ${X11_Xinput_LIB}")
@@ -917,7 +919,7 @@ if(WITH_BUILDINFO)
 		# my mods to manually place an svn revision as git doesn't respond properly
 		#execute_process(COMMAND svnversion ${CMAKE_SOURCE_DIR} OUTPUT_VARIABLE BUILD_REV RESULT_VARIABLE BUILD_REV_RETURN OUTPUT_STRIP_TRAILING_WHITESPACE)
 		#if(BUILD_REV_RETURN)
-			set(BUILD_REV "34998")
+			set(BUILD_REV "35018")
 		#endif()
 	endif()
 	
@@ -926,7 +928,7 @@ if(WITH_BUILDINFO)
 		execute_process(COMMAND cmd /c time /t OUTPUT_VARIABLE BUILD_TIME OUTPUT_STRIP_TRAILING_WHITESPACE)  
 		#execute_process(COMMAND svnversion ${CMAKE_SOURCE_DIR} OUTPUT_VARIABLE BUILD_REV RESULT_VARIABLE BUILD_REV_RETURN OUTPUT_STRIP_TRAILING_WHITESPACE)
 		#if(BUILD_REV_RETURN)
-			set(BUILD_REV "34998")
+			set(BUILD_REV "35018")
 		#endif()
 	endif()
 endif()
@@ -1054,6 +1056,9 @@ endif()
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${PLATFORM_CFLAGS} ${C_WARNINGS}")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${PLATFORM_CFLAGS} ${CXX_WARNINGS}")
+
+#-------------------------------------------------------------------------------
+# Global Defines
 
 # better not define flags here but this is a debugging option thats off by default.
 if(WITH_CXX_GUARDEDALLOC)

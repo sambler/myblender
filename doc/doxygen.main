@@ -18,6 +18,10 @@
  *  as part of the normal development process.
  */
 
+/** \defgroup MEM Guarded memory (de)allocation
+ *  \ingroup intern
+ */
+
 /** \defgroup extern External libraries
  *  \section externabout External libraries
  *  As with \ref intern these libraries are
@@ -99,6 +103,16 @@
 
 /** \defgroup editorui Interface and Widgets
  *  \ingroup gui
+ */
+
+/** \defgroup externformats external formats */
+
+/** \defgroup collada COLLADA
+ *  \ingroup externformats
+ */
+
+/** \defgroup avi AVI
+ *  \ingroup externformats
  */
 
 /** \defgroup imbuf IMage Buffer */

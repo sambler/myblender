@@ -161,6 +161,9 @@ endif()
 
 TEST_SSE_SUPPORT()
 
+# linux only, not cached
+set(WITH_BINRELOC OFF)
+
 # disabled for now, not supported
 # option(WITH_WEBPLUGIN     "Enable Web Plugin (Unix only)" OFF)
 
@@ -346,12 +349,15 @@ if(UNIX AND NOT APPLE)
 	set(LLIBS "-lutil -lc -lm -lpthread -lstdc++ ${X11_X11_LIB} ${X11_Xinput_LIB}")
 
 	if(CMAKE_SYSTEM_NAME MATCHES "Linux")
-		# BSD's dont use libdl.so
-		list(APPEND LLIBS -ldl)
+		if(NOT WITH_PYTHON_MODULE)
+			# BSD's dont use libdl.so
+			list(APPEND LLIBS -ldl)
 
-		# binreloc is linux only
-		set(BINRELOC ${CMAKE_SOURCE_DIR}/extern/binreloc)
-		set(BINRELOC_INC ${BINRELOC}/include)
+			# binreloc is linux only
+			set(BINRELOC ${CMAKE_SOURCE_DIR}/extern/binreloc)
+			set(BINRELOC_INC ${BINRELOC}/include)
+			set(WITH_BINRELOC ON)
+		endif()
 	endif()
 
 	set(PLATFORM_LINKFLAGS "-pthread")
@@ -919,7 +925,7 @@ if(WITH_BUILDINFO)
 		# my mods to manually place an svn revision as git doesn't respond properly
 		#execute_process(COMMAND svnversion ${CMAKE_SOURCE_DIR} OUTPUT_VARIABLE BUILD_REV RESULT_VARIABLE BUILD_REV_RETURN OUTPUT_STRIP_TRAILING_WHITESPACE)
 		#if(BUILD_REV_RETURN)
-			set(BUILD_REV "35018")
+			set(BUILD_REV "35040")
 		#endif()
 	endif()
 	
@@ -928,7 +934,7 @@ if(WITH_BUILDINFO)
 		execute_process(COMMAND cmd /c time /t OUTPUT_VARIABLE BUILD_TIME OUTPUT_STRIP_TRAILING_WHITESPACE)  
 		#execute_process(COMMAND svnversion ${CMAKE_SOURCE_DIR} OUTPUT_VARIABLE BUILD_REV RESULT_VARIABLE BUILD_REV_RETURN OUTPUT_STRIP_TRAILING_WHITESPACE)
 		#if(BUILD_REV_RETURN)
-			set(BUILD_REV "35018")
+			set(BUILD_REV "35040")
 		#endif()
 	endif()
 endif()

@@ -34,6 +34,7 @@ blender_include_dirs(
 	../../intern/guardedalloc
 	../blender/blenlib
 	../blender/blenkernel
+	../blender/blenloader
 	../blender/editors/include
 	../blender/makesrna
 	../blender/imbuf
@@ -89,7 +90,7 @@ if(NOT WITH_SDL)
 	add_definitions(-DDISABLE_SDL)
 endif()
 
-if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+if(WITH_BINRELOC)
 	add_definitions(-DWITH_BINRELOC)
 	blender_include_dirs(${BINRELOC_INC})
 endif()
@@ -591,7 +592,7 @@ endif()
 		bf_intern_mikktspace
 	)
 
-	if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+	if(WITH_BINRELOC)
 		list(APPEND BLENDER_SORTED_LIBS extern_binreloc)
 	endif()
 

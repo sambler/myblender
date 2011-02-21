@@ -2029,6 +2029,55 @@ static void lib_link_nodetree(FileData *fd, Main *main)
 	}
 }
 
+/* updates group node socket own_index so that
+ * external links to/from the group node are preserved.
+ */
+static void lib_node_do_versions_group(bNode *gnode)
+{
+	bNodeTree *ngroup= (bNodeTree*)gnode->id;
+	bNode *intnode;
+	bNodeSocket *sock, *gsock, *intsock;
+	int found;
+	
+	for (sock=gnode->outputs.first; sock; sock=sock->next) {
+		int old_index = sock->to_index;
+		for (gsock=ngroup->outputs.first; gsock; gsock=gsock->next) {
+			if (gsock->link && gsock->link->fromsock->own_index == old_index) {
+				sock->own_index = gsock->own_index;
+				break;
+			}
+		}
+	}
+	for (sock=gnode->inputs.first; sock; sock=sock->next) {
+		int old_index = sock->to_index;
+		/* can't use break in double loop */
+		found = 0;
+		for (intnode=ngroup->nodes.first; intnode && !found; intnode=intnode->next) {
+			for (intsock=intnode->inputs.first; intsock; intsock=intsock->next) {
+				if (intsock->own_index == old_index && intsock->link) {
+					sock->own_index = intsock->link->fromsock->own_index;
+					found = 1;
+					break;
+				}
+			}
+		}
+	}
+}
+
+/* updates external links for all group nodes in a tree */
+static void lib_nodetree_do_versions_group(bNodeTree *ntree)
+{
+	bNode *node;
+	
+	for (node=ntree->nodes.first; node; node=node->next) {
+		if (node->type==NODE_GROUP) {
+			bNodeTree *ngroup= (bNodeTree*)node->id;
+			if (ngroup->flag & NTREE_DO_VERSIONS)
+				lib_node_do_versions_group(node);
+		}
+	}
+}
+
 /* verify types for nodes and groups, all data has to be read */
 /* open = 0: appending/linking, open = 1: open new file (need to clean out dynamic
 * typedefs*/
@@ -2047,10 +2096,40 @@ static void lib_verify_nodetree(Main *main, int UNUSED(open))
 	/* now create the own typeinfo structs an verify nodes */
 	/* here we still assume no groups in groups */
 	for(ntree= main->nodetree.first; ntree; ntree= ntree->id.next) {
-		ntreeVerifyTypes(ntree);	/* internal nodes, no groups! */
-		ntreeMakeOwnType(ntree);	/* for group usage */
+		ntreeVerifyTypes(ntree);		/* internal nodes, no groups! */
 	}
 	
+	{
+		int has_old_groups=0;
+		/* XXX this should actually be part of do_versions, but since we need
+		 * finished library linking, it is not possible there. Instead in do_versions
+		 * we have set the NTREE_DO_VERSIONS flag, so at this point we can do the
+		 * actual group node updates.
+		 */
+		for(ntree= main->nodetree.first; ntree; ntree= ntree->id.next) {
+			if (ntree->flag & NTREE_DO_VERSIONS) {
+				/* this adds copies and links from all unlinked internal sockets to group inputs/outputs. */
+				nodeAddAllGroupSockets(ntree);
+				has_old_groups = 1;
+			}
+		}
+		/* now verify all types in material trees, groups are set OK now */
+		for(ma= main->mat.first; ma; ma= ma->id.next) {
+			if(ma->nodetree)
+				lib_nodetree_do_versions_group(ma->nodetree);
+		}
+		/* and scene trees */
+		for(sce= main->scene.first; sce; sce= sce->id.next) {
+			if(sce->nodetree)
+				lib_nodetree_do_versions_group(ma->nodetree);
+		}
+		/* and texture trees */
+		for(tx= main->tex.first; tx; tx= tx->id.next) {
+			if(tx->nodetree)
+				lib_nodetree_do_versions_group(ma->nodetree);
+		}
+	}
+
 	/* now verify all types in material trees, groups are set OK now */
 	for(ma= main->mat.first; ma; ma= ma->id.next) {
 		if(ma->nodetree)
@@ -2079,7 +2158,6 @@ static void direct_link_nodetree(FileData *fd, bNodeTree *ntree)
 	bNodeLink *link;
 	
 	ntree->init= 0;		/* to set callbacks and force setting types */
-	ntree->owntype= NULL;
 	ntree->progress= NULL;
 	
 	ntree->adt= newdataadr(fd, ntree->adt);
@@ -2117,6 +2195,10 @@ static void direct_link_nodetree(FileData *fd, bNodeTree *ntree)
 	}
 	link_list(fd, &ntree->links);
 	
+	/* external sockets */
+	link_list(fd, &ntree->inputs);
+	link_list(fd, &ntree->outputs);
+	
 	/* and we connect the rest */
 	for(node= ntree->nodes.first; node; node= node->next) {
 		node->preview= newimaadr(fd, node->preview);
@@ -2126,13 +2208,16 @@ static void direct_link_nodetree(FileData *fd, bNodeTree *ntree)
 		for(sock= node->outputs.first; sock; sock= sock->next)
 			sock->ns.data= NULL;
 	}
+	for(sock= ntree->outputs.first; sock; sock= sock->next)
+		sock->link= newdataadr(fd, sock->link);
+	
 	for(link= ntree->links.first; link; link= link->next) {
 		link->fromnode= newdataadr(fd, link->fromnode);
 		link->tonode= newdataadr(fd, link->tonode);
 		link->fromsock= newdataadr(fd, link->fromsock);
 		link->tosock= newdataadr(fd, link->tosock);
 	}
-		
+	
 	/* type verification is in lib-link */
 }
 
@@ -11404,8 +11489,23 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 		}
 	}
 
+	if (main->versionfile < 256 || (main->versionfile == 256 && main->subversionfile < 2)) {
+		bNodeTree *ntree;
+		
+		/* node sockets are not exposed automatically any more,
+		 * this mimics the old behaviour by adding all unlinked sockets to groups.
+		 */
+		for (ntree=main->nodetree.first; ntree; ntree=ntree->id.next) {
+			/* XXX Only setting a flag here. Actual adding of group sockets
+			 * is done in lib_verify_nodetree, because at this point the internal
+			 * nodes may not be up-to-date! (missing lib-link)
+			 */
+			ntree->flag |= NTREE_DO_VERSIONS;
+		}
+	}
+
 	/* put compatibility code here until next subversion bump */
-	
+
 	{
 		bScreen *sc;
 		
@@ -11418,7 +11518,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 			}
 		}
 	}
-
+	
 	/* WATCH IT!!!: pointers from libdata have not been converted yet here! */
 	/* WATCH IT 2!: Userdef struct init has to be in editors/interface/resources.c! */
 

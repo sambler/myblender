@@ -8,31 +8,6 @@
  *
  * For more information on using Blender browse to http://www.blender.org
  *
- * \section sects Main sections of the blender code
- *
- *  The following sections are the broad categories into which the various modules
- *  belong.
- *
- *  - \ref render
- *  - \ref meshedit
- *  - \ref texture
- *  - \ref compositor
- *  - \ref scripts
- *  - \ref gameengine
- *  - \ref data
- *
- * \section GUI
- *  - \ref gui
- *
- * \section libraries Libraries and Wrappers
- *  - \ref GHOST
- *  - \ref imbuf
- *  - \ref audaspace
- *  - \ref DNA
- *  - \ref RNA
- *
- * \section Miscellaneous
- *  - \ref undoc
  */
 
 /** \defgroup intern Internal libraries
@@ -55,15 +30,18 @@
  *  folder are updated.
  *
  */
-/** \defgroup editors Editor modules */
 /** \defgroup blenderplayer Blender Player */
 
-/** \defgroup render Rendering Module */
-/** \defgroup meshedit Mesh Editing Module */
+/** \defgroup render Rendering */
+/** \defgroup meshedit Mesh Editing */
 /** \defgroup texture Texturing */
 /** \defgroup compositor Compositing */
 
 /** \defgroup scripts Scripting */
+
+/** \defgroup python Python
+ *  \ingroup scripts
+ */
 
 /** \defgroup gameengine Game Engine */
 
@@ -82,9 +60,19 @@
  *  \ingroup core
  */
 
+/** \defgroup nodes nodes
+ *  \ingroup core
+ */
+
+/** \defgroup modifiers modifiers
+ *  \ingroup core
+ */
+
 /** \defgroup data DNA, RNA and .blend access*/
 
 /** \defgroup GHOST GHOST API */
+
+/** \defgroup gpu GPU */
 
 /** \defgroup DNA sDNA
  *  \ingroup data
@@ -104,6 +92,12 @@
 /** \defgroup gui GUI */
 
 /** \defgroup wm windowmanager
+ *  \ingroup gui
+ */
+
+/** \defgroup editors Editors */
+
+/** \defgroup editorui Interface and Widgets
  *  \ingroup gui
  */
 

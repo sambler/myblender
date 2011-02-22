@@ -24,11 +24,11 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-SET(INC 
+set(INC 
 	.
-	../../../blenkernel
-	../../
 	..
+	../..
+	../../../blenkernel
 	../../../blenlib
 	intern/include
 	../../../../../intern/guardedalloc
@@ -36,12 +36,12 @@ SET(INC
 	${OPENEXR_INC}
 )
 
-SET(SRC
+set(SRC
 	openexr_api.cpp
 )
 
-IF(WITH_IMAGE_OPENEXR)
-	ADD_DEFINITIONS(-DWITH_OPENEXR)
-ENDIF(WITH_IMAGE_OPENEXR)
+if(WITH_IMAGE_OPENEXR)
+	add_definitions(-DWITH_OPENEXR)
+endif()
 
-BLENDERLIB(bf_openexr "${SRC}" "${INC}")                 
+blender_add_lib(bf_imbuf_openexr "${SRC}" "${INC}")                 

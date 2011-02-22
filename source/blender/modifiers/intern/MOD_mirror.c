@@ -34,15 +34,18 @@
 #include "DNA_object_types.h"
 
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_cdderivedmesh.h"
 #include "BKE_mesh.h"
 #include "BKE_modifier.h"
 #include "BKE_deform.h"
-#include "BKE_utildefines.h"
+
 
 #include "MEM_guardedalloc.h"
 #include "depsgraph_private.h"
+
+#include "MOD_util.h"
 
 static void initData(ModifierData *md)
 {
@@ -61,7 +64,7 @@ static void copyData(ModifierData *md, ModifierData *target)
 	tmmd->axis = mmd->axis;
 	tmmd->flag = mmd->flag;
 	tmmd->tolerance = mmd->tolerance;
-	tmmd->mirror_ob = mmd->mirror_ob;;
+	tmmd->mirror_ob = mmd->mirror_ob;
 }
 
 static void foreachObjectLink(
@@ -141,7 +144,11 @@ static DerivedMesh *doMirrorOnAxis(MirrorModifierData *mmd,
 		if (mmd->mirror_ob) {
 			mul_m4_v3(mtx, co);
 		}
-		isShared = ABS(co[axis])<=tolerance;
+		
+		if(mmd->flag & MOD_MIR_NO_MERGE)
+			isShared = 0;
+		else
+			isShared = ABS(co[axis])<=tolerance;
 		
 		/* Because the topology result (# of vertices) must be the same if
 		* the mesh data is overridden by vertex cos, have to calc sharedness
@@ -153,8 +160,8 @@ static DerivedMesh *doMirrorOnAxis(MirrorModifierData *mmd,
 		
 		indexMap[i][0] = numVerts - 1;
 		indexMap[i][1] = !isShared;
-		
-		if(isShared) {
+		//
+		if(isShared ) {
 			co[axis] = 0;
 			if (mmd->mirror_ob) {
 				mul_m4_v3(imtx, co);
@@ -337,6 +344,7 @@ ModifierTypeInfo modifierType_Mirror = {
 
 	/* copyData */          copyData,
 	/* deformVerts */       0,
+	/* deformMatrices */    0,
 	/* deformVertsEM */     0,
 	/* deformMatricesEM */  0,
 	/* applyModifier */     applyModifier,

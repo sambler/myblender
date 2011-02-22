@@ -38,11 +38,12 @@
 #include "DNA_scene_types.h"
 
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_global.h"
 #include "BKE_main.h"
 #include "BKE_report.h"
-#include "BKE_utildefines.h"
+
 #include "BKE_writeavi.h"
 #include "AVI_avi.h"
 
@@ -213,7 +214,7 @@ static int append_avi(RenderData *UNUSED(rd), int frame, int *pixels, int rectx,
 	return 1;
 }
 
-void end_avi(void)
+static void end_avi(void)
 {
 	if (avi == NULL) return;
 

@@ -34,7 +34,7 @@
 #include "BLI_math.h"
 #include "BLI_edgehash.h"
 #include "BLI_editVert.h"
-
+#include "BLI_utildefines.h"
 
 #include "DNA_material_types.h"
 #include "DNA_meshdata_types.h"
@@ -50,7 +50,7 @@
 #include "BKE_material.h"
 #include "BKE_paint.h"
 #include "BKE_property.h"
-#include "BKE_utildefines.h"
+
 
 #include "BIF_gl.h"
 #include "BIF_glutil.h"
@@ -93,13 +93,10 @@ static EdgeHash *get_tface_mesh_marked_edge_info(Mesh *me)
 	EdgeHash *eh = BLI_edgehash_new();
 	int i;
 	MFace *mf;
-	MTFace *tf = NULL;
 	
 	for (i=0; i<me->totface; i++) {
 		mf = &me->mface[i];
-		if (me->mtface)
-			tf = &me->mtface[i];
-		
+
 		if (mf->v3) {
 			if (!(mf->flag&ME_HIDE)) {
 				unsigned int flags = eEdge_Visible;
@@ -343,7 +340,7 @@ static int set_draw_settings_cached(int clearcache, int textured, MTFace *texfac
 
 /* Icky globals, fix with userdata parameter */
 
-struct TextureDrawState {
+static struct TextureDrawState {
 	Object *ob;
 	int islit, istex;
 	int color_profile;
@@ -383,7 +380,7 @@ static void draw_textured_begin(Scene *scene, View3D *v3d, RegionView3D *rv3d, O
 	glShadeModel(GL_SMOOTH);
 }
 
-static void draw_textured_end()
+static void draw_textured_end(void)
 {
 	/* switch off textures */
 	GPU_set_tpage(NULL, 0);
@@ -526,10 +523,10 @@ static int draw_tface_mapped__set_draw(void *userData, int index)
 {
 	Mesh *me = (Mesh*)userData;
 	MTFace *tface = (me->mtface)? &me->mtface[index]: NULL;
-	MFace *mface = (me->mface)? &me->mface[index]: NULL;
+	MFace *mface = &me->mface[index];
 	MCol *mcol = (me->mcol)? &me->mcol[index]: NULL;
-	int matnr = me->mface[index].mat_nr;
-	if (mface && mface->flag&ME_HIDE) return 0;
+	const int matnr = mface->mat_nr;
+	if (mface->flag & ME_HIDE) return 0;
 	return draw_tface__set_draw(tface, mcol, matnr);
 }
 
@@ -565,7 +562,7 @@ static int wpaint__setSolidDrawOptions(void *userData, int index, int *drawSmoot
 	return 1;
 }
 
-void draw_mesh_text(Scene *scene, Object *ob, int glsl)
+static void draw_mesh_text(Scene *scene, Object *ob, int glsl)
 {
 	Mesh *me = ob->data;
 	DerivedMesh *ddm;
@@ -661,20 +658,20 @@ void draw_mesh_textured(Scene *scene, View3D *v3d, RegionView3D *rv3d, Object *o
 	/* draw the textured mesh */
 	draw_textured_begin(scene, v3d, rv3d, ob);
 
+	glColor4f(1.0f,1.0f,1.0f,1.0f);
+
 	if(ob->mode & OB_MODE_EDIT) {
-		glColor4f(1.0f,1.0f,1.0f,1.0f);
 		dm->drawMappedFacesTex(dm, draw_em_tf_mapped__set_draw, me->edit_mesh);
 	} else if(faceselect) {
 		if(ob->mode & OB_MODE_WEIGHT_PAINT)
 			dm->drawMappedFaces(dm, wpaint__setSolidDrawOptions, me, 1, GPU_enable_material);
 		else
-			dm->drawMappedFacesTex(dm, draw_tface_mapped__set_draw, me);
+			dm->drawMappedFacesTex(dm, me->mface ? draw_tface_mapped__set_draw : NULL, me);
 	}
 	else {
 		if( GPU_buffer_legacy(dm) )
 			dm->drawFacesTex(dm, draw_tface__set_draw_legacy);
 		else {
-			glColor4f(1.0f,1.0f,1.0f,1.0f);
 			if( !CustomData_has_layer(&dm->faceData,CD_TEXTURE_MCOL) )
 				add_tface_color_layer(dm);
 			dm->drawFacesTex(dm, draw_tface__set_draw);

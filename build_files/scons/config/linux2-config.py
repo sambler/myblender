@@ -193,6 +193,8 @@ CCFLAGS = ['-pipe','-fPIC','-funsigned-char','-fno-strict-aliasing','-D_LARGEFIL
 
 CPPFLAGS = []
 CXXFLAGS = ['-pipe','-fPIC','-funsigned-char','-fno-strict-aliasing','-D_LARGEFILE_SOURCE', '-D_FILE_OFFSET_BITS=64','-D_LARGEFILE64_SOURCE']
+# g++ 4.6, only needed for bullet
+CXXFLAGS += ['-fpermissive']
 if WITH_BF_FFMPEG:
   # libavutil needs UINT64_C()
   CXXFLAGS += ['-D__STDC_CONSTANT_MACROS', ]
@@ -204,7 +206,7 @@ REL_CCFLAGS = ['-O2']
 ##ARFLAGS = ruv
 ##ARFLAGSQUIET = ru
 ##
-C_WARN = ['-Wno-char-subscripts', '-Wdeclaration-after-statement', '-Wunused-parameter', '-Werror=declaration-after-statement', '-Werror=implicit-function-declaration', '-Werror=return-type']
+C_WARN = ['-Wno-char-subscripts', '-Wdeclaration-after-statement', '-Wunused-parameter', '-Wstrict-prototypes', '-Werror=declaration-after-statement', '-Werror=implicit-function-declaration', '-Werror=return-type']
 CC_WARN = ['-Wall']
 CXX_WARN = ['-Wno-invalid-offsetof', '-Wno-sign-compare']
 

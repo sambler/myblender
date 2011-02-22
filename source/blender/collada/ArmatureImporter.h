@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -20,6 +20,10 @@
  * Contributor(s): Chingiz Dyussenov, Arystanbek Dyussenov, Nathan Letwory.
  *
  * ***** END GPL LICENSE BLOCK *****
+ */
+
+/** \file ArmatureImporter.h
+ *  \ingroup collada
  */
 
 #ifndef __BC_ARMATUREIMPORTER_H__
@@ -105,9 +109,8 @@ private:
 
 	void fix_leaf_bones();
 
-	void set_leaf_bone_shapes(Object *ob_arm);
-
 #if 0
+	void set_leaf_bone_shapes(Object *ob_arm);
 	void set_euler_rotmode();
 #endif
 

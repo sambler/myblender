@@ -42,6 +42,7 @@
 #include "BLI_listbase.h"
 #include "BLI_rand.h"
 #include "BLI_string.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_context.h"
 #include "BKE_group.h"
@@ -51,11 +52,13 @@
 #include "BKE_property.h"
 #include "BKE_report.h"
 #include "BKE_scene.h"
+#include "BKE_library.h"
 #include "BKE_deform.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
 
+#include "ED_object.h"
 #include "ED_screen.h"
 
 #include "UI_interface.h"
@@ -430,7 +433,7 @@ static short select_grouped_group(bContext *C, Object *ob)	/* Select objects in 
 	}
 
 	/* build the menu. */
-	pup= uiPupMenuBegin(C, "Select Group", 0);
+	pup= uiPupMenuBegin(C, "Select Group", ICON_NULL);
 	layout= uiPupMenuLayout(pup);
 
 	for (i=0; i<group_count; i++) {
@@ -826,21 +829,26 @@ void OBJECT_OT_select_same_group(wmOperatorType *ot)
 /**************************** Select Mirror ****************************/
 static int object_select_mirror_exec(bContext *C, wmOperator *op)
 {
+	Scene *scene= CTX_data_scene(C);
 	short extend;
 	
 	extend= RNA_boolean_get(op->ptr, "extend");
 	
 	CTX_DATA_BEGIN(C, Base*, primbase, selected_bases) {
-
 		char tmpname[32];
-		flip_side_name(tmpname, primbase->object->id.name+2, TRUE);
 
-		CTX_DATA_BEGIN(C, Base*, secbase, visible_bases) {
-			if(!strcmp(secbase->object->id.name+2, tmpname)) {
-				ED_base_object_select(secbase, BA_SELECT);
+		flip_side_name(tmpname, primbase->object->id.name+2, TRUE);
+		
+		if(strcmp(tmpname, primbase->object->id.name+2)!=0) { /* names differ */
+			Object *ob= (Object *)find_id("OB", tmpname);
+			if(ob) {
+				Base *secbase= object_in_scene(ob, scene);
+
+				if(secbase) {
+					ED_base_object_select(secbase, BA_SELECT);
+				}
 			}
 		}
-		CTX_DATA_END;
 		
 		if (extend == 0) ED_base_object_select(primbase, BA_DESELECT);
 		

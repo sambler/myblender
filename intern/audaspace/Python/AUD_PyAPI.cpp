@@ -1,26 +1,27 @@
 /*
  * $Id$
  *
- * ***** BEGIN LGPL LICENSE BLOCK *****
+ * ***** BEGIN GPL LICENSE BLOCK *****
  *
- * Copyright 2009 Jörg Hermann Müller
+ * Copyright 2009-2011 Jörg Hermann Müller
  *
  * This file is part of AudaSpace.
  *
- * AudaSpace is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
+ * Audaspace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
  * AudaSpace is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU Lesser General Public License
- * along with AudaSpace.  If not, see <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU General Public License
+ * along with Audaspace; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * ***** END LGPL LICENSE BLOCK *****
+ * ***** END GPL LICENSE BLOCK *****
  */
 
 #include "AUD_PyAPI.h"
@@ -851,7 +852,7 @@ Factory_filter(Factory* self, PyObject* args)
 		return NULL;
 	}
 
-	if(!PySequence_Length(py_b) || (py_a != NULL && !PySequence_Length(py_a)))
+	if(!PySequence_Size(py_b) || (py_a != NULL && !PySequence_Size(py_a)))
 	{
 		PyErr_SetString(PyExc_ValueError, "The sequence has to contain at least one value!");
 		return NULL;
@@ -862,7 +863,7 @@ Factory_filter(Factory* self, PyObject* args)
 	float value;
 	int result;
 
-	for(int i = 0; i < PySequence_Length(py_b); i++)
+	for(int i = 0; i < PySequence_Size(py_b); i++)
 	{
 		py_value = PySequence_GetItem(py_b, i);
 		result = PyArg_Parse(py_value, "f:filter", &value);
@@ -876,7 +877,7 @@ Factory_filter(Factory* self, PyObject* args)
 
 	if(py_a)
 	{
-		for(int i = 0; i < PySequence_Length(py_a); i++)
+		for(int i = 0; i < PySequence_Size(py_a); i++)
 		{
 			py_value = PySequence_GetItem(py_a, i);
 			result = PyArg_Parse(py_value, "f:filter", &value);

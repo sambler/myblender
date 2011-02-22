@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,10 @@
  * Contributor(s): Joshua Leung (full recode)
  *
  * ***** END GPL LICENSE BLOCK *****
+ */
+
+/** \file ED_keyframes_draw.h
+ *  \ingroup editors
  */
 
 #ifndef ED_KEYFRAMES_DRAW_H
@@ -100,7 +104,7 @@ typedef enum eKeyframeShapeDrawOpts {
 } eKeyframeShapeDrawOpts;
 
 /* draw simple diamond-shape keyframe (with OpenGL) */
-void draw_keyframe_shape(float x, float y, float xscale, float hsize, short sel, short key_type, short mode);
+void draw_keyframe_shape(float x, float y, float xscale, float hsize, short sel, short key_type, short mode, float alpha);
 
 /* ******************************* Methods ****************************** */
 

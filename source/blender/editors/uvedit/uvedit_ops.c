@@ -40,6 +40,7 @@
 #include "BLI_math.h"
 #include "BLI_blenlib.h"
 #include "BLI_editVert.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_context.h"
 #include "BKE_customdata.h"
@@ -51,6 +52,7 @@
 
 #include "ED_image.h"
 #include "ED_mesh.h"
+#include "ED_uvedit.h"
 #include "ED_object.h"
 #include "ED_screen.h"
 #include "ED_transform.h"
@@ -134,7 +136,7 @@ void ED_uvedit_assign_image(Scene *scene, Object *obedit, Image *ima, Image *pre
 
 	/* and update depdency graph */
 	if(update)
-		DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+		DAG_id_tag_update(obedit->data, 0);
 
 	BKE_mesh_end_editmesh(obedit->data, em);
 }
@@ -167,7 +169,7 @@ static int uvedit_set_tile(Object *obedit, Image *ima, int curtile)
 			tf->tile= curtile; /* set tile index */
 	}
 
-	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+	DAG_id_tag_update(obedit->data, 0);
 	BKE_mesh_end_editmesh(obedit->data, em);
 
 	return 1;
@@ -401,7 +403,7 @@ int ED_uvedit_minmax(Scene *scene, Image *ima, Object *obedit, float *min, float
 	return sel;
 }
 
-int uvedit_center(Scene *scene, Image *ima, Object *obedit, float *cent, int mode)
+static int uvedit_center(Scene *scene, Image *ima, Object *obedit, float *cent, int mode)
 {
 	EditMesh *em= BKE_mesh_get_editmesh((Mesh*)obedit->data);
 	EditFace *efa;
@@ -878,7 +880,7 @@ static void select_linked(Scene *scene, Image *ima, EditMesh *em, float limit[2]
 		nverts= efa->v4? 4: 3;
 
 		for(i=0; i<nverts; i++) {
-			/* make_uv_vert_map_EM sets verts tmp.l to the indicies */
+			/* make_uv_vert_map_EM sets verts tmp.l to the indices */
 			vlist= EM_get_uv_map_vert(vmap, (*(&efa->v1 + i))->tmp.l);
 			
 			startv= vlist;
@@ -1017,7 +1019,7 @@ static void weld_align_uv(bContext *C, int tool)
 		}
 	}
 
-	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 
 	BKE_mesh_end_editmesh(obedit->data, em);
@@ -1030,7 +1032,7 @@ static int align_exec(bContext *C, wmOperator *op)
 	return OPERATOR_FINISHED;
 }
 
-void UV_OT_align(wmOperatorType *ot)
+static void UV_OT_align(wmOperatorType *ot)
 {
 	static EnumPropertyItem axis_items[] = {
 		{'a', "ALIGN_AUTO", 0, "Align Auto", "Automatically choose the axis on which there is most alignment already"},
@@ -1061,7 +1063,7 @@ static int weld_exec(bContext *C, wmOperator *UNUSED(op))
 	return OPERATOR_FINISHED;
 }
 
-void UV_OT_weld(wmOperatorType *ot)
+static void UV_OT_weld(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Weld";
@@ -1084,7 +1086,6 @@ typedef struct UVVertAverage {
 
 static int stitch_exec(bContext *C, wmOperator *op)
 {
-	SpaceImage *sima;
 	Scene *scene;
 	Object *obedit;
 	EditMesh *em;
@@ -1092,8 +1093,7 @@ static int stitch_exec(bContext *C, wmOperator *op)
 	EditVert *eve;
 	Image *ima;
 	MTFace *tf;
-	
-	sima= CTX_wm_space_image(C);
+
 	scene= CTX_data_scene(C);
 	obedit= CTX_data_edit_object(C);
 	em= BKE_mesh_get_editmesh((Mesh*)obedit->data);
@@ -1240,14 +1240,14 @@ static int stitch_exec(bContext *C, wmOperator *op)
 		MEM_freeN(uv_average);
 	}
 
-	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 
 	BKE_mesh_end_editmesh(obedit->data, em);
 	return OPERATOR_FINISHED;
 }
 
-void UV_OT_stitch(wmOperatorType *ot)
+static void UV_OT_stitch(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Stitch";
@@ -1304,7 +1304,7 @@ static int select_inverse_exec(bContext *C, wmOperator *UNUSED(op))
 	return OPERATOR_FINISHED;
 }
 
-void UV_OT_select_inverse(wmOperatorType *ot)
+static void UV_OT_select_inverse(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Select Inverse";
@@ -1400,7 +1400,7 @@ static int select_all_exec(bContext *C, wmOperator *op)
 	return OPERATOR_FINISHED;
 }
 
-void UV_OT_select_all(wmOperatorType *ot)
+static void UV_OT_select_all(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Select or Deselect All";
@@ -1701,7 +1701,7 @@ static int mouse_select(bContext *C, float co[2], int extend, int loop)
 		}
 	}
 	
-	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_SELECT, obedit->data);
 	
 	BKE_mesh_end_editmesh(obedit->data, em);
@@ -1735,7 +1735,7 @@ static int select_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	return select_exec(C, op);
 }
 
-void UV_OT_select(wmOperatorType *ot)
+static void UV_OT_select(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Select";
@@ -1784,7 +1784,7 @@ static int select_loop_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	return select_loop_exec(C, op);
 }
 
-void UV_OT_select_loop(wmOperatorType *ot)
+static void UV_OT_select_loop(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Loop Select";
@@ -1853,7 +1853,7 @@ static int select_linked_internal(bContext *C, wmOperator *op, wmEvent *event, i
 
 	select_linked(scene, ima, em, limit, hit_p, extend);
 
-	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_SELECT, obedit->data);
 
 	BKE_mesh_end_editmesh(obedit->data, em);
@@ -1865,7 +1865,7 @@ static int select_linked_exec(bContext *C, wmOperator *op)
 	return select_linked_internal(C, op, NULL, 0);
 }
 
-void UV_OT_select_linked(wmOperatorType *ot)
+static void UV_OT_select_linked(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Select Linked";
@@ -1892,7 +1892,7 @@ static int select_linked_pick_exec(bContext *C, wmOperator *op)
 	return select_linked_internal(C, op, NULL, 1);
 }
 
-void UV_OT_select_linked_pick(wmOperatorType *ot)
+static void UV_OT_select_linked_pick(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Select Linked Pick";
@@ -1942,14 +1942,14 @@ static int unlink_selection_exec(bContext *C, wmOperator *op)
 		}
 	}
 	
-	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_SELECT, obedit->data);
 
 	BKE_mesh_end_editmesh(obedit->data, em);
 	return OPERATOR_FINISHED;
 }
 
-void UV_OT_unlink_selection(wmOperatorType *ot)
+static void UV_OT_unlink_selection(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Unlink Selection";
@@ -2230,7 +2230,7 @@ static int border_select_exec(bContext *C, wmOperator *op)
 	return OPERATOR_CANCELLED;
 } 
 
-void UV_OT_select_border(wmOperatorType *ot)
+static void UV_OT_select_border(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Border Select";
@@ -2271,7 +2271,7 @@ static void select_uv_inside_ellipse(Scene *scene, int select, EditFace *efa, MT
 	}
 }
 
-int circle_select_exec(bContext *C, wmOperator *op)
+static int circle_select_exec(bContext *C, wmOperator *op)
 {
 	SpaceImage *sima= CTX_wm_space_image(C);
 	Scene *scene= CTX_data_scene(C);
@@ -2319,7 +2319,7 @@ int circle_select_exec(bContext *C, wmOperator *op)
 	return OPERATOR_FINISHED;
 }
 
-void UV_OT_circle_select(wmOperatorType *ot)
+static void UV_OT_circle_select(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Circle Select";
@@ -2389,7 +2389,7 @@ static int snap_cursor_exec(bContext *C, wmOperator *op)
 	return OPERATOR_FINISHED;
 }
 
-void UV_OT_snap_cursor(wmOperatorType *ot)
+static void UV_OT_snap_cursor(wmOperatorType *ot)
 {
 	static EnumPropertyItem target_items[] = {
 		{0, "PIXELS", 0, "Pixels", ""},
@@ -2452,7 +2452,7 @@ static int snap_uvs_to_adjacent_unselected(Scene *scene, Image *ima, Object *obe
 		eve->tmp.l=-1;
 	
 	/* index every vert that has a selected UV using it, but only once so as to
-	 * get unique indicies and to count how much to malloc */
+	 * get unique indices and to count how much to malloc */
 	for(efa= em->faces.first; efa; efa= efa->next) {
 		tface= CustomData_em_get(&em->fdata, efa->data, CD_MTFACE);
 
@@ -2623,13 +2623,13 @@ static int snap_selection_exec(bContext *C, wmOperator *op)
 	if(!change)
 		return OPERATOR_CANCELLED;
 	
-	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 
 	return OPERATOR_FINISHED;
 }
 
-void UV_OT_snap_selection(wmOperatorType *ot)
+static void UV_OT_snap_selection(wmOperatorType *ot)
 {
 	static EnumPropertyItem target_items[] = {
 		{0, "PIXELS", 0, "Pixels", ""},
@@ -2690,7 +2690,7 @@ static int pin_exec(bContext *C, wmOperator *op)
 	return OPERATOR_FINISHED;
 }
 
-void UV_OT_pin(wmOperatorType *ot)
+static void UV_OT_pin(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Pin";
@@ -2736,7 +2736,7 @@ static int select_pinned_exec(bContext *C, wmOperator *UNUSED(op))
 	return OPERATOR_FINISHED;
 }
 
-void UV_OT_select_pinned(wmOperatorType *ot)
+static void UV_OT_select_pinned(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Selected Pinned";
@@ -2875,7 +2875,7 @@ static int hide_exec(bContext *C, wmOperator *op)
 	return OPERATOR_FINISHED;
 }
 
-void UV_OT_hide(wmOperatorType *ot)
+static void UV_OT_hide(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Hide Selected";
@@ -3009,7 +3009,7 @@ static int reveal_exec(bContext *C, wmOperator *UNUSED(op))
 	return OPERATOR_FINISHED;
 }
 
-void UV_OT_reveal(wmOperatorType *ot)
+static void UV_OT_reveal(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Reveal Hidden";
@@ -3055,7 +3055,7 @@ static int set_2d_cursor_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	return set_2d_cursor_exec(C, op);
 }
 
-void UV_OT_cursor_set(wmOperatorType *ot)
+static void UV_OT_cursor_set(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Set 2D Cursor";
@@ -3123,7 +3123,7 @@ static int set_tile_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	return set_tile_exec(C, op);
 }
 
-void UV_OT_tile_set(wmOperatorType *ot)
+static void UV_OT_tile_set(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Set Tile";

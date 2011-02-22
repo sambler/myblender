@@ -19,9 +19,10 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-SET(INC
+set(INC
 	../include
 	../../blenkernel
+	../../blenloader
 	../../blenlib
 	../../makesdna
 	../../makesrna
@@ -30,9 +31,11 @@ SET(INC
 	../../../../intern/guardedalloc
 )
 
-SET(SRC
+set(SRC
 	mball_edit.c
 	mball_ops.c
+
+	mball_intern.h
 )
 
-BLENDERLIB(bf_editor_metaball "${SRC}" "${INC}")
+blender_add_lib(bf_editor_metaball "${SRC}" "${INC}")

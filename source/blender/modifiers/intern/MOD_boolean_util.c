@@ -37,6 +37,7 @@
 #include "MEM_guardedalloc.h"
 
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 #include "BLI_ghash.h"
 
 #include "BKE_cdderivedmesh.h"
@@ -46,6 +47,8 @@
 #include "BKE_object.h"
 
 #include "CSG_BooleanOps.h"
+
+#include "MOD_boolean_util.h"
 
 /**
  * Here's the vertex iterator structure used to walk through
@@ -450,7 +453,7 @@ static void FreeMeshDescriptors(
 	FaceIt_Destruct(face_it);
 }
 
-DerivedMesh *NewBooleanDerivedMesh_intern(
+static DerivedMesh *NewBooleanDerivedMesh_intern(
 	DerivedMesh *dm, struct Object *ob, DerivedMesh *dm_select, struct Object *ob_select,
 	int int_op_type, Material **mat, int *totmat)
 {
@@ -577,7 +580,7 @@ int NewBooleanMesh(Scene *scene, Base *base, Base *base_select, int int_op_type)
 	MEM_freeN(mat);
 
 	/* update dag */
-	DAG_id_flush_update(&ob_new->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&ob_new->id, OB_RECALC_DATA);
 
 	return 1;
 }

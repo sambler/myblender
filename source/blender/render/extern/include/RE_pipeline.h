@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,12 +27,15 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file RE_pipeline.h
+ *  \ingroup render
+ */
+
 #ifndef RE_PIPELINE_H
 #define RE_PIPELINE_H
 
 #include "DNA_listBase.h"
 #include "DNA_vec_types.h"
-#include "BKE_utildefines.h"
 #include "RNA_types.h"
 
 struct bNodeTree;
@@ -145,7 +148,8 @@ typedef struct RenderStats {
 	int totface, totvert, totstrand, tothalo, totlamp, totpart;
 	short curfield, curblur, curpart, partsdone, convertdone;
 	double starttime, lastframetime;
-	char *infostr, *statstr, scenename[32];
+	const char *infostr, *statstr;
+	char scenename[32];
 	
 } RenderStats;
 
@@ -236,7 +240,7 @@ void RE_display_draw_cb	(struct Render *re, void *handle, void (*f)(void *handle
 void RE_stats_draw_cb	(struct Render *re, void *handle, void (*f)(void *handle, RenderStats *rs));
 void RE_progress_cb	(struct Render *re, void *handle, void (*f)(void *handle, float));
 void RE_test_break_cb	(struct Render *re, void *handle, int (*f)(void *handle));
-void RE_error_cb		(struct Render *re, void *handle, void (*f)(void *handle, char *str));
+void RE_error_cb		(struct Render *re, void *handle, void (*f)(void *handle, const char *str));
 
 /* should move to kernel once... still unsure on how/where */
 float RE_filter_value(int type, float x);
@@ -287,20 +291,20 @@ typedef struct RenderEngine {
 	ListBase fullresult;
 } RenderEngine;
 
-void RE_layer_load_from_file(RenderLayer *layer, struct ReportList *reports, char *filename);
-void RE_result_load_from_file(RenderResult *result, struct ReportList *reports, char *filename);
+void RE_layer_load_from_file(RenderLayer *layer, struct ReportList *reports, const char *filename, int x, int y);
+void RE_result_load_from_file(RenderResult *result, struct ReportList *reports, const char *filename);
 
 struct RenderResult *RE_engine_begin_result(RenderEngine *engine, int x, int y, int w, int h);
 void RE_engine_update_result(RenderEngine *engine, struct RenderResult *result);
 void RE_engine_end_result(RenderEngine *engine, struct RenderResult *result);
 
 int RE_engine_test_break(RenderEngine *engine);
-void RE_engine_update_stats(RenderEngine *engine, char *stats, char *info);
+void RE_engine_update_stats(RenderEngine *engine, const char *stats, const char *info);
 
 void RE_engines_init(void);
 void RE_engines_exit(void);
 
-int RE_is_rendering_allowed(struct Scene *scene, void *erh, void (*error)(void *handle, char *str));
+int RE_is_rendering_allowed(struct Scene *scene, void *erh, void (*error)(void *handle, const char *str));
 
 #endif /* RE_PIPELINE_H */
 

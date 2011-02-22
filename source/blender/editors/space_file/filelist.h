@@ -47,8 +47,8 @@ struct rcti;
 struct ReportList;
 
 struct FileList *	filelist_new(short type);
-void				filelist_init_icons();
-void				filelist_free_icons();
+void				filelist_init_icons(void);
+void				filelist_free_icons(void);
 int					filelist_find(struct FileList* filelist, char *file);
 void				filelist_free(struct FileList* filelist);
 void				filelist_sort(struct FileList* filelist, short sort);
@@ -69,16 +69,15 @@ void				filelist_readdir(struct FileList* filelist);
 
 int					filelist_empty(struct FileList* filelist);
 void				filelist_parent(struct FileList* filelist);
-void				filelist_setfiletypes(struct FileList* filelist, short has_quicktime);
 
-
+struct BlendHandle *filelist_lib(struct FileList* filelist);
 int					filelist_islibrary (struct FileList* filelist, char* dir, char* group);
 void				filelist_from_main(struct FileList* filelist);
 void				filelist_from_library(struct FileList* filelist);
 void				filelist_freelib(struct FileList* filelist);
 void				filelist_hideparent(struct FileList* filelist, short hide);
 
-struct ListBase *	folderlist_new();
+struct ListBase *	folderlist_new(void);
 void				folderlist_free(struct ListBase* folderlist);
 struct ListBase	*	folderlist_duplicate(ListBase* folderlist);
 void				folderlist_popdir(struct ListBase* folderlist, char *dir);

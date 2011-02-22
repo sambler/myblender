@@ -22,6 +22,9 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/* COLLADABU_ASSERT, may be able to remove later */
+#include "COLLADABUPlatform.h"
+
 #include "DocumentExporter.h"
 #include "DocumentImporter.h"
 
@@ -32,8 +35,8 @@ extern "C"
 
 	int collada_import(bContext *C, const char *filepath)
 	{
-		DocumentImporter imp;
-		imp.import(C, filepath);
+		DocumentImporter imp (C, filepath);
+		imp.import();
 
 		return 1;
 	}

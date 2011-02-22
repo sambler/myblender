@@ -54,12 +54,6 @@ struct bMotionPath;
 #define DRAW_CONSTCOLOR	2
 #define DRAW_SCENESET	4
 
-#define V3D_XRAY	1
-#define V3D_TRANSP	2
-#define V3D_XRAYTRANSP	4
-
-#define V3D_SELECT_MOUSE	1
-
 /* view3d_header.c */
 void view3d_header_buttons(const struct bContext *C, struct ARegion *ar);
 void VIEW3D_OT_layers(struct wmOperatorType *ot);
@@ -78,8 +72,8 @@ void VIEW3D_OT_view_center_cursor(struct wmOperatorType *ot);
 void VIEW3D_OT_view_center_camera(struct wmOperatorType *ot);
 void VIEW3D_OT_view_pan(struct wmOperatorType *ot);
 void VIEW3D_OT_view_persportho(struct wmOperatorType *ot);
-void VIEW3D_OT_add_background_image(struct wmOperatorType *ot);
-void VIEW3D_OT_remove_background_image(struct wmOperatorType *ot);
+void VIEW3D_OT_background_image_add(struct wmOperatorType *ot);
+void VIEW3D_OT_background_image_remove(struct wmOperatorType *ot);
 void VIEW3D_OT_view_orbit(struct wmOperatorType *ot);
 void VIEW3D_OT_clip_border(struct wmOperatorType *ot);
 void VIEW3D_OT_cursor3d(struct wmOperatorType *ot);
@@ -113,7 +107,7 @@ void draw_object_backbufsel(Scene *scene, View3D *v3d, RegionView3D *rv3d, struc
 void drawaxes(float size, char drawtype);
 
 void view3d_cached_text_draw_begin(void);
-void view3d_cached_text_draw_add(const float co[3], const char *str, short xoffs, short flag);
+void view3d_cached_text_draw_add(const float co[3], const char *str, short xoffs, short flag, const unsigned char col[4]);
 void view3d_cached_text_draw_end(View3D *v3d, ARegion *ar, int depth_write, float mat[][4]);
 #define V3D_CACHE_TEXT_ZBUF			(1<<0)
 #define V3D_CACHE_TEXT_WORLDSPACE	(1<<1)
@@ -135,7 +129,6 @@ void add_view3d_after(ListBase *lb, Base *base, int flag);
 
 void circf(float x, float y, float rad);
 void circ(float x, float y, float rad);
-void view3d_update_depths(struct ARegion *ar);
 void view3d_update_depths_rect(struct ARegion *ar, struct ViewDepths *d, struct rcti *rect);
 float view3d_depth_near(struct ViewDepths *d);
 
@@ -193,6 +186,8 @@ void VIEW3D_OT_snap_cursor_to_active(struct wmOperatorType *ot);
 /* space_view3d.c */
 ARegion *view3d_has_buttons_region(ScrArea *sa);
 ARegion *view3d_has_tools_region(ScrArea *sa);
+
+extern const char *view3d_context_dir[]; /* doc access */
 
 /* draw_volume.c */
 void draw_volume(struct ARegion *ar, struct GPUTexture *tex, float *min, float *max, int res[3], float dx, struct GPUTexture *tex_shadow);

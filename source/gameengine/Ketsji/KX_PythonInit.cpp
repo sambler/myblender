@@ -51,7 +51,7 @@ extern "C" {
 	#include "py_capi_utils.h"
 	#include "mathutils.h" // Blender.Mathutils module copied here so the blenderlayer can use.
 	#include "bgl.h"
-	#include "blf_api.h"
+	#include "blf_py_api.h"
 
 	#include "marshal.h" /* python header for loading/saving dicts */
 }
@@ -232,7 +232,7 @@ static PyObject* gPyExpandPath(PyObject*, PyObject* args)
 
 	BLI_strncpy(expanded, filename, FILE_MAXDIR + FILE_MAXFILE);
 	BLI_path_abs(expanded, gp_GamePythonPath);
-	return PyUnicode_FromString(expanded);
+	return PyUnicode_DecodeFSDefault(expanded);
 }
 
 static char gPyStartGame_doc[] =
@@ -498,7 +498,7 @@ static PyObject* gPyGetBlendFileList(PyObject*, PyObject* args)
 	
     while ((dirp = readdir(dp)) != NULL) {
 		if (BLI_testextensie(dirp->d_name, ".blend")) {
-			value = PyUnicode_FromString(dirp->d_name);
+			value= PyUnicode_DecodeFSDefault(dirp->d_name);
 			PyList_Append(list, value);
 			Py_DECREF(value);
 		}
@@ -923,6 +923,11 @@ static PyObject* gPySetBackgroundColor(PyObject*, PyObject* value)
 	{
 		gp_Rasterizer->SetBackColor(vec[0], vec[1], vec[2], vec[3]);
 	}
+
+	KX_WorldInfo *wi = gp_KetsjiScene->GetWorldInfo();
+	if (wi->hasWorld())
+		wi->setBackColor(vec[0], vec[1], vec[2]);
+
 	Py_RETURN_NONE;
 }
 
@@ -1393,6 +1398,7 @@ PyObject* initGameLogic(KX_KetsjiEngine *engine, KX_Scene* scene) // quick hack 
 
 	/* 7. Action actuator													   */
 	KX_MACRO_addTypesToDict(d, KX_ACTIONACT_PLAY,        ACT_ACTION_PLAY);
+	KX_MACRO_addTypesToDict(d, KX_ACTIONACT_PINGPONG,    ACT_ACTION_PINGPONG);
 	KX_MACRO_addTypesToDict(d, KX_ACTIONACT_FLIPPER,     ACT_ACTION_FLIPPER);
 	KX_MACRO_addTypesToDict(d, KX_ACTIONACT_LOOPSTOP,    ACT_ACTION_LOOP_STOP);
 	KX_MACRO_addTypesToDict(d, KX_ACTIONACT_LOOPEND,     ACT_ACTION_LOOP_END);
@@ -1826,7 +1832,7 @@ static void initPySysObjects__append(PyObject *sys_path, char *filename)
 	BLI_split_dirfile(filename, expanded, NULL); /* get the dir part of filename only */
 	BLI_path_abs(expanded, gp_GamePythonPath); /* filename from lib->filename is (always?) absolute, so this may not be needed but it wont hurt */
 	BLI_cleanup_file(gp_GamePythonPath, expanded); /* Dont use BLI_cleanup_dir because it adds a slash - BREAKS WIN32 ONLY */
-	item= PyUnicode_FromString(expanded);
+	item= PyUnicode_DecodeFSDefault(expanded);
 	
 //	printf("SysPath - '%s', '%s', '%s'\n", expanded, filename, gp_GamePythonPath);
 	
@@ -1917,7 +1923,7 @@ PyObject* initGamePlayerPythonScripting(const STR_String& progname, TPythonSecur
 		PyObject *py_argv= PyList_New(argc);
 
 		for (i=0; i<argc; i++)
-			PyList_SET_ITEM(py_argv, i, PyUnicode_FromString(argv[i]));
+			PyList_SET_ITEM(py_argv, i, PyC_UnicodeFromByte(argv[i]));
 
 		PySys_SetObject("argv", py_argv);
 		Py_DECREF(py_argv);

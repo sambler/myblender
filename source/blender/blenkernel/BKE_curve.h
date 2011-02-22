@@ -1,6 +1,4 @@
-/**
- * blenlib/BKE_curve.h (mar-2001 nzc)
- *	
+/*
  * $Id$ 
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -31,6 +29,11 @@
 #ifndef BKE_CURVE_H
 #define BKE_CURVE_H
 
+/** \file BKE_curve.h
+ *  \ingroup bke
+ *  \since March 2001
+ *  \author nzc
+ */
 struct Curve;
 struct ListBase;
 struct Object;
@@ -54,7 +57,7 @@ struct BevList;
 void unlink_curve( struct Curve *cu);
 void free_curve( struct Curve *cu);
 void BKE_free_editfont(struct Curve *cu);
-struct Curve *add_curve(char *name, int type);
+struct Curve *add_curve(const char *name, int type);
 struct Curve *copy_curve( struct Curve *cu);
 void make_local_curve( struct Curve *cu);
 short curve_type( struct Curve *cu);

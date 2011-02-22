@@ -24,12 +24,13 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-REMOVE_STRICT_FLAGS()
+remove_strict_flags()
 
-SET(INC
+set(INC
 	.
 	../blenlib
 	../blenkernel
+	../blenloader
 	../windowmanager
 	../makesdna
 	../makesrna
@@ -37,23 +38,23 @@ SET(INC
 	../../../intern/guardedalloc
 )
 
-IF(APPLE)
-	LIST(APPEND INC
+if(APPLE)
+	list(APPEND INC
 		${OPENCOLLADA_INC}/COLLADAStreamWriter
 		${OPENCOLLADA_INC}/COLLADABaseUtils
 		${OPENCOLLADA_INC}/COLLADAFramework
 		${OPENCOLLADA_INC}/COLLADASaxFrameworkLoader 
 	)
-ELSE(APPLE)
-	LIST(APPEND INC
+else()
+	list(APPEND INC
 		${OPENCOLLADA_INC}/COLLADAStreamWriter/include
 		${OPENCOLLADA_INC}/COLLADABaseUtils/include
 		${OPENCOLLADA_INC}/COLLADAFramework/include
 		${OPENCOLLADA_INC}/COLLADASaxFrameworkLoader/include 
 	)
-ENDIF(APPLE)
+endif()
 
-SET(SRC
+set(SRC
 	AnimationImporter.cpp
 	ArmatureExporter.cpp
 	ArmatureImporter.cpp
@@ -73,10 +74,35 @@ SET(SRC
 	collada.cpp
 	collada_internal.cpp
 	collada_utils.cpp
+
+	AnimationImporter.h
+	ArmatureExporter.h
+	ArmatureImporter.h
+	CameraExporter.h
+	DocumentExporter.h
+	DocumentImporter.h
+	EffectExporter.h
+	GeometryExporter.h
+	ImageExporter.h
+	InstanceWriter.h
+	LightExporter.h
+	MaterialExporter.h
+	MeshImporter.h
+	SkinInfo.h
+	TransformReader.h
+	TransformWriter.h
+	collada.h
+	collada_internal.h
+	collada_utils.h
 )
 
-IF(WITH_BUILDINFO)
-	ADD_DEFINITIONS(-DNAN_BUILDINFO)
-ENDIF(WITH_BUILDINFO)
+if(WITH_BUILDINFO)
+	add_definitions(-DNAN_BUILDINFO)
+endif()
 
-BLENDERLIB(bf_collada "${SRC}" "${INC}")
+if(CMAKE_COMPILER_IS_GNUCXX)
+	# COLLADAFWArray.h gives error with gcc 4.5
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fpermissive")
+endif()
+
+blender_add_lib(bf_collada "${SRC}" "${INC}")

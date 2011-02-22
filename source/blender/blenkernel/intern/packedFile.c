@@ -47,6 +47,7 @@
 #include "DNA_packedFile_types.h"
 
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_utildefines.h"
 #include "BKE_global.h"
@@ -162,7 +163,7 @@ PackedFile *newPackedFileMemory(void *mem, int memlen)
 	return pf;
 }
 
-PackedFile *newPackedFile(ReportList *reports, char *filename)
+PackedFile *newPackedFile(ReportList *reports, const char *filename)
 {
 	PackedFile *pf = NULL;
 	int file, filelen;
@@ -263,7 +264,7 @@ static char *find_new_name(char *name)
 	
 */
 
-int writePackedFile(ReportList *reports, char *filename, PackedFile *pf, int guimode)
+int writePackedFile(ReportList *reports, const char *filename, PackedFile *pf, int guimode)
 {
 	int file, number, remove_tmp = FALSE;
 	int ret_value = RET_OK;
@@ -331,7 +332,7 @@ PF_NOFILE		- the original file doens't exist
 
 */
 
-int checkPackedFile(char *filename, PackedFile *pf)
+int checkPackedFile(const char *filename, PackedFile *pf)
 {
 	struct stat st;
 	int ret_val, i, len, file;
@@ -458,7 +459,7 @@ int unpackVFont(ReportList *reports, VFont *vfont, int how)
 		if (newname != NULL) {
 			ret_value = RET_OK;
 			freePackedFile(vfont->packedfile);
-			vfont->packedfile = 0;
+			vfont->packedfile = NULL;
 			strcpy(vfont->name, newname);
 			MEM_freeN(newname);
 		}
@@ -484,7 +485,7 @@ int unpackSound(Main *bmain, ReportList *reports, bSound *sound, int how)
 			MEM_freeN(newname);
 
 			freePackedFile(sound->packedfile);
-			sound->packedfile = 0;
+			sound->packedfile = NULL;
 
 			sound_load(bmain, sound);
 

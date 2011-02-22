@@ -1,6 +1,4 @@
-/**
- * BKE_cloth.h
- *
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -30,6 +28,11 @@
  */
 #ifndef BKE_CLOTH_H
 #define BKE_CLOTH_H
+
+/** \file BKE_cloth.h
+ *  \ingroup bke
+ *  \author Daniel Genrich
+ */
 
 #include <float.h>
 
@@ -252,7 +255,7 @@ typedef enum
 */
 typedef struct
 {
-	char		*name;
+	const char		*name;
 	CM_SOLVER_ID	id;
 	int	( *init ) ( struct Object *ob, struct ClothModifierData *clmd );
 	int	( *solver ) ( struct Object *ob, float framenr, struct ClothModifierData *clmd, struct ListBase *effectors );

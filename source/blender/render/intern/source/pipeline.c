@@ -58,6 +58,7 @@
 #include "BLI_blenlib.h"
 #include "BLI_rand.h"
 #include "BLI_threads.h"
+#include "BLI_utildefines.h"
 
 #include "PIL_time.h"
 #include "IMB_imbuf.h"
@@ -133,12 +134,11 @@ static void result_nothing(void *UNUSED(arg), RenderResult *UNUSED(rr)) {}
 static void result_rcti_nothing(void *UNUSED(arg), RenderResult *UNUSED(rr), volatile struct rcti *UNUSED(rect)) {}
 static void stats_nothing(void *UNUSED(arg), RenderStats *UNUSED(rs)) {}
 static void float_nothing(void *UNUSED(arg), float UNUSED(val)) {}
-static void print_error(void *UNUSED(arg), char *str) {printf("ERROR: %s\n", str);}
+static void print_error(void *UNUSED(arg), const char *str) {printf("ERROR: %s\n", str);}
 static int default_break(void *UNUSED(arg)) {return G.afbreek == 1;}
 
 static void stats_background(void *UNUSED(arg), RenderStats *rs)
 {
-	char str[400], *spos= str;
 	uintptr_t mem_in_use, mmap_in_use, peak_memory;
 	float megs_used_memory, mmap_used_memory, megs_peak_memory;
 
@@ -150,24 +150,25 @@ static void stats_background(void *UNUSED(arg), RenderStats *rs)
 	mmap_used_memory= (mmap_in_use)/(1024.0*1024.0);
 	megs_peak_memory = (peak_memory)/(1024.0*1024.0);
 
-	spos+= sprintf(spos, "Fra:%d Mem:%.2fM (%.2fM, peak %.2fM) ", rs->cfra,
+	fprintf(stdout, "Fra:%d Mem:%.2fM (%.2fM, peak %.2fM) ", rs->cfra,
 				   megs_used_memory, mmap_used_memory, megs_peak_memory);
-	
+
 	if(rs->curfield)
-		spos+= sprintf(spos, "Field %d ", rs->curfield);
+		fprintf(stdout, "Field %d ", rs->curfield);
 	if(rs->curblur)
-		spos+= sprintf(spos, "Blur %d ", rs->curblur);
-	
+		fprintf(stdout, "Blur %d ", rs->curblur);
+
 	if(rs->infostr) {
-		spos+= sprintf(spos, "| %s", rs->infostr);
+		fprintf(stdout, "| %s", rs->infostr);
 	}
 	else {
 		if(rs->tothalo)
-			spos+= sprintf(spos, "Sce: %s Ve:%d Fa:%d Ha:%d La:%d", rs->scenename, rs->totvert, rs->totface, rs->tothalo, rs->totlamp);
-		else 
-			spos+= sprintf(spos, "Sce: %s Ve:%d Fa:%d La:%d", rs->scenename, rs->totvert, rs->totface, rs->totlamp);
+			fprintf(stdout, "Sce: %s Ve:%d Fa:%d Ha:%d La:%d", rs->scenename, rs->totvert, rs->totface, rs->tothalo, rs->totlamp);
+		else
+			fprintf(stdout, "Sce: %s Ve:%d Fa:%d La:%d", rs->scenename, rs->totvert, rs->totface, rs->totlamp);
 	}
-	printf("%s\n", str);
+	fputc('\n', stdout);
+	fflush(stdout);
 }
 
 void RE_FreeRenderResult(RenderResult *res)
@@ -278,7 +279,7 @@ static void pop_render_result(Render *re)
 
 /* NOTE: OpenEXR only supports 32 chars for layer+pass names
    In blender we now use max 10 chars for pass, max 20 for layer */
-static char *get_pass_name(int passtype, int channel)
+static const char *get_pass_name(int passtype, int channel)
 {
 	
 	if(passtype == SCE_PASS_COMBINED) {
@@ -457,9 +458,9 @@ static void scene_unique_exr_name(Scene *scene, char *str, int sample)
 	BLI_splitdirstring(di, fi);
 	
 	if(sample==0)
-		sprintf(name, "%s_%s.exr", fi, scene->id.name+2);
+		BLI_snprintf(name, sizeof(name), "%s_%s.exr", fi, scene->id.name+2);
 	else
-		sprintf(name, "%s_%s%d.exr", fi, scene->id.name+2, sample);
+		BLI_snprintf(name, sizeof(name), "%s_%s%d.exr", fi, scene->id.name+2, sample);
 
 	BLI_make_file_string("/", str, btempdir, name);
 }
@@ -471,7 +472,7 @@ static void render_unique_exr_name(Render *re, char *str, int sample)
 
 static void render_layer_add_pass(RenderResult *rr, RenderLayer *rl, int channels, int passtype)
 {
-	char *typestr= get_pass_name(passtype, 0);
+	const char *typestr= get_pass_name(passtype, 0);
 	RenderPass *rpass= MEM_callocN(sizeof(RenderPass), typestr);
 	int rectsize= rr->rectx*rr->recty*channels;
 	
@@ -574,7 +575,7 @@ static RenderResult *new_render_result(Render *re, rcti *partrct, int crop, int 
 		rl= MEM_callocN(sizeof(RenderLayer), "new render layer");
 		BLI_addtail(&rr->layers, rl);
 		
-		strcpy(rl->name, srl->name);
+		BLI_strncpy(rl->name, srl->name, sizeof(rl->name));
 		rl->lay= srl->lay;
 		rl->lay_zmask= srl->lay_zmask;
 		rl->layflag= srl->layflag;
@@ -921,11 +922,11 @@ static void renderresult_add_names(RenderResult *rr)
 	
 	for(rl= rr->layers.first; rl; rl= rl->next)
 		for(rpass= rl->passes.first; rpass; rpass= rpass->next)
-			strcpy(rpass->name, get_pass_name(rpass->passtype, -1));
+			BLI_strncpy(rpass->name, get_pass_name(rpass->passtype, -1), sizeof(rpass->name));
 }
 
 /* called for reading temp files, and for external engines */
-static int read_render_result_from_file(char *filename, RenderResult *rr)
+static int read_render_result_from_file(const char *filename, RenderResult *rr)
 {
 	RenderLayer *rl;
 	RenderPass *rpass;
@@ -1403,7 +1404,7 @@ void RE_test_break_cb(Render *re, void *handle, int (*f)(void *handle))
 	re->test_break= f;
 	re->tbh= handle;
 }
-void RE_error_cb(Render *re, void *handle, void (*f)(void *handle, char *str))
+void RE_error_cb(Render *re, void *handle, void (*f)(void *handle, const char *str))
 {
 	re->error= f;
 	re->erh= handle;
@@ -1494,14 +1495,15 @@ static void *do_part_thread(void *pa_v)
 float panorama_pixel_rot(Render *re)
 {
 	float psize, phi, xfac;
+	float borderfac= (float)(re->disprect.xmax - re->disprect.xmin) / (float)re->winx;
 	
 	/* size of 1 pixel mapped to viewplane coords */
-	psize= (re->viewplane.xmax-re->viewplane.xmin)/(float)re->winx;
+	psize= (re->viewplane.xmax-re->viewplane.xmin)/(float)(re->winx);
 	/* angle of a pixel */
 	phi= atan(psize/re->clipsta);
 	
 	/* correction factor for viewplane shifting, first calculate how much the viewplane angle is */
-	xfac= ((re->viewplane.xmax-re->viewplane.xmin))/(float)re->xparts;
+	xfac= borderfac*((re->viewplane.xmax-re->viewplane.xmin))/(float)re->xparts;
 	xfac= atan(0.5f*xfac/re->clipsta); 
 	/* and how much the same viewplane angle is wrapped */
 	psize= 0.5f*phi*((float)re->partx);
@@ -1532,9 +1534,9 @@ static RenderPart *find_next_pano_slice(Render *re, int *minx, rctf *viewplane)
 			
 	if(best) {
 		float phi= panorama_pixel_rot(re);
-		/* R.disprect.xmax - R.disprect.xmin rather then R.winx for border render */
+
 		R.panodxp= (re->winx - (best->disprect.xmin + best->disprect.xmax) )/2;
-		R.panodxv= ((viewplane->xmax-viewplane->xmin)*R.panodxp)/(float)(R.disprect.xmax - R.disprect.xmin);
+		R.panodxv= ((viewplane->xmax-viewplane->xmin)*R.panodxp)/(float)(re->winx);
 
 		/* shift viewplane */
 		R.viewplane.xmin = viewplane->xmin + R.panodxv;
@@ -1596,7 +1598,7 @@ static void print_part_stats(Render *re, RenderPart *pa)
 {
 	char str[64];
 	
-	sprintf(str, "%s, Part %d-%d", re->scene->id.name+2, pa->nr, re->i.totpart);
+	BLI_snprintf(str, sizeof(str), "%s, Part %d-%d", re->scene->id.name+2, pa->nr, re->i.totpart);
 	re->i.infostr= str;
 	re->stats_draw(re->sdh, &re->i);
 	re->i.infostr= NULL;
@@ -2048,8 +2050,8 @@ static void load_backbuffer(Render *re)
 		ImBuf *ibuf;
 		char name[256];
 		
-		strcpy(name, re->r.backbuf);
-		BLI_path_abs(name, G.main->name);
+		BLI_strncpy(name, re->r.backbuf, sizeof(name));
+		BLI_path_abs(name, re->main->name);
 		BLI_path_frame(name, re->r.cfra, 0);
 		
 		if(re->backbuf) {
@@ -2205,6 +2207,7 @@ static void ntree_render_scenes(Render *re)
 {
 	bNode *node;
 	int cfra= re->scene->r.cfra;
+	int restore_scene= 0;
 	
 	if(re->scene->nodetree==NULL) return;
 	
@@ -2216,12 +2219,19 @@ static void ntree_render_scenes(Render *re)
 		if(node->type==CMP_NODE_R_LAYERS) {
 			if(node->id && node->id != (ID *)re->scene) {
 				if(node->id->flag & LIB_DOIT) {
-					render_scene(re, (Scene *)node->id, cfra);
+					Scene *scene = (Scene*)node->id;
+
+					render_scene(re, scene, cfra);
+					restore_scene= (scene != re->scene);
 					node->id->flag &= ~LIB_DOIT;
 				}
 			}
 		}
 	}
+
+	/* restore scene if we rendered another last */
+	if(restore_scene)
+		set_scene_bg(re->main, re->scene);
 }
 
 /* helper call to detect if theres a composite with render-result node */
@@ -2329,12 +2339,17 @@ static void do_merge_fullsample(Render *re, bNodeTree *ntree)
 	BLI_rw_mutex_unlock(&re->resultmutex);
 }
 
+/* called externally, via compositor */
 void RE_MergeFullSample(Render *re, Main *bmain, Scene *sce, bNodeTree *ntree)
 {
 	Scene *scene;
 	bNode *node;
 
+	/* default start situation */
+	G.afbreek= 0;
+	
 	re->main= bmain;
+	re->scene= sce;
 	
 	/* first call RE_ReadRenderResult on every renderlayer scene. this creates Render structs */
 	
@@ -2472,6 +2487,7 @@ static void do_render_seq(Render * re)
 	struct ImBuf *ibuf;
 	RenderResult *rr; /* don't assign re->result here as it might change during give_ibuf_seq */
 	int cfra = re->r.cfra;
+	SeqRenderData context;
 
 	re->i.cfra= cfra;
 
@@ -2482,7 +2498,11 @@ static void do_render_seq(Render * re)
 
 	recurs_depth++;
 
-	ibuf= give_ibuf_seq(re->main, re->scene, re->result->rectx, re->result->recty, cfra, 0, 100.0);
+	context = seq_new_render_data(re->main, re->scene,
+				      re->result->rectx, re->result->recty, 
+				      100);
+
+	ibuf = give_ibuf_seq(context, cfra, 0);
 
 	recurs_depth--;
 
@@ -2658,7 +2678,7 @@ static int check_valid_camera(Scene *scene)
 	return 1;
 }
 
-int RE_is_rendering_allowed(Scene *scene, void *erh, void (*error)(void *handle, char *str))
+int RE_is_rendering_allowed(Scene *scene, void *erh, void (*error)(void *handle, const char *str))
 {
 	SceneRenderLayer *srl;
 	
@@ -2712,10 +2732,16 @@ int RE_is_rendering_allowed(Scene *scene, void *erh, void (*error)(void *handle,
 				if(node->type==CMP_NODE_COMPOSITE)
 					break;
 			
-			
 			if(node==NULL) {
 				error(erh, "No Render Output Node in Scene");
 				return 0;
+			}
+			
+			if(scene->r.scemode & R_FULL_SAMPLE) {
+				if(composite_needs_render(scene)==0) {
+					error(erh, "Full Sample AA not supported without 3d rendering");
+					return 0;
+				}
 			}
 		}
 	}
@@ -2774,7 +2800,7 @@ static void update_physics_cache(Render *re, Scene *scene, int UNUSED(anim_init)
 	baker.break_data = re->tbh;
 	baker.progressbar = NULL;
 
-	BKE_ptcache_make_cache(&baker);
+	BKE_ptcache_bake(&baker);
 }
 /* evaluating scene options for general Blender render */
 static int render_initialize_from_main(Render *re, Main *bmain, Scene *scene, SceneRenderLayer *srl, unsigned int lay, int anim, int anim_init)
@@ -3238,7 +3264,7 @@ int RE_engine_test_break(RenderEngine *engine)
 	return re->test_break(re->tbh);
 }
 
-void RE_engine_update_stats(RenderEngine *engine, char *stats, char *info)
+void RE_engine_update_stats(RenderEngine *engine, const char *stats, const char *info)
 {
 	Render *re= engine->re;
 
@@ -3251,7 +3277,7 @@ void RE_engine_update_stats(RenderEngine *engine, char *stats, char *info)
 
 /* loads in image into a result, size must match
  * x/y offsets are only used on a partial copy when dimensions dont match */
-void RE_layer_load_from_file(RenderLayer *layer, ReportList *reports, char *filename)
+void RE_layer_load_from_file(RenderLayer *layer, ReportList *reports, const char *filename, int x, int y)
 {
 	ImBuf *ibuf = IMB_loadiffname(filename, IB_rect);
 
@@ -3262,7 +3288,7 @@ void RE_layer_load_from_file(RenderLayer *layer, ReportList *reports, char *file
 
 			memcpy(layer->rectf, ibuf->rect_float, sizeof(float)*4*layer->rectx*layer->recty);
 		} else {
-			if ((ibuf->x >= layer->rectx) && (ibuf->y >= layer->recty)) {
+			if ((ibuf->x - x >= layer->rectx) && (ibuf->y - y >= layer->recty)) {
 				ImBuf *ibuf_clip;
 
 				if(ibuf->rect_float==NULL)
@@ -3270,7 +3296,7 @@ void RE_layer_load_from_file(RenderLayer *layer, ReportList *reports, char *file
 
 				ibuf_clip = IMB_allocImBuf(layer->rectx, layer->recty, 32, IB_rectfloat);
 				if(ibuf_clip) {
-					IMB_rectcpy(ibuf_clip, ibuf, 0,0, 0,0, layer->rectx, layer->recty);
+					IMB_rectcpy(ibuf_clip, ibuf, 0,0, x,y, layer->rectx, layer->recty);
 
 					memcpy(layer->rectf, ibuf_clip->rect_float, sizeof(float)*4*layer->rectx*layer->recty);
 					IMB_freeImBuf(ibuf_clip);
@@ -3291,7 +3317,7 @@ void RE_layer_load_from_file(RenderLayer *layer, ReportList *reports, char *file
 	}
 }
 
-void RE_result_load_from_file(RenderResult *result, ReportList *reports, char *filename)
+void RE_result_load_from_file(RenderResult *result, ReportList *reports, const char *filename)
 {
 	if(!read_render_result_from_file(filename, result)) {
 		BKE_reportf(reports, RPT_ERROR, "RE_result_rect_from_file: failed to load '%s'\n", filename);

@@ -2,62 +2,120 @@
  *
  * \section intro Introduction
  *
- * Blender is an integrated 3d package, which features:
- *  - modeling
- *  - animation
- *  - texturing
- *  - compositing
- *  - rendering
- *  - scripting
- *  - game creation
+ * Blender is an integrated 3d package.
  *
  * These pages document the source code of blender.
  *
- * \section sects Main sections of the blender code
+ * For more information on using Blender browse to http://www.blender.org
  *
- *  The following sections are the broad categories into which the various modules
- *  belong.
- *
- *  - \ref mainmodule
- *  - \ref render
- *  - \ref meshedit
- *  - \ref texture
- *  - \ref compositor
- *  - \ref scripts
- *  - \ref gameengine
- *
- * \section GUI
- *  - \ref gui
- *  - \ref hotkeys
- *  - \ref toolbox
- *
- * \section Libraries and Wrappers
- *  - GHOST API: \ref GHOST_C-api.h
- *  - \ref imbuf
- *
- * \section Miscellaneous
- *  - \ref undoc
  */
 
-/** \defgroup mainmodule Main Module */
-/** \defgroup defaultconfig Default and Configuration
- *  \ingroup mainmodule
+/** \defgroup intern Internal libraries
+ *  \section internabout Internal libraries
+ *  Blender comes with some of its dependencies
+ *  directly included in the codebase. Libraries
+ *  that are in the \c intern/ folder are maintained
+ *  as part of the normal development process.
  */
 
-/** \defgroup render Rendering Module */
-/** \defgroup meshedit Mesh Editing Module */
-/** \defgroup texture Textureing */
+/** \defgroup MEM Guarded memory (de)allocation
+ *  \ingroup intern
+ */
+
+/** \defgroup extern External libraries
+ *  \section externabout External libraries
+ *  As with \ref intern these libraries are
+ *  provided in the Blender codebase. This is
+ *  to make building Blender easier. The main
+ *  development of these libraries is \b not part
+ *  of the normal Blender development process, but
+ *  each of the library is developed separately.
+ *  Whenever deemed necessary libraries in \c extern/
+ *  folder are updated.
+ *
+ */
+/** \defgroup blenderplayer Blender Player */
+
+/** \defgroup render Rendering */
+/** \defgroup meshedit Mesh Editing */
+/** \defgroup texture Texturing */
 /** \defgroup compositor Compositing */
+
 /** \defgroup scripts Scripting */
+
+/** \defgroup python Python
+ *  \ingroup scripts
+ */
+
 /** \defgroup gameengine Game Engine */
 
+/** \defgroup audaspace Audaspace
+ *  \ingroup intern undoc
+ *  \todo add to doxygen
+ */
+
+/** \defgroup core core */
+
+/** \defgroup bke blenkernel
+ *  \ingroup core
+ */
+
+/** \defgroup bli blenlib
+ *  \ingroup core
+ */
+
+/** \defgroup nodes nodes
+ *  \ingroup core
+ */
+
+/** \defgroup modifiers modifiers
+ *  \ingroup core
+ */
+
+/** \defgroup data DNA, RNA and .blend access*/
+
+/** \defgroup GHOST GHOST API */
+
+/** \defgroup gpu GPU */
+
+/** \defgroup DNA sDNA
+ *  \ingroup data
+ */
+/** \defgroup RNA RNA
+ *  \ingroup data
+ */
+
+/** \defgroup readwrite .blend read and write functions
+ *  \ingroup data
+ */
+
+/** \defgroup readblenfile readblenfile
+ *  \ingroup data
+ */
+
 /** \defgroup gui GUI */
-/** \defgroup hotkeys Hotkeys
+
+/** \defgroup wm windowmanager
  *  \ingroup gui
  */
-/** \defgroup toolbox Toolbox
+
+/** \defgroup editors Editors */
+
+/** \defgroup editorui Interface and Widgets
  *  \ingroup gui
+ */
+
+/** \defgroup externformats external formats */
+
+/** \defgroup collada COLLADA
+ *  \ingroup externformats
+ */
+
+/** \defgroup avi AVI
+ *  \ingroup externformats
  */
 
 /** \defgroup imbuf IMage Buffer */
-/** \defgroup undoc Undocumented */
+
+/** \defgroup undoc Undocumented
+ *  \brief Modules and libraries that are still undocumented, or lacking proper integration into the doxygen system, are marked in this group. */

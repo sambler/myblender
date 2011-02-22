@@ -34,12 +34,13 @@
 
 #include "BLI_math.h"
 #include "BLI_edgehash.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_cdderivedmesh.h"
 #include "BKE_mesh.h"
 #include "BKE_particle.h"
 #include "BKE_deform.h"
-#include "BKE_utildefines.h"
+
 
 #include "MOD_modifiertypes.h"
 
@@ -126,7 +127,7 @@ static void dm_calc_normal(DerivedMesh *dm, float (*temp_nors)[3])
 		}
 
 		for(edge_iter = BLI_edgehashIterator_new(edge_hash); !BLI_edgehashIterator_isDone(edge_iter); BLI_edgehashIterator_step(edge_iter)) {
-			/* Get the edge vert indicies, and edge value (the face indicies that use it)*/
+			/* Get the edge vert indices, and edge value (the face indices that use it)*/
 			BLI_edgehashIterator_getKey(edge_iter, (int*)&ed_v1, (int*)&ed_v2);
 			edge_ref = BLI_edgehashIterator_getValue(edge_iter);
 
@@ -290,7 +291,7 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 
 		ehi= BLI_edgehashIterator_new(edgehash);
 		for(; !BLI_edgehashIterator_isDone(ehi); BLI_edgehashIterator_step(ehi)) {
-			int eidx= GET_INT_FROM_POINTER(BLI_edgehashIterator_getValue(ehi));
+			eidx= GET_INT_FROM_POINTER(BLI_edgehashIterator_getValue(ehi));
 			if(edge_users[eidx] >= 0) {
 				BLI_edgehashIterator_getKey(ehi, &v1, &v2);
 				orig_mvert[v1].flag |= ME_VERT_TMP_TAG;
@@ -407,7 +408,7 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 		float *vert_angles= MEM_callocN(sizeof(float) * numVerts * 2, "mod_solid_pair"); /* 2 in 1 */
 		float *vert_accum= vert_angles + numVerts;
 		float face_angles[4];
-		int i, j, vidx;
+		int j, vidx;
 
 		face_nors = CustomData_get_layer(&dm->faceData, CD_NORMAL);
 		if(!face_nors) {
@@ -649,18 +650,19 @@ ModifierTypeInfo modifierType_Solidify = {
 							| eModifierTypeFlag_EnableInEditmode,
 
 	/* copyData */          copyData,
-	/* deformVerts */       0,
-	/* deformVertsEM */     0,
-	/* deformMatricesEM */  0,
+	/* deformVerts */       NULL,
+	/* deformMatrices */    NULL,
+	/* deformVertsEM */     NULL,
+	/* deformMatricesEM */  NULL,
 	/* applyModifier */     applyModifier,
 	/* applyModifierEM */   applyModifierEM,
 	/* initData */          initData,
 	/* requiredDataMask */  requiredDataMask,
-	/* freeData */          0,
-	/* isDisabled */        0,
-	/* updateDepgraph */    0,
-	/* dependsOnTime */     0,
-	/* dependsOnNormals */	0,
-	/* foreachObjectLink */ 0,
-	/* foreachIDLink */     0,
+	/* freeData */          NULL,
+	/* isDisabled */        NULL,
+	/* updateDepgraph */    NULL,
+	/* dependsOnTime */     NULL,
+	/* dependsOnNormals */	NULL,
+	/* foreachObjectLink */ NULL,
+	/* foreachIDLink */     NULL
 };

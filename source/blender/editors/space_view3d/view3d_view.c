@@ -35,6 +35,8 @@
 
 #include "BLI_math.h"
 #include "BLI_rect.h"
+#include "BLI_listbase.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_anim.h"
 #include "BKE_action.h"
@@ -67,15 +69,21 @@
    opengl drawing context */
 void view3d_operator_needs_opengl(const bContext *C)
 {
+	wmWindow *win = CTX_wm_window(C);
 	ARegion *ar= CTX_wm_region(C);
+	
+	view3d_region_operator_needs_opengl(win, ar);
+}
 
+void view3d_region_operator_needs_opengl(wmWindow *win, ARegion *ar)
+{
 	/* for debugging purpose, context should always be OK */
-	if(ar->regiontype!=RGN_TYPE_WINDOW)
-		printf("view3d_operator_needs_opengl error, wrong region\n");
+	if ((ar == NULL) || (ar->regiontype!=RGN_TYPE_WINDOW))
+		printf("view3d_region_operator_needs_opengl error, wrong region\n");
 	else {
 		RegionView3D *rv3d= ar->regiondata;
 		
-		wmSubWindowSet(CTX_wm_window(C), ar->swinid);
+		wmSubWindowSet(win, ar->swinid);
 		glMatrixMode(GL_PROJECTION);
 		glLoadMatrixf(rv3d->winmat);
 		glMatrixMode(GL_MODELVIEW);
@@ -419,7 +427,7 @@ static int view3d_setcameratoview_exec(bContext *C, wmOperator *UNUSED(op))
 
 }
 
-int view3d_setcameratoview_poll(bContext *C)
+static int view3d_setcameratoview_poll(bContext *C)
 {
 	View3D *v3d = CTX_wm_view3d(C);
 	RegionView3D *rv3d= CTX_wm_region_view3d(C);
@@ -469,6 +477,13 @@ static int view3d_setobjectascamera_exec(bContext *C, wmOperator *UNUSED(op))
 	return OPERATOR_FINISHED;
 }
 
+static int region3d_unlocked_poll(bContext *C)
+{
+	RegionView3D *rv3d= CTX_wm_region_view3d(C);
+	return (rv3d && rv3d->viewlock==0);
+}
+
+
 void VIEW3D_OT_object_as_camera(wmOperatorType *ot)
 {
 	
@@ -479,7 +494,7 @@ void VIEW3D_OT_object_as_camera(wmOperatorType *ot)
 	
 	/* api callbacks */
 	ot->exec= view3d_setobjectascamera_exec;	
-	ot->poll= ED_operator_region_view3d_active;
+	ot->poll= region3d_unlocked_poll;
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
@@ -1629,9 +1644,8 @@ void VIEW3D_OT_localview(wmOperatorType *ot)
 #ifdef WITH_GAMEENGINE
 
 static ListBase queue_back;
-static void SaveState(bContext *C)
+static void SaveState(bContext *C, wmWindow *win)
 {
-	wmWindow *win= CTX_wm_window(C);
 	Object *obact = CTX_data_active_object(C);
 	
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
@@ -1646,9 +1660,8 @@ static void SaveState(bContext *C)
 	//XXX waitcursor(1);
 }
 
-static void RestoreState(bContext *C)
+static void RestoreState(bContext *C, wmWindow *win)
 {
-	wmWindow *win= CTX_wm_window(C);
 	Object *obact = CTX_data_active_object(C);
 	
 	if(obact && obact->mode & OB_MODE_TEXTURE_PAINT)
@@ -1662,7 +1675,8 @@ static void RestoreState(bContext *C)
 	//XXX waitcursor(0);
 	//XXX G.qual= 0;
 	
-	win->queue= queue_back;
+	if(win) /* check because closing win can set to NULL */
+		win->queue= queue_back;
 	
 	GPU_state_init();
 	GPU_set_tpage(NULL, 0);
@@ -1720,7 +1734,7 @@ extern void StartKetsjiShell(struct bContext *C, struct ARegion *ar, rcti *cam_f
 
 #endif // WITH_GAMEENGINE
 
-int game_engine_poll(bContext *C)
+static int game_engine_poll(bContext *C)
 {
 	/* we need a context and area to launch BGE
 	it's a temporary solution to avoid crash at load time
@@ -1742,7 +1756,6 @@ int ED_view3d_context_activate(bContext *C)
 	bScreen *sc= CTX_wm_screen(C);
 	ScrArea *sa= CTX_wm_area(C);
 	ARegion *ar;
-	RegionView3D *rv3d;
 
 	/* sa can be NULL when called from python */
 	if(sa==NULL || sa->spacetype != SPACE_VIEW3D)
@@ -1763,7 +1776,6 @@ int ED_view3d_context_activate(bContext *C)
 	// bad context switch ..
 	CTX_wm_area_set(C, sa);
 	CTX_wm_region_set(C, ar);
-	rv3d= ar->regiondata;
 
 	return 1;
 }
@@ -1809,16 +1821,25 @@ static int game_engine_exec(bContext *C, wmOperator *op)
 	}
 
 
-	SaveState(C);
+	SaveState(C, prevwin);
 
 	StartKetsjiShell(C, ar, &cam_frame, 1);
+
+	/* window wasnt closed while the BGE was running */
+	if(BLI_findindex(&CTX_wm_manager(C)->windows, prevwin) == -1) {
+		prevwin= NULL;
+		CTX_wm_window_set(C, NULL);
+	}
 	
-	/* restore context, in case it changed in the meantime, for
-	   example by working in another window or closing it */
-	CTX_wm_region_set(C, prevar);
-	CTX_wm_window_set(C, prevwin);
-	CTX_wm_area_set(C, prevsa);
-	RestoreState(C);
+	if(prevwin) {
+		/* restore context, in case it changed in the meantime, for
+		   example by working in another window or closing it */
+		CTX_wm_region_set(C, prevar);
+		CTX_wm_window_set(C, prevwin);
+		CTX_wm_area_set(C, prevsa);
+	}
+
+	RestoreState(C, prevwin);
 
 	//XXX restore_all_scene_cfra(scene_cfra_store);
 	set_scene_bg(CTX_data_main(C), startscene);

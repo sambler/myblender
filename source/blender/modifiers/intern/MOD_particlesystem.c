@@ -34,7 +34,9 @@
 
 #include "DNA_material_types.h"
 
-#include "BKE_utildefines.h"
+#include "BLI_utildefines.h"
+
+
 #include "BKE_cdderivedmesh.h"
 #include "BKE_material.h"
 #include "BKE_modifier.h"
@@ -78,25 +80,20 @@ static void copyData(ModifierData *md, ModifierData *target)
 	tpsmd->psys = psmd->psys;
 }
 
-static CustomDataMask requiredDataMask(Object *ob, ModifierData *md)
+static CustomDataMask requiredDataMask(Object *UNUSED(ob), ModifierData *md)
 {
 	ParticleSystemModifierData *psmd= (ParticleSystemModifierData*) md;
 	CustomDataMask dataMask = 0;
-	Material *ma;
 	MTex *mtex;
 	int i;
 
 	if(!psmd->psys->part)
 		return 0;
 
-	ma= give_current_material(ob, psmd->psys->part->omat);
-	if(ma) {
-		for(i=0; i<MAX_MTEX; i++) {
-			mtex=ma->mtex[i];
-			if(mtex && (ma->septex & (1<<i))==0)
-				if(mtex->pmapto && (mtex->texco & TEXCO_UV))
-					dataMask |= CD_MASK_MTFACE;
-		}
+	for(i=0; i<MAX_MTEX; i++) {
+		mtex = psmd->psys->part->mtex[i];
+		if(mtex && mtex->mapto && (mtex->texco & TEXCO_UV))
+			dataMask |= CD_MASK_MTFACE;
 	}
 
 	if(psmd->psys->part->tanfac!=0.0)
@@ -112,7 +109,7 @@ static CustomDataMask requiredDataMask(Object *ob, ModifierData *md)
 	
 	/* particles only need this if they are after a non deform modifier, and
 	* the modifier stack will only create them in that case. */
-	dataMask |= CD_MASK_ORIGSPACE;
+	dataMask |= CD_MASK_ORIGSPACE|CD_MASK_ORIGINDEX;
 
 	dataMask |= CD_MASK_ORCO;
 	
@@ -154,6 +151,10 @@ static void deformVerts(ModifierData *md, Object *ob,
 		psmd->dm->needsFree = 1;
 		psmd->dm->release(psmd->dm);
 	}
+	else if(psmd->flag & eParticleSystemFlag_file_loaded) {
+		/* in file read dm just wasn't saved in file so no need to reset everything */
+		psmd->flag &= ~eParticleSystemFlag_file_loaded;
+	}
 	else {
 		/* no dm before, so recalc particles fully */
 		psys->recalc |= PSYS_RECALC_RESET;
@@ -176,7 +177,6 @@ static void deformVerts(ModifierData *md, Object *ob,
 	if(psmd->dm->getNumVerts(psmd->dm)!=psmd->totdmvert ||
 		  psmd->dm->getNumEdges(psmd->dm)!=psmd->totdmedge ||
 		  psmd->dm->getNumFaces(psmd->dm)!=psmd->totdmface){
-		/* in file read dm hasn't really changed but just wasn't saved in file */
 
 		psys->recalc |= PSYS_RECALC_RESET;
 
@@ -224,6 +224,7 @@ ModifierTypeInfo modifierType_ParticleSystem = {
 	/* copyData */          copyData,
 	/* deformVerts */       deformVerts,
 	/* deformVertsEM */     0 /* deformVertsEM */ ,
+	/* deformMatrices */    0,
 	/* deformMatricesEM */  0,
 	/* applyModifier */     0,
 	/* applyModifierEM */   0,

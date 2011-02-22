@@ -40,6 +40,7 @@
 
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
@@ -49,6 +50,7 @@
 #include "DNA_curve_types.h"
 #include "DNA_key_types.h"
 
+#include "BKE_animsys.h"
 #include "BKE_anim.h"
 #include "BKE_cdderivedmesh.h"
 #include "BKE_displist.h"
@@ -59,7 +61,7 @@
 #include "BKE_main.h"
 #include "BKE_mesh.h"
 #include "BKE_modifier.h"
-#include "BKE_utildefines.h"
+
 #include "BKE_deform.h"
 
 //XXX #include "BIF_editdeform.h"
@@ -181,7 +183,7 @@ void resizelattice(Lattice *lt, int uNew, int vNew, int wNew, Object *ltOb)
 	MEM_freeN(vertexCos);
 }
 
-Lattice *add_lattice(char *name)
+Lattice *add_lattice(const char *name)
 {
 	Lattice *lt;
 	
@@ -203,10 +205,6 @@ Lattice *copy_lattice(Lattice *lt)
 
 	ltn= copy_libblock(lt);
 	ltn->def= MEM_dupallocN(lt->def);
-		
-#if 0 // XXX old animation system
-	id_us_plus((ID *)ltn->ipo);
-#endif // XXX old animation system
 
 	ltn->key= copy_key(ltn->key);
 	if(ltn->key) ltn->key->from= (ID *)ltn;
@@ -233,6 +231,12 @@ void free_lattice(Lattice *lt)
 		MEM_freeN(editlt);
 		MEM_freeN(lt->editlatt);
 	}
+	
+	/* free animation data */
+	if (lt->adt) {
+		BKE_free_animdata(&lt->id);
+		lt->adt= NULL;
+	}
 }
 
 
@@ -247,11 +251,11 @@ void make_local_lattice(Lattice *lt)
 	 * - mixed: make copy
 	 */
 	
-	if(lt->id.lib==0) return;
+	if(lt->id.lib==NULL) return;
 	if(lt->id.us==1) {
-		lt->id.lib= 0;
+		lt->id.lib= NULL;
 		lt->id.flag= LIB_LOCAL;
-		new_id(0, (ID *)lt, 0);
+		new_id(NULL, (ID *)lt, NULL);
 		return;
 	}
 	
@@ -265,9 +269,9 @@ void make_local_lattice(Lattice *lt)
 	}
 	
 	if(local && lib==0) {
-		lt->id.lib= 0;
+		lt->id.lib= NULL;
 		lt->id.flag= LIB_LOCAL;
-		new_id(0, (ID *)lt, 0);
+		new_id(NULL, (ID *)lt, NULL);
 	}
 	else if(local && lib) {
 		ltn= copy_lattice(lt);
@@ -277,7 +281,7 @@ void make_local_lattice(Lattice *lt)
 		while(ob) {
 			if(ob->data==lt) {
 				
-				if(ob->id.lib==0) {
+				if(ob->id.lib==NULL) {
 					ob->data= ltn;
 					ltn->id.us++;
 					lt->id.us--;

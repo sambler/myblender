@@ -16,14 +16,50 @@ Variables = SCons.Variables
 BoolVariable = SCons.Variables.BoolVariable
 
 def get_version():
+    import re
+
     fname = os.path.join(os.path.dirname(__file__), "..", "..", "..", "source", "blender", "blenkernel", "BKE_blender.h")
+    ver_base = None
+    ver_char = None
+    ver_cycle = None
+
+    re_ver = re.compile("^#\s*define\s+BLENDER_VERSION\s+([0-9]+)")
+    re_ver_char = re.compile("^#\s*define\s+BLENDER_VERSION_CHAR\s*(\S*)") # optional arg
+    re_ver_cycle = re.compile("^#\s*define\s+BLENDER_VERSION_CYCLE\s*(\S*)") # optional arg
+
     for l in open(fname, "r"):
-        if "BLENDER_VERSION" in l:
-            ver = int(l.split()[-1])
-            return "%d.%d" % (ver / 100, ver % 100)
+        match = re_ver.match(l)
+        if match:
+            ver = int(match.group(1))
+            ver_base = "%d.%d" % (ver / 100, ver % 100)
+
+        match = re_ver_char.match(l)
+        if match:
+            ver_char = match.group(1)
+            if ver_char == "BLENDER_CHAR_VERSION":
+                ver_char = ""
+
+        match = re_ver_cycle.match(l)
+        if match:
+            ver_cycle = match.group(1)
+            if ver_cycle == "BLENDER_CYCLE_VERSION":
+                ver_cycle = ""
+
+        if (ver_base is not None) and (ver_char is not None) and (ver_cycle is not None):
+            # eg '2.56a-beta'
+            if ver_cycle:
+                ver_display = "%s%s-%s" % (ver_base, ver_char, ver_cycle)
+            else:
+                ver_display = "%s%s" % (ver_base, ver_char)  # assume release
+
+            return ver_base, ver_display
+
     raise Exception("%s: missing version string" % fname)
 
-VERSION = get_version() # This is used in creating the local config directories
+
+# This is used in creating the local config directories
+VERSION, VERSION_DISPLAY = get_version()
+
 
 def print_arguments(args, bc):
     if len(args):
@@ -92,8 +128,7 @@ def validate_arguments(args, bc):
             'WITH_BF_RAYOPTIMIZATION',
             'BF_RAYOPTIMIZATION_SSE_FLAGS',
             'BF_NO_ELBEEM',
-	    'WITH_BF_CXX_GUARDEDALLOC',
-            'BF_VCREDIST' # Windows-only, and useful only when creating installer
+            'WITH_BF_CXX_GUARDEDALLOC'
             ]
     
     # Have options here that scons expects to be lists
@@ -454,8 +489,7 @@ def read_opts(env, cfg, args):
         
         (BoolVariable('WITH_BF_RAYOPTIMIZATION', 'Enable raytracer SSE/SIMD optimization.', False)),
         ('BF_RAYOPTIMIZATION_SSE_FLAGS', 'SSE flags', ''),
-        (BoolVariable('WITH_BF_CXX_GUARDEDALLOC', 'Enable GuardedAlloc for C++ memory allocation tracking.', False)),
-        ('BF_VCREDIST', 'Full path to vcredist', '')
+        (BoolVariable('WITH_BF_CXX_GUARDEDALLOC', 'Enable GuardedAlloc for C++ memory allocation tracking.', False))
     ) # end of opts.AddOptions()
 
     return localopts
@@ -504,11 +538,6 @@ def NSIS_Installer(target=None, source=None, env=None):
                 for f in df:
                     outfile = os.path.join(dp,f)
                     datafiles += '  File '+outfile + "\n"
-    
-    os.chdir("release")
-    v = open("VERSION")
-    version = v.read()[:-1]    
-    v.close()
 
     #### change to suit install dir ####
     inst_dir = install_base_dir + env['BF_INSTALLDIR']
@@ -522,7 +551,7 @@ def NSIS_Installer(target=None, source=None, env=None):
 
     # var replacements
     ns_cnt = string.replace(ns_cnt, "[DISTDIR]", os.path.normpath(inst_dir+os.sep))
-    ns_cnt = string.replace(ns_cnt, "[VERSION]", version)
+    ns_cnt = string.replace(ns_cnt, "[VERSION]", VERSION_DISPLAY)
     ns_cnt = string.replace(ns_cnt, "[SHORTVERSION]", VERSION)
     ns_cnt = string.replace(ns_cnt, "[RELDIR]", os.path.normpath(rel_dir))
     ns_cnt = string.replace(ns_cnt, "[BITNESS]", bitness)
@@ -547,12 +576,6 @@ def NSIS_Installer(target=None, source=None, env=None):
 
     ns_cnt = string.replace(ns_cnt, "[DODATAFILES]", datafiles)
 
-    # Setup vcredist part
-    vcredist = "File \""+env['BF_VCREDIST'] + "\"\n"
-    vcredist += "  ExecWait '\"$TEMP\\" + os.path.basename(env['BF_VCREDIST']) + "\" /q'\n"
-    vcredist += "  Delete \"$TEMP\\" + os.path.basename(env['BF_VCREDIST'])+"\""
-    ns_cnt = string.replace(ns_cnt, "[VCREDIST]", vcredist)
-
     tmpnsi = os.path.normpath(install_base_dir+os.sep+env['BF_BUILDDIR']+os.sep+"00.blender_tmp.nsi")
     new_nsis = open(tmpnsi, 'w')
     new_nsis.write(ns_cnt)
@@ -576,3 +599,24 @@ def NSIS_Installer(target=None, source=None, env=None):
         print data.strip().split("\n")[-1]
     return rv
 
+def check_environ():
+    problematic_envvars = ""
+    for i in os.environ:
+        try:
+            os.environ[i].decode('ascii')
+        except UnicodeDecodeError:
+            problematic_envvars = problematic_envvars + "%s = %s\n" % (i, os.environ[i])
+    if len(problematic_envvars)>0:
+        print("================\n\n")
+        print("@@ ABORTING BUILD @@\n")
+        print("PROBLEM DETECTED WITH ENVIRONMENT")
+        print("---------------------------------\n\n")
+        print("A problem with one or more environment variable was found")
+        print("Their value contain non-ascii characters. Check the below")
+        print("list and override them locally to be ASCII-clean by doing")
+        print("'set VARNAME=cleanvalue' on the command-line prior to")
+        print("starting the build process:\n")
+        print(problematic_envvars)
+        return False
+    else:
+        return True

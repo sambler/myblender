@@ -19,9 +19,10 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-SET(INC
+set(INC
 	../include
 	../../blenkernel
+	../../blenloader
 	../../blenlib
 	../../makesdna
 	../../makesrna
@@ -29,12 +30,14 @@ SET(INC
 	../../../../intern/guardedalloc
 )
 
-SET(SRC
+set(SRC
 	action_draw.c
 	action_edit.c
 	action_ops.c
 	action_select.c
 	space_action.c
+
+	action_intern.h
 )
 
-BLENDERLIB(bf_editor_space_action "${SRC}" "${INC}")
+blender_add_lib(bf_editor_space_action "${SRC}" "${INC}")

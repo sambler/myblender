@@ -37,10 +37,13 @@
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
 #include "BLI_rand.h"
+#include "BLI_utildefines.h"
 
+#include "BKE_object.h"
 #include "BKE_context.h"
 #include "BKE_screen.h"
 
+#include "ED_space_api.h"
 #include "ED_screen.h"
 #include "ED_object.h"
 
@@ -195,12 +198,14 @@ static SpaceLink *view3d_new(const bContext *C)
 	v3d->grid= 1.0f;
 	v3d->gridlines= 16;
 	v3d->gridsubdiv = 10;
-	v3d->drawtype= OB_WIRE;
+	v3d->drawtype= OB_SOLID;
 	
 	v3d->gridflag |= V3D_SHOW_X;
 	v3d->gridflag |= V3D_SHOW_Y;
 	v3d->gridflag |= V3D_SHOW_FLOOR;
 	v3d->gridflag &= ~V3D_SHOW_Z;
+	
+	v3d->flag |= V3D_SELECT_OUTLINE;
 	
 	v3d->lens= 35.0f;
 	v3d->near= 0.01f;
@@ -317,6 +322,10 @@ static void view3d_main_area_init(wmWindowManager *wm, ARegion *ar)
 
 	/* object ops. */
 	
+	/* important to be before Pose keymap since they can both be enabled at once */
+	keymap= WM_keymap_find(wm->defaultconf, "Face Mask", 0, 0);
+	WM_event_add_keymap_handler(&ar->handlers, keymap);
+	
 	/* pose is not modal, operator poll checks for this */
 	keymap= WM_keymap_find(wm->defaultconf, "Pose", 0, 0);
 	WM_event_add_keymap_handler(&ar->handlers, keymap);
@@ -331,9 +340,6 @@ static void view3d_main_area_init(wmWindowManager *wm, ARegion *ar)
 	WM_event_add_keymap_handler(&ar->handlers, keymap);
 
 	keymap= WM_keymap_find(wm->defaultconf, "Weight Paint", 0, 0);
-	WM_event_add_keymap_handler(&ar->handlers, keymap);
-	
-	keymap= WM_keymap_find(wm->defaultconf, "Face Mask", 0, 0);
 	WM_event_add_keymap_handler(&ar->handlers, keymap);
 
 	keymap= WM_keymap_find(wm->defaultconf, "Sculpt", 0, 0);
@@ -478,7 +484,7 @@ static void view3d_dropboxes(void)
 	WM_dropbox_add(lb, "OBJECT_OT_add_named_cursor", view3d_ob_drop_poll, view3d_ob_drop_copy);
 	WM_dropbox_add(lb, "OBJECT_OT_drop_named_material", view3d_mat_drop_poll, view3d_id_drop_copy);
 	WM_dropbox_add(lb, "MESH_OT_drop_named_image", view3d_ima_ob_drop_poll, view3d_id_path_drop_copy);
-	WM_dropbox_add(lb, "VIEW3D_OT_add_background_image", view3d_ima_bg_drop_poll, view3d_id_path_drop_copy);
+	WM_dropbox_add(lb, "VIEW3D_OT_background_image_add", view3d_ima_bg_drop_poll, view3d_id_path_drop_copy);
 }
 
 
@@ -620,6 +626,11 @@ static void view3d_main_area_listener(ARegion *ar, wmNotifier *wmn)
 					ED_region_tag_redraw(ar);
 					break;
 			}
+			switch(wmn->action) {
+				case NA_ADDED:
+					ED_region_tag_redraw(ar);
+					break;
+			}
 			break;
 		case NC_GEOM:
 			switch(wmn->data) {
@@ -696,6 +707,7 @@ static void view3d_main_area_listener(ARegion *ar, wmNotifier *wmn)
 			switch(wmn->data) {
 				case ND_GPENCIL:
 				case ND_ANIMPLAY:
+				case ND_SKETCH:
 					ED_region_tag_redraw(ar);
 					break;
 				case ND_SCREENBROWSE:
@@ -899,7 +911,7 @@ static void view3d_props_area_listener(ARegion *ar, wmNotifier *wmn)
 }
 
 /*area (not region) level listener*/
-void space_view3d_listener(struct ScrArea *sa, struct wmNotifier *wmn)
+static void space_view3d_listener(struct ScrArea *sa, struct wmNotifier *wmn)
 {
 	View3D *v3d = sa->spacedata.first;
 
@@ -939,6 +951,11 @@ void space_view3d_listener(struct ScrArea *sa, struct wmNotifier *wmn)
 #endif
 }
 
+const char *view3d_context_dir[] = {
+	"selected_objects", "selected_bases", "selected_editable_objects",
+	"selected_editable_bases", "visible_objects", "visible_bases", "selectable_objects", "selectable_bases",
+	"active_base", "active_object", NULL};
+
 static int view3d_context(const bContext *C, const char *member, bContextDataResult *result)
 {
 	View3D *v3d= CTX_wm_view3d(C);
@@ -947,12 +964,7 @@ static int view3d_context(const bContext *C, const char *member, bContextDataRes
 	unsigned int lay = v3d ? v3d->lay:scene->lay; /* fallback to the scene layer, allows duplicate and other oject operators to run outside the 3d view */
 
 	if(CTX_data_dir(member)) {
-		static const char *dir[] = {
-			"selected_objects", "selected_bases", "selected_editable_objects",
-			"selected_editable_bases", "visible_objects", "visible_bases", "selectable_objects", "selectable_bases",
-			"active_base", "active_object", NULL};
-
-		CTX_data_dir_set(result, dir);
+		CTX_data_dir_set(result, view3d_context_dir);
 	}
 	else if(CTX_data_equals(member, "selected_objects") || CTX_data_equals(member, "selected_bases")) {
 		int selected_objects= CTX_data_equals(member, "selected_objects");

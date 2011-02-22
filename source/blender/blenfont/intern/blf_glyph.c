@@ -41,6 +41,7 @@
 #include "MEM_guardedalloc.h"
 
 #include "DNA_vec_types.h"
+#include "DNA_userdef_types.h"
 
 #include "BLI_blenlib.h"
 
@@ -50,7 +51,6 @@
 #include "blf_internal_types.h"
 #include "blf_internal.h"
 
-FT_Library global_ft_lib;
 
 GlyphCacheBLF *blf_glyph_cache_find(FontBLF *font, int size, int dpi)
 {
@@ -113,6 +113,23 @@ GlyphCacheBLF *blf_glyph_cache_new(FontBLF *font)
 
 	BLI_addhead(&font->cache, gc);
 	return(gc);
+}
+
+void blf_glyph_cache_clear(FontBLF *font)
+{
+	GlyphCacheBLF *gc;
+	GlyphBLF *g;
+	int i;
+
+	for(gc=font->cache.first; gc; gc=gc->next) {
+		for (i= 0; i < 257; i++) {
+			while (gc->bucket[i].first) {
+				g= gc->bucket[i].first;
+				BLI_remlink(&(gc->bucket[i]), g);
+				blf_glyph_free(g);
+			}
+		}
+	}
 }
 
 void blf_glyph_cache_free(GlyphCacheBLF *gc)
@@ -187,26 +204,24 @@ GlyphBLF *blf_glyph_search(GlyphCacheBLF *gc, unsigned int c)
 	return(NULL);
 }
 
-GlyphBLF *blf_glyph_add(FontBLF *font, FT_UInt index, unsigned int c)
+GlyphBLF *blf_glyph_add(FontBLF *font, unsigned int index, unsigned int c)
 {
 	FT_GlyphSlot slot;
 	GlyphBLF *g;
 	FT_Error err;
 	FT_Bitmap bitmap, tempbitmap;
-	int sharp;
+	int sharp = (U.text_render & USER_TEXT_DISABLE_AA);
 	FT_BBox bbox;
 	unsigned int key;
-
-	sharp = 0; /* TODO make the value be configurable somehow */
 
 	g= blf_glyph_search(font->glyph_cache, c);
 	if (g)
 		return(g);
 
 	if (sharp)
-		err = FT_Load_Glyph(font->face, index, FT_LOAD_TARGET_MONO);
+		err = FT_Load_Glyph(font->face, (FT_UInt)index, FT_LOAD_TARGET_MONO);
 	else
-		err = FT_Load_Glyph(font->face, index, FT_LOAD_TARGET_NORMAL | FT_LOAD_NO_HINTING | FT_LOAD_NO_BITMAP); /* Sure about NO_* flags? */
+		err = FT_Load_Glyph(font->face, (FT_UInt)index, FT_LOAD_TARGET_NORMAL | FT_LOAD_NO_HINTING | FT_LOAD_NO_BITMAP); /* Sure about NO_* flags? */
 	if (err)
 		return(NULL);
 
@@ -219,9 +234,9 @@ GlyphBLF *blf_glyph_add(FontBLF *font, FT_UInt index, unsigned int c)
 		/* Convert result from 1 bit per pixel to 8 bit per pixel */
 		/* Accum errors for later, fine if not interested beyond "ok vs any error" */
 		FT_Bitmap_New(&tempbitmap);
-		err += FT_Bitmap_Convert(global_ft_lib, &slot->bitmap, &tempbitmap, 1); /* Does Blender use Pitch 1 always? It works so far */
-		err += FT_Bitmap_Copy(global_ft_lib, &tempbitmap, &slot->bitmap);
-		err += FT_Bitmap_Done(global_ft_lib, &tempbitmap);
+		err += FT_Bitmap_Convert(font->ft_lib, &slot->bitmap, &tempbitmap, 1); /* Does Blender use Pitch 1 always? It works so far */
+		err += FT_Bitmap_Copy(font->ft_lib, &tempbitmap, &slot->bitmap);
+		err += FT_Bitmap_Done(font->ft_lib, &tempbitmap);
 	} else {
 		err = FT_Render_Glyph(slot, FT_RENDER_MODE_NORMAL);
 	}
@@ -233,7 +248,7 @@ GlyphBLF *blf_glyph_add(FontBLF *font, FT_UInt index, unsigned int c)
 	g->next= NULL;
 	g->prev= NULL;
 	g->c= c;
-	g->idx= index;
+	g->idx= (FT_UInt)index;
 	g->tex= 0;
 	g->build_tex= 0;
 	g->bitmap= NULL;

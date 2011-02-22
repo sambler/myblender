@@ -33,6 +33,7 @@
 #include "BKE_main.h"
 
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 #include "BLI_storage_types.h"
 #ifdef WIN32
 #include "BLI_winstuff.h"
@@ -260,7 +261,6 @@ static int file_select_invoke(bContext *C, wmOperator *op, wmEvent *event)
 {
 	ARegion *ar= CTX_wm_region(C);
 	SpaceFile *sfile= CTX_wm_space_file(C);
-	short val;
 	rcti rect;
 	int extend = RNA_boolean_get(op->ptr, "extend");
 	int fill = RNA_boolean_get(op->ptr, "fill");
@@ -270,7 +270,6 @@ static int file_select_invoke(bContext *C, wmOperator *op, wmEvent *event)
 
 	rect.xmin = rect.xmax = event->x - ar->winrct.xmin;
 	rect.ymin = rect.ymax = event->y - ar->winrct.ymin;
-	val = event->val;
 
 	if(!BLI_in_rcti(&ar->v2d.mask, rect.xmin, rect.ymin))
 		return OPERATOR_CANCELLED;
@@ -517,7 +516,7 @@ int file_cancel_exec(bContext *C, wmOperator *UNUSED(unused))
 	return OPERATOR_FINISHED;
 }
 
-int file_operator_poll(bContext *C)
+static int file_operator_poll(bContext *C)
 {
 	int poll = ED_operator_file_active(C);
 	SpaceFile *sfile= CTX_wm_space_file(C);
@@ -542,7 +541,7 @@ void FILE_OT_cancel(struct wmOperatorType *ot)
 
 void file_sfile_to_operator(wmOperator *op, SpaceFile *sfile, char *filepath)
 {
-	BLI_join_dirfile(filepath, sfile->params->dir, sfile->params->file);
+	BLI_join_dirfile(filepath, FILE_MAX, sfile->params->dir, sfile->params->file); /* XXX, not real length */
 	if(RNA_struct_find_property(op->ptr, "relative_path")) {
 		if(RNA_boolean_get(op->ptr, "relative_path")) {
 			BLI_path_rel(filepath, G.main->name);
@@ -640,7 +639,7 @@ int file_draw_check_exists(SpaceFile *sfile)
 		if(RNA_struct_find_property(sfile->op->ptr, "check_existing")) {
 			if(RNA_boolean_get(sfile->op->ptr, "check_existing")) {
 				char filepath[FILE_MAX];
-				BLI_join_dirfile(filepath, sfile->params->dir, sfile->params->file);
+				BLI_join_dirfile(filepath, sizeof(filepath), sfile->params->dir, sfile->params->file);
 				if(BLI_exists(filepath) && !BLI_is_dir(filepath)) {
 					return TRUE;
 				}
@@ -736,7 +735,7 @@ void FILE_OT_parent(struct wmOperatorType *ot)
 }
 
 
-int file_refresh_exec(bContext *C, wmOperator *UNUSED(unused))
+static int file_refresh_exec(bContext *C, wmOperator *UNUSED(unused))
 {
 	SpaceFile *sfile= CTX_wm_space_file(C);
 
@@ -930,13 +929,13 @@ static int new_folder_path(const char* parent, char *folder, char *name)
 	int len = 0;
 
 	BLI_strncpy(name, "New Folder", FILE_MAXFILE);
-	BLI_join_dirfile(folder, parent, name);
+	BLI_join_dirfile(folder, FILE_MAX, parent, name); /* XXX, not real length */
 	/* check whether folder with the name already exists, in this case
 	   add number to the name. Check length of generated name to avoid
 	   crazy case of huge number of folders each named 'New Folder (x)' */
 	while (BLI_exists(folder) && (len<FILE_MAXFILE)) {
 		len = BLI_snprintf(name, FILE_MAXFILE, "New Folder(%d)", i);
-		BLI_join_dirfile(folder, parent, name);
+		BLI_join_dirfile(folder, FILE_MAX, parent, name); /* XXX, not real length */
 		i++;
 	}
 
@@ -1018,8 +1017,8 @@ static void file_expand_directory(bContext *C)
 	if(sfile->params) {
 		if ( sfile->params->dir[0] == '~' ) {
 			char tmpstr[sizeof(sfile->params->dir)-1];
-			strncpy(tmpstr, sfile->params->dir+1, sizeof(tmpstr));
-			BLI_join_dirfile(sfile->params->dir, BLI_getDefaultDocumentFolder(), tmpstr);
+			BLI_strncpy(tmpstr, sfile->params->dir+1, sizeof(tmpstr));
+			BLI_join_dirfile(sfile->params->dir, sizeof(sfile->params->dir), BLI_getDefaultDocumentFolder(), tmpstr);
 		}
 
 #ifdef WIN32
@@ -1029,7 +1028,7 @@ static void file_expand_directory(bContext *C)
 	}
 }
 
-int file_directory_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
+static int file_directory_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 {
 	SpaceFile *sfile= CTX_wm_space_file(C);
 
@@ -1057,7 +1056,14 @@ int file_directory_exec(bContext *C, wmOperator *UNUSED(unused))
 
 		if (!BLI_exists(sfile->params->dir)) {
 			BLI_recurdir_fileops(sfile->params->dir);
-		} 
+		}
+
+		/* special case, user may have pasted a fulepath into the directory */
+		if(BLI_exists(sfile->params->dir) && BLI_is_dir(sfile->params->dir) == 0) {
+			char path[sizeof(sfile->params->dir)];
+			BLI_strncpy(path, sfile->params->dir, sizeof(path));
+			BLI_split_dirfile(path, sfile->params->dir, sfile->params->file);
+		}
 
 		BLI_cleanup_dir(G.main->name, sfile->params->dir);
 		BLI_add_slash(sfile->params->dir);
@@ -1110,7 +1116,7 @@ void FILE_OT_refresh(struct wmOperatorType *ot)
 	ot->poll= ED_operator_file_active; /* <- important, handler is on window level */
 }
 
-int file_hidedot_exec(bContext *C, wmOperator *UNUSED(unused))
+static int file_hidedot_exec(bContext *C, wmOperator *UNUSED(unused))
 {
 	SpaceFile *sfile= CTX_wm_space_file(C);
 	
@@ -1163,7 +1169,7 @@ struct ARegion *file_buttons_region(struct ScrArea *sa)
 	return arnew;
 }
 
-int file_bookmark_toggle_exec(bContext *C, wmOperator *UNUSED(unused))
+static int file_bookmark_toggle_exec(bContext *C, wmOperator *UNUSED(unused))
 {
 	ScrArea *sa= CTX_wm_area(C);
 	ARegion *ar= file_buttons_region(sa);
@@ -1187,7 +1193,7 @@ void FILE_OT_bookmark_toggle(struct wmOperatorType *ot)
 }
 
 
-int file_filenum_exec(bContext *C, wmOperator *op)
+static int file_filenum_exec(bContext *C, wmOperator *op)
 {
 	SpaceFile *sfile= CTX_wm_space_file(C);
 	ScrArea *sa= CTX_wm_area(C);
@@ -1219,7 +1225,7 @@ void FILE_OT_filenum(struct wmOperatorType *ot)
 	RNA_def_int(ot->srna, "increment", 1, 0, 100, "Increment", "", 0,100);
 }
 
-int file_rename_exec(bContext *C, wmOperator *UNUSED(op))
+static int file_rename_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	ScrArea *sa= CTX_wm_area(C);
 	SpaceFile *sfile= (SpaceFile*)CTX_wm_space_data(C);
@@ -1240,7 +1246,7 @@ int file_rename_exec(bContext *C, wmOperator *UNUSED(op))
 
 }
 
-int file_rename_poll(bContext *C)
+static int file_rename_poll(bContext *C)
 {
 	int poll = ED_operator_file_active(C);
 	SpaceFile *sfile= CTX_wm_space_file(C);
@@ -1271,7 +1277,7 @@ void FILE_OT_rename(struct wmOperatorType *ot)
 
 }
 
-int file_delete_poll(bContext *C)
+static int file_delete_poll(bContext *C)
 {
 	int poll = ED_operator_file_active(C);
 	SpaceFile *sfile= CTX_wm_space_file(C);

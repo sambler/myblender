@@ -43,6 +43,7 @@
 #include "BLI_editVert.h"
 #include "BLI_dynstr.h"
 #include "BLI_rand.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_DerivedMesh.h"
 #include "BKE_context.h"
@@ -58,7 +59,6 @@
 
 #include "ED_mesh.h"
 #include "ED_object.h"
-#include "ED_retopo.h"
 #include "ED_screen.h"
 #include "ED_util.h"
 #include "ED_view3d.h"
@@ -259,7 +259,7 @@ EditEdge *addedgelist(EditMesh *em, EditVert *v1, EditVert *v2, EditEdge *exampl
 			eed->h |= (example->h & EM_FGON);
 		}
 	}
-
+	
 	return eed;
 }
 
@@ -380,6 +380,7 @@ EditFace *addfacelist(EditMesh *em, EditVert *v1, EditVert *v2, EditVert *v3, Ed
 		efa->mat_nr= example->mat_nr;
 		efa->flag= example->flag;
 		CustomData_em_copy_data(&em->fdata, &em->fdata, example->data, &efa->data);
+		CustomData_em_validate_data(&em->fdata, efa->data, efa->v4 ? 4 : 3);
 	}
 	else {
 		efa->mat_nr= em->mat_nr;
@@ -918,9 +919,9 @@ void make_editMesh(Scene *scene, Object *ob)
 }
 
 /* makes Mesh out of editmesh */
-void load_editMesh(Scene *scene, Object *ob)
+void load_editMesh(Scene *scene, Object *obedit)
 {
-	Mesh *me= ob->data;
+	Mesh *me= obedit->data;
 	MVert *mvert, *oldverts;
 	MEdge *medge;
 	MFace *mface;
@@ -988,8 +989,6 @@ void load_editMesh(Scene *scene, Object *ob)
 	while(eve) {
 		VECCOPY(mvert->co, eve->co);
 
-		mvert->mat_nr= 32767;  /* what was this for, halos? */
-		
 		/* vertex normal */
 		VECCOPY(nor, eve->no);
 		mul_v3_fl(nor, 32767.0);
@@ -1062,20 +1061,6 @@ void load_editMesh(Scene *scene, Object *ob)
 			if(efa->f & 1) mface->flag |= ME_FACE_SEL;
 			else mface->flag &= ~ME_FACE_SEL;
 		}
-		
-		/* mat_nr in vertex */
-		if(me->totcol>1) {
-			mvert= me->mvert+mface->v1;
-			if(mvert->mat_nr == (char)32767) mvert->mat_nr= mface->mat_nr;
-			mvert= me->mvert+mface->v2;
-			if(mvert->mat_nr == (char)32767) mvert->mat_nr= mface->mat_nr;
-			mvert= me->mvert+mface->v3;
-			if(mvert->mat_nr == (char)32767) mvert->mat_nr= mface->mat_nr;
-			if(mface->v4) {
-				mvert= me->mvert+mface->v4;
-				if(mvert->mat_nr == (char)32767) mvert->mat_nr= mface->mat_nr;
-			}
-		}
 			
 		/* watch: efa->e1->f2==0 means loose edge */ 
 			
@@ -1110,7 +1095,7 @@ void load_editMesh(Scene *scene, Object *ob)
 		Object *ob;
 		ModifierData *md;
 		EditVert **vertMap = NULL;
-		int i,j;
+		int j;
 
 		for (ob=G.main->object.first; ob; ob=ob->id.next) {
 			if (ob->parent==ob && ELEM(ob->partype, PARVERT1,PARVERT3)) {
@@ -1196,7 +1181,9 @@ void load_editMesh(Scene *scene, Object *ob)
 				eve= em->verts.first;
 				mvert = me->mvert;
 				while(eve) {
-					VECSUB(ofs[i], mvert->co, oldverts[eve->keyindex].co);
+					if(eve->keyindex>=0)
+						VECSUB(ofs[i], mvert->co, oldverts[eve->keyindex].co);
+
 					eve= eve->next;
 					i++;
 					mvert++;
@@ -1310,13 +1297,13 @@ void load_editMesh(Scene *scene, Object *ob)
 	mesh_calc_normals(me->mvert, me->totvert, me->mface, me->totface, NULL);
 
 	/* topology could be changed, ensure mdisps are ok */
-	multires_topology_changed(ob);
+	multires_topology_changed(scene, obedit);
 }
 
 void remake_editMesh(Scene *scene, Object *ob)
 {
 	make_editMesh(scene, ob);
-	DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	BIF_undo_push("Undo all changes");
 }
 
@@ -1432,8 +1419,8 @@ static int mesh_separate_selected(wmOperator *op, Main *bmain, Scene *scene, Bas
 	/* hashedges are invalid now, make new! */
 	editMesh_set_hash(em);
 
-	DAG_id_flush_update(&obedit->id, OB_RECALC_DATA);	
-	DAG_id_flush_update(&basenew->object->id, OB_RECALC_DATA);	
+	DAG_id_tag_update(&obedit->id, OB_RECALC_DATA);	
+	DAG_id_tag_update(&basenew->object->id, OB_RECALC_DATA);	
 
 	BKE_mesh_end_editmesh(me, em);
 
@@ -1606,7 +1593,6 @@ typedef struct UndoMesh {
 	EditSelectionC *selected;
 	int totvert, totedge, totface, totsel;
 	int selectmode, shapenr;
-	RetopoPaintData *retopo_paint_data;
 	char retopo_mode;
 	CustomData vdata, edata, fdata;
 } UndoMesh;
@@ -1853,7 +1839,7 @@ static void *getEditMesh(bContext *C)
 }
 
 /* and this is all the undo system needs to know */
-void undo_push_mesh(bContext *C, char *name)
+void undo_push_mesh(bContext *C, const char *name)
 {
 	undo_editmode_push(C, name, getEditMesh, free_undoMesh, undoMesh_to_editMesh, editMesh_to_undoMesh, NULL);
 }

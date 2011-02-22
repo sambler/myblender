@@ -41,13 +41,14 @@
 #include "GHOST_C-api.h"
 
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_blender.h"
 #include "BKE_context.h"
 #include "BKE_library.h"
 #include "BKE_global.h"
 #include "BKE_main.h"
-#include "BKE_utildefines.h"
+
 
 #include "BIF_gl.h"
 
@@ -60,6 +61,7 @@
 #include "wm_event_system.h"
 
 #include "ED_screen.h"
+#include "ED_fileselect.h"
 
 #include "PIL_time.h"
 
@@ -67,7 +69,7 @@
 #include "GPU_extensions.h"
 
 /* the global to talk to ghost */
-GHOST_SystemHandle g_system= NULL;
+static GHOST_SystemHandle g_system= NULL;
 
 /* set by commandline */
 static int prefsizx= 0, prefsizy= 0, prefstax= 0, prefstay= 0, initialstate= GHOST_kWindowStateNormal;
@@ -148,10 +150,9 @@ void wm_window_free(bContext *C, wmWindowManager *wm, wmWindow *win)
 			CTX_wm_window_set(C, NULL);
 	}	
 
-	if(wm->windrawable==win)
-		wm->windrawable= NULL;
-	if(wm->winactive==win)
-		wm->winactive= NULL;
+	/* always set drawable and active to NULL, prevents non-drawable state of main windows (bugs #22967 and #25071, possibly #22477 too) */
+	wm->windrawable= NULL;
+	wm->winactive= NULL;
 
 	/* end running jobs, a job end also removes its timer */
 	for(wt= wm->timers.first; wt; wt= wtnext) {
@@ -272,12 +273,7 @@ void wm_window_title(wmWindowManager *wm, wmWindow *win)
 		/* this is set to 1 if you don't have startup.blend open */
 		if(G.save_over && G.main->name[0]) {
 			char str[sizeof(G.main->name) + 12];
-			
-			if(wm->file_saved)
-				sprintf(str, "Blender [%s]", G.main->name);
-			else
-				sprintf(str, "Blender* [%s]", G.main->name);
-			
+			BLI_snprintf(str, sizeof(str), "Blender%s [%s]", wm->file_saved ? "":"*", G.main->name);
 			GHOST_SetTitle(win->ghostwin, str);
 		}
 		else
@@ -298,7 +294,7 @@ void wm_window_title(wmWindowManager *wm, wmWindow *win)
 }
 
 /* belongs to below */
-static void wm_window_add_ghostwindow(bContext *C, char *title, wmWindow *win)
+static void wm_window_add_ghostwindow(bContext *C, const char *title, wmWindow *win)
 {
 	GHOST_WindowHandle ghostwin;
 	int scr_w, scr_h, posy;
@@ -414,6 +410,11 @@ void wm_window_add_ghostwindows(bContext* C, wmWindowManager *wm)
 		keymap= WM_keymap_find(wm->defaultconf, "Screen Editing", 0, 0);
 		WM_event_add_keymap_handler(&win->modalhandlers, keymap);
 		
+		/* add drop boxes */
+		{
+			ListBase *lb= WM_dropboxmap_find("Window", 0, 0);
+			WM_event_add_dropbox_handler(&win->handlers, lb);
+		}
 		wm_window_title(wm, win);
 	}
 }
@@ -821,15 +822,17 @@ static int ghost_event_proc(GHOST_EventHandle evt, GHOST_TUserDataPtr private)
 				/* printf("Drop detected\n"); */
 				
 				/* add drag data to wm for paths: */
-				/* need icon type, some dropboxes check for that... see filesel code for this */
 				
 				if(ddd->dataType == GHOST_kDragnDropTypeFilenames) {
 					GHOST_TStringArray *stra= ddd->data;
-					int a;
+					int a, icon;
 					
 					for(a=0; a<stra->count; a++) {
 						printf("drop file %s\n", stra->strings[a]);
-						WM_event_start_drag(C, 0, WM_DRAG_PATH, stra->strings[a], 0.0);
+						/* try to get icon type from extension */
+						icon= ED_file_extension_icon((char *)stra->strings[a]);
+						
+						WM_event_start_drag(C, icon, WM_DRAG_PATH, stra->strings[a], 0.0);
 						/* void poin should point to string, it makes a copy */
 						break; // only one drop element supported now 
 					}
@@ -1008,6 +1011,9 @@ char *WM_clipboard_text_get(int selection)
 {
 	char *p, *p2, *buf, *newbuf;
 
+	if(G.background)
+		return NULL;
+
 	buf= (char*)GHOST_getClipboard(selection);
 	if(!buf)
 		return NULL;
@@ -1028,33 +1034,35 @@ char *WM_clipboard_text_get(int selection)
 
 void WM_clipboard_text_set(char *buf, int selection)
 {
+	if(!G.background) {
 #ifdef _WIN32
-	/* do conversion from \n to \r\n on Windows */
-	char *p, *p2, *newbuf;
-	int newlen= 0;
-	
-	for(p= buf; *p; p++) {
-		if(*p == '\n')
-			newlen += 2;
-		else
-			newlen++;
-	}
-	
-	newbuf= MEM_callocN(newlen+1, "WM_clipboard_text_set");
-
-	for(p= buf, p2= newbuf; *p; p++, p2++) {
-		if(*p == '\n') { 
-			*(p2++)= '\r'; *p2= '\n';
+		/* do conversion from \n to \r\n on Windows */
+		char *p, *p2, *newbuf;
+		int newlen= 0;
+		
+		for(p= buf; *p; p++) {
+			if(*p == '\n')
+				newlen += 2;
+			else
+				newlen++;
 		}
-		else *p2= *p;
-	}
-	*p2= '\0';
-
-	GHOST_putClipboard((GHOST_TInt8*)newbuf, selection);
-	MEM_freeN(newbuf);
+		
+		newbuf= MEM_callocN(newlen+1, "WM_clipboard_text_set");
+	
+		for(p= buf, p2= newbuf; *p; p++, p2++) {
+			if(*p == '\n') { 
+				*(p2++)= '\r'; *p2= '\n';
+			}
+			else *p2= *p;
+		}
+		*p2= '\0';
+	
+		GHOST_putClipboard((GHOST_TInt8*)newbuf, selection);
+		MEM_freeN(newbuf);
 #else
-	GHOST_putClipboard((GHOST_TInt8*)buf, selection);
+		GHOST_putClipboard((GHOST_TInt8*)buf, selection);
 #endif
+	}
 }
 
 /* ******************* progress bar **************** */
@@ -1147,12 +1155,12 @@ void WM_setprefsize(int stax, int stay, int sizx, int sizy)
 }
 
 /* for borderless and border windows set from command-line */
-void WM_setinitialstate_fullscreen()
+void WM_setinitialstate_fullscreen(void)
 {
 	initialstate= GHOST_kWindowStateFullScreen;
 }
 
-void WM_setinitialstate_normal()
+void WM_setinitialstate_normal(void)
 {
 	initialstate= GHOST_kWindowStateNormal;
 }

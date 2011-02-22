@@ -34,9 +34,16 @@
 #include "DNA_material_types.h"
 #include "DNA_node_types.h"
 #include "DNA_object_types.h"
+#include "DNA_particle_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_space_types.h"
 #include "DNA_world_types.h"
+
+#include "BLI_blenlib.h"
+#include "BLI_math.h"
+#include "BLI_editVert.h"
+#include "BLI_listbase.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_animsys.h"
 #include "BKE_context.h"
@@ -57,11 +64,6 @@
 #include "IMB_imbuf.h"
 #include "IMB_imbuf_types.h"
 
-#include "BLI_blenlib.h"
-#include "BLI_math.h"
-#include "BLI_editVert.h"
-#include "BLI_listbase.h"
-
 #include "GPU_material.h"
 
 #include "RNA_access.h"
@@ -69,6 +71,7 @@
 #include "WM_api.h"
 #include "WM_types.h"
 
+#include "ED_render.h"
 #include "ED_curve.h"
 #include "ED_mesh.h"
 
@@ -79,7 +82,7 @@
 #include "render_intern.h"	// own include
 
 /***************************** Updates ***********************************
- * ED_render_id_flush_update gets called from DAG_id_flush_update, to do *
+ * ED_render_id_flush_update gets called from DAG_id_tag_update, to do *
  * editor level updates when the ID changes. when these ID blocks are in *
  * the dependency graph, we can get rid of the manual dependency checks  */
 
@@ -296,6 +299,7 @@ static int material_slot_remove_exec(bContext *C, wmOperator *op)
 	}
 
 	object_remove_material_slot(ob);
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	WM_event_add_notifier(C, NC_OBJECT|ND_DRAW, ob);
 	WM_event_add_notifier(C, NC_OBJECT|ND_OB_SHADING, ob);
 	
@@ -355,7 +359,7 @@ static int material_slot_assign_exec(bContext *C, wmOperator *UNUSED(op))
 		}
 	}
 
-	DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, ob->data);
 	
 	return OPERATOR_FINISHED;
@@ -735,12 +739,12 @@ void SCENE_OT_render_layer_remove(wmOperatorType *ot)
 static int texture_slot_move(bContext *C, wmOperator *op)
 {
 	ID *id= CTX_data_pointer_get_type(C, "texture_slot", &RNA_TextureSlot).id.data;
-	Material *ma = (Material *)id;
 
 	if(id) {
 		MTex **mtex_ar, *mtexswap;
 		short act;
 		int type= RNA_enum_get(op->ptr, "type");
+		struct AnimData *adt= BKE_animdata_from_id(id);
 
 		give_active_mtex(id, &mtex_ar, &act);
 
@@ -750,9 +754,9 @@ static int texture_slot_move(bContext *C, wmOperator *op)
 				mtex_ar[act] = mtex_ar[act-1];
 				mtex_ar[act-1] = mtexswap;
 				
-				BKE_animdata_fix_paths_rename(id, ma->adt, "texture_slots", NULL, NULL, act-1, -1, 0);
-				BKE_animdata_fix_paths_rename(id, ma->adt, "texture_slots", NULL, NULL, act, act-1, 0);
-				BKE_animdata_fix_paths_rename(id, ma->adt, "texture_slots", NULL, NULL, -1, act, 0);
+				BKE_animdata_fix_paths_rename(id, adt, "texture_slots", NULL, NULL, act-1, -1, 0);
+				BKE_animdata_fix_paths_rename(id, adt, "texture_slots", NULL, NULL, act, act-1, 0);
+				BKE_animdata_fix_paths_rename(id, adt, "texture_slots", NULL, NULL, -1, act, 0);
 
 				if(GS(id->name)==ID_MA) {
 					Material *ma= (Material *)id;
@@ -772,9 +776,9 @@ static int texture_slot_move(bContext *C, wmOperator *op)
 				mtex_ar[act] = mtex_ar[act+1];
 				mtex_ar[act+1] = mtexswap;
 				
-				BKE_animdata_fix_paths_rename(id, ma->adt, "texture_slots", NULL, NULL, act+1, -1, 0);
-				BKE_animdata_fix_paths_rename(id, ma->adt, "texture_slots", NULL, NULL, act, act+1, 0);
-				BKE_animdata_fix_paths_rename(id, ma->adt, "texture_slots", NULL, NULL, -1, act, 0);
+				BKE_animdata_fix_paths_rename(id, adt, "texture_slots", NULL, NULL, act+1, -1, 0);
+				BKE_animdata_fix_paths_rename(id, adt, "texture_slots", NULL, NULL, act, act+1, 0);
+				BKE_animdata_fix_paths_rename(id, adt, "texture_slots", NULL, NULL, -1, act, 0);
 
 				if(GS(id->name)==ID_MA) {
 					Material *ma= (Material *)id;
@@ -789,6 +793,7 @@ static int texture_slot_move(bContext *C, wmOperator *op)
 			}
 		}
 
+		DAG_id_tag_update(id, 0);
 		WM_event_add_notifier(C, NC_TEXTURE, CTX_data_scene(C));
 	}
 
@@ -848,6 +853,10 @@ static int save_envmap(wmOperator *op, Scene *scene, EnvMap *env, char *str, int
 	else if (env->type == ENV_PLANE) {
 		ibuf = IMB_allocImBuf(dx, dx, 24, IB_rectfloat);
 		IMB_rectcpy(ibuf, env->cube[1], 0, 0, 0, 0, dx, dx);		
+	}
+	else {
+		BKE_report(op->reports, RPT_ERROR, "Invalid environment map type");
+		return OPERATOR_CANCELLED;
 	}
 	
 	if (scene->r.color_mgt_flag & R_COLOR_MANAGEMENT)
@@ -1087,7 +1096,7 @@ void ED_render_clear_mtex_copybuf(void)
 	mtexcopied= 0;
 }
 
-void copy_mtex_copybuf(ID *id)
+static void copy_mtex_copybuf(ID *id)
 {
 	MTex **mtex= NULL;
 	
@@ -1103,6 +1112,9 @@ void copy_mtex_copybuf(ID *id)
 			mtex= &(((World *)id)->mtex[(int)((World *)id)->texact]);
 			// mtex= wrld->mtex[(int)wrld->texact]; // TODO
 			break;
+		case ID_PA:
+			mtex= &(((ParticleSettings *)id)->mtex[(int)((ParticleSettings *)id)->texact]);
+			break;
 	}
 	
 	if(mtex && *mtex) {
@@ -1114,7 +1126,7 @@ void copy_mtex_copybuf(ID *id)
 	}
 }
 
-void paste_mtex_copybuf(ID *id)
+static void paste_mtex_copybuf(ID *id)
 {
 	MTex **mtex= NULL;
 	
@@ -1132,6 +1144,9 @@ void paste_mtex_copybuf(ID *id)
 		case ID_WO:
 			mtex= &(((World *)id)->mtex[(int)((World *)id)->texact]);
 			// mtex= wrld->mtex[(int)wrld->texact]; // TODO
+			break;
+		case ID_PA:
+			mtex= &(((ParticleSettings *)id)->mtex[(int)((ParticleSettings *)id)->texact]);
 			break;
 	}
 	
@@ -1197,6 +1212,7 @@ static int paste_mtex_exec(bContext *C, wmOperator *UNUSED(op))
 		Material *ma= CTX_data_pointer_get_type(C, "material", &RNA_Material).data;
 		Lamp *la= CTX_data_pointer_get_type(C, "lamp", &RNA_Lamp).data;
 		World *wo= CTX_data_pointer_get_type(C, "world", &RNA_World).data;
+		ParticleSystem *psys= CTX_data_pointer_get_type(C, "particle_system", &RNA_ParticleSystem).data;
 		
 		if (ma)
 			id = &ma->id;
@@ -1204,6 +1220,8 @@ static int paste_mtex_exec(bContext *C, wmOperator *UNUSED(op))
 			id = &la->id;
 		else if (wo)
 			id = &wo->id;
+		else if (psys)
+			id = &psys->part->id;
 		
 		if (id==NULL)
 			return OPERATOR_CANCELLED;

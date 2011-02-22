@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -29,6 +29,11 @@
 
 #ifndef DNA_BRUSH_TYPES_H
 #define DNA_BRUSH_TYPES_H
+
+/** \file DNA_brush_types.h
+ *  \ingroup DNA
+ */
+
 
 #include "DNA_ID.h"
 #include "DNA_texture_types.h" /* for MTex */
@@ -126,6 +131,10 @@ typedef struct Brush {
 #define BRUSH_PLANE_TRIM (1<<26)
 #define BRUSH_FRONTFACE (1<<27)
 #define BRUSH_CUSTOM_ICON (1<<28)
+
+/* temporary flag which sets up autmatically for correct
+   brush drawing when inverted modal operator is running */
+#define BRUSH_INVERTED (1<<29)
 
 /* Brush.sculpt_tool */
 #define SCULPT_TOOL_DRAW        1

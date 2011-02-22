@@ -36,6 +36,7 @@
 
 #include "BLI_math.h"
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 
 #include "DNA_anim_types.h"
 #include "DNA_armature_types.h"
@@ -63,13 +64,13 @@
 #include "BKE_lattice.h"
 #include "BKE_main.h"
 #include "BKE_object.h"
-#include "BKE_utildefines.h"
+
 #include "BIK_api.h"
 #include "BKE_sketch.h"
 
 /*	**************** Generic Functions, data level *************** */
 
-bArmature *add_armature(char *name)
+bArmature *add_armature(const char *name)
 {
 	bArmature *arm;
 	
@@ -135,19 +136,19 @@ void make_local_armature(bArmature *arm)
 	Object *ob;
 	bArmature *newArm;
 	
-	if (arm->id.lib==0)
+	if (arm->id.lib==NULL)
 		return;
 	if (arm->id.us==1) {
-		arm->id.lib= 0;
+		arm->id.lib= NULL;
 		arm->id.flag= LIB_LOCAL;
-		new_id(0, (ID*)arm, 0);
+		new_id(NULL, (ID*)arm, NULL);
 		return;
 	}
 	
 	if(local && lib==0) {
-		arm->id.lib= 0;
+		arm->id.lib= NULL;
 		arm->id.flag= LIB_LOCAL;
-		new_id(0, (ID *)arm, 0);
+		new_id(NULL, (ID *)arm, NULL);
 	}
 	else if(local && lib) {
 		newArm= copy_armature(arm);
@@ -157,7 +158,7 @@ void make_local_armature(bArmature *arm)
 		while(ob) {
 			if(ob->data==arm) {
 				
-				if(ob->id.lib==0) {
+				if(ob->id.lib==NULL) {
 					ob->data= newArm;
 					newArm->id.us++;
 					arm->id.us--;
@@ -247,16 +248,15 @@ Bone *get_named_bone (bArmature *arm, const char *name)
 }
 
 /* Finds the best possible extension to the name on a particular axis. (For renaming, check for unique names afterwards)
- * This assumes that bone names are at most 32 chars long!
  * 	strip_number: removes number extensions  (TODO: not used)
  *	axis: the axis to name on
  *	head/tail: the head/tail co-ordinate of the bone on the specified axis
  */
-int bone_autoside_name (char *name, int UNUSED(strip_number), short axis, float head, float tail)
+int bone_autoside_name (char name[MAXBONENAME], int UNUSED(strip_number), short axis, float head, float tail)
 {
 	unsigned int len;
-	char	basename[32]={""};
-	char 	extension[5]={""};
+	char	basename[MAXBONENAME]= "";
+	char 	extension[5]= "";
 
 	len= strlen(name);
 	if (len == 0) return 0;
@@ -349,13 +349,13 @@ int bone_autoside_name (char *name, int UNUSED(strip_number), short axis, float 
 				}
 			}
 		}
-		
-		if ((32 - len) < strlen(extension) + 1) { /* add 1 for the '.' */
+
+		if ((MAXBONENAME - len) < strlen(extension) + 1) { /* add 1 for the '.' */
 			strncpy(name, basename, len-strlen(extension));
 		}
-		
-		sprintf(name, "%s.%s", basename, extension);
-		
+
+		BLI_snprintf(name, MAXBONENAME, "%s.%s", basename, extension);
+
 		return 1;
 	}
 
@@ -590,7 +590,7 @@ static void pchan_b_bone_defmats(bPoseChannel *pchan, bPoseChanDeform *pdef_info
 	Mat4 *b_bone_rest= b_bone_spline_setup(pchan, 1);
 	Mat4 *b_bone_mats;
 	DualQuat *b_bone_dual_quats= NULL;
-	float tmat[4][4];
+	float tmat[4][4]= MAT4_UNITY;
 	int a;
 	
 	/* allocate b_bone matrices and dual quats */
@@ -611,7 +611,6 @@ static void pchan_b_bone_defmats(bPoseChannel *pchan, bPoseChanDeform *pdef_info
 		- translate over the curve to the bbone mat space
 		- transform with b_bone matrix
 		- transform back into global space */
-	unit_m4(tmat);
 
 	for(a=0; a<bone->segments; a++) {
 		invert_m4_m4(tmat, b_bone_rest[a].mat);
@@ -937,19 +936,15 @@ void armature_deform_verts(Object *armOb, Object *target, DerivedMesh *dm,
 			dvert = NULL;
 
 		if(armature_def_nr >= 0 && dvert) {
-			armature_weight = 0.0f; /* a def group was given, so default to 0 */
-			for(j = 0; j < dvert->totweight; j++) {
-				if(dvert->dw[j].def_nr == armature_def_nr) {
-					armature_weight = dvert->dw[j].weight;
-					break;
-				}
+			armature_weight= defvert_find_weight(dvert, armature_def_nr);
+
+			if(invert_vgroup) {
+				armature_weight= 1.0f-armature_weight;
 			}
+
 			/* hackish: the blending factor can be used for blending with prevCos too */
 			if(prevCos) {
-				if(invert_vgroup)
-					prevco_weight= 1.0f-armature_weight;
-				else
-					prevco_weight= armature_weight;
+				prevco_weight= armature_weight;
 				armature_weight= 1.0f;
 			}
 		}
@@ -1104,11 +1099,10 @@ void armature_mat_world_to_pose(Object *ob, float inmat[][4], float outmat[][4])
  */
 void armature_loc_world_to_pose(Object *ob, float *inloc, float *outloc) 
 {
-	float xLocMat[4][4];
+	float xLocMat[4][4]= MAT4_UNITY;
 	float nLocMat[4][4];
 	
 	/* build matrix for location */
-	unit_m4(xLocMat);
 	VECCOPY(xLocMat[3], inloc);
 
 	/* get bone-space cursor matrix and extract location */
@@ -1184,11 +1178,10 @@ void armature_mat_pose_to_bone(bPoseChannel *pchan, float inmat[][4], float outm
  */
 void armature_loc_pose_to_bone(bPoseChannel *pchan, float *inloc, float *outloc) 
 {
-	float xLocMat[4][4];
+	float xLocMat[4][4]= MAT4_UNITY;
 	float nLocMat[4][4];
 	
 	/* build matrix for location */
-	unit_m4(xLocMat);
 	VECCOPY(xLocMat[3], inloc);
 
 	/* get bone-space cursor matrix and extract location */
@@ -1251,6 +1244,7 @@ void BKE_rotMode_change_values (float quat[4], float eul[3], float axis[3], floa
 		}
 		else if (oldMode == ROT_MODE_QUAT) {
 			/* quat to euler */
+			normalize_qt(quat);
 			quat_to_eulO( eul, newMode,quat);
 		}
 		/* else { no conversion needed } */
@@ -1273,6 +1267,7 @@ void BKE_rotMode_change_values (float quat[4], float eul[3], float axis[3], floa
 		}
 		else if (oldMode == ROT_MODE_QUAT) {
 			/* quat to axis angle */
+			normalize_qt(quat);
 			quat_to_axis_angle( axis, angle,quat);
 		}
 		
@@ -1405,13 +1400,6 @@ void where_is_armature_bone(Bone *bone, Bone *prevbone)
 		VECCOPY(bone->arm_mat[3], bone->head);
 	}
 	
-	/* head */
-	VECCOPY(bone->arm_head, bone->arm_mat[3]);
-	/* tail is in current local coord system */
-	VECCOPY(vec, bone->arm_mat[1]);
-	mul_v3_fl(vec, bone->length);
-	add_v3_v3v3(bone->arm_tail, bone->arm_head, vec);
-	
 	/* and the kiddies */
 	prevbone= bone;
 	for(bone= bone->childbase.first; bone; bone= bone->next) {
@@ -1455,10 +1443,6 @@ static void pose_proxy_synchronize(Object *ob, Object *from, int layer_protected
 
 	if(error)
 		return;
-	
-	/* exception, armature local layer should be proxied too */
-	if (pose->proxy_layer)
-		((bArmature *)ob->data)->layer= pose->proxy_layer;
 	
 	/* clear all transformation values from library */
 	rest_pose(frompose);
@@ -1505,7 +1489,7 @@ static void pose_proxy_synchronize(Object *ob, Object *from, int layer_protected
 			 */
 			extract_proxylocal_constraints(&proxylocal_constraints, &pchan->constraints);
 			copy_constraints(&pchanw.constraints, &pchanp->constraints, FALSE);
-			addlisttolist(&pchanw.constraints, &proxylocal_constraints);
+			BLI_movelisttolist(&pchanw.constraints, &proxylocal_constraints);
 			
 			/* constraints - set target ob pointer to own object */
 			for (con= pchanw.constraints.first; con; con= con->next) {
@@ -1734,28 +1718,25 @@ static void splineik_init_tree_from_pchan(Scene *scene, Object *UNUSED(ob), bPos
 		ikData->numpoints= ikData->chainlen+1; 
 		ikData->points= MEM_callocN(sizeof(float)*ikData->numpoints, "Spline IK Binding");
 		
+		/* bind 'tip' of chain (i.e. first joint = tip of bone with the Spline IK Constraint) */
+		ikData->points[0] = 1.0f;
+		
 		/* perform binding of the joints to parametric positions along the curve based 
 		 * proportion of the total length that each bone occupies
 		 */
 		for (i = 0; i < segcount; i++) {
-			if (i != 0) {
-				/* 'head' joints 
-				 * 	- 2 methods; the one chosen depends on whether we've got usable lengths
-				 */
-				if ((ikData->flag & CONSTRAINT_SPLINEIK_EVENSPLITS) || (totLength == 0.0f)) {
-					/* 1) equi-spaced joints */
-					ikData->points[i]= ikData->points[i-1] - segmentLen;
-				}
-				else {
-					 /*	2) to find this point on the curve, we take a step from the previous joint
-					  *	  a distance given by the proportion that this bone takes
-					  */
-					ikData->points[i]= ikData->points[i-1] - (boneLengths[i] / totLength);
-				}
+			/* 'head' joints, travelling towards the root of the chain
+			 * 	- 2 methods; the one chosen depends on whether we've got usable lengths
+			 */
+			if ((ikData->flag & CONSTRAINT_SPLINEIK_EVENSPLITS) || (totLength == 0.0f)) {
+				/* 1) equi-spaced joints */
+				ikData->points[i+1]= ikData->points[i] - segmentLen;
 			}
 			else {
-				/* 'tip' of chain, special exception for the first joint */
-				ikData->points[0]= 1.0f;
+				/*	2) to find this point on the curve, we take a step from the previous joint
+				 *	  a distance given by the proportion that this bone takes
+				 */
+				ikData->points[i+1]= ikData->points[i] - (boneLengths[i] / totLength);
 			}
 		}
 		
@@ -2102,8 +2083,7 @@ void pchan_to_mat4(bPoseChannel *pchan, float chan_mat[4][4])
 		 * but if this proves to be too problematic, switch back to the old system of operating directly on 
 		 * the stored copy
 		 */
-		QUATCOPY(quat, pchan->quat);
-		normalize_qt(quat);
+		normalize_qt_qt(quat, pchan->quat);
 		quat_to_mat3(rmat, quat);
 	}
 	
@@ -2120,7 +2100,7 @@ void pchan_to_mat4(bPoseChannel *pchan, float chan_mat[4][4])
 
 /* loc/rot/size to mat4 */
 /* used in constraint.c too */
-void chan_calc_mat(bPoseChannel *pchan)
+void pchan_calc_mat(bPoseChannel *pchan)
 {
 	/* this is just a wrapper around the copy of this function which calculates the matrix 
 	 * and stores the result in any given channel
@@ -2276,7 +2256,7 @@ void where_is_pose_bone(Scene *scene, Object *ob, bPoseChannel *pchan, float cti
 	parchan= pchan->parent;
 	
 	/* this gives a chan_mat with actions (ipos) results */
-	if(do_extra)	chan_calc_mat(pchan);
+	if(do_extra)	pchan_calc_mat(pchan);
 	else			unit_m4(pchan->chan_mat);
 
 	/* construct the posemat based on PoseChannels, that we do before applying constraints */
@@ -2410,7 +2390,7 @@ void where_is_pose (Scene *scene, Object *ob)
 	
 	if(ELEM(NULL, arm, scene)) return;
 	if((ob->pose==NULL) || (ob->pose->flag & POSE_RECALC)) 
-	   armature_rebuild_pose(ob, arm);
+		armature_rebuild_pose(ob, arm);
 	   
 	ctime= bsystem_time(scene, ob, (float)scene->r.cfra, 0.0);	/* not accurate... */
 	

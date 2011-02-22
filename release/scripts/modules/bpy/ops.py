@@ -134,6 +134,16 @@ class bpy_ops_submodule_op(object):
 
         return C_dict, C_exec
 
+    @staticmethod
+    def _scene_update(context):
+        scene = context.scene
+        if scene:  # None in backgroud mode
+            scene.update()
+        else:
+            import bpy
+            for scene in bpy.data.scenes:
+                scene.update()
+
     __doc__ = property(_get_doc)
 
     def __init__(self, module, func):
@@ -153,22 +163,23 @@ class bpy_ops_submodule_op(object):
         return self.module + "." + self.func
 
     def __call__(self, *args, **kw):
+        import bpy
+        context = bpy.context
 
         # Get the operator from blender
+        wm = context.window_manager
+
+        # run to account for any rna values the user changes.
+        __class__._scene_update(context)
+
         if args:
             C_dict, C_exec = __class__._parse_args(args)
             ret = op_call(self.idname_py(), C_dict, kw, C_exec)
         else:
             ret = op_call(self.idname_py(), None, kw)
 
-        if 'FINISHED' in ret:
-            import bpy
-            scene = bpy.context.scene
-            if scene:  # None in backgroud mode
-                scene.update()
-            else:
-                for scene in bpy.data.scenes:
-                    scene.update()
+        if 'FINISHED' in ret and context.window_manager == wm:
+            __class__._scene_update(context)
 
         return ret
 
@@ -184,7 +195,8 @@ class bpy_ops_submodule_op(object):
         as_string = op_as_string(idname)
         op_class = getattr(bpy.types, idname)
         descr = op_class.bl_rna.description
-        # XXX, workaround for not registering every __doc__ to save time on load.
+        # XXX, workaround for not registering
+        # every __doc__ to save time on load.
         if not descr:
             descr = op_class.__doc__
             if not descr:

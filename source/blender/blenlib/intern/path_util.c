@@ -43,6 +43,7 @@
 #include "BLI_string.h"
 #include "BLI_storage.h"
 #include "BLI_storage_types.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_utildefines.h"
 #include "BKE_blender.h"	// BLENDER_VERSION
@@ -70,7 +71,7 @@
 
 #else /* non windows */
 
-#ifdef __linux__
+#ifdef WITH_BINRELOC
 #include "binreloc.h"
 #endif
 
@@ -78,6 +79,8 @@
 
 /* local */
 #define UNIQUE_NAME_MAX 128
+
+extern char bprogname[];
 
 static int add_win32_extension(char *name);
 static char *blender_version_decimal(void);
@@ -416,8 +419,8 @@ void BLI_path_rel(char *file, const char *relfile)
 	/* also bail out if relative path is not set */
 	if (relfile[0] == 0) return;
 
-#ifdef WIN32 
-	if (strlen(relfile) > 2 && relfile[1] != ':') {
+#ifdef WIN32
+	if (BLI_strnlen(relfile, 3) > 2 && relfile[1] != ':') {
 		char* ptemp;
 		/* fix missing volume name in relative base,
 		   can happen with old recent-files.txt files */
@@ -431,7 +434,7 @@ void BLI_path_rel(char *file, const char *relfile)
 		BLI_strncpy(temp, relfile, FILE_MAXDIR + FILE_MAXFILE);
 	}
 
-	if (strlen(file) > 2) {
+	if (BLI_strnlen(file, 3) > 2) {
 		if ( temp[1] == ':' && file[1] == ':' && temp[0] != file[0] )
 			return;
 	}
@@ -456,7 +459,7 @@ void BLI_path_rel(char *file, const char *relfile)
 		char *p= temp;
 		char *q= file;
 
-		while ((*p == *q)) {
+		while (*p == *q) {
 			++p; ++q;
 			/* dont search beyond the end of the string
 			 * in the rare case they match */
@@ -749,8 +752,8 @@ int BLI_path_cwd(char *path)
 #endif
 	
 	if (wasrelative==1) {
-		char cwd[FILE_MAXDIR + FILE_MAXFILE];
-		BLI_getwdN(cwd); /* incase the full path to the blend isnt used */
+		char cwd[FILE_MAXDIR + FILE_MAXFILE]= "";
+		BLI_getwdN(cwd, sizeof(cwd)); /* incase the full path to the blend isnt used */
 		
 		if (cwd[0] == '\0') {
 			printf( "Could not get the current working directory - $PWD for an unknown reason.");
@@ -858,7 +861,7 @@ static int test_path(char *targetpath, const char *path_base, const char *path_s
 {
 	char tmppath[FILE_MAX];
 	
-	if(path_sep)	BLI_join_dirfile(tmppath, path_base, path_sep);
+	if(path_sep)	BLI_join_dirfile(tmppath, sizeof(tmppath), path_base, path_sep);
 	else			BLI_strncpy(tmppath, path_base, sizeof(tmppath));
 	
 	BLI_make_file_string("/", targetpath, tmppath, folder_name);
@@ -894,7 +897,6 @@ static int test_env_path(char *path, const char *envvar)
 
 static int get_path_local(char *targetpath, const char *folder_name, const char *subfolder_name)
 {
-	extern char bprogname[]; /* argv[0] from creator.c */
 	char bprogdir[FILE_MAX];
 	char relfolder[FILE_MAX];
 	
@@ -903,9 +905,9 @@ static int get_path_local(char *targetpath, const char *folder_name, const char 
 #endif
 	
 	if (subfolder_name) {
-		BLI_join_dirfile(relfolder, folder_name, subfolder_name);
+		BLI_join_dirfile(relfolder, sizeof(relfolder), folder_name, subfolder_name);
 	} else {
-		BLI_strncpy(relfolder, folder_name, FILE_MAX);
+		BLI_strncpy(relfolder, folder_name, sizeof(relfolder));
 	}
 	
 	/* use argv[0] (bprogname) to get the path to the executable */
@@ -963,7 +965,6 @@ static int get_path_system(char *targetpath, const char *folder_name, const char
 
 	/* first allow developer only overrides to the system path
 	 * these are only used when running blender from source */
-	extern char bprogname[]; /* argv[0] from creator.c */
 	char cwd[FILE_MAX];
 	char relfolder[FILE_MAX];
 	char bprogdir[FILE_MAX];
@@ -972,15 +973,18 @@ static int get_path_system(char *targetpath, const char *folder_name, const char
 	BLI_split_dirfile(bprogname, bprogdir, NULL);
 
 	if (subfolder_name) {
-		BLI_join_dirfile(relfolder, folder_name, subfolder_name);
+		BLI_join_dirfile(relfolder, sizeof(relfolder), folder_name, subfolder_name);
 	} else {
-		BLI_strncpy(relfolder, folder_name, FILE_MAX);
+		BLI_strncpy(relfolder, folder_name, sizeof(relfolder));
 	}
 
 	/* try CWD/release/folder_name */
-	if(test_path(targetpath, BLI_getwdN(cwd), "release", relfolder))
-		return 1;
-	
+	if(BLI_getwdN(cwd, sizeof(cwd))) {
+		if(test_path(targetpath, cwd, "release", relfolder)) {
+			return 1;
+		}
+	}
+
 	/* try EXECUTABLE_DIR/release/folder_name */
 	if(test_path(targetpath, bprogdir, "release", relfolder))
 		return 1;
@@ -1181,8 +1185,9 @@ void BLI_setenv_if_new(const char *env, const char* val)
 void BLI_clean(char *path)
 {
 	if(path==0) return;
+
 #ifdef WIN32
-	if(path && strlen(path)>2) {
+	if(path && BLI_strnlen(path, 3) > 2) {
 		BLI_char_switch(path+2, '/', '\\');
 	}
 #else
@@ -1271,7 +1276,7 @@ void BLI_make_file_string(const char *relabase, char *string,  const char *dir, 
 	}
 #ifdef WIN32
 	else {
-		if (strlen(dir) >= 2 && dir[1] == ':' ) {
+		if (BLI_strnlen(dir, 3) >= 2 && dir[1] == ':' ) {
 			BLI_strncpy(string, dir, 3);
 			dir += 2;
 		}
@@ -1317,10 +1322,10 @@ int BLI_testextensie(const char *str, const char *ext)
 {
 	short a, b;
 	int retval;
-
+	
 	a= strlen(str);
 	b= strlen(ext);
-
+	
 	if(a==0 || b==0 || b>=a) {
 		retval = 0;
 	} else if (BLI_strcasecmp(ext, str + a - b)) {
@@ -1328,7 +1333,7 @@ int BLI_testextensie(const char *str, const char *ext)
 	} else {
 		retval = 1;
 	}
-
+	
 	return (retval);
 }
 
@@ -1377,7 +1382,7 @@ int BLI_testextensie_glob(const char *str, const char *ext_fnmatch)
 
 int BLI_replace_extension(char *path, int maxlen, const char *ext)
 {
-	int a;
+	unsigned int a;
 
 	for(a=strlen(path)-1; a>=0; a--)
 		if(path[a] == '.' || path[a] == '/' || path[a] == '\\')
@@ -1418,12 +1423,12 @@ void BLI_split_dirfile(const char *string, char *dir, char *file)
 }
 
 /* simple appending of filename to dir, does not check for valid path! */
-void BLI_join_dirfile(char *string, const char *dir, const char *file)
+void BLI_join_dirfile(char *string, const int maxlen, const char *dir, const char *file)
 {
 	int sl_dir;
 	
 	if(string != dir) /* compare pointers */
-		BLI_strncpy(string, dir, FILE_MAX);
+		BLI_strncpy(string, dir, maxlen);
 
 	if (!file)
 		return;
@@ -1431,7 +1436,7 @@ void BLI_join_dirfile(char *string, const char *dir, const char *file)
 	sl_dir= BLI_add_slash(string);
 	
 	if (sl_dir <FILE_MAX) {
-		BLI_strncpy(string + sl_dir, file, FILE_MAX-sl_dir);
+		BLI_strncpy(string + sl_dir, file, maxlen - sl_dir);
 	}
 }
 
@@ -1506,21 +1511,21 @@ int BKE_rebase_path(char *abs, int abs_size, char *rel, int rel_size, const char
 
 		/* if image is _in_ current .blend file directory */
 		if (!strcmp(dir, blend_dir)) {
-			BLI_join_dirfile(dest_path, dest_dir, base);
+			BLI_join_dirfile(dest_path, sizeof(dest_path), dest_dir, base);
 		}
 		/* "below" */
 		else {
 			/* rel = image_path_dir - blend_dir */
 			BLI_strncpy(rel_dir, dir + len, sizeof(rel_dir));
 
-			BLI_join_dirfile(dest_path, dest_dir, rel_dir);
-			BLI_join_dirfile(dest_path, dest_path, base);
+			BLI_join_dirfile(dest_path, sizeof(dest_path), dest_dir, rel_dir);
+			BLI_join_dirfile(dest_path, sizeof(dest_path), dest_path, base);
 		}
 
 	}
 	/* image is out of current directory */
 	else {
-		BLI_join_dirfile(dest_path, dest_dir, base);
+		BLI_join_dirfile(dest_path, sizeof(dest_path), dest_dir, base);
 	}
 
 	if (abs)
@@ -1643,54 +1648,54 @@ static int add_win32_extension(char *name)
 	return (retval);
 }
 
-void BLI_where_am_i(char *fullname, const char *name)
+/* filename must be FILE_MAX length minimum */
+void BLI_where_am_i(char *fullname, const int maxlen, const char *name)
 {
 	char filename[FILE_MAXDIR+FILE_MAXFILE];
 	char *path = NULL, *temp;
-	
+
 #ifdef _WIN32
-	char *separator = ";";
-	char slash = '\\';
+	const char *separator = ";";
 #else
-	char *separator = ":";
-	char slash = '/';
+	const char *separator = ":";
 #endif
 
 	
-#ifdef __linux__
+#ifdef WITH_BINRELOC
 	/* linux uses binreloc since argv[0] is not relyable, call br_init( NULL ) first */
 	path = br_find_exe( NULL );
 	if (path) {
-		BLI_strncpy(fullname, path, FILE_MAXDIR+FILE_MAXFILE);
+		BLI_strncpy(fullname, path, maxlen);
 		free(path);
 		return;
 	}
 #endif
 
 #ifdef _WIN32
-	if(GetModuleFileName(0, fullname, FILE_MAXDIR+FILE_MAXFILE)) {
-		GetShortPathName(fullname, fullname, FILE_MAXDIR+FILE_MAXFILE);
+	if(GetModuleFileName(0, fullname, maxlen)) {
+		GetShortPathName(fullname, fullname, maxlen);
 		return;
 	}
 #endif
 
 	/* unix and non linux */
-	if (name && fullname && strlen(name)) {
-		strcpy(fullname, name);
+	if (name && name[0]) {
+		BLI_strncpy(fullname, name, maxlen);
 		if (name[0] == '.') {
-			// relative path, prepend cwd
-			BLI_getwdN(fullname);
-			
+			char wdir[FILE_MAX]= "";
+			BLI_getwdN(wdir, sizeof(wdir));	 /* backup cwd to restore after */
+
 			// not needed but avoids annoying /./ in name
-			if(name && name[0]=='.' && name[1]==slash)
-				BLI_join_dirfile(fullname, fullname, name+2);
+			if(name[1]==SEP)
+				BLI_join_dirfile(fullname, maxlen, wdir, name+2);
 			else
-				BLI_join_dirfile(fullname, fullname, name);
-			
-			add_win32_extension(fullname);
-		} else if (BLI_last_slash(name)) {
+				BLI_join_dirfile(fullname, maxlen, wdir, name);
+
+			add_win32_extension(fullname); /* XXX, doesnt respect length */
+		}
+		else if (BLI_last_slash(name)) {
 			// full path
-			strcpy(fullname, name);
+			BLI_strncpy(fullname, name, maxlen);
 			add_win32_extension(fullname);
 		} else {
 			// search for binary in $PATH
@@ -1705,9 +1710,9 @@ void BLI_where_am_i(char *fullname, const char *name)
 					} else {
 						strncpy(filename, path, sizeof(filename));
 					}
-					BLI_join_dirfile(fullname, fullname, name);
+					BLI_join_dirfile(fullname, maxlen, fullname, name);
 					if (add_win32_extension(filename)) {
-						strcpy(fullname, filename);
+						BLI_strncpy(fullname, filename, maxlen);
 						break;
 					}
 				} while (temp);
@@ -1725,7 +1730,7 @@ void BLI_where_am_i(char *fullname, const char *name)
 		// spaces and double-quotes. There's another solution to this
 		// with spawnv(P_WAIT, bprogname, argv) instead of system() but
 		// that's even uglier
-		GetShortPathName(fullname, fullname, FILE_MAXDIR+FILE_MAXFILE);
+		GetShortPathName(fullname, fullname, maxlen);
 #if defined(DEBUG)
 		printf("Shortname = '%s'\n", fullname);
 #endif
@@ -1733,12 +1738,12 @@ void BLI_where_am_i(char *fullname, const char *name)
 	}
 }
 
-void BLI_where_is_temp(char *fullname, int usertemp)
+void BLI_where_is_temp(char *fullname, const int maxlen, int usertemp)
 {
 	fullname[0] = '\0';
 	
 	if (usertemp && BLI_is_dir(U.tempdir)) {
-		strcpy(fullname, U.tempdir);
+		BLI_strncpy(fullname, U.tempdir, maxlen);
 	}
 	
 	
@@ -1746,7 +1751,7 @@ void BLI_where_is_temp(char *fullname, int usertemp)
 	if (fullname[0] == '\0') {
 		char *tmp = getenv("TEMP"); /* Windows */
 		if (tmp && BLI_is_dir(tmp)) {
-			strcpy(fullname, tmp);
+			BLI_strncpy(fullname, tmp, maxlen);
 		}
 	}
 #else
@@ -1754,31 +1759,32 @@ void BLI_where_is_temp(char *fullname, int usertemp)
 	if (fullname[0] == '\0') {
 		char *tmp = getenv("TMP");
 		if (tmp && BLI_is_dir(tmp)) {
-			strcpy(fullname, tmp);
+			BLI_strncpy(fullname, tmp, maxlen);
 		}
 	}
 	
 	if (fullname[0] == '\0') {
 		char *tmp = getenv("TMPDIR");
 		if (tmp && BLI_is_dir(tmp)) {
-			strcpy(fullname, tmp);
+			BLI_strncpy(fullname, tmp, maxlen);
 		}
 	}
 #endif	
 	
 	if (fullname[0] == '\0') {
-		strcpy(fullname, "/tmp/");
+		BLI_strncpy(fullname, "/tmp/", maxlen);
 	} else {
 		/* add a trailing slash if needed */
 		BLI_add_slash(fullname);
 #ifdef WIN32
-		strcpy(U.tempdir, fullname); /* also set user pref to show %TEMP%. /tmp/ is just plain confusing for Windows users. */
+		if(U.tempdir != fullname) {
+			BLI_strncpy(U.tempdir, fullname, maxlen); /* also set user pref to show %TEMP%. /tmp/ is just plain confusing for Windows users. */
+		}
 #endif
 	}
 }
 
 char *get_install_dir(void) {
-	extern char bprogname[];
 	char *tmpname = BLI_strdup(bprogname);
 	char *cut;
 

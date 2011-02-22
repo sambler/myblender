@@ -34,6 +34,7 @@
 #include "BKE_context.h"
 
 #include "BLI_rect.h"
+#include "BLI_utildefines.h"
 
 #include "ED_screen.h"
 #include "ED_types.h"
@@ -108,13 +109,6 @@ static int node_select_exec(bContext *C, wmOperator *op)
 	
 	/* perform the select */
 	node= node_mouse_select(snode, ar, mval, extend);
-
-	/* WATCH THIS, there are a few other ways to change the active material */
-	if(node) {
-		if (node->id && ELEM(GS(node->id->name), ID_MA, ID_TE)) {
-			WM_event_add_notifier(C, NC_MATERIAL|ND_SHADING_DRAW, node->id);
-		}
-	}
 	
 	/* send notifiers */
 	WM_event_add_notifier(C, NC_NODE|NA_SELECTED, NULL);
@@ -143,6 +137,7 @@ void NODE_OT_select(wmOperatorType *ot)
 	/* identifiers */
 	ot->name= "Select";
 	ot->idname= "NODE_OT_select";
+	ot->description= "Select node under cursor";
 	
 	/* api callbacks */
 	ot->invoke= node_select_invoke;
@@ -223,6 +218,7 @@ void NODE_OT_select_border(wmOperatorType *ot)
 	/* identifiers */
 	ot->name= "Border Select";
 	ot->idname= "NODE_OT_select_border";
+	ot->description= "Use box selection to select nodes";
 	
 	/* api callbacks */
 	ot->invoke= node_border_select_invoke;
@@ -292,7 +288,7 @@ static int node_select_linked_to_exec(bContext *C, wmOperator *UNUSED(op))
 		node->flag &= ~NODE_TEST;
 
 	for (link=snode->edittree->links.first; link; link=link->next) {
-		if (link->fromnode->flag & NODE_SELECT)
+		if (link->fromnode && link->tonode && (link->fromnode->flag & NODE_SELECT))
 			link->tonode->flag |= NODE_TEST;
 	}
 	
@@ -332,7 +328,7 @@ static int node_select_linked_from_exec(bContext *C, wmOperator *UNUSED(op))
 		node->flag &= ~NODE_TEST;
 
 	for(link=snode->edittree->links.first; link; link=link->next) {
-		if(link->tonode->flag & NODE_SELECT)
+		if(link->fromnode && link->tonode && (link->tonode->flag & NODE_SELECT))
 			link->fromnode->flag |= NODE_TEST;
 	}
 	

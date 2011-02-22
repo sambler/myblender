@@ -35,6 +35,7 @@
 #include "MEM_guardedalloc.h"
 
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 #include "BLI_ghash.h"
 #include "BLI_edgehash.h"
 
@@ -49,6 +50,8 @@
 #include "BKE_object.h"
 
 #include "depsgraph_private.h"
+
+#include "MOD_util.h"
 
 static void initData(ModifierData *md)
 {
@@ -443,7 +446,13 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 			  }
 
 			  if(med.v1 == med.v2) continue;
-
+			  
+			  /* XXX Unfortunately the calc_mapping returns sometimes numVerts... leads to bad crashes */
+			  if(med.v1 >= numVerts)
+				  med.v1= numVerts-1;
+			  if(med.v2 >= numVerts)
+				  med.v2= numVerts-1;
+			  
 			  if (initFlags) {
 				  med.flag |= ME_EDGEDRAW | ME_EDGERENDER;
 			  }
@@ -460,9 +469,15 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 			  {
 				  vert1 = calc_mapping(indexMap, inMED.v1, j);
 				  vert2 = calc_mapping(indexMap, inMED.v2, j);
-
+				  
 				  /* edge could collapse to single point after mapping */
 				  if(vert1 == vert2) continue;
+				  
+				  /* XXX Unfortunately the calc_mapping returns sometimes numVerts... leads to bad crashes */
+				  if(vert1 >= numVerts)
+					  vert1= numVerts-1;
+				  if(vert2 >= numVerts)
+					  vert2= numVerts-1;
 
 				  /* avoid duplicate edges */
 				  if(!BLI_edgehash_haskey(edges, vert1, vert2)) {
@@ -533,12 +548,10 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 				  if (inMF.v4)
 					  mf2->v4 = calc_mapping(indexMap, inMF.v4, j);
 
-				  test_index_face_maxvert(mf2, &result->faceData, numFaces, inMF.v4?4:3, numVerts);
 				  numFaces++;
 
 				  /* if the face has fewer than 3 vertices, don't create it */
-				  if(mf2->v3 == 0 || (mf2->v1 && (mf2->v1 == mf2->v3 || mf2->v1 ==
-								 mf2->v4))) {
+				  if(test_index_face_maxvert(mf2, &result->faceData, numFaces-1, inMF.v4?4:3, numVerts) < 3) {
 					  numFaces--;
 					  DM_free_face_data(result, numFaces, 1);
 								 }
@@ -794,6 +807,7 @@ ModifierTypeInfo modifierType_Array = {
 
 	/* copyData */          copyData,
 	/* deformVerts */       0,
+	/* deformMatrices */    0,
 	/* deformVertsEM */     0,
 	/* deformMatricesEM */  0,
 	/* applyModifier */     applyModifier,

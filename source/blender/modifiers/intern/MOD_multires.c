@@ -40,6 +40,8 @@
 
 #include "DNA_mesh_types.h"
 
+#include "MOD_util.h"
+
 static void initData(ModifierData *md)
 {
 	MultiresModifierData *mmd = (MultiresModifierData*)md;
@@ -109,6 +111,7 @@ ModifierTypeInfo modifierType_Multires = {
 
 	/* copyData */          copyData,
 	/* deformVerts */       0,
+	/* deformMatrices */    0,
 	/* deformVertsEM */     0,
 	/* deformMatricesEM */  0,
 	/* applyModifier */     applyModifier,

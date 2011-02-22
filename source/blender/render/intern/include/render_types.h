@@ -244,7 +244,7 @@ struct Render
 	int (*test_break)(void *handle);
 	void *tbh;
 	
-	void (*error)(void *handle, char *str);
+	void (*error)(void *handle, const char *str);
 	void *erh;
 	
 	RenderStats i;
@@ -433,7 +433,9 @@ typedef struct StrandBuffer {
 	int overrideuv;
 	int flag, maxdepth;
 	float adaptcos, minwidth, widthfade;
-
+	
+	float maxwidth;	/* for cliptest of strands in blender unit */
+	
 	float winmat[4][4];
 	int winx, winy;
 } StrandBuffer;
@@ -605,6 +607,7 @@ typedef struct LampRen {
 #define R_DIVIDE_24		32	
 /* vertex normals are tangent or view-corrected vector, for hair strands */
 #define R_TANGENT		64		
+#define R_TRACEBLE		128
 
 /* strandbuffer->flag */
 #define R_STRAND_BSPLINE	1

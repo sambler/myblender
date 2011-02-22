@@ -19,9 +19,10 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-SET(INC
+set(INC
 	../include
 	../../blenkernel
+	../../blenloader
 	../../blenlib
 	../../makesdna
 	../../makesrna
@@ -29,7 +30,7 @@ SET(INC
 	../../../../intern/guardedalloc
 )
 
-SET(SRC
+set(SRC
 	transform.c
 	transform_constraints.c
 	transform_conversions.c
@@ -40,6 +41,8 @@ SET(SRC
 	transform_ops.c
 	transform_orientations.c
 	transform_snap.c
+
+	transform.h
 )
 
-BLENDERLIB(bf_editor_transform "${SRC}" "${INC}")
+blender_add_lib(bf_editor_transform "${SRC}" "${INC}")

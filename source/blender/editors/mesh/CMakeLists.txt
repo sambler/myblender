@@ -19,9 +19,10 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-SET(INC
+set(INC
 	../include
 	../../blenkernel
+	../../blenloader
 	../../blenlib
 	../../imbuf
 	../../makesdna
@@ -31,7 +32,7 @@ SET(INC
 	../../../../intern/guardedalloc
 )
 
-SET(SRC
+set(SRC
 	editface.c
 	editmesh.c
 	editmesh_add.c
@@ -43,10 +44,8 @@ SET(SRC
 	mesh_data.c
 	mesh_ops.c
 	meshtools.c
+
+	mesh_intern.h
 )
 
-IF(WIN32)
-	LIST(APPEND INC ${PTHREADS_INC})
-ENDIF(WIN32)
-
-BLENDERLIB(bf_editor_mesh "${SRC}" "${INC}")
+blender_add_lib(bf_editor_mesh "${SRC}" "${INC}")

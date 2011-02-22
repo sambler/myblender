@@ -36,6 +36,7 @@
 #include "BLF_api.h"
 
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 
 #include "DNA_text_types.h"
 #include "DNA_space_types.h"
@@ -45,7 +46,7 @@
 #include "BKE_context.h"
 #include "BKE_suggestions.h"
 #include "BKE_text.h"
-#include "BKE_utildefines.h"
+
 
 #include "BIF_gl.h"
 
@@ -56,14 +57,11 @@
 #include "text_intern.h"
 
 /******************** text font drawing ******************/
-static int mono= -1; // XXX needs proper storage and change all the BLF_* here
+// XXX, fixme
+#define mono blf_mono_font
 
 static void text_font_begin(SpaceText *st)
 {
-	if(mono == -1)
-		mono= BLF_load_mem("monospace", (unsigned char*)datatoc_bmonofont_ttf, datatoc_bmonofont_ttf_size);
-
-	BLF_aspect(mono, 1.0);
 	BLF_size(mono, st->lheight, 72);
 }
 
@@ -91,7 +89,7 @@ static int text_font_draw_character(SpaceText *st, int x, int y, char c)
 	return st->cwidth;
 }
 
-int text_font_width(SpaceText *UNUSED(st), char *str)
+int text_font_width(SpaceText *UNUSED(st), const char *str)
 {
 	return BLF_width(mono, str);
 }
@@ -126,7 +124,7 @@ static void flatten_string_append(FlattenString *fs, char c, int accum)
 	fs->pos++;
 }
 
-int flatten_string(SpaceText *st, FlattenString *fs, char *in)
+int flatten_string(SpaceText *st, FlattenString *fs, const char *in)
 {
 	int r = 0, i = 0;
 
@@ -252,7 +250,7 @@ static int find_bool(char *string)
 
 /* Ensures the format string for the given line is long enough, reallocating
  as needed. Allocation is done here, alone, to ensure consistency. */
-int text_check_format_len(TextLine *line, unsigned int len)
+static int text_check_format_len(TextLine *line, unsigned int len)
 {
 	if(line->format) {
 		if(strlen(line->format) < len) {
@@ -604,7 +602,6 @@ void wrap_offset_in_line(SpaceText *st, ARegion *ar, TextLine *linein, int cursi
 	start= 0;
 	end= max;
 	chop= 1;
-	chars= 0;
 	*offc= 0;
 
 	for(i=0, j=0; linein->line[j]!='\0'; j++) {
@@ -648,7 +645,7 @@ void wrap_offset_in_line(SpaceText *st, ARegion *ar, TextLine *linein, int cursi
 	}
 }
 
-int text_get_char_pos(SpaceText *st, char *line, int cur)
+int text_get_char_pos(SpaceText *st, const char *line, int cur)
 {
 	int a=0, i;
 	
@@ -957,14 +954,14 @@ void text_free_caches(SpaceText *st)
 /************************ word-wrap utilities *****************************/
 
 /* cache should be updated in caller */
-int text_get_visible_lines_no(SpaceText *st, int lineno)
+static int text_get_visible_lines_no(SpaceText *st, int lineno)
 {
 	DrawCache *drawcache= (DrawCache *)st->drawcache;
 
 	return drawcache->line_height[lineno];
 }
 
-int text_get_visible_lines(SpaceText *st, ARegion *ar, char *str)
+int text_get_visible_lines(SpaceText *st, ARegion *ar, const char *str)
 {
 	int i, j, start, end, max, lines, chars;
 	char ch;
@@ -1032,10 +1029,8 @@ static TextLine *first_visible_line(SpaceText *st, ARegion *ar, int *wrap_top)
 	Text *text= st->text;
 	TextLine* pline= text->lines.first;
 	int i= st->top, lineno= 0;
-	DrawCache *drawcache;
 
 	text_update_drawcache(st, ar);
-	drawcache= (DrawCache *)st->drawcache;
 
 	if(wrap_top) *wrap_top= 0;
 
@@ -1053,7 +1048,7 @@ static TextLine *first_visible_line(SpaceText *st, ARegion *ar, int *wrap_top)
 			}
 		}
 	} else {
-		for(i=st->top, pline= text->lines.first; pline->next && i>0; i--)
+		for(i=st->top; pline->next && i>0; i--)
 			pline= pline->next;
 	}
 
@@ -1062,7 +1057,7 @@ static TextLine *first_visible_line(SpaceText *st, ARegion *ar, int *wrap_top)
 
 /************************ draw scrollbar *****************************/
 
-static void calc_text_rcts(SpaceText *st, ARegion *ar, rcti *scroll)
+static void calc_text_rcts(SpaceText *st, ARegion *ar, rcti *scroll, rcti *back)
 {
 	int lhlstart, lhlend, ltexth, sell_off, curl_off;
 	short barheight, barstart, hlstart, hlend, blank_lines;
@@ -1075,8 +1070,11 @@ static void calc_text_rcts(SpaceText *st, ARegion *ar, rcti *scroll)
 	blank_lines = st->viewlines / 2;
 	
 	/* nicer code: use scroll rect for entire bar */
-	//scroll->xmin= 5;
-	//scroll->xmax= 17;
+	back->xmin= ar->winx -18;
+	back->xmax= ar->winx;
+	back->ymin= 0;
+	back->ymax= ar->winy;
+	
 	scroll->xmin= ar->winx - 17;
 	scroll->xmax= ar->winx - 5;
 	scroll->ymin= 4;
@@ -1172,19 +1170,23 @@ static void calc_text_rcts(SpaceText *st, ARegion *ar, rcti *scroll)
 	CLAMP(st->txtscroll.ymax, pix_bottom_margin, ar->winy - pix_top_margin);
 }
 
-static void draw_textscroll(SpaceText *st, rcti *scroll)
+static void draw_textscroll(SpaceText *st, rcti *scroll, rcti *back)
 {
 	bTheme *btheme= U.themes.first;
 	uiWidgetColors wcol= btheme->tui.wcol_scroll;
-	char col[3];
+	unsigned char col[4];
 	float rad;
 	
+	UI_ThemeColor(TH_BACK);
+	glRecti(back->xmin, back->ymin, back->xmax, back->ymax);
+
 	uiWidgetScrollDraw(&wcol, scroll, &st->txtbar, (st->flags & ST_SCROLL_SELECT)?UI_SCROLL_PRESSED:0);
 
 	uiSetRoundBox(15);
 	rad= 0.4f*MIN2(st->txtscroll.xmax - st->txtscroll.xmin, st->txtscroll.ymax - st->txtscroll.ymin);
 	UI_GetThemeColor3ubv(TH_HILITE, col);
-	glColor4ub(col[0], col[1], col[2], 48);
+	col[3]= 48;
+	glColor4ubv(col);
 	glEnable(GL_BLEND);
 	uiRoundBox(st->txtscroll.xmin+1, st->txtscroll.ymin, st->txtscroll.xmax-1, st->txtscroll.ymax, rad);
 	glDisable(GL_BLEND);
@@ -1231,7 +1233,7 @@ static void draw_markers(SpaceText *st, ARegion *ar)
 		/* invisible part of line (before top, after last visible line) */
 		if(y2 < 0 || y1 > st->top+st->viewlines) continue;
 
-		glColor3ub(marker->color[0], marker->color[1], marker->color[2]);
+		glColor3ubv(marker->color);
 		x= st->showlinenrs ? TXT_OFFSET + TEXTXLOC : TXT_OFFSET;
 		y= ar->winy-3;
 
@@ -1280,7 +1282,7 @@ static void draw_documentation(SpaceText *st, ARegion *ar)
 {
 	TextLine *tmp;
 	char *docs, buf[DOC_WIDTH+1], *p;
-	int len, i, br, lines;
+	int i, br, lines;
 	int boxw, boxh, l, x, y, top;
 	
 	if(!st || !st->text) return;
@@ -1305,7 +1307,6 @@ static void draw_documentation(SpaceText *st, ARegion *ar)
 	}
 
 	top= y= ar->winy - st->lheight*l - 2;
-	len= strlen(docs);
 	boxw= DOC_WIDTH*st->cwidth + 20;
 	boxh= (DOC_HEIGHT+1)*st->lheight;
 
@@ -1420,7 +1421,7 @@ static void draw_suggestion_list(SpaceText *st, ARegion *ar)
 			UI_ThemeColor(TH_SHADE2);
 			glRecti(x+16, y-3, x+16+w, y+st->lheight-3);
 		}
-		b=1; /* b=1 colour block, text is default. b=0 no block, colour text */
+		b=1; /* b=1 color block, text is default. b=0 no block, color text */
 		switch (item->type) {
 			case 'k': UI_ThemeColor(TH_SYNTAX_B); b=0; break;
 			case 'm': UI_ThemeColor(TH_TEXT); break;
@@ -1444,10 +1445,11 @@ static void draw_cursor(SpaceText *st, ARegion *ar)
 {
 	Text *text= st->text;
 	int vcurl, vcurc, vsell, vselc, hidden=0;
-	int offl, offc, x, y, w, i;
+	int x, y, w, i;
 
 	/* Draw the selection */
 	if(text->curl!=text->sell || text->curc!=text->selc) {
+		int offl, offc;
 		/* Convert all to view space character coordinates */
 		wrap_offset(st, ar, text->curl, text->curc, &offl, &offc);
 		vcurl = txt_get_span(text->lines.first, text->curl) - st->top + offl;
@@ -1491,6 +1493,7 @@ static void draw_cursor(SpaceText *st, ARegion *ar)
 		}
 	}
 	else {
+		int offl, offc;
 		wrap_offset(st, ar, text->sell, text->selc, &offl, &offc);
 		vsell = txt_get_span(text->lines.first, text->sell) - st->top + offl;
 		vselc = text_get_char_pos(st, text->sell->line, text->selc) - st->left + offc;
@@ -1673,7 +1676,7 @@ void draw_text_main(SpaceText *st, ARegion *ar)
 {
 	Text *text= st->text;
 	TextLine *tmp;
-	rcti scroll;
+	rcti scroll, back;
 	char linenr[12];
 	int i, x, y, winx, linecount= 0, lineno= 0;
 	int wraplinecount= 0, wrap_skip= 0;
@@ -1692,7 +1695,7 @@ void draw_text_main(SpaceText *st, ARegion *ar)
 	else st->viewlines= 0;
 	
 	/* update rects for scroll */
-	calc_text_rcts(st, ar, &scroll);	/* scroll will hold the entire bar size */
+	calc_text_rcts(st, ar, &scroll, &back);	/* scroll will hold the entire bar size */
 
 	/* update syntax formatting if needed */
 	tmp= text->lines.first;
@@ -1776,11 +1779,20 @@ void draw_text_main(SpaceText *st, ARegion *ar)
 		wrap_skip= 0;
 	}
 	
+	if(st->flags&ST_SHOW_MARGIN) {
+		UI_ThemeColor(TH_HILITE);
+
+		glBegin(GL_LINES);
+		glVertex2i(x+st->cwidth*st->margin_column, 0);
+		glVertex2i(x+st->cwidth*st->margin_column, ar->winy - 2);
+		glEnd();
+	}
+
 	/* draw other stuff */
 	draw_brackets(st, ar);
 	draw_markers(st, ar);
 	glTranslatef(0.375f, 0.375f, 0.0f); /* XXX scroll requires exact pixel space */
-	draw_textscroll(st, &scroll);
+	draw_textscroll(st, &scroll, &back);
 	draw_documentation(st, ar);
 	draw_suggestion_list(st, ar);
 	

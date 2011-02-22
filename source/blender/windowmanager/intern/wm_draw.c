@@ -39,10 +39,11 @@
 #include "MEM_guardedalloc.h"
 
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_context.h"
 #include "BKE_global.h"
-#include "BKE_utildefines.h"
+
 
 #include "GHOST_C-api.h"
 
@@ -79,13 +80,13 @@ static void wm_paintcursor_draw(bContext *C, ARegion *ar)
 		if(screen->subwinactive == ar->swinid) {
 			for(pc= wm->paintcursors.first; pc; pc= pc->next) {
 				if(pc->poll == NULL || pc->poll(C)) {
-					ARegion *ar= CTX_wm_region(C);
+					ARegion *ar_other= CTX_wm_region(C);
 					if (ELEM(win->grabcursor, GHOST_kGrabWrap, GHOST_kGrabHide)) {
 						int x = 0, y = 0;
 						wm_get_cursor_position(win, &x, &y);
-						pc->draw(C, x - ar->winrct.xmin, y - ar->winrct.ymin, pc->customdata);
+						pc->draw(C, x - ar_other->winrct.xmin, y - ar_other->winrct.ymin, pc->customdata);
 					} else {
-						pc->draw(C, win->eventstate->x - ar->winrct.xmin, win->eventstate->y - ar->winrct.ymin, pc->customdata);
+						pc->draw(C, win->eventstate->x - ar_other->winrct.xmin, win->eventstate->y - ar_other->winrct.ymin, pc->customdata);
 					}
 				}
 			}
@@ -559,7 +560,7 @@ static void wm_method_draw_triple(bContext *C, wmWindow *win)
 	bScreen *screen= win->screen;
 	ScrArea *sa;
 	ARegion *ar;
-	int copytex= 0;
+	int copytex= 0, paintcursor= 1;
 
 	if(win->drawdata) {
 		glClearColor(0, 0, 0, 0);
@@ -568,8 +569,6 @@ static void wm_method_draw_triple(bContext *C, wmWindow *win)
 		wmSubWindowSet(win, screen->mainwin);
 
 		wm_triple_draw_textures(win, win->drawdata);
-
-		triple= win->drawdata;
 	}
 	else {
 		win->drawdata= MEM_callocN(sizeof(wmDrawTriple), "wmDrawTriple");
@@ -617,13 +616,16 @@ static void wm_method_draw_triple(bContext *C, wmWindow *win)
 			CTX_wm_menu_set(C, ar);
 			ED_region_do_draw(C, ar);
 			CTX_wm_menu_set(C, NULL);
+			/* when a menu is being drawn, don't do the paint cursors */
+			paintcursor= 0;
 		}
 	}
 
-	if(screen->do_draw_gesture)
+	/* always draw, not only when screen tagged */
+	if(win->gesture.first)
 		wm_gesture_draw(win);
 
-	if(wm->paintcursors.first) {
+	if(paintcursor && wm->paintcursors.first) {
 		for(sa= screen->areabase.first; sa; sa= sa->next) {
 			for(ar=sa->regionbase.first; ar; ar= ar->next) {
 				if(ar->swinid == screen->subwinactive) {
@@ -809,7 +811,7 @@ void wm_draw_region_clear(wmWindow *win, ARegion *ar)
 	win->screen->do_draw= 1;
 }
 
-void wm_draw_region_modified(wmWindow *win, ARegion *ar)
+static void wm_draw_region_modified(wmWindow *win, ARegion *ar)
 {
 	int drawmethod= wm_automatic_draw_method(win);
 

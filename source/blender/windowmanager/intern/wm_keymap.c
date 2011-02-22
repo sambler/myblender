@@ -37,6 +37,7 @@
 #include "MEM_guardedalloc.h"
 
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_blender.h"
 #include "BKE_context.h"
@@ -44,7 +45,7 @@
 #include "BKE_library.h"
 #include "BKE_main.h"
 #include "BKE_screen.h"
-#include "BKE_utildefines.h"
+
 
 #include "RNA_access.h"
 #include "RNA_enum_types.h"
@@ -75,7 +76,7 @@ void WM_keymap_properties_reset(wmKeyMapItem *kmi, struct IDProperty *properties
 	keymap_properties_set(kmi);
 }
 
-wmKeyConfig *WM_keyconfig_new(wmWindowManager *wm, char *idname)
+wmKeyConfig *WM_keyconfig_new(wmWindowManager *wm, const char *idname)
 {
 	wmKeyConfig *keyconf;
 	
@@ -86,7 +87,7 @@ wmKeyConfig *WM_keyconfig_new(wmWindowManager *wm, char *idname)
 	return keyconf;
 }
 
-wmKeyConfig *WM_keyconfig_new_user(wmWindowManager *wm, char *idname)
+wmKeyConfig *WM_keyconfig_new_user(wmWindowManager *wm, const char *idname)
 {
 	wmKeyConfig *keyconf = WM_keyconfig_new(wm, idname);
 
@@ -196,8 +197,18 @@ static void keymap_event_set(wmKeyMapItem *kmi, short type, short val, int modif
 	}
 }
 
+static void keymap_item_set_id(wmKeyMap *keymap, wmKeyMapItem *kmi)
+{
+	keymap->kmi_id++;
+	if ((keymap->flag & KEYMAP_USER) == 0) {
+		kmi->id = keymap->kmi_id;
+	} else {
+		kmi->id = -keymap->kmi_id; // User defined keymap entries have negative ids
+	}
+}
+
 /* if item was added, then bail out */
-wmKeyMapItem *WM_keymap_verify_item(wmKeyMap *keymap, char *idname, int type, int val, int modifier, int keymodifier)
+wmKeyMapItem *WM_keymap_verify_item(wmKeyMap *keymap, const char *idname, int type, int val, int modifier, int keymodifier)
 {
 	wmKeyMapItem *kmi;
 	
@@ -210,10 +221,7 @@ wmKeyMapItem *WM_keymap_verify_item(wmKeyMap *keymap, char *idname, int type, in
 		BLI_addtail(&keymap->items, kmi);
 		BLI_strncpy(kmi->idname, idname, OP_MAX_TYPENAME);
 		
-		if ((keymap->flag & KEYMAP_USER) == 0) {
-			keymap->kmi_id++;
-			kmi->id = keymap->kmi_id;
-		}
+		keymap_item_set_id(keymap, kmi);
 
 		keymap_event_set(kmi, type, val, modifier, keymodifier);
 		keymap_properties_set(kmi);
@@ -222,7 +230,7 @@ wmKeyMapItem *WM_keymap_verify_item(wmKeyMap *keymap, char *idname, int type, in
 }
 
 /* always add item */
-wmKeyMapItem *WM_keymap_add_item(wmKeyMap *keymap, char *idname, int type, int val, int modifier, int keymodifier)
+wmKeyMapItem *WM_keymap_add_item(wmKeyMap *keymap, const char *idname, int type, int val, int modifier, int keymodifier)
 {
 	wmKeyMapItem *kmi= MEM_callocN(sizeof(wmKeyMapItem), "keymap entry");
 	
@@ -232,16 +240,13 @@ wmKeyMapItem *WM_keymap_add_item(wmKeyMap *keymap, char *idname, int type, int v
 	keymap_event_set(kmi, type, val, modifier, keymodifier);
 	keymap_properties_set(kmi);
 
-	if ((keymap->flag & KEYMAP_USER) == 0) {
-		keymap->kmi_id++;
-		kmi->id = keymap->kmi_id;
-	}
+	keymap_item_set_id(keymap, kmi);
 
 	return kmi;
 }
 
 /* menu wrapper for WM_keymap_add_item */
-wmKeyMapItem *WM_keymap_add_menu(wmKeyMap *keymap, char *idname, int type, int val, int modifier, int keymodifier)
+wmKeyMapItem *WM_keymap_add_menu(wmKeyMap *keymap, const char *idname, int type, int val, int modifier, int keymodifier)
 {
 	wmKeyMapItem *kmi= WM_keymap_add_item(keymap, "WM_OT_call_menu", type, val, modifier, keymodifier);
 	RNA_string_set(kmi->ptr, "name", idname);
@@ -265,7 +270,7 @@ void WM_keymap_remove_item(wmKeyMap *keymap, wmKeyMapItem *kmi)
    space/region ids are same as DNA_space_types.h */
 /* gets free'd in wm.c */
 
-wmKeyMap *WM_keymap_list_find(ListBase *lb, char *idname, int spaceid, int regionid)
+wmKeyMap *WM_keymap_list_find(ListBase *lb, const char *idname, int spaceid, int regionid)
 {
 	wmKeyMap *km;
 
@@ -277,7 +282,7 @@ wmKeyMap *WM_keymap_list_find(ListBase *lb, char *idname, int spaceid, int regio
 	return NULL;
 }
 
-wmKeyMap *WM_keymap_find(wmKeyConfig *keyconf, char *idname, int spaceid, int regionid)
+wmKeyMap *WM_keymap_find(wmKeyConfig *keyconf, const char *idname, int spaceid, int regionid)
 {
 	wmKeyMap *km= WM_keymap_list_find(&keyconf->keymaps, idname, spaceid, regionid);
 	
@@ -292,7 +297,7 @@ wmKeyMap *WM_keymap_find(wmKeyConfig *keyconf, char *idname, int spaceid, int re
 	return km;
 }
 
-wmKeyMap *WM_keymap_find_all(const bContext *C, char *idname, int spaceid, int regionid)
+wmKeyMap *WM_keymap_find_all(const bContext *C, const char *idname, int spaceid, int regionid)
 {
 	wmWindowManager *wm = CTX_wm_manager(C);
 	wmKeyConfig *keyconf;
@@ -323,7 +328,7 @@ wmKeyMap *WM_keymap_find_all(const bContext *C, char *idname, int spaceid, int r
 
 /* modal maps get linked to a running operator, and filter the keys before sending to modal() callback */
 
-wmKeyMap *WM_modalkeymap_add(wmKeyConfig *keyconf, char *idname, EnumPropertyItem *items)
+wmKeyMap *WM_modalkeymap_add(wmKeyConfig *keyconf, const char *idname, EnumPropertyItem *items)
 {
 	wmKeyMap *km= WM_keymap_find(keyconf, idname, 0, 0);
 	km->flag |= KEYMAP_MODAL;
@@ -332,7 +337,7 @@ wmKeyMap *WM_modalkeymap_add(wmKeyConfig *keyconf, char *idname, EnumPropertyIte
 	return km;
 }
 
-wmKeyMap *WM_modalkeymap_get(wmKeyConfig *keyconf, char *idname)
+wmKeyMap *WM_modalkeymap_get(wmKeyConfig *keyconf, const char *idname)
 {
 	wmKeyMap *km;
 	
@@ -354,15 +359,12 @@ wmKeyMapItem *WM_modalkeymap_add_item(wmKeyMap *km, int type, int val, int modif
 	
 	keymap_event_set(kmi, type, val, modifier, keymodifier);
 
-	if ((km->flag & KEYMAP_USER) == 0) {
-		km->kmi_id++;
-		kmi->id = km->kmi_id;
-	}
+	keymap_item_set_id(km, kmi);
 
 	return kmi;
 }
 
-void WM_modalkeymap_assign(wmKeyMap *km, char *opname)
+void WM_modalkeymap_assign(wmKeyMap *km, const char *opname)
 {
 	wmOperatorType *ot= WM_operatortype_find(opname, 0);
 	
@@ -651,6 +653,10 @@ wmKeyMap *WM_keymap_copy_to_user(wmKeyMap *keymap)
 
 	usermap= WM_keymap_list_find(&U.keymaps, keymap->idname, keymap->spaceid, keymap->regionid);
 
+	/* XXX this function is only used by RMB setting hotkeys, and it clears maps on 2nd try this way */
+	if(keymap==usermap)
+		return keymap;
+	
 	if(!usermap) {
 		/* not saved yet, duplicate existing */
 		usermap= MEM_dupallocN(keymap);
@@ -757,7 +763,7 @@ wmKeyMapItem *WM_keymap_item_find_id(wmKeyMap *keymap, int id)
 
 /* Guess an appropriate keymap from the operator name */
 /* Needs to be kept up to date with Keymap and Operator naming */
-wmKeyMap *WM_keymap_guess_opname(const bContext *C, char *opname)
+wmKeyMap *WM_keymap_guess_opname(const bContext *C, const char *opname)
 {
 	wmKeyMap *km=NULL;
 	SpaceLink *sl = CTX_wm_space_data(C);

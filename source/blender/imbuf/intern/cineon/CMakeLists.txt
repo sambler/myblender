@@ -24,18 +24,18 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-SET(INC 
+set(INC 
 		.
-		intern/include
 		..
-		../../
+		../..
 		../../../blenkernel
+		../../../blenloader
 		../../../blenlib
 		../../../makesdna
 		../../../../../intern/guardedalloc
 )
 
-SET(SRC
+set(SRC
 	cineon_dpx.c
 	cineonlib.c
 	dpxlib.c
@@ -44,4 +44,4 @@ SET(SRC
 	logmemfile.c
 )
 
-BLENDERLIB(bf_cineon "${SRC}" "${INC}")
+blender_add_lib(bf_imbuf_cineon "${SRC}" "${INC}")

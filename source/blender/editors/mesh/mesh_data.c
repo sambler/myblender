@@ -38,6 +38,11 @@
 #include "DNA_scene_types.h"
 #include "DNA_view3d_types.h"
 
+#include "BLI_math.h"
+#include "BLI_editVert.h"
+#include "BLI_edgehash.h"
+#include "BLI_utildefines.h"
+
 #include "BKE_context.h"
 #include "BKE_depsgraph.h"
 #include "BKE_displist.h"
@@ -46,10 +51,6 @@
 #include "BKE_material.h"
 #include "BKE_mesh.h"
 #include "BKE_report.h"
-
-#include "BLI_math.h"
-#include "BLI_editVert.h"
-#include "BLI_edgehash.h"
 
 #include "RNA_access.h"
 #include "RNA_define.h"
@@ -189,7 +190,7 @@ int ED_mesh_uv_texture_add(bContext *C, Mesh *me, const char *name, int active_s
 		mesh_update_customdata_pointers(me);
 	}
 
-	DAG_id_flush_update(&me->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&me->id, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, me);
 
 	return 1;
@@ -208,7 +209,7 @@ int ED_mesh_uv_texture_remove(bContext *C, Object *ob, Mesh *me)
 		return 0;
 
 	delete_customdata_layer(C, ob, cdl);
-	DAG_id_flush_update(&me->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&me->id, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, me);
 
 	return 1;
@@ -252,7 +253,7 @@ int ED_mesh_color_add(bContext *C, Scene *scene, Object *ob, Mesh *me, const cha
 			shadeMeshMCol(scene, ob, me);
 	}
 
-	DAG_id_flush_update(&me->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&me->id, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, me);
 
 	return 1;
@@ -271,7 +272,7 @@ int ED_mesh_color_remove(bContext *C, Object *ob, Mesh *me)
 		return 0;
 
 	delete_customdata_layer(C, ob, cdl);
-	DAG_id_flush_update(&me->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&me->id, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, me);
 
 	return 1;
@@ -315,6 +316,7 @@ void MESH_OT_uv_texture_add(wmOperatorType *ot)
 static int drop_named_image_invoke(bContext *C, wmOperator *op, wmEvent *event)
 {
 	Scene *scene= CTX_data_scene(C);
+	View3D *v3d= CTX_wm_view3d(C);
 	Base *base= ED_view3d_give_base_under_cursor(C, event->mval);
 	Image *ima= NULL;
 	Mesh *me;
@@ -366,6 +368,10 @@ static int drop_named_image_invoke(bContext *C, wmOperator *op, wmEvent *event)
 		me->edit_mesh= NULL;
 	}
 
+	/* dummie drop support; ensure view shows a result :) */
+	if(v3d)
+		v3d->flag2 |= V3D_SOLID_TEX;
+	
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 	
 	return OPERATOR_FINISHED;
@@ -485,7 +491,7 @@ static int sticky_add_exec(bContext *C, wmOperator *UNUSED(op))
 
 	RE_make_sticky(scene, v3d);
 
-	DAG_id_flush_update(&me->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&me->id, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, me);
 
 	return OPERATOR_FINISHED;
@@ -517,7 +523,7 @@ static int sticky_remove_exec(bContext *C, wmOperator *UNUSED(op))
 	CustomData_free_layer_active(&me->vdata, CD_MSTICKY, me->totvert);
 	me->msticky= NULL;
 
-	DAG_id_flush_update(&me->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&me->id, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, me);
 
 	return OPERATOR_FINISHED;
@@ -540,81 +546,14 @@ void MESH_OT_sticky_remove(wmOperatorType *ot)
 
 /************************** Add Geometry Layers *************************/
 
-static void mesh_calc_edges(Mesh *mesh, int update)
-{
-	CustomData edata;
-	EdgeHashIterator *ehi;
-	MFace *mf = mesh->mface;
-	MEdge *med, *med_orig;
-	EdgeHash *eh = BLI_edgehash_new();
-	int i, totedge, totface = mesh->totface;
-
-	if(mesh->totedge==0)
-		update= 0;
-
-	if(update) {
-		/* assume existing edges are valid
-		 * useful when adding more faces and generating edges from them */
-		med= mesh->medge;
-		for(i= 0; i<mesh->totedge; i++, med++)
-			BLI_edgehash_insert(eh, med->v1, med->v2, med);
-	}
-
-	for (i = 0; i < totface; i++, mf++) {
-		if (!BLI_edgehash_haskey(eh, mf->v1, mf->v2))
-			BLI_edgehash_insert(eh, mf->v1, mf->v2, NULL);
-		if (!BLI_edgehash_haskey(eh, mf->v2, mf->v3))
-			BLI_edgehash_insert(eh, mf->v2, mf->v3, NULL);
-		
-		if (mf->v4) {
-			if (!BLI_edgehash_haskey(eh, mf->v3, mf->v4))
-				BLI_edgehash_insert(eh, mf->v3, mf->v4, NULL);
-			if (!BLI_edgehash_haskey(eh, mf->v4, mf->v1))
-				BLI_edgehash_insert(eh, mf->v4, mf->v1, NULL);
-		} else {
-			if (!BLI_edgehash_haskey(eh, mf->v3, mf->v1))
-				BLI_edgehash_insert(eh, mf->v3, mf->v1, NULL);
-		}
-	}
-
-	totedge = BLI_edgehash_size(eh);
-
-	/* write new edges into a temporary CustomData */
-	memset(&edata, 0, sizeof(edata));
-	CustomData_add_layer(&edata, CD_MEDGE, CD_CALLOC, NULL, totedge);
-
-	ehi = BLI_edgehashIterator_new(eh);
-	med = CustomData_get_layer(&edata, CD_MEDGE);
-	for(i = 0; !BLI_edgehashIterator_isDone(ehi);
-		BLI_edgehashIterator_step(ehi), ++i, ++med) {
-
-		if(update && (med_orig=BLI_edgehashIterator_getValue(ehi))) {
-			*med= *med_orig; /* copy from the original */
-		} else {
-			BLI_edgehashIterator_getKey(ehi, (int*)&med->v1, (int*)&med->v2);
-			med->flag = ME_EDGEDRAW|ME_EDGERENDER;
-		}
-	}
-	BLI_edgehashIterator_free(ehi);
-
-	/* free old CustomData and assign new one */
-	CustomData_free(&mesh->edata, mesh->totedge);
-	mesh->edata = edata;
-	mesh->totedge = totedge;
-
-	mesh->medge = CustomData_get_layer(&mesh->edata, CD_MEDGE);
-
-	BLI_edgehash_free(eh, NULL);
-}
-
 void ED_mesh_update(Mesh *mesh, bContext *C, int calc_edges)
 {
 	if(calc_edges || (mesh->totface && mesh->totedge == 0))
-		mesh_calc_edges(mesh, calc_edges);
+		BKE_mesh_calc_edges(mesh, calc_edges);
 
 	mesh_calc_normals(mesh->mvert, mesh->totvert, mesh->mface, mesh->totface, NULL);
 
-	DAG_id_flush_update(&mesh->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&mesh->id, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, mesh);
 }
 

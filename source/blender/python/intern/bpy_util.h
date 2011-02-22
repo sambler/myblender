@@ -22,8 +22,6 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
-#include <Python.h>
-
 #ifndef BPY_UTIL_H
 #define BPY_UTIL_H
 
@@ -54,11 +52,11 @@ int BPY_class_validate(const char *class_type, PyObject *class, PyObject *base_c
 char *BPy_enum_as_string(struct EnumPropertyItem *item);
 
 
-#define BLANK_PYTHON_TYPE {PyVarObject_HEAD_INIT(NULL, 0) 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+#define BLANK_PYTHON_TYPE {PyVarObject_HEAD_INIT(NULL, 0) NULL}
 
 /* error reporting */
-int BPy_reports_to_error(struct ReportList *reports);
-int BPy_errors_to_report(struct ReportList *reports);
+short BPy_reports_to_error(struct ReportList *reports, const short clear);
+short BPy_errors_to_report(struct ReportList *reports);
 
 /* TODO - find a better solution! */
 struct bContext *BPy_GetContext(void);

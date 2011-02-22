@@ -1,5 +1,4 @@
-/**
- *
+/*
  * $Id$ 
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -21,10 +20,15 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
-#include "DNA_listBase.h"
-
 #ifndef DNA_MODIFIER_TYPES_H
 #define DNA_MODIFIER_TYPES_H
+
+/** \file DNA_modifier_types.h
+ *  \ingroup DNA
+ */
+
+#include "DNA_listBase.h"
+
 
 #define MODSTACK_DEBUG 1
 
@@ -79,6 +83,7 @@ typedef enum ModifierMode {
 	eModifierMode_OnCage = (1<<3),
 	eModifierMode_Expanded = (1<<4),
 	eModifierMode_Virtual = (1<<5),
+	eModifierMode_ApplyOnSpline = (1<<6),
 	eModifierMode_DisableTemporary = (1 << 31)
 } ModifierMode;
 
@@ -209,13 +214,13 @@ typedef struct ArrayModifierData {
 #define MOD_ARR_FITCURVE   2
 
 /* ArrayModifierData->offset_type */
-#define MOD_ARR_OFF_CONST    1<<0
-#define MOD_ARR_OFF_RELATIVE 1<<1
-#define MOD_ARR_OFF_OBJ      1<<2
+#define MOD_ARR_OFF_CONST    (1<<0)
+#define MOD_ARR_OFF_RELATIVE (1<<1)
+#define MOD_ARR_OFF_OBJ      (1<<2)
 
 /* ArrayModifierData->flags */
-#define MOD_ARR_MERGE      1<<0
-#define MOD_ARR_MERGEFINAL 1<<1
+#define MOD_ARR_MERGE      (1<<0)
+#define MOD_ARR_MERGEFINAL (1<<1)
 
 typedef struct MirrorModifierData {
 	ModifierData modifier;
@@ -227,13 +232,14 @@ typedef struct MirrorModifierData {
 } MirrorModifierData;
 
 /* MirrorModifierData->flag */
-#define MOD_MIR_CLIPPING	1<<0
-#define MOD_MIR_MIRROR_U	1<<1
-#define MOD_MIR_MIRROR_V	1<<2
-#define MOD_MIR_AXIS_X		1<<3
-#define MOD_MIR_AXIS_Y		1<<4
-#define MOD_MIR_AXIS_Z		1<<5
-#define MOD_MIR_VGROUP		1<<6
+#define MOD_MIR_CLIPPING	(1<<0)
+#define MOD_MIR_MIRROR_U	(1<<1)
+#define MOD_MIR_MIRROR_V	(1<<2)
+#define MOD_MIR_AXIS_X		(1<<3)
+#define MOD_MIR_AXIS_Y		(1<<4)
+#define MOD_MIR_AXIS_Z		(1<<5)
+#define MOD_MIR_VGROUP		(1<<6)
+#define MOD_MIR_NO_MERGE	(1<<7)
 
 typedef struct EdgeSplitModifierData {
 	ModifierData modifier;
@@ -243,8 +249,8 @@ typedef struct EdgeSplitModifierData {
 } EdgeSplitModifierData;
 
 /* EdgeSplitModifierData->flags */
-#define MOD_EDGESPLIT_FROMANGLE   1<<1
-#define MOD_EDGESPLIT_FROMFLAG    1<<2
+#define MOD_EDGESPLIT_FROMANGLE   (1<<1)
+#define MOD_EDGESPLIT_FROMFLAG    (1<<2)
 
 typedef struct BevelModifierData {
 	ModifierData modifier;
@@ -331,7 +337,7 @@ typedef struct UVProjectModifierData {
 #define MOD_UVPROJECT_MAXPROJECTORS 10
 
 /* UVProjectModifierData->flags */
-#define MOD_UVPROJECT_OVERRIDEIMAGE 1<<0
+#define MOD_UVPROJECT_OVERRIDEIMAGE (1<<0)
 
 typedef struct DecimateModifierData {
 	ModifierData modifier;
@@ -384,13 +390,13 @@ enum {
 };
 
 /* WaveModifierData.flag */
-#define MOD_WAVE_X      1<<1
-#define MOD_WAVE_Y      1<<2
-#define MOD_WAVE_CYCL   1<<3
-#define MOD_WAVE_NORM   1<<4
-#define MOD_WAVE_NORM_X 1<<5
-#define MOD_WAVE_NORM_Y 1<<6
-#define MOD_WAVE_NORM_Z 1<<7
+#define MOD_WAVE_X      (1<<1)
+#define MOD_WAVE_Y      (1<<2)
+#define MOD_WAVE_CYCL   (1<<3)
+#define MOD_WAVE_NORM   (1<<4)
+#define MOD_WAVE_NORM_X (1<<5)
+#define MOD_WAVE_NORM_Y (1<<6)
+#define MOD_WAVE_NORM_Z (1<<7)
 
 typedef struct WaveModifierData {
 	ModifierData modifier;
@@ -550,6 +556,7 @@ typedef struct MeshDeformModifierData {
 typedef enum {
 	eParticleSystemFlag_Pars =			(1<<0),
 	eParticleSystemFlag_psys_updated =	(1<<1),
+	eParticleSystemFlag_file_loaded =	(1<<2),
 } ParticleSystemModifierFlag;
 
 typedef struct ParticleSystemModifierData {

@@ -30,7 +30,9 @@
 
 #include "BLF_api.h"
 
-#include "BKE_utildefines.h"
+#include "BLI_utildefines.h"
+
+
 
 #include "BIF_gl.h"
 #include "BIF_glutil.h"
@@ -39,18 +41,9 @@
 
 #include "textview.h"
 
-
-static int mono= -1; // XXX needs proper storage and change all the BLF_* here!
-
-
 static void console_font_begin(TextViewContext *sc)
 {
-	if(mono == -1) {
-		mono= BLF_load_mem("monospace", (unsigned char*)datatoc_bmonofont_ttf, datatoc_bmonofont_ttf_size);
-	}
-
-	BLF_aspect(mono, 1.0);
-	BLF_size(mono, sc->lheight-2, 72);
+	BLF_size(blf_mono_font, sc->lheight-2, 72);
 }
 
 typedef struct ConsoleDrawContext {
@@ -95,6 +88,7 @@ static int console_draw_string(ConsoleDrawContext *cdc, const char *str, int str
 	int rct_ofs= cdc->lheight/4;
 	int tot_lines = (str_len/cdc->console_width)+1; /* total number of lines for wrapping */
 	int y_next = (str_len > cdc->console_width) ? cdc->xy[1]+cdc->lheight*tot_lines : cdc->xy[1]+cdc->lheight;
+	const int mono= blf_mono_font;
 
 	/* just advance the height */
 	if(cdc->draw==0) {
@@ -224,10 +218,11 @@ int textview_draw(TextViewContext *tvc, int draw, int mval[2], void **mouse_pick
 {
 	ConsoleDrawContext cdc= {0};
 
-	int x_orig=CONSOLE_DRAW_MARGIN, y_orig=CONSOLE_DRAW_MARGIN;
+	int x_orig=CONSOLE_DRAW_MARGIN, y_orig=CONSOLE_DRAW_MARGIN + tvc->lheight/6;
 	int xy[2], y_prev;
 	int sel[2]= {-1, -1}; /* defaults disabled */
 	unsigned char fg[3], bg[3];
+	const int mono= blf_mono_font;
 
 	console_font_begin(tvc);
 
@@ -244,6 +239,7 @@ int textview_draw(TextViewContext *tvc, int draw, int mval[2], void **mouse_pick
 	assert(cdc.cwidth > 0);
 	cdc.lheight= tvc->lheight;
 	cdc.console_width= (tvc->winx - (CONSOLE_DRAW_SCROLL + CONSOLE_DRAW_MARGIN*2) ) / cdc.cwidth;
+	CLAMP(cdc.console_width, 1, INT_MAX); /* avoid divide by zero on small windows */
 	cdc.winx= tvc->winx-(CONSOLE_DRAW_MARGIN+CONSOLE_DRAW_SCROLL);
 	cdc.ymin= tvc->ymin;
 	cdc.ymax= tvc->ymax;
@@ -255,6 +251,7 @@ int textview_draw(TextViewContext *tvc, int draw, int mval[2], void **mouse_pick
 
 	/* shouldnt be needed */
 	tvc->cwidth= cdc.cwidth;
+	tvc->console_width= cdc.console_width;
 	tvc->iter_index= 0;
 
 	if(tvc->sel_start != tvc->sel_end) {

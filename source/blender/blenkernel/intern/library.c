@@ -67,11 +67,11 @@
 #include "DNA_world_types.h"
 #include "DNA_gpencil_types.h"
 
-
 #include "BLI_blenlib.h"
 #include "BLI_dynstr.h"
+#include "BLI_utildefines.h"
 
-#include "BKE_utildefines.h"
+
 #include "BKE_animsys.h"
 #include "BKE_context.h"
 #include "BKE_library.h"
@@ -138,8 +138,14 @@ void id_us_plus(ID *id)
 
 void id_us_min(ID *id)
 {
-	if(id)
-		id->us--;
+	if(id) {
+		if(id->us<2 && (id->flag & LIB_FAKEUSER))
+		   id->us= 1;
+		else if(id->us<=0)
+			printf("ID user decrement error: %s \n", id->name);
+		else
+			id->us--;
+	}
 }
 
 int id_make_local(ID *id, int test)
@@ -304,7 +310,7 @@ int id_copy(ID *id, ID **newid, int test)
 			if(!test) *newid= (ID*)copy_action((bAction*)id);
 			return 1;
 		case ID_NT:
-			if(!test) *newid= (ID*)ntreeCopyTree((bNodeTree*)id, 0);
+			if(!test) *newid= (ID*)ntreeCopyTree((bNodeTree*)id);
 			return 1;
 		case ID_BR:
 			if(!test) *newid= (ID*)copy_brush((Brush*)id);
@@ -413,7 +419,7 @@ ListBase *which_libbase(Main *mainlib, short type)
 		case ID_GD:
 			return &(mainlib->gpencil);
 	}
-	return 0;
+	return NULL;
 }
 
 /* Flag all ids in listbase */
@@ -444,7 +450,7 @@ void recalc_all_library_objects(Main *main)
 	/* flag for full recalc */
 	for(ob=main->object.first; ob; ob=ob->id.next)
 		if(ob->id.lib)
-			ob->recalc |= OB_RECALC_ALL;
+			ob->recalc |= OB_RECALC_OB|OB_RECALC_DATA|OB_RECALC_TIME;
 }
 
 /* note: MAX_LIBARRAY define should match this code */
@@ -682,7 +688,7 @@ void set_free_windowmanager_cb(void (*func)(bContext *C, wmWindowManager *) )
 	free_windowmanager_cb= func;
 }
 
-void animdata_dtar_clear_cb(ID *UNUSED(id), AnimData *adt, void *userdata)
+static void animdata_dtar_clear_cb(ID *UNUSED(id), AnimData *adt, void *userdata)
 {
 	ChannelDriver *driver;
 	FCurve *fcu;
@@ -852,7 +858,7 @@ void free_main(Main *mainvar)
 /* ***************** ID ************************ */
 
 
-ID *find_id(char *type, char *name)		/* type: "OB" or "MA" etc */
+ID *find_id(const char *type, const char *name)		/* type: "OB" or "MA" etc */
 {
 	ListBase *lb= which_libbase(G.main, GS(type));
 	return BLI_findstring(lb, name, offsetof(ID, name) + 2);
@@ -914,7 +920,7 @@ static void IDnames_to_dyn_pupstring(DynStr *pupds, ListBase *lb, ID *link, shor
 				
 			BLI_dynstr_append(pupds, buf);
 			BLI_dynstr_append(pupds, id->name+2);
-			sprintf(buf, "%%x%d", i+1);
+			BLI_snprintf(buf, sizeof(buf), "%%x%d", i+1);
 			BLI_dynstr_append(pupds, buf);
 			
 			/* icon */
@@ -925,7 +931,7 @@ static void IDnames_to_dyn_pupstring(DynStr *pupds, ListBase *lb, ID *link, shor
 			case ID_IM: /* fall through */
 			case ID_WO: /* fall through */
 			case ID_LA: /* fall through */
-				sprintf(buf, "%%i%d", BKE_icon_getid(id) );
+				BLI_snprintf(buf, sizeof(buf), "%%i%d", BKE_icon_getid(id) );
 				BLI_dynstr_append(pupds, buf);
 				break;
 			default:
@@ -941,7 +947,7 @@ static void IDnames_to_dyn_pupstring(DynStr *pupds, ListBase *lb, ID *link, shor
 
 /* used by headerbuttons.c buttons.c editobject.c editseq.c */
 /* if nr==NULL no MAX_IDPUP, this for non-header browsing */
-void IDnames_to_pupstring(char **str, char *title, char *extraops, ListBase *lb, ID *link, short *nr)
+void IDnames_to_pupstring(const char **str, const char *title, const char *extraops, ListBase *lb, ID *link, short *nr)
 {
 	DynStr *pupds= BLI_dynstr_new();
 
@@ -963,7 +969,7 @@ void IDnames_to_pupstring(char **str, char *title, char *extraops, ListBase *lb,
 }
 
 /* skips viewer images */
-void IMAnames_to_pupstring(char **str, char *title, char *extraops, ListBase *lb, ID *link, short *nr)
+void IMAnames_to_pupstring(const char **str, const char *title, const char *extraops, ListBase *lb, ID *link, short *nr)
 {
 	DynStr *pupds= BLI_dynstr_new();
 	
@@ -1001,7 +1007,7 @@ static void sort_alpha_id(ListBase *lb, ID *id)
 			idtest= idtest->next;
 		}
 		/* as last */
-		if(idtest==0) {
+		if(idtest==NULL) {
 			BLI_addtail(lb, id);
 		}
 	}
@@ -1012,7 +1018,7 @@ static void sort_alpha_id(ListBase *lb, ID *id)
  * Check to see if there is an ID with the same name as 'name'.
  * Returns the ID if so, if not, returns NULL
  */
-static ID *is_dupid(ListBase *lb, ID *id, char *name)
+static ID *is_dupid(ListBase *lb, ID *id, const char *name)
 {
 	ID *idtest=NULL;
 	
@@ -1122,7 +1128,7 @@ static int check_for_dupid(ListBase *lb, ID *id, char *name)
 			continue;
 		}
 		/* this format specifier is from hell... */
-		sprintf(name, "%s.%.3d", left, nr);
+		BLI_snprintf(name, sizeof(id->name) - 2,"%s.%.3d", left, nr);
 
 		return 1;
 	}
@@ -1183,7 +1189,7 @@ int new_id(ListBase *lb, ID *id, const char *tname)
 }
 
 /* next to indirect usage in read/writefile also in editobject.c scene.c */
-void clear_id_newpoins()
+void clear_id_newpoins(void)
 {
 	ListBase *lbarray[MAX_LIBARRAY];
 	ID *id;
@@ -1193,7 +1199,7 @@ void clear_id_newpoins()
 	while(a--) {
 		id= lbarray[a]->first;
 		while(id) {
-			id->newid= 0;
+			id->newid= NULL;
 			id->flag &= ~LIB_NEW;
 			id= id->next;
 		}
@@ -1251,25 +1257,43 @@ static void lib_indirect_test_id(ID *id, Library *lib)
 	}
 }
 
-void tag_main(struct Main *mainvar, int tag)
+void tag_main_lb(ListBase *lb, const short tag)
+{
+	ID *id;
+	if(tag) {
+		for(id= lb->first; id; id= id->next) {
+			id->flag |= LIB_DOIT;
+		}
+	}
+	else {
+		for(id= lb->first; id; id= id->next) {
+			id->flag &= ~LIB_DOIT;
+		}
+	}
+}
+
+void tag_main_idcode(struct Main *mainvar, const short type, const short tag)
+{
+	ListBase *lb= which_libbase(mainvar, type);
+
+	tag_main_lb(lb, tag);
+}
+
+void tag_main(struct Main *mainvar, const short tag)
 {
 	ListBase *lbarray[MAX_LIBARRAY];
-	ID *id;
 	int a;
 
 	a= set_listbasepointers(mainvar, lbarray);
 	while(a--) {
-		for(id= lbarray[a]->first; id; id= id->next) {
-			if(tag)	id->flag |= LIB_DOIT;
-			else	id->flag &= ~LIB_DOIT;
-		}
+		tag_main_lb(lbarray[a], tag);
 	}
 }
 
 /* if lib!=NULL, only all from lib local */
 void all_local(Library *lib, int untagged_only)
 {
-	ListBase *lbarray[MAX_LIBARRAY], tempbase={0, 0};
+	ListBase *lbarray[MAX_LIBARRAY], tempbase={NULL, NULL};
 	ID *id, *idn;
 	int a;
 
@@ -1298,7 +1322,7 @@ void all_local(Library *lib, int untagged_only)
 							image_fix_relative_path((Image *)id);
 						
 						id->lib= NULL;
-						new_id(lbarray[a], id, 0);	/* new_id only does it with double names */
+						new_id(lbarray[a], id, NULL);	/* new_id only does it with double names */
 						sort_alpha_id(lbarray[a], id);
 					}
 				}
@@ -1310,7 +1334,7 @@ void all_local(Library *lib, int untagged_only)
 		while( (id=tempbase.first) ) {
 			BLI_remlink(&tempbase, id);
 			BLI_addtail(lbarray[a], id);
-			new_id(lbarray[a], id, 0);
+			new_id(lbarray[a], id, NULL);
 		}
 	}
 
@@ -1331,7 +1355,7 @@ void test_idbutton(char *name)
 	
 
 	lb= which_libbase(G.main, GS(name-2) );
-	if(lb==0) return;
+	if(lb==NULL) return;
 	
 	/* search for id */
 	idtest= BLI_findstring(lb, name, offsetof(ID, name) + 2);
@@ -1361,7 +1385,7 @@ void text_idbutton(struct ID *id, char *text)
 	}
 }
 
-void rename_id(ID *id, char *name)
+void rename_id(ID *id, const char *name)
 {
 	ListBase *lb;
 
@@ -1374,7 +1398,7 @@ void rename_id(ID *id, char *name)
 void name_uiprefix_id(char *name, ID *id)
 {
 	name[0] = id->lib ? 'L':' ';
-	name[1] = id->flag & LIB_FAKEUSER ? 'F':' ';
+	name[1] = id->flag & LIB_FAKEUSER ? 'F': (id->us==0)?'0':' ';
 	name[2] = ' ';
 
 	strcpy(name+3, id->name+2);

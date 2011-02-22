@@ -29,9 +29,9 @@ makesrna_tool.Append(CCFLAGS = '-DBASE_HEADER="\\"source/blender/makesrna/\\"" '
 
 defs = []
 
-incs = '#/intern/guardedalloc ../../blenlib ../../blenkernel'
+incs = '#/intern/guardedalloc ../../blenlib ../../blenkernel ../../blenloader'
 incs += ' ../../imbuf ../../makesdna ../../makesrna ../../ikplugin'
-incs += ' ../../windowmanager ../../editors/include'
+incs += ' ../../windowmanager ../../editors/include ../../blenfont'
 incs += ' ../../render/extern/include'
 incs += ' #/intern/audaspace/intern '
 
@@ -87,9 +87,6 @@ if env['BF_UNIT_TEST']:
 
 if env['WITH_BF_PYTHON']:
     defs.append('WITH_PYTHON')
-
-if env['WITH_BF_COLLADA']:
-    defs.append('WITH_COLLADA')
 
 if env['OURPLATFORM'] == 'linux2':
     cflags='-pthread'

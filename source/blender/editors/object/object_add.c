@@ -43,6 +43,7 @@
 
 #include "BLI_math.h"
 #include "BLI_listbase.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_anim.h"
 #include "BKE_animsys.h"
@@ -105,15 +106,16 @@ void ED_object_location_from_view(bContext *C, float *loc)
 
 void ED_object_rotation_from_view(bContext *C, float *rot)
 {
-	RegionView3D *rv3d= ED_view3d_context_rv3d(C);
-	
+	RegionView3D *rv3d= CTX_wm_region_view3d(C);
 	if(rv3d) {
-		rv3d->viewquat[0]= -rv3d->viewquat[0];
-		quat_to_eul( rot, rv3d->viewquat);
-		rv3d->viewquat[0]= -rv3d->viewquat[0];
+		float quat[4];
+		copy_qt_qt(quat, rv3d->viewquat);
+		quat[0]= -quat[0];
+		quat_to_eul(rot, quat);
 	}
-	else
-		rot[0] = rot[1] = rot[2] = 0.f;
+	else {
+		zero_v3(rot);
+	}
 }
 
 void ED_object_base_init_transform(bContext *C, Base *base, float *loc, float *rot)
@@ -256,9 +258,11 @@ int ED_object_add_generic_get_opts(bContext *C, wmOperator *op, float *loc, floa
 		view_align = FALSE;
 	else if (RNA_property_is_set(op->ptr, "view_align"))
 		view_align = RNA_boolean_get(op->ptr, "view_align");
-	else
+	else {
 		view_align = U.flag & USER_ADD_VIEWALIGNED;
-
+		RNA_boolean_set(op->ptr, "view_align", view_align);
+	}
+	
 	if (view_align)
 		ED_object_rotation_from_view(C, rot);
 	else
@@ -276,6 +280,7 @@ int ED_object_add_generic_get_opts(bContext *C, wmOperator *op, float *loc, floa
 }
 
 /* for object add primitive operators */
+/* do not call undo push in this function (users of this function have to) */
 Object *ED_object_add_type(bContext *C, int type, float *loc, float *rot, int enter_editmode, unsigned int layer)
 {
 	Main *bmain= CTX_data_main(C);
@@ -399,6 +404,8 @@ static Object *effector_add_type(bContext *C, wmOperator *op, int type)
 
 	ob->pd= object_add_collision_fields(type);
 
+	DAG_scene_sort(CTX_data_main(C), CTX_data_scene(C));
+
 	return ob;
 }
 
@@ -483,20 +490,10 @@ void OBJECT_OT_camera_add(wmOperatorType *ot)
 
 
 /* ***************** add primitives *************** */
-
-static EnumPropertyItem prop_metaball_types[]= {
-	{MB_BALL, "MBALL_BALL", ICON_META_BALL, "Meta Ball", ""},
-	{MB_TUBE, "MBALL_CAPSULE", ICON_META_CAPSULE, "Meta Capsule", ""},
-	{MB_PLANE, "MBALL_PLANE", ICON_META_PLANE, "Meta Plane", ""},
-	{MB_CUBE, "MBALL_CUBE", ICON_META_CUBE, "Meta Cube", ""},
-	{MB_ELIPSOID, "MBALL_ELLIPSOID", ICON_META_ELLIPSOID, "Meta Ellipsoid", ""},
-	{0, NULL, 0, NULL, NULL}
-};
-
 static int object_metaball_add_exec(bContext *C, wmOperator *op)
 {
 	Object *obedit= CTX_data_edit_object(C);
-	MetaElem *elem;
+	/*MetaElem *elem;*/ /*UNUSED*/
 	int newob= 0;
 	int enter_editmode;
 	unsigned int layer;
@@ -512,11 +509,11 @@ static int object_metaball_add_exec(bContext *C, wmOperator *op)
 		obedit= ED_object_add_type(C, OB_MBALL, loc, rot, TRUE, layer);
 		newob = 1;
 	}
-	else DAG_id_flush_update(&obedit->id, OB_RECALC_DATA);
+	else DAG_id_tag_update(&obedit->id, OB_RECALC_DATA);
 	
 	ED_object_new_primitive_matrix(C, obedit, loc, rot, mat);
 	
-	elem= (MetaElem*)add_metaball_primitive(C, mat, RNA_enum_get(op->ptr, "type"), newob);
+	/* elem= (MetaElem *) */ add_metaball_primitive(C, mat, RNA_enum_get(op->ptr, "type"), newob);
 
 	/* userdef */
 	if (newob && !enter_editmode) {
@@ -536,7 +533,7 @@ static int object_metaball_add_invoke(bContext *C, wmOperator *op, wmEvent *UNUS
 
 	object_add_generic_invoke_options(C, op);
 
-	pup= uiPupMenuBegin(C, op->type->name, 0);
+	pup= uiPupMenuBegin(C, op->type->name, ICON_NULL);
 	layout= uiPupMenuLayout(pup);
 	if(!obedit || obedit->type == OB_MBALL)
 		uiItemsEnumO(layout, op->type->idname, "type");
@@ -557,12 +554,12 @@ void OBJECT_OT_metaball_add(wmOperatorType *ot)
 	/* api callbacks */
 	ot->invoke= object_metaball_add_invoke;
 	ot->exec= object_metaball_add_exec;
-	ot->poll= ED_operator_objectmode;
+	ot->poll= ED_operator_scene_editable;
 
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 	
-	RNA_def_enum(ot->srna, "type", prop_metaball_types, 0, "Primitive", "");
+	RNA_def_enum(ot->srna, "type", metaelem_type_items, 0, "Primitive", "");
 	ED_object_add_generic_props(ot, TRUE);
 }
 
@@ -623,7 +620,7 @@ static int object_armature_add_exec(bContext *C, wmOperator *op)
 		ED_object_enter_editmode(C, 0);
 		newob = 1;
 	}
-	else DAG_id_flush_update(&obedit->id, OB_RECALC_DATA);
+	else DAG_id_tag_update(&obedit->id, OB_RECALC_DATA);
 	
 	if(obedit==NULL) {
 		BKE_report(op->reports, RPT_ERROR, "Cannot create editmode armature.");
@@ -659,7 +656,7 @@ void OBJECT_OT_armature_add(wmOperatorType *ot)
 	ED_object_add_generic_props(ot, TRUE);
 }
 
-static char *get_lamp_defname(int type)
+static const char *get_lamp_defname(int type)
 {
 	switch (type) {
 		case LA_LOCAL: return "Point";
@@ -685,9 +682,7 @@ static int object_lamp_add_exec(bContext *C, wmOperator *op)
 		return OPERATOR_CANCELLED;
 
 	ob= ED_object_add_type(C, OB_LAMP, loc, rot, FALSE, layer);
-	if(ob && ob->data)
-		((Lamp*)ob->data)->type= type;
-	
+	((Lamp*)ob->data)->type= type;
 	rename_id((ID *)ob, get_lamp_defname(type));
 	rename_id((ID *)ob->data, get_lamp_defname(type));
 	
@@ -976,8 +971,13 @@ static void make_object_duplilist_real(bContext *C, Scene *scene, Base *base)
 		basen->lay= base->lay;
 		BLI_addhead(&scene->base, basen);	/* addhead: othwise eternal loop */
 		basen->object= ob;
-		ob->ipo= NULL;		/* make sure apply works */
-		ob->parent= ob->track= NULL;
+		
+		/* make sure apply works */
+		BKE_free_animdata(&ob->id);	
+		ob->adt = NULL;
+		
+		ob->parent= NULL;
+		ob->constraints.first= ob->constraints.last= NULL;
 		ob->disp.first= ob->disp.last= NULL;
 		ob->transflag &= ~OB_DUPLI;	
 		ob->lay= base->lay;
@@ -1042,9 +1042,7 @@ static EnumPropertyItem convert_target_items[]= {
 
 static void curvetomesh(Scene *scene, Object *ob) 
 {
-	Curve *cu= ob->data;
-	
-	if(cu->disp.first==0)
+	if(ob->disp.first==0)
 		makeDispListCurveTypes(scene, ob, 0); /* force creation */
 
 	nurbs_to_mesh(ob); /* also does users */
@@ -1072,7 +1070,7 @@ static Base *duplibase_for_convert(Scene *scene, Base *base, Object *ob)
 	}
 
 	obn= copy_object(ob);
-	obn->recalc |= OB_RECALC_ALL;
+	obn->recalc |= OB_RECALC_OB|OB_RECALC_DATA|OB_RECALC_TIME;
 
 	basen= MEM_mallocN(sizeof(Base), "duplibase");
 	*basen= *base;
@@ -1097,8 +1095,8 @@ static int convert_exec(bContext *C, wmOperator *op)
 	Nurb *nu;
 	MetaBall *mb;
 	Mesh *me;
-	int target= RNA_enum_get(op->ptr, "target");
-	int keep_original= RNA_boolean_get(op->ptr, "keep_original");
+	const short target= RNA_enum_get(op->ptr, "target");
+	const short keep_original= RNA_boolean_get(op->ptr, "keep_original");
 	int a, mballConverted= 0;
 
 	/* don't forget multiple users! */
@@ -1107,16 +1105,30 @@ static int convert_exec(bContext *C, wmOperator *op)
 	CTX_DATA_BEGIN(C, Base*, base, selected_editable_bases) {
 		ob= base->object;
 		ob->flag &= ~OB_DONE;
+
+		/* flag data thats not been edited (only needed for !keep_original) */
+		if(ob->data) {
+			((ID *)ob->data)->flag |= LIB_DOIT;
+		}
 	}
 	CTX_DATA_END;
 
 	CTX_DATA_BEGIN(C, Base*, base, selected_editable_bases) {
 		ob= base->object;
 
-		if(ob->flag & OB_DONE) {
+		if(ob->flag & OB_DONE || !IS_TAGGED(ob->data)) {
 			if (ob->type != target) {
 				base->flag &= ~SELECT;
 				ob->flag &= ~SELECT;
+			}
+
+			/* obdata already modified */
+			if(!IS_TAGGED(ob->data)) {
+				/* When 2 objects with linked data are selected, converting both
+				 * would keep modifiers on all but the converted object [#26003] */
+				if(ob->type == OB_MESH) {
+					object_free_modifiers(ob);	/* after derivedmesh calls! */
+				}
 			}
 		}
 		else if (ob->type==OB_MESH && target == OB_CURVE) {
@@ -1156,7 +1168,7 @@ static int convert_exec(bContext *C, wmOperator *op)
 				newob->data= copy_mesh(me);
 			} else {
 				newob = ob;
-				ob->recalc |= OB_RECALC_ALL;
+				ob->recalc |= OB_RECALC_OB|OB_RECALC_DATA|OB_RECALC_TIME;
 			}
 
 			/* make new mesh data from the original copy */
@@ -1189,7 +1201,7 @@ static int convert_exec(bContext *C, wmOperator *op)
 
 			cu= newob->data;
 
-			if (!cu->disp.first)
+			if (!newob->disp.first)
 				makeDispListCurveTypes(scene, newob, 0);
 
 			newob->type= OB_CURVE;
@@ -1217,7 +1229,7 @@ static int convert_exec(bContext *C, wmOperator *op)
 					for(ob1= bmain->object.first; ob1; ob1=ob1->id.next) {
 						if(ob1->data==ob->data) {
 							ob1->type= OB_CURVE;
-							ob1->recalc |= OB_RECALC_ALL;
+							ob1->recalc |= OB_RECALC_OB|OB_RECALC_DATA|OB_RECALC_TIME;
 						}
 					}
 				}
@@ -1226,8 +1238,12 @@ static int convert_exec(bContext *C, wmOperator *op)
 			for(nu=cu->nurb.first; nu; nu=nu->next)
 				nu->charidx= 0;
 
-			if(target == OB_MESH)
+			if(target == OB_MESH) {
 				curvetomesh(scene, newob);
+
+				/* meshes doesn't use displist */
+				freedisplist(&newob->disp);
+			}
 		}
 		else if(ELEM(ob->type, OB_CURVE, OB_SURF)) {
 			ob->flag |= OB_DONE;
@@ -1244,18 +1260,16 @@ static int convert_exec(bContext *C, wmOperator *op)
 					newob->data= copy_curve(ob->data);
 				} else {
 					newob= ob;
+
+					/* meshes doesn't use displist */
+					freedisplist(&newob->disp);
 				}
 
 				curvetomesh(scene, newob);
 			}
 		}
-		else if(ob->type==OB_MBALL) {
+		else if(ob->type==OB_MBALL && target == OB_MESH) {
 			Object *baseob;
-
-			if (target != OB_MESH) {
-				ob->flag |= OB_DONE;
-				continue;
-			}
 
 			base->flag &= ~SELECT;
 			ob->flag &= ~SELECT;
@@ -1298,11 +1312,12 @@ static int convert_exec(bContext *C, wmOperator *op)
 
 				mballConverted= 1;
 			}
-			else
-				continue;
 		}
-		else
+		else {
 			continue;
+		}
+
+		/* tag obdata if it was been changed */
 
 		/* If the original object is active then make this object active */
 		if(basen) {
@@ -1314,8 +1329,9 @@ static int convert_exec(bContext *C, wmOperator *op)
 			basen= NULL;
 		}
 
-		if (!keep_original) {
-			DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+		if (!keep_original && (ob->flag & OB_DONE)) {
+			DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
+			((ID *)ob->data)->flag &= ~LIB_DOIT; /* flag not to convert this datablock again */
 		}
 
 		/* delete original if needed */
@@ -1410,7 +1426,7 @@ static Base *object_add_duplicate_internal(Main *bmain, Scene *scene, Base *base
 	}
 	else {
 		obn= copy_object(ob);
-		obn->recalc |= OB_RECALC_ALL;
+		obn->recalc |= OB_RECALC_OB|OB_RECALC_DATA|OB_RECALC_TIME;
 		
 		basen= MEM_mallocN(sizeof(Base), "duplibase");
 		*basen= *base;
@@ -1664,8 +1680,10 @@ static int duplicate_exec(bContext *C, wmOperator *op)
 		/* new object becomes active */
 		if(BASACT==base)
 			ED_base_object_activate(C, basen);
-		
-		DAG_id_flush_update(base->object->data, 0);
+
+		if(basen->object->data) {
+			DAG_id_tag_update(basen->object->data, 0);
+		}
 	}
 	CTX_DATA_END;
 

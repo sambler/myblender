@@ -37,6 +37,7 @@
 #include "BLI_rand.h"
 #include "BLI_math.h"
 #include "BLI_edgehash.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_cdderivedmesh.h"
 #include "BKE_deform.h"
@@ -46,10 +47,11 @@
 #include "BKE_object.h"
 #include "BKE_particle.h"
 #include "BKE_scene.h"
-#include "BKE_utildefines.h"
+
 
 #include "MEM_guardedalloc.h"
 
+#include "MOD_util.h"
 
 static void initData(ModifierData *md)
 {
@@ -127,11 +129,10 @@ static void createFacepa(ExplodeModifierData *emd,
 	/* set protected verts */
 	if(emd->vgroup){
 		MDeformVert *dvert = dm->getVertDataArray(dm, CD_MDEFORMVERT);
-		float val;
 		if(dvert){
-			int defgrp_index= emd->vgroup-1;
+			const int defgrp_index= emd->vgroup-1;
 			for(i=0; i<totvert; i++, dvert++){
-				val = BLI_frand();
+				float val = BLI_frand();
 				val = (1.0f-emd->protect)*val + emd->protect*0.5f;
 				if(val < defvert_find_weight(dvert, defgrp_index))
 					vertpa[i] = -1;
@@ -197,7 +198,7 @@ static DerivedMesh * splitEdges(ExplodeModifierData *emd, DerivedMesh *dm){
 	int *facesplit = MEM_callocN(sizeof(int)*totface,"explode_facesplit");
 	int *vertpa = MEM_callocN(sizeof(int)*totvert,"explode_vertpa2");
 	int *facepa = emd->facepa;
-	int *fs, totesplit=0,totfsplit=0,totin=0,curdupvert=0,curdupface=0,curdupin=0;
+	int *fs, totesplit=0,totfsplit=0,totin=0,curdupface=0,curdupin=0;
 	int i,j,v1,v2,v3,v4,esplit;
 
 	edgehash= BLI_edgehash_new();
@@ -313,7 +314,6 @@ static DerivedMesh * splitEdges(ExplodeModifierData *emd, DerivedMesh *dm){
 	emd->facepa=facepa;
 
 	/* create new verts */
-	curdupvert=totvert;
 	ehi= BLI_edgehashIterator_new(edgehash);
 	for(; !BLI_edgehashIterator_isDone(ehi); BLI_edgehashIterator_step(ehi)) {
 		BLI_edgehashIterator_getKey(ehi, &i, &j);
@@ -670,7 +670,8 @@ static DerivedMesh * explodeMesh(ExplodeModifierData *emd,
 	EdgeHashIterator *ehi;
 	float *vertco=0, imat[4][4];
 	float loc0[3], nor[3];
-	float timestep, cfra;
+	float cfra;
+	/* float timestep; */
 	int *facepa=emd->facepa;
 	int totdup=0,totvert=0,totface=0,totpart=0;
 	int i, j, v, mindex=0;
@@ -685,7 +686,7 @@ static DerivedMesh * explodeMesh(ExplodeModifierData *emd,
 	sim.psys= psmd->psys;
 	sim.psmd= psmd;
 
-	timestep= psys_get_timestep(&sim);
+	/* timestep= psys_get_timestep(&sim); */
 
 	//if(part->flag & PART_GLOB_TIME)
 		cfra= BKE_curframe(scene);
@@ -894,6 +895,7 @@ ModifierTypeInfo modifierType_Explode = {
 	/* flags */             eModifierTypeFlag_AcceptsMesh,
 	/* copyData */          copyData,
 	/* deformVerts */       0,
+	/* deformMatrices */    0,
 	/* deformVertsEM */     0,
 	/* deformMatricesEM */  0,
 	/* applyModifier */     applyModifier,

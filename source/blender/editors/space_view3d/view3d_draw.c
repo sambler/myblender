@@ -1021,25 +1021,27 @@ static void drawviewborder(Scene *scene, ARegion *ar, View3D *v3d)
 		uiDrawBox(GL_LINE_LOOP, x1, y1, x2, y2, 12.0);
 	}
 
-	/* thirds */
-	if (ca && (ca->flag & CAM_SHOWTHIRDS)) {
-		float x1third, x2third, y1third, y2third;
-		fac= 0.333333;
+	/* grid */
+	if (ca && (ca->ShowGrid > 1)) {
+		float x1grid, x2grid, y1grid, y2grid;
+		int g;
 		
-		a= fac*(x2-x1);
-		x1third= x1 + a;
-		x2third= x2 - a;
-		
-		a= fac*(y2-y1);
-		y1third= y1 + a;
-		y2third= y2 - a;
-		
-		UI_ThemeColorBlendShade(TH_REDALERT, TH_BACK, 0.25, 0);
-		
-		fdrawline(x1third,y1, x1third, y2);
-		fdrawline(x2third,y1, x2third, y2);
-		fdrawline(x1,y1third, x2,y1third);
-		fdrawline(x1,y2third, x2,y2third);
+		for(g=0;g<ca->ShowGrid;g++) {
+			a= g*( (x2-x1)/ca->ShowGrid);
+			x1grid= x1 + a;
+			x2grid= x2 - a;
+			
+			a= g*( (y2-y1)/ca->ShowGrid);
+			y1grid= y1 + a;
+			y2grid= y2 - a;
+			
+			UI_ThemeColorBlendShade(TH_REDALERT, TH_BACK, 0.25, 0);
+			
+			fdrawline(x1grid,y1, x1grid, y2);
+			fdrawline(x2grid,y1, x2grid, y2);
+			fdrawline(x1,y1grid, x2,y1grid);
+			fdrawline(x1,y2grid, x2,y2grid);
+		}
 	}
 
 	setlinestyle(0);

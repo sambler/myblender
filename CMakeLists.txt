@@ -159,10 +159,27 @@ if(NOT WITH_IMAGE_OPENJPEG AND WITH_IMAGE_REDCODE)
 	message(FATAL_ERROR "WITH_IMAGE_REDCODE requires WITH_IMAGE_OPENJPEG")
 endif()
 
+# python module, needs some different options
+if(WITH_PYTHON_MODULE AND WITH_PLAYER)
+	message(FATAL_ERROR "WITH_PYTHON_MODULE requires WITH_PLAYER to be OFF")
+endif()
+
+if(WITH_PYTHON_MODULE AND WITH_PYTHON_INSTALL)
+	message(FATAL_ERROR "WITH_PYTHON_MODULE requires WITH_PYTHON_INSTALL to be OFF")
+endif()
+
 TEST_SSE_SUPPORT()
+
+#-----------------------------------------------------------------------------
+# Initialize un-cached vars, avoid unused warning
 
 # linux only, not cached
 set(WITH_BINRELOC OFF)
+
+# these are added to later on.
+set(C_WARNINGS "")
+set(CXX_WARNINGS "")
+
 
 # disabled for now, not supported
 # option(WITH_WEBPLUGIN     "Enable Web Plugin (Unix only)" OFF)

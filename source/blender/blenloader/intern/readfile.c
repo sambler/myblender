@@ -2109,7 +2109,7 @@ static void lib_verify_nodetree(Main *main, int UNUSED(open))
 		for(ntree= main->nodetree.first; ntree; ntree= ntree->id.next) {
 			if (ntree->flag & NTREE_DO_VERSIONS) {
 				/* this adds copies and links from all unlinked internal sockets to group inputs/outputs. */
-				nodeAddAllGroupSockets(ntree);
+				nodeGroupExposeAllSockets(ntree);
 				has_old_groups = 1;
 			}
 		}
@@ -2121,13 +2121,16 @@ static void lib_verify_nodetree(Main *main, int UNUSED(open))
 		/* and scene trees */
 		for(sce= main->scene.first; sce; sce= sce->id.next) {
 			if(sce->nodetree)
-				lib_nodetree_do_versions_group(ma->nodetree);
+				lib_nodetree_do_versions_group(sce->nodetree);
 		}
 		/* and texture trees */
 		for(tx= main->tex.first; tx; tx= tx->id.next) {
 			if(tx->nodetree)
-				lib_nodetree_do_versions_group(ma->nodetree);
+				lib_nodetree_do_versions_group(tx->nodetree);
 		}
+		
+		for(ntree= main->nodetree.first; ntree; ntree= ntree->id.next)
+			ntree->flag &= ~NTREE_DO_VERSIONS;
 	}
 
 	/* now verify all types in material trees, groups are set OK now */
@@ -4382,6 +4385,7 @@ static void lib_link_scene(FileData *fd, Main *main)
 
 			SEQ_BEGIN(sce->ed, seq) {
 				if(seq->ipo) seq->ipo= newlibadr_us(fd, sce->id.lib, seq->ipo);
+				seq->scene_sound = NULL;
 				if(seq->scene) {
 					seq->scene= newlibadr(fd, sce->id.lib, seq->scene);
 					seq->scene_sound = sound_scene_add_scene_sound(sce, seq, seq->startdisp, seq->enddisp, seq->startofs + seq->anim_startofs);

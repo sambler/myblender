@@ -1,4 +1,6 @@
-/*
+/**
+ * $Id$
+ *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -15,38 +17,12 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- *
- * The Original Code is: all of this file.
- *
- * Contributor(s): snailrose.
- *
  * ***** END GPL LICENSE BLOCK *****
  */
- 
-/** \file SCA_JoystickPrivate.h
- *  \ingroup gamelogic
- */
 
-#ifndef __SCA_JOYSTICKPRIVATE_H__
-#define __SCA_JOYSTICKPRIVATE_H__
-#include "SCA_Joystick.h"
+#ifndef BPY_TRACEBACK_H
+#define BPY_TRACEBACK_H
 
-#ifndef DISABLE_SDL
-class SCA_Joystick::PrivateData
-{
-public:
-	/*
-	 * The Joystick
-	 */
-	SDL_Joystick*	m_joystick;
+void python_script_error_jump(const char *filepath, int *lineno, int *offset);
 
-	PrivateData()
-	: m_joystick(NULL)
-	{
-	}
-};
-#endif
-
-#endif
+#endif // BPY_TRACEBACK_H

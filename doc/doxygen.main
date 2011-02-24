@@ -6,6 +6,11 @@
  *
  * These pages document the source code of blender.
  *
+ * \subsection implinks Important Links
+ * - <a href="http://projects.blender.org">projects.blender.org</a> with <a href="http://projects.blender.org/tracker/index.php?group_id=9&atid=498">bug tracker</a>
+ * - <a href="http://wiki.blender.org/index.php/Dev:Contents">Development documents</a> on our wiki.
+ *
+ * \subsection blother Other
  * For more information on using Blender browse to http://www.blender.org
  *
  */
@@ -34,6 +39,12 @@
  *  folder are updated.
  *
  */
+
+/** \defgroup bullet Bullet Physics Library
+ *  \ingroup extern
+ *  \see \ref bulletdoc
+ */
+
 /** \defgroup blenderplayer Blender Player */
 
 /** \defgroup render Rendering */
@@ -47,7 +58,59 @@
  *  \ingroup scripts
  */
 
-/** \defgroup gameengine Game Engine */
+/** \defgroup bge Game Engine */
+/** \defgroup gamelogic Game Logic
+ *  \ingroup bge
+ */
+/** \defgroup bgeconv Converter
+ *  \ingroup bge
+ */
+/** \defgroup blroutines Blender Routines
+ *  \ingroup bge
+ */
+/** \defgroup expressions Expressions
+ *  \ingroup bge
+ */
+/** \defgroup player Game Player
+ *  \ingroup bge
+ */
+/** \defgroup ketsji Ketsji
+ *  \ingroup bge
+ *  \todo check all headers and code files for proper licenses
+ */
+/** \defgroup ketsjinet Ketsji Network
+ *  \ingroup ketsji
+ */
+/** \defgroup bgenet Network
+ *  \ingroup bge
+ */
+/** \defgroup bgenetlb Loopback Network
+ *  \ingroup bgenet
+ */
+/** \defgroup phys Physics
+ *  \ingroup bge
+ */
+/** \defgroup physbullet Bullet Physics
+ *  \ingroup phys
+ */
+/** \defgroup physdummy Dummy Physics (none)
+ *  \ingroup phys
+ */
+/** \defgroup bgerast Rasterizer
+ *  \ingroup bge
+ */
+/** \defgroup bgerastoglfilters OpenGL Filters
+ *  \ingroup bgerast
+ */
+/** \defgroup bgerastogl OpenGL Rasterizer
+ *  \ingroup bgerast
+ */
+/** \defgroup bgesg BGE SceneGraph
+ *  \ingroup bge
+ */
+/** \defgroup bgevideotex BGE Video Texture
+ *  \ingroup bge
+ */
 
 /** \defgroup audaspace Audaspace
  *  \ingroup intern undoc
@@ -74,7 +137,10 @@
 
 /** \defgroup data DNA, RNA and .blend access*/
 
-/** \defgroup GHOST GHOST API */
+/** \defgroup GHOST GHOST API
+ * \ingroup intern GUI
+ * \ref GHOSTPage
+ */
 
 /** \defgroup gpu GPU */
 

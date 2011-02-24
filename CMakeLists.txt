@@ -159,10 +159,27 @@ if(NOT WITH_IMAGE_OPENJPEG AND WITH_IMAGE_REDCODE)
 	message(FATAL_ERROR "WITH_IMAGE_REDCODE requires WITH_IMAGE_OPENJPEG")
 endif()
 
+# python module, needs some different options
+if(WITH_PYTHON_MODULE AND WITH_PLAYER)
+	message(FATAL_ERROR "WITH_PYTHON_MODULE requires WITH_PLAYER to be OFF")
+endif()
+
+if(WITH_PYTHON_MODULE AND WITH_PYTHON_INSTALL)
+	message(FATAL_ERROR "WITH_PYTHON_MODULE requires WITH_PYTHON_INSTALL to be OFF")
+endif()
+
 TEST_SSE_SUPPORT()
+
+#-----------------------------------------------------------------------------
+# Initialize un-cached vars, avoid unused warning
 
 # linux only, not cached
 set(WITH_BINRELOC OFF)
+
+# these are added to later on.
+set(C_WARNINGS "")
+set(CXX_WARNINGS "")
+
 
 # disabled for now, not supported
 # option(WITH_WEBPLUGIN     "Enable Web Plugin (Unix only)" OFF)
@@ -925,7 +942,7 @@ if(WITH_BUILDINFO)
 		# my mods to manually place an svn revision as git doesn't respond properly
 		#execute_process(COMMAND svnversion ${CMAKE_SOURCE_DIR} OUTPUT_VARIABLE BUILD_REV RESULT_VARIABLE BUILD_REV_RETURN OUTPUT_STRIP_TRAILING_WHITESPACE)
 		#if(BUILD_REV_RETURN)
-			set(BUILD_REV "35040")
+			set(BUILD_REV "35116")
 		#endif()
 	endif()
 	
@@ -934,7 +951,7 @@ if(WITH_BUILDINFO)
 		execute_process(COMMAND cmd /c time /t OUTPUT_VARIABLE BUILD_TIME OUTPUT_STRIP_TRAILING_WHITESPACE)  
 		#execute_process(COMMAND svnversion ${CMAKE_SOURCE_DIR} OUTPUT_VARIABLE BUILD_REV RESULT_VARIABLE BUILD_REV_RETURN OUTPUT_STRIP_TRAILING_WHITESPACE)
 		#if(BUILD_REV_RETURN)
-			set(BUILD_REV "35040")
+			set(BUILD_REV "35116")
 		#endif()
 	endif()
 endif()

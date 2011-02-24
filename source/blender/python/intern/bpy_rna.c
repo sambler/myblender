@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -24,6 +24,7 @@
 
 #include <Python.h>
 
+#include <stddef.h>
 #include <float.h> /* FLT_MIN/MAX */
 
 #include "bpy_rna.h"
@@ -655,7 +656,7 @@ static long pyrna_prop_hash(BPy_PropertyRNA *self)
 }
 
 /* use our own dealloc so we can free a property if we use one */
-static void pyrna_struct_dealloc( BPy_StructRNA *self )
+static void pyrna_struct_dealloc(BPy_StructRNA *self)
 {
 	if (self->freeptr && self->ptr.data) {
 		IDP_FreeProperty(self->ptr.data);
@@ -663,9 +664,37 @@ static void pyrna_struct_dealloc( BPy_StructRNA *self )
 		self->ptr.data= NULL;
 	}
 
+#ifdef USE_WEAKREFS
+    if (self->in_weakreflist != NULL) {
+        PyObject_ClearWeakRefs((PyObject *)self);
+	}
+#endif
+
 	/* Note, for subclassed PyObjects we cant just call PyObject_DEL() directly or it will crash */
 	Py_TYPE(self)->tp_free(self);
-	return;
+}
+
+/* use our own dealloc so we can free a property if we use one */
+static void pyrna_prop_dealloc(BPy_PropertyRNA *self)
+{
+#ifdef USE_WEAKREFS
+    if (self->in_weakreflist != NULL) {
+        PyObject_ClearWeakRefs((PyObject *)self);
+	}
+#endif
+	/* Note, for subclassed PyObjects we cant just call PyObject_DEL() directly or it will crash */
+	Py_TYPE(self)->tp_free(self);
+}
+
+static void pyrna_prop_array_dealloc(BPy_PropertyRNA *self)
+{
+#ifdef USE_WEAKREFS
+    if (self->in_weakreflist != NULL) {
+        PyObject_ClearWeakRefs((PyObject *)self);
+	}
+#endif
+	/* Note, for subclassed PyObjects we cant just call PyObject_DEL() directly or it will crash */
+	Py_TYPE(self)->tp_free(self);
 }
 
 static const char *pyrna_enum_as_string(PointerRNA *ptr, PropertyRNA *prop)
@@ -2246,8 +2275,8 @@ static char pyrna_struct_keyframe_insert_doc[] =
 "   :arg group: The name of the group the F-Curve should be added to if it doesn't exist yet.\n"
 "   :type group: str\n"
 "   :return: Success of keyframe insertion.\n"
-"   :rtype: boolean";
-
+"   :rtype: boolean\n"
+;
 static PyObject *pyrna_struct_keyframe_insert(BPy_StructRNA *self, PyObject *args, PyObject *kw)
 {
 	/* args, pyrna_struct_keyframe_parse handles these */
@@ -2289,8 +2318,8 @@ static char pyrna_struct_keyframe_delete_doc[] =
 "   :arg group: The name of the group the F-Curve should be added to if it doesn't exist yet.\n"
 "   :type group: str\n"
 "   :return: Success of keyframe deleation.\n"
-"   :rtype: boolean";
-
+"   :rtype: boolean\n"
+;
 static PyObject *pyrna_struct_keyframe_delete(BPy_StructRNA *self, PyObject *args, PyObject *kw)
 {
 	/* args, pyrna_struct_keyframe_parse handles these */
@@ -2329,8 +2358,8 @@ static char pyrna_struct_driver_add_doc[] =
 "   :arg index: array index of the property drive. Defaults to -1 for all indices or a single channel if the property is not an array.\n"
 "   :type index: int\n"
 "   :return: The driver(s) added.\n"
-"   :rtype: :class:`FCurve` or list if index is -1 with an array property.";
-
+"   :rtype: :class:`FCurve` or list if index is -1 with an array property.\n"
+;
 static PyObject *pyrna_struct_driver_add(BPy_StructRNA *self, PyObject *args)
 {
 	const char *path, *path_full;
@@ -2401,8 +2430,8 @@ static char pyrna_struct_driver_remove_doc[] =
 "   :arg index: array index of the property drive. Defaults to -1 for all indices or a single channel if the property is not an array.\n"
 "   :type index: int\n"
 "   :return: Success of driver removal.\n"
-"   :rtype: boolean";
-
+"   :rtype: boolean\n"
+;
 static PyObject *pyrna_struct_driver_remove(BPy_StructRNA *self, PyObject *args)
 {
 	const char *path, *path_full;
@@ -2438,8 +2467,8 @@ static char pyrna_struct_is_property_set_doc[] =
 "   Check if a property is set, use for testing operator properties.\n"
 "\n"
 "   :return: True when the property has been set.\n"
-"   :rtype: boolean";
-
+"   :rtype: boolean\n"
+;
 static PyObject *pyrna_struct_is_property_set(BPy_StructRNA *self, PyObject *args)
 {
 	PropertyRNA *prop;
@@ -2478,8 +2507,8 @@ static char pyrna_struct_is_property_hidden_doc[] =
 "   Check if a property is hidden.\n"
 "\n"
 "   :return: True when the property is hidden.\n"
-"   :rtype: boolean";
-
+"   :rtype: boolean\n"
+;
 static PyObject *pyrna_struct_is_property_hidden(BPy_StructRNA *self, PyObject *args)
 {
 	PropertyRNA *prop;
@@ -2504,8 +2533,8 @@ static char pyrna_struct_path_resolve_doc[] =
 "   :arg path: path which this property resolves.\n"
 "   :type path: string\n"
 "   :arg coerce: optional argument, when True, the property will be converted into its python representation.\n"
-"   :type coerce: boolean\n";
-
+"   :type coerce: boolean\n"
+;
 static PyObject *pyrna_struct_path_resolve(BPy_StructRNA *self, PyObject *args)
 {
 	const char *path;
@@ -2555,8 +2584,8 @@ static char pyrna_struct_path_from_id_doc[] =
 "   :arg property: Optional property name which can be used if the path is to a property of this object.\n"
 "   :type property: string\n"
 "   :return: The path from :class:`bpy_struct.id_data` to this struct and property (when given).\n"
-"   :rtype: str";
-
+"   :rtype: str\n"
+;
 static PyObject *pyrna_struct_path_from_id(BPy_StructRNA *self, PyObject *args)
 {
 	const char *name= NULL;
@@ -2598,8 +2627,8 @@ static char pyrna_prop_path_from_id_doc[] =
 "   Returns the data path from the ID to this property (string).\n"
 "\n"
 "   :return: The path from :class:`bpy_struct.id_data` to this property.\n"
-"   :rtype: str";
-
+"   :rtype: str\n"
+;
 static PyObject *pyrna_prop_path_from_id(BPy_PropertyRNA *self)
 {
 	const char *path;
@@ -2625,8 +2654,8 @@ static char pyrna_struct_type_recast_doc[] =
 "   Return a new instance, this is needed because types such as textures can be changed at runtime.\n"
 "\n"
 "   :return: a new instance of this object with the type initialized again.\n"
-"   :rtype: subclass of :class:`bpy_struct`";
-
+"   :rtype: subclass of :class:`bpy_struct`\n"
+;
 static PyObject *pyrna_struct_type_recast(BPy_StructRNA *self)
 {
 	PointerRNA r_ptr;
@@ -3244,10 +3273,10 @@ static char pyrna_struct_get_doc[] =
 "   :arg key: The key assosiated with the custom property.\n"
 "   :type key: string\n"
 "   :arg default: Optional argument for the value to return if *key* is not found.\n"
-// "   :type default: Undefined\n"
+"   :type default: Undefined\n"
 "\n"
-"   .. note:: Only :class:`ID`, :class:`Bone` and :class:`PoseBone` classes support custom properties.\n";
-
+"   .. note:: Only :class:`ID`, :class:`Bone` and :class:`PoseBone` classes support custom properties.\n"
+;
 static PyObject *pyrna_struct_get(BPy_StructRNA *self, PyObject *args)
 {
 	IDProperty *group, *idprop;
@@ -3283,8 +3312,8 @@ static char pyrna_struct_as_pointer_doc[] =
 "   :return: int (memory address).\n"
 "   :rtype: int\n"
 "\n"
-"   .. note:: This is intended only for advanced script writers who need to pass blender data to their own C/Python modules.\n";
-
+"   .. note:: This is intended only for advanced script writers who need to pass blender data to their own C/Python modules.\n"
+;
 static PyObject *pyrna_struct_as_pointer(BPy_StructRNA *self)
 {
 	return PyLong_FromVoidPtr(self->ptr.data);
@@ -3937,6 +3966,16 @@ static PyObject * pyrna_func_call(PyObject *self, PyObject *args, PyObject *kw)
 		return NULL;
 	}
 
+	/* for testing */
+	/*
+	{
+		const char *fn;
+		int lineno;
+		PyC_FileAndNum(&fn, &lineno);
+		printf("pyrna_func_call > %.200s.%.200s : %.200s:%d\n", RNA_struct_identifier(self_ptr->type), RNA_function_identifier(self_func), fn, lineno);
+	}
+	*/
+
 	/* include the ID pointer for pyrna_param_to_py() so we can include the
 	 * ID pointer on return values, this only works when returned values have
 	 * the same ID as the functions. */
@@ -4228,10 +4267,10 @@ PyTypeObject pyrna_struct_meta_idprop_Type = {
 PyTypeObject pyrna_struct_Type = {
 	PyVarObject_HEAD_INIT(NULL, 0)
 	"bpy_struct",			/* tp_name */
-	sizeof( BPy_StructRNA ),	/* tp_basicsize */
+	sizeof(BPy_StructRNA),	/* tp_basicsize */
 	0,			/* tp_itemsize */
 	/* methods */
-	( destructor ) pyrna_struct_dealloc,/* tp_dealloc */
+	(destructor) pyrna_struct_dealloc,/* tp_dealloc */
 	NULL,                       /* printfunc tp_print; */
 	NULL,						/* getattrfunc tp_getattr; */
 	NULL,						/* setattrfunc tp_setattr; */
@@ -4271,8 +4310,11 @@ PyTypeObject pyrna_struct_Type = {
 	(richcmpfunc)pyrna_struct_richcmp,	/* richcmpfunc tp_richcompare; */
 
   /***  weak reference enabler ***/
-	0,                          /* long tp_weaklistoffset; */
-
+#ifdef USE_WEAKREFS
+	offsetof(BPy_StructRNA, in_weakreflist),	/* long tp_weaklistoffset; */
+#else
+	0,
+#endif
   /*** Added in release 2.2 ***/
 	/*   Iterators */
 	NULL,                       /* getiterfunc tp_iter; */
@@ -4307,11 +4349,11 @@ PyTypeObject pyrna_struct_Type = {
 PyTypeObject pyrna_prop_Type = {
 	PyVarObject_HEAD_INIT(NULL, 0)
 	"bpy_prop",		/* tp_name */
-	sizeof( BPy_PropertyRNA ),			/* tp_basicsize */
+	sizeof(BPy_PropertyRNA),			/* tp_basicsize */
 	0,			/* tp_itemsize */
 	/* methods */
-	NULL,						/* tp_dealloc */
-	NULL,                   /* printfunc tp_print; */
+	(destructor) pyrna_prop_dealloc, /* tp_dealloc */
+	NULL,						/* printfunc tp_print; */
 	NULL,						/* getattrfunc tp_getattr; */
 	NULL,                       /* setattrfunc tp_setattr; */
 	NULL,						/* tp_compare */ /* DEPRECATED in python 3.0! */
@@ -4352,7 +4394,11 @@ PyTypeObject pyrna_prop_Type = {
 	(richcmpfunc)pyrna_prop_richcmp,	/* richcmpfunc tp_richcompare; */
 
   /***  weak reference enabler ***/
-	0,                          /* long tp_weaklistoffset; */
+#ifdef USE_WEAKREFS
+	offsetof(BPy_PropertyRNA, in_weakreflist),	/* long tp_weaklistoffset; */
+#else
+	0,
+#endif
 
   /*** Added in release 2.2 ***/
 	/*   Iterators */
@@ -4387,10 +4433,10 @@ PyTypeObject pyrna_prop_Type = {
 PyTypeObject pyrna_prop_array_Type = {
 	PyVarObject_HEAD_INIT(NULL, 0)
 	"bpy_prop_array",		/* tp_name */
-	sizeof( BPy_PropertyArrayRNA ),			/* tp_basicsize */
-	0,			/* tp_itemsize */
+	sizeof(BPy_PropertyArrayRNA),			/* tp_basicsize */
+	0,							/* tp_itemsize */
 	/* methods */
-	NULL,						/* tp_dealloc */
+	(destructor)pyrna_prop_array_dealloc, /* tp_dealloc */
 	NULL,                       /* printfunc tp_print; */
 	NULL,						/* getattrfunc tp_getattr; */
 	NULL,                       /* setattrfunc tp_setattr; */
@@ -4432,8 +4478,11 @@ PyTypeObject pyrna_prop_array_Type = {
 	NULL, /* subclassed */		/* richcmpfunc tp_richcompare; */
 
   /***  weak reference enabler ***/
-	0,                          /* long tp_weaklistoffset; */
-
+#ifdef USE_WEAKREFS
+	offsetof(BPy_PropertyArrayRNA, in_weakreflist),	/* long tp_weaklistoffset; */
+#else
+	0,
+#endif
   /*** Added in release 2.2 ***/
 	/*   Iterators */
 	(getiterfunc)pyrna_prop_array_iter,	/* getiterfunc tp_iter; */
@@ -4467,10 +4516,10 @@ PyTypeObject pyrna_prop_array_Type = {
 PyTypeObject pyrna_prop_collection_Type = {
 	PyVarObject_HEAD_INIT(NULL, 0)
 	"bpy_prop_collection",		/* tp_name */
-	sizeof( BPy_PropertyRNA ),			/* tp_basicsize */
+	sizeof(BPy_PropertyRNA),			/* tp_basicsize */
 	0,			/* tp_itemsize */
 	/* methods */
-	NULL,						/* tp_dealloc */
+	(destructor)pyrna_prop_dealloc, /* tp_dealloc */
 	NULL,                       /* printfunc tp_print; */
 	NULL,						/* getattrfunc tp_getattr; */
 	NULL,                       /* setattrfunc tp_setattr; */
@@ -4512,7 +4561,11 @@ PyTypeObject pyrna_prop_collection_Type = {
 	NULL, /* subclassed */		/* richcmpfunc tp_richcompare; */
 
   /***  weak reference enabler ***/
-	0,                          /* long tp_weaklistoffset; */
+#ifdef USE_WEAKREFS
+	offsetof(BPy_PropertyRNA, in_weakreflist),	/* long tp_weaklistoffset; */
+#else
+	0,
+#endif
 
   /*** Added in release 2.2 ***/
 	/*   Iterators */
@@ -4548,10 +4601,10 @@ PyTypeObject pyrna_prop_collection_Type = {
 static PyTypeObject pyrna_prop_collection_idprop_Type = {
 	PyVarObject_HEAD_INIT(NULL, 0)
 	"bpy_prop_collection_idprop",		/* tp_name */
-	sizeof( BPy_PropertyRNA ),			/* tp_basicsize */
-	0,			/* tp_itemsize */
+	sizeof(BPy_PropertyRNA),			/* tp_basicsize */
+	0,							/* tp_itemsize */
 	/* methods */
-	NULL,						/* tp_dealloc */
+	(destructor)pyrna_prop_dealloc, /* tp_dealloc */
 	NULL,                       /* printfunc tp_print; */
 	NULL,						/* getattrfunc tp_getattr; */
 	NULL,                       /* setattrfunc tp_setattr; */
@@ -4593,7 +4646,11 @@ static PyTypeObject pyrna_prop_collection_idprop_Type = {
 	NULL, /* subclassed */		/* richcmpfunc tp_richcompare; */
 
   /***  weak reference enabler ***/
-	0,                          /* long tp_weaklistoffset; */
+#ifdef USE_WEAKREFS
+	offsetof(BPy_PropertyRNA, in_weakreflist),	/* long tp_weaklistoffset; */
+#else
+	0,
+#endif
 
   /*** Added in release 2.2 ***/
 	/*   Iterators */
@@ -4834,6 +4891,9 @@ PyObject *pyrna_struct_CreatePyObject( PointerRNA *ptr )
 		else {
 			fprintf(stderr, "Could not make type\n");
 			pyrna = ( BPy_StructRNA * ) PyObject_NEW( BPy_StructRNA, &pyrna_struct_Type );
+#ifdef USE_WEAKREFS
+			pyrna->in_weakreflist= NULL;
+#endif
 		}
 	}
 
@@ -4870,11 +4930,17 @@ PyObject *pyrna_prop_CreatePyObject( PointerRNA *ptr, PropertyRNA *prop )
 		}
 
 		pyrna = (BPy_PropertyRNA *) PyObject_NEW(BPy_PropertyRNA, type);
+#ifdef USE_WEAKREFS
+		pyrna->in_weakreflist= NULL;
+#endif
 	}
 	else {
 		pyrna = (BPy_PropertyRNA *) PyObject_NEW(BPy_PropertyArrayRNA, &pyrna_prop_array_Type);
 		((BPy_PropertyArrayRNA *)pyrna)->arraydim= 0;
 		((BPy_PropertyArrayRNA *)pyrna)->arrayoffset= 0;
+#ifdef USE_WEAKREFS
+		((BPy_PropertyArrayRNA *)pyrna)->in_weakreflist= NULL;
+#endif
 	}
 
 	if( !pyrna ) {
@@ -5019,7 +5085,7 @@ PyObject *BPY_rna_types(void)
 
 	if ((pyrna_basetype_Type.tp_flags & Py_TPFLAGS_READY)==0)  {
 		pyrna_basetype_Type.tp_name = "RNA_Types";
-		pyrna_basetype_Type.tp_basicsize = sizeof( BPy_BaseTypeRNA );
+		pyrna_basetype_Type.tp_basicsize = sizeof(BPy_BaseTypeRNA);
 		pyrna_basetype_Type.tp_getattro = ( getattrofunc )pyrna_basetype_getattro;
 		pyrna_basetype_Type.tp_flags = Py_TPFLAGS_DEFAULT;
 		pyrna_basetype_Type.tp_methods = pyrna_basetype_methods;
@@ -5033,7 +5099,9 @@ PyObject *BPY_rna_types(void)
 	/* avoid doing this lookup for every getattr */
 	RNA_blender_rna_pointer_create(&self->ptr);
 	self->prop = RNA_struct_find_property(&self->ptr, "structs");
-
+#ifdef USE_WEAKREFS
+	self->in_weakreflist= NULL;
+#endif
 	return (PyObject *)self;
 }
 
@@ -5415,7 +5483,7 @@ static int bpy_class_call(bContext *C, PointerRNA *ptr, FunctionRNA *func, Param
 	/* testing, for correctness, not operator and not draw function */
 	const short is_readonly= strstr("draw", func_id) || /*strstr("render", func_id) ||*/ !RNA_struct_is_a(ptr->type, &RNA_Operator);
 #endif
-
+	
 	py_class= RNA_struct_py_type_get(ptr->type);
 	
 	/* rare case. can happen when registering subclasses */

@@ -133,7 +133,7 @@ if(WITH_BUILDINFO)
 
 	# include the output directory, where the buildinfo.h file is generated
 	include_directories(${CMAKE_BINARY_DIR}/source/creator)
-	message(WARNING "${CMAKE_CURRENT_SOURCE_DIR}")
+	#message(WARNING "${CMAKE_CURRENT_SOURCE_DIR}")
 	# a custom target that is always built
 	add_custom_target(buildinfo ALL
 		DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/buildinfo.h)

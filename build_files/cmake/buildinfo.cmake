@@ -4,10 +4,10 @@
 # the FindSubversion.cmake module is part of the standard distribution
 include(FindSubversion)
 # extract working copy information for SOURCE_DIR into MY_XXX variables
-if(Subversion_FOUND)
+if(0)
 	Subversion_WC_INFO(${SOURCE_DIR} MY)
 else()
-	set(MY_WC_REVISION "unknown")
+	set(MY_WC_REVISION "35132M")
 endif()
 
 # BUILD_PLATFORM and BUILD_PLATFORM are taken from CMake

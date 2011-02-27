@@ -157,24 +157,24 @@ class IMAGE_MT_image_invert(bpy.types.Menu):
     def draw(self, context):
         layout = self.layout
 
-        op = layout.operator("image.invert", text="Invert Image Colors");
-        op.invert_r = True;
-        op.invert_g = True;
-        op.invert_b = True;
+        op = layout.operator("image.invert", text="Invert Image Colors")
+        op.invert_r = True
+        op.invert_g = True
+        op.invert_b = True
 
         layout.separator()
 
-        op = layout.operator("image.invert", text="Invert Red Channel");
-        op.invert_r = True;
+        op = layout.operator("image.invert", text="Invert Red Channel")
+        op.invert_r = True
 
-        op = layout.operator("image.invert", text="Invert Green Channel");
-        op.invert_g = True;
+        op = layout.operator("image.invert", text="Invert Green Channel")
+        op.invert_g = True
 
-        op = layout.operator("image.invert", text="Invert Blue Channel");
-        op.invert_b = True;
+        op = layout.operator("image.invert", text="Invert Blue Channel")
+        op.invert_b = True
 
-        op = layout.operator("image.invert", text="Invert Alpha Channel");
-        op.invert_a = True;
+        op = layout.operator("image.invert", text="Invert Alpha Channel")
+        op.invert_a = True
 
 
 class IMAGE_MT_uvs_showhide(bpy.types.Menu):
@@ -387,8 +387,8 @@ class IMAGE_HT_header(bpy.types.Header):
             row.prop(toolsettings, "use_snap", text="")
             row.prop(toolsettings, "snap_element", text="", icon_only=True)
 
-            # mesh = context.edit_object.data
-            # row.prop_search(mesh.uv_textures, "active", mesh, "uv_textures")
+            mesh = context.edit_object.data
+            layout.prop_search(mesh.uv_textures, "active", mesh, "uv_textures", text="")
 
         if ima:
             # layers

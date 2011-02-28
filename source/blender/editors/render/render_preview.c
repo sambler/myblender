@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/render/render_preview.c
+ *  \ingroup edrend
+ */
+
+
 /* global includes */
 
 #include <stdlib.h>
@@ -68,6 +73,7 @@
 #include "BKE_main.h"
 #include "BKE_material.h"
 #include "BKE_node.h"
+#include "BKE_idprop.h"
 
 #include "IMB_imbuf.h"
 #include "IMB_imbuf_types.h"
@@ -286,6 +292,7 @@ void ED_preview_init_dbase(void)
 	BlendFileData *bfd;
 	extern int datatoc_preview_blend_size;
 	extern char datatoc_preview_blend[];
+	const int fileflags= G.fileflags;
 	
 	G.fileflags |= G_FILE_NO_UI;
 	bfd= BLO_read_from_memory(datatoc_preview_blend, datatoc_preview_blend_size, NULL);
@@ -294,7 +301,7 @@ void ED_preview_init_dbase(void)
 		
 		MEM_freeN(bfd);
 	}
-	G.fileflags &= ~G_FILE_NO_UI;
+	G.fileflags= fileflags;
 }
 
 void ED_preview_free_dbase(void)
@@ -1053,6 +1060,14 @@ static void shader_preview_render(ShaderPreview *sp, ID *id, int split, int firs
 
 	/* unassign the pointers, reset vars */
 	preview_prepare_scene(sp->scene, NULL, GS(id->name), sp);
+	
+	/* XXX bad exception, end-exec is not being called in render, because it uses local main */
+	if(idtype == ID_TE) {
+		Tex *tex= (Tex *)id;
+		if(tex->use_nodes && tex->nodetree)
+			ntreeEndExecTree(tex->nodetree);
+	}
+
 }
 
 /* runs inside thread for material and icons */
@@ -1078,12 +1093,19 @@ static void shader_preview_free(void *customdata)
 	ShaderPreview *sp= customdata;
 	
 	if(sp->matcopy) {
+		struct IDProperty *properties;
 		/* node previews */
 		shader_preview_updatejob(sp);
 		
 		/* get rid of copied material */
 		BLI_remlink(&pr_main->mat, sp->matcopy);
 		free_material(sp->matcopy);
+
+		properties= IDP_GetProperties((ID *)sp->matcopy, FALSE);
+		if (properties) {
+			IDP_FreeProperty(properties);
+			MEM_freeN(properties);
+		}
 		MEM_freeN(sp->matcopy);
 	}
 	

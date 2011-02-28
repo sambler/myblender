@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/transform/transform.c
+ *  \ingroup edtransform
+ */
+
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -376,7 +381,7 @@ static void viewRedrawPost(bContext *C, TransInfo *t)
 
 /* ************************** TRANSFORMATIONS **************************** */
 
-void BIF_selectOrientation() {
+void BIF_selectOrientation(void) {
 #if 0 // TRANSFORM_FIX_ME
 	short val;
 	char *str_menu = BIF_menustringTransformOrientation("Orientation");
@@ -1373,7 +1378,7 @@ static void drawHelpline(bContext *UNUSED(C), int x, int y, void *customdata)
 	}
 }
 
-void drawTransformView(const struct bContext *C, struct ARegion *UNUSED(ar), void *arg)
+static void drawTransformView(const struct bContext *C, struct ARegion *UNUSED(ar), void *arg)
 {
 	TransInfo *t = arg;
 
@@ -1382,12 +1387,14 @@ void drawTransformView(const struct bContext *C, struct ARegion *UNUSED(ar), voi
 	drawSnapping(C, t);
 }
 
-void drawTransformPixel(const struct bContext *UNUSED(C), struct ARegion *UNUSED(ar), void *UNUSED(arg))
+#if 0
+static void drawTransformPixel(const struct bContext *UNUSED(C), struct ARegion *UNUSED(ar), void *UNUSED(arg))
 {
 //	TransInfo *t = arg;
 //
 //	drawHelpline(C, t->mval[0], t->mval[1], t);
 }
+#endif
 
 void saveTransform(bContext *C, TransInfo *t, wmOperator *op)
 {
@@ -2202,7 +2209,7 @@ static void constraintSizeLim(TransInfo *t, TransData *td)
 
 /* ************************** WARP *************************** */
 
-void postInputWarp(TransInfo *t, float values[3])
+static void postInputWarp(TransInfo *t, float values[3])
 {
 	mul_v3_fl(values, (float)(M_PI * 2));
 
@@ -2371,7 +2378,7 @@ int Warp(TransInfo *t, short UNUSED(mval[2]))
 
 /* ************************** SHEAR *************************** */
 
-void postInputShear(TransInfo *UNUSED(t), float values[3])
+static void postInputShear(TransInfo *UNUSED(t), float values[3])
 {
 	mul_v3_fl(values, 0.05f);
 }
@@ -2525,6 +2532,7 @@ void initResize(TransInfo *t)
 
 static void headerResize(TransInfo *t, float vec[3], char *str) {
 	char tvec[60];
+	char *spos= str;
 	if (hasNumInput(&t->num)) {
 		outputNumInput(&(t->num), tvec);
 	}
@@ -2537,24 +2545,27 @@ static void headerResize(TransInfo *t, float vec[3], char *str) {
 	if (t->con.mode & CON_APPLY) {
 		switch(t->num.idx_max) {
 		case 0:
-			sprintf(str, "Scale: %s%s %s", &tvec[0], t->con.text, t->proptext);
+			spos += sprintf(spos, "Scale: %s%s %s", &tvec[0], t->con.text, t->proptext);
 			break;
 		case 1:
-			sprintf(str, "Scale: %s : %s%s %s", &tvec[0], &tvec[20], t->con.text, t->proptext);
+			spos += sprintf(spos, "Scale: %s : %s%s %s", &tvec[0], &tvec[20], t->con.text, t->proptext);
 			break;
 		case 2:
-			sprintf(str, "Scale: %s : %s : %s%s %s", &tvec[0], &tvec[20], &tvec[40], t->con.text, t->proptext);
+			spos += sprintf(spos, "Scale: %s : %s : %s%s %s", &tvec[0], &tvec[20], &tvec[40], t->con.text, t->proptext);
 		}
 	}
 	else {
 		if (t->flag & T_2D_EDIT)
-			sprintf(str, "Scale X: %s   Y: %s%s %s", &tvec[0], &tvec[20], t->con.text, t->proptext);
+			spos += sprintf(spos, "Scale X: %s   Y: %s%s %s", &tvec[0], &tvec[20], t->con.text, t->proptext);
 		else
-			sprintf(str, "Scale X: %s   Y: %s  Z: %s%s %s", &tvec[0], &tvec[20], &tvec[40], t->con.text, t->proptext);
+			spos += sprintf(spos, "Scale X: %s   Y: %s  Z: %s%s %s", &tvec[0], &tvec[20], &tvec[40], t->con.text, t->proptext);
 	}
 	
-	if (t->flag & (T_PROP_EDIT|T_PROP_CONNECTED))
-		sprintf(str, "%s Proportional size: %.2f", str, t->prop_size);
+	if (t->flag & (T_PROP_EDIT|T_PROP_CONNECTED)) {
+		spos += sprintf(spos, " Proportional size: %.2f", t->prop_size);
+	}
+
+	(void)spos;
 }
 
 #define SIGN(a)		(a<-FLT_EPSILON?1:a>FLT_EPSILON?2:3)
@@ -2853,7 +2864,7 @@ int ToSphere(TransInfo *t, short UNUSED(mval[2]))
 /* ************************** ROTATION *************************** */
 
 
-void postInputRotation(TransInfo *t, float values[3])
+static void postInputRotation(TransInfo *t, float values[3])
 {
 	if ((t->con.mode & CON_APPLY) && t->con.applyRot) {
 		t->con.applyRot(t, NULL, t->axis, values);
@@ -2921,7 +2932,7 @@ static void ElementRotation(TransInfo *t, TransData *td, float mat[3][3], short 
 		
 		
 		if(td->flag & TD_USEQUAT) {
-			mul_serie_m3(fmat, td->mtx, mat, td->smtx, 0, 0, 0, 0, 0);
+			mul_serie_m3(fmat, td->mtx, mat, td->smtx, NULL, NULL, NULL, NULL, NULL);
 			mat3_to_quat( quat,fmat);	// Actual transform
 			
 			if(td->ext->quat){
@@ -2988,7 +2999,7 @@ static void ElementRotation(TransInfo *t, TransData *td, float mat[3][3], short 
 		if ((t->flag & T_V3D_ALIGN)==0) { // align mode doesn't rotate objects itself
 			/* euler or quaternion/axis-angle? */
 			if (td->ext->rotOrder == ROT_MODE_QUAT) {
-				mul_serie_m3(fmat, td->mtx, mat, td->smtx, 0, 0, 0, 0, 0);
+				mul_serie_m3(fmat, td->mtx, mat, td->smtx, NULL, NULL, NULL, NULL, NULL);
 				
 				mat3_to_quat( quat,fmat);	// Actual transform
 				
@@ -3003,7 +3014,7 @@ static void ElementRotation(TransInfo *t, TransData *td, float mat[3][3], short 
 				
 				axis_angle_to_quat(iquat, td->ext->irotAxis, td->ext->irotAngle);
 				
-				mul_serie_m3(fmat, td->mtx, mat, td->smtx, 0, 0, 0, 0, 0);
+				mul_serie_m3(fmat, td->mtx, mat, td->smtx, NULL, NULL, NULL, NULL, NULL);
 				mat3_to_quat( quat,fmat);	// Actual transform
 				mul_qt_qtqt(tquat, quat, iquat);
 				
@@ -3058,7 +3069,7 @@ static void ElementRotation(TransInfo *t, TransData *td, float mat[3][3], short 
 		if ((t->flag & T_V3D_ALIGN)==0) { // align mode doesn't rotate objects itself
 			/* euler or quaternion? */
 			   if ((td->ext->rotOrder == ROT_MODE_QUAT) || (td->flag & TD_USEQUAT)) {
-				mul_serie_m3(fmat, td->mtx, mat, td->smtx, 0, 0, 0, 0, 0);
+				mul_serie_m3(fmat, td->mtx, mat, td->smtx, NULL, NULL, NULL, NULL, NULL);
 				mat3_to_quat( quat,fmat);	// Actual transform
 				
 				mul_qt_qtqt(td->ext->quat, quat, td->ext->iquat);
@@ -3071,7 +3082,7 @@ static void ElementRotation(TransInfo *t, TransData *td, float mat[3][3], short 
 				
 				axis_angle_to_quat(iquat, td->ext->irotAxis, td->ext->irotAngle);
 				
-				mul_serie_m3(fmat, td->mtx, mat, td->smtx, 0, 0, 0, 0, 0);
+				mul_serie_m3(fmat, td->mtx, mat, td->smtx, NULL, NULL, NULL, NULL, NULL);
 				mat3_to_quat( quat,fmat);	// Actual transform
 				mul_qt_qtqt(tquat, quat, iquat);
 				
@@ -3137,7 +3148,7 @@ static void applyRotation(TransInfo *t, float angle, float axis[3])
 
 int Rotation(TransInfo *t, short UNUSED(mval[2]))
 {
-	char str[64];
+	char str[128];
 	
 	float final;
 
@@ -5886,9 +5897,9 @@ void BIF_TransformSetUndo(char *UNUSED(str))
 }
 
 
-void NDofTransform(void)
-{
 #if 0 // TRANSFORM_FIX_ME
+static void NDofTransform(void)
+{
 	float fval[7];
 	float maxval = 50.0f; // also serves as threshold
 	int axis = -1;
@@ -5933,5 +5944,5 @@ void NDofTransform(void)
 		initTransform(mode, CTX_NDOF);
 		Transform();
 	}
-#endif
 }
+#endif

@@ -26,12 +26,15 @@
  *
  * ***** END GPL LICENSE BLOCK *****
 */
+
+/** \file blender/python/generic/mathutils.h
+ *  \ingroup pygen
+ */
+
 //Include this file for access to vector, quat, matrix, euler, etc...
 
 #ifndef MATHUTILS_H
 #define MATHUTILS_H
-
-#include <Python.h>
 
 /* Can cast different mathutils types to this, use for generic funcs */
 
@@ -50,15 +53,18 @@ typedef struct {
 	BASE_MATH_MEMBERS(data)
 } BaseMathObject;
 
-#include "mathutils_vector.h"
-#include "mathutils_matrix.h"
-#include "mathutils_quat.h"
-#include "mathutils_euler.h"
-#include "mathutils_color.h"
+#include "mathutils_Vector.h"
+#include "mathutils_Matrix.h"
+#include "mathutils_Quaternion.h"
+#include "mathutils_Euler.h"
+#include "mathutils_Color.h"
 #include "mathutils_geometry.h"
 
 PyObject *BaseMathObject_getOwner( BaseMathObject * self, void * );
 PyObject *BaseMathObject_getWrapped( BaseMathObject *self, void * );
+
+int BaseMathObject_traverse(BaseMathObject *self, visitproc visit, void *arg);
+int BaseMathObject_clear(BaseMathObject *self);
 void BaseMathObject_dealloc(BaseMathObject * self);
 
 PyMODINIT_FUNC BPyInit_mathutils(void);

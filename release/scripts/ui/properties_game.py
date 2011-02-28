@@ -163,7 +163,6 @@ class PHYSICS_PT_game_physics(PhysicsButtonsPanel, bpy.types.Panel):
             subsub.active = game.use_anisotropic_friction
             subsub.prop(game, "friction_coefficients", text="", slider=True)
 
-
         elif game.physics_type in ('SENSOR', 'INVISIBLE', 'NO_COLLISION', 'OCCLUDE'):
             layout.prop(ob, "hide_render", text="Invisible")
 
@@ -191,13 +190,9 @@ class PHYSICS_PT_game_collision_bounds(PhysicsButtonsPanel, bpy.types.Panel):
         layout.active = game.use_collision_bounds
         layout.prop(game, "collision_bounds_type", text="Bounds")
 
-        split = layout.split()
-
-        col = split.column()
-        col.prop(game, "collision_margin", text="Margin", slider=True)
-
-        col = split.column()
-        col.prop(game, "use_collision_compound", text="Compound")
+        row = layout.row()
+        row.prop(game, "collision_margin", text="Margin", slider=True)
+        row.prop(game, "use_collision_compound", text="Compound")
 
 
 class RenderButtonsPanel():
@@ -347,7 +342,7 @@ class RENDER_PT_game_performance(RenderButtonsPanel, bpy.types.Panel):
         row.prop(gs, "use_frame_rate")
         row.prop(gs, "use_display_lists")
 
-        
+
 class RENDER_PT_game_display(RenderButtonsPanel, bpy.types.Panel):
     bl_label = "Display"
     COMPAT_ENGINES = {'BLENDER_GAME'}
@@ -361,7 +356,7 @@ class RENDER_PT_game_display(RenderButtonsPanel, bpy.types.Panel):
         flow.prop(gs, "show_framerate_profile", text="Framerate and Profile")
         flow.prop(gs, "show_physics_visualization", text="Physics Visualization")
         flow.prop(gs, "use_deprecation_warnings")
-        flow.prop(gs, "show_mouse")
+        flow.prop(gs, "show_mouse", text="Mouse Cursor")
 
 
 class RENDER_PT_game_sound(RenderButtonsPanel, bpy.types.Panel):
@@ -423,13 +418,9 @@ class WORLD_PT_game_world(WorldButtonsPanel, bpy.types.Panel):
 
         world = context.world
 
-        split = layout.split()
-
-        col = split.column()
-        col.prop(world, "horizon_color")
-
-        col = split.column()
-        col.prop(world, "ambient_color")
+        row = layout.row()
+        row.column().prop(world, "horizon_color")
+        row.column().prop(world, "ambient_color")
 
 
 class WORLD_PT_game_mist(WorldButtonsPanel, bpy.types.Panel):
@@ -452,13 +443,10 @@ class WORLD_PT_game_mist(WorldButtonsPanel, bpy.types.Panel):
         world = context.world
 
         layout.active = world.mist_settings.use_mist
-        split = layout.split()
 
-        col = split.column()
-        col.prop(world.mist_settings, "start")
-
-        col = split.column()
-        col.prop(world.mist_settings, "depth")
+        row = layout.row()
+        row.prop(world.mist_settings, "start")
+        row.prop(world.mist_settings, "depth")
 
 
 class WORLD_PT_game_physics(WorldButtonsPanel, bpy.types.Panel):
@@ -511,11 +499,11 @@ class WORLD_PT_game_physics(WorldButtonsPanel, bpy.types.Panel):
 
 
 def register():
-    pass
+    bpy.utils.register_module(__name__)
 
 
 def unregister():
-    pass
+    bpy.utils.unregister_module(__name__)
 
 if __name__ == "__main__":
     register()

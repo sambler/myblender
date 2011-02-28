@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/python/generic/mathutils.c
+ *  \ingroup pygen
+ */
+
+
 /* Note: Changes to Mathutils since 2.4x
  * use radians rather then degrees
  * - Mathutils.Vector/Euler/Quaternion(), now only take single sequence arguments.
@@ -86,6 +91,8 @@
  * - geometry.BoxPack2D -> box_pack_2d
  * - geometry.BarycentricTransform -> barycentric_transform
  */
+
+#include <Python.h>
 
 #include "mathutils.h"
 
@@ -191,7 +198,7 @@ int mathutils_any_to_rotmat(float rmat[3][3], PyObject *value, const char *error
 		if(!BaseMath_ReadCallback((BaseMathObject *)value)) {
 			return -1;
 		}
-		else if(((MatrixObject *)value)->colSize < 3 || ((MatrixObject *)value)->rowSize < 3) {
+		else if(((MatrixObject *)value)->col_size < 3 || ((MatrixObject *)value)->row_size < 3) {
 			PyErr_Format(PyExc_ValueError, "%.200s: matrix must have minimum 3x3 dimensions", error_prefix);
 			return -1;
 		}
@@ -247,7 +254,7 @@ int EXPP_VectorsAreEqual(float *vecA, float *vecB, int size, int floatSteps)
 /* Mathutils Callbacks */
 
 /* for mathutils internal use only, eventually should re-alloc but to start with we only have a few users */
-Mathutils_Callback *mathutils_callbacks[8] = {NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
+static Mathutils_Callback *mathutils_callbacks[8] = {NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
 
 int Mathutils_RegisterCallback(Mathutils_Callback *cb)
 {
@@ -271,7 +278,7 @@ int _BaseMathObject_ReadCallback(BaseMathObject *self)
 		return 1;
 
 	if(!PyErr_Occurred())
-		PyErr_Format(PyExc_SystemError, "%s user has become invalid", Py_TYPE(self)->tp_name);
+		PyErr_Format(PyExc_RuntimeError, "%s user has become invalid", Py_TYPE(self)->tp_name);
 	return 0;
 }
 
@@ -282,7 +289,7 @@ int _BaseMathObject_WriteCallback(BaseMathObject *self)
 		return 1;
 
 	if(!PyErr_Occurred())
-		PyErr_Format(PyExc_SystemError, "%s user has become invalid", Py_TYPE(self)->tp_name);
+		PyErr_Format(PyExc_RuntimeError, "%s user has become invalid", Py_TYPE(self)->tp_name);
 	return 0;
 }
 
@@ -293,7 +300,7 @@ int _BaseMathObject_ReadIndexCallback(BaseMathObject *self, int index)
 		return 1;
 
 	if(!PyErr_Occurred())
-		PyErr_Format(PyExc_SystemError, "%s user has become invalid", Py_TYPE(self)->tp_name);
+		PyErr_Format(PyExc_RuntimeError, "%s user has become invalid", Py_TYPE(self)->tp_name);
 	return 0;
 }
 
@@ -304,7 +311,7 @@ int _BaseMathObject_WriteIndexCallback(BaseMathObject *self, int index)
 		return 1;
 
 	if(!PyErr_Occurred())
-		PyErr_Format(PyExc_SystemError, "%s user has become invalid", Py_TYPE(self)->tp_name);
+		PyErr_Format(PyExc_RuntimeError, "%s user has become invalid", Py_TYPE(self)->tp_name);
 	return 0;
 }
 
@@ -323,18 +330,32 @@ PyObject *BaseMathObject_getWrapped(BaseMathObject *self, void *UNUSED(closure))
 	return PyBool_FromLong((self->wrapped == Py_WRAP) ? 1:0);
 }
 
-void BaseMathObject_dealloc(BaseMathObject * self)
+int BaseMathObject_traverse(BaseMathObject *self, visitproc visit, void *arg)
+{
+	Py_VISIT(self->cb_user);
+	return 0;
+}
+
+int BaseMathObject_clear(BaseMathObject *self)
+{
+	Py_CLEAR(self->cb_user);
+	return 0;
+}
+
+void BaseMathObject_dealloc(BaseMathObject *self)
 {
 	/* only free non wrapped */
-	if(self->wrapped != Py_WRAP)
+	if(self->wrapped != Py_WRAP) {
 		PyMem_Free(self->data);
+	}
 
-	Py_XDECREF(self->cb_user);
+	BaseMathObject_clear(self);
+
 	Py_TYPE(self)->tp_free(self); // PyObject_DEL(self); // breaks subtypes
 }
 
 /*----------------------------MODULE INIT-------------------------*/
-struct PyMethodDef M_Mathutils_methods[] = {
+static struct PyMethodDef M_Mathutils_methods[] = {
 	{NULL, NULL, 0, NULL}
 };
 
@@ -344,10 +365,10 @@ static struct PyModuleDef M_Mathutils_module_def = {
 	M_Mathutils_doc,  /* m_doc */
 	0,  /* m_size */
 	M_Mathutils_methods,  /* m_methods */
-	0,  /* m_reload */
-	0,  /* m_traverse */
-	0,  /* m_clear */
-	0,  /* m_free */
+	NULL,  /* m_reload */
+	NULL,  /* m_traverse */
+	NULL,  /* m_clear */
+	NULL,  /* m_free */
 };
 
 PyMODINIT_FUNC BPyInit_mathutils(void)

@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file guardedalloc/intern/mallocn.c
+ *  \ingroup MEM
+ */
+
 
 /**
 
@@ -167,12 +172,13 @@ static int malloc_debug_memset= 0;
 
 static void print_error(const char *str, ...)
 {
-	char buf[1024];
+	char buf[512];
 	va_list ap;
 
 	va_start(ap, str);
-	vsprintf(buf, str, ap);
+	vsnprintf(buf, sizeof(buf), str, ap);
 	va_end(ap);
+	buf[sizeof(buf) - 1] = '\0';
 
 	if (error_callback) error_callback(buf);
 }

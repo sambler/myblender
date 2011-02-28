@@ -1,4 +1,4 @@
-/**
+/*
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/nodes/intern/TEX_nodes/TEX_math.c
+ *  \ingroup texnodes
+ */
+
 
 #include "../TEX_util.h"
 
@@ -106,11 +111,17 @@ static void valuefn(float *out, TexParams *p, bNode *node, bNodeStack **in, shor
 		break;
 	case 10: /* Power */
 		{
-			/* Don't want any imaginary numbers... */
-			if( in0 >= 0 )
-				*out= pow(in0, in1);
-			else
-				*out= 0.0;
+			/* Only raise negative numbers by full integers */
+			if( in0 >= 0 ) {
+				out[0]= pow(in0, in1);
+            } else {
+                float y_mod_1 = fmod(in1, 1);
+                if (y_mod_1 > 0.999 || y_mod_1 < 0.001) {
+                    *out = pow(in0, floor(in1 + 0.5));
+                } else {
+                    *out = 0.0;
+                }
+            }
 		}
 		break;
 	case 11: /* Logarithm */
@@ -181,6 +192,7 @@ void register_node_type_tex_math(ListBase *lb)
 	node_type_base(&ntype, TEX_NODE_MATH, "Math", NODE_CLASS_CONVERTOR, NODE_OPTIONS,
 				   inputs, outputs);
 	node_type_size(&ntype, 120, 110, 160);
+	node_type_label(&ntype, node_math_label);
 	node_type_storage(&ntype, "node_math", NULL, NULL);
 	node_type_exec(&ntype, exec);
 	

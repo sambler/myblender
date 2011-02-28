@@ -60,6 +60,12 @@ def context_tex_datablock(context):
         return idblock
 
     idblock = context.brush
+    if idblock:
+        return idblock
+
+    if context.particle_system:
+        idblock = context.particle_system.settings
+
     return idblock
 
 
@@ -84,7 +90,7 @@ class TEXTURE_PT_context_texture(TextureButtonsPanel, bpy.types.Panel):
         engine = context.scene.render.engine
         if not hasattr(context, "texture_slot"):
             return False
-        return ((context.material or context.world or context.lamp or context.brush or context.texture)
+        return ((context.material or context.world or context.lamp or context.brush or context.texture or context.particle_system or isinstance(context.space_data.pin_id, bpy.types.ParticleSettings))
             and (engine in cls.COMPAT_ENGINES))
 
     def draw(self, context):
@@ -96,8 +102,12 @@ class TEXTURE_PT_context_texture(TextureButtonsPanel, bpy.types.Panel):
         idblock = context_tex_datablock(context)
         pin_id = space.pin_id
 
-        if not isinstance(pin_id, bpy.types.Material):
+        if space.use_pin_id and not isinstance(pin_id, bpy.types.Texture):
+            idblock = pin_id
             pin_id = None
+
+        if not space.use_pin_id:
+            layout.prop(space, "texture_context", expand=True)
 
         tex_collection = (pin_id is None) and (node is None) and (not isinstance(idblock, bpy.types.Brush))
 
@@ -125,9 +135,6 @@ class TEXTURE_PT_context_texture(TextureButtonsPanel, bpy.types.Panel):
             col.template_ID(space, "pin_id")
 
         col = split.column()
-
-        if not space.pin_id:
-            col.prop(space, "show_brush_texture", text="Brush", toggle=True)
 
         if tex:
             split = layout.split(percentage=0.2)
@@ -237,9 +244,8 @@ class TEXTURE_PT_clouds(TextureTypePanel, bpy.types.Panel):
         col.prop(tex, "noise_scale", text="Size")
         col.prop(tex, "noise_depth", text="Depth")
 
-        col = split.column()
-        col.prop(tex, "nabla", text="Nabla")
-	
+        split.prop(tex, "nabla", text="Nabla")
+
 class TEXTURE_PT_planet(TextureTypePanel, bpy.types.Panel):
     bl_label = "Planet"
     tex_type = 'PLANET'
@@ -292,8 +298,7 @@ class TEXTURE_PT_wood(TextureTypePanel, bpy.types.Panel):
         col.prop(tex, "noise_scale", text="Size")
         col.prop(tex, "turbulence")
 
-        col = split.column()
-        col.prop(tex, "nabla")
+        split.prop(tex, "nabla")
 
 
 class TEXTURE_PT_marble(TextureTypePanel, bpy.types.Panel):
@@ -333,13 +338,9 @@ class TEXTURE_PT_magic(TextureTypePanel, bpy.types.Panel):
 
         tex = context.texture
 
-        split = layout.split()
-
-        col = split.column()
-        col.prop(tex, "noise_depth", text="Depth")
-
-        col = split.column()
-        col.prop(tex, "turbulence")
+        row = layout.row()
+        row.prop(tex, "noise_depth", text="Depth")
+        row.prop(tex, "turbulence")
 
 
 class TEXTURE_PT_blend(TextureTypePanel, bpy.types.Panel):
@@ -375,13 +376,9 @@ class TEXTURE_PT_stucci(TextureTypePanel, bpy.types.Panel):
         layout.prop(tex, "noise_type", text="Type", expand=True)
         layout.prop(tex, "noise_basis", text="Basis")
 
-        split = layout.split()
-
-        col = split.column()
-        col.prop(tex, "noise_scale", text="Size")
-
-        col = split.column()
-        col.prop(tex, "turbulence")
+        row = layout.row()
+        row.prop(tex, "noise_scale", text="Size")
+        row.prop(tex, "turbulence")
 
 
 class TEXTURE_PT_image(TextureTypePanel, bpy.types.Panel):
@@ -591,13 +588,9 @@ class TEXTURE_PT_musgrave(TextureTypePanel, bpy.types.Panel):
 
         layout.prop(tex, "noise_basis", text="Basis")
 
-        split = layout.split()
-
-        col = split.column()
-        col.prop(tex, "noise_scale", text="Size")
-
-        col = split.column()
-        col.prop(tex, "nabla")
+        row = layout.row()
+        row.prop(tex, "noise_scale", text="Size")
+        row.prop(tex, "nabla")
 
 
 class TEXTURE_PT_voronoi(TextureTypePanel, bpy.types.Panel):
@@ -631,14 +624,9 @@ class TEXTURE_PT_voronoi(TextureTypePanel, bpy.types.Panel):
         sub.prop(tex, "weight_4", text="4", slider=True)
 
         layout.label(text="Noise:")
-
-        split = layout.split()
-
-        col = split.column()
-        col.prop(tex, "noise_scale", text="Size")
-
-        col = split.column()
-        col.prop(tex, "nabla")
+        row = layout.row()
+        row.prop(tex, "noise_scale", text="Size")
+        row.prop(tex, "nabla")
 
 
 class TEXTURE_PT_distortednoise(TextureTypePanel, bpy.types.Panel):
@@ -660,8 +648,7 @@ class TEXTURE_PT_distortednoise(TextureTypePanel, bpy.types.Panel):
         col.prop(tex, "distortion", text="Distortion")
         col.prop(tex, "noise_scale", text="Size")
 
-        col = split.column()
-        col.prop(tex, "nabla")
+        split.prop(tex, "nabla")
 
 
 class TEXTURE_PT_voxeldata(TextureButtonsPanel, bpy.types.Panel):
@@ -771,12 +758,9 @@ class TEXTURE_PT_pointdensity_turbulence(TextureButtonsPanel, bpy.types.Panel):
         return tex and (tex.type == 'POINT_DENSITY' and (engine in cls.COMPAT_ENGINES))
 
     def draw_header(self, context):
-        layout = self.layout
-
-        tex = context.texture
         pd = tex.point_density
 
-        layout.prop(pd, "use_turbulence", text="")
+        self.layout.prop(pd, "use_turbulence", text="")
 
     def draw(self, context):
         layout = self.layout
@@ -883,14 +867,9 @@ class TEXTURE_PT_mapping(TextureSlotPanel, bpy.types.Panel):
                 row.prop(tex, "mapping_y", text="")
                 row.prop(tex, "mapping_z", text="")
 
-        split = layout.split()
-
-        col = split.column()
-        col.prop(tex, "offset")
-
-        col = split.column()
-
-        col.prop(tex, "scale")
+        row = layout.row()
+        row.column().prop(tex, "offset")
+        row.column().prop(tex, "scale")
 
 
 class TEXTURE_PT_influence(TextureSlotPanel, bpy.types.Panel):
@@ -1008,38 +987,65 @@ class TEXTURE_PT_influence(TextureSlotPanel, bpy.types.Panel):
             col = split.column()
             factor_but(col, "use_map_zenith_up", "zenith_up_factor", "Zenith Up")
             factor_but(col, "use_map_zenith_down", "zenith_down_factor", "Zenith Down")
+        elif isinstance(idblock, bpy.types.ParticleSettings):
+            split = layout.split()
+
+            col = split.column()
+            col.label(text="General:")
+            factor_but(col, "use_map_time", "time_factor", "Time")
+            factor_but(col, "use_map_life", "life_factor", "Lifetime")
+            factor_but(col, "use_map_density", "density_factor", "Density")
+            factor_but(col, "use_map_size", "size_factor", "Size")
+
+            col = split.column()
+            col.label(text="Physics:")
+            factor_but(col, "use_map_velocity", "velocity_factor", "Velocity")
+            factor_but(col, "use_map_damp", "damp_factor", "Damp")
+            factor_but(col, "use_map_gravity", "gravity_factor", "Gravity")
+            factor_but(col, "use_map_field", "field_factor", "Force Fields")
+
+            layout.label(text="Hair:")
+
+            split = layout.split()
+
+            col = split.column()
+            factor_but(col, "use_map_length", "length_factor", "Length")
+            factor_but(col, "use_map_clump", "clump_factor", "Clump")
+
+            col = split.column()
+            factor_but(col, "use_map_kink", "kink_factor", "Kink")
+            factor_but(col, "use_map_rough", "rough_factor", "Rough")
 
         layout.separator()
 
-        split = layout.split()
+        if not isinstance(idblock, bpy.types.ParticleSettings):
+            split = layout.split()
 
-        col = split.column()
-        col.prop(tex, "blend_type", text="Blend")
-        col.prop(tex, "use_rgb_to_intensity")
-        # color is used on grayscale textures even when use_rgb_to_intensity is disabled.
-        col.prop(tex, "color", text="")
+            col = split.column()
+            col.prop(tex, "blend_type", text="Blend")
+            col.prop(tex, "use_rgb_to_intensity")
+            # color is used on grayscale textures even when use_rgb_to_intensity is disabled.
+            col.prop(tex, "color", text="")
 
-        col = split.column()
-        col.prop(tex, "invert", text="Negative")
-        col.prop(tex, "use_stencil")
+            col = split.column()
+            col.prop(tex, "invert", text="Negative")
+            col.prop(tex, "use_stencil")
 
         if isinstance(idblock, bpy.types.Material) or isinstance(idblock, bpy.types.World):
             col.prop(tex, "default_value", text="DVar", slider=True)
 
         if isinstance(idblock, bpy.types.Material):
-            row = layout.row()
-            row.label(text="Bump Mapping:")
+            layout.label(text="Bump Mapping:")
 
-            row = layout.row()
             # only show bump settings if activated but not for normalmap images
-            row.active = tex.use_map_normal and not( tex.texture.type == 'IMAGE' and tex.texture.use_normal_map )
+            row = layout.row()
+            row.active = tex.use_map_normal and not (tex.texture.type == 'IMAGE' and tex.texture.use_normal_map)
 
-            col = row.column()
-            col.prop(tex, "bump_method", text="Method")
+            row.prop(tex, "bump_method", text="Method")
 
-            col = row.column()
-            col.prop(tex, "bump_objectspace", text="Space")
-            col.active = tex.bump_method in ('BUMP_DEFAULT', 'BUMP_BEST_QUALITY')
+            sub = row.row()
+            sub.active = tex.bump_method in ('BUMP_DEFAULT', 'BUMP_BEST_QUALITY')
+            sub.prop(tex, "bump_objectspace", text="Space")
 
 
 class TEXTURE_PT_custom_props(TextureButtonsPanel, PropertyPanel, bpy.types.Panel):
@@ -1049,11 +1055,11 @@ class TEXTURE_PT_custom_props(TextureButtonsPanel, PropertyPanel, bpy.types.Pane
 
 
 def register():
-    pass
+    bpy.utils.register_module(__name__)
 
 
 def unregister():
-    pass
+    bpy.utils.unregister_module(__name__)
 
 if __name__ == "__main__":
     register()

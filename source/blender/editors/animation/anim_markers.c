@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/animation/anim_markers.c
+ *  \ingroup edanimation
+ */
+
 
 #include <math.h>
 
@@ -205,7 +210,7 @@ void ED_markers_get_minmax (ListBase *markers, short sel, float *first, float *l
 /* --------------------------------- */
 
 /* Adds a marker to list of cfra elems */
-void add_marker_to_cfra_elem(ListBase *lb, TimeMarker *marker, short only_sel)
+static void add_marker_to_cfra_elem(ListBase *lb, TimeMarker *marker, short only_sel)
 {
 	CfraElem *ce, *cen;
 	
@@ -264,6 +269,29 @@ TimeMarker *ED_markers_get_first_selected(ListBase *markers)
 	return NULL;
 }
 
+/* --------------------------------- */
+
+/* Print debugging prints of list of markers 
+ * BSI's: do NOT make static or put in if-defs as "unused code". That's too much trouble when we need to use for quick debuggging!
+ */
+void debug_markers_print_list(ListBase *markers)
+{
+	TimeMarker *marker;
+	
+	if (markers == NULL) {
+		printf("No markers list to print debug for\n");
+		return;
+	}
+	
+	printf("List of markers follows: -----\n");
+	
+	for (marker = markers->first; marker; marker = marker->next) {
+		printf("\t'%s' on %d at %p with %d\n", marker->name, marker->frame, (void *)marker, marker->flag);
+	}
+	
+	printf("End of list ------------------\n");
+}
+
 /* ************* Marker Drawing ************ */
 
 /* function to draw markers */
@@ -318,7 +346,6 @@ static void draw_marker(View2D *v2d, TimeMarker *marker, int cfra, int flag)
 	
 	UI_icon_draw(xpos*xscale-5.0f, 16.0f, icon_id);
 	
-	glBlendFunc(GL_ONE, GL_ZERO);
 	glDisable(GL_BLEND);
 	
 	/* and the marker name too, shifted slightly to the top-right */
@@ -343,7 +370,7 @@ static void draw_marker(View2D *v2d, TimeMarker *marker, int cfra, int flag)
 		}
 
 #ifdef DURIAN_CAMERA_SWITCH
-		if(marker->camera && marker->camera->restrictflag & OB_RESTRICT_RENDER) {
+		if(marker->camera && (marker->camera->restrictflag & OB_RESTRICT_RENDER)) {
 			float col[4];
 			glGetFloatv(GL_CURRENT_COLOR, col);
 			col[3]= 0.4;
@@ -496,7 +523,7 @@ static int ed_marker_add(bContext *C, wmOperator *UNUSED(op))
 	marker = MEM_callocN(sizeof(TimeMarker), "TimeMarker");
 	marker->flag= SELECT;
 	marker->frame= frame;
-	sprintf(marker->name, "F_%02d", frame); // XXX - temp code only
+	BLI_snprintf(marker->name, sizeof(marker->name), "F_%02d", frame); // XXX - temp code only
 	BLI_addtail(markers, marker);
 	
 	WM_event_add_notifier(C, NC_SCENE|ND_MARKERS, NULL);
@@ -724,19 +751,19 @@ static int ed_marker_move_modal(bContext *C, wmOperator *op, wmEvent *evt)
 					if (ELEM(mm->slink->spacetype, SPACE_TIME, SPACE_SOUND)) {
 						SpaceTime *stime= (SpaceTime *)mm->slink;
 						if (stime->flag & TIME_DRAWFRAMES) 
-							sprintf(str, "Marker %d offset %d", selmarker->frame, offs);
+							BLI_snprintf(str, sizeof(str), "Marker %d offset %d", selmarker->frame, offs);
 						else 
-							sprintf(str, "Marker %.2f offset %.2f", FRA2TIME(selmarker->frame), FRA2TIME(offs));
+							BLI_snprintf(str, sizeof(str), "Marker %.2f offset %.2f", FRA2TIME(selmarker->frame), FRA2TIME(offs));
 					}
 					else if (mm->slink->spacetype == SPACE_ACTION) {
 						SpaceAction *saction= (SpaceAction *)mm->slink;
 						if (saction->flag & SACTION_DRAWTIME)
-							sprintf(str, "Marker %.2f offset %.2f", FRA2TIME(selmarker->frame), FRA2TIME(offs));
+							BLI_snprintf(str, sizeof(str), "Marker %.2f offset %.2f", FRA2TIME(selmarker->frame), FRA2TIME(offs));
 						else
-							sprintf(str, "Marker %.2f offset %.2f", (double)(selmarker->frame), (double)(offs));
+							BLI_snprintf(str, sizeof(str), "Marker %.2f offset %.2f", (double)(selmarker->frame), (double)(offs));
 					}
 					else {
-						sprintf(str, "Marker %.2f offset %.2f", (double)(selmarker->frame), (double)(offs));
+						BLI_snprintf(str, sizeof(str), "Marker %.2f offset %.2f", (double)(selmarker->frame), (double)(offs));
 					}
 				}
 				else {
@@ -744,19 +771,19 @@ static int ed_marker_move_modal(bContext *C, wmOperator *op, wmEvent *evt)
 					if (ELEM(mm->slink->spacetype, SPACE_TIME, SPACE_SOUND)) { 
 						SpaceTime *stime= (SpaceTime *)mm->slink;
 						if (stime->flag & TIME_DRAWFRAMES) 
-							sprintf(str, "Marker offset %d ", offs);
+							BLI_snprintf(str, sizeof(str), "Marker offset %d ", offs);
 						else 
-							sprintf(str, "Marker offset %.2f ", FRA2TIME(offs));
+							BLI_snprintf(str, sizeof(str), "Marker offset %.2f ", FRA2TIME(offs));
 					}
 					else if (mm->slink->spacetype == SPACE_ACTION) {
 						SpaceAction *saction= (SpaceAction *)mm->slink;
 						if (saction->flag & SACTION_DRAWTIME)
-							sprintf(str, "Marker offset %.2f ", FRA2TIME(offs));
+							BLI_snprintf(str, sizeof(str), "Marker offset %.2f ", FRA2TIME(offs));
 						else
-							sprintf(str, "Marker offset %.2f ", (double)(offs));
+							BLI_snprintf(str, sizeof(str), "Marker offset %.2f ", (double)(offs));
 					}
 					else {
-						sprintf(str, "Marker offset %.2f ", (double)(offs));
+						BLI_snprintf(str, sizeof(str), "Marker offset %.2f ", (double)(offs));
 					}
 				}
 				
@@ -779,7 +806,7 @@ static int ed_marker_move_modal(bContext *C, wmOperator *op, wmEvent *evt)
 			ed_marker_move_apply(op);
 			// ed_marker_header_update(C, op, str, (int)vec[0]);
 			// strcat(str, str_tx);
-			sprintf(str, "Marker offset %s", str_tx);
+			BLI_snprintf(str, sizeof(str), "Marker offset %s", str_tx);
 			ED_area_headerprint(CTX_wm_area(C), str);
 			
 			WM_event_add_notifier(C, NC_SCENE|ND_MARKERS, NULL);
@@ -868,6 +895,7 @@ static void ed_marker_duplicate_apply(bContext *C)
 #endif
 
 			/* new marker is added to the begining of list */
+			// FIXME: bad ordering!
 			BLI_addhead(markers, newmarker);
 		}
 	}
@@ -996,8 +1024,8 @@ static int ed_marker_select(bContext *C, wmEvent *evt, int extend, int camera)
 	WM_event_add_notifier(C, NC_SCENE|ND_MARKERS, NULL);
 	WM_event_add_notifier(C, NC_ANIMATION|ND_MARKERS, NULL);
 
-	/* allowing tweaks */
-	return OPERATOR_PASS_THROUGH;
+	/* allowing tweaks, but needs OPERATOR_FINISHED, otherwise renaming fails... [#25987] */
+	return OPERATOR_FINISHED|OPERATOR_PASS_THROUGH;
 }
 
 static int ed_marker_select_invoke(bContext *C, wmOperator *op, wmEvent *evt)

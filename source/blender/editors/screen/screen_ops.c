@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -23,6 +23,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/screen/screen_ops.c
+ *  \ingroup edscr
+ */
+
 
 #include <math.h>
 #include <string.h>
@@ -2174,11 +2179,11 @@ static int repeat_history_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(ev
 	if(items==0)
 		return OPERATOR_CANCELLED;
 	
-	pup= uiPupMenuBegin(C, op->type->name, ICON_NULL);
+	pup= uiPupMenuBegin(C, op->type->name, ICON_NONE);
 	layout= uiPupMenuLayout(pup);
 	
 	for (i=items-1, lastop= wm->operators.last; lastop; lastop= lastop->prev, i--)
-		uiItemIntO(layout, lastop->type->name, ICON_NULL, op->type->idname, "index", i);
+		uiItemIntO(layout, lastop->type->name, ICON_NONE, op->type->idname, "index", i);
 	
 	uiPupMenuEnd(C, pup);
 	
@@ -2446,23 +2451,23 @@ static int header_toolbox_invoke(bContext *C, wmOperator *UNUSED(op), wmEvent *U
 	uiPopupMenu *pup;
 	uiLayout *layout;
 	
-	pup= uiPupMenuBegin(C, "Header", ICON_NULL);
+	pup= uiPupMenuBegin(C, "Header", ICON_NONE);
 	layout= uiPupMenuLayout(pup);
 	
 	// XXX SCREEN_OT_region_flip doesn't work - gets wrong context for active region, so added custom operator
 	if (ar->alignment == RGN_ALIGN_TOP)
-		uiItemO(layout, "Flip to Bottom", ICON_NULL, "SCREEN_OT_header_flip");
+		uiItemO(layout, "Flip to Bottom", ICON_NONE, "SCREEN_OT_header_flip");
 	else
-		uiItemO(layout, "Flip to Top", ICON_NULL, "SCREEN_OT_header_flip");
+		uiItemO(layout, "Flip to Top", ICON_NONE, "SCREEN_OT_header_flip");
 	
 	uiItemS(layout);
 	
 	/* file browser should be fullscreen all the time, but other regions can be maximised/restored... */
 	if (sa->spacetype != SPACE_FILE) {
 		if (sa->full) 
-			uiItemO(layout, "Tile Area", ICON_NULL, "SCREEN_OT_screen_full_area");
+			uiItemO(layout, "Tile Area", ICON_NONE, "SCREEN_OT_screen_full_area");
 		else
-			uiItemO(layout, "Maximize Area", ICON_NULL, "SCREEN_OT_screen_full_area");
+			uiItemO(layout, "Maximize Area", ICON_NONE, "SCREEN_OT_screen_full_area");
 	}
 	
 	uiPupMenuEnd(C, pup);
@@ -2470,7 +2475,7 @@ static int header_toolbox_invoke(bContext *C, wmOperator *UNUSED(op), wmEvent *U
 	return OPERATOR_CANCELLED;
 }
 
-void SCREEN_OT_header_toolbox(wmOperatorType *ot)
+static void SCREEN_OT_header_toolbox(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Header Toolbox";
@@ -2917,7 +2922,7 @@ static int screen_new_exec(bContext *C, wmOperator *UNUSED(op))
 	return OPERATOR_FINISHED;
 }
 
-void SCREEN_OT_new(wmOperatorType *ot)
+static void SCREEN_OT_new(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "New Screen";
@@ -2942,7 +2947,7 @@ static int screen_delete_exec(bContext *C, wmOperator *UNUSED(op))
 	return OPERATOR_FINISHED;
 }
 
-void SCREEN_OT_delete(wmOperatorType *ot)
+static void SCREEN_OT_delete(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Delete Screen"; //was scene
@@ -2977,7 +2982,7 @@ static int scene_new_exec(bContext *C, wmOperator *op)
 	return OPERATOR_FINISHED;
 }
 
-void SCENE_OT_new(wmOperatorType *ot)
+static void SCENE_OT_new(wmOperatorType *ot)
 {
 	static EnumPropertyItem type_items[]= {
 		{SCE_COPY_EMPTY, "EMPTY", 0, "Empty", "Add empty scene"},
@@ -3013,7 +3018,7 @@ static int scene_delete_exec(bContext *C, wmOperator *UNUSED(op))
 	return OPERATOR_FINISHED;
 }
 
-void SCENE_OT_delete(wmOperatorType *ot)
+static void SCENE_OT_delete(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Delete Scene";
@@ -3075,6 +3080,7 @@ void ED_operatortypes_screen(void)
 	
 	/* tools shared by more space types */
 	WM_operatortype_append(ED_OT_undo);
+	WM_operatortype_append(ED_OT_undo_push);
 	WM_operatortype_append(ED_OT_redo);	
 	
 }
@@ -3220,10 +3226,16 @@ void ED_keymap_screen(wmKeyConfig *keyconf)
 	WM_keymap_add_item(keymap, "SCREEN_OT_keyframe_jump", PAGEUPKEY, KM_PRESS, KM_CTRL, 0);
 	RNA_boolean_set(WM_keymap_add_item(keymap, "SCREEN_OT_keyframe_jump", PAGEDOWNKEY, KM_PRESS, KM_CTRL, 0)->ptr, "next", 0);
 	
+	WM_keymap_add_item(keymap, "SCREEN_OT_keyframe_jump", MEDIALAST, KM_PRESS, 0, 0);
+	RNA_boolean_set(WM_keymap_add_item(keymap, "SCREEN_OT_keyframe_jump", MEDIAFIRST, KM_PRESS, 0, 0)->ptr, "next", 0);
+	
 	/* play (forward and backwards) */
 	WM_keymap_add_item(keymap, "SCREEN_OT_animation_play", AKEY, KM_PRESS, KM_ALT, 0);
 	RNA_boolean_set(WM_keymap_add_item(keymap, "SCREEN_OT_animation_play", AKEY, KM_PRESS, KM_ALT|KM_SHIFT, 0)->ptr, "reverse", 1);
 	WM_keymap_add_item(keymap, "SCREEN_OT_animation_cancel", ESCKEY, KM_PRESS, 0, 0);
+	
+	WM_keymap_add_item(keymap, "SCREEN_OT_animation_play", MEDIAPLAY, KM_PRESS, 0, 0);
+	WM_keymap_add_item(keymap, "SCREEN_OT_animation_cancel", MEDIASTOP, KM_PRESS, 0, 0);
 	
 	/* Alternative keys for animation and sequencer playing */
 #if 0 // XXX: disabled for restoring later... bad implementation

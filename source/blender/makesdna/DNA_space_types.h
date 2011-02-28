@@ -1,6 +1,4 @@
-/**
- * blenlib/DNA_space_types.h (mar-2001 nzc)
- *	
+/*
  * $Id$ 
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -30,6 +28,11 @@
  */
 #ifndef DNA_SPACE_TYPES_H
 #define DNA_SPACE_TYPES_H
+/** \file DNA_space_types.h
+ *  \ingroup DNA
+ *  \since mar-2001
+ *  \author nzc
+ */
 
 #include "DNA_listBase.h"
 #include "DNA_color_types.h"		/* for Histogram */
@@ -135,7 +138,8 @@ typedef struct SpaceButs {
 	short mainb, mainbo, mainbuser;	/* context tabs */
 	short re_align, align;			/* align for panels */
 	short preview;					/* preview is signal to refresh */
-	char flag, pad[3];
+	short texture_context;			/* texture context selector (material, world, brush)*/
+	char flag, pad;
 	
 	void *path;						/* runtime */
 	int pathflag, dataicon;			/* runtime */
@@ -322,6 +326,9 @@ typedef struct SpaceText {
 
 	char findstr[256];		/* ST_MAX_FIND_STR */
 	char replacestr[256];	/* ST_MAX_FIND_STR */
+
+	short margin_column; /* column number to show right margin at */
+	char pad[6];
 
 	void *drawcache; /* cache for faster drawing */
 } SpaceText;
@@ -627,9 +634,15 @@ typedef struct SpaceSound {
 /* sbuts->flag */
 #define SB_PRV_OSA			1
 #define SB_PIN_CONTEXT		2
-#define SB_WORLD_TEX		4
-#define SB_BRUSH_TEX		8
+//#define SB_WORLD_TEX		4	//not used anymore
+//#define SB_BRUSH_TEX		8	//not used anymore	
 #define SB_SHADING_CONTEXT	16
+
+/* sbuts->texture_context */
+#define SB_TEXC_MAT_OR_LAMP	0
+#define SB_TEXC_WORLD		1
+#define SB_TEXC_BRUSH		2
+#define SB_TEXC_PARTICLES	3
 
 /* sbuts->align */
 #define BUT_FREE  		0
@@ -789,6 +802,8 @@ enum FileSortTypeE {
 #define SIPO_TEMP_NEEDCHANSYNC	(1<<10)
 	/* don't perform realtime updates */
 #define SIPO_NOREALTIMEUPDATES	(1<<11)
+	/* don't draw curves with AA ("beauty-draw") for performance */
+#define SIPO_BEAUTYDRAW_OFF		(1<<12)
 
 /* SpaceIpo->mode (Graph Editor Mode) */
 enum {
@@ -805,6 +820,7 @@ enum {
 									   // execution (see BPY_main.c)
 #define	ST_FIND_WRAP			0x0020
 #define	ST_FIND_ALL				0x0040
+#define	ST_SHOW_MARGIN			0x0080
 
 
 /* stext->findstr/replacestr */

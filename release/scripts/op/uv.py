@@ -19,7 +19,6 @@
 # <pep8 compliant>
 
 import bpy
-from bpy.props import *
 
 
 def write_svg(fw, mesh, image_width, image_height, face_iter):
@@ -239,6 +238,9 @@ def write_png(fw, mesh_source, image_width, image_height, face_iter):
         bpy.data.materials.remove(mat_solid)
 
 
+from bpy.props import StringProperty, BoolProperty, EnumProperty, IntVectorProperty
+
+
 class ExportUVLayout(bpy.types.Operator):
     """Export UV layout to file"""
 
@@ -369,10 +371,12 @@ def menu_func(self, context):
 
 
 def register():
+    bpy.utils.register_module(__name__)
     bpy.types.IMAGE_MT_uvs.append(menu_func)
 
 
 def unregister():
+    bpy.utils.unregister_module(__name__)
     bpy.types.IMAGE_MT_uvs.remove(menu_func)
 
 if __name__ == "__main__":

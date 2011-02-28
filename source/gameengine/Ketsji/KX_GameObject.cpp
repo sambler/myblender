@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
  * Game object wrapper
  */
+
+/** \file gameengine/Ketsji/KX_GameObject.cpp
+ *  \ingroup ketsji
+ */
+
 
 #if defined(_WIN64)
 typedef unsigned __int64 uint_ptr;
@@ -152,7 +157,8 @@ KX_GameObject::~KX_GameObject()
 #ifdef WITH_PYTHON
 	if (m_attr_dict) {
 		PyDict_Clear(m_attr_dict); /* incase of circular refs or other weired cases */
-		Py_DECREF(m_attr_dict);
+		/* Py_CLEAR: Py_DECREF's and NULL's */
+		Py_CLEAR(m_attr_dict);
 	}
 #endif // WITH_PYTHON
 }

@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -21,6 +21,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/makesrna/intern/rna_render.c
+ *  \ingroup RNA
+ */
+
 
 #include <stdlib.h>
 
@@ -54,7 +59,7 @@ static RenderEngineType internal_game_type = {
 
 ListBase R_engines = {NULL, NULL};
 
-void RE_engines_init()
+void RE_engines_init(void)
 {
 	BLI_addtail(&R_engines, &internal_render_type);
 #ifdef WITH_GAMEENGINE
@@ -62,7 +67,7 @@ void RE_engines_init()
 #endif
 }
 
-void RE_engines_exit()
+void RE_engines_exit(void)
 {
 	RenderEngineType *type, *next;
 
@@ -334,7 +339,9 @@ static void rna_def_render_layer(BlenderRNA *brna)
 	RNA_def_function_flag(func, FUNC_USE_REPORTS);
 	prop= RNA_def_string(func, "filename", "", 0, "Filename", "Filename to load into this render tile, must be no smaller then the renderlayer");
 	RNA_def_property_flag(prop, PROP_REQUIRED);
-	
+	prop= RNA_def_int(func, "x", 0, 0, INT_MAX, "Offset X", "Offset the position to copy from if the image is larger then the render layer", 0, INT_MAX);
+	prop= RNA_def_int(func, "y", 0, 0, INT_MAX, "Offset Y", "Offset the position to copy from if the image is larger then the render layer", 0, INT_MAX);
+
 	RNA_define_verify_sdna(0);
 
 	rna_def_render_layer_common(srna, 0);

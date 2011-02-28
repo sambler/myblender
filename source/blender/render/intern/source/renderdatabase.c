@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -24,6 +24,11 @@
  *
  * ***** END GPL/BL DUAL LICENSE BLOCK *****
  */
+
+/** \file blender/render/intern/source/renderdatabase.c
+ *  \ingroup render
+ */
+
 
 /*
  * Storage, retrieval and query of render specific data.
@@ -109,7 +114,7 @@
 #define RE_RADFACE_ELEMS	1
 #define RE_SIMPLIFY_ELEMS	2
 #define RE_FACE_ELEMS		1
-#define RE_NMAP_TANGENT_ELEMS	12
+#define RE_NMAP_TANGENT_ELEMS	16
 
 float *RE_vertren_get_sticky(ObjectRen *obr, VertRen *ver, int verify)
 {
@@ -1000,6 +1005,7 @@ HaloRen *RE_inithalo(Render *re, ObjectRen *obr, Material *ma,   float *vec,   f
 	if(ma->mtex[0]) {
 
 		if( (ma->mode & MA_HALOTEX) ) har->tex= 1;
+		else if(har->mat->septex & (1<<0));	/* only 1 level textures */
 		else {
 
 			mtex= ma->mtex[0];

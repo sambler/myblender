@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/space_time/space_time.c
+ *  \ingroup sptime
+ */
+
 
 #include <string.h>
 #include <stdio.h>
@@ -56,6 +61,7 @@
 #include "UI_resources.h"
 #include "UI_view2d.h"
 
+#include "ED_space_api.h"
 #include "ED_markers.h"
 
 #include "time_intern.h"
@@ -637,7 +643,7 @@ static SpaceLink *time_duplicate(SpaceLink *sl)
 	SpaceTime *stime= (SpaceTime *)sl;
 	SpaceTime *stimen= MEM_dupallocN(stime);
 	
-	time_cache_free(stimen);
+	stimen->caches.first = stimen->caches.last = NULL;
 	
 	return (SpaceLink *)stimen;
 }

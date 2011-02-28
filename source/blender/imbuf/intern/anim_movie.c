@@ -1,4 +1,4 @@
-/**
+/*
  * anim.c
  *
  * $Id$
@@ -28,6 +28,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/imbuf/intern/anim_movie.c
+ *  \ingroup imbuf
+ */
+
 
 #ifdef _WIN32
 #define INC_OLE2

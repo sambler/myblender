@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,8 +27,12 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
-#include "../SHD_util.h"
+/** \file blender/nodes/intern/SHD_nodes/SHD_math.c
+ *  \ingroup shdnodes
+ */
 
+
+#include "../SHD_util.h"
 
 
 /* **************** SCALAR MATH ******************** */ 
@@ -241,6 +245,7 @@ void register_node_type_sh_math(ListBase *lb)
 	node_type_base(&ntype, SH_NODE_MATH, "Math", NODE_CLASS_CONVERTOR, NODE_OPTIONS,
 		sh_node_math_in, sh_node_math_out);
 	node_type_size(&ntype, 120, 110, 160);
+	node_type_label(&ntype, node_math_label);
 	node_type_storage(&ntype, "node_math", NULL, NULL);
 	node_type_exec(&ntype, node_shader_exec_math);
 	node_type_gpu(&ntype, gpu_shader_math);

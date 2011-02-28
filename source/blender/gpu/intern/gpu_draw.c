@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -29,6 +29,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/gpu/intern/gpu_draw.c
+ *  \ingroup gpu
+ */
+
 
 #include <string.h>
 
@@ -930,7 +935,7 @@ static void gpu_material_to_fixed(GPUMaterialFixed *smat, const Material *bmat, 
 	}
 }
 
-Material *gpu_active_node_material(Material *ma)
+static Material *gpu_active_node_material(Material *ma)
 {
 	if(ma && ma->use_nodes && ma->nodetree) {
 		bNode *node= nodeGetActiveID(ma->nodetree, ID_MA);

@@ -30,6 +30,11 @@
 *
 */
 
+/** \file blender/modifiers/intern/MOD_mirror.c
+ *  \ingroup modifiers
+ */
+
+
 #include "DNA_meshdata_types.h"
 #include "DNA_object_types.h"
 
@@ -44,6 +49,8 @@
 
 #include "MEM_guardedalloc.h"
 #include "depsgraph_private.h"
+
+#include "MOD_util.h"
 
 static void initData(ModifierData *md)
 {
@@ -142,7 +149,11 @@ static DerivedMesh *doMirrorOnAxis(MirrorModifierData *mmd,
 		if (mmd->mirror_ob) {
 			mul_m4_v3(mtx, co);
 		}
-		isShared = ABS(co[axis])<=tolerance;
+		
+		if(mmd->flag & MOD_MIR_NO_MERGE)
+			isShared = 0;
+		else
+			isShared = ABS(co[axis])<=tolerance;
 		
 		/* Because the topology result (# of vertices) must be the same if
 		* the mesh data is overridden by vertex cos, have to calc sharedness
@@ -154,8 +165,8 @@ static DerivedMesh *doMirrorOnAxis(MirrorModifierData *mmd,
 		
 		indexMap[i][0] = numVerts - 1;
 		indexMap[i][1] = !isShared;
-		
-		if(isShared) {
+		//
+		if(isShared ) {
 			co[axis] = 0;
 			if (mmd->mirror_ob) {
 				mul_m4_v3(imtx, co);

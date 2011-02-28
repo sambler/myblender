@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -21,6 +21,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/makesrna/intern/rna_define.c
+ *  \ingroup RNA
+ */
+
 
 #include <float.h>
 #include <limits.h>
@@ -412,7 +417,7 @@ static int rna_validate_identifier(const char *identifier, char *error, int prop
 
 /* Blender Data Definition */
 
-BlenderRNA *RNA_create()
+BlenderRNA *RNA_create(void)
 {
 	BlenderRNA *brna;
 

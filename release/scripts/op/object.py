@@ -19,7 +19,7 @@
 # <pep8 compliant>
 
 import bpy
-from bpy.props import *
+from bpy.props import StringProperty, BoolProperty, EnumProperty, IntProperty
 
 
 class SelectPattern(bpy.types.Operator):
@@ -476,7 +476,6 @@ class MakeDupliFace(bpy.types.Operator):
 
     def _main(self, context):
         from mathutils import Vector
-        from math import sqrt
 
         SCALE_FAC = 0.01
         offset = 0.5 * SCALE_FAC
@@ -506,7 +505,7 @@ class MakeDupliFace(bpy.types.Operator):
 
             mesh.vertices.foreach_set("co", face_verts)
             mesh.faces.foreach_set("vertices_raw", faces)
-            mesh.update_tag()  # generates edge data
+            mesh.update()  # generates edge data
 
             # pick an object to use
             obj = objects[0]
@@ -565,11 +564,11 @@ class ClearAllRestrictRender(bpy.types.Operator):
 
 
 def register():
-    pass
+    bpy.utils.register_module(__name__)
 
 
 def unregister():
-    pass
+    bpy.utils.unregister_module(__name__)
 
 if __name__ == "__main__":
     register()

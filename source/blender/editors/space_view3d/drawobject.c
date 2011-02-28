@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -24,6 +24,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/space_view3d/drawobject.c
+ *  \ingroup spview3d
+ */
+
 
 #include <string.h>
 #include <math.h>
@@ -573,7 +578,7 @@ typedef struct ViewCachedString {
 	/* str is allocated past the end */
 } ViewCachedString;
 
-void view3d_cached_text_draw_begin()
+void view3d_cached_text_draw_begin(void)
 {
 	ListBase *strings= &CachedText[CachedTextLevel];
 	strings->first= strings->last= NULL;
@@ -4070,8 +4075,14 @@ static void draw_new_particle_system(Scene *scene, View3D *v3d, RegionView3D *rv
 		psys->lattice= NULL;
 	}
 
-	if( (base->flag & OB_FROMDUPLI) && (ob->flag & OB_FROMGROUP) )
+	if(pdd) {
+		/* drop references to stack memory */
+		pdd->ma_r= pdd->ma_g= pdd->ma_b= NULL;
+	}
+
+	if( (base->flag & OB_FROMDUPLI) && (ob->flag & OB_FROMGROUP) ) {
 		glLoadMatrixf(rv3d->viewmat);
+	}
 }
 
 static void draw_update_ptcache_edit(Scene *scene, Object *ob, PTCacheEdit *edit)
@@ -5300,7 +5311,8 @@ static void draw_box(float vec[8][3])
 }
 
 /* uses boundbox, function used by Ketsji */
-void get_local_bounds(Object *ob, float *center, float *size)
+#if 0
+static void get_local_bounds(Object *ob, float *center, float *size)
 {
 	BoundBox *bb= object_get_boundbox(ob);
 	
@@ -5318,8 +5330,7 @@ void get_local_bounds(Object *ob, float *center, float *size)
 		center[2]= (bb->vec[0][2] + bb->vec[1][2])/2.0;
 	}
 }
-
-
+#endif
 
 static void draw_bb_quadric(BoundBox *bb, short type)
 {
@@ -5362,7 +5373,7 @@ static void draw_bb_quadric(BoundBox *bb, short type)
 
 static void draw_bounding_volume(Scene *scene, Object *ob)
 {
-	BoundBox *bb=0;
+	BoundBox *bb= NULL;
 	
 	if(ob->type==OB_MESH) {
 		bb= mesh_get_bb(ob);
@@ -5373,7 +5384,7 @@ static void draw_bounding_volume(Scene *scene, Object *ob)
 	else if(ob->type==OB_MBALL) {
 		if(is_basis_mball(ob)) {
 			bb= ob->bb;
-			if(bb==0) {
+			if(bb==NULL) {
 				makeDispListMBall(scene, ob);
 				bb= ob->bb;
 			}
@@ -5384,7 +5395,7 @@ static void draw_bounding_volume(Scene *scene, Object *ob)
 		return;
 	}
 	
-	if(bb==0) return;
+	if(bb==NULL) return;
 	
 	if(ob->boundtype==OB_BOUND_BOX) draw_box(bb->vec);
 	else draw_bb_quadric(bb, ob->boundtype);
@@ -5552,8 +5563,7 @@ static void draw_hooks(Object *ob)
 	}
 }
 
-//<rcruiz>
-void drawRBpivot(bRigidBodyJointConstraint *data)
+static void drawRBpivot(bRigidBodyJointConstraint *data)
 {
 	int axis;
 	float mat[4][4];

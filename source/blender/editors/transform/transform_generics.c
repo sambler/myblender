@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/transform/transform_generics.c
+ *  \ingroup edtransform
+ */
+
 
 #include <string.h>
 #include <math.h>
@@ -1318,7 +1323,7 @@ void calculateCenterCursor2D(TransInfo *t)
 	calculateCenter2D(t);
 }
 
-void calculateCenterCursorGraph2D(TransInfo *t)
+static void calculateCenterCursorGraph2D(TransInfo *t)
 {
 	SpaceIpo *sipo= (SpaceIpo *)t->sa->spacedata.first;
 	Scene *scene= t->scene;

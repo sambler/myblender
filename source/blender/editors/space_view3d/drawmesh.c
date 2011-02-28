@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -24,6 +24,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/space_view3d/drawmesh.c
+ *  \ingroup spview3d
+ */
+
 
 #include <string.h>
 #include <math.h>
@@ -340,7 +345,7 @@ static int set_draw_settings_cached(int clearcache, int textured, MTFace *texfac
 
 /* Icky globals, fix with userdata parameter */
 
-struct TextureDrawState {
+static struct TextureDrawState {
 	Object *ob;
 	int islit, istex;
 	int color_profile;
@@ -562,7 +567,7 @@ static int wpaint__setSolidDrawOptions(void *userData, int index, int *drawSmoot
 	return 1;
 }
 
-void draw_mesh_text(Scene *scene, Object *ob, int glsl)
+static void draw_mesh_text(Scene *scene, Object *ob, int glsl)
 {
 	Mesh *me = ob->data;
 	DerivedMesh *ddm;

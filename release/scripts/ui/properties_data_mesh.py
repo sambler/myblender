@@ -33,7 +33,7 @@ class MESH_MT_vertex_group_specials(bpy.types.Menu):
         layout.operator("object.vertex_group_copy_to_linked", icon='LINK_AREA')
         layout.operator("object.vertex_group_copy_to_selected", icon='LINK_AREA')
         layout.operator("object.vertex_group_mirror", icon='ARROW_LEFTRIGHT')
-        layout.operator("object.vertex_group_remove", icon='X', text="Delete All").all=True
+        layout.operator("object.vertex_group_remove", icon='X', text="Delete All").all = True
 
 
 class MESH_MT_shape_key_specials(bpy.types.Menu):
@@ -94,9 +94,7 @@ class DATA_PT_normals(MeshButtonsPanel, bpy.types.Panel):
         sub.active = mesh.use_auto_smooth
         sub.prop(mesh, "auto_smooth_angle", text="Angle")
 
-        col = split.column()
-
-        col.prop(mesh, "show_double_sided")
+        split.prop(mesh, "show_double_sided")
 
 
 class DATA_PT_settings(MeshButtonsPanel, bpy.types.Panel):
@@ -283,7 +281,6 @@ class DATA_PT_texface(MeshButtonsPanel, bpy.types.Panel):
     @classmethod
     def poll(cls, context):
         ob = context.active_object
-        rd = context.scene.render
 
         return (context.mode == 'EDIT_MESH') and ob and ob.type == 'MESH'
 
@@ -355,11 +352,11 @@ class DATA_PT_custom_props_mesh(MeshButtonsPanel, PropertyPanel, bpy.types.Panel
 
 
 def register():
-    pass
+    bpy.utils.register_module(__name__)
 
 
 def unregister():
-    pass
+    bpy.utils.unregister_module(__name__)
 
 if __name__ == "__main__":
     register()

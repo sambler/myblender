@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -21,6 +21,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/makesrna/intern/rna_actuator.c
+ *  \ingroup RNA
+ */
+
 
 #include <stdlib.h>
 
@@ -549,6 +554,7 @@ static void rna_def_action_actuator(BlenderRNA *brna)
 
 	static EnumPropertyItem prop_type_items[] ={
 		{ACT_ACTION_PLAY, "PLAY", 0, "Play", ""},
+		{ACT_ACTION_PINGPONG, "PINGPONG", 0, "Ping Pong", ""},
 		{ACT_ACTION_FLIPPER, "FLIPPER", 0, "Flipper", ""},
 		{ACT_ACTION_LOOP_STOP, "LOOPSTOP", 0, "Loop Stop", ""},
 		{ACT_ACTION_LOOP_END, "LOOPEND", 0, "Loop End", ""},
@@ -587,15 +593,15 @@ static void rna_def_action_actuator(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Property", "Use this property to define the Action position");
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 
-	prop= RNA_def_property(srna, "frame_start", PROP_INT, PROP_NONE);
-	RNA_def_property_int_sdna(prop, NULL, "sta");
-	RNA_def_property_range(prop, 0, MAXFRAME);
+	prop= RNA_def_property(srna, "frame_start", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "sta");
+	RNA_def_property_ui_range(prop, 0.0, MAXFRAME, 100, 2);
 	RNA_def_property_ui_text(prop, "Start Frame", "");
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 
-	prop= RNA_def_property(srna, "frame_end", PROP_INT, PROP_NONE);
-	RNA_def_property_int_sdna(prop, NULL, "end");
-	RNA_def_property_range(prop, 0, MAXFRAME);
+	prop= RNA_def_property(srna, "frame_end", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "end");
+	RNA_def_property_ui_range(prop, 0.0, MAXFRAME, 100, 2);
 	RNA_def_property_ui_text(prop, "End Frame", "");
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 
@@ -834,15 +840,15 @@ static void rna_def_fcurve_actuator(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "F-Curve Type", "Specify the way you want to play the animation");
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 	
-	prop= RNA_def_property(srna, "frame_start", PROP_INT, PROP_NONE);
-	RNA_def_property_int_sdna(prop, NULL, "sta");
-	RNA_def_property_ui_range(prop, 1, MAXFRAME, 1, 1);
+	prop= RNA_def_property(srna, "frame_start", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "sta");
+	RNA_def_property_ui_range(prop, 1.0, MAXFRAME, 100, 2);
 	RNA_def_property_ui_text(prop, "Start Frame", "");
 	RNA_def_property_update(prop, NC_SCENE, NULL);
 
-	prop= RNA_def_property(srna, "frame_end", PROP_INT, PROP_NONE);
-	RNA_def_property_int_sdna(prop, NULL, "end");
-	RNA_def_property_ui_range(prop, 1, MAXFRAME, 1, 1);
+	prop= RNA_def_property(srna, "frame_end", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "end");
+	RNA_def_property_ui_range(prop, 1.0, MAXFRAME, 100, 2);
 	RNA_def_property_ui_text(prop, "End Frame", "");
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 	
@@ -1778,6 +1784,7 @@ static void rna_def_shape_action_actuator(BlenderRNA *brna)
 
 	static EnumPropertyItem prop_type_items[] ={
 		{ACT_ACTION_PLAY, "PLAY", 0, "Play", ""},
+		{ACT_ACTION_PINGPONG, "PINGPONG", 0, "Ping Pong", ""},
 		{ACT_ACTION_FLIPPER, "FLIPPER", 0, "Flipper", ""},
 		{ACT_ACTION_LOOP_STOP, "LOOPSTOP", 0, "Loop Stop", ""},
 		{ACT_ACTION_LOOP_END, "LOOPEND", 0, "Loop End", ""},
@@ -1816,15 +1823,15 @@ static void rna_def_shape_action_actuator(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Property", "Use this property to define the Action position");
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 
-	prop= RNA_def_property(srna, "frame_start", PROP_INT, PROP_NONE);
-	RNA_def_property_int_sdna(prop, NULL, "sta");
-	RNA_def_property_range(prop, 0, MAXFRAME);
+	prop= RNA_def_property(srna, "frame_start", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "sta");
+	RNA_def_property_ui_range(prop, 0.0, MAXFRAME, 100, 2);
 	RNA_def_property_ui_text(prop, "Start Frame", "");
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 
-	prop= RNA_def_property(srna, "frame_end", PROP_INT, PROP_NONE);
-	RNA_def_property_int_sdna(prop, NULL, "end");
-	RNA_def_property_range(prop, 0, MAXFRAME);
+	prop= RNA_def_property(srna, "frame_end", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "end");
+	RNA_def_property_ui_range(prop, 0.0, MAXFRAME, 100, 2);
 	RNA_def_property_ui_text(prop, "End Frame", "");
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 

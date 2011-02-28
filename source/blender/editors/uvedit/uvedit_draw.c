@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/uvedit/uvedit_draw.c
+ *  \ingroup eduv
+ */
+
+
 #include <float.h>
 #include <math.h>
 #include <stdlib.h>
@@ -46,6 +51,7 @@
 #include "BIF_gl.h"
 #include "BIF_glutil.h"
 
+#include "ED_util.h"
 #include "ED_image.h"
 #include "ED_mesh.h"
 #include "ED_uvedit.h"

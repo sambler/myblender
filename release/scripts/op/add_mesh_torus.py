@@ -19,10 +19,11 @@
 # <pep8 compliant>
 import bpy
 import mathutils
-from math import cos, sin, pi
 
 
 def add_torus(major_rad, minor_rad, major_seg, minor_seg):
+    from math import cos, sin, pi
+
     Vector = mathutils.Vector
     Quaternion = mathutils.Quaternion
 
@@ -71,7 +72,7 @@ def add_torus(major_rad, minor_rad, major_seg, minor_seg):
 
     return verts, faces
 
-from bpy.props import *
+from bpy.props import FloatProperty, IntProperty, BoolProperty, FloatVectorProperty
 
 
 class AddTorus(bpy.types.Operator):
@@ -129,7 +130,7 @@ class AddTorus(bpy.types.Operator):
 
         mesh.vertices.foreach_set("co", verts_loc)
         mesh.faces.foreach_set("vertices_raw", faces)
-        mesh.update_tag()
+        mesh.update()
 
         import add_object_utils
         add_object_utils.object_data_add(context, mesh, operator=self)
@@ -142,10 +143,12 @@ def menu_func(self, context):
 
 
 def register():
+    bpy.utils.register_class(AddTorus)
     bpy.types.INFO_MT_mesh_add.append(menu_func)
 
 
 def unregister():
+    bpy.utils.unregister_class(AddTorus)
     bpy.types.INFO_MT_mesh_add.remove(menu_func)
 
 if __name__ == "__main__":

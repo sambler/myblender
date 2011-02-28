@@ -18,14 +18,14 @@
 
 # <pep8 compliant>
 import bpy
-from bpy.props import *
+from bpy.props import StringProperty
 
 
 class CONSOLE_HT_header(bpy.types.Header):
     bl_space_type = 'CONSOLE'
 
     def draw(self, context):
-        sc = context.space_data
+        # sc = context.space_data
         # text = sc.text
         layout = self.layout
 
@@ -163,11 +163,11 @@ class ConsoleLanguage(bpy.types.Operator):
 
 
 def register():
-    pass
+    bpy.utils.register_module(__name__)
 
 
 def unregister():
-    pass
+    bpy.utils.unregister_module(__name__)
 
 if __name__ == "__main__":
     register()

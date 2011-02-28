@@ -25,6 +25,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/render/intern/source/render_texture.c
+ *  \ingroup render
+ */
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -83,7 +88,7 @@ extern struct Render R;
 
 
 
-void init_render_texture(Render *re, Tex *tex)
+static void init_render_texture(Render *re, Tex *tex)
 {
 	int cfra= re->scene->r.cfra;
 	
@@ -137,7 +142,7 @@ void init_render_textures(Render *re)
 	}
 }
 
-void end_render_texture(Tex *tex)
+static void end_render_texture(Tex *tex)
 {
 	if(tex && tex->use_nodes && tex->nodetree)
 		ntreeEndExecTree(tex->nodetree);
@@ -822,12 +827,12 @@ static int plugintex(Tex *tex, float *texvec, float *dxt, float *dyt, int osatex
 			if(osatex) rgbnor= ((TexDoitold)pit->doit)(tex->stype, 
 				pit->data, texvec, dxt, dyt);
 			else rgbnor= ((TexDoitold)pit->doit)(tex->stype, 
-				pit->data, texvec, 0, 0);
+				pit->data, texvec, NULL, NULL);
 		} else {
 			if(osatex) rgbnor= ((TexDoit)pit->doit)(tex->stype, 
 				pit->data, texvec, dxt, dyt, result);
 			else rgbnor= ((TexDoit)pit->doit)(tex->stype, 
-				pit->data, texvec, 0, 0, result);
+				pit->data, texvec, NULL, NULL, result);
 		}
 
 		if (pit->version < 6) {
@@ -2179,6 +2184,7 @@ void do_material_tex(ShadeInput *shi)
 	float texvec[3], dxt[3], dyt[3], tempvec[3], norvec[3], warpvec[3]={0.0f, 0.0f, 0.0f}, Tnor=1.0;
 	int tex_nr, rgbnor= 0, warpdone=0;
 	int use_compat_bump, use_ntap_bump;
+	int iFirstTimeNMap=1;
 
 	compatible_bump_init(&compat_bump);
 	ntap_bump_init(&ntap_bump);
@@ -2492,14 +2498,17 @@ void do_material_tex(ShadeInput *shi)
 						if(mtex->normapspace == MTEX_NSPACE_TANGENT) {
 							/* qdn: tangent space */
 							float B[3], tv[3];
-							cross_v3_v3v3(B, shi->vn, shi->nmaptang);	/* bitangent */
+							const float * no = iFirstTimeNMap!=0 ? shi->nmapnorm : shi->vn;
+							iFirstTimeNMap=0;
+							cross_v3_v3v3(B, no, shi->nmaptang);	/* bitangent */
+							mul_v3_fl(B, shi->nmaptang[3]);
 							/* transform norvec from tangent space to object surface in camera space */
-							tv[0] = texres.nor[0]*shi->nmaptang[0] + texres.nor[1]*B[0] + texres.nor[2]*shi->vn[0];
-							tv[1] = texres.nor[0]*shi->nmaptang[1] + texres.nor[1]*B[1] + texres.nor[2]*shi->vn[1];
-							tv[2] = texres.nor[0]*shi->nmaptang[2] + texres.nor[1]*B[2] + texres.nor[2]*shi->vn[2];
-							shi->vn[0]= facm*shi->vn[0] + fact*tv[0];
-							shi->vn[1]= facm*shi->vn[1] + fact*tv[1];
-							shi->vn[2]= facm*shi->vn[2] + fact*tv[2];
+							tv[0] = texres.nor[0]*shi->nmaptang[0] + texres.nor[1]*B[0] + texres.nor[2]*no[0];
+							tv[1] = texres.nor[0]*shi->nmaptang[1] + texres.nor[1]*B[1] + texres.nor[2]*no[1];
+							tv[2] = texres.nor[0]*shi->nmaptang[2] + texres.nor[1]*B[2] + texres.nor[2]*no[2];
+							shi->vn[0]= facm*no[0] + fact*tv[0];
+							shi->vn[1]= facm*no[1] + fact*tv[1];
+							shi->vn[2]= facm*no[2] + fact*tv[2];
 						}
 						else {
 							float nor[3];

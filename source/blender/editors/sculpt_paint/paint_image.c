@@ -29,6 +29,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/sculpt_paint/paint_image.c
+ *  \ingroup edsculpt
+ */
+
+
 #include <float.h>
 #include <string.h>
 #include <stdio.h>
@@ -942,7 +947,7 @@ static int check_seam(const ProjPaintState *ps, const int orig_face, const int o
 {
 	LinkNode *node;
 	int face_index;
-	int i1, i2;
+	unsigned int i1, i2;
 	int i1_fidx = -1, i2_fidx = -1; /* index in face */
 	MFace *mf;
 	MTFace *tf;

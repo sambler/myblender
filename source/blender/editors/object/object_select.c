@@ -25,6 +25,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/object/object_select.c
+ *  \ingroup edobj
+ */
+
+
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -62,6 +67,7 @@
 #include "ED_screen.h"
 
 #include "UI_interface.h"
+#include "UI_resources.h"
 
 #include "RNA_access.h"
 #include "RNA_define.h"
@@ -433,7 +439,7 @@ static short select_grouped_group(bContext *C, Object *ob)	/* Select objects in 
 	}
 
 	/* build the menu. */
-	pup= uiPupMenuBegin(C, "Select Group", ICON_NULL);
+	pup= uiPupMenuBegin(C, "Select Group", ICON_NONE);
 	layout= uiPupMenuLayout(pup);
 
 	for (i=0; i<group_count; i++) {

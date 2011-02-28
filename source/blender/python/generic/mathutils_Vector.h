@@ -1,5 +1,5 @@
 /*
- * $Id: mathutils_Vector.h 34837 2011-02-14 04:15:25Z campbellbarton $
+ * $Id: mathutils_Vector.h 35236 2011-02-27 20:10:08Z jesterking $
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *

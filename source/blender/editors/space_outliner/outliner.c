@@ -592,7 +592,8 @@ static TreeElement *outliner_add_element(SpaceOops *soops, ListBase *lb, void *i
 	
     /* if we are searching for something expand to see child elements
        - user prefs need individual treatment later to not expand rna entries */
-	if(searching && soops->outlinevis!=SO_USERDEF) tselem->flag |= TSE_CHILDSEARCH;
+	if(searching && soops->outlinevis!=SO_USERDEF && soops->outlinevis!=SO_DATABLOCKS)
+        tselem->flag |= TSE_CHILDSEARCH;
 
 	te->parent= parent;
 	te->index= index;	// for data arays
@@ -4814,7 +4815,7 @@ static void outliner_draw_tree_element(bContext *C, uiBlock *block, Scene *scene
 	te->ys= (float)*starty;
 	te->xend= startx+offsx;
 		
-	if( (tselem->flag & TSE_CLOSED)==0 || (searching && (tselem->flag & TSE_CHILDSEARCH)) ) {
+	if((tselem->flag & TSE_CLOSED)==0 || (searching && (tselem->flag & TSE_CHILDSEARCH)) ) {
 		*starty-= OL_H;
 		
 		for(ten= te->subtree.first; ten; ten= ten->next)

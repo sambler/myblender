@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/windowmanager/intern/wm_window.c
+ *  \ingroup wm
+ */
+
+
 #include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -41,11 +46,14 @@
 #include "GHOST_C-api.h"
 
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_blender.h"
 #include "BKE_context.h"
+#include "BKE_library.h"
 #include "BKE_global.h"
-#include "BKE_utildefines.h"
+#include "BKE_main.h"
+
 
 #include "BIF_gl.h"
 
@@ -58,13 +66,15 @@
 #include "wm_event_system.h"
 
 #include "ED_screen.h"
+#include "ED_fileselect.h"
 
 #include "PIL_time.h"
 
 #include "GPU_draw.h"
+#include "GPU_extensions.h"
 
 /* the global to talk to ghost */
-GHOST_SystemHandle g_system= NULL;
+static GHOST_SystemHandle g_system= NULL;
 
 /* set by commandline */
 static int prefsizx= 0, prefsizy= 0, prefstax= 0, prefstay= 0, initialstate= GHOST_kWindowStateNormal;
@@ -145,10 +155,9 @@ void wm_window_free(bContext *C, wmWindowManager *wm, wmWindow *win)
 			CTX_wm_window_set(C, NULL);
 	}	
 
-	if(wm->windrawable==win)
-		wm->windrawable= NULL;
-	if(wm->winactive==win)
-		wm->winactive= NULL;
+	/* always set drawable and active to NULL, prevents non-drawable state of main windows (bugs #22967 and #25071, possibly #22477 too) */
+	wm->windrawable= NULL;
+	wm->winactive= NULL;
 
 	/* end running jobs, a job end also removes its timer */
 	for(wt= wm->timers.first; wt; wt= wtnext) {
@@ -214,7 +223,7 @@ wmWindow *wm_window_copy(bContext *C, wmWindow *winorig)
 	
 	/* duplicate assigns to window */
 	win->screen= ED_screen_duplicate(win, winorig->screen);
-	BLI_strncpy(win->screenname, win->screen->id.name+2, 21);
+	BLI_strncpy(win->screenname, win->screen->id.name+2, sizeof(win->screenname));
 	win->screen->winid= win->winid;
 
 	win->screen->do_refresh= 1;
@@ -235,13 +244,20 @@ void wm_window_close(bContext *C, wmWindowManager *wm, wmWindow *win)
 	CTX_wm_window_set(C, win);	/* needed by handlers */
 	WM_event_remove_handlers(C, &win->handlers);
 	WM_event_remove_handlers(C, &win->modalhandlers);
-	ED_screen_exit(C, win, win->screen); /* will free the current screen if it is a temp layout */
+	ED_screen_exit(C, win, win->screen); 
+	
+	/* if temp screen, delete it */
+	if(win->screen->temp) {
+		Main *bmain= CTX_data_main(C);
+		free_libblock(&bmain->screen, win->screen);
+	}
+	
 	wm_window_free(C, wm, win);
 	
 	/* check remaining windows */
 	if(wm->windows.first) {
 		for(win= wm->windows.first; win; win= win->next)
-			if(win->screen->full!=SCREENTEMP)
+			if(win->screen->temp == 0)
 				break;
 		/* in this case we close all */
 		if(win==NULL)
@@ -254,23 +270,16 @@ void wm_window_close(bContext *C, wmWindowManager *wm, wmWindow *win)
 void wm_window_title(wmWindowManager *wm, wmWindow *win)
 {
 	/* handle the 'temp' window */
-	if(win->screen && win->screen->full==SCREENTEMP) {
+	if(win->screen && win->screen->temp) {
 		GHOST_SetTitle(win->ghostwin, "Blender");
 	}
 	else {
 		
 		/* this is set to 1 if you don't have startup.blend open */
-		if(G.save_over) {
-			char *str= MEM_mallocN(strlen(G.sce) + 16, "title");
-			
-			if(wm->file_saved)
-				sprintf(str, "Blender [%s]", G.sce);
-			else
-				sprintf(str, "Blender* [%s]", G.sce);
-			
+		if(G.save_over && G.main->name[0]) {
+			char str[sizeof(G.main->name) + 12];
+			BLI_snprintf(str, sizeof(str), "Blender%s [%s]", wm->file_saved ? "":"*", G.main->name);
 			GHOST_SetTitle(win->ghostwin, str);
-			
-			MEM_freeN(str);
 		}
 		else
 			GHOST_SetTitle(win->ghostwin, "Blender");
@@ -290,7 +299,7 @@ void wm_window_title(wmWindowManager *wm, wmWindow *win)
 }
 
 /* belongs to below */
-static void wm_window_add_ghostwindow(bContext *C, char *title, wmWindow *win)
+static void wm_window_add_ghostwindow(bContext *C, const char *title, wmWindow *win)
 {
 	GHOST_WindowHandle ghostwin;
 	int scr_w, scr_h, posy;
@@ -321,6 +330,8 @@ static void wm_window_add_ghostwindow(bContext *C, char *title, wmWindow *win)
 								 0 /* no AA */);
 	
 	if (ghostwin) {
+		/* needed so we can detect the graphics card below */
+		GPU_extensions_init();
 		
 		/* set the state*/
 		GHOST_SetWindowState(ghostwin, initial_state);
@@ -333,7 +344,11 @@ static void wm_window_add_ghostwindow(bContext *C, char *title, wmWindow *win)
 		
 		/* until screens get drawn, make it nice grey */
 		glClearColor(.55, .55, .55, 0.0);
-		glClear(GL_COLOR_BUFFER_BIT);
+		/* Crash on OSS ATI: bugs.launchpad.net/ubuntu/+source/mesa/+bug/656100 */
+		if(!GPU_type_matches(GPU_DEVICE_ATI, GPU_OS_UNIX, GPU_DRIVER_OPENSOURCE)) {
+			glClear(GL_COLOR_BUFFER_BIT);
+		}
+
 		wm_window_swap_buffers(win);
 		
 		//GHOST_SetWindowState(ghostwin, GHOST_kWindowStateModified);
@@ -400,6 +415,11 @@ void wm_window_add_ghostwindows(bContext* C, wmWindowManager *wm)
 		keymap= WM_keymap_find(wm->defaultconf, "Screen Editing", 0, 0);
 		WM_event_add_keymap_handler(&win->modalhandlers, keymap);
 		
+		/* add drop boxes */
+		{
+			ListBase *lb= WM_dropboxmap_find("Window", 0, 0);
+			WM_event_add_dropbox_handler(&win->handlers, lb);
+		}
 		wm_window_title(wm, win);
 	}
 }
@@ -424,7 +444,7 @@ wmWindow *WM_window_open(bContext *C, rcti *rect)
 	return win;
 }
 
-/* uses screen->full tag to define what to do, currently it limits
+/* uses screen->temp tag to define what to do, currently it limits
    to only one "temp" window for render out, preferences, filewindow, etc */
 /* type is #define in WM_api.h */
 
@@ -438,7 +458,7 @@ void WM_window_open_temp(bContext *C, rcti *position, int type)
 	
 	/* test if we have a temp screen already */
 	for(win= CTX_wm_manager(C)->windows.first; win; win= win->next)
-		if(win->screen->full == SCREENTEMP)
+		if(win->screen->temp)
 			break;
 	
 	/* add new window? */
@@ -460,7 +480,7 @@ void WM_window_open_temp(bContext *C, rcti *position, int type)
 	/* add new screen? */
 	if(win->screen==NULL)
 		win->screen= ED_screen_add(win, CTX_data_scene(C), "temp");
-	win->screen->full = SCREENTEMP; 
+	win->screen->temp = 1; 
 	
 	/* make window active, and validate/resize */
 	CTX_wm_window_set(C, win);
@@ -807,15 +827,17 @@ static int ghost_event_proc(GHOST_EventHandle evt, GHOST_TUserDataPtr private)
 				/* printf("Drop detected\n"); */
 				
 				/* add drag data to wm for paths: */
-				/* need icon type, some dropboxes check for that... see filesel code for this */
 				
 				if(ddd->dataType == GHOST_kDragnDropTypeFilenames) {
 					GHOST_TStringArray *stra= ddd->data;
-					int a;
+					int a, icon;
 					
 					for(a=0; a<stra->count; a++) {
 						printf("drop file %s\n", stra->strings[a]);
-						WM_event_start_drag(C, 0, WM_DRAG_PATH, stra->strings[a], 0.0);
+						/* try to get icon type from extension */
+						icon= ED_file_extension_icon((char *)stra->strings[a]);
+						
+						WM_event_start_drag(C, icon, WM_DRAG_PATH, stra->strings[a], 0.0);
 						/* void poin should point to string, it makes a copy */
 						break; // only one drop element supported now 
 					}
@@ -994,6 +1016,9 @@ char *WM_clipboard_text_get(int selection)
 {
 	char *p, *p2, *buf, *newbuf;
 
+	if(G.background)
+		return NULL;
+
 	buf= (char*)GHOST_getClipboard(selection);
 	if(!buf)
 		return NULL;
@@ -1014,33 +1039,35 @@ char *WM_clipboard_text_get(int selection)
 
 void WM_clipboard_text_set(char *buf, int selection)
 {
+	if(!G.background) {
 #ifdef _WIN32
-	/* do conversion from \n to \r\n on Windows */
-	char *p, *p2, *newbuf;
-	int newlen= 0;
-	
-	for(p= buf; *p; p++) {
-		if(*p == '\n')
-			newlen += 2;
-		else
-			newlen++;
-	}
-	
-	newbuf= MEM_callocN(newlen+1, "WM_clipboard_text_set");
-
-	for(p= buf, p2= newbuf; *p; p++, p2++) {
-		if(*p == '\n') { 
-			*(p2++)= '\r'; *p2= '\n';
+		/* do conversion from \n to \r\n on Windows */
+		char *p, *p2, *newbuf;
+		int newlen= 0;
+		
+		for(p= buf; *p; p++) {
+			if(*p == '\n')
+				newlen += 2;
+			else
+				newlen++;
 		}
-		else *p2= *p;
-	}
-	*p2= '\0';
-
-	GHOST_putClipboard((GHOST_TInt8*)newbuf, selection);
-	MEM_freeN(newbuf);
+		
+		newbuf= MEM_callocN(newlen+1, "WM_clipboard_text_set");
+	
+		for(p= buf, p2= newbuf; *p; p++, p2++) {
+			if(*p == '\n') { 
+				*(p2++)= '\r'; *p2= '\n';
+			}
+			else *p2= *p;
+		}
+		*p2= '\0';
+	
+		GHOST_putClipboard((GHOST_TInt8*)newbuf, selection);
+		MEM_freeN(newbuf);
 #else
-	GHOST_putClipboard((GHOST_TInt8*)buf, selection);
+		GHOST_putClipboard((GHOST_TInt8*)buf, selection);
 #endif
+	}
 }
 
 /* ******************* progress bar **************** */
@@ -1133,12 +1160,12 @@ void WM_setprefsize(int stax, int stay, int sizx, int sizy)
 }
 
 /* for borderless and border windows set from command-line */
-void WM_setinitialstate_fullscreen()
+void WM_setinitialstate_fullscreen(void)
 {
 	initialstate= GHOST_kWindowStateFullScreen;
 }
 
-void WM_setinitialstate_normal()
+void WM_setinitialstate_normal(void)
 {
 	initialstate= GHOST_kWindowStateNormal;
 }

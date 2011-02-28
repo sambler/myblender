@@ -33,6 +33,20 @@ def add_scrollback(text, text_type):
             type=text_type)
 
 
+def replace_help(namespace):
+    def _help(value):
+        # because of how the console works. we need our own help() pager func.
+        # replace the bold function because it adds crazy chars
+        import pydoc
+        pydoc.getpager = lambda: pydoc.plainpager
+        pydoc.Helper.getline = lambda self, prompt: None
+        pydoc.TextDoc.use_bold = lambda self, text: text
+
+        help(value)
+
+    namespace["help"] = _help
+
+
 def get_console(console_id):
     '''
     helper function for console operators
@@ -83,7 +97,12 @@ def get_console(console_id):
         namespace["bpy"] = bpy
         namespace["C"] = bpy.context
 
+        replace_help(namespace)
+
         console = InteractiveConsole(locals=namespace, filename="<blender_console>")
+
+        console.push("from mathutils import *")
+        console.push("from math import *")
 
         if _BPY_MAIN_OWN:
             console._bpy_main_mod = bpy_main_mod
@@ -108,9 +127,6 @@ def execute(context):
     try:
         line_object = sc.history[-1]
     except:
-        return {'CANCELLED'}
-
-    if sc.console_type != 'PYTHON':
         return {'CANCELLED'}
 
     console, stdout, stderr = get_console(hash(context.region))
@@ -187,7 +203,13 @@ def execute(context):
     # restore the stdin
     sys.stdin = stdin_backup
 
+    # execute any hooks
+    for func, args in execute.hooks:
+        func(*args)
+
     return {'FINISHED'}
+
+execute.hooks = []
 
 
 def autocomplete(context):
@@ -198,9 +220,6 @@ def autocomplete(context):
     console = get_console(hash(context.region))[0]
 
     if not console:
-        return {'CANCELLED'}
-
-    if sc.console_type != 'PYTHON':
         return {'CANCELLED'}
 
     # dont allow the stdin to be used, can lock blender.
@@ -261,14 +280,16 @@ def banner(context):
     sc = context.space_data
     version_string = sys.version.strip().replace('\n', ' ')
 
-    add_scrollback(" * Python Interactive Console %s *" % version_string, 'OUTPUT')
-    add_scrollback("Command History:  Up/Down Arrow", 'OUTPUT')
-    add_scrollback("Cursor:           Left/Right Home/End", 'OUTPUT')
-    add_scrollback("Remove:           Backspace/Delete", 'OUTPUT')
-    add_scrollback("Execute:          Enter", 'OUTPUT')
-    add_scrollback("Autocomplete:     Ctrl+Space", 'OUTPUT')
-    add_scrollback("Ctrl +/-  Wheel:  Zoom", 'OUTPUT')
-    add_scrollback("Builtin Modules: bpy, bpy.data, bpy.ops, bpy.props, bpy.types, bpy.context, bgl, blf, mathutils, geometry", 'OUTPUT')
+    add_scrollback("PYTHON INTERACTIVE CONSOLE %s" % version_string, 'OUTPUT')
+    add_scrollback("", 'OUTPUT')
+    add_scrollback("Command History:     Up/Down Arrow", 'OUTPUT')
+    add_scrollback("Cursor:              Left/Right Home/End", 'OUTPUT')
+    add_scrollback("Remove:              Backspace/Delete", 'OUTPUT')
+    add_scrollback("Execute:             Enter", 'OUTPUT')
+    add_scrollback("Autocomplete:        Ctrl+Space", 'OUTPUT')
+    add_scrollback("Ctrl +/-  Wheel:     Zoom", 'OUTPUT')
+    add_scrollback("Builtin Modules:     bpy, bpy.data, bpy.ops, bpy.props, bpy.types, bpy.context, bgl, blf, mathutils", 'OUTPUT')
+    add_scrollback("Convenience Imports: from mathutils import *; from math import *", 'OUTPUT')
     add_scrollback("", 'OUTPUT')
     add_scrollback("  WARNING!!! Blender 2.5 API is subject to change, see API reference for more info.", 'ERROR')
     add_scrollback("", 'OUTPUT')

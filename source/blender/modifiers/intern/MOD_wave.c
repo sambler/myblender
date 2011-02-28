@@ -30,13 +30,20 @@
 *
 */
 
+/** \file blender/modifiers/intern/MOD_wave.c
+ *  \ingroup modifiers
+ */
+
+
 #include "BLI_math.h"
 
 #include "DNA_meshdata_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_object_types.h"
 
-#include "BKE_utildefines.h"
+#include "BLI_utildefines.h"
+
+
 #include "BKE_DerivedMesh.h"
 #include "BKE_object.h"
 #include "BKE_deform.h"
@@ -149,11 +156,11 @@ static CustomDataMask requiredDataMask(Object *UNUSED(ob), ModifierData *md)
 
 	/* ask for UV coordinates if we need them */
 	if(wmd->texture && wmd->texmapping == MOD_WAV_MAP_UV)
-		dataMask |= (1 << CD_MTFACE);
+		dataMask |= CD_MASK_MTFACE;
 
 	/* ask for vertexgroups if we need them */
 	if(wmd->defgrp_name[0])
-		dataMask |= (1 << CD_MDEFORMVERT);
+		dataMask |= CD_MASK_MDEFORMVERT;
 
 	return dataMask;
 }
@@ -450,6 +457,7 @@ ModifierTypeInfo modifierType_Wave = {
 							| eModifierTypeFlag_SupportsEditmode,
 	/* copyData */          copyData,
 	/* deformVerts */       deformVerts,
+	/* deformMatrices */    0,
 	/* deformVertsEM */     deformVertsEM,
 	/* deformMatricesEM */  0,
 	/* applyModifier */     0,

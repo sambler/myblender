@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file gameengine/Converter/BlenderWorldInfo.cpp
+ *  \ingroup bgeconv
+ */
+
 
 #include <stdio.h>  // printf()
 
@@ -188,6 +193,12 @@ float BlenderWorldInfo::getMistColorBlue()
 	return m_mistcolor[2];
 }
 
+void BlenderWorldInfo::setBackColor(float r, float g, float b)
+{
+	m_backgroundcolor[0] = r;
+	m_backgroundcolor[1] = g;
+	m_backgroundcolor[2] = b;
+}
 
 	void	
 BlenderWorldInfo::setMistStart(

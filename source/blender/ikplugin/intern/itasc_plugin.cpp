@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/ikplugin/intern/itasc_plugin.cpp
+ *  \ingroup ikplugin
+ */
+
+
 #include <stdlib.h>
 #include <string.h>
 #include <vector>
@@ -49,6 +54,7 @@ extern "C" {
 #include "BIK_api.h"
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_global.h"
 #include "BKE_armature.h"

@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
  * blenloader readfile private function prototypes
  */
+
+/** \file blender/blenloader/intern/readfile.h
+ *  \ingroup blenloader
+ */
+
 #ifndef READFILE_H
 #define READFILE_H
 
@@ -110,7 +115,7 @@ void blo_split_main(ListBase *mainlist, struct Main *main);
 
 BlendFileData *blo_read_file_internal(FileData *fd, const char *filename);
 
-FileData *blo_openblenderfile(char *name, struct ReportList *reports);
+FileData *blo_openblenderfile(const char *name, struct ReportList *reports);
 FileData *blo_openblendermemory(void *buffer, int buffersize, struct ReportList *reports);
 FileData *blo_openblendermemfile(struct MemFile *memfile, struct ReportList *reports);
 

@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/space_file/file_intern.h
+ *  \ingroup spfile
+ */
+
 #ifndef ED_FILE_INTERN_H
 #define ED_FILE_INTERN_H
 
@@ -66,6 +71,7 @@ void FILE_OT_cancel(struct wmOperatorType *ot);
 void FILE_OT_parent(struct wmOperatorType *ot);
 void FILE_OT_directory_new(struct wmOperatorType *ot);
 void FILE_OT_filename(struct wmOperatorType *ot);
+void FILE_OT_directory(struct wmOperatorType *ot);
 void FILE_OT_previous(struct wmOperatorType *ot);
 void FILE_OT_next(struct wmOperatorType *ot);
 void FILE_OT_refresh(struct wmOperatorType *ot);
@@ -92,8 +98,10 @@ void file_operator_to_sfile(struct SpaceFile *sfile, struct wmOperator *op);
 
 
 /* filesel.c */
+float file_shorten_string(char* string, float w, int front);
 float file_string_width(const char* str);
-float file_font_pointsize();
+
+float file_font_pointsize(void);
 void file_change_dir(bContext *C, int checkdir);
 int file_select_match(struct SpaceFile *sfile, const char *pattern);
 void autocomplete_directory(struct bContext *C, char *str, void *arg_v);

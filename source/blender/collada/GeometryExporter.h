@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -23,11 +23,16 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file GeometryExporter.h
+ *  \ingroup collada
+ */
+
 #ifndef __GEOMETRYEXPORTER_H__
 #define __GEOMETRYEXPORTER_H__
 
 #include <string>
 #include <vector>
+#include <set>
 
 #include "COLLADASWStreamWriter.h"
 #include "COLLADASWLibraryGeometries.h"
@@ -82,13 +87,15 @@ public:
 
 	void create_normals(std::vector<Normal> &nor, std::vector<Face> &ind, Mesh *me);
 	
-	std::string getIdBySemantics(std::string geom_id, COLLADASW::Semantics type, std::string other_suffix = "");
+	std::string getIdBySemantics(std::string geom_id, COLLADASW::InputSemantic::Semantics type, std::string other_suffix = "");
 	
-	COLLADASW::URI getUrlBySemantics(std::string geom_id, COLLADASW::Semantics type, std::string other_suffix = "");
+	COLLADASW::URI getUrlBySemantics(std::string geom_id, COLLADASW::InputSemantic::Semantics type, std::string other_suffix = "");
 
 	COLLADASW::URI makeUrl(std::string id);
 	
 	/* int getTriCount(MFace *faces, int totface);*/
+private:
+	std::set<std::string> exportedGeometry;
 };
 
 struct GeometryFunctor {

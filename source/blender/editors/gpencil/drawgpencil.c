@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -24,6 +24,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/gpencil/drawgpencil.c
+ *  \ingroup edgpencil
+ */
+
  
 #include <stdio.h>
 #include <string.h>
@@ -38,6 +43,7 @@
 
 #include "BLI_math.h"
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 
 #include "DNA_gpencil_types.h"
 #include "DNA_scene_types.h"
@@ -48,7 +54,7 @@
 #include "BKE_context.h"
 #include "BKE_global.h"
 #include "BKE_gpencil.h"
-#include "BKE_utildefines.h"
+
 
 
 #include "WM_api.h"
@@ -754,7 +760,7 @@ void draw_gpencil_view3d_ext (Scene *scene, View3D *v3d, ARegion *ar, short only
 	 * deal with the camera border, otherwise map the coords to the camera border. */
 	if(rv3d->persp == RV3D_CAMOB && !(G.f & G_RENDER_OGL)) {
 		rctf rectf;
-		view3d_calc_camera_border(scene, ar, rv3d, v3d, &rectf);
+		view3d_calc_camera_border(scene, ar, rv3d, v3d, &rectf, -1); /* negative shift */
 		BLI_copy_rcti_rctf(&rect, &rectf);
 	}
 	else {

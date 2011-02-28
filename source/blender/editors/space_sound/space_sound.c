@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/space_sound/space_sound.c
+ *  \ingroup spsnd
+ */
+
+
 #include <string.h>
 #include <stdio.h>
 
@@ -36,10 +41,12 @@
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
 #include "BLI_rand.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_context.h"
 #include "BKE_screen.h"
 
+#include "ED_space_api.h"
 #include "ED_screen.h"
 
 #include "BIF_gl.h"
@@ -164,12 +171,12 @@ static void sound_main_area_draw(const bContext *C, ARegion *ar)
 	/* scrollers? */
 }
 
-void sound_operatortypes(void)
+static void sound_operatortypes(void)
 {
 	
 }
 
-void sound_keymap(struct wmKeyConfig *UNUSED(keyconf))
+static void sound_keymap(struct wmKeyConfig *UNUSED(keyconf))
 {
 	
 }

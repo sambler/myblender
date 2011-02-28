@@ -1,3 +1,6 @@
+/** \file blender/imbuf/intern/cineon/cineonlib.c
+ *  \ingroup imbcineon
+ */
 /*
  *	 Cineon image file format library routines.
  *
@@ -185,6 +188,8 @@ dumpCineonImageInfo(CineonImageInformation* imageInfo) {
 static void
 fillCineonFormatInfo(CineonFile* cineon, CineonFormatInformation* formatInfo) {
 
+	(void)cineon; /* unused */
+	
 	formatInfo->interleave = 0;
 	formatInfo->packing = 5;
 	formatInfo->signage = 0;
@@ -238,6 +243,8 @@ dumpCineonFormatInfo(CineonFormatInformation* formatInfo) {
 static void
 fillCineonOriginationInfo(CineonFile* cineon,
 	CineonOriginationInformation* originInfo, CineonFileInformation* fileInfo) {
+	
+	(void)cineon; /* unused */
 
 	originInfo->x_offset = htonl(0);
 	originInfo->y_offset = htonl(0);

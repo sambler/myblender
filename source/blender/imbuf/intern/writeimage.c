@@ -1,4 +1,4 @@
-/**
+/*
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -29,6 +29,11 @@
  * $Id$
  */
 
+/** \file blender/imbuf/intern/writeimage.c
+ *  \ingroup imbuf
+ */
+
+
 #include <stdio.h>
 
 #include "IMB_imbuf_types.h"
@@ -37,7 +42,7 @@
 
 #include "imbuf.h"
 
-short IMB_saveiff(struct ImBuf *ibuf, char *name, int flags)
+short IMB_saveiff(struct ImBuf *ibuf, const char *name, int flags)
 {
 	ImFileType *type;
 
@@ -50,7 +55,7 @@ short IMB_saveiff(struct ImBuf *ibuf, char *name, int flags)
 				if(ibuf->rect==NULL && ibuf->rect_float)
 					IMB_rect_from_float(ibuf);
 			}
-
+			/* TODO. have const char for image write funcs */
 			return type->save(ibuf, name, flags);
 		}
 	}

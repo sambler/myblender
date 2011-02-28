@@ -1,9 +1,7 @@
-/**
- * mjpeg.c
+/*
+ * $Id$
  *
  * This is external code. Converts between avi and mpeg/jpeg.
- *
- * $Id$ 
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -29,7 +27,13 @@
  * Contributor(s): none yet.
  *
  * ***** END GPL LICENSE BLOCK *****
- *  */
+ *
+ */
+
+/** \file blender/avi/intern/mjpeg.c
+ *  \ingroup avi
+ */
+
 
 #include "AVI_avi.h"
 #include <stdlib.h>
@@ -144,6 +148,8 @@ static int Decode_JPEG(unsigned char *inBuffer, unsigned char *outBuffer, unsign
 	unsigned int y;
 	struct jpeg_decompress_struct dinfo;
 	struct jpeg_error_mgr jerr;
+	
+	(void)width; /* unused */
 
 	numbytes= 0;
 
@@ -324,7 +330,9 @@ static void check_and_compress_jpeg(int quality, unsigned char *outbuf, unsigned
 void *avi_converter_from_mjpeg (AviMovie *movie, int stream, unsigned char *buffer, int *size) {
 	int deint;
 	unsigned char *buf;
-		
+
+	(void)stream; /* unused */
+
 	buf= MEM_mallocN (movie->header->Height * movie->header->Width * 3, "avi.avi_converter_from_mjpeg 1");
 
 	deint= check_and_decode_jpeg(buffer, buf, movie->header->Width, movie->header->Height, *size);
@@ -374,10 +382,11 @@ void *avi_converter_to_mjpeg (AviMovie *movie, int stream, unsigned char *buffer
 /* Compression from memory */
 
 static void jpegmemdestmgr_init_destination(j_compress_ptr cinfo) {
-	;
+	(void)cinfo; /* unused */
 }
 
 static boolean jpegmemdestmgr_empty_output_buffer(j_compress_ptr cinfo) {
+	(void)cinfo; /* unused */
 	return TRUE;
 }
 

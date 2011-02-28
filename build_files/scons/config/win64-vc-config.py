@@ -22,6 +22,12 @@ BF_OPENAL_INC = '${BF_OPENAL}/include '
 BF_OPENAL_LIB = 'wrap_oal'
 BF_OPENAL_LIBPATH = '${BF_OPENAL}/lib'
 
+WITH_BF_SNDFILE = True
+BF_SNDFILE = LIBDIR + '/sndfile'
+BF_SNDFILE_INC = '${BF_SNDFILE}/include'
+BF_SNDFILE_LIB = 'libsndfile-1'
+BF_SNDFILE_LIBPATH = '${BF_SNDFILE}/lib'
+
 # TODO - are these useful on win32?
 # BF_CXX = '/usr'
 # WITH_BF_STATICCXX = False
@@ -142,10 +148,10 @@ BF_COLLADA_LIB = 'bf_collada'
 
 BF_OPENCOLLADA = LIBDIR + '/opencollada'
 BF_OPENCOLLADA_INC = '${BF_OPENCOLLADA}/include'
-BF_OPENCOLLADA_LIB = 'OpenCOLLADAStreamWriter OpenCOLLADASaxFrameworkLoader OpenCOLLADAFramework OpenCOLLADABaseUtils GeneratedSaxParser MathMLSolver xml2 pcre buffer ftoa'
+BF_OPENCOLLADA_LIB = 'OpenCOLLADAStreamWriter OpenCOLLADASaxFrameworkLoader OpenCOLLADAFramework OpenCOLLADABaseUtils GeneratedSaxParser MathMLSolver xml2 pcre buffer ftoa UTF'
 BF_OPENCOLLADA_LIBPATH = '${BF_OPENCOLLADA}/lib'
 
-WITH_BF_LCMS = True
+WITH_BF_LCMS = False
 BF_LCMS = LIBDIR + '/lcms'
 BF_LCMS_INC = '${BF_LCMS}/include'
 BF_LCMS_LIB = 'lcms'
@@ -166,13 +172,13 @@ CC = 'cl.exe'
 CXX = 'cl.exe'
 
 CFLAGS = []
-CCFLAGS = ['/nologo', '/Ob1', '/J', '/W3', '/Gd', '/wd4244', '/wd4305', '/wd4800', '/wd4065', '/wd4267']
+CCFLAGS = ['/nologo', '/Ob1', '/J', '/W0', '/Gd', '/we4013', '/wd4018', '/wd4244', '/wd4305', '/wd4800', '/wd4065', '/wd4267']
 CXXFLAGS = ['/EHsc']
 BGE_CXXFLAGS = ['/O2', '/EHsc', '/GR', '/fp:fast']
 
 BF_DEBUG_CCFLAGS = ['/Zi', '/FR${TARGET}.sbr']
 
-CPPFLAGS = ['-DWIN32','-D_CONSOLE', '-D_LIB', '-DFTGL_LIBRARY_STATIC', '-D_CRT_SECURE_NO_DEPRECATE']
+CPPFLAGS = ['-DWIN32', '-D_CONSOLE', '-D_LIB', '-DFTGL_LIBRARY_STATIC', '-D_CRT_SECURE_NO_DEPRECATE']
 REL_CFLAGS = ['-O2', '-DNDEBUG']
 REL_CCFLAGS = ['-O2', '-DNDEBUG']
 REL_CXXFLAGS = ['-O2', '-DNDEBUG']

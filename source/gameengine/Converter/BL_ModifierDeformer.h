@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,10 @@
  * Contributor(s): none yet.
  *
  * ***** END GPL LICENSE BLOCK *****
+ */
+
+/** \file BL_ModifierDeformer.h
+ *  \ingroup bgeconv
  */
 
 #ifndef BL_MODIFIERDEFORMER
@@ -95,7 +99,8 @@ public:
 	{
 		return m_dm;
 	}
-
+	// The derived mesh returned by this function must be released!
+	virtual struct DerivedMesh* GetPhysicsMesh();
 
 protected:
 	double					 m_lastModifierUpdate;

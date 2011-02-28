@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -22,21 +22,31 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/python/intern/bpy_rna.c
+ *  \ingroup pythonintern
+ */
+
+
+#include <Python.h>
+
+#include <stddef.h>
+#include <float.h> /* FLT_MIN/MAX */
+
 #include "bpy_rna.h"
 #include "bpy_props.h"
 #include "bpy_util.h"
 #include "bpy_rna_callback.h"
-//#include "blendef.h"
+
 #include "BLI_dynstr.h"
 #include "BLI_string.h"
 #include "BLI_listbase.h"
-#include "float.h" /* FLT_MIN/MAX */
+#include "BLI_utildefines.h"
 
 #include "RNA_enum_types.h"
 #include "RNA_define.h" /* RNA_def_property_free_identifier */
 
 #include "MEM_guardedalloc.h"
-#include "BKE_utildefines.h"
+
 #include "BKE_idcode.h"
 #include "BKE_context.h"
 #include "BKE_global.h" /* evil G.* */
@@ -50,20 +60,63 @@
 #include "DNA_anim_types.h"
 #include "ED_keyframing.h"
 
-#define USE_MATHUTILS
-#define USE_STRING_COERCE
-
-#ifdef USE_MATHUTILS
-#include "../generic/mathutils.h" /* so we can have mathutils callbacks */
 #include "../generic/IDProp.h" /* for IDprop lookups */
 #include "../generic/py_capi_utils.h"
 
-static int pyrna_py_to_prop(PointerRNA *ptr, PropertyRNA *prop, void *data, PyObject *value, const char *error_prefix);
-static PyObject *pyrna_prop_array_subscript_slice(BPy_PropertyArrayRNA *self, PointerRNA *ptr, PropertyRNA *prop, int start, int stop, int length);
-static Py_ssize_t pyrna_prop_array_length(BPy_PropertyArrayRNA *self);
+#define USE_PEDANTIC_WRITE
+#define USE_MATHUTILS
+#define USE_STRING_COERCE
+
+static PyObject *pyrna_prop_collection_values(BPy_PropertyRNA *self);
+
+#ifdef USE_PEDANTIC_WRITE
+static short rna_disallow_writes= FALSE;
+
+static int rna_id_write_error(PointerRNA *ptr, PyObject *key)
+{
+	ID *id= ptr->id.data;
+	if(id) {
+		const short idcode= GS(id->name);
+		if(!ELEM(idcode, ID_WM, ID_SCR)) { /* may need more added here */
+			const char *idtype= BKE_idcode_to_name(idcode);
+			const char *pyname;
+			if(key && PyUnicode_Check(key))	pyname= _PyUnicode_AsString(key);
+			else							pyname= "<UNKNOWN>";
+
+			/* make a nice string error */
+			BLI_assert(idtype != NULL);
+			PyErr_Format(PyExc_AttributeError, "Writing to ID classes in this context is not allowed: %.200s, %.200s datablock, error setting %.200s.%.200s", id->name+2, idtype, RNA_struct_identifier(ptr->type), pyname);
+
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+#endif // USE_PEDANTIC_WRITE
+
+
+#ifdef USE_PEDANTIC_WRITE
+int pyrna_write_check(void)
+{
+	return !rna_disallow_writes;
+}
+#else // USE_PEDANTIC_WRITE
+int pyrna_write_check(void)
+{
+	return TRUE;
+}
+#endif // USE_PEDANTIC_WRITE
+
 static Py_ssize_t pyrna_prop_collection_length(BPy_PropertyRNA *self);
-static short pyrna_rotation_euler_order_get(PointerRNA *ptr, PropertyRNA **prop_eul_order, short order_fallback);
+static Py_ssize_t pyrna_prop_array_length(BPy_PropertyArrayRNA *self);
+static int pyrna_py_to_prop(PointerRNA *ptr, PropertyRNA *prop, void *data, PyObject *value, const char *error_prefix);
 static int deferred_register_prop(StructRNA *srna, PyObject *key, PyObject *item);
+
+#ifdef USE_MATHUTILS
+#include "../generic/mathutils.h" /* so we can have mathutils callbacks */
+
+static PyObject *pyrna_prop_array_subscript_slice(BPy_PropertyArrayRNA *self, PointerRNA *ptr, PropertyRNA *prop, Py_ssize_t start, Py_ssize_t stop, Py_ssize_t length);
+static short pyrna_rotation_euler_order_get(PointerRNA *ptr, PropertyRNA **prop_eul_order, short order_fallback);
 
 /* bpyrna vector/euler/quat callbacks */
 static int mathutils_rna_array_cb_index= -1; /* index for our callbacks */
@@ -85,16 +138,16 @@ static int mathutils_rna_vector_get(BaseMathObject *bmo, int subtype)
 	BPy_PropertyRNA *self= (BPy_PropertyRNA *)bmo->cb_user;
 	if(self->prop==NULL)
 		return 0;
-	
+
 	RNA_property_float_get_array(&self->ptr, self->prop, bmo->data);
-	
+
 	/* Euler order exception */
 	if(subtype==MATHUTILS_CB_SUBTYPE_EUL) {
 		EulerObject *eul= (EulerObject *)bmo;
 		PropertyRNA *prop_eul_order= NULL;
 		eul->order= pyrna_rotation_euler_order_get(&self->ptr, &prop_eul_order, eul->order);
 	}
-	
+
 	return 1;
 }
 
@@ -104,7 +157,13 @@ static int mathutils_rna_vector_set(BaseMathObject *bmo, int subtype)
 	float min, max;
 	if(self->prop==NULL)
 		return 0;
-	
+
+#ifdef USE_PEDANTIC_WRITE
+	if(rna_disallow_writes && rna_id_write_error(&self->ptr, NULL)) {
+		return 0;
+	}
+#endif // USE_PEDANTIC_WRITE
+
 	if (!RNA_property_editable_flag(&self->ptr, self->prop)) {
 		PyErr_Format(PyExc_AttributeError, "bpy_prop \"%.200s.%.200s\" is read-only", RNA_struct_identifier(self->ptr.type), RNA_property_identifier(self->prop));
 		return 0;
@@ -120,7 +179,9 @@ static int mathutils_rna_vector_set(BaseMathObject *bmo, int subtype)
 	}
 
 	RNA_property_float_set_array(&self->ptr, self->prop, bmo->data);
-	RNA_property_update(BPy_GetContext(), &self->ptr, self->prop);
+	if(RNA_property_update_check(self->prop)) {
+		RNA_property_update(BPy_GetContext(), &self->ptr, self->prop);
+	}
 
 	/* Euler order exception */
 	if(subtype==MATHUTILS_CB_SUBTYPE_EUL) {
@@ -129,7 +190,9 @@ static int mathutils_rna_vector_set(BaseMathObject *bmo, int subtype)
 		short order= pyrna_rotation_euler_order_get(&self->ptr, &prop_eul_order, eul->order);
 		if(order != eul->order) {
 			RNA_property_enum_set(&self->ptr, prop_eul_order, eul->order);
-			RNA_property_update(BPy_GetContext(), &self->ptr, prop_eul_order);
+			if(RNA_property_update_check(prop_eul_order)) {
+				RNA_property_update(BPy_GetContext(), &self->ptr, prop_eul_order);
+			}
 		}
 	}
 	return 1;
@@ -141,7 +204,7 @@ static int mathutils_rna_vector_get_index(BaseMathObject *bmo, int UNUSED(subtyp
 
 	if(self->prop==NULL)
 		return 0;
-	
+
 	bmo->data[index]= RNA_property_float_get_index(&self->ptr, self->prop, index);
 	return 1;
 }
@@ -152,7 +215,13 @@ static int mathutils_rna_vector_set_index(BaseMathObject *bmo, int UNUSED(subtyp
 
 	if(self->prop==NULL)
 		return 0;
-	
+
+#ifdef USE_PEDANTIC_WRITE
+	if(rna_disallow_writes && rna_id_write_error(&self->ptr, NULL)) {
+		return 0;
+	}
+#endif // USE_PEDANTIC_WRITE
+
 	if (!RNA_property_editable_flag(&self->ptr, self->prop)) {
 		PyErr_Format(PyExc_AttributeError, "bpy_prop \"%.200s.%.200s\" is read-only", RNA_struct_identifier(self->ptr.type), RNA_property_identifier(self->prop));
 		return 0;
@@ -160,11 +229,15 @@ static int mathutils_rna_vector_set_index(BaseMathObject *bmo, int UNUSED(subtyp
 
 	RNA_property_float_clamp(&self->ptr, self->prop, &bmo->data[index]);
 	RNA_property_float_set_index(&self->ptr, self->prop, index, bmo->data[index]);
-	RNA_property_update(BPy_GetContext(), &self->ptr, self->prop);
+
+	if(RNA_property_update_check(self->prop)) {
+		RNA_property_update(BPy_GetContext(), &self->ptr, self->prop);
+	}
+
 	return 1;
 }
 
-Mathutils_Callback mathutils_rna_array_cb = {
+static Mathutils_Callback mathutils_rna_array_cb = {
 	(BaseMathCheckFunc)		mathutils_rna_generic_check,
 	(BaseMathGetFunc)		mathutils_rna_vector_get,
 	(BaseMathSetFunc)		mathutils_rna_vector_set,
@@ -190,22 +263,31 @@ static int mathutils_rna_matrix_get(BaseMathObject *bmo, int UNUSED(subtype))
 static int mathutils_rna_matrix_set(BaseMathObject *bmo, int UNUSED(subtype))
 {
 	BPy_PropertyRNA *self= (BPy_PropertyRNA *)bmo->cb_user;
-	
+
 	if(self->prop==NULL)
 		return 0;
-	
+
+#ifdef USE_PEDANTIC_WRITE
+	if(rna_disallow_writes && rna_id_write_error(&self->ptr, NULL)) {
+		return 0;
+	}
+#endif // USE_PEDANTIC_WRITE
+
 	if (!RNA_property_editable_flag(&self->ptr, self->prop)) {
 		PyErr_Format(PyExc_AttributeError, "bpy_prop \"%.200s.%.200s\" is read-only", RNA_struct_identifier(self->ptr.type), RNA_property_identifier(self->prop));
 		return 0;
 	}
-	
+
 	/* can ignore clamping here */
 	RNA_property_float_set_array(&self->ptr, self->prop, bmo->data);
-	RNA_property_update(BPy_GetContext(), &self->ptr, self->prop);
+
+	if(RNA_property_update_check(self->prop)) {
+		RNA_property_update(BPy_GetContext(), &self->ptr, self->prop);
+	}
 	return 1;
 }
 
-Mathutils_Callback mathutils_rna_matrix_cb = {
+static Mathutils_Callback mathutils_rna_matrix_cb = {
 	mathutils_rna_generic_check,
 	mathutils_rna_matrix_get,
 	mathutils_rna_matrix_set,
@@ -213,18 +295,22 @@ Mathutils_Callback mathutils_rna_matrix_cb = {
 	NULL
 };
 
-/* same as RNA_enum_value_from_id but raises an exception  */
-int pyrna_enum_value_from_id(EnumPropertyItem *item, const char *identifier, int *value, const char *error_prefix)
+static short pyrna_rotation_euler_order_get(PointerRNA *ptr, PropertyRNA **prop_eul_order, short order_fallback)
 {
-	if(RNA_enum_value_from_id(item, identifier, value) == 0) {
-		char *enum_str= BPy_enum_as_string(item);
-		PyErr_Format(PyExc_TypeError, "%s: '%.200s' not found in (%s)", error_prefix, identifier, enum_str);
-		MEM_freeN(enum_str);
-		return -1;
+	/* attempt to get order */
+	if(*prop_eul_order==NULL)
+		*prop_eul_order= RNA_struct_find_property(ptr, "rotation_mode");
+
+	if(*prop_eul_order) {
+		short order= RNA_property_enum_get(ptr, *prop_eul_order);
+		if (order >= ROT_MODE_XYZ && order <= ROT_MODE_ZYX) /* could be quat or axisangle */
+			return order;
 	}
 
-	return 0;
+	return order_fallback;
 }
+
+#endif // USE_MATHUTILS
 
 #define PROP_ALL_VECTOR_SUBTYPES PROP_TRANSLATION: case PROP_DIRECTION: case PROP_VELOCITY: case PROP_ACCELERATION: case PROP_XYZ: case PROP_XYZ_LENGTH
 
@@ -294,7 +380,7 @@ PyObject *pyrna_math_object_from_array(PointerRNA *ptr, PropertyRNA *prop)
 		case PROP_QUATERNION:
 			if(len==3) { /* euler */
 				if(is_thick) {
-					/* attempt to get order, only needed for thixk types since wrapped with update via callbacks */
+					/* attempt to get order, only needed for thick types since wrapped with update via callbacks */
 					PropertyRNA *prop_eul_order= NULL;
 					short order= pyrna_rotation_euler_order_get(ptr, &prop_eul_order, ROT_MODE_XYZ);
 
@@ -346,27 +432,25 @@ PyObject *pyrna_math_object_from_array(PointerRNA *ptr, PropertyRNA *prop)
 			ret = pyrna_prop_CreatePyObject(ptr, prop); /* owned by the Mathutils PyObject */
 		}
 	}
-
-#endif
+#else // USE_MATHUTILS
+	(void)ptr;
+	(void)prop;
+#endif // USE_MATHUTILS
 
 	return ret;
 }
 
-#endif
-
-static short pyrna_rotation_euler_order_get(PointerRNA *ptr, PropertyRNA **prop_eul_order, short order_fallback)
+/* same as RNA_enum_value_from_id but raises an exception  */
+int pyrna_enum_value_from_id(EnumPropertyItem *item, const char *identifier, int *value, const char *error_prefix)
 {
-	/* attempt to get order */
-	if(*prop_eul_order==NULL)
-		*prop_eul_order= RNA_struct_find_property(ptr, "rotation_mode");
-
-	if(*prop_eul_order) {
-		short order= RNA_property_enum_get(ptr, *prop_eul_order);
-		if (order >= ROT_MODE_XYZ && order <= ROT_MODE_ZYX) /* could be quat or axisangle */
-			return order;
+	if(RNA_enum_value_from_id(item, identifier, value) == 0) {
+		const char *enum_str= BPy_enum_as_string(item);
+		PyErr_Format(PyExc_TypeError, "%s: '%.200s' not found in (%s)", error_prefix, identifier, enum_str);
+		MEM_freeN((void *)enum_str);
+		return -1;
 	}
 
-	return order_fallback;
+	return 0;
 }
 
 static int pyrna_struct_compare( BPy_StructRNA * a, BPy_StructRNA * b )
@@ -441,13 +525,13 @@ static PyObject *pyrna_prop_richcmp(PyObject *a, PyObject *b, int op)
 static PyObject *pyrna_struct_str( BPy_StructRNA *self )
 {
 	PyObject *ret;
-	char *name;
+	const char *name;
 
 	/* print name if available */
 	name= RNA_struct_name_get_alloc(&self->ptr, NULL, FALSE);
 	if(name) {
 		ret= PyUnicode_FromFormat( "<bpy_struct, %.200s(\"%.200s\")>", RNA_struct_identifier(self->ptr.type), name);
-		MEM_freeN(name);
+		MEM_freeN((void *)name);
 		return ret;
 	}
 
@@ -459,22 +543,22 @@ static PyObject *pyrna_struct_repr(BPy_StructRNA *self)
 	ID *id= self->ptr.id.data;
 	if(id == NULL)
 		return pyrna_struct_str(self); /* fallback */
-	
+
 	if(RNA_struct_is_ID(self->ptr.type)) {
 		return PyUnicode_FromFormat( "bpy.data.%s[\"%s\"]", BKE_idcode_to_name_plural(GS(id->name)), id->name+2);
 	}
 	else {
 		PyObject *ret;
-		char *path;
+		const char *path;
 		path= RNA_path_from_ID_to_struct(&self->ptr);
 		if(path) {
 			ret= PyUnicode_FromFormat( "bpy.data.%s[\"%s\"].%s", BKE_idcode_to_name_plural(GS(id->name)), id->name+2, path);
-			MEM_freeN(path);
+			MEM_freeN((void *)path);
 		}
 		else { /* cant find, print something sane */
 			ret= PyUnicode_FromFormat( "bpy.data.%s[\"%s\"]...%s", BKE_idcode_to_name_plural(GS(id->name)), id->name+2, RNA_struct_identifier(self->ptr.type));
 		}
-		
+
 		return ret;
 	}
 }
@@ -483,13 +567,13 @@ static PyObject *pyrna_prop_str( BPy_PropertyRNA *self )
 {
 	PyObject *ret;
 	PointerRNA ptr;
-	char *name;
+	const char *name;
 	const char *type_id= NULL;
 	char type_fmt[64]= "";
 	int type= RNA_property_type(self->prop);
 
 	if(RNA_enum_id_from_value(property_type_items, type, &type_id)==0) {
-		PyErr_SetString(PyExc_SystemError, "could not use property type, internal error"); /* should never happen */
+		PyErr_SetString(PyExc_RuntimeError, "could not use property type, internal error"); /* should never happen */
 		return NULL;
 	}
 	else {
@@ -516,8 +600,14 @@ static PyObject *pyrna_prop_str( BPy_PropertyRNA *self )
 
 		if(name) {
 			ret= PyUnicode_FromFormat( "<bpy_%.200s, %.200s.%.200s(\"%.200s\")>", type_fmt, RNA_struct_identifier(self->ptr.type), RNA_property_identifier(self->prop), name);
-			MEM_freeN(name);
+			MEM_freeN((void *)name);
 			return ret;
+		}
+	}
+	if(RNA_property_type(self->prop) == PROP_COLLECTION) {
+		PointerRNA r_ptr;
+		if(RNA_property_collection_type_get(&self->ptr, self->prop, &r_ptr)) {
+			return PyUnicode_FromFormat( "<bpy_%.200s, %.200s>", type_fmt, RNA_struct_identifier(r_ptr.type));
 		}
 	}
 
@@ -528,20 +618,20 @@ static PyObject *pyrna_prop_repr(BPy_PropertyRNA *self)
 {
 	ID *id= self->ptr.id.data;
 	PyObject *ret;
-	char *path;
-	
+	const char *path;
+
 	if(id == NULL)
 		return pyrna_prop_str(self); /* fallback */
-	
+
 	path= RNA_path_from_ID_to_property(&self->ptr, self->prop);
 	if(path) {
 		ret= PyUnicode_FromFormat( "bpy.data.%s[\"%s\"].%s", BKE_idcode_to_name_plural(GS(id->name)), id->name+2, path);
-		MEM_freeN(path);
+		MEM_freeN((void *)path);
 	}
 	else { /* cant find, print something sane */
 		ret= PyUnicode_FromFormat( "bpy.data.%s[\"%s\"]...%s", BKE_idcode_to_name_plural(GS(id->name)), id->name+2, RNA_property_identifier(self->prop));
 	}
-	
+
 	return ret;
 }
 
@@ -552,7 +642,7 @@ static long pyrna_struct_hash( BPy_StructRNA *self )
 
 /* from python's meth_hash v3.1.2 */
 static long pyrna_prop_hash(BPy_PropertyRNA *self)
-{	
+{
 	long x,y;
 	if (self->ptr.data == NULL)
 		x = 0;
@@ -571,7 +661,7 @@ static long pyrna_prop_hash(BPy_PropertyRNA *self)
 }
 
 /* use our own dealloc so we can free a property if we use one */
-static void pyrna_struct_dealloc( BPy_StructRNA *self )
+static void pyrna_struct_dealloc(BPy_StructRNA *self)
 {
 	if (self->freeptr && self->ptr.data) {
 		IDP_FreeProperty(self->ptr.data);
@@ -579,17 +669,45 @@ static void pyrna_struct_dealloc( BPy_StructRNA *self )
 		self->ptr.data= NULL;
 	}
 
+#ifdef USE_WEAKREFS
+    if (self->in_weakreflist != NULL) {
+        PyObject_ClearWeakRefs((PyObject *)self);
+	}
+#endif
+
 	/* Note, for subclassed PyObjects we cant just call PyObject_DEL() directly or it will crash */
 	Py_TYPE(self)->tp_free(self);
-	return;
 }
 
-static char *pyrna_enum_as_string(PointerRNA *ptr, PropertyRNA *prop)
+/* use our own dealloc so we can free a property if we use one */
+static void pyrna_prop_dealloc(BPy_PropertyRNA *self)
+{
+#ifdef USE_WEAKREFS
+    if (self->in_weakreflist != NULL) {
+        PyObject_ClearWeakRefs((PyObject *)self);
+	}
+#endif
+	/* Note, for subclassed PyObjects we cant just call PyObject_DEL() directly or it will crash */
+	Py_TYPE(self)->tp_free(self);
+}
+
+static void pyrna_prop_array_dealloc(BPy_PropertyRNA *self)
+{
+#ifdef USE_WEAKREFS
+    if (self->in_weakreflist != NULL) {
+        PyObject_ClearWeakRefs((PyObject *)self);
+	}
+#endif
+	/* Note, for subclassed PyObjects we cant just call PyObject_DEL() directly or it will crash */
+	Py_TYPE(self)->tp_free(self);
+}
+
+static const char *pyrna_enum_as_string(PointerRNA *ptr, PropertyRNA *prop)
 {
 	EnumPropertyItem *item;
-	char *result;
+	const char *result;
 	int free= FALSE;
-	
+
 	RNA_property_enum_items(BPy_GetContext(), ptr, prop, &item, NULL, &free);
 	if(item) {
 		result= BPy_enum_as_string(item);
@@ -597,28 +715,32 @@ static char *pyrna_enum_as_string(PointerRNA *ptr, PropertyRNA *prop)
 	else {
 		result= "";
 	}
-	
+
 	if(free)
 		MEM_freeN(item);
-	
+
 	return result;
 }
 
 
 static int pyrna_string_to_enum(PyObject *item, PointerRNA *ptr, PropertyRNA *prop, int *val, const char *error_prefix)
 {
-	char *param= _PyUnicode_AsString(item);
+	const char *param= _PyUnicode_AsString(item);
 
 	if (param==NULL) {
-		char *enum_str= pyrna_enum_as_string(ptr, prop);
+		const char *enum_str= pyrna_enum_as_string(ptr, prop);
 		PyErr_Format(PyExc_TypeError, "%.200s expected a string enum type in (%.200s)", error_prefix, enum_str);
-		MEM_freeN(enum_str);
+		MEM_freeN((void *)enum_str);
 		return 0;
 	} else {
+		/* hack so that dynamic enums used for operator properties will be able to be built (i.e. context will be supplied to itemf)
+		 * and thus running defining operator buttons for such operators in UI will work */
+		RNA_def_property_clear_flag(prop, PROP_ENUM_NO_CONTEXT); 
+		
 		if (!RNA_property_enum_value(BPy_GetContext(), ptr, prop, param, val)) {
-			char *enum_str= pyrna_enum_as_string(ptr, prop);
+			const char *enum_str= pyrna_enum_as_string(ptr, prop);
 			PyErr_Format(PyExc_TypeError, "%.200s enum \"%.200s\" not found in (%.200s)", error_prefix, param, enum_str);
-			MEM_freeN(enum_str);
+			MEM_freeN((void *)enum_str);
 			return 0;
 		}
 	}
@@ -639,10 +761,10 @@ int pyrna_set_to_enum_bitfield(EnumPropertyItem *items, PyObject *value, int *r_
 	*r_value= 0;
 
 	while (_PySet_NextEntry(value, &pos, &key, &hash)) {
-		char *param= _PyUnicode_AsString(key);
+		const char *param= _PyUnicode_AsString(key);
 
 		if(param==NULL) {
-			PyErr_Format(PyExc_TypeError, "%.200s expected a string. found a %.200s", error_prefix, Py_TYPE(key)->tp_name);
+			PyErr_Format(PyExc_TypeError, "%.200s expected a string, not %.200s", error_prefix, Py_TYPE(key)->tp_name);
 			return -1;
 		}
 		if(pyrna_enum_value_from_id(items, param, &ret, error_prefix) < 0)
@@ -670,7 +792,7 @@ static int pyrna_prop_to_enum_bitfield(PointerRNA *ptr, PropertyRNA *prop, PyObj
 	}
 	else {
 		if(PySet_GET_SIZE(value)) {
-			PyErr_Format(PyExc_TypeError, "%.200s: empty enum \"%.200s\" could not have any values assigned.", error_prefix, RNA_property_identifier(prop));
+			PyErr_Format(PyExc_TypeError, "%.200s: empty enum \"%.200s\" could not have any values assigned", error_prefix, RNA_property_identifier(prop));
 			ret= -1;
 		}
 		else {
@@ -727,17 +849,17 @@ static PyObject *pyrna_enum_to_py(PointerRNA *ptr, PropertyRNA *prop, int val)
 		if (RNA_property_enum_identifier(BPy_GetContext(), ptr, prop, val, &identifier)) {
 			ret = PyUnicode_FromString(identifier);
 		} else {
-			EnumPropertyItem *item;
+			EnumPropertyItem *enum_item;
 			int free= FALSE;
 
 			/* don't throw error here, can't trust blender 100% to give the
 			 * right values, python code should not generate error for that */
-			RNA_property_enum_items(BPy_GetContext(), ptr, prop, &item, NULL, &free);
-			if(item && item->identifier) {
-				ret= PyUnicode_FromString(item->identifier);
+			RNA_property_enum_items(BPy_GetContext(), ptr, prop, &enum_item, NULL, &free);
+			if(enum_item && enum_item->identifier) {
+				ret= PyUnicode_FromString(enum_item->identifier);
 			}
 			else {
-				char *ptr_name= RNA_struct_name_get_alloc(ptr, NULL, FALSE);
+				const char *ptr_name= RNA_struct_name_get_alloc(ptr, NULL, FALSE);
 
 				/* prefer not fail silently incase of api errors, maybe disable it later */
 				printf("RNA Warning: Current value \"%d\" matches no enum in '%s', '%s', '%s'\n", val, RNA_struct_identifier(ptr->type), ptr_name, RNA_property_identifier(prop));
@@ -749,13 +871,13 @@ static PyObject *pyrna_enum_to_py(PointerRNA *ptr, PropertyRNA *prop, int val)
 #endif
 
 				if(ptr_name)
-					MEM_freeN(ptr_name);
+					MEM_freeN((void *)ptr_name);
 
-				ret = PyUnicode_FromString( "" );
+				ret = PyUnicode_FromString("");
 			}
 
 			if(free)
-				MEM_freeN(item);
+				MEM_freeN(enum_item);
 
 			/*PyErr_Format(PyExc_AttributeError, "RNA Error: Current value \"%d\" matches no enum", val);
 			ret = NULL;*/
@@ -773,7 +895,7 @@ PyObject * pyrna_prop_to_py(PointerRNA *ptr, PropertyRNA *prop)
 	if (RNA_property_array_check(ptr, prop)) {
 		return pyrna_py_from_array(ptr, prop);
 	}
-	
+
 	/* see if we can coorce into a python type - PropertyType */
 	switch (type) {
 	case PROP_BOOLEAN:
@@ -788,7 +910,7 @@ PyObject * pyrna_prop_to_py(PointerRNA *ptr, PropertyRNA *prop)
 	case PROP_STRING:
 	{
 		int subtype= RNA_property_subtype(prop);
-		char *buf;
+		const char *buf;
 		buf = RNA_property_string_get_alloc(ptr, prop, NULL, -1);
 #ifdef USE_STRING_COERCE
 		/* only file paths get special treatment, they may contain non utf-8 chars */
@@ -798,10 +920,10 @@ PyObject * pyrna_prop_to_py(PointerRNA *ptr, PropertyRNA *prop)
 		else {
 			ret= PyUnicode_FromString(buf);
 		}
-#else
+#else // USE_STRING_COERCE
 		ret= PyUnicode_FromString(buf);
-#endif
-		MEM_freeN(buf);
+#endif // USE_STRING_COERCE
+		MEM_freeN((void *)buf);
 		break;
 	}
 	case PROP_ENUM:
@@ -825,11 +947,11 @@ PyObject * pyrna_prop_to_py(PointerRNA *ptr, PropertyRNA *prop)
 		ret = pyrna_prop_CreatePyObject(ptr, prop);
 		break;
 	default:
-		PyErr_Format(PyExc_TypeError, "bpy_struct internal error: unknown type \"%d\" (pyrna_prop_to_py)", type);
+		PyErr_Format(PyExc_TypeError, "bpy_struct internal error: unknown type '%d' (pyrna_prop_to_py)", type);
 		ret = NULL;
 		break;
 	}
-	
+
 	return ret;
 }
 
@@ -850,7 +972,7 @@ int pyrna_pydict_to_props(PointerRNA *ptr, PyObject *kw, int all_args, const cha
 		if (strcmp(arg_name, "rna_type")==0) continue;
 
 		if (kw==NULL) {
-			PyErr_Format( PyExc_TypeError, "%.200s: no keywords, expected \"%.200s\"", error_prefix, arg_name ? arg_name : "<UNKNOWN>");
+			PyErr_Format(PyExc_TypeError, "%.200s: no keywords, expected \"%.200s\"", error_prefix, arg_name ? arg_name : "<UNKNOWN>");
 			error_val= -1;
 			break;
 		}
@@ -859,7 +981,7 @@ int pyrna_pydict_to_props(PointerRNA *ptr, PyObject *kw, int all_args, const cha
 
 		if (item == NULL) {
 			if(all_args) {
-				PyErr_Format( PyExc_TypeError, "%.200s: keyword \"%.200s\" missing", error_prefix, arg_name ? arg_name : "<UNKNOWN>");
+				PyErr_Format(PyExc_TypeError, "%.200s: keyword \"%.200s\" missing", error_prefix, arg_name ? arg_name : "<UNKNOWN>");
 				error_val = -1; /* pyrna_py_to_prop sets the error */
 				break;
 			}
@@ -883,7 +1005,7 @@ int pyrna_pydict_to_props(PointerRNA *ptr, PyObject *kw, int all_args, const cha
 			arg_name= NULL;
 		}
 
-		PyErr_Format( PyExc_TypeError, "%.200s: keyword \"%.200s\" unrecognized", error_prefix, arg_name ? arg_name : "<UNKNOWN>");
+		PyErr_Format(PyExc_TypeError, "%.200s: keyword \"%.200s\" unrecognized", error_prefix, arg_name ? arg_name : "<UNKNOWN>");
 		error_val = -1;
 	}
 
@@ -897,22 +1019,22 @@ static PyObject *pyrna_func_to_py(BPy_DummyPointerRNA *pyrna, FunctionRNA *func)
 	static PyMethodDef func_meth = {"<generic rna function>", (PyCFunction)pyrna_func_call, METH_VARARGS|METH_KEYWORDS, "python rna function"};
 	PyObject *self;
 	PyObject *ret;
-	
+
 	if(func==NULL) {
-		PyErr_Format( PyExc_RuntimeError, "%.200s: type attempted to get NULL function", RNA_struct_identifier(pyrna->ptr.type));
+		PyErr_Format(PyExc_RuntimeError, "%.200s: type attempted to get NULL function", RNA_struct_identifier(pyrna->ptr.type));
 		return NULL;
 	}
 
 	self= PyTuple_New(2);
-	
+
 	PyTuple_SET_ITEM(self, 0, (PyObject *)pyrna);
 	Py_INCREF(pyrna);
 
 	PyTuple_SET_ITEM(self, 1, PyCapsule_New((void *)func, NULL, NULL));
-	
+
 	ret= PyCFunction_New(&func_meth, self);
 	Py_DECREF(self);
-	
+
 	return ret;
 }
 
@@ -922,35 +1044,21 @@ static int pyrna_py_to_prop(PointerRNA *ptr, PropertyRNA *prop, void *data, PyOb
 {
 	/* XXX hard limits should be checked here */
 	int type = RNA_property_type(prop);
-	
+
 
 	if (RNA_property_array_check(ptr, prop)) {
-
-		/* char error_str[512]; */
 		int ok= 1;
 
-#ifdef USE_MATHUTILS
-		if(MatrixObject_Check(value)) {
-			MatrixObject *mat = (MatrixObject*)value;
-			if(!BaseMath_ReadCallback(mat))
-				return -1;
-		} else /* continue... */
-#endif
-		if (!PySequence_Check(value)) {
-			PyErr_Format(PyExc_TypeError, "%.200s RNA array assignment to %.200s.%.200s expected a sequence instead of %.200s instance.", error_prefix, RNA_struct_identifier(ptr->type), RNA_property_identifier(prop), Py_TYPE(value)->tp_name);
-			return -1;
-		}
 		/* done getting the length */
 		ok= pyrna_py_to_array(ptr, prop, data, value, error_prefix);
 
 		if (!ok) {
-			/* PyErr_Format(PyExc_AttributeError, "%.200s %s", error_prefix, error_str); */
 			return -1;
 		}
 	}
 	else {
 		/* Normal Property (not an array) */
-		
+
 		/* see if we can coorce into a python type - PropertyType */
 		switch (type) {
 		case PROP_BOOLEAN:
@@ -963,9 +1071,9 @@ static int pyrna_py_to_prop(PointerRNA *ptr, PropertyRNA *prop, void *data, PyOb
 				param = PyObject_IsTrue( value );
 			else
 				param = PyLong_AsLong( value );
-			
+
 			if(param < 0) {
-				PyErr_Format(PyExc_TypeError, "%.200s %.200s.%.200s expected True/False or 0/1", error_prefix, RNA_struct_identifier(ptr->type), RNA_property_identifier(prop));
+				PyErr_Format(PyExc_TypeError, "%.200s %.200s.%.200s expected True/False or 0/1, not %.200s", error_prefix, RNA_struct_identifier(ptr->type), RNA_property_identifier(prop), Py_TYPE(value)->tp_name);
 				return -1;
 			} else {
 				if(data)	*((int*)data)= param;
@@ -978,11 +1086,11 @@ static int pyrna_py_to_prop(PointerRNA *ptr, PropertyRNA *prop, void *data, PyOb
 			int overflow;
 			long param= PyLong_AsLongAndOverflow(value, &overflow);
 			if(overflow || (param > INT_MAX) || (param < INT_MIN)) {
-				PyErr_Format(PyExc_TypeError, "%.200s %.200s.%.200s value not in 'int' range (" STRINGIFY(INT_MIN) ", " STRINGIFY(INT_MAX) ")", error_prefix, RNA_struct_identifier(ptr->type), RNA_property_identifier(prop));
+				PyErr_Format(PyExc_ValueError, "%.200s %.200s.%.200s value not in 'int' range (" STRINGIFY(INT_MIN) ", " STRINGIFY(INT_MAX) ")", error_prefix, RNA_struct_identifier(ptr->type), RNA_property_identifier(prop));
 				return -1;
 			}
 			else if (param==-1 && PyErr_Occurred()) {
-				PyErr_Format(PyExc_TypeError, "%.200s %.200s.%.200s expected an int type", error_prefix, RNA_struct_identifier(ptr->type), RNA_property_identifier(prop));
+				PyErr_Format(PyExc_TypeError, "%.200s %.200s.%.200s expected an int type, not %.200s", error_prefix, RNA_struct_identifier(ptr->type), RNA_property_identifier(prop), Py_TYPE(value)->tp_name);
 				return -1;
 			} else {
 				int param_i= (int)param;
@@ -996,7 +1104,7 @@ static int pyrna_py_to_prop(PointerRNA *ptr, PropertyRNA *prop, void *data, PyOb
 		{
 			float param = PyFloat_AsDouble(value);
 			if (PyErr_Occurred()) {
-				PyErr_Format(PyExc_TypeError, "%.200s %.200s.%.200s expected a float type", error_prefix, RNA_struct_identifier(ptr->type), RNA_property_identifier(prop));
+				PyErr_Format(PyExc_TypeError, "%.200s %.200s.%.200s expected a float type, not %.200s", error_prefix, RNA_struct_identifier(ptr->type), RNA_property_identifier(prop), Py_TYPE(value)->tp_name);
 				return -1;
 			} else {
 				RNA_property_float_clamp(ptr, prop, (float *)&param);
@@ -1012,17 +1120,18 @@ static int pyrna_py_to_prop(PointerRNA *ptr, PropertyRNA *prop, void *data, PyOb
 			PyObject *value_coerce= NULL;
 			int subtype= RNA_property_subtype(prop);
 			if(ELEM3(subtype, PROP_FILEPATH, PROP_DIRPATH, PROP_FILENAME)) {
+				/* TODO, get size */
 				param= PyC_UnicodeAsByte(value, &value_coerce);
 			}
 			else {
 				param= _PyUnicode_AsString(value);
 			}
-#else
-			param= _PyUnicode_AsString(value);
-#endif
+#else // USE_STRING_COERCE
+			param= _PyUnicode_AsStringSize(value);
+#endif // USE_STRING_COERCE
 
 			if (param==NULL) {
-				PyErr_Format(PyExc_TypeError, "%.200s %.200s.%.200s expected a string type", error_prefix, RNA_struct_identifier(ptr->type), RNA_property_identifier(prop));
+				PyErr_Format(PyExc_TypeError, "%.200s %.200s.%.200s expected a string type, not %.200s", error_prefix, RNA_struct_identifier(ptr->type), RNA_property_identifier(prop), Py_TYPE(value)->tp_name);
 				return -1;
 			}
 			else {
@@ -1031,7 +1140,7 @@ static int pyrna_py_to_prop(PointerRNA *ptr, PropertyRNA *prop, void *data, PyOb
 			}
 #ifdef USE_STRING_COERCE
 			Py_XDECREF(value_coerce);
-#endif
+#endif // USE_STRING_COERCE
 			break;
 		}
 		case PROP_ENUM:
@@ -1054,36 +1163,36 @@ static int pyrna_py_to_prop(PointerRNA *ptr, PropertyRNA *prop, void *data, PyOb
 				}
 			}
 			else {
-				char *enum_str= pyrna_enum_as_string(ptr, prop);
-				PyErr_Format(PyExc_TypeError, "%.200s %.200s.%.200s expected a string enum or a set of strings in (%.2000s)", error_prefix, RNA_struct_identifier(ptr->type), RNA_property_identifier(prop), enum_str);
-				MEM_freeN(enum_str);
+				const char *enum_str= pyrna_enum_as_string(ptr, prop);
+				PyErr_Format(PyExc_TypeError, "%.200s %.200s.%.200s expected a string enum or a set of strings in (%.2000s), not %.200s", error_prefix, RNA_struct_identifier(ptr->type), RNA_property_identifier(prop), enum_str, Py_TYPE(value)->tp_name);
+				MEM_freeN((void *)enum_str);
 				return -1;
 			}
 
 			if(data)	*((int*)data)= val;
 			else		RNA_property_enum_set(ptr, prop, val);
-			
+
 			break;
 		}
 		case PROP_POINTER:
 		{
 			PyObject *value_new= NULL;
-					
-			StructRNA *ptype= RNA_property_pointer_type(ptr, prop);
+
+			StructRNA *ptr_type= RNA_property_pointer_type(ptr, prop);
 			int flag = RNA_property_flag(prop);
 
 			/* this is really nasty!, so we can fake the operator having direct properties eg:
 			 * layout.prop(self, "filepath")
 			 * ... which infact should be
 			 * layout.prop(self.properties, "filepath")
-			 * 
+			 *
 			 * we need to do this trick.
 			 * if the prop is not an operator type and the pyobject is an operator, use its properties in place of its self.
-			 * 
+			 *
 			 * this is so bad that its almost a good reason to do away with fake 'self.properties -> self' class mixing
 			 * if this causes problems in the future it should be removed.
 			 */
-			if(	(ptype == &RNA_AnyType) &&
+			if(	(ptr_type == &RNA_AnyType) &&
 				(BPy_StructRNA_Check(value)) &&
 				(RNA_struct_is_a(((BPy_StructRNA *)value)->ptr.type, &RNA_Operator))
 			) {
@@ -1093,7 +1202,7 @@ static int pyrna_py_to_prop(PointerRNA *ptr, PropertyRNA *prop, void *data, PyOb
 
 
 			/* if property is an OperatorProperties pointer and value is a map, forward back to pyrna_pydict_to_props */
-			if (RNA_struct_is_a(ptype, &RNA_OperatorProperties) && PyDict_Check(value)) {
+			if (RNA_struct_is_a(ptr_type, &RNA_OperatorProperties) && PyDict_Check(value)) {
 				PointerRNA opptr = RNA_property_pointer_get(ptr, prop);
 				return pyrna_pydict_to_props(&opptr, value, 0, error_prefix);
 			}
@@ -1107,16 +1216,16 @@ static int pyrna_py_to_prop(PointerRNA *ptr, PropertyRNA *prop, void *data, PyOb
 					value_new= value;
 				}
 				else {
-					PyErr_Format(PyExc_TypeError, "%.200s %.200s.%.200s collection has no type, cant be used as a %.200s type", error_prefix, RNA_struct_identifier(ptr->type), RNA_property_identifier(prop), RNA_struct_identifier(ptype));
+					PyErr_Format(PyExc_TypeError, "%.200s %.200s.%.200s collection has no type, cant be used as a %.200s type", error_prefix, RNA_struct_identifier(ptr->type), RNA_property_identifier(prop), RNA_struct_identifier(ptr_type));
 					return -1;
 				}
 			}
 
 			if(!BPy_StructRNA_Check(value) && value != Py_None) {
-				PyErr_Format(PyExc_TypeError, "%.200s %.200s.%.200s expected a %.200s type", error_prefix, RNA_struct_identifier(ptr->type), RNA_property_identifier(prop), RNA_struct_identifier(ptype));
+				PyErr_Format(PyExc_TypeError, "%.200s %.200s.%.200s expected a %.200s type, not %.200s", error_prefix, RNA_struct_identifier(ptr->type), RNA_property_identifier(prop), RNA_struct_identifier(ptr_type), Py_TYPE(value)->tp_name);
 				Py_XDECREF(value_new); return -1;
 			} else if((flag & PROP_NEVER_NULL) && value == Py_None) {
-				PyErr_Format(PyExc_TypeError, "%.200s %.200s.%.200s does not support a 'None' assignment %.200s type", error_prefix, RNA_struct_identifier(ptr->type), RNA_property_identifier(prop), RNA_struct_identifier(ptype));
+				PyErr_Format(PyExc_TypeError, "%.200s %.200s.%.200s does not support a 'None' assignment %.200s type", error_prefix, RNA_struct_identifier(ptr->type), RNA_property_identifier(prop), RNA_struct_identifier(ptr_type));
 				Py_XDECREF(value_new); return -1;
 			} else if(value != Py_None && ((flag & PROP_ID_SELF_CHECK) && ptr->id.data == ((BPy_StructRNA*)value)->ptr.id.data)) {
 				PyErr_Format(PyExc_TypeError, "%.200s %.200s.%.200s ID type does not support assignment to its self", error_prefix, RNA_struct_identifier(ptr->type), RNA_property_identifier(prop));
@@ -1135,7 +1244,7 @@ static int pyrna_py_to_prop(PointerRNA *ptr, PropertyRNA *prop, void *data, PyOb
 					else if(value == Py_None) {
 						*((void**)data)= NULL;
 					}
-					else if(RNA_struct_is_a(param->ptr.type, ptype)) {
+					else if(RNA_struct_is_a(param->ptr.type, ptr_type)) {
 						*((void**)data)= param->ptr.data;
 					}
 					else {
@@ -1145,29 +1254,28 @@ static int pyrna_py_to_prop(PointerRNA *ptr, PropertyRNA *prop, void *data, PyOb
 				else {
 					/* data==NULL, assign to RNA */
 					if(value == Py_None) {
-						PointerRNA valueptr;
-						memset(&valueptr, 0, sizeof(valueptr));
+						PointerRNA valueptr= {{NULL}};
 						RNA_property_pointer_set(ptr, prop, valueptr);
 					}
-					else if(RNA_struct_is_a(param->ptr.type, ptype)) {
+					else if(RNA_struct_is_a(param->ptr.type, ptr_type)) {
 						RNA_property_pointer_set(ptr, prop, param->ptr);
 					}
 					else {
 						PointerRNA tmp;
-						RNA_pointer_create(NULL, ptype, NULL, &tmp);
-						PyErr_Format(PyExc_TypeError, "%.200s %.200s.%.200s expected a %.200s type", error_prefix, RNA_struct_identifier(ptr->type), RNA_property_identifier(prop), RNA_struct_identifier(tmp.type));
+						RNA_pointer_create(NULL, ptr_type, NULL, &tmp);
+						PyErr_Format(PyExc_TypeError, "%.200s %.200s.%.200s expected a %.200s type. not %.200s", error_prefix, RNA_struct_identifier(ptr->type), RNA_property_identifier(prop), RNA_struct_identifier(tmp.type), RNA_struct_identifier(param->ptr.type));
 						Py_XDECREF(value_new); return -1;
 					}
 				}
-				
+
 				if(raise_error) {
 					PointerRNA tmp;
-					RNA_pointer_create(NULL, ptype, NULL, &tmp);
-					PyErr_Format(PyExc_TypeError, "%.200s %.200s.%.200s expected a %.200s type", error_prefix, RNA_struct_identifier(ptr->type), RNA_property_identifier(prop), RNA_struct_identifier(tmp.type));
+					RNA_pointer_create(NULL, ptr_type, NULL, &tmp);
+					PyErr_Format(PyExc_TypeError, "%.200s %.200s.%.200s expected a %.200s type, not %.200s", error_prefix, RNA_struct_identifier(ptr->type), RNA_property_identifier(prop), RNA_struct_identifier(tmp.type), RNA_struct_identifier(param->ptr.type));
 					Py_XDECREF(value_new); return -1;
 				}
 			}
-			
+
 			Py_XDECREF(value_new);
 
 			break;
@@ -1181,14 +1289,14 @@ static int pyrna_py_to_prop(PointerRNA *ptr, PropertyRNA *prop, void *data, PyOb
 			CollectionPointerLink *link;
 
 			lb= (data)? (ListBase*)data: NULL;
-			
+
 			/* convert a sequence of dict's into a collection */
 			if(!PySequence_Check(value)) {
-				PyErr_Format(PyExc_TypeError, "%.200s %.200s.%.200s expected a sequence for an RNA collection, found a '%.200s' instead", error_prefix, RNA_struct_identifier(ptr->type), RNA_property_identifier(prop), Py_TYPE(value)->tp_name);
+				PyErr_Format(PyExc_TypeError, "%.200s %.200s.%.200s expected a sequence for an RNA collection, not %.200s", error_prefix, RNA_struct_identifier(ptr->type), RNA_property_identifier(prop), Py_TYPE(value)->tp_name);
 				return -1;
 			}
 
-			seq_len = PySequence_Length(value);
+			seq_len = PySequence_Size(value);
 			for(i=0; i<seq_len; i++) {
 				item= PySequence_GetItem(value, i);
 
@@ -1199,7 +1307,7 @@ static int pyrna_py_to_prop(PointerRNA *ptr, PropertyRNA *prop, void *data, PyOb
 				}
 
 				if(PyDict_Check(item)==0) {
-					PyErr_Format(PyExc_TypeError, "%.200s %.200s.%.200s expected a each sequence member to be a dict for an RNA collection, found a '%.200s' instead", error_prefix, RNA_struct_identifier(ptr->type), RNA_property_identifier(prop), Py_TYPE(item)->tp_name);
+					PyErr_Format(PyExc_TypeError, "%.200s %.200s.%.200s expected a each sequence member to be a dict for an RNA collection, not %.200s", error_prefix, RNA_struct_identifier(ptr->type), RNA_property_identifier(prop), Py_TYPE(item)->tp_name);
 					Py_XDECREF(item);
 					return -1;
 				}
@@ -1214,7 +1322,7 @@ static int pyrna_py_to_prop(PointerRNA *ptr, PropertyRNA *prop, void *data, PyOb
 
 				if(pyrna_pydict_to_props(&itemptr, item, 1, "Converting a python list to an RNA collection")==-1) {
 					PyObject *msg= PyC_ExceptionBuffer();
-					char *msg_char= _PyUnicode_AsString(msg);
+					const char *msg_char= _PyUnicode_AsString(msg);
 
 					PyErr_Format(PyExc_TypeError, "%.200s %.200s.%.200s error converting a member of a collection from a dicts into an RNA collection, failed with: %s", error_prefix, RNA_struct_identifier(ptr->type), RNA_property_identifier(prop), msg_char);
 
@@ -1224,7 +1332,7 @@ static int pyrna_py_to_prop(PointerRNA *ptr, PropertyRNA *prop, void *data, PyOb
 				}
 				Py_DECREF(item);
 			}
-			
+
 			break;
 		}
 		default:
@@ -1235,7 +1343,9 @@ static int pyrna_py_to_prop(PointerRNA *ptr, PropertyRNA *prop, void *data, PyOb
 	}
 
 	/* Run rna property functions */
-	RNA_property_update(BPy_GetContext(), ptr, prop);
+	if(RNA_property_update_check(prop)) {
+		RNA_property_update(BPy_GetContext(), ptr, prop);
+	}
 
 	return 0;
 }
@@ -1248,12 +1358,10 @@ static PyObject * pyrna_prop_array_to_py_index(BPy_PropertyArrayRNA *self, int i
 static int pyrna_py_to_prop_array_index(BPy_PropertyArrayRNA *self, int index, PyObject *value)
 {
 	int ret = 0;
-	int totdim;
 	PointerRNA *ptr= &self->ptr;
 	PropertyRNA *prop= self->prop;
-	int type = RNA_property_type(prop);
 
-	totdim= RNA_property_array_dimension(ptr, prop, NULL);
+	const int totdim= RNA_property_array_dimension(ptr, prop, NULL);
 
 	if (totdim > 1) {
 		/* char error_str[512]; */
@@ -1264,11 +1372,11 @@ static int pyrna_py_to_prop_array_index(BPy_PropertyArrayRNA *self, int index, P
 	}
 	else {
 		/* see if we can coorce into a python type - PropertyType */
-		switch (type) {
+		switch (RNA_property_type(prop)) {
 		case PROP_BOOLEAN:
 			{
 				int param = PyLong_AsLong( value );
-		
+
 				if( param < 0 || param > 1) {
 					PyErr_SetString(PyExc_TypeError, "expected True/False or 0/1");
 					ret = -1;
@@ -1309,8 +1417,10 @@ static int pyrna_py_to_prop_array_index(BPy_PropertyArrayRNA *self, int index, P
 	}
 
 	/* Run rna property functions */
-	RNA_property_update(BPy_GetContext(), ptr, prop);
-	
+	if(RNA_property_update_check(prop)) {
+		RNA_property_update(BPy_GetContext(), ptr, prop);
+	}
+
 	return ret;
 }
 
@@ -1351,20 +1461,34 @@ static int pyrna_prop_collection_bool( BPy_PropertyRNA *self )
 static PyObject *pyrna_prop_collection_subscript_int(BPy_PropertyRNA *self, Py_ssize_t keynum)
 {
 	PointerRNA newptr;
-	int len= RNA_property_collection_length(&self->ptr, self->prop);
+	Py_ssize_t keynum_abs= keynum;
 
-	if(keynum < 0) keynum += len;
+	/* notice getting the length of the collection is avoided unless negative index is used
+	 * or to detect internal error with a valid index.
+	 * This is done for faster lookups. */
+	if(keynum < 0) {
+		keynum_abs += RNA_property_collection_length(&self->ptr, self->prop);
 
-	if(keynum >= 0 && keynum < len)  {
-		if(RNA_property_collection_lookup_int(&self->ptr, self->prop, keynum, &newptr)) {
-			return pyrna_struct_CreatePyObject(&newptr);
-		}
-		else { /* fail's if ptr.data == NULL, valid for mesh.materials */
-			Py_RETURN_NONE;
+		if(keynum_abs < 0) {
+			PyErr_Format(PyExc_IndexError, "bpy_prop_collection[%d]: out of range.", keynum);
+			return NULL;
 		}
 	}
-	PyErr_Format(PyExc_IndexError, "bpy_prop_collection[index]: index %d out of range, size %d", keynum, len);
-	return NULL;
+
+	if(RNA_property_collection_lookup_int(&self->ptr, self->prop, keynum_abs, &newptr)) {
+		return pyrna_struct_CreatePyObject(&newptr);
+	}
+	else {
+		const int len= RNA_property_collection_length(&self->ptr, self->prop);
+		if(keynum_abs >= len) {
+			PyErr_Format(PyExc_IndexError, "bpy_prop_collection[index]: index %d out of range, size %d", keynum, len);
+		}
+		else {
+			PyErr_Format(PyExc_RuntimeError, "bpy_prop_collection[index]: internal error, valid index %d given in %d sized collection but value not found", keynum_abs, len);
+		}
+
+		return NULL;
+	}
 }
 
 static PyObject *pyrna_prop_array_subscript_int(BPy_PropertyArrayRNA *self, int keynum)
@@ -1391,25 +1515,36 @@ static PyObject *pyrna_prop_collection_subscript_str(BPy_PropertyRNA *self, cons
 }
 /* static PyObject *pyrna_prop_array_subscript_str(BPy_PropertyRNA *self, char *keyname) */
 
-static PyObject *pyrna_prop_collection_subscript_slice(PointerRNA *ptr, PropertyRNA *prop, int start, int stop)
+static PyObject *pyrna_prop_collection_subscript_slice(BPy_PropertyRNA *self, Py_ssize_t start, Py_ssize_t stop)
 {
-	PointerRNA newptr;
-	PyObject *list = PyList_New(stop - start);
-	int count;
+	int count= 0;
 
-	start = MIN2(start,stop); /* values are clamped from  */
+	PyObject *list= PyList_New(0);
+	PyObject *item;
 
-	for(count = start; count < stop; count++) {
-		if(RNA_property_collection_lookup_int(ptr, prop, count - start, &newptr)) {
-			PyList_SET_ITEM(list, count - start, pyrna_struct_CreatePyObject(&newptr));
+	/* first loop up-until the start */
+	CollectionPropertyIterator rna_macro_iter;
+	for(RNA_property_collection_begin(&self->ptr, self->prop, &rna_macro_iter); rna_macro_iter.valid; RNA_property_collection_next(&rna_macro_iter)) {
+		/* PointerRNA itemptr= rna_macro_iter.ptr; */
+		if(count == start) {
+			break;
 		}
-		else {
-			Py_DECREF(list);
+		count++;
+	}
 
-			PyErr_SetString(PyExc_RuntimeError, "error getting an rna struct from a collection");
-			return NULL;
+	/* add items until stop */
+	for(; rna_macro_iter.valid; RNA_property_collection_next(&rna_macro_iter)) {
+		item= pyrna_struct_CreatePyObject(&rna_macro_iter.ptr);
+		PyList_Append(list, item);
+		Py_DECREF(item);
+
+		count++;
+		if(count == stop) {
+			break;
 		}
 	}
+
+	RNA_property_collection_end(&rna_macro_iter);
 
 	return list;
 }
@@ -1418,17 +1553,17 @@ static PyObject *pyrna_prop_collection_subscript_slice(PointerRNA *ptr, Property
  * note: could also use pyrna_prop_array_to_py_index(self, count) in a loop but its a lot slower
  * since at the moment it reads (and even allocates) the entire array for each index.
  */
-static PyObject *pyrna_prop_array_subscript_slice(BPy_PropertyArrayRNA *self, PointerRNA *ptr, PropertyRNA *prop, int start, int stop, int length)
+static PyObject *pyrna_prop_array_subscript_slice(BPy_PropertyArrayRNA *self, PointerRNA *ptr, PropertyRNA *prop, Py_ssize_t start, Py_ssize_t stop, Py_ssize_t length)
 {
 	int count, totdim;
 
-	PyObject *list = PyList_New(stop - start);
+	PyObject *tuple= PyTuple_New(stop - start);
 
 	totdim = RNA_property_array_dimension(ptr, prop, NULL);
 
 	if (totdim > 1) {
 		for (count = start; count < stop; count++)
-			PyList_SET_ITEM(list, count - start, pyrna_prop_array_to_py_index(self, count));
+			PyTuple_SET_ITEM(tuple, count - start, pyrna_prop_array_to_py_index(self, count));
 	}
 	else {
 		switch (RNA_property_type(prop)) {
@@ -1439,9 +1574,9 @@ static PyObject *pyrna_prop_array_subscript_slice(BPy_PropertyArrayRNA *self, Po
 				if(length > PYRNA_STACK_ARRAY)	{	values= PyMem_MALLOC(sizeof(float) * length); }
 				else							{	values= values_stack; }
 				RNA_property_float_get_array(ptr, prop, values);
-			
+
 				for(count=start; count<stop; count++)
-					PyList_SET_ITEM(list, count-start, PyFloat_FromDouble(values[count]));
+					PyTuple_SET_ITEM(tuple, count-start, PyFloat_FromDouble(values[count]));
 
 				if(values != values_stack) {
 					PyMem_FREE(values);
@@ -1457,7 +1592,7 @@ static PyObject *pyrna_prop_array_subscript_slice(BPy_PropertyArrayRNA *self, Po
 
 				RNA_property_boolean_get_array(ptr, prop, values);
 				for(count=start; count<stop; count++)
-					PyList_SET_ITEM(list, count-start, PyBool_FromLong(values[count]));
+					PyTuple_SET_ITEM(tuple, count-start, PyBool_FromLong(values[count]));
 
 				if(values != values_stack) {
 					PyMem_FREE(values);
@@ -1473,7 +1608,7 @@ static PyObject *pyrna_prop_array_subscript_slice(BPy_PropertyArrayRNA *self, Po
 
 				RNA_property_int_get_array(ptr, prop, values);
 				for(count=start; count<stop; count++)
-					PyList_SET_ITEM(list, count-start, PyLong_FromSsize_t(values[count]));
+					PyTuple_SET_ITEM(tuple, count-start, PyLong_FromSsize_t(values[count]));
 
 				if(values != values_stack) {
 					PyMem_FREE(values);
@@ -1481,13 +1616,14 @@ static PyObject *pyrna_prop_array_subscript_slice(BPy_PropertyArrayRNA *self, Po
 				break;
 			}
 		default:
-			/* probably will never happen */
+			BLI_assert(!"Invalid array type");
+
 			PyErr_SetString(PyExc_TypeError, "not an array type");
-			Py_DECREF(list);
-			list= NULL;
+			Py_DECREF(tuple);
+			tuple= NULL;
 		}
 	}
-	return list;
+	return tuple;
 }
 
 static PyObject *pyrna_prop_collection_subscript(BPy_PropertyRNA *self, PyObject *key)
@@ -1503,25 +1639,43 @@ static PyObject *pyrna_prop_collection_subscript(BPy_PropertyRNA *self, PyObject
 		return pyrna_prop_collection_subscript_int(self, i);
 	}
 	else if (PySlice_Check(key)) {
-		int len= RNA_property_collection_length(&self->ptr, self->prop);
-		Py_ssize_t start, stop, step, slicelength;
+		PySliceObject *key_slice= (PySliceObject *)key;
+		Py_ssize_t step= 1;
 
-		if (PySlice_GetIndicesEx((PySliceObject*)key, len, &start, &stop, &step, &slicelength) < 0)
+		if(key_slice->step != Py_None && !_PyEval_SliceIndex(key, &step)) {
 			return NULL;
-
-		if (slicelength <= 0) {
-			return PyList_New(0);
 		}
-		else if (step == 1) {
-			return pyrna_prop_collection_subscript_slice(&self->ptr, self->prop, start, stop);
+		else if (step != 1) {
+			PyErr_SetString(PyExc_TypeError, "bpy_prop_collection[slice]: slice steps not supported");
+			return NULL;
+		}
+		else if(key_slice->start == Py_None && key_slice->stop == Py_None) {
+			return pyrna_prop_collection_subscript_slice(self, 0, PY_SSIZE_T_MAX);
 		}
 		else {
-			PyErr_SetString(PyExc_TypeError, "bpy_prop_collection[slice]: slice steps not supported with rna");
-			return NULL;
+			Py_ssize_t start= 0, stop= PY_SSIZE_T_MAX;
+
+			/* avoid PySlice_GetIndicesEx because it needs to know the length ahead of time. */
+			if(key_slice->start != Py_None && !_PyEval_SliceIndex(key_slice->start, &start))	return NULL;
+			if(key_slice->stop != Py_None && !_PyEval_SliceIndex(key_slice->stop, &stop))		return NULL;
+
+			if(start < 0 || stop < 0) {
+				/* only get the length for negative values */
+				Py_ssize_t len= (Py_ssize_t)RNA_property_collection_length(&self->ptr, self->prop);
+				if(start < 0) start += len;
+				if(stop < 0) start += len;
+			}
+
+			if (stop - start <= 0) {
+				return PyList_New(0);
+			}
+			else {
+				return pyrna_prop_collection_subscript_slice(self, start, stop);
+			}
 		}
 	}
 	else {
-		PyErr_Format(PyExc_TypeError, "bpy_prop_collection[key]: invalid key, must be a string or an int instead of %.200s instance.", Py_TYPE(key)->tp_name);
+		PyErr_Format(PyExc_TypeError, "bpy_prop_collection[key]: invalid key, must be a string or an int, not %.200s", Py_TYPE(key)->tp_name);
 		return NULL;
 	}
 }
@@ -1538,21 +1692,34 @@ static PyObject *pyrna_prop_array_subscript(BPy_PropertyArrayRNA *self, PyObject
 		return pyrna_prop_array_subscript_int(self, PyLong_AsLong(key));
 	}
 	else if (PySlice_Check(key)) {
-		Py_ssize_t start, stop, step, slicelength;
-		int len = pyrna_prop_array_length(self);
+		Py_ssize_t step= 1;
+		PySliceObject *key_slice= (PySliceObject *)key;
 
-		if (PySlice_GetIndicesEx((PySliceObject*)key, len, &start, &stop, &step, &slicelength) < 0)
+		if(key_slice->step != Py_None && !_PyEval_SliceIndex(key, &step)) {
 			return NULL;
-
-		if (slicelength <= 0) {
-			return PyList_New(0);
 		}
-		else if (step == 1) {
-			return pyrna_prop_array_subscript_slice(self, &self->ptr, self->prop, start, stop, len);
+		else if (step != 1) {
+			PyErr_SetString(PyExc_TypeError, "bpy_prop_array[slice]: slice steps not supported");
+			return NULL;
+		}
+		else if(key_slice->start == Py_None && key_slice->stop == Py_None) {
+			/* note, no significant advantage with optimizing [:] slice as with collections but include here for consistency with collection slice func */
+			Py_ssize_t len= (Py_ssize_t)pyrna_prop_array_length(self);
+			return pyrna_prop_array_subscript_slice(self, &self->ptr, self->prop, 0, len, len);
 		}
 		else {
-			PyErr_SetString(PyExc_TypeError, "bpy_prop_array[slice]: slice steps not supported with rna");
-			return NULL;
+			int len= pyrna_prop_array_length(self);
+			Py_ssize_t start, stop, slicelength;
+
+			if (PySlice_GetIndicesEx((void *)key, len, &start, &stop, &step, &slicelength) < 0)
+				return NULL;
+
+			if (slicelength <= 0) {
+				return PyTuple_New(0);
+			}
+			else {
+				return pyrna_prop_array_subscript_slice(self, &self->ptr, self->prop, start, stop, len);
+			}
 		}
 	}
 	else {
@@ -1570,7 +1737,7 @@ static int prop_subscript_ass_array_slice(PointerRNA *ptr, PropertyRNA *prop, in
 	int ret= 0;
 
 	if(value_orig == NULL) {
-		PyErr_SetString(PyExc_TypeError, "bpy_prop_array[slice] = value: deleting with list types is not supported by bpy_struct.");
+		PyErr_SetString(PyExc_TypeError, "bpy_prop_array[slice] = value: deleting with list types is not supported by bpy_struct");
 		return -1;
 	}
 
@@ -1580,7 +1747,7 @@ static int prop_subscript_ass_array_slice(PointerRNA *ptr, PropertyRNA *prop, in
 
 	if(PySequence_Fast_GET_SIZE(value) != stop-start) {
 		Py_DECREF(value);
-		PyErr_SetString(PyExc_TypeError, "bpy_prop_array[slice] = value: resizing bpy_struct arrays isn't supported.");
+		PyErr_SetString(PyExc_TypeError, "bpy_prop_array[slice] = value: resizing bpy_struct arrays isn't supported");
 		return -1;
 	}
 
@@ -1597,7 +1764,7 @@ static int prop_subscript_ass_array_slice(PointerRNA *ptr, PropertyRNA *prop, in
 			else							{	values= values_stack; }
 			if(start != 0 || stop != length) /* partial assignment? - need to get the array */
 				RNA_property_float_get_array(ptr, prop, values);
-			
+
 			for(count=start; count<stop; count++) {
 				fval = PyFloat_AsDouble(PySequence_Fast_GET_ITEM(value, count-start));
 				CLAMP(fval, min, max);
@@ -1617,7 +1784,7 @@ static int prop_subscript_ass_array_slice(PointerRNA *ptr, PropertyRNA *prop, in
 
 			if(start != 0 || stop != length) /* partial assignment? - need to get the array */
 				RNA_property_boolean_get_array(ptr, prop, values);
-	
+
 			for(count=start; count<stop; count++)
 				values[count] = PyLong_AsLong(PySequence_Fast_GET_ITEM(value, count-start));
 
@@ -1655,11 +1822,11 @@ static int prop_subscript_ass_array_slice(PointerRNA *ptr, PropertyRNA *prop, in
 	}
 
 	Py_DECREF(value);
-	
+
 	if(values_alloc) {
 		PyMem_FREE(values_alloc);
 	}
-	
+
 	return ret;
 
 }
@@ -1700,7 +1867,7 @@ static int pyrna_prop_array_ass_subscript( BPy_PropertyArrayRNA *self, PyObject 
 		int len= RNA_property_array_length(&self->ptr, self->prop);
 		Py_ssize_t start, stop, step, slicelength;
 
-		if (PySlice_GetIndicesEx((PySliceObject*)key, len, &start, &stop, &step, &slicelength) < 0) {
+		if (PySlice_GetIndicesEx((void *)key, len, &start, &stop, &step, &slicelength) < 0) {
 			ret= -1;
 		}
 		else if (slicelength <= 0) {
@@ -1720,7 +1887,9 @@ static int pyrna_prop_array_ass_subscript( BPy_PropertyArrayRNA *self, PyObject 
 	}
 
 	if(ret != -1) {
-		RNA_property_update(BPy_GetContext(), &self->ptr, self->prop);
+		if(RNA_property_update_check(self->prop)) {
+			RNA_property_update(BPy_GetContext(), &self->ptr, self->prop);
+		}
 	}
 
 	return ret;
@@ -1775,7 +1944,7 @@ static int pyrna_prop_collection_contains(BPy_PropertyRNA *self, PyObject *value
 	PointerRNA newptr; /* not used, just so RNA_property_collection_lookup_string runs */
 
 	/* key in dict style check */
-	char *keyname = _PyUnicode_AsString(value);
+	const char *keyname = _PyUnicode_AsString(value);
 
 	if(keyname==NULL) {
 		PyErr_SetString(PyExc_TypeError, "bpy_prop_collection.__contains__: expected a string");
@@ -1791,23 +1960,23 @@ static int pyrna_prop_collection_contains(BPy_PropertyRNA *self, PyObject *value
 static int pyrna_struct_contains(BPy_StructRNA *self, PyObject *value)
 {
 	IDProperty *group;
-	char *name = _PyUnicode_AsString(value);
+	const char *name = _PyUnicode_AsString(value);
 
 	if (!name) {
-		PyErr_SetString( PyExc_TypeError, "bpy_struct.__contains__: expected a string");
+		PyErr_SetString(PyExc_TypeError, "bpy_struct.__contains__: expected a string");
 		return -1;
 	}
 
 	if(RNA_struct_idprops_check(self->ptr.type)==0) {
-		PyErr_SetString( PyExc_TypeError, "bpy_struct: this type doesnt support IDProperties");
+		PyErr_SetString(PyExc_TypeError, "bpy_struct: this type doesnt support IDProperties");
 		return -1;
 	}
 
 	group= RNA_struct_idprops(&self->ptr, 0);
-	
+
 	if(!group)
 		return 0;
-	
+
 	return IDP_GetPropertyFromGroup(group, name) ? 1:0;
 }
 
@@ -1854,29 +2023,29 @@ static PyObject *pyrna_struct_subscript( BPy_StructRNA *self, PyObject *key )
 {
 	/* mostly copied from BPy_IDGroup_Map_GetItem */
 	IDProperty *group, *idprop;
-	char *name= _PyUnicode_AsString(key);
+	const char *name= _PyUnicode_AsString(key);
 
 	if(RNA_struct_idprops_check(self->ptr.type)==0) {
-		PyErr_SetString( PyExc_TypeError, "this type doesn't support IDProperties");
+		PyErr_SetString(PyExc_TypeError, "this type doesn't support IDProperties");
 		return NULL;
 	}
 
 	if(name==NULL) {
-		PyErr_SetString( PyExc_TypeError, "bpy_struct[key]: only strings are allowed as keys of ID properties");
+		PyErr_SetString(PyExc_TypeError, "bpy_struct[key]: only strings are allowed as keys of ID properties");
 		return NULL;
 	}
 
 	group= RNA_struct_idprops(&self->ptr, 0);
 
 	if(group==NULL) {
-		PyErr_Format( PyExc_KeyError, "bpy_struct[key]: key \"%s\" not found", name);
+		PyErr_Format(PyExc_KeyError, "bpy_struct[key]: key \"%s\" not found", name);
 		return NULL;
 	}
 
 	idprop= IDP_GetPropertyFromGroup(group, name);
 
 	if(idprop==NULL) {
-		PyErr_Format( PyExc_KeyError, "bpy_struct[key]: key \"%s\" not found", name);
+		PyErr_Format(PyExc_KeyError, "bpy_struct[key]: key \"%s\" not found", name);
 		return NULL;
 	}
 
@@ -1886,6 +2055,12 @@ static PyObject *pyrna_struct_subscript( BPy_StructRNA *self, PyObject *key )
 static int pyrna_struct_ass_subscript( BPy_StructRNA *self, PyObject *key, PyObject *value )
 {
 	IDProperty *group= RNA_struct_idprops(&self->ptr, 1);
+
+#ifdef USE_PEDANTIC_WRITE
+	if(rna_disallow_writes && rna_id_write_error(&self->ptr, key)) {
+		return -1;
+	}
+#endif // USE_STRING_COERCE
 
 	if(group==NULL) {
 		PyErr_SetString(PyExc_TypeError, "bpy_struct[key] = val: id properties not supported for this type");
@@ -1916,7 +2091,7 @@ static PyObject *pyrna_struct_keys(BPy_PropertyRNA *self)
 	IDProperty *group;
 
 	if(RNA_struct_idprops_check(self->ptr.type)==0) {
-		PyErr_SetString( PyExc_TypeError, "bpy_struct.keys(): this type doesn't support IDProperties");
+		PyErr_SetString(PyExc_TypeError, "bpy_struct.keys(): this type doesn't support IDProperties");
 		return NULL;
 	}
 
@@ -1943,7 +2118,7 @@ static PyObject *pyrna_struct_items(BPy_PropertyRNA *self)
 	IDProperty *group;
 
 	if(RNA_struct_idprops_check(self->ptr.type)==0) {
-		PyErr_SetString( PyExc_TypeError, "bpy_struct.items(): this type doesn't support IDProperties");
+		PyErr_SetString(PyExc_TypeError, "bpy_struct.items(): this type doesn't support IDProperties");
 		return NULL;
 	}
 
@@ -1970,7 +2145,7 @@ static PyObject *pyrna_struct_values(BPy_PropertyRNA *self)
 	IDProperty *group;
 
 	if(RNA_struct_idprops_check(self->ptr.type)==0) {
-		PyErr_SetString( PyExc_TypeError, "bpy_struct.values(): this type doesn't support IDProperties");
+		PyErr_SetString(PyExc_TypeError, "bpy_struct.values(): this type doesn't support IDProperties");
 		return NULL;
 	}
 
@@ -1984,17 +2159,17 @@ static PyObject *pyrna_struct_values(BPy_PropertyRNA *self)
 
 /* for keyframes and drivers */
 static int pyrna_struct_anim_args_parse(PointerRNA *ptr, const char *error_prefix, const char *path,
-	char **path_full, int *index)
+	const char **path_full, int *index)
 {
 	const int is_idbase= RNA_struct_is_ID(ptr->type);
 	PropertyRNA *prop;
 	PointerRNA r_ptr;
-	
+
 	if (ptr->data==NULL) {
 		PyErr_Format(PyExc_TypeError, "%.200s this struct has no data, can't be animated", error_prefix);
 		return -1;
 	}
-	
+
 	/* full paths can only be given from ID base */
 	if(is_idbase) {
 		int r_index= -1;
@@ -2010,13 +2185,13 @@ static int pyrna_struct_anim_args_parse(PointerRNA *ptr, const char *error_prefi
 			return -1;
 		}
 	}
-    else {
+	else {
 		prop = RNA_struct_find_property(ptr, path);
 		r_ptr= *ptr;
-    }
+	}
 
 	if (prop==NULL) {
-		PyErr_Format( PyExc_TypeError, "%.200s property \"%s\" not found", error_prefix, path);
+		PyErr_Format(PyExc_TypeError, "%.200s property \"%s\" not found", error_prefix, path);
 		return -1;
 	}
 
@@ -2037,19 +2212,19 @@ static int pyrna_struct_anim_args_parse(PointerRNA *ptr, const char *error_prefi
 	else {
 		int array_len= RNA_property_array_length(&r_ptr, prop);
 		if((*index) < -1 || (*index) >= array_len) {
-			PyErr_Format( PyExc_TypeError, "%.200s index out of range \"%s\", given %d, array length is %d", error_prefix, path, *index, array_len);
+			PyErr_Format(PyExc_TypeError, "%.200s index out of range \"%s\", given %d, array length is %d", error_prefix, path, *index, array_len);
 			return -1;
 		}
 	}
-	
+
 	if(is_idbase) {
 		*path_full= BLI_strdup(path);
 	}
 	else {
 		*path_full= RNA_path_from_ID_to_property(&r_ptr, prop);
-	
+
 		if (*path_full==NULL) {
-			PyErr_Format( PyExc_TypeError, "%.200s could not make path to \"%s\"", error_prefix, path);
+			PyErr_Format(PyExc_TypeError, "%.200s could not make path to \"%s\"", error_prefix, path);
 			return -1;
 		}
 	}
@@ -2059,18 +2234,18 @@ static int pyrna_struct_anim_args_parse(PointerRNA *ptr, const char *error_prefi
 
 /* internal use for insert and delete */
 static int pyrna_struct_keyframe_parse(PointerRNA *ptr, PyObject *args, PyObject *kw,  const char *parse_str, const char *error_prefix,
-	char **path_full, int *index, float *cfra, char **group_name) /* return values */
+	const char **path_full, int *index, float *cfra, const char **group_name) /* return values */
 {
-	static char *kwlist[] = {"data_path", "index", "frame", "group", NULL};
-	char *path;
+	static const char *kwlist[] = {"data_path", "index", "frame", "group", NULL};
+	const char *path;
 
 	/* note, parse_str MUST start with 's|ifs' */
 	if (!PyArg_ParseTupleAndKeywords(args, kw, parse_str, (char **)kwlist, &path, index, cfra, group_name))
 		return -1;
 
-	if(pyrna_struct_anim_args_parse(ptr, error_prefix, path,  path_full, index) < 0) 
+	if(pyrna_struct_anim_args_parse(ptr, error_prefix, path,  path_full, index) < 0)
 		return -1;
-	
+
 	if(*cfra==FLT_MAX)
 		*cfra= CTX_data_scene(BPy_GetContext())->r.cfra;
 
@@ -2084,31 +2259,40 @@ static char pyrna_struct_keyframe_insert_doc[] =
 "\n"
 "   :arg data_path: path to the property to key, analogous to the fcurve's data path.\n"
 "   :type data_path: string\n"
-"   :arg index: array index of the property to key. Defaults to -1 which will key all indicies or a single channel if the property is not an array.\n"
+"   :arg index: array index of the property to key. Defaults to -1 which will key all indices or a single channel if the property is not an array.\n"
 "   :type index: int\n"
 "   :arg frame: The frame on which the keyframe is inserted, defaulting to the current frame.\n"
 "   :type frame: float\n"
 "   :arg group: The name of the group the F-Curve should be added to if it doesn't exist yet.\n"
 "   :type group: str\n"
 "   :return: Success of keyframe insertion.\n"
-"   :rtype: boolean";
-
+"   :rtype: boolean\n"
+;
 static PyObject *pyrna_struct_keyframe_insert(BPy_StructRNA *self, PyObject *args, PyObject *kw)
 {
-	PyObject *result;
 	/* args, pyrna_struct_keyframe_parse handles these */
-	char *path_full= NULL;
+	const char *path_full= NULL;
 	int index= -1;
 	float cfra= FLT_MAX;
-	char *group_name= NULL;
+	const char *group_name= NULL;
 
-	if(pyrna_struct_keyframe_parse(&self->ptr, args, kw, "s|ifs:bpy_struct.keyframe_insert()", "bpy_struct.keyframe_insert()", &path_full, &index, &cfra, &group_name) == -1)
+	if(pyrna_struct_keyframe_parse(&self->ptr, args, kw, "s|ifs:bpy_struct.keyframe_insert()", "bpy_struct.keyframe_insert()", &path_full, &index, &cfra, &group_name) == -1) {
 		return NULL;
+	}
+	else {
+		short result;
+		ReportList reports;
 
-	result= PyBool_FromLong(insert_keyframe((ID *)self->ptr.id.data, NULL, group_name, path_full, index, cfra, 0));
-	MEM_freeN(path_full);
+		BKE_reports_init(&reports, RPT_STORE);
 
-	return result;
+		result= insert_keyframe(&reports, (ID *)self->ptr.id.data, NULL, group_name, path_full, index, cfra, 0);
+		MEM_freeN((void *)path_full);
+
+		if(BPy_reports_to_error(&reports, TRUE))
+			return NULL;
+
+		return PyBool_FromLong(result);
+	}
 }
 
 static char pyrna_struct_keyframe_delete_doc[] =
@@ -2118,31 +2302,41 @@ static char pyrna_struct_keyframe_delete_doc[] =
 "\n"
 "   :arg data_path: path to the property to remove a key, analogous to the fcurve's data path.\n"
 "   :type data_path: string\n"
-"   :arg index: array index of the property to remove a key. Defaults to -1 removing all indicies or a single channel if the property is not an array.\n"
+"   :arg index: array index of the property to remove a key. Defaults to -1 removing all indices or a single channel if the property is not an array.\n"
 "   :type index: int\n"
 "   :arg frame: The frame on which the keyframe is deleted, defaulting to the current frame.\n"
 "   :type frame: float\n"
 "   :arg group: The name of the group the F-Curve should be added to if it doesn't exist yet.\n"
 "   :type group: str\n"
 "   :return: Success of keyframe deleation.\n"
-"   :rtype: boolean";
-
+"   :rtype: boolean\n"
+;
 static PyObject *pyrna_struct_keyframe_delete(BPy_StructRNA *self, PyObject *args, PyObject *kw)
 {
-	PyObject *result;
 	/* args, pyrna_struct_keyframe_parse handles these */
-	char *path_full= NULL;
+	const char *path_full= NULL;
 	int index= -1;
 	float cfra= FLT_MAX;
-	char *group_name= NULL;
+	const char *group_name= NULL;
 
-	if(pyrna_struct_keyframe_parse(&self->ptr, args, kw, "s|ifs:bpy_struct.keyframe_delete()", "bpy_struct.keyframe_insert()", &path_full, &index, &cfra, &group_name) == -1)
+	if(pyrna_struct_keyframe_parse(&self->ptr, args, kw, "s|ifs:bpy_struct.keyframe_delete()", "bpy_struct.keyframe_insert()", &path_full, &index, &cfra, &group_name) == -1) {
 		return NULL;
+	}
+	else {
+		short result;
+		ReportList reports;
 
-	result= PyBool_FromLong(delete_keyframe((ID *)self->ptr.id.data, NULL, group_name, path_full, index, cfra, 0));
-	MEM_freeN(path_full);
+		BKE_reports_init(&reports, RPT_STORE);
 
-	return result;
+		result= delete_keyframe(&reports, (ID *)self->ptr.id.data, NULL, group_name, path_full, index, cfra, 0);
+		MEM_freeN((void *)path_full);
+
+		if(BPy_reports_to_error(&reports, TRUE))
+			return NULL;
+
+		return PyBool_FromLong(result);
+	}
+
 }
 
 static char pyrna_struct_driver_add_doc[] =
@@ -2152,55 +2346,68 @@ static char pyrna_struct_driver_add_doc[] =
 "\n"
 "   :arg path: path to the property to drive, analogous to the fcurve's data path.\n"
 "   :type path: string\n"
-"   :arg index: array index of the property drive. Defaults to -1 for all indicies or a single channel if the property is not an array.\n"
+"   :arg index: array index of the property drive. Defaults to -1 for all indices or a single channel if the property is not an array.\n"
 "   :type index: int\n"
 "   :return: The driver(s) added.\n"
-"   :rtype: :class:`FCurve` or list if index is -1 with an array property.";
-
+"   :rtype: :class:`FCurve` or list if index is -1 with an array property.\n"
+;
 static PyObject *pyrna_struct_driver_add(BPy_StructRNA *self, PyObject *args)
 {
-	char *path, *path_full;
+	const char *path, *path_full;
 	int index= -1;
-	PyObject *ret;
 
 	if (!PyArg_ParseTuple(args, "s|i:driver_add", &path, &index))
 		return NULL;
 
-	if(pyrna_struct_anim_args_parse(&self->ptr, "bpy_struct.driver_add():", path,  &path_full, &index) < 0) 
+	if(pyrna_struct_anim_args_parse(&self->ptr, "bpy_struct.driver_add():", path,  &path_full, &index) < 0) {
 		return NULL;
+	}
+	else {
+		PyObject *ret= NULL;
+		ReportList reports;
+		int result;
 
-	if(ANIM_add_driver((ID *)self->ptr.id.data, path_full, index, 0, DRIVER_TYPE_PYTHON)) {
-		ID *id= self->ptr.id.data;
-		AnimData *adt= BKE_animdata_from_id(id);
-		FCurve *fcu;
+		BKE_reports_init(&reports, RPT_STORE);
 
-		PointerRNA tptr;
-		PyObject *item;
+		result= ANIM_add_driver(&reports, (ID *)self->ptr.id.data, path_full, index, 0, DRIVER_TYPE_PYTHON);
 
-		if(index == -1) { /* all, use a list */
-			int i= 0;
-			ret= PyList_New(0);
-			while((fcu= list_find_fcurve(&adt->drivers, path_full, i++))) {
+		if(BPy_reports_to_error(&reports, TRUE))
+			return NULL;
+
+		if(result) {
+			ID *id= self->ptr.id.data;
+			AnimData *adt= BKE_animdata_from_id(id);
+			FCurve *fcu;
+
+			PointerRNA tptr;
+			PyObject *item;
+
+			if(index == -1) { /* all, use a list */
+				int i= 0;
+				ret= PyList_New(0);
+				while((fcu= list_find_fcurve(&adt->drivers, path_full, i++))) {
+					RNA_pointer_create(id, &RNA_FCurve, fcu, &tptr);
+					item= pyrna_struct_CreatePyObject(&tptr);
+					PyList_Append(ret, item);
+					Py_DECREF(item);
+				}
+			}
+			else {
+				fcu= list_find_fcurve(&adt->drivers, path_full, index);
 				RNA_pointer_create(id, &RNA_FCurve, fcu, &tptr);
-				item= pyrna_struct_CreatePyObject(&tptr);
-				PyList_Append(ret, item);
-				Py_DECREF(item);
+				ret= pyrna_struct_CreatePyObject(&tptr);
 			}
 		}
 		else {
-			fcu= list_find_fcurve(&adt->drivers, path_full, index);
-			RNA_pointer_create(id, &RNA_FCurve, fcu, &tptr);
-			ret= pyrna_struct_CreatePyObject(&tptr);
+			/* XXX, should be handled by reports, */
+			PyErr_SetString(PyExc_TypeError, "bpy_struct.driver_add(): failed because of an internal error");
+			return NULL;
 		}
-	}
-	else {
-		PyErr_SetString(PyExc_TypeError, "bpy_struct.driver_add(): failed because of an internal error");
-		return NULL;
-	}
 
-	MEM_freeN(path_full);
+		MEM_freeN((void *)path_full);
 
-	return ret;
+		return ret;
+	}
 }
 
 
@@ -2211,28 +2418,37 @@ static char pyrna_struct_driver_remove_doc[] =
 "\n"
 "   :arg path: path to the property to drive, analogous to the fcurve's data path.\n"
 "   :type path: string\n"
-"   :arg index: array index of the property drive. Defaults to -1 for all indicies or a single channel if the property is not an array.\n"
+"   :arg index: array index of the property drive. Defaults to -1 for all indices or a single channel if the property is not an array.\n"
 "   :type index: int\n"
 "   :return: Success of driver removal.\n"
-"   :rtype: boolean";
-
+"   :rtype: boolean\n"
+;
 static PyObject *pyrna_struct_driver_remove(BPy_StructRNA *self, PyObject *args)
 {
-	char *path, *path_full;
+	const char *path, *path_full;
 	int index= -1;
-	PyObject *ret;
 
 	if (!PyArg_ParseTuple(args, "s|i:driver_remove", &path, &index))
 		return NULL;
 
-	if(pyrna_struct_anim_args_parse(&self->ptr, "bpy_struct.driver_remove():", path,  &path_full, &index) < 0) 
+	if(pyrna_struct_anim_args_parse(&self->ptr, "bpy_struct.driver_remove():", path,  &path_full, &index) < 0) {
 		return NULL;
+	}
+	else {
+		short result;
+		ReportList reports;
 
-	ret= PyBool_FromLong(ANIM_remove_driver((ID *)self->ptr.id.data, path_full, index, 0));
+		BKE_reports_init(&reports, RPT_STORE);
 
-	MEM_freeN(path_full);
+		result= ANIM_remove_driver(&reports, (ID *)self->ptr.id.data, path_full, index, 0);
 
-	return ret;
+		MEM_freeN((void *)path_full);
+
+		if(BPy_reports_to_error(&reports, TRUE))
+			return NULL;
+
+		return PyBool_FromLong(result);
+	}
 }
 
 
@@ -2242,12 +2458,12 @@ static char pyrna_struct_is_property_set_doc[] =
 "   Check if a property is set, use for testing operator properties.\n"
 "\n"
 "   :return: True when the property has been set.\n"
-"   :rtype: boolean";
-
+"   :rtype: boolean\n"
+;
 static PyObject *pyrna_struct_is_property_set(BPy_StructRNA *self, PyObject *args)
 {
 	PropertyRNA *prop;
-	char *name;
+	const char *name;
 	int ret;
 
 	if (!PyArg_ParseTuple(args, "s:is_property_set", &name))
@@ -2261,7 +2477,7 @@ static PyObject *pyrna_struct_is_property_set(BPy_StructRNA *self, PyObject *arg
 	/* double property lookup, could speed up */
 	/* return PyBool_FromLong(RNA_property_is_set(&self->ptr, name)); */
 	if(RNA_property_flag(prop) & PROP_IDPROPERTY) {
-		IDProperty *group= RNA_struct_idprops(&self->ptr, 0);		
+		IDProperty *group= RNA_struct_idprops(&self->ptr, 0);
 		if(group) {
 			ret= IDP_GetPropertyFromGroup(group, name) ? 1:0;
 		}
@@ -2272,7 +2488,7 @@ static PyObject *pyrna_struct_is_property_set(BPy_StructRNA *self, PyObject *arg
 	else {
 		ret= 1;
 	}
-	
+
 	return PyBool_FromLong(ret);
 }
 
@@ -2282,12 +2498,12 @@ static char pyrna_struct_is_property_hidden_doc[] =
 "   Check if a property is hidden.\n"
 "\n"
 "   :return: True when the property is hidden.\n"
-"   :rtype: boolean";
-
+"   :rtype: boolean\n"
+;
 static PyObject *pyrna_struct_is_property_hidden(BPy_StructRNA *self, PyObject *args)
 {
 	PropertyRNA *prop;
-	char *name;
+	const char *name;
 
 	if (!PyArg_ParseTuple(args, "s:is_property_hidden", &name))
 		return NULL;
@@ -2308,11 +2524,11 @@ static char pyrna_struct_path_resolve_doc[] =
 "   :arg path: path which this property resolves.\n"
 "   :type path: string\n"
 "   :arg coerce: optional argument, when True, the property will be converted into its python representation.\n"
-"   :type coerce: boolean\n";
-
+"   :type coerce: boolean\n"
+;
 static PyObject *pyrna_struct_path_resolve(BPy_StructRNA *self, PyObject *args)
 {
-	char *path;
+	const char *path;
 	PyObject *coerce= Py_True;
 	PointerRNA r_ptr;
 	PropertyRNA *r_prop;
@@ -2359,12 +2575,12 @@ static char pyrna_struct_path_from_id_doc[] =
 "   :arg property: Optional property name which can be used if the path is to a property of this object.\n"
 "   :type property: string\n"
 "   :return: The path from :class:`bpy_struct.id_data` to this struct and property (when given).\n"
-"   :rtype: str";
-
+"   :rtype: str\n"
+;
 static PyObject *pyrna_struct_path_from_id(BPy_StructRNA *self, PyObject *args)
 {
-	char *name= NULL;
-	char *path;
+	const char *name= NULL;
+	const char *path;
 	PropertyRNA *prop;
 	PyObject *ret;
 
@@ -2391,7 +2607,7 @@ static PyObject *pyrna_struct_path_from_id(BPy_StructRNA *self, PyObject *args)
 	}
 
 	ret= PyUnicode_FromString(path);
-	MEM_freeN(path);
+	MEM_freeN((void *)path);
 
 	return ret;
 }
@@ -2402,11 +2618,11 @@ static char pyrna_prop_path_from_id_doc[] =
 "   Returns the data path from the ID to this property (string).\n"
 "\n"
 "   :return: The path from :class:`bpy_struct.id_data` to this property.\n"
-"   :rtype: str";
-
+"   :rtype: str\n"
+;
 static PyObject *pyrna_prop_path_from_id(BPy_PropertyRNA *self)
 {
-	char *path;
+	const char *path;
 	PropertyRNA *prop = self->prop;
 	PyObject *ret;
 
@@ -2418,7 +2634,7 @@ static PyObject *pyrna_prop_path_from_id(BPy_PropertyRNA *self)
 	}
 
 	ret= PyUnicode_FromString(path);
-	MEM_freeN(path);
+	MEM_freeN((void *)path);
 
 	return ret;
 }
@@ -2429,8 +2645,8 @@ static char pyrna_struct_type_recast_doc[] =
 "   Return a new instance, this is needed because types such as textures can be changed at runtime.\n"
 "\n"
 "   :return: a new instance of this object with the type initialized again.\n"
-"   :rtype: subclass of :class:`bpy_struct`";
-
+"   :rtype: subclass of :class:`bpy_struct`\n"
+;
 static PyObject *pyrna_struct_type_recast(BPy_StructRNA *self)
 {
 	PointerRNA r_ptr;
@@ -2535,17 +2751,29 @@ static PyObject *pyrna_struct_dir(BPy_StructRNA *self)
 
 		BLI_freelistN(&lb);
 	}
+
+	{
+		/* set(), this is needed to remove-doubles because the deferred
+		 * register-props will be in both the python __dict__ and accessed as RNA */
+
+		PyObject *set= PySet_New(ret);
+
+		Py_DECREF(ret);
+		ret= PySequence_List(set);
+		Py_DECREF(set);
+	}
+
 	return ret;
 }
 
 //---------------getattr--------------------------------------------
 static PyObject *pyrna_struct_getattro( BPy_StructRNA *self, PyObject *pyname )
 {
-	char *name = _PyUnicode_AsString(pyname);
+	const char *name = _PyUnicode_AsString(pyname);
 	PyObject *ret;
 	PropertyRNA *prop;
 	FunctionRNA *func;
-	
+
 	if(name == NULL) {
 		PyErr_SetString(PyExc_AttributeError, "bpy_struct: __getattr__ must be a string");
 		ret = NULL;
@@ -2570,7 +2798,7 @@ static PyObject *pyrna_struct_getattro( BPy_StructRNA *self, PyObject *pyname )
 	else if (self->ptr.type == &RNA_Context) {
 		bContext *C = self->ptr.data;
 		if(C==NULL) {
-			PyErr_Format( PyExc_AttributeError, "bpy_struct: Context is 'NULL', can't get \"%.200s\" from context", name);
+			PyErr_Format(PyExc_AttributeError, "bpy_struct: Context is 'NULL', can't get \"%.200s\" from context", name);
 			ret= NULL;
 		}
 		else {
@@ -2595,9 +2823,9 @@ static PyObject *pyrna_struct_getattro( BPy_StructRNA *self, PyObject *pyname )
 					{
 						CollectionPointerLink *link;
 						PyObject *linkptr;
-	
+
 						ret = PyList_New(0);
-	
+
 						for(link=newlb.first; link; link=link->next) {
 							linkptr= pyrna_struct_CreatePyObject(&link->ptr);
 							PyList_Append(ret, linkptr);
@@ -2607,6 +2835,8 @@ static PyObject *pyrna_struct_getattro( BPy_StructRNA *self, PyObject *pyname )
 					break;
 				default:
 					/* should never happen */
+					BLI_assert(!"Invalid context type");
+
 					PyErr_Format(PyExc_AttributeError, "bpy_struct: Context type invalid %d, can't get \"%.200s\" from context", newtype, name);
 					ret= NULL;
 				}
@@ -2625,7 +2855,7 @@ static PyObject *pyrna_struct_getattro( BPy_StructRNA *self, PyObject *pyname )
 	}
 	else {
 #if 0
-		PyErr_Format( PyExc_AttributeError, "bpy_struct: attribute \"%.200s\" not found", name);
+		PyErr_Format(PyExc_AttributeError, "bpy_struct: attribute \"%.200s\" not found", name);
 		ret = NULL;
 #endif
 		/* Include this incase this instance is a subtype of a python class
@@ -2637,7 +2867,7 @@ static PyObject *pyrna_struct_getattro( BPy_StructRNA *self, PyObject *pyname )
 		/* The error raised here will be displayed */
 		ret = PyObject_GenericGetAttr((PyObject *)self, pyname);
 	}
-	
+
 	return ret;
 }
 
@@ -2658,14 +2888,40 @@ static int pyrna_is_deferred_prop(PyObject *value)
 	return PyTuple_CheckExact(value) && PyTuple_GET_SIZE(value)==2 && PyCallable_Check(PyTuple_GET_ITEM(value, 0)) && PyDict_CheckExact(PyTuple_GET_ITEM(value, 1));
 }
 
-static PyObject *pyrna_struct_meta_idprop_getattro(PyObject *cls, PyObject *pyname)
+#if 0
+static PyObject *pyrna_struct_meta_idprop_getattro(PyObject *cls, PyObject *attr)
 {
-	return PyType_Type.tp_getattro(cls, pyname);	
+	PyObject *ret= PyType_Type.tp_getattro(cls, attr);
+
+	/* Allows:
+	 * >>> bpy.types.Scene.foo = BoolProperty()
+	 * >>> bpy.types.Scene.foo
+	 * <bpy_struct, BooleanProperty("foo")>
+	 * ...rather then returning the defered class register tuple as checked by pyrna_is_deferred_prop()
+	 *
+	 * Disable for now, this is faking internal behavior in a way thats too tricky to maintain well. */
+#if 0
+	if(ret == NULL) { // || pyrna_is_deferred_prop(ret)
+		StructRNA *srna= srna_from_self(cls, "StructRNA.__getattr__");
+		if(srna) {
+			PropertyRNA *prop= RNA_struct_type_find_property(srna, _PyUnicode_AsString(attr));
+			if(prop) {
+				PointerRNA tptr;
+				PyErr_Clear(); /* clear error from tp_getattro */
+				RNA_pointer_create(NULL, &RNA_Property, prop, &tptr);
+				ret= pyrna_struct_CreatePyObject(&tptr);
+			}
+		}
+	}
+#endif
+
+	return ret;
 }
+#endif
 
 static int pyrna_struct_meta_idprop_setattro(PyObject *cls, PyObject *attr, PyObject *value)
 {
-	StructRNA *srna= srna_from_self(cls, "");
+	StructRNA *srna= srna_from_self(cls, "StructRNA.__setattr__");
 
 	if(srna == NULL) {
 		if(value && pyrna_is_deferred_prop(value)) {
@@ -2674,7 +2930,7 @@ static int pyrna_struct_meta_idprop_setattro(PyObject *cls, PyObject *attr, PyOb
 		}
 
 		/* srna_from_self may set an error */
-		PyErr_Clear(); 
+		PyErr_Clear();
 		return PyType_Type.tp_setattro(cls, attr, value);
 	}
 
@@ -2682,34 +2938,45 @@ static int pyrna_struct_meta_idprop_setattro(PyObject *cls, PyObject *attr, PyOb
 		/* check if the value is a property */
 		if(pyrna_is_deferred_prop(value)) {
 			int ret= deferred_register_prop(srna, attr, value);
-			if(ret < 0)
+			if(ret == -1) {
+				/* error set */
 				return ret;
-			/* pass through, when the value isn't assigned it still works but gets confusing from script writers POV */
+			}
+
+			/* pass through and assign to the classes __dict__ as well
+			 * when the value isn't assigned it still creates the RNA property
+			 * but gets confusing from script writers POV if the assigned value cant be read back. */
 		}
 		else {
 			/* remove existing property if its set or we also end up with confusement */
-			char *attr_str= _PyUnicode_AsString(attr);
+			const char *attr_str= _PyUnicode_AsString(attr);
 			RNA_def_property_free_identifier(srna, attr_str); /* ignore on failier */
 		}
 	}
 	else { /* __delattr__ */
 		/* first find if this is a registered property */
-		char *attr_str= _PyUnicode_AsString(attr);
+		const char *attr_str= _PyUnicode_AsString(attr);
 		int ret= RNA_def_property_free_identifier(srna, attr_str);
 		if (ret == -1) {
-			PyErr_Format(PyExc_TypeError, "struct_meta_idprop.detattr(): '%s' not a dynamic property.", attr_str);
+			PyErr_Format(PyExc_TypeError, "struct_meta_idprop.detattr(): '%s' not a dynamic property", attr_str);
 			return -1;
 		}
 	}
-	
+
 	/* fallback to standard py, delattr/setattr */
 	return PyType_Type.tp_setattro(cls, attr, value);
 }
-		
+
 static int pyrna_struct_setattro( BPy_StructRNA *self, PyObject *pyname, PyObject *value )
 {
-	char *name = _PyUnicode_AsString(pyname);
+	const char *name = _PyUnicode_AsString(pyname);
 	PropertyRNA *prop= NULL;
+
+#ifdef USE_PEDANTIC_WRITE
+	if(rna_disallow_writes && rna_id_write_error(&self->ptr, pyname)) {
+		return -1;
+	}
+#endif // USE_STRING_COERCE
 
 	if(name == NULL) {
 		PyErr_SetString(PyExc_AttributeError, "bpy_struct: __setattr__ must be a string");
@@ -2717,7 +2984,7 @@ static int pyrna_struct_setattro( BPy_StructRNA *self, PyObject *pyname, PyObjec
 	}
 	else if (name[0] != '_' && (prop= RNA_struct_find_property(&self->ptr, name))) {
 		if (!RNA_property_editable_flag(&self->ptr, prop)) {
-			PyErr_Format( PyExc_AttributeError, "bpy_struct: attribute \"%.200s\" from \"%.200s\" is read-only", RNA_property_identifier(prop), RNA_struct_identifier(self->ptr.type) );
+			PyErr_Format(PyExc_AttributeError, "bpy_struct: attribute \"%.200s\" from \"%.200s\" is read-only", RNA_property_identifier(prop), RNA_struct_identifier(self->ptr.type) );
 			return -1;
 		}
 	}
@@ -2785,7 +3052,7 @@ static PyObject *pyrna_prop_array_getattro( BPy_PropertyRNA *self, PyObject *pyn
 
 static PyObject *pyrna_prop_collection_getattro( BPy_PropertyRNA *self, PyObject *pyname )
 {
-	char *name = _PyUnicode_AsString(pyname);
+	const char *name = _PyUnicode_AsString(pyname);
 
 	if(name == NULL) {
 		PyErr_SetString(PyExc_AttributeError, "bpy_prop_collection: __getattr__ must be a string");
@@ -2820,9 +3087,15 @@ static PyObject *pyrna_prop_collection_getattro( BPy_PropertyRNA *self, PyObject
 //--------------- setattr-------------------------------------------
 static int pyrna_prop_collection_setattro( BPy_PropertyRNA *self, PyObject *pyname, PyObject *value )
 {
-	char *name = _PyUnicode_AsString(pyname);
+	const char *name = _PyUnicode_AsString(pyname);
 	PropertyRNA *prop;
 	PointerRNA r_ptr;
+
+#ifdef USE_PEDANTIC_WRITE
+	if(rna_disallow_writes && rna_id_write_error(&self->ptr, pyname)) {
+		return -1;
+	}
+#endif // USE_STRING_COERCE
 
 	if(name == NULL) {
 		PyErr_SetString(PyExc_AttributeError, "bpy_prop: __setattr__ must be a string");
@@ -2839,7 +3112,7 @@ static int pyrna_prop_collection_setattro( BPy_PropertyRNA *self, PyObject *pyna
 		}
 	}
 
-	PyErr_Format( PyExc_AttributeError, "bpy_prop_collection: attribute \"%.200s\" not found", name);
+	PyErr_Format(PyExc_AttributeError, "bpy_prop_collection: attribute \"%.200s\" not found", name);
 	return -1;
 }
 
@@ -2850,7 +3123,7 @@ static PyObject *pyrna_prop_collection_idprop_add(BPy_PropertyRNA *self)
 
 	RNA_property_collection_add(&self->ptr, self->prop, &r_ptr);
 	if(!r_ptr.data) {
-		PyErr_SetString( PyExc_TypeError, "bpy_prop_collection.add(): not supported for this collection");
+		PyErr_SetString(PyExc_TypeError, "bpy_prop_collection.add(): not supported for this collection");
 		return NULL;
 	}
 	else {
@@ -2863,12 +3136,12 @@ static PyObject *pyrna_prop_collection_idprop_remove(BPy_PropertyRNA *self, PyOb
 	int key= PyLong_AsLong(value);
 
 	if (key==-1 && PyErr_Occurred()) {
-		PyErr_SetString( PyExc_TypeError, "bpy_prop_collection.remove(): expected one int argument");
+		PyErr_SetString(PyExc_TypeError, "bpy_prop_collection.remove(): expected one int argument");
 		return NULL;
 	}
 
 	if(!RNA_property_collection_remove(&self->ptr, self->prop, key)) {
-		PyErr_SetString( PyExc_TypeError, "bpy_prop_collection.remove() not supported for this collection");
+		PyErr_SetString(PyExc_TypeError, "bpy_prop_collection.remove() not supported for this collection");
 		return NULL;
 	}
 
@@ -2880,12 +3153,12 @@ static PyObject *pyrna_prop_collection_idprop_move(BPy_PropertyRNA *self, PyObje
 	int key=0, pos=0;
 
 	if (!PyArg_ParseTuple(args, "ii", &key, &pos)) {
-		PyErr_SetString( PyExc_TypeError, "bpy_prop_collection.move(): expected two ints as arguments");
+		PyErr_SetString(PyExc_TypeError, "bpy_prop_collection.move(): expected two ints as arguments");
 		return NULL;
 	}
 
 	if(!RNA_property_collection_move(&self->ptr, self->prop, key, pos)) {
-		PyErr_SetString( PyExc_TypeError, "bpy_prop_collection.move() not supported for this collection");
+		PyErr_SetString(PyExc_TypeError, "bpy_prop_collection.move() not supported for this collection");
 		return NULL;
 	}
 
@@ -2909,17 +3182,17 @@ static PyObject *pyrna_struct_get_id_data(BPy_DummyPointerRNA *self)
 /*****************************************************************************/
 
 static PyGetSetDef pyrna_prop_getseters[] = {
-	{"id_data", (getter)pyrna_struct_get_id_data, (setter)NULL, "The :class:`ID` object this datablock is from or None, (not available for all data types)", NULL},
+	{(char *)"id_data", (getter)pyrna_struct_get_id_data, (setter)NULL, (char *)"The :class:`ID` object this datablock is from or None, (not available for all data types)", NULL},
 	{NULL,NULL,NULL,NULL,NULL}  /* Sentinel */
 };
 
 
 static PyGetSetDef pyrna_struct_getseters[] = {
-	{"id_data", (getter)pyrna_struct_get_id_data, (setter)NULL, "The :class:`ID` object this datablock is from or None, (not available for all data types)", NULL},
+	{(char *)"id_data", (getter)pyrna_struct_get_id_data, (setter)NULL, (char *)"The :class:`ID` object this datablock is from or None, (not available for all data types)", NULL},
 	{NULL,NULL,NULL,NULL,NULL}  /* Sentinel */
 };
 
-static PyObject *pyrna_prop_keys(BPy_PropertyRNA *self)
+static PyObject *pyrna_prop_collection_keys(BPy_PropertyRNA *self)
 {
 	PyObject *ret= PyList_New(0);
 	PyObject *item;
@@ -2940,11 +3213,11 @@ static PyObject *pyrna_prop_keys(BPy_PropertyRNA *self)
 		}
 	}
 	RNA_PROP_END;
-	
+
 	return ret;
 }
 
-static PyObject *pyrna_prop_items(BPy_PropertyRNA *self)
+static PyObject *pyrna_prop_collection_items(BPy_PropertyRNA *self)
 {
 	PyObject *ret= PyList_New(0);
 	PyObject *item;
@@ -2973,23 +3246,14 @@ static PyObject *pyrna_prop_items(BPy_PropertyRNA *self)
 		}
 	}
 	RNA_PROP_END;
-	
+
 	return ret;
 }
 
-static PyObject *pyrna_prop_values(BPy_PropertyRNA *self)
+static PyObject *pyrna_prop_collection_values(BPy_PropertyRNA *self)
 {
-	PyObject *ret= PyList_New(0);
-	PyObject *item;
-	
-	RNA_PROP_BEGIN(&self->ptr, itemptr, self->prop) {
-		item = pyrna_struct_CreatePyObject(&itemptr);
-		PyList_Append(ret, item);
-		Py_DECREF(item);
-	}
-	RNA_PROP_END;
-
-	return ret;
+	/* re-use slice*/
+	return pyrna_prop_collection_subscript_slice(self, 0, PY_SSIZE_T_MAX);
 }
 
 static char pyrna_struct_get_doc[] =
@@ -3000,15 +3264,15 @@ static char pyrna_struct_get_doc[] =
 "   :arg key: The key assosiated with the custom property.\n"
 "   :type key: string\n"
 "   :arg default: Optional argument for the value to return if *key* is not found.\n"
-// "   :type default: Undefined\n"
+"   :type default: Undefined\n"
 "\n"
-"   .. note:: Only :class:`ID`, :class:`Bone` and :class:`PoseBone` classes support custom properties.\n";
-
+"   .. note:: Only :class:`ID`, :class:`Bone` and :class:`PoseBone` classes support custom properties.\n"
+;
 static PyObject *pyrna_struct_get(BPy_StructRNA *self, PyObject *args)
 {
 	IDProperty *group, *idprop;
 
-	char *key;
+	const char *key;
 	PyObject* def = Py_None;
 
 	if (!PyArg_ParseTuple(args, "s|O:get", &key, &def))
@@ -3016,7 +3280,7 @@ static PyObject *pyrna_struct_get(BPy_StructRNA *self, PyObject *args)
 
 	/* mostly copied from BPy_IDGroup_Map_GetItem */
 	if(RNA_struct_idprops_check(self->ptr.type)==0) {
-		PyErr_SetString( PyExc_TypeError, "this type doesn't support IDProperties");
+		PyErr_SetString(PyExc_TypeError, "this type doesn't support IDProperties");
 		return NULL;
 	}
 
@@ -3039,30 +3303,30 @@ static char pyrna_struct_as_pointer_doc[] =
 "   :return: int (memory address).\n"
 "   :rtype: int\n"
 "\n"
-"   .. note:: This is intended only for advanced script writers who need to pass blender data to their own C/Python modules.\n";
-
+"   .. note:: This is intended only for advanced script writers who need to pass blender data to their own C/Python modules.\n"
+;
 static PyObject *pyrna_struct_as_pointer(BPy_StructRNA *self)
 {
 	return PyLong_FromVoidPtr(self->ptr.data);
 }
 
-static PyObject *pyrna_prop_get(BPy_PropertyRNA *self, PyObject *args)
+static PyObject *pyrna_prop_collection_get(BPy_PropertyRNA *self, PyObject *args)
 {
 	PointerRNA newptr;
-	
-	char *key;
+
+	const char *key;
 	PyObject* def = Py_None;
 
 	if (!PyArg_ParseTuple(args, "s|O:get", &key, &def))
 		return NULL;
-	
+
 	if(RNA_property_collection_lookup_string(&self->ptr, self->prop, key, &newptr))
 		return pyrna_struct_CreatePyObject(&newptr);
 
 	return Py_INCREF(def), def;
 }
 
-static void foreach_attr_type(	BPy_PropertyRNA *self, char *attr,
+static void foreach_attr_type(	BPy_PropertyRNA *self, const char *attr,
 									/* values to assign */
 									RawPropertyType *raw_type, int *attr_tot, int *attr_signed )
 {
@@ -3082,12 +3346,12 @@ static void foreach_attr_type(	BPy_PropertyRNA *self, char *attr,
 	RNA_PROP_END;
 }
 
-/* pyrna_prop_foreach_get/set both use this */
+/* pyrna_prop_collection_foreach_get/set both use this */
 static int foreach_parse_args(
 		BPy_PropertyRNA *self, PyObject *args,
 
 		/*values to assign */
-		char **attr, PyObject **seq, int *tot, int *size, RawPropertyType *raw_type, int *attr_tot, int *attr_signed)
+		const char **attr, PyObject **seq, int *tot, int *size, RawPropertyType *raw_type, int *attr_tot, int *attr_signed)
 {
 #if 0
 	int array_tot;
@@ -3098,11 +3362,11 @@ static int foreach_parse_args(
 	*raw_type= PROP_RAW_UNSET;
 
 	if(!PyArg_ParseTuple(args, "sO", attr, seq) || (!PySequence_Check(*seq) && PyObject_CheckBuffer(*seq))) {
-		PyErr_SetString( PyExc_TypeError, "foreach_get(attr, sequence) expects a string and a sequence" );
+		PyErr_SetString(PyExc_TypeError, "foreach_get(attr, sequence) expects a string and a sequence");
 		return -1;
 	}
 
-	*tot= PySequence_Length(*seq); // TODO - buffer may not be a sequence! array.array() is tho.
+	*tot= PySequence_Size(*seq); // TODO - buffer may not be a sequence! array.array() is tho.
 
 	if(*tot>0) {
 		foreach_attr_type(self, *attr, raw_type, attr_tot, attr_signed);
@@ -3122,7 +3386,7 @@ static int foreach_parse_args(
 
 		/* rna_access.c - rna_raw_access(...) uses this same method */
 		if(target_tot != (*tot)) {
-			PyErr_Format( PyExc_TypeError, "foreach_get(attr, sequence) sequence length mismatch given %d, needed %d", *tot, target_tot);
+			PyErr_Format(PyExc_TypeError, "foreach_get(attr, sequence) sequence length mismatch given %d, needed %d", *tot, target_tot);
 			return -1;
 		}
 #endif
@@ -3131,7 +3395,7 @@ static int foreach_parse_args(
 	/* check 'attr_tot' otherwise we dont know if any values were set
 	 * this isnt ideal because it means running on an empty list may fail silently when its not compatible. */
 	if (*size == 0 && *attr_tot != 0) {
-		PyErr_SetString( PyExc_AttributeError, "attribute does not support foreach method" );
+		PyErr_SetString(PyExc_AttributeError, "attribute does not support foreach method");
 		return -1;
 	}
 	return 0;
@@ -3169,7 +3433,7 @@ static PyObject *foreach_getset(BPy_PropertyRNA *self, PyObject *args, int set)
 	void *array= NULL;
 
 	/* get/set both take the same args currently */
-	char *attr;
+	const char *attr;
 	PyObject *seq;
 	int tot, size, attr_tot, attr_signed;
 	RawPropertyType raw_type;
@@ -3223,6 +3487,7 @@ static PyObject *foreach_getset(BPy_PropertyRNA *self, PyObject *args, int set)
 					break;
 				case PROP_RAW_UNSET:
 					/* should never happen */
+					BLI_assert(!"Invalid array type - set");
 					break;
 				}
 
@@ -3277,6 +3542,7 @@ static PyObject *foreach_getset(BPy_PropertyRNA *self, PyObject *args, int set)
 					break;
 				case PROP_RAW_UNSET:
 					/* should never happen */
+					BLI_assert(!"Invalid array type - get");
 					break;
 				}
 
@@ -3292,37 +3558,63 @@ static PyObject *foreach_getset(BPy_PropertyRNA *self, PyObject *args, int set)
 	if(PyErr_Occurred()) {
 		/* Maybe we could make our own error */
 		PyErr_Print();
-		PyErr_SetString(PyExc_SystemError, "could not access the py sequence");
+		PyErr_SetString(PyExc_TypeError, "could not access the py sequence");
 		return NULL;
 	}
 	if (!ok) {
-		PyErr_SetString(PyExc_SystemError, "internal error setting the array");
+		PyErr_SetString(PyExc_RuntimeError, "internal error setting the array");
 		return NULL;
 	}
 
 	Py_RETURN_NONE;
 }
 
-static PyObject *pyrna_prop_foreach_get(BPy_PropertyRNA *self, PyObject *args)
+static char pyrna_prop_collection_foreach_get_doc[] =
+".. method:: foreach_get(attr, seq)\n"
+"\n"
+"   This is a function to give fast access to attribites within a collection.\n"
+"\n"
+"   .. code-block:: python\n"
+"\n"
+"      collection.foreach_get(someseq, attr)\n"
+"\n"
+"      # Python equivelent\n"
+"      for i in range(len(seq)): someseq[i] = getattr(collection, attr)\n"
+"\n"
+;
+static PyObject *pyrna_prop_collection_foreach_get(BPy_PropertyRNA *self, PyObject *args)
 {
 	return foreach_getset(self, args, 0);
 }
 
-static  PyObject *pyrna_prop_foreach_set(BPy_PropertyRNA *self, PyObject *args)
+static char pyrna_prop_collection_foreach_set_doc[] =
+".. method:: foreach_set(attr, seq)\n"
+"\n"
+"   This is a function to give fast access to attribites within a collection.\n"
+"\n"
+"   .. code-block:: python\n"
+"\n"
+"      collection.foreach_set(seq, attr)\n"
+"\n"
+"      # Python equivelent\n"
+"      for i in range(len(seq)): setattr(collection[i], attr, seq[i])\n"
+"\n"
+;
+static  PyObject *pyrna_prop_collection_foreach_set(BPy_PropertyRNA *self, PyObject *args)
 {
 	return foreach_getset(self, args, 1);
 }
 
 /* A bit of a kludge, make a list out of a collection or array,
  * then return the lists iter function, not especially fast but convenient for now */
-PyObject *pyrna_prop_array_iter(BPy_PropertyArrayRNA *self)
+static PyObject *pyrna_prop_array_iter(BPy_PropertyArrayRNA *self)
 {
 	/* Try get values from a collection */
 	PyObject *ret;
 	PyObject *iter= NULL;
 	int len= pyrna_prop_array_length(self);
 	ret = pyrna_prop_array_subscript_slice(self, &self->ptr, self->prop, 0, len, len);
-	
+
 	/* we know this is a list so no need to PyIter_Check
 	 * otherwise it could be NULL (unlikely) if conversion failed */
 	if(ret) {
@@ -3333,13 +3625,13 @@ PyObject *pyrna_prop_array_iter(BPy_PropertyArrayRNA *self)
 	return iter;
 }
 
-PyObject *pyrna_prop_collection_iter(BPy_PropertyRNA *self)
+static PyObject *pyrna_prop_collection_iter(BPy_PropertyRNA *self)
 {
 	/* Try get values from a collection */
 	PyObject *ret;
 	PyObject *iter= NULL;
-	ret = pyrna_prop_values(self);
-	
+	ret= pyrna_prop_collection_values(self);
+
 	/* we know this is a list so no need to PyIter_Check
 	 * otherwise it could be NULL (unlikely) if conversion failed */
 	if(ret) {
@@ -3389,14 +3681,14 @@ static struct PyMethodDef pyrna_prop_array_methods[] = {
 };
 
 static struct PyMethodDef pyrna_prop_collection_methods[] = {
-	{"foreach_get", (PyCFunction)pyrna_prop_foreach_get, METH_VARARGS, NULL},
-	{"foreach_set", (PyCFunction)pyrna_prop_foreach_set, METH_VARARGS, NULL},
+	{"foreach_get", (PyCFunction)pyrna_prop_collection_foreach_get, METH_VARARGS, pyrna_prop_collection_foreach_get_doc},
+	{"foreach_set", (PyCFunction)pyrna_prop_collection_foreach_set, METH_VARARGS, pyrna_prop_collection_foreach_set_doc},
 
-	{"keys", (PyCFunction)pyrna_prop_keys, METH_NOARGS, NULL},
-	{"items", (PyCFunction)pyrna_prop_items, METH_NOARGS,NULL},
-	{"values", (PyCFunction)pyrna_prop_values, METH_NOARGS, NULL},
-	
-	{"get", (PyCFunction)pyrna_prop_get, METH_VARARGS, NULL},
+	{"keys", (PyCFunction)pyrna_prop_collection_keys, METH_NOARGS, NULL},
+	{"items", (PyCFunction)pyrna_prop_collection_items, METH_NOARGS,NULL},
+	{"values", (PyCFunction)pyrna_prop_collection_values, METH_NOARGS, NULL},
+
+	{"get", (PyCFunction)pyrna_prop_collection_get, METH_VARARGS, NULL},
 	{NULL, NULL, 0, NULL}
 };
 
@@ -3409,23 +3701,42 @@ static struct PyMethodDef pyrna_prop_collection_idprop_methods[] = {
 
 /* only needed for subtyping, so a new class gets a valid BPy_StructRNA
  * todo - also accept useful args */
-static PyObject * pyrna_struct_new(PyTypeObject *type, PyObject *args, PyObject *UNUSED(kwds)) {
+static PyObject * pyrna_struct_new(PyTypeObject *type, PyObject *args, PyObject *UNUSED(kwds))
+{
+	if(PyTuple_GET_SIZE(args) == 1) {
+		BPy_StructRNA *base= (BPy_StructRNA *)PyTuple_GET_ITEM(args, 0);
+		if (type == Py_TYPE(base)) {
+			Py_INCREF(base);
+			return (PyObject *)base;
+		}
+		else if (PyType_IsSubtype(type, &pyrna_struct_Type)) {
+			/* this almost never runs, only when using user defined subclasses of built-in object.
+			 * this isnt common since its NOT related to registerable subclasses. eg:
 
-	BPy_StructRNA *base;
-	
-	if (!PyArg_ParseTuple(args, "O!:bpy_struct.__new__", &pyrna_struct_Type, &base))
+				>>> class MyObSubclass(bpy.types.Object):
+				...     def test_func(self):
+				...         print(100)
+				... 
+				>>> myob = MyObSubclass(bpy.context.object)
+				>>> myob.test_func()
+				100
+			 * 
+			 * Keep this since it could be useful.
+			 */
+			BPy_StructRNA *ret;
+			if((ret= (BPy_StructRNA *)type->tp_alloc(type, 0))) {
+				ret->ptr = base->ptr;
+			}
+			/* pass on exception & NULL if tp_alloc fails */
+			return (PyObject *)ret;
+		}
+
+		/* error, invalid type given */
+		PyErr_Format(PyExc_TypeError, "bpy_struct.__new__(type): type '%.200s' is not a subtype of bpy_struct", type->tp_name);
 		return NULL;
-
-	if (type == Py_TYPE(base)) {
-		Py_INCREF(base);
-		return (PyObject *)base;
-	} else if (PyType_IsSubtype(type, &pyrna_struct_Type)) {
-		BPy_StructRNA *ret = (BPy_StructRNA *) type->tp_alloc(type, 0);
-		ret->ptr = base->ptr;
-		return (PyObject *)ret;
 	}
 	else {
-		PyErr_Format(PyExc_TypeError, "bpy_struct.__new__(type): type '%.200s' is not a subtype of bpy_struct.", type->tp_name);
+		PyErr_Format(PyExc_TypeError, "bpy_struct.__new__(type): expected a single argument");
 		return NULL;
 	}
 }
@@ -3435,10 +3746,10 @@ static PyObject * pyrna_struct_new(PyTypeObject *type, PyObject *args, PyObject 
 static PyObject * pyrna_prop_new(PyTypeObject *type, PyObject *args, PyObject *UNUSED(kwds)) {
 
 	BPy_PropertyRNA *base;
-	
+
 	if (!PyArg_ParseTuple(args, "O!:bpy_prop.__new__", &pyrna_prop_Type, &base))
 		return NULL;
-	
+
 	if (type == Py_TYPE(base)) {
 		Py_INCREF(base);
 		return (PyObject *)base;
@@ -3449,12 +3760,12 @@ static PyObject * pyrna_prop_new(PyTypeObject *type, PyObject *args, PyObject *U
 		return (PyObject *)ret;
 	}
 	else {
-		PyErr_Format(PyExc_TypeError, "bpy_prop.__new__(type): type '%.200s' is not a subtype of bpy_prop.", type->tp_name);
+		PyErr_Format(PyExc_TypeError, "bpy_prop.__new__(type): type '%.200s' is not a subtype of bpy_prop", type->tp_name);
 		return NULL;
 	}
 }
 
-PyObject *pyrna_param_to_py(PointerRNA *ptr, PropertyRNA *prop, void *data)
+static PyObject *pyrna_param_to_py(PointerRNA *ptr, PropertyRNA *prop, void *data)
 {
 	PyObject *ret;
 	int type = RNA_property_type(prop);
@@ -3488,6 +3799,7 @@ PyObject *pyrna_param_to_py(PointerRNA *ptr, PropertyRNA *prop, void *data)
 			break;
 		case PROP_FLOAT:
 			switch(RNA_property_subtype(prop)) {
+#ifdef USE_MATHUTILS
 				case PROP_ALL_VECTOR_SUBTYPES:
 					ret= newVectorObject(data, len, Py_NEW, NULL);
 					break;
@@ -3501,6 +3813,7 @@ PyObject *pyrna_param_to_py(PointerRNA *ptr, PropertyRNA *prop, void *data)
 						break;
 					}
 					/* pass through */
+#endif
 				default:
 					ret = PyTuple_New(len);
 					for(a=0; a<len; a++)
@@ -3562,21 +3875,21 @@ PyObject *pyrna_param_to_py(PointerRNA *ptr, PropertyRNA *prop, void *data)
 		case PROP_POINTER:
 		{
 			PointerRNA newptr;
-			StructRNA *type= RNA_property_pointer_type(ptr, prop);
+			StructRNA *ptype= RNA_property_pointer_type(ptr, prop);
 
 			if(flag & PROP_RNAPTR) {
 				/* in this case we get the full ptr */
 				newptr= *(PointerRNA*)data;
 			}
 			else {
-				if(RNA_struct_is_ID(type)) {
+				if(RNA_struct_is_ID(ptype)) {
 					RNA_id_pointer_create(*(void**)data, &newptr);
 				} else {
 					/* note: this is taken from the function's ID pointer
 					 * and will break if a function returns a pointer from
 					 * another ID block, watch this! - it should at least be
 					 * easy to debug since they are all ID's */
-					RNA_pointer_create(ptr->id.data, type, *(void**)data, &newptr);
+					RNA_pointer_create(ptr->id.data, ptype, *(void**)data, &newptr);
 				}
 			}
 
@@ -3632,16 +3945,28 @@ static PyObject * pyrna_func_call(PyObject *self, PyObject *args, PyObject *kw)
 	void *retdata_single= NULL;
 
 	/* Should never happen but it does in rare cases */
+	BLI_assert(self_ptr != NULL);
+
 	if(self_ptr==NULL) {
 		PyErr_SetString(PyExc_RuntimeError, "rna functions internal rna pointer is NULL, this is a bug. aborting");
 		return NULL;
 	}
-	
+
 	if(self_func==NULL) {
 		PyErr_Format(PyExc_RuntimeError, "%.200s.<unknown>(): rna function internal function is NULL, this is a bug. aborting", RNA_struct_identifier(self_ptr->type));
 		return NULL;
 	}
-	
+
+	/* for testing */
+	/*
+	{
+		const char *fn;
+		int lineno;
+		PyC_FileAndNum(&fn, &lineno);
+		printf("pyrna_func_call > %.200s.%.200s : %.200s:%d\n", RNA_struct_identifier(self_ptr->type), RNA_function_identifier(self_func), fn, lineno);
+	}
+	*/
+
 	/* include the ID pointer for pyrna_param_to_py() so we can include the
 	 * ID pointer on return values, this only works when returned values have
 	 * the same ID as the functions. */
@@ -3722,7 +4047,7 @@ static PyObject * pyrna_func_call(PyObject *self, PyObject *args, PyObject *kw)
 			break;
 		}
 	}
-	
+
 	RNA_parameter_list_end(&iter);
 
 	/* Check if we gave args that dont exist in the function
@@ -3737,7 +4062,7 @@ static PyObject * pyrna_func_call(PyObject *self, PyObject *args, PyObject *kw)
 		DynStr *bad_args= BLI_dynstr_new();
 		DynStr *good_args= BLI_dynstr_new();
 
-		char *arg_name, *bad_args_str, *good_args_str;
+		const char *arg_name, *bad_args_str, *good_args_str;
 		int found= FALSE, first= TRUE;
 
 		while (PyDict_Next(kw, &pos, &key, &value)) {
@@ -3790,8 +4115,8 @@ static PyObject * pyrna_func_call(PyObject *self, PyObject *args, PyObject *kw)
 
 		BLI_dynstr_free(bad_args);
 		BLI_dynstr_free(good_args);
-		MEM_freeN(bad_args_str);
-		MEM_freeN(good_args_str);
+		MEM_freeN((void *)bad_args_str);
+		MEM_freeN((void *)good_args_str);
 
 		err= -1;
 	}
@@ -3805,8 +4130,7 @@ static PyObject * pyrna_func_call(PyObject *self, PyObject *args, PyObject *kw)
 		BKE_reports_init(&reports, RPT_STORE);
 		RNA_function_call(C, &reports, self_ptr, self_func, &parms);
 
-		err= (BPy_reports_to_error(&reports))? -1: 0;
-		BKE_reports_clear(&reports);
+		err= (BPy_reports_to_error(&reports, TRUE))? -1: 0;
 
 		/* return value */
 		if(err==0) {
@@ -3875,7 +4199,7 @@ PyTypeObject pyrna_struct_meta_idprop_Type = {
 	NULL,						/* hashfunc tp_hash; */
 	NULL,						/* ternaryfunc tp_call; */
 	NULL,						/* reprfunc tp_str; */
-	(getattrofunc) pyrna_struct_meta_idprop_getattro,	/* getattrofunc tp_getattro; */
+	NULL /*(getattrofunc) pyrna_struct_meta_idprop_getattro*/,	/* getattrofunc tp_getattro; */
 	(setattrofunc) pyrna_struct_meta_idprop_setattro,	/* setattrofunc tp_setattro; */
 
 	/* Functions to access object as input/output buffer */
@@ -3883,6 +4207,50 @@ PyTypeObject pyrna_struct_meta_idprop_Type = {
 
   /*** Flags to define presence of optional/expanded features ***/
 	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,         /* long tp_flags; */
+
+	NULL,						/*  char *tp_doc;  Documentation string */
+  /*** Assigned meaning in release 2.0 ***/
+	/* call function for all accessible objects */
+	NULL,                       /* traverseproc tp_traverse; */
+
+	/* delete references to contained objects */
+	NULL,                       /* inquiry tp_clear; */
+
+  /***  Assigned meaning in release 2.1 ***/
+  /*** rich comparisons ***/
+	NULL,	/* richcmpfunc tp_richcompare; */
+
+  /***  weak reference enabler ***/
+	0,                          /* long tp_weaklistoffset; */
+
+  /*** Added in release 2.2 ***/
+	/*   Iterators */
+	NULL,                       /* getiterfunc tp_iter; */
+	NULL,                       /* iternextfunc tp_iternext; */
+
+  /*** Attribute descriptor and subclassing stuff ***/
+	NULL,						/* struct PyMethodDef *tp_methods; */
+	NULL,                       /* struct PyMemberDef *tp_members; */
+	NULL,						/* struct PyGetSetDef *tp_getset; */
+	NULL,                       /* struct _typeobject *tp_base; */
+	NULL,                       /* PyObject *tp_dict; */
+	NULL,                       /* descrgetfunc tp_descr_get; */
+	NULL,                       /* descrsetfunc tp_descr_set; */
+	0,                          /* long tp_dictoffset; */
+	NULL,                       /* initproc tp_init; */
+	NULL,                       /* allocfunc tp_alloc; */
+	NULL,						/* newfunc tp_new; */
+	/*  Low-level free-memory routine */
+	NULL,                       /* freefunc tp_free;  */
+	/* For PyObject_IS_GC */
+	NULL,                       /* inquiry tp_is_gc;  */
+	NULL,                       /* PyObject *tp_bases; */
+	/* method resolution order */
+	NULL,                       /* PyObject *tp_mro;  */
+	NULL,                       /* PyObject *tp_cache; */
+	NULL,                       /* PyObject *tp_subclasses; */
+	NULL,                       /* PyObject *tp_weaklist; */
+	NULL
 };
 
 
@@ -3890,10 +4258,10 @@ PyTypeObject pyrna_struct_meta_idprop_Type = {
 PyTypeObject pyrna_struct_Type = {
 	PyVarObject_HEAD_INIT(NULL, 0)
 	"bpy_struct",			/* tp_name */
-	sizeof( BPy_StructRNA ),	/* tp_basicsize */
+	sizeof(BPy_StructRNA),	/* tp_basicsize */
 	0,			/* tp_itemsize */
 	/* methods */
-	( destructor ) pyrna_struct_dealloc,/* tp_dealloc */
+	(destructor) pyrna_struct_dealloc,/* tp_dealloc */
 	NULL,                       /* printfunc tp_print; */
 	NULL,						/* getattrfunc tp_getattr; */
 	NULL,						/* setattrfunc tp_setattr; */
@@ -3933,8 +4301,11 @@ PyTypeObject pyrna_struct_Type = {
 	(richcmpfunc)pyrna_struct_richcmp,	/* richcmpfunc tp_richcompare; */
 
   /***  weak reference enabler ***/
-	0,                          /* long tp_weaklistoffset; */
-
+#ifdef USE_WEAKREFS
+	offsetof(BPy_StructRNA, in_weakreflist),	/* long tp_weaklistoffset; */
+#else
+	0,
+#endif
   /*** Added in release 2.2 ***/
 	/*   Iterators */
 	NULL,                       /* getiterfunc tp_iter; */
@@ -3969,11 +4340,11 @@ PyTypeObject pyrna_struct_Type = {
 PyTypeObject pyrna_prop_Type = {
 	PyVarObject_HEAD_INIT(NULL, 0)
 	"bpy_prop",		/* tp_name */
-	sizeof( BPy_PropertyRNA ),			/* tp_basicsize */
+	sizeof(BPy_PropertyRNA),			/* tp_basicsize */
 	0,			/* tp_itemsize */
 	/* methods */
-	NULL,						/* tp_dealloc */
-	NULL,                   /* printfunc tp_print; */
+	(destructor) pyrna_prop_dealloc, /* tp_dealloc */
+	NULL,						/* printfunc tp_print; */
 	NULL,						/* getattrfunc tp_getattr; */
 	NULL,                       /* setattrfunc tp_setattr; */
 	NULL,						/* tp_compare */ /* DEPRECATED in python 3.0! */
@@ -4014,7 +4385,11 @@ PyTypeObject pyrna_prop_Type = {
 	(richcmpfunc)pyrna_prop_richcmp,	/* richcmpfunc tp_richcompare; */
 
   /***  weak reference enabler ***/
-	0,                          /* long tp_weaklistoffset; */
+#ifdef USE_WEAKREFS
+	offsetof(BPy_PropertyRNA, in_weakreflist),	/* long tp_weaklistoffset; */
+#else
+	0,
+#endif
 
   /*** Added in release 2.2 ***/
 	/*   Iterators */
@@ -4049,10 +4424,10 @@ PyTypeObject pyrna_prop_Type = {
 PyTypeObject pyrna_prop_array_Type = {
 	PyVarObject_HEAD_INIT(NULL, 0)
 	"bpy_prop_array",		/* tp_name */
-	sizeof( BPy_PropertyArrayRNA ),			/* tp_basicsize */
-	0,			/* tp_itemsize */
+	sizeof(BPy_PropertyArrayRNA),			/* tp_basicsize */
+	0,							/* tp_itemsize */
 	/* methods */
-	NULL,						/* tp_dealloc */
+	(destructor)pyrna_prop_array_dealloc, /* tp_dealloc */
 	NULL,                       /* printfunc tp_print; */
 	NULL,						/* getattrfunc tp_getattr; */
 	NULL,                       /* setattrfunc tp_setattr; */
@@ -4094,8 +4469,11 @@ PyTypeObject pyrna_prop_array_Type = {
 	NULL, /* subclassed */		/* richcmpfunc tp_richcompare; */
 
   /***  weak reference enabler ***/
-	0,                          /* long tp_weaklistoffset; */
-
+#ifdef USE_WEAKREFS
+	offsetof(BPy_PropertyArrayRNA, in_weakreflist),	/* long tp_weaklistoffset; */
+#else
+	0,
+#endif
   /*** Added in release 2.2 ***/
 	/*   Iterators */
 	(getiterfunc)pyrna_prop_array_iter,	/* getiterfunc tp_iter; */
@@ -4129,10 +4507,10 @@ PyTypeObject pyrna_prop_array_Type = {
 PyTypeObject pyrna_prop_collection_Type = {
 	PyVarObject_HEAD_INIT(NULL, 0)
 	"bpy_prop_collection",		/* tp_name */
-	sizeof( BPy_PropertyRNA ),			/* tp_basicsize */
+	sizeof(BPy_PropertyRNA),			/* tp_basicsize */
 	0,			/* tp_itemsize */
 	/* methods */
-	NULL,						/* tp_dealloc */
+	(destructor)pyrna_prop_dealloc, /* tp_dealloc */
 	NULL,                       /* printfunc tp_print; */
 	NULL,						/* getattrfunc tp_getattr; */
 	NULL,                       /* setattrfunc tp_setattr; */
@@ -4174,7 +4552,11 @@ PyTypeObject pyrna_prop_collection_Type = {
 	NULL, /* subclassed */		/* richcmpfunc tp_richcompare; */
 
   /***  weak reference enabler ***/
-	0,                          /* long tp_weaklistoffset; */
+#ifdef USE_WEAKREFS
+	offsetof(BPy_PropertyRNA, in_weakreflist),	/* long tp_weaklistoffset; */
+#else
+	0,
+#endif
 
   /*** Added in release 2.2 ***/
 	/*   Iterators */
@@ -4207,13 +4589,13 @@ PyTypeObject pyrna_prop_collection_Type = {
 };
 
 /* only for add/remove/move methods */
-PyTypeObject pyrna_prop_collection_idprop_Type = {
+static PyTypeObject pyrna_prop_collection_idprop_Type = {
 	PyVarObject_HEAD_INIT(NULL, 0)
 	"bpy_prop_collection_idprop",		/* tp_name */
-	sizeof( BPy_PropertyRNA ),			/* tp_basicsize */
-	0,			/* tp_itemsize */
+	sizeof(BPy_PropertyRNA),			/* tp_basicsize */
+	0,							/* tp_itemsize */
 	/* methods */
-	NULL,						/* tp_dealloc */
+	(destructor)pyrna_prop_dealloc, /* tp_dealloc */
 	NULL,                       /* printfunc tp_print; */
 	NULL,						/* getattrfunc tp_getattr; */
 	NULL,                       /* setattrfunc tp_setattr; */
@@ -4255,7 +4637,11 @@ PyTypeObject pyrna_prop_collection_idprop_Type = {
 	NULL, /* subclassed */		/* richcmpfunc tp_richcompare; */
 
   /***  weak reference enabler ***/
-	0,                          /* long tp_weaklistoffset; */
+#ifdef USE_WEAKREFS
+	offsetof(BPy_PropertyRNA, in_weakreflist),	/* long tp_weaklistoffset; */
+#else
+	0,
+#endif
 
   /*** Added in release 2.2 ***/
 	/*   Iterators */
@@ -4351,7 +4737,7 @@ static PyObject* pyrna_srna_ExternalType(StructRNA *srna)
 	PyObject *newclass;
 
 	if(bpy_types_dict==NULL) {
-		PyObject *bpy_types= PyImport_ImportModuleLevel("bpy_types", NULL, NULL, NULL, 0);
+		PyObject *bpy_types= PyImport_ImportModuleLevel((char *)"bpy_types", NULL, NULL, NULL, 0);
 
 		if(bpy_types==NULL) {
 			PyErr_Print();
@@ -4436,7 +4822,7 @@ static PyObject* pyrna_srna_Subtype(StructRNA *srna)
 		}
 
 		/* always use O not N when calling, N causes refcount errors */
-		newclass = PyObject_CallFunction(metaclass, "s(O){sss()}", idname, py_base, "__module__","bpy.types", "__slots__");
+		newclass = PyObject_CallFunction(metaclass, (char *)"s(O){sss()}", idname, py_base, "__module__","bpy.types", "__slots__");
 
 		/* newclass will now have 2 ref's, ???, probably 1 is internal since decrefing here segfaults */
 
@@ -4496,11 +4882,14 @@ PyObject *pyrna_struct_CreatePyObject( PointerRNA *ptr )
 		else {
 			fprintf(stderr, "Could not make type\n");
 			pyrna = ( BPy_StructRNA * ) PyObject_NEW( BPy_StructRNA, &pyrna_struct_Type );
+#ifdef USE_WEAKREFS
+			pyrna->in_weakreflist= NULL;
+#endif
 		}
 	}
 
 	if( !pyrna ) {
-		PyErr_SetString( PyExc_MemoryError, "couldn't create bpy_struct object" );
+		PyErr_SetString(PyExc_MemoryError, "couldn't create bpy_struct object");
 		return NULL;
 	}
 	
@@ -4532,15 +4921,21 @@ PyObject *pyrna_prop_CreatePyObject( PointerRNA *ptr, PropertyRNA *prop )
 		}
 
 		pyrna = (BPy_PropertyRNA *) PyObject_NEW(BPy_PropertyRNA, type);
+#ifdef USE_WEAKREFS
+		pyrna->in_weakreflist= NULL;
+#endif
 	}
 	else {
 		pyrna = (BPy_PropertyRNA *) PyObject_NEW(BPy_PropertyArrayRNA, &pyrna_prop_array_Type);
 		((BPy_PropertyArrayRNA *)pyrna)->arraydim= 0;
 		((BPy_PropertyArrayRNA *)pyrna)->arrayoffset= 0;
+#ifdef USE_WEAKREFS
+		((BPy_PropertyArrayRNA *)pyrna)->in_weakreflist= NULL;
+#endif
 	}
 
 	if( !pyrna ) {
-		PyErr_SetString( PyExc_MemoryError, "couldn't create BPy_rna object" );
+		PyErr_SetString(PyExc_MemoryError, "couldn't create BPy_rna object");
 		return NULL;
 	}
 	
@@ -4620,20 +5015,16 @@ static PyObject *pyrna_basetype_getattro( BPy_BaseTypeRNA *self, PyObject *pynam
 {
 	PointerRNA newptr;
 	PyObject *ret;
-	char *name= _PyUnicode_AsString(pyname);
+	const char *name= _PyUnicode_AsString(pyname);
 
 	if(name == NULL) {
 		PyErr_SetString(PyExc_AttributeError, "bpy.types: __getattr__ must be a string");
 		ret = NULL;
 	}
-	else if(strcmp(name, "register")==0) {
-		/* this is called so often, make an exception and save a full lookup on all types */
-		ret= PyObject_GenericGetAttr((PyObject *)self, pyname);
-	}
 	else if (RNA_property_collection_lookup_string(&self->ptr, self->prop, name, &newptr)) {
 		ret= pyrna_struct_Subtype(&newptr);
 		if (ret==NULL) {
-			PyErr_Format(PyExc_SystemError, "bpy.types.%.200s subtype could not be generated, this is a bug!", _PyUnicode_AsString(pyname));
+			PyErr_Format(PyExc_RuntimeError, "bpy.types.%.200s subtype could not be generated, this is a bug!", _PyUnicode_AsString(pyname));
 		}
 	}
 	else {
@@ -4649,33 +5040,35 @@ static PyObject *pyrna_basetype_getattro( BPy_BaseTypeRNA *self, PyObject *pynam
 }
 
 static PyObject *pyrna_basetype_dir(BPy_BaseTypeRNA *self);
-static PyObject *pyrna_basetype_register(PyObject *self, PyObject *py_class);
-static PyObject *pyrna_basetype_unregister(PyObject *self, PyObject *py_class);
+static PyObject *pyrna_register_class(PyObject *self, PyObject *py_class);
+static PyObject *pyrna_unregister_class(PyObject *self, PyObject *py_class);
 
 static struct PyMethodDef pyrna_basetype_methods[] = {
 	{"__dir__", (PyCFunction)pyrna_basetype_dir, METH_NOARGS, ""},
-	{"register", (PyCFunction)pyrna_basetype_register, METH_O, ""},
-	{"unregister", (PyCFunction)pyrna_basetype_unregister, METH_O, ""},
 	{NULL, NULL, 0, NULL}
 };
 
 static PyObject *pyrna_basetype_dir(BPy_BaseTypeRNA *self)
 {
-	PyObject *list, *name;
+	PyObject *list;
+#if 0
+	PyObject *name;
 	PyMethodDef *meth;
-	
-	list= pyrna_prop_keys(self); /* like calling structs.keys(), avoids looping here */
+#endif
 
+	list= pyrna_prop_collection_keys(self); /* like calling structs.keys(), avoids looping here */
+
+#if 0 /* for now only contains __dir__ */
 	for(meth=pyrna_basetype_methods; meth->ml_name; meth++) {
 		name = PyUnicode_FromString(meth->ml_name);
 		PyList_Append(list, name);
 		Py_DECREF(name);
 	}
-	
+#endif
 	return list;
 }
 
-PyTypeObject pyrna_basetype_Type = BLANK_PYTHON_TYPE;
+static PyTypeObject pyrna_basetype_Type = BLANK_PYTHON_TYPE;
 
 PyObject *BPY_rna_types(void)
 {
@@ -4683,7 +5076,7 @@ PyObject *BPY_rna_types(void)
 
 	if ((pyrna_basetype_Type.tp_flags & Py_TPFLAGS_READY)==0)  {
 		pyrna_basetype_Type.tp_name = "RNA_Types";
-		pyrna_basetype_Type.tp_basicsize = sizeof( BPy_BaseTypeRNA );
+		pyrna_basetype_Type.tp_basicsize = sizeof(BPy_BaseTypeRNA);
 		pyrna_basetype_Type.tp_getattro = ( getattrofunc )pyrna_basetype_getattro;
 		pyrna_basetype_Type.tp_flags = Py_TPFLAGS_DEFAULT;
 		pyrna_basetype_Type.tp_methods = pyrna_basetype_methods;
@@ -4697,7 +5090,9 @@ PyObject *BPY_rna_types(void)
 	/* avoid doing this lookup for every getattr */
 	RNA_blender_rna_pointer_create(&self->ptr);
 	self->prop = RNA_struct_find_property(&self->ptr, "structs");
-
+#ifdef USE_WEAKREFS
+	self->in_weakreflist= NULL;
+#endif
 	return (PyObject *)self;
 }
 
@@ -4720,18 +5115,18 @@ StructRNA *pyrna_struct_as_srna(PyObject *self, int parent, const char *error_pr
 	}
 
 	if(py_srna==NULL) {
-		 PyErr_Format(PyExc_SystemError, "%.200s, missing bl_rna attribute from '%.200s' instance (may not be registered)", error_prefix, Py_TYPE(self)->tp_name);
+		 PyErr_Format(PyExc_RuntimeError, "%.200s, missing bl_rna attribute from '%.200s' instance (may not be registered)", error_prefix, Py_TYPE(self)->tp_name);
 		return NULL;
 	}
 
 	if(!BPy_StructRNA_Check(py_srna)) {
-		 PyErr_Format(PyExc_SystemError, "%.200s, bl_rna attribute wrong type '%.200s' on '%.200s'' instance", error_prefix, Py_TYPE(py_srna)->tp_name, Py_TYPE(self)->tp_name);
+		 PyErr_Format(PyExc_TypeError, "%.200s, bl_rna attribute wrong type '%.200s' on '%.200s'' instance", error_prefix, Py_TYPE(py_srna)->tp_name, Py_TYPE(self)->tp_name);
 		 Py_DECREF(py_srna);
 		return NULL;
 	}
 
 	if(py_srna->ptr.type != &RNA_Struct) {
-		PyErr_Format(PyExc_SystemError, "%.200s, bl_rna attribute not a RNA_Struct, on '%.200s'' instance", error_prefix, Py_TYPE(self)->tp_name);
+		PyErr_Format(PyExc_TypeError, "%.200s, bl_rna attribute not a RNA_Struct, on '%.200s'' instance", error_prefix, Py_TYPE(self)->tp_name);
 		 Py_DECREF(py_srna);
 		return NULL;
 	}
@@ -4744,12 +5139,10 @@ StructRNA *pyrna_struct_as_srna(PyObject *self, int parent, const char *error_pr
 
 /* Orphan functions, not sure where they should go */
 /* get the srna for methods attached to types */
-/* */
+/*
+ * Caller needs to raise error.*/
 StructRNA *srna_from_self(PyObject *self, const char *error_prefix)
 {
-	/* a bit sloppy but would cause a very confusing bug if
-	 * an error happened to be set here */
-	PyErr_Clear();
 
 	if(self==NULL) {
 		return NULL;
@@ -4760,10 +5153,24 @@ StructRNA *srna_from_self(PyObject *self, const char *error_prefix)
 	else if (PyType_Check(self)==0) {
 		return NULL;
 	}
-	/* These cases above not errors, they just mean the type was not compatible
-	 * After this any errors will be raised in the script */
+	else {
+		/* These cases above not errors, they just mean the type was not compatible
+		 * After this any errors will be raised in the script */
 
-	return pyrna_struct_as_srna(self, 0, error_prefix);
+		PyObject *error_type, *error_value, *error_traceback;
+		StructRNA *srna;
+
+		PyErr_Fetch(&error_type, &error_value, &error_traceback);
+		PyErr_Clear();
+
+		srna= pyrna_struct_as_srna(self, 0, error_prefix);
+
+		if(!PyErr_Occurred()) {
+			PyErr_Restore(error_type, error_value, error_traceback);
+		}
+
+		return srna;
+	}
 }
 
 static int deferred_register_prop(StructRNA *srna, PyObject *key, PyObject *item)
@@ -4823,7 +5230,7 @@ static int pyrna_deferred_register_props(StructRNA *srna, PyObject *class_dict)
 	PyObject *item, *key;
 	PyObject *order;
 	Py_ssize_t pos = 0;
-	int ret;
+	int ret= 0;
 
 	/* in both cases PyDict_CheckExact(class_dict) will be true even
 	 * though Operators have a metaclass dict namespace */
@@ -4833,7 +5240,7 @@ static int pyrna_deferred_register_props(StructRNA *srna, PyObject *class_dict)
 			key= PyList_GET_ITEM(order, pos);
 			item= PyDict_GetItem(class_dict, key);
 			ret= deferred_register_prop(srna, key, item);
-			if(ret==-1)
+			if(ret != 0)
 				break;
 		}
 	}
@@ -4841,12 +5248,12 @@ static int pyrna_deferred_register_props(StructRNA *srna, PyObject *class_dict)
 		while (PyDict_Next(class_dict, &pos, &key, &item)) {
 			ret= deferred_register_prop(srna, key, item);
 
-			if(ret==-1)
+			if(ret != 0)
 				break;
 		}
 	}
 
-	return 0;
+	return ret;
 }
 
 static int pyrna_deferred_register_class_recursive(StructRNA *srna, PyTypeObject *py_class)
@@ -4928,13 +5335,13 @@ static int bpy_class_validate(PointerRNA *dummyptr, void *py_data, int *have_fun
 
 	if (base_class) {
 		if (!PyObject_IsSubclass(py_class, base_class)) {
-			PyErr_Format( PyExc_TypeError, "expected %.200s subclass of class \"%.200s\"", class_type, py_class_name);
+			PyErr_Format(PyExc_TypeError, "expected %.200s subclass of class \"%.200s\"", class_type, py_class_name);
 			return -1;
 		}
 	}
 
 	/* verify callback functions */
-	lb= RNA_struct_defined_functions(srna);
+	lb= RNA_struct_type_functions(srna);
 	i= 0;
 	for(link=lb->first; link; link=link->next) {
 		func= (FunctionRNA*)link;
@@ -4950,7 +5357,7 @@ static int bpy_class_validate(PointerRNA *dummyptr, void *py_data, int *have_fun
 
 		if (item==NULL) {
 			if ((flag & FUNC_REGISTER_OPTIONAL)==0) {
-				PyErr_Format( PyExc_AttributeError, "expected %.200s, %.200s class to have an \"%.200s\" attribute", class_type, py_class_name, RNA_function_identifier(func));
+				PyErr_Format(PyExc_AttributeError, "expected %.200s, %.200s class to have an \"%.200s\" attribute", class_type, py_class_name, RNA_function_identifier(func));
 				return -1;
 			}
 
@@ -4960,14 +5367,14 @@ static int bpy_class_validate(PointerRNA *dummyptr, void *py_data, int *have_fun
 			Py_DECREF(item); /* no need to keep a ref, the class owns it (technically we should keep a ref but...) */
 			if(flag & FUNC_NO_SELF) {
 				if (PyMethod_Check(item)==0) {
-					PyErr_Format( PyExc_TypeError, "expected %.200s, %.200s class \"%.200s\" attribute to be a method, not a %.200s", class_type, py_class_name, RNA_function_identifier(func), Py_TYPE(item)->tp_name);
+					PyErr_Format(PyExc_TypeError, "expected %.200s, %.200s class \"%.200s\" attribute to be a method, not a %.200s", class_type, py_class_name, RNA_function_identifier(func), Py_TYPE(item)->tp_name);
 					return -1;
 				}
 				item= ((PyMethodObject *)item)->im_func;
 			}
 			else {
 				if (PyFunction_Check(item)==0) {
-					PyErr_Format( PyExc_TypeError, "expected %.200s, %.200s class \"%.200s\" attribute to be a function, not a %.200s", class_type, py_class_name, RNA_function_identifier(func), Py_TYPE(item)->tp_name);
+					PyErr_Format(PyExc_TypeError, "expected %.200s, %.200s class \"%.200s\" attribute to be a function, not a %.200s", class_type, py_class_name, RNA_function_identifier(func), Py_TYPE(item)->tp_name);
 					return -1;
 				}
 			}
@@ -4985,7 +5392,7 @@ static int bpy_class_validate(PointerRNA *dummyptr, void *py_data, int *have_fun
 					func_arg_count++;
 
 				if (arg_count != func_arg_count) {
-					PyErr_Format( PyExc_AttributeError, "expected %.200s, %.200s class \"%.200s\" function to have %d args, found %d", class_type, py_class_name, RNA_function_identifier(func), func_arg_count, arg_count);
+					PyErr_Format(PyExc_ValueError, "expected %.200s, %.200s class \"%.200s\" function to have %d args, found %d", class_type, py_class_name, RNA_function_identifier(func), func_arg_count, arg_count);
 					return -1;
 				}
 			}
@@ -4993,7 +5400,7 @@ static int bpy_class_validate(PointerRNA *dummyptr, void *py_data, int *have_fun
 	}
 
 	/* verify properties */
-	lb= RNA_struct_defined_properties(srna);
+	lb= RNA_struct_type_properties(srna);
 	for(link=lb->first; link; link=link->next) {
 		const char *identifier;
 		prop= (PropertyRNA*)link;
@@ -5012,7 +5419,7 @@ static int bpy_class_validate(PointerRNA *dummyptr, void *py_data, int *have_fun
 			if(strcmp(identifier, rna_attr) == 0) { \
 				item= PyObject_GetAttrString(py_class, py_attr); \
 				if(item && item != Py_None) { \
-					if(pyrna_py_to_prop(dummyptr, prop, NULL, item, "validating class error:") != 0) { \
+					if(pyrna_py_to_prop(dummyptr, prop, NULL, item, "validating class:") != 0) { \
 						Py_DECREF(item); \
 						return -1; \
 					} \
@@ -5027,7 +5434,7 @@ static int bpy_class_validate(PointerRNA *dummyptr, void *py_data, int *have_fun
 #undef		BPY_REPLACEMENT_STRING
 
 			if (item == NULL && (((flag & PROP_REGISTER_OPTIONAL) != PROP_REGISTER_OPTIONAL))) {
-				PyErr_Format( PyExc_AttributeError, "expected %.200s, %.200s class to have an \"%.200s\" attribute", class_type, py_class_name, identifier);
+				PyErr_Format(PyExc_AttributeError, "expected %.200s, %.200s class to have an \"%.200s\" attribute", class_type, py_class_name, identifier);
 				return -1;
 			}
 
@@ -5036,7 +5443,7 @@ static int bpy_class_validate(PointerRNA *dummyptr, void *py_data, int *have_fun
 		else {
 			Py_DECREF(item); /* no need to keep a ref, the class owns it */
 
-			if(pyrna_py_to_prop(dummyptr, prop, NULL, item, "validating class error:") != 0)
+			if(pyrna_py_to_prop(dummyptr, prop, NULL, item, "validating class:") != 0)
 				return -1;
 		}
 	}
@@ -5044,13 +5451,12 @@ static int bpy_class_validate(PointerRNA *dummyptr, void *py_data, int *have_fun
 	return 0;
 }
 
-extern void BPY_update_modules( void ); //XXX temp solution
-
 /* TODO - multiple return values like with rna functions */
-static int bpy_class_call(PointerRNA *ptr, FunctionRNA *func, ParameterList *parms)
+static int bpy_class_call(bContext *C, PointerRNA *ptr, FunctionRNA *func, ParameterList *parms)
 {
 	PyObject *args;
-	PyObject *ret= NULL, *py_srna= NULL, *py_class, *py_class_instance= NULL, *parmitem;
+	PyObject *ret= NULL, *py_srna= NULL, *py_class_instance= NULL, *parmitem;
+	PyTypeObject *py_class;
 	void **py_class_instance_store= NULL;
 	PropertyRNA *parm;
 	ParameterIterator iter;
@@ -5063,7 +5469,11 @@ static int bpy_class_call(PointerRNA *ptr, FunctionRNA *func, ParameterList *par
 
 	PyGILState_STATE gilstate;
 
-	bContext *C= BPy_GetContext(); // XXX - NEEDS FIXING, QUITE BAD.
+#ifdef USE_PEDANTIC_WRITE
+	const char *func_id= RNA_function_identifier(func);
+	/* testing, for correctness, not operator and not draw function */
+	const short is_readonly= strstr("draw", func_id) || /*strstr("render", func_id) ||*/ !RNA_struct_is_a(ptr->type, &RNA_Operator);
+#endif
 	
 	py_class= RNA_struct_py_type_get(ptr->type);
 	
@@ -5072,6 +5482,11 @@ static int bpy_class_call(PointerRNA *ptr, FunctionRNA *func, ParameterList *par
 		fprintf(stderr, "bpy_class_call(): unable to get python class for rna struct '%.200s'\n", RNA_struct_identifier(ptr->type));
 		return -1;
 	}
+
+	/* XXX, this is needed because render engine calls without a context
+	 * this should be supported at some point but at the moment its not! */
+	if(C==NULL)
+		C= BPy_GetContext();
 
 	bpy_context_set(C, &gilstate);
 
@@ -5106,11 +5521,39 @@ static int bpy_class_call(PointerRNA *ptr, FunctionRNA *func, ParameterList *par
 			py_class_instance = NULL;
 		}
 		else {
+#if 1
+			/* Skip the code below and call init directly on the allocated 'py_srna'
+			 * otherwise __init__() always needs to take a second self argument, see pyrna_struct_new().
+			 * Although this is annoying to have to impliment a part of pythons typeobject.c:type_call().
+			 */
+			if(py_class->tp_init) {
+				/* true in most cases even when the class its self doesnt define an __init__ function. */
+				args = PyTuple_New(0);
+		        if (py_class->tp_init(py_srna, args, NULL) < 0) {
+		            Py_DECREF(py_srna);
+		            py_srna= NULL;
+					/* err set below */
+				}
+				Py_DECREF(args);
+			}
+
+			py_class_instance= py_srna;
+
+#else
+			/* 'almost' all the time calling the class isnt needed.
+			 * We could just do...
+			py_class_instance = py_srna;
+			Py_INCREF(py_class_instance);
+			 * This would work fine but means __init__ functions wouldnt run.
+			 * none of blenders default scripts use __init__ but its nice to call it
+			 * for general correctness. just to note why this is here when it could be safely removed.
+			 */
 			args = PyTuple_New(1);
 			PyTuple_SET_ITEM(args, 0, py_srna);
 			py_class_instance= PyObject_Call(py_class, args, NULL);
 			Py_DECREF(args);
-			
+
+#endif		
 			if(py_class_instance == NULL) {
 				err= -1; /* so the error is not overridden below */
 			}
@@ -5121,8 +5564,8 @@ static int bpy_class_call(PointerRNA *ptr, FunctionRNA *func, ParameterList *par
 		}
 	}
 
-	if (is_static || py_class_instance) { /* Initializing the class worked, now run its invoke function */
-		PyObject *item= PyObject_GetAttrString(py_class, RNA_function_identifier(func));
+	if (err != -1 && (is_static || py_class_instance)) { /* Initializing the class worked, now run its invoke function */
+		PyObject *item= PyObject_GetAttrString((PyObject *)py_class, RNA_function_identifier(func));
 //		flag= RNA_function_flag(func);
 
 		if(item) {
@@ -5161,7 +5604,18 @@ static int bpy_class_call(PointerRNA *ptr, FunctionRNA *func, ParameterList *par
 				i++;
 			}
 
+#ifdef USE_PEDANTIC_WRITE
+			rna_disallow_writes= is_readonly ? TRUE:FALSE;	
+#endif
+			/* *** Main Caller *** */
+			
 			ret = PyObject_Call(item, args, NULL);
+
+			/* *** Done Calling *** */
+
+#ifdef USE_PEDANTIC_WRITE
+			rna_disallow_writes= FALSE;
+#endif
 
 			RNA_parameter_list_end(&iter);
 			Py_DECREF(item);
@@ -5170,14 +5624,14 @@ static int bpy_class_call(PointerRNA *ptr, FunctionRNA *func, ParameterList *par
 		else {
 			PyErr_Print();
 			PyErr_Clear();
-			PyErr_Format(PyExc_TypeError, "could not find function %.200s in %.200s to execute callback.", RNA_function_identifier(func), RNA_struct_identifier(ptr->type));
+			PyErr_Format(PyExc_TypeError, "could not find function %.200s in %.200s to execute callback", RNA_function_identifier(func), RNA_struct_identifier(ptr->type));
 			err= -1;
 		}
 	}
 	else {
 		/* the error may be alredy set if the class instance couldnt be created */
 		if(err != -1) {
-			PyErr_Format(PyExc_RuntimeError, "could not create instance of %.200s to call callback function %.200s.", RNA_struct_identifier(ptr->type), RNA_function_identifier(func));
+			PyErr_Format(PyExc_RuntimeError, "could not create instance of %.200s to call callback function %.200s", RNA_struct_identifier(ptr->type), RNA_function_identifier(func));
 			err= -1;
 		}
 	}
@@ -5187,7 +5641,7 @@ static int bpy_class_call(PointerRNA *ptr, FunctionRNA *func, ParameterList *par
 	}
 	else {
 		if(ret_len==0 && ret != Py_None) {
-			PyErr_Format(PyExc_RuntimeError, "expected class %.200s, function %.200s to return None, got a %.200s type instead.", RNA_struct_identifier(ptr->type), RNA_function_identifier(func), Py_TYPE(ret)->tp_name);
+			PyErr_Format(PyExc_RuntimeError, "expected class %.200s, function %.200s to return None, not %.200s", RNA_struct_identifier(ptr->type), RNA_function_identifier(func), Py_TYPE(ret)->tp_name);
 			err= -1;
 		}
 		else if(ret_len==1) {
@@ -5196,11 +5650,11 @@ static int bpy_class_call(PointerRNA *ptr, FunctionRNA *func, ParameterList *par
 		else if (ret_len > 1) {
 
 			if(PyTuple_Check(ret)==0) {
-				PyErr_Format(PyExc_RuntimeError, "expected class %.200s, function %.200s to return a tuple of size %d, got a %.200s type instead.", RNA_struct_identifier(ptr->type), RNA_function_identifier(func), ret_len, Py_TYPE(ret)->tp_name);
+				PyErr_Format(PyExc_RuntimeError, "expected class %.200s, function %.200s to return a tuple of size %d, not %.200s", RNA_struct_identifier(ptr->type), RNA_function_identifier(func), ret_len, Py_TYPE(ret)->tp_name);
 				err= -1;
 			}
 			else if (PyTuple_GET_SIZE(ret) != ret_len) {
-				PyErr_Format(PyExc_RuntimeError, "class %.200s, function %.200s to returned %d items, expected %d.", RNA_struct_identifier(ptr->type), RNA_function_identifier(func), PyTuple_GET_SIZE(ret), ret_len);
+				PyErr_Format(PyExc_RuntimeError, "class %.200s, function %.200s to returned %d items, expected %d", RNA_struct_identifier(ptr->type), RNA_function_identifier(func), PyTuple_GET_SIZE(ret), ret_len);
 				err= -1;
 			}
 			else {
@@ -5227,6 +5681,20 @@ static int bpy_class_call(PointerRNA *ptr, FunctionRNA *func, ParameterList *par
 	}
 
 	if(err != 0) {
+		ReportList *reports;
+		/* alert the user, else they wont know unless they see the console. */
+		if (!is_static && ptr->data && RNA_struct_is_a(ptr->type, &RNA_Operator)) {
+			wmOperator *op= ptr->data;
+			reports= op->reports;
+		}
+		else {
+			/* wont alert users but they can view in 'info' space */
+			reports= CTX_wm_reports(C);
+		}
+
+		BPy_errors_to_report(reports);
+
+		/* also print in the console for py */
 		PyErr_Print();
 		PyErr_Clear();
 	}
@@ -5251,12 +5719,13 @@ static void bpy_class_free(void *pyob_ptr)
 	if(PyErr_Occurred())
 		PyErr_Clear();
 
+#if 0 /* needs further investigation, too annoying so quiet for now */
 	if(G.f&G_DEBUG) {
 		if(self->ob_refcnt > 1) {
 			PyC_ObSpit("zombie class - ref should be 1", self);
 		}
 	}
-
+#endif
 	Py_DECREF((PyObject *)pyob_ptr);
 
 	PyGILState_Release(gilstate);
@@ -5327,8 +5796,16 @@ void pyrna_free_types(void)
  * the decref. This is not so bad because the leak only happens when re-registering (hold F8)
  * - Should still be fixed - Campbell
  * */
-
-static PyObject *pyrna_basetype_register(PyObject *UNUSED(self), PyObject *py_class)
+static char pyrna_register_class_doc[] =
+".. method:: register_class(cls)\n"
+"\n"
+"   Register a subclass of a blender type in (:class:`Panel`, :class:`Menu`, :class:`Header`, :class:`Operator`, :class:`KeyingSetInfo`, :class:`RenderEngine`).\n"
+"\n"
+"   .. note:: :exc:`ValueError` exception is raised if the class is not a subclass of a registerable blender class.\n"
+"\n"
+;
+PyMethodDef meth_bpy_register_class = {"register_class", pyrna_register_class, METH_O, pyrna_register_class_doc};
+static PyObject *pyrna_register_class(PyObject *UNUSED(self), PyObject *py_class)
 {
 	bContext *C= NULL;
 	ReportList reports;
@@ -5338,19 +5815,19 @@ static PyObject *pyrna_basetype_register(PyObject *UNUSED(self), PyObject *py_cl
 	const char *identifier;
 
 	if(PyDict_GetItemString(((PyTypeObject*)py_class)->tp_dict, "bl_rna")) {
-		PyErr_SetString(PyExc_AttributeError, "bpy.types.register(...): already registered as a subclass.");
+		PyErr_SetString(PyExc_AttributeError, "register_class(...): already registered as a subclass");
 		return NULL;
 	}
 
 	/* warning: gets parent classes srna, only for the register function */
-	srna= pyrna_struct_as_srna(py_class, 1, "bpy.types.register(...):");
+	srna= pyrna_struct_as_srna(py_class, 1, "register_class(...):");
 	if(srna==NULL)
 		return NULL;
 	
 	/* fails in cases, cant use this check but would like to :| */
 	/*
 	if(RNA_struct_py_type_get(srna)) {
-		PyErr_Format(PyExc_ValueError, "bpy.types.register(...): %.200s's parent class %.200s is alredy registered, this is not allowed.", ((PyTypeObject*)py_class)->tp_name, RNA_struct_identifier(srna));
+		PyErr_Format(PyExc_ValueError, "register_class(...): %.200s's parent class %.200s is alredy registered, this is not allowed", ((PyTypeObject*)py_class)->tp_name, RNA_struct_identifier(srna));
 		return NULL;
 	}
 	*/
@@ -5359,7 +5836,7 @@ static PyObject *pyrna_basetype_register(PyObject *UNUSED(self), PyObject *py_cl
 	reg= RNA_struct_register(srna);
 
 	if(!reg) {
-		PyErr_Format(PyExc_ValueError, "bpy.types.register(...): expected a subclass of a registerable rna type (%.200s does not support registration).", RNA_struct_identifier(srna));
+		PyErr_Format(PyExc_ValueError, "register_class(...): expected a subclass of a registerable rna type (%.200s does not support registration)", RNA_struct_identifier(srna));
 		return NULL;
 	}
 	
@@ -5373,13 +5850,13 @@ static PyObject *pyrna_basetype_register(PyObject *UNUSED(self), PyObject *py_cl
 
 	srna_new= reg(C, &reports, py_class, identifier, bpy_class_validate, bpy_class_call, bpy_class_free);
 
-	if(!srna_new) {
-		BPy_reports_to_error(&reports);
-		BKE_reports_clear(&reports);
+	if(BPy_reports_to_error(&reports, TRUE))
 		return NULL;
-	}
 
-	BKE_reports_clear(&reports);
+	/* python errors validating are not converted into reports so the check above will fail.
+	 * the cause for returning NULL will be printed as an error */
+	if(srna_new == NULL)
+		return NULL;
 
 	pyrna_subtype_set_rna(py_class, srna_new); /* takes a ref to py_class */
 
@@ -5402,30 +5879,35 @@ static PyObject *pyrna_basetype_register(PyObject *UNUSED(self), PyObject *py_cl
 
 static int pyrna_srna_contains_pointer_prop_srna(StructRNA *srna_props, StructRNA *srna, const char **prop_identifier)
 {
-	PointerRNA tptr;
-	PropertyRNA *iterprop;
-	RNA_pointer_create(NULL, &RNA_Struct, srna_props, &tptr);
-	
-	iterprop= RNA_struct_find_property(&tptr, "properties");
+	PropertyRNA *prop;
+	LinkData *link;
 
-	RNA_PROP_BEGIN(&tptr, itemptr, iterprop) {
-		PropertyRNA *prop= itemptr.data;
-		if(RNA_property_type(prop) == PROP_POINTER) {
-			if (strcmp(RNA_property_identifier(prop), "rna_type") == 0) {
-				/* pass */
-			}
-			else if(RNA_property_pointer_type(&tptr, prop) == srna) {
+	/* verify properties */
+	const ListBase *lb= RNA_struct_type_properties(srna);
+
+	for(link=lb->first; link; link=link->next) {
+		prop= (PropertyRNA*)link;
+		if(RNA_property_type(prop) == PROP_POINTER && !(RNA_property_flag(prop) & PROP_BUILTIN)) {
+			PointerRNA tptr;
+			RNA_pointer_create(NULL, &RNA_Struct, srna_props, &tptr);
+
+			if(RNA_property_pointer_type(&tptr, prop) == srna) {
 				*prop_identifier= RNA_property_identifier(prop);
 				return 1;
 			}
 		}
 	}
-	RNA_PROP_END;
-	
+
 	return 0;
 }
 
-static PyObject *pyrna_basetype_unregister(PyObject *UNUSED(self), PyObject *py_class)
+static char pyrna_unregister_class_doc[] =
+".. method:: unregister_class(cls)\n"
+"\n"
+"   Unload the python class from blender.\n"
+;
+PyMethodDef meth_bpy_unregister_class = {"unregister_class", pyrna_unregister_class, METH_O, pyrna_unregister_class_doc};
+static PyObject *pyrna_unregister_class(PyObject *UNUSED(self), PyObject *py_class)
 {
 	bContext *C= NULL;
 	StructUnregisterFunc unreg;
@@ -5433,11 +5915,11 @@ static PyObject *pyrna_basetype_unregister(PyObject *UNUSED(self), PyObject *py_
 
 	/*if(PyDict_GetItemString(((PyTypeObject*)py_class)->tp_dict, "bl_rna")==NULL) {
 		PWM_cursor_wait(0);
-		PyErr_SetString(PyExc_ValueError, "bpy.types.unregister(): not a registered as a subclass.");
+		PyErr_SetString(PyExc_ValueError, "unregister_class(): not a registered as a subclass");
 		return NULL;
 	}*/
 
-	srna= pyrna_struct_as_srna(py_class, 0, "bpy.types.unregister(...):");
+	srna= pyrna_struct_as_srna(py_class, 0, "unregister_class(...):");
 	if(srna==NULL)
 		return NULL;
 	
@@ -5445,7 +5927,7 @@ static PyObject *pyrna_basetype_unregister(PyObject *UNUSED(self), PyObject *py_
 	unreg= RNA_struct_unregister(srna);
 
 	if(!unreg) {
-		PyErr_SetString(PyExc_ValueError, "bpy.types.unregister(...): expected a Type subclassed from a registerable rna type (no unregister supported).");
+		PyErr_SetString(PyExc_ValueError, "unregister_class(...): expected a Type subclassed from a registerable rna type (no unregister supported)");
 		return NULL;
 	}
 	
@@ -5472,7 +5954,7 @@ static PyObject *pyrna_basetype_unregister(PyObject *UNUSED(self), PyObject *py_
 		RNA_PROP_END;
 		
 		if(prop_identifier) {
-			PyErr_Format(PyExc_SystemError, "bpy.types.unregister(...): Cant unregister %s because %s.%s pointer property is using this.", RNA_struct_identifier(srna), RNA_struct_identifier(srna_iter), prop_identifier);
+			PyErr_Format(PyExc_RuntimeError, "unregister_class(...): can't unregister %s because %s.%s pointer property is using this", RNA_struct_identifier(srna), RNA_struct_identifier(srna_iter), prop_identifier);
 			return NULL;
 		}		
 	}

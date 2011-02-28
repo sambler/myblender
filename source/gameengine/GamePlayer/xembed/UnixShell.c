@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -58,7 +58,7 @@
 /* --------------------------------------------------------------------- */
 
 /** If defined: write to the plugin log file */
-#ifndef NDEBUG
+#if defined(DEBUG)
 #define NZC_GENERATE_LOG
 #endif
 

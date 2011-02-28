@@ -30,6 +30,11 @@
 *
 */
 
+/** \file blender/modifiers/intern/MOD_edgesplit.c
+ *  \ingroup modifiers
+ */
+
+
 /* EdgeSplit modifier: Splits edges in the mesh according to sharpness flag
  * or edge angle (can be used to achieve autosmoothing) */
 
@@ -39,14 +44,16 @@
 #include "BLI_memarena.h"
 #include "BLI_edgehash.h"
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
-#include "BKE_utildefines.h"
+
 #include "BKE_cdderivedmesh.h"
 #include "BKE_modifier.h"
 #include "BKE_particle.h"
 
 #include "MEM_guardedalloc.h"
 
+#include "MOD_util.h"
 
 #if 0
 #define EDGESPLIT_DEBUG_3
@@ -1277,6 +1284,7 @@ ModifierTypeInfo modifierType_EdgeSplit = {
 
 	/* copyData */          copyData,
 	/* deformVerts */       0,
+	/* deformMatrices */    0,
 	/* deformVertsEM */     0,
 	/* deformMatricesEM */  0,
 	/* applyModifier */     applyModifier,

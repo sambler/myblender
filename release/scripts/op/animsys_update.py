@@ -367,6 +367,7 @@ data_path_update = [
     ("PoseBone", "ik_limit_z", "use_ik_limit_z"),
     ("PoseBone", "ik_lin_control", "use_ik_linear_control"),
     ("PoseBone", "ik_rot_control", "use_ik_rotation_control"),
+    ("Bone", "use_hinge", "use_inherit_rotation"),
     ("SPHFluidSettings", "spring_k", "spring_force"),
     ("SPHFluidSettings", "stiffness_k", "stiffness"),
     ("SPHFluidSettings", "stiffness_knear", "stiffness_near"),
@@ -691,7 +692,6 @@ class UpdateAnimData(bpy.types.Operator):
 
     def execute(self, context):
         import animsys_refactor
-        reload(animsys_refactor)
         animsys_refactor.update_data_paths(data_path_update)
         return {'FINISHED'}
 
@@ -699,5 +699,10 @@ class UpdateAnimData(bpy.types.Operator):
 if __name__ == "__main__":
     bpy.ops.anim.update_data_paths()
 
+
 def register():
-    pass
+    bpy.utils.register_module(__name__)
+
+
+def unregister():
+    bpy.utils.unregister_module(__name__)

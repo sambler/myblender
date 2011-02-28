@@ -31,12 +31,17 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/blenkernel/intern/script.c
+ *  \ingroup bke
+ */
+
+
 
 #include "MEM_guardedalloc.h"
 
 /*
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 #include "BPY_extern.h" // Blender Python library
 #endif
 */

@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -24,6 +24,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/blenkernel/intern/gpencil.c
+ *  \ingroup bke
+ */
+
  
 #include <stdio.h>
 #include <string.h>
@@ -33,8 +38,8 @@
 
 #include "MEM_guardedalloc.h"
 
-
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 
 #include "DNA_gpencil_types.h"
 
@@ -42,7 +47,7 @@
 #include "BKE_gpencil.h"
 #include "BKE_library.h"
 #include "BKE_main.h"
-#include "BKE_utildefines.h"
+
 
 
 /* ************************************************** */
@@ -190,7 +195,7 @@ bGPDlayer *gpencil_layer_addnew (bGPdata *gpd)
 }
 
 /* add a new gp-datablock */
-bGPdata *gpencil_data_addnew (char name[])
+bGPdata *gpencil_data_addnew (const char name[])
 {
 	bGPdata *gpd;
 	

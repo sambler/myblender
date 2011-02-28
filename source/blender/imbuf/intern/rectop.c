@@ -1,4 +1,4 @@
-/**
+/*
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -29,14 +29,20 @@
  * $Id$
  */
 
+/** \file blender/imbuf/intern/rectop.c
+ *  \ingroup imbuf
+ */
+
+
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 
 #include "imbuf.h"
 #include "IMB_imbuf_types.h"
 #include "IMB_imbuf.h"
 
 #include "IMB_allocimbuf.h"
-#include "BKE_utildefines.h"
+
 
 /* blend modes */
 

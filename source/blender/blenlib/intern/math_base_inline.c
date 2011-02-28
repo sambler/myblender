@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  * ***** END GPL LICENSE BLOCK *****
  * */
 
+/** \file blender/blenlib/intern/math_base_inline.c
+ *  \ingroup bli
+ */
+
+
 #include <float.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,8 +37,8 @@
 
 #include "BLI_math.h"
 
-#ifndef BLI_MATH_BASE_INLINE
-#define BLI_MATH_BASE_INLINE
+#ifndef BLI_MATH_BASE_INLINE_H
+#define BLI_MATH_BASE_INLINE_H
 
 /* A few small defines. Keep'em local! */
 #define SMALL_NUMBER	1.e-8
@@ -127,5 +132,5 @@ MINLINE float signf(float f)
 	return (f < 0.f)? -1.f: 1.f;
 }
 
-#endif /* BLI_MATH_BASE_INLINE */
+#endif /* BLI_MATH_BASE_INLINE_H */
 

@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -19,6 +19,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/armature/BIF_retarget.h
+ *  \ingroup edarmature
+ */
+
 
 #ifndef BIF_RETARGET_H
 #define BIF_RETARGET_H
@@ -154,7 +159,15 @@ typedef struct RigControl {
 void BIF_retargetArc(struct bContext *C, ReebArc *earc, RigGraph *template_rigg);
 RigGraph *RIG_graphFromArmature(const struct bContext *C, struct Object *ob, struct bArmature *arm);
 int RIG_nbJoints(RigGraph *rg);
-char *RIG_nameBone(RigGraph *rg, int arc_index, int bone_index);
+const char *RIG_nameBone(RigGraph *rg, int arc_index, int bone_index);
 void RIG_freeRigGraph(BGraph *rg);
+
+/* UNUSED */
+void BIF_retargetArmature(bContext *C);
+void BIF_adjustRetarget(bContext *C);
+/* UNUSED / print funcs */
+void RIG_printArc(struct RigGraph *rg, struct RigArc *arc);
+void RIG_printGraph(struct RigGraph *rg);
+void RIG_printArcBones(struct RigArc *arc);
 
 #endif /* BIF_RETARGET_H */

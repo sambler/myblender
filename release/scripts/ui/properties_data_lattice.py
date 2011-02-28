@@ -59,23 +59,17 @@ class DATA_PT_lattice(DataButtonsPanel, bpy.types.Panel):
 
         lat = context.lattice
 
-        split = layout.split()
-        col = split.column()
-        col.prop(lat, "points_u")
-        col = split.column()
-        col.prop(lat, "interpolation_type_u", text="")
+        row = layout.row()
+        row.prop(lat, "points_u")
+        row.prop(lat, "interpolation_type_u", text="")
 
-        split = layout.split()
-        col = split.column()
-        col.prop(lat, "points_v")
-        col = split.column()
-        col.prop(lat, "interpolation_type_v", text="")
+        row = layout.row()
+        row.prop(lat, "points_v")
+        row.prop(lat, "interpolation_type_v", text="")
 
-        split = layout.split()
-        col = split.column()
-        col.prop(lat, "points_w")
-        col = split.column()
-        col.prop(lat, "interpolation_type_w", text="")
+        row = layout.row()
+        row.prop(lat, "points_w")
+        row.prop(lat, "interpolation_type_w", text="")
 
         row = layout.row()
         row.prop(lat, "use_outside")
@@ -85,14 +79,15 @@ class DATA_PT_lattice(DataButtonsPanel, bpy.types.Panel):
 class DATA_PT_custom_props_lattice(DataButtonsPanel, PropertyPanel, bpy.types.Panel):
     COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
     _context_path = "object.data"
+    _property_type = bpy.types.Lattice
 
 
 def register():
-    pass
+    bpy.utils.register_module(__name__)
 
 
 def unregister():
-    pass
+    bpy.utils.unregister_module(__name__)
 
 if __name__ == "__main__":
     register()

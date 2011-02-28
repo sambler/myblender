@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -26,8 +26,8 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
-/**
- * @file	GHOST_Debug.h
+/** \file ghost/intern/GHOST_Debug.h
+ *  \ingroup GHOST
  * Macro's used in GHOST debug target.
  */
 
@@ -35,10 +35,10 @@
 #define _GHOST_DEBUG_H_
 
 #if defined(WIN32) && !defined(FREE_WINDOWS)
-	#ifdef _DEBUG
+	#ifdef DEBUG
 		#pragma warning (disable:4786) // suppress stl-MSVC debug info warning
 		// #define GHOST_DEBUG
-	#endif // _DEBUG
+	#endif // DEBUG
 #endif // WIN32
 
 #ifdef BF_GHOST_DEBUG 

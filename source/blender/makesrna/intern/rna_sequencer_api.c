@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -21,6 +21,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/makesrna/intern/rna_sequencer_api.c
+ *  \ingroup RNA
+ */
+
 
 
 #include <stdlib.h>
@@ -66,7 +71,7 @@ void RNA_api_sequence_strip(StructRNA *srna)
 	func= RNA_def_function(srna, "swap", "rna_Sequence_swap_internal");
 	RNA_def_function_flag(func, FUNC_USE_REPORTS);
 	parm= RNA_def_pointer(func, "other", "Sequence", "Other", "");
-	RNA_def_property_flag(parm, PROP_REQUIRED);
+	RNA_def_property_flag(parm, PROP_REQUIRED|PROP_NEVER_NULL);
 }
 
 #endif

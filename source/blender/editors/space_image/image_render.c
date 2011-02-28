@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,8 +25,15 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/space_image/image_render.c
+ *  \ingroup spimage
+ */
+
+
 #include <stdlib.h>
 #include <stdio.h>
+
+#include "BLI_utildefines.h"
 
 #include "DNA_screen_types.h"
 #include "DNA_space_types.h"
@@ -50,7 +57,7 @@ static ScrArea *image_area= NULL;
 
 /* can get as well the full picture, as the parts while rendering */
 /* XXX will be obsolete, here for reference now */
-void imagewindow_progress(SpaceImage *sima, RenderResult *rr, volatile rcti *renrect)
+static void imagewindow_progress(SpaceImage *sima, RenderResult *rr, volatile rcti *renrect)
 {
 	float x1, y1, *rectf= NULL;
 	unsigned int *rect32= NULL;
@@ -122,7 +129,7 @@ void imagewindow_progress(SpaceImage *sima, RenderResult *rr, volatile rcti *ren
 
 
 /* coming from BIF_toggle_render_display() */
-void imagewindow_toggle_render(bContext *C)
+static void imagewindow_toggle_render(bContext *C)
 {
 	bScreen *sc= CTX_wm_screen(C);
 	ScrArea *sa;
@@ -161,7 +168,7 @@ static void imagewindow_renderinfo_cb(void *UNUSED(handle), RenderStats *UNUSED(
 	}
 }
 
-void ED_space_image_render_callbacks(bContext *C, Render *re)
+static void ED_space_image_render_callbacks(bContext *C, Render *re)
 {
 	
 //	RE_display_init_cb(re, C, imagewindow_init_display_cb);

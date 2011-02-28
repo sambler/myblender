@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -30,11 +30,17 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/gpu/intern/gpu_draw.c
+ *  \ingroup gpu
+ */
+
+
 #include <string.h>
 
 #include "GL/glew.h"
 
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
 #include "DNA_lamp_types.h"
 #include "DNA_material_types.h"
@@ -58,7 +64,7 @@
 #include "BKE_material.h"
 #include "BKE_node.h"
 #include "BKE_object.h"
-#include "BKE_utildefines.h"
+
 
 #include "BLI_threads.h"
 #include "BLI_blenlib.h"
@@ -307,7 +313,7 @@ static void gpu_make_repbind(Image *ima)
 		ima->repbind= MEM_callocN(sizeof(int)*ima->totbind, "repbind");
 }
 
-static void gpu_clear_tpage()
+static void gpu_clear_tpage(void)
 {
 	if(GTS.lasttface==0)
 		return;
@@ -775,9 +781,9 @@ void GPU_free_smoke(SmokeModifierData *smd)
 
 void GPU_create_smoke(SmokeModifierData *smd, int highres)
 {
-	if(smd->type & MOD_SMOKE_TYPE_DOMAIN && smd->domain && !smd->domain->tex && !highres)
+	if(smd->type & MOD_SMOKE_TYPE_DOMAIN && !smd->domain->tex && !highres)
 		smd->domain->tex = GPU_texture_create_3D(smd->domain->res[0], smd->domain->res[1], smd->domain->res[2], smoke_get_density(smd->domain->fluid));
-	else if(smd->type & MOD_SMOKE_TYPE_DOMAIN && smd->domain && !smd->domain->tex && highres)
+	else if(smd->type & MOD_SMOKE_TYPE_DOMAIN && !smd->domain->tex && highres)
 		smd->domain->tex = GPU_texture_create_3D(smd->domain->res_wt[0], smd->domain->res_wt[1], smd->domain->res_wt[2], smoke_turbulence_get_density(smd->domain->wt));
 
 	smd->domain->tex_shadow = GPU_texture_create_3D(smd->domain->res[0], smd->domain->res[1], smd->domain->res[2], smd->domain->shadow);
@@ -810,7 +816,8 @@ void GPU_free_unused_buffers(void)
 	BLI_freelistN(&image_free_queue);
 
 	/* vbo buffers */
-	GPU_buffer_pool_free_unused(0);
+	/* it's probably not necessary to free all buffers every frame */
+	/* GPU_buffer_pool_free_unused(0); */
 
 	BLI_unlock_thread(LOCK_OPENGL);
 }
@@ -900,7 +907,7 @@ static struct GPUMaterialState {
 } GMS = {NULL};
 
 /* fixed function material, alpha handed by caller */
-static void gpu_material_to_fixed(GPUMaterialFixed *smat, const Material *bmat, const int gamma)
+static void gpu_material_to_fixed(GPUMaterialFixed *smat, const Material *bmat, const int gamma, const Object *ob)
 {
 	if (bmat->mode & MA_SHLESS) {
 		copy_v3_v3(smat->diff, &bmat->r);
@@ -914,6 +921,9 @@ static void gpu_material_to_fixed(GPUMaterialFixed *smat, const Material *bmat, 
 		mul_v3_v3fl(smat->diff, &bmat->r, bmat->ref + bmat->emit);
 		smat->diff[3]= 1.0; /* caller may set this to bmat->alpha */
 
+		if(bmat->shade_flag & MA_OBCOLOR)
+			mul_v3_v3(smat->diff, ob->col);
+		
 		mul_v3_v3fl(smat->spec, &bmat->specr, bmat->spec);
 		smat->spec[3]= 1.0; /* always 1 */
 		smat->hard= CLAMPIS(bmat->har, 0, 128);
@@ -925,7 +935,7 @@ static void gpu_material_to_fixed(GPUMaterialFixed *smat, const Material *bmat, 
 	}
 }
 
-Material *gpu_active_node_material(Material *ma)
+static Material *gpu_active_node_material(Material *ma)
 {
 	if(ma && ma->use_nodes && ma->nodetree) {
 		bNode *node= nodeGetActiveID(ma->nodetree, ID_MA);
@@ -978,7 +988,7 @@ void GPU_begin_object_materials(View3D *v3d, RegionView3D *rv3d, Scene *scene, O
 
 	/* no materials assigned? */
 	if(ob->totcol==0) {
-		gpu_material_to_fixed(&GMS.matbuf[0], &defmaterial, 0);
+		gpu_material_to_fixed(&GMS.matbuf[0], &defmaterial, 0, ob);
 
 		/* do material 1 too, for displists! */
 		memcpy(&GMS.matbuf[1], &GMS.matbuf[0], sizeof(GPUMaterialFixed));
@@ -1008,7 +1018,7 @@ void GPU_begin_object_materials(View3D *v3d, RegionView3D *rv3d, Scene *scene, O
 		}
 		else {
 			/* fixed function opengl materials */
-			gpu_material_to_fixed(&GMS.matbuf[a], ma, gamma);
+			gpu_material_to_fixed(&GMS.matbuf[a], ma, gamma, ob);
 
 			blendmode = (ma->alpha == 1.0f)? GPU_BLEND_SOLID: GPU_BLEND_ALPHA;
 			if(do_alpha_pass && GMS.alphapass)

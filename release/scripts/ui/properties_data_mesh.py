@@ -33,6 +33,7 @@ class MESH_MT_vertex_group_specials(bpy.types.Menu):
         layout.operator("object.vertex_group_copy_to_linked", icon='LINK_AREA')
         layout.operator("object.vertex_group_copy_to_selected", icon='LINK_AREA')
         layout.operator("object.vertex_group_mirror", icon='ARROW_LEFTRIGHT')
+        layout.operator("object.vertex_group_remove", icon='X', text="Delete All").all = True
 
 
 class MESH_MT_shape_key_specials(bpy.types.Menu):
@@ -70,13 +71,10 @@ class DATA_PT_context_mesh(MeshButtonsPanel, bpy.types.Panel):
         mesh = context.mesh
         space = context.space_data
 
-        split = layout.split(percentage=0.65)
         if ob:
-            split.template_ID(ob, "data")
-            split.separator()
+            layout.template_ID(ob, "data")
         elif mesh:
-            split.template_ID(space, "pin_id")
-            split.separator()
+            layout.template_ID(space, "pin_id")
 
 
 class DATA_PT_normals(MeshButtonsPanel, bpy.types.Panel):
@@ -96,9 +94,7 @@ class DATA_PT_normals(MeshButtonsPanel, bpy.types.Panel):
         sub.active = mesh.use_auto_smooth
         sub.prop(mesh, "auto_smooth_angle", text="Angle")
 
-        col = split.column()
-
-        col.prop(mesh, "show_double_sided")
+        split.prop(mesh, "show_double_sided")
 
 
 class DATA_PT_settings(MeshButtonsPanel, bpy.types.Panel):
@@ -111,6 +107,7 @@ class DATA_PT_settings(MeshButtonsPanel, bpy.types.Panel):
         mesh = context.mesh
 
         layout.prop(mesh, "texture_mesh")
+        layout.prop(mesh, "use_auto_texspace")
 
 
 class DATA_PT_vertex_groups(MeshButtonsPanel, bpy.types.Panel):
@@ -284,9 +281,8 @@ class DATA_PT_texface(MeshButtonsPanel, bpy.types.Panel):
     @classmethod
     def poll(cls, context):
         ob = context.active_object
-        rd = context.scene.render
 
-        return (context.mode == 'EDIT_MESH') and (rd.engine == 'BLENDER_GAME') and ob and ob.type == 'MESH'
+        return (context.mode == 'EDIT_MESH') and ob and ob.type == 'MESH'
 
     def draw(self, context):
         layout = self.layout
@@ -297,6 +293,9 @@ class DATA_PT_texface(MeshButtonsPanel, bpy.types.Panel):
         tf = me.faces.active_tface
 
         if tf:
+            if context.scene.render.engine != 'BLENDER_GAME':
+                col.label(text="Options only supported in Game Engine")
+
             split = layout.split()
             col = split.column()
 
@@ -349,14 +348,15 @@ class DATA_PT_vertex_colors(MeshButtonsPanel, bpy.types.Panel):
 class DATA_PT_custom_props_mesh(MeshButtonsPanel, PropertyPanel, bpy.types.Panel):
     COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
     _context_path = "object.data"
+    _property_type = bpy.types.Mesh
 
 
 def register():
-    pass
+    bpy.utils.register_module(__name__)
 
 
 def unregister():
-    pass
+    bpy.utils.unregister_module(__name__)
 
 if __name__ == "__main__":
     register()

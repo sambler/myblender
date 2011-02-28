@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/space_image/image_header.c
+ *  \ingroup spimage
+ */
+
+
 #include <string.h>
 #include <stdio.h>
 
@@ -33,21 +38,18 @@
 #include "DNA_space_types.h"
 #include "DNA_windowmanager_types.h"
 
-
 #include "BLI_blenlib.h"
 #include "BLI_editVert.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_context.h"
-
 
 #include "ED_image.h"
 
 #include "WM_types.h"
 
-
 #include "UI_interface.h"
-
-
+#include "UI_resources.h"
 
 #include "image_intern.h"
 
@@ -63,13 +65,13 @@ static int toolbox_invoke(bContext *C, wmOperator *UNUSED(op), wmEvent *UNUSED(e
 
 	show_uvedit= ED_space_image_show_uvedit(sima, obedit);
 
-	pup= uiPupMenuBegin(C, "Toolbox", 0);
+	pup= uiPupMenuBegin(C, "Toolbox", ICON_NONE);
 	layout= uiPupMenuLayout(pup);
 
-	uiItemM(layout, C, "IMAGE_MT_view", NULL, 0);
-	if(show_uvedit) uiItemM(layout, C, "IMAGE_MT_select", NULL, 0);
-	uiItemM(layout, C, "IMAGE_MT_image", NULL, 0);
-	if(show_uvedit) uiItemM(layout, C, "IMAGE_MT_uvs", NULL, 0);
+	uiItemM(layout, C, "IMAGE_MT_view", NULL, ICON_NONE);
+	if(show_uvedit) uiItemM(layout, C, "IMAGE_MT_select", NULL, ICON_NONE);
+	uiItemM(layout, C, "IMAGE_MT_image", NULL, ICON_NONE);
+	if(show_uvedit) uiItemM(layout, C, "IMAGE_MT_uvs", NULL, ICON_NONE);
 
 	uiPupMenuEnd(C, pup);
 

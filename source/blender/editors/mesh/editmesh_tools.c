@@ -26,6 +26,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/mesh/editmesh_tools.c
+ *  \ingroup edmesh
+ */
+
+
 /*
 
 editmesh_tool.c: UI called tools for editmesh, geometry changes here, otherwise in mods.c
@@ -52,11 +57,13 @@ editmesh_tool.c: UI called tools for editmesh, geometry changes here, otherwise 
 
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 #include "BLI_editVert.h"
 #include "BLI_rand.h"
 #include "BLI_ghash.h"
 #include "BLI_linklist.h"
 #include "BLI_heap.h"
+#include "BLI_scanfill.h"
 
 #include "BKE_context.h"
 #include "BKE_depsgraph.h"
@@ -482,11 +489,12 @@ static int removedoublesflag_exec(bContext *C, wmOperator *op)
 	if(count) {
 		recalc_editnormals(em);
 
-		DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+		DAG_id_tag_update(obedit->data, 0);
 		WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 	}
 
-	BKE_reportf(op->reports, RPT_INFO, "Removed %d vertices", count);
+	BKE_reportf(op->reports, RPT_INFO, "Removed %d vert%s.", count, (count==1)?"ex":"ices");
+
 	BKE_mesh_end_editmesh(obedit->data, em);
 
 	return OPERATOR_FINISHED;
@@ -494,6 +502,8 @@ static int removedoublesflag_exec(bContext *C, wmOperator *op)
 
 void MESH_OT_remove_doubles(wmOperatorType *ot)
 {
+	PropertyRNA *prop;
+
 	/* identifiers */
 	ot->name= "Remove Doubles";
 	ot->description= "Remove duplicate vertices";
@@ -506,7 +516,8 @@ void MESH_OT_remove_doubles(wmOperatorType *ot)
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 
-	RNA_def_float(ot->srna, "limit", 0.0001f, 0.000001f, 50.0f, "Merge Threshold", "Minimum distance between merged verts", 0.00001f, 2.0f);
+	prop= RNA_def_float(ot->srna, "limit", 0.0001f, 0.000001f, 50.0f, "Merge Threshold", "Minimum distance between merged verts", 0.00001f, 2.0f);
+	RNA_def_property_ui_range(prop,  0.000001f, 50.0f, 0.001, 5);
 }
 
 // XXX is this needed?
@@ -519,7 +530,7 @@ static void xsortvert_flag__doSetX(void *userData, EditVert *UNUSED(eve), int x,
 }
 
 /* all verts with (flag & 'flag') are sorted */
-void xsortvert_flag(bContext *C, int flag)
+static void xsortvert_flag(bContext *C, int flag)
 {
 	ViewContext vc;
 	EditVert *eve;
@@ -551,14 +562,37 @@ void xsortvert_flag(bContext *C, int flag)
 		}
 	}
 
-	addlisttolist(&vc.em->verts, &tbase);
+	BLI_movelisttolist(&vc.em->verts, &tbase);
 
 	MEM_freeN(sortblock);
 
 }
 
+static int mesh_vertices_sort_exec(bContext *C, wmOperator *UNUSED(op))
+{
+	xsortvert_flag(C, SELECT);
+	return OPERATOR_FINISHED;
+}
+
+void MESH_OT_vertices_sort(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name= "Vertex Sort";
+	ot->description= "Sort vertex order";
+	ot->idname= "MESH_OT_vertices_sort";
+
+	/* api callbacks */
+	ot->exec= mesh_vertices_sort_exec;
+
+	ot->poll= EM_view3d_poll; /* uses view relative X axis to sort verts */
+
+	/* flags */
+	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+}
+
+
 /* called from buttons */
-void hashvert_flag(EditMesh *em, int flag)
+static void hashvert_flag(EditMesh *em, int flag)
 {
 	/* switch vertex order using hash table */
 	EditVert *eve;
@@ -609,11 +643,36 @@ void hashvert_flag(EditMesh *em, int flag)
 		sb++;
 	}
 
-	addlisttolist(&em->verts, &tbase);
+	BLI_movelisttolist(&em->verts, &tbase);
 
 	MEM_freeN(sortblock);
 
 }
+
+static int mesh_vertices_randomize_exec(bContext *C, wmOperator *UNUSED(op))
+{
+	Object *obedit= CTX_data_edit_object(C);
+	EditMesh *em= BKE_mesh_get_editmesh((Mesh *)obedit->data);
+	hashvert_flag(em, SELECT);
+	return OPERATOR_FINISHED;
+}
+
+void MESH_OT_vertices_randomize(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name= "Vertex Randomize";
+	ot->description= "Randomize vertex order";
+	ot->idname= "MESH_OT_vertices_randomize";
+
+	/* api callbacks */
+	ot->exec= mesh_vertices_randomize_exec;
+
+	ot->poll= ED_operator_editmesh;
+
+	/* flags */
+	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+}
+
 
 /* generic extern called extruder */
 static void extrude_mesh(Object *obedit, EditMesh *em, wmOperator *op, short type)
@@ -631,7 +690,7 @@ static void extrude_mesh(Object *obedit, EditMesh *em, wmOperator *op, short typ
 	EM_stats_update(em);
 
 	if(transmode==0) {
-		BKE_report(op->reports, RPT_ERROR, "Not a valid selection for extrude");
+		BKE_report(op->reports, RPT_WARNING, "Not a valid selection for extrude");
 	}
 	else {
 		EM_fgon_flags(em);
@@ -642,7 +701,7 @@ static void extrude_mesh(Object *obedit, EditMesh *em, wmOperator *op, short typ
 			* This shouldn't be necessary, derived queries should be
 			* automatically building this data if invalid. Or something.
 			*/
-		DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+		DAG_id_tag_update(obedit->data, 0);
 
 		/* individual faces? */
 //		BIF_TransformSetUndo("Extrude");
@@ -673,7 +732,7 @@ static int mesh_extrude_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(even
 
 	BKE_mesh_end_editmesh(obedit->data, em);
 
-	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 
 	return OPERATOR_FINISHED;
@@ -687,14 +746,14 @@ static int mesh_extrude_exec(bContext *C, wmOperator *op)
 
 	extrude_mesh(obedit, em, op, RNA_int_get(op->ptr, "type"));
 
-	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 
 	BKE_mesh_end_editmesh(obedit->data, em);
 	return OPERATOR_FINISHED;
 }
 
-EnumPropertyItem extrude_items[] = {
+static EnumPropertyItem extrude_items[] = {
 		{1, "REGION", 0, "Region", ""},
 		{2, "FACES", 0, "Individual Faces", ""},
 		{3, "EDGES", 0, "Only Edges", ""},
@@ -809,7 +868,7 @@ static int split_mesh(bContext *C, wmOperator *UNUSED(op))
 
 	WM_cursor_wait(0);
 
-	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 
 	BKE_mesh_end_editmesh(obedit->data, em);
@@ -869,7 +928,7 @@ static int extrude_repeat_mesh(bContext *C, wmOperator *op)
 
 	EM_fgon_flags(em);
 
-	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 
 	BKE_mesh_end_editmesh(obedit->data, em);
@@ -973,7 +1032,7 @@ static int spin_mesh(bContext *C, wmOperator *op, float *dvec, int steps, float 
 
 		EM_fgon_flags(em);
 
-		DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+		DAG_id_tag_update(obedit->data, 0);
 	}
 
 	BKE_mesh_end_editmesh(obedit->data, em);
@@ -987,11 +1046,11 @@ static int spin_mesh_exec(bContext *C, wmOperator *op)
 
 	ok= spin_mesh(C, op, NULL, RNA_int_get(op->ptr,"steps"), RNA_float_get(op->ptr,"degrees"), RNA_boolean_get(op->ptr,"dupli"));
 	if(ok==0) {
-		BKE_report(op->reports, RPT_ERROR, "No valid vertices are selected");
+		BKE_report(op->reports, RPT_WARNING, "No valid vertices are selected");
 		return OPERATOR_CANCELLED;
 	}
 
-	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 
 	return OPERATOR_FINISHED;
@@ -1073,7 +1132,7 @@ static int screw_mesh_exec(bContext *C, wmOperator *op)
 		}
 	}
 	if(v1==NULL || v2==NULL) {
-		BKE_report(op->reports, RPT_ERROR, "You have to select a string of connected vertices too");
+		BKE_report(op->reports, RPT_WARNING, "You have to select a string of connected vertices too");
 		BKE_mesh_end_editmesh(obedit->data, em);
 		return OPERATOR_CANCELLED;
 	}
@@ -1092,14 +1151,14 @@ static int screw_mesh_exec(bContext *C, wmOperator *op)
 	}
 
 	if(spin_mesh(C, op, dvec, turns*steps, 360.0f*turns, 0)) {
-		DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+		DAG_id_tag_update(obedit->data, 0);
 		WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 
 		BKE_mesh_end_editmesh(obedit->data, em);
 		return OPERATOR_FINISHED;
 	}
 	else {
-		BKE_report(op->reports, RPT_ERROR, "No valid vertices are selected");
+		BKE_report(op->reports, RPT_WARNING, "No valid vertices are selected");
 		BKE_mesh_end_editmesh(obedit->data, em);
 		return OPERATOR_CANCELLED;
 	}
@@ -1193,13 +1252,13 @@ static void delete_mesh(EditMesh *em, wmOperator *op, int event)
 	EditVert *eve,*nextve;
 	EditEdge *eed,*nexted;
 	int count;
-	char *str="Erase";
+	/* const char *str="Erase"; */
 
 
 	if(event<1) return;
 
 	if(event==10 ) {
-		str= "Erase Vertices";
+		/* str= "Erase Vertices"; */
 		erase_edges(em, &em->edges);
 		erase_faces(em, &em->faces);
 		erase_vertices(em, &em->verts);
@@ -1208,10 +1267,10 @@ static void delete_mesh(EditMesh *em, wmOperator *op, int event)
 		if(!EdgeLoopDelete(em, op))
 			return;
 
-		str= "Erase Edge Loop";
+		/* str= "Erase Edge Loop"; */
 	}
 	else if(event==4) {
-		str= "Erase Edges & Faces";
+		/* str= "Erase Edges & Faces"; */
 		efa= em->faces.first;
 		while(efa) {
 			nextvl= efa->next;
@@ -1253,7 +1312,7 @@ static void delete_mesh(EditMesh *em, wmOperator *op, int event)
 		}
 	}
 	else if(event==1) {
-		str= "Erase Edges";
+		/* str= "Erase Edges"; */
 		// faces first
 		efa= em->faces.first;
 		while(efa) {
@@ -1298,18 +1357,18 @@ static void delete_mesh(EditMesh *em, wmOperator *op, int event)
 
 	}
 	else if(event==2) {
-		str="Erase Faces";
+		/* str="Erase Faces"; */
 		delfaceflag(em, SELECT);
 	}
 	else if(event==3) {
-		str= "Erase All";
+		/* str= "Erase All"; */
 		if(em->verts.first) free_vertlist(em, &em->verts);
 		if(em->edges.first) free_edgelist(em, &em->edges);
 		if(em->faces.first) free_facelist(em, &em->faces);
 		if(em->selected.first) BLI_freelistN(&(em->selected));
 	}
 	else if(event==5) {
-		str= "Erase Only Faces";
+		/* str= "Erase Only Faces"; */
 		efa= em->faces.first;
 		while(efa) {
 			nextvl= efa->next;
@@ -1347,7 +1406,7 @@ static int delete_mesh_exec(bContext *C, wmOperator *op)
 
 	delete_mesh(em, op, type);
 
-	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 
 	BKE_mesh_end_editmesh(obedit->data, em);
@@ -1515,6 +1574,7 @@ static void facecopy(EditMesh *em, EditFace *source, EditFace *target)
 	if (target->v4)
 		interp_weights_face_v3( w[3],v1, v2, v3, v4, target->v4->co);
 
+	CustomData_em_validate_data(&em->fdata, target->data, target->v4 ? 4 : 3);
 	CustomData_em_interp(&em->fdata, &source->data, NULL, (float*)w, 1, target->data);
 }
 
@@ -1679,7 +1739,7 @@ static void fill_quad_double_op(EditMesh *em, EditFace *efa, struct GHash *gh, i
 	EditEdge *cedge[2]={NULL, NULL};
 	EditVert *v[4], **verts[2];
 	EditFace *hold;
-	short start=0, end, left, right, vertsize,i;
+	short start=0, /*end,*/ left, /* right,*/ vertsize,i;
 
 	v[0] = efa->v1;
 	v[1] = efa->v2;
@@ -1700,9 +1760,9 @@ static void fill_quad_double_op(EditMesh *em, EditFace *efa, struct GHash *gh, i
 	// the array to the correct direction
 
 	if(verts[0][0] != v[start]) {flipvertarray(verts[0],numcuts+2);}
-	end	= (start+1)%4;
+	/* end	= (start+1)%4; */ /* UNUSED */
 	left   = (start+2)%4;
-	right  = (start+3)%4;
+	/* right  = (start+3)%4; */ /* UNUSED */
 	if(verts[1][0] != v[left]) {flipvertarray(verts[1],numcuts+2);}
 	/*
 	We should have something like this now
@@ -2755,7 +2815,7 @@ void esubdivideflag(Object *obedit, EditMesh *em, int flag, float smooth, float 
 		}
 	}
 
-//	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+//	DAG_id_tag_update(obedit->data, 0);
 	// Now for each face in the mesh we need to figure out How many edges were cut
 	// and which filling method to use for that face
 	for(ef = em->faces.first;ef;ef = ef->next) {
@@ -3452,7 +3512,7 @@ void join_triangles(EditMesh *em)
 #define FACE_MARKCLEAR(f) (f->f1 = 1)
 
 /* quick hack, basically a copy of beautify_fill */
-void edge_flip(EditMesh *em)
+static void edge_flip(EditMesh *em)
 {
 	EditVert *v1, *v2, *v3, *v4;
 	EditEdge *eed, *nexted;
@@ -3553,7 +3613,7 @@ static const EnumPropertyItem direction_items[]= {
 #define AXIS_X		1
 #define AXIS_Y		2
 
-static const EnumPropertyItem axis_items[]= {
+static const EnumPropertyItem axis_items_xy[]= {
 	{AXIS_X, "X", 0, "X", ""},
 	{AXIS_Y, "Y", 0, "Y", ""},
 	{0, NULL, 0, NULL, NULL}};
@@ -3773,7 +3833,7 @@ static int edge_rotate_selected(bContext *C, wmOperator *op)
 		}
 		else
 		{
-			BKE_report(op->reports, RPT_ERROR, "Select one edge or two adjacent faces");
+			BKE_report(op->reports, RPT_WARNING, "Select one edge or two adjacent faces");
 			BKE_mesh_end_editmesh(obedit->data, em);
 			return OPERATOR_CANCELLED;
 		}
@@ -3788,7 +3848,7 @@ static int edge_rotate_selected(bContext *C, wmOperator *op)
 		}
 	}
 	else  {
-		BKE_report(op->reports, RPT_ERROR, "Select one edge or two adjacent faces");
+		BKE_report(op->reports, RPT_WARNING, "Select one edge or two adjacent faces");
 		BKE_mesh_end_editmesh(obedit->data, em);
 		return OPERATOR_CANCELLED;
 	}
@@ -3798,7 +3858,7 @@ static int edge_rotate_selected(bContext *C, wmOperator *op)
 
 	BKE_mesh_end_editmesh(obedit->data, em);
 
-	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 
 	return OPERATOR_FINISHED;
@@ -3827,7 +3887,7 @@ void MESH_OT_edge_rotate(wmOperatorType *ot)
 
   /* XXX old bevel not ported yet */
 
-void bevel_menu(EditMesh *em)
+static void bevel_menu(EditMesh *em)
 {
 	BME_Mesh *bm;
 	BME_TransData_Head *td;
@@ -4200,7 +4260,7 @@ useless:
 			return 0;
 		}
 
-		if(me->drawflag & ME_DRAW_EDGELEN) {
+		if(me->drawflag & ME_DRAWEXTRA_EDGELEN) {
 			if(!(tempsv->up->f & SELECT)) {
 				tempsv->up->f |= SELECT;
 				tempsv->up->f2 |= 16;
@@ -4649,11 +4709,11 @@ useless:
 		} else {
 			draw = 0;
 		}
-//		DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+//		DAG_id_tag_update(obedit->data, 0);
 	}
 
 
-	if(me->drawflag & ME_DRAW_EDGELEN) {
+	if(me->drawflag & ME_DRAWEXTRA_EDGELEN) {
 		look = vertlist;
 		while(look) {
 			tempsv  = BLI_ghash_lookup(vertgh,(EditVert*)look->link);
@@ -4669,7 +4729,7 @@ useless:
 
 	if(!immediate)
 		EM_automerge(0);
-//	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+//	DAG_id_tag_update(obedit->data, 0);
 //	scrarea_queue_winredraw(curarea);
 
 	//BLI_ghash_free(edgesgh, freeGHash, NULL);
@@ -4720,7 +4780,7 @@ int EdgeLoopDelete(EditMesh *UNUSED(em), wmOperator *UNUSED(op))
 	EM_select_more(em);
 	removedoublesflag(em, 1,0, 0.001);
 	EM_select_flush(em);
-	//	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+	//	DAG_id_tag_update(obedit->data, 0);
 	return 1;
 #endif
 	return 0;
@@ -4874,12 +4934,12 @@ static int mesh_rip_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	}
 
 	if(efa) {
-		BKE_report(op->reports, RPT_ERROR, "Can't perform ripping with faces selected this way");
+		BKE_report(op->reports, RPT_WARNING, "Can't perform ripping with faces selected this way");
 		BKE_mesh_end_editmesh(obedit->data, em);
 		return OPERATOR_CANCELLED;
 	}
 	if(sefa==NULL) {
-		BKE_report(op->reports, RPT_ERROR, "No proper selection or faces included");
+		BKE_report(op->reports, RPT_WARNING, "No proper selection or faces included");
 		BKE_mesh_end_editmesh(obedit->data, em);
 		return OPERATOR_CANCELLED;
 	}
@@ -4944,7 +5004,7 @@ static int mesh_rip_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	}
 
 	if(seed==NULL) {	// never happens?
-		BKE_report(op->reports, RPT_ERROR, "No proper edge found to start");
+		BKE_report(op->reports, RPT_WARNING, "No proper edge found to start");
 		BKE_mesh_end_editmesh(obedit->data, em);
 		return OPERATOR_CANCELLED;
 	}
@@ -5029,7 +5089,7 @@ static int mesh_rip_invoke(bContext *C, wmOperator *op, wmEvent *event)
 		}
 	}
 
-	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 
 	BKE_mesh_end_editmesh(obedit->data, em);
@@ -5074,7 +5134,7 @@ static void shape_propagate(Object *obedit, EditMesh *em, wmOperator *op)
 	if(me->key){
 		ky = me->key;
 	} else {
-		BKE_report(op->reports, RPT_ERROR, "Object Has No Key");
+		BKE_report(op->reports, RPT_WARNING, "Object Has No Key");
 		return;
 	}
 
@@ -5089,7 +5149,7 @@ static void shape_propagate(Object *obedit, EditMesh *em, wmOperator *op)
 			}
 		}
 	} else {
-		BKE_report(op->reports, RPT_ERROR, "Object Has No Blendshapes");
+		BKE_report(op->reports, RPT_WARNING, "Object Has No Blendshapes");
 		return;
 	}
 
@@ -5102,7 +5162,7 @@ static void shape_propagate(Object *obedit, EditMesh *em, wmOperator *op)
 	}
 #endif
 
-	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+	DAG_id_tag_update(obedit->data, 0);
 	return;
 }
 
@@ -5115,7 +5175,7 @@ static int shape_propagate_to_all_exec(bContext *C, wmOperator *op)
 
 	shape_propagate(obedit, em, op);
 
-	DAG_id_flush_update(&me->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&me->id, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, me);
 
 	return OPERATOR_FINISHED;
@@ -5177,7 +5237,7 @@ static int blend_from_shape_exec(bContext *C, wmOperator *op)
 	if(!blended)
 		return OPERATOR_CANCELLED;
 
-	DAG_id_flush_update(&me->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&me->id, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, me);
 
 	return OPERATOR_FINISHED;
@@ -5236,7 +5296,7 @@ void MESH_OT_blend_from_shape(wmOperatorType *ot)
 	prop= RNA_def_enum(ot->srna, "shape", shape_items, 0, "Shape", "Shape key to use for blending.");
 	RNA_def_enum_funcs(prop, shape_itemf);
 	RNA_def_float(ot->srna, "blend", 1.0f, -FLT_MAX, FLT_MAX, "Blend", "Blending factor.", -2.0f, 2.0f);
-	RNA_def_boolean(ot->srna, "add", 1, "Add", "Add rather then blend between shapes.");
+	RNA_def_boolean(ot->srna, "add", 0, "Add", "Add rather then blend between shapes.");
 }
 
 /************************ Merge Operator *************************/
@@ -5678,7 +5738,7 @@ static int collapseEdges(EditMesh *em)
 	CollectedEdge *curredge;
 	Collection *edgecollection;
 
-	int totedges, groupcount, mergecount,vcount;
+	int totedges, mergecount,vcount /*, groupcount*/;
 	float avgcount[3];
 
 	allcollections.first = 0;
@@ -5687,7 +5747,7 @@ static int collapseEdges(EditMesh *em)
 	mergecount = 0;
 
 	build_edgecollection(em, &allcollections);
-	groupcount = BLI_countlist(&allcollections);
+	/*groupcount = BLI_countlist(&allcollections);*/ /*UNUSED*/
 
 
 	for(edgecollection = allcollections.first; edgecollection; edgecollection = edgecollection->next){
@@ -5840,6 +5900,7 @@ static int merge_exec(bContext *C, wmOperator *op)
 	Object *obedit= CTX_data_edit_object(C);
 	EditMesh *em= BKE_mesh_get_editmesh((Mesh *)obedit->data);
 	int count= 0, uvs= RNA_boolean_get(op->ptr, "uvs");
+	EditSelection *ese;
 
 	switch(RNA_enum_get(op->ptr, "type")) {
 		case 3:
@@ -5849,10 +5910,21 @@ static int merge_exec(bContext *C, wmOperator *op)
 			count = merge_target(C, em, 1, uvs);
 			break;
 		case 1:
-			count = merge_firstlast(em, 0, uvs);
+			ese= (EditSelection *)em->selected.last;
+			if(ese && ese->type == EDITVERT) {
+				count = merge_firstlast(em, 0, uvs);
+			} else {
+				BKE_report(op->reports, RPT_WARNING, "no last selected vertex set");
+			}
 			break;
 		case 6:
-			count = merge_firstlast(em, 1, uvs);
+			ese= (EditSelection *)em->selected.first;
+			if(ese && ese->type == EDITVERT) {
+				count = merge_firstlast(em, 1, uvs);
+			}
+			else {
+				BKE_report(op->reports, RPT_WARNING, "no last selected vertex set");
+			}
 			break;
 		case 5:
 			count = collapseEdges(em);
@@ -5868,7 +5940,7 @@ static int merge_exec(bContext *C, wmOperator *op)
 
 	BKE_mesh_end_editmesh(obedit->data, em);
 
-	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 
 	return OPERATOR_FINISHED;
@@ -5965,7 +6037,6 @@ static int select_vertex_path_exec(bContext *C, wmOperator *op)
 	EditMesh *em= BKE_mesh_get_editmesh((Mesh *)obedit->data);
 	EditVert *eve, *s, *t;
 	EditEdge *eed;
-	EditSelection *ese;
 	PathEdge *newpe, *currpe;
 	PathNode *currpn;
 	PathNode *Q;
@@ -5976,17 +6047,24 @@ static int select_vertex_path_exec(bContext *C, wmOperator *op)
 	Heap *heap; /*binary heap for sorting pointers to PathNodes based upon a 'cost'*/
 
 	s = t = NULL;
+	for(eve=em->verts.first; eve; eve=eve->next) {
+		if(eve->f&SELECT) {
+			if(s == NULL) s= eve;
+			else if(t == NULL) t= eve;
+			else {
+				/* more than two vertices are selected,
+				   show warning message and cancel operator */
+				s = t = NULL;
+				break;
+			}
 
-	ese = ((EditSelection*)em->selected.last);
-	if(ese && ese->type == EDITVERT && ese->prev && ese->prev->type == EDITVERT) {
-		t = (EditVert*)ese->data;
-		s = (EditVert*)ese->prev->data;
-
-		/*need to find out if t is actually reachable by s....*/
-		for(eve=em->verts.first; eve; eve=eve->next){
-			eve->f1 = 0;
 		}
 
+		/*need to find out if t is actually reachable by s....*/
+		eve->f1 = 0;
+	}
+
+	if(s != NULL && t != NULL) {
 		s->f1 = 1;
 
 		unbalanced = 1;
@@ -6107,7 +6185,7 @@ static int select_vertex_path_exec(bContext *C, wmOperator *op)
 	}
 	else {
 		BKE_mesh_end_editmesh(obedit->data, em);
-		BKE_report(op->reports, RPT_ERROR, "Path Selection requires that exactly two vertices be selected");
+		BKE_report(op->reports, RPT_WARNING, "Path Selection requires that exactly two vertices be selected");
 		return OPERATOR_CANCELLED;
 	}
 
@@ -6392,7 +6470,7 @@ static int mesh_rotate_uvs(bContext *C, wmOperator *op)
 	int dir= RNA_enum_get(op->ptr, "direction");
 
 	if (!EM_texFaceCheck(em)) {
-		BKE_report(op->reports, RPT_ERROR, "Mesh has no uv/image layers.");
+		BKE_report(op->reports, RPT_WARNING, "Mesh has no uv/image layers.");
 		BKE_mesh_end_editmesh(obedit->data, em);
 		return OPERATOR_CANCELLED;
 	}
@@ -6448,7 +6526,7 @@ static int mesh_rotate_uvs(bContext *C, wmOperator *op)
 	if(!change)
 		return OPERATOR_CANCELLED;
 
-	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 
 	return OPERATOR_FINISHED;
@@ -6466,7 +6544,7 @@ static int mesh_mirror_uvs(bContext *C, wmOperator *op)
 	int axis= RNA_enum_get(op->ptr, "axis");
 
 	if (!EM_texFaceCheck(em)) {
-		BKE_report(op->reports, RPT_ERROR, "Mesh has no uv/image layers.");
+		BKE_report(op->reports, RPT_WARNING, "Mesh has no uv/image layers.");
 		BKE_mesh_end_editmesh(obedit->data, em);
 		return OPERATOR_CANCELLED;
 	}
@@ -6537,7 +6615,7 @@ static int mesh_mirror_uvs(bContext *C, wmOperator *op)
 	if(!change)
 		return OPERATOR_CANCELLED;
 
-	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 
 	return OPERATOR_FINISHED;
@@ -6554,7 +6632,7 @@ static int mesh_rotate_colors(bContext *C, wmOperator *op)
 	int dir= RNA_enum_get(op->ptr, "direction");
 
 	if (!EM_vertColorCheck(em)) {
-		BKE_report(op->reports, RPT_ERROR, "Mesh has no color layers.");
+		BKE_report(op->reports, RPT_WARNING, "Mesh has no color layers.");
 		BKE_mesh_end_editmesh(obedit->data, em);
 		return OPERATOR_CANCELLED;
 	}
@@ -6593,7 +6671,7 @@ static int mesh_rotate_colors(bContext *C, wmOperator *op)
 	if(!change)
 		return OPERATOR_CANCELLED;
 
-	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 
 	return OPERATOR_FINISHED;
@@ -6611,7 +6689,7 @@ static int mesh_mirror_colors(bContext *C, wmOperator *op)
 	int axis= RNA_enum_get(op->ptr, "axis");
 
 	if (!EM_vertColorCheck(em)) {
-		BKE_report(op->reports, RPT_ERROR, "Mesh has no color layers");
+		BKE_report(op->reports, RPT_WARNING, "Mesh has no color layers");
 		BKE_mesh_end_editmesh(obedit->data, em);
 		return OPERATOR_CANCELLED;
 	}
@@ -6649,7 +6727,7 @@ static int mesh_mirror_colors(bContext *C, wmOperator *op)
 	if(!change)
 		return OPERATOR_CANCELLED;
 
-	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 
 	return OPERATOR_FINISHED;
@@ -6688,7 +6766,7 @@ void MESH_OT_uvs_mirror(wmOperatorType *ot)
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 
 	/* props */
-	RNA_def_enum(ot->srna, "axis", axis_items, DIRECTION_CW, "Axis", "Axis to mirror UVs around.");
+	RNA_def_enum(ot->srna, "axis", axis_items_xy, DIRECTION_CW, "Axis", "Axis to mirror UVs around.");
 }
 
 void MESH_OT_colors_rotate(wmOperatorType *ot)
@@ -6724,7 +6802,7 @@ void MESH_OT_colors_mirror(wmOperatorType *ot)
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 
 	/* props */
-	RNA_def_enum(ot->srna, "axis", axis_items, DIRECTION_CW, "Axis", "Axis to mirror colors around.");
+	RNA_def_enum(ot->srna, "axis", axis_items_xy, DIRECTION_CW, "Axis", "Axis to mirror colors around.");
 }
 
 /********************** Subdivide Operator *************************/
@@ -6747,7 +6825,7 @@ static int subdivide_exec(bContext *C, wmOperator *op)
 
 	esubdivideflag(obedit, em, 1, smooth, fractal, ts->editbutflag|flag, cuts, corner_cut_pattern, 0);
 
-	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 
 	return OPERATOR_FINISHED;
@@ -6769,7 +6847,7 @@ void MESH_OT_subdivide(wmOperatorType *ot)
 
 	/* properties */
 	RNA_def_int(ot->srna, "number_cuts", 1, 1, INT_MAX, "Number of Cuts", "", 1, 10);
-	RNA_def_float(ot->srna, "smoothness", 0.0f, 0.0f, FLT_MAX, "Smoothness", "Smoothness factor.", 0.0f, 1000.0f);
+	RNA_def_float(ot->srna, "smoothness", 0.0f, 0.0f, FLT_MAX, "Smoothness", "Smoothness factor.", 0.0f, 1.0f);
 	RNA_def_float(ot->srna, "fractal", 0.0, 0.0f, FLT_MAX, "Fractal", "Fractal randomness factor.", 0.0f, 1000.0f);
 	RNA_def_enum(ot->srna, "corner_cut_pattern", corner_type_items, SUBDIV_CORNER_INNERVERT, "Corner Cut Pattern", "Topology pattern to use to fill a face after cutting across its corner");
 }
@@ -7029,7 +7107,7 @@ static int fill_mesh_exec(bContext *C, wmOperator *UNUSED(op))
 
 	BKE_mesh_end_editmesh(obedit->data, em);
 
-	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 
 	return OPERATOR_FINISHED;
@@ -7060,7 +7138,7 @@ static int beautify_fill_exec(bContext *C, wmOperator *UNUSED(op))
 
 	BKE_mesh_end_editmesh(obedit->data, em);
 
-	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 
 	return OPERATOR_FINISHED;
@@ -7131,7 +7209,7 @@ static int sort_faces_exec(bContext *C, wmOperator *op)
 	if (!v3d) return OPERATOR_CANCELLED;
 
 	/* This operator work in Object Mode, not in edit mode.
-	 * After talk with Cambell we agree that there is no point to port this to EditMesh right now.
+	 * After talk with Campbell we agree that there is no point to port this to EditMesh right now.
 	 * so for now, we just exit_editmode and enter_editmode at the end of this function.
 	 */
 	ED_object_exit_editmode(C, EM_FREEDATA);
@@ -7224,7 +7302,7 @@ static int sort_faces_exec(bContext *C, wmOperator *op)
 	}
 
 	MEM_freeN(index);
-	DAG_id_flush_update(ob->data, OB_RECALC_DATA);
+	DAG_id_tag_update(ob->data, 0);
 
 	/* Return to editmode. */
 	ED_object_enter_editmode(C, 0);
@@ -7268,7 +7346,7 @@ static int quads_convert_to_tris_exec(bContext *C, wmOperator *UNUSED(op))
 
 	convert_to_triface(em,0);
 
-	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 
 	BKE_mesh_end_editmesh(obedit->data, em);
@@ -7297,7 +7375,7 @@ static int tris_convert_to_quads_exec(bContext *C, wmOperator *UNUSED(op))
 
 	join_triangles(em);
 
-	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 
 	BKE_mesh_end_editmesh(obedit->data, em);
@@ -7326,7 +7404,7 @@ static int edge_flip_exec(bContext *C, wmOperator *UNUSED(op))
 
 	edge_flip(em);
 
-	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 
 	BKE_mesh_end_editmesh(obedit->data, em);
@@ -7373,7 +7451,7 @@ static int mesh_faces_shade_smooth_exec(bContext *C, wmOperator *UNUSED(op))
 
 	BKE_mesh_end_editmesh(obedit->data, em);
 
-	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 
 	return OPERATOR_FINISHED;
@@ -7401,7 +7479,7 @@ static int mesh_faces_shade_flat_exec(bContext *C, wmOperator *UNUSED(op))
 
 	mesh_set_smooth_faces(em, 0);
 
-	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 
 	return OPERATOR_FINISHED;
@@ -7480,7 +7558,7 @@ void MESH_OT_select_axis(wmOperatorType *ot)
 		{-1, "ALIGNED",  0, "Aligned Axis", ""},
 		{0, NULL, 0, NULL, NULL}};
 	
-	static EnumPropertyItem axis_items[] = {
+	static EnumPropertyItem axis_items_xyz[] = {
 		{0, "X_AXIS", 0, "X Axis", ""},
 		{1, "Y_AXIS", 0, "Y Axis", ""},
 		{2, "Z_AXIS", 0, "Z Axis", ""},
@@ -7500,6 +7578,6 @@ void MESH_OT_select_axis(wmOperatorType *ot)
 
 	/* properties */
 	RNA_def_enum(ot->srna, "mode", axis_mode_items, 0, "Axis Mode", "Axis side to use when selecting");
-	RNA_def_enum(ot->srna, "axis", axis_items, 0, "Axis", "Select the axis to compare each vertex on");
+	RNA_def_enum(ot->srna, "axis", axis_items_xyz, 0, "Axis", "Select the axis to compare each vertex on");
 }
 

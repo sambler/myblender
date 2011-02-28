@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/blenkernel/intern/brush.c
+ *  \ingroup bke
+ */
+
+
 #include <math.h>
 #include <string.h>
 
@@ -45,6 +50,7 @@
 #include "BLI_math.h"
 #include "BLI_blenlib.h"
 #include "BLI_rand.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_brush.h"
 #include "BKE_colortools.h"
@@ -67,7 +73,7 @@ static void brush_set_defaults(Brush *brush)
 	brush->blend = 0;
 	brush->flag = 0;
 
-	brush->ob_mode = (OB_MODE_SCULPT|OB_MODE_VERTEX_PAINT|OB_MODE_WEIGHT_PAINT|OB_MODE_TEXTURE_PAINT);
+	brush->ob_mode = OB_MODE_ALL_PAINT;
 
 	/* BRUSH SCULPT TOOL SETTINGS */
 	brush->size= 35; /* radius of the brush in pixels */
@@ -185,13 +191,13 @@ void make_local_brush(Brush *brush)
 	Scene *scene;
 	int local= 0, lib= 0;
 
-	if(brush->id.lib==0) return;
+	if(brush->id.lib==NULL) return;
 
 	if(brush->clone.image) {
 		/* special case: ima always local immediately */
-		brush->clone.image->id.lib= 0;
+		brush->clone.image->id.lib= NULL;
 		brush->clone.image->id.flag= LIB_LOCAL;
-		new_id(0, (ID *)brush->clone.image, 0);
+		new_id(NULL, (ID *)brush->clone.image, NULL);
 	}
 
 	for(scene= G.main->scene.first; scene; scene=scene->id.next)
@@ -201,9 +207,9 @@ void make_local_brush(Brush *brush)
 		}
 
 	if(local && lib==0) {
-		brush->id.lib= 0;
+		brush->id.lib= NULL;
 		brush->id.flag= LIB_LOCAL;
-		new_id(0, (ID *)brush, 0);
+		new_id(NULL, (ID *)brush, NULL);
 
 		/* enable fake user by default */
 		if (!(brush->id.flag & LIB_FAKEUSER)) {
@@ -218,7 +224,7 @@ void make_local_brush(Brush *brush)
 		
 		for(scene= G.main->scene.first; scene; scene=scene->id.next)
 			if(paint_brush(&scene->toolsettings->imapaint.paint)==brush)
-				if(scene->id.lib==0) {
+				if(scene->id.lib==NULL) {
 					paint_brush_set(&scene->toolsettings->imapaint.paint, brushn);
 					brushn->id.us++;
 					brush->id.us--;
@@ -228,10 +234,8 @@ void make_local_brush(Brush *brush)
 
 void brush_debug_print_state(Brush *br)
 {
-	Brush def;
-
 	/* create a fake brush and set it to the defaults */
-	memset(&def, 0, sizeof(Brush));
+	Brush def= {{NULL}};
 	brush_set_defaults(&def);
 	
 #define BR_TEST(field, t)					\
@@ -425,7 +429,7 @@ int brush_texture_set_nr(Brush *brush, int nr)
 	id= (ID *)brush->mtex.tex;
 
 	idtest= (ID*)BLI_findlink(&G.main->tex, nr-1);
-	if(idtest==0) { /* new tex */
+	if(idtest==NULL) { /* new tex */
 		if(id) idtest= (ID *)copy_texture((Tex *)id);
 		else idtest= (ID *)add_texture("Tex");
 		idtest->us--;
@@ -908,7 +912,13 @@ static void brush_apply_pressure(BrushPainter *painter, Brush *brush, float pres
 
 void brush_jitter_pos(Brush *brush, float *pos, float *jitterpos)
 {
-	if(brush->jitter){
+	int use_jitter= brush->jitter != 0;
+
+	/* jitter-ed brush gives wierd and unpredictable result for this
+	   kinds of stroke, so manyally disable jitter usage (sergey) */
+	use_jitter&= (brush->flag & (BRUSH_RESTORE_MESH|BRUSH_ANCHORED)) == 0;
+
+	if(use_jitter){
 		float rand_pos[2];
 		const int radius= brush_size(brush);
 		const int diameter= 2*radius;
@@ -1098,11 +1108,9 @@ unsigned int *brush_gen_texture_cache(Brush *br, int half_side)
 {
 	unsigned int *texcache = NULL;
 	MTex *mtex = &br->mtex;
-	TexResult texres;
+	TexResult texres= {0};
 	int hasrgb, ix, iy;
 	int side = half_side * 2;
-
-	memset(&texres, 0, sizeof(TexResult));
 	
 	if(mtex->tex) {
 		float x, y, step = 2.0 / side, co[3];

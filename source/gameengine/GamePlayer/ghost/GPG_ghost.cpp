@@ -1,4 +1,4 @@
-/**
+/*
 * $Id$
 *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
 * Start up of the Blender Player on GHOST.
 */
+
+/** \file gameengine/GamePlayer/ghost/GPG_ghost.cpp
+ *  \ingroup player
+ */
+
 
 #include <iostream>
 #include <math.h>
@@ -72,6 +77,11 @@ extern "C"
 extern char bprogname[];	/* holds a copy of argv[0], from creator.c */
 extern char btempdir[];		/* use this to store a valid temp directory */
 
+// For BLF
+#include "BLF_api.h"
+extern int datatoc_bfont_ttf_size;
+extern char datatoc_bfont_ttf[];
+
 #ifdef __cplusplus
 }
 #endif // __cplusplus
@@ -95,15 +105,15 @@ extern char btempdir[];		/* use this to store a valid temp directory */
 
 #ifdef WIN32
 #include <windows.h>
-#ifdef NDEBUG
+#if !defined(DEBUG)
 #include <wincon.h>
-#endif // NDEBUG
+#endif // !defined(DEBUG)
 #endif // WIN32
 
 const int kMinWindowWidth = 100;
 const int kMinWindowHeight = 100;
 
-char bprogname[FILE_MAXDIR+FILE_MAXFILE];
+char bprogname[FILE_MAX];
 
 #ifdef WIN32
 typedef enum 
@@ -357,7 +367,7 @@ int main(int argc, char** argv)
 	signal (SIGFPE, SIG_IGN);
 #endif /* __alpha__ */
 #endif /* __linux__ */
-	BLI_where_am_i(bprogname, argv[0]);
+	BLI_where_am_i(bprogname, sizeof(bprogname), argv[0]);
 #ifdef __APPLE__
     // Can't use Carbon right now because of double defined type ID (In Carbon.h and DNA_ID.h, sigh)
     /*
@@ -389,9 +399,14 @@ int main(int argc, char** argv)
 	GEN_init_messaging_system();
 
 	IMB_init();
+
+	// Setup builtin font for BLF (mostly copied from creator.c, wm_init_exit.c and interface_style.c)
+	BLF_init(11, U.dpi);
+	BLF_lang_init();
+	BLF_load_mem("default", (unsigned char*)datatoc_bfont_ttf, datatoc_bfont_ttf_size);
  
 	// Parse command line options
-#ifndef NDEBUG
+#if defined(DEBUG)
 	printf("argv[0] = '%s'\n", argv[0]);
 #endif
 
@@ -438,7 +453,7 @@ int main(int argc, char** argv)
 		;)
 
 	{
-#ifndef NDEBUG
+#if defined(DEBUG)
 		printf("argv[%d] = '%s'   , %i\n", i, argv[i],argc);
 #endif
 		if (argv[i][0] == '-')
@@ -469,7 +484,7 @@ int main(int argc, char** argv)
 								SYS_WriteCommandLineInt(syshandle, paramname, atoi(argv[i]));
 								SYS_WriteCommandLineFloat(syshandle, paramname, atof(argv[i]));
 								SYS_WriteCommandLineString(syshandle, paramname, argv[i]);
-#ifndef NDEBUG
+#if defined(DEBUG)
 								printf("%s = '%s'\n", paramname, argv[i]);
 #endif
 								i++;
@@ -542,9 +557,9 @@ int main(int argc, char** argv)
 					printf("error: too few options for parent window argument.\n");
 				}
 
-#ifndef NDEBUG
+#if defined(DEBUG)
 				printf("XWindows ID = %d\n", parentWindow);
-#endif //NDEBUG
+#endif // defined(DEBUG)
 
 #endif  // _WIN32			
 			case 'c':
@@ -745,12 +760,12 @@ int main(int argc, char** argv)
 					else 
 					{
 #ifdef WIN32
-#ifdef NDEBUG
+#if !defined(DEBUG)
 						if (closeConsole)
 						{
 							//::FreeConsole();    // Close a console window
 						}
-#endif // NDEBUG
+#endif // !defined(DEBUG)
 #endif // WIN32
 						Main *maggie = bfd->main;
 						Scene *scene = bfd->curscene;
@@ -821,9 +836,10 @@ int main(int argc, char** argv)
 						app.SetGameEngineData(maggie, scene, argc, argv); /* this argc cant be argc_py_clamped, since python uses it */
 						
 						BLI_strncpy(pathname, maggie->name, sizeof(pathname));
-						BLI_strncpy(G.sce, maggie->name, sizeof(G.sce));
-						setGamePythonPath(G.sce);
-
+						BLI_strncpy(G.main->name, maggie->name, sizeof(G.main->name));
+#ifdef WITH_PYTHON
+						setGamePythonPath(G.main->name);
+#endif
 						if (firstTimeRunning)
 						{
 							firstTimeRunning = false;
@@ -932,7 +948,13 @@ int main(int argc, char** argv)
 		}
 	}
 
+	// Cleanup
+	RNA_exit();
+	BLF_exit();
+	IMB_exit();
 	free_nodesystem();
+
+	SYS_DeleteSystem(syshandle);
 
 	return error ? -1 : 0;
 }

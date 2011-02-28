@@ -30,6 +30,11 @@
 *
 */
 
+/** \file blender/modifiers/intern/MOD_multires.c
+ *  \ingroup modifiers
+ */
+
+
 #include <stddef.h>
 
 #include "BKE_cdderivedmesh.h"
@@ -39,6 +44,8 @@
 #include "BKE_particle.h"
 
 #include "DNA_mesh_types.h"
+
+#include "MOD_util.h"
 
 static void initData(ModifierData *md)
 {
@@ -59,6 +66,8 @@ static void copyData(ModifierData *md, ModifierData *target)
 	tmmd->sculptlvl = mmd->sculptlvl;
 	tmmd->renderlvl = mmd->renderlvl;
 	tmmd->totlvl = mmd->totlvl;
+	tmmd->simple = mmd->simple;
+	tmmd->flags = mmd->flags;
 }
 
 static DerivedMesh *applyModifier(ModifierData *md, Object *ob, DerivedMesh *dm,
@@ -107,6 +116,7 @@ ModifierTypeInfo modifierType_Multires = {
 
 	/* copyData */          copyData,
 	/* deformVerts */       0,
+	/* deformMatrices */    0,
 	/* deformVertsEM */     0,
 	/* deformMatricesEM */  0,
 	/* applyModifier */     applyModifier,

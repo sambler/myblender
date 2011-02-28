@@ -29,6 +29,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/blenkernel/intern/mesh.c
+ *  \ingroup bke
+ */
+
+
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -42,6 +47,12 @@
 #include "DNA_key_types.h"
 #include "DNA_meshdata_types.h"
 #include "DNA_ipo_types.h"
+
+#include "BLI_blenlib.h"
+#include "BLI_editVert.h"
+#include "BLI_math.h"
+#include "BLI_edgehash.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_animsys.h"
 #include "BKE_main.h"
@@ -58,12 +69,6 @@
 #include "BKE_curve.h"
 /* -- */
 #include "BKE_object.h"
-#include "BKE_utildefines.h"
-
-#include "BLI_blenlib.h"
-#include "BLI_editVert.h"
-#include "BLI_math.h"
-#include "BLI_edgehash.h"
 
 
 EditMesh *BKE_mesh_get_editmesh(Mesh *me)
@@ -98,11 +103,11 @@ void unlink_mesh(Mesh *me)
 {
 	int a;
 	
-	if(me==0) return;
+	if(me==NULL) return;
 	
 	for(a=0; a<me->totcol; a++) {
 		if(me->mat[a]) me->mat[a]->id.us--;
-		me->mat[a]= 0;
+		me->mat[a]= NULL;
 	}
 
 	if(me->key) {
@@ -110,9 +115,9 @@ void unlink_mesh(Mesh *me)
 		if (me->key->id.us == 0 && me->key->ipo )
 			me->key->ipo->id.us--;
 	}
-	me->key= 0;
+	me->key= NULL;
 	
-	if(me->texcomesh) me->texcomesh= 0;
+	if(me->texcomesh) me->texcomesh= NULL;
 }
 
 
@@ -184,7 +189,7 @@ void free_dverts(MDeformVert *dvert, int totvert)
 	MEM_freeN (dvert);
 }
 
-Mesh *add_mesh(char *name)
+Mesh *add_mesh(const char *name)
 {
 	Mesh *me;
 	
@@ -255,9 +260,9 @@ void make_local_tface(Mesh *me)
 				if(tface->tpage) {
 					ima= tface->tpage;
 					if(ima->id.lib) {
-						ima->id.lib= 0;
+						ima->id.lib= NULL;
 						ima->id.flag= LIB_LOCAL;
-						new_id(0, (ID *)ima, 0);
+						new_id(NULL, (ID *)ima, NULL);
 					}
 				}
 			}
@@ -277,11 +282,11 @@ void make_local_mesh(Mesh *me)
 		* - mixed: make copy
 		*/
 	
-	if(me->id.lib==0) return;
+	if(me->id.lib==NULL) return;
 	if(me->id.us==1) {
-		me->id.lib= 0;
+		me->id.lib= NULL;
 		me->id.flag= LIB_LOCAL;
-		new_id(0, (ID *)me, 0);
+		new_id(NULL, (ID *)me, NULL);
 		
 		if(me->mtface) make_local_tface(me);
 		
@@ -298,9 +303,9 @@ void make_local_mesh(Mesh *me)
 	}
 	
 	if(local && lib==0) {
-		me->id.lib= 0;
+		me->id.lib= NULL;
 		me->id.flag= LIB_LOCAL;
-		new_id(0, (ID *)me, 0);
+		new_id(NULL, (ID *)me, NULL);
 		
 		if(me->mtface) make_local_tface(me);
 		
@@ -312,7 +317,7 @@ void make_local_mesh(Mesh *me)
 		ob= bmain->object.first;
 		while(ob) {
 			if( me==get_mesh(ob) ) {				
-				if(ob->id.lib==0) {
+				if(ob->id.lib==NULL) {
 					set_mesh(ob, men);
 				}
 			}
@@ -327,7 +332,7 @@ void boundbox_mesh(Mesh *me, float *loc, float *size)
 	float min[3], max[3];
 	float mloc[3], msize[3];
 	
-	if(me->bb==0) me->bb= MEM_callocN(sizeof(BoundBox), "boundbox");
+	if(me->bb==NULL) me->bb= MEM_callocN(sizeof(BoundBox), "boundbox");
 	bb= me->bb;
 
 	if (!loc) loc= mloc;
@@ -444,7 +449,7 @@ int test_index_face(MFace *mface, CustomData *fdata, int mfindex, int nr)
 		mface->v4= 0;
 		nr--;
 	}
-	if(mface->v2 && mface->v2==mface->v3) {
+	if((mface->v2 || mface->v4) && mface->v2==mface->v3) {
 		mface->v3= mface->v4;
 		mface->v4= 0;
 		nr--;
@@ -454,6 +459,32 @@ int test_index_face(MFace *mface, CustomData *fdata, int mfindex, int nr)
 		mface->v3= mface->v4;
 		mface->v4= 0;
 		nr--;
+	}
+
+	/* check corrupt cases, bowtie geometry, cant handle these because edge data wont exist so just return 0 */
+	if(nr==3) {
+		if(
+		/* real edges */
+			mface->v1==mface->v2 ||
+			mface->v2==mface->v3 ||
+			mface->v3==mface->v1
+		) {
+			return 0;
+		}
+	}
+	else if(nr==4) {
+		if(
+		/* real edges */
+			mface->v1==mface->v2 ||
+			mface->v2==mface->v3 ||
+			mface->v3==mface->v4 ||
+			mface->v4==mface->v1 ||
+		/* across the face */
+			mface->v1==mface->v3 ||
+			mface->v2==mface->v4
+		) {
+			return 0;
+		}
 	}
 
 	/* prevent a zero at wrong index location */
@@ -486,18 +517,18 @@ int test_index_face(MFace *mface, CustomData *fdata, int mfindex, int nr)
 Mesh *get_mesh(Object *ob)
 {
 	
-	if(ob==0) return 0;
+	if(ob==NULL) return NULL;
 	if(ob->type==OB_MESH) return ob->data;
-	else return 0;
+	else return NULL;
 }
 
 void set_mesh(Object *ob, Mesh *me)
 {
-	Mesh *old=0;
+	Mesh *old=NULL;
 
 	multires_force_update(ob);
 	
-	if(ob==0) return;
+	if(ob==NULL) return;
 	
 	if(ob->type==OB_MESH) {
 		old= ob->data;
@@ -678,6 +709,23 @@ void mesh_strip_loose_faces(Mesh *me)
 	me->totface = b;
 }
 
+void mesh_strip_loose_edges(Mesh *me)
+{
+	int a,b;
+
+	for (a=b=0; a<me->totedge; a++) {
+		if (me->medge[a].v1!=me->medge[a].v2) {
+			if (a!=b) {
+				memcpy(&me->medge[b],&me->medge[a],sizeof(me->medge[b]));
+				CustomData_copy_data(&me->edata, &me->edata, a, b, 1);
+				CustomData_free_elem(&me->edata, a, 1);
+			}
+			b++;
+		}
+	}
+	me->totedge = b;
+}
+
 void mball_to_mesh(ListBase *lb, Mesh *me)
 {
 	DispList *dl;
@@ -687,7 +735,7 @@ void mball_to_mesh(ListBase *lb, Mesh *me)
 	int a, *index;
 	
 	dl= lb->first;
-	if(dl==0) return;
+	if(dl==NULL) return;
 
 	if(dl->type==DL_INDEX4) {
 		me->totvert= dl->nr;
@@ -735,7 +783,7 @@ void mball_to_mesh(ListBase *lb, Mesh *me)
 int nurbs_to_mdata(Object *ob, MVert **allvert, int *totvert,
 	MEdge **alledge, int *totedge, MFace **allface, int *totface)
 {
-	return nurbs_to_mdata_customdb(ob, &((Curve *)ob->data)->disp,
+	return nurbs_to_mdata_customdb(ob, &ob->disp,
 		allvert, totvert, alledge, totedge, allface, totface);
 }
 
@@ -751,8 +799,12 @@ int nurbs_to_mdata_customdb(Object *ob, ListBase *dispbase, MVert **allvert, int
 	float *data;
 	int a, b, ofs, vertcount, startvert, totvert=0, totvlak=0;
 	int p1, p2, p3, p4, *index;
+	int conv_polys= 0;
 
 	cu= ob->data;
+
+	conv_polys|= cu->flag & CU_3D;		/* 2d polys are filled with DL_INDEX3 displists */
+	conv_polys|= ob->type == OB_SURF;	/* surf polys are never filled */
 
 	/* count */
 	dl= dispbase->first;
@@ -762,8 +814,10 @@ int nurbs_to_mdata_customdb(Object *ob, ListBase *dispbase, MVert **allvert, int
 			totvlak+= dl->parts*(dl->nr-1);
 		}
 		else if(dl->type==DL_POLY) {
-			totvert+= dl->parts*dl->nr;
-			totvlak+= dl->parts*dl->nr;
+			if(conv_polys) {
+				totvert+= dl->parts*dl->nr;
+				totvlak+= dl->parts*dl->nr;
+			}
 		}
 		else if(dl->type==DL_SURF) {
 			totvert+= dl->parts*dl->nr;
@@ -783,7 +837,7 @@ int nurbs_to_mdata_customdb(Object *ob, ListBase *dispbase, MVert **allvert, int
 	}
 
 	*allvert= mvert= MEM_callocN(sizeof (MVert) * totvert, "nurbs_init mvert");
-	*allface= mface= MEM_callocN(sizeof (MVert) * totvert, "nurbs_init mface");
+	*allface= mface= MEM_callocN(sizeof (MVert) * totvlak, "nurbs_init mface");
 
 	/* verts and faces */
 	vertcount= 0;
@@ -815,24 +869,26 @@ int nurbs_to_mdata_customdb(Object *ob, ListBase *dispbase, MVert **allvert, int
 
 		}
 		else if(dl->type==DL_POLY) {
-			startvert= vertcount;
-			a= dl->parts*dl->nr;
-			data= dl->verts;
-			while(a--) {
-				VECCOPY(mvert->co, data);
-				data+=3;
-				vertcount++;
-				mvert++;
-			}
+			if(conv_polys) {
+				startvert= vertcount;
+				a= dl->parts*dl->nr;
+				data= dl->verts;
+				while(a--) {
+					VECCOPY(mvert->co, data);
+					data+=3;
+					vertcount++;
+					mvert++;
+				}
 
-			for(a=0; a<dl->parts; a++) {
-				ofs= a*dl->nr;
-				for(b=0; b<dl->nr; b++) {
-					mface->v1= startvert+ofs+b;
-					if(b==dl->nr-1) mface->v2= startvert+ofs;
-					else mface->v2= startvert+ofs+b+1;
-					if(smooth) mface->flag |= ME_SMOOTH;
-					mface++;
+				for(a=0; a<dl->parts; a++) {
+					ofs= a*dl->nr;
+					for(b=0; b<dl->nr; b++) {
+						mface->v1= startvert+ofs+b;
+						if(b==dl->nr-1) mface->v2= startvert+ofs;
+						else mface->v2= startvert+ofs+b+1;
+						if(smooth) mface->flag |= ME_SMOOTH;
+						mface++;
+					}
 				}
 			}
 		}
@@ -972,7 +1028,7 @@ void nurbs_to_mesh(Object *ob)
 
 	tex_space_mesh(me);
 
-	cu->mat= 0;
+	cu->mat= NULL;
 	cu->totcol= 0;
 
 	if(ob->data) {
@@ -1214,8 +1270,6 @@ void mesh_set_smooth_flag(Object *meshOb, int enableSmooth)
 			mf->flag &= ~ME_SMOOTH;
 		}
 	}
-
-// XXX do this in caller	DAG_id_flush_update(&me->id, OB_RECALC_DATA);
 }
 
 void mesh_calc_normals(MVert *mverts, int numVerts, MFace *mfaces, int numFaces, float **faceNors_r) 
@@ -1475,8 +1529,6 @@ void mesh_pmv_revert(Mesh *me)
 		me->pv->edge_map= NULL;
 		MEM_freeN(me->pv->vert_map);
 		me->pv->vert_map= NULL;
-
-// XXX do this in caller		DAG_id_flush_update(&me->id, OB_RECALC_DATA);
 	}
 }
 
@@ -1509,7 +1561,10 @@ int mesh_center_median(Mesh *me, float cent[3])
 	for(mvert= me->mvert; i--; mvert++) {
 		add_v3_v3(cent, mvert->co);
 	}
-	mul_v3_fl(cent, 1.0f/(float)me->totvert);
+	/* otherwise we get NAN for 0 verts */
+	if(me->totvert) {
+		mul_v3_fl(cent, 1.0f/(float)me->totvert);
+	}
 
 	return (me->totvert != 0);
 }

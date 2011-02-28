@@ -1,5 +1,5 @@
 
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -23,9 +23,18 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/python/intern/bpy_operator_wrap.c
+ *  \ingroup pythonintern
+ */
+
+
+#include <Python.h>
+
 #include "bpy_operator_wrap.h"
 #include "WM_api.h"
 #include "WM_types.h"
+
+#include "BLI_utildefines.h"
 
 #include "RNA_define.h"
 

@@ -27,9 +27,17 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/physics/physics_pointcache.c
+ *  \ingroup edphys
+ */
+
+
 #include <stdlib.h>
 
 #include "MEM_guardedalloc.h"
+
+#include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 
 #include "DNA_scene_types.h"
 
@@ -41,12 +49,9 @@
 #include "BKE_pointcache.h"
 #include "BKE_report.h"
 #include "BKE_scene.h"
-#include "BKE_utildefines.h" 
-
-#include "BLI_blenlib.h"
+ 
 
 #include "ED_particle.h"
-
 
 #include "WM_api.h"
 #include "WM_types.h"
@@ -75,15 +80,15 @@ static int ptcache_poll(bContext *C)
 	return (ptr.data && ptr.id.data);
 }
 
-void bake_console_progress(void *UNUSED(arg), int nr)
+static void bake_console_progress(void *UNUSED(arg), int nr)
 {
 	printf("\rbake: %3i%%", nr);
 	fflush(stdout);
 }
 
-void bake_console_progress_end(void *UNUSED(arg))
+static void bake_console_progress_end(void *UNUSED(arg))
 {
-	printf("\n");
+	printf("\rbake: done!\n");
 }
 
 static int ptcache_bake_all_exec(bContext *C, wmOperator *op)
@@ -103,6 +108,9 @@ static int ptcache_bake_all_exec(bContext *C, wmOperator *op)
 	baker.break_test = cache_break_test;
 	baker.break_data = NULL;
 
+	/* Disabled for now as this doesn't work properly,
+	 * and pointcache baking will be reimplemented with
+	 * the job system soon anyways. */
 	if (win) {
 		baker.progressbar = (void (*)(void *, int))WM_timecursor;
 		baker.progressend = (void (*)(void *))WM_cursor_restore;
@@ -113,7 +121,7 @@ static int ptcache_bake_all_exec(bContext *C, wmOperator *op)
 		baker.progresscontext = NULL;
 	}
 
-	BKE_ptcache_make_cache(&baker);
+	BKE_ptcache_bake(&baker);
 
 	WM_event_add_notifier(C, NC_SCENE|ND_FRAME, scene);
 	WM_event_add_notifier(C, NC_OBJECT|ND_POINTCACHE, NULL);
@@ -201,6 +209,9 @@ static int ptcache_bake_exec(bContext *C, wmOperator *op)
 	baker.break_test = cache_break_test;
 	baker.break_data = NULL;
 
+	/* Disabled for now as this doesn't work properly,
+	 * and pointcache baking will be reimplemented with
+	 * the job system soon anyways. */
 	if (win) {
 		baker.progressbar = (void (*)(void *, int))WM_timecursor;
 		baker.progressend = (void (*)(void *))WM_cursor_restore;
@@ -212,7 +223,7 @@ static int ptcache_bake_exec(bContext *C, wmOperator *op)
 		baker.progresscontext = NULL;
 	}
 
-	BKE_ptcache_make_cache(&baker);
+	BKE_ptcache_bake(&baker);
 
 	BLI_freelistN(&pidlist);
 

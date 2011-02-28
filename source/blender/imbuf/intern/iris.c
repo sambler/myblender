@@ -1,4 +1,4 @@
-/**
+/*
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -28,6 +28,11 @@
  *
  * $Id$
  */
+
+/** \file blender/imbuf/intern/iris.c
+ *  \ingroup imbuf
+ */
+
 
 #include <string.h>
 
@@ -123,7 +128,8 @@ static int file_offset;
 static unsigned short getshort(FILE *inf)
 {
 	unsigned char * buf;
-	
+	(void)inf; /* unused */
+
 	buf = file_data + file_offset;
 	file_offset += 2;
 	
@@ -133,6 +139,7 @@ static unsigned short getshort(FILE *inf)
 static unsigned int getlong(FILE *inf)
 {
 	unsigned char * buf;
+	(void)inf; /* unused */
 	
 	buf = file_data + file_offset;
 	file_offset += 4;
@@ -173,9 +180,8 @@ static void readheader(FILE *inf, IMAGE *image)
 
 static int writeheader(FILE *outf, IMAGE *image)
 {
-	IMAGE t;
+	IMAGE t= {0};
 
-	memset(&t, 0, sizeof(IMAGE));
 	fwrite(&t,sizeof(IMAGE),1,outf);
 	fseek(outf,0,SEEK_SET);
 	putshort(outf,image->imagic);
@@ -258,6 +264,8 @@ struct ImBuf *imb_loadiris(unsigned char *mem, size_t size, int flags)
 	int bpp, rle, cur, badorder;
 	ImBuf * ibuf;
 
+	(void)size; /* unused */
+	
 	if(!imb_is_a_iris(mem)) return NULL;
 
 	/*printf("new iris\n");*/
@@ -658,7 +666,7 @@ static void expandrow(unsigned char *optr, unsigned char *iptr, int z)
  *  Added: zbuf write
  */
 
-static int output_iris(unsigned int *lptr, int xsize, int ysize, int zsize, char *name, int *zptr)
+static int output_iris(unsigned int *lptr, int xsize, int ysize, int zsize, const char *name, int *zptr)
 {
 	FILE *outf;
 	IMAGE *image;
@@ -812,7 +820,7 @@ static int compressrow(unsigned char *lbuf, unsigned char *rlebuf, int z, int cn
 	return optr - (unsigned char *)rlebuf;
 }
 
-int imb_saveiris(struct ImBuf * ibuf, char *name, int flags)
+int imb_saveiris(struct ImBuf * ibuf, const char *name, int flags)
 {
 	short zsize;
 	int ret;

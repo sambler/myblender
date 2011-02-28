@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/armature/poseUtils.c
+ *  \ingroup edarmature
+ */
+
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <stddef.h>
@@ -38,6 +43,7 @@
 #include "BLI_blenlib.h"
 #include "BLI_dynstr.h"
 #include "BLI_dlrbTree.h"
+#include "BLI_utildefines.h"
 
 #include "DNA_anim_types.h"
 #include "DNA_armature_types.h"
@@ -161,7 +167,7 @@ void poseAnim_mapping_refresh (bContext *C, Scene *scene, Object *ob)
 	 */
 	// FIXME: shouldn't this use the builtin stuff?
 	if ((arm->flag & ARM_DELAYDEFORM)==0)
-		DAG_id_flush_update(&ob->id, OB_RECALC_DATA);  /* sets recalc flags */
+		DAG_id_tag_update(&ob->id, OB_RECALC_DATA);  /* sets recalc flags */
 	else
 		where_is_pose(scene, ob);
 	

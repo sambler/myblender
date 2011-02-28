@@ -1,3 +1,6 @@
+/** \file blender/editors/uvedit/uvedit_parametrizer.c
+ *  \ingroup eduv
+ */
 
 #include "MEM_guardedalloc.h"
 
@@ -6,8 +9,9 @@
 #include "BLI_rand.h"
 #include "BLI_heap.h"
 #include "BLI_boxpack2d.h"
+#include "BLI_utildefines.h"
 
-#include "BKE_utildefines.h"
+
 
 #include "ONL_opennl.h"
 
@@ -259,7 +263,7 @@ static int phash_size(PHash *ph)
 static void phash_insert(PHash *ph, PHashLink *link)
 {
 	int size = ph->cursize;
-	int hash = PHASH_hash(ph, link->key);
+	uintptr_t hash = PHASH_hash(ph, link->key);
 	PHashLink *lookup = ph->buckets[hash];
 
 	if (lookup == NULL) {
@@ -295,7 +299,7 @@ static void phash_insert(PHash *ph, PHashLink *link)
 static PHashLink *phash_lookup(PHash *ph, PHashKey key)
 {
 	PHashLink *link;
-	int hash = PHASH_hash(ph, key);
+	uintptr_t hash = PHASH_hash(ph, key);
 
 	for (link = ph->buckets[hash]; link; link = link->next)
 		if (link->key == key)
@@ -308,7 +312,7 @@ static PHashLink *phash_lookup(PHash *ph, PHashKey key)
 
 static PHashLink *phash_next(PHash *ph, PHashKey key, PHashLink *link)
 {
-	int hash = PHASH_hash(ph, key);
+	uintptr_t hash = PHASH_hash(ph, key);
 
 	for (link = link->next; link; link = link->next)
 		if (link->key == key)
@@ -3735,7 +3739,7 @@ static void p_smooth(PChart *chart)
 	int j, it2, maxiter2, it;
 	int nedges = chart->nedges, nwheel, gridx, gridy;
 	int edgesx, edgesy, nsize, esize, i, x, y, maxiter, totiter;
-	float minv[2], maxv[2], median, invmedian, distortion, avglen2d, avglen3d;
+	float minv[2], maxv[2], median, invmedian, avglen2d, avglen3d;
 	float center[2], dx, dy, *nodes, dlimit, d, *oldnodesx, *oldnodesy;
 	float *nodesx, *nodesy, *hedges, *vedges, climit, moved, padding;
 	SmoothTriangle *triangles, *t, *t2, **tri, **trip;
@@ -3754,7 +3758,6 @@ static void p_smooth(PChart *chart)
 	invmedian = 1.0/median;
 
 	/* compute edge distortion */
-	distortion = 0.0;
 	avglen2d = avglen3d = 0.0;
 
 	for (e=chart->edges; e; e=e->nextlink) {
@@ -4042,7 +4045,7 @@ static void p_smooth(PChart *chart)
 
 /* Exported */
 
-ParamHandle *param_construct_begin()
+ParamHandle *param_construct_begin(void)
 {
 	PHandle *handle = MEM_callocN(sizeof*handle, "PHandle");
 	handle->construction_chart = p_chart_new(handle);
@@ -4360,7 +4363,7 @@ void param_pack(ParamHandle *handle, float margin)
 	}	
 	
 	if(margin>0.0f) {
-		/* multiply the margin by the area to give pradictable results not dependant on UV scale,
+		/* multiply the margin by the area to give predictable results not dependant on UV scale,
 		 * ...Without using the area running pack multiple times also gives a bad feedback loop.
 		 * multiply by 0.1 so the margin value from the UI can be from 0.0 to 1.0 but not give a massive margin */
 		margin = (margin*(float)area) * 0.1;

@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -28,26 +28,39 @@
  * Initialize Python thingies.
  */
 
+/** \file gameengine/Ketsji/KX_PythonInit.cpp
+ *  \ingroup ketsji
+ */
+
+
 #include "GL/glew.h"
 
 #if defined(WIN32) && !defined(FREE_WINDOWS)
 #pragma warning (disable : 4786)
 #endif //WIN32
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
+
+#ifdef _POSIX_C_SOURCE
+#undef _POSIX_C_SOURCE
+#endif
+
+#ifdef _XOPEN_SOURCE
+#undef _XOPEN_SOURCE
+#endif
+
+#include <Python.h>
 
 extern "C" {
 	#include "bpy_internal_import.h"  /* from the blender python api, but we want to import text too! */
 	#include "py_capi_utils.h"
 	#include "mathutils.h" // Blender.Mathutils module copied here so the blenderlayer can use.
-	#include "geometry.h" // Blender.Geometry module copied here so the blenderlayer can use.
 	#include "bgl.h"
-	#include "blf_api.h"
+	#include "blf_py_api.h"
 
 	#include "marshal.h" /* python header for loading/saving dicts */
 }
 
-#define WITH_PYTHON
 #include "AUD_PyInit.h"
 
 #endif
@@ -130,7 +143,7 @@ extern "C" {
 
 // 'local' copy of canvas ptr, for window height/width python scripts
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 
 static RAS_ICanvas* gp_Canvas = NULL;
 static char gp_GamePythonPath[FILE_MAXDIR + FILE_MAXFILE] = "";
@@ -138,7 +151,7 @@ static char gp_GamePythonPathOrig[FILE_MAXDIR + FILE_MAXFILE] = ""; // not super
 
 static SCA_PythonKeyboard* gp_PythonKeyboard = NULL;
 static SCA_PythonMouse* gp_PythonMouse = NULL;
-#endif // DISABLE_PYTHON
+#endif // WITH_PYTHON
 
 static KX_Scene*	gp_KetsjiScene = NULL;
 static KX_KetsjiEngine*	gp_KetsjiEngine = NULL;
@@ -167,7 +180,7 @@ void	KX_RasterizerDrawDebugLine(const MT_Vector3& from,const MT_Vector3& to,cons
 		gp_Rasterizer->DrawDebugLine(from,to,color);
 }
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 
 static PyObject *gp_OrigPythonSysPath= NULL;
 static PyObject *gp_OrigPythonSysModules= NULL;
@@ -224,7 +237,7 @@ static PyObject* gPyExpandPath(PyObject*, PyObject* args)
 
 	BLI_strncpy(expanded, filename, FILE_MAXDIR + FILE_MAXFILE);
 	BLI_path_abs(expanded, gp_GamePythonPath);
-	return PyUnicode_FromString(expanded);
+	return PyUnicode_DecodeFSDefault(expanded);
 }
 
 static char gPyStartGame_doc[] =
@@ -490,7 +503,7 @@ static PyObject* gPyGetBlendFileList(PyObject*, PyObject* args)
 	
     while ((dirp = readdir(dp)) != NULL) {
 		if (BLI_testextensie(dirp->d_name, ".blend")) {
-			value = PyUnicode_FromString(dirp->d_name);
+			value= PyUnicode_DecodeFSDefault(dirp->d_name);
 			PyList_Append(list, value);
 			Py_DECREF(value);
 		}
@@ -915,6 +928,11 @@ static PyObject* gPySetBackgroundColor(PyObject*, PyObject* value)
 	{
 		gp_Rasterizer->SetBackColor(vec[0], vec[1], vec[2], vec[3]);
 	}
+
+	KX_WorldInfo *wi = gp_KetsjiScene->GetWorldInfo();
+	if (wi->hasWorld())
+		wi->setBackColor(vec[0], vec[1], vec[2]);
+
 	Py_RETURN_NONE;
 }
 
@@ -1385,6 +1403,7 @@ PyObject* initGameLogic(KX_KetsjiEngine *engine, KX_Scene* scene) // quick hack 
 
 	/* 7. Action actuator													   */
 	KX_MACRO_addTypesToDict(d, KX_ACTIONACT_PLAY,        ACT_ACTION_PLAY);
+	KX_MACRO_addTypesToDict(d, KX_ACTIONACT_PINGPONG,    ACT_ACTION_PINGPONG);
 	KX_MACRO_addTypesToDict(d, KX_ACTIONACT_FLIPPER,     ACT_ACTION_FLIPPER);
 	KX_MACRO_addTypesToDict(d, KX_ACTIONACT_LOOPSTOP,    ACT_ACTION_LOOP_STOP);
 	KX_MACRO_addTypesToDict(d, KX_ACTIONACT_LOOPEND,     ACT_ACTION_LOOP_END);
@@ -1818,7 +1837,7 @@ static void initPySysObjects__append(PyObject *sys_path, char *filename)
 	BLI_split_dirfile(filename, expanded, NULL); /* get the dir part of filename only */
 	BLI_path_abs(expanded, gp_GamePythonPath); /* filename from lib->filename is (always?) absolute, so this may not be needed but it wont hurt */
 	BLI_cleanup_file(gp_GamePythonPath, expanded); /* Dont use BLI_cleanup_dir because it adds a slash - BREAKS WIN32 ONLY */
-	item= PyUnicode_FromString(expanded);
+	item= PyUnicode_DecodeFSDefault(expanded);
 	
 //	printf("SysPath - '%s', '%s', '%s'\n", expanded, filename, gp_GamePythonPath);
 	
@@ -1909,7 +1928,7 @@ PyObject* initGamePlayerPythonScripting(const STR_String& progname, TPythonSecur
 		PyObject *py_argv= PyList_New(argc);
 
 		for (i=0; i<argc; i++)
-			PyList_SET_ITEM(py_argv, i, PyUnicode_FromString(argv[i]));
+			PyList_SET_ITEM(py_argv, i, PyC_UnicodeFromByte(argv[i]));
 
 		PySys_SetObject("argv", py_argv);
 		Py_DECREF(py_argv);
@@ -2324,22 +2343,22 @@ PyObject* initGameKeys()
 
 PyObject* initMathutils()
 {
-	return Mathutils_Init();
+	return BPyInit_mathutils();
 }
 
 PyObject* initGeometry()
 {
-	return Geometry_Init();
+	return BPyInit_mathutils_geometry();
 }
 
 PyObject* initBGL()
 {
-	return BGL_Init();
+	return BPyInit_bgl();
 }
 
 PyObject* initBLF()
 {
-	return BLF_Init();
+	return BPyInit_blf();
 }
 
 // utility function for loading and saving the globalDict
@@ -2443,4 +2462,4 @@ void resetGamePythonPath()
 	gp_GamePythonPathOrig[0] = '\0';
 }
 
-#endif // DISABLE_PYTHON
+#endif // WITH_PYTHON

@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/space_info/info_ops.c
+ *  \ingroup spinfo
+ */
+
+
 #include <string.h>
 #include <stdio.h>
 
@@ -38,6 +43,7 @@
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
 #include "BLI_bpath.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_context.h"
 #include "BKE_global.h"
@@ -52,6 +58,7 @@
 
 
 #include "UI_interface.h"
+#include "UI_resources.h"
 
 #include "IMB_imbuf_types.h"
 
@@ -154,7 +161,7 @@ static int unpack_all_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event)
 	else
 		sprintf(title, "Unpack %d files", count);
 	
-	pup= uiPupMenuBegin(C, title, 0);
+	pup= uiPupMenuBegin(C, title, ICON_NONE);
 	layout= uiPupMenuLayout(pup);
 
 	uiLayoutSetOperatorContext(layout, WM_OP_EXEC_DEFAULT);
@@ -184,14 +191,19 @@ void FILE_OT_unpack_all(wmOperatorType *ot)
 
 /********************* make paths relative operator *********************/
 
-static int make_paths_relative_exec(bContext *UNUSED(C), wmOperator *op)
+static int make_paths_relative_exec(bContext *C, wmOperator *op)
 {
+	Main *bmain= CTX_data_main(C);
+
 	if(!G.relbase_valid) {
 		BKE_report(op->reports, RPT_WARNING, "Can't set relative paths with an unsaved blend file.");
 		return OPERATOR_CANCELLED;
 	}
 
-	makeFilesRelative(G.sce, op->reports);
+	makeFilesRelative(bmain, bmain->name, op->reports);
+
+	/* redraw everything so any changed paths register */
+	WM_main_add_notifier(NC_WINDOW, NULL);
 
 	return OPERATOR_FINISHED;
 }
@@ -211,14 +223,20 @@ void FILE_OT_make_paths_relative(wmOperatorType *ot)
 
 /********************* make paths absolute operator *********************/
 
-static int make_paths_absolute_exec(bContext *UNUSED(C), wmOperator *op)
+static int make_paths_absolute_exec(bContext *C, wmOperator *op)
 {
+	Main *bmain= CTX_data_main(C);
+
 	if(!G.relbase_valid) {
 		BKE_report(op->reports, RPT_WARNING, "Can't set absolute paths with an unsaved blend file.");
 		return OPERATOR_CANCELLED;
 	}
 
-	makeFilesAbsolute(G.sce, op->reports);
+	makeFilesAbsolute(bmain, bmain->name, op->reports);
+
+	/* redraw everything so any changed paths register */
+	WM_main_add_notifier(NC_WINDOW, NULL);
+
 	return OPERATOR_FINISHED;
 }
 
@@ -244,7 +262,7 @@ static int report_missing_files_exec(bContext *UNUSED(C), wmOperator *op)
 	txtname[0] = '\0';
 	
 	/* run the missing file check */
-	checkMissingFiles(G.sce, op->reports);
+	checkMissingFiles(G.main, op->reports);
 	
 	return OPERATOR_FINISHED;
 }
@@ -269,7 +287,7 @@ static int find_missing_files_exec(bContext *UNUSED(C), wmOperator *op)
 	char *path;
 	
 	path= RNA_string_get_alloc(op->ptr, "filepath", NULL, 0);
-	findMissingFiles(path, G.sce);
+	findMissingFiles(G.main, path);
 	MEM_freeN(path);
 
 	return OPERATOR_FINISHED;
@@ -312,7 +330,7 @@ void FILE_OT_find_missing_files(wmOperatorType *ot)
 #define INFO_COLOR_TIMEOUT	3.0
 #define ERROR_TIMEOUT		10.0
 #define ERROR_COLOR_TIMEOUT	6.0
-#define COLLAPSE_TIMEOUT	0.2
+#define COLLAPSE_TIMEOUT	0.25
 static int update_reports_display_invoke(bContext *C, wmOperator *UNUSED(op), wmEvent *event)
 {
 	wmWindowManager *wm= CTX_wm_manager(C);
@@ -323,12 +341,16 @@ static int update_reports_display_invoke(bContext *C, wmOperator *UNUSED(op), wm
 	float neutral_col[3] = {0.35, 0.35, 0.35};
 	float neutral_grey= 0.6;
 	float timeout=0.0, color_timeout=0.0;
+	int send_note= 0;
 	
 	/* escape if not our timer */
-	if(reports->reporttimer==NULL || reports->reporttimer != event->customdata)
+	if(		(reports->reporttimer==NULL) ||
+			(reports->reporttimer != event->customdata) ||
+			((report= BKE_reports_last_displayable(reports))==NULL) /* may have been deleted */
+	) {
 		return OPERATOR_PASS_THROUGH;
-	
-	report= BKE_reports_last_displayable(reports);
+	}
+
 	rti = (ReportTimerInfo *)reports->reporttimer->customdata;
 	
 	timeout = (report->type & RPT_ERROR_ALL)?ERROR_TIMEOUT:INFO_TIMEOUT;
@@ -345,7 +367,7 @@ static int update_reports_display_invoke(bContext *C, wmOperator *UNUSED(op), wm
 	}
 
 	if (rti->widthfac == 0.0) {
-		/* initialise colours based on report type */
+		/* initialise colors based on report type */
 		if(report->type & RPT_ERROR_ALL) {
 			rti->col[0] = 1.0;
 			rti->col[1] = 0.2;
@@ -366,17 +388,25 @@ static int update_reports_display_invoke(bContext *C, wmOperator *UNUSED(op), wm
 	progress = reports->reporttimer->duration / timeout;
 	color_progress = reports->reporttimer->duration / color_timeout;
 	
-	/* fade colours out sharply according to progress through fade-out duration */
-	interp_v3_v3v3(rti->col, rti->col, neutral_col, color_progress);
-	rti->greyscale = interpf(neutral_grey, rti->greyscale, color_progress);
+	/* save us from too many draws */
+	if(color_progress <= 1.0f) {
+		send_note= 1;
+		
+		/* fade colors out sharply according to progress through fade-out duration */
+		interp_v3_v3v3(rti->col, rti->col, neutral_col, color_progress);
+		rti->greyscale = interpf(neutral_grey, rti->greyscale, color_progress);
+	}
 
 	/* collapse report at end of timeout */
 	if (progress*timeout > timeout - COLLAPSE_TIMEOUT) {
 		rti->widthfac = (progress*timeout - (timeout - COLLAPSE_TIMEOUT)) / COLLAPSE_TIMEOUT;
 		rti->widthfac = 1.0 - rti->widthfac;
+		send_note= 1;
 	}
 	
-	WM_event_add_notifier(C, NC_SPACE|ND_SPACE_INFO, NULL);
+	if(send_note) {
+		WM_event_add_notifier(C, NC_SPACE|ND_SPACE_INFO, NULL);
+	}
 	
 	return (OPERATOR_FINISHED|OPERATOR_PASS_THROUGH);
 }
@@ -395,3 +425,5 @@ void INFO_OT_reports_display_update(wmOperatorType *ot)
 	
 	/* properties */
 }
+
+/* report operators */

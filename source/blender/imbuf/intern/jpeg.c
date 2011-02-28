@@ -1,4 +1,4 @@
-/**
+/*
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -28,6 +28,11 @@
  *
  * $Id$
  */
+
+/** \file blender/imbuf/intern/jpeg.c
+ *  \ingroup imbuf
+ */
+
 
 
 /* This little block needed for linking to Blender... */
@@ -132,6 +137,7 @@ typedef my_source_mgr * my_src_ptr;
 
 static void init_source(j_decompress_ptr cinfo)
 {
+	(void)cinfo; /* unused */
 }
 
 
@@ -165,6 +171,7 @@ static void skip_input_data(j_decompress_ptr cinfo, long num_bytes)
 
 static void term_source(j_decompress_ptr cinfo)
 {
+	(void)cinfo; /* unused */
 }
 
 static void memory_source(j_decompress_ptr cinfo, unsigned char *buffer, size_t size)
@@ -432,37 +439,6 @@ next_stamp_marker:
 	return(ibuf);
 }
 
-ImBuf * imb_ibJpegImageFromFilename (const char * filename, int flags)
-{
-	struct jpeg_decompress_struct _cinfo, *cinfo = &_cinfo;
-	struct my_error_mgr jerr;
-	FILE * infile;
-	ImBuf * ibuf;
-	
-	if ((infile = fopen(filename, "rb")) == NULL) return 0;
-
-	cinfo->err = jpeg_std_error(&jerr.pub);
-	jerr.pub.error_exit = jpeg_error;
-
-	/* Establish the setjmp return context for my_error_exit to use. */
-	if (setjmp(jerr.setjmp_buffer)) {
-		/* If we get here, the JPEG code has signaled an error.
-		 * We need to clean up the JPEG object, close the input file, and return.
-		 */
-		jpeg_destroy_decompress(cinfo);
-		fclose(infile);
-		return NULL;
-	}
-
-	jpeg_create_decompress(cinfo);
-	jpeg_stdio_src(cinfo, infile);
-
-	ibuf = ibJpegImageFromCinfo(cinfo, flags);
-	
-	fclose(infile);
-	return(ibuf);
-}
-
 ImBuf * imb_load_jpeg (unsigned char * buffer, size_t size, int flags)
 {
 	struct jpeg_decompress_struct _cinfo, *cinfo = &_cinfo;
@@ -620,7 +596,7 @@ static int init_jpeg(FILE * outfile, struct jpeg_compress_struct * cinfo, struct
 }
 
 
-static int save_stdjpeg(char * name, struct ImBuf * ibuf)
+static int save_stdjpeg(const char *name, struct ImBuf *ibuf)
 {
 	FILE * outfile;
 	struct jpeg_compress_struct _cinfo, *cinfo = &_cinfo;
@@ -654,7 +630,7 @@ static int save_stdjpeg(char * name, struct ImBuf * ibuf)
 }
 
 
-static int save_vidjpeg(char * name, struct ImBuf * ibuf)
+static int save_vidjpeg(const char *name, struct ImBuf *ibuf)
 {
 	FILE * outfile;
 	struct jpeg_compress_struct _cinfo, *cinfo = &_cinfo;
@@ -693,7 +669,7 @@ static int save_vidjpeg(char * name, struct ImBuf * ibuf)
 	return 1;
 }
 
-static int save_jstjpeg(char * name, struct ImBuf * ibuf)
+static int save_jstjpeg(const char *name, struct ImBuf *ibuf)
 {
 	char fieldname[1024];
 	struct ImBuf * tbuf;
@@ -724,7 +700,7 @@ static int save_jstjpeg(char * name, struct ImBuf * ibuf)
 	return returnval;
 }
 
-static int save_maxjpeg(char * name, struct ImBuf * ibuf)
+static int save_maxjpeg(const char *name, struct ImBuf *ibuf)
 {
 	FILE * outfile;
 	struct jpeg_compress_struct _cinfo, *cinfo = &_cinfo;
@@ -763,7 +739,7 @@ static int save_maxjpeg(char * name, struct ImBuf * ibuf)
 	return 1;
 }
 
-int imb_savejpeg(struct ImBuf * ibuf, char * name, int flags)
+int imb_savejpeg(struct ImBuf *ibuf, const char *name, int flags)
 {
 	
 	ibuf->flags = flags;

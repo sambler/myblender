@@ -128,6 +128,10 @@ class IMAGE_MT_image(bpy.types.Menu):
 
             layout.operator("image.external_edit", "Edit Externally")
 
+            layout.separator()
+
+            layout.menu("IMAGE_MT_image_invert")
+
             if not show_render:
                 layout.separator()
 
@@ -145,6 +149,32 @@ class IMAGE_MT_image(bpy.types.Menu):
             layout.separator()
 
             layout.prop(sima, "use_image_paint")
+
+
+class IMAGE_MT_image_invert(bpy.types.Menu):
+    bl_label = "Invert"
+
+    def draw(self, context):
+        layout = self.layout
+
+        op = layout.operator("image.invert", text="Invert Image Colors")
+        op.invert_r = True
+        op.invert_g = True
+        op.invert_b = True
+
+        layout.separator()
+
+        op = layout.operator("image.invert", text="Invert Red Channel")
+        op.invert_r = True
+
+        op = layout.operator("image.invert", text="Invert Green Channel")
+        op.invert_g = True
+
+        op = layout.operator("image.invert", text="Invert Blue Channel")
+        op.invert_b = True
+
+        op = layout.operator("image.invert", text="Invert Alpha Channel")
+        op.invert_a = True
 
 
 class IMAGE_MT_uvs_showhide(bpy.types.Menu):
@@ -204,7 +234,7 @@ class IMAGE_MT_uvs_weldalign(bpy.types.Menu):
         layout = self.layout
 
         layout.operator("uv.weld")  # W, 1
-        layout.operator_enums("uv.align", "axis")  # W, 2/3/4
+        layout.operator_enum("uv.align", "axis")  # W, 2/3/4
 
 
 class IMAGE_MT_uvs(bpy.types.Menu):
@@ -250,7 +280,8 @@ class IMAGE_MT_uvs(bpy.types.Menu):
         layout.separator()
 
         layout.menu("IMAGE_MT_uvs_showhide")
-        
+
+
 class IMAGE_MT_uvs_select_mode(bpy.types.Menu):
     bl_label = "UV Select Mode"
 
@@ -259,9 +290,9 @@ class IMAGE_MT_uvs_select_mode(bpy.types.Menu):
 
         layout.operator_context = 'INVOKE_REGION_WIN'
         toolsettings = context.tool_settings
-        
+
         # do smart things depending on whether uv_select_sync is on
-        
+
         if toolsettings.use_uv_select_sync:
             prop = layout.operator("wm.context_set_value", text="Vertex", icon='VERTEXSEL')
             prop.value = "(True, False, False)"
@@ -287,7 +318,7 @@ class IMAGE_MT_uvs_select_mode(bpy.types.Menu):
             prop = layout.operator("wm.context_set_string", text="Face", icon='UV_FACESEL')
             prop.value = "FACE"
             prop.data_path = "tool_settings.uv_select_mode"
-        
+
             prop = layout.operator("wm.context_set_string", text="Island", icon='UV_ISLANDSEL')
             prop.value = "ISLAND"
             prop.data_path = "tool_settings.uv_select_mode"
@@ -356,8 +387,8 @@ class IMAGE_HT_header(bpy.types.Header):
             row.prop(toolsettings, "use_snap", text="")
             row.prop(toolsettings, "snap_element", text="", icon_only=True)
 
-            # mesh = context.edit_object.data
-            # row.prop_search(mesh.uv_textures, "active", mesh, "uv_textures")
+            mesh = context.edit_object.data
+            layout.prop_search(mesh.uv_textures, "active", mesh, "uv_textures", text="")
 
         if ima:
             # layers
@@ -660,6 +691,26 @@ class IMAGE_PT_tools_brush_texture(BrushButtonsPanel, bpy.types.Panel):
         col.template_ID_preview(brush, "texture", new="texture.new", rows=3, cols=8)
 
 
+class IMAGE_PT_tools_brush_tool(BrushButtonsPanel, bpy.types.Panel):
+    bl_label = "Tool"
+    bl_options = {'DEFAULT_CLOSED'}
+
+    def draw(self, context):
+        layout = self.layout
+        settings = context.tool_settings.image_paint
+        brush = settings.brush
+
+        col = layout.column(align=True)
+
+        col.prop(brush, "imagepaint_tool", expand=False, text="")
+
+        row = layout.row(align=True)
+        row.prop(brush, "use_paint_sculpt", text="", icon='SCULPTMODE_HLT')
+        row.prop(brush, "use_paint_vertex", text="", icon='VPAINT_HLT')
+        row.prop(brush, "use_paint_weight", text="", icon='WPAINT_HLT')
+        row.prop(brush, "use_paint_texture", text="", icon='TPAINT_HLT')
+
+
 class IMAGE_PT_paint_stroke(BrushButtonsPanel, bpy.types.Panel):
     bl_label = "Paint Stroke"
     bl_options = {'DEFAULT_CLOSED'}
@@ -706,11 +757,11 @@ class IMAGE_PT_paint_curve(BrushButtonsPanel, bpy.types.Panel):
 
 
 def register():
-    pass
+    bpy.utils.register_module(__name__)
 
 
 def unregister():
-    pass
+    bpy.utils.unregister_module(__name__)
 
 if __name__ == "__main__":
     register()

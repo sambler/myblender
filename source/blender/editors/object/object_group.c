@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,10 +27,15 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/object/object_group.c
+ *  \ingroup edobj
+ */
+
+
 #include <string.h>
 
-
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 
 #include "DNA_group_types.h"
 #include "DNA_object_types.h"
@@ -96,7 +101,7 @@ void GROUP_OT_objects_add_active(wmOperatorType *ot)
 	
 	/* api callbacks */
 	ot->exec= objects_add_active_exec;	
-	ot->poll= ED_operator_scene_editable;
+	ot->poll= ED_operator_objectmode;
 
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
@@ -143,7 +148,7 @@ void GROUP_OT_objects_remove_active(wmOperatorType *ot)
 	
 	/* api callbacks */
 	ot->exec= objects_remove_active_exec;	
-	ot->poll= ED_operator_scene_editable;
+	ot->poll= ED_operator_objectmode;
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
@@ -177,7 +182,7 @@ void GROUP_OT_objects_remove(wmOperatorType *ot)
 	
 	/* api callbacks */
 	ot->exec= group_objects_remove_exec;	
-	ot->poll= ED_operator_scene_editable;
+	ot->poll= ED_operator_objectmode;
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
@@ -214,7 +219,7 @@ void GROUP_OT_create(wmOperatorType *ot)
 	
 	/* api callbacks */
 	ot->exec= group_create_exec;	
-	ot->poll= ED_operator_scene_editable;
+	ot->poll= ED_operator_objectmode;
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;

@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -27,15 +27,21 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/ikplugin/intern/iksolver_plugin.c
+ *  \ingroup ikplugin
+ */
+
+
 #include "MEM_guardedalloc.h"
 
 #include "BIK_api.h"
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_armature.h"
 #include "BKE_constraint.h"
-#include "BKE_utildefines.h"
+
 #include "DNA_object_types.h"
 #include "DNA_action_types.h"
 #include "DNA_constraint_types.h"

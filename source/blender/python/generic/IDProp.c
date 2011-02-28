@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -23,10 +23,21 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
-#include "BKE_idprop.h"
-#include "BKE_utildefines.h"
+/** \file blender/python/generic/IDProp.c
+ *  \ingroup pygen
+ */
+
+
+#include <Python.h>
+
 #include "IDProp.h"
 #include "MEM_guardedalloc.h"
+
+#include "BLI_string.h"
+#include "BLI_utildefines.h"
+
+#include "BKE_idprop.h"
+
 
 #define USE_STRING_COERCE
 
@@ -45,7 +56,7 @@ extern PyTypeObject IDGroup_Iter_Type;
 
 /*********************** ID Property Main Wrapper Stuff ***************/
 
-PyObject *IDGroup_repr( BPy_IDProperty *self )
+static PyObject *IDGroup_repr( BPy_IDProperty *self )
 {
 	return PyUnicode_FromFormat( "<bpy ID property from \"%s\">", self->id->name);
 }
@@ -89,7 +100,7 @@ PyObject *BPy_IDGroup_WrapData( ID *id, IDProperty *prop )
 				int i;
 
 				if (!seq) {
-					PyErr_Format( PyExc_RuntimeError, "BPy_IDGroup_MapDataToPy, IDP_IDPARRAY: PyList_New(%d) failed", prop->len);
+					PyErr_Format(PyExc_RuntimeError, "BPy_IDGroup_MapDataToPy, IDP_IDPARRAY: PyList_New(%d) failed", prop->len);
 					return NULL;
 				}
 
@@ -109,7 +120,8 @@ PyObject *BPy_IDGroup_WrapData( ID *id, IDProperty *prop )
 	Py_RETURN_NONE;
 }
 
-int BPy_IDGroup_SetData(BPy_IDProperty *self, IDProperty *prop, PyObject *value)
+#if 0 /* UNUSED, currenly assignment overwrites into new properties, rather then setting in-place */
+static int BPy_IDGroup_SetData(BPy_IDProperty *self, IDProperty *prop, PyObject *value)
 {
 	switch (prop->type) {
 		case IDP_STRING:
@@ -177,8 +189,9 @@ int BPy_IDGroup_SetData(BPy_IDProperty *self, IDProperty *prop, PyObject *value)
 	}
 	return 0;
 }
+#endif
 
-PyObject *BPy_IDGroup_GetName(BPy_IDProperty *self, void *UNUSED(closure))
+static PyObject *BPy_IDGroup_GetName(BPy_IDProperty *self, void *UNUSED(closure))
 {
 	return PyUnicode_FromString(self->prop->name);
 }
@@ -192,12 +205,12 @@ static int BPy_IDGroup_SetName(BPy_IDProperty *self, PyObject *value, void *UNUS
 	}
 
 	st = _PyUnicode_AsString(value);
-	if (strlen(st) >= MAX_IDPROP_NAME) {
+	if (BLI_strnlen(st, MAX_IDPROP_NAME) == MAX_IDPROP_NAME) {
 		PyErr_SetString(PyExc_TypeError, "string length cannot exceed 31 characters!");
 		return -1;
 	}
 
-	strcpy(self->prop->name, st);
+	BLI_strncpy(self->prop->name, st, sizeof(self->prop->name));
 	return 0;
 }
 
@@ -209,17 +222,14 @@ static PyObject *BPy_IDGroup_GetType(BPy_IDProperty *self)
 #endif
 
 static PyGetSetDef BPy_IDGroup_getseters[] = {
-	{"name",
-	 (getter)BPy_IDGroup_GetName, (setter)BPy_IDGroup_SetName,
-	 "The name of this Group.",
-	 NULL},
+	{(char *)"name", (getter)BPy_IDGroup_GetName, (setter)BPy_IDGroup_SetName, (char *)"The name of this Group.", NULL},
 	 {NULL, NULL, NULL, NULL, NULL}
 };
 
 static Py_ssize_t BPy_IDGroup_Map_Len(BPy_IDProperty *self)
 {
 	if (self->prop->type != IDP_GROUP) {
-		PyErr_SetString( PyExc_TypeError, "len() of unsized object");
+		PyErr_SetString(PyExc_TypeError, "len() of unsized object");
 		return -1;
 	}
 
@@ -232,21 +242,21 @@ static PyObject *BPy_IDGroup_Map_GetItem(BPy_IDProperty *self, PyObject *item)
 	char *name;
 
 	if (self->prop->type  != IDP_GROUP) {
-		PyErr_SetString( PyExc_TypeError, "unsubscriptable object");
+		PyErr_SetString(PyExc_TypeError, "unsubscriptable object");
 		return NULL;
 	}
 
 	name= _PyUnicode_AsString(item);
 
 	if (name == NULL) {
-		PyErr_SetString( PyExc_TypeError, "only strings are allowed as keys of ID properties");
+		PyErr_SetString(PyExc_TypeError, "only strings are allowed as keys of ID properties");
 		return NULL;
 	}
 
 	idprop= IDP_GetPropertyFromGroup(self->prop, name);
 
 	if(idprop==NULL) {
-		PyErr_SetString( PyExc_KeyError, "key not in subgroup dict");
+		PyErr_SetString(PyExc_KeyError, "key not in subgroup dict");
 		return NULL;
 	}
 
@@ -260,7 +270,7 @@ static int idp_sequence_type(PyObject *seq)
 	PyObject *item;
 	int type= IDP_INT;
 
-	int i, len = PySequence_Length(seq);
+	int i, len = PySequence_Size(seq);
 	for (i=0; i < len; i++) {
 		item = PySequence_GetItem(seq, i);
 		if (PyFloat_Check(item)) {
@@ -295,7 +305,7 @@ static int idp_sequence_type(PyObject *seq)
 }
 
 /* note: group can be a pointer array or a group */
-char *BPy_IDProperty_Map_ValidateAndCreate(char *name, IDProperty *group, PyObject *ob)
+const char *BPy_IDProperty_Map_ValidateAndCreate(const char *name, IDProperty *group, PyObject *ob)
 {
 	IDProperty *prop = NULL;
 	IDPropertyTemplate val = {0};
@@ -330,7 +340,7 @@ char *BPy_IDProperty_Map_ValidateAndCreate(char *name, IDProperty *group, PyObje
 		we assume IDP_INT unless we hit a float
 		number; then we assume it's */
 
-		val.array.len = PySequence_Length(ob);
+		val.array.len = PySequence_Size(ob);
 
 		switch(val.array.type) {
 		case IDP_DOUBLE:
@@ -352,7 +362,7 @@ char *BPy_IDProperty_Map_ValidateAndCreate(char *name, IDProperty *group, PyObje
 		case IDP_IDPARRAY:
 			prop= IDP_NewIDPArray(name);
 			for (i=0; i<val.array.len; i++) {
-				char *error;
+				const char *error;
 				item = PySequence_GetItem(ob, i);
 				error= BPy_IDProperty_Map_ValidateAndCreate("", prop, item);
 				Py_DECREF(item);
@@ -415,7 +425,7 @@ char *BPy_IDProperty_Map_ValidateAndCreate(char *name, IDProperty *group, PyObje
 int BPy_Wrap_SetMapItem(IDProperty *prop, PyObject *key, PyObject *val)
 {
 	if (prop->type  != IDP_GROUP) {
-		PyErr_SetString( PyExc_TypeError, "unsubscriptable object");
+		PyErr_SetString(PyExc_TypeError, "unsubscriptable object");
 		return -1;
 	}
 
@@ -427,21 +437,21 @@ int BPy_Wrap_SetMapItem(IDProperty *prop, PyObject *key, PyObject *val)
 			MEM_freeN(pkey);
 			return 0;
 		} else {
-			PyErr_SetString( PyExc_KeyError, "property not found in group" );
+			PyErr_SetString(PyExc_KeyError, "property not found in group");
 			return -1;
 		}
 	}
 	else {
-		char *err;
+		const char *err;
 
 		if (!PyUnicode_Check(key)) {
-			PyErr_SetString( PyExc_TypeError, "only strings are allowed as subgroup keys" );
+			PyErr_SetString(PyExc_TypeError, "only strings are allowed as subgroup keys");
 			return -1;
 		}
 
 		err = BPy_IDProperty_Map_ValidateAndCreate(_PyUnicode_AsString(key), prop, val);
 		if (err) {
-			PyErr_SetString( PyExc_KeyError, err );
+			PyErr_SetString(PyExc_KeyError, err );
 			return -1;
 		}
 
@@ -489,7 +499,7 @@ static PyObject *BPy_IDGroup_MapDataToPy(IDProperty *prop)
 			int i;
 
 			if (!seq) {
-				PyErr_Format( PyExc_RuntimeError, "BPy_IDGroup_MapDataToPy, IDP_ARRAY: PyList_New(%d) failed", prop->len);
+				PyErr_Format(PyExc_RuntimeError, "BPy_IDGroup_MapDataToPy, IDP_ARRAY: PyList_New(%d) failed", prop->len);
 				return NULL;
 			}
 
@@ -514,7 +524,7 @@ static PyObject *BPy_IDGroup_MapDataToPy(IDProperty *prop)
 			int i;
 
 			if (!seq) {
-				PyErr_Format( PyExc_RuntimeError, "BPy_IDGroup_MapDataToPy, IDP_IDPARRAY: PyList_New(%d) failed", prop->len);
+				PyErr_Format(PyExc_RuntimeError, "BPy_IDGroup_MapDataToPy, IDP_IDPARRAY: PyList_New(%d) failed", prop->len);
 				return NULL;
 			}
 
@@ -556,7 +566,7 @@ static PyObject *BPy_IDGroup_Pop(BPy_IDProperty *self, PyObject *value)
 	char *name = _PyUnicode_AsString(value);
 
 	if (!name) {
-		PyErr_SetString( PyExc_TypeError, "pop expected at least 1 argument, got 0" );
+		PyErr_SetString(PyExc_TypeError, "pop expected at least 1 argument, got 0");
 		return NULL;
 	}
 
@@ -576,7 +586,7 @@ static PyObject *BPy_IDGroup_Pop(BPy_IDProperty *self, PyObject *value)
 		return pyform;
 	}
 
-	PyErr_SetString( PyExc_KeyError, "item not in group" );
+	PyErr_SetString(PyExc_KeyError, "item not in group");
 	return NULL;
 }
 
@@ -693,7 +703,7 @@ static int BPy_IDGroup_Contains(BPy_IDProperty *self, PyObject *value)
 	char *name = _PyUnicode_AsString(value);
 
 	if (!name) {
-		PyErr_SetString( PyExc_TypeError, "expected a string");
+		PyErr_SetString(PyExc_TypeError, "expected a string");
 		return -1;
 	}
 
@@ -706,7 +716,7 @@ static PyObject *BPy_IDGroup_Update(BPy_IDProperty *self, PyObject *value)
 	Py_ssize_t i=0;
 
 	if (!PyDict_Check(value)) {
-		PyErr_SetString( PyExc_TypeError, "expected an object derived from dict.");
+		PyErr_SetString(PyExc_TypeError, "expected an object derived from dict");
 		return NULL;
 	}
 
@@ -725,7 +735,7 @@ static PyObject *BPy_IDGroup_ConvertToPy(BPy_IDProperty *self)
 
 
 /* Matches python dict.get(key, [default]) */
-PyObject* BPy_IDGroup_Get(BPy_IDProperty *self, PyObject *args)
+static PyObject* BPy_IDGroup_Get(BPy_IDProperty *self, PyObject *args)
 {
 	IDProperty *idprop;
 	char *key;
@@ -762,23 +772,23 @@ static struct PyMethodDef BPy_IDGroup_methods[] = {
 		"idprop.get(k[,d]) -> idprop[k] if k in idprop, else d.  d defaults to None"},
 	{"convert_to_pyobject", (PyCFunction)BPy_IDGroup_ConvertToPy, METH_NOARGS,
 		"return a purely python version of the group"},
-	{0, NULL, 0, NULL}
+	{NULL, NULL, 0, NULL}
 };
 
 static PySequenceMethods BPy_IDGroup_Seq = {
-	(lenfunc) BPy_IDGroup_Map_Len,			/* lenfunc sq_length */
-	0,									/* binaryfunc sq_concat */
-	0,									/* ssizeargfunc sq_repeat */
-	0,									/* ssizeargfunc sq_item */ /* TODO - setting this will allow PySequence_Check to return True */
-	0,									/* intintargfunc ***was_sq_slice*** */
-	0,									/* intobjargproc sq_ass_item */
-	0,									/* ssizeobjargproc ***was_sq_ass_slice*** */
+	(lenfunc) BPy_IDGroup_Map_Len,		/* lenfunc sq_length */
+	NULL,								/* binaryfunc sq_concat */
+	NULL,								/* ssizeargfunc sq_repeat */
+	NULL,								/* ssizeargfunc sq_item */ /* TODO - setting this will allow PySequence_Check to return True */
+	NULL,								/* intintargfunc ***was_sq_slice*** */
+	NULL,								/* intobjargproc sq_ass_item */
+	NULL,								/* ssizeobjargproc ***was_sq_ass_slice*** */
 	(objobjproc) BPy_IDGroup_Contains,	/* objobjproc sq_contains */
-	0,									/* binaryfunc sq_inplace_concat */
-	0,									/* ssizeargfunc sq_inplace_repeat */
+	NULL,								/* binaryfunc sq_inplace_concat */
+	NULL,								/* ssizeargfunc sq_inplace_repeat */
 };
 
-PyMappingMethods BPy_IDGroup_Mapping = {
+static PyMappingMethods BPy_IDGroup_Mapping = {
 	(lenfunc)BPy_IDGroup_Map_Len, 			/*inquiry mp_length */
 	(binaryfunc)BPy_IDGroup_Map_GetItem,		/*binaryfunc mp_subscript */
 	(objobjargproc)BPy_IDGroup_Map_SetItem,	/*objobjargproc mp_ass_subscript */
@@ -876,14 +886,8 @@ static PyObject *BPy_IDArray_GetLen(BPy_IDArray *self)
 }
 
 static PyGetSetDef BPy_IDArray_getseters[] = {
-	{"len",
-	 (getter)BPy_IDArray_GetLen, (setter)NULL,
-	 "The length of the array, can also be gotten with len(array).",
-	 NULL},
-	{"type",
-	 (getter)BPy_IDArray_GetType, (setter)NULL,
-	 "The type of the data in the array, is an ant.",
-	 NULL},
+	{(char *)"len", (getter)BPy_IDArray_GetLen, (setter)NULL, (char *)"The length of the array, can also be gotten with len(array).", NULL},
+	{(char *)"type", (getter)BPy_IDArray_GetType, (setter)NULL, (char *)"The type of the data in the array, is an ant.", NULL},
 	{NULL, NULL, NULL, NULL, NULL},
 };
 
@@ -895,7 +899,7 @@ static PyObject *BPy_IDArray_ConvertToPy(BPy_IDArray *self)
 static PyMethodDef BPy_IDArray_methods[] = {
 	{"convert_to_pyobject", (PyCFunction)BPy_IDArray_ConvertToPy, METH_NOARGS,
 		"return a purely python version of the group"},
-	{0, NULL, 0, NULL}
+	{NULL, NULL, 0, NULL}
 };
 
 static int BPy_IDArray_Len(BPy_IDArray *self)
@@ -906,7 +910,7 @@ static int BPy_IDArray_Len(BPy_IDArray *self)
 static PyObject *BPy_IDArray_GetItem(BPy_IDArray *self, int index)
 {
 	if (index < 0 || index >= self->prop->len) {
-		PyErr_SetString( PyExc_IndexError, "index out of range!");
+		PyErr_SetString(PyExc_IndexError, "index out of range!");
 		return NULL;
 	}
 
@@ -922,7 +926,7 @@ static PyObject *BPy_IDArray_GetItem(BPy_IDArray *self, int index)
 			break;
 	}
 
-	PyErr_SetString( PyExc_RuntimeError, "invalid/corrupt array type!");
+	PyErr_SetString(PyExc_RuntimeError, "invalid/corrupt array type!");
 	return NULL;
 }
 
@@ -933,7 +937,7 @@ static int BPy_IDArray_SetItem(BPy_IDArray *self, int index, PyObject *value)
 	double d;
 
 	if (index < 0 || index >= self->prop->len) {
-		PyErr_SetString( PyExc_RuntimeError, "index out of range!");
+		PyErr_SetString(PyExc_RuntimeError, "index out of range!");
 		return -1;
 	}
 
@@ -969,16 +973,16 @@ static int BPy_IDArray_SetItem(BPy_IDArray *self, int index, PyObject *value)
 
 static PySequenceMethods BPy_IDArray_Seq = {
 	(lenfunc) BPy_IDArray_Len,			/* inquiry sq_length */
-	0,									/* binaryfunc sq_concat */
-	0,									/* intargfunc sq_repeat */
+	NULL,								/* binaryfunc sq_concat */
+	NULL,								/* intargfunc sq_repeat */
 	(ssizeargfunc)BPy_IDArray_GetItem,	/* intargfunc sq_item */
-	0,									/* intintargfunc sq_slice */
-	(ssizeobjargproc)BPy_IDArray_SetItem,	/* intobjargproc sq_ass_item */
-	0,									/* intintobjargproc sq_ass_slice */
-	0,									/* objobjproc sq_contains */
+	NULL,								/* intintargfunc sq_slice */
+	(ssizeobjargproc)BPy_IDArray_SetItem,/* intobjargproc sq_ass_item */
+	NULL,								/* intintobjargproc sq_ass_slice */
+	NULL,								/* objobjproc sq_contains */
 				/* Added in release 2.0 */
-	0,									/* binaryfunc sq_inplace_concat */
-	0,									/* intargfunc sq_inplace_repeat */
+	NULL,								/* binaryfunc sq_inplace_concat */
+	NULL,								/* intargfunc sq_inplace_repeat */
 };
 
 PyTypeObject IDArray_Type = {
@@ -1092,7 +1096,7 @@ static PyObject *BPy_Group_Iter_Next(BPy_IDGroup_Iter *self)
 			return PyUnicode_FromString(cur->name);
 		}
 	} else {
-		PyErr_SetString( PyExc_StopIteration, "iterator at end" );
+		PyErr_SetString(PyExc_StopIteration, "iterator at end");
 		return NULL;
 	}
 }

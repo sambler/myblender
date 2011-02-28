@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -22,6 +22,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/imbuf/intern/dds/dds_api.cpp
+ *  \ingroup imbdds
+ */
+
+
 #include <stddef.h>
 #include <dds_api.h>
 #include <Stream.h>
@@ -37,7 +42,7 @@ extern "C" {
 #include "IMB_allocimbuf.h"
 
 
-int imb_save_dds(struct ImBuf * ibuf, char *name, int flags)
+int imb_save_dds(struct ImBuf * ibuf, const char *name, int flags)
 {
 	return(0); /* todo: finish this function */
 

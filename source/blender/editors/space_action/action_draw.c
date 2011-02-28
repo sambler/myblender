@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/space_action/action_draw.c
+ *  \ingroup spaction
+ */
+
+
 /* System includes ----------------------------------------------------- */
 
 #include <math.h>
@@ -34,9 +39,9 @@
 #include <string.h>
 #include <float.h>
 
-
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
 /* Types --------------------------------------------------------------- */
 
@@ -45,7 +50,7 @@
 
 #include "BKE_action.h"
 #include "BKE_context.h"
-#include "BKE_utildefines.h"
+
 
 /* Everything from source (BIF, BDR, BSE) ------------------------------ */ 
 
@@ -58,6 +63,7 @@
 #include "ED_anim_api.h"
 #include "ED_keyframes_draw.h"
 
+#include "action_intern.h"
 
 /* ************************************************************************* */
 /* Channel List */
@@ -162,9 +168,9 @@ void draw_channel_strips(bAnimContext *ac, SpaceAction *saction, ARegion *ar)
 	float act_start, act_end, y;
 	int height, items;
 	
-	char col1[3], col2[3];
-	char col1a[3], col2a[3];
-	char col1b[3], col2b[3];
+	unsigned char col1[3], col2[3];
+	unsigned char col1a[3], col2a[3];
+	unsigned char col1b[3], col2b[3];
 	
 	
 	/* get theme colors */
@@ -228,7 +234,7 @@ void draw_channel_strips(bAnimContext *ac, SpaceAction *saction, ARegion *ar)
 					switch (ale->type) {
 						case ANIMTYPE_SUMMARY:
 						{
-							// FIXME: hardcoded colours - reddish color from NLA
+							// FIXME: hardcoded colors - reddish color from NLA
 							glColor4f(0.8f, 0.2f, 0.0f, 0.4f);
 						}
 							break;

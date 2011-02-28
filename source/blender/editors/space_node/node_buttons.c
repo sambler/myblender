@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,24 +26,29 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/space_node/node_buttons.c
+ *  \ingroup spnode
+ */
+
+
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
 #include <float.h>
 
+#include "MEM_guardedalloc.h"
+
 #include "DNA_node_types.h"
 #include "DNA_scene_types.h"
-
-#include "MEM_guardedalloc.h"
 
 #include "BLI_math.h"
 #include "BLI_blenlib.h"
 #include "BLI_rand.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_context.h"
 #include "BKE_node.h"
 #include "BKE_screen.h"
-
 
 #include "WM_api.h"
 #include "WM_types.h"

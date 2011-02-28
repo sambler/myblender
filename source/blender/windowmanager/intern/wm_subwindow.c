@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -30,6 +30,11 @@
  * 
  */
 
+/** \file blender/windowmanager/intern/wm_subwindow.c
+ *  \ingroup wm
+ */
+
+
 #include <string.h>
 
 #include "MEM_guardedalloc.h"
@@ -39,8 +44,9 @@
 
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
-#include "BKE_utildefines.h"
+
 #include "BKE_context.h"
 #include "BKE_global.h"
 

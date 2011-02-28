@@ -29,12 +29,19 @@
  *
  */
 
+/** \file blender/blenlib/intern/noise.c
+ *  \ingroup bli
+ */
+
+
 #ifdef _WIN32 	 
 #pragma warning (disable : 4244) // "conversion from double to float"
 #pragma warning (disable : 4305) // "truncation from const double to float" 
 #endif
 
 #include <math.h>
+
+#include "BLI_noise.h"
 
 /* local */
 static float noise3_perlin(float vec[3]);
@@ -388,7 +395,7 @@ static char p[512+2]= {
 0xA2,0xA0};
 
 
-float g[512+2][3]= {
+static float g[512+2][3]= {
 	{0.33783, 0.715698, -0.611206},
 	{-0.944031, -0.326599, -0.045624},
 	{-0.101074, -0.416443, -0.903503},
@@ -1756,7 +1763,7 @@ float mg_RidgedMultiFractal(float x, float y, float z, float H, float lacunarity
 	signal = offset - fabs(noisefunc(x, y, z));
 	signal *= signal;
 	result = signal;
-	weight = 1.f;
+
 
 	for( i=1; i<(int)octaves; i++ ) {
 		x *= lacunarity;

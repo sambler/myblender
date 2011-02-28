@@ -24,24 +24,30 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-FILE(GLOB SRC intern/*.c)
-
-SET(INC 
+set(INC 
 	.
 	..
 	../blenlib
 	../imbuf
 	../makesdna
+	../blenloader
 	../../../intern/guardedalloc
 )
 
-IF(WIN32)
-	LIST(APPEND INC ${PTHREADS_INC})
-ENDIF(WIN32)
+set(SRC
+	intern/pluginapi.c
 
-IF(WITH_QUICKTIME)
-	LIST(APPEND INC ${QUICKTIME_INC})
-	ADD_DEFINITIONS(-DWITH_QUICKTIME)
-ENDIF(WITH_QUICKTIME)
+	documentation.h
+	externdef.h
+	floatpatch.h
+	iff.h
+	plugin.h
+	util.h
+)
 
-BLENDERLIB(bf_blenpluginapi "${SRC}" "${INC}")
+if(WITH_CODEC_QUICKTIME)
+	list(APPEND INC ${QUICKTIME_INC})
+	add_definitions(-DWITH_QUICKTIME)
+endif()
+
+blender_add_lib(bf_blenpluginapi "${SRC}" "${INC}")

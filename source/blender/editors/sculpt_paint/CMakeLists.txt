@@ -19,11 +19,10 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-FILE(GLOB SRC *.c)
-
-SET(INC
+set(INC
 	../include
 	../../blenkernel
+	../../blenloader
 	../../imbuf
 	../../gpu
 	../../blenlib
@@ -34,8 +33,18 @@ SET(INC
 	../../../../intern/guardedalloc
 )
 
-IF(WIN32)
-	LIST(APPEND INC ${PTHREADS_INC})
-ENDIF(WIN32)
+set(SRC
+	paint_image.c
+	paint_ops.c
+	paint_stroke.c
+	paint_undo.c
+	paint_utils.c
+	paint_vertex.c
+	sculpt.c
+	sculpt_undo.c
 
-BLENDERLIB(bf_editor_sculpt_paint "${SRC}" "${INC}")
+	paint_intern.h
+	sculpt_intern.h
+)
+
+blender_add_lib(bf_editor_sculpt_paint "${SRC}" "${INC}")

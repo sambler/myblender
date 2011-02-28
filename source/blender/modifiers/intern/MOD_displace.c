@@ -30,12 +30,18 @@
 *
 */
 
+/** \file blender/modifiers/intern/MOD_displace.c
+ *  \ingroup modifiers
+ */
+
+
 #include "DNA_meshdata_types.h"
 #include "DNA_object_types.h"
 
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
-#include "BKE_utildefines.h"
+
 #include "BKE_cdderivedmesh.h"
 #include "BKE_modifier.h"
 #include "BKE_texture.h"
@@ -82,10 +88,10 @@ static CustomDataMask requiredDataMask(Object *UNUSED(ob), ModifierData *md)
 	CustomDataMask dataMask = 0;
 
 	/* ask for vertexgroups if we need them */
-	if(dmd->defgrp_name[0]) dataMask |= (1 << CD_MDEFORMVERT);
+	if(dmd->defgrp_name[0]) dataMask |= CD_MASK_MDEFORMVERT;
 
 	/* ask for UV coordinates if we need them */
-	if(dmd->texmapping == MOD_DISP_MAP_UV) dataMask |= (1 << CD_MTFACE);
+	if(dmd->texmapping == MOD_DISP_MAP_UV) dataMask |= CD_MASK_MTFACE;
 
 	return dataMask;
 }
@@ -148,6 +154,12 @@ static void updateDepgraph(ModifierData *md, DagForest *forest,
 		dag_add_relation(forest, curNode, obNode,
 				 DAG_RL_DATA_DATA | DAG_RL_OB_DATA, "Displace Modifier");
 	}
+	
+
+	if(dmd->texmapping == MOD_DISP_MAP_GLOBAL)
+		dag_add_relation(forest, obNode, obNode,
+						 DAG_RL_DATA_DATA | DAG_RL_OB_DATA, "Displace Modifier");
+	
 }
 
 static void get_texture_coords(DisplaceModifierData *dmd, Object *ob,
@@ -350,6 +362,7 @@ ModifierTypeInfo modifierType_Displace = {
 
 	/* copyData */          copyData,
 	/* deformVerts */       deformVerts,
+	/* deformMatrices */    0,
 	/* deformVertsEM */     deformVertsEM,
 	/* deformMatricesEM */  0,
 	/* applyModifier */     0,

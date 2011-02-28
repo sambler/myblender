@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -24,6 +24,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  * */
+
+/** \file blender/blenlib/intern/math_base.c
+ *  \ingroup bli
+ */
+
 
 
 #include "BLI_math.h"
@@ -52,7 +57,8 @@ double round(double x)
 		y += 1.0;
 	return copysign(y, x);
 }
-
+#else /* OpenSuse 11.1 seems to need this. */
+double round(double x);
 #endif
 
 

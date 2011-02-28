@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/blenlib/PIL_dynlib.h
+ *  \ingroup bli
+ */
+
 #ifndef __PIL_DYNLIB_H__
 #define __PIL_DYNLIB_H__
 
@@ -38,7 +43,7 @@ PIL_dynlib_open(
 	void*
 PIL_dynlib_find_symbol(
 	PILdynlib* lib, 
-	char *symname);
+	const char *symname);
 
 	char*
 PIL_dynlib_get_error_as_string(

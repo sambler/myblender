@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,10 +25,15 @@
  * ***** END GPL LICENSE BLOCK *****
  * */
 
+/** \file blender/blenlib/intern/math_geom_inline.c
+ *  \ingroup bli
+ */
+
+
 #include "BLI_math.h"
 
-#ifndef BLI_MATH_GEOM_INLINE
-#define BLI_MATH_GEOM_INLINE
+#ifndef BLI_MATH_GEOM_INLINE_H
+#define BLI_MATH_GEOM_INLINE_H
 
 /****************************** Spherical Harmonics **************************/
 
@@ -134,5 +139,5 @@ MINLINE void madd_sh_shfl(float r[9], float sh[3], float f)
 	add_sh_shsh(r, r, tmp);
 }
 
-#endif /* BLI_MATH_GEOM_INLINE */
+#endif /* BLI_MATH_GEOM_INLINE_H */
 

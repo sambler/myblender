@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file gameengine/Ketsji/KX_ConvertPhysicsObjects.cpp
+ *  \ingroup ketsji
+ */
+
 #if defined(WIN32) && !defined(FREE_WINDOWS)
 #pragma warning (disable : 4786)
 #endif
@@ -218,6 +223,9 @@ void	KX_ConvertBulletObject(	class	KX_GameObject* gameobj,
 
 			break;
 		}
+	case KX_BOUND_DYN_MESH:
+		/* do nothing */
+		break;
 	}
 
 

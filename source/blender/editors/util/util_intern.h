@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/util/util_intern.h
+ *  \ingroup edutil
+ */
+
+
 #ifndef ED_UTIL_INTERN_H
 #define ED_UTIL_INTERN_H
 
@@ -34,6 +39,7 @@
 /* editmode_undo.c */
 void undo_editmode_clear(void);
 void undo_editmode_name(bContext *C, const char *undoname);
+int undo_editmode_valid(const char *undoname);
 
 #endif /* ED_UTIL_INTERN_H */
 

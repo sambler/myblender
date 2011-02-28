@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/space_nla/nla_draw.c
+ *  \ingroup spnla
+ */
+
+
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,11 +42,11 @@
 #include "DNA_space_types.h"
 #include "DNA_windowmanager_types.h"
 
-
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
 #include "BLI_rand.h"
 #include "BLI_dlrbTree.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_fcurve.h"
 #include "BKE_nla.h"
@@ -141,7 +146,7 @@ static void nla_action_draw_keyframes (AnimData *adt, bAction *act, View2D *v2d,
 	 *	- size is 3.0f which is smaller than the editable keyframes, so that there is a distinction
 	 */
 	for (ak= keys.first; ak; ak= ak->next)
-		draw_keyframe_shape(ak->cfra, y, xscale, 3.0f, 0, ak->key_type, KEYFRAME_SHAPE_FRAME);
+		draw_keyframe_shape(ak->cfra, y, xscale, 3.0f, 0, ak->key_type, KEYFRAME_SHAPE_FRAME, 1.0f);
 	
 	/* free icons */
 	BLI_dlrbTree_free(&keys);
@@ -171,7 +176,7 @@ static void nla_strip_get_color_inside (AnimData *adt, NlaStrip *strip, float co
 	}	
 	else if (strip->type == NLASTRIP_TYPE_META) {
 		/* Meta Clip */
-		// TODO: should temporary metas get different colours too?
+		// TODO: should temporary metas get different colors too?
 		if (strip->flag & NLASTRIP_FLAG_SELECT) {
 			/* selected - use a bold purple color */
 			// FIXME: hardcoded temp-hack colors
@@ -272,7 +277,7 @@ static void nla_draw_strip_curves (NlaStrip *strip, float yminc, float ymaxc)
 	}
 	
 	/* time -------------------------- */
-	// XXX do we want to draw this curve? in a different colour too?
+	// XXX do we want to draw this curve? in a different color too?
 	
 	/* turn off AA'd lines */
 	glDisable(GL_LINE_SMOOTH);
@@ -417,6 +422,7 @@ static void nla_draw_strip (SpaceNla *snla, AnimData *adt, NlaTrack *UNUSED(nlt)
 static void nla_draw_strip_text (NlaTrack *UNUSED(nlt), NlaStrip *strip, int UNUSED(index), View2D *v2d, float yminc, float ymaxc)
 {
 	char str[256], dir[3];
+	char col[4];
 	rctf rect;
 	
 	/* 'dir' - direction that strip is played in */
@@ -431,12 +437,15 @@ static void nla_draw_strip_text (NlaTrack *UNUSED(nlt), NlaStrip *strip, int UNU
 	else
 		sprintf(str, "%s | %.2f %s %.2f", strip->name, strip->start, dir, strip->end);
 	
-	/* set text colour - if colours (see above) are light, draw black text, otherwise draw white */
-	if (strip->flag & (NLASTRIP_FLAG_ACTIVE|NLASTRIP_FLAG_SELECT|NLASTRIP_FLAG_TWEAKUSER))
-		glColor3f(0.0f, 0.0f, 0.0f);
-	else
-		glColor3f(1.0f, 1.0f, 1.0f);
-	
+	/* set text color - if colors (see above) are light, draw black text, otherwise draw white */
+	if (strip->flag & (NLASTRIP_FLAG_ACTIVE|NLASTRIP_FLAG_SELECT|NLASTRIP_FLAG_TWEAKUSER)) {
+		col[0]= col[1]= col[2]= 0;
+	}
+	else {
+		col[0]= col[1]= col[2]= 255;
+	}
+	col[3]= 1.0;
+
 	/* set bounding-box for text 
 	 *	- padding of 2 'units' on either side
 	 */
@@ -447,7 +456,8 @@ static void nla_draw_strip_text (NlaTrack *UNUSED(nlt), NlaStrip *strip, int UNU
 	rect.ymax= ymaxc;
 	
 	/* add this string to the cache of texts to draw*/
-	UI_view2d_text_cache_rectf(v2d, &rect, str);
+
+	UI_view2d_text_cache_rectf(v2d, &rect, str, col);
 }
 
 /* ---------------------- */

@@ -29,6 +29,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/blenkernel/intern/boids.c
+ *  \ingroup bke
+ */
+
+
 #include <string.h>
 #include <math.h>
 
@@ -41,11 +46,13 @@
 #include "BLI_math.h"
 #include "BLI_blenlib.h"
 #include "BLI_kdtree.h"
+#include "BLI_utildefines.h"
+
 #include "BKE_collision.h"
 #include "BKE_effect.h"
 #include "BKE_boids.h"
 #include "BKE_particle.h"
-#include "BKE_utildefines.h"
+
 #include "BKE_modifier.h"
 
 #include "RNA_enum_types.h"
@@ -58,7 +65,7 @@ typedef struct BoidValues {
 
 static int apply_boid_rule(BoidBrainData *bbd, BoidRule *rule, BoidValues *val, ParticleData *pa, float fuzziness);
 
-static int rule_none(BoidRule *rule, BoidBrainData *UNUSED(data), BoidValues *val, ParticleData *pa)
+static int rule_none(BoidRule *UNUSED(rule), BoidBrainData *UNUSED(data), BoidValues *UNUSED(val), ParticleData *UNUSED(pa))
 {
 	return 0;
 }
@@ -205,7 +212,9 @@ static int rule_avoid_collision(BoidRule *rule, BoidBrainData *bbd, BoidValues *
 		add_v3_v3v3(col.co2, pa->prev_state.co, pa->prev_state.vel);
 		sub_v3_v3v3(ray_dir, col.co2, col.co1);
 		mul_v3_fl(ray_dir, acbr->look_ahead);
-		col.t = 0.0f;
+		col.f = 0.0f;
+		col.cfra = fmod(bbd->cfra-bbd->dfra, 1.0f);
+		col.dfra = bbd->dfra;
 		hit.index = -1;
 		hit.dist = col.ray_len = len_v3(ray_dir);
 
@@ -344,7 +353,7 @@ static int rule_avoid_collision(BoidRule *rule, BoidBrainData *bbd, BoidValues *
 
 	return ret;
 }
-static int rule_separate(BoidRule *rule, BoidBrainData *bbd, BoidValues *val, ParticleData *pa)
+static int rule_separate(BoidRule *UNUSED(rule), BoidBrainData *bbd, BoidValues *val, ParticleData *pa)
 {
 	KDTreeNearest *ptn = NULL;
 	ParticleTarget *pt;
@@ -384,7 +393,7 @@ static int rule_separate(BoidRule *rule, BoidBrainData *bbd, BoidValues *val, Pa
 	}
 	return ret;
 }
-static int rule_flock(BoidRule *rule, BoidBrainData *bbd, BoidValues *val, ParticleData *pa)
+static int rule_flock(BoidRule *UNUSED(rule), BoidBrainData *bbd, BoidValues *UNUSED(val), ParticleData *pa)
 {
 	KDTreeNearest ptn[11];
 	float vec[3] = {0.0f, 0.0f, 0.0f}, loc[3] = {0.0f, 0.0f, 0.0f};
@@ -772,7 +781,9 @@ static Object *boid_find_ground(BoidBrainData *bbd, ParticleData *pa, float *gro
 		sub_v3_v3v3(col.co2, pa->state.co, zvec);
 		sub_v3_v3(col.co2, zvec);
 		sub_v3_v3v3(ray_dir, col.co2, col.co1);
-		col.t = 0.0f;
+		col.f = 0.0f;
+		col.cfra = fmod(bbd->cfra-bbd->dfra, 1.0f);
+		col.dfra = bbd->dfra;
 		hit.index = -1;
 		hit.dist = col.ray_len = len_v3(ray_dir);
 
@@ -796,7 +807,9 @@ static Object *boid_find_ground(BoidBrainData *bbd, ParticleData *pa, float *gro
 		sub_v3_v3v3(col.co2, pa->state.co, zvec);
 		sub_v3_v3(col.co2, zvec);
 		sub_v3_v3v3(ray_dir, col.co2, col.co1);
-		col.t = 0.0f;
+		col.f = 0.0f;
+		col.cfra = fmod(bbd->cfra-bbd->dfra, 1.0f);
+		col.dfra = bbd->dfra;
 		hit.index = -1;
 		hit.dist = col.ray_len = len_v3(ray_dir);
 
@@ -1257,7 +1270,11 @@ void boid_body(BoidBrainData *bbd, ParticleData *pa)
 	switch(bpa->data.mode) {
 		case eBoidMode_InAir:
 		{
-			float grav[3] = {0.0f, 0.0f, bbd->sim->scene->physics_settings.gravity[2] < 0.0f ? -1.0f : 0.0f};
+			float grav[3];
+
+			grav[0]= 0.0f;
+			grav[1]= 0.0f;
+			grav[2]= bbd->sim->scene->physics_settings.gravity[2] < 0.0f ? -1.0f : 0.0f;
 
 			/* don't take forward acceleration into account (better banking) */
 			if(dot_v3v3(bpa->data.acc, pa->state.vel) > 0.0f) {
@@ -1296,7 +1313,12 @@ void boid_body(BoidBrainData *bbd, ParticleData *pa)
 		}
 		case eBoidMode_Falling:
 		{
-			float grav[3] = {0.0f, 0.0f, bbd->sim->scene->physics_settings.gravity[2] < 0.0f ? -1.0f : 0.0f};
+			float grav[3];
+
+			grav[0]= 0.0f;
+			grav[1]= 0.0f;
+			grav[2]= bbd->sim->scene->physics_settings.gravity[2] < 0.0f ? -1.0f : 0.0f;
+
 
 			/* gather apparent gravity */
 			VECADDFAC(bpa->gravity, bpa->gravity, grav, dtime);
@@ -1453,7 +1475,7 @@ BoidRule *boid_new_rule(int type)
 
 	rule->type = type;
 	rule->flag |= BOIDRULE_IN_AIR|BOIDRULE_ON_LAND;
-	strcpy(rule->name, boidrule_type_items[type-1].name);
+	BLI_strncpy(rule->name, boidrule_type_items[type-1].name, sizeof(rule->name));
 
 	return rule;
 }

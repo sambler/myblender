@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/space_image/image_buttons.c
+ *  \ingroup spimage
+ */
+
+
 
 #include <string.h>
 #include <stdio.h>
@@ -40,6 +45,7 @@
 #include "BLI_math.h"
 #include "BLI_editVert.h"
 #include "BLI_rand.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_colortools.h"
 #include "BKE_context.h"
@@ -137,21 +143,28 @@ static void image_info(Image *ima, ImBuf *ibuf, char *str)
 	
 	if(ibuf->rect_float) {
 		if(ibuf->channels!=4) {
-			sprintf(str+ofs, "%d float channel(s)", ibuf->channels);
+			ofs+= sprintf(str+ofs, "%d float channel(s)", ibuf->channels);
 		}
 		else if(ibuf->depth==32)
-			strcat(str, " RGBA float");
+			ofs+= sprintf(str+ofs, " RGBA float");
 		else
-			strcat(str, " RGB float");
+			ofs+= sprintf(str+ofs, " RGB float");
 	}
 	else {
 		if(ibuf->depth==32)
-			strcat(str, " RGBA byte");
+			ofs+= sprintf(str+ofs, " RGBA byte");
 		else
-			strcat(str, " RGB byte");
+			ofs+= sprintf(str+ofs, " RGB byte");
 	}
 	if(ibuf->zbuf || ibuf->zbuf_float)
-		strcat(str, " + Z");
+		ofs+= sprintf(str+ofs, " + Z");
+
+	if(ima->source==IMA_SRC_SEQUENCE) {
+		char *file= BLI_last_slash(ibuf->name);
+		if(file==NULL)	file= ibuf->name;
+		else			file++;
+		sprintf(str+ofs, ", %s", file);
+	}
 	
 }
 
@@ -342,6 +355,8 @@ static void image_panel_curves(const bContext *C, Panel *pa)
 #if 0
 /* 0: disable preview 
    otherwise refresh preview
+ 
+   XXX if you put this back, also check XXX in image_main_area_draw() */
 */
 void image_preview_event(int event)
 {
@@ -477,7 +492,7 @@ static void image_panel_preview(ScrArea *sa, short cntrl)	// IMAGE_HANDLER_PREVI
 
 /* ********************* callbacks for standard image buttons *************** */
 
-static char *slot_menu()
+static char *slot_menu(void)
 {
 	char *str;
 	int a, slot;
@@ -710,7 +725,7 @@ static void uiblock_layer_pass_arrow_buttons(uiLayout *layout, RenderResult *rr,
 	if(rr==NULL || iuser==NULL)
 		return;
 	if(rr->layers.first==NULL) {
-		uiItemL(row, "No Layers in Render Result.", 0);
+		uiItemL(row, "No Layers in Render Result.", ICON_NONE);
 		return;
 	}
 
@@ -754,7 +769,7 @@ static void rna_update_cb(bContext *C, void *arg_cb, void *UNUSED(arg))
 	RNA_property_update(C, &cb->ptr, cb->prop);
 }
 
-void uiTemplateImage(uiLayout *layout, bContext *C, PointerRNA *ptr, char *propname, PointerRNA *userptr, int compact)
+void uiTemplateImage(uiLayout *layout, bContext *C, PointerRNA *ptr, const char *propname, PointerRNA *userptr, int compact)
 {
 	PropertyRNA *prop;
 	PointerRNA imaptr;
@@ -771,14 +786,20 @@ void uiTemplateImage(uiLayout *layout, bContext *C, PointerRNA *ptr, char *propn
 
 	if(!ptr->data)
 		return;
-	
+
 	prop= RNA_struct_find_property(ptr, propname);
 	if(!prop) {
 		printf("uiTemplateImage: property not found: %s.%s\n", RNA_struct_identifier(ptr->type), propname);
 		return;
 	}
 
+	if(RNA_property_type(prop) != PROP_POINTER) {
+		printf("uiTemplateImage: expected pointer property for %s.%s\n", RNA_struct_identifier(ptr->type), propname);
+		return;
+	}
+
 	block= uiLayoutGetBlock(layout);
+
 
 	imaptr= RNA_property_pointer_get(ptr, prop);
 	ima= imaptr.data;
@@ -804,8 +825,8 @@ void uiTemplateImage(uiLayout *layout, bContext *C, PointerRNA *ptr, char *propn
 			image_info(ima, ibuf, str);
 			BKE_image_release_ibuf(ima, lock);
 
-			uiItemL(layout, ima->id.name+2, 0);
-			uiItemL(layout, str, 0);
+			uiItemL(layout, ima->id.name+2, ICON_NONE);
+			uiItemL(layout, str, ICON_NONE);
 
 			if(ima->type==IMA_TYPE_COMPOSITE) {
 				// XXX not working yet
@@ -837,7 +858,7 @@ void uiTemplateImage(uiLayout *layout, bContext *C, PointerRNA *ptr, char *propn
 		}
 		else {
 			row= uiLayoutRow(layout, 0);
-			uiItemR(row, &imaptr, "source", 0, NULL, 0);
+			uiItemR(row, &imaptr, "source", 0, NULL, ICON_NONE);
 
 			if(ima->source != IMA_SRC_GENERATED) {
 				row= uiLayoutRow(layout, 1);
@@ -851,7 +872,7 @@ void uiTemplateImage(uiLayout *layout, bContext *C, PointerRNA *ptr, char *propn
 				row= uiLayoutRow(split, 1);
 				uiLayoutSetEnabled(row, ima->packedfile==NULL);
 				
-				uiItemR(row, &imaptr, "filepath", 0, "", 0);
+				uiItemR(row, &imaptr, "filepath", 0, "", ICON_NONE);
 				uiItemO(row, "", ICON_FILE_REFRESH, "image.reload");
 			}
 
@@ -875,7 +896,7 @@ void uiTemplateImage(uiLayout *layout, bContext *C, PointerRNA *ptr, char *propn
 					ibuf= BKE_image_acquire_ibuf(ima, iuser, &lock);
 					image_info(ima, ibuf, str);
 					BKE_image_release_ibuf(ima, lock);
-					uiItemL(layout, str, 0);
+					uiItemL(layout, str, ICON_NONE);
 				}
 			}
 			
@@ -886,13 +907,13 @@ void uiTemplateImage(uiLayout *layout, bContext *C, PointerRNA *ptr, char *propn
 					split= uiLayoutSplit(layout, 0, 0);
 
 					col= uiLayoutColumn(split, 0);
-					uiItemR(col, &imaptr, "use_fields", 0, NULL, 0);
+					uiItemR(col, &imaptr, "use_fields", 0, NULL, ICON_NONE);
 					row= uiLayoutRow(col, 0);
-					uiItemR(row, &imaptr, "field_order", UI_ITEM_R_EXPAND, NULL, 0);
+					uiItemR(row, &imaptr, "field_order", UI_ITEM_R_EXPAND, NULL, ICON_NONE);
 					uiLayoutSetActive(row, RNA_boolean_get(&imaptr, "use_fields"));
 
 					col= uiLayoutColumn(split, 0);
-					uiItemR(col, &imaptr, "use_premultiply", 0, NULL, 0);
+					uiItemR(col, &imaptr, "use_premultiply", 0, NULL, ICON_NONE);
 				}
 			}
 
@@ -905,30 +926,30 @@ void uiTemplateImage(uiLayout *layout, bContext *C, PointerRNA *ptr, char *propn
 				 
 				sprintf(str, "(%d) Frames", iuser->framenr);
 				row= uiLayoutRow(col, 1);
-				uiItemR(col, userptr, "frame_duration", 0, str, 0);
+				uiItemR(col, userptr, "frame_duration", 0, str, ICON_NONE);
 				if(ima->anim) {
 					block= uiLayoutGetBlock(row);
 					but= uiDefBut(block, BUT, 0, "Match Movie Length", 0, 0, UI_UNIT_X*2, UI_UNIT_Y, 0, 0, 0, 0, 0, "Set the number of frames to match the movie or sequence.");
 					uiButSetFunc(but, set_frames_cb, ima, iuser);
 				}
 
-				uiItemR(col, userptr, "frame_start", 0, "Start", 0);
-				uiItemR(col, userptr, "frame_offset", 0, NULL, 0);
+				uiItemR(col, userptr, "frame_start", 0, "Start", ICON_NONE);
+				uiItemR(col, userptr, "frame_offset", 0, NULL, ICON_NONE);
 
 				col= uiLayoutColumn(split, 0);
-				uiItemR(col, userptr, "fields_per_frame", 0, "Fields", 0);
-				uiItemR(col, userptr, "use_auto_refresh", 0, NULL, 0);
-				uiItemR(col, userptr, "use_cyclic", 0, NULL, 0);
+				uiItemR(col, userptr, "fields_per_frame", 0, "Fields", ICON_NONE);
+				uiItemR(col, userptr, "use_auto_refresh", 0, NULL, ICON_NONE);
+				uiItemR(col, userptr, "use_cyclic", 0, NULL, ICON_NONE);
 			}
 			else if(ima->source==IMA_SRC_GENERATED) {
 				split= uiLayoutSplit(layout, 0, 0);
 
 				col= uiLayoutColumn(split, 1);
-				uiItemR(col, &imaptr, "generated_width", 0, "X", 0);
-				uiItemR(col, &imaptr, "generated_height", 0, "Y", 0);
+				uiItemR(col, &imaptr, "generated_width", 0, "X", ICON_NONE);
+				uiItemR(col, &imaptr, "generated_height", 0, "Y", ICON_NONE);
 
 				col= uiLayoutColumn(split, 0);
-				uiItemR(col, &imaptr, "generated_type", UI_ITEM_R_EXPAND, NULL, 0);
+				uiItemR(col, &imaptr, "generated_type", UI_ITEM_R_EXPAND, NULL, ICON_NONE);
 			}
 
 					}
@@ -1012,6 +1033,7 @@ void IMAGE_OT_properties(wmOperatorType *ot)
 {
 	ot->name= "Properties";
 	ot->idname= "IMAGE_OT_properties";
+	ot->description= "Toggle display properties panel";
 	
 	ot->exec= image_properties;
 	ot->poll= ED_operator_image_active;
@@ -1035,6 +1057,7 @@ void IMAGE_OT_scopes(wmOperatorType *ot)
 {
 	ot->name= "Scopes";
 	ot->idname= "IMAGE_OT_scopes";
+	ot->description= "Toggle display scopes panel";
 	
 	ot->exec= image_scopes;
 	ot->poll= ED_operator_image_active;

@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/space_nla/space_nla.c
+ *  \ingroup spnla
+ */
+
+
 #include <string.h>
 #include <stdio.h>
 
@@ -37,12 +42,14 @@
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
 #include "BLI_rand.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_context.h"
 #include "BKE_global.h"
 #include "BKE_main.h"
 #include "BKE_screen.h"
 
+#include "ED_space_api.h"
 #include "ED_anim_api.h"
 #include "ED_markers.h"
 #include "ED_screen.h"
@@ -209,9 +216,13 @@ static void nla_channel_area_init(wmWindowManager *wm, ARegion *ar)
 	UI_view2d_region_reinit(&ar->v2d, V2D_COMMONVIEW_LIST, ar->winx, ar->winy);
 	
 	/* own keymap */
-	// TODO: cannot use generic copy, need special NLA version
+		/* own channels map first to override some channel keymaps */
 	keymap= WM_keymap_find(wm->defaultconf, "NLA Channels", SPACE_NLA, 0);
 	WM_event_add_keymap_handler_bb(&ar->handlers, keymap, &ar->v2d.mask, &ar->winrct);
+		/* now generic channels map for everything else that can apply */
+	keymap= WM_keymap_find(wm->defaultconf, "Animation Channels", 0, 0);
+	WM_event_add_keymap_handler_bb(&ar->handlers, keymap, &ar->v2d.mask, &ar->winrct);
+	
 	keymap= WM_keymap_find(wm->defaultconf, "NLA Generic", SPACE_NLA, 0);
 	WM_event_add_keymap_handler_bb(&ar->handlers, keymap, &ar->v2d.mask, &ar->winrct);
 }
@@ -510,7 +521,7 @@ void ED_spacetype_nla(void)
 	art->init= nla_main_area_init;
 	art->draw= nla_main_area_draw;
 	art->listener= nla_main_area_listener;
-	art->keymapflag= ED_KEYMAP_VIEW2D/*|ED_KEYMAP_MARKERS*/|ED_KEYMAP_ANIMATION|ED_KEYMAP_FRAMES;
+	art->keymapflag= ED_KEYMAP_VIEW2D|ED_KEYMAP_MARKERS|ED_KEYMAP_ANIMATION|ED_KEYMAP_FRAMES;
 
 	BLI_addhead(&st->regiontypes, art);
 	

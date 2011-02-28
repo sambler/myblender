@@ -30,7 +30,7 @@
 /**
  * \file BLO_readblenfile.c
  * \brief This file handles the loading if .blend files
- * \ingroup mainmodule
+ * \ingroup blo
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -54,7 +54,7 @@
 #include "BLI_blenlib.h"
 
 /** Magic number for the file header */
-char *headerMagic = "BLENDFI";
+const char *headerMagic = "BLENDFI";
 
 /**
  * \brief Set the version number into the array.

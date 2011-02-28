@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/space_file/space_file.c
+ *  \ingroup spfile
+ */
+
+
 #include <string.h>
 #include <stdio.h>
 
@@ -42,10 +47,12 @@
 #include "BLI_math.h"
 #include "BLI_rand.h"
 #include "BLI_storage_types.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_context.h"
 #include "BKE_screen.h"
 
+#include "ED_space_api.h"
 #include "ED_screen.h"
 #include "ED_fileselect.h"
 
@@ -57,7 +64,6 @@
 
 #include "UI_resources.h"
 #include "UI_view2d.h"
-
 
 
 #include "file_intern.h"	// own include
@@ -327,6 +333,13 @@ static void file_main_area_draw(const bContext *C, ARegion *ar)
 		v2d->scroll = V2D_SCROLL_BOTTOM;
 		v2d->keepofs &= ~V2D_LOCKOFS_X;
 		v2d->keepofs |= V2D_LOCKOFS_Y;
+		
+		/* XXX this happens on scaling down Screen (like from startup.blend) */
+		/* view2d has no type specific for filewindow case, which doesnt scroll vertically */
+		if(v2d->cur.ymax < 0) {
+			v2d->cur.ymin -= v2d->cur.ymax;
+			v2d->cur.ymax= 0;
+		}
 	}
 	/* v2d has initialized flag, so this call will only set the mask correct */
 	UI_view2d_region_reinit(v2d, V2D_COMMONVIEW_LIST, ar->winx, ar->winy);
@@ -355,7 +368,7 @@ static void file_main_area_draw(const bContext *C, ARegion *ar)
 
 }
 
-void file_operatortypes(void)
+static void file_operatortypes(void)
 {
 	WM_operatortype_append(FILE_OT_select);
 	WM_operatortype_append(FILE_OT_select_all_toggle);
@@ -377,10 +390,11 @@ void file_operatortypes(void)
 	WM_operatortype_append(FILE_OT_delete);
 	WM_operatortype_append(FILE_OT_rename);
 	WM_operatortype_append(FILE_OT_smoothscroll);
+	WM_operatortype_append(FILE_OT_directory);
 }
 
 /* NOTE: do not add .blend file reading on this level */
-void file_keymap(struct wmKeyConfig *keyconf)
+static void file_keymap(struct wmKeyConfig *keyconf)
 {
 	wmKeyMapItem *kmi;
 	/* keys for all areas */

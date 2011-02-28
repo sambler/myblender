@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/animation/anim_draw.c
+ *  \ingroup edanimation
+ */
+
 #include "BLO_sys_types.h"
 
 #include "DNA_anim_types.h"
@@ -232,7 +237,7 @@ void ANIM_draw_cfra (const bContext *C, View2D *v2d, short flag)
 	
 	/* Draw dark green line if slow-parenting/time-offset is enabled */
 	if (flag & DRAWCFRA_SHOW_TIMEOFS) {
-		Object *ob= (scene->basact) ? (scene->basact->object) : 0;
+		Object *ob= OBACT;
 		if(ob) {
 			float timeoffset= give_timeoffset(ob);
 			// XXX ob->ipoflag is depreceated!
@@ -352,14 +357,13 @@ static short bezt_nlamapping_apply(KeyframeEditData *ked, BezTriple *bezt)
  */
 void ANIM_nla_mapping_apply_fcurve (AnimData *adt, FCurve *fcu, short restore, short only_keys)
 {
-	KeyframeEditData ked;
+	KeyframeEditData ked= {{NULL}};
 	KeyframeEditFunc map_cb;
 	
 	/* init edit data 
 	 *	- AnimData is stored in 'data'
 	 *	- only_keys is stored in 'i1'
 	 */
-	memset(&ked, 0, sizeof(KeyframeEditData));
 	ked.data= (void *)adt;
 	ked.i1= (int)only_keys;
 	
@@ -393,7 +397,7 @@ float ANIM_unit_mapping_get_factor (Scene *scene, ID *id, FCurve *fcu, short res
 			if (RNA_SUBTYPE_UNIT(RNA_property_subtype(prop)) == PROP_UNIT_ROTATION)
 			{
 				/* if the radians flag is not set, default to using degrees which need conversions */
-				if ((scene) && (scene->unit.flag & USER_UNIT_ROT_RADIANS) == 0) {
+				if ((scene) && (scene->unit.system_rotation == USER_UNIT_ROT_RADIANS) == 0) {
 					if (restore)
 						return M_PI / 180.0f;	/* degrees to radians */
 					else
@@ -466,7 +470,7 @@ void ANIM_unit_mapping_apply_fcurve (Scene *scene, ID *id, FCurve *fcu, short fl
 	// TODO: only sel?
 	if (fcu->fpt) {
 		FPoint *fpt;
-		int i;
+		unsigned int i;
 		
 		for (i=0, fpt=fcu->fpt; i < fcu->totvert; i++, fpt++) {
 			/* apply unit mapping */

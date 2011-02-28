@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file gameengine/Converter/KX_BlenderSceneConverter.cpp
+ *  \ingroup bgeconv
+ */
+
 
 #if defined(WIN32) && !defined(FREE_WINDOWS)
 #pragma warning (disable:4786) // suppress stl-MSVC debug info warning
@@ -623,12 +628,6 @@ void KX_BlenderSceneConverter::RegisterWorldInfo(
 	m_worldinfos.push_back(pair<KX_Scene*,KX_WorldInfo*>(m_currentScene,worldinfo));
 }
 
-//quick hack
-extern "C"
-{
-	void mat3_to_compatible_eul( float *eul, float *oldrot,float mat[][3]);
-}
-
 void	KX_BlenderSceneConverter::ResetPhysicsObjectsAnimationIpo(bool clearIpo)
 {
 
@@ -783,8 +782,8 @@ void	KX_BlenderSceneConverter::WritePhysicsObjectToAnimationIpo(int frameNumber)
 
 					mat3_to_compatible_eul(blenderObject->rot, blenderObject->rot, tmat);
 
-					insert_keyframe(&blenderObject->id, NULL, NULL, "location", -1, frameNumber, INSERTKEY_FAST);
-					insert_keyframe(&blenderObject->id, NULL, NULL, "rotation_euler", -1, frameNumber, INSERTKEY_FAST);
+					insert_keyframe(NULL, &blenderObject->id, NULL, NULL, "location", -1, frameNumber, INSERTKEY_FAST);
+					insert_keyframe(NULL, &blenderObject->id, NULL, NULL, "rotation_euler", -1, frameNumber, INSERTKEY_FAST);
 
 #if 0
 					const MT_Point3& position = gameObj->NodeGetWorldPosition();
@@ -912,7 +911,7 @@ void	KX_BlenderSceneConverter::TestHandlesPhysicsObjectToAnimationIpo()
 
 }
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 PyObject *KX_BlenderSceneConverter::GetPyNamespace()
 {
 	return m_ketsjiEngine->GetPyNamespace();

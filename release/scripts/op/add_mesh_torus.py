@@ -19,15 +19,16 @@
 # <pep8 compliant>
 import bpy
 import mathutils
-from math import cos, sin, pi
 
 
 def add_torus(major_rad, minor_rad, major_seg, minor_seg):
+    from math import cos, sin, pi
+
     Vector = mathutils.Vector
     Quaternion = mathutils.Quaternion
 
-    PI_2 = pi * 2
-    z_axis = (0, 0, 1)
+    PI_2 = pi * 2.0
+    z_axis = 0.0, 0.0, 1.0
 
     verts = []
     faces = []
@@ -71,7 +72,7 @@ def add_torus(major_rad, minor_rad, major_seg, minor_seg):
 
     return verts, faces
 
-from bpy.props import *
+from bpy.props import FloatProperty, IntProperty, BoolProperty, FloatVectorProperty
 
 
 class AddTorus(bpy.types.Operator):
@@ -103,8 +104,12 @@ class AddTorus(bpy.types.Operator):
             default=0.5, min=0.01, max=100.0)
 
     # generic transform props
-    location = FloatVectorProperty(name="Location")
-    rotation = FloatVectorProperty(name="Rotation")
+    view_align = BoolProperty(name="Align to View",
+            default=False)
+    location = FloatVectorProperty(name="Location",
+            subtype='TRANSLATION')
+    rotation = FloatVectorProperty(name="Rotation",
+            subtype='EULER')
 
     def execute(self, context):
 
@@ -128,7 +133,7 @@ class AddTorus(bpy.types.Operator):
         mesh.update()
 
         import add_object_utils
-        add_object_utils.add_object_data(context, mesh, operator=self)
+        add_object_utils.object_data_add(context, mesh, operator=self)
 
         return {'FINISHED'}
 
@@ -138,10 +143,12 @@ def menu_func(self, context):
 
 
 def register():
+    bpy.utils.register_class(AddTorus)
     bpy.types.INFO_MT_mesh_add.append(menu_func)
 
 
 def unregister():
+    bpy.utils.unregister_class(AddTorus)
     bpy.types.INFO_MT_mesh_add.remove(menu_func)
 
 if __name__ == "__main__":

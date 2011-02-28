@@ -29,12 +29,21 @@
 * ***** END GPL LICENSE BLOCK *****
 *
 */
+
+/** \file blender/modifiers/intern/MOD_bevel.c
+ *  \ingroup modifiers
+ */
+
 #include "MEM_guardedalloc.h"
+
+#include "BLI_utildefines.h"
 
 #include "BKE_bmesh.h"
 #include "BKE_cdderivedmesh.h"
 #include "BKE_modifier.h"
 #include "BKE_particle.h"
+
+#include "MOD_util.h"
 
 
 static void initData(ModifierData *md)
@@ -72,7 +81,7 @@ static CustomDataMask requiredDataMask(Object *UNUSED(ob), ModifierData *md)
 	CustomDataMask dataMask = 0;
 
 	/* ask for vertexgroups if we need them */
-	if(bmd->defgrp_name[0]) dataMask |= (1 << CD_MDEFORMVERT);
+	if(bmd->defgrp_name[0]) dataMask |= CD_MASK_MDEFORMVERT;
 
 	return dataMask;
 }
@@ -127,6 +136,7 @@ ModifierTypeInfo modifierType_Bevel = {
 
 	/* copyData */          copyData,
 	/* deformVerts */       0,
+	/* deformMatrices */    0,
 	/* deformVertsEM */     0,
 	/* deformMatricesEM */  0,
 	/* applyModifier */     applyModifier,

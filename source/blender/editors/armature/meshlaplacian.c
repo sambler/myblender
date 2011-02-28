@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -28,6 +28,11 @@
  * meshlaplacian.c: Algorithms using the mesh laplacian.
  */
 
+/** \file blender/editors/armature/meshlaplacian.c
+ *  \ingroup edarmature
+ */
+
+
 #include <math.h>
 #include <string.h>
 
@@ -41,10 +46,11 @@
 #include "BLI_math.h"
 #include "BLI_edgehash.h"
 #include "BLI_memarena.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_DerivedMesh.h"
 #include "BKE_modifier.h"
-#include "BKE_utildefines.h"
+
 
 #ifdef RIGID_DEFORM
 #include "BLI_editVert.h"
@@ -56,16 +62,17 @@
 #include "BLO_sys_types.h" // for intptr_t support
 
 #include "ED_mesh.h"
+#include "ED_armature.h"
 
 #include "meshlaplacian.h"
 
 
 /* ************* XXX *************** */
-static void waitcursor(int val) {}
+static void waitcursor(int UNUSED(val)) {}
 static void progress_bar(int UNUSED(dummy_val), const char *UNUSED(dummy)) {}
-static void start_progress_bar() {}
-static void end_progress_bar() {}
-static void error(char *str) { printf("error: %s\n", str); }
+static void start_progress_bar(void) {}
+static void end_progress_bar(void) {}
+static void error(const char *str) { printf("error: %s\n", str); }
 /* ************* XXX *************** */
 
 
@@ -236,7 +243,7 @@ static void laplacian_triangle_weights(LaplacianSystem *sys, int f, int i1, int 
 	}
 }
 
-LaplacianSystem *laplacian_system_construct_begin(int totvert, int totface, int lsq)
+static LaplacianSystem *laplacian_system_construct_begin(int totvert, int totface, int lsq)
 {
 	LaplacianSystem *sys;
 
@@ -278,7 +285,7 @@ void laplacian_add_triangle(LaplacianSystem *sys, int v1, int v2, int v3)
 	sys->totface++;
 }
 
-void laplacian_system_construct_end(LaplacianSystem *sys)
+static void laplacian_system_construct_end(LaplacianSystem *sys)
 {
 	int (*face)[3];
 	int a, totvert=sys->totvert, totface=sys->totface;
@@ -329,7 +336,7 @@ void laplacian_system_construct_end(LaplacianSystem *sys)
 	sys->edgehash= NULL;
 }
 
-void laplacian_system_delete(LaplacianSystem *sys)
+static void laplacian_system_delete(LaplacianSystem *sys)
 {
 	if(sys->verts) MEM_freeN(sys->verts);
 	if(sys->varea) MEM_freeN(sys->varea);
@@ -398,7 +405,7 @@ typedef struct BVHCallbackUserData {
 	LaplacianSystem *sys;
 } BVHCallbackUserData;
 
-static void bvh_callback(void *userdata, int index, const BVHTreeRay *ray, BVHTreeRayHit *hit)
+static void bvh_callback(void *userdata, int index, const BVHTreeRay *UNUSED(ray), BVHTreeRayHit *hit)
 {
 	BVHCallbackUserData *data = (struct BVHCallbackUserData*)userdata;
 	MFace *mf = data->sys->heat.mface + index;
@@ -564,7 +571,7 @@ static void heat_set_H(LaplacianSystem *sys, int vertex)
 	sys->heat.H[vertex]= h;
 }
 
-void heat_calc_vnormals(LaplacianSystem *sys)
+static void heat_calc_vnormals(LaplacianSystem *sys)
 {
 	float fnor[3];
 	int a, v1, v2, v3, (*face)[3];
@@ -648,8 +655,8 @@ void heat_bone_weighting(Object *ob, Mesh *me, float (*verts)[3], int numsource,
 	MFace *mface;
 	float solution, weight;
 	int *vertsflipped = NULL, *mask= NULL;
-	int a, totface, j, bbone, firstsegment, lastsegment, thrownerror = 0;
-	
+	int a, totface, j, bbone, firstsegment, lastsegment;
+
 	*err_str= NULL;
 
 	/* count triangles and create mask */
@@ -761,9 +768,8 @@ void heat_bone_weighting(Object *ob, Mesh *me, float (*verts)[3], int numsource,
 				}
 			}
 		}
-		else if(!thrownerror) {
+		else if(*err_str == NULL) {
 			*err_str= "Bone Heat Weighting: failed to find solution for one or more bones";
-			thrownerror= 1;
 			break;
 		}
 
@@ -1264,11 +1270,9 @@ static int meshdeform_inside_cage(MeshDeformBind *mdb, float *co)
 {
 	MDefBoundIsect *isect;
 	float outside[3], start[3], dir[3];
-	int i, counter;
+	int i;
 
 	for(i=1; i<=6; i++) {
-		counter = 0;
-
 		outside[0] = co[0] + (mdb->max[0] - mdb->min[0] + 1.0f)*MESHDEFORM_OFFSET[i][0];
 		outside[1] = co[1] + (mdb->max[1] - mdb->min[1] + 1.0f)*MESHDEFORM_OFFSET[i][1];
 		outside[2] = co[2] + (mdb->max[2] - mdb->min[2] + 1.0f)*MESHDEFORM_OFFSET[i][2];
@@ -1401,7 +1405,7 @@ static void meshdeform_bind_floodfill(MeshDeformBind *mdb)
 	MEM_freeN(stack);
 }
 
-static float meshdeform_boundary_phi(MeshDeformBind *mdb, MDefBoundIsect *isect, int cagevert)
+static float meshdeform_boundary_phi(MeshDeformBind *UNUSED(mdb), MDefBoundIsect *isect, int cagevert)
 {
 	int a;
 
@@ -1412,7 +1416,7 @@ static float meshdeform_boundary_phi(MeshDeformBind *mdb, MDefBoundIsect *isect,
 	return 0.0f;
 }
 
-static float meshdeform_interp_w(MeshDeformBind *mdb, float *gridvec, float *vec, int cagevert)
+static float meshdeform_interp_w(MeshDeformBind *mdb, float *gridvec, float *UNUSED(vec), int UNUSED(cagevert))
 {
 	float dvec[3], ivec[3], wx, wy, wz, result=0.0f;
 	float weight, totweight= 0.0f;
@@ -1563,7 +1567,7 @@ static void meshdeform_matrix_add_semibound_phi(MeshDeformBind *mdb, int x, int 
 	}
 }
 
-static void meshdeform_matrix_add_exterior_phi(MeshDeformBind *mdb, int x, int y, int z, int cagevert)
+static void meshdeform_matrix_add_exterior_phi(MeshDeformBind *mdb, int x, int y, int z, int UNUSED(cagevert))
 {
 	float phi, totweight;
 	int i, a, acenter;

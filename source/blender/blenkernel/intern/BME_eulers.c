@@ -1,4 +1,4 @@
-/**
+/*
  * BME_eulers.c    jan 2007
  *
  *	BMesh Euler construction API.
@@ -32,8 +32,13 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
-#include "MEM_guardedalloc.h"
+/** \file blender/blenkernel/intern/BME_eulers.c
+ *  \ingroup bke
+ */
 
+
+#include "MEM_guardedalloc.h"
+#include "BLI_utildefines.h"
 
 #include "bmesh_private.h"
 

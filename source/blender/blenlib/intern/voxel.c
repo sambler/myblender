@@ -1,4 +1,4 @@
-/**
+/*
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -26,9 +26,15 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
-#include "BLI_voxel.h"
+/** \file blender/blenlib/intern/voxel.c
+ *  \ingroup bli
+ */
 
-#include "BKE_utildefines.h"
+
+#include "BLI_voxel.h"
+#include "BLI_utildefines.h"
+
+
 
 BM_INLINE float D(float *data,  int *res, int x, int y, int z)
 {

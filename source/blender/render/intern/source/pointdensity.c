@@ -23,6 +23,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/render/intern/source/pointdensity.c
+ *  \ingroup render
+ */
+
+
 #include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -32,6 +37,7 @@
 #include "BLI_math.h"
 #include "BLI_blenlib.h"
 #include "BLI_kdopbvh.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_DerivedMesh.h"
 #include "BKE_global.h"
@@ -49,6 +55,7 @@
 #include "render_types.h"
 #include "renderdatabase.h"
 #include "texture.h"
+#include "pointdensity.h"
 
 /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
 /* defined in pipeline.c, is hardcopy of active dynamic allocated Render */
@@ -94,7 +101,7 @@ static void pointdensity_cache_psys(Render *re, PointDensity *pd, Object *ob, Pa
 {
 	DerivedMesh* dm;
 	ParticleKey state;
-	ParticleSimulationData sim = {re->scene, ob, psys, NULL};
+	ParticleSimulationData sim= {0};
 	ParticleData *pa=NULL;
 	float cfra = BKE_curframe(re->scene);
 	int i, childexists;
@@ -103,10 +110,9 @@ static void pointdensity_cache_psys(Render *re, PointDensity *pd, Object *ob, Pa
 	float partco[3];
 	float obview[4][4];
 	
-	
 	/* init everything */
 	if (!psys || !ob || !pd) return;
-	
+
 	mul_m4_m4m4(obview, re->viewinv, ob->obmat);
 	
 	/* Just to create a valid rendering context for particles */
@@ -119,6 +125,10 @@ static void pointdensity_cache_psys(Render *re, PointDensity *pd, Object *ob, Pa
 		return;
 	}
 	
+	sim.scene= re->scene;
+	sim.ob= ob;
+	sim.psys= psys;
+
 	/* in case ob->imat isn't up-to-date */
 	invert_m4_m4(ob->imat, ob->obmat);
 	
@@ -253,7 +263,7 @@ static void cache_pointdensity(Render *re, Tex *tex)
 	}
 }
 
-static void free_pointdensity(Render *re, Tex *tex)
+static void free_pointdensity(Render *UNUSED(re), Tex *tex)
 {
 	PointDensity *pd = tex->pd;
 
@@ -321,7 +331,7 @@ typedef struct PointDensityRangeData
 	int offset;
 } PointDensityRangeData;
 
-void accum_density(void *userdata, int index, float squared_dist)
+static void accum_density(void *userdata, int index, float squared_dist)
 {
 	PointDensityRangeData *pdr = (PointDensityRangeData *)userdata;
 	const float dist = (pdr->squared_radius - squared_dist) / pdr->squared_radius * 0.5f;

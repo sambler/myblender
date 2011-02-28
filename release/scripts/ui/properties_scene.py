@@ -53,17 +53,12 @@ class SCENE_PT_unit(SceneButtonsPanel, bpy.types.Panel):
 
         col = layout.column()
         col.row().prop(unit, "system", expand=True)
+        col.row().prop(unit, "system_rotation", expand=True)
 
-        split = layout.split()
-        split.active = (unit.system != 'NONE')
-
-        col = split.column()
-        col.prop(unit, "scale_length", text="Scale")
-
-        col = split.column()
-        col.prop(unit, "use_separate")
-
-        layout.column().prop(unit, "rotation_units")
+        row = layout.row()
+        row.active = (unit.system != 'NONE')
+        row.prop(unit, "scale_length", text="Scale")
+        row.prop(unit, "use_separate")
 
 
 class SCENE_PT_keying_sets(SceneButtonsPanel, bpy.types.Panel):
@@ -198,9 +193,7 @@ class SCENE_PT_simplify(SceneButtonsPanel, bpy.types.Panel):
 class SCENE_PT_custom_props(SceneButtonsPanel, PropertyPanel, bpy.types.Panel):
     COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
     _context_path = "scene"
-
-
-from bpy.props import *
+    _property_type = bpy.types.Scene
 
 #  XXX, move operator to op/ dir
 
@@ -229,7 +222,7 @@ class ANIM_OT_keying_set_export(bpy.types.Operator):
         f.write("# Keying Set: %s\n" % ks.name)
 
         f.write("import bpy\n\n")
-        f.write("scene= bpy.data.scenes[0]\n\n") # XXX, why not use the current scene?
+        f.write("scene= bpy.data.scenes[0]\n\n")  # XXX, why not use the current scene?
 
         # Add KeyingSet and set general settings
         f.write("# Keying Set Level declarations\n")
@@ -238,7 +231,7 @@ class ANIM_OT_keying_set_export(bpy.types.Operator):
         if not ks.is_path_absolute:
             f.write("ks.is_path_absolute = False\n")
         f.write("\n")
-    
+
         f.write("ks.bl_options = %r\n" % ks.bl_options)
         f.write("\n")
 
@@ -306,16 +299,16 @@ class ANIM_OT_keying_set_export(bpy.types.Operator):
 
     def invoke(self, context, event):
         wm = context.window_manager
-        wm.add_fileselect(self)
+        wm.fileselect_add(self)
         return {'RUNNING_MODAL'}
 
 
 def register():
-    pass
+    bpy.utils.register_module(__name__)
 
 
 def unregister():
-    pass
+    bpy.utils.unregister_module(__name__)
 
 if __name__ == "__main__":
     register()

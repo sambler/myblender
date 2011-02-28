@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -21,6 +21,14 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/collada/collada_internal.cpp
+ *  \ingroup collada
+ */
+
+
+/* COLLADABU_ASSERT, may be able to remove later */
+#include "COLLADABUPlatform.h"
 
 #include "collada_internal.h"
 
@@ -247,7 +255,7 @@ std::string id_name(void *id)
 
 std::string get_geometry_id(Object *ob)
 {
-	return translate_id(id_name(ob)) + "-mesh";
+	return translate_id(id_name(ob->data)) + "-mesh";
 }
 
 std::string get_light_id(Object *ob)

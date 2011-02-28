@@ -30,6 +30,11 @@
 *
 */
 
+/** \file blender/modifiers/intern/MOD_uvproject.c
+ *  \ingroup modifiers
+ */
+
+
 /* UV Project modifier: Generates UVs projected from an object */
 
 #include "DNA_meshdata_types.h"
@@ -38,8 +43,9 @@
 
 #include "BLI_math.h"
 #include "BLI_uvproject.h"
+#include "BLI_utildefines.h"
 
-#include "BKE_utildefines.h"
+
 #include "BKE_DerivedMesh.h"
 
 #include "MOD_modifiertypes.h"
@@ -84,7 +90,7 @@ static CustomDataMask requiredDataMask(Object *UNUSED(ob), ModifierData *UNUSED(
 	CustomDataMask dataMask = 0;
 
 	/* ask for UV coordinates */
-	dataMask |= (1 << CD_MTFACE);
+	dataMask |= CD_MASK_MTFACE;
 
 	return dataMask;
 }
@@ -412,6 +418,7 @@ ModifierTypeInfo modifierType_UVProject = {
 
 	/* copyData */          copyData,
 	/* deformVerts */       0,
+	/* deformMatrices */    0,
 	/* deformVertsEM */     0,
 	/* deformMatricesEM */  0,
 	/* applyModifier */     applyModifier,

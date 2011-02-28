@@ -128,6 +128,7 @@ class USERPREF_MT_keyconfigs(bpy.types.Menu):
     bl_label = "KeyPresets"
     preset_subdir = "keyconfig"
     preset_operator = "wm.keyconfig_activate"
+
     def draw(self, context):
         props = self.layout.operator("wm.context_set_value", text="Blender (default)")
         props.data_path = "window_manager.keyconfigs.active"
@@ -279,7 +280,7 @@ class InputKeyMapPanel(bpy.types.Panel):
         else:
             row.label()
 
-        if kmi.id:
+        if not kmi.is_user_defined:
             op = row.operator("wm.keyitem_restore", text="", icon='BACK')
             op.item_id = kmi.id
         op = row.operator("wm.keyitem_remove", text="", icon='X')
@@ -379,7 +380,7 @@ class InputKeyMapPanel(bpy.types.Panel):
         subcol = subsplit.column()
 
         row = subcol.row(align=True)
-        
+
         #row.prop_search(wm.keyconfigs, "active", wm, "keyconfigs", text="Key Config:")
         text = bpy.path.display_name(context.window_manager.keyconfigs.active.name)
         if not text:
@@ -387,7 +388,7 @@ class InputKeyMapPanel(bpy.types.Panel):
         row.menu("USERPREF_MT_keyconfigs", text=text)
         row.operator("wm.keyconfig_preset_add", text="", icon="ZOOMIN")
         row.operator("wm.keyconfig_preset_add", text="", icon="ZOOMOUT").remove_active = True
-    
+
 #        layout.context_pointer_set("keyconfig", wm.keyconfigs.active)
 #        row.operator("wm.keyconfig_remove", text="", icon='X')
 
@@ -403,7 +404,7 @@ class InputKeyMapPanel(bpy.types.Panel):
             self.draw_hierarchy(display_keymaps, col)
 
 
-from bpy.props import *
+from bpy.props import StringProperty, BoolProperty, IntProperty
 
 
 def export_properties(prefix, properties, lines=None):
@@ -575,7 +576,7 @@ class WM_OT_keyconfig_import(bpy.types.Operator):
 
     def invoke(self, context, event):
         wm = context.window_manager
-        wm.add_fileselect(self)
+        wm.fileselect_add(self)
         return {'RUNNING_MODAL'}
 
 # This operator is also used by interaction presets saving - AddPresetBase
@@ -605,7 +606,7 @@ class WM_OT_keyconfig_export(bpy.types.Operator):
         f.write("import bpy\n")
         f.write("import os\n\n")
         f.write("wm = bpy.context.window_manager\n")
-        f.write("kc = wm.keyconfigs.new(os.path.splitext(os.path.basename(__file__))[0])\n\n") # keymap must be created by caller
+        f.write("kc = wm.keyconfigs.new(os.path.splitext(os.path.basename(__file__))[0])\n\n")  # keymap must be created by caller
 
         # Generate a list of keymaps to export:
         #
@@ -665,7 +666,7 @@ class WM_OT_keyconfig_export(bpy.types.Operator):
 
     def invoke(self, context, event):
         wm = context.window_manager
-        wm.add_fileselect(self)
+        wm.fileselect_add(self)
         return {'RUNNING_MODAL'}
 
 
@@ -675,7 +676,6 @@ class WM_OT_keymap_edit(bpy.types.Operator):
     bl_label = "Edit Key Map"
 
     def execute(self, context):
-        wm = context.window_manager
         km = context.keymap
         km.copy_to_user()
         return {'FINISHED'}
@@ -708,12 +708,17 @@ class WM_OT_keyitem_restore(bpy.types.Operator):
 
     item_id = IntProperty(name="Item Identifier", description="Identifier of the item to remove")
 
+    @classmethod
+    def poll(cls, context):
+        km = context.keymap
+        return km.is_user_defined
+
     def execute(self, context):
-        wm = context.window_manager
         km = context.keymap
         kmi = km.items.from_id(self.item_id)
 
-        km.restore_item_to_default(kmi)
+        if not kmi.is_user_defined:
+            km.restore_item_to_default(kmi)
 
         return {'FINISHED'}
 
@@ -749,8 +754,12 @@ class WM_OT_keyitem_remove(bpy.types.Operator):
 
     item_id = IntProperty(name="Item Identifier", description="Identifier of the item to remove")
 
+    @classmethod
+    def poll(cls, context):
+        km = context.keymap
+        return km.is_user_defined
+
     def execute(self, context):
-        wm = context.window_manager
         km = context.keymap
         kmi = km.items.from_id(self.item_id)
         km.items.remove(kmi)
@@ -768,7 +777,6 @@ class WM_OT_keyconfig_remove(bpy.types.Operator):
         return wm.keyconfigs.active.is_user_defined
 
     def execute(self, context):
-        import sys
         wm = context.window_manager
         keyconfig = wm.keyconfigs.active
         wm.keyconfigs.remove(keyconfig)
@@ -776,11 +784,11 @@ class WM_OT_keyconfig_remove(bpy.types.Operator):
 
 
 def register():
-    pass
+    bpy.utils.register_module(__name__)
 
 
 def unregister():
-    pass
+    bpy.utils.unregister_module(__name__)
 
 if __name__ == "__main__":
     register()

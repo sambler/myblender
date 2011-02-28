@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/space_image/space_image.c
+ *  \ingroup spimage
+ */
+
+
 #include <string.h>
 #include <stdio.h>
 
@@ -39,6 +44,7 @@
 #include "BLI_math.h"
 #include "BLI_editVert.h"
 #include "BLI_rand.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_colortools.h"
 #include "BKE_context.h"
@@ -48,6 +54,7 @@
 
 #include "IMB_imbuf_types.h"
 
+#include "ED_image.h"
 #include "ED_mesh.h"
 #include "ED_space_api.h"
 #include "ED_screen.h"
@@ -225,9 +232,18 @@ void ED_space_image_uv_aspect(SpaceImage *sima, float *aspx, float *aspy)
 	
 	ED_space_image_aspect(sima, aspx, aspy);
 	ED_space_image_size(sima, &w, &h);
+
+	*aspx *= (float)w;
+	*aspy *= (float)h;
 	
-	*aspx *= (float)w/256.0f;
-	*aspy *= (float)h/256.0f;
+	if(*aspx < *aspy) {
+		*aspy= *aspy / *aspx;
+		*aspx= 1.0f;
+	}
+	else {
+		*aspx= *aspx / *aspy;
+		*aspy= 1.0f;		
+	}
 }
 
 void ED_image_uv_aspect(Image *ima, float *aspx, float *aspy)
@@ -256,11 +272,9 @@ int ED_space_image_show_paint(SpaceImage *sima)
 
 int ED_space_image_show_uvedit(SpaceImage *sima, Object *obedit)
 {
-	if(ED_space_image_show_render(sima))
+	if(sima && (ED_space_image_show_render(sima) || ED_space_image_show_paint(sima)))
 		return 0;
-	if(ED_space_image_show_paint(sima))
-		return 0;
-	
+
 	if(obedit && obedit->type == OB_MESH) {
 		EditMesh *em = BKE_mesh_get_editmesh(obedit->data);
 		int ret;
@@ -384,6 +398,7 @@ static SpaceLink *image_new(const bContext *UNUSED(C))
 	simage->iuser.frames= 100;
 	
 	scopes_new(&simage->scopes);
+	simage->sample_line_hist.height= 100;
 
 	/* header */
 	ar= MEM_callocN(sizeof(ARegion), "header for image");
@@ -449,7 +464,7 @@ static SpaceLink *image_duplicate(SpaceLink *sl)
 	return (SpaceLink *)simagen;
 }
 
-void image_operatortypes(void)
+static void image_operatortypes(void)
 {
 	WM_operatortype_append(IMAGE_OT_view_all);
 	WM_operatortype_append(IMAGE_OT_view_pan);
@@ -468,6 +483,8 @@ void image_operatortypes(void)
 	WM_operatortype_append(IMAGE_OT_save_sequence);
 	WM_operatortype_append(IMAGE_OT_pack);
 	WM_operatortype_append(IMAGE_OT_unpack);
+	
+	WM_operatortype_append(IMAGE_OT_invert);
 
 	WM_operatortype_append(IMAGE_OT_cycle_render_slot);
 
@@ -482,7 +499,7 @@ void image_operatortypes(void)
 	WM_operatortype_append(IMAGE_OT_scopes);
 }
 
-void image_keymap(struct wmKeyConfig *keyconf)
+static void image_keymap(struct wmKeyConfig *keyconf)
 {
 	wmKeyMap *keymap= WM_keymap_find(keyconf, "Image Generic", SPACE_IMAGE, 0);
 	wmKeyMapItem *kmi;
@@ -496,6 +513,7 @@ void image_keymap(struct wmKeyConfig *keyconf)
 	WM_keymap_add_item(keymap, "IMAGE_OT_scopes", PKEY, KM_PRESS, 0, 0);
 
 	WM_keymap_add_item(keymap, "IMAGE_OT_cycle_render_slot", JKEY, KM_PRESS, 0, 0);
+	RNA_boolean_set(WM_keymap_add_item(keymap, "IMAGE_OT_cycle_render_slot", JKEY, KM_PRESS, KM_ALT, 0)->ptr, "reverse", TRUE);
 	
 	keymap= WM_keymap_find(keyconf, "Image", SPACE_IMAGE, 0);
 	
@@ -576,13 +594,13 @@ static void image_refresh(const bContext *C, ScrArea *UNUSED(sa))
 		MTFace *tf;
 		
 		if(em && EM_texFaceCheck(em)) {
-			sima->image= ima= NULL;
+			sima->image= NULL;
 			
 			tf = EM_get_active_mtface(em, NULL, NULL, 1); /* partially selected face is ok */
 			
 			if(tf && (tf->mode & TF_TEX)) {
 				/* don't need to check for pin here, see above */
-				sima->image= ima= tf->tpage;
+				sima->image= tf->tpage;
 				
 				if(sima->flag & SI_EDITTILE);
 				else sima->curtile= tf->tile;
@@ -633,29 +651,35 @@ static void image_listener(ScrArea *sa, wmNotifier *wmn)
 			switch(wmn->data) {
 				case ND_DATA:
 				case ND_SELECT:
+					image_scopes_tag_refresh(sa);
 					ED_area_tag_refresh(sa);
 					ED_area_tag_redraw(sa);
 					break;
 			}
 		case NC_OBJECT:
+		{
+			Object *ob= (Object *)wmn->reference;
 			switch(wmn->data) {
 				case ND_TRANSFORM:
-					if(sima->lock && (sima->flag & SI_DRAWSHADOW)) {
+				case ND_MODIFIER:
+					if(ob && (ob->mode & OB_MODE_EDIT) && sima->lock && (sima->flag & SI_DRAWSHADOW)) {
 						ED_area_tag_refresh(sa);
 						ED_area_tag_redraw(sa);
 					}
 					break;
 			}
+		}
 	}
 }
+
+const char *image_context_dir[] = {"edit_image", NULL};
 
 static int image_context(const bContext *C, const char *member, bContextDataResult *result)
 {
 	SpaceImage *sima= CTX_wm_space_image(C);
 
 	if(CTX_data_dir(member)) {
-		static const char *dir[] = {"edit_image", NULL};
-		CTX_data_dir_set(result, dir);
+		CTX_data_dir_set(result, image_context_dir);
 	}
 	else if(CTX_data_equals(member, "edit_image")) {
 		CTX_data_id_pointer_set(result, (ID*)ED_space_image(sima));
@@ -752,6 +776,9 @@ static void image_main_area_draw(const bContext *C, ARegion *ar)
 	View2D *v2d= &ar->v2d;
 	//View2DScrollers *scrollers;
 	float col[3];
+	
+	/* XXX not supported yet, disabling for now */
+	scene->r.scemode &= ~R_COMP_CROP;
 	
 	/* clear and setup matrix */
 	UI_GetThemeColor3fv(TH_BACK, col);

@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -20,6 +20,10 @@
  * Contributor(s): Chingiz Dyussenov, Arystanbek Dyussenov, Nathan Letwory.
  *
  * ***** END GPL LICENSE BLOCK *****
+ */
+
+/** \file MeshImporter.h
+ *  \ingroup collada
  */
 
 #ifndef __BC__MESHIMPORTER_H__
@@ -72,6 +76,8 @@ class MeshImporter : public MeshImporterBase
 {
 private:
 
+	UnitConverter *unitconverter;
+
 	Scene *scene;
 	ArmatureImporter *armature_importer;
 
@@ -116,12 +122,10 @@ private:
 	// TODO: import uv set names
 	void read_faces(COLLADAFW::Mesh *mesh, Mesh *me, int new_tris);
 
-	void get_vector(float v[3], COLLADAFW::MeshVertexData& arr, int i);
+	void get_vector(float v[3], COLLADAFW::MeshVertexData& arr, int i, int stride);
 
 	bool flat_face(unsigned int *nind, COLLADAFW::MeshVertexData& nor, int count);
 	
-	UnitConverter *unitconverter;
-
 public:
 
 	MeshImporter(UnitConverter *unitconv, ArmatureImporter *arm, Scene *sce);

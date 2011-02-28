@@ -29,6 +29,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/imbuf/intern/allocimbuf.c
+ *  \ingroup imbuf
+ */
+
+
 /* It's become a bit messy... Basically, only the IMB_ prefixed files
  * should remain. */
 
@@ -277,7 +282,8 @@ short imb_addrectfloatImBuf(ImBuf *ibuf)
 	
 	if(ibuf==NULL) return FALSE;
 	
-	imb_freerectfloatImBuf(ibuf);
+	if(ibuf->rect_float)
+		imb_freerectfloatImBuf(ibuf); /* frees mipmap too, hrm */
 	
 	size = ibuf->x *ibuf->y;
 	size = size *4 *sizeof(float);
@@ -298,8 +304,12 @@ short imb_addrectImBuf(ImBuf *ibuf)
 	int size;
 
 	if(ibuf==NULL) return FALSE;
-	imb_freerectImBuf(ibuf);
-
+	
+	/* don't call imb_freerectImBuf, it frees mipmaps, this call is used only too give float buffers display */
+	if(ibuf->rect && (ibuf->mall & IB_rect))
+		MEM_freeN(ibuf->rect);
+	ibuf->rect= NULL;
+	
 	size = ibuf->x*ibuf->y;
 	size = size*sizeof(unsigned int);
 
@@ -443,7 +453,7 @@ static void imbuf_cache_destructor(void *data)
 	ibuf->c_handle = 0;
 }
 
-static MEM_CacheLimiterC **get_imbuf_cache_limiter()
+static MEM_CacheLimiterC **get_imbuf_cache_limiter(void)
 {
 	static MEM_CacheLimiterC *c = 0;
 
@@ -453,7 +463,7 @@ static MEM_CacheLimiterC **get_imbuf_cache_limiter()
 	return &c;
 }
 
-void IMB_free_cache_limiter()
+void IMB_free_cache_limiter(void)
 {
 	delete_MEM_CacheLimiter(*get_imbuf_cache_limiter());
 	*get_imbuf_cache_limiter() = 0;

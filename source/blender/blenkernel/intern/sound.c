@@ -1,3 +1,6 @@
+/** \file blender/blenkernel/intern/sound.c
+ *  \ingroup bke
+ */
 /**
  * sound.c (mar-2001 nzc)
  *
@@ -55,7 +58,7 @@ static void sound_sync_callback(void* data, int mode, float time)
 }
 #endif
 
-int sound_define_from_str(char *str)
+int sound_define_from_str(const char *str)
 {
 	if (BLI_strcaseeq(str, "NULL"))
 		return AUD_NULL_DEVICE;
@@ -74,7 +77,7 @@ void sound_force_device(int device)
 	force_device = device;
 }
 
-void sound_init_once()
+void sound_init_once(void)
 {
 	AUD_initOnce();
 }
@@ -110,15 +113,17 @@ void sound_init(struct Main *bmain)
 		
 #ifdef WITH_JACK
 	AUD_setSyncCallback(sound_sync_callback, bmain);
+#else
+	(void)bmain; /* unused */
 #endif
 }
 
-void sound_exit()
+void sound_exit(void)
 {
 	AUD_exit();
 }
 
-struct bSound* sound_new_file(struct Main *bmain, char* filename)
+struct bSound* sound_new_file(struct Main *bmain, const char *filename)
 {
 	bSound* sound = NULL;
 
@@ -129,7 +134,7 @@ struct bSound* sound_new_file(struct Main *bmain, char* filename)
 
 	strcpy(str, filename);
 
-	path = /*bmain ? bmain->name :*/ G.sce;
+	path = /*bmain ? bmain->name :*/ G.main->name;
 
 	BLI_path_abs(str, path);
 
@@ -141,7 +146,7 @@ struct bSound* sound_new_file(struct Main *bmain, char* filename)
 	BLI_strncpy(sound->name, filename, FILE_MAX);
 // XXX unused currently	sound->type = SOUND_TYPE_FILE;
 
-	sound_load(sound);
+	sound_load(bmain, sound);
 
 	if(!sound->playback_handle)
 	{
@@ -167,7 +172,7 @@ struct bSound* sound_new_buffer(struct bContext *C, struct bSound *source)
 	sound->child_sound = source;
 	sound->type = SOUND_TYPE_BUFFER;
 
-	sound_load(sound);
+	sound_load(CTX_data_main(C), sound);
 
 	if(!sound->playback_handle)
 	{
@@ -193,7 +198,7 @@ struct bSound* sound_new_limiter(struct bContext *C, struct bSound *source, floa
 	sound->end = end;
 	sound->type = SOUND_TYPE_LIMITER;
 
-	sound_load(sound);
+	sound_load(CTX_data_main(C), sound);
 
 	if(!sound->playback_handle)
 	{
@@ -234,7 +239,7 @@ void sound_delete_cache(struct bSound* sound)
 	}
 }
 
-void sound_load(struct bSound* sound)
+void sound_load(struct Main *bmain, struct bSound* sound)
 {
 	if(sound)
 	{
@@ -264,7 +269,7 @@ void sound_load(struct bSound* sound)
 			if(sound->id.lib)
 				path = sound->id.lib->filepath;
 			else
-				path = /*bmain ? bmain->name :*/ G.sce;
+				path = bmain->name;
 
 			BLI_path_abs(fullpath, path);
 
@@ -274,7 +279,7 @@ void sound_load(struct bSound* sound)
 			/* or else load it from disk */
 			else
 				sound->handle = AUD_load(fullpath);
-		} // XXX
+		}
 // XXX unused currently
 #if 0
 			break;
@@ -380,7 +385,7 @@ void sound_move_scene_sound(struct Scene *scene, void* handle, int startframe, i
 	AUD_moveSequencer(scene->sound_scene, handle, startframe / FPS, endframe / FPS, frameskip / FPS);
 }
 
-void sound_start_play_scene(struct Scene *scene)
+static void sound_start_play_scene(struct Scene *scene)
 {
 	scene->sound_scene_handle = AUD_play(scene->sound_scene, 1);
 	AUD_setLoop(scene->sound_scene_handle, -1);
@@ -481,4 +486,13 @@ int sound_read_sound_buffer(struct bSound* sound, float* buffer, int length, flo
 	AUD_Sound* limiter = AUD_limitSound(sound->cache, start, end);
 	return AUD_readSound(limiter, buffer, length);
 	AUD_unload(limiter);
+}
+
+int sound_get_channels(struct bSound* sound)
+{
+	AUD_SoundInfo info;
+
+	info = AUD_getInfo(sound->playback_handle);
+
+	return info.specs.channels;
 }

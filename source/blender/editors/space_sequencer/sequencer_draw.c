@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/space_sequencer/sequencer_draw.c
+ *  \ingroup spseq
+ */
+
+
 #include <string.h>
 #include <math.h>
 
@@ -32,6 +37,7 @@
 
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
 #include "IMB_imbuf_types.h"
 
@@ -44,7 +50,7 @@
 #include "BKE_context.h"
 #include "BKE_global.h"
 #include "BKE_sequencer.h"
-#include "BKE_utildefines.h"
+
 #include "BKE_sound.h"
 
 #include "IMB_imbuf.h"
@@ -69,13 +75,11 @@
 
 
 /* Note, Dont use WHILE_SEQ while drawing! - it messes up transform, - Campbell */
+static void draw_shadedstrip(Sequence *seq, unsigned char col[3], float x1, float y1, float x2, float y2);
 
-int no_rightbox=0, no_leftbox= 0;
-static void draw_shadedstrip(Sequence *seq, char *col, float x1, float y1, float x2, float y2);
-
-static void get_seq_color3ubv(Scene *curscene, Sequence *seq, char *col)
+static void get_seq_color3ubv(Scene *curscene, Sequence *seq, unsigned char col[3])
 {
-	char blendcol[3];
+	unsigned char blendcol[3];
 	SolidColorVars *colvars = (SolidColorVars *)seq->effectdata;
 
 	switch(seq->type) {
@@ -212,7 +216,7 @@ static void drawmeta_contents(Scene *scene, Sequence *seqm, float x1, float y1, 
 	/* Note, this used to use WHILE_SEQ, but it messes up the seq->depth value, (needed by transform when doing overlap checks)
 	 * so for now, just use the meta's immediate children, could be fixed but its only drawing - Campbell */
 	Sequence *seq;
-	char col[4];
+	unsigned char col[4];
 
 	int chan_min= MAXSEQ;
 	int chan_max= 0;
@@ -248,7 +252,7 @@ static void drawmeta_contents(Scene *scene, Sequence *seqm, float x1, float y1, 
 
 			get_seq_color3ubv(scene, seq, col);
 
-			glColor4ubv((GLubyte *)col);
+			glColor4ubv(col);
 			
 			/* clamp within parent sequence strip bounds */
 			if(x1_chan < x1) x1_chan= x1;
@@ -260,7 +264,7 @@ static void drawmeta_contents(Scene *scene, Sequence *seqm, float x1, float y1, 
 			glRectf(x1_chan,  y1_chan, x2_chan,  y2_chan);
 
 			UI_GetColorPtrBlendShade3ubv(col, col, col, 0.0, -30);
-			glColor4ubv((GLubyte *)col);
+			glColor4ubv(col);
 			fdrawbox(x1_chan,  y1_chan, x2_chan,  y2_chan);
 
 			if((seqm->flag & SEQ_MUTE) == 0 && (seq->flag & SEQ_MUTE))
@@ -343,7 +347,7 @@ static void draw_seq_handle(View2D *v2d, Sequence *seq, float pixelx, short dire
 	}
 	
 	if(G.moving || (seq->flag & whichsel)) {
-		cpack(0xFFFFFF);
+		const char col[4]= {255, 255, 255, 255};
 		if (direction == SEQ_LEFTHANDLE) {
 			sprintf(str, "%d", seq->startdisp);
 			x1= rx1;
@@ -353,14 +357,14 @@ static void draw_seq_handle(View2D *v2d, Sequence *seq, float pixelx, short dire
 			x1= x2 - handsize*0.75;
 			y1= y2 + 0.05;
 		}
-		UI_view2d_text_cache_add(v2d, x1, y1, str);
+		UI_view2d_text_cache_add(v2d, x1, y1, str, col);
 	}	
 }
 
 static void draw_seq_extensions(Scene *scene, ARegion *ar, Sequence *seq)
 {
 	float x1, x2, y1, y2, pixely, a;
-	char col[3], blendcol[3];
+	unsigned char col[3], blendcol[3];
 	View2D *v2d= &ar->v2d;
 	
 	if(seq->type >= SEQ_EFFECT) return;
@@ -462,11 +466,12 @@ static void draw_seq_extensions(Scene *scene, ARegion *ar, Sequence *seq)
 }
 
 /* draw info text on a sequence strip */
-static void draw_seq_text(View2D *v2d, Sequence *seq, float x1, float x2, float y1, float y2, char *background_col)
+static void draw_seq_text(View2D *v2d, Sequence *seq, float x1, float x2, float y1, float y2, const unsigned char background_col[3])
 {
 	rctf rect;
 	char str[32 + FILE_MAXDIR+FILE_MAXFILE];
 	const char *name= seq->name+2;
+	char col[4];
 	
 	if(name[0]=='\0')
 		name= give_seqname(seq);
@@ -511,22 +516,23 @@ static void draw_seq_text(View2D *v2d, Sequence *seq, float x1, float x2, float 
 	}
 	
 	if(seq->flag & SELECT){
-		cpack(0xFFFFFF);
+		col[0]= col[1]= col[2]= 255;
 	}else if ((((int)background_col[0] + (int)background_col[1] + (int)background_col[2]) / 3) < 50){
-		cpack(0x505050); /* use lighter text colour for dark background */
+		col[0]= col[1]= col[2]= 80; /* use lighter text color for dark background */
 	}else{
-		cpack(0);
+		col[0]= col[1]= col[2]= 0;
 	}
-	
+	col[3]= 255;
+
 	rect.xmin= x1;
 	rect.ymin= y1;
 	rect.xmax= x2;
 	rect.ymax= y2;
-	UI_view2d_text_cache_rectf(v2d, &rect, str);
+	UI_view2d_text_cache_rectf(v2d, &rect, str, col);
 }
 
 /* draws a shaded strip, made from gradient + flat color + gradient */
-static void draw_shadedstrip(Sequence *seq, char *col, float x1, float y1, float x2, float y2)
+static void draw_shadedstrip(Sequence *seq, unsigned char col[3], float x1, float y1, float x2, float y2)
 {
 	float ymid1, ymid2;
 	
@@ -544,7 +550,7 @@ static void draw_shadedstrip(Sequence *seq, char *col, float x1, float y1, float
 	if(seq->flag & SELECT) UI_GetColorPtrBlendShade3ubv(col, col, col, 0.0, -50);
 	else UI_GetColorPtrBlendShade3ubv(col, col, col, 0.0, 0);
 	
-	glColor3ubv((GLubyte *)col);
+	glColor3ubv(col);
 	
 	glVertex2f(x1,y1);
 	glVertex2f(x2,y1);
@@ -590,7 +596,7 @@ static void draw_seq_strip(Scene *scene, ARegion *ar, Sequence *seq, int outline
 {
 	View2D *v2d= &ar->v2d;
 	float x1, x2, y1, y2;
-	char col[3], background_col[3], is_single_image;
+	unsigned char col[3], background_col[3], is_single_image;
 
 	/* we need to know if this is a single image/color or not for drawing */
 	is_single_image = (char)seq_single_check(seq);
@@ -670,7 +676,7 @@ static void draw_seq_strip(Scene *scene, ARegion *ar, Sequence *seq, int outline
 
 static Sequence *special_seq_update= 0;
 
-void set_special_seq_update(int val)
+static void set_special_seq_update(int val)
 {
 //	int x;
 
@@ -693,6 +699,7 @@ void draw_image_seq(const bContext* C, Scene *scene, ARegion *ar, SpaceSeq *sseq
 	float proxy_size = 100.0;
 	GLuint texid;
 	GLuint last_texid;
+	SeqRenderData context;
 
 	render_size = sseq->render_size;
 	if (render_size == 0) {
@@ -728,12 +735,18 @@ void draw_image_seq(const bContext* C, Scene *scene, ARegion *ar, SpaceSeq *sseq
 	UI_view2d_totRect_set(v2d, viewrectx + 0.5f, viewrecty + 0.5f);
 	UI_view2d_curRect_validate(v2d);
 
+	/* only initialize the preview if a render is in progress */
+	if(G.rendering)
+		return;
+
+	context = seq_new_render_data(bmain, scene, rectx, recty, proxy_size);
+
 	if (special_seq_update)
-		ibuf= give_ibuf_seq_direct(bmain, scene, rectx, recty, cfra + frame_ofs, proxy_size, special_seq_update);
+		ibuf= give_ibuf_seq_direct(context, cfra + frame_ofs, special_seq_update);
 	else if (!U.prefetchframes) // XXX || (G.f & G_PLAYANIM) == 0) {
-		ibuf= (ImBuf *)give_ibuf_seq(bmain, scene, rectx, recty, cfra + frame_ofs, sseq->chanshown, proxy_size);
+		ibuf= (ImBuf *)give_ibuf_seq(context, cfra + frame_ofs, sseq->chanshown);
 	else
-		ibuf= (ImBuf *)give_ibuf_seq_threaded(bmain, scene, rectx, recty, cfra + frame_ofs, sseq->chanshown, proxy_size);
+		ibuf= (ImBuf *)give_ibuf_seq_threaded(context, cfra + frame_ofs, sseq->chanshown);
 	
 	if(ibuf==NULL) 
 		return;
@@ -866,6 +879,7 @@ void draw_image_seq(const bContext* C, Scene *scene, ARegion *ar, SpaceSeq *sseq
 	UI_view2d_view_restore(C);
 }
 
+#if 0
 void drawprefetchseqspace(Scene *scene, ARegion *UNUSED(ar), SpaceSeq *sseq)
 {
 	int rectx, recty;
@@ -889,6 +903,7 @@ void drawprefetchseqspace(Scene *scene, ARegion *UNUSED(ar), SpaceSeq *sseq)
 			proxy_size);
 	}
 }
+#endif
 
 /* draw backdrop of the sequencer strips view */
 static void draw_seq_backdrop(View2D *v2d)

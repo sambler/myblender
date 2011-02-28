@@ -1,3 +1,6 @@
+/** \file blender/blenkernel/intern/writeframeserver.c
+ *  \ingroup bke
+ */
 /*
  * $Id$
  *
@@ -47,10 +50,11 @@
 
 #include "DNA_userdef_types.h"
 
-#include "BKE_utildefines.h"
+#include "BLI_utildefines.h"
+
+#include "BKE_writeframeserver.h"
 #include "BKE_global.h"
 #include "BKE_report.h"
-
 
 #include "DNA_scene_types.h"
 
@@ -62,31 +66,31 @@ static int render_height;
 
 
 #if defined(_WIN32)
-static int startup_socket_system()
+static int startup_socket_system(void)
 {
 	WSADATA wsa;
 	return (WSAStartup(MAKEWORD(2,0),&wsa) == 0);
 }
 
-static void shutdown_socket_system()
+static void shutdown_socket_system(void)
 {
 	WSACleanup();
 }
-static int select_was_interrupted_by_signal()
+static int select_was_interrupted_by_signal(void)
 {
 	return (WSAGetLastError() == WSAEINTR);
 }
 #else
-static int startup_socket_system()
+static int startup_socket_system(void)
 {
 	return 1;
 }
 
-static void shutdown_socket_system()
+static void shutdown_socket_system(void)
 {
 }
 
-static int select_was_interrupted_by_signal()
+static int select_was_interrupted_by_signal(void)
 {
 	return (errno == EINTR);
 }
@@ -367,7 +371,7 @@ int append_frameserver(RenderData *UNUSED(rd), int frame, int *pixels, int rectx
 	return 0;
 }
 
-void end_frameserver()
+void end_frameserver(void)
 {
 	if (connsock != -1) {
 		closesocket(connsock);

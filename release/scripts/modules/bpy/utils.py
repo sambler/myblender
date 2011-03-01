@@ -23,10 +23,7 @@ This module contains utility functions specific to blender but
 not assosiated with blenders internal data.
 """
 
-from _bpy import register_class
-from _bpy import unregister_class
-
-from _bpy import blend_paths
+from _bpy import register_class, unregister_class, blend_paths
 from _bpy import script_paths as _bpy_script_paths
 from _bpy import user_resource as _user_resource
 
@@ -103,9 +100,11 @@ def load_scripts(reload_scripts=False, refresh_scripts=False):
     :arg refresh_scripts: only load scripts which are not already loaded as modules.
     :type refresh_scripts: bool
     """
-    import time
+    use_time = _bpy.app.debug
 
-    t_main = time.time()
+    if use_time:
+        import time
+        t_main = time.time()
 
     loaded_modules = set()
 
@@ -213,7 +212,7 @@ def load_scripts(reload_scripts=False, refresh_scripts=False):
         import gc
         print("gc.collect() -> %d" % gc.collect())
 
-    if _bpy.app.debug:
+    if use_time:
         print("Python Script Load Time %.4f" % (time.time() - t_main))
 
 
@@ -418,27 +417,27 @@ def _bpy_module_classes(module, is_registered=False):
     typemap_list = _bpy_types.TypeMap.get(module, ())
     i = 0
     while i < len(typemap_list):
-        cls_weakref, path, line = typemap_list[i]
+        cls_weakref = typemap_list[i]
         cls = cls_weakref()
 
         if cls is None:
             del typemap_list[i]
         else:
             if is_registered == cls.is_registered:
-                yield (cls, path, line)
+                yield cls
             i += 1
 
 
 def register_module(module, verbose=False):
     if verbose:
         print("bpy.utils.register_module(%r): ..." % module)
-    for cls, path, line in _bpy_module_classes(module, is_registered=False):
+    for cls in _bpy_module_classes(module, is_registered=False):
         if verbose:
-            print("    %s of %s:%s" % (cls, path, line))
+            print("    %r" % cls)
         try:
             register_class(cls)
         except:
-            print("bpy.utils.register_module(): failed to registering class '%s.%s'" % (cls.__module__, cls.__name__))
+            print("bpy.utils.register_module(): failed to registering class %r" % cls)
             print("\t", path, "line", line)
             import traceback
             traceback.print_exc()
@@ -451,13 +450,13 @@ def register_module(module, verbose=False):
 def unregister_module(module, verbose=False):
     if verbose:
         print("bpy.utils.unregister_module(%r): ..." % module)
-    for cls, path, line in _bpy_module_classes(module, is_registered=True):
+    for cls in _bpy_module_classes(module, is_registered=True):
         if verbose:
-            print("    %s of %s:%s" % (cls, path, line))
+            print("    %r" % cls)
         try:
             unregister_class(cls)
         except:
-            print("bpy.utils.unregister_module(): failed to unregistering class '%s.%s'" % (cls.__module__, cls.__name__))
+            print("bpy.utils.unregister_module(): failed to unregistering class %r" % cls)
             print("\t", path, "line", line)
             import traceback
             traceback.print_exc()

@@ -117,7 +117,6 @@ typedef struct uiHandleButtonData {
 	float vec[3], origvec[3];
 	int togdual, togonly;
 	ColorBand *coba;
-	CurveMapping *cumap;
 
 	/* tooltip */
 	ARegion *tooltip;
@@ -1230,12 +1229,12 @@ static void ui_textedit_set_cursor_pos(uiBut *but, uiHandleButtonData *data, sho
 	}
 	/* mouse inside the widget */
 	else if (x >= startx) {
-		float aspect= sqrt(but->block->aspect);
+		float aspect= (but->block->aspect);
 		
 		but->pos= strlen(origstr)-but->ofs;
 		
 		/* XXX does not take zoom level into account */
-		while (aspect*startx + aspect*BLF_width(fstyle->uifont_id, origstr+but->ofs) > x) {
+		while (startx + aspect*BLF_width(fstyle->uifont_id, origstr+but->ofs) > x) {
 			if (but->pos <= 0) break;
 			but->pos--;
 			origstr[but->pos+but->ofs] = 0;
@@ -1874,8 +1873,7 @@ static void ui_numedit_begin(uiBut *but, uiHandleButtonData *data)
 	float softrange, softmin, softmax;
 
 	if(but->type == BUT_CURVE) {
-		data->cumap= (CurveMapping*)but->poin;
-		but->editcumap= data->cumap;
+		but->editcumap= (CurveMapping*)but->poin;
 	}
 	else if(but->type == BUT_COLORBAND) {
 		data->coba= (ColorBand*)but->poin;
@@ -3375,7 +3373,7 @@ static int ui_do_but_COLORBAND(bContext *C, uiBlock *block, uiBut *but, uiHandle
 
 static int ui_numedit_but_CURVE(uiBut *but, uiHandleButtonData *data, int snap, int mx, int my)
 {
-	CurveMapping *cumap= data->cumap;
+	CurveMapping *cumap= (CurveMapping*)but->poin;
 	CurveMap *cuma= cumap->cm+cumap->cur;
 	CurveMapPoint *cmp= cuma->curve;
 	float fx, fy, zoomx, zoomy, offsx, offsy;
@@ -3565,7 +3563,7 @@ static int ui_do_but_CURVE(bContext *C, uiBlock *block, uiBut *but, uiHandleButt
 		}
 		else if(event->type==LEFTMOUSE && event->val!=KM_PRESS) {
 			if(data->dragsel != -1) {
-				CurveMapping *cumap= data->cumap;
+				CurveMapping *cumap= (CurveMapping*)but->poin;
 				CurveMap *cuma= cumap->cm+cumap->cur;
 				CurveMapPoint *cmp= cuma->curve;
 

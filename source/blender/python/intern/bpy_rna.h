@@ -29,19 +29,30 @@
 #ifndef BPY_RNA_H
 #define BPY_RNA_H
 
-
 /* --- bpy build options --- */
+#ifdef WITH_PYTHON_SAFETY
+
 /* play it safe and keep optional for now, need to test further now this affects looping on 10000's of verts for eg. */
-// #define USE_WEAKREFS
+#define USE_WEAKREFS
 
 /* method to invalidate removed py data, XXX, slow to remove objects, otherwise no overhead */
-//#define USE_PYRNA_INVALIDATE_GC
+/* #define USE_PYRNA_INVALIDATE_GC */
 
 /* different method */
-//#define USE_PYRNA_INVALIDATE_WEAKREF
+#define USE_PYRNA_INVALIDATE_WEAKREF
+
+/* support for inter references, currently only needed for corner case */
+#define USE_PYRNA_STRUCT_REFERENCE
 
 /* use real collection iterators rather then faking with a list */
 #define USE_PYRNA_ITER
+
+#else /* WITH_PYTHON_SAFETY */
+
+ /* default, no defines! */
+
+#endif /* !WITH_PYTHON_SAFETY */
+
 
 /* sanity checks on above defs */
 #if defined(USE_PYRNA_INVALIDATE_WEAKREF) && !defined(USE_WEAKREFS)
@@ -90,6 +101,11 @@ typedef struct {
 	PyObject *in_weakreflist;
 #endif
 	PointerRNA ptr;
+#ifdef USE_PYRNA_STRUCT_REFERENCE
+	/* generic PyObject we hold a reference to, example use:
+	 * hold onto the collection iterator to prevent it from freeing allocated data we may use */
+	PyObject *reference;
+#endif /* !USE_PYRNA_STRUCT_REFERENCE */
 	int freeptr; /* needed in some cases if ptr.data is created on the fly, free when deallocing */
 } BPy_StructRNA;
 

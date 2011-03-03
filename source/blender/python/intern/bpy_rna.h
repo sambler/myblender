@@ -40,6 +40,8 @@
 /* different method */
 //#define USE_PYRNA_INVALIDATE_WEAKREF
 
+/* use real collection iterators rather then faking with a list */
+#define USE_PYRNA_ITER
 
 /* sanity checks on above defs */
 #if defined(USE_PYRNA_INVALIDATE_WEAKREF) && !defined(USE_WEAKREFS)
@@ -72,41 +74,56 @@ extern PyTypeObject pyrna_prop_collection_Type;
 #define PYRNA_STRUCT_IS_VALID(pysrna) (((BPy_StructRNA *)(pysrna))->ptr.type != NULL)
 #define PYRNA_PROP_IS_VALID(pysrna) (((BPy_PropertyRNA *)(pysrna))->ptr.type != NULL)
 
+/* 'in_weakreflist' MUST be aligned */
+
 typedef struct {
 	PyObject_HEAD /* required python macro   */
+#ifdef USE_WEAKREFS
+	PyObject *in_weakreflist;
+#endif
 	PointerRNA	ptr;
 } BPy_DummyPointerRNA;
 
 typedef struct {
 	PyObject_HEAD /* required python macro   */
-	PointerRNA ptr;
-	int freeptr; /* needed in some cases if ptr.data is created on the fly, free when deallocing */
 #ifdef USE_WEAKREFS
 	PyObject *in_weakreflist;
 #endif
+	PointerRNA ptr;
+	int freeptr; /* needed in some cases if ptr.data is created on the fly, free when deallocing */
 } BPy_StructRNA;
 
 typedef struct {
 	PyObject_HEAD /* required python macro   */
-	PointerRNA ptr;
-	PropertyRNA *prop;
 #ifdef USE_WEAKREFS
 	PyObject *in_weakreflist;
 #endif
+	PointerRNA ptr;
+	PropertyRNA *prop;
 } BPy_PropertyRNA;
 
 typedef struct {
 	PyObject_HEAD /* required python macro   */
+#ifdef USE_WEAKREFS
+	PyObject *in_weakreflist;
+#endif
 	PointerRNA ptr;
 	PropertyRNA *prop;
 
 	/* Arystan: this is a hack to allow sub-item r/w access like: face.uv[n][m] */
 	int arraydim; /* array dimension, e.g: 0 for face.uv, 2 for face.uv[n][m], etc. */
 	int arrayoffset; /* array first item offset, e.g. if face.uv is [4][2], arrayoffset for face.uv[n] is 2n */
+} BPy_PropertyArrayRNA;
+
+typedef struct {
+	PyObject_HEAD /* required python macro   */
 #ifdef USE_WEAKREFS
 	PyObject *in_weakreflist;
 #endif
-} BPy_PropertyArrayRNA;
+
+	/* collection iterator spesific parts */
+	CollectionPropertyIterator iter;
+} BPy_PropertyCollectionIterRNA;
 
 /* cheap trick */
 #define BPy_BaseTypeRNA BPy_PropertyRNA

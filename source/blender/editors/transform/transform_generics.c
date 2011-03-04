@@ -339,7 +339,7 @@ void recalcData(TransInfo *t)
 		SpaceAction *saction= (SpaceAction *)t->sa->spacedata.first;
 		scene= t->scene;
 		
-		bAnimContext ac= {0};
+		bAnimContext ac= {NULL};
 		ListBase anim_data = {NULL, NULL};
 		bAnimListElem *ale;
 		int filter;

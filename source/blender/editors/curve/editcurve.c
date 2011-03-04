@@ -1068,7 +1068,7 @@ static void curve_rename_fcurves(Object *obedit, ListBase *orig_curves)
 	CVKeyIndex *keyIndex;
 	char rna_path[64], orig_rna_path[64];
 	AnimData *ad= BKE_animdata_from_id(&cu->id);
-	ListBase curves= {0, 0};
+	ListBase curves= {NULL, NULL};
 	FCurve *fcu, *next;
 
 	while(nu) {
@@ -2465,7 +2465,7 @@ void selectend_nurb(Object *obedit, short selfirst, short doswap, short selstatu
 	int a;
 	short sel;
 
-	if(obedit==0) return;
+	if(obedit==NULL) return;
 
 	cu= (Curve*)obedit->data;
 	cu->lastsel= NULL;
@@ -3314,7 +3314,7 @@ static short findnearestNurbvert(ViewContext *vc, short sel, int mval[2], Nurb *
 		/* sel==1: selected gets a disadvantage */
 		/* in nurb and bezt or bp the nearest is written */
 		/* return 0 1 2: handlepunt */
-	struct { BPoint *bp; BezTriple *bezt; Nurb *nurb; int dist, hpoint, select, mval[2]; } data = {0};
+	struct { BPoint *bp; BezTriple *bezt; Nurb *nurb; int dist, hpoint, select, mval[2]; } data = {NULL};
 
 	data.dist = 100;
 	data.hpoint = 0;
@@ -3341,24 +3341,24 @@ static void findselectedNurbvert(ListBase *editnurb, Nurb **nu, BezTriple **bezt
 	BPoint *bp1;
 	int a;
 
-	*nu= 0;
-	*bezt= 0;
-	*bp= 0;
+	*nu= NULL;
+	*bezt= NULL;
+	*bp= NULL;
 	for(nu1= editnurb->first; nu1; nu1= nu1->next) {
 		if(nu1->type == CU_BEZIER) {
 			bezt1= nu1->bezt;
 			a= nu1->pntsu;
 			while(a--) {
 				if( (bezt1->f1 & SELECT) || (bezt1->f2 & SELECT) || (bezt1->f3 & SELECT) ) {
-					if(*nu!=0 && *nu!= nu1) {
-						*nu= 0;
-						*bp= 0;
-						*bezt= 0;
+					if(*nu != NULL && *nu != nu1) {
+						*nu= NULL;
+						*bp= NULL;
+						*bezt= NULL;
 						return;
 					}
 					else if(*bezt || *bp) {
-						*bp= 0;
-						*bezt= 0;
+						*bp= NULL;
+						*bezt= NULL;
 					}
 					else {
 						*bezt= bezt1;
@@ -3373,15 +3373,15 @@ static void findselectedNurbvert(ListBase *editnurb, Nurb **nu, BezTriple **bezt
 			a= nu1->pntsu*nu1->pntsv;
 			while(a--) {
 				if( bp1->f1 & 1 ) {
-					if(*nu!=0 && *nu!= nu1) {
-						*bp= 0;
-						*bezt= 0;
-						*nu= 0;
+					if(*nu != NULL && *nu != nu1) {
+						*bp= NULL;
+						*bezt= NULL;
+						*nu= NULL;
 						return;
 					}
 					else if(*bezt || *bp) {
-						*bp= 0;
-						*bezt= 0;
+						*bp= NULL;
+						*bezt= NULL;
 					}
 					else {
 						*bp= bp1;
@@ -3420,7 +3420,7 @@ static int convertspline(short type, Nurb *nu)
 				bezt++;
 			}
 			MEM_freeN(nu->bp);
-			nu->bp= 0;
+			nu->bp= NULL;
 			nu->pntsu= nr;
 			nu->type = CU_BEZIER;
 			calchandlesNurb(nu);
@@ -3520,7 +3520,7 @@ static int convertspline(short type, Nurb *nu)
 					bezt++;
 				}
 				MEM_freeN(nu->bp);
-				nu->bp= 0;
+				nu->bp= NULL;
 				MEM_freeN(nu->knotsu);
 				nu->knotsu= NULL;
 				nu->pntsu= nr;
@@ -3725,12 +3725,12 @@ typedef struct NurbSort {
 	float vec[3];
 } NurbSort;
 
-static ListBase nsortbase= {0, 0};
+static ListBase nsortbase= {NULL, NULL};
 /*  static NurbSort *nusmain; */ /* this var seems to go unused... at least in this file */
 
 static void make_selection_list_nurb(ListBase *editnurb)
 {
-	ListBase nbase= {0, 0};
+	ListBase nbase= {NULL, NULL};
 	NurbSort *nus, *nustest, *headdo, *taildo;
 	Nurb *nu;
 	BPoint *bp;
@@ -3765,7 +3765,7 @@ static void make_selection_list_nurb(ListBase *editnurb)
 	while(nbase.first) {
 	
 		headdist= taildist= 1.0e30;
-		headdo= taildo= 0;
+		headdo= taildo= NULL;
 
 		nustest= nbase.first;
 		while(nustest) {
@@ -3976,7 +3976,7 @@ static int make_segment_exec(bContext *C, wmOperator *op)
 	Object *obedit= CTX_data_edit_object(C);
 	Curve *cu= obedit->data;
 	ListBase *nubase= curve_get_editcurve(obedit);
-	Nurb *nu, *nu1=0, *nu2=0;
+	Nurb *nu, *nu1=NULL, *nu2=NULL;
 	BPoint *bp;
 	float *fp, offset;
 	int a, ok= 0;
@@ -4011,7 +4011,7 @@ static int make_segment_exec(bContext *C, wmOperator *op)
 
 		if((nu->flagu & CU_NURB_CYCLIC)==0) {    /* not cyclic */
 			if(nu->type == CU_BEZIER) {
-				if(nu1==0) {
+				if(nu1==NULL) {
 					if( BEZSELECTED_HIDDENHANDLES(cu, nu->bezt) ) nu1= nu;
 					else {
 						if( BEZSELECTED_HIDDENHANDLES(cu, &(nu->bezt[nu->pntsu-1])) ) {
@@ -4021,7 +4021,7 @@ static int make_segment_exec(bContext *C, wmOperator *op)
 						}
 					}
 				}
-				else if(nu2==0) {
+				else if(nu2==NULL) {
 					if( BEZSELECTED_HIDDENHANDLES(cu, nu->bezt) ) {
 						nu2= nu;
 						switchdirectionNurb(nu);
@@ -4037,7 +4037,7 @@ static int make_segment_exec(bContext *C, wmOperator *op)
 			}
 			else if(nu->pntsv==1) {
 				bp= nu->bp;
-				if(nu1==0) {
+				if(nu1==NULL) {
 					if( bp->f1 & SELECT) nu1= nu;
 					else {
 						bp= bp+(nu->pntsu-1);
@@ -4048,7 +4048,7 @@ static int make_segment_exec(bContext *C, wmOperator *op)
 						}
 					}
 				}
-				else if(nu2==0) {
+				else if(nu2==NULL) {
 					if( bp->f1 & SELECT ) {
 						nu2= nu;
 						switchdirectionNurb(nu);
@@ -4174,8 +4174,8 @@ int mouse_nurb(bContext *C, short mval[2], int extend)
 	ListBase *editnurb= curve_get_editcurve(obedit);
 	ViewContext vc;
 	Nurb *nu;
-	BezTriple *bezt=0;
-	BPoint *bp=0;
+	BezTriple *bezt=NULL;
+	BPoint *bp=NULL;
 	int location[2];
 	short hand;
 	
@@ -4474,7 +4474,7 @@ static int addvert_Nurb(bContext *C, short mode, float location[3])
 				mul_m3_v3(imat,newbp->vec);
 				newbp->vec[3]= 1.0;
 
-				newnu->knotsu= newnu->knotsv= 0;
+				newnu->knotsu= newnu->knotsv= NULL;
 				nurbs_knot_calc_u(newnu);
 
 				ok= 1;
@@ -4540,7 +4540,7 @@ static int addvert_Nurb(bContext *C, short mode, float location[3])
 			bezt= newbezt;
 			ok= 1;
 		}
-		else bezt= 0;
+		else bezt= NULL;
 
 		if(bezt) {
 			if(!newnu) nu->pntsu++;
@@ -4611,7 +4611,7 @@ static int addvert_Nurb(bContext *C, short mode, float location[3])
 			bp= newbp;
 			ok= 1;
 		}
-		else bp= 0;
+		else bp= NULL;
 
 		if(bp) {
 			if(mode=='e') {
@@ -5030,13 +5030,13 @@ static int select_row_exec(bContext *C, wmOperator *UNUSED(op))
 	Object *obedit= CTX_data_edit_object(C);
 	Curve *cu= obedit->data;
 	ListBase *editnurb= curve_get_editcurve(obedit);
-	static BPoint *last=0;
+	static BPoint *last= NULL;
 	static int direction=0;
 	Nurb *nu;
 	BPoint *bp;
 	int u = 0, v = 0, a, b, ok=0;
 
-	if(editnurb->first==0)
+	if(editnurb->first == NULL)
 		return OPERATOR_CANCELLED;
 	if(cu->lastsel==NULL)
 		return OPERATOR_CANCELLED;
@@ -6064,7 +6064,7 @@ int join_curve_exec(bContext *C, wmOperator *UNUSED(op))
 	float imat[4][4], cmat[4][4];
 	int a;
 
-	tempbase.first= tempbase.last= 0;
+	tempbase.first= tempbase.last= NULL;
 	
 	/* trasnform all selected curves inverse in obact */
 	invert_m4_m4(imat, ob->obmat);

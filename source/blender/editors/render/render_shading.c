@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -23,6 +23,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/render/render_shading.c
+ *  \ingroup edrend
+ */
+
 
 #include <stdlib.h>
 #include <string.h>

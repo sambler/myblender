@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -21,6 +21,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/makesrna/intern/makesrna.c
+ *  \ingroup RNA
+ */
+
 
 #include <float.h>
 #include <limits.h>
@@ -1785,7 +1790,7 @@ static const char *rna_property_subtypename(PropertySubType type)
 	}
 }
 
-static const char *rna_property_subtype_unit(PropertyType type)
+static const char *rna_property_subtype_unit(PropertySubType type)
 {
 	switch(RNA_SUBTYPE_UNIT(type)) {
 		case PROP_UNIT_NONE:		return "PROP_UNIT_NONE";

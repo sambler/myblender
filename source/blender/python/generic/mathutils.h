@@ -26,6 +26,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
 */
+
+/** \file blender/python/generic/mathutils.h
+ *  \ingroup pygen
+ */
+
 //Include this file for access to vector, quat, matrix, euler, etc...
 
 #ifndef MATHUTILS_H
@@ -57,6 +62,9 @@ typedef struct {
 
 PyObject *BaseMathObject_getOwner( BaseMathObject * self, void * );
 PyObject *BaseMathObject_getWrapped( BaseMathObject *self, void * );
+
+int BaseMathObject_traverse(BaseMathObject *self, visitproc visit, void *arg);
+int BaseMathObject_clear(BaseMathObject *self);
 void BaseMathObject_dealloc(BaseMathObject * self);
 
 PyMODINIT_FUNC BPyInit_mathutils(void);
@@ -91,10 +99,10 @@ int _BaseMathObject_ReadIndexCallback(BaseMathObject *self, int index);
 int _BaseMathObject_WriteIndexCallback(BaseMathObject *self, int index);
 
 /* since this is called so often avoid where possible */
-#define BaseMath_ReadCallback(_self) (((_self)->cb_user ?	_BaseMathObject_ReadCallback((BaseMathObject *)_self):1))
-#define BaseMath_WriteCallback(_self) (((_self)->cb_user ?_BaseMathObject_WriteCallback((BaseMathObject *)_self):1))
-#define BaseMath_ReadIndexCallback(_self, _index) (((_self)->cb_user ?	_BaseMathObject_ReadIndexCallback((BaseMathObject *)_self, _index):1))
-#define BaseMath_WriteIndexCallback(_self, _index) (((_self)->cb_user ?	_BaseMathObject_WriteIndexCallback((BaseMathObject *)_self, _index):1))
+#define BaseMath_ReadCallback(_self) (((_self)->cb_user ?	_BaseMathObject_ReadCallback((BaseMathObject *)_self):0))
+#define BaseMath_WriteCallback(_self) (((_self)->cb_user ?_BaseMathObject_WriteCallback((BaseMathObject *)_self):0))
+#define BaseMath_ReadIndexCallback(_self, _index) (((_self)->cb_user ?	_BaseMathObject_ReadIndexCallback((BaseMathObject *)_self, _index):0))
+#define BaseMath_WriteIndexCallback(_self, _index) (((_self)->cb_user ?	_BaseMathObject_WriteIndexCallback((BaseMathObject *)_self, _index):0))
 
 /* utility func */
 int mathutils_array_parse(float *array, int array_min, int array_max, PyObject *value, const char *error_prefix);

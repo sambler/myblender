@@ -1,4 +1,4 @@
-/**
+/*
 * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/blenkernel/intern/sequencer.c
+ *  \ingroup bke
+ */
+
 
 #include <stddef.h>
 #include <stdlib.h>
@@ -193,7 +198,7 @@ void seq_free_sequence(Scene *scene, Sequence *seq)
 		if (ed->act_seq==seq)
 			ed->act_seq= NULL;
 
-		if(seq->scene_sound)
+		if(seq->scene_sound && ELEM(seq->type, SEQ_SOUND, SEQ_SCENE))
 			sound_remove_scene_sound(scene, seq->scene_sound);
 
 		seq_free_animdata(scene, seq);
@@ -2965,6 +2970,28 @@ void seq_translate(Scene *evil_scene, Sequence *seq, int delta)
 	calc_sequence_disp(evil_scene, seq);
 }
 
+Sequence *seq_foreground_frame_get(Scene *scene, int frame)
+{
+	Editing *ed= seq_give_editing(scene, FALSE);
+	Sequence *seq, *best_seq=NULL;
+	int best_machine = -1;
+	
+	if(!ed) return NULL;
+	
+	for (seq=ed->seqbasep->first; seq; seq= seq->next) {
+		if(seq->flag & SEQ_MUTE || seq->startdisp > frame || seq->enddisp <= frame)
+			continue;
+		/* only use elements you can see - not */
+		if (ELEM5(seq->type, SEQ_IMAGE, SEQ_META, SEQ_SCENE, SEQ_MOVIE, SEQ_COLOR)) {
+			if (seq->machine > best_machine) {
+				best_seq = seq;
+				best_machine = seq->machine;
+			}
+		}
+	}
+	return best_seq;
+}
+
 /* return 0 if there werent enough space */
 int shuffle_seq(ListBase * seqbasep, Sequence *test, Scene *evil_scene)
 {
@@ -3377,6 +3404,7 @@ Sequence *alloc_sequence(ListBase *lb, int cfra, int machine)
 	seq->mul= 1.0;
 	seq->blend_opacity = 100.0;
 	seq->volume = 1.0f;
+	seq->scene_sound = NULL;
 
 	return seq;
 }

@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/space_file/file_draw.c
+ *  \ingroup spfile
+ */
+
 
 #include <math.h>
 #include <string.h>
@@ -76,10 +81,10 @@
 #define TILE_BORDER_Y 8
 
 /* button events */
-static enum {
+enum {
 	B_FS_DIRNAME,
 	B_FS_FILENAME
-} eFile_ButEvents;
+} /*eFile_ButEvents*/;
 
 
 static void do_file_buttons(bContext *C, void *UNUSED(arg), int event)
@@ -384,7 +389,7 @@ static void file_draw_preview(uiBlock *block, struct direntry *file, int sx, int
 		uiButSetDragImage(but, file->path, get_file_icon(file), imb, scale);
 		
 		glDisable(GL_BLEND);
-		imb = 0;
+		imb = NULL;
 	}
 }
 

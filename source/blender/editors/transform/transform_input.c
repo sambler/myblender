@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -21,6 +21,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/transform/transform_input.c
+ *  \ingroup edtransform
+ */
+
 
 #include <stdlib.h>
 #include <math.h>

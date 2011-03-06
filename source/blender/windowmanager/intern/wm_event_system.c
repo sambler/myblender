@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/windowmanager/intern/wm_event_system.c
+ *  \ingroup wm
+ */
+
 
 #include <stdlib.h>
 #include <string.h>
@@ -1617,6 +1622,7 @@ static void wm_paintcursor_test(bContext *C, wmEvent *event)
 	
 	if(wm->paintcursors.first) {
 		ARegion *ar= CTX_wm_region(C);
+		
 		if(ar)
 			wm_paintcursor_tag(C, wm->paintcursors.first, ar);
 		
@@ -1729,6 +1735,14 @@ void wm_event_do_handlers(bContext *C)
 			CTX_wm_area_set(C, area_event_inside(C, event->x, event->y));
 			CTX_wm_region_set(C, region_event_inside(C, event->x, event->y));
 			
+			/* XXX to solve, here screen handlers? */
+			if(event->type==MOUSEMOVE) {
+				/* state variables in screen, cursors, also used in wm_draw.c */
+				ED_screen_set_subwinactive(win, event);	
+				/* for regions having custom cursors */
+				wm_paintcursor_test(C, event);
+			}
+			
 			/* MVC demands to not draw in event handlers... but we need to leave it for ogl selecting etc */
 			wm_window_make_drawable(C, win);
 			
@@ -1749,15 +1763,7 @@ void wm_event_do_handlers(bContext *C)
 				ScrArea *sa;
 				ARegion *ar;
 				int doit= 0;
-				
-				/* XXX to solve, here screen handlers? */
-				if(event->type==MOUSEMOVE) {
-					/* state variables in screen, cursors */
-					ED_screen_set_subwinactive(win, event);	
-					/* for regions having custom cursors */
-					wm_paintcursor_test(C, event);
-				}
-
+	
 				for(sa= win->screen->areabase.first; sa; sa= sa->next) {
 					if(wm_event_inside_i(event, &sa->totrct)) {
 						CTX_wm_area_set(C, sa);
@@ -2099,21 +2105,29 @@ void WM_event_add_mousemove(bContext *C)
 /* for modal callbacks, check configuration for how to interpret exit with tweaks  */
 int WM_modal_tweak_exit(wmEvent *evt, int tweak_event)
 {
-	/* user preset or keymap? dunno... */
-	// XXX WTH is this?
-	int tweak_modal= (U.flag & USER_RELEASECONFIRM)==0;
-	
-	switch(tweak_event) {
-		case EVT_TWEAK_L:
-		case EVT_TWEAK_M:
-		case EVT_TWEAK_R:
-			if(evt->val==tweak_modal)
-				return 1;
-		default:
-			/* this case is when modal callcback didnt get started with a tweak */
-			if(evt->val)
-				return 1;
+	/* if the release-confirm userpref setting is enabled, 
+	 * tweak events can be cancelled when mouse is released
+	 */
+	if (U.flag & USER_RELEASECONFIRM) {
+		/* option on, so can exit with km-release */
+		if (evt->val == KM_RELEASE) {
+			switch (tweak_event) {
+				case EVT_TWEAK_L:
+				case EVT_TWEAK_M:
+				case EVT_TWEAK_R:
+					return 1;
+			}
+		}
 	}
+	else {
+		/* this is fine as long as not doing km-release, otherwise
+		 * some items (i.e. markers) being tweaked may end up getting
+		 * dropped all over
+		 */
+		if (evt->val != KM_RELEASE)
+			return 1;
+	}
+	
 	return 0;
 }
 
@@ -2188,7 +2202,12 @@ static int convert_key(GHOST_TKey key)
 			case GHOST_kKeyNumpadSlash:		return PADSLASHKEY;
 				
 			case GHOST_kKeyGrLess:		    return GRLESSKEY; 
-				
+			
+			case GHOST_kKeyMediaPlay:		return MEDIAPLAY;
+			case GHOST_kKeyMediaStop:		return MEDIASTOP;
+			case GHOST_kKeyMediaFirst:		return MEDIAFIRST;
+			case GHOST_kKeyMediaLast:		return MEDIALAST;
+			
 			default:
 				return UNKNOWNKEY;	/* GHOST_kKeyUnknown */
 		}

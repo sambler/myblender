@@ -1,4 +1,4 @@
-/**
+/*
 * $Id$
 *
 * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,6 +27,11 @@
 * ***** END GPL LICENSE BLOCK *****
 *
 */
+
+/** \file blender/blenkernel/intern/icons.c
+ *  \ingroup bke
+ */
+
 
 #include <math.h>
 #include <stdlib.h>

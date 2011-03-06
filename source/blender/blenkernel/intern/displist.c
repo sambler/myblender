@@ -29,6 +29,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/blenkernel/intern/displist.c
+ *  \ingroup bke
+ */
+
+
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -1934,11 +1939,6 @@ float *makeOrcoDispList(Scene *scene, Object *ob, DerivedMesh *derivedFinal, int
 	}
 
 	return orco;
-}
-
-void imagestodisplist(void)
-{
-	/* removed */
 }
 
 /* this is confusing, there's also min_max_object, appplying the obmat... */

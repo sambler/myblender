@@ -1,4 +1,7 @@
-/**
+/** \file blender/editors/interface/resources.c
+ *  \ingroup edinterface
+ */
+/*
  * $Id$
  *
  * ***** BEGIN GPL/BL DUAL LICENSE BLOCK *****

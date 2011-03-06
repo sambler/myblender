@@ -1,4 +1,4 @@
-/**
+/*
  *  $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -29,6 +29,11 @@
  * various string, file, list operations.
  */
 
+/** \file blender/blenlib/intern/path_util.c
+ *  \ingroup bli
+ */
+
+
 #include <ctype.h>
 #include <string.h>
 #include <stdlib.h>
@@ -53,8 +58,10 @@
 #if defined WIN32 && !defined _LIBC
 # include "BLI_fnmatch.h" /* use fnmatch included in blenlib */
 #else
-# define _GNU_SOURCE
-# include <fnmatch.h>
+#  ifndef _GNU_SOURCE
+#    define _GNU_SOURCE
+#  endif
+#  include <fnmatch.h>
 #endif
 
 #ifdef WIN32
@@ -71,7 +78,7 @@
 
 #else /* non windows */
 
-#ifdef __linux__
+#ifdef WITH_BINRELOC
 #include "binreloc.h"
 #endif
 
@@ -199,7 +206,7 @@ void BLI_newname(char *name, int add)
 
 int BLI_uniquename_cb(int (*unique_check)(void *, const char *), void *arg, const char defname[], char delim, char *name, short name_len)
 {
-	if(name == '\0') {
+	if(name[0] == '\0') {
 		BLI_strncpy(name, defname, name_len);
 	}
 
@@ -602,6 +609,7 @@ int BLI_path_frame(char *path, int frame, int digits)
 		p= tmp + ch_sta;
 		p += sprintf(p, format, frame);
 		memcpy(p, path + ch_end, strlen(path + ch_end));
+		*(tmp+strlen(path)) = '\0';
 #endif
 		strcpy(path, tmp);
 		return 1;
@@ -812,12 +820,12 @@ void BLI_getlastdir(const char* dir, char *last, int maxlen)
 /* This is now only used to really get the user's default document folder */
 /* On Windows I chose the 'Users/<MyUserName>/Documents' since it's used
    as default location to save documents */
-char *BLI_getDefaultDocumentFolder(void) {
+const char *BLI_getDefaultDocumentFolder(void) {
 	#if !defined(WIN32)
 		return getenv("HOME");
 
 	#else /* Windows */
-		char * ret;
+		const char * ret;
 		static char documentfolder[MAXPATHLEN];
 		HRESULT hResult;
 
@@ -883,7 +891,7 @@ static int test_path(char *targetpath, const char *path_base, const char *path_s
 
 static int test_env_path(char *path, const char *envvar)
 {
-	char *env = envvar?getenv(envvar):NULL;
+	const char *env = envvar?getenv(envvar):NULL;
 	if (!env) return 0;
 	
 	if (BLI_is_dir(env)) {
@@ -1196,7 +1204,7 @@ void BLI_setenv_if_new(const char *env, const char* val)
 
 void BLI_clean(char *path)
 {
-	if(path==0) return;
+	if(path==NULL) return;
 
 #ifdef WIN32
 	if(path && BLI_strnlen(path, 3) > 2) {
@@ -1209,7 +1217,7 @@ void BLI_clean(char *path)
 
 void BLI_char_switch(char *string, char from, char to) 
 {
-	if(string==0) return;
+	if(string==NULL) return;
 	while (*string != 0) {
 		if (*string == from) *string = to;
 		string++;
@@ -1394,7 +1402,7 @@ int BLI_testextensie_glob(const char *str, const char *ext_fnmatch)
 
 int BLI_replace_extension(char *path, int maxlen, const char *ext)
 {
-	int a;
+	unsigned int a;
 
 	for(a=strlen(path)-1; a>=0; a--)
 		if(path[a] == '.' || path[a] == '/' || path[a] == '\\')
@@ -1629,7 +1637,7 @@ static int add_win32_extension(char *name)
 #ifdef _WIN32
 		char filename[FILE_MAXDIR+FILE_MAXFILE];
 		char ext[FILE_MAXDIR+FILE_MAXFILE];
-		char *extensions = getenv("PATHEXT");
+		const char *extensions = getenv("PATHEXT");
 		if (extensions) {
 			char *temp;
 			do {
@@ -1664,7 +1672,7 @@ static int add_win32_extension(char *name)
 void BLI_where_am_i(char *fullname, const int maxlen, const char *name)
 {
 	char filename[FILE_MAXDIR+FILE_MAXFILE];
-	char *path = NULL, *temp;
+	const char *path = NULL, *temp;
 
 #ifdef _WIN32
 	const char *separator = ";";
@@ -1673,12 +1681,12 @@ void BLI_where_am_i(char *fullname, const int maxlen, const char *name)
 #endif
 
 	
-#ifdef __linux__
+#ifdef WITH_BINRELOC
 	/* linux uses binreloc since argv[0] is not relyable, call br_init( NULL ) first */
 	path = br_find_exe( NULL );
 	if (path) {
 		BLI_strncpy(fullname, path, maxlen);
-		free(path);
+		free((void *)path);
 		return;
 	}
 #endif
@@ -1750,7 +1758,7 @@ void BLI_where_am_i(char *fullname, const int maxlen, const char *name)
 	}
 }
 
-void BLI_where_is_temp(char *fullname, int maxlen, int usertemp)
+void BLI_where_is_temp(char *fullname, const int maxlen, int usertemp)
 {
 	fullname[0] = '\0';
 	
@@ -1761,7 +1769,7 @@ void BLI_where_is_temp(char *fullname, int maxlen, int usertemp)
 	
 #ifdef WIN32
 	if (fullname[0] == '\0') {
-		char *tmp = getenv("TEMP"); /* Windows */
+		const char *tmp = getenv("TEMP"); /* Windows */
 		if (tmp && BLI_is_dir(tmp)) {
 			BLI_strncpy(fullname, tmp, maxlen);
 		}
@@ -1769,14 +1777,14 @@ void BLI_where_is_temp(char *fullname, int maxlen, int usertemp)
 #else
 	/* Other OS's - Try TMP and TMPDIR */
 	if (fullname[0] == '\0') {
-		char *tmp = getenv("TMP");
+		const char *tmp = getenv("TMP");
 		if (tmp && BLI_is_dir(tmp)) {
 			BLI_strncpy(fullname, tmp, maxlen);
 		}
 	}
 	
 	if (fullname[0] == '\0') {
-		char *tmp = getenv("TMPDIR");
+		const char *tmp = getenv("TMPDIR");
 		if (tmp && BLI_is_dir(tmp)) {
 			BLI_strncpy(fullname, tmp, maxlen);
 		}

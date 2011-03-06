@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -24,6 +24,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/space_image/image_render.c
+ *  \ingroup spimage
+ */
+
 
 #include <stdlib.h>
 #include <stdio.h>

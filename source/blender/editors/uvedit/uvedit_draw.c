@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -24,6 +24,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/uvedit/uvedit_draw.c
+ *  \ingroup eduv
+ */
+
 
 #include <float.h>
 #include <math.h>
@@ -174,7 +179,7 @@ static void draw_uvs_stretch(SpaceImage *sima, Scene *scene, EditMesh *em, MTFac
 
 				totarea += EM_face_area(efa);
 				//totuvarea += tf_area(tf, efa->v4!=0);
-				totuvarea += uv_area(tf_uv, efa->v4!=0);
+				totuvarea += uv_area(tf_uv, efa->v4 != NULL);
 				
 				if(uvedit_face_visible(scene, ima, efa, tf)) {
 					efa->tmp.p = tf;
@@ -207,7 +212,7 @@ static void draw_uvs_stretch(SpaceImage *sima, Scene *scene, EditMesh *em, MTFac
 						area = EM_face_area(efa) / totarea;
 						uv_copy_aspect(tf->uv, tf_uv, aspx, aspy);
 						//uvarea = tf_area(tf, efa->v4!=0) / totuvarea;
-						uvarea = uv_area(tf_uv, efa->v4!=0) / totuvarea;
+						uvarea = uv_area(tf_uv, efa->v4 != NULL) / totuvarea;
 						
 						if(area < FLT_EPSILON || uvarea < FLT_EPSILON)
 							areadiff = 1.0;

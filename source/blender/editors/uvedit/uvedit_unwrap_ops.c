@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/uvedit/uvedit_unwrap_ops.c
+ *  \ingroup eduv
+ */
+
 
 #include <string.h>
 #include <stdlib.h>

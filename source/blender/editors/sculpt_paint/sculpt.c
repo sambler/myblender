@@ -30,6 +30,11 @@
  *
  */
 
+/** \file blender/editors/sculpt_paint/sculpt.c
+ *  \ingroup edsculpt
+ */
+
+
 #include "MEM_guardedalloc.h"
 
 #include "BLI_math.h"
@@ -59,6 +64,7 @@
 #include "BKE_paint.h"
 #include "BKE_report.h"
 #include "BKE_lattice.h" /* for armature_deform_verts */
+#include "BKE_node.h"
 
 #include "BIF_glutil.h"
 
@@ -109,6 +115,16 @@ void ED_sculpt_modifiers_changed(Object *ob)
 		}
 
 		sculpt_free_deformMats(ob->sculpt);
+	} else {
+		PBVHNode **nodes;
+		int n, totnode;
+
+		BLI_pbvh_search_gather(ss->pbvh, NULL, NULL, &nodes, &totnode);
+
+		for(n = 0; n < totnode; n++)
+			BLI_pbvh_node_mark_update(nodes[n]);
+
+		MEM_freeN(nodes);
 	}
 }
 
@@ -1509,7 +1525,7 @@ static void do_layer_brush(Sculpt *sd, SculptSession *ss, PBVHNode **nodes, int 
 	Brush *brush = paint_brush(&sd->paint);
 	float bstrength= ss->cache->bstrength;
 	float area_normal[3], offset[3];
-	float lim= ss->cache->radius / 4;
+	float lim= brush->height;
 	int n;
 
 	if(bstrength < 0)
@@ -1542,15 +1558,15 @@ static void do_layer_brush(Sculpt *sd, SculptSession *ss, PBVHNode **nodes, int 
 		sculpt_brush_test_init(ss, &test);
 
 		BLI_pbvh_vertex_iter_begin(ss->pbvh, nodes[n], vd, PBVH_ITER_UNIQUE) {
-			if(sculpt_brush_test(&test, vd.co)) {
-				const float fade = bstrength*ss->cache->radius*tex_strength(ss, brush, vd.co, test.dist)*frontface(brush, area_normal, vd.no, vd.fno);
+			if(sculpt_brush_test(&test, origco[vd.i])) {
+				const float fade = bstrength*tex_strength(ss, brush, vd.co, test.dist)*frontface(brush, area_normal, vd.no, vd.fno);
 				float *disp= &layer_disp[vd.i];
 				float val[3];
 
 				*disp+= fade;
 
 				/* Don't let the displacement go past the limit */
-				if((lim < 0 && *disp < lim) || (lim > 0 && *disp > lim))
+				if((lim < 0 && *disp < lim) || (lim >= 0 && *disp > lim))
 					*disp = lim;
 
 				mul_v3_v3fl(val, offset, *disp);
@@ -2459,12 +2475,12 @@ static void sculpt_flush_stroke_deform(Sculpt *sd, SculptSession *ss)
 
 			int n, totnode;
 			PBVHNode** nodes;
-			PBVHVertexIter vd;
 
 			BLI_pbvh_search_gather(ss->pbvh, NULL, NULL, &nodes, &totnode);
 
 			#pragma omp parallel for schedule(guided) if (sd->flags & SCULPT_USE_OPENMP)
 			for (n= 0; n < totnode; n++) {
+				PBVHVertexIter vd;
 
 				BLI_pbvh_vertex_iter_begin(ss->pbvh, nodes[n], vd, PBVH_ITER_UNIQUE) {
 					sculpt_flush_pbvhvert_deform(ss, &vd);
@@ -3249,6 +3265,21 @@ int sculpt_stroke_get_location(bContext *C, struct PaintStroke *stroke, float ou
 	return srd.hit;
 }
 
+static void sculpt_brush_init_tex(Sculpt *sd, SculptSession *ss)
+{
+	Brush *brush = paint_brush(&sd->paint);
+	MTex *mtex= &brush->mtex;
+
+	/* init mtex nodes */
+	if(mtex->tex && mtex->tex->nodetree)
+		ntreeBeginExecTree(mtex->tex->nodetree); /* has internal flag to detect it only does it once */
+
+	/* TODO: Shouldn't really have to do this at the start of every
+	   stroke, but sculpt would need some sort of notification when
+	   changes are made to the texture. */
+	sculpt_update_tex(sd, ss);
+}
+
 static int sculpt_brush_stroke_init(bContext *C, ReportList *reports)
 {
 	Scene *scene= CTX_data_scene(C);
@@ -3263,11 +3294,7 @@ static int sculpt_brush_stroke_init(bContext *C, ReportList *reports)
 	}
 
 	view3d_operator_needs_opengl(C);
-
-	/* TODO: Shouldn't really have to do this at the start of every
-	   stroke, but sculpt would need some sort of notification when
-	   changes are made to the texture. */
-	sculpt_update_tex(sd, ss);
+	sculpt_brush_init_tex(sd, ss);
 
 	sculpt_update_mesh_elements(scene, ob, brush->sculpt_tool == SCULPT_TOOL_SMOOTH);
 
@@ -3424,6 +3451,15 @@ static void sculpt_stroke_update_step(bContext *C, struct PaintStroke *stroke, P
 	sculpt_flush_update(C);
 }
 
+static void sculpt_brush_exit_tex(Sculpt *sd)
+{
+	Brush *brush= paint_brush(&sd->paint);
+	MTex *mtex= &brush->mtex;
+
+	if(mtex->tex && mtex->tex->nodetree)
+		ntreeEndExecTree(mtex->tex->nodetree);
+}
+
 static void sculpt_stroke_done(bContext *C, struct PaintStroke *unused)
 {
 	Object *ob= CTX_data_active_object(C);
@@ -3473,6 +3509,8 @@ static void sculpt_stroke_done(bContext *C, struct PaintStroke *unused)
 
 		WM_event_add_notifier(C, NC_OBJECT|ND_DRAW, ob);
 	}
+
+	sculpt_brush_exit_tex(sd);
 }
 
 static int sculpt_brush_stroke_invoke(bContext *C, wmOperator *op, wmEvent *event)
@@ -3486,7 +3524,7 @@ static int sculpt_brush_stroke_invoke(bContext *C, wmOperator *op, wmEvent *even
 	stroke = paint_stroke_new(C, sculpt_stroke_get_location,
 				  sculpt_stroke_test_start,
 				  sculpt_stroke_update_step,
-				  sculpt_stroke_done);
+				  sculpt_stroke_done, event->type);
 
 	op->customdata = stroke;
 
@@ -3516,7 +3554,7 @@ static int sculpt_brush_stroke_exec(bContext *C, wmOperator *op)
 		return OPERATOR_CANCELLED;
 
 	op->customdata = paint_stroke_new(C, sculpt_stroke_get_location, sculpt_stroke_test_start,
-					  sculpt_stroke_update_step, sculpt_stroke_done);
+					  sculpt_stroke_update_step, sculpt_stroke_done, 0);
 
 	sculpt_update_cache_invariants(C, sd, ss, op, NULL);
 

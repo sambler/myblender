@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/space_nla/nla_select.c
+ *  \ingroup spnla
+ */
+
 
 #include <string.h>
 #include <stdio.h>
@@ -86,11 +91,11 @@ static short selmodes_to_flagmodes (short sel)
  *	3) (de)select all - no testing is done; only for use internal tools as normal function...
  */
 
-static enum {
+enum {
 	DESELECT_STRIPS_NOTEST = 0,
 	DESELECT_STRIPS_TEST,
 	DESELECT_STRIPS_CLEARACTIVE,
-} eDeselectNlaStrips;
+} /*eDeselectNlaStrips*/;
  
 /* Deselects strips in the NLA Editor
  *	- This is called by the deselect all operator, as well as other ones!
@@ -206,11 +211,11 @@ void NLA_OT_select_all_toggle (wmOperatorType *ot)
  */
 
 /* defines for borderselect mode */
-static enum {
+enum {
 	NLA_BORDERSEL_ALLSTRIPS	= 0,
 	NLA_BORDERSEL_FRAMERANGE,
 	NLA_BORDERSEL_CHANNELS,
-} eNLAEDIT_BorderSelect_Mode;
+} /* eNLAEDIT_BorderSelect_Mode */;
 
 
 static void borderselect_nla_strips (bAnimContext *ac, rcti rect, short mode, short selectmode)

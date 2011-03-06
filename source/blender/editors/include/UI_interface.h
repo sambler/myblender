@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,10 @@
  * Contributor(s): none yet.
  *
  * ***** END GPL LICENSE BLOCK *****
+ */
+
+/** \file UI_interface.h
+ *  \ingroup editorui
  */
 
 #ifndef UI_INTERFACE_H
@@ -634,9 +638,6 @@ void UI_exit(void);
 /* uiLayoutOperatorButs flags */
 #define UI_LAYOUT_OP_SHOW_TITLE 1
 #define UI_LAYOUT_OP_SHOW_EMPTY 2
-
-/* for more readable function names */
-#define ICON_NULL 0
 
 uiLayout *uiBlockLayout(uiBlock *block, int dir, int type, int x, int y, int size, int em, struct uiStyle *style);
 void uiBlockSetCurLayout(uiBlock *block, uiLayout *layout);

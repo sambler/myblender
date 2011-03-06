@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/screen/area.c
+ *  \ingroup edscr
+ */
+
 
 #include <string.h>
 #include <stdio.h>
@@ -1284,6 +1289,9 @@ void ED_region_panels(const bContext *C, ARegion *ar, int vertical, const char *
 				panel->labelofs= xco - triangle;
 				panel->layout= NULL;
 			}
+			else {
+				panel->labelofs= 0;
+			}
 
 			if(open) {
 				short panelContext;
@@ -1415,7 +1423,7 @@ void ED_region_header(const bContext *C, ARegion *ar)
 	uiBlock *block;
 	uiLayout *layout;
 	HeaderType *ht;
-	Header header = {0};
+	Header header = {NULL};
 	int maxco, xco, yco;
 
 	/* clear */	

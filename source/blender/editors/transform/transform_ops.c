@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -22,6 +22,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/transform/transform_ops.c
+ *  \ingroup edtransform
+ */
+
+
 #include "MEM_guardedalloc.h"
 
 #include "DNA_scene_types.h"
@@ -35,11 +40,13 @@
 
 #include "BKE_context.h"
 #include "BKE_global.h"
+#include "BKE_armature.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
 
 #include "UI_interface.h"
+#include "UI_resources.h"
 
 #include "ED_screen.h"
 
@@ -151,7 +158,7 @@ static int select_orientation_invoke(bContext *C, wmOperator *UNUSED(op), wmEven
 	uiPopupMenu *pup;
 	uiLayout *layout;
 
-	pup= uiPupMenuBegin(C, "Orientation", ICON_NULL);
+	pup= uiPupMenuBegin(C, "Orientation", ICON_NONE);
 	layout= uiPupMenuLayout(pup);
 	uiItemsEnumO(layout, "TRANSFORM_OT_select_orientation", "orientation");
 	uiPupMenuEnd(C, pup);
@@ -368,6 +375,8 @@ static int transform_exec(bContext *C, wmOperator *op)
 	transformEnd(C, t);
 
 	transformops_exit(C, op);
+	
+	WM_event_add_notifier(C, NC_OBJECT|ND_TRANSFORM, NULL);
 
 	return OPERATOR_FINISHED;
 }

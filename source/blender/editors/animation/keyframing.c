@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/animation/keyframing.c
+ *  \ingroup edanimation
+ */
+
  
 #include <stdio.h>
 #include <stddef.h>
@@ -295,6 +300,7 @@ int insert_bezt_fcurve (FCurve *fcu, BezTriple *bezt, short flag)
 int insert_vert_fcurve (FCurve *fcu, float x, float y, short flag)
 {
 	BezTriple beztr= {{{0}}};
+	unsigned int oldTot = fcu->totvert;
 	int a;
 	
 	/* set all three points, for nicer start position 
@@ -330,10 +336,16 @@ int insert_vert_fcurve (FCurve *fcu, float x, float y, short flag)
 	if ((fcu->totvert > 2) && (flag & INSERTKEY_REPLACE)==0) {
 		BezTriple *bezt= (fcu->bezt + a);
 		
-		/* set interpolation from previous (if available) */
-		// FIXME: this doesn't work if user tweaked the interpolation specifically, and they were just overwriting some existing key in the process...
-		if (a > 0) bezt->ipo= (bezt-1)->ipo;
-		else if (a < fcu->totvert-1) bezt->ipo= (bezt+1)->ipo;
+		/* set interpolation from previous (if available), but only if we didn't just replace some keyframe 
+		 * 	- replacement is indicated by no-change in number of verts
+		 *	- when replacing, the user may have specified some interpolation that should be kept
+		 */
+		if (fcu->totvert > oldTot) {
+			if (a > 0) 
+				bezt->ipo= (bezt-1)->ipo;
+			else if (a < fcu->totvert-1) 
+				bezt->ipo= (bezt+1)->ipo;
+		}
 			
 		/* don't recalculate handles if fast is set
 		 *	- this is a hack to make importers faster
@@ -349,12 +361,12 @@ int insert_vert_fcurve (FCurve *fcu, float x, float y, short flag)
 
 /* -------------- 'Smarter' Keyframing Functions -------------------- */
 /* return codes for new_key_needed */
-static enum {
+enum {
 	KEYNEEDED_DONTADD = 0,
 	KEYNEEDED_JUSTADD,
 	KEYNEEDED_DELPREV,
 	KEYNEEDED_DELNEXT
-} eKeyNeededStatus;
+} /*eKeyNeededStatus*/;
 
 /* This helper function determines whether a new keyframe is needed */
 /* Cases where keyframes should not be added:
@@ -1034,10 +1046,10 @@ short delete_keyframe (ReportList *reports, ID *id, bAction *act, const char gro
 /* KEYFRAME MODIFICATION */
 
 /* mode for commonkey_modifykey */
-static enum {
+enum {
 	COMMONKEY_MODE_INSERT = 0,
 	COMMONKEY_MODE_DELETE,
-} eCommonModifyKey_Modes;
+} /*eCommonModifyKey_Modes*/;
 
 /* Polling callback for use with ANIM_*_keyframe() operators
  * This is based on the standard ED_operator_areaactive callback,

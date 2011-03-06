@@ -61,9 +61,10 @@ else:
         "bpy.app",
         "bpy.path",
         "bpy.data",
-        "bpy.props",
+        #"bpy.props",
         "bpy.utils",
-        #"bpy.types",  # supports filtering
+        "bpy.context",
+        # "bpy.types",  # supports filtering
         "bpy.ops",  # supports filtering
         "bge",
         "aud",
@@ -73,8 +74,8 @@ else:
         "mathutils.geometry",
     )
 
-    FILTER_BPY_TYPES = ("Mesh", )  # allow 
-    FILTER_BPY_OPS = ("import_scene", )  # allow 
+    FILTER_BPY_TYPES = ("PropertyGroup", "Panel", "Menu", "Operator", "RenderEngine")  # allow
+    FILTER_BPY_OPS = ("import.scene", )  # allow
 
     # for quick rebuilds
     """
@@ -131,13 +132,60 @@ def range_str(val):
         return str(val)
 
 
+def example_extract_docstring(filepath):
+    file = open(filepath, 'r')
+    line = file.readline()
+    line_no = 0
+    text = []
+    if line.startswith('"""'):  # assume nothing here
+        line_no += 1
+    else:
+        file.close()
+        return "", 0
+
+    for line in file.readlines():
+        line_no += 1
+        if line.startswith('"""'):
+            break
+        else:
+            text.append(line.rstrip())
+
+    line_no += 1
+    file.close()
+    return "\n".join(text), line_no
+
+
 def write_example_ref(ident, fw, example_id, ext="py"):
     if example_id in EXAMPLE_SET:
-        fw("%s.. literalinclude:: ../examples/%s.%s\n\n" % (ident, example_id, ext))
+
+        # extract the comment
+        filepath = "../examples/%s.%s" % (example_id, ext)
+        filepath_full = os.path.join(os.path.dirname(fw.__self__.name), filepath)
+
+        text, line_no = example_extract_docstring(filepath_full)
+
+        for line in text.split("\n"):
+            fw("%s\n" % (ident + line).rstrip())
+        fw("\n")
+
+        fw("%s.. literalinclude:: %s\n" % (ident, filepath))
+        if line_no > 0:
+            fw("%s   :lines: %d-\n" % (ident, line_no))
+        fw("\n")
         EXAMPLE_SET_USED.add(example_id)
     else:
         if bpy.app.debug:
             print("\tskipping example:", example_id)
+
+    # Support for numbered files bpy.types.Operator -> bpy.types.Operator.1.py
+    i = 1
+    while True:
+        example_id_num = "%s.%d" % (example_id, i)
+        if example_id_num in EXAMPLE_SET:
+            write_example_ref(ident, fw, example_id_num, ext)
+            i += 1
+        else:
+            break
 
 
 def write_indented_lines(ident, fn, text, strip=True):
@@ -463,6 +511,8 @@ def pycontext2sphinx(BASEPATH):
     else:
         pass  # will have raised an error above
 
+    file.close()
+
 
 def pyrna2sphinx(BASEPATH):
     """ bpy.types and bpy.ops
@@ -516,6 +566,9 @@ def pyrna2sphinx(BASEPATH):
         fw("%s\n%s\n\n" % (title, "=" * len(title)))
 
         fw(".. module:: bpy.types\n\n")
+
+        # docs first?, ok
+        write_example_ref("", fw, "bpy.types.%s" % struct.identifier)
 
         base_ids = [base.identifier for base in struct.get_bases()]
 
@@ -678,6 +731,10 @@ def pyrna2sphinx(BASEPATH):
                 fw("   * :class:`%s`\n" % ref)
             fw("\n")
 
+        # docs last?, disable for now
+        # write_example_ref("", fw, "bpy.types.%s" % struct.identifier)
+        file.close()
+
     if "bpy.types" not in EXCLUDE_MODULES:
         for struct in structs.values():
             # TODO, rna_info should filter these out!
@@ -715,46 +772,51 @@ def pyrna2sphinx(BASEPATH):
             for key, descr in descr_items:
                 if type(descr) == GetSetDescriptorType:
                     py_descr2sphinx("   ", fw, descr, "bpy.types", _BPY_STRUCT_FAKE, key)
+            file.close()
 
     # operators
     def write_ops():
         API_BASEURL = "https://svn.blender.org/svnroot/bf-blender/trunk/blender/release/scripts"
-        fw = None
-        last_mod = ''
 
-        for op_key in sorted(ops.keys()):
-            op = ops[op_key]
+        op_modules = {}
+        for op in ops.values():
+            op_modules.setdefault(op.module_name, []).append(op)
+        del op
 
-            if last_mod != op.module_name:
-                filepath = os.path.join(BASEPATH, "bpy.ops.%s.rst" % op.module_name)
-                file = open(filepath, "w")
-                fw = file.write
+        for op_module_name, ops_mod in op_modules.items():
+            filepath = os.path.join(BASEPATH, "bpy.ops.%s.rst" % op_module_name)
+            file = open(filepath, "w")
+            fw = file.write
 
-                title = "%s Operators" % (op.module_name[0].upper() + op.module_name[1:])
-                fw("%s\n%s\n\n" % (title, "=" * len(title)))
+            title = "%s Operators" % op_module_name.replace("_", " ").title()
+            fw("%s\n%s\n\n" % (title, "=" * len(title)))
 
-                fw(".. module:: bpy.ops.%s\n\n" % op.module_name)
-                last_mod = op.module_name
+            fw(".. module:: bpy.ops.%s\n\n" % op_module_name)
 
-            args_str = ", ".join(prop.get_arg_default(force=True) for prop in op.args)
-            fw(".. function:: %s(%s)\n\n" % (op.func_name, args_str))
+            ops_mod.sort(key=lambda op: op.func_name)
 
-            # if the description isn't valid, we output the standard warning
-            # with a link to the wiki so that people can help
-            if not op.description or op.description == "(undocumented operator)":
-                operator_description = undocumented_message('bpy.ops', op.module_name, op.func_name)
-            else:
-                operator_description = op.description
+            for op in ops_mod:
+                args_str = ", ".join(prop.get_arg_default(force=True) for prop in op.args)
+                fw(".. function:: %s(%s)\n\n" % (op.func_name, args_str))
 
-            fw("   %s\n\n" % operator_description)
-            for prop in op.args:
-                write_param("   ", fw, prop)
-            if op.args:
-                fw("\n")
+                # if the description isn't valid, we output the standard warning
+                # with a link to the wiki so that people can help
+                if not op.description or op.description == "(undocumented operator)":
+                    operator_description = undocumented_message('bpy.ops', op.module_name, op.func_name)
+                else:
+                    operator_description = op.description
 
-            location = op.get_location()
-            if location != (None, None):
-                fw("   :file: `%s <%s/%s>`_:%d\n\n" % (location[0], API_BASEURL, location[0], location[1]))
+                fw("   %s\n\n" % operator_description)
+                for prop in op.args:
+                    write_param("   ", fw, prop)
+                if op.args:
+                    fw("\n")
+
+                location = op.get_location()
+                if location != (None, None):
+                    fw("   :file: `%s <%s/%s>`_:%d\n\n" % (location[0], API_BASEURL, location[0], location[1]))
+
+            file.close()
 
     if "bpy.ops" not in EXCLUDE_MODULES:
         write_ops()
@@ -806,9 +868,10 @@ def rna2sphinx(BASEPATH):
     fw("\n")
     fw("This document is an API reference for Blender %s. built %s.\n" % (version_string, bpy.app.build_date))
     fw("\n")
-    fw("An introduction to Blender and Python can be found at <http://wiki.blender.org/index.php/Dev:2.5/Py/API/Intro>\n")
+    fw("| An introduction to Blender and Python can be found at `Quickstart Intro <http://wiki.blender.org/index.php/Dev:2.5/Py/API/Intro>`_,\n")
+    fw("| For a more general explanation of blender/python see the `API Overview <http://wiki.blender.org/index.php/Dev:2.5/Py/API/Overview>`_\n")
     fw("\n")
-    fw("`A PDF version of this document is also available <blender_python_reference_%s.pdf>`__\n" % version_string_fp)
+    fw("`A PDF version of this document is also available <blender_python_reference_%s.pdf>`_\n" % version_string_fp)
     fw("\n")
     fw(".. warning:: The Python API in Blender is **UNSTABLE**, It should only be used for testing, any script written now may break in future releases.\n")
     fw("   \n")
@@ -895,6 +958,7 @@ def rna2sphinx(BASEPATH):
         fw = file.write
         fw("Operators (bpy.ops)\n")
         fw("===================\n\n")
+        write_example_ref("", fw, "bpy.ops")
         fw(".. toctree::\n")
         fw("   :glob:\n\n")
         fw("   bpy.ops.*\n\n")
@@ -961,7 +1025,6 @@ def rna2sphinx(BASEPATH):
     if "mathutils" not in EXCLUDE_MODULES:
         import mathutils as module
         pymodule2sphinx(BASEPATH, "mathutils", module, "Math Types & Utilities (mathutils)")
-
 
     if "mathutils.geometry" not in EXCLUDE_MODULES:
         import mathutils.geometry as module

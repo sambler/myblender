@@ -29,6 +29,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/blenkernel/intern/particle_system.c
+ *  \ingroup bke
+ */
+
+
 #include <stddef.h>
 #include "BLI_storage.h" /* _LARGEFILE_SOURCE */
 
@@ -2286,6 +2291,10 @@ static void particle_fluidsim(ParticleSystem *psys, int own_psys, ParticleData *
 
 	/* pressure and near pressure */
 	for(n=own_psys?1:0; n<neighbours; n++) {
+		/* disregard particles at the exact same location */
+		if(ptn[n].dist < FLT_EPSILON)
+			continue;
+
 		sub_v3_v3(ptn[n].co, pa->prev_state.co);
 		mul_v3_fl(ptn[n].co, 1.f/ptn[n].dist);
 		q = ptn[n].dist/h;
@@ -2305,6 +2314,10 @@ static void particle_fluidsim(ParticleSystem *psys, int own_psys, ParticleData *
 
 	/* main calculations */
 	for(n=own_psys?1:0; n<neighbours; n++) {
+		/* disregard particles at the exact same location */
+		if(ptn[n].dist < FLT_EPSILON)
+			continue;
+
 		npa = psys->particles + ptn[n].index;
 
 		rij = ptn[n].dist;

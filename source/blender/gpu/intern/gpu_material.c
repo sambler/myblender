@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/gpu/intern/gpu_material.c
+ *  \ingroup gpu
+ */
+
 
 #include <math.h>
 #include <string.h>
@@ -776,12 +781,12 @@ static void material_lights(GPUShadeInput *shi, GPUShadeResult *shr)
 			ListBase *lb = object_duplilist(shi->gpumat->scene, ob);
 			
 			for(dob=lb->first; dob; dob=dob->next) {
-				Object *ob = dob->ob;
-				
-				if(ob->type==OB_LAMP) {
-					copy_m4_m4(ob->obmat, dob->mat);
+				Object *ob_iter = dob->ob;
 
-					lamp = GPU_lamp_from_blender(shi->gpumat->scene, ob, base->object);
+				if(ob_iter->type==OB_LAMP) {
+					copy_m4_m4(ob_iter->obmat, dob->mat);
+
+					lamp = GPU_lamp_from_blender(shi->gpumat->scene, ob_iter, ob);
 					if(lamp)
 						shade_one_light(shi, shr, lamp);
 				}
@@ -886,7 +891,7 @@ static void do_material_tex(GPUShadeInput *shi)
 	MTex *mtex;
 	Tex *tex;
 	GPUNodeLink *texco, *tin, *trgb, *tnor, *tcol, *stencil, *tnorfac;
-	GPUNodeLink *texco_norm, *texco_orco, *texco_object, *texco_tangent;
+	GPUNodeLink *texco_norm, *texco_orco, *texco_object;
 	GPUNodeLink *texco_global, *texco_uv = NULL;
 	GPUNodeLink *newnor, *orn;
 	char *lastuvname = NULL;
@@ -918,7 +923,7 @@ static void do_material_tex(GPUShadeInput *shi)
 			mtex= ma->mtex[tex_nr];
 			
 			tex= mtex->tex;
-			if(tex==0) continue;
+			if(tex == NULL) continue;
 
 			/* which coords */
 			if(mtex->texco==TEXCO_ORCO)

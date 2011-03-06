@@ -32,6 +32,10 @@
 #ifndef BLI_STRING_H
 #define BLI_STRING_H
 
+/** \file BLI_string.h
+ *  \ingroup bli
+ */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -104,7 +108,7 @@ char *BLI_replacestr(char *str, const char *oldText, const char *newText);
 	 */
 int BLI_snprintf(char *buffer, size_t count, const char *format, ...)
 #ifdef __GNUC__
-__attribute__ ((format (printf, 3, 4)));
+__attribute__ ((format (printf, 3, 4)))
 #endif
 ;
 
@@ -114,7 +118,7 @@ __attribute__ ((format (printf, 3, 4)));
 	 */
 char *BLI_sprintfN(const char *format, ...)
 #ifdef __GNUC__
-__attribute__ ((format (printf, 1, 2)));
+__attribute__ ((format (printf, 1, 2)))
 #endif
 ;
 

@@ -94,9 +94,7 @@ class DATA_PT_normals(MeshButtonsPanel, bpy.types.Panel):
         sub.active = mesh.use_auto_smooth
         sub.prop(mesh, "auto_smooth_angle", text="Angle")
 
-        col = split.column()
-
-        col.prop(mesh, "show_double_sided")
+        split.prop(mesh, "show_double_sided")
 
 
 class DATA_PT_settings(MeshButtonsPanel, bpy.types.Panel):
@@ -283,7 +281,6 @@ class DATA_PT_texface(MeshButtonsPanel, bpy.types.Panel):
     @classmethod
     def poll(cls, context):
         ob = context.active_object
-        rd = context.scene.render
 
         return (context.mode == 'EDIT_MESH') and ob and ob.type == 'MESH'
 

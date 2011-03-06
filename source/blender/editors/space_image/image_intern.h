@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/space_image/image_intern.h
+ *  \ingroup spimage
+ */
+
 
 #ifndef ED_IMAGE_INTERN_H
 #define ED_IMAGE_INTERN_H
@@ -78,6 +83,8 @@ void IMAGE_OT_save_as(struct wmOperatorType *ot);
 void IMAGE_OT_save_sequence(struct wmOperatorType *ot);
 void IMAGE_OT_pack(struct wmOperatorType *ot);
 void IMAGE_OT_unpack(struct wmOperatorType *ot);
+
+void IMAGE_OT_invert(struct wmOperatorType *ot);
 
 void IMAGE_OT_cycle_render_slot(struct wmOperatorType *ot);
 

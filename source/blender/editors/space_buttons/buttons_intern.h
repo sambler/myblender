@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/space_buttons/buttons_intern.h
+ *  \ingroup spbuttons
+ */
+
 #ifndef ED_BUTTONS_INTERN_H
 #define ED_BUTTONS_INTERN_H
 

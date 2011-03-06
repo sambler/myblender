@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/space_buttons/space_buttons.c
+ *  \ingroup spbuttons
+ */
+
 
 #include <string.h>
 #include <stdio.h>

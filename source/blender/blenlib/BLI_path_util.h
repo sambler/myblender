@@ -1,8 +1,4 @@
-/**
- * blenlib/BLI_storage_types.h
- *
- * Some types for dealing with directories
- *
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -33,6 +29,10 @@
 #ifndef BLI_PATH_UTIL_H
 #define BLI_PATH_UTIL_H
 
+/** \file BLI_path_util.h
+ *  \ingroup bli
+ */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -40,7 +40,7 @@ extern "C" {
 struct ListBase;
 struct direntry;
 
-char *BLI_getDefaultDocumentFolder(void);
+const char *BLI_getDefaultDocumentFolder(void);
 
 char *BLI_get_folder(int folder_id, const char *subfolder);
 char *BLI_get_folder_create(int folder_id, const char *subfolder);

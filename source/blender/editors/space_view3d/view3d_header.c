@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/space_view3d/view3d_header.c
+ *  \ingroup spview3d
+ */
+
 
 #include <string.h>
 #include <stdio.h>
@@ -139,10 +144,11 @@ static void handle_view3d_lock(bContext *C)
 
 static int view3d_layers_exec(bContext *C, wmOperator *op)
 {
-	Main *bmain= CTX_data_main(C);
 	Scene *scene= CTX_data_scene(C);
 	ScrArea *sa= CTX_wm_area(C);
 	View3D *v3d= sa->spacedata.first;
+	Base *base;
+	int oldlay= v3d->lay;
 	int nr= RNA_int_get(op->ptr, "nr");
 	int toggle= RNA_boolean_get(op->ptr, "toggle");
 	
@@ -200,8 +206,12 @@ static int view3d_layers_exec(bContext *C, wmOperator *op)
 	
 	if(v3d->scenelock) handle_view3d_lock(C);
 	
-	/* new layers might need unflushed events events */
-	DAG_scene_update_flags(bmain, scene, v3d->lay, FALSE);	/* tags all that moves and flushes */
+	/* XXX new layers might need updates, there is no provision yet to detect if that's needed */
+	oldlay= ~oldlay & v3d->lay;
+	for (base= scene->base.first; base; base= base->next) {
+		if(base->lay & oldlay)
+			base->object->recalc= OB_RECALC_OB|OB_RECALC_DATA;
+	}
 
 	ED_area_tag_redraw(sa);
 	
@@ -450,7 +460,7 @@ void uiTemplateHeader3D(uiLayout *layout, struct bContext *C)
 	uiBlockEndAlign(block);
 	
 	/* Draw type */
-	uiItemR(layout, &v3dptr, "viewport_shade", UI_ITEM_R_ICON_ONLY, "", ICON_NULL);
+	uiItemR(layout, &v3dptr, "viewport_shade", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
 
 	if (obedit==NULL && ((ob && ob->mode & (OB_MODE_VERTEX_PAINT|OB_MODE_WEIGHT_PAINT|OB_MODE_TEXTURE_PAINT)))) {
 		/* Manipulators aren't used in weight paint mode */
@@ -458,13 +468,13 @@ void uiTemplateHeader3D(uiLayout *layout, struct bContext *C)
 		PointerRNA meshptr;
 
 		RNA_pointer_create(&ob->id, &RNA_Mesh, ob->data, &meshptr);
-		uiItemR(layout, &meshptr, "use_paint_mask", UI_ITEM_R_ICON_ONLY, "", ICON_NULL);
+		uiItemR(layout, &meshptr, "use_paint_mask", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
 	} else {
 		const char *str_menu;
 
 		row= uiLayoutRow(layout, 1);
-		uiItemR(row, &v3dptr, "pivot_point", UI_ITEM_R_ICON_ONLY, "", ICON_NULL);
-		uiItemR(row, &v3dptr, "use_pivot_point_align", UI_ITEM_R_ICON_ONLY, "", ICON_NULL);
+		uiItemR(row, &v3dptr, "pivot_point", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
+		uiItemR(row, &v3dptr, "use_pivot_point_align", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
 
 		/* NDOF */
 		/* Not implemented yet
@@ -479,7 +489,7 @@ void uiTemplateHeader3D(uiLayout *layout, struct bContext *C)
 
 		/* Transform widget / manipulators */
 		row= uiLayoutRow(layout, 1);
-		uiItemR(row, &v3dptr, "show_manipulator", UI_ITEM_R_ICON_ONLY, "", ICON_NULL);
+		uiItemR(row, &v3dptr, "show_manipulator", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
 		block= uiLayoutGetBlock(row);
 		
 		if(v3d->twflag & V3D_USE_MANIPULATOR) {
@@ -507,7 +517,7 @@ void uiTemplateHeader3D(uiLayout *layout, struct bContext *C)
 			uiTemplateLayers(layout, &v3dptr, "layers", &v3dptr, "layers_used", ob_lay);
 
 		/* Scene lock */
-		uiItemR(layout, &v3dptr, "lock_camera_and_layers", UI_ITEM_R_ICON_ONLY, "", ICON_NULL);
+		uiItemR(layout, &v3dptr, "lock_camera_and_layers", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
 	}
 	
 	/* selection modus, dont use python for this since it cant do the toggle buttons with shift+click as well as clicking to set one. */

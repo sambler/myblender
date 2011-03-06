@@ -1,4 +1,4 @@
-/**
+/*
  *
  * $Id$
  *
@@ -22,6 +22,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/blenkernel/intern/sketch.c
+ *  \ingroup bke
+ */
+
 
 #include <string.h>
 #include <math.h>

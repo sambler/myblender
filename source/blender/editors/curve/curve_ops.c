@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/curve/curve_ops.c
+ *  \ingroup edcurve
+ */
+
 
 #include <stdlib.h>
 #include <math.h>

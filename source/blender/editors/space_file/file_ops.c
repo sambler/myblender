@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/space_file/file_ops.c
+ *  \ingroup spfile
+ */
+
 
 #include "BKE_context.h"
 #include "BKE_screen.h"

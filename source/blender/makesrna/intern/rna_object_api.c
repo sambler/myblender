@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/makesrna/intern/rna_object_api.c
+ *  \ingroup RNA
+ */
+
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -302,7 +307,7 @@ static void rna_Object_create_duplilist(Object *ob, ReportList *reports, Scene *
 	/* ob->duplilist should now be freed with Object.free_duplilist */
 }
 
-static void rna_Object_free_duplilist(Object *ob, ReportList *reports)
+static void rna_Object_free_duplilist(Object *ob)
 {
 	if (ob->duplilist) {
 		free_object_duplilist(ob->duplilist);
@@ -331,7 +336,7 @@ static PointerRNA rna_Object_shape_key_add(Object *ob, bContext *C, ReportList *
 
 int rna_Object_is_visible(Object *ob, Scene *sce)
 {
-	return !(ob->restrictflag & OB_RESTRICT_VIEW) && ob->lay & sce->lay;
+	return !(ob->restrictflag & OB_RESTRICT_VIEW) && (ob->lay & sce->lay);
 }
 
 /*
@@ -372,7 +377,7 @@ static void rna_Mesh_assign_verts_to_group(Object *ob, bDeformGroup *group, int 
 
 void rna_Object_ray_cast(Object *ob, ReportList *reports, float ray_start[3], float ray_end[3], float r_location[3], float r_normal[3], int *index)
 {
-	BVHTreeFromMesh treeData= {0};
+	BVHTreeFromMesh treeData= {NULL};
 	
 	if(ob->derivedFinal==NULL) {
 		BKE_reportf(reports, RPT_ERROR, "object \"%s\" has no mesh data to be used for ray casting.", ob->id.name+2);
@@ -444,14 +449,13 @@ void RNA_api_object(StructRNA *srna)
 
 	/* duplis */
 	func= RNA_def_function(srna, "create_dupli_list", "rna_Object_create_duplilist");
-	RNA_def_function_ui_description(func, "Create a list of dupli objects for this object, needs to be freed manually with free_dupli_list.");
+	RNA_def_function_ui_description(func, "Create a list of dupli objects for this object, needs to be freed manually with free_dupli_list to restore the objects real matrix and layers.");
 	parm= RNA_def_pointer(func, "scene", "Scene", "", "Scene within which to evaluate duplis.");
 	RNA_def_property_flag(parm, PROP_REQUIRED|PROP_NEVER_NULL);
 	RNA_def_function_flag(func, FUNC_USE_REPORTS);
 
 	func= RNA_def_function(srna, "free_dupli_list", "rna_Object_free_duplilist");
 	RNA_def_function_ui_description(func, "Free the list of dupli objects.");
-	RNA_def_function_flag(func, FUNC_USE_REPORTS);
 
 	/* Armature */
 	func= RNA_def_function(srna, "find_armature", "modifiers_isDeformedByArmature");

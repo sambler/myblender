@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -24,6 +24,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/blenfont/intern/blf_dir.c
+ *  \ingroup blf
+ */
+
 
 #include <stdio.h>
 #include <stdlib.h>

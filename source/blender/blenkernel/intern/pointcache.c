@@ -1,4 +1,5 @@
-/**
+/*
+ * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -19,10 +20,15 @@
  * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
  * All rights reserved.
  *
-* Contributor(s): Campbell Barton <ideasman42@gmail.com>
+ * Contributor(s): Campbell Barton <ideasman42@gmail.com>
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/blenkernel/intern/pointcache.c
+ *  \ingroup bke
+ */
+
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -280,6 +286,8 @@ static void ptcache_particle_read(int index, void *psys_v, void **data, float cf
 	/* set frames cached before birth to birth time */
 	if(cfra < pa->time)
 		pa->state.time = pa->time;
+	else if(cfra > pa->dietime)
+		pa->state.time = pa->dietime;
 
 	if(data[BPHYS_DATA_SIZE])
 		PTCACHE_DATA_TO(data, BPHYS_DATA_SIZE, 0, &pa->size);
@@ -1390,7 +1398,7 @@ static PTCacheMem *ptcache_disk_frame_to_mem(PTCacheID *pid, int cfra)
 	unsigned int i, error = 0;
 
 	if(pf == NULL)
-		return 0;
+		return NULL;
 
 	if(!ptcache_file_header_begin_read(pf))
 		error = 1;

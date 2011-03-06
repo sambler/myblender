@@ -1,4 +1,4 @@
-/**
+/*
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/blenlib/intern/bpath.c
+ *  \ingroup bli
+ */
+
 
 #include <sys/stat.h>
 
@@ -141,9 +146,11 @@ void BLI_bpathIterator_init(struct BPathIterator **bpi_pt, Main *bmain, const ch
 	BLI_bpathIterator_step(bpi);
 }
 
+#if 0
 static void BLI_bpathIterator_alloc(struct BPathIterator **bpi) {
 	*bpi= MEM_mallocN(sizeof(BPathIterator), "BLI_bpathIterator_alloc");
 }
+#endif
 
 void BLI_bpathIterator_free(struct BPathIterator *bpi) {
 	if (bpi->seqdata.seqar)
@@ -192,7 +199,7 @@ const char* BLI_bpathIterator_getName(struct BPathIterator *bpi) {
 int	BLI_bpathIterator_getType(struct BPathIterator *bpi) {
 	return bpi->type;
 }
-int	BLI_bpathIterator_getPathMaxLen(struct BPathIterator *bpi) {
+unsigned int	BLI_bpathIterator_getPathMaxLen(struct BPathIterator *bpi) {
 	return bpi->len;
 }
 const char* BLI_bpathIterator_getBasePath(struct BPathIterator *bpi) {

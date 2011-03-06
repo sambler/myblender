@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/space_view3d/view3d_view.c
+ *  \ingroup spview3d
+ */
+
 
 #include "DNA_camera_types.h"
 #include "DNA_lamp_types.h"

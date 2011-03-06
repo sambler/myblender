@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -24,6 +24,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/interface/view2d_ops.c
+ *  \ingroup edinterface
+ */
+
 
 #include <math.h>
 
@@ -1203,13 +1208,13 @@ struct View2DScrollers {
 };
 
 /* quick enum for vsm->zone (scroller handles) */
-static enum {
+enum {
 	SCROLLHANDLE_MIN= -1,
 	SCROLLHANDLE_BAR,
 	SCROLLHANDLE_MAX,
 	SCROLLHANDLE_MIN_OUTSIDE,
 	SCROLLHANDLE_MAX_OUTSIDE
-} eV2DScrollerHandle_Zone;
+} /*eV2DScrollerHandle_Zone*/;
 
 /* ------------------------ */
 

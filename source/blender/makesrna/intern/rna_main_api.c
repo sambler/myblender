@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/makesrna/intern/rna_main_api.c
+ *  \ingroup RNA
+ */
+
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -205,7 +210,7 @@ struct bNodeTree *rna_Main_nodetree_new(Main *bmain, const char *name, int type)
 {
 	bNodeTree *tree = ntreeAddTree(name, type, TRUE);
 
-	ntreeMakeOwnType(tree);
+//	ntreeMakeGroupSockets(tree);
 
 	id_us_min(&tree->id);
 	return tree;
@@ -394,7 +399,7 @@ Group *rna_Main_groups_new(Main *bmain, const char *name)
 {
 	return add_group(name);
 }
-void rna_Main_groups_remove(Main *bmain, ReportList *reports, Group *group)
+void rna_Main_groups_remove(Main *bmain, Group *group)
 {
 	unlink_group(group);
 	free_libblock(&bmain->group, group);
@@ -405,7 +410,7 @@ Text *rna_Main_texts_new(Main *bmain, const char *name)
 {
 	return add_empty_text(name);
 }
-void rna_Main_texts_remove(Main *bmain, ReportList *reports, Text *text)
+void rna_Main_texts_remove(Main *bmain, Text *text)
 {
 	unlink_text(bmain, text);
 	free_libblock(&bmain->text, text);
@@ -1044,7 +1049,6 @@ void RNA_def_main_groups(BlenderRNA *brna, PropertyRNA *cprop)
 	RNA_def_function_return(func, parm);
 
 	func= RNA_def_function(srna, "remove", "rna_Main_groups_remove");
-	RNA_def_function_flag(func, FUNC_USE_REPORTS);
 	RNA_def_function_ui_description(func, "Remove a group from the current blendfile.");
 	parm= RNA_def_pointer(func, "group", "Group", "", "Group to remove.");
 	RNA_def_property_flag(parm, PROP_REQUIRED|PROP_NEVER_NULL);
@@ -1072,7 +1076,6 @@ void RNA_def_main_texts(BlenderRNA *brna, PropertyRNA *cprop)
 	RNA_def_function_return(func, parm);
 
 	func= RNA_def_function(srna, "remove", "rna_Main_texts_remove");
-	RNA_def_function_flag(func, FUNC_USE_REPORTS);
 	RNA_def_function_ui_description(func, "Remove a text from the current blendfile.");
 	parm= RNA_def_pointer(func, "text", "Text", "", "Text to remove.");
 	RNA_def_property_flag(parm, PROP_REQUIRED|PROP_NEVER_NULL);

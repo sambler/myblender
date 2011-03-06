@@ -317,16 +317,17 @@ class VIEW3D_MT_view_navigation(bpy.types.Menu):
     def draw(self, context):
         layout = self.layout
 
-        layout.operator_enums("view3d.view_orbit", "type")
+        layout.operator_enum("view3d.view_orbit", "type")
 
         layout.separator()
 
-        layout.operator_enums("view3d.view_pan", "type")
+        layout.operator_enum("view3d.view_pan", "type")
 
         layout.separator()
 
         layout.operator("view3d.zoom", text="Zoom In").delta = 1
         layout.operator("view3d.zoom", text="Zoom Out").delta = -1
+        layout.operator("view3d.zoom_camera_1_to_1", text="Zoom Camera 1:1")
 
         layout.separator()
 
@@ -425,6 +426,7 @@ class VIEW3D_MT_select_pose(bpy.types.Menu):
 
         layout.operator("pose.select_all", text="Select/Deselect All")
         layout.operator("pose.select_inverse", text="Inverse")
+        layout.operator("pose.select_flip_active", text="Flip Active")
         layout.operator("pose.select_constraint_target", text="Constraint Target")
         layout.operator("pose.select_linked", text="Linked")
 
@@ -647,10 +649,11 @@ class VIEW3D_MT_select_face(bpy.types.Menu):  # XXX no matching enum
     bl_label = "Select"
 
     def draw(self, context):
-        layout = self.layout
+        # layout = self.layout
 
         # TODO
         # see view3d_select_faceselmenu
+        pass
 
 # ********** Object menu **********
 
@@ -932,7 +935,7 @@ class VIEW3D_MT_make_links(bpy.types.Menu):
             layout.operator_menu_enum("object.make_links_scene", "scene", text="Objects to Scene...")
             layout.operator_menu_enum("marker.make_links_scene", "scene", text="Markers to Scene...")
 
-        layout.operator_enums("object.make_links_data", "type")  # inline
+        layout.operator_enum("object.make_links_data", "type")  # inline
 
 
 class VIEW3D_MT_object_game(bpy.types.Menu):
@@ -1150,8 +1153,6 @@ class VIEW3D_MT_pose(bpy.types.Menu):
 
     def draw(self, context):
         layout = self.layout
-
-        arm = context.active_object.data
 
         layout.operator("ed.undo")
         layout.operator("ed.redo")
@@ -1447,7 +1448,7 @@ class VIEW3D_OT_edit_mesh_extrude_individual_move(bpy.types.Operator):
 
         totface = mesh.total_face_sel
         totedge = mesh.total_edge_sel
-        totvert = mesh.total_vert_sel
+        # totvert = mesh.total_vert_sel
 
         if select_mode[2] and totface == 1:
             bpy.ops.mesh.extrude_region_move('INVOKE_REGION_WIN', TRANSFORM_OT_translate={"constraint_orientation": 'NORMAL', "constraint_axis": (False, False, True)})
@@ -1475,7 +1476,7 @@ class VIEW3D_OT_edit_mesh_extrude_move(bpy.types.Operator):
 
         totface = mesh.total_face_sel
         totedge = mesh.total_edge_sel
-        totvert = mesh.total_vert_sel
+        # totvert = mesh.total_vert_sel
 
         if totface >= 1:
             bpy.ops.mesh.extrude_region_move('INVOKE_REGION_WIN', TRANSFORM_OT_translate={"constraint_orientation": 'NORMAL', "constraint_axis": (False, False, True)})
@@ -1507,6 +1508,8 @@ class VIEW3D_MT_edit_mesh_vertices(bpy.types.Menu):
 
         layout.operator("mesh.vertices_smooth")
         layout.operator("mesh.remove_doubles")
+        layout.operator("mesh.vertices_sort")
+        layout.operator("mesh.vertices_randomize")
 
         layout.operator("mesh.select_vertex_path")
 
@@ -1958,7 +1961,6 @@ class VIEW3D_PT_view3d_properties(bpy.types.Panel):
         layout = self.layout
 
         view = context.space_data
-        scene = context.scene
 
         col = layout.column()
         col.active = view.region_3d.view_perspective != 'CAMERA'

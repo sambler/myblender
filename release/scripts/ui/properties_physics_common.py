@@ -232,8 +232,9 @@ def basic_force_field_settings_ui(self, context, field):
         col.prop(field, "flow")
 
     col = split.column()
-    col.prop(field, "noise")
-    col.prop(field, "seed")
+    sub = col.column(align=True)
+    sub.prop(field, "noise")
+    sub.prop(field, "seed")
     if field.type == 'TURBULENCE':
         col.prop(field, "use_global_coords", text="Global")
     elif field.type == 'HARMONIC':
@@ -254,8 +255,6 @@ def basic_force_field_settings_ui(self, context, field):
 def basic_force_field_falloff_ui(self, context, field):
     layout = self.layout
 
-    # XXX: This doesn't update for some reason.
-    #split = layout.split()
     split = layout.split(percentage=0.35)
 
     if not field or field.type == 'NONE':

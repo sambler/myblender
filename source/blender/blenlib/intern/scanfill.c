@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
  * (uit traces) maart 95
  */
+
+/** \file blender/blenlib/intern/scanfill.c
+ *  \ingroup bli
+ */
+
 
 #include "MEM_guardedalloc.h"
 

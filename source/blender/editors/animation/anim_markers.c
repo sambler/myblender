@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/animation/anim_markers.c
+ *  \ingroup edanimation
+ */
+
 
 #include <math.h>
 
@@ -281,7 +286,7 @@ void debug_markers_print_list(ListBase *markers)
 	printf("List of markers follows: -----\n");
 	
 	for (marker = markers->first; marker; marker = marker->next) {
-		printf("\t'%s' on %d at %p with %d\n", marker->name, marker->frame, marker, marker->flag);
+		printf("\t'%s' on %d at %p with %d\n", marker->name, marker->frame, (void *)marker, marker->flag);
 	}
 	
 	printf("End of list ------------------\n");
@@ -341,7 +346,6 @@ static void draw_marker(View2D *v2d, TimeMarker *marker, int cfra, int flag)
 	
 	UI_icon_draw(xpos*xscale-5.0f, 16.0f, icon_id);
 	
-	glBlendFunc(GL_ONE, GL_ZERO);
 	glDisable(GL_BLEND);
 	
 	/* and the marker name too, shifted slightly to the top-right */
@@ -366,7 +370,7 @@ static void draw_marker(View2D *v2d, TimeMarker *marker, int cfra, int flag)
 		}
 
 #ifdef DURIAN_CAMERA_SWITCH
-		if(marker->camera && marker->camera->restrictflag & OB_RESTRICT_RENDER) {
+		if(marker->camera && (marker->camera->restrictflag & OB_RESTRICT_RENDER)) {
 			float col[4];
 			glGetFloatv(GL_CURRENT_COLOR, col);
 			col[3]= 0.4;
@@ -410,7 +414,7 @@ void draw_markers_time(const bContext *C, int flag)
  */
 
 /* maximum y-axis value (in region screen-space) that marker events should still be accepted for  */
-#define ANIMEDIT_MARKER_YAXIS_MAX 	40
+#define ANIMEDIT_MARKER_YAXIS_MAX 	30
 
 /* ------------------------ */
 

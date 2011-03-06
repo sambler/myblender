@@ -1,4 +1,4 @@
-/**  
+/*  
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/render/intern/source/pipeline.c
+ *  \ingroup render
+ */
+
 
 #include <math.h>
 #include <limits.h>
@@ -167,6 +172,7 @@ static void stats_background(void *UNUSED(arg), RenderStats *rs)
 		else
 			fprintf(stdout, "Sce: %s Ve:%d Fa:%d La:%d", rs->scenename, rs->totvert, rs->totface, rs->totlamp);
 	}
+	fputc('\n', stdout);
 	fflush(stdout);
 }
 

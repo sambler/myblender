@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * Blender.Noise BPython module implementation.
@@ -29,6 +29,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
 */
+
+/** \file blender/python/generic/noise_py_api.c
+ *  \ingroup pygen
+ */
+
 
 /************************/
 /* Blender Noise Module */

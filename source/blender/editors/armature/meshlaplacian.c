@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
  * meshlaplacian.c: Algorithms using the mesh laplacian.
  */
+
+/** \file blender/editors/armature/meshlaplacian.c
+ *  \ingroup edarmature
+ */
+
 
 #include <math.h>
 #include <string.h>

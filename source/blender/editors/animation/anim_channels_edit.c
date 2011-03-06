@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -24,6 +24,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/animation/anim_channels_edit.c
+ *  \ingroup edanimation
+ */
+
 
 #include <stdio.h>
 #include <stdlib.h>

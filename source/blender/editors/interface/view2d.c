@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -24,6 +24,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/interface/view2d.c
+ *  \ingroup edinterface
+ */
+
 
 #include <float.h>
 #include <limits.h>
@@ -1001,7 +1006,7 @@ void UI_view2d_view_ortho(View2D *v2d)
 	
 	/* set matrix on all appropriate axes */
 	wmOrtho2(curmasked.xmin-xofs, curmasked.xmax-xofs, curmasked.ymin-yofs, curmasked.ymax-yofs);
-	
+
 	/* XXX is this necessary? */
 	glLoadIdentity();
 }

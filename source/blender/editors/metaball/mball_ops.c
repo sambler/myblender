@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/metaball/mball_ops.c
+ *  \ingroup edmeta
+ */
+
 
 #include "WM_api.h"
 #include "WM_types.h"

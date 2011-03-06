@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/interface/interface_intern.h
+ *  \ingroup edinterface
+ */
+
 
 #ifndef INTERFACE_H
 #define INTERFACE_H

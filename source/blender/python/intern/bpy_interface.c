@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -22,6 +22,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/python/intern/bpy_interface.c
+ *  \ingroup pythonintern
+ */
+
  
 /* grr, python redefines */
 #ifdef _POSIX_C_SOURCE
@@ -32,9 +37,12 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "RNA_types.h"
+
 #include "bpy.h"
 #include "bpy_rna.h"
 #include "bpy_util.h"
+#include "bpy_traceback.h"
 
 #include "DNA_space_types.h"
 #include "DNA_text_types.h"
@@ -157,6 +165,7 @@ void BPY_modules_update(bContext *C)
 }
 
 /* must be called before Py_Initialize */
+#ifndef WITH_PYTHON_MODULE
 static void bpy_python_start_path(void)
 {
 	char *py_path_bundle= BLI_get_folder(BLENDER_PYTHON, NULL);
@@ -195,8 +204,7 @@ static void bpy_python_start_path(void)
 		// printf("found python (wchar_t) '%ls'\n", py_path_bundle_wchar);
 	}
 }
-
-
+#endif
 
 void BPY_context_set(bContext *C)
 {
@@ -217,10 +225,11 @@ static struct _inittab bpy_internal_modules[]= {
 };
 
 /* call BPY_context_set first */
-void BPY_python_start( int argc, char **argv )
+void BPY_python_start(int argc, const char **argv)
 {
+#ifndef WITH_PYTHON_MODULE
 	PyThreadState *py_tstate = NULL;
-	
+
 	/* not essential but nice to set our name */
 	static wchar_t bprogname_wchar[FILE_MAXDIR+FILE_MAXFILE]; /* python holds a reference */
 	utf8towchar(bprogname_wchar, bprogname);
@@ -252,8 +261,13 @@ void BPY_python_start( int argc, char **argv )
 	
 	/* Initialize thread support (also acquires lock) */
 	PyEval_InitThreads();
+#else
+	(void)argc;
+	(void)argv;
 	
-	
+	PyImport_ExtendInittab(bpy_internal_modules);
+#endif
+
 	/* bpy.* and lets us import it */
 	BPy_init_modules();
 
@@ -281,8 +295,10 @@ void BPY_python_start( int argc, char **argv )
 	
 	pyrna_alloc_types();
 
+#ifndef WITH_PYTHON_MODULE
 	py_tstate = PyGILState_GetThisThreadState();
 	PyEval_ReleaseThread(py_tstate);
+#endif
 }
 
 void BPY_python_end(void)
@@ -319,6 +335,18 @@ void BPY_python_end(void)
 
 }
 
+static void python_script_error_jump_text(struct Text *text)
+{
+	int lineno;
+	int offset;
+	python_script_error_jump(text->id.name+2, &lineno, &offset);
+	if(lineno != -1) {
+		/* select the line with the error */
+		txt_move_to(text, lineno - 1, INT_MAX, FALSE);
+		txt_move_to(text, lineno - 1, offset, TRUE);
+	}
+}
+
 /* super annoying, undo _PyModule_Clear(), bug [#23871] */
 #define PYMODULE_CLEAR_WORKAROUND
 
@@ -332,7 +360,7 @@ typedef struct {
 } PyModuleObject;
 #endif
 
-static int python_script_exec(bContext *C, const char *fn, struct Text *text, struct ReportList *reports)
+static int python_script_exec(bContext *C, const char *fn, struct Text *text, struct ReportList *reports, const short do_jump)
 {
 	PyObject *main_mod= NULL;
 	PyObject *py_dict= NULL, *py_result= NULL;
@@ -361,6 +389,9 @@ static int python_script_exec(bContext *C, const char *fn, struct Text *text, st
 			MEM_freeN( buf );
 
 			if(PyErr_Occurred()) {
+				if(do_jump) {
+					python_script_error_jump_text(text);
+				}
 				BPY_text_free_code(text);
 			}
 		}
@@ -400,12 +431,17 @@ static int python_script_exec(bContext *C, const char *fn, struct Text *text, st
 #endif
 		}
 		else {
-			PyErr_Format(PyExc_SystemError, "Python file \"%s\" could not be opened: %s", fn, strerror(errno));
+			PyErr_Format(PyExc_IOError, "Python file \"%s\" could not be opened: %s", fn, strerror(errno));
 			py_result= NULL;
 		}
 	}
 
 	if (!py_result) {
+		if(text) {
+			if(do_jump) {
+				python_script_error_jump_text(text);
+			}
+		}
 		BPy_errors_to_report(reports);
 	} else {
 		Py_DECREF( py_result );
@@ -434,13 +470,13 @@ static int python_script_exec(bContext *C, const char *fn, struct Text *text, st
 /* Can run a file or text block */
 int BPY_filepath_exec(bContext *C, const char *filepath, struct ReportList *reports)
 {
-	return python_script_exec(C, filepath, NULL, reports);
+	return python_script_exec(C, filepath, NULL, reports, FALSE);
 }
 
 
-int BPY_text_exec(bContext *C, struct Text *text, struct ReportList *reports)
+int BPY_text_exec(bContext *C, struct Text *text, struct ReportList *reports, const short do_jump)
 {
-	return python_script_exec(C, NULL, text, reports);
+	return python_script_exec(C, NULL, text, reports, do_jump);
 }
 
 void BPY_DECREF(void *pyob_ptr)
@@ -659,3 +695,102 @@ int BPY_context_member_get(bContext *C, const char *member, bContextDataResult *
 	return done;
 }
 
+
+#ifdef WITH_PYTHON_MODULE
+#include "BLI_storage.h"
+/* TODO, reloading the module isnt functional at the moment. */
+
+extern int main_python(int argc, const char **argv);
+static struct PyModuleDef bpy_proxy_def = {
+	PyModuleDef_HEAD_INIT,
+	"bpy",  /* m_name */
+	NULL,  /* m_doc */
+	0,  /* m_size */
+	NULL,  /* m_methods */
+	NULL,  /* m_reload */
+	NULL,  /* m_traverse */
+	NULL,  /* m_clear */
+	NULL,  /* m_free */
+};	
+
+typedef struct {
+    PyObject_HEAD
+    /* Type-specific fields go here. */
+	PyObject *mod;
+} dealloc_obj;
+
+/* call once __file__ is set */
+void bpy_module_delay_init(PyObject *bpy_proxy)
+{
+	const int argc= 1;
+	const char *argv[2];
+
+	const char *filename_rel= PyModule_GetFilename(bpy_proxy); /* can be relative */
+	char filename_abs[1024];
+
+	BLI_strncpy(filename_abs, filename_rel, sizeof(filename_abs));
+	BLI_path_cwd(filename_abs);
+	
+	argv[0]= filename_abs;
+	argv[1]= NULL;
+	
+	// printf("module found %s\n", argv[0]);
+
+	main_python(argc, argv);
+
+	/* initialized in BPy_init_modules() */
+	PyDict_Update(PyModule_GetDict(bpy_proxy), PyModule_GetDict(bpy_package_py));
+}
+
+static void dealloc_obj_dealloc(PyObject *self);
+
+static PyTypeObject dealloc_obj_Type = {{{0}}};
+
+/* use our own dealloc so we can free a property if we use one */
+static void dealloc_obj_dealloc(PyObject *self)
+{
+	bpy_module_delay_init(((dealloc_obj *)self)->mod);
+
+	/* Note, for subclassed PyObjects we cant just call PyObject_DEL() directly or it will crash */
+	dealloc_obj_Type.tp_free(self);
+}
+
+PyMODINIT_FUNC
+PyInit_bpy(void)
+{
+	PyObject *bpy_proxy= PyModule_Create(&bpy_proxy_def);
+	
+	/* Problem:
+	 * 1) this init function is expected to have a private member defined - 'md_def'
+	 *    but this is only set for C defined modules (not py packages)
+	 *    so we cant return 'bpy_package_py' as is.
+	 *
+	 * 2) there is a 'bpy' C module for python to load which is basically all of blender,
+	 *    and there is scripts/bpy/__init__.py, 
+	 *    we may end up having to rename this module so there is no naming conflict here eg:
+	 *    'from blender import bpy'
+	 *
+	 * 3) we dont know the filename at this point, workaround by assigning a dummy value
+	 *    which calls back when its freed so the real loading can take place.
+	 */
+
+	/* assign an object which is freed after __file__ is assigned */
+	dealloc_obj *dob;
+	
+	/* assign dummy type */
+	dealloc_obj_Type.tp_name = "dealloc_obj";
+	dealloc_obj_Type.tp_basicsize = sizeof(dealloc_obj);
+	dealloc_obj_Type.tp_dealloc = dealloc_obj_dealloc;
+	dealloc_obj_Type.tp_flags = Py_TPFLAGS_DEFAULT;
+	
+	if(PyType_Ready(&dealloc_obj_Type) < 0)
+		return NULL;
+
+	dob= (dealloc_obj *) dealloc_obj_Type.tp_alloc(&dealloc_obj_Type, 0);
+	dob->mod= bpy_proxy; /* borrow */
+	PyModule_AddObject(bpy_proxy, "__file__", (PyObject *)dob); /* borrow */
+
+	return bpy_proxy;
+}
+
+#endif

@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -24,6 +24,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/render/intern/source/rayshade.c
+ *  \ingroup render
+ */
+
 
 #include <stdio.h>
 #include <math.h>
@@ -1502,7 +1507,7 @@ void ray_trace(ShadeInput *shi, ShadeResult *shr)
 	float diff[3];
 	int do_tra, do_mir;
 	
-	do_tra= ((shi->mat->mode & MA_TRANSP) && (shi->mat->mode & MA_RAYTRANSP) && shr->alpha!=1.0f && (shi->depth <= shi->mat->ray_depth_tra));
+	do_tra= ((shi->mode & MA_TRANSP) && (shi->mode & MA_RAYTRANSP) && shr->alpha!=1.0f && (shi->depth <= shi->mat->ray_depth_tra));
 	do_mir= ((shi->mat->mode & MA_RAYMIRROR) && shi->ray_mirror!=0.0f && (shi->depth <= shi->mat->ray_depth));
 	
 	/* raytrace mirror amd refract like to separate the spec color */
@@ -2342,7 +2347,7 @@ static void ray_shadow_qmc(ShadeInput *shi, LampRen *lar, float *lampco, float *
 		
 		samples++;
 		
-		if ((lar->ray_samp_method == LA_SAMP_HALTON)) {
+		if (lar->ray_samp_method == LA_SAMP_HALTON) {
 		
 			/* adaptive sampling - consider samples below threshold as in shadow (or vice versa) and exit early */
 			if ((max_samples > min_adapt_samples) && (adapt_thresh > 0.0) && (samples > max_samples / 3)) {

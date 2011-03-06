@@ -1,3 +1,6 @@
+/** \file mikktspace/mikktspace.c
+ *  \ingroup mikktspace
+ */
 /**
  *  Copyright (C) 2011 by Morten S. Mikkelsen
  *
@@ -23,12 +26,7 @@
 #include <math.h>
 #include <string.h>
 #include <float.h>
-
-#ifdef __APPLE__
-#include <stdlib.h>  /* OSX gets its malloc stuff through here */
-#else
-#include <malloc.h> 
-#endif
+#include <stdlib.h>
 
 #include "mikktspace.h"
 

@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -29,6 +29,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/gpu/intern/gpu_codegen.c
+ *  \ingroup gpu
+ */
+
 
 #include "GL/glew.h"
 

@@ -1,4 +1,4 @@
-/** mball.c
+/* mball.c
  *  
  * MetaBalls are created from a single Object (with a name without number in it),
  * here the DispList and BoundBox also is located.
@@ -31,6 +31,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/blenkernel/intern/mball.c
+ *  \ingroup bke
+ */
+
 
 #include <stdio.h>
 #include <string.h>

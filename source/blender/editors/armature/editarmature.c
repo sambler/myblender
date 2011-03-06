@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -24,6 +24,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/armature/editarmature.c
+ *  \ingroup edarmature
+ */
+
 
 #include <ctype.h>
 #include <stdlib.h>
@@ -82,6 +87,7 @@
 #include "ED_view3d.h"
 
 #include "UI_interface.h"
+#include "UI_resources.h"
 
 #include "armature_intern.h"
 #include "meshlaplacian.h"
@@ -3316,11 +3322,12 @@ void ARMATURE_OT_merge (wmOperatorType *ot)
 /* ************** END Add/Remove stuff in editmode ************ */
 /* *************** Tools in editmode *********** */
 
-static int armature_hide_exec(bContext *C, wmOperator *UNUSED(op))
+static int armature_hide_exec(bContext *C, wmOperator *op)
 {
 	Object *obedit= CTX_data_edit_object(C);
 	bArmature *arm= obedit->data;
 	EditBone *ebone;
+	const int invert= RNA_boolean_get(op->ptr, "unselected") ? BONE_SELECTED : 0;
 
 	/* cancel if nothing selected */
 	if (CTX_DATA_COUNT(C, selected_bones) == 0)
@@ -3328,7 +3335,7 @@ static int armature_hide_exec(bContext *C, wmOperator *UNUSED(op))
 
 	for (ebone = arm->edbo->first; ebone; ebone=ebone->next) {
 		if (EBONE_VISIBLE(arm, ebone)) {
-			if (ebone->flag & BONE_SELECTED) {
+			if ((ebone->flag & BONE_SELECTED) != invert) {
 				ebone->flag &= ~(BONE_TIPSEL|BONE_SELECTED|BONE_ROOTSEL);
 				ebone->flag |= BONE_HIDDEN_A;
 			}
@@ -3355,6 +3362,9 @@ void ARMATURE_OT_hide(wmOperatorType *ot)
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+
+	/* props */
+	RNA_def_boolean(ot->srna, "unselected", 0, "Unselected", "Hide unselected rather than selected.");
 }
 
 static int armature_reveal_exec(bContext *C, wmOperator *UNUSED(op))
@@ -3392,8 +3402,9 @@ void ARMATURE_OT_reveal(wmOperatorType *ot)
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
-}
 
+}
+#if 0 // remove this?
 static void hide_selected_armature_bones(Scene *scene)
 {
 	Object *obedit= scene->obedit; // XXX get from context
@@ -3412,8 +3423,6 @@ static void hide_selected_armature_bones(Scene *scene)
 	ED_armature_sync_selection(arm->edbo);
 }
 
-
-#if 0 // remove this?
 static void hide_unselected_armature_bones(Scene *scene)
 {
 	Object *obedit= scene->obedit; // XXX get from context
@@ -3433,9 +3442,7 @@ static void hide_unselected_armature_bones(Scene *scene)
 	ED_armature_validate_active(arm);
 	ED_armature_sync_selection(arm->edbo);
 }
-#endif
 
-#if 0 // remove this?
 void show_all_armature_bones(Scene *scene)
 {
 	Object *obedit= scene->obedit; // XXX get from context
@@ -3999,7 +4006,7 @@ static int armature_parent_set_exec(bContext *C, wmOperator *op)
 static int armature_parent_set_invoke(bContext *C, wmOperator *UNUSED(op), wmEvent *UNUSED(event))
 {
 	EditBone *actbone = CTX_data_active_bone(C);
-	uiPopupMenu *pup= uiPupMenuBegin(C, "Make Parent ", ICON_NULL);
+	uiPopupMenu *pup= uiPupMenuBegin(C, "Make Parent ", ICON_NONE);
 	uiLayout *layout= uiPupMenuLayout(pup);
 	int allchildbones = 0;
 	

@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -24,6 +24,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  * */
+
+/** \file blender/blenlib/intern/math_rotation.c
+ *  \ingroup bli
+ */
+
 
 
 #include <assert.h>
@@ -1258,7 +1263,7 @@ void eulO_to_mat4(float M[4][4], const float e[3], const short order)
 
 
 /* Convert 3x3 matrix to Euler angles (in radians). */
-void mat3_to_eulO(float eul[3], short order,float M[3][3])
+void mat3_to_eulO(float eul[3], const short order,float M[3][3])
 {
 	float eul1[3], eul2[3];
 	

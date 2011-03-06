@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -24,6 +24,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/object/object_edit.c
+ *  \ingroup edobj
+ */
+
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
@@ -170,7 +175,7 @@ static int object_hide_view_set_exec(bContext *C, wmOperator *op)
 	Main *bmain= CTX_data_main(C);
 	Scene *scene= CTX_data_scene(C);
 	short changed = 0;
-	int unselected= RNA_boolean_get(op->ptr, "unselected");
+	const int unselected= RNA_boolean_get(op->ptr, "unselected");
 	
 	CTX_DATA_BEGIN(C, Base*, base, visible_bases) {
 		if(!unselected) {
@@ -259,7 +264,7 @@ void OBJECT_OT_hide_render_clear(wmOperatorType *ot)
 
 static int object_hide_render_set_exec(bContext *C, wmOperator *op)
 {
-	int unselected= RNA_boolean_get(op->ptr, "unselected");
+	const int unselected= RNA_boolean_get(op->ptr, "unselected");
 
 	CTX_DATA_BEGIN(C, Base*, base, visible_bases) {
 		if(!unselected) {
@@ -591,15 +596,6 @@ void OBJECT_OT_posemode_toggle(wmOperatorType *ot)
 }
 
 /* *********************** */
-
-static void check_editmode(int type)
-{
-	Object *obedit= NULL; // XXX
-	
-	if (obedit==NULL || obedit->type==type) return;
-
-// XXX	ED_object_exit_editmode(C, EM_FREEDATA|EM_FREEUNDO|EM_WAITCURSOR|EM_DO_UNDO); /* freedata, and undo */
-}
 
 #if 0
 // XXX should be in view3d?
@@ -1801,7 +1797,7 @@ static void auto_timeoffs(Scene *scene, View3D *v3d)
 	int tot=0, a;
 	short offset=25;
 
-	if(BASACT==0 || v3d==NULL) return;
+	if(BASACT==NULL || v3d==NULL) return;
 // XXX	if(button(&offset, 0, 1000,"Total time")==0) return;
 
 	/* make array of all bases, xco yco (screen) */
@@ -1839,7 +1835,7 @@ static void ofs_timeoffs(Scene *scene, View3D *v3d)
 {
 	float offset=0.0f;
 
-	if(BASACT==0 || v3d==NULL) return;
+	if(BASACT==NULL || v3d==NULL) return;
 	
 // XXX	if(fbutton(&offset, -10000.0f, 10000.0f, 10, 10, "Offset")==0) return;
 
@@ -1859,7 +1855,7 @@ static void rand_timeoffs(Scene *scene, View3D *v3d)
 	Base *base;
 	float rand_ofs=0.0f;
 
-	if(BASACT==0 || v3d==NULL) return;
+	if(BASACT==NULL || v3d==NULL) return;
 	
 // XXX	if(fbutton(&rand_ofs, 0.0f, 10000.0f, 10, 10, "Randomize")==0) return;
 	

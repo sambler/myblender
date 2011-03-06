@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/render/intern/source/rendercore.c
+ *  \ingroup render
+ */
+
 
 /* system includes */
 #include <stdio.h>
@@ -2174,14 +2179,20 @@ static void bake_shade(void *handle, Object *ob, ShadeInput *shi, int quad, int 
 				mul_m3_v3(imat, nor);
 			}
 			else if(R.r.bake_normal_space == R_BAKE_SPACE_OBJECT)
-				mul_mat3_m4_v3(ob->imat, nor); /* ob->imat includes viewinv! */
+				mul_mat3_m4_v3(ob->imat_ren, nor); /* ob->imat_ren includes viewinv! */
 			else if(R.r.bake_normal_space == R_BAKE_SPACE_WORLD)
 				mul_mat3_m4_v3(R.viewinv, nor);
 
 			normalize_v3(nor); /* in case object has scaling */
 
-			shr.combined[0]= nor[0]/2.0f + 0.5f;
-			shr.combined[1]= 0.5f - nor[1]/2.0f;
+			// The invert of the red channel is to make
+			// the normal map compliant with the outside world.
+			// It needs to be done because in Blender
+			// the normal used in the renderer points inward. It is generated
+			// this way in calc_vertexnormals(). Should this ever change
+			// this negate must be removed.
+			shr.combined[0]= (-nor[0])/2.0f + 0.5f;
+			shr.combined[1]= nor[1]/2.0f + 0.5f;
 			shr.combined[2]= nor[2]/2.0f + 0.5f;
 		}
 		else if(bs->type==RE_BAKE_TEXTURE) {

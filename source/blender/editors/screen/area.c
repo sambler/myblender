@@ -1418,7 +1418,7 @@ void ED_region_header(const bContext *C, ARegion *ar)
 	uiBlock *block;
 	uiLayout *layout;
 	HeaderType *ht;
-	Header header = {0};
+	Header header = {NULL};
 	int maxco, xco, yco;
 
 	/* clear */	

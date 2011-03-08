@@ -5173,7 +5173,6 @@ static void direct_link_region(FileData *fd, ARegion *ar, int spacetype)
 			rv3d->clipbb= newdataadr(fd, rv3d->clipbb);
 			
 			rv3d->depths= NULL;
-			rv3d->retopo_view_data= NULL;
 			rv3d->ri= NULL;
 			rv3d->sms= NULL;
 			rv3d->smooth_timer= NULL;

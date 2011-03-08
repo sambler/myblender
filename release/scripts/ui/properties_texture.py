@@ -286,13 +286,13 @@ class TEXTURE_PT_wood(TextureTypePanel, bpy.types.Panel):
         layout.prop(tex, "wood_type", expand=True)
 
         col = layout.column()
-        col.active = tex.wood_type in ('RINGNOISE', 'BANDNOISE')
+        col.active = tex.wood_type in {'RINGNOISE', 'BANDNOISE'}
         col.label(text="Noise:")
         col.row().prop(tex, "noise_type", text="Type", expand=True)
         layout.prop(tex, "noise_basis", text="Basis")
 
         split = layout.split()
-        split.active = tex.wood_type in ('RINGNOISE', 'BANDNOISE')
+        split.active = tex.wood_type in {'RINGNOISE', 'BANDNOISE'}
 
         col = split.column()
         col.prop(tex, "noise_scale", text="Size")
@@ -357,7 +357,7 @@ class TEXTURE_PT_blend(TextureTypePanel, bpy.types.Panel):
 
         sub = layout.row()
 
-        sub.active = (tex.progression in ('LINEAR', 'QUADRATIC', 'EASING', 'RADIAL'))
+        sub.active = (tex.progression in {'LINEAR', 'QUADRATIC', 'EASING', 'RADIAL'})
         sub.prop(tex, "use_flip_axis", expand=True)
 
 
@@ -397,7 +397,7 @@ class TEXTURE_PT_image(TextureTypePanel, bpy.types.Panel):
 def texture_filter_common(tex, layout):
     layout.label(text="Filter:")
     layout.prop(tex, "filter_type", text="")
-    if tex.use_mipmap and tex.filter_type in ('AREA', 'EWA', 'FELINE'):
+    if tex.use_mipmap and tex.filter_type in {'AREA', 'EWA', 'FELINE'}:
         if tex.filter_type == 'FELINE':
             layout.prop(tex, "filter_probes", text="Probes")
         else:
@@ -577,11 +577,11 @@ class TEXTURE_PT_musgrave(TextureTypePanel, bpy.types.Panel):
 
         musgrave_type = tex.musgrave_type
         col = split.column()
-        if musgrave_type in ('HETERO_TERRAIN', 'RIDGED_MULTIFRACTAL', 'HYBRID_MULTIFRACTAL'):
+        if musgrave_type in {'HETERO_TERRAIN', 'RIDGED_MULTIFRACTAL', 'HYBRID_MULTIFRACTAL'}:
             col.prop(tex, "offset")
-        if musgrave_type in ('MULTIFRACTAL', 'RIDGED_MULTIFRACTAL', 'HYBRID_MULTIFRACTAL'):
+        if musgrave_type in {'MULTIFRACTAL', 'RIDGED_MULTIFRACTAL', 'HYBRID_MULTIFRACTAL'}:
             col.prop(tex, "noise_intensity", text="Intensity")
-        if musgrave_type in ('RIDGED_MULTIFRACTAL', 'HYBRID_MULTIFRACTAL'):
+        if musgrave_type in {'RIDGED_MULTIFRACTAL', 'HYBRID_MULTIFRACTAL'}:
             col.prop(tex, "gain")
 
         layout.label(text="Noise:")
@@ -668,7 +668,7 @@ class TEXTURE_PT_voxeldata(TextureButtonsPanel, bpy.types.Panel):
         vd = tex.voxel_data
 
         layout.prop(vd, "file_format")
-        if vd.file_format in ('BLENDER_VOXEL', 'RAW_8BIT'):
+        if vd.file_format in {'BLENDER_VOXEL', 'RAW_8BIT'}:
             layout.prop(vd, "filepath")
         if vd.file_format == 'RAW_8BIT':
             layout.prop(vd, "resolution")
@@ -680,7 +680,7 @@ class TEXTURE_PT_voxeldata(TextureButtonsPanel, bpy.types.Panel):
             layout.template_image(tex, "image", tex.image_user, compact=True)
             #layout.prop(vd, "frame_duration")
 
-        if vd.file_format in ('BLENDER_VOXEL', 'RAW_8BIT'):
+        if vd.file_format in {'BLENDER_VOXEL', 'RAW_8BIT'}:
             layout.prop(vd, "use_still_frame")
             row = layout.row()
             row.active = vd.use_still_frame
@@ -733,9 +733,9 @@ class TEXTURE_PT_pointdensity(TextureButtonsPanel, bpy.types.Panel):
 
         col.label(text="Color Source:")
         col.prop(pd, "color_source", text="")
-        if pd.color_source in ('PARTICLE_SPEED', 'PARTICLE_VELOCITY'):
+        if pd.color_source in {'PARTICLE_SPEED', 'PARTICLE_VELOCITY'}:
             col.prop(pd, "speed_scale")
-        if pd.color_source in ('PARTICLE_SPEED', 'PARTICLE_AGE'):
+        if pd.color_source in {'PARTICLE_SPEED', 'PARTICLE_AGE'}:
             layout.template_color_ramp(pd, "color_ramp", expand=True)
 
         col = split.column()
@@ -896,7 +896,7 @@ class TEXTURE_PT_mapping(TextureSlotPanel, bpy.types.Panel):
                 layout.prop(tex, "map_mode", expand=True)
 
                 row = layout.row()
-                row.active = tex.map_mode in ('FIXED', 'TILED')
+                row.active = tex.map_mode in {'FIXED', 'TILED'}
                 row.prop(tex, "angle")
         else:
             if isinstance(idblock, bpy.types.Material):
@@ -907,7 +907,7 @@ class TEXTURE_PT_mapping(TextureSlotPanel, bpy.types.Panel):
                 split = layout.split()
 
                 col = split.column()
-                if tex.texture_coords in ('ORCO', 'UV'):
+                if tex.texture_coords in {'ORCO', 'UV'}:
                     col.prop(tex, "use_from_dupli")
                 elif tex.texture_coords == 'OBJECT':
                     col.prop(tex, "use_from_original")
@@ -959,7 +959,7 @@ class TEXTURE_PT_influence(TextureSlotPanel, bpy.types.Panel):
             return sub  # XXX, temp. use_map_normal needs to override.
 
         if isinstance(idblock, bpy.types.Material):
-            if idblock.type in ('SURFACE', 'WIRE'):
+            if idblock.type in {'SURFACE', 'WIRE'}:
                 split = layout.split()
 
                 col = split.column()
@@ -1097,7 +1097,7 @@ class TEXTURE_PT_influence(TextureSlotPanel, bpy.types.Panel):
             row.prop(tex, "bump_method", text="Method")
 
             sub = row.row()
-            sub.active = tex.bump_method in ('BUMP_DEFAULT', 'BUMP_BEST_QUALITY')
+            sub.active = tex.bump_method in {'BUMP_DEFAULT', 'BUMP_BEST_QUALITY'}
             sub.prop(tex, "bump_objectspace", text="Space")
 
 

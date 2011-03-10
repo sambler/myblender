@@ -2134,6 +2134,10 @@ static int cycle_render_slot_exec(bContext *C, wmOperator *op)
 	
 	WM_event_add_notifier(C, NC_IMAGE|ND_DRAW, NULL);
 
+	/* no undo push for browsing existing */
+	if(ima->renders[ima->render_slot])
+		return OPERATOR_CANCELLED;
+	
 	return OPERATOR_FINISHED;
 }
 
@@ -2147,7 +2151,8 @@ void IMAGE_OT_cycle_render_slot(wmOperatorType *ot)
 	ot->exec= cycle_render_slot_exec;
 	ot->poll= cycle_render_slot_poll;
 
-	/* no registry or undo flags, this is a UI option */
+	/* flags */
+	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 
 	/* properties */
 	RNA_def_int(ot->srna, "slot_cycle", 1, -1, 1,

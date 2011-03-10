@@ -2147,9 +2147,8 @@ void IMAGE_OT_cycle_render_slot(wmOperatorType *ot)
 	ot->exec= cycle_render_slot_exec;
 	ot->poll= cycle_render_slot_poll;
 
-	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
-	
+	/* no registry or undo flags, this is a UI option */
+
 	/* properties */
 	RNA_def_int(ot->srna, "slot_cycle", 1, -1, 1,
                   "Slot Cycle Direction", "Render Slot cycle direction.", -1, 1);

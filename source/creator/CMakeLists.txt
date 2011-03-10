@@ -208,6 +208,12 @@ if(WITH_INSTALL)
 			"file(REMOVE_RECURSE ${TARGETDIR_VER})"
 		)
 
+		# message after building.
+		add_custom_command(
+			TARGET blender POST_BUILD MAIN_DEPENDENCY blender
+			COMMAND ${CMAKE_COMMAND} -E echo 'now run: \"make install\" to copy runtime files & scripts to ${TARGETDIR_VER}'
+		)
+
 		# there are a few differences between portable and system install
 		if(WITH_INSTALL_PORTABLE)
 			install(
@@ -338,7 +344,7 @@ if(WITH_INSTALL)
 
 		install(  # same as linux!, deduplicate
 			DIRECTORY ${CMAKE_SOURCE_DIR}/release/text/
-			DESTINATION ${TARGETDIR_VER}/../
+			DESTINATION ${TARGETDIR}/
 			PATTERN ".svn" EXCLUDE
 		)
 
@@ -358,12 +364,12 @@ if(WITH_INSTALL)
 				PATTERN ".svn" EXCLUDE
 			)
 
-			install(
-				FILES ${LIBDIR}/gettext/lib/gnu_gettext.dll
-				DESTINATION ${TARGETDIR}/
-			)
-
 			if(NOT CMAKE_CL_64)
+				install(
+					FILES ${LIBDIR}/gettext/lib/gnu_gettext.dll
+					DESTINATION ${TARGETDIR}/
+				)
+
 				install(
 					FILES ${LIBDIR}/iconv/lib/iconv.dll
 					DESTINATION ${TARGETDIR}/
@@ -373,13 +379,7 @@ if(WITH_INSTALL)
 
 		install( # same as linux!, deduplicate
 			DIRECTORY ${CMAKE_SOURCE_DIR}/release/bin/.blender/locale/
-			DESTINATION ${CMAKE_INSTALL_PREFIX}/share/blender/${BLENDER_VERSION}/datafiles/locale
-			PATTERN ".svn" EXCLUDE
-		)
-
-		install( # same as linux!, deduplicate
-			DIRECTORY ${CMAKE_SOURCE_DIR}/release/text/
-			DESTINATION ${TARGETDIR_VER}/../
+			DESTINATION ${TARGETDIR_VER}/datafiles/locale
 			PATTERN ".svn" EXCLUDE
 		)
 
@@ -413,27 +413,46 @@ if(WITH_INSTALL)
 
 			if(WITH_PYTHON_INSTALL)
 				#~ # note, as far as python is concerned 'RelWithDebInfo' is not debug since its without debug flags.
-				# install(CODE "message(\"copying a subset of the systems python...\")")
+
+				# create the directory in multiple steps, so it actually gets created when it doesn't exist yet
+				install(CODE "
+				message(\"creating ${TARGETDIR_VER}/python/lib\")
+				file(MAKE_DIRECTORY ${TARGETDIR_VER}/python/)
+				file(MAKE_DIRECTORY ${TARGETDIR_VER}/python/lib/)
+				message(\"done creating dir\")
+				")
 
 				install(
 					CODE
-					"execute_process(COMMAND ${CMAKE_COMMAND}
-					-E make_directory ${TARGETDIR_VER}/python/lib/)"
+					"
+					execute_process(COMMAND \"${CMAKE_COMMAND}\" -E chdir \"${TARGETDIR_VER}/python/lib/\"
+						\"${CMAKE_COMMAND}\" -E tar xzfv \"${LIBDIR}/release/python32.tar.gz\")
+					"
+					CONFIGURATIONS Release
 				)
-
 				install(
 					CODE
 					"
-					if(BUILD_TYPE MATCHES \"Debug\")
-						set(PYBUNDLE \"python32_d.tar.gz\")
-					else()
-						set(PYBUNDLE \"python32.tar.gz\")
-					endif()
-
-					execute_process(COMMAND ${CMAKE_COMMAND}
-						-E chdir ${TARGETDIR_VER}/python/lib/
-						${CMAKE_COMMAND} -E tar xzfv ${LIBDIR}/release/\${PYBUNDLE})
+					execute_process(COMMAND \"${CMAKE_COMMAND}\" -E chdir \"${TARGETDIR_VER}/python/lib/\"
+						\"${CMAKE_COMMAND}\" -E tar xzfv \"${LIBDIR}/release/python32.tar.gz\")
 					"
+					CONFIGURATIONS RelWithDebInfo
+				)
+				install(
+					CODE
+					"
+					execute_process(COMMAND \"${CMAKE_COMMAND}\" -E chdir \"${TARGETDIR_VER}/python/lib/\"
+						\"${CMAKE_COMMAND}\" -E tar xzfv \"${LIBDIR}/release/python32.tar.gz\")
+					"
+					CONFIGURATIONS MinSizeRel
+				)
+				install(
+					CODE
+					"
+					execute_process(COMMAND \"${CMAKE_COMMAND}\" -E chdir \"${TARGETDIR_VER}/python/lib/\"
+						\"${CMAKE_COMMAND}\" -E tar xzfv \"${LIBDIR}/release/python32_d.tar.gz\")
+					"
+					CONFIGURATIONS Debug
 				)
 
 				# doesnt work, todo

@@ -1525,31 +1525,33 @@ static void rna_def_material_physics(BlenderRNA *brna)
 	RNA_def_struct_nested(brna, srna, "Material");
 	RNA_def_struct_ui_text(srna, "Material Physics", "Physics settings for a Material datablock");
 	
-	prop= RNA_def_property(srna, "use_normal_align", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "dynamode", MA_FH_NOR);
-	RNA_def_property_ui_text(prop, "Align to Normal", "Align dynamic game objects along the surface normal, when inside the physics distance area");
-	
 	prop= RNA_def_property(srna, "friction", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "friction");
 	RNA_def_property_range(prop, 0, 100);
 	RNA_def_property_ui_text(prop, "Friction", "Coulomb friction coefficient, when inside the physics distance area");
 
-	prop= RNA_def_property(srna, "force", PROP_FLOAT, PROP_NONE);
-	RNA_def_property_float_sdna(prop, NULL, "fh");
-	RNA_def_property_range(prop, 0, 1);
-	RNA_def_property_ui_text(prop, "Force", "Upward spring force, when inside the physics distance area");
-	
 	prop= RNA_def_property(srna, "elasticity", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "reflect");
 	RNA_def_property_range(prop, 0, 1);
 	RNA_def_property_ui_text(prop, "Elasticity", "Elasticity of collisions");
+
+	/* FH/Force Field Settings */
+	prop= RNA_def_property(srna, "use_fh_normal", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "dynamode", MA_FH_NOR);
+	RNA_def_property_ui_text(prop, "Align to Normal", "Align dynamic game objects along the surface normal, when inside the physics distance area");
+
+	prop= RNA_def_property(srna, "fh_force", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "fh");
+	RNA_def_property_range(prop, 0, 1);
+	RNA_def_property_ui_range(prop, 0.0, 1.0, 10, 2);
+	RNA_def_property_ui_text(prop, "Force", "Upward spring force, when inside the physics distance area");
 	
-	prop= RNA_def_property(srna, "distance", PROP_FLOAT, PROP_NONE);
+	prop= RNA_def_property(srna, "fh_distance", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "fhdist");
 	RNA_def_property_range(prop, 0, 20);
 	RNA_def_property_ui_text(prop, "Distance", "Distance of the physics area");
 	
-	prop= RNA_def_property(srna, "damping", PROP_FLOAT, PROP_NONE);
+	prop= RNA_def_property(srna, "fh_damping", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "xyfrict");
 	RNA_def_property_range(prop, 0, 1);
 	RNA_def_property_ui_text(prop, "Damping", "Damping of the spring force, when inside the physics distance area");
@@ -1579,6 +1581,12 @@ void RNA_def_material(BlenderRNA *brna)
 		{MA_MONKEY, "MONKEY", ICON_MONKEY, "Flat", "Preview type: Monkey"},
 		{MA_HAIR, "HAIR", ICON_HAIR, "Flat", "Preview type: Hair strands"},
 		{MA_SPHERE_A, "SPHERE_A", ICON_MAT_SPHERE_SKY, "Flat", "Preview type: Large sphere with sky"},
+		{0, NULL, 0, NULL, NULL}};
+
+	static EnumPropertyItem prop_shadows_only_items[] = {
+		{MA_SO_OLD, "SHADOW_ONLY_OLD", 0, "Shadow and Distance", ""},
+		{MA_SO_SHADOW, "SHADOW_ONLY", 0, "Shadow Only", ""},
+		{MA_SO_SHADED, "SHADOW_ONLY_SHADED", 0, "Shadow and Shading", ""},
 		{0, NULL, 0, NULL, NULL}};
 
 	srna= RNA_def_struct(brna, "Material", "ID");
@@ -1710,6 +1718,12 @@ void RNA_def_material(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "use_only_shadow", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "mode", MA_ONLYSHADOW);
 	RNA_def_property_ui_text(prop, "Only Shadow", "Renders shadows as the material's alpha value, making materials transparent except for shadowed areas");
+	RNA_def_property_update(prop, 0, "rna_Material_update");
+
+	prop= RNA_def_property(srna, "shadow_only_type", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_bitflag_sdna(prop, NULL, "shadowonly_flag");
+	RNA_def_property_enum_items(prop, prop_shadows_only_items);
+	RNA_def_property_ui_text(prop, "Shadow Type", "How to draw shadows");
 	RNA_def_property_update(prop, 0, "rna_Material_update");
 	
 	prop= RNA_def_property(srna, "use_face_texture", PROP_BOOLEAN, PROP_NONE);

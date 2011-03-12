@@ -38,6 +38,10 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "DNA_sensor_types.h"
+#include "DNA_controller_types.h"
+#include "DNA_actuator_types.h"
+
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 
@@ -68,6 +72,10 @@
 
 #include "WM_api.h"
 #include "WM_types.h"
+
+/* proto */
+static void ui_add_smart_controller(bContext *C, uiBut *from, uiBut *to);
+static void ui_add_link(bContext *C, uiBut *from, uiBut *to);
 
 /***************** structs and defines ****************/
 
@@ -117,7 +125,6 @@ typedef struct uiHandleButtonData {
 	float vec[3], origvec[3];
 	int togdual, togonly;
 	ColorBand *coba;
-	CurveMapping *cumap;
 
 	/* tooltip */
 	ARegion *tooltip;
@@ -137,11 +144,11 @@ typedef struct uiHandleButtonData {
 	float dragf, dragfstart;
 	CBData *dragcbd;
 
-	/* menu open */
+	/* menu open (watch uiFreeActiveButtons) */
 	uiPopupBlockHandle *menu;
 	int menuretval;
 	
-	/* search box */
+	/* search box (watch uiFreeActiveButtons) */
 	ARegion *searchbox;
 
 	/* post activate */
@@ -749,7 +756,72 @@ static uiLinkLine *ui_is_a_link(uiBut *from, uiBut *to)
 	return NULL;
 }
 
-static void ui_add_link(uiBut *from, uiBut *to)
+/* XXX BAD BAD HACK, fixme later **************** */
+/* Try to add an AND Controller between the sensor and the actuator logic bricks and to connect them all */
+static void ui_add_smart_controller(bContext *C, uiBut *from, uiBut *to)
+{
+	Object *ob= NULL;
+	bSensor *sens_iter;
+	bActuator *act_to, *act_iter;
+	bController *cont;
+	bController ***sens_from_links;
+	uiBut *tmp_but;
+
+	uiLink *link= from->link;
+
+	if(link->ppoin)
+		sens_from_links= (bController ***)(link->ppoin);
+	else return;
+
+	act_to = (bActuator *)(to->poin);
+
+	/* (1) get the object */
+	CTX_DATA_BEGIN(C, Object*, ob_iter, selected_editable_objects) {
+		for (sens_iter= ob_iter->sensors.first; sens_iter; sens_iter= sens_iter->next)
+		{
+			if (&(sens_iter->links) == sens_from_links) {
+				ob= ob_iter;
+				break;
+			}
+		}
+		if (ob) break;
+	} CTX_DATA_END;
+
+	if(!ob) return;
+
+	/* (2) check if the sensor and the actuator are from the same object */
+	for (act_iter= ob->actuators.first; act_iter; act_iter= (bActuator *)act_iter->next) {
+		if (act_iter == act_to)
+			break;
+	}
+
+	// only works if the sensor and the actuator are from the same object
+	if(!act_iter) return;
+
+	/* (3) add a new controller */
+	if (WM_operator_name_call(C, "LOGIC_OT_controller_add", WM_OP_EXEC_DEFAULT, NULL) & OPERATOR_FINISHED)
+	{
+		cont = (bController *)ob->controllers.last;
+
+		/* (4) link the sensor->controller->actuator */
+		tmp_but = MEM_callocN(sizeof(uiBut), "uiBut");
+		uiSetButLink(tmp_but, (void **)&cont, (void ***)&(cont->links), &(cont->totlinks), from->link->tocode, (int)to->hardmin);
+		tmp_but->hardmin= from->link->tocode;
+		tmp_but->poin= (char *)cont;
+
+		tmp_but->type= INLINK;
+		ui_add_link(C, from, tmp_but);
+
+		tmp_but->type= LINK;
+		ui_add_link(C, tmp_but, to);
+
+		/* (5) garbage collection */
+		MEM_freeN(tmp_but->link);
+		MEM_freeN(tmp_but);
+	}
+}
+
+static void ui_add_link(bContext *C, uiBut *from, uiBut *to)
 {
 	/* in 'from' we have to add a link to 'to' */
 	uiLink *link;
@@ -768,6 +840,7 @@ static void ui_add_link(uiBut *from, uiBut *to)
 	}
 	else if (from->type==LINK && to->type==INLINK) {
 		if( from->link->tocode != (int)to->hardmin ) {
+			ui_add_smart_controller(C, from, to);
 			return;
 		}
 	}
@@ -813,8 +886,8 @@ static void ui_apply_but_LINK(bContext *C, uiBut *but, uiHandleButtonData *data)
 		if (!ELEM(bt->type, LINK, INLINK) || !ELEM(but->type, LINK, INLINK))
 			return;
 		
-		if(but->type==LINK) ui_add_link(but, bt);
-		else ui_add_link(bt, but);
+		if(but->type==LINK) ui_add_link(C, but, bt);
+		else ui_add_link(C, bt, but);
 
 		ui_apply_but_func(C, but);
 		data->retval= but->retval;
@@ -1181,7 +1254,7 @@ static int ui_textedit_delete_selection(uiBut *but, uiHandleButtonData *data)
 	int len= strlen(str);
 	int change= 0;
 	if(but->selsta != but->selend && len) {
-		memmove( str+but->selsta, str+but->selend, len-but->selsta+1 );
+		memmove( str+but->selsta, str+but->selend, (len - but->selend) + 1 );
 		change= 1;
 	}
 	
@@ -1230,12 +1303,12 @@ static void ui_textedit_set_cursor_pos(uiBut *but, uiHandleButtonData *data, sho
 	}
 	/* mouse inside the widget */
 	else if (x >= startx) {
-		float aspect= sqrt(but->block->aspect);
+		float aspect= (but->block->aspect);
 		
 		but->pos= strlen(origstr)-but->ofs;
 		
 		/* XXX does not take zoom level into account */
-		while (aspect*startx + aspect*BLF_width(fstyle->uifont_id, origstr+but->ofs) > x) {
+		while (startx + aspect*BLF_width(fstyle->uifont_id, origstr+but->ofs) > x) {
 			if (but->pos <= 0) break;
 			but->pos--;
 			origstr[but->pos+but->ofs] = 0;
@@ -1874,8 +1947,7 @@ static void ui_numedit_begin(uiBut *but, uiHandleButtonData *data)
 	float softrange, softmin, softmax;
 
 	if(but->type == BUT_CURVE) {
-		data->cumap= (CurveMapping*)but->poin;
-		but->editcumap= data->cumap;
+		but->editcumap= (CurveMapping*)but->poin;
 	}
 	else if(but->type == BUT_COLORBAND) {
 		data->coba= (ColorBand*)but->poin;
@@ -3375,7 +3447,7 @@ static int ui_do_but_COLORBAND(bContext *C, uiBlock *block, uiBut *but, uiHandle
 
 static int ui_numedit_but_CURVE(uiBut *but, uiHandleButtonData *data, int snap, int mx, int my)
 {
-	CurveMapping *cumap= data->cumap;
+	CurveMapping *cumap= (CurveMapping*)but->poin;
 	CurveMap *cuma= cumap->cm+cumap->cur;
 	CurveMapPoint *cmp= cuma->curve;
 	float fx, fy, zoomx, zoomy, offsx, offsy;
@@ -3565,7 +3637,7 @@ static int ui_do_but_CURVE(bContext *C, uiBlock *block, uiBut *but, uiHandleButt
 		}
 		else if(event->type==LEFTMOUSE && event->val!=KM_PRESS) {
 			if(data->dragsel != -1) {
-				CurveMapping *cumap= data->cumap;
+				CurveMapping *cumap= (CurveMapping*)but->poin;
 				CurveMap *cuma= cumap->cm+cumap->cur;
 				CurveMapPoint *cmp= cuma->curve;
 
@@ -4387,7 +4459,7 @@ static int ui_do_button(bContext *C, uiBlock *block, uiBut *but, wmEvent *event)
 				return WM_UI_HANDLER_BREAK;
 			}
 		} 
-		else if(but->pointype && but->poin==0) {
+		else if(but->pointype && but->poin==NULL) {
 			/* there's a pointer needed */
 			BKE_reportf(NULL, RPT_WARNING, "DoButton pointer error: %s", but->str);
 			button_activate_state(C, but, BUTTON_STATE_EXIT);
@@ -4522,6 +4594,28 @@ int ui_button_is_active(ARegion *ar)
 {
 	return (ui_but_find_activated(ar) != NULL);
 }
+
+/* is called by notifier */
+void uiFreeActiveButtons(const bContext *C, bScreen *screen)
+{
+	ScrArea *sa= screen->areabase.first;
+	
+	for(;sa; sa= sa->next) {
+		ARegion *ar= sa->regionbase.first;
+		for(;ar; ar= ar->next) {
+			uiBut *but= ui_but_find_activated(ar);
+			if(but) {
+				uiHandleButtonData *data= but->active;
+				
+				if(data->menu==NULL && data->searchbox==NULL)
+					if(data->state == BUTTON_STATE_HIGHLIGHT)
+						ui_button_active_free(C, but);
+			}
+		}
+	}
+}
+
+
 
 /* returns TRUE if highlighted button allows drop of names */
 /* called in region context */

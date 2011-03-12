@@ -313,7 +313,7 @@ static void node_update(const bContext *C, bNodeTree *ntree, bNode *node)
 	node->totr.xmin= node->locx;
 	node->totr.xmax= node->locx + node->width;
 	node->totr.ymax= node->locy;
-	node->totr.ymin= dy;
+	node->totr.ymin= MIN2(dy, node->locy-2*NODE_DY);
 }
 
 /* based on settings in node, sets drawing rect info. each redraw! */
@@ -464,7 +464,7 @@ static void node_draw_mute_line(View2D *v2d, SpaceNode *snode, bNode *node)
 {
 	bNodeSocket *valsock= NULL, *colsock= NULL, *vecsock= NULL;
 	bNodeSocket *sock;
-	bNodeLink link= {0};
+	bNodeLink link= {NULL};
 	int a;
 	
 	/* connect the first value buffer in with first value out */

@@ -69,6 +69,7 @@ get_blender_version()
 # Blender internal features
 option(WITH_INTERNATIONAL "Enable I18N   (International fonts and text)" ON)
 option(WITH_PYTHON        "Enable Embedded Python API" ON)
+option(WITH_PYTHON_SAFETY "Enable internal API error checking to track invalid data to prevent crash on access (at the expense of some effeciency)." OFF)
 option(WITH_PYTHON_MODULE "Enable building as a python module (experemental)" OFF)
 option(WITH_BUILDINFO     "Include extra build details" ON)
 option(WITH_IK_ITASC      "Enable ITASC IK solver" ON)
@@ -125,6 +126,9 @@ option(WITH_LZMA          "Enable best LZMA compression, (used for pointcache)" 
 # Misc
 option(WITH_RAYOPTIMIZATION	"Enable use of SIMD (SSE) optimizations for the raytracer" ON) 
 option(WITH_INSTALL       "Install accompanying scripts and language files needed to run blender" ON)
+if(UNIX AND NOT APPLE)
+	option(WITH_INSTALL_PORTABLE "Install redistributeable runtime, otherwise install into CMAKE_INSTALL_PREFIX" ON)
+endif()
 option(WITH_PYTHON_INSTALL       "Copy system python into the blender install folder" ON)
 
 # Debug
@@ -135,6 +139,16 @@ option(WITH_ASSERT_ABORT "Call abort() when raising an assertion through BLI_ass
 mark_as_advanced(WITH_ASSERT_ABORT)
 
 if(APPLE)
+	if(NOT CMAKE_OSX_ARCHITECTURES)
+		set(CMAKE_OSX_ARCHITECTURES x86_64 CACHE STRING
+		"Choose the architecture you want to build Blender for: i386, x86_64 or ppc"
+		FORCE)
+	endif()
+	if(NOT CMAKE_OSX_DEPLOYMENT_TARGET)
+		set(CMAKE_OSX_DEPLOYMENT_TARGET 10.5 CACHE STRING
+		"Choose the minimum OSX version required: 10.4 or 10.5"
+		FORCE)
+	endif()
 	option(WITH_COCOA	  "Use Cocoa framework instead of deprecated Carbon" ON)
 	option(USE_QTKIT	  "Use QtKit instead of Carbon quicktime (needed for having partial quicktime for 64bit)" OFF)
 	option(WITH_LIBS10.5  "Use 10.5 libs (needed for 64bit builds)" OFF)
@@ -186,9 +200,17 @@ set(CXX_WARNINGS "")
 
 # For alternate Python locations the commandline can be used to override detected/default cache settings, e.g:
 # On Unix: 
-#   cmake -D PYTHON_LIBRARY=/usr/local/lib/python3.1/config/libpython3.1.so -D PYTHON_INCLUDE_DIRS=/usr/local/include/python3.1 -G "Unix Makefiles" ../blender
+#   cmake ../blender \
+#         -D PYTHON_VERSION=3.2 \
+#         -D PYTHON_INCLUDE_DIRS=/opt/py32/include/python3.2d \
+#         -D PYTHON_LIBPATH=/opt/py32/lib \
+#         -D PYTHON_LIBRARY=python3.2d
+#
 # On Macs: 
-#   cmake -D PYTHON_INCLUDE_DIRS=/System/Library/Frameworks/Python.framework/Versions/3.1/include/python3.1 -D PYTHON_LIBPATH=/System/Library/Frameworks/Python.framework/Versions/3.1/lib/python3.1/config -G Xcode ../blender
+#   cmake ../blender \
+#         -D PYTHON_INCLUDE_DIRS=/System/Library/Frameworks/Python.framework/Versions/3.2/include/python3.2 \
+#         -D PYTHON_LIBPATH=/System/Library/Frameworks/Python.framework/Versions/3.2/lib/python3.2/config \
+#         -G Xcode
 #
 # When changing any of this remember to update the notes in doc/build_systems/cmake.txt
 
@@ -243,23 +265,19 @@ if(UNIX AND NOT APPLE)
 
 
 	if(WITH_PYTHON)
-		# No way to set py31. remove for now.
+		# No way to set py32. remove for now.
 		# find_package(PythonLibs)
-		set(PYTHON /usr)
-		set(PYTHON_VERSION 3.1 CACHE STRING "")
-		mark_as_advanced(PYTHON_VERSION)
-		set(PYTHON_INCLUDE_DIRS "${PYTHON}/include/python${PYTHON_VERSION}" CACHE STRING "")
-		mark_as_advanced(PYTHON_INCLUDE_DIRS)
-		# set(PYTHON_BINARY python) # not used yet
-		set(PYTHON_LIBRARY python${PYTHON_VERSION} CACHE STRING "")
-		mark_as_advanced(PYTHON_LIBRARY)
-		set(PYTHON_LIBPATH ${PYTHON}/lib CACHE STRING "")
-		mark_as_advanced(PYTHON_LIBPATH)
-		# find_package(PythonInterp) # not used yet
-		# set(PYTHON_BINARY ${PYTHON_EXECUTABLE} CACHE STRING "")
 
-		set(PYTHON_LINKFLAGS "-Xlinker -export-dynamic")
-		mark_as_advanced(PYTHON_LINKFLAGS)
+		# defines...
+		
+		#  PYTHON_VERSION
+		#  PYTHON_INCLUDE_DIRS
+		#  PYTHON_LIBRARY
+		#  PYTHON_LIBPATH
+		#  PYTHON_LINKFLAGS
+
+		include(build_files/cmake/FindPythonLibsUnix.cmake)
+
 	endif()
 
 	if(WITH_SDL)
@@ -609,10 +627,10 @@ elseif(WIN32)
 
 		if(WITH_PYTHON)
 			set(PYTHON ${LIBDIR}/python)
-			set(PYTHON_VERSION 3.1)
+			set(PYTHON_VERSION 3.2)
 			set(PYTHON_INCLUDE_DIRS "${PYTHON}/include/python${PYTHON_VERSION}")
 			# set(PYTHON_BINARY python) # not used yet
-			set(PYTHON_LIBRARY python31)
+			set(PYTHON_LIBRARY python32)
 			set(PYTHON_LIBPATH ${PYTHON}/lib)
 		endif()
 
@@ -716,10 +734,10 @@ elseif(WIN32)
 
 		if(WITH_PYTHON)
 			set(PYTHON ${LIBDIR}/python)
-			set(PYTHON_VERSION 3.1)
+			set(PYTHON_VERSION 3.2)
 			set(PYTHON_INCLUDE_DIRS "${PYTHON}/include/python${PYTHON_VERSION}")
 			# set(PYTHON_BINARY python) # not used yet
-			set(PYTHON_LIBRARY python31mw)
+			set(PYTHON_LIBRARY python32mw)
 			set(PYTHON_LIBPATH ${PYTHON}/lib)
 		endif()
 
@@ -745,6 +763,10 @@ elseif(APPLE)
         #set(CMAKE_XCODE_ATTRIBUTE_
         
     ENDIF(${CMAKE_GENERATOR} MATCHES "Xcode")
+
+	if (${CMAKE_OSX_DEPLOYMENT_TARGET} STREQUAL "10.5")
+		set(WITH_LIBS10.5 ON CACHE BOOL "Use 10.5 libs" FORCE)
+	endif()
 
 	if(WITH_LIBS10.5)
 		set(LIBDIR ${CMAKE_SOURCE_DIR}/../lib/darwin-9.x.universal)
@@ -781,10 +803,10 @@ elseif(APPLE)
 		set(SNDFILE_LIBPATH ${SNDFILE}/lib ${FFMPEG}/lib)
 	endif()
 
-	set(PYTHON_VERSION 3.1)
+	set(PYTHON_VERSION 3.2)
 
-	if(PYTHON_VERSION MATCHES 3.1)
-		# we use precompiled libraries for py 3.1 and up by default
+	if(PYTHON_VERSION MATCHES 3.2)
+		# we use precompiled libraries for py 3.2 and up by default
 
 		set(PYTHON ${LIBDIR}/python)
 		set(PYTHON_INCLUDE_DIRS "${PYTHON}/include/python${PYTHON_VERSION}")
@@ -796,7 +818,7 @@ elseif(APPLE)
 		# otherwise, use custom system framework
 
 		set(PYTHON /System/Library/Frameworks/Python.framework/Versions/)
-		set(PYTHON_VERSION 3.1)
+		set(PYTHON_VERSION 3.2)
 		set(PYTHON_INCLUDE_DIRS "${PYTHON}${PYTHON_VERSION}/include/python${PYTHON_VERSION}")
 		# set(PYTHON_BINARY ${PYTHON}${PYTHON_VERSION}/bin/python${PYTHON_VERSION}) # not used yet
 		set(PYTHON_LIBRARY "")

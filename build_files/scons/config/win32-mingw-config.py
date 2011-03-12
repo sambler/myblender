@@ -2,12 +2,12 @@ LCGDIR = '#../lib/windows'
 LIBDIR = "${LCGDIR}"
 
 BF_PYTHON = LIBDIR + '/python'
-BF_PYTHON_VERSION = '3.1'
+BF_PYTHON_VERSION = '3.2'
 WITH_BF_STATICPYTHON = False
 BF_PYTHON_INC = '${BF_PYTHON}/include/python${BF_PYTHON_VERSION}'
 BF_PYTHON_BINARY = 'python'
 BF_PYTHON_LIB = 'python${BF_PYTHON_VERSION[0]}${BF_PYTHON_VERSION[2]}mw'
-BF_PYTHON_DLL = 'python31'
+BF_PYTHON_DLL = 'python32'
 BF_PYTHON_LIBPATH = '${BF_PYTHON}/lib'
 BF_PYTHON_LIB_STATIC = '${BF_PYTHON}/lib/libpython${BF_PYTHON_VERSION[0]}${BF_PYTHON_VERSION[2]}.a'
 
@@ -50,7 +50,7 @@ BF_PTHREADS_INC = '${BF_PTHREADS}/include'
 BF_PTHREADS_LIB = 'pthreadGC2'
 BF_PTHREADS_LIBPATH = '${BF_PTHREADS}/lib'
 
-WITH_BF_OPENEXR = True
+WITH_BF_OPENEXR = False  # TODO, gives linking problems for the moment.
 WITH_BF_STATICOPENEXR = False
 BF_OPENEXR = LIBDIR + '/gcc/openexr'
 BF_OPENEXR_INC = '${BF_OPENEXR}/include ${BF_OPENEXR}/include/OpenEXR'
@@ -144,7 +144,7 @@ BF_OPENGL_LIB_STATIC = [ '${BF_OPENGL}/lib/libGL.a', '${BF_OPENGL}/lib/libGLU.a'
              '${BF_OPENGL}/lib/libXmu.a', '${BF_OPENGL}/lib/libXext.a',
              '${BF_OPENGL}/lib/libX11.a', '${BF_OPENGL}/lib/libXi.a' ]
 
-WITH_BF_COLLADA = True
+WITH_BF_COLLADA = False  # TODO, gives linking problems at the moment.
 BF_COLLADA = '#source/blender/collada'
 BF_COLLADA_INC = '${BF_COLLADA}'
 BF_COLLADA_LIB = 'bf_collada'

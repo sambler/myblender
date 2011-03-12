@@ -152,7 +152,7 @@ int mathutils_array_parse(float *array, int array_min, int array_max, PyObject *
 		(QuaternionObject_Check(value) && (size= 4)) ||
 		(ColorObject_Check(value) && (size= 3))
 	) {
-		if(!BaseMath_ReadCallback((BaseMathObject *)value)) {
+		if(BaseMath_ReadCallback((BaseMathObject *)value) == -1) {
 			return -1;
 		}
 
@@ -175,7 +175,7 @@ int mathutils_array_parse(float *array, int array_min, int array_max, PyObject *
 int mathutils_any_to_rotmat(float rmat[3][3], PyObject *value, const char *error_prefix)
 {
 	if(EulerObject_Check(value)) {
-		if(!BaseMath_ReadCallback((BaseMathObject *)value)) {
+		if(BaseMath_ReadCallback((BaseMathObject *)value) == -1) {
 			return -1;
 		}
 		else {
@@ -184,7 +184,7 @@ int mathutils_any_to_rotmat(float rmat[3][3], PyObject *value, const char *error
 		}
 	}
 	else if (QuaternionObject_Check(value)) {
-		if(!BaseMath_ReadCallback((BaseMathObject *)value)) {
+		if(BaseMath_ReadCallback((BaseMathObject *)value) == -1) {
 			return -1;
 		}
 		else {
@@ -195,7 +195,7 @@ int mathutils_any_to_rotmat(float rmat[3][3], PyObject *value, const char *error
 		}
 	}
 	else if (MatrixObject_Check(value)) {
-		if(!BaseMath_ReadCallback((BaseMathObject *)value)) {
+		if(BaseMath_ReadCallback((BaseMathObject *)value) == -1) {
 			return -1;
 		}
 		else if(((MatrixObject *)value)->col_size < 3 || ((MatrixObject *)value)->row_size < 3) {
@@ -274,45 +274,45 @@ int Mathutils_RegisterCallback(Mathutils_Callback *cb)
 int _BaseMathObject_ReadCallback(BaseMathObject *self)
 {
 	Mathutils_Callback *cb= mathutils_callbacks[self->cb_type];
-	if(cb->get(self, self->cb_subtype))
-		return 1;
+	if(cb->get(self, self->cb_subtype) != -1)
+		return 0;
 
 	if(!PyErr_Occurred())
-		PyErr_Format(PyExc_RuntimeError, "%s user has become invalid", Py_TYPE(self)->tp_name);
-	return 0;
+		PyErr_Format(PyExc_RuntimeError, "%s read, user has become invalid", Py_TYPE(self)->tp_name);
+	return -1;
 }
 
 int _BaseMathObject_WriteCallback(BaseMathObject *self)
 {
 	Mathutils_Callback *cb= mathutils_callbacks[self->cb_type];
-	if(cb->set(self, self->cb_subtype))
-		return 1;
+	if(cb->set(self, self->cb_subtype) != -1)
+		return 0;
 
 	if(!PyErr_Occurred())
-		PyErr_Format(PyExc_RuntimeError, "%s user has become invalid", Py_TYPE(self)->tp_name);
-	return 0;
+		PyErr_Format(PyExc_RuntimeError, "%s write, user has become invalid", Py_TYPE(self)->tp_name);
+	return -1;
 }
 
 int _BaseMathObject_ReadIndexCallback(BaseMathObject *self, int index)
 {
 	Mathutils_Callback *cb= mathutils_callbacks[self->cb_type];
-	if(cb->get_index(self, self->cb_subtype, index))
-		return 1;
+	if(cb->get_index(self, self->cb_subtype, index) != -1)
+		return 0;
 
 	if(!PyErr_Occurred())
-		PyErr_Format(PyExc_RuntimeError, "%s user has become invalid", Py_TYPE(self)->tp_name);
-	return 0;
+		PyErr_Format(PyExc_RuntimeError, "%s read index, user has become invalid", Py_TYPE(self)->tp_name);
+	return -1;
 }
 
 int _BaseMathObject_WriteIndexCallback(BaseMathObject *self, int index)
 {
 	Mathutils_Callback *cb= mathutils_callbacks[self->cb_type];
-	if(cb->set_index(self, self->cb_subtype, index))
-		return 1;
+	if(cb->set_index(self, self->cb_subtype, index) != -1)
+		return 0;
 
 	if(!PyErr_Occurred())
-		PyErr_Format(PyExc_RuntimeError, "%s user has become invalid", Py_TYPE(self)->tp_name);
-	return 0;
+		PyErr_Format(PyExc_RuntimeError, "%s write index, user has become invalid", Py_TYPE(self)->tp_name);
+	return -1;
 }
 
 /* BaseMathObject generic functions for all mathutils types */
@@ -349,7 +349,10 @@ void BaseMathObject_dealloc(BaseMathObject *self)
 		PyMem_Free(self->data);
 	}
 
-	BaseMathObject_clear(self);
+	if(self->cb_user) {
+		PyObject_GC_UnTrack(self);
+		BaseMathObject_clear(self);
+	}
 
 	Py_TYPE(self)->tp_free(self); // PyObject_DEL(self); // breaks subtypes
 }

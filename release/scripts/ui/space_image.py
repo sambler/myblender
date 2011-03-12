@@ -143,7 +143,7 @@ class IMAGE_MT_image(bpy.types.Menu):
                 # only for dirty && specific image types, perhaps
                 # this could be done in operator poll too
                 if ima.is_dirty:
-                    if ima.source in ('FILE', 'GENERATED') and ima.type != 'MULTILAYER':
+                    if ima.source in {'FILE', 'GENERATED'} and ima.type != 'MULTILAYER':
                         layout.operator("image.pack", text="Pack As PNG").as_png = True
 
             layout.separator()
@@ -404,7 +404,7 @@ class IMAGE_HT_header(bpy.types.Header):
             row = layout.row(align=True)
             if ima.type == 'COMPOSITE':
                 row.operator("image.record_composite", icon='REC')
-            if ima.type == 'COMPOSITE' and ima.source in ('MOVIE', 'SEQUENCE'):
+            if ima.type == 'COMPOSITE' and ima.source in {'MOVIE', 'SEQUENCE'}:
                 row.operator("image.play_composite", icon='PLAY')
 
         if show_uvedit or sima.use_image_paint:
@@ -425,7 +425,6 @@ class IMAGE_PT_image_properties(bpy.types.Panel):
         layout = self.layout
 
         sima = context.space_data
-        # ima = sima.image
         iuser = sima.image_user
 
         layout.template_image(sima, "image", iuser)
@@ -684,11 +683,9 @@ class IMAGE_PT_tools_brush_texture(BrushButtonsPanel, bpy.types.Panel):
         toolsettings = context.tool_settings.image_paint
         brush = toolsettings.brush
 
-#        tex_slot = brush.texture_slot
-
         col = layout.column()
-
         col.template_ID_preview(brush, "texture", new="texture.new", rows=3, cols=8)
+        col.prop(brush, "use_fixed_texture")
 
 
 class IMAGE_PT_tools_brush_tool(BrushButtonsPanel, bpy.types.Panel):

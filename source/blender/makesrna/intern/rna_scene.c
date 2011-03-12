@@ -1206,6 +1206,10 @@ static void rna_def_tool_settings(BlenderRNA  *brna)
 	RNA_def_property_enum_items(prop, edge_tag_items);
 	RNA_def_property_ui_text(prop, "Edge Tag Mode", "The edge flag to tag when selecting the shortest path");
 
+	prop= RNA_def_property(srna, "edge_path_live_unwrap", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "edge_mode_live_unwrap", 1);
+	RNA_def_property_ui_text(prop, "Live Unwrap", "Changing edges seam re-calculates UV unwrap");
+
 	/* etch-a-ton */
 	prop= RNA_def_property(srna, "use_bone_sketching", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "bone_sketching", BONE_SKETCHING);
@@ -1954,7 +1958,7 @@ static void rna_def_scene_render_data(BlenderRNA *brna)
 		{R_OUTPUT_SCREEN, "SCREEN", 0, "Full Screen", "Images are rendered in full Screen"},
 		{R_OUTPUT_AREA, "AREA", 0, "Image Editor", "Images are rendered in Image Editor"},
 		{R_OUTPUT_WINDOW, "WINDOW", 0, "New Window", "Images are rendered in new Window"},
-		{R_OUTPUT_NONE, "NONE", 0, "No Output", "Images are rendered without drawing"},
+		{R_OUTPUT_NONE, "NONE", 0, "Keep UI", "Images are rendered without forcing UI changes, optionally showing result"},
 		{0, NULL, 0, NULL, NULL}};
 	
 	/* Bake */
@@ -2151,7 +2155,7 @@ static void rna_def_scene_render_data(BlenderRNA *brna)
 	
 	prop= RNA_def_property(srna, "resolution_percentage", PROP_INT, PROP_PERCENTAGE);
 	RNA_def_property_int_sdna(prop, NULL, "size");
-	RNA_def_property_range(prop, 1, INT_MAX);
+	RNA_def_property_range(prop, 1, SHRT_MAX);
 	RNA_def_property_ui_range(prop, 1, 100, 10, 1);
 	RNA_def_property_ui_text(prop, "Resolution %", "Percentage scale for render resolution");
 	RNA_def_property_update(prop, NC_SCENE|ND_RENDER_OPTIONS, NULL);

@@ -923,7 +923,7 @@ static void do_material_tex(GPUShadeInput *shi)
 			mtex= ma->mtex[tex_nr];
 			
 			tex= mtex->tex;
-			if(tex==0) continue;
+			if(tex == NULL) continue;
 
 			/* which coords */
 			if(mtex->texco==TEXCO_ORCO)
@@ -1553,13 +1553,13 @@ GPULamp *GPU_lamp_from_blender(Scene *scene, Object *ob, Object *par)
 			return lamp;
 		}
 
-		lamp->tex = GPU_texture_create_depth(lamp->size, lamp->size);
+		lamp->tex = GPU_texture_create_depth(lamp->size, lamp->size, NULL);
 		if(!lamp->tex) {
 			gpu_lamp_shadow_free(lamp);
 			return lamp;
 		}
 
-		if(!GPU_framebuffer_texture_attach(lamp->fb, lamp->tex)) {
+		if(!GPU_framebuffer_texture_attach(lamp->fb, lamp->tex, NULL)) {
 			gpu_lamp_shadow_free(lamp);
 			return lamp;
 		}

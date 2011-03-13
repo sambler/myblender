@@ -590,9 +590,8 @@ static TreeElement *outliner_add_element(SpaceOops *soops, ListBase *lb, void *i
 	check_persistant(soops, te, id, type, index);
 	tselem= TREESTORE(te);	
 	
-    /* if we are searching for something expand to see child elements
-       - user prefs need individual treatment later to not expand rna entries */
-	if(searching && soops->outlinevis!=SO_USERDEF && soops->outlinevis!=SO_DATABLOCKS)
+    /* if we are searching for something expand to see child elements */
+	if(searching)
         tselem->flag |= TSE_CHILDSEARCH;
 
 	te->parent= parent;
@@ -1056,7 +1055,7 @@ static TreeElement *outliner_add_element(SpaceOops *soops, ListBase *lb, void *i
 				te->name= (char*)RNA_struct_ui_name(ptr->type);
 
             /* If searching don't expand RNA entries */
-            if(searching && BLI_strcasecmp("RNA",te->name)!=0) tselem->flag &= ~TSE_CHILDSEARCH;
+            if(searching && BLI_strcasecmp("RNA",te->name)==0) tselem->flag &= ~TSE_CHILDSEARCH;
 
 			iterprop= RNA_struct_iterator_property(ptr->type);
 			tot= RNA_property_collection_length(ptr, iterprop);
@@ -1088,7 +1087,7 @@ static TreeElement *outliner_add_element(SpaceOops *soops, ListBase *lb, void *i
 			te->rnaptr= *ptr;
 
             /* If searching don't expand RNA entries */
-            if(searching && BLI_strcasecmp("RNA",te->name)!=0) tselem->flag &= ~TSE_CHILDSEARCH;
+            if(searching && BLI_strcasecmp("RNA",te->name)==0) tselem->flag &= ~TSE_CHILDSEARCH;
 
 			if(proptype == PROP_POINTER) {
 				pptr= RNA_property_pointer_get(ptr, prop);
@@ -4673,7 +4672,8 @@ static void outliner_draw_tree_element(bContext *C, uiBlock *block, Scene *scene
 		glEnable(GL_BLEND);
 
         /* start by highlighting search matches */
-        if(searching && (tselem->flag & TSE_SEARCHMATCH) ) {
+		/* we don't expand items when searching in the datablocks but we still want to highlight any filter matches. */
+        if( (searching || (soops->outlinevis==SO_DATABLOCKS && soops->search_string[0]!=0)) && (tselem->flag & TSE_SEARCHMATCH) ) {
             glColor4f(0.0f, 0.8f, 0.0f, 0.3f); /* TODO - add search highlight colour to theme? */
             glRecti(startx, *starty, xmax, *starty+OL_H);
         }

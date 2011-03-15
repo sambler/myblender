@@ -74,6 +74,7 @@ typedef enum ModifierType {
 	 * trunk with the correct modifier once its merged */
 	eModifierType_Warp,
 	eModifierType_Ocean,
+	eModifierType_DynamicPaint,
 	NUM_MODIFIER_TYPES
 } ModifierType;
 
@@ -736,7 +737,7 @@ typedef struct ScrewModifierData {
 
 typedef struct OceanModifierData {
 	ModifierData modifier;		
-	
+
 	struct Ocean *ocean;
 	struct OceanCache *oceancache;
 	
@@ -792,5 +793,21 @@ typedef struct OceanModifierData {
 #define MOD_OCEAN_GENERATE_FOAM	1
 #define MOD_OCEAN_GENERATE_NORMALS	2
 
+/* Dynamic paint modifier flags */
+#define MOD_DYNAMICPAINT_TYPE_CANVAS (1 << 0)
+#define MOD_DYNAMICPAINT_TYPE_PAINT (1 << 1)
+
+typedef struct DynamicPaintModifierData {
+	ModifierData modifier;
+
+	struct DynamicPaintCanvasSettings *canvas;
+	struct DynamicPaintPainterSettings *paint;
+	float time;
+	int type;  /* canvas / painter */
+	short baking;	/* Set nonzero if baking,
+					*  -> updates derived mesh on modifier call*/
+	short pad;
+	int pad2;
+} DynamicPaintModifierData;
 
 #endif

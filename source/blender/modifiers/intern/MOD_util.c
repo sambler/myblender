@@ -190,5 +190,6 @@ void modifier_type_init(ModifierTypeInfo *types[])
 	INIT_TYPE(ShapeKey);
 	INIT_TYPE(Solidify);
 	INIT_TYPE(Screw);
+	INIT_TYPE(DynamicPaint);
 #undef INIT_TYPE
 }

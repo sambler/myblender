@@ -2967,7 +2967,7 @@ static PyObject *pyrna_struct_meta_idprop_getattro(PyObject *cls, PyObject *attr
 static int pyrna_struct_meta_idprop_setattro(PyObject *cls, PyObject *attr, PyObject *value)
 {
 	StructRNA *srna= srna_from_self(cls, "StructRNA.__setattr__");
-	const int is_deferred_prop= pyrna_is_deferred_prop(value);
+	const int is_deferred_prop= (value && pyrna_is_deferred_prop(value));
 
 	if(srna && !pyrna_write_check() && (is_deferred_prop || RNA_struct_type_find_property(srna, _PyUnicode_AsString(attr)))) {
 		PyErr_Format(PyExc_AttributeError, "pyrna_struct_meta_idprop_setattro() can't set in readonly state '%.200s.%S'", ((PyTypeObject *)cls)->tp_name, attr);
@@ -3144,7 +3144,7 @@ static PyObject *pyrna_prop_collection_getattro(BPy_PropertyRNA *self, PyObject 
 
 		PyObject *ret= PyObject_GenericGetAttr((PyObject *)self, pyname);
 
-		if(ret == NULL) {
+		if(ret == NULL && name[0] != '_') { /* avoid inheriting __call__ and similar */
 			/* since this is least common case, handle it last */
 			PointerRNA r_ptr;
 			if(RNA_property_collection_type_get(&self->ptr, self->prop, &r_ptr)) {

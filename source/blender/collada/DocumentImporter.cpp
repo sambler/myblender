@@ -49,6 +49,7 @@
 #include "COLLADAFWLight.h"
 
 #include "COLLADASaxFWLLoader.h"
+#include "COLLADASaxFWLIExtraDataCallbackHandler.h"
 
 #include "BLI_listbase.h"
 #include "BLI_math.h"
@@ -74,10 +75,11 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "ExtraHandler.h"
 #include "DocumentImporter.h"
 #include "TransformReader.h"
-#include "collada_internal.h"
 
+#include "collada_internal.h"
 #include "collada_utils.h"
 
 
@@ -143,6 +145,10 @@ private:
 		/** TODO Add error handler (implement COLLADASaxFWL::IErrorHandler */
 		COLLADASaxFWL::Loader loader;
 		COLLADAFW::Root root(&loader, this);
+		ExtraHandler *ehandler = new ExtraHandler();
+		
+		loader.registerExtraDataCallbackHandler(ehandler);
+		
 
 		if (!root.loadDocument(mFilename))
 			return false;
@@ -157,6 +163,8 @@ private:
 		if (!root2.loadDocument(mFilename))
 			return false;
 		
+		
+		delete ehandler;
 
 		return true;
 	}
@@ -596,7 +604,7 @@ private:
 		// default - lambert
 		else {
 			ma->diff_shader = MA_DIFF_LAMBERT;
-			fprintf(stderr, "Current shader type is not supported.\n");
+			fprintf(stderr, "Current shader type is not supported, default to lambert.\n");
 		}
 		// reflectivity
 		ma->ray_mirror = ef->getReflectivity().getFloatValue();
@@ -955,7 +963,10 @@ private:
 			break;
 		case COLLADAFW::Light::DIRECTIONAL_LIGHT:
 			{
+				/* our sun is very strong, so pick a smaller energy level */
 				lamp->type = LA_SUN;
+				lamp->energy = 1.0;
+				lamp->mode |= LA_NO_SPEC;
 			}
 			break;
 		case COLLADAFW::Light::POINT_LIGHT:

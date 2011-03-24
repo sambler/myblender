@@ -87,6 +87,7 @@
 #include "ED_fluidsim.h"
 
 #include "WM_types.h"
+#include "WM_api.h"
 
 #include "physics_intern.h" // own include
 
@@ -1081,9 +1082,11 @@ static int fluidsimBake(bContext *UNUSED(C), ReportList *UNUSED(reports), Object
 
 static int fluid_bake_exec(bContext *C, wmOperator *op)
 {
-	Object *ob= CTX_data_active_object(C);
+	/* only one bake job at a time */
+	if(WM_jobs_test(CTX_wm_manager(C), CTX_data_scene(C)))
+		return 0;
 
-	if(!fluidsimBake(C, op->reports, ob))
+	if(!fluidsimBake(C, op->reports, CTX_data_active_object(C)))
 		return OPERATOR_CANCELLED;
 
 	return OPERATOR_FINISHED;

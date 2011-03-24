@@ -1033,6 +1033,13 @@ if(WITH_OPENMP)
 endif() 
 
 #-----------------------------------------------------------------------------
+# Configure Python.
+
+if(WITH_PYTHON_MODULE)
+	add_definitions(-DPy_ENABLE_SHARED)
+endif() 
+
+#-----------------------------------------------------------------------------
 # Extra compile flags
 
 if((NOT WIN32) AND (NOT MSVC))
@@ -1081,6 +1088,13 @@ elseif(CMAKE_C_COMPILER_ID MATCHES "Intel")
 
 endif()
 
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+	if(WITH_IK_ITASC OR WITH_MOD_FLUID)
+		message(WARNING "Using Clang as CXX compiler: disabling WITH_IK_ITASC and WITH_MOD_FLUID, these features will be missing.")
+		set(WITH_IK_ITASC OFF)
+		set(WITH_MOD_FLUID OFF)
+	endif()
+endif()
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${PLATFORM_CFLAGS} ${C_WARNINGS}")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${PLATFORM_CFLAGS} ${CXX_WARNINGS}")

@@ -202,6 +202,8 @@ void POSE_OT_push(struct wmOperatorType *ot);
 void POSE_OT_relax(struct wmOperatorType *ot);
 void POSE_OT_breakdown(struct wmOperatorType *ot);
 
+void POSE_OT_propagate(struct wmOperatorType *ot);
+
 /* ******************************************************* */
 /* editarmature.c */
 

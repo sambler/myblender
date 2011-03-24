@@ -952,7 +952,7 @@ FileData *blo_openblenderfile(const char *name, ReportList *reports)
 	gzfile= gzopen(name, "rb");
 
 	if (gzfile == (gzFile)Z_NULL) {
-		BKE_reportf(reports, RPT_ERROR, "Unable to open \"%s\": %s.", name, errno ? strerror(errno) : "Unknown erro reading file");
+		BKE_reportf(reports, RPT_ERROR, "Unable to open \"%s\": %s.", name, errno ? strerror(errno) : "Unknown error reading file");
 		return NULL;
 	} else {
 		FileData *fd = filedata_new();
@@ -4515,6 +4515,7 @@ static void direct_link_scene(FileData *fd, Scene *sce)
 	sce->stats= NULL;
 	sce->fps_info= NULL;
 	sce->customdata_mask_modal= 0;
+	sce->lay_updated = 0;
 
 	sound_create_scene(sce);
 
@@ -11618,6 +11619,13 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 			if(part->draw & PART_DRAW_MAT_COL)
 				part->draw_col = PART_DRAW_COL_MAT;
 		}
+	}
+
+	if (main->versionfile < 256 || (main->versionfile == 256 && main->subversionfile <4)){
+		Mesh *me;
+
+		for(me= main->mesh.first; me; me= me->id.next)
+			mesh_calc_normals(me->mvert, me->totvert, me->mface, me->totface, NULL);
 	}
 
 	/* put compatibility code here until next subversion bump */

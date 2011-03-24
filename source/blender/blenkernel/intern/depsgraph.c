@@ -2269,7 +2269,7 @@ void DAG_ids_flush_update(Main *bmain, int time)
 		DAG_scene_flush_update(bmain, sce, lay, time);
 }
 
-void DAG_on_load_update(Main *bmain, const short do_time)
+void DAG_on_visible_update(Main *bmain, const short do_time)
 {
 	Scene *scene;
 	Base *base;
@@ -2294,7 +2294,7 @@ void DAG_on_load_update(Main *bmain, const short do_time)
 			node= (sce_iter->theDag)? dag_get_node(sce_iter->theDag, ob): NULL;
 			oblay= (node)? node->lay: ob->lay;
 
-			if(oblay & lay) {
+			if((oblay & lay) & ~scene->lay_updated) {
 				if(ELEM6(ob->type, OB_MESH, OB_CURVE, OB_SURF, OB_FONT, OB_MBALL, OB_LATTICE))
 					ob->recalc |= OB_RECALC_DATA;
 				if(ob->dup_group) 
@@ -2317,6 +2317,7 @@ void DAG_on_load_update(Main *bmain, const short do_time)
 
 		/* now tag update flags, to ensure deformers get calculated on redraw */
 		DAG_scene_update_flags(bmain, scene, lay, do_time);
+		scene->lay_updated |= lay;
 	}
 }
 

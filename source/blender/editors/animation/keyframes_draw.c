@@ -80,7 +80,7 @@
 /* ActKeyColumns (Keyframe Columns) ------------------------------------------ */
 
 /* Comparator callback used for ActKeyColumns and cframe float-value pointer */
-// NOTE: this is exported to other modules that use the ActKeyColumns for finding keyframes
+/* NOTE: this is exported to other modules that use the ActKeyColumns for finding keyframes */
 short compare_ak_cfraPtr (void *node, void *data)
 {
 	ActKeyColumn *ak= (ActKeyColumn *)node;
@@ -311,6 +311,23 @@ static BezTriple *abk_get_bezt_with_value (ActBeztColumn *abk, float value)
 
 /* ActKeyBlocks (Long Keyframes) ------------------------------------------ */
 
+/* Comparator callback used for ActKeyBlock and cframe float-value pointer */
+/* NOTE: this is exported to other modules that use the ActKeyBlocks for finding long-keyframes */
+short compare_ab_cfraPtr (void *node, void *data)
+{
+	ActKeyBlock *ab= (ActKeyBlock *)node;
+	float *cframe= data;
+	
+	if (*cframe < ab->start)
+		return -1;
+	else if (*cframe > ab->start)
+		return 1;
+	else
+		return 0;
+}
+
+/* --------------- */
+
 /* Create a ActKeyColumn for a pair of BezTriples */
 static ActKeyBlock *bezts_to_new_actkeyblock(BezTriple *prev, BezTriple *beztn)
 {
@@ -440,6 +457,33 @@ static void set_touched_actkeyblock (ActKeyBlock *ab)
 	set_touched_actkeyblock(ab->right);
 }
 
+/* --------- */
+
+/* Checks if ActKeyBlock should exist... */
+short actkeyblock_is_valid (ActKeyBlock *ab, DLRBT_Tree *keys)
+{
+	ActKeyColumn *ak;
+	short startCurves, endCurves, totCurves;
+	
+	/* check that block is valid */
+	if (ab == NULL)
+		return 0;
+	
+	/* find out how many curves occur at each keyframe */
+	ak= (ActKeyColumn *)BLI_dlrbTree_search_exact(keys, compare_ak_cfraPtr, &ab->start);
+	startCurves = (ak)? ak->totcurve: 0;
+	
+	ak= (ActKeyColumn *)BLI_dlrbTree_search_exact(keys, compare_ak_cfraPtr, &ab->end);
+	endCurves = (ak)? ak->totcurve: 0;
+	
+	/* only draw keyblock if it appears in at all of the keyframes at lowest end */
+	if (!startCurves && !endCurves) 
+		return 0;
+	
+	totCurves = (startCurves>endCurves)? endCurves: startCurves;
+	return (ab->totcurve >= totCurves);
+}
+
 /* *************************** Keyframe Drawing *************************** */
 
 /* coordinates for diamond shape */
@@ -559,22 +603,7 @@ static void draw_keylist(View2D *v2d, DLRBT_Tree *keys, DLRBT_Tree *blocks, floa
 	/* draw keyblocks */
 	if (blocks) {
 		for (ab= blocks->first; ab; ab= ab->next) {
-			short startCurves, endCurves, totCurves;
-			
-			/* find out how many curves occur at each keyframe */
-			ak= (ActKeyColumn *)BLI_dlrbTree_search_exact(keys, compare_ak_cfraPtr, &ab->start);
-			startCurves = (ak)? ak->totcurve: 0;
-			
-			ak= (ActKeyColumn *)BLI_dlrbTree_search_exact(keys, compare_ak_cfraPtr, &ab->end);
-			endCurves = (ak)? ak->totcurve: 0;
-			
-			/* only draw keyblock if it appears in at all of the keyframes at lowest end */
-			if (!startCurves && !endCurves) 
-				continue;
-			else
-				totCurves = (startCurves>endCurves)? endCurves: startCurves;
-				
-			if (ab->totcurve >= totCurves) {
+			if (actkeyblock_is_valid(ab, keys)) {
 				/* draw block */
 				if (ab->sel)
 					UI_ThemeColor4(TH_STRIP_SELECT);

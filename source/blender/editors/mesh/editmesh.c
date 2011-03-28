@@ -935,7 +935,7 @@ void load_editMesh(Scene *scene, Object *obedit)
 	EditEdge *eed;
 	EditSelection *ese;
 	float *fp, *newkey, *oldkey;
-	int i, a, ototvert;
+	int i, j, a, ototvert;
 	
 	/* this one also tests of edges are not in faces: */
 	/* eed->f2==0: not in face, f2==1: draw it */

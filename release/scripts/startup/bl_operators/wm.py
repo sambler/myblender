@@ -617,6 +617,15 @@ class WM_OT_doc_view(bpy.types.Operator):
                 url = '%s/bpy.ops.%s.html#bpy.ops.%s.%s' % \
                         (self._prefix, class_name, class_name, class_prop)
             else:
+
+                # detect if this is a inherited member and use that name instead
+                rna_parent = getattr(bpy.types, class_name).bl_rna
+                rna_prop = rna_parent.properties[class_prop]
+                rna_parent = rna_parent.base
+                while rna_parent and rna_prop == rna_parent.properties.get(class_prop):
+                    class_name = rna_parent.identifier
+                    rna_parent = rna_parent.base
+
                 # It so happens that epydoc nests these, not sphinx
                 # class_name_full = self._nested_class_string(class_name)
                 url = '%s/bpy.types.%s.html#bpy.types.%s.%s' % \
@@ -772,7 +781,10 @@ class WM_OT_properties_edit(bpy.types.Operator):
 
         # otherwise existing buttons which reference freed
         # memory may crash blender [#26510]
-        context.area.tag_redraw()
+        # context.area.tag_redraw()
+        for win in context.window_manager.windows:
+            for area in win.screen.areas:
+                area.tag_redraw()
 
         return {'FINISHED'}
 
@@ -847,6 +859,38 @@ class WM_OT_keyconfig_activate(bpy.types.Operator):
         bpy.utils.keyconfig_set(self.filepath)
         return {'FINISHED'}
 
+class WM_OT_appconfig_default(bpy.types.Operator):
+    bl_idname = "wm.appconfig_default"
+    bl_label = "Default Application Configuration"
+
+    def execute(self, context):
+        import os
+
+        context.window_manager.keyconfigs.active = context.window_manager.keyconfigs.default
+
+        filepath = os.path.join(bpy.utils.preset_paths("interaction")[0], "blender.py")        
+        
+        if os.path.exists(filepath):
+            bpy.ops.script.execute_preset(filepath = filepath, menu_idname = "USERPREF_MT_interaction_presets")
+        
+        return {'FINISHED'}
+
+class WM_OT_appconfig_activate(bpy.types.Operator):
+    bl_idname = "wm.appconfig_activate"
+    bl_label = "Activate Application Configuration"
+
+    filepath = StringProperty(name="File Path", maxlen=1024)
+
+    def execute(self, context):
+        import os
+        bpy.utils.keyconfig_set(self.filepath)
+        
+        filepath = self.filepath.replace("keyconfig", "interaction")
+        
+        if os.path.exists(filepath):
+            bpy.ops.script.execute_preset(filepath = filepath, menu_idname = "USERPREF_MT_interaction_presets")
+        
+        return {'FINISHED'}
 
 class WM_OT_sysinfo(bpy.types.Operator):
     '''Generate System Info'''

@@ -119,6 +119,16 @@ class USERPREF_MT_interaction_presets(bpy.types.Menu):
     preset_operator = "script.execute_preset"
     draw = bpy.types.Menu.draw_preset
 
+class USERPREF_MT_appconfigs(bpy.types.Menu):
+    bl_label = "AppPresets"
+    preset_subdir = "keyconfig"
+    preset_operator = "wm.appconfig_activate"
+
+    def draw(self, context):
+        props = self.layout.operator("wm.appconfig_default", text="Blender (default)")
+
+        # now draw the presets
+        bpy.types.Menu.draw_preset(self, context)
 
 class USERPREF_MT_splash(bpy.types.Menu):
     bl_label = "Splash"
@@ -134,7 +144,7 @@ class USERPREF_MT_splash(bpy.types.Menu):
         # text = bpy.path.display_name(context.window_manager.keyconfigs.active.name)
         # if not text:
         #     text = "Blender (default)"
-        row.menu("USERPREF_MT_keyconfigs", text="Preset")
+        row.menu("USERPREF_MT_appconfigs", text="Preset")
 
 
 class USERPREF_PT_interface(bpy.types.Panel):
@@ -1100,6 +1110,12 @@ class WM_OT_addon_install(bpy.types.Operator):
 
             try:  # extract the file to "addons"
                 file_to_extract.extractall(path_addons)
+
+                # zip files can create this dir with metadata, don't need it
+                macosx_dir = os.path.join(path_addons, '__MACOSX')
+                if os.path.isdir(macosx_dir):
+                    shutil.rmtree(macosx_dir)
+
             except:
                 traceback.print_exc()
                 return {'CANCELLED'}

@@ -84,6 +84,10 @@ else()
 	option(WITH_OPENMP        "Enable OpenMP (has to be supported by the compiler)" OFF)
 endif()
 
+if(UNIX AND NOT APPLE)
+	option(WITH_X11_XINPUT "Enable X11 Xinput (tablet support)"	ON)
+endif()
+
 # Modifiers
 option(WITH_MOD_FLUID        	"Enable Elbeem Modifier (Fluid Simulation)" ON)
 option(WITH_MOD_DECIMATE       	"Enable Decimate Modifier" ON)
@@ -107,11 +111,7 @@ endif()
 
 # 3D format support
 # disable opencollada on non-apple unix because opencollada has no package for debian
-if(UNIX AND NOT APPLE)
-	option(WITH_OPENCOLLADA		"Enable OpenCollada Support (http://www.opencollada.org)"	OFF)
-else()
-	option(WITH_OPENCOLLADA		"Enable OpenCollada Support (http://www.opencollada.org)"	OFF)
-endif()
+option(WITH_OPENCOLLADA		"Enable OpenCollada Support (http://www.opencollada.org)"	OFF)
 
 # Sound output
 option(WITH_SDL           "Enable SDL for sound and joystick support" ON)
@@ -384,7 +384,11 @@ if(UNIX AND NOT APPLE)
 	mark_as_advanced(X11_XF86keysym_INCLUDE_PATH)
 
 	# OpenSuse needs lutil, ArchLinux not, for now keep, can avoid by using --as-needed
-	set(LLIBS "-lutil -lc -lm -lpthread -lstdc++ ${X11_X11_LIB} ${X11_Xinput_LIB}")
+	set(LLIBS "-lutil -lc -lm -lpthread -lstdc++ ${X11_X11_LIB}")
+
+	if(WITH_X11_XINPUT)
+		list(APPEND LLIBS ${X11_Xinput_LIB})
+	endif()
 
 	if(CMAKE_SYSTEM_NAME MATCHES "Linux")
 		if(NOT WITH_PYTHON_MODULE)
@@ -1065,12 +1069,14 @@ if(CMAKE_COMPILER_IS_GNUCC)
 	ADD_CHECK_C_COMPILER_FLAG(C_WARNINGS C_WARN_ERROR_IMPLICIT_FUNCTION_DECLARATION -Werror=implicit-function-declaration)
 	ADD_CHECK_C_COMPILER_FLAG(C_WARNINGS C_WARN_ERROR_RETURN_TYPE -Werror=return-type)
 	# system headers sometimes do this, disable for now, was: -Werror=strict-prototypes
-	ADD_CHECK_C_COMPILER_FLAG(C_WARNINGS C_WARN_ERROR_STRICT_PROTOTYPES -Wstrict-prototypes)
+	ADD_CHECK_C_COMPILER_FLAG(C_WARNINGS C_WARN_STRICT_PROTOTYPES -Wstrict-prototypes)
 	ADD_CHECK_C_COMPILER_FLAG(C_WARNINGS C_WARN_NO_CHAR_SUBSCRIPTS -Wno-char-subscripts)
 	ADD_CHECK_C_COMPILER_FLAG(C_WARNINGS C_WARN_NO_UNKNOWN_PRAGMAS -Wno-unknown-pragmas)
 	ADD_CHECK_C_COMPILER_FLAG(C_WARNINGS C_WARN_POINTER_ARITH -Wpointer-arith)
 	ADD_CHECK_C_COMPILER_FLAG(C_WARNINGS C_WARN_UNUSED_PARAMETER -Wunused-parameter)
 	ADD_CHECK_C_COMPILER_FLAG(C_WARNINGS C_WARN_WRITE_STRINGS -Wwrite-strings)
+	ADD_CHECK_C_COMPILER_FLAG(C_WARNINGS C_WARN_DOUBLE_PROMOTION -Wdouble-promotion -Wno-error=double-promotion)
+	ADD_CHECK_C_COMPILER_FLAG(C_WARNINGS C_WARN_NO_ERROR_UNUSED_BUT_SET_VARIABLE -Wno-error=unused-but-set-variable)
 
 	ADD_CHECK_CXX_COMPILER_FLAG(CXX_WARNINGS CXX_WARN_ALL -Wall)
 	ADD_CHECK_CXX_COMPILER_FLAG(CXX_WARNINGS CXX_WARN_NO_INVALID_OFFSETOF -Wno-invalid-offsetof)

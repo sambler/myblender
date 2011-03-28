@@ -2166,8 +2166,8 @@ static int smooth_exec(bContext *C, wmOperator *UNUSED(op))
 				if(bezt->f2 & SELECT) {
 					for(i=0; i<3; i++) {
 						val = bezt->vec[1][i];
-						newval = ((beztOrig+(a-1))->vec[1][i] * 0.5) + ((beztOrig+(a+1))->vec[1][i] * 0.5);
-						offset = (val*((1.0/6.0)*5)) + (newval*(1.0/6.0)) - val;
+						newval = ((beztOrig+(a-1))->vec[1][i] * 0.5f) + ((beztOrig+(a+1))->vec[1][i] * 0.5f);
+						offset = (val*((1.0f/6.0f)*5.0f)) + (newval*(1.0f/6.0f)) - val;
 						/* offset handles */
 						bezt->vec[1][i] += offset;
 						bezt->vec[0][i] += offset;
@@ -2186,8 +2186,8 @@ static int smooth_exec(bContext *C, wmOperator *UNUSED(op))
 				if(bp->f1 & SELECT) {
 					for(i=0; i<3; i++) {
 						val = bp->vec[i];
-						newval = ((bpOrig+(a-1))->vec[i] * 0.5) + ((bpOrig+(a+1))->vec[i] * 0.5);
-						offset = (val*((1.0/6.0)*5)) + (newval*(1.0/6.0)) - val;
+						newval = ((bpOrig+(a-1))->vec[i] * 0.5f) + ((bpOrig+(a+1))->vec[i] * 0.5f);
+						offset = (val*((1.0f/6.0f)*5.0f)) + (newval*(1.0f/6.0f)) - val;
 					
 						bp->vec[i] += offset;
 					}
@@ -2271,9 +2271,9 @@ static int smooth_radius_exec(bContext *C, wmOperator *UNUSED(op))
 						if (start_sel>0)						start_rad = (nu->bezt+start_sel-1)->radius;
 						if (end_sel!=-1 && end_sel < nu->pntsu)	end_rad = (nu->bezt+start_sel+1)->radius;
 						
-						if (start_rad >= 0.0 && end_rad >= 0.0)	(nu->bezt+start_sel)->radius = (start_rad + end_rad)/2;
-						else if (start_rad >= 0.0)				(nu->bezt+start_sel)->radius = start_rad;
-						else if (end_rad >= 0.0)				(nu->bezt+start_sel)->radius = end_rad;
+						if (start_rad >= 0.0f && end_rad >= 0.0f)	(nu->bezt+start_sel)->radius = (start_rad + end_rad)/2;
+						else if (start_rad >= 0.0f)				(nu->bezt+start_sel)->radius = start_rad;
+						else if (end_rad >= 0.0f)				(nu->bezt+start_sel)->radius = end_rad;
 					} else {
 						/* if endpoints selected, then use them */
 						if (start_sel==0) {
@@ -2293,7 +2293,7 @@ static int smooth_radius_exec(bContext *C, wmOperator *UNUSED(op))
 						range = (float)(end_sel - start_sel) + 2.0f;
 						for(bezt=nu->bezt+start_sel, a=start_sel; a<=end_sel; a++, bezt++) {
 							fac = (float)(1+a-start_sel) / range;
-							bezt->radius = start_rad*(1.0-fac) + end_rad*fac;
+							bezt->radius = start_rad*(1.0f-fac) + end_rad*fac;
 						}
 					}
 				}
@@ -2333,9 +2333,9 @@ static int smooth_radius_exec(bContext *C, wmOperator *UNUSED(op))
 						if (start_sel>0)						start_rad = (nu->bp+start_sel-1)->radius;
 						if (end_sel!=-1 && end_sel < nu->pntsu)	end_rad = (nu->bp+start_sel+1)->radius;
 						
-						if (start_rad >= 0.0 && end_rad >= 0.0)	(nu->bp+start_sel)->radius = (start_rad + end_rad)/2;
-						else if (start_rad >= 0.0)				(nu->bp+start_sel)->radius = start_rad;
-						else if (end_rad >= 0.0)				(nu->bp+start_sel)->radius = end_rad;
+						if (start_rad >= 0.0f && end_rad >= 0.0f)	(nu->bp+start_sel)->radius = (start_rad + end_rad)/2;
+						else if (start_rad >= 0.0f)					(nu->bp+start_sel)->radius = start_rad;
+						else if (end_rad >= 0.0f)					(nu->bp+start_sel)->radius = end_rad;
 					} else {
 						/* if endpoints selected, then use them */
 						if (start_sel==0) {
@@ -2355,7 +2355,7 @@ static int smooth_radius_exec(bContext *C, wmOperator *UNUSED(op))
 						range = (float)(end_sel - start_sel) + 2.0f;
 						for(bp=nu->bp+start_sel, a=start_sel; a<=end_sel; a++, bp++) {
 							fac = (float)(1+a-start_sel) / range;
-							bp->radius = start_rad*(1.0-fac) + end_rad*fac;
+							bp->radius = start_rad*(1.0f-fac) + end_rad*fac;
 						}
 					}
 				}
@@ -3750,7 +3750,7 @@ static void make_selection_list_nurb(ListBase *editnurb)
 				add_v3_v3(nus->vec, bp->vec);
 				bp++;
 			}
-			mul_v3_fl(nus->vec, 1.0/(float)nu->pntsu);
+			mul_v3_fl(nus->vec, 1.0f/(float)nu->pntsu);
 			
 			
 		}
@@ -4106,7 +4106,7 @@ static int make_segment_exec(bContext *C, wmOperator *op)
 						nu1->knotsu= fp;
 						
 						
-						offset= nu1->knotsu[a-1] +1.0;
+						offset= nu1->knotsu[a-1] + 1.0f;
 						fp= nu1->knotsu+a;
 						for(a=0; a<nu2->pntsu; a++, fp++) {
 							if(nu2->knotsu) 
@@ -4291,8 +4291,8 @@ static int spin_nurb(float viewmat[][4], Object *obedit, float *axis, float *cen
 	mul_m3_m3m3(scalemat1,imat,tmat);
 
 	unit_m3(scalemat2);
-	scalemat2[0][0]/= M_SQRT2;
-	scalemat2[1][1]/= M_SQRT2;
+	scalemat2[0][0]/= (float)M_SQRT2;
+	scalemat2[1][1]/= (float)M_SQRT2;
 
 	mul_m3_m3m3(tmat,persmat,bmat);
 	mul_m3_m3m3(cmat,scalemat2,tmat);
@@ -6217,10 +6217,10 @@ Nurb *add_nurbs_primitive(bContext *C, float mat[4][4], int type, int newob)
 			bezt->radius = 1.0;
 
 			bezt->vec[1][0]+= -grid;
-			bezt->vec[0][0]+= -1.5*grid;
-			bezt->vec[0][1]+= -0.5*grid;
-			bezt->vec[2][0]+= -0.5*grid;
-			bezt->vec[2][1]+=  0.5*grid;
+			bezt->vec[0][0]+= -1.5f*grid;
+			bezt->vec[0][1]+= -0.5f*grid;
+			bezt->vec[2][0]+= -0.5f*grid;
+			bezt->vec[2][1]+=  0.5f*grid;
 			for(a=0;a<3;a++) mul_m4_v3(mat, bezt->vec[a]);
 
 			bezt++;
@@ -6253,7 +6253,7 @@ Nurb *add_nurbs_primitive(bContext *C, float mat[4][4], int type, int newob)
 			}
 
 			bp= nu->bp;
-			bp->vec[0]+= -1.5*grid; 
+			bp->vec[0]+= -1.5f*grid;
 			bp++;
 			bp->vec[0]+= -grid;
 			bp->vec[1]+=  grid; 
@@ -6261,7 +6261,7 @@ Nurb *add_nurbs_primitive(bContext *C, float mat[4][4], int type, int newob)
 			bp->vec[0]+= grid;
 			bp->vec[1]+= grid; 
 			bp++;
-			bp->vec[0]+= 1.5*grid;
+			bp->vec[0]+= 1.5f*grid;
 
 			bp= nu->bp;
 			for(a=0;a<4;a++, bp++) mul_m4_v3(mat,bp->vec);
@@ -6289,13 +6289,13 @@ Nurb *add_nurbs_primitive(bContext *C, float mat[4][4], int type, int newob)
 		}
 
 		bp= nu->bp;
-		bp->vec[0]+= -2.0*grid; 
+		bp->vec[0]+= -2.0f*grid;
 		bp++;
 		bp->vec[0]+= -grid;
 		bp++; bp++;
 		bp->vec[0]+= grid;
 		bp++;
-		bp->vec[0]+= 2.0*grid;
+		bp->vec[0]+= 2.0f*grid;
 
 		bp= nu->bp;
 		for(a=0;a<5;a++, bp++) mul_m4_v3(mat,bp->vec);
@@ -6360,8 +6360,8 @@ Nurb *add_nurbs_primitive(bContext *C, float mat[4][4], int type, int newob)
 					bp->vec[1]+= nurbcircle[a][1]*grid;
 				}
 				else {
-					bp->vec[0]+= 0.25*nurbcircle[a][0]*grid-.75*grid;
-					bp->vec[2]+= 0.25*nurbcircle[a][1]*grid;
+					bp->vec[0]+= 0.25f*nurbcircle[a][0]*grid-0.75f*grid;
+					bp->vec[2]+= 0.25f*nurbcircle[a][1]*grid;
 				}
 				if(a & 1) bp->vec[3]= 0.25*M_SQRT2;
 				else bp->vec[3]= 1.0;
@@ -6390,9 +6390,9 @@ Nurb *add_nurbs_primitive(bContext *C, float mat[4][4], int type, int newob)
 			for(a=0; a<4; a++) {
 				for(b=0; b<4; b++) {
 					bp->f1= SELECT;
-					fac= (float)a -1.5;
+					fac= (float)a -1.5f;
 					bp->vec[0]+= fac*grid;
-					fac= (float)b -1.5;
+					fac= (float)b -1.5f;
 					bp->vec[1]+= fac*grid;
 					if(a==1 || a==2) if(b==1 || b==2) {
 						bp->vec[2]+= grid;

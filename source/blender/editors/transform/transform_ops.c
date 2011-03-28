@@ -303,7 +303,7 @@ static int transformops_data(bContext *C, wmOperator *op, wmEvent *event)
 
 		if (mode == -1)
 		{
-			mode = RNA_int_get(op->ptr, "mode");
+			mode = RNA_enum_get(op->ptr, "mode");
 		}
 
 		retval = initTransform(C, t, op, event, mode);
@@ -755,6 +755,8 @@ void TRANSFORM_OT_seq_slide(struct wmOperatorType *ot)
 
 void TRANSFORM_OT_transform(struct wmOperatorType *ot)
 {
+	PropertyRNA *prop;
+
 	static EnumPropertyItem transform_mode_types[] = {
 			{TFM_INIT, "INIT", 0, "Init", ""},
 			{TFM_DUMMY, "DUMMY", 0, "Dummy", ""},
@@ -800,7 +802,8 @@ void TRANSFORM_OT_transform(struct wmOperatorType *ot)
 	ot->cancel  = transform_cancel;
 	ot->poll   = ED_operator_areaactive;
 
-	RNA_def_enum(ot->srna, "mode", transform_mode_types, 0, "Mode", "");
+	prop= RNA_def_enum(ot->srna, "mode", transform_mode_types, TFM_TRANSLATION, "Mode", "");
+	RNA_def_property_flag(prop, PROP_HIDDEN);
 
 	RNA_def_float_vector(ot->srna, "value", 4, NULL, -FLT_MAX, FLT_MAX, "Values", "", -FLT_MAX, FLT_MAX);
 

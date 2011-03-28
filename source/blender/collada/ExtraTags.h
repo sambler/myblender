@@ -17,34 +17,38 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor(s): Chingiz Dyussenov, Arystanbek Dyussenov, Jan Diederich, Tod Liverseed,
- *                 Nathan Letwory
+ * Contributor(s): Nathan Letwory.
  *
  * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file LightExporter.h
+/** \file blender/collada/ExtraTags.h
  *  \ingroup collada
  */
 
-#ifndef __LIGHTEXPORTER_H__
-#define __LIGHTEXPORTER_H__
+#include <string>
+#include <map>
+#include <vector>
 
-#include "COLLADASWStreamWriter.h"
-#include "COLLADASWLibraryLights.h"
-
-#include "DNA_lamp_types.h"
-#include "DNA_object_types.h"
-#include "DNA_scene_types.h"
-
-class LightsExporter: COLLADASW::LibraryLights
+/** \brief Class for saving <extra> tags for a specific UniqueId.
+ */
+class ExtraTags
 {
 public:
-	LightsExporter(COLLADASW::StreamWriter *sw);
-	void exportLights(Scene *sce);
-	void operator()(Object *ob);
-private:
-	bool exportBlenderProfile(COLLADASW::Light &cla, Lamp *la);
-};
+	/** Constructor. */
+	ExtraTags(const std::string profile);
 
-#endif
+	/** Destructor. */
+	virtual ~ExtraTags();
+
+	/** Handle the beginning of an element. */
+	bool addTag( const std::string tag, const std::string data);
+	
+private:
+	/** Disable default copy constructor. */
+	ExtraTags( const ExtraTags& pre );
+	/** Disable default assignment operator. */
+	const ExtraTags& operator= ( const ExtraTags& pre );
+	
+	std::string profile;
+};

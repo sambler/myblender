@@ -574,6 +574,28 @@ PropertyRNA *RNA_struct_find_nested(PointerRNA *ptr, StructRNA *srna)
 	return prop;
 }
 
+int RNA_struct_contains_property(PointerRNA *ptr, PropertyRNA *prop_test)
+{
+	/* note, prop_test could be freed memory, only use for comparison */
+
+	/* validate the RNA is ok */
+	PropertyRNA *iterprop;
+	int found= FALSE;
+
+	iterprop= RNA_struct_iterator_property(ptr->type);
+
+	RNA_PROP_BEGIN(ptr, itemptr, iterprop) {
+		/* PropertyRNA *prop= itemptr.data; */
+		if(prop_test == (PropertyRNA *)itemptr.data) {
+			found= TRUE;
+			break;
+		}
+	}
+	RNA_PROP_END;
+
+	return found;
+}
+
 /* low level direct access to type->properties, note this ignores parent classes so should be used with care */
 const struct ListBase *RNA_struct_type_properties(StructRNA *srna)
 {
@@ -881,10 +903,10 @@ void RNA_property_float_range(PointerRNA *ptr, PropertyRNA *prop, float *hardmin
 			IDProperty *item;
 
 			item= IDP_GetPropertyTypeFromGroup(idp_ui, "min", IDP_DOUBLE);
-			*hardmin= item ? IDP_Double(item) : FLT_MIN; 
+			*hardmin= item ? (float)IDP_Double(item) : FLT_MIN;
 
 			item= IDP_GetPropertyTypeFromGroup(idp_ui, "max", IDP_DOUBLE);
-			*hardmax= item ? IDP_Double(item) : FLT_MAX;
+			*hardmax= item ? (float)IDP_Double(item) : FLT_MAX;
 
 			return;
 		}
@@ -912,16 +934,16 @@ void RNA_property_float_ui_range(PointerRNA *ptr, PropertyRNA *prop, float *soft
 			IDProperty *item;
 
 			item= IDP_GetPropertyTypeFromGroup(idp_ui, "soft_min", IDP_DOUBLE);
-			*softmin= item ? IDP_Double(item) : FLT_MIN;
+			*softmin= item ? (float)IDP_Double(item) : FLT_MIN;
 
 			item= IDP_GetPropertyTypeFromGroup(idp_ui, "soft_max", IDP_DOUBLE);
-			*softmax= item ? IDP_Double(item) : FLT_MAX;
+			*softmax= item ? (float)IDP_Double(item) : FLT_MAX;
 
 			item= IDP_GetPropertyTypeFromGroup(idp_ui, "step", IDP_DOUBLE);
-			*step= item ? IDP_Double(item) : 1.0f;
+			*step= item ? (float)IDP_Double(item) : 1.0f;
 
 			item= IDP_GetPropertyTypeFromGroup(idp_ui, "precision", IDP_DOUBLE);
-			*precision= item ? IDP_Double(item) : 3.0f;
+			*precision= item ? (float)IDP_Double(item) : 3.0f;
 
 			return;
 		}
@@ -5054,4 +5076,20 @@ int RNA_property_copy(PointerRNA *ptr, PointerRNA *fromptr, PropertyRNA *prop, i
 	}
 
 	return 0;
+}
+
+void RNA_warning(const char *format, ...)
+{
+	va_list args;
+
+	va_start(args, format);
+	vprintf(format, args);
+	va_end(args);
+
+#ifdef WITH_PYTHON
+	{
+		extern void PyC_LineSpit(void);
+		PyC_LineSpit();
+	}
+#endif
 }

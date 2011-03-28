@@ -17,34 +17,34 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor(s): Chingiz Dyussenov, Arystanbek Dyussenov, Jan Diederich, Tod Liverseed,
- *                 Nathan Letwory
+ * Contributor(s): Nathan Letwory.
  *
  * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file LightExporter.h
+/** \file blender/collada/ExtraTags.cpp
  *  \ingroup collada
  */
 
-#ifndef __LIGHTEXPORTER_H__
-#define __LIGHTEXPORTER_H__
+#include <stddef.h>
+#include "BLI_string.h"
 
-#include "COLLADASWStreamWriter.h"
-#include "COLLADASWLibraryLights.h"
+#include <iostream>
 
-#include "DNA_lamp_types.h"
-#include "DNA_object_types.h"
-#include "DNA_scene_types.h"
+#include "ExtraTags.h"
 
-class LightsExporter: COLLADASW::LibraryLights
+ExtraTags::ExtraTags(const std::string profile)
 {
-public:
-	LightsExporter(COLLADASW::StreamWriter *sw);
-	void exportLights(Scene *sce);
-	void operator()(Object *ob);
-private:
-	bool exportBlenderProfile(COLLADASW::Light &cla, Lamp *la);
-};
+	this->profile = profile;
+}
 
-#endif
+ExtraTags::~ExtraTags()
+{
+}
+
+bool ExtraTags::addTag(const std::string tag, const std::string data)
+{
+	std::cout << "ready to add " << tag << ": " << data << "." << std::endl;
+	
+	return true;
+}

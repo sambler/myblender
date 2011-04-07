@@ -27,7 +27,7 @@ For HTML generation
 -------------------
 - Run this script from blenders root path once you have compiled blender
 
-    ./blender.bin -b -P doc/python_api/sphinx_doc_gen.py
+    ./blender.bin --background --python doc/python_api/sphinx_doc_gen.py
 
   This will generate python files in doc/python_api/sphinx-in/,
   assuming that ./blender.bin is or links to the blender executable
@@ -74,7 +74,7 @@ else:
         "mathutils.geometry",
     )
 
-    FILTER_BPY_TYPES = ("PropertyGroup", "Panel", "Menu", "Operator", "RenderEngine")  # allow
+    FILTER_BPY_TYPES = ("bpy_struct", "Panel", "Menu", "Operator", "RenderEngine")  # allow
     FILTER_BPY_OPS = ("import.scene", )  # allow
 
     # for quick rebuilds
@@ -272,7 +272,7 @@ def py_descr2sphinx(ident, fw, descr, module_name, type_name, identifier):
     else:
         raise TypeError("type was not GetSetDescriptorType, MethodDescriptorType or ClassMethodDescriptorType")
 
-    write_example_ref(ident, fw, module_name + "." + type_name + "." + identifier)
+    write_example_ref(ident + "   ", fw, module_name + "." + type_name + "." + identifier)
     fw("\n")
 
 
@@ -461,6 +461,7 @@ def pycontext2sphinx(BASEPATH):
         "edit_text": ("Text", False),
         "editable_bones": ("EditBone", True),
         "fluid": ("FluidSimulationModifier", False),
+        "image_paint_object": ("Object", False),
         "lamp": ("Lamp", False),
         "lattice": ("Lattice", False),
         "material": ("Material", False),
@@ -490,7 +491,6 @@ def pycontext2sphinx(BASEPATH):
         "smoke": ("SmokeModifier", False),
         "soft_body": ("SoftBodyModifier", False),
         "texture": ("Texture", False),
-        "texture_paint_object": ("Object", False),
         "texture_slot": ("MaterialTextureSlot", False),
         "vertex_paint_object": ("Object", False),
         "visible_bases": ("ObjectBase", True),
@@ -984,6 +984,15 @@ def rna2sphinx(BASEPATH):
         fw("   bge.render.rst\n\n")
         fw("   bge.events.rst\n\n")
 
+    # rna generated change log
+    fw("========\n")
+    fw("API Info\n")
+    fw("========\n")
+    fw("\n")
+    fw(".. toctree::\n")
+    fw("   :maxdepth: 1\n\n")
+    fw("   change_log.rst\n\n")
+
     file.close()
 
     # internal modules
@@ -1087,6 +1096,8 @@ def rna2sphinx(BASEPATH):
         shutil.copy2(os.path.join(BASEPATH, "..", "rst", "bge.logic.rst"), BASEPATH)
         shutil.copy2(os.path.join(BASEPATH, "..", "rst", "bge.render.rst"), BASEPATH)
         shutil.copy2(os.path.join(BASEPATH, "..", "rst", "bge.events.rst"), BASEPATH)
+
+    shutil.copy2(os.path.join(BASEPATH, "..", "rst", "change_log.rst"), BASEPATH)
 
     if 0:
         filepath = os.path.join(BASEPATH, "bpy.rst")

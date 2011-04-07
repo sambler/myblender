@@ -363,7 +363,7 @@ class PARTICLE_PT_velocity(ParticleButtonsPanel, bpy.types.Panel):
         sub.prop(part, "tangent_phase", slider=True)
 
         col = split.column()
-        col.label(text="Emitter Object")
+        col.label(text="Emitter Object:")
         col.prop(part, "object_align_factor", text="")
 
         layout.label(text="Other:")
@@ -889,7 +889,7 @@ class PARTICLE_PT_render(ParticleButtonsPanel, bpy.types.Panel):
             split = layout.split(percentage=0.33)
             split.label(text="Split uv's:")
             split.prop(part, "billboard_uv_split", text="Number of splits")
-            
+
             if psys:
                 col = layout.column()
                 col.active = part.billboard_uv_split > 1
@@ -1212,3 +1212,6 @@ class PARTICLE_PT_custom_props(ParticleButtonsPanel, PropertyPanel, bpy.types.Pa
     COMPAT_ENGINES = {'BLENDER_RENDER'}
     _context_path = "particle_system.settings"
     _property_type = bpy.types.ParticleSettings
+
+if __name__ == "__main__":  # only for live edit.
+    bpy.utils.register_module(__name__)

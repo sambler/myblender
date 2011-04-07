@@ -667,7 +667,7 @@ class IMAGE_PT_paint(bpy.types.Panel):
 
             col.prop(brush, "blend", text="Blend")
 
-            if brush.imagepaint_tool == 'CLONE':
+            if brush.image_tool == 'CLONE':
                 col.separator()
                 col.prop(brush, "clone_image", text="Image")
                 col.prop(brush, "clone_alpha", text="Alpha")
@@ -699,13 +699,13 @@ class IMAGE_PT_tools_brush_tool(BrushButtonsPanel, bpy.types.Panel):
 
         col = layout.column(align=True)
 
-        col.prop(brush, "imagepaint_tool", expand=False, text="")
+        col.prop(brush, "image_tool", expand=False, text="")
 
         row = layout.row(align=True)
         row.prop(brush, "use_paint_sculpt", text="", icon='SCULPTMODE_HLT')
         row.prop(brush, "use_paint_vertex", text="", icon='VPAINT_HLT')
         row.prop(brush, "use_paint_weight", text="", icon='WPAINT_HLT')
-        row.prop(brush, "use_paint_texture", text="", icon='TPAINT_HLT')
+        row.prop(brush, "use_paint_image", text="", icon='TPAINT_HLT')
 
 
 class IMAGE_PT_paint_stroke(BrushButtonsPanel, bpy.types.Panel):
@@ -751,3 +751,6 @@ class IMAGE_PT_paint_curve(BrushButtonsPanel, bpy.types.Panel):
         row.operator("brush.curve_preset", icon="SHARPCURVE", text="").shape = 'SHARP'
         row.operator("brush.curve_preset", icon="LINCURVE", text="").shape = 'LINE'
         row.operator("brush.curve_preset", icon="NOCURVE", text="").shape = 'MAX'
+
+if __name__ == "__main__":  # only for live edit.
+    bpy.utils.register_module(__name__)

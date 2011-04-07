@@ -282,7 +282,7 @@ class TEXTURE_PT_wood(TextureTypePanel, bpy.types.Panel):
 
         tex = context.texture
 
-        layout.prop(tex, "noisebasis_2", expand=True)
+        layout.prop(tex, "noise_basis_2", expand=True)
         layout.prop(tex, "wood_type", expand=True)
 
         col = layout.column()
@@ -312,7 +312,7 @@ class TEXTURE_PT_marble(TextureTypePanel, bpy.types.Panel):
         tex = context.texture
 
         layout.prop(tex, "marble_type", expand=True)
-        layout.prop(tex, "noisebasis_2", expand=True)
+        layout.prop(tex, "noise_basis_2", expand=True)
         layout.label(text="Noise:")
         layout.prop(tex, "noise_type", text="Type", expand=True)
         layout.prop(tex, "noise_basis", text="Basis")
@@ -1106,3 +1106,6 @@ class TEXTURE_PT_custom_props(TextureButtonsPanel, PropertyPanel, bpy.types.Pane
     COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
     _context_path = "texture"
     _property_type = bpy.types.Texture
+
+if __name__ == "__main__":  # only for live edit.
+    bpy.utils.register_module(__name__)

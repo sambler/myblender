@@ -3156,9 +3156,9 @@ static int drawDispList(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *bas
 	ListBase *lb=NULL;
 	DispList *dl;
 	Curve *cu;
-	int solid, retval= 0;
-	
-	solid= (dt > OB_WIRE);
+	const short render_only= (v3d->flag2 & V3D_RENDER_OVERRIDE);
+	const short solid= (dt > OB_WIRE);
+	int retval= 0;
 
 	if (drawCurveDerivedMesh(scene, v3d, rv3d, base, dt) == 0) {
 		return 0;
@@ -3179,9 +3179,11 @@ static int drawDispList(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *bas
 			index3_nors_incr= 0;
 			
 			if( displist_has_faces(lb)==0) {
-				draw_index_wire= 0;
-				drawDispListwire(lb);
-				draw_index_wire= 1;
+				if(!render_only) {
+					draw_index_wire= 0;
+					drawDispListwire(lb);
+					draw_index_wire= 1;
+				}
 			}
 			else {
 				if(draw_glsl_material(scene, ob, v3d, dt)) {
@@ -3209,9 +3211,11 @@ static int drawDispList(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *bas
 			index3_nors_incr= 1;
 		}
 		else {
-			draw_index_wire= 0;
-			retval= drawDispListwire(lb);
-			draw_index_wire= 1;
+			if(!render_only || (render_only && displist_has_faces(lb))) {
+				draw_index_wire= 0;
+				retval= drawDispListwire(lb);
+				draw_index_wire= 1;
+			}
 		}
 		break;
 	case OB_SURF:

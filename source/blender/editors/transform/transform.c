@@ -3178,15 +3178,9 @@ int Rotation(TransInfo *t, short UNUSED(mval[2]))
 		outputNumInput(&(t->num), c);
 		
 		sprintf(str, "Rot: %s %s %s", &c[0], t->con.text, t->proptext);
-		
-		/* Clamp between -180 and 180 */
-		while (final >= 180.0f)
-			final -= 360.0f;
-		
-		while (final <= -180.0f)
-			final += 360.0f;
 
-		final = DEG2RADF(final);
+		/* Clamp between -180 and 180 */
+		final= angle_wrap_rad(DEG2RADF(final));
 	}
 	else {
 		sprintf(str, "Rot: %.2f%s %s", RAD2DEGF(final), t->con.text, t->proptext);
@@ -5799,8 +5793,10 @@ void initTimeScale(TransInfo *t)
 {
 	int center[2];
 
-	/* this tool is only really available in the Action Editor... */
-	if (t->spacetype != SPACE_ACTION) {
+	/* this tool is only really available in the Action Editor
+	 * AND NLA Editor (for strip scaling)
+	 */
+	if (ELEM(t->spacetype, SPACE_ACTION, SPACE_NLA) == 0) {
 		t->state = TRANS_CANCEL;
 	}
 

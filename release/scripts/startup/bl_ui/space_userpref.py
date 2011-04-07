@@ -119,6 +119,7 @@ class USERPREF_MT_interaction_presets(bpy.types.Menu):
     preset_operator = "script.execute_preset"
     draw = bpy.types.Menu.draw_preset
 
+
 class USERPREF_MT_appconfigs(bpy.types.Menu):
     bl_label = "AppPresets"
     preset_subdir = "keyconfig"
@@ -129,6 +130,7 @@ class USERPREF_MT_appconfigs(bpy.types.Menu):
 
         # now draw the presets
         bpy.types.Menu.draw_preset(self, context)
+
 
 class USERPREF_MT_splash(bpy.types.Menu):
     bl_label = "Splash"
@@ -1042,6 +1044,10 @@ class WM_OT_addon_install(bpy.types.Operator):
     bl_label = "Install Add-On..."
 
     overwrite = BoolProperty(name="Overwrite", description="Remove existing addons with the same ID", default=True)
+    target = EnumProperty(
+            name="Target Path",
+            items=(('DEFAULT', "Default", ""),
+                   ('PREFS', "User Prefs", "")))
 
     filepath = StringProperty(name="File Path", description="File path to write file to")
     filter_folder = BoolProperty(name="Filter folders", description="", default=True, options={'HIDDEN'})
@@ -1068,12 +1074,21 @@ class WM_OT_addon_install(bpy.types.Operator):
 
         pyfile = self.filepath
 
-        # dont use bpy.utils.script_paths("addons") because we may not be able to write to it.
-        path_addons = bpy.utils.user_resource('SCRIPTS', "addons", create=True)
+        if self.target == 'DEFAULT':
+            # dont use bpy.utils.script_paths("addons") because we may not be able to write to it.
+            path_addons = bpy.utils.user_resource('SCRIPTS', "addons", create=True)
+        else:
+            path_addons = bpy.context.user_preferences.filepaths.script_directory
+            if path_addons:
+                path_addons = os.path.join(path_addons, "addons")
 
         if not path_addons:
             self.report({'ERROR'}, "Failed to get addons path")
             return {'CANCELLED'}
+
+        # create dir is if missing.
+        if not os.path.exists(path_addons):
+            os.makedirs(path_addons)
 
         # Check if we are installing from a target path,
         # doing so causes 2+ addons of same name or when the same from/to
@@ -1186,3 +1201,6 @@ class WM_OT_addon_expand(bpy.types.Operator):
         info = addon_utils.module_bl_info(mod)
         info["show_expanded"] = not info["show_expanded"]
         return {'FINISHED'}
+
+if __name__ == "__main__":  # only for live edit.
+    bpy.utils.register_module(__name__)

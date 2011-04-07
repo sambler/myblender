@@ -906,7 +906,7 @@ static uiBlock *wm_block_create_redo(bContext *C, ARegion *ar, void *arg_op)
 
 	uiLayoutOperatorButs(C, layout, op, NULL, 'H', UI_LAYOUT_OP_SHOW_TITLE);
 
-	uiPopupBoundsBlock(block, 4.0f, 0, 0);
+	uiPopupBoundsBlock(block, 4, 0, 0);
 	uiEndBlock(C, block);
 
 	return block;
@@ -969,7 +969,7 @@ static uiBlock *wm_block_create_dialog(bContext *C, ARegion *ar, void *userData)
 	}
 
 	/* center around the mouse */
-	uiPopupBoundsBlock(block, 4.0f, data->width/-2, data->height/2);
+	uiPopupBoundsBlock(block, 4, data->width/-2, data->height/2);
 	uiEndBlock(C, block);
 
 	return block;
@@ -992,7 +992,7 @@ static uiBlock *wm_operator_create_ui(bContext *C, ARegion *ar, void *userData)
 	/* since ui is defined the auto-layout args are not used */
 	uiLayoutOperatorButs(C, layout, op, NULL, 'V', 0);
 
-	uiPopupBoundsBlock(block, 4.0f, 0, 0);
+	uiPopupBoundsBlock(block, 4, 0, 0);
 	uiEndBlock(C, block);
 
 	return block;
@@ -1041,8 +1041,13 @@ int WM_operator_ui_popup(bContext *C, wmOperator *op, int width, int height)
 
 int WM_operator_redo_popup(bContext *C, wmOperator *op)
 {
+	/* CTX_wm_reports(C) because operator is on stack, not active in event system */
 	if((op->type->flag & OPTYPE_REGISTER)==0) {
-		BKE_reportf(op->reports, RPT_ERROR, "Operator '%s' does not have register enabled, incorrect invoke function.", op->type->idname);
+		BKE_reportf(CTX_wm_reports(C), RPT_ERROR, "Operator redo '%s' does not have register enabled, incorrect invoke function.", op->type->idname);
+		return OPERATOR_CANCELLED;
+	}
+	if(op->type->poll && op->type->poll(C)==0) {
+		BKE_reportf(CTX_wm_reports(C), RPT_ERROR, "Operator redo '%s': wrong context.", op->type->idname);
 		return OPERATOR_CANCELLED;
 	}
 	
@@ -1128,8 +1133,8 @@ static uiBlock *wm_block_create_splash(bContext *C, ARegion *ar, void *UNUSED(ar
 	sprintf(revision_str, "r%s", build_rev);
 	
 	BLF_size(style->widgetlabel.uifont_id, style->widgetlabel.points, U.dpi);
-	ver_width = BLF_width(style->widgetlabel.uifont_id, version_str)+5;
-	rev_width = BLF_width(style->widgetlabel.uifont_id, revision_str)+5;
+	ver_width = (int)BLF_width(style->widgetlabel.uifont_id, version_str) + 5;
+	rev_width = (int)BLF_width(style->widgetlabel.uifont_id, revision_str) + 5;
 #endif //NAN_BUILDINFO
 
 	block= uiBeginBlock(C, ar, "_popup", UI_EMBOSS);
@@ -1259,7 +1264,7 @@ static uiBlock *wm_block_search_menu(bContext *C, ARegion *ar, void *UNUSED(arg_
 	/* fake button, it holds space for search items */
 	uiDefBut(block, LABEL, 0, "", 10, 10 - uiSearchBoxhHeight(), 180, uiSearchBoxhHeight(), NULL, 0, 0, 0, 0, NULL);
 	
-	uiPopupBoundsBlock(block, 6.0f, 0, -20); /* move it downwards, mouse over button */
+	uiPopupBoundsBlock(block, 6, 0, -20); /* move it downwards, mouse over button */
 	uiEndBlock(C, block);
 	
 	event= *(win->eventstate);	/* XXX huh huh? make api call */
@@ -1517,7 +1522,7 @@ static int wm_link_append_exec(bContext *C, wmOperator *op)
 		BKE_report(op->reports, RPT_ERROR, "Nothing indicated");
 		return OPERATOR_CANCELLED;
 	}
-	else if(BLI_streq(bmain->name, libname)) {
+	else if(BLI_path_cmp(bmain->name, libname) == 0) {
 		BKE_report(op->reports, RPT_ERROR, "Cannot use current file as library");
 		return OPERATOR_CANCELLED;
 	}
@@ -1994,7 +1999,7 @@ static void WM_OT_quit_blender(wmOperatorType *ot)
 /* *********************** */
 #if defined(WIN32)
 static int console= 1;
-void WM_toggle_console(bContext *UNUSED(C), short show)
+void WM_console_toggle(bContext *UNUSED(C), short show)
 {
 	if(show) {
 		ShowWindow(GetConsoleWindow(),SW_SHOW);
@@ -2006,24 +2011,24 @@ void WM_toggle_console(bContext *UNUSED(C), short show)
 	}
 }
 
-static int wm_toggle_console_op(bContext *C, wmOperator *UNUSED(op))
+static int wm_console_toggle_op(bContext *C, wmOperator *UNUSED(op))
 {
 	if(console) {
-		WM_toggle_console(C, 0);
+		WM_console_toggle(C, 0);
 	}
 	else {
-		WM_toggle_console(C, 1);
+		WM_console_toggle(C, 1);
 	}
 	return OPERATOR_FINISHED;
 }
 
-static void WM_OT_toggle_console(wmOperatorType *ot)
+static void WM_OT_console_toggle(wmOperatorType *ot)
 {
 	ot->name= "Toggle System Console";
-	ot->idname= "WM_OT_toggle_console";
+	ot->idname= "WM_OT_console_toggle";
 	ot->description= "Toggle System Console";
 	
-	ot->exec= wm_toggle_console_op;
+	ot->exec= wm_console_toggle_op;
 	ot->poll= WM_operator_winactive;
 }
 #endif
@@ -2723,8 +2728,8 @@ static void wm_radial_control_paint(bContext *C, int x, int y, void *customdata)
 	}
 
 	glColor4f(rc->col[0], rc->col[1], rc->col[2], rc->col[3]);
-	glutil_draw_lined_arc(0.0, M_PI*2.0, r1, 40);
-	glutil_draw_lined_arc(0.0, M_PI*2.0, r2, 40);
+	glutil_draw_lined_arc(0.0, (float)(M_PI*2.0), r1, 40);
+	glutil_draw_lined_arc(0.0, (float)(M_PI*2.0), r2, 40);
 	glDisable(GL_BLEND);
 }
 
@@ -2737,7 +2742,7 @@ int WM_radial_control_modal(bContext *C, wmOperator *op, wmEvent *event)
 	int ret = OPERATOR_RUNNING_MODAL;
 	// float initial_value = RNA_float_get(op->ptr, "initial_value");
 
-	mode = RNA_int_get(op->ptr, "mode");
+	mode = RNA_enum_get(op->ptr, "mode");
 	RNA_int_get_array(op->ptr, "initial_mouse", initial_mouse);
 
 	switch(event->type) {
@@ -2761,11 +2766,11 @@ int WM_radial_control_modal(bContext *C, wmOperator *op, wmEvent *event)
 		else if(mode == WM_RADIALCONTROL_STRENGTH) {
 			new_value = 1 - dist / WM_RADIAL_CONTROL_DISPLAY_SIZE;
 		} else if(mode == WM_RADIALCONTROL_ANGLE)
-			new_value = ((int)(atan2(delta[1], delta[0]) * (180.0 / M_PI)) + 180);
+			new_value = ((int)(atan2f(delta[1], delta[0]) * (float)(180.0 / M_PI)) + 180);
 		
 		if(event->ctrl) {
 			if(mode == WM_RADIALCONTROL_STRENGTH)
-				new_value = ((int)ceil(new_value * 10.f) * 10.0f) / 100.f;
+				new_value = ((int)ceilf(new_value * 10.f) * 10.0f) / 100.f;
 			else
 				new_value = ((int)new_value + 5) / 10*10;
 		}
@@ -2813,7 +2818,7 @@ int WM_radial_control_invoke(bContext *C, wmOperator *op, wmEvent *event)
 {
 	wmRadialControl *rc = MEM_callocN(sizeof(wmRadialControl), "radial control");
 	// wmWindow *win = CTX_wm_window(C);
-	int mode = RNA_int_get(op->ptr, "mode");
+	int mode = RNA_enum_get(op->ptr, "mode");
 	float initial_value = RNA_float_get(op->ptr, "initial_value");
 	//float initial_size = RNA_float_get(op->ptr, "initial_size");
 	int mouse[2];
@@ -2876,7 +2881,7 @@ int WM_radial_control_invoke(bContext *C, wmOperator *op, wmEvent *event)
 /* Gets a descriptive string of the operation */
 void WM_radial_control_string(wmOperator *op, char str[], int maxlen)
 {
-	int mode = RNA_int_get(op->ptr, "mode");
+	int mode = RNA_enum_get(op->ptr, "mode");
 	float v = RNA_float_get(op->ptr, "new_value");
 
 	if(mode == WM_RADIALCONTROL_SIZE)
@@ -3107,7 +3112,7 @@ void wm_operatortype_init(void)
 	WM_operatortype_append(WM_OT_search_menu);
 	WM_operatortype_append(WM_OT_call_menu);
 #if defined(WIN32)
-	WM_operatortype_append(WM_OT_toggle_console);
+	WM_operatortype_append(WM_OT_console_toggle);
 #endif
 
 #ifdef WITH_COLLADA

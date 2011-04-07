@@ -87,6 +87,7 @@
 
 #include "RNA_access.h"
 #include "RNA_define.h"
+#include "RNA_enum_types.h"
 
 /* Undo stuff */
 typedef struct {
@@ -3580,6 +3581,7 @@ void CURVE_OT_spline_type_set(wmOperatorType *ot)
 
 	/* identifiers */
 	ot->name= "Set Spline Type";
+	ot->description = "Set type of actibe spline";
 	ot->idname= "CURVE_OT_spline_type_set";
 	
 	/* api callbacks */
@@ -3622,6 +3624,7 @@ void CURVE_OT_handle_type_set(wmOperatorType *ot)
 
 	/* identifiers */
 	ot->name= "Set Handle Type";
+	ot->description = "Set type of handles for selected control points";
 	ot->idname= "CURVE_OT_handle_type_set";
 	
 	/* api callbacks */
@@ -4744,6 +4747,7 @@ void CURVE_OT_extrude(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Extrude";
+	ot->description = "Extrude selected control point(s) and move";
 	ot->idname= "CURVE_OT_extrude";
 	
 	/* api callbacks */
@@ -4755,7 +4759,7 @@ void CURVE_OT_extrude(wmOperatorType *ot)
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 
 	/* to give to transform */
-	RNA_def_int(ot->srna, "mode", TFM_TRANSLATION, 0, INT_MAX, "Mode", "", 0, INT_MAX);
+	RNA_def_enum(ot->srna, "mode", transform_mode_types, TFM_TRANSLATION, "Mode", "");
 }
 
 /***************** make cyclic operator **********************/
@@ -4872,6 +4876,7 @@ void CURVE_OT_cyclic_toggle(wmOperatorType *ot)
 
 	/* identifiers */
 	ot->name= "Toggle Cyclic";
+	ot->description = "Make active spline closed/opened loop";
 	ot->idname= "CURVE_OT_cyclic_toggle";
 	
 	/* api callbacks */
@@ -5618,6 +5623,7 @@ void CURVE_OT_duplicate(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Duplicate";
+	ot->description = "Duplicate selected control points and segments between them";
 	ot->idname= "CURVE_OT_duplicate";
 	
 	/* api callbacks */
@@ -5629,7 +5635,7 @@ void CURVE_OT_duplicate(wmOperatorType *ot)
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 
 	/* to give to transform */
-	RNA_def_int(ot->srna, "mode", TFM_TRANSLATION, 0, INT_MAX, "Mode", "", 0, INT_MAX);
+	RNA_def_enum(ot->srna, "mode", transform_mode_types, TFM_TRANSLATION, "Mode", "");
 }
 
 /********************** delete operator *********************/
@@ -5983,6 +5989,7 @@ void CURVE_OT_delete(wmOperatorType *ot)
 
 	/* identifiers */
 	ot->name= "Delete";
+	ot->description = "Delete selected control points or segments";
 	ot->idname= "CURVE_OT_delete";
 	
 	/* api callbacks */

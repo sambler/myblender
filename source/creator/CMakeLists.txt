@@ -100,12 +100,14 @@ set(SRC
 	creator.c
 )
 
+if(OFF)  # XXX, Disable, is giving problems with linking msvc2010
+
 if(WIN32 AND NOT UNIX)
 	string(SUBSTRING ${BLENDER_VERSION} 0 1 bver1)
 	string(SUBSTRING ${BLENDER_VERSION} 2 1 bver2)
 	string(SUBSTRING ${BLENDER_VERSION} 3 1 bver3)
 	add_definitions(
-		-DBLEN_VER_RC_STR="${BLENDER_VERSION}"
+		-DBLEN_VER_RC_STR_M=${BLENDER_VERSION}
 		-DBLEN_VER_RC_1=${bver1}
 		-DBLEN_VER_RC_2=${bver2}
 		-DBLEN_VER_RC_3=${bver3}
@@ -116,6 +118,8 @@ if(WIN32 AND NOT UNIX)
 		../icons/winblender.rc
 	)
 endif()
+
+endif(OFF)  # XXX.
 
 if(WITH_BUILDINFO)
 	# --------------------------------------------------------------------------
@@ -547,19 +551,20 @@ elseif(WIN32)
 			)
 		endif()
 	endif()
-	
-	add_custom_command(TARGET blender
-		POST_BUILD
-		MAIN_DEPENDENCY blender
-		COMMAND copy /Y \"${LIBDIR}\\thumbhandler\\lib\\BlendThumb64.dll\" \"${TARGETDIR}\\\"
-	)
-	if(NOT CMAKE_CL_64)
-		add_custom_command(TARGET blender
-			POST_BUILD
-			MAIN_DEPENDENCY blender
-			COMMAND copy /Y \"${LIBDIR}\\thumbhandler\\lib\\BlendThumb.dll\" \"${TARGETDIR}\\\"
-		)
-	endif()
+
+    if(NOT CMAKE_CL_64)
+		install(
+			FILES
+	    	${LIBDIR}/thumbhandler/lib/BlendThumb.dll
+    		DESTINATION ${TARGETDIR}/
+	    )
+    else()
+		install(
+			FILES
+	    	${LIBDIR}/thumbhandler/lib/BlendThumb64.dll
+    		DESTINATION ${TARGETDIR}/
+	    )
+    endif()
 
 elseif(APPLE)
 	set(SOURCEDIR ${CMAKE_SOURCE_DIR}/source/darwin/blender.app)
@@ -776,7 +781,6 @@ endif()
 		extern_bullet
 		ge_logic_loopbacknetwork
 		bf_intern_moto
-		extern_glew
 		extern_openjpeg
 		extern_redcode
 		ge_videotex
@@ -786,6 +790,10 @@ endif()
 		bf_intern_audaspace
 		bf_intern_mikktspace
 	)
+
+    if(WITH_BUILTIN_GLEW)
+		list(APPEND BLENDER_SORTED_LIBS extern_glew)
+    endif()
 
 	if(WITH_BINRELOC)
 		list(APPEND BLENDER_SORTED_LIBS extern_binreloc)

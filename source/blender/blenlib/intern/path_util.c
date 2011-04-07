@@ -587,7 +587,7 @@ int BLI_path_frame(char *path, int frame, int digits)
 
 	if (stringframe_chars(path, &ch_sta, &ch_end)) { /* warning, ch_end is the last # +1 */
 		char tmp[FILE_MAX];
-		sprintf(tmp, "%.*s%.*d%s", ch_sta, path, digits, frame, path+ch_end);
+		sprintf(tmp, "%.*s%.*d%s", ch_sta, path, ch_end-ch_sta, frame, path+ch_end);
 		strcpy(path, tmp);
 		return 1;
 	}
@@ -603,7 +603,7 @@ int BLI_path_frame_range(char *path, int sta, int end, int digits)
 
 	if (stringframe_chars(path, &ch_sta, &ch_end)) { /* warning, ch_end is the last # +1 */
 		char tmp[FILE_MAX];
-		sprintf(tmp, "%.*s%.*d-%.*d%s", ch_sta, path, digits, sta, digits, end, path+ch_end);
+		sprintf(tmp, "%.*s%.*d-%.*d%s", ch_sta, path, ch_end-ch_sta, sta, ch_end-ch_sta, end, path+ch_end);
 		strcpy(path, tmp);
 		return 1;
 	}
@@ -1481,7 +1481,7 @@ int BKE_rebase_path(char *abs, int abs_size, char *rel, int rel_size, const char
 	if (!strncmp(path, blend_dir, len)) {
 
 		/* if image is _in_ current .blend file directory */
-		if (!strcmp(dir, blend_dir)) {
+		if (BLI_path_cmp(dir, blend_dir) == 0) {
 			BLI_join_dirfile(dest_path, sizeof(dest_path), dest_dir, base);
 		}
 		/* "below" */
@@ -1508,7 +1508,7 @@ int BKE_rebase_path(char *abs, int abs_size, char *rel, int rel_size, const char
 	}
 
 	/* return 2 if src=dest */
-	if (!strcmp(path, dest_path)) {
+	if (BLI_path_cmp(path, dest_path) == 0) {
 		// if (G.f & G_DEBUG) printf("%s and %s are the same file\n", path, dest_path);
 		return 2;
 	}

@@ -218,13 +218,25 @@ Editing *seq_give_editing(Scene *scene, int alloc)
 	return scene->ed;
 }
 
+static void seq_free_clipboard_recursive(Sequence *seq_parent)
+{
+	Sequence *seq, *nseq;
+
+	for(seq= seq_parent->seqbase.first; seq; seq= nseq) {
+		nseq= seq->next;
+		seq_free_clipboard_recursive(seq);
+	}
+
+	seq_free_sequence(NULL, seq_parent);
+}
+
 void seq_free_clipboard(void)
 {
 	Sequence *seq, *nseq;
 
 	for(seq= seqbase_clipboard.first; seq; seq= nseq) {
 		nseq= seq->next;
-		seq_free_sequence(NULL, seq);
+		seq_free_clipboard_recursive(seq);
 	}
 	seqbase_clipboard.first= seqbase_clipboard.last= NULL;
 }
@@ -1017,7 +1029,7 @@ static float give_stripelem_index(Sequence *seq, float cfra)
 	if (seq->strobe < 1.0f) seq->strobe = 1.0f;
 	
 	if (seq->strobe > 1.0f) {
-		nr -= fmod((double)nr, (double)seq->strobe);
+		nr -= fmodf((double)nr, (double)seq->strobe);
 	}
 
 	return nr;
@@ -2972,6 +2984,24 @@ void seq_translate(Scene *evil_scene, Sequence *seq, int delta)
 	}
 
 	calc_sequence_disp(evil_scene, seq);
+}
+
+void seq_sound_init(Scene *scene, Sequence *seq)
+{
+	if(seq->type==SEQ_META) {
+		Sequence *seq_child;
+		for(seq_child= seq->seqbase.first; seq_child; seq_child= seq_child->next) {
+			seq_sound_init(scene, seq_child);
+		}
+	}
+	else {
+		if(seq->sound) {
+			seq->scene_sound = sound_add_scene_sound(scene, seq, seq->startdisp, seq->enddisp, seq->startofs + seq->anim_startofs);
+		}
+		if(seq->scene) {
+			sound_scene_add_scene_sound(scene, seq, seq->startdisp, seq->enddisp, seq->startofs + seq->anim_startofs);
+		}
+	}
 }
 
 Sequence *seq_foreground_frame_get(Scene *scene, int frame)

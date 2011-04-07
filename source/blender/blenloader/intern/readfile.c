@@ -500,7 +500,7 @@ static Main *blo_find_main(FileData *fd, ListBase *mainlist, const char *name, c
 	for (m= mainlist->first; m; m= m->next) {
 		char *libname= (m->curlib)?m->curlib->filepath:m->name;
 		
-		if (BLI_streq(name1, libname)) {
+		if (BLI_path_cmp(name1, libname) == 0) {
 			if(G.f & G_DEBUG) printf("blo_find_main: found library %s\n", libname);
 			return m;
 		}
@@ -5449,7 +5449,7 @@ static void direct_link_library(FileData *fd, Library *lib, Main *main)
 	
 	for(newmain= fd->mainlist.first; newmain; newmain= newmain->next) {
 		if(newmain->curlib) {
-			if(strcmp(newmain->curlib->filepath, lib->filepath)==0) {
+			if(BLI_path_cmp(newmain->curlib->filepath, lib->filepath) == 0) {
 				printf("Fixed error in file; multiple instances of lib:\n %s\n", lib->filepath);
 				BKE_reportf(fd->reports, RPT_WARNING, "Library '%s', '%s' had multiple instances, save and reload!", lib->name, lib->filepath);
 
@@ -6939,13 +6939,6 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 				sa= sa->next;
 			}
 			sc= sc->id.next;
-		}
-	}
-	if(main->versionfile <= 112) {
-		Mesh *me = main->mesh.first;
-		while(me) {
-			me->cubemapsize= 1.0;
-			me= me->id.next;
 		}
 	}
 	if(main->versionfile <= 113) {
@@ -11528,7 +11521,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 
 		for (brush= main->brush.first; brush; brush= brush->id.next) {
 			if(brush->height == 0)
-				brush->height= 0.4;
+				brush->height= 0.4f;
 		}
 
 		/* replace 'rim material' option for in offset*/
@@ -11552,7 +11545,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 		}
 	}
 
-	if (main->versionfile < 256 || (main->versionfile == 256 && main->subversionfile < 5)){
+	if (main->versionfile < 256 || (main->versionfile == 256 && main->subversionfile < 6)){
 		Mesh *me;
 
 		for(me= main->mesh.first; me; me= me->id.next)
@@ -12301,50 +12294,19 @@ static void expand_armature(FileData *fd, Main *mainvar, bArmature *arm)
 	}
 }
 
-static void expand_modifier(FileData *fd, Main *mainvar, ModifierData *md)
+static void expand_object_expandModifiers(void *userData, Object *UNUSED(ob),
+											  ID **idpoin)
 {
-	if (md->type==eModifierType_Lattice) {
-		LatticeModifierData *lmd = (LatticeModifierData*) md;
-			
-		expand_doit(fd, mainvar, lmd->object);
-	} 
-	else if (md->type==eModifierType_Curve) {
-		CurveModifierData *cmd = (CurveModifierData*) md;
-			
-		expand_doit(fd, mainvar, cmd->object);
-	}
-	else if (md->type==eModifierType_Array) {
-		ArrayModifierData *amd = (ArrayModifierData*) md;
-			
-		expand_doit(fd, mainvar, amd->curve_ob);
-		expand_doit(fd, mainvar, amd->offset_ob);
-	}
-	else if (md->type==eModifierType_Mirror) {
-		MirrorModifierData *mmd = (MirrorModifierData*) md;
-			
-		expand_doit(fd, mainvar, mmd->mirror_ob);
-	}
-	else if (md->type==eModifierType_Displace) {
-		DisplaceModifierData *dmd = (DisplaceModifierData*) md;
-		
-		expand_doit(fd, mainvar, dmd->map_object);
-		expand_doit(fd, mainvar, dmd->texture);
-	}
-	else if (md->type==eModifierType_Smoke) {
-		SmokeModifierData *smd = (SmokeModifierData*) md;
-			
-		if(smd->type==MOD_SMOKE_TYPE_DOMAIN && smd->domain)
-		{	
-			expand_doit(fd, mainvar, smd->domain->coll_group);
-			expand_doit(fd, mainvar, smd->domain->fluid_group);
-			expand_doit(fd, mainvar, smd->domain->eff_group);
-		}
-	}
+	struct { FileData *fd; Main *mainvar; } *data= userData;
+
+	FileData *fd= data->fd;
+	Main *mainvar= data->mainvar;
+
+	expand_doit(fd, mainvar, *idpoin);
 }
 
 static void expand_object(FileData *fd, Main *mainvar, Object *ob)
 {
-	ModifierData *md;
 	ParticleSystem *psys;
 	bSensor *sens;
 	bController *cont;
@@ -12354,9 +12316,14 @@ static void expand_object(FileData *fd, Main *mainvar, Object *ob)
 	int a;
 
 	expand_doit(fd, mainvar, ob->data);
-	
-	for (md=ob->modifiers.first; md; md=md->next) {
-		expand_modifier(fd, mainvar, md);
+
+	/* expand_object_expandModifier() */
+	if(ob->modifiers.first) {
+		struct { FileData *fd; Main *mainvar; } data;
+		data.fd= fd;
+		data.mainvar= mainvar;
+
+		modifiers_foreachIDLink(ob, expand_object_expandModifiers, (void *)&data);
 	}
 
 	expand_pose(fd, mainvar, ob->pose);

@@ -1107,6 +1107,33 @@ static void wm_block_splash_refreshmenu (bContext *UNUSED(C), void *UNUSED(arg_b
 	  */
 }
 
+static int wm_resource_check_prev(void)
+{
+
+	char *res= BLI_get_folder_version(BLENDER_RESOURCE_PATH_USER, BLENDER_VERSION, TRUE);
+
+	// if(res) printf("USER: %s\n", res);
+
+	if(res == NULL) {
+		res= BLI_get_folder_version(BLENDER_RESOURCE_PATH_LOCAL, BLENDER_VERSION, TRUE);
+	}
+
+	// if(res) printf("LOCAL: %s\n", res);
+
+	if(res == NULL) {
+		int res_dir[]= {BLENDER_RESOURCE_PATH_USER, BLENDER_RESOURCE_PATH_LOCAL, -1};
+		int i= 0;
+
+		for(i= 0; res_dir[i] != -1; i++) {
+			if(BLI_get_folder_version(res_dir[i], BLENDER_VERSION - 1, TRUE)) {
+				return TRUE;
+			}
+		}
+	}
+
+	return FALSE;
+}
+
 static uiBlock *wm_block_create_splash(bContext *C, ARegion *ar, void *UNUSED(arg))
 {
 	uiBlock *block;
@@ -1183,11 +1210,17 @@ static uiBlock *wm_block_create_splash(bContext *C, ARegion *ar, void *UNUSED(ar
 	for(recent = G.recent_files.first, i=0; (i<5) && (recent); recent = recent->next, i++) {
 		uiItemStringO(col, BLI_path_basename(recent->filepath), ICON_FILE_BLEND, "WM_OT_open_mainfile", "filepath", recent->filepath);
 	}
+
+	if(wm_resource_check_prev()) {
+		uiItemS(col);
+		uiItemO(col, NULL, ICON_NEW, "WM_OT_copy_prev_settings");
+	}
+
 	uiItemS(col);
 	uiItemO(col, NULL, ICON_RECOVER_LAST, "WM_OT_recover_last_session");
 	uiItemL(col, "", ICON_NONE);
 	
-	uiCenteredBoundsBlock(block, 0.0f);
+	uiCenteredBoundsBlock(block, 0);
 	uiEndBlock(C, block);
 	
 	return block;
@@ -2678,9 +2711,9 @@ static void wm_radial_control_paint(bContext *C, int x, int y, void *customdata)
 		r3= r1;
 	} else if(rc->mode == WM_RADIALCONTROL_STRENGTH) {
 		r1= (1 - rc->value) * WM_RADIAL_CONTROL_DISPLAY_SIZE;
-		r2= r3= WM_RADIAL_CONTROL_DISPLAY_SIZE;
+		r2= r3= (float)WM_RADIAL_CONTROL_DISPLAY_SIZE;
 	} else if(rc->mode == WM_RADIALCONTROL_ANGLE) {
-		r1= r2= r3= WM_RADIAL_CONTROL_DISPLAY_SIZE;
+		r1= r2= r3= (float)WM_RADIAL_CONTROL_DISPLAY_SIZE;
 		angle = rc->value;
 	}
 
@@ -2721,9 +2754,9 @@ static void wm_radial_control_paint(bContext *C, int x, int y, void *customdata)
 		glColor4f(rc->col[0], rc->col[1], rc->col[2], rc->col[3]);
 		glEnable(GL_LINE_SMOOTH);
 		glRotatef(-angle, 0, 0, 1);
-		fdrawline(0, 0, WM_RADIAL_CONTROL_DISPLAY_SIZE, 0);
+		fdrawline(0.0f, 0.0f, (float)WM_RADIAL_CONTROL_DISPLAY_SIZE, 0.0f);
 		glRotatef(angle, 0, 0, 1);
-		fdrawline(0, 0, WM_RADIAL_CONTROL_DISPLAY_SIZE, 0);
+		fdrawline(0.0f, 0.0f, (float)WM_RADIAL_CONTROL_DISPLAY_SIZE, 0.0f);
 		glDisable(GL_LINE_SMOOTH);
 	}
 
@@ -2759,7 +2792,7 @@ int WM_radial_control_modal(bContext *C, wmOperator *op, wmEvent *event)
 		//	delta[1]+= WM_RADIAL_CONTROL_DISPLAY_SIZE * sin(initial_value*M_PI/180.0f);
 		//}
 
-		dist= sqrt(delta[0]*delta[0]+delta[1]*delta[1]);
+		dist= sqrtf(delta[0]*delta[0]+delta[1]*delta[1]);
 
 		if(mode == WM_RADIALCONTROL_SIZE)
 			new_value = dist;
@@ -2794,9 +2827,9 @@ int WM_radial_control_modal(bContext *C, wmOperator *op, wmEvent *event)
 		new_value = 0;
 
 	/* Update paint data */
-	rc->value = new_value;
+	rc->value = (float)new_value;
 
-	RNA_float_set(op->ptr, "new_value", new_value);
+	RNA_float_set(op->ptr, "new_value", rc->value);
 
 	if(ret != OPERATOR_RUNNING_MODAL) {
 		WM_paint_cursor_end(CTX_wm_manager(C), rc->cursor);
@@ -2831,16 +2864,16 @@ int WM_radial_control_invoke(bContext *C, wmOperator *op, wmEvent *event)
 
 	if(mode == WM_RADIALCONTROL_SIZE) {
 		rc->max_value = 200;
-		mouse[0]-= initial_value;
+		mouse[0]-= (int)initial_value;
 	}
 	else if(mode == WM_RADIALCONTROL_STRENGTH) {
 		rc->max_value = 1;
-		mouse[0]-= WM_RADIAL_CONTROL_DISPLAY_SIZE * (1 - initial_value);
+		mouse[0]-= (int)(WM_RADIAL_CONTROL_DISPLAY_SIZE * (1.0f - initial_value));
 	}
 	else if(mode == WM_RADIALCONTROL_ANGLE) {
 		rc->max_value = 360;
-		mouse[0]-= WM_RADIAL_CONTROL_DISPLAY_SIZE * cos(initial_value);
-		mouse[1]-= WM_RADIAL_CONTROL_DISPLAY_SIZE * sin(initial_value);
+		mouse[0]-= (int)(WM_RADIAL_CONTROL_DISPLAY_SIZE * cos(initial_value));
+		mouse[1]-= (int)(WM_RADIAL_CONTROL_DISPLAY_SIZE * sin(initial_value));
 		initial_value *= 180.0f/(float)M_PI;
 	}
 
@@ -3029,7 +3062,7 @@ static int redraw_timer_exec(bContext *C, wmOperator *op)
 		}
 	}
 	
-	time= ((PIL_check_seconds_timer()-stime)*1000);
+	time= (float)((PIL_check_seconds_timer()-stime)*1000);
 
 	RNA_enum_description(redraw_timer_type_items, type, &infostr);
 

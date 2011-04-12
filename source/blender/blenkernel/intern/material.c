@@ -687,6 +687,10 @@ void assign_material(Object *ob, Material *ma, int act)
 	if(act>MAXMAT) return;
 	if(act<1) act= 1;
 	
+	/* prevent crashing when using accidentally */
+	BLI_assert(ob->id.lib == NULL);
+	if(ob->id.lib) return;
+	
 	/* test arraylens */
 	
 	totcolp= give_totcolp(ob);

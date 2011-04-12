@@ -50,7 +50,33 @@ set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/build_files/cmake/Modules/")
 # quiet output for Makefiles, 'make -s' helps too
 # set_property(GLOBAL PROPERTY RULE_MESSAGES OFF)
 
+# ignore system set flag, use our own
+# must be before project(...)
+# if the user wants to add their own its ok after first run.
+if(DEFINED CMAKE_C_STANDARD_LIBRARIES)
+	set(_reset_standard_libraries OFF)
+else()
+	set(_reset_standard_libraries ON)
+endif()
+
+
 project(Blender)
+
+
+if (_reset_standard_libraries)
+	# Must come after project(...)
+	#
+	# MINGW workaround for -ladvapi32 being included which surprisingly causes
+	# string formatting of floats, eg: printf("%.*f", 3, value). to crash blender
+	# with a meaningless stack trace. by overriding this flag we ensure we only
+	# have libs we define and that cmake & scons builds match.
+	set(CMAKE_C_STANDARD_LIBRARIES "" CACHE STRING "" FORCE)
+	set(CMAKE_CXX_STANDARD_LIBRARIES "" CACHE STRING "" FORCE)
+	mark_as_advanced(CMAKE_C_STANDARD_LIBRARIES)
+	mark_as_advanced(CMAKE_CXX_STANDARD_LIBRARIES)
+endif()
+unset(_reset_standard_libraries)
+
 
 enable_testing()
 
@@ -100,6 +126,8 @@ endif()
 option(WITH_MOD_FLUID        	"Enable Elbeem Modifier (Fluid Simulation)" ON)
 option(WITH_MOD_DECIMATE       	"Enable Decimate Modifier" ON)
 option(WITH_MOD_BOOLEAN        	"Enable Boolean Modifier" ON)
+option(WITH_MOD_CLOTH_ELTOPO   	"Enable Experemental cloth solver" OFF)
+mark_as_advanced(WITH_MOD_CLOTH_ELTOPO)
 
 # Image format support
 option(WITH_IMAGE_OPENEXR       "Enable OpenEXR Support (http://www.openexr.com)" ON)
@@ -514,7 +542,7 @@ elseif(WIN32)
 
 	if(MSVC)
 		if(CMAKE_CL_64)
-			set(LLIBS kernel32 user32 vfw32 winmm ws2_32 )
+			set(LLIBS ws2_32 vfw32 winmm kernel32 user32 gdi32 comdlg32 advapi32 shfolder shell32 ole32 oleaut32 uuid )
 		else()
 			set(LLIBS kernel32 user32 gdi32 comdlg32 advapi32 shell32 ole32 oleaut32 uuid ws2_32 vfw32 winmm)
 		endif()

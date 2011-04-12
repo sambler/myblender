@@ -864,7 +864,7 @@ static void rna_def_modifier_mirror(BlenderRNA *brna)
 	
 	prop= RNA_def_property(srna, "use_mirror_merge", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_negative_sdna(prop, NULL, "flag", MOD_MIR_NO_MERGE);
-	RNA_def_property_ui_text(prop, "Merge Verticies", "Merge vertices within the merge threshold");
+	RNA_def_property_ui_text(prop, "Merge Vertices", "Merge vertices within the merge threshold");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
 	prop= RNA_def_property(srna, "use_mirror_u", PROP_BOOLEAN, PROP_NONE);
@@ -1193,7 +1193,7 @@ static void rna_def_modifier_boolean(BlenderRNA *brna)
 
 	prop= RNA_def_property(srna, "object", PROP_POINTER, PROP_NONE);
 	RNA_def_property_ui_text(prop, "Object", "Mesh object to use for Boolean operation");
-	RNA_def_property_pointer_funcs(prop, NULL, "rna_BooleanModifier_object_set", NULL, NULL);
+	RNA_def_property_pointer_funcs(prop, NULL, "rna_BooleanModifier_object_set", NULL, "rna_Mesh_object_poll");
 	RNA_def_property_flag(prop, PROP_EDITABLE|PROP_ID_SELF_CHECK);
 	RNA_def_property_update(prop, 0, "rna_Modifier_dependency_update");
 

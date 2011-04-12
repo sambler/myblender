@@ -100,26 +100,35 @@ set(SRC
 	creator.c
 )
 
-if(OFF)  # XXX, Disable, is giving problems with linking msvc2010
-
+# MSVC 2010 gives linking errors with the manifest
 if(WIN32 AND NOT UNIX)
 	string(SUBSTRING ${BLENDER_VERSION} 0 1 bver1)
 	string(SUBSTRING ${BLENDER_VERSION} 2 1 bver2)
 	string(SUBSTRING ${BLENDER_VERSION} 3 1 bver3)
-	add_definitions(
-		-DBLEN_VER_RC_STR_M=${BLENDER_VERSION}
-		-DBLEN_VER_RC_1=${bver1}
-		-DBLEN_VER_RC_2=${bver2}
-		-DBLEN_VER_RC_3=${bver3}
-		-DBLEN_VER_RC_4=0
-	)
+	if(MINGW)
+		add_definitions(
+			-DWINDRES
+			-DBLEN_VER_RC_STR_M=${BLENDER_VERSION}
+			-DBLEN_VER_RC_1=${bver1}
+			-DBLEN_VER_RC_2=${bver2}
+			-DBLEN_VER_RC_3=${bver3}
+			-DBLEN_VER_RC_4=0
+		)
+	else()
+		add_definitions(
+			-DBLEN_VER_RC_STR=${BLENDER_VERSION}
+			-DBLEN_VER_RC_1=${bver1}
+			-DBLEN_VER_RC_2=${bver2}
+			-DBLEN_VER_RC_3=${bver3}
+			-DBLEN_VER_RC_4=0
+		)
+	endif()
+	
 
 	list(APPEND SRC
 		../icons/winblender.rc
 	)
 endif()
-
-endif(OFF)  # XXX.
 
 if(WITH_BUILDINFO)
 	# --------------------------------------------------------------------------
@@ -791,6 +800,10 @@ endif()
 		bf_intern_mikktspace
 	)
 
+    if(WITH_ELTOPO)
+		list(APPEND BLENDER_SORTED_LIBS extern_eltopo)
+    endif()
+    
     if(WITH_BUILTIN_GLEW)
 		list(APPEND BLENDER_SORTED_LIBS extern_glew)
     endif()

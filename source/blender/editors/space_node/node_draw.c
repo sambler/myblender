@@ -284,7 +284,7 @@ static void node_update(const bContext *C, bNodeTree *ntree, bNode *node)
 		node->butr.xmax= node->width - 2*NODE_DYS;
 		node->butr.ymin= 0;
 		node->butr.ymax= 0;
-
+		
 		RNA_pointer_create(&ntree->id, &RNA_Node, node, &ptr);
 
 		layout= uiBlockLayout(node->block, UI_LAYOUT_VERTICAL, UI_LAYOUT_PANEL,
@@ -386,7 +386,7 @@ static int node_get_colorid(bNode *node)
 /* based on settings in node, sets drawing rect info. each redraw! */
 /* note: this assumes only 1 group at a time is drawn (linked data) */
 /* in node->totr the entire boundbox for the group is stored */
-static void node_update_group(const bContext *C, bNodeTree *ntree, bNode *gnode)
+static void node_update_group(const bContext *C, bNodeTree *UNUSED(ntree), bNode *gnode)
 {
 	bNodeTree *ngroup= (bNodeTree *)gnode->id;
 	bNode *node;
@@ -406,7 +406,7 @@ static void node_update_group(const bContext *C, bNodeTree *ntree, bNode *gnode)
 		if(node->flag & NODE_HIDDEN)
 			node_update_hidden(node);
 		else
-			node_update(C, ntree, node);
+			node_update(C, ngroup, node);
 		node->locx-= gnode->locx;
 		node->locy-= gnode->locy;
 	}
@@ -804,7 +804,9 @@ static void node_draw_basis(const bContext *C, ARegion *ar, SpaceNode *snode, bN
 	else
 		UI_ThemeColor(TH_TEXT); */
 	
-	if (node->typeinfo->labelfunc)
+	if (node->label[0]!='\0')
+		BLI_strncpy(showname, node->label, sizeof(showname));
+	else if (node->typeinfo->labelfunc)
 		BLI_strncpy(showname, node->typeinfo->labelfunc(node), sizeof(showname));
 	else
 		BLI_strncpy(showname, node->typeinfo->name, sizeof(showname));
@@ -948,7 +950,9 @@ static void node_draw_hidden(const bContext *C, ARegion *ar, SpaceNode *snode, b
 		UI_ThemeColor(TH_TEXT);
 	
 	if(node->miniwidth>0.0f) {
-		if (node->typeinfo->labelfunc)
+		if (node->label[0]!='\0')
+			BLI_strncpy(showname, node->label, sizeof(showname));
+		else if (node->typeinfo->labelfunc)
 			BLI_strncpy(showname, node->typeinfo->labelfunc(node), sizeof(showname));
 		else
 			BLI_strncpy(showname, node->typeinfo->name, sizeof(showname));
@@ -1200,6 +1204,7 @@ void drawnodespace(const bContext *C, ARegion *ar, View2D *v2d)
 	SpaceNode *snode= CTX_wm_space_node(C);
 	Scene *scene= CTX_data_scene(C);
 	int color_manage = scene->r.color_mgt_flag & R_COLOR_MANAGEMENT;
+	bNodeLinkDrag *nldrag;
 	
 	UI_ThemeClearColor(TH_BACK);
 	glClear(GL_COLOR_BUFFER_BIT);
@@ -1254,6 +1259,14 @@ void drawnodespace(const bContext *C, ARegion *ar, View2D *v2d)
 				node_draw_group(C, ar, snode, snode->nodetree, node);
 		}
 	}
+	
+	/* temporary links */
+	glEnable(GL_BLEND);
+	glEnable(GL_LINE_SMOOTH);
+	for(nldrag= snode->linkdrag.first; nldrag; nldrag= nldrag->next)
+		node_draw_link(&ar->v2d, snode, nldrag->link);
+	glDisable(GL_LINE_SMOOTH);
+	glDisable(GL_BLEND);
 	
 	/* draw grease-pencil ('canvas' strokes) */
 	if (/*(snode->flag & SNODE_DISPGP) &&*/ (snode->nodetree))

@@ -356,7 +356,7 @@ static bKinematicConstraint *has_targetless_ik(bPoseChannel *pchan)
 	bConstraint *con= pchan->constraints.first;
 
 	for(;con; con= con->next) {
-		if(con->type==CONSTRAINT_TYPE_KINEMATIC && (con->enforce!=0.0)) {
+		if(con->type==CONSTRAINT_TYPE_KINEMATIC && (con->enforce!=0.0f)) {
 			bKinematicConstraint *data= con->data;
 
 			if(data->tar==NULL)
@@ -757,7 +757,7 @@ static void pchan_autoik_adjust (bPoseChannel *pchan, short chainlen)
 
 	/* check if pchan has ik-constraint */
 	for (con= pchan->constraints.first; con; con= con->next) {
-		if (con->type == CONSTRAINT_TYPE_KINEMATIC && (con->enforce!=0.0)) {
+		if (con->type == CONSTRAINT_TYPE_KINEMATIC && (con->enforce!=0.0f)) {
 			bKinematicConstraint *data= con->data;
 			
 			/* only accept if a temporary one (for auto-ik) */
@@ -2056,27 +2056,25 @@ static void createTransEditVerts(bContext *C, TransInfo *t)
 	if(propmode) editmesh_set_connectivity_distance(em, mtx);
 
 	/* detect CrazySpace [tm] */
-	if(propmode==0) {
-		if(modifiers_getCageIndex(t->scene, t->obedit, NULL, 1)>=0) {
-			if(modifiers_isCorrectableDeformed(t->obedit)) {
-				/* check if we can use deform matrices for modifier from the
-				   start up to stack, they are more accurate than quats */
-				totleft= editmesh_get_first_deform_matrices(t->scene, t->obedit, em, &defmats, &defcos);
+	if(modifiers_getCageIndex(t->scene, t->obedit, NULL, 1)>=0) {
+		if(modifiers_isCorrectableDeformed(t->obedit)) {
+			/* check if we can use deform matrices for modifier from the
+			   start up to stack, they are more accurate than quats */
+			totleft= editmesh_get_first_deform_matrices(t->scene, t->obedit, em, &defmats, &defcos);
 
-				/* if we still have more modifiers, also do crazyspace
-				   correction with quats, relative to the coordinates after
-				   the modifiers that support deform matrices (defcos) */
-				if(totleft > 0) {
-					mappedcos= crazyspace_get_mapped_editverts(t->scene, t->obedit);
-					quats= MEM_mallocN( (t->total)*sizeof(float)*4, "crazy quats");
-					crazyspace_set_quats_editmesh(em, (float*)defcos, mappedcos, quats);
-					if(mappedcos)
-						MEM_freeN(mappedcos);
-				}
-
-				if(defcos)
-					MEM_freeN(defcos);
+			/* if we still have more modifiers, also do crazyspace
+			   correction with quats, relative to the coordinates after
+			   the modifiers that support deform matrices (defcos) */
+			if(totleft > 0) {
+				mappedcos= crazyspace_get_mapped_editverts(t->scene, t->obedit);
+				quats= MEM_mallocN( (t->total)*sizeof(float)*4, "crazy quats");
+				crazyspace_set_quats_editmesh(em, (float*)defcos, mappedcos, quats);
+				if(mappedcos)
+					MEM_freeN(mappedcos);
 			}
+
+			if(defcos)
+				MEM_freeN(defcos);
 		}
 	}
 
@@ -2615,6 +2613,7 @@ static void createTransNlaData(bContext *C, TransInfo *t)
 								unit_m3(td->smtx);
 							}
 							else {
+								/* time scaling only needs single value */
 								td->val= &tdn->h1[0];
 								td->ival= tdn->h1[0];
 							}
@@ -2646,6 +2645,7 @@ static void createTransNlaData(bContext *C, TransInfo *t)
 								unit_m3(td->smtx);
 							}
 							else {
+								/* time scaling only needs single value */
 								td->val= &tdn->h2[0];
 								td->ival= tdn->h2[0];
 							}
@@ -2666,7 +2666,7 @@ static void createTransNlaData(bContext *C, TransInfo *t)
 			}
 		}
 	}
-
+	
 	/* cleanup temp list */
 	BLI_freelistN(&anim_data);
 }
@@ -2804,7 +2804,7 @@ static void posttrans_fcurve_clean (FCurve *fcu)
 			if (BEZSELECTED(bezt) == 0) {
 				/* check beztriple should be removed according to cache */
 				for (index= 0; index < len; index++) {
-					if (IS_EQ(bezt->vec[1][0], selcache[index])) {
+					if (IS_EQF(bezt->vec[1][0], selcache[index])) {
 						delete_fcurve_key(fcu, i, 0);
 						break;
 					}
@@ -2977,7 +2977,7 @@ void flushTransGPactionData (TransInfo *t)
 
 	/* flush data! */
 	for (i = 0; i < t->total; i++, tfd++) {
-		*(tfd->sdata)= (int)floor(tfd->val + 0.5);
+		*(tfd->sdata)= (int)floor(tfd->val + 0.5f);
 	}
 }
 
@@ -3360,8 +3360,8 @@ static void createTransGraphEditData(bContext *C, TransInfo *t)
 		mul_v3_fl(mtx[1], yscale);
 		
 		/* smtx is global (i.e. view) to data conversion */
-		if (IS_EQ(xscale, 0.0f) == 0) mul_v3_fl(smtx[0], 1.0f/xscale);
-		if (IS_EQ(yscale, 0.0f) == 0) mul_v3_fl(smtx[1], 1.0f/yscale);
+		if (IS_EQF(xscale, 0.0f) == 0) mul_v3_fl(smtx[0], 1.0f/xscale);
+		if (IS_EQF(yscale, 0.0f) == 0) mul_v3_fl(smtx[1], 1.0f/yscale);
 	}
 	
 	/* loop 2: build transdata arrays */
@@ -4139,7 +4139,7 @@ static short constraints_list_needinv(TransInfo *t, ListBase *list)
 	if (list) {
 		for (con= list->first; con; con=con->next) {
 			/* only consider constraint if it is enabled, and has influence on result */
-			if ((con->flag & CONSTRAINT_DISABLE)==0 && (con->enforce!=0.0)) {
+			if ((con->flag & CONSTRAINT_DISABLE)==0 && (con->enforce!=0.0f)) {
 				/* (affirmative) returns for specific constraints here... */
 					/* constraints that require this regardless  */
 				if (con->type == CONSTRAINT_TYPE_CHILDOF) return 1;
@@ -4709,10 +4709,10 @@ void special_aftertrans_update(bContext *C, TransInfo *t)
 
 			if(t->mode == TFM_SEQ_SLIDE) {
 				if(t->frame_side == 'B')
-					scene_marker_tfm_translate(t->scene, floor(t->values[0] + 0.5f), SELECT);
+					ED_markers_post_apply_transform(&t->scene->markers, t->scene, TFM_TIME_TRANSLATE, t->vec[0], t->frame_side);
 			}
 			else if (ELEM(t->frame_side, 'L', 'R')) {
-				scene_marker_tfm_extend(t->scene, floor(t->vec[0] + 0.5f), SELECT, t->scene->r.cfra, t->frame_side);
+				ED_markers_post_apply_transform(&t->scene->markers, t->scene, TFM_TIME_EXTEND, t->vec[0], t->frame_side);
 			}
 		}
 
@@ -4785,24 +4785,6 @@ void special_aftertrans_update(bContext *C, TransInfo *t)
 				posttrans_action_clean(&ac, (bAction *)ac.data);
 			}
 		}
-
-		/* marker transform, not especially nice but we may want to move markers
-		 * at the same time as keyframes in the dope sheet. */
-		if ((saction->flag & SACTION_MARKERS_MOVE) && (cancelled == 0)) {
-			/* cant use , TFM_TIME_EXTEND
-			 * for some reason EXTEND is changed into TRANSLATE, so use frame_side instead */
-
-			if(t->mode == TFM_TIME_TRANSLATE) {
-				if(t->frame_side == 'B')
-					scene_marker_tfm_translate(t->scene, floor(t->vec[0] + 0.5f), SELECT);
-				else if (ELEM(t->frame_side, 'L', 'R'))
-					scene_marker_tfm_extend(t->scene, floor(t->vec[0] + 0.5f), SELECT, t->scene->r.cfra, t->frame_side);
-			}
-			else if(t->mode == TFM_TIME_SCALE) {
-				scene_marker_tfm_scale(t->scene, t->vec[0], SELECT);
-			}
-		}
-		
 		else if (ac.datatype == ANIMCONT_GPENCIL) {
 			/* remove duplicate frames and also make sure points are in order! */
 				/* 3 cases here for curve cleanups:
@@ -4821,6 +4803,21 @@ void special_aftertrans_update(bContext *C, TransInfo *t)
 					if (ID_REAL_USERS(gpd) > 1)
 						posttrans_gpd_clean(gpd);
 				}
+			}
+		}
+		
+		/* marker transform, not especially nice but we may want to move markers
+		 * at the same time as keyframes in the dope sheet. 
+		 */
+		if ((saction->flag & SACTION_MARKERS_MOVE) && (cancelled == 0)) {
+			if (t->mode == TFM_TIME_TRANSLATE) {
+				if (ELEM(t->frame_side, 'L', 'R')) /* TFM_TIME_EXTEND */
+					ED_markers_post_apply_transform(ED_context_get_markers(C), t->scene, t->mode, t->vec[0], t->frame_side);
+				else /* TFM_TIME_TRANSLATE */
+					ED_markers_post_apply_transform(ED_context_get_markers(C), t->scene, t->mode, t->vec[0], t->frame_side);
+			}
+			else if (t->mode == TFM_TIME_SCALE) {
+				ED_markers_post_apply_transform(ED_context_get_markers(C), t->scene, t->mode, t->vec[0], t->frame_side);
 			}
 		}
 		
@@ -4860,9 +4857,9 @@ void special_aftertrans_update(bContext *C, TransInfo *t)
 					 ((cancelled == 0) || (duplicate)) )
 				{
 					if (adt) {
-						ANIM_nla_mapping_apply_fcurve(adt, fcu, 0, 1);
+						ANIM_nla_mapping_apply_fcurve(adt, fcu, 0, 0);
 						posttrans_fcurve_clean(fcu);
-						ANIM_nla_mapping_apply_fcurve(adt, fcu, 1, 1);
+						ANIM_nla_mapping_apply_fcurve(adt, fcu, 1, 0);
 					}
 					else
 						posttrans_fcurve_clean(fcu);

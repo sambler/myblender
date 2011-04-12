@@ -322,6 +322,7 @@ void uiBlockSetEmboss(uiBlock *block, char dt);
 void uiFreeBlock(const struct bContext *C, uiBlock *block);
 void uiFreeBlocks(const struct bContext *C, struct ListBase *lb);
 void uiFreeInactiveBlocks(const struct bContext *C, struct ListBase *lb);
+void uiFreeActiveButtons(const struct bContext *C, struct bScreen *screen);
 
 void uiBlockSetRegion(uiBlock *block, struct ARegion *region);
 
@@ -719,6 +720,7 @@ void uiTemplateList(uiLayout *layout, struct bContext *C, struct PointerRNA *ptr
 /* items */
 void uiItemO(uiLayout *layout, const char *name, int icon, const char *opname);
 void uiItemEnumO(uiLayout *layout, const char *opname, const char *name, int icon, const char *propname, int value);
+void uiItemEnumO_value(uiLayout *layout, const char *name, int icon, const char *opname, const char *propname, int value);
 void uiItemEnumO_string(uiLayout *layout, const char *name, int icon, const char *opname, const char *propname, const char *value);
 void uiItemsEnumO(uiLayout *layout, const char *opname, const char *propname);
 void uiItemBooleanO(uiLayout *layout, const char *name, int icon, const char *opname, const char *propname, int value);

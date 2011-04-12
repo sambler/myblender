@@ -45,6 +45,7 @@
 
 #include "UI_view2d.h"
 
+#include "ED_anim_api.h"
 #include "ED_screen.h"
 #include "ED_transform.h"
 
@@ -226,6 +227,7 @@ void graphedit_operatortypes(void)
 	
 	WM_operatortype_append(GRAPH_OT_previewrange_set);
 	WM_operatortype_append(GRAPH_OT_view_all);
+	WM_operatortype_append(GRAPH_OT_view_selected);
 	WM_operatortype_append(GRAPH_OT_properties);
 	
 	WM_operatortype_append(GRAPH_OT_ghost_curves_create);
@@ -254,6 +256,7 @@ void graphedit_operatortypes(void)
 	WM_operatortype_append(GRAPH_OT_sound_bake);
 	WM_operatortype_append(GRAPH_OT_smooth);
 	WM_operatortype_append(GRAPH_OT_clean);
+	WM_operatortype_append(GRAPH_OT_euler_filter);
 	WM_operatortype_append(GRAPH_OT_delete);
 	WM_operatortype_append(GRAPH_OT_duplicate);
 	
@@ -275,10 +278,11 @@ void ED_operatormacros_graph(void)
 	wmOperatorTypeMacro *otmacro;
 	
 	ot= WM_operatortype_append_macro("GRAPH_OT_duplicate_move", "Duplicate", OPTYPE_UNDO|OPTYPE_REGISTER);
-	WM_operatortype_macro_define(ot, "GRAPH_OT_duplicate");
-	otmacro= WM_operatortype_macro_define(ot, "TRANSFORM_OT_transform");
-	RNA_int_set(otmacro->ptr, "mode", TFM_TIME_DUPLICATE);
-
+	if (ot) {
+		WM_operatortype_macro_define(ot, "GRAPH_OT_duplicate");
+		otmacro= WM_operatortype_macro_define(ot, "TRANSFORM_OT_transform");
+		RNA_enum_set(otmacro->ptr, "mode", TFM_TIME_DUPLICATE);
+	}
 }
 
 
@@ -387,6 +391,7 @@ static void graphedit_keymap_keyframes (wmKeyConfig *keyconf, wmKeyMap *keymap)
 		/* auto-set range */
 	WM_keymap_add_item(keymap, "GRAPH_OT_previewrange_set", PKEY, KM_PRESS, KM_CTRL|KM_ALT, 0);
 	WM_keymap_add_item(keymap, "GRAPH_OT_view_all", HOMEKEY, KM_PRESS, 0, 0);
+	WM_keymap_add_item(keymap, "GRAPH_OT_view_selected", PADPERIOD, KM_PRESS, 0, 0);
 	
 		/* F-Modifiers */
 	RNA_boolean_set(WM_keymap_add_item(keymap, "GRAPH_OT_fmodifier_add", MKEY, KM_PRESS, KM_CTRL|KM_SHIFT, 0)->ptr, "only_active", 0);

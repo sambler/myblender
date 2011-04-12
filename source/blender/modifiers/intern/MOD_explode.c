@@ -148,7 +148,7 @@ static void createFacepa(ExplodeModifierData *emd,
 	/* make tree of emitter locations */
 	tree=BLI_kdtree_new(totpart);
 	for(p=0,pa=psys->particles; p<totpart; p++,pa++){
-		psys_particle_on_dm(psmd->dm,psys->part->from,pa->num,pa->num_dmcache,pa->fuv,pa->foffset,co,NULL,NULL,NULL,NULL,NULL);
+		psys_particle_on_emitter(psmd,psys->part->from,pa->num,pa->num_dmcache,pa->fuv,pa->foffset,co,NULL,NULL,NULL,NULL,NULL);
 		BLI_kdtree_insert(tree, p, co, NULL);
 	}
 	BLI_kdtree_balance(tree);
@@ -191,14 +191,14 @@ static int edgecut_get(EdgeHash *edgehash, int v1, int v2)
 }
 
  
-const short add_faces[24] = {
+static const short add_faces[24] = {
 	0,
 	0, 0, 2, 0, 1, 2, 2, 0, 2, 1,
 	2, 2, 2, 2, 3, 0, 0, 0, 1, 0,
 	1, 1, 2
  };
 
-MFace *get_dface(DerivedMesh *dm, DerivedMesh *split, int cur, int i, MFace *mf)
+static MFace *get_dface(DerivedMesh *dm, DerivedMesh *split, int cur, int i, MFace *mf)
 {
 	MFace *df = CDDM_get_face(split, cur);
 	DM_copy_face_data(dm, split, i, cur, 1);
@@ -518,14 +518,13 @@ static void remap_faces_23(DerivedMesh *dm, DerivedMesh *split, MFace *mf, int *
 
 static void remap_uvs_23(DerivedMesh *dm, DerivedMesh *split, int numlayer, int i, int cur, int c0, int c1, int c2)
 {
-	MTFace *mf, *df1, *df2, *df3;
+	MTFace *mf, *df1, *df2;
 	int l;
 
 	for(l=0; l<numlayer; l++) {
 		mf = CustomData_get_layer_n(&split->faceData, CD_MTFACE, l);
 		df1 = mf+cur;
 		df2 = df1 + 1;
-		df3 = df1 + 2;
 		mf = CustomData_get_layer_n(&dm->faceData, CD_MTFACE, l);
 		mf += i;
 

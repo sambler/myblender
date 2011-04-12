@@ -902,6 +902,7 @@ void nodeGroupRemoveSocket(bNodeTree *ngroup, bNodeSocket *gsock, int in_out)
 	case SOCK_IN:	BLI_remlink(&ngroup->inputs, gsock);	break;
 	case SOCK_OUT:	BLI_remlink(&ngroup->outputs, gsock);	break;
 	}
+	MEM_freeN(gsock);
 }
 
 /* ************** Add stuff ********** */
@@ -1325,7 +1326,7 @@ void ntreeClearPreview(bNodeTree *ntree)
 /* hack warning! this function is only used for shader previews, and 
 since it gets called multiple times per pixel for Ztransp we only
 add the color once. Preview gets cleared before it starts render though */
-void nodeAddToPreview(bNode *node, float *col, int x, int y)
+void nodeAddToPreview(bNode *node, float *col, int x, int y, int do_manage)
 {
 	bNodePreview *preview= node->preview;
 	if(preview) {
@@ -1333,7 +1334,7 @@ void nodeAddToPreview(bNode *node, float *col, int x, int y)
 			if(x<preview->xsize && y<preview->ysize) {
 				unsigned char *tar= preview->rect+ 4*((preview->xsize*y) + x);
 				
-				if(TRUE) {
+				if(do_manage) {
 					tar[0]= FTOCHAR(linearrgb_to_srgb(col[0]));
 					tar[1]= FTOCHAR(linearrgb_to_srgb(col[1]));
 					tar[2]= FTOCHAR(linearrgb_to_srgb(col[2]));
@@ -1759,32 +1760,29 @@ void ntreeSocketUseFlags(bNodeTree *ntree)
 /* ************** dependency stuff *********** */
 
 /* node is guaranteed to be not checked before */
-static int node_recurs_check(bNode *node, bNode ***nsort, int level)
+static int node_recurs_check(bNode *node, bNode ***nsort)
 {
 	bNode *fromnode;
 	bNodeSocket *sock;
-	int has_inputlinks= 0;
+	int level = 0xFFF;
 	
 	node->done= 1;
-	level++;
 	
 	for(sock= node->inputs.first; sock; sock= sock->next) {
 		if(sock->link) {
-			has_inputlinks= 1;
 			fromnode= sock->link->fromnode;
-			if(fromnode && fromnode->done==0) {
-				fromnode->level= node_recurs_check(fromnode, nsort, level);
+			if(fromnode) {
+				if (fromnode->done==0)
+					fromnode->level= node_recurs_check(fromnode, nsort);
+				if (fromnode->level <= level)
+					level = fromnode->level - 1;
 			}
 		}
 	}
-//	printf("node sort %s level %d\n", node->name, level);
 	**nsort= node;
 	(*nsort)++;
 	
-	if(has_inputlinks)
-		return level;
-	else 
-		return 0xFFF;
+	return level;
 }
 
 
@@ -1873,7 +1871,7 @@ void ntreeSolveOrder(bNodeTree *ntree)
 	/* recursive check */
 	for(node= ntree->nodes.first; node; node= node->next) {
 		if(node->done==0) {
-			node->level= node_recurs_check(node, &nsort, 0);
+			node->level= node_recurs_check(node, &nsort);
 		}
 	}
 	
@@ -2333,7 +2331,7 @@ void ntreeBeginExecTree(bNodeTree *ntree)
 					ns->hasoutput = 1;
 					
 					/* sock type is needed to detect rgba or value or vector types */
-					if(sock->link)
+					if(sock->link && sock->link->fromsock)
 						ns->sockettype= sock->link->fromsock->type;
 					else
 						sock->ns.sockettype= sock->type;
@@ -2468,7 +2466,7 @@ static int node_only_value(bNode *node)
 	if(node->inputs.first && node->type==CMP_NODE_MAP_VALUE) {
 		int retval= 1;
 		for(sock= node->inputs.first; sock; sock= sock->next) {
-			if(sock->link)
+			if(sock->link && sock->link->fromnode)
 				retval &= node_only_value(sock->link->fromnode);
 		}
 		return retval;
@@ -2626,7 +2624,7 @@ static void freeExecutableNode(bNodeTree *ntree)
 	for(node= ntree->nodes.first; node; node= node->next) {
 		if((node->exec & NODE_FINISHED)==0) {
 			for(sock= node->inputs.first; sock; sock= sock->next)
-				if(sock->link)
+				if(sock->link && sock->link->fromnode)
 					sock->link->fromnode->exec &= ~NODE_FREEBUFS;
 		}
 	}
@@ -2727,7 +2725,7 @@ void ntreeCompositExecTree(bNodeTree *ntree, RenderData *rd, int do_preview)
 			node= getExecutableNode(ntree);
 			if(node) {
 				if(ntree->progress && totnode)
-					ntree->progress(ntree->prh, (1.0 - curnode/(float)totnode));
+					ntree->progress(ntree->prh, (1.0f - curnode/(float)totnode));
 				if(ntree->stats_draw) {
 					char str[64];
 					sprintf(str, "Compositing %d %s", curnode, node->name);

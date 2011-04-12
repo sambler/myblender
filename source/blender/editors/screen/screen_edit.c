@@ -324,8 +324,7 @@ static short testsplitpoint(ScrArea *sa, char dir, float fac)
 	if(dir=='h' && (sa->v2->vec.y- sa->v1->vec.y <= 2*AREAMINY)) return 0;
 	
 	// to be sure
-	if(fac<0.0) fac= 0.0;
-	if(fac>1.0) fac= 1.0;
+	CLAMP(fac, 0.0f, 1.0f);
 	
 	if(dir=='h') {
 		y= sa->v1->vec.y+ fac*(sa->v2->vec.y- sa->v1->vec.y);
@@ -654,14 +653,14 @@ static void screen_test_scale(bScreen *sc, int winsizex, int winsizey)
 			/* FIXME, this resizing logic is no good when resizing the window + redrawing [#24428]
 			 * need some way to store these as floats internally and re-apply from there. */
 			tempf= ((float)sv->vec.x)*facx;
-			sv->vec.x= (short)(tempf+0.5);
+			sv->vec.x= (short)(tempf+0.5f);
 			sv->vec.x+= AREAGRID-1;
 			sv->vec.x-=  (sv->vec.x % AREAGRID); 
 
 			CLAMP(sv->vec.x, 0, winsizex);
 			
 			tempf= ((float)sv->vec.y)*facy;
-			sv->vec.y= (short)(tempf+0.5);
+			sv->vec.y= (short)(tempf+0.5f);
 			sv->vec.y+= AREAGRID-1;
 			sv->vec.y-=  (sv->vec.y % AREAGRID); 
 
@@ -960,8 +959,9 @@ static void region_cursor_set(wmWindow *win, int swinid)
 	}
 }
 
-void ED_screen_do_listen(wmWindow *win, wmNotifier *note)
+void ED_screen_do_listen(bContext *C, wmNotifier *note)
 {
+	wmWindow *win= CTX_wm_window(C);
 	
 	/* generic notes */
 	switch(note->category) {
@@ -973,8 +973,11 @@ void ED_screen_do_listen(wmWindow *win, wmNotifier *note)
 			win->screen->do_draw= 1;
 			break;
 		case NC_SCREEN:
+			if(note->data==ND_SUBWINACTIVE)
+				uiFreeActiveButtons(C, win->screen);
 			if(note->action==NA_EDITED)
 				win->screen->do_draw= win->screen->do_refresh= 1;
+			break;
 		case NC_SCENE:
 			if(note->data==ND_MODE)
 				region_cursor_set(win, note->swinid);				
@@ -1217,8 +1220,10 @@ static void screen_cursor_set(wmWindow *win, wmEvent *event)
 
 /* called in wm_event_system.c. sets state vars in screen, cursors */
 /* event type is mouse move */
-void ED_screen_set_subwinactive(wmWindow *win, wmEvent *event)
+void ED_screen_set_subwinactive(bContext *C, wmEvent *event)
 {
+	wmWindow *win= CTX_wm_window(C);
+	
 	if(win->screen) {
 		bScreen *scr= win->screen;
 		ScrArea *sa;
@@ -1264,6 +1269,7 @@ void ED_screen_set_subwinactive(wmWindow *win, wmEvent *event)
 		}
 		else if(oldswin!=scr->subwinactive) {
 			region_cursor_set(win, scr->subwinactive);
+			WM_event_add_notifier(C, NC_SCREEN|ND_SUBWINACTIVE, scr);
 		}
 	}
 }
@@ -1579,6 +1585,9 @@ ScrArea *ED_screen_full_toggle(bContext *C, wmWindow *win, ScrArea *sa)
 		   are no longer in the same screen */
 		for(ar=sa->regionbase.first; ar; ar=ar->next)
 			uiFreeBlocks(C, &ar->uiblocks);
+		
+		/* prevent hanging header prints */
+		ED_area_headerprint(sa, NULL);
 	}
 
 	if(sa && sa->full) {

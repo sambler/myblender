@@ -49,6 +49,7 @@
 
 #include "BKE_context.h"
 #include "BKE_customdata.h"
+#include "BKE_global.h"
 #include "BKE_main.h"
 #include "BKE_mesh.h"
 #include "BKE_report.h"
@@ -66,6 +67,7 @@
 #include "ED_armature.h"
 #include "ED_screen_types.h"
 #include "ED_keyframes_draw.h"
+#include "ED_view3d.h"
 
 #include "RNA_access.h"
 #include "RNA_define.h"
@@ -105,6 +107,27 @@ int ED_operator_screenactive(bContext *C)
 	if(CTX_wm_window(C)==NULL) return 0;
 	if(CTX_wm_screen(C)==NULL) return 0;
 	return 1;
+}
+
+/* XXX added this to prevent anim state to change during renders */
+int ED_operator_screenactive_norender(bContext *C)
+{
+	if(G.rendering) return 0;
+	if(CTX_wm_window(C)==NULL) return 0;
+	if(CTX_wm_screen(C)==NULL) return 0;
+	return 1;
+}
+
+
+static int screen_active_editable(bContext *C)
+{
+	if(ED_operator_screenactive(C)) {
+		/* no full window splitting allowed */
+		if(CTX_wm_screen(C)->full != SCREENNORMAL)
+			return 0;
+		return 1;
+	}
+	return 0;
 }
 
 /* when mouse is over area-edge */
@@ -279,6 +302,12 @@ int ED_operator_object_active_editable_mesh(bContext *C)
 {
 	Object *ob = ED_object_active_context(C);
 	return ((ob != NULL) && !(ob->id.lib) && !(ob->restrictflag & OB_RESTRICT_VIEW) && ob->type == OB_MESH);
+}
+
+int ED_operator_object_active_editable_font(bContext *C)
+{
+	Object *ob = ED_object_active_context(C);
+	return ((ob != NULL) && !(ob->id.lib) && !(ob->restrictflag & OB_RESTRICT_VIEW) && ob->type == OB_FONT);
 }
 
 int ED_operator_editmesh(bContext *C)
@@ -1256,13 +1285,16 @@ static int area_split_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	sAreaSplitData *sd;
 	int dir;
 	
+	/* no full window splitting allowed */
+	if(CTX_wm_screen(C)->full != SCREENNORMAL)
+		return OPERATOR_CANCELLED;
+	
 	if(event->type==EVT_ACTIONZONE_AREA) {
 		sActionzoneData *sad= event->customdata;
 		
 		if(sad->modifier>0) {
 			return OPERATOR_PASS_THROUGH;
 		}
-		
 		
 		/* verify *sad itself */
 		if(sad==NULL || sad->sa1==NULL || sad->az==NULL)
@@ -1291,10 +1323,6 @@ static int area_split_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	else {
 		ScrEdge *actedge;
 		int x, y;
-		
-		/* no full window splitting allowed */
-		if(CTX_wm_area(C) && CTX_wm_area(C)->full)
-			return OPERATOR_CANCELLED;
 		
 		/* retrieve initial mouse coord, so we can find the active edge */
 		if(RNA_property_is_set(op->ptr, "mouse_x"))
@@ -1417,7 +1445,10 @@ static int area_split_modal(bContext *C, wmOperator *op, wmEvent *event)
 						sd->origmin= sd->sarea->totrct.ymin;
 						sd->sarea->flag |= AREA_FLAG_DRAWSPLIT_H;
 					}
-				}				
+				}
+				
+				CTX_wm_window(C)->screen->do_draw= 1;
+
 			}
 			
 			fac= (dir == 'v') ? event->x-sd->origmin : event->y-sd->origmin;
@@ -1461,7 +1492,7 @@ static void SCREEN_OT_area_split(wmOperatorType *ot)
 	ot->invoke= area_split_invoke;
 	ot->modal= area_split_modal;
 	
-	ot->poll= ED_operator_screenactive;
+	ot->poll= screen_active_editable;
 	ot->flag= OPTYPE_BLOCKING;
 	
 	/* rna */
@@ -1696,7 +1727,7 @@ static void SCREEN_OT_frame_offset(wmOperatorType *ot)
 	
 	ot->exec= frame_offset_exec;
 	
-	ot->poll= ED_operator_screenactive;
+	ot->poll= ED_operator_screenactive_norender;
 	ot->flag= 0;
 	
 	/* rna */
@@ -1746,7 +1777,7 @@ static void SCREEN_OT_frame_jump(wmOperatorType *ot)
 	
 	ot->exec= frame_jump_exec;
 	
-	ot->poll= ED_operator_screenactive;
+	ot->poll= ED_operator_screenactive_norender;
 	ot->flag= OPTYPE_UNDO;
 	
 	/* rna */
@@ -1826,7 +1857,7 @@ static void SCREEN_OT_keyframe_jump(wmOperatorType *ot)
 	
 	ot->exec= keyframe_jump_exec;
 	
-	ot->poll= ED_operator_screenactive;
+	ot->poll= ED_operator_screenactive_norender;
 	ot->flag= OPTYPE_UNDO;
 	
 	/* rna */
@@ -1898,7 +1929,18 @@ static void SCREEN_OT_screen_set(wmOperatorType *ot)
 /* function to be called outside UI context, or for redo */
 static int screen_full_area_exec(bContext *C, wmOperator *UNUSED(op))
 {
-	ED_screen_full_toggle(C, CTX_wm_window(C), CTX_wm_area(C));
+	bScreen *screen = CTX_wm_screen(C);
+	ScrArea *sa=NULL;
+	
+	/* search current screen for 'fullscreen' areas */
+	/* prevents restoring info header, when mouse is over it */
+	for (sa=screen->areabase.first; sa; sa=sa->next) {
+		if (sa->full) break;
+	}
+	
+	if(sa==NULL) sa= CTX_wm_area(C);
+	
+	ED_screen_full_toggle(C, CTX_wm_window(C), sa);
 	return OPERATOR_FINISHED;
 }
 
@@ -2200,7 +2242,7 @@ static void SCREEN_OT_area_join(wmOperatorType *ot)
 	ot->exec= area_join_exec;
 	ot->invoke= area_join_invoke;
 	ot->modal= area_join_modal;
-	ot->poll= ED_operator_screenactive;
+	ot->poll= screen_active_editable;
 	
 	ot->flag= OPTYPE_BLOCKING;
 	
@@ -2464,26 +2506,36 @@ static int region_quadview_exec(bContext *C, wmOperator *op)
 		
 		/* lock views and set them */
 		if(sa->spacetype==SPACE_VIEW3D) {
+			/* run ED_view3d_lock() so the correct 'rv3d->viewquat' is set,
+			 * otherwise when restoring rv3d->localvd the 'viewquat' won't
+			 * match the 'view', set on entering localview See: [#26315],
+			 *
+			 * We could avoid manipulating rv3d->localvd here if exiting
+			 * localview with a 4-split would assign these view locks */
 			RegionView3D *rv3d;
 			
 			rv3d= ar->regiondata;
 			rv3d->viewlock= RV3D_LOCKED; rv3d->view= RV3D_VIEW_FRONT; rv3d->persp= RV3D_ORTHO;
-			if (rv3d->localvd) { rv3d->localvd->view = rv3d->view; rv3d->localvd->persp = rv3d->persp; }
+			ED_view3d_lock(rv3d);
+			if (rv3d->localvd) { rv3d->localvd->view = rv3d->view; rv3d->localvd->persp = rv3d->persp; copy_qt_qt(rv3d->localvd->viewquat, rv3d->viewquat);}
 			
 			ar= ar->next;
 			rv3d= ar->regiondata;
 			rv3d->viewlock= RV3D_LOCKED; rv3d->view= RV3D_VIEW_TOP; rv3d->persp= RV3D_ORTHO;
-			if (rv3d->localvd) { rv3d->localvd->view = rv3d->view; rv3d->localvd->persp = rv3d->persp; }
+			ED_view3d_lock(rv3d);
+			if (rv3d->localvd) { rv3d->localvd->view = rv3d->view; rv3d->localvd->persp = rv3d->persp; copy_qt_qt(rv3d->localvd->viewquat, rv3d->viewquat);}
 			
 			ar= ar->next;
 			rv3d= ar->regiondata;
 			rv3d->viewlock= RV3D_LOCKED; rv3d->view= RV3D_VIEW_RIGHT; rv3d->persp= RV3D_ORTHO;
-			if (rv3d->localvd) { rv3d->localvd->view = rv3d->view; rv3d->localvd->persp = rv3d->persp; }
+			ED_view3d_lock(rv3d);
+			if (rv3d->localvd) { rv3d->localvd->view = rv3d->view; rv3d->localvd->persp = rv3d->persp; copy_qt_qt(rv3d->localvd->viewquat, rv3d->viewquat);}
 			
 			ar= ar->next;
 			rv3d= ar->regiondata;
 			rv3d->view= RV3D_VIEW_CAMERA; rv3d->persp= RV3D_CAMOB;
-			if (rv3d->localvd) {rv3d->localvd->view = rv3d->view; rv3d->localvd->persp = rv3d->persp; }
+			ED_view3d_lock(rv3d);
+			if (rv3d->localvd) {rv3d->localvd->view = rv3d->view; rv3d->localvd->persp = rv3d->persp; copy_qt_qt(rv3d->localvd->viewquat, rv3d->viewquat);}
 		}
 		ED_area_tag_redraw(sa);
 		WM_event_add_notifier(C, NC_SCREEN|NA_EDITED, NULL);
@@ -2736,7 +2788,7 @@ static int screen_animation_step(bContext *C, wmOperator *UNUSED(op), wmEvent *e
 		else sync= (scene->flag & SCE_FRAME_DROP);
 		
 		if((scene->audio.flag & AUDIO_SYNC) && !(sad->flag & ANIMPLAY_FLAG_REVERSE) && finite(time = sound_sync_scene(scene)))
-			scene->r.cfra = time * FPS + 0.5;
+			scene->r.cfra = (double)time * FPS + 0.5;
 		else
 		{
 			if (sync) {
@@ -2746,7 +2798,7 @@ static int screen_animation_step(bContext *C, wmOperator *UNUSED(op), wmEvent *e
 					scene->r.cfra -= step;
 				else
 					scene->r.cfra += step;
-				wt->duration -= ((float)step)/FPS;
+				wt->duration -= ((double)step)/FPS;
 			}
 			else {
 				/* one frame +/- */
@@ -2845,7 +2897,7 @@ static void SCREEN_OT_animation_step(wmOperatorType *ot)
 	/* api callbacks */
 	ot->invoke= screen_animation_step;
 	
-	ot->poll= ED_operator_screenactive;
+	ot->poll= ED_operator_screenactive_norender;
 	
 }
 
@@ -2902,26 +2954,29 @@ static void SCREEN_OT_animation_play(wmOperatorType *ot)
 	/* api callbacks */
 	ot->exec= screen_animation_play_exec;
 	
-	ot->poll= ED_operator_screenactive;
+	ot->poll= ED_operator_screenactive_norender;
 	
 	RNA_def_boolean(ot->srna, "reverse", 0, "Play in Reverse", "Animation is played backwards");
 	RNA_def_boolean(ot->srna, "sync", 0, "Sync", "Drop frames to maintain framerate");
 }
 
-static int screen_animation_cancel_exec(bContext *C, wmOperator *UNUSED(op))
+static int screen_animation_cancel_exec(bContext *C, wmOperator *op)
 {
 	bScreen *screen= CTX_wm_screen(C);
-	
+
 	if (screen->animtimer) {
-		ScreenAnimData *sad= screen->animtimer->customdata;
-		Scene *scene= CTX_data_scene(C);
-		
-		/* reset current frame before stopping, and just send a notifier to deal with the rest 
-		 * (since playback still needs to be stopped)
-		 */
-		scene->r.cfra= sad->sfra;
-		WM_event_add_notifier(C, NC_SCENE|ND_FRAME, scene);
-		
+		if(RNA_boolean_get(op->ptr, "restore_frame")) {
+			ScreenAnimData *sad= screen->animtimer->customdata;
+			Scene *scene= CTX_data_scene(C);
+
+			/* reset current frame before stopping, and just send a notifier to deal with the rest
+			 * (since playback still needs to be stopped)
+			 */
+			scene->r.cfra= sad->sfra;
+
+			WM_event_add_notifier(C, NC_SCENE|ND_FRAME, scene);
+		}
+
 		/* call the other "toggling" operator to clean up now */
 		ED_screen_animation_play(C, 0, 0);
 	}
@@ -2940,6 +2995,8 @@ static void SCREEN_OT_animation_cancel(wmOperatorType *ot)
 	ot->exec= screen_animation_cancel_exec;
 	
 	ot->poll= ED_operator_screenactive;
+
+	RNA_def_boolean(ot->srna, "restore_frame", TRUE, "Restore Frame", "Restore the frame when animation was initialized.");
 }
 
 /* ************** border select operator (template) ***************************** */
@@ -3091,6 +3148,7 @@ static void SCREEN_OT_new(wmOperatorType *ot)
 	
 	/* api callbacks */
 	ot->exec= screen_new_exec;
+	ot->poll= WM_operator_winactive;
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
@@ -3126,18 +3184,30 @@ static void SCREEN_OT_delete(wmOperatorType *ot)
 static int scene_new_exec(bContext *C, wmOperator *op)
 {
 	Scene *newscene, *scene= CTX_data_scene(C);
+	bScreen *screen= CTX_wm_screen(C);
 	Main *bmain= CTX_data_main(C);
 	int type= RNA_enum_get(op->ptr, "type");
+
+	if(type == SCE_COPY_NEW) {
+		newscene= add_scene("Scene");
+	}
+	else { /* different kinds of copying */
+		newscene= copy_scene(scene, type);
+
+		/* these can't be handled in blenkernel curently, so do them here */
+		if(type == SCE_COPY_LINK_DATA) {
+			ED_object_single_users(bmain, newscene, 0);
+		}
+		else if(type == SCE_COPY_FULL) {
+			ED_object_single_users(bmain, newscene, 1);
+		}
+	}
 	
-	newscene= copy_scene(scene, type);
-	
-	/* these can't be handled in blenkernel curently, so do them here */
-	if(type == SCE_COPY_LINK_DATA)
-		ED_object_single_users(bmain, newscene, 0);
-	else if(type == SCE_COPY_FULL)
-		ED_object_single_users(bmain, newscene, 1);
-	
+	/* this notifier calls ED_screen_set_scene, doing a lot of UI stuff, not for inside event loops */
 	WM_event_add_notifier(C, NC_SCENE|ND_SCENEBROWSE, newscene);
+	
+	if(screen)
+		screen->scene= newscene;
 	
 	return OPERATOR_FINISHED;
 }
@@ -3145,7 +3215,8 @@ static int scene_new_exec(bContext *C, wmOperator *op)
 static void SCENE_OT_new(wmOperatorType *ot)
 {
 	static EnumPropertyItem type_items[]= {
-		{SCE_COPY_EMPTY, "EMPTY", 0, "Empty", "Add empty scene"},
+		{SCE_COPY_NEW, "NEW", 0, "New", "Add new scene"},
+		{SCE_COPY_EMPTY, "EMPTY", 0, "Copy Settings", "Make a copy without any objects"},
 		{SCE_COPY_LINK_OB, "LINK_OBJECTS", 0, "Link Objects", "Link to the objects from the current scene"},
 		{SCE_COPY_LINK_DATA, "LINK_OBJECT_DATA", 0, "Link Object Data", "Copy objects linked to data from the current scene"},
 		{SCE_COPY_FULL, "FULL_COPY", 0, "Full Copy", "Make a full copy of the current scene"},

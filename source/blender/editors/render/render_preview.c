@@ -1053,8 +1053,10 @@ static void shader_preview_render(ShaderPreview *sp, ID *id, int split, int firs
 	/* callbacs are cleared on GetRender() */
 	if(ELEM(sp->pr_method, PR_BUTS_RENDER, PR_NODE_RENDER)) {
 		RE_display_draw_cb(re, sp, shader_preview_draw);
-		RE_test_break_cb(re, sp, shader_preview_break);
 	}
+	/* set this for all previews, default is react to G.afbreek still */
+	RE_test_break_cb(re, sp, shader_preview_break);
+	
 	/* lens adjust */
 	oldlens= ((Camera *)sce->camera->data)->lens;
 	if(sizex > sp->sizey)
@@ -1115,11 +1117,20 @@ static void shader_preview_free(void *customdata)
 	
 	if(sp->matcopy) {
 		struct IDProperty *properties;
+		int a;
+		
 		/* node previews */
 		shader_preview_updatejob(sp);
 		
 		/* get rid of copied material */
 		BLI_remlink(&pr_main->mat, sp->matcopy);
+		
+		/* free_material decrements texture, prevent this. hack alert! */
+		for(a=0; a<MAX_MTEX; a++) {
+			MTex *mtex= sp->matcopy->mtex[a];
+			if(mtex && mtex->tex) mtex->tex= NULL;
+		}
+		
 		free_material(sp->matcopy);
 
 		properties= IDP_GetProperties((ID *)sp->matcopy, FALSE);

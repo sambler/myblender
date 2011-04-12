@@ -470,8 +470,12 @@ void	CcdPhysicsEnvironment::updateCcdPhysicsController(CcdPhysicsController* ctr
 			if (newMass)
 				body->getCollisionShape()->calculateLocalInertia(newMass, inertia);
 			body->setMassProps(newMass, inertia);
+			m_dynamicsWorld->addRigidBody(body, newCollisionGroup, newCollisionMask);
+		}	
+		else
+		{
+			m_dynamicsWorld->addCollisionObject(obj, newCollisionGroup, newCollisionMask);
 		}
-		m_dynamicsWorld->addCollisionObject(obj, newCollisionGroup, newCollisionMask);
 	}
 	// to avoid nasty interaction, we must update the property of the controller as well
 	ctrl->m_cci.m_mass = newMass;
@@ -1457,7 +1461,7 @@ struct OcclusionBuffer
 						const float face,
 						const btScalar minarea)
 	{
-		const btScalar		a2=cross(b-a,c-a)[2];
+		const btScalar		a2=btCross(b-a,c-a)[2];
 		if((face*a2)<0.f || btFabs(a2)<minarea)
 			return false;
 		// further down we are normally going to write to the Zbuffer, mark it so
@@ -2793,3 +2797,35 @@ float		CcdPhysicsEnvironment::getAppliedImpulse(int	constraintid)
 
 	return 0.f;
 }
+
+void	CcdPhysicsEnvironment::exportFile(const char* filename)
+{
+	btDefaultSerializer*	serializer = new btDefaultSerializer();
+	
+		
+	for (int i=0;i<m_dynamicsWorld->getNumCollisionObjects();i++)
+	{
+
+		btCollisionObject* colObj = m_dynamicsWorld->getCollisionObjectArray()[i];
+
+		CcdPhysicsController* controller = static_cast<CcdPhysicsController*>(colObj->getUserPointer());
+		if (controller)
+		{
+			const char* name = controller->getName();
+			if (name)
+			{
+				serializer->registerNameForPointer(colObj,name);
+			}
+		}
+	}
+
+	m_dynamicsWorld->serialize(serializer);
+
+	FILE* file = fopen(filename,"wb");
+	if (file)
+	{
+		fwrite(serializer->getBufferPointer(),serializer->getCurrentBufferSize(),1, file);
+		fclose(file);
+	}
+}
+

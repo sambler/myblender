@@ -1254,7 +1254,7 @@ static int allow_make_links_data(int ev, Object *ob, Object *obt)
 static int make_links_data_exec(bContext *C, wmOperator *op)
 {
 	Main *bmain= CTX_data_main(C);
-	int event = RNA_int_get(op->ptr, "type");
+	int event = RNA_enum_get(op->ptr, "type");
 	Object *ob;
 	ID *id;
 	int a;
@@ -1354,7 +1354,7 @@ void OBJECT_OT_make_links_data(wmOperatorType *ot)
 
 	/* api callbacks */
 	ot->exec= make_links_data_exec;
-	ot->poll= ED_operator_objectmode;
+	ot->poll= ED_operator_object_active;
 
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
@@ -1365,11 +1365,6 @@ void OBJECT_OT_make_links_data(wmOperatorType *ot)
 
 
 /**************************** Make Single User ********************************/
-
-static void single_object_users__forwardModifierLinks(void *UNUSED(userData), Object *UNUSED(ob), Object **obpoin)
-{
-	ID_NEW(*obpoin);
-}
 
 static void single_object_users(Scene *scene, View3D *v3d, int flag)	
 {
@@ -1402,19 +1397,7 @@ static void single_object_users(Scene *scene, View3D *v3d, int flag)
 	
 	/* object pointers */
 	for(base= FIRSTBASE; base; base= base->next) {
-		ob= base->object;
-		if(ob->id.lib==NULL) {
-			relink_constraints(&base->object->constraints);
-			if (base->object->pose){
-				bPoseChannel *chan;
-				for (chan = base->object->pose->chanbase.first; chan; chan=chan->next){
-					relink_constraints(&chan->constraints);
-				}
-			}
-			modifiers_foreachObjectLink(base->object, single_object_users__forwardModifierLinks, NULL);
-			
-			ID_NEW(ob->parent);
-		}
+		object_relink(base->object);
 	}
 
 	set_sca_new_poins();

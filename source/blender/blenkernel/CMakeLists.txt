@@ -235,7 +235,7 @@ if(WITH_BULLET)
 	add_definitions(-DUSE_BULLET)
 endif()
 
-if(WITH_ELTOPO)
+if(WITH_MOD_CLOTH_ELTOPO)
 	list(APPEND INC ../../../extern/eltopo)
 	add_definitions(-DUSE_ELTOPO)
 endif()

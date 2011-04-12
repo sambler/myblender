@@ -951,7 +951,7 @@ static int get_path_local(char *targetpath, const char *folder_name, const char 
 		return 1;
 	}
 	else if( inc_prev && BLI_strcasecmp(folder_name, "config")==0 /* we only go back for config */
-			&& test_path(targetpath, bprogdir, blender_prev_version_decimal(ver), relfolder)) {
+			&& test_path(targetpath, bprogdir, blender_prev_version_decimal(), relfolder)) {
 		config_from_local = 1;
 		return 1;
 	}

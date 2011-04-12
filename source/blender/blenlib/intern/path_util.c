@@ -924,7 +924,7 @@ static int get_path_local(char *targetpath, const char *folder_name, const char 
 		let's back up and allow the config to be in the same dir as the .app bundle.
 		blender exe is in blender.app/Contents/MacOS so up three gives us the app bundle's parent folder */
 	BLI_join_dirfile(osxprogfolder, sizeof(osxprogfolder), bprogdir, "../../../");
-	if(test_path(targetpath, osxprogfolder, blender_version_decimal(), relfolder)) {
+	if(test_path(targetpath, osxprogfolder, blender_version_decimal(ver), relfolder)) {
 		/* vers folder in same location as blender only counts as local config if we are looking for the config dir */
 		if(BLI_strcasecmp(folder_name, "config")==0)
 			config_from_local = 1;
@@ -937,7 +937,7 @@ static int get_path_local(char *targetpath, const char *folder_name, const char 
 	}
 	else if (config_from_local && BLI_strcasecmp(folder_name, "config")==0) {
 		/* we started with a prev local config but we aren't looking for it now - give a non-existing current config path to save the config file into */
-		test_path(targetpath, osxprogfolder, blender_version_decimal(), relfolder);
+		test_path(targetpath, osxprogfolder, blender_version_decimal(ver), relfolder);
 		return 1;
 	}
 	/* if not there check normally */
@@ -987,7 +987,7 @@ static int get_path_user(char *targetpath, const char *folder_name, const char *
 	if (user_base_path) {
 		BLI_snprintf(user_path, FILE_MAX, BLENDER_USER_FORMAT, user_base_path, blender_version_decimal(ver));
 		if(inc_prev)
-			BLI_snprintf(user_path_prev, FILE_MAX, BLENDER_USER_FORMAT, user_base_path, blender_prev_version_decimal(ver));
+			BLI_snprintf(user_path_prev, FILE_MAX, BLENDER_USER_FORMAT, user_base_path, blender_prev_version_decimal());
 	}
 
 	if(!user_path[0] && !user_path_prev)
@@ -1175,7 +1175,7 @@ char *BLI_get_user_folder_notest(int folder_id, const char *subfolder)
 			if( config_from_local )
 				get_path_local(path, "config", subfolder, ver, 0);
 			else
-				get_path_user(path, "config", subfolder, "BLENDER_USER_CONFIG",ver, 0);
+				get_path_user(path, "config", subfolder, "BLENDER_USER_CONFIG", ver, 0);
 			break;
 		case BLENDER_USER_AUTOSAVE:
 			get_path_user(path, "autosave", subfolder, "BLENDER_USER_AUTOSAVE", ver, 0);
@@ -1217,10 +1217,10 @@ char *BLI_get_folder_version(const int id, const int ver, const int do_check)
 	int ok;
 	switch(id) {
 	case BLENDER_RESOURCE_PATH_USER:
-		ok= get_path_user(path, NULL, NULL, NULL, ver);
+		ok= get_path_user(path, NULL, NULL, NULL, ver, 0);
 		break;
 	case BLENDER_RESOURCE_PATH_LOCAL:
-		ok= get_path_local(path, NULL, NULL, ver);
+		ok= get_path_local(path, NULL, NULL, ver, 0);
 		break;
 	case BLENDER_RESOURCE_PATH_SYSTEM:
 		ok= get_path_system(path, NULL, NULL, NULL, ver);

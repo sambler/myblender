@@ -873,14 +873,18 @@ def rna2sphinx(BASEPATH):
     if bpy.app.build_revision != "Unknown":
         version_string = version_string + " r" + bpy.app.build_revision
 
-    # for use with files
     version_string_fp = "_".join(str(v) for v in bpy.app.version)
+
+    if bpy.app.version_cycle == "release":
+        version_string_pdf = "%s%s_release" % ("_".join(str(v) for v in bpy.app.version[:2]), bpy.app.version_char)
+    else:
+        version_string_pdf = version_string_fp
 
     fw("project = 'Blender'\n")
     # fw("master_doc = 'index'\n")
     fw("copyright = u'Blender Foundation'\n")
-    fw("version = '%s - UNSTABLE API'\n" % version_string)
-    fw("release = '%s - UNSTABLE API'\n" % version_string)
+    fw("version = '%s - API'\n" % version_string)
+    fw("release = '%s - API'\n" % version_string)
     fw("html_theme = 'blender-org'\n")
     fw("html_theme_path = ['../']\n")
     fw("html_favicon = 'favicon.ico'\n")
@@ -906,23 +910,19 @@ def rna2sphinx(BASEPATH):
     fw("| An introduction to Blender and Python can be found at `Quickstart Intro <http://wiki.blender.org/index.php/Dev:2.5/Py/API/Intro>`_,\n")
     fw("| For a more general explanation of blender/python see the `API Overview <http://wiki.blender.org/index.php/Dev:2.5/Py/API/Overview>`_\n")
     fw("\n")
-    fw("`A PDF version of this document is also available <blender_python_reference_%s.pdf>`_\n" % version_string_fp)
+    fw("`A PDF version of this document is also available <blender_python_reference_%s.pdf>`_\n" % version_string_pdf)
     fw("\n")
-    fw(".. warning:: The Python API in Blender is **UNSTABLE**, It should only be used for testing, any script written now may break in future releases.\n")
+    fw(".. warning:: The Blender Python API has areas which are still in development.\n")
     fw("   \n")
     fw("   The following areas are subject to change.\n")
-    fw("      * operator names and arguments\n")
-    fw("      * render api\n")
-    fw("      * function calls with the data api (any function calls with values accessed from bpy.data), including functions for importing and exporting meshes\n")
-    fw("      * class registration (Operator, Panels, Menus, Headers)\n")
-    fw("      * modules: bpy.props, blf)\n")
-    fw("      * members in the bpy.context have to be reviewed\n")
-    fw("      * python defined modal operators, especially drawing callbacks are highly experemental\n")
+    fw("      * operator behavior, names and arguments\n")
+    fw("      * mesh creation and editing functions\n")
     fw("   \n")
     fw("   These parts of the API are relatively stable and are unlikely to change significantly\n")
     fw("      * data API, access to attributes of blender data such as mesh verts, material color, timeline frames and scene objects\n")
     fw("      * user interface functions for defining buttons, creation of menus, headers, panels\n")
-    fw("      * modules: bgl and mathutils\n")
+    fw("      * render engine integration\n")
+    fw("      * modules: bgl, mathutils\n")
     fw("      * game engine modules\n")
     fw("\n")
 

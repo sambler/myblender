@@ -1114,24 +1114,20 @@ static int wm_resource_check_prev(void)
 
 	// if(res) printf("USER: %s\n", res);
 
+#if 0 /* ignore the local folder */
 	if(res == NULL) {
+		/* with a local dir, copying old files isnt useful since local dir get priority for config */
 		res= BLI_get_folder_version(BLENDER_RESOURCE_PATH_LOCAL, BLENDER_VERSION, TRUE);
 	}
+#endif
 
 	// if(res) printf("LOCAL: %s\n", res);
-
-	if(res == NULL) {
-		int res_dir[]= {BLENDER_RESOURCE_PATH_USER, BLENDER_RESOURCE_PATH_LOCAL, -1};
-		int i= 0;
-
-		for(i= 0; res_dir[i] != -1; i++) {
-			if(BLI_get_folder_version(res_dir[i], BLENDER_VERSION - 1, TRUE)) {
-				return TRUE;
-			}
-		}
+	if(res) {
+		return FALSE;
 	}
-
-	return FALSE;
+	else {
+		return (BLI_get_folder_version(BLENDER_RESOURCE_PATH_USER, BLENDER_VERSION - 1, TRUE) != NULL);
+	}
 }
 
 static uiBlock *wm_block_create_splash(bContext *C, ARegion *ar, void *UNUSED(arg))
@@ -1143,7 +1139,7 @@ static uiBlock *wm_block_create_splash(bContext *C, ARegion *ar, void *UNUSED(ar
 	struct RecentFile *recent;
 	int i;
 	MenuType *mt= WM_menutype_find("USERPREF_MT_splash", TRUE);
-	char url[64];
+	char url[96];
 	
 #ifdef NAN_BUILDINFO
 	int ver_width, rev_width;
@@ -1197,23 +1193,29 @@ static uiBlock *wm_block_create_splash(bContext *C, ARegion *ar, void *UNUSED(ar
 	col = uiLayoutColumn(split, 0);
 	uiItemL(col, "Links", ICON_NONE);
 	uiItemStringO(col, "Donations", ICON_URL, "WM_OT_url_open", "url", "http://www.blender.org/blenderorg/blender-foundation/donation-payment/");
-	uiItemStringO(col, "Release Log", ICON_URL, "WM_OT_url_open", "url", "http://www.blender.org/development/release-logs/blender-256-beta/");
+	uiItemStringO(col, "Release Log", ICON_URL, "WM_OT_url_open", "url", "http://www.blender.org/development/release-logs/blender-257/");
 	uiItemStringO(col, "Manual", ICON_URL, "WM_OT_url_open", "url", "http://wiki.blender.org/index.php/Doc:Manual");
 	uiItemStringO(col, "Blender Website", ICON_URL, "WM_OT_url_open", "url", "http://www.blender.org/");
 	uiItemStringO(col, "User Community", ICON_URL, "WM_OT_url_open", "url", "http://www.blender.org/community/user-community/"); // 
-	BLI_snprintf(url, sizeof(url), "http://www.blender.org/documentation/blender_python_api_%d_%d_%d", BLENDER_VERSION/100, BLENDER_VERSION%100, BLENDER_SUBVERSION);
+	if(strcmp(STRINGIFY(BLENDER_VERSION_CYCLE), "release")==0) {
+		BLI_snprintf(url, sizeof(url), "http://www.blender.org/documentation/blender_python_api_%d_%d" STRINGIFY(BLENDER_VERSION_CHAR) "_release", BLENDER_VERSION/100, BLENDER_VERSION%100);
+	}
+	else {
+		BLI_snprintf(url, sizeof(url), "http://www.blender.org/documentation/blender_python_api_%d_%d_%d", BLENDER_VERSION/100, BLENDER_VERSION%100, BLENDER_SUBVERSION);
+	}
 	uiItemStringO(col, "Python API Reference", ICON_URL, "WM_OT_url_open", "url", url);
 	uiItemL(col, "", ICON_NONE);
 
 	col = uiLayoutColumn(split, 0);
+
+	if(wm_resource_check_prev()) {
+		uiItemO(col, NULL, ICON_NEW, "WM_OT_copy_prev_settings");
+		uiItemS(col);
+	}
+
 	uiItemL(col, "Recent", ICON_NONE);
 	for(recent = G.recent_files.first, i=0; (i<5) && (recent); recent = recent->next, i++) {
 		uiItemStringO(col, BLI_path_basename(recent->filepath), ICON_FILE_BLEND, "WM_OT_open_mainfile", "filepath", recent->filepath);
-	}
-
-	if(wm_resource_check_prev()) {
-		uiItemS(col);
-		uiItemO(col, NULL, ICON_NEW, "WM_OT_copy_prev_settings");
 	}
 
 	uiItemS(col);

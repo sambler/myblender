@@ -72,7 +72,7 @@ static char M_Geometry_intersect_ray_tri_doc[] =
 "   :type ray: :class:`mathutils.Vector`\n"
 "   :arg orig: Origin\n"
 "   :type orig: :class:`mathutils.Vector`\n"
-"   :arg clip: Clip by the ray length\n"
+"   :arg clip: When False, don't restrict the intersection to the area of the triangle, use the infinite plane defined by the triangle.\n"
 "   :type clip: boolean\n"
 "   :return: The point of intersection or None if no intersection is found\n"
 "   :rtype: :class:`mathutils.Vector` or None\n"
@@ -841,10 +841,10 @@ static PyObject *M_Geometry_barycentric_transform(PyObject *UNUSED(self), PyObje
 		vec_t1_tar->size != 3 ||
 		vec_t2_tar->size != 3 ||
 		vec_t3_tar->size != 3)
-	 {
-		 PyErr_SetString(PyExc_ValueError, "One of more of the vector arguments wasnt a 3D vector");
-		 return NULL;
-	 }
+	{
+		PyErr_SetString(PyExc_ValueError, "One of more of the vector arguments wasnt a 3D vector");
+		return NULL;
+	}
 
 	barycentric_transform(vec, vec_pt->vec,
 			vec_t1_tar->vec, vec_t2_tar->vec, vec_t3_tar->vec,

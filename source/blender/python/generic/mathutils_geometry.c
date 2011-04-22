@@ -48,7 +48,7 @@
 
 #include "BKE_curve.h"
 
-#define SWAP_FLOAT(a,b,tmp) tmp=a; a=b; b=tmp
+#define SWAP_FLOAT(a, b, tmp) tmp=a; a=b; b=tmp
 #define eps 0.000001
 
 
@@ -72,7 +72,7 @@ static char M_Geometry_intersect_ray_tri_doc[] =
 "   :type ray: :class:`mathutils.Vector`\n"
 "   :arg orig: Origin\n"
 "   :type orig: :class:`mathutils.Vector`\n"
-"   :arg clip: Clip by the ray length\n"
+"   :arg clip: When False, don't restrict the intersection to the area of the triangle, use the infinite plane defined by the triangle.\n"
 "   :type clip: boolean\n"
 "   :return: The point of intersection or None if no intersection is found\n"
 "   :rtype: :class:`mathutils.Vector` or None\n"
@@ -114,7 +114,7 @@ static PyObject *M_Geometry_intersect_ray_tri(PyObject *UNUSED(self), PyObject* 
 	/* if determinant is near zero, ray lies in plane of triangle */
 	det= dot_v3v3(e1, pvec);
 
-	if (det > -0.000001 && det < 0.000001) {
+	if (det > -0.000001f && det < 0.000001f) {
 		Py_RETURN_NONE;
 	}
 
@@ -446,7 +446,8 @@ static PyObject *M_Geometry_tesselate_polygon(PyObject *UNUSED(self), PyObject *
 			index++;
 		}
 		freedisplist(&dispbase);
-	} else {
+	}
+	else {
 		/* no points, do this so scripts dont barf */
 		freedisplist(&dispbase); /* possible some dl was allocated */
 		tri_list= PyList_New(0);
@@ -489,7 +490,8 @@ static PyObject *M_Geometry_intersect_line_line_2d(PyObject *UNUSED(self), PyObj
 
 	if(isect_seg_seg_v2_point(line_a1->vec, line_a2->vec, line_b1->vec, line_b2->vec, vi) == 1) {
 		return newVectorObject(vi, 2, Py_NEW, NULL);
-	} else {
+	}
+	else {
 		Py_RETURN_NONE;
 	}
 }
@@ -537,7 +539,7 @@ static PyObject *M_Geometry_intersect_point_line(PyObject *UNUSED(self), PyObjec
 	else { l2[2]=0.0;	VECCOPY2D(l2, line_2->vec) }
 	
 	/* do the calculation */
-	lambda= closest_to_line_v3(pt_out,pt_in, l1, l2);
+	lambda= closest_to_line_v3(pt_out, pt_in, l1, l2);
 	
 	ret= PyTuple_New(2);
 	PyTuple_SET_ITEM(ret, 0, newVectorObject(pt_out, 3, Py_NEW, NULL));
@@ -684,7 +686,7 @@ static char M_Geometry_box_pack_2d_doc[] =
 "\n"
 "   Returns the normal of the 3D tri or quad.\n"
 "\n"
-"   :arg boxes: list of boxes, each box is a list where the first 4 items are [x,y, width, height, ...] other items are ignored.\n"
+"   :arg boxes: list of boxes, each box is a list where the first 4 items are [x, y, width, height, ...] other items are ignored.\n"
 "   :type boxes: list\n"
 "   :return: the width and height of the packed bounding box\n"
 "   :rtype: tuple, pair of floats\n"
@@ -697,7 +699,7 @@ static PyObject *M_Geometry_box_pack_2d(PyObject *UNUSED(self), PyObject *boxlis
 	PyObject *ret;
 	
 	if(!PyList_Check(boxlist)) {
-		PyErr_SetString(PyExc_TypeError, "expected a list of boxes [[x,y,w,h], ... ]");
+		PyErr_SetString(PyExc_TypeError, "expected a list of boxes [[x, y, w, h], ... ]");
 		return NULL;
 	}
 
@@ -839,10 +841,10 @@ static PyObject *M_Geometry_barycentric_transform(PyObject *UNUSED(self), PyObje
 		vec_t1_tar->size != 3 ||
 		vec_t2_tar->size != 3 ||
 		vec_t3_tar->size != 3)
-	 {
-		 PyErr_SetString(PyExc_ValueError, "One of more of the vector arguments wasnt a 3D vector");
-		 return NULL;
-	 }
+	{
+		PyErr_SetString(PyExc_ValueError, "One of more of the vector arguments wasnt a 3D vector");
+		return NULL;
+	}
 
 	barycentric_transform(vec, vec_pt->vec,
 			vec_t1_tar->vec, vec_t2_tar->vec, vec_t3_tar->vec,

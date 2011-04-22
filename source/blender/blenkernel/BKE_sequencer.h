@@ -217,9 +217,16 @@ void seq_stripelem_cache_destruct(void);
 
 void seq_stripelem_cache_cleanup(void);
 
+/* returned ImBuf is properly refed and has to be freed */
 struct ImBuf * seq_stripelem_cache_get(
 	SeqRenderData context, struct Sequence * seq, 
 	float cfra, seq_stripelem_ibuf_t type);
+
+/* passed ImBuf is properly refed, so ownership is *not* 
+   transfered to the cache.
+   you can pass the same ImBuf multiple times to the cache without problems.
+*/
+   
 void seq_stripelem_cache_put(
 	SeqRenderData context, struct Sequence * seq, 
 	float cfra, seq_stripelem_ibuf_t type, struct ImBuf * nval);
@@ -258,6 +265,7 @@ int seq_single_check(struct Sequence *seq);
 void seq_single_fix(struct Sequence *seq);
 int seq_test_overlap(struct ListBase * seqbasep, struct Sequence *test);
 void seq_translate(struct Scene *scene, struct Sequence *seq, int delta);
+void seq_sound_init(struct Scene *scene, struct Sequence *seq);
 struct Sequence *seq_foreground_frame_get(struct Scene *scene, int frame);
 struct ListBase *seq_seqbase(struct ListBase *seqbase, struct Sequence *seq);
 void seq_offset_animdata(struct Scene *scene, struct Sequence *seq, int ofs);

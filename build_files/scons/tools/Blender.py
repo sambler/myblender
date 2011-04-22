@@ -292,7 +292,7 @@ def buildinfo(lenv, build_type):
     build_time = time.strftime ("%H:%M:%S")
     build_rev = os.popen('svnversion').read()[:-1] # remove \n
     if build_rev == '': 
-        build_rev = '35596'
+        build_rev = '36281'
     if lenv['BF_DEBUG']:
         build_type = "Debug"
         build_cflags = ' '.join(lenv['CFLAGS'] + lenv['CCFLAGS'] + lenv['BF_DEBUG_CCFLAGS'] + lenv['CPPFLAGS'])
@@ -489,7 +489,7 @@ def AppIt(target=None, source=None, env=None):
         shutil.rmtree(cmd)
     shutil.copytree(sourcedir, cmd)
     cmd = "cat %s | sed s/\$\{MACOSX_BUNDLE_SHORT_VERSION_STRING\}/%s/ | "%(sourceinfo,VERSION)
-    cmd += "sed s/\$\{MACOSX_BUNDLE_LONG_VERSION_STRING\}/%s,\ `date +'%%Y-%%b-%%d'`/ > %s"%(VERSION,targetinfo)
+    cmd += "sed s/\$\{MACOSX_BUNDLE_LONG_VERSION_STRING\}/%s,\ %s/g > %s"%(VERSION,time.strftime("%Y-%b-%d"),targetinfo)
     commands.getoutput(cmd)
     cmd = 'cp %s/%s %s/%s.app/Contents/MacOS/%s'%(builddir, binary,installdir, binary, binary)
     commands.getoutput(cmd)

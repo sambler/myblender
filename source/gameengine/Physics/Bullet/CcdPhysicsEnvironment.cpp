@@ -470,8 +470,12 @@ void	CcdPhysicsEnvironment::updateCcdPhysicsController(CcdPhysicsController* ctr
 			if (newMass)
 				body->getCollisionShape()->calculateLocalInertia(newMass, inertia);
 			body->setMassProps(newMass, inertia);
+			m_dynamicsWorld->addRigidBody(body, newCollisionGroup, newCollisionMask);
+		}	
+		else
+		{
+			m_dynamicsWorld->addCollisionObject(obj, newCollisionGroup, newCollisionMask);
 		}
-		m_dynamicsWorld->addCollisionObject(obj, newCollisionGroup, newCollisionMask);
 	}
 	// to avoid nasty interaction, we must update the property of the controller as well
 	ctrl->m_cci.m_mass = newMass;
@@ -588,6 +592,9 @@ bool	CcdPhysicsEnvironment::proceedDeltaTime(double curTime,float timeStep,float
 
 	float subStep = timeStep / float(m_numTimeSubSteps);
 	i = m_dynamicsWorld->stepSimulation(interval,25,subStep);//perform always a full simulation step
+//uncomment next line to see where Bullet spend its time (printf in console)	
+//CProfileManager::dumpAll();
+
 	processFhSprings(curTime,i*subStep);
 
 	for (it=m_controllers.begin(); it!=m_controllers.end(); it++)
@@ -2755,7 +2762,8 @@ int			CcdPhysicsEnvironment::createConstraint(class PHY_IPhysicsController* ctrl
 PHY_IPhysicsController* CcdPhysicsEnvironment::CreateConeController(float coneradius,float coneheight)
 {
 	CcdConstructionInfo	cinfo;
-	memset(&cinfo, 0, sizeof(cinfo)); /* avoid uninitialized values */
+//don't memset cinfo: this is C++ and values should be set in the constructor!
+
 	// we don't need a CcdShapeConstructionInfo for this shape:
 	// it is simple enough for the standard copy constructor (see CcdPhysicsController::GetReplica)
 	cinfo.m_collisionShape = new btConeShape(coneradius,coneheight);

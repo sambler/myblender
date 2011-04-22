@@ -101,7 +101,7 @@ EnumPropertyItem metaelem_type_items[] = {
 #define OBTYPE_CU_CURVE {OB_CURVE, "CURVE", 0, "Curve", ""}
 #define OBTYPE_CU_SURF {OB_SURF, "SURFACE", 0, "Surface", ""}
 #define OBTYPE_CU_FONT {OB_FONT, "FONT", 0, "Font", ""}
-    
+
 EnumPropertyItem object_type_items[] = {
 	{OB_MESH, "MESH", 0, "Mesh", ""},
 	OBTYPE_CU_CURVE,
@@ -1059,6 +1059,9 @@ static PointerRNA rna_Object_collision_get(PointerRNA *ptr)
 {
 	Object *ob= (Object*)ptr->id.data;
 
+	if(ob->type != OB_MESH)
+		return PointerRNA_NULL;
+
 	/* weak */
 	if(!ob->pd)
 		ob->pd= object_add_collision_fields(0);
@@ -1305,7 +1308,7 @@ static void rna_def_object_game_settings(BlenderRNA *brna)
 	PropertyRNA *prop;
 
 	static EnumPropertyItem body_type_items[] = {
-		{OB_BODY_TYPE_NO_COLLISION, "NO_COLLISION", 0, "No Collision", "Disable colision for this object"},
+		{OB_BODY_TYPE_NO_COLLISION, "NO_COLLISION", 0, "No Collision", "Disable collision for this object"},
 		{OB_BODY_TYPE_STATIC, "STATIC", 0, "Static", "Stationary object"},
 		{OB_BODY_TYPE_DYNAMIC, "DYNAMIC", 0, "Dynamic", "Linear physics"},
 		{OB_BODY_TYPE_RIGID, "RIGID_BODY", 0, "Rigid Body", "Linear and angular physics"},

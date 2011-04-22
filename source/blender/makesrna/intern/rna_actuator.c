@@ -53,7 +53,7 @@ EnumPropertyItem actuator_type_items[] ={
 	{ACT_2DFILTER, "FILTER_2D", 0, "Filter 2D", ""},
 	{ACT_GAME, "GAME", 0, "Game", ""},
 	{ACT_MESSAGE, "MESSAGE", 0, "Message", ""},
-	{ACT_OBJECT, "OBJECT", 0, "Motion", ""},
+	{ACT_OBJECT, "MOTION", 0, "Motion", ""},
 	{ACT_PARENT, "PARENT", 0, "Parent", ""},
 	{ACT_PROPERTY, "PROPERTY", 0, "Property", ""},
 	{ACT_RANDOM, "RANDOM", 0, "Random", ""},
@@ -497,18 +497,18 @@ static void rna_Actuator_Armature_update(Main *bmain, Scene *scene, PointerRNA *
 /* note: the following set functions exists only to avoid id refcounting */
 static void rna_Actuator_editobject_mesh_set(PointerRNA *ptr, PointerRNA value)
 {
-        bActuator *act = (bActuator *)ptr->data;
-        bEditObjectActuator *eoa = (bEditObjectActuator *) act->data;
+	bActuator *act = (bActuator *)ptr->data;
+	bEditObjectActuator *eoa = (bEditObjectActuator *) act->data;
 
-        eoa->me = value.data;
+	eoa->me = value.data;
 }
 
 static void rna_Actuator_action_action_set(PointerRNA *ptr, PointerRNA value)
 {
-        bActuator *act = (bActuator *)ptr->data;
-        bActionActuator *aa = (bActionActuator *) act->data;
+	bActuator *act = (bActuator *)ptr->data;
+	bActionActuator *aa = (bActionActuator *) act->data;
 
-        aa->act = value.data;
+	aa->act = value.data;
 }
 
 #else
@@ -579,8 +579,8 @@ static void rna_def_action_actuator(BlenderRNA *brna)
 	RNA_def_property_struct_type(prop, "Action");
 	RNA_def_property_flag(prop, PROP_EDITABLE);
 	RNA_def_property_ui_text(prop, "Action", "");
-        /* note: custom set function is ONLY to avoid rna setting a user for this. */
-        RNA_def_property_pointer_funcs(prop, NULL, "rna_Actuator_action_action_set", NULL, NULL);
+	/* note: custom set function is ONLY to avoid rna setting a user for this. */
+	RNA_def_property_pointer_funcs(prop, NULL, "rna_Actuator_action_action_set", NULL, NULL);
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 
 	prop= RNA_def_property(srna, "use_continue_last_frame", PROP_BOOLEAN, PROP_NONE);
@@ -1173,7 +1173,7 @@ static void rna_def_constraint_actuator(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "distance", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_funcs(prop, "rna_ConstraintActuator_distance_get", "rna_ConstraintActuator_distance_set", NULL);
 	RNA_def_property_ui_range(prop, -2000.f, 2000.f, 1, 2);
-	RNA_def_property_ui_text(prop, "Distance", "Set the maximum length of ray");
+	RNA_def_property_ui_text(prop, "Distance", "Keep this distance to target");
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 
 	//XXX to use a pointer or add a material lookup
@@ -1235,7 +1235,7 @@ static void rna_def_constraint_actuator(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Distance", "Height of the force field area");
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 
-	prop= RNA_def_property(srna, "fh_force", PROP_FLOAT, PROP_PERCENTAGE);
+	prop= RNA_def_property(srna, "fh_force", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_funcs(prop, "rna_ConstraintActuator_spring_get", "rna_ConstraintActuator_spring_set", NULL);
 	RNA_def_property_ui_range(prop, 0.0, 1.0, 10, 2);
 	RNA_def_property_ui_text(prop, "Force", "Spring force within the force field area");
@@ -1462,7 +1462,7 @@ static void rna_def_random_actuator(BlenderRNA *brna)
 	static EnumPropertyItem prop_distribution_items[] ={
 		{ACT_RANDOM_BOOL_CONST, "BOOL_CONSTANT", 0, "Bool Constant", ""},
 		{ACT_RANDOM_BOOL_UNIFORM, "BOOL_UNIFORM", 0, "Bool Uniform", ""},
-		{ACT_RANDOM_BOOL_BERNOUILLI, "BOOL_BERNOUILLI", 0, "Bool Bernouilli", ""},
+		{ACT_RANDOM_BOOL_BERNOUILLI, "BOOL_BERNOUILLI", 0, "Bool Bernoulli", ""},
 		{ACT_RANDOM_INT_CONST, "INT_CONSTANT", 0, "Int Constant", ""},
 		{ACT_RANDOM_INT_UNIFORM, "INT_UNIFORM", 0, "Int Uniform", ""},
 		{ACT_RANDOM_INT_POISSON, "INT_POISSON", 0, "Int Poisson", ""},
@@ -1811,8 +1811,8 @@ static void rna_def_shape_action_actuator(BlenderRNA *brna)
 	RNA_def_property_struct_type(prop, "Action");
 	RNA_def_property_flag(prop, PROP_EDITABLE);
 	RNA_def_property_ui_text(prop, "Action", "");
-        /* note: custom set function is ONLY to avoid rna setting a user for this. */
-        RNA_def_property_pointer_funcs(prop, NULL, "rna_Actuator_action_action_set", NULL, NULL);
+	/* note: custom set function is ONLY to avoid rna setting a user for this. */
+	RNA_def_property_pointer_funcs(prop, NULL, "rna_Actuator_action_action_set", NULL, NULL);
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 
 	prop= RNA_def_property(srna, "use_continue_last_frame", PROP_BOOLEAN, PROP_NONE);

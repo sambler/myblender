@@ -499,6 +499,11 @@ static void calc_tangent_vector(ObjectRen *obr, VertexTangent **vtangents, MemAr
 }
 
 
+
+/****************************************************************
+************ tangent space generation interface *****************
+****************************************************************/
+
 typedef struct
 {
 	ObjectRen *obr;
@@ -526,8 +531,8 @@ static void GetPosition(const SMikkTSpaceContext * pContext, float fPos[], const
 	//assert(vert_index>=0 && vert_index<4);
 	SRenderMeshToTangent * pMesh = (SRenderMeshToTangent *) pContext->m_pUserData;
 	VlakRen *vlr= RE_findOrAddVlak(pMesh->obr, face_num);
-	VertRen * pVerts[] = {vlr->v1, vlr->v2, vlr->v3, vlr->v4};
-	VECCOPY(fPos, pVerts[vert_index]->co);
+	const float *co= (&vlr->v1)[vert_index]->co;
+	VECCOPY(fPos, co);
 }
 
 static void GetTextureCoordinate(const SMikkTSpaceContext * pContext, float fUV[], const int face_num, const int vert_index)
@@ -536,16 +541,17 @@ static void GetTextureCoordinate(const SMikkTSpaceContext * pContext, float fUV[
 	SRenderMeshToTangent * pMesh = (SRenderMeshToTangent *) pContext->m_pUserData;
 	VlakRen *vlr= RE_findOrAddVlak(pMesh->obr, face_num);
 	MTFace *tface= RE_vlakren_get_tface(pMesh->obr, vlr, pMesh->obr->actmtface, NULL, 0);
+	const float *coord;
 	
-	if(tface!=NULL)
-	{
-		float * pTexCo = tface->uv[vert_index];
-		fUV[0]=pTexCo[0]; fUV[1]=pTexCo[1];
+	if(tface != NULL)	{
+		coord= tface->uv[vert_index];
+		fUV[0]= coord[0]; fUV[1]= coord[1];
 	}
-	else
-	{
-		VertRen * pVerts[] = {vlr->v1, vlr->v2, vlr->v3, vlr->v4};
-		map_to_sphere(&fUV[0], &fUV[1], pVerts[vert_index]->orco[0], pVerts[vert_index]->orco[1], pVerts[vert_index]->orco[2]);
+	else if((coord= (&vlr->v1)[vert_index]->orco)) {
+		map_to_sphere(&fUV[0], &fUV[1], coord[0], coord[1], coord[2]);
+	}
+	else { /* else we get un-initialized value, 0.0 ok default? */
+		fUV[0]= fUV[1]= 0.0f;
 	}
 }
 
@@ -554,8 +560,8 @@ static void GetNormal(const SMikkTSpaceContext * pContext, float fNorm[], const 
 	//assert(vert_index>=0 && vert_index<4);
 	SRenderMeshToTangent * pMesh = (SRenderMeshToTangent *) pContext->m_pUserData;
 	VlakRen *vlr= RE_findOrAddVlak(pMesh->obr, face_num);
-	VertRen * pVerts[] = {vlr->v1, vlr->v2, vlr->v3, vlr->v4};
-	VECCOPY(fNorm, pVerts[vert_index]->n);
+	const float *n= (&vlr->v1)[vert_index]->n;
+	VECCOPY(fNorm, n);
 }
 static void SetTSpace(const SMikkTSpaceContext * pContext, const float fvTangent[], const float fSign, const int face_num, const int iVert)
 {
@@ -563,8 +569,7 @@ static void SetTSpace(const SMikkTSpaceContext * pContext, const float fvTangent
 	SRenderMeshToTangent * pMesh = (SRenderMeshToTangent *) pContext->m_pUserData;
 	VlakRen *vlr= RE_findOrAddVlak(pMesh->obr, face_num);
 	float * ftang= RE_vlakren_get_nmap_tangent(pMesh->obr, vlr, 1);
-	if(ftang!=NULL)
-	{
+	if(ftang!=NULL)	{
 		VECCOPY(&ftang[iVert*4+0], fvTangent);
 		ftang[iVert*4+3]=fSign;
 	}
@@ -594,53 +599,11 @@ static void calc_vertexnormals(Render *re, ObjectRen *obr, int do_tangent, int d
 	for(a=0; a<obr->totvlak; a++) {
 		VlakRen *vlr= RE_findOrAddVlak(obr, a);
 		if(vlr->flag & ME_SMOOTH) {
-			VertRen *v1= vlr->v1;
-			VertRen *v2= vlr->v2;
-			VertRen *v3= vlr->v3;
-			VertRen *v4= vlr->v4;
-			float n1[3], n2[3], n3[3], n4[3];
-			float fac1, fac2, fac3, fac4=0.0f;
-			
-			sub_v3_v3v3(n1, v2->co, v1->co);
-			normalize_v3(n1);
-			sub_v3_v3v3(n2, v3->co, v2->co);
-			normalize_v3(n2);
-			if(v4==NULL) {
-				sub_v3_v3v3(n3, v1->co, v3->co);
-				normalize_v3(n3);
+			float *n4= (vlr->v4)? vlr->v4->n: NULL;
+			float *c4= (vlr->v4)? vlr->v4->co: NULL;
 
-				fac1= saacos(-n1[0]*n3[0]-n1[1]*n3[1]-n1[2]*n3[2]);
-				fac2= saacos(-n1[0]*n2[0]-n1[1]*n2[1]-n1[2]*n2[2]);
-				fac3= saacos(-n2[0]*n3[0]-n2[1]*n3[1]-n2[2]*n3[2]);
-			}
-			else {
-				sub_v3_v3v3(n3, v4->co, v3->co);
-				normalize_v3(n3);
-				sub_v3_v3v3(n4, v1->co, v4->co);
-				normalize_v3(n4);
-
-				fac1= saacos(-n4[0]*n1[0]-n4[1]*n1[1]-n4[2]*n1[2]);
-				fac2= saacos(-n1[0]*n2[0]-n1[1]*n2[1]-n1[2]*n2[2]);
-				fac3= saacos(-n2[0]*n3[0]-n2[1]*n3[1]-n2[2]*n3[2]);
-				fac4= saacos(-n3[0]*n4[0]-n3[1]*n4[1]-n3[2]*n4[2]);
-
-				v4->n[0] +=fac4*vlr->n[0];
-				v4->n[1] +=fac4*vlr->n[1];
-				v4->n[2] +=fac4*vlr->n[2];
-			}
-
-			v1->n[0] +=fac1*vlr->n[0];
-			v1->n[1] +=fac1*vlr->n[1];
-			v1->n[2] +=fac1*vlr->n[2];
-
-			v2->n[0] +=fac2*vlr->n[0];
-			v2->n[1] +=fac2*vlr->n[1];
-			v2->n[2] +=fac2*vlr->n[2];
-
-			v3->n[0] +=fac3*vlr->n[0];
-			v3->n[1] +=fac3*vlr->n[1];
-			v3->n[2] +=fac3*vlr->n[2];
-			
+			accumulate_vertex_normals(vlr->v1->n, vlr->v2->n, vlr->v3->n, n4,
+				vlr->n, vlr->v1->co, vlr->v2->co, vlr->v3->co, c4);
 		}
 		if(do_nmap_tangent || do_tangent) {
 			/* tangents still need to be calculated for flat faces too */
@@ -652,17 +615,12 @@ static void calc_vertexnormals(Render *re, ObjectRen *obr, int do_tangent, int d
 		/* do solid faces */
 	for(a=0; a<obr->totvlak; a++) {
 		VlakRen *vlr= RE_findOrAddVlak(obr, a);
+
 		if((vlr->flag & ME_SMOOTH)==0) {
-			float *f1= vlr->v1->n;
-			if(f1[0]==0.0 && f1[1]==0.0 && f1[2]==0.0) VECCOPY(f1, vlr->n);
-			f1= vlr->v2->n;
-			if(f1[0]==0.0 && f1[1]==0.0 && f1[2]==0.0) VECCOPY(f1, vlr->n);
-			f1= vlr->v3->n;
-			if(f1[0]==0.0 && f1[1]==0.0 && f1[2]==0.0) VECCOPY(f1, vlr->n);
-			if(vlr->v4) {
-				f1= vlr->v4->n;
-				if(f1[0]==0.0 && f1[1]==0.0 && f1[2]==0.0) VECCOPY(f1, vlr->n);
-			}
+			if(is_zero_v3(vlr->v1->n)) VECCOPY(vlr->v1->n, vlr->n);
+			if(is_zero_v3(vlr->v2->n)) VECCOPY(vlr->v2->n, vlr->n);
+			if(is_zero_v3(vlr->v3->n)) VECCOPY(vlr->v3->n, vlr->n);
+			if(vlr->v4 && is_zero_v3(vlr->v4->n)) VECCOPY(vlr->v4->n, vlr->n);
 		}
 
 		if(do_nmap_tangent) {
@@ -3236,12 +3194,15 @@ static void init_render_mesh(Render *re, ObjectRen *obr, int timeoffset)
 	int a, a1, ok, vertofs;
 	int end, do_autosmooth=0, totvert = 0;
 	int use_original_normals= 0;
+	int recalc_normals = 0;	// false by default
+	int negative_scale;
 
 	me= ob->data;
 
 	mul_m4_m4m4(mat, ob->obmat, re->viewmat);
 	invert_m4_m4(ob->imat, mat);
 	copy_m3_m4(imat, ob->imat);
+	negative_scale= is_negative_m4(mat);
 
 	if(me->totvert==0)
 		return;
@@ -3313,6 +3274,7 @@ static void init_render_mesh(Render *re, ObjectRen *obr, int timeoffset)
 	
 	ma= give_render_material(re, ob, 1);
 
+
 	if(ma->material_type == MA_TYPE_HALO) {
 		make_render_halos(re, obr, me, totvert, mvert, ma, orco);
 	}
@@ -3321,8 +3283,15 @@ static void init_render_mesh(Render *re, ObjectRen *obr, int timeoffset)
 		for(a=0; a<totvert; a++, mvert++) {
 			ver= RE_findOrAddVert(obr, obr->totvert++);
 			VECCOPY(ver->co, mvert->co);
-			if(do_autosmooth==0)	/* autosmooth on original unrotated data to prevent differences between frames */
+			if(do_autosmooth==0) {	/* autosmooth on original unrotated data to prevent differences between frames */
+				normal_short_to_float_v3(ver->n, mvert->no);
 				mul_m4_v3(mat, ver->co);
+				mul_transposed_m3_v3(imat, ver->n);
+				normalize_v3(ver->n);
+
+				if(!negative_scale)
+					negate_v3(ver->n);
+			}
   
 			if(orco) {
 				ver->orco= orco;
@@ -3339,6 +3308,10 @@ static void init_render_mesh(Render *re, ObjectRen *obr, int timeoffset)
 		if(!timeoffset) {
 			/* store customdata names, because DerivedMesh is freed */
 			RE_set_customdata_names(obr, &dm->faceData);
+
+			/* add tangent layer if we need one */
+			if(need_nmap_tangent!=0 && CustomData_get_layer_index(&dm->faceData, CD_TANGENT) == -1)
+				DM_add_tangent_layer(dm);
 			
 			/* still to do for keys: the correct local texture coordinate */
 
@@ -3369,7 +3342,7 @@ static void init_render_mesh(Render *re, ObjectRen *obr, int timeoffset)
 				if(ok) {
 					end= dm->getNumFaces(dm);
 					mface= dm->getFaceArray(dm);
-
+					
 					for(a=0; a<end; a++, mface++) {
 						int v1, v2, v3, v4, flag;
 						
@@ -3415,7 +3388,7 @@ static void init_render_mesh(Render *re, ObjectRen *obr, int timeoffset)
 								CustomDataLayer *layer;
 								MTFace *mtface, *mtf;
 								MCol *mcol, *mc;
-								int index, mtfn= 0, mcn= 0;
+								int index, mtfn= 0, mcn= 0, mtng=0;
 								char *name;
 
 								for(index=0; index<dm->faceData.totlayer; index++) {
@@ -3432,6 +3405,22 @@ static void init_render_mesh(Render *re, ObjectRen *obr, int timeoffset)
 										mcol= (MCol*)layer->data;
 										memcpy(mc, &mcol[a*4], sizeof(MCol)*4);
 									}
+									else if(layer->type == CD_TANGENT && mtng < 1)
+									{
+										if(need_nmap_tangent!=0)
+										{
+											const float * tangent = (const float *) layer->data;
+											int t;
+											int nr_verts = v4!=0 ? 4 : 3;
+											float * ftang = RE_vlakren_get_nmap_tangent(obr, vlr, 1);
+											for(t=0; t<nr_verts; t++)
+											{
+												QUATCOPY(ftang+t*4, tangent+a*16+t*4);
+												mul_mat3_m4_v3(mat, ftang+t*4);
+												normalize_v3(ftang+t*4);
+											}
+										}
+									}
 								}
 							}
 						}
@@ -3447,6 +3436,7 @@ static void init_render_mesh(Render *re, ObjectRen *obr, int timeoffset)
 				MEdge *medge;
 				struct edgesort *edgetable;
 				int totedge= 0;
+				recalc_normals= 1;
 				
 				medge= dm->getEdgeArray(dm);
 				
@@ -3489,6 +3479,7 @@ static void init_render_mesh(Render *re, ObjectRen *obr, int timeoffset)
 	
 	if(!timeoffset) {
 		if (test_for_displace(re, ob ) ) {
+			recalc_normals= 1;
 			calc_vertexnormals(re, obr, 0, 0);
 			if(do_autosmooth)
 				do_displacement(re, obr, mat, imat);
@@ -3497,11 +3488,13 @@ static void init_render_mesh(Render *re, ObjectRen *obr, int timeoffset)
 		}
 
 		if(do_autosmooth) {
+			recalc_normals= 1;
 			autosmooth(re, obr, mat, me->smoothresh);
 		}
 
-		calc_vertexnormals(re, obr, need_tangent, need_nmap_tangent);
-
+		if(recalc_normals!=0 || need_tangent!=0)
+			calc_vertexnormals(re, obr, need_tangent, need_nmap_tangent);
+		
 		if(need_stress)
 			calc_edge_stress(re, obr, me);
 	}
@@ -3733,7 +3726,7 @@ static GroupObject *add_render_lamp(Render *re, Object *ob)
 		
 			VECCOPY(vec,ob->obmat[2]);
 			normalize_v3(vec);
-		    
+
 			InitSunSky(lar->sunsky, la->atm_turbidity, vec, la->horizon_brightness, 
 					la->spread, la->sun_brightness, la->sun_size, la->backscattered_light,
 					   la->skyblendfac, la->skyblendtype, la->sky_exposure, la->sky_colorspace);
@@ -4643,7 +4636,10 @@ void RE_Database_Free(Render *re)
 	
 	re->totvlak=re->totvert=re->totstrand=re->totlamp=re->tothalo= 0;
 	re->i.convertdone= 0;
-	
+
+	re->backbuf= NULL;
+	re->bakebuf= NULL;
+
 	if(re->scene)
 		if(re->scene->r.scemode & R_FREE_IMAGE)
 			if((re->r.scemode & R_PREVIEWBUTS)==0)

@@ -45,6 +45,7 @@
 
 #include "UI_view2d.h"
 
+#include "ED_anim_api.h"
 #include "ED_screen.h"
 #include "ED_transform.h"
 
@@ -255,6 +256,7 @@ void graphedit_operatortypes(void)
 	WM_operatortype_append(GRAPH_OT_sound_bake);
 	WM_operatortype_append(GRAPH_OT_smooth);
 	WM_operatortype_append(GRAPH_OT_clean);
+	WM_operatortype_append(GRAPH_OT_euler_filter);
 	WM_operatortype_append(GRAPH_OT_delete);
 	WM_operatortype_append(GRAPH_OT_duplicate);
 	
@@ -276,10 +278,11 @@ void ED_operatormacros_graph(void)
 	wmOperatorTypeMacro *otmacro;
 	
 	ot= WM_operatortype_append_macro("GRAPH_OT_duplicate_move", "Duplicate", OPTYPE_UNDO|OPTYPE_REGISTER);
-	WM_operatortype_macro_define(ot, "GRAPH_OT_duplicate");
-	otmacro= WM_operatortype_macro_define(ot, "TRANSFORM_OT_transform");
-	RNA_int_set(otmacro->ptr, "mode", TFM_TIME_DUPLICATE);
-
+	if (ot) {
+		WM_operatortype_macro_define(ot, "GRAPH_OT_duplicate");
+		otmacro= WM_operatortype_macro_define(ot, "TRANSFORM_OT_transform");
+		RNA_enum_set(otmacro->ptr, "mode", TFM_TIME_DUPLICATE);
+	}
 }
 
 

@@ -232,7 +232,7 @@ static void node_area_listener(ScrArea *sa, wmNotifier *wmn)
 				if(type==NTREE_COMPOSIT) {
 					Scene *scene= wmn->window->screen->scene;
 					
-					/* note that NodeTagIDChanged is alredy called by BKE_image_signal() on all
+					/* note that NodeTagIDChanged is already called by BKE_image_signal() on all
 					 * scenes so really this is just to know if the images is used in the compo else
 					 * painting on images could become very slow when the compositor is open. */
 					if(NodeTagIDChanged(scene->nodetree, wmn->reference))
@@ -431,7 +431,7 @@ static int node_context(const bContext *C, const char *member, bContextDataResul
 		bNode *node;
 		
 		for(next_node(snode->edittree); (node=next_node(NULL));) {
-			if(node->flag & SELECT) {
+			if(node->flag & NODE_SELECT) {
 				CTX_data_list_add(result, &snode->edittree->id, &RNA_Node, node);
 			}
 		}

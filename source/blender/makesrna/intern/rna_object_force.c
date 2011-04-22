@@ -322,10 +322,21 @@ static void rna_PointCache_frame_step_range(PointerRNA *ptr, int *min, int *max)
 
 static char *rna_CollisionSettings_path(PointerRNA *ptr)
 {
+	/* both methods work ok, but return the shorter path */
+#if 0
 	Object *ob= (Object*)ptr->id.data;
 	ModifierData *md = (ModifierData *)modifiers_findByType(ob, eModifierType_Collision);
-	
-	return BLI_sprintfN("modifiers[\"%s\"].settings", md->name);
+
+	if(md) {
+		return BLI_sprintfN("modifiers[\"%s\"].settings", md->name);
+	}
+	else {
+		return BLI_strdup("");
+	}
+#else
+	/* more reliable */
+	return BLI_strdup("collision");
+#endif
 }
 
 static int rna_SoftBodySettings_use_edges_get(PointerRNA *ptr)
@@ -809,7 +820,7 @@ static void rna_def_pointcache(BlenderRNA *brna)
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", PTCACHE_EXTERNAL);
 	RNA_def_property_ui_text(prop, "External", "Read cache from an external location");
 	RNA_def_property_update(prop, NC_OBJECT, "rna_Cache_idname_change");
-    
+
 	prop= RNA_def_property(srna, "use_library_path", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_negative_sdna(prop, NULL, "flag", PTCACHE_IGNORE_LIBPATH);
 	RNA_def_property_ui_text(prop, "Library Path", "Use this files path when library linked into another file.");
@@ -1658,7 +1669,7 @@ static void rna_def_softbody(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "fuzzy", PROP_INT, PROP_NONE);
 	RNA_def_property_int_sdna(prop, NULL, "fuzzyness");
 	RNA_def_property_range(prop, 1, 100);
-	RNA_def_property_ui_text(prop, "Fuzzy", "Fuzziness while on collision, high values make collsion handling faster but less stable");
+	RNA_def_property_ui_text(prop, "Fuzzy", "Fuzziness while on collision, high values make collision handling faster but less stable");
 	RNA_def_property_update(prop, 0, "rna_softbody_update");
 	
 	prop= RNA_def_property(srna, "use_auto_step", PROP_BOOLEAN, PROP_NONE);

@@ -1003,15 +1003,15 @@ static PTCacheFile *ptcache_file_open(PTCacheID *pid, int mode, int cfra)
 		fp = fopen(filename, "rb+");
 	}
 
-	 if (!fp)
-		 return NULL;
-	
+	if (!fp)
+		return NULL;
+
 	pf= MEM_mallocN(sizeof(PTCacheFile), "PTCacheFile");
 	pf->fp= fp;
 	pf->old_format = 0;
 	pf->frame = cfra;
- 	
-	 return pf;
+
+	return pf;
 }
 static void ptcache_file_close(PTCacheFile *pf)
 {
@@ -1028,7 +1028,6 @@ static int ptcache_file_compressed_read(PTCacheFile *pf, unsigned char *result, 
 	size_t in_len;
 #ifdef WITH_LZO
 	size_t out_len = len;
-	size_t sizeOfIt = 5;
 #endif
 	unsigned char *in;
 	unsigned char *props = MEM_callocN(16*sizeof(char), "tmp");
@@ -1051,6 +1050,7 @@ static int ptcache_file_compressed_read(PTCacheFile *pf, unsigned char *result, 
 #ifdef WITH_LZMA
 			if(compressed == 2)
 			{
+				size_t sizeOfIt;
 				size_t leni = in_len, leno = out_len;
 				ptcache_file_read(pf, &size, 1, sizeof(unsigned int));
 				sizeOfIt = (size_t)size;
@@ -1308,8 +1308,8 @@ static void ptcache_data_copy(void *from[], void *to[])
 {
 	int i;
 	for(i=0; i<BPHYS_TOT_DATA; i++) {
-        /* note, durian file 03.4b_comp crashes if to[i] is not tested
-         * its NULL, not sure if this should be fixed elsewhere but for now its needed */
+	/* note, durian file 03.4b_comp crashes if to[i] is not tested
+	 * its NULL, not sure if this should be fixed elsewhere but for now its needed */
 		if(from[i] && to[i])
 			memcpy(to[i], from[i], ptcache_data_size[i]);
 	}
@@ -2557,7 +2557,7 @@ static void *ptcache_bake_thread(void *ptr) {
 				ptcache_dt_to_str(run, ctime-stime);
 				ptcache_dt_to_str(etd, fetd);
 
-				printf("Baked for %s, current frame: %i/%i (%.3fs), ETC: %s          \r", run, *data->cfra_ptr-sfra+1, efra-sfra+1, (float)(ctime-ptime), etd);
+				printf("Baked for %s, current frame: %i/%i (%.3fs), ETC: %s          \r", run, *data->cfra_ptr-sfra+1, efra-sfra+1, ctime-ptime, etd);
 			}
 			ptime = ctime;
 		}

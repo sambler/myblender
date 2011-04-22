@@ -45,6 +45,7 @@
 
 #include "RNA_define.h"
 #include "RNA_access.h"
+#include "RNA_enum_types.h"
 
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
@@ -138,7 +139,7 @@ static int dupli_extrude_cursor(bContext *C, wmOperator *op, wmEvent *event)
 
 	/* call extrude? */
 	if(done) {
-		short rot_src= RNA_boolean_get(op->ptr, "rotate_source");
+		const short rot_src= RNA_boolean_get(op->ptr, "rotate_source");
 		EditEdge *eed;
 		float vec[3], cent[3], mat[3][3];
 		float nor[3]= {0.0, 0.0, 0.0};
@@ -197,7 +198,7 @@ static int dupli_extrude_cursor(bContext *C, wmOperator *op, wmEvent *event)
 		copy_v3_v3(min, cent);
 		
 		mul_m4_v3(vc.obedit->obmat, min);	// view space
-		view3d_get_view_aligned_coordinate(&vc, min, event->mval);
+		view3d_get_view_aligned_coordinate(&vc, min, event->mval, TRUE);
 		mul_m4_v3(vc.obedit->imat, min); // back in object space
 		
 		sub_v3_v3(min, cent);
@@ -245,20 +246,16 @@ static int dupli_extrude_cursor(bContext *C, wmOperator *op, wmEvent *event)
 	}
 	else if(vc.em->selectmode & SCE_SELECT_VERTEX) {
 
-		float mat[3][3],imat[3][3];
-		float *curs= give_cursor(vc.scene, vc.v3d);
+		float imat[4][4];
+		const float *curs= give_cursor(vc.scene, vc.v3d);
 		
 		copy_v3_v3(min, curs);
-		view3d_get_view_aligned_coordinate(&vc, min, event->mval);
-		
+		view3d_get_view_aligned_coordinate(&vc, min, event->mval, TRUE);
+
 		eve= addvertlist(vc.em, 0, NULL);
 
-		copy_m3_m4(mat, vc.obedit->obmat);
-		invert_m3_m3(imat, mat);
-		
-		copy_v3_v3(eve->co, min);
-		mul_m3_v3(imat, eve->co);
-		sub_v3_v3v3(eve->co, eve->co, vc.obedit->obmat[3]);
+		invert_m4_m4(imat, vc.obedit->obmat);
+		mul_v3_m4v3(eve->co, imat, min);
 		
 		eve->f= SELECT;
 	}
@@ -1099,9 +1096,9 @@ static void make_prim(Object *obedit, int type, float mat[4][4], int tot, int se
 		phi= 0; 
 		phid/=2;
 		for(a=0; a<=tot; a++) {
-			vec[0]= dia*sin(phi);
+			vec[0]= dia*sinf(phi);
 			vec[1]= 0.0;
-			vec[2]= dia*cos(phi);
+			vec[2]= dia*cosf(phi);
 			eve= addvertlist(em, vec, NULL);
 			eve->f= 1+2+4;
 			if(a==0) v1= eve;
@@ -1226,8 +1223,8 @@ static void make_prim(Object *obedit, int type, float mat[4][4], int tot, int se
 		for(b=0; b<=ext; b++) {
 			for(a=0; a<tot; a++) {
 				
-				vec[0]= dia*sin(phi);
-				vec[1]= dia*cos(phi);
+				vec[0]= dia*sinf(phi);
+				vec[1]= dia*cosf(phi);
 				vec[2]= b?depth:-depth;
 				
 				mul_m4_v3(mat, vec);
@@ -1757,7 +1754,7 @@ static int mesh_duplicate_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(ev
 void MESH_OT_duplicate(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Duplicate";
+	ot->name= "Duplicate Mesh";
 	ot->description= "Duplicate selected vertices, edges or faces";
 	ot->idname= "MESH_OT_duplicate";
 	
@@ -1768,6 +1765,6 @@ void MESH_OT_duplicate(wmOperatorType *ot)
 	ot->poll= ED_operator_editmesh;
 	
 	/* to give to transform */
-	RNA_def_int(ot->srna, "mode", TFM_TRANSLATION, 0, INT_MAX, "Mode", "", 0, INT_MAX);
+	RNA_def_enum(ot->srna, "mode", transform_mode_types, TFM_TRANSLATION, "Mode", "");
 }
 

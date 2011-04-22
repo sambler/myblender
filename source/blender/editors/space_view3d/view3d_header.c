@@ -142,13 +142,31 @@ static void handle_view3d_lock(bContext *C)
 	}
 }
 
+/* layer code is on three levels actually:
+- here for operator
+- uiTemplateLayers in interface/ code for buttons
+- ED_view3d_scene_layer_set for RNA
+ */
+static void view3d_layers_editmode_ensure(Scene *scene, View3D *v3d)
+{
+	/* sanity check - when in editmode disallow switching the editmode layer off since its confusing
+	 * an alternative would be to always draw the editmode object. */
+	if(scene->obedit && (scene->obedit->lay & v3d->lay)==0) {
+		int bit;
+		for(bit=0; bit<32; bit++) {
+			if(scene->obedit->lay & (1<<bit)) {
+				v3d->lay |= 1<<bit;
+				break;
+			}
+		}
+	}
+}
+
 static int view3d_layers_exec(bContext *C, wmOperator *op)
 {
 	Scene *scene= CTX_data_scene(C);
 	ScrArea *sa= CTX_wm_area(C);
 	View3D *v3d= sa->spacedata.first;
-	Base *base;
-	int oldlay= v3d->lay;
 	int nr= RNA_int_get(op->ptr, "nr");
 	int toggle= RNA_boolean_get(op->ptr, "toggle");
 	
@@ -163,7 +181,10 @@ static int view3d_layers_exec(bContext *C, wmOperator *op)
 		if (toggle && v3d->lay == ((1<<20)-1)) {
 			/* return to active layer only */
 			v3d->lay = v3d->layact;
-		} else {
+
+			view3d_layers_editmode_ensure(scene, v3d);
+		}
+		else {
 			v3d->lay |= (1<<20)-1;
 		}		
 	}
@@ -178,19 +199,10 @@ static int view3d_layers_exec(bContext *C, wmOperator *op)
 				v3d->lay |= (1<<nr);
 		} else {
 			v3d->lay = (1<<nr);
-
-			/* sanity check - when in editmode disallow switching the editmode layer off since its confusing
-			 * an alternative would be to always draw the editmode object. */
-			if(scene->obedit && (scene->obedit->lay & v3d->lay)==0) {
-				for(bit=0; bit<32; bit++) {
-					if(scene->obedit->lay & (1<<bit)) {
-						v3d->lay |= 1<<bit;
-						break;
-					}
-				}
-			}
 		}
-		
+
+		view3d_layers_editmode_ensure(scene, v3d);
+
 		/* set active layer, ensure to always have one */
 		if(v3d->lay & (1<<nr))
 		   v3d->layact= 1<<nr;
@@ -206,12 +218,7 @@ static int view3d_layers_exec(bContext *C, wmOperator *op)
 	
 	if(v3d->scenelock) handle_view3d_lock(C);
 	
-	/* XXX new layers might need updates, there is no provision yet to detect if that's needed */
-	oldlay= ~oldlay & v3d->lay;
-	for (base= scene->base.first; base; base= base->next) {
-		if(base->lay & oldlay)
-			base->object->recalc= OB_RECALC_OB|OB_RECALC_DATA;
-	}
+	DAG_on_visible_update(CTX_data_main(C), FALSE);
 
 	ED_area_tag_redraw(sa);
 	
@@ -478,12 +485,12 @@ void uiTemplateHeader3D(uiLayout *layout, struct bContext *C)
 
 		/* NDOF */
 		/* Not implemented yet
-		 if (G.ndofdevice ==0 ) {
+		if (G.ndofdevice ==0 ) {
 			uiDefIconTextButC(block, ICONTEXTROW,B_NDOF, ICON_NDOF_TURN, ndof_pup(), 0,0,XIC+10,YIC, &(v3d->ndofmode), 0, 3.0, 0, 0, "Ndof mode");
-		
+
 			uiDefIconButC(block, TOG, B_NDOF,  ICON_NDOF_DOM,
-					  0,0,XIC,YIC,
-					  &v3d->ndoffilter, 0, 1, 0, 0, "dominant axis");	
+					0,0,XIC,YIC,
+					&v3d->ndoffilter, 0, 1, 0, 0, "dominant axis");
 		}
 		 */
 
@@ -506,7 +513,7 @@ void uiTemplateHeader3D(uiLayout *layout, struct bContext *C)
 		uiDefButS(block, MENU, B_MAN_MODE, str_menu,0,0,70,YIC, &v3d->twmode, 0, 0, 0, 0, "Transform Orientation");
 		MEM_freeN((void *)str_menu);
 	}
- 		
+
 	if(obedit==NULL && v3d->localvd==NULL) {
 		unsigned int ob_lay = ob ? ob->lay : 0;
 		

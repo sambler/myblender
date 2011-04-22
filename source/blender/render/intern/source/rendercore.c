@@ -1058,14 +1058,14 @@ static void reset_sky_speed(RenderPart *pa, RenderLayer *rl)
 
 static unsigned short *make_solid_mask(RenderPart *pa)
 { 
-	 intptr_t *rd= pa->rectdaps;
-	 unsigned short *solidmask, *sp;
-	 int x;
- 	
+	intptr_t *rd= pa->rectdaps;
+	unsigned short *solidmask, *sp;
+	int x;
+
 	if(rd==NULL) return NULL;
- 	
+
 	sp=solidmask= MEM_mallocN(sizeof(short)*pa->rectx*pa->recty, "solidmask");
- 	
+
 	for(x=pa->rectx*pa->recty; x>0; x--, rd++, sp++) {
 		if(*rd) {
 			PixStr *ps= (PixStr *)*rd;
@@ -1077,7 +1077,7 @@ static unsigned short *make_solid_mask(RenderPart *pa)
 		else
 			*sp= 0;
 	}
- 			
+
 	return solidmask;
 }
 
@@ -1543,6 +1543,7 @@ static void shade_sample_sss(ShadeSample *ssamp, Material *mat, ObjectInstanceRe
 	if(shi->obr->ob && shi->obr->ob->transflag & OB_NEG_SCALE) {
 		negate_v3(shi->vn);
 		negate_v3(shi->vno);
+		negate_v3(shi->nmapnorm);
 	}
 
 	/* if nodetree, use the material that we are currently preprocessing

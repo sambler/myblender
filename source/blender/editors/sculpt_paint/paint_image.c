@@ -486,22 +486,22 @@ static int project_bucket_offset_safe(const ProjPaintState *ps, const float proj
 /* still use 2D X,Y space but this works for verts transformed by a perspective matrix, using their 4th component as a weight */
 static void barycentric_weights_v2_persp(float v1[4], float v2[4], float v3[4], float co[2], float w[3])
 {
-   float wtot_inv, wtot;
+	float wtot_inv, wtot;
 
-   w[0] = area_tri_signed_v2(v2, v3, co) / v1[3];
-   w[1] = area_tri_signed_v2(v3, v1, co) / v2[3];
-   w[2] = area_tri_signed_v2(v1, v2, co) / v3[3];
-   wtot = w[0]+w[1]+w[2];
+	w[0] = area_tri_signed_v2(v2, v3, co) / v1[3];
+	w[1] = area_tri_signed_v2(v3, v1, co) / v2[3];
+	w[2] = area_tri_signed_v2(v1, v2, co) / v3[3];
+	wtot = w[0]+w[1]+w[2];
 
-   if (wtot != 0.0f) {
-	   wtot_inv = 1.0f/wtot;
+	if (wtot != 0.0f) {
+		wtot_inv = 1.0f/wtot;
 
-	   w[0] = w[0]*wtot_inv;
-	   w[1] = w[1]*wtot_inv;
-	   w[2] = w[2]*wtot_inv;
-   }
-   else /* dummy values for zero area face */
-	   w[0] = w[1] = w[2] = 1.0f/3.0f;
+		w[0] = w[0]*wtot_inv;
+		w[1] = w[1]*wtot_inv;
+		w[2] = w[2]*wtot_inv;
+	}
+	else /* dummy values for zero area face */
+		w[0] = w[1] = w[2] = 1.0f/3.0f;
 }
 
 static float VecZDepthOrtho(float pt[2], float v1[3], float v2[3], float v3[3], float w[3])
@@ -866,7 +866,7 @@ static int line_isect_x(const float p1[2], const float p2[2], const float x_leve
 	
 	x_diff= fabsf(p1[0]-p2[0]); /* yuck, horizontal line, we cant do much here */
 	
-	if (x_diff < 0.000001) { /* yuck, vertical line, we cant do much here */
+	if (x_diff < 0.000001f) { /* yuck, vertical line, we cant do much here */
 		*y_isect = (p1[0]+p2[0]) * 0.5f;
 		return ISECT_TRUE;		
 	}
@@ -1740,7 +1740,7 @@ static int project_bucket_isect_circle(const float cent[2], const float radius_s
 	 */
 	
 	if((bucket_bounds->xmin <= cent[0] && bucket_bounds->xmax >= cent[0]) || (bucket_bounds->ymin <= cent[1] && bucket_bounds->ymax >= cent[1]) ) {
-	   return 1;
+		return 1;
 	}
 	
 	/* out of bounds left */
@@ -2992,6 +2992,7 @@ static void project_paint_begin(ProjPaintState *ps)
 				invert_m4_m4(viewmat, viewinv);
 
 				/* camera winmat */
+				object_camera_mode(&ps->scene->r, camera);
 				object_camera_matrix(&ps->scene->r, camera, ps->winx, ps->winy, 0,
 						winmat, &_viewplane, &ps->clipsta, &ps->clipend,
 						&_lens, &_ycor, &_viewdx, &_viewdy);

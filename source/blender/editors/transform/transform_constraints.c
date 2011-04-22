@@ -191,11 +191,11 @@ static void axisProjection(TransInfo *t, float axis[3], float in[3], float out[3
 	if(in[0]==0.0f && in[1]==0.0f && in[2]==0.0f)
 		return;
 
-	angle = fabs(angle_v3v3(axis, t->viewinv[2]));
-	if (angle > M_PI / 2) {
-		angle = M_PI - angle;
+	angle = fabsf(angle_v3v3(axis, t->viewinv[2]));
+	if (angle > (float)M_PI / 2.0f) {
+		angle = (float)M_PI - angle;
 	}
-	angle = 180.0f * angle / M_PI;
+	angle = RAD2DEGF(angle);
 
 	/* For when view is parallel to constraint... will cause NaNs otherwise
 	   So we take vertical motion in 3D space and apply it to the
@@ -228,12 +228,12 @@ static void axisProjection(TransInfo *t, float axis[3], float in[3], float out[3
 
 		/* give arbitrary large value if projection is impossible */
 		factor = dot_v3v3(axis, norm);
-		if (1 - fabs(factor) < 0.0002f) {
+		if (1.0f - fabsf(factor) < 0.0002f) {
 			VECCOPY(out, axis);
 			if (factor > 0) {
-				mul_v3_fl(out, 1000000000);
+				mul_v3_fl(out, 1000000000.0f);
 			} else {
-				mul_v3_fl(out, -1000000000);
+				mul_v3_fl(out, -1000000000.0f);
 			}
 		} else {
 			add_v3_v3v3(v2, t->con.center, axis);
@@ -243,7 +243,13 @@ static void axisProjection(TransInfo *t, float axis[3], float in[3], float out[3
 			
 			sub_v3_v3v3(v, i2, v);
 	
-			sub_v3_v3v3(out, i1, t->con.center);
+			sub_v3_v3v3(out, i1,  t->con.center);
+
+			/* possible some values become nan when
+			 * viewpoint and object are both zero */
+			if(!finite(out[0])) out[0]= 0.0f;
+			if(!finite(out[1])) out[1]= 0.0f;
+			if(!finite(out[2])) out[2]= 0.0f;
 		}
 	}
 }
@@ -870,7 +876,7 @@ static void setNearestAxis3d(TransInfo *t)
 		axis[1] = (float)(icoord[1] - t->center2d[1]);
 		axis[2] = 0.0f;
 
-		 if (normalize_v3(axis) != 0.0f) {
+		if (normalize_v3(axis) != 0.0f) {
 			project_v3_v3v3(proj, mvec, axis);
 			sub_v3_v3v3(axis, mvec, proj);
 			len[i] = normalize_v3(axis);

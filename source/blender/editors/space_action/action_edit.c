@@ -711,7 +711,7 @@ void ACTION_OT_duplicate (wmOperatorType *ot)
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 	
 	/* to give to transform */
-	RNA_def_int(ot->srna, "mode", TFM_TIME_TRANSLATE, 0, INT_MAX, "Mode", "", 0, INT_MAX);
+	RNA_def_enum(ot->srna, "mode", transform_mode_types, TFM_TRANSLATION, "Mode", "");
 }
 
 /* ******************** Delete Keyframes Operator ************************* */
@@ -1220,7 +1220,7 @@ void ACTION_OT_keyframe_type (wmOperatorType *ot)
 	/* identifiers */
 	ot->name= "Set Keyframe Type";
 	ot->idname= "ACTION_OT_keyframe_type";
-	ot->description= "Set type of keyframe for the seleced keyframes";
+	ot->description= "Set type of keyframe for the selected keyframes";
 	
 	/* api callbacks */
 	ot->invoke= WM_menu_invoke;

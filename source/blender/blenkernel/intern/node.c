@@ -56,7 +56,6 @@
 #include "BKE_fcurve.h"
 #include "BKE_node.h"
 #include "BKE_utildefines.h"
-#include "BKE_node.h"
 
 #include "PIL_time.h"
 
@@ -2236,6 +2235,10 @@ static void group_tag_used_outputs(bNode *gnode, bNodeStack *stack, bNodeStack *
 			if (ns)
 				ns->sockettype = sock->type;
 		}
+		
+		/* non-composite trees do all nodes by default */
+		if (ntree->type!=NTREE_COMPOSIT)
+			node->need_exec = 1;
 	}
 }
 
@@ -2321,7 +2324,7 @@ void ntreeBeginExecTree(bNodeTree *ntree)
 		for(node= ntree->nodes.first; node; node= node->next) {
 			bNodeSocket *sock;
 			
-			/* composite has own need_exec tag handling */
+			/* non-composite trees do all nodes by default */
 			if(ntree->type!=NTREE_COMPOSIT)
 				node->need_exec= 1;
 
@@ -2725,7 +2728,7 @@ void ntreeCompositExecTree(bNodeTree *ntree, RenderData *rd, int do_preview)
 			node= getExecutableNode(ntree);
 			if(node) {
 				if(ntree->progress && totnode)
-					ntree->progress(ntree->prh, (1.0 - curnode/(float)totnode));
+					ntree->progress(ntree->prh, (1.0f - curnode/(float)totnode));
 				if(ntree->stats_draw) {
 					char str[64];
 					sprintf(str, "Compositing %d %s", curnode, node->name);

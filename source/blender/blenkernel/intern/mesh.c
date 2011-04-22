@@ -236,6 +236,8 @@ Mesh *copy_mesh(Mesh *me)
 	}
 	
 	men->mselect= NULL;
+	men->edit_mesh= NULL;
+	men->pv= NULL; /* looks like this is no-longer supported but NULL just incase */
 
 	men->bb= MEM_dupallocN(men->bb);
 	
@@ -362,9 +364,9 @@ void tex_space_mesh(Mesh *me)
 
 	if(me->texflag & AUTOSPACE) {
 		for (a=0; a<3; a++) {
-			if(size[a]==0.0) size[a]= 1.0;
-			else if(size[a]>0.0 && size[a]<0.00001) size[a]= 0.00001;
-			else if(size[a]<0.0 && size[a]> -0.00001) size[a]= -0.00001;
+			if(size[a]==0.0f) size[a]= 1.0f;
+			else if(size[a]>0.0f && size[a]<0.00001f) size[a]= 0.00001f;
+			else if(size[a]<0.0f && size[a]> -0.00001f) size[a]= -0.00001f;
 		}
 
 		copy_v3_v3(me->loc, loc);
@@ -751,9 +753,7 @@ void mball_to_mesh(ListBase *lb, Mesh *me)
 		verts= dl->verts;
 		while(a--) {
 			VECCOPY(mvert->co, verts);
-			mvert->no[0]= (short int)(nors[0]*32767.0);
-			mvert->no[1]= (short int)(nors[1]*32767.0);
-			mvert->no[2]= (short int)(nors[2]*32767.0);
+			normal_float_to_short_v3(mvert->no, nors);
 			mvert++;
 			nors+= 3;
 			verts+= 3;
@@ -837,7 +837,7 @@ int nurbs_to_mdata_customdb(Object *ob, ListBase *dispbase, MVert **allvert, int
 	}
 
 	*allvert= mvert= MEM_callocN(sizeof (MVert) * totvert, "nurbs_init mvert");
-	*allface= mface= MEM_callocN(sizeof (MVert) * totvlak, "nurbs_init mface");
+	*allface= mface= MEM_callocN(sizeof (MFace) * totvlak, "nurbs_init mface");
 
 	/* verts and faces */
 	vertcount= 0;
@@ -1270,34 +1270,37 @@ void mesh_set_smooth_flag(Object *meshOb, int enableSmooth)
 			mf->flag &= ~ME_SMOOTH;
 		}
 	}
+
+	mesh_calc_normals(me->mvert, me->totvert, me->mface, me->totface, NULL);
 }
 
-void mesh_calc_normals(MVert *mverts, int numVerts, MFace *mfaces, int numFaces, float **faceNors_r) 
+void mesh_calc_normals(MVert *mverts, int numVerts, MFace *mfaces, int numFaces, float (*faceNors_r)[3]) 
 {
 	float (*tnorms)[3]= MEM_callocN(numVerts*sizeof(*tnorms), "tnorms");
-	float *fnors= MEM_callocN(sizeof(*fnors)*3*numFaces, "meshnormals");
+	float (*fnors)[3]= (faceNors_r)? faceNors_r: MEM_callocN(sizeof(*fnors)*numFaces, "meshnormals");
 	int i;
 
-	for (i=0; i<numFaces; i++) {
+	for(i=0; i<numFaces; i++) {
 		MFace *mf= &mfaces[i];
-		float *f_no= &fnors[i*3];
+		float *f_no= fnors[i];
+		float *n4 = (mf->v4)? tnorms[mf->v4]: NULL;
+		float *c4 = (mf->v4)? mverts[mf->v4].co: NULL;
 
-		if (mf->v4)
-			normal_quad_v3( f_no,mverts[mf->v1].co, mverts[mf->v2].co, mverts[mf->v3].co, mverts[mf->v4].co);
+		if(mf->v4)
+			normal_quad_v3(f_no, mverts[mf->v1].co, mverts[mf->v2].co, mverts[mf->v3].co, mverts[mf->v4].co);
 		else
-			normal_tri_v3( f_no,mverts[mf->v1].co, mverts[mf->v2].co, mverts[mf->v3].co);
-		
-		add_v3_v3(tnorms[mf->v1], f_no);
-		add_v3_v3(tnorms[mf->v2], f_no);
-		add_v3_v3(tnorms[mf->v3], f_no);
-		if (mf->v4)
-			add_v3_v3(tnorms[mf->v4], f_no);
+			normal_tri_v3(f_no, mverts[mf->v1].co, mverts[mf->v2].co, mverts[mf->v3].co);
+
+		accumulate_vertex_normals(tnorms[mf->v1], tnorms[mf->v2], tnorms[mf->v3], n4,
+			f_no, mverts[mf->v1].co, mverts[mf->v2].co, mverts[mf->v3].co, c4);
 	}
-	for (i=0; i<numVerts; i++) {
+
+	/* following Mesh convention; we use vertex coordinate itself for normal in this case */
+	for(i=0; i<numVerts; i++) {
 		MVert *mv= &mverts[i];
 		float *no= tnorms[i];
 		
-		if (normalize_v3(no)==0.0)
+		if(normalize_v3(no) == 0.0f)
 			normalize_v3_v3(no, mv->co);
 
 		normal_float_to_short_v3(mv->no, no);
@@ -1305,11 +1308,8 @@ void mesh_calc_normals(MVert *mverts, int numVerts, MFace *mfaces, int numFaces,
 	
 	MEM_freeN(tnorms);
 
-	if (faceNors_r) {
-		*faceNors_r = fnors;
-	} else {
+	if(fnors != faceNors_r)
 		MEM_freeN(fnors);
-	}
 }
 
 float (*mesh_getVertexCos(Mesh *me, int *numVerts_r))[3]
@@ -1398,7 +1398,7 @@ UvVertMap *make_uv_vert_map(struct MFace *mface, struct MTFace *tface, unsigned 
 				sub_v2_v2v2(uvdiff, uv2, uv);
 
 
-				if(fabs(uv[0]-uv2[0]) < limit[0] && fabs(uv[1]-uv2[1]) < limit[1]) {
+				if(fabsf(uv[0]-uv2[0]) < limit[0] && fabsf(uv[1]-uv2[1]) < limit[1]) {
 					if(lastv) lastv->next= next;
 					else vlist= next;
 					iterv->next= newvlist;
@@ -1465,7 +1465,7 @@ void create_vert_edge_map(ListBase **map, IndexNode **mem, const MEdge *medge, c
 	(*map) = MEM_callocN(sizeof(ListBase) * totvert, "vert edge map");
 	(*mem) = MEM_callocN(sizeof(IndexNode) * totedge * 2, "vert edge map mem");
 	node = *mem;
-       
+
 	/* Find the users */
 	for(i = 0; i < totedge; ++i){
 		for(j = 0; j < 2; ++j, ++node) {

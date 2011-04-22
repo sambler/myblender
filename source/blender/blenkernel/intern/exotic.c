@@ -138,22 +138,22 @@ static int is_stl(const char *str)
 	return 1;
 }
 
-#define READSTLVERT {                                   \
-  if (fread(mvert->co, sizeof(float), 3, fpSTL) != 3) { \
-	char error_msg[255];                                \
-	MEM_freeN(vertdata);                                \
-	MEM_freeN(facedata);                                \
-	fclose(fpSTL);                                      \
-	sprintf(error_msg, "Problems reading face %d!", i); \
-	return;                                             \
-  }                                                     \
-  else {                                                \
-	if (ENDIAN_ORDER==B_ENDIAN) {                       \
-	  SWITCH_INT(mvert->co[0]);                         \
-	  SWITCH_INT(mvert->co[1]);                         \
-	  SWITCH_INT(mvert->co[2]);                         \
-	}                                                   \
-  }                                                     \
+#define READSTLVERT {                                             \
+	if (fread(mvert->co, sizeof(float), 3, fpSTL) != 3) {      \
+		char error_msg[255];                                \
+		MEM_freeN(vertdata);                                \
+		MEM_freeN(facedata);                                \
+		fclose(fpSTL);                                      \
+		sprintf(error_msg, "Problems reading face %d!", i); \
+		return;                                             \
+	}                                                          \
+	else {                                                     \
+		if (ENDIAN_ORDER==B_ENDIAN) {                       \
+			SWITCH_INT(mvert->co[0]);                    \
+			SWITCH_INT(mvert->co[1]);                    \
+			SWITCH_INT(mvert->co[2]);                    \
+		}                                                   \
+	}                                                          \
 }
 
 static void simple_vertex_normal_blend(short *no, short *ble)
@@ -182,12 +182,10 @@ static void mesh_add_normals_flags(Mesh *me)
 		v2= me->mvert+mface->v2;
 		v3= me->mvert+mface->v3;
 		v4= me->mvert+mface->v4;
-		
+
 		normal_tri_v3( nor,v1->co, v2->co, v3->co);
-		sno[0]= 32767.0*nor[0];
-		sno[1]= 32767.0*nor[1];
-		sno[2]= 32767.0*nor[2];
-		
+		normal_float_to_short_v3(sno, nor);
+
 		simple_vertex_normal_blend(v1->no, sno);
 		simple_vertex_normal_blend(v2->no, sno);
 		simple_vertex_normal_blend(v3->no, sno);
@@ -891,7 +889,7 @@ void write_dxf(struct Scene *scene, char *str)
 	write_group(0, "SECTION");
 	write_group(2, "BLOCKS");
 
-    
+
 	/* only write meshes we're using in this scene */
 	flag_listbase_ids(&G.main->mesh, LIB_DOIT, 0);
 	
@@ -1610,7 +1608,7 @@ static void dxf_read_arc(Scene *scene, int noob)
 		dia = (float) atof(val);
 	  } else if (id==62) {
 		int colorid= atoi(val);
-	    
+
 		CLAMP(colorid, 1, 255);
 		dxf_col_to_rgb(colorid, &color[0], &color[1], &color[2]);
 	  } else if (id==67) {

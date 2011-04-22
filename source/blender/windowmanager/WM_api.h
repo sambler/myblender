@@ -173,7 +173,7 @@ struct wmEventHandler *WM_event_add_ui_handler(const struct bContext *C, ListBas
 			void (*remove)(struct bContext *C, void *userdata), void *userdata);
 void		WM_event_remove_ui_handler(ListBase *handlers,
 			int (*func)(struct bContext *C, struct wmEvent *event, void *userdata),
-			void (*remove)(struct bContext *C, void *userdata), void *userdata);
+			void (*remove)(struct bContext *C, void *userdata), void *userdata, int postpone);
 void		WM_event_remove_area_handler(struct ListBase *handlers, void *area);
 
 struct wmEventHandler *WM_event_add_modal_handler(struct bContext *C, struct wmOperator *op);
@@ -359,7 +359,7 @@ void		WM_progress_clear(struct wmWindow *win);
 
 #ifdef WIN32
 			/* Windows System Console */
-void		WM_toggle_console(struct bContext *C, short show);
+void		WM_console_toggle(struct bContext *C, short show);
 #endif
 
 /* debugging only, convenience function to write on crash */

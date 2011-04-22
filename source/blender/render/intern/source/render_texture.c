@@ -2284,7 +2284,7 @@ void do_material_tex(ShadeInput *shi)
 				if(use_compat_bump) {
 					rgbnor = compatible_bump_compute(&compat_bump, shi, mtex, tex,
 						&texres, Tnor*stencilTin, co, dx, dy, texvec, dxt, dyt);
- 				}
+				}
 				else if(use_ntap_bump) {
 					rgbnor = ntap_bump_compute(&ntap_bump, shi, mtex, tex,
 						&texres, Tnor*stencilTin, co, dx, dy, texvec, dxt, dyt);
@@ -2354,9 +2354,16 @@ void do_material_tex(ShadeInput *shi)
 				}
 				// warping, local space
 				if(mtex->mapto & MAP_WARP) {
-					warpvec[0]= mtex->warpfac*texres.nor[0];
-					warpvec[1]= mtex->warpfac*texres.nor[1];
-					warpvec[2]= mtex->warpfac*texres.nor[2];
+					float *warpnor= texres.nor, warpnor_[3];
+					
+					if(use_ntap_bump) {
+						VECCOPY(warpnor_, texres.nor);
+						warpnor= warpnor_;
+						normalize_v3(warpnor_);
+					}
+					warpvec[0]= mtex->warpfac*warpnor[0];
+					warpvec[1]= mtex->warpfac*warpnor[1];
+					warpvec[2]= mtex->warpfac*warpnor[2];
 					warpdone= 1;
 				}
 #if 0				
@@ -3206,7 +3213,7 @@ void do_lamp_tex(LampRen *la, float *lavec, ShadeInput *shi, float *colf, int ef
 				if(la->type==LA_SPOT) {
 					tempvec[0]*= la->spottexfac;
 					tempvec[1]*= la->spottexfac;
-                    /* project from 3d to 2d */
+				/* project from 3d to 2d */
 					tempvec[0] /= -tempvec[2];
 					tempvec[1] /= -tempvec[2];
 				}

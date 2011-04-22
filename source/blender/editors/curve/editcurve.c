@@ -87,6 +87,7 @@
 
 #include "RNA_access.h"
 #include "RNA_define.h"
+#include "RNA_enum_types.h"
 
 /* Undo stuff */
 typedef struct {
@@ -2167,8 +2168,8 @@ static int smooth_exec(bContext *C, wmOperator *UNUSED(op))
 				if(bezt->f2 & SELECT) {
 					for(i=0; i<3; i++) {
 						val = bezt->vec[1][i];
-						newval = ((beztOrig+(a-1))->vec[1][i] * 0.5) + ((beztOrig+(a+1))->vec[1][i] * 0.5);
-						offset = (val*((1.0/6.0)*5)) + (newval*(1.0/6.0)) - val;
+						newval = ((beztOrig+(a-1))->vec[1][i] * 0.5f) + ((beztOrig+(a+1))->vec[1][i] * 0.5f);
+						offset = (val*((1.0f/6.0f)*5.0f)) + (newval*(1.0f/6.0f)) - val;
 						/* offset handles */
 						bezt->vec[1][i] += offset;
 						bezt->vec[0][i] += offset;
@@ -2187,8 +2188,8 @@ static int smooth_exec(bContext *C, wmOperator *UNUSED(op))
 				if(bp->f1 & SELECT) {
 					for(i=0; i<3; i++) {
 						val = bp->vec[i];
-						newval = ((bpOrig+(a-1))->vec[i] * 0.5) + ((bpOrig+(a+1))->vec[i] * 0.5);
-						offset = (val*((1.0/6.0)*5)) + (newval*(1.0/6.0)) - val;
+						newval = ((bpOrig+(a-1))->vec[i] * 0.5f) + ((bpOrig+(a+1))->vec[i] * 0.5f);
+						offset = (val*((1.0f/6.0f)*5.0f)) + (newval*(1.0f/6.0f)) - val;
 					
 						bp->vec[i] += offset;
 					}
@@ -2272,9 +2273,9 @@ static int smooth_radius_exec(bContext *C, wmOperator *UNUSED(op))
 						if (start_sel>0)						start_rad = (nu->bezt+start_sel-1)->radius;
 						if (end_sel!=-1 && end_sel < nu->pntsu)	end_rad = (nu->bezt+start_sel+1)->radius;
 						
-						if (start_rad >= 0.0 && end_rad >= 0.0)	(nu->bezt+start_sel)->radius = (start_rad + end_rad)/2;
-						else if (start_rad >= 0.0)				(nu->bezt+start_sel)->radius = start_rad;
-						else if (end_rad >= 0.0)				(nu->bezt+start_sel)->radius = end_rad;
+						if (start_rad >= 0.0f && end_rad >= 0.0f)	(nu->bezt+start_sel)->radius = (start_rad + end_rad)/2;
+						else if (start_rad >= 0.0f)				(nu->bezt+start_sel)->radius = start_rad;
+						else if (end_rad >= 0.0f)				(nu->bezt+start_sel)->radius = end_rad;
 					} else {
 						/* if endpoints selected, then use them */
 						if (start_sel==0) {
@@ -2294,7 +2295,7 @@ static int smooth_radius_exec(bContext *C, wmOperator *UNUSED(op))
 						range = (float)(end_sel - start_sel) + 2.0f;
 						for(bezt=nu->bezt+start_sel, a=start_sel; a<=end_sel; a++, bezt++) {
 							fac = (float)(1+a-start_sel) / range;
-							bezt->radius = start_rad*(1.0-fac) + end_rad*fac;
+							bezt->radius = start_rad*(1.0f-fac) + end_rad*fac;
 						}
 					}
 				}
@@ -2334,9 +2335,9 @@ static int smooth_radius_exec(bContext *C, wmOperator *UNUSED(op))
 						if (start_sel>0)						start_rad = (nu->bp+start_sel-1)->radius;
 						if (end_sel!=-1 && end_sel < nu->pntsu)	end_rad = (nu->bp+start_sel+1)->radius;
 						
-						if (start_rad >= 0.0 && end_rad >= 0.0)	(nu->bp+start_sel)->radius = (start_rad + end_rad)/2;
-						else if (start_rad >= 0.0)				(nu->bp+start_sel)->radius = start_rad;
-						else if (end_rad >= 0.0)				(nu->bp+start_sel)->radius = end_rad;
+						if (start_rad >= 0.0f && end_rad >= 0.0f)	(nu->bp+start_sel)->radius = (start_rad + end_rad)/2;
+						else if (start_rad >= 0.0f)					(nu->bp+start_sel)->radius = start_rad;
+						else if (end_rad >= 0.0f)					(nu->bp+start_sel)->radius = end_rad;
 					} else {
 						/* if endpoints selected, then use them */
 						if (start_sel==0) {
@@ -2356,7 +2357,7 @@ static int smooth_radius_exec(bContext *C, wmOperator *UNUSED(op))
 						range = (float)(end_sel - start_sel) + 2.0f;
 						for(bp=nu->bp+start_sel, a=start_sel; a<=end_sel; a++, bp++) {
 							fac = (float)(1+a-start_sel) / range;
-							bp->radius = start_rad*(1.0-fac) + end_rad*fac;
+							bp->radius = start_rad*(1.0f-fac) + end_rad*fac;
 						}
 					}
 				}
@@ -2854,7 +2855,7 @@ static void subdividenurb(Object *obedit, int number_cuts)
 	int a, b, sel, amount, *usel, *vsel, i;
 	float factor;
 
-   // printf("*** subdivideNurb: entering subdivide\n");
+	// printf("*** subdivideNurb: entering subdivide\n");
 
 	for(nu= editnurb->nurbs.first; nu; nu= nu->next) {
 		amount= 0;
@@ -3030,7 +3031,7 @@ static void subdividenurb(Object *obedit, int number_cuts)
 		/* This is a very strange test ... */
 		/** 
 		   Subdivide NURB surfaces - nzc 30-5-'00 -
-           
+
 			 Subdivision of a NURB curve can be effected by adding a 
 		   control point (insertion of a knot), or by raising the
 		   degree of the functions used to build the NURB. The
@@ -3230,8 +3231,7 @@ static void subdividenurb(Object *obedit, int number_cuts)
 						MEM_freeN(nu->bp);
 						nu->bp= bpnew;
 						nu->pntsu+= sel;
-						nurbs_knot_calc_u(nu); /* shift knots
-													 forward */
+						nurbs_knot_calc_u(nu); /* shift knots forward */
 					}
 				}
 			}
@@ -3580,6 +3580,7 @@ void CURVE_OT_spline_type_set(wmOperatorType *ot)
 
 	/* identifiers */
 	ot->name= "Set Spline Type";
+	ot->description = "Set type of active spline";
 	ot->idname= "CURVE_OT_spline_type_set";
 	
 	/* api callbacks */
@@ -3622,6 +3623,7 @@ void CURVE_OT_handle_type_set(wmOperatorType *ot)
 
 	/* identifiers */
 	ot->name= "Set Handle Type";
+	ot->description = "Set type of handles for selected control points";
 	ot->idname= "CURVE_OT_handle_type_set";
 	
 	/* api callbacks */
@@ -3751,7 +3753,7 @@ static void make_selection_list_nurb(ListBase *editnurb)
 				add_v3_v3(nus->vec, bp->vec);
 				bp++;
 			}
-			mul_v3_fl(nus->vec, 1.0/(float)nu->pntsu);
+			mul_v3_fl(nus->vec, 1.0f/(float)nu->pntsu);
 			
 			
 		}
@@ -4107,7 +4109,7 @@ static int make_segment_exec(bContext *C, wmOperator *op)
 						nu1->knotsu= fp;
 						
 						
-						offset= nu1->knotsu[a-1] +1.0;
+						offset= nu1->knotsu[a-1] + 1.0f;
 						fp= nu1->knotsu+a;
 						for(a=0; a<nu2->pntsu; a++, fp++) {
 							if(nu2->knotsu) 
@@ -4168,7 +4170,7 @@ void CURVE_OT_make_segment(wmOperatorType *ot)
 
 /***************** pick select from 3d view **********************/
 
-int mouse_nurb(bContext *C, short mval[2], int extend)
+int mouse_nurb(bContext *C, const short mval[2], int extend)
 {
 	Object *obedit= CTX_data_edit_object(C); 
 	Curve *cu= obedit->data;
@@ -4292,8 +4294,8 @@ static int spin_nurb(float viewmat[][4], Object *obedit, float *axis, float *cen
 	mul_m3_m3m3(scalemat1,imat,tmat);
 
 	unit_m3(scalemat2);
-	scalemat2[0][0]/= M_SQRT2;
-	scalemat2[1][1]/= M_SQRT2;
+	scalemat2[0][0]/= (float)M_SQRT2;
+	scalemat2[1][1]/= (float)M_SQRT2;
 
 	mul_m3_m3m3(tmat,persmat,bmat);
 	mul_m3_m3m3(cmat,scalemat2,tmat);
@@ -4410,11 +4412,10 @@ static int addvert_Nurb(bContext *C, short mode, float location[3])
 	Nurb *nu, *newnu= NULL;
 	BezTriple *bezt, *newbezt = NULL;
 	BPoint *bp, *newbp = NULL;
-	float mat[3][3],imat[3][3], temp[3];
+	float imat[4][4], temp[3];
 	int ok= 0;
 
-	copy_m3_m4(mat, obedit->obmat);
-	invert_m3_m3(imat,mat);
+	invert_m4_m4(imat, obedit->obmat);
 
 	findselectedNurbvert(&editnurb->nurbs, &nu, &bezt, &bp);
 
@@ -4448,10 +4449,14 @@ static int addvert_Nurb(bContext *C, short mode, float location[3])
 				temp[0] = 1;
 				temp[1] = 0;
 				temp[2] = 0;
+
 				copy_v3_v3(newbezt->vec[1], location);
-				sub_v3_v3(newbezt->vec[1], obedit->obmat[3]);
-				sub_v3_v3v3(newbezt->vec[0], newbezt->vec[1],temp);
-				add_v3_v3v3(newbezt->vec[2], newbezt->vec[1],temp);
+				sub_v3_v3v3(newbezt->vec[0], newbezt->vec[1], temp);
+				add_v3_v3v3(newbezt->vec[2], newbezt->vec[1], temp);
+
+				mul_m4_v3(imat, newbezt->vec[0]);
+				mul_m4_v3(imat, newbezt->vec[1]);
+				mul_m4_v3(imat, newbezt->vec[2]);
 
 				ok= 1;
 				nu= newnu;
@@ -4470,9 +4475,7 @@ static int addvert_Nurb(bContext *C, short mode, float location[3])
 				newnu->orderu= 2;
 				newnu->pntsu= 1;
 
-				copy_v3_v3(newbp->vec, location);
-				sub_v3_v3(newbp->vec, obedit->obmat[3]);
-				mul_m3_v3(imat,newbp->vec);
+				mul_v3_m4v3(newbp->vec, imat, location);
 				newbp->vec[3]= 1.0;
 
 				newnu->knotsu= newnu->knotsv= NULL;
@@ -4552,9 +4555,7 @@ static int addvert_Nurb(bContext *C, short mode, float location[3])
 				copy_v3_v3(newbezt->vec[2], bezt->vec[2]);
 			}
 			else {
-				copy_v3_v3(newbezt->vec[1], location);
-				sub_v3_v3(newbezt->vec[1], obedit->obmat[3]);
-				mul_m3_v3(imat,newbezt->vec[1]);
+				mul_v3_m4v3(newbezt->vec[1], imat, location);
 				sub_v3_v3v3(temp, newbezt->vec[1],temp);
 				add_v3_v3v3(newbezt->vec[0], bezt->vec[0],temp);
 				add_v3_v3v3(newbezt->vec[2], bezt->vec[2],temp);
@@ -4619,9 +4620,7 @@ static int addvert_Nurb(bContext *C, short mode, float location[3])
 				copy_v3_v3(newbp->vec, bp->vec);
 			}
 			else {
-				copy_v3_v3(newbp->vec, location);
-				sub_v3_v3(newbp->vec, obedit->obmat[3]);
-				mul_m3_v3(imat,newbp->vec);
+				mul_v3_m4v3(newbp->vec, imat, location);
 				newbp->vec[3]= 1.0;
 
 				if(!newnu && nu->orderu<4 && nu->orderu<=nu->pntsu)
@@ -4663,17 +4662,37 @@ static int add_vertex_exec(bContext *C, wmOperator *op)
 static int add_vertex_invoke(bContext *C, wmOperator *op, wmEvent *event)
 {
 	RegionView3D *rv3d= CTX_wm_region_view3d(C);
-	ViewContext vc;
-	float location[3] = {0.0f, 0.0f, 0.0f};
-	short mval[2];
 
 	if(rv3d && !RNA_property_is_set(op->ptr, "location")) {
+		Curve *cu;
+		ViewContext vc;
+		float location[3];
+		short mval[2];
+
+		Nurb *nu;
+		BezTriple *bezt;
+		BPoint *bp;
+
 		view3d_set_viewcontext(C, &vc);
+
+		cu= vc.obedit->data;
+
+		findselectedNurbvert(&cu->editnurb->nurbs, &nu, &bezt, &bp);
+
+		if(bezt) {
+			mul_v3_m4v3(location, vc.obedit->obmat, bezt->vec[1]);
+		}
+		else if (bp) {
+			mul_v3_m4v3(location, vc.obedit->obmat, bp->vec);
+		}
+		else {
+			copy_v3_v3(location, give_cursor(vc.scene, vc.v3d));
+		}
 
 		mval[0]= event->x - vc.ar->winrct.xmin;
 		mval[1]= event->y - vc.ar->winrct.ymin;
 		
-		view3d_get_view_aligned_coordinate(&vc, location, mval);
+		view3d_get_view_aligned_coordinate(&vc, location, mval, TRUE);
 		RNA_float_set_array(op->ptr, "location", location);
 	}
 
@@ -4731,7 +4750,7 @@ static int extrude_exec(bContext *C, wmOperator *UNUSED(op))
 static int extrude_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 {
 	if(extrude_exec(C, op) == OPERATOR_FINISHED) {
-		RNA_int_set(op->ptr, "mode", TFM_TRANSLATION);
+		RNA_enum_set(op->ptr, "mode", TFM_TRANSLATION);
 		WM_operator_name_call(C, "TRANSFORM_OT_transform", WM_OP_INVOKE_REGION_WIN, op->ptr);
 
 		return OPERATOR_FINISHED;
@@ -4744,6 +4763,7 @@ void CURVE_OT_extrude(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Extrude";
+	ot->description = "Extrude selected control point(s) and move";
 	ot->idname= "CURVE_OT_extrude";
 	
 	/* api callbacks */
@@ -4755,7 +4775,7 @@ void CURVE_OT_extrude(wmOperatorType *ot)
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 
 	/* to give to transform */
-	RNA_def_int(ot->srna, "mode", TFM_TRANSLATION, 0, INT_MAX, "Mode", "", 0, INT_MAX);
+	RNA_def_enum(ot->srna, "mode", transform_mode_types, TFM_TRANSLATION, "Mode", "");
 }
 
 /***************** make cyclic operator **********************/
@@ -4872,6 +4892,7 @@ void CURVE_OT_cyclic_toggle(wmOperatorType *ot)
 
 	/* identifiers */
 	ot->name= "Toggle Cyclic";
+	ot->description = "Make active spline closed/opened loop";
 	ot->idname= "CURVE_OT_cyclic_toggle";
 	
 	/* api callbacks */
@@ -4975,8 +4996,8 @@ static int select_linked_pick_invoke(bContext *C, wmOperator *op, wmEvent *event
 	int a, location[2], deselect;
 
 	deselect= RNA_boolean_get(op->ptr, "deselect");
- 	location[0]= event->x - ar->winrct.xmin;
- 	location[1]= event->y - ar->winrct.ymin;
+	location[0]= event->x - ar->winrct.xmin;
+	location[1]= event->y - ar->winrct.ymin;
 
 	view3d_operator_needs_opengl(C);
 	view3d_set_viewcontext(C, &vc);
@@ -5608,7 +5629,7 @@ static int duplicate_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 {
 	duplicate_exec(C, op);
 
-	RNA_int_set(op->ptr, "mode", TFM_TRANSLATION);
+	RNA_enum_set(op->ptr, "mode", TFM_TRANSLATION);
 	WM_operator_name_call(C, "TRANSFORM_OT_transform", WM_OP_INVOKE_REGION_WIN, op->ptr);
 
 	return OPERATOR_FINISHED;
@@ -5617,7 +5638,8 @@ static int duplicate_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 void CURVE_OT_duplicate(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Duplicate";
+	ot->name= "Duplicate Curve";
+	ot->description = "Duplicate selected control points and segments between them";
 	ot->idname= "CURVE_OT_duplicate";
 	
 	/* api callbacks */
@@ -5629,7 +5651,7 @@ void CURVE_OT_duplicate(wmOperatorType *ot)
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 
 	/* to give to transform */
-	RNA_def_int(ot->srna, "mode", TFM_TRANSLATION, 0, INT_MAX, "Mode", "", 0, INT_MAX);
+	RNA_def_enum(ot->srna, "mode", transform_mode_types, TFM_TRANSLATION, "Mode", "");
 }
 
 /********************** delete operator *********************/
@@ -5983,6 +6005,7 @@ void CURVE_OT_delete(wmOperatorType *ot)
 
 	/* identifiers */
 	ot->name= "Delete";
+	ot->description = "Delete selected control points or segments";
 	ot->idname= "CURVE_OT_delete";
 	
 	/* api callbacks */
@@ -6218,10 +6241,10 @@ Nurb *add_nurbs_primitive(bContext *C, float mat[4][4], int type, int newob)
 			bezt->radius = 1.0;
 
 			bezt->vec[1][0]+= -grid;
-			bezt->vec[0][0]+= -1.5*grid;
-			bezt->vec[0][1]+= -0.5*grid;
-			bezt->vec[2][0]+= -0.5*grid;
-			bezt->vec[2][1]+=  0.5*grid;
+			bezt->vec[0][0]+= -1.5f*grid;
+			bezt->vec[0][1]+= -0.5f*grid;
+			bezt->vec[2][0]+= -0.5f*grid;
+			bezt->vec[2][1]+=  0.5f*grid;
 			for(a=0;a<3;a++) mul_m4_v3(mat, bezt->vec[a]);
 
 			bezt++;
@@ -6254,7 +6277,7 @@ Nurb *add_nurbs_primitive(bContext *C, float mat[4][4], int type, int newob)
 			}
 
 			bp= nu->bp;
-			bp->vec[0]+= -1.5*grid; 
+			bp->vec[0]+= -1.5f*grid;
 			bp++;
 			bp->vec[0]+= -grid;
 			bp->vec[1]+=  grid; 
@@ -6262,7 +6285,7 @@ Nurb *add_nurbs_primitive(bContext *C, float mat[4][4], int type, int newob)
 			bp->vec[0]+= grid;
 			bp->vec[1]+= grid; 
 			bp++;
-			bp->vec[0]+= 1.5*grid;
+			bp->vec[0]+= 1.5f*grid;
 
 			bp= nu->bp;
 			for(a=0;a<4;a++, bp++) mul_m4_v3(mat,bp->vec);
@@ -6290,13 +6313,13 @@ Nurb *add_nurbs_primitive(bContext *C, float mat[4][4], int type, int newob)
 		}
 
 		bp= nu->bp;
-		bp->vec[0]+= -2.0*grid; 
+		bp->vec[0]+= -2.0f*grid;
 		bp++;
 		bp->vec[0]+= -grid;
 		bp++; bp++;
 		bp->vec[0]+= grid;
 		bp++;
-		bp->vec[0]+= 2.0*grid;
+		bp->vec[0]+= 2.0f*grid;
 
 		bp= nu->bp;
 		for(a=0;a<5;a++, bp++) mul_m4_v3(mat,bp->vec);
@@ -6361,8 +6384,8 @@ Nurb *add_nurbs_primitive(bContext *C, float mat[4][4], int type, int newob)
 					bp->vec[1]+= nurbcircle[a][1]*grid;
 				}
 				else {
-					bp->vec[0]+= 0.25*nurbcircle[a][0]*grid-.75*grid;
-					bp->vec[2]+= 0.25*nurbcircle[a][1]*grid;
+					bp->vec[0]+= 0.25f*nurbcircle[a][0]*grid-0.75f*grid;
+					bp->vec[2]+= 0.25f*nurbcircle[a][1]*grid;
 				}
 				if(a & 1) bp->vec[3]= 0.25*M_SQRT2;
 				else bp->vec[3]= 1.0;
@@ -6391,9 +6414,9 @@ Nurb *add_nurbs_primitive(bContext *C, float mat[4][4], int type, int newob)
 			for(a=0; a<4; a++) {
 				for(b=0; b<4; b++) {
 					bp->f1= SELECT;
-					fac= (float)a -1.5;
+					fac= (float)a -1.5f;
 					bp->vec[0]+= fac*grid;
-					fac= (float)b -1.5;
+					fac= (float)b -1.5f;
 					bp->vec[1]+= fac*grid;
 					if(a==1 || a==2) if(b==1 || b==2) {
 						bp->vec[2]+= grid;
@@ -6640,7 +6663,7 @@ static int add_primitive_bezier_circle_exec(bContext *C, wmOperator *op)
 void CURVE_OT_primitive_bezier_circle_add(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Add Circle";
+	ot->name= "Add Bezier Circle";
 	ot->description= "Construct a Bezier Circle";
 	ot->idname= "CURVE_OT_primitive_bezier_circle_add";
 	

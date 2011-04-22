@@ -236,6 +236,8 @@ Mesh *copy_mesh(Mesh *me)
 	}
 	
 	men->mselect= NULL;
+	men->edit_mesh= NULL;
+	men->pv= NULL; /* looks like this is no-longer supported but NULL just incase */
 
 	men->bb= MEM_dupallocN(men->bb);
 	
@@ -835,7 +837,7 @@ int nurbs_to_mdata_customdb(Object *ob, ListBase *dispbase, MVert **allvert, int
 	}
 
 	*allvert= mvert= MEM_callocN(sizeof (MVert) * totvert, "nurbs_init mvert");
-	*allface= mface= MEM_callocN(sizeof (MVert) * totvlak, "nurbs_init mface");
+	*allface= mface= MEM_callocN(sizeof (MFace) * totvlak, "nurbs_init mface");
 
 	/* verts and faces */
 	vertcount= 0;
@@ -1463,7 +1465,7 @@ void create_vert_edge_map(ListBase **map, IndexNode **mem, const MEdge *medge, c
 	(*map) = MEM_callocN(sizeof(ListBase) * totvert, "vert edge map");
 	(*mem) = MEM_callocN(sizeof(IndexNode) * totedge * 2, "vert edge map mem");
 	node = *mem;
-       
+
 	/* Find the users */
 	for(i = 0; i < totedge; ++i){
 		for(j = 0; j < 2; ++j, ++node) {

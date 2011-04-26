@@ -967,6 +967,11 @@ bNode *nodeAddNodeType(bNodeTree *ntree, int type, bNodeTree *ngroup, ID *id)
 	} else
 		ntype= node_get_type(ntree, type, id);
 
+	if(ntype == NULL) {
+		printf("nodeAddNodeType() error: '%d' type invalid\n", type);
+		return NULL;
+	}
+
 	node= MEM_callocN(sizeof(bNode), "new node");
 	BLI_addtail(&ntree->nodes, node);
 	node->typeinfo= ntype;
@@ -1997,11 +2002,23 @@ static void node_group_execute(bNodeStack *stack, void *data, bNode *gnode, bNod
 	if (ntree->type==NTREE_COMPOSIT) {
 		bNodeSocket *sock;
 		bNodeStack *ns;
+		
+		/* clear hasoutput on all local stack data,
+		 * only the group output will be used from now on
+		 */
+		for (node=ntree->nodes.first; node; node=node->next) {
+			for (sock=node->outputs.first; sock; sock=sock->next) {
+				if (sock->stack_type==SOCK_STACK_LOCAL) {
+					ns= get_socket_stack(stack, sock, in);
+					ns->hasoutput = 0;
+				}
+			}
+		}
+		/* use the hasoutput flag to tag external sockets */
 		for (sock=ntree->outputs.first; sock; sock=sock->next) {
-			/* use the hasoutput flag to tag external sockets */
 			if (sock->stack_type==SOCK_STACK_LOCAL) {
 				ns= get_socket_stack(stack, sock, in);
-				ns->hasoutput = 0;
+				ns->hasoutput = 1;
 			}
 		}
 		/* now free all stacks that are not used from outside */
@@ -2009,11 +2026,9 @@ static void node_group_execute(bNodeStack *stack, void *data, bNode *gnode, bNod
 			for (sock=node->outputs.first; sock; sock=sock->next) {
 				if (sock->stack_type==SOCK_STACK_LOCAL ) {
 					ns= get_socket_stack(stack, sock, in);
-					if (ns->hasoutput!=0 && ns->data) {
+					if (ns->hasoutput==0 && ns->data) {
 						free_compbuf(ns->data);
 						ns->data = NULL;
-						/* reset the flag */
-						ns->hasoutput = 1;
 					}
 				}
 			}
@@ -2229,16 +2244,40 @@ static void group_tag_used_outputs(bNode *gnode, bNodeStack *stack, bNodeStack *
 			}
 		}
 		
-		/* set stack types (for local stack entries) */
-		for(sock= node->outputs.first; sock; sock= sock->next) {
-			bNodeStack *ns = get_socket_stack(stack, sock, NULL);
-			if (ns)
-				ns->sockettype = sock->type;
-		}
-		
 		/* non-composite trees do all nodes by default */
 		if (ntree->type!=NTREE_COMPOSIT)
 			node->need_exec = 1;
+		
+		for(sock= node->inputs.first; sock; sock= sock->next) {
+			bNodeStack *ns = get_socket_stack(stack, sock, gin);
+			if (ns) {
+				ns->hasoutput = 1;
+				
+				/* sock type is needed to detect rgba or value or vector types */
+				if(sock->link && sock->link->fromsock)
+					ns->sockettype= sock->link->fromsock->type;
+				else
+					sock->ns.sockettype= sock->type;
+			}
+			
+			if(sock->link) {
+				bNodeLink *link= sock->link;
+				/* this is the test for a cyclic case */
+				if(link->fromnode && link->tonode) {
+					if(link->fromnode->level >= link->tonode->level && link->tonode->level!=0xFFF);
+					else {
+						node->need_exec= 0;
+					}
+				}
+			}
+		}
+		
+		/* set stack types (for local stack entries) */
+		for(sock= node->outputs.first; sock; sock= sock->next) {
+			bNodeStack *ns = get_socket_stack(stack, sock, gin);
+			if (ns)
+				ns->sockettype = sock->type;
+		}
 	}
 }
 

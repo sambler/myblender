@@ -38,12 +38,7 @@
 #include <stddef.h>
 #include <assert.h>
 
-#ifdef WIN32
-#include "BLI_winstuff.h"
-#include <windows.h>  
-
-#include <io.h>
-#endif
+#include "GHOST_C-api.h"
 
 #include "MEM_guardedalloc.h"
 
@@ -219,6 +214,9 @@ static int wm_macro_exec(bContext *C, wmOperator *op)
 			} else {
 				break; /* operator didn't finish, end macro */
 			}
+			
+			if (retval & OPERATOR_ABORT_MACRO)
+				break;
 		}
 	}
 	
@@ -244,6 +242,9 @@ static int wm_macro_invoke_internal(bContext *C, wmOperator *op, wmEvent *event,
 		} else {
 			break; /* operator didn't finish, end macro */
 		}
+		
+		if (retval & OPERATOR_ABORT_MACRO)
+			break;
 	}
 
 	return wm_macro_end(op, retval);
@@ -270,43 +271,45 @@ static int wm_macro_modal(bContext *C, wmOperator *op, wmEvent *event)
 			MacroData *md = op->customdata;
 
 			md->retval = OPERATOR_FINISHED; /* keep in mind that at least one operator finished */
-
-			retval = wm_macro_invoke_internal(C, op, event, opm->next);
-
-			/* if new operator is modal and also added its own handler */
-			if (retval & OPERATOR_RUNNING_MODAL && op->opm != opm) {
-				wmWindow *win = CTX_wm_window(C);
-				wmEventHandler *handler = NULL;
-
-				for (handler = win->modalhandlers.first; handler; handler = handler->next) {
-					/* first handler in list is the new one */
-					if (handler->op == op)
-						break;
-				}
-
-				if (handler) {
-					BLI_remlink(&win->modalhandlers, handler);
-					wm_event_free_handler(handler);
-				}
-
-				/* if operator is blocking, grab cursor
-				 * This may end up grabbing twice, but we don't care.
-				 * */
-				if(op->opm->type->flag & OPTYPE_BLOCKING) {
-					int bounds[4] = {-1,-1,-1,-1};
-					int wrap = (U.uiflag & USER_CONTINUOUS_MOUSE) && ((op->opm->flag & OP_GRAB_POINTER) || (op->opm->type->flag & OPTYPE_GRAB_POINTER));
-
-					if(wrap) {
-						ARegion *ar= CTX_wm_region(C);
-						if(ar) {
-							bounds[0]= ar->winrct.xmin;
-							bounds[1]= ar->winrct.ymax;
-							bounds[2]= ar->winrct.xmax;
-							bounds[3]= ar->winrct.ymin;
-						}
+			
+			if (!(retval & OPERATOR_ABORT_MACRO)) {
+				retval = wm_macro_invoke_internal(C, op, event, opm->next);
+	
+				/* if new operator is modal and also added its own handler */
+				if (retval & OPERATOR_RUNNING_MODAL && op->opm != opm) {
+					wmWindow *win = CTX_wm_window(C);
+					wmEventHandler *handler = NULL;
+	
+					for (handler = win->modalhandlers.first; handler; handler = handler->next) {
+						/* first handler in list is the new one */
+						if (handler->op == op)
+							break;
 					}
-
-					WM_cursor_grab(CTX_wm_window(C), wrap, FALSE, bounds);
+	
+					if (handler) {
+						BLI_remlink(&win->modalhandlers, handler);
+						wm_event_free_handler(handler);
+					}
+	
+					/* if operator is blocking, grab cursor
+					 * This may end up grabbing twice, but we don't care.
+					 * */
+					if(op->opm->type->flag & OPTYPE_BLOCKING) {
+						int bounds[4] = {-1,-1,-1,-1};
+						int wrap = (U.uiflag & USER_CONTINUOUS_MOUSE) && ((op->opm->flag & OP_GRAB_POINTER) || (op->opm->type->flag & OPTYPE_GRAB_POINTER));
+	
+						if(wrap) {
+							ARegion *ar= CTX_wm_region(C);
+							if(ar) {
+								bounds[0]= ar->winrct.xmin;
+								bounds[1]= ar->winrct.ymax;
+								bounds[2]= ar->winrct.xmax;
+								bounds[3]= ar->winrct.ymin;
+							}
+						}
+	
+						WM_cursor_grab(CTX_wm_window(C), wrap, FALSE, bounds);
+					}
 				}
 			}
 		}
@@ -1194,7 +1197,7 @@ static uiBlock *wm_block_create_splash(bContext *C, ARegion *ar, void *UNUSED(ar
 	uiItemL(col, "Links", ICON_NONE);
 	uiItemStringO(col, "Donations", ICON_URL, "WM_OT_url_open", "url", "http://www.blender.org/blenderorg/blender-foundation/donation-payment/");
 	uiItemStringO(col, "Release Log", ICON_URL, "WM_OT_url_open", "url", "http://www.blender.org/development/release-logs/blender-257/");
-	uiItemStringO(col, "Manual", ICON_URL, "WM_OT_url_open", "url", "http://wiki.blender.org/index.php/Doc:Manual");
+	uiItemStringO(col, "Manual", ICON_URL, "WM_OT_url_open", "url", "http://wiki.blender.org/index.php/Doc:2.5/Manual");
 	uiItemStringO(col, "Blender Website", ICON_URL, "WM_OT_url_open", "url", "http://www.blender.org/");
 	uiItemStringO(col, "User Community", ICON_URL, "WM_OT_url_open", "url", "http://www.blender.org/community/user-community/"); // 
 	if(strcmp(STRINGIFY(BLENDER_VERSION_CYCLE), "release")==0) {
@@ -2001,7 +2004,6 @@ static void WM_OT_collada_import(wmOperatorType *ot)
 #endif
 
 
-
 /* *********************** */
 
 static void WM_OT_window_fullscreen_toggle(wmOperatorType *ot)
@@ -2035,28 +2037,10 @@ static void WM_OT_quit_blender(wmOperatorType *ot)
 }
 
 /* *********************** */
-#if defined(WIN32)
-static int console= 1;
-void WM_console_toggle(bContext *UNUSED(C), short show)
-{
-	if(show) {
-		ShowWindow(GetConsoleWindow(),SW_SHOW);
-		console= 1;
-	}
-	else {
-		ShowWindow(GetConsoleWindow(),SW_HIDE);
-		console= 0;
-	}
-}
 
-static int wm_console_toggle_op(bContext *C, wmOperator *UNUSED(op))
+static int wm_console_toggle_op(bContext *UNUSED(C), wmOperator *UNUSED(op))
 {
-	if(console) {
-		WM_console_toggle(C, 0);
-	}
-	else {
-		WM_console_toggle(C, 1);
-	}
+	GHOST_toggleConsole(2);
 	return OPERATOR_FINISHED;
 }
 
@@ -2069,7 +2053,6 @@ static void WM_OT_console_toggle(wmOperatorType *ot)
 	ot->exec= wm_console_toggle_op;
 	ot->poll= WM_operator_winactive;
 }
-#endif
 
 /* ************ default paint cursors, draw always around cursor *********** */
 /*

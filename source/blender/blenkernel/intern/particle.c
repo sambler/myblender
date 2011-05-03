@@ -3032,7 +3032,7 @@ void psys_cache_paths(ParticleSimulationData *sim, float cfra)
 
 	psys->totcached = totpart;
 
-	if(psys && psys->lattice){
+	if(psys->lattice){
 		end_latt_deform(psys->lattice);
 		psys->lattice= NULL;
 	}

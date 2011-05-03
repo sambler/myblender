@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/object/object_ops.c
+ *  \ingroup edobj
+ */
+
 
 #include <stdlib.h>
 #include <math.h>
@@ -60,9 +65,7 @@ void ED_operatortypes_object(void)
 	WM_operatortype_append(OBJECT_OT_scale_clear);
 	WM_operatortype_append(OBJECT_OT_origin_clear);
 	WM_operatortype_append(OBJECT_OT_visual_transform_apply);
-	WM_operatortype_append(OBJECT_OT_location_apply);
-	WM_operatortype_append(OBJECT_OT_scale_apply);
-	WM_operatortype_append(OBJECT_OT_rotation_apply);
+	WM_operatortype_append(OBJECT_OT_transform_apply);
 	WM_operatortype_append(OBJECT_OT_origin_set);
 	
 	WM_operatortype_append(OBJECT_OT_mode_set);
@@ -140,7 +143,6 @@ void ED_operatortypes_object(void)
 	WM_operatortype_append(OBJECT_OT_multires_external_pack);
 	WM_operatortype_append(OBJECT_OT_meshdeform_bind);
 	WM_operatortype_append(OBJECT_OT_explode_refresh);
-	WM_operatortype_append(OBJECT_OT_ocean_bake);
 	
 	WM_operatortype_append(OBJECT_OT_constraint_add);
 	WM_operatortype_append(OBJECT_OT_constraint_add_with_targets);
@@ -216,7 +218,7 @@ void ED_operatormacros_object(void)
 	wmOperatorType *ot;
 	wmOperatorTypeMacro *otmacro;
 	
-	ot= WM_operatortype_append_macro("OBJECT_OT_duplicate_move", "Duplicate", OPTYPE_UNDO|OPTYPE_REGISTER);
+	ot= WM_operatortype_append_macro("OBJECT_OT_duplicate_move", "Duplicate Objects", OPTYPE_UNDO|OPTYPE_REGISTER);
 	if(ot) {
 		WM_operatortype_macro_define(ot, "OBJECT_OT_duplicate");
 		otmacro= WM_operatortype_macro_define(ot, "TRANSFORM_OT_translate");

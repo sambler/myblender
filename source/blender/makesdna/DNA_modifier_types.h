@@ -1,5 +1,4 @@
-/**
- *
+/*
  * $Id$ 
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -21,10 +20,15 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
-#include "DNA_listBase.h"
-
 #ifndef DNA_MODIFIER_TYPES_H
 #define DNA_MODIFIER_TYPES_H
+
+/** \file DNA_modifier_types.h
+ *  \ingroup DNA
+ */
+
+#include "DNA_listBase.h"
+
 
 #define MODSTACK_DEBUG 1
 
@@ -66,10 +70,7 @@ typedef enum ModifierType {
 	eModifierType_ShapeKey,
 	eModifierType_Solidify,
 	eModifierType_Screw,
-	/* placeholder, keep this so durian files load in
-	 * trunk with the correct modifier once its merged */
 	eModifierType_Warp,
-	eModifierType_Ocean,
 	NUM_MODIFIER_TYPES
 } ModifierType;
 
@@ -103,6 +104,17 @@ typedef enum {
 	eSubsurfModifierFlag_ControlEdges = (1<<2),
 	eSubsurfModifierFlag_SubsurfUv = (1<<3)
 } SubsurfModifierFlag;
+
+/* not a real modifier */
+typedef struct MappingInfoModifierData {
+	ModifierData modifier;
+
+	struct Tex *texture;
+	struct Object *map_object;
+	char uvlayer_name[32];
+	int uvlayer_tmp;
+	int texmapping;
+} MappingInfoModifierData;
 
 typedef struct SubsurfModifierData {
 	ModifierData modifier;
@@ -236,6 +248,7 @@ typedef struct MirrorModifierData {
 #define MOD_MIR_AXIS_Y		(1<<4)
 #define MOD_MIR_AXIS_Z		(1<<5)
 #define MOD_MIR_VGROUP		(1<<6)
+#define MOD_MIR_NO_MERGE	(1<<7)
 
 typedef struct EdgeSplitModifierData {
 	ModifierData modifier;
@@ -288,15 +301,19 @@ typedef struct SmokeModifierData {
 typedef struct DisplaceModifierData {
 	ModifierData modifier;
 
+	/* keep in sync with MappingInfoModifierData */
 	struct Tex *texture;
+	struct Object *map_object;
+	char uvlayer_name[32];
+	int uvlayer_tmp;
+	int texmapping;
+	int pad10;
+	/* end MappingInfoModifierData */
+
 	float strength;
 	int direction;
 	char defgrp_name[32];
 	float midlevel;
-	int texmapping;
-	struct Object *map_object;
-	char uvlayer_name[32];
-	int uvlayer_tmp, pad;
 } DisplaceModifierData;
 
 /* DisplaceModifierData->direction */
@@ -470,7 +487,7 @@ typedef struct CollisionModifierData {
 	
 	unsigned int numverts;
 	unsigned int numfaces;
-	float time, pad;		/* cfra time of modifier */
+	float time_x, time_xnew;		/* cfra time of modifier */
 	struct BVHTree *bvhtree; /* bounding volume hierarchy for this cloth object */
 } CollisionModifierData;
 
@@ -584,7 +601,7 @@ typedef struct ParticleInstanceModifierData {
 typedef enum {
 	eExplodeFlag_CalcFaces =	(1<<0),
 	eExplodeFlag_PaSize =		(1<<1),
-	eExplodeFlag_EdgeSplit =	(1<<2),
+	eExplodeFlag_EdgeCut =		(1<<2),
 	eExplodeFlag_Unborn =		(1<<3),
 	eExplodeFlag_Alive =		(1<<4),
 	eExplodeFlag_Dead =			(1<<5),
@@ -595,6 +612,7 @@ typedef struct ExplodeModifierData {
 	int *facepa;
 	short flag, vgroup;
 	float protect;
+	char uvname[32];
 } ExplodeModifierData;
 
 typedef struct MultiresModifierData {
@@ -700,13 +718,16 @@ typedef struct SolidifyModifierData {
 	float crease_outer;
 	float crease_rim;
 	int flag;
+	short mat_ofs;
+	short mat_ofs_rim;
+	int pad;
 } SolidifyModifierData;
 
 #define MOD_SOLIDIFY_RIM			(1<<0)
 #define MOD_SOLIDIFY_EVEN			(1<<1)
 #define MOD_SOLIDIFY_NORMAL_CALC	(1<<2)
 #define MOD_SOLIDIFY_VGROUP_INV		(1<<3)
-#define MOD_SOLIDIFY_RIM_MATERIAL	(1<<4)
+#define MOD_SOLIDIFY_RIM_MATERIAL	(1<<4) /* deprecated, used in do_versions */
 
 typedef struct ScrewModifierData {
 	ModifierData modifier;
@@ -725,63 +746,42 @@ typedef struct ScrewModifierData {
 #define MOD_SCREW_OBJECT_OFFSET	(1<<2)
 // #define MOD_SCREW_OBJECT_ANGLE	(1<<4)
 
-typedef struct OceanModifierData {
-	ModifierData modifier;		
-	
-	struct Ocean *ocean;
-	struct OceanCache *oceancache;
-	
-	int		resolution;
-	int		spatial_size;
-	
-	float	wind_velocity;
-	
-	float	damp;
-	float	smallest_wave;
-	float	depth;
-	
-	float	wave_alignment;
-	float	wave_direction;
-	float	wave_scale;
-	
-	float	chop_amount;
-	float	foam_coverage;
-	float	time;
-	
-	int		seed;
-	int		flag;
-	int		output;
-	
-	int		refresh;
-	
-	int		bakestart;
-	int		bakeend;
-	
-	char	cachepath[240];	// FILE_MAX
-	int		cached;
-	
-	int		geometry_mode;
-	float	size;
-	int		repeat_x;
-	int		repeat_y;
-	
-	float	foam_fade;
-	
-} OceanModifierData;
+typedef struct WarpModifierData {
+	ModifierData modifier;
 
+	/* keep in sync with MappingInfoModifierData */
+	struct Tex *texture;
+	struct Object *map_object;
+	char uvlayer_name[32];
+	int uvlayer_tmp;
+	int texmapping;
+	int pad10;
+	/* end MappingInfoModifierData */
 
-#define MOD_OCEAN_GEOM_GENERATE	0
-#define MOD_OCEAN_GEOM_DISPLACE	1
-#define MOD_OCEAN_GEOM_SIM_ONLY	2
+	float strength;
 
-#define MOD_OCEAN_REFRESH_RESET			1
-#define MOD_OCEAN_REFRESH_SIM			2
-#define MOD_OCEAN_REFRESH_ADD			4
-#define MOD_OCEAN_REFRESH_CLEAR_CACHE	8
-#define MOD_OCEAN_REFRESH_TOPOLOGY		16
+	struct Object *object_from;
+	struct Object *object_to;
+	struct CurveMapping *curfalloff;
+	char defgrp_name[32];			/* optional vertexgroup name */
+	float falloff_radius;
+	char flag; /* not used yet */
+	char falloff_type;
+	char pad[2];
+} WarpModifierData;
 
-#define MOD_OCEAN_GENERATE_FOAM	1
-#define MOD_OCEAN_GENERATE_NORMALS	2
+#define MOD_WARP_VOLUME_PRESERVE 1
 
+typedef enum {
+	eWarp_Falloff_None =		0,
+	eWarp_Falloff_Curve =		1,
+	eWarp_Falloff_Sharp =		2, /* PROP_SHARP */
+	eWarp_Falloff_Smooth =		3, /* PROP_SMOOTH */
+	eWarp_Falloff_Root =		4, /* PROP_ROOT */
+	eWarp_Falloff_Linear =		5, /* PROP_LIN */
+	eWarp_Falloff_Const =		6, /* PROP_CONST */
+	eWarp_Falloff_Sphere =		7, /* PROP_SPHERE */
+	/* PROP_RANDOM not used */
+} WarpModifierFalloff;
 
 #endif

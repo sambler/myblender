@@ -1,4 +1,5 @@
-/*  exotic.c   
+/*
+ * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -20,14 +21,20 @@
  * All rights reserved.
  *
  *
- * Contributor(s): 
+ * Contributor(s):
  * - Martin DeMello
  *   Added dxf_read_arc, dxf_read_ellipse and dxf_read_lwpolyline
  *   Copyright (C) 2004 by Etheract Software Labs
  *
  * - Blender Foundation
  *
- * ***** END GPL LICENSE BLOCK *****/
+ * ***** END GPL LICENSE BLOCK ****
+ */
+
+/** \file blender/blenkernel/intern/exotic.c
+ *  \ingroup bke
+ */
+
 
 #include <stddef.h>
 #include "BLI_storage.h"
@@ -131,22 +138,22 @@ static int is_stl(const char *str)
 	return 1;
 }
 
-#define READSTLVERT {                                   \
-  if (fread(mvert->co, sizeof(float), 3, fpSTL) != 3) { \
-	char error_msg[255];                                \
-	MEM_freeN(vertdata);                                \
-	MEM_freeN(facedata);                                \
-	fclose(fpSTL);                                      \
-	sprintf(error_msg, "Problems reading face %d!", i); \
-	return;                                             \
-  }                                                     \
-  else {                                                \
-	if (ENDIAN_ORDER==B_ENDIAN) {                       \
-	  SWITCH_INT(mvert->co[0]);                         \
-	  SWITCH_INT(mvert->co[1]);                         \
-	  SWITCH_INT(mvert->co[2]);                         \
-	}                                                   \
-  }                                                     \
+#define READSTLVERT {                                             \
+	if (fread(mvert->co, sizeof(float), 3, fpSTL) != 3) {      \
+		char error_msg[255];                                \
+		MEM_freeN(vertdata);                                \
+		MEM_freeN(facedata);                                \
+		fclose(fpSTL);                                      \
+		sprintf(error_msg, "Problems reading face %d!", i); \
+		return;                                             \
+	}                                                          \
+	else {                                                     \
+		if (ENDIAN_ORDER==B_ENDIAN) {                       \
+			SWITCH_INT(mvert->co[0]);                    \
+			SWITCH_INT(mvert->co[1]);                    \
+			SWITCH_INT(mvert->co[2]);                    \
+		}                                                   \
+	}                                                          \
 }
 
 static void simple_vertex_normal_blend(short *no, short *ble)
@@ -175,12 +182,10 @@ static void mesh_add_normals_flags(Mesh *me)
 		v2= me->mvert+mface->v2;
 		v3= me->mvert+mface->v3;
 		v4= me->mvert+mface->v4;
-		
+
 		normal_tri_v3( nor,v1->co, v2->co, v3->co);
-		sno[0]= 32767.0*nor[0];
-		sno[1]= 32767.0*nor[1];
-		sno[2]= 32767.0*nor[2];
-		
+		normal_float_to_short_v3(sno, nor);
+
 		simple_vertex_normal_blend(v1->no, sno);
 		simple_vertex_normal_blend(v2->no, sno);
 		simple_vertex_normal_blend(v3->no, sno);
@@ -364,10 +369,16 @@ static void read_stl_mesh_ascii(Scene *scene, const char *str)
 		 * sure we have enough storage for some more faces
 		 */
 		if ( (totface) && ( (totface % 10000) == 0 ) ) {
+			float  *vertdata_old= vertdata;
 			++numtenthousand;
 			vertdata = realloc(vertdata, 
 							   numtenthousand*3*30000*sizeof(float));
-			if (!vertdata) { STLALLOCERROR; }
+			if (!vertdata) {
+				if(vertdata_old) {
+					free(vertdata_old);
+				}
+				STLALLOCERROR;
+			}
 		}
 		
 		/* Don't read normal, but check line for proper syntax anyway
@@ -507,9 +518,6 @@ int BKE_read_exotic(Scene *scene, const char *name)
 
 /* ************************ WRITE ************************** */
 
-
-char temp_dir[160]= {0, 0};
-
 static void write_vert_stl(Object *ob, MVert *verts, int index, FILE *fpSTL)
 {
 	float vert[3];
@@ -582,7 +590,6 @@ void write_stl(Scene *scene, char *str)
 		BKE_reportf(reports, RPT_ERROR, "Can't open file: %s.", strerror(errno));
 		return;
 	}
-	strcpy(temp_dir, str);
 	
 	//XXX waitcursor(1);
 	
@@ -868,7 +875,6 @@ void write_dxf(struct Scene *scene, char *str)
 		//XXX error("Can't write file");
 		return;
 	}
-	strcpy(temp_dir, str);
 	
 	//XXX waitcursor(1);
 	
@@ -883,7 +889,7 @@ void write_dxf(struct Scene *scene, char *str)
 	write_group(0, "SECTION");
 	write_group(2, "BLOCKS");
 
-    
+
 	/* only write meshes we're using in this scene */
 	flag_listbase_ids(&G.main->mesh, LIB_DOIT, 0);
 	
@@ -1128,7 +1134,7 @@ static void dxf_add_mat (Object *ob, Mesh *me, float color[3], char *layer)
 						
 	ma= G.main->mat.first;
 	while(ma) {
-		if(ma->mtex[0]==0) {
+		if(ma->mtex[0]==NULL) {
 			if(color[0]==ma->r && color[1]==ma->g && color[2]==ma->b) {
 				me->mat[0]= ma;
 				ma->id.us++;
@@ -1137,7 +1143,7 @@ static void dxf_add_mat (Object *ob, Mesh *me, float color[3], char *layer)
 		}
 		ma= ma->id.next;
 	}
-	if(ma==0) {
+	if(ma==NULL) {
 		ma= add_material("ext");
 		me->mat[0]= ma;
 		ma->r= color[0];
@@ -1602,7 +1608,7 @@ static void dxf_read_arc(Scene *scene, int noob)
 		dia = (float) atof(val);
 	  } else if (id==62) {
 		int colorid= atoi(val);
-	    
+
 		CLAMP(colorid, 1, 255);
 		dxf_col_to_rgb(colorid, &color[0], &color[1], &color[2]);
 	  } else if (id==67) {
@@ -1646,7 +1652,7 @@ static void dxf_read_arc(Scene *scene, int noob)
 	cent[2]= center[2];
 
 	dxf_get_mesh(scene, &me, &ob, noob);
-	strcpy(oldllay, layname);		
+	BLI_strncpy(oldllay, layname, sizeof(oldllay));
 	if(ob) VECCOPY(ob->loc, cent);
 	dxf_add_mat (ob, me, color, layname);
 

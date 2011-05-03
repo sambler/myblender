@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file KX_BlenderSceneConverter.h
+ *  \ingroup bgeconv
+ */
+
 #ifndef __KX_BLENDERSCENECONVERTER_H
 #define __KX_BLENDERSCENECONVERTER_H
 
@@ -142,9 +147,9 @@ public:
 	struct Main*		  GetMainDynamicPath(const char *path);
 	vector<struct Main*> &GetMainDynamic();
 	
-	bool LinkBlendFileMemory(void *data, int length, const char *path, char *group, KX_Scene *scene_merge, char **err_str);
-	bool LinkBlendFilePath(const char *path, char *group, KX_Scene *scene_merge, char **err_str);
-	bool LinkBlendFile(struct BlendHandle *bpy_openlib, const char *path, char *group, KX_Scene *scene_merge, char **err_str);
+	bool LinkBlendFileMemory(void *data, int length, const char *path, char *group, KX_Scene *scene_merge, char **err_str, short options);
+	bool LinkBlendFilePath(const char *path, char *group, KX_Scene *scene_merge, char **err_str, short options);
+	bool LinkBlendFile(struct BlendHandle *bpy_openlib, const char *path, char *group, KX_Scene *scene_merge, char **err_str, short options);
 	bool MergeScene(KX_Scene *to, KX_Scene *from);
 	RAS_MeshObject *ConvertMeshSpecial(KX_Scene* kx_scene, Main *maggie, const char *name);
 	bool FreeBlendFile(struct Main *maggie);
@@ -171,6 +176,13 @@ public:
 #endif
 //		/printf("\t m_ketsjiEngine->m_scenes: %d\n", m_ketsjiEngine->CurrentScenes()->size());
 	}
+	
+	/* LibLoad Options */
+	enum 
+	{
+		LIB_LOAD_LOAD_ACTIONS = 1,
+		LIB_LOAD_VERBOSE = 2,
+	};
 
 
 

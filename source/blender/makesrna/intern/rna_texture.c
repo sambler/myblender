@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -21,6 +21,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/makesrna/intern/rna_texture.c
+ *  \ingroup RNA
+ */
+
 
 #include <float.h>
 #include <stdio.h>
@@ -66,7 +71,6 @@ EnumPropertyItem texture_type_items[] = {
 	{TEX_VORONOI, "VORONOI", ICON_TEXTURE, "Voronoi", ""},
 	{TEX_VOXELDATA, "VOXEL_DATA", ICON_TEXTURE, "Voxel Data", ""},
 	{TEX_WOOD, "WOOD", ICON_TEXTURE, "Wood", ""},
-	{TEX_OCEAN, "OCEAN", ICON_TEXTURE, "Ocean", ""},
 	{0, NULL, 0, NULL, NULL}};
 
 #ifdef RNA_RUNTIME
@@ -120,8 +124,6 @@ static StructRNA *rna_Texture_refine(struct PointerRNA *ptr)
 			return &RNA_VoxelDataTexture;
 		case TEX_WOOD:
 			return &RNA_WoodTexture;
-		case TEX_OCEAN:
-			return &RNA_OceanTexture;
 		default:
 			return &RNA_Texture;
 	}
@@ -130,7 +132,7 @@ static StructRNA *rna_Texture_refine(struct PointerRNA *ptr)
 static void rna_Texture_update(Main *bmain, Scene *scene, PointerRNA *ptr)
 {
 	Tex *tex= ptr->id.data;
-	
+
 	DAG_id_tag_update(&tex->id, 0);
 	WM_main_add_notifier(NC_TEXTURE, tex);
 }
@@ -147,9 +149,12 @@ static void rna_Texture_voxeldata_image_update(Main *bmain, Scene *scene, Pointe
 {
 	Tex *tex= ptr->id.data;
 	
-	tex->ima->source = IMA_SRC_SEQUENCE;
+	if(tex->ima) { /* may be getting cleared too */
+		tex->ima->source = IMA_SRC_SEQUENCE;
+	}
 	rna_Texture_voxeldata_update(bmain, scene, ptr);
 }
+
 
 /* Used for Texture Properties, used (also) for/in Nodes */
 static void rna_Texture_nodes_update(Main *bmain, Scene *scene, PointerRNA *ptr)
@@ -187,6 +192,20 @@ void rna_TextureSlot_update(Main *bmain, Scene *scene, PointerRNA *ptr)
 		case ID_BR: 
 			WM_main_add_notifier(NC_BRUSH, id);
 			break;
+		case ID_PA:
+		{
+			MTex *mtex= ptr->data;
+			int recalc = OB_RECALC_DATA;
+
+			if(mtex->mapto & PAMAP_INIT)
+				recalc |= PSYS_RECALC_RESET;
+			if(mtex->mapto & PAMAP_CHILD)
+				recalc |= PSYS_RECALC_CHILD;
+
+			DAG_id_tag_update(id, recalc);
+			WM_main_add_notifier(NC_OBJECT|ND_PARTICLE|NA_EDITED, NULL);
+			break;
+		}
 	}
 }
 
@@ -373,110 +392,6 @@ static char *rna_VoxelData_path(PointerRNA *ptr)
 {
 	return BLI_sprintfN("voxel_data");
 }
-
-static void rna_Texture_ocean_init_update(Main *bmain, Scene *scene, PointerRNA *ptr)
-{
-	Tex *tex= ptr->id.data;
-	
-	BKE_init_ocean_fromtex(tex->ot);
-	BKE_simulate_ocean_fromtex(tex->ot);
-	
-	rna_Texture_update(bmain, scene, ptr);
-}
-
-/*
- static void rna_Texture_ocean_sim_update(Main *bmain, Scene *scene, PointerRNA *ptr)
-{
-	Tex *tex= ptr->id.data;
-	
-	BKE_simulate_ocean_fromtex(tex->ot);
-	
-	rna_Texture_update(bmain, scene, ptr);
-}
-*/
-/*
- * old version assuming update functions actually get run
- * which is not the case at this point in time
- 
-static void rna_Texture_ocean_chop_set(PointerRNA *ptr, float value)
-{
-	OceanTex *ot= (OceanTex*)ptr->data;
-	float old_value = ot->chop_amount;
-	
-	ot->chop_amount = value;
-	
-	if ((old_value == 0.0 && value > 0.0) ||
-		(old_value > 0.0 && value == 0.0))
-	{
-		BKE_init_ocean_fromtex(ot);
-	}
-}
- */
-
-static char *rna_OceanTex_path(PointerRNA *ptr)
-{
-	return BLI_sprintfN("ocean");
-}
-
-
-/* ***** NASTINESS ALERT ***** */
-
-/* this is abusing rna property set functions to run updates, since currently
- * RNA update functions are not run when animated via fcurves */
-
-static void rna_Texture_ocean_chop_set(PointerRNA *ptr, float value)
-{
-	OceanTex *ot= (OceanTex*)ptr->data;
-	float old_value = ot->chop_amount;
-	
-	ot->chop_amount = value;
-	
-	if ((old_value == 0.0 && value > 0.0) ||
-		(old_value > 0.0 && value == 0.0))
-	{
-		BKE_init_ocean_fromtex(ot);
-	}
-	BKE_simulate_ocean_fromtex(ot);
-}
-
-static void rna_Texture_ocean_time_set(PointerRNA *ptr, float value)
-{
-	OceanTex *ot= (OceanTex*)ptr->data;
-	
-	ot->time = value;
-	BKE_simulate_ocean_fromtex(ot);
-}
-
-static void rna_Texture_ocean_wave_scale_set(PointerRNA *ptr, float value)
-{
-	OceanTex *ot= (OceanTex*)ptr->data;
-	
-	ot->wave_scale = value;
-	BKE_simulate_ocean_fromtex(ot);
-}
-
-static void rna_Texture_ocean_wave_alignment_set(PointerRNA *ptr, float value)
-{
-	OceanTex *ot= (OceanTex*)ptr->data;
-	
-	ot->wave_alignment = value;
-	BKE_init_ocean_fromtex(ot);
-	BKE_simulate_ocean_fromtex(ot);
-}
-
-static void rna_Texture_ocean_wind_velocity_set(PointerRNA *ptr, float value)
-{
-	OceanTex *ot= (OceanTex*)ptr->data;
-	
-	ot->wind_velocity = value;
-	BKE_init_ocean_fromtex(ot);
-	BKE_simulate_ocean_fromtex(ot);
-}
-
-
-
-
-/* ***** END NASTINESS ALERT ***** */
 
 #else
 
@@ -875,7 +790,7 @@ static void rna_def_texture_wood(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Pattern", "");
 	RNA_def_property_update(prop, 0, "rna_Texture_nodes_update");
 
-	prop= RNA_def_property(srna, "noisebasis_2", PROP_ENUM, PROP_NONE);
+	prop= RNA_def_property(srna, "noise_basis_2", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "noisebasis2");
 	RNA_def_property_enum_items(prop, prop_wood_noisebasis2);
 	RNA_def_property_ui_text(prop, "Noise Basis 2", "");
@@ -949,7 +864,7 @@ static void rna_def_texture_marble(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Noise Basis", "Sets the noise basis used for turbulence");
 	RNA_def_property_update(prop, 0, "rna_Texture_nodes_update");
 
-	prop= RNA_def_property(srna, "noisebasis_2", PROP_ENUM, PROP_NONE);
+	prop= RNA_def_property(srna, "noise_basis_2", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "noisebasis2");
 	RNA_def_property_enum_items(prop, prop_marble_noisebasis2);
 	RNA_def_property_ui_text(prop, "Noise Basis 2", "");
@@ -1101,7 +1016,7 @@ static void rna_def_texture_image(BlenderRNA *brna)
 
 	prop= RNA_def_property(srna, "use_interpolation", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "imaflag", TEX_INTERPOL);
-	RNA_def_property_ui_text(prop, "Interpolation", "Interpolates pixels using Area filter");
+	RNA_def_property_ui_text(prop, "Interpolation", "Interpolates pixels using selected filter");
 	RNA_def_property_update(prop, 0, "rna_Texture_update");
 
 	/* XXX: I think flip_axis should be a generic Texture property, enabled for all the texture types */
@@ -1512,6 +1427,8 @@ static void rna_def_texture_pointdensity(BlenderRNA *brna)
 		{TEX_PD_FALLOFF_SOFT, "SOFT", 0, "Soft", ""},
 		{TEX_PD_FALLOFF_CONSTANT, "CONSTANT", 0, "Constant", "Density is constant within lookup radius"},
 		{TEX_PD_FALLOFF_ROOT, "ROOT", 0, "Root", ""},
+		{TEX_PD_FALLOFF_PARTICLE_AGE, "PARTICLE_AGE", 0, "Particle Age", ""},
+		{TEX_PD_FALLOFF_PARTICLE_VEL, "PARTICLE_VELOCITY", 0, "Particle Velocity", ""},
 		{0, NULL, 0, NULL, NULL}};
 	
 	static EnumPropertyItem color_source_items[] = {
@@ -1594,12 +1511,30 @@ static void rna_def_texture_pointdensity(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Scale", "Multiplier to bring particle speed within an acceptable range");
 	RNA_def_property_update(prop, 0, "rna_Texture_update");
 	
+	prop= RNA_def_property(srna, "falloff_speed_scale", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "falloff_speed_scale");
+	RNA_def_property_range(prop, 0.001, 100.0);
+	RNA_def_property_ui_text(prop, "Velocity Scale", "Multiplier to bring particle speed within an acceptable range");
+	RNA_def_property_update(prop, 0, "rna_Texture_update");
+
+	
 	prop= RNA_def_property(srna, "color_ramp", PROP_POINTER, PROP_NEVER_NULL);
 	RNA_def_property_pointer_sdna(prop, NULL, "coba");
 	RNA_def_property_struct_type(prop, "ColorRamp");
 	RNA_def_property_ui_text(prop, "Color Ramp", "");
 	RNA_def_property_update(prop, 0, "rna_Texture_update");
+
+	prop= RNA_def_property(srna, "falloff_curve", PROP_POINTER, PROP_NEVER_NULL);
+	RNA_def_property_pointer_sdna(prop, NULL, "falloff_curve");
+	RNA_def_property_struct_type(prop, "CurveMapping");
+	RNA_def_property_ui_text(prop, "Falloff Curve", "");
+	RNA_def_property_update(prop, 0, "rna_Texture_update");
 	
+	prop= RNA_def_property(srna, "use_falloff_curve", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", TEX_PD_FALLOFF_CURVE);
+	RNA_def_property_ui_text(prop, "Falloff Curve", "Use a custom falloff curve");
+	RNA_def_property_update(prop, 0, "rna_Texture_update");
+
 	/* Turbulence */
 	prop= RNA_def_property(srna, "use_turbulence", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", TEX_PD_TURBULENCE);
@@ -1723,6 +1658,7 @@ static void rna_def_texture_voxeldata(BlenderRNA *brna)
 	
 	prop= RNA_def_property(srna, "resolution", PROP_INT, PROP_NONE);
 	RNA_def_property_int_sdna(prop, NULL, "resol");
+	RNA_def_property_range(prop, 1, 100000);
 	RNA_def_property_ui_text(prop, "Resolution", "Resolution of the voxel grid");
 	RNA_def_property_update(prop, 0, "rna_Texture_voxeldata_update");
 	
@@ -1765,149 +1701,6 @@ static void rna_def_texture_voxeldata(BlenderRNA *brna)
 	RNA_def_property_pointer_sdna(prop, NULL, "iuser");
 	RNA_def_property_ui_text(prop, "Image User", "Parameters defining which layer, pass and frame of the image is displayed");
 	RNA_def_property_update(prop, 0, "rna_Texture_voxeldata_update");
-}
-
-static void rna_def_texture_ocean(BlenderRNA *brna)
-{
-	StructRNA *srna;
-	PropertyRNA *prop;
-	
-	static EnumPropertyItem ocean_output_items[] = {
-		{TEX_OCN_DISPLACEMENT, "DISPLACEMENT", 0, "Displacement", "Outputs XYZ displacement in RGB channels"},
-		//{TEX_OCN_NORMALS, "NORMALS", 0, "Normals", "Outputs wave normals"},
-		{TEX_OCN_FOAM, "FOAM", 0, "Foam", "Outputs Foam (wave overlap) amount in single channel"},
-		{TEX_OCN_JPLUS, "JPLUS", 0, "JPlus", "Positive Eigenvalues"},
-		{TEX_OCN_EMINUS, "EMINUS", 0, "EMinus", "Negative Eigenvectors"},
-		{TEX_OCN_EPLUS, "EPLUS", 0, "EPlus", "Positive Eigenvectors"},
-		{0, NULL, 0, NULL, NULL}};
-	
-	srna= RNA_def_struct(brna, "OceanTexData", NULL);
-	RNA_def_struct_sdna(srna, "OceanTex");
-	RNA_def_struct_ui_text(srna, "Ocean", "Ocean Texture settings");
-	RNA_def_struct_path_func(srna, "rna_OceanTex_path");
-	
-	prop= RNA_def_property(srna, "output", PROP_ENUM, PROP_NONE);
-	RNA_def_property_enum_sdna(prop, NULL, "output");
-	RNA_def_property_enum_items(prop, ocean_output_items);
-	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
-	RNA_def_property_ui_text(prop, "Output", "The data that is output by the texture");
-	RNA_def_property_update(prop, 0, "rna_Texture_ocean_init_update");
-
-	prop= RNA_def_property(srna, "generate_normals", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "flag", TEX_OCN_GENERATE_NORMALS);
-	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
-	RNA_def_property_ui_text(prop, "Generate Normals", "Outputs normals for bump mapping - disabling can speed up performance if its not needed");
-	RNA_def_property_update(prop, 0, "rna_Texture_ocean_init_update");
-	
-	prop= RNA_def_property(srna, "xz", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "flag", TEX_OCN_XZ);
-	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
-	RNA_def_property_ui_text(prop, "XZ", "");
-	RNA_def_property_update(prop, 0, "rna_Texture_ocean_init_update");
-	
-	prop= RNA_def_property(srna, "resolution", PROP_INT, PROP_UNSIGNED);
-	RNA_def_property_int_sdna(prop, NULL, "resolution");
-	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
-	RNA_def_property_range(prop, 1, 1024);
-	RNA_def_property_ui_range(prop, 1, 100, 1, 0);
-	RNA_def_property_ui_text(prop, "Resolution", "Resolution of the generated surface");
-	RNA_def_property_update(prop, 0, "rna_Texture_ocean_init_update");
-		
-	prop= RNA_def_property(srna, "spatial_size", PROP_INT, PROP_DISTANCE);
-	RNA_def_property_int_sdna(prop, NULL, "spatial_size");
-	RNA_def_property_ui_range(prop, 1, 512, 2, 0);
-	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
-	RNA_def_property_ui_text(prop, "Spatial Size", "Physical size of the simulation domain (m)");
-	RNA_def_property_update(prop, 0, "rna_Texture_ocean_init_update");
-	
-	prop= RNA_def_property(srna, "wind_velocity", PROP_FLOAT, PROP_VELOCITY);
-	RNA_def_property_float_sdna(prop, NULL, "wind_velocity");
-	RNA_def_property_ui_text(prop, "Wind Velocity", "Wind speed (m/s)");
-	RNA_def_property_float_funcs(prop, NULL, "rna_Texture_ocean_wind_velocity_set", NULL);
-	//RNA_def_property_update(prop, 0, "rna_Texture_ocean_init_update");
-	RNA_def_property_update(prop, 0, "rna_Texture_update");
-		
-	prop= RNA_def_property(srna, "damp", PROP_FLOAT, PROP_FACTOR);
-	RNA_def_property_float_sdna(prop, NULL, "damp");
-	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
-	RNA_def_property_ui_text(prop, "Damping", "Damp reflected waves going in opposite direction to the wind");
-	RNA_def_property_update(prop, 0, "rna_Texture_ocean_init_update");
-	
-	prop= RNA_def_property(srna, "smallest_wave", PROP_FLOAT, PROP_DISTANCE);
-	RNA_def_property_float_sdna(prop, NULL, "smallest_wave");
-	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
-	RNA_def_property_ui_text(prop, "Smallest Wave", "Shortest allowed wavelength (m)");
-	RNA_def_property_update(prop, 0, "rna_Texture_ocean_init_update");
-	
-	prop= RNA_def_property(srna, "wave_alignment", PROP_FLOAT, PROP_UNSIGNED);
-	RNA_def_property_float_sdna(prop, NULL, "wave_alignment");
-	RNA_def_property_range(prop, 0.0, 10.0);
-	RNA_def_property_ui_text(prop, "Wave Alignment", "");
-	RNA_def_property_float_funcs(prop, NULL, "rna_Texture_ocean_wave_alignment_set", NULL);
-	//RNA_def_property_update(prop, 0, "rna_Texture_ocean_init_update");
-	RNA_def_property_update(prop, 0, "rna_Texture_update");
-	
-	prop= RNA_def_property(srna, "wave_direction", PROP_FLOAT, PROP_ANGLE);
-	RNA_def_property_float_sdna(prop, NULL, "wave_direction");
-	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
-	RNA_def_property_ui_text(prop, "Wave Direction", "");
-	RNA_def_property_update(prop, 0, "rna_Texture_ocean_init_update");
-	
-	prop= RNA_def_property(srna, "wave_scale", PROP_FLOAT, PROP_UNSIGNED);
-	RNA_def_property_float_sdna(prop, NULL, "wave_scale");
-	RNA_def_property_ui_text(prop, "Wave Scale", "");
-	RNA_def_property_float_funcs(prop, NULL, "rna_Texture_ocean_wave_scale_set", NULL);
-	// RNA_def_property_update(prop, 0, "rna_Texture_ocean_sim_update");
-	RNA_def_property_update(prop, 0, "rna_Texture_update");
-	
-	prop= RNA_def_property(srna, "depth", PROP_FLOAT, PROP_UNSIGNED);
-	RNA_def_property_float_sdna(prop, NULL, "depth");
-	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
-	RNA_def_property_ui_text(prop, "Depth", "");
-	RNA_def_property_update(prop, 0, "rna_Texture_ocean_init_update");
-	
-	prop= RNA_def_property(srna, "foam_coverage", PROP_FLOAT, PROP_NONE);
-	RNA_def_property_float_sdna(prop, NULL, "foam_coverage");
-	RNA_def_property_ui_text(prop, "Foam Coverage", "");
-	RNA_def_property_update(prop, 0, "rna_Texture_update");
-	
-	prop= RNA_def_property(srna, "chop_amount", PROP_FLOAT, PROP_UNSIGNED);
-	RNA_def_property_float_sdna(prop, NULL, "chop_amount");
-	RNA_def_property_ui_text(prop, "Chop Amount", "");
-	RNA_def_property_ui_range(prop, 0.0, 2.0, 3, 0);
-	RNA_def_property_float_funcs(prop, NULL, "rna_Texture_ocean_chop_set", NULL);
-	//RNA_def_property_update(prop, 0, "rna_Texture_ocean_sim_update");
-	RNA_def_property_update(prop, 0, "rna_Texture_update");
-	
-	prop= RNA_def_property(srna, "time", PROP_FLOAT, PROP_UNSIGNED);
-	RNA_def_property_float_sdna(prop, NULL, "time");
-	RNA_def_property_ui_text(prop, "Time", "");
-	RNA_def_property_float_funcs(prop, NULL, "rna_Texture_ocean_time_set", NULL);
-	// RNA_def_property_update(prop, 0, "rna_Texture_ocean_sim_update");
-	RNA_def_property_update(prop, 0, "rna_Texture_update");
-	
-	prop= RNA_def_property(srna, "random_seed", PROP_INT, PROP_UNSIGNED);
-	RNA_def_property_int_sdna(prop, NULL, "seed");
-	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
-	RNA_def_property_ui_text(prop, "Random Seed", "");
-	RNA_def_property_update(prop, 0, "rna_Texture_ocean_init_update");
-	
-	prop= RNA_def_property(srna, "ocean_object", PROP_POINTER, PROP_NONE);
-	RNA_def_property_pointer_sdna(prop, NULL, "object");
-	RNA_def_property_ui_text(prop, "Modifier Object", "Object containing the ocean modifier");
-	RNA_def_property_flag(prop, PROP_EDITABLE);
-	RNA_def_property_update(prop, 0, "rna_Texture_update");
-	
-	srna= RNA_def_struct(brna, "OceanTexture", "Texture");
-	RNA_def_struct_sdna(srna, "Tex");
-	RNA_def_struct_ui_text(srna, "Ocean", "Settings for the Ocean texture");
-	
-	prop= RNA_def_property(srna, "ocean", PROP_POINTER, PROP_NONE);
-	RNA_def_property_pointer_sdna(prop, NULL, "ot");
-	RNA_def_property_struct_type(prop, "OceanTexData");
-	RNA_def_property_ui_text(prop, "Ocean", "The ocean data associated with this texture");
-	RNA_def_property_update(prop, 0, "rna_Texture_update");
-	
 }
 
 static void rna_def_texture(BlenderRNA *brna)
@@ -2012,7 +1805,6 @@ static void rna_def_texture(BlenderRNA *brna)
 	rna_def_texture_distorted_noise(brna);
 	rna_def_texture_pointdensity(brna);
 	rna_def_texture_voxeldata(brna);
-	rna_def_texture_ocean(brna);
 	/* XXX add more types here .. */
 }
 

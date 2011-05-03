@@ -34,10 +34,19 @@ Example Usage:
     --match="*.3ds" \
     --start=0 --end=1000 \
     --save_path=/tmp/test
+
+./blender.bin --background --addons io_curve_svg --python source/tests/batch_import.py -- \
+    --operator="bpy.ops.import_curve.svg" \
+    --path="/usr/" \
+    --match="*.svg" \
+    --start=0 --end=1000 \
+    --save_path=/tmp/test
+
 """
 
 import os
 import sys
+
 
 def clear_scene():
     import bpy
@@ -60,8 +69,9 @@ def batch_import(operator="",
                    start=0,
                    end=sys.maxsize,
                    ):
+    import addon_utils
+    _reset_all = addon_utils.reset_all  # XXX, hack
 
-    print(list(globals().keys()))
     import fnmatch
 
     path = os.path.normpath(path)
@@ -93,16 +103,29 @@ def batch_import(operator="",
     if len(files) != files_len:
         print(" using a subset in (%d, %d), total %d" % (start, end, len(files)), end="")
 
-    print("")
-
     import bpy
     op = eval(operator)
+
+    tot_done = 0
+    tot_fail = 0
+
     for i, f in enumerate(files):
         print("    %s(filepath=%r) # %d of %d" % (operator, f, i + start, len(files)))
+
+        # hack so loading the new file doesnt undo our loaded addons
+        addon_utils.reset_all = lambda: None  # XXX, hack
+
         bpy.ops.wm.read_factory_settings()
+
+        addon_utils.reset_all = _reset_all  # XXX, hack
         clear_scene()
 
-        op(filepath=f)
+        result = op(filepath=f)
+
+        if 'FINISHED' in result:
+            tot_done += 1
+        else:
+            tot_fail += 1
 
         if save_path:
             fout = os.path.join(save_path, os.path.relpath(f, path))
@@ -115,6 +138,8 @@ def batch_import(operator="",
                 os.makedirs(fout_dir)
 
             bpy.ops.wm.save_as_mainfile(filepath=fout_blend)
+
+    print("finished, done:%d,  fail:%d" % (tot_done, tot_fail))
 
 
 def main():

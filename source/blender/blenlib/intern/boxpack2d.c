@@ -21,6 +21,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/blenlib/intern/boxpack2d.c
+ *  \ingroup bli
+ */
+
+
 #include <stdlib.h> /* for qsort */
 
 #include "MEM_guardedalloc.h"
@@ -100,12 +105,10 @@ typedef struct boxVert {
 /* qsort function - sort largest to smallest */
 static int box_areasort(const void *p1, const void *p2)
 {
-	const boxPack *b1=p1, *b2=p2;
-	float a1, a2;
+	const boxPack *b1= p1, *b2= p2;
+	const float a1= BOXAREA(b1);
+	const float a2= BOXAREA(b2);
 
-	a1 = BOXAREA(b1);
-	a2 = BOXAREA(b2);
-	
 	if		( a1 < a2 ) return  1;
 	else if	( a1 > a2 ) return -1;
 	return 0;
@@ -149,7 +152,7 @@ static int vertex_sort(const void *p1, const void *p2)
  * 	len - the number of boxes in the array.
  *	tot_width and tot_height are set so you can normalize the data.
  *  */
-void boxPack2D(boxPack *boxarray, int len, float *tot_width, float *tot_height)
+void boxPack2D(boxPack *boxarray, const int len, float *tot_width, float *tot_height)
 {
 	boxVert *vert; /* the current vert */
 	int box_index, verts_pack_len, i, j, k, isect;
@@ -171,7 +174,7 @@ void boxPack2D(boxPack *boxarray, int len, float *tot_width, float *tot_height)
 	vertex_pack_indices = MEM_mallocN( len*3*sizeof(int), "boxPack Indices");
 	
 	for (box=boxarray, box_index=0, i=0; box_index < len; box_index++, box++) {
-		 		
+
 		vert->blb = vert->brb = vert->tlb =\
 			vert->isect_cache[0] = vert->isect_cache[1] =\
 			vert->isect_cache[2] = vert->isect_cache[3] = NULL;
@@ -257,17 +260,17 @@ void boxPack2D(boxPack *boxarray, int len, float *tot_width, float *tot_height)
 				if (vert->free & quad_flags[j]) {
 					switch (j) {
 					case BL:
-						 SET_BOXRIGHT(box, vert->x);
-						 SET_BOXTOP(box, vert->y);
-						 break;
+						SET_BOXRIGHT(box, vert->x);
+						SET_BOXTOP(box, vert->y);
+						break;
 					case TR:
-						 SET_BOXLEFT(box, vert->x);
-						 SET_BOXBOTTOM(box, vert->y);
-						 break;
+						SET_BOXLEFT(box, vert->x);
+						SET_BOXBOTTOM(box, vert->y);
+						break;
 					case TL:
-						 SET_BOXRIGHT(box, vert->x);
-						 SET_BOXBOTTOM(box, vert->y);
-						 break;
+						SET_BOXRIGHT(box, vert->x);
+						SET_BOXBOTTOM(box, vert->y);
+						break;
 					case BR:
 						SET_BOXLEFT(box, vert->x);
 						SET_BOXTOP(box, vert->y);

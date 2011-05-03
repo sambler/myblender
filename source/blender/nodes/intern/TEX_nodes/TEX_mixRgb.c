@@ -1,4 +1,4 @@
-/**
+/*
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -26,8 +26,13 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
-#include "../TEX_util.h"
+/** \file blender/nodes/intern/TEX_nodes/TEX_mixRgb.c
+ *  \ingroup texnodes
+ */
 
+
+#include "../TEX_util.h"
+#include "TEX_node.h"
 
 /* **************** MIX RGB ******************** */
 static bNodeSocketType inputs[]= {
@@ -67,6 +72,7 @@ void register_node_type_tex_mix_rgb(ListBase *lb)
 	node_type_base(&ntype, TEX_NODE_MIX_RGB, "Mix", NODE_CLASS_OP_COLOR, NODE_OPTIONS,
 				   inputs, outputs);
 	node_type_size(&ntype, 100, 60, 150);
+	node_type_label(&ntype, node_blend_label);
 	node_type_exec(&ntype, exec);
 	
 	nodeRegisterType(lb, &ntype);

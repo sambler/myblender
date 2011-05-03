@@ -746,9 +746,9 @@ void texco_norm(vec3 normal, out vec3 outnormal)
 	outnormal = normalize(normal);
 }
 
-void texco_tangent(vec3 tangent, out vec3 outtangent)
+void texco_tangent(vec4 tangent, out vec3 outtangent)
 {
-	outtangent = normalize(tangent);
+	outtangent = normalize(tangent.xyz);
 }
 
 void texco_global(mat4 viewinvmat, vec3 co, out vec3 global)
@@ -1098,8 +1098,13 @@ void mtex_image(vec3 texco, sampler2D ima, out float value, out vec4 color)
 
 void mtex_normal(vec3 texco, sampler2D ima, out vec3 normal)
 {
+	// The invert of the red channel is to make
+	// the normal map compliant with the outside world.
+	// It needs to be done because in Blender
+	// the normal used points inward.
+	// Should this ever change this negate must be removed.
     vec4 color = texture2D(ima, texco.xy);
-	normal = 2.0*(vec3(color.r, -color.g, color.b) - vec3(0.5, -0.5, 0.5));
+	normal = 2.0*(vec3(-color.r, color.g, color.b) - vec3(-0.5, 0.5, 0.5));
 }
 
 void mtex_bump_normals_init( vec3 vN, out vec3 vNorg, out vec3 vNacc, out float fPrevMagnitude )
@@ -1132,9 +1137,9 @@ void mtex_bump_init_objspace( vec3 surf_pos, vec3 surf_norm,
 	vec3 vSigmaT = view2obj * dFdy( surf_pos );
 	vec3 vN = normalize( surf_norm * obj2view );
 
-	vR1 = cross( vSigmaT , vN );
-	vR2 = cross( vN , vSigmaS ) ;
-	fDet = dot ( vSigmaS , vR1 );
+	vR1 = cross( vSigmaT, vN );
+	vR2 = cross( vN, vSigmaS ) ;
+	fDet = dot ( vSigmaS, vR1 );
 	
 	/* pretransform vNacc (in mtex_bump_apply) using the inverse transposed */
 	vR1 = vR1 * view2obj;
@@ -1155,9 +1160,9 @@ void mtex_bump_init_texturespace( vec3 surf_pos, vec3 surf_norm,
 	vec3 vSigmaT = dFdy( surf_pos );
 	vec3 vN = surf_norm; /* normalized interpolated vertex normal */
 	
-	vR1 = normalize( cross( vSigmaT , vN ) );
-	vR2 = normalize( cross( vN , vSigmaS ) );
-	fDet = (dot( vSigmaS , vR1 ) < 0)? (-1): 1;
+	vR1 = normalize( cross( vSigmaT, vN ) );
+	vR2 = normalize( cross( vN, vSigmaS ) );
+	fDet = sign( dot(vSigmaS, vR1) );
 	
 	float fMagnitude = abs(fDet);
 	vNacc_out = vNacc_in * (fMagnitude / fPrevMagnitude_in);
@@ -1173,9 +1178,9 @@ void mtex_bump_init_viewspace( vec3 surf_pos, vec3 surf_norm,
 	vec3 vSigmaT = dFdy( surf_pos );
 	vec3 vN = surf_norm; /* normalized interpolated vertex normal */
 	
-	vR1 = cross( vSigmaT , vN );
-	vR2 = cross( vN , vSigmaS ) ;
-	fDet = dot ( vSigmaS , vR1 );
+	vR1 = cross( vSigmaT, vN );
+	vR2 = cross( vN, vSigmaS ) ;
+	fDet = dot ( vSigmaS, vR1 );
 	
 	float fMagnitude = abs(fDet);
 	vNacc_out = vNacc_in * (fMagnitude / fPrevMagnitude_in);
@@ -1238,8 +1243,8 @@ void mtex_bump_apply_texspace( float fDet, float dBs, float dBt, vec3 vR1, vec3 
 	vec2 TexDy = dFdy(texco.xy);
 
 	vec3 vSurfGrad = sign(fDet) * ( 
-	            dBs / length( vec2(ima_x*TexDx.x, ima_y*TexDx.y) ) * normalize(vR1) + 
-	            dBt / length( vec2(ima_x*TexDy.x, ima_y*TexDy.y) ) * normalize(vR2) );
+	            dBs / length( vec2(ima_x*TexDx.x, ima_y*TexDx.y) ) * vR1 + 
+	            dBt / length( vec2(ima_x*TexDy.x, ima_y*TexDy.y) ) * vR2 );
 				
 	vNacc_out = vNacc_in - vSurfGrad;
 	perturbed_norm = normalize( vNacc_out );
@@ -1250,12 +1255,11 @@ void mtex_negate_texnormal(vec3 normal, out vec3 outnormal)
 	outnormal = vec3(-normal.x, -normal.y, normal.z);
 }
 
-void mtex_nspace_tangent(vec3 tangent, vec3 normal, vec3 texnormal, out vec3 outnormal)
+void mtex_nspace_tangent(vec4 tangent, vec3 normal, vec3 texnormal, out vec3 outnormal)
 {
-	tangent = normalize(tangent);
-	vec3 B = cross(normal, tangent);
+	vec3 B = tangent.w * cross(normal, tangent.xyz);
 
-	outnormal = texnormal.x*tangent + texnormal.y*B + texnormal.z*normal;
+	outnormal = texnormal.x*tangent.xyz + texnormal.y*B + texnormal.z*normal;
 	outnormal = normalize(outnormal);
 }
 
@@ -1680,6 +1684,16 @@ void shade_add(vec4 col1, vec4 col2, out vec4 outcol)
 void shade_madd(vec4 col, vec4 col1, vec4 col2, out vec4 outcol)
 {
 	outcol = col + col1*col2;
+}
+
+void shade_add_clamped(vec4 col1, vec4 col2, out vec4 outcol)
+{
+	outcol = col1 + max(col2, vec4(0.0, 0.0, 0.0, 0.0));
+}
+
+void shade_madd_clamped(vec4 col, vec4 col1, vec4 col2, out vec4 outcol)
+{
+	outcol = col + max(col1*col2, vec4(0.0, 0.0, 0.0, 0.0));
 }
 
 void shade_maddf(vec4 col, float f, vec4 col1, out vec4 outcol)

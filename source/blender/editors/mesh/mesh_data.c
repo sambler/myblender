@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/mesh/mesh_data.c
+ *  \ingroup edmesh
+ */
+
 
 #include <math.h>
 #include <stdlib.h>
@@ -158,6 +163,17 @@ static void delete_customdata_layer(bContext *C, Object *ob, CustomDataLayer *la
 	}
 }
 
+static void copy_editface_active_customdata(EditMesh *em, int type, int index)
+{
+	EditFace *efa;
+	int n= CustomData_get_active_layer(&em->fdata, type);
+
+	for(efa= em->faces.first; efa; efa= efa->next) {
+		void *data= CustomData_em_get_n(&em->fdata, efa->data, type, n);
+		CustomData_em_set_n(&em->fdata, efa->data, type, index, data);
+	}
+}
+
 int ED_mesh_uv_texture_add(bContext *C, Mesh *me, const char *name, int active_set)
 {
 	EditMesh *em;
@@ -171,6 +187,10 @@ int ED_mesh_uv_texture_add(bContext *C, Mesh *me, const char *name, int active_s
 			return 0;
 
 		EM_add_data_layer(em, &em->fdata, CD_MTFACE, name);
+
+		if(layernum) /* copy data from active UV */
+			copy_editface_active_customdata(em, CD_MTFACE, layernum);
+
 		if(active_set || layernum==0)
 			CustomData_set_layer_active(&em->fdata, CD_MTFACE, layernum);
 	}
@@ -229,6 +249,10 @@ int ED_mesh_color_add(bContext *C, Scene *scene, Object *ob, Mesh *me, const cha
 			return 0;
 
 		EM_add_data_layer(em, &em->fdata, CD_MCOL, name);
+
+		if(layernum) /* copy data from active vertex color layer */
+			copy_editface_active_customdata(em, CD_MCOL, layernum);
+
 		if(active_set || layernum==0)
 			CustomData_set_layer_active(&em->fdata, CD_MCOL, layernum);
 	}
@@ -546,77 +570,10 @@ void MESH_OT_sticky_remove(wmOperatorType *ot)
 
 /************************** Add Geometry Layers *************************/
 
-static void mesh_calc_edges(Mesh *mesh, int update)
-{
-	CustomData edata;
-	EdgeHashIterator *ehi;
-	MFace *mf = mesh->mface;
-	MEdge *med, *med_orig;
-	EdgeHash *eh = BLI_edgehash_new();
-	int i, totedge, totface = mesh->totface;
-
-	if(mesh->totedge==0)
-		update= 0;
-
-	if(update) {
-		/* assume existing edges are valid
-		 * useful when adding more faces and generating edges from them */
-		med= mesh->medge;
-		for(i= 0; i<mesh->totedge; i++, med++)
-			BLI_edgehash_insert(eh, med->v1, med->v2, med);
-	}
-
-	for (i = 0; i < totface; i++, mf++) {
-		if (!BLI_edgehash_haskey(eh, mf->v1, mf->v2))
-			BLI_edgehash_insert(eh, mf->v1, mf->v2, NULL);
-		if (!BLI_edgehash_haskey(eh, mf->v2, mf->v3))
-			BLI_edgehash_insert(eh, mf->v2, mf->v3, NULL);
-		
-		if (mf->v4) {
-			if (!BLI_edgehash_haskey(eh, mf->v3, mf->v4))
-				BLI_edgehash_insert(eh, mf->v3, mf->v4, NULL);
-			if (!BLI_edgehash_haskey(eh, mf->v4, mf->v1))
-				BLI_edgehash_insert(eh, mf->v4, mf->v1, NULL);
-		} else {
-			if (!BLI_edgehash_haskey(eh, mf->v3, mf->v1))
-				BLI_edgehash_insert(eh, mf->v3, mf->v1, NULL);
-		}
-	}
-
-	totedge = BLI_edgehash_size(eh);
-
-	/* write new edges into a temporary CustomData */
-	memset(&edata, 0, sizeof(edata));
-	CustomData_add_layer(&edata, CD_MEDGE, CD_CALLOC, NULL, totedge);
-
-	ehi = BLI_edgehashIterator_new(eh);
-	med = CustomData_get_layer(&edata, CD_MEDGE);
-	for(i = 0; !BLI_edgehashIterator_isDone(ehi);
-		BLI_edgehashIterator_step(ehi), ++i, ++med) {
-
-		if(update && (med_orig=BLI_edgehashIterator_getValue(ehi))) {
-			*med= *med_orig; /* copy from the original */
-		} else {
-			BLI_edgehashIterator_getKey(ehi, (int*)&med->v1, (int*)&med->v2);
-			med->flag = ME_EDGEDRAW|ME_EDGERENDER|SELECT; /* select for newly created meshes which are selected [#25595] */
-		}
-	}
-	BLI_edgehashIterator_free(ehi);
-
-	/* free old CustomData and assign new one */
-	CustomData_free(&mesh->edata, mesh->totedge);
-	mesh->edata = edata;
-	mesh->totedge = totedge;
-
-	mesh->medge = CustomData_get_layer(&mesh->edata, CD_MEDGE);
-
-	BLI_edgehash_free(eh, NULL);
-}
-
 void ED_mesh_update(Mesh *mesh, bContext *C, int calc_edges)
 {
 	if(calc_edges || (mesh->totface && mesh->totedge == 0))
-		mesh_calc_edges(mesh, calc_edges);
+		BKE_mesh_calc_edges(mesh, calc_edges);
 
 	mesh_calc_normals(mesh->mvert, mesh->totvert, mesh->mface, mesh->totface, NULL);
 

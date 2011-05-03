@@ -28,6 +28,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/blenkernel/intern/ipo.c
+ *  \ingroup bke
+ */
+
+
 /* NOTE:
  *
  * This file is no longer used to provide tools for the depreceated IPO system. Instead, it
@@ -62,7 +67,7 @@
 #include "BLI_utildefines.h"
 
 
-
+#include "BKE_ipo.h"
 #include "BKE_animsys.h"
 #include "BKE_action.h"
 #include "BKE_fcurve.h"
@@ -326,7 +331,7 @@ static char *shapekey_adrcodes_to_paths (int adrcode, int *UNUSED(array_index))
 	if (adrcode == 0) 
 		sprintf(buf, "speed");
 	else
-		sprintf(buf, "keys[%d].value", adrcode);
+		sprintf(buf, "key_blocks[%d].value", adrcode);
 	return buf;
 }
 
@@ -709,6 +714,11 @@ static const char *world_adrcodes_to_paths (int adrcode, int *array_index)
 			*array_index= 1; return "stars.color";
 		case WO_STAR_B:
 			*array_index= 2; return "stars.color"; */
+		case WO_STAR_R:
+		case WO_STAR_G:
+		case WO_STAR_B:
+			printf("WARNING: WO_STAR_R/G/B deprecated\n");
+			return NULL;
 		
 		case WO_STARDIST:
 			return "stars.min_distance";
@@ -798,7 +808,7 @@ static const char *particle_adrcodes_to_paths (int adrcode, int *array_index)
  *		- array_index			- index in property's array (if applicable) to use
  *		- return				- the allocated path...
  */
-static char *get_rna_access (int blocktype, int adrcode, char actname[], char constname[], Sequence * seq, int *array_index)
+static char *get_rna_access (int blocktype, int adrcode, char actname[], char constname[], Sequence *seq, int *array_index)
 {
 	DynStr *path= BLI_dynstr_new();
 	const char *propname=NULL;
@@ -914,8 +924,17 @@ static char *get_rna_access (int blocktype, int adrcode, char actname[], char co
 		sprintf(buf, "pose.bones[\"%s\"].constraints[\"%s\"]", actname, constname);
 	}
 	else if (actname && actname[0]) {
-		/* Pose-Channel */
-		sprintf(buf, "pose.bones[\"%s\"]", actname);
+		if ((blocktype == ID_OB) && strcmp(actname, "Object")==0) {
+			/* Actionified "Object" IPO's... no extra path stuff needed */
+		}
+		else if ((blocktype == ID_KE) && strcmp(actname, "Shape")==0) {
+			/* Actionified "Shape" IPO's - these are forced onto object level via the action container there... */
+			strcpy(buf, "data.shape_keys");
+		}
+		else {
+			/* Pose-Channel */
+			sprintf(buf, "pose.bones[\"%s\"]", actname);
+		}
 	}
 	else if (constname && constname[0]) {
 		/* Constraint in Object */
@@ -923,8 +942,7 @@ static char *get_rna_access (int blocktype, int adrcode, char actname[], char co
 	}
 	else if (seq) {
 		/* Sequence names in Scene */
-		sprintf(buf, "sequence_editor.sequences_all[\"%s\"]", 
-			seq->name+2);
+		sprintf(buf, "sequence_editor.sequences_all[\"%s\"]", seq->name+2);
 	}
 	else
 		strcpy(buf, ""); /* empty string */
@@ -1321,20 +1339,17 @@ static void icu_to_fcurves (ID *id, ListBase *groups, ListBase *list, IpoCurve *
 					}
 				}
 				
-				/* correct values for sequencer curves,
-				   that were not locked to frame */
-
-				if (seq && 
-				    (seq->flag & SEQ_IPO_FRAME_LOCKED) == 0) {
+				/* correct values for sequencer curves, that were not locked to frame */
+				if (seq && (seq->flag & SEQ_IPO_FRAME_LOCKED) == 0) {
 					double mul= (seq->enddisp-seq->startdisp)/100.0f;
 					double offset= seq->startdisp;
 					
 					dst->vec[0][0] *= mul;
 					dst->vec[0][0] += offset;
-
+					
 					dst->vec[1][0] *= mul;
 					dst->vec[1][0] += offset;
-
+					
 					dst->vec[2][0] *= mul;
 					dst->vec[2][0] += offset;
 				}
@@ -1357,7 +1372,7 @@ static void icu_to_fcurves (ID *id, ListBase *groups, ListBase *list, IpoCurve *
  * This does not assume that any ID or AnimData uses it, but does assume that
  * it is given two lists, which it will perform driver/animation-data separation.
  */
-static void ipo_to_animato (ID *id, Ipo *ipo, char actname[], char constname[], Sequence * seq, ListBase *animgroups, ListBase *anim, ListBase *drivers)
+static void ipo_to_animato (ID *id, Ipo *ipo, char actname[], char constname[], Sequence *seq, ListBase *animgroups, ListBase *anim, ListBase *drivers)
 {
 	IpoCurve *icu;
 	
@@ -1401,8 +1416,7 @@ static void ipo_to_animato (ID *id, Ipo *ipo, char actname[], char constname[], 
 	
 	/* if this IPO block doesn't have any users after this one, free... */
 	ipo->id.us--;
-	if ( (ipo->id.us == 0) || ((ipo->id.us == 1) && (ipo->id.flag & LIB_FAKEUSER)) ) 
-	{
+	if (ID_REAL_USERS(ipo) <= 0) {
 		IpoCurve *icn;
 		
 		for (icu= ipo->curve.first; icu; icu= icn) {
@@ -1481,7 +1495,7 @@ static void action_to_animato (ID *id, bAction *act, ListBase *groups, ListBase 
  * This assumes that AnimData has been added already. Separation of drivers
  * from animation data is accomplished here too...
  */
-static void ipo_to_animdata (ID *id, Ipo *ipo, char actname[], char constname[], Sequence * seq)
+static void ipo_to_animdata (ID *id, Ipo *ipo, char actname[], char constname[], Sequence *seq)
 {
 	AnimData *adt= BKE_animdata_from_id(id);
 	ListBase anim = {NULL, NULL};
@@ -1512,8 +1526,12 @@ static void ipo_to_animdata (ID *id, Ipo *ipo, char actname[], char constname[],
 		if (G.f & G_DEBUG) printf("\thas anim \n");
 		/* try to get action */
 		if (adt->action == NULL) {
-			adt->action= add_empty_action("ConvData_Action"); // XXX we need a better name for this
-			if (G.f & G_DEBUG) printf("\t\tadded new action \n");
+			char nameBuf[MAX_ID_NAME];
+			
+			BLI_snprintf(nameBuf, sizeof(nameBuf), "CDA:%s", ipo->id.name+2);
+			
+			adt->action= add_empty_action(nameBuf);
+			if (G.f & G_DEBUG) printf("\t\tadded new action - '%s' \n", nameBuf);
 		}
 		
 		/* add F-Curves to action */
@@ -1649,7 +1667,6 @@ void do_versions_ipos_to_animato(Main *main)
 {
 	ListBase drivers = {NULL, NULL};
 	ID *id;
-	AnimData *adt;
 	
 	if (main == NULL) {
 		printf("Argh! Main is NULL in do_versions_ipos_to_animato() \n");
@@ -1678,7 +1695,7 @@ void do_versions_ipos_to_animato(Main *main)
 		/* check if object has any animation data */
 		if (ob->nlastrips.first) {
 			/* Add AnimData block */
-			adt= BKE_id_add_animdata(id);
+			BKE_id_add_animdata(id);
 			
 			/* IPO first to take into any non-NLA'd Object Animation */
 			if (ob->ipo) {
@@ -1701,7 +1718,7 @@ void do_versions_ipos_to_animato(Main *main)
 		}
 		else if ((ob->ipo) || (ob->action)) {
 			/* Add AnimData block */
-			adt= BKE_id_add_animdata(id);
+			AnimData *adt= BKE_id_add_animdata(id);
 			
 			/* Action first - so that Action name get conserved */
 			if (ob->action) {
@@ -1785,6 +1802,13 @@ void do_versions_ipos_to_animato(Main *main)
 				BLI_freelinkN(&ob->constraintChannels, conchan);
 			}
 		}
+		
+		/* object's action will always be object-rooted */
+		{
+			AnimData *adt= BKE_animdata_from_id(id);
+			if (adt && adt->action)
+				adt->action->idroot = ID_OB;
+		}
 	}
 	
 	/* shapekeys */
@@ -1799,10 +1823,14 @@ void do_versions_ipos_to_animato(Main *main)
 		 */
 		if (key->ipo) {
 			/* Add AnimData block */
-			adt= BKE_id_add_animdata(id);
+			AnimData *adt= BKE_id_add_animdata(id);
 			
 			/* Convert Shapekey data... */
 			ipo_to_animdata(id, key->ipo, NULL, NULL, NULL);
+			
+			if (adt->action)
+				adt->action->idroot = key->ipo->blocktype;
+			
 			key->ipo->id.us--;
 			key->ipo= NULL;
 		}
@@ -1817,10 +1845,14 @@ void do_versions_ipos_to_animato(Main *main)
 		/* we're only interested in the IPO */
 		if (ma->ipo) {
 			/* Add AnimData block */
-			adt= BKE_id_add_animdata(id);
+			AnimData *adt= BKE_id_add_animdata(id);
 			
 			/* Convert Material data... */
 			ipo_to_animdata(id, ma->ipo, NULL, NULL, NULL);
+			
+			if (adt->action)
+				adt->action->idroot = ma->ipo->blocktype;
+			
 			ma->ipo->id.us--;
 			ma->ipo= NULL;
 		}
@@ -1835,10 +1867,14 @@ void do_versions_ipos_to_animato(Main *main)
 		/* we're only interested in the IPO */
 		if (wo->ipo) {
 			/* Add AnimData block */
-			adt= BKE_id_add_animdata(id);
+			AnimData *adt= BKE_id_add_animdata(id);
 			
 			/* Convert World data... */
 			ipo_to_animdata(id, wo->ipo, NULL, NULL, NULL);
+			
+			if (adt->action)
+				adt->action->idroot = wo->ipo->blocktype;
+			
 			wo->ipo->id.us--;
 			wo->ipo= NULL;
 		}
@@ -1851,7 +1887,7 @@ void do_versions_ipos_to_animato(Main *main)
 		if (ed && ed->seqbasep) {
 			Sequence * seq;
 			
-			adt= BKE_id_add_animdata(id);
+			AnimData *adt= BKE_id_add_animdata(id);
 			
 			SEQ_BEGIN(ed, seq) {
 				IpoCurve *icu = (seq->ipo) ? seq->ipo->curve.first : NULL;
@@ -1869,7 +1905,7 @@ void do_versions_ipos_to_animato(Main *main)
 				   to different DNA variables later 
 				   (semi-hack (tm) )
 				*/
-				switch(seq->type) {
+				switch (seq->type) {
 					case SEQ_IMAGE:
 					case SEQ_META:
 					case SEQ_SCENE:
@@ -1885,6 +1921,10 @@ void do_versions_ipos_to_animato(Main *main)
 				
 				/* convert IPO */
 				ipo_to_animdata((ID *)scene, seq->ipo, NULL, NULL, seq);
+				
+				if (adt->action)
+					adt->action->idroot = ID_SCE; /* scene-rooted */
+				
 				seq->ipo->id.us--;
 				seq->ipo = NULL;
 			}
@@ -1902,10 +1942,14 @@ void do_versions_ipos_to_animato(Main *main)
 		/* we're only interested in the IPO */
 		if (te->ipo) {
 			/* Add AnimData block */
-			adt= BKE_id_add_animdata(id);
+			AnimData *adt= BKE_id_add_animdata(id);
 			
 			/* Convert Texture data... */
 			ipo_to_animdata(id, te->ipo, NULL, NULL, NULL);
+			
+			if (adt->action)
+				adt->action->idroot = te->ipo->blocktype;
+			
 			te->ipo->id.us--;
 			te->ipo= NULL;
 		}
@@ -1920,10 +1964,14 @@ void do_versions_ipos_to_animato(Main *main)
 		/* we're only interested in the IPO */
 		if (ca->ipo) {
 			/* Add AnimData block */
-			adt= BKE_id_add_animdata(id);
+			AnimData *adt= BKE_id_add_animdata(id);
 			
 			/* Convert Camera data... */
 			ipo_to_animdata(id, ca->ipo, NULL, NULL, NULL);
+			
+			if (adt->action)
+				adt->action->idroot = ca->ipo->blocktype;
+			
 			ca->ipo->id.us--;
 			ca->ipo= NULL;
 		}
@@ -1938,10 +1986,14 @@ void do_versions_ipos_to_animato(Main *main)
 		/* we're only interested in the IPO */
 		if (la->ipo) {
 			/* Add AnimData block */
-			adt= BKE_id_add_animdata(id);
+			AnimData *adt= BKE_id_add_animdata(id);
 			
 			/* Convert Lamp data... */
 			ipo_to_animdata(id, la->ipo, NULL, NULL, NULL);
+			
+			if (adt->action)
+				adt->action->idroot = la->ipo->blocktype;
+			
 			la->ipo->id.us--;
 			la->ipo= NULL;
 		}
@@ -1956,10 +2008,14 @@ void do_versions_ipos_to_animato(Main *main)
 		/* we're only interested in the IPO */
 		if (cu->ipo) {
 			/* Add AnimData block */
-			adt= BKE_id_add_animdata(id);
+			AnimData *adt= BKE_id_add_animdata(id);
 			
 			/* Convert Curve data... */
 			ipo_to_animdata(id, cu->ipo, NULL, NULL, NULL);
+			
+			if (adt->action)
+				adt->action->idroot = cu->ipo->blocktype;
+			
 			cu->ipo->id.us--;
 			cu->ipo= NULL;
 		}
@@ -1982,6 +2038,10 @@ void do_versions_ipos_to_animato(Main *main)
 		
 		if (G.f & G_DEBUG) printf("\tconverting action %s \n", id->name+2);
 		
+		/* if old action, it will be object-only... */
+		if (act->chanbase.first)
+			act->idroot = ID_OB;
+		
 		/* be careful! some of the actions we encounter will be converted ones... */
 		action_to_animato(NULL, act, &act->groups, &act->curves, &drivers);
 	}
@@ -1999,6 +2059,7 @@ void do_versions_ipos_to_animato(Main *main)
 			/* add a new action for this, and convert all data into that action */
 			new_act= add_empty_action("ConvIPO_Action"); // XXX need a better name...
 			ipo_to_animato(NULL, ipo, NULL, NULL, NULL, NULL, &new_act->curves, &drivers);
+			new_act->idroot = ipo->blocktype;
 		}
 		
 		/* clear fake-users, and set user-count to zero to make sure it is cleared on file-save */

@@ -1,4 +1,4 @@
-/**
+/*
 * $Id$
 *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
 * Start up of the Blender Player on GHOST.
 */
+
+/** \file gameengine/GamePlayer/ghost/GPG_ghost.cpp
+ *  \ingroup player
+ */
+
 
 #include <iostream>
 #include <math.h>
@@ -108,7 +113,13 @@ extern char datatoc_bfont_ttf[];
 const int kMinWindowWidth = 100;
 const int kMinWindowHeight = 100;
 
-char bprogname[FILE_MAXDIR+FILE_MAXFILE];
+char bprogname[FILE_MAX];
+
+static void mem_error_cb(const char *errorStr)
+{
+	fprintf(stderr, "%s", errorStr);
+	fflush(stderr);
+}
 
 #ifdef WIN32
 typedef enum 
@@ -362,7 +373,7 @@ int main(int argc, char** argv)
 	signal (SIGFPE, SIG_IGN);
 #endif /* __alpha__ */
 #endif /* __linux__ */
-	BLI_where_am_i(bprogname, argv[0]);
+	BLI_where_am_i(bprogname, sizeof(bprogname), argv[0]);
 #ifdef __APPLE__
     // Can't use Carbon right now because of double defined type ID (In Carbon.h and DNA_ID.h, sigh)
     /*
@@ -829,9 +840,10 @@ int main(int argc, char** argv)
 						
 						//					GPG_Application app (system, maggie, startscenename);
 						app.SetGameEngineData(maggie, scene, argc, argv); /* this argc cant be argc_py_clamped, since python uses it */
-						
 						BLI_strncpy(pathname, maggie->name, sizeof(pathname));
-						BLI_strncpy(G.main->name, maggie->name, sizeof(G.main->name));
+						if(G.main != maggie) {
+							BLI_strncpy(G.main->name, maggie->name, sizeof(G.main->name));
+						}
 #ifdef WITH_PYTHON
 						setGamePythonPath(G.main->name);
 #endif
@@ -927,6 +939,10 @@ int main(int argc, char** argv)
 						}
 						app.StopGameEngine();
 
+						/* 'app' is freed automatic when out of scope. 
+						 * removal is needed else the system will free an already freed value */
+						system->removeEventConsumer(&app);
+
 						BLO_blendfiledata_free(bfd);
 					}
 				} while (exitcode == KX_EXIT_REQUEST_RESTART_GAME || exitcode == KX_EXIT_REQUEST_START_OTHER_GAME);
@@ -950,6 +966,13 @@ int main(int argc, char** argv)
 	free_nodesystem();
 
 	SYS_DeleteSystem(syshandle);
+
+	int totblock= MEM_get_memory_blocks_in_use();
+	if(totblock!=0) {
+		printf("Error Totblock: %d\n",totblock);
+		MEM_set_error_callback(mem_error_cb);
+		MEM_printmemlist();
+	}
 
 	return error ? -1 : 0;
 }

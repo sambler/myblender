@@ -1,6 +1,4 @@
-/**
- * blenlib/BKE_text.h (mar-2001 nzc)
- *	
+/*
  * $Id$ 
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -30,6 +28,12 @@
  */
 #ifndef BKE_TEXT_H
 #define BKE_TEXT_H
+
+/** \file BKE_text.h
+ *  \ingroup bke
+ *  \since March 2001
+ *  \author nzc
+ */
 
 #ifdef __cplusplus
 extern "C" {
@@ -85,6 +89,7 @@ void	txt_split_curline	(struct Text *text);
 void	txt_backspace_char	(struct Text *text);
 void	txt_backspace_word	(struct Text *text);
 int		txt_add_char		(struct Text *text, char add);
+int		txt_add_raw_char	(struct Text *text, char add);
 int		txt_replace_char	(struct Text *text, char add);
 void	txt_export_to_object	(struct Text *text);
 void	txt_export_to_objects(struct Text *text);

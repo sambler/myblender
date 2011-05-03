@@ -29,6 +29,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/blenkernel/intern/texture.c
+ *  \ingroup bke
+ */
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -51,6 +56,7 @@
 #include "DNA_brush_types.h"
 #include "DNA_node_types.h"
 #include "DNA_color_types.h"
+#include "DNA_particle_types.h"
 
 #include "IMB_imbuf.h"
 
@@ -58,7 +64,6 @@
 #include "BKE_utildefines.h"
 #include "BKE_global.h"
 #include "BKE_main.h"
-#include "BKE_ocean.h"
 
 #include "BKE_library.h"
 #include "BKE_image.h"
@@ -68,9 +73,7 @@
 #include "BKE_icons.h"
 #include "BKE_node.h"
 #include "BKE_animsys.h"
-
-/* prototypes */
-void init_oceantex(struct OceanTex *oc);
+#include "BKE_colortools.h"
 
 /* ------------------------------------------------------------------------- */
 
@@ -95,14 +98,14 @@ void open_plugin_tex(PluginTex *pit)
 	int (*version)(void);
 	
 	/* init all the happy variables */
-	pit->doit= 0;
-	pit->pname= 0;
-	pit->stnames= 0;
-	pit->varstr= 0;
-	pit->result= 0;
-	pit->cfra= 0;
+	pit->doit= NULL;
+	pit->pname= NULL;
+	pit->stnames= NULL;
+	pit->varstr= NULL;
+	pit->result= NULL;
+	pit->cfra= NULL;
 	pit->version= 0;
-	pit->instance_init= 0;
+	pit->instance_init= NULL;
 	
 	/* clear the error list */
 	PIL_dynlib_get_error_as_string(NULL);
@@ -115,12 +118,12 @@ void open_plugin_tex(PluginTex *pit)
 	pit->handle= PIL_dynlib_open(pit->name);
 	if(test_dlerr(pit->name, pit->name)) return;
 
-	if (pit->handle != 0) {
+	if (pit->handle != NULL) {
 		/* find the address of the version function */
 		version= (int (*)(void)) PIL_dynlib_find_symbol(pit->handle, "plugin_tex_getversion");
 		if (test_dlerr(pit->name, "plugin_tex_getversion")) return;
 		
-		if (version != 0) {
+		if (version != NULL) {
 			pit->version= version();
 			if( pit->version >= 2 && pit->version <=6) {
 				int (*info_func)(PluginInfo *);
@@ -170,8 +173,8 @@ PluginTex *add_plugin_tex(char *str)
 	strcpy(pit->name, str);
 	open_plugin_tex(pit);
 	
-	if(pit->doit==0) {
-		if(pit->handle==0) {;} //XXX error("no plugin: %s", str);
+	if(pit->doit==NULL) {
+		if(pit->handle==NULL) {;} //XXX error("no plugin: %s", str);
 		else {;} //XXX error("in plugin: %s", str);
 		MEM_freeN(pit);
 		return NULL;
@@ -195,7 +198,7 @@ PluginTex *add_plugin_tex(char *str)
 
 void free_plugin_tex(PluginTex *pit)
 {
-	if(pit==0) return;
+	if(pit==NULL) return;
 		
 	/* no PIL_dynlib_close: same plugin can be opened multiple times, 1 handle */
 	MEM_freeN(pit);	
@@ -220,9 +223,9 @@ void init_mapping(TexMapping *texmap)
 	
 	size_to_mat3( smat,texmap->size);
 	
-	eul[0]= (M_PI/180.0f)*texmap->rot[0];
-	eul[1]= (M_PI/180.0f)*texmap->rot[1];
-	eul[2]= (M_PI/180.0f)*texmap->rot[2];
+	eul[0]= DEG2RADF(texmap->rot[0]);
+	eul[1]= DEG2RADF(texmap->rot[1]);
+	eul[2]= DEG2RADF(texmap->rot[2]);
 	eul_to_mat3( rmat,eul);
 	
 	mul_m3_m3m3(mat, rmat, smat);
@@ -339,8 +342,11 @@ int do_colorband(ColorBand *coba, float in, float out[4])
 		
 				if(cbd2->pos!=cbd1->pos)
 					fac= (in-cbd1->pos)/(cbd2->pos-cbd1->pos);
-				else
-					fac= 0.0f;
+				else {
+					/* was setting to 0.0 in 2.56 & previous, but this
+					 * is incorrect for the last element, see [#26732] */
+					fac= (a != coba->tot) ? 0.0f : 1.0f;
+				}
 				
 				if (coba->ipotype==4) {
 					/* constant */
@@ -370,10 +376,10 @@ int do_colorband(ColorBand *coba, float in, float out[4])
 					out[1]= t[3]*cbd3->g +t[2]*cbd2->g +t[1]*cbd1->g +t[0]*cbd0->g;
 					out[2]= t[3]*cbd3->b +t[2]*cbd2->b +t[1]*cbd1->b +t[0]*cbd0->b;
 					out[3]= t[3]*cbd3->a +t[2]*cbd2->a +t[1]*cbd1->a +t[0]*cbd0->a;
-					CLAMP(out[0], 0.0, 1.0);
-					CLAMP(out[1], 0.0, 1.0);
-					CLAMP(out[2], 0.0, 1.0);
-					CLAMP(out[3], 0.0, 1.0);
+					CLAMP(out[0], 0.0f, 1.0f);
+					CLAMP(out[1], 0.0f, 1.0f);
+					CLAMP(out[2], 0.0f, 1.0f);
+					CLAMP(out[3], 0.0f, 1.0f);
 				}
 				else {
 				
@@ -477,12 +483,13 @@ int colorband_element_remove(struct ColorBand *coba, int index)
 void free_texture(Tex *tex)
 {
 	free_plugin_tex(tex->plugin);
+	
 	if(tex->coba) MEM_freeN(tex->coba);
 	if(tex->env) BKE_free_envmap(tex->env);
 	if(tex->pd) BKE_free_pointdensity(tex->pd);
 	if(tex->vd) BKE_free_voxeldata(tex->vd);
-	if(tex->ot) BKE_free_oceantex(tex->ot);
 	BKE_free_animdata((struct ID *)tex);
+	
 	BKE_previewimg_free(&tex->preview);
 	BKE_icon_delete((struct ID*)tex);
 	tex->id.icon_id = 0;
@@ -563,10 +570,6 @@ void default_tex(Tex *tex)
 		tex->vd->interp_type=TEX_VD_LINEAR;
 		tex->vd->file_format=TEX_VD_SMOKE;
 	}
-	
-	if (tex->ot) {
-		init_oceantex(tex->ot);
-	}
 	pit = tex->plugin;
 	if (pit) {
 		varstr= pit->varstr;
@@ -601,10 +604,6 @@ void tex_set_type(Tex *tex, int type)
 			if (tex->env == NULL)
 				tex->env = BKE_add_envmap();
 			break;
-		case TEX_OCEAN:
-			if (tex->ot == NULL)
-				tex->ot = BKE_add_oceantex();
-			break;
 	}
 	
 	tex->type = type;
@@ -630,7 +629,7 @@ void default_mtex(MTex *mtex)
 {
 	mtex->texco= TEXCO_ORCO;
 	mtex->mapto= MAP_COL;
-	mtex->object= 0;
+	mtex->object= NULL;
 	mtex->projx= PROJ_X;
 	mtex->projy= PROJ_Y;
 	mtex->projz= PROJ_Z;
@@ -641,7 +640,7 @@ void default_mtex(MTex *mtex)
 	mtex->size[0]= 1.0;
 	mtex->size[1]= 1.0;
 	mtex->size[2]= 1.0;
-	mtex->tex= 0;
+	mtex->tex= NULL;
 	mtex->texflag= MTEX_3TAP_BUMP | MTEX_BUMP_OBJECTSPACE;
 	mtex->colormodel= 0;
 	mtex->r= 1.0;
@@ -683,14 +682,16 @@ void default_mtex(MTex *mtex)
 	mtex->lifefac= 1.0f;
 	mtex->sizefac= 1.0f;
 	mtex->ivelfac= 1.0f;
-	mtex->pvelfac= 1.0f;
+	mtex->dampfac= 1.0f;
+	mtex->gravityfac= 1.0f;
+	mtex->fieldfac= 1.0f;
 	mtex->normapspace= MTEX_NSPACE_TANGENT;
 }
 
 
 /* ------------------------------------------------------------------------- */
 
-MTex *add_mtex()
+MTex *add_mtex(void)
 {
 	MTex *mtex;
 	
@@ -752,11 +753,7 @@ Tex *copy_texture(Tex *tex)
 	
 	texn= copy_libblock(tex);
 	if(texn->type==TEX_IMAGE) id_us_plus((ID *)texn->ima);
-	else texn->ima= 0;
-	
-#if 0 // XXX old animation system
-	id_us_plus((ID *)texn->ipo);
-#endif // XXX old animation system
+	else texn->ima= NULL;
 	
 	if(texn->plugin) {
 		texn->plugin= MEM_dupallocN(texn->plugin);
@@ -765,19 +762,54 @@ Tex *copy_texture(Tex *tex)
 	
 	if(texn->coba) texn->coba= MEM_dupallocN(texn->coba);
 	if(texn->env) texn->env= BKE_copy_envmap(texn->env);
-	if(texn->pd) texn->pd= MEM_dupallocN(texn->pd);
+	if(texn->pd) texn->pd= BKE_copy_pointdensity(texn->pd);
 	if(texn->vd) texn->vd= MEM_dupallocN(texn->vd);
-	if(texn->ot) texn->ot= BKE_copy_oceantex(texn->ot);
-	
 	if(tex->preview) texn->preview = BKE_previewimg_copy(tex->preview);
 
 	if(tex->nodetree) {
 		ntreeEndExecTree(tex->nodetree);
-		texn->nodetree= ntreeCopyTree(tex->nodetree, 0); /* 0 == full new tree */
+		texn->nodetree= ntreeCopyTree(tex->nodetree); 
 	}
 	
 	return texn;
 }
+
+/* texture copy without adding to main dbase */
+Tex *localize_texture(Tex *tex)
+{
+	Tex *texn;
+	
+	texn= copy_libblock(tex);
+	BLI_remlink(&G.main->tex, texn);
+	
+	/* image texture: free_texture also doesn't decrease */
+	
+	if(texn->plugin) {
+		texn->plugin= MEM_dupallocN(texn->plugin);
+		open_plugin_tex(texn->plugin);
+	}
+	
+	if(texn->coba) texn->coba= MEM_dupallocN(texn->coba);
+	if(texn->env) {
+		texn->env= BKE_copy_envmap(texn->env);
+		id_us_min(&texn->env->ima->id);
+	}
+	if(texn->pd) texn->pd= BKE_copy_pointdensity(texn->pd);
+	if(texn->vd) {
+		texn->vd= MEM_dupallocN(texn->vd);
+		if(texn->vd->dataset)
+			texn->vd->dataset= MEM_dupallocN(texn->vd->dataset);
+	}
+	
+	texn->preview = NULL;
+	
+	if(tex->nodetree) {
+		texn->nodetree= ntreeLocalize(tex->nodetree);
+	}
+	
+	return texn;
+}
+
 
 /* ------------------------------------------------------------------------- */
 
@@ -789,6 +821,7 @@ void make_local_texture(Tex *tex)
 	World *wrld;
 	Lamp *la;
 	Brush *br;
+	ParticleSettings *pa;
 	int a, local=0, lib=0;
 
 	/* - only lib users: do nothing
@@ -796,19 +829,19 @@ void make_local_texture(Tex *tex)
 		* - mixed: make copy
 		*/
 	
-	if(tex->id.lib==0) return;
+	if(tex->id.lib==NULL) return;
 
 	/* special case: ima always local immediately */
 	if(tex->ima) {
-		tex->ima->id.lib= 0;
+		tex->ima->id.lib= NULL;
 		tex->ima->id.flag= LIB_LOCAL;
-		new_id(0, (ID *)tex->ima, 0);
+		new_id(&bmain->image, (ID *)tex->ima, NULL);
 	}
 
 	if(tex->id.us==1) {
-		tex->id.lib= 0;
+		tex->id.lib= NULL;
 		tex->id.flag= LIB_LOCAL;
-		new_id(0, (ID *)tex, 0);
+		new_id(&bmain->tex, (ID *)tex, NULL);
 
 		return;
 	}
@@ -851,11 +884,21 @@ void make_local_texture(Tex *tex)
 		}
 		br= br->id.next;
 	}
+	pa= bmain->particle.first;
+	while(pa) {
+		for(a=0; a<MAX_MTEX; a++) {
+			if(pa->mtex[a] && pa->mtex[a]->tex==tex) {
+				if(pa->id.lib) lib= 1;
+				else local= 1;
+			}
+		}
+		pa= pa->id.next;
+	}
 	
 	if(local && lib==0) {
-		tex->id.lib= 0;
+		tex->id.lib= NULL;
 		tex->id.flag= LIB_LOCAL;
-		new_id(0, (ID *)tex, 0);
+		new_id(&bmain->tex, (ID *)tex, NULL);
 	}
 	else if(local && lib) {
 		texn= copy_texture(tex);
@@ -865,7 +908,7 @@ void make_local_texture(Tex *tex)
 		while(ma) {
 			for(a=0; a<MAX_MTEX; a++) {
 				if(ma->mtex[a] && ma->mtex[a]->tex==tex) {
-					if(ma->id.lib==0) {
+					if(ma->id.lib==NULL) {
 						ma->mtex[a]->tex= texn;
 						texn->id.us++;
 						tex->id.us--;
@@ -878,7 +921,7 @@ void make_local_texture(Tex *tex)
 		while(la) {
 			for(a=0; a<MAX_MTEX; a++) {
 				if(la->mtex[a] && la->mtex[a]->tex==tex) {
-					if(la->id.lib==0) {
+					if(la->id.lib==NULL) {
 						la->mtex[a]->tex= texn;
 						texn->id.us++;
 						tex->id.us--;
@@ -891,7 +934,7 @@ void make_local_texture(Tex *tex)
 		while(wrld) {
 			for(a=0; a<MAX_MTEX; a++) {
 				if(wrld->mtex[a] && wrld->mtex[a]->tex==tex) {
-					if(wrld->id.lib==0) {
+					if(wrld->id.lib==NULL) {
 						wrld->mtex[a]->tex= texn;
 						texn->id.us++;
 						tex->id.us--;
@@ -903,13 +946,26 @@ void make_local_texture(Tex *tex)
 		br= bmain->brush.first;
 		while(br) {
 			if(br->mtex.tex==tex) {
-				if(br->id.lib==0) {
+				if(br->id.lib==NULL) {
 					br->mtex.tex= texn;
 					texn->id.us++;
 					tex->id.us--;
 				}
 			}
 			br= br->id.next;
+		}
+		pa= bmain->particle.first;
+		while(pa) {
+			for(a=0; a<MAX_MTEX; a++) {
+				if(pa->mtex[a] && pa->mtex[a]->tex==tex) {
+					if(pa->id.lib==NULL) {
+						pa->mtex[a]->tex= texn;
+						texn->id.us++;
+						tex->id.us--;
+					}
+				}
+			}
+			pa= pa->id.next;
 		}
 	}
 }
@@ -921,7 +977,7 @@ void autotexname(Tex *tex)
 	Main *bmain= G.main;
 	char texstr[20][15]= {"None"  , "Clouds" , "Wood", "Marble", "Magic"  , "Blend",
 		"Stucci", "Noise"  , "Image", "Plugin", "EnvMap" , "Musgrave",
-		"Voronoi", "DistNoise", "Point Density", "Voxel Data", "Ocean", "", "", ""};
+		"Voronoi", "DistNoise", "Point Density", "Voxel Data", "", "", "", ""};
 	Image *ima;
 	char di[FILE_MAXDIR], fi[FILE_MAXFILE];
 	
@@ -953,8 +1009,8 @@ Tex *give_current_object_texture(Object *ob)
 	Material *ma;
 	Tex *tex= NULL;
 	
-	if(ob==0) return 0;
-	if(ob->totcol==0 && !(ob->type==OB_LAMP)) return 0;
+	if(ob==NULL) return NULL;
+	if(ob->totcol==0 && !(ob->type==OB_LAMP)) return NULL;
 	
 	if(ob->type==OB_LAMP) {
 		tex= give_current_lamp_texture(ob->data);
@@ -1061,6 +1117,10 @@ int give_active_mtex(ID *id, MTex ***mtex_ar, short *act)
 		*mtex_ar=		((Lamp *)id)->mtex;
 		if(act) *act=	(((Lamp *)id)->texact);
 		break;
+	case ID_PA:
+		*mtex_ar=		((ParticleSettings *)id)->mtex;
+		if(act) *act=	(((ParticleSettings *)id)->texact);
+		break;
 	default:
 		*mtex_ar = NULL;
 		if(act) *act=	0;
@@ -1084,6 +1144,9 @@ void set_active_mtex(ID *id, short act)
 		break;
 	case ID_LA:
 		((Lamp *)id)->texact= act;
+		break;
+	case ID_PA:
+		((ParticleSettings *)id)->texact= act;
 		break;
 	}
 }
@@ -1134,7 +1197,7 @@ Tex *give_current_world_texture(World *world)
 	MTex *mtex= NULL;
 	Tex *tex= NULL;
 	
-	if(!world) return 0;
+	if(!world) return NULL;
 	
 	mtex= world->mtex[(int)(world->texact)];
 	if(mtex) tex= mtex->tex;
@@ -1177,6 +1240,42 @@ void set_current_brush_texture(Brush *br, Tex *newtex)
 	if(newtex) {
 		br->mtex.tex= newtex;
 		id_us_plus(&newtex->id);
+	}
+}
+
+Tex *give_current_particle_texture(ParticleSettings *part)
+{
+	MTex *mtex= NULL;
+	Tex *tex= NULL;
+	
+	if(!part) return NULL;
+	
+	mtex= part->mtex[(int)(part->texact)];
+	if(mtex) tex= mtex->tex;
+	
+	return tex;
+}
+
+void set_current_particle_texture(ParticleSettings *part, Tex *newtex)
+{
+	int act= part->texact;
+
+	if(part->mtex[act] && part->mtex[act]->tex)
+		id_us_min(&part->mtex[act]->tex->id);
+
+	if(newtex) {
+		if(!part->mtex[act]) {
+			part->mtex[act]= add_mtex();
+			part->mtex[act]->texco= TEXCO_ORCO;
+			part->mtex[act]->blendtype= MTEX_MUL;
+		}
+		
+		part->mtex[act]->tex= newtex;
+		id_us_plus(&newtex->id);
+	}
+	else if(part->mtex[act]) {
+		MEM_freeN(part->mtex[act]);
+		part->mtex[act]= NULL;
 	}
 }
 
@@ -1260,6 +1359,13 @@ PointDensity *BKE_add_pointdensity(void)
 	pd->object = NULL;
 	pd->psys = 0;
 	pd->psys_cache_space= TEX_PD_WORLDSPACE;
+	pd->falloff_curve = curvemapping_add(1, 0, 0, 1, 1);
+
+	pd->falloff_curve->preset = CURVE_PRESET_LINE;
+	pd->falloff_curve->cm->flag &= ~CUMA_EXTEND_EXTRAPOLATE;
+	curvemap_reset(pd->falloff_curve->cm, &pd->falloff_curve->clipr, pd->falloff_curve->preset, CURVEMAP_SLOPE_POSITIVE);
+	curvemapping_changed(pd->falloff_curve, 0);
+
 	return pd;
 } 
 
@@ -1271,7 +1377,7 @@ PointDensity *BKE_copy_pointdensity(PointDensity *pd)
 	pdn->point_tree = NULL;
 	pdn->point_data = NULL;
 	if(pdn->coba) pdn->coba= MEM_dupallocN(pdn->coba);
-	
+	pdn->falloff_curve = curvemapping_copy(pdn->falloff_curve); /* can be NULL */
 	return pdn;
 }
 
@@ -1285,7 +1391,12 @@ void BKE_free_pointdensitydata(PointDensity *pd)
 		MEM_freeN(pd->point_data);
 		pd->point_data = NULL;
 	}
-	if(pd->coba) MEM_freeN(pd->coba);
+	if(pd->coba) {
+		MEM_freeN(pd->coba);
+		pd->coba = NULL;
+	}
+
+	curvemapping_free(pd->falloff_curve); /* can be NULL */
 }
 
 void BKE_free_pointdensity(PointDensity *pd)
@@ -1294,7 +1405,6 @@ void BKE_free_pointdensity(PointDensity *pd)
 	MEM_freeN(pd);
 }
 
-/* ------------------------------------------------------------------------- */
 
 void BKE_free_voxeldatadata(struct VoxelData *vd)
 {
@@ -1337,100 +1447,6 @@ struct VoxelData *BKE_copy_voxeldata(struct VoxelData *vd)
 	vdn->dataset = NULL;
 
 	return vdn;
-}
-
-/* ------------------------------------------------------------------------- */
-
-void BKE_init_ocean_fromtex(struct OceanTex *ot)
-{
-	int do_heightfield, do_chop, do_normals, do_jacobian;
-	
-	if (!ot || !ot->ocean) return; 
-	
-	do_heightfield = (ot->output == TEX_OCN_DISPLACEMENT);
-	do_chop = (ot->chop_amount > 0);
-	do_normals = (ot->flag & TEX_OCN_GENERATE_NORMALS);
-	do_jacobian = (ot->output >= TEX_OCN_FOAM); 
-	
-	BKE_free_ocean_data(ot->ocean);
-	BKE_init_ocean(ot->ocean, ot->resolution*ot->resolution, ot->resolution*ot->resolution, ot->spatial_size, ot->spatial_size, 
-			ot->wind_velocity, ot->smallest_wave, 1.0, ot->wave_direction, ot->damp, ot->wave_alignment, 
-			ot->depth, ot->time,
-			do_heightfield, do_chop, do_normals, do_jacobian,
-			ot->seed);
-}
-
-void BKE_simulate_ocean_fromtex(struct OceanTex *ot)
-{
-	if (!ot || !ot->ocean) return;
-	
-	BKE_simulate_ocean(ot->ocean, ot->time, ot->wave_scale, ot->chop_amount);
-}
-
-void init_oceantex(OceanTex *ot)
-{
-	ot->output = TEX_OCN_DISPLACEMENT;
-	
-	ot->object = NULL;
-	
-	ot->resolution = 7;
-	ot->spatial_size = 50;
-	
-	ot->wave_alignment = 0.0;
-	ot->wind_velocity = 30.0;
-	
-	ot->damp = 0.5;
-	ot->smallest_wave = 0.01;
-	ot->wave_direction= 0.0;
-	ot->depth = 200.0;
-	
-	ot->wave_scale = 1.0;
-	
-	ot->chop_amount = 0.0;
-	
-	ot->foam_coverage = 0.0;
-	
-	ot->seed = 0;
-	ot->time = 1.0;
-	
-	//ot->flag |= TEX_OCN_GENERATE_NORMALS;
-	
-	if (!ot->ocean) {
-		ot->ocean = BKE_add_ocean();
-		BKE_init_ocean_fromtex(ot);
-	}
-	
-}
-
-struct OceanTex *BKE_add_oceantex(void)
-{
-	OceanTex *ot;
-	
-	ot= MEM_callocN(sizeof(struct OceanTex), "ocean texture");
-	
-	init_oceantex(ot);
-	BKE_simulate_ocean_fromtex(ot);
-	
-	return ot;
-}
-
-struct OceanTex *BKE_copy_oceantex(struct OceanTex *ot)
-{
-	OceanTex *otn;
-	
-	otn= MEM_dupallocN(ot);
-	
-	otn->ocean = BKE_add_ocean();
-	BKE_init_ocean_fromtex(otn);
-	BKE_simulate_ocean_fromtex(otn);
-	
-	return otn;
-}
-
-void BKE_free_oceantex(struct OceanTex *ot)
-{
-	BKE_free_ocean(ot->ocean);
-	MEM_freeN(ot);
 }
 
 

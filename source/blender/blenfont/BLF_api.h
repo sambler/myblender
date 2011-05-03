@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/blenfont/BLF_api.h
+ *  \ingroup blf
+ */
+
 
 #ifndef BLF_API_H
 #define BLF_API_H
@@ -152,7 +157,7 @@ void BLF_shadow_offset(int fontid, int x, int y);
  *
  *	BLF_buffer(NULL, NULL, 0, 0, 0);
  */
-void BLF_buffer(int fontid, float *fbuf, unsigned char *cbuf, unsigned int w, unsigned int h, int nch);
+void BLF_buffer(int fontid, float *fbuf, unsigned char *cbuf, int w, int h, int nch);
 
 /*
  * Set the color to be used for text.
@@ -176,6 +181,8 @@ void BLF_lang_set(const char *);
 
 /* Set the current encoding name. */
 void BLF_lang_encoding_name(const char *str);
+
+void BLF_lang_encoding(const char *str);
 
 /* Add a path to the font dir paths. */
 void BLF_dir_add(const char *path);

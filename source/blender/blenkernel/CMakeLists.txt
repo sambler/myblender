@@ -24,6 +24,11 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
+if(WITH_CODEC_FFMPEG)
+	# FFMPEG gives warnigns which are hard to avoid across multiple versions.
+	remove_strict_flags()
+endif()
+
 set(INC 
 	.
 	../avi
@@ -38,7 +43,6 @@ set(INC
 	../nodes
 	../editors/include
 	../render/extern/include
-	../../../extern/glew/include
 	../../../intern/audaspace/intern
 	../../../intern/bsp/extern ../blenfont
 	../../../intern/decimation/extern
@@ -48,7 +52,9 @@ set(INC
 	../../../intern/memutil
 	../../../intern/opennl/extern
 	../../../intern/smoke/extern
+	../../../intern/mikktspace
     ../../../source/blender/windowmanager # XXX - BAD LEVEL CALL WM_api.h
+	${GLEW_INCLUDE_PATH}
 	${ZLIB_INCLUDE_DIRS}
 )
 
@@ -105,11 +111,11 @@ set(SRC
 	intern/material.c
 	intern/mball.c
 	intern/mesh.c
+	intern/mesh_validate.c
 	intern/modifier.c
 	intern/multires.c
 	intern/nla.c
 	intern/node.c
-	intern/ocean.c
 	intern/object.c
 	intern/packedFile.c
 	intern/paint.c
@@ -139,7 +145,7 @@ set(SRC
 	intern/writeavi.c
 	intern/writeffmpeg.c
 	intern/writeframeserver.c
-
+	
 	BKE_DerivedMesh.h
 	BKE_action.h
 	BKE_anim.h
@@ -234,6 +240,11 @@ if(WITH_BULLET)
 	add_definitions(-DUSE_BULLET)
 endif()
 
+if(WITH_MOD_CLOTH_ELTOPO)
+	list(APPEND INC ../../../extern/eltopo)
+	add_definitions(-DWITH_ELTOPO)
+endif()
+
 if(WITH_IMAGE_OPENEXR)
 	add_definitions(-DWITH_OPENEXR)
 endif()
@@ -276,6 +287,10 @@ endif()
 if(WITH_PYTHON)
 	list(APPEND INC ../python ${PYTHON_INCLUDE_DIRS})
 	add_definitions(-DWITH_PYTHON)
+
+	if(WITH_PYTHON_SECURITY)
+		add_definitions(-DWITH_PYTHON_SECURITY)
+	endif()
 endif()
 
 if(WITH_OPENMP)
@@ -300,14 +315,8 @@ if(WITH_LZMA)
 	add_definitions(-DWITH_LZMA)
 endif()
 
-if(WITH_FFTW3)
-	list(APPEND INC ${FFTW3_INC})	
-	add_definitions(-DFFTW3=1)
-endif()
-
 if(MSVC)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /WX")
 endif()
-
 
 blender_add_lib(bf_blenkernel "${SRC}" "${INC}")

@@ -763,6 +763,8 @@ void	KX_BlenderSceneConverter::WritePhysicsObjectToAnimationIpo(int frameNumber)
 			if (blenderObject && blenderObject->parent==NULL && gameObj->GetPhysicsController() != NULL)
 			{
 				//KX_IPhysicsController* physCtrl = gameObj->GetPhysicsController();
+				if (blenderObject->gameflag2 & OB_IGNORE_ANIM_RECORDING)
+					continue;
 
 				if(blenderObject->adt==NULL)
 					BKE_id_add_animdata(&blenderObject->id);

@@ -64,6 +64,7 @@
 #include "BKE_utildefines.h"
 #include "BKE_global.h"
 #include "BKE_main.h"
+#include "BKE_ocean.h"
 
 #include "BKE_library.h"
 #include "BKE_image.h"
@@ -488,6 +489,7 @@ void free_texture(Tex *tex)
 	if(tex->env) BKE_free_envmap(tex->env);
 	if(tex->pd) BKE_free_pointdensity(tex->pd);
 	if(tex->vd) BKE_free_voxeldata(tex->vd);
+	if(tex->ot) BKE_free_oceantex(tex->ot);
 	BKE_free_animdata((struct ID *)tex);
 	
 	BKE_previewimg_free(&tex->preview);
@@ -570,6 +572,10 @@ void default_tex(Tex *tex)
 		tex->vd->interp_type=TEX_VD_LINEAR;
 		tex->vd->file_format=TEX_VD_SMOKE;
 	}
+	
+	if (tex->ot) {
+		init_oceantex(tex->ot);
+	}
 	pit = tex->plugin;
 	if (pit) {
 		varstr= pit->varstr;
@@ -603,6 +609,10 @@ void tex_set_type(Tex *tex, int type)
 		case TEX_ENVMAP:
 			if (tex->env == NULL)
 				tex->env = BKE_add_envmap();
+			break;
+		case TEX_OCEAN:
+			if (tex->ot == NULL)
+				tex->ot = BKE_add_oceantex();
 			break;
 	}
 	
@@ -800,6 +810,9 @@ Tex *localize_texture(Tex *tex)
 		if(texn->vd->dataset)
 			texn->vd->dataset= MEM_dupallocN(texn->vd->dataset);
 	}
+	if(texn->ot) {
+		texn->ot= BKE_copy_oceantex(tex->ot);
+	}
 	
 	texn->preview = NULL;
 	
@@ -977,7 +990,7 @@ void autotexname(Tex *tex)
 	Main *bmain= G.main;
 	char texstr[20][15]= {"None"  , "Clouds" , "Wood", "Marble", "Magic"  , "Blend",
 		"Stucci", "Noise"  , "Image", "Plugin", "EnvMap" , "Musgrave",
-		"Voronoi", "DistNoise", "Point Density", "Voxel Data", "", "", "", ""};
+		"Voronoi", "DistNoise", "Point Density", "Voxel Data", "Ocean", "", "", ""};
 	Image *ima;
 	char di[FILE_MAXDIR], fi[FILE_MAXFILE];
 	
@@ -1405,6 +1418,7 @@ void BKE_free_pointdensity(PointDensity *pd)
 	MEM_freeN(pd);
 }
 
+/* ------------------------------------------------------------------------- */
 
 void BKE_free_voxeldatadata(struct VoxelData *vd)
 {
@@ -1447,6 +1461,104 @@ struct VoxelData *BKE_copy_voxeldata(struct VoxelData *vd)
 	vdn->dataset = NULL;
 
 	return vdn;
+}
+
+/* ------------------------------------------------------------------------- */
+
+void BKE_init_ocean_fromtex(struct OceanTex *ot)
+{
+	int do_heightfield, do_chop, do_normals, do_jacobian;
+	
+	if (!ot || !ot->ocean) return; 
+	
+	do_heightfield = (ot->output == TEX_OCN_DISPLACEMENT);
+	do_chop = (ot->chop_amount > 0);
+	do_normals = (ot->flag & TEX_OCN_GENERATE_NORMALS);
+	do_jacobian = (ot->output >= TEX_OCN_FOAM); 
+	
+	BKE_free_ocean_data(ot->ocean);
+	BKE_init_ocean(ot->ocean, ot->resolution*ot->resolution, ot->resolution*ot->resolution, ot->spatial_size, ot->spatial_size, 
+			ot->wind_velocity, ot->smallest_wave, 1.0, ot->wave_direction, ot->damp, ot->wave_alignment, 
+			ot->depth, ot->time,
+			do_heightfield, do_chop, do_normals, do_jacobian,
+			ot->seed);
+}
+
+void BKE_simulate_ocean_fromtex(struct OceanTex *ot)
+{
+	if (!ot || !ot->ocean) return;
+	
+	BKE_simulate_ocean(ot->ocean, ot->time, ot->wave_scale, ot->chop_amount);
+}
+
+void init_oceantex(OceanTex *ot)
+{
+	ot->output = TEX_OCN_DISPLACEMENT;
+	
+	ot->object = NULL;
+	
+	ot->resolution = 7;
+	ot->spatial_size = 50;
+	
+	ot->wave_alignment = 0.0;
+	ot->wind_velocity = 30.0;
+	
+	ot->damp = 0.5;
+	ot->smallest_wave = 0.01;
+	ot->wave_direction= 0.0;
+	ot->depth = 200.0;
+	
+	ot->wave_scale = 1.0;
+	
+	ot->chop_amount = 0.0;
+	
+	ot->foam_coverage = 0.0;
+	
+	ot->seed = 0;
+	ot->time = 1.0;
+	
+	/*
+	if (!ot->ocean) {
+		ot->ocean = BKE_add_ocean();
+		BKE_init_ocean_fromtex(ot);
+	}
+	 */
+	
+}
+
+struct OceanTex *BKE_add_oceantex(void)
+{
+	OceanTex *ot;
+	
+	ot= MEM_callocN(sizeof(struct OceanTex), "ocean texture");
+	
+	ot->ocean = NULL;
+	
+	init_oceantex(ot);
+	//BKE_simulate_ocean_fromtex(ot);
+	
+	return ot;
+}
+
+struct OceanTex *BKE_copy_oceantex(struct OceanTex *ot)
+{
+	OceanTex *otn;
+	
+	otn= MEM_dupallocN(ot);
+	
+	otn->ocean = NULL;
+	
+	//otn->ocean = BKE_add_ocean();
+	//BKE_init_ocean_fromtex(otn);
+	//BKE_simulate_ocean_fromtex(otn);
+	
+	return otn;
+}
+
+void BKE_free_oceantex(struct OceanTex *ot)
+{
+	BKE_free_ocean(ot->ocean);
+	MEM_freeN(ot);
 }
 
 

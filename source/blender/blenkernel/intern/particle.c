@@ -2242,6 +2242,7 @@ static void do_path_effectors(ParticleSimulationData *sim, int i, ParticleCacheK
 
 	VECCOPY(eff_key.co,(ca-1)->co);
 	VECCOPY(eff_key.vel,(ca-1)->vel);
+	print_v3("hair key vel:", eff_key.vel);
 	QUATCOPY(eff_key.rot,(ca-1)->rot);
 
 	pd_point_from_particle(sim, sim->psys->particles+i, &eff_key, &epoint);

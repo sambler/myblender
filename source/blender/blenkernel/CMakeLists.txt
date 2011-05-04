@@ -116,6 +116,7 @@ set(SRC
 	intern/multires.c
 	intern/nla.c
 	intern/node.c
+	intern/ocean.c
 	intern/object.c
 	intern/packedFile.c
 	intern/paint.c
@@ -315,8 +316,14 @@ if(WITH_LZMA)
 	add_definitions(-DWITH_LZMA)
 endif()
 
+if(WITH_FFTW3)
+	list(APPEND INC ${FFTW3_INC})	
+	add_definitions(-DFFTW3=1)
+endif()
+
 if(MSVC)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /WX")
 endif()
+
 
 blender_add_lib(bf_blenkernel "${SRC}" "${INC}")

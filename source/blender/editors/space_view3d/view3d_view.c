@@ -1902,6 +1902,7 @@ void VIEW3D_OT_game_start(wmOperatorType *ot)
 	ot->exec= game_engine_exec;
 	
 	ot->poll= game_engine_poll;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 }
 
 /* ************************************** */

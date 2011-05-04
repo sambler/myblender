@@ -1484,6 +1484,11 @@ static void rna_def_object_game_settings(BlenderRNA *brna)
 	RNA_def_property_pointer_sdna(prop, NULL, "bsoft");
 	RNA_def_property_ui_text(prop, "Soft Body Settings", "Settings for Bullet soft body simulation");
 
+	prop= RNA_def_property(srna, "use_animation_recording", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_negative_sdna(prop, NULL, "gameflag2", OB_IGNORE_ANIM_RECORDING);
+	RNA_def_property_ui_text(prop, "Allow Animation Recording", "Allow saving animation keyframes for this object when 'Record Animation' is enabled");
+	
+	
 	/* state */
 
 	prop= RNA_def_property(srna, "states_visible", PROP_BOOLEAN, PROP_LAYER_MEMBER);

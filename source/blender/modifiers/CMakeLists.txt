@@ -60,6 +60,7 @@ set(SRC
 	intern/MOD_mirror.c
 	intern/MOD_multires.c
 	intern/MOD_none.c
+	intern/MOD_ocean.c
 	intern/MOD_particleinstance.c
 	intern/MOD_particlesystem.c
 	intern/MOD_screw.c
@@ -98,6 +99,10 @@ endif()
 
 if(NOT WITH_MOD_FLUID)
 	add_definitions(-DDISABLE_ELBEEM)
+endif()
+
+if(WITH_OPENMP)
+	add_definitions(-DPARALLEL=1)
 endif()
 
 blender_add_lib(bf_modifiers "${SRC}" "${INC}")

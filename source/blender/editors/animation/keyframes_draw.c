@@ -536,7 +536,7 @@ void draw_keyframe_shape (float x, float y, float xscale, float hsize, short sel
 	glScalef(1.0f/xscale*hsize, hsize, 1.0f);
 	
 	/* anti-aliased lines for more consistent appearance */
-	glEnable(GL_LINE_SMOOTH);
+	//glEnable(GL_LINE_SMOOTH);
 	
 	/* draw! */
 	if ELEM(mode, KEYFRAME_SHAPE_INSIDE, KEYFRAME_SHAPE_BOTH) {
@@ -582,7 +582,7 @@ void draw_keyframe_shape (float x, float y, float xscale, float hsize, short sel
 		glCallList(displist1);
 	}
 	
-	glDisable(GL_LINE_SMOOTH);
+	//glDisable(GL_LINE_SMOOTH);
 	
 	/* restore view transform */
 	glScalef(xscale/hsize, 1.0f/hsize, 1.0);

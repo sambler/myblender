@@ -843,7 +843,11 @@ typedef struct OceanModifierData {
 #define MOD_OCEAN_GENERATE_FOAM	1
 #define MOD_OCEAN_GENERATE_NORMALS	2
 
-typedef struct WarpModifierData {
+
+#define MOD_DYNAMICPAINT_TYPE_CANVAS (1 << 0)
+#define MOD_DYNAMICPAINT_TYPE_PAINT (1 << 1)
+
+typedef struct DynamicPaintModifierData {
 	ModifierData modifier;
 
 	struct DynamicPaintCanvasSettings *canvas;

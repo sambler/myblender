@@ -319,6 +319,32 @@ static void rna_SpaceView3D_layer_update(Main *bmain, Scene *scene, PointerRNA *
 	DAG_on_visible_update(bmain, FALSE);
 }
 
+static void rna_SpaceView3D_pivot_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *ptr)
+{
+	if (U.uiflag & USER_LOCKAROUND) {
+		View3D *v3d_act= (View3D*)(ptr->data);
+
+		/* TODO, space looper */
+		bScreen *screen;
+		for(screen= bmain->screen.first; screen; screen= screen->id.next) {
+			ScrArea *sa;
+			for(sa= screen->areabase.first; sa; sa= sa->next) {
+				SpaceLink *sl;
+				for(sl= sa->spacedata.first; sl ;sl= sl->next) {
+					if(sl->spacetype==SPACE_VIEW3D) {
+						View3D *v3d= (View3D *)sl;
+						if (v3d != v3d_act) {
+							v3d->around= v3d_act->around;
+							v3d->flag= (v3d->flag & ~V3D_ALIGN) | (v3d_act->flag & V3D_ALIGN);
+							ED_area_tag_redraw_regiontype(sa, RGN_TYPE_HEADER);
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
 static PointerRNA rna_SpaceView3D_region_3d_get(PointerRNA *ptr)
 {
 	View3D *v3d= (View3D*)(ptr->data);
@@ -480,6 +506,27 @@ static EnumPropertyItem *rna_SpaceImageEditor_draw_channels_itemf(bContext *C, P
 	*free= 1;
 
 	return item;
+}
+
+static void rna_SpaceImageEditor_zoom_get(PointerRNA *ptr, float *values)
+{
+	SpaceImage *sima= (SpaceImage*)ptr->data;
+	ScrArea *sa;
+	ARegion *ar;
+
+	values[0] = values[1] = 1;
+
+	sa = rna_area_from_space(ptr);
+	if(!sa) return;
+	
+	/* find aregion */
+	for(ar=sa->regionbase.first; ar; ar=ar->next) {
+		if(ar->regiontype == RGN_TYPE_WINDOW)
+			break;
+	}
+	if(!ar) return;
+
+	ED_space_image_zoom(sima, ar, &values[0], &values[1]);
 }
 
 static void rna_SpaceImageEditor_cursor_location_get(PointerRNA *ptr, float *values)
@@ -1277,13 +1324,13 @@ static void rna_def_space_view3d(BlenderRNA *brna)
 	RNA_def_property_enum_sdna(prop, NULL, "around");
 	RNA_def_property_enum_items(prop, pivot_items);
 	RNA_def_property_ui_text(prop, "Pivot Point", "Pivot center for rotation/scaling");
-	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_VIEW3D, NULL);
+	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_VIEW3D, "rna_SpaceView3D_pivot_update");
 	
 	prop= RNA_def_property(srna, "use_pivot_point_align", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", V3D_ALIGN);
 	RNA_def_property_ui_text(prop, "Align", "Manipulate object centers only");
 	RNA_def_property_ui_icon(prop, ICON_ALIGN, 0);
-	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_VIEW3D, NULL);
+	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_VIEW3D, "rna_SpaceView3D_pivot_update");
 
 	prop= RNA_def_property(srna, "show_manipulator", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "twflag", V3D_USE_MANIPULATOR);
@@ -1530,6 +1577,12 @@ static void rna_def_space_image(BlenderRNA *brna)
 	RNA_def_property_pointer_sdna(prop, NULL, "sample_line_hist");
 	RNA_def_property_struct_type(prop, "Histogram");
 	RNA_def_property_ui_text(prop, "Line sample", "Sampled colors along line");
+
+	prop= RNA_def_property(srna, "zoom", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_array(prop, 2);
+	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+	RNA_def_property_float_funcs(prop, "rna_SpaceImageEditor_zoom_get", NULL, NULL);
+	RNA_def_property_ui_text(prop, "Zoom", "Zoom factor");
 	
 	/* image draw */
 	prop= RNA_def_property(srna, "show_repeat", PROP_BOOLEAN, PROP_NONE);
@@ -1797,6 +1850,11 @@ static void rna_def_space_text(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "use_find_wrap", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flags", ST_FIND_WRAP);
 	RNA_def_property_ui_text(prop, "Find Wrap", "Search again from the start of the file when reaching the end");
+	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_TEXT, NULL);
+
+	prop= RNA_def_property(srna, "use_match_case", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flags", ST_MATCH_CASE);
+	RNA_def_property_ui_text(prop, "Match case", "Search string is sensitive to uppercase and lowercase letters");
 	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_TEXT, NULL);
 
 	prop= RNA_def_property(srna, "find_text", PROP_STRING, PROP_NONE);

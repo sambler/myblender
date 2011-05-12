@@ -260,8 +260,11 @@ typedef struct Object {
 	ListBase pc_ids;
 	ListBase *duplilist;	/* for temporary dupli list storage, only for use by RNA API */
 
-    int use_cust_wire_colour;       /* Use Custom Wire Colour - use int for alignment */
-    float cust_wire_colour[3];      /* custom wireframe colour */
+	float ima_ofs[2];		/* offset for image empties */
+	char pad3[8];
+
+	int use_cust_wire_colour;       /* Use Custom Wire Colour - use int for alignment */
+	float cust_wire_colour[3];      /* custom wireframe colour */
 } Object;
 
 /* Warning, this is not used anymore because hooks are now modifiers */
@@ -402,6 +405,7 @@ extern Object workob;
 #define OB_CUBE			5
 #define OB_EMPTY_SPHERE	6
 #define OB_EMPTY_CONE	7
+#define OB_EMPTY_IMAGE	8
 
 /* boundtype */
 #define OB_BOUND_BOX		0

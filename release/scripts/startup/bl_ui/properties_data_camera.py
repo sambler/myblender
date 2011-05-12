@@ -128,6 +128,7 @@ class DATA_PT_camera_display(CameraButtonsPanel, bpy.types.Panel):
         col.prop(cam, "show_title_safe", text="Title Safe")
         col.prop(cam, "show_grid", text="Grid")
         col.prop(cam, "show_name", text="Name")
+        col.prop_menu_enum(cam, "show_guide")
 
         col = split.column()
         col.prop(cam, "draw_size", text="Size")

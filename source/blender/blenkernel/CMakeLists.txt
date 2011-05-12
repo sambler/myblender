@@ -53,7 +53,7 @@ set(INC
 	../../../intern/opennl/extern
 	../../../intern/smoke/extern
 	../../../intern/mikktspace
-    ../../../source/blender/windowmanager # XXX - BAD LEVEL CALL WM_api.h
+	../../../source/blender/windowmanager # XXX - BAD LEVEL CALL WM_api.h
 	${GLEW_INCLUDE_PATH}
 	${ZLIB_INCLUDE_DIRS}
 )
@@ -92,7 +92,6 @@ set(SRC
 	intern/displist.c
 	intern/dynamicpaint.c
 	intern/effect.c
-	intern/exotic.c
 	intern/fcurve.c
 	intern/fluidsim.c
 	intern/fmodifier.c
@@ -178,7 +177,6 @@ set(SRC
 	BKE_displist.h
 	BKE_effect.h
 	BKE_endian.h
-	BKE_exotic.h
 	BKE_fcurve.h
 	BKE_fluidsim.h
 	BKE_font.h
@@ -323,7 +321,7 @@ if(WITH_FFTW3)
 endif()
 
 if(MSVC)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /WX")
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /WX")
 endif()
 
 

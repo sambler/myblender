@@ -124,10 +124,6 @@ static void init_render_texture(Render *re, Tex *tex)
 			}
 		}
 	}
-	else if(tex->type==TEX_OCEAN) {
-		if (!(re->r.scemode & R_PREVIEWBUTS))
-			BKE_simulate_ocean_fromtex(tex->ot);
-	}
 	
 	if(tex->nodetree && tex->use_nodes) {
 		ntreeBeginExecTree(tex->nodetree); /* has internal flag to detect it only does it once */
@@ -252,7 +248,7 @@ static int clouds(Tex *tex, float *texvec, TexResult *texres)
 	
 	texres->tin = BLI_gTurbulence(tex->noisesize, texvec[0], texvec[1], texvec[2], tex->noisedepth, (tex->noisetype!=TEX_NOISESOFT), tex->noisebasis);
 
-	if (0) { //texres->nor!=NULL) {
+	if (texres->nor!=NULL) {
 		// calculate bumpnormal
 		texres->nor[0] = BLI_gTurbulence(tex->noisesize, texvec[0] + tex->nabla, texvec[1], texvec[2], tex->noisedepth,  (tex->noisetype!=TEX_NOISESOFT), tex->noisebasis);
 		texres->nor[1] = BLI_gTurbulence(tex->noisesize, texvec[0], texvec[1] + tex->nabla, texvec[2], tex->noisedepth,  (tex->noisetype!=TEX_NOISESOFT), tex->noisebasis);
@@ -2230,7 +2226,7 @@ void do_material_tex(ShadeInput *shi)
 			use_compat_bump= (mtex->texflag & MTEX_COMPAT_BUMP);
 			use_ntap_bump= (mtex->texflag & (MTEX_3TAP_BUMP|MTEX_5TAP_BUMP));
 
-			/* XXX texture node trees and ocean don't work for this yet */
+			/* XXX texture node trees don't work for this yet */
 			if(tex->nodetree && tex->use_nodes) {
 				use_compat_bump = 0;
 				use_ntap_bump = 0;
@@ -2241,11 +2237,13 @@ void do_material_tex(ShadeInput *shi)
 				use_ntap_bump = 0;
 				use_compat_bump = 1;
 			}
-			if (tex->type == TEX_OCEAN) {
-				use_compat_bump = 0;
+			
+			/* case ocean */
+			if(tex->type == TEX_OCEAN) {
 				use_ntap_bump = 0;
- 			}
- 
+				use_compat_bump = 0;
+			}
+
 			/* which coords */
 			if(mtex->texco==TEXCO_ORCO) {
 				if(mtex->texflag & MTEX_DUPLI_MAPTO) {
@@ -2523,7 +2521,6 @@ void do_material_tex(ShadeInput *shi)
 					if ((tex->type==TEX_IMAGE) && (tex->imaflag & TEX_NORMALMAP)) {
 						/* qdn: for normalmaps, to invert the normalmap vector,
 						   it is better to negate x & y instead of subtracting the vector as was done before */
-						
 						if (norfac < 0.0f) {
 							texres.nor[0] = -texres.nor[0];
 							texres.nor[1] = -texres.nor[1];
@@ -2579,13 +2576,6 @@ void do_material_tex(ShadeInput *shi)
 						else {
 							float nor[3], dot;
 	
-							/* ocean normals in object space */
-							if (tex->type == TEX_OCEAN) {
-								if(shi->obr && shi->obr->ob)
-									mul_mat3_m4_v3(shi->obr->ob->obmat, texres.nor);
-								mul_mat3_m4_v3(R.viewmat, texres.nor);
-							}
-							
 							if(shi->mat->mode & MA_TANGENT_V) {
 								shi->tang[0]+= Tnor*norfac*texres.nor[0];
 								shi->tang[1]+= Tnor*norfac*texres.nor[1];

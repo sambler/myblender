@@ -146,7 +146,7 @@ class PHYSICS_PT_game_physics(PhysicsButtonsPanel, bpy.types.Panel):
             col = layout.column()
             col.prop(game, "use_actor")
             col.prop(game, "use_ghost")
-            col.prop(ob, "hide_render", text="Invisible", toggle=False)
+            col.prop(ob, "hide_render", text="Invisible")
 
             layout.separator()
 
@@ -165,8 +165,6 @@ class PHYSICS_PT_game_physics(PhysicsButtonsPanel, bpy.types.Panel):
 
         elif game.physics_type in {'SENSOR', 'INVISIBLE', 'NO_COLLISION', 'OCCLUDE'}:
             layout.prop(ob, "hide_render", text="Invisible")
-
-        layout.prop(game, "use_animation_recording")
 
 
 class PHYSICS_PT_game_collision_bounds(PhysicsButtonsPanel, bpy.types.Panel):

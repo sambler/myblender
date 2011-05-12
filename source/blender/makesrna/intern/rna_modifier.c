@@ -2521,7 +2521,7 @@ static void rna_def_modifier_ocean(BlenderRNA *brna)
 	RNA_def_property_int_sdna(prop, NULL, "resolution");
 	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 	RNA_def_property_range(prop, 1, 1024);
-	RNA_def_property_ui_range(prop, 1, 100, 1, 0);
+	RNA_def_property_ui_range(prop, 1, 32, 1, 0);
 	RNA_def_property_ui_text(prop, "Resolution", "Resolution of the generated surface");
 	RNA_def_property_update(prop, 0, "rna_OceanModifier_init_update");
 	

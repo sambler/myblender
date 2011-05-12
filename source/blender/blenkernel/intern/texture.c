@@ -76,9 +76,6 @@
 #include "BKE_animsys.h"
 #include "BKE_colortools.h"
 
-/* prototypes */
-void init_oceantex(struct OceanTex *oc);
-
 /* ------------------------------------------------------------------------- */
 
 /* All support for plugin textures: */
@@ -777,7 +774,6 @@ Tex *copy_texture(Tex *tex)
 	if(texn->env) texn->env= BKE_copy_envmap(texn->env);
 	if(texn->pd) texn->pd= BKE_copy_pointdensity(texn->pd);
 	if(texn->vd) texn->vd= MEM_dupallocN(texn->vd);
-	if(texn->ot) texn->ot= BKE_copy_oceantex(texn->ot);
 	if(tex->preview) texn->preview = BKE_previewimg_copy(tex->preview);
 
 	if(tex->nodetree) {
@@ -813,6 +809,9 @@ Tex *localize_texture(Tex *tex)
 		texn->vd= MEM_dupallocN(texn->vd);
 		if(texn->vd->dataset)
 			texn->vd->dataset= MEM_dupallocN(texn->vd->dataset);
+	}
+	if(texn->ot) {
+		texn->ot= BKE_copy_oceantex(tex->ot);
 	}
 	
 	texn->preview = NULL;
@@ -1419,6 +1418,7 @@ void BKE_free_pointdensity(PointDensity *pd)
 	MEM_freeN(pd);
 }
 
+/* ------------------------------------------------------------------------- */
 
 void BKE_free_voxeldatadata(struct VoxelData *vd)
 {
@@ -1463,6 +1463,7 @@ struct VoxelData *BKE_copy_voxeldata(struct VoxelData *vd)
 	return vdn;
 }
 
+/* ------------------------------------------------------------------------- */
 
 void BKE_init_ocean_fromtex(struct OceanTex *ot)
 {
@@ -1516,12 +1517,12 @@ void init_oceantex(OceanTex *ot)
 	ot->seed = 0;
 	ot->time = 1.0;
 	
-	//ot->flag |= TEX_OCN_GENERATE_NORMALS;
-	
+	/*
 	if (!ot->ocean) {
 		ot->ocean = BKE_add_ocean();
 		BKE_init_ocean_fromtex(ot);
 	}
+	 */
 	
 }
 
@@ -1531,8 +1532,10 @@ struct OceanTex *BKE_add_oceantex(void)
 	
 	ot= MEM_callocN(sizeof(struct OceanTex), "ocean texture");
 	
+	ot->ocean = NULL;
+	
 	init_oceantex(ot);
-	BKE_simulate_ocean_fromtex(ot);
+	//BKE_simulate_ocean_fromtex(ot);
 	
 	return ot;
 }
@@ -1543,9 +1546,11 @@ struct OceanTex *BKE_copy_oceantex(struct OceanTex *ot)
 	
 	otn= MEM_dupallocN(ot);
 	
-	otn->ocean = BKE_add_ocean();
-	BKE_init_ocean_fromtex(otn);
-	BKE_simulate_ocean_fromtex(otn);
+	otn->ocean = NULL;
+	
+	//otn->ocean = BKE_add_ocean();
+	//BKE_init_ocean_fromtex(otn);
+	//BKE_simulate_ocean_fromtex(otn);
 	
 	return otn;
 }

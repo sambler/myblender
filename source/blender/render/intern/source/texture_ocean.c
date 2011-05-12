@@ -101,6 +101,7 @@ int ocean_texture(Tex *tex, float *texvec, TexResult *texres)
 		}
 		
 	} else {
+		printf("ocean_tex ELSE\n");
 		if (!ot->ocean) return 0;
 		
 		normals = (ot->flag & TEX_OCN_GENERATE_NORMALS);
@@ -173,3 +174,4 @@ int ocean_texture(Tex *tex, float *texvec, TexResult *texres)
 	
 	return retval;
 }
+

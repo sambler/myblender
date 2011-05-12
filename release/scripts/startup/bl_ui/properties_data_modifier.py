@@ -411,6 +411,7 @@ class DATA_PT_modifiers(ModifierButtonsPanel, bpy.types.Panel):
         else:
             row.operator("object.multires_external_save", text="Save External...")
             row.label()
+
     def OCEAN(self, layout, ob, md):
         col = layout.column()
         

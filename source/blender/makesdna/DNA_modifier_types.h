@@ -788,7 +788,7 @@ typedef enum {
 
 typedef struct OceanModifierData {
 	ModifierData modifier;		
-
+	
 	struct Ocean *ocean;
 	struct OceanCache *oceancache;
 	
@@ -830,7 +830,6 @@ typedef struct OceanModifierData {
 	
 } OceanModifierData;
 
-
 #define MOD_OCEAN_GEOM_GENERATE	0
 #define MOD_OCEAN_GEOM_DISPLACE	1
 #define MOD_OCEAN_GEOM_SIM_ONLY	2
@@ -844,11 +843,7 @@ typedef struct OceanModifierData {
 #define MOD_OCEAN_GENERATE_FOAM	1
 #define MOD_OCEAN_GENERATE_NORMALS	2
 
-/* Dynamic paint modifier flags */
-#define MOD_DYNAMICPAINT_TYPE_CANVAS (1 << 0)
-#define MOD_DYNAMICPAINT_TYPE_PAINT (1 << 1)
-
-typedef struct DynamicPaintModifierData {
+typedef struct WarpModifierData {
 	ModifierData modifier;
 
 	struct DynamicPaintCanvasSettings *canvas;

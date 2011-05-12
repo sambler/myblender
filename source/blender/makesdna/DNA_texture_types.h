@@ -53,7 +53,6 @@ struct Image;
 struct PreviewImage;
 struct ImBuf;
 struct CurveMapping;
-struct Ocean;
 
 typedef struct MTex {
 

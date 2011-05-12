@@ -2930,7 +2930,7 @@ static void lib_link_texture(FileData *fd, Main *main)
 				tex->pd->object= newlibadr(fd, tex->id.lib, tex->pd->object);
 			if(tex->vd) tex->vd->object= newlibadr(fd, tex->id.lib, tex->vd->object);
 			if(tex->ot) tex->ot->object= newlibadr(fd, tex->id.lib, tex->ot->object);
-
+				
 			if(tex->nodetree)
 				lib_link_ntree(fd, &tex->id, tex->nodetree);
 			
@@ -4172,8 +4172,8 @@ static void direct_link_modifiers(FileData *fd, ListBase *lb)
 			omd->oceancache = NULL;
 			omd->ocean = NULL;
 			omd->refresh = (MOD_OCEAN_REFRESH_ADD|MOD_OCEAN_REFRESH_RESET|MOD_OCEAN_REFRESH_SIM);
-		}
 	}
+}
 }
 
 static void direct_link_object(FileData *fd, Object *ob)
@@ -11483,7 +11483,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 			}
 		}
 	}
-	
+
 	/* put compatibility code here until next subversion bump */
 	if (main->versionfile < 255 || (main->versionfile == 255 && main->subversionfile < 3)) {
 		Object *ob;

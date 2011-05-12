@@ -42,7 +42,7 @@
 #include <iostream>
 
 #ifdef FREE_WINDOWS
-#  define _WIN32_WINNT 0x0500 /* GetConsoleWindow() for MinGW */
+#  define WINVER 0x0501 /* GetConsoleWindow() for MinGW */
 #endif
 
 #include "GHOST_SystemWin32.h"
@@ -238,7 +238,7 @@ GHOST_IWindow* GHOST_SystemWin32::createWindow(
 	bool stereoVisual, const GHOST_TUns16 numOfAASamples, const GHOST_TEmbedderWindowID parentWindow )
 {
 	GHOST_Window* window = 0;
-	window = new GHOST_WindowWin32 (this, title, left, top, width, height, state, type, stereoVisual, numOfAASamples);
+	window = new GHOST_WindowWin32 (this, title, left, top, width, height, state, type, stereoVisual, numOfAASamples, parentWindow);
 	if (window) {
 		if (window->getValid()) {
 			// Store the pointer to the window
@@ -247,6 +247,14 @@ GHOST_IWindow* GHOST_SystemWin32::createWindow(
 //			}
 		}
 		else {
+
+			// Invalid parent window hwnd
+			if (((GHOST_WindowWin32*)window)->getNextWindow() == NULL) {
+				delete window;
+				window = 0;
+				return window;
+			}
+
 			// An invalid window could be one that was used to test for AA
 			window = ((GHOST_WindowWin32*)window)->getNextWindow();
 			
@@ -296,7 +304,6 @@ bool GHOST_SystemWin32::processEvents(bool waitForEvent)
 
 		// Process all the events waiting for us
 		while (::PeekMessage(&msg, 0, 0, 0, PM_REMOVE) != 0) {
-			::TranslateMessage(&msg);
 			::DispatchMessage(&msg);
 			anyProcessed = true;
 		}
@@ -811,6 +818,11 @@ LRESULT WINAPI GHOST_SystemWin32::s_wndProc(HWND hwnd, UINT msg, WPARAM wParam, 
 				// Keyboard events, processed
 				////////////////////////////////////////////////////////////////////////
 				case WM_INPUT:
+					// check WM_INPUT from input sink when ghost window is not in the foreground
+					if (wParam == RIM_INPUTSINK) {
+						if (GetFocus() != hwnd) // WM_INPUT message not for this window
+							return 0;
+					} //else wPAram == RIM_INPUT
 					event = processKeyEvent(window, wParam, lParam);
 					if (!event) {
 						GHOST_PRINT("GHOST_SystemWin32::wndProc: key event ")

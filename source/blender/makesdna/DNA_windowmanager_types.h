@@ -312,15 +312,8 @@ typedef struct wmOperator {
 #define OPERATOR_PASS_THROUGH	8
 /* in case operator got executed outside WM code... like via fileselect */
 #define OPERATOR_HANDLED		16
-#define OPERATOR_ABORT_MACRO	32
 
 /* wmOperator flag */
 #define OP_GRAB_POINTER			1
-
-typedef enum wmRadialControlMode {
-	WM_RADIALCONTROL_SIZE,
-	WM_RADIALCONTROL_STRENGTH,
-	WM_RADIALCONTROL_ANGLE
-} wmRadialControlMode;
 
 #endif /* DNA_WINDOWMANAGER_TYPES_H */

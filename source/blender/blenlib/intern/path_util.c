@@ -930,12 +930,12 @@ static int get_path_local(char *targetpath, const char *folder_name, const char 
 			config_from_local = 1;
 		return 1;
 	}
-	else if( inc_prev && BLI_strcasecmp(folder_name, "config")==0 /* we only go back for config */
+	else if( inc_prev && folder_name && BLI_strcasecmp(folder_name, "config")==0 /* we only go back for config */
 			&& test_path(targetpath, osxprogfolder, blender_prev_version_decimal(), relfolder) ) {
 			config_from_local = 1;
 		return 1;
 	}
-	else if (config_from_local && BLI_strcasecmp(folder_name, "config")==0) {
+	else if (config_from_local && folder_name && BLI_strcasecmp(folder_name, "config")==0) {
 		/* we started with a prev local config but we aren't looking for it now - give a non-existing current config path to save the config file into */
 		test_path(targetpath, osxprogfolder, blender_version_decimal(ver), relfolder);
 		return 1;
@@ -946,16 +946,16 @@ static int get_path_local(char *targetpath, const char *folder_name, const char 
 	/* try EXECUTABLE_DIR/2.5x/folder_name - new default directory for local blender installed files */
 	if(test_path(targetpath, bprogdir, blender_version_decimal(ver), relfolder)) {
 		/* vers folder in same location as blender only counts as local config if we are looking for the config dir */
-		if(BLI_strcasecmp(folder_name, "config")==0)
+		if(folder_name && BLI_strcasecmp(folder_name, "config")==0)
 			config_from_local = 1;
 		return 1;
 	}
-	else if( inc_prev && BLI_strcasecmp(folder_name, "config")==0 /* we only go back for config */
+	else if( inc_prev && folder_name && BLI_strcasecmp(folder_name, "config")==0 /* we only go back for config */
 			&& test_path(targetpath, bprogdir, blender_prev_version_decimal(), relfolder)) {
 		config_from_local = 1;
 		return 1;
 	}
-	else if (config_from_local && BLI_strcasecmp(folder_name, "config")==0) {
+	else if (config_from_local && folder_name && BLI_strcasecmp(folder_name, "config")==0) {
 		/* we started with a prev local config but we aren't looking for it now - give a non-existing current config path to save the config file into */
 		test_path(targetpath, bprogdir, blender_version_decimal(ver), relfolder);
 		return 1;

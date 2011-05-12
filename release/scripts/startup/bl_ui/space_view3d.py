@@ -177,6 +177,11 @@ class VIEW3D_MT_transform(bpy.types.Menu):
         layout.operator("object.origin_set", text="Origin to Geometry").type = 'ORIGIN_GEOMETRY'
         layout.operator("object.origin_set", text="Origin to 3D Cursor").type = 'ORIGIN_CURSOR'
 
+        layout.separator()
+
+        layout.operator("object.randomize_transform")
+        layout.operator("object.align")
+
 
 class VIEW3D_MT_mirror(bpy.types.Menu):
     bl_label = "Mirror"
@@ -846,10 +851,15 @@ class VIEW3D_MT_object_apply(bpy.types.Menu):
     def draw(self, context):
         layout = self.layout
 
-        layout.operator("object.location_apply", text="Location")
-        layout.operator("object.rotation_apply", text="Rotation")
-        layout.operator("object.scale_apply", text="Scale")
+        layout.operator("object.transform_apply", text="Location").location = True
+        layout.operator("object.transform_apply", text="Rotation").rotation = True
+        layout.operator("object.transform_apply", text="Scale").scale = True
+        props = layout.operator("object.transform_apply", text="Rotation & Scale")
+        props.scale = True
+        props.rotation = True
+
         layout.separator()
+
         layout.operator("object.visual_transform_apply", text="Visual Transform")
         layout.operator("object.duplicates_make_real")
 

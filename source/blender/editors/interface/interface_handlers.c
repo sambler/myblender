@@ -262,14 +262,12 @@ static int ui_is_a_warp_but(uiBut *but)
 static int ui_is_utf8_but(uiBut *but)
 {
 	if (but->rnaprop) {
-		int subtype= RNA_property_subtype(but->rnaprop);
-		
-		if(ELEM3(subtype, PROP_FILEPATH, PROP_DIRPATH, PROP_FILENAME)) {
-			return TRUE;
-		}
+		const int subtype= RNA_property_subtype(but->rnaprop);
+		return !(ELEM3(subtype, PROP_FILEPATH, PROP_DIRPATH, PROP_FILENAME));
 	}
-
-	return !(but->flag & UI_BUT_NO_UTF8);
+	else {
+		return !(but->flag & UI_BUT_NO_UTF8);
+	}
 }
 
 /* ********************** button apply/revert ************************/
@@ -1679,7 +1677,7 @@ static void ui_textedit_begin(bContext *C, uiBut *but, uiHandleButtonData *data)
 static void ui_textedit_end(bContext *C, uiBut *but, uiHandleButtonData *data)
 {
 	if(but) {
-		if(!ui_is_utf8_but(but)) {
+		if(ui_is_utf8_but(but)) {
 			int strip= BLI_utf8_invalid_strip(but->editstr, strlen(but->editstr));
 			/* not a file?, strip non utf-8 chars */
 			if(strip) {
@@ -2801,10 +2799,16 @@ static int ui_do_but_SLI(bContext *C, uiBlock *block, uiBut *but, uiHandleButton
 			
 			tempf= data->value;
 			temp= (int)data->value;
-			
-			/* XXX useles "if", same result for f, uh??? */
-			if(but->type==SLI) f= (float)(mx-but->x1)/(but->x2-but->x1);
-			else f= (float)(mx- but->x1)/(but->x2-but->x1);
+
+#if 0
+			if(but->type==SLI) {
+				f= (float)(mx-but->x1)/(but->x2-but->x1); /* same as below */
+			}
+			else
+#endif
+			{
+				f= (float)(mx- but->x1)/(but->x2-but->x1);
+			}
 			
 			f= softmin + f*softrange;
 			
@@ -4898,7 +4902,7 @@ static void button_activate_state(bContext *C, uiBut *but, uiHandleButtonState s
 		}
 		else {
 			if(button_modal_state(data->state))
-				WM_event_remove_ui_handler(&data->window->modalhandlers, ui_handler_region_menu, NULL, data);
+				WM_event_remove_ui_handler(&data->window->modalhandlers, ui_handler_region_menu, NULL, data, 1); /* 1 = postpone free */
 		}
 	}
 	
@@ -6154,7 +6158,7 @@ static void ui_handler_remove_popup(bContext *C, void *userdata)
 
 void UI_add_region_handlers(ListBase *handlers)
 {
-	WM_event_remove_ui_handler(handlers, ui_handler_region, ui_handler_remove_region, NULL);
+	WM_event_remove_ui_handler(handlers, ui_handler_region, ui_handler_remove_region, NULL, 0);
 	WM_event_add_ui_handler(NULL, handlers, ui_handler_region, ui_handler_remove_region, NULL);
 }
 
@@ -6165,7 +6169,7 @@ void UI_add_popup_handlers(bContext *C, ListBase *handlers, uiPopupBlockHandle *
 
 void UI_remove_popup_handlers(ListBase *handlers, uiPopupBlockHandle *popup)
 {
-	WM_event_remove_ui_handler(handlers, ui_handler_popup, ui_handler_remove_popup, popup);
+	WM_event_remove_ui_handler(handlers, ui_handler_popup, ui_handler_remove_popup, popup, 0);
 }
 
 

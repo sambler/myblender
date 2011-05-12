@@ -338,7 +338,7 @@ typedef struct PEData {
 	DerivedMesh *dm;
 	PTCacheEdit *edit;
 
-	short *mval;
+	const short *mval;
 	rcti *rect;
 	float rad;
 	float dist;
@@ -1369,7 +1369,7 @@ void PARTICLE_OT_select_all(wmOperatorType *ot)
 
 /************************ pick select operator ************************/
 
-int PE_mouse_particles(bContext *C, short *mval, int extend)
+int PE_mouse_particles(bContext *C, const short mval[2], int extend)
 {
 	PEData data;
 	Scene *scene= CTX_data_scene(C);
@@ -1574,7 +1574,7 @@ int PE_border_select(bContext *C, rcti *rect, int select, int extend)
 
 /************************ circle select operator ************************/
 
-int PE_circle_select(bContext *C, int selecting, short *mval, float rad)
+int PE_circle_select(bContext *C, int selecting, const short mval[2], float rad)
 {
 	Scene *scene= CTX_data_scene(C);
 	Object *ob= CTX_data_active_object(C);
@@ -2445,7 +2445,7 @@ static int weight_set_exec(bContext *C, wmOperator *op)
 	HairKey *hkey;
 	float weight;
 	ParticleBrushData *brush= &pset->brush[pset->brushtype];
-    float factor= RNA_float_get(op->ptr, "factor");
+	float factor= RNA_float_get(op->ptr, "factor");
 
 	weight= brush->strength;
 	edit= psys->edit;
@@ -2477,8 +2477,8 @@ void PARTICLE_OT_weight_set(wmOperatorType *ot)
 
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
-    
-    RNA_def_float(ot->srna, "factor", 1, 0, 1, "Factor", "", 0, 1);
+
+	RNA_def_float(ot->srna, "factor", 1, 0, 1, "Factor", "", 0, 1);
 }
 
 /************************ cursor drawing *******************************/
@@ -2519,80 +2519,6 @@ static void toggle_particle_cursor(bContext *C, int enable)
 	}
 	else if(enable)
 		pset->paintcursor= WM_paint_cursor_activate(CTX_wm_manager(C), PE_poll_view3d, brush_drawcursor, NULL);
-}
-
-/********************* radial control operator *********************/
-
-static int brush_radial_control_invoke(bContext *C, wmOperator *op, wmEvent *event)
-{
-	ParticleEditSettings *pset= PE_settings(CTX_data_scene(C));
-	ParticleBrushData *brush;
-	int mode = RNA_enum_get(op->ptr, "mode");
-	float original_value=1.0f;
-
-	if(pset->brushtype < 0)
-		return OPERATOR_CANCELLED;
-
-	brush= &pset->brush[pset->brushtype];
-
-	toggle_particle_cursor(C, 0);
-
-	if(mode == WM_RADIALCONTROL_SIZE)
-		original_value = brush->size;
-	else if(mode == WM_RADIALCONTROL_STRENGTH)
-		original_value = brush->strength;
-
-	RNA_float_set(op->ptr, "initial_value", original_value);
-
-	return WM_radial_control_invoke(C, op, event);
-}
-
-static int brush_radial_control_modal(bContext *C, wmOperator *op, wmEvent *event)
-{
-	int ret = WM_radial_control_modal(C, op, event);
-
-	if(ret != OPERATOR_RUNNING_MODAL)
-		toggle_particle_cursor(C, 1);
-
-	return ret;
-}
-
-static int brush_radial_control_exec(bContext *C, wmOperator *op)
-{
-	ParticleEditSettings *pset= PE_settings(CTX_data_scene(C));
-	ParticleBrushData *brush;
-	int mode = RNA_enum_get(op->ptr, "mode");
-	float new_value = RNA_float_get(op->ptr, "new_value");
-
-	if(pset->brushtype < 0)
-		return OPERATOR_CANCELLED;
-
-	brush= &pset->brush[pset->brushtype];
-
-	if(mode == WM_RADIALCONTROL_SIZE)
-		brush->size= new_value;
-	else if(mode == WM_RADIALCONTROL_STRENGTH)
-		brush->strength= new_value;
-
-	WM_event_add_notifier(C, NC_WINDOW, NULL);
-
-	return OPERATOR_FINISHED;
-}
-
-void PARTICLE_OT_brush_radial_control(wmOperatorType *ot)
-{
-	WM_OT_radial_control_partial(ot);
-
-	ot->name= "Brush Radial Control";
-	ot->idname= "PARTICLE_OT_brush_radial_control";
-
-	ot->invoke= brush_radial_control_invoke;
-	ot->modal= brush_radial_control_modal;
-	ot->exec= brush_radial_control_exec;
-	ot->poll= PE_poll;
-	
-	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO|OPTYPE_BLOCKING;
 }
 
 /*************************** delete operator **************************/

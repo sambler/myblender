@@ -440,6 +440,8 @@ static void image_undo_restore(bContext *C, ListBase *lb)
 		GPU_free_image(ima); /* force OpenGL reload */
 		if(ibuf->rect_float)
 			ibuf->userflags |= IB_RECT_INVALID; /* force recreate of char rect */
+		if(ibuf->mipmap[0])
+			ibuf->userflags |= IB_MIPMAP_INVALID; /* force mipmap recreatiom */
 
 	}
 
@@ -486,22 +488,22 @@ static int project_bucket_offset_safe(const ProjPaintState *ps, const float proj
 /* still use 2D X,Y space but this works for verts transformed by a perspective matrix, using their 4th component as a weight */
 static void barycentric_weights_v2_persp(float v1[4], float v2[4], float v3[4], float co[2], float w[3])
 {
-   float wtot_inv, wtot;
+	float wtot_inv, wtot;
 
-   w[0] = area_tri_signed_v2(v2, v3, co) / v1[3];
-   w[1] = area_tri_signed_v2(v3, v1, co) / v2[3];
-   w[2] = area_tri_signed_v2(v1, v2, co) / v3[3];
-   wtot = w[0]+w[1]+w[2];
+	w[0] = area_tri_signed_v2(v2, v3, co) / v1[3];
+	w[1] = area_tri_signed_v2(v3, v1, co) / v2[3];
+	w[2] = area_tri_signed_v2(v1, v2, co) / v3[3];
+	wtot = w[0]+w[1]+w[2];
 
-   if (wtot != 0.0f) {
-	   wtot_inv = 1.0f/wtot;
+	if (wtot != 0.0f) {
+		wtot_inv = 1.0f/wtot;
 
-	   w[0] = w[0]*wtot_inv;
-	   w[1] = w[1]*wtot_inv;
-	   w[2] = w[2]*wtot_inv;
-   }
-   else /* dummy values for zero area face */
-	   w[0] = w[1] = w[2] = 1.0f/3.0f;
+		w[0] = w[0]*wtot_inv;
+		w[1] = w[1]*wtot_inv;
+		w[2] = w[2]*wtot_inv;
+	}
+	else /* dummy values for zero area face */
+		w[0] = w[1] = w[2] = 1.0f/3.0f;
 }
 
 static float VecZDepthOrtho(float pt[2], float v1[3], float v2[3], float v3[3], float w[3])
@@ -1740,7 +1742,7 @@ static int project_bucket_isect_circle(const float cent[2], const float radius_s
 	 */
 	
 	if((bucket_bounds->xmin <= cent[0] && bucket_bounds->xmax >= cent[0]) || (bucket_bounds->ymin <= cent[1] && bucket_bounds->ymax >= cent[1]) ) {
-	   return 1;
+		return 1;
 	}
 	
 	/* out of bounds left */
@@ -2992,6 +2994,7 @@ static void project_paint_begin(ProjPaintState *ps)
 				invert_m4_m4(viewmat, viewinv);
 
 				/* camera winmat */
+				object_camera_mode(&ps->scene->r, camera);
 				object_camera_matrix(&ps->scene->r, camera, ps->winx, ps->winy, 0,
 						winmat, &_viewplane, &ps->clipsta, &ps->clipend,
 						&_lens, &_ycor, &_viewdx, &_viewdy);
@@ -5065,56 +5068,6 @@ void ED_space_image_paint_update(wmWindowManager *wm, ToolSettings *settings)
 	}
 }
 
-/* ************ image paint radial control *************/
-static int paint_radial_control_invoke(bContext *C, wmOperator *op, wmEvent *event)
-{
-	float zoom;
-	ToolSettings *ts = CTX_data_scene(C)->toolsettings;
-	get_imapaint_zoom(C, &zoom, &zoom);
-	toggle_paint_cursor(C, 0);
-	brush_radial_control_invoke(op, paint_brush(&ts->imapaint.paint), zoom);
-	return WM_radial_control_invoke(C, op, event);
-}
-
-static int paint_radial_control_modal(bContext *C, wmOperator *op, wmEvent *event)
-{
-	int ret = WM_radial_control_modal(C, op, event);
-	if(ret != OPERATOR_RUNNING_MODAL)
-		toggle_paint_cursor(C, 1);
-	return ret;
-}
-
-static int paint_radial_control_exec(bContext *C, wmOperator *op)
-{
-	Brush *brush = paint_brush(&CTX_data_scene(C)->toolsettings->imapaint.paint);
-	float zoom;
-	int ret;
-	char str[64];
-	get_imapaint_zoom(C, &zoom, &zoom);
-	ret = brush_radial_control_exec(op, brush, 1.0f / zoom);
-	WM_radial_control_string(op, str, sizeof(str));
-	
-	WM_event_add_notifier(C, NC_BRUSH|NA_EDITED, brush);
-
-	return ret;
-}
-
-void PAINT_OT_image_paint_radial_control(wmOperatorType *ot)
-{
-	WM_OT_radial_control_partial(ot);
-
-	ot->name= "Image Paint Radial Control";
-	ot->idname= "PAINT_OT_image_paint_radial_control";
-
-	ot->invoke= paint_radial_control_invoke;
-	ot->modal= paint_radial_control_modal;
-	ot->exec= paint_radial_control_exec;
-	ot->poll= image_paint_poll;
-	
-	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO|OPTYPE_BLOCKING;
-}
-
 /************************ grab clone operator ************************/
 
 typedef struct GrabClone {
@@ -5271,6 +5224,26 @@ static int sample_color_modal(bContext *C, wmOperator *op, wmEvent *event)
 	return OPERATOR_RUNNING_MODAL;
 }
 
+/* same as image_paint_poll but fail when face mask mode is enabled */
+static int image_paint_sample_color_poll(bContext *C)
+{
+	if(image_paint_poll(C)) {
+		if(CTX_wm_view3d(C)) {
+			Object *obact = CTX_data_active_object(C);
+			if (obact && obact->mode & OB_MODE_TEXTURE_PAINT) {
+				Mesh *me= get_mesh(obact);
+				if(me) {
+					return !(me->editflag & ME_EDIT_PAINT_MASK);
+				}
+			}
+		}
+
+		return 1;
+	}
+
+	return 0;
+}
+
 void PAINT_OT_sample_color(wmOperatorType *ot)
 {
 	/* identifiers */
@@ -5281,7 +5254,7 @@ void PAINT_OT_sample_color(wmOperatorType *ot)
 	ot->exec= sample_color_exec;
 	ot->invoke= sample_color_invoke;
 	ot->modal= sample_color_modal;
-	ot->poll= image_paint_poll;
+	ot->poll= image_paint_sample_color_poll;
 
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
@@ -5422,28 +5395,6 @@ void PAINT_OT_texture_paint_toggle(wmOperatorType *ot)
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 }
 
-/************* texture paint radial control *************/
-
-static int texture_paint_radial_control_invoke(bContext *C, wmOperator *op, wmEvent *event)
-{
-	ToolSettings *ts = CTX_data_scene(C)->toolsettings;
-	toggle_paint_cursor(C, !ts->imapaint.paintcursor);
-	brush_radial_control_invoke(op, paint_brush(&ts->imapaint.paint), 1);
-	return WM_radial_control_invoke(C, op, event);
-}
-
-static int texture_paint_radial_control_exec(bContext *C, wmOperator *op)
-{
-	Brush *brush = paint_brush(&CTX_data_scene(C)->toolsettings->imapaint.paint);
-	int ret = brush_radial_control_exec(op, brush, 1);
-	char str[64];
-	WM_radial_control_string(op, str, sizeof(str));
-
-	WM_event_add_notifier(C, NC_BRUSH|NA_EDITED, brush);
-
-	return ret;
-}
-
 static int texture_paint_poll(bContext *C)
 {
 	if(texture_paint_toggle_poll(C))
@@ -5457,23 +5408,6 @@ int image_texture_paint_poll(bContext *C)
 {
 	return (texture_paint_poll(C) || image_paint_poll(C));
 }
-
-void PAINT_OT_texture_paint_radial_control(wmOperatorType *ot)
-{
-	WM_OT_radial_control_partial(ot);
-
-	ot->name= "Texture Paint Radial Control";
-	ot->idname= "PAINT_OT_texture_paint_radial_control";
-
-	ot->invoke= texture_paint_radial_control_invoke;
-	ot->modal= paint_radial_control_modal;
-	ot->exec= texture_paint_radial_control_exec;
-	ot->poll= texture_paint_poll;
-	
-	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO|OPTYPE_BLOCKING;
-}
-
 
 int facemask_paint_poll(bContext *C)
 {

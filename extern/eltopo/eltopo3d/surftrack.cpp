@@ -300,9 +300,9 @@ void SurfTrack::render( unsigned int options )
       
       glEnable(GL_LIGHTING);
       glShadeModel(GL_SMOOTH);
-      Gluvi::set_generic_lights();
-      Gluvi::set_generic_material(1.0f, 1.0f, 1.0f, GL_FRONT);   // exterior surface colour
-      Gluvi::set_generic_material(1.0f, 1.0f, 1.0f, GL_BACK);
+      //Gluvi::set_generic_lights();
+      //Gluvi::set_generic_material(1.0f, 1.0f, 1.0f, GL_FRONT);   // exterior surface colour
+      //Gluvi::set_generic_material(1.0f, 1.0f, 1.0f, GL_BACK);
       
       if ( options & NO_SHADING )
       {

@@ -170,8 +170,16 @@ static ParamHandle *construct_param_handle(Scene *scene, EditMesh *em, short imp
 		float *uv[4];
 		int nverts;
 		
-		if((efa->h) || (sel && (efa->f & SELECT)==0)) 
-			continue;
+		if(scene->toolsettings->uv_flag & UV_SYNC_SELECTION) {
+			if(efa->h) {
+				continue;
+			}
+		}
+		else {
+			if((efa->h) || (sel && (efa->f & SELECT)==0)) {
+				continue;
+			}
+		}
 
 		tf= (MTFace *)CustomData_em_get(&em->fdata, efa->data, CD_MTFACE);
 		
@@ -629,7 +637,7 @@ static void uv_map_rotation_matrix(float result[][4], RegionView3D *rv3d, Object
 	rotside[1][0]= (float)sin(sideangle);
 	rotside[1][1]= (float)cos(sideangle);
 	rotside[2][2]= 1.0f;
-      
+
 	upangle= (float)M_PI*upangledeg/180.0f;
 	rotup[1][1]= (float)cos(upangle)/radius;
 	rotup[1][2]= -(float)sin(upangle)/radius;

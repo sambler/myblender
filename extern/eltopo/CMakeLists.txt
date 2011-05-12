@@ -20,7 +20,7 @@
 #
 # The Original Code is: all of this file.
 #
-# Contributor(s): Jacques Beaurai
+# Contributor(s): Jacques Beaurai, Erwin Coumans
 #
 # ***** END GPL LICENSE BLOCK *****
 
@@ -117,7 +117,7 @@ set(SRC
 	eltopo3d/options.h
 	eltopo3d/subdivisionscheme.h
 	eltopo3d/surftrack.h
-)
+	)
 
 add_definitions(-DNOGUI)
 add_definitions(-DUSE_FORTRAN_BLAS)

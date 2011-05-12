@@ -45,12 +45,6 @@
 #include "py_capi_utils.h"
 #endif
 
-PyObject *		PyC_UnicodeFromByte(const char *str);
-const char *	PyC_UnicodeAsByte(PyObject *py_str, PyObject **coerce); /* coerce must be NULL */
-
-/*** Function to wrap ID properties ***/
-PyObject *BPy_Wrap_IDProperty(ID *id, IDProperty *prop, IDProperty *parent);
-
 extern PyTypeObject IDArray_Type;
 extern PyTypeObject IDGroup_Iter_Type;
 
@@ -513,15 +507,15 @@ static PyObject *BPy_IDGroup_MapDataToPy(IDProperty *prop)
 			for (i=0; i<prop->len; i++) {
 				if (prop->subtype == IDP_FLOAT) {
 					PyList_SET_ITEM(seq, i,
-						PyFloat_FromDouble(((float*)prop->data.pointer)[i]));
+							PyFloat_FromDouble(((float*)prop->data.pointer)[i]));
 				}
 				else if (prop->subtype == IDP_DOUBLE) {
 					PyList_SET_ITEM(seq, i,
-						PyFloat_FromDouble(((double*)prop->data.pointer)[i]));
+							PyFloat_FromDouble(((double*)prop->data.pointer)[i]));
 				}
 				else 	{
 					PyList_SET_ITEM(seq, i,
-						  PyLong_FromLong(((int*)prop->data.pointer)[i]));
+							PyLong_FromLong(((int*)prop->data.pointer)[i]));
 				}
 			}
 			return seq;
@@ -588,7 +582,7 @@ static PyObject *BPy_IDGroup_Pop(BPy_IDProperty *self, PyObject *value)
 			/*ok something bad happened with the pyobject,
 			  so don't remove the prop from the group.  if pyform is
 			  NULL, then it already should have raised an exception.*/
-			  return NULL;
+			return NULL;
 		}
 
 		IDP_RemFromGroup(self->prop, idprop);

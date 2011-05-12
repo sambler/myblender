@@ -180,14 +180,20 @@ void free_brush(Brush *brush)
 	curvemapping_free(brush->curve);
 }
 
+static void extern_local_brush(Brush *brush)
+{
+	id_lib_extern((ID *)brush->mtex.tex);
+}
+
 void make_local_brush(Brush *brush)
 {
+
 	/* - only lib users: do nothing
-		* - only local users: set flag
-		* - mixed: make copy
-		*/
-	
-	Brush *brushn;
+	 * - only local users: set flag
+	 * - mixed: make copy
+	 */
+
+	Main *bmain= G.main;
 	Scene *scene;
 	int local= 0, lib= 0;
 
@@ -197,19 +203,22 @@ void make_local_brush(Brush *brush)
 		/* special case: ima always local immediately */
 		brush->clone.image->id.lib= NULL;
 		brush->clone.image->id.flag= LIB_LOCAL;
-		new_id(NULL, (ID *)brush->clone.image, NULL);
+		new_id(&bmain->brush, (ID *)brush->clone.image, NULL);
+		extern_local_brush(brush);
 	}
 
-	for(scene= G.main->scene.first; scene; scene=scene->id.next)
+	for(scene= bmain->scene.first; scene && ELEM(0, lib, local); scene=scene->id.next) {
 		if(paint_brush(&scene->toolsettings->imapaint.paint)==brush) {
 			if(scene->id.lib) lib= 1;
 			else local= 1;
 		}
+	}
 
 	if(local && lib==0) {
 		brush->id.lib= NULL;
 		brush->id.flag= LIB_LOCAL;
-		new_id(NULL, (ID *)brush, NULL);
+		new_id(&bmain->brush, (ID *)brush, NULL);
+		extern_local_brush(brush);
 
 		/* enable fake user by default */
 		if (!(brush->id.flag & LIB_FAKEUSER)) {
@@ -218,17 +227,19 @@ void make_local_brush(Brush *brush)
 		}
 	}
 	else if(local && lib) {
-		brushn= copy_brush(brush);
+		Brush *brushn= copy_brush(brush);
 		brushn->id.us= 1; /* only keep fake user */
 		brushn->id.flag |= LIB_FAKEUSER;
 		
-		for(scene= G.main->scene.first; scene; scene=scene->id.next)
-			if(paint_brush(&scene->toolsettings->imapaint.paint)==brush)
+		for(scene= bmain->scene.first; scene; scene=scene->id.next) {
+			if(paint_brush(&scene->toolsettings->imapaint.paint)==brush) {
 				if(scene->id.lib==NULL) {
 					paint_brush_set(&scene->toolsettings->imapaint.paint, brushn);
 					brushn->id.us++;
 					brush->id.us--;
 				}
+			}
+		}
 	}
 }
 
@@ -413,13 +424,6 @@ void brush_curve_preset(Brush *b, /*CurveMappingPreset*/int preset)
 	b->curve->preset = preset;
 	curvemap_reset(cm, &b->curve->clipr, b->curve->preset, CURVEMAP_SLOPE_NEGATIVE);
 	curvemapping_changed(b->curve, 0);
-}
-
-static MTex *brush_active_texture(Brush *brush)
-{
-	if(brush)
-		return &brush->mtex;
-	return NULL;
 }
 
 int brush_texture_set_nr(Brush *brush, int nr)
@@ -1119,12 +1123,12 @@ float brush_curve_strength_clamp(Brush *br, float p, const float len)
  * used for sculpt only */
 float brush_curve_strength(Brush *br, float p, const float len)
 {
-    if(p >= len)
-        p= 1.0f;
-    else
-        p= p/len;
+	if(p >= len)
+		p= 1.0f;
+	else
+		p= p/len;
 
-    return curvemapping_evaluateF(br->curve, 0, p);
+	return curvemapping_evaluateF(br->curve, 0, p);
 }
 
 /* TODO: should probably be unified with BrushPainter stuff? */
@@ -1174,7 +1178,7 @@ unsigned int *brush_gen_texture_cache(Brush *br, int half_side)
 }
 
 /**** Radial Control ****/
-static struct ImBuf *brush_gen_radial_control_imbuf(Brush *br)
+struct ImBuf *brush_gen_radial_control_imbuf(Brush *br)
 {
 	ImBuf *im = MEM_callocN(sizeof(ImBuf), "radial control texture");
 	unsigned int *texcache;
@@ -1206,50 +1210,6 @@ static struct ImBuf *brush_gen_radial_control_imbuf(Brush *br)
 	}
 
 	return im;
-}
-
-void brush_radial_control_invoke(wmOperator *op, Brush *br, float size_weight)
-{
-	int mode = RNA_enum_get(op->ptr, "mode");
-	float original_value= 0;
-
-	if(mode == WM_RADIALCONTROL_SIZE)
-		original_value = brush_size(br) * size_weight;
-	else if(mode == WM_RADIALCONTROL_STRENGTH)
-		original_value = brush_alpha(br);
-	else if(mode == WM_RADIALCONTROL_ANGLE) {
-		MTex *mtex = brush_active_texture(br);
-		if(mtex)
-			original_value = mtex->rot;
-	}
-
-	RNA_float_set(op->ptr, "initial_value", original_value);
-	op->customdata = brush_gen_radial_control_imbuf(br);
-}
-
-int brush_radial_control_exec(wmOperator *op, Brush *br, float size_weight)
-{
-	int mode = RNA_enum_get(op->ptr, "mode");
-	float new_value = RNA_float_get(op->ptr, "new_value");
-	const float conv = 0.017453293;
-
-	if(mode == WM_RADIALCONTROL_SIZE)
-		if (brush_use_locked_size(br)) {
-			float initial_value = RNA_float_get(op->ptr, "initial_value");
-			const float unprojected_radius = brush_unprojected_radius(br);
-			brush_set_unprojected_radius(br, unprojected_radius * new_value/initial_value * size_weight);
-		}
-		else
-			brush_set_size(br, new_value * size_weight);
-	else if(mode == WM_RADIALCONTROL_STRENGTH)
-		brush_set_alpha(br, new_value);
-	else if(mode == WM_RADIALCONTROL_ANGLE) {
-		MTex *mtex = brush_active_texture(br);
-		if(mtex)
-			mtex->rot = new_value * conv;
-	}
-
-	return OPERATOR_FINISHED;
 }
 
 /* Unified Size and Strength */

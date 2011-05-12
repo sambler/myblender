@@ -52,6 +52,9 @@
 #ifndef RID_INPUT
 #define RID_INPUT 0x10000003
 #endif
+#ifndef RIM_INPUTSINK
+#define RIM_INPUTSINK 0x1
+#endif
 #ifndef RI_KEY_BREAK
 #define RI_KEY_BREAK 0x1
 #endif
@@ -127,8 +130,6 @@ DECLARE_HANDLE(HRAWINPUT);
 #ifdef FREE_WINDOWS
 #define NEED_RAW_PROC
 typedef BOOL (WINAPI * LPFNDLLRRID)(RAWINPUTDEVICE*,UINT, UINT);
-#define RegisterRawInputDevices(pRawInputDevices, uiNumDevices, cbSize) ((pRegisterRawInputDevices)?pRegisterRawInputDevices(pRawInputDevices, uiNumDevices, cbSize):0)
-
 
 typedef UINT (WINAPI * LPFNDLLGRID)(HRAWINPUT, UINT, LPVOID, PUINT, UINT);
 #define GetRawInputData(hRawInput, uiCommand, pData, pcbSize, cbSizeHeader) ((pGetRawInputData)?pGetRawInputData(hRawInput, uiCommand, pData, pcbSize, cbSizeHeader):(UINT)-1)
@@ -415,6 +416,17 @@ protected:
 	 * Initiates WM_INPUT messages from keyboard 
 	 */
 	GHOST_TInt32 initKeyboardRawInput(void);
+
+	/**
+ * Toggles console
+ * @action	0 - Hides
+ *			1 - Shows
+ *			2 - Toggles
+ *			3 - Hides if it runs not from  command line
+ *			* - Does nothing
+ * @return current status (1 -visible, 0 - hidden)
+ */
+	int toggleConsole(int action);
 	
 	/** The current state of the modifier keys. */
 	GHOST_ModifierKeys m_modifierKeys;
@@ -430,6 +442,9 @@ protected:
 	WORD m_langId;
 	/** stores keyboard layout. */
 	HKL m_keylayout;
+
+	/** Console status */
+	int m_consoleStatus;
 
 	/** handle for user32.dll*/
 	HMODULE user32;
@@ -471,6 +486,5 @@ inline void GHOST_SystemWin32::handleKeyboardChange(void)
 		}
 	}
 }
-
 #endif // _GHOST_SYSTEM_WIN32_H_
 

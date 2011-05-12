@@ -101,7 +101,9 @@ EnumPropertyItem snap_element_items[] = {
 EnumPropertyItem image_type_items[] = {
 	{0, "", 0, "Image", NULL},
 	{R_BMP, "BMP", ICON_FILE_IMAGE, "BMP", ""},
-	//{R_DDS, "DDS", ICON_FILE_IMAGE, "DDS", ""}, // XXX not yet implemented
+#ifdef WITH_DDS
+	{R_DDS, "DDS", ICON_FILE_IMAGE, "DDS", ""},
+#endif
 	{R_IRIS, "IRIS", ICON_FILE_IMAGE, "Iris", ""},
 	{R_PNG, "PNG", ICON_FILE_IMAGE, "PNG", ""},
 	{R_JPEG90, "JPEG", ICON_FILE_IMAGE, "JPEG", ""},
@@ -313,7 +315,7 @@ static void rna_Scene_layer_set(PointerRNA *ptr, const int *values)
 	scene->lay= ED_view3d_scene_layer_set(scene->lay, values, &scene->layact);
 }
 
-static void rna_Scene_view3d_update(Main *bmain, Scene *unused, PointerRNA *ptr)
+static void rna_Scene_view3d_update(Main *bmain, Scene *UNUSED(scene_unused), PointerRNA *ptr)
 {
 	Scene *scene= (Scene*)ptr->data;
 
@@ -740,14 +742,14 @@ static int rna_RenderSettings_engine_get(PointerRNA *ptr)
 	return 0;
 }
 
-static void rna_Scene_glsl_update(Main *bmain, Scene *unused, PointerRNA *ptr)
+static void rna_Scene_glsl_update(Main *bmain, Scene *UNUSED(scene_unused), PointerRNA *ptr)
 {
 	Scene *scene= (Scene*)ptr->id.data;
 
 	DAG_id_tag_update(&scene->id, 0);
 }
 
-static void rna_RenderSettings_color_management_update(Main *bmain, Scene *unused, PointerRNA *ptr)
+static void rna_RenderSettings_color_management_update(Main *bmain, Scene *UNUSED(scene_unused), PointerRNA *ptr)
 {
 	/* reset image nodes */
 	Scene *scene= (Scene*)ptr->id.data;
@@ -769,7 +771,7 @@ static void rna_RenderSettings_color_management_update(Main *bmain, Scene *unuse
 		}
 	}
 
-	rna_Scene_glsl_update(bmain, unused, ptr);
+	rna_Scene_glsl_update(bmain, scene, ptr);
 }
 
 static void rna_SceneRenderLayer_name_set(PointerRNA *ptr, const char *value)
@@ -815,7 +817,7 @@ static void rna_SceneRenderLayer_layer_set(PointerRNA *ptr, const int *values)
 	rl->lay= ED_view3d_scene_layer_set(rl->lay, values, NULL);
 }
 
-static void rna_SceneRenderLayer_pass_update(Main *bmain, Scene *unused, PointerRNA *ptr)
+static void rna_SceneRenderLayer_pass_update(Main *bmain, Scene *UNUSED(scene_unused), PointerRNA *ptr)
 {
 	Scene *scene= (Scene*)ptr->id.data;
 
@@ -832,7 +834,7 @@ static void rna_Scene_use_nodes_set(PointerRNA *ptr, int value)
 		ED_node_composit_default(scene);
 }
 
-static void rna_Physics_update(Main *bmain, Scene *unused, PointerRNA *ptr)
+static void rna_Physics_update(Main *bmain, Scene *UNUSED(scene_unused), PointerRNA *ptr)
 {
 	Scene *scene= (Scene*)ptr->id.data;
 	Base *base;
@@ -1786,7 +1788,8 @@ static void rna_def_scene_game_data(BlenderRNA *brna)
 
 	prop= RNA_def_property(srna, "physics_gravity", PROP_FLOAT, PROP_ACCELERATION);
 	RNA_def_property_float_sdna(prop, NULL, "gravity");
-	RNA_def_property_range(prop, 0.0, 25.0);
+	RNA_def_property_ui_range(prop, 0.0, 25.0, 1, 2);
+	RNA_def_property_range(prop, 0.0, 10000.0);
 	RNA_def_property_ui_text(prop, "Physics Gravity", "Gravitational constant used for physics simulation in the game engine");
 	RNA_def_property_update(prop, NC_SCENE, NULL);
 
@@ -1907,6 +1910,11 @@ static void rna_def_scene_game_data(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "use_glsl_nodes", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_negative_sdna(prop, NULL, "flag", GAME_GLSL_NO_NODES);
 	RNA_def_property_ui_text(prop, "GLSL Nodes", "Use nodes for GLSL rendering");
+	RNA_def_property_update(prop, NC_SCENE|NA_EDITED, "rna_Scene_glsl_update");
+
+	prop= RNA_def_property(srna, "use_glsl_color_management", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_negative_sdna(prop, NULL, "flag", GAME_GLSL_NO_COLOR_MANAGEMENT);
+	RNA_def_property_ui_text(prop, "GLSL Color Management", "Use color management for GLSL rendering");
 	RNA_def_property_update(prop, NC_SCENE|NA_EDITED, "rna_Scene_glsl_update");
 
 	prop= RNA_def_property(srna, "use_glsl_extra_textures", PROP_BOOLEAN, PROP_NONE);
@@ -3201,6 +3209,7 @@ void RNA_def_scene(BlenderRNA *brna)
 
 	/* Layers */
 	prop= RNA_def_property(srna, "layers", PROP_BOOLEAN, PROP_LAYER_MEMBER);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE); // this seems to be too much trouble with depsgraph updates/etc. currently (20110420)
 	RNA_def_property_boolean_sdna(prop, NULL, "lay", 1);
 	RNA_def_property_array(prop, 20);
 	RNA_def_property_boolean_funcs(prop, NULL, "rna_Scene_layer_set");

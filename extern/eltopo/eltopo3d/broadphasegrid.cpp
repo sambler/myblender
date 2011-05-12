@@ -117,7 +117,8 @@ void BroadPhaseGrid::update_broad_phase_static( const DynamicSurface& surface )
       {
          surface.edge_static_bounds(i, edge_xmins[i], edge_xmaxs[i]);
       }      
-      build_acceleration_grid( m_edge_grid, edge_xmins, edge_xmaxs, grid_scale, surface.m_proximity_epsilon );
+      if (num_edges)
+		  build_acceleration_grid( m_edge_grid, edge_xmins, edge_xmaxs, grid_scale, surface.m_proximity_epsilon );
    }
    
    {
@@ -126,8 +127,10 @@ void BroadPhaseGrid::update_broad_phase_static( const DynamicSurface& surface )
       for(unsigned int i = 0; i < num_triangles; i++)
       {
          surface.triangle_static_bounds(i, tri_xmins[i], tri_xmaxs[i]);
-      }      
-      build_acceleration_grid( m_triangle_grid, tri_xmins, tri_xmaxs, grid_scale, surface.m_proximity_epsilon );  
+      }   
+	  
+      if (num_triangles)
+		  build_acceleration_grid( m_triangle_grid, tri_xmins, tri_xmaxs, grid_scale, surface.m_proximity_epsilon );  
    }
    
 }
@@ -161,7 +164,8 @@ void BroadPhaseGrid::update_broad_phase_continuous( const DynamicSurface& surfac
       {
          surface.edge_continuous_bounds(i, edge_xmins[i], edge_xmaxs[i]);
       }
-      build_acceleration_grid( m_edge_grid, edge_xmins, edge_xmaxs, grid_scale, surface.m_proximity_epsilon );
+      if (num_edges)
+		  build_acceleration_grid( m_edge_grid, edge_xmins, edge_xmaxs, grid_scale, surface.m_proximity_epsilon );
    }
    
    {
@@ -171,7 +175,8 @@ void BroadPhaseGrid::update_broad_phase_continuous( const DynamicSurface& surfac
       {            
          surface.triangle_continuous_bounds(i, tri_xmins[i], tri_xmaxs[i]);
       }
-      build_acceleration_grid( m_triangle_grid, tri_xmins, tri_xmaxs, grid_scale, surface.m_proximity_epsilon );  
+      if (num_triangles)
+		  build_acceleration_grid( m_triangle_grid, tri_xmins, tri_xmaxs, grid_scale, surface.m_proximity_epsilon );  
    }
    
 }

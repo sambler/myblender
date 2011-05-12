@@ -702,7 +702,7 @@ void find_coplanarity_times(const Vec3d &x0, const Vec3d &x1, const Vec3d &x2, c
          // start off with secant approximation (in case the cubic is actually linear)
          double alpha=vhi/(vhi-vlo);
          tmid=alpha*tlo+(1-alpha)*thi;
-         for(int iteration=0; iteration<50; ++iteration){
+         for(int iteration=0; iteration<75; ++iteration){
             vmid=signed_volume((1-tmid)*x0+tmid*xnew0, (1-tmid)*x1+tmid*xnew1,
                                (1-tmid)*x2+tmid*xnew2, (1-tmid)*x3+tmid*xnew3);
             if(std::fabs(vmid)<1e-2*convergence_tol) break;

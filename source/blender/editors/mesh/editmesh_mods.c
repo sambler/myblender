@@ -140,14 +140,13 @@ void EM_automerge(Scene *scene, Object *obedit, int update)
 	int len;
 
 	if ((scene->toolsettings->automerge) &&
-		(obedit && obedit->type==OB_MESH && (obedit->mode & OB_MODE_EDIT)) &&
-		(me->mr==NULL)
+		(obedit && obedit->type==OB_MESH && (obedit->mode & OB_MODE_EDIT))
 	  ) {
 		EditMesh *em= me->edit_mesh;
+		int totvert= em->totvert, totedge= em->totedge, totface= em->totface;
 
 		len = removedoublesflag(em, 1, 1, scene->toolsettings->doublimit);
-		if (len) {
-			em->totvert -= len; /* saves doing a countall */
+		if (totvert != em->totvert || totedge != em->totedge || totface != em->totface) {
 			if (update) {
 				DAG_id_tag_update(&me->id, 0);
 			}
@@ -1827,6 +1826,20 @@ static int edge_not_in_tagged_face(EditMesh *em, EditEdge *eed)
 	return 1;
 }
 
+static void ensure_ed_vert_sel(EditMesh *em)
+{
+	EditEdge *eed;
+
+	/* EM_selectmode_flush() doesnt take into account that deselected edges
+	 * may be still connected to selected edges [#26885] */
+	for(eed= em->edges.first; eed; eed= eed->next) {
+		if(eed->f & SELECT) {
+			eed->v1->f |= SELECT;
+			eed->v2->f |= SELECT;
+		}
+	}
+}
+
 /* selects or deselects edges that:
 - if edges has 2 faces:
 	- has vertices with valence of 4
@@ -1899,6 +1912,10 @@ static void edgeloop_select(EditMesh *em, EditEdge *starteed, int select)
 	for(eed= em->edges.first; eed; eed= eed->next) {
 		if(eed->f2) EM_select_edge(eed, select);
 	}
+
+	if(select == FALSE && !(em->selectmode & SCE_SELECT_VERTEX)) { /* only when not in vert sel [#26931] */
+		ensure_ed_vert_sel(em);
+	}
 }
 
 /* 
@@ -1967,6 +1984,10 @@ static void edgering_select(EditMesh *em, EditEdge *startedge, int select)
 	/* (de)select the edges */
 	for(eed= em->edges.first; eed; eed= eed->next) {
 			if(eed->f2) EM_select_edge(eed, select);
+	}
+
+	if(select == FALSE && !(em->selectmode & SCE_SELECT_VERTEX)) { /* only when not in vert sel [#26931] */
+		ensure_ed_vert_sel(em);
 	}
 }
 
@@ -2040,7 +2061,7 @@ void MESH_OT_loop_multi_select(wmOperatorType *ot)
 
 /* ***************** loop select (non modal) ************** */
 
-static void mouse_mesh_loop(bContext *C, short mval[2], short extend, short ring)
+static void mouse_mesh_loop(bContext *C, const short mval[2], short extend, short ring)
 {
 	ViewContext vc;
 	EditMesh *em;
@@ -2128,7 +2149,7 @@ void MESH_OT_loop_select(wmOperatorType *ot)
 /* ******************* mesh shortest path select, uses prev-selected edge ****************** */
 
 /* since you want to create paths with multiple selects, it doesn't have extend option */
-static void mouse_mesh_shortest_path(bContext *C, short mval[2])
+static void mouse_mesh_shortest_path(bContext *C, const short mval[2])
 {
 	ViewContext vc;
 	EditMesh *em;
@@ -2261,7 +2282,7 @@ void MESH_OT_select_shortest_path(wmOperatorType *ot)
 
 /* here actual select happens */
 /* gets called via generic mouse select operator */
-int mouse_mesh(bContext *C, short mval[2], short extend)
+int mouse_mesh(bContext *C, const short mval[2], short extend)
 {
 	ViewContext vc;
 	EditVert *eve;
@@ -2430,7 +2451,7 @@ static int select_linked_limited_invoke(ViewContext *vc, short all, short sel)
 	if (!change)
 		return OPERATOR_CANCELLED;
 	
-	if (!sel) /* make sure de-selecting faces didnt de-select the verts/edges connected to selected faces, this is common with boundries */
+	if (!sel) /* make sure de-selecting faces didnt de-select the verts/edges connected to selected faces, this is common with boundaries */
 		for(efa= em->faces.first; efa; efa= efa->next)
 			if (efa->f & SELECT)
 				EM_select_face(efa, 1);
@@ -2560,7 +2581,7 @@ void MESH_OT_select_linked_pick(wmOperatorType *ot)
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 	
 	RNA_def_boolean(ot->srna, "deselect", 0, "Deselect", "");
-	RNA_def_boolean(ot->srna, "limit", 0, "Limit by Seams", "Limit selection by seam boundries (faces only)");
+	RNA_def_boolean(ot->srna, "limit", 0, "Limit by Seams", "Limit selection by seam boundaries (faces only)");
 }
 
 
@@ -2649,7 +2670,7 @@ void MESH_OT_select_linked(wmOperatorType *ot)
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 	
-	RNA_def_boolean(ot->srna, "limit", 0, "Limit by Seams", "Limit selection by seam boundries (faces only)");
+	RNA_def_boolean(ot->srna, "limit", 0, "Limit by Seams", "Limit selection by seam boundaries (faces only)");
 }
 
 

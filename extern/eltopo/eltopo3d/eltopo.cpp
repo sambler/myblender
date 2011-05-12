@@ -133,7 +133,7 @@ void el_topo_free_static_operations_results( double* out_vertex_locations, int* 
 ///
 // ---------------------------------------------------------
 
-void el_topo_integrate( const int num_vertices, 
+extern "C" void el_topo_integrate( const int num_vertices, 
                         const double *in_vertex_locations, 
                         const double *in_vertex_new_locations, 
                         const int num_triangles, 

@@ -60,6 +60,9 @@ int eltopo_line_line_moving_isect_v3v3_f(float v1[2][3], int i1, float v2[2][3],
 									  float normal[3], float bary[3], float *t, float *relnor);
 
 
+void eltopo_start_memarena(void);
+void eltopo_end_memarena(void);
+
 #ifdef _cplusplus
 }
 #endif

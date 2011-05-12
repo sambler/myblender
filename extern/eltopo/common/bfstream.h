@@ -16,7 +16,6 @@
 #define __LITTLE_ENDIAN__
 #endif
 
-
 #ifdef __BIG_ENDIAN__
 #ifdef __LITTLE_ENDIAN__
 #error Cannot be both big and little endian

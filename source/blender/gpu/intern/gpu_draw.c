@@ -76,6 +76,8 @@
 
 #include "smoke_API.h"
 
+extern Material defmaterial; /* from material.c */
+
 /* These are some obscure rendering functions shared between the
  * game engine and the blender, in this module to avoid duplicaten
  * and abstract them away from the rest a bit */
@@ -210,8 +212,8 @@ static int is_pow2_limit(int num)
 	/* take texture clamping into account */
 
 	/* XXX: texturepaint not global!
-	   if (G.f & G_TEXTUREPAINT)
-	   return 1;*/
+	if (G.f & G_TEXTUREPAINT)
+		return 1;*/
 
 	if (U.glreslimit != 0 && num > U.glreslimit)
 		return 0;
@@ -222,8 +224,8 @@ static int is_pow2_limit(int num)
 static int smaller_pow2_limit(int num)
 {
 	/* XXX: texturepaint not global!
-	   if (G.f & G_TEXTUREPAINT)
-	   return 1;*/
+	if (G.f & G_TEXTUREPAINT)
+		return 1;*/
 	
 	/* take texture clamping into account */
 	if (U.glreslimit != 0 && num > U.glreslimit)
@@ -531,7 +533,7 @@ int GPU_verify_image(Image *ima, ImageUser *iuser, int tftile, int compare, int 
 	}
 
 	/* scale if not a power of two */
-	if (!mipmap && (!is_pow2_limit(rectw) || !is_pow2_limit(recth))) {
+	if (!is_pow2_limit(rectw) || !is_pow2_limit(recth)) {
 		rectw= smaller_pow2_limit(rectw);
 		recth= smaller_pow2_limit(recth);
 		
@@ -793,7 +795,7 @@ static ListBase image_free_queue = {NULL, NULL};
 
 static void gpu_queue_image_for_free(Image *ima)
 {
-    Image *cpy = MEM_dupallocN(ima);
+	Image *cpy = MEM_dupallocN(ima);
 
 	BLI_lock_thread(LOCK_OPENGL);
 	BLI_addtail(&image_free_queue, cpy);
@@ -951,7 +953,6 @@ static Material *gpu_active_node_material(Material *ma)
 
 void GPU_begin_object_materials(View3D *v3d, RegionView3D *rv3d, Scene *scene, Object *ob, int glsl, int *do_alpha_pass)
 {
-	extern Material defmaterial; /* from material.c */
 	Material *ma;
 	GPUMaterial *gpumat;
 	GPUBlendMode blendmode;
@@ -1042,7 +1043,6 @@ void GPU_begin_object_materials(View3D *v3d, RegionView3D *rv3d, Scene *scene, O
 
 int GPU_enable_material(int nr, void *attribs)
 {
-	extern Material defmaterial; /* from material.c */
 	GPUVertexAttribs *gattribs = attribs;
 	GPUMaterial *gpumat;
 	GPUBlendMode blendmode;

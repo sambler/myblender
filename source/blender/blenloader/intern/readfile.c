@@ -137,7 +137,6 @@
 //XXX #include "BIF_previewrender.h" // bedlelvel, for struct RenderInfo
 #include "BLO_readfile.h"
 #include "BLO_undofile.h"
-#include "BLO_readblenfile.h" // streaming read pipe, for BLO_readblenfile BLO_readblenfilememory
 
 #include "readfile.h"
 
@@ -289,6 +288,8 @@ static void oldnewmap_insert(OldNewMap *onm, void *oldaddr, void *newaddr, int n
 static void *oldnewmap_lookup_and_inc(OldNewMap *onm, void *addr) 
 {
 	int i;
+
+	if(addr==NULL) return NULL;
 
 	if (onm->lasthit<onm->nentries-1) {
 		OldNew *entry= &onm->entries[++onm->lasthit];
@@ -1204,7 +1205,7 @@ void blo_end_image_pointer_map(FileData *fd, Main *oldmain)
 	
 	/* used entries were restored, so we put them to zero */
 	for (i=0; i<fd->imamap->nentries; i++, entry++) {
-		 if (entry->nr>0)
+		if (entry->nr>0)
 			entry->newp= NULL;
 	}
 	
@@ -1863,6 +1864,10 @@ static void lib_link_nladata_strips(FileData *fd, ID *id, ListBase *list)
 		
 		/* reassign the counted-reference to action */
 		strip->act = newlibadr_us(fd, id->lib, strip->act);
+		
+		/* fix action id-root (i.e. if it comes from a pre 2.57 .blend file) */
+		if ((strip->act) && (strip->act->idroot == 0))
+			strip->act->idroot = GS(id->name);
 	}
 }
 
@@ -1955,6 +1960,12 @@ static void lib_link_animdata(FileData *fd, ID *id, AnimData *adt)
 	/* link action data */
 	adt->action= newlibadr_us(fd, id->lib, adt->action);
 	adt->tmpact= newlibadr_us(fd, id->lib, adt->tmpact);
+	
+	/* fix action id-roots (i.e. if they come from a pre 2.57 .blend file) */
+	if ((adt->action) && (adt->action->idroot == 0))
+		adt->action->idroot = GS(id->name);
+	if ((adt->tmpact) && (adt->tmpact->idroot == 0))
+		adt->tmpact->idroot = GS(id->name);
 	
 	/* link drivers */
 	lib_link_fcurves(fd, id, &adt->drivers);
@@ -2951,6 +2962,10 @@ static void direct_link_texture(FileData *fd, Tex *tex)
 	if(tex->pd) {
 		tex->pd->point_tree = NULL;
 		tex->pd->coba= newdataadr(fd, tex->pd->coba);
+		tex->pd->falloff_curve= newdataadr(fd, tex->pd->falloff_curve);
+		if(tex->pd->falloff_curve) {
+			direct_link_curvemapping(fd, tex->pd->falloff_curve);
+		}
 	}
 	
 	tex->vd= newdataadr(fd, tex->vd);
@@ -3400,15 +3415,19 @@ static void lib_link_mesh(FileData *fd, Main *main)
 
 static void direct_link_dverts(FileData *fd, int count, MDeformVert *mdverts)
 {
-	int	i;
+	int i;
 
-	if (!mdverts)
+	if (mdverts == NULL) {
 		return;
+	}
 
-	for (i=0; i<count; i++) {
-		mdverts[i].dw=newdataadr(fd, mdverts[i].dw);
-		if (!mdverts[i].dw)
-			mdverts[i].totweight=0;
+	for (i= count; i > 0; i--, mdverts++) {
+		if(mdverts->dw) {
+			mdverts->dw= newdataadr(fd, mdverts->dw);
+		}
+		if (mdverts->dw == NULL) {
+			mdverts->totweight= 0;
+		}
 	}
 }
 
@@ -3678,7 +3697,7 @@ static void lib_link_object(FileData *fd, Main *main)
 
 			ob->gpd= newlibadr_us(fd, ob->id.lib, ob->gpd);
 			ob->duplilist= NULL;
-            
+
 			ob->id.flag -= LIB_NEEDLINK;
 			/* if id.us==0 a new base will be created later on */
 			
@@ -3749,7 +3768,12 @@ static void lib_link_object(FileData *fd, Main *main)
 				}
 				else if(act->type==ACT_OBJECT) {
 					bObjectActuator *oa= act->data;
-					oa->reference= newlibadr(fd, ob->id.lib, oa->reference);
+					if(oa==NULL) {
+						init_actuator(act);
+					}
+					else {
+						oa->reference= newlibadr(fd, ob->id.lib, oa->reference);
+					}
 				}
 				else if(act->type==ACT_EDIT_OBJECT) {
 					bEditObjectActuator *eoa= act->data;
@@ -3759,15 +3783,6 @@ static void lib_link_object(FileData *fd, Main *main)
 					else {
 						eoa->ob= newlibadr(fd, ob->id.lib, eoa->ob);
 						eoa->me= newlibadr(fd, ob->id.lib, eoa->me);
-					}
-				}
-				else if(act->type==ACT_OBJECT) {
-					bObjectActuator *oa= act->data;
-					if(oa==NULL) {
-						init_actuator(act);
-					}
-					else {
-						oa->reference= newlibadr(fd, ob->id.lib, oa->reference);
 					}
 				}
 				else if(act->type==ACT_SCENE) {
@@ -4105,6 +4120,13 @@ static void direct_link_modifiers(FileData *fd, ListBase *lb)
 					for(a=0; a<mmd->totcagevert*3; a++)
 						SWITCH_INT(mmd->bindcos[a])
 			}
+		}
+		else if (md->type==eModifierType_Warp) {
+			WarpModifierData *tmd = (WarpModifierData *) md;
+
+			tmd->curfalloff= newdataadr(fd, tmd->curfalloff);
+			if(tmd->curfalloff)
+				direct_link_curvemapping(fd, tmd->curfalloff);
 		}
 	}
 }
@@ -5354,10 +5376,12 @@ static void direct_link_screen(FileData *fd, bScreen *sc)
 				
 				/* WARNING: gpencil data is no longer stored directly in sima after 2.5 
 				 * so sacrifice a few old files for now to avoid crashes with new files!
-				 */
-				//sima->gpd= newdataadr(fd, sima->gpd);
-				//if (sima->gpd)
-				//	direct_link_gpencil(fd, sima->gpd);
+				 * committed: r28002 */
+#if 0
+				sima->gpd= newdataadr(fd, sima->gpd);
+				if (sima->gpd)
+					direct_link_gpencil(fd, sima->gpd);
+#endif
 			}
 			else if(sl->spacetype==SPACE_NODE) {
 				SpaceNode *snode= (SpaceNode *)sl;
@@ -6498,7 +6522,7 @@ static void area_add_window_regions(ScrArea *sa, SpaceLink *sl, ListBase *lb)
 				
 				ar->v2d.max[0]= MAXFRAMEF;
 				ar->v2d.max[1]= FLT_MAX;
-			 	
+
 				ar->v2d.minzoom= 0.01f;
 				ar->v2d.maxzoom= 50;
 				ar->v2d.scroll = (V2D_SCROLL_BOTTOM|V2D_SCROLL_SCALE_HORIZONTAL);
@@ -6649,10 +6673,14 @@ static void do_versions_gpencil_2_50(Main *main, bScreen *screen)
 			}
 			else if (sl->spacetype==SPACE_IMAGE) {
 				SpaceImage *sima= (SpaceImage *)sl;
+#if 0			/* see comment on r28002 */
 				if(sima->gpd) {
 					versions_gpencil_add_main(&main->gpencil, (ID *)sima->gpd, "GPencil Image");
 					sima->gpd= NULL;
 				}
+#else
+				sima->gpd= NULL;
+#endif
 			}
 		}
 	}		
@@ -8690,11 +8718,11 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 				ima->gen_x= 256; ima->gen_y= 256;
 				ima->gen_type= 1;
 				
-				if(0==strncmp(ima->id.name+2, "Viewer Node", sizeof(ima->id.name+2))) {
+				if(0==strncmp(ima->id.name+2, "Viewer Node", sizeof(ima->id.name)-2)) {
 					ima->source= IMA_SRC_VIEWER;
 					ima->type= IMA_TYPE_COMPOSITE;
 				}
-				if(0==strncmp(ima->id.name+2, "Render Result", sizeof(ima->id.name+2))) {
+				if(0==strncmp(ima->id.name+2, "Render Result", sizeof(ima->id.name)-2)) {
 					ima->source= IMA_SRC_VIEWER;
 					ima->type= IMA_TYPE_R_RESULT;
 				}
@@ -9968,7 +9996,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 					{
 						char str[FILE_MAX];
 						BLI_join_dirfile(str, sizeof(str), seq->strip->dir, seq->strip->stripdata->name);
-						BLI_path_abs(str, G.main->name);
+						BLI_path_abs(str, main->name);
 						seq->sound = sound_new_file(main, str);
 					}
 					/* don't know, if anybody used that
@@ -11569,7 +11597,57 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 	/* put compatibility code here until next subversion bump */
 
 	{
+		/* screen view2d settings were not properly initialized [#27164]
+		 * v2d->scroll caused the bug but best reset other values too which are in old blend files only.
+		 * need to make less ugly - possibly an iterator? */
+		bScreen *screen;
+		for(screen= main->screen.first; screen; screen= screen->id.next) {
+			ScrArea *sa;
+			/* add regions */
+			for(sa= screen->areabase.first; sa; sa= sa->next) {
+				SpaceLink *sl= sa->spacedata.first;
+				if(sl->spacetype==SPACE_IMAGE) {
+					ARegion *ar;
+					for (ar=sa->regionbase.first; ar; ar= ar->next) {
+						if(ar->regiontype == RGN_TYPE_WINDOW) {
+							View2D *v2d= &ar->v2d;
+							v2d->minzoom= v2d->maxzoom= v2d->scroll= v2d->keeptot= v2d->keepzoom= v2d->keepofs= v2d->align= 0;
+						}
+					}
+				}
+				for (sl= sa->spacedata.first; sl; sl= sl->next) {
+					if(sl->spacetype==SPACE_IMAGE) {
+						ARegion *ar;
+						for (ar=sl->regionbase.first; ar; ar= ar->next) {
+							if(ar->regiontype == RGN_TYPE_WINDOW) {
+								View2D *v2d= &ar->v2d;
+								v2d->minzoom= v2d->maxzoom= v2d->scroll= v2d->keeptot= v2d->keepzoom= v2d->keepofs= v2d->align= 0;
+							}
+						}
+					}
+				}
+			}
+		}
 
+		{
+			/* Initialize texture point density curve falloff */
+			Tex *tex;
+			for(tex= main->tex.first; tex; tex= tex->id.next) {
+				if(tex->pd) {
+					if (tex->pd->falloff_speed_scale == 0.0)
+						tex->pd->falloff_speed_scale = 100.0;
+
+					if (!tex->pd->falloff_curve) {
+						tex->pd->falloff_curve = curvemapping_add(1, 0, 0, 1, 1);
+
+						tex->pd->falloff_curve->preset = CURVE_PRESET_LINE;
+						tex->pd->falloff_curve->cm->flag &= ~CUMA_EXTEND_EXTRAPOLATE;
+						curvemap_reset(tex->pd->falloff_curve->cm, &tex->pd->falloff_curve->clipr, tex->pd->falloff_curve->preset, CURVEMAP_SLOPE_POSITIVE);
+						curvemapping_changed(tex->pd->falloff_curve, 0);
+					}
+				}
+			}
+		}
 	}
 	
 	/* WATCH IT!!!: pointers from libdata have not been converted yet here! */

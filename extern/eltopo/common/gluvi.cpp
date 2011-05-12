@@ -11,6 +11,7 @@
 
 using namespace std;
 
+#if 0
 namespace Gluvi{
 
 Target3D::
@@ -1125,3 +1126,4 @@ void run(void)
 
 }     // namespace Gluvi
 
+#endif

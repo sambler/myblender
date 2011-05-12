@@ -189,7 +189,7 @@ void view3d_clr_clipping(void)
 	}
 }
 
-static int test_clipping(float *vec, float clip[][4])
+static int test_clipping(const float vec[3], float clip[][4])
 {
 	float view[3];
 	copy_v3_v3(view, vec);
@@ -205,7 +205,7 @@ static int test_clipping(float *vec, float clip[][4])
 
 /* for 'local' ED_view3d_local_clipping must run first
  * then all comparisons can be done in localspace */
-int view3d_test_clipping(RegionView3D *rv3d, float *vec, int local)
+int view3d_test_clipping(RegionView3D *rv3d, const float vec[3], const int local)
 {
 	return test_clipping(vec, local ? rv3d->clip_local : rv3d->clip);
 }
@@ -921,6 +921,60 @@ void view3d_calc_camera_border(Scene *scene, ARegion *ar, RegionView3D *rv3d, Vi
 	}
 }
 
+static void drawviewborder_grid3(float x1, float x2, float y1, float y2, float fac, char diagonal)
+{
+	float x3, y3, x4, y4;
+
+	x3= x1 + fac * (x2-x1);
+	y3= y1 + fac * (y2-y1);
+	x4= x1 + (1.0f - fac) * (x2-x1);
+	y4= y1 + (1.0f - fac) * (y2-y1);
+
+	glBegin(GL_LINES);
+	switch(diagonal) {
+	case '\0':
+		glVertex2f(x1, y3);
+		glVertex2f(x2, y3);
+
+		glVertex2f(x1, y4);
+		glVertex2f(x2, y4);
+
+		glVertex2f(x3, y1);
+		glVertex2f(x3, y2);
+
+		glVertex2f(x4, y1);
+		glVertex2f(x4, y2);
+		break;
+	case 'H': /* hoz */
+		glVertex2f(x1, y1);
+		glVertex2f(x2, y4);
+
+		glVertex2f(x1, y3);
+		glVertex2f(x2, y2);
+
+		glVertex2f(x2, y1);
+		glVertex2f(x1, y4);
+
+		glVertex2f(x2, y3);
+		glVertex2f(x1, y2);
+		break;
+	case 'V': /* vert */
+		glVertex2f(x1, y1);
+		glVertex2f(x4, y2);
+
+		glVertex2f(x3, y1);
+		glVertex2f(x2, y2);
+
+		glVertex2f(x1, y2);
+		glVertex2f(x4, y1);
+
+		glVertex2f(x3, y2);
+		glVertex2f(x2, y1);
+		break;
+	}
+	glEnd();
+}
+
 static void drawviewborder(Scene *scene, ARegion *ar, View3D *v3d)
 {
 	float fac, a;
@@ -944,10 +998,14 @@ static void drawviewborder(Scene *scene, ARegion *ar, View3D *v3d)
 	y2= viewborder.ymax;
 	
 	/* apply offsets so the real 3D camera shows through */
-	x1i= (int)(x1 - 1.0f);
-	y1i= (int)(y1 - 1.0f);
-	x2i= (int)(x2 + 1.0f);
-	y2i= (int)(y2 + 1.0f);
+
+	/* note: quite un-scientific but without this bit extra
+	 * 0.0001 on the lower left the 2D border sometimes
+	 * obscures the 3D camera border */
+	x1i= (int)(x1 - 1.0001f);
+	y1i= (int)(y1 - 1.0001f);
+	x2i= (int)(x2 + (1.0f-0.0001f));
+	y2i= (int)(y2 + (1.0f-0.0001f));
 	
 	/* passepartout, specified in camera edit buttons */
 	if (ca && (ca->flag & CAM_SHOWPASSEPARTOUT) && ca->passepartalpha > 0.000001f) {
@@ -993,23 +1051,72 @@ static void drawviewborder(Scene *scene, ARegion *ar, View3D *v3d)
 		cpack(0x4040FF);
 		glRectf(x3,  y3,  x4,  y4); 
 	}
-    
+
 	/* safety border */
-	if (ca && (ca->flag & CAM_SHOWTITLESAFE)) {
-		fac= 0.1;
-		
-		a= fac*(x2-x1);
-		x1+= a; 
-		x2-= a;
-		
-		a= fac*(y2-y1);
-		y1+= a;
-		y2-= a;
-		
-		UI_ThemeColorBlendShade(TH_WIRE, TH_BACK, 0.25, 0);
-		
-		uiSetRoundBox(15);
-		uiDrawBox(GL_LINE_LOOP, x1, y1, x2, y2, 12.0);
+	if(ca) {
+		if (ca->dtx & CAM_DTX_CENTER) {
+			UI_ThemeColorBlendShade(TH_WIRE, TH_BACK, 0.25, 0);
+
+			x3= x1+ 0.5f*(x2-x1);
+			y3= y1+ 0.5f*(y2-y1);
+
+			glBegin(GL_LINES);
+			glVertex2f(x1, y3);
+			glVertex2f(x2, y3);
+
+			glVertex2f(x3, y1);
+			glVertex2f(x3, y2);
+			glEnd();
+		}
+
+		if (ca->dtx & CAM_DTX_CENTER_DIAG) {
+			UI_ThemeColorBlendShade(TH_WIRE, TH_BACK, 0.25, 0);
+
+			glBegin(GL_LINES);
+			glVertex2f(x1, y1);
+			glVertex2f(x2, y2);
+
+			glVertex2f(x1, y2);
+			glVertex2f(x2, y1);
+			glEnd();
+		}
+
+		if (ca->dtx & CAM_DTX_THIRDS) {
+			UI_ThemeColorBlendShade(TH_WIRE, TH_BACK, 0.25, 0);
+			drawviewborder_grid3(x1, x2, y1, y2, 1.0f/3.0f, '\0');
+		}
+
+		if (ca->dtx & CAM_DTX_GOLDEN) {
+			UI_ThemeColorBlendShade(TH_WIRE, TH_BACK, 0.25, 0);
+			drawviewborder_grid3(x1, x2, y1, y2, 1.0f-(1.0f/1.61803399), '\0');
+		}
+
+		if (ca->dtx & CAM_DTX_GOLDEN_DIAG_H) {
+			UI_ThemeColorBlendShade(TH_WIRE, TH_BACK, 0.25, 0);
+			drawviewborder_grid3(x1, x2, y1, y2, 1.0f-(1.0f/1.61803399), 'H');
+		}
+
+		if (ca->dtx & CAM_DTX_GOLDEN_DIAG_V) {
+			UI_ThemeColorBlendShade(TH_WIRE, TH_BACK, 0.25, 0);
+			drawviewborder_grid3(x1, x2, y1, y2, 1.0f-(1.0f/1.61803399), 'V');
+		}
+
+		if (ca->flag & CAM_SHOWTITLESAFE) {
+			fac= 0.1;
+
+			a= fac*(x2-x1);
+			x1+= a;
+			x2-= a;
+
+			a= fac*(y2-y1);
+			y1+= a;
+			y2-= a;
+
+			UI_ThemeColorBlendShade(TH_WIRE, TH_BACK, 0.25, 0);
+
+			uiSetRoundBox(15);
+			uiDrawBox(GL_LINE_LOOP, x1, y1, x2, y2, 12.0);
+		}
 	}
 
 	setlinestyle(0);
@@ -1172,7 +1279,7 @@ ImBuf *view3d_read_backbuf(ViewContext *vc, short xmin, short ymin, short xmax, 
 }
 
 /* smart function to sample a rect spiralling outside, nice for backbuf selection */
-unsigned int view3d_sample_backbuf_rect(ViewContext *vc, short mval[2], int size, 
+unsigned int view3d_sample_backbuf_rect(ViewContext *vc, const short mval[2], int size,
 										unsigned int min, unsigned int max, int *dist, short strict, 
 										void *handle, unsigned int (*indextest)(void *handle, unsigned int index))
 {
@@ -1317,7 +1424,11 @@ static void draw_bgpic(Scene *scene, ARegion *ar, View3D *v3d)
 				float tzoom= MIN2(zoomx, zoomy);
 				int mip= 0;
 
-				if(ibuf->mipmap[0]==NULL)
+				if((ibuf->userflags&IB_MIPMAP_INVALID) != 0) {
+					IMB_remakemipmap(ibuf, 0);
+					ibuf->userflags&= ~IB_MIPMAP_INVALID;
+				}
+				else if(ibuf->mipmap[0]==NULL)
 					IMB_makemipmap(ibuf, 0);
 
 				while(tzoom < 1.0f && mip<8 && ibuf->mipmap[mip]) {
@@ -2212,7 +2323,7 @@ ImBuf *ED_view3d_draw_offscreen_imbuf(Scene *scene, View3D *v3d, ARegion *ar, in
 }
 
 /* creates own 3d views, used by the sequencer */
-ImBuf *ED_view3d_draw_offscreen_imbuf_simple(Scene *scene, int width, int height, unsigned int flag, int drawtype, char err_out[256])
+ImBuf *ED_view3d_draw_offscreen_imbuf_simple(Scene *scene, Object *camera, int width, int height, unsigned int flag, int drawtype, char err_out[256])
 {
 	View3D v3d= {NULL};
 	ARegion ar= {NULL};
@@ -2223,7 +2334,7 @@ ImBuf *ED_view3d_draw_offscreen_imbuf_simple(Scene *scene, int width, int height
 	ar.regiondata= &rv3d;
 	ar.regiontype= RGN_TYPE_WINDOW;
 
-	v3d.camera= scene->camera;
+	v3d.camera= camera;
 	v3d.lay= scene->lay;
 	v3d.drawtype = drawtype;
 	v3d.flag2 = V3D_RENDER_OVERRIDE;

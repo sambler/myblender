@@ -78,7 +78,14 @@ class DATA_PT_camera(CameraButtonsPanel, bpy.types.Panel):
         elif cam.type == 'ORTHO':
             col.prop(cam, "ortho_scale")
 
-        layout.prop(cam, "use_panorama")
+        col = layout.column()
+        if cam.type == 'ORTHO':
+            if cam.use_panorama:
+                col.alert = True
+            else:
+                col.enabled = False
+
+        col.prop(cam, "use_panorama")
 
         split = layout.split()
 
@@ -120,6 +127,7 @@ class DATA_PT_camera_display(CameraButtonsPanel, bpy.types.Panel):
         col.prop(cam, "show_mist", text="Mist")
         col.prop(cam, "show_title_safe", text="Title Safe")
         col.prop(cam, "show_name", text="Name")
+        col.prop_menu_enum(cam, "show_guide")
 
         col = split.column()
         col.prop(cam, "draw_size", text="Size")

@@ -75,13 +75,14 @@ endif()
 if(WITH_PYTHON)
 	blender_include_dirs(../blender/python)
 	add_definitions(-DWITH_PYTHON)
+
+	if(WITH_PYTHON_SECURITY)
+		add_definitions(-DWITH_PYTHON_SECURITY)
+	endif()
 endif()
 
 if(WITH_GAMEENGINE)
-	blender_include_dirs(
-		../kernel/gen_messaging
-		../kernel/gen_system
-	)
+	blender_include_dirs(../gameengine/BlenderRoutines)
 
 	add_definitions(-DWITH_GAMEENGINE)
 endif()
@@ -190,10 +191,10 @@ if(WITH_PYTHON_MODULE)
 	set_target_properties(
 		blender
 		PROPERTIES
-			 PREFIX ""
-			 OUTPUT_NAME bpy
-			 LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/
-			 RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/  # only needed on windows
+				PREFIX ""
+				OUTPUT_NAME bpy
+				LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/
+				RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/  # only needed on windows
 	)
 	
 	if(WIN32)
@@ -201,7 +202,7 @@ if(WITH_PYTHON_MODULE)
 		set_target_properties(
 			blender
 			PROPERTIES
-				 SUFFIX ".pyd"
+			SUFFIX ".pyd"
 		)	
 	endif()
 	
@@ -217,7 +218,7 @@ endif()
 # Post build steps for bundling/packaging.
 
 
-if(MSVC)
+if(MSVC_IDE)
 	# ${CMAKE_CFG_INTDIR} should replace \${BUILD_TYPE} when using add_command
 	set(TARGETDIR ${EXECUTABLE_OUTPUT_PATH}/\${BUILD_TYPE})
 elseif(APPLE)
@@ -253,7 +254,7 @@ if(UNIX AND NOT APPLE)
 		install(
 			FILES
 			${CMAKE_SOURCE_DIR}/release/freedesktop/blender.desktop
-			${CMAKE_SOURCE_DIR}/release/freedesktop/icons/scalable/blender.svg
+			${CMAKE_SOURCE_DIR}/release/freedesktop/icons/scalable/apps/blender.svg
 			${CMAKE_SOURCE_DIR}/doc/manpage/blender.1
 			DESTINATION ${TARGETDIR}
 		)
@@ -290,8 +291,20 @@ if(UNIX AND NOT APPLE)
 			DESTINATION ${CMAKE_INSTALL_PREFIX}/share/applications
 		)
 		install(
-			FILES ${CMAKE_SOURCE_DIR}/release/freedesktop/icons/scalable/blender.svg
-			DESTINATION ${CMAKE_INSTALL_PREFIX}/share/pixmaps
+			DIRECTORY
+					${CMAKE_SOURCE_DIR}/release/freedesktop/icons/16x16
+					${CMAKE_SOURCE_DIR}/release/freedesktop/icons/22x22
+					${CMAKE_SOURCE_DIR}/release/freedesktop/icons/24x24
+					${CMAKE_SOURCE_DIR}/release/freedesktop/icons/32x32
+					${CMAKE_SOURCE_DIR}/release/freedesktop/icons/48x48
+					${CMAKE_SOURCE_DIR}/release/freedesktop/icons/256x256
+			DESTINATION ${CMAKE_INSTALL_PREFIX}/share/icons/hicolor/
+			PATTERN ".svn" EXCLUDE
+			PATTERN "*.svg" EXCLUDE
+		)
+		install(
+			FILES ${CMAKE_SOURCE_DIR}/release/freedesktop/icons/scalable/apps/blender.svg
+			DESTINATION ${CMAKE_INSTALL_PREFIX}/share/icons/hicolor/scalable/apps
 		)
 		install(
 			PROGRAMS ${CMAKE_SOURCE_DIR}/release/bin/blender-thumbnailer.py
@@ -561,19 +574,19 @@ elseif(WIN32)
 		endif()
 	endif()
 
-    if(NOT CMAKE_CL_64)
+	if(NOT CMAKE_CL_64)
 		install(
 			FILES
-	    	${LIBDIR}/thumbhandler/lib/BlendThumb.dll
-    		DESTINATION ${TARGETDIR}/
-	    )
-    else()
+			${LIBDIR}/thumbhandler/lib/BlendThumb.dll
+			DESTINATION ${TARGETDIR}/
+		)
+	else()
 		install(
 			FILES
-	    	${LIBDIR}/thumbhandler/lib/BlendThumb64.dll
-    		DESTINATION ${TARGETDIR}/
-	    )
-    endif()
+			${LIBDIR}/thumbhandler/lib/BlendThumb64.dll
+			DESTINATION ${TARGETDIR}/
+		)
+	endif()
 
 elseif(APPLE)
 	set(SOURCEDIR ${CMAKE_SOURCE_DIR}/source/darwin/blender.app)
@@ -758,11 +771,9 @@ endif()
 		bf_imbuf_cineon
 		bf_imbuf_openexr
 		bf_imbuf_dds
-		bf_readblenfile
 		bf_collada
 		bf_intern_bsp
 		bf_intern_bop
-		bf_gen_system
 		bf_intern_decimate
 		bf_intern_elbeem
 		bf_intern_ik
@@ -784,7 +795,6 @@ endif()
 		ge_logic_expressions
 		ge_scenegraph
 		ge_logic_network
-		bf_gen_system
 		bf_python # duplicate for BPY_driver_exec
 		ge_logic_ngnetwork
 		extern_bullet
@@ -800,13 +810,13 @@ endif()
 		bf_intern_mikktspace
 	)
 
-    if(WITH_MOD_CLOTH_ELTOPO)
+	if(WITH_MOD_CLOTH_ELTOPO)
 		list(APPEND BLENDER_SORTED_LIBS extern_eltopo)
-    endif()
-    
-    if(WITH_BUILTIN_GLEW)
+	endif()
+
+	if(WITH_BUILTIN_GLEW)
 		list(APPEND BLENDER_SORTED_LIBS extern_glew)
-    endif()
+	endif()
 
 	if(WITH_BINRELOC)
 		list(APPEND BLENDER_SORTED_LIBS extern_binreloc)

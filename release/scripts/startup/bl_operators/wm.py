@@ -395,7 +395,7 @@ class WM_MT_context_menu_enum(bpy.types.Menu):
         base_path, prop_string = data_path.rsplit(".", 1)
         value_base = context_path_validate(context, base_path)
 
-        values = [(i.name, i.identifier) for i in value_base.bl_rna.properties[prop_string].items]
+        values = [(i.name, i.identifier) for i in value_base.bl_rna.properties[prop_string].enum_items]
 
         for name, identifier in values:
             prop = self.layout.operator("wm.context_set_enum", text=name)
@@ -838,6 +838,18 @@ class WM_OT_properties_add(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class WM_OT_properties_context_change(bpy.types.Operator):
+    "Change the context tab in a Properties Window"
+    bl_idname = "wm.properties_context_change"
+    bl_label = ""
+
+    context = StringProperty(name="Context", maxlen=32)
+
+    def execute(self, context):
+        context.space_data.context = (self.context)
+        return {'FINISHED'}
+
+
 class WM_OT_properties_remove(bpy.types.Operator):
     '''Internal use (edit a property data_path)'''
     bl_idname = "wm.properties_remove"
@@ -910,7 +922,7 @@ class WM_OT_sysinfo(bpy.types.Operator):
 
 
 class WM_OT_copy_prev_settings(bpy.types.Operator):
-    '''Generate System Info'''
+    '''Copy settings from previous version'''
     bl_idname = "wm.copy_prev_settings"
     bl_label = "Copy Previous Settings"
 
@@ -918,23 +930,24 @@ class WM_OT_copy_prev_settings(bpy.types.Operator):
         import os
         import shutil
         ver = bpy.app.version
-        ver_prev = ((ver[0] * 100) + ver[1]) - 1
-        ver_prev = ver_prev // 100, ver_prev % 100
-        for res in ('USER', 'LOCAL'):
-            path_src = bpy.utils.resource_path(res, ver_prev[0], ver_prev[1])
-            path_dst = bpy.utils.resource_path(res)
+        ver_old = ((ver[0] * 100) + ver[1]) - 1
+        path_src = bpy.utils.resource_path('USER', ver_old // 100, ver_old % 100)
+        path_dst = bpy.utils.resource_path('USER')
 
-            if os.path.isdir(path_dst):
-                self.report({'ERROR'}, "Path %r exists" % path_dst)
-                return {'CANCELLED'}
-            else:
-                break
-
-        if os.path.isdir(path_src):
+        if os.path.isdir(path_dst):
+            self.report({'ERROR'}, "Target path %r exists" % path_dst)
+        elif not os.path.isdir(path_src):
+            self.report({'ERROR'}, "Source path %r exists" % path_src)
+        else:
             shutil.copytree(path_src, path_dst)
-            bpy.ops.wm.read_homefile()
+            # dont loose users work if they open the splash later.
+            if bpy.data.is_saved is bpy.data.is_dirty is False:
+                bpy.ops.wm.read_homefile()
+            else:
+                self.report({'INFO'}, "Reload Start-Up file to restore settings.")
+            return {'FINISHED'}
 
-        return {'FINISHED'}
+        return {'CANCELLED'}
 
 
 def _webbrowser_bug_fix():

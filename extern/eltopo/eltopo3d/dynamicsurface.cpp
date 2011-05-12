@@ -3014,13 +3014,13 @@ void DynamicSurface::integrate( double dt )
          
          if ( !all_collisions_handled )
          {
-            solver_ok = handle_collisions_simultaneous( curr_dt );            
+            //solver_ok = handle_collisions_simultaneous( curr_dt );            
          }
 
          if ( !solver_ok )
          {
             // punt to rigid impact zones
-            new_rigid_impact_zones( curr_dt );
+           // new_rigid_impact_zones( curr_dt );
          }  
          
          //assert_predicted_mesh_is_intersection_free();

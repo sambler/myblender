@@ -50,6 +50,7 @@
 #include "BLI_utildefines.h"
 #include "BLI_ghash.h"
 #include "BLI_memarena.h"
+#include "BLI_rand.h"
 
 #include "BKE_DerivedMesh.h"
 #include "BKE_global.h"
@@ -65,7 +66,7 @@
 #include "BLI_kdopbvh.h"
 #include "BKE_collision.h"
 
-#ifdef USE_ELTOPO
+#ifdef WITH_ELTOPO
 #include "eltopo-capi.h"
 #endif
 
@@ -492,7 +493,7 @@ DO_INLINE void collision_interpolateOnTriangle ( float to[3], float v1[3], float
 	VECADDMUL ( to, v3, w3 );
 }
 
-#ifndef USE_ELTOPO
+#ifndef WITH_ELTOPO
 static int cloth_collision_response_static ( ClothModifierData *clmd, CollisionModifierData *collmd, CollPair *collpair, CollPair *collision_end )
 {
 	int result = 0;
@@ -607,9 +608,9 @@ static int cloth_collision_response_static ( ClothModifierData *clmd, CollisionM
 	}
 	return result;
 }
-#endif
+#endif /* !WITH_ELTOPO */
 
-#ifdef USE_ELTOPO
+#ifdef WITH_ELTOPO
 typedef struct edgepairkey {
 	int a1, a2, b1, b2;
 } edgepairkey;
@@ -771,10 +772,6 @@ static CollPair* cloth_edge_collision ( ModifierData *md1, ModifierData *md2,
 		normal_tri_v3(n2, v4[1], v5[1], v6[1]);
 
 		/*offset new positions a bit, to account for margins*/
-		copy_v3_v3(off, n2);
-		mul_v3_fl(off,  epsilon1 + epsilon2 + ALMOST_ZERO);
-		add_v3_v3(v4[1], off); add_v3_v3(v5[1], off); add_v3_v3(v6[1], off);
-		
 		i1 = ap1; i2 = ap2; i3 = ap3;
 		i4 = bp1; i5 = bp2; i6 = bp3;
 
@@ -784,24 +781,45 @@ static CollPair* cloth_edge_collision ( ModifierData *md1, ModifierData *md2,
 			table[0] = ap1; table[1] = ap2; table[2] = ap3;
 			table[3] = bp1; table[4] = bp2; table[5] = bp3;
 			for (k=0; k<3; k++) {
+				float p1[3], p2[3];
 				int k2 = (k+1)%3;
 				
 				get_edgepairkey(&tstkey, table[j], table[j2], table[k+3], table[k2+3]);
-				if (BLI_ghash_haskey(visithash, &tstkey))
-					continue;
+				//if (BLI_ghash_haskey(visithash, &tstkey))
+				//	continue;
 				
 				key = BLI_memarena_alloc(arena, sizeof(edgepairkey));
 				*key = tstkey;
 				BLI_ghash_insert(visithash, key, NULL);
 
-				ret = eltopo_line_line_moving_isect_v3v3_f(verts[j], table[j], verts[j2], table[j2], 
-														   verts[k+3], table[k+3], verts[k2+3], table[k2+3], 
-														   no, uv, &t, &relnor);
+				sub_v3_v3v3(p1, verts[j], verts[j2]);
+				sub_v3_v3v3(p2, verts[k+3], verts[k2+3]);
 				
+				cross_v3_v3v3(off, p1, p2);
+				normalize_v3(off);
+
+				if (dot_v3v3(n2, off) < 0.0)
+					negate_v3(off);
+				
+				mul_v3_fl(off,  epsilon1 + epsilon2 + ALMOST_ZERO);
+				copy_v3_v3(p1, verts[k+3]);
+				copy_v3_v3(p2, verts[k2+3]);
+				add_v3_v3(p1, off);
+				add_v3_v3(p2, off);
+				
+				ret = eltopo_line_line_moving_isect_v3v3_f(verts[j], table[j], verts[j2], table[j2], 
+														   p1, table[k+3], p2, table[k2+3], 
+														   no, uv, &t, &relnor);
 				/*cloth vert versus coll face*/
-				if (ret && dot_v3v3(n2, no) > 0.0) {
+				if (ret) {
 					collpair->ap1 = table[j]; collpair->ap2 = table[j2]; 
 					collpair->bp1 = table[k+3]; collpair->bp2 = table[k2+3];
+					
+					/*I'm not sure if this is correct, but hopefully it's 
+					  better then simply ignoring back edges*/
+					if (dot_v3v3(n2, no) < 0.0) {
+						negate_v3(no);
+					}
 					
 					copy_v3_v3(collpair->normal, no);
 					mul_v3_v3fl(collpair->vector, collpair->normal, relnor);
@@ -872,7 +890,7 @@ static int cloth_edge_collision_response_moving ( ClothModifierData *clmd, Colli
 			{
 				normalize_v3( vrel_t_pre );
 
-				impulse = magtangent; // 2.0 * 
+				impulse = magtangent; 
 				VECADDMUL ( pimpulse, vrel_t_pre, impulse);
 			}
 
@@ -880,7 +898,8 @@ static int cloth_edge_collision_response_moving ( ClothModifierData *clmd, Colli
 			// I_c = m * v_N / 2.0
 			// no 2.0 * magrelVel normally, but looks nicer DG
 			impulse =  magrelVel;
-
+			
+			mul_v3_fl(collpair->normal, 0.5);
 			VECADDMUL ( pimpulse, collpair->normal, impulse);
 
 			// Apply repulse impulse if distance too short
@@ -888,7 +907,7 @@ static int cloth_edge_collision_response_moving ( ClothModifierData *clmd, Colli
 			spf = (float)clmd->sim_parms->stepsPerFrame / clmd->sim_parms->timescale;
 
 			d = collpair->distance;
-			if ( ( magrelVel < 0.1*d*spf ) && ( d > ALMOST_ZERO ) )
+			if ( ( magrelVel < 0.1*d*spf && ( d > ALMOST_ZERO ) ) )
 			{
 				repulse = MIN2 ( d*1.0/spf, 0.1*d*spf - magrelVel );
 
@@ -906,7 +925,6 @@ static int cloth_edge_collision_response_moving ( ClothModifierData *clmd, Colli
 				w1 *= 2.0;
 			else
 				w2 *= 2.0;
-			
 			
 			VECADDFAC(cloth1->verts[collpair->ap1].impulse, cloth1->verts[collpair->ap1].impulse, pimpulse, w1*2.0);
 			VECADDFAC(cloth1->verts[collpair->ap2].impulse, cloth1->verts[collpair->ap2].impulse, pimpulse, w2*2.0);
@@ -1086,8 +1104,86 @@ static int cloth_collision_response_moving ( ClothModifierData *clmd, CollisionM
 	return result;
 }
 
+
+typedef struct tripairkey {
+	int p, a1, a2, a3;
+} tripairkey;
+
+unsigned int tripair_hash(void *vkey)
+{
+	tripairkey *key = vkey;
+	int keys[4] = {key->p, key->a1, key->a2, key->a3};
+	int i, j;
+	
+	for (i=0; i<4; i++) {
+		for (j=0; j<3; j++) {
+			if (keys[j] >= keys[j+1]) {
+				SWAP(int, keys[j], keys[j+1]);
+			}
+		}
+	}
+	
+	return keys[0]*101 + keys[1]*72 + keys[2]*53 + keys[3]*34;
+}
+
+int tripair_cmp(const void *va, const void *vb)
+{
+	tripairkey *a = va, *b = vb;
+	int keysa[4] = {a->p, a->a1, a->a2, a->a3};
+	int keysb[4] = {b->p, b->a1, b->a2, b->a3};
+	int i;
+	
+	for (i=0; i<4; i++) {
+		int j, ok=0;
+		for (j=0; j<4; j++) {
+			if (keysa[i] == keysa[j]) {
+				ok = 1;
+				break;
+			}
+		}
+		if (!ok)
+			return -1;
+	}
+	
+	return 0;
+}
+
+static void get_tripairkey(tripairkey *key, int p, int a1, int a2, int a3)
+{
+	key->a1 = a1;
+	key->a2 = a2;
+	key->a3 = a3;
+	key->p = p;
+}
+
+static int checkvisit(MemArena *arena, GHash *gh, int p, int a1, int a2, int a3)
+{
+	tripairkey key, *key2;
+	
+	get_tripairkey(&key, p, a1, a2, a3);
+	if (BLI_ghash_haskey(gh, &key))
+		return 1;
+	
+	key2 = BLI_memarena_alloc(arena, sizeof(*key2));
+	*key2 = key;
+	BLI_ghash_insert(gh, key2, NULL);
+	
+	return 0;
+}
+
+int cloth_point_tri_moving_v3v3_f(float v1[2][3], int i1, float v2[2][3], int i2,
+                                   float v3[2][3],  int i3, float v4[2][3], int i4,
+                                   float normal[3], float bary[3], float *t, 
+								   float *relnor, GHash *gh, MemArena *arena)
+{
+	if (checkvisit(arena, gh, i1, i2, i3, i4))
+		return 0;
+	
+	return eltopo_point_tri_moving_v3v3_f(v1, i1, v2, i2, v3, i3, v4, i4, normal, bary, t, relnor);
+}
+
 static CollPair* cloth_collision ( ModifierData *md1, ModifierData *md2, BVHTreeOverlap *overlap, 
-								   CollPair *collpair)
+								   CollPair *collpair, double dt, GHash *gh, MemArena *arena)
 {
 	ClothModifierData *clmd = ( ClothModifierData * ) md1;
 	CollisionModifierData *collmd = ( CollisionModifierData * ) md2;
@@ -1099,7 +1195,7 @@ static CollPair* cloth_collision ( ModifierData *md1, ModifierData *md2, BVHTree
 	float no[3], uv[3], t, relnor;
 	int i, i1, i2, i3, i4, i5, i6;
 	Cloth *cloth = clmd->clothObject;
-	float n1[3], n2[3], off[3], v1[2][3], v2[2][3], v3[2][3], v4[2][3], v5[2][3], v6[2][3];
+	float n1[3], sdis, p[3], l, n2[3], off[3], v1[2][3], v2[2][3], v3[2][3], v4[2][3], v5[2][3], v6[2][3];
 	int j, ret, bp1, bp2, bp3, ap1, ap2, ap3;
 	
 	face1 = & ( clmd->clothObject->mfaces[overlap->indexA] );
@@ -1190,6 +1286,21 @@ static CollPair* cloth_collision ( ModifierData *md1, ModifierData *md2, BVHTree
 		copy_v3_v3(v6[1], collmd->current_xnew[bp3].co);
 		
 		normal_tri_v3(n2, v4[1], v5[1], v6[1]);
+		
+		sdis = clmd->coll_parms->distance_repel + epsilon2 + FLT_EPSILON;
+
+		/*apply a repulsion force, to help the solver along*/
+		copy_v3_v3(off, n2);
+		negate_v3(off);
+		if (isect_ray_plane_v3(v1[1], off, v4[1], v5[1], v6[1], &l, 0)) {
+			if (l >= 0.0 && l < sdis) {
+				mul_v3_fl(off, (l-sdis)*cloth->verts[ap1].mass*dt*clmd->coll_parms->repel_force*0.1);
+
+				add_v3_v3(cloth->verts[ap1].tv, off);
+				add_v3_v3(cloth->verts[ap2].tv, off);
+				add_v3_v3(cloth->verts[ap3].tv, off);
+			}
+		}
 
 		/*offset new positions a bit, to account for margins*/
 		copy_v3_v3(off, n2);
@@ -1197,35 +1308,35 @@ static CollPair* cloth_collision ( ModifierData *md1, ModifierData *md2, BVHTree
 		add_v3_v3(v4[1], off); add_v3_v3(v5[1], off); add_v3_v3(v6[1], off);
 		
 		i1 = ap1; i2 = ap2; i3 = ap3;
-		i4 = bp1; i5 = bp2; i6 = bp3;
+		i4 = bp1+cloth->numverts; i5 = bp2+cloth->numverts; i6 = bp3+cloth->numverts;
 		
 		for (j=0; j<6; j++) {
 			int collp;
 
 			switch (j) {
 			case 0:
-				ret = eltopo_point_tri_moving_v3v3_f(v1, i1, v4, i4, v5, i5, v6, i6, no, uv, &t, &relnor);
+				ret = cloth_point_tri_moving_v3v3_f(v1, i1, v4, i4, v5, i5, v6, i6, no, uv, &t, &relnor, gh, arena);
 				collp = ap1;
 				break;
 			case 1:
 				collp = ap2;
-				ret = eltopo_point_tri_moving_v3v3_f(v2, i2, v4, i4, v5, i5, v6, i6, no, uv, &t, &relnor);
+				ret = cloth_point_tri_moving_v3v3_f(v2, i2, v4, i4, v5, i5, v6, i6, no, uv, &t, &relnor, gh, arena);
 				break;
 			case 2:
 				collp = ap3;
-				ret = eltopo_point_tri_moving_v3v3_f(v3, i3, v4, i4, v5, i5, v6, i6, no, uv, &t, &relnor);
+				ret = cloth_point_tri_moving_v3v3_f(v3, i3, v4, i4, v5, i5, v6, i6, no, uv, &t, &relnor, gh, arena);
 				break;
 			case 3:
 				collp = bp1;
-				ret = eltopo_point_tri_moving_v3v3_f(v4, i4, v1, i1, v2, i2, v3, i3, no, uv, &t, &relnor);
+				ret = cloth_point_tri_moving_v3v3_f(v4, i4, v1, i1, v2, i2, v3, i3, no, uv, &t, &relnor, gh, arena);
 				break;
 			case 4:
 				collp = bp2;				
-				ret = eltopo_point_tri_moving_v3v3_f(v5, i5, v1, i1, v2, i2, v3, i3, no, uv, &t, &relnor);
+				ret = cloth_point_tri_moving_v3v3_f(v5, i5, v1, i1, v2, i2, v3, i3, no, uv, &t, &relnor, gh, arena);
 				break;
 			case 5:
 				collp = bp3;
-				ret = eltopo_point_tri_moving_v3v3_f(v6, i6, v1, i1, v2, i2, v3, i3, no, uv, &t, &relnor);
+				ret = cloth_point_tri_moving_v3v3_f(v6, i6, v1, i1, v2, i2, v3, i3, no, uv, &t, &relnor, gh, arena);
 				break;
 			}
 			
@@ -1262,13 +1373,34 @@ static CollPair* cloth_collision ( ModifierData *md1, ModifierData *md2, BVHTree
 	
 	return collpair;
 }
-#else
+
+static void machine_epsilon_offset(Cloth *cloth) {
+	ClothVertex *cv;
+	int i, j;
+	
+	cv = cloth->verts;
+	for (i=0; i<cloth->numverts; i++, cv++) {
+		/*aggrevatingly enough, it's necassary to offset the coordinates
+		 by a multiple of the 32-bit floating point epsilon when switching
+		 into doubles*/
+		#define RNDSIGN (float)(-1*(BLI_rand()%2==0)|1)
+		for (j=0; j<3; j++) {
+			cv->tx[j] += FLT_EPSILON*30.0f*RNDSIGN;
+			cv->txold[j] += FLT_EPSILON*30.0f*RNDSIGN;
+			cv->tv[j] += FLT_EPSILON*30.0f*RNDSIGN;
+		}		
+	}
+}
+
+#else /* !WITH_ELTOPO */
 
 //Determines collisions on overlap, collisions are written to collpair[i] and collision+number_collision_found is returned
-static CollPair* cloth_collision ( ModifierData *md1, ModifierData *md2, BVHTreeOverlap *overlap, CollPair *collpair )
+static CollPair* cloth_collision ( ModifierData *md1, ModifierData *md2, 
+	BVHTreeOverlap *overlap, CollPair *collpair, float dt )
 {
 	ClothModifierData *clmd = ( ClothModifierData * ) md1;
 	CollisionModifierData *collmd = ( CollisionModifierData * ) md2;
+	Cloth *cloth = clmd->clothObject;
 	MFace *face1=NULL, *face2 = NULL;
 #ifdef USE_BULLET
 	ClothVertex *verts1 = clmd->clothObject->verts;
@@ -1276,6 +1408,7 @@ static CollPair* cloth_collision ( ModifierData *md1, ModifierData *md2, BVHTree
 	double distance = 0;
 	float epsilon1 = clmd->coll_parms->epsilon;
 	float epsilon2 = BLI_bvhtree_getepsilon ( collmd->bvhtree );
+	float n2[3], sdis, l;
 	int i;
 
 	face1 = & ( clmd->clothObject->mfaces[overlap->indexA] );
@@ -1347,7 +1480,28 @@ static CollPair* cloth_collision ( ModifierData *md1, ModifierData *md2, BVHTree
 			else
 				break;
 		}
+		
+		normal_tri_v3(n2, collmd->current_xnew[collpair->bp1].co, 
+			collmd->current_xnew[collpair->bp2].co, 
+			collmd->current_xnew[collpair->bp3].co);
+		
+		sdis = clmd->coll_parms->distance_repel + epsilon2 + FLT_EPSILON;
+		
+		/*apply a repulsion force, to help the solver along.
+          this is kindof crude, it only tests one vert of the triangle*/
+		if (isect_ray_plane_v3(cloth->verts[collpair->ap1].tx, n2, collmd->current_xnew[collpair->bp1].co, 
+			collmd->current_xnew[collpair->bp2].co,
+			collmd->current_xnew[collpair->bp3].co, &l, 0))
+		{
+			if (l >= 0.0 && l < sdis) {
+				mul_v3_fl(n2, (l-sdis)*cloth->verts[collpair->ap1].mass*dt*clmd->coll_parms->repel_force*0.1);
 
+				add_v3_v3(cloth->verts[collpair->ap1].tv, n2);
+				add_v3_v3(cloth->verts[collpair->ap2].tv, n2);
+				add_v3_v3(cloth->verts[collpair->ap3].tv, n2);
+			}
+		}
+		
 #ifdef USE_BULLET
 		// calc distance + normal
 		distance = plNearestPoints (
@@ -1403,7 +1557,7 @@ static CollPair* cloth_collision ( ModifierData *md1, ModifierData *md2, BVHTree
 	}
 	return collpair;
 }
-#endif
+#endif /* WITH_ELTOPO */
 
 
 #if 0
@@ -1520,10 +1674,10 @@ static int cloth_collision_response_moving( ClothModifierData *clmd, CollisionMo
 #if 0
 static float projectPointOntoLine(float *p, float *a, float *b) 
 {
-   float ba[3], pa[3];
-   VECSUB(ba, b, a);
-   VECSUB(pa, p, a);
-   return INPR(pa, ba) / INPR(ba, ba);
+	float ba[3], pa[3];
+	VECSUB(ba, b, a);
+	VECSUB(pa, p, a);
+	return INPR(pa, ba) / INPR(ba, ba);
 }
 
 static void calculateEENormal(float *np1, float *np2, float *np3, float *np4,float *out_normal) 
@@ -2111,31 +2265,44 @@ void free_collider_cache(ListBase **colliders)
 }
 
 
-static void cloth_bvh_objcollisions_nearcheck ( ClothModifierData * clmd, CollisionModifierData *collmd, CollPair **collisions, CollPair **collisions_index, int numresult, BVHTreeOverlap *overlap)
+static void cloth_bvh_objcollisions_nearcheck ( ClothModifierData * clmd, CollisionModifierData *collmd,
+	CollPair **collisions, CollPair **collisions_index, int numresult, BVHTreeOverlap *overlap, double dt)
 {
 	int i;
-#ifdef USE_ELTOPO
+#ifdef WITH_ELTOPO
 	GHash *visithash = BLI_ghash_new(edgepair_hash, edgepair_cmp, "visthash, collision.c");
+	GHash *tri_visithash = BLI_ghash_new(tripair_hash, tripair_cmp, "tri_visthash, collision.c");
 	MemArena *arena = BLI_memarena_new(1<<16, "edge hash arena, collision.c");
 #endif
 	
 	*collisions = ( CollPair* ) MEM_mallocN ( sizeof ( CollPair ) * numresult * 64, "collision array" ); //*4 since cloth_collision_static can return more than 1 collision
 	*collisions_index = *collisions;
+	
+#ifdef WITH_ELTOPO
+	machine_epsilon_offset(clmd->clothObject);
 
 	for ( i = 0; i < numresult; i++ )
 	{
-		*collisions_index = cloth_collision ( ( ModifierData * ) clmd, ( ModifierData * ) collmd, overlap+i, *collisions_index );
+		*collisions_index = cloth_collision ( ( ModifierData * ) clmd, ( ModifierData * ) collmd,
+											  overlap+i, *collisions_index, dt, tri_visithash, arena );
 	}
 
-#ifdef USE_ELTOPO
 	for ( i = 0; i < numresult; i++ )
 	{
 		*collisions_index = cloth_edge_collision ( ( ModifierData * ) clmd, ( ModifierData * ) collmd,
 												   overlap+i, *collisions_index, visithash, arena );
 	}
 	BLI_ghash_free(visithash, NULL, NULL);
+	BLI_ghash_free(tri_visithash, NULL, NULL);
 	BLI_memarena_free(arena);
-#endif	
+#else /* WITH_ELTOPO */
+	for ( i = 0; i < numresult; i++ )
+	{
+		*collisions_index = cloth_collision ( ( ModifierData * ) clmd, ( ModifierData * ) collmd,
+											  overlap+i, *collisions_index, dt );
+	}
+#endif /* WITH_ELTOPO */
+
 }
 
 static int cloth_bvh_objcollisions_resolve ( ClothModifierData * clmd, CollisionModifierData *collmd, CollPair *collisions, CollPair *collisions_index)
@@ -2160,15 +2327,19 @@ static int cloth_bvh_objcollisions_resolve ( ClothModifierData * clmd, Collision
 
 		if ( collmd->bvhtree )
 		{
-#ifdef USE_ELTOPO
+#ifdef WITH_ELTOPO
 			result += cloth_collision_response_moving(clmd, collmd, collisions, collisions_index);
 			result += cloth_edge_collision_response_moving(clmd, collmd, collisions, collisions_index);
 #else
 			result += cloth_collision_response_static ( clmd, collmd, collisions, collisions_index );
 #endif
+#ifdef WITH_ELTOPO
+			{
+#else
 			// apply impulses in parallel
 			if ( result )
 			{
+#endif
 				for ( i = 0; i < numverts; i++ )
 				{
 					// calculate "velocities" (just xnew = xold + v; no dt in v)
@@ -2201,7 +2372,7 @@ int cloth_bvh_objcollision (Object *ob, ClothModifierData * clmd, float step, fl
 
 	if ((clmd->sim_parms->flags & CLOTH_SIMSETTINGS_FLAG_COLLOBJ) || cloth_bvh==NULL)
 		return 0;
-
+	
 	verts = cloth->verts;
 	numfaces = cloth->numfaces;
 	numverts = cloth->numverts;
@@ -2249,7 +2420,8 @@ int cloth_bvh_objcollision (Object *ob, ClothModifierData * clmd, float step, fl
 			// go to next object if no overlap is there
 			if( result && overlap ) {
 				/* check if collisions really happen (costly near check) */
-				cloth_bvh_objcollisions_nearcheck ( clmd, collmd, &collisions[i], &collisions_index[i], result, overlap);
+				cloth_bvh_objcollisions_nearcheck ( clmd, collmd, &collisions[i], 
+					&collisions_index[i], result, overlap, dt/(float)clmd->coll_parms->loop_count);
 			
 				// resolve nearby collisions
 				ret += cloth_bvh_objcollisions_resolve ( clmd, collmd, collisions[i],  collisions_index[i]);
@@ -2405,5 +2577,5 @@ int cloth_bvh_objcollision (Object *ob, ClothModifierData * clmd, float step, fl
 	if(collobjs)
 		MEM_freeN(collobjs);
 
-	return MIN2 ( ret, 1 );
+	return 1|MIN2 ( ret, 1 );
 }

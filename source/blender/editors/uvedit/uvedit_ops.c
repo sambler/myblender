@@ -347,6 +347,17 @@ void uvedit_uv_deselect(Scene *scene, EditFace *efa, MTFace *tf, int i)
 		tf->flag &= ~TF_SEL_MASK(i);
 }
 
+/*********************** live unwrap utilities ***********************/
+
+static void uvedit_live_unwrap_update(SpaceImage *sima, Scene *scene, Object *obedit)
+{
+	if(sima && (sima->flag & SI_LIVE_UNWRAP)) {
+		ED_uvedit_live_unwrap_begin(scene, obedit);
+		ED_uvedit_live_unwrap_re_solve();
+		ED_uvedit_live_unwrap_end(0);
+	}
+}
+
 /*********************** geometric utilities ***********************/
 
 void uv_center(float uv[][2], float cent[2], int quad)
@@ -408,7 +419,7 @@ int ED_uvedit_minmax(Scene *scene, Image *ima, Object *obedit, float *min, float
 	return sel;
 }
 
-int ED_uvedit_median(Scene *scene, Image *ima, Object *obedit, float co[3])
+static int ED_uvedit_median(Scene *scene, Image *ima, Object *obedit, float co[3])
 {
 	EditMesh *em= BKE_mesh_get_editmesh((Mesh*)obedit->data);
 	EditFace *efa;
@@ -976,6 +987,7 @@ static void select_linked(Scene *scene, Image *ima, EditMesh *em, float limit[2]
 
 static void weld_align_uv(bContext *C, int tool)
 {
+	SpaceImage *sima;
 	Scene *scene;
 	Object *obedit;
 	Image *ima;
@@ -988,6 +1000,7 @@ static void weld_align_uv(bContext *C, int tool)
 	obedit= CTX_data_edit_object(C);
 	em= BKE_mesh_get_editmesh((Mesh*)obedit->data);
 	ima= CTX_data_edit_image(C);
+	sima= CTX_wm_space_image(C);
 
 	INIT_MINMAX2(min, max);
 
@@ -1044,6 +1057,7 @@ static void weld_align_uv(bContext *C, int tool)
 		}
 	}
 
+	uvedit_live_unwrap_update(sima, scene, obedit);
 	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 
@@ -1111,6 +1125,7 @@ typedef struct UVVertAverage {
 
 static int stitch_exec(bContext *C, wmOperator *op)
 {
+	SpaceImage *sima;
 	Scene *scene;
 	Object *obedit;
 	EditMesh *em;
@@ -1123,6 +1138,7 @@ static int stitch_exec(bContext *C, wmOperator *op)
 	obedit= CTX_data_edit_object(C);
 	em= BKE_mesh_get_editmesh((Mesh*)obedit->data);
 	ima= CTX_data_edit_image(C);
+	sima= CTX_wm_space_image(C);
 	
 	if(RNA_boolean_get(op->ptr, "use_limit")) {
 		UvVertMap *vmap;
@@ -1265,6 +1281,7 @@ static int stitch_exec(bContext *C, wmOperator *op)
 		MEM_freeN(uv_average);
 	}
 
+	uvedit_live_unwrap_update(sima, scene, obedit);
 	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 
@@ -1287,59 +1304,6 @@ static void UV_OT_stitch(wmOperatorType *ot)
 	/* properties */
 	RNA_def_boolean(ot->srna, "use_limit", 1, "Use Limit", "Stitch UVs within a specified limit distance.");
 	RNA_def_float(ot->srna, "limit", 0.01f, 0.0f, FLT_MAX, "Limit", "Limit distance in normalized coordinates.", -FLT_MAX, FLT_MAX);
-}
-
-/* ******************** (de)select all operator **************** */
-
-static int select_inverse_exec(bContext *C, wmOperator *UNUSED(op))
-{
-	Scene *scene;
-	ToolSettings *ts;
-	Object *obedit;
-	EditMesh *em;
-	EditFace *efa;
-	Image *ima;
-	MTFace *tf;
-	
-	scene= CTX_data_scene(C);
-	ts= CTX_data_tool_settings(C);
-	obedit= CTX_data_edit_object(C);
-	em= BKE_mesh_get_editmesh((Mesh*)obedit->data);
-	ima= CTX_data_edit_image(C);
-
-	if(ts->uv_flag & UV_SYNC_SELECTION) {
-		EM_select_swap(em);
-	}
-	else {
-		for(efa= em->faces.first; efa; efa= efa->next) {
-			tf = CustomData_em_get(&em->fdata, efa->data, CD_MTFACE);
-
-			if(uvedit_face_visible(scene, ima, efa, tf)) {
-				tf->flag ^= TF_SEL1;
-				tf->flag ^= TF_SEL2;
-				tf->flag ^= TF_SEL3;
-				if(efa->v4) tf->flag ^= TF_SEL4;
-			}
-		}
-	}
-
-	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
-
-	BKE_mesh_end_editmesh(obedit->data, em);
-	return OPERATOR_FINISHED;
-}
-
-static void UV_OT_select_inverse(wmOperatorType *ot)
-{
-	/* identifiers */
-	ot->name= "Select Inverse";
-	ot->description= "Select inverse of (un)selected UV vertices";
-	ot->idname= "UV_OT_select_inverse";
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
-	
-	/* api callbacks */
-	ot->exec= select_inverse_exec;
-	ot->poll= ED_operator_uvedit;
 }
 
 /* ******************** (de)select all operator **************** */
@@ -1408,11 +1372,7 @@ static int select_all_exec(bContext *C, wmOperator *op)
 					tf->flag &= ~select_flag;
 					break;
 				case SEL_INVERT:
-					if ((tf->flag & select_flag) == select_flag) {
-						tf->flag &= ~select_flag;
-					} else {
-						tf->flag &= ~select_flag;
-					}
+					tf->flag ^= select_flag;
 					break;
 				}
 			}
@@ -1770,7 +1730,7 @@ static void UV_OT_select(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Select";
-	ot->description= "Select UV vertice";
+	ot->description= "Select UV vertices";
 	ot->idname= "UV_OT_select";
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 	
@@ -2314,7 +2274,7 @@ static int circle_select_exec(bContext *C, wmOperator *op)
 	int x, y, radius, width, height, select;
 	float zoomx, zoomy, offset[2], ellipse[2];
 	int gesture_mode= RNA_int_get(op->ptr, "gesture_mode");
-    
+
 	/* get operator properties */
 	select= (gesture_mode == GESTURE_MODAL_SELECT);
 	x= RNA_int_get(op->ptr, "x");
@@ -2653,7 +2613,8 @@ static int snap_selection_exec(bContext *C, wmOperator *op)
 
 	if(!change)
 		return OPERATOR_CANCELLED;
-	
+
+	uvedit_live_unwrap_update(sima, scene, obedit);
 	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 
@@ -3178,7 +3139,6 @@ static void UV_OT_tile_set(wmOperatorType *ot)
 void ED_operatortypes_uvedit(void)
 {
 	WM_operatortype_append(UV_OT_select_all);
-	WM_operatortype_append(UV_OT_select_inverse);
 	WM_operatortype_append(UV_OT_select);
 	WM_operatortype_append(UV_OT_select_loop);
 	WM_operatortype_append(UV_OT_select_linked);
@@ -3240,7 +3200,7 @@ void ED_keymap_uvedit(wmKeyConfig *keyconf)
 
 	WM_keymap_add_item(keymap, "UV_OT_unlink_selected", LKEY, KM_PRESS, KM_ALT, 0);
 	WM_keymap_add_item(keymap, "UV_OT_select_all", AKEY, KM_PRESS, 0, 0);
-	WM_keymap_add_item(keymap, "UV_OT_select_inverse", IKEY, KM_PRESS, KM_CTRL, 0);
+	RNA_enum_set(WM_keymap_add_item(keymap, "UV_OT_select_all", IKEY, KM_PRESS, KM_CTRL, 0)->ptr, "action", SEL_INVERT);
 	WM_keymap_add_item(keymap, "UV_OT_select_pinned", PKEY, KM_PRESS, KM_SHIFT, 0);
 
 	WM_keymap_add_menu(keymap, "IMAGE_MT_uvs_weldalign", WKEY, KM_PRESS, 0, 0);

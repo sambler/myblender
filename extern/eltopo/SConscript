@@ -24,5 +24,5 @@ elif sys.platform=='darwin':
 eltopo_src = env.Glob("common/*.cpp") + env.Glob("eltopo3d/*.cpp") + env.Glob("common/newsparse/*.cpp") + env.Glob("common/sparse/*.cpp") + env.Glob("common/meshes/*.cpp") + ["eltopo-capi.cpp"]
 incs = '. common eltopo3d common/newsparse common/meshes common/sparse'
 
-env.BlenderLib ( libname = 'extern_eltopo3d', sources=eltopo_src, includes=Split(incs), defines=Split(defs), libtype=['extern', 'player'], priority=[20,137], compileflags=cflags )
+env.BlenderLib ( libname = 'extern_eltopo3d', sources=eltopo_src, includes=Split(incs), defines=Split(defs), libtype=['extern','player'], priority=[20,137], compileflags=cflags )
 

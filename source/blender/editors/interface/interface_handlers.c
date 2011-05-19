@@ -298,7 +298,7 @@ static void ui_apply_but_func(bContext *C, uiBut *but)
 		after->func_arg3= but->func_arg3;
 
 		after->funcN= but->funcN;
-		after->func_argN= but->func_argN;
+		after->func_argN= MEM_dupallocN(but->func_argN);
 
 		after->rename_func= but->rename_func;
 		after->rename_arg1= but->rename_arg1;
@@ -402,6 +402,8 @@ static void ui_apply_but_funcs_after(bContext *C)
 			after.func(C, after.func_arg1, after.func_arg2);
 		if(after.funcN)
 			after.funcN(C, after.func_argN, after.func_arg2);
+		if(after.func_argN)
+			MEM_freeN(after.func_argN);
 		
 		if(after.handle_func)
 			after.handle_func(C, after.handle_func_arg, after.retval);
@@ -5532,10 +5534,6 @@ static int ui_mouse_motion_towards_check(uiBlock *block, uiPopupBlockHandle *men
 	int closer;
 
 	if(!menu->dotowards) return 0;
-	if((block->direction & UI_TOP) || (block->direction & UI_DOWN)) {
-		menu->dotowards= 0;
-		return menu->dotowards;
-	}
 
 	/* verify that we are moving towards one of the edges of the
 	 * menu block, in other words, in the triangle formed by the

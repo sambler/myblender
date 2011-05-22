@@ -162,11 +162,11 @@ void drawSnapping(const struct bContext *C, TransInfo *t)
 			invert_m4_m4(imat, rv3d->viewmat);
 
 			for (p = t->tsnap.points.first; p; p = p->next) {
-				drawcircball(GL_LINE_LOOP, p->co, view3d_pixel_size(rv3d, p->co) * size, imat);
+				drawcircball(GL_LINE_LOOP, p->co, ED_view3d_pixel_size(rv3d, p->co) * size, imat);
 			}
 
 			if (t->tsnap.status & POINT_INIT) {
-				drawcircball(GL_LINE_LOOP, t->tsnap.snapPoint, view3d_pixel_size(rv3d, t->tsnap.snapPoint) * size, imat);
+				drawcircball(GL_LINE_LOOP, t->tsnap.snapPoint, ED_view3d_pixel_size(rv3d, t->tsnap.snapPoint) * size, imat);
 			}
 			
 			/* draw normal if needed */
@@ -1581,7 +1581,7 @@ static int snapObjects(Scene *scene, View3D *v3d, ARegion *ar, Object *obedit, f
 	int retval = 0;
 	float ray_start[3], ray_normal[3];
 	
-	viewray(ar, v3d, mval, ray_start, ray_normal);
+	ED_view3d_win_to_ray(ar, v3d, mval, ray_start, ray_normal);
 
 	if (mode == SNAP_ALL && obedit)
 	{
@@ -1812,7 +1812,7 @@ static int peelObjects(Scene *scene, View3D *v3d, ARegion *ar, Object *obedit, L
 	int retval = 0;
 	float ray_start[3], ray_normal[3];
 	
-	viewray(ar, v3d, mval, ray_start, ray_normal);
+	ED_view3d_win_to_ray(ar, v3d, mval, ray_start, ray_normal);
 
 	for ( base = scene->base.first; base != NULL; base = base->next ) {
 		if ( BASE_SELECTABLE(v3d, base) ) {

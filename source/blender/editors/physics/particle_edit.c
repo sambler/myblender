@@ -385,7 +385,7 @@ static void PE_set_view3d_data(bContext *C, PEData *data)
 			/* we may need to force an update here by setting the rv3d as dirty
 			 * for now it seems ok, but take care!:
 			 * rv3d->depths->dirty = 1; */
-			view3d_update_depths(data->vc.ar);
+			ED_view3d_depth_update(data->vc.ar);
 		}
 	}
 }
@@ -1505,13 +1505,7 @@ static int select_linked_exec(bContext *C, wmOperator *op)
 
 static int select_linked_invoke(bContext *C, wmOperator *op, wmEvent *event)
 {
-	ARegion *ar= CTX_wm_region(C);
-	int location[2];
-
-	location[0]= event->x - ar->winrct.xmin;
-	location[1]= event->y - ar->winrct.ymin;
-	RNA_int_set_array(op->ptr, "location", location);
-
+	RNA_int_set_array(op->ptr, "location", event->mval);
 	return select_linked_exec(C, op);
 }
 
@@ -3250,7 +3244,7 @@ static int brush_add(PEData *data, short number)
 
 		mco[0]= data->mval[0] + dmx;
 		mco[1]= data->mval[1] + dmy;
-		viewline(data->vc.ar, data->vc.v3d, mco, co1, co2);
+		ED_view3d_win_to_segment_clip(data->vc.ar, data->vc.v3d, mco, co1, co2);
 
 		mul_m4_v3(imat,co1);
 		mul_m4_v3(imat,co2);
@@ -3507,6 +3501,7 @@ static void brush_edit_apply(bContext *C, wmOperator *op, PointerRNA *itemptr)
 		switch(pset->brushtype) {
 			case PE_BRUSH_COMB:
 			{
+				float mval_f[2];
 				data.mval= mval;
 				data.rad= (float)brush->size;
 
@@ -3518,7 +3513,9 @@ static void brush_edit_apply(bContext *C, wmOperator *op, PointerRNA *itemptr)
 
 				invert_m4_m4(ob->imat, ob->obmat);
 
-				window_to_3d_delta(ar, vec, dx, dy);
+				mval_f[0]= dx;
+				mval_f[1]= dy;
+				ED_view3d_win_to_delta(ar, mval_f, vec);
 				data.dvec= vec;
 
 				foreach_mouse_hit_key(&data, brush_comb, selected);
@@ -3682,12 +3679,10 @@ static int brush_edit_exec(bContext *C, wmOperator *op)
 
 static void brush_edit_apply_event(bContext *C, wmOperator *op, wmEvent *event)
 {
-	ARegion *ar= CTX_wm_region(C);
 	PointerRNA itemptr;
 	float mouse[2];
 
-	mouse[0]= event->x - ar->winrct.xmin;
-	mouse[1]= event->y - ar->winrct.ymin;
+	VECCOPY2D(mouse, event->mval);
 
 	/* fill in stroke */
 	RNA_collection_add(op->ptr, "stroke", &itemptr);

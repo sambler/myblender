@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/animation/anim_deps.c
+ *  \ingroup edanimation
+ */
+
+
 #include <string.h>
 
 #include "MEM_guardedalloc.h"
@@ -38,6 +43,7 @@
 #include "DNA_sequence_types.h"
 
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_animsys.h"
 #include "BKE_action.h"
@@ -90,7 +96,7 @@ void ANIM_list_elem_update(Scene *scene, bAnimListElem *ale)
 	else {
 		/* in other case we do standard depsgaph update, ideally
 		   we'd be calling property update functions here too ... */
-		DAG_id_flush_update(id, OB_RECALC_ALL); // XXX or do we want something more restrictive?
+		DAG_id_tag_update(id, OB_RECALC_OB|OB_RECALC_DATA|OB_RECALC_TIME); // XXX or do we want something more restrictive?
 	}
 }
 
@@ -106,7 +112,7 @@ void ANIM_id_update(Scene *UNUSED(scene), ID *id)
 			adt->recalc |= ADT_RECALC_ANIM;
 			
 		/* set recalc flags */
-		DAG_id_flush_update(id, OB_RECALC_ALL); // XXX or do we want something more restrictive?
+		DAG_id_tag_update(id, OB_RECALC_OB|OB_RECALC_DATA|OB_RECALC_TIME); // XXX or do we want something more restrictive?
 	}
 }
 

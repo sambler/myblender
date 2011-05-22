@@ -24,23 +24,34 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-FILE(GLOB SRC *.cpp)
-
-SET(INC
-	../../../../source/kernel/gen_system
+set(INC
 	../../../../intern/string
+	../../../../intern/container
 	../../../../intern/moto/include
 	../../../../source/gameengine/Rasterizer
 	../../../../source/gameengine/Ketsji
 	../../../../source/gameengine/SceneGraph
-	../../../../extern/glew/include
+	../../../../source/gameengine/BlenderRoutines
 	../../../../source/blender/gpu
 	../../../../source/blender/makesdna
 	../../../../source/blender/blenkernel
 	../../../../source/blender/blenlib
 	../../../../source/blender/blenloader
+	${GLEW_INCLUDE_PATH}
 )
 
-ADD_DEFINITIONS(-DGLEW_STATIC)
+set(SRC
+	RAS_GLExtensionManager.cpp
+	RAS_ListRasterizer.cpp
+	RAS_OpenGLRasterizer.cpp
+	RAS_VAOpenGLRasterizer.cpp
 
-BLENDERLIB(bf_oglrasterizer "${SRC}" "${INC}")
+	RAS_GLExtensionManager.h
+	RAS_ListRasterizer.h
+	RAS_OpenGLRasterizer.h
+	RAS_VAOpenGLRasterizer.h
+)
+
+add_definitions(-DGLEW_STATIC)
+
+blender_add_lib(ge_oglrasterizer "${SRC}" "${INC}")

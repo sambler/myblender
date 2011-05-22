@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -24,6 +24,11 @@
  *
  * ***** END GPL/BL DUAL LICENSE BLOCK *****
  */
+
+/** \file blender/render/intern/source/renderdatabase.c
+ *  \ingroup render
+ */
+
 
 /*
  * Storage, retrieval and query of render specific data.
@@ -58,10 +63,11 @@
 #include <string.h>
 
 #include "MEM_guardedalloc.h"
-#include "BKE_utildefines.h"
+
 
 #include "BLI_math.h"
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 #include "BLI_ghash.h"
 #include "BLI_memarena.h"
 
@@ -75,8 +81,8 @@
 #include "BKE_DerivedMesh.h"
 
 #include "RE_render_ext.h"	/* externtex */
-#include "RE_raytrace.h"
 
+#include "rayobject.h"
 #include "renderpipeline.h"
 #include "render_types.h"
 #include "renderdatabase.h"
@@ -108,7 +114,7 @@
 #define RE_RADFACE_ELEMS	1
 #define RE_SIMPLIFY_ELEMS	2
 #define RE_FACE_ELEMS		1
-#define RE_NMAP_TANGENT_ELEMS	12
+#define RE_NMAP_TANGENT_ELEMS	16
 
 float *RE_vertren_get_sticky(ObjectRen *obr, VertRen *ver, int verify)
 {
@@ -294,7 +300,7 @@ MTFace *RE_vlakren_get_tface(ObjectRen *obr, VlakRen *vlr, int n, char **name, i
 	if(verify) {
 		if(n>=node->totmtface) {
 			MTFace *mtface= node->mtface;
-			int size= size= (n+1)*256;
+			int size= (n+1)*256;
 
 			node->mtface= MEM_callocN(size*sizeof(MTFace), "Vlak mtface");
 
@@ -776,7 +782,7 @@ void free_renderdata_vlaknodes(VlakTableNode *vlaknodes)
 	MEM_freeN(vlaknodes);
 }
 
-void free_renderdata_strandnodes(StrandTableNode *strandnodes)
+static void free_renderdata_strandnodes(StrandTableNode *strandnodes)
 {
 	int a;
 	
@@ -999,6 +1005,7 @@ HaloRen *RE_inithalo(Render *re, ObjectRen *obr, Material *ma,   float *vec,   f
 	if(ma->mtex[0]) {
 
 		if( (ma->mode & MA_HALOTEX) ) har->tex= 1;
+		else if(har->mat->septex & (1<<0));	/* only 1 level textures */
 		else {
 
 			mtex= ma->mtex[0];
@@ -1042,13 +1049,13 @@ HaloRen *RE_inithalo(Render *re, ObjectRen *obr, Material *ma,   float *vec,   f
 }
 
 HaloRen *RE_inithalo_particle(Render *re, ObjectRen *obr, DerivedMesh *dm, Material *ma,   float *vec,   float *vec1, 
-				  float *orco, float *uvco, float hasize, float vectsize, int seed)
+				  float *orco, float *uvco, float hasize, float vectsize, int seed, float *pa_co)
 {
 	HaloRen *har;
 	MTex *mtex;
 	float tin, tr, tg, tb, ta;
 	float xn, yn, zn, texvec[3], hoco[4], hoco1[4], in[3],tex[3],out[3];
-	int i;
+	int i, hasrgb;
 
 	if(hasize==0.0) return NULL;
 
@@ -1122,16 +1129,8 @@ HaloRen *RE_inithalo_particle(Render *re, ObjectRen *obr, DerivedMesh *dm, Mater
 				;
 			}
 			else if(mtex->texco & TEXCO_OBJECT) {
-				if(mtex->object){
-					float imat[4][4];
-					/* imat should really be cached somewhere before this */
-					invert_m4_m4(imat,mtex->object->obmat);
-					mul_m4_v3(imat,texvec);
-				}
-				/* texvec[0]+= imatbase->ivec[0]; */
-				/* texvec[1]+= imatbase->ivec[1]; */
-				/* texvec[2]+= imatbase->ivec[2]; */
-				/* mul_m3_v3(imatbase->imat, texvec); */
+				if(mtex->object)
+					mul_m4_v3(mtex->object->imat_ren,texvec);
 			}
 			else if(mtex->texco & TEXCO_GLOB){
 				VECCOPY(texvec,vec);
@@ -1147,11 +1146,17 @@ HaloRen *RE_inithalo_particle(Render *re, ObjectRen *obr, DerivedMesh *dm, Mater
 				texvec[1]=2.0f*uvco[2*uv_index+1]-1.0f;
 				texvec[2]=0.0f;
 			}
+			else if(mtex->texco & TEXCO_PARTICLE) {
+				/* particle coordinates in range [0,1] */
+				texvec[0] = 2.f * pa_co[0] - 1.f;
+				texvec[1] = 2.f * pa_co[1] - 1.f;
+				texvec[2] = pa_co[2];
+			}
 			else if(orco) {
 				VECCOPY(texvec, orco);
 			}
 
-			externtex(mtex, texvec, &tin, &tr, &tg, &tb, &ta, 0);
+			hasrgb = externtex(mtex, texvec, &tin, &tr, &tg, &tb, &ta, 0);
 
 			//yn= tin*mtex->colfac;
 			//zn= tin*mtex->alphafac;
@@ -1172,12 +1177,22 @@ HaloRen *RE_inithalo_particle(Render *re, ObjectRen *obr, DerivedMesh *dm, Mater
 				har->g= in[1];
 				har->b= in[2];
 			}
+
+			/* alpha returned, so let's use it instead of intensity */
+			if(hasrgb)
+				tin = ta;
+
 			if(mtex->mapto & MAP_ALPHA)
 				har->alfa = texture_value_blend(mtex->def_var,har->alfa,tin,mtex->alphafac,mtex->blendtype);
 			if(mtex->mapto & MAP_HAR)
 				har->hard = 1.0+126.0*texture_value_blend(mtex->def_var,((float)har->hard)/127.0,tin,mtex->hardfac,mtex->blendtype);
 			if(mtex->mapto & MAP_RAYMIRR)
 				har->hasize = 100.0*texture_value_blend(mtex->def_var,har->hasize/100.0,tin,mtex->raymirrfac,mtex->blendtype);
+			if(mtex->mapto & MAP_TRANSLU) {
+				float add = texture_value_blend(mtex->def_var,(float)har->add/255.0,tin,mtex->translfac,mtex->blendtype);
+				CLAMP(add, 0.f, 1.f);
+				har->add = 255.0*add;
+			}
 			/* now what on earth is this good for?? */
 			//if(mtex->texco & 16) {
 			//	har->alfa= tin;
@@ -1382,19 +1397,21 @@ int clip_render_object(float boundbox[][3], float *bounds, float winmat[][4])
 
 		fl= 0;
 		if(bounds) {
-			if(vec[0] > bounds[1]*vec[3]) fl |= 1;
-			if(vec[0]< bounds[0]*vec[3]) fl |= 2;
+			if(vec[0] < bounds[0]*vec[3]) fl |= 1;
+			else if(vec[0] > bounds[1]*vec[3]) fl |= 2;
+			
 			if(vec[1] > bounds[3]*vec[3]) fl |= 4;
-			if(vec[1]< bounds[2]*vec[3]) fl |= 8;
+			else if(vec[1]< bounds[2]*vec[3]) fl |= 8;
 		}
 		else {
 			if(vec[0] < -vec[3]) fl |= 1;
-			if(vec[0] > vec[3]) fl |= 2;
-			if(vec[1] < -vec[3]) fl |= 4;
-			if(vec[1] > vec[3]) fl |= 8;
+			else if(vec[0] > vec[3]) fl |= 2;
+			
+			if(vec[1] > vec[3]) fl |= 4;
+			else if(vec[1] < -vec[3]) fl |= 8;
 		}
 		if(vec[2] < -vec[3]) fl |= 16;
-		if(vec[2] > vec[3]) fl |= 32;
+		else if(vec[2] > vec[3]) fl |= 32;
 
 		flag &= fl;
 		if(flag==0) return 0;

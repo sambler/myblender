@@ -24,31 +24,22 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-SET(SRC 
-	GPG_Application.cpp
-	GPG_Canvas.cpp
-	GPG_ghost.cpp
-	GPG_KeyboardDevice.cpp
-	GPG_System.cpp
-)
-
-SET(INC
+set(INC
 	.
 	../../../../intern/string
 	../../../../intern/ghost
 	../../../../intern/guardedalloc
+	../../../../intern/container
 	../../../../intern/moto/include
 	../../../../source/gameengine/Rasterizer/RAS_OpenGLRasterizer
-	../../../../source/kernel/gen_system
-	../../../../source/kernel/gen_messaging
+	../../../../source/gameengine/BlenderRoutines
 	../../../../source/gameengine/Converter
 	../../../../source/blender/imbuf
 	../../../../source/gameengine/Ketsji
+	../../../../source/blender/blenfont
 	../../../../source/blender/blenlib
 	../../../../source/blender/blenkernel
-	../../../../source/blender/readblenfile
 	../../../../source/blender
-	../../../../source/blender/include
 	../../../../source/blender/makesdna
 	../../../../source/blender/makesrna
 	../../../../source/gameengine/Rasterizer
@@ -59,17 +50,29 @@ SET(INC
 	../../../../source/gameengine/Physics/common
 	../../../../source/gameengine/Network/LoopBackNetwork
 	../../../../source/gameengine/GamePlayer/common
-	../../../../source/blender/misc
 	../../../../source/blender/blenloader
 	../../../../source/blender/gpu
-	../../../../extern/glew/include
-	${PYTHON_INC}
+	${GLEW_INCLUDE_PATH}
+	${PYTHON_INCLUDE_DIRS}
 )
 
-ADD_DEFINITIONS(-DGLEW_STATIC)
+set(SRC 
+	GPG_Application.cpp
+	GPG_Canvas.cpp
+	GPG_ghost.cpp
+	GPG_KeyboardDevice.cpp
+	GPG_System.cpp
 
-IF(WITH_FFMPEG)
-	ADD_DEFINITIONS(-DWITH_FFMPEG)
-ENDIF(WITH_FFMPEG)
+	GPG_Application.h
+	GPG_Canvas.h
+	GPG_KeyboardDevice.h
+	GPG_System.h
+)
 
-BLENDERLIB_NOLIST(gp_ghost "${SRC}" "${INC}")
+add_definitions(-DGLEW_STATIC)
+
+if(WITH_CODEC_FFMPEG)
+	add_definitions(-DWITH_FFMPEG)
+endif()
+
+blender_add_lib_nolist(ge_player_ghost "${SRC}" "${INC}")

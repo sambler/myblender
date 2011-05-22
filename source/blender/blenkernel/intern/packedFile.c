@@ -1,4 +1,4 @@
-/**
+/*
  * blenkernel/packedFile.c - (cleaned up mar-01 nzc)
  *
  * $Id$
@@ -29,6 +29,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/blenkernel/intern/packedFile.c
+ *  \ingroup bke
+ */
+
+
 #include <stdio.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -47,6 +52,7 @@
 #include "DNA_packedFile_types.h"
 
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_utildefines.h"
 #include "BKE_global.h"
@@ -162,7 +168,7 @@ PackedFile *newPackedFileMemory(void *mem, int memlen)
 	return pf;
 }
 
-PackedFile *newPackedFile(ReportList *reports, char *filename)
+PackedFile *newPackedFile(ReportList *reports, const char *filename)
 {
 	PackedFile *pf = NULL;
 	int file, filelen;
@@ -179,7 +185,7 @@ PackedFile *newPackedFile(ReportList *reports, char *filename)
 	// convert relative filenames to absolute filenames
 	
 	strcpy(name, filename);
-	BLI_path_abs(name, G.sce);
+	BLI_path_abs(name, G.main->name);
 	
 	// open the file
 	// and create a PackedFile structure
@@ -227,7 +233,7 @@ void packAll(Main *bmain, ReportList *reports)
 	}
 
 	for(vf=bmain->vfont.first; vf; vf=vf->id.next)
-		if(vf->packedfile == NULL && vf->id.lib==NULL && strcmp(vf->name, "<builtin>") != 0)
+		if(vf->packedfile == NULL && vf->id.lib==NULL && strcmp(vf->name, FO_BUILTIN_NAME) != 0)
 			vf->packedfile = newPackedFile(reports, vf->name);
 
 	for(sound=bmain->sound.first; sound; sound=sound->id.next)
@@ -263,7 +269,7 @@ static char *find_new_name(char *name)
 	
 */
 
-int writePackedFile(ReportList *reports, char *filename, PackedFile *pf, int guimode)
+int writePackedFile(ReportList *reports, const char *filename, PackedFile *pf, int guimode)
 {
 	int file, number, remove_tmp = FALSE;
 	int ret_value = RET_OK;
@@ -274,7 +280,7 @@ int writePackedFile(ReportList *reports, char *filename, PackedFile *pf, int gui
 	if (guimode) {} //XXX  waitcursor(1);
 	
 	strcpy(name, filename);
-	BLI_path_abs(name, G.sce);
+	BLI_path_abs(name, G.main->name);
 	
 	if (BLI_exists(name)) {
 		for (number = 1; number <= 999; number++) {
@@ -331,7 +337,7 @@ PF_NOFILE		- the original file doens't exist
 
 */
 
-int checkPackedFile(char *filename, PackedFile *pf)
+int checkPackedFile(const char *filename, PackedFile *pf)
 {
 	struct stat st;
 	int ret_val, i, len, file;
@@ -339,7 +345,7 @@ int checkPackedFile(char *filename, PackedFile *pf)
 	char name[FILE_MAXDIR + FILE_MAXFILE];
 	
 	strcpy(name, filename);
-	BLI_path_abs(name, G.sce);
+	BLI_path_abs(name, G.main->name);
 	
 	if (stat(name, &st)) {
 		ret_val = PF_NOFILE;
@@ -458,7 +464,7 @@ int unpackVFont(ReportList *reports, VFont *vfont, int how)
 		if (newname != NULL) {
 			ret_value = RET_OK;
 			freePackedFile(vfont->packedfile);
-			vfont->packedfile = 0;
+			vfont->packedfile = NULL;
 			strcpy(vfont->name, newname);
 			MEM_freeN(newname);
 		}
@@ -467,7 +473,7 @@ int unpackVFont(ReportList *reports, VFont *vfont, int how)
 	return (ret_value);
 }
 
-int unpackSound(ReportList *reports, bSound *sound, int how)
+int unpackSound(Main *bmain, ReportList *reports, bSound *sound, int how)
 {
 	char localname[FILE_MAXDIR + FILE_MAX], fi[FILE_MAX];
 	char *newname;
@@ -484,9 +490,9 @@ int unpackSound(ReportList *reports, bSound *sound, int how)
 			MEM_freeN(newname);
 
 			freePackedFile(sound->packedfile);
-			sound->packedfile = 0;
+			sound->packedfile = NULL;
 
-			sound_load(sound);
+			sound_load(bmain, sound);
 
 			ret_value = RET_OK;
 		}
@@ -536,6 +542,6 @@ void unpackAll(Main *bmain, ReportList *reports, int how)
 
 	for(sound=bmain->sound.first; sound; sound=sound->id.next)
 		if(sound->packedfile)
-			unpackSound(reports, sound, how);
+			unpackSound(bmain, reports, sound, how);
 }
 

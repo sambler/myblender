@@ -1,4 +1,4 @@
-/**
+/*
  *
  * $Id$
  *
@@ -26,6 +26,11 @@
  * ***** END GPL/BL DUAL LICENSE BLOCK *****
  */
 
+/** \file blender/render/intern/source/imagetexture.c
+ *  \ingroup render
+ */
+
+
 
 
 #include <stdio.h>
@@ -51,13 +56,15 @@
 #include "BLI_math.h"
 #include "BLI_blenlib.h"
 #include "BLI_threads.h"
+#include "BLI_utildefines.h"
 
-#include "BKE_utildefines.h"
 #include "BKE_global.h"
 #include "BKE_main.h"
 #include "BKE_image.h"
 #include "BKE_texture.h"
 #include "BKE_library.h"
+
+#include "RE_render_ext.h"
 
 #include "renderpipeline.h"
 #include "render_types.h"
@@ -151,9 +158,9 @@ int imagewrap(Tex *tex, Image *ima, ImBuf *ibuf, float *texvec, TexResult *texre
 			if((xs+ys) & 1) return retval; 
 		}
 		/* scale around center, (0.5, 0.5) */
-		if(tex->checkerdist<1.0) {
-			fx= (fx-0.5)/(1.0-tex->checkerdist) +0.5;
-			fy= (fy-0.5)/(1.0-tex->checkerdist) +0.5;
+		if(tex->checkerdist<1.0f) {
+			fx= (fx-0.5f)/(1.0f-tex->checkerdist) +0.5f;
+			fy= (fy-0.5f)/(1.0f-tex->checkerdist) +0.5f;
 		}
 	}
 
@@ -161,7 +168,7 @@ int imagewrap(Tex *tex, Image *ima, ImBuf *ibuf, float *texvec, TexResult *texre
 	y = (int)floorf(fy*ibuf->y);
 
 	if(tex->extend == TEX_CLIPCUBE) {
-		if(x<0 || y<0 || x>=ibuf->x || y>=ibuf->y || texvec[2]<-1.0 || texvec[2]>1.0) {
+		if(x<0 || y<0 || x>=ibuf->x || y>=ibuf->y || texvec[2]<-1.0f || texvec[2]>1.0f) {
 			return retval;
 		}
 	}
@@ -208,8 +215,14 @@ int imagewrap(Tex *tex, Image *ima, ImBuf *ibuf, float *texvec, TexResult *texre
 	if(texres->nor) {
 		if(tex->imaflag & TEX_NORMALMAP) {
 			// qdn: normal from color
-			texres->nor[0] = 2.f*(texres->tr - 0.5f);
-			texres->nor[1] = 2.f*(0.5f - texres->tg);
+			// The invert of the red channel is to make
+			// the normal map compliant with the outside world.
+			// It needs to be done because in Blender
+			// the normal used in the renderer points inward. It is generated
+			// this way in calc_vertexnormals(). Should this ever change
+			// this negate must be removed.
+			texres->nor[0] = -2.f*(texres->tr - 0.5f);
+			texres->nor[1] = 2.f*(texres->tg - 0.5f);
 			texres->nor[2] = 2.f*(texres->tb - 0.5f);
 		}
 		else {
@@ -245,7 +258,7 @@ int imagewrap(Tex *tex, Image *ima, ImBuf *ibuf, float *texvec, TexResult *texre
 	if(tex->flag & TEX_NEGALPHA) texres->ta= 1.0f-texres->ta;
 
 	/* de-premul, this is being premulled in shade_input_do_shade() */
-	if(texres->ta!=1.0f && texres->ta>FLT_EPSILON) {
+	if(texres->ta!=1.0f && texres->ta>1e-4f) {
 		fx= 1.0f/texres->ta;
 		texres->tr*= fx;
 		texres->tg*= fx;
@@ -387,7 +400,7 @@ static float clipx_rctf(rctf *rf, float x1, float x2)
 		rf->xmin = rf->xmax;
 		return 0.0;
 	}
-	else if(size!=0.0) {
+	else if(size!=0.0f) {
 		return (rf->xmax - rf->xmin)/size;
 	}
 	return 1.0;
@@ -410,7 +423,7 @@ static float clipy_rctf(rctf *rf, float y1, float y2)
 		rf->ymin = rf->ymax;
 		return 0.0;
 	}
-	else if(size!=0.0) {
+	else if(size!=0.0f) {
 		return (rf->ymax - rf->ymin)/size;
 	}
 	return 1.0;
@@ -469,12 +482,12 @@ static void boxsampleclip(struct ImBuf *ibuf, rctf *rf, TexResult *texres)
 
 					ibuf_get_color(col, ibuf, x, y);
 					
-					if(mulx==1.0) {
+					if(mulx==1.0f) {
 						texres->ta+= col[3];
 						texres->tr+= col[0];
 						texres->tg+= col[1];
 						texres->tb+= col[2];
-						div+= 1.0;
+						div+= 1.0f;
 					}
 					else {
 						texres->ta+= mulx*col[3];
@@ -487,7 +500,7 @@ static void boxsampleclip(struct ImBuf *ibuf, rctf *rf, TexResult *texres)
 			}
 		}
 
-		if(div!=0.0) {
+		if(div!=0.0f) {
 			div= 1.0f/div;
 			texres->tb*= div;
 			texres->tg*= div;
@@ -508,6 +521,7 @@ static void boxsample(ImBuf *ibuf, float minx, float miny, float maxx, float max
    * clipped-away parts are sampled as well.
    */
 	/* note: actually minx etc isnt in the proper range... this due to filter size and offset vectors for bump */
+	/* note: talpha must be initialized */
 	TexResult texr;
 	rctf *rf, stack[8];
 	float opp, tot, alphaclip= 1.0;
@@ -530,7 +544,7 @@ static void boxsample(ImBuf *ibuf, float minx, float miny, float maxx, float max
 	else {
 		alphaclip= clipx_rctf(rf, 0.0, (float)(ibuf->x));
 
-		if(alphaclip<=0.0) {
+		if(alphaclip<=0.0f) {
 			texres->tr= texres->tb= texres->tg= texres->ta= 0.0;
 			return;
 		}
@@ -545,7 +559,7 @@ static void boxsample(ImBuf *ibuf, float minx, float miny, float maxx, float max
 	else {
 		alphaclip*= clipy_rctf(rf, 0.0, (float)(ibuf->y));
 
-		if(alphaclip<=0.0) {
+		if(alphaclip<=0.0f) {
 			texres->tr= texres->tb= texres->tg= texres->ta= 0.0;
 			return;
 		}
@@ -565,7 +579,7 @@ static void boxsample(ImBuf *ibuf, float minx, float miny, float maxx, float max
 			if(texres->talpha) texres->ta+= opp*texr.ta;
 			rf++;
 		}
-		if(tot!= 0.0) {
+		if(tot!= 0.0f) {
 			texres->tr/= tot;
 			texres->tg/= tot;
 			texres->tb/= tot;
@@ -577,7 +591,7 @@ static void boxsample(ImBuf *ibuf, float minx, float miny, float maxx, float max
 
 	if(texres->talpha==0) texres->ta= 1.0;
 	
-	if(alphaclip!=1.0) {
+	if(alphaclip!=1.0f) {
 		/* premul it all */
 		texres->tr*= alphaclip;
 		texres->tg*= alphaclip;
@@ -808,7 +822,7 @@ static void imp2radangle(float A, float B, float C, float F, float* a, float* b,
 static void ewa_eval(TexResult* texr, ImBuf* ibuf, float fx, float fy, afdata_t* AFD)
 {
 	// scaling dxt/dyt by full resolution can cause overflow because of huge A/B/C and esp. F values,
-	// scaling by aspect ratio alone does the opposite, so try something inbetween instead...
+	// scaling by aspect ratio alone does the opposite, so try something in between instead...
 	const float ff2 = ibuf->x, ff = sqrtf(ff2), q = ibuf->y / ff;
 	const float Ux = AFD->dxt[0]*ff, Vx = AFD->dxt[1]*q, Uy = AFD->dyt[0]*ff, Vy = AFD->dyt[1]*q;
 	float A = Vx*Vx + Vy*Vy;
@@ -945,12 +959,12 @@ static void alpha_clip_aniso(ImBuf *ibuf, float minx, float miny, float maxx, fl
 		rf.xmax= maxx*(ibuf->x);
 		rf.ymin= miny*(ibuf->y);
 		rf.ymax= maxy*(ibuf->y);
-   
+
 		alphaclip = clipx_rctf(&rf, 0.0, (float)(ibuf->x));
 		alphaclip*= clipy_rctf(&rf, 0.0, (float)(ibuf->y));
 		alphaclip= MAX2(alphaclip, 0.0f);
 
-		if(alphaclip!=1.0) {
+		if(alphaclip!=1.0f) {
 			/* premul it all */
 			texres->tr*= alphaclip;
 			texres->tg*= alphaclip;
@@ -958,6 +972,30 @@ static void alpha_clip_aniso(ImBuf *ibuf, float minx, float miny, float maxx, fl
 			texres->ta*= alphaclip;
 		}
 	}
+}
+
+static void image_mipmap_test(Tex *tex, ImBuf *ibuf)
+{
+	if (tex->imaflag & TEX_MIPMAP) {
+		if ((ibuf->flags & IB_fields) == 0) {
+			
+			if (ibuf->mipmap[0] && (ibuf->userflags & IB_MIPMAP_INVALID)) {
+				BLI_lock_thread(LOCK_IMAGE);
+				if (ibuf->userflags & IB_MIPMAP_INVALID) {
+					IMB_remakemipmap(ibuf, tex->imaflag & TEX_GAUSS_MIP);
+					ibuf->userflags &= ~IB_MIPMAP_INVALID;
+				}				
+				BLI_unlock_thread(LOCK_IMAGE);
+			}
+			if (ibuf->mipmap[0] == NULL) {
+				BLI_lock_thread(LOCK_IMAGE);
+				if (ibuf->mipmap[0] == NULL) 
+					IMB_makemipmap(ibuf, tex->imaflag & TEX_GAUSS_MIP);
+				BLI_unlock_thread(LOCK_IMAGE);
+			}
+		}
+	}
+	
 }
 
 static int imagewraposa_aniso(Tex *tex, Image *ima, ImBuf *ibuf, float *texvec, float *dxt, float *dyt, TexResult *texres)
@@ -996,15 +1034,9 @@ static int imagewraposa_aniso(Tex *tex, Image *ima, ImBuf *ibuf, float *texvec, 
 
 	if ((ibuf == NULL) || ((ibuf->rect == NULL) && (ibuf->rect_float == NULL))) return retval;
 
-	// mipmap test
-	if (tex->imaflag & TEX_MIPMAP) {
-		if (((ibuf->flags & IB_fields) == 0) && (ibuf->mipmap[0] == NULL)) {
-			BLI_lock_thread(LOCK_IMAGE);
-			if (ibuf->mipmap[0] == NULL) IMB_makemipmap(ibuf, tex->imaflag & TEX_GAUSS_MIP);
-			BLI_unlock_thread(LOCK_IMAGE);
-		}
-	}
-
+	/* mipmap test */
+	image_mipmap_test(tex, ibuf);
+	
 	if ((tex->imaflag & TEX_USEALPHA) && ((tex->imaflag & TEX_CALCALPHA) == 0)) texres->talpha = 1;
 	texr.talpha = texres->talpha;
 
@@ -1068,8 +1100,8 @@ static int imagewraposa_aniso(Tex *tex, Image *ima, ImBuf *ibuf, float *texvec, 
 	}
 
 	// side faces of unit-cube
-	minx = (minx > 0.25f) ? 0.25f : ((minx < 1e-5f) ? 1e-5 : minx);
-	miny = (miny > 0.25f) ? 0.25f : ((miny < 1e-5f) ? 1e-5 : miny);
+	minx = (minx > 0.25f) ? 0.25f : ((minx < 1e-5f) ? 1e-5f : minx);
+	miny = (miny > 0.25f) ? 0.25f : ((miny < 1e-5f) ? 1e-5f : miny);
 
 	// repeat and clip
 
@@ -1157,10 +1189,8 @@ static int imagewraposa_aniso(Tex *tex, Image *ima, ImBuf *ibuf, float *texvec, 
 	// brecht: added stupid clamping here, large dx/dy can give very large
 	// filter sizes which take ages to render, it may be better to do this
 	// more intelligently later in the code .. probably it's not noticeable
-	if(AFD.dxt[0]*AFD.dxt[0] + AFD.dxt[1]*AFD.dxt[1] > 2.0f*2.0f) {
+	if(AFD.dxt[0]*AFD.dxt[0] + AFD.dxt[1]*AFD.dxt[1] > 2.0f*2.0f)
 		mul_v2_fl(AFD.dxt, 2.0f/len_v2(AFD.dxt));
-		mul_v2_fl(AFD.dyt, 2.0f/len_v2(AFD.dyt));
-	}
 	if(AFD.dyt[0]*AFD.dyt[0] + AFD.dyt[1]*AFD.dyt[1] > 2.0f*2.0f)
 		mul_v2_fl(AFD.dyt, 2.0f/len_v2(AFD.dyt));
 
@@ -1328,8 +1358,14 @@ static int imagewraposa_aniso(Tex *tex, Image *ima, ImBuf *ibuf, float *texvec, 
 		ibuf->rect -= ibuf->x*ibuf->y;
 
 	if (texres->nor && (tex->imaflag & TEX_NORMALMAP)) {	// normal from color
-		texres->nor[0] = 2.f*(texres->tr - 0.5f);
-		texres->nor[1] = 2.f*(0.5f - texres->tg);
+		// The invert of the red channel is to make
+		// the normal map compliant with the outside world.
+		// It needs to be done because in Blender
+		// the normal used in the renderer points inward. It is generated
+		// this way in calc_vertexnormals(). Should this ever change
+		// this negate must be removed.
+		texres->nor[0] = -2.f*(texres->tr - 0.5f);
+		texres->nor[1] = 2.f*(texres->tg - 0.5f);
 		texres->nor[2] = 2.f*(texres->tb - 0.5f);
 	}
 	
@@ -1339,7 +1375,7 @@ static int imagewraposa_aniso(Tex *tex, Image *ima, ImBuf *ibuf, float *texvec, 
 
 	// brecht: tried to fix this, see "TXF alpha" comments
 
-	if (texres->ta != 1.f && (texres->ta > FLT_EPSILON)) {
+	if (texres->ta != 1.f && (texres->ta > 1e-4f)) {
 		fx = 1.f/texres->ta;
 		texres->tr *= fx;
 		texres->tg *= fx;
@@ -1385,20 +1421,10 @@ int imagewraposa(Tex *tex, Image *ima, ImBuf *ibuf, float *texvec, float *DXT, f
 		ibuf= BKE_image_get_ibuf(ima, &tex->iuser); 
 	}
 	if(ibuf==NULL || (ibuf->rect==NULL && ibuf->rect_float==NULL))
-	   return retval;
+		return retval;
 	
 	/* mipmap test */
-	if (tex->imaflag & TEX_MIPMAP) {
-		if(ibuf->flags & IB_fields);
-		else if(ibuf->mipmap[0]==NULL) {
-			BLI_lock_thread(LOCK_IMAGE);
-			
-			if(ibuf->mipmap[0]==NULL)
-				IMB_makemipmap(ibuf, tex->imaflag & TEX_GAUSS_MIP);
-
-			BLI_unlock_thread(LOCK_IMAGE);
-		}
-	}
+	image_mipmap_test(tex, ibuf);
 
 	if(tex->imaflag & TEX_USEALPHA) {
 		if(tex->imaflag & TEX_CALCALPHA);
@@ -1441,8 +1467,8 @@ int imagewraposa(Tex *tex, Image *ima, ImBuf *ibuf, float *texvec, float *DXT, f
 	
 	if(tex->imaflag & TEX_FILTER_MIN) {
 		/* make sure the filtersize is minimal in pixels (normal, ref map can have miniature pixel dx/dy) */
-		 float addval= (0.5f * tex->filtersize) / (float) MIN2(ibuf->x, ibuf->y);
- 		
+		float addval= (0.5f * tex->filtersize) / (float) MIN2(ibuf->x, ibuf->y);
+
 		if(addval > minx)
 			minx= addval;
 		if(addval > miny)
@@ -1460,9 +1486,9 @@ int imagewraposa(Tex *tex, Image *ima, ImBuf *ibuf, float *texvec, float *DXT, f
 
 	if(tex->imaflag & TEX_IMAROT) SWAP(float, minx, miny);
 	
-	if(minx>0.25) minx= 0.25;
+	if(minx>0.25f) minx= 0.25f;
 	else if(minx<0.00001f) minx= 0.00001f;	/* side faces of unit-cube */
-	if(miny>0.25) miny= 0.25;
+	if(miny>0.25f) miny= 0.25f;
 	else if(miny<0.00001f) miny= 0.00001f;
 
 	
@@ -1526,41 +1552,41 @@ int imagewraposa(Tex *tex, Image *ima, ImBuf *ibuf, float *texvec, float *DXT, f
 		}
 
 		/* scale around center, (0.5, 0.5) */
-		if(tex->checkerdist<1.0) {
-			fx= (fx-0.5)/(1.0-tex->checkerdist) +0.5;
-			fy= (fy-0.5)/(1.0-tex->checkerdist) +0.5;
-			minx/= (1.0-tex->checkerdist);
-			miny/= (1.0-tex->checkerdist);
+		if(tex->checkerdist<1.0f) {
+			fx= (fx-0.5f)/(1.0f-tex->checkerdist) +0.5f;
+			fy= (fy-0.5f)/(1.0f-tex->checkerdist) +0.5f;
+			minx/= (1.0f-tex->checkerdist);
+			miny/= (1.0f-tex->checkerdist);
 		}
 	}
 
 	if(tex->extend == TEX_CLIPCUBE) {
-		if(fx+minx<0.0 || fy+miny<0.0 || fx-minx>1.0 || fy-miny>1.0 || texvec[2]<-1.0 || texvec[2]>1.0) {
+		if(fx+minx<0.0f || fy+miny<0.0f || fx-minx>1.0f || fy-miny>1.0f || texvec[2]<-1.0f || texvec[2]>1.0f) {
 			return retval;
 		}
 	}
 	else if(tex->extend==TEX_CLIP || tex->extend==TEX_CHECKER) {
-		if(fx+minx<0.0 || fy+miny<0.0 || fx-minx>1.0 || fy-miny>1.0) {
+		if(fx+minx<0.0f || fy+miny<0.0f || fx-minx>1.0f || fy-miny>1.0f) {
 			return retval;
 		}
 	}
 	else {
 		if(imapextend) {
-			if(fx>1.0) fx = 1.0;
-			else if(fx<0.0) fx= 0.0;
+			if(fx>1.0f) fx = 1.0f;
+			else if(fx<0.0f) fx= 0.0f;
 		}
 		else {
-			if(fx>1.0) fx -= (int)(fx);
-			else if(fx<0.0) fx+= 1-(int)(fx);
+			if(fx>1.0f) fx -= (int)(fx);
+			else if(fx<0.0f) fx+= 1-(int)(fx);
 		}
 		
 		if(imapextend) {
-			if(fy>1.0) fy = 1.0;
-			else if(fy<0.0) fy= 0.0;
+			if(fy>1.0f) fy = 1.0f;
+			else if(fy<0.0f) fy= 0.0f;
 		}
 		else {
-			if(fy>1.0) fy -= (int)(fy);
-			else if(fy<0.0) fy+= 1-(int)(fy);
+			if(fy>1.0f) fy -= (int)(fy);
+			else if(fy<0.0f) fy+= 1-(int)(fy);
 		}
 	}
 
@@ -1577,7 +1603,7 @@ int imagewraposa(Tex *tex, Image *ima, ImBuf *ibuf, float *texvec, float *DXT, f
 		dx= minx;
 		dy= miny;
 		maxd= MAX2(dx, dy);
-		if(maxd>0.5) maxd= 0.5;
+		if(maxd>0.5f) maxd= 0.5f;
 
 		pixsize = 1.0f/ (float) MIN2(ibuf->x, ibuf->y);
 		
@@ -1668,7 +1694,7 @@ int imagewraposa(Tex *tex, Image *ima, ImBuf *ibuf, float *texvec, float *DXT, f
 				
 				fx= 2.0f*(pixsize-maxd)/pixsize;
 				
-				if(fx>=1.0) {
+				if(fx>=1.0f) {
 					texres->ta= texr.ta; texres->tb= texr.tb;
 					texres->tg= texr.tg; texres->tr= texr.tr;
 				} else {
@@ -1718,13 +1744,19 @@ int imagewraposa(Tex *tex, Image *ima, ImBuf *ibuf, float *texvec, float *DXT, f
 
 	if(texres->nor && (tex->imaflag & TEX_NORMALMAP)) {
 		// qdn: normal from color
-		texres->nor[0] = 2.f*(texres->tr - 0.5f);
-		texres->nor[1] = 2.f*(0.5f - texres->tg);
+		// The invert of the red channel is to make
+		// the normal map compliant with the outside world.
+		// It needs to be done because in Blender
+		// the normal used in the renderer points inward. It is generated
+		// this way in calc_vertexnormals(). Should this ever change
+		// this negate must be removed.
+		texres->nor[0] = -2.f*(texres->tr - 0.5f);
+		texres->nor[1] = 2.f*(texres->tg - 0.5f);
 		texres->nor[2] = 2.f*(texres->tb - 0.5f);
 	}
 	
 	/* de-premul, this is being premulled in shade_input_do_shade() */
-	if(texres->ta!=1.0f && texres->ta>FLT_EPSILON) {
+	if(texres->ta!=1.0f && texres->ta>1e-4f) {
 		fx= 1.0f/texres->ta;
 		texres->tr*= fx;
 		texres->tg*= fx;
@@ -1748,7 +1780,8 @@ void image_sample(Image *ima, float fx, float fy, float dx, float dy, float *res
 	
 	if( (R.flag & R_SEC_FIELD) && (ibuf->flags & IB_fields) )
 		ibuf->rect+= (ibuf->x*ibuf->y);
-	
+
+	texres.talpha= 1; /* boxsample expects to be initialized */
 	boxsample(ibuf, fx, fy, fx+dx, fy+dy, &texres, 0, 1);
 	result[0]= texres.tr;
 	result[1]= texres.tg;

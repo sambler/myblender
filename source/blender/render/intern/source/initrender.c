@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/render/intern/source/initrender.c
+ *  \ingroup render
+ */
+
+
 
 /* Global includes */
 
@@ -40,8 +45,7 @@
 #include "BLI_math.h"
 #include "BLI_blenlib.h"
 #include "BLI_jitter.h"
-
-
+#include "BLI_utildefines.h"
 
 #include "DNA_camera_types.h"
 #include "DNA_group_types.h"
@@ -50,7 +54,7 @@
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 
-#include "BKE_utildefines.h"
+
 #include "BKE_global.h"
 #include "BKE_material.h"
 #include "BKE_object.h"
@@ -443,10 +447,17 @@ void make_sample_tables(Render *re)
 
 /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
 
+struct Object *RE_GetCamera(Render *re)
+{
+	return re->camera_override ? re->camera_override : re->scene->camera;
+}
+
 /* call this after InitState() */
 /* per render, there's one persistant viewplane. Parts will set their own viewplanes */
 void RE_SetCamera(Render *re, Object *camera)
 {
+	object_camera_mode(&re->r, camera);
+
 	object_camera_matrix(&re->r, camera, re->winx, re->winy, re->flag & R_SEC_FIELD,
 			re->winmat, &re->viewplane, &re->clipsta, &re->clipend,
 			&re->lens, &re->ycor, &re->viewdx, &re->viewdy);

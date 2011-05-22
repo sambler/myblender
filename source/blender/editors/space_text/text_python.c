@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/space_text/text_python.c
+ *  \ingroup sptext
+ */
+
+
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -49,7 +54,7 @@ int text_do_suggest_select(SpaceText *st, ARegion *ar)
 	TextLine *tmp;
 	int l, x, y, w, h, i;
 	int tgti, *top;
-	short mval[2] = {0, 0};
+	int mval[2] = {0, 0};
 	
 	if(!st || !st->text) return 0;
 	if(!texttool_text_is_active(st->text)) return 0;
@@ -98,7 +103,7 @@ int text_do_suggest_select(SpaceText *st, ARegion *ar)
 	return 1;
 }
 
-void text_pop_suggest_list()
+void text_pop_suggest_list(void)
 {
 	SuggItem *item, *sel;
 	int *top, i;
@@ -187,7 +192,7 @@ static void confirm_suggestion(Text *text, int skipleft)
 // XXX
 static int doc_scroll= 0;
 
-short do_texttools(SpaceText *st, char ascii, unsigned short evnt, short val)
+static short do_texttools(SpaceText *st, char ascii, unsigned short evnt, short val)
 {
 	ARegion *ar= NULL; // XXX
 	int qual= 0; // XXX
@@ -358,7 +363,7 @@ short do_texttools(SpaceText *st, char ascii, unsigned short evnt, short val)
 }
 
 #if 0
-#ifndef DISABLE_PYTHON	
+#ifdef WITH_PYTHON	
 	/* Run text plugin scripts if enabled */
 	if(st->doplugins && event && val) {
 		if(BPY_menu_do_shortcut(PYMENU_TEXTPLUGIN, event, qual)) {
@@ -370,7 +375,7 @@ short do_texttools(SpaceText *st, char ascii, unsigned short evnt, short val)
 		; // XXX redraw_alltext();
 #endif
 
-short do_textmarkers(SpaceText *st, char ascii, unsigned short evnt, short val)
+static short do_textmarkers(SpaceText *st, char ascii, unsigned short evnt, short val)
 {
 	Text *text;
 	TextMarker *marker, *mrk, *nxt;

@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,15 +26,23 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/animation/anim_ops.c
+ *  \ingroup edanimation
+ */
+
+
 #include <stdlib.h>
 #include <math.h>
 
 #include "BLO_sys_types.h"
 
+#include "BLI_utildefines.h"
+
 #include "DNA_anim_types.h"
 #include "DNA_scene_types.h"
 
 #include "BKE_context.h"
+#include "BKE_global.h"
 #include "BKE_sound.h"
 
 #include "UI_view2d.h"
@@ -45,6 +53,7 @@
 #include "WM_api.h"
 #include "WM_types.h"
 
+#include "ED_anim_api.h"
 #include "ED_screen.h"
 
 #include "anim_intern.h"
@@ -55,6 +64,9 @@
 static int change_frame_poll(bContext *C)
 {
 	ScrArea *curarea= CTX_wm_area(C);
+	
+	/* XXX temp? prevent changes during render */
+	if(G.rendering) return 0;
 	
 	/* as long as there is an active area, and it isn't a Graph Editor 
 	 * (since the Graph Editor has its own version which does extra stuff),
@@ -95,14 +107,9 @@ static int frame_from_event(bContext *C, wmEvent *event)
 {
 	ARegion *region= CTX_wm_region(C);
 	float viewx;
-	int x, y;
-	
-	/* convert screen coordinates to region coordinates */
-	x= event->x - region->winrct.xmin;
-	y= event->y - region->winrct.ymin;
-	
+
 	/* convert from region coordinates to View2D 'tot' space */
-	UI_view2d_region_to_view(&region->v2d, x, y, &viewx, NULL);
+	UI_view2d_region_to_view(&region->v2d, event->mval[0], event->mval[1], &viewx, NULL);
 	
 	/* round result to nearest int (frames are ints!) */
 	return (int)floor(viewx+0.5f);
@@ -151,7 +158,7 @@ static int change_frame_modal(bContext *C, wmOperator *op, wmEvent *event)
 	return OPERATOR_RUNNING_MODAL;
 }
 
-void ANIM_OT_change_frame(wmOperatorType *ot)
+static void ANIM_OT_change_frame(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Change frame";
@@ -206,18 +213,19 @@ static int previewrange_define_exec(bContext *C, wmOperator *op)
 	return OPERATOR_FINISHED;
 } 
 
-void ANIM_OT_previewrange_set(wmOperatorType *ot)
+static void ANIM_OT_previewrange_set(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Set Preview Range";
 	ot->idname= "ANIM_OT_previewrange_set";
+	ot->description= "Interactively define frame range used for playback";
 	
 	/* api callbacks */
 	ot->invoke= WM_border_select_invoke;
 	ot->exec= previewrange_define_exec;
 	ot->modal= WM_border_select_modal;
 	
-	ot->poll= ED_operator_areaactive;
+	ot->poll= ED_operator_animview_active;
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
@@ -252,16 +260,17 @@ static int previewrange_clear_exec(bContext *C, wmOperator *UNUSED(op))
 	return OPERATOR_FINISHED;
 } 
 
-void ANIM_OT_previewrange_clear(wmOperatorType *ot)
+static void ANIM_OT_previewrange_clear(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Clear Preview Range";
 	ot->idname= "ANIM_OT_previewrange_clear";
+	ot->description= "Clear Preview Range";
 	
 	/* api callbacks */
 	ot->exec= previewrange_clear_exec;
 	
-	ot->poll= ED_operator_areaactive;
+	ot->poll= ED_operator_animview_active;
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
@@ -319,16 +328,17 @@ static int toggle_time_exec(bContext *C, wmOperator *UNUSED(op))
 	return OPERATOR_FINISHED;
 }
 
-void ANIM_OT_time_toggle(wmOperatorType *ot)
+static void ANIM_OT_time_toggle(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Toggle Frames/Seconds";
 	ot->idname= "ANIM_OT_time_toggle";
+	ot->description= "Toggle whether timing is displayed in frames or seconds for active timeline view";
 	
 	/* api callbacks */
 	ot->exec= toggle_time_exec;
 	
-	ot->poll= ED_operator_areaactive;
+	ot->poll= ED_operator_animview_active;
 }
 
 /* ************************** registration **********************************/

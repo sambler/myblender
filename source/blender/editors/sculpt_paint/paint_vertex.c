@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/sculpt_paint/paint_vertex.c
+ *  \ingroup edsculpt
+ */
+
+
 #include <math.h>
 #include <string.h>
 
@@ -40,6 +45,7 @@
 
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 #include "BLI_ghash.h"
 
 #include "IMB_imbuf.h"
@@ -121,15 +127,18 @@ int weight_paint_mode_poll(bContext *C)
 
 int weight_paint_poll(bContext *C)
 {
-	Object *ob = CTX_data_active_object(C);
+	Object *ob= CTX_data_active_object(C);
+	ScrArea *sa;
 
-	if(ob && ob->mode & OB_MODE_WEIGHT_PAINT &&
-	   paint_brush(&CTX_data_tool_settings(C)->wpaint->paint)) {
-		ScrArea *sa= CTX_wm_area(C);
-		if(sa->spacetype==SPACE_VIEW3D) {
-			ARegion *ar= CTX_wm_region(C);
-			if(ar->regiontype==RGN_TYPE_WINDOW)
-				return 1;
+	if(	(ob != NULL) &&
+		(ob->mode & OB_MODE_WEIGHT_PAINT) &&
+		(paint_brush(&CTX_data_tool_settings(C)->wpaint->paint) != NULL) &&
+		(sa= CTX_wm_area(C)) &&
+		(sa->spacetype == SPACE_VIEW3D)
+	) {
+		ARegion *ar= CTX_wm_region(C);
+		if(ar->regiontype==RGN_TYPE_WINDOW) {
+			return 1;
 		}
 	}
 	return 0;
@@ -156,19 +165,19 @@ static int *get_indexarray(Mesh *me)
 /* in contradiction to cpack drawing colors, the MCOL colors (vpaint colors) are per byte! 
    so not endian sensitive. Mcol = ABGR!!! so be cautious with cpack calls */
 
-unsigned int rgba_to_mcol(float r, float g, float b, float a)
+static unsigned int rgba_to_mcol(float r, float g, float b, float a)
 {
 	int ir, ig, ib, ia;
 	unsigned int col;
 	char *cp;
 	
-	ir= floor(255.0*r);
+	ir= floor(255.0f * r);
 	if(ir<0) ir= 0; else if(ir>255) ir= 255;
-	ig= floor(255.0*g);
+	ig= floor(255.0f * g);
 	if(ig<0) ig= 0; else if(ig>255) ig= 255;
-	ib= floor(255.0*b);
+	ib= floor(255.0f * b);
 	if(ib<0) ib= 0; else if(ib>255) ib= 255;
-	ia= floor(255.0*a);
+	ia= floor(255.0f * a);
 	if(ia<0) ia= 0; else if(ia>255) ia= 255;
 	
 	cp= (char *)&col;
@@ -197,7 +206,7 @@ static void do_shared_vertexcol(Mesh *me)
 	short *scolmain, *scol;
 	char *mcol;
 	
-	if(me->mcol==0 || me->totvert==0 || me->totface==0) return;
+	if(me->mcol==NULL || me->totvert==0 || me->totface==0) return;
 	
 	scolmain= MEM_callocN(4*sizeof(short)*me->totvert, "colmain");
 	
@@ -258,7 +267,7 @@ static void make_vertexcol(Object *ob)	/* single ob */
 	Mesh *me;
 	if(!ob || ob->id.lib) return;
 	me= get_mesh(ob);
-	if(me==0) return;
+	if(me==NULL) return;
 	if(me->edit_mesh) return;
 
 	/* copies from shadedisplist to mcol */
@@ -273,7 +282,7 @@ static void make_vertexcol(Object *ob)	/* single ob */
 
 	memset(me->mcol, 255, 4*sizeof(MCol)*me->totface);
 	
-	DAG_id_flush_update(&me->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&me->id, 0);
 	
 }
 
@@ -316,7 +325,7 @@ void vpaint_fill(Object *ob, unsigned int paintcol)
 	int i, selected;
 
 	me= get_mesh(ob);
-	if(me==0 || me->totface==0) return;
+	if(me==NULL || me->totface==0) return;
 
 	if(!me->mcol)
 		make_vertexcol(ob);
@@ -334,7 +343,7 @@ void vpaint_fill(Object *ob, unsigned int paintcol)
 		}
 	}
 	
-	DAG_id_flush_update(&me->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&me->id, 0);
 }
 
 
@@ -352,7 +361,7 @@ void wpaint_fill(VPaint *wp, Object *ob, float paintweight)
 	int selected;
 	
 	me= ob->data;
-	if(me==0 || me->totface==0 || me->dvert==0 || !me->mface) return;
+	if(me==NULL || me->totface==0 || me->dvert==NULL || !me->mface) return;
 	
 	selected= (me->editflag & ME_EDIT_PAINT_MASK);
 
@@ -448,10 +457,10 @@ void wpaint_fill(VPaint *wp, Object *ob, float paintweight)
 	MEM_freeN(indexar);
 	copy_wpaint_prev(wp, NULL, 0);
 
-	DAG_id_flush_update(&me->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&me->id, 0);
 }
 
-/* XXX: should be re-implemented as a vertex/weight paint 'colour correct' operator
+/* XXX: should be re-implemented as a vertex/weight paint 'color correct' operator
  
 void vpaint_dogamma(Scene *scene)
 {
@@ -658,7 +667,7 @@ static void vpaint_blend(VPaint *vp, unsigned int *col, unsigned int *colorig, u
 		unsigned int testcol=0, a;
 		char *cp, *ct, *co;
 		
-		alpha= (int)(255.0*brush_alpha(brush));
+		alpha= (int)(255.0f*brush_alpha(brush));
 		
 		if(brush->vertexpaint_tool==VP_MIX || brush->vertexpaint_tool==VP_BLUR) testcol= mcol_blend( *colorig, paintcol, alpha);
 		else if(brush->vertexpaint_tool==VP_ADD) testcol= mcol_add( *colorig, paintcol, alpha);
@@ -722,15 +731,15 @@ static int sample_backbuf_area(ViewContext *vc, int *indexar, int totface, int x
 	return tot;
 }
 
-static float calc_vp_alpha_dl(VPaint *vp, ViewContext *vc, float vpimat[][3], float *vert_nor, float *mval, float pressure)
+static float calc_vp_alpha_dl(VPaint *vp, ViewContext *vc, float vpimat[][3], float *vert_nor, const float mval[2], float pressure)
 {
 	Brush *brush = paint_brush(&vp->paint);
 	float fac, fac_2, size, dx, dy;
 	float alpha;
-	short vertco[2];
+	int vertco[2];
 	const int radius= brush_size(brush);
 
-	project_short_noclip(vc->ar, vert_nor, vertco);
+	project_int_noclip(vc->ar, vert_nor, vertco);
 	dx= mval[0]-vertco[0];
 	dy= mval[1]-vertco[1];
 	
@@ -753,7 +762,7 @@ static float calc_vp_alpha_dl(VPaint *vp, ViewContext *vc, float vpimat[][3], fl
 		
 		/* transpose ! */
 		fac= vpimat[2][0]*no[0]+vpimat[2][1]*no[1]+vpimat[2][2]*no[2];
-		if(fac>0.0) {
+		if(fac > 0.0f) {
 			dx= vpimat[0][0]*no[0]+vpimat[0][1]*no[1]+vpimat[0][2]*no[2];
 			dy= vpimat[1][0]*no[0]+vpimat[1][1]*no[1]+vpimat[1][2]*no[2];
 			
@@ -788,20 +797,20 @@ static void wpaint_blend(VPaint *wp, MDeformWeight *dw, MDeformWeight *uw, float
 	}
 	
 	if(tool==VP_MIX || tool==VP_BLUR)
-		dw->weight = paintval*alpha + dw->weight*(1.0-alpha);
+		dw->weight = paintval*alpha + dw->weight*(1.0f-alpha);
 	else if(tool==VP_ADD)
 		dw->weight += paintval*alpha;
 	else if(tool==VP_SUB) 
 		dw->weight -= paintval*alpha;
 	else if(tool==VP_MUL) 
 		/* first mul, then blend the fac */
-		dw->weight = ((1.0-alpha) + alpha*paintval)*dw->weight;
+		dw->weight = ((1.0f-alpha) + alpha*paintval)*dw->weight;
 	else if(tool==VP_LIGHTEN) {
 		if (dw->weight < paintval)
-			dw->weight = paintval*alpha + dw->weight*(1.0-alpha);
+			dw->weight = paintval*alpha + dw->weight*(1.0f-alpha);
 	} else if(tool==VP_DARKEN) {
 		if (dw->weight > paintval)
-			dw->weight = paintval*alpha + dw->weight*(1.0-alpha);
+			dw->weight = paintval*alpha + dw->weight*(1.0f-alpha);
 	}
 	CLAMP(dw->weight, 0.0f, 1.0f);
 	
@@ -811,22 +820,22 @@ static void wpaint_blend(VPaint *wp, MDeformWeight *dw, MDeformWeight *uw, float
 		
 		alpha= brush_alpha(brush);
 		if(tool==VP_MIX || tool==VP_BLUR)
-			testw = paintval*alpha + uw->weight*(1.0-alpha);
+			testw = paintval*alpha + uw->weight*(1.0f-alpha);
 		else if(tool==VP_ADD)
 			testw = uw->weight + paintval*alpha;
 		else if(tool==VP_SUB) 
 			testw = uw->weight - paintval*alpha;
 		else if(tool==VP_MUL) 
 			/* first mul, then blend the fac */
-			testw = ((1.0-alpha) + alpha*paintval)*uw->weight;		
+			testw = ((1.0f-alpha) + alpha*paintval)*uw->weight;
 		else if(tool==VP_LIGHTEN) {
 			if (uw->weight < paintval)
-				testw = paintval*alpha + uw->weight*(1.0-alpha);
+				testw = paintval*alpha + uw->weight*(1.0f-alpha);
 			else
 				testw = uw->weight;
 		} else if(tool==VP_DARKEN) {
 			if (uw->weight > paintval)
-				testw = paintval*alpha + uw->weight*(1.0-alpha);
+				testw = paintval*alpha + uw->weight*(1.0f-alpha);
 			else
 				testw = uw->weight;
 		}
@@ -852,14 +861,14 @@ static void wpaint_blend(VPaint *wp, MDeformWeight *dw, MDeformWeight *uw, float
 /* else */
 /*     sets wp->weight to the closest weight value to vertex */
 /*     note: we cant sample frontbuf, weight colors are interpolated too unpredictable */
-void sample_wpaint(Scene *scene, ARegion *ar, View3D *UNUSED(v3d), int mode)
+static void sample_wpaint(Scene *scene, ARegion *ar, View3D *UNUSED(v3d), int mode)
 {
 	ViewContext vc;
 	ToolSettings *ts= scene->toolsettings;
 	Object *ob= OBACT;
 	Mesh *me= get_mesh(ob);
 	int index;
-	short mval[2] = {0, 0}, sco[2];
+	int mval[2] = {0, 0}, sco[2];
 	int vgroup= ob->actdef-1;
 
 	if (!me) return;
@@ -925,7 +934,7 @@ void sample_wpaint(Scene *scene, ARegion *ar, View3D *UNUSED(v3d), int mode)
 					val= 0; // XXX pupmenu(str);
 					if(val>=0) {
 						ob->actdef= val+1;
-						DAG_id_flush_update(&me->id, OB_RECALC_DATA);
+						DAG_id_tag_update(&me->id, 0);
 					}
 					MEM_freeN(str);
 				}
@@ -944,20 +953,20 @@ void sample_wpaint(Scene *scene, ARegion *ar, View3D *UNUSED(v3d), int mode)
 			else {
 				/* calc 3 or 4 corner weights */
 				dm->getVertCo(dm, mface->v1, co);
-				project_short_noclip(ar, co, sco);
+				project_int_noclip(ar, co, sco);
 				w1= ((mval[0]-sco[0])*(mval[0]-sco[0]) + (mval[1]-sco[1])*(mval[1]-sco[1]));
 				
 				dm->getVertCo(dm, mface->v2, co);
-				project_short_noclip(ar, co, sco);
+				project_int_noclip(ar, co, sco);
 				w2= ((mval[0]-sco[0])*(mval[0]-sco[0]) + (mval[1]-sco[1])*(mval[1]-sco[1]));
 				
 				dm->getVertCo(dm, mface->v3, co);
-				project_short_noclip(ar, co, sco);
+				project_int_noclip(ar, co, sco);
 				w3= ((mval[0]-sco[0])*(mval[0]-sco[0]) + (mval[1]-sco[1])*(mval[1]-sco[1]));
 				
 				if(mface->v4) {
 					dm->getVertCo(dm, mface->v4, co);
-					project_short_noclip(ar, co, sco);
+					project_int_noclip(ar, co, sco);
 					w4= ((mval[0]-sco[0])*(mval[0]-sco[0]) + (mval[1]-sco[1])*(mval[1]-sco[1]));
 				}
 				else w4= 1.0e10;
@@ -1080,7 +1089,7 @@ static int set_wpaint(bContext *C, wmOperator *UNUSED(op))		/* toggle */
 		* exit (exit needs doing regardless because we
 				* should redeform).
 		*/
-	DAG_id_flush_update(&me->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&me->id, 0);
 	
 	if(ob->mode & OB_MODE_WEIGHT_PAINT) {
 		Object *par;
@@ -1136,110 +1145,6 @@ void PAINT_OT_weight_paint_toggle(wmOperatorType *ot)
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 	
-}
-
-/* ************ paint radial controls *************/
-
-static int vpaint_radial_control_invoke(bContext *C, wmOperator *op, wmEvent *event)
-{
-	Paint *p = paint_get_active(CTX_data_scene(C));
-	Brush *brush = paint_brush(p);
-	float col[4];
-	
-	WM_paint_cursor_end(CTX_wm_manager(C), p->paint_cursor);
-	p->paint_cursor = NULL;
-	brush_radial_control_invoke(op, brush, 1);
-
-	copy_v3_v3(col, brush->add_col);
-	col[3]= 0.5f;
-	RNA_float_set_array(op->ptr, "color", col);
-
-	return WM_radial_control_invoke(C, op, event);
-}
-
-static int vpaint_radial_control_modal(bContext *C, wmOperator *op, wmEvent *event)
-{
-	int ret = WM_radial_control_modal(C, op, event);
-	if(ret != OPERATOR_RUNNING_MODAL)
-		paint_cursor_start(C, vertex_paint_poll);
-	return ret;
-}
-
-static int vpaint_radial_control_exec(bContext *C, wmOperator *op)
-{
-	Brush *brush = paint_brush(&CTX_data_scene(C)->toolsettings->vpaint->paint);
-	int ret = brush_radial_control_exec(op, brush, 1);
-	
-	WM_event_add_notifier(C, NC_BRUSH|NA_EDITED, brush);
-	
-	return ret;
-}
-
-static int wpaint_radial_control_invoke(bContext *C, wmOperator *op, wmEvent *event)
-{
-	Paint *p = paint_get_active(CTX_data_scene(C));
-	Brush *brush = paint_brush(p);
-	float col[4];
-	
-	WM_paint_cursor_end(CTX_wm_manager(C), p->paint_cursor);
-	p->paint_cursor = NULL;
-	brush_radial_control_invoke(op, brush, 1);
-
-	copy_v3_v3(col, brush->add_col);
-	col[3]= 0.5f;
-	RNA_float_set_array(op->ptr, "color", col);
-
-	return WM_radial_control_invoke(C, op, event);
-}
-
-static int wpaint_radial_control_modal(bContext *C, wmOperator *op, wmEvent *event)
-{
-	int ret = WM_radial_control_modal(C, op, event);
-	if(ret != OPERATOR_RUNNING_MODAL)
-		paint_cursor_start(C, weight_paint_poll);
-	return ret;
-}
-
-static int wpaint_radial_control_exec(bContext *C, wmOperator *op)
-{
-	Brush *brush = paint_brush(&CTX_data_scene(C)->toolsettings->wpaint->paint);
-	int ret = brush_radial_control_exec(op, brush, 1);
-	
-	WM_event_add_notifier(C, NC_BRUSH|NA_EDITED, brush);
-	
-	return ret;
-}
-
-void PAINT_OT_weight_paint_radial_control(wmOperatorType *ot)
-{
-	WM_OT_radial_control_partial(ot);
-
-	ot->name= "Weight Paint Radial Control";
-	ot->idname= "PAINT_OT_weight_paint_radial_control";
-
-	ot->invoke= wpaint_radial_control_invoke;
-	ot->modal= wpaint_radial_control_modal;
-	ot->exec= wpaint_radial_control_exec;
-	ot->poll= weight_paint_poll;
-	
-	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO|OPTYPE_BLOCKING;
-}
-
-void PAINT_OT_vertex_paint_radial_control(wmOperatorType *ot)
-{
-	WM_OT_radial_control_partial(ot);
-
-	ot->name= "Vertex Paint Radial Control";
-	ot->idname= "PAINT_OT_vertex_paint_radial_control";
-
-	ot->invoke= vpaint_radial_control_invoke;
-	ot->modal= vpaint_radial_control_modal;
-	ot->exec= vpaint_radial_control_exec;
-	ot->poll= vertex_paint_poll;
-	
-	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO|OPTYPE_BLOCKING;
 }
 
 /* ************ weight paint operator ********** */
@@ -1331,8 +1236,10 @@ static int wpaint_stroke_test_start(bContext *C, wmOperator *op, wmEvent *UNUSED
 	if(me==NULL || me->totface==0) return OPERATOR_PASS_THROUGH;
 	
 	/* if nothing was added yet, we make dverts and a vertex deform group */
-	if (!me->dvert)
+	if (!me->dvert) {
 		ED_vgroup_data_create(&me->id);
+		WM_event_add_notifier(C, NC_GEOM|ND_DATA, me);
+	}
 	
 	/* make mode data storage */
 	wpd= MEM_callocN(sizeof(struct WPaintData), "WPaintData");
@@ -1427,7 +1334,7 @@ static void wpaint_stroke_update_step(bContext *C, struct PaintStroke *stroke, P
 	Object *ob;
 	Mesh *me;
 	float mat[4][4];
-	float paintweight= ts->vgroup_weight;
+	float paintweight;
 	int *indexar;
 	int totindex, index, totw, flip;
 	float alpha;
@@ -1511,10 +1418,10 @@ static void wpaint_stroke_update_step(bContext *C, struct PaintStroke *stroke, P
 			if(mface->v4) (me->dvert+mface->v4)->flag= 1;
 					
 			if(brush->vertexpaint_tool==VP_BLUR) {
-				MDeformWeight *dw, *(*dw_func)(MDeformVert *, int);
+				MDeformWeight *dw, *(*dw_func)(MDeformVert *, const int);
 						
 				if(wp->flag & VP_ONLYVGROUP)
-					dw_func= (void *)defvert_find_index; /* uses a const, cast to quiet warning */
+					dw_func= (MDeformWeight *(*)(MDeformVert *, const int))defvert_find_index;
 				else
 					dw_func= defvert_verify_index;
 						
@@ -1586,7 +1493,7 @@ static void wpaint_stroke_update_step(bContext *C, struct PaintStroke *stroke, P
 			
 	swap_m4m4(vc->rv3d->persmat, mat);
 			
-	DAG_id_flush_update(ob->data, OB_RECALC_DATA);
+	DAG_id_tag_update(ob->data, 0);
 	ED_region_tag_redraw(vc->ar);
 }
 
@@ -1625,7 +1532,7 @@ static void wpaint_stroke_done(bContext *C, struct PaintStroke *stroke)
 		}
 	}
 	
-	DAG_id_flush_update(ob->data, OB_RECALC_DATA);	
+	DAG_id_tag_update(ob->data, 0);
 }
 
 
@@ -1634,7 +1541,7 @@ static int wpaint_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	
 	op->customdata = paint_stroke_new(C, NULL, wpaint_stroke_test_start,
 					  wpaint_stroke_update_step,
-					  wpaint_stroke_done);
+					  wpaint_stroke_done, event->type);
 	
 	/* add modal handler */
 	WM_event_add_modal_handler(C, op);
@@ -1676,7 +1583,7 @@ static int weight_paint_set_exec(bContext *C, wmOperator *UNUSED(op))
 void PAINT_OT_weight_set(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Weight Set";
+	ot->name= "Set Weight";
 	ot->idname= "PAINT_OT_weight_set";
 
 	/* api callbacks */
@@ -1727,7 +1634,7 @@ static int set_vpaint(bContext *C, wmOperator *op)		/* toggle */
 	
 	if (me)
 		/* update modifier stack for mapping requirements */
-		DAG_id_flush_update(&me->id, OB_RECALC_DATA);
+		DAG_id_tag_update(&me->id, 0);
 	
 	WM_event_add_notifier(C, NC_SCENE|ND_MODE, scene);
 	
@@ -1817,7 +1724,7 @@ static int vpaint_stroke_test_start(bContext *C, struct wmOperator *op, wmEvent 
 	return 1;
 }
 
-static void vpaint_paint_face(VPaint *vp, VPaintData *vpd, Object *ob, int index, float mval[2], float pressure, int UNUSED(flip))
+static void vpaint_paint_face(VPaint *vp, VPaintData *vpd, Object *ob, int index, const float mval[2], float pressure, int UNUSED(flip))
 {
 	ViewContext *vc = &vpd->vc;
 	Brush *brush = paint_brush(&vp->paint);
@@ -1847,7 +1754,7 @@ static void vpaint_paint_face(VPaint *vp, VPaintData *vpd, Object *ob, int index
 	for(i = 0; i < (mface->v4 ? 4 : 3); ++i) {
 		alpha= calc_vp_alpha_dl(vp, vc, vpd->vpimat, vpd->vertexcosnos+6*(&mface->v1)[i], mval, pressure);
 		if(alpha)
-			vpaint_blend(vp, mcol+i, mcolorig+i, vpd->paintcol, (int)(alpha*255.0));
+			vpaint_blend(vp, mcol+i, mcolorig+i, vpd->paintcol, (int)(alpha*255.0f));
 	}
 }
 
@@ -1903,7 +1810,7 @@ static void vpaint_stroke_update_step(bContext *C, struct PaintStroke *stroke, P
 			
 	ED_region_tag_redraw(vc->ar);
 			
-	DAG_id_flush_update(ob->data, OB_RECALC_DATA);
+	DAG_id_tag_update(ob->data, 0);
 }
 
 static void vpaint_stroke_done(bContext *C, struct PaintStroke *stroke)
@@ -1926,7 +1833,7 @@ static int vpaint_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	
 	op->customdata = paint_stroke_new(C, NULL, vpaint_stroke_test_start,
 					  vpaint_stroke_update_step,
-					  vpaint_stroke_done);
+					  vpaint_stroke_done, event->type);
 	
 	/* add modal handler */
 	WM_event_add_modal_handler(C, op);
@@ -1973,7 +1880,7 @@ static int weight_from_bones_exec(bContext *C, wmOperator *op)
 
 	create_vgroups_from_armature(op->reports, scene, ob, armob, type, (me->editflag & ME_EDIT_MIRROR_X));
 
-	DAG_id_flush_update(&me->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&me->id, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, me);
 
 	return OPERATOR_FINISHED;

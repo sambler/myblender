@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/uvedit/uvedit_unwrap_ops.c
+ *  \ingroup eduv
+ */
+
+
 #include <string.h>
 #include <stdlib.h>
 #include <math.h>
@@ -38,16 +43,17 @@
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 
+#include "BLI_math.h"
+#include "BLI_edgehash.h"
+#include "BLI_editVert.h"
+#include "BLI_uvproject.h"
+#include "BLI_utildefines.h"
+
 #include "BKE_context.h"
 #include "BKE_customdata.h"
 #include "BKE_depsgraph.h"
 #include "BKE_image.h"
 #include "BKE_mesh.h"
-
-#include "BLI_math.h"
-#include "BLI_edgehash.h"
-#include "BLI_editVert.h"
-#include "BLI_uvproject.h"
 
 #include "PIL_time.h"
 
@@ -128,7 +134,7 @@ static int ED_uvedit_ensure_uvs(bContext *C, Scene *scene, Object *obedit)
 
 /****************** Parametrizer Conversion ***************/
 
-ParamHandle *construct_param_handle(Scene *scene, EditMesh *em, short implicit, short fill, short sel, short correct_aspect)
+static ParamHandle *construct_param_handle(Scene *scene, EditMesh *em, short implicit, short fill, short sel, short correct_aspect)
 {
 	ParamHandle *handle;
 	EditFace *efa;
@@ -143,7 +149,7 @@ ParamHandle *construct_param_handle(Scene *scene, EditMesh *em, short implicit, 
 		efa = EM_get_actFace(em, 1);
 
 		if(efa) {
-            float aspx, aspy;
+			float aspx, aspy;
 			tf= CustomData_em_get(&em->fdata, efa->data, CD_MTFACE);
 
 			ED_image_uv_aspect(tf->tpage, &aspx, &aspy);
@@ -153,7 +159,7 @@ ParamHandle *construct_param_handle(Scene *scene, EditMesh *em, short implicit, 
 		}
 	}
 	
-	/* we need the vert indicies */
+	/* we need the vert indices */
 	for(ev= em->verts.first, a=0; ev; ev= ev->next, a++)
 		ev->tmp.l = a;
 	
@@ -164,8 +170,16 @@ ParamHandle *construct_param_handle(Scene *scene, EditMesh *em, short implicit, 
 		float *uv[4];
 		int nverts;
 		
-		if((efa->h) || (sel && (efa->f & SELECT)==0)) 
-			continue;
+		if(scene->toolsettings->uv_flag & UV_SYNC_SELECTION) {
+			if(efa->h) {
+				continue;
+			}
+		}
+		else {
+			if((efa->h) || (sel && (efa->f & SELECT)==0)) {
+				continue;
+			}
+		}
 
 		tf= (MTFace *)CustomData_em_get(&em->fdata, efa->data, CD_MTFACE);
 		
@@ -286,7 +300,7 @@ static void minimize_stretch_iteration(bContext *C, wmOperator *op, int interact
 
 		ms->lasttime = PIL_check_seconds_timer();
 
-		DAG_id_flush_update(ms->obedit->data, OB_RECALC_DATA);
+		DAG_id_tag_update(ms->obedit->data, 0);
 		WM_event_add_notifier(C, NC_GEOM|ND_DATA, ms->obedit->data);
 	}
 }
@@ -309,7 +323,7 @@ static void minimize_stretch_exit(bContext *C, wmOperator *op, int cancel)
 	param_stretch_end(ms->handle);
 	param_delete(ms->handle);
 
-	DAG_id_flush_update(ms->obedit->data, OB_RECALC_DATA);
+	DAG_id_tag_update(ms->obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, ms->obedit->data);
 
 	MEM_freeN(ms);
@@ -425,19 +439,26 @@ void UV_OT_minimize_stretch(wmOperatorType *ot)
 
 /* ******************** Pack Islands operator **************** */
 
-static int pack_islands_exec(bContext *C, wmOperator *UNUSED(op))
+static int pack_islands_exec(bContext *C, wmOperator *op)
 {
 	Scene *scene= CTX_data_scene(C);
 	Object *obedit= CTX_data_edit_object(C);
 	EditMesh *em= BKE_mesh_get_editmesh((Mesh*)obedit->data);
 	ParamHandle *handle;
 
+	if(RNA_property_is_set(op->ptr, "margin")) {
+		scene->toolsettings->uvcalc_margin= RNA_float_get(op->ptr, "margin");
+	}
+	else {
+		RNA_float_set(op->ptr, "margin", scene->toolsettings->uvcalc_margin);
+	}
+
 	handle = construct_param_handle(scene, em, 1, 0, 1, 1);
 	param_pack(handle, scene->toolsettings->uvcalc_margin);
 	param_flush(handle);
 	param_delete(handle);
 	
-	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 
 	BKE_mesh_end_editmesh(obedit->data, em);
@@ -454,6 +475,9 @@ void UV_OT_pack_islands(wmOperatorType *ot)
 	/* api callbacks */
 	ot->exec= pack_islands_exec;
 	ot->poll= ED_operator_uvedit;
+
+	/* properties */
+	RNA_def_float_factor(ot->srna, "margin", 0.0f, 0.0f, 1.0f, "Margin", "Space between islands", 0.0f, 1.0f);
 }
 
 /* ******************** Average Islands Scale operator **************** */
@@ -470,7 +494,7 @@ static int average_islands_scale_exec(bContext *C, wmOperator *UNUSED(op))
 	param_flush(handle);
 	param_delete(handle);
 	
-	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 
 	BKE_mesh_end_editmesh(obedit->data, em);
@@ -496,7 +520,7 @@ static ParamHandle *liveHandle = NULL;
 void ED_uvedit_live_unwrap_begin(Scene *scene, Object *obedit)
 {
 	EditMesh *em= BKE_mesh_get_editmesh((Mesh*)obedit->data);
-	short abf = scene->toolsettings->unwrapper == 1;
+	short abf = scene->toolsettings->unwrapper == 0;
 	short fillholes = scene->toolsettings->uvcalc_flag & UVCALC_FILLHOLES;
 
 	if(!ED_uvedit_test(obedit)) {
@@ -613,7 +637,7 @@ static void uv_map_rotation_matrix(float result[][4], RegionView3D *rv3d, Object
 	rotside[1][0]= (float)sin(sideangle);
 	rotside[1][1]= (float)cos(sideangle);
 	rotside[2][2]= 1.0f;
-      
+
 	upangle= (float)M_PI*upangledeg/180.0f;
 	rotup[1][1]= (float)cos(upangle)/radius;
 	rotup[1][2]= -(float)sin(upangle)/radius;
@@ -701,11 +725,11 @@ static void correct_uv_aspect(EditMesh *em)
 			if(efa->f & SELECT) {
 				tf= CustomData_em_get(&em->fdata, efa->data, CD_MTFACE);
 
-				tf->uv[0][0]= ((tf->uv[0][0]-0.5)*scale)+0.5;
-				tf->uv[1][0]= ((tf->uv[1][0]-0.5)*scale)+0.5;
-				tf->uv[2][0]= ((tf->uv[2][0]-0.5)*scale)+0.5;
+				tf->uv[0][0]= ((tf->uv[0][0]-0.5f)*scale)+0.5f;
+				tf->uv[1][0]= ((tf->uv[1][0]-0.5f)*scale)+0.5f;
+				tf->uv[2][0]= ((tf->uv[2][0]-0.5f)*scale)+0.5f;
 				if(efa->v4)
-					tf->uv[3][0]= ((tf->uv[3][0]-0.5)*scale)+0.5;
+					tf->uv[3][0]= ((tf->uv[3][0]-0.5f)*scale)+0.5f;
 			}
 		}
 	}
@@ -716,11 +740,11 @@ static void correct_uv_aspect(EditMesh *em)
 			if(efa->f & SELECT) {
 				tf= CustomData_em_get(&em->fdata, efa->data, CD_MTFACE);
 
-				tf->uv[0][1]= ((tf->uv[0][1]-0.5)*scale)+0.5;
-				tf->uv[1][1]= ((tf->uv[1][1]-0.5)*scale)+0.5;
-				tf->uv[2][1]= ((tf->uv[2][1]-0.5)*scale)+0.5;
+				tf->uv[0][1]= ((tf->uv[0][1]-0.5f)*scale)+0.5f;
+				tf->uv[1][1]= ((tf->uv[1][1]-0.5f)*scale)+0.5f;
+				tf->uv[2][1]= ((tf->uv[2][1]-0.5f)*scale)+0.5f;
 				if(efa->v4)
-					tf->uv[3][1]= ((tf->uv[3][1]-0.5)*scale)+0.5;
+					tf->uv[3][1]= ((tf->uv[3][1]-0.5f)*scale)+0.5f;
 			}
 		}
 	}
@@ -796,8 +820,8 @@ static void uv_map_clip_correct(EditMesh *em, wmOperator *op)
 				nverts= (efa->v4)? 4: 3;
 
 				for(b=0; b<nverts; b++) {
-					CLAMP(tf->uv[b][0], 0.0, 1.0);
-					CLAMP(tf->uv[b][1], 0.0, 1.0);
+					CLAMP(tf->uv[b][0], 0.0f, 1.0f);
+					CLAMP(tf->uv[b][1], 0.0f, 1.0f);
 				}
 			}
 		}
@@ -806,38 +830,57 @@ static void uv_map_clip_correct(EditMesh *em, wmOperator *op)
 
 /* ******************** Unwrap operator **************** */
 
-static int unwrap_exec(bContext *C, wmOperator *op)
+/* assumes UV layer is checked, doesn't run update funcs */
+void ED_unwrap_lscm(Scene *scene, Object *obedit, const short sel)
 {
-	Scene *scene= CTX_data_scene(C);
-	Object *obedit= CTX_data_edit_object(C);
 	EditMesh *em= BKE_mesh_get_editmesh((Mesh*)obedit->data);
-	ParamHandle *handle;
-	int method = RNA_enum_get(op->ptr, "method");
-	int fill_holes = RNA_boolean_get(op->ptr, "fill_holes");
-	int correct_aspect = RNA_boolean_get(op->ptr, "correct_aspect");
-	
-	/* add uvs if they don't exist yet */
-	if(!ED_uvedit_ensure_uvs(C, scene, obedit)) {
-		BKE_mesh_end_editmesh(obedit->data, em);
-		return OPERATOR_CANCELLED;
-	}
 
-	handle= construct_param_handle(scene, em, 0, fill_holes, 1, correct_aspect);
+	const short fill_holes= scene->toolsettings->uvcalc_flag & UVCALC_FILLHOLES;
+	const short correct_aspect= !(scene->toolsettings->uvcalc_flag & UVCALC_NO_ASPECT_CORRECT);
 
-	param_lscm_begin(handle, PARAM_FALSE, method == 0);
+	ParamHandle *handle= construct_param_handle(scene, em, 0, fill_holes, sel, correct_aspect);
+
+	param_lscm_begin(handle, PARAM_FALSE, scene->toolsettings->unwrapper == 0);
 	param_lscm_solve(handle);
 	param_lscm_end(handle);
-	
+
 	param_pack(handle, scene->toolsettings->uvcalc_margin);
 
 	param_flush(handle);
 
 	param_delete(handle);
 
-	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+	BKE_mesh_end_editmesh(obedit->data, em);
+}
+
+static int unwrap_exec(bContext *C, wmOperator *op)
+{
+	Scene *scene= CTX_data_scene(C);
+	Object *obedit= CTX_data_edit_object(C);
+	int method = RNA_enum_get(op->ptr, "method");
+	int fill_holes = RNA_boolean_get(op->ptr, "fill_holes");
+	int correct_aspect = RNA_boolean_get(op->ptr, "correct_aspect");
+	
+	/* add uvs if they don't exist yet */
+	if(!ED_uvedit_ensure_uvs(C, scene, obedit)) {
+		return OPERATOR_CANCELLED;
+	}
+
+	/* remember last method for live unwrap */
+	scene->toolsettings->unwrapper = method;
+
+	if(fill_holes)		scene->toolsettings->uvcalc_flag |=  UVCALC_FILLHOLES;
+	else				scene->toolsettings->uvcalc_flag &= ~UVCALC_FILLHOLES;
+
+	if(correct_aspect)	scene->toolsettings->uvcalc_flag &= ~UVCALC_NO_ASPECT_CORRECT;
+	else				scene->toolsettings->uvcalc_flag |=  UVCALC_NO_ASPECT_CORRECT;
+
+	/* execute unwrap */
+	ED_unwrap_lscm(scene, obedit, TRUE);
+
+	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 
-	BKE_mesh_end_editmesh(obedit->data, em);
 	return OPERATOR_FINISHED;
 }
 
@@ -850,6 +893,7 @@ void UV_OT_unwrap(wmOperatorType *ot)
 
 	/* identifiers */
 	ot->name= "Unwrap";
+	ot->description= "Unwrap the mesh of the object being edited";
 	ot->idname= "UV_OT_unwrap";
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 	
@@ -940,7 +984,7 @@ static int uv_from_view_exec(bContext *C, wmOperator *op)
 
 	uv_map_clip_correct(em, op);
 
-	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 
 	BKE_mesh_end_editmesh(obedit->data, em);
@@ -1007,7 +1051,7 @@ static int reset_exec(bContext *C, wmOperator *UNUSED(op))
 		}
 	}
 
-	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 
 	BKE_mesh_end_editmesh(obedit->data, em);
@@ -1057,7 +1101,7 @@ static void uv_map_mirror(EditFace *efa, MTFace *tf)
 	for(i=0; i<nverts; i++) {
 		if(i != mi) {
 			dx = tf->uv[mi][0] - tf->uv[i][0];
-			if(dx > 0.5) tf->uv[i][0] += 1.0;
+			if(dx > 0.5f) tf->uv[i][0] += 1.0f;
 		} 
 	} 
 }
@@ -1095,7 +1139,7 @@ static int sphere_project_exec(bContext *C, wmOperator *op)
 
 	uv_map_clip_correct(em, op);
 
-	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 
 	BKE_mesh_end_editmesh(obedit->data, em);
@@ -1167,7 +1211,7 @@ static int cylinder_project_exec(bContext *C, wmOperator *op)
 
 	uv_map_clip_correct(em, op);
 
-	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 
 	BKE_mesh_end_editmesh(obedit->data, em);
@@ -1228,24 +1272,24 @@ static int cube_project_exec(bContext *C, wmOperator *op)
 			else if(no[1]>=no[0] && no[1]>=no[2]) coy= 2;
 			else { cox= 1; coy= 2; }
 			
-			tf->uv[0][0]= 0.5+0.5*cube_size*(loc[cox] + efa->v1->co[cox]);
-			tf->uv[0][1]= 0.5+0.5*cube_size*(loc[coy] + efa->v1->co[coy]);
+			tf->uv[0][0]= 0.5f+0.5f*cube_size*(loc[cox] + efa->v1->co[cox]);
+			tf->uv[0][1]= 0.5f+0.5f*cube_size*(loc[coy] + efa->v1->co[coy]);
 			dx = floor(tf->uv[0][0]);
 			dy = floor(tf->uv[0][1]);
 			tf->uv[0][0] -= dx;
 			tf->uv[0][1] -= dy;
-			tf->uv[1][0]= 0.5+0.5*cube_size*(loc[cox] + efa->v2->co[cox]);
-			tf->uv[1][1]= 0.5+0.5*cube_size*(loc[coy] + efa->v2->co[coy]);
+			tf->uv[1][0]= 0.5f+0.5f*cube_size*(loc[cox] + efa->v2->co[cox]);
+			tf->uv[1][1]= 0.5f+0.5f*cube_size*(loc[coy] + efa->v2->co[coy]);
 			tf->uv[1][0] -= dx;
 			tf->uv[1][1] -= dy;
-			tf->uv[2][0]= 0.5+0.5*cube_size*(loc[cox] + efa->v3->co[cox]);
-			tf->uv[2][1]= 0.5+0.5*cube_size*(loc[coy] + efa->v3->co[coy]);
+			tf->uv[2][0]= 0.5f+0.5f*cube_size*(loc[cox] + efa->v3->co[cox]);
+			tf->uv[2][1]= 0.5f+0.5f*cube_size*(loc[coy] + efa->v3->co[coy]);
 			tf->uv[2][0] -= dx;
 			tf->uv[2][1] -= dy;
 
 			if(efa->v4) {
-				tf->uv[3][0]= 0.5+0.5*cube_size*(loc[cox] + efa->v4->co[cox]);
-				tf->uv[3][1]= 0.5+0.5*cube_size*(loc[coy] + efa->v4->co[coy]);
+				tf->uv[3][0]= 0.5f+0.5f*cube_size*(loc[cox] + efa->v4->co[cox]);
+				tf->uv[3][1]= 0.5f+0.5f*cube_size*(loc[coy] + efa->v4->co[coy]);
 				tf->uv[3][0] -= dx;
 				tf->uv[3][1] -= dy;
 			}
@@ -1254,7 +1298,7 @@ static int cube_project_exec(bContext *C, wmOperator *op)
 
 	uv_map_clip_correct(em, op);
 
-	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 
 	BKE_mesh_end_editmesh(obedit->data, em);

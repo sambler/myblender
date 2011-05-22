@@ -1,6 +1,4 @@
-/* DNA_particle_types.h
- *
- *
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -32,6 +30,10 @@
 #ifndef DNA_PARTICLE_TYPES_H
 #define DNA_PARTICLE_TYPES_H
 
+/** \file DNA_particle_types.h
+ *  \ingroup DNA
+ */
+
 #include "DNA_ID.h"
 #include "DNA_boid_types.h"
 
@@ -60,6 +62,11 @@ typedef struct BoidParticle {
 	float wander[3];
 	float rt;
 } BoidParticle;
+
+typedef struct ParticleSpring {
+	float rest_length;
+	unsigned int particle_index[2], delete_flag;
+}ParticleSpring;
 
 /* Child particles are created around or between parent particles */
 typedef struct ChildParticle {
@@ -116,11 +123,23 @@ typedef struct ParticleData {
 
 typedef struct SPHFluidSettings {
 	/*Particle Fluid*/
-	float spring_k, radius, rest_length;
+	float radius, spring_k, rest_length;
+	float plasticity_constant, yield_ratio;
+	float plasticity_balance, yield_balance;
 	float viscosity_omega, viscosity_beta;
 	float stiffness_k, stiffness_knear, rest_density;
 	float buoyancy;
+	int flag, spring_frames;
 } SPHFluidSettings;
+
+/* fluid->flag */
+#define SPH_VISCOELASTIC_SPRINGS	1
+#define SPH_CURRENT_REST_LENGTH		2
+#define SPH_FAC_REPULSION			4
+#define SPH_FAC_DENSITY				8
+#define SPH_FAC_RADIUS				16
+#define SPH_FAC_VISCOSITY			32
+#define SPH_FAC_REST_LENGTH			64
 
 typedef struct ParticleSettings {
 	ID id;
@@ -131,12 +150,12 @@ typedef struct ParticleSettings {
 
 	struct EffectorWeights *effector_weights;
 
-	int flag;
-	short type, from, distr;
+	int flag, rt;
+	short type, from, distr, texact;
 	/* physics modes */
 	short phystype, rotmode, avemode, reactevent;
 	short draw, draw_as, draw_size, childtype;
-	short ren_as, subframes;
+	short ren_as, subframes, draw_col;
 	/* number of path segments, power of 2 except */
 	short draw_step, ren_step;
 	short hair_step, keys_step;
@@ -151,6 +170,9 @@ typedef struct ParticleSettings {
 	short bb_align, bb_uv_split, bb_anim, bb_split_offset;
 	float bb_tilt, bb_rand_tilt, bb_offset[2];
 
+	/* draw color */
+	float color_vec_max;
+
 	/* simplification */
 	short simplify_flag, simplify_refsize;
 	float simplify_rate, simplify_transition;
@@ -158,15 +180,15 @@ typedef struct ParticleSettings {
 
 	/* general values */
 	float sta, end, lifetime, randlife;
-	float timetweak, jitfac, eff_hair;
-	int totpart, userjit, grid_res;
+	float timetweak, jitfac, eff_hair, grid_rand;
+	int totpart, userjit, grid_res, effector_amount;
 
 	/* initial velocity factors */
 	float normfac, obfac, randfac, partfac, tanfac, tanphase, reactfac;
-	float ob_vel[3], rt;
+	float ob_vel[3];
 	float avefac, phasefac, randrotfac, randphasefac;
 	/* physical properties */
-	float mass, size, randsize, reactshape;
+	float mass, size, randsize;
 	/* global physical properties */
 	float acc[3], dragfac, brownfac, dampfac;
 	/* length */
@@ -178,13 +200,17 @@ typedef struct ParticleSettings {
 	/* clumping */
 	float clumpfac, clumppow;
 	/* kink */
-	float kink_amp, kink_freq, kink_shape;
+	float kink_amp, kink_freq, kink_shape, kink_flat;
+	float kink_amp_clump;
 	/* rough */
 	float rough1, rough1_size;
 	float rough2, rough2_size, rough2_thres;
 	float rough_end, rough_end_shape;
 	/* length */
 	float clength, clength_thres;
+	/* parting */
+	float parting_fac;
+	float parting_min, parting_max;
 	/* branching */
 	float branch_thres;
 	/* drawing stuff */
@@ -193,6 +219,8 @@ typedef struct ParticleSettings {
 	int trail_count;
 	/* keyed particles */
 	int keyed_loops;
+
+	struct MTex *mtex[18];		/* MAX_MTEX */
 
 	struct Group *dup_group;
 	struct ListBase dupliweights;
@@ -231,9 +259,9 @@ typedef struct ParticleSystem{				/* note, make sure all (runtime) are NULL's in
 	char name[32];							/* particle system name */
 	
 	float imat[4][4];	/* used for duplicators */
-	float cfra, tree_frame;
-	int seed, rt;
-	int flag, totpart, totchild, totcached, totchildcache;
+	float cfra, tree_frame, bvhtree_frame;
+	int seed, child_seed;
+	int flag, totpart, totunexist, totchild, totcached, totchildcache;
 	short recalc, target_psys, totkeyed, bakespace;
 
 	char bb_uvname[3][32];					/* billboard uv name */
@@ -250,7 +278,11 @@ typedef struct ParticleSystem{				/* note, make sure all (runtime) are NULL's in
 
 	struct ListBase *effectors;
 
-	struct KDTree *tree;					/* used for interactions with self and other systems */
+	ParticleSpring *fluid_springs;
+	int tot_fluidsprings, alloc_fluidsprings;
+
+	struct KDTree *tree;								/* used for interactions with self and other systems */
+	struct BVHTree *bvhtree;								/* used for interactions with self and other systems */
 
 	struct ParticleDrawData *pdd;
 
@@ -273,7 +305,7 @@ typedef struct ParticleSystem{				/* note, make sure all (runtime) are NULL's in
 		/* for dopesheet */
 #define PART_DS_EXPAND		8
 
-#define PART_HAIR_GEOMETRY	16
+#define PART_HAIR_REGROW	16	/* regrow hair for each frame */
 
 #define PART_UNBORN			32	/*show unborn particles*/
 #define PART_DIED			64	/*show died particles*/
@@ -287,25 +319,25 @@ typedef struct ParticleSystem{				/* note, make sure all (runtime) are NULL's in
 #define PART_ROT_DYN		(1<<14)	/* dynamic rotation */
 #define PART_SIZEMASS		(1<<16)
 
-//#define PART_HAIR_GRAVITY	(1<<15)
+#define PART_HIDE_ADVANCED_HAIR	(1<<15)
 
 //#define PART_ABS_TIME		(1<<17)
 //#define PART_GLOB_TIME		(1<<18)
 
 #define PART_BOIDS_2D		(1<<19)
 
-#define PART_BRANCHING		(1<<20)
-#define PART_ANIM_BRANCHING	(1<<21)
-#define PART_SYMM_BRANCHING	(1<<24)
+//#define PART_BRANCHING		(1<<20)
+//#define PART_ANIM_BRANCHING	(1<<21)
 
 #define PART_HAIR_BSPLINE	1024
 
+#define PART_GRID_HEXAGONAL	(1<<24)
 #define PART_GRID_INVERT	(1<<26)
 
-#define PART_CHILD_EFFECT	(1<<27)
-#define PART_CHILD_SEAMS	(1<<28)
-#define PART_CHILD_RENDER	(1<<29)
-#define PART_CHILD_GUIDE	(1<<30)
+#define PART_CHILD_EFFECT		(1<<27)
+#define PART_CHILD_LONG_HAIR	(1<<28)
+/* #define PART_CHILD_RENDER		(1<<29) */ /*UNUSED*/
+#define PART_CHILD_GUIDE		(1<<30)
 
 #define PART_SELF_EFFECT	(1<<22)
 
@@ -318,7 +350,7 @@ typedef struct ParticleSystem{				/* note, make sure all (runtime) are NULL's in
 #define PART_FROM_VERT		0
 #define PART_FROM_FACE		1
 #define PART_FROM_VOLUME	2
-#define PART_FROM_PARTICLE	3
+/* #define PART_FROM_PARTICLE	3  deprecated! */ 
 #define PART_FROM_CHILD		4
 
 /* part->distr */
@@ -354,9 +386,16 @@ typedef struct ParticleSystem{				/* note, make sure all (runtime) are NULL's in
 #define PART_DRAW_RAND_GR	1024
 #define PART_DRAW_REN_ADAPT	2048
 #define PART_DRAW_VEL_LENGTH	(1<<12)
-#define PART_DRAW_MAT_COL		(1<<13)
+#define PART_DRAW_MAT_COL		(1<<13) /* deprecated, but used in do_versions */
 #define PART_DRAW_WHOLE_GR		(1<<14)
 #define PART_DRAW_REN_STRAND	(1<<15)
+
+/* part->draw_col */
+#define PART_DRAW_COL_NONE		0
+#define PART_DRAW_COL_MAT		1
+#define PART_DRAW_COL_VEL		2
+#define PART_DRAW_COL_ACC		3
+
 
 /* part->simplify_flag */
 #define PART_SIMPLIFY_ENABLE	1
@@ -371,10 +410,9 @@ typedef struct ParticleSystem{				/* note, make sure all (runtime) are NULL's in
 
 /* part->bb_anim */
 #define PART_BB_ANIM_NONE	0
-#define PART_BB_ANIM_TIME	1
+#define PART_BB_ANIM_AGE	1
 #define PART_BB_ANIM_ANGLE	2
-#define PART_BB_ANIM_OFF_TIME	3
-#define PART_BB_ANIM_OFF_ANGLE	4
+#define PART_BB_ANIM_FRAME	3
 
 /* part->bb_split_offset */
 #define PART_BB_OFF_NONE	0
@@ -442,7 +480,7 @@ typedef struct ParticleSystem{				/* note, make sure all (runtime) are NULL's in
 #define PSYS_ENABLED		16	/* deprecated */
 #define PSYS_HAIR_UPDATED	32  /* signal for updating hair particle mode */
 #define PSYS_DRAWING		64
-//#define PSYS_SOFT_BAKE		128
+#define PSYS_USE_IMAT		128
 #define PSYS_DELETE			256	/* remove particlesystem as soon as possible */
 #define PSYS_HAIR_DONE		512
 #define PSYS_KEYED			1024
@@ -490,5 +528,26 @@ typedef struct ParticleSystem{				/* note, make sure all (runtime) are NULL's in
 #define PTARGET_MODE_NEUTRAL	0
 #define PTARGET_MODE_FRIEND		1
 #define PTARGET_MODE_ENEMY		2
+
+/* mapto */
+/* init */
+#define PAMAP_INIT		15
+#define PAMAP_TIME		(1<<0)	/* emission time */
+#define PAMAP_LIFE		(1<<1)	/* life time */
+#define PAMAP_DENS		(1<<2)	/* density */
+#define PAMAP_SIZE		(1<<3)	/* physical size */
+/* reset */
+#define PAMAP_IVEL		(1<<5)	/* initial velocity */
+/* physics */
+#define PAMAP_PHYSICS	3136
+#define PAMAP_FIELD		(1<<6)	/* force fields */
+#define PAMAP_GRAVITY	(1<<10)
+#define PAMAP_DAMP		(1<<11)
+/* children */
+#define PAMAP_CHILD		912
+#define PAMAP_CLUMP		(1<<7)
+#define PAMAP_KINK		(1<<8)
+#define PAMAP_ROUGH		(1<<9)
+#define PAMAP_LENGTH	(1<<4)
 
 #endif

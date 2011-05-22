@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -26,8 +26,9 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
-/**
- * @file	GHOST_SystemCocoa.h
+
+/** \file ghost/intern/GHOST_SystemCocoa.h
+ *  \ingroup GHOST
  * Declaration of GHOST_SystemCocoa class.
  */
 
@@ -214,26 +215,6 @@ public:
 	virtual void putClipboard(GHOST_TInt8 *buffer, bool selection) const;
 
 	/**
-	 * Determine the base dir in which shared resources are located. It will first try to use
-	 * "unpack and run" path, then look for properly installed path, not including versioning.
-	 * @return Unsigned char string pointing to system dir (eg /usr/share/blender/).
-	 */
-	virtual const GHOST_TUns8* getSystemDir() const;
-
-	/**
-	 * Determine the base dir in which user configuration is stored, not including versioning.
-	 * If needed, it will create the base directory.
-	 * @return Unsigned char string pointing to user dir (eg ~/.blender/).
-	 */
-	virtual const GHOST_TUns8* getUserDir() const;
-
-	/**
-	  * Determine the directory of the current binary
-	  * @return Unsigned char string pointing to the binary dir
-	  */
-	 virtual const GHOST_TUns8* getBinaryDir() const;
-
-	/**
      * Handles a window event. Called by GHOST_WindowCocoa window delegate
      * @param eventType The type of window event
 	 * @param window The window on which the event occurred
@@ -246,6 +227,11 @@ public:
      * @return Indication whether the event was handled. 
      */
     GHOST_TSuccess handleApplicationBecomeActiveEvent();
+
+	/**
+	 * @see GHOST_ISystem
+	 */
+	int toggleConsole(int action) { return 0; }
 	
 	
 protected:

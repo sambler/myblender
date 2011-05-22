@@ -27,12 +27,15 @@ import bpy as _bpy
 import os as _os
 
 
-def abspath(path):
+def abspath(path, start=None):
     """
     Returns the absolute path relative to the current blend file using the "//" prefix.
+
+    :arg start: Relative to this path, when not set the current filename is used.
+    :type start: string
     """
     if path.startswith("//"):
-        return _os.path.join(_os.path.dirname(_bpy.data.filepath), path[2:])
+        return _os.path.join(_os.path.dirname(_bpy.data.filepath if start is None else start), path[2:])
 
     return path
 
@@ -110,6 +113,13 @@ def display_name(name):
         return name_base
 
 
+def display_name_from_filepath(name):
+    """
+    Returns the path stripped of directort and extension, ensured to be utf8 compatible.
+    """
+    return _os.path.splitext(_os.path.basename(name))[0].encode("utf8", "replace").decode("utf8")
+
+
 def resolve_ncase(path):
     """
     Resolve a case insensitive path on a case sensitive system,
@@ -119,13 +129,13 @@ def resolve_ncase(path):
     import os
 
     def _ncase_path_found(path):
-        if path == "" or os.path.exists(path):
+        if not path or os.path.exists(path):
             return path, True
 
         filename = os.path.basename(path)  # filename may be a directory or a file
         dirpath = os.path.dirname(path)
 
-        suffix = ""
+        suffix = path[:0]  # "" but ensure byte/str match
         if not filename:  # dir ends with a slash?
             if len(dirpath) < len(path):
                 suffix = path[:len(path) - len(dirpath)]
@@ -134,6 +144,9 @@ def resolve_ncase(path):
             dirpath = os.path.dirname(dirpath)
 
         if not os.path.exists(dirpath):
+            if dirpath == path:
+                return path, False
+
             dirpath, found = _ncase_path_found(dirpath)
 
             if not found:
@@ -203,7 +216,9 @@ def module_names(path, recursive=False):
     modules = []
 
     for filename in sorted(_os.listdir(path)):
-        if filename.endswith(".py") and filename != "__init__.py":
+        if filename == "modules":
+            pass  # XXX, hard coded exception.
+        elif filename.endswith(".py") and filename != "__init__.py":
             fullpath = join(path, filename)
             modules.append((filename[0:-3], fullpath))
         elif ("." not in filename):

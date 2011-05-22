@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -24,6 +24,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  * */
+
+/** \file blender/blenlib/intern/math_vector.c
+ *  \ingroup bli
+ */
+
 
 
 #include "BLI_math.h"
@@ -202,10 +207,10 @@ void angle_tri_v3(float angles[3], const float v1[3], const float v2[3], const f
 	normalize_v3(ed2);
 	normalize_v3(ed3);
 
-	angles[0]= M_PI - angle_normalized_v3v3(ed1, ed2);
-	angles[1]= M_PI - angle_normalized_v3v3(ed2, ed3);
+	angles[0]= (float)M_PI - angle_normalized_v3v3(ed1, ed2);
+	angles[1]= (float)M_PI - angle_normalized_v3v3(ed2, ed3);
 	// face_angles[2] = M_PI - angle_normalized_v3v3(ed3, ed1);
-	angles[2]= M_PI - (angles[0] + angles[1]);
+	angles[2]= (float)M_PI - (angles[0] + angles[1]);
 }
 
 void angle_quad_v3(float angles[4], const float v1[3], const float v2[3], const float v3[3], const float v4[3])
@@ -222,13 +227,23 @@ void angle_quad_v3(float angles[4], const float v1[3], const float v2[3], const 
 	normalize_v3(ed3);
 	normalize_v3(ed4);
 
-	angles[0]= M_PI - angle_normalized_v3v3(ed1, ed2);
-	angles[1]= M_PI - angle_normalized_v3v3(ed2, ed3);
-	angles[2]= M_PI - angle_normalized_v3v3(ed3, ed4);
-	angles[3]= M_PI - angle_normalized_v3v3(ed4, ed1);
+	angles[0]= (float)M_PI - angle_normalized_v3v3(ed1, ed2);
+	angles[1]= (float)M_PI - angle_normalized_v3v3(ed2, ed3);
+	angles[2]= (float)M_PI - angle_normalized_v3v3(ed3, ed4);
+	angles[3]= (float)M_PI - angle_normalized_v3v3(ed4, ed1);
 }
 
 /********************************* Geometry **********************************/
+
+/* Project v1 on v2 */
+void project_v2_v2v2(float c[2], const float v1[2], const float v2[2])
+{
+	float mul;
+	mul = dot_v2v2(v1, v2) / dot_v2v2(v2, v2);
+
+	c[0] = mul * v2[0];
+	c[1] = mul * v2[1];
+}
 
 /* Project v1 on v2 */
 void project_v3_v3v3(float c[3], const float v1[3], const float v2[3])
@@ -354,3 +369,91 @@ void minmax_v3v3_v3(float min[3], float max[3], const float vec[3])
 	if(max[2]<vec[2]) max[2]= vec[2];
 }
 
+
+/***************************** Array Functions *******************************/
+
+void range_vni(int *array_tar, const int size, const int start)
+{
+	int *array_pt= array_tar + (size-1);
+	int j= start + (size-1);
+	int i= size;
+	while(i--) { *(array_pt--) = j--; }
+}
+
+void negate_vn(float *array_tar, const int size)
+{
+	float *array_pt= array_tar + (size-1);
+	int i= size;
+	while(i--) { *(array_pt--) *= -1.0f; }
+}
+
+void negate_vn_vn(float *array_tar, const float *array_src, const int size)
+{
+	float *tar= array_tar + (size-1);
+	const float *src= array_src + (size-1);
+	int i= size;
+	while(i--) { *(tar--) = - *(src--); }
+}
+
+void mul_vn_fl(float *array_tar, const int size, const float f)
+{
+	float *array_pt= array_tar + (size-1);
+	int i= size;
+	while(i--) { *(array_pt--) *= f; }
+}
+
+void mul_vn_vn_fl(float *array_tar, const float *array_src, const int size, const float f)
+{
+	float *tar= array_tar + (size-1);
+	const float *src= array_src + (size-1);
+	int i= size;
+	while(i--) { *(tar--) = *(src--) * f; }
+}
+
+void add_vn_vn(float *array_tar, const float *array_src, const int size)
+{
+	float *tar= array_tar + (size-1);
+	const float *src= array_src + (size-1);
+	int i= size;
+	while(i--) { *(tar--) += *(src--); }
+}
+
+void add_vn_vnvn(float *array_tar, const float *array_src_a, const float *array_src_b, const int size)
+{
+	float *tar= array_tar + (size-1);
+	const float *src_a= array_src_a + (size-1);
+	const float *src_b= array_src_b + (size-1);
+	int i= size;
+	while(i--) { *(tar--) = *(src_a--) + *(src_b--); }
+}
+
+void sub_vn_vn(float *array_tar, const float *array_src, const int size)
+{
+	float *tar= array_tar + (size-1);
+	const float *src= array_src + (size-1);
+	int i= size;
+	while(i--) { *(tar--) -= *(src--); }
+}
+
+void sub_vn_vnvn(float *array_tar, const float *array_src_a, const float *array_src_b, const int size)
+{
+	float *tar= array_tar + (size-1);
+	const float *src_a= array_src_a + (size-1);
+	const float *src_b= array_src_b + (size-1);
+	int i= size;
+	while(i--) { *(tar--) = *(src_a--) - *(src_b--); }
+}
+
+void fill_vni(int *array_tar, const int size, const int val)
+{
+	int *tar= array_tar + (size-1);
+	int i= size;
+	while(i--) { *(tar--) = val; }
+}
+
+void fill_vn(float *array_tar, const int size, const float val)
+{
+	float *tar= array_tar + (size-1);
+	int i= size;
+	while(i--) { *(tar--) = val; }
+}

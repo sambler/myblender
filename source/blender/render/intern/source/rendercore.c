@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/render/intern/source/rendercore.c
+ *  \ingroup render
+ */
+
+
 /* system includes */
 #include <stdio.h>
 #include <math.h>
@@ -41,8 +46,9 @@
 #include "BLI_jitter.h"
 #include "BLI_rand.h"
 #include "BLI_threads.h"
+#include "BLI_utildefines.h"
 
-#include "BKE_utildefines.h"
+
 
 #include "DNA_image_types.h"
 #include "DNA_lamp_types.h"
@@ -60,6 +66,8 @@
 #include "IMB_imbuf.h"
 
 /* local include */
+#include "rayintersection.h"
+#include "rayobject.h"
 #include "renderpipeline.h"
 #include "render_types.h"
 #include "renderdatabase.h"
@@ -70,7 +78,6 @@
 #include "shading.h"
 #include "sss.h"
 #include "zbuf.h"
-#include "RE_raytrace.h"
 
 #include "PIL_time.h"
 
@@ -96,8 +103,9 @@ void calc_view_vector(float *view, float x, float y)
 	}
 	else {
 		
-		if(R.r.mode & R_PANORAMA)
+		if(R.r.mode & R_PANORAMA) {
 			x-= R.panodxp;
+		}
 		
 		/* move x and y to real viewplane coords */
 		x= (x/(float)R.winx);
@@ -891,7 +899,7 @@ static void freeps(ListBase *lb)
 	lb->first= lb->last= NULL;
 }
 
-static void addps(ListBase *lb, intptr_t *rd, int inobi, int facenr, int z, int maskz, unsigned short mask)
+static void addps(ListBase *lb, intptr_t *rd, int obi, int facenr, int z, int maskz, unsigned short mask)
 {
 	PixStrMain *psm;
 	PixStr *ps, *last= NULL;
@@ -900,7 +908,7 @@ static void addps(ListBase *lb, intptr_t *rd, int inobi, int facenr, int z, int 
 		ps= (PixStr *)(*rd);
 		
 		while(ps) {
-			if( ps->obi == inobi && ps->facenr == facenr ) {
+			if( ps->obi == obi && ps->facenr == facenr ) {
 				ps->mask |= mask;
 				return;
 			}
@@ -921,7 +929,7 @@ static void addps(ListBase *lb, intptr_t *rd, int inobi, int facenr, int z, int 
 	else *rd= (intptr_t)ps;
 	
 	ps->next= NULL;
-	ps->obi= inobi;
+	ps->obi= obi;
 	ps->facenr= facenr;
 	ps->z= z;
 	ps->maskz= maskz;
@@ -1050,14 +1058,14 @@ static void reset_sky_speed(RenderPart *pa, RenderLayer *rl)
 
 static unsigned short *make_solid_mask(RenderPart *pa)
 { 
-	 intptr_t *rd= pa->rectdaps;
-	 unsigned short *solidmask, *sp;
-	 int x;
- 	
+	intptr_t *rd= pa->rectdaps;
+	unsigned short *solidmask, *sp;
+	int x;
+
 	if(rd==NULL) return NULL;
- 	
+
 	sp=solidmask= MEM_mallocN(sizeof(short)*pa->rectx*pa->recty, "solidmask");
- 	
+
 	for(x=pa->rectx*pa->recty; x>0; x--, rd++, sp++) {
 		if(*rd) {
 			PixStr *ps= (PixStr *)*rd;
@@ -1069,7 +1077,7 @@ static unsigned short *make_solid_mask(RenderPart *pa)
 		else
 			*sp= 0;
 	}
- 			
+
 	return solidmask;
 }
 
@@ -1443,7 +1451,7 @@ typedef struct ZBufSSSHandle {
 	int totps;
 } ZBufSSSHandle;
 
-static void addps_sss(void *cb_handle, int myobi, int facenr, int x, int y, int z)
+static void addps_sss(void *cb_handle, int obi, int facenr, int x, int y, int z)
 {
 	ZBufSSSHandle *handle = cb_handle;
 	RenderPart *pa= handle->pa;
@@ -1458,7 +1466,7 @@ static void addps_sss(void *cb_handle, int myobi, int facenr, int x, int y, int 
 	if(pa->rectall) {
 		intptr_t *rs= pa->rectall + pa->rectx*y + x;
 
-		addps(&handle->psmlist, rs, myobi, facenr, z, 0, 0);
+		addps(&handle->psmlist, rs, obi, facenr, z, 0, 0);
 		handle->totps++;
 	}
 	if(pa->rectz) {
@@ -1471,7 +1479,7 @@ static void addps_sss(void *cb_handle, int myobi, int facenr, int x, int y, int 
 				handle->totps++;
 			*rz= z;
 			*rp= facenr;
-			*ro= myobi;
+			*ro= obi;
 		}
 	}
 	if(pa->rectbackz) {
@@ -1484,12 +1492,12 @@ static void addps_sss(void *cb_handle, int myobi, int facenr, int x, int y, int 
 				handle->totps++;
 			*rz= z;
 			*rp= facenr;
-			*ro= myobi;
+			*ro= obi;
 		}
 	}
 }
 
-static void shade_sample_sss(ShadeSample *ssamp, Material *mat, ObjectInstanceRen *myobi, VlakRen *vlr, int quad, float x, float y, float z, float *co, float *color, float *area)
+static void shade_sample_sss(ShadeSample *ssamp, Material *mat, ObjectInstanceRen *obi, VlakRen *vlr, int quad, float x, float y, float z, float *co, float *color, float *area)
 {
 	ShadeInput *shi= ssamp->shi;
 	ShadeResult shr;
@@ -1499,9 +1507,9 @@ static void shade_sample_sss(ShadeSample *ssamp, Material *mat, ObjectInstanceRe
 	shi->samplenr= R.shadowsamplenr[shi->thread]++;
 	
 	if(quad) 
-		shade_input_set_triangle_i(shi, myobi, vlr, 0, 2, 3);
+		shade_input_set_triangle_i(shi, obi, vlr, 0, 2, 3);
 	else
-		shade_input_set_triangle_i(shi, myobi, vlr, 0, 1, 2);
+		shade_input_set_triangle_i(shi, obi, vlr, 0, 1, 2);
 
 	/* center pixel */
 	sx = x + 0.5f;
@@ -1535,6 +1543,7 @@ static void shade_sample_sss(ShadeSample *ssamp, Material *mat, ObjectInstanceRe
 	if(shi->obr->ob && shi->obr->ob->transflag & OB_NEG_SCALE) {
 		negate_v3(shi->vn);
 		negate_v3(shi->vno);
+		negate_v3(shi->nmapnorm);
 	}
 
 	/* if nodetree, use the material that we are currently preprocessing
@@ -1679,13 +1688,13 @@ void zbufshade_sss_tile(RenderPart *pa)
 			if(rs) {
 				/* for each sample in this pixel, shade it */
 				for(ps=(PixStr*)*rs; ps; ps=ps->next) {
-					ObjectInstanceRen *myobi= &re->objectinstance[ps->obi];
-					ObjectRen *obr= myobi->obr;
+					ObjectInstanceRen *obi= &re->objectinstance[ps->obi];
+					ObjectRen *obr= obi->obr;
 					vlr= RE_findOrAddVlak(obr, (ps->facenr-1) & RE_QUAD_MASK);
 					quad= (ps->facenr & RE_QUAD_OFFS);
 					z= ps->z;
 
-					shade_sample_sss(&ssamp, mat, myobi, vlr, quad, x, y, z,
+					shade_sample_sss(&ssamp, mat, obi, vlr, quad, x, y, z,
 						co[totpoint], color[totpoint], &area[totpoint]);
 
 					totpoint++;
@@ -1699,14 +1708,14 @@ void zbufshade_sss_tile(RenderPart *pa)
 #else
 			if(rp) {
 				if(*rp != 0) {
-					ObjectInstanceRen *myobi= &re->objectinstance[*ro];
-					ObjectRen *obr= myobi->obr;
+					ObjectInstanceRen *obi= &re->objectinstance[*ro];
+					ObjectRen *obr= obi->obr;
 
 					/* shade front */
 					vlr= RE_findOrAddVlak(obr, (*rp-1) & RE_QUAD_MASK);
 					quad= ((*rp) & RE_QUAD_OFFS);
 
-					shade_sample_sss(&ssamp, mat, myobi, vlr, quad, x, y, *rz,
+					shade_sample_sss(&ssamp, mat, obi, vlr, quad, x, y, *rz,
 						co[totpoint], color[totpoint], &area[totpoint]);
 					
 					VECADD(fcol, fcol, color[totpoint]);
@@ -1719,14 +1728,14 @@ void zbufshade_sss_tile(RenderPart *pa)
 
 			if(rbp) {
 				if(*rbp != 0 && !(*rbp == *(rp-1) && *rbo == *(ro-1))) {
-					ObjectInstanceRen *myobi= &re->objectinstance[*rbo];
-					ObjectRen *obr= myobi->obr;
+					ObjectInstanceRen *obi= &re->objectinstance[*rbo];
+					ObjectRen *obr= obi->obr;
 
 					/* shade back */
 					vlr= RE_findOrAddVlak(obr, (*rbp-1) & RE_QUAD_MASK);
 					quad= ((*rbp) & RE_QUAD_OFFS);
 
-					shade_sample_sss(&ssamp, mat, myobi, vlr, quad, x, y, *rbz,
+					shade_sample_sss(&ssamp, mat, obi, vlr, quad, x, y, *rbz,
 						co[totpoint], color[totpoint], &area[totpoint]);
 					
 					/* to indicate this is a back sample */
@@ -1954,7 +1963,7 @@ void RE_shade_external(Render *re, ShadeInput *shi, ShadeResult *shr)
 {
 	static VlakRen vlr;
 	static ObjectRen obr;
-	static ObjectInstanceRen myobi;
+	static ObjectInstanceRen obi;
 	
 	/* init */
 	if(re) {
@@ -1963,15 +1972,15 @@ void RE_shade_external(Render *re, ShadeInput *shi, ShadeResult *shr)
 		/* fake render face */
 		memset(&vlr, 0, sizeof(VlakRen));
 		memset(&obr, 0, sizeof(ObjectRen));
-		memset(&myobi, 0, sizeof(ObjectInstanceRen));
+		memset(&obi, 0, sizeof(ObjectInstanceRen));
 		obr.lay= -1;
-		myobi.obr= &obr;
+		obi.obr= &obr;
 		
 		return;
 	}
 	shi->vlr= &vlr;
 	shi->obr= &obr;
-	shi->obi= &myobi;
+	shi->obi= &obi;
 	
 	if(shi->mat->nodetree && shi->mat->use_nodes)
 		ntreeShaderExecTree(shi->mat->nodetree, shi, shr);
@@ -2077,26 +2086,12 @@ static void bake_mask_clear( ImBuf *ibuf, char *mask, char val )
 	}
 }
 
-static void bake_set_shade_input(ObjectInstanceRen *myobi, VlakRen *vlr, ShadeInput *shi, int quad, int isect, int x, int y, float u, float v)
+static void bake_set_shade_input(ObjectInstanceRen *obi, VlakRen *vlr, ShadeInput *shi, int quad, int isect, int x, int y, float u, float v)
 {
-	if(isect) {
-		/* raytrace intersection with different u,v than scanconvert */
-		if(vlr->v4) {
-			if(quad)
-				shade_input_set_triangle_i(shi, myobi, vlr, 2, 1, 3);
-			else
-				shade_input_set_triangle_i(shi, myobi, vlr, 0, 1, 3);
-		}
-		else
-			shade_input_set_triangle_i(shi, myobi, vlr, 0, 1, 2);
-	}
-	else {
-		/* regular scanconvert */
-		if(quad) 
-			shade_input_set_triangle_i(shi, myobi, vlr, 0, 2, 3);
-		else
-			shade_input_set_triangle_i(shi, myobi, vlr, 0, 1, 2);
-	}
+	if(quad) 
+		shade_input_set_triangle_i(shi, obi, vlr, 0, 2, 3);
+	else
+		shade_input_set_triangle_i(shi, obi, vlr, 0, 1, 2);
 		
 	/* cache for shadow */
 	shi->samplenr= R.shadowsamplenr[shi->thread]++;
@@ -2148,7 +2143,9 @@ static void bake_shade(void *handle, Object *ob, ShadeInput *shi, int quad, int 
 	
 		shade_input_set_shade_texco(shi);
 		
-		if(!ELEM3(bs->type, RE_BAKE_NORMALS, RE_BAKE_TEXTURE, RE_BAKE_SHADOW))
+		/* only do AO for a full bake (and obviously AO bakes)
+			AO for light bakes is a leftover and might not be needed */
+		if( ELEM3(bs->type, RE_BAKE_ALL, RE_BAKE_AO, RE_BAKE_LIGHT))
 			shade_samples_do_AO(ssamp);
 		
 		if(shi->mat->nodetree && shi->mat->use_nodes) {
@@ -2171,26 +2168,34 @@ static void bake_shade(void *handle, Object *ob, ShadeInput *shi, int quad, int 
 				if(tvn && ttang) {
 					VECCOPY(mat[0], ttang);
 					cross_v3_v3v3(mat[1], tvn, ttang);
+					mul_v3_fl(mat[1], ttang[3]);
 					VECCOPY(mat[2], tvn);
 				}
 				else {
 					VECCOPY(mat[0], shi->nmaptang);
-					cross_v3_v3v3(mat[1], shi->vn, shi->nmaptang);
-					VECCOPY(mat[2], shi->vn);
+					cross_v3_v3v3(mat[1], shi->nmapnorm, shi->nmaptang);
+					mul_v3_fl(mat[1], shi->nmaptang[3]);
+					VECCOPY(mat[2], shi->nmapnorm);
 				}
 
 				invert_m3_m3(imat, mat);
 				mul_m3_v3(imat, nor);
 			}
 			else if(R.r.bake_normal_space == R_BAKE_SPACE_OBJECT)
-				mul_mat3_m4_v3(ob->imat, nor); /* ob->imat includes viewinv! */
+				mul_mat3_m4_v3(ob->imat_ren, nor); /* ob->imat_ren includes viewinv! */
 			else if(R.r.bake_normal_space == R_BAKE_SPACE_WORLD)
 				mul_mat3_m4_v3(R.viewinv, nor);
 
 			normalize_v3(nor); /* in case object has scaling */
 
-			shr.combined[0]= nor[0]/2.0f + 0.5f;
-			shr.combined[1]= 0.5f - nor[1]/2.0f;
+			// The invert of the red channel is to make
+			// the normal map compliant with the outside world.
+			// It needs to be done because in Blender
+			// the normal used in the renderer points inward. It is generated
+			// this way in calc_vertexnormals(). Should this ever change
+			// this negate must be removed.
+			shr.combined[0]= (-nor[0])/2.0f + 0.5f;
+			shr.combined[1]= nor[1]/2.0f + 0.5f;
 			shr.combined[2]= nor[2]/2.0f + 0.5f;
 		}
 		else if(bs->type==RE_BAKE_TEXTURE) {
@@ -2202,6 +2207,42 @@ static void bake_shade(void *handle, Object *ob, ShadeInput *shi, int quad, int 
 		else if(bs->type==RE_BAKE_SHADOW) {
 			VECCOPY(shr.combined, shr.shad);
 			shr.alpha = shi->alpha;
+		}
+		else if(bs->type==RE_BAKE_SPEC_COLOR) {
+			shr.combined[0]= shi->specr;
+			shr.combined[1]= shi->specg;
+			shr.combined[2]= shi->specb;
+			shr.alpha = 1.0f;
+		}
+		else if(bs->type==RE_BAKE_SPEC_INTENSITY) {
+			shr.combined[0]=
+			shr.combined[1]=
+			shr.combined[2]= shi->spec;
+			shr.alpha = 1.0f;
+		}
+		else if(bs->type==RE_BAKE_MIRROR_COLOR) {
+			shr.combined[0]= shi->mirr;
+			shr.combined[1]= shi->mirg;
+			shr.combined[2]= shi->mirb;
+			shr.alpha = 1.0f;
+		}
+		else if(bs->type==RE_BAKE_MIRROR_INTENSITY) {
+			shr.combined[0]=
+			shr.combined[1]=
+			shr.combined[2]= shi->ray_mirror;
+			shr.alpha = 1.0f;
+		}
+		else if(bs->type==RE_BAKE_ALPHA) {
+			shr.combined[0]=
+			shr.combined[1]=
+			shr.combined[2]= shi->alpha;
+			shr.alpha = 1.0f;
+		}
+		else if(bs->type==RE_BAKE_EMIT) {
+			shr.combined[0]=
+			shr.combined[1]=
+			shr.combined[2]= shi->emit;
+			shr.alpha = 1.0f;
 		}
 	}
 	
@@ -2285,19 +2326,19 @@ static int bake_intersect_tree(RayObject* raytree, Isect* isect, float *start, f
 	/* 'dir' is always normalized */
 	VECADDFAC(isect->start, start, dir, -R.r.bake_biasdist);					
 
-	isect->vec[0] = dir[0]*maxdist*sign;
-	isect->vec[1] = dir[1]*maxdist*sign;
-	isect->vec[2] = dir[2]*maxdist*sign;
+	isect->dir[0] = dir[0]*sign;
+	isect->dir[1] = dir[1]*sign;
+	isect->dir[2] = dir[2]*sign;
 
-	isect->labda = maxdist;
+	isect->dist = maxdist;
 
 	hit = RE_rayobject_raycast(raytree, isect);
 	if(hit) {
-		hitco[0] = isect->start[0] + isect->labda*isect->vec[0];
-		hitco[1] = isect->start[1] + isect->labda*isect->vec[1];
-		hitco[2] = isect->start[2] + isect->labda*isect->vec[2];
+		hitco[0] = isect->start[0] + isect->dist*isect->dir[0];
+		hitco[1] = isect->start[1] + isect->dist*isect->dir[1];
+		hitco[2] = isect->start[2] + isect->dist*isect->dir[2];
 
-		*dist= len_v3v3(start, hitco);
+		*dist= isect->dist;
 	}
 
 	return hit;
@@ -2356,9 +2397,9 @@ static void do_bake_shade(void *handle, int x, int y, float u, float v)
 {
 	BakeShade *bs= handle;
 	VlakRen *vlr= bs->vlr;
-	ObjectInstanceRen *myobi= bs->obi;
-	Object *ob= myobi->obr->ob;
-	float l, *v1, *v2, *v3, tvn[3], ttang[3];
+	ObjectInstanceRen *obi= bs->obi;
+	Object *ob= obi->obr->ob;
+	float l, *v1, *v2, *v3, tvn[3], ttang[4];
 	int quad;
 	ShadeSample *ssamp= &bs->ssamp;
 	ShadeInput *shi= ssamp->shi;
@@ -2386,19 +2427,19 @@ static void do_bake_shade(void *handle, int x, int y, float u, float v)
 	shi->co[1]= l*v3[1]+u*v1[1]+v*v2[1];
 	shi->co[2]= l*v3[2]+u*v1[2]+v*v2[2];
 	
-	if(myobi->flag & R_TRANSFORMED)
-		mul_m4_v3(myobi->mat, shi->co);
+	if(obi->flag & R_TRANSFORMED)
+		mul_m4_v3(obi->mat, shi->co);
 	
 	VECCOPY(shi->dxco, bs->dxco);
 	VECCOPY(shi->dyco, bs->dyco);
 
 	quad= bs->quad;
-	bake_set_shade_input(myobi, vlr, shi, quad, 0, x, y, u, v);
+	bake_set_shade_input(obi, vlr, shi, quad, 0, x, y, u, v);
 
 	if(bs->type==RE_BAKE_NORMALS && R.r.bake_normal_space==R_BAKE_SPACE_TANGENT) {
 		shade_input_set_shade_texco(shi);
-		VECCOPY(tvn, shi->vn);
-		VECCOPY(ttang, shi->nmaptang);
+		VECCOPY(tvn, shi->nmapnorm);
+		QUATCOPY(ttang, shi->nmaptang);
 	}
 
 	/* if we are doing selected to active baking, find point on other face */
@@ -2418,10 +2459,11 @@ static void do_bake_shade(void *handle, int x, int y, float u, float v)
 			memset(&isec, 0, sizeof(isec));
 			isec.mode= RE_RAY_MIRROR;
 
-			isec.orig.ob   = myobi;
+			isec.orig.ob   = obi;
 			isec.orig.face = vlr;
 			isec.userdata= bs->actob;
-			isec.skip = RE_SKIP_VLR_NEIGHBOUR|RE_SKIP_VLR_BAKE_CHECK;
+			isec.check = RE_CHECK_VLR_BAKE;
+			isec.skip = RE_SKIP_VLR_NEIGHBOUR;
 			
 			if(bake_intersect_tree(R.raytree, &isec, shi->co, shi->vn, sign, co, &dist)) {
 				if(!hit || len_v3v3(shi->co, co) < len_v3v3(shi->co, minco)) {
@@ -2444,14 +2486,14 @@ static void do_bake_shade(void *handle, int x, int y, float u, float v)
 
 		/* if hit, we shade from the new point, otherwise from point one starting face */
 		if(hit) {
-			myobi= (ObjectInstanceRen*)minisec.hit.ob;
+			obi= (ObjectInstanceRen*)minisec.hit.ob;
 			vlr= (VlakRen*)minisec.hit.face;
 			quad= (minisec.isect == 2);
 			VECCOPY(shi->co, minco);
 			
 			u= -minisec.u;
 			v= -minisec.v;
-			bake_set_shade_input(myobi, vlr, shi, quad, 1, x, y, u, v);
+			bake_set_shade_input(obi, vlr, shi, quad, 1, x, y, u, v);
 		}
 	}
 
@@ -2467,19 +2509,19 @@ static int get_next_bake_face(BakeShade *bs)
 	VlakRen *vlr;
 	MTFace *tface;
 	static int v= 0, vdone= 0;
-	static ObjectInstanceRen *myobi= NULL;
+	static ObjectInstanceRen *obi= NULL;
 	
 	if(bs==NULL) {
 		vlr= NULL;
 		v= vdone= 0;
-		myobi= R.instancetable.first;
+		obi= R.instancetable.first;
 		return 0;
 	}
 	
 	BLI_lock_thread(LOCK_CUSTOM1);	
 
-	for(; myobi; myobi=myobi->next, v=0) {
-		obr= myobi->obr;
+	for(; obi; obi=obi->next, v=0) {
+		obr= obi->obr;
 
 		for(; v<obr->totvlak; v++) {
 			vlr= RE_findOrAddVlak(obr, v);
@@ -2516,7 +2558,7 @@ static int get_next_bake_face(BakeShade *bs)
 						R.bakebuf= ima;
 					}				
 					
-					bs->obi= myobi;
+					bs->obi= obi;
 					bs->vlr= vlr;
 					
 					bs->vdone++;	/* only for error message if nothing was rendered */
@@ -2537,8 +2579,8 @@ static int get_next_bake_face(BakeShade *bs)
 static void shade_tface(BakeShade *bs)
 {
 	VlakRen *vlr= bs->vlr;
-	ObjectInstanceRen *myobi= bs->obi;
-	ObjectRen *obr= myobi->obr;
+	ObjectInstanceRen *obi= bs->obi;
+	ObjectRen *obr= obi->obr;
 	MTFace *tface= RE_vlakren_get_tface(obr, vlr, obr->bakemtface, NULL, 0);
 	Image *ima= tface->tpage;
 	float vec[4][2];
@@ -2574,7 +2616,7 @@ static void shade_tface(BakeShade *bs)
 	/* get pixel level vertex coordinates */
 	for(a=0; a<4; a++) {
 		/* Note, workaround for pixel aligned UVs which are common and can screw up our intersection tests
-		 * where a pixel gets inbetween 2 faces or the middle of a quad,
+		 * where a pixel gets in between 2 faces or the middle of a quad,
 		 * camera aligned quads also have this problem but they are less common.
 		 * Add a small offset to the UVs, fixes bug #18685 - Campbell */
 		vec[a][0]= tface->uv[a][0]*(float)bs->rectx - (0.5f + 0.001);

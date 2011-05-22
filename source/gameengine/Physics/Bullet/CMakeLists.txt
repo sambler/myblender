@@ -24,16 +24,16 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-SET(SRC CcdPhysicsEnvironment.cpp CcdPhysicsController.cpp CcdGraphicController.cpp)
+# since this includes bullet we get errors from the headers too
+remove_strict_flags()
 
-SET(INC
+set(INC
 	.
 	../common
 	../../../../extern/bullet2/src
-	../../../../extern/glew/include
 	../../../../intern/moto/include
 	../../../../intern/guardedalloc
-	../../../kernel/gen_system
+	../../../../intern/container
 	../../../../intern/string
 	../../Rasterizer
 	../../Ketsji
@@ -43,11 +43,22 @@ SET(INC
 	../../../../source/blender/makesdna
 	../../../../source/blender/blenlib
 	../../../../source/blender/blenkernel
-	${PYTHON_INC}
+	${GLEW_INCLUDE_PATH}
+	${PYTHON_INCLUDE_DIRS}
 )
 
-IF(WITH_BULLET)
-	ADD_DEFINITIONS(-DUSE_BULLET)
-ENDIF(WITH_BULLET)
+set(SRC
+	CcdPhysicsEnvironment.cpp
+	CcdPhysicsController.cpp
+	CcdGraphicController.cpp
 
-BLENDERLIB(bf_bullet "${SRC}" "${INC}")
+	CcdGraphicController.h
+	CcdPhysicsController.h
+	CcdPhysicsEnvironment.h
+)
+
+if(WITH_BULLET)
+	add_definitions(-DUSE_BULLET)
+endif()
+
+blender_add_lib(ge_phys_bullet "${SRC}" "${INC}")

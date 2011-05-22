@@ -1,28 +1,33 @@
 /*
  * $Id$
  *
- * ***** BEGIN LGPL LICENSE BLOCK *****
+ * ***** BEGIN GPL LICENSE BLOCK *****
  *
- * Copyright 2009 Jörg Hermann Müller
+ * Copyright 2009-2011 Jörg Hermann Müller
  *
  * This file is part of AudaSpace.
  *
- * AudaSpace is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
+ * Audaspace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
  * AudaSpace is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU Lesser General Public License
- * along with AudaSpace.  If not, see <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU General Public License
+ * along with Audaspace; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * ***** END LGPL LICENSE BLOCK *****
+ * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file AUD_C-API.h
+ *  \ingroup audaspace
+ */
+ 
 #ifndef AUD_CAPI
 #define AUD_CAPI
 
@@ -58,7 +63,7 @@ typedef struct
 /**
  * Initializes FFMPEG if it is enabled.
  */
-extern void AUD_initOnce();
+extern void AUD_initOnce(void);
 
 /**
  * Initializes an audio device.
@@ -72,17 +77,17 @@ extern int AUD_init(AUD_DeviceType device, AUD_DeviceSpecs specs, int buffersize
 /**
  * Unitinitializes an audio device.
  */
-extern void AUD_exit();
+extern void AUD_exit(void);
 
 /**
  * Locks the playback device.
  */
-extern void AUD_lock();
+extern void AUD_lock(void);
 
 /**
  * Unlocks the device.
  */
-extern void AUD_unlock();
+extern void AUD_unlock(void);
 
 /**
  * Returns information about a sound.
@@ -454,9 +459,11 @@ extern float* AUD_readSoundBuffer(const char* filename, float low, float high,
  */
 extern AUD_Channel* AUD_pauseAfter(AUD_Channel* handle, float seconds);
 
-extern AUD_Sound* AUD_createSequencer(void* data, AUD_volumeFunction volume);
+extern AUD_Sound* AUD_createSequencer(int muted, void* data, AUD_volumeFunction volume);
 
 extern void AUD_destroySequencer(AUD_Sound* sequencer);
+
+extern void AUD_setSequencerMuted(AUD_Sound* sequencer, int muted);
 
 extern AUD_SequencerEntry* AUD_addSequencer(AUD_Sound** sequencer, AUD_Sound* sound,
 										float begin, float end, float skip, void* data);
@@ -471,9 +478,9 @@ extern void AUD_muteSequencer(AUD_Sound* sequencer, AUD_SequencerEntry* entry,
 
 extern int AUD_readSound(AUD_Sound* sound, sample_t* buffer, int length);
 
-extern void AUD_startPlayback();
+extern void AUD_startPlayback(void);
 
-extern void AUD_stopPlayback();
+extern void AUD_stopPlayback(void);
 
 extern void AUD_seekSequencer(AUD_Channel* handle, float time);
 
@@ -483,7 +490,7 @@ extern float AUD_getSequencerPosition(AUD_Channel* handle);
 extern void AUD_setSyncCallback(AUD_syncFunction function, void* data);
 #endif
 
-extern int AUD_doesPlayback();
+extern int AUD_doesPlayback(void);
 
 #ifdef __cplusplus
 }

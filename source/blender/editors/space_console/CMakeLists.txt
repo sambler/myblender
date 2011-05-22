@@ -19,9 +19,7 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-FILE(GLOB SRC *.c)
-
-SET(INC
+set(INC
 	../include
 	../../blenfont
 	../../blenkernel
@@ -31,10 +29,19 @@ SET(INC
 	../../makesrna
 	../../windowmanager
 	../../../../intern/guardedalloc
+	${GLEW_INCLUDE_PATH}
 )
 
-IF(NOT WITH_PYTHON)
-	ADD_DEFINITIONS(-DDISABLE_PYTHON)
-ENDIF(NOT WITH_PYTHON)
+set(SRC
+	console_draw.c
+	console_ops.c
+	space_console.c
 
-BLENDERLIB(bf_editor_space_console "${SRC}" "${INC}")
+	console_intern.h
+)
+
+if(WITH_PYTHON)
+	add_definitions(-DWITH_PYTHON)
+endif()
+
+blender_add_lib(bf_editor_space_console "${SRC}" "${INC}")

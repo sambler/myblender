@@ -30,11 +30,18 @@
 *
 */
 
+/** \file blender/modifiers/intern/MOD_lattice.c
+ *  \ingroup modifiers
+ */
+
+
 #include <string.h>
 
 #include "DNA_object_types.h"
 
-#include "BKE_utildefines.h"
+#include "BLI_utildefines.h"
+
+
 #include "BKE_cdderivedmesh.h"
 #include "BKE_lattice.h"
 #include "BKE_modifier.h"
@@ -59,7 +66,7 @@ static CustomDataMask requiredDataMask(Object *UNUSED(ob), ModifierData *md)
 	CustomDataMask dataMask = 0;
 
 	/* ask for vertexgroups if we need them */
-	if(lmd->name[0]) dataMask |= (1 << CD_MDEFORMVERT);
+	if(lmd->name[0]) dataMask |= CD_MASK_MDEFORMVERT;
 
 	return dataMask;
 }
@@ -135,17 +142,18 @@ ModifierTypeInfo modifierType_Lattice = {
 							| eModifierTypeFlag_SupportsEditmode,
 	/* copyData */          copyData,
 	/* deformVerts */       deformVerts,
+	/* deformMatrices */    NULL,
 	/* deformVertsEM */     deformVertsEM,
-	/* deformMatricesEM */  0,
-	/* applyModifier */     0,
-	/* applyModifierEM */   0,
-	/* initData */          0,
+	/* deformMatricesEM */  NULL,
+	/* applyModifier */     NULL,
+	/* applyModifierEM */   NULL,
+	/* initData */          NULL,
 	/* requiredDataMask */  requiredDataMask,
-	/* freeData */          0,
+	/* freeData */          NULL,
 	/* isDisabled */        isDisabled,
 	/* updateDepgraph */    updateDepgraph,
-	/* dependsOnTime */     0,
-	/* dependsOnNormals */	0,
+	/* dependsOnTime */     NULL,
+	/* dependsOnNormals */	NULL,
 	/* foreachObjectLink */ foreachObjectLink,
-	/* foreachIDLink */     0,
+	/* foreachIDLink */     NULL,
 };

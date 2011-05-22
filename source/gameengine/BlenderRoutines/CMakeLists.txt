@@ -1,16 +1,13 @@
 
-FILE(GLOB SRC *.cpp)
-
-SET(INC
+set(INC
 	.
-	../../../source/kernel/gen_system
 	../../../intern/string
+	../../../intern/container
 	../../../intern/guardedalloc
 	../../../intern/audaspace/intern
 	../../../source/gameengine/Rasterizer/RAS_OpenGLRasterizer 
 	../../../source/gameengine/Converter
 	../../../source/blender/imbuf
-	../../../intern/ghost/include
 	../../../intern/moto/include
 	../../../source/gameengine/Ketsji 
 	../../../source/blender/blenlib
@@ -18,8 +15,7 @@ SET(INC
 	../../../source/blender/blenfont
 	../../../source/blender/editors/include
 	../../../source/blender/windowmanager
-	../../../source/blender 
-	../../../source/blender/include
+	../../../source/blender
 	../../../source/blender/makesdna
 	../../../source/blender/makesrna 
 	../../../source/gameengine/Rasterizer 
@@ -30,23 +26,37 @@ SET(INC
 	../../../source/gameengine/Physics/common
 	../../../source/gameengine/Physics/Bullet
 	../../../source/gameengine/Network/LoopBackNetwork
-	../../../source/blender/misc 
 	../../../source/blender/blenloader
 	../../../source/blender/gpu
 	../../../extern/bullet2/src
-	../../../extern/glew/include
+	${GLEW_INCLUDE_PATH}
 )
 
-ADD_DEFINITIONS(-DGLEW_STATIC)
+set(SRC
+	BL_KetsjiEmbedStart.cpp
+	BL_System.cpp
+	KX_BlenderCanvas.cpp
+	KX_BlenderGL.cpp
+	KX_BlenderInputDevice.cpp
+	KX_BlenderKeyboardDevice.cpp
+	KX_BlenderMouseDevice.cpp
+	KX_BlenderRenderTools.cpp
+	KX_BlenderSystem.cpp
 
-IF(WITH_FFMPEG)
-	ADD_DEFINITIONS(-DWITH_FFMPEG)
-ENDIF(WITH_FFMPEG)
+	BL_System.h
+	KX_BlenderCanvas.h
+	KX_BlenderGL.h
+	KX_BlenderInputDevice.h
+	KX_BlenderKeyboardDevice.h
+	KX_BlenderMouseDevice.h
+	KX_BlenderRenderTools.h
+	KX_BlenderSystem.h
+)
 
-IF(WITH_PYTHON)
-	LIST(APPEND INC ${PYTHON_INC})
-ELSE(WITH_PYTHON)
-	ADD_DEFINITIONS(-DDISABLE_PYTHON)
-ENDIF(WITH_PYTHON)
+add_definitions(-DGLEW_STATIC)
 
-BLENDERLIB(bf_blroutines "${SRC}" "${INC}")
+if(WITH_CODEC_FFMPEG)
+	add_definitions(-DWITH_FFMPEG)
+endif()
+
+blender_add_lib(ge_blen_routines "${SRC}" "${INC}")

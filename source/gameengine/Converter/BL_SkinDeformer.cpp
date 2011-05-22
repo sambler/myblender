@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,12 +27,17 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file gameengine/Converter/BL_SkinDeformer.cpp
+ *  \ingroup bgeconv
+ */
+
+
 #if defined(WIN32) && !defined(FREE_WINDOWS)
 #pragma warning (disable : 4786)
 #endif //WIN32
 
 #include "BL_SkinDeformer.h"
-#include "GEN_Map.h"
+#include "CTR_Map.h"
 #include "STR_HashedString.h"
 #include "RAS_IPolygonMaterial.h"
 #include "RAS_MeshObject.h"
@@ -42,6 +47,7 @@
 #include "DNA_action_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
+#include "BLI_utildefines.h"
 #include "BKE_armature.h"
 #include "BKE_action.h"
 #include "MT_Point3.h"
@@ -49,7 +55,7 @@
 extern "C"{
 	#include "BKE_lattice.h"
 }
- #include "BKE_utildefines.h"
+ 
 
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
@@ -102,7 +108,7 @@ BL_SkinDeformer::~BL_SkinDeformer()
 		m_armobj->Release();
 }
 
-void BL_SkinDeformer::Relink(GEN_Map<class GEN_HashedPtr, void*>*map)
+void BL_SkinDeformer::Relink(CTR_Map<class CTR_HashedPtr, void*>*map)
 {
 	if (m_armobj) {
 		void **h_obj = (*map)[m_armobj];

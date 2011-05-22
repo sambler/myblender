@@ -1,4 +1,4 @@
-/**
+/*
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -26,7 +26,13 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
-#include "../TEX_util.h"                                                   
+/** \file blender/nodes/intern/TEX_nodes/TEX_compose.c
+ *  \ingroup texnodes
+ */
+
+
+#include "../TEX_util.h"      
+#include "TEX_node.h"
 
 static bNodeSocketType inputs[]= {
 	{ SOCK_VALUE, 1, "Red",   0.0f, 0.0f, 0.0f, 0.0f,  0.0f, 1.0f },
@@ -52,20 +58,14 @@ static void exec(void *data, bNode *node, bNodeStack **in, bNodeStack **out)
 	tex_output(node, in, out[0], &colorfn, data);
 }
 
-bNodeType tex_node_compose= {
-	/* *next,*prev     */ NULL, NULL,
-	/* type code       */ TEX_NODE_COMPOSE,
-	/* name            */ "Compose RGBA",
-	/* width+range     */ 100, 60, 150,
-	/* class+opts      */ NODE_CLASS_OP_COLOR, 0,
-	/* input sock      */ inputs,
-	/* output sock     */ outputs,
-	/* storage         */ "", 
-	/* execfunc        */ exec,
-	/* butfunc         */ NULL,
-	/* initfunc        */ NULL,
-	/* freestoragefunc */ NULL,
-	/* copystoragefunc */ NULL,
-	/* id              */ NULL   
+void register_node_type_tex_compose(ListBase *lb)
+{
+	static bNodeType ntype;
 	
-};
+	node_type_base(&ntype, TEX_NODE_COMPOSE, "Compose RGBA", NODE_CLASS_OP_COLOR, 0,
+				   inputs, outputs);
+	node_type_size(&ntype, 100, 60, 150);
+	node_type_exec(&ntype, exec);
+	
+	nodeRegisterType(lb, &ntype);
+}

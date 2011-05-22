@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,10 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file ED_keyframing.h
+ *  \ingroup editors
+ */
+
 #ifndef ED_KEYFRAMING_H
 #define ED_KEYFRAMING_H
 
@@ -32,6 +36,7 @@
 extern "C" {
 #endif
 
+struct Main;
 struct ListBase;
 struct ID;
 struct Scene;
@@ -47,9 +52,11 @@ struct bConstraint;
 
 struct bContext;
 struct wmOperatorType;
+struct ReportList;
 
 struct PointerRNA;
 struct PropertyRNA;
+struct EnumPropertyItem;
 
 #include "RNA_types.h"
 
@@ -93,7 +100,7 @@ int insert_vert_fcurve(struct FCurve *fcu, float x, float y, short flag);
  *	Use this to insert a keyframe using the current value being keyframed, in the 
  *	nominated F-Curve (no creation of animation data performed). Returns success.
  */
-short insert_keyframe_direct(struct PointerRNA ptr, struct PropertyRNA *prop, struct FCurve *fcu, float cfra, short flag);
+short insert_keyframe_direct(struct ReportList *reports, struct PointerRNA ptr, struct PropertyRNA *prop, struct FCurve *fcu, float cfra, short flag);
 
 /* -------- */
 
@@ -101,12 +108,12 @@ short insert_keyframe_direct(struct PointerRNA ptr, struct PropertyRNA *prop, st
  *	Use this to create any necessary animation data, and then insert a keyframe
  *	using the current value being keyframed, in the relevant place. Returns success.
  */
-short insert_keyframe(struct ID *id, struct bAction *act, const char group[], const char rna_path[], int array_index, float cfra, short flag);
+short insert_keyframe(struct ReportList *reports, struct ID *id, struct bAction *act, const char group[], const char rna_path[], int array_index, float cfra, short flag);
 
 /* Main Keyframing API call: 
  * 	Use this to delete keyframe on current frame for relevant channel. Will perform checks just in case.
  */
-short delete_keyframe(struct ID *id, struct bAction *act, const char group[], const char rna_path[], int array_index, float cfra, short flag);
+short delete_keyframe(struct ReportList *reports, struct ID *id, struct bAction *act, const char group[], const char rna_path[], int array_index, float cfra, short flag);
 
 /* ************ Keying Sets ********************** */
 
@@ -184,7 +191,7 @@ KeyingSetInfo *ANIM_keyingset_info_find_named(const char name[]);
 
 /* for RNA type registrations... */
 void ANIM_keyingset_info_register(KeyingSetInfo *ksi);
-void ANIM_keyingset_info_unregister(const struct bContext *C, KeyingSetInfo *ksi);
+void ANIM_keyingset_info_unregister(struct Main *bmain, KeyingSetInfo *ksi);
 
 /* cleanup on exit */
 void ANIM_keyingset_infos_exit(void);
@@ -201,12 +208,22 @@ int ANIM_scene_get_keyingset_index(struct Scene *scene, struct KeyingSet *ks);
 struct KeyingSet *ANIM_get_keyingset_for_autokeying(struct Scene *scene, const char *tranformKSName);
 
 /* Create (and show) a menu containing all the Keying Sets which can be used in the current context */
-void ANIM_keying_sets_menu_setup(struct bContext *C, char title[], char op_name[]);
+void ANIM_keying_sets_menu_setup(struct bContext *C, const char title[], const char op_name[]);
+
+/* Dynamically populate an enum of Keying Sets */
+struct EnumPropertyItem *ANIM_keying_sets_enum_itemf(struct bContext *C, struct PointerRNA *ptr, int *free);
 
 /* Check if KeyingSet can be used in the current context */
 short ANIM_keyingset_context_ok_poll(struct bContext *C, struct KeyingSet *ks);
 
 /* ************ Drivers ********************** */
+
+/* Flags for use by driver creation calls */
+typedef enum eCreateDriverFlags {
+	CREATEDRIVER_WITH_DEFAULT_DVAR 	= (1<<0),	/* create drivers with a default variable for nicer UI */
+} eCreateDriverFlags;
+
+/* -------- */
 
 /* Returns whether there is a driver in the copy/paste buffer to paste */
 short ANIM_driver_can_paste(void);
@@ -214,23 +231,23 @@ short ANIM_driver_can_paste(void);
 /* Main Driver Management API calls:
  * 	Add a new driver for the specified property on the given ID block
  */
-short ANIM_add_driver(struct ID *id, const char rna_path[], int array_index, short flag, int type);
+short ANIM_add_driver(struct ReportList *reports, struct ID *id, const char rna_path[], int array_index, short flag, int type);
 
 /* Main Driver Management API calls:
  * 	Remove the driver for the specified property on the given ID block (if available)
  */
-short ANIM_remove_driver(struct ID *id, const char rna_path[], int array_index, short flag);
+short ANIM_remove_driver(struct ReportList *reports, struct ID *id, const char rna_path[], int array_index, short flag);
 
 /* Main Driver Management API calls:
  * 	Make a copy of the driver for the specified property on the given ID block
  */
-short ANIM_copy_driver(struct ID *id, const char rna_path[], int array_index, short flag);
+short ANIM_copy_driver(struct ReportList *reports, struct ID *id, const char rna_path[], int array_index, short flag);
 
 /* Main Driver Management API calls:
  * 	Add a new driver for the specified property on the given ID block or replace an existing one
  *	with the driver + driver-curve data from the buffer 
  */
-short ANIM_paste_driver(struct ID *id, const char rna_path[], int array_index, short flag);
+short ANIM_paste_driver(struct ReportList *reports, struct ID *id, const char rna_path[], int array_index, short flag);
 
 /* ************ Auto-Keyframing ********************** */
 /* Notes:
@@ -247,8 +264,12 @@ short ANIM_paste_driver(struct ID *id, const char rna_path[], int array_index, s
 #define IS_AUTOKEY_ON(scene)	((scene) ? (scene->toolsettings->autokey_mode & AUTOKEY_ON) : (U.autokey_mode & AUTOKEY_ON))
 	/* check the mode for auto-keyframing (per scene takes presidence)  */
 #define IS_AUTOKEY_MODE(scene, mode) 	((scene) ? (scene->toolsettings->autokey_mode == AUTOKEY_MODE_##mode) : (U.autokey_mode == AUTOKEY_MODE_##mode))
-	/* check if a flag is set for auto-keyframing (as userprefs only!) */
-#define IS_AUTOKEY_FLAG(flag)	(U.autokey_flag & AUTOKEY_FLAG_##flag)
+	/* check if a flag is set for auto-keyframing (per scene takes presidence) */
+#define IS_AUTOKEY_FLAG(scene, flag) \
+	((scene)? \
+		((scene->toolsettings->autokey_flag & AUTOKEY_FLAG_##flag) || (U.autokey_flag & AUTOKEY_FLAG_##flag)) \
+	 : \
+		(U.autokey_flag & AUTOKEY_FLAG_##flag))
 
 /* auto-keyframing feature - checks for whether anything should be done for the current frame */
 int autokeyframe_cfra_can_key(struct Scene *scene, struct ID *id);

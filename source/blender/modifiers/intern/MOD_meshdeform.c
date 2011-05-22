@@ -30,12 +30,18 @@
 *
 */
 
+/** \file blender/modifiers/intern/MOD_meshdeform.c
+ *  \ingroup modifiers
+ */
+
+
 #include "DNA_meshdata_types.h"
 #include "DNA_object_types.h"
 
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
-#include "BKE_utildefines.h"
+
 #include "BKE_cdderivedmesh.h"
 #include "BKE_global.h"
 #include "BKE_mesh.h"
@@ -83,7 +89,7 @@ static CustomDataMask requiredDataMask(Object *UNUSED(ob), ModifierData *md)
 	CustomDataMask dataMask = 0;
 
 	/* ask for vertexgroups if we need them */
-	if(mmd->defgrp_name[0]) dataMask |= (1 << CD_MDEFORMVERT);
+	if(mmd->defgrp_name[0]) dataMask |= CD_MASK_MDEFORMVERT;
 
 	return dataMask;
 }
@@ -347,7 +353,7 @@ static void deformVerts(ModifierData *md, Object *ob,
 						int UNUSED(useRenderParams),
 						int UNUSED(isFinalCalc))
 {
-	DerivedMesh *dm= get_dm(ob, NULL, derivedData, NULL, 0);;
+	DerivedMesh *dm= get_dm(ob, NULL, derivedData, NULL, 0);
 
 	modifier_vgroup_cache(md, vertexCos); /* if next modifier needs original vertices */
 	
@@ -363,7 +369,7 @@ static void deformVertsEM(ModifierData *md, Object *ob,
 						float (*vertexCos)[3],
 						int numVerts)
 {
-	DerivedMesh *dm= get_dm(ob, NULL, derivedData, NULL, 0);;
+	DerivedMesh *dm= get_dm(ob, NULL, derivedData, NULL, 0);
 
 	meshdeformModifier_do(md, ob, dm, vertexCos, numVerts);
 
@@ -371,7 +377,7 @@ static void deformVertsEM(ModifierData *md, Object *ob,
 		dm->release(dm);
 }
 
-#define MESHDEFORM_MIN_INFLUENCE 0.00001
+#define MESHDEFORM_MIN_INFLUENCE 0.00001f
 
 void modifier_mdef_compact_influences(ModifierData *md)
 {
@@ -444,17 +450,18 @@ ModifierTypeInfo modifierType_MeshDeform = {
 
 	/* copyData */          copyData,
 	/* deformVerts */       deformVerts,
+	/* deformMatrices */    NULL,
 	/* deformVertsEM */     deformVertsEM,
-	/* deformMatricesEM */  0,
-	/* applyModifier */     0,
-	/* applyModifierEM */   0,
+	/* deformMatricesEM */  NULL,
+	/* applyModifier */     NULL,
+	/* applyModifierEM */   NULL,
 	/* initData */          initData,
 	/* requiredDataMask */  requiredDataMask,
 	/* freeData */          freeData,
 	/* isDisabled */        isDisabled,
 	/* updateDepgraph */    updateDepgraph,
-	/* dependsOnTime */     0,
-	/* dependsOnNormals */	0,
+	/* dependsOnTime */     NULL,
+	/* dependsOnNormals */	NULL,
 	/* foreachObjectLink */ foreachObjectLink,
-	/* foreachIDLink */     0,
+	/* foreachIDLink */     NULL,
 };

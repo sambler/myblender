@@ -1,4 +1,5 @@
-/**
+/*
+ * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -20,17 +21,19 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/blenkernel/intern/unit.c
+ *  \ingroup bke
+ */
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
+#include <assert.h>
 #include "BKE_unit.h"
 
-#ifdef WIN32
-#define _USE_MATH_DEFINES
-#endif
-#include <math.h>
-
+#include "BLI_math.h"
 #include "BLI_winstuff.h"
 
 
@@ -73,13 +76,13 @@
 
 /* define a single unit */
 typedef struct bUnitDef {
-	char *name;
-	char *name_plural;	/* abused a bit for the display name */
-	char *name_short;	/* this is used for display*/
-	char *name_alt;		/* keyboard-friendly ASCII-only version of name_short, can be NULL */
+	const char *name;
+	const char *name_plural;	/* abused a bit for the display name */
+	const char *name_short;	/* this is used for display*/
+	const char *name_alt;		/* keyboard-friendly ASCII-only version of name_short, can be NULL */
 						/* if name_short has non-ASCII chars, name_alt should be present */
 	
-	char *name_display;		/* can be NULL */
+	const char *name_display;		/* can be NULL */
 
 	double scalar;
 	double bias;		/* not used yet, needed for converting temperature */
@@ -92,7 +95,7 @@ typedef struct bUnitDef {
 /* define a single unit */
 typedef struct bUnitCollection {
 	struct bUnitDef *units;
-	int base_unit;				/* basic unit index (when user desn't specify unit explicitly) */
+	int base_unit;				/* basic unit index (when user doesn't specify unit explicitly) */
 	int flag;					/* options for this system */
 	int length;					/* to quickly find the last item */
 } bUnitCollection;
@@ -259,16 +262,18 @@ static struct bUnitCollection buNaturalTimeCollecton = {buNaturalTimeDef, 3, 0, 
 
 static struct bUnitDef buNaturalRotDef[] = {
 	{"degree", "degrees",			"°", NULL, "Degrees",		M_PI/180.0, 0.0,	B_UNIT_DEF_NONE},
+//	{"radian", "radians",			"r", NULL, "Radians",		1.0, 0.0,			B_UNIT_DEF_NONE},
+//	{"turn", "turns",				"t", NULL, "Turns",			1.0/(M_PI*2.0), 0.0,B_UNIT_DEF_NONE},
 	{NULL, NULL, NULL, NULL, NULL, 0.0, 0.0}
 };
 static struct bUnitCollection buNaturalRotCollection = {buNaturalRotDef, 0, 0, sizeof(buNaturalRotDef)/sizeof(bUnitDef)};
 
 #define UNIT_SYSTEM_TOT (((sizeof(bUnitSystems) / 9) / sizeof(void *)) - 1)
 static struct bUnitCollection *bUnitSystems[][9] = {
-	{0, 0, 0, 0, 0, &buNaturalRotCollection, &buNaturalTimeCollecton, 0, 0},
-	{0, &buMetricLenCollecton, &buMetricAreaCollecton, &buMetricVolCollecton, &buMetricMassCollecton, &buNaturalRotCollection, &buNaturalTimeCollecton, &buMetricVelCollecton, &buMetricAclCollecton}, /* metric */
-	{0, &buImperialLenCollecton, &buImperialAreaCollecton, &buImperialVolCollecton, &buImperialMassCollecton, &buNaturalRotCollection, &buNaturalTimeCollecton, &buImperialVelCollecton, &buImperialAclCollecton}, /* imperial */
-	{0, 0, 0, 0, 0, 0, 0, 0, 0}
+	{NULL, NULL, NULL, NULL, NULL, &buNaturalRotCollection, &buNaturalTimeCollecton, NULL, NULL},
+	{NULL, &buMetricLenCollecton, &buMetricAreaCollecton, &buMetricVolCollecton, &buMetricMassCollecton, &buNaturalRotCollection, &buNaturalTimeCollecton, &buMetricVelCollecton, &buMetricAclCollecton}, /* metric */
+	{NULL, &buImperialLenCollecton, &buImperialAreaCollecton, &buImperialVolCollecton, &buImperialMassCollecton, &buNaturalRotCollection, &buNaturalTimeCollecton, &buImperialVelCollecton, &buImperialAclCollecton}, /* imperial */
+	{NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL}
 };
 
 
@@ -276,6 +281,7 @@ static struct bUnitCollection *bUnitSystems[][9] = {
 /* internal, has some option not exposed */
 static bUnitCollection *unit_get_system(int system, int type)
 {
+	assert((system > -1) && (system < UNIT_SYSTEM_TOT) && (type > -1) && (type < B_UNIT_TYPE_TOT));
 	return bUnitSystems[system][type]; /* select system to use, metric/imperial/other? */
 }
 
@@ -338,8 +344,7 @@ static int unit_as_string(char *str, int len_max, double value, int prec, bUnitC
 
 	/* Convert to a string */
 	{
-		char conv_str[6] = {'%', '.', '0'+prec, 'l', 'f', '\0'}; /* "%.2lf" when prec is 2, must be under 10 */
-		len= snprintf(str, len_max, conv_str, (float)value_conv);
+		len= snprintf(str, len_max, "%.*lf", prec, value_conv);
 
 		if(len >= len_max)
 			len= len_max;
@@ -422,7 +427,7 @@ void bUnit_AsString(char *str, int len_max, double value, int prec, int system, 
 }
 
 
-static char *unit_find_str(char *str, char *substr)
+static char *unit_find_str(char *str, const char *substr)
 {
 	char *str_found;
 
@@ -477,7 +482,7 @@ static int ch_is_op(char op)
 	}
 }
 
-static int unit_scale_str(char *str, int len_max, char *str_tmp, double scale_pref, bUnitDef *unit, char *replace_str)
+static int unit_scale_str(char *str, int len_max, char *str_tmp, double scale_pref, bUnitDef *unit, const char *replace_str)
 {
 	char *str_found;
 
@@ -687,7 +692,7 @@ void bUnit_ToUnitAltName(char *str, int len_max, char *orig_str, int system, int
 
 			found= unit_find_str(orig_str, unit->name_short);
 			if(found) {
-				int offset= found - orig_str;
+				int offset= (int)(found - orig_str);
 				int len_name= 0;
 
 				/* copy everything before the unit */
@@ -739,7 +744,7 @@ double bUnit_BaseScalar(int system, int type)
 /* external access */
 int bUnit_IsValid(int system, int type)
 {
-	return !(type < 0 || type >= B_UNIT_MAXDEF || system < 0 || system > UNIT_SYSTEM_TOT);
+	return !(system < 0 || system > UNIT_SYSTEM_TOT || type < 0 || type > B_UNIT_TYPE_TOT);
 }
 
 
@@ -756,11 +761,16 @@ void bUnit_GetSystem(void **usys_pt, int *len, int system, int type)
 	*len= usys->length;
 }
 
-char *bUnit_GetName(void *usys_pt, int index)
+int bUnit_GetBaseUnit(void *usys_pt)
+{
+	return ((bUnitCollection *)usys_pt)->base_unit;
+}
+
+const char *bUnit_GetName(void *usys_pt, int index)
 {
 	return ((bUnitCollection *)usys_pt)->units[index].name;
 }
-char *bUnit_GetNameDisplay(void *usys_pt, int index)
+const char *bUnit_GetNameDisplay(void *usys_pt, int index)
 {
 	return ((bUnitCollection *)usys_pt)->units[index].name_display;
 }

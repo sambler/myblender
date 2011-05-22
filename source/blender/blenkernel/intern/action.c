@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/blenkernel/intern/action.c
+ *  \ingroup bke
+ */
+
+
 #include <string.h>
 #include <math.h>
 #include <stdlib.h>
@@ -39,6 +44,11 @@
 #include "DNA_scene_types.h"
 #include "DNA_object_types.h"
 
+#include "BLI_blenlib.h"
+#include "BLI_math.h"
+#include "BLI_utildefines.h"
+#include "BLI_ghash.h"
+
 #include "BKE_animsys.h"
 #include "BKE_action.h"
 #include "BKE_anim.h"
@@ -48,14 +58,10 @@
 #include "BKE_library.h"
 #include "BKE_main.h"
 #include "BKE_object.h"
-#include "BKE_utildefines.h"
+
 #include "BKE_idprop.h"
 
 #include "BIK_api.h"
-
-#include "BLI_blenlib.h"
-#include "BLI_ghash.h"
-#include "BLI_math.h"
 
 #include "RNA_access.h"
 
@@ -89,15 +95,15 @@ bAction *add_empty_action(const char name[])
 void make_local_action(bAction *act)
 {
 	// Object *ob;
+	Main *bmain= G.main;
 	bAction *actn;
 	int local=0, lib=0;
 	
-	if (act->id.lib==0) return;
+	if (act->id.lib==NULL) return;
 	if (act->id.us==1) {
-		act->id.lib= 0;
+		act->id.lib= NULL;
 		act->id.flag= LIB_LOCAL;
-		//make_local_action_channels(act);
-		new_id(0, (ID *)act, 0);
+		new_id(&bmain->action, (ID *)act, NULL);
 		return;
 	}
 	
@@ -113,10 +119,10 @@ void make_local_action(bAction *act)
 #endif
 	
 	if(local && lib==0) {
-		act->id.lib= 0;
+		act->id.lib= NULL;
 		act->id.flag= LIB_LOCAL;
 		//make_local_action_channels(act);
-		new_id(0, (ID *)act, 0);
+		new_id(&bmain->action, (ID *)act, NULL);
 	}
 	else if(local && lib) {
 		actn= copy_action(act);
@@ -376,6 +382,20 @@ bActionGroup *action_groups_find_named (bAction *act, const char name[])
 	return BLI_findstring(&act->groups, name, offsetof(bActionGroup, name));
 }
 
+/* Clear all 'temp' flags on all groups */
+void action_groups_clear_tempflags (bAction *act)
+{
+	bActionGroup *agrp;
+	
+	/* sanity checks */
+	if (ELEM(NULL, act, act->groups.first))
+		return;
+		
+	/* flag clearing loop */
+	for (agrp = act->groups.first; agrp; agrp = agrp->next)
+		agrp->flag &= ~AGRP_TEMP;
+}
+
 /* *************** Pose channels *************** */
 
 /* usually used within a loop, so we got a N^2 slowdown */
@@ -400,17 +420,18 @@ bPoseChannel *verify_pose_channel(bPose *pose, const char *name)
 		return NULL;
 	
 	/* See if this channel exists */
-	for (chan=pose->chanbase.first; chan; chan=chan->next) {
-		if (!strcmp (name, chan->name))
-			return chan;
+	chan= BLI_findstring(&pose->chanbase, name, offsetof(bPoseChannel, name));
+	if(chan) {
+		return chan;
 	}
-	
+
 	/* If not, create it and add it */
 	chan = MEM_callocN(sizeof(bPoseChannel), "verifyPoseChannel");
 	
-	strncpy(chan->name, name, 31);
+	BLI_strncpy(chan->name, name, sizeof(chan->name));
 	/* init vars to prevent math errors */
-	chan->quat[0] = chan->rotAxis[1]= 1.0f;
+	unit_qt(chan->quat);
+	unit_axis_angle(chan->rotAxis, &chan->rotAngle);
 	chan->size[0] = chan->size[1] = chan->size[2] = 1.0f;
 	
 	chan->limitmin[0]= chan->limitmin[1]= chan->limitmin[2]= -180.0f;
@@ -774,7 +795,7 @@ void pose_add_group (Object *ob)
 		return;
 	
 	grp= MEM_callocN(sizeof(bActionGroup), "PoseGroup");
-	strcpy(grp->name, "Group");
+	BLI_strncpy(grp->name, "Group", sizeof(grp->name));
 	BLI_addtail(&pose->agroups, grp);
 	BLI_uniquename(&pose->agroups, grp, "Group", '.', offsetof(bActionGroup, name), sizeof(grp->name));
 	
@@ -810,7 +831,10 @@ void pose_remove_group (Object *ob)
 		
 		/* now, remove it from the pose */
 		BLI_freelinkN(&pose->agroups, grp);
-		pose->active_group= 0;
+		pose->active_group--;
+		if(pose->active_group < 0 || pose->agroups.first == NULL) {
+			pose->active_group= 0;
+		}
 	}
 }
 
@@ -847,7 +871,8 @@ void calc_action_range(const bAction *act, float *start, float *end, short incl_
 				float nmin, nmax;
 				
 				/* get extents for this curve */
-				calc_fcurve_range(fcu, &nmin, &nmax);
+				// TODO: allow enabling/disabling this?
+				calc_fcurve_range(fcu, &nmin, &nmax, FALSE);
 				
 				/* compare to the running tally */
 				min= MIN2(min, nmin);
@@ -953,6 +978,11 @@ short action_get_item_transforms (bAction *act, Object *ob, bPoseChannel *pchan,
 		bPtr= strstr(fcu->rna_path, basePath);
 		
 		if (bPtr) {
+			/* we must add len(basePath) bytes to the match so that we are at the end of the 
+			 * base path so that we don't get false positives with these strings in the names
+			 */
+			bPtr += strlen(basePath);
+			
 			/* step 2: check for some property with transforms 
 			 *	- to speed things up, only check for the ones not yet found 
 			 * 	  unless we're getting the curves too
@@ -961,8 +991,8 @@ short action_get_item_transforms (bAction *act, Object *ob, bPoseChannel *pchan,
 			 *	- once a match has been found, the curve cannot possibly be any other one
 			 */
 			if ((curves) || (flags & ACT_TRANS_LOC) == 0) {
-				pPtr= strstr(fcu->rna_path, "location");
-				if ((pPtr) && (pPtr >= bPtr)) {
+				pPtr= strstr(bPtr, "location");
+				if (pPtr) {
 					flags |= ACT_TRANS_LOC;
 					
 					if (curves) 
@@ -972,8 +1002,8 @@ short action_get_item_transforms (bAction *act, Object *ob, bPoseChannel *pchan,
 			}
 			
 			if ((curves) || (flags & ACT_TRANS_SCALE) == 0) {
-				pPtr= strstr(fcu->rna_path, "scale");
-				if ((pPtr) && (pPtr >= bPtr)) {
+				pPtr= strstr(bPtr, "scale");
+				if (pPtr) {
 					flags |= ACT_TRANS_SCALE;
 					
 					if (curves) 
@@ -983,11 +1013,23 @@ short action_get_item_transforms (bAction *act, Object *ob, bPoseChannel *pchan,
 			}
 			
 			if ((curves) || (flags & ACT_TRANS_ROT) == 0) {
-				pPtr= strstr(fcu->rna_path, "rotation");
-				if ((pPtr) && (pPtr >= bPtr)) {
+				pPtr= strstr(bPtr, "rotation");
+				if (pPtr) {
 					flags |= ACT_TRANS_ROT;
 					
 					if (curves) 
+						BLI_addtail(curves, BLI_genericNodeN(fcu));
+					continue;
+				}
+			}
+			
+			if ((curves) || (flags & ACT_TRANS_PROP) == 0) {
+				/* custom properties only */
+				pPtr= strstr(bPtr, "[\""); /* extra '"' comment here to keep my texteditor functionlist working :) */  
+				if (pPtr) {
+					flags |= ACT_TRANS_PROP;
+					
+					if (curves)
 						BLI_addtail(curves, BLI_genericNodeN(fcu));
 					continue;
 				}
@@ -1027,7 +1069,6 @@ void extract_pose_from_pose(bPose *pose, const bPose *src)
 void rest_pose(bPose *pose)
 {
 	bPoseChannel *pchan;
-	int i;
 	
 	if (!pose)
 		return;
@@ -1036,16 +1077,12 @@ void rest_pose(bPose *pose)
 	memset(pose->cyclic_offset, 0, sizeof(pose->cyclic_offset));
 	
 	for (pchan=pose->chanbase.first; pchan; pchan= pchan->next) {
-		for (i=0; i<3; i++) {
-			pchan->loc[i]= 0.0f;
-			pchan->quat[i+1]= 0.0f;
-			pchan->eul[i]= 0.0f;
-			pchan->size[i]= 1.0f;
-			pchan->rotAxis[i]= 0.0f;
-		}
-		pchan->quat[0]= pchan->rotAxis[1]= 1.0f;
-		pchan->rotAngle= 0.0f;
-		
+		zero_v3(pchan->loc);
+		zero_v3(pchan->eul);
+		unit_qt(pchan->quat);
+		unit_axis_angle(pchan->rotAxis, &pchan->rotAngle);
+		pchan->size[0]= pchan->size[1]= pchan->size[2]= 1.0f;
+
 		pchan->flag &= ~(POSE_LOC|POSE_ROT|POSE_SIZE);
 	}
 }
@@ -1056,7 +1093,7 @@ void copy_pose_result(bPose *to, bPose *from)
 	bPoseChannel *pchanto, *pchanfrom;
 	
 	if(to==NULL || from==NULL) {
-		printf("pose result copy error to:%p from:%p\n", to, from); // debug temp
+		printf("pose result copy error to:%p from:%p\n", (void *)to, (void *)from); // debug temp
 		return;
 	}
 
@@ -1119,8 +1156,8 @@ void what_does_obaction (Scene *UNUSED(scene), Object *ob, Object *myworkob, bPo
 	
 	myworkob->pose= pose;	/* need to set pose too, since this is used for both types of Action Constraint */
 
-	strcpy(myworkob->parsubstr, ob->parsubstr);
-	strcpy(myworkob->id.name, "OB<ConstrWorkOb>"); /* we don't use real object name, otherwise RNA screws with the real thing */
+	BLI_strncpy(myworkob->parsubstr, ob->parsubstr, sizeof(myworkob->parsubstr));
+	BLI_strncpy(myworkob->id.name, "OB<ConstrWorkOb>", sizeof(myworkob->id.name)); /* we don't use real object name, otherwise RNA screws with the real thing */
 	
 	/* if we're given a group to use, it's likely to be more efficient (though a bit more dangerous) */
 	if (agrp) {
@@ -1134,10 +1171,9 @@ void what_does_obaction (Scene *UNUSED(scene), Object *ob, Object *myworkob, bPo
 		animsys_evaluate_action_group(&id_ptr, act, agrp, NULL, cframe);
 	}
 	else {
-		AnimData adt;
+		AnimData adt= {NULL};
 		
 		/* init animdata, and attach to workob */
-		memset(&adt, 0, sizeof(AnimData));
 		myworkob->adt= &adt;
 		
 		adt.recalc= ADT_RECALC_ANIM;

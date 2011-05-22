@@ -28,6 +28,8 @@
 # Main entry-point for the SCons building system
 # Set up some custom actions and target/argument handling
 # Then read all SConscripts and build
+#
+# TODO: fix /FORCE:MULTIPLE on windows to get proper debug builds.
 
 import platform as pltfrm
 
@@ -58,6 +60,10 @@ import bcolors
 
 EnsureSConsVersion(1,0,0)
 
+# Before we do anything, let's check if we have a sane os.environ
+if not btools.check_environ():
+    Exit()
+
 BlenderEnvironment = Blender.BlenderEnvironment
 B = Blender
 
@@ -71,7 +77,7 @@ Decider('MD5-timestamp')
 
 ##### BEGIN SETUP #####
 
-B.possible_types = ['core', 'player', 'intern', 'extern']
+B.possible_types = ['core', 'player', 'player2', 'intern', 'extern']
 
 B.binarykind = ['blender' , 'blenderplayer']
 ##################################
@@ -141,7 +147,6 @@ if not env:
     print "Could not create a build environment"
     Exit()
 
-
 cc = B.arguments.get('CC', None)
 cxx = B.arguments.get('CXX', None)
 if cc:
@@ -149,13 +154,11 @@ if cc:
 if cxx:
     env['CXX'] = cxx
 
-if env['CC'] in ['cl', 'cl.exe'] and sys.platform=='win32':
-    if bitness == 64:
-        platform = 'win64-vc'
-    else:
-        platform = 'win32-vc'
-elif env['CC'] in ['gcc'] and sys.platform=='win32':
-    platform = 'win32-mingw'
+if sys.platform=='win32':
+    if env['CC'] in ['cl', 'cl.exe']:
+         platform = 'win64-vc' if bitness == 64 else 'win32-vc'
+    elif env['CC'] in ['gcc']:
+        platform = 'win32-mingw'
 
 env.SConscriptChdir(0)
 
@@ -192,6 +195,10 @@ else:
 
 opts = btools.read_opts(env, optfiles, B.arguments)
 opts.Update(env)
+
+if sys.platform=='win32':
+    if bitness==64:
+        env.Append(CFLAGS=['-DWIN64']) # -DWIN32 needed too, as it's used all over to target Windows generally
 
 if not env['BF_FANCY']:
     B.bc.disable()
@@ -396,7 +403,7 @@ SConscript(B.root_build_dir+'/source/SConscript')
 # libraries to give as objects to linking phase
 mainlist = []
 for tp in B.possible_types:
-    if not tp == 'player':
+    if (not tp == 'player') and (not tp == 'player2'):
         mainlist += B.create_blender_liblist(env, tp)
 
 if B.arguments.get('BF_PRIORITYLIST', '0')=='1':
@@ -410,9 +417,10 @@ if 'blender' in B.targets or not env['WITH_BF_NOBLENDER']:
     env.BlenderProg(B.root_build_dir, "blender", mainlist + thestatlibs + dobj, thesyslibs, [B.root_build_dir+'/lib'] + thelibincs, 'blender')
 if env['WITH_BF_PLAYER']:
     playerlist = B.create_blender_liblist(env, 'player')
+    playerlist += B.create_blender_liblist(env, 'player2')
     playerlist += B.create_blender_liblist(env, 'intern')
     playerlist += B.create_blender_liblist(env, 'extern')
-    env.BlenderProg(B.root_build_dir, "blenderplayer",  playerlist, thestatlibs + dobj + thesyslibs, [B.root_build_dir+'/lib'] + thelibincs, 'blenderplayer')
+    env.BlenderProg(B.root_build_dir, "blenderplayer",  playerlist + thestatlibs + dobj, thesyslibs, [B.root_build_dir+'/lib'] + thelibincs, 'blenderplayer')
 
 ##### Now define some targets
 
@@ -488,11 +496,13 @@ if  env['OURPLATFORM']!='darwin':
                         dn.remove('.svn')
                     if '_svn' in dn:
                         dn.remove('_svn')
-                    
+                    if '__pycache__' in dn:  # py3.2 cache dir
+                        dn.remove('__pycache__')
+
                     dir = os.path.join(env['BF_INSTALLDIR'], VERSION)
                     dir += os.sep + os.path.basename(scriptpath) + dp[len(scriptpath):]
-                    
-                    source=[os.path.join(dp, f) for f in df if f[-3:]!='pyc']
+
+                    source=[os.path.join(dp, f) for f in df if not f.endswith(".pyc")]
                     # To ensure empty dirs are created too
                     if len(source)==0:
                         env.Execute(Mkdir(dir))
@@ -539,29 +549,30 @@ for tp, tn, tf in os.walk('release/plugins'):
     df = tp[8:] # remove 'release/'
     for f in tf:
         pluglist.append(os.path.join(tp, f))
-        plugtargetlist.append( os.path.join(env['BF_INSTALLDIR'], df, f) )
+        plugtargetlist.append( os.path.join(env['BF_INSTALLDIR'], VERSION, df, f) )
 
 
 # header files for plugins
 pluglist.append('source/blender/blenpluginapi/documentation.h')
-plugtargetlist.append(os.path.join(env['BF_INSTALLDIR'], 'plugins', 'include', 'documentation.h'))
+plugtargetlist.append(os.path.join(env['BF_INSTALLDIR'], VERSION, 'plugins', 'include', 'documentation.h'))
 pluglist.append('source/blender/blenpluginapi/externdef.h')
-plugtargetlist.append(os.path.join(env['BF_INSTALLDIR'], 'plugins', 'include', 'externdef.h'))
+plugtargetlist.append(os.path.join(env['BF_INSTALLDIR'], VERSION, 'plugins', 'include', 'externdef.h'))
 pluglist.append('source/blender/blenpluginapi/floatpatch.h')
-plugtargetlist.append(os.path.join(env['BF_INSTALLDIR'], 'plugins', 'include', 'floatpatch.h'))
+plugtargetlist.append(os.path.join(env['BF_INSTALLDIR'], VERSION, 'plugins', 'include', 'floatpatch.h'))
 pluglist.append('source/blender/blenpluginapi/iff.h')
-plugtargetlist.append(os.path.join(env['BF_INSTALLDIR'], 'plugins', 'include', 'iff.h'))
+plugtargetlist.append(os.path.join(env['BF_INSTALLDIR'], VERSION, 'plugins', 'include', 'iff.h'))
 pluglist.append('source/blender/blenpluginapi/plugin.h')
-plugtargetlist.append(os.path.join(env['BF_INSTALLDIR'], 'plugins', 'include', 'plugin.h'))
+plugtargetlist.append(os.path.join(env['BF_INSTALLDIR'], VERSION, 'plugins', 'include', 'plugin.h'))
 pluglist.append('source/blender/blenpluginapi/util.h')
-plugtargetlist.append(os.path.join(env['BF_INSTALLDIR'], 'plugins', 'include', 'util.h'))
+plugtargetlist.append(os.path.join(env['BF_INSTALLDIR'], VERSION, 'plugins', 'include', 'util.h'))
 pluglist.append('source/blender/blenpluginapi/plugin.DEF')
-plugtargetlist.append(os.path.join(env['BF_INSTALLDIR'], 'plugins', 'include', 'plugin.def'))
+plugtargetlist.append(os.path.join(env['BF_INSTALLDIR'], VERSION, 'plugins', 'include', 'plugin.def'))
 
 plugininstall = []
-for targetdir,srcfile in zip(plugtargetlist, pluglist):
-    td, tf = os.path.split(targetdir)
-    plugininstall.append(env.Install(dir=td, source=srcfile))
+# plugins in blender 2.5 don't work at the moment.
+#for targetdir,srcfile in zip(plugtargetlist, pluglist):
+#    td, tf = os.path.split(targetdir)
+#    plugininstall.append(env.Install(dir=td, source=srcfile))
 
 textlist = []
 texttargetlist = []
@@ -634,6 +645,16 @@ if env['OURPLATFORM'] in ('win32-vc', 'win32-mingw', 'win64-vc', 'linuxcross'):
                     '${BF_FFMPEG_LIBPATH}/avdevice-52.dll',
                     '${BF_FFMPEG_LIBPATH}/avutil-50.dll',
                     '${BF_FFMPEG_LIBPATH}/swscale-0.dll']
+
+    # Since the thumb handler is loaded by Explorer, architecture is
+    # strict: the x86 build fails on x64 Windows. We need to ship
+    # both builds in x86 packages.
+    if bitness == 32:
+        dllsources.append('${LCGDIR}/thumbhandler/lib/BlendThumb.dll')	
+    dllsources.append('${LCGDIR}/thumbhandler/lib/BlendThumb64.dll')
+
+    dllsources.append('#source/icons/blender.exe.manifest')
+
     windlls = env.Install(dir=env['BF_INSTALLDIR'], source = dllsources)
     allinstall += windlls
 
@@ -662,7 +683,14 @@ if 'blenderlite' in B.targets:
 
 Depends(nsiscmd, allinstall)
 
+buildslave_action = env.Action(btools.buildslave, btools.buildslave_print)
+buildslave_cmd = env.Command('buildslave_exec', None, buildslave_action)
+buildslave_alias = env.Alias('buildslave', buildslave_cmd)
+
+Depends(buildslave_cmd, allinstall)
+
 Default(B.program_list)
 
 if not env['WITHOUT_BF_INSTALL']:
         Default(installtarget)
+

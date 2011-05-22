@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/space_node/space_node.c
+ *  \ingroup spnode
+ */
+
+
 #include <string.h>
 #include <stdio.h>
 
@@ -39,11 +44,13 @@
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
 #include "BLI_rand.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_context.h"
 #include "BKE_screen.h"
 #include "BKE_node.h"
 
+#include "ED_space_api.h"
 #include "ED_render.h"
 #include "ED_screen.h"
 
@@ -63,16 +70,13 @@
 ARegion *node_has_buttons_region(ScrArea *sa)
 {
 	ARegion *ar, *arnew;
-	
-	for(ar= sa->regionbase.first; ar; ar= ar->next)
-		if(ar->regiontype==RGN_TYPE_UI)
-			return ar;
+
+	ar= BKE_area_find_region_type(sa, RGN_TYPE_UI);
+	if(ar) return ar;
 	
 	/* add subdiv level; after header */
-	for(ar= sa->regionbase.first; ar; ar= ar->next)
-		if(ar->regiontype==RGN_TYPE_HEADER)
-			break;
-	
+	ar= BKE_area_find_region_type(sa, RGN_TYPE_HEADER);
+
 	/* is error! */
 	if(ar==NULL) return NULL;
 	
@@ -97,6 +101,9 @@ static SpaceLink *node_new(const bContext *UNUSED(C))
 	snode= MEM_callocN(sizeof(SpaceNode), "initnode");
 	snode->spacetype= SPACE_NODE;	
 	
+	/* backdrop */
+	snode->zoom = 1.0f;
+	
 	/* header */
 	ar= MEM_callocN(sizeof(ARegion), "header for node");
 	
@@ -118,15 +125,15 @@ static SpaceLink *node_new(const bContext *UNUSED(C))
 	BLI_addtail(&snode->regionbase, ar);
 	ar->regiontype= RGN_TYPE_WINDOW;
 	
-	ar->v2d.tot.xmin=  -10.0f;
-	ar->v2d.tot.ymin=  -10.0f;
-	ar->v2d.tot.xmax= 512.0f;
-	ar->v2d.tot.ymax= 512.0f;
+	ar->v2d.tot.xmin=  -256.0f;
+	ar->v2d.tot.ymin=  -256.0f;
+	ar->v2d.tot.xmax= 768.0f;
+	ar->v2d.tot.ymax= 768.0f;
 	
-	ar->v2d.cur.xmin=  0.0f;
-	ar->v2d.cur.ymin=  0.0f;
-	ar->v2d.cur.xmax= 512.0f;
-	ar->v2d.cur.ymax= 512.0f;
+	ar->v2d.cur.xmin=  -256.0f;
+	ar->v2d.cur.ymin=  -256.0f;
+	ar->v2d.cur.xmax= 768.0f;
+	ar->v2d.cur.ymax= 768.0f;
 	
 	ar->v2d.min[0]= 1.0f;
 	ar->v2d.min[1]= 1.0f;
@@ -160,9 +167,9 @@ static void node_init(struct wmWindowManager *UNUSED(wm), ScrArea *UNUSED(sa))
 static void node_area_listener(ScrArea *sa, wmNotifier *wmn)
 {
 	/* note, ED_area_tag_refresh will re-execute compositor */
-	/* XXX, should edit some to check for the nodeTree type, especially  NC_NODE|NA_EDITED which refreshes all types */
 	SpaceNode *snode= sa->spacedata.first;
-
+	int type= snode->treetype;
+	
 	/* preview renders */
 	switch(wmn->category) {
 		case NC_SCENE:
@@ -171,23 +178,35 @@ static void node_area_listener(ScrArea *sa, wmNotifier *wmn)
 				case ND_FRAME:
 					ED_area_tag_refresh(sa);
 					break;
+				case ND_TRANSFORM_DONE:
+					if(type==NTREE_COMPOSIT) {
+						if(snode->flag & SNODE_AUTO_RENDER) {
+							snode->recalc= 1;
+							ED_area_tag_refresh(sa);
+						}
+					}
+					break;
 			}
 			break;
 		case NC_WM:
 			if(wmn->data==ND_FILEREAD)
 				ED_area_tag_refresh(sa);
 			break;
-			
+		
 		/* future: add ID checks? */
 		case NC_MATERIAL:
-			if(wmn->data==ND_SHADING)
-				ED_area_tag_refresh(sa);
-			else if(wmn->data==ND_SHADING_DRAW)
-				ED_area_tag_refresh(sa);
+			if(type==NTREE_SHADER) {
+				if(wmn->data==ND_SHADING)
+					ED_area_tag_refresh(sa);
+				else if(wmn->data==ND_SHADING_DRAW)
+					ED_area_tag_refresh(sa);
+			}
 			break;
 		case NC_TEXTURE:
-			if(wmn->data==ND_NODES)
-				ED_area_tag_refresh(sa);
+			if(type==NTREE_SHADER || type==NTREE_TEXTURE) {
+				if(wmn->data==ND_NODES)
+					ED_area_tag_refresh(sa);
+			}
 			break;
 		case NC_TEXT:
 			/* pynodes */
@@ -207,10 +226,10 @@ static void node_area_listener(ScrArea *sa, wmNotifier *wmn)
 
 		case NC_IMAGE:
 			if (wmn->action == NA_EDITED) {
-				if(snode->treetype==NTREE_COMPOSIT) {
+				if(type==NTREE_COMPOSIT) {
 					Scene *scene= wmn->window->screen->scene;
 					
-					/* note that NodeTagIDChanged is alredy called by BKE_image_signal() on all
+					/* note that NodeTagIDChanged is already called by BKE_image_signal() on all
 					 * scenes so really this is just to know if the images is used in the compo else
 					 * painting on images could become very slow when the compositor is open. */
 					if(NodeTagIDChanged(scene->nodetree, wmn->reference))
@@ -236,8 +255,15 @@ static void node_area_refresh(const struct bContext *C, struct ScrArea *sa)
 		}
 		else if(snode->treetype==NTREE_COMPOSIT) {
 			Scene *scene= (Scene *)snode->id;
-			if(scene->use_nodes)
-				snode_composite_job(C, sa);
+			if(scene->use_nodes) {
+				/* recalc is set on 3d view changes for auto compo */
+				if(snode->recalc) {
+					snode->recalc= 0;
+					node_render_changed_exec((struct bContext*)C, NULL);
+				}
+				else 
+					snode_composite_job(C, sa);
+			}
 		}
 		else if(snode->treetype==NTREE_TEXTURE) {
 			Tex *tex= (Tex *)snode->id;
@@ -254,6 +280,7 @@ static SpaceLink *node_duplicate(SpaceLink *sl)
 	
 	/* clear or remove stuff from old */
 	snoden->nodetree= NULL;
+	snoden->linkdrag.first= snoden->linkdrag.last= NULL;
 	
 	return (SpaceLink *)snoden;
 }
@@ -387,20 +414,21 @@ static void node_region_listener(ARegion *ar, wmNotifier *wmn)
 	}
 }
 
+const char *node_context_dir[] = {"selected_nodes", NULL};
+
 static int node_context(const bContext *C, const char *member, bContextDataResult *result)
 {
 	SpaceNode *snode= CTX_wm_space_node(C);
 	
 	if(CTX_data_dir(member)) {
-		static const char *dir[] = {"selected_nodes", NULL};
-		CTX_data_dir_set(result, dir);
+		CTX_data_dir_set(result, node_context_dir);
 		return 1;
 	}
 	else if(CTX_data_equals(member, "selected_nodes")) {
 		bNode *node;
 		
 		for(next_node(snode->edittree); (node=next_node(NULL));) {
-			if(node->flag & SELECT) {
+			if(node->flag & NODE_SELECT) {
 				CTX_data_list_add(result, &snode->edittree->id, &RNA_Node, node);
 			}
 		}

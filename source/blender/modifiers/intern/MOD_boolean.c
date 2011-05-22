@@ -30,15 +30,24 @@
 *
 */
 
+/** \file blender/modifiers/intern/MOD_boolean.c
+ *  \ingroup modifiers
+ */
+
+#include <stdio.h>
+
 #include "DNA_object_types.h"
 
-#include "BKE_utildefines.h"
+#include "BLI_utildefines.h"
+
+
 #include "BKE_cdderivedmesh.h"
 #include "BKE_modifier.h"
 
 #include "depsgraph_private.h"
 
 #include "MOD_boolean_util.h"
+#include "MOD_util.h"
 
 
 static void copyData(ModifierData *md, ModifierData *target)
@@ -82,7 +91,7 @@ static void updateDepgraph(ModifierData *md, DagForest *forest,
 	}
 }
 
-
+#ifdef WITH_MOD_BOOLEAN
 static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 						DerivedMesh *derivedData,
 						int UNUSED(useRenderParams),
@@ -107,12 +116,21 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 	
 	return derivedData;
 }
+#else // WITH_MOD_BOOLEAN
+static DerivedMesh *applyModifier(ModifierData *UNUSED(md), Object *UNUSED(ob),
+						DerivedMesh *derivedData,
+						int UNUSED(useRenderParams),
+						int UNUSED(isFinalCalc))
+{
+	return derivedData;
+}
+#endif // WITH_MOD_BOOLEAN
 
 static CustomDataMask requiredDataMask(Object *UNUSED(ob), ModifierData *UNUSED(md))
 {
-	CustomDataMask dataMask = (1 << CD_MTFACE) + (1 << CD_MEDGE);
+	CustomDataMask dataMask = CD_MASK_MTFACE | CD_MASK_MEDGE;
 
-	dataMask |= (1 << CD_MDEFORMVERT);
+	dataMask |= CD_MASK_MDEFORMVERT;
 	
 	return dataMask;
 }
@@ -127,18 +145,19 @@ ModifierTypeInfo modifierType_Boolean = {
 							| eModifierTypeFlag_UsesPointCache,
 
 	/* copyData */          copyData,
-	/* deformVerts */       0,
-	/* deformVertsEM */     0,
-	/* deformMatricesEM */  0,
+	/* deformVerts */       NULL,
+	/* deformMatrices */    NULL,
+	/* deformVertsEM */     NULL,
+	/* deformMatricesEM */  NULL,
 	/* applyModifier */     applyModifier,
-	/* applyModifierEM */   0,
-	/* initData */          0,
+	/* applyModifierEM */   NULL,
+	/* initData */          NULL,
 	/* requiredDataMask */  requiredDataMask,
-	/* freeData */          0,
+	/* freeData */          NULL,
 	/* isDisabled */        isDisabled,
 	/* updateDepgraph */    updateDepgraph,
-	/* dependsOnTime */     0,
-	/* dependsOnNormals */	0,
+	/* dependsOnTime */     NULL,
+	/* dependsOnNormals */	NULL,
 	/* foreachObjectLink */ foreachObjectLink,
-	/* foreachIDLink */     0,
+	/* foreachIDLink */     NULL,
 };

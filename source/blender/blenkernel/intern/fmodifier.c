@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/blenkernel/intern/fmodifier.c
+ *  \ingroup bke
+ */
+
+
 
 #include <math.h>
 #include <stdio.h>
@@ -38,10 +43,11 @@
 
 #include "BLI_blenlib.h"
 #include "BLI_math.h" /* windows needs for M_PI */
+#include "BLI_utildefines.h"
 
 #include "BKE_fcurve.h"
 #include "BKE_idprop.h"
-#include "BKE_utildefines.h"
+
 
 #define SMALL -1.0e-10
 #define SELECT 1
@@ -146,7 +152,7 @@ static void fcm_generator_verify (FModifier *fcm)
 				nc= MEM_callocN(sizeof(float)*(data->poly_order+1), "FMod_Generator_Coefs");
 				
 				if (data->coefficients) {
-					if (data->arraysize > (data->poly_order+1))
+					if ((int)data->arraysize > (data->poly_order+1))
 						memcpy(nc, data->coefficients, sizeof(float)*(data->poly_order+1));
 					else
 						memcpy(nc, data->coefficients, sizeof(float)*data->arraysize);
@@ -172,7 +178,7 @@ static void fcm_generator_verify (FModifier *fcm)
 				nc= MEM_callocN(sizeof(float)*(data->poly_order*2), "FMod_Generator_Coefs");
 				
 				if (data->coefficients) {
-					if (data->arraysize > (data->poly_order * 2))
+					if (data->arraysize > (unsigned int)(data->poly_order * 2))
 						memcpy(nc, data->coefficients, sizeof(float)*(data->poly_order * 2));
 					else
 						memcpy(nc, data->coefficients, sizeof(float)*data->arraysize);
@@ -240,7 +246,7 @@ static void fcm_generator_evaluate (FCurve *UNUSED(fcu), FModifier *fcm, float *
 			unsigned int i;
 			
 			/* for each coefficient pair, solve for that bracket before accumulating in value by multiplying */
-			for (cp=data->coefficients, i=0; (cp) && (i < data->poly_order); cp+=2, i++) 
+			for (cp=data->coefficients, i=0; (cp) && (i < (unsigned int)data->poly_order); cp+=2, i++) 
 				value *= (cp[0]*evaltime + cp[1]);
 				
 			/* only if something changed, write *cvalue in one go */
@@ -340,7 +346,7 @@ static void fcm_fn_generator_evaluate (FCurve *UNUSED(fcu), FModifier *fcm, floa
 		case FCM_GENERATOR_FN_LN: /* natural log */
 		{
 			/* check that value is greater than 1? */
-			if (arg > 1.0f) {
+			if (arg > 1.0) {
 				fn= log;
 			}
 			else {
@@ -352,7 +358,7 @@ static void fcm_fn_generator_evaluate (FCurve *UNUSED(fcu), FModifier *fcm, floa
 		case FCM_GENERATOR_FN_SQRT: /* square root */
 		{
 			/* no negative numbers */
-			if (arg > 0.0f) {
+			if (arg > 0.0) {
 				fn= sqrt;
 			}
 			else {
@@ -368,7 +374,7 @@ static void fcm_fn_generator_evaluate (FCurve *UNUSED(fcu), FModifier *fcm, floa
 	
 	/* execute function callback to set value if appropriate */
 	if (fn) {
-		float value= (float)(data->amplitude*fn(arg) + data->value_offset);
+		float value= (float)(data->amplitude*(float)fn(arg) + data->value_offset);
 		
 		if (data->flag & FCM_GENERATOR_ADDITIVE)
 			*cvalue += value;
@@ -802,13 +808,13 @@ static void fcm_python_copy (FModifier *fcm, FModifier *src)
 
 static void fcm_python_evaluate (FCurve *UNUSED(fcu), FModifier *UNUSED(fcm), float *UNUSED(cvalue), float UNUSED(evaltime))
 {
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 	//FMod_Python *data= (FMod_Python *)fcm->data;
 	
 	/* FIXME... need to implement this modifier...
 	 *	It will need it execute a script using the custom properties 
 	 */
-#endif /* DISABLE_PYTHON */
+#endif /* WITH_PYTHON */
 }
 
 static FModifierTypeInfo FMI_PYTHON = {
@@ -932,7 +938,7 @@ static FModifierTypeInfo *fmodifiersTypeInfo[FMODIFIER_NUM_TYPES];
 static short FMI_INIT= 1; /* when non-zero, the list needs to be updated */
 
 /* This function only gets called when FMI_INIT is non-zero */
-static void fmods_init_typeinfo () 
+static void fmods_init_typeinfo (void) 
 {
 	fmodifiersTypeInfo[0]=  NULL; 					/* 'Null' F-Curve Modifier */
 	fmodifiersTypeInfo[1]=  &FMI_GENERATOR; 		/* Generator F-Curve Modifier */
@@ -1009,9 +1015,13 @@ FModifier *add_fmodifier (ListBase *modifiers, int type)
 	fcm->flag = FMODIFIER_FLAG_EXPANDED;
 	BLI_addtail(modifiers, fcm);
 	
+	/* tag modifier as "active" if no other modifiers exist in the stack yet */
+	if (modifiers->first == modifiers->last)
+		fcm->flag |= FMODIFIER_FLAG_ACTIVE;
+	
 	/* add modifier's data */
 	fcm->data= MEM_callocN(fmi->size, fmi->structName);
-		
+	
 	/* init custom settings if necessary */
 	if (fmi->new_data)	
 		fmi->new_data(fcm->data);

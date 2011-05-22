@@ -30,16 +30,24 @@
 *
 */
 
+/** \file blender/modifiers/intern/MOD_fluidsim.c
+ *  \ingroup modifiers
+ */
+
+
 #include "DNA_scene_types.h"
 #include "DNA_object_fluidsim.h"
 #include "DNA_object_types.h"
 
-#include "BKE_utildefines.h"
+#include "BLI_utildefines.h"
+
+
 #include "BKE_cdderivedmesh.h"
 #include "BKE_modifier.h"
 
 #include "depsgraph_private.h"
 
+#include "MOD_util.h"
 #include "MOD_fluidsim_util.h"
 #include "MEM_guardedalloc.h"
 
@@ -70,9 +78,10 @@ static void copyData(ModifierData *md, ModifierData *target)
 
 
 
-static DerivedMesh * applyModifier(
-		ModifierData *md, Object *ob, DerivedMesh *derivedData,
-  int useRenderParams, int isFinalCalc)
+static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
+						DerivedMesh *dm,
+						int useRenderParams,
+						int isFinalCalc)
 {
 	FluidsimModifierData *fluidmd= (FluidsimModifierData*) md;
 	DerivedMesh *result = NULL;
@@ -83,17 +92,12 @@ static DerivedMesh * applyModifier(
 		initData(md);
 		
 		if(!fluidmd->fss)
-			return derivedData;
+			return dm;
 	}
 
-	result = fluidsimModifier_do(fluidmd, md->scene, ob, derivedData, useRenderParams, isFinalCalc);
+	result= fluidsimModifier_do(fluidmd, md->scene, ob, dm, useRenderParams, isFinalCalc);
 
-	if(result) 
-	{ 
-		return result; 
-	}
-	
-	return derivedData;
+	return result ? result : dm;
 }
 
 static void updateDepgraph(
@@ -143,18 +147,19 @@ ModifierTypeInfo modifierType_Fluidsim = {
 							| eModifierTypeFlag_Single,
 
 	/* copyData */          copyData,
-	/* deformVerts */       0,
-	/* deformVertsEM */     0,
-	/* deformMatricesEM */  0,
+	/* deformVerts */       NULL,
+	/* deformMatrices */    NULL,
+	/* deformVertsEM */     NULL,
+	/* deformMatricesEM */  NULL,
 	/* applyModifier */     applyModifier,
-	/* applyModifierEM */   0,
+	/* applyModifierEM */   NULL,
 	/* initData */          initData,
-	/* requiredDataMask */  0,
+	/* requiredDataMask */  NULL,
 	/* freeData */          freeData,
-	/* isDisabled */        0,
+	/* isDisabled */        NULL,
 	/* updateDepgraph */    updateDepgraph,
 	/* dependsOnTime */     dependsOnTime,
-	/* dependsOnNormals */	0,
-	/* foreachObjectLink */ 0,
-	/* foreachIDLink */     0,
+	/* dependsOnNormals */	NULL,
+	/* foreachObjectLink */ NULL,
+	/* foreachIDLink */     NULL,
 };

@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -24,6 +24,10 @@
  * Contributor(s): Blender Foundation
  *
  * ***** END GPL LICENSE BLOCK *****
+ */
+
+/** \file ED_screen_types.h
+ *  \ingroup editors
  */
 
 #ifndef ED_SCREEN_TYPES_H__
@@ -52,7 +56,7 @@ enum {
 		/* don't drop frames (and ignore SCE_FRAME_DROP flag) */
 	ANIMPLAY_FLAG_NO_SYNC		= (1<<3),
 		/* use nextfra at next timer update */
-	ANIMPLAY_FLAG_USE_NEXT_FRAME,
+	ANIMPLAY_FLAG_USE_NEXT_FRAME = (1<<4)
 };
 
 /* ----------------------------------------------------- */

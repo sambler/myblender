@@ -1,4 +1,4 @@
-/**
+/*
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -26,7 +26,13 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
-#include "../TEX_util.h"                                                   
+/** \file blender/nodes/intern/TEX_nodes/TEX_checker.c
+ *  \ingroup texnodes
+ */
+
+
+#include "../TEX_util.h"
+#include "TEX_node.h"
 #include <math.h>
 
 static bNodeSocketType inputs[]= {
@@ -48,9 +54,9 @@ static void colorfn(float *out, TexParams *p, bNode *UNUSED(node), bNodeStack **
 	float sz = tex_input_value(in[2], p, thread);
 	
 	/* 0.00001  because of unit sized stuff */
-	int xi = (int)fabs(floor(0.00001 + x / sz));
-	int yi = (int)fabs(floor(0.00001 + y / sz));
-	int zi = (int)fabs(floor(0.00001 + z / sz));
+	int xi = (int)fabs(floor(0.00001f + x / sz));
+	int yi = (int)fabs(floor(0.00001f + y / sz));
+	int zi = (int)fabs(floor(0.00001f + z / sz));
 	
 	if( (xi % 2 == yi % 2) == (zi % 2) ) {
 		tex_input_rgba(out, in[0], p, thread);
@@ -64,20 +70,14 @@ static void exec(void *data, bNode *node, bNodeStack **in, bNodeStack **out)
 	tex_output(node, in, out[0], &colorfn, data);
 }
 
-bNodeType tex_node_checker= {
-	/* *next,*prev */	NULL, NULL,
-	/* type code   */	TEX_NODE_CHECKER,
-	/* name        */	"Checker",
-	/* width+range */	100, 60, 150,
-	/* class+opts  */	NODE_CLASS_PATTERN, NODE_OPTIONS | NODE_PREVIEW,
-	/* input sock  */	inputs,
-	/* output sock */	outputs,
-	/* storage     */	"", 
-	/* execfunc    */	exec,
-	/* butfunc     */	NULL,
-	/* initfunc    */	NULL,
-	/* freestoragefunc    */	NULL,
-	/* copystoragefunc    */	NULL,
-	/* id          */	NULL
+void register_node_type_tex_checker(ListBase *lb)
+{
+	static bNodeType ntype;
 	
-};
+	node_type_base(&ntype, TEX_NODE_CHECKER, "Checker", NODE_CLASS_PATTERN, NODE_PREVIEW|NODE_OPTIONS,
+				   inputs, outputs);
+	node_type_size(&ntype, 100, 60, 150);
+	node_type_exec(&ntype, exec);
+	
+	nodeRegisterType(lb, &ntype);
+}

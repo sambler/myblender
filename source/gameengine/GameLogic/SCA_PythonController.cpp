@@ -1,4 +1,4 @@
-/**
+/*
  * Execute Python scripts
  *
  * $Id$
@@ -29,16 +29,23 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file gameengine/GameLogic/SCA_PythonController.cpp
+ *  \ingroup gamelogic
+ */
+
+
+#include <stddef.h>
+
 #include "SCA_PythonController.h"
 #include "SCA_LogicManager.h"
 #include "SCA_ISensor.h"
 #include "SCA_IActuator.h"
 #include "PyObjectPlus.h"
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 #include "compile.h"
 #include "eval.h"
-#endif // DISABLE_PYTHON
+#endif // WITH_PYTHON
 
 #include <algorithm>
 
@@ -49,7 +56,7 @@ SCA_PythonController* SCA_PythonController::m_sCurrentController = NULL;
 
 SCA_PythonController::SCA_PythonController(SCA_IObject* gameobj, int mode)
 	: SCA_IController(gameobj),
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 	m_bytecode(NULL),
 	m_function(NULL),
 #endif
@@ -57,7 +64,7 @@ SCA_PythonController::SCA_PythonController(SCA_IObject* gameobj, int mode)
 	m_bModified(true),
 	m_debug(false),
 	m_mode(mode)
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 	, m_pythondictionary(NULL)
 #endif
 
@@ -84,7 +91,7 @@ int			SCA_PythonController::Release()
 SCA_PythonController::~SCA_PythonController()
 {
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 	//printf("released python byte script\n");
 	
 	Py_XDECREF(m_bytecode);
@@ -104,7 +111,7 @@ CValue* SCA_PythonController::GetReplica()
 {
 	SCA_PythonController* replica = new SCA_PythonController(*this);
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 	/* why is this needed at all??? - m_bytecode is NULL'd below so this doesnt make sense
 	 * but removing it crashes blender (with YoFrankie). so leave in for now - Campbell */
 	Py_XINCREF(replica->m_bytecode);
@@ -146,7 +153,7 @@ void SCA_PythonController::SetScriptName(const STR_String& name)
 }
 
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 void SCA_PythonController::SetNamespace(PyObject*	pythondictionary)
 {
 	if (m_pythondictionary)
@@ -171,7 +178,7 @@ int SCA_PythonController::IsTriggered(class SCA_ISensor* sensor)
 	return 0;
 }
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 
 /* warning, self is not the SCA_PythonController, its a PyObjectPlus_Proxy */
 PyObject* SCA_PythonController::sPyGetCurrentController(PyObject *self)
@@ -255,10 +262,7 @@ PyAttributeDef SCA_PythonController::Attributes[] = {
 
 void SCA_PythonController::ErrorPrint(const char *error_msg)
 {
-	// didn't compile, so instead of compile, complain
-	// something is wrong, tell the user what went wrong
-	printf("%s - controller \"%s\":\n", error_msg, GetName().Ptr());
-	//PyRun_SimpleString(m_scriptText.Ptr());
+	printf("%s - object '%s', controller '%s':\n", error_msg, GetParent()->GetName().Ptr(), GetName().Ptr());
 	PyErr_Print();
 	
 	/* Added in 2.48a, the last_traceback can reference Objects for example, increasing
@@ -307,7 +311,7 @@ bool SCA_PythonController::Import()
 	function_string= strrchr(mod_path, '.');
 
 	if(function_string == NULL) {
-		printf("Python module name formatting error \"%s\":\n\texpected \"SomeModule.Func\", got \"%s\"\n", GetName().Ptr(), m_scriptText.Ptr());
+		printf("Python module name formatting error in object '%s', controller '%s':\n\texpected 'SomeModule.Func', got '%s'\n", GetParent()->GetName().Ptr(), GetName().Ptr(), m_scriptText.Ptr());
 		return false;
 	}
 
@@ -340,13 +344,14 @@ bool SCA_PythonController::Import()
 		if(PyErr_Occurred())
 			ErrorPrint("Python controller found the module but could not access the function");
 		else
-			printf("Python module error \"%s\":\n \"%s\" module found but function missing\n", GetName().Ptr(), m_scriptText.Ptr());
+			printf("Python module error in object '%s', controller '%s':\n '%s' module found but function missing\n", GetParent()->GetName().Ptr(), GetName().Ptr(), m_scriptText.Ptr());
 		return false;
 	}
 	
 	if(!PyCallable_Check(m_function)) {
 		Py_DECREF(m_function);
-		printf("Python module function error \"%s\":\n \"%s\" not callable\n", GetName().Ptr(), m_scriptText.Ptr());
+		m_function = NULL;
+		printf("Python module function error in object '%s', controller '%s':\n '%s' not callable\n", GetParent()->GetName().Ptr(), GetName().Ptr(), m_scriptText.Ptr());
 		return false;
 	}
 	
@@ -364,7 +369,8 @@ bool SCA_PythonController::Import()
 	
 	if(m_function_argc > 1) {
 		Py_DECREF(m_function);
-		printf("Python module function has \"%s\":\n \"%s\" takes %d args, should be zero or 1 controller arg\n", GetName().Ptr(), m_scriptText.Ptr(), m_function_argc);
+		m_function = NULL;
+		printf("Python module function in object '%s', controller '%s':\n '%s' takes %d args, should be zero or 1 controller arg\n", GetParent()->GetName().Ptr(), GetName().Ptr(), m_scriptText.Ptr(), m_function_argc);
 		return false;
 	}
 	
@@ -408,7 +414,9 @@ void SCA_PythonController::Trigger(SCA_LogicManager* logicmgr)
 		 */
 
 		excdict= PyDict_Copy(m_pythondictionary);
-		resultobj = PyEval_EvalCode((PyCodeObject*)m_bytecode, excdict, excdict);
+
+		resultobj = PyEval_EvalCode((PyObject *)m_bytecode, excdict, excdict);
+
 		/* PyRun_SimpleString(m_scriptText.Ptr()); */
 		break;
 	}
@@ -438,22 +446,9 @@ void SCA_PythonController::Trigger(SCA_LogicManager* logicmgr)
 	
 	/* Free the return value and print the error */
 	if (resultobj)
-	{
 		Py_DECREF(resultobj);
-	}
 	else
-	{
-		// something is wrong, tell the user what went wrong
-		printf("Python script error from controller \"%s\":\n", GetName().Ptr());
-		PyErr_Print();
-		
-		/* Added in 2.48a, the last_traceback can reference Objects for example, increasing
-		 * their user count. Not to mention holding references to wrapped data.
-		 * This is especially bad when the PyObject for the wrapped data is free'd, after blender 
-		 * has already dealocated the pointer */
-		PySys_SetObject( (char *)"last_traceback", NULL);
-		PyErr_Clear(); /* just to be sure */
-	}
+		ErrorPrint("Python script error");
 	
 	if(excdict) /* Only for SCA_PYEXEC_SCRIPT types */
 	{
@@ -527,13 +522,13 @@ int SCA_PythonController::pyattr_set_script(void *self_v, const KX_PYATTRIBUTE_D
 	return PY_SET_ATTR_SUCCESS;
 }
 
-#else // DISABLE_PYTHON
+#else // WITH_PYTHON
 
 void SCA_PythonController::Trigger(SCA_LogicManager* logicmgr)
 {
 	/* intentionally blank */
 }
 
-#endif // DISABLE_PYTHON
+#endif // WITH_PYTHON
 
 /* eof */

@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -22,6 +22,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/makesrna/intern/rna_sound.c
+ *  \ingroup RNA
+ */
+
+
 #include <stdlib.h>
 
 #include "RNA_define.h"
@@ -38,7 +43,7 @@
 
 static void rna_Sound_filepath_update(Main *bmain, Scene *scene, PointerRNA *ptr)
 {
-	sound_load((bSound*)ptr->data);
+	sound_load(bmain, (bSound*)ptr->data);
 }
 
 static int rna_Sound_caching_get(PointerRNA *ptr)

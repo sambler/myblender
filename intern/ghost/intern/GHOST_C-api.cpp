@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file ghost/intern/GHOST_C-api.cpp
+ *  \ingroup GHOST
+ */
+
 
 /*
 
@@ -129,7 +134,7 @@ void GHOST_GetMainDisplayDimensions(GHOST_SystemHandle systemhandle,
 
 
 GHOST_WindowHandle GHOST_CreateWindow(GHOST_SystemHandle systemhandle,
-									  char* title,
+									  const char* title,
 									  GHOST_TInt32 left,
 									  GHOST_TInt32 top,
 									  GHOST_TUns32 width,
@@ -246,6 +251,13 @@ GHOST_TSuccess GHOST_AddEventConsumer(GHOST_SystemHandle systemhandle, GHOST_Eve
 	GHOST_ISystem* system = (GHOST_ISystem*) systemhandle;
 	
 	return system->addEventConsumer((GHOST_CallbackEventConsumer*)consumerhandle);
+}
+
+GHOST_TSuccess GHOST_RemoveEventConsumer(GHOST_SystemHandle systemhandle, GHOST_EventConsumerHandle consumerhandle)
+{
+	GHOST_ISystem* system = (GHOST_ISystem*) systemhandle;
+
+	return system->removeEventConsumer((GHOST_CallbackEventConsumer*)consumerhandle);
 }
 
 GHOST_TSuccess GHOST_SetProgressBar(GHOST_WindowHandle windowhandle,float progress)
@@ -391,7 +403,7 @@ GHOST_TSuccess GHOST_GetModifierKeyState(GHOST_SystemHandle systemhandle,
 {
 	GHOST_ISystem* system = (GHOST_ISystem*) systemhandle;
 	GHOST_TSuccess result;
-	bool isdown;
+	bool isdown= false;
 	
 	result = system->getModifierKeyState(mask, isdown);
 	*isDown = (int) isdown;
@@ -407,7 +419,7 @@ GHOST_TSuccess GHOST_GetButtonState(GHOST_SystemHandle systemhandle,
 {
 	GHOST_ISystem* system = (GHOST_ISystem*) systemhandle;
 	GHOST_TSuccess result;
-	bool isdown;
+	bool isdown= false;
 	
 	result = system->getButtonState(mask, isdown);
 	*isDown = (int) isdown;
@@ -525,7 +537,7 @@ GHOST_TSuccess GHOST_SetDrawingContextType(GHOST_WindowHandle windowhandle,
 
 
 void GHOST_SetTitle(GHOST_WindowHandle windowhandle,
-					char* title)
+					const char* title)
 {
 	GHOST_IWindow* window = (GHOST_IWindow*) windowhandle;
 	
@@ -864,4 +876,10 @@ void GHOST_putClipboard(GHOST_TInt8 *buffer, int selection)
 {
 	GHOST_ISystem* system = GHOST_ISystem::getSystem();
 	system->putClipboard(buffer, selection);
+}
+
+int GHOST_toggleConsole(int action)
+{
+	GHOST_ISystem* system = GHOST_ISystem::getSystem();
+	return system->toggleConsole(action);
 }

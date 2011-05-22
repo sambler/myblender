@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -21,6 +21,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/makesrna/intern/rna_property.c
+ *  \ingroup RNA
+ */
+
 
 #include <stdlib.h>
 
@@ -96,11 +101,11 @@ void RNA_def_gameproperty(BlenderRNA *brna)
 	PropertyRNA *prop;
 
 	static EnumPropertyItem gameproperty_type_items[] ={
-		{GPROP_BOOL, "BOOL", 0, "Boolean", ""},
-		{GPROP_INT, "INT", 0, "Integer", ""},
-		{GPROP_FLOAT, "FLOAT", 0, "Float", ""},
-		{GPROP_STRING, "STRING", 0, "String", ""},
-		{GPROP_TIME, "TIMER", 0, "Timer", ""},
+		{GPROP_BOOL, "BOOL", 0, "Boolean", "Boolean Property"},
+		{GPROP_INT, "INT", 0, "Integer", "Integer Property"},
+		{GPROP_FLOAT, "FLOAT", 0, "Float", "Floating-Point Property"},
+		{GPROP_STRING, "STRING", 0, "String", "String Property"},
+		{GPROP_TIME, "TIMER", 0, "Timer", "Timer Property"},
 		{0, NULL, 0, NULL, NULL}};
 
 	/* Base Struct for GameProperty */
@@ -154,7 +159,7 @@ void RNA_def_gameproperty(BlenderRNA *brna)
 	RNA_def_struct_sdna(srna, "bProperty");
 
 	prop= RNA_def_property(srna, "value", PROP_FLOAT, PROP_NONE);
-	RNA_def_property_float_sdna(prop, NULL, "data");
+	// RNA_def_property_float_sdna(prop, NULL, "data");
 	RNA_def_property_ui_text(prop, "Value", "Property value");
 	RNA_def_property_range(prop, -10000, 10000);
 	RNA_def_property_float_funcs(prop, "rna_GameFloatProperty_value_get", "rna_GameFloatProperty_value_set", NULL);
@@ -166,7 +171,7 @@ void RNA_def_gameproperty(BlenderRNA *brna)
 	RNA_def_struct_sdna(srna, "bProperty");
 
 	prop= RNA_def_property(srna, "value", PROP_FLOAT, PROP_NONE);
-	RNA_def_property_float_sdna(prop, NULL, "data");
+	// RNA_def_property_float_sdna(prop, NULL, "data");
 	RNA_def_property_ui_text(prop, "Value", "Property value");
 	RNA_def_property_range(prop, -10000, 10000);
 	RNA_def_property_float_funcs(prop, "rna_GameFloatProperty_value_get", "rna_GameFloatProperty_value_set", NULL);

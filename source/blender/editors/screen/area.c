@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/screen/area.c
+ *  \ingroup edscr
+ */
+
+
 #include <string.h>
 #include <stdio.h>
 
@@ -36,6 +41,7 @@
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
 #include "BLI_rand.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_context.h"
 #include "BKE_global.h"
@@ -101,7 +107,7 @@ void ED_region_pixelspace(ARegion *ar)
 	int width= ar->winrct.xmax-ar->winrct.xmin+1;
 	int height= ar->winrct.ymax-ar->winrct.ymin+1;
 	
-	wmOrtho2(-0.375, (float)width-0.375, -0.375, (float)height-0.375);
+	wmOrtho2(-0.375f, (float)width-0.375f, -0.375f, (float)height-0.375f);
 	glLoadIdentity();
 }
 
@@ -163,27 +169,22 @@ void ED_area_overdraw_flush(ScrArea *sa, ARegion *ar)
 
 static void area_draw_azone(short x1, short y1, short x2, short y2)
 {
-	float xmin = x1;
-	float xmax = x2-2;
-	float ymin = y1-1;
-	float ymax = y2-3;
-	
-	float dx= 0.3f*(xmax-xmin);
-	float dy= 0.3f*(ymax-ymin);
+	int dx= floor(0.3f*(x2-x1));
+	int dy= floor(0.3f*(y2-y1));
 	
 	glColor4ub(255, 255, 255, 180);
-	fdrawline(xmin, ymax, xmax, ymin);
+	fdrawline(x1, y2, x2, y1);
 	glColor4ub(255, 255, 255, 130);
-	fdrawline(xmin, ymax-dy, xmax-dx, ymin);
+	fdrawline(x1, y2-dy, x2-dx, y1);
 	glColor4ub(255, 255, 255, 80);
-	fdrawline(xmin, ymax-2*dy, xmax-2*dx, ymin);
+	fdrawline(x1, y2-2*dy, x2-2*dx, y1);
 	
 	glColor4ub(0, 0, 0, 210);
-	fdrawline(xmin, ymax+1, xmax+1, ymin);
+	fdrawline(x1, y2+1, x2+1, y1);
 	glColor4ub(0, 0, 0, 180);
-	fdrawline(xmin, ymax-dy+1, xmax-dx+1, ymin);
+	fdrawline(x1, y2-dy+1, x2-dx+1, y1);
 	glColor4ub(0, 0, 0, 150);
-	fdrawline(xmin, ymax-2*dy+1, xmax-2*dx+1, ymin);
+	fdrawline(x1, y2-2*dy+1, x2-2*dx+1, y1);
 }
 
 
@@ -313,6 +314,10 @@ void ED_region_do_draw(bContext *C, ARegion *ar)
 	ARegionType *at= ar->type;
 	rcti winrct;
 	
+	/* see BKE_spacedata_draw_locks() */
+	if(at->do_lock)
+		return;
+	
 	/* checks other overlapping regions */
 	region_scissor_winrct(ar, &winrct);
 	
@@ -338,7 +343,7 @@ void ED_region_do_draw(bContext *C, ARegion *ar)
 		glClear(GL_COLOR_BUFFER_BIT);
 		
 		UI_ThemeColor(TH_TEXT);
-		BLF_draw_default(20, 8, 0.0f, ar->headerstr);
+		BLF_draw_default(20, 8, 0.0f, ar->headerstr, 65535); /* XXX, use real length */
 	}
 	else if(at->draw) {
 		at->draw(C, ar);
@@ -405,6 +410,19 @@ void ED_area_tag_redraw(ScrArea *sa)
 			ED_region_tag_redraw(ar);
 }
 
+void ED_area_tag_redraw_regiontype(ScrArea *sa, int regiontype)
+{
+	ARegion *ar;
+	
+	if(sa) {
+		for(ar= sa->regionbase.first; ar; ar= ar->next) {
+			if(ar->regiontype == regiontype) {
+				ED_region_tag_redraw(ar);
+			}
+		}
+	}
+}
+
 void ED_area_tag_refresh(ScrArea *sa)
 {
 	if(sa)
@@ -414,10 +432,14 @@ void ED_area_tag_refresh(ScrArea *sa)
 /* *************************************************************** */
 
 /* use NULL to disable it */
-void ED_area_headerprint(ScrArea *sa, char *str)
+void ED_area_headerprint(ScrArea *sa, const char *str)
 {
 	ARegion *ar;
-	
+
+	/* happens when running transform operators in backround mode */
+	if(sa == NULL)
+		return;
+
 	for(ar= sa->regionbase.first; ar; ar= ar->next) {
 		if(ar->regiontype==RGN_TYPE_HEADER) {
 			if(str) {
@@ -437,7 +459,6 @@ void ED_area_headerprint(ScrArea *sa, char *str)
 /* ************************************************************ */
 
 
-#define AZONESPOT		12
 static void area_azone_initialize(ScrArea *sa) 
 {
 	AZone *az;
@@ -451,8 +472,8 @@ static void area_azone_initialize(ScrArea *sa)
 	az->type= AZONE_AREA;
 	az->x1= sa->totrct.xmin;
 	az->y1= sa->totrct.ymin;
-	az->x2= sa->totrct.xmin + AZONESPOT-1;
-	az->y2= sa->totrct.ymin + AZONESPOT-1;
+	az->x2= sa->totrct.xmin + AZONESPOT;
+	az->y2= sa->totrct.ymin + AZONESPOT;
 	BLI_init_rcti(&az->rect, az->x1, az->x2, az->y1, az->y2);
 	
 	az= (AZone *)MEM_callocN(sizeof(AZone), "actionzone");
@@ -460,13 +481,13 @@ static void area_azone_initialize(ScrArea *sa)
 	az->type= AZONE_AREA;
 	az->x1= sa->totrct.xmax+1;
 	az->y1= sa->totrct.ymax+1;
-	az->x2= sa->totrct.xmax-AZONESPOT+1;
-	az->y2= sa->totrct.ymax-AZONESPOT+1;
+	az->x2= sa->totrct.xmax-AZONESPOT;
+	az->y2= sa->totrct.ymax-AZONESPOT;
 	BLI_init_rcti(&az->rect, az->x1, az->x2, az->y1, az->y2);
 }
 
 #define AZONEPAD_EDGE	4
-#define AZONEPAD_ICON	8
+#define AZONEPAD_ICON	9
 static void region_azone_edge(AZone *az, ARegion *ar)
 {
 	switch(az->edge) {
@@ -830,7 +851,7 @@ static void region_subwindow(wmWindow *win, ARegion *ar)
 		wm_subwindow_position(win, ar->swinid, &ar->winrct);
 }
 
-static void ed_default_handlers(wmWindowManager *wm, ListBase *handlers, int flag)
+static void ed_default_handlers(wmWindowManager *wm, ScrArea *sa, ListBase *handlers, int flag)
 {
 	/* note, add-handler checks if it already exists */
 	
@@ -847,8 +868,18 @@ static void ed_default_handlers(wmWindowManager *wm, ListBase *handlers, int fla
 	if(flag & ED_KEYMAP_MARKERS) {
 		/* time-markers */
 		wmKeyMap *keymap= WM_keymap_find(wm->defaultconf, "Markers", 0, 0);
-		WM_event_add_keymap_handler(handlers, keymap);
-		// XXX need boundbox check urgently!!!
+		
+		/* time space only has this keymap, the others get a boundbox restricted map */
+		if(sa->spacetype!=SPACE_TIME) {
+			ARegion *ar;
+			static rcti rect= {0, 10000, 0, 30};	/* same local check for all areas */
+			ar= BKE_area_find_region_type(sa, RGN_TYPE_WINDOW);
+			if(ar) {
+				WM_event_add_keymap_handler_bb(handlers, keymap, &rect, &ar->winrct);
+			}
+		}
+		else
+			WM_event_add_keymap_handler(handlers, keymap);
 	}
 	if(flag & ED_KEYMAP_ANIMATION) {
 		/* frame changing and timeline operators (for time spaces) */
@@ -901,7 +932,7 @@ void ED_area_initialize(wmWindowManager *wm, wmWindow *win, ScrArea *sa)
 	region_rect_recursive(sa, sa->regionbase.first, &rect, 0);
 	
 	/* default area handlers */
-	ed_default_handlers(wm, &sa->handlers, sa->type->keymapflag);
+	ed_default_handlers(wm, sa, &sa->handlers, sa->type->keymapflag);
 	/* checks spacedata, adds own handlers */
 	if(sa->type->init)
 		sa->type->init(wm, sa);
@@ -912,7 +943,7 @@ void ED_area_initialize(wmWindowManager *wm, wmWindow *win, ScrArea *sa)
 		
 		if(ar->swinid) {
 			/* default region handlers */
-			ed_default_handlers(wm, &ar->handlers, ar->type->keymapflag);
+			ed_default_handlers(wm, sa, &ar->handlers, ar->type->keymapflag);
 			/* own handlers */
 			if(ar->type->init)
 				ar->type->init(wm, ar);
@@ -946,7 +977,6 @@ void ED_region_toggle_hidden(bContext *C, ARegion *ar)
 	ScrArea *sa= CTX_wm_area(C);
 
 	ar->flag ^= RGN_FLAG_HIDDEN;
-	ar->v2d.flag &= ~V2D_IS_INITIALISED; /* XXX should become hide/unhide api? */
 
 	if(ar->flag & RGN_FLAG_HIDDEN)
 		WM_event_remove_handlers(C, &ar->handlers);
@@ -1055,6 +1085,9 @@ void ED_area_newspace(bContext *C, ScrArea *sa, int type)
 		if(sl && sl->regionbase.first==NULL) {
 			st->free(sl);
 			BLI_freelinkN(&sa->spacedata, sl);
+			if(slold == sl) {
+				slold= NULL;
+			}
 			sl= NULL;
 		}
 		
@@ -1090,10 +1123,12 @@ void ED_area_newspace(bContext *C, ScrArea *sa, int type)
 				
 		/*send space change notifyer*/
 		WM_event_add_notifier(C, NC_SPACE|ND_SPACE_CHANGED, sa);
-
-		ED_area_tag_redraw(sa);
+		
 		ED_area_tag_refresh(sa);
 	}
+	
+	/* also redraw when re-used */
+	ED_area_tag_redraw(sa);
 }
 
 void ED_area_prevspace(bContext *C, ScrArea *sa)
@@ -1117,7 +1152,7 @@ void ED_area_prevspace(bContext *C, ScrArea *sa)
 	WM_event_add_notifier(C, NC_SPACE|ND_SPACE_CHANGED, sa);
 }
 
-static char *editortype_pup(void)
+static const char *editortype_pup(void)
 {
 	return(
 		   "Editor type:%t"
@@ -1152,7 +1187,7 @@ static char *editortype_pup(void)
 		   
 		   "|%l"
 		   
-		   "|Console %x18"
+		   "|Python Console %x18"
 		   );
 }
 
@@ -1214,7 +1249,7 @@ int ED_area_header_standardbuttons(const bContext *C, uiBlock *block, int yco)
 
 /************************ standard UI regions ************************/
 
-void ED_region_panels(const bContext *C, ARegion *ar, int vertical, char *context, int contextnr)
+void ED_region_panels(const bContext *C, ARegion *ar, int vertical, const char *context, int contextnr)
 {
 	ScrArea *sa= CTX_wm_area(C);
 	uiStyle *style= U.uistyles.first;
@@ -1274,6 +1309,9 @@ void ED_region_panels(const bContext *C, ARegion *ar, int vertical, char *contex
 				uiBlockLayoutResolve(block, &xco, &yco);
 				panel->labelofs= xco - triangle;
 				panel->layout= NULL;
+			}
+			else {
+				panel->labelofs= 0;
 			}
 
 			if(open) {
@@ -1406,7 +1444,7 @@ void ED_region_header(const bContext *C, ARegion *ar)
 	uiBlock *block;
 	uiLayout *layout;
 	HeaderType *ht;
-	Header header = {0};
+	Header header = {NULL};
 	int maxco, xco, yco;
 
 	/* clear */	
@@ -1417,7 +1455,7 @@ void ED_region_header(const bContext *C, ARegion *ar)
 	UI_view2d_view_ortho(&ar->v2d);
 
 	xco= maxco= 8;
-	yco= HEADERY-3;
+	yco= HEADERY-4;
 
 	/* draw all headers types */
 	for(ht= ar->type->headertypes.first; ht; ht= ht->next) {

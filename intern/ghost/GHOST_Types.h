@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -26,8 +26,19 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file ghost/GHOST_Types.h
+ *  \ingroup GHOST
+ */
+
+
 #ifndef _GHOST_TYPES_H_
 #define _GHOST_TYPES_H_
+
+#ifdef WITH_CXX_GUARDEDALLOC
+#include "MEM_guardedalloc.h"
+#endif
+
+#define GHOST_DECLARE_HANDLE(name) typedef struct name##__ { int unused; } *name
 
 typedef	char				GHOST_TInt8;
 typedef	unsigned char		GHOST_TUns8;
@@ -347,7 +358,13 @@ typedef enum {
 	GHOST_kKeyF21,
 	GHOST_kKeyF22,
 	GHOST_kKeyF23,
-	GHOST_kKeyF24
+	GHOST_kKeyF24,
+	
+	// Multimedia keypad buttons
+	GHOST_kKeyMediaPlay,
+	GHOST_kKeyMediaStop,
+	GHOST_kKeyMediaFirst,
+	GHOST_kKeyMediaLast
 } GHOST_TKey;
 
 typedef enum {
@@ -444,7 +461,7 @@ typedef struct {
    GHOST_TUns64 delta;
 } GHOST_TEventNDOFData;
 
-typedef int     (*GHOST_NDOFLibraryInit_fp)();
+typedef int     (*GHOST_NDOFLibraryInit_fp)(void);
 typedef void    (*GHOST_NDOFLibraryShutdown_fp)(void* deviceHandle);
 typedef void*   (*GHOST_NDOFDeviceOpen_fp)(void* platformData);
 

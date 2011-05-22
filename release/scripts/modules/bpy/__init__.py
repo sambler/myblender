@@ -18,6 +18,10 @@
 
 # <pep8 compliant>
 
+"""
+Give access to blender data and utility functions.
+"""
+
 # internal blender C module
 import _bpy
 from _bpy import types, props, app
@@ -26,9 +30,8 @@ data = _bpy.data
 context = _bpy.context
 
 # python modules
-from bpy import utils, path
-
-from bpy import ops as _ops_module
+from . import utils, path
+from . import ops as _ops_module
 
 # fake operator module
 ops = _ops_module.ops_fake_module
@@ -38,17 +41,9 @@ import sys as _sys
 
 def _main():
 
-    ## security issue, dont allow the $CWD in the path.
-    ## note: this removes "" but not "." which are the same, security
-    ## people need to explain how this is even a fix.
-    # _sys.path[:] = filter(None, _sys.path)
-
-    # because of how the console works. we need our own help() pager func.
-    # replace the bold function because it adds crazy chars
-    import pydoc
-    pydoc.getpager = lambda: pydoc.plainpager
-    pydoc.Helper.getline = lambda self, prompt: None
-    pydoc.TextDoc.use_bold = lambda self, text: text
+    # Possibly temp. addons path
+    from os.path import join, dirname, normpath
+    _sys.path.append(normpath(join(dirname(__file__), "..", "..", "addons", "modules")))
 
     # if "-d" in sys.argv: # Enable this to measure startup speed
     if 0:

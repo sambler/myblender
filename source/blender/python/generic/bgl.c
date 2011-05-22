@@ -27,15 +27,23 @@
  * ***** END GPL LICENSE BLOCK *****
 */
 
+/** \file blender/python/generic/bgl.c
+ *  \ingroup pygen
+ */
+
+
 /* This file is the 'bgl' module.
  * The BGL submodule "wraps" OpenGL functions and constants,
  * allowing script writers to make OpenGL calls in their Python scripts. */
+
+#include <Python.h>
 
 #include "bgl.h" /*This must come first */
 #include <GL/glew.h>
 #include "MEM_guardedalloc.h"
 
-#include "BKE_utildefines.h"
+#include "BLI_utildefines.h"
+
 
 static char Method_Buffer_doc[] =
 	"(type, dimensions, [template]) - Create a new Buffer object\n\n\
@@ -92,9 +100,9 @@ PyTypeObject BGL_bufferType = {
 	( printfunc ) 0,	/*tp_print */
 	( getattrfunc ) Buffer_getattr,	/*tp_getattr */
 	( setattrfunc ) 0,	/*tp_setattr */
-	0,		/*tp_compare */
+	NULL,		/*tp_compare */
 	( reprfunc ) Buffer_repr,	/*tp_repr */
-	0,			/*tp_as_number */
+	NULL,			/*tp_as_number */
 	&Buffer_SeqMethods,	/*tp_as_sequence */
 };
 
@@ -124,16 +132,16 @@ static PyObject *Method_##funcname (PyObject *UNUSED(self), PyObject *args) {\
 int BGL_typeSize(int type)
 {
 	switch (type) {
-		case GL_BYTE: 
-		  return sizeof(char);
-		case GL_SHORT: 
-		  return sizeof(short);
-		case GL_INT: 
-		  return sizeof(int);
-		case GL_FLOAT: 
-		  return sizeof(float);
-		case GL_DOUBLE:
-		  return sizeof(double);
+	case GL_BYTE:
+		return sizeof(char);
+	case GL_SHORT:
+		return sizeof(short);
+	case GL_INT:
+		return sizeof(int);
+	case GL_FLOAT:
+		return sizeof(float);
+	case GL_DOUBLE:
+		return sizeof(double);
 	}
 	return -1;
 }
@@ -162,7 +170,8 @@ Buffer *BGL_MakeBuffer(int type, int ndimensions, int *dimensions, void *initbuf
  
 	if (initbuffer) {
 		memcpy(buffer->buf.asvoid, initbuffer, length*size);
-	} else {
+	}
+	else {
 		memset(buffer->buf.asvoid, 0, length*size);
 		/*
 		for (i= 0; i<length; i++) {
@@ -185,43 +194,60 @@ Buffer *BGL_MakeBuffer(int type, int ndimensions, int *dimensions, void *initbuf
 #define MAX_DIMENSIONS	256
 static PyObject *Method_Buffer (PyObject *UNUSED(self), PyObject *args)
 {
-	PyObject *length_ob= NULL, *template= NULL;
+	PyObject *length_ob= NULL, *init= NULL;
 	Buffer *buffer;
 	int dimensions[MAX_DIMENSIONS];
 	
 	int i, type;
 	int ndimensions = 0;
 	
-	if (!PyArg_ParseTuple(args, "iO|O", &type, &length_ob, &template)) {
+	if (!PyArg_ParseTuple(args, "iO|O", &type, &length_ob, &init)) {
 		PyErr_SetString(PyExc_AttributeError, "expected an int and one or two PyObjects");
 		return NULL;
 	}
-	if (type!=GL_BYTE && type!=GL_SHORT && type!=GL_INT && type!=GL_FLOAT && type!=GL_DOUBLE) {
+	if (!ELEM5(type, GL_BYTE, GL_SHORT, GL_INT, GL_FLOAT, GL_DOUBLE)) {
 		PyErr_SetString(PyExc_AttributeError, "invalid first argument type, should be one of GL_BYTE, GL_SHORT, GL_INT, GL_FLOAT or GL_DOUBLE");
 		return NULL;
 	}
 
-	if (PyNumber_Check(length_ob)) {
+	if (PyLong_Check(length_ob)) {
 		ndimensions= 1;
-		dimensions[0]= PyLong_AsLong(length_ob);
-	} else if (PySequence_Check(length_ob)) {
-		ndimensions= PySequence_Length(length_ob);
+		if(((dimensions[0]= PyLong_AsLong(length_ob)) < 1)) {
+			PyErr_SetString(PyExc_AttributeError, "dimensions must be between 1 and "STRINGIFY(MAX_DIMENSIONS));
+			return NULL;
+		}
+	}
+	else if (PySequence_Check(length_ob)) {
+		ndimensions= PySequence_Size(length_ob);
 		if (ndimensions > MAX_DIMENSIONS) {
-			PyErr_SetString(PyExc_AttributeError, "too many dimensions, max is 256");
+			PyErr_SetString(PyExc_AttributeError, "too many dimensions, max is "STRINGIFY(MAX_DIMENSIONS));
+			return NULL;
+		}
+		else if (ndimensions < 1) {
+			PyErr_SetString(PyExc_AttributeError, "sequence must have at least one dimension");
 			return NULL;
 		}
 		for (i=0; i<ndimensions; i++) {
 			PyObject *ob= PySequence_GetItem(length_ob, i);
 
-			if (!PyNumber_Check(ob)) dimensions[i]= 1;
+			if (!PyLong_Check(ob)) dimensions[i]= 1;
 			else dimensions[i]= PyLong_AsLong(ob);
 			Py_DECREF(ob);
+
+			if(dimensions[i] < 1) {
+				PyErr_SetString(PyExc_AttributeError, "dimensions must be between 1 and "STRINGIFY(MAX_DIMENSIONS));
+				return NULL;
+			}
 		}
+	}
+	else {
+		PyErr_Format(PyExc_TypeError, "invalid second argument argument expected a sequence or an int, not a %.200s", Py_TYPE(length_ob)->tp_name);
+		return NULL;
 	}
 	
 	buffer= BGL_MakeBuffer(type, ndimensions, dimensions, NULL);
-	if (template && ndimensions) {
-		if (Buffer_ass_slice((PyObject *) buffer, 0, dimensions[0], template)) {
+	if (init && ndimensions) {
+		if (Buffer_ass_slice((PyObject *) buffer, 0, dimensions[0], init)) {
 			Py_DECREF(buffer);
 			return NULL;
 		}
@@ -255,7 +281,8 @@ static PyObject *Buffer_item(PyObject *self, int i)
 			case GL_FLOAT: return PyFloat_FromDouble(buf->buf.asfloat[i]);
 			case GL_DOUBLE: return Py_BuildValue("d", buf->buf.asdouble[i]);
 		}
-	} else {
+	}
+	else {
 		Buffer *newbuf;
 		int j, length, size;
  
@@ -266,7 +293,7 @@ static PyObject *Buffer_item(PyObject *self, int i)
 		size= BGL_typeSize(buf->type);
 
 		newbuf= (Buffer *) PyObject_NEW(Buffer, &BGL_bufferType);
-    
+
 		Py_INCREF(self);
 		newbuf->parent= self;
 
@@ -280,7 +307,7 @@ static PyObject *Buffer_item(PyObject *self, int i)
 
 		return (PyObject *) newbuf;
 	}
-  
+
 	return NULL;
 }
 
@@ -297,9 +324,9 @@ static PyObject *Buffer_slice(PyObject *self, int begin, int end)
 	  
 	list= PyList_New(end-begin);
 
-	for (count= begin; count<end; count++)
-		PyList_SetItem(list, count-begin, Buffer_item(self, count));
-	
+	for (count= begin; count<end; count++) {
+		PyList_SET_ITEM(list, count-begin, Buffer_item(self, count));
+	}
 	return list;
 }
 
@@ -325,17 +352,21 @@ static int Buffer_ass_item(PyObject *self, int i, PyObject *v)
 	if (buf->type==GL_BYTE) {
 		if (!PyArg_Parse(v, "b:Coordinates must be ints", &buf->buf.asbyte[i]))
 		return -1;
-	} else if (buf->type==GL_SHORT) {
+	}
+	else if (buf->type==GL_SHORT) {
 		if (!PyArg_Parse(v, "h:Coordinates must be ints", &buf->buf.asshort[i]))
 			return -1;
 	  
-	} else if (buf->type==GL_INT) {
+	}
+	else if (buf->type==GL_INT) {
 		if (!PyArg_Parse(v, "i:Coordinates must be ints", &buf->buf.asint[i]))
 			return -1;
-	} else if (buf->type==GL_FLOAT) {
+	}
+	else if (buf->type==GL_FLOAT) {
 		if (!PyArg_Parse(v, "f:Coordinates must be floats", &buf->buf.asfloat[i]))
 			return -1;
-	} else if (buf->type==GL_DOUBLE) {
+	}
+	else if (buf->type==GL_DOUBLE) {
 		if (!PyArg_Parse(v, "d:Coordinates must be floats", &buf->buf.asdouble[i]))
 			return -1;
 	}
@@ -358,8 +389,8 @@ static int Buffer_ass_slice(PyObject *self, int begin, int end, PyObject *seq)
 		return -1;
 	}
 
-	if (PySequence_Length(seq)!=(end-begin)) {
-		int seq_len = PySequence_Length(seq);
+	if (PySequence_Size(seq)!=(end-begin)) {
+		int seq_len = PySequence_Size(seq);
 		char err_str[128];
 		sprintf(err_str, "size mismatch in assignment. Expected size: %d (size provided: %d)", seq_len, (end-begin));
 		PyErr_SetString(PyExc_TypeError, err_str);
@@ -391,11 +422,11 @@ static PyObject *Buffer_tolist(PyObject *self)
 {
 	int i, len= ((Buffer *)self)->dimensions[0];
 	PyObject *list= PyList_New(len);
-	
+
 	for (i=0; i<len; i++) {
-	  PyList_SetItem(list, i, Buffer_item(self, i));
+		PyList_SET_ITEM(list, i, Buffer_item(self, i));
 	}
-	
+
 	return list;
 }
 
@@ -404,11 +435,11 @@ static PyObject *Buffer_dimensions(PyObject *self)
 	Buffer *buffer= (Buffer *) self;
 	PyObject *list= PyList_New(buffer->ndimensions);
 	int i;
-	  
+
 	for (i= 0; i<buffer->ndimensions; i++) {
-	  PyList_SetItem(list, i, PyLong_FromLong(buffer->dimensions[i]));
+		PyList_SET_ITEM(list, i, PyLong_FromLong(buffer->dimensions[i]));
 	}
-	
+
 	return list;
 }
 
@@ -773,7 +804,7 @@ BGLU_Wrap(9, UnProject,			GLint,		(GLdouble, GLdouble, GLdouble, GLdoubleP, GLdo
  * {"glAccum", Method_Accumfunc, METH_VARARGS} */
 
 static struct PyMethodDef BGL_methods[] = {
-  {"Buffer", Method_Buffer, METH_VARARGS, Method_Buffer_doc}, 
+	{"Buffer", Method_Buffer, METH_VARARGS, Method_Buffer_doc},
 
 /* #ifndef __APPLE__ */
 	MethodDef(Accum),
@@ -1105,22 +1136,21 @@ static struct PyMethodDef BGL_methods[] = {
 static struct PyModuleDef BGL_module_def = {
 	PyModuleDef_HEAD_INIT,
 	"bgl",  /* m_name */
-	0,  /* m_doc */
+	NULL,  /* m_doc */
 	0,  /* m_size */
 	BGL_methods,  /* m_methods */
-	0,  /* m_reload */
-	0,  /* m_traverse */
-	0,  /* m_clear */
-	0,  /* m_free */
+	NULL,  /* m_reload */
+	NULL,  /* m_traverse */
+	NULL,  /* m_clear */
+	NULL,  /* m_free */
 };
 
 
-PyObject *BGL_Init(void)
+PyObject *BPyInit_bgl(void)
 {
-	PyObject *mod, *dict, *item;
-	mod = PyModule_Create(&BGL_module_def);
-	PyDict_SetItemString(PyImport_GetModuleDict(), BGL_module_def.m_name, mod);
-	dict= PyModule_GetDict(mod);
+	PyObject *submodule, *dict, *item;
+	submodule= PyModule_Create(&BGL_module_def);
+	dict= PyModule_GetDict(submodule);
 	
 	if( PyType_Ready( &BGL_bufferType) < 0)
 		return NULL; /* should never happen */
@@ -1611,7 +1641,7 @@ PyObject *BGL_Init(void)
 	EXPP_ADDCONST(GL_TEXTURE_RESIDENT);
 	EXPP_ADDCONST(GL_TEXTURE_BINDING_1D);
 	EXPP_ADDCONST(GL_TEXTURE_BINDING_2D);
-      
-	return mod;
+
+	return submodule;
 }
 

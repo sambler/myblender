@@ -8,7 +8,7 @@ for source in env.Glob('*_api.c'):
 
 incs = '../include ../../blenlib ../../blenfont ../../blenkernel ../../makesdna ../../imbuf'
 incs += ' ../../makesrna ../../windowmanager #/intern/guardedalloc ../../gpu'
-incs += ' #/extern/glew/include'
+incs += ' #/extern/glew/include ../../blenloader'
 incs += ' ../../python/' # python button eval
 
 defs = []
@@ -16,7 +16,7 @@ defs = []
 if env['WITH_BF_INTERNATIONAL']:
     defs.append('INTERNATIONAL')
 
-if not env['WITH_BF_PYTHON']:
-    defs.append('DISABLE_PYTHON')
+if env['WITH_BF_PYTHON']:
+    defs.append('WITH_PYTHON')
     
 env.BlenderLib ( 'bf_editors_interface', sources, Split(incs), defs, libtype=['core'], priority=[110] )

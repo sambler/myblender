@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,7 +27,13 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/nodes/intern/TEX_nodes/TEX_image.c
+ *  \ingroup texnodes
+ */
+
+
 #include "../TEX_util.h"
+#include "TEX_node.h"
 
 static bNodeSocketType outputs[]= {
 	{ SOCK_RGBA, 0, "Image",  0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f},
@@ -58,7 +64,13 @@ static void colorfn(float *out, TexParams *p, bNode *node, bNodeStack **UNUSED(i
 			py = (int)( (y-yoff) * ysize );
 		
 			if( (!xsize) || (!ysize) ) return;
-			if( !ibuf->rect_float ) IMB_float_from_rect(ibuf);
+			
+			if( !ibuf->rect_float ) {
+				BLI_lock_thread(LOCK_IMAGE);
+				if( !ibuf->rect_float )
+					IMB_float_from_rect(ibuf);
+				BLI_unlock_thread(LOCK_IMAGE);
+			}
 			
 			while( px < 0 ) px += ibuf->x;
 			while( py < 0 ) py += ibuf->y;
@@ -78,27 +90,23 @@ static void exec(void *data, bNode *node, bNodeStack **in, bNodeStack **out)
 
 static void init(bNode* node)
 {
-   ImageUser *iuser= MEM_callocN(sizeof(ImageUser), "node image user");
-   node->storage= iuser;
-   iuser->sfra= 1;
-   iuser->fie_ima= 2;
-   iuser->ok= 1;
+	ImageUser *iuser= MEM_callocN(sizeof(ImageUser), "node image user");
+	node->storage= iuser;
+	iuser->sfra= 1;
+	iuser->fie_ima= 2;
+	iuser->ok= 1;
 }
 
-bNodeType tex_node_image= {
-	/* *next,*prev */	NULL, NULL,
-	/* type code   */	TEX_NODE_IMAGE,
-	/* name        */	"Image",
-	/* width+range */	120, 80, 300,
-	/* class+opts  */	NODE_CLASS_INPUT, NODE_PREVIEW|NODE_OPTIONS,
-	/* input sock  */	NULL,
-	/* output sock */	outputs,
-	/* storage     */	"ImageUser",
-	/* execfunc    */	exec,
-	/* butfunc     */	NULL,
-	/* initfunc    */	init,
-	/* freestoragefunc    */	node_free_standard_storage,
-	/* copystoragefunc    */	node_copy_standard_storage,
-	/* id          */	NULL
-};
-
+void register_node_type_tex_image(ListBase *lb)
+{
+	static bNodeType ntype;
+	
+	node_type_base(&ntype, TEX_NODE_IMAGE, "Image", NODE_CLASS_INPUT, NODE_PREVIEW|NODE_OPTIONS,
+				   NULL, outputs);
+	node_type_size(&ntype, 120, 80, 300);
+	node_type_init(&ntype, init);
+	node_type_storage(&ntype, "ImageUser", node_free_standard_storage, node_copy_standard_storage);
+	node_type_exec(&ntype, exec);
+	
+	nodeRegisterType(lb, &ntype);
+}

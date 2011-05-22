@@ -19,12 +19,11 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-FILE(GLOB SRC *.c)
-
-SET(INC
+set(INC
 	../include
 	../../blenfont
 	../../blenkernel
+	../../blenloader
 	../../blenlib
 	../../gpu
 	../../imbuf
@@ -34,17 +33,35 @@ SET(INC
 	../../render/extern/include
 	../../../../intern/guardedalloc
 	../../../../intern/smoke/extern
+	${GLEW_INCLUDE_PATH}
 )
 
-IF(WITH_GAMEENGINE)
-	LIST(APPEND INC ../../../kernel/gen_system)
-	ADD_DEFINITIONS(-DGAMEBLENDER)
-ENDIF(WITH_GAMEENGINE)
+set(SRC
+	drawanimviz.c
+	drawarmature.c
+	drawmesh.c
+	drawobject.c
+	drawvolume.c
+	space_view3d.c
+	view3d_buttons.c
+	view3d_draw.c
+	view3d_edit.c
+	view3d_fly.c
+	view3d_header.c
+	view3d_ops.c
+	view3d_select.c
+	view3d_snap.c
+	view3d_toolbar.c
+	view3d_view.c
 
-IF(WIN32)
-	LIST(APPEND INC ${PTHREADS_INC})
-ENDIF(WIN32)
+	view3d_intern.h
+)
 
-ADD_DEFINITIONS(-DGLEW_STATIC)
+if(WITH_GAMEENGINE)
+	list(APPEND INC ../../../../source/gameengine/BlenderRoutines)
+	add_definitions(-DWITH_GAMEENGINE)
+endif()
 
-BLENDERLIB(bf_editor_space_view3d "${SRC}" "${INC}")
+add_definitions(-DGLEW_STATIC)
+
+blender_add_lib(bf_editor_space_view3d "${SRC}" "${INC}")

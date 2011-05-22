@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/mesh/editmesh.c
+ *  \ingroup edmesh
+ */
+
+
 
 #include <stdlib.h>
 #include <string.h>
@@ -43,6 +48,7 @@
 #include "BLI_editVert.h"
 #include "BLI_dynstr.h"
 #include "BLI_rand.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_DerivedMesh.h"
 #include "BKE_context.h"
@@ -53,10 +59,11 @@
 #include "BKE_material.h"
 #include "BKE_mesh.h"
 #include "BKE_paint.h"
+#include "BKE_report.h"
+#include "BKE_multires.h"
 
 #include "ED_mesh.h"
 #include "ED_object.h"
-#include "ED_retopo.h"
 #include "ED_screen.h"
 #include "ED_util.h"
 #include "ED_view3d.h"
@@ -257,7 +264,7 @@ EditEdge *addedgelist(EditMesh *em, EditVert *v1, EditVert *v2, EditEdge *exampl
 			eed->h |= (example->h & EM_FGON);
 		}
 	}
-
+	
 	return eed;
 }
 
@@ -378,6 +385,7 @@ EditFace *addfacelist(EditMesh *em, EditVert *v1, EditVert *v2, EditVert *v3, Ed
 		efa->mat_nr= example->mat_nr;
 		efa->flag= example->flag;
 		CustomData_em_copy_data(&em->fdata, &em->fdata, example->data, &efa->data);
+		CustomData_em_validate_data(&em->fdata, efa->data, efa->v4 ? 4 : 3);
 	}
 	else {
 		efa->mat_nr= em->mat_nr;
@@ -591,7 +599,7 @@ static void edge_normal_compare(EditEdge *eed, EditFace *efa1)
 	if(efa1==efa2) return;
 	
 	inp= efa1->n[0]*efa2->n[0] + efa1->n[1]*efa2->n[1] + efa1->n[2]*efa2->n[2];
-	if(inp<0.999 && inp >-0.999) eed->f2= 1;
+	if(inp<0.999f && inp >-0.999f) eed->f2= 1;
 		
 	if(efa1->v4) cent_quad_v3(cent1, efa1->v1->co, efa1->v2->co, efa1->v3->co, efa1->v4->co);
 	else cent_tri_v3(cent1, efa1->v1->co, efa1->v2->co, efa1->v3->co);
@@ -602,7 +610,7 @@ static void edge_normal_compare(EditEdge *eed, EditFace *efa1)
 	normalize_v3(cent1);
 	inp= cent1[0]*efa1->n[0] + cent1[1]*efa1->n[1] + cent1[2]*efa1->n[2]; 
 
-	if(inp < -0.001 ) eed->f1= 1;
+	if(inp < -0.001f) eed->f1= 1;
 }
 
 #if 0
@@ -737,6 +745,7 @@ void make_editMesh(Scene *scene, Object *ob)
 	EditSelection *ese;
 	float *co, (*keyco)[3]= NULL;
 	int tot, a, eekadoodle= 0;
+	const short is_paint_sel= paint_facesel_test(ob);
 
 	if(me->edit_mesh==NULL)
 		me->edit_mesh= MEM_callocN(sizeof(EditMesh), "editmesh");
@@ -787,13 +796,11 @@ void make_editMesh(Scene *scene, Object *ob)
 		evlist[a]= eve;
 		
 		/* face select sets selection in next loop */
-		if(!paint_facesel_test(ob))
+		if(!is_paint_sel)
 			eve->f |= (mvert->flag & 1);
 		
-		if (mvert->flag & ME_HIDE) eve->h= 1;		
-		eve->no[0]= mvert->no[0]/32767.0;
-		eve->no[1]= mvert->no[1]/32767.0;
-		eve->no[2]= mvert->no[2]/32767.0;
+		if (mvert->flag & ME_HIDE) eve->h= 1;
+		normal_short_to_float_v3(eve->no, mvert->no);
 
 		eve->bweight= ((float)mvert->bweight)/255.0f;
 
@@ -862,7 +869,7 @@ void make_editMesh(Scene *scene, Object *ob)
 					if(mface->flag & ME_FACE_SEL) {
 						efa->f |= SELECT;
 						
-						if(paint_facesel_test(ob)) {
+						if(is_paint_sel) {
 							EM_select_face(efa, 1); /* flush down */
 						}
 
@@ -915,9 +922,9 @@ void make_editMesh(Scene *scene, Object *ob)
 }
 
 /* makes Mesh out of editmesh */
-void load_editMesh(Scene *scene, Object *ob)
+void load_editMesh(Scene *scene, Object *obedit)
 {
-	Mesh *me= ob->data;
+	Mesh *me= obedit->data;
 	MVert *mvert, *oldverts;
 	MEdge *medge;
 	MFace *mface;
@@ -927,8 +934,8 @@ void load_editMesh(Scene *scene, Object *ob)
 	EditFace *efa, *efa_act;
 	EditEdge *eed;
 	EditSelection *ese;
-	float *fp, *newkey, *oldkey, nor[3];
-	int i, j, a, ototvert;
+	float *fp, *newkey, *oldkey;
+	int i, a, ototvert;
 	
 	/* this one also tests of edges are not in faces: */
 	/* eed->f2==0: not in face, f2==1: draw it */
@@ -985,12 +992,8 @@ void load_editMesh(Scene *scene, Object *ob)
 	while(eve) {
 		VECCOPY(mvert->co, eve->co);
 
-		mvert->mat_nr= 32767;  /* what was this for, halos? */
-		
 		/* vertex normal */
-		VECCOPY(nor, eve->no);
-		mul_v3_fl(nor, 32767.0);
-		VECCOPY(mvert->no, nor);
+		normal_float_to_short_v3(mvert->no, eve->no);
 
 		/* note: it used to remove me->dvert when it was not in use, cancelled
 		   that... annoying when you have a fresh vgroup */
@@ -1002,7 +1005,7 @@ void load_editMesh(Scene *scene, Object *ob)
 		mvert->flag |= (eve->f & SELECT);
 		if (eve->h) mvert->flag |= ME_HIDE;
 		
-		mvert->bweight= (char)(255.0*eve->bweight);
+		mvert->bweight= (char)(255.0f*eve->bweight);
 
 		eve= eve->next;
 		mvert++;
@@ -1023,8 +1026,8 @@ void load_editMesh(Scene *scene, Object *ob)
 		if(eed->h & EM_FGON) medge->flag |= ME_FGON;	// different defines yes
 		if(eed->h & 1) medge->flag |= ME_HIDE;
 		
-		medge->crease= (char)(255.0*eed->crease);
-		medge->bweight= (char)(255.0*eed->bweight);
+		medge->crease= (char)(255.0f*eed->crease);
+		medge->bweight= (char)(255.0f*eed->bweight);
 		CustomData_from_em_block(&em->edata, &me->edata, eed->data, a);		
 
 		eed->tmp.l = a++;
@@ -1059,20 +1062,6 @@ void load_editMesh(Scene *scene, Object *ob)
 			if(efa->f & 1) mface->flag |= ME_FACE_SEL;
 			else mface->flag &= ~ME_FACE_SEL;
 		}
-		
-		/* mat_nr in vertex */
-		if(me->totcol>1) {
-			mvert= me->mvert+mface->v1;
-			if(mvert->mat_nr == (char)32767) mvert->mat_nr= mface->mat_nr;
-			mvert= me->mvert+mface->v2;
-			if(mvert->mat_nr == (char)32767) mvert->mat_nr= mface->mat_nr;
-			mvert= me->mvert+mface->v3;
-			if(mvert->mat_nr == (char)32767) mvert->mat_nr= mface->mat_nr;
-			if(mface->v4) {
-				mvert= me->mvert+mface->v4;
-				if(mvert->mat_nr == (char)32767) mvert->mat_nr= mface->mat_nr;
-			}
-		}
 			
 		/* watch: efa->e1->f2==0 means loose edge */ 
 			
@@ -1104,12 +1093,13 @@ void load_editMesh(Scene *scene, Object *ob)
 
 	/* patch hook indices and vertex parents */
 	{
-		Object *ob2;
+		Object *ob;
 		ModifierData *md;
 		EditVert **vertMap = NULL;
+		int j;
 
-		for (ob2=G.main->object.first; ob2; ob2=ob2->id.next) {
-			if (ob2->parent==ob2 && ELEM(ob2->partype, PARVERT1,PARVERT3)) {
+		for (ob=G.main->object.first; ob; ob=ob->id.next) {
+			if (ob->parent==ob && ELEM(ob->partype, PARVERT1,PARVERT3)) {
 				
 				/* duplicate code from below, make it function later...? */
 				if (!vertMap) {
@@ -1120,22 +1110,22 @@ void load_editMesh(Scene *scene, Object *ob)
 							vertMap[eve->keyindex] = eve;
 					}
 				}
-				if(ob2->par1 < ototvert) {
-					eve = vertMap[ob2->par1];
-					if(eve) ob2->par1= eve->tmp.l;
+				if(ob->par1 < ototvert) {
+					eve = vertMap[ob->par1];
+					if(eve) ob->par1= eve->tmp.l;
 				}
-				if(ob2->par2 < ototvert) {
-					eve = vertMap[ob2->par2];
-					if(eve) ob2->par2= eve->tmp.l;
+				if(ob->par2 < ototvert) {
+					eve = vertMap[ob->par2];
+					if(eve) ob->par2= eve->tmp.l;
 				}
-				if(ob2->par3 < ototvert) {
-					eve = vertMap[ob2->par3];
-					if(eve) ob2->par3= eve->tmp.l;
+				if(ob->par3 < ototvert) {
+					eve = vertMap[ob->par3];
+					if(eve) ob->par3= eve->tmp.l;
 				}
 				
 			}
-			if (ob2->data==me) {
-				for (md=ob2->modifiers.first; md; md=md->next) {
+			if (ob->data==me) {
+				for (md=ob->modifiers.first; md; md=md->next) {
 					if (md->type==eModifierType_Hook) {
 						HookModifierData *hmd = (HookModifierData*) md;
 
@@ -1187,12 +1177,15 @@ void load_editMesh(Scene *scene, Object *ob)
 			}
 
 			if(act_is_basis) { /* active key is a base */
+				float (*fp)[3]= actkey->data;
 				i=0;
 				ofs= MEM_callocN(sizeof(float) * 3 * em->totvert,  "currkey->data");
 				eve= em->verts.first;
 				mvert = me->mvert;
 				while(eve) {
-					VECSUB(ofs[i], mvert->co, oldverts[eve->keyindex].co);
+					if(eve->keyindex>=0)
+						VECSUB(ofs[i], mvert->co, fp[eve->keyindex]);
+
 					eve= eve->next;
 					i++;
 					mvert++;
@@ -1304,12 +1297,15 @@ void load_editMesh(Scene *scene, Object *ob)
 	}
 
 	mesh_calc_normals(me->mvert, me->totvert, me->mface, me->totface, NULL);
+
+	/* topology could be changed, ensure mdisps are ok */
+	multires_topology_changed(scene, obedit);
 }
 
 void remake_editMesh(Scene *scene, Object *ob)
 {
 	make_editMesh(scene, ob);
-	DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	BIF_undo_push("Undo all changes");
 }
 
@@ -1323,7 +1319,7 @@ static EnumPropertyItem prop_separate_types[] = {
 };
 
 /* return 1: success */
-static int mesh_separate_selected(Main *bmain, Scene *scene, Base *editbase)
+static int mesh_separate_selected(wmOperator *op, Main *bmain, Scene *scene, Base *editbase)
 {
 	EditMesh *em, *emnew;
 	EditVert *eve, *v1;
@@ -1339,7 +1335,7 @@ static int mesh_separate_selected(Main *bmain, Scene *scene, Base *editbase)
 	me= obedit->data;
 	em= BKE_mesh_get_editmesh(me);
 	if(me->key) {
-		error("Can't separate with vertex keys");
+		BKE_report(op->reports, RPT_WARNING, "Can't separate mesh with shape keys.");
 		BKE_mesh_end_editmesh(me, em);
 		return 0;
 	}
@@ -1421,12 +1417,19 @@ static int mesh_separate_selected(Main *bmain, Scene *scene, Base *editbase)
 	free_editMesh(emnew);
 	MEM_freeN(menew->edit_mesh);
 	menew->edit_mesh= NULL;
-	
+
+	/* copy settings */
+	menew->texflag= me->texflag;
+	menew->drawflag= me->drawflag;
+	menew->flag= me->flag;
+	menew->editflag= me->editflag;
+	menew->smoothresh= me->smoothresh;
+
 	/* hashedges are invalid now, make new! */
 	editMesh_set_hash(em);
 
-	DAG_id_flush_update(&obedit->id, OB_RECALC_DATA);	
-	DAG_id_flush_update(&basenew->object->id, OB_RECALC_DATA);	
+	DAG_id_tag_update(&obedit->id, OB_RECALC_DATA);	
+	DAG_id_tag_update(&basenew->object->id, OB_RECALC_DATA);	
 
 	BKE_mesh_end_editmesh(me, em);
 
@@ -1434,7 +1437,7 @@ static int mesh_separate_selected(Main *bmain, Scene *scene, Base *editbase)
 }
 
 /* return 1: success */
-static int mesh_separate_material(Main *bmain, Scene *scene, Base *editbase)
+static int mesh_separate_material(wmOperator *op, Main *bmain, Scene *scene, Base *editbase)
 {
 	Mesh *me= editbase->object->data;
 	EditMesh *em= BKE_mesh_get_editmesh(me);
@@ -1446,7 +1449,7 @@ static int mesh_separate_material(Main *bmain, Scene *scene, Base *editbase)
 		/* select the material */
 		EM_select_by_material(em, curr_mat);
 		/* and now separate */
-		if(0==mesh_separate_selected(bmain, scene, editbase)) {
+		if(0==mesh_separate_selected(op, bmain, scene, editbase)) {
 			BKE_mesh_end_editmesh(me, em);
 			return 0;
 		}
@@ -1457,7 +1460,7 @@ static int mesh_separate_material(Main *bmain, Scene *scene, Base *editbase)
 }
 
 /* return 1: success */
-static int mesh_separate_loose(Main *bmain, Scene *scene, Base *editbase)
+static int mesh_separate_loose(wmOperator *op, Main *bmain, Scene *scene, Base *editbase)
 {
 	Mesh *me;
 	EditMesh *em;
@@ -1497,7 +1500,7 @@ static int mesh_separate_loose(Main *bmain, Scene *scene, Base *editbase)
 		tot= BLI_countlist(&em->verts);
 
 		/* and now separate */
-		doit= mesh_separate_selected(bmain, scene, editbase);
+		doit= mesh_separate_selected(op, bmain, scene, editbase);
 
 		/* with hidden verts this can happen */
 		if(tot == BLI_countlist(&em->verts))
@@ -1517,11 +1520,11 @@ static int mesh_separate_exec(bContext *C, wmOperator *op)
 	int retval= 0, type= RNA_enum_get(op->ptr, "type");
 	
 	if(type == 0)
-		retval= mesh_separate_selected(bmain, scene, base);
+		retval= mesh_separate_selected(op, bmain, scene, base);
 	else if(type == 1)
-		retval= mesh_separate_material(bmain, scene, base);
+		retval= mesh_separate_material(op, bmain, scene, base);
 	else if(type == 2)
-		retval= mesh_separate_loose(bmain, scene, base);
+		retval= mesh_separate_loose(op, bmain, scene, base);
 	   
 	if(retval) {
 		WM_event_add_notifier(C, NC_GEOM|ND_DATA, base->object->data);
@@ -1599,7 +1602,6 @@ typedef struct UndoMesh {
 	EditSelectionC *selected;
 	int totvert, totedge, totface, totsel;
 	int selectmode, shapenr;
-	RetopoPaintData *retopo_paint_data;
 	char retopo_mode;
 	CustomData vdata, edata, fdata;
 } UndoMesh;
@@ -1665,7 +1667,7 @@ static void *editMesh_to_undoMesh(void *emv)
 		evec->h= eve->h;
 		evec->keyindex= eve->keyindex;
 		eve->tmp.l = a; /*store index*/
-		evec->bweight= (short)(eve->bweight*255.0);
+		evec->bweight= (short)(eve->bweight*255.0f);
 
 		CustomData_from_em_block(&em->vdata, &um->vdata, eve->data, a);
 	}
@@ -1679,8 +1681,8 @@ static void *editMesh_to_undoMesh(void *emv)
 		eedc->h= eed->h;
 		eedc->seam= eed->seam;
 		eedc->sharp= eed->sharp;
-		eedc->crease= (short)(eed->crease*255.0);
-		eedc->bweight= (short)(eed->bweight*255.0);
+		eedc->crease= (short)(eed->crease*255.0f);
+		eedc->bweight= (short)(eed->bweight*255.0f);
 		eedc->fgoni= eed->fgoni;
 		eed->tmp.l = a; /*store index*/
 		CustomData_from_em_block(&em->edata, &um->edata, eed->data, a);
@@ -1846,7 +1848,7 @@ static void *getEditMesh(bContext *C)
 }
 
 /* and this is all the undo system needs to know */
-void undo_push_mesh(bContext *C, char *name)
+void undo_push_mesh(bContext *C, const char *name)
 {
 	undo_editmode_push(C, name, getEditMesh, free_undoMesh, undoMesh_to_editMesh, editMesh_to_undoMesh, NULL);
 }

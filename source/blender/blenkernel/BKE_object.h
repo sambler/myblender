@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,12 +25,15 @@
  * Contributor(s): none yet.
  *
  * ***** END GPL LICENSE BLOCK *****
- * General operations, lookup, etc. for blender objects.
  */
 
 #ifndef BKE_OBJECT_H
 #define BKE_OBJECT_H
 
+/** \file BKE_object.h
+ *  \ingroup bke
+ *  \brief General operations, lookup, etc. for blender objects.
+ */
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -73,23 +76,24 @@ void object_copy_proxy_drivers(struct Object *ob, struct Object *target);
 
 void unlink_object(struct Object *ob);
 int exist_object(struct Object *obtest);
-void *add_camera(char *name);
+void *add_camera(const char *name);
 struct Camera *copy_camera(struct Camera *cam);
 void make_local_camera(struct Camera *cam);
 float dof_camera(struct Object *ob);
 	
-void *add_lamp(char *name);
+void *add_lamp(const char *name);
 struct Lamp *copy_lamp(struct Lamp *la);
+struct Lamp *localize_lamp(struct Lamp *la);
 void make_local_lamp(struct Lamp *la);
 void free_camera(struct Camera *ca);
 void free_lamp(struct Lamp *la);
 
-struct Object *add_only_object(int type, char *name);
+struct Object *add_only_object(int type, const char *name);
 struct Object *add_object(struct Scene *scene, int type);
 
 struct Object *copy_object(struct Object *ob);
-void expand_local_object(struct Object *ob);
 void make_local_object(struct Object *ob);
+int object_is_libdata(struct Object *ob);
 int object_data_is_libdata(struct Object *ob);
 void set_mblur_offs(float blur);
 void set_field_offs(float field);
@@ -98,10 +102,10 @@ void disable_speed_curve(int val);
 float bsystem_time(struct Scene *scene, struct Object *ob, float cfra, float ofs);
 void object_scale_to_mat3(struct Object *ob, float mat[][3]);
 void object_rot_to_mat3(struct Object *ob, float mat[][3]);
-void object_mat3_to_rot(struct Object *ob, float mat[][3], int use_compat);
+void object_mat3_to_rot(struct Object *ob, float mat[][3], short use_compat);
 void object_to_mat3(struct Object *ob, float mat[][3]);
 void object_to_mat4(struct Object *ob, float mat[][4]);
-void object_apply_mat4(struct Object *ob, float mat[][4]);
+void object_apply_mat4(struct Object *ob, float mat[][4], const short use_compat, const short use_parent);
 
 void set_no_parent_ipo(int val);
 
@@ -130,12 +134,17 @@ int give_obdata_texspace(struct Object *ob, short **texflag, float **loc, float 
 
 int object_insert_ptcache(struct Object *ob);
 // void object_delete_ptcache(struct Object *ob, int index);
-struct KeyBlock *object_insert_shape_key(struct Scene *scene, struct Object *ob, char *name, int from_mix);
+struct KeyBlock *object_insert_shape_key(struct Scene *scene, struct Object *ob, const char *name, int from_mix);
 
+int object_is_modified(struct Scene *scene, struct Object *ob);
+
+void object_camera_mode(struct RenderData *rd, struct Object *camera);
 void object_camera_matrix(
 		struct RenderData *rd, struct Object *camera, int winx, int winy, short field_second,
 		float winmat[][4], struct rctf *viewplane, float *clipsta, float *clipend, float *lens, float *ycor,
 		float *viewdx, float *viewdy);
+
+void object_relink(struct Object *ob);
 
 #ifdef __cplusplus
 }

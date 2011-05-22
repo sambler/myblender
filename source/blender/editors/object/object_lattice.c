@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,11 +25,19 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/object/object_lattice.c
+ *  \ingroup edobj
+ */
+
+
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
 
 #include "MEM_guardedalloc.h"
+
+#include "BLI_listbase.h"
+#include "BLI_utildefines.h"
 
 #include "DNA_curve_types.h"
 #include "DNA_key_types.h"
@@ -46,8 +54,8 @@
 #include "BKE_lattice.h"
 #include "BKE_mesh.h"
 
-#include "BLI_listbase.h"
-
+#include "ED_lattice.h"
+#include "ED_object.h"
 #include "ED_screen.h"
 #include "ED_view3d.h"
 #include "ED_util.h"
@@ -84,8 +92,6 @@ void make_editLatt(Object *obedit)
 	KeyBlock *actkey;
 
 	free_editLatt(obedit);
-
-	lt= obedit->data;
 
 	actkey= ob_get_keyblock(obedit);
 	if(actkey)
@@ -182,7 +188,7 @@ void ED_setflagsLatt(Object *obedit, int flag)
 	}
 }
 
-int select_all_exec(bContext *C, wmOperator *op)
+static int select_all_exec(bContext *C, wmOperator *op)
 {
 	Object *obedit= CTX_data_edit_object(C);
 	Lattice *lt= obedit->data;
@@ -249,7 +255,7 @@ void LATTICE_OT_select_all(wmOperatorType *ot)
 	WM_operator_properties_select_all(ot);
 }
 
-int make_regular_poll(bContext *C)
+static int make_regular_poll(bContext *C)
 {
 	Object *ob;
 
@@ -259,7 +265,7 @@ int make_regular_poll(bContext *C)
 	return (ob && ob->type==OB_LATTICE);
 }
 
-int make_regular_exec(bContext *C, wmOperator *UNUSED(op))
+static int make_regular_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	Object *ob= CTX_data_edit_object(C);
 	Lattice *lt;
@@ -274,7 +280,7 @@ int make_regular_exec(bContext *C, wmOperator *UNUSED(op))
 		resizelattice(lt, lt->pntsu, lt->pntsv, lt->pntsw, NULL);
 	}
 	
-	DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, ob->data);
 
 	return OPERATOR_FINISHED;
@@ -299,7 +305,7 @@ void LATTICE_OT_make_regular(wmOperatorType *ot)
 
 static void findnearestLattvert__doClosest(void *userData, BPoint *bp, int x, int y)
 {
-	struct { BPoint *bp; short dist, select, mval[2]; } *data = userData;
+	struct { BPoint *bp; short dist, select; int mval[2]; } *data = userData;
 	float temp = abs(data->mval[0]-x) + abs(data->mval[1]-y);
 	
 	if((bp->f1 & SELECT)==data->select)
@@ -312,12 +318,12 @@ static void findnearestLattvert__doClosest(void *userData, BPoint *bp, int x, in
 	}
 }
 
-static BPoint *findnearestLattvert(ViewContext *vc, short mval[2], int sel)
+static BPoint *findnearestLattvert(ViewContext *vc, const int mval[2], int sel)
 {
 		/* sel==1: selected gets a disadvantage */
 		/* in nurb and bezt or bp the nearest is written */
 		/* return 0 1 2: handlepunt */
-	struct { BPoint *bp; short dist, select, mval[2]; } data = {0};
+	struct { BPoint *bp; short dist, select; int mval[2]; } data = {NULL};
 
 	data.dist = 100;
 	data.select = sel;
@@ -330,7 +336,7 @@ static BPoint *findnearestLattvert(ViewContext *vc, short mval[2], int sel)
 	return data.bp;
 }
 
-int mouse_lattice(bContext *C, short mval[2], int extend)
+int mouse_lattice(bContext *C, const int mval[2], int extend)
 {
 	ViewContext vc;
 	BPoint *bp= NULL;
@@ -414,7 +420,7 @@ static void *get_editlatt(bContext *C)
 }
 
 /* and this is all the undo system needs to know */
-void undo_push_lattice(bContext *C, char *name)
+void undo_push_lattice(bContext *C, const char *name)
 {
 	undo_editmode_push(C, name, get_editlatt, free_undoLatt, undoLatt_to_editLatt, editLatt_to_undoLatt, validate_undoLatt);
 }

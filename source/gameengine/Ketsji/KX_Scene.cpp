@@ -28,6 +28,11 @@
  * Ketsji scene. Holds references to all scene data.
  */
 
+/** \file gameengine/Ketsji/KX_Scene.cpp
+ *  \ingroup ketsji
+ */
+
+
 #if defined(WIN32) && !defined(FREE_WINDOWS)
 #pragma warning (disable : 4786)
 #endif //WIN32
@@ -62,7 +67,7 @@
 #include "SCA_IController.h"
 #include "SCA_IActuator.h"
 #include "SG_Node.h"
-#include "SYS_System.h"
+#include "BL_System.h"
 #include "SG_Controller.h"
 #include "SG_IObject.h"
 #include "SG_Tree.h"
@@ -208,7 +213,7 @@ KX_Scene::KX_Scene(class SCA_IInputDevice* keyboarddevice,
 
 	m_bucketmanager=new RAS_BucketManager();
 	
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 	m_attr_dict = PyDict_New(); /* new ref */
 	m_draw_call_pre = NULL;
 	m_draw_call_post = NULL;
@@ -262,12 +267,14 @@ KX_Scene::~KX_Scene()
 		delete m_bucketmanager;
 	}
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 	PyDict_Clear(m_attr_dict);
-	Py_DECREF(m_attr_dict);
+	/* Py_CLEAR: Py_DECREF's and NULL's */
+	Py_CLEAR(m_attr_dict);
 
-	Py_XDECREF(m_draw_call_pre);
-	Py_XDECREF(m_draw_call_post);
+	/* these may be NULL but the macro checks */
+	Py_CLEAR(m_draw_call_pre);
+	Py_CLEAR(m_draw_call_post);
 #endif
 }
 
@@ -323,7 +330,10 @@ list<class KX_Camera*>* KX_Scene::GetCameras()
 	return &m_cameras;
 }
 
-
+list<class KX_FontObject*>* KX_Scene::GetFonts()
+{
+	return &m_fonts;
+}
 
 void KX_Scene::SetFramingType(RAS_FrameSettings & frame_settings)
 {
@@ -1014,6 +1024,9 @@ int KX_Scene::NewRemoveObject(class CValue* gameobj)
 	// in case this is a camera
 	m_cameras.remove((KX_Camera*)newobj);
 
+	// in case this is a font
+	m_fonts.remove((KX_FontObject*)newobj);
+
 	/* currently does nothing, keep incase we need to Unregister something */
 #if 0
 	if (m_sceneConverter)
@@ -1073,8 +1086,9 @@ void KX_Scene::ReplaceMesh(class CValue* obj,void* meshobj, bool use_gfx, bool u
 				blendobj->parent &&							// original object had armature (not sure this test is needed)
 				blendobj->parent->type == OB_ARMATURE &&
 				blendmesh->dvert!=NULL;						// mesh has vertex group
+#ifdef USE_BULLET
 			bool bHasSoftBody = (!parentobj && (blendobj->gameflag & OB_SOFT_BODY));
-
+#endif
 			bool releaseParent = true;
 
 			
@@ -1187,6 +1201,27 @@ void KX_Scene::ReplaceMesh(class CValue* obj,void* meshobj, bool use_gfx, bool u
 #endif
 }
 
+/* Font Object routines */
+void KX_Scene::AddFont(KX_FontObject* font)
+{
+	if (!FindFont(font))
+		m_fonts.push_back(font);
+}
+
+KX_FontObject* KX_Scene::FindFont(KX_FontObject* font)
+{
+	list<KX_FontObject*>::iterator it = m_fonts.begin();
+
+	while ( (it != m_fonts.end()) 
+			&& ((*it) != font) ) {
+	  ++it;
+	}
+
+	return ((it == m_fonts.end()) ? NULL : (*it));
+}
+
+
+/* Camera Object routines */
 KX_Camera* KX_Scene::FindCamera(KX_Camera* cam)
 {
 	list<KX_Camera*>::iterator it = m_cameras.begin();
@@ -1479,7 +1514,7 @@ void KX_Scene::LogicUpdateFrame(double curtime, bool frame)
 void KX_Scene::LogicEndFrame()
 {
 	m_logicmgr->EndFrame();
-	int numobj = m_euthanasyobjects->GetCount();
+	int numobj;
 
 	KX_GameObject* obj;
 
@@ -1721,6 +1756,11 @@ static void MergeScene_GameObject(KX_GameObject* gameobj, KX_Scene *to, KX_Scene
 	if(sg) {
 		if(sg->GetSGClientInfo() == from) {
 			sg->SetSGClientInfo(to);
+
+			/* Make sure to grab the children too since they might not be tied to a game object */
+			NodeList children = sg->GetSGChildren();
+			for (int i=0; i<children.size(); i++)
+					children[i]->SetSGClientInfo(to);
 		}
 #ifdef USE_BULLET
 		SGControllerList::iterator contit;
@@ -1824,6 +1864,16 @@ bool KX_Scene::MergeScene(KX_Scene *other)
 
 			/* when merging objects sensors are moved across into the new manager, dont need to do this here */
 		}
+
+		/* grab any timer properties from the other scene */
+		SCA_TimeEventManager *timemgr=		GetTimeEventManager();
+		SCA_TimeEventManager *timemgr_other=	other->GetTimeEventManager();
+		vector<CValue*> times = timemgr_other->GetTimeValues();
+
+		for(unsigned int i= 0; i < times.size(); i++) {
+			timemgr->AddTimeProperty(times[i]);
+		}
+		
 	}
 	return true;
 }
@@ -1838,7 +1888,7 @@ void KX_Scene::Render2DFilters(RAS_ICanvas* canvas)
 	m_filtermanager.RenderFilters(canvas);
 }
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 
 void KX_Scene::RunDrawingCallbacks(PyObject* cb_list)
 {
@@ -2086,8 +2136,7 @@ PyObject* KX_Scene::pyattr_get_drawing_callback_pre(void *self_v, const KX_PYATT
 
 	if(self->m_draw_call_pre==NULL)
 		self->m_draw_call_pre= PyList_New(0);
-	else
-		Py_INCREF(self->m_draw_call_pre);
+	Py_INCREF(self->m_draw_call_pre);
 	return self->m_draw_call_pre;
 }
 
@@ -2097,8 +2146,7 @@ PyObject* KX_Scene::pyattr_get_drawing_callback_post(void *self_v, const KX_PYAT
 
 	if(self->m_draw_call_post==NULL)
 		self->m_draw_call_post= PyList_New(0);
-	else
-		Py_INCREF(self->m_draw_call_post);
+	Py_INCREF(self->m_draw_call_post);
 	return self->m_draw_call_post;
 }
 
@@ -2248,4 +2296,4 @@ KX_PYMETHODDEF_DOC(KX_Scene, get, "")
 	return def;
 }
 
-#endif // DISABLE_PYTHON
+#endif // WITH_PYTHON

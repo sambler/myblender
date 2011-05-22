@@ -1,4 +1,4 @@
-/**
+/*
  * KX_CameraActuator.cpp
  *
  * $Id$
@@ -29,6 +29,11 @@
  * ***** END GPL LICENSE BLOCK *****
  *
  */
+
+/** \file gameengine/Ketsji/KX_CameraActuator.cpp
+ *  \ingroup ketsji
+ */
+
 
 #include "KX_CameraActuator.h"
 #include <iostream>
@@ -96,7 +101,7 @@ bool KX_CameraActuator::UnlinkObject(SCA_IObject* clientobj)
 }
 
 
-void KX_CameraActuator::Relink(GEN_Map<GEN_HashedPtr, void*> *obj_map)
+void KX_CameraActuator::Relink(CTR_Map<CTR_HashedPtr, void*> *obj_map)
 {
 	void **h_obj = (*obj_map)[m_ob];
 	if (h_obj) {
@@ -346,7 +351,7 @@ CValue *KX_CameraActuator::findObject(char *obName)
 	return NULL;
 }
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 
 /* ------------------------------------------------------------------------- */
 /* Python functions                                                          */
@@ -414,6 +419,6 @@ int KX_CameraActuator::pyattr_set_object(void *self_v, const KX_PYATTRIBUTE_DEF 
 	return PY_SET_ATTR_SUCCESS;
 }
 
-#endif // DISABLE_PYTHON
+#endif // WITH_PYTHON
 
 /* eof */

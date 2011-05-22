@@ -30,13 +30,20 @@
 *
 */
 
+/** \file blender/modifiers/intern/MOD_cloth.c
+ *  \ingroup modifiers
+ */
+
+
 #include "DNA_cloth_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_object_types.h"
 
 #include "MEM_guardedalloc.h"
 
-#include "BKE_utildefines.h"
+#include "BLI_utildefines.h"
+
+
 #include "BKE_cloth.h"
 #include "BKE_cdderivedmesh.h"
 #include "BKE_global.h"
@@ -45,6 +52,7 @@
 
 #include "depsgraph_private.h"
 
+#include "MOD_util.h"
 
 static void initData(ModifierData *md) 
 {
@@ -62,7 +70,9 @@ static void initData(ModifierData *md)
 }
 
 static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
-		DerivedMesh *derivedData, int useRenderParams, int isFinalCalc)
+						DerivedMesh *dm,
+						int UNUSED(useRenderParams),
+						int UNUSED(isFinalCalc))
 {
 	ClothModifierData *clmd = (ClothModifierData*) md;
 	DerivedMesh *result=NULL;
@@ -73,17 +83,17 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 		initData(md);
 		
 		if(!clmd->sim_parms || !clmd->coll_parms)
-			return derivedData;
+			return dm;
 	}
 
-	result = clothModifier_do(clmd, md->scene, ob, derivedData, useRenderParams, isFinalCalc);
+	result = clothModifier_do(clmd, md->scene, ob, dm);
 
 	if(result)
 	{
 		CDDM_calc_normals(result);
 		return result;
 	}
-	return derivedData;
+	return dm;
 }
 
 static void updateDepgraph(
@@ -118,10 +128,10 @@ static CustomDataMask requiredDataMask(Object *UNUSED(ob), ModifierData *md)
 	ClothModifierData *clmd = (ClothModifierData*)md;
 
 	if(cloth_uses_vgroup(clmd))
-		dataMask |= (1 << CD_MDEFORMVERT);
+		dataMask |= CD_MASK_MDEFORMVERT;
 
 	if(clmd->sim_parms->shapekey_rest != 0)
-		dataMask |= (1 << CD_CLOTH_ORCO);
+		dataMask |= CD_MASK_CLOTH_ORCO;
 
 	return dataMask;
 }
@@ -191,18 +201,19 @@ ModifierTypeInfo modifierType_Cloth = {
 							| eModifierTypeFlag_Single,
 
 	/* copyData */          copyData,
-	/* deformVerts */       0,
-	/* deformVertsEM */     0,
-	/* deformMatricesEM */  0,
+	/* deformVerts */       NULL,
+	/* deformMatrices */    NULL,
+	/* deformVertsEM */     NULL,
+	/* deformMatricesEM */  NULL,
 	/* applyModifier */     applyModifier,
-	/* applyModifierEM */   0,
+	/* applyModifierEM */   NULL,
 	/* initData */          initData,
 	/* requiredDataMask */  requiredDataMask,
 	/* freeData */          freeData,
-	/* isDisabled */        0,
+	/* isDisabled */        NULL,
 	/* updateDepgraph */    updateDepgraph,
 	/* dependsOnTime */     dependsOnTime,
-	/* dependsOnNormals */	0,
-	/* foreachObjectLink */ 0,
-	/* foreachIDLink */     0,
+	/* dependsOnNormals */	NULL,
+	/* foreachObjectLink */ NULL,
+	/* foreachIDLink */     NULL,
 };

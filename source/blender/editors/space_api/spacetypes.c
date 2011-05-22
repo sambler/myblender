@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -22,15 +22,22 @@
  * ***** END GPL/BL DUAL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/space_api/spacetypes.c
+ *  \ingroup spapi
+ */
+
+
 #include <stdlib.h>
 
 #include "MEM_guardedalloc.h"
+
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 
 #include "DNA_object_types.h"
 #include "DNA_windowmanager_types.h"
 
-#include "BKE_utildefines.h"
+
 #include "BKE_context.h"
 #include "BKE_screen.h"
 
@@ -120,7 +127,9 @@ void ED_spacetypes_init(void)
 	ED_operatormacros_node();
 	ED_operatormacros_object();
 	ED_operatormacros_file();
-
+	ED_operatormacros_graph();
+	ED_operatormacros_action();
+	
 	/* register dropboxes (can use macros) */
 	spacetypes = BKE_spacetypes_list();
 	for(type=spacetypes->first; type; type=type->next) {
@@ -223,6 +232,8 @@ void ED_region_draw_cb_draw(const bContext *C, ARegion *ar, int type)
 
 
 /* ********************* space template *********************** */
+/* forward declare */
+void ED_spacetype_xxx(void);
 
 /* allocate and init some vars */
 static SpaceLink *xxx_new(const bContext *UNUSED(C))

@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/space_view3d/view3d_ops.c
+ *  \ingroup spview3d
+ */
+
+
 #include <stdlib.h>
 #include <math.h>
 
@@ -38,7 +43,7 @@
 
 #include "BLI_math.h"
 #include "BLI_blenlib.h"
-
+#include "BLI_utildefines.h"
 
 #include "RNA_access.h"
 
@@ -57,13 +62,15 @@ void view3d_operatortypes(void)
 	WM_operatortype_append(VIEW3D_OT_rotate);
 	WM_operatortype_append(VIEW3D_OT_move);
 	WM_operatortype_append(VIEW3D_OT_zoom);
+	WM_operatortype_append(VIEW3D_OT_zoom_camera_1_to_1);
+	WM_operatortype_append(VIEW3D_OT_dolly);
 	WM_operatortype_append(VIEW3D_OT_view_all);
 	WM_operatortype_append(VIEW3D_OT_viewnumpad);
 	WM_operatortype_append(VIEW3D_OT_view_orbit);
 	WM_operatortype_append(VIEW3D_OT_view_pan);
 	WM_operatortype_append(VIEW3D_OT_view_persportho);
-	WM_operatortype_append(VIEW3D_OT_add_background_image);
-	WM_operatortype_append(VIEW3D_OT_remove_background_image);
+	WM_operatortype_append(VIEW3D_OT_background_image_add);
+	WM_operatortype_append(VIEW3D_OT_background_image_remove);
 	WM_operatortype_append(VIEW3D_OT_view_selected);
 	WM_operatortype_append(VIEW3D_OT_view_center_cursor);
 	WM_operatortype_append(VIEW3D_OT_view_center_camera);
@@ -123,6 +130,7 @@ void view3d_keymap(wmKeyConfig *keyconf)
 	WM_keymap_verify_item(keymap, "VIEW3D_OT_rotate", MIDDLEMOUSE, KM_PRESS, 0, 0);
 	WM_keymap_verify_item(keymap, "VIEW3D_OT_move", MIDDLEMOUSE, KM_PRESS, KM_SHIFT, 0);
 	WM_keymap_verify_item(keymap, "VIEW3D_OT_zoom", MIDDLEMOUSE, KM_PRESS, KM_CTRL, 0);
+	WM_keymap_verify_item(keymap, "VIEW3D_OT_dolly", MIDDLEMOUSE, KM_PRESS, KM_CTRL|KM_SHIFT, 0);
 	WM_keymap_verify_item(keymap, "VIEW3D_OT_view_selected", PADPERIOD, KM_PRESS, 0, 0);
 	WM_keymap_verify_item(keymap, "VIEW3D_OT_view_center_cursor", PADPERIOD, KM_PRESS, KM_CTRL, 0);
 	
@@ -146,6 +154,8 @@ void view3d_keymap(wmKeyConfig *keyconf)
 	/*wheel mouse forward/back*/
 	RNA_int_set(WM_keymap_add_item(keymap, "VIEW3D_OT_zoom", WHEELINMOUSE, KM_PRESS, 0, 0)->ptr, "delta", 1);
 	RNA_int_set(WM_keymap_add_item(keymap, "VIEW3D_OT_zoom", WHEELOUTMOUSE, KM_PRESS, 0, 0)->ptr, "delta", -1);
+
+	WM_keymap_add_item(keymap, "VIEW3D_OT_zoom_camera_1_to_1", PADENTER, KM_PRESS, KM_SHIFT, 0);
 
 	WM_keymap_add_item(keymap, "VIEW3D_OT_view_center_camera", HOMEKEY, KM_PRESS, 0, 0); /* only with camera view */
 	RNA_boolean_set(WM_keymap_add_item(keymap, "VIEW3D_OT_view_all", HOMEKEY, KM_PRESS, 0, 0)->ptr, "center", 0); /* only without camera view */
@@ -272,7 +282,7 @@ void view3d_keymap(wmKeyConfig *keyconf)
 	RNA_string_set(kmi->ptr, "value", "MEDIAN_POINT");
 
 	kmi = WM_keymap_add_item(keymap, "WM_OT_context_toggle", COMMAKEY, KM_PRESS, KM_ALT, 0); /* new in 2.5 */
-	RNA_string_set(kmi->ptr, "data_path", "space_data.pivot_point_align");
+	RNA_string_set(kmi->ptr, "data_path", "space_data.use_pivot_point_align");
 
 	kmi = WM_keymap_add_item(keymap, "WM_OT_context_toggle", SPACEKEY, KM_PRESS, KM_CTRL, 0); /* new in 2.5 */
 	RNA_string_set(kmi->ptr, "data_path", "space_data.show_manipulator");

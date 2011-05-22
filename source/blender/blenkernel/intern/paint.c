@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -23,7 +25,12 @@
  * Contributor(s): none yet.
  *
  * ***** END GPL LICENSE BLOCK *****
- */ 
+ */
+
+/** \file blender/blenkernel/intern/paint.c
+ *  \ingroup bke
+ */
+
 
 
 #include "DNA_object_types.h"
@@ -31,7 +38,9 @@
 #include "DNA_scene_types.h"
 #include "DNA_brush_types.h"
 
-#include "BKE_utildefines.h"
+#include "BLI_utildefines.h"
+
+
 #include "BKE_brush.h"
 #include "BKE_library.h"
 #include "BKE_paint.h"

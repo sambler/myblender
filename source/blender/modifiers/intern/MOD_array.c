@@ -30,11 +30,17 @@
 *
 */
 
+/** \file blender/modifiers/intern/MOD_array.c
+ *  \ingroup modifiers
+ */
+
+
 /* Array modifier: duplicates the object multiple times along an axis */
 
 #include "MEM_guardedalloc.h"
 
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 #include "BLI_ghash.h"
 #include "BLI_edgehash.h"
 
@@ -49,6 +55,8 @@
 #include "BKE_object.h"
 
 #include "depsgraph_private.h"
+
+#include "MOD_util.h"
 
 static void initData(ModifierData *md)
 {
@@ -149,6 +157,30 @@ static float vertarray_size(MVert *mvert, int numVerts, int axis)
 	}
 
 	return max_co - min_co;
+}
+
+/* XXX This function fixes bad merging code, in some cases removing vertices creates indices > maxvert */
+
+static int test_index_face_maxvert(MFace *mface, CustomData *fdata, int mfindex, int nr, int maxvert)
+{
+	if(mface->v1 >= maxvert) {
+		// printf("bad index in array\n");
+		mface->v1= maxvert - 1;
+	}
+	if(mface->v2 >= maxvert) {
+		// printf("bad index in array\n");
+		mface->v2= maxvert - 1;
+	}
+	if(mface->v3 >= maxvert) {
+		// printf("bad index in array\n");
+		mface->v3= maxvert - 1;
+	}
+	if(mface->v4 >= maxvert) {
+		// printf("bad index in array\n");
+		mface->v4= maxvert - 1;
+	}
+	
+	return test_index_face(mface, fdata, mfindex, nr);
 }
 
 typedef struct IndexMapEntry {
@@ -253,11 +285,11 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 	if(amd->fit_type == MOD_ARR_FITCURVE && amd->curve_ob) {
 		Curve *cu = amd->curve_ob->data;
 		if(cu) {
-			float tmp_mat3[3][3];
+			float tmp_mat[3][3];
 			float scale;
 			
-			object_to_mat3(amd->curve_ob, tmp_mat3);
-			scale = mat3_to_scale(tmp_mat3);
+			object_to_mat3(amd->curve_ob, tmp_mat);
+			scale = mat3_to_scale(tmp_mat);
 				
 			if(!cu->path) {
 				cu->flag |= CU_PATH; // needed for path & bevlist
@@ -281,60 +313,60 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 		else
 			/* if the offset has no translation, just make one copy */
 			count = 1;
-		  }
+	}
 
-		  if(count < 1)
-			  count = 1;
+	if(count < 1)
+		count = 1;
 
 	/* allocate memory for count duplicates (including original) plus
 		  * start and end caps
 	*/
-		  finalVerts = dm->getNumVerts(dm) * count;
-		  finalEdges = dm->getNumEdges(dm) * count;
-		  finalFaces = dm->getNumFaces(dm) * count;
-		  if(start_cap) {
-			  finalVerts += start_cap->getNumVerts(start_cap);
-			  finalEdges += start_cap->getNumEdges(start_cap);
-			  finalFaces += start_cap->getNumFaces(start_cap);
-		  }
-		  if(end_cap) {
-			  finalVerts += end_cap->getNumVerts(end_cap);
-			  finalEdges += end_cap->getNumEdges(end_cap);
-			  finalFaces += end_cap->getNumFaces(end_cap);
-		  }
-		  result = CDDM_from_template(dm, finalVerts, finalEdges, finalFaces);
+	finalVerts = dm->getNumVerts(dm) * count;
+	finalEdges = dm->getNumEdges(dm) * count;
+	finalFaces = dm->getNumFaces(dm) * count;
+	if(start_cap) {
+		finalVerts += start_cap->getNumVerts(start_cap);
+		finalEdges += start_cap->getNumEdges(start_cap);
+		finalFaces += start_cap->getNumFaces(start_cap);
+	}
+	if(end_cap) {
+		finalVerts += end_cap->getNumVerts(end_cap);
+		finalEdges += end_cap->getNumEdges(end_cap);
+		finalFaces += end_cap->getNumFaces(end_cap);
+	}
+	result = CDDM_from_template(dm, finalVerts, finalEdges, finalFaces);
 
-		  /* calculate the offset matrix of the final copy (for merging) */ 
-		  unit_m4(final_offset);
+	/* calculate the offset matrix of the final copy (for merging) */
+	unit_m4(final_offset);
 
-		  for(j=0; j < count - 1; j++) {
-			  mul_m4_m4m4(tmp_mat, final_offset, offset);
-			  copy_m4_m4(final_offset, tmp_mat);
-		  }
+	for(j=0; j < count - 1; j++) {
+		mul_m4_m4m4(tmp_mat, final_offset, offset);
+		copy_m4_m4(final_offset, tmp_mat);
+	}
 
-		  numVerts = numEdges = numFaces = 0;
-		  mvert = CDDM_get_verts(result);
+	numVerts = numEdges = numFaces = 0;
+	mvert = CDDM_get_verts(result);
 
-		  for (i = 0; i < maxVerts; i++) {
-			  indexMap[i].merge = -1; /* default to no merge */
-			  indexMap[i].merge_final = 0; /* default to no merge */
-		  }
+	for (i = 0; i < maxVerts; i++) {
+		indexMap[i].merge = -1; /* default to no merge */
+		indexMap[i].merge_final = 0; /* default to no merge */
+	}
 
-		  for (i = 0; i < maxVerts; i++) {
-			  MVert *inMV;
-			  MVert *mv = &mvert[numVerts];
-			  MVert *mv2;
-			  float co[3];
+	for (i = 0; i < maxVerts; i++) {
+		MVert *inMV;
+		MVert *mv = &mvert[numVerts];
+		MVert *mv2;
+		float co[3];
 
-			  inMV = &src_mvert[i];
+		inMV = &src_mvert[i];
 
-			  DM_copy_vert_data(dm, result, i, numVerts, 1);
-			  *mv = *inMV;
-			  numVerts++;
+		DM_copy_vert_data(dm, result, i, numVerts, 1);
+		*mv = *inMV;
+		numVerts++;
 
-			  indexMap[i].new = numVerts - 1;
+		indexMap[i].new = numVerts - 1;
 
-			  copy_v3_v3(co, mv->co);
+		copy_v3_v3(co, mv->co);
 		
 		/* Attempts to merge verts from one duplicate with verts from the
 			  * next duplicate which are closer than amd->merge_dist.
@@ -342,132 +374,148 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 			  * If verts are merged in the first duplicate pair, they are merged
 			  * in all pairs.
 		*/
-			  if((count > 1) && (amd->flags & MOD_ARR_MERGE)) {
-				  float tmp_co[3];
-				  mul_v3_m4v3(tmp_co, offset, mv->co);
+		if((count > 1) && (amd->flags & MOD_ARR_MERGE)) {
+			float tmp_co[3];
+			mul_v3_m4v3(tmp_co, offset, mv->co);
 
-				  for(j = 0; j < maxVerts; j++) {
-					  /* if vertex already merged, don't use it */
-					  if( indexMap[j].merge != -1 ) continue;
+			for(j = 0; j < maxVerts; j++) {
+				/* if vertex already merged, don't use it */
+				if( indexMap[j].merge != -1 ) continue;
 
-					  inMV = &src_mvert[j];
-					  /* if this vert is within merge limit, merge */
-					  if(compare_len_v3v3(tmp_co, inMV->co, amd->merge_dist)) {
-						  indexMap[i].merge = j;
+				inMV = &src_mvert[j];
+				/* if this vert is within merge limit, merge */
+				if(compare_len_v3v3(tmp_co, inMV->co, amd->merge_dist)) {
+					indexMap[i].merge = j;
 
-						  /* test for merging with final copy of merge target */
-						  if(amd->flags & MOD_ARR_MERGEFINAL) {
-							  copy_v3_v3(tmp_co, inMV->co);
-							  inMV = &src_mvert[i];
-							  mul_m4_v3(final_offset, tmp_co);
-							  if(compare_len_v3v3(tmp_co, inMV->co, amd->merge_dist))
-								  indexMap[i].merge_final = 1;
-						  }
-						  break;
-					  }
-				  }
-			  }
+					/* test for merging with final copy of merge target */
+					if(amd->flags & MOD_ARR_MERGEFINAL) {
+						copy_v3_v3(tmp_co, inMV->co);
+						inMV = &src_mvert[i];
+						mul_m4_v3(final_offset, tmp_co);
+						if(compare_len_v3v3(tmp_co, inMV->co, amd->merge_dist))
+							indexMap[i].merge_final = 1;
+					}
+					break;
+				}
+			}
+		}
 
-			  /* if no merging, generate copies of this vert */
-			  if(indexMap[i].merge < 0) {
-				  for(j=0; j < count - 1; j++) {
-					  mv2 = &mvert[numVerts];
+		/* if no merging, generate copies of this vert */
+		if(indexMap[i].merge < 0) {
+			for(j=0; j < count - 1; j++) {
+				mv2 = &mvert[numVerts];
 
-					  DM_copy_vert_data(result, result, numVerts - 1, numVerts, 1);
-					  *mv2 = *mv;
-					  numVerts++;
+				DM_copy_vert_data(result, result, numVerts - 1, numVerts, 1);
+				*mv2 = *mv;
+				numVerts++;
 
-					  mul_m4_v3(offset, co);
-					  copy_v3_v3(mv2->co, co);
-				  }
-			  } else if(indexMap[i].merge != i && indexMap[i].merge_final) {
+				mul_m4_v3(offset, co);
+				copy_v3_v3(mv2->co, co);
+			}
+		} else if(indexMap[i].merge != i && indexMap[i].merge_final) {
 			/* if this vert is not merging with itself, and it is merging
 				  * with the final copy of its merge target, remove the first copy
 			*/
-				  numVerts--;
-				  DM_free_vert_data(result, numVerts, 1);
-			  }
-		  }
+			numVerts--;
+			DM_free_vert_data(result, numVerts, 1);
+		}
+	}
 
-		  /* make a hashtable so we can avoid duplicate edges from merging */
-		  edges = BLI_edgehash_new();
+	/* make a hashtable so we can avoid duplicate edges from merging */
+	edges = BLI_edgehash_new();
 
-		  maxEdges = dm->getNumEdges(dm);
-		  medge = CDDM_get_edges(result);
-		  for(i = 0; i < maxEdges; i++) {
-			  MEdge inMED;
-			  MEdge med;
-			  MEdge *med2;
-			  int vert1, vert2;
+	maxEdges = dm->getNumEdges(dm);
+	medge = CDDM_get_edges(result);
+	for(i = 0; i < maxEdges; i++) {
+		MEdge inMED;
+		MEdge med;
+		MEdge *med2;
+		int vert1, vert2;
 
-			  dm->getEdge(dm, i, &inMED);
+		dm->getEdge(dm, i, &inMED);
 
-			  med = inMED;
-			  med.v1 = indexMap[inMED.v1].new;
-			  med.v2 = indexMap[inMED.v2].new;
+		med = inMED;
+		med.v1 = indexMap[inMED.v1].new;
+		med.v2 = indexMap[inMED.v2].new;
 
 		/* if vertices are to be merged with the final copies of their
 			  * merge targets, calculate that final copy
 		*/
-			  if(indexMap[inMED.v1].merge_final) {
-				  med.v1 = calc_mapping(indexMap, indexMap[inMED.v1].merge,
-						  count - 1);
-			  }
-			  if(indexMap[inMED.v2].merge_final) {
-				  med.v2 = calc_mapping(indexMap, indexMap[inMED.v2].merge,
-						  count - 1);
-			  }
+		if(indexMap[inMED.v1].merge_final) {
+			med.v1 = calc_mapping(indexMap, indexMap[inMED.v1].merge,
+			count - 1);
+		}
+		if(indexMap[inMED.v2].merge_final) {
+			med.v2 = calc_mapping(indexMap, indexMap[inMED.v2].merge,
+			count - 1);
+		}
 
-			  if(med.v1 == med.v2) continue;
+		if(med.v1 == med.v2) continue;
 
-			  if (initFlags) {
-				  med.flag |= ME_EDGEDRAW | ME_EDGERENDER;
-			  }
+		/* XXX Unfortunately the calc_mapping returns sometimes numVerts... leads to bad crashes */
+		if(med.v1 >= numVerts)
+			med.v1= numVerts-1;
+		if(med.v2 >= numVerts)
+			med.v2= numVerts-1;
 
-			  if(!BLI_edgehash_haskey(edges, med.v1, med.v2)) {
-				  DM_copy_edge_data(dm, result, i, numEdges, 1);
-				  medge[numEdges] = med;
-				  numEdges++;
+		if (initFlags) {
+			med.flag |= ME_EDGEDRAW | ME_EDGERENDER;
+		}
 
-				  BLI_edgehash_insert(edges, med.v1, med.v2, NULL);
-			  }
+		if(!BLI_edgehash_haskey(edges, med.v1, med.v2)) {
+			DM_copy_edge_data(dm, result, i, numEdges, 1);
+			medge[numEdges] = med;
+			numEdges++;
 
-			  for(j = 1; j < count; j++)
-			  {
-				  vert1 = calc_mapping(indexMap, inMED.v1, j);
-				  vert2 = calc_mapping(indexMap, inMED.v2, j);
-				  /* avoid duplicate edges */
-				  if(!BLI_edgehash_haskey(edges, vert1, vert2)) {
-					  med2 = &medge[numEdges];
+			BLI_edgehash_insert(edges, med.v1, med.v2, NULL);
+		}
 
-					  DM_copy_edge_data(dm, result, i, numEdges, 1);
-					  *med2 = med;
-					  numEdges++;
+		for(j = 1; j < count; j++)
+		{
+			vert1 = calc_mapping(indexMap, inMED.v1, j);
+			vert2 = calc_mapping(indexMap, inMED.v2, j);
 
-					  med2->v1 = vert1;
-					  med2->v2 = vert2;
+			/* edge could collapse to single point after mapping */
+			if(vert1 == vert2) continue;
 
-					  BLI_edgehash_insert(edges, med2->v1, med2->v2, NULL);
-				  }
-			  }
-		  }
+			/* XXX Unfortunately the calc_mapping returns sometimes numVerts... leads to bad crashes */
+			if(vert1 >= numVerts)
+				vert1= numVerts-1;
+			if(vert2 >= numVerts)
+				vert2= numVerts-1;
 
-		  maxFaces = dm->getNumFaces(dm);
-		  mface = CDDM_get_faces(result);
-		  for (i=0; i < maxFaces; i++) {
-			  MFace inMF;
-			  MFace *mf = &mface[numFaces];
+			/* avoid duplicate edges */
+			if(!BLI_edgehash_haskey(edges, vert1, vert2)) {
+				med2 = &medge[numEdges];
 
-			  dm->getFace(dm, i, &inMF);
+				DM_copy_edge_data(dm, result, i, numEdges, 1);
+				*med2 = med;
+				numEdges++;
 
-			  DM_copy_face_data(dm, result, i, numFaces, 1);
-			  *mf = inMF;
+				med2->v1 = vert1;
+				med2->v2 = vert2;
 
-			  mf->v1 = indexMap[inMF.v1].new;
-			  mf->v2 = indexMap[inMF.v2].new;
-			  mf->v3 = indexMap[inMF.v3].new;
-			  if(inMF.v4)
-				  mf->v4 = indexMap[inMF.v4].new;
+				BLI_edgehash_insert(edges, med2->v1, med2->v2, NULL);
+			}
+		}
+	}
+
+	maxFaces = dm->getNumFaces(dm);
+	mface = CDDM_get_faces(result);
+	for (i=0; i < maxFaces; i++) {
+		MFace inMF;
+		MFace *mf = &mface[numFaces];
+
+		dm->getFace(dm, i, &inMF);
+
+		DM_copy_face_data(dm, result, i, numFaces, 1);
+		*mf = inMF;
+
+		mf->v1 = indexMap[inMF.v1].new;
+		mf->v2 = indexMap[inMF.v2].new;
+		mf->v3 = indexMap[inMF.v3].new;
+		if(inMF.v4)
+			mf->v4 = indexMap[inMF.v4].new;
 
 		/* if vertices are to be merged with the final copies of their
 			  * merge targets, calculate that final copy
@@ -481,7 +529,7 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 			  if(inMF.v4 && indexMap[inMF.v4].merge_final)
 				  mf->v4 = calc_mapping(indexMap, indexMap[inMF.v4].merge, count-1);
 
-			  if(test_index_face(mf, &result->faceData, numFaces, inMF.v4?4:3) < 3)
+		if(test_index_face_maxvert(mf, &result->faceData, numFaces, inMF.v4?4:3, numVerts) < 3)
 				  continue;
 
 			  numFaces++;
@@ -505,12 +553,10 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 				  if (inMF.v4)
 					  mf2->v4 = calc_mapping(indexMap, inMF.v4, j);
 
-				  test_index_face(mf2, &result->faceData, numFaces, inMF.v4?4:3);
 				  numFaces++;
 
 				  /* if the face has fewer than 3 vertices, don't create it */
-				  if(mf2->v3 == 0 || (mf2->v1 && (mf2->v1 == mf2->v3 || mf2->v1 ==
-								 mf2->v4))) {
+			if(test_index_face_maxvert(mf2, &result->faceData, numFaces-1, inMF.v4?4:3, numVerts) < 3) {
 					  numFaces--;
 					  DM_free_face_data(result, numFaces, 1);
 								 }
@@ -547,6 +593,7 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 				  if(amd->flags & MOD_ARR_MERGE) {
 					  float tmp_co[3];
 					  MVert *in_mv;
+				int j;
 
 					  copy_v3_v3(tmp_co, mv->co);
 					  mul_m4_v3(startoffset, tmp_co);
@@ -600,8 +647,8 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 				  if(mface[numFaces].v4) {
 					  mface[numFaces].v4 = vert_map[mface[numFaces].v4];
 
-					  test_index_face(&mface[numFaces], &result->faceData,
-									  numFaces, 4);
+				test_index_face_maxvert(&mface[numFaces], &result->faceData,
+				numFaces, 4, numVerts);
 				  }
 				  else
 				  {
@@ -647,6 +694,7 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 				  if(amd->flags & MOD_ARR_MERGE) {
 					  float tmp_co[3];
 					  MVert *in_mv;
+				int j;
 
 					  copy_v3_v3(tmp_co, mv->co);
 					  mul_m4_v3(offset, tmp_co);
@@ -727,26 +775,27 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 		  return result;
 }
 
-static DerivedMesh *applyModifier(
-		ModifierData *md, Object *ob, DerivedMesh *derivedData,
-  int UNUSED(useRenderParams), int UNUSED(isFinalCalc))
+static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
+						DerivedMesh *dm,
+						int UNUSED(useRenderParams),
+						int UNUSED(isFinalCalc))
 {
 	DerivedMesh *result;
 	ArrayModifierData *amd = (ArrayModifierData*) md;
 
-	result = arrayModifier_doArray(amd, md->scene, ob, derivedData, 0);
+	result = arrayModifier_doArray(amd, md->scene, ob, dm, 0);
 
-	if(result != derivedData)
+	if(result != dm)
 		CDDM_calc_normals(result);
 
 	return result;
 }
 
-static DerivedMesh *applyModifierEM(
-		ModifierData *md, Object *ob, struct EditMesh *UNUSED(editData),
-  DerivedMesh *derivedData)
+static DerivedMesh *applyModifierEM(ModifierData *md, Object *ob,
+						struct EditMesh *UNUSED(editData),
+						DerivedMesh *dm)
 {
-	return applyModifier(md, ob, derivedData, 0, 1);
+	return applyModifier(md, ob, dm, 0, 1);
 }
 
 
@@ -762,18 +811,19 @@ ModifierTypeInfo modifierType_Array = {
 							| eModifierTypeFlag_AcceptsCVs,
 
 	/* copyData */          copyData,
-	/* deformVerts */       0,
-	/* deformVertsEM */     0,
-	/* deformMatricesEM */  0,
+	/* deformVerts */       NULL,
+	/* deformMatrices */    NULL,
+	/* deformVertsEM */     NULL,
+	/* deformMatricesEM */  NULL,
 	/* applyModifier */     applyModifier,
 	/* applyModifierEM */   applyModifierEM,
 	/* initData */          initData,
-	/* requiredDataMask */  0,
-	/* freeData */          0,
-	/* isDisabled */        0,
+	/* requiredDataMask */  NULL,
+	/* freeData */          NULL,
+	/* isDisabled */        NULL,
 	/* updateDepgraph */    updateDepgraph,
-	/* dependsOnTime */     0,
-	/* dependsOnNormals */	0,
+	/* dependsOnTime */     NULL,
+	/* dependsOnNormals */	NULL,
 	/* foreachObjectLink */ foreachObjectLink,
-	/* foreachIDLink */     0,
+	/* foreachIDLink */     NULL,
 };

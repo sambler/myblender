@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/nodes/intern/CMP_nodes/CMP_sepcombHSVA.c
+ *  \ingroup cmpnodes
+ */
+
 
 #include "../CMP_util.h"
 
@@ -64,7 +69,7 @@ static void node_composit_exec_sephsva(void *UNUSED(data), bNode *node, bNodeSta
 	if(in[0]->data==NULL) {
 		float h, s, v;
 	
-      rgb_to_hsv(in[0]->vec[0], in[0]->vec[1], in[0]->vec[2], &h, &s, &v);
+	rgb_to_hsv(in[0]->vec[0], in[0]->vec[1], in[0]->vec[2], &h, &s, &v);
 		
 		out[0]->vec[0] = h;
 		out[1]->vec[0] = s;
@@ -96,23 +101,18 @@ static void node_composit_exec_sephsva(void *UNUSED(data), bNode *node, bNodeSta
 	}
 }
 
-bNodeType cmp_node_sephsva= {
-	/* *next,*prev */	NULL, NULL,
-	/* type code   */	CMP_NODE_SEPHSVA,
-	/* name        */	"Separate HSVA",
-	/* width+range */	80, 40, 140,
-	/* class+opts  */	NODE_CLASS_CONVERTOR, 0,
-	/* input sock  */	cmp_node_sephsva_in,
-	/* output sock */	cmp_node_sephsva_out,
-	/* storage     */	"",
-	/* execfunc    */	node_composit_exec_sephsva,
-	/* butfunc     */	NULL,
-	/* initfunc    */	NULL,
-	/* freestoragefunc    */	NULL,
-	/* copystoragefunc    */	NULL,
-	/* id          */	NULL
-	
-};
+void register_node_type_cmp_sephsva(ListBase *lb)
+{
+	static bNodeType ntype;
+
+	node_type_base(&ntype, CMP_NODE_SEPHSVA, "Separate HSVA", NODE_CLASS_CONVERTOR, 0,
+		cmp_node_sephsva_in, cmp_node_sephsva_out);
+	node_type_size(&ntype, 80, 40, 140);
+	node_type_exec(&ntype, node_composit_exec_sephsva);
+
+	nodeRegisterType(lb, &ntype);
+}
+
 
 /* **************** COMBINE HSVA ******************** */
 static bNodeSocketType cmp_node_combhsva_in[]= {
@@ -129,63 +129,59 @@ static bNodeSocketType cmp_node_combhsva_out[]= {
 
 static void do_comb_hsva(bNode *UNUSED(node), float *out, float *in1, float *in2, float *in3, float *in4)
 {
-   float r,g,b;
-   hsv_to_rgb(in1[0], in2[0], in3[0], &r, &g, &b);
+	float r,g,b;
+	hsv_to_rgb(in1[0], in2[0], in3[0], &r, &g, &b);
 
-   out[0] = r;
-   out[1] = g;
-   out[2] = b;
-   out[3] = in4[0];
+	out[0] = r;
+	out[1] = g;
+	out[2] = b;
+	out[3] = in4[0];
 }
 
 static void node_composit_exec_combhsva(void *UNUSED(data), bNode *node, bNodeStack **in, bNodeStack **out)
 {
-   /* stack order out: 1 rgba channels */
-   /* stack order in: 4 value channels */
+	/* stack order out: 1 rgba channels */
+	/* stack order in: 4 value channels */
 
-   /* input no image? then only color operation */
-   if((in[0]->data==NULL) && (in[1]->data==NULL) && (in[2]->data==NULL) && (in[3]->data==NULL)) {
-	  out[0]->vec[0] = in[0]->vec[0];
-	  out[0]->vec[1] = in[1]->vec[0];
-	  out[0]->vec[2] = in[2]->vec[0];
-	  out[0]->vec[3] = in[3]->vec[0];
-   }
-   else {
-	  /* make output size of first available input image */
-	  CompBuf *cbuf;
-	  CompBuf *stackbuf;
+	/* input no image? then only color operation */
+	if((in[0]->data==NULL) && (in[1]->data==NULL) && (in[2]->data==NULL) && (in[3]->data==NULL)) {
+		out[0]->vec[0] = in[0]->vec[0];
+		out[0]->vec[1] = in[1]->vec[0];
+		out[0]->vec[2] = in[2]->vec[0];
+		out[0]->vec[3] = in[3]->vec[0];
+	}
+	else {
+		/* make output size of first available input image */
+		CompBuf *cbuf;
+		CompBuf *stackbuf;
 
-	  /* allocate a CompBuf the size of the first available input */
-	  if (in[0]->data) cbuf = in[0]->data;
-	  else if (in[1]->data) cbuf = in[1]->data;
-	  else if (in[2]->data) cbuf = in[2]->data;
-	  else cbuf = in[3]->data;
+		/* allocate a CompBuf the size of the first available input */
+		if (in[0]->data) cbuf = in[0]->data;
+		else if (in[1]->data) cbuf = in[1]->data;
+		else if (in[2]->data) cbuf = in[2]->data;
+		else cbuf = in[3]->data;
 
-	  stackbuf = alloc_compbuf(cbuf->x, cbuf->y, CB_RGBA, 1); /* allocs */
+		stackbuf = alloc_compbuf(cbuf->x, cbuf->y, CB_RGBA, 1); /* allocs */
 
-	  composit4_pixel_processor(node, stackbuf, in[0]->data, in[0]->vec, in[1]->data, in[1]->vec, 
-		 in[2]->data, in[2]->vec, in[3]->data, in[3]->vec, 
-		 do_comb_hsva, CB_VAL, CB_VAL, CB_VAL, CB_VAL);
+		composit4_pixel_processor(node, stackbuf, in[0]->data, in[0]->vec, in[1]->data, in[1]->vec,
+		in[2]->data, in[2]->vec, in[3]->data, in[3]->vec,
+		do_comb_hsva, CB_VAL, CB_VAL, CB_VAL, CB_VAL);
 
-	  out[0]->data= stackbuf;
-   }	
+		out[0]->data= stackbuf;
+	}
 }
 
-bNodeType cmp_node_combhsva= {
-	/* *next,*prev */	NULL, NULL,
-	/* type code   */	CMP_NODE_COMBHSVA,
-	/* name        */	"Combine HSVA",
-	/* width+range */	80, 40, 140,
-	/* class+opts  */	NODE_CLASS_CONVERTOR, NODE_OPTIONS,
-	/* input sock  */	cmp_node_combhsva_in,
-	/* output sock */	cmp_node_combhsva_out,
-	/* storage     */	"",
-	/* execfunc    */	node_composit_exec_combhsva,
-	/* butfunc     */	NULL,
-	/* initfunc    */	NULL,
-	/* freestoragefunc    */	NULL,
-	/* copystoragefunc    */	NULL,
-	/* id          */	NULL
-};
+void register_node_type_cmp_combhsva(ListBase *lb)
+{
+	static bNodeType ntype;
+
+	node_type_base(&ntype, CMP_NODE_COMBHSVA, "Combine HSVA", NODE_CLASS_CONVERTOR, NODE_OPTIONS,
+		cmp_node_combhsva_in, cmp_node_combhsva_out);
+	node_type_size(&ntype, 80, 40, 140);
+	node_type_exec(&ntype, node_composit_exec_combhsva);
+
+	nodeRegisterType(lb, &ntype);
+}
+
 
 

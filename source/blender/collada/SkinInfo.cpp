@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -22,11 +22,19 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/collada/SkinInfo.cpp
+ *  \ingroup collada
+ */
+
+
 #include <algorithm>
 
 #if !defined(WIN32) || defined(FREE_WINDOWS)
 #include <stdint.h>
 #endif
+
+/* COLLADABU_ASSERT, may be able to remove later */
+#include "COLLADABUPlatform.h"
 
 #include "BKE_object.h"
 #include "DNA_armature_types.h"
@@ -215,7 +223,7 @@ void SkinInfo::link_armature(bContext *C, Object *ob, std::map<COLLADAFW::Unique
 	((ArmatureModifierData *)md)->object = ob_arm;
 
 	copy_m4_m4(ob->obmat, bind_shape_matrix);
-	object_apply_mat4(ob, ob->obmat);
+	object_apply_mat4(ob, ob->obmat, 0, 0);
 #if 1
 	bc_set_parent(ob, ob_arm, C);
 #else
@@ -241,7 +249,11 @@ void SkinInfo::link_armature(bContext *C, Object *ob, std::map<COLLADAFW::Unique
 	for (it = joint_data.begin(), joint_index = 0; it != joint_data.end(); it++, joint_index++) {
 		const char *name = "Group";
 
+		// skip joints that have invalid UID
+		if ((*it).joint_uid == COLLADAFW::UniqueId::INVALID) continue;
+		
 		// name group by joint node name
+		
 		if (joint_by_uid.find((*it).joint_uid) != joint_by_uid.end()) {
 			name = bc_get_joint_name(joint_by_uid[(*it).joint_uid]);
 		}

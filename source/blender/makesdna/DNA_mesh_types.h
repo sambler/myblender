@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$ 
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -29,6 +29,10 @@
 #ifndef DNA_MESH_TYPES_H
 #define DNA_MESH_TYPES_H
 
+/** \file DNA_mesh_types.h
+ *  \ingroup DNA
+ */
+
 #include "DNA_listBase.h"
 #include "DNA_ID.h"
 #include "DNA_customdata_types.h"
@@ -54,8 +58,6 @@ typedef struct Mesh {
 	struct AnimData *adt;		/* animation data (must be immediately after id for utilities to use it) */
 
 	struct BoundBox *bb;
-
-	ListBase effect;
 	
 	struct Ipo *ipo;		// XXX depreceated... old animation system
 	struct Key *key;
@@ -83,24 +85,22 @@ typedef struct Mesh {
 	 * of the last selected face and is similar to the old active face flag where
 	 * the face does not need to be selected, -1 is inactive */
 	int act_face; 
-	
-	short texflag, editflag;
-	
+
 	/* texture space, copied as one block in editobject.c */
 	float loc[3];
 	float size[3];
 	float rot[3];
-	
-	float cubemapsize;
-	
-	int drawflag;
+
+	short texflag, drawflag;
 	short smoothresh, flag;
 
 	short subdiv, subdivr;
-	short totcol;
-	short subsurftype;		/* only kept for backwards compat, not used anymore */
+	char subsurftype;		/* only kept for backwards compat, not used anymore */
+	char editflag;
 
-	struct Multires *mr;		/* Multiresolution modeling data */
+	short totcol;
+
+	struct Multires *mr;		/* deprecated multiresolution modeling data, only keep for loading old files */
 	struct PartialVisibility *pv;
 } Mesh;
 
@@ -124,7 +124,7 @@ typedef struct TFace {
 #define ME_EDIT_MIRROR_Z (1 << 2) // unused so far
 
 #define ME_EDIT_PAINT_MASK (1 << 3)
-#define ME_EDIT_MIRROR_TOPO (1 << 4) // unused so far
+#define ME_EDIT_MIRROR_TOPO (1 << 4)
 
 
 /* me->flag */
@@ -139,7 +139,7 @@ typedef struct TFace {
 #define ME_OPT_EDGES	256
 #define ME_DS_EXPAND	512
 
-/* me->drawflag, int */ 
+/* me->drawflag, short */
 #define ME_DRAWEDGES	(1 << 0)
 #define ME_DRAWFACES	(1 << 1)
 #define ME_DRAWNORMALS	(1 << 2)
@@ -153,9 +153,9 @@ typedef struct TFace {
 #define ME_DRAWSHARP    (1 << 8)
 #define ME_DRAWBWEIGHTS	(1 << 9)
 
-#define ME_DRAW_EDGELEN  (1 << 10) 
-#define ME_DRAW_FACEAREA (1 << 11)
-#define ME_DRAW_EDGEANG  (1 << 12)
+#define ME_DRAWEXTRA_EDGELEN  (1 << 10)
+#define ME_DRAWEXTRA_FACEAREA (1 << 11)
+#define ME_DRAWEXTRA_FACEANG  (1 << 12)
 
 /* old global flags:
 #define G_DRAWEDGES		(1 << 18)

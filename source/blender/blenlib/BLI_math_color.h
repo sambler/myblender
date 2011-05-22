@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,8 +25,12 @@
  * ***** END GPL LICENSE BLOCK *****
  * */
 
-#ifndef BLI_MATH_COLOR
-#define BLI_MATH_COLOR
+#ifndef BLI_MATH_COLOR_H
+#define BLI_MATH_COLOR_H
+
+/** \file BLI_math_color.h
+ *  \ingroup bli
+ */
 
 #ifdef __cplusplus
 extern "C" {
@@ -89,18 +93,18 @@ int constrain_rgb(float *r, float *g, float *b);
 void minmax_rgb(short c[3]);
 
 void rgb_float_set_hue_float_offset(float * rgb, float hue_offset);
-void rgb_byte_set_hue_float_offset(char * rgb, float hue_offset);
+void rgb_byte_set_hue_float_offset(unsigned char * rgb, float hue_offset);
 
 /***************** lift/gamma/gain / ASC-CDL conversion *****************/
 
 void lift_gamma_gain_to_asc_cdl(float *lift, float *gamma, float *gain, float *offset, float *slope, float *power);
 
-void rgb_byte_to_float(char *in, float *out);
-void rgb_float_to_byte(float *in, char *out);
+void rgb_byte_to_float(const unsigned char *in, float *out);
+void rgb_float_to_byte(const float *in, unsigned char *out);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* BLI_MATH_COLOR */
+#endif /* BLI_MATH_COLOR_H */
 

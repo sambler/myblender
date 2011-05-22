@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -22,12 +22,25 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/python/intern/bpy_rna_callback.c
+ *  \ingroup pythonintern
+ */
+
+
+#include <Python.h>
+
+#include "RNA_types.h"
 
 #include "bpy_rna.h"
+#include "bpy_rna_callback.h"
 #include "bpy_util.h"
 
+#include "BLI_utildefines.h"
+
 #include "DNA_screen_types.h"
-#include "BKE_utildefines.h"
+
+#include "RNA_access.h"
+
 #include "BKE_context.h"
 #include "ED_space_api.h"
 
@@ -35,7 +48,7 @@
 #define RNA_CAPSULE_ID "RNA_HANDLE"
 #define RNA_CAPSULE_ID_INVALID "RNA_HANDLE_REMOVED"
 
-void cb_region_draw(const bContext *C, ARegion *UNUSED(ar), void *customdata)
+static void cb_region_draw(const bContext *C, ARegion *UNUSED(ar), void *customdata)
 {
 	PyObject *cb_func, *cb_args, *result;
 	PyGILState_STATE gilstate;
@@ -44,7 +57,7 @@ void cb_region_draw(const bContext *C, ARegion *UNUSED(ar), void *customdata)
 
 	cb_func= PyTuple_GET_ITEM((PyObject *)customdata, 0);
 	cb_args= PyTuple_GET_ITEM((PyObject *)customdata, 1);
-	result = PyObject_CallObject(cb_func, cb_args);
+	result= PyObject_CallObject(cb_func, cb_args);
 
 	if(result) {
 		Py_DECREF(result);
@@ -75,7 +88,7 @@ PyObject *pyrna_callback_add(BPy_StructRNA *self, PyObject *args)
 
 	if(RNA_struct_is_a(self->ptr.type, &RNA_Region)) {
 		if(cb_event_str) {
-			static EnumPropertyItem region_draw_mode_items[] = {
+			static EnumPropertyItem region_draw_mode_items[]= {
 				{REGION_DRAW_POST_PIXEL, "POST_PIXEL", 0, "Post Pixel", ""},
 				{REGION_DRAW_POST_VIEW, "POST_VIEW", 0, "Post View", ""},
 				{REGION_DRAW_PRE_VIEW, "PRE_VIEW", 0, "Pre View", ""},
@@ -111,7 +124,7 @@ PyObject *pyrna_callback_remove(BPy_StructRNA *self, PyObject *args)
 	handle= PyCapsule_GetPointer(py_handle, RNA_CAPSULE_ID);
 
 	if(handle==NULL) {
-		PyErr_SetString(PyExc_ValueError, "callback_remove(handle): NULL handle given, invalid or already removed.");
+		PyErr_SetString(PyExc_ValueError, "callback_remove(handle): NULL handle given, invalid or already removed");
 		return NULL;
 	}
 

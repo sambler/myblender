@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/util/editmode_undo.c
+ *  \ingroup edutil
+ */
+
+
 
 #include <stdlib.h>
 #include <string.h>
@@ -37,26 +42,29 @@
 #include "DNA_object_types.h"
 #include "DNA_screen_types.h"
 
-#include "BKE_utildefines.h"
+#include "BLI_blenlib.h"
+#include "BLI_dynstr.h"
+#include "BLI_utildefines.h"
+
+
 #include "BKE_context.h"
 #include "BKE_depsgraph.h"
 #include "BKE_global.h"
 
-#include "BLI_blenlib.h"
-#include "BLI_dynstr.h"
-
-
+#include "ED_util.h"
 #include "ED_mesh.h"
 
 #include "UI_interface.h"
 #include "UI_resources.h"
+
+#include "util_intern.h"
 
 /* ***************** generic editmode undo system ********************* */
 /*
 
 Add this in your local code:
 
-void undo_editmode_push(bContext *C, char *name, 
+void undo_editmode_push(bContext *C, const char *name, 
 		void * (*getdata)(bContext *C),     // use context to retrieve current editdata
 		void (*freedata)(void *), 			// pointer to function freeing data
 		void (*to_editmode)(void *, void *),        // data to editmode conversion
@@ -75,7 +83,7 @@ void undo_editmode_menu(void)				// history menu
 /* ********************************************************************* */
 
 /* ****** XXX ***** */
-void error(const char *UNUSED(arg)) {}
+static void error(const char *UNUSED(arg)) {}
 /* ****** XXX ***** */
 
 
@@ -109,7 +117,7 @@ static void undo_restore(UndoElem *undo, void *editdata)
 }
 
 /* name can be a dynamic string */
-void undo_editmode_push(bContext *C, char *name, 
+void undo_editmode_push(bContext *C, const char *name, 
 						void * (*getdata)(bContext *C),
 						void (*freedata)(void *), 
 						void (*to_editmode)(void *, void *),  
@@ -269,7 +277,7 @@ void undo_editmode_step(bContext *C, int step)
 		EM_selectmode_to_scene(CTX_data_scene(C), obedit);
 	}
 
-	DAG_id_flush_update(&obedit->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&obedit->id, OB_RECALC_DATA);
 
 	/* XXX notifiers */
 }
@@ -314,6 +322,20 @@ void undo_editmode_name(bContext *C, const char *undoname)
 	}
 }
 
+/* undoname optionally, if NULL it just checks for existing undo steps */
+int undo_editmode_valid(const char *undoname)
+{
+	if(undoname) {
+		UndoElem *uel;
+		
+		for(uel= undobase.last; uel; uel= uel->prev) {
+			if(strcmp(undoname, uel->name)==0)
+				break;
+		}
+		return uel != NULL;
+	}
+	return undobase.last != undobase.first;
+}
 
 /* ************** for interaction with menu/pullown */
 

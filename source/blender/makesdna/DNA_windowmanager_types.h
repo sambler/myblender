@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,6 +27,10 @@
  */
 #ifndef DNA_WINDOWMANAGER_TYPES_H
 #define DNA_WINDOWMANAGER_TYPES_H
+
+/** \file DNA_windowmanager_types.h
+ *  \ingroup DNA
+ */
 
 #include "DNA_listBase.h"
 #include "DNA_vec_types.h"
@@ -82,6 +86,7 @@ enum ReportListFlags {
 	RPT_PRINT = 1,
 	RPT_STORE = 2,
 	RPT_FREE = 4,
+	RPT_OP_HOLD = 8 /* dont move them into the operator global list (caller will use) */
 };
 #
 #
@@ -90,8 +95,8 @@ typedef struct Report {
 	short type; /* ReportType */
 	short flag;
 	int len; /* strlen(message), saves some time calculating the word wrap  */
-	char *typestr;
-	char *message;
+	const char *typestr;
+	const char *message;
 } Report;
 
 /* saved in the wm, dont remove */
@@ -146,8 +151,8 @@ typedef struct wmWindowManager {
 } wmWindowManager;
 
 /* wmWindowManager.initialized */
-#define WM_INIT_WINDOW		1<<0
-#define WM_INIT_KEYMAP		1<<1
+#define WM_INIT_WINDOW		(1<<0)
+#define WM_INIT_KEYMAP		(1<<1)
 
 /* the savable part, rest of data is local in ghostwinlay */
 typedef struct wmWindow {
@@ -169,9 +174,10 @@ typedef struct wmWindow {
 	short monitor;		/* multiscreen... no idea how to store yet */
 	short active;		/* set to 1 if an active window, for quick rejects */
 	short cursor;		/* current mouse cursor type */
-	short lastcursor;	/* for temp waitcursor */
+	short lastcursor;	/* previous cursor when setting modal one */
+	short modalcursor;	/* the current modal cursor */
 	short addmousemove;	/* internal: tag this for extra mousemove event, makes cursors/buttons active on UI switching */
-	short pad2[2];
+	short pad2;
 
 	struct wmEvent *eventstate;	/* storage for event system */
 	
@@ -228,7 +234,7 @@ typedef struct wmKeyMapItem {
 
 	/* runtime */
 	short maptype;					/* keymap editor */
-	short id;						/* unique identifier */
+	short id;						/* unique identifier. Positive for kmi that override builtins, negative otherwise */
 	short pad;
 	struct PointerRNA *ptr;			/* rna pointer to access properties */
 } wmKeyMapItem;
@@ -309,11 +315,5 @@ typedef struct wmOperator {
 
 /* wmOperator flag */
 #define OP_GRAB_POINTER			1
-
-typedef enum wmRadialControlMode {
-	WM_RADIALCONTROL_SIZE,
-	WM_RADIALCONTROL_STRENGTH,
-	WM_RADIALCONTROL_ANGLE,
-} wmRadialControlMode;
 
 #endif /* DNA_WINDOWMANAGER_TYPES_H */

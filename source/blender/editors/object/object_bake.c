@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/object/object_bake.c
+ *  \ingroup edobj
+ */
+
+
 /*
 	meshtools.c: no editmode (violated already :), tools operating on meshes
 */
@@ -42,6 +47,7 @@
 
 #include "BLI_blenlib.h"
 #include "BLI_threads.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_blender.h"
 #include "BKE_context.h"
@@ -65,6 +71,8 @@
 #include "WM_types.h"
 
 #include "ED_object.h"
+
+#include "object_intern.h"
 
 /* ****************** render BAKING ********************** */
 
@@ -116,7 +124,7 @@ typedef struct BakeRender {
 } BakeRender;
 
 /* use by exec and invoke */
-int test_bake_internal(bContext *C, ReportList *reports)
+static int test_bake_internal(bContext *C, ReportList *reports)
 {
 	Scene *scene= CTX_data_scene(C);
 
@@ -181,9 +189,18 @@ static void finish_bake_internal(BakeRender *bkr)
 		for(ima= G.main->image.first; ima; ima= ima->id.next) {
 			if(ima->ok==IMA_OK_LOADED) {
 				ImBuf *ibuf= BKE_image_get_ibuf(ima, NULL);
-				if(ibuf && (ibuf->userflags & IB_BITMAPDIRTY)) {
-					GPU_free_image(ima);
-					imb_freemipmapImBuf(ibuf);
+				if(ibuf) {
+					if(ibuf->userflags & IB_BITMAPDIRTY) {
+						GPU_free_image(ima);
+						imb_freemipmapImBuf(ibuf);
+					}
+
+					/* freed when baking is done, but if its canceled we need to free here */
+					if (ibuf->userdata) {
+						printf("freed\n");
+						MEM_freeN(ibuf->userdata);
+						ibuf->userdata= NULL;
+					}
 				}
 			}
 		}
@@ -235,7 +252,7 @@ static void bake_freejob(void *bkv)
 	BakeRender *bkr= bkv;
 	finish_bake_internal(bkr);
 
-	if(bkr->tot==0) BKE_report(bkr->reports, RPT_ERROR, "No valid images found to bake to");
+	if(bkr->tot==0) BKE_report(bkr->reports, RPT_ERROR, "No objects or images found to bake to");
 	MEM_freeN(bkr);
 	G.rendering = 0;
 }
@@ -307,9 +324,7 @@ static int bake_image_exec(bContext *C, wmOperator *op)
 	}
 	else {
 		ListBase threads;
-		BakeRender bkr;
-
-		memset(&bkr, 0, sizeof(bkr));
+		BakeRender bkr= {NULL};
 
 		init_bake_internal(&bkr, C);
 		bkr.reports= op->reports;

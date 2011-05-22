@@ -1,4 +1,4 @@
-/**
+/*
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -26,6 +26,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/render/intern/source/volume_precache.c
+ *  \ingroup render
+ */
+
+
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,14 +42,16 @@
 #include "BLI_math.h"
 #include "BLI_threads.h"
 #include "BLI_voxel.h"
+#include "BLI_utildefines.h"
 
 #include "PIL_time.h"
 
 #include "RE_shader_ext.h"
-#include "RE_raytrace.h"
 
 #include "DNA_material_types.h"
 
+#include "rayintersection.h"
+#include "rayobject.h"
 #include "render_types.h"
 #include "rendercore.h"
 #include "renderdatabase.h"
@@ -67,17 +74,17 @@ extern struct Render R;
 
 /* Recursive test for intersections, from a point inside the mesh, to outside
  * Number of intersections (depth) determine if a point is inside or outside the mesh */
-int intersect_outside_volume(RayObject *tree, Isect *isect, float *offset, int limit, int depth)
+static int intersect_outside_volume(RayObject *tree, Isect *isect, float *offset, int limit, int depth)
 {
 	if (limit == 0) return depth;
 	
 	if (RE_rayobject_raycast(tree, isect)) {
 		
-		isect->start[0] = isect->start[0] + isect->labda*isect->vec[0];
-		isect->start[1] = isect->start[1] + isect->labda*isect->vec[1];
-		isect->start[2] = isect->start[2] + isect->labda*isect->vec[2];
+		isect->start[0] = isect->start[0] + isect->dist*isect->dir[0];
+		isect->start[1] = isect->start[1] + isect->dist*isect->dir[1];
+		isect->start[2] = isect->start[2] + isect->dist*isect->dir[2];
 		
-		isect->labda = FLT_MAX;
+		isect->dist = FLT_MAX;
 		isect->skip = RE_SKIP_VLR_NEIGHBOUR;
 		isect->orig.face= isect->hit.face;
 		isect->orig.ob= isect->hit.ob;
@@ -89,25 +96,24 @@ int intersect_outside_volume(RayObject *tree, Isect *isect, float *offset, int l
 }
 
 /* Uses ray tracing to check if a point is inside or outside an ObjectInstanceRen */
-int point_inside_obi(RayObject *tree, ObjectInstanceRen *UNUSED(obi), float *co)
+static int point_inside_obi(RayObject *tree, ObjectInstanceRen *UNUSED(obi), float *co)
 {
-	Isect isect;
-	float vec[3] = {0.0f,0.0f,1.0f};
+	Isect isect= {{0}};
+	float dir[3] = {0.0f,0.0f,1.0f};
 	int final_depth=0, depth=0, limit=20;
 	
 	/* set up the isect */
-	memset(&isect, 0, sizeof(isect));
 	VECCOPY(isect.start, co);
-	VECCOPY(isect.vec, vec);
+	VECCOPY(isect.dir, dir);
 	isect.mode= RE_RAY_MIRROR;
 	isect.last_hit= NULL;
 	isect.lay= -1;
 	
-	isect.labda = FLT_MAX;
+	isect.dist = FLT_MAX;
 	isect.orig.face= NULL;
 	isect.orig.ob = NULL;
 
-	final_depth = intersect_outside_volume(tree, &isect, vec, limit, depth);
+	final_depth = intersect_outside_volume(tree, &isect, dir, limit, depth);
 	
 	/* even number of intersections: point is outside
 	 * odd number: point is inside */
@@ -344,7 +350,7 @@ static void ms_diffuse(float *x0, float *x, float diff, int *n) //n is the unpad
 	}
 }
 
-void multiple_scattering_diffusion(Render *re, VolumePrecache *vp, Material *ma)
+static void multiple_scattering_diffusion(Render *re, VolumePrecache *vp, Material *ma)
 {
 	const float diff = ma->vol.ms_diff * 0.001f; 	/* compensate for scaling for a nicer UI range */
 	const int simframes = (int)(ma->vol.ms_spread * (float)MAX3(vp->res[0], vp->res[1], vp->res[2]));
@@ -396,7 +402,7 @@ void multiple_scattering_diffusion(Render *re, VolumePrecache *vp, Material *ma)
 					/* Displays progress every second */
 					if(time-lasttime>1.0f) {
 						char str[64];
-						sprintf(str, "Simulating multiple scattering: %d%%", (int)(100.0f * (c / total)));
+						BLI_snprintf(str, sizeof(str), "Simulating multiple scattering: %d%%", (int)(100.0f * (c / total)));
 						re->i.infostr= str;
 						re->stats_draw(re->sdh, &re->i);
 						re->i.infostr= NULL;
@@ -408,7 +414,7 @@ void multiple_scattering_diffusion(Render *re, VolumePrecache *vp, Material *ma)
 		SWAP(float *,sr,sr0);
 		SWAP(float *,sg,sg0);
 		SWAP(float *,sb,sb0);
-               
+
 		/* main diffusion simulation */
 		ms_diffuse(sr0, sr, diff, n);
 		ms_diffuse(sg0, sg, diff, n);
@@ -486,7 +492,11 @@ static void *vol_precache_part(void *data)
 	float scatter_col[3] = {0.f, 0.f, 0.f};
 	float co[3], cco[3];
 	int x, y, z, i;
-	const int res[3]= {pa->res[0], pa->res[1], pa->res[2]};
+	int res[3];
+
+	res[0]= pa->res[0];
+	res[1]= pa->res[1];
+	res[2]= pa->res[2];
 
 	for (z= pa->minz; z < pa->maxz; z++) {
 		co[2] = pa->bbmin[2] + (pa->voxel[2] * (z + 0.5f));
@@ -496,6 +506,9 @@ static void *vol_precache_part(void *data)
 			
 			for (x=pa->minx; x < pa->maxx; x++) {
 				co[0] = pa->bbmin[0] + (pa->voxel[0] * (x + 0.5f));
+				
+				if (pa->re->test_break && pa->re->test_break(pa->re->tbh))
+					break;
 				
 				/* convert from world->camera space for shading */
 				mul_v3_m4v3(cco, pa->viewmat, co);
@@ -525,7 +538,7 @@ static void *vol_precache_part(void *data)
 	
 	pa->done = 1;
 	
-	return 0;
+	return NULL;
 }
 
 
@@ -594,6 +607,7 @@ static void precache_init_parts(Render *re, RayObject *tree, ShadeInput *shi, Ob
 				pa->done = 0;
 				pa->working = 0;
 				
+				pa->re = re;
 				pa->num = i;
 				pa->tree = tree;
 				pa->shi = shi;
@@ -662,7 +676,7 @@ static int precache_resolution(Render *re, VolumePrecache *vp, ObjectInstanceRen
  * in camera space, aligned with the ObjectRen's bounding box.
  * Resolution is defined by the user.
  */
-void vol_precache_objectinstance_threads(Render *re, ObjectInstanceRen *obi, Material *ma)
+static void vol_precache_objectinstance_threads(Render *re, ObjectInstanceRen *obi, Material *ma)
 {
 	VolumePrecache *vp;
 	VolPrecachePart *nextpa, *pa;
@@ -695,9 +709,8 @@ void vol_precache_objectinstance_threads(Render *re, ObjectInstanceRen *obi, Mat
 	vp->data_r = MEM_callocN(sizeof(float)*vp->res[0]*vp->res[1]*vp->res[2], "volume light cache data red channel");
 	vp->data_g = MEM_callocN(sizeof(float)*vp->res[0]*vp->res[1]*vp->res[2], "volume light cache data green channel");
 	vp->data_b = MEM_callocN(sizeof(float)*vp->res[0]*vp->res[1]*vp->res[2], "volume light cache data blue channel");
-	if (vp->data_r==0 || vp->data_g==0 || vp->data_b==0) {
+	if (vp->data_r==NULL || vp->data_g==NULL || vp->data_b==NULL) {
 		MEM_freeN(vp);
-		vp = NULL;
 		return;
 	}
 
@@ -737,7 +750,7 @@ void vol_precache_objectinstance_threads(Render *re, ObjectInstanceRen *obi, Mat
 		time= PIL_check_seconds_timer();
 		if(time-lasttime>1.0f) {
 			char str[64];
-			sprintf(str, "Precaching volume: %d%%", (int)(100.0f * ((float)counter / (float)totparts)));
+			BLI_snprintf(str, sizeof(str), "Precaching volume: %d%%", (int)(100.0f * ((float)counter / (float)totparts)));
 			re->i.infostr= str;
 			re->stats_draw(re->sdh, &re->i);
 			re->i.infostr= NULL;

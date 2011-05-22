@@ -30,16 +30,22 @@
 *
 */
 
+/** \file blender/modifiers/intern/MOD_cast.c
+ *  \ingroup modifiers
+ */
+
+
 #include "DNA_meshdata_types.h"
 #include "DNA_object_types.h"
 
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
-#include "BKE_utildefines.h"
+
 #include "BKE_deform.h"
 #include "BKE_DerivedMesh.h"
 #include "BKE_modifier.h"
-#include "BKE_utildefines.h"
+
 
 #include "depsgraph_private.h"
 
@@ -92,7 +98,7 @@ static CustomDataMask requiredDataMask(Object *UNUSED(ob), ModifierData *md)
 	CustomDataMask dataMask = 0;
 
 	/* ask for vertexgroups if we need them */
-	if(cmd->defgrp_name[0]) dataMask |= (1 << CD_MDEFORMVERT);
+	if(cmd->defgrp_name[0]) dataMask |= CD_MASK_MDEFORMVERT;
 
 	return dataMask;
 }
@@ -421,9 +427,9 @@ static void cuboid_do(
 			}
 
 			if (has_radius) {
-				if (fabs(tmp_co[0]) > cmd->radius ||
-								fabs(tmp_co[1]) > cmd->radius ||
-								fabs(tmp_co[2]) > cmd->radius) continue;
+				if (fabsf(tmp_co[0]) > cmd->radius ||
+								fabsf(tmp_co[1]) > cmd->radius ||
+								fabsf(tmp_co[2]) > cmd->radius) continue;
 			}
 
 			for (j = 0; j < dvert[i].totweight; ++j) {
@@ -473,7 +479,7 @@ static void cuboid_do(
 
 			/* ok, now we know which coordinate of the vertex to use */
 
-			if (fabs(tmp_co[coord]) < FLT_EPSILON) /* avoid division by zero */
+			if (fabsf(tmp_co[coord]) < FLT_EPSILON) /* avoid division by zero */
 				continue;
 
 			/* finally, this is the factor we wanted, to project the vertex
@@ -517,9 +523,9 @@ static void cuboid_do(
 		}
 
 		if (has_radius) {
-			if (fabs(tmp_co[0]) > cmd->radius ||
-						 fabs(tmp_co[1]) > cmd->radius ||
-						 fabs(tmp_co[2]) > cmd->radius) continue;
+			if (fabsf(tmp_co[0]) > cmd->radius ||
+						 fabsf(tmp_co[1]) > cmd->radius ||
+						 fabsf(tmp_co[2]) > cmd->radius) continue;
 		}
 
 		octant = 0;
@@ -544,7 +550,7 @@ static void cuboid_do(
 			coord = 2;
 		}
 
-		if (fabs(tmp_co[coord]) < FLT_EPSILON)
+		if (fabsf(tmp_co[coord]) < FLT_EPSILON)
 			continue;
 
 		fbb = apex[coord] / tmp_co[coord];
@@ -618,17 +624,18 @@ ModifierTypeInfo modifierType_Cast = {
 
 	/* copyData */          copyData,
 	/* deformVerts */       deformVerts,
+	/* deformMatrices */    NULL,
 	/* deformVertsEM */     deformVertsEM,
-	/* deformMatricesEM */  0,
-	/* applyModifier */     0,
-	/* applyModifierEM */   0,
+	/* deformMatricesEM */  NULL,
+	/* applyModifier */     NULL,
+	/* applyModifierEM */   NULL,
 	/* initData */          initData,
 	/* requiredDataMask */  requiredDataMask,
-	/* freeData */          0,
+	/* freeData */          NULL,
 	/* isDisabled */        isDisabled,
 	/* updateDepgraph */    updateDepgraph,
-	/* dependsOnTime */     0,
-	/* dependsOnNormals */	0,
+	/* dependsOnTime */     NULL,
+	/* dependsOnNormals */	NULL,
 	/* foreachObjectLink */ foreachObjectLink,
-	/* foreachIDLink */     0,
+	/* foreachIDLink */     NULL,
 };

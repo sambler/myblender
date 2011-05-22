@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -24,6 +24,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/screen/screen_edit.c
+ *  \ingroup edscr
+ */
+
+
 #include <string.h>
 #include <math.h>
 
@@ -34,6 +39,7 @@
 #include "DNA_userdef_types.h"
 
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_context.h"
 #include "BKE_global.h"
@@ -221,16 +227,16 @@ void removenotused_scredges(bScreen *sc)
 	sa= sc->areabase.first;
 	while(sa) {
 		se= screen_findedge(sc, sa->v1, sa->v2);
-		if(se==0) printf("error: area %d edge 1 doesn't exist\n", a);
+		if(se==NULL) printf("error: area %d edge 1 doesn't exist\n", a);
 		else se->flag= 1;
 		se= screen_findedge(sc, sa->v2, sa->v3);
-		if(se==0) printf("error: area %d edge 2 doesn't exist\n", a);
+		if(se==NULL) printf("error: area %d edge 2 doesn't exist\n", a);
 		else se->flag= 1;
 		se= screen_findedge(sc, sa->v3, sa->v4);
-		if(se==0) printf("error: area %d edge 3 doesn't exist\n", a);
+		if(se==NULL) printf("error: area %d edge 3 doesn't exist\n", a);
 		else se->flag= 1;
 		se= screen_findedge(sc, sa->v4, sa->v1);
-		if(se==0) printf("error: area %d edge 4 doesn't exist\n", a);
+		if(se==NULL) printf("error: area %d edge 4 doesn't exist\n", a);
 		else se->flag= 1;
 		sa= sa->next;
 		a++;
@@ -318,8 +324,7 @@ static short testsplitpoint(ScrArea *sa, char dir, float fac)
 	if(dir=='h' && (sa->v2->vec.y- sa->v1->vec.y <= 2*AREAMINY)) return 0;
 	
 	// to be sure
-	if(fac<0.0) fac= 0.0;
-	if(fac>1.0) fac= 1.0;
+	CLAMP(fac, 0.0f, 1.0f);
 	
 	if(dir=='h') {
 		y= sa->v1->vec.y+ fac*(sa->v2->vec.y- sa->v1->vec.y);
@@ -345,7 +350,7 @@ static short testsplitpoint(ScrArea *sa, char dir, float fac)
 	}
 }
 
-ScrArea *area_split(bScreen *sc, ScrArea *sa, char dir, float fac)
+ScrArea *area_split(bScreen *sc, ScrArea *sa, char dir, float fac, int merge)
 {
 	ScrArea *newa=NULL;
 	ScrVert *sv1, *sv2;
@@ -399,7 +404,8 @@ ScrArea *area_split(bScreen *sc, ScrArea *sa, char dir, float fac)
 	}
 	
 	/* remove double vertices en edges */
-	removedouble_scrverts(sc);
+	if(merge)
+		removedouble_scrverts(sc);
 	removedouble_scredges(sc);
 	removenotused_scredges(sc);
 	
@@ -408,7 +414,7 @@ ScrArea *area_split(bScreen *sc, ScrArea *sa, char dir, float fac)
 
 /* empty screen, with 1 dummy area without spacedata */
 /* uses window size */
-bScreen *ED_screen_add(wmWindow *win, Scene *scene, char *name)
+bScreen *ED_screen_add(wmWindow *win, Scene *scene, const char *name)
 {
 	bScreen *sc;
 	ScrVert *sv1, *sv2, *sv3, *sv4;
@@ -416,6 +422,7 @@ bScreen *ED_screen_add(wmWindow *win, Scene *scene, char *name)
 	sc= alloc_libblock(&G.main->screen, ID_SCR, name);
 	sc->scene= scene;
 	sc->do_refresh= 1;
+	sc->redraws_flag= TIME_ALL_3D_WIN|TIME_ALL_ANIM_WIN;
 	sc->winid= win->winid;
 	
 	sv1= screen_addvert(sc, 0, 0);
@@ -643,18 +650,20 @@ static void screen_test_scale(bScreen *sc, int winsizex, int winsizey)
 		
 		/* make sure it fits! */
 		for(sv= sc->vertbase.first; sv; sv= sv->next) {
+			/* FIXME, this resizing logic is no good when resizing the window + redrawing [#24428]
+			 * need some way to store these as floats internally and re-apply from there. */
 			tempf= ((float)sv->vec.x)*facx;
-			sv->vec.x= (short)(tempf+0.5);
+			sv->vec.x= (short)(tempf+0.5f);
 			sv->vec.x+= AREAGRID-1;
 			sv->vec.x-=  (sv->vec.x % AREAGRID); 
-			
+
 			CLAMP(sv->vec.x, 0, winsizex);
 			
-			tempf= ((float)sv->vec.y )*facy;
-			sv->vec.y= (short)(tempf+0.5);
+			tempf= ((float)sv->vec.y)*facy;
+			sv->vec.y= (short)(tempf+0.5f);
 			sv->vec.y+= AREAGRID-1;
 			sv->vec.y-=  (sv->vec.y % AREAGRID); 
-			
+
 			CLAMP(sv->vec.y, 0, winsizey);
 		}
 	}
@@ -950,8 +959,9 @@ static void region_cursor_set(wmWindow *win, int swinid)
 	}
 }
 
-void ED_screen_do_listen(wmWindow *win, wmNotifier *note)
+void ED_screen_do_listen(bContext *C, wmNotifier *note)
 {
+	wmWindow *win= CTX_wm_window(C);
 	
 	/* generic notes */
 	switch(note->category) {
@@ -963,8 +973,11 @@ void ED_screen_do_listen(wmWindow *win, wmNotifier *note)
 			win->screen->do_draw= 1;
 			break;
 		case NC_SCREEN:
+			if(note->data==ND_SUBWINACTIVE)
+				uiFreeActiveButtons(C, win->screen);
 			if(note->action==NA_EDITED)
 				win->screen->do_draw= win->screen->do_refresh= 1;
+			break;
 		case NC_SCENE:
 			if(note->data==ND_MODE)
 				region_cursor_set(win, note->swinid);				
@@ -976,8 +989,9 @@ void ED_screen_do_listen(wmWindow *win, wmNotifier *note)
 void ED_screen_draw(wmWindow *win)
 {
 	ScrArea *sa;
-	ScrArea *sa1=NULL;
-	ScrArea *sa2=NULL;
+	ScrArea *sa1= NULL;
+	ScrArea *sa2= NULL;
+	ScrArea *sa3= NULL;
 	int dir = -1;
 	int dira = -1;
 
@@ -986,6 +1000,7 @@ void ED_screen_draw(wmWindow *win)
 	for(sa= win->screen->areabase.first; sa; sa= sa->next) {
 		if (sa->flag & AREA_FLAG_DRAWJOINFROM) sa1 = sa;
 		if (sa->flag & AREA_FLAG_DRAWJOINTO) sa2 = sa;
+		if (sa->flag & (AREA_FLAG_DRAWSPLIT_H|AREA_FLAG_DRAWSPLIT_V)) sa3 = sa;
 		drawscredge_area(sa, win->sizex, win->sizey, 0);
 	}
 	for(sa= win->screen->areabase.first; sa; sa= sa->next)
@@ -1018,34 +1033,60 @@ void ED_screen_draw(wmWindow *win)
 		scrarea_draw_shape_light(sa1, dira);
 	}
 	
-//	if(G.f & G_DEBUG) printf("draw screen\n");
+	/* splitpoint */
+	if(sa3) {
+		glEnable(GL_BLEND);
+		glColor4ub(255, 255, 255, 100);
+		
+		if(sa3->flag & AREA_FLAG_DRAWSPLIT_H) {
+			sdrawline(sa3->totrct.xmin, win->eventstate->y, sa3->totrct.xmax, win->eventstate->y);
+			glColor4ub(0, 0, 0, 100);
+			sdrawline(sa3->totrct.xmin, win->eventstate->y+1, sa3->totrct.xmax, win->eventstate->y+1);
+		}
+		else {
+			sdrawline(win->eventstate->x, sa3->totrct.ymin, win->eventstate->x, sa3->totrct.ymax);
+			glColor4ub(0, 0, 0, 100);
+			sdrawline(win->eventstate->x+1, sa3->totrct.ymin, win->eventstate->x+1, sa3->totrct.ymax);
+		}
+		
+		glDisable(GL_BLEND);
+	}
+	
 	win->screen->do_draw= 0;
 }
 
 /* make this screen usable */
 /* for file read and first use, for scaling window, area moves */
 void ED_screen_refresh(wmWindowManager *wm, wmWindow *win)
-{
-	ScrArea *sa;
-	rcti winrct= {0, win->sizex-1, 0, win->sizey-1};
+{	
+	/* exception for bg mode, we only need the screen context */
+	if (!G.background) {
+		ScrArea *sa;
+		rcti winrct;
 	
-	screen_test_scale(win->screen, win->sizex, win->sizey);
+		winrct.xmin= 0;
+		winrct.xmax= win->sizex-1;
+		winrct.ymin= 0;
+		winrct.ymax= win->sizey-1;
+		
+		screen_test_scale(win->screen, win->sizex, win->sizey);
+		
+		if(win->screen->mainwin==0)
+			win->screen->mainwin= wm_subwindow_open(win, &winrct);
+		else
+			wm_subwindow_position(win, win->screen->mainwin, &winrct);
+		
+		for(sa= win->screen->areabase.first; sa; sa= sa->next) {
+			/* set spacetype and region callbacks, calls init() */
+			/* sets subwindows for regions, adds handlers */
+			ED_area_initialize(wm, win, sa);
+		}
 	
-	if(win->screen->mainwin==0)
-		win->screen->mainwin= wm_subwindow_open(win, &winrct);
-	else
-		wm_subwindow_position(win, win->screen->mainwin, &winrct);
-	
-	for(sa= win->screen->areabase.first; sa; sa= sa->next) {
-		/* set spacetype and region callbacks, calls init() */
-		/* sets subwindows for regions, adds handlers */
-		ED_area_initialize(wm, win, sa);
+		/* wake up animtimer */
+		if(win->screen->animtimer)
+			WM_event_timer_sleep(wm, win, win->screen->animtimer, 0);
 	}
 
-	/* wake up animtimer */
-	if(win->screen->animtimer)
-		WM_event_timer_sleep(wm, win, win->screen->animtimer, 0);
-	
 	if(G.f & G_DEBUG) printf("set screen\n");
 	win->screen->do_refresh= 0;
 
@@ -1092,7 +1133,10 @@ void ED_area_exit(bContext *C, ScrArea *sa)
 	ARegion *ar;
 
 	if (sa->spacetype == SPACE_FILE) {
-		ED_fileselect_exit(C, (SpaceFile*)(sa) ? sa->spacedata.first : CTX_wm_space_data(C));
+		SpaceLink *sl= sa->spacedata.first;
+		if(sl && sl->spacetype == SPACE_FILE) {
+			ED_fileselect_exit(C, (SpaceFile *)sl);
+		}
 	}
 
 	CTX_wm_area_set(C, sa);
@@ -1130,8 +1174,7 @@ void ED_screen_exit(bContext *C, wmWindow *window, bScreen *screen)
 	/* mark it available for use for other windows */
 	screen->winid= 0;
 	
-	/* before deleting the temp screen or we get invalid access */
-	if (prevwin->screen->full != SCREENTEMP) {
+	if (prevwin->screen->temp == 0) {
 		/* use previous window if possible */
 		CTX_wm_window_set(C, prevwin);
 	} else {
@@ -1139,11 +1182,6 @@ void ED_screen_exit(bContext *C, wmWindow *window, bScreen *screen)
 		CTX_wm_window_set(C, NULL);
 	}
 	
-	/* if temp screen, delete it */
-	if(screen->full == SCREENTEMP) {
-		Main *bmain= CTX_data_main(C);
-		free_libblock(&bmain->screen, screen);
-	}
 }
 
 /* *********************************** */
@@ -1185,8 +1223,10 @@ static void screen_cursor_set(wmWindow *win, wmEvent *event)
 
 /* called in wm_event_system.c. sets state vars in screen, cursors */
 /* event type is mouse move */
-void ED_screen_set_subwinactive(wmWindow *win, wmEvent *event)
+void ED_screen_set_subwinactive(bContext *C, wmEvent *event)
 {
+	wmWindow *win= CTX_wm_window(C);
+	
 	if(win->screen) {
 		bScreen *scr= win->screen;
 		ScrArea *sa;
@@ -1232,6 +1272,7 @@ void ED_screen_set_subwinactive(wmWindow *win, wmEvent *event)
 		}
 		else if(oldswin!=scr->subwinactive) {
 			region_cursor_set(win, scr->subwinactive);
+			WM_event_add_notifier(C, NC_SCREEN|ND_SUBWINACTIVE, scr);
 		}
 	}
 }
@@ -1432,7 +1473,7 @@ void ED_screen_set_scene(bContext *C, Scene *scene)
 	CTX_data_scene_set(C, scene);
 	set_scene_bg(CTX_data_main(C), scene);
 	
-	ED_update_for_newframe(C, 1);
+	ED_update_for_newframe(CTX_data_main(C), scene, curscreen, 1);
 	
 	/* complete redraw */
 	WM_event_add_notifier(C, NC_WINDOW, NULL);
@@ -1463,7 +1504,7 @@ int ED_screen_full_newspace(bContext *C, ScrArea *sa, int type)
 	bScreen *screen= CTX_wm_screen(C);
 	ScrArea *newsa= NULL;
 
-	if(!sa || sa->full==0) {
+	if(!sa || sa->full==NULL) {
 		newsa= ED_screen_full_toggle(C, win, sa);
 	}
 	
@@ -1547,53 +1588,49 @@ ScrArea *ED_screen_full_toggle(bContext *C, wmWindow *win, ScrArea *sa)
 		   are no longer in the same screen */
 		for(ar=sa->regionbase.first; ar; ar=ar->next)
 			uiFreeBlocks(C, &ar->uiblocks);
+		
+		/* prevent hanging header prints */
+		ED_area_headerprint(sa, NULL);
 	}
 
 	if(sa && sa->full) {
+		ScrArea *old;
 		short fulltype;
 
 		sc= sa->full;		/* the old screen to restore */
 		oldscreen= win->screen;	/* the one disappearing */
 
 		fulltype = sc->full;
+		sc->full= 0;
 
-		/* refuse to go out of SCREENAUTOPLAY as long as G_FLAGS_AUTOPLAY
-		   is set */
-
-		if (fulltype != SCREENAUTOPLAY || (G.flags & G_FILE_AUTOPLAY) == 0) {
-			ScrArea *old;
-
-			sc->full= 0;
-
-			/* find old area */
-			for(old= sc->areabase.first; old; old= old->next)
-				if(old->full) break;
-			if(old==NULL) {
-				if (G.f & G_DEBUG)
-					printf("something wrong in areafullscreen\n");
-				return NULL;
-			}
-				// old feature described below (ton)
-				// in autoplay screens the headers are disabled by
-				// default. So use the old headertype instead
-
-			area_copy_data(old, sa, 1);	/*  1 = swap spacelist */
-			if (sa->flag & AREA_TEMP_INFO) sa->flag &= ~AREA_TEMP_INFO;
-			old->full= NULL;
-
-			/* animtimer back */
-			sc->animtimer= oldscreen->animtimer;
-			oldscreen->animtimer= NULL;
-
-			ED_screen_set(C, sc);
-
-			free_screen(oldscreen);
-			free_libblock(&CTX_data_main(C)->screen, oldscreen);
+		/* removed: SCREENAUTOPLAY exception here */
+	
+		/* find old area */
+		for(old= sc->areabase.first; old; old= old->next)
+			if(old->full) break;
+		if(old==NULL) {
+			if (G.f & G_DEBUG)
+				printf("something wrong in areafullscreen\n");
+			return NULL;
 		}
+
+		area_copy_data(old, sa, 1);	/*  1 = swap spacelist */
+		if (sa->flag & AREA_TEMP_INFO) sa->flag &= ~AREA_TEMP_INFO;
+		old->full= NULL;
+
+		/* animtimer back */
+		sc->animtimer= oldscreen->animtimer;
+		oldscreen->animtimer= NULL;
+
+		ED_screen_set(C, sc);
+
+		free_screen(oldscreen);
+		free_libblock(&CTX_data_main(C)->screen, oldscreen);
+
 	}
 	else {
 		ScrArea *newa;
-		char newname[20];
+		char newname[MAX_ID_NAME-2];
 
 		oldscreen= win->screen;
 
@@ -1604,7 +1641,7 @@ ScrArea *ED_screen_full_toggle(bContext *C, wmWindow *win, ScrArea *sa)
 		*/
 
 		oldscreen->full = SCREENFULL;
-		BLI_snprintf(newname, sizeof(newname), "%s-%s", oldscreen->id.name+2, "temp");
+		BLI_snprintf(newname, sizeof(newname), "%s-%s", oldscreen->id.name+2, "full");
 		sc= ED_screen_add(win, oldscreen->scene, newname);
 		sc->full = SCREENFULL; // XXX
 
@@ -1613,7 +1650,7 @@ ScrArea *ED_screen_full_toggle(bContext *C, wmWindow *win, ScrArea *sa)
 		oldscreen->animtimer= NULL;
 
 		/* returns the top small area */
-		newa= area_split(sc, (ScrArea *)sc->areabase.first, 'h', 0.99f);
+		newa= area_split(sc, (ScrArea *)sc->areabase.first, 'h', 0.99f, 1);
 		ED_area_newspace(C, newa, SPACE_INFO);
 
 		/* use random area when we have no active one, e.g. when the
@@ -1738,20 +1775,17 @@ void ED_screen_animation_timer_update(bScreen *screen, int redraws, int refresh)
 	}
 }
 
-/* results in fully updated anim system */
-void ED_update_for_newframe(const bContext *C, int UNUSED(mute))
-{
-	Main *bmain= CTX_data_main(C);
-	bScreen *screen= CTX_wm_screen(C);
-	Scene *scene= CTX_data_scene(C);
-	
+/* results in fully updated anim system
+ * screen can be NULL */
+void ED_update_for_newframe(Main *bmain, Scene *scene, bScreen *screen, int UNUSED(mute))
+{	
 #ifdef DURIAN_CAMERA_SWITCH
 	void *camera= scene_camera_switch_find(scene);
 	if(camera && scene->camera != camera) {
 		bScreen *sc;
 		scene->camera= camera;
 		/* are there cameras in the views that are not in the scene? */
-		for(sc= CTX_data_main(C)->screen.first; sc; sc= sc->id.next) {
+		for(sc= bmain->screen.first; sc; sc= sc->id.next) {
 			BKE_screen_view3d_scene_sync(sc);
 		}
 	}
@@ -1761,7 +1795,7 @@ void ED_update_for_newframe(const bContext *C, int UNUSED(mute))
 	
 	/* update animated image textures for gpu, etc,
 	 * call before scene_update_for_newframe so modifiers with textuers dont lag 1 frame */
-	ED_image_update_frame(C);
+	ED_image_update_frame(bmain, scene->r.cfra);
 
 	/* this function applies the changes too */
 	/* XXX future: do all windows */
@@ -1783,7 +1817,7 @@ void ED_update_for_newframe(const bContext *C, int UNUSED(mute))
 	/* update animated texture nodes */
 	{
 		Tex *tex;
-		for(tex= CTX_data_main(C)->tex.first; tex; tex= tex->id.next)
+		for(tex= bmain->tex.first; tex; tex= tex->id.next)
 			if( tex->use_nodes && tex->nodetree ) {
 				ntreeTexTagAnimated( tex->nodetree );
 			}

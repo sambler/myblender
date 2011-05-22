@@ -24,8 +24,20 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-SET(INC .)
+set(INC
+	.
+	../guardedalloc
+)
 
-FILE(GLOB SRC intern/*.cpp)
+set(SRC
+	intern/CTR_List.cpp
 
-BLENDERLIB(bf_intern_ctr "${SRC}" "${INC}")
+	CTR_HashedPtr.h
+	CTR_List.h
+	CTR_Map.h
+	CTR_TaggedIndex.h
+	CTR_TaggedSetOps.h
+	CTR_UHeap.h
+)
+
+blender_add_lib(bf_intern_ctr "${SRC}" "${INC}")

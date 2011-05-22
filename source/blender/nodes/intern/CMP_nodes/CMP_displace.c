@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/nodes/intern/CMP_nodes/CMP_displace.c
+ *  \ingroup cmpnodes
+ */
+
+
 #include "../CMP_util.h"
 
 
@@ -48,7 +53,7 @@ static bNodeSocketType cmp_node_displace_out[]= {
  * in order to take effect */
 #define DISPLACE_EPSILON	0.01
 
-static void do_displace(CompBuf *stackbuf, CompBuf *cbuf, CompBuf *vecbuf, float *UNUSED(veccol), CompBuf *xbuf,  CompBuf *ybuf, float *xscale, float *yscale)
+static void do_displace(bNode *node, CompBuf *stackbuf, CompBuf *cbuf, CompBuf *vecbuf, float *UNUSED(veccol), CompBuf *xbuf,  CompBuf *ybuf, float *xscale, float *yscale)
 {
 	ImBuf *ibuf;
 	int x, y;
@@ -78,6 +83,10 @@ static void do_displace(CompBuf *stackbuf, CompBuf *cbuf, CompBuf *vecbuf, float
 			else
 				ys = yscale[0];
 
+			/* clamp x and y displacement to triple image resolution - 
+			 * to prevent hangs from huge values mistakenly plugged in eg. z buffers */
+			CLAMP(xs, -stackbuf->x*4, stackbuf->x*4);
+			CLAMP(ys, -stackbuf->y*4, stackbuf->y*4);
 			
 			p_dx = vec[0] * xs;
 			p_dy = vec[1] * ys;
@@ -109,7 +118,11 @@ static void do_displace(CompBuf *stackbuf, CompBuf *cbuf, CompBuf *vecbuf, float
 			
 			ibuf_sample(ibuf, u, v, dxt, dyt, col);
 			qd_setPixel(stackbuf, x, y, col);
+			
+			if(node->exec & NODE_BREAK) break;
 		}
+		
+		if(node->exec & NODE_BREAK) break;
 	}
 	IMB_freeImBuf(ibuf);
 	
@@ -140,7 +153,7 @@ static void do_displace(CompBuf *stackbuf, CompBuf *cbuf, CompBuf *vecbuf, float
 }
 
 
-static void node_composit_exec_displace(void *UNUSED(data), bNode *UNUSED(node), bNodeStack **in, bNodeStack **out)
+static void node_composit_exec_displace(void *UNUSED(data), bNode *node, bNodeStack **in, bNodeStack **out)
 {
 	if(out[0]->hasoutput==0)
 		return;
@@ -159,7 +172,7 @@ static void node_composit_exec_displace(void *UNUSED(data), bNode *UNUSED(node),
 		
 		stackbuf= alloc_compbuf(cbuf->x, cbuf->y, CB_RGBA, 1); /* allocs */
 
-		do_displace(stackbuf, cbuf, vecbuf, in[1]->vec, xbuf, ybuf, in[2]->vec, in[3]->vec);
+		do_displace(node, stackbuf, cbuf, vecbuf, in[1]->vec, xbuf, ybuf, in[2]->vec, in[3]->vec);
 		
 		out[0]->data= stackbuf;
 		
@@ -171,20 +184,16 @@ static void node_composit_exec_displace(void *UNUSED(data), bNode *UNUSED(node),
 	}
 }
 
-bNodeType cmp_node_displace= {
-	/* *next,*prev */	NULL, NULL,
-	/* type code   */	CMP_NODE_DISPLACE,
-	/* name        */	"Displace",
-	/* width+range */	140, 100, 320,
-	/* class+opts  */	NODE_CLASS_DISTORT, NODE_OPTIONS,
-	/* input sock  */	cmp_node_displace_in,
-	/* output sock */	cmp_node_displace_out,
-	/* storage     */	"",
-	/* execfunc    */	node_composit_exec_displace, 
-	/* butfunc     */	NULL,
-	/* initfunc    */	NULL,
-	/* freestoragefunc    */	NULL,
-	/* copystoragefunc    */	NULL,
-	/* id          */	NULL
-};
+void register_node_type_cmp_displace(ListBase *lb)
+{
+	static bNodeType ntype;
+
+	node_type_base(&ntype, CMP_NODE_DISPLACE, "Displace", NODE_CLASS_DISTORT, NODE_OPTIONS,
+		cmp_node_displace_in, cmp_node_displace_out);
+	node_type_size(&ntype, 140, 100, 320);
+	node_type_exec(&ntype, node_composit_exec_displace);
+
+	nodeRegisterType(lb, &ntype);
+}
+
 

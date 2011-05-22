@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,20 +26,26 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/space_info/space_info.c
+ *  \ingroup spinfo
+ */
+
+
 #include <string.h>
 #include <stdio.h>
-
 
 #include "MEM_guardedalloc.h"
 
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
 #include "BLI_rand.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_context.h"
 #include "BKE_global.h"
 #include "BKE_screen.h"
 
+#include "ED_space_api.h"
 #include "ED_screen.h"
 
 #include "BIF_gl.h"
@@ -49,7 +55,7 @@
 
 #include "UI_resources.h"
 #include "UI_interface.h"
-
+#include "UI_view2d.h"
 
 #include "info_intern.h"	// own include
 
@@ -62,7 +68,9 @@ static SpaceLink *info_new(const bContext *UNUSED(C))
 	
 	sinfo= MEM_callocN(sizeof(SpaceInfo), "initinfo");
 	sinfo->spacetype= SPACE_INFO;
-	
+
+	sinfo->rpt_mask= INFO_RPT_OP;
+
 	/* header */
 	ar= MEM_callocN(sizeof(ARegion), "header for info");
 	
@@ -75,6 +83,17 @@ static SpaceLink *info_new(const bContext *UNUSED(C))
 	
 	BLI_addtail(&sinfo->regionbase, ar);
 	ar->regiontype= RGN_TYPE_WINDOW;
+	
+	/* keep in sync with console */
+	ar->v2d.scroll |= (V2D_SCROLL_RIGHT);
+	ar->v2d.align |= V2D_ALIGN_NO_NEG_X|V2D_ALIGN_NO_NEG_Y; /* align bottom left */
+	ar->v2d.keepofs |= V2D_LOCKOFS_X;
+	ar->v2d.keepzoom = (V2D_LOCKZOOM_X|V2D_LOCKZOOM_Y|V2D_LIMITZOOM|V2D_KEEPASPECT);
+	ar->v2d.keeptot= V2D_KEEPTOT_BOUNDS;
+	ar->v2d.minzoom= ar->v2d.maxzoom= 1.0f;
+
+	/* for now, aspect ratio should be maintained, and zoom is clamped within sane default limits */
+	//ar->v2d.keepzoom= (V2D_KEEPASPECT|V2D_LIMITZOOM);
 	
 	return (SpaceLink *)sinfo;
 }
@@ -105,19 +124,57 @@ static SpaceLink *info_duplicate(SpaceLink *sl)
 
 
 /* add handlers, stuff you only do once or on area/region changes */
-static void info_main_area_init(wmWindowManager *UNUSED(wm), ARegion *UNUSED(ar))
+static void info_main_area_init(wmWindowManager *wm, ARegion *ar)
 {
+	wmKeyMap *keymap;
+
+	UI_view2d_region_reinit(&ar->v2d, V2D_COMMONVIEW_CUSTOM, ar->winx, ar->winy);
+
+	/* own keymap */
+	keymap= WM_keymap_find(wm->defaultconf, "Info", SPACE_INFO, 0);
+	WM_event_add_keymap_handler(&ar->handlers, keymap);
 }
 
-static void info_main_area_draw(const bContext *UNUSED(C), ARegion *UNUSED(ar))
+static void info_textview_update_rect(const bContext *C, ARegion *ar)
 {
-	
+	SpaceInfo *sinfo= CTX_wm_space_info(C);
+	View2D *v2d= &ar->v2d;
+
+	UI_view2d_totRect_set(v2d, ar->winx-1, info_textview_height(sinfo, ar, CTX_wm_reports(C)));
+}
+
+static void info_main_area_draw(const bContext *C, ARegion *ar)
+{
+	/* draw entirely, view changes should be handled here */
+	SpaceInfo *sinfo= CTX_wm_space_info(C);
+	View2D *v2d= &ar->v2d;
+	View2DScrollers *scrollers;
+
 	/* clear and setup matrix */
 	UI_ThemeClearColor(TH_BACK);
 	glClear(GL_COLOR_BUFFER_BIT);
+
+	/* quick way to avoid drawing if not bug enough */
+	if(ar->winy < 16)
+		return;
+		
+	info_textview_update_rect(C, ar);
+
+	/* worlks best with no view2d matrix set */
+	UI_view2d_view_ortho(v2d);
+
+	info_textview_main(sinfo, ar, CTX_wm_reports(C));
+
+	/* reset view matrix */
+	UI_view2d_view_restore(C);
+	
+	/* scrollers */
+	scrollers= UI_view2d_scrollers_calc(C, v2d, V2D_ARG_DUMMY, V2D_ARG_DUMMY, V2D_ARG_DUMMY, V2D_GRID_CLAMP);
+	UI_view2d_scrollers_draw(C, v2d, scrollers);
+	UI_view2d_scrollers_free(scrollers);
 }
 
-void info_operatortypes(void)
+static void info_operatortypes(void)
 {
 	WM_operatortype_append(FILE_OT_pack_all);
 	WM_operatortype_append(FILE_OT_unpack_all);
@@ -125,15 +182,37 @@ void info_operatortypes(void)
 	WM_operatortype_append(FILE_OT_make_paths_absolute);
 	WM_operatortype_append(FILE_OT_report_missing_files);
 	WM_operatortype_append(FILE_OT_find_missing_files);
-	
 	WM_operatortype_append(INFO_OT_reports_display_update);
+
+	/* info_report.c */
+	WM_operatortype_append(INFO_OT_select_pick);
+	WM_operatortype_append(INFO_OT_select_all_toggle);
+	WM_operatortype_append(INFO_OT_select_border);
+
+	WM_operatortype_append(INFO_OT_report_replay);
+	WM_operatortype_append(INFO_OT_report_delete);
+	WM_operatortype_append(INFO_OT_report_copy);
 }
 
-void info_keymap(struct wmKeyConfig *keyconf)
+static void info_keymap(struct wmKeyConfig *keyconf)
 {
 	wmKeyMap *keymap= WM_keymap_find(keyconf, "Window", 0, 0);
 	
-	WM_keymap_verify_item(keymap, "INFO_OT_reports_display_update", TIMER, KM_ANY, KM_ANY, 0);
+	WM_keymap_verify_item(keymap, "INFO_OT_reports_display_update", TIMERREPORT, KM_ANY, KM_ANY, 0);
+
+	/* info space */
+	keymap= WM_keymap_find(keyconf, "Info", SPACE_INFO, 0);
+	
+	
+	/* report selection */
+	WM_keymap_add_item(keymap, "INFO_OT_select_pick", SELECTMOUSE, KM_PRESS, 0, 0);
+	WM_keymap_add_item(keymap, "INFO_OT_select_all_toggle", AKEY, KM_PRESS, 0, 0);
+	WM_keymap_add_item(keymap, "INFO_OT_select_border", BKEY, KM_PRESS, 0, 0);
+
+	WM_keymap_add_item(keymap, "INFO_OT_report_replay", RKEY, KM_PRESS, 0, 0);
+	WM_keymap_add_item(keymap, "INFO_OT_report_delete", XKEY, KM_PRESS, 0, 0);
+	WM_keymap_add_item(keymap, "INFO_OT_report_delete", DELKEY, KM_PRESS, 0, 0);
+	WM_keymap_add_item(keymap, "INFO_OT_report_copy", CKEY, KM_PRESS, KM_CTRL, 0);
 }
 
 /* add handlers, stuff you only do once or on area/region changes */
@@ -147,9 +226,19 @@ static void info_header_area_draw(const bContext *C, ARegion *ar)
 	ED_region_header(C, ar);
 }
 
-static void info_main_area_listener(ARegion *UNUSED(ar), wmNotifier *UNUSED(wmn))
+static void info_main_area_listener(ARegion *ar, wmNotifier *wmn)
 {
+	// SpaceInfo *sinfo= sa->spacedata.first;
+
 	/* context changes */
+	switch(wmn->category) {
+		case NC_SPACE:
+			if(wmn->data == ND_SPACE_INFO_REPORT) {
+				/* redraw also but only for report view, could do less redraws by checking the type */
+				ED_region_tag_redraw(ar);
+			}
+			break;
+	}
 }
 
 static void info_header_listener(ARegion *ar, wmNotifier *wmn)
@@ -189,11 +278,11 @@ static void recent_files_menu_draw(const bContext *UNUSED(C), Menu *menu)
 			uiItemStringO(layout, BLI_path_basename(recent->filepath), ICON_FILE_BLEND, "WM_OT_open_mainfile", "filepath", recent->filepath);
 		}
 	} else {
-		uiItemL(layout, "No Recent Files", 0);
+		uiItemL(layout, "No Recent Files", ICON_NONE);
 	}
 }
 
-void recent_files_menu_register()
+static void recent_files_menu_register(void)
 {
 	MenuType *mt;
 
@@ -223,10 +312,11 @@ void ED_spacetype_info(void)
 	/* regions: main window */
 	art= MEM_callocN(sizeof(ARegionType), "spacetype info region");
 	art->regionid = RGN_TYPE_WINDOW;
+	art->keymapflag= ED_KEYMAP_UI|ED_KEYMAP_VIEW2D;
+
 	art->init= info_main_area_init;
 	art->draw= info_main_area_draw;
 	art->listener= info_main_area_listener;
-	art->keymapflag= ED_KEYMAP_UI|ED_KEYMAP_VIEW2D;
 
 	BLI_addhead(&st->regiontypes, art);
 	
@@ -246,4 +336,3 @@ void ED_spacetype_info(void)
 
 	BKE_spacetype_register(st);
 }
-

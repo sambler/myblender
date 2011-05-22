@@ -25,7 +25,11 @@
  * Contributor(s): none yet.
  *
  * ***** END GPL LICENSE BLOCK *****
- * General KX game object.
+ */
+
+/** \file KX_GameObject.h
+ *  \ingroup ketsji
+ *  \brief General KX game object.
  */
 
 #ifndef __KX_GAMEOBJECT
@@ -36,14 +40,15 @@
 #pragma warning (disable : 4355) 
 #endif 
 
+#include <stddef.h>
 
 #include "ListValue.h"
 #include "SCA_IObject.h"
 #include "SG_Node.h"
 #include "MT_Transform.h"
 #include "MT_CmMatrix4x4.h"
-#include "GEN_Map.h"
-#include "GEN_HashedPtr.h"
+#include "CTR_Map.h"
+#include "CTR_HashedPtr.h"
 #include "KX_Scene.h"
 #include "KX_KetsjiEngine.h" /* for m_anim_framerate */
 #include "KX_IPhysicsController.h" /* for suspend/resume */
@@ -60,7 +65,7 @@ class PHY_IGraphicController;
 class PHY_IPhysicsEnvironment;
 struct Object;
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 /* utility conversion function */
 bool ConvertPythonToGameObject(PyObject * value, KX_GameObject **object, bool py_none_ok, const char *error_prefix);
 #endif
@@ -116,7 +121,7 @@ public:
 	 */
 	static KX_GameObject* GetClientObject(KX_ClientObjectInfo* info);
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 	// Python attributes that wont convert into CValue
 	// 
 	// there are 2 places attributes can be stored, in the CValue,
@@ -137,7 +142,7 @@ public:
 
 	virtual void	/* This function should be virtual - derived classed override it */
 	Relink(
-		GEN_Map<GEN_HashedPtr, void*> *map
+		CTR_Map<CTR_HashedPtr, void*> *map
 	);
 
 	/**
@@ -796,7 +801,7 @@ public:
 	CListValue* GetChildren();
 	CListValue* GetChildrenRecursive();
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 	/**
 	 * @section Python interface functions.
 	 */

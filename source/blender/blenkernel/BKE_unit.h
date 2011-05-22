@@ -1,4 +1,4 @@
-/**
+/*
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -23,6 +23,10 @@
 
 #ifndef BKE_UNIT_H
 #define BKE_UNIT_H
+
+/** \file BKE_unit.h
+ *  \ingroup bke
+ */
 
 #ifdef __cplusplus
 extern "C" {
@@ -51,10 +55,11 @@ int bUnit_IsValid(int system, int type);
 /* loop over scales, coudl add names later */
 //double bUnit_Iter(void **unit, char **name, int system, int type);
 
-void	bUnit_GetSystem(void **usys_pt, int *len, int system, int type);
-char*	bUnit_GetName(void *usys_pt, int index);
-char*	bUnit_GetNameDisplay(void *usys_pt, int index);
-double	bUnit_GetScaler(void *usys_pt, int index);
+void		bUnit_GetSystem(void **usys_pt, int *len, int system, int type);
+int			bUnit_GetBaseUnit(void *usys_pt);
+const char*	bUnit_GetName(void *usys_pt, int index);
+const char*	bUnit_GetNameDisplay(void *usys_pt, int index);
+double		bUnit_GetScaler(void *usys_pt, int index);
 
 /* aligned with PropertyUnit */
 #define		B_UNIT_NONE 0
@@ -66,7 +71,7 @@ double	bUnit_GetScaler(void *usys_pt, int index);
 #define 	B_UNIT_TIME 6
 #define 	B_UNIT_VELOCITY 7
 #define 	B_UNIT_ACCELERATION 8
-#define 	B_UNIT_MAXDEF 9
+#define 	B_UNIT_TYPE_TOT 9
 
 #ifdef __cplusplus
 }

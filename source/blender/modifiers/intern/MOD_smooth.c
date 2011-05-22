@@ -30,14 +30,20 @@
 *
 */
 
+/** \file blender/modifiers/intern/MOD_smooth.c
+ *  \ingroup modifiers
+ */
+
+
 #include "DNA_meshdata_types.h"
 
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_cdderivedmesh.h"
 #include "BKE_particle.h"
 #include "BKE_deform.h"
-#include "BKE_utildefines.h"
+
 
 #include "MEM_guardedalloc.h"
 
@@ -85,7 +91,7 @@ static CustomDataMask requiredDataMask(Object *UNUSED(ob), ModifierData *md)
 	CustomDataMask dataMask = 0;
 
 	/* ask for vertexgroups if we need them */
-	if(smd->defgrp_name[0]) dataMask |= (1 << CD_MDEFORMVERT);
+	if(smd->defgrp_name[0]) dataMask |= CD_MASK_MDEFORMVERT;
 
 	return dataMask;
 }
@@ -136,9 +142,7 @@ static void smoothModifier_do(
 			v1 = vertexCos[idx1];
 			v2 = vertexCos[idx2];
 
-			fvec[0] = (v1[0] + v2[0]) / 2.0;
-			fvec[1] = (v1[1] + v2[1]) / 2.0;
-			fvec[2] = (v1[2] + v2[2]) / 2.0;
+			mid_v3_v3v3(fvec, v1, v2);
 
 			v1 = &ftmp[idx1*3];
 			v2 = &ftmp[idx2*3];
@@ -255,17 +259,18 @@ ModifierTypeInfo modifierType_Smooth = {
 
 	/* copyData */          copyData,
 	/* deformVerts */       deformVerts,
+	/* deformMatrices */    NULL,
 	/* deformVertsEM */     deformVertsEM,
-	/* deformMatricesEM */  0,
-	/* applyModifier */     0,
-	/* applyModifierEM */   0,
+	/* deformMatricesEM */  NULL,
+	/* applyModifier */     NULL,
+	/* applyModifierEM */   NULL,
 	/* initData */          initData,
 	/* requiredDataMask */  requiredDataMask,
-	/* freeData */          0,
+	/* freeData */          NULL,
 	/* isDisabled */        isDisabled,
-	/* updateDepgraph */    0,
-	/* dependsOnTime */     0,
-	/* dependsOnNormals */	0,
-	/* foreachObjectLink */ 0,
-	/* foreachIDLink */     0,
+	/* updateDepgraph */    NULL,
+	/* dependsOnTime */     NULL,
+	/* dependsOnNormals */	NULL,
+	/* foreachObjectLink */ NULL,
+	/* foreachIDLink */     NULL,
 };

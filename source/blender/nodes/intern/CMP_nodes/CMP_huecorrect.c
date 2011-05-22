@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/nodes/intern/CMP_nodes/CMP_huecorrect.c
+ *  \ingroup cmpnodes
+ */
+
+
 #include "../CMP_util.h"
 
 static bNodeSocketType cmp_node_huecorrect_in[]= {
@@ -48,7 +53,7 @@ static void do_huecorrect(bNode *node, float *out, float *in)
 	
 	/* adjust hue, scaling returned default 0.5 up to 1 */
 	f = curvemapping_evaluateF(node->storage, 0, hsv[0]);
-	hsv[0] *= (f * 2.f);
+	hsv[0] += f-0.5f;
 	
 	/* adjust saturation, scaling returned default 0.5 up to 1 */
 	f = curvemapping_evaluateF(node->storage, 1, hsv[0]);
@@ -58,7 +63,7 @@ static void do_huecorrect(bNode *node, float *out, float *in)
 	f = curvemapping_evaluateF(node->storage, 2, hsv[0]);
 	hsv[2] *= (f * 2.f);
 	
-	CLAMP(hsv[0], 0.f, 1.f);
+	hsv[0] = hsv[0] - floor(hsv[0]); /* mod 1.0 */
 	CLAMP(hsv[1], 0.f, 1.f);
 	
 	/* convert back to rgb */
@@ -76,7 +81,7 @@ static void do_huecorrect_fac(bNode *node, float *out, float *in, float *fac)
 	
 	/* adjust hue, scaling returned default 0.5 up to 1 */
 	f = curvemapping_evaluateF(node->storage, 0, hsv[0]);
-	hsv[0] *= (f * 2.f);
+	hsv[0] += f-0.5f;
 	
 	/* adjust saturation, scaling returned default 0.5 up to 1 */
 	f = curvemapping_evaluateF(node->storage, 1, hsv[0]);
@@ -86,7 +91,7 @@ static void do_huecorrect_fac(bNode *node, float *out, float *in, float *fac)
 	f = curvemapping_evaluateF(node->storage, 2, hsv[0]);
 	hsv[2] *= (f * 2.f);
 	
-	CLAMP(hsv[0], 0.f, 1.f);
+	hsv[0] = hsv[0] - floor(hsv[0]);  /* mod 1.0 */
 	CLAMP(hsv[1], 0.f, 1.f);
 	
 	/* convert back to rgb */
@@ -148,20 +153,18 @@ static void node_composit_init_huecorrect(bNode* node)
 	cumapping->cur = 1;
 }
 
-bNodeType cmp_node_huecorrect= {
-	/* *next,*prev */	NULL, NULL,
-	/* type code   */	CMP_NODE_HUECORRECT,
-	/* name        */	"Hue Correct",
-	/* width+range */	320, 140, 400,
-	/* class+opts  */	NODE_CLASS_OP_COLOR, NODE_OPTIONS,
-	/* input sock  */	cmp_node_huecorrect_in,
-	/* output sock */	cmp_node_huecorrect_out,
-	/* storage     */	"CurveMapping",
-	/* execfunc    */	node_composit_exec_huecorrect,
-	/* butfunc     */	NULL,
-	/* initfunc    */	node_composit_init_huecorrect,
-	/* freestoragefunc    */	node_free_curves,
-	/* copystoragefunc    */	node_copy_curves,
-	/* id          */	NULL
-};
+void register_node_type_cmp_huecorrect(ListBase *lb)
+{
+	static bNodeType ntype;
+
+	node_type_base(&ntype, CMP_NODE_HUECORRECT, "Hue Correct", NODE_CLASS_OP_COLOR, NODE_OPTIONS,
+		cmp_node_huecorrect_in, cmp_node_huecorrect_out);
+	node_type_size(&ntype, 320, 140, 400);
+	node_type_init(&ntype, node_composit_init_huecorrect);
+	node_type_storage(&ntype, "CurveMapping", node_free_curves, node_copy_curves);
+	node_type_exec(&ntype, node_composit_exec_huecorrect);
+
+	nodeRegisterType(lb, &ntype);
+}
+
 

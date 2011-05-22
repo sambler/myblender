@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,9 +27,15 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/object/object_vgroup.c
+ *  \ingroup edobj
+ */
+
+
 #include <string.h>
 #include <stddef.h>
 #include <math.h>
+#include <assert.h>
 
 #include "MEM_guardedalloc.h"
 
@@ -45,6 +51,7 @@
 
 #include "BLI_blenlib.h"
 #include "BLI_editVert.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_context.h"
 #include "BKE_customdata.h"
@@ -68,18 +75,27 @@
 
 /************************ Exported Functions **********************/
 static void vgroup_remap_update_users(Object *ob, int *map);
+static void vgroup_delete_edit_mode(Object *ob, bDeformGroup *defgroup);
+static void vgroup_delete_object_mode(Object *ob, bDeformGroup *dg);
 
 static Lattice *vgroup_edit_lattice(Object *ob)
 {
-	if(ob->type==OB_LATTICE) {
-		Lattice *lt= ob->data;
-		return (lt->editlatt)? lt->editlatt->latt: lt;
-	}
-
-	return NULL;
+	Lattice *lt= ob->data;
+	BLI_assert(ob->type==OB_LATTICE);
+	return (lt->editlatt)? lt->editlatt->latt: lt;
 }
 
-bDeformGroup *ED_vgroup_add_name(Object *ob, char *name)
+int ED_vgroup_object_is_edit_mode(Object *ob)
+{
+	if(ob->type == OB_MESH)
+		return (((Mesh*)ob->data)->edit_mesh != NULL);
+	else if(ob->type == OB_LATTICE)
+		return (((Lattice*)ob->data)->editlatt != NULL);
+
+	return 0;
+}
+
+bDeformGroup *ED_vgroup_add_name(Object *ob, const char *name)
 {
 	bDeformGroup *defgroup;
 	
@@ -103,6 +119,25 @@ bDeformGroup *ED_vgroup_add(Object *ob)
 	return ED_vgroup_add_name(ob, "Group");
 }
 
+void ED_vgroup_delete(Object *ob, bDeformGroup *defgroup) 
+{
+	bDeformGroup *dg = (bDeformGroup *)ob->defbase.first;
+
+	while (dg) {
+		if (dg == defgroup)
+			break;
+		dg = dg->next;
+	}
+
+	if (dg == NULL)
+		return;
+
+	if(ED_vgroup_object_is_edit_mode(ob))
+		vgroup_delete_edit_mode(ob, dg);
+	else
+		vgroup_delete_object_mode(ob, dg);
+}
+
 void ED_vgroup_data_create(ID *id)
 {
 	/* create deform verts */
@@ -117,7 +152,7 @@ void ED_vgroup_data_create(ID *id)
 	}
 }
 
-int ED_vgroup_give_parray(ID *id, MDeformVert ***dvert_arr, int *dvert_tot)
+static int ED_vgroup_give_parray(ID *id, MDeformVert ***dvert_arr, int *dvert_tot)
 {
 	if(id) {
 		switch(GS(id->name)) {
@@ -136,8 +171,7 @@ int ED_vgroup_give_parray(ID *id, MDeformVert ***dvert_arr, int *dvert_tot)
 						return 0;
 					}
 
-					i = 0;
-					for (eve=em->verts.first; eve; eve=eve->next) i++;
+					i= BLI_countlist(&em->verts);
 
 					*dvert_arr= MEM_mallocN(sizeof(void*)*i, "vgroup parray from me");
 					*dvert_tot = i;
@@ -171,14 +205,19 @@ int ED_vgroup_give_parray(ID *id, MDeformVert ***dvert_arr, int *dvert_tot)
 				Lattice *lt= (Lattice *)id;
 				lt= (lt->editlatt)? lt->editlatt->latt: lt;
 
-				*dvert_tot= lt->pntsu*lt->pntsv*lt->pntsw;
-				*dvert_arr= MEM_mallocN(sizeof(void*)*(*dvert_tot), "vgroup parray from me");
+				if(lt->dvert) {
+					*dvert_tot= lt->pntsu*lt->pntsv*lt->pntsw;
+					*dvert_arr= MEM_mallocN(sizeof(void*)*(*dvert_tot), "vgroup parray from me");
 
-				for (i=0; i<*dvert_tot; i++) {
-					(*dvert_arr)[i] = lt->dvert + i;
+					for (i=0; i<*dvert_tot; i++) {
+						(*dvert_arr)[i] = lt->dvert + i;
+					}
+
+					return 1;
 				}
-
-				return 1;
+				else {
+					return 0;
+				}
 			}
 		}
 	}
@@ -272,7 +311,7 @@ int ED_vgroup_copy_array(Object *ob, Object *ob_from)
 
 /* for mesh in object mode
    lattice can be in editmode */
-void ED_vgroup_nr_vert_remove(Object *ob, int def_nr, int vertnum)
+static void ED_vgroup_nr_vert_remove(Object *ob, int def_nr, int vertnum)
 {
 	/* This routine removes the vertex from the deform
 	 * group with number def_nr.
@@ -309,7 +348,7 @@ void ED_vgroup_nr_vert_remove(Object *ob, int def_nr, int vertnum)
 		 */
 		if(dvert->dw[i].def_nr == def_nr) {
 			dvert->totweight--;
-        
+
 			/* if there are still other deform weights
 			 * attached to this vert then remove this
 			 * deform weight, and reshuffle the others
@@ -340,7 +379,7 @@ void ED_vgroup_nr_vert_remove(Object *ob, int def_nr, int vertnum)
 
 /* for Mesh in Object mode */
 /* allows editmode for Lattice */
-void ED_vgroup_nr_vert_add(Object *ob, int def_nr, int vertnum, float weight, int assignmode)
+static void ED_vgroup_nr_vert_add(Object *ob, int def_nr, int vertnum, float weight, int assignmode)
 {
 	/* add the vert to the deform group with the
 	 * specified number
@@ -379,15 +418,15 @@ void ED_vgroup_nr_vert_add(Object *ob, int def_nr, int vertnum, float weight, in
 				break;
 			case WEIGHT_ADD:
 				dv->dw[i].weight+=weight;
-				if(dv->dw[i].weight >= 1.0)
-					dv->dw[i].weight = 1.0;
+				if(dv->dw[i].weight >= 1.0f)
+					dv->dw[i].weight = 1.0f;
 				break;
 			case WEIGHT_SUBTRACT:
 				dv->dw[i].weight-=weight;
 				/* if the weight is zero or less then
 				 * remove the vert from the deform group
 				 */
-				if(dv->dw[i].weight <= 0.0)
+				if(dv->dw[i].weight <= 0.0f)
 					ED_vgroup_nr_vert_remove(ob, def_nr, vertnum);
 				break;
 			}
@@ -418,10 +457,10 @@ void ED_vgroup_nr_vert_add(Object *ob, int def_nr, int vertnum, float weight, in
 			MEM_freeN(dv->dw);
 		}
 		dv->dw=newdw;
-    
+
 		dv->dw[dv->totweight].weight=weight;
 		dv->dw[dv->totweight].def_nr=def_nr;
-    
+
 		dv->totweight++;
 		break;
 	}
@@ -460,23 +499,10 @@ void ED_vgroup_vert_remove(Object *ob, bDeformGroup	*dg, int vertnum)
 	/* This routine removes the vertex from the specified
 	 * deform group.
 	 */
-
-	int def_nr;
-
-	/* if the object is NULL abort
-	 */
-	if(!ob)
+	const int def_nr= defgroup_find_index(ob, dg);
+	if(def_nr < 0)
 		return;
 
-	/* get the deform number that cooresponds
-	 * to this deform group, and abort if it
-	 * can not be found.
-	 */
-	def_nr = defgroup_find_index(ob, dg);
-	if(def_nr < 0) return;
-
-	/* call another routine to do the work
-	 */
 	ED_vgroup_nr_vert_remove(ob, def_nr, vertnum);
 }
 
@@ -493,22 +519,32 @@ static float get_vert_def_nr(Object *ob, int def_nr, int vertnum)
 
 		if(me->edit_mesh) {
 			eve= BLI_findlink(&me->edit_mesh->verts, vertnum);
-			if(!eve) return 0.0f;
+			if(!eve) {
+				return 0.0f;
+			}
 			dvert= CustomData_em_get(&me->edit_mesh->vdata, eve->data, CD_MDEFORMVERT);
 			vertnum= 0;
 		}
-		else
+		else {
+			if(vertnum >= me->totvert) {
+				return 0.0f;
+			}
 			dvert = me->dvert;
+		}
 	}
 	else if(ob->type==OB_LATTICE) {
 		Lattice *lt= vgroup_edit_lattice(ob);
-		
-		if(lt->dvert)
+
+		if(lt->dvert) {
+			if(vertnum >= lt->pntsu*lt->pntsv*lt->pntsw) {
+				return 0.0f;
+			}
 			dvert = lt->dvert;
+		}
 	}
 	
 	if(dvert==NULL)
-		return 0.0f;
+		return -1;
 	
 	dvert += vertnum;
 	
@@ -516,22 +552,22 @@ static float get_vert_def_nr(Object *ob, int def_nr, int vertnum)
 		if(dvert->dw[i].def_nr == def_nr)
 			return dvert->dw[i].weight;
 
-	return 0.0f;
+	return -1;
 }
 
 float ED_vgroup_vert_weight(Object *ob, bDeformGroup *dg, int vertnum)
 {
 	int def_nr;
 
-	if(!ob) return 0.0f;
+	if(!ob) return -1;
 
 	def_nr = defgroup_find_index(ob, dg);
-	if(def_nr < 0) return 0.0f;
+	if(def_nr < 0) return -1;
 
 	return get_vert_def_nr(ob, def_nr, vertnum);
 }
 
-void ED_vgroup_select_by_name(Object *ob, char *name)
+void ED_vgroup_select_by_name(Object *ob, const char *name)
 {	/* note: ob->actdef==0 signals on painting to create a new one, if a bone in posemode is selected */
 	ob->actdef= defgroup_name_index(ob, name) + 1;
 }
@@ -555,9 +591,10 @@ static void vgroup_select_verts(Object *ob, int select)
 			if(dvert && dvert->totweight){
 				for(i=0; i<dvert->totweight; i++){
 					if(dvert->dw[i].def_nr == (ob->actdef-1)){
-						if(select) eve->f |= SELECT;
-						else eve->f &= ~SELECT;
-						
+						if(!eve->h) {
+							if(select) eve->f |= SELECT;
+							else eve->f &= ~SELECT;
+						}
 						break;
 					}
 				}
@@ -596,7 +633,7 @@ static void vgroup_select_verts(Object *ob, int select)
 static void vgroup_duplicate(Object *ob)
 {
 	bDeformGroup *dg, *cdg;
-	char name[32], s[32];
+	char name[sizeof(dg->name)];
 	MDeformWeight *org, *cpy;
 	MDeformVert *dvert, **dvert_array=NULL;
 	int i, idg, icdg, dvert_tot=0;
@@ -605,26 +642,17 @@ static void vgroup_duplicate(Object *ob)
 	if(!dg)
 		return;
 	
-	if(strstr(dg->name, "_copy")) {
-		BLI_strncpy(name, dg->name, 32); /* will be renamed _copy.001... etc */
+	if(!strstr(dg->name, "_copy")) {
+		BLI_snprintf(name, sizeof(name), "%s_copy", dg->name);
 	}
 	else {
-		BLI_snprintf(name, 32, "%s_copy", dg->name);
-		while(defgroup_find_name(ob, name)) {
-			if((strlen(name) + 6) > 32) {
-				if (G.f & G_DEBUG)
-					printf("Internal error: the name for the new vertex group is > 32 characters");
-				return;
-			}
-			strcpy(s, name);
-			BLI_snprintf(name, 32, "%s_copy", s);
-		}
-	}		
+		BLI_snprintf(name, sizeof(name), "%s", dg->name);
+	}
 
 	cdg = defgroup_duplicate(dg);
 	strcpy(cdg->name, name);
 	defgroup_unique_name(cdg, ob);
-	
+
 	BLI_addtail(&ob->defbase, cdg);
 
 	idg = (ob->actdef-1);
@@ -1102,61 +1130,53 @@ static void vgroup_delete_update_users(Object *ob, int id)
 }
 
 
-static void vgroup_delete_object_mode(Object *ob)
+static void vgroup_delete_object_mode(Object *ob, bDeformGroup *dg)
 {
-	bDeformGroup *dg;
-	MDeformVert *dvert, *dvert_array=NULL;
+	MDeformVert *dvert_array=NULL;
 	int i, e, dvert_tot=0;
-	
-	dg = BLI_findlink(&ob->defbase, (ob->actdef-1));
-	if(!dg)
-		return;
+	const int dg_index= BLI_findindex(&ob->defbase, dg);
+
+	assert(dg_index > -1);
 	
 	ED_vgroup_give_array(ob->data, &dvert_array, &dvert_tot);
 
 	if(dvert_array) {
-		for(i = 0; i < dvert_tot; i++) {
-			dvert = dvert_array + i;
-			if(dvert) {
-				if(defvert_find_index(dvert, (ob->actdef-1)))
-					ED_vgroup_vert_remove(ob, dg, i);
-			}
+		MDeformVert *dvert;
+		for(i= 0, dvert= dvert_array; i < dvert_tot; i++, dvert++) {
+			ED_vgroup_vert_remove(ob, dg, i); /* ok if the dg isnt in this dvert, will continue silently */
 		}
 
-		for(i = 0; i < dvert_tot; i++) {
-			dvert = dvert_array+i;
-			if(dvert) {
-				for(e = 0; e < dvert->totweight; e++) {
-					if(dvert->dw[e].def_nr > (ob->actdef-1))
-						dvert->dw[e].def_nr--;
+		for(i= 0, dvert= dvert_array; i < dvert_tot; i++, dvert++) {
+			for(e = 0; e < dvert->totweight; e++) {
+				if(dvert->dw[e].def_nr > dg_index) {
+					dvert->dw[e].def_nr--;
 				}
 			}
 		}
 	}
 
-	vgroup_delete_update_users(ob, ob->actdef);
+	vgroup_delete_update_users(ob, dg_index + 1);
 
-	/* Update the active deform index if necessary */
-	if(ob->actdef == BLI_countlist(&ob->defbase))
-		ob->actdef--;
-  
 	/* Remove the group */
 	BLI_freelinkN(&ob->defbase, dg);
+
+	/* Update the active deform index if necessary */
+	if(ob->actdef > dg_index)
+		ob->actdef--;
+	if(ob->actdef < 1 && ob->defbase.first)
+		ob->actdef= 1;
+
 }
 
 /* only in editmode */
 /* removes from active defgroup, if allverts==0 only selected vertices */
-static void vgroup_active_remove_verts(Object *ob, int allverts)
+static void vgroup_active_remove_verts(Object *ob, const int allverts, bDeformGroup *dg)
 {
 	EditVert *eve;
 	MDeformVert *dvert;
 	MDeformWeight *newdw;
-	bDeformGroup *dg, *eg;
+	bDeformGroup *eg;
 	int	i;
-
-	dg=BLI_findlink(&ob->defbase, ob->actdef-1);
-	if(!dg)
-		return;
 
 	if(ob->type == OB_MESH) {
 		Mesh *me= ob->data;
@@ -1207,20 +1227,15 @@ static void vgroup_active_remove_verts(Object *ob, int allverts)
 	}
 }
 
-static void vgroup_delete_edit_mode(Object *ob)
+static void vgroup_delete_edit_mode(Object *ob, bDeformGroup *dg)
 {
-	bDeformGroup *defgroup;
 	int i;
+	const int dg_index= BLI_findindex(&ob->defbase, dg);
 
-	if(!ob->actdef)
-		return;
-
-	defgroup = BLI_findlink(&ob->defbase, ob->actdef-1);
-	if(!defgroup)
-		return;
+	assert(dg_index > -1);
 
 	/* Make sure that no verts are using this group */
-	vgroup_active_remove_verts(ob, 1);
+	vgroup_active_remove_verts(ob, TRUE, dg);
 
 	/* Make sure that any verts with higher indices are adjusted accordingly */
 	if(ob->type==OB_MESH) {
@@ -1234,7 +1249,7 @@ static void vgroup_delete_edit_mode(Object *ob)
 
 			if(dvert)
 				for(i=0; i<dvert->totweight; i++)
-					if(dvert->dw[i].def_nr > (ob->actdef-1))
+					if(dvert->dw[i].def_nr > dg_index)
 						dvert->dw[i].def_nr--;
 		}
 		BKE_mesh_end_editmesh(me, em);
@@ -1249,24 +1264,26 @@ static void vgroup_delete_edit_mode(Object *ob)
 			tot= lt->pntsu*lt->pntsv*lt->pntsw;
 			for(a=0, bp= lt->def; a<tot; a++, bp++, dvert++) {
 				for(i=0; i<dvert->totweight; i++){
-					if(dvert->dw[i].def_nr > (ob->actdef-1))
+					if(dvert->dw[i].def_nr > dg_index)
 						dvert->dw[i].def_nr--;
 				}
 			}
 		}
 	}
 
-	vgroup_delete_update_users(ob, ob->actdef);
+	vgroup_delete_update_users(ob, dg_index + 1);
+
+	/* Remove the group */
+	BLI_freelinkN (&ob->defbase, dg);
 
 	/* Update the active deform index if necessary */
-	if(ob->actdef==BLI_countlist(&ob->defbase))
+	if(ob->actdef > dg_index)
 		ob->actdef--;
-	
-	/* Remove the group */
-	BLI_freelinkN (&ob->defbase, defgroup);
-	
+	if(ob->actdef < 1 && ob->defbase.first)
+		ob->actdef= 1;
+
 	/* remove all dverts */
-	if(ob->actdef==0) {
+	if(ob->defbase.first == NULL) {
 		if(ob->type==OB_MESH) {
 			Mesh *me= ob->data;
 			CustomData_free_layer_active(&me->vdata, CD_MDEFORMVERT, me->totvert);
@@ -1294,10 +1311,14 @@ static int vgroup_object_in_edit_mode(Object *ob)
 
 static void vgroup_delete(Object *ob)
 {
+	bDeformGroup *dg = BLI_findlink(&ob->defbase, ob->actdef-1);
+	if(!dg)
+		return;
+
 	if(vgroup_object_in_edit_mode(ob))
-		vgroup_delete_edit_mode(ob);
+		vgroup_delete_edit_mode(ob, dg);
 	else
-		vgroup_delete_object_mode(ob);
+		vgroup_delete_object_mode(ob, dg);
 }
 
 static void vgroup_delete_all(Object *ob)
@@ -1348,7 +1369,6 @@ static void vgroup_assign_verts(Object *ob, float weight)
 			dvert= CustomData_em_get(&em->vdata, eve->data, CD_MDEFORMVERT);
 
 			if(dvert && (eve->f & SELECT)){
-				done=0;
 				/* See if this vert already has a reference to this group */
 				/*		If so: Change its weight */
 				done=0;
@@ -1400,22 +1420,14 @@ static void vgroup_assign_verts(Object *ob, float weight)
 /* removes from all defgroup, if allverts==0 only selected vertices */
 static void vgroup_remove_verts(Object *ob, int allverts)
 {
-	int actdef, defCount;
-	
-	actdef= ob->actdef;
-	defCount= BLI_countlist(&ob->defbase);
-	
-	if(defCount == 0)
-		return;
-	
 	/* To prevent code redundancy, we just use vgroup_active_remove_verts, but that
 	 * only operates on the active vgroup. So we iterate through all groups, by changing
 	 * active group index
 	 */
-	for(ob->actdef= 1; ob->actdef <= defCount; ob->actdef++)
-		vgroup_active_remove_verts(ob, allverts);
-		
-	ob->actdef= actdef;
+	bDeformGroup *dg;
+	for(dg= ob->defbase.first; dg; dg= dg->next) {
+		vgroup_active_remove_verts(ob, allverts, dg);
+	}
 }
 
 /********************** vertex group operators *********************/
@@ -1443,7 +1455,7 @@ static int vertex_group_add_exec(bContext *C, wmOperator *UNUSED(op))
 	Object *ob= CTX_data_pointer_get_type(C, "object", &RNA_Object).data;
 
 	ED_vgroup_add(ob);
-	DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, ob->data);
 	WM_event_add_notifier(C, NC_OBJECT|ND_DRAW, ob);
 	
@@ -1473,7 +1485,7 @@ static int vertex_group_remove_exec(bContext *C, wmOperator *op)
 	else
 		vgroup_delete(ob);
 
-	DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, ob->data);
 	WM_event_add_notifier(C, NC_OBJECT|ND_DRAW, ob);
 	
@@ -1506,7 +1518,7 @@ static int vertex_group_assign_exec(bContext *C, wmOperator *op)
 		ED_vgroup_add(ob);
 
 	vgroup_assign_verts(ob, ts->vgroup_weight);
-	DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, ob->data);
 	
 	return OPERATOR_FINISHED;
@@ -1535,10 +1547,17 @@ static int vertex_group_remove_from_exec(bContext *C, wmOperator *op)
 
 	if(RNA_boolean_get(op->ptr, "all"))
 		vgroup_remove_verts(ob, 0);
-	else
-		vgroup_active_remove_verts(ob, 0);
+	else {
+		bDeformGroup *dg= BLI_findlink(&ob->defbase, ob->actdef - 1);
 
-	DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+		if(dg == NULL) {
+			return OPERATOR_CANCELLED;
+		}
+
+		vgroup_active_remove_verts(ob, FALSE, dg);
+	}
+
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, ob->data);
 
 	return OPERATOR_FINISHED;
@@ -1617,7 +1636,7 @@ static int vertex_group_copy_exec(bContext *C, wmOperator *UNUSED(op))
 	Object *ob= CTX_data_pointer_get_type(C, "object", &RNA_Object).data;
 
 	vgroup_duplicate(ob);
-	DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	WM_event_add_notifier(C, NC_OBJECT|ND_DRAW, ob);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, ob->data);
 
@@ -1647,7 +1666,7 @@ static int vertex_group_levels_exec(bContext *C, wmOperator *op)
 	
 	vgroup_levels(ob, offset, gain);
 	
-	DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	WM_event_add_notifier(C, NC_OBJECT|ND_DRAW, ob);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, ob->data);
 	
@@ -1677,7 +1696,7 @@ static int vertex_group_normalize_exec(bContext *C, wmOperator *UNUSED(op))
 
 	vgroup_normalize(ob);
 
-	DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	WM_event_add_notifier(C, NC_OBJECT|ND_DRAW, ob);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, ob->data);
 
@@ -1705,7 +1724,7 @@ static int vertex_group_normalize_all_exec(bContext *C, wmOperator *op)
 
 	vgroup_normalize_all(ob, lock_active);
 
-	DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	WM_event_add_notifier(C, NC_OBJECT|ND_DRAW, ob);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, ob->data);
 
@@ -1735,7 +1754,7 @@ static int vertex_group_invert_exec(bContext *C, wmOperator *op)
 	int auto_remove= RNA_boolean_get(op->ptr,"auto_remove");
 
 	vgroup_invert(ob, auto_assign, auto_remove);
-	DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	WM_event_add_notifier(C, NC_OBJECT|ND_DRAW, ob);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, ob->data);
 
@@ -1766,7 +1785,7 @@ static int vertex_group_blend_exec(bContext *C, wmOperator *UNUSED(op))
 
 	vgroup_blend(ob);
 
-	DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	WM_event_add_notifier(C, NC_OBJECT|ND_DRAW, ob);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, ob->data);
 
@@ -1800,7 +1819,7 @@ static int vertex_group_clean_exec(bContext *C, wmOperator *op)
 	if(all_groups)	vgroup_clean_all(ob, limit, keep_single);
 	else			vgroup_clean(ob, limit, keep_single);
 
-	DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	WM_event_add_notifier(C, NC_OBJECT|ND_DRAW, ob);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, ob->data);
 
@@ -1833,7 +1852,7 @@ static int vertex_group_mirror_exec(bContext *C, wmOperator *op)
 
 	ED_vgroup_mirror(ob, RNA_boolean_get(op->ptr,"mirror_weights"), RNA_boolean_get(op->ptr,"flip_group_names"));
 
-	DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	WM_event_add_notifier(C, NC_OBJECT|ND_DRAW, ob);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, ob->data);
 
@@ -1845,7 +1864,7 @@ void OBJECT_OT_vertex_group_mirror(wmOperatorType *ot)
 	/* identifiers */
 	ot->name= "Mirror Vertex Group";
 	ot->idname= "OBJECT_OT_vertex_group_mirror";
-	ot->description= "Mirror weights, and flip vertex group names, copying when only one side is selected";
+	ot->description= "Mirror all vertex groups, flip weights and/or names, editing only selected vertices, flipping when both sides are selected otherwise copy from unselected";
 
 	/* api callbacks */
 	ot->poll= vertex_group_poll_edit;
@@ -1856,7 +1875,7 @@ void OBJECT_OT_vertex_group_mirror(wmOperatorType *ot)
 
 	/* properties */
 	RNA_def_boolean(ot->srna, "mirror_weights", TRUE, "Mirror Weights", "Mirror weights.");
-	RNA_def_boolean(ot->srna, "flip_group_names", TRUE, "Flip Groups", "Flip vertex group names while mirroring.");
+	RNA_def_boolean(ot->srna, "flip_group_names", TRUE, "Flip Groups", "Flip vertex group names.");
 
 }
 
@@ -1874,7 +1893,7 @@ static int vertex_group_copy_to_linked_exec(bContext *C, wmOperator *UNUSED(op))
 				BLI_duplicatelist(&base->object->defbase, &ob->defbase);
 				base->object->actdef= ob->actdef;
 
-				DAG_id_flush_update(&base->object->id, OB_RECALC_DATA);
+				DAG_id_tag_update(&base->object->id, OB_RECALC_DATA);
 				WM_event_add_notifier(C, NC_OBJECT|ND_DRAW, base->object);
 				WM_event_add_notifier(C, NC_GEOM|ND_DATA, base->object->data);
 
@@ -1921,7 +1940,7 @@ void OBJECT_OT_vertex_group_copy_to_selected(wmOperatorType *ot)
 	/* identifiers */
 	ot->name= "Copy Vertex Group to Selected";
 	ot->idname= "OBJECT_OT_vertex_group_copy_to_selected";
-	ot->description= "Copy Vertex Groups to other selected objects with matching indicies";
+	ot->description= "Copy Vertex Groups to other selected objects with matching indices";
 
 	/* api callbacks */
 	ot->poll= vertex_group_poll;
@@ -1941,7 +1960,7 @@ static int set_active_group_exec(bContext *C, wmOperator *op)
 
 	ob->actdef= nr+1;
 
-	DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, ob);
 
 	return OPERATOR_FINISHED;
@@ -2043,6 +2062,7 @@ static int vgroup_do_remap(Object *ob, char *name_array, wmOperator *op)
 		}
 		else {
 			BKE_report(op->reports, RPT_ERROR, "Editmode lattice isnt supported yet.");
+			MEM_freeN(sort_map_update);
 			return OPERATOR_CANCELLED;
 		}
 	}
@@ -2097,7 +2117,7 @@ static int vertex_group_sort_exec(bContext *C, wmOperator *op)
 	ret = vgroup_do_remap(ob, name_array, op);
 
 	if (ret != OPERATOR_CANCELLED) {
-		DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+		DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 		WM_event_add_notifier(C, NC_GEOM|ND_DATA, ob);
 	}
 
@@ -2151,7 +2171,7 @@ static int vgroup_move_exec(bContext *C, wmOperator *op)
 	if (name_array) MEM_freeN(name_array);
 
 	if (ret != OPERATOR_CANCELLED) {
-		DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+		DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 		WM_event_add_notifier(C, NC_GEOM|ND_DATA, ob);
 	}
 

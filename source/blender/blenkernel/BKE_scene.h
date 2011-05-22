@@ -1,6 +1,4 @@
-/**
- * blenlib/BKE_scene.h (mar-2001 nzc)
- *	
+/*
  * $Id$ 
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -31,6 +29,12 @@
 #ifndef BKE_SCENE_H
 #define BKE_SCENE_H
 
+/** \file BKE_scene.h
+ *  \ingroup bke
+ *  \since March 2001
+ *  \author nzc
+ */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -46,23 +50,24 @@ struct Scene;
 struct Text;
 struct Text;
 
-#define SCE_COPY_EMPTY		0
-#define SCE_COPY_LINK_OB	1
-#define SCE_COPY_LINK_DATA	2
-#define SCE_COPY_FULL		3
+#define SCE_COPY_NEW		0
+#define SCE_COPY_EMPTY		1
+#define SCE_COPY_LINK_OB	2
+#define SCE_COPY_LINK_DATA	3
+#define SCE_COPY_FULL		4
 
-#define SETLOOPER(s, b) sce= s, b= _setlooper_base_step(&sce, NULL); b; b= _setlooper_base_step(&sce, b)
-struct Base *_setlooper_base_step(struct Scene **sce, struct Base *base);
+#define SETLOOPER(_sce_basis, _sce_iter, _base) _sce_iter= _sce_basis, _base= _setlooper_base_step(&_sce_iter, NULL); _base; _base= _setlooper_base_step(&_sce_iter, _base)
+struct Base *_setlooper_base_step(struct Scene **sce_iter, struct Base *base);
 
 void free_avicodecdata(struct AviCodecData *acd);
 void free_qtcodecdata(struct QuicktimeCodecData *acd);
 
 void free_scene(struct Scene *sce);
-struct Scene *add_scene(char *name);
+struct Scene *add_scene(const char *name);
 struct Base *object_in_scene(struct Object *ob, struct Scene *sce);
 
 void set_scene_bg(struct Main *bmain, struct Scene *sce);
-struct Scene *set_scene_name(struct Main *bmain, char *name);
+struct Scene *set_scene_name(struct Main *bmain, const char *name);
 
 struct Scene *copy_scene(struct Scene *sce, int type);
 void unlink_scene(struct Main *bmain, struct Scene *sce, struct Scene *newsce);
@@ -74,8 +79,6 @@ int scene_camera_switch_update(struct Scene *scene);
 
 char *scene_find_marker_name(struct Scene *scene, int frame);
 char *scene_find_last_marker_name(struct Scene *scene, int frame);
-int scene_marker_tfm_translate(struct Scene *scene, int delta, int flag);
-int scene_marker_tfm_extend(struct Scene *scene, int delta, int flag, int frame, char side);
 
 struct Base *scene_add_base(struct Scene *sce, struct Object *ob);
 void scene_deselect_all(struct Scene *sce);

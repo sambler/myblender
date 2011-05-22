@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/render/intern/source/occlusion.c
+ *  \ingroup render
+ */
+
+
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -40,10 +45,11 @@
 #include "BLI_blenlib.h"
 #include "BLI_memarena.h"
 #include "BLI_threads.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_global.h"
 #include "BKE_scene.h"
-#include "BKE_utildefines.h"
+
 
 #include "RE_shader_ext.h"
 
@@ -188,6 +194,7 @@ static void occ_shade(ShadeSample *ssamp, ObjectInstanceRen *myobi, VlakRen *vlr
 	if(shi->obr->ob && shi->obr->ob->transflag & OB_NEG_SCALE) {
 		negate_v3(shi->vn);
 		negate_v3(shi->vno);
+		negate_v3(shi->nmapnorm);
 	}
 
 	/* init material vars */
@@ -304,7 +311,7 @@ static float sh_eval(float *sh, float *v)
 
 /* ------------------------------ Building --------------------------------- */
 
-static void occ_face(const OccFace *face, float *co, float *normal, float *area)
+static void occ_face(const OccFace *face, float co[3], float normal[3], float *area)
 {
 	ObjectInstanceRen *myobi;
 	VlakRen *vlr;
@@ -421,20 +428,22 @@ static void occ_node_from_face(OccFace *face, OccNode *node)
 	sh_from_disc(n, node->area, node->sh);
 }
 
-static void occ_build_dco(OcclusionTree *tree, OccNode *node, float *co, float *dco)
+static void occ_build_dco(OcclusionTree *tree, OccNode *node, const float co[3], float *dco)
 {
-	OccNode *child;
-	float dist, d[3], nco[3];
 	int b;
-
 	for(b=0; b<TOTCHILD; b++) {
+		float dist, d[3], nco[3];
+
 		if(node->childflag & (1<<b)) {
-			occ_face(tree->face+node->child[b].face, nco, 0, 0);
+			occ_face(tree->face+node->child[b].face, nco, NULL, NULL);
 		}
 		else if(node->child[b].node) {
-			child= node->child[b].node;
+			OccNode *child= node->child[b].node;
 			occ_build_dco(tree, child, co, dco);
 			VECCOPY(nco, child->co);
+		}
+		else {
+			continue;
 		}
 
 		VECSUB(d, nco, co);
@@ -521,7 +530,7 @@ static void occ_build_recursive(OcclusionTree *tree, OccNode *node, int begin, i
 	ListBase threads;
 	OcclusionBuildThread othreads[BLENDER_MAX_THREADS];
 	OccNode *child, tmpnode;
-	OccFace *face;
+	/* OccFace *face; */
 	int a, b, totthread=0, offset[TOTCHILD], count[TOTCHILD];
 
 	/* add a new node */
@@ -530,7 +539,7 @@ static void occ_build_recursive(OcclusionTree *tree, OccNode *node, int begin, i
 	/* leaf node with only children */
 	if(end - begin <= TOTCHILD) {
 		for(a=begin, b=0; a<end; a++, b++) {
-			face= &tree->face[a];
+			/* face= &tree->face[a]; */
 			node->child[b].face= a;
 			node->childflag |= (1<<b);
 		}
@@ -547,7 +556,7 @@ static void occ_build_recursive(OcclusionTree *tree, OccNode *node, int begin, i
 				node->child[b].node= NULL;
 			}
 			else if(count[b] == 1) {
-				face= &tree->face[offset[b]];
+				/* face= &tree->face[offset[b]]; */
 				node->child[b].face= offset[b];
 				node->childflag |= (1<<b);
 			}
@@ -605,7 +614,8 @@ static void occ_build_recursive(OcclusionTree *tree, OccNode *node, int begin, i
 
 	/* compute maximum distance from center */
 	node->dco= 0.0f;
-	occ_build_dco(tree, node, node->co, &node->dco);
+	if(node->area > 0.0f)
+		occ_build_dco(tree, node, node->co, &node->dco);
 }
 
 static void occ_build_sh_normalize(OccNode *node)
@@ -1526,7 +1536,7 @@ static int sample_occ_cache(OcclusionTree *tree, float *co, float *n, int x, int
 
 	for(i=0; i<4; i++) {
 		VECSUB(d, samples[i]->co, co);
-		dist2= INPR(d, d);
+		//dist2= INPR(d, d);
 
 		wz[i]= 1.0f; //(samples[i]->dist2/(1e-4f + dist2));
 		wn[i]= pow(INPR(samples[i]->n, n), 32.0f);

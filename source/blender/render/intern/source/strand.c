@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/render/intern/source/strand.c
+ *  \ingroup render
+ */
+
+
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
@@ -39,12 +44,14 @@
 
 #include "BLI_math.h"
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 #include "BLI_ghash.h"
 #include "BLI_memarena.h"
+#include "BLI_rand.h"
 
 #include "BKE_DerivedMesh.h"
 #include "BKE_key.h"
-#include "BKE_utildefines.h"
+
 
 #include "render_types.h"
 #include "initrender.h"
@@ -59,7 +66,7 @@
 /* to be removed */
 void hoco_to_zco(ZSpan *zspan, float *zco, float *hoco);
 void zspan_scanconvert_strand(ZSpan *zspan, void *handle, float *v1, float *v2, float *v3, void (*func)(void *, int, int, float, float, float) );
-void zbufsinglewire(ZSpan *zspan, int myobi, int zvlnr, float *ho1, float *ho2);
+void zbufsinglewire(ZSpan *zspan, int obi, int zvlnr, float *ho1, float *ho2);
 
 /* *************** */
 
@@ -203,7 +210,7 @@ static void interpolate_vec4(float *v1, float *v2, float t, float negt, float *v
 	v[3]= negt*v1[3] + t*v2[3];
 }
 
-void interpolate_shade_result(ShadeResult *shr1, ShadeResult *shr2, float t, ShadeResult *shr, int addpassflag)
+static void interpolate_shade_result(ShadeResult *shr1, ShadeResult *shr2, float t, ShadeResult *shr, int addpassflag)
 {
 	float negt= 1.0f - t;
 
@@ -245,7 +252,7 @@ void interpolate_shade_result(ShadeResult *shr1, ShadeResult *shr2, float t, Sha
 	}
 }
 
-void strand_apply_shaderesult_alpha(ShadeResult *shr, float alpha)
+static void strand_apply_shaderesult_alpha(ShadeResult *shr, float alpha)
 {
 	if(alpha < 1.0f) {
 		shr->combined[0] *= alpha;
@@ -262,11 +269,12 @@ void strand_apply_shaderesult_alpha(ShadeResult *shr, float alpha)
 	}
 }
 
-void strand_shade_point(Render *re, ShadeSample *ssamp, StrandSegment *sseg, StrandPoint *spoint)
+static void strand_shade_point(Render *re, ShadeSample *ssamp, StrandSegment *sseg, StrandVert *svert, StrandPoint *spoint)
 {
 	ShadeInput *shi= ssamp->shi;
 	ShadeResult *shr= ssamp->shr;
 	VlakRen vlr;
+	int seed;
 
 	memset(&vlr, 0, sizeof(vlr));
 	vlr.flag= R_SMOOTH;
@@ -283,6 +291,13 @@ void strand_shade_point(Render *re, ShadeSample *ssamp, StrandSegment *sseg, Str
 
 	/* cache for shadow */
 	shi->samplenr= re->shadowsamplenr[shi->thread]++;
+
+	/* all samples */
+	shi->mask= 0xFFFF;
+
+	/* seed RNG for consistent results across tiles */
+	seed = shi->strand->index + (svert - shi->strand->vert);
+	BLI_thread_srandom(shi->thread, seed);
 
 	shade_input_set_strand(shi, sseg->strand, spoint);
 	shade_input_set_strand_texco(shi, sseg->strand, sseg->v[1], spoint);
@@ -313,7 +328,7 @@ struct StrandShadeCache {
 	MemArena *memarena;
 };
 
-StrandShadeCache *strand_shade_cache_create()
+StrandShadeCache *strand_shade_cache_create(void)
 {
 	StrandShadeCache *cache;
 
@@ -346,7 +361,7 @@ static void strand_shade_get(Render *re, StrandShadeCache *cache, ShadeSample *s
 		/* not shaded yet, shade and insert into hash */
 		p.t= (sseg->v[1] == svert)? 0.0f: 1.0f;
 		strand_eval_point(sseg, &p);
-		strand_shade_point(re, ssamp, sseg, &p);
+		strand_shade_point(re, ssamp, sseg, svert, &p);
 
 		hashshr= MEM_callocN(sizeof(ShadeResult), "HashShadeResult");
 		*hashshr= ssamp->shr[0];
@@ -503,10 +518,10 @@ static void do_strand_fillac(void *handle, int x, int y, float u, float v, float
 	StrandSegment *sseg= spart->segment;
 	APixstrand *apn, *apnew;
 	float t, s;
-	int offset, mask, myobi, strnr, seg, zverg, bufferz, maskz=0;
+	int offset, mask, obi, strnr, seg, zverg, bufferz, maskz=0;
 
 	offset = y*spart->rectx + x;
-	myobi= sseg->obi - spart->re->objectinstance;
+	obi= sseg->obi - spart->re->objectinstance;
 	strnr= sseg->strand->index + 1;
 	seg= sseg->v[1] - sseg->strand->vert;
 	mask= (1<<spart->sample);
@@ -540,11 +555,11 @@ static void do_strand_fillac(void *handle, int x, int y, float u, float v, float
 	}
 
 #define CHECK_ADD(n) \
-	if(apn->p[n]==strnr && apn->obi[n]==myobi && apn->seg[n]==seg) \
+	if(apn->p[n]==strnr && apn->obi[n]==obi && apn->seg[n]==seg) \
 	{ if(!(apn->mask[n] & mask)) { apn->mask[n] |= mask; apn->v[n] += t; apn->u[n] += s; } break; }
 #define CHECK_ASSIGN(n) \
 	if(apn->p[n]==0) \
-	{apn->obi[n]= myobi; apn->p[n]= strnr; apn->z[n]= zverg; apn->mask[n]= mask; apn->v[n]= t; apn->u[n]= s; apn->seg[n]= seg; break; }
+	{apn->obi[n]= obi; apn->p[n]= strnr; apn->z[n]= zverg; apn->mask[n]= mask; apn->v[n]= t; apn->u[n]= s; apn->seg[n]= seg; break; }
 
 	/* add to pixel list */
 	if(zverg < bufferz && (spart->totapixbuf[offset] < MAX_ZROW)) {
@@ -578,7 +593,8 @@ static void do_strand_fillac(void *handle, int x, int y, float u, float v, float
 	}
 }
 
-static int strand_test_clip(float winmat[][4], ZSpan *zspan, float *bounds, float *co, float *zcomp)
+/* width is calculated in hoco space, to ensure strands are visible */
+static int strand_test_clip(float winmat[][4], ZSpan *zspan, float *bounds, float *co, float *zcomp, float widthx, float widthy)
 {
 	float hoco[4];
 	int clipflag= 0;
@@ -588,10 +604,11 @@ static int strand_test_clip(float winmat[][4], ZSpan *zspan, float *bounds, floa
 	/* we compare z without perspective division for segment sorting */
 	*zcomp= hoco[2];
 
-	if(hoco[0] > bounds[1]*hoco[3]) clipflag |= 1;
-	else if(hoco[0]< bounds[0]*hoco[3]) clipflag |= 2;
-	else if(hoco[1] > bounds[3]*hoco[3]) clipflag |= 4;
-	else if(hoco[1]< bounds[2]*hoco[3]) clipflag |= 8;
+	if(hoco[0]+widthx < bounds[0]*hoco[3]) clipflag |= 1;
+	else if(hoco[0]-widthx > bounds[1]*hoco[3]) clipflag |= 2;
+	
+	if(hoco[1]-widthy > bounds[3]*hoco[3]) clipflag |= 4;
+	else if(hoco[1]+widthy < bounds[2]*hoco[3]) clipflag |= 8;
 
 	clipflag |= testclip(hoco);
 
@@ -653,26 +670,27 @@ static void strand_render(Render *re, StrandSegment *sseg, float winmat[][4], St
 	}
 	else {
 		float hoco1[4], hoco2[4];
-		int a, myobi, index;
+		int a, obi, index;
   
-		myobi= sseg->obi - re->objectinstance;
+		obi= sseg->obi - re->objectinstance;
 		index= sseg->strand->index;
 
-		  projectvert(p1->co, winmat, hoco1);
-		  projectvert(p2->co, winmat, hoco2);
+		projectvert(p1->co, winmat, hoco1);
+		projectvert(p2->co, winmat, hoco2);
+
   
 		for(a=0; a<totzspan; a++) {
 #if 0
 			/* render both strand and single pixel wire to counter aliasing */
-			zbufclip4(re, &zspan[a], myobi, index, p1->hoco2, p1->hoco1, p2->hoco1, p2->hoco2, p1->clip2, p1->clip1, p2->clip1, p2->clip2);
+			zbufclip4(re, &zspan[a], obi, index, p1->hoco2, p1->hoco1, p2->hoco1, p2->hoco2, p1->clip2, p1->clip1, p2->clip1, p2->clip2);
 #endif
 			/* only render a line for now, which makes the shadow map more
 			   similiar across frames, and so reduces flicker */
-			zbufsinglewire(&zspan[a], myobi, index, hoco1, hoco2);
+			zbufsinglewire(&zspan[a], obi, index, hoco1, hoco2);
 		}
 	}
 }
-  
+
 static int strand_segment_recursive(Render *re, float winmat[][4], StrandPart *spart, ZSpan *zspan, int totzspan, StrandSegment *sseg, StrandPoint *p1, StrandPoint *p2, int depth)
 {
 	StrandPoint p;
@@ -763,7 +781,7 @@ void render_strand_segment(Render *re, float winmat[][4], StrandPart *spart, ZSp
 int zbuffer_strands_abuf(Render *re, RenderPart *pa, APixstrand *apixbuf, ListBase *apsmbase, unsigned int lay, int negzmask, float winmat[][4], int winx, int winy, int sample, float (*jit)[2], float clipcrop, int shadow, StrandShadeCache *cache)
 {
 	ObjectRen *obr;
-	ObjectInstanceRen *myobi;
+	ObjectInstanceRen *obi;
 	ZSpan zspan;
 	StrandRen *strand=0;
 	StrandVert *svert;
@@ -824,25 +842,39 @@ int zbuffer_strands_abuf(Render *re, RenderPart *pa, APixstrand *apixbuf, ListBa
 	totsegment= 0;
 
 	/* for all object instances */
-	for(myobi=re->instancetable.first, i=0; myobi; myobi=myobi->next, i++) {
-		obr= myobi->obr;
+	for(obi=re->instancetable.first, i=0; obi; obi=obi->next, i++) {
+		Material *ma;
+		float widthx, widthy;
+
+		obr= obi->obr;
 
 		if(!obr->strandbuf || !(obr->strandbuf->lay & lay))
 			continue;
 
 		/* compute matrix and try clipping whole object */
-		if(myobi->flag & R_TRANSFORMED)
-			mul_m4_m4m4(obwinmat, myobi->mat, winmat);
+		if(obi->flag & R_TRANSFORMED)
+			mul_m4_m4m4(obwinmat, obi->mat, winmat);
 		else
 			copy_m4_m4(obwinmat, winmat);
 
-		if(clip_render_object(myobi->obr->boundbox, bounds, winmat))
+		/* test if we should skip it */
+		ma = obr->strandbuf->ma;
+
+		if(shadow && !(ma->mode & MA_SHADBUF))
 			continue;
+		else if(!shadow && (ma->mode & MA_ONLYCAST))
+			continue;
+
+		if(clip_render_object(obi->obr->boundbox, bounds, obwinmat))
+			continue;
+		
+		widthx= obr->strandbuf->maxwidth*obwinmat[0][0];
+		widthy= obr->strandbuf->maxwidth*obwinmat[1][1];
 
 		/* for each bounding box containing a number of strands */
 		sbound= obr->strandbuf->bound;
 		for(c=0; c<obr->strandbuf->totbound; c++, sbound++) {
-			if(clip_render_object(sbound->boundbox, bounds, winmat))
+			if(clip_render_object(sbound->boundbox, bounds, obwinmat))
 				continue;
 
 			/* for each strand in this bounding box */
@@ -851,14 +883,14 @@ int zbuffer_strands_abuf(Render *re, RenderPart *pa, APixstrand *apixbuf, ListBa
 				svert= strand->vert;
 
 				/* keep clipping and z depth for 4 control points */
-				clip[1]= strand_test_clip(obwinmat, &zspan, bounds, svert->co, &z[1]);
-				clip[2]= strand_test_clip(obwinmat, &zspan, bounds, (svert+1)->co, &z[2]);
+				clip[1]= strand_test_clip(obwinmat, &zspan, bounds, svert->co, &z[1], widthx, widthy);
+				clip[2]= strand_test_clip(obwinmat, &zspan, bounds, (svert+1)->co, &z[2], widthx, widthy);
 				clip[0]= clip[1]; z[0]= z[1];
 
 				for(b=0; b<strand->totvert-1; b++, svert++) {
 					/* compute 4th point clipping and z depth */
 					if(b < strand->totvert-2) {
-						clip[3]= strand_test_clip(obwinmat, &zspan, bounds, (svert+2)->co, &z[3]);
+						clip[3]= strand_test_clip(obwinmat, &zspan, bounds, (svert+2)->co, &z[3], widthx, widthy);
 					}
 					else {
 						clip[3]= clip[2]; z[3]= z[2];
@@ -906,15 +938,10 @@ int zbuffer_strands_abuf(Render *re, RenderPart *pa, APixstrand *apixbuf, ListBa
 			if(re->test_break(re->tbh))
 				break;
 
-			myobi= &re->objectinstance[sortseg->obi];
-			obr= myobi->obr;
+			obi= &re->objectinstance[sortseg->obi];
+			obr= obi->obr;
 
-			if(myobi->flag & R_TRANSFORMED)
-				mul_m4_m4m4(obwinmat, myobi->mat, winmat);
-			else
-				copy_m4_m4(obwinmat, winmat);
-
-			sseg.obi= myobi;
+			sseg.obi= obi;
 			sseg.strand= RE_findOrAddStrand(obr, sortseg->strand);
 			sseg.buffer= sseg.strand->buffer;
 			sseg.sqadaptcos= sseg.buffer->adaptcos;
@@ -929,7 +956,7 @@ int zbuffer_strands_abuf(Render *re, RenderPart *pa, APixstrand *apixbuf, ListBa
 
 			spart.segment= &sseg;
 
-			render_strand_segment(re, obwinmat, &spart, &zspan, 1, &sseg);
+			render_strand_segment(re, winmat, &spart, &zspan, 1, &sseg);
 		}
 	}
 
@@ -1015,12 +1042,22 @@ void free_strand_surface(Render *re)
 	BLI_freelistN(&re->strandsurface);
 }
 
-void strand_minmax(StrandRen *strand, float *min, float *max)
+void strand_minmax(StrandRen *strand, float *min, float *max, float width)
 {
 	StrandVert *svert;
+	float vec[3], width2= 2.0f*width;
 	int a;
 
-	for(a=0, svert=strand->vert; a<strand->totvert; a++, svert++)
-		DO_MINMAX(svert->co, min, max)
+	for(a=0, svert=strand->vert; a<strand->totvert; a++, svert++) {
+		VECCOPY(vec, svert->co);
+		DO_MINMAX(vec, min, max);
+		
+		if(width!=0.0f) {
+			vec[0]+= width; vec[1]+= width; vec[2]+= width;
+			DO_MINMAX(vec, min, max);
+			vec[0]-= width2; vec[1]-= width2; vec[2]-= width2;
+			DO_MINMAX(vec, min, max);
+		}
+	}
 }
 

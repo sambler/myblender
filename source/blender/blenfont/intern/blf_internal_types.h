@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -24,6 +24,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/blenfont/intern/blf_internal_types.h
+ *  \ingroup blf
+ */
+
 
 #ifndef BLF_INTERNAL_TYPES_H
 #define BLF_INTERNAL_TYPES_H
@@ -133,7 +138,7 @@ typedef struct FontBLF {
 	char *filename;
 
 	/* aspect ratio or scale. */
-	float aspect;
+	float aspect[3];
 
 	/* initial position for draw the text. */
 	float pos[3];
@@ -154,8 +159,10 @@ typedef struct FontBLF {
 	/* shadow color. */
 	float shadow_col[4];
 	
-	/* this is the matrix that we load before rotate/scale/translate. */
-	float mat[4][4];
+	/* Multiplied this matrix with the current one before
+	 * draw the text! see blf_draw__start.
+	 */
+	double m[16];
 
 	/* clipping rectangle. */
 	rctf clip_rec;
@@ -177,6 +184,12 @@ typedef struct FontBLF {
 
 	/* current glyph cache, size and dpi. */
 	GlyphCacheBLF *glyph_cache;
+	
+	/* fast ascii lookip */
+	GlyphBLF *glyph_ascii_table[256];
+
+	/* freetype2 lib handle. */
+	FT_Library ft_lib;
 
 	/* freetype2 face. */
 	FT_Face face;
@@ -187,9 +200,9 @@ typedef struct FontBLF {
 	/* the same but unsigned char */
 	unsigned char *b_cbuf;
 
-	/* buffer size. */
-	unsigned int bw;
-	unsigned int bh;
+	/* buffer size, keep signed so comparisons with negative values work */
+	int bw;
+	int bh;
 
 	/* number of channels. */
 	int bch;

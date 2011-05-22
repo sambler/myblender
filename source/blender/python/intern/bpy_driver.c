@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -21,6 +21,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/python/intern/bpy_driver.c
+ *  \ingroup pythonintern
+ */
+
 /* ****************************************** */
 /* Drivers - PyExpression Evaluation */
 
@@ -34,87 +39,63 @@
 #include "BKE_fcurve.h"
 #include "BKE_global.h"
 
+#include "bpy_driver.h"
+
 /* for pydrivers (drivers using one-line Python expressions to express relationships between targets) */
-PyObject *bpy_pydriver_Dict = NULL;
+PyObject *bpy_pydriver_Dict= NULL;
 
 /* For faster execution we keep a special dictionary for pydrivers, with
  * the needed modules and aliases.
  */
-static int bpy_pydriver_create_dict(void)
+int bpy_pydriver_create_dict(void)
 {
 	PyObject *d, *mod;
 
 	/* validate namespace for driver evaluation */
 	if (bpy_pydriver_Dict) return -1;
 
-	d = PyDict_New();
+	d= PyDict_New();
 	if (d == NULL)
 		return -1;
 	else
-		bpy_pydriver_Dict = d;
+		bpy_pydriver_Dict= d;
 
 	/* import some modules: builtins, bpy, math, (Blender.noise )*/
 	PyDict_SetItemString(d, "__builtins__", PyEval_GetBuiltins());
 
-	mod = PyImport_ImportModule("math");
+	mod= PyImport_ImportModule("math");
 	if (mod) {
 		PyDict_Merge(d, PyModule_GetDict(mod), 0); /* 0 - dont overwrite existing values */
 		Py_DECREF(mod);
 	}
 
 	/* add bpy to global namespace */
-	mod= PyImport_ImportModuleLevel("bpy", NULL, NULL, NULL, 0);
+	mod= PyImport_ImportModuleLevel((char *)"bpy", NULL, NULL, NULL, 0);
 	if (mod) {
 		PyDict_SetItemString(bpy_pydriver_Dict, "bpy", mod);
 		Py_DECREF(mod);
 	}
 
-
-#if 0 // non existant yet
-	mod = PyImport_ImportModule("Blender.Noise");
-	if (mod) {
-		PyDict_SetItemString(d, "noise", mod);
-		PyDict_SetItemString(d, "n", mod);
-		Py_DECREF(mod);
-	} else {
-		PyErr_Clear();
-	}
-
-	/* If there's a Blender text called pydrivers.py, import it.
-	 * Users can add their own functions to this module.
-	 */
-	if (G.f & G_SCRIPT_AUTOEXEC) {
-		mod = importText("pydrivers"); /* can also use PyImport_Import() */
-		if (mod) {
-			PyDict_SetItemString(d, "pydrivers", mod);
-			PyDict_SetItemString(d, "p", mod);
-			Py_DECREF(mod);
-		} else {
-			PyErr_Clear();
-		}
-	}
-#endif // non existant yet
-
 	return 0;
 }
 
 /* Update function, it gets rid of pydrivers global dictionary, forcing
- * BPY_eval_driver to recreate it. This function is used to force
+ * BPY_driver_exec to recreate it. This function is used to force
  * reloading the Blender text module "pydrivers.py", if available, so
  * updates in it reach pydriver evaluation.
  */
-void BPY_pydriver_update(void)
+void BPY_driver_reset(void)
 {
 	PyGILState_STATE gilstate;
 	int use_gil= 1; // (PyThreadState_Get()==NULL);
 
 	if(use_gil)
-		gilstate = PyGILState_Ensure();
+		gilstate= PyGILState_Ensure();
 
 	if (bpy_pydriver_Dict) { /* free the global dict used by pydrivers */
 		PyDict_Clear(bpy_pydriver_Dict);
 		Py_DECREF(bpy_pydriver_Dict);
-		bpy_pydriver_Dict = NULL;
+		bpy_pydriver_Dict= NULL;
 	}
 
 	if(use_gil)
@@ -124,22 +105,14 @@ void BPY_pydriver_update(void)
 }
 
 /* error return function for BPY_eval_pydriver */
-static float pydriver_error(ChannelDriver *driver)
+static void pydriver_error(ChannelDriver *driver)
 {
-	if (bpy_pydriver_Dict) { /* free the global dict used by pydrivers */
-		PyDict_Clear(bpy_pydriver_Dict);
-		Py_DECREF(bpy_pydriver_Dict);
-		bpy_pydriver_Dict = NULL;
-	}
-
 	driver->flag |= DRIVER_FLAG_INVALID; /* py expression failed */
 	fprintf(stderr, "\nError in Driver: The following Python expression failed:\n\t'%s'\n\n", driver->expression);
 
 	// BPy_errors_to_report(NULL); // TODO - reports
 	PyErr_Print();
 	PyErr_Clear();
-
-	return 0.0f;
 }
 
 /* This evals py driver expressions, 'expr' is a Python expression that
@@ -149,7 +122,7 @@ static float pydriver_error(ChannelDriver *driver)
  * bake operator which intern starts a thread which calls scene update which
  * does a driver update. to avoid a deadlock check PyThreadState_Get() if PyGILState_Ensure() is needed.
  */
-float BPY_eval_driver (ChannelDriver *driver)
+float BPY_driver_exec(ChannelDriver *driver)
 {
 	PyObject *driver_vars=NULL;
 	PyObject *retval= NULL;
@@ -159,13 +132,13 @@ float BPY_eval_driver (ChannelDriver *driver)
 	int use_gil;
 
 	DriverVar *dvar;
-	double result = 0.0; /* default return */
-	char *expr = NULL;
+	double result= 0.0; /* default return */
+	char *expr= NULL;
 	short targets_ok= 1;
 	int i;
 
 	/* get the py expression to be evaluated */
-	expr = driver->expression;
+	expr= driver->expression;
 	if ((expr == NULL) || (expr[0]=='\0'))
 		return 0.0f;
 
@@ -177,7 +150,7 @@ float BPY_eval_driver (ChannelDriver *driver)
 	use_gil= 1; //(PyThreadState_Get()==NULL);
 
 	if(use_gil)
-		gilstate = PyGILState_Ensure();
+		gilstate= PyGILState_Ensure();
 
 	/* init global dictionary for py-driver evaluation settings */
 	if (!bpy_pydriver_Dict) {
@@ -227,10 +200,10 @@ float BPY_eval_driver (ChannelDriver *driver)
 	}
 
 	/* add target values to a dict that will be used as '__locals__' dict */
-	driver_vars = PyDict_New(); // XXX do we need to decref this?
+	driver_vars= PyDict_New(); // XXX do we need to decref this?
 	for (dvar= driver->variables.first, i=0; dvar; dvar= dvar->next) {
-		PyObject *driver_arg = NULL;
-		float tval = 0.0f;
+		PyObject *driver_arg= NULL;
+		float tval= 0.0f;
 		
 		/* try to get variable value */
 		tval= driver_get_variable_value(driver, dvar);
@@ -238,15 +211,15 @@ float BPY_eval_driver (ChannelDriver *driver)
 		
 		/* try to add to dictionary */
 		/* if (PyDict_SetItemString(driver_vars, dvar->name, driver_arg)) { */
-		if (PyDict_SetItem(driver_vars, PyTuple_GET_ITEM(expr_vars, i++), driver_arg)) { /* use string interning for faster namespace creation */
+		if (PyDict_SetItem(driver_vars, PyTuple_GET_ITEM(expr_vars, i++), driver_arg) < 0) { /* use string interning for faster namespace creation */
 			/* this target failed - bad name */
 			if (targets_ok) {
 				/* first one - print some extra info for easier identification */
-				fprintf(stderr, "\nBPY_eval_driver() - Error while evaluating PyDriver:\n");
+				fprintf(stderr, "\nBPY_driver_eval() - Error while evaluating PyDriver:\n");
 				targets_ok= 0;
 			}
 			
-			fprintf(stderr, "\tBPY_eval_driver() - couldn't add variable '%s' to namespace\n", dvar->name);
+			fprintf(stderr, "\tBPY_driver_eval() - couldn't add variable '%s' to namespace\n", dvar->name);
 			// BPy_errors_to_report(NULL); // TODO - reports
 			PyErr_Print();
 			PyErr_Clear();
@@ -255,11 +228,11 @@ float BPY_eval_driver (ChannelDriver *driver)
 
 #if 0 // slow, with this can avoid all Py_CompileString above.
 	/* execute expression to get a value */
-	retval = PyRun_String(expr, Py_eval_input, bpy_pydriver_Dict, driver_vars);
+	retval= PyRun_String(expr, Py_eval_input, bpy_pydriver_Dict, driver_vars);
 #else
 	/* evaluate the compiled expression */
 	if (expr_code)
-		retval= PyEval_EvalCode((PyCodeObject *)expr_code, bpy_pydriver_Dict, driver_vars);
+		retval= PyEval_EvalCode((void *)expr_code, bpy_pydriver_Dict, driver_vars);
 #endif
 
 	/* decref the driver vars first...  */
@@ -268,10 +241,11 @@ float BPY_eval_driver (ChannelDriver *driver)
 	/* process the result */
 	if (retval == NULL) {
 		pydriver_error(driver);
-	} else if((result= PyFloat_AsDouble(retval)) == -1.0 && PyErr_Occurred()) {
+	}
+	else if((result= PyFloat_AsDouble(retval)) == -1.0 && PyErr_Occurred()) {
 		pydriver_error(driver);
 		Py_DECREF(retval);
-		result = 0.0;
+		result= 0.0;
 	}
 	else {
 		/* all fine, make sure the "invalid expression" flag is cleared */
@@ -281,12 +255,12 @@ float BPY_eval_driver (ChannelDriver *driver)
 
 	if(use_gil)
 		PyGILState_Release(gilstate);
-    
+
 	if(finite(result)) {
 		return (float)result;
 	}
 	else {
-		fprintf(stderr, "\tBPY_eval_driver() - driver '%s' evaluates to '%f'\n", dvar->name, result);
+		fprintf(stderr, "\tBPY_driver_eval() - driver '%s' evaluates to '%f'\n", dvar->name, result);
 		return 0.0f;
 	}
 }

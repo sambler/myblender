@@ -1,4 +1,4 @@
-/**
+/*
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -24,16 +24,21 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/render/intern/source/pixelshading.c
+ *  \ingroup render
+ */
+
+
 #include <float.h>
 #include <math.h>
 #include <string.h>
+
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
 /* External modules: */
 #include "IMB_imbuf_types.h"
 #include "IMB_imbuf.h"
-
-
 
 #include "DNA_camera_types.h"
 #include "DNA_group_types.h"
@@ -48,7 +53,7 @@
 #include "BKE_global.h"
 #include "BKE_material.h"
 #include "BKE_texture.h"
-#include "BKE_utildefines.h"
+
 
 /* own module */
 #include "render_types.h"
@@ -285,14 +290,14 @@ int shadeHaloFloat(HaloRen *har,  float *col, int zz,
 	int a;
    
 	if(R.wrld.mode & WO_MIST) {
-	   if(har->type & HA_ONLYSKY) {
-		   /* stars but no mist */
-		   alpha= har->alfa;
-	   }
-	   else {
-		   /* a bit patchy... */
-		   alpha= mistfactor(-har->co[2], har->co)*har->alfa;
-	   }
+		if(har->type & HA_ONLYSKY) {
+			/* stars but no mist */
+			alpha= har->alfa;
+		}
+		else {
+			/* a bit patchy... */
+			alpha= mistfactor(-har->co[2], har->co)*har->alfa;
+		}
 	}
 	else alpha= har->alfa;
 	

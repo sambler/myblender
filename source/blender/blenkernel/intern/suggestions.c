@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/blenkernel/intern/suggestions.c
+ *  \ingroup bke
+ */
+
+
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
@@ -54,7 +59,7 @@ static int txttl_cmp(const char *first, const char *second, int len) {
 	return cmp;
 }
 
-static void txttl_free_suggest() {
+static void txttl_free_suggest(void) {
 	SuggItem *item, *prev;
 	for (item = suggestions.last; item; item=prev) {
 		prev = item->prev;
@@ -66,7 +71,7 @@ static void txttl_free_suggest() {
 	suggestions.top = 0;
 }
 
-static void txttl_free_docs() {
+static void txttl_free_docs(void) {
 	if (documentation) {
 		MEM_freeN(documentation);
 		documentation = NULL;
@@ -77,7 +82,7 @@ static void txttl_free_docs() {
 /* General tool functions */
 /**************************/
 
-void free_texttools() {
+void free_texttools(void) {
 	txttl_free_suggest();
 	txttl_free_docs();
 }
@@ -88,7 +93,7 @@ void texttool_text_set_active(Text *text) {
 	activeToolText = text;
 }
 
-void texttool_text_clear() {
+void texttool_text_clear(void) {
 	free_texttools();
 	activeToolText = NULL;
 }
@@ -191,15 +196,15 @@ void texttool_suggest_prefix(const char *prefix) {
 	}
 }
 
-void texttool_suggest_clear() {
+void texttool_suggest_clear(void) {
 	txttl_free_suggest();
 }
 
-SuggItem *texttool_suggest_first() {
+SuggItem *texttool_suggest_first(void) {
 	return suggestions.firstmatch;
 }
 
-SuggItem *texttool_suggest_last() {
+SuggItem *texttool_suggest_last(void) {
 	return suggestions.lastmatch;
 }
 
@@ -207,11 +212,11 @@ void texttool_suggest_select(SuggItem *sel) {
 	suggestions.selected = sel;
 }
 
-SuggItem *texttool_suggest_selected() {
+SuggItem *texttool_suggest_selected(void) {
 	return suggestions.selected;
 }
 
-int *texttool_suggest_top() {
+int *texttool_suggest_top(void) {
 	return &suggestions.top;
 }
 
@@ -243,10 +248,10 @@ void texttool_docs_show(const char *docs) {
 	documentation[len] = '\0';
 }
 
-char *texttool_docs_get() {
+char *texttool_docs_get(void) {
 	return documentation;
 }
 
-void texttool_docs_clear() {
+void texttool_docs_clear(void) {
 	txttl_free_docs();
 }

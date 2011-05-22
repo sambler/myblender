@@ -19,17 +19,28 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-FILE(GLOB SRC *.c)
-
-SET(INC
+set(INC
 	../include
 	../../blenkernel
+	../../blenloader
 	../../blenlib
 	../../imbuf
 	../../makesdna
 	../../makesrna
 	../../windowmanager
 	../../../../intern/guardedalloc
+	${GLEW_INCLUDE_PATH}
 )
 
-BLENDERLIB(bf_editor_gpencil "${SRC}" "${INC}")
+set(SRC
+	drawgpencil.c
+	editaction_gpencil.c
+	gpencil_buttons.c
+	gpencil_edit.c
+	gpencil_ops.c
+	gpencil_paint.c
+
+	gpencil_intern.h
+)
+
+blender_add_lib(bf_editor_gpencil "${SRC}" "${INC}")

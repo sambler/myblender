@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,12 +26,17 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file BL_ArmatureConstraint.h
+ *  \ingroup bgeconv
+ */
+
 #ifndef __BL_ARMATURECONSTRAINT
 #define __BL_ARMATURECONSTRAINT
 
 #include "DNA_constraint_types.h"
-#include "GEN_HashedPtr.h"
-#include "GEN_Map.h"
+#include "CTR_HashedPtr.h"
+#include "CTR_Map.h"
 #include "PyObjectPlus.h"
 
 class SCA_IObject;
@@ -75,7 +80,7 @@ public:
 
 	BL_ArmatureConstraint* GetReplica() const;
 	void ReParent(BL_ArmatureObject* armature);
-	void Relink(GEN_Map<GEN_HashedPtr, void*> *map);
+	void Relink(CTR_Map<CTR_HashedPtr, void*> *map);
 	bool UnlinkObject(SCA_IObject* clientobj);
 
 	void UpdateTarget();
@@ -104,14 +109,14 @@ public:
 	void SetTarget(KX_GameObject* target);
 	void SetSubtarget(KX_GameObject* subtarget);
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 
 	// Python access
 	virtual PyObject* py_repr(void);
 
 	static PyObject* py_attr_getattr(void *self, const struct KX_PYATTRIBUTE_DEF *attrdef);
 	static int py_attr_setattr(void *self, const struct KX_PYATTRIBUTE_DEF *attrdef, PyObject *value);
-#endif // DISABLE_PYTHON
+#endif // WITH_PYTHON
 };
 
 #endif //__BL_ARMATURECONSTRAINT

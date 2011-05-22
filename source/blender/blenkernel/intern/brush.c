@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/blenkernel/intern/brush.c
+ *  \ingroup bke
+ */
+
+
 #include <math.h>
 #include <string.h>
 
@@ -45,6 +50,7 @@
 #include "BLI_math.h"
 #include "BLI_blenlib.h"
 #include "BLI_rand.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_brush.h"
 #include "BKE_colortools.h"
@@ -67,7 +73,7 @@ static void brush_set_defaults(Brush *brush)
 	brush->blend = 0;
 	brush->flag = 0;
 
-	brush->ob_mode = (OB_MODE_SCULPT|OB_MODE_VERTEX_PAINT|OB_MODE_WEIGHT_PAINT|OB_MODE_TEXTURE_PAINT);
+	brush->ob_mode = OB_MODE_ALL_PAINT;
 
 	/* BRUSH SCULPT TOOL SETTINGS */
 	brush->size= 35; /* radius of the brush in pixels */
@@ -174,36 +180,45 @@ void free_brush(Brush *brush)
 	curvemapping_free(brush->curve);
 }
 
+static void extern_local_brush(Brush *brush)
+{
+	id_lib_extern((ID *)brush->mtex.tex);
+}
+
 void make_local_brush(Brush *brush)
 {
+
 	/* - only lib users: do nothing
-		* - only local users: set flag
-		* - mixed: make copy
-		*/
-	
-	Brush *brushn;
+	 * - only local users: set flag
+	 * - mixed: make copy
+	 */
+
+	Main *bmain= G.main;
 	Scene *scene;
 	int local= 0, lib= 0;
 
-	if(brush->id.lib==0) return;
+	if(brush->id.lib==NULL) return;
 
 	if(brush->clone.image) {
 		/* special case: ima always local immediately */
-		brush->clone.image->id.lib= 0;
+		brush->clone.image->id.lib= NULL;
 		brush->clone.image->id.flag= LIB_LOCAL;
-		new_id(0, (ID *)brush->clone.image, 0);
+		new_id(&bmain->brush, (ID *)brush->clone.image, NULL);
+		extern_local_brush(brush);
 	}
 
-	for(scene= G.main->scene.first; scene; scene=scene->id.next)
+	for(scene= bmain->scene.first; scene && ELEM(0, lib, local); scene=scene->id.next) {
 		if(paint_brush(&scene->toolsettings->imapaint.paint)==brush) {
 			if(scene->id.lib) lib= 1;
 			else local= 1;
 		}
+	}
 
 	if(local && lib==0) {
-		brush->id.lib= 0;
+		brush->id.lib= NULL;
 		brush->id.flag= LIB_LOCAL;
-		new_id(0, (ID *)brush, 0);
+		new_id(&bmain->brush, (ID *)brush, NULL);
+		extern_local_brush(brush);
 
 		/* enable fake user by default */
 		if (!(brush->id.flag & LIB_FAKEUSER)) {
@@ -212,26 +227,26 @@ void make_local_brush(Brush *brush)
 		}
 	}
 	else if(local && lib) {
-		brushn= copy_brush(brush);
+		Brush *brushn= copy_brush(brush);
 		brushn->id.us= 1; /* only keep fake user */
 		brushn->id.flag |= LIB_FAKEUSER;
 		
-		for(scene= G.main->scene.first; scene; scene=scene->id.next)
-			if(paint_brush(&scene->toolsettings->imapaint.paint)==brush)
-				if(scene->id.lib==0) {
+		for(scene= bmain->scene.first; scene; scene=scene->id.next) {
+			if(paint_brush(&scene->toolsettings->imapaint.paint)==brush) {
+				if(scene->id.lib==NULL) {
 					paint_brush_set(&scene->toolsettings->imapaint.paint, brushn);
 					brushn->id.us++;
 					brush->id.us--;
 				}
+			}
+		}
 	}
 }
 
 void brush_debug_print_state(Brush *br)
 {
-	Brush def;
-
 	/* create a fake brush and set it to the defaults */
-	memset(&def, 0, sizeof(Brush));
+	Brush def= {{NULL}};
 	brush_set_defaults(&def);
 	
 #define BR_TEST(field, t)					\
@@ -411,13 +426,6 @@ void brush_curve_preset(Brush *b, /*CurveMappingPreset*/int preset)
 	curvemapping_changed(b->curve, 0);
 }
 
-static MTex *brush_active_texture(Brush *brush)
-{
-	if(brush)
-		return &brush->mtex;
-	return NULL;
-}
-
 int brush_texture_set_nr(Brush *brush, int nr)
 {
 	ID *idtest, *id=NULL;
@@ -425,7 +433,7 @@ int brush_texture_set_nr(Brush *brush, int nr)
 	id= (ID *)brush->mtex.tex;
 
 	idtest= (ID*)BLI_findlink(&G.main->tex, nr-1);
-	if(idtest==0) { /* new tex */
+	if(idtest==NULL) { /* new tex */
 		if(id) idtest= (ID *)copy_texture((Tex *)id);
 		else idtest= (ID *)add_texture("Tex");
 		idtest->us--;
@@ -589,13 +597,21 @@ void brush_imbuf_new(Brush *brush, short flt, short texfall, int bufsize, ImBuf 
 					dst[2]= FTOCHAR(rgba[2]);
 					dst[3]= FTOCHAR(rgba[3]);
 				}
-				else {
+				else if (texfall == 2) {
 					dist = sqrt(xy[0]*xy[0] + xy[1]*xy[1]);
 
 					brush_sample_tex(brush, xy, rgba, 0);
 					dst[0] = FTOCHAR(rgba[0]*brush->rgb[0]);
 					dst[1] = FTOCHAR(rgba[1]*brush->rgb[1]);
 					dst[2] = FTOCHAR(rgba[2]*brush->rgb[2]);
+					dst[3] = FTOCHAR(rgba[3]*alpha*brush_curve_strength_clamp(brush, dist, radius));
+				} else {
+					dist = sqrt(xy[0]*xy[0] + xy[1]*xy[1]);
+
+					brush_sample_tex(brush, xy, rgba, 0);
+					dst[0]= crgb[0];
+					dst[1]= crgb[1];
+					dst[2]= crgb[2];
 					dst[3] = FTOCHAR(rgba[3]*alpha*brush_curve_strength_clamp(brush, dist, radius));
 				}
 			}
@@ -719,6 +735,12 @@ static void brush_painter_do_partial(BrushPainter *painter, ImBuf *oldtexibuf, i
 	maskibuf = painter->cache.maskibuf;
 
 	dotexold = (oldtexibuf != NULL);
+
+	/* not sure if it's actually needed or it's a mistake in coords/sizes
+	   calculation in brush_painter_fixed_tex_partial_update(), but without this
+	   limitation memory gets corrupted at fast strokes with quite big spacing (sergey) */
+	w = MIN2(w, ibuf->x);
+	h = MIN2(h, ibuf->y);
 
 	if (painter->cache.flt) {
 		for (; y < h; y++) {
@@ -866,11 +888,8 @@ static void brush_painter_refresh_cache(BrushPainter *painter, float *pos)
 		flt= cache->flt;
 		size= (cache->size)? cache->size: diameter;
 
-		if (!(mtex && mtex->tex) || (mtex->tex->type==0)) {
-			brush_imbuf_new(brush, flt, 0, size, &cache->ibuf);
-		}
-		else if (brush->flag & BRUSH_FIXED_TEX) {
-			brush_imbuf_new(brush, flt, 0, size, &cache->maskibuf);
+		if (brush->flag & BRUSH_FIXED_TEX) {
+			brush_imbuf_new(brush, flt, 3, size, &cache->maskibuf);
 			brush_painter_fixed_tex_partial_update(painter, pos);
 		}
 		else
@@ -897,18 +916,24 @@ void brush_painter_break_stroke(BrushPainter *painter)
 static void brush_apply_pressure(BrushPainter *painter, Brush *brush, float pressure)
 {
 	if (brush_use_alpha_pressure(brush)) 
-		brush_set_alpha(brush, MAX2(0.0, painter->startalpha*pressure));
+		brush_set_alpha(brush, MAX2(0.0f, painter->startalpha*pressure));
 	if (brush_use_size_pressure(brush))
-		brush_set_size(brush, MAX2(1.0, painter->startsize*pressure));
+		brush_set_size(brush, MAX2(1.0f, painter->startsize*pressure));
 	if (brush->flag & BRUSH_JITTER_PRESSURE)
-		brush->jitter = MAX2(0.0, painter->startjitter*pressure);
+		brush->jitter = MAX2(0.0f, painter->startjitter*pressure);
 	if (brush->flag & BRUSH_SPACING_PRESSURE)
-		brush->spacing = MAX2(1.0, painter->startspacing*(1.5f-pressure));
+		brush->spacing = MAX2(1.0f, painter->startspacing*(1.5f-pressure));
 }
 
 void brush_jitter_pos(Brush *brush, float *pos, float *jitterpos)
 {
-	if(brush->jitter){
+	int use_jitter= brush->jitter != 0;
+
+	/* jitter-ed brush gives wierd and unpredictable result for this
+	   kinds of stroke, so manyally disable jitter usage (sergey) */
+	use_jitter&= (brush->flag & (BRUSH_RESTORE_MESH|BRUSH_ANCHORED)) == 0;
+
+	if(use_jitter){
 		float rand_pos[2];
 		const int radius= brush_size(brush);
 		const int diameter= 2*radius;
@@ -1003,29 +1028,42 @@ int brush_painter_paint(BrushPainter *painter, BrushFunc func, float *pos, doubl
 		len= normalize_v2(dmousepos);
 		painter->accumdistance += len;
 
-		/* do paint op over unpainted distance */
-		while ((len > 0.0f) && (painter->accumdistance >= spacing)) {
-			step= spacing - startdistance;
-			paintpos[0]= painter->lastmousepos[0] + dmousepos[0]*step;
-			paintpos[1]= painter->lastmousepos[1] + dmousepos[1]*step;
+		if (brush->flag & BRUSH_SPACE) {
+			/* do paint op over unpainted distance */
+			while ((len > 0.0f) && (painter->accumdistance >= spacing)) {
+				step= spacing - startdistance;
+				paintpos[0]= painter->lastmousepos[0] + dmousepos[0]*step;
+				paintpos[1]= painter->lastmousepos[1] + dmousepos[1]*step;
 
-			t = step/len;
-			press= (1.0f-t)*painter->lastpressure + t*pressure;
-			brush_apply_pressure(painter, brush, press);
-			spacing= MAX2(1.0f, radius)*brush->spacing*0.01f;
+				t = step/len;
+				press= (1.0f-t)*painter->lastpressure + t*pressure;
+				brush_apply_pressure(painter, brush, press);
+				spacing= MAX2(1.0f, radius)*brush->spacing*0.01f;
 
-			brush_jitter_pos(brush, paintpos, finalpos);
+				brush_jitter_pos(brush, paintpos, finalpos);
+
+				if (painter->cache.enabled)
+					brush_painter_refresh_cache(painter, finalpos);
+
+				totpaintops +=
+					func(user, painter->cache.ibuf, painter->lastpaintpos, finalpos);
+
+				painter->lastpaintpos[0]= paintpos[0];
+				painter->lastpaintpos[1]= paintpos[1];
+				painter->accumdistance -= spacing;
+				startdistance -= spacing;
+			}
+		} else {
+			brush_jitter_pos(brush, pos, finalpos);
 
 			if (painter->cache.enabled)
 				brush_painter_refresh_cache(painter, finalpos);
 
-			totpaintops +=
-				func(user, painter->cache.ibuf, painter->lastpaintpos, finalpos);
+			totpaintops += func(user, painter->cache.ibuf, pos, finalpos);
 
-			painter->lastpaintpos[0]= paintpos[0];
-			painter->lastpaintpos[1]= paintpos[1];
-			painter->accumdistance -= spacing;
-			startdistance -= spacing;
+			painter->lastpaintpos[0]= pos[0];
+			painter->lastpaintpos[1]= pos[1];
+			painter->accumdistance= 0;
 		}
 
 		/* do airbrush paint ops, based on the number of paint ops left over
@@ -1041,7 +1079,7 @@ int brush_painter_paint(BrushPainter *painter, BrushFunc func, float *pos, doubl
 			else
 				painter->accumtime -= painttime;
 
-			while (painter->accumtime >= brush->rate) {
+			while (painter->accumtime >= (double)brush->rate) {
 				brush_apply_pressure(painter, brush, pressure);
 
 				brush_jitter_pos(brush, pos, finalpos);
@@ -1051,7 +1089,7 @@ int brush_painter_paint(BrushPainter *painter, BrushFunc func, float *pos, doubl
 
 				totpaintops +=
 					func(user, painter->cache.ibuf, painter->lastmousepos, finalpos);
-				painter->accumtime -= brush->rate;
+				painter->accumtime -= (double)brush->rate;
 			}
 
 			painter->lasttime= curtime;
@@ -1077,7 +1115,7 @@ float brush_curve_strength_clamp(Brush *br, float p, const float len)
 	else			p= p/len;
 
 	p= curvemapping_evaluateF(br->curve, 0, p);
-	if(p < 0.0)			p= 0.0f;
+	if(p < 0.0f)		p= 0.0f;
 	else if(p > 1.0f)	p= 1.0f;
 	return p;
 }
@@ -1085,12 +1123,12 @@ float brush_curve_strength_clamp(Brush *br, float p, const float len)
  * used for sculpt only */
 float brush_curve_strength(Brush *br, float p, const float len)
 {
-    if(p >= len)
-        p= 1.0f;
-    else
-        p= p/len;
+	if(p >= len)
+		p= 1.0f;
+	else
+		p= p/len;
 
-    return curvemapping_evaluateF(br->curve, 0, p);
+	return curvemapping_evaluateF(br->curve, 0, p);
 }
 
 /* TODO: should probably be unified with BrushPainter stuff? */
@@ -1098,11 +1136,9 @@ unsigned int *brush_gen_texture_cache(Brush *br, int half_side)
 {
 	unsigned int *texcache = NULL;
 	MTex *mtex = &br->mtex;
-	TexResult texres;
+	TexResult texres= {0};
 	int hasrgb, ix, iy;
 	int side = half_side * 2;
-
-	memset(&texres, 0, sizeof(TexResult));
 	
 	if(mtex->tex) {
 		float x, y, step = 2.0 / side, co[3];
@@ -1126,10 +1162,10 @@ unsigned int *brush_gen_texture_cache(Brush *br, int half_side)
 				 * if the texture didn't give an RGB value, copy the intensity across
 				 */
 				if(hasrgb & TEX_RGB)
-					texres.tin = (0.35 * texres.tr + 0.45 *
-								  texres.tg + 0.2 * texres.tb);
+					texres.tin = (0.35f * texres.tr + 0.45f *
+								  texres.tg + 0.2f * texres.tb);
 
-				texres.tin = texres.tin * 255.0;
+				texres.tin = texres.tin * 255.0f;
 				((char*)texcache)[(iy*side+ix)*4] = (char)texres.tin;
 				((char*)texcache)[(iy*side+ix)*4+1] = (char)texres.tin;
 				((char*)texcache)[(iy*side+ix)*4+2] = (char)texres.tin;
@@ -1142,7 +1178,7 @@ unsigned int *brush_gen_texture_cache(Brush *br, int half_side)
 }
 
 /**** Radial Control ****/
-static struct ImBuf *brush_gen_radial_control_imbuf(Brush *br)
+struct ImBuf *brush_gen_radial_control_imbuf(Brush *br)
 {
 	ImBuf *im = MEM_callocN(sizeof(ImBuf), "radial control texture");
 	unsigned int *texcache;
@@ -1174,50 +1210,6 @@ static struct ImBuf *brush_gen_radial_control_imbuf(Brush *br)
 	}
 
 	return im;
-}
-
-void brush_radial_control_invoke(wmOperator *op, Brush *br, float size_weight)
-{
-	int mode = RNA_int_get(op->ptr, "mode");
-	float original_value= 0;
-
-	if(mode == WM_RADIALCONTROL_SIZE)
-		original_value = brush_size(br) * size_weight;
-	else if(mode == WM_RADIALCONTROL_STRENGTH)
-		original_value = brush_alpha(br);
-	else if(mode == WM_RADIALCONTROL_ANGLE) {
-		MTex *mtex = brush_active_texture(br);
-		if(mtex)
-			original_value = mtex->rot;
-	}
-
-	RNA_float_set(op->ptr, "initial_value", original_value);
-	op->customdata = brush_gen_radial_control_imbuf(br);
-}
-
-int brush_radial_control_exec(wmOperator *op, Brush *br, float size_weight)
-{
-	int mode = RNA_int_get(op->ptr, "mode");
-	float new_value = RNA_float_get(op->ptr, "new_value");
-	const float conv = 0.017453293;
-
-	if(mode == WM_RADIALCONTROL_SIZE)
-		if (brush_use_locked_size(br)) {
-			float initial_value = RNA_float_get(op->ptr, "initial_value");
-			const float unprojected_radius = brush_unprojected_radius(br);
-			brush_set_unprojected_radius(br, unprojected_radius * new_value/initial_value * size_weight);
-		}
-		else
-			brush_set_size(br, new_value * size_weight);
-	else if(mode == WM_RADIALCONTROL_STRENGTH)
-		brush_set_alpha(br, new_value);
-	else if(mode == WM_RADIALCONTROL_ANGLE) {
-		MTex *mtex = brush_active_texture(br);
-		if(mtex)
-			mtex->rot = new_value * conv;
-	}
-
-	return OPERATOR_FINISHED;
 }
 
 /* Unified Size and Strength */

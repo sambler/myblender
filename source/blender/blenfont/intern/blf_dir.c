@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/blenfont/intern/blf_dir.c
+ *  \ingroup blf
+ */
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -44,7 +49,9 @@
 
 #include "BIF_gl.h"
 
+#include "BLF_api.h"
 #include "blf_internal_types.h"
+#include "blf_internal.h"
 
 static ListBase global_font_dir= { NULL, NULL };
 
@@ -54,7 +61,7 @@ static DirBLF *blf_dir_find(const char *path)
 	
 	p= global_font_dir.first;
 	while (p) {
-		if (!strcmp(p->path, path))
+		if (BLI_path_cmp(p->path, path) == 0)
 			return(p);
 		p= p->next;
 	}
@@ -121,24 +128,20 @@ void BLF_dir_free(char **dirs, int count)
 	MEM_freeN(dirs);
 }
 
-char *blf_dir_search(char *file)
+char *blf_dir_search(const char *file)
 {
 	DirBLF *dir;
 	char full_path[FILE_MAXDIR+FILE_MAXFILE];
-	char *s;
-	
-	dir= global_font_dir.first;
-	s= NULL;
-	while (dir) {
-		BLI_join_dirfile(full_path, dir->path, file);
+	char *s= NULL;
+
+	for(dir=global_font_dir.first; dir; dir= dir->next) {
+		BLI_join_dirfile(full_path, sizeof(full_path), dir->path, file);
 		if (BLI_exist(full_path)) {
-			s= (char *)MEM_mallocN(strlen(full_path)+1,"blf_dir_search");
-			strcpy(s, full_path);
+			s= BLI_strdup(full_path);
 			break;
 		}
-		dir= dir->next;
 	}
-	
+
 	if (!s) {
 		/* check the current directory, why not ? */
 		if (BLI_exist(file))
@@ -148,6 +151,7 @@ char *blf_dir_search(char *file)
 	return(s);
 }
 
+#if 0 // UNUSED
 int blf_dir_split(const char *str, char *file, int *size)
 {
 	int i, len;
@@ -171,11 +175,12 @@ int blf_dir_split(const char *str, char *file, int *size)
 	}
 	return(0);
 }
+#endif
 
 /* Some font have additional file with metrics information,
  * in general, the extension of the file is: .afm or .pfm
  */
-char *blf_dir_metrics_search(char *filename)
+char *blf_dir_metrics_search(const char *filename)
 {
 	char *mfile;
 	char *s;

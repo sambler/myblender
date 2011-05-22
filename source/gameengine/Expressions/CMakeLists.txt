@@ -24,11 +24,8 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-FILE(GLOB SRC *.cpp)
-
-SET(INC
+set(INC
 	.
-	../../../source/kernel/gen_system
 	../../../intern/string
 	../../../intern/guardedalloc
 	../../../intern/moto/include
@@ -36,10 +33,48 @@ SET(INC
 	../../../source/blender/blenloader
 )
 
-IF(WITH_PYTHON)
-	LIST(APPEND INC ${PYTHON_INC})
-ELSE(WITH_PYTHON)
-	ADD_DEFINITIONS(-DDISABLE_PYTHON)
-ENDIF(WITH_PYTHON)
+set(SRC
+	BoolValue.cpp
+	ConstExpr.cpp
+	EXP_C-Api.cpp
+	EmptyValue.cpp
+	ErrorValue.cpp
+	Expression.cpp
+	FloatValue.cpp
+	IdentifierExpr.cpp
+	IfExpr.cpp
+	InputParser.cpp
+	IntValue.cpp
+	KX_HashedPtr.cpp
+	ListValue.cpp
+	Operator1Expr.cpp
+	Operator2Expr.cpp
+	PyObjectPlus.cpp
+	StringValue.cpp
+	Value.cpp
+	VectorValue.cpp
 
-BLENDERLIB(bf_expressions "${SRC}" "${INC}")
+	BoolValue.h
+	ConstExpr.h
+	EXP_C-Api.h
+	EmptyValue.h
+	ErrorValue.h
+	Expression.h
+	FloatValue.h
+	IdentifierExpr.h
+	IfExpr.h
+	InputParser.h
+	IntValue.h
+	KX_HashedPtr.h
+	KX_Python.h
+	ListValue.h
+	Operator1Expr.h
+	Operator2Expr.h
+	PyObjectPlus.h
+	StringValue.h
+	Value.h
+	VectorValue.h
+	VoidValue.h
+)
+
+blender_add_lib(ge_logic_expressions "${SRC}" "${INC}")

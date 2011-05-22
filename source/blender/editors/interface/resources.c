@@ -1,4 +1,7 @@
-/**
+/** \file blender/editors/interface/resources.c
+ *  \ingroup edinterface
+ */
+/*
  * $Id$
  *
  * ***** BEGIN GPL/BL DUAL LICENSE BLOCK *****
@@ -36,7 +39,6 @@
 
 #include "MEM_guardedalloc.h"
 
-
 #include "DNA_curve_types.h"
 #include "DNA_userdef_types.h"
 #include "DNA_screen_types.h"
@@ -44,13 +46,13 @@
 #include "DNA_windowmanager_types.h"
 
 #include "BLI_blenlib.h"
-
+#include "BLI_utildefines.h"
 
 #include "BKE_DerivedMesh.h"
 #include "BKE_global.h"
 #include "BKE_main.h"
 #include "BKE_texture.h"
-#include "BKE_utildefines.h"
+
 
 #include "BIF_gl.h"
 
@@ -81,14 +83,14 @@ void ui_resources_free(void)
 /*    THEMES */
 /* ******************************************************** */
 
-char *UI_ThemeGetColorPtr(bTheme *btheme, int spacetype, int colorid)
+const unsigned char *UI_ThemeGetColorPtr(bTheme *btheme, int spacetype, int colorid)
 {
 	ThemeSpace *ts= NULL;
 	static char error[4]={240, 0, 240, 255};
 	static char alert[4]={240, 60, 60, 255};
 	static char headerdesel[4]={0,0,0,255};
 	
-	char *cp= error;
+	const char *cp= error;
 	
 	if(btheme) {
 	
@@ -263,6 +265,8 @@ char *UI_ThemeGetColorPtr(bTheme *btheme, int spacetype, int colorid)
 				cp= ts->vertex_select; break;
 			case TH_VERTEX_SIZE:
 				cp= &ts->vertex_size; break;
+			case TH_OUTLINE_WIDTH:
+				cp= &ts->outline_width; break;
 			case TH_EDGE:
 				cp= ts->edge; break;
 			case TH_EDGE_SELECT:
@@ -285,6 +289,12 @@ char *UI_ThemeGetColorPtr(bTheme *btheme, int spacetype, int colorid)
 				cp= ts->face_dot; break;
 			case TH_FACEDOT_SIZE:
 				cp= &ts->facedot_size; break;
+			case TH_DRAWEXTRA_EDGELEN:
+				cp= ts->extra_edge_len; break;
+			case TH_DRAWEXTRA_FACEAREA:
+				cp= ts->extra_face_area; break;
+			case TH_DRAWEXTRA_FACEANG:
+				cp= ts->extra_face_angle; break;
 			case TH_NORMAL:
 				cp= ts->normal; break;
 			case TH_VNORMAL:
@@ -402,10 +412,85 @@ char *UI_ThemeGetColorPtr(bTheme *btheme, int spacetype, int colorid)
 		}
 	}
 	
-	return cp;
+	return (unsigned char *)cp;
 }
 
+
+#define SETCOL(col, r, g, b, a)  col[0]=r; col[1]=g; col[2]= b; col[3]= a;
+#define SETCOLF(col, r, g, b, a)  col[0]=r*255; col[1]=g*255; col[2]= b*255; col[3]= a*255;
 #define SETCOLTEST(col, r, g, b, a)  if(col[3]==0) {col[0]=r; col[1]=g; col[2]= b; col[3]= a;}
+
+/* use this call to init new bone color sets in Theme */
+static void ui_theme_init_boneColorSets(bTheme *btheme)
+{
+	int i;
+	
+	/* define default color sets - currently we only define 15 of these, though that should be ample */
+		/* set 1 */
+	SETCOL(btheme->tarm[0].solid, 0x9a, 0x00, 0x00, 255);
+	SETCOL(btheme->tarm[0].select, 0xbd, 0x11, 0x11, 255);
+	SETCOL(btheme->tarm[0].active, 0xf7, 0x0a, 0x0a, 255);
+		/* set 2 */
+	SETCOL(btheme->tarm[1].solid, 0xf7, 0x40, 0x18, 255);
+	SETCOL(btheme->tarm[1].select, 0xf6, 0x69, 0x13, 255);
+	SETCOL(btheme->tarm[1].active, 0xfa, 0x99, 0x00, 255);
+		/* set 3 */
+	SETCOL(btheme->tarm[2].solid, 0x1e, 0x91, 0x09, 255);
+	SETCOL(btheme->tarm[2].select, 0x59, 0xb7, 0x0b, 255);
+	SETCOL(btheme->tarm[2].active, 0x83, 0xef, 0x1d, 255);
+		/* set 4 */
+	SETCOL(btheme->tarm[3].solid, 0x0a, 0x36, 0x94, 255);
+	SETCOL(btheme->tarm[3].select, 0x36, 0x67, 0xdf, 255);
+	SETCOL(btheme->tarm[3].active, 0x5e, 0xc1, 0xef, 255);
+		/* set 5 */
+	SETCOL(btheme->tarm[4].solid, 0xa9, 0x29, 0x4e, 255);
+	SETCOL(btheme->tarm[4].select, 0xc1, 0x41, 0x6a, 255);
+	SETCOL(btheme->tarm[4].active, 0xf0, 0x5d, 0x91, 255);
+		/* set 6 */
+	SETCOL(btheme->tarm[5].solid, 0x43, 0x0c, 0x78, 255);
+	SETCOL(btheme->tarm[5].select, 0x54, 0x3a, 0xa3, 255);
+	SETCOL(btheme->tarm[5].active, 0x87, 0x64, 0xd5, 255);
+		/* set 7 */
+	SETCOL(btheme->tarm[6].solid, 0x24, 0x78, 0x5a, 255);
+	SETCOL(btheme->tarm[6].select, 0x3c, 0x95, 0x79, 255);
+	SETCOL(btheme->tarm[6].active, 0x6f, 0xb6, 0xab, 255);
+		/* set 8 */
+	SETCOL(btheme->tarm[7].solid, 0x4b, 0x70, 0x7c, 255);
+	SETCOL(btheme->tarm[7].select, 0x6a, 0x86, 0x91, 255);
+	SETCOL(btheme->tarm[7].active, 0x9b, 0xc2, 0xcd, 255);
+		/* set 9 */
+	SETCOL(btheme->tarm[8].solid, 0xf4, 0xc9, 0x0c, 255);
+	SETCOL(btheme->tarm[8].select, 0xee, 0xc2, 0x36, 255);
+	SETCOL(btheme->tarm[8].active, 0xf3, 0xff, 0x00, 255);
+		/* set 10 */
+	SETCOL(btheme->tarm[9].solid, 0x1e, 0x20, 0x24, 255);
+	SETCOL(btheme->tarm[9].select, 0x48, 0x4c, 0x56, 255);
+	SETCOL(btheme->tarm[9].active, 0xff, 0xff, 0xff, 255);
+		/* set 11 */
+	SETCOL(btheme->tarm[10].solid, 0x6f, 0x2f, 0x6a, 255);
+	SETCOL(btheme->tarm[10].select, 0x98, 0x45, 0xbe, 255);
+	SETCOL(btheme->tarm[10].active, 0xd3, 0x30, 0xd6, 255);
+		/* set 12 */
+	SETCOL(btheme->tarm[11].solid, 0x6c, 0x8e, 0x22, 255);
+	SETCOL(btheme->tarm[11].select, 0x7f, 0xb0, 0x22, 255);
+	SETCOL(btheme->tarm[11].active, 0xbb, 0xef, 0x5b, 255);
+		/* set 13 */
+	SETCOL(btheme->tarm[12].solid, 0x8d, 0x8d, 0x8d, 255);
+	SETCOL(btheme->tarm[12].select, 0xb0, 0xb0, 0xb0, 255);
+	SETCOL(btheme->tarm[12].active, 0xde, 0xde, 0xde, 255);
+		/* set 14 */
+	SETCOL(btheme->tarm[13].solid, 0x83, 0x43, 0x26, 255);
+	SETCOL(btheme->tarm[13].select, 0x8b, 0x58, 0x11, 255);
+	SETCOL(btheme->tarm[13].active, 0xbd, 0x6a, 0x11, 255);
+		/* set 15 */
+	SETCOL(btheme->tarm[14].solid, 0x08, 0x31, 0x0e, 255);
+	SETCOL(btheme->tarm[14].select, 0x1c, 0x43, 0x0b, 255);
+	SETCOL(btheme->tarm[14].active, 0x34, 0x62, 0x2b, 255);
+	
+	/* reset flags too */
+	for (i = 0; i < 20; i++)
+		btheme->tarm[i].flag = 0;
+}
 
 /* use this call to init new variables in themespace, if they're same for all */
 static void ui_theme_init_new_do(ThemeSpace *ts)
@@ -452,8 +537,6 @@ static void ui_theme_init_new(bTheme *btheme)
 	
 }
 
-#define SETCOL(col, r, g, b, a)  col[0]=r; col[1]=g; col[2]= b; col[3]= a;
-#define SETCOLF(col, r, g, b, a)  col[0]=r*255; col[1]=g*255; col[2]= b*255; col[3]= a*255;
 
 /* initialize default theme
    Note: when you add new colors, created & saved themes need initialized
@@ -461,7 +544,7 @@ static void ui_theme_init_new(bTheme *btheme)
 */
 void ui_theme_init_default(void)
 {
-	bTheme *btheme= U.themes.first;
+	bTheme *btheme;
 	
 	/* we search for the theme with name Default */
 	for(btheme= U.themes.first; btheme; btheme= btheme->next) {
@@ -478,7 +561,11 @@ void ui_theme_init_default(void)
 
 	/* UI buttons */
 	ui_widget_color_init(&btheme->tui);
-
+	btheme->tui.iconfile[0]= 0;
+	
+	/* Bone Color Sets */
+	ui_theme_init_boneColorSets(btheme);
+	
 	/* common (new) variables */
 	ui_theme_init_new(btheme);
 	
@@ -505,6 +592,7 @@ void ui_theme_init_default(void)
 	SETCOL(btheme->tv3d.vertex, 0, 0, 0, 255);
 	SETCOL(btheme->tv3d.vertex_select, 255, 133, 0, 255);
 	btheme->tv3d.vertex_size= 3;
+	btheme->tv3d.outline_width= 1;
 	SETCOL(btheme->tv3d.edge,       0x0, 0x0, 0x0, 255);
 	SETCOL(btheme->tv3d.edge_select, 255, 160, 0, 255);
 	SETCOL(btheme->tv3d.edge_seam, 219, 37, 18, 255);
@@ -514,7 +602,22 @@ void ui_theme_init_default(void)
 	SETCOL(btheme->tv3d.normal, 0x22, 0xDD, 0xDD, 255);
 	SETCOL(btheme->tv3d.vertex_normal, 0x23, 0x61, 0xDD, 255);
 	SETCOL(btheme->tv3d.face_dot, 255, 133, 0, 255);
+	SETCOL(btheme->tv3d.editmesh_active, 255, 255, 255, 128);
+	SETCOLF(btheme->tv3d.edge_crease, 0.8, 0, 0.6, 1.0);
+	SETCOL(btheme->tv3d.edge_sharp, 255, 32, 32, 255);
+	SETCOL(btheme->tv3d.header_text, 0, 0, 0, 255);
+	SETCOL(btheme->tv3d.header_text_hi, 255, 255, 255, 255);
+	SETCOL(btheme->tv3d.button_text, 0, 0, 0, 255);
+	SETCOL(btheme->tv3d.button_text_hi, 255, 255, 255, 255);
+	SETCOL(btheme->tv3d.button_title, 0, 0, 0, 255);
+	SETCOL(btheme->tv3d.title, 0, 0, 0, 255);
+
 	btheme->tv3d.facedot_size= 4;
+
+	SETCOL(btheme->tv3d.extra_edge_len, 32, 0, 0, 255);
+	SETCOL(btheme->tv3d.extra_face_area, 0, 32, 0, 255);
+	SETCOL(btheme->tv3d.extra_face_angle, 0, 0, 128, 255);
+
 	SETCOL(btheme->tv3d.cframe, 0x60, 0xc0,	 0x40, 255);
 
 	SETCOL(btheme->tv3d.nurb_uline, 0x90, 0x90, 0x00, 255);
@@ -709,20 +812,20 @@ void UI_SetTheme(int spacetype, int regionid)
 // for space windows only
 void UI_ThemeColor(int colorid)
 {
-	char *cp;
+	const unsigned char *cp;
 	
 	cp= UI_ThemeGetColorPtr(theme_active, theme_spacetype, colorid);
-	glColor3ub(cp[0], cp[1], cp[2]);
+	glColor3ubv(cp);
 
 }
 
 // plus alpha
 void UI_ThemeColor4(int colorid)
 {
-	char *cp;
+	const unsigned char *cp;
 	
 	cp= UI_ThemeGetColorPtr(theme_active, theme_spacetype, colorid);
-	glColor4ub(cp[0], cp[1], cp[2], cp[3]);
+	glColor4ubv(cp);
 
 }
 
@@ -730,7 +833,7 @@ void UI_ThemeColor4(int colorid)
 void UI_ThemeColorShade(int colorid, int offset)
 {
 	int r, g, b;
-	char *cp;
+	const unsigned char *cp;
 	
 	cp= UI_ThemeGetColorPtr(theme_active, theme_spacetype, colorid);
 	r= offset + (int) cp[0];
@@ -745,7 +848,7 @@ void UI_ThemeColorShade(int colorid, int offset)
 void UI_ThemeColorShadeAlpha(int colorid, int coloffset, int alphaoffset)
 {
 	int r, g, b, a;
-	char *cp;
+	const unsigned char *cp;
 	
 	cp= UI_ThemeGetColorPtr(theme_active, theme_spacetype, colorid);
 	r= coloffset + (int) cp[0];
@@ -763,15 +866,15 @@ void UI_ThemeColorShadeAlpha(int colorid, int coloffset, int alphaoffset)
 void UI_ThemeColorBlend(int colorid1, int colorid2, float fac)
 {
 	int r, g, b;
-	char *cp1, *cp2;
+	const unsigned char *cp1, *cp2;
 	
 	cp1= UI_ThemeGetColorPtr(theme_active, theme_spacetype, colorid1);
 	cp2= UI_ThemeGetColorPtr(theme_active, theme_spacetype, colorid2);
 
-	if(fac<0.0) fac=0.0; else if(fac>1.0) fac= 1.0;
-	r= floor((1.0-fac)*cp1[0] + fac*cp2[0]);
-	g= floor((1.0-fac)*cp1[1] + fac*cp2[1]);
-	b= floor((1.0-fac)*cp1[2] + fac*cp2[2]);
+	CLAMP(fac, 0.0f, 1.0f);
+	r= floorf((1.0f-fac)*cp1[0] + fac*cp2[0]);
+	g= floorf((1.0f-fac)*cp1[1] + fac*cp2[1]);
+	b= floorf((1.0f-fac)*cp1[2] + fac*cp2[2]);
 	
 	glColor3ub(r, g, b);
 }
@@ -780,15 +883,15 @@ void UI_ThemeColorBlend(int colorid1, int colorid2, float fac)
 void UI_ThemeColorBlendShade(int colorid1, int colorid2, float fac, int offset)
 {
 	int r, g, b;
-	char *cp1, *cp2;
+	const unsigned char *cp1, *cp2;
 	
 	cp1= UI_ThemeGetColorPtr(theme_active, theme_spacetype, colorid1);
 	cp2= UI_ThemeGetColorPtr(theme_active, theme_spacetype, colorid2);
 
-	if(fac<0.0) fac=0.0; else if(fac>1.0) fac= 1.0;
-	r= offset+floor((1.0-fac)*cp1[0] + fac*cp2[0]);
-	g= offset+floor((1.0-fac)*cp1[1] + fac*cp2[1]);
-	b= offset+floor((1.0-fac)*cp1[2] + fac*cp2[2]);
+	CLAMP(fac, 0.0f, 1.0f);
+	r= offset+floorf((1.0f-fac)*cp1[0] + fac*cp2[0]);
+	g= offset+floorf((1.0f-fac)*cp1[1] + fac*cp2[1]);
+	b= offset+floorf((1.0f-fac)*cp1[2] + fac*cp2[2]);
 	
 	CLAMP(r, 0, 255);
 	CLAMP(g, 0, 255);
@@ -801,16 +904,16 @@ void UI_ThemeColorBlendShade(int colorid1, int colorid2, float fac, int offset)
 void UI_ThemeColorBlendShadeAlpha(int colorid1, int colorid2, float fac, int offset, int alphaoffset)
 {
 	int r, g, b, a;
-	char *cp1, *cp2;
+	const unsigned char *cp1, *cp2;
 	
 	cp1= UI_ThemeGetColorPtr(theme_active, theme_spacetype, colorid1);
 	cp2= UI_ThemeGetColorPtr(theme_active, theme_spacetype, colorid2);
 
-	if(fac<0.0) fac=0.0; else if(fac>1.0) fac= 1.0;
-	r= offset+floor((1.0-fac)*cp1[0] + fac*cp2[0]);
-	g= offset+floor((1.0-fac)*cp1[1] + fac*cp2[1]);
-	b= offset+floor((1.0-fac)*cp1[2] + fac*cp2[2]);
-	a= alphaoffset+floor((1.0-fac)*cp1[3] + fac*cp2[3]);
+	CLAMP(fac, 0.0f, 1.0f);
+	r= offset+floorf((1.0f-fac)*cp1[0] + fac*cp2[0]);
+	g= offset+floorf((1.0f-fac)*cp1[1] + fac*cp2[1]);
+	b= offset+floorf((1.0f-fac)*cp1[2] + fac*cp2[2]);
+	a= alphaoffset + floorf((1.0f-fac)*cp1[3] + fac*cp2[3]);
 	
 	CLAMP(r, 0, 255);
 	CLAMP(g, 0, 255);
@@ -824,7 +927,7 @@ void UI_ThemeColorBlendShadeAlpha(int colorid1, int colorid2, float fac, int off
 // get individual values, not scaled
 float UI_GetThemeValuef(int colorid)
 {
-	char *cp;
+	const unsigned char *cp;
 	
 	cp= UI_ThemeGetColorPtr(theme_active, theme_spacetype, colorid);
 	return ((float)cp[0]);
@@ -834,7 +937,7 @@ float UI_GetThemeValuef(int colorid)
 // get individual values, not scaled
 int UI_GetThemeValue(int colorid)
 {
-	char *cp;
+	const unsigned char *cp;
 	
 	cp= UI_ThemeGetColorPtr(theme_active, theme_spacetype, colorid);
 	return ((int) cp[0]);
@@ -845,19 +948,19 @@ int UI_GetThemeValue(int colorid)
 // get the color, range 0.0-1.0
 void UI_GetThemeColor3fv(int colorid, float *col)
 {
-	char *cp;
+	const unsigned char *cp;
 	
 	cp= UI_ThemeGetColorPtr(theme_active, theme_spacetype, colorid);
-	col[0]= ((float)cp[0])/255.0;
-	col[1]= ((float)cp[1])/255.0;
-	col[2]= ((float)cp[2])/255.0;
+	col[0]= ((float)cp[0])/255.0f;
+	col[1]= ((float)cp[1])/255.0f;
+	col[2]= ((float)cp[2])/255.0f;
 }
 
 // get the color, range 0.0-1.0, complete with shading offset
 void UI_GetThemeColorShade3fv(int colorid, int offset, float *col)
 {
 	int r, g, b;
-	char *cp;
+	const unsigned char *cp;
 	
 	cp= UI_ThemeGetColorPtr(theme_active, theme_spacetype, colorid);
 	
@@ -868,15 +971,15 @@ void UI_GetThemeColorShade3fv(int colorid, int offset, float *col)
 	b= offset + (int) cp[2];
 	CLAMP(b, 0, 255);
 	
-	col[0]= ((float)r)/255.0;
-	col[1]= ((float)g)/255.0;
-	col[2]= ((float)b)/255.0;
+	col[0]= ((float)r)/255.0f;
+	col[1]= ((float)g)/255.0f;
+	col[2]= ((float)b)/255.0f;
 }
 
 // get the color, in char pointer
-void UI_GetThemeColor3ubv(int colorid, char *col)
+void UI_GetThemeColor3ubv(int colorid, unsigned char col[3])
 {
-	char *cp;
+	const unsigned char *cp;
 	
 	cp= UI_ThemeGetColorPtr(theme_active, theme_spacetype, colorid);
 	col[0]= cp[0];
@@ -885,9 +988,9 @@ void UI_GetThemeColor3ubv(int colorid, char *col)
 }
 
 // get the color, in char pointer
-void UI_GetThemeColor4ubv(int colorid, char *col)
+void UI_GetThemeColor4ubv(int colorid, unsigned char col[4])
 {
-	char *cp;
+	const unsigned char *cp;
 	
 	cp= UI_ThemeGetColorPtr(theme_active, theme_spacetype, colorid);
 	col[0]= cp[0];
@@ -896,9 +999,9 @@ void UI_GetThemeColor4ubv(int colorid, char *col)
 	col[3]= cp[3];
 }
 
-void UI_GetThemeColorType4ubv(int colorid, int spacetype, char *col)
+void UI_GetThemeColorType4ubv(int colorid, int spacetype, char col[4])
 {
-	char *cp;
+	const unsigned char *cp;
 	
 	cp= UI_ThemeGetColorPtr(theme_active, spacetype, colorid);
 	col[0]= cp[0];
@@ -908,14 +1011,13 @@ void UI_GetThemeColorType4ubv(int colorid, int spacetype, char *col)
 }
 
 // blends and shades between two char color pointers
-void UI_ColorPtrBlendShade3ubv(char *cp1, char *cp2, float fac, int offset)
+void UI_ColorPtrBlendShade3ubv(const unsigned char cp1[3], const unsigned char cp2[3], float fac, int offset)
 {
 	int r, g, b;
-	
-	if(fac<0.0) fac=0.0; else if(fac>1.0) fac= 1.0;
-	r= offset+floor((1.0-fac)*cp1[0] + fac*cp2[0]);
-	g= offset+floor((1.0-fac)*cp1[1] + fac*cp2[1]);
-	b= offset+floor((1.0-fac)*cp1[2] + fac*cp2[2]);
+	CLAMP(fac, 0.0f, 1.0f);
+	r= offset+floorf((1.0f-fac)*cp1[0] + fac*cp2[0]);
+	g= offset+floorf((1.0f-fac)*cp1[1] + fac*cp2[1]);
+	b= offset+floorf((1.0f-fac)*cp1[2] + fac*cp2[2]);
 	
 	r= r<0?0:(r>255?255:r);
 	g= g<0?0:(g>255?255:g);
@@ -925,19 +1027,19 @@ void UI_ColorPtrBlendShade3ubv(char *cp1, char *cp2, float fac, int offset)
 }
 
 // get a 3 byte color, blended and shaded between two other char color pointers
-void UI_GetColorPtrBlendShade3ubv(char *cp1, char *cp2, char *col, float fac, int offset)
+void UI_GetColorPtrBlendShade3ubv(const unsigned char cp1[3], const unsigned char cp2[3], unsigned char col[3], float fac, int offset)
 {
 	int r, g, b;
-	
-	if(fac<0.0) fac=0.0; else if(fac>1.0) fac= 1.0;
-	r= offset+floor((1.0-fac)*cp1[0] + fac*cp2[0]);
-	g= offset+floor((1.0-fac)*cp1[1] + fac*cp2[1]);
-	b= offset+floor((1.0-fac)*cp1[2] + fac*cp2[2]);
-	
-	r= r<0?0:(r>255?255:r);
-	g= g<0?0:(g>255?255:g);
-	b= b<0?0:(b>255?255:b);
-	
+
+	CLAMP(fac, 0.0f, 1.0f);
+	r= offset+floor((1.0f-fac)*cp1[0] + fac*cp2[0]);
+	g= offset+floor((1.0f-fac)*cp1[1] + fac*cp2[1]);
+	b= offset+floor((1.0f-fac)*cp1[2] + fac*cp2[2]);
+
+	CLAMP(r, 0, 255);
+	CLAMP(g, 0, 255);
+	CLAMP(b, 0, 255);
+
 	col[0] = r;
 	col[1] = g;
 	col[2] = b;
@@ -951,26 +1053,27 @@ void UI_ThemeClearColor(int colorid)
 	glClearColor(col[0], col[1], col[2], 0.0);
 }
 
-void UI_make_axis_color(char *src_col, char *dst_col, char axis)
+void UI_make_axis_color(const unsigned char src_col[3], unsigned char dst_col[3], const char axis)
 {
 	switch(axis)
 	{
-		case 'x':
 		case 'X':
 			dst_col[0]= src_col[0]>219?255:src_col[0]+36;
 			dst_col[1]= src_col[1]<26?0:src_col[1]-26;
 			dst_col[2]= src_col[2]<26?0:src_col[2]-26;
 			break;
-		case 'y':
 		case 'Y':
 			dst_col[0]= src_col[0]<46?0:src_col[0]-36;
 			dst_col[1]= src_col[1]>189?255:src_col[1]+66;
 			dst_col[2]= src_col[2]<46?0:src_col[2]-36;
 			break;
-		default: 
+		case 'Z':
 			dst_col[0]= src_col[0]<26?0:src_col[0]-26; 
 			dst_col[1]= src_col[1]<26?0:src_col[1]-26; 
 			dst_col[2]= src_col[2]>209?255:src_col[2]+46;
+			break;
+		default:
+			BLI_assert(!"invalid axis arg");
 	}
 }
 
@@ -993,10 +1096,8 @@ void init_userdef_do_versions(void)
 		U.tb_rightmouse= 5;
 	}
 	if(U.mixbufsize==0) U.mixbufsize= 2048;
-	if (BLI_streq(U.tempdir, "/")) {
-		char *tmp= getenv("TEMP");
-		
-		strcpy(U.tempdir, tmp?tmp:"/tmp/");
+	if (strcmp(U.tempdir, "/") == 0) {
+		BLI_where_is_temp(U.tempdir, sizeof(U.tempdir), FALSE);
 	}
 	if (U.autokey_mode == 0) {
 		/* 'add/replace' but not on */
@@ -1004,7 +1105,7 @@ void init_userdef_do_versions(void)
 	}
 	if (U.savetime <= 0) {
 		U.savetime = 1;
-// XXX		error("startup.blend is buggy, please consider removing it.\n");
+// XXX		error(STRINGIFY(BLENDER_STARTUP_FILE)" is buggy, please consider removing it.\n");
 	}
 	/* transform widget settings */
 	if(U.tw_hotspot==0) {
@@ -1184,7 +1285,7 @@ void init_userdef_do_versions(void)
 	if ((bmain->versionfile < 245) || (bmain->versionfile == 245 && bmain->subversionfile < 11)) {
 		bTheme *btheme;
 		for (btheme= U.themes.first; btheme; btheme= btheme->next) {
-			/* these should all use the same colour */
+			/* these should all use the same color */
 			SETCOL(btheme->tv3d.cframe, 0x60, 0xc0, 0x40, 255);
 			SETCOL(btheme->tipo.cframe, 0x60, 0xc0, 0x40, 255);
 			SETCOL(btheme->tact.cframe, 0x60, 0xc0, 0x40, 255);
@@ -1202,69 +1303,8 @@ void init_userdef_do_versions(void)
 			SETCOL(btheme->tact.group_active, 0x7d, 0xe9, 0x60, 255);
 			
 			/* bone custom-color sets */
-			// FIXME: this check for initialised colors is bad
-			if (btheme->tarm[0].solid[3] == 0) {
-					/* set 1 */
-				SETCOL(btheme->tarm[0].solid, 0x9a, 0x00, 0x00, 255);
-				SETCOL(btheme->tarm[0].select, 0xbd, 0x11, 0x11, 255);
-				SETCOL(btheme->tarm[0].active, 0xf7, 0x0a, 0x0a, 255);
-					/* set 2 */
-				SETCOL(btheme->tarm[1].solid, 0xf7, 0x40, 0x18, 255);
-				SETCOL(btheme->tarm[1].select, 0xf6, 0x69, 0x13, 255);
-				SETCOL(btheme->tarm[1].active, 0xfa, 0x99, 0x00, 255);
-					/* set 3 */
-				SETCOL(btheme->tarm[2].solid, 0x1e, 0x91, 0x09, 255);
-				SETCOL(btheme->tarm[2].select, 0x59, 0xb7, 0x0b, 255);
-				SETCOL(btheme->tarm[2].active, 0x83, 0xef, 0x1d, 255);
-					/* set 4 */
-				SETCOL(btheme->tarm[3].solid, 0x0a, 0x36, 0x94, 255);
-				SETCOL(btheme->tarm[3].select, 0x36, 0x67, 0xdf, 255);
-				SETCOL(btheme->tarm[3].active, 0x5e, 0xc1, 0xef, 255);
-					/* set 5 */
-				SETCOL(btheme->tarm[4].solid, 0xa9, 0x29, 0x4e, 255);
-				SETCOL(btheme->tarm[4].select, 0xc1, 0x41, 0x6a, 255);
-				SETCOL(btheme->tarm[4].active, 0xf0, 0x5d, 0x91, 255);
-					/* set 6 */
-				SETCOL(btheme->tarm[5].solid, 0x43, 0x0c, 0x78, 255);
-				SETCOL(btheme->tarm[5].select, 0x54, 0x3a, 0xa3, 255);
-				SETCOL(btheme->tarm[5].active, 0x87, 0x64, 0xd5, 255);
-					/* set 7 */
-				SETCOL(btheme->tarm[6].solid, 0x24, 0x78, 0x5a, 255);
-				SETCOL(btheme->tarm[6].select, 0x3c, 0x95, 0x79, 255);
-				SETCOL(btheme->tarm[6].active, 0x6f, 0xb6, 0xab, 255);
-					/* set 8 */
-				SETCOL(btheme->tarm[7].solid, 0x4b, 0x70, 0x7c, 255);
-				SETCOL(btheme->tarm[7].select, 0x6a, 0x86, 0x91, 255);
-				SETCOL(btheme->tarm[7].active, 0x9b, 0xc2, 0xcd, 255);
-					/* set 9 */
-				SETCOL(btheme->tarm[8].solid, 0xf4, 0xc9, 0x0c, 255);
-				SETCOL(btheme->tarm[8].select, 0xee, 0xc2, 0x36, 255);
-				SETCOL(btheme->tarm[8].active, 0xf3, 0xff, 0x00, 255);
-					/* set 10 */
-				SETCOL(btheme->tarm[9].solid, 0x1e, 0x20, 0x24, 255);
-				SETCOL(btheme->tarm[9].select, 0x48, 0x4c, 0x56, 255);
-				SETCOL(btheme->tarm[9].active, 0xff, 0xff, 0xff, 255);
-					/* set 11 */
-				SETCOL(btheme->tarm[10].solid, 0x6f, 0x2f, 0x6a, 255);
-				SETCOL(btheme->tarm[10].select, 0x98, 0x45, 0xbe, 255);
-				SETCOL(btheme->tarm[10].active, 0xd3, 0x30, 0xd6, 255);
-					/* set 12 */
-				SETCOL(btheme->tarm[11].solid, 0x6c, 0x8e, 0x22, 255);
-				SETCOL(btheme->tarm[11].select, 0x7f, 0xb0, 0x22, 255);
-				SETCOL(btheme->tarm[11].active, 0xbb, 0xef, 0x5b, 255);
-					/* set 13 */
-				SETCOL(btheme->tarm[12].solid, 0x8d, 0x8d, 0x8d, 255);
-				SETCOL(btheme->tarm[12].select, 0xb0, 0xb0, 0xb0, 255);
-				SETCOL(btheme->tarm[12].active, 0xde, 0xde, 0xde, 255);
-					/* set 14 */
-				SETCOL(btheme->tarm[13].solid, 0x83, 0x43, 0x26, 255);
-				SETCOL(btheme->tarm[13].select, 0x8b, 0x58, 0x11, 255);
-				SETCOL(btheme->tarm[13].active, 0xbd, 0x6a, 0x11, 255);
-					/* set 15 */
-				SETCOL(btheme->tarm[14].solid, 0x08, 0x31, 0x0e, 255);
-				SETCOL(btheme->tarm[14].select, 0x1c, 0x43, 0x0b, 255);
-				SETCOL(btheme->tarm[14].active, 0x34, 0x62, 0x2b, 255);
-			}
+			if (btheme->tarm[0].solid[3] == 0)
+				ui_theme_init_boneColorSets(btheme);
 		}
 	}
 	if ((bmain->versionfile < 245) || (bmain->versionfile == 245 && bmain->subversionfile < 16)) {
@@ -1490,6 +1530,27 @@ void init_userdef_do_versions(void)
 			btheme->tui.wcol_progress= wcol_progress;
 		}
 	}
+
+	if (bmain->versionfile < 255 || (bmain->versionfile == 255 && bmain->subversionfile < 2)) {
+		bTheme *btheme;
+		for(btheme= U.themes.first; btheme; btheme= btheme->next) {
+			SETCOL(btheme->tv3d.extra_edge_len, 32, 0, 0, 255);
+			SETCOL(btheme->tv3d.extra_face_angle, 0, 32, 0, 255);
+			SETCOL(btheme->tv3d.extra_face_area, 0, 0, 128, 255);
+		}
+	}
+	
+	if (bmain->versionfile < 256 || (bmain->versionfile == 256 && bmain->subversionfile < 4)) {
+		bTheme *btheme;
+		for(btheme= U.themes.first; btheme; btheme= btheme->next) {
+			if((btheme->tv3d.outline_width) == 0) btheme->tv3d.outline_width= 1;
+		}
+	}
+
+	if (bmain->versionfile < 257) {
+		/* clear "AUTOKEY_FLAG_ONLYKEYINGSET" flag from userprefs, so that it doesn't linger around from old configs like a ghost */
+		U.autokey_flag &= ~AUTOKEY_FLAG_ONLYKEYINGSET;
+	}
 	
 	/* GL Texture Garbage Collection (variable abused above!) */
 	if (U.textimeout == 0) {
@@ -1506,7 +1567,7 @@ void init_userdef_do_versions(void)
 		U.dbl_click_time = 350;
 	}
 	if (U.anim_player_preset == 0) {
-		U.anim_player_preset =1 ;
+		U.anim_player_preset = 1 ;
 	}
 	if (U.scrcastfps == 0) {
 		U.scrcastfps = 10;
@@ -1515,6 +1576,8 @@ void init_userdef_do_versions(void)
 	if (U.v2d_min_gridsize == 0) {
 		U.v2d_min_gridsize= 35;
 	}
+	if (U.dragthreshold == 0 )
+		U.dragthreshold= 5;
 
 	/* funny name, but it is GE stuff, moves userdef stuff to engine */
 // XXX	space_set_commmandline_options();

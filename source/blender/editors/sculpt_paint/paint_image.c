@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  * imagepaint.c
  *
@@ -29,6 +29,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/sculpt_paint/paint_image.c
+ *  \ingroup edsculpt
+ */
+
+
 #include <float.h>
 #include <string.h>
 #include <stdio.h>
@@ -44,30 +49,34 @@
 #include "BLI_dynstr.h"
 #include "BLI_linklist.h"
 #include "BLI_memarena.h"
-#include "PIL_time.h"
 #include "BLI_threads.h"
+#include "BLI_utildefines.h"
+
+#include "PIL_time.h"
 
 #include "IMB_imbuf.h"
 #include "IMB_imbuf_types.h"
 
+#include "DNA_brush_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
-#include "DNA_brush_types.h"
+#include "DNA_texture_types.h"
 
 #include "BKE_context.h"
+#include "BKE_depsgraph.h"
+#include "BKE_DerivedMesh.h"
 #include "BKE_idprop.h"
-#include "BKE_object.h"
 #include "BKE_brush.h"
 #include "BKE_image.h"
+#include "BKE_library.h"
 #include "BKE_main.h"
 #include "BKE_mesh.h"
+#include "BKE_node.h"
+#include "BKE_object.h"
 #include "BKE_paint.h"
-#include "BKE_DerivedMesh.h"
 #include "BKE_report.h"
-#include "BKE_depsgraph.h"
-#include "BKE_library.h"
 
 #include "BIF_gl.h"
 #include "BIF_glutil.h"
@@ -163,17 +172,17 @@ typedef struct ImagePaintRegion {
 #define PROJ_DEBUG_WINCLIP 1
 
 /* projectFaceSeamFlags options */
-//#define PROJ_FACE_IGNORE	1<<0	/* When the face is hidden, backfacing or occluded */
-//#define PROJ_FACE_INIT	1<<1	/* When we have initialized the faces data */
-#define PROJ_FACE_SEAM1	1<<0	/* If this face has a seam on any of its edges */
-#define PROJ_FACE_SEAM2	1<<1
-#define PROJ_FACE_SEAM3	1<<2
-#define PROJ_FACE_SEAM4	1<<3
+//#define PROJ_FACE_IGNORE	(1<<0)	/* When the face is hidden, backfacing or occluded */
+//#define PROJ_FACE_INIT	(1<<1)	/* When we have initialized the faces data */
+#define PROJ_FACE_SEAM1	(1<<0)	/* If this face has a seam on any of its edges */
+#define PROJ_FACE_SEAM2	(1<<1)
+#define PROJ_FACE_SEAM3	(1<<2)
+#define PROJ_FACE_SEAM4	(1<<3)
 
-#define PROJ_FACE_NOSEAM1	1<<4
-#define PROJ_FACE_NOSEAM2	1<<5
-#define PROJ_FACE_NOSEAM3	1<<6
-#define PROJ_FACE_NOSEAM4	1<<7
+#define PROJ_FACE_NOSEAM1	(1<<4)
+#define PROJ_FACE_NOSEAM2	(1<<5)
+#define PROJ_FACE_NOSEAM3	(1<<6)
+#define PROJ_FACE_NOSEAM4	(1<<7)
 
 #define PROJ_SRC_VIEW		1
 #define PROJ_SRC_IMAGE_CAM	2
@@ -189,8 +198,8 @@ typedef struct ImagePaintRegion {
 #define PROJ_FACE_SCALE_SEAM	0.99f
 
 #define PROJ_BUCKET_NULL		0
-#define PROJ_BUCKET_INIT		1<<0
-// #define PROJ_BUCKET_CLONE_INIT	1<<1
+#define PROJ_BUCKET_INIT		(1<<0)
+// #define PROJ_BUCKET_CLONE_INIT	(1<<1)
 
 /* used for testing doubles, if a point is on a line etc */
 #define PROJ_GEOM_TOLERANCE 0.00075f
@@ -430,7 +439,10 @@ static void image_undo_restore(bContext *C, ListBase *lb)
 
 		GPU_free_image(ima); /* force OpenGL reload */
 		if(ibuf->rect_float)
-			imb_freerectImBuf(ibuf); /* force recreate of char rect */
+			ibuf->userflags |= IB_RECT_INVALID; /* force recreate of char rect */
+		if(ibuf->mipmap[0])
+			ibuf->userflags |= IB_MIPMAP_INVALID; /* force mipmap recreatiom */
+
 	}
 
 	IMB_freeImBuf(tmpibuf);
@@ -476,22 +488,22 @@ static int project_bucket_offset_safe(const ProjPaintState *ps, const float proj
 /* still use 2D X,Y space but this works for verts transformed by a perspective matrix, using their 4th component as a weight */
 static void barycentric_weights_v2_persp(float v1[4], float v2[4], float v3[4], float co[2], float w[3])
 {
-   float wtot_inv, wtot;
+	float wtot_inv, wtot;
 
-   w[0] = area_tri_signed_v2(v2, v3, co) / v1[3];
-   w[1] = area_tri_signed_v2(v3, v1, co) / v2[3];
-   w[2] = area_tri_signed_v2(v1, v2, co) / v3[3];
-   wtot = w[0]+w[1]+w[2];
+	w[0] = area_tri_signed_v2(v2, v3, co) / v1[3];
+	w[1] = area_tri_signed_v2(v3, v1, co) / v2[3];
+	w[2] = area_tri_signed_v2(v1, v2, co) / v3[3];
+	wtot = w[0]+w[1]+w[2];
 
-   if (wtot != 0.0f) {
-	   wtot_inv = 1.0f/wtot;
+	if (wtot != 0.0f) {
+		wtot_inv = 1.0f/wtot;
 
-	   w[0] = w[0]*wtot_inv;
-	   w[1] = w[1]*wtot_inv;
-	   w[2] = w[2]*wtot_inv;
-   }
-   else /* dummy values for zero area face */
-	   w[0] = w[1] = w[2] = 1.0f/3.0f;
+		w[0] = w[0]*wtot_inv;
+		w[1] = w[1]*wtot_inv;
+		w[2] = w[2]*wtot_inv;
+	}
+	else /* dummy values for zero area face */
+		w[0] = w[1] = w[2] = 1.0f/3.0f;
 }
 
 static float VecZDepthOrtho(float pt[2], float v1[3], float v2[3], float v3[3], float w[3])
@@ -502,8 +514,34 @@ static float VecZDepthOrtho(float pt[2], float v1[3], float v2[3], float v3[3], 
 
 static float VecZDepthPersp(float pt[2], float v1[3], float v2[3], float v3[3], float w[3])
 {
+	float wtot_inv, wtot;
+	float w_tmp[3];
+
 	barycentric_weights_v2_persp(v1, v2, v3, pt, w);
-	return (v1[2]*w[0]) + (v2[2]*w[1]) + (v3[2]*w[2]);
+	/* for the depth we need the weights to match what
+	 * barycentric_weights_v2 would return, in this case its easiest just to
+	 * undo the 4th axis division and make it unit-sum
+	 *
+	 * don't call barycentric_weights_v2() becaue our callers expect 'w'
+	 * to be weighted from the perspective */
+	w_tmp[0]= w[0] * v1[3];
+	w_tmp[1]= w[1] * v2[3];
+	w_tmp[2]= w[2] * v3[3];
+
+	wtot = w_tmp[0]+w_tmp[1]+w_tmp[2];
+
+	if (wtot != 0.0f) {
+		wtot_inv = 1.0f/wtot;
+
+		w_tmp[0] = w_tmp[0]*wtot_inv;
+		w_tmp[1] = w_tmp[1]*wtot_inv;
+		w_tmp[2] = w_tmp[2]*wtot_inv;
+	}
+	else /* dummy values for zero area face */
+		w_tmp[0] = w_tmp[1] = w_tmp[2] = 1.0f/3.0f;
+	/* done mimicing barycentric_weights_v2() */
+
+	return (v1[2]*w_tmp[0]) + (v2[2]*w_tmp[1]) + (v3[2]*w_tmp[2]);
 }
 
 
@@ -637,9 +675,8 @@ static int project_paint_PickColor(const ProjPaintState *ps, float pt[2], float 
 		}
 	}
 	else {
-		xi = (int)((uv[0]*ibuf->x) + 0.5f);
-		yi = (int)((uv[1]*ibuf->y) + 0.5f);
-		
+		//xi = (int)((uv[0]*ibuf->x) + 0.5f);
+		//yi = (int)((uv[1]*ibuf->y) + 0.5f);
 		//if (xi<0 || xi>=ibuf->x  ||  yi<0 || yi>=ibuf->y) return 0;
 		
 		/* wrap */
@@ -729,7 +766,7 @@ static int project_paint_occlude_ptv_clip(
 	if (side)	interp_v3_v3v3v3(wco, ps->dm_mvert[mf->v1].co, ps->dm_mvert[mf->v3].co, ps->dm_mvert[mf->v4].co, w);
 	else		interp_v3_v3v3v3(wco, ps->dm_mvert[mf->v1].co, ps->dm_mvert[mf->v2].co, ps->dm_mvert[mf->v3].co, w);
 	
-	if(!view3d_test_clipping(ps->rv3d, wco, 1)) {
+	if(!ED_view3d_test_clipping(ps->rv3d, wco, 1)) {
 		return 1;
 	}
 	
@@ -778,7 +815,7 @@ static int project_bucket_point_occluded(const ProjPaintState *ps, LinkNode *buc
 	return 0;
 }
 
-/* basic line intersection, could move to arithb.c, 2 points with a horiz line
+/* basic line intersection, could move to math_geom.c, 2 points with a horiz line
  * 1 for an intersection, 2 if the first point is aligned, 3 if the second point is aligned */
 #define ISECT_TRUE 1
 #define ISECT_TRUE_P1 2
@@ -831,7 +868,7 @@ static int line_isect_x(const float p1[2], const float p2[2], const float x_leve
 	
 	x_diff= fabsf(p1[0]-p2[0]); /* yuck, horizontal line, we cant do much here */
 	
-	if (x_diff < 0.000001) { /* yuck, vertical line, we cant do much here */
+	if (x_diff < 0.000001f) { /* yuck, vertical line, we cant do much here */
 		*y_isect = (p1[0]+p2[0]) * 0.5f;
 		return ISECT_TRUE;		
 	}
@@ -934,20 +971,20 @@ static int pixel_bounds_array(float (* uv)[2], rcti *bounds_px, const int ibuf_x
 
 #ifndef PROJ_DEBUG_NOSEAMBLEED
 
-/* This function returns 1 if this face has a seam along the 2 face-vert indicies
+/* This function returns 1 if this face has a seam along the 2 face-vert indices
  * 'orig_i1_fidx' and 'orig_i2_fidx' */
 static int check_seam(const ProjPaintState *ps, const int orig_face, const int orig_i1_fidx, const int orig_i2_fidx, int *other_face, int *orig_fidx)
 {
 	LinkNode *node;
 	int face_index;
-	int i1, i2;
+	unsigned int i1, i2;
 	int i1_fidx = -1, i2_fidx = -1; /* index in face */
 	MFace *mf;
 	MTFace *tf;
 	const MFace *orig_mf = ps->dm_mface + orig_face;  
 	const MTFace *orig_tf = ps->dm_mtface + orig_face;
 	
-	/* vert indicies from face vert order indicies */
+	/* vert indices from face vert order indices */
 	i1 = (*(&orig_mf->v1 + orig_i1_fidx));
 	i2 = (*(&orig_mf->v1 + orig_i2_fidx));
 	
@@ -1011,8 +1048,11 @@ static void uv_image_outset(float (*orig_uv)[2], float (*outset_uv)[2], const fl
 	float puv[4][2]; /* pixelspace uv's */
 	float no1[2], no2[2], no3[2], no4[2]; /* normals */
 	float dir1[2], dir2[2], dir3[2], dir4[2];
-	float ibuf_inv[2] = {1.0f / (float)ibuf_x, 1.0f / (float)ibuf_y};
-	
+	float ibuf_inv[2];
+
+	ibuf_inv[0]= 1.0f / (float)ibuf_x;
+	ibuf_inv[1]= 1.0f / (float)ibuf_y;
+
 	/* make UV's in pixel space so we can */
 	puv[0][0] = orig_uv[0][0] * ibuf_x;
 	puv[0][1] = orig_uv[0][1] * ibuf_y;
@@ -1134,9 +1174,10 @@ static void project_face_seams_init(const ProjPaintState *ps, const int face_ind
 #endif // PROJ_DEBUG_NOSEAMBLEED
 
 
-/* TODO - move to arithb.c */
+/* TODO - move to math_geom.c */
 
 /* little sister we only need to know lambda */
+#ifndef PROJ_DEBUG_NOSEAMBLEED
 static float lambda_cp_line2(const float p[2], const float l1[2], const float l2[2])
 {
 	float h[2], u[2];
@@ -1149,6 +1190,7 @@ static float lambda_cp_line2(const float p[2], const float l1[2], const float l2
 	
 	return(dot_v2v2(u, h)/dot_v2v2(u, u));
 }
+#endif // PROJ_DEBUG_NOSEAMBLEED
 
 
 /* Converts a UV location to a 3D screenspace location
@@ -1231,7 +1273,7 @@ static void project_face_pixel(const MTFace *tf_other, ImBuf *ibuf_other, const 
 }
 
 /* run this outside project_paint_uvpixel_init since pixels with mask 0 dont need init */
-float project_paint_uvpixel_mask(
+static float project_paint_uvpixel_mask(
 		const ProjPaintState *ps,
 		const int face_index,
 		const int side,
@@ -1621,6 +1663,7 @@ static int line_clip_rect2f(
 /* scale the quad & tri about its center
  * scaling by PROJ_FACE_SCALE_SEAM (0.99x) is used for getting fake UV pixel coords that are on the
  * edge of the face but slightly inside it occlusion tests dont return hits on adjacent faces */
+#ifndef PROJ_DEBUG_NOSEAMBLEED
 static void scale_quad(float insetCos[4][3], float *origCos[4], const float inset)
 {
 	float cent[3];
@@ -1664,7 +1707,7 @@ static void scale_tri(float insetCos[4][3], float *origCos[4], const float inset
 	add_v3_v3(insetCos[1], cent);
 	add_v3_v3(insetCos[2], cent);
 }
-
+#endif //PROJ_DEBUG_NOSEAMBLEED
 
 static float Vec2Lenf_nosqrt(const float *v1, const float *v2)
 {
@@ -1699,7 +1742,7 @@ static int project_bucket_isect_circle(const float cent[2], const float radius_s
 	 */
 	
 	if((bucket_bounds->xmin <= cent[0] && bucket_bounds->xmax >= cent[0]) || (bucket_bounds->ymin <= cent[1] && bucket_bounds->ymax >= cent[1]) ) {
-	   return 1;
+		return 1;
 	}
 	
 	/* out of bounds left */
@@ -2133,7 +2176,7 @@ if __name__ == '__main__':
 	
 /* checks if pt is inside a convex 2D polyline, the polyline must be ordered rotating clockwise
  * otherwise it would have to test for mixed (line_point_side_v2 > 0.0f) cases */
-int IsectPoly2Df(const float pt[2], float uv[][2], const int tot)
+static int IsectPoly2Df(const float pt[2], float uv[][2], const int tot)
 {
 	int i;
 	if (line_point_side_v2(uv[tot-1], uv[0], pt) < 0.0f)
@@ -2194,7 +2237,7 @@ static void project_paint_face_init(const ProjPaintState *ps, const int thread_i
 	
 	float tf_uv_pxoffset[4][2]; /* bucket bounds in UV space so we can init pixels only for this face,  */
 	float xhalfpx, yhalfpx;
-	const float ibuf_xf = ibuf->x, ibuf_yf = ibuf->y;
+	const float ibuf_xf = (float)ibuf->x, ibuf_yf = (float)ibuf->y;
 	
 	int has_x_isect = 0, has_isect = 0; /* for early loop exit */
 	
@@ -2306,7 +2349,7 @@ static void project_paint_face_init(const ProjPaintState *ps, const int thread_i
 						/* a pitty we need to get the worldspace pixel location here */
 						if(do_clip) {
 							interp_v3_v3v3v3(wco, ps->dm_mvert[ (*(&mf->v1 + i1)) ].co, ps->dm_mvert[ (*(&mf->v1 + i2)) ].co, ps->dm_mvert[ (*(&mf->v1 + i3)) ].co, w);
-							if(view3d_test_clipping(ps->rv3d, wco, 1)) {
+							if(ED_view3d_test_clipping(ps->rv3d, wco, 1)) {
 								continue; /* Watch out that no code below this needs to run */
 							}
 						}
@@ -2494,26 +2537,32 @@ static void project_paint_face_init(const ProjPaintState *ps, const int thread_i
 											
 											/* Only bother calculating the weights if we intersect */
 											if (ps->do_mask_normal || ps->dm_mtface_clone) {
-#if 0
-												/* This is not QUITE correct since UV is not inside the UV's but good enough for seams */
+#if 1
+												/* get the UV on the line since we want to copy the pixels from there for bleeding */
+												float uv_close[2];
+												float fac= closest_to_line_v2(uv_close, uv, tf_uv_pxoffset[fidx1], tf_uv_pxoffset[fidx2]);
+												if		(fac < 0.0f) copy_v2_v2(uv_close, tf_uv_pxoffset[fidx1]);
+												else if	(fac > 1.0f) copy_v2_v2(uv_close, tf_uv_pxoffset[fidx2]);
+
 												if (side) {
-													barycentric_weights_v2(tf_uv_pxoffset[0], tf_uv_pxoffset[2], tf_uv_pxoffset[3], uv, w);
+													barycentric_weights_v2(tf_uv_pxoffset[0], tf_uv_pxoffset[2], tf_uv_pxoffset[3], uv_close, w);
 												}
 												else {
-													barycentric_weights_v2(tf_uv_pxoffset[0], tf_uv_pxoffset[1], tf_uv_pxoffset[2], uv, w);
+													barycentric_weights_v2(tf_uv_pxoffset[0], tf_uv_pxoffset[1], tf_uv_pxoffset[2], uv_close, w);
 												}
-#endif
-#if 1
+#else											/* this is buggy with quads, dont use for now */
+
 												/* Cheat, we know where we are along the edge so work out the weights from that */
 												fac = fac1 + (fac * (fac2-fac1));
+
 												w[0]=w[1]=w[2]= 0.0;
 												if (side) {
-													w[fidx1?fidx1-1:0] = fac;
-													w[fidx2?fidx2-1:0] = 1.0f-fac;
+													w[fidx1?fidx1-1:0] = 1.0f-fac;
+													w[fidx2?fidx2-1:0] = fac;
 												}
 												else {
-													w[fidx1] = fac;
-													w[fidx2] = 1.0f-fac;
+													w[fidx1] = 1.0f-fac;
+													w[fidx2] = fac;
 												}
 #endif
 											}
@@ -2523,7 +2572,7 @@ static void project_paint_face_init(const ProjPaintState *ps, const int thread_i
 												if (side)	interp_v3_v3v3v3(wco, ps->dm_mvert[mf->v1].co, ps->dm_mvert[mf->v3].co, ps->dm_mvert[mf->v4].co, w);
 												else		interp_v3_v3v3v3(wco, ps->dm_mvert[mf->v1].co, ps->dm_mvert[mf->v2].co, ps->dm_mvert[mf->v3].co, w);
 
-												if(view3d_test_clipping(ps->rv3d, wco, 1)) {
+												if(ED_view3d_test_clipping(ps->rv3d, wco, 1)) {
 													continue; /* Watch out that no code below this needs to run */
 												}
 											}
@@ -2563,7 +2612,7 @@ static void project_paint_face_init(const ProjPaintState *ps, const int thread_i
 }
 
 
-/* takes floating point screenspace min/max and returns int min/max to be used as indicies for ps->bucketRect, ps->bucketFlags */
+/* takes floating point screenspace min/max and returns int min/max to be used as indices for ps->bucketRect, ps->bucketFlags */
 static void project_paint_bucket_bounds(const ProjPaintState *ps, const float min[2], const float max[2], int bucketMin[2], int bucketMax[2])
 {
 	/* divide by bucketWidth & bucketHeight so the bounds are offset in bucket grid units */
@@ -2765,7 +2814,7 @@ static void project_paint_delayed_face_init(ProjPaintState *ps, const MFace *mf,
 
 static int project_paint_view_clip(View3D *v3d, RegionView3D *rv3d, float *clipsta, float *clipend)
 {
-	int orth= get_view3d_cliprange(v3d, rv3d, clipsta, clipend);
+	int orth= ED_view3d_clip_range_get(v3d, rv3d, clipsta, clipend);
 
 	if (orth) { /* only needed for ortho */
 		float fac = 2.0f / ((*clipend) - (*clipsta));
@@ -2816,7 +2865,7 @@ static void project_paint_begin(ProjPaintState *ps)
 	/* Workaround for subsurf selection, try the display mesh first */
 	if (ps->source==PROJ_SRC_IMAGE_CAM) {
 		/* using render mesh, assume only camera was rendered from */
-		ps->dm = mesh_create_derived_render(ps->scene, ps->ob, ps->v3d->customdata_mask | CD_MASK_MTFACE);
+		ps->dm = mesh_create_derived_render(ps->scene, ps->ob, ps->scene->customdata_mask | CD_MASK_MTFACE);
 		ps->dm_release= TRUE;
 	}
 	else if(ps->ob->derivedFinal && CustomData_has_layer( &ps->ob->derivedFinal->faceData, CD_MTFACE)) {
@@ -2824,7 +2873,7 @@ static void project_paint_begin(ProjPaintState *ps)
 		ps->dm_release= FALSE;
 	}
 	else {
-		ps->dm = mesh_get_derived_final(ps->scene, ps->ob, ps->v3d->customdata_mask | CD_MASK_MTFACE);
+		ps->dm = mesh_get_derived_final(ps->scene, ps->ob, ps->scene->customdata_mask | CD_MASK_MTFACE);
 		ps->dm_release= TRUE;
 	}
 	
@@ -2904,7 +2953,7 @@ static void project_paint_begin(ProjPaintState *ps)
 			copy_m4_m4(viewmat, ps->rv3d->viewmat);
 			copy_m4_m4(viewinv, ps->rv3d->viewinv);
 
-			view3d_get_object_project_mat(ps->rv3d, ps->ob, ps->projectMat);
+			ED_view3d_ob_project_mat_get(ps->rv3d, ps->ob, ps->projectMat);
 
 			ps->is_ortho= project_paint_view_clip(ps->v3d, ps->rv3d, &ps->clipsta, &ps->clipend);
 		}
@@ -2945,6 +2994,7 @@ static void project_paint_begin(ProjPaintState *ps)
 				invert_m4_m4(viewmat, viewinv);
 
 				/* camera winmat */
+				object_camera_mode(&ps->scene->r, camera);
 				object_camera_matrix(&ps->scene->r, camera, ps->winx, ps->winy, 0,
 						winmat, &_viewplane, &ps->clipsta, &ps->clipend,
 						&_lens, &_ycor, &_viewdx, &_viewdy);
@@ -3925,7 +3975,7 @@ static int project_paint_op(void *state, ImBuf *UNUSED(ibufb), float *lastpos, f
 }
 
 
-static int project_paint_sub_stroke(ProjPaintState *ps, BrushPainter *painter, int *UNUSED(prevmval_i), int *mval_i, double time, float pressure)
+static int project_paint_sub_stroke(ProjPaintState *ps, BrushPainter *painter, const int UNUSED(prevmval_i[2]), const int mval_i[2], double time, float pressure)
 {
 	
 	/* Use mouse coords as floats for projection painting */
@@ -3944,7 +3994,7 @@ static int project_paint_sub_stroke(ProjPaintState *ps, BrushPainter *painter, i
 }
 
 
-static int project_paint_stroke(ProjPaintState *ps, BrushPainter *painter, int *prevmval_i, int *mval_i, double time, float pressure)
+static int project_paint_stroke(ProjPaintState *ps, BrushPainter *painter, const int prevmval_i[2], const int mval_i[2], double time, float pressure)
 {
 	int a, redraw;
 	
@@ -3961,7 +4011,7 @@ static int project_paint_stroke(ProjPaintState *ps, BrushPainter *painter, int *
 
 /* Imagepaint Partial Redraw & Dirty Region */
 
-static void imapaint_clear_partial_redraw()
+static void imapaint_clear_partial_redraw(void)
 {
 	memset(&imapaintpartial, 0, sizeof(imapaintpartial));
 }
@@ -4009,9 +4059,10 @@ static void imapaint_image_update(SpaceImage *sima, Image *image, ImBuf *ibuf, s
 {
 	if(ibuf->rect_float)
 		/* TODO - should just update a portion from imapaintpartial! */
-		imb_freerectImBuf(ibuf); /* force recreate of char rect */
+		ibuf->userflags |= IB_RECT_INVALID; /* force recreate of char rect */
+	
 	if(ibuf->mipmap[0])
-		imb_freemipmapImBuf(ibuf);
+		ibuf->userflags |= IB_MIPMAP_INVALID;
 
 	/* todo: should set_tpage create ->rect? */
 	if(texpaint || (sima && sima->lock)) {
@@ -4178,7 +4229,7 @@ static void imapaint_lift_smear(ImBuf *ibuf, ImBuf *ibufb, int *pos)
 	int a, tot;
 
 	imapaint_set_region(region, 0, 0, pos[0], pos[1], ibufb->x, ibufb->y);
-	tot= imapaint_torus_split_region(region, ibuf, ibufb);
+	tot= imapaint_torus_split_region(region, ibufb, ibuf);
 
 	for(a=0; a<tot; a++)
 		IMB_rectblend(ibufb, ibuf, region[a].destx, region[a].desty,
@@ -4366,7 +4417,7 @@ static int imapaint_paint_sub_stroke(ImagePaintState *s, BrushPainter *painter, 
 	else return 0;
 }
 
-static int imapaint_paint_stroke(ViewContext *vc, ImagePaintState *s, BrushPainter *painter, short texpaint, int *prevmval, int *mval, double time, float pressure)
+static int imapaint_paint_stroke(ViewContext *vc, ImagePaintState *s, BrushPainter *painter, short texpaint, const int prevmval[2], const int mval[2], double time, float pressure)
 {
 	Image *newimage = NULL;
 	float fwuv[2], bkuv[2], newuv[2];
@@ -4523,6 +4574,8 @@ typedef struct PaintOperation {
 
 	ViewContext vc;
 	wmTimer *timer;
+
+	short restore_projection;
 } PaintOperation;
 
 static void paint_redraw(bContext *C, ImagePaintState *s, int final)
@@ -4598,6 +4651,17 @@ static void project_state_init(bContext *C, Object *ob, ProjPaintState *ps)
 		ps->do_mask_normal = 0; /* no need to do blending */
 }
 
+static void paint_brush_init_tex(Brush *brush)
+{
+	/* init mtex nodes */ 
+	if(brush) {
+		MTex *mtex= &brush->mtex;
+		if(mtex->tex && mtex->tex->nodetree)
+			ntreeBeginExecTree(mtex->tex->nodetree); /* has internal flag to detect it only does it once */
+	}
+	
+}
+
 static int texture_paint_init(bContext *C, wmOperator *op)
 {
 	Scene *scene= CTX_data_scene(C);
@@ -4608,6 +4672,13 @@ static int texture_paint_init(bContext *C, wmOperator *op)
 	pop->first= 1;
 	op->customdata= pop;
 	
+	/* XXX: Soften tool does not support projection painting atm, so just disable
+	        projection for this brush */
+	if(brush->imagepaint_tool == PAINT_TOOL_SOFTEN) {
+		settings->imapaint.flag |= IMAGEPAINT_PROJECT_DISABLE;
+		pop->restore_projection = 1;
+	}
+
 	/* initialize from context */
 	if(CTX_wm_region_view3d(C)) {
 		pop->mode= PAINT_MODE_3D;
@@ -4649,12 +4720,16 @@ static int texture_paint_init(bContext *C, wmOperator *op)
 			return 0;
 		}
 	}
-
+	
+	paint_brush_init_tex(pop->s.brush);
+	
 	/* note, if we have no UVs on the derived mesh, then we must return here */
 	if(pop->mode == PAINT_MODE_3D_PROJECT) {
 
 		/* initialize all data from the context */
 		project_state_init(C, OBACT, &pop->ps);
+		
+		paint_brush_init_tex(pop->ps.brush);
 
 		pop->ps.source= PROJ_SRC_VIEW;
 
@@ -4719,6 +4794,15 @@ static void paint_apply(bContext *C, wmOperator *op, PointerRNA *itemptr)
 	pop->first= 0;
 }
 
+static void paint_brush_exit_tex(Brush *brush)
+{
+	if(brush) {
+		MTex *mtex= &brush->mtex;
+		if(mtex->tex && mtex->tex->nodetree)
+			ntreeEndExecTree(mtex->tex->nodetree);
+	}	
+}
+
 static void paint_exit(bContext *C, wmOperator *op)
 {
 	Scene *scene= CTX_data_scene(C);
@@ -4728,12 +4812,19 @@ static void paint_exit(bContext *C, wmOperator *op)
 	if(pop->timer)
 		WM_event_remove_timer(CTX_wm_manager(C), CTX_wm_window(C), pop->timer);
 
+	if(pop->restore_projection)
+		settings->imapaint.flag &= ~IMAGEPAINT_PROJECT_DISABLE;
+
+	paint_brush_exit_tex(pop->s.brush);
+	
 	settings->imapaint.flag &= ~IMAGEPAINT_DRAWING;
 	imapaint_canvas_free(&pop->s);
 	brush_painter_free(pop->painter);
 
 	if(pop->mode == PAINT_MODE_3D_PROJECT) {
 		brush_set_size(pop->ps.brush, pop->orig_brush_size);
+		paint_brush_exit_tex(pop->ps.brush);
+		
 		project_paint_end(&pop->ps);
 	}
 	
@@ -4767,7 +4858,6 @@ static int paint_exec(bContext *C, wmOperator *op)
 
 static void paint_apply_event(bContext *C, wmOperator *op, wmEvent *event)
 {
-	ARegion *ar= CTX_wm_region(C);
 	PaintOperation *pop= op->customdata;
 	wmTabletData *wmtab;
 	PointerRNA itemptr;
@@ -4777,8 +4867,8 @@ static void paint_apply_event(bContext *C, wmOperator *op, wmEvent *event)
 
 	// XXX +1 matches brush location better but
 	// still not exact, find out why and fix ..
-	mouse[0]= event->x - ar->winrct.xmin + 1;
-	mouse[1]= event->y - ar->winrct.ymin + 1;
+	mouse[0]= event->mval[0] + 1;
+	mouse[1]= event->mval[1] + 1;
 
 	time= PIL_check_seconds_timer();
 
@@ -4961,55 +5051,20 @@ static void toggle_paint_cursor(bContext *C, int enable)
 		settings->imapaint.paintcursor= WM_paint_cursor_activate(CTX_wm_manager(C), image_paint_poll, brush_drawcursor, NULL);
 }
 
-/* ************ image paint radial control *************/
-static int paint_radial_control_invoke(bContext *C, wmOperator *op, wmEvent *event)
+/* enable the paint cursor if it isn't already.
+
+   purpose is to make sure the paint cursor is shown if paint
+   mode is enabled in the image editor. the paint poll will
+   ensure that the cursor is hidden when not in paint mode */
+void ED_space_image_paint_update(wmWindowManager *wm, ToolSettings *settings)
 {
-	float zoom;
-	ToolSettings *ts = CTX_data_scene(C)->toolsettings;
-	get_imapaint_zoom(C, &zoom, &zoom);
-	toggle_paint_cursor(C, !ts->imapaint.paintcursor);
-	brush_radial_control_invoke(op, paint_brush(&ts->imapaint.paint), zoom);
-	return WM_radial_control_invoke(C, op, event);
-}
+	ImagePaintSettings *imapaint = &settings->imapaint;
 
-static int paint_radial_control_modal(bContext *C, wmOperator *op, wmEvent *event)
-{
-	ToolSettings *ts = CTX_data_scene(C)->toolsettings;
-	int ret = WM_radial_control_modal(C, op, event);
-	if(ret != OPERATOR_RUNNING_MODAL)
-			toggle_paint_cursor(C, !ts->imapaint.paintcursor);
-	return ret;
-}
-
-static int paint_radial_control_exec(bContext *C, wmOperator *op)
-{
-	Brush *brush = paint_brush(&CTX_data_scene(C)->toolsettings->imapaint.paint);
-	float zoom;
-	int ret;
-	char str[64];
-	get_imapaint_zoom(C, &zoom, &zoom);
-	ret = brush_radial_control_exec(op, brush, 1.0f / zoom);
-	WM_radial_control_string(op, str, sizeof(str));
-	
-	WM_event_add_notifier(C, NC_BRUSH|NA_EDITED, brush);
-
-	return ret;
-}
-
-void PAINT_OT_image_paint_radial_control(wmOperatorType *ot)
-{
-	WM_OT_radial_control_partial(ot);
-
-	ot->name= "Image Paint Radial Control";
-	ot->idname= "PAINT_OT_image_paint_radial_control";
-
-	ot->invoke= paint_radial_control_invoke;
-	ot->modal= paint_radial_control_modal;
-	ot->exec= paint_radial_control_exec;
-	ot->poll= image_paint_poll;
-	
-	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO|OPTYPE_BLOCKING;
+	if(!imapaint->paintcursor) {
+		imapaint->paintcursor =
+			WM_paint_cursor_activate(wm, image_paint_poll,
+						 brush_drawcursor, NULL);
+	}
 }
 
 /************************ grab clone operator ************************/
@@ -5129,16 +5184,8 @@ static int sample_color_exec(bContext *C, wmOperator *op)
 
 static int sample_color_invoke(bContext *C, wmOperator *op, wmEvent *event)
 {
-	ARegion *ar= CTX_wm_region(C);
-	int location[2];
-
-	if(ar) {
-		location[0]= event->x - ar->winrct.xmin;
-		location[1]= event->y - ar->winrct.ymin;
-		RNA_int_set_array(op->ptr, "location", location);
-
-		sample_color_exec(C, op);
-	}
+	RNA_int_set_array(op->ptr, "location", event->mval);
+	sample_color_exec(C, op);
 
 	WM_event_add_modal_handler(C, op);
 
@@ -5147,25 +5194,37 @@ static int sample_color_invoke(bContext *C, wmOperator *op, wmEvent *event)
 
 static int sample_color_modal(bContext *C, wmOperator *op, wmEvent *event)
 {
-	ARegion *ar= CTX_wm_region(C);
-	int location[2];
-
 	switch(event->type) {
 		case LEFTMOUSE:
 		case RIGHTMOUSE: // XXX hardcoded
 			return OPERATOR_FINISHED;
 		case MOUSEMOVE:
-			if(ar) {
-				location[0]= event->x - ar->winrct.xmin;
-				location[1]= event->y - ar->winrct.ymin;
-				RNA_int_set_array(op->ptr, "location", location);
-
-				sample_color_exec(C, op);
-			}
+			RNA_int_set_array(op->ptr, "location", event->mval);
+			sample_color_exec(C, op);
 			break;
 	}
 
 	return OPERATOR_RUNNING_MODAL;
+}
+
+/* same as image_paint_poll but fail when face mask mode is enabled */
+static int image_paint_sample_color_poll(bContext *C)
+{
+	if(image_paint_poll(C)) {
+		if(CTX_wm_view3d(C)) {
+			Object *obact = CTX_data_active_object(C);
+			if (obact && obact->mode & OB_MODE_TEXTURE_PAINT) {
+				Mesh *me= get_mesh(obact);
+				if(me) {
+					return !(me->editflag & ME_EDIT_PAINT_MASK);
+				}
+			}
+		}
+
+		return 1;
+	}
+
+	return 0;
 }
 
 void PAINT_OT_sample_color(wmOperatorType *ot)
@@ -5178,7 +5237,7 @@ void PAINT_OT_sample_color(wmOperatorType *ot)
 	ot->exec= sample_color_exec;
 	ot->invoke= sample_color_invoke;
 	ot->modal= sample_color_modal;
-	ot->poll= image_paint_poll;
+	ot->poll= image_paint_sample_color_poll;
 
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
@@ -5208,14 +5267,10 @@ static int set_clone_cursor_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	View3D *v3d= CTX_wm_view3d(C);
 	ARegion *ar= CTX_wm_region(C);
 	float location[3];
-	short mval[2];
-
-	mval[0]= event->x - ar->winrct.xmin;
-	mval[1]= event->y - ar->winrct.ymin;
 
 	view3d_operator_needs_opengl(C);
 
-	if(!view_autodist(scene, ar, v3d, mval, location))
+	if(!ED_view3d_autodist(scene, ar, v3d, event->mval, location))
 		return OPERATOR_CANCELLED;
 
 	RNA_float_set_array(op->ptr, "location", location);
@@ -5257,7 +5312,7 @@ static int texture_paint_toggle_exec(bContext *C, wmOperator *op)
 {
 	Scene *scene= CTX_data_scene(C);
 	Object *ob= CTX_data_active_object(C);
-	Mesh *me= 0;
+	Mesh *me= NULL;
 	
 	if(ob==NULL)
 		return OPERATOR_CANCELLED;
@@ -5299,7 +5354,7 @@ static int texture_paint_toggle_exec(bContext *C, wmOperator *op)
 		toggle_paint_cursor(C, 1);
 	}
 
-	DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	WM_event_add_notifier(C, NC_SCENE|ND_MODE, scene);
 
 	return OPERATOR_FINISHED;
@@ -5319,28 +5374,6 @@ void PAINT_OT_texture_paint_toggle(wmOperatorType *ot)
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 }
 
-/************* texture paint radial control *************/
-
-static int texture_paint_radial_control_invoke(bContext *C, wmOperator *op, wmEvent *event)
-{
-	ToolSettings *ts = CTX_data_scene(C)->toolsettings;
-	toggle_paint_cursor(C, !ts->imapaint.paintcursor);
-	brush_radial_control_invoke(op, paint_brush(&ts->imapaint.paint), 1);
-	return WM_radial_control_invoke(C, op, event);
-}
-
-static int texture_paint_radial_control_exec(bContext *C, wmOperator *op)
-{
-	Brush *brush = paint_brush(&CTX_data_scene(C)->toolsettings->imapaint.paint);
-	int ret = brush_radial_control_exec(op, brush, 1);
-	char str[64];
-	WM_radial_control_string(op, str, sizeof(str));
-
-	WM_event_add_notifier(C, NC_BRUSH|NA_EDITED, brush);
-
-	return ret;
-}
-
 static int texture_paint_poll(bContext *C)
 {
 	if(texture_paint_toggle_poll(C))
@@ -5355,23 +5388,6 @@ int image_texture_paint_poll(bContext *C)
 	return (texture_paint_poll(C) || image_paint_poll(C));
 }
 
-void PAINT_OT_texture_paint_radial_control(wmOperatorType *ot)
-{
-	WM_OT_radial_control_partial(ot);
-
-	ot->name= "Texture Paint Radial Control";
-	ot->idname= "PAINT_OT_texture_paint_radial_control";
-
-	ot->invoke= texture_paint_radial_control_invoke;
-	ot->modal= paint_radial_control_modal;
-	ot->exec= texture_paint_radial_control_exec;
-	ot->poll= texture_paint_poll;
-	
-	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO|OPTYPE_BLOCKING;
-}
-
-
 int facemask_paint_poll(bContext *C)
 {
 	return paint_facesel_test(CTX_data_active_object(C));
@@ -5382,12 +5398,10 @@ static int texture_paint_camera_project_exec(bContext *C, wmOperator *op)
 {
 	Image *image= BLI_findlink(&CTX_data_main(C)->image, RNA_enum_get(op->ptr, "image"));
 	Scene *scene= CTX_data_scene(C);
-	ProjPaintState ps;
+	ProjPaintState ps= {NULL};
 	int orig_brush_size;
 	IDProperty *idgroup;
 	IDProperty *view_data= NULL;
-
-	memset(&ps, 0, sizeof(ps));
 
 	project_state_init(C, OBACT, &ps);
 
@@ -5412,10 +5426,10 @@ static int texture_paint_camera_project_exec(bContext *C, wmOperator *op)
 	idgroup= IDP_GetProperties(&image->id, 0);
 
 	if(idgroup) {
-		view_data= IDP_GetPropertyFromGroup(idgroup, PROJ_VIEW_DATA_ID);
+		view_data= IDP_GetPropertyTypeFromGroup(idgroup, PROJ_VIEW_DATA_ID, IDP_ARRAY);
 
 		/* type check to make sure its ok */
-		if(view_data->len != PROJ_VIEW_DATA_SIZE || view_data->type != IDP_ARRAY || view_data->subtype != IDP_FLOAT) {
+		if(view_data->len != PROJ_VIEW_DATA_SIZE || view_data->subtype != IDP_FLOAT) {
 			BKE_report(op->reports, RPT_ERROR, "Image project data invalid.");
 			return OPERATOR_CANCELLED;
 		}
@@ -5512,6 +5526,7 @@ static int texture_paint_image_from_view_exec(bContext *C, wmOperator *op)
 	int w= settings->imapaint.screen_grab_size[0];
 	int h= settings->imapaint.screen_grab_size[1];
 	int maxsize;
+	char err_out[256]= "unknown";
 
 	RNA_string_get(op->ptr, "filepath", filename);
 
@@ -5520,11 +5535,11 @@ static int texture_paint_image_from_view_exec(bContext *C, wmOperator *op)
 	if(w > maxsize) w= maxsize;
 	if(h > maxsize) h= maxsize;
 
-	ibuf= ED_view3d_draw_offscreen_imbuf(CTX_data_scene(C), CTX_wm_view3d(C), CTX_wm_region(C), w, h, IB_rect);
+	ibuf= ED_view3d_draw_offscreen_imbuf(CTX_data_scene(C), CTX_wm_view3d(C), CTX_wm_region(C), w, h, IB_rect, err_out);
 	if(!ibuf) {
 		/* Mostly happens when OpenGL offscreen buffer was failed to create, */
 		/* but could be other reasons. Should be handled in the future. nazgul */
-		BKE_report(op->reports, RPT_ERROR, "Failed to create OpenGL offscreen buffer.");
+		BKE_reportf(op->reports, RPT_ERROR, "Failed to create OpenGL offscreen buffer: %s", err_out);
 		return OPERATOR_CANCELLED;
 	}
 
@@ -5569,6 +5584,7 @@ void PAINT_OT_image_from_view(wmOperatorType *ot)
 
 	/* api callbacks */
 	ot->exec= texture_paint_image_from_view_exec;
+	ot->poll= ED_operator_region_view3d_active;
 
 	/* flags */
 	ot->flag= OPTYPE_REGISTER;

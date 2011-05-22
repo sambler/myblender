@@ -30,21 +30,28 @@
 *
 */
 
+/** \file blender/modifiers/intern/MOD_hook.c
+ *  \ingroup modifiers
+ */
+
+
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
 #include "DNA_object_types.h"
 
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_action.h"
 #include "BKE_cdderivedmesh.h"
 #include "BKE_modifier.h"
 #include "BKE_deform.h"
-#include "BKE_utildefines.h"
+
 
 #include "depsgraph_private.h"
 #include "MEM_guardedalloc.h"
 
+#include "MOD_util.h"
 
 static void initData(ModifierData *md) 
 {
@@ -75,8 +82,8 @@ static CustomDataMask requiredDataMask(Object *UNUSED(ob), ModifierData *md)
 	CustomDataMask dataMask = 0;
 
 	/* ask for vertexgroups if we need them */
-	if(hmd->name[0]) dataMask |= (1 << CD_MDEFORMVERT);
-	// if(hmd->indexar) dataMask |= CD_MASK_ORIGINDEX;
+	if(hmd->name[0]) dataMask |= CD_MASK_MDEFORMVERT;
+	if(hmd->indexar) dataMask |= CD_MASK_ORIGINDEX;
 
 	return dataMask;
 }
@@ -129,8 +136,8 @@ static float hook_falloff(float *co_1, float *co_2, const float falloff_squared,
 		if(len_squared > falloff_squared) {
 			return 0.0f;
 		}
-		else if(len_squared > 0.0) {
-			return fac * (1.0 - (len_squared / falloff_squared));
+		else if(len_squared > 0.0f) {
+			return fac * (1.0f - (len_squared / falloff_squared));
 		}
 	}
 
@@ -138,7 +145,7 @@ static float hook_falloff(float *co_1, float *co_2, const float falloff_squared,
 }
 
 static void deformVerts(ModifierData *md, Object *ob,
-						DerivedMesh *derivedData,
+						DerivedMesh *dm,
 						float (*vertexCos)[3],
 						int numVerts,
 						int UNUSED(useRenderParams),
@@ -148,7 +155,6 @@ static void deformVerts(ModifierData *md, Object *ob,
 	bPoseChannel *pchan= get_pose_channel(hmd->object->pose, hmd->subtarget);
 	float vec[3], mat[4][4], dmat[4][4];
 	int i, *index_pt;
-	DerivedMesh *dm = derivedData;
 	const float falloff_squared= hmd->falloff * hmd->falloff; /* for faster comparisons */
 	
 	int max_dvert= 0;
@@ -243,7 +249,6 @@ static void deformVerts(ModifierData *md, Object *ob,
 		}
 	}
 	else if(dvert) {	/* vertex group hook */
-		int i;
 		const float fac_orig= hmd->force;
 
 		for(i = 0; i < max_dvert; i++, dvert++) {
@@ -269,7 +274,7 @@ static void deformVertsEM(
 
 	if(!derivedData) dm = CDDM_from_editmesh(editData, ob->data);
 
-	deformVerts(md, ob, derivedData, vertexCos, numVerts, 0, 0);
+	deformVerts(md, ob, dm, vertexCos, numVerts, 0, 0);
 
 	if(!derivedData) dm->release(dm);
 }
@@ -284,17 +289,18 @@ ModifierTypeInfo modifierType_Hook = {
 							| eModifierTypeFlag_SupportsEditmode,
 	/* copyData */          copyData,
 	/* deformVerts */       deformVerts,
+	/* deformMatrices */    NULL,
 	/* deformVertsEM */     deformVertsEM,
-	/* deformMatricesEM */  0,
-	/* applyModifier */     0,
-	/* applyModifierEM */   0,
+	/* deformMatricesEM */  NULL,
+	/* applyModifier */     NULL,
+	/* applyModifierEM */   NULL,
 	/* initData */          initData,
 	/* requiredDataMask */  requiredDataMask,
 	/* freeData */          freeData,
 	/* isDisabled */        isDisabled,
 	/* updateDepgraph */    updateDepgraph,
-	/* dependsOnTime */     0,
-	/* dependsOnNormals */	0,
+	/* dependsOnTime */     NULL,
+	/* dependsOnNormals */	NULL,
 	/* foreachObjectLink */ foreachObjectLink,
-	/* foreachIDLink */     0,
+	/* foreachIDLink */     NULL,
 };

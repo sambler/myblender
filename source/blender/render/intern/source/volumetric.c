@@ -1,4 +1,4 @@
-/**
+/*
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -26,6 +26,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/render/intern/source/volumetric.c
+ *  \ingroup render
+ */
+
+
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,9 +42,9 @@
 #include "BLI_math.h"
 #include "BLI_rand.h"
 #include "BLI_voxel.h"
+#include "BLI_utildefines.h"
 
 #include "RE_shader_ext.h"
-#include "RE_raytrace.h"
 
 #include "DNA_material_types.h"
 #include "DNA_group_types.h"
@@ -50,6 +55,8 @@
 
 #include "render_types.h"
 #include "pixelshading.h"
+#include "rayintersection.h"
+#include "rayobject.h"
 #include "shading.h"
 #include "shadbuf.h"
 #include "texture.h"
@@ -83,17 +90,18 @@ static float vol_get_shadow(ShadeInput *shi, LampRen *lar, float *co)
 		
 		copy_v3_v3(is.start, co);
 		if(lar->type==LA_SUN || lar->type==LA_HEMI) {
-			is.vec[0] = -lar->vec[0];
-			is.vec[1] = -lar->vec[1];
-			is.vec[2] = -lar->vec[2];
-			is.labda = R.maxdist;
+			is.dir[0] = -lar->vec[0];
+			is.dir[1] = -lar->vec[1];
+			is.dir[2] = -lar->vec[2];
+			is.dist = R.maxdist;
 		} else {
-			VECSUB( is.vec, lar->co, is.start );
-			is.labda = len_v3( is.vec );
+			VECSUB( is.dir, lar->co, is.start );
+			is.dist = normalize_v3( is.dir );
 		}
 
 		is.mode = RE_RAY_MIRROR;
-		is.skip = RE_SKIP_VLR_RENDER_CHECK | RE_SKIP_VLR_NON_SOLID_MATERIAL;
+		is.check = RE_CHECK_VLR_NON_SOLID_MATERIAL;
+		is.skip = 0;
 		
 		if(lar->mode & (LA_LAYER|LA_LAYER_SHADOW))
 			is.lay= lar->lay;	
@@ -115,20 +123,14 @@ static float vol_get_shadow(ShadeInput *shi, LampRen *lar, float *co)
 
 static int vol_get_bounds(ShadeInput *shi, float *co, float *vec, float *hitco, Isect *isect, int intersect_type)
 {
-	/* XXX TODO - get raytrace max distance from object instance's bounding box */
-	/* need to account for scaling only, but keep coords in camera space...
-	 * below code is WIP and doesn't work!
-	sub_v3_v3v3(bb_dim, shi->obi->obr->boundbox[1], shi->obi->obr->boundbox[2]);
-	mul_m3_v3(shi->obi->nmat, bb_dim);
-	maxsize = len_v3(bb_dim);
-	*/
 	
 	VECCOPY(isect->start, co);
-	VECCOPY(isect->vec, vec );
-	isect->labda = FLT_MAX;
+	VECCOPY(isect->dir, vec );
+	isect->dist = FLT_MAX;
 	isect->mode= RE_RAY_MIRROR;
 	isect->last_hit = NULL;
 	isect->lay= -1;
+	isect->check= RE_CHECK_VLR_NONE;
 	
 	if (intersect_type == VOL_BOUNDS_DEPTH) {
 		isect->skip = RE_SKIP_VLR_NEIGHBOUR;
@@ -142,9 +144,9 @@ static int vol_get_bounds(ShadeInput *shi, float *co, float *vec, float *hitco, 
 	
 	if(RE_rayobject_raycast(R.raytree, isect))
 	{
-		hitco[0] = isect->start[0] + isect->labda*isect->vec[0];
-		hitco[1] = isect->start[1] + isect->labda*isect->vec[1];
-		hitco[2] = isect->start[2] + isect->labda*isect->vec[2];
+		hitco[0] = isect->start[0] + isect->dist*isect->dir[0];
+		hitco[1] = isect->start[1] + isect->dist*isect->dir[1];
+		hitco[2] = isect->start[2] + isect->dist*isect->dir[2];
 		return 1;
 	} else {
 		return 0;
@@ -189,10 +191,11 @@ static void vol_trace_behind(ShadeInput *shi, VlakRen *vlr, float *co, float *co
 	Isect isect;
 	
 	VECCOPY(isect.start, co);
-	VECCOPY(isect.vec, shi->view);
-	isect.labda = FLT_MAX;
+	VECCOPY(isect.dir, shi->view);
+	isect.dist = FLT_MAX;
 	
 	isect.mode= RE_RAY_MIRROR;
+	isect.check = RE_CHECK_VLR_NONE;
 	isect.skip = RE_SKIP_VLR_NEIGHBOUR;
 	isect.orig.ob = (void*) shi->obi;
 	isect.orig.face = (void*)vlr;
@@ -302,7 +305,7 @@ float vol_get_density(struct ShadeInput *shi, float *co)
 /* Color of light that gets scattered out by the volume */
 /* Uses same physically based scattering parameter as in transmission calculations, 
  * along with artificial reflection scale/reflection color tint */
-void vol_get_reflection_color(ShadeInput *shi, float *ref_col, float *co)
+static void vol_get_reflection_color(ShadeInput *shi, float *ref_col, float *co)
 {
 	float scatter = shi->mat->vol.scattering;
 	float reflection= shi->mat->vol.reflection;
@@ -322,7 +325,7 @@ void vol_get_reflection_color(ShadeInput *shi, float *ref_col, float *co)
 
 /* compute emission component, amount of radiance to add per segment
  * can be textured with 'emit' */
-void vol_get_emission(ShadeInput *shi, float *emission_col, float *co)
+static void vol_get_emission(ShadeInput *shi, float *emission_col, float *co)
 {
 	float emission = shi->mat->vol.emission;
 	VECCOPY(emission_col, shi->mat->vol.emission_col);
@@ -337,10 +340,10 @@ void vol_get_emission(ShadeInput *shi, float *emission_col, float *co)
 
 
 /* A combination of scattering and absorption -> known as sigma T.
- * This can possibly use a specific scattering colour, 
+ * This can possibly use a specific scattering color, 
  * and absorption multiplier factor too, but these parameters are left out for simplicity.
  * It's easy enough to get a good wide range of results with just these two parameters. */
-void vol_get_sigma_t(ShadeInput *shi, float *sigma_t, float *co)
+static void vol_get_sigma_t(ShadeInput *shi, float *sigma_t, float *co)
 {
 	/* technically absorption, but named transmission color 
 	 * since it describes the effect of the coloring *after* absorption */
@@ -358,7 +361,7 @@ void vol_get_sigma_t(ShadeInput *shi, float *sigma_t, float *co)
 /* phase function - determines in which directions the light 
  * is scattered in the volume relative to incoming direction 
  * and view direction */
-float vol_get_phasefunc(ShadeInput *shi, float g, float *w, float *wp)
+static float vol_get_phasefunc(ShadeInput *UNUSED(shi), float g, float *w, float *wp)
 {
 	const float normalize = 0.25f; // = 1.f/4.f = M_PI/(4.f*M_PI)
 	
@@ -405,7 +408,7 @@ float vol_get_phasefunc(ShadeInput *shi, float g, float *w, float *wp)
 }
 
 /* Compute transmittance = e^(-attenuation) */
-void vol_get_transmittance_seg(ShadeInput *shi, float *tr, float stepsize, float *co, float density)
+static void vol_get_transmittance_seg(ShadeInput *shi, float *tr, float stepsize, float *co, float density)
 {
 	/* input density = density at co */
 	float tau[3] = {0.f, 0.f, 0.f};
@@ -461,7 +464,7 @@ static void vol_get_transmittance(ShadeInput *shi, float *tr, float *co, float *
 	tr[2] = expf(-tau[2]);
 }
 
-void vol_shade_one_lamp(struct ShadeInput *shi, float *co, LampRen *lar, float *lacol)
+static void vol_shade_one_lamp(struct ShadeInput *shi, float *co, LampRen *lar, float *lacol)
 {
 	float visifac, lv[3], lampdist;
 	float tr[3]={1.0,1.0,1.0};
@@ -578,8 +581,8 @@ outgoing radiance from behind surface * beam transmittance/attenuation
 /* For ease of use, I've also introduced a 'reflection' and 'reflection color' parameter, which isn't 
  * physically correct. This works as an RGB tint/gain on out-scattered light, but doesn't affect the light 
  * that is transmitted through the volume. While having wavelength dependent absorption/scattering is more correct,
- * it also makes it harder to control the overall look of the volume since colouring the outscattered light results
- * in the inverse colour being transmitted through the rest of the volume.
+ * it also makes it harder to control the overall look of the volume since coloring the outscattered light results
+ * in the inverse color being transmitted through the rest of the volume.
  */
 static void volumeintegrate(struct ShadeInput *shi, float *col, float *co, float *endco)
 {
@@ -741,8 +744,9 @@ void shade_volume_shadow(struct ShadeInput *shi, struct ShadeResult *shr, struct
 {
 	float hitco[3];
 	float tr[3] = {1.0,1.0,1.0};
-	Isect is;
+	Isect is= {{0}};
 	float *startco, *endco;
+	int intersect_type = VOL_BOUNDS_DEPTH;
 
 	memset(shr, 0, sizeof(ShadeResult));
 	
@@ -751,10 +755,12 @@ void shade_volume_shadow(struct ShadeInput *shi, struct ShadeResult *shr, struct
 	if (shi->flippednor) {
 		startco = last_is->start;
 		endco = shi->co;
+		intersect_type = VOL_BOUNDS_SS;
 	}
+	
 	/* trace to find a backface, the other side bounds of the volume */
 	/* (ray intersect ignores front faces here) */
-	else if (vol_get_bounds(shi, shi->co, shi->view, hitco, &is, VOL_BOUNDS_DEPTH)) {
+	else if (vol_get_bounds(shi, shi->co, shi->view, hitco, &is, intersect_type)) {
 		startco = shi->co;
 		endco = hitco;
 	}
@@ -765,9 +771,21 @@ void shade_volume_shadow(struct ShadeInput *shi, struct ShadeResult *shr, struct
 	}
 
 	vol_get_transmittance(shi, tr, startco, endco);
+
+	
+	/* if we hit another face in the same volume bounds */
+	/* shift raytrace coordinates to the hit point, to avoid shading volume twice */
+	/* due to idiosyncracy in ray_trace_shadow_tra() */
+	if (is.hit.ob == shi->obi) {
+		copy_v3_v3(shi->co, hitco);
+		last_is->dist -= is.dist;
+		shi->vlr = (VlakRen *)is.hit.face;
+	}
+
 	
 	copy_v3_v3(shr->combined, tr);
 	shr->combined[3] = 1.0f - luminance(tr);
+	shr->alpha = shr->combined[3];
 }
 
 
@@ -784,6 +802,7 @@ void shade_volume_inside(ShadeInput *shi, ShadeResult *shr)
 	MatInside *m;
 	Material *mat_backup;
 	ObjectInstanceRen *obi_backup;
+	float prev_alpha = shr->alpha;
 
 	/* XXX: extend to multiple volumes perhaps later */
 	mat_backup = shi->mat;
@@ -794,11 +813,14 @@ void shade_volume_inside(ShadeInput *shi, ShadeResult *shr)
 	shi->obi = m->obi;
 	shi->obr = m->obi->obr;
 	
-	memset(shr, 0, sizeof(ShadeResult));
-	
 	volume_trace(shi, shr, VOL_SHADE_INSIDE);
+	
+	shr->alpha = shr->alpha + prev_alpha;
+	CLAMP(shr->alpha, 0.0, 1.0);
 
 	shi->mat = mat_backup;
 	shi->obi = obi_backup;
 	shi->obr = obi_backup->obr;
 }
+
+

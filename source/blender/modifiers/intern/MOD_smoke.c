@@ -30,13 +30,23 @@
 *
 */
 
-#include "stddef.h"
+/** \file blender/modifiers/intern/MOD_smoke.c
+ *  \ingroup modifiers
+ */
+
+
+#include <stddef.h>
 
 #include "MEM_guardedalloc.h"
 
+#include "DNA_group_types.h"
 #include "DNA_object_types.h"
+#include "DNA_scene_types.h"
+#include "DNA_smoke_types.h"
 
-#include "BKE_utildefines.h"
+#include "BLI_utildefines.h"
+
+
 #include "BKE_cdderivedmesh.h"
 #include "BKE_modifier.h"
 #include "BKE_smoke.h"
@@ -76,13 +86,13 @@ static void deformVerts(ModifierData *md, Object *ob,
 						DerivedMesh *derivedData,
 						float (*vertexCos)[3],
 						int UNUSED(numVerts),
-						int useRenderParams,
-						int isFinalCalc)
+						int UNUSED(useRenderParams),
+						int UNUSED(isFinalCalc))
 {
 	SmokeModifierData *smd = (SmokeModifierData*) md;
-	DerivedMesh *dm = dm= get_cddm(ob, NULL, derivedData, vertexCos);
+	DerivedMesh *dm = get_cddm(ob, NULL, derivedData, vertexCos);
 
-	smokeModifier_do(smd, md->scene, ob, dm, useRenderParams, isFinalCalc);
+	smokeModifier_do(smd, md->scene, ob, dm);
 
 	if(dm != derivedData)
 		dm->release(dm);
@@ -93,12 +103,13 @@ static int dependsOnTime(ModifierData *UNUSED(md))
 	return 1;
 }
 
-static void updateDepgraph(ModifierData *UNUSED(md), DagForest *UNUSED(forest),
-						struct Scene *UNUSED(scene),
+static void updateDepgraph(ModifierData *md, DagForest *forest,
+						struct Scene *scene,
 						Object *UNUSED(ob),
-						DagNode *UNUSED(obNode))
+						DagNode *obNode)
 {
-	/*SmokeModifierData *smd = (SmokeModifierData *) md;
+	SmokeModifierData *smd = (SmokeModifierData *) md;
+
 	if(smd && (smd->type & MOD_SMOKE_TYPE_DOMAIN) && smd->domain)
 	{
 		if(smd->domain->fluid_group)
@@ -112,7 +123,7 @@ static void updateDepgraph(ModifierData *UNUSED(md), DagForest *UNUSED(forest),
 					SmokeModifierData *smd2 = (SmokeModifierData *)modifiers_findByType(go->ob, eModifierType_Smoke);
 					
 					// check for initialized smoke object
-					if(smd2 && (smd2->type & MOD_SMOKE_TYPE_FLOW) && smd2->flow)
+					if(smd2 && (((smd2->type & MOD_SMOKE_TYPE_FLOW) && smd2->flow) || ((smd->type & MOD_SMOKE_TYPE_COLL) && smd2->coll)))
 					{
 						DagNode *curNode = dag_get_node(forest, go->ob);
 						dag_add_relation(forest, curNode, obNode, DAG_RL_DATA_DATA|DAG_RL_OB_DATA, "Smoke Flow");
@@ -120,10 +131,33 @@ static void updateDepgraph(ModifierData *UNUSED(md), DagForest *UNUSED(forest),
 				}
 			}
 		}
+		else {
+			Base *base = scene->base.first;
+
+			for(; base; base = base->next) {
+				SmokeModifierData *smd2 = (SmokeModifierData *)modifiers_findByType(base->object, eModifierType_Smoke);
+
+				if(smd2 && (((smd2->type & MOD_SMOKE_TYPE_FLOW) && smd2->flow) || ((smd->type & MOD_SMOKE_TYPE_COLL) && smd2->coll)))
+				{
+					DagNode *curNode = dag_get_node(forest, base->object);
+					dag_add_relation(forest, curNode, obNode, DAG_RL_DATA_DATA|DAG_RL_OB_DATA, "Smoke Flow");
+				}
+			}
+		}
 	}
-	*/
 }
 
+static void foreachIDLink(ModifierData *md, Object *ob,
+					   IDWalkFunc walk, void *userData)
+{
+	SmokeModifierData *smd = (SmokeModifierData*) md;
+
+	if(smd->type==MOD_SMOKE_TYPE_DOMAIN && smd->domain) {
+		walk(userData, ob, (ID **)&smd->domain->coll_group);
+		walk(userData, ob, (ID **)&smd->domain->fluid_group);
+		walk(userData, ob, (ID **)&smd->domain->eff_group);
+	}
+}
 
 ModifierTypeInfo modifierType_Smoke = {
 	/* name */              "Smoke",
@@ -136,17 +170,18 @@ ModifierTypeInfo modifierType_Smoke = {
 
 	/* copyData */          copyData,
 	/* deformVerts */       deformVerts,
-	/* deformVertsEM */     0,
-	/* deformMatricesEM */  0,
-	/* applyModifier */     0,
-	/* applyModifierEM */   0,
+	/* deformMatrices */    NULL,
+	/* deformVertsEM */     NULL,
+	/* deformMatricesEM */  NULL,
+	/* applyModifier */     NULL,
+	/* applyModifierEM */   NULL,
 	/* initData */          initData,
-	/* requiredDataMask */  0,
+	/* requiredDataMask */  NULL,
 	/* freeData */          freeData,
-	/* isDisabled */        0,
+	/* isDisabled */        NULL,
 	/* updateDepgraph */    updateDepgraph,
 	/* dependsOnTime */     dependsOnTime,
-	/* dependsOnNormals */	0,
-	/* foreachObjectLink */ 0,
-	/* foreachIDLink */     0,
+	/* dependsOnNormals */	NULL,
+	/* foreachObjectLink */ NULL,
+	/* foreachIDLink */     foreachIDLink,
 };

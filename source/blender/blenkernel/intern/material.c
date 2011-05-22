@@ -30,6 +30,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/blenkernel/intern/material.c
+ *  \ingroup bke
+ */
+
+
 #include <string.h>
 #include <math.h>
 
@@ -44,6 +49,8 @@
 #include "DNA_scene_types.h"
 
 #include "BLI_math.h"		
+#include "BLI_listbase.h"		
+#include "BLI_utildefines.h"
 
 #include "BKE_animsys.h"
 #include "BKE_displist.h"
@@ -54,7 +61,7 @@
 #include "BKE_material.h"
 #include "BKE_mesh.h"
 #include "BKE_node.h"
-#include "BKE_utildefines.h"
+
 
 #include "GPU_material.h"
 
@@ -84,7 +91,8 @@ void free_material(Material *ma)
 	
 	BKE_free_animdata((ID *)ma);
 	
-	BKE_previewimg_free(&ma->preview);
+	if(ma->preview)
+		BKE_previewimg_free(&ma->preview);
 	BKE_icon_delete((struct ID*)ma);
 	ma->id.icon_id = 0;
 	
@@ -185,7 +193,7 @@ void init_material(Material *ma)
 	ma->preview = NULL;
 }
 
-Material *add_material(char *name)
+Material *add_material(const char *name)
 {
 	Material *ma;
 
@@ -196,6 +204,7 @@ Material *add_material(char *name)
 	return ma;	
 }
 
+/* XXX keep synced with next function */
 Material *copy_material(Material *ma)
 {
 	Material *man;
@@ -203,9 +212,6 @@ Material *copy_material(Material *ma)
 	
 	man= copy_libblock(ma);
 	
-#if 0 // XXX old animation system
-	id_us_plus((ID *)man->ipo);
-#endif // XXX old animation system
 	id_lib_extern((ID *)man->group);
 	
 	for(a=0; a<MAX_MTEX; a++) {
@@ -222,12 +228,50 @@ Material *copy_material(Material *ma)
 	if (ma->preview) man->preview = BKE_previewimg_copy(ma->preview);
 
 	if(ma->nodetree) {
-		man->nodetree= ntreeCopyTree(ma->nodetree, 0);	/* 0 == full new tree */
+		man->nodetree= ntreeCopyTree(ma->nodetree);	/* 0 == full new tree */
 	}
 
 	man->gpumaterial.first= man->gpumaterial.last= NULL;
 	
 	return man;
+}
+
+/* XXX (see above) material copy without adding to main dbase */
+Material *localize_material(Material *ma)
+{
+	Material *man;
+	int a;
+	
+	man= copy_libblock(ma);
+	BLI_remlink(&G.main->mat, man);
+
+	/* no increment for texture ID users, in previewrender.c it prevents decrement */
+	for(a=0; a<MAX_MTEX; a++) {
+		if(ma->mtex[a]) {
+			man->mtex[a]= MEM_mallocN(sizeof(MTex), "copymaterial");
+			memcpy(man->mtex[a], ma->mtex[a], sizeof(MTex));
+		}
+	}
+	
+	if(ma->ramp_col) man->ramp_col= MEM_dupallocN(ma->ramp_col);
+	if(ma->ramp_spec) man->ramp_spec= MEM_dupallocN(ma->ramp_spec);
+	
+	man->preview = NULL;
+	
+	if(ma->nodetree)
+		man->nodetree= ntreeLocalize(ma->nodetree);
+	
+	man->gpumaterial.first= man->gpumaterial.last= NULL;
+	
+	return man;
+}
+
+static void extern_local_material(Material *ma)
+{
+	int i;
+	for(i=0; i < MAX_MTEX; i++) {
+		if(ma->mtex[i]) id_lib_extern((ID *)ma->mtex[i]->tex);
+	}
 }
 
 void make_local_material(Material *ma)
@@ -245,15 +289,13 @@ void make_local_material(Material *ma)
 		* - mixed: make copy
 		*/
 	
-	if(ma->id.lib==0) return;
+	if(ma->id.lib==NULL) return;
 	if(ma->id.us==1) {
-		ma->id.lib= 0;
+		ma->id.lib= NULL;
 		ma->id.flag= LIB_LOCAL;
-		new_id(0, (ID *)ma, 0);
-		for(a=0; a<MAX_MTEX; a++) {
-			if(ma->mtex[a]) id_lib_extern((ID *)ma->mtex[a]->tex);
-		}
-		
+
+		new_id(&bmain->mat, (ID *)ma, NULL);
+		extern_local_material(ma);
 		return;
 	}
 	
@@ -311,14 +353,11 @@ void make_local_material(Material *ma)
 	}
 	
 	if(local && lib==0) {
-		ma->id.lib= 0;
+		ma->id.lib= NULL;
 		ma->id.flag= LIB_LOCAL;
-		
-		for(a=0; a<MAX_MTEX; a++) {
-			if(ma->mtex[a]) id_lib_extern((ID *)ma->mtex[a]->tex);
-		}
-		
-		new_id(0, (ID *)ma, 0);
+
+		new_id(&bmain->mat, (ID *)ma, NULL);
+		extern_local_material(ma);
 	}
 	else if(local && lib) {
 		
@@ -331,7 +370,7 @@ void make_local_material(Material *ma)
 			if(ob->mat) {
 				for(a=0; a<ob->totcol; a++) {
 					if(ob->mat[a]==ma) {
-						if(ob->id.lib==0) {
+						if(ob->id.lib==NULL) {
 							ob->mat[a]= man;
 							man->id.us++;
 							ma->id.us--;
@@ -347,7 +386,7 @@ void make_local_material(Material *ma)
 			if(me->mat) {
 				for(a=0; a<me->totcol; a++) {
 					if(me->mat[a]==ma) {
-						if(me->id.lib==0) {
+						if(me->id.lib==NULL) {
 							me->mat[a]= man;
 							man->id.us++;
 							ma->id.us--;
@@ -363,7 +402,7 @@ void make_local_material(Material *ma)
 			if(cu->mat) {
 				for(a=0; a<cu->totcol; a++) {
 					if(cu->mat[a]==ma) {
-						if(cu->id.lib==0) {
+						if(cu->id.lib==NULL) {
 							cu->mat[a]= man;
 							man->id.us++;
 							ma->id.us--;
@@ -379,7 +418,7 @@ void make_local_material(Material *ma)
 			if(mb->mat) {
 				for(a=0; a<mb->totcol; a++) {
 					if(mb->mat[a]==ma) {
-						if(mb->id.lib==0) {
+						if(mb->id.lib==NULL) {
 							mb->mat[a]= man;
 							man->id.us++;
 							ma->id.us--;
@@ -389,6 +428,15 @@ void make_local_material(Material *ma)
 			}
 			mb= mb->id.next;
 		}
+	}
+}
+
+/* for curve, mball, mesh types */
+void extern_local_matarar(struct Material **matar, short totcol)
+{
+	short i;
+	for(i= 0; i < totcol; i++) {
+		id_lib_extern((ID *)matar[i]);
 	}
 }
 
@@ -445,7 +493,7 @@ Material ***give_matarar_id(ID *id)
 		return &(((Curve *)id)->mat);
 		break;
 	case ID_MB:
-		return &(((Curve *)id)->mat);
+		return &(((MetaBall *)id)->mat);
 		break;
 	}
 	return NULL;
@@ -461,7 +509,7 @@ short *give_totcolp_id(ID *id)
 		return &(((Curve *)id)->totcol);
 		break;
 	case ID_MB:
-		return &(((Curve *)id)->totcol);
+		return &(((MetaBall *)id)->totcol);
 		break;
 	}
 	return NULL;
@@ -492,6 +540,7 @@ Material *material_pop_id(ID *id, int index)
 		short *totcol= give_totcolp_id(id);
 		if(index >= 0 && index < (*totcol)) {
 			ret= (*matar)[index];
+			id_us_min((ID *)ret);			
 			if(*totcol <= 1) {
 				*totcol= 0;
 				MEM_freeN(*matar);
@@ -529,6 +578,10 @@ Material *give_current_material(Object *ob, int act)
 	totcolp= give_totcolp(ob);
 	if(totcolp==NULL || ob->totcol==0) return NULL;
 	
+	if(act<0) {
+		printf("no!\n");
+	}
+	
 	if(act>ob->totcol) act= ob->totcol;
 	else if(act<=0) act= 1;
 
@@ -545,7 +598,7 @@ Material *give_current_material(Object *ob, int act)
 		matarar= give_matarar(ob);
 		
 		if(matarar && *matarar) ma= (*matarar)[act-1];
-		else ma= 0;
+		else ma= NULL;
 		
 	}
 	
@@ -555,7 +608,7 @@ Material *give_current_material(Object *ob, int act)
 ID *material_from(Object *ob, int act)
 {
 
-	if(ob==0) return 0;
+	if(ob==NULL) return NULL;
 
 	if(ob->totcol==0) return ob->data;
 	if(act==0) act= 1;
@@ -589,66 +642,52 @@ Material *give_node_material(Material *ma)
 /* from misc_util: flip the bytes from x  */
 /*  #define GS(x) (((unsigned char *)(x))[0] << 8 | ((unsigned char *)(x))[1]) */
 
+void resize_object_material(Object *ob, const short totcol)
+{
+	Material **newmatar;
+	char *newmatbits;
+
+	if(totcol==0) {
+		if(ob->totcol) {
+			MEM_freeN(ob->mat);
+			MEM_freeN(ob->matbits);
+			ob->mat= NULL;
+			ob->matbits= NULL;
+		}
+	}
+	else if(ob->totcol<totcol) {
+		newmatar= MEM_callocN(sizeof(void *)*totcol, "newmatar");
+		newmatbits= MEM_callocN(sizeof(char)*totcol, "newmatbits");
+		if(ob->totcol) {
+			memcpy(newmatar, ob->mat, sizeof(void *)*ob->totcol);
+			memcpy(newmatbits, ob->matbits, sizeof(char)*ob->totcol);
+			MEM_freeN(ob->mat);
+			MEM_freeN(ob->matbits);
+		}
+		ob->mat= newmatar;
+		ob->matbits= newmatbits;
+	}
+	ob->totcol= totcol;
+	if(ob->totcol && ob->actcol==0) ob->actcol= 1;
+	if(ob->actcol>ob->totcol) ob->actcol= ob->totcol;
+}
+
 void test_object_materials(ID *id)
 {
 	/* make the ob mat-array same size as 'ob->data' mat-array */
 	Object *ob;
-	Mesh *me;
-	Curve *cu;
-	MetaBall *mb;
-	Material **newmatar;
-	char *newmatbits;
-	int totcol=0;
+	short *totcol;
 
-	if(id==0) return;
+	if(id==NULL || (totcol=give_totcolp_id(id))==NULL) {
+		return;
+	}
 
-	if( GS(id->name)==ID_ME ) {
-		me= (Mesh *)id;
-		totcol= me->totcol;
-	}
-	else if( GS(id->name)==ID_CU ) {
-		cu= (Curve *)id;
-		totcol= cu->totcol;
-	}
-	else if( GS(id->name)==ID_MB ) {
-		mb= (MetaBall *)id;
-		totcol= mb->totcol;
-	}
-	else return;
-
-	ob= G.main->object.first;
-	while(ob) {
-		
+	for(ob= G.main->object.first; ob; ob= ob->id.next) {
 		if(ob->data==id) {
-		
-			if(totcol==0) {
-				if(ob->totcol) {
-					MEM_freeN(ob->mat);
-					MEM_freeN(ob->matbits);
-					ob->mat= NULL;
-					ob->matbits= NULL;
-				}
-			}
-			else if(ob->totcol<totcol) {
-				newmatar= MEM_callocN(sizeof(void *)*totcol, "newmatar");
-				newmatbits= MEM_callocN(sizeof(char)*totcol, "newmatbits");
-				if(ob->totcol) {
-					memcpy(newmatar, ob->mat, sizeof(void *)*ob->totcol);
-					memcpy(newmatbits, ob->matbits, sizeof(char)*ob->totcol);
-					MEM_freeN(ob->mat);
-					MEM_freeN(ob->matbits);
-				}
-				ob->mat= newmatar;
-				ob->matbits= newmatbits;
-			}
-			ob->totcol= totcol;
-			if(ob->totcol && ob->actcol==0) ob->actcol= 1;
-			if(ob->actcol>ob->totcol) ob->actcol= ob->totcol;
+			resize_object_material(ob, *totcol);
 		}
-		ob= ob->id.next;
 	}
 }
-
 
 void assign_material(Object *ob, Material *ma, int act)
 {
@@ -659,12 +698,16 @@ void assign_material(Object *ob, Material *ma, int act)
 	if(act>MAXMAT) return;
 	if(act<1) act= 1;
 	
+	/* prevent crashing when using accidentally */
+	BLI_assert(ob->id.lib == NULL);
+	if(ob->id.lib) return;
+	
 	/* test arraylens */
 	
 	totcolp= give_totcolp(ob);
 	matarar= give_matarar(ob);
 	
-	if(totcolp==0 || matarar==0) return;
+	if(totcolp==NULL || matarar==NULL) return;
 	
 	if(act > *totcolp) {
 		matar= MEM_callocN(sizeof(void *)*act, "matarray1");
@@ -756,14 +799,10 @@ int find_material_index(Object *ob, Material *ma)
 
 int object_add_material_slot(Object *ob)
 {
-	Material *ma;
-	
-	if(ob==0) return FALSE;
+	if(ob==NULL) return FALSE;
 	if(ob->totcol>=MAXMAT) return FALSE;
 	
-	ma= give_current_material(ob, ob->actcol);
-
-	assign_material(ob, ma, ob->totcol+1);
+	assign_material(ob, NULL, ob->totcol+1);
 	ob->actcol= ob->totcol;
 	return TRUE;
 }
@@ -786,10 +825,10 @@ static void do_init_render_material(Material *ma, int r_mode, float *amb)
 			
 			ma->texco |= mtex->texco;
 			ma->mapto |= mtex->mapto;
-			if(r_mode & R_OSA) {
-				if ELEM3(mtex->tex->type, TEX_IMAGE, TEX_PLUGIN, TEX_ENVMAP) ma->texco |= TEXCO_OSA;
-				else if(mtex->texflag & MTEX_NEW_BUMP) ma->texco |= TEXCO_OSA; // NEWBUMP: need texture derivatives for procedurals as well
-			}
+
+			/* always get derivatives for these textures */
+			if ELEM3(mtex->tex->type, TEX_IMAGE, TEX_PLUGIN, TEX_ENVMAP) ma->texco |= TEXCO_OSA;
+			else if(mtex->texflag & (MTEX_COMPAT_BUMP|MTEX_3TAP_BUMP|MTEX_5TAP_BUMP)) ma->texco |= TEXCO_OSA;
 			
 			if(ma->texco & (TEXCO_ORCO|TEXCO_REFL|TEXCO_NORM|TEXCO_STRAND|TEXCO_STRESS)) needuv= 1;
 			else if(ma->texco & (TEXCO_GLOB|TEXCO_UV|TEXCO_OBJECT|TEXCO_SPEED)) needuv= 1;
@@ -841,7 +880,7 @@ static void init_render_nodetree(bNodeTree *ntree, Material *basemat, int r_mode
 				if(ma!=basemat) {
 					do_init_render_material(ma, r_mode, amb);
 					basemat->texco |= ma->texco;
-					basemat->mode_l |= ma->mode_l;
+					basemat->mode_l |= ma->mode_l & ~(MA_TRANSP|MA_ZTRANSP|MA_RAYTRANSP); 
 				}
 			}
 			else if(node->type==NODE_GROUP)
@@ -933,7 +972,7 @@ int material_in_material(Material *parmat, Material *mat)
 	
 /* ****************** */
 
-char colname_array[125][20]= {
+static char colname_array[125][20]= {
 "Black","DarkRed","HalfRed","Red","Red",
 "DarkGreen","DarkOlive","Brown","Chocolate","OrangeRed",
 "HalfGreen","GreenOlive","DryOlive","Goldenrod","DarkOrange",
@@ -966,13 +1005,13 @@ void automatname(Material *ma)
 	int nr, r, g, b;
 	float ref;
 	
-	if(ma==0) return;
+	if(ma==NULL) return;
 	if(ma->mode & MA_SHLESS) ref= 1.0;
 	else ref= ma->ref;
 	
-	r= (int)(4.99*(ref*ma->r));
-	g= (int)(4.99*(ref*ma->g));
-	b= (int)(4.99*(ref*ma->b));
+	r= (int)(4.99f*(ref*ma->r));
+	g= (int)(4.99f*(ref*ma->g));
+	b= (int)(4.99f*(ref*ma->b));
 	nr= r + 5*g + 25*b;
 	if(nr>124) nr= 124;
 	new_id(&G.main->mat, (ID *)ma, colname_array[nr]);
@@ -1014,7 +1053,7 @@ int object_remove_material_slot(Object *ob)
 	
 	if(*totcolp==0) {
 		MEM_freeN(*matarar);
-		*matarar= 0;
+		*matarar= NULL;
 	}
 	
 	actcol= ob->actcol;
@@ -1037,7 +1076,7 @@ int object_remove_material_slot(Object *ob)
 			if(obt->totcol==0) {
 				MEM_freeN(obt->mat);
 				MEM_freeN(obt->matbits);
-				obt->mat= 0;
+				obt->mat= NULL;
 				obt->matbits= NULL;
 			}
 		}
@@ -1138,10 +1177,10 @@ void ramp_blend(int type, float *r, float *g, float *b, float fac, float *col)
 			}
 				break;
 		case MA_RAMP_DIFF:
-			*r = facm*(*r) + fac*fabs(*r-col[0]);
+			*r = facm*(*r) + fac*fabsf(*r-col[0]);
 			if(g) {
-				*g = facm*(*g) + fac*fabs(*g-col[1]);
-				*b = facm*(*b) + fac*fabs(*b-col[2]);
+				*g = facm*(*g) + fac*fabsf(*g-col[1]);
+				*b = facm*(*b) + fac*fabsf(*b-col[2]);
 			}
 				break;
 		case MA_RAMP_DARK:
@@ -1286,12 +1325,12 @@ void ramp_blend(int type, float *r, float *g, float *b, float fac, float *col)
 		case MA_RAMP_SOFT: 
 			if (g){ 
 				float scr, scg, scb; 
-                 
+
 				/* first calculate non-fac based Screen mix */ 
 				scr = 1.0f - (1.0f - col[0]) * (1.0f - *r); 
 				scg = 1.0f - (1.0f - col[1]) * (1.0f - *g); 
 				scb = 1.0f - (1.0f - col[2]) * (1.0f - *b); 
-                 
+
 				*r = facm*(*r) + fac*(((1.0f - *r) * col[0] * (*r)) + (*r * scr)); 
 				*g = facm*(*g) + fac*(((1.0f - *g) * col[1] * (*g)) + (*g * scg)); 
 				*b = facm*(*b) + fac*(((1.0f - *b) * col[2] * (*b)) + (*b * scb)); 
@@ -1318,8 +1357,7 @@ void ramp_blend(int type, float *r, float *g, float *b, float fac, float *col)
 
 /* copy/paste buffer, if we had a propper py api that would be better */
 Material matcopybuf;
-// MTex mtexcopybuf;
-static short matcopied=0;
+static short matcopied= 0;
 
 void clear_matcopybuf(void)
 {
@@ -1329,7 +1367,6 @@ void clear_matcopybuf(void)
 
 void free_matcopybuf(void)
 {
-//	extern MTex mtexcopybuf;	/* buttons.c */
 	int a;
 
 	for(a=0; a<MAX_MTEX; a++) {
@@ -1350,7 +1387,6 @@ void free_matcopybuf(void)
 		MEM_freeN(matcopybuf.nodetree);
 		matcopybuf.nodetree= NULL;
 	}
-//	default_mtex(&mtexcopybuf);
 
 	matcopied= 0;
 }
@@ -1373,7 +1409,7 @@ void copy_matcopybuf(Material *ma)
 			matcopybuf.mtex[a]= MEM_dupallocN(mtex);
 		}
 	}
-	matcopybuf.nodetree= ntreeCopyTree(ma->nodetree, 0);
+	matcopybuf.nodetree= ntreeCopyTree(ma->nodetree);
 	matcopybuf.preview= NULL;
 	matcopybuf.gpumaterial.first= matcopybuf.gpumaterial.last= NULL;
 	matcopied= 1;
@@ -1401,7 +1437,7 @@ void paste_matcopybuf(Material *ma)
 		MEM_freeN(ma->nodetree);
 	}
 
-	GPU_materials_free(ma);
+	GPU_material_free(ma);
 
 	id= (ma->id);
 	memcpy(ma, &matcopybuf, sizeof(Material));
@@ -1418,11 +1454,5 @@ void paste_matcopybuf(Material *ma)
 		}
 	}
 
-	ma->nodetree= ntreeCopyTree(matcopybuf.nodetree, 0);
-
-	/*
-	BIF_preview_changed(ID_MA);
-	BIF_undo_push("Paste material settings");
-	scrarea_queue_winredraw(curarea);
-	*/
+	ma->nodetree= ntreeCopyTree(matcopybuf.nodetree);
 }

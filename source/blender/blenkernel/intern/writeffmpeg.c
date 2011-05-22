@@ -369,7 +369,7 @@ static AVFrame* generate_video_frame(uint8_t* pixels, ReportList *reports)
 	}
 
 	if (c->pix_fmt != PIX_FMT_BGR32) {
-		sws_scale(img_convert_ctx, rgb_frame->data,
+		sws_scale(img_convert_ctx, (const uint8_t * const*) rgb_frame->data,
 			  rgb_frame->linesize, 0, c->height, 
 			  current_frame->data, current_frame->linesize);
 		delete_picture(rgb_frame);
@@ -396,7 +396,7 @@ static void set_ffmpeg_property_option(AVCodecContext* c, IDProperty * prop)
 	switch(prop->type) {
 	case IDP_STRING:
 		fprintf(stderr, "%s.\n", IDP_String(prop));
-		av_set_string3(c, prop->name, IDP_String(prop),0,&rv);
+		rv = av_set_string(c, prop->name, IDP_String(prop));
 		break;
 	case IDP_FLOAT:
 		fprintf(stderr, "%g.\n", IDP_Float(prop));
@@ -407,7 +407,7 @@ static void set_ffmpeg_property_option(AVCodecContext* c, IDProperty * prop)
 		
 		if (param) {
 			if (IDP_Int(prop)) {
-				av_set_string3(c, name, param,0,&rv);
+				rv = av_set_string(c, name, param);
 			} else {
 				return;
 			}
@@ -672,7 +672,7 @@ static int start_ffmpeg_impl(struct RenderData *rd, int rectx, int recty, Report
 		return 0;
 	}
 
-	of = avformat_alloc_context();
+	of = av_alloc_format_context();
 	if (!of) {
 		BKE_report(reports, RPT_ERROR, "Error opening output file");
 		return 0;

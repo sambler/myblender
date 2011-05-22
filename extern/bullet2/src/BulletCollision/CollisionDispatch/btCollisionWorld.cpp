@@ -33,7 +33,6 @@ subject to the following restrictions:
 #include "LinearMath/btQuickprof.h"
 #include "LinearMath/btStackAlloc.h"
 #include "LinearMath/btSerializer.h"
-#include "BulletSoftBody/btSoftBody.h"
 
 //#define DISABLE_DBVT_COMPOUNDSHAPE_RAYCAST_ACCELERATION
 

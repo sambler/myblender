@@ -335,7 +335,7 @@ void recalcData(TransInfo *t)
 		flushTransSeq(t);
 	}
 	else if (t->spacetype == SPACE_ACTION) {
-        scene= t->scene;
+		Scene *scene= t->scene;
 		SpaceAction *saction= (SpaceAction *)t->sa->spacedata.first;
 		
 		bAnimContext ac= {NULL};
@@ -379,6 +379,7 @@ void recalcData(TransInfo *t)
 		}
 	}
 	else if (t->spacetype == SPACE_IPO) {
+		Scene *scene;
 		SpaceIpo *sipo= (SpaceIpo *)t->sa->spacedata.first;
 		
 		ListBase anim_data = {NULL, NULL};
@@ -443,7 +444,7 @@ void recalcData(TransInfo *t)
 	else if (t->spacetype == SPACE_NLA) {
 		TransDataNla *tdn= (TransDataNla *)t->customData;
 		SpaceNla *snla= (SpaceNla *)t->sa->spacedata.first;
-        scene= t->scene;
+		Scene *scene= t->scene;
 		double secf= FPS;
 		int i;
 		

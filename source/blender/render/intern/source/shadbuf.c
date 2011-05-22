@@ -285,15 +285,15 @@ static int compress_deepsamples(DeepSample *dsample, int tot, float epsilon)
 
 static float deep_alpha(Render *re, int obinr, int facenr, int strand)
 {
-	ObjectInstanceRen *myobi= &re->objectinstance[obinr];
+	ObjectInstanceRen *obi= &re->objectinstance[obinr];
 	Material *ma;
 
 	if(strand) {
-		StrandRen *strand2= RE_findOrAddStrand(myobi->obr, facenr-1);
-		ma= strand2->buffer->ma;
+		StrandRen *strand= RE_findOrAddStrand(obi->obr, facenr-1);
+		ma= strand->buffer->ma;
 	}
 	else {
-		VlakRen *vlr= RE_findOrAddVlak(myobi->obr, (facenr-1) & RE_QUAD_MASK);
+		VlakRen *vlr= RE_findOrAddVlak(obi->obr, (facenr-1) & RE_QUAD_MASK);
 		ma= vlr->mat;
 	}
 
@@ -614,7 +614,7 @@ static void compress_shadowbuf(ShadBuf *shb, int *rectz, int square)
 /* sets start/end clipping. lar->shb should be initialized */
 static void shadowbuf_autoclip(Render *re, LampRen *lar)
 {
-	ObjectInstanceRen *myobi;
+	ObjectInstanceRen *obi;
 	ObjectRen *obr;
 	VlakRen *vlr= NULL;
 	VertRen *ver= NULL;
@@ -636,11 +636,11 @@ static void shadowbuf_autoclip(Render *re, LampRen *lar)
 	clipflag= MEM_callocN(sizeof(char)*maxtotvert, "autoclipflag");
 
 	/* set clip in vertices when face visible */
-	for(i=0, myobi=re->instancetable.first; myobi; i++, myobi=myobi->next) {
-		obr= myobi->obr;
+	for(i=0, obi=re->instancetable.first; obi; i++, obi=obi->next) {
+		obr= obi->obr;
 
-		if(myobi->flag & R_TRANSFORMED)
-			mul_m4_m4m4(obviewmat, myobi->mat, viewmat);
+		if(obi->flag & R_TRANSFORMED)
+			mul_m4_m4m4(obviewmat, obi->mat, viewmat);
 		else
 			copy_m4_m4(obviewmat, viewmat);
 
@@ -658,7 +658,7 @@ static void shadowbuf_autoclip(Render *re, LampRen *lar)
 				if((ma->mode & MA_SHADBUF)==0) ok= 0;
 			}
 			
-			if(ok && (myobi->lay & lay)) {
+			if(ok && (obi->lay & lay)) {
 				clipflag[vlr->v1->index]= 1;
 				clipflag[vlr->v2->index]= 1;
 				clipflag[vlr->v3->index]= 1;
@@ -1872,7 +1872,7 @@ static void isb_bsp_recalc_box(ISBBranch *root)
 }
 
 /* callback function for zbuf clip */
-static void isb_bsp_test_strand(ZSpan *zspan, int myobi, int zvlnr, float *v1, float *v2, float *v3, float *v4)
+static void isb_bsp_test_strand(ZSpan *zspan, int obi, int zvlnr, float *v1, float *v2, float *v3, float *v4)
 {
 	BSPFace face;
 	
@@ -1880,7 +1880,7 @@ static void isb_bsp_test_strand(ZSpan *zspan, int myobi, int zvlnr, float *v1, f
 	face.v2= v2;
 	face.v3= v3;
 	face.v4= v4;
-	face.obi= myobi;
+	face.obi= obi;
 	face.facenr= zvlnr & ~RE_QUAD_OFFS;
 	face.type= R_STRAND;
 	if(R.osa)
@@ -1906,7 +1906,7 @@ static void isb_bsp_test_strand(ZSpan *zspan, int myobi, int zvlnr, float *v1, f
 }
 
 /* callback function for zbuf clip */
-static void isb_bsp_test_face(ZSpan *zspan, int myobi, int zvlnr, float *v1, float *v2, float *v3, float *v4) 
+static void isb_bsp_test_face(ZSpan *zspan, int obi, int zvlnr, float *v1, float *v2, float *v3, float *v4) 
 {
 	BSPFace face;
 	
@@ -1914,7 +1914,7 @@ static void isb_bsp_test_face(ZSpan *zspan, int myobi, int zvlnr, float *v1, flo
 	face.v2= v2;
 	face.v3= v3;
 	face.v4= v4;
-	face.obi= myobi;
+	face.obi= obi;
 	face.facenr= zvlnr & ~RE_QUAD_OFFS;
 	face.type= 0;
 	if(R.osa)
@@ -1952,7 +1952,7 @@ static int testclip_minmax(float *ho, float *minmax)
 /* main loop going over all faces and check in bsp overlaps, fill in shadfac values */
 static void isb_bsp_fillfaces(Render *re, LampRen *lar, ISBBranch *root)
 {
-	ObjectInstanceRen *myobi;
+	ObjectInstanceRen *obi;
 	ObjectRen *obr;
 	ShadBuf *shb= lar->shb;
 	ZSpan zspan, zspanstrand;
@@ -1990,11 +1990,11 @@ static void isb_bsp_fillfaces(Render *re, LampRen *lar, ISBBranch *root)
 	zspan.zbuffunc= isb_bsp_test_face;
 	zspanstrand.zbuffunc= isb_bsp_test_strand;
 	
-	for(i=0, myobi=re->instancetable.first; myobi; i++, myobi=myobi->next) {
-		obr= myobi->obr;
+	for(i=0, obi=re->instancetable.first; obi; i++, obi=obi->next) {
+		obr= obi->obr;
 
-		if(myobi->flag & R_TRANSFORMED)
-			mul_m4_m4m4(winmat, myobi->mat, shb->persmat);
+		if(obi->flag & R_TRANSFORMED)
+			mul_m4_m4m4(winmat, obi->mat, shb->persmat);
 		else
 			copy_m4_m4(winmat, shb->persmat);
 
@@ -2012,7 +2012,7 @@ static void isb_bsp_fillfaces(Render *re, LampRen *lar, ISBBranch *root)
 				zspanstrand.shad_alpha= zspan.shad_alpha= ma->shad_alpha;
 			}
 			
-			if(ok && (myobi->lay & lay)) {
+			if(ok && (obi->lay & lay)) {
 				float hoco[4][4];
 				int c1, c2, c3, c4=0;
 				int d1, d2, d3, d4=0;
@@ -2064,15 +2064,15 @@ static void isb_bsp_fillfaces(Render *re, LampRen *lar, ISBBranch *root)
 }
 
 /* returns 1 when the viewpixel is visible in lampbuffer */
-static int viewpixel_to_lampbuf(ShadBuf *shb, ObjectInstanceRen *myobi, VlakRen *vlr, float x, float y, float *co)
+static int viewpixel_to_lampbuf(ShadBuf *shb, ObjectInstanceRen *obi, VlakRen *vlr, float x, float y, float *co)
 {
 	float hoco[4], v1[3], nor[3];
 	float dface, fac, siz;
 	
-	RE_vlakren_get_normal(&R, myobi, vlr, nor);
+	RE_vlakren_get_normal(&R, obi, vlr, nor);
 	VECCOPY(v1, vlr->v1->co);
-	if(myobi->flag & R_TRANSFORMED)
-		mul_m4_v3(myobi->mat, v1);
+	if(obi->flag & R_TRANSFORMED)
+		mul_m4_v3(obi->mat, v1);
 
 	/* from shadepixel() */
 	dface= v1[0]*nor[0] + v1[1]*nor[1] + v1[2]*nor[2];
@@ -2134,7 +2134,7 @@ static int viewpixel_to_lampbuf(ShadBuf *shb, ObjectInstanceRen *myobi, VlakRen 
 }
 
 /* storage of shadow results, solid osa and transp case */
-static void isb_add_shadfac(ISBShadfacA **isbsapp, MemArena *mem, int myobi, int facenr, short shadfac, short samples)
+static void isb_add_shadfac(ISBShadfacA **isbsapp, MemArena *mem, int obi, int facenr, short shadfac, short samples)
 {
 	ISBShadfacA *new;
 	float shadfacf;
@@ -2146,7 +2146,7 @@ static void isb_add_shadfac(ISBShadfacA **isbsapp, MemArena *mem, int myobi, int
 		shadfacf= ((float)shadfac)/(4096.0);
 	
 	new= BLI_memarena_alloc(mem, sizeof(ISBShadfacA));
-	new->obi= myobi;
+	new->obi= obi;
 	new->facenr= facenr & ~RE_QUAD_OFFS;
 	new->shadfac= shadfacf;
 	if(*isbsapp)
@@ -2254,13 +2254,13 @@ static void isb_make_buffer(RenderPart *pa, LampRen *lar)
 							ps= ps->next;
 						}
 						if(ps && ps->facenr>0) {
-							ObjectInstanceRen *myobi= &R.objectinstance[ps->obi];
-							ObjectRen *obr= myobi->obr;
+							ObjectInstanceRen *obi= &R.objectinstance[ps->obi];
+							ObjectRen *obr= obi->obr;
 							VlakRen *vlr= RE_findOrAddVlak(obr, (ps->facenr-1) & RE_QUAD_MASK);
 							
 							samp= samplebuf[sample] + sindex;
 							/* convert image plane pixel location to lamp buffer space */
-							if(viewpixel_to_lampbuf(shb, myobi, vlr, xs + R.jit[sample][0], ys + R.jit[sample][1], samp->zco)) {
+							if(viewpixel_to_lampbuf(shb, obi, vlr, xs + R.jit[sample][0], ys + R.jit[sample][1], samp->zco)) {
 								samp->obi= ps->obi;
 								samp->facenr= ps->facenr & ~RE_QUAD_OFFS;
 								ps->shadfac= 0;
@@ -2275,15 +2275,15 @@ static void isb_make_buffer(RenderPart *pa, LampRen *lar)
 				rectp= pa->rectp + sindex;
 				recto= pa->recto + sindex;
 				if(*rectp>0) {
-					ObjectInstanceRen *myobi= &R.objectinstance[*recto];
-					ObjectRen *obr= myobi->obr;
+					ObjectInstanceRen *obi= &R.objectinstance[*recto];
+					ObjectRen *obr= obi->obr;
 					VlakRen *vlr= RE_findOrAddVlak(obr, (*rectp-1) & RE_QUAD_MASK);
 					float xs= (float)(x + pa->disprect.xmin);
 					float ys= (float)(y + pa->disprect.ymin);
 					
 					samp= samplebuf[0] + sindex;
 					/* convert image plane pixel location to lamp buffer space */
-					if(viewpixel_to_lampbuf(shb, myobi, vlr, xs, ys, samp->zco)) {
+					if(viewpixel_to_lampbuf(shb, obi, vlr, xs, ys, samp->zco)) {
 						samp->obi= *recto;
 						samp->facenr= *rectp & ~RE_QUAD_OFFS;
 						samp->shadfac= isbdata->shadfacs + sindex;
@@ -2449,8 +2449,8 @@ static void isb_make_buffer_transp(RenderPart *pa, APixstr *apixbuf, LampRen *la
 					int a;
 					for(a=0; a<4; a++) {
 						if(apn->p[a]) {
-							ObjectInstanceRen *myobi= &R.objectinstance[apn->obi[a]];
-							ObjectRen *obr= myobi->obr;
+							ObjectInstanceRen *obi= &R.objectinstance[apn->obi[a]];
+							ObjectRen *obr= obi->obr;
 							VlakRen *vlr= RE_findOrAddVlak(obr, (apn->p[a]-1) & RE_QUAD_MASK);
 							float zco[3];
 							
@@ -2464,7 +2464,7 @@ static void isb_make_buffer_transp(RenderPart *pa, APixstr *apixbuf, LampRen *la
 									if(apn->mask[a] & mask) {
 										
 										/* convert image plane pixel location to lamp buffer space */
-										if(viewpixel_to_lampbuf(shb, myobi, vlr, xs + R.jit[sample][0], ys + R.jit[sample][1], zco)) {
+										if(viewpixel_to_lampbuf(shb, obi, vlr, xs + R.jit[sample][0], ys + R.jit[sample][1], zco)) {
 											samp= isb_alloc_sample_transp(samplebuf[sample] + sindex, memarena);
 											samp->obi= apn->obi[a];
 											samp->facenr= apn->p[a] & ~RE_QUAD_OFFS;
@@ -2479,7 +2479,7 @@ static void isb_make_buffer_transp(RenderPart *pa, APixstr *apixbuf, LampRen *la
 							else {
 								
 								/* convert image plane pixel location to lamp buffer space */
-								if(viewpixel_to_lampbuf(shb, myobi, vlr, xs, ys, zco)) {
+								if(viewpixel_to_lampbuf(shb, obi, vlr, xs, ys, zco)) {
 									
 									samp= isb_alloc_sample_transp(samplebuf[0] + sindex, memarena);
 									samp->obi= apn->obi[a];
@@ -2573,11 +2573,11 @@ float ISB_getshadow(ShadeInput *shi, ShadBuf *shb)
 						}
 						else {
 							int sindex= y*isbdata->rectx + x;
-							int myobi= shi->obi - R.objectinstance;
+							int obi= shi->obi - R.objectinstance;
 							ISBShadfacA *isbsa= *(isbdata->shadfaca + sindex);
 							
 							while(isbsa) {
-								if(isbsa->facenr==shi->facenr+1 && isbsa->obi==myobi)
+								if(isbsa->facenr==shi->facenr+1 && isbsa->obi==obi)
 									return isbsa->shadfac>=1.0f?0.0f:1.0f - isbsa->shadfac;
 								isbsa= isbsa->next;
 							}

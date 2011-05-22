@@ -57,7 +57,6 @@
 #include "BKE_global.h"
 #include "BKE_image.h"
 #include "BKE_paint.h"
-#include "BKE_colortools.h" /* for colorcorrection_do_ibuf() */
 
 #include "BIF_gl.h"
 #include "BIF_glutil.h"

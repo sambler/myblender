@@ -97,7 +97,7 @@ void btSequentialImpulseConstraintSolver::resolveSingleConstraintRowGenericSIMD(
 	const btScalar deltaVel1Dotn	=	c.m_contactNormal.dot(body1.internalGetDeltaLinearVelocity()) 	+ c.m_relpos1CrossNormal.dot(body1.internalGetDeltaAngularVelocity());
 	const btScalar deltaVel2Dotn	=	-c.m_contactNormal.dot(body2.internalGetDeltaLinearVelocity()) + c.m_relpos2CrossNormal.dot(body2.internalGetDeltaAngularVelocity());
 
-	//const btScalar delta_rel_vel	=	deltaVel1Dotn-deltaVel2Dotn;
+//	const btScalar delta_rel_vel	=	deltaVel1Dotn-deltaVel2Dotn;
 	deltaImpulse	-=	deltaVel1Dotn*c.m_jacDiagABInv;
 	deltaImpulse	-=	deltaVel2Dotn*c.m_jacDiagABInv;
 

@@ -2289,6 +2289,7 @@ bool j2k_encode(opj_j2k_t *j2k, opj_cio_t *cio, opj_image_t *image, opj_codestre
 	/* INDEX >> */
 	j2k->cstr_info = cstr_info;
 	if (cstr_info) {
+		int compno;
 		cstr_info->tile = (opj_tile_info_t *) opj_malloc(cp->tw * cp->th * sizeof(opj_tile_info_t));
 		cstr_info->image_w = image->x1 - image->x0;
 		cstr_info->image_h = image->y1 - image->y0;

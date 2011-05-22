@@ -112,12 +112,12 @@ static void solve_parenting (Scene *scene, Object *ob, Object *par, float obmat[
 
 float originmat[3][3];	/* after where_is_object(), can be used in other functions (bad!) */
 
-void clear_workob(Object *myworkob)
+void clear_workob(Object *workob)
 {
-	memset(myworkob, 0, sizeof(Object));
+	memset(workob, 0, sizeof(Object));
 	
-	myworkob->size[0]= myworkob->size[1]= myworkob->size[2]= 1.0f;
-	myworkob->rotmode= ROT_MODE_EUL;
+	workob->size[0]= workob->size[1]= workob->size[2]= 1.0f;
+	workob->rotmode= ROT_MODE_EUL;
 }
 
 void copy_baseflags(struct Scene *scene)

@@ -186,10 +186,10 @@ void	btMultiSapBroadphase::setAabb(btBroadphaseProxy* proxy,const btVector3& aab
 		btMultiSapProxy*		m_multiProxy;
 		btDispatcher*			m_dispatcher;
 
-		MyNodeOverlapCallback(btMultiSapBroadphase* multiSap2,btMultiSapProxy* multiProxy2,btDispatcher* dispatcher2)
-			:m_multiSap(multiSap2),
-			m_multiProxy(multiProxy2),
-			m_dispatcher(dispatcher2)
+		MyNodeOverlapCallback(btMultiSapBroadphase* multiSap,btMultiSapProxy* multiProxy,btDispatcher* dispatcher)
+			:m_multiSap(multiSap),
+			m_multiProxy(multiProxy),
+			m_dispatcher(dispatcher)
 		{
 
 		}

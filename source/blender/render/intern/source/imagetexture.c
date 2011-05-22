@@ -829,7 +829,7 @@ static void ewa_eval(TexResult* texr, ImBuf* ibuf, float fx, float fy, afdata_t*
 	float B = -2.f*(Ux*Vx + Uy*Vy);
 	float C = Ux*Ux + Uy*Uy;
 	float F = A*C - B*B*0.25f;
-	float a, b, th, ecc, a2, b2, ue, ve, U0, V0, DDQ, UL, ac1, ac2, BU, d; // TXF alpha: cw = 0.f;
+	float a, b, th, ecc, a2, b2, ue, ve, U0, V0, DDQ, U, ac1, ac2, BU, d; // TXF alpha: cw = 0.f;
 	int u, v, u1, u2, v1, v2; // TXF alpha: clip = 0;
 
 	// The so-called 'high' quality ewa method simply adds a constant of 1 to both A & C,
@@ -869,10 +869,10 @@ static void ewa_eval(TexResult* texr, ImBuf* ibuf, float fx, float fy, afdata_t*
 	U0 -= 0.5f;
 	V0 -= 0.5f;
 	DDQ = 2.f*A;
-	UL = u1 - U0;
-	ac1 = A*(2.f*UL + 1.f);
-	ac2 = A*UL*UL;
-	BU = B*UL;
+	U = u1 - U0;
+	ac1 = A*(2.f*U + 1.f);
+	ac2 = A*U*U;
+	BU = B*U;
 
 	d = texr->tr = texr->tb = texr->tg = texr->ta = 0.f;
 	for (v=v1; v<=v2; ++v) {

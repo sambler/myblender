@@ -153,10 +153,10 @@ void	btTriangleMeshShape::processAllTriangles(btTriangleCallback* callback,const
 		btVector3 m_aabbMin;
 		btVector3 m_aabbMax;
 
-		FilteredCallback(btTriangleCallback* callback2,const btVector3& aabbMin2,const btVector3& aabbMax2)
-			:m_callback(callback2),
-			m_aabbMin(aabbMin2),
-			m_aabbMax(aabbMax2)
+		FilteredCallback(btTriangleCallback* callback,const btVector3& aabbMin,const btVector3& aabbMax)
+			:m_callback(callback),
+			m_aabbMin(aabbMin),
+			m_aabbMax(aabbMax)
 		{
 		}
 

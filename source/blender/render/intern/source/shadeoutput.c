@@ -1167,7 +1167,7 @@ float lamp_get_visibility(LampRen *lar, float *co, float *lv, float *dist)
 			}
 			
 			if(lar->mode & LA_SPHERE) {
-				t= lar->dist - dist[0];
+				float t= lar->dist - dist[0];
 				if(t<=0.0f) 
 					visifac= 0.0f;
 				else

@@ -989,6 +989,7 @@ static void split_edge(SmoothEdge *edge, SmoothVert *vert, SmoothMesh *mesh)
 		/* edge2 is not loose, so it must be sharp */
 		SmoothEdge *copy_edge = smoothedge_copy(edge, mesh);
 		SmoothEdge *copy_edge2 = smoothedge_copy(edge2, mesh);
+		SmoothVert *vert2;
 
 		/* replace edge with its copy in visited_faces */
 		repdata.find = edge;
@@ -1020,6 +1021,7 @@ static void split_edge(SmoothEdge *edge, SmoothVert *vert, SmoothMesh *mesh)
 	} else {
 		/* edge2 is loose */
 		SmoothEdge *copy_edge = smoothedge_copy(edge, mesh);
+		SmoothVert *vert2;
 
 		/* replace edge with its copy in visited_faces */
 		repdata.find = edge;

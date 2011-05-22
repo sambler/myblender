@@ -110,7 +110,7 @@ RAS_BucketManager::~RAS_BucketManager()
 void RAS_BucketManager::OrderBuckets(const MT_Transform& cameratrans, BucketList& buckets, vector<sortedmeshslot>& slots, bool alpha)
 {
 	BucketList::iterator bit;
-	//list<RAS_MeshSlot>::iterator mit;
+	list<RAS_MeshSlot>::iterator mit;
 	size_t size = 0, i = 0;
 
 	/* Camera's near plane equation: pnorm.dot(point) + pval,
@@ -339,7 +339,7 @@ void RAS_BucketManager::RemoveMaterial(RAS_IPolyMaterial * mat)
 		}
 	}
 
-	for(i=0; i<m_AlphaBuckets.size(); i++) {
+	for(int i=0; i<m_AlphaBuckets.size(); i++) {
 		RAS_MaterialBucket *bucket = m_AlphaBuckets[i];
 		if (mat == bucket->GetPolyMaterial()) {
 			m_AlphaBuckets.erase(m_AlphaBuckets.begin()+i);

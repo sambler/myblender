@@ -302,7 +302,7 @@ static APixstr *addpsA(ZSpan *zspan)
 	return zspan->curpstr;
 }
 
-static void zbuffillAc4(ZSpan *zspan, int myobi, int zvlnr, float *v1, float *v2, float *v3, float *v4)
+static void zbuffillAc4(ZSpan *zspan, int obi, int zvlnr, float *v1, float *v2, float *v3, float *v4)
 {
 	APixstr *ap, *apofs, *apn;
 	double zxd, zyd, zy0, zverg;
@@ -398,14 +398,14 @@ static void zbuffillAc4(ZSpan *zspan, int myobi, int zvlnr, float *v1, float *v2
 						
 						apn= ap;
 						while(apn) {
-							if(apn->p[0]==0) {apn->obi[0]= myobi; apn->p[0]= zvlnr; apn->z[0]= intzverg; apn->mask[0]= mask; break; }
-							if(apn->p[0]==zvlnr && apn->obi[0]==myobi) {apn->mask[0]|= mask; break; }
-							if(apn->p[1]==0) {apn->obi[1]= myobi; apn->p[1]= zvlnr; apn->z[1]= intzverg; apn->mask[1]= mask; break; }
-							if(apn->p[1]==zvlnr && apn->obi[1]==myobi) {apn->mask[1]|= mask; break; }
-							if(apn->p[2]==0) {apn->obi[2]= myobi; apn->p[2]= zvlnr; apn->z[2]= intzverg; apn->mask[2]= mask; break; }
-							if(apn->p[2]==zvlnr && apn->obi[2]==myobi) {apn->mask[2]|= mask; break; }
-							if(apn->p[3]==0) {apn->obi[3]= myobi; apn->p[3]= zvlnr; apn->z[3]= intzverg; apn->mask[3]= mask; break; }
-							if(apn->p[3]==zvlnr && apn->obi[3]==myobi) {apn->mask[3]|= mask; break; }
+							if(apn->p[0]==0) {apn->obi[0]= obi; apn->p[0]= zvlnr; apn->z[0]= intzverg; apn->mask[0]= mask; break; }
+							if(apn->p[0]==zvlnr && apn->obi[0]==obi) {apn->mask[0]|= mask; break; }
+							if(apn->p[1]==0) {apn->obi[1]= obi; apn->p[1]= zvlnr; apn->z[1]= intzverg; apn->mask[1]= mask; break; }
+							if(apn->p[1]==zvlnr && apn->obi[1]==obi) {apn->mask[1]|= mask; break; }
+							if(apn->p[2]==0) {apn->obi[2]= obi; apn->p[2]= zvlnr; apn->z[2]= intzverg; apn->mask[2]= mask; break; }
+							if(apn->p[2]==zvlnr && apn->obi[2]==obi) {apn->mask[2]|= mask; break; }
+							if(apn->p[3]==0) {apn->obi[3]= obi; apn->p[3]= zvlnr; apn->z[3]= intzverg; apn->mask[3]= mask; break; }
+							if(apn->p[3]==zvlnr && apn->obi[3]==obi) {apn->mask[3]|= mask; break; }
 							if(apn->next==NULL) apn->next= addpsA(zspan);
 							apn= apn->next;
 						}				
@@ -428,7 +428,7 @@ static void zbuffillAc4(ZSpan *zspan, int myobi, int zvlnr, float *v1, float *v2
 
 
 
-static void zbuflineAc(ZSpan *zspan, int myobi, int zvlnr, float *vec1, float *vec2)
+static void zbuflineAc(ZSpan *zspan, int obi, int zvlnr, float *vec1, float *vec2)
 {
 	APixstr *ap, *apn;
 	int *rectz, *rectmask;
@@ -490,14 +490,14 @@ static void zbuflineAc(ZSpan *zspan, int myobi, int zvlnr, float *vec1, float *v
 					
 						apn= ap;
 						while(apn) {	/* loop unrolled */
-							if(apn->p[0]==0) {apn->obi[0]= myobi; apn->p[0]= zvlnr; apn->z[0]= vergz; apn->mask[0]= mask; break; }
-							if(apn->p[0]==zvlnr && apn->obi[0]==myobi) {apn->mask[0]|= mask; break; }
-							if(apn->p[1]==0) {apn->obi[1]= myobi; apn->p[1]= zvlnr; apn->z[1]= vergz; apn->mask[1]= mask; break; }
-							if(apn->p[1]==zvlnr && apn->obi[1]==myobi) {apn->mask[1]|= mask; break; }
-							if(apn->p[2]==0) {apn->obi[2]= myobi; apn->p[2]= zvlnr; apn->z[2]= vergz; apn->mask[2]= mask; break; }
-							if(apn->p[2]==zvlnr && apn->obi[2]==myobi) {apn->mask[2]|= mask; break; }
-							if(apn->p[3]==0) {apn->obi[3]= myobi; apn->p[3]= zvlnr; apn->z[3]= vergz; apn->mask[3]= mask; break; }
-							if(apn->p[3]==zvlnr && apn->obi[3]==myobi) {apn->mask[3]|= mask; break; }
+							if(apn->p[0]==0) {apn->obi[0]= obi; apn->p[0]= zvlnr; apn->z[0]= vergz; apn->mask[0]= mask; break; }
+							if(apn->p[0]==zvlnr && apn->obi[0]==obi) {apn->mask[0]|= mask; break; }
+							if(apn->p[1]==0) {apn->obi[1]= obi; apn->p[1]= zvlnr; apn->z[1]= vergz; apn->mask[1]= mask; break; }
+							if(apn->p[1]==zvlnr && apn->obi[1]==obi) {apn->mask[1]|= mask; break; }
+							if(apn->p[2]==0) {apn->obi[2]= obi; apn->p[2]= zvlnr; apn->z[2]= vergz; apn->mask[2]= mask; break; }
+							if(apn->p[2]==zvlnr && apn->obi[2]==obi) {apn->mask[2]|= mask; break; }
+							if(apn->p[3]==0) {apn->obi[3]= obi; apn->p[3]= zvlnr; apn->z[3]= vergz; apn->mask[3]= mask; break; }
+							if(apn->p[3]==zvlnr && apn->obi[3]==obi) {apn->mask[3]|= mask; break; }
 							if(apn->next==0) apn->next= addpsA(zspan);
 							apn= apn->next;
 						}				
@@ -561,13 +561,13 @@ static void zbuflineAc(ZSpan *zspan, int myobi, int zvlnr, float *vec1, float *v
 						
 						apn= ap;
 						while(apn) {	/* loop unrolled */
-							if(apn->p[0]==0) {apn->obi[0]= myobi; apn->p[0]= zvlnr; apn->z[0]= vergz; apn->mask[0]= mask; break; }
+							if(apn->p[0]==0) {apn->obi[0]= obi; apn->p[0]= zvlnr; apn->z[0]= vergz; apn->mask[0]= mask; break; }
 							if(apn->p[0]==zvlnr) {apn->mask[0]|= mask; break; }
-							if(apn->p[1]==0) {apn->obi[1]= myobi; apn->p[1]= zvlnr; apn->z[1]= vergz; apn->mask[1]= mask; break; }
+							if(apn->p[1]==0) {apn->obi[1]= obi; apn->p[1]= zvlnr; apn->z[1]= vergz; apn->mask[1]= mask; break; }
 							if(apn->p[1]==zvlnr) {apn->mask[1]|= mask; break; }
-							if(apn->p[2]==0) {apn->obi[2]= myobi; apn->p[2]= zvlnr; apn->z[2]= vergz; apn->mask[2]= mask; break; }
+							if(apn->p[2]==0) {apn->obi[2]= obi; apn->p[2]= zvlnr; apn->z[2]= vergz; apn->mask[2]= mask; break; }
 							if(apn->p[2]==zvlnr) {apn->mask[2]|= mask; break; }
-							if(apn->p[3]==0) {apn->obi[3]= myobi; apn->p[3]= zvlnr; apn->z[3]= vergz; apn->mask[3]= mask; break; }
+							if(apn->p[3]==0) {apn->obi[3]= obi; apn->p[3]= zvlnr; apn->z[3]= vergz; apn->mask[3]= mask; break; }
 							if(apn->p[3]==zvlnr) {apn->mask[3]|= mask; break; }
 							if(apn->next==0) apn->next= addpsA(zspan);
 							apn= apn->next;
@@ -585,7 +585,7 @@ static void zbuflineAc(ZSpan *zspan, int myobi, int zvlnr, float *vec1, float *v
 
 /* *************  NORMAL ZBUFFER ************ */
 
-static void zbufline(ZSpan *zspan, int myobi, int zvlnr, float *vec1, float *vec2)
+static void zbufline(ZSpan *zspan, int obi, int zvlnr, float *vec1, float *vec2)
 {
 	int *rectz, *rectp, *recto, *rectmask;
 	int start, end, x, y, oldx, oldy, ofs;
@@ -642,7 +642,7 @@ static void zbufline(ZSpan *zspan, int myobi, int zvlnr, float *vec1, float *vec
 			if(x>=0 && y>=0 && y<zspan->recty) {
 				if(vergz<*rectz) {
 					if(!zspan->rectmask || vergz>*rectmask) {
-						*recto= myobi;
+						*recto= obi;
 						*rectz= vergz;
 						*rectp= zvlnr;
 					}
@@ -703,7 +703,7 @@ static void zbufline(ZSpan *zspan, int myobi, int zvlnr, float *vec1, float *vec
 					if(!zspan->rectmask || vergz>*rectmask) {
 						*rectz= vergz;
 						*rectp= zvlnr;
-						*recto= myobi;
+						*recto= obi;
 					}
 				}
 			}
@@ -715,7 +715,7 @@ static void zbufline(ZSpan *zspan, int myobi, int zvlnr, float *vec1, float *vec
 	}
 }
 
-static void zbufline_onlyZ(ZSpan *zspan, int myobi, int zvlnr, float *vec1, float *vec2)
+static void zbufline_onlyZ(ZSpan *zspan, int obi, int zvlnr, float *vec1, float *vec2)
 {
 	int *rectz, *rectz1= NULL;
 	int start, end, x, y, oldx, oldy, ofs;
@@ -903,7 +903,7 @@ void hoco_to_zco(ZSpan *zspan, float *zco, float *hoco)
 	zco[2]= 0x7FFFFFFF *(hoco[2]*div);
 }
 
-void zbufclipwire(ZSpan *zspan, int myobi, int zvlnr, int ec, float *ho1, float *ho2, float *ho3, float *ho4, int c1, int c2, int c3, int c4)
+void zbufclipwire(ZSpan *zspan, int obi, int zvlnr, int ec, float *ho1, float *ho2, float *ho3, float *ho4, int c1, int c2, int c3, int c4)
 {
 	float vez[20];
 	int and, or;
@@ -932,7 +932,7 @@ void zbufclipwire(ZSpan *zspan, int myobi, int zvlnr, int ec, float *ho1, float 
 				if( clipline(vez, vez+4)) {
 					hoco_to_zco(zspan, vez, vez);
 					hoco_to_zco(zspan, vez+4, vez+4);
-					zspan->zbuflinefunc(zspan, myobi, zvlnr, vez, vez+4);
+					zspan->zbuflinefunc(zspan, obi, zvlnr, vez, vez+4);
 				}
 			}
 			if(ec & ME_V2V3) {
@@ -941,7 +941,7 @@ void zbufclipwire(ZSpan *zspan, int myobi, int zvlnr, int ec, float *ho1, float 
 				if( clipline(vez, vez+4)) {
 					hoco_to_zco(zspan, vez, vez);
 					hoco_to_zco(zspan, vez+4, vez+4);
-					zspan->zbuflinefunc(zspan, myobi, zvlnr, vez, vez+4);
+					zspan->zbuflinefunc(zspan, obi, zvlnr, vez, vez+4);
 				}
 			}
 			if(ho4) {
@@ -951,7 +951,7 @@ void zbufclipwire(ZSpan *zspan, int myobi, int zvlnr, int ec, float *ho1, float 
 					if( clipline(vez, vez+4)) {
 						hoco_to_zco(zspan, vez, vez);
 						hoco_to_zco(zspan, vez+4, vez+4);
-						zspan->zbuflinefunc(zspan, myobi, zvlnr, vez, vez+4);
+						zspan->zbuflinefunc(zspan, obi, zvlnr, vez, vez+4);
 					}
 				}
 				if(ec & ME_V4V1) {
@@ -960,7 +960,7 @@ void zbufclipwire(ZSpan *zspan, int myobi, int zvlnr, int ec, float *ho1, float 
 					if( clipline(vez, vez+4)) {
 						hoco_to_zco(zspan, vez, vez);
 						hoco_to_zco(zspan, vez+4, vez+4);
-						zspan->zbuflinefunc(zspan, myobi, zvlnr, vez, vez+4);
+						zspan->zbuflinefunc(zspan, obi, zvlnr, vez, vez+4);
 					}
 				}
 			}
@@ -971,7 +971,7 @@ void zbufclipwire(ZSpan *zspan, int myobi, int zvlnr, int ec, float *ho1, float 
 					if( clipline(vez, vez+4)) {
 						hoco_to_zco(zspan, vez, vez);
 						hoco_to_zco(zspan, vez+4, vez+4);
-						zspan->zbuflinefunc(zspan, myobi, zvlnr, vez, vez+4);
+						zspan->zbuflinefunc(zspan, obi, zvlnr, vez, vez+4);
 					}
 				}
 			}
@@ -986,19 +986,19 @@ void zbufclipwire(ZSpan *zspan, int myobi, int zvlnr, int ec, float *ho1, float 
 	if(ho4) {
 		hoco_to_zco(zspan, vez+12, ho4);
 
-		if(ec & ME_V3V4)  zspan->zbuflinefunc(zspan, myobi, zvlnr, vez+8, vez+12);
-		if(ec & ME_V4V1)  zspan->zbuflinefunc(zspan, myobi, zvlnr, vez+12, vez);
+		if(ec & ME_V3V4)  zspan->zbuflinefunc(zspan, obi, zvlnr, vez+8, vez+12);
+		if(ec & ME_V4V1)  zspan->zbuflinefunc(zspan, obi, zvlnr, vez+12, vez);
 	}
 	else {
-		if(ec & ME_V3V1)  zspan->zbuflinefunc(zspan, myobi, zvlnr, vez+8, vez);
+		if(ec & ME_V3V1)  zspan->zbuflinefunc(zspan, obi, zvlnr, vez+8, vez);
 	}
 
-	if(ec & ME_V1V2)  zspan->zbuflinefunc(zspan, myobi, zvlnr, vez, vez+4);
-	if(ec & ME_V2V3)  zspan->zbuflinefunc(zspan, myobi, zvlnr, vez+4, vez+8);
+	if(ec & ME_V1V2)  zspan->zbuflinefunc(zspan, obi, zvlnr, vez, vez+4);
+	if(ec & ME_V2V3)  zspan->zbuflinefunc(zspan, obi, zvlnr, vez+4, vez+8);
 
 }
 
-void zbufsinglewire(ZSpan *zspan, int myobi, int zvlnr, float *ho1, float *ho2)
+void zbufsinglewire(ZSpan *zspan, int obi, int zvlnr, float *ho1, float *ho2)
 {
 	float f1[4], f2[4];
 	int c1, c2;
@@ -1014,7 +1014,7 @@ void zbufsinglewire(ZSpan *zspan, int myobi, int zvlnr, float *ho1, float *ho2)
 			if(clipline(f1, f2)) {
 				hoco_to_zco(zspan, f1, f1);
 				hoco_to_zco(zspan, f2, f2);
-				zspan->zbuflinefunc(zspan, myobi, zvlnr, f1, f2);
+				zspan->zbuflinefunc(zspan, obi, zvlnr, f1, f2);
 			}
 		}
 	}
@@ -1022,7 +1022,7 @@ void zbufsinglewire(ZSpan *zspan, int myobi, int zvlnr, float *ho1, float *ho2)
 		hoco_to_zco(zspan, f1, ho1);
 		hoco_to_zco(zspan, f2, ho2);
 
-		zspan->zbuflinefunc(zspan, myobi, zvlnr, f1, f2);
+		zspan->zbuflinefunc(zspan, obi, zvlnr, f1, f2);
 	}
 }
 
@@ -1037,7 +1037,7 @@ void zbufsinglewire(ZSpan *zspan, int myobi, int zvlnr, float *ho1, float *ho2)
  * @param v2 [4 floats, world coordinates] second vertex
  * @param v3 [4 floats, world coordinates] third vertex
  */
-static void zbuffillGLinv4(ZSpan *zspan, int myobi, int zvlnr, float *v1, float *v2, float *v3, float *v4) 
+static void zbuffillGLinv4(ZSpan *zspan, int obi, int zvlnr, float *v1, float *v2, float *v3, float *v4) 
 {
 	double zxd, zyd, zy0, zverg;
 	float x0,y0,z0;
@@ -1133,7 +1133,7 @@ static void zbuffillGLinv4(ZSpan *zspan, int myobi, int zvlnr, float *v1, float 
 
 				if( intzverg > *rz || *rz==0x7FFFFFFF) {
 					if(!zspan->rectmask || intzverg > *rm) {
-						*ro= myobi;
+						*ro= obi;
 						*rz= intzverg;
 						*rp= zvlnr;
 					}
@@ -1157,7 +1157,7 @@ static void zbuffillGLinv4(ZSpan *zspan, int myobi, int zvlnr, float *v1, float 
 
 /* uses spanbuffers */
 
-static void zbuffillGL4(ZSpan *zspan, int myobi, int zvlnr, float *v1, float *v2, float *v3, float *v4)
+static void zbuffillGL4(ZSpan *zspan, int obi, int zvlnr, float *v1, float *v2, float *v3, float *v4)
 {
 	double zxd, zyd, zy0, zverg;
 	float x0,y0,z0;
@@ -1255,7 +1255,7 @@ static void zbuffillGL4(ZSpan *zspan, int myobi, int zvlnr, float *v1, float *v2
 					if(!zspan->rectmask || intzverg > *rm) {
 						*rz= intzverg;
 						*rp= zvlnr;
-						*ro= myobi;
+						*ro= obi;
 					}
 				}
 				zverg+= zxd;
@@ -1287,7 +1287,7 @@ static void zbuffillGL4(ZSpan *zspan, int myobi, int zvlnr, float *v1, float *v2
  */
 
 /* now: filling two Z values, the closest and 2nd closest */
-static void zbuffillGL_onlyZ(ZSpan *zspan, int myobi, int zvlnr, float *v1, float *v2, float *v3, float *v4) 
+static void zbuffillGL_onlyZ(ZSpan *zspan, int obi, int zvlnr, float *v1, float *v2, float *v3, float *v4) 
 {
 	double zxd, zyd, zy0, zverg;
 	float x0,y0,z0;
@@ -1826,7 +1826,7 @@ void zbuf_make_winmat(Render *re, float winmat[][4])
 
 /* do zbuffering and clip, f1 f2 f3 are hocos, c1 c2 c3 are clipping flags */
 
-void zbufclip(ZSpan *zspan, int myobi, int zvlnr, float *f1, float *f2, float *f3, int c1, int c2, int c3)
+void zbufclip(ZSpan *zspan, int obi, int zvlnr, float *f1, float *f2, float *f3, int c1, int c2, int c3)
 {
 	float *vlzp[32][3], labda[3][2];
 	float vez[400], *trias[40];
@@ -1925,7 +1925,7 @@ void zbufclip(ZSpan *zspan, int myobi, int zvlnr, float *f1, float *f2, float *f
 			}
 			for(b=1;b<clvl;b++) {
 				if(vlzp[b][0]) {
-					zspan->zbuffunc(zspan, myobi, zvlnr, vlzp[b][0],vlzp[b][1],vlzp[b][2], NULL);
+					zspan->zbuffunc(zspan, obi, zvlnr, vlzp[b][0],vlzp[b][1],vlzp[b][2], NULL);
 				}
 			}
 			return;
@@ -1936,10 +1936,10 @@ void zbufclip(ZSpan *zspan, int myobi, int zvlnr, float *f1, float *f2, float *f
 	hoco_to_zco(zspan, vez, f1);
 	hoco_to_zco(zspan, vez+4, f2);
 	hoco_to_zco(zspan, vez+8, f3);
-	zspan->zbuffunc(zspan, myobi, zvlnr, vez,vez+4,vez+8, NULL);
+	zspan->zbuffunc(zspan, obi, zvlnr, vez,vez+4,vez+8, NULL);
 }
 
-void zbufclip4(ZSpan *zspan, int myobi, int zvlnr, float *f1, float *f2, float *f3, float *f4, int c1, int c2, int c3, int c4)
+void zbufclip4(ZSpan *zspan, int obi, int zvlnr, float *f1, float *f2, float *f3, float *f4, int c1, int c2, int c3, int c4)
 {
 	float vez[16];
 	
@@ -1947,8 +1947,8 @@ void zbufclip4(ZSpan *zspan, int myobi, int zvlnr, float *f1, float *f2, float *
 		if(c1 & c2 & c3 & c4) {	/* completely out */
 			return;
 		} else {	/* clipping */
-			zbufclip(zspan, myobi, zvlnr, f1, f2, f3, c1, c2, c3);
-			zbufclip(zspan, myobi, zvlnr, f1, f3, f4, c1, c3, c4);
+			zbufclip(zspan, obi, zvlnr, f1, f2, f3, c1, c2, c3);
+			zbufclip(zspan, obi, zvlnr, f1, f3, f4, c1, c3, c4);
 		}
 		return;
 	}
@@ -1959,7 +1959,7 @@ void zbufclip4(ZSpan *zspan, int myobi, int zvlnr, float *f1, float *f2, float *
 	hoco_to_zco(zspan, vez+8, f3);
 	hoco_to_zco(zspan, vez+12, f4);
 
-	zspan->zbuffunc(zspan, myobi, zvlnr, vez, vez+4, vez+8, vez+12);
+	zspan->zbuffunc(zspan, obi, zvlnr, vez, vez+4, vez+8, vez+12);
 }
 
 /* ************** ZMASK ******************************** */
@@ -2044,7 +2044,7 @@ void zbuffer_solid(RenderPart *pa, RenderLayer *rl, void(*fillfunc)(RenderPart*,
 	VlakRen *vlr= NULL;
 	VertRen *v1, *v2, *v3, *v4;
 	Material *ma=0;
-	ObjectInstanceRen *myobi;
+	ObjectInstanceRen *obi;
 	ObjectRen *obr;
 	float obwinmat[4][4], winmat[4][4], bounds[4];
 	float ho1[4], ho2[4], ho3[4], ho4[4]={0};
@@ -2125,23 +2125,23 @@ void zbuffer_solid(RenderPart *pa, RenderLayer *rl, void(*fillfunc)(RenderPart*,
 		}
 
 		/* regular zbuffering loop, does all sample buffers */
-		for(i=0, myobi=R.instancetable.first; myobi; i++, myobi=myobi->next) {
-			obr= myobi->obr;
+		for(i=0, obi=R.instancetable.first; obi; i++, obi=obi->next) {
+			obr= obi->obr;
 
 			/* continue happens in 2 different ways... zmaskpass only does lay_zmask stuff */
 			if(zmaskpass) {
-				if((myobi->lay & lay_zmask)==0)
+				if((obi->lay & lay_zmask)==0)
 					continue;
 			}
-			else if(!all_z && !(myobi->lay & (lay|lay_zmask)))
+			else if(!all_z && !(obi->lay & (lay|lay_zmask)))
 				continue;
 			
-			if(myobi->flag & R_TRANSFORMED)
-				mul_m4_m4m4(obwinmat, myobi->mat, winmat);
+			if(obi->flag & R_TRANSFORMED)
+				mul_m4_m4m4(obwinmat, obi->mat, winmat);
 			else
 				copy_m4_m4(obwinmat, winmat);
 
-			if(clip_render_object(myobi->obr->boundbox, bounds, obwinmat))
+			if(clip_render_object(obi->obr->boundbox, bounds, obwinmat))
 				continue;
 
 			zbuf_project_cache_clear(cache, obr->totvert);
@@ -2151,7 +2151,7 @@ void zbuffer_solid(RenderPart *pa, RenderLayer *rl, void(*fillfunc)(RenderPart*,
 				else vlr++;
 
 				/* the cases: visible for render, only z values, zmask, nothing */
-				if(myobi->lay & lay) {
+				if(obi->lay & lay) {
 					if(vlr->mat!=ma) {
 						ma= vlr->mat;
 						nofill= (ma->mode & MA_ONLYCAST) || ((ma->mode & MA_TRANSP) && (ma->mode & MA_ZTRANSP));
@@ -2166,7 +2166,7 @@ void zbuffer_solid(RenderPart *pa, RenderLayer *rl, void(*fillfunc)(RenderPart*,
 						}
 					}
 				}
-				else if(all_z || (myobi->lay & lay_zmask)) {
+				else if(all_z || (obi->lay & lay_zmask)) {
 					env= 1;
 					nofill= 0;
 					ma= NULL; 
@@ -2275,7 +2275,7 @@ void zbuffer_shadow(Render *re, float winmat[][4], LampRen *lar, int *rectz, int
 {
 	ZbufProjectCache cache[ZBUF_PROJECT_CACHE_SIZE];
 	ZSpan zspan;
-	ObjectInstanceRen *myobi;
+	ObjectInstanceRen *obi;
 	ObjectRen *obr;
 	VlakRen *vlr= NULL;
 	Material *ma= NULL;
@@ -2308,20 +2308,20 @@ void zbuffer_shadow(Render *re, float winmat[][4], LampRen *lar, int *rectz, int
 	zspan.zbuflinefunc= zbufline_onlyZ;
 	zspan.zbuffunc= zbuffillGL_onlyZ;
 
-	for(i=0, myobi=re->instancetable.first; myobi; i++, myobi=myobi->next) {
-		obr= myobi->obr;
+	for(i=0, obi=re->instancetable.first; obi; i++, obi=obi->next) {
+		obr= obi->obr;
 
 		if(obr->ob==re->excludeob)
 			continue;
-		else if(!(myobi->lay & lay))
+		else if(!(obi->lay & lay))
 			continue;
 
-		if(myobi->flag & R_TRANSFORMED)
-			mul_m4_m4m4(obwinmat, myobi->mat, winmat);
+		if(obi->flag & R_TRANSFORMED)
+			mul_m4_m4m4(obwinmat, obi->mat, winmat);
 		else
 			copy_m4_m4(obwinmat, winmat);
 
-		if(clip_render_object(myobi->obr->boundbox, NULL, obwinmat))
+		if(clip_render_object(obi->obr->boundbox, NULL, obwinmat))
 			continue;
 
 		zbuf_project_cache_clear(cache, obr->totvert);
@@ -2339,7 +2339,7 @@ void zbuffer_shadow(Render *re, float winmat[][4], LampRen *lar, int *rectz, int
 				if((ma->mode & MA_SHADBUF)==0) ok= 0;
 			}
 
-			if(ok && (myobi->lay & lay) && !(vlr->flag & R_HIDDEN)) {
+			if(ok && (obi->lay & lay) && !(vlr->flag & R_HIDDEN)) {
 				c1= zbuf_shadow_project(cache, vlr->v1->index, obwinmat, vlr->v1->co, ho1);
 				c2= zbuf_shadow_project(cache, vlr->v2->index, obwinmat, vlr->v2->co, ho2);
 				c3= zbuf_shadow_project(cache, vlr->v3->index, obwinmat, vlr->v3->co, ho3);
@@ -2378,7 +2378,7 @@ void zbuffer_shadow(Render *re, float winmat[][4], LampRen *lar, int *rectz, int
 				for(a=sbound->start; a<sbound->end; a++) {
 					strand= RE_findOrAddStrand(obr, a);
 
-					sseg.obi= myobi;
+					sseg.obi= obi;
 					sseg.buffer= strand->buffer;
 					sseg.sqadaptcos= sseg.buffer->adaptcos;
 					sseg.sqadaptcos *= sseg.sqadaptcos;
@@ -2432,7 +2432,7 @@ void zbuffer_shadow(Render *re, float winmat[][4], LampRen *lar, int *rectz, int
 	zbuf_free_span(&zspan);
 }
 
-static void zbuffill_sss(ZSpan *zspan, int myobi, int zvlnr, float *v1, float *v2, float *v3, float *v4)
+static void zbuffill_sss(ZSpan *zspan, int obi, int zvlnr, float *v1, float *v2, float *v3, float *v4)
 {
 	double zxd, zyd, zy0, z;
 	float x0, y0, x1, y1, x2, y2, z0, z1, z2, xx1, *span1, *span2;
@@ -2499,7 +2499,7 @@ static void zbuffill_sss(ZSpan *zspan, int myobi, int zvlnr, float *v1, float *v
 		z= (double)sn1*zxd + zy0;
 		
 		for(x= sn1; x<=sn2; x++, z+=zxd)
-			zspan->sss_func(zspan->sss_handle, myobi, zvlnr, x, y, z);
+			zspan->sss_func(zspan->sss_handle, obi, zvlnr, x, y, z);
 		
 		zy0 -= zyd;
 	}
@@ -2509,7 +2509,7 @@ void zbuffer_sss(RenderPart *pa, unsigned int lay, void *handle, void (*func)(vo
 {
 	ZbufProjectCache cache[ZBUF_PROJECT_CACHE_SIZE];
 	ZSpan zspan;
-	ObjectInstanceRen *myobi;
+	ObjectInstanceRen *obi;
 	ObjectRen *obr;
 	VlakRen *vlr= NULL;
 	VertRen *v1, *v2, *v3, *v4;
@@ -2549,18 +2549,18 @@ void zbuffer_sss(RenderPart *pa, unsigned int lay, void *handle, void (*func)(vo
 		fillrect(pa->rectbackz, pa->rectx, pa->recty, -0x7FFFFFFF);
 	}
 
-	for(i=0, myobi=R.instancetable.first; myobi; i++, myobi=myobi->next) {
-		obr= myobi->obr;
+	for(i=0, obi=R.instancetable.first; obi; i++, obi=obi->next) {
+		obr= obi->obr;
 
-		if(!(myobi->lay & lay))
+		if(!(obi->lay & lay))
 			continue;
 
-		if(myobi->flag & R_TRANSFORMED)
-			mul_m4_m4m4(obwinmat, myobi->mat, winmat);
+		if(obi->flag & R_TRANSFORMED)
+			mul_m4_m4m4(obwinmat, obi->mat, winmat);
 		else
 			copy_m4_m4(obwinmat, winmat);
 
-		if(clip_render_object(myobi->obr->boundbox, bounds, obwinmat))
+		if(clip_render_object(obi->obr->boundbox, bounds, obwinmat))
 			continue;
 
 		zbuf_project_cache_clear(cache, obr->totvert);
@@ -2571,7 +2571,7 @@ void zbuffer_sss(RenderPart *pa, unsigned int lay, void *handle, void (*func)(vo
 			
 			if(material_in_material(vlr->mat, sss_ma)) {
 				/* three cases, visible for render, only z values and nothing */
-				if(myobi->lay & lay) {
+				if(obi->lay & lay) {
 					if(vlr->mat!=ma) {
 						ma= vlr->mat;
 						nofill= ma->mode & MA_ONLYCAST;
@@ -3241,7 +3241,7 @@ static int zbuffer_abuf(Render *re, RenderPart *pa, APixstr *APixbuf, ListBase *
 	ZbufProjectCache cache[ZBUF_PROJECT_CACHE_SIZE];
 	ZSpan zspans[16], *zspan;	/* MAX_OSA */
 	Material *ma=NULL;
-	ObjectInstanceRen *myobi;
+	ObjectInstanceRen *obi;
 	ObjectRen *obr;
 	VlakRen *vlr=NULL;
 	VertRen *v1, *v2, *v3, *v4;
@@ -3293,18 +3293,18 @@ static int zbuffer_abuf(Render *re, RenderPart *pa, APixstr *APixbuf, ListBase *
 	/* we use this to test if nothing was filled in */
 	zvlnr= 0;
 		
-	for(i=0, myobi=re->instancetable.first; myobi; i++, myobi=myobi->next) {
-		obr= myobi->obr;
+	for(i=0, obi=re->instancetable.first; obi; i++, obi=obi->next) {
+		obr= obi->obr;
 
-		if(!(myobi->lay & lay))
+		if(!(obi->lay & lay))
 			continue;
 
-		if(myobi->flag & R_TRANSFORMED)
-			mul_m4_m4m4(obwinmat, myobi->mat, winmat);
+		if(obi->flag & R_TRANSFORMED)
+			mul_m4_m4m4(obwinmat, obi->mat, winmat);
 		else
 			copy_m4_m4(obwinmat, winmat);
 
-		if(clip_render_object(myobi->obr->boundbox, bounds, obwinmat))
+		if(clip_render_object(obi->obr->boundbox, bounds, obwinmat))
 			continue;
 
 		zbuf_project_cache_clear(cache, obr->totvert);
@@ -3323,7 +3323,7 @@ static int zbuffer_abuf(Render *re, RenderPart *pa, APixstr *APixbuf, ListBase *
 			}
 			
 			if(dofill) {
-				if(!(vlr->flag & R_HIDDEN) && (myobi->lay & lay)) {
+				if(!(vlr->flag & R_HIDDEN) && (obi->lay & lay)) {
 					unsigned short partclip;
 					
 					v1= vlr->v1;
@@ -3696,13 +3696,13 @@ static void shade_strand_samples(StrandShadeCache *cache, ShadeSample *ssamp, in
 {
 	StrandSegment sseg;
 	StrandVert *svert;
-	ObjectInstanceRen *myobi;
+	ObjectInstanceRen *obi;
 	ObjectRen *obr;
 
-	myobi= R.objectinstance + row->obi;
-	obr= myobi->obr;
+	obi= R.objectinstance + row->obi;
+	obr= obi->obr;
 
-	sseg.obi= myobi;
+	sseg.obi= obi;
 	sseg.strand= RE_findOrAddStrand(obr, row->p-1);
 	sseg.buffer= sseg.strand->buffer;
 
@@ -3720,7 +3720,7 @@ static void shade_strand_samples(StrandShadeCache *cache, ShadeSample *ssamp, in
 static void unref_strand_samples(StrandShadeCache *cache, ZTranspRow *row, int totface)
 {
 	StrandVert *svert;
-	ObjectInstanceRen *myobi;
+	ObjectInstanceRen *obi;
 	ObjectRen *obr;
 	StrandRen *strand;
 
@@ -3731,8 +3731,8 @@ static void unref_strand_samples(StrandShadeCache *cache, ZTranspRow *row, int t
 		totface--;
 
 		if(row[totface].segment != -1) {
-			myobi= R.objectinstance + row[totface].obi;
-			obr= myobi->obr;
+			obi= R.objectinstance + row[totface].obi;
+			obr= obi->obr;
 			strand= RE_findOrAddStrand(obr, row[totface].p-1);
 			svert= strand->vert + row[totface].segment;
 
@@ -3742,14 +3742,14 @@ static void unref_strand_samples(StrandShadeCache *cache, ZTranspRow *row, int t
 	}
 }
 
-static void shade_tra_samples_fill(ShadeSample *ssamp, int x, int y, int z, int myobi, int facenr, int curmask)
+static void shade_tra_samples_fill(ShadeSample *ssamp, int x, int y, int z, int obi, int facenr, int curmask)
 {
 	ShadeInput *shi= ssamp->shi;
 	float xs, ys;
 	
 	ssamp->tot= 0;
 
-	shade_input_set_triangle(shi, myobi, facenr, 1);
+	shade_input_set_triangle(shi, obi, facenr, 1);
 		
 	/* officially should always be true... we have no sky info */
 	if(shi->vlr) {
@@ -4175,13 +4175,13 @@ unsigned short *zbuffer_transp_shade(RenderPart *pa, RenderLayer *rl, float *pas
 						for(a=0; a<R.osa; a++) {
 							alpha= samp_shr[a].combined[3];
 							if(alpha!=0.0f) {
-								RenderLayer *rl2= ssamp.rlpp[a];
+								RenderLayer *rl= ssamp.rlpp[a];
 								
-								addAlphaOverFloat(rl2->rectf + 4*od, samp_shr[a].combined);
+								addAlphaOverFloat(rl->rectf + 4*od, samp_shr[a].combined);
 				
-								add_transp_passes(rl2, od, &samp_shr[a], alpha);
+								add_transp_passes(rl, od, &samp_shr[a], alpha);
 								if(addpassflag & SCE_PASS_VECTOR)
-									add_transp_speed(rl2, od, samp_shr[a].winspeed, alpha, rdrect);
+									add_transp_speed(rl, od, samp_shr[a].winspeed, alpha, rdrect);
 							}
 						}
 					}

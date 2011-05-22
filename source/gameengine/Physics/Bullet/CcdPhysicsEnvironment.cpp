@@ -1453,7 +1453,7 @@ struct OcclusionBuffer
 			}
 			return(n);
 		}
-		for(i=0;i<ni;++i) po[i]=pi[i];
+		for(int i=0;i<ni;++i) po[i]=pi[i];
 		return(ni);
 	}
 	// write or check a triangle to buffer. a,b,c in device coordinates (-1,+1)
@@ -1595,27 +1595,27 @@ struct OcclusionBuffer
 			const int		dy[]={	x[1]-x[0]-dx[0]*width,
 									x[2]-x[1]-dx[1]*width,
 									x[0]-x[2]-dx[2]*width};
-			const int		f=x[2]*y[0]+x[0]*y[1]-x[2]*y[1]-x[0]*y[2]+x[1]*y[2]-x[1]*y[0];
-			const btScalar	ia=1/(btScalar)f;
+			const int		a=x[2]*y[0]+x[0]*y[1]-x[2]*y[1]-x[0]*y[2]+x[1]*y[2]-x[1]*y[0];
+			const btScalar	ia=1/(btScalar)a;
 			const btScalar	dzx=ia*(y[2]*(z[1]-z[0])+y[1]*(z[0]-z[2])+y[0]*(z[2]-z[1]));
 			const btScalar	dzy=ia*(x[2]*(z[0]-z[1])+x[0]*(z[1]-z[2])+x[1]*(z[2]-z[0]))-(dzx*width);		
-			int				g[]={	miy*x[1]+mix*y[0]-x[1]*y[0]-mix*y[1]+x[0]*y[1]-miy*x[0],
+			int				c[]={	miy*x[1]+mix*y[0]-x[1]*y[0]-mix*y[1]+x[0]*y[1]-miy*x[0],
 									miy*x[2]+mix*y[1]-x[2]*y[1]-mix*y[2]+x[1]*y[2]-miy*x[1],
 									miy*x[0]+mix*y[2]-x[0]*y[2]-mix*y[0]+x[2]*y[0]-miy*x[2]};
-			btScalar		v=ia*((z[2]*g[0])+(z[0]*g[1])+(z[1]*g[2]));
+			btScalar		v=ia*((z[2]*c[0])+(z[0]*c[1])+(z[1]*c[2]));
 			btScalar*		scan=&m_buffer[miy*m_sizes[0]];
 			for(int iy=miy;iy<mxy;++iy)
 			{
 				for(int ix=mix;ix<mxx;++ix)
 				{
-					if((g[0]>=0)&&(g[1]>=0)&&(g[2]>=0))
+					if((c[0]>=0)&&(c[1]>=0)&&(c[2]>=0))
 					{
 						if(POLICY::Process(scan[ix],v)) 
 							return(true);
 					}
-					g[0]+=dx[0];g[1]+=dx[1];g[2]+=dx[2];v+=dzx;
+					c[0]+=dx[0];c[1]+=dx[1];c[2]+=dx[2];v+=dzx;
 				}
-				g[0]+=dy[0];g[1]+=dy[1];g[2]+=dy[2];v+=dzy;
+				c[0]+=dy[0];c[1]+=dy[1];c[2]+=dy[2];v+=dzy;
 				scan+=m_sizes[0];
 			}
 		}

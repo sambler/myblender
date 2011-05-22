@@ -637,21 +637,21 @@ AviError AVI_open_movie (const char *name, AviMovie *movie) {
 }
 
 void *AVI_read_frame (AviMovie *movie, AviFormat format, int frame, int stream) {
-	int cur_frame=-1, temp, i=0, rwnd=1;
+	int cur_frame=-1, temp, i=0, rewind=1;
 	void *buffer;
 
 	/* Retrieve the record number of the desired frame in the index 
 		If a chunk has Size 0 we need to rewind to previous frame */
-	while(rwnd && frame > -1) {
+	while(rewind && frame > -1) {
 		i=0;
 		cur_frame=-1;
-		rwnd = 0;
+		rewind = 0;
 
 		while (cur_frame < frame && i < movie->index_entries) {
 			if (fcc_is_data (movie->entries[i].ChunkId) &&
 				fcc_get_stream (movie->entries[i].ChunkId) == stream) {
 				if ((cur_frame == frame -1) && (movie->entries[i].Size == 0)) {
-					rwnd = 1;
+					rewind = 1;
 					frame = frame -1;
 				} else {
 					cur_frame++;

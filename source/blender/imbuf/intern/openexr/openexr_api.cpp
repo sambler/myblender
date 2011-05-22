@@ -826,8 +826,8 @@ static ExrHandle *imb_exr_begin_read_mem(InputFile *file, int width, int height)
 	/* first build hierarchical layer list */
 	for(echan= (ExrChannel *)data->channels.first; echan; echan= echan->next) {
 		if( imb_exr_split_channel_name(echan, layname, passname) ) {
-			lay= imb_exr_get_layer(&data->layers, layname);
-			pass= imb_exr_get_pass(&lay->passes, passname);
+			ExrLayer *lay= imb_exr_get_layer(&data->layers, layname);
+			ExrPass *pass= imb_exr_get_pass(&lay->passes, passname);
 			
 			pass->chan[pass->totchan]= echan;
 			pass->totchan++;

@@ -1157,7 +1157,7 @@ static PyObject *pyrna_enum_to_py(PointerRNA *ptr, PropertyRNA *prop, int val)
 	else {
 		const char *identifier;
 		if (RNA_property_enum_identifier(BPy_GetContext(), ptr, prop, val, &identifier)) {
-			ret = PyUnicode_FromString(identifier);
+			ret= PyUnicode_FromString(identifier);
 		}
 		else {
 			EnumPropertyItem *enum_item;

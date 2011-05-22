@@ -1324,7 +1324,7 @@ bool tcd_decode_tile(opj_tcd_t *tcd, unsigned char *src, int len, int tileno, op
 
 	/* INDEX >>  */
 	if(cstr_info) {
-		int resno, numprec = 0;
+		int resno, compno, numprec = 0;
 		for (compno = 0; compno < cstr_info->numcomps; compno++) {
 			opj_tcp_t *tcp = &tcd->cp->tcps[0];
 			opj_tccp_t *tccp = &tcp->tccps[compno];

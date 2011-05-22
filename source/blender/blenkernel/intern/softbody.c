@@ -2587,42 +2587,42 @@ static void softbody_calc_forces(Scene *scene, Object *ob, float forcetime, floa
 			if(do_selfcollision){
 				int attached;
 				BodyPoint   *obp;
-				int c,d;
+				int c,b;
 				float velcenter[3],dvel[3],def[3];
 				float distance;
 				float compare;
-				
+
 				for(c=sb->totpoint, obp= sb->bpoint; c>=a; c--, obp++) {
-					
+
 					//if ((bp->octantflag & obp->octantflag) == 0) continue;
-					
+
 					compare = (obp->colball + bp->colball);
 					sub_v3_v3v3(def, bp->pos, obp->pos);
-					
+
 					/* rather check the AABBoxes before ever calulating the real distance */
 					/* mathematically it is completly nuts, but performace is pretty much (3) times faster */
 					if ((ABS(def[0]) > compare) || (ABS(def[1]) > compare) || (ABS(def[2]) > compare)) continue;
-					
+
 					distance = normalize_v3(def);
 					if (distance < compare ){
 						/* exclude body points attached with a spring */
 						attached = 0;
-						for(d=obp->nofsprings;d>0;d--){
-							bs = sb->bspring + obp->springs[d-1];
+						for(b=obp->nofsprings;b>0;b--){
+							bs = sb->bspring + obp->springs[b-1];
 							if (( sb->totpoint-a == bs->v2)  || ( sb->totpoint-a == bs->v1)){
 								attached=1;
-                            continue;}
+								continue;}
 						}
 						if (!attached){
 							float f = tune/(distance) + tune/(compare*compare)*distance - 2.0f*tune/compare ;
-							
+
 							mid_v3_v3v3(velcenter, bp->vec, obp->vec);
 							sub_v3_v3v3(dvel,velcenter,bp->vec);
 							mul_v3_fl(dvel,_final_mass(ob,bp));
-                            
+
 							Vec3PlusStVec(bp->force,f*(1.0f-sb->balldamp),def);
 							Vec3PlusStVec(bp->force,sb->balldamp,dvel);
-                            
+
 							if(nl_flags & NLF_BUILD){
 								//int ia =3*(sb->totpoint-a);
 								//int ic =3*(sb->totpoint-c);
@@ -2632,29 +2632,29 @@ static void softbody_calc_forces(Scene *scene, Object *ob, float forcetime, floa
 								/*some quick and dirty entries to the jacobian*/
 								//dfdx_goal(ia,ia,op,mpos);
 								//dfdv_goal(ia,ia,mvel);
-								/* exploit force(a,d) == -force(d,a) part1/2 */
+								/* exploit force(a,b) == -force(b,a) part1/2 */
 								//dfdx_goal(ic,ic,op,mpos);
 								//dfdv_goal(ic,ic,mvel);
-								
-								
+
+
 								/*TODO sit down an X-out the true jacobian entries*/
 								/*well does not make to much sense because the eigenvalues
-                                 of the jacobian go negative; and negative eigenvalues
-                                 on a complex iterative system z(n+1)=A * z(n)
-                                 give imaginary roots in the charcateristic polynom
-                                 --> solutions that to z(t)=u(t)* exp ( i omega t) --> oscilations we don't want here
-                                 where u(t) is a unknown amplitude function (worst case rising fast)
-                                 */
+								of the jacobian go negative; and negative eigenvalues
+								on a complex iterative system z(n+1)=A * z(n)
+								give imaginary roots in the charcateristic polynom
+								--> solutions that to z(t)=u(t)* exp ( i omega t) --> oscilations we don't want here
+								where u(t) is a unknown amplitude function (worst case rising fast)
+								*/
 							}
-							
-							/* exploit force(a,d) == -force(d,a) part2/2 */
+
+							/* exploit force(a,b) == -force(b,a) part2/2 */
 							sub_v3_v3v3(dvel,velcenter,obp->vec);
 							mul_v3_fl(dvel,(_final_mass(ob,bp)+_final_mass(ob,obp))/2.0f);
-							
+
 							Vec3PlusStVec(obp->force,sb->balldamp,dvel);
 							Vec3PlusStVec(obp->force,-f*(1.0f-sb->balldamp),def);
-							
-							
+
+
 						}
 					}
 				}

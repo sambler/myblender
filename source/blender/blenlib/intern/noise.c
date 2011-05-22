@@ -1107,8 +1107,8 @@ static float dist_Minkovsky(float x, float y, float z, float e)
 void voronoi(float x, float y, float z, float* da, float* pa, float me, int dtype)
 {
 	int xx, yy, zz, xi, yi, zi;
-	float xd, yd, zd, d, *pp;
-    
+	float xd, yd, zd, d, *p;
+
 	float (*distfunc)(float, float, float, float);
 	switch (dtype) {
 		case 1:
@@ -1133,7 +1133,7 @@ void voronoi(float x, float y, float z, float* da, float* pa, float me, int dtyp
 		default:
 			distfunc = dist_Real;
 	}
-    
+
 	xi = (int)(floor(x));
 	yi = (int)(floor(y));
 	zi = (int)(floor(z));
@@ -1141,32 +1141,32 @@ void voronoi(float x, float y, float z, float* da, float* pa, float me, int dtyp
 	for (xx=xi-1;xx<=xi+1;xx++) {
 		for (yy=yi-1;yy<=yi+1;yy++) {
 			for (zz=zi-1;zz<=zi+1;zz++) {
-				pp = HASHPNT(xx, yy, zz);
-				xd = x - (pp[0] + xx);
-				yd = y - (pp[1] + yy);
-				zd = z - (pp[2] + zz);
+				p = HASHPNT(xx, yy, zz);
+				xd = x - (p[0] + xx);
+				yd = y - (p[1] + yy);
+				zd = z - (p[2] + zz);
 				d = distfunc(xd, yd, zd, me);
 				if (d<da[0]) {
 					da[3]=da[2];  da[2]=da[1];  da[1]=da[0];  da[0]=d;
 					pa[9]=pa[6];  pa[10]=pa[7];  pa[11]=pa[8];
 					pa[6]=pa[3];  pa[7]=pa[4];  pa[8]=pa[5];
 					pa[3]=pa[0];  pa[4]=pa[1];  pa[5]=pa[2];
-					pa[0]=pp[0]+xx;  pa[1]=pp[1]+yy;  pa[2]=pp[2]+zz;
+					pa[0]=p[0]+xx;  pa[1]=p[1]+yy;  pa[2]=p[2]+zz;
 				}
 				else if (d<da[1]) {
 					da[3]=da[2];  da[2]=da[1];  da[1]=d;
 					pa[9]=pa[6];  pa[10]=pa[7];  pa[11]=pa[8];
 					pa[6]=pa[3];  pa[7]=pa[4];  pa[8]=pa[5];
-					pa[3]=pp[0]+xx;  pa[4]=pp[1]+yy;  pa[5]=pp[2]+zz;
+					pa[3]=p[0]+xx;  pa[4]=p[1]+yy;  pa[5]=p[2]+zz;
 				}
 				else if (d<da[2]) {
 					da[3]=da[2];  da[2]=d;
 					pa[9]=pa[6];  pa[10]=pa[7];  pa[11]=pa[8];
-					pa[6]=pp[0]+xx;  pa[7]=pp[1]+yy;  pa[8]=pp[2]+zz;
+					pa[6]=p[0]+xx;  pa[7]=p[1]+yy;  pa[8]=p[2]+zz;
 				}
 				else if (d<da[3]) {
 					da[3]=d;
-					pa[9]=pp[0]+xx;  pa[10]=pp[1]+yy;  pa[11]=pp[2]+zz;
+					pa[9]=p[0]+xx;  pa[10]=p[1]+yy;  pa[11]=p[2]+zz;
 				}
 			}
 		}
@@ -1295,10 +1295,10 @@ void cellNoiseV(float x, float y, float z, float *ca)
 	int xi = (int)(floor(x));
 	int yi = (int)(floor(y));
 	int zi = (int)(floor(z));
-	float *pp = HASHPNT(xi, yi, zi);
-	ca[0] = pp[0];
-	ca[1] = pp[1];
-	ca[2] = pp[2];
+	float *p = HASHPNT(xi, yi, zi);
+	ca[0] = p[0];
+	ca[1] = p[1];
+	ca[2] = p[2];
 }
 
 

@@ -354,18 +354,18 @@ static void split_v_renderfaces(ObjectRen *obr, int startvlak, int startvert, in
 			vlr->v2 = vert;
 
 			if (v==vLen-1) {
-				VlakRen *vlr2 = RE_findOrAddVlak(obr, startvlak + vLen*uIndex + 0);
-				vlr2->v1 = vert;
+				VlakRen *vlr = RE_findOrAddVlak(obr, startvlak + vLen*uIndex + 0);
+				vlr->v1 = vert;
 			} else {
-				VlakRen *vlr3 = RE_findOrAddVlak(obr, startvlak + vLen*uIndex + v+1);
-				vlr3->v1 = vert;
+				VlakRen *vlr = RE_findOrAddVlak(obr, startvlak + vLen*uIndex + v+1);
+				vlr->v1 = vert;
 			}
 		} else {
 			vlr->v2 = vert;
 
 			if (v<vLen-1) {
-				VlakRen *vlr4 = RE_findOrAddVlak(obr, startvlak + vLen*uIndex + v+1);
-				vlr4->v1 = vert;
+				VlakRen *vlr = RE_findOrAddVlak(obr, startvlak + vLen*uIndex + v+1);
+				vlr->v1 = vert;
 			}
 
 			if (v==0) {
@@ -3164,19 +3164,19 @@ static void free_camera_inside_volumes(Render *re)
 
 static void init_camera_inside_volumes(Render *re)
 {
-	ObjectInstanceRen *myobi;
+	ObjectInstanceRen *obi;
 	VolumeOb *vo;
 	float co[3] = {0.f, 0.f, 0.f};
 
 	for(vo= re->volumes.first; vo; vo= vo->next) {
-		for(myobi= re->instancetable.first; myobi; myobi= myobi->next) {
-			if (myobi->obr == vo->obr) {
-				if (point_inside_volume_objectinstance(re, myobi, co)) {
+		for(obi= re->instancetable.first; obi; obi= obi->next) {
+			if (obi->obr == vo->obr) {
+				if (point_inside_volume_objectinstance(re, obi, co)) {
 					MatInside *mi;
 
 					mi = MEM_mallocN(sizeof(MatInside), "camera inside material");
 					mi->ma = vo->ma;
-					mi->obi = myobi;
+					mi->obi = obi;
 
 					BLI_addtail(&(re->render_volumes_inside), mi);
 				}
@@ -4335,7 +4335,7 @@ static int render_object_type(int type)
 
 static void find_dupli_instances(Render *re, ObjectRen *obr)
 {
-	ObjectInstanceRen *myobi;
+	ObjectInstanceRen *obi;
 	float imat[4][4], obmat[4][4], obimat[4][4], nmat[3][3];
 	int first = 1;
 
@@ -4345,18 +4345,18 @@ static void find_dupli_instances(Render *re, ObjectRen *obr)
 	/* for objects instanced by dupliverts/faces/particles, we go over the
 	 * list of instances to find ones that instance obr, and setup their
 	 * matrices and obr pointer */
-	for(myobi=re->instancetable.last; myobi; myobi=myobi->prev) {
-		if(!myobi->obr && myobi->ob == obr->ob && myobi->psysindex == obr->psysindex) {
-			myobi->obr= obr;
+	for(obi=re->instancetable.last; obi; obi=obi->prev) {
+		if(!obi->obr && obi->ob == obr->ob && obi->psysindex == obr->psysindex) {
+			obi->obr= obr;
 
 			/* compute difference between object matrix and
 			 * object matrix with dupli transform, in viewspace */
-			copy_m4_m4(obimat, myobi->mat);
-			mul_m4_m4m4(myobi->mat, imat, obimat);
+			copy_m4_m4(obimat, obi->mat);
+			mul_m4_m4m4(obi->mat, imat, obimat);
 
-			copy_m3_m4(nmat, myobi->mat);
-			invert_m3_m3(myobi->nmat, nmat);
-			transpose_m3(myobi->nmat);
+			copy_m3_m4(nmat, obi->mat);
+			invert_m3_m3(obi->nmat, nmat);
+			transpose_m3(obi->nmat);
 
 			if(!first) {
 				re->totvert += obr->totvert;
@@ -4370,23 +4370,23 @@ static void find_dupli_instances(Render *re, ObjectRen *obr)
 	}
 }
 
-static void assign_dupligroup_dupli(Render *re, ObjectInstanceRen *myobi, ObjectRen *obr)
+static void assign_dupligroup_dupli(Render *re, ObjectInstanceRen *obi, ObjectRen *obr)
 {
 	float imat[4][4], obmat[4][4], obimat[4][4], nmat[3][3];
 
 	mul_m4_m4m4(obmat, obr->obmat, re->viewmat);
 	invert_m4_m4(imat, obmat);
 
-	myobi->obr= obr;
+	obi->obr= obr;
 
 	/* compute difference between object matrix and
 	 * object matrix with dupli transform, in viewspace */
-	copy_m4_m4(obimat, myobi->mat);
-	mul_m4_m4m4(myobi->mat, imat, obimat);
+	copy_m4_m4(obimat, obi->mat);
+	mul_m4_m4m4(obi->mat, imat, obimat);
 
-	copy_m3_m4(nmat, myobi->mat);
-	invert_m3_m3(myobi->nmat, nmat);
-	transpose_m3(myobi->nmat);
+	copy_m3_m4(nmat, obi->mat);
+	invert_m3_m3(obi->nmat, nmat);
+	transpose_m3(obi->nmat);
 
 	re->totvert += obr->totvert;
 	re->totvlak += obr->totvlak;
@@ -4412,7 +4412,7 @@ static ObjectRen *find_dupligroup_dupli(Render *re, Object *ob, int psysindex)
 	return NULL;
 }
 
-static void set_dupli_tex_mat(Render *re, ObjectInstanceRen *myobi, DupliObject *dob)
+static void set_dupli_tex_mat(Render *re, ObjectInstanceRen *obi, DupliObject *dob)
 {
 	/* For duplis we need to have a matrix that transform the coordinate back
 	 * to it's original position, without the dupli transforms. We also check
@@ -4448,9 +4448,9 @@ static void set_dupli_tex_mat(Render *re, ObjectInstanceRen *myobi, DupliObject 
 	if(needtexmat) {
 		float imat[4][4];
 
-		myobi->duplitexmat= BLI_memarena_alloc(re->memArena, sizeof(float)*4*4);
+		obi->duplitexmat= BLI_memarena_alloc(re->memArena, sizeof(float)*4*4);
 		invert_m4_m4(imat, dob->mat);
-		mul_serie_m4(myobi->duplitexmat, re->viewmat, dob->omat, imat, re->viewinv, 0, 0, 0, 0);
+		mul_serie_m4(obi->duplitexmat, re->viewmat, dob->omat, imat, re->viewinv, 0, 0, 0, 0);
 	}
 }
 
@@ -4496,7 +4496,7 @@ static void init_render_object_data(Render *re, ObjectRen *obr, int timeoffset)
 static void add_render_object(Render *re, Object *ob, Object *par, DupliObject *dob, int timeoffset, int vectorlay)
 {
 	ObjectRen *obr;
-	ObjectInstanceRen *myobi;
+	ObjectInstanceRen *obi;
 	ParticleSystem *psys;
 	int show_emitter, allow_render= 1, index, psysindex, i;
 
@@ -4529,8 +4529,8 @@ static void add_render_object(Render *re, Object *ob, Object *par, DupliObject *
 
 		/* only add instance for objects that have not been used for dupli */
 		if(!(ob->transflag & OB_RENDER_DUPLI)) {
-			myobi= RE_addRenderInstance(re, obr, ob, par, index, 0, NULL, ob->lay);
-			if(dob) set_dupli_tex_mat(re, myobi, dob);
+			obi= RE_addRenderInstance(re, obr, ob, par, index, 0, NULL, ob->lay);
+			if(dob) set_dupli_tex_mat(re, obi, dob);
 		}
 		else
 			find_dupli_instances(re, obr);
@@ -4561,8 +4561,8 @@ static void add_render_object(Render *re, Object *ob, Object *par, DupliObject *
 
 			/* only add instance for objects that have not been used for dupli */
 			if(!(ob->transflag & OB_RENDER_DUPLI)) {
-				myobi= RE_addRenderInstance(re, obr, ob, par, index, psysindex, NULL, ob->lay);
-				if(dob) set_dupli_tex_mat(re, myobi, dob);
+				obi= RE_addRenderInstance(re, obr, ob, par, index, psysindex, NULL, ob->lay);
+				if(dob) set_dupli_tex_mat(re, obi, dob);
 			}
 			else
 				find_dupli_instances(re, obr);
@@ -4812,7 +4812,7 @@ static void database_init_objects(Render *re, unsigned int renderlay, int nolamp
 	Base *base;
 	Object *ob;
 	Group *group;
-	ObjectInstanceRen *myobi;
+	ObjectInstanceRen *obi;
 	Scene *sce_iter;
 	float mat[4][4];
 	int lay, vectorlay;
@@ -4889,30 +4889,30 @@ static void database_init_objects(Render *re, unsigned int renderlay, int nolamp
 						ParticleSystem *psys;
 						ObjectRen *obr = NULL;
 						int psysindex;
-						float mat2[4][4];
+						float mat[4][4];
 
-						myobi=NULL;
+						obi=NULL;
 
 						/* instances instead of the actual object are added in two cases, either
 						 * this is a duplivert/face/particle, or it is a non-animated object in
 						 * a dupligroup that has already been created before */
 						if(dob->type != OB_DUPLIGROUP || (obr=find_dupligroup_dupli(re, obd, 0))) {
-							mul_m4_m4m4(mat2, dob->mat, re->viewmat);
-							myobi= RE_addRenderInstance(re, NULL, obd, ob, dob->index, 0, mat2, obd->lay);
+							mul_m4_m4m4(mat, dob->mat, re->viewmat);
+							obi= RE_addRenderInstance(re, NULL, obd, ob, dob->index, 0, mat, obd->lay);
 
 							/* fill in instance variables for texturing */
-							set_dupli_tex_mat(re, myobi, dob);
+							set_dupli_tex_mat(re, obi, dob);
 							if(dob->type != OB_DUPLIGROUP) {
-								VECCOPY(myobi->dupliorco, dob->orco);
-								myobi->dupliuv[0]= dob->uv[0];
-								myobi->dupliuv[1]= dob->uv[1];
+								VECCOPY(obi->dupliorco, dob->orco);
+								obi->dupliuv[0]= dob->uv[0];
+								obi->dupliuv[1]= dob->uv[1];
 							}
 							else {
 								/* for the second case, setup instance to point to the already
 								 * created object, and possibly setup instances if this object
 								 * itself was duplicated. for the first case find_dupli_instances
 								 * will be called later. */
-								assign_dupligroup_dupli(re, myobi, obr);
+								assign_dupligroup_dupli(re, obi, obr);
 								if(obd->transflag & OB_RENDER_DUPLI)
 									find_dupli_instances(re, obr);
 							}
@@ -4923,25 +4923,25 @@ static void database_init_objects(Render *re, unsigned int renderlay, int nolamp
 						psysindex= 1;
 						for(psys=obd->particlesystem.first; psys; psys=psys->next) {
 							if(dob->type != OB_DUPLIGROUP || (obr=find_dupligroup_dupli(re, obd, psysindex))) {
-								if(myobi == NULL)
+								if(obi == NULL)
 									mul_m4_m4m4(mat, dob->mat, re->viewmat);
-								myobi= RE_addRenderInstance(re, NULL, obd, ob, dob->index, psysindex++, mat, obd->lay);
+								obi= RE_addRenderInstance(re, NULL, obd, ob, dob->index, psysindex++, mat, obd->lay);
 
-								set_dupli_tex_mat(re, myobi, dob);
+								set_dupli_tex_mat(re, obi, dob);
 								if(dob->type != OB_DUPLIGROUP) {
-									VECCOPY(myobi->dupliorco, dob->orco);
-									myobi->dupliuv[0]= dob->uv[0];
-									myobi->dupliuv[1]= dob->uv[1];
+									VECCOPY(obi->dupliorco, dob->orco);
+									obi->dupliuv[0]= dob->uv[0];
+									obi->dupliuv[1]= dob->uv[1];
 								}
 								else {
-									assign_dupligroup_dupli(re, myobi, obr);
+									assign_dupligroup_dupli(re, obi, obr);
 									if(obd->transflag & OB_RENDER_DUPLI)
 										find_dupli_instances(re, obr);
 								}
 							}
 						}
 
-						if(myobi==NULL)
+						if(obi==NULL)
 							/* can't instance, just create the object */
 							init_render_object(re, obd, ob, dob, timeoffset, vectorlay);
 						
@@ -5272,15 +5272,15 @@ static void calculate_speedvector(float *vectors, int step, float winsq, float w
 	}
 }
 
-static float *calculate_strandsurface_speedvectors(Render *re, ObjectInstanceRen *myobi, StrandSurface *mesh)
+static float *calculate_strandsurface_speedvectors(Render *re, ObjectInstanceRen *obi, StrandSurface *mesh)
 {
 	float winsq= (float)re->winx*(float)re->winy, winroot= sqrt(winsq), (*winspeed)[4];  /* int's can wrap on large images */
 	float ho[4], prevho[4], nextho[4], winmat[4][4], vec[2];
 	int a;
 
 	if(mesh->co && mesh->prevco && mesh->nextco) {
-		if(myobi->flag & R_TRANSFORMED)
-			mul_m4_m4m4(winmat, myobi->mat, re->winmat);
+		if(obi->flag & R_TRANSFORMED)
+			mul_m4_m4m4(winmat, obi->mat, re->winmat);
 		else
 			copy_m4_m4(winmat, re->winmat);
 
@@ -5304,9 +5304,9 @@ static float *calculate_strandsurface_speedvectors(Render *re, ObjectInstanceRen
 	return NULL;
 }
 
-static void calculate_speedvectors(Render *re, ObjectInstanceRen *myobi, float *vectors, int step)
+static void calculate_speedvectors(Render *re, ObjectInstanceRen *obi, float *vectors, int step)
 {
-	ObjectRen *obr= myobi->obr;
+	ObjectRen *obr= obi->obr;
 	VertRen *ver= NULL;
 	StrandRen *strand= NULL;
 	StrandBuffer *strandbuf;
@@ -5316,8 +5316,8 @@ static void calculate_speedvectors(Render *re, ObjectInstanceRen *myobi, float *
 	float winsq= (float)re->winx*(float)re->winy, winroot= sqrt(winsq);  /* int's can wrap on large images */
 	int a, *face, *index;
 
-	if(myobi->flag & R_TRANSFORMED)
-		mul_m4_m4m4(winmat, myobi->mat, re->winmat);
+	if(obi->flag & R_TRANSFORMED)
+		mul_m4_m4m4(winmat, obi->mat, re->winmat);
 	else
 		copy_m4_m4(winmat, re->winmat);
 
@@ -5326,7 +5326,7 @@ static void calculate_speedvectors(Render *re, ObjectInstanceRen *myobi, float *
 			if((a & 255)==0) ver= obr->vertnodes[a>>8].vert;
 			else ver++;
 
-			speed= RE_vertren_get_winspeed(myobi, ver, 1);
+			speed= RE_vertren_get_winspeed(obi, ver, 1);
 			projectvert(ver->co, winmat, ho);
 			calculate_speedvector(vectors, step, winsq, winroot, ver->co, ho, speed);
 		}
@@ -5338,7 +5338,7 @@ static void calculate_speedvectors(Render *re, ObjectInstanceRen *myobi, float *
 
 		/* compute speed vectors at surface vertices */
 		if(mesh)
-			winspeed= (float(*)[4])calculate_strandsurface_speedvectors(re, myobi, mesh);
+			winspeed= (float(*)[4])calculate_strandsurface_speedvectors(re, obi, mesh);
 
 		if(winspeed) {
 			for(a=0; a<obr->totstrand; a++, vectors+=2) {
@@ -5347,7 +5347,7 @@ static void calculate_speedvectors(Render *re, ObjectInstanceRen *myobi, float *
 
 				index= RE_strandren_get_face(obr, strand, 0);
 				if(index && *index < mesh->totface) {
-					speed= RE_strandren_get_winspeed(myobi, strand, 1);
+					speed= RE_strandren_get_winspeed(obi, strand, 1);
 
 					/* interpolate speed vectors from strand surface */
 					face= mesh->face[*index];
@@ -5373,9 +5373,9 @@ static void calculate_speedvectors(Render *re, ObjectInstanceRen *myobi, float *
 	}
 }
 
-static int load_fluidsimspeedvectors(Render *re, ObjectInstanceRen *myobi, float *vectors, int step)
+static int load_fluidsimspeedvectors(Render *re, ObjectInstanceRen *obi, float *vectors, int step)
 {
-	ObjectRen *obr= myobi->obr;
+	ObjectRen *obr= obi->obr;
 	Object *fsob= obr->ob;
 	VertRen *ver= NULL;
 	float *speed, div, zco[2], avgvel[4] = {0.0, 0.0, 0.0, 0.0};
@@ -5410,8 +5410,8 @@ static int load_fluidsimspeedvectors(Render *re, ObjectInstanceRen *myobi, float
 	
 	velarray = fss->meshVelocities;
 
-	if(myobi->flag & R_TRANSFORMED)
-		mul_m4_m4m4(winmat, myobi->mat, re->winmat);
+	if(obi->flag & R_TRANSFORMED)
+		mul_m4_m4m4(winmat, obi->mat, re->winmat);
 	else
 		copy_m4_m4(winmat, re->winmat);
 	
@@ -5468,7 +5468,7 @@ static int load_fluidsimspeedvectors(Render *re, ObjectInstanceRen *myobi, float
 			zco[0]*= len; zco[1]*= len;
 		}
 		
-		speed= RE_vertren_get_winspeed(myobi, ver, 1);
+		speed= RE_vertren_get_winspeed(obi, ver, 1);
 		// set both to the same value
 		speed[0]= speed[2]= zco[0];
 		speed[1]= speed[3]= zco[1];
@@ -5482,17 +5482,17 @@ static int load_fluidsimspeedvectors(Render *re, ObjectInstanceRen *myobi, float
 /* result should be that we can free entire database */
 static void copy_dbase_object_vectors(Render *re, ListBase *lb)
 {
-	ObjectInstanceRen *myobi, *obilb;
+	ObjectInstanceRen *obi, *obilb;
 	ObjectRen *obr;
 	VertRen *ver= NULL;
 	float *vec, ho[4], winmat[4][4];
 	int a, totvector;
 
-	for(myobi= re->instancetable.first; myobi; myobi= myobi->next) {
-		obr= myobi->obr;
+	for(obi= re->instancetable.first; obi; obi= obi->next) {
+		obr= obi->obr;
 
 		obilb= MEM_mallocN(sizeof(ObjectInstanceRen), "ObInstanceVector");
-		memcpy(obilb, myobi, sizeof(ObjectInstanceRen));
+		memcpy(obilb, obi, sizeof(ObjectInstanceRen));
 		BLI_addtail(lb, obilb);
 
 		obilb->totvector= totvector= obr->totvert;
@@ -5500,8 +5500,8 @@ static void copy_dbase_object_vectors(Render *re, ListBase *lb)
 		if(totvector > 0) {
 			vec= obilb->vectors= MEM_mallocN(2*sizeof(float)*totvector, "vector array");
 
-			if(myobi->flag & R_TRANSFORMED)
-				mul_m4_m4m4(winmat, myobi->mat, re->winmat);
+			if(obi->flag & R_TRANSFORMED)
+				mul_m4_m4m4(winmat, obi->mat, re->winmat);
 			else
 				copy_m4_m4(winmat, re->winmat);
 
@@ -5518,17 +5518,17 @@ static void copy_dbase_object_vectors(Render *re, ListBase *lb)
 
 static void free_dbase_object_vectors(ListBase *lb)
 {
-	ObjectInstanceRen *myobi;
+	ObjectInstanceRen *obi;
 	
-	for(myobi= lb->first; myobi; myobi= myobi->next)
-		if(myobi->vectors)
-			MEM_freeN(myobi->vectors);
+	for(obi= lb->first; obi; obi= obi->next)
+		if(obi->vectors)
+			MEM_freeN(obi->vectors);
 	BLI_freelistN(lb);
 }
 
 void RE_Database_FromScene_Vectors(Render *re, Main *bmain, Scene *sce, unsigned int lay)
 {
-	ObjectInstanceRen *myobi, *oldobi;
+	ObjectInstanceRen *obi, *oldobi;
 	StrandSurface *mesh;
 	ListBase *table;
 	ListBase oldtable= {NULL, NULL}, newtable= {NULL, NULL};
@@ -5579,20 +5579,20 @@ void RE_Database_FromScene_Vectors(Render *re, Main *bmain, Scene *sce, unsigned
 				table= &oldtable;
 			
 			oldobi= table->first;
-			for(myobi= re->instancetable.first; myobi && oldobi; myobi= myobi->next) {
+			for(obi= re->instancetable.first; obi && oldobi; obi= obi->next) {
 				int ok= 1;
 				FluidsimModifierData *fluidmd;
 
-				if(!(myobi->obr->flag & R_NEED_VECTORS))
+				if(!(obi->obr->flag & R_NEED_VECTORS))
 					continue;
 
-				myobi->totvector= myobi->obr->totvert;
+				obi->totvector= obi->obr->totvert;
 
 				/* find matching object in old table */
-				if(oldobi->ob!=myobi->ob || oldobi->par!=myobi->par || oldobi->index!=myobi->index || oldobi->psysindex!=myobi->psysindex) {
+				if(oldobi->ob!=obi->ob || oldobi->par!=obi->par || oldobi->index!=obi->index || oldobi->psysindex!=obi->psysindex) {
 					ok= 0;
 					for(oldobi= table->first; oldobi; oldobi= oldobi->next)
-						if(oldobi->ob==myobi->ob && oldobi->par==myobi->par && oldobi->index==myobi->index && oldobi->psysindex==myobi->psysindex)
+						if(oldobi->ob==obi->ob && oldobi->par==obi->par && oldobi->index==obi->index && oldobi->psysindex==obi->psysindex)
 							break;
 					if(oldobi==NULL)
 						oldobi= table->first;
@@ -5600,23 +5600,23 @@ void RE_Database_FromScene_Vectors(Render *re, Main *bmain, Scene *sce, unsigned
 						ok= 1;
 				}
 				if(ok==0) {
-					 printf("speed table: missing object %s\n", myobi->ob->id.name+2);
+					 printf("speed table: missing object %s\n", obi->ob->id.name+2);
 					continue;
 				}
 
 				// NT check for fluidsim special treatment
-				fluidmd = (FluidsimModifierData *)modifiers_findByType(myobi->ob, eModifierType_Fluidsim);
+				fluidmd = (FluidsimModifierData *)modifiers_findByType(obi->ob, eModifierType_Fluidsim);
 				if(fluidmd && fluidmd->fss && (fluidmd->fss->type & OB_FLUIDSIM_DOMAIN)) {
 					// use preloaded per vertex simulation data , only does calculation for step=1
 					// NOTE/FIXME - velocities and meshes loaded unnecessarily often during the database_fromscene_vectors calls...
-					load_fluidsimspeedvectors(re, myobi, oldobi->vectors, step);
+					load_fluidsimspeedvectors(re, obi, oldobi->vectors, step);
 				}
 				else {
 					/* check if both have same amounts of vertices */
-					if(myobi->totvector==oldobi->totvector)
-						calculate_speedvectors(re, myobi, oldobi->vectors, step);
+					if(obi->totvector==oldobi->totvector)
+						calculate_speedvectors(re, obi, oldobi->vectors, step);
 					else
-						printf("Warning: object %s has different amount of vertices or strands on other frame\n", myobi->ob->id.name+2);
+						printf("Warning: object %s has different amount of vertices or strands on other frame\n", obi->ob->id.name+2);
 				} // not fluidsim
 
 				oldobi= oldobi->next;

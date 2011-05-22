@@ -736,7 +736,7 @@ static void ffmpeg_postprocess(struct anim * anim, ImBuf * ibuf,
 		unsigned char* top;
 		
 		sws_scale(anim->img_convert_ctx,
-			  input->data,
+			  (const uint8_t * const *)input->data,
 			  input->linesize,
 			  0,
 			  anim->pCodecCtx->height,
@@ -786,7 +786,7 @@ static void ffmpeg_postprocess(struct anim * anim, ImBuf * ibuf,
 		unsigned char* r;
 		
 		sws_scale(anim->img_convert_ctx,
-			  input->data,
+			  (const uint8_t * const *)input->data,
 			  input->linesize,
 			  0,
 			  anim->pCodecCtx->height,

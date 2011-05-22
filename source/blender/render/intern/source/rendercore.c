@@ -899,7 +899,7 @@ static void freeps(ListBase *lb)
 	lb->first= lb->last= NULL;
 }
 
-static void addps(ListBase *lb, intptr_t *rd, int inobi, int facenr, int z, int maskz, unsigned short mask)
+static void addps(ListBase *lb, intptr_t *rd, int obi, int facenr, int z, int maskz, unsigned short mask)
 {
 	PixStrMain *psm;
 	PixStr *ps, *last= NULL;
@@ -908,7 +908,7 @@ static void addps(ListBase *lb, intptr_t *rd, int inobi, int facenr, int z, int 
 		ps= (PixStr *)(*rd);
 		
 		while(ps) {
-			if( ps->obi == inobi && ps->facenr == facenr ) {
+			if( ps->obi == obi && ps->facenr == facenr ) {
 				ps->mask |= mask;
 				return;
 			}
@@ -929,7 +929,7 @@ static void addps(ListBase *lb, intptr_t *rd, int inobi, int facenr, int z, int 
 	else *rd= (intptr_t)ps;
 	
 	ps->next= NULL;
-	ps->obi= inobi;
+	ps->obi= obi;
 	ps->facenr= facenr;
 	ps->z= z;
 	ps->maskz= maskz;
@@ -1451,7 +1451,7 @@ typedef struct ZBufSSSHandle {
 	int totps;
 } ZBufSSSHandle;
 
-static void addps_sss(void *cb_handle, int myobi, int facenr, int x, int y, int z)
+static void addps_sss(void *cb_handle, int obi, int facenr, int x, int y, int z)
 {
 	ZBufSSSHandle *handle = cb_handle;
 	RenderPart *pa= handle->pa;
@@ -1466,7 +1466,7 @@ static void addps_sss(void *cb_handle, int myobi, int facenr, int x, int y, int 
 	if(pa->rectall) {
 		intptr_t *rs= pa->rectall + pa->rectx*y + x;
 
-		addps(&handle->psmlist, rs, myobi, facenr, z, 0, 0);
+		addps(&handle->psmlist, rs, obi, facenr, z, 0, 0);
 		handle->totps++;
 	}
 	if(pa->rectz) {
@@ -1479,7 +1479,7 @@ static void addps_sss(void *cb_handle, int myobi, int facenr, int x, int y, int 
 				handle->totps++;
 			*rz= z;
 			*rp= facenr;
-			*ro= myobi;
+			*ro= obi;
 		}
 	}
 	if(pa->rectbackz) {
@@ -1492,12 +1492,12 @@ static void addps_sss(void *cb_handle, int myobi, int facenr, int x, int y, int 
 				handle->totps++;
 			*rz= z;
 			*rp= facenr;
-			*ro= myobi;
+			*ro= obi;
 		}
 	}
 }
 
-static void shade_sample_sss(ShadeSample *ssamp, Material *mat, ObjectInstanceRen *myobi, VlakRen *vlr, int quad, float x, float y, float z, float *co, float *color, float *area)
+static void shade_sample_sss(ShadeSample *ssamp, Material *mat, ObjectInstanceRen *obi, VlakRen *vlr, int quad, float x, float y, float z, float *co, float *color, float *area)
 {
 	ShadeInput *shi= ssamp->shi;
 	ShadeResult shr;
@@ -1507,9 +1507,9 @@ static void shade_sample_sss(ShadeSample *ssamp, Material *mat, ObjectInstanceRe
 	shi->samplenr= R.shadowsamplenr[shi->thread]++;
 	
 	if(quad) 
-		shade_input_set_triangle_i(shi, myobi, vlr, 0, 2, 3);
+		shade_input_set_triangle_i(shi, obi, vlr, 0, 2, 3);
 	else
-		shade_input_set_triangle_i(shi, myobi, vlr, 0, 1, 2);
+		shade_input_set_triangle_i(shi, obi, vlr, 0, 1, 2);
 
 	/* center pixel */
 	sx = x + 0.5f;
@@ -1688,13 +1688,13 @@ void zbufshade_sss_tile(RenderPart *pa)
 			if(rs) {
 				/* for each sample in this pixel, shade it */
 				for(ps=(PixStr*)*rs; ps; ps=ps->next) {
-					ObjectInstanceRen *myobi= &re->objectinstance[ps->obi];
-					ObjectRen *obr= myobi->obr;
+					ObjectInstanceRen *obi= &re->objectinstance[ps->obi];
+					ObjectRen *obr= obi->obr;
 					vlr= RE_findOrAddVlak(obr, (ps->facenr-1) & RE_QUAD_MASK);
 					quad= (ps->facenr & RE_QUAD_OFFS);
 					z= ps->z;
 
-					shade_sample_sss(&ssamp, mat, myobi, vlr, quad, x, y, z,
+					shade_sample_sss(&ssamp, mat, obi, vlr, quad, x, y, z,
 						co[totpoint], color[totpoint], &area[totpoint]);
 
 					totpoint++;
@@ -1708,14 +1708,14 @@ void zbufshade_sss_tile(RenderPart *pa)
 #else
 			if(rp) {
 				if(*rp != 0) {
-					ObjectInstanceRen *myobi= &re->objectinstance[*ro];
-					ObjectRen *obr= myobi->obr;
+					ObjectInstanceRen *obi= &re->objectinstance[*ro];
+					ObjectRen *obr= obi->obr;
 
 					/* shade front */
 					vlr= RE_findOrAddVlak(obr, (*rp-1) & RE_QUAD_MASK);
 					quad= ((*rp) & RE_QUAD_OFFS);
 
-					shade_sample_sss(&ssamp, mat, myobi, vlr, quad, x, y, *rz,
+					shade_sample_sss(&ssamp, mat, obi, vlr, quad, x, y, *rz,
 						co[totpoint], color[totpoint], &area[totpoint]);
 					
 					VECADD(fcol, fcol, color[totpoint]);
@@ -1728,14 +1728,14 @@ void zbufshade_sss_tile(RenderPart *pa)
 
 			if(rbp) {
 				if(*rbp != 0 && !(*rbp == *(rp-1) && *rbo == *(ro-1))) {
-					ObjectInstanceRen *myobi= &re->objectinstance[*rbo];
-					ObjectRen *obr= myobi->obr;
+					ObjectInstanceRen *obi= &re->objectinstance[*rbo];
+					ObjectRen *obr= obi->obr;
 
 					/* shade back */
 					vlr= RE_findOrAddVlak(obr, (*rbp-1) & RE_QUAD_MASK);
 					quad= ((*rbp) & RE_QUAD_OFFS);
 
-					shade_sample_sss(&ssamp, mat, myobi, vlr, quad, x, y, *rbz,
+					shade_sample_sss(&ssamp, mat, obi, vlr, quad, x, y, *rbz,
 						co[totpoint], color[totpoint], &area[totpoint]);
 					
 					/* to indicate this is a back sample */
@@ -1963,7 +1963,7 @@ void RE_shade_external(Render *re, ShadeInput *shi, ShadeResult *shr)
 {
 	static VlakRen vlr;
 	static ObjectRen obr;
-	static ObjectInstanceRen myobi;
+	static ObjectInstanceRen obi;
 	
 	/* init */
 	if(re) {
@@ -1972,15 +1972,15 @@ void RE_shade_external(Render *re, ShadeInput *shi, ShadeResult *shr)
 		/* fake render face */
 		memset(&vlr, 0, sizeof(VlakRen));
 		memset(&obr, 0, sizeof(ObjectRen));
-		memset(&myobi, 0, sizeof(ObjectInstanceRen));
+		memset(&obi, 0, sizeof(ObjectInstanceRen));
 		obr.lay= -1;
-		myobi.obr= &obr;
+		obi.obr= &obr;
 		
 		return;
 	}
 	shi->vlr= &vlr;
 	shi->obr= &obr;
-	shi->obi= &myobi;
+	shi->obi= &obi;
 	
 	if(shi->mat->nodetree && shi->mat->use_nodes)
 		ntreeShaderExecTree(shi->mat->nodetree, shi, shr);
@@ -2086,12 +2086,12 @@ static void bake_mask_clear( ImBuf *ibuf, char *mask, char val )
 	}
 }
 
-static void bake_set_shade_input(ObjectInstanceRen *myobi, VlakRen *vlr, ShadeInput *shi, int quad, int isect, int x, int y, float u, float v)
+static void bake_set_shade_input(ObjectInstanceRen *obi, VlakRen *vlr, ShadeInput *shi, int quad, int isect, int x, int y, float u, float v)
 {
 	if(quad) 
-		shade_input_set_triangle_i(shi, myobi, vlr, 0, 2, 3);
+		shade_input_set_triangle_i(shi, obi, vlr, 0, 2, 3);
 	else
-		shade_input_set_triangle_i(shi, myobi, vlr, 0, 1, 2);
+		shade_input_set_triangle_i(shi, obi, vlr, 0, 1, 2);
 		
 	/* cache for shadow */
 	shi->samplenr= R.shadowsamplenr[shi->thread]++;
@@ -2397,8 +2397,8 @@ static void do_bake_shade(void *handle, int x, int y, float u, float v)
 {
 	BakeShade *bs= handle;
 	VlakRen *vlr= bs->vlr;
-	ObjectInstanceRen *myobi= bs->obi;
-	Object *ob= myobi->obr->ob;
+	ObjectInstanceRen *obi= bs->obi;
+	Object *ob= obi->obr->ob;
 	float l, *v1, *v2, *v3, tvn[3], ttang[4];
 	int quad;
 	ShadeSample *ssamp= &bs->ssamp;
@@ -2427,14 +2427,14 @@ static void do_bake_shade(void *handle, int x, int y, float u, float v)
 	shi->co[1]= l*v3[1]+u*v1[1]+v*v2[1];
 	shi->co[2]= l*v3[2]+u*v1[2]+v*v2[2];
 	
-	if(myobi->flag & R_TRANSFORMED)
-		mul_m4_v3(myobi->mat, shi->co);
+	if(obi->flag & R_TRANSFORMED)
+		mul_m4_v3(obi->mat, shi->co);
 	
 	VECCOPY(shi->dxco, bs->dxco);
 	VECCOPY(shi->dyco, bs->dyco);
 
 	quad= bs->quad;
-	bake_set_shade_input(myobi, vlr, shi, quad, 0, x, y, u, v);
+	bake_set_shade_input(obi, vlr, shi, quad, 0, x, y, u, v);
 
 	if(bs->type==RE_BAKE_NORMALS && R.r.bake_normal_space==R_BAKE_SPACE_TANGENT) {
 		shade_input_set_shade_texco(shi);
@@ -2459,7 +2459,7 @@ static void do_bake_shade(void *handle, int x, int y, float u, float v)
 			memset(&isec, 0, sizeof(isec));
 			isec.mode= RE_RAY_MIRROR;
 
-			isec.orig.ob   = myobi;
+			isec.orig.ob   = obi;
 			isec.orig.face = vlr;
 			isec.userdata= bs->actob;
 			isec.check = RE_CHECK_VLR_BAKE;
@@ -2486,14 +2486,14 @@ static void do_bake_shade(void *handle, int x, int y, float u, float v)
 
 		/* if hit, we shade from the new point, otherwise from point one starting face */
 		if(hit) {
-			myobi= (ObjectInstanceRen*)minisec.hit.ob;
+			obi= (ObjectInstanceRen*)minisec.hit.ob;
 			vlr= (VlakRen*)minisec.hit.face;
 			quad= (minisec.isect == 2);
 			VECCOPY(shi->co, minco);
 			
 			u= -minisec.u;
 			v= -minisec.v;
-			bake_set_shade_input(myobi, vlr, shi, quad, 1, x, y, u, v);
+			bake_set_shade_input(obi, vlr, shi, quad, 1, x, y, u, v);
 		}
 	}
 
@@ -2509,19 +2509,19 @@ static int get_next_bake_face(BakeShade *bs)
 	VlakRen *vlr;
 	MTFace *tface;
 	static int v= 0, vdone= 0;
-	static ObjectInstanceRen *myobi= NULL;
+	static ObjectInstanceRen *obi= NULL;
 	
 	if(bs==NULL) {
 		vlr= NULL;
 		v= vdone= 0;
-		myobi= R.instancetable.first;
+		obi= R.instancetable.first;
 		return 0;
 	}
 	
 	BLI_lock_thread(LOCK_CUSTOM1);	
 
-	for(; myobi; myobi=myobi->next, v=0) {
-		obr= myobi->obr;
+	for(; obi; obi=obi->next, v=0) {
+		obr= obi->obr;
 
 		for(; v<obr->totvlak; v++) {
 			vlr= RE_findOrAddVlak(obr, v);
@@ -2558,7 +2558,7 @@ static int get_next_bake_face(BakeShade *bs)
 						R.bakebuf= ima;
 					}				
 					
-					bs->obi= myobi;
+					bs->obi= obi;
 					bs->vlr= vlr;
 					
 					bs->vdone++;	/* only for error message if nothing was rendered */
@@ -2579,8 +2579,8 @@ static int get_next_bake_face(BakeShade *bs)
 static void shade_tface(BakeShade *bs)
 {
 	VlakRen *vlr= bs->vlr;
-	ObjectInstanceRen *myobi= bs->obi;
-	ObjectRen *obr= myobi->obr;
+	ObjectInstanceRen *obi= bs->obi;
+	ObjectRen *obr= obi->obr;
 	MTFace *tface= RE_vlakren_get_tface(obr, vlr, obr->bakemtface, NULL, 0);
 	Image *ima= tface->tpage;
 	float vec[4][2];

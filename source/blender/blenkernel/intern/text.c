@@ -2751,19 +2751,19 @@ int setcurr_tab_spaces (Text *text, int space)
 		 * 	2) within an identifier
 		 *	3) after the cursor (text->curc), i.e. when creating space before a function def [#25414] 
 		 */
-		int a, doindent = 0;
+		int a, indent = 0;
 		for(a=0; (a < text->curc) && (text->curl->line[a] != '\0'); a++)
 		{
 			char ch= text->curl->line[a];
 			if (ch=='#') {
 				break;
 			} else if (ch==':') {
-				doindent = 1;
+				indent = 1;
 			} else if (ch==']' || ch=='}' || ch=='"' || ch=='\'') {
-				doindent = 0;
+				indent = 0;
 			}
 		}
-		if (doindent) {
+		if (indent) {
 			i += space;
 		}
 	}

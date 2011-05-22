@@ -861,15 +861,15 @@ static void draw_manipulator_rotate(View3D *v3d, RegionView3D *rv3d, int moving,
 		drawcircball(GL_LINE_LOOP, unitmat[3], 1.2f*size, unitmat);
 
 		if(moving) {
-			float mvec[3];
-			mvec[0]= 0.0f; // XXX (float)(t->imval[0] - t->center2d[0]);
-			mvec[1]= 0.0f; // XXX (float)(t->imval[1] - t->center2d[1]);
-			mvec[2]= 0.0f;
-			normalize_v3(mvec);
-			mul_v3_fl(mvec, 1.2f*size);
+			float vec[3];
+			vec[0]= 0; // XXX (float)(t->imval[0] - t->center2d[0]);
+			vec[1]= 0; // XXX (float)(t->imval[1] - t->center2d[1]);
+			vec[2]= 0.0f;
+			normalize_v3(vec);
+			mul_v3_fl(vec, 1.2f*size);
 			glBegin(GL_LINES);
 			glVertex3f(0.0f, 0.0f, 0.0f);
-			glVertex3fv(mvec);
+			glVertex3fv(vec);
 			glEnd();
 		}
 	}

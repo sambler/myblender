@@ -4976,9 +4976,9 @@ void special_aftertrans_update(bContext *C, TransInfo *t)
 		int i, recalcObPaths=0;
 
 		for (i = 0; i < t->total; i++) {
+			TransData *td = t->data + i;
 			ListBase pidlist;
 			PTCacheID *pid;
-            TransData *td = t->data + i;
 			ob = td->ob;
 
 			if (td->flag & TD_NOACTION)

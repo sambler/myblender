@@ -607,7 +607,7 @@ void unique_editbone_name (ListBase *edbo, char *name, EditBone *bone)
 /* helper for apply_armature_pose2bones - fixes parenting of objects that are bone-parented to armature */
 static void applyarmature_fix_boneparents (Scene *scene, Object *armob)
 {
-	Object myworkob, *ob;
+	Object workob, *ob;
 	
 	/* go through all objects in database */
 	for (ob= G.main->object.first; ob; ob= ob->id.next) {
@@ -618,8 +618,8 @@ static void applyarmature_fix_boneparents (Scene *scene, Object *armob)
 			 */
 			object_apply_mat4(ob, ob->obmat, FALSE, FALSE);
 			
-			what_does_parent(scene, ob, &myworkob);
-			invert_m4_m4(ob->parentinv, myworkob.obmat);
+			what_does_parent(scene, ob, &workob);
+			invert_m4_m4(ob->parentinv, workob.obmat);
 		}
 	}
 }

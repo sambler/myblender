@@ -253,7 +253,7 @@ struct ImBuf *imb_jp2_decode(unsigned char *mem, size_t size, int flags)
 		} else {
 			/* 8bit rgb or rgba */
 			for (i = 0; i < w * h; i++, rect+=4) {
-				index = w * h - ((i) / (w) + 1) * w + (i) % (w);
+				int index = w * h - ((i) / (w) + 1) * w + (i) % (w);
 				
 				rect[0]= image->comps[0].data[index] + signed_offsets[0];
 				rect[1]= image->comps[1].data[index] + signed_offsets[1];

@@ -256,6 +256,7 @@ void btSimulationIslandManager::buildIslands(btDispatcher* dispatcher,btCollisio
 
 		if (allSleeping)
 		{
+			int idx;
 			for (idx=startIslandIndex;idx<endIslandIndex;idx++)
 			{
 				int i = getUnionFind().getElement(idx).m_sz;
@@ -274,6 +275,8 @@ void btSimulationIslandManager::buildIslands(btDispatcher* dispatcher,btCollisio
 			}
 		} else
 		{
+
+			int idx;
 			for (idx=startIslandIndex;idx<endIslandIndex;idx++)
 			{
 				int i = getUnionFind().getElement(idx).m_sz;

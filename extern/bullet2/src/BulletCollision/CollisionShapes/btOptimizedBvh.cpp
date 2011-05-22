@@ -360,7 +360,7 @@ void	btOptimizedBvh::updateBvhNodes(btStridingMeshInterface* meshInterface,int f
 				
 
 				{
-					for (int k=0;k<3;k++)
+					for (int i=0;i<3;i++)
 					{
 						curNode.m_quantizedAabbMin[i] = leftChildNode->m_quantizedAabbMin[i];
 						if (curNode.m_quantizedAabbMin[i]>rightChildNode->m_quantizedAabbMin[i])

@@ -97,9 +97,9 @@ void	btBvhTriangleMeshShape::performRaycast (btTriangleCallback* callback, const
 		btStridingMeshInterface*	m_meshInterface;
 		btTriangleCallback* m_callback;
 
-		MyNodeOverlapCallback(btTriangleCallback* callback2,btStridingMeshInterface* meshInterface)
+		MyNodeOverlapCallback(btTriangleCallback* callback,btStridingMeshInterface* meshInterface)
 			:m_meshInterface(meshInterface),
-			m_callback(callback2)
+			m_callback(callback)
 		{
 		}
 				
@@ -166,9 +166,9 @@ void	btBvhTriangleMeshShape::performConvexcast (btTriangleCallback* callback, co
 		btStridingMeshInterface*	m_meshInterface;
 		btTriangleCallback* m_callback;
 
-		MyNodeOverlapCallback(btTriangleCallback* callback2,btStridingMeshInterface* meshInterface)
+		MyNodeOverlapCallback(btTriangleCallback* callback,btStridingMeshInterface* meshInterface)
 			:m_meshInterface(meshInterface),
-			m_callback(callback2)
+			m_callback(callback)
 		{
 		}
 				
@@ -247,9 +247,9 @@ void	btBvhTriangleMeshShape::processAllTriangles(btTriangleCallback* callback,co
 		btVector3				m_triangle[3];
 
 
-		MyNodeOverlapCallback(btTriangleCallback* callback2,btStridingMeshInterface* meshInterface)
+		MyNodeOverlapCallback(btTriangleCallback* callback,btStridingMeshInterface* meshInterface)
 			:m_meshInterface(meshInterface),
-			m_callback(callback2)
+			m_callback(callback)
 		{
 		}
 				

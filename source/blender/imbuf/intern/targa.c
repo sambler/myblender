@@ -649,16 +649,16 @@ struct ImBuf *imb_loadtarga(unsigned char *mem, size_t mem_size, int flags)
 	
 	if (tga.imgtyp == 3 || tga.imgtyp == 11){
 		uchar *crect;
-		unsigned int *lrect, col2;
+		unsigned int *lrect, col;
 		
 		crect = (uchar *) ibuf->rect;
 		lrect = (unsigned int *) ibuf->rect;
 		
 		for (size = ibuf->x * ibuf->y; size > 0; size --){
-			col2 = *lrect++;
+			col = *lrect++;
 			
 			crect[0] = 255;
-			crect[1] = crect[2] = crect[3] = col2;
+			crect[1] = crect[2] = crect[3] = col;
 			crect += 4;
 		}
 	}

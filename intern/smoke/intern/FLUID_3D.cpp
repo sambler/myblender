@@ -609,8 +609,8 @@ void FLUID_3D::copyBorderAll(float* field, int zBegin, int zEnd)
 	int _blockTotalCells=_slabSize * zSize;
 
 	if (zBegin==0)
-	for (y = 0; y < _yRes; y++)
-		for (x = 0; x < _xRes; x++)
+	for (int y = 0; y < _yRes; y++)
+		for (int x = 0; x < _xRes; x++)
 		{
 			// front slab
 			index = x + y * _xRes;

@@ -875,10 +875,10 @@ DO_INLINE float fbstar(float length, float L, float kb, float cb)
 {
 	float tempfb = kb * fb(length, L);
 
-	float result = cb * (length - L);
+	float fbstar = cb * (length - L);
 	
-	if(tempfb < result)
-		return result;
+	if(tempfb < fbstar)
+		return fbstar;
 	else
 		return tempfb;		
 }
@@ -887,9 +887,9 @@ DO_INLINE float fbstar(float length, float L, float kb, float cb)
 DO_INLINE float fbstar_jacobi(float length, float L, float kb, float cb)
 {
 	float tempfb = kb * fb(length, L);
-	float check = cb * (length - L);
+	float fbstar = cb * (length - L);
 
-	if(tempfb < check)
+	if(tempfb < fbstar)
 	{		
 		return cb;
 	}

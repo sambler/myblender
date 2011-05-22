@@ -921,7 +921,7 @@ int PyObjectPlus::py_set_attrdef(PyObject *self_py, PyObject *value, const PyAtt
 					}
 					for (int i=0; i<attrdef->m_imin; i++)
 					{
-						list = PySequence_GetItem(value, i); /* new ref */
+						PyObject *list = PySequence_GetItem(value, i); /* new ref */
 						if (!PySequence_Check(list) || PySequence_Size(list) != attrdef->m_imax) 
 						{
 							PyErr_Format(PyExc_TypeError, "expected a sequence of [%d][%d] floats for attribute \"%s\"", attrdef->m_imin, attrdef->m_imax, attrdef->m_name);

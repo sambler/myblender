@@ -1461,7 +1461,7 @@ static void alter_co(float *co, EditEdge *edge, float smooth, float fractal, int
 
 	if(beauty & B_SMOOTH) {
 		/* we calculate an offset vector vec1[], to be added to *co */
-		float len, fac2, nor[3], nor1[3], nor2[3];
+		float len, fac, nor[3], nor1[3], nor2[3];
 
 		sub_v3_v3v3(nor, edge->v1->co, edge->v2->co);
 		len= 0.5f*normalize_v3(nor);
@@ -1470,18 +1470,18 @@ static void alter_co(float *co, EditEdge *edge, float smooth, float fractal, int
 		VECCOPY(nor2, edge->v2->no);
 
 		/* cosine angle */
-		fac2= nor[0]*nor1[0] + nor[1]*nor1[1] + nor[2]*nor1[2] ;
+		fac= nor[0]*nor1[0] + nor[1]*nor1[1] + nor[2]*nor1[2] ;
 
-		vec1[0]= fac2*nor1[0];
-		vec1[1]= fac2*nor1[1];
-		vec1[2]= fac2*nor1[2];
+		vec1[0]= fac*nor1[0];
+		vec1[1]= fac*nor1[1];
+		vec1[2]= fac*nor1[2];
 
 		/* cosine angle */
-		fac2= -nor[0]*nor2[0] - nor[1]*nor2[1] - nor[2]*nor2[2] ;
+		fac= -nor[0]*nor2[0] - nor[1]*nor2[1] - nor[2]*nor2[2] ;
 
-		vec1[0]+= fac2*nor2[0];
-		vec1[1]+= fac2*nor2[1];
-		vec1[2]+= fac2*nor2[2];
+		vec1[0]+= fac*nor2[0];
+		vec1[1]+= fac*nor2[1];
+		vec1[2]+= fac*nor2[2];
 
 		/* falloff for multi subdivide */
 		smooth *= sqrtf(fabs(1.0f - 2.0f*fabsf(0.5f-perc)));

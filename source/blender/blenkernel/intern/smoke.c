@@ -1077,19 +1077,19 @@ static void smoke_calc_domain(Scene *scene, Object *ob, SmokeModifierData *smd)
 								if(bigdensity)
 								{
 									// init all surrounding cells according to amplification, too											
-									int l, m, n;
+									int i, j, k;
 									smoke_turbulence_get_res(smd->domain->wt, bigres);
-                                    
-									for(l = 0; l < smd->domain->amplify + 1; l++)
-										for(m = 0; m < smd->domain->amplify + 1; m++)
-											for(n = 0; n < smd->domain->amplify + 1; n++)
+
+									for(i = 0; i < smd->domain->amplify + 1; i++)
+										for(j = 0; j < smd->domain->amplify + 1; j++)
+											for(k = 0; k < smd->domain->amplify + 1; k++)
 											{														
-												index = smoke_get_index((smd->domain->amplify + 1)* cell[0] + l, bigres[0], (smd->domain->amplify + 1)* cell[1] + m, bigres[1], (smd->domain->amplify + 1)* cell[2] + n);														
+												index = smoke_get_index((smd->domain->amplify + 1)* cell[0] + i, bigres[0], (smd->domain->amplify + 1)* cell[1] + j, bigres[1], (smd->domain->amplify + 1)* cell[2] + k);														
 												bigdensity[index] = 0.f;													
 											}										
 								}
 							}
-                        }	// particles loop
+							}	// particles loop
 
 
 							// apply emission values

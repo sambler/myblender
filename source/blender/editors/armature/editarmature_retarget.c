@@ -2232,6 +2232,8 @@ static void retargetArctoArcAggresive(bContext *C, RigGraph *rigg, RigArc *iarc,
 	/* equal number of joints and potential position, just fill them in */
 	if (nb_joints == earc->bcount)
 	{
+		int i;
+		
 		/* init with first values */
 		for (i = 0; i < nb_joints; i++)
 		{
@@ -2245,6 +2247,7 @@ static void retargetArctoArcAggresive(bContext *C, RigGraph *rigg, RigArc *iarc,
 		MemoNode *table = MEM_callocN(nb_memo_nodes * sizeof(MemoNode), "memoization table");
 		MemoNode *result;
 		float **positions_cache = MEM_callocN(sizeof(float*) * (nb_positions + 2), "positions cache");
+		int i;
 		
 		positions_cache[0] = node_start->p;
 		positions_cache[nb_positions + 1] = node_end->p;
@@ -2253,7 +2256,7 @@ static void retargetArctoArcAggresive(bContext *C, RigGraph *rigg, RigArc *iarc,
 
 		for (i = 1; i <= nb_positions; i++)
 		{
-			bucket = IT_peek(iter, i);
+			EmbedBucket *bucket = IT_peek(iter, i);
 			positions_cache[i] = bucket->p;
 		}
 

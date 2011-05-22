@@ -80,17 +80,17 @@ int blf_utf8_next(unsigned char *buf, int *iindex)
 	 *
 	 * Returns 0 to indicate an error (e.g. invalid UTF8)
 	 */
-	int idx= *iindex, len, r;
+	int index= *iindex, len, r;
 	unsigned char d, d2, d3, d4;
 
-	d= buf[idx++];
+	d= buf[index++];
 	if (!d)
 		return(0);
 
-	while (buf[idx] && ((buf[idx] & 0xc0) == 0x80))
-		idx++;
+	while (buf[index] && ((buf[index] & 0xc0) == 0x80))
+		index++;
 
-	len= idx - *iindex;
+	len= index - *iindex;
 	if (len == 1)
 		r= d;
 	else if (len == 2) {
@@ -123,6 +123,6 @@ int blf_utf8_next(unsigned char *buf, int *iindex)
 		r <<= 6;
 		r |= (d4 & 0x3f);
 	}
-	*iindex= idx;
+	*iindex= index;
 	return(r);
 }

@@ -584,8 +584,8 @@ static void mesh_create_shadedColors(Render *re, Object *ob, int onlyForMesh, un
 
 		for (j=0; j<nverts; j++) {
 			MVert *mv= &mvert[vidx[j]];
-			char *cl1= (char*)&col1base[j*4];
-			char *cl2= (char*)(col2base?&col2base[j*4]:NULL);
+			char *col1= (char*)&col1base[j*4];
+			char *col2= (char*)(col2base?&col2base[j*4]:NULL);
 			float *vn = (mf->flag & ME_SMOOTH)?&vnors[3*vidx[j]]:n1;
 
 			mul_v3_m4v3(vec, mat, mv->co);
@@ -593,7 +593,7 @@ static void mesh_create_shadedColors(Render *re, Object *ob, int onlyForMesh, un
 			mul_v3_v3fl(vec, vn, 0.001f);
 
 			fastshade_customdata(&dm->faceData, i, j, ma);
-			fastshade(vec, vn, orco?&orco[vidx[j]*3]:mv->co, ma, cl1, cl2);
+			fastshade(vec, vn, orco?&orco[vidx[j]*3]:mv->co, ma, col1, col2);
 		}
 	} 
 	MEM_freeN(vnors);

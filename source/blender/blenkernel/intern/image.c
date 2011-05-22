@@ -1442,12 +1442,12 @@ void BKE_image_assign_ibuf(Image *ima, ImBuf *ibuf)
 	image_assign_ibuf(ima, ibuf, IMA_NO_INDEX, 0);
 }
 
-void BKE_image_signal(Image *ima, ImageUser *iuser, int signl)
+void BKE_image_signal(Image *ima, ImageUser *iuser, int signal)
 {
 	if(ima==NULL)
 		return;
 	
-	switch(signl) {
+	switch(signal) {
 	case IMA_SIGNAL_FREE:
 		image_free_buffers(ima);
 		if(iuser)

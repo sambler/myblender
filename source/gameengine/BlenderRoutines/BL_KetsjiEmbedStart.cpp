@@ -372,7 +372,7 @@ extern "C" void StartKetsjiShell(struct bContext *C, struct ARegion *ar, rcti *c
 			if(useglslmat && (scene->gm.matmode == GAME_MAT_GLSL))
 				sceneconverter->SetGLSLMaterials(true);
 					
-            KX_Scene* startscene2 = new KX_Scene(keyboarddevice,
+			KX_Scene* startscene = new KX_Scene(keyboarddevice,
 				mousedevice,
 				networkdevice,
 				startscenename,
@@ -382,7 +382,7 @@ extern "C" void StartKetsjiShell(struct bContext *C, struct ARegion *ar, rcti *c
 #ifdef WITH_PYTHON
 			// some python things
 			PyObject *gameLogic, *gameLogic_keys;
-			setupGamePython(ketsjiengine, startscene2, blenderdata, pyGlobalDict, &gameLogic, &gameLogic_keys, 0, NULL);
+			setupGamePython(ketsjiengine, startscene, blenderdata, pyGlobalDict, &gameLogic, &gameLogic_keys, 0, NULL);
 #endif // WITH_PYTHON
 
 			//initialize Dome Settings
@@ -404,10 +404,10 @@ extern "C" void StartKetsjiShell(struct bContext *C, struct ARegion *ar, rcti *c
 			{
 				// convert and add scene
 				sceneconverter->ConvertScene(
-					startscene2,
+					startscene,
 					rendertools,
 					canvas);
-				ketsjiengine->AddScene(startscene2);
+				ketsjiengine->AddScene(startscene);
 				
 				// init the rasterizer
 				rasterizer->Init();

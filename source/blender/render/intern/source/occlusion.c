@@ -142,7 +142,7 @@ typedef struct OcclusionBuildThread {
 
 extern Render R; // meh
 
-static void occ_shade(ShadeSample *ssamp, ObjectInstanceRen *myobi, VlakRen *vlr, float *rad)
+static void occ_shade(ShadeSample *ssamp, ObjectInstanceRen *obi, VlakRen *vlr, float *rad)
 {
 	ShadeInput *shi= ssamp->shi;
 	ShadeResult *shr= ssamp->shr;
@@ -170,7 +170,7 @@ static void occ_shade(ShadeSample *ssamp, ObjectInstanceRen *myobi, VlakRen *vlr
 	shi->co[1]= l*v3[1]+u*v1[1]+v*v2[1];
 	shi->co[2]= l*v3[2]+u*v1[2]+v*v2[2];
 
-	shade_input_set_triangle_i(shi, myobi, vlr, 0, 1, 2);
+	shade_input_set_triangle_i(shi, obi, vlr, 0, 1, 2);
 
 	/* set up view vector */
 	VECCOPY(shi->view, shi->co);
@@ -212,7 +212,7 @@ static void occ_shade(ShadeSample *ssamp, ObjectInstanceRen *myobi, VlakRen *vlr
 static void occ_build_shade(Render *re, OcclusionTree *tree)
 {
 	ShadeSample ssamp;
-	ObjectInstanceRen *myobi;
+	ObjectInstanceRen *obi;
 	VlakRen *vlr;
 	int a;
 
@@ -226,10 +226,10 @@ static void occ_build_shade(Render *re, OcclusionTree *tree)
 	ssamp.tot= 1;
 
 	for(a=0; a<tree->totface; a++) {
-		myobi= &R.objectinstance[tree->face[a].obi];
-		vlr= RE_findOrAddVlak(myobi->obr, tree->face[a].facenr);
+		obi= &R.objectinstance[tree->face[a].obi];
+		vlr= RE_findOrAddVlak(obi->obr, tree->face[a].facenr);
 
-		occ_shade(&ssamp, myobi, vlr, tree->rad[a]);
+		occ_shade(&ssamp, obi, vlr, tree->rad[a]);
 	}
 }
 
@@ -313,12 +313,12 @@ static float sh_eval(float *sh, float *v)
 
 static void occ_face(const OccFace *face, float co[3], float normal[3], float *area)
 {
-	ObjectInstanceRen *myobi;
+	ObjectInstanceRen *obi;
 	VlakRen *vlr;
 	float v1[3], v2[3], v3[3], v4[3];
 
-	myobi= &R.objectinstance[face->obi];
-	vlr= RE_findOrAddVlak(myobi->obr, face->facenr);
+	obi= &R.objectinstance[face->obi];
+	vlr= RE_findOrAddVlak(obi->obr, face->facenr);
 	
 	if(co) {
 		if(vlr->v4)
@@ -326,8 +326,8 @@ static void occ_face(const OccFace *face, float co[3], float normal[3], float *a
 		else
 			cent_tri_v3(co, vlr->v1->co, vlr->v2->co, vlr->v3->co);
 
-		if(myobi->flag & R_TRANSFORMED)
-			mul_m4_v3(myobi->mat, co);
+		if(obi->flag & R_TRANSFORMED)
+			mul_m4_v3(obi->mat, co);
 	}
 	
 	if(normal) {
@@ -335,8 +335,8 @@ static void occ_face(const OccFace *face, float co[3], float normal[3], float *a
 		normal[1]= -vlr->n[1];
 		normal[2]= -vlr->n[2];
 
-		if(myobi->flag & R_TRANSFORMED)
-			mul_m3_v3(myobi->nmat, normal);
+		if(obi->flag & R_TRANSFORMED)
+			mul_m3_v3(obi->nmat, normal);
 	}
 
 	if(area) {
@@ -345,11 +345,11 @@ static void occ_face(const OccFace *face, float co[3], float normal[3], float *a
 		VECCOPY(v3, vlr->v3->co);
 		if(vlr->v4) VECCOPY(v4, vlr->v4->co);
 
-		if(myobi->flag & R_TRANSFORMED) {
-			mul_m4_v3(myobi->mat, v1);
-			mul_m4_v3(myobi->mat, v2);
-			mul_m4_v3(myobi->mat, v3);
-			if(vlr->v4) mul_m4_v3(myobi->mat, v4);
+		if(obi->flag & R_TRANSFORMED) {
+			mul_m4_v3(obi->mat, v1);
+			mul_m4_v3(obi->mat, v2);
+			mul_m4_v3(obi->mat, v3);
+			if(vlr->v4) mul_m4_v3(obi->mat, v4);
 		}
 
 		/* todo: correct area for instances */
@@ -637,7 +637,7 @@ static void occ_build_sh_normalize(OccNode *node)
 static OcclusionTree *occ_tree_build(Render *re)
 {
 	OcclusionTree *tree;
-	ObjectInstanceRen *myobi;
+	ObjectInstanceRen *obi;
 	ObjectRen *obr;
 	Material *ma;
 	VlakRen *vlr= NULL;
@@ -645,8 +645,8 @@ static OcclusionTree *occ_tree_build(Render *re)
 
 	/* count */
 	totface= 0;
-	for(myobi=re->instancetable.first; myobi; myobi=myobi->next) {
-		obr= myobi->obr;
+	for(obi=re->instancetable.first; obi; obi=obi->next) {
+		obr= obi->obr;
 		for(a=0; a<obr->totvlak; a++) {
 			if((a & 255)==0) vlr= obr->vlaknodes[a>>8].vlak;
 			else vlr++;
@@ -684,8 +684,8 @@ static OcclusionTree *occ_tree_build(Render *re)
 		tree->rad= MEM_callocN(sizeof(float)*3*totface, "OcclusionRad");
 
 	/* make array of face pointers */
-	for(b=0, c=0, myobi=re->instancetable.first; myobi; myobi=myobi->next, c++) {
-		obr= myobi->obr;
+	for(b=0, c=0, obi=re->instancetable.first; obi; obi=obi->next, c++) {
+		obr= obi->obr;
 		for(a=0; a<obr->totvlak; a++) {
 			if((a & 255)==0) vlr= obr->vlaknodes[a>>8].vlak;
 			else vlr++;
@@ -1167,21 +1167,21 @@ static float occ_quad_form_factor(float *p, float *n, float *q0, float *q1, floa
 
 static float occ_form_factor(OccFace *face, float *p, float *n)
 {
-	ObjectInstanceRen *myobi;
+	ObjectInstanceRen *obi;
 	VlakRen *vlr;
 	float v1[3], v2[3], v3[3], v4[3], q0[3], q1[3], q2[3], q3[3], contrib= 0.0f;
 
-	myobi= &R.objectinstance[face->obi];
-	vlr= RE_findOrAddVlak(myobi->obr, face->facenr);
+	obi= &R.objectinstance[face->obi];
+	vlr= RE_findOrAddVlak(obi->obr, face->facenr);
 
 	VECCOPY(v1, vlr->v1->co);
 	VECCOPY(v2, vlr->v2->co);
 	VECCOPY(v3, vlr->v3->co);
 
-	if(myobi->flag & R_TRANSFORMED) {
-		mul_m4_v3(myobi->mat, v1);
-		mul_m4_v3(myobi->mat, v2);
-		mul_m4_v3(myobi->mat, v3);
+	if(obi->flag & R_TRANSFORMED) {
+		mul_m4_v3(obi->mat, v1);
+		mul_m4_v3(obi->mat, v2);
+		mul_m4_v3(obi->mat, v3);
 	}
 
 	if(occ_visible_quad(p, n, v1, v2, v3, q0, q1, q2, q3))
@@ -1189,8 +1189,8 @@ static float occ_form_factor(OccFace *face, float *p, float *n)
 
 	if(vlr->v4) {
 		VECCOPY(v4, vlr->v4->co);
-		if(myobi->flag & R_TRANSFORMED)
-			mul_m4_v3(myobi->mat, v4);
+		if(obi->flag & R_TRANSFORMED)
+			mul_m4_v3(obi->mat, v4);
 
 		if(occ_visible_quad(p, n, v1, v3, v4, q0, q1, q2, q3))
 			contrib += occ_quad_form_factor(p, n, q0, q1, q2, q3);

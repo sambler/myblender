@@ -787,14 +787,14 @@ int getTransformOrientation(const bContext *C, float normal[3], float plane[3], 
 			
 			if (ml_sel)
 			{	
-				float mat2[4][4];
+				float mat[4][4];
 
 				/* Rotation of MetaElem is stored in quat */
-				 quat_to_mat4( mat2,ml_sel->quat);
+				 quat_to_mat4( mat,ml_sel->quat);
 
-				VECCOPY(normal, mat2[2]);
+				VECCOPY(normal, mat[2]);
 
-				negate_v3_v3(plane, mat2[1]);
+				negate_v3_v3(plane, mat[1]);
 				
 				result = ORIENTATION_NORMAL;
 			}

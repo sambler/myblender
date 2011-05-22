@@ -738,7 +738,7 @@ void CalcSnapGeometry(TransInfo *t, float *UNUSED(vec))
 			{
 				if (p1->flag == 0)
 				{
-					float vec2[3];
+					float vec[3];
 					float new_dist;
 					
 					p2 = NULL;
@@ -770,26 +770,26 @@ void CalcSnapGeometry(TransInfo *t, float *UNUSED(vec))
 					{
 						p2->flag = 1;
 						
-						add_v3_v3v3(vec2, p1->p, p2->p);
-						mul_v3_fl(vec2, 0.5f);
+						add_v3_v3v3(vec, p1->p, p2->p);
+						mul_v3_fl(vec, 0.5f);
 					}
 					else
 					{
-						VECCOPY(vec2, p1->p);
+						VECCOPY(vec, p1->p);
 					}
 					
 					if (last_p == NULL)
 					{
-						VECCOPY(p, vec2);
+						VECCOPY(p, vec);
 						max_dist = 0;
 						break;
 					}
 					
-					new_dist = len_v3v3(last_p, vec2);
+					new_dist = len_v3v3(last_p, vec);
 					
 					if (new_dist < max_dist)
 					{
-						VECCOPY(p, vec2);
+						VECCOPY(p, vec);
 						max_dist = new_dist;
 					}
 				}
@@ -1613,9 +1613,9 @@ static int snapObjects(Scene *scene, View3D *v3d, ARegion *ar, Object *obedit, f
 				
 				for(dupli_ob = lb->first; dupli_ob; dupli_ob = dupli_ob->next)
 				{
-					Object *ob2 = dupli_ob->ob;
+					Object *ob = dupli_ob->ob;
 					
-					retval |= snapObject(scene, ar, ob2, 0, dupli_ob->mat, ray_start, ray_normal, mval, loc, no, dist, &depth);
+					retval |= snapObject(scene, ar, ob, 0, dupli_ob->mat, ray_start, ray_normal, mval, loc, no, dist, &depth);
 				}
 				
 				free_object_duplilist(lb);

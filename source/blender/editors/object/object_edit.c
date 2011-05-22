@@ -1107,26 +1107,26 @@ static void copymenu_modifiers(Main *bmain, Scene *scene, View3D *v3d, Object *o
 						copy_object_softbody(base->object, ob);
 					} else {
 						/* copy specific types */
-						ModifierData *md2, *mdn;
+						ModifierData *md, *mdn;
 						
 						/* remove all with type 'event' */
-						for (md2=base->object->modifiers.first; md2; md2=mdn) {
-							mdn= md2->next;
-							if(md2->type==event) {
-								BLI_remlink(&base->object->modifiers, md2);
-								modifier_free(md2);
+						for (md=base->object->modifiers.first; md; md=mdn) {
+							mdn= md->next;
+							if(md->type==event) {
+								BLI_remlink(&base->object->modifiers, md);
+								modifier_free(md);
 							}
 						}
 						
 						/* copy all with type 'event' */
-						for (md2=ob->modifiers.first; md2; md2=md2->next) {
-							if (md2->type==event) {
+						for (md=ob->modifiers.first; md; md=md->next) {
+							if (md->type==event) {
 								
 								mdn = modifier_new(event);
 								BLI_addtail(&base->object->modifiers, mdn);
 								modifier_unique_name(&base->object->modifiers, mdn);
 
-								modifier_copyData(md2, mdn);
+								modifier_copyData(md, mdn);
 							}
 						}
 

@@ -1664,14 +1664,13 @@ static void sample_apply(bContext *C, wmOperator *op, wmEvent *event)
 	if(fx>=0.0f && fy>=0.0f && fx<1.0f && fy<1.0f) {
 		float *fp;
 		char *cp;
-		mx= (int)(fx*ibuf->x);
-        my= (int)(fy*ibuf->y);
+		int x= (int)(fx*ibuf->x), y= (int)(fy*ibuf->y);
 
-		CLAMP(mx, 0, ibuf->x-1);
-		CLAMP(my, 0, ibuf->y-1);
+		CLAMP(x, 0, ibuf->x-1);
+		CLAMP(y, 0, ibuf->y-1);
 
-		info->x= mx;
-		info->y= my;
+		info->x= x;
+		info->y= y;
 		info->draw= 1;
 		info->channels= ibuf->channels;
 
@@ -1681,7 +1680,7 @@ static void sample_apply(bContext *C, wmOperator *op, wmEvent *event)
 		info->zfp= NULL;
 		
 		if(ibuf->rect) {
-			cp= (char *)(ibuf->rect + my*ibuf->x + mx);
+			cp= (char *)(ibuf->rect + y*ibuf->x + x);
 
 			info->col[0]= cp[0];
 			info->col[1]= cp[1];
@@ -1696,7 +1695,7 @@ static void sample_apply(bContext *C, wmOperator *op, wmEvent *event)
 			info->colfp= info->colf;
 		}
 		if(ibuf->rect_float) {
-			fp= (ibuf->rect_float + (ibuf->channels)*(my*ibuf->x + mx));
+			fp= (ibuf->rect_float + (ibuf->channels)*(y*ibuf->x + x));
 
 			info->colf[0]= fp[0];
 			info->colf[1]= fp[1];
@@ -1706,11 +1705,11 @@ static void sample_apply(bContext *C, wmOperator *op, wmEvent *event)
 		}
 
 		if(ibuf->zbuf) {
-			info->z= ibuf->zbuf[my*ibuf->x + mx];
+			info->z= ibuf->zbuf[y*ibuf->x + x];
 			info->zp= &info->z;
 		}
 		if(ibuf->zbuf_float) {
-			info->zf= ibuf->zbuf_float[my*ibuf->x + mx];
+			info->zf= ibuf->zbuf_float[y*ibuf->x + x];
 			info->zfp= &info->zf;
 		}
 		

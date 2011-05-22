@@ -76,10 +76,10 @@ void	btHashedOverlappingPairCache::cleanProxyFromPairs(btBroadphaseProxy* proxy,
 		btDispatcher* m_dispatcher;
 
 	public:
-		CleanPairCallback(btBroadphaseProxy* cleanProxy,btOverlappingPairCache* pairCache,btDispatcher* dispatcher2)
+		CleanPairCallback(btBroadphaseProxy* cleanProxy,btOverlappingPairCache* pairCache,btDispatcher* dispatcher)
 			:m_cleanProxy(cleanProxy),
 			m_pairCache(pairCache),
-			m_dispatcher(dispatcher2)
+			m_dispatcher(dispatcher)
 		{
 		}
 		virtual	bool	processOverlap(btBroadphasePair& pair)
@@ -576,10 +576,10 @@ void	btSortedOverlappingPairCache::cleanProxyFromPairs(btBroadphaseProxy* proxy,
 		btDispatcher* m_dispatcher;
 
 	public:
-		CleanPairCallback(btBroadphaseProxy* cleanProxy,btOverlappingPairCache* pairCache,btDispatcher* dispatcher2)
+		CleanPairCallback(btBroadphaseProxy* cleanProxy,btOverlappingPairCache* pairCache,btDispatcher* dispatcher)
 			:m_cleanProxy(cleanProxy),
 			m_pairCache(pairCache),
-			m_dispatcher(dispatcher2)
+			m_dispatcher(dispatcher)
 		{
 		}
 		virtual	bool	processOverlap(btBroadphasePair& pair)

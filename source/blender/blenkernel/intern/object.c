@@ -112,12 +112,12 @@ static void solve_parenting (Scene *scene, Object *ob, Object *par, float obmat[
 
 float originmat[3][3];	/* after where_is_object(), can be used in other functions (bad!) */
 
-void clear_workob(Object *myworkob)
+void clear_workob(Object *workob)
 {
-	memset(myworkob, 0, sizeof(Object));
+	memset(workob, 0, sizeof(Object));
 	
-	myworkob->size[0]= myworkob->size[1]= myworkob->size[2]= 1.0f;
-	myworkob->rotmode= ROT_MODE_EUL;
+	workob->size[0]= workob->size[1]= workob->size[2]= 1.0f;
+	workob->rotmode= ROT_MODE_EUL;
 }
 
 void copy_baseflags(struct Scene *scene)
@@ -1946,23 +1946,23 @@ static void give_parvert(Object *par, int nr, float *vec)
 		if(dm) {
 			MVert *mvert= dm->getVertArray(dm);
 			int *index = (int *)dm->getVertDataArray(dm, CD_ORIGINDEX);
-			int i, count2, vindex, numVerts = dm->getNumVerts(dm);
+			int i, vindex, numVerts = dm->getNumVerts(dm);
 
 			/* get the average of all verts with (original index == nr) */
-			count2= 0;
+			count= 0;
 			for(i = 0; i < numVerts; i++) {
 				vindex= (index)? index[i]: i;
 
 				if(vindex == nr) {
 					add_v3_v3(vec, mvert[i].co);
-					count2++;
+					count++;
 				}
 			}
 
-			if (count2==0) {
+			if (count==0) {
 				/* keep as 0,0,0 */
-			} else if(count2 > 0) {
-				mul_v3_fl(vec, 1.0f / count2);
+			} else if(count > 0) {
+				mul_v3_fl(vec, 1.0f / count);
 			} else {
 				/* use first index if its out of range */
 				dm->getVertCo(dm, 0, vec);
@@ -2278,29 +2278,29 @@ for a lamp that is the child of another object */
 }
 
 /* for calculation of the inverse parent transform, only used for editor */
-void what_does_parent(Scene *scene, Object *ob, Object *myworkob)
+void what_does_parent(Scene *scene, Object *ob, Object *workob)
 {
-	clear_workob(myworkob);
+	clear_workob(workob);
 	
-	unit_m4(myworkob->obmat);
-	unit_m4(myworkob->parentinv);
-	unit_m4(myworkob->constinv);
-	myworkob->parent= ob->parent;
+	unit_m4(workob->obmat);
+	unit_m4(workob->parentinv);
+	unit_m4(workob->constinv);
+	workob->parent= ob->parent;
 
-	myworkob->trackflag= ob->trackflag;
-	myworkob->upflag= ob->upflag;
+	workob->trackflag= ob->trackflag;
+	workob->upflag= ob->upflag;
 	
-	myworkob->partype= ob->partype;
-	myworkob->par1= ob->par1;
-	myworkob->par2= ob->par2;
-	myworkob->par3= ob->par3;
+	workob->partype= ob->partype;
+	workob->par1= ob->par1;
+	workob->par2= ob->par2;
+	workob->par3= ob->par3;
 
-	myworkob->constraints.first = ob->constraints.first;
-	myworkob->constraints.last = ob->constraints.last;
+	workob->constraints.first = ob->constraints.first;
+	workob->constraints.last = ob->constraints.last;
 
-	BLI_strncpy(myworkob->parsubstr, ob->parsubstr, sizeof(myworkob->parsubstr));
+	BLI_strncpy(workob->parsubstr, ob->parsubstr, sizeof(workob->parsubstr));
 
-	where_is_object(scene, myworkob);
+	where_is_object(scene, workob);
 }
 
 BoundBox *unit_boundbox(void)

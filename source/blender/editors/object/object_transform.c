@@ -373,15 +373,15 @@ void OBJECT_OT_origin_clear(wmOperatorType *ot)
  * should stay in the same place, e.g. for apply-size-rot or object center */
 static void ignore_parent_tx(Main *bmain, Scene *scene, Object *ob ) 
 {
-	Object myworkob;
+	Object workob;
 	Object *ob_child;
 	
 	/* a change was made, adjust the children to compensate */
 	for(ob_child=bmain->object.first; ob_child; ob_child=ob_child->id.next) {
 		if(ob_child->parent == ob) {
 			object_apply_mat4(ob_child, ob_child->obmat, TRUE, FALSE);
-			what_does_parent(scene, ob_child, &myworkob);
-			invert_m4_m4(ob_child->parentinv, myworkob.obmat);
+			what_does_parent(scene, ob_child, &workob);
+			invert_m4_m4(ob_child->parentinv, workob.obmat);
 		}
 	}
 }

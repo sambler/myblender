@@ -1128,36 +1128,36 @@ void copy_pose_result(bPose *to, bPose *from)
 /* For the calculation of the effects of an Action at the given frame on an object 
  * This is currently only used for the Action Constraint 
  */
-void what_does_obaction (Scene *UNUSED(scene), Object *ob, Object *myworkob, bPose *pose, bAction *act, char groupname[], float cframe)
+void what_does_obaction (Scene *UNUSED(scene), Object *ob, Object *workob, bPose *pose, bAction *act, char groupname[], float cframe)
 {
 	bActionGroup *agrp= action_groups_find_named(act, groupname);
 	
 	/* clear workob */
-	clear_workob(myworkob);
+	clear_workob(workob);
 	
 	/* init workob */
-	copy_m4_m4(myworkob->obmat, ob->obmat);
-	copy_m4_m4(myworkob->parentinv, ob->parentinv);
-	copy_m4_m4(myworkob->constinv, ob->constinv);
-	myworkob->parent= ob->parent;
+	copy_m4_m4(workob->obmat, ob->obmat);
+	copy_m4_m4(workob->parentinv, ob->parentinv);
+	copy_m4_m4(workob->constinv, ob->constinv);
+	workob->parent= ob->parent;
 	
-	myworkob->rotmode= ob->rotmode;
+	workob->rotmode= ob->rotmode;
 	
-	myworkob->trackflag= ob->trackflag;
-	myworkob->upflag= ob->upflag;
+	workob->trackflag= ob->trackflag;
+	workob->upflag= ob->upflag;
 	
-	myworkob->partype= ob->partype;
-	myworkob->par1= ob->par1;
-	myworkob->par2= ob->par2;
-	myworkob->par3= ob->par3;
+	workob->partype= ob->partype;
+	workob->par1= ob->par1;
+	workob->par2= ob->par2;
+	workob->par3= ob->par3;
 
-	myworkob->constraints.first = ob->constraints.first;
-	myworkob->constraints.last = ob->constraints.last;
+	workob->constraints.first = ob->constraints.first;
+	workob->constraints.last = ob->constraints.last;
 	
-	myworkob->pose= pose;	/* need to set pose too, since this is used for both types of Action Constraint */
+	workob->pose= pose;	/* need to set pose too, since this is used for both types of Action Constraint */
 
-	BLI_strncpy(myworkob->parsubstr, ob->parsubstr, sizeof(myworkob->parsubstr));
-	BLI_strncpy(myworkob->id.name, "OB<ConstrWorkOb>", sizeof(myworkob->id.name)); /* we don't use real object name, otherwise RNA screws with the real thing */
+	BLI_strncpy(workob->parsubstr, ob->parsubstr, sizeof(workob->parsubstr));
+	BLI_strncpy(workob->id.name, "OB<ConstrWorkOb>", sizeof(workob->id.name)); /* we don't use real object name, otherwise RNA screws with the real thing */
 	
 	/* if we're given a group to use, it's likely to be more efficient (though a bit more dangerous) */
 	if (agrp) {
@@ -1165,7 +1165,7 @@ void what_does_obaction (Scene *UNUSED(scene), Object *ob, Object *myworkob, bPo
 		PointerRNA id_ptr;
 		
 		/* get RNA-pointer for the workob's ID */
-		RNA_id_pointer_create(&myworkob->id, &id_ptr);
+		RNA_id_pointer_create(&workob->id, &id_ptr);
 		
 		/* execute action for this group only */
 		animsys_evaluate_action_group(&id_ptr, act, agrp, NULL, cframe);
@@ -1174,13 +1174,13 @@ void what_does_obaction (Scene *UNUSED(scene), Object *ob, Object *myworkob, bPo
 		AnimData adt= {NULL};
 		
 		/* init animdata, and attach to workob */
-		myworkob->adt= &adt;
+		workob->adt= &adt;
 		
 		adt.recalc= ADT_RECALC_ANIM;
 		adt.action= act;
 		
 		/* execute effects of Action on to workob (or it's PoseChannels) */
-		BKE_animsys_evaluate_animdata(&myworkob->id, &adt, cframe, ADT_RECALC_ANIM);
+		BKE_animsys_evaluate_animdata(&workob->id, &adt, cframe, ADT_RECALC_ANIM);
 	}
 }
 

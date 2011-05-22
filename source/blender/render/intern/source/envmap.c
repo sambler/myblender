@@ -690,7 +690,7 @@ int envmaptex(Tex *tex, float *texvec, float *dxt, float *dyt, int osatex, TexRe
 		env->ima= tex->ima;
 		if(env->ima && env->ima->ok) {
 			if(env->cube[1]==NULL) {
-				ibuf= BKE_image_get_ibuf(env->ima, NULL);
+				ImBuf *ibuf= BKE_image_get_ibuf(env->ima, NULL);
 				if(ibuf)
 					envmap_split_ima(env, ibuf);
 				else

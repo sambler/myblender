@@ -91,7 +91,6 @@ void VIEW3D_OT_zoom_border(struct wmOperatorType *ot);
 void VIEW3D_OT_drawtype(struct wmOperatorType *ot);
 
 void view3d_boxview_copy(ScrArea *sa, ARegion *ar);
-void view3d_persp_mat4(struct RegionView3D *rv3d, float mat[][4]);
 
 /* view3d_fly.c */
 void view3d_keymap(struct wmKeyConfig *keyconf);
@@ -165,6 +164,7 @@ void fly_modal_keymap(struct wmKeyConfig *keyconf);
 void viewrotate_modal_keymap(struct wmKeyConfig *keyconf);
 void viewmove_modal_keymap(struct wmKeyConfig *keyconf);
 void viewzoom_modal_keymap(struct wmKeyConfig *keyconf);
+void viewdolly_modal_keymap(struct wmKeyConfig *keyconf);
 
 /* view3d_buttons.c */
 void VIEW3D_OT_properties(struct wmOperatorType *ot);

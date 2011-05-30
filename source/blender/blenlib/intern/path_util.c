@@ -970,7 +970,7 @@ static int is_portable_install(void)
 	const int ver= BLENDER_VERSION;
 	char path[FILE_MAX];
 
-	return get_path_local(path, "config", NULL, ver);
+	return get_path_local(path, "config", NULL, ver, 0);
 }
 
 static int get_path_user(char *targetpath, const char *folder_name, const char *subfolder_name, const char *envvar, const int ver, int inc_prev)
@@ -982,7 +982,7 @@ static int get_path_user(char *targetpath, const char *folder_name, const char *
 
 	/* for portable install, user path is always local */
 	if (is_portable_install())
-		return get_path_local(targetpath, folder_name, subfolder_name, ver);
+		return get_path_local(targetpath, folder_name, subfolder_name, ver, 0);
 	
 	user_path[0] = '\0';
 	user_path_prev[0] = '\0';
@@ -1149,30 +1149,10 @@ char *BLI_get_folder(int folder_id, const char *subfolder)
 			if (get_path_user(path, "autosave", subfolder, "BLENDER_USER_DATAFILES", ver, 0))	break;
 			return NULL;
 
-		case BLENDER_CONFIG:		/* general case */
-			if (get_path_local(path, "config", subfolder, ver, 1)) break;
-			if (get_path_user(path, "config", subfolder, "BLENDER_USER_CONFIG", ver, 1)) break;
-			if (get_path_system(path, "config", subfolder, "BLENDER_SYSTEM_CONFIG", ver)) break;
-			return NULL;
-			
 		case BLENDER_USER_CONFIG:
-			if (get_path_local(path, "config", subfolder, ver, 1)) break;
+//			if (get_path_local(path, "config", subfolder, ver, 1)) break;
 			if (get_path_user(path, "config", subfolder, "BLENDER_USER_CONFIG", ver, 1)) break;
 			return NULL;
-			
-		case BLENDER_SYSTEM_CONFIG:
-			if (get_path_local(path, "config", subfolder, ver, 0)) break;
-			if (get_path_system(path, "config", subfolder, "BLENDER_SYSTEM_CONFIG", ver)) break;
-			return NULL;
-			
-		case BLENDER_SCRIPTS:		/* general case */
-			if (get_path_local(path, "scripts", subfolder, ver, 0)) break;
-			if (get_path_user(path, "scripts", subfolder, "BLENDER_USER_SCRIPTS", ver, 0)) break;
-			if (get_path_system(path, "scripts", subfolder, "BLENDER_SYSTEM_SCRIPTS", ver)) break;
-			return NULL;
-			
-		case BLENDER_USER_SCRIPTS:
-
 			
 		case BLENDER_USER_SCRIPTS:
 #if defined(WIN32) && BLENDER_VERSION < 258

@@ -296,7 +296,7 @@ def buildinfo(lenv, build_type):
     build_time = time.strftime ("%H:%M:%S")
     build_rev = os.popen('svnversion').read()[:-1] # remove \n
     if build_rev == '': 
-        build_rev = '36856'
+        build_rev = '37008'
     if lenv['BF_DEBUG']:
         build_type = "Debug"
         build_cflags = ' '.join(lenv['CFLAGS'] + lenv['CCFLAGS'] + lenv['BF_DEBUG_CCFLAGS'] + lenv['CPPFLAGS'])
@@ -449,10 +449,16 @@ def WinPyBundle(target=None, source=None, env=None):
     shutil.rmtree(py_target, False, printexception)
     exclude_re=[re.compile('.*/test/.*'),
                 re.compile('^config/.*'),
+                re.compile('^config-*/.*'),
                 re.compile('^distutils/.*'),
                 re.compile('^idlelib/.*'),
                 re.compile('^lib2to3/.*'),
-                re.compile('^tkinter/.*')]
+                re.compile('^tkinter/.*'),
+                re.compile('^_tkinter_d.pyd'),
+                re.compile('^turtledemo'),
+                re.compile('^turtle.py'),
+                ]
+
     print "Unpacking '" + py_tar + "' to '" + py_target + "'"
     untar_pybundle(py_tar,py_target,exclude_re)
 
@@ -569,17 +575,17 @@ def UnixPyBundle(target=None, source=None, env=None):
     run("cp -R '%s' '%s'" % (py_src, os.path.dirname(py_target)))
     run("rm -rf '%s/distutils'" % py_target)
     run("rm -rf '%s/lib2to3'" % py_target)
-    run("rm -rf '%s/idlelib'" % py_target)
-    run("rm -rf '%s/tkinter'" % py_target)
     run("rm -rf '%s/config'" % py_target)
-
+    run("rm -rf '%s/config-*'" % py_target)
     run("rm -rf '%s/site-packages'" % py_target)
     run("mkdir '%s/site-packages'" % py_target)    # python needs it.'
-
+    run("rm -rf '%s/idlelib'" % py_target)
+    run("rm -rf '%s/tkinter'" % py_target)
+    run("rm -rf '%s/turtledemo'" % py_target)
+    run("rm -r '%s/turtle.py'" % py_target)
     run("rm -f '%s/lib-dynload/_tkinter.so'" % py_target)
+
     run("find '%s' -type d -name 'test' -prune -exec rm -rf {} ';'" % py_target)
-    run("find '%s' -type d -name 'config-*' -prune -exec rm -rf {} ';'" % py_target)
-    run("find '%s' -type d -name 'turtledemo' -prune -exec rm -rf {} ';'" % py_target)
     run("find '%s' -type d -name '__pycache__' -exec rm -rf {} ';'" % py_target)
     run("find '%s' -name '*.py[co]' -exec rm -rf {} ';'" % py_target)
     run("find '%s' -name '*.so' -exec strip -s {} ';'" % py_target)

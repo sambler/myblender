@@ -736,7 +736,7 @@ int BLI_path_cwd(char *path)
 			* cwd should contain c:\ etc on win32 so the relbase can be NULL
 			* relbase being NULL also prevents // being misunderstood as relative to the current
 			* blend file which isnt a feature we want to use in this case since were dealing
-			* with a path from the command line, rather then from inside Blender */
+			* with a path from the command line, rather than from inside Blender */
 			
 			char origpath[FILE_MAXDIR + FILE_MAXFILE];
 			BLI_strncpy(origpath, path, FILE_MAXDIR + FILE_MAXFILE);
@@ -964,12 +964,25 @@ static int get_path_local(char *targetpath, const char *folder_name, const char 
 	return 0;
 }
 
+static int is_portable_install(void)
+{
+	/* detect portable install by the existance of config folder */
+	const int ver= BLENDER_VERSION;
+	char path[FILE_MAX];
+
+	return get_path_local(path, "config", NULL, ver);
+}
+
 static int get_path_user(char *targetpath, const char *folder_name, const char *subfolder_name, const char *envvar, const int ver, int inc_prev)
 {
 	char user_path[FILE_MAX];
 	char user_path_prev[FILE_MAX];
 	const char *user_base_path;
 	int path_exists;
+
+	/* for portable install, user path is always local */
+	if (is_portable_install())
+		return get_path_local(targetpath, folder_name, subfolder_name, ver);
 	
 	user_path[0] = '\0';
 	user_path_prev[0] = '\0';
@@ -1087,6 +1100,26 @@ static int get_path_system(char *targetpath, const char *folder_name, const char
 	}
 }
 
+#if defined(WIN32) && BLENDER_VERSION < 258
+
+static int path_have_257_script_install(void)
+{
+	const int ver= BLENDER_VERSION;
+	char path[FILE_MAX] = "";
+	char system_pyfile[FILE_MAX];
+
+	if (get_path_user(path, "scripts", NULL, "BLENDER_USER_SCRIPTS", ver)) {
+		BLI_join_dirfile(system_pyfile, sizeof(system_pyfile), path, "modules/bpy_types.py");
+
+		if (BLI_exists(system_pyfile))
+			return 1;
+	}
+
+	return 0;
+}
+
+#endif
+
 /* get a folder out of the 'folder_id' presets for paths */
 /* returns the path if found, NULL string if not */
 char *BLI_get_folder(int folder_id, const char *subfolder)
@@ -1096,14 +1129,14 @@ char *BLI_get_folder(int folder_id, const char *subfolder)
 	
 	switch (folder_id) {
 		case BLENDER_DATAFILES:		/* general case */
-			if (get_path_local(path, "datafiles", subfolder, ver, 0)) break;
 			if (get_path_user(path, "datafiles", subfolder, "BLENDER_USER_DATAFILES", ver, 0))	break;
+			if (get_path_local(path, "datafiles", subfolder, ver, 0)) break;
 			if (get_path_system(path, "datafiles", subfolder, "BLENDER_SYSTEM_DATAFILES", ver)) break;
 			return NULL;
 			
 		case BLENDER_USER_DATAFILES:
-			if (get_path_local(path, "datafiles", subfolder, ver, 0)) break;
 			if (get_path_user(path, "datafiles", subfolder, "BLENDER_USER_DATAFILES", ver, 0))	break;
+			if (get_path_local(path, "datafiles", subfolder, ver, 0)) break;
 			return NULL;
 			
 		case BLENDER_SYSTEM_DATAFILES:
@@ -1139,20 +1172,31 @@ char *BLI_get_folder(int folder_id, const char *subfolder)
 			return NULL;
 			
 		case BLENDER_USER_SCRIPTS:
-			if (get_path_local(path, "scripts", subfolder, ver, 0)) break;
-			if (get_path_user(path, "scripts", subfolder, "BLENDER_USER_SCRIPTS", ver, 0)) break;
+
+			
+		case BLENDER_USER_SCRIPTS:
+#if defined(WIN32) && BLENDER_VERSION < 258
+			/* if we have a 2.57 installation, then we may have system script
+			 * files in the user configuration folder. avoid using that folder
+			 * if they are there, until the version gets bumped to 2.58, so
+			 * we can be sure that folder only has addons etc. */
+			if (path_have_257_script_install()) {
+				if (get_path_local(path, "scripts", subfolder, ver)) break;
+			}
+			else
+#endif
+			{
+				if (get_path_local(path, "scripts", subfolder, ver, 0)) break;
+				if (get_path_user(path, "scripts", subfolder, "BLENDER_USER_SCRIPTS", ver, 0)) break;
+			}
+
 			return NULL;
 			
 		case BLENDER_SYSTEM_SCRIPTS:
 			if (get_path_local(path, "scripts", subfolder, ver, 0)) break;
 			if (get_path_system(path, "scripts", subfolder, "BLENDER_SYSTEM_SCRIPTS", ver)) break;
 			return NULL;
-			
-		case BLENDER_PYTHON:		/* general case */
-			if (get_path_local(path, "python", subfolder, ver, 0)) break;
-			if (get_path_system(path, "python", subfolder, "BLENDER_SYSTEM_PYTHON", ver)) break;
-			return NULL;
-			
+						
 		case BLENDER_SYSTEM_PYTHON:
 			if (get_path_local(path, "python", subfolder, ver, 0)) break;
 			if (get_path_system(path, "python", subfolder, "BLENDER_SYSTEM_PYTHON", ver)) break;
@@ -1773,7 +1817,6 @@ void BLI_where_am_i(char *fullname, const size_t maxlen, const char *name)
 
 #ifdef _WIN32
 	if(GetModuleFileName(0, fullname, maxlen)) {
-		GetShortPathName(fullname, fullname, maxlen);
 		if(!BLI_exists(fullname)) {
 			printf("path can't be found: \"%.*s\"\n", maxlen, fullname);
 			MessageBox(NULL, "path constains invalid characters or is too long (see console)", "Error", MB_OK);
@@ -1826,18 +1869,6 @@ void BLI_where_am_i(char *fullname, const size_t maxlen, const char *name)
 		if (strcmp(name, fullname)) {
 			printf("guessing '%s' == '%s'\n", name, fullname);
 		}
-#endif
-
-#ifdef _WIN32
-		// in windows change long filename to short filename because
-		// win2k doesn't know how to parse a commandline with lots of
-		// spaces and double-quotes. There's another solution to this
-		// with spawnv(P_WAIT, bprogname, argv) instead of system() but
-		// that's even uglier
-		GetShortPathName(fullname, fullname, maxlen);
-#if defined(DEBUG)
-		printf("Shortname = '%s'\n", fullname);
-#endif
 #endif
 	}
 }

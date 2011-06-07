@@ -1725,7 +1725,6 @@ static void lib_link_fcurves(FileData *fd, ID *id, ListBase *list)
 static void direct_link_fmodifiers(FileData *fd, ListBase *list)
 {
 	FModifier *fcm;
-	int a;
 	
 	for (fcm= list->first; fcm; fcm= fcm->next) {
 		/* relink general data */
@@ -1741,6 +1740,7 @@ static void direct_link_fmodifiers(FileData *fd, ListBase *list)
 				data->coefficients= newdataadr(fd, data->coefficients);
 
 				if(fd->flags & FD_FLAGS_SWITCH_ENDIAN) {
+					unsigned int a;
 					for(a = 0; a < data->arraysize; a++)
 						SWITCH_INT(data->coefficients[a]);
 				}
@@ -2095,7 +2095,7 @@ static void lib_nodetree_do_versions_group(bNodeTree *ntree)
 	for (node=ntree->nodes.first; node; node=node->next) {
 		if (node->type==NODE_GROUP) {
 			bNodeTree *ngroup= (bNodeTree*)node->id;
-			if (ngroup->flag & NTREE_DO_VERSIONS)
+			if (ngroup && (ngroup->flag & NTREE_DO_VERSIONS))
 				lib_node_do_versions_group(node);
 		}
 	}
@@ -6324,7 +6324,7 @@ static void area_add_header_region(ScrArea *sa, ListBase *lb)
 	
 	BLI_addtail(lb, ar);
 	ar->regiontype= RGN_TYPE_HEADER;
-	if(sa->headertype==1)
+	if(sa->headertype==HEADERDOWN)
 		ar->alignment= RGN_ALIGN_BOTTOM;
 	else
 		ar->alignment= RGN_ALIGN_TOP;

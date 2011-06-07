@@ -645,8 +645,12 @@ static void region_rect_recursive(ScrArea *sa, ARegion *ar, rcti *remainder, int
 	if(ar->next==NULL && alignment!=RGN_ALIGN_QSPLIT)
 		alignment= RGN_ALIGN_NONE;
 	
+	/* prefsize, for header we stick to exception */
 	prefsizex= ar->sizex?ar->sizex:ar->type->prefsizex;
-	prefsizey= ar->sizey?ar->sizey:ar->type->prefsizey;
+	if(ar->regiontype==RGN_TYPE_HEADER)
+		prefsizey= ar->type->prefsizey;
+	else
+		prefsizey= ar->sizey?ar->sizey:ar->type->prefsizey;
 	
 	/* hidden is user flag */
 	if(ar->flag & RGN_FLAG_HIDDEN);
@@ -806,8 +810,18 @@ static void region_rect_recursive(ScrArea *sa, ARegion *ar, rcti *remainder, int
 			ar->winrct.xmax= ar->winrct.xmin;
 	}
 	/* in end, add azones, where appropriate */
-	region_azone_add(sa, ar, alignment);
-
+	if(ar->regiontype == RGN_TYPE_HEADER && ar->winy + 6 > sa->winy) {
+		/* The logic for this is: when the header takes up the full area,
+		 * disallow hiding it to view the main window.
+		 *
+		 * Without this, uou can drag down the file selectors header and hide it
+		 * by accident very easily (highly annoying!), the value 6 is arbitrary
+		 * but accounts for small common rounding problems when scaling the UI,
+		 * must be minimum '4' */
+	}
+	else {
+		region_azone_add(sa, ar, alignment);
+	}
 
 	region_rect_recursive(sa, ar->next, remainder, quad);
 }
@@ -948,6 +962,9 @@ void ED_area_initialize(wmWindowManager *wm, wmWindow *win, ScrArea *sa)
 			uiFreeBlocks(NULL, &ar->uiblocks);	
 		}
 		
+		/* rechecks 2d matrix for header on dpi changing, do not do for other regions, it resets view && blocks view2d operator polls (ton) */
+		if(ar->regiontype==RGN_TYPE_HEADER)
+			ar->v2d.flag &= ~V2D_IS_INITIALISED;
 	}
 }
 
@@ -1116,7 +1133,7 @@ void ED_area_newspace(bContext *C, ScrArea *sa, int type)
 		/* tell WM to refresh, cursor types etc */
 		WM_event_add_mousemove(C);
 				
-		/*send space change notifyer*/
+		/*send space change notifier*/
 		WM_event_add_notifier(C, NC_SPACE|ND_SPACE_CHANGED, sa);
 		
 		ED_area_tag_refresh(sa);
@@ -1143,7 +1160,7 @@ void ED_area_prevspace(bContext *C, ScrArea *sa)
 	}
 	ED_area_tag_redraw(sa);
 
-	/*send space change notifyer*/
+	/*send space change notifier*/
 	WM_event_add_notifier(C, NC_SPACE|ND_SPACE_CHANGED, sa);
 }
 
@@ -1191,7 +1208,7 @@ static void spacefunc(struct bContext *C, void *UNUSED(arg1), void *UNUSED(arg2)
 	ED_area_newspace(C, CTX_wm_area(C), CTX_wm_area(C)->butspacetype);
 	ED_area_tag_redraw(CTX_wm_area(C));
 
-	/*send space change notifyer*/
+	/*send space change notifier*/
 	WM_event_add_notifier(C, NC_SPACE|ND_SPACE_CHANGED, CTX_wm_area(C));
 }
 
@@ -1203,13 +1220,13 @@ int ED_area_header_switchbutton(const bContext *C, uiBlock *block, int yco)
 	int xco= 8;
 	
 	but= uiDefIconTextButC(block, ICONTEXTROW, 0, ICON_VIEW3D, 
-						   editortype_pup(), xco, yco, XIC+10, YIC, 
+						   editortype_pup(), xco, yco, UI_UNIT_X+10, UI_UNIT_Y, 
 						   &(sa->butspacetype), 1.0, SPACEICONMAX, 0, 0, 
 						   "Displays current editor type. "
 						   "Click for menu of available types");
 	uiButSetFunc(but, spacefunc, NULL, NULL);
 	
-	return xco + XIC + 14;
+	return xco + UI_UNIT_X + 14;
 }
 
 int ED_area_header_standardbuttons(const bContext *C, uiBlock *block, int yco)
@@ -1225,21 +1242,21 @@ int ED_area_header_standardbuttons(const bContext *C, uiBlock *block, int yco)
 	if (sa->flag & HEADER_NO_PULLDOWN) {
 		uiDefIconButBitS(block, TOG, HEADER_NO_PULLDOWN, 0, 
 						 ICON_DISCLOSURE_TRI_RIGHT,
-						 xco,yco,XIC,YIC-2,
+						 xco,yco,UI_UNIT_X,UI_UNIT_Y-2,
 						 &(sa->flag), 0, 0, 0, 0, 
 						 "Show pulldown menus");
 	}
 	else {
 		uiDefIconButBitS(block, TOG, HEADER_NO_PULLDOWN, 0, 
 						 ICON_DISCLOSURE_TRI_DOWN,
-						 xco,yco,XIC,YIC-2,
+						 xco,yco,UI_UNIT_X,UI_UNIT_Y-2,
 						 &(sa->flag), 0, 0, 0, 0, 
 						 "Hide pulldown menus");
 	}
 
 	uiBlockSetEmboss(block, UI_EMBOSS);
 	
-	return xco + XIC;
+	return xco + UI_UNIT_X;
 }
 
 /************************ standard UI regions ************************/
@@ -1260,11 +1277,11 @@ void ED_region_panels(const bContext *C, ARegion *ar, int vertical, const char *
 
 	if(vertical) {
 		w= v2d->cur.xmax - v2d->cur.xmin;
-		em= (ar->type->prefsizex)? 10: 20;
+		em= (ar->type->prefsizex)? UI_UNIT_Y/2: UI_UNIT_Y;
 	}
 	else {
 		w= UI_PANEL_WIDTH;
-		em= (ar->type->prefsizex)? 10: 20;
+		em= (ar->type->prefsizex)? UI_UNIT_Y/2: UI_UNIT_Y;
 	}
 
 	x= 0;
@@ -1288,8 +1305,8 @@ void ED_region_panels(const bContext *C, ARegion *ar, int vertical, const char *
 			panel= uiBeginPanel(sa, ar, block, pt, &open);
 
 			/* bad fixed values */
-			header= (pt->flag & PNL_NO_HEADER)? 0: 20;
-			triangle= 22;
+			header= (pt->flag & PNL_NO_HEADER)? 0: UI_UNIT_Y;
+			triangle= (int)(UI_UNIT_Y * 1.1f);
 
 			if(vertical)
 				y -= header;
@@ -1441,6 +1458,7 @@ void ED_region_header(const bContext *C, ARegion *ar)
 	HeaderType *ht;
 	Header header = {NULL};
 	int maxco, xco, yco;
+	int headery= ED_area_headersize();
 
 	/* clear */	
 	UI_ThemeClearColor((ED_screen_area_active(C))?TH_HEADER:TH_HEADERDESEL);
@@ -1450,12 +1468,12 @@ void ED_region_header(const bContext *C, ARegion *ar)
 	UI_view2d_view_ortho(&ar->v2d);
 
 	xco= maxco= 8;
-	yco= HEADERY-4;
+	yco= headery-4;
 
 	/* draw all headers types */
 	for(ht= ar->type->headertypes.first; ht; ht= ht->next) {
 		block= uiBeginBlock(C, ar, ht->idname, UI_EMBOSS);
-		layout= uiBlockLayout(block, UI_LAYOUT_HORIZONTAL, UI_LAYOUT_HEADER, xco, yco, HEADERY-6, 1, style);
+		layout= uiBlockLayout(block, UI_LAYOUT_HORIZONTAL, UI_LAYOUT_HEADER, xco, yco, UI_UNIT_Y, 1, style);
 
 		if(ht->draw) {
 			header.type= ht;
@@ -1479,7 +1497,7 @@ void ED_region_header(const bContext *C, ARegion *ar)
 	}
 
 	/* always as last  */
-	UI_view2d_totRect_set(&ar->v2d, maxco+XIC+80, ar->v2d.tot.ymax-ar->v2d.tot.ymin);
+	UI_view2d_totRect_set(&ar->v2d, maxco+UI_UNIT_X+80, ar->v2d.tot.ymax-ar->v2d.tot.ymin);
 
 	/* restore view matrix? */
 	UI_view2d_view_restore(C);
@@ -1490,3 +1508,8 @@ void ED_region_header_init(ARegion *ar)
 	UI_view2d_region_reinit(&ar->v2d, V2D_COMMONVIEW_HEADER, ar->winx, ar->winy);
 }
 
+/* UI_UNIT_Y is defined as U variable now, depending dpi */
+int ED_area_headersize(void)
+{
+	return UI_UNIT_Y+6;
+}

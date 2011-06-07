@@ -449,6 +449,45 @@ void uiCenteredBoundsBlock(uiBlock *block, int addval)
 
 /* link line drawing is not part of buttons or theme.. so we stick with it here */
 
+static int ui_but_float_precision(uiBut *but, double value)
+{
+	int prec;
+
+	/* first check if prec is 0 and fallback to a simple default */
+	if((prec= (int)but->a2) == 0) {
+		prec= (but->hardmax < 10.001f) ? 3 : 2;
+	}
+
+	/* check on the number of decimal places neede to display
+	 * the number, this is so 0.00001 is not displayed as 0.00,
+	 * _but_, this is only for small values si 10.0001 will not get
+	 * the same treatment */
+	if(value != 0.0 && (value= ABS(value)) < 0.1) {
+		double prec_d= -(log10(value));
+		double prec_d_floor = floor(prec_d + FLT_EPSILON);
+		int test_prec= (int)prec_d_floor;
+
+		/* this check is so 0.00016 from isnt rounded to 0.0001 */
+		if(prec_d - prec_d_floor > FLT_EPSILON) { /* not ending with a .0~001 */
+			/* check if a second decimal place is needed 0.00015 for eg. */
+			if(double_round(value, test_prec + 1) - double_round(value, test_prec + 2) != 0.0) {
+				test_prec += 2;
+			}
+			else {
+				test_prec += 1;
+			}
+		}
+
+		if(test_prec > prec && test_prec <= 7) {
+			prec= test_prec;
+		}
+	}
+
+	CLAMP(prec, 1, 7);
+
+	return prec;
+}
+
 static void ui_draw_linkline(uiLinkLine *line)
 {
 	rcti rect;
@@ -892,13 +931,14 @@ void uiDrawBlock(const bContext *C, uiBlock *block)
 
 	/* widgets */
 	for(but= block->buttons.first; but; but= but->next) {
-		ui_but_to_pixelrect(&rect, ar, block, but);
+		if(!(but->flag & (UI_HIDDEN|UI_SCROLLED))) {
+			ui_but_to_pixelrect(&rect, ar, block, but);
 		
-		if(!(but->flag & UI_HIDDEN) &&
 			/* XXX: figure out why invalid coordinates happen when closing render window */
 			/* and material preview is redrawn in main window (temp fix for bug #23848) */
-			rect.xmin < rect.xmax && rect.ymin < rect.ymax)
-			ui_draw_but(C, ar, &style, but, &rect);
+			if(rect.xmin < rect.xmax && rect.ymin < rect.ymax)
+				ui_draw_but(C, ar, &style, but, &rect);
+		}
 	}
 	
 	/* restore matrix */
@@ -1529,10 +1569,7 @@ void ui_get_but_string(uiBut *but, char *str, int maxlen)
 				ui_get_but_string_unit(but, str, maxlen, value, 0);
 			}
 			else {
-				int prec= (int)but->a2;
-				if(prec==0) prec= 3;
-				else CLAMP(prec, 1, 7);
-
+				const int prec= ui_but_float_precision(but, value);
 				BLI_snprintf(str, maxlen, "%.*f", prec, value);
 			}
 		}
@@ -1668,7 +1705,7 @@ int ui_set_but_string(bContext *C, uiBut *but, const char *str)
 	return 0;
 }
 
-void ui_set_but_default(bContext *C, uiBut *UNUSED(but), short all)
+void ui_set_but_default(bContext *C, short all)
 {
 	PointerRNA ptr;
 
@@ -2008,10 +2045,7 @@ void ui_check_but(uiBut *but)
 				BLI_snprintf(but->drawstr, sizeof(but->drawstr), "%s%s", but->str, new_str);
 			}
 			else {
-				int prec= (int)but->a2;
-				if(prec==0) prec= (but->hardmax < 10.001f) ? 3 : 2;
-				else CLAMP(prec, 1, 7);
-
+				const int prec= ui_but_float_precision(but, value);
 				BLI_snprintf(but->drawstr, sizeof(but->drawstr), "%s%.*f", but->str, prec, value);
 			}
 		}
@@ -2029,11 +2063,9 @@ void ui_check_but(uiBut *but)
 
 	case LABEL:
 		if(ui_is_but_float(but)) {
-			int prec= (int)but->a2;
+			int prec;
 			value= ui_get_but_val(but);
-			if(prec==0) prec= 3;
-			else CLAMP(prec, 1, 7);
-
+			prec= ui_but_float_precision(but, value);
 			BLI_snprintf(but->drawstr, sizeof(but->drawstr), "%s%.*f", but->str, prec, value);
 		}
 		else {
@@ -2481,28 +2513,8 @@ static uiBut *ui_def_but_rna(uiBlock *block, int type, int retval, const char *s
 				icon= RNA_property_ui_icon(prop);
 			}
 		}
-
-		if(!tip) {
-			if(type == ROW && proptype == PROP_ENUM) {
-				EnumPropertyItem *item;
-				int i, totitem, free;
-
-				RNA_property_enum_items(block->evil_C, ptr, prop, &item, &totitem, &free);
-
-				for(i=0; i<totitem; i++) {
-					if(item[i].identifier[0] && item[i].value == (int)max) {
-						if(item[i].description[0])
-							tip= item[i].description;
-						break;
-					}
-				}
-
-				if(free)
-					MEM_freeN(item);
-			}
-		}
 		
-		if(!tip)
+		if(!tip && proptype != PROP_ENUM)
 			tip= RNA_property_ui_description(prop);
 
 		if(min == max || a1 == -1 || a2 == -1) {

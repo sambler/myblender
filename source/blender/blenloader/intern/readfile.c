@@ -3843,26 +3843,10 @@ static void lib_link_object(FileData *fd, Main *main)
 				
 				if(smd && smd->type == MOD_SMOKE_TYPE_DOMAIN && smd->domain) 
 				{
-					smd->domain->coll_group = newlibadr_us(fd, ob->id.lib, smd->domain->coll_group);
-					smd->domain->eff_group = newlibadr_us(fd, ob->id.lib, smd->domain->eff_group);
-					smd->domain->fluid_group = newlibadr_us(fd, ob->id.lib, smd->domain->fluid_group);
-
-					smd->domain->effector_weights->group = newlibadr(fd, ob->id.lib, smd->domain->effector_weights->group);
-
 					smd->domain->flags |= MOD_SMOKE_FILE_LOAD; /* flag for refreshing the simulation after loading */
 				}
 			}
 
-			{
-				ClothModifierData *clmd = (ClothModifierData *)modifiers_findByType(ob, eModifierType_Cloth);
-				
-				if(clmd) 
-				{
-					clmd->sim_parms->effector_weights->group = newlibadr(fd, ob->id.lib, clmd->sim_parms->effector_weights->group);
-					clmd->coll_parms->group= newlibadr(fd, ob->id.lib, clmd->coll_parms->group);
-				}
-			}
-			
 			/* texture field */
 			if(ob->pd)
 				lib_link_partdeflect(fd, &ob->id, ob->pd);
@@ -12758,8 +12742,14 @@ static void give_base_to_objects(Main *mainvar, Scene *sce, Library *lib, const 
 					/* when appending, make sure any indirectly loaded objects
 					 * get a base else they cant be accessed at all [#27437] */
 					if(ob->id.us==1 && is_link==FALSE && ob->id.lib==lib) {
-						if(object_in_any_scene(mainvar, ob)==0) {
-							do_it= 1;
+
+						/* we may be appending from a scene where we already
+						 *  have a linked object which is not in any scene [#27616] */
+						if((ob->id.flag & LIB_PRE_EXISTING)==0) {
+
+							if(object_in_any_scene(mainvar, ob)==0) {
+								do_it= 1;
+							}
 						}
 					}
 				}

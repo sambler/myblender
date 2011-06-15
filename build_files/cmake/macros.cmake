@@ -205,13 +205,13 @@ macro(setup_liblinks
 	endif()
 	if(WITH_IMAGE_OPENEXR)
 		if(WIN32 AND NOT UNIX)
-			foreach(_LOOP_VAR ${OPENEXR_LIB})
+			foreach(_LOOP_VAR ${OPENEXR_LIBRARIES})
 				target_link_libraries(${target} debug ${_LOOP_VAR}_d)
 				target_link_libraries(${target} optimized ${_LOOP_VAR})
 			endforeach()
 			unset(_LOOP_VAR)
 		else()
-			target_link_libraries(${target} ${OPENEXR_LIB})
+			target_link_libraries(${target} ${OPENEXR_LIBRARIES})
 		endif()
 	endif()
 	if(WITH_IMAGE_OPENJPEG AND UNIX AND NOT APPLE)
@@ -484,8 +484,8 @@ macro(blender_project_hack_post)
 	unset(_reset_standard_cflags_rel)
 	unset(_reset_standard_cxxflags_rel)
 
-	# --------------------------------------------------
-	# workaround for omission in cmake 2.8.4's GNU.cmake
+	# ------------------------------------------------------------------
+	# workaround for omission in cmake 2.8.4's GNU.cmake, fixed in 2.8.5
 	if(CMAKE_COMPILER_IS_GNUCC)
 		if(NOT DARWIN)
 			set(CMAKE_INCLUDE_SYSTEM_FLAG_C "-isystem ")

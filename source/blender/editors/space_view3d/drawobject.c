@@ -5465,7 +5465,7 @@ static void drawObjectSelect(Scene *scene, View3D *v3d, ARegion *ar, Base *base)
 	}
 	else if(ob->type==OB_ARMATURE) {
 		if(!(ob->mode & OB_MODE_POSE))
-			draw_armature(scene, v3d, ar, base, OB_WIRE, 0);
+			draw_armature(scene, v3d, ar, base, OB_WIRE, FALSE, TRUE);
 	}
 
 	glLineWidth(1.0);
@@ -6015,7 +6015,7 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, int flag)
 		case OB_ARMATURE:
 			if((v3d->flag2 & V3D_RENDER_OVERRIDE)==0) {
 				if(dt>OB_WIRE) GPU_enable_material(0, NULL); // we use default material
-				empty_object= draw_armature(scene, v3d, ar, base, dt, flag);
+				empty_object= draw_armature(scene, v3d, ar, base, dt, flag, FALSE);
 				if(dt>OB_WIRE) GPU_disable_material();
 			}
 			break;

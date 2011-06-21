@@ -187,7 +187,8 @@ static void buttons_operatortypes(void)
 {
 	WM_operatortype_append(BUTTONS_OT_toolbox);
 	WM_operatortype_append(BUTTONS_OT_file_browse);
-	WM_operatortype_append(BUTTONS_OT_resflip);
+	WM_operatortype_append(BUTTONS_OT_directory_browse);
+    WM_operatortype_append(BUTTONS_OT_resflip);
 }
 
 static void buttons_keymap(struct wmKeyConfig *keyconf)

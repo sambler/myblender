@@ -11594,9 +11594,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 					}
 	}
 
-	/* put compatibility code here until next subversion bump */
-
-	{
+	if (main->versionfile < 258 || (main->versionfile == 258 && main->subversionfile < 1)){
 		/* screen view2d settings were not properly initialized [#27164]
 		 * v2d->scroll caused the bug but best reset other values too which are in old blend files only.
 		 * need to make less ugly - possibly an iterator? */
@@ -11663,6 +11661,20 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 				}
 			}
 		}
+
+		{
+			ParticleSettings *part;
+			for(part = main->particle.first; part; part = part->id.next) {
+				/* Initialize particle billboard scale */
+				part->bb_size[0] = part->bb_size[1] = 1.0f;
+			}
+		}
+	}
+	
+	/* put compatibility code here until next subversion bump */
+
+	{
+	
 	}
 	
 	/* WATCH IT!!!: pointers from libdata have not been converted yet here! */
@@ -11745,7 +11757,8 @@ static BHead *read_userdef(BlendFileData *bfd, FileData *fd, BHead *bhead)
 
 	// XXX
 	user->uifonts.first= user->uifonts.last= NULL;
-	user->uistyles.first= user->uistyles.last= NULL;
+	
+	link_list(fd, &user->uistyles);
 
 	/* free fd->datamap again */
 	oldnewmap_free_unused(fd->datamap);

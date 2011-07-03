@@ -614,6 +614,7 @@ elseif(WIN32)
 		set(PTHREADS_INCLUDE_DIRS ${LIBDIR}/pthreads/include)
 		set(PTHREADS_LIBRARIES ${LIBDIR}/pthreads/lib/pthreadVC2.lib)
 
+		set(FREETYPE ${LIBDIR}/freetype)
 		set(FREETYPE_INCLUDE_DIRS
 			${LIBDIR}/freetype/include
 			${LIBDIR}/freetype/include/freetype2
@@ -713,7 +714,7 @@ elseif(WIN32)
 			set(PYTHON_LIBRARIES ${LIBDIR}/python/lib/python32.lib)
 		endif()
 
-		set(PLATFORM_LINKFLAGS "/SUBSYSTEM:CONSOLE /STACK:2097152 /INCREMENTAL:NO  /NODEFAULTLIB:msvcrt.lib\;msvcmrt.lib\;msvcurt.lib\;msvcrtd.lib ")
+		set(PLATFORM_LINKFLAGS "/SUBSYSTEM:CONSOLE /STACK:2097152 /INCREMENTAL:NO /NODEFAULTLIB:msvcrt.lib /NODEFAULTLIB:msvcmrt.lib /NODEFAULTLIB:msvcurt.lib /NODEFAULTLIB:msvcrtd.lib")
 
 		# MSVC only, Mingw doesnt need
 		if(CMAKE_CL_64)
@@ -722,7 +723,7 @@ elseif(WIN32)
 			set(PLATFORM_LINKFLAGS "/MACHINE:IX86 /LARGEADDRESSAWARE ${PLATFORM_LINKFLAGS}")
 		endif()
 
-		set(PLATFORM_LINKFLAGS_DEBUG "/NODEFAULTLIB:libcmt.lib\;libc.lib")
+		set(PLATFORM_LINKFLAGS_DEBUG "/NODEFAULTLIB:libcmt.lib /NODEFAULTLIB:libc.lib")
 
 	else()
 		# keep GCC spesific stuff here

@@ -1319,7 +1319,7 @@ void OBJECT_OT_make_links_scene(wmOperatorType *ot)
 
 	/* identifiers */
 	ot->name= "Link Objects to Scene";
-	ot->description = "Make linked data local to each object";
+	ot->description = "Link selection to another scene";
 	ot->idname= "OBJECT_OT_make_links_scene";
 
 	/* api callbacks */
@@ -1660,6 +1660,7 @@ void ED_object_single_users(Main *bmain, Scene *scene, int full)
 
 	if(full) {
 		single_obdata_users(bmain, scene, 0);
+		single_object_action_users(scene, 0);
 		single_mat_users_expand(bmain);
 		single_tex_users_expand(bmain);
 	}

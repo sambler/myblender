@@ -327,7 +327,7 @@ if(WITH_LZMA)
 endif()
 
 if(WITH_FFTW3)
-	list(APPEND INC ${FFTW3_INC})	
+	list(APPEND INC ${FFTW3_INCLUDE_DIRS})	
 	add_definitions(-DFFTW3=1)
 endif()
 

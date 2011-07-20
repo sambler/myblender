@@ -924,7 +924,7 @@ static int get_path_local(char *targetpath, const char *folder_name, const char 
 		let's back up and allow the config to be in the same dir as the .app bundle.
 		blender exe is in blender.app/Contents/MacOS so up three gives us the app bundle's parent folder */
 	BLI_join_dirfile(osxprogfolder, sizeof(osxprogfolder), bprogdir, "../../../");
-	if(test_path(targetpath, osxprogfolder, blender_version_decimal(ver), relfolder)) {
+	if(folder_name && test_path(targetpath, osxprogfolder, blender_version_decimal(ver), relfolder)) {
 		/* vers folder in same location as blender only counts as local config if we are looking for the config dir */
 		if(BLI_strcasecmp(folder_name, "config")==0)
 			config_from_local = 1;
@@ -944,7 +944,7 @@ static int get_path_local(char *targetpath, const char *folder_name, const char 
 #endif /* __APPLE__ */
 	
 	/* try EXECUTABLE_DIR/2.5x/folder_name - new default directory for local blender installed files */
-	if(test_path(targetpath, bprogdir, blender_version_decimal(ver), relfolder)) {
+	if(folder_name && test_path(targetpath, bprogdir, blender_version_decimal(ver), relfolder)) {
 		/* vers folder in same location as blender only counts as local config if we are looking for the config dir */
 		if(folder_name && BLI_strcasecmp(folder_name, "config")==0)
 			config_from_local = 1;

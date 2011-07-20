@@ -320,11 +320,7 @@ def creator(env):
         defs.append('WITH_PYTHON')
         if env['BF_DEBUG']:
             defs.append('_DEBUG')
-        
-    if env['BF_BUILDINFO']:
-        defs.append('BUILD_DATE')
-        defs.append('NAN_BUILDINFO')
-        
+
     if env['OURPLATFORM'] in ('win32-vc', 'win32-mingw', 'linuxcross', 'win64-vc'):
         incs.append(env['BF_PTHREADS_INC'])
 
@@ -343,7 +339,7 @@ def buildinfo(lenv, build_type):
     build_time = time.strftime ("%H:%M:%S")
     build_rev = os.popen('svnversion').read()[:-1] # remove \n
     if build_rev == '': 
-        build_rev = '38513'
+        build_rev = '38543'
     if lenv['BF_DEBUG']:
         build_type = "Debug"
         build_cflags = ' '.join(lenv['CFLAGS'] + lenv['CCFLAGS'] + lenv['BF_DEBUG_CCFLAGS'] + lenv['CPPFLAGS'])

@@ -93,7 +93,6 @@ typedef struct Camera {
 #define CAM_ANGLETOGGLE		32
 #define CAM_DS_EXPAND		64
 #define CAM_PANORAMA		128
-#define CAM_SHOWGRID		256
 
 /* yafray: dof sampling switch */
 /* #define CAM_YF_NO_QMC	512 */ /* depreceated */

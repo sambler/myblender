@@ -1146,29 +1146,6 @@ static void drawviewborder(Scene *scene, ARegion *ar, View3D *v3d)
 		}
 	}
 
-	/* grid */
-	if (ca && (ca->ShowGrid > 1)) {
-		float x1grid, x2grid, y1grid, y2grid;
-		int g;
-		
-		for(g=0;g<ca->ShowGrid;g++) {
-			a= g*( (x2-x1)/ca->ShowGrid);
-			x1grid= x1 + a;
-			x2grid= x2 - a;
-			
-			a= g*( (y2-y1)/ca->ShowGrid);
-			y1grid= y1 + a;
-			y2grid= y2 - a;
-			
-			UI_ThemeColorBlendShade(TH_REDALERT, TH_BACK, 0.25, 0);
-			
-			fdrawline(x1grid,y1, x1grid, y2);
-			fdrawline(x2grid,y1, x2grid, y2);
-			fdrawline(x1,y1grid, x2,y1grid);
-			fdrawline(x1,y2grid, x2,y2grid);
-		}
-	}
-
 	setlinestyle(0);
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 

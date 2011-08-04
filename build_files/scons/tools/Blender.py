@@ -206,6 +206,12 @@ def setup_staticlibs(lenv):
         if lenv['WITH_BF_STATICJEMALLOC']:
             statlibs += Split(lenv['BF_JEMALLOC_LIB_STATIC'])
 
+    if lenv['OURPLATFORM']=='linux2':
+        if lenv['WITH_BF_3DMOUSE']:
+            libincs += Split(lenv['BF_3DMOUSE_LIBPATH'])
+            if lenv['WITH_BF_STATIC3DMOUSE']:
+                statlibs += Split(lenv['BF_3DMOUSE_LIB_STATIC'])
+
     return statlibs, libincs
 
 def setup_syslibs(lenv):
@@ -270,6 +276,11 @@ def setup_syslibs(lenv):
     if lenv['WITH_BF_JEMALLOC']:
         if not lenv['WITH_BF_STATICJEMALLOC']:
             syslibs += Split(lenv['BF_JEMALLOC_LIB'])
+
+    if lenv['OURPLATFORM']=='linux2':
+        if lenv['WITH_BF_3DMOUSE']:
+            if not lenv['WITH_BF_STATIC3DMOUSE']:
+                syslibs += Split(lenv['BF_3DMOUSE_LIB'])
 
     syslibs += lenv['LLIBS']
 
@@ -339,7 +350,7 @@ def buildinfo(lenv, build_type):
     build_time = time.strftime ("%H:%M:%S")
     build_rev = os.popen('svnversion').read()[:-1] # remove \n
     if build_rev == '': 
-        build_rev = '38869'
+        build_rev = '39015'
     if lenv['BF_DEBUG']:
         build_type = "Debug"
         build_cflags = ' '.join(lenv['CFLAGS'] + lenv['CCFLAGS'] + lenv['BF_DEBUG_CCFLAGS'] + lenv['CPPFLAGS'])

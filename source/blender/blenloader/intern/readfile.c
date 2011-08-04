@@ -3173,7 +3173,7 @@ static void lib_link_particlesettings(FileData *fd, Main *main)
 			if(part->effector_weights)
 				part->effector_weights->group = newlibadr(fd, part->id.lib, part->effector_weights->group);
 
-			if(part->dupliweights.first) {
+			if(part->dupliweights.first && part->dup_group) {
 				int index_ok = 0;
 				/* check for old files without indices (all indexes 0) */
 				dw = part->dupliweights.first;
@@ -3203,6 +3203,9 @@ static void lib_link_particlesettings(FileData *fd, Main *main)
 					for(; dw; dw=dw->next)
 						dw->ob = newlibadr(fd, part->id.lib, dw->ob);
 				}
+			}
+			else {
+				part->dupliweights.first = part->dupliweights.last = NULL;
 			}
 
 			if(part->boids) {
@@ -13114,10 +13117,10 @@ static void append_do_cursor(Scene *scene, Library *curlib, short flag)
 	}
 }
 
+/* Context == NULL signifies not to do any scene manipulation */
 static void library_append_end(const bContext *C, Main *mainl, FileData **fd, int idcode, short flag)
 {
 	Main *mainvar;
-	Scene *scene= CTX_data_scene(C);
 	Library *curlib;
 
 	/* make main consistent */
@@ -13146,22 +13149,28 @@ static void library_append_end(const bContext *C, Main *mainl, FileData **fd, in
 	lib_verify_nodetree(mainvar, FALSE);
 	fix_relpaths_library(G.main->name, mainvar); /* make all relative paths, relative to the open blend file */
 
-	/* give a base to loose objects. If group append, do it for objects too */
-	if(scene) {
-		const short is_link= (flag & FILE_LINK) != 0;
-		if(idcode==ID_SCE) {
-			/* dont instance anything when linking in scenes, assume the scene its self instances the data */
-		}
-		else {
-			give_base_to_objects(mainvar, scene, curlib, idcode, is_link);
+	if(C) {
+		Scene *scene= CTX_data_scene(C);
 
-			if (flag & FILE_GROUP_INSTANCE) {
-				give_base_to_groups(mainvar, scene);
+		/* give a base to loose objects. If group append, do it for objects too */
+		if(scene) {
+			const short is_link= (flag & FILE_LINK) != 0;
+			if(idcode==ID_SCE) {
+				/* dont instance anything when linking in scenes, assume the scene its self instances the data */
+			}
+			else {
+				give_base_to_objects(mainvar, scene, curlib, idcode, is_link);
+
+				if (flag & FILE_GROUP_INSTANCE) {
+					give_base_to_groups(mainvar, scene);
+				}
 			}
 		}
-	}
-	else {
-		printf("library_append_end, scene is NULL (objects wont get bases)\n");
+		else {
+			printf("library_append_end, scene is NULL (objects wont get bases)\n");
+		}
+
+		append_do_cursor(scene, curlib, flag);
 	}
 	/* has been removed... erm, why? s..ton) */
 	/* 20040907: looks like they are give base already in append_named_part(); -Nathan L */
@@ -13172,8 +13181,6 @@ static void library_append_end(const bContext *C, Main *mainl, FileData **fd, in
 		blo_freefiledata( *fd );
 		*fd = NULL;
 	}	
-
-	append_do_cursor(scene, curlib, flag);
 }
 
 void BLO_library_append_end(const bContext *C, struct Main *mainl, BlendHandle** bh, int idcode, short flag)

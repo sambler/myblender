@@ -4726,6 +4726,8 @@ static void direct_link_windowmanager(FileData *fd, wmWindowManager *wm)
 
 	wm->keyconfigs.first= wm->keyconfigs.last= NULL;
 	wm->defaultconf= NULL;
+	wm->addonconf= NULL;
+	wm->userconf= NULL;
 
 	wm->jobs.first= wm->jobs.last= NULL;
 	wm->drags.first= wm->drags.last= NULL;
@@ -11762,33 +11764,57 @@ static void lib_link_all(FileData *fd, Main *main)
 	lib_link_library(fd, main);		/* only init users */
 }
 
+static void direct_link_keymapitem(FileData *fd, wmKeyMapItem *kmi)
+{
+	kmi->properties= newdataadr(fd, kmi->properties);
+	if(kmi->properties)
+		IDP_DirectLinkProperty(kmi->properties, (fd->flags & FD_FLAGS_SWITCH_ENDIAN), fd);
+	kmi->ptr= NULL;
+	kmi->flag &= ~KMI_UPDATE;
+}
 
 static BHead *read_userdef(BlendFileData *bfd, FileData *fd, BHead *bhead)
 {
 	UserDef *user;
 	wmKeyMap *keymap;
 	wmKeyMapItem *kmi;
+	wmKeyMapDiffItem *kmdi;
 
 	bfd->user= user= read_struct(fd, bhead, "user def");
 
 	/* read all data into fd->datamap */
 	bhead= read_data_into_oldnewmap(fd, bhead, "user def");
 
+	if(user->keymaps.first) {
+		/* backwards compatibility */
+		user->user_keymaps= user->keymaps;
+		user->keymaps.first= user->keymaps.last= NULL;
+	}
+
 	link_list(fd, &user->themes);
-	link_list(fd, &user->keymaps);
+	link_list(fd, &user->user_keymaps);
 	link_list(fd, &user->addons);
 
-	for(keymap=user->keymaps.first; keymap; keymap=keymap->next) {
+	for(keymap=user->user_keymaps.first; keymap; keymap=keymap->next) {
 		keymap->modal_items= NULL;
 		keymap->poll= NULL;
+		keymap->flag &= ~KEYMAP_UPDATE;
 
+		link_list(fd, &keymap->diff_items);
 		link_list(fd, &keymap->items);
-		for(kmi=keymap->items.first; kmi; kmi=kmi->next) {
-			kmi->properties= newdataadr(fd, kmi->properties);
-			if(kmi->properties)
-				IDP_DirectLinkProperty(kmi->properties, (fd->flags & FD_FLAGS_SWITCH_ENDIAN), fd);
-			kmi->ptr= NULL;
+		
+		for(kmdi=keymap->diff_items.first; kmdi; kmdi=kmdi->next) {
+			kmdi->remove_item= newdataadr(fd, kmdi->remove_item);
+			kmdi->add_item= newdataadr(fd, kmdi->add_item);
+
+			if(kmdi->remove_item)
+				direct_link_keymapitem(fd, kmdi->remove_item);
+			if(kmdi->add_item)
+				direct_link_keymapitem(fd, kmdi->add_item);
 		}
+
+		for(kmi=keymap->items.first; kmi; kmi=kmi->next)
+			direct_link_keymapitem(fd, kmi);
 	}
 
 	// XXX
@@ -12975,9 +13001,8 @@ static void append_id_part(FileData *fd, Main *mainvar, ID *id, ID **id_r)
 
 /* common routine to append/link something from a library */
 
-static Main* library_append_begin(const bContext *C, FileData **fd, const char *filepath)
+static Main* library_append_begin(Main *mainvar, FileData **fd, const char *filepath)
 {
-	Main *mainvar= CTX_data_main(C);
 	Main *mainl;
 
 	/* make mains */
@@ -12993,59 +13018,12 @@ static Main* library_append_begin(const bContext *C, FileData **fd, const char *
 	return mainl;
 }
 
-Main* BLO_library_append_begin(const bContext *C, BlendHandle** bh, const char *filepath)
+Main* BLO_library_append_begin(Main *mainvar, BlendHandle** bh, const char *filepath)
 {
 	FileData *fd= (FileData*)(*bh);
-	return library_append_begin(C, &fd, filepath);
+	return library_append_begin(mainvar, &fd, filepath);
 }
 
-static void append_do_cursor(Scene *scene, Library *curlib, short flag)
-{
-	Base *centerbase;
-	Object *ob;
-	float *curs, centerloc[3], vec[3], min[3], max[3];
-	int count= 0;
-
-	/* when not linking (appending)... */
-	if(flag & FILE_LINK) 
-		return;
-
-	/* we're not appending at cursor */
-	if((flag & FILE_ATCURSOR) == 0) 
-		return;
-	
-	/* find the center of everything appended */
-	INIT_MINMAX(min, max);
-	centerbase= (scene->base.first);
-	while(centerbase) {
-		if(centerbase->object->id.lib==curlib && centerbase->object->parent==NULL) {
-			VECCOPY(vec, centerbase->object->loc);
-			DO_MINMAX(vec, min, max);
-			count++;
-		}
-		centerbase= centerbase->next;
-	}
-	/* we haven't found any objects to move to cursor */
-	if(!count) 
-		return;
-	
-	/* move from the center of the appended objects to cursor */
-	mid_v3_v3v3(centerloc, min, max);
-	curs = scene->cursor;
-	VECSUB(centerloc,curs,centerloc);
-	
-	/* now translate the center of the objects */
-	centerbase= (scene->base.first);
-	while(centerbase) {
-		if(centerbase->object->id.lib==curlib && centerbase->object->parent==NULL) {
-			ob= centerbase->object;
-			ob->loc[0] += centerloc[0];
-			ob->loc[1] += centerloc[1];
-			ob->loc[2] += centerloc[2];
-		}
-		centerbase= centerbase->next;
-	}
-}
 
 /* Context == NULL signifies not to do any scene manipulation */
 static void library_append_end(const bContext *C, Main *mainl, FileData **fd, int idcode, short flag)
@@ -13099,8 +13077,6 @@ static void library_append_end(const bContext *C, Main *mainl, FileData **fd, in
 		else {
 			printf("library_append_end, scene is NULL (objects wont get bases)\n");
 		}
-
-		append_do_cursor(scene, curlib, flag);
 	}
 	/* has been removed... erm, why? s..ton) */
 	/* 20040907: looks like they are give base already in append_named_part(); -Nathan L */

@@ -124,15 +124,15 @@ bool RAS_OpenGLRasterizer::Init()
 	glFrontFace(GL_CCW);
 	m_last_frontface = true;
 
-	glClearColor(m_redback,m_greenback,m_blueback,m_alphaback);
-	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-
 	m_redback = 0.4375;
 	m_greenback = 0.4375;
 	m_blueback = 0.4375;
 	m_alphaback = 0.0;
+
+	glClearColor(m_redback,m_greenback,m_blueback,m_alphaback);
+	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
 
 	glShadeModel(GL_SMOOTH);
 
@@ -303,6 +303,8 @@ bool RAS_OpenGLRasterizer::BeginFrame(int drawingmode, double time)
 
 	glShadeModel(GL_SMOOTH);
 
+	glEnable(GL_MULTISAMPLE_ARB);
+
 	m_2DCanvas->BeginFrame();
 	
 	return true;
@@ -387,6 +389,9 @@ void RAS_OpenGLRasterizer::EndFrame()
 	FlushDebugLines();
 
 	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+
+	glDisable(GL_MULTISAMPLE_ARB);
+
 	m_2DCanvas->EndFrame();
 }	
 

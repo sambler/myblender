@@ -45,6 +45,7 @@
 #include "STR_String.h"
 #include "MT_Vector3.h"
 #include "SG_QList.h"
+#include <stddef.h>
 
 /*------------------------------
  * Python defines
@@ -53,7 +54,8 @@
 #ifdef WITH_PYTHON
 #ifdef USE_MATHUTILS
 extern "C" {
-#include "../../blender/python/generic/mathutils.h" /* so we can have mathutils callbacks */
+#include "../../blender/python/mathutils/mathutils.h" /* so we can have mathutils callbacks */
+#include "../../blender/python/generic/py_capi_utils.h" /* for PyC_LineSpit only */
 }
 #endif
 

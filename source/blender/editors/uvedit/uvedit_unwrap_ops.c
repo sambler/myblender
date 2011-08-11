@@ -134,6 +134,41 @@ static int ED_uvedit_ensure_uvs(bContext *C, Scene *scene, Object *obedit)
 
 /****************** Parametrizer Conversion ***************/
 
+static int uvedit_have_selection(Scene *scene, EditMesh *em, short implicit)
+{
+	EditFace *efa;
+	MTFace *tf;
+
+	/* verify if we have any selected uv's before unwrapping,
+	   so we can cancel the operator early */
+	for(efa= em->faces.first; efa; efa= efa->next) {
+		if(scene->toolsettings->uv_flag & UV_SYNC_SELECTION) {
+			if(efa->h)
+				continue;
+		}
+		else if((efa->h) || ((efa->f & SELECT)==0))
+			continue;
+
+		tf= (MTFace *)CustomData_em_get(&em->fdata, efa->data, CD_MTFACE);
+
+		if(!tf)
+			return 1; /* default selected if doesn't exists */
+		
+		if(implicit &&
+			!(	uvedit_uv_selected(scene, efa, tf, 0) ||
+				uvedit_uv_selected(scene, efa, tf, 1) ||
+				uvedit_uv_selected(scene, efa, tf, 2) ||
+				(efa->v4 && uvedit_uv_selected(scene, efa, tf, 3)) )
+		) {
+			continue;
+		}
+
+		return 1;
+	}
+
+	return 0;
+}
+
 static ParamHandle *construct_param_handle(Scene *scene, EditMesh *em, short implicit, short fill, short sel, short correct_aspect)
 {
 	ParamHandle *handle;
@@ -170,7 +205,11 @@ static ParamHandle *construct_param_handle(Scene *scene, EditMesh *em, short imp
 		float *uv[4];
 		int nverts;
 		
-		if((efa->h) || (sel && (efa->f & SELECT)==0)) 
+		if(scene->toolsettings->uv_flag & UV_SYNC_SELECTION) {
+			if(efa->h)
+				continue;
+		}
+		else if((efa->h) || (sel && (efa->f & SELECT)==0))
 			continue;
 
 		tf= (MTFace *)CustomData_em_get(&em->fdata, efa->data, CD_MTFACE);
@@ -248,13 +287,19 @@ typedef struct MinStretch {
 	wmTimer *timer;
 } MinStretch;
 
-static void minimize_stretch_init(bContext *C, wmOperator *op)
+static int minimize_stretch_init(bContext *C, wmOperator *op)
 {
 	Scene *scene= CTX_data_scene(C);
 	Object *obedit= CTX_data_edit_object(C);
 	EditMesh *em= BKE_mesh_get_editmesh((Mesh*)obedit->data);
 	MinStretch *ms;
 	int fill_holes= RNA_boolean_get(op->ptr, "fill_holes");
+	short implicit= 1;
+
+	if(!uvedit_have_selection(scene, em, implicit)) {
+		BKE_mesh_end_editmesh(obedit->data, em);
+		return 0;
+	}
 
 	ms= MEM_callocN(sizeof(MinStretch), "MinStretch");
 	ms->scene= scene;
@@ -262,7 +307,8 @@ static void minimize_stretch_init(bContext *C, wmOperator *op)
 	ms->em= em;
 	ms->blend= RNA_float_get(op->ptr, "blend");
 	ms->iterations= RNA_int_get(op->ptr, "iterations");
-	ms->handle= construct_param_handle(scene, em, 1, fill_holes, 1, 1);
+	ms->i= 0;
+	ms->handle= construct_param_handle(scene, em, implicit, fill_holes, 1, 1);
 	ms->lasttime= PIL_check_seconds_timer();
 
 	param_stretch_begin(ms->handle);
@@ -270,6 +316,8 @@ static void minimize_stretch_init(bContext *C, wmOperator *op)
 		param_stretch_blend(ms->handle, ms->blend);
 
 	op->customdata= ms;
+
+	return 1;
 }
 
 static void minimize_stretch_iteration(bContext *C, wmOperator *op, int interactive)
@@ -279,6 +327,9 @@ static void minimize_stretch_iteration(bContext *C, wmOperator *op, int interact
 
 	param_stretch_blend(ms->handle, ms->blend);
 	param_stretch_iter(ms->handle);
+
+	ms->i++;
+	RNA_int_set(op->ptr, "iterations", ms->i);
 
 	if(interactive && (PIL_check_seconds_timer() - ms->lasttime > 0.5)) {
 		char str[100];
@@ -326,7 +377,8 @@ static int minimize_stretch_exec(bContext *C, wmOperator *op)
 {
 	int i, iterations;
 
-	minimize_stretch_init(C, op);
+	if(!minimize_stretch_init(C, op))
+		return OPERATOR_CANCELLED;
 
 	iterations= RNA_int_get(op->ptr, "iterations");
 	for(i=0; i<iterations; i++)
@@ -340,7 +392,9 @@ static int minimize_stretch_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(
 {
 	MinStretch *ms;
 
-	minimize_stretch_init(C, op);
+	if(!minimize_stretch_init(C, op))
+		return OPERATOR_CANCELLED;
+
 	minimize_stretch_iteration(C, op, 1);
 
 	ms= op->customdata;
@@ -431,14 +485,27 @@ void UV_OT_minimize_stretch(wmOperatorType *ot)
 
 /* ******************** Pack Islands operator **************** */
 
-static int pack_islands_exec(bContext *C, wmOperator *UNUSED(op))
+static int pack_islands_exec(bContext *C, wmOperator *op)
 {
 	Scene *scene= CTX_data_scene(C);
 	Object *obedit= CTX_data_edit_object(C);
 	EditMesh *em= BKE_mesh_get_editmesh((Mesh*)obedit->data);
 	ParamHandle *handle;
+	short implicit= 1;
 
-	handle = construct_param_handle(scene, em, 1, 0, 1, 1);
+	if(!uvedit_have_selection(scene, em, implicit)) {
+		BKE_mesh_end_editmesh(obedit->data, em);
+		return OPERATOR_CANCELLED;
+	}
+
+	if(RNA_property_is_set(op->ptr, "margin")) {
+		scene->toolsettings->uvcalc_margin= RNA_float_get(op->ptr, "margin");
+	}
+	else {
+		RNA_float_set(op->ptr, "margin", scene->toolsettings->uvcalc_margin);
+	}
+
+	handle = construct_param_handle(scene, em, implicit, 0, 1, 1);
 	param_pack(handle, scene->toolsettings->uvcalc_margin);
 	param_flush(handle);
 	param_delete(handle);
@@ -460,6 +527,9 @@ void UV_OT_pack_islands(wmOperatorType *ot)
 	/* api callbacks */
 	ot->exec= pack_islands_exec;
 	ot->poll= ED_operator_uvedit;
+
+	/* properties */
+	RNA_def_float_factor(ot->srna, "margin", 0.0f, 0.0f, 1.0f, "Margin", "Space between islands", 0.0f, 1.0f);
 }
 
 /* ******************** Average Islands Scale operator **************** */
@@ -470,8 +540,14 @@ static int average_islands_scale_exec(bContext *C, wmOperator *UNUSED(op))
 	Object *obedit= CTX_data_edit_object(C);
 	EditMesh *em= BKE_mesh_get_editmesh((Mesh*)obedit->data);
 	ParamHandle *handle;
+	short implicit= 1;
 
-	handle= construct_param_handle(scene, em, 1, 0, 1, 1);
+	if(!uvedit_have_selection(scene, em, implicit)) {
+		BKE_mesh_end_editmesh(obedit->data, em);
+		return OPERATOR_CANCELLED;
+	}
+
+	handle= construct_param_handle(scene, em, implicit, 0, 1, 1);
 	param_average(handle);
 	param_flush(handle);
 	param_delete(handle);
@@ -619,7 +695,7 @@ static void uv_map_rotation_matrix(float result[][4], RegionView3D *rv3d, Object
 	rotside[1][0]= (float)sin(sideangle);
 	rotside[1][1]= (float)cos(sideangle);
 	rotside[2][2]= 1.0f;
-      
+
 	upangle= (float)M_PI*upangledeg/180.0f;
 	rotup[1][1]= (float)cos(upangle)/radius;
 	rotup[1][2]= -(float)sin(upangle)/radius;
@@ -707,11 +783,11 @@ static void correct_uv_aspect(EditMesh *em)
 			if(efa->f & SELECT) {
 				tf= CustomData_em_get(&em->fdata, efa->data, CD_MTFACE);
 
-				tf->uv[0][0]= ((tf->uv[0][0]-0.5)*scale)+0.5;
-				tf->uv[1][0]= ((tf->uv[1][0]-0.5)*scale)+0.5;
-				tf->uv[2][0]= ((tf->uv[2][0]-0.5)*scale)+0.5;
+				tf->uv[0][0]= ((tf->uv[0][0]-0.5f)*scale)+0.5f;
+				tf->uv[1][0]= ((tf->uv[1][0]-0.5f)*scale)+0.5f;
+				tf->uv[2][0]= ((tf->uv[2][0]-0.5f)*scale)+0.5f;
 				if(efa->v4)
-					tf->uv[3][0]= ((tf->uv[3][0]-0.5)*scale)+0.5;
+					tf->uv[3][0]= ((tf->uv[3][0]-0.5f)*scale)+0.5f;
 			}
 		}
 	}
@@ -722,11 +798,11 @@ static void correct_uv_aspect(EditMesh *em)
 			if(efa->f & SELECT) {
 				tf= CustomData_em_get(&em->fdata, efa->data, CD_MTFACE);
 
-				tf->uv[0][1]= ((tf->uv[0][1]-0.5)*scale)+0.5;
-				tf->uv[1][1]= ((tf->uv[1][1]-0.5)*scale)+0.5;
-				tf->uv[2][1]= ((tf->uv[2][1]-0.5)*scale)+0.5;
+				tf->uv[0][1]= ((tf->uv[0][1]-0.5f)*scale)+0.5f;
+				tf->uv[1][1]= ((tf->uv[1][1]-0.5f)*scale)+0.5f;
+				tf->uv[2][1]= ((tf->uv[2][1]-0.5f)*scale)+0.5f;
 				if(efa->v4)
-					tf->uv[3][1]= ((tf->uv[3][1]-0.5)*scale)+0.5;
+					tf->uv[3][1]= ((tf->uv[3][1]-0.5f)*scale)+0.5f;
 			}
 		}
 	}
@@ -802,8 +878,8 @@ static void uv_map_clip_correct(EditMesh *em, wmOperator *op)
 				nverts= (efa->v4)? 4: 3;
 
 				for(b=0; b<nverts; b++) {
-					CLAMP(tf->uv[b][0], 0.0, 1.0);
-					CLAMP(tf->uv[b][1], 0.0, 1.0);
+					CLAMP(tf->uv[b][0], 0.0f, 1.0f);
+					CLAMP(tf->uv[b][1], 0.0f, 1.0f);
 				}
 			}
 		}
@@ -816,11 +892,13 @@ static void uv_map_clip_correct(EditMesh *em, wmOperator *op)
 void ED_unwrap_lscm(Scene *scene, Object *obedit, const short sel)
 {
 	EditMesh *em= BKE_mesh_get_editmesh((Mesh*)obedit->data);
+	ParamHandle *handle;
 
 	const short fill_holes= scene->toolsettings->uvcalc_flag & UVCALC_FILLHOLES;
 	const short correct_aspect= !(scene->toolsettings->uvcalc_flag & UVCALC_NO_ASPECT_CORRECT);
+	short implicit= 0;
 
-	ParamHandle *handle= construct_param_handle(scene, em, 0, fill_holes, sel, correct_aspect);
+	handle= construct_param_handle(scene, em, implicit, fill_holes, sel, correct_aspect);
 
 	param_lscm_begin(handle, PARAM_FALSE, scene->toolsettings->unwrapper == 0);
 	param_lscm_solve(handle);
@@ -839,9 +917,18 @@ static int unwrap_exec(bContext *C, wmOperator *op)
 {
 	Scene *scene= CTX_data_scene(C);
 	Object *obedit= CTX_data_edit_object(C);
+	EditMesh *em= BKE_mesh_get_editmesh((Mesh*)obedit->data);
 	int method = RNA_enum_get(op->ptr, "method");
 	int fill_holes = RNA_boolean_get(op->ptr, "fill_holes");
 	int correct_aspect = RNA_boolean_get(op->ptr, "correct_aspect");
+	short implicit= 0;
+
+	if(!uvedit_have_selection(scene, em, implicit)) {
+		BKE_mesh_end_editmesh(obedit->data, em);
+		return 0;
+	}
+
+	BKE_mesh_end_editmesh(obedit->data, em);
 	
 	/* add uvs if they don't exist yet */
 	if(!ED_uvedit_ensure_uvs(C, scene, obedit)) {
@@ -858,7 +945,7 @@ static int unwrap_exec(bContext *C, wmOperator *op)
 	else				scene->toolsettings->uvcalc_flag |=  UVCALC_NO_ASPECT_CORRECT;
 
 	/* execute unwrap */
-	ED_unwrap_lscm(scene, obedit, FALSE);
+	ED_unwrap_lscm(scene, obedit, TRUE);
 
 	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
@@ -875,6 +962,7 @@ void UV_OT_unwrap(wmOperatorType *ot)
 
 	/* identifiers */
 	ot->name= "Unwrap";
+	ot->description= "Unwrap the mesh of the object being edited";
 	ot->idname= "UV_OT_unwrap";
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 	
@@ -1082,7 +1170,7 @@ static void uv_map_mirror(EditFace *efa, MTFace *tf)
 	for(i=0; i<nverts; i++) {
 		if(i != mi) {
 			dx = tf->uv[mi][0] - tf->uv[i][0];
-			if(dx > 0.5) tf->uv[i][0] += 1.0;
+			if(dx > 0.5f) tf->uv[i][0] += 1.0f;
 		} 
 	} 
 }
@@ -1253,24 +1341,24 @@ static int cube_project_exec(bContext *C, wmOperator *op)
 			else if(no[1]>=no[0] && no[1]>=no[2]) coy= 2;
 			else { cox= 1; coy= 2; }
 			
-			tf->uv[0][0]= 0.5+0.5*cube_size*(loc[cox] + efa->v1->co[cox]);
-			tf->uv[0][1]= 0.5+0.5*cube_size*(loc[coy] + efa->v1->co[coy]);
+			tf->uv[0][0]= 0.5f+0.5f*cube_size*(loc[cox] + efa->v1->co[cox]);
+			tf->uv[0][1]= 0.5f+0.5f*cube_size*(loc[coy] + efa->v1->co[coy]);
 			dx = floor(tf->uv[0][0]);
 			dy = floor(tf->uv[0][1]);
 			tf->uv[0][0] -= dx;
 			tf->uv[0][1] -= dy;
-			tf->uv[1][0]= 0.5+0.5*cube_size*(loc[cox] + efa->v2->co[cox]);
-			tf->uv[1][1]= 0.5+0.5*cube_size*(loc[coy] + efa->v2->co[coy]);
+			tf->uv[1][0]= 0.5f+0.5f*cube_size*(loc[cox] + efa->v2->co[cox]);
+			tf->uv[1][1]= 0.5f+0.5f*cube_size*(loc[coy] + efa->v2->co[coy]);
 			tf->uv[1][0] -= dx;
 			tf->uv[1][1] -= dy;
-			tf->uv[2][0]= 0.5+0.5*cube_size*(loc[cox] + efa->v3->co[cox]);
-			tf->uv[2][1]= 0.5+0.5*cube_size*(loc[coy] + efa->v3->co[coy]);
+			tf->uv[2][0]= 0.5f+0.5f*cube_size*(loc[cox] + efa->v3->co[cox]);
+			tf->uv[2][1]= 0.5f+0.5f*cube_size*(loc[coy] + efa->v3->co[coy]);
 			tf->uv[2][0] -= dx;
 			tf->uv[2][1] -= dy;
 
 			if(efa->v4) {
-				tf->uv[3][0]= 0.5+0.5*cube_size*(loc[cox] + efa->v4->co[cox]);
-				tf->uv[3][1]= 0.5+0.5*cube_size*(loc[coy] + efa->v4->co[coy]);
+				tf->uv[3][0]= 0.5f+0.5f*cube_size*(loc[cox] + efa->v4->co[cox]);
+				tf->uv[3][1]= 0.5f+0.5f*cube_size*(loc[coy] + efa->v4->co[coy]);
 				tf->uv[3][0] -= dx;
 				tf->uv[3][1] -= dy;
 			}

@@ -115,7 +115,7 @@ static void rna_Sensor_type_set(struct PointerRNA *ptr, int value)
 }
 
 /* Always keep in alphabetical order */
-EnumPropertyItem *rna_Sensor_type_itemf(bContext *C, PointerRNA *ptr, int *free)
+EnumPropertyItem *rna_Sensor_type_itemf(bContext *C, PointerRNA *ptr, PropertyRNA *UNUSED(prop), int *free)
 {
 	EnumPropertyItem *item= NULL;
 	Object *ob=NULL;
@@ -243,10 +243,10 @@ static void rna_Sensor_Armature_update(Main *bmain, Scene *scene, PointerRNA *pt
 /* note: the following set functions exists only to avoid id refcounting */
 static void rna_Sensor_touch_material_set(PointerRNA *ptr, PointerRNA value)
 {
-        bSensor *sens = (bSensor *)ptr->data;
-        bTouchSensor *ts = (bTouchSensor *) sens->data;
+	bSensor *sens = (bSensor *)ptr->data;
+	bTouchSensor *ts = (bTouchSensor *) sens->data;
 
-        ts->ma = value.data;
+	ts->ma = value.data;
 }
 #else
 

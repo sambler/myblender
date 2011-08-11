@@ -298,7 +298,7 @@ static int poselib_sanitise_exec (bContext *C, wmOperator *op)
 		/* check if any pose matches this */
 		// TODO: don't go looking through the list like this every time...
 		for (marker= act->markers.first; marker; marker= marker->next) {
-			if (IS_EQ(marker->frame, ak->cfra)) {
+			if (IS_EQ(marker->frame, (double)ak->cfra)) {
 				marker->flag = -1;
 				break;
 			}
@@ -354,7 +354,7 @@ void POSELIB_OT_action_sanitise (wmOperatorType *ot)
 static void poselib_add_menu_invoke__replacemenu (bContext *C, uiLayout *layout, void *UNUSED(arg))
 {
 	Object *ob= get_poselib_object(C);
-	bAction *act= (ob) ? ob->poselib : NULL;
+	bAction *act= ob->poselib; /* never NULL */
 	TimeMarker *marker;
 	
 	/* set the operator execution context correctly */
@@ -483,7 +483,7 @@ void POSELIB_OT_pose_add (wmOperatorType *ot)
 /* ----- */
 
 /* can be called with C == NULL */
-static EnumPropertyItem *poselib_stored_pose_itemf(bContext *C, PointerRNA *UNUSED(ptr), int *free)
+static EnumPropertyItem *poselib_stored_pose_itemf(bContext *C, PointerRNA *UNUSED(ptr), PropertyRNA *UNUSED(prop), int *free)
 {
 	Object *ob = get_poselib_object(C);
 	bAction *act = (ob) ? ob->poselib : NULL;
@@ -527,7 +527,7 @@ static int poselib_remove_exec (bContext *C, wmOperator *op)
 	}
 	
 	/* get index (and pointer) of pose to remove */
-	marker= BLI_findlink(&act->markers, RNA_int_get(op->ptr, "pose"));
+	marker= BLI_findlink(&act->markers, RNA_enum_get(op->ptr, "pose"));
 	if (marker == NULL) {
 		BKE_reportf(op->reports, RPT_ERROR, "Invalid Pose specified %d", RNA_int_get(op->ptr, "pose"));
 		return OPERATOR_CANCELLED;

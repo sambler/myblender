@@ -85,8 +85,6 @@ void ED_operatortypes_armature(void)
 	WM_operatortype_append(ARMATURE_OT_autoside_names);
 	WM_operatortype_append(ARMATURE_OT_flip_names);
 	
-	WM_operatortype_append(ARMATURE_OT_flags_set);
-	
 	WM_operatortype_append(ARMATURE_OT_layers_show_all);
 	WM_operatortype_append(ARMATURE_OT_armature_layers);
 	WM_operatortype_append(ARMATURE_OT_bone_layers);
@@ -141,10 +139,10 @@ void ED_operatortypes_armature(void)
 
 	WM_operatortype_append(POSE_OT_quaternions_flip);
 	
-	WM_operatortype_append(POSE_OT_flags_set);
-	
 	WM_operatortype_append(POSE_OT_armature_layers);
 	WM_operatortype_append(POSE_OT_bone_layers);
+	
+	WM_operatortype_append(POSE_OT_propagate);
 	
 	/* POSELIB */
 	WM_operatortype_append(POSELIB_OT_browse_interactive);
@@ -180,7 +178,7 @@ void ED_operatormacros_armature(void)
 	ot= WM_operatortype_append_macro("ARMATURE_OT_extrude_move", "Extrude", OPTYPE_UNDO|OPTYPE_REGISTER);
 	if(ot) {
 		otmacro=WM_operatortype_macro_define(ot, "ARMATURE_OT_extrude");
-		RNA_enum_set(otmacro->ptr, "forked", 0);
+		RNA_boolean_set(otmacro->ptr, "forked", 0);
 		otmacro= WM_operatortype_macro_define(ot, "TRANSFORM_OT_translate");
 		RNA_enum_set(otmacro->ptr, "proportional", 0);
 	}
@@ -190,7 +188,7 @@ void ED_operatormacros_armature(void)
 	ot= WM_operatortype_append_macro("ARMATURE_OT_extrude_forked", "Extrude Forked", OPTYPE_UNDO|OPTYPE_REGISTER);
 	if(ot) {
 		otmacro=WM_operatortype_macro_define(ot, "ARMATURE_OT_extrude");
-		RNA_enum_set(otmacro->ptr, "forked", 1);
+		RNA_boolean_set(otmacro->ptr, "forked", 1);
 		otmacro= WM_operatortype_macro_define(ot, "TRANSFORM_OT_translate");
 		RNA_enum_set(otmacro->ptr, "proportional", 0);
 	}
@@ -266,12 +264,9 @@ void ED_keymap_armature(wmKeyConfig *keyconf)
 	WM_keymap_add_item(keymap, "ARMATURE_OT_separate", PKEY, KM_PRESS, KM_CTRL|KM_ALT, 0);
 	
 		/* set flags */
-	kmi= WM_keymap_add_item(keymap, "ARMATURE_OT_flags_set", WKEY, KM_PRESS, KM_SHIFT, 0);
-		RNA_enum_set(kmi->ptr, "mode", 2); // toggle
-	kmi= WM_keymap_add_item(keymap, "ARMATURE_OT_flags_set", WKEY, KM_PRESS, KM_CTRL|KM_SHIFT, 0);
-		RNA_enum_set(kmi->ptr, "mode", 1); // enable
-	kmi= WM_keymap_add_item(keymap, "ARMATURE_OT_flags_set", WKEY, KM_PRESS, KM_ALT, 0);
-		RNA_enum_set(kmi->ptr, "mode", 0); // clear
+	WM_keymap_add_menu(keymap, "VIEW3D_MT_bone_options_toggle", WKEY, KM_PRESS, KM_SHIFT, 0);
+	WM_keymap_add_menu(keymap, "VIEW3D_MT_bone_options_enable", WKEY, KM_PRESS, KM_CTRL|KM_SHIFT, 0);
+	WM_keymap_add_menu(keymap, "VIEW3D_MT_bone_options_disable", WKEY, KM_PRESS, KM_ALT, 0);
 		
 		/* armature/bone layers */
 	WM_keymap_add_item(keymap, "ARMATURE_OT_layers_show_all", ACCENTGRAVEKEY, KM_PRESS, KM_CTRL, 0);
@@ -347,13 +342,10 @@ void ED_keymap_armature(wmKeyConfig *keyconf)
 	WM_keymap_add_menu(keymap, "VIEW3D_MT_pose_group", GKEY, KM_PRESS, KM_CTRL, 0);
 	
 		/* set flags */
-	kmi= WM_keymap_add_item(keymap, "POSE_OT_flags_set", WKEY, KM_PRESS, KM_SHIFT, 0);
-		RNA_enum_set(kmi->ptr, "mode", 2); // toggle
-	kmi= WM_keymap_add_item(keymap, "POSE_OT_flags_set", WKEY, KM_PRESS, KM_CTRL|KM_SHIFT, 0);
-		RNA_enum_set(kmi->ptr, "mode", 1); // enable
-	kmi= WM_keymap_add_item(keymap, "POSE_OT_flags_set", WKEY, KM_PRESS, KM_ALT, 0);
-		RNA_enum_set(kmi->ptr, "mode", 0); // clear
-		
+	WM_keymap_add_menu(keymap, "VIEW3D_MT_bone_options_toggle", WKEY, KM_PRESS, KM_SHIFT, 0);
+	WM_keymap_add_menu(keymap, "VIEW3D_MT_bone_options_enable", WKEY, KM_PRESS, KM_CTRL|KM_SHIFT, 0);
+	WM_keymap_add_menu(keymap, "VIEW3D_MT_bone_options_disable", WKEY, KM_PRESS, KM_ALT, 0);
+
 		/* armature/bone layers */
 	WM_keymap_add_item(keymap, "ARMATURE_OT_layers_show_all", ACCENTGRAVEKEY, KM_PRESS, KM_CTRL, 0);
 	WM_keymap_add_item(keymap, "POSE_OT_armature_layers", MKEY, KM_PRESS, KM_SHIFT, 0);

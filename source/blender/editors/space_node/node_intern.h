@@ -40,6 +40,20 @@ struct ARegionType;
 struct View2D;
 struct bContext;
 struct wmWindowManager;
+struct bNode;
+struct bNodeSocket;
+struct bNodeLink;
+
+/* temp data to pass on to modal */
+typedef struct bNodeLinkDrag
+{
+	struct bNodeLinkDrag *next, *prev;
+	
+	struct bNode *node;
+	struct bNodeSocket *sock;
+	struct bNodeLink *link;
+	int in_out;
+} bNodeLinkDrag;
 
 /* space_node.c */
 ARegion *node_has_buttons_region(ScrArea *sa);
@@ -76,11 +90,12 @@ void node_draw_link(View2D *v2d, SpaceNode *snode, bNodeLink *link);
 void node_draw_link_bezier(View2D *v2d, SpaceNode *snode, bNodeLink *link, int th_col1, int do_shaded, int th_col2, int do_triple, int th_col3 );
 int node_link_bezier_points(View2D *v2d, SpaceNode *snode, bNodeLink *link, float coord_array[][2], int resol);
 void draw_nodespace_back_pix(ARegion *ar, SpaceNode *snode, int color_manage);
-void draw_nodespace_color_info(ARegion *ar, int channels, int x, int y, char *cp, float *fp);
+void draw_nodespace_color_info(struct ARegion *ar, int color_manage, int channels, int x, int y, char *cp, float *fp);
 
 /* node_edit.c */
 void node_tree_from_ID(ID *id, bNodeTree **ntree, bNodeTree **edittree, int *treetype);
 void snode_notify(bContext *C, SpaceNode *snode);
+void snode_dag_update(bContext *C, SpaceNode *snode);
 bNode *next_node(bNodeTree *ntree);
 bNode *node_add_node(SpaceNode *snode, Scene *scene, int type, float locx, float locy);
 void snode_set_context(SpaceNode *snode, Scene *scene);
@@ -99,6 +114,7 @@ int node_render_changed_exec(bContext *, wmOperator *);
 
 void NODE_OT_duplicate(struct wmOperatorType *ot);
 void NODE_OT_delete(struct wmOperatorType *ot);
+void NODE_OT_delete_reconnect(struct wmOperatorType *ot);
 void NODE_OT_resize(struct wmOperatorType *ot);
 
 void NODE_OT_link(struct wmOperatorType *ot);
@@ -137,8 +153,8 @@ extern const char *node_context_dir[];
 // XXX from BSE_node.h
 #define HIDDEN_RAD		15.0f
 #define BASIS_RAD		8.0f
-#define NODE_DYS		10
-#define NODE_DY			20
+#define NODE_DYS		(U.widget_unit/2)
+#define NODE_DY			U.widget_unit
 #define NODE_SOCKSIZE	5
 
 // XXX button events (butspace)

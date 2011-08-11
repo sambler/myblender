@@ -47,6 +47,8 @@
 
 struct Text;
 
+void bpy_import_init(PyObject *builtins);
+
 PyObject*	bpy_text_import(struct Text *text);
 PyObject*	bpy_text_import_name(char *name, int *found);
 PyObject*	bpy_text_reimport(PyObject *module, int *found);
@@ -57,7 +59,7 @@ void bpy_text_filename_get(char *fn, size_t fn_len, struct Text *text);
 extern PyMethodDef bpy_import_meth;
 extern PyMethodDef bpy_reload_meth;
 
-/* The game engine has its own Main struct, if this is set search this rather then G.main */
+/* The game engine has its own Main struct, if this is set search this rather than G.main */
 struct Main *bpy_import_main_get(void);
 void bpy_import_main_set(struct Main *maggie);
 

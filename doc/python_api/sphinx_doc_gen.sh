@@ -12,9 +12,17 @@ SSH_UPLOAD="/data/www/vhosts/www.blender.org/documentation" # blender_python_api
 # "_".join(str(v) for v in bpy.app.version)
 # custom blender vars
 blender_srcdir=$(dirname $0)/../../
-blender_version=$(grep BLENDER_VERSION $blender_srcdir/source/blender/blenkernel/BKE_blender.h | tr -dc 0-9)
-blender_subversion=$(grep BLENDER_SUBVERSION $blender_srcdir/source/blender/blenkernel/BKE_blender.h | tr -dc 0-9)
-BLENDER_VERSION=$(expr $blender_version / 100)_$(expr $blender_version % 100)_$blender_subversion
+blender_version=$(grep "BLENDER_VERSION\s" $blender_srcdir/source/blender/blenkernel/BKE_blender.h | awk '{print $3}')
+blender_version_char=$(grep BLENDER_VERSION_CHAR $blender_srcdir/source/blender/blenkernel/BKE_blender.h | awk '{print $3}')
+blender_version_cycle=$(grep BLENDER_VERSION_CYCLE $blender_srcdir/source/blender/blenkernel/BKE_blender.h | awk '{print $3}')
+blender_subversion=$(grep BLENDER_SUBVERSION $blender_srcdir/source/blender/blenkernel/BKE_blender.h | awk '{print $3}')
+
+if [ "$blender_version_cycle" == "release" ]
+then
+	BLENDER_VERSION=$(expr $blender_version / 100)_$(expr $blender_version % 100)$blender_version_char"_release"
+else
+	BLENDER_VERSION=$(expr $blender_version / 100)_$(expr $blender_version % 100)_$blender_subversion
+fi
 
 SSH_UPLOAD_FULL=$SSH_UPLOAD/"blender_python_api_"$BLENDER_VERSION
 
@@ -25,12 +33,16 @@ $BLENDER --background --factory-startup --python $SPHINXBASE/sphinx_doc_gen.py
 
 # html
 sphinx-build $SPHINXBASE/sphinx-in $SPHINXBASE/sphinx-out
+
 cp $SPHINXBASE/sphinx-out/contents.html $SPHINXBASE/sphinx-out/index.html
 ssh $SSH_USER@emo.blender.org 'rm -rf '$SSH_UPLOAD_FULL'/*'
 rsync --progress -avze "ssh -p 22" $SPHINXBASE/sphinx-out/* $SSH_HOST:$SSH_UPLOAD_FULL/
 
-# symlink the dir to a static URL
-ssh $SSH_USER@emo.blender.org 'rm '$SSH_UPLOAD'/250PythonDoc && ln -s '$SSH_UPLOAD_FULL' '$SSH_UPLOAD'/250PythonDoc'
+## symlink the dir to a static URL
+#ssh $SSH_USER@emo.blender.org 'rm '$SSH_UPLOAD'/250PythonDoc && ln -s '$SSH_UPLOAD_FULL' '$SSH_UPLOAD'/250PythonDoc'
+
+# better redirect
+ssh $SSH_USER@emo.blender.org 'echo "<html><head><title>Redirecting...</title><meta http-equiv=\"REFRESH\" content=\"0;url=../blender_python_api_'$BLENDER_VERSION'/\"></head><body>Redirecting...</body></html>" > '$SSH_UPLOAD'/250PythonDoc/index.html'
 
 # pdf
 sphinx-build -b latex $SPHINXBASE/sphinx-in $SPHINXBASE/sphinx-out

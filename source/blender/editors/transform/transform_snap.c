@@ -162,11 +162,11 @@ void drawSnapping(const struct bContext *C, TransInfo *t)
 			invert_m4_m4(imat, rv3d->viewmat);
 
 			for (p = t->tsnap.points.first; p; p = p->next) {
-				drawcircball(GL_LINE_LOOP, p->co, view3d_pixel_size(rv3d, p->co) * size, imat);
+				drawcircball(GL_LINE_LOOP, p->co, ED_view3d_pixel_size(rv3d, p->co) * size, imat);
 			}
 
 			if (t->tsnap.status & POINT_INIT) {
-				drawcircball(GL_LINE_LOOP, t->tsnap.snapPoint, view3d_pixel_size(rv3d, t->tsnap.snapPoint) * size, imat);
+				drawcircball(GL_LINE_LOOP, t->tsnap.snapPoint, ED_view3d_pixel_size(rv3d, t->tsnap.snapPoint) * size, imat);
 			}
 			
 			/* draw normal if needed */
@@ -385,14 +385,14 @@ static void initSnappingMode(TransInfo *t)
 		if (t->tsnap.applySnap != NULL && // A snapping function actually exist
 			(obedit != NULL && ELEM4(obedit->type, OB_MESH, OB_ARMATURE, OB_CURVE, OB_LATTICE)) ) // Temporary limited to edit mode meshes, armature, curves
 		{
-			/* editmode meshes now supported */
-			if ((obedit->type != OB_MESH) && ((t->flag & T_PROP_EDIT) || t->tsnap.project)) /* also exclude edit for project, for now */
+			/* Exclude editmesh if using proportional edit */
+			if ((obedit->type == OB_MESH) && (t->flag & T_PROP_EDIT))
 			{
 				t->tsnap.modeSelect = SNAP_NOT_OBEDIT;
 			}
 			else
 			{
-				t->tsnap.modeSelect = SNAP_ALL;
+				t->tsnap.modeSelect = t->tsnap.snap_self ? SNAP_ALL : SNAP_NOT_OBEDIT;
 			}
 		}
 		/* Particles edit mode*/
@@ -457,18 +457,27 @@ void initSnapping(TransInfo *t, wmOperator *op)
 			{
 				t->tsnap.project = RNA_boolean_get(op->ptr, "use_snap_project");
 			}
+
+			if (RNA_struct_find_property(op->ptr, "use_snap_self"))
+			{
+				t->tsnap.snap_self = RNA_boolean_get(op->ptr, "use_snap_self");
+			}
 		}
 	}
 	/* use scene defaults only when transform is modal */
 	else if (t->flag & T_MODAL)
 	{
-		if (ts->snap_flag & SCE_SNAP) {
-			t->modifiers |= MOD_SNAP;
-		}
+		if(ELEM(t->spacetype, SPACE_VIEW3D, SPACE_IMAGE))
+		{
+			if (ts->snap_flag & SCE_SNAP) {
+				t->modifiers |= MOD_SNAP;
+			}
 
-		t->tsnap.align = ((t->settings->snap_flag & SCE_SNAP_ROTATE) == SCE_SNAP_ROTATE);
-		t->tsnap.project = ((t->settings->snap_flag & SCE_SNAP_PROJECT) == SCE_SNAP_PROJECT);
-		t->tsnap.peel = ((t->settings->snap_flag & SCE_SNAP_PROJECT) == SCE_SNAP_PROJECT);
+			t->tsnap.align = ((t->settings->snap_flag & SCE_SNAP_ROTATE) == SCE_SNAP_ROTATE);
+			t->tsnap.project = ((t->settings->snap_flag & SCE_SNAP_PROJECT) == SCE_SNAP_PROJECT);
+			t->tsnap.snap_self = !((t->settings->snap_flag & SCE_SNAP_NO_SELF) == SCE_SNAP_NO_SELF);
+			t->tsnap.peel = ((t->settings->snap_flag & SCE_SNAP_PROJECT) == SCE_SNAP_PROJECT);
+		}
 	}
 	
 	t->tsnap.target = snap_target;
@@ -645,7 +654,7 @@ float RotationBetween(TransInfo *t, float p1[3], float p2[3])
 		
 		cross_v3_v3v3(tmp, start, end);
 		
-		if (dot_v3v3(tmp, axis) < 0.0)
+		if (dot_v3v3(tmp, axis) < 0.0f)
 			angle = -acos(dot_v3v3(start, end));
 		else	
 			angle = acos(dot_v3v3(start, end));
@@ -661,11 +670,11 @@ float RotationBetween(TransInfo *t, float p1[3], float p2[3])
 		angle = atan2(start[1],start[0]) - atan2(end[1],end[0]);
 	}
 	
-	if (angle > M_PI) {
-		angle = angle - 2 * M_PI;
+	if (angle > (float)M_PI) {
+		angle = angle - 2 * (float)M_PI;
 	}
-	else if (angle < -(M_PI)) {
-		angle = 2 * M_PI + angle;
+	else if (angle < -((float)M_PI)) {
+		angle = 2.0f * (float)M_PI + angle;
 	}
 	
 	return angle;
@@ -1134,7 +1143,7 @@ static int snapEdge(ARegion *ar, float v1co[3], short v1no[3], float v2co[3], sh
 			 * this takes care of series of connected edges a bit slanted w.r.t the viewport
 			 * otherwise, it would stick to the verts of the closest edge and not slide along merrily 
 			 * */
-			if (new_dist <= *dist && new_depth < *depth * 1.001)
+			if (new_dist <= *dist && new_depth < *depth * 1.001f)
 			{
 				float n1[3], n2[3];
 				
@@ -1581,7 +1590,7 @@ static int snapObjects(Scene *scene, View3D *v3d, ARegion *ar, Object *obedit, f
 	int retval = 0;
 	float ray_start[3], ray_normal[3];
 	
-	viewray(ar, v3d, mval, ray_start, ray_normal);
+	ED_view3d_win_to_ray(ar, v3d, mval, ray_start, ray_normal);
 
 	if (mode == SNAP_ALL && obedit)
 	{
@@ -1613,9 +1622,9 @@ static int snapObjects(Scene *scene, View3D *v3d, ARegion *ar, Object *obedit, f
 				
 				for(dupli_ob = lb->first; dupli_ob; dupli_ob = dupli_ob->next)
 				{
-					Object *ob = dupli_ob->ob;
+					Object *dob = dupli_ob->ob;
 					
-					retval |= snapObject(scene, ar, ob, 0, dupli_ob->mat, ray_start, ray_normal, mval, loc, no, dist, &depth);
+					retval |= snapObject(scene, ar, dob, 0, dupli_ob->mat, ray_start, ray_normal, mval, loc, no, dist, &depth);
 				}
 				
 				free_object_duplilist(lb);
@@ -1670,7 +1679,7 @@ static void removeDoublesPeel(ListBase *depth_peels)
 	{
 		DepthPeel *next_peel = peel->next;
 		
-		if (peel && next_peel && ABS(peel->depth - next_peel->depth) < 0.0015)
+		if (next_peel && ABS(peel->depth - next_peel->depth) < 0.0015f)
 		{
 			peel->next = next_peel->next;
 			
@@ -1812,7 +1821,7 @@ static int peelObjects(Scene *scene, View3D *v3d, ARegion *ar, Object *obedit, L
 	int retval = 0;
 	float ray_start[3], ray_normal[3];
 	
-	viewray(ar, v3d, mval, ray_start, ray_normal);
+	ED_view3d_win_to_ray(ar, v3d, mval, ray_start, ray_normal);
 
 	for ( base = scene->base.first; base != NULL; base = base->next ) {
 		if ( BASE_SELECTABLE(v3d, base) ) {
@@ -1938,8 +1947,13 @@ static void applyGrid(TransInfo *t, float *val, int max_index, float fac[3], Gea
 	int i;
 	float asp[3] = {1.0f, 1.0f, 1.0f}; // TODO: Remove hard coded limit here (3)
 
+	if(max_index > 2) {
+		printf("applyGrid: invalid index %d, clamping\n", max_index);
+		max_index= 2;
+	}
+
 	// Early bailing out if no need to snap
-	if (fac[action] == 0.0)
+	if (fac[action] == 0.0f)
 		return;
 	
 	/* evil hack - snapping needs to be adapted for image aspect ratio */
@@ -1948,6 +1962,6 @@ static void applyGrid(TransInfo *t, float *val, int max_index, float fac[3], Gea
 	}
 
 	for (i=0; i<=max_index; i++) {
-		val[i]= fac[action]*asp[i]*(float)floor(val[i]/(fac[action]*asp[i]) +.5);
+		val[i]= fac[action]*asp[i]*(float)floor(val[i]/(fac[action]*asp[i]) +0.5f);
 	}
 }

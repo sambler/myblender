@@ -94,14 +94,13 @@ static void do_node_add(bContext *C, void *UNUSED(arg), int event)
 		if(node->flag & NODE_TEST) node->flag |= NODE_SELECT;
 	}
 	
-	snode_autoconnect(snode, 1, 0);
-	
 	/* deselect after autoconnection */
 	for(node= snode->edittree->nodes.first; node; node= node->next) {
 		if(node->flag & NODE_TEST) node->flag &= ~NODE_SELECT;
 	}
 		
 	snode_notify(C, snode);
+	snode_dag_update(C, snode);
 }
 
 static void node_auto_add_menu(bContext *C, uiLayout *layout, void *arg_nodeclass)

@@ -28,29 +28,35 @@ remove_strict_flags()
 
 set(INC
 	.
-	../blenlib
 	../blenkernel
+	../blenlib
 	../blenloader
-	../windowmanager
+	../editors/include
 	../makesdna
 	../makesrna
-	../editors/include
+	../windowmanager
 	../../../intern/guardedalloc
 )
 
+set(INC_SYS
+
+)
+
 if(APPLE)
-	list(APPEND INC
-		${OPENCOLLADA_INC}/COLLADAStreamWriter
-		${OPENCOLLADA_INC}/COLLADABaseUtils
-		${OPENCOLLADA_INC}/COLLADAFramework
-		${OPENCOLLADA_INC}/COLLADASaxFrameworkLoader 
+	list(APPEND INC_SYS
+		${OPENCOLLADA_INCLUDE_DIR}/COLLADAStreamWriter
+		${OPENCOLLADA_INCLUDE_DIR}/COLLADABaseUtils
+		${OPENCOLLADA_INCLUDE_DIR}/COLLADAFramework
+		${OPENCOLLADA_INCLUDE_DIR}/COLLADASaxFrameworkLoader
+		${OPENCOLLADA_INCLUDE_DIR}/GeneratedSaxParser
 	)
 else()
-	list(APPEND INC
-		${OPENCOLLADA_INC}/COLLADAStreamWriter/include
-		${OPENCOLLADA_INC}/COLLADABaseUtils/include
-		${OPENCOLLADA_INC}/COLLADAFramework/include
-		${OPENCOLLADA_INC}/COLLADASaxFrameworkLoader/include 
+	list(APPEND INC_SYS
+		${OPENCOLLADA_INCLUDE_DIR}/COLLADAStreamWriter/include
+		${OPENCOLLADA_INCLUDE_DIR}/COLLADABaseUtils/include
+		${OPENCOLLADA_INCLUDE_DIR}/COLLADAFramework/include
+		${OPENCOLLADA_INCLUDE_DIR}/COLLADASaxFrameworkLoader/include
+		${OPENCOLLADA_INCLUDE_DIR}/GeneratedSaxParser/include
 	)
 endif()
 
@@ -62,6 +68,8 @@ set(SRC
 	DocumentExporter.cpp
 	DocumentImporter.cpp
 	EffectExporter.cpp
+	ExtraHandler.cpp
+	ExtraTags.cpp
 	GeometryExporter.cpp
 	ImageExporter.cpp
 	InstanceWriter.cpp
@@ -82,6 +90,8 @@ set(SRC
 	DocumentExporter.h
 	DocumentImporter.h
 	EffectExporter.h
+	ExtraHandler.h
+	ExtraTags.h
 	GeometryExporter.h
 	ImageExporter.h
 	InstanceWriter.h
@@ -105,4 +115,4 @@ if(CMAKE_COMPILER_IS_GNUCXX)
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fpermissive")
 endif()
 
-blender_add_lib(bf_collada "${SRC}" "${INC}")
+blender_add_lib(bf_collada "${SRC}" "${INC}" "${INC_SYS}")

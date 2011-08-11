@@ -126,6 +126,7 @@ static void get_seq_color3ubv(Scene *curscene, Sequence *seq, unsigned char col[
 	case SEQ_OVERDROP:
 	case SEQ_GLOW:
 	case SEQ_MULTICAM:
+	case SEQ_ADJUSTMENT:
 		UI_GetThemeColor3ubv(TH_SEQ_EFFECT, col);
 		
 		/* slightly offset hue to distinguish different effects */
@@ -137,6 +138,8 @@ static void get_seq_color3ubv(Scene *curscene, Sequence *seq, unsigned char col[
 		if (seq->type == SEQ_OVERDROP)		rgb_byte_set_hue_float_offset(col,0.24);
 		if (seq->type == SEQ_GLOW)			rgb_byte_set_hue_float_offset(col,0.28);
 		if (seq->type == SEQ_TRANSFORM)		rgb_byte_set_hue_float_offset(col,0.36);
+		if (seq->type == SEQ_MULTICAM)		rgb_byte_set_hue_float_offset(col,0.32);
+		if (seq->type == SEQ_ADJUSTMENT)		rgb_byte_set_hue_float_offset(col,0.40);
 		break;
 		
 	case SEQ_COLOR:
@@ -303,20 +306,20 @@ static void draw_seq_handle(View2D *v2d, Sequence *seq, float pixelx, short dire
 	/* set up co-ordinates/dimensions for either left or right handle */
 	if (direction == SEQ_LEFTHANDLE) {	
 		rx1 = x1;
-		rx2 = x1+handsize*0.75;
+		rx2 = x1+handsize * 0.75f;
 		
-		v1[0]= x1+handsize/4; v1[1]= y1+( ((y1+y2)/2.0 - y1)/2);
-		v2[0]= x1+handsize/4; v2[1]= y2-( ((y1+y2)/2.0 - y1)/2);
-		v3[0]= v2[0] + handsize/4; v3[1]= (y1+y2)/2.0;
+		v1[0]= x1+handsize/4; v1[1]= y1+( ((y1+y2)/2.0f - y1)/2);
+		v2[0]= x1+handsize/4; v2[1]= y2-( ((y1+y2)/2.0f - y1)/2);
+		v3[0]= v2[0] + handsize/4; v3[1]= (y1+y2)/2.0f;
 		
 		whichsel = SEQ_LEFTSEL;
 	} else if (direction == SEQ_RIGHTHANDLE) {	
-		rx1 = x2-handsize*0.75;
+		rx1 = x2-handsize*0.75f;
 		rx2 = x2;
 		
-		v1[0]= x2-handsize/4; v1[1]= y1+( ((y1+y2)/2.0 - y1)/2);
-		v2[0]= x2-handsize/4; v2[1]= y2-( ((y1+y2)/2.0 - y1)/2);
-		v3[0]= v2[0] - handsize/4; v3[1]= (y1+y2)/2.0;
+		v1[0]= x2-handsize/4; v1[1]= y1+( ((y1+y2)/2.0f - y1)/2);
+		v2[0]= x2-handsize/4; v2[1]= y2-( ((y1+y2)/2.0f - y1)/2);
+		v3[0]= v2[0] - handsize/4; v3[1]= (y1+y2)/2.0f;
 		
 		whichsel = SEQ_RIGHTSEL;
 	}
@@ -351,11 +354,11 @@ static void draw_seq_handle(View2D *v2d, Sequence *seq, float pixelx, short dire
 		if (direction == SEQ_LEFTHANDLE) {
 			sprintf(str, "%d", seq->startdisp);
 			x1= rx1;
-			y1 -= 0.45;
+			y1 -= 0.45f;
 		} else {
 			sprintf(str, "%d", seq->enddisp - 1);
-			x1= x2 - handsize*0.75;
-			y1= y2 + 0.05;
+			x1= x2 - handsize*0.75f;
+			y1= y2 + 0.05f;
 		}
 		UI_view2d_text_cache_add(v2d, x1, y1, str, col);
 	}	
@@ -441,7 +444,7 @@ static void draw_seq_extensions(Scene *scene, ARegion *ar, Sequence *seq)
 		
 		glColor3ubv((GLubyte *)col);
 		
-		for(a=y1; a< y2; a+= pixely*2.0 ) {
+		for(a=y1; a< y2; a+= pixely * 2.0f) {
 			fdrawline(x1,  a,  (float)(seq->start),  a);
 		}
 	}
@@ -459,7 +462,7 @@ static void draw_seq_extensions(Scene *scene, ARegion *ar, Sequence *seq)
 		
 		glColor3ubv((GLubyte *)col);
 		
-		for(a=y1; a< y2; a+= pixely*2.0 ) {
+		for(a=y1; a< y2; a+= pixely * 2.0f) {
 			fdrawline((float)(seq->start+seq->len),  a,  x2,  a);
 		}
 	}
@@ -476,7 +479,7 @@ static void draw_seq_text(View2D *v2d, Sequence *seq, float x1, float x2, float 
 	if(name[0]=='\0')
 		name= give_seqname(seq);
 
-	if(seq->type == SEQ_META) {
+	if(seq->type == SEQ_META || seq->type == SEQ_ADJUSTMENT) {
 		sprintf(str, "%d | %s", seq->len, name);
 	}
 	else if(seq->type == SEQ_SCENE) {
@@ -541,21 +544,23 @@ static void draw_shadedstrip(Sequence *seq, unsigned char col[3], float x1, floa
 		glPolygonStipple(stipple_halftone);
 	}
 	
-	ymid1 = (y2-y1)*0.25 + y1;
-	ymid2 = (y2-y1)*0.65 + y1;
+	ymid1 = (y2-y1)*0.25f + y1;
+	ymid2 = (y2-y1)*0.65f + y1;
 	
 	glShadeModel(GL_SMOOTH);
 	glBegin(GL_QUADS);
 	
-	if(seq->flag & SELECT) UI_GetColorPtrBlendShade3ubv(col, col, col, 0.0, -50);
+	if(seq->flag & SEQ_INVALID_EFFECT) { col[0]= 255; col[1]= 0; col[2]= 255; }
+	else if(seq->flag & SELECT) UI_GetColorPtrBlendShade3ubv(col, col, col, 0.0, -50);
 	else UI_GetColorPtrBlendShade3ubv(col, col, col, 0.0, 0);
 	
 	glColor3ubv(col);
 	
 	glVertex2f(x1,y1);
 	glVertex2f(x2,y1);
-	
-	if(seq->flag & SELECT) UI_GetColorPtrBlendShade3ubv(col, col, col, 0.0, 5);
+
+	if(seq->flag & SEQ_INVALID_EFFECT) { col[0]= 255; col[1]= 0; col[2]= 255; }
+	else if(seq->flag & SELECT) UI_GetColorPtrBlendShade3ubv(col, col, col, 0.0, 5);
 	else UI_GetColorPtrBlendShade3ubv(col, col, col, 0.0, -5);
 
 	glColor3ubv((GLubyte *)col);
@@ -634,14 +639,35 @@ static void draw_seq_strip(Scene *scene, ARegion *ar, Sequence *seq, int outline
 	/* draw sound wave */
 	if(seq->type == SEQ_SOUND) drawseqwave(scene, seq, x1, y1, x2, y2, (ar->v2d.cur.xmax - ar->v2d.cur.xmin)/ar->winx);
 
+	/* draw lock */
+	if(seq->flag & SEQ_LOCK) {
+		glEnable(GL_POLYGON_STIPPLE);
+		glEnable(GL_BLEND);
+
+		/* light stripes */
+		glColor4ub(255, 255, 255, 32);
+		glPolygonStipple(stipple_diag_stripes_pos);
+		glRectf(x1, y1, x2, y2);
+
+		/* dark stripes */
+		glColor4ub(0, 0, 0, 32);
+		glPolygonStipple(stipple_diag_stripes_neg);
+		glRectf(x1, y1, x2, y2);
+
+		glDisable(GL_POLYGON_STIPPLE);
+		glDisable(GL_BLEND);
+	}
+
 	get_seq_color3ubv(scene, seq, col);
 	if (G.moving && (seq->flag & SELECT)) {
 		if(seq->flag & SEQ_OVERLAP) {
 			col[0]= 255; col[1]= col[2]= 40;
-		} else UI_GetColorPtrBlendShade3ubv(col, col, col, 0.0, 120);
+		}
+		else
+			UI_GetColorPtrBlendShade3ubv(col, col, col, 0.0, 120+outline_tint);
 	}
-
-	UI_GetColorPtrBlendShade3ubv(col, col, col, 0.0, outline_tint);
+	else
+		UI_GetColorPtrBlendShade3ubv(col, col, col, 0.0, outline_tint);
 	
 	glColor3ubv((GLubyte *)col);
 	
@@ -719,8 +745,8 @@ void draw_image_seq(const bContext* C, Scene *scene, ARegion *ar, SpaceSeq *sseq
 
 	if (sseq->mainb == SEQ_DRAW_IMG_IMBUF) {
 		viewrectx *= scene->r.xasp / scene->r.yasp;
-		viewrectx /= proxy_size / 100.0;
-		viewrecty /= proxy_size / 100.0;
+		viewrectx /= proxy_size / 100.0f;
+		viewrecty /= proxy_size / 100.0f;
 	}
 
 	if(frame_ofs == 0) {
@@ -835,10 +861,10 @@ void draw_image_seq(const bContext* C, Scene *scene, ARegion *ar, SpaceSeq *sseq
 		UI_ThemeColorBlendShade(TH_WIRE, TH_BACK, 1.0, 0);
 
 		glBegin(GL_LINE_LOOP);
-		glVertex2f(x1-0.5, y1-0.5);
-		glVertex2f(x1-0.5, y2+0.5);
-		glVertex2f(x2+0.5, y2+0.5);
-		glVertex2f(x2+0.5, y1-0.5);
+		glVertex2f(x1-0.5f, y1-0.5f);
+		glVertex2f(x1-0.5f, y2+0.5f);
+		glVertex2f(x2+0.5f, y2+0.5f);
+		glVertex2f(x2+0.5f, y1-0.5f);
 		glEnd();
 
 		/* safety border */
@@ -964,11 +990,11 @@ static void draw_seq_strips(const bContext *C, Editing *ed, ARegion *ar)
 		/* loop through strips, checking for those that are visible */
 		for (seq= ed->seqbasep->first; seq; seq= seq->next) {
 			/* boundbox and selection tests for NOT drawing the strip... */
-			if ((seq->flag & SELECT) == sel) continue;
+			if ((seq->flag & SELECT) != sel) continue;
 			else if (seq == last_seq) continue;
 			else if (MIN2(seq->startdisp, seq->start) > v2d->cur.xmax) continue;
 			else if (MAX2(seq->enddisp, seq->start+seq->len) < v2d->cur.xmin) continue;
-			else if (seq->machine+1.0 < v2d->cur.ymin) continue;
+			else if (seq->machine+1.0f < v2d->cur.ymin) continue;
 			else if (seq->machine > v2d->cur.ymax) continue;
 			
 			/* strip passed all tests unscathed... so draw it now */
@@ -1022,9 +1048,9 @@ void draw_timeline_seq(const bContext *C, ARegion *ar)
 	/* clear and setup matrix */
 	UI_GetThemeColor3fv(TH_BACK, col);
 	if (ed && ed->metastack.first) 
-		glClearColor(col[0], col[1], col[2]-0.1, 0.0);
+		glClearColor(col[0], col[1], col[2]-0.1f, 0.0f);
 	else 
-		glClearColor(col[0], col[1], col[2], 0.0);
+		glClearColor(col[0], col[1], col[2], 0.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
 
 	UI_view2d_view_ortho(v2d);

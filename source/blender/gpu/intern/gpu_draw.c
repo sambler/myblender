@@ -76,6 +76,8 @@
 
 #include "smoke_API.h"
 
+extern Material defmaterial; /* from material.c */
+
 /* These are some obscure rendering functions shared between the
  * game engine and the blender, in this module to avoid duplicaten
  * and abstract them away from the rest a bit */
@@ -106,7 +108,7 @@ void GPU_render_text(MTFace *tface, int mode,
 			line_height= MAX4(v1[1], v2[1], v3[1], v4[2]) - MIN4(v1[1], v2[1], v3[1], v4[2]);
 		else
 			line_height= MAX3(v1[1], v2[1], v3[1]) - MIN3(v1[1], v2[1], v3[1]);
-		line_height *= 1.2; /* could be an option? */
+		line_height *= 1.2f; /* could be an option? */
 		/* end multiline */
 
 		
@@ -210,8 +212,8 @@ static int is_pow2_limit(int num)
 	/* take texture clamping into account */
 
 	/* XXX: texturepaint not global!
-	   if (G.f & G_TEXTUREPAINT)
-	   return 1;*/
+	if (G.f & G_TEXTUREPAINT)
+		return 1;*/
 
 	if (U.glreslimit != 0 && num > U.glreslimit)
 		return 0;
@@ -222,8 +224,8 @@ static int is_pow2_limit(int num)
 static int smaller_pow2_limit(int num)
 {
 	/* XXX: texturepaint not global!
-	   if (G.f & G_TEXTUREPAINT)
-	   return 1;*/
+	if (G.f & G_TEXTUREPAINT)
+		return 1;*/
 	
 	/* take texture clamping into account */
 	if (U.glreslimit != 0 && num > U.glreslimit)
@@ -244,8 +246,9 @@ static struct GPUTextureState {
 	int domipmap, linearmipmap;
 
 	int alphamode;
+	float anisotropic;
 	MTFace *lasttface;
-} GTS = {0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL, 1, 0, -1, NULL};
+} GTS = {0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL, 1, 0, -1, 1.f, NULL};
 
 /* Mipmap settings */
 
@@ -288,6 +291,26 @@ static GLenum gpu_get_mipmap_filter(int mag)
 		else
 			return GL_NEAREST;
 	}
+}
+
+/* Anisotropic filtering settings */
+void GPU_set_anisotropic(float value)
+{
+	if (GTS.anisotropic != value)
+	{
+		GPU_free_images();
+
+		/* Clamp value to the maximum value the graphics card supports */
+		if (value > GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT)
+			value = GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT;
+
+		GTS.anisotropic = value;
+	}
+}
+
+float GPU_get_anisotropic()
+{
+	return GTS.anisotropic;
 }
 
 /* Set OpenGL state for an MTFace */
@@ -358,7 +381,7 @@ static void gpu_set_blend_mode(GPUBlendMode blendmode)
 		 * turn off alpha test in this case */
 
 		/* added after 2.45 to clip alpha */
-		if(U.glalphaclip == 1.0) {
+		if(U.glalphaclip == 1.0f) {
 			glDisable(GL_ALPHA_TEST);
 		}
 		else {
@@ -531,7 +554,7 @@ int GPU_verify_image(Image *ima, ImageUser *iuser, int tftile, int compare, int 
 	}
 
 	/* scale if not a power of two */
-	if (!mipmap && (!is_pow2_limit(rectw) || !is_pow2_limit(recth))) {
+	if (!is_pow2_limit(rectw) || !is_pow2_limit(recth)) {
 		rectw= smaller_pow2_limit(rectw);
 		recth= smaller_pow2_limit(recth);
 		
@@ -557,6 +580,8 @@ int GPU_verify_image(Image *ima, ImageUser *iuser, int tftile, int compare, int 
 		ima->tpageflag |= IMA_MIPMAP_COMPLETE;
 	}
 
+	if (GLEW_EXT_texture_filter_anisotropic)
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, GPU_get_anisotropic());
 	/* set to modulate with vertex color */
 	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 		
@@ -685,9 +710,25 @@ void GPU_paint_update_image(Image *ima, int x, int y, int w, int h, int mipmap)
 		glGetIntegerv(GL_UNPACK_SKIP_PIXELS, &skip_pixels);
 		glGetIntegerv(GL_UNPACK_SKIP_ROWS, &skip_rows);
 
-		if ((ibuf->rect==NULL) && ibuf->rect_float)
-			IMB_rect_from_float(ibuf);
-
+		if (ibuf->rect_float){
+			/*This case needs a whole new buffer*/
+			if(ibuf->rect==NULL) {
+				IMB_rect_from_float(ibuf);
+			}
+			else {
+				/* Do partial drawing. 'buffer' holds only the changed part. Needed for color corrected result */
+ 				float *buffer = (float *)MEM_mallocN(w*h*sizeof(float)*4, "temp_texpaint_float_buf");
+				IMB_partial_rect_from_float(ibuf, buffer, x, y, w, h);
+				glBindTexture(GL_TEXTURE_2D, ima->bindcode);
+				glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, w, h, GL_RGBA,
+					GL_FLOAT, buffer);
+				MEM_freeN(buffer);
+				if(ima->tpageflag & IMA_MIPMAP_COMPLETE)
+					ima->tpageflag &= ~IMA_MIPMAP_COMPLETE;
+				return;
+			}
+		}
+		
 		glBindTexture(GL_TEXTURE_2D, ima->bindcode);
 
 		glPixelStorei(GL_UNPACK_ROW_LENGTH, ibuf->x);
@@ -781,19 +822,25 @@ void GPU_free_smoke(SmokeModifierData *smd)
 
 void GPU_create_smoke(SmokeModifierData *smd, int highres)
 {
+#ifdef WITH_SMOKE
 	if(smd->type & MOD_SMOKE_TYPE_DOMAIN && !smd->domain->tex && !highres)
 		smd->domain->tex = GPU_texture_create_3D(smd->domain->res[0], smd->domain->res[1], smd->domain->res[2], smoke_get_density(smd->domain->fluid));
 	else if(smd->type & MOD_SMOKE_TYPE_DOMAIN && !smd->domain->tex && highres)
 		smd->domain->tex = GPU_texture_create_3D(smd->domain->res_wt[0], smd->domain->res_wt[1], smd->domain->res_wt[2], smoke_turbulence_get_density(smd->domain->wt));
 
 	smd->domain->tex_shadow = GPU_texture_create_3D(smd->domain->res[0], smd->domain->res[1], smd->domain->res[2], smd->domain->shadow);
+#else // WITH_SMOKE
+	(void)highres;
+	smd->domain->tex= NULL;
+	smd->domain->tex_shadow= NULL;
+#endif // WITH_SMOKE
 }
 
 static ListBase image_free_queue = {NULL, NULL};
 
 static void gpu_queue_image_for_free(Image *ima)
 {
-    Image *cpy = MEM_dupallocN(ima);
+	Image *cpy = MEM_dupallocN(ima);
 
 	BLI_lock_thread(LOCK_OPENGL);
 	BLI_addtail(&image_free_queue, cpy);
@@ -951,7 +998,6 @@ static Material *gpu_active_node_material(Material *ma)
 
 void GPU_begin_object_materials(View3D *v3d, RegionView3D *rv3d, Scene *scene, Object *ob, int glsl, int *do_alpha_pass)
 {
-	extern Material defmaterial; /* from material.c */
 	Material *ma;
 	GPUMaterial *gpumat;
 	GPUBlendMode blendmode;
@@ -1042,7 +1088,6 @@ void GPU_begin_object_materials(View3D *v3d, RegionView3D *rv3d, Scene *scene, O
 
 int GPU_enable_material(int nr, void *attribs)
 {
-	extern Material defmaterial; /* from material.c */
 	GPUVertexAttribs *gattribs = attribs;
 	GPUMaterial *gpumat;
 	GPUBlendMode blendmode;
@@ -1288,8 +1333,8 @@ int GPU_scene_object_lights(Scene *scene, Object *ob, int lay, float viewmat[][4
 				/* spot lamp */
 				negate_v3_v3(direction, base->object->obmat[2]);
 				glLightfv(GL_LIGHT0+count, GL_SPOT_DIRECTION, direction);
-				glLightf(GL_LIGHT0+count, GL_SPOT_CUTOFF, la->spotsize/2.0);
-				glLightf(GL_LIGHT0+count, GL_SPOT_EXPONENT, 128.0*la->spotblend);
+				glLightf(GL_LIGHT0+count, GL_SPOT_CUTOFF, la->spotsize/2.0f);
+				glLightf(GL_LIGHT0+count, GL_SPOT_EXPONENT, 128.0f*la->spotblend);
 			}
 			else
 				glLightf(GL_LIGHT0+count, GL_SPOT_CUTOFF, 180.0);

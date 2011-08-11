@@ -395,7 +395,7 @@ static int rna_validate_identifier(const char *identifier, char *error, int prop
 		}
 
 		if (identifier[a]==' ') {
-			strcpy(error, "spaces are not ok in identifier names");
+			strcpy(error, "spaces are not okay in identifier names");
 			return 0;
 		}
 
@@ -409,6 +409,21 @@ static int rna_validate_identifier(const char *identifier, char *error, int prop
 		if (strcmp(identifier, kwlist[a]) == 0) {
 			strcpy(error, "this keyword is reserved by python");
 			return 0;
+		}
+	}
+
+	if(property) {
+		static const char *kwlist_prop[] = {
+			/* not keywords but reserved all the same because py uses */
+			"keys", "values", "items", "get",
+			NULL
+		};
+
+		for(a=0; kwlist_prop[a]; a++) {
+			if (strcmp(identifier, kwlist_prop[a]) == 0) {
+				strcpy(error, "this keyword is reserved by python");
+				return 0;
+			}
 		}
 	}
 	
@@ -431,7 +446,7 @@ BlenderRNA *RNA_create(void)
 	return brna;
 }
 
-void RNA_define_free(BlenderRNA *brna)
+void RNA_define_free(BlenderRNA *UNUSED(brna))
 {
 	StructDefRNA *ds;
 	FunctionDefRNA *dfunc;
@@ -798,7 +813,7 @@ void RNA_def_struct_idprops_func(StructRNA *srna, const char *idproperties)
 	if(idproperties) srna->idproperties= (IDPropertiesFunc)idproperties;
 }
 
-void RNA_def_struct_register_funcs(StructRNA *srna, const char *reg, const char *unreg)
+void RNA_def_struct_register_funcs(StructRNA *srna, const char *reg, const char *unreg, const char *instance)
 {
 	if(!DefRNA.preprocess) {
 		fprintf(stderr, "RNA_def_struct_register_funcs: only during preprocessing.\n");
@@ -807,6 +822,7 @@ void RNA_def_struct_register_funcs(StructRNA *srna, const char *reg, const char 
 
 	if(reg) srna->reg= (StructRegisterFunc)reg;
 	if(unreg) srna->unreg= (StructUnregisterFunc)unreg;
+	if(instance) srna->instance= (StructInstanceFunc)instance;
 }
 
 void RNA_def_struct_path_func(StructRNA *srna, const char *path)
@@ -1823,6 +1839,11 @@ void RNA_def_property_update(PropertyRNA *prop, int noteflag, const char *func)
 	prop->update= (UpdateFunc)func;
 }
 
+void RNA_def_property_update_runtime(PropertyRNA *prop, void *func)
+{
+	prop->update= func;
+}
+
 void RNA_def_property_dynamic_array_funcs(PropertyRNA *prop, const char *getlength)
 {
 	if(!DefRNA.preprocess) {
@@ -2039,6 +2060,11 @@ void RNA_def_property_collection_funcs(PropertyRNA *prop, const char *begin, con
 void RNA_def_property_srna(PropertyRNA *prop, const char *type)
 {
 	prop->srna= (StructRNA*)type;
+}
+
+void RNA_def_py_data(PropertyRNA *prop, void *py_data)
+{
+	prop->py_data= py_data;
 }
 
 /* Compact definitions */
@@ -2258,6 +2284,12 @@ void RNA_def_enum_funcs(PropertyRNA *prop, EnumPropertyItemFunc itemfunc)
 {
 	EnumPropertyRNA *eprop= (EnumPropertyRNA*)prop;
 	eprop->itemf= itemfunc;
+}
+
+void RNA_def_enum_py_data(PropertyRNA *prop, void *py_data)
+{
+	EnumPropertyRNA *eprop= (EnumPropertyRNA*)prop;
+	eprop->py_data= py_data;
 }
 
 PropertyRNA *RNA_def_float(StructOrFunctionRNA *cont_, const char *identifier, float default_value, 
@@ -2540,7 +2572,7 @@ void RNA_def_function_return(FunctionRNA *func, PropertyRNA *ret)
 	RNA_def_function_output(func, ret);
 }
 
-void RNA_def_function_output(FunctionRNA *func, PropertyRNA *ret)
+void RNA_def_function_output(FunctionRNA *UNUSED(func), PropertyRNA *ret)
 {
 	ret->flag|= PROP_OUTPUT;
 }
@@ -2800,6 +2832,7 @@ void RNA_def_property_free_pointers(PropertyRNA *prop)
 		if(prop->identifier) MEM_freeN((void*)prop->identifier);
 		if(prop->name) MEM_freeN((void*)prop->name);
 		if(prop->description) MEM_freeN((void*)prop->description);
+		if(prop->py_data) MEM_freeN(prop->py_data);
 
 		switch(prop->type) {
 			case PROP_BOOLEAN: {
@@ -2840,7 +2873,7 @@ void RNA_def_property_free_pointers(PropertyRNA *prop)
 	}
 }
 
-void RNA_def_property_free(StructOrFunctionRNA *cont_, PropertyRNA *prop)
+static void rna_def_property_free(StructOrFunctionRNA *cont_, PropertyRNA *prop)
 {
 	ContainerRNA *cont= cont_;
 	
@@ -2865,7 +2898,7 @@ int RNA_def_property_free_identifier(StructOrFunctionRNA *cont_, const char *ide
 	for(prop= cont->properties.first; prop; prop= prop->next) {
 		if(strcmp(prop->identifier, identifier)==0) {
 			if(prop->flag & PROP_RUNTIME) {
-				RNA_def_property_free(cont_, prop);
+				rna_def_property_free(cont_, prop);
 				return 1;
 			}
 			else {

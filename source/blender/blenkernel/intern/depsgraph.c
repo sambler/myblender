@@ -372,6 +372,9 @@ static void build_dag_object(DagForest *dag, DagNode *scenenode, Scene *scene, O
 		node2->first_ancestor = ob;
 		node2->ancestor_count += 1;
 	}
+
+	/* also build a custom data mask for dependencies that need certain layers */
+	node->customdata_mask= 0;
 	
 	if (ob->type == OB_ARMATURE) {
 		if (ob->pose){
@@ -451,8 +454,12 @@ static void build_dag_object(DagForest *dag, DagNode *scenenode, Scene *scene, O
 			case PARSKEL:
 				dag_add_relation(dag,node2,node,DAG_RL_DATA_DATA|DAG_RL_OB_OB, "Parent");
 				break;
-			case PARVERT1: case PARVERT3: case PARBONE:
+			case PARVERT1: case PARVERT3:
 				dag_add_relation(dag,node2,node,DAG_RL_DATA_OB|DAG_RL_OB_OB, "Vertex Parent");
+				node2->customdata_mask |= CD_MASK_ORIGINDEX;
+				break;
+			case PARBONE:
+				dag_add_relation(dag,node2,node,DAG_RL_DATA_OB|DAG_RL_OB_OB, "Bone Parent");
 				break;
 			default:
 				if(ob->parent->type==OB_LATTICE) 
@@ -492,7 +499,7 @@ static void build_dag_object(DagForest *dag, DagNode *scenenode, Scene *scene, O
 			}
 		}
 	}
-    
+
 	/* softbody collision  */
 	if ((ob->type==OB_MESH) || (ob->type==OB_CURVE) || (ob->type==OB_LATTICE)) {
 		if(modifiers_isSoftbodyEnabled(ob) || modifiers_isClothEnabled(ob) || ob->particlesystem.first)
@@ -592,7 +599,7 @@ static void build_dag_object(DagForest *dag, DagNode *scenenode, Scene *scene, O
 			if(part->ren_as == PART_DRAW_GR && part->dup_group) {
 				for(go=part->dup_group->gobject.first; go; go=go->next) {
 					node2 = dag_get_node(dag, go->ob);
-					dag_add_relation(dag, node, node2, DAG_RL_OB_OB, "Particle Group Visualisation");
+					dag_add_relation(dag, node2, node, DAG_RL_OB_OB, "Particle Group Visualisation");
 				}
 			}
 
@@ -647,8 +654,11 @@ static void build_dag_object(DagForest *dag, DagNode *scenenode, Scene *scene, O
 				if (ELEM(con->type, CONSTRAINT_TYPE_FOLLOWPATH, CONSTRAINT_TYPE_CLAMPTO))
 					dag_add_relation(dag, node2, node, DAG_RL_DATA_OB|DAG_RL_OB_OB, cti->name);
 				else {
-					if (ELEM3(obt->type, OB_ARMATURE, OB_MESH, OB_LATTICE) && (ct->subtarget[0]))
+					if (ELEM3(obt->type, OB_ARMATURE, OB_MESH, OB_LATTICE) && (ct->subtarget[0])) {
 						dag_add_relation(dag, node2, node, DAG_RL_DATA_OB|DAG_RL_OB_OB, cti->name);
+						if (obt->type == OB_MESH)
+							node2->customdata_mask |= CD_MASK_MDEFORMVERT;
+					}
 					else
 						dag_add_relation(dag, node2, node, DAG_RL_OB_OB, cti->name);
 				}
@@ -722,6 +732,9 @@ struct DagForest *build_dag(Main *bmain, Scene *sce, short mask)
 					itA->node->color |= itA->type;
 				}
 			}
+
+			/* also flush custom data mask */
+			((Object*)node->ob)->customdata_mask= node->customdata_mask;
 		}
 	}
 	/* now set relations equal, so that when only one parent changes, the correct recalcs are found */
@@ -1092,10 +1105,10 @@ void graph_bfs(void)
 					push_queue(nqueue,itA->node);
 				}
 				
-				 else {
+				else {
 					fprintf(stderr,"bfs not dag tree edge color :%i \n",itA->node->color);
 				}
-				 
+
 				
 				itA = itA->next;
 			}
@@ -1189,7 +1202,7 @@ DagNodeQueue * graph_dfs(void)
 	int skip = 0;
 	int minheight;
 	int maxpos=0;
-	int	is_cycle = 0;
+	/* int	is_cycle = 0; */ /* UNUSED */
 	/*
 	 *fprintf(stderr,"starting DFS \n ------------\n");
 	 */	
@@ -1225,7 +1238,7 @@ DagNodeQueue * graph_dfs(void)
 		while(nqueue->count) {
 			//graph_print_queue(nqueue);
 
-			 skip = 0;
+			skip = 0;
 			node = get_top_node_queue(nqueue);
 			
 			minheight = pos[node->DFS_dist];
@@ -1245,7 +1258,7 @@ DagNodeQueue * graph_dfs(void)
 				} else { 
 					if (itA->node->color == DAG_GRAY) { // back edge
 						fprintf(stderr,"dfs back edge :%15s %15s \n",((ID *) node->ob)->name, ((ID *) itA->node->ob)->name);
-						is_cycle = 1;
+						/* is_cycle = 1; */ /* UNUSED */
 					} else if (itA->node->color == DAG_BLACK) {
 						;
 						/* already processed node but we may want later to change distance either to shorter to longer.
@@ -1253,7 +1266,7 @@ DagNodeQueue * graph_dfs(void)
 						*/
 						/*if (node->DFS_dist >= itA->node->DFS_dist)
 							itA->node->DFS_dist = node->DFS_dist + 1;
-						 	
+
 							fprintf(stderr,"dfs forward or cross edge :%15s %i-%i %15s %i-%i \n",
 								((ID *) node->ob)->name,
 								node->DFS_dvtm, 
@@ -1287,17 +1300,17 @@ DagNodeQueue * graph_dfs(void)
 				/*
 				 fprintf(stderr,"DFS node : %20s %i %i %i %i\n",((ID *) node->ob)->name,node->BFS_dist, node->DFS_dist, node->DFS_dvtm, node->DFS_fntm ); 	
 				*/
-				 push_stack(retqueue,node);
+				push_stack(retqueue,node);
 				
 			}
 		}
 	}
 		node = node->next;
 	} while (node);
-//	  fprintf(stderr,"i size : %i \n", maxpos);
-	  
+//	fprintf(stderr,"i size : %i \n", maxpos);
+
 	queue_delete(nqueue);
-	  return(retqueue);
+	return(retqueue);
 }
 
 /* unused */
@@ -1556,10 +1569,9 @@ void graph_print_queue(DagNodeQueue *nqueue)
 void graph_print_queue_dist(DagNodeQueue *nqueue)
 {	
 	DagNodeQueueElem *queueElem;
-	int max, count;
+	int count;
 	
 	queueElem = nqueue->first;
-	max = queueElem->node->DFS_fntm;
 	count = 0;
 	while(queueElem) {
 		fprintf(stderr,"** %25s %2.2i-%2.2i ",((ID *) queueElem->node->ob)->name,queueElem->node->DFS_dvtm,queueElem->node->DFS_fntm);
@@ -1906,7 +1918,9 @@ static void dag_scene_flush_layers(Scene *sce, int lay)
 	}
 
 	/* ensure cameras are set as if they are on a visible layer, because
-	   they ared still used for rendering or setting the camera view */
+	 * they ared still used for rendering or setting the camera view
+	 *
+	 * XXX, this wont work for local view / unlocked camera's */
 	if(sce->camera) {
 		node= dag_get_node(sce->theDag, sce->camera);
 		node->scelay |= lay;
@@ -2271,7 +2285,7 @@ void DAG_ids_flush_update(Main *bmain, int time)
 		DAG_scene_flush_update(bmain, sce, lay, time);
 }
 
-void DAG_on_load_update(Main *bmain, const short do_time)
+void DAG_on_visible_update(Main *bmain, const short do_time)
 {
 	Scene *scene;
 	Base *base;
@@ -2296,7 +2310,7 @@ void DAG_on_load_update(Main *bmain, const short do_time)
 			node= (sce_iter->theDag)? dag_get_node(sce_iter->theDag, ob): NULL;
 			oblay= (node)? node->lay: ob->lay;
 
-			if(oblay & lay) {
+			if((oblay & lay) & ~scene->lay_updated) {
 				if(ELEM6(ob->type, OB_MESH, OB_CURVE, OB_SURF, OB_FONT, OB_MBALL, OB_LATTICE))
 					ob->recalc |= OB_RECALC_DATA;
 				if(ob->dup_group) 
@@ -2319,6 +2333,7 @@ void DAG_on_load_update(Main *bmain, const short do_time)
 
 		/* now tag update flags, to ensure deformers get calculated on redraw */
 		DAG_scene_update_flags(bmain, scene, lay, do_time);
+		scene->lay_updated |= lay;
 	}
 }
 

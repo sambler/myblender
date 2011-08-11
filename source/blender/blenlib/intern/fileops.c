@@ -133,13 +133,13 @@ int BLI_is_writable(const char *filename)
 
 int BLI_touch(const char *file)
 {
-   FILE *f = fopen(file,"r+b");
-   if (f != NULL) {
+	FILE *f = fopen(file,"r+b");
+	if (f != NULL) {
 		char c = getc(f);
 		rewind(f);
 		putc(c,f);
 	} else {
-	   f = fopen(file,"wb");
+		f = fopen(file,"wb");
 	}
 	if (f) {
 		fclose(f);
@@ -225,7 +225,8 @@ int BLI_copy_fileops(const char *file, const char *to) {
 
 int BLI_link(const char *file, const char *to) {
 	callLocalErrorCallBack("Linking files is unsupported on Windows");
-	
+	(void)file;
+	(void)to;
 	return 1;
 }
 

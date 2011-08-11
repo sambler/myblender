@@ -172,14 +172,16 @@ float ED_object_new_primitive_matrix(bContext *C, Object *obedit, float *loc, fl
 void ED_object_add_generic_props(wmOperatorType *ot, int do_editmode)
 {
 	PropertyRNA *prop;
-	RNA_def_boolean(ot->srna, "view_align", 0, "Align to View", "Align the new object to the view.");
+	
+	/* note: this property gets hidden for add-camera operator */
+	RNA_def_boolean(ot->srna, "view_align", 0, "Align to View", "Align the new object to the view");
 
 	if(do_editmode) {
-		prop= RNA_def_boolean(ot->srna, "enter_editmode", 0, "Enter Editmode", "Enter editmode when adding this object.");
+		prop= RNA_def_boolean(ot->srna, "enter_editmode", 0, "Enter Editmode", "Enter editmode when adding this object");
 		RNA_def_property_flag(prop, PROP_HIDDEN);
 	}
 	
-	RNA_def_float_vector_xyz(ot->srna, "location", 3, NULL, -FLT_MAX, FLT_MAX, "Location", "Location for the newly added object.", -FLT_MAX, FLT_MAX);
+	RNA_def_float_vector_xyz(ot->srna, "location", 3, NULL, -FLT_MAX, FLT_MAX, "Location", "Location for the newly added object", -FLT_MAX, FLT_MAX);
 	RNA_def_float_rotation(ot->srna, "rotation", 3, NULL, -FLT_MAX, FLT_MAX, "Rotation", "Rotation for the newly added object", -FLT_MAX, FLT_MAX);
 	
 	prop = RNA_def_boolean_layer_member(ot->srna, "layers", 20, NULL, "Layer", "");
@@ -417,7 +419,7 @@ static Object *effector_add_type(bContext *C, wmOperator *op, int type)
 /* for object add operator */
 static int effector_add_exec(bContext *C, wmOperator *op)
 {
-	if(effector_add_type(C, op, RNA_int_get(op->ptr, "type")) == NULL)
+	if(effector_add_type(C, op, RNA_enum_get(op->ptr, "type")) == NULL)
 		return OPERATOR_CANCELLED;
 
 	return OPERATOR_FINISHED;
@@ -478,6 +480,8 @@ static int object_camera_add_exec(bContext *C, wmOperator *op)
 
 void OBJECT_OT_camera_add(wmOperatorType *ot)
 {
+	PropertyRNA *prop;
+	
 	/* identifiers */
 	ot->name= "Add Camera";
 	ot->description = "Add a camera object to the scene";
@@ -491,6 +495,11 @@ void OBJECT_OT_camera_add(wmOperatorType *ot)
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 		
 	ED_object_add_generic_props(ot, TRUE);
+	
+	/* hide this for cameras, default */
+	prop= RNA_struct_type_find_property(ot->srna, "view_align");
+	RNA_def_property_flag(prop, PROP_HIDDEN);
+
 }
 
 
@@ -628,7 +637,7 @@ static int object_armature_add_exec(bContext *C, wmOperator *op)
 	else DAG_id_tag_update(&obedit->id, OB_RECALC_DATA);
 	
 	if(obedit==NULL) {
-		BKE_report(op->reports, RPT_ERROR, "Cannot create editmode armature.");
+		BKE_report(op->reports, RPT_ERROR, "Cannot create editmode armature");
 		return OPERATOR_CANCELLED;
 	}
 	
@@ -797,14 +806,14 @@ static int object_delete_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	Main *bmain= CTX_data_main(C);
 	Scene *scene= CTX_data_scene(C);
-	int islamp= 0;
+	/* int islamp= 0; */ /* UNUSED */
 	
 	if(CTX_data_edit_object(C)) 
 		return OPERATOR_CANCELLED;
 	
 	CTX_DATA_BEGIN(C, Base*, base, selected_bases) {
 
-		if(base->object->type==OB_LAMP) islamp= 1;
+		/* if(base->object->type==OB_LAMP) islamp= 1; */
 
 		/* deselect object -- it could be used in other scenes */
 		base->object->flag &= ~SELECT;
@@ -813,8 +822,6 @@ static int object_delete_exec(bContext *C, wmOperator *UNUSED(op))
 		ED_base_object_free_and_unlink(bmain, scene, base);
 	}
 	CTX_DATA_END;
-
-	if(islamp) reshadeall_displist(scene);	/* only frees displist */
 
 	DAG_scene_sort(bmain, scene);
 	DAG_ids_flush_update(bmain, 0);
@@ -843,13 +850,6 @@ void OBJECT_OT_delete(wmOperatorType *ot)
 
 /**************************** Copy Utilities ******************************/
 
-static void copy_object__forwardModifierLinks(void *UNUSED(userData), Object *UNUSED(ob),
-											  ID **idpoin)
-{
-	/* this is copied from ID_NEW; it might be better to have a macro */
-	if(*idpoin && (*idpoin)->newid) *idpoin = (*idpoin)->newid;
-}
-
 /* after copying objects, copied data should get new pointers */
 static void copy_object_set_idnew(bContext *C, int dupflag)
 {
@@ -860,17 +860,7 @@ static void copy_object_set_idnew(bContext *C, int dupflag)
 	
 	/* XXX check object pointers */
 	CTX_DATA_BEGIN(C, Object*, ob, selected_editable_objects) {
-		relink_constraints(&ob->constraints);
-		if (ob->pose){
-			bPoseChannel *chan;
-			for (chan = ob->pose->chanbase.first; chan; chan=chan->next){
-				relink_constraints(&chan->constraints);
-			}
-		}
-		modifiers_foreachIDLink(ob, copy_object__forwardModifierLinks, NULL);
-		ID_NEW(ob->parent);
-		ID_NEW(ob->proxy);
-		ID_NEW(ob->proxy_group);
+		object_relink(ob);
 	}
 	CTX_DATA_END;
 	
@@ -1390,7 +1380,7 @@ static int convert_exec(bContext *C, wmOperator *op)
 void OBJECT_OT_convert(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Convert";
+	ot->name= "Convert to";
 	ot->description = "Convert selected objects to another type";
 	ot->idname= "OBJECT_OT_convert";
 	
@@ -1403,8 +1393,8 @@ void OBJECT_OT_convert(wmOperatorType *ot)
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 
 	/* properties */
-	ot->prop= RNA_def_enum(ot->srna, "target", convert_target_items, OB_MESH, "Target", "Type of object to convert to.");
-	RNA_def_boolean(ot->srna, "keep_original", 0, "Keep Original", "Keep original objects instead of replacing them.");
+	ot->prop= RNA_def_enum(ot->srna, "target", convert_target_items, OB_MESH, "Target", "Type of object to convert to");
+	RNA_def_boolean(ot->srna, "keep_original", 0, "Keep Original", "Keep original objects instead of replacing them");
 }
 
 /**************************** Duplicate ************************/
@@ -1638,7 +1628,8 @@ static Base *object_add_duplicate_internal(Main *bmain, Scene *scene, Base *base
 }
 
 /* single object duplicate, if dupflag==0, fully linked, else it uses the flags given */
-/* leaves selection of base/object unaltered */
+/* leaves selection of base/object unaltered.
+ * note: don't call this within a loop since clear_* funcs loop over the entire database. */
 Base *ED_object_add_duplicate(Main *bmain, Scene *scene, Base *base, int dupflag)
 {
 	Base *basen;
@@ -1653,6 +1644,10 @@ Base *ED_object_add_duplicate(Main *bmain, Scene *scene, Base *base, int dupflag
 	}
 
 	ob= basen->object;
+
+	/* link own references to the newly duplicated data [#26816] */
+	object_relink(ob);
+	set_sca_new_poins_ob(ob);
 
 	DAG_scene_sort(bmain, scene);
 	ED_render_id_flush_update(bmain, ob->data);
@@ -1707,7 +1702,7 @@ void OBJECT_OT_duplicate(wmOperatorType *ot)
 	PropertyRNA *prop;
 	
 	/* identifiers */
-	ot->name= "Duplicate";
+	ot->name= "Duplicate Objects";
 	ot->description = "Duplicate selected objects";
 	ot->idname= "OBJECT_OT_duplicate";
 	
@@ -1719,8 +1714,8 @@ void OBJECT_OT_duplicate(wmOperatorType *ot)
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 	
 	/* to give to transform */
-	RNA_def_boolean(ot->srna, "linked", 0, "Linked", "Duplicate object but not object data, linking to the original data.");
-	prop= RNA_def_int(ot->srna, "mode", TFM_TRANSLATION, 0, INT_MAX, "Mode", "", 0, INT_MAX);
+	RNA_def_boolean(ot->srna, "linked", 0, "Linked", "Duplicate object but not object data, linking to the original data");
+	prop= RNA_def_enum(ot->srna, "mode", transform_mode_types, TFM_TRANSLATION, "Mode", "");
 	RNA_def_property_flag(prop, PROP_HIDDEN);
 }
 
@@ -1789,8 +1784,8 @@ void OBJECT_OT_add_named(wmOperatorType *ot)
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 	
-	RNA_def_boolean(ot->srna, "linked", 0, "Linked", "Duplicate object but not object data, linking to the original data.");
-	RNA_def_string(ot->srna, "name", "Cube", 24, "Name", "Object name to add.");
+	RNA_def_boolean(ot->srna, "linked", 0, "Linked", "Duplicate object but not object data, linking to the original data");
+	RNA_def_string(ot->srna, "name", "Cube", 24, "Name", "Object name to add");
 }
 
 
@@ -1815,11 +1810,11 @@ static int join_exec(bContext *C, wmOperator *op)
 	Object *ob= CTX_data_active_object(C);
 
 	if(scene->obedit) {
-		BKE_report(op->reports, RPT_ERROR, "This data does not support joining in editmode.");
+		BKE_report(op->reports, RPT_ERROR, "This data does not support joining in editmode");
 		return OPERATOR_CANCELLED;
 	}
 	else if(object_data_is_libdata(ob)) {
-		BKE_report(op->reports, RPT_ERROR, "Can't edit external libdata.");
+		BKE_report(op->reports, RPT_ERROR, "Can't edit external libdata");
 		return OPERATOR_CANCELLED;
 	}
 
@@ -1868,11 +1863,11 @@ static int join_shapes_exec(bContext *C, wmOperator *op)
 	Object *ob= CTX_data_active_object(C);
 	
 	if(scene->obedit) {
-		BKE_report(op->reports, RPT_ERROR, "This data does not support joining in editmode.");
+		BKE_report(op->reports, RPT_ERROR, "This data does not support joining in editmode");
 		return OPERATOR_CANCELLED;
 	}
 	else if(object_data_is_libdata(ob)) {
-		BKE_report(op->reports, RPT_ERROR, "Can't edit external libdata.");
+		BKE_report(op->reports, RPT_ERROR, "Can't edit external libdata");
 		return OPERATOR_CANCELLED;
 	}
 	

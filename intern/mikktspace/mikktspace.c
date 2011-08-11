@@ -243,7 +243,7 @@ tbool genTangSpace(const SMikkTSpaceContext * pContext, const float fAngularThre
 	int iNrActiveGroups = 0, index = 0;
 	const int iNrFaces = pContext->m_pInterface->m_getNumFaces(pContext);
 	tbool bRes = TFALSE;
-	const float fThresCos = (const float) cos((fAngularThreshold*M_PI)/180);
+	const float fThresCos = (float) cos((fAngularThreshold*(float)M_PI)/180.0f);
 
 	// verify all call-backs have been set
 	if( pContext->m_pInterface->m_getNumFaces==NULL ||
@@ -282,7 +282,6 @@ tbool genTangSpace(const SMikkTSpaceContext * pContext, const float fAngularThre
 
 	// Mark all degenerate triangles
 	iTotTris = iNrTrianglesIn;
-	iNrTrianglesIn = 0;
 	iDegenTriangles = 0;
 	for(t=0; t<iTotTris; t++)
 	{
@@ -646,7 +645,7 @@ void MergeVertsFast(int piTriList_in_and_out[], STmpVert pTmpVert[], const SMikk
 		int iL=iL_in, iR=iR_in;
 		assert((iR_in-iL_in)>0);	// at least 2 entries
 
-		// seperate (by fSep) all points between iL_in and iR_in in pTmpVert[]
+		// separate (by fSep) all points between iL_in and iR_in in pTmpVert[]
 		while(iL < iR)
 		{
 			tbool bReadyLeftSwap = TFALSE, bReadyRightSwap = TFALSE;
@@ -1412,7 +1411,7 @@ STSpace EvalTspace(int face_indices[], const int iFaces, const int piTriListIn[]
 			// weight contribution by the angle
 			// between the two edge vectors
 			fCos = vdot(v1,v2); fCos=fCos>1?1:(fCos<(-1) ? (-1) : fCos);
-			fAngle = (const float) acos(fCos);
+			fAngle = (float) acos(fCos);
 			fMagS = pTriInfos[f].fMagS;
 			fMagT = pTriInfos[f].fMagT;
 

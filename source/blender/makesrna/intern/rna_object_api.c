@@ -39,12 +39,15 @@
 #include "RNA_define.h"
 
 #include "DNA_object_types.h"
+#include "DNA_modifier_types.h"
 
 // #include "BLO_sys_types.h" /* needed for intptr_t used in ED_mesh.h */
 
 // #include "ED_mesh.h"
 
+
 #ifdef RNA_RUNTIME
+#include "BLI_math.h"
 
 #include "BKE_main.h"
 #include "BKE_global.h"
@@ -63,8 +66,6 @@
 #include "BKE_mball.h"
 #include "BKE_modifier.h"
 
-#include "BLI_math.h"
-
 #include "DNA_mesh_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_meshdata_types.h"
@@ -77,19 +78,19 @@
 
 /* copied from Mesh_getFromObject and adapted to RNA interface */
 /* settings: 0 - preview, 1 - render */
-static Mesh *rna_Object_create_mesh(Object *ob, ReportList *reports, Scene *sce, int apply_modifiers, int settings)
+static Mesh *rna_Object_to_mesh(Object *ob, ReportList *reports, Scene *sce, int apply_modifiers, int settings)
 {
 	Mesh *tmpmesh;
 	Curve *tmpcu = NULL;
 	Object *tmpobj = NULL;
-	int render = settings, i;
+	int render = settings == eModifierMode_Render, i;
 	int cage = !apply_modifiers;
 
 	/* perform the mesh extraction based on type */
-	 switch (ob->type) {
-	 case OB_FONT:
-	 case OB_CURVE:
-	 case OB_SURF:
+	switch (ob->type) {
+	case OB_FONT:
+	case OB_CURVE:
+	case OB_SURF:
 
 		/* copies object and modifiers (but not the data) */
 		tmpobj= copy_object(ob);
@@ -129,7 +130,7 @@ static Mesh *rna_Object_create_mesh(Object *ob, ReportList *reports, Scene *sce,
 		free_libblock_us( &G.main->object, tmpobj );
 		break;
 
-	 case OB_MBALL:
+	case OB_MBALL:
 		/* metaballs don't have modifiers, so just convert to mesh */
 		ob = find_basis_mball( sce, ob );
 		/* todo, re-generatre for render-res */
@@ -137,9 +138,9 @@ static Mesh *rna_Object_create_mesh(Object *ob, ReportList *reports, Scene *sce,
 
 		tmpmesh = add_mesh("Mesh");
 		mball_to_mesh( &ob->disp, tmpmesh );
-		 break;
+		break;
 
-	 case OB_MESH:
+	case OB_MESH:
 		/* copies object and modifiers (but not the data) */
 		if (cage) {
 			/* copies the data */
@@ -164,10 +165,10 @@ static Mesh *rna_Object_create_mesh(Object *ob, ReportList *reports, Scene *sce,
 		}
 		
 		break;
-	 default:
+	default:
 		BKE_report(reports, RPT_ERROR, "Object does not have geometry data");
-		 return NULL;
-	  }
+		return NULL;
+	}
 
 	/* Copy materials to new mesh */
 	switch (ob->type) {
@@ -414,11 +415,51 @@ void rna_Object_ray_cast(Object *ob, ReportList *reports, float ray_start[3], fl
 	*index= -1;
 }
 
+void rna_Object_closest_point_on_mesh(Object *ob, ReportList *reports, float point_co[3], float max_dist, float n_location[3], float n_normal[3], int *index)
+{
+	BVHTreeFromMesh treeData= {NULL};
+	
+	if(ob->derivedFinal==NULL) {
+		BKE_reportf(reports, RPT_ERROR, "object \"%s\" has no mesh data to be used for finding nearest point.", ob->id.name+2);
+		return;
+	}
+
+	/* no need to managing allocation or freeing of the BVH data. this is generated and freed as needed */
+	bvhtree_from_mesh_faces(&treeData, ob->derivedFinal, 0.0f, 4, 6);
+
+	if(treeData.tree==NULL) {
+		BKE_reportf(reports, RPT_ERROR, "object \"%s\" could not create internal data for finding nearest point", ob->id.name+2);
+		return;
+	}
+	else {
+		BVHTreeNearest nearest;
+
+		nearest.index = -1;
+		nearest.dist = max_dist * max_dist;
+
+		if(BLI_bvhtree_find_nearest(treeData.tree, point_co, &nearest, treeData.nearest_callback, &treeData) != -1) {
+			copy_v3_v3(n_location, nearest.co);
+			copy_v3_v3(n_normal, nearest.no);
+			*index= nearest.index;
+			return;
+		}
+	}
+
+	zero_v3(n_location);
+	zero_v3(n_normal);
+	*index= -1;
+}
+
 /* ObjectBase */
 
 void rna_ObjectBase_layers_from_view(Base *base, View3D *v3d)
 {
 	base->lay= base->object->lay= v3d->lay;
+}
+
+int rna_Object_is_modified(Object *ob, Scene *scene, int settings)
+{
+	return object_is_modified(scene, ob) & settings;
 }
 
 #else
@@ -429,13 +470,13 @@ void RNA_api_object(StructRNA *srna)
 	PropertyRNA *parm;
 
 	static EnumPropertyItem mesh_type_items[] = {
-		{0, "PREVIEW", 0, "Preview", "Apply modifier preview settings"},
-		{1, "RENDER", 0, "Render", "Apply modifier render settings"},
+		{eModifierMode_Realtime, "PREVIEW", 0, "Preview", "Apply modifier preview settings"},
+		{eModifierMode_Render, "RENDER", 0, "Render", "Apply modifier render settings"},
 		{0, NULL, 0, NULL, NULL}
 	};
 
 	/* mesh */
-	func= RNA_def_function(srna, "create_mesh", "rna_Object_create_mesh");
+	func= RNA_def_function(srna, "to_mesh", "rna_Object_to_mesh");
 	RNA_def_function_ui_description(func, "Create a Mesh datablock with modifiers applied.");
 	RNA_def_function_flag(func, FUNC_USE_REPORTS);
 	parm= RNA_def_pointer(func, "scene", "Scene", "", "Scene within which to evaluate modifiers.");
@@ -448,13 +489,13 @@ void RNA_api_object(StructRNA *srna)
 	RNA_def_function_return(func, parm);
 
 	/* duplis */
-	func= RNA_def_function(srna, "create_dupli_list", "rna_Object_create_duplilist");
+	func= RNA_def_function(srna, "dupli_list_create", "rna_Object_create_duplilist");
 	RNA_def_function_ui_description(func, "Create a list of dupli objects for this object, needs to be freed manually with free_dupli_list to restore the objects real matrix and layers.");
 	parm= RNA_def_pointer(func, "scene", "Scene", "", "Scene within which to evaluate duplis.");
 	RNA_def_property_flag(parm, PROP_REQUIRED|PROP_NEVER_NULL);
 	RNA_def_function_flag(func, FUNC_USE_REPORTS);
 
-	func= RNA_def_function(srna, "free_dupli_list", "rna_Object_free_duplilist");
+	func= RNA_def_function(srna, "dupli_list_clear", "rna_Object_free_duplilist");
 	RNA_def_function_ui_description(func, "Free the list of dupli objects.");
 
 	/* Armature */
@@ -495,12 +536,44 @@ void RNA_api_object(StructRNA *srna)
 	parm= RNA_def_int(func, "index", 0, 0, 0, "", "The face index, -1 when no intersection is found.", 0, 0);
 	RNA_def_function_output(func, parm);
 
+	/* Nearest Point */
+	func= RNA_def_function(srna, "closest_point_on_mesh", "rna_Object_closest_point_on_mesh");
+	RNA_def_function_ui_description(func, "Find the nearest point on the object.");
+	RNA_def_function_flag(func, FUNC_USE_REPORTS);
+
+	/* location of point for test and max distance */
+	parm= RNA_def_float_vector(func, "point", 3, NULL, -FLT_MAX, FLT_MAX, "", "", -1e4, 1e4);
+	RNA_def_property_flag(parm, PROP_REQUIRED);
+	/* default is sqrt(FLT_MAX) */
+	RNA_def_float(func, "max_dist", 1.844674352395373e+19, 0.0, FLT_MAX, "", "", 0.0, FLT_MAX);
+
+	/* return location and normal */
+	parm= RNA_def_float_vector(func, "location", 3, NULL, -FLT_MAX, FLT_MAX, "Location", "The location on the object closest to the point", -1e4, 1e4);
+	RNA_def_property_flag(parm, PROP_THICK_WRAP);
+	RNA_def_function_output(func, parm);
+	parm= RNA_def_float_vector(func, "normal", 3, NULL, -FLT_MAX, FLT_MAX, "Normal", "The face normal at the closest point", -1e4, 1e4);
+	RNA_def_property_flag(parm, PROP_THICK_WRAP);
+	RNA_def_function_output(func, parm);
+
+	parm= RNA_def_int(func, "index", 0, 0, 0, "", "The face index, -1 when no closest point is found.", 0, 0);
+	RNA_def_function_output(func, parm);
+
 	/* View */
 	func= RNA_def_function(srna, "is_visible", "rna_Object_is_visible");
 	RNA_def_function_ui_description(func, "Determine if object is visible in a given scene.");
 	parm= RNA_def_pointer(func, "scene", "Scene", "", "");
 	RNA_def_property_flag(parm, PROP_REQUIRED|PROP_NEVER_NULL);
-	parm= RNA_def_boolean(func, "is_visible", 0, "", "Object visibility.");
+	parm= RNA_def_boolean(func, "result", 0, "", "Object visibility.");
+	RNA_def_function_return(func, parm);
+
+	/* utility function for checking if the object is modified */
+	func= RNA_def_function(srna, "is_modified", "rna_Object_is_modified");
+	RNA_def_function_ui_description(func, "Determine if this object is modified from the base mesh data.");
+	parm= RNA_def_pointer(func, "scene", "Scene", "", "");
+	RNA_def_property_flag(parm, PROP_REQUIRED|PROP_NEVER_NULL);
+	parm= RNA_def_enum(func, "settings", mesh_type_items, 0, "", "Modifier settings to apply.");
+	RNA_def_property_flag(parm, PROP_REQUIRED);
+	parm= RNA_def_boolean(func, "result", 0, "", "Object visibility.");
 	RNA_def_function_return(func, parm);
 }
 

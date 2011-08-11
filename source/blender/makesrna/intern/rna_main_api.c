@@ -84,12 +84,12 @@
 
 #include "ED_screen.h"
 
-Tex *rna_Main_add_texture(Main *bmain, const char *name)
+Tex *rna_Main_add_texture(Main *UNUSED(bmain), const char *name)
 {
 	return add_texture(name);
 }
 
-Camera *rna_Main_cameras_new(Main *bmain, const char *name)
+Camera *rna_Main_cameras_new(Main *UNUSED(bmain), const char *name)
 {
 	ID *id= add_camera(name);
 	id_us_min(id);
@@ -105,7 +105,7 @@ void rna_Main_cameras_remove(Main *bmain, ReportList *reports, struct Camera *ca
 	/* XXX python now has invalid pointer? */
 }
 
-Scene *rna_Main_scenes_new(Main *bmain, const char *name)
+Scene *rna_Main_scenes_new(Main *UNUSED(bmain), const char *name)
 {
 	return add_scene(name);
 }
@@ -129,7 +129,7 @@ void rna_Main_scenes_remove(Main *bmain, bContext *C, ReportList *reports, struc
 	unlink_scene(bmain, scene, newscene);
 }
 
-Object *rna_Main_objects_new(Main *bmain, ReportList *reports, const char *name, ID *data)
+Object *rna_Main_objects_new(Main *UNUSED(bmain), ReportList *reports, const char *name, ID *data)
 {
 	Object *ob;
 	int type= OB_EMPTY;
@@ -190,7 +190,7 @@ void rna_Main_objects_remove(Main *bmain, ReportList *reports, struct Object *ob
 	}
 }
 
-struct Material *rna_Main_materials_new(Main *bmain, const char *name)
+struct Material *rna_Main_materials_new(Main *UNUSED(bmain), const char *name)
 {
 	ID *id= (ID *)add_material(name);
 	id_us_min(id);
@@ -206,7 +206,7 @@ void rna_Main_materials_remove(Main *bmain, ReportList *reports, struct Material
 	/* XXX python now has invalid pointer? */
 }
 
-struct bNodeTree *rna_Main_nodetree_new(Main *bmain, const char *name, int type)
+struct bNodeTree *rna_Main_nodetree_new(Main *UNUSED(bmain), const char *name, int type)
 {
 	bNodeTree *tree = ntreeAddTree(name, type, TRUE);
 
@@ -225,7 +225,7 @@ void rna_Main_nodetree_remove(Main *bmain, ReportList *reports, struct bNodeTree
 	/* XXX python now has invalid pointer? */
 }
 
-Mesh *rna_Main_meshes_new(Main *bmain, const char *name)
+Mesh *rna_Main_meshes_new(Main *UNUSED(bmain), const char *name)
 {
 	Mesh *me= add_mesh(name);
 	id_us_min(&me->id);
@@ -241,7 +241,7 @@ void rna_Main_meshes_remove(Main *bmain, ReportList *reports, Mesh *mesh)
 	/* XXX python now has invalid pointer? */
 }
 
-Lamp *rna_Main_lamps_new(Main *bmain, const char *name, int type)
+Lamp *rna_Main_lamps_new(Main *UNUSED(bmain), const char *name, int type)
 {
 	Lamp *lamp= add_lamp(name);
 	lamp->type= type;
@@ -258,14 +258,14 @@ void rna_Main_lamps_remove(Main *bmain, ReportList *reports, Lamp *lamp)
 	/* XXX python now has invalid pointer? */
 }
 
-Image *rna_Main_images_new(Main *bmain, const char *name, int width, int height, int alpha, int float_buffer)
+Image *rna_Main_images_new(Main *UNUSED(bmain), const char *name, int width, int height, int alpha, int float_buffer)
 {
 	float color[4]= {0.0, 0.0, 0.0, 1.0};
 	Image *image= BKE_add_image_size(width, height, name, alpha ? 32:24, float_buffer, 0, color);
 	id_us_min(&image->id);
 	return image;
 }
-Image *rna_Main_images_load(Main *bmain, ReportList *reports, const char *filepath)
+Image *rna_Main_images_load(Main *UNUSED(bmain), ReportList *reports, const char *filepath)
 {
 	Image *ima;
 
@@ -287,7 +287,7 @@ void rna_Main_images_remove(Main *bmain, ReportList *reports, Image *image)
 	/* XXX python now has invalid pointer? */
 }
 
-Lattice *rna_Main_lattices_new(Main *bmain, const char *name)
+Lattice *rna_Main_lattices_new(Main *UNUSED(bmain), const char *name)
 {
 	Lattice *lt= add_lattice(name);
 	id_us_min(&lt->id);
@@ -301,7 +301,7 @@ void rna_Main_lattices_remove(Main *bmain, ReportList *reports, struct Lattice *
 		BKE_reportf(reports, RPT_ERROR, "Lattice \"%s\" must have zero users to be removed, found %d.", lt->id.name+2, ID_REAL_USERS(lt));
 }
 
-Curve *rna_Main_curves_new(Main *bmain, const char *name, int type)
+Curve *rna_Main_curves_new(Main *UNUSED(bmain), const char *name, int type)
 {
 	Curve *cu= add_curve(name, type);
 	id_us_min(&cu->id);
@@ -315,7 +315,7 @@ void rna_Main_curves_remove(Main *bmain, ReportList *reports, struct Curve *cu)
 		BKE_reportf(reports, RPT_ERROR, "Curve \"%s\" must have zero users to be removed, found %d.", cu->id.name+2, ID_REAL_USERS(cu));
 }
 
-MetaBall *rna_Main_metaballs_new(Main *bmain, const char *name)
+MetaBall *rna_Main_metaballs_new(Main *UNUSED(bmain), const char *name)
 {
 	MetaBall *mb= add_mball(name);
 	id_us_min(&mb->id);
@@ -329,7 +329,7 @@ void rna_Main_metaballs_remove(Main *bmain, ReportList *reports, struct MetaBall
 		BKE_reportf(reports, RPT_ERROR, "MetaBall \"%s\" must have zero users to be removed, found %d.", mb->id.name+2, ID_REAL_USERS(mb));
 }
 
-VFont *rna_Main_fonts_load(Main *bmain, ReportList *reports, const char *filepath)
+VFont *rna_Main_fonts_load(Main *UNUSED(bmain), ReportList *reports, const char *filepath)
 {
 	VFont *font;
 
@@ -352,7 +352,7 @@ void rna_Main_fonts_remove(Main *bmain, ReportList *reports, VFont *vfont)
 	/* XXX python now has invalid pointer? */
 }
 
-Tex *rna_Main_textures_new(Main *bmain, const char *name, int type)
+Tex *rna_Main_textures_new(Main *UNUSED(bmain), const char *name, int type)
 {
 	Tex *tex= add_texture(name);
 	tex_set_type(tex, type);
@@ -367,7 +367,7 @@ void rna_Main_textures_remove(Main *bmain, ReportList *reports, struct Tex *tex)
 		BKE_reportf(reports, RPT_ERROR, "Texture \"%s\" must have zero users to be removed, found %d.", tex->id.name+2, ID_REAL_USERS(tex));
 }
 
-Brush *rna_Main_brushes_new(Main *bmain, const char *name)
+Brush *rna_Main_brushes_new(Main *UNUSED(bmain), const char *name)
 {
 	Brush *brush = add_brush(name);
 	id_us_min(&brush->id);
@@ -381,7 +381,7 @@ void rna_Main_brushes_remove(Main *bmain, ReportList *reports, struct Brush *bru
 		BKE_reportf(reports, RPT_ERROR, "Brush \"%s\" must have zero users to be removed, found %d.", brush->id.name+2, ID_REAL_USERS(brush));
 }
 
-World *rna_Main_worlds_new(Main *bmain, const char *name)
+World *rna_Main_worlds_new(Main *UNUSED(bmain), const char *name)
 {
 	World *world = add_world(name);
 	id_us_min(&world->id);
@@ -395,7 +395,7 @@ void rna_Main_worlds_remove(Main *bmain, ReportList *reports, struct World *worl
 		BKE_reportf(reports, RPT_ERROR, "World \"%s\" must have zero users to be removed, found %d.", world->id.name+2, ID_REAL_USERS(world));
 }
 
-Group *rna_Main_groups_new(Main *bmain, const char *name)
+Group *rna_Main_groups_new(Main *UNUSED(bmain), const char *name)
 {
 	return add_group(name);
 }
@@ -406,7 +406,7 @@ void rna_Main_groups_remove(Main *bmain, Group *group)
 	/* XXX python now has invalid pointer? */
 }
 
-Text *rna_Main_texts_new(Main *bmain, const char *name)
+Text *rna_Main_texts_new(Main *UNUSED(bmain), const char *name)
 {
 	return add_empty_text(name);
 }
@@ -430,7 +430,7 @@ Text *rna_Main_texts_load(Main *bmain, ReportList *reports, const char *filepath
 	return txt;
 }
 
-bArmature *rna_Main_armatures_new(Main *bmain, const char *name)
+bArmature *rna_Main_armatures_new(Main *UNUSED(bmain), const char *name)
 {
 	bArmature *arm= add_armature(name);
 	id_us_min(&arm->id);
@@ -446,7 +446,7 @@ void rna_Main_armatures_remove(Main *bmain, ReportList *reports, bArmature *arm)
 	/* XXX python now has invalid pointer? */
 }
 
-bAction *rna_Main_actions_new(Main *bmain, const char *name)
+bAction *rna_Main_actions_new(Main *UNUSED(bmain), const char *name)
 {
 	bAction *act= add_empty_action(name);
 	id_us_min(&act->id);
@@ -537,6 +537,7 @@ void RNA_def_main_cameras(BlenderRNA *brna, PropertyRNA *cprop)
 
 	RNA_def_property_srna(cprop, "BlendDataCameras");
 	srna= RNA_def_struct(brna, "BlendDataCameras", NULL);
+	RNA_def_struct_sdna(srna, "Main");
 	RNA_def_struct_ui_text(srna, "Main Cameras", "Collection of cameras");
 
 	func= RNA_def_function(srna, "new", "rna_Main_cameras_new");
@@ -566,6 +567,7 @@ void RNA_def_main_scenes(BlenderRNA *brna, PropertyRNA *cprop)
 
 	RNA_def_property_srna(cprop, "BlendDataScenes");
 	srna= RNA_def_struct(brna, "BlendDataScenes", NULL);
+	RNA_def_struct_sdna(srna, "Main");
 	RNA_def_struct_ui_text(srna, "Main Scenes", "Collection of scenes");
 
 	func= RNA_def_function(srna, "new", "rna_Main_scenes_new");
@@ -591,6 +593,7 @@ void RNA_def_main_objects(BlenderRNA *brna, PropertyRNA *cprop)
 
 	RNA_def_property_srna(cprop, "BlendDataObjects");
 	srna= RNA_def_struct(brna, "BlendDataObjects", NULL);
+	RNA_def_struct_sdna(srna, "Main");
 	RNA_def_struct_ui_text(srna, "Main Objects", "Collection of objects");
 
 	func= RNA_def_function(srna, "new", "rna_Main_objects_new");
@@ -624,6 +627,7 @@ void RNA_def_main_materials(BlenderRNA *brna, PropertyRNA *cprop)
 
 	RNA_def_property_srna(cprop, "BlendDataMaterials");
 	srna= RNA_def_struct(brna, "BlendDataMaterials", NULL);
+	RNA_def_struct_sdna(srna, "Main");
 	RNA_def_struct_ui_text(srna, "Main Material", "Collection of materials");
 
 	func= RNA_def_function(srna, "new", "rna_Main_materials_new");
@@ -658,6 +662,7 @@ void RNA_def_main_node_groups(BlenderRNA *brna, PropertyRNA *cprop)
 
 	RNA_def_property_srna(cprop, "BlendDataNodeTrees");
 	srna= RNA_def_struct(brna, "BlendDataNodeTrees", NULL);
+	RNA_def_struct_sdna(srna, "Main");
 	RNA_def_struct_ui_text(srna, "Main Node Trees", "Collection of node trees");
 
 	func= RNA_def_function(srna, "new", "rna_Main_nodetree_new");
@@ -688,6 +693,7 @@ void RNA_def_main_meshes(BlenderRNA *brna, PropertyRNA *cprop)
 
 	RNA_def_property_srna(cprop, "BlendDataMeshes");
 	srna= RNA_def_struct(brna, "BlendDataMeshes", NULL);
+	RNA_def_struct_sdna(srna, "Main");
 	RNA_def_struct_ui_text(srna, "Main Meshes", "Collection of meshes");
 
 	func= RNA_def_function(srna, "new", "rna_Main_meshes_new");
@@ -716,6 +722,7 @@ void RNA_def_main_lamps(BlenderRNA *brna, PropertyRNA *cprop)
 
 	RNA_def_property_srna(cprop, "BlendDataLamps");
 	srna= RNA_def_struct(brna, "BlendDataLamps", NULL);
+	RNA_def_struct_sdna(srna, "Main");
 	RNA_def_struct_ui_text(srna, "Main Lamps", "Collection of lamps");
 
 	func= RNA_def_function(srna, "new", "rna_Main_lamps_new");
@@ -747,6 +754,7 @@ void RNA_def_main_libraries(BlenderRNA *brna, PropertyRNA *cprop)
 
 	RNA_def_property_srna(cprop, "BlendDataLibraries");
 	srna= RNA_def_struct(brna, "BlendDataLibraries", NULL);
+	RNA_def_struct_sdna(srna, "Main");
 	RNA_def_struct_ui_text(srna, "Main Libraries", "Collection of libraries");
 
 	func= RNA_def_function(srna, "tag", "rna_Main_libraries_tag");
@@ -762,6 +770,7 @@ void RNA_def_main_screens(BlenderRNA *brna, PropertyRNA *cprop)
 
 	RNA_def_property_srna(cprop, "BlendDataScreens");
 	srna= RNA_def_struct(brna, "BlendDataScreens", NULL);
+	RNA_def_struct_sdna(srna, "Main");
 	RNA_def_struct_ui_text(srna, "Main Screens", "Collection of screens");
 
 	func= RNA_def_function(srna, "tag", "rna_Main_screens_tag");
@@ -777,6 +786,7 @@ void RNA_def_main_window_managers(BlenderRNA *brna, PropertyRNA *cprop)
 
 	RNA_def_property_srna(cprop, "BlendDataWindowManagers");
 	srna= RNA_def_struct(brna, "BlendDataWindowManagers", NULL);
+	RNA_def_struct_sdna(srna, "Main");
 	RNA_def_struct_ui_text(srna, "Main Window Managers", "Collection of window managers");
 
 	func= RNA_def_function(srna, "tag", "rna_Main_window_managers_tag");
@@ -791,6 +801,7 @@ void RNA_def_main_images(BlenderRNA *brna, PropertyRNA *cprop)
 
 	RNA_def_property_srna(cprop, "BlendDataImages");
 	srna= RNA_def_struct(brna, "BlendDataImages", NULL);
+	RNA_def_struct_sdna(srna, "Main");
 	RNA_def_struct_ui_text(srna, "Main Images", "Collection of images");
 
 	func= RNA_def_function(srna, "new", "rna_Main_images_new");
@@ -835,6 +846,7 @@ void RNA_def_main_lattices(BlenderRNA *brna, PropertyRNA *cprop)
 
 	RNA_def_property_srna(cprop, "BlendDataLattices");
 	srna= RNA_def_struct(brna, "BlendDataLattices", NULL);
+	RNA_def_struct_sdna(srna, "Main");
 	RNA_def_struct_ui_text(srna, "Main Lattices", "Collection of lattices");
 
 	func= RNA_def_function(srna, "new", "rna_Main_lattices_new");
@@ -863,6 +875,7 @@ void RNA_def_main_curves(BlenderRNA *brna, PropertyRNA *cprop)
 
 	RNA_def_property_srna(cprop, "BlendDataCurves");
 	srna= RNA_def_struct(brna, "BlendDataCurves", NULL);
+	RNA_def_struct_sdna(srna, "Main");
 	RNA_def_struct_ui_text(srna, "Main Curves", "Collection of curves");
 
 	func= RNA_def_function(srna, "new", "rna_Main_curves_new");
@@ -893,6 +906,7 @@ void RNA_def_main_metaballs(BlenderRNA *brna, PropertyRNA *cprop)
 
 	RNA_def_property_srna(cprop, "BlendDataMetaBalls");
 	srna= RNA_def_struct(brna, "BlendDataMetaBalls", NULL);
+	RNA_def_struct_sdna(srna, "Main");
 	RNA_def_struct_ui_text(srna, "Main MetaBall", "Collection of metaballs");
 
 	func= RNA_def_function(srna, "new", "rna_Main_metaballs_new");
@@ -921,6 +935,7 @@ void RNA_def_main_fonts(BlenderRNA *brna, PropertyRNA *cprop)
 
 	RNA_def_property_srna(cprop, "BlendDataFonts");
 	srna= RNA_def_struct(brna, "BlendDataFonts", NULL);
+	RNA_def_struct_sdna(srna, "Main");
 	RNA_def_struct_ui_text(srna, "Main Fonts", "Collection of fonts");
 
 	func= RNA_def_function(srna, "load", "rna_Main_fonts_load");
@@ -950,6 +965,7 @@ void RNA_def_main_textures(BlenderRNA *brna, PropertyRNA *cprop)
 
 	RNA_def_property_srna(cprop, "BlendDataTextures");
 	srna= RNA_def_struct(brna, "BlendDataTextures", NULL);
+	RNA_def_struct_sdna(srna, "Main");
 	RNA_def_struct_ui_text(srna, "Main Textures", "Collection of groups");
 
 	func= RNA_def_function(srna, "new", "rna_Main_textures_new");
@@ -980,6 +996,7 @@ void RNA_def_main_brushes(BlenderRNA *brna, PropertyRNA *cprop)
 
 	RNA_def_property_srna(cprop, "BlendDataBrushes");
 	srna= RNA_def_struct(brna, "BlendDataBrushes", NULL);
+	RNA_def_struct_sdna(srna, "Main");
 	RNA_def_struct_ui_text(srna, "Main Brushes", "Collection of brushes");
 
 	func= RNA_def_function(srna, "new", "rna_Main_brushes_new");
@@ -1009,6 +1026,7 @@ void RNA_def_main_worlds(BlenderRNA *brna, PropertyRNA *cprop)
 
 	RNA_def_property_srna(cprop, "BlendDataWorlds");
 	srna= RNA_def_struct(brna, "BlendDataWorlds", NULL);
+	RNA_def_struct_sdna(srna, "Main");
 	RNA_def_struct_ui_text(srna, "Main Worlds", "Collection of worlds");
 
 	func= RNA_def_function(srna, "new", "rna_Main_worlds_new");
@@ -1038,6 +1056,7 @@ void RNA_def_main_groups(BlenderRNA *brna, PropertyRNA *cprop)
 
 	RNA_def_property_srna(cprop, "BlendDataGroups");
 	srna= RNA_def_struct(brna, "BlendDataGroups", NULL);
+	RNA_def_struct_sdna(srna, "Main");
 	RNA_def_struct_ui_text(srna, "Main Groups", "Collection of groups");
 
 	func= RNA_def_function(srna, "new", "rna_Main_groups_new");
@@ -1065,6 +1084,7 @@ void RNA_def_main_texts(BlenderRNA *brna, PropertyRNA *cprop)
 
 	RNA_def_property_srna(cprop, "BlendDataTexts");
 	srna= RNA_def_struct(brna, "BlendDataTexts", NULL);
+	RNA_def_struct_sdna(srna, "Main");
 	RNA_def_struct_ui_text(srna, "Main Texts", "Collection of texts");
 
 	func= RNA_def_function(srna, "new", "rna_Main_texts_new");
@@ -1103,6 +1123,7 @@ void RNA_def_main_sounds(BlenderRNA *brna, PropertyRNA *cprop)
 
 	RNA_def_property_srna(cprop, "BlendDataSounds");
 	srna= RNA_def_struct(brna, "BlendDataSounds", NULL);
+	RNA_def_struct_sdna(srna, "Main");
 	RNA_def_struct_ui_text(srna, "Main Sounds", "Collection of sounds");
 
 	/* TODO, 'load' */
@@ -1120,6 +1141,7 @@ void RNA_def_main_armatures(BlenderRNA *brna, PropertyRNA *cprop)
 
 	RNA_def_property_srna(cprop, "BlendDataArmatures");
 	srna= RNA_def_struct(brna, "BlendDataArmatures", NULL);
+	RNA_def_struct_sdna(srna, "Main");
 	RNA_def_struct_ui_text(srna, "Main Armatures", "Collection of armatures");
 
 	func= RNA_def_function(srna, "new", "rna_Main_armatures_new");
@@ -1148,6 +1170,7 @@ void RNA_def_main_actions(BlenderRNA *brna, PropertyRNA *cprop)
 
 	RNA_def_property_srna(cprop, "BlendDataActions");
 	srna= RNA_def_struct(brna, "BlendDataActions", NULL);
+	RNA_def_struct_sdna(srna, "Main");
 	RNA_def_struct_ui_text(srna, "Main Actions", "Collection of actions");
 
 	func= RNA_def_function(srna, "new", "rna_Main_actions_new");
@@ -1176,6 +1199,7 @@ void RNA_def_main_particles(BlenderRNA *brna, PropertyRNA *cprop)
 
 	RNA_def_property_srna(cprop, "BlendDataParticles");
 	srna= RNA_def_struct(brna, "BlendDataParticles", NULL);
+	RNA_def_struct_sdna(srna, "Main");
 	RNA_def_struct_ui_text(srna, "Main Particle Settings", "Collection of particle settings");
 
 	func= RNA_def_function(srna, "new", "rna_Main_particles_new");
@@ -1205,6 +1229,7 @@ void RNA_def_main_gpencil(BlenderRNA *brna, PropertyRNA *cprop)
 
 	RNA_def_property_srna(cprop, "BlendDataGreasePencils");
 	srna= RNA_def_struct(brna, "BlendDataGreasePencils", NULL);
+	RNA_def_struct_sdna(srna, "Main");
 	RNA_def_struct_ui_text(srna, "Main Grease Pencils", "Collection of grease pencils");
 
 	func= RNA_def_function(srna, "tag", "rna_Main_gpencil_tag");

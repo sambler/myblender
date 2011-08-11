@@ -95,7 +95,7 @@ typedef struct bUnitDef {
 /* define a single unit */
 typedef struct bUnitCollection {
 	struct bUnitDef *units;
-	int base_unit;				/* basic unit index (when user desn't specify unit explicitly) */
+	int base_unit;				/* basic unit index (when user doesn't specify unit explicitly) */
 	int flag;					/* options for this system */
 	int length;					/* to quickly find the last item */
 } bUnitCollection;
@@ -136,7 +136,7 @@ static struct bUnitDef buImperialLenDef[] = {
 	{"yard", "yards",		"yd", NULL, "Yards",	UN_SC_YD, 0.0,	B_UNIT_DEF_NONE},
 	{"foot", "feet",		"'", "ft", "Feet",		UN_SC_FT, 0.0,	B_UNIT_DEF_NONE}, /* base unit */
 	{"inch", "inches",		"\"", "in", "Inches",	UN_SC_IN, 0.0,	B_UNIT_DEF_NONE},
-	{"thou", "thous",		"mil", NULL, "Thous",	UN_SC_MIL, 0.0,	B_UNIT_DEF_NONE},
+	{"thou", "thou",		"thou", "mil", "Thou",	UN_SC_MIL, 0.0,	B_UNIT_DEF_NONE}, /* plural for thou has no 's' */
 	{NULL, NULL, NULL, NULL, NULL, 0.0, 0.0}
 };
 static struct bUnitCollection buImperialLenCollecton = {buImperialLenDef, 4, 0, sizeof(buImperialLenDef)/sizeof(bUnitDef)};
@@ -344,9 +344,7 @@ static int unit_as_string(char *str, int len_max, double value, int prec, bUnitC
 
 	/* Convert to a string */
 	{
-		char conv_str[6] = {'%', '.', '0', 'l', 'f', '\0'}; /* "%.2lf" when prec is 2, must be under 10 */
-		conv_str[2] += prec;
-		len= snprintf(str, len_max, conv_str, (float)value_conv);
+		len= snprintf(str, len_max, "%.*lf", prec, value_conv);
 
 		if(len >= len_max)
 			len= len_max;

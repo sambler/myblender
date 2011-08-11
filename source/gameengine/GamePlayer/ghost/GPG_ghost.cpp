@@ -47,7 +47,6 @@
 //#include <Carbon/Carbon.h>
 //#include <CFBundle.h>
 #endif // __APPLE__
-#include "GEN_messaging.h"
 #include "KX_KetsjiEngine.h"
 #include "KX_PythonInit.h"
 
@@ -63,14 +62,17 @@ extern "C"
 #include "BKE_global.h"	
 #include "BKE_icons.h"	
 #include "BKE_node.h"	
-#include "BKE_report.h"	
+#include "BKE_report.h"
+#include "BKE_library.h"
+#include "BLI_threads.h"
 #include "BLI_blenlib.h"
 #include "DNA_scene_types.h"
 #include "DNA_userdef_types.h"
 #include "BLO_readfile.h"
-#include "BLO_readblenfile.h"
+#include "BLO_runtime.h"
 #include "IMB_imbuf.h"
 #include "BKE_text.h"
+#include "BKE_sound.h"
 	
 	int GHOST_HACK_getFirstFile(char buf[]);
 	
@@ -92,7 +94,7 @@ extern char datatoc_bfont_ttf[];
 * End Blender include block
 **********************************/
 
-#include "SYS_System.h"
+#include "BL_System.h"
 #include "GPG_Application.h"
 
 #include "GHOST_ISystem.h"
@@ -114,6 +116,12 @@ const int kMinWindowWidth = 100;
 const int kMinWindowHeight = 100;
 
 char bprogname[FILE_MAX];
+
+static void mem_error_cb(const char *errorStr)
+{
+	fprintf(stderr, "%s", errorStr);
+	fflush(stderr);
+}
 
 #ifdef WIN32
 typedef enum 
@@ -193,7 +201,7 @@ void usage(const char* program, bool isBlenderPlayer)
 	}
 	
 	printf("usage:   %s [-w [w h l t]] [-f [fw fh fb ff]] %s[-g gamengineoptions] "
-		"[-s stereomode] %s\n", program, consoleoption, filename);
+		"[-s stereomode] [-m aasamples] %s\n", program, consoleoption, filename);
 	printf("  -h: Prints this command summary\n\n");
 	printf("  -w: display in a window\n");
 	printf("       --Optional parameters--\n"); 
@@ -229,9 +237,8 @@ void usage(const char* program, bool isBlenderPlayer)
 	printf("             cubemap                (Cube Map)\n");
 	printf("             sphericalpanoramic     (Spherical Panoramic)\n");
 	printf("                             depending on the type of dome you are using\n\n");
-#ifndef _WIN32
+	printf("  -m: maximum anti-aliasing (eg. 2,4,8,16)\n\n");
 	printf("  -i: parent windows ID \n\n");
-#endif
 #ifdef _WIN32
 	printf("  -c: keep console window open\n\n");
 #endif
@@ -251,6 +258,7 @@ void usage(const char* program, bool isBlenderPlayer)
 	printf("\n");
 	printf("example: %s -w 320 200 10 10 -g noaudio%s%s\n", program, pathname, filename);
 	printf("example: %s -g show_framerate = 0 %s%s\n", program, pathname, filename);
+	printf("example: %s -i 232421 -m 16 %s%s\n\n", program, pathname, filename);
 }
 
 static void get_filename(int argc, char **argv, char *filename)
@@ -308,8 +316,8 @@ static BlendFileData *load_game_data(char *progname, char *filename = NULL, char
 	BKE_reports_init(&reports, RPT_STORE);
 	
 	/* try to load ourself, will only work if we are a runtime */
-	if (blo_is_a_runtime(progname)) {
-		bfd= blo_read_runtime(progname, &reports);
+	if (BLO_is_a_runtime(progname)) {
+		bfd= BLO_read_runtime(progname, &reports);
 		if (bfd) {
 			bfd->type= BLENFILETYPE_RUNTIME;
 			strcpy(bfd->main->name, progname);
@@ -340,7 +348,9 @@ int main(int argc, char** argv)
 	bool fullScreen = false;
 	bool fullScreenParFound = false;
 	bool windowParFound = false;
+#ifdef WIN32
 	bool closeConsole = true;
+#endif
 	RAS_IRasterizer::StereoMode stereomode = RAS_IRasterizer::RAS_STEREO_NOSTEREO;
 	bool stereoWindow = false;
 	bool stereoParFound = false;
@@ -361,6 +371,7 @@ int main(int argc, char** argv)
 	GHOST_TEmbedderWindowID parentWindow = 0;
 	bool isBlenderPlayer = false;
 	int validArguments=0;
+	GHOST_TUns16 aasamples = 0;
 	
 #ifdef __linux__
 #ifdef __alpha__
@@ -389,14 +400,20 @@ int main(int argc, char** argv)
 		  ::DisposeNibReference(nibRef);
     */
 #endif // __APPLE__
-
+	
+	// We don't use threads directly in the BGE, but we need to call this so things like
+	// freeing up GPU_Textures works correctly.
+	BLI_threadapi_init();
+	
 	RNA_init();
 
 	init_nodesystem();
 	
 	initglobals();
 
-	GEN_init_messaging_system();
+	// We load our own G.main, so free the one that initglobals() gives us
+	free_main(G.main);
+	G.main = NULL;
 
 	IMB_init();
 
@@ -439,8 +456,13 @@ int main(int argc, char** argv)
 	U.audioformat = 0x24;
 	U.audiochannels = 2;
 
+	// XXX this one too
+	U.anisotropic_filter = 2;
+
+	sound_init_once();
+
 	/* if running blenderplayer the last argument can't be parsed since it has to be the filename. */
-	isBlenderPlayer = !blo_is_a_runtime(argv[0]);
+	isBlenderPlayer = !BLO_is_a_runtime(argv[0]);
 	if (isBlenderPlayer)
 		validArguments = argc - 1;
 	else
@@ -547,7 +569,6 @@ int main(int argc, char** argv)
 				usage(argv[0], isBlenderPlayer);
 				return 0;
 				break;
-#ifndef _WIN32
 			case 'i':
 				i++;
 				if ( (i + 1) <= validArguments )
@@ -556,15 +577,20 @@ int main(int argc, char** argv)
 					error = true;
 					printf("error: too few options for parent window argument.\n");
 				}
-
 #if defined(DEBUG)
 				printf("XWindows ID = %d\n", parentWindow);
 #endif // defined(DEBUG)
-
-#endif  // _WIN32			
+				break;
+			case 'm':
+				i++;
+				if ((i+1) <= validArguments )
+				aasamples = atoi(argv[i++]);
+				break;
 			case 'c':
 				i++;
+#ifdef WIN32
 				closeConsole = false;
+#endif
 				break;
 			case 's':  // stereo
 				i++;
@@ -688,6 +714,8 @@ int main(int argc, char** argv)
 		{
 			GPU_set_mipmap(0);
 		}
+
+		GPU_set_anisotropic(U.anisotropic_filter);
 		
 		// Create the system
 		if (GHOST_ISystem::createSystem() == GHOST_kSuccess)
@@ -834,9 +862,10 @@ int main(int argc, char** argv)
 						
 						//					GPG_Application app (system, maggie, startscenename);
 						app.SetGameEngineData(maggie, scene, argc, argv); /* this argc cant be argc_py_clamped, since python uses it */
-						
 						BLI_strncpy(pathname, maggie->name, sizeof(pathname));
-						BLI_strncpy(G.main->name, maggie->name, sizeof(G.main->name));
+						if(G.main != maggie) {
+							BLI_strncpy(G.main->name, maggie->name, sizeof(G.main->name));
+						}
 #ifdef WITH_PYTHON
 						setGamePythonPath(G.main->name);
 #endif
@@ -850,13 +879,13 @@ int main(int argc, char** argv)
 								if (scr_saver_mode == SCREEN_SAVER_MODE_SAVER)
 								{
 									app.startScreenSaverFullScreen(fullScreenWidth, fullScreenHeight, fullScreenBpp, fullScreenFrequency,
-										stereoWindow, stereomode);
+										stereoWindow, stereomode, aasamples);
 								}
 								else
 #endif
 								{
 									app.startFullScreen(fullScreenWidth, fullScreenHeight, fullScreenBpp, fullScreenFrequency,
-										stereoWindow, stereomode);
+										stereoWindow, stereomode, aasamples);
 								}
 							}
 							else
@@ -896,16 +925,16 @@ int main(int argc, char** argv)
 #ifdef WIN32
 								if (scr_saver_mode == SCREEN_SAVER_MODE_PREVIEW)
 								{
-									app.startScreenSaverPreview(scr_saver_hwnd, stereoWindow, stereomode);
+									app.startScreenSaverPreview(scr_saver_hwnd, stereoWindow, stereomode, aasamples);
 								}
 								else
 #endif
 								{
 																										if (parentWindow != 0)
-										app.startEmbeddedWindow(title, parentWindow, stereoWindow, stereomode);
+										app.startEmbeddedWindow(title, parentWindow, stereoWindow, stereomode, aasamples);
 									else
 										app.startWindow(title, windowLeft, windowTop, windowWidth, windowHeight,
-										stereoWindow, stereomode);
+										stereoWindow, stereomode, aasamples);
 								}
 							}
 						}
@@ -932,6 +961,10 @@ int main(int argc, char** argv)
 						}
 						app.StopGameEngine();
 
+						/* 'app' is freed automatic when out of scope. 
+						 * removal is needed else the system will free an already freed value */
+						system->removeEventConsumer(&app);
+
 						BLO_blendfiledata_free(bfd);
 					}
 				} while (exitcode == KX_EXIT_REQUEST_RESTART_GAME || exitcode == KX_EXIT_REQUEST_START_OTHER_GAME);
@@ -955,6 +988,13 @@ int main(int argc, char** argv)
 	free_nodesystem();
 
 	SYS_DeleteSystem(syshandle);
+
+	int totblock= MEM_get_memory_blocks_in_use();
+	if(totblock!=0) {
+		printf("Error Totblock: %d\n",totblock);
+		MEM_set_error_callback(mem_error_cb);
+		MEM_printmemlist();
+	}
 
 	return error ? -1 : 0;
 }

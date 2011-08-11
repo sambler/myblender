@@ -71,17 +71,12 @@ ARegion *graph_has_buttons_region(ScrArea *sa)
 {
 	ARegion *ar, *arnew;
 	
-	for (ar= sa->regionbase.first; ar; ar= ar->next) {
-		if (ar->regiontype==RGN_TYPE_UI)
-			return ar;
-	}
-	
+	ar= BKE_area_find_region_type(sa, RGN_TYPE_UI);
+	if(ar) return ar;
+
 	/* add subdiv level; after main */
-	for (ar= sa->regionbase.first; ar; ar= ar->next) {
-		if (ar->regiontype==RGN_TYPE_WINDOW)
-			break;
-	}
-	
+	ar= BKE_area_find_region_type(sa, RGN_TYPE_WINDOW);
+
 	/* is error! */
 	if (ar==NULL) return NULL;
 	
@@ -253,7 +248,7 @@ static void graph_main_area_draw(const bContext *C, ARegion *ar)
 		graph_draw_curves(&ac, sipo, ar, grid, 1);
 		
 		/* XXX the slow way to set tot rect... but for nice sliders needed (ton) */
-		get_graph_keyframe_extents(&ac, &v2d->tot.xmin, &v2d->tot.xmax, &v2d->tot.ymin, &v2d->tot.ymax);
+		get_graph_keyframe_extents(&ac, &v2d->tot.xmin, &v2d->tot.xmax, &v2d->tot.ymin, &v2d->tot.ymax, FALSE);
 		/* extra offset so that these items are visible */
 		v2d->tot.xmin -= 10.0f;
 		v2d->tot.xmax += 10.0f;

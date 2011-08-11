@@ -170,7 +170,7 @@ public:
 	SceneExporter(COLLADASW::StreamWriter *sw, ArmatureExporter *arm) : COLLADASW::LibraryVisualScenes(sw),
 																		arm_exporter(arm) {}
 	
-	void exportScene(Scene *sce) {
+	void exportScene(Scene *sce, bool export_selected) {
  		// <library_visual_scenes> <visual_scene>
 		std::string id_naming = id_name(sce);
 		openVisualScene(translate_id(id_naming), id_naming);
@@ -179,7 +179,7 @@ public:
 		//forEachMeshObjectInScene(sce, *this);
 		//forEachCameraObjectInScene(sce, *this);
 		//forEachLampObjectInScene(sce, *this);
-		exportHierarchy(sce);
+		exportHierarchy(sce, export_selected);
 
 		// </visual_scene> </library_visual_scenes>
 		closeVisualScene();
@@ -187,7 +187,7 @@ public:
 		closeLibrary();
 	}
 
-	void exportHierarchy(Scene *sce)
+	void exportHierarchy(Scene *sce, bool export_selected)
 	{
 		Base *base= (Base*) sce->base.first;
 		while(base) {
@@ -198,8 +198,11 @@ public:
 				case OB_MESH:
 				case OB_CAMERA:
 				case OB_LAMP:
-				case OB_EMPTY:
 				case OB_ARMATURE:
+				case OB_EMPTY:
+					if (export_selected && !(ob->flag & SELECT)) {
+						break;
+					}
 					// write nodes....
 					writeNodes(ob, sce);
 					break;
@@ -307,15 +310,19 @@ public:
 
 	AnimationExporter(COLLADASW::StreamWriter *sw): COLLADASW::LibraryAnimations(sw) { this->sw = sw; }
 
+
+
 	void exportAnimations(Scene *sce)
 	{
-		this->scene = sce;
+		if(hasAnimations(sce)) {
+			this->scene = sce;
 
-		openLibrary();
-		
-		forEachObjectInScene(sce, *this);
-		
-		closeLibrary();
+			openLibrary();
+
+			forEachObjectInScene(sce, *this);
+
+			closeLibrary();
+		}
 	}
 
 	// called for each exported object
@@ -905,9 +912,27 @@ protected:
 			}
 		}
 	}
+	
+	bool hasAnimations(Scene *sce)
+	{
+		Base *base= (Base*) sce->base.first;
+		while(base) {
+			Object *ob = base->object;
+			
+			FCurve *fcu = 0;
+			if(ob->adt && ob->adt->action)
+				fcu = (FCurve*)ob->adt->action->curves.first;
+				
+			if ((ob->type == OB_ARMATURE && ob->data) || fcu) {
+				return true;
+			}
+			base= base->next;
+		}
+		return false;
+	}
 };
 
-void DocumentExporter::exportCurrentScene(Scene *sce, const char* filename)
+void DocumentExporter::exportCurrentScene(Scene *sce, const char* filename, bool selected)
 {
 	PointerRNA sceneptr, unit_settings;
 	PropertyRNA *system; /* unused , *scale; */
@@ -987,28 +1012,34 @@ void DocumentExporter::exportCurrentScene(Scene *sce, const char* filename)
 	asset.add();
 	
 	// <library_cameras>
-	CamerasExporter ce(&sw);
-	ce.exportCameras(sce);
+	if(has_object_type(sce, OB_CAMERA)) {
+		CamerasExporter ce(&sw);
+		ce.exportCameras(sce, selected);
+	}
 	
 	// <library_lights>
-	LightsExporter le(&sw);
-	le.exportLights(sce);
+	if(has_object_type(sce, OB_LAMP)) {
+		LightsExporter le(&sw);
+		le.exportLights(sce, selected);
+	}
 
 	// <library_images>
 	ImagesExporter ie(&sw, filename);
-	ie.exportImages(sce);
+	ie.exportImages(sce, selected);
 	
 	// <library_effects>
 	EffectsExporter ee(&sw);
-	ee.exportEffects(sce);
+	ee.exportEffects(sce, selected);
 	
 	// <library_materials>
 	MaterialsExporter me(&sw);
-	me.exportMaterials(sce);
+	me.exportMaterials(sce, selected);
 
 	// <library_geometries>
-	GeometryExporter ge(&sw);
-	ge.exportGeom(sce);
+	if(has_object_type(sce, OB_MESH)) {
+		GeometryExporter ge(&sw);
+		ge.exportGeom(sce, selected);
+	}
 
 	// <library_animations>
 	AnimationExporter ae(&sw);
@@ -1016,11 +1047,13 @@ void DocumentExporter::exportCurrentScene(Scene *sce, const char* filename)
 
 	// <library_controllers>
 	ArmatureExporter arm_exporter(&sw);
-	arm_exporter.export_controllers(sce);
+	if(has_object_type(sce, OB_ARMATURE)) {
+		arm_exporter.export_controllers(sce, selected);
+	}
 
 	// <library_visual_scenes>
 	SceneExporter se(&sw, &arm_exporter);
-	se.exportScene(sce);
+	se.exportScene(sce, selected);
 	
 	// <scene>
 	std::string scene_name(translate_id(id_name(sce)));

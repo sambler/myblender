@@ -75,13 +75,18 @@ endif()
 if(WITH_PYTHON)
 	blender_include_dirs(../blender/python)
 	add_definitions(-DWITH_PYTHON)
+
+	if(WITH_PYTHON_SECURITY)
+		add_definitions(-DWITH_PYTHON_SECURITY)
+	endif()
+endif()
+
+if(WITH_HEADLESS)
+	add_definitions(-DWITH_HEADLESS)
 endif()
 
 if(WITH_GAMEENGINE)
-	blender_include_dirs(
-		../kernel/gen_messaging
-		../kernel/gen_system
-	)
+	blender_include_dirs(../gameengine/BlenderRoutines)
 
 	add_definitions(-DWITH_GAMEENGINE)
 endif()
@@ -92,7 +97,7 @@ endif()
 
 if(WITH_BINRELOC)
 	add_definitions(-DWITH_BINRELOC)
-	blender_include_dirs(${BINRELOC_INC})
+	blender_include_dirs(${BINRELOC_INCLUDE_DIRS})
 endif()
 
 # Setup the exe sources and buildinfo
@@ -100,7 +105,31 @@ set(SRC
 	creator.c
 )
 
+# MSVC 2010 gives linking errors with the manifest
 if(WIN32 AND NOT UNIX)
+	string(SUBSTRING ${BLENDER_VERSION} 0 1 bver1)
+	string(SUBSTRING ${BLENDER_VERSION} 2 1 bver2)
+	string(SUBSTRING ${BLENDER_VERSION} 3 1 bver3)
+	if(MINGW)
+		add_definitions(
+			-DWINDRES
+			-DBLEN_VER_RC_STR_M=${BLENDER_VERSION}
+			-DBLEN_VER_RC_1=${bver1}
+			-DBLEN_VER_RC_2=${bver2}
+			-DBLEN_VER_RC_3=${bver3}
+			-DBLEN_VER_RC_4=0
+		)
+	else()
+		add_definitions(
+			-DBLEN_VER_RC_STR=${BLENDER_VERSION}
+			-DBLEN_VER_RC_1=${bver1}
+			-DBLEN_VER_RC_2=${bver2}
+			-DBLEN_VER_RC_3=${bver3}
+			-DBLEN_VER_RC_4=0
+		)
+	endif()
+	
+
 	list(APPEND SRC
 		../icons/winblender.rc
 	)
@@ -166,10 +195,21 @@ if(WITH_PYTHON_MODULE)
 	set_target_properties(
 		blender
 		PROPERTIES
-			 PREFIX ""
-			 OUTPUT_NAME bpy
-			 LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/
+			PREFIX ""
+			OUTPUT_NAME bpy
+			LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+			RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin  # only needed on windows
 	)
+	
+	if(WIN32)
+		# python modules use this
+		set_target_properties(
+			blender
+			PROPERTIES
+			SUFFIX ".pyd"
+		)	
+	endif()
+	
 else()
 	add_executable(blender ${EXETYPE} ${SRC})
 endif()
@@ -182,404 +222,493 @@ endif()
 # Post build steps for bundling/packaging.
 
 
-if(MSVC)
+if(MSVC_IDE)
 	# ${CMAKE_CFG_INTDIR} should replace \${BUILD_TYPE} when using add_command
 	set(TARGETDIR ${EXECUTABLE_OUTPUT_PATH}/\${BUILD_TYPE})
 elseif(APPLE)
-	set(TARGETDIR ${EXECUTABLE_OUTPUT_PATH}/${CMAKE_CFG_INTDIR})
+	set(TARGETDIR ${EXECUTABLE_OUTPUT_PATH}/\${BUILD_TYPE})
 else()
 	set(TARGETDIR ${EXECUTABLE_OUTPUT_PATH})
 endif()
 
-if(WITH_INSTALL)
 
-	if(UNIX AND NOT APPLE)
+# -----------------------------------------------------------------------------
+# Install Targets
 
-		if(WITH_INSTALL_PORTABLE)
-			set(TARGETDIR_VER ${EXECUTABLE_OUTPUT_PATH}/${CMAKE_CFG_INTDIR}/${BLENDER_VERSION})
+set(BLENDER_TEXT_FILES
+	${CMAKE_SOURCE_DIR}/release/text/GPL-license.txt
+	${CMAKE_SOURCE_DIR}/release/text/Python-license.txt
+	${CMAKE_SOURCE_DIR}/release/text/copyright.txt
+	${CMAKE_SOURCE_DIR}/release/text/readme.html
+)
+
+if(UNIX AND NOT APPLE)
+
+	if(WITH_INSTALL_PORTABLE)
+		set(TARGETDIR_VER ${TARGETDIR}/${BLENDER_VERSION})
+	else()
+		if(WITH_PYTHON_MODULE)
+			set(TARGETDIR_VER ${PYTHON_LIBPATH}/python${PYTHON_VERSION}/site-packages/${BLENDER_VERSION})
 		else()
 			set(TARGETDIR_VER ${CMAKE_INSTALL_PREFIX}/share/blender/${BLENDER_VERSION})
 		endif()
+	endif()
 
-		# important to make a clean  install each time
-		# else old scripts get loaded.
+	# important to make a clean  install each time
+	# else old scripts get loaded.
+	install(
+		CODE
+		"file(REMOVE_RECURSE ${TARGETDIR_VER})"
+	)
+
+	# message after building.
+	add_custom_command(
+		TARGET blender POST_BUILD MAIN_DEPENDENCY blender
+		COMMAND ${CMAKE_COMMAND} -E echo 'now run: \"make install\" to copy runtime files & scripts to ${TARGETDIR_VER}'
+	)
+
+	# there are a few differences between portable and system install
+	if(WITH_INSTALL_PORTABLE)
 		install(
-			CODE
-			"file(REMOVE_RECURSE ${TARGETDIR_VER})"
-		)
-
-		# message after building.
-		add_custom_command(
-			TARGET blender POST_BUILD MAIN_DEPENDENCY blender
-			COMMAND ${CMAKE_COMMAND} -E echo 'now run: \"make install\" to copy runtime files & scripts to ${TARGETDIR_VER}'
-		)
-
-		# there are a few differences between portable and system install
-		if(WITH_INSTALL_PORTABLE)
-			install(
-				FILES
+			FILES
 				${CMAKE_SOURCE_DIR}/release/freedesktop/blender.desktop
-				${CMAKE_SOURCE_DIR}/release/freedesktop/icons/scalable/blender.svg
+				${CMAKE_SOURCE_DIR}/release/freedesktop/icons/scalable/apps/blender.svg
 				${CMAKE_SOURCE_DIR}/doc/manpage/blender.1
-				DESTINATION ${TARGETDIR}
-			)
+			DESTINATION ${TARGETDIR}
+		)
 
+		install(
+			PROGRAMS
+			${CMAKE_SOURCE_DIR}/release/bin/blender-thumbnailer.py
+			DESTINATION ${TARGETDIR}
+		)
+
+		install(
+			FILES ${BLENDER_TEXT_FILES}
+			DESTINATION ${TARGETDIR}
+		)
+
+	else()
+		# main blender binary
+		if(WITH_PYTHON_MODULE)
 			install(
-				PROGRAMS
-				${CMAKE_SOURCE_DIR}/release/bin/blender-thumbnailer.py
-				DESTINATION ${TARGETDIR}
+				TARGETS blender
+				LIBRARY
+				DESTINATION ${PYTHON_LIBPATH}/python${PYTHON_VERSION}/site-packages
 			)
-
-			install(
-				DIRECTORY ${CMAKE_SOURCE_DIR}/release/text/
-				DESTINATION ${TARGETDIR}
-				PATTERN ".svn" EXCLUDE
-			)
-
 		else()
-			# main blender binary
 			install(
 				PROGRAMS ${TARGETDIR}/blender
 				DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
 			)
+		endif()
 
-			if(WITH_GAMEENGINE AND WITH_PLAYER)
-				install(
-					PROGRAMS ${TARGETDIR}/blenderplayer
-					DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
-				)
-			endif()
 
-			# misc files
+		if(WITH_GAMEENGINE AND WITH_PLAYER)
 			install(
-				FILES ${CMAKE_SOURCE_DIR}/release/freedesktop/blender.desktop
-				DESTINATION ${CMAKE_INSTALL_PREFIX}/share/applications
-			)
-			install(
-				FILES ${CMAKE_SOURCE_DIR}/release/freedesktop/icons/scalable/blender.svg
-				DESTINATION ${CMAKE_INSTALL_PREFIX}/share/pixmaps
-			)
-			install(
-				PROGRAMS ${CMAKE_SOURCE_DIR}/release/bin/blender-thumbnailer.py
+				PROGRAMS ${TARGETDIR}/blenderplayer
 				DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
 			)
-			install(
-				FILES ${CMAKE_SOURCE_DIR}/doc/manpage/blender.1
-				DESTINATION ${CMAKE_INSTALL_PREFIX}/share/man/man1
-			)
-			install(
-				DIRECTORY ${CMAKE_SOURCE_DIR}/release/text/
-				DESTINATION ${CMAKE_INSTALL_PREFIX}/share/doc/blender
-				PATTERN ".svn" EXCLUDE
-			)
 		endif()
+
+		# misc files
+		install(
+			FILES ${CMAKE_SOURCE_DIR}/release/freedesktop/blender.desktop
+			DESTINATION ${CMAKE_INSTALL_PREFIX}/share/applications
+		)
+		install(
+			DIRECTORY
+				${CMAKE_SOURCE_DIR}/release/freedesktop/icons/16x16
+				${CMAKE_SOURCE_DIR}/release/freedesktop/icons/22x22
+				${CMAKE_SOURCE_DIR}/release/freedesktop/icons/24x24
+				${CMAKE_SOURCE_DIR}/release/freedesktop/icons/32x32
+				${CMAKE_SOURCE_DIR}/release/freedesktop/icons/48x48
+				${CMAKE_SOURCE_DIR}/release/freedesktop/icons/256x256
+			DESTINATION ${CMAKE_INSTALL_PREFIX}/share/icons/hicolor
+			PATTERN ".svn" EXCLUDE
+			PATTERN "*.svg" EXCLUDE
+		)
+		install(
+			FILES ${CMAKE_SOURCE_DIR}/release/freedesktop/icons/scalable/apps/blender.svg
+			DESTINATION ${CMAKE_INSTALL_PREFIX}/share/icons/hicolor/scalable/apps
+		)
+		install(
+			PROGRAMS ${CMAKE_SOURCE_DIR}/release/bin/blender-thumbnailer.py
+			DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
+		)
+		install(
+			FILES ${CMAKE_SOURCE_DIR}/doc/manpage/blender.1
+			DESTINATION ${CMAKE_INSTALL_PREFIX}/share/man/man1
+		)
+		install(
+			FILES ${BLENDER_TEXT_FILES}
+			DESTINATION ${CMAKE_INSTALL_PREFIX}/share/doc/blender
+		)
+	endif()
+
+	install(
+		FILES ${CMAKE_SOURCE_DIR}/release/bin/.blender/.bfont.ttf
+		DESTINATION ${TARGETDIR_VER}
+	)
+
+	if(WITH_INTERNATIONAL)
+		install(
+			FILES ${CMAKE_SOURCE_DIR}/release/bin/.blender/.Blanguages
+			DESTINATION ${TARGETDIR_VER}
+		)
 
 		install(
-			FILES ${CMAKE_SOURCE_DIR}/release/bin/.blender/.bfont.ttf
-			DESTINATION ${TARGETDIR_VER}/config
-		)
-
-		if(WITH_INTERNATIONAL)
-			install(
-				FILES ${CMAKE_SOURCE_DIR}/release/bin/.blender/.Blanguages
-				DESTINATION ${TARGETDIR_VER}/config
-			)
-
-			install(
-				DIRECTORY ${CMAKE_SOURCE_DIR}/release/bin/.blender/locale
-				DESTINATION ${TARGETDIR_VER}/datafiles/
-				PATTERN ".svn" EXCLUDE
-			)
-		endif()
-
-			# plugins in blender 2.5 don't work at the moment.
-			#
-			# install(
-			# 	DIRECTORY ${CMAKE_SOURCE_DIR}/release/plugins
-			# 	DESTINATION ${TARGETDIR_VER}/
-			# 	PATTERN ".svn" EXCLUDE
-			# )
-
-		if(WITH_PYTHON)
-			# install(CODE "message(\"copying blender scripts...\")")
-			install(
-				DIRECTORY ${CMAKE_SOURCE_DIR}/release/scripts
-				DESTINATION ${TARGETDIR_VER}/
-				PATTERN ".svn" EXCLUDE
-				PATTERN "__pycache__" EXCLUDE
-			)
-
-			if(WITH_PYTHON_INSTALL)
-				# Copy the systems python into the install directory
-				# Scons copy in tools/Blender.py
-				# install(CODE "message(\"copying a subset of the systems python...\")")
-				install(
-					DIRECTORY ${PYTHON_LIBPATH}/python${PYTHON_VERSION}
-					DESTINATION ${TARGETDIR_VER}/python/lib/
-					PATTERN ".svn" EXCLUDE
-					PATTERN "__pycache__" EXCLUDE               # ./distutils
-					PATTERN "distutils" EXCLUDE                 # ./distutils
-					PATTERN "lib2to3" EXCLUDE                   # ./lib2to3
-					PATTERN "config" EXCLUDE                    # ./config
-					PATTERN "config-*" EXCLUDE                  # ./config-*
-					PATTERN "site-packages/*" EXCLUDE           # ./site-packages/*
-					PATTERN "tkinter" EXCLUDE                   # ./tkinter
-					PATTERN "lib-dynload/_tkinter.*" EXCLUDE    # ./lib-dynload/_tkinter.co
-					PATTERN "test" EXCLUDE                      # ./test
-					PATTERN "turtledemo" EXCLUDE                # ./turtledemo
-				)
-
-				# # doesnt work, todo
-				# install(CODE "execute_process(COMMAND find ${TARGETDIR}/${BLENDER_VERSION}/python/lib/ -name '*.so' -exec strip -s {} '\;')")
-			endif()
-		endif()
-	elseif(WIN32)
-
-		set(TARGETDIR_VER ${TARGETDIR}/${BLENDER_VERSION})
-
-		install(  # same as linux!, deduplicate
-			CODE
-			"file(REMOVE_RECURSE ${TARGETDIR_VER})"
-		)
-
-		install(  # same as linux!, deduplicate
-			DIRECTORY ${CMAKE_SOURCE_DIR}/release/text/
-			DESTINATION ${TARGETDIR}/
+			DIRECTORY ${CMAKE_SOURCE_DIR}/release/bin/.blender/locale
+			DESTINATION ${TARGETDIR_VER}/datafiles
 			PATTERN ".svn" EXCLUDE
 		)
-
-		install(  # same as linux!, deduplicate
-			FILES ${CMAKE_SOURCE_DIR}/release/bin/.blender/.bfont.ttf
-			DESTINATION ${TARGETDIR_VER}/config
-		)
-
-		if(WITH_INTERNATIONAL) # same as linux!, deduplicate
-			install(
-				FILES ${CMAKE_SOURCE_DIR}/release/bin/.blender/.Blanguages
-				DESTINATION ${TARGETDIR_VER}/config
-			)
-			install(
-				DIRECTORY ${CMAKE_SOURCE_DIR}/release/bin/.blender/locale
-				DESTINATION ${TARGETDIR_VER}/datafiles/
-				PATTERN ".svn" EXCLUDE
-			)
-
-			if(NOT CMAKE_CL_64)
-				install(
-					FILES ${LIBDIR}/gettext/lib/gnu_gettext.dll
-					DESTINATION ${TARGETDIR}/
-				)
-
-				install(
-					FILES ${LIBDIR}/iconv/lib/iconv.dll
-					DESTINATION ${TARGETDIR}/
-				)
-			endif()
-		endif()
-
-		install( # same as linux!, deduplicate
-			DIRECTORY ${CMAKE_SOURCE_DIR}/release/bin/.blender/locale/
-			DESTINATION ${TARGETDIR_VER}/datafiles/locale
-			PATTERN ".svn" EXCLUDE
-		)
+	endif()
 
 		# plugins in blender 2.5 don't work at the moment.
 		#
 		# install(
 		# 	DIRECTORY ${CMAKE_SOURCE_DIR}/release/plugins
-		# 	DESTINATION ${TARGETDIR_VER}/
+		# 	DESTINATION ${TARGETDIR_VER}
 		# 	PATTERN ".svn" EXCLUDE
 		# )
 
-		if(WITH_PYTHON)
-			# install(CODE "message(\"copying blender scripts...\")")
-			install(  # same as linux!, deduplicate
-				DIRECTORY ${CMAKE_SOURCE_DIR}/release/scripts
-				DESTINATION ${TARGETDIR_VER}/
+	if(WITH_PYTHON)
+		# install(CODE "message(\"copying blender scripts...\")")
+		install(
+			DIRECTORY ${CMAKE_SOURCE_DIR}/release/scripts
+			DESTINATION ${TARGETDIR_VER}
+			PATTERN ".svn" EXCLUDE
+			PATTERN "__pycache__" EXCLUDE
+		)
+
+		if(WITH_PYTHON_INSTALL)
+			# Copy the systems python into the install directory
+			# Scons copy in tools/Blender.py
+			# install(CODE "message(\"copying a subset of the systems python...\")")
+			install(
+				DIRECTORY ${PYTHON_LIBPATH}/python${PYTHON_VERSION}
+				DESTINATION ${TARGETDIR_VER}/python/lib
 				PATTERN ".svn" EXCLUDE
-				PATTERN "__pycache__" EXCLUDE
+				PATTERN "__pycache__" EXCLUDE               # * any cache *
+				PATTERN "distutils" EXCLUDE                 # ./distutils
+				PATTERN "lib2to3" EXCLUDE                   # ./lib2to3
+				PATTERN "config" EXCLUDE                    # ./config
+				PATTERN "config-*" EXCLUDE                  # ./config-*
+				PATTERN "site-packages/*" EXCLUDE           # ./site-packages/*
+				PATTERN "tkinter" EXCLUDE                   # ./tkinter
+				PATTERN "lib-dynload/_tkinter.*" EXCLUDE    # ./lib-dynload/_tkinter.co
+				PATTERN "idlelib" EXCLUDE                   # ./idlelib
+				PATTERN "test" EXCLUDE                      # ./test
+				PATTERN "turtledemo" EXCLUDE                # ./turtledemo
+				PATTERN "turtle.py" EXCLUDE					# ./turtle.py
 			)
 
-			# TODO, multiple targets?
-			install(FILES ${LIBDIR}/python/lib/python32.dll DESTINATION ${TARGETDIR}/ CONFIGURATIONS Release)
-			install(FILES ${LIBDIR}/python/lib/python32.dll DESTINATION ${TARGETDIR}/ CONFIGURATIONS RelWithDebInfo)
-			install(FILES ${LIBDIR}/python/lib/python32.dll DESTINATION ${TARGETDIR}/ CONFIGURATIONS MinSizeRel)
-
-			install(
-				FILES ${LIBDIR}/python/lib/python32_d.dll
-				DESTINATION ${TARGETDIR}/
-				CONFIGURATIONS Debug
-			)
-
-			if(WITH_PYTHON_INSTALL)
-				#~ # note, as far as python is concerned 'RelWithDebInfo' is not debug since its without debug flags.
-
-				# create the directory in multiple steps, so it actually gets created when it doesn't exist yet
-				install(CODE "
-				message(\"creating ${TARGETDIR_VER}/python/lib\")
-				file(MAKE_DIRECTORY ${TARGETDIR_VER}/python/)
-				file(MAKE_DIRECTORY ${TARGETDIR_VER}/python/lib/)
-				message(\"done creating dir\")
-				")
-
-				install(
-					CODE
-					"
-					execute_process(COMMAND \"${CMAKE_COMMAND}\" -E chdir \"${TARGETDIR_VER}/python/lib/\"
-						\"${CMAKE_COMMAND}\" -E tar xzfv \"${LIBDIR}/release/python32.tar.gz\")
-					"
-					CONFIGURATIONS Release
-				)
-				install(
-					CODE
-					"
-					execute_process(COMMAND \"${CMAKE_COMMAND}\" -E chdir \"${TARGETDIR_VER}/python/lib/\"
-						\"${CMAKE_COMMAND}\" -E tar xzfv \"${LIBDIR}/release/python32.tar.gz\")
-					"
-					CONFIGURATIONS RelWithDebInfo
-				)
-				install(
-					CODE
-					"
-					execute_process(COMMAND \"${CMAKE_COMMAND}\" -E chdir \"${TARGETDIR_VER}/python/lib/\"
-						\"${CMAKE_COMMAND}\" -E tar xzfv \"${LIBDIR}/release/python32.tar.gz\")
-					"
-					CONFIGURATIONS MinSizeRel
-				)
-				install(
-					CODE
-					"
-					execute_process(COMMAND \"${CMAKE_COMMAND}\" -E chdir \"${TARGETDIR_VER}/python/lib/\"
-						\"${CMAKE_COMMAND}\" -E tar xzfv \"${LIBDIR}/release/python32_d.tar.gz\")
-					"
-					CONFIGURATIONS Debug
-				)
-
-				# doesnt work, todo
-				# install(CODE "execute_process(COMMAND find ${TARGETDIR}/${BLENDER_VERSION}/python/lib/ -name '*.so' -exec strip -s {} '\;')")
-			endif()
+			# # doesnt work, todo
+			# install(CODE "execute_process(COMMAND find ${TARGETDIR}/${BLENDER_VERSION}/python/lib/ -name '*.so' -exec strip -s {} '\;')")
 		endif()
+	endif()
+elseif(WIN32)
 
-		if(CMAKE_CL_64)
-			# gettext and png are statically linked on win64
+	set(TARGETDIR_VER ${TARGETDIR}/${BLENDER_VERSION})
+
+	install(  # same as linux!, deduplicate
+		CODE
+		"file(REMOVE_RECURSE ${TARGETDIR_VER})"
+	)
+
+	install(  # same as linux!, deduplicate
+		FILES ${BLENDER_TEXT_FILES}
+		DESTINATION ${TARGETDIR}
+	)
+
+	install(  # same as linux!, deduplicate
+		FILES ${CMAKE_SOURCE_DIR}/release/bin/.blender/.bfont.ttf
+		DESTINATION ${TARGETDIR_VER}
+	)
+
+	if(WITH_INTERNATIONAL) # same as linux!, deduplicate
+		install(
+			FILES ${CMAKE_SOURCE_DIR}/release/bin/.blender/.Blanguages
+			DESTINATION ${TARGETDIR_VER}
+		)
+		install(
+			DIRECTORY ${CMAKE_SOURCE_DIR}/release/bin/.blender/locale
+			DESTINATION ${TARGETDIR_VER}/datafiles
+			PATTERN ".svn" EXCLUDE
+		)
+
+		if(NOT CMAKE_CL_64)
 			install(
-				FILES ${LIBDIR}/zlib/lib/zlib.dll
-				DESTINATION ${TARGETDIR}/
+				FILES ${LIBDIR}/gettext/lib/gnu_gettext.dll
+				DESTINATION ${TARGETDIR}
 			)
-		else()
+
 			install(
-				FILES
+				FILES ${LIBDIR}/iconv/lib/iconv.dll
+				DESTINATION ${TARGETDIR}
+			)
+		endif()
+	endif()
+
+	install( # same as linux!, deduplicate
+		DIRECTORY ${CMAKE_SOURCE_DIR}/release/bin/.blender/locale
+		DESTINATION ${TARGETDIR_VER}/datafiles/locale
+		PATTERN ".svn" EXCLUDE
+	)
+
+	# plugins in blender 2.5 don't work at the moment.
+	#
+	# install(
+	# 	DIRECTORY ${CMAKE_SOURCE_DIR}/release/plugins
+	# 	DESTINATION ${TARGETDIR_VER}
+	# 	PATTERN ".svn" EXCLUDE
+	# )
+
+	if(WITH_PYTHON)
+		# install(CODE "message(\"copying blender scripts...\")")
+		install(  # same as linux!, deduplicate
+			DIRECTORY ${CMAKE_SOURCE_DIR}/release/scripts
+			DESTINATION ${TARGETDIR_VER}
+			PATTERN ".svn" EXCLUDE
+			PATTERN "__pycache__" EXCLUDE
+		)
+
+		install(
+			FILES ${LIBDIR}/python/lib/python32.dll
+			DESTINATION ${TARGETDIR}
+			CONFIGURATIONS Release;RelWithDebInfo;MinSizeRel
+		)
+
+		install(
+			FILES ${LIBDIR}/python/lib/python32_d.dll
+			DESTINATION ${TARGETDIR}
+			CONFIGURATIONS Debug
+		)
+
+		if(WITH_PYTHON_INSTALL)
+			# note, as far as python is concerned 'RelWithDebInfo' is not debug since its without debug flags.
+
+			# create the directory in multiple steps, so it actually gets created when it doesn't exist yet
+			install(
+				CODE
+				"
+				message(\"creating ${TARGETDIR_VER}/python/lib\")
+				file(MAKE_DIRECTORY \"${TARGETDIR_VER}/python\")
+				file(MAKE_DIRECTORY \"${TARGETDIR_VER}/python/lib\")
+				message(\"done creating dir\")
+				"
+			)
+
+			install(
+				CODE
+				"
+				if(\"\${CMAKE_INSTALL_CONFIG_NAME}\" STREQUAL \"Debug\")
+					execute_process(COMMAND \"${CMAKE_COMMAND}\" -E chdir \"${TARGETDIR_VER}/python/lib\"
+						\"${CMAKE_COMMAND}\" -E tar xzfv \"${LIBDIR}/release/python32_d.tar.gz\")
+				else()
+					execute_process(COMMAND \"${CMAKE_COMMAND}\" -E chdir \"${TARGETDIR_VER}/python/lib\"
+						\"${CMAKE_COMMAND}\" -E tar xzfv \"${LIBDIR}/release/python32.tar.gz\")
+				endif()
+				"
+			)
+
+			# doesnt work, todo
+			# install(CODE "execute_process(COMMAND find ${TARGETDIR}/${BLENDER_VERSION}/python/lib/ -name '*.so' -exec strip -s {} '\;')")
+		endif()
+	endif()
+
+	if(CMAKE_CL_64)
+		# gettext and png are statically linked on win64
+		install(
+			FILES ${LIBDIR}/zlib/lib/zlib.dll
+			DESTINATION ${TARGETDIR}
+		)
+	else()
+		install(
+			FILES
 				${LIBDIR}/png/lib/libpng.dll
 				${LIBDIR}/zlib/lib/zlib.dll
-				DESTINATION ${TARGETDIR}/
-			)
-		endif()
+			DESTINATION ${TARGETDIR}
+		)
+	endif()
 
-		if(MSVC)
-			install(
-				FILES ${LIBDIR}/pthreads/lib/pthreadVC2.dll
-				DESTINATION ${TARGETDIR}/
-			)
-		else()
-			install(
-				FILES ${LIBDIR}/pthreads/lib/pthreadGC2.dll
-				DESTINATION ${TARGETDIR}/
-			)
-		endif()
+	if(MSVC)
+		install(
+			FILES ${LIBDIR}/pthreads/lib/pthreadVC2.dll
+			DESTINATION ${TARGETDIR}
+		)
+	else()
+		install(
+			FILES ${LIBDIR}/pthreads/lib/pthreadGC2.dll
+			DESTINATION ${TARGETDIR}
+		)
+	endif()
 
-		if(WITH_CODEC_FFMPEG)
-			install(
-				FILES
+	if(WITH_CODEC_FFMPEG)
+		install(
+			FILES
 				${LIBDIR}/ffmpeg/lib/avcodec-52.dll
 				${LIBDIR}/ffmpeg/lib/avformat-52.dll
 				${LIBDIR}/ffmpeg/lib/avdevice-52.dll
 				${LIBDIR}/ffmpeg/lib/avutil-50.dll
 				${LIBDIR}/ffmpeg/lib/swscale-0.dll
-				DESTINATION ${TARGETDIR}/
-			)
-
-		endif()
-
-		if(WITH_CODEC_SNDFILE)
-			install(
-				FILES
-				${LIBDIR}/sndfile/lib/libsndfile-1.dll
-				DESTINATION ${TARGETDIR}/
-			)
-		endif()
-
-		if(WITH_OPENAL)
-			install(
-				FILES
-				${LIBDIR}/openal/lib/OpenAL32.dll
-				${LIBDIR}/openal/lib/wrap_oal.dll
-				DESTINATION ${TARGETDIR}/
-			)
-		endif()
-
-		if(WITH_SDL)
-			if(NOT CMAKE_CL_64)
-				install(
-					FILES
-					${LIBDIR}/sdl/lib/SDL.dll
-					DESTINATION ${TARGETDIR}/
-				)
-			endif()
-		endif()
-
-	elseif(APPLE)
-		# TODO, APPLE needs a 'make install' target like win32 and unix
-
-		set(SOURCEDIR ${CMAKE_SOURCE_DIR}/source/darwin/blender.app)
-		set(SOURCEINFO ${SOURCEDIR}/Contents/Info.plist)
-		set(TARGETINFO ${TARGETDIR}/blender.app/Contents/Info.plist)
-
-		add_custom_command(
-			TARGET blender POST_BUILD MAIN_DEPENDENCY blender
-			COMMAND cp -R ${CMAKE_SOURCE_DIR}/release/text/* ${TARGETDIR}/
+			DESTINATION ${TARGETDIR}
 		)
 
-		add_custom_command(
-			TARGET blender POST_BUILD MAIN_DEPENDENCY blender
-			COMMAND cp -Rf ${SOURCEINFO} ${TARGETDIR}/blender.app/Contents/
-			COMMAND cp -Rf ${SOURCEDIR}/Contents/PkgInfo ${TARGETDIR}/blender.app/Contents/
-			COMMAND cp -Rf ${SOURCEDIR}/Contents/Resources ${TARGETDIR}/blender.app/Contents/
-			COMMAND cat ${SOURCEINFO} | sed s/VERSION/${BLENDER_VERSION}${BLENDER_VERSION_CHAR}/ | sed s/DATE/`date +'%Y-%b-%d'`/ > ${TARGETINFO}
-			COMMAND rm -Rf ${TARGETDIR}/blender.app/Contents/MacOS/${BLENDER_VERSION}
-			COMMAND mkdir ${TARGETDIR}/blender.app/Contents/MacOS/${BLENDER_VERSION}
-			COMMAND mkdir ${TARGETDIR}/blender.app/Contents/MacOS/${BLENDER_VERSION}/datafiles/
-			COMMAND cp ${CMAKE_SOURCE_DIR}/release/bin/.blender/.bfont.ttf ${TARGETDIR}/blender.app/Contents/MacOS/${BLENDER_VERSION}/datafiles/
-		)
+	endif()
 
-		if(WITH_INTERNATIONAL)
-			add_custom_command(
-				TARGET blender POST_BUILD MAIN_DEPENDENCY blender
-				COMMAND cp ${CMAKE_SOURCE_DIR}/release/bin/.blender/.Blanguages ${TARGETDIR}/blender.app/Contents/MacOS/${BLENDER_VERSION}/datafiles/
-				COMMAND cp -Rf ${CMAKE_SOURCE_DIR}/release/bin/.blender/locale ${TARGETDIR}/blender.app/Contents/MacOS/${BLENDER_VERSION}/datafiles/
-			)
-		endif()
-
-		if(WITH_PYTHON)
-			set(PYTHON_ZIP "python_${CMAKE_OSX_ARCHITECTURES}.zip")
-			add_custom_command(
-				TARGET blender POST_BUILD MAIN_DEPENDENCY blender
-				COMMAND cp -Rf ${CMAKE_SOURCE_DIR}/release/scripts ${TARGETDIR}/blender.app/Contents/MacOS/${BLENDER_VERSION}/
-				COMMAND mkdir ${TARGETDIR}/blender.app/Contents/MacOS/${BLENDER_VERSION}/python/
-				COMMAND unzip -q ${LIBDIR}/release/${PYTHON_ZIP} -d ${TARGETDIR}/blender.app/Contents/MacOS/${BLENDER_VERSION}/python/
-				COMMAND find ${TARGETDIR}/blender.app -name '*.py[co]' -prune -exec rm -rf {} '\;'
-				COMMAND find ${TARGETDIR}/blender.app -name '__pycache__' -exec rmdir {} '+'
-			)
-		endif()
-
-		add_custom_command(
-			TARGET blender POST_BUILD MAIN_DEPENDENCY blender
-			COMMAND find ${TARGETDIR}/blender.app -name .DS_Store -prune -exec rm -rf {} "\;"
-			COMMAND find ${TARGETDIR}/blender.app -name .svn -prune -exec rm -rf {} "\;"
-			COMMAND find ${TARGETDIR}/blender.app -name __MACOSX -prune -exec rm -rf {} "\;"
+	if(WITH_CODEC_SNDFILE)
+		install(
+			FILES ${LIBDIR}/sndfile/lib/libsndfile-1.dll
+			DESTINATION ${TARGETDIR}
 		)
 	endif()
 
+	if(WITH_OPENAL)
+		install(
+			FILES
+				${LIBDIR}/openal/lib/OpenAL32.dll
+				${LIBDIR}/openal/lib/wrap_oal.dll
+			DESTINATION ${TARGETDIR}
+		)
+	endif()
+
+	if(WITH_SDL)
+		if(NOT CMAKE_CL_64)
+			install(
+				FILES ${LIBDIR}/sdl/lib/SDL.dll
+				DESTINATION ${TARGETDIR}
+			)
+		endif()
+	endif()
+
+	if(NOT CMAKE_CL_64)
+		install(
+			FILES ${LIBDIR}/thumbhandler/lib/BlendThumb.dll
+			DESTINATION ${TARGETDIR}
+		)
+	else()
+		install(
+			FILES ${LIBDIR}/thumbhandler/lib/BlendThumb64.dll
+			DESTINATION ${TARGETDIR}
+		)
+	endif()
+
+elseif(APPLE)
+	set(SOURCEDIR ${CMAKE_SOURCE_DIR}/source/darwin/blender.app)
+	set(SOURCEINFO ${SOURCEDIR}/Contents/Info.plist)
+	set(TARGETDIR_VER ${TARGETDIR}/blender.app/Contents/MacOS/${BLENDER_VERSION})
+
+	# setup Info.plist
+	execute_process(COMMAND date "+%Y-%m-%d" OUTPUT_VARIABLE BLENDER_DATE OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+	set_target_properties(blender PROPERTIES
+		MACOSX_BUNDLE_INFO_PLIST ${SOURCEINFO}
+		MACOSX_BUNDLE_SHORT_VERSION_STRING ${BLENDER_VERSION}
+		MACOSX_BUNDLE_LONG_VERSION_STRING "${BLENDER_VERSION} ${BLENDER_DATE}")
+
+	# important to make a clean  install each time else old scripts get loaded.
+	install(
+		CODE
+		"file(REMOVE_RECURSE ${TARGETDIR_VER})"
+	)
+
+	# message after building.
+	add_custom_command(
+		TARGET blender POST_BUILD MAIN_DEPENDENCY blender
+		COMMAND ${CMAKE_COMMAND} -E echo 'now run: \"make install\" to copy runtime files & scripts to ${TARGETDIR_VER}'
+	)
+
+	# handy install macro to exclude files, we use \$ escape for the "to"
+	# argument when calling so ${BUILD_TYPE} does not get expanded
+	macro(install_dir from to)
+		install(
+			DIRECTORY ${from}
+			DESTINATION ${to}
+			PATTERN ".svn" EXCLUDE
+			PATTERN "*.pyc" EXCLUDE
+			PATTERN "*.pyo" EXCLUDE
+			PATTERN "*.orig" EXCLUDE
+			PATTERN "*.rej" EXCLUDE
+			PATTERN "__pycache__" EXCLUDE
+			PATTERN "__MACOSX" EXCLUDE
+			PATTERN ".DS_Store" EXCLUDE
+		)
+	endmacro()
+
+	# install release and app files
+	install(
+		FILES ${BLENDER_TEXT_FILES}
+		DESTINATION ${TARGETDIR}
+	)
+
+	install(
+		FILES ${SOURCEDIR}/Contents/PkgInfo
+		DESTINATION ${TARGETDIR}/blender.app/Contents
+	)
+
+	install_dir(
+		${SOURCEDIR}/Contents/Resources
+		\${TARGETDIR}/blender.app/Contents/
+	)
+
+	install(
+		FILES ${CMAKE_SOURCE_DIR}/release/bin/.blender/.bfont.ttf
+		DESTINATION ${TARGETDIR_VER}
+	)
+
+	# localization
+	if(WITH_INTERNATIONAL)
+		install(
+			FILES ${CMAKE_SOURCE_DIR}/release/bin/.blender/.Blanguages
+			DESTINATION ${TARGETDIR_VER}/datafiles
+		)
+
+		install_dir(
+			${CMAKE_SOURCE_DIR}/release/bin/.blender/locale/
+			\${TARGETDIR_VER}/datafiles/locale
+		)
+	endif()
+
+	# python
+	if(WITH_PYTHON)
+		# the python zip is first extract as part of the build process,
+		# and then later installed as part of make install. this is much
+		# quicker, and means we can easily exclude files on copy
+		add_custom_target(
+			extractpyzip
+			DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/python)
+
+		set(PYTHON_ZIP "python_${CMAKE_OSX_ARCHITECTURES}.zip")
+			
+		add_custom_command(
+			OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/python
+			COMMAND rm -rf ${CMAKE_CURRENT_BINARY_DIR}/python/
+			COMMAND mkdir ${CMAKE_CURRENT_BINARY_DIR}/python/
+			COMMAND unzip -q ${LIBDIR}/release/${PYTHON_ZIP} -d ${CMAKE_CURRENT_BINARY_DIR}/python/
+			DEPENDS ${LIBDIR}/release/${PYTHON_ZIP})
+		
+		add_dependencies(blender extractpyzip)
+
+		# copy extracted python files
+		install_dir(
+			${CMAKE_CURRENT_BINARY_DIR}/python
+			\${TARGETDIR_VER}
+		)
+
+		# copy scripts
+		install_dir(
+			${CMAKE_SOURCE_DIR}/release/scripts
+			\${TARGETDIR_VER}
+		)
+	endif()
 endif()
+
+unset(BLENDER_TEXT_FILES)
+
+
+# -----------------------------------------------------------------------------
+# Setup link libs
 
 add_dependencies(blender makesdna)
 
@@ -639,6 +768,7 @@ endif()
 		bf_intern_opennl
 		bf_python
 		bf_python_ext
+		bf_python_mathutils
 		bf_ikplugin
 		bf_modifiers
 		bf_blenkernel
@@ -654,11 +784,9 @@ endif()
 		bf_imbuf_cineon
 		bf_imbuf_openexr
 		bf_imbuf_dds
-		bf_readblenfile
 		bf_collada
 		bf_intern_bsp
 		bf_intern_bop
-		bf_gen_system
 		bf_intern_decimate
 		bf_intern_elbeem
 		bf_intern_ik
@@ -680,13 +808,11 @@ endif()
 		ge_logic_expressions
 		ge_scenegraph
 		ge_logic_network
-		bf_gen_system
 		bf_python # duplicate for BPY_driver_exec
 		ge_logic_ngnetwork
 		extern_bullet
 		ge_logic_loopbacknetwork
 		bf_intern_moto
-		extern_glew
 		extern_openjpeg
 		extern_redcode
 		ge_videotex
@@ -696,6 +822,14 @@ endif()
 		bf_intern_audaspace
 		bf_intern_mikktspace
 	)
+
+	if(WITH_MOD_CLOTH_ELTOPO)
+		list(APPEND BLENDER_SORTED_LIBS extern_eltopo)
+	endif()
+
+	if(WITH_BUILTIN_GLEW)
+		list(APPEND BLENDER_SORTED_LIBS extern_glew)
+	endif()
 
 	if(WITH_BINRELOC)
 		list(APPEND BLENDER_SORTED_LIBS extern_binreloc)
@@ -731,6 +865,12 @@ endif()
 		message(STATUS "Blender Skipping: (${REM_MSG})")
 	endif()
 	target_link_libraries(blender ${BLENDER_SORTED_LIBS})
+	
+	unset(SEARCHLIB)
+	unset(SORTLIB)
+	unset(REMLIB)
+	unset(REM_MSG)
+	
 #else()
 #	target_link_libraries(blender ${BLENDER_LINK_LIBS})
 #endif()

@@ -328,6 +328,7 @@ static int set_draw_settings_cached(int clearcache, int textured, MTFace *texfac
 
 			glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, spec);
 			glColorMaterial(GL_FRONT_AND_BACK, GL_DIFFUSE);
+			glMateriali(GL_FRONT_AND_BACK, GL_SHININESS, CLAMPIS(ma->har, 0, 128));
 			glEnable(GL_LIGHTING);
 			glEnable(GL_COLOR_MATERIAL);
 		}
@@ -365,7 +366,7 @@ static void draw_textured_begin(Scene *scene, View3D *v3d, RegionView3D *rv3d, O
 	}
 	else {
 		/* draw with lights in the scene otherwise */
-		Gtexdraw.islit= GPU_scene_object_lights(scene, ob, v3d->lay, rv3d->viewmat, get_view3d_ortho(v3d, rv3d));
+		Gtexdraw.islit= GPU_scene_object_lights(scene, ob, v3d->lay, rv3d->viewmat, !rv3d->is_persp);
 	}
 	
 	obcol[0]= CLAMPIS(ob->col[0]*255, 0, 255);

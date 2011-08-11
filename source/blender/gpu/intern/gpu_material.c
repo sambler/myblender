@@ -373,6 +373,12 @@ void gpu_material_add_node(GPUMaterial *material, GPUNode *node)
 
 /* Code generation */
 
+static int gpu_do_color_management(GPUMaterial *mat)
+{
+	return ((mat->scene->r.color_mgt_flag & R_COLOR_MANAGEMENT) &&
+	   !((mat->scene->gm.flag & GAME_GLSL_NO_COLOR_MANAGEMENT)));
+}
+
 static GPUNodeLink *lamp_get_visibility(GPUMaterial *mat, GPULamp *lamp, GPUNodeLink **lv, GPUNodeLink **dist)
 {
 	GPUNodeLink *visifac, *inpr;
@@ -551,7 +557,7 @@ static void add_to_diffuse(GPUMaterial *mat, Material *ma, GPUShadeInput *shi, G
 		addcol = shi->rgb;
 
 	/* output to */
-	GPU_link(mat, "shade_madd", *diff, rgb, addcol, diff);
+	GPU_link(mat, "shade_madd_clamped", *diff, rgb, addcol, diff);
 }
 
 static void ramp_spec_result(GPUShadeInput *shi, GPUNodeLink **spec)
@@ -665,7 +671,7 @@ static void shade_one_light(GPUShadeInput *shi, GPUShadeResult *shr, GPULamp *la
 	i = is;
 	GPU_link(mat, "shade_visifac", i, visifac, shi->refl, &i);
 
-	vn = shi->vn;
+
 	/*if(ma->mode & MA_TANGENT_VN)
 		GPU_link(mat, "shade_tangent_v_spec", GPU_attribute(CD_TANGENT, ""), &vn);*/
 
@@ -724,7 +730,7 @@ static void shade_one_light(GPUShadeInput *shi, GPUShadeResult *shr, GPULamp *la
 		if(lamp->type == LA_HEMI) {
 			GPU_link(mat, "shade_hemi_spec", vn, lv, view, GPU_uniform(&ma->spec), shi->har, visifac, &t);
 			GPU_link(mat, "shade_add_spec", t, GPU_dynamic_uniform(lamp->dyncol), shi->specrgb, &outcol);
-			GPU_link(mat, "shade_add", shr->spec, outcol, &shr->spec);
+			GPU_link(mat, "shade_add_clamped", shr->spec, outcol, &shr->spec);
 		}
 		else {
 			if(ma->spec_shader==MA_SPEC_PHONG)
@@ -747,11 +753,11 @@ static void shade_one_light(GPUShadeInput *shi, GPUShadeResult *shr, GPULamp *la
 				GPUNodeLink *spec;
 				do_specular_ramp(shi, specfac, t, &spec);
 				GPU_link(mat, "shade_add_spec", t, GPU_dynamic_uniform(lamp->dyncol), spec, &outcol);
-				GPU_link(mat, "shade_add", shr->spec, outcol, &shr->spec);
+				GPU_link(mat, "shade_add_clamped", shr->spec, outcol, &shr->spec);
 			}
 			else {
 				GPU_link(mat, "shade_add_spec", t, GPU_dynamic_uniform(lamp->dyncol), shi->specrgb, &outcol);
-				GPU_link(mat, "shade_add", shr->spec, outcol, &shr->spec);
+				GPU_link(mat, "shade_add_clamped", shr->spec, outcol, &shr->spec);
 			}
 		}
 	}
@@ -894,7 +900,7 @@ static void do_material_tex(GPUShadeInput *shi)
 	GPUNodeLink *texco_norm, *texco_orco, *texco_object;
 	GPUNodeLink *texco_global, *texco_uv = NULL;
 	GPUNodeLink *newnor, *orn;
-	char *lastuvname = NULL;
+	/*char *lastuvname = NULL;*/ /*UNUSED*/
 	float one = 1.0f, norfac, ofs[3];
 	int tex_nr, rgbnor, talpha;
 	int init_done = 0, iBumpSpacePrev;
@@ -936,12 +942,14 @@ static void do_material_tex(GPUShadeInput *shi)
 				texco= texco_object;
 			else if(mtex->texco==TEXCO_GLOB)
 				texco= texco_global;
-			else if(mtex->texco==TEXCO_REFL)
+			else if(mtex->texco==TEXCO_REFL) {
+				GPU_link(mat, "texco_refl", shi->vn, shi->view, &shi->ref);
 				texco= shi->ref;
+			}
 			else if(mtex->texco==TEXCO_UV) {
 				if(1) { //!(texco_uv && strcmp(mtex->uvname, lastuvname) == 0)) {
 					GPU_link(mat, "texco_uv", GPU_attribute(CD_MTFACE, mtex->uvname), &texco_uv);
-					lastuvname = mtex->uvname;
+					/*lastuvname = mtex->uvname;*/ /*UNUSED*/
 				}
 				texco= texco_uv;
 			}
@@ -1011,7 +1019,7 @@ static void do_material_tex(GPUShadeInput *shi)
 				}
 
 				if(tex->type==TEX_IMAGE)
-					if(mat->scene->r.color_mgt_flag & R_COLOR_MANAGEMENT)
+					if(gpu_do_color_management(mat))
 						GPU_link(mat, "srgb_to_linearrgb", tcol, &tcol);
 				
 				if(mtex->mapto & MAP_COL) {
@@ -1060,7 +1068,7 @@ static void do_material_tex(GPUShadeInput *shi)
 						else
 							newnor = tnor;
 						
-						norfac = MIN2(fabsf(mtex->norfac), 1.0);
+						norfac = MIN2(fabsf(mtex->norfac), 1.0f);
 						
 						if(norfac == 1.0f && !GPU_link_changed(stencil)) {
 							shi->vn = newnor;
@@ -1167,7 +1175,6 @@ static void do_material_tex(GPUShadeInput *shi)
 				}
 				
 				GPU_link(mat, "vec_math_negate", shi->vn, &orn);
-				GPU_link(mat, "texco_refl", shi->vn, shi->view, &shi->ref);
 			}
 
 			if((mtex->mapto & MAP_VARS)) {
@@ -1258,6 +1265,8 @@ void GPU_shadeinput_set(GPUMaterial *mat, Material *ma, GPUShadeInput *shi)
 	GPU_link(mat, "set_value", GPU_uniform(&ma->amb), &shi->amb);
 	GPU_link(mat, "shade_view", GPU_builtin(GPU_VIEW_POSITION), &shi->view);
 	GPU_link(mat, "vcol_attribute", GPU_attribute(CD_MCOL, ""), &shi->vcol);
+	if(gpu_do_color_management(mat))
+		GPU_link(mat, "srgb_to_linearrgb", shi->vcol, &shi->vcol);
 	GPU_link(mat, "texco_refl", shi->vn, shi->view, &shi->ref);
 }
 
@@ -1308,7 +1317,7 @@ void GPU_shaderesult_set(GPUShadeInput *shi, GPUShadeResult *shr)
 			/* exposure correction */
 			if(world->exp!=0.0f || world->range!=1.0f) {
 				linfac= 1.0 + pow((2.0*world->exp + 0.5), -10);
-				logfac= log((linfac-1.0)/linfac)/world->range;
+				logfac= log((linfac-1.0f)/linfac)/world->range;
 
 				GPU_link(mat, "set_value", GPU_uniform(&linfac), &ulinfac);
 				GPU_link(mat, "set_value", GPU_uniform(&logfac), &ulogfac);
@@ -1362,9 +1371,6 @@ void GPU_shaderesult_set(GPUShadeInput *shi, GPUShadeResult *shr)
 		mat->obcolalpha = 1;
 		GPU_link(mat, "shade_alpha_obcolor", shr->combined, GPU_builtin(GPU_OBCOLOR), &shr->combined);
 	}
-
-	if(mat->scene->r.color_mgt_flag & R_COLOR_MANAGEMENT)
-		GPU_link(mat, "linearrgb_to_srgb", shr->combined, &shr->combined);
 }
 
 static GPUNodeLink *GPU_blender_material(GPUMaterial *mat, Material *ma)
@@ -1398,6 +1404,10 @@ GPUMaterial *GPU_material_from_blender(Scene *scene, Material *ma)
 		outlink = GPU_blender_material(mat, ma);
 		GPU_material_output_link(mat, outlink);
 	}
+
+	if(gpu_do_color_management(mat))
+		if(mat->outlink)
+			GPU_link(mat, "linearrgb_to_srgb", mat->outlink, &mat->outlink);
 
 	/*if(!GPU_material_construct_end(mat)) {
 		GPU_material_free(mat);
@@ -1481,10 +1491,10 @@ static void gpu_lamp_from_blender(Scene *scene, Object *ob, Object *par, Lamp *l
 
 	lamp->spotsi= la->spotsize;
 	if(lamp->mode & LA_HALO)
-		if(lamp->spotsi > 170.0)
-			lamp->spotsi = 170.0;
+		if(lamp->spotsi > 170.0f)
+			lamp->spotsi = 170.0f;
 	lamp->spotsi= cos(M_PI*lamp->spotsi/360.0);
-	lamp->spotbl= (1.0 - lamp->spotsi)*la->spotblend;
+	lamp->spotbl= (1.0f - lamp->spotsi)*la->spotblend;
 	lamp->k= la->k;
 
 	lamp->dist= la->dist;

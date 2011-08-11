@@ -12,12 +12,12 @@ def write_some_data(context, filepath, use_some_setting):
 
 # ExportHelper is a helper class, defines filename and
 # invoke() function which calls the file selector.
-from io_utils import ExportHelper
+from bpy_extras.io_utils import ExportHelper
 from bpy.props import StringProperty, BoolProperty, EnumProperty
 
 
 class ExportSomeData(bpy.types.Operator, ExportHelper):
-    '''This appiers in the tooltip of the operator and in the generated docs.'''
+    '''This appears in the tooltip of the operator and in the generated docs.'''
     bl_idname = "export.some_data"  # this is important since its how bpy.ops.export.some_data is constructed
     bl_label = "Export Some Data"
 

@@ -66,7 +66,6 @@ void free_mesh(struct Mesh *me);
 struct Mesh *add_mesh(const char *name);
 struct Mesh *copy_mesh(struct Mesh *me);
 void mesh_update_customdata_pointers(struct Mesh *me);
-void make_local_tface(struct Mesh *me);
 void make_local_mesh(struct Mesh *me);
 void boundbox_mesh(struct Mesh *me, float *loc, float *size);
 void tex_space_mesh(struct Mesh *me);
@@ -100,7 +99,7 @@ void mesh_strip_loose_edges(struct Mesh *me);
 	/* Calculate vertex and face normals, face normals are returned in *faceNors_r if non-NULL
 	 * and vertex normals are stored in actual mverts.
 	 */
-void mesh_calc_normals(struct MVert *mverts, int numVerts, struct MFace *mfaces, int numFaces, float **faceNors_r);
+void mesh_calc_normals(struct MVert *mverts, int numVerts, struct MFace *mfaces, int numFaces, float (*faceNors_r)[3]);
 
 	/* Return a newly MEM_malloc'd array of all the mesh vertex locations
 	 * (_numVerts_r_ may be NULL) */

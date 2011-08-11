@@ -34,7 +34,10 @@ set(INC
 	../makesrna
 	../render/extern/include
 	../../../intern/guardedalloc
-	../../../extern/glew/include
+)
+
+set(INC_SYS
+	${GLEW_INCLUDE_PATH}
 )
 
 set(SRC
@@ -149,9 +152,13 @@ set(SRC
 )
 
 if(WITH_PYTHON)
-	set(INC ${INC} ../python ${PYTHON_INCLUDE_DIRS})
+	list(APPEND INC
+		../python
+	)
+	list(APPEND INC_SYS
+		${PYTHON_INCLUDE_DIRS}
+	)
 	add_definitions(-DWITH_PYTHON)
 endif()
 
-blender_add_lib(bf_nodes "${SRC}" "${INC}")
-
+blender_add_lib(bf_nodes "${SRC}" "${INC}" "${INC_SYS}")

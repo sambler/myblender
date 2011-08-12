@@ -128,6 +128,30 @@ typedef struct TreeElement {
 #define OL_RNA_COL_SPACEX	(UI_UNIT_X*2.5)
 
 
+/* Outliner Searching --
+
+   Are we looking for something in the outliner?
+   If so finding matches in child items makes it more useful
+
+     - We want to flag parents to act as being open to filter child matches 
+     - and also flag matches so we can highlight them
+     - Flags are stored in TreeStoreElem->flag
+     - Flag options defined in DNA_outliner_types.h
+     
+     - NOT in datablocks view - searching all datablocks takes way too long 
+        to be useful
+     - not searching into RNA items helps but isn't the complete solution
+     
+     - searching variable is global to outliner files so we only set it once 
+        per tree build - set in outliner_build_tree
+        
+     - variable definition in outliner_tree.c
+    */
+extern int searching;
+
+/* is the currrent element open? if so we also show children */
+#define TSELEM_OPEN(telm)    ( (telm->flag & TSE_CLOSED)==0 || (searching && (telm->flag & TSE_CHILDSEARCH)) )
+
 /* outliner_tree.c ----------------------------------------------- */
 
 void outliner_free_tree(ListBase *lb);

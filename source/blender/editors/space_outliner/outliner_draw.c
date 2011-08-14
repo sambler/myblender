@@ -1262,8 +1262,8 @@ static void outliner_draw_tree_element(bContext *C, uiBlock *block, Scene *scene
 		    still want to highlight any filter matches. */
         if( (SEARCHING_OUTLINER || (soops->outlinevis==SO_DATABLOCKS && soops->search_string[0]!=0)) && (tselem->flag & TSE_SEARCHMATCH) ) {
             /* TODO - add search highlight colour to theme? */
-            glColor4f(0.0f, 0.8f, 0.0f, 0.3f);
-            glRecti(startx, *starty, xmax, *starty+UI_UNIT_Y);
+            glColor4f(0.0f, 0.6f, 0.0f, 0.3f);
+            glRecti(startx, *starty+1, ar->v2d.cur.xmax, *starty+UI_UNIT_Y-1);
         }
 
 		/* colors for active/selected data */

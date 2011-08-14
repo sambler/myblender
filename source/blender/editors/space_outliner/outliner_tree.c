@@ -119,10 +119,6 @@
 /* ********************************************************* */
 /* Persistant Data */
 
-/* see outliner_intern.h for more info */
-int searching=0;
-
-
 static void outliner_storage_cleanup(SpaceOops *soops)
 {
 	TreeStore *ts= soops->treestore;
@@ -840,7 +836,7 @@ static TreeElement *outliner_add_element(SpaceOops *soops, ListBase *lb, void *i
 	tselem= TREESTORE(te);	
 	
 	/* if we are searching for something expand to see child elements */
-	if(searching)
+	if(SEARCHING_OUTLINER)
         tselem->flag |= TSE_CHILDSEARCH;
     
 	te->parent= parent;
@@ -998,7 +994,7 @@ static TreeElement *outliner_add_element(SpaceOops *soops, ListBase *lb, void *i
 				te->name= (char*)RNA_struct_ui_name(ptr->type);
 
             /* If searching don't expand RNA entries */
-            if(searching && BLI_strcasecmp("RNA",te->name)==0) tselem->flag &= ~TSE_CHILDSEARCH;
+            if(SEARCHING_OUTLINER && BLI_strcasecmp("RNA",te->name)==0) tselem->flag &= ~TSE_CHILDSEARCH;
 
 			iterprop= RNA_struct_iterator_property(ptr->type);
 			tot= RNA_property_collection_length(ptr, iterprop);
@@ -1030,7 +1026,7 @@ static TreeElement *outliner_add_element(SpaceOops *soops, ListBase *lb, void *i
 			te->rnaptr= *ptr;
 
             /* If searching don't expand RNA entries */
-            if(searching && BLI_strcasecmp("RNA",te->name)==0) tselem->flag &= ~TSE_CHILDSEARCH;
+            if(SEARCHING_OUTLINER && BLI_strcasecmp("RNA",te->name)==0) tselem->flag &= ~TSE_CHILDSEARCH;
 
 			if(proptype == PROP_POINTER) {
 				pptr= RNA_property_pointer_get(ptr, prop);
@@ -1429,9 +1425,6 @@ void outliner_build_tree(Main *mainvar, Scene *scene, SpaceOops *soops)
 	TreeStoreElem *tselem;
 	int show_opened= (soops->treestore==NULL); /* on first view, we open scenes */
 
-    /* Are we searching -- see outliner_intern.h */
-    searching= (soops->search_string[0]!=0 && soops->outlinevis!=SO_DATABLOCKS);
-    
 	if(soops->tree.first && (soops->storeflag & SO_TREESTORE_REDRAW))
 		return;
 

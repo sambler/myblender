@@ -141,16 +141,12 @@ typedef struct TreeElement {
      - NOT in datablocks view - searching all datablocks takes way too long 
         to be useful
      - not searching into RNA items helps but isn't the complete solution
-     
-     - searching variable is global to outliner files so we only set it once 
-        per tree build - set in outliner_build_tree
-        
-     - variable definition in outliner_tree.c
     */
-extern int searching;
+
+#define SEARCHING_OUTLINER   (soops->search_string[0]!=0 && soops->outlinevis!=SO_DATABLOCKS)
 
 /* is the currrent element open? if so we also show children */
-#define TSELEM_OPEN(telm)    ( (telm->flag & TSE_CLOSED)==0 || (searching && (telm->flag & TSE_CHILDSEARCH)) )
+#define TSELEM_OPEN(telm)    ( (telm->flag & TSE_CLOSED)==0 || (SEARCHING_OUTLINER && (telm->flag & TSE_CHILDSEARCH)) )
 
 /* outliner_tree.c ----------------------------------------------- */
 

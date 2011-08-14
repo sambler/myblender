@@ -1260,7 +1260,7 @@ static void outliner_draw_tree_element(bContext *C, uiBlock *block, Scene *scene
         /* start by highlighting search matches */
 		/* we don't expand items when searching in the datablocks but we 
 		    still want to highlight any filter matches. */
-        if( (searching || (soops->outlinevis==SO_DATABLOCKS && soops->search_string[0]!=0)) && (tselem->flag & TSE_SEARCHMATCH) ) {
+        if( (SEARCHING_OUTLINER || (soops->outlinevis==SO_DATABLOCKS && soops->search_string[0]!=0)) && (tselem->flag & TSE_SEARCHMATCH) ) {
             /* TODO - add search highlight colour to theme? */
             glColor4f(0.0f, 0.8f, 0.0f, 0.3f);
             glRecti(startx, *starty, xmax, *starty+UI_UNIT_Y);

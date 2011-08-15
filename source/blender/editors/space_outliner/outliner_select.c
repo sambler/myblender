@@ -133,7 +133,7 @@ void outliner_select(SpaceOops *soops, ListBase *lb, int *index, short *selectin
 					tselem->flag &= ~TSE_SELECTED;
 			}
 		}
-		else if (TSELEM_OPEN(tselem)) {
+		else if (TSELEM_OPEN(tselem,soops)) {
 			/* Only try selecting sub-elements if we haven't hit the right element yet
 			 *
 			 * Hack warning:

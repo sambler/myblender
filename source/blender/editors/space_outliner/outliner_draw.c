@@ -99,7 +99,7 @@ static void outliner_height(SpaceOops *soops, ListBase *lb, int *h)
 	TreeElement *te= lb->first;
 	while(te) {
 		TreeStoreElem *tselem= TREESTORE(te);
-		if(TSELEM_OPEN(tselem))
+		if(TSELEM_OPEN(tselem,soops))
 			outliner_height(soops, &te->subtree, h);
 		(*h) += UI_UNIT_Y;
 		te= te->next;
@@ -114,7 +114,7 @@ static void outliner_width(SpaceOops *soops, ListBase *lb, int *w)
 //		TreeStoreElem *tselem= TREESTORE(te);
 		
 		// XXX fixme... te->xend is not set yet
-		if(!TSELEM_OPEN(tselem)) {
+		if(!TSELEM_OPEN(tselem,soops)) {
 			if (te->xend > *w)
 				*w = te->xend;
 		}
@@ -137,7 +137,7 @@ static void outliner_rna_width(SpaceOops *soops, ListBase *lb, int *w, int start
 		if(startx+100 > *w)
 			*w = startx+100;
 
-		if(TSELEM_OPEN(tselem))
+		if(TSELEM_OPEN(tselem,soops))
 			outliner_rna_width(soops, &te->subtree, w, startx+UI_UNIT_X);
 		te= te->next;
 	}
@@ -521,7 +521,7 @@ static void outliner_draw_restrictbuts(uiBlock *block, Scene *scene, ARegion *ar
 			}
 		}
 		
-		if(TSELEM_OPEN(tselem)) outliner_draw_restrictbuts(block, scene, ar, soops, &te->subtree);
+		if(TSELEM_OPEN(tselem,soops)) outliner_draw_restrictbuts(block, scene, ar, soops, &te->subtree);
 	}
 }
 
@@ -562,7 +562,7 @@ static void outliner_draw_rnabuts(uiBlock *block, Scene *scene, ARegion *ar, Spa
 				ptr= &te->rnaptr;
 				prop= te->directdata;
 				
-				if(!(RNA_property_type(prop) == PROP_POINTER && (TSELEM_OPEN(tselem))) )
+				if(!(RNA_property_type(prop) == PROP_POINTER && (TSELEM_OPEN(tselem,soops))) )
 					uiDefAutoButR(block, ptr, prop, -1, "", ICON_NONE, sizex, (int)te->ys, OL_RNA_COL_SIZEX, UI_UNIT_Y-1);
 			}
 			else if(tselem->type == TSE_RNA_ARRAY_ELEM) {
@@ -573,7 +573,7 @@ static void outliner_draw_rnabuts(uiBlock *block, Scene *scene, ARegion *ar, Spa
 			}
 		}
 		
-		if(TSELEM_OPEN(tselem)) outliner_draw_rnabuts(block, scene, ar, soops, sizex, &te->subtree);
+		if(TSELEM_OPEN(tselem,soops)) outliner_draw_rnabuts(block, scene, ar, soops, sizex, &te->subtree);
 	}
 }
 
@@ -830,7 +830,7 @@ static void outliner_draw_keymapbuts(uiBlock *block, ARegion *ar, SpaceOops *soo
 			}
 		}
 		
-		if(TSELEM_OPEN(tselem)) outliner_draw_keymapbuts(block, ar, soops, &te->subtree);
+		if(TSELEM_OPEN(tselem,soops)) outliner_draw_keymapbuts(block, ar, soops, &te->subtree);
 	}
 }
 
@@ -873,7 +873,7 @@ static void outliner_buttons(const bContext *C, uiBlock *block, ARegion *ar, Spa
 			}
 		}
 		
-		if(TSELEM_OPEN(tselem)) outliner_buttons(C, block, ar, soops, &te->subtree);
+		if(TSELEM_OPEN(tselem,soops)) outliner_buttons(C, block, ar, soops, &te->subtree);
 	}
 }
 
@@ -1260,7 +1260,7 @@ static void outliner_draw_tree_element(bContext *C, uiBlock *block, Scene *scene
         /* start by highlighting search matches */
 		/* we don't expand items when searching in the datablocks but we 
 		    still want to highlight any filter matches. */
-        if( (SEARCHING_OUTLINER || (soops->outlinevis==SO_DATABLOCKS && soops->search_string[0]!=0)) && (tselem->flag & TSE_SEARCHMATCH) ) {
+        if( (SEARCHING_OUTLINER(soops) || (soops->outlinevis==SO_DATABLOCKS && soops->search_string[0]!=0)) && (tselem->flag & TSE_SEARCHMATCH) ) {
             /* TODO - add search highlight colour to theme? */
             glColor4f(0.0f, 0.6f, 0.0f, 0.3f);
             glRecti(startx, *starty+1, ar->v2d.cur.xmax, *starty+UI_UNIT_Y-1);
@@ -1346,7 +1346,7 @@ static void outliner_draw_tree_element(bContext *C, uiBlock *block, Scene *scene
 				icon_x = startx+5*ufac;
 			
 				// icons a bit higher
-			if(TSELEM_OPEN(tselem)) 
+			if(TSELEM_OPEN(tselem,soops)) 
 				UI_icon_draw((float)icon_x, (float)*starty+2*ufac, ICON_DISCLOSURE_TRI_DOWN);
 			else
 				UI_icon_draw((float)icon_x, (float)*starty+2*ufac, ICON_DISCLOSURE_TRI_RIGHT);
@@ -1385,7 +1385,7 @@ static void outliner_draw_tree_element(bContext *C, uiBlock *block, Scene *scene
 		offsx+= (int)(UI_UNIT_X + UI_GetStringWidth(te->name));
 		
 		/* closed item, we draw the icons, not when it's a scene, or master-server list though */
-		if(!TSELEM_OPEN(tselem)) {
+		if(!TSELEM_OPEN(tselem,soops)) {
 			if(te->subtree.first) {
 				if(tselem->type==0 && te->idcode==ID_SCE);
 				else if(tselem->type!=TSE_R_LAYER) { /* this tree element always has same amount of branches, so dont draw */
@@ -1411,7 +1411,7 @@ static void outliner_draw_tree_element(bContext *C, uiBlock *block, Scene *scene
 	te->ys= (float)*starty;
 	te->xend= startx+offsx;
 		
-	if(TSELEM_OPEN(tselem)) {
+	if(TSELEM_OPEN(tselem,soops)) {
 		*starty-= UI_UNIT_Y;
 		
 		for(ten= te->subtree.first; ten; ten= ten->next)
@@ -1444,7 +1444,7 @@ static void outliner_draw_hierarchy(SpaceOops *soops, ListBase *lb, int startx, 
 			
 		*starty-= UI_UNIT_Y;
 		
-		if(TSELEM_OPEN(tselem))
+		if(TSELEM_OPEN(tselem,soops))
 			outliner_draw_hierarchy(soops, &te->subtree, startx+UI_UNIT_X, starty);
 	}
 	
@@ -1468,12 +1468,12 @@ static void outliner_draw_struct_marks(ARegion *ar, SpaceOops *soops, ListBase *
 		tselem= TREESTORE(te);
 		
 		/* selection status */
-		if(TSELEM_OPEN(tselem))
+		if(TSELEM_OPEN(tselem,soops))
 			if(tselem->type == TSE_RNA_STRUCT)
 				glRecti(0, *starty+1, (int)ar->v2d.cur.xmax+V2D_SCROLL_WIDTH, *starty+UI_UNIT_Y-1);
 
 		*starty-= UI_UNIT_Y;
-		if(TSELEM_OPEN(tselem)) {
+		if(TSELEM_OPEN(tselem,soops)) {
 			outliner_draw_struct_marks(ar, soops, &te->subtree, starty);
 			if(tselem->type == TSE_RNA_STRUCT)
 				fdrawline(0, (float)*starty+UI_UNIT_Y, ar->v2d.cur.xmax+V2D_SCROLL_WIDTH, (float)*starty+UI_UNIT_Y);
@@ -1494,7 +1494,7 @@ static void outliner_draw_selection(ARegion *ar, SpaceOops *soops, ListBase *lb,
 			glRecti(0, *starty+1, (int)ar->v2d.cur.xmax, *starty+UI_UNIT_Y-1);
 		}
 		*starty-= UI_UNIT_Y;
-		if(TSELEM_OPEN(tselem)) outliner_draw_selection(ar, soops, &te->subtree, starty);
+		if(TSELEM_OPEN(tselem,soops)) outliner_draw_selection(ar, soops, &te->subtree, starty);
 	}
 }
 

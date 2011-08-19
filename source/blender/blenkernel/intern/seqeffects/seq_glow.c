@@ -35,7 +35,7 @@
 
 #include "MEM_guardedalloc.h"
 
-#include "BLI_math.h" /* windows needs for M_PI */
+#include "BLI_math.h" /* for M_PI */
 #include "BLI_utildefines.h"
 
 #include "DNA_scene_types.h"

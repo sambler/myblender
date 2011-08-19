@@ -51,11 +51,6 @@
 
 #include "seq_intern.h"
 
-/* from seq_cross.c */
-extern struct ImBuf* do_cross_effect(SeqRenderData context, Sequence *UNUSED(seq),
-			float UNUSED(cfra), float facf0, float facf1, struct ImBuf *ibuf1,
-			struct ImBuf *ibuf2, struct ImBuf *ibuf3);
-
 /* **********************************************************************
    SPEED
    ********************************************************************** */

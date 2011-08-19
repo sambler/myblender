@@ -64,7 +64,7 @@ static int early_out_adjustment(struct Sequence *UNUSED(seq), float UNUSED(facf0
 }
 
 static struct ImBuf * do_adjustment_impl(SeqRenderData context, Sequence * seq,
-					 float cfra)
+					float cfra)
 {
 	Editing * ed;
 	ListBase * seqbasep;
@@ -75,13 +75,12 @@ static struct ImBuf * do_adjustment_impl(SeqRenderData context, Sequence * seq,
 	seqbasep = seq_seqbase(&ed->seqbase, seq);
 
 	if (seq->machine > 0) {
-		i = give_ibuf_seqbase(context, cfra,
-				      seq->machine - 1, seqbasep);
+		i = give_ibuf_seqbase(context, cfra, seq->machine - 1, seqbasep);
 	}
 
 	/* found nothing? so let's work the way up the metastrip stack, so
-	   that it is possible to group a bunch of adjustment strips into
-	   a metastrip and have that work on everything below the metastrip
+		that it is possible to group a bunch of adjustment strips into
+		a metastrip and have that work on everything below the metastrip
 	*/
 
 	if (!i) {

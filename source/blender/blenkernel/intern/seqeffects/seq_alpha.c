@@ -63,7 +63,7 @@ static void init_alpha_over_or_under(Sequence * seq)
 }
 
 void do_alphaover_effect_byte(float facf0, float facf1, int x, int y,
-					 char * rect1, char *rect2, char *out)
+					char * rect1, char *rect2, char *out)
 {
 	int fac2, mfac, fac, fac4;
 	int xo, tempc;
@@ -129,7 +129,7 @@ void do_alphaover_effect_byte(float facf0, float facf1, int x, int y,
 }
 
 void do_alphaover_effect_float(float facf0, float facf1, int x, int y,
-					  float * rect1, float *rect2, float *out)
+					float * rect1, float *rect2, float *out)
 {
 	float fac2, mfac, fac, fac4;
 	int xo;
@@ -218,8 +218,8 @@ static struct ImBuf * do_alphaover_effect(
    ********************************************************************** */
 
 void do_alphaunder_effect_byte(
-	float facf0, float facf1, int x, int y, char *rect1,
-	char *rect2, char *out)
+	float facf0, float facf1, int x, int y,
+	char *rect1, char *rect2, char *out)
 {
 	int fac2, mfac, fac, fac4;
 	int xo;
@@ -287,8 +287,7 @@ void do_alphaunder_effect_byte(
 
 
 void do_alphaunder_effect_float(float facf0, float facf1, int x, int y,
-					   float *rect1, float *rect2,
-					   float *out)
+					float *rect1, float *rect2, float *out)
 {
 	float fac2, mfac, fac, fac4;
 	int xo;

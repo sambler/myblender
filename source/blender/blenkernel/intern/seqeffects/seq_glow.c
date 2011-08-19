@@ -62,21 +62,20 @@ enum {
    ********************************************************************** */
 
 static void RVBlurBitmap2_byte ( unsigned char* map, int width,int height,
-				 float blur,
-				 int quality)
+				float blur, int quality)
 /*	MUUUCCH better than the previous blur. */
 /*	We do the blurring in two passes which is a whole lot faster. */
 /*	I changed the math arount to implement an actual Gaussian */
 /*	distribution. */
-/* */
+/*	*/
 /*	Watch out though, it tends to misbehaven with large blur values on */
 /*	a small bitmap.  Avoid avoid avoid. */
 /*=============================== */
 {
 	unsigned char*	temp=NULL,*swap;
 	float	*filter=NULL;
-	int	x,y,i,fx,fy;
-	int	index, ix, halfWidth;
+	int		x,y,i,fx,fy;
+	int		index, ix, halfWidth;
 	float	fval, k, curColor[3], curColor2[3], weight=0;
 
 	/*	If we're not really blurring, bail out */
@@ -225,27 +224,26 @@ static void RVBlurBitmap2_byte ( unsigned char* map, int width,int height,
 	/*	Swap buffers */
 	swap=temp;temp=map;map=swap;
 
-	/*	Tidy up	 */
+	/*	Tidy up	*/
 	MEM_freeN (filter);
 	MEM_freeN (temp);
 }
 
 static void RVBlurBitmap2_float ( float* map, int width,int height,
-				  float blur,
-				  int quality)
+				float blur, int quality)
 /*	MUUUCCH better than the previous blur. */
 /*	We do the blurring in two passes which is a whole lot faster. */
 /*	I changed the math arount to implement an actual Gaussian */
 /*	distribution. */
-/* */
+/*	*/
 /*	Watch out though, it tends to misbehaven with large blur values on */
 /*	a small bitmap.  Avoid avoid avoid. */
 /*=============================== */
 {
 	float*	temp=NULL,*swap;
 	float	*filter=NULL;
-	int	x,y,i,fx,fy;
-	int	index, ix, halfWidth;
+	int		x,y,i,fx,fy;
+	int		index, ix, halfWidth;
 	float	fval, k, curColor[3], curColor2[3], weight=0;
 
 	/*	If we're not really blurring, bail out */
@@ -395,7 +393,7 @@ static void RVBlurBitmap2_float ( float* map, int width,int height,
 	/*	Swap buffers */
 	swap=temp;temp=map;map=swap;
 
-	/*	Tidy up	 */
+	/*	Tidy up	*/
 	MEM_freeN (filter);
 	MEM_freeN (temp);
 }
@@ -405,7 +403,8 @@ static void RVBlurBitmap2_float ( float* map, int width,int height,
 /*	C must have been previously allocated but it may be A or B. */
 /*	We clamp values to 255 to prevent weirdness */
 /*=============================== */
-static void RVAddBitmaps_byte (unsigned char* a, unsigned char* b, unsigned char* c, int width, int height)
+static void RVAddBitmaps_byte (unsigned char* a, unsigned char* b,
+				unsigned char* c, int width, int height)
 {
 	int	x,y,index;
 
@@ -439,16 +438,16 @@ static void RVAddBitmaps_float (float* a, float* b, float* c,
 /*	For each pixel whose total luminance exceeds the threshold, */
 /*	Multiply it's value by BOOST and add it to the output map */
 static void RVIsolateHighlights_byte (unsigned char* in, unsigned char* out,
-					  int width, int height, int threshold,
-					  float boost, float clamp)
+					int width, int height, int threshold,
+					float boost, float clamp)
 {
-	int x,y,index;
+	int	x,y,index;
 	int	intensity;
 
 
 	for(y=0;y< height;y++) {
 		for (x=0;x< width;x++) {
-			 index= (x+y*width)*4;
+			index= (x+y*width)*4;
 
 			/*	Isolate the intensity */
 			intensity=(in[index+GlowR]+in[index+GlowG]+in[index+GlowB]-threshold);
@@ -468,16 +467,16 @@ static void RVIsolateHighlights_byte (unsigned char* in, unsigned char* out,
 }
 
 static void RVIsolateHighlights_float (float* in, float* out,
-					  int width, int height, float threshold,
-					  float boost, float clamp)
+					int width, int height, float threshold,
+					float boost, float clamp)
 {
-	int x,y,index;
+	int		x,y,index;
 	float	intensity;
 
 
 	for(y=0;y< height;y++) {
 		for (x=0;x< width;x++) {
-			 index= (x+y*width)*4;
+			index= (x+y*width)*4;
 
 			/*	Isolate the intensity */
 			intensity=(in[index+GlowR]+in[index+GlowG]+in[index+GlowB]-threshold);
@@ -528,10 +527,8 @@ static void copy_glow_effect(Sequence *dst, Sequence *src)
 	dst->effectdata = MEM_dupallocN(src->effectdata);
 }
 
-//void do_glow_effect(Cast *cast, float facf0, float facf1, int xo, int yo, ImBuf *ibuf1, ImBuf *ibuf2, ImBuf *outbuf, ImBuf *use)
 static void do_glow_effect_byte(Sequence *seq, int render_size, float facf0, float UNUSED(facf1),
-				int x, int y, char *rect1,
-				char *UNUSED(rect2), char *out)
+				int x, int y, char *rect1, char *UNUSED(rect2), char *out)
 {
 	unsigned char *outbuf=(unsigned char *)out;
 	unsigned char *inbuf=(unsigned char *)rect1;
@@ -544,8 +541,7 @@ static void do_glow_effect_byte(Sequence *seq, int render_size, float facf0, flo
 }
 
 static void do_glow_effect_float(Sequence *seq, int render_size, float facf0, float UNUSED(facf1),
-				 int x, int y,
-				 float *rect1, float *UNUSED(rect2), float *out)
+				int x, int y, float *rect1, float *UNUSED(rect2), float *out)
 {
 	float *outbuf = out;
 	float *inbuf = rect1;
@@ -569,16 +565,16 @@ static struct ImBuf * do_glow_effect(
 
 	if (out->rect_float) {
 		do_glow_effect_float(seq, render_size,
-				     facf0, facf1,
-				     context.rectx, context.recty,
-				     ibuf1->rect_float, ibuf2->rect_float,
-				     out->rect_float);
+				facf0, facf1,
+				context.rectx, context.recty,
+				ibuf1->rect_float, ibuf2->rect_float,
+				out->rect_float);
 	} else {
 		do_glow_effect_byte(seq, render_size,
-				    facf0, facf1,
-				    context.rectx, context.recty,
-				    (char*) ibuf1->rect, (char*) ibuf2->rect,
-				    (char*) out->rect);
+				facf0, facf1,
+				context.rectx, context.recty,
+				(char*) ibuf1->rect, (char*) ibuf2->rect,
+				(char*) out->rect);
 	}
 
 	return out;

@@ -57,8 +57,7 @@
 #define YOFF	8
 
 static void do_drop_effect_byte(float facf0, float facf1, int x, int y,
-				char *rect2i, char *rect1i,
-				char *outi)
+				char *rect2i, char *rect1i, char *outi)
 {
 	int height, width, temp, fac, fac1, fac2;
 	char *rt1, *rt2, *out;
@@ -97,8 +96,7 @@ static void do_drop_effect_byte(float facf0, float facf1, int x, int y,
 }
 
 static void do_drop_effect_float(float facf0, float facf1, int x, int y,
-				 float *rect2i, float *rect1i,
-				 float *outi)
+				float *rect2i, float *rect1i, float *outi)
 {
 	int height, width;
 	float temp, fac, fac1, fac2;
@@ -137,13 +135,9 @@ static void do_drop_effect_float(float facf0, float facf1, int x, int y,
 	memcpy(out, rt1, 4 * sizeof(float)*YOFF*width);
 }
 
-struct ImBuf * do_overdrop_effect(SeqRenderData context,
-					 Sequence *UNUSED(seq),
-					 float UNUSED(cfra),
-					 float facf0, float facf1,
-					 struct ImBuf * ibuf1,
-					 struct ImBuf * ibuf2,
-					 struct ImBuf * ibuf3)
+struct ImBuf * do_overdrop_effect(SeqRenderData context, Sequence *UNUSED(seq),
+				float UNUSED(cfra), float facf0, float facf1,
+				struct ImBuf * ibuf1, struct ImBuf * ibuf2, struct ImBuf * ibuf3)
 {
 	struct ImBuf * out = prepare_effect_imbufs(context,ibuf1, ibuf2, ibuf3);
 	int x = context.rectx;

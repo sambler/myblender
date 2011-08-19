@@ -102,8 +102,7 @@ static float in_band(WipeZone *wipezone,float width,float dist,float perc,int si
 	return alpha;
 }
 
-static float check_zone(WipeZone *wipezone, int x, int y,
-	Sequence *seq, float facf0)
+static float check_zone(WipeZone *wipezone, int x, int y, Sequence *seq, float facf0)
 {
 	float posx, posy,hyp,hyp2,angle,hwidth,b1,b2,b3,pointdist;
 /*some future stuff
@@ -204,19 +203,19 @@ float hyp3,hyp4,b4,b5
 				if(  hyp < hwidth && hyp2 > hwidth )
 					output = in_band(wipezone,hwidth,hyp,facf0,1,1);
 				else if( hyp > hwidth && hyp2 < hwidth )
-					  output = in_band(wipezone,hwidth,hyp2,facf0,1,1);
+					output = in_band(wipezone,hwidth,hyp2,facf0,1,1);
 				else
-					  output = in_band(wipezone,hwidth,hyp2,facf0,1,1) * in_band(wipezone,hwidth,hyp,facf0,1,1);
+					output = in_band(wipezone,hwidth,hyp2,facf0,1,1) * in_band(wipezone,hwidth,hyp,facf0,1,1);
 			}
 			if(!wipe->forward)output = 1-output;
 		break;
 		case DO_CLOCK_WIPE:
-			  /*
-				  temp1: angle of effect center in rads
-				  temp2: angle of line through (halfx,halfy) and (x,y) in rads
-				  temp3: angle of low side of blur
-				  temp4: angle of high side of blur
-			  */
+			/*
+				temp1: angle of effect center in rads
+				temp2: angle of line through (halfx,halfy) and (x,y) in rads
+				temp3: angle of low side of blur
+				temp4: angle of high side of blur
+			*/
 			output = 1.0f - facf0;
 			widthf = wipe->edgeWidth*2.0f*(float)M_PI;
 			temp1 = 2.0f * (float)M_PI * facf0;
@@ -282,9 +281,9 @@ float hyp3,hyp4,b4,b5
 				if( hyp < hwidth && hyp2 > hwidth )
 					output = in_band(wipezone,hwidth,hyp,facf0,1,1);
 				else if( hyp > hwidth && hyp2 < hwidth )
-					 output = in_band(wipezone,hwidth,hyp2,facf0,1,1);
+					output = in_band(wipezone,hwidth,hyp2,facf0,1,1);
 				else
-					 output = in_band(wipezone,hwidth,hyp2,facf0,1,1) * in_band(wipezone,hwidth,hyp,facf0,1,1);
+					output = in_band(wipezone,hwidth,hyp2,facf0,1,1) * in_band(wipezone,hwidth,hyp,facf0,1,1);
 			}
 
 			if(invert)facf0 = 1-facf0;
@@ -361,9 +360,7 @@ static void copy_wipe_effect(Sequence *dst, Sequence *src)
 }
 
 static void do_wipe_effect_byte(Sequence *seq, float facf0, float UNUSED(facf1),
-				int x, int y,
-				unsigned char *rect1,
-				unsigned char *rect2, unsigned char *out)
+				int x, int y, unsigned char *rect1, unsigned char *rect2, unsigned char *out)
 {
 	WipeZone wipezone;
 	WipeVars *wipe = (WipeVars *)seq->effectdata;
@@ -419,9 +416,7 @@ static void do_wipe_effect_byte(Sequence *seq, float facf0, float UNUSED(facf1),
 }
 
 static void do_wipe_effect_float(Sequence *seq, float facf0, float UNUSED(facf1),
-				 int x, int y,
-				 float *rect1,
-				 float *rect2, float *out)
+				int x, int y, float *rect1, float *rect2, float *out)
 {
 	WipeZone wipezone;
 	WipeVars *wipe = (WipeVars *)seq->effectdata;
@@ -486,14 +481,14 @@ static struct ImBuf * do_wipe_effect(
 
 	if (out->rect_float) {
 		do_wipe_effect_float(seq,
-				     facf0, facf1, context.rectx, context.recty,
-				     ibuf1->rect_float, ibuf2->rect_float,
-				     out->rect_float);
+				facf0, facf1, context.rectx, context.recty,
+				ibuf1->rect_float, ibuf2->rect_float,
+				out->rect_float);
 	} else {
 		do_wipe_effect_byte(seq,
-				    facf0, facf1, context.rectx, context.recty,
-				    (unsigned char*) ibuf1->rect, (unsigned char*) ibuf2->rect,
-				    (unsigned char*) out->rect);
+				facf0, facf1, context.rectx, context.recty,
+				(unsigned char*) ibuf1->rect, (unsigned char*) ibuf2->rect,
+				(unsigned char*) out->rect);
 	}
 
 	return out;

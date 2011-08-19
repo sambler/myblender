@@ -52,9 +52,8 @@
    SUB
    ********************************************************************** */
 
-static void do_sub_effect_byte(float facf0, float facf1,
-				   int x, int y,
-				   char *rect1, char *rect2, char *out)
+static void do_sub_effect_byte(float facf0, float facf1, int x, int y,
+				char *rect1, char *rect2, char *out)
 {
 	int col, xo, fac1, fac3;
 	char *rt1, *rt2, *rt;
@@ -105,8 +104,7 @@ static void do_sub_effect_byte(float facf0, float facf1,
 }
 
 static void do_sub_effect_float(float facf0, float facf1, int x, int y,
-				float *rect1, float *rect2,
-				float *out)
+				float *rect1, float *rect2, float *out)
 {
 	int xo;
 	float fac1, fac3;

@@ -53,10 +53,9 @@
    ********************************************************************** */
 
 static void do_mul_effect_byte(float facf0, float facf1, int x, int y,
-				   unsigned char *rect1, unsigned char *rect2,
-				   unsigned char *out)
+				unsigned char *rect1, unsigned char *rect2, unsigned char *out)
 {
-	int xo, fac1, fac3;
+	int  xo, fac1, fac3;
 	char *rt1, *rt2, *rt;
 
 	xo= x;
@@ -68,9 +67,9 @@ static void do_mul_effect_byte(float facf0, float facf1, int x, int y,
 	fac3= (int)(256.0f*facf1);
 
 	/* formula:
-	 *		fac*(a*b) + (1-fac)*a  => fac*a*(b-1)+axaux= c*px + py*s ;//+centx
+	*		fac*(a*b) + (1-fac)*a  => fac*a*(b-1)+axaux= c*px + py*s ;//+centx
 			yaux= -s*px + c*py;//+centy
-	 */
+	*/
 
 	while(y--) {
 
@@ -102,10 +101,9 @@ static void do_mul_effect_byte(float facf0, float facf1, int x, int y,
 }
 
 static void do_mul_effect_float(float facf0, float facf1, int x, int y,
-					float *rect1, float *rect2,
-					float *out)
+					float *rect1, float *rect2, float *out)
 {
-	int xo;
+	int   xo;
 	float fac1, fac3;
 	float *rt1, *rt2, *rt;
 
@@ -118,8 +116,8 @@ static void do_mul_effect_float(float facf0, float facf1, int x, int y,
 	fac3= facf1;
 
 	/* formula:
-	 *		fac*(a*b) + (1-fac)*a  => fac*a*(b-1)+a
-	 */
+	*		fac*(a*b) + (1-fac)*a  => fac*a*(b-1)+a
+	*/
 
 	while(y--) {
 

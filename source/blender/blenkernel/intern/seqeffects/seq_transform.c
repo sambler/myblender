@@ -96,8 +96,8 @@ static void copy_transform_effect(Sequence *dst, Sequence *src)
 }
 
 static void transform_image(int x, int y, struct ImBuf *ibuf1, struct ImBuf *out,
-			    float scale_x, float scale_y, float translate_x, float translate_y,
-			    float rotate, int interpolation)
+			float scale_x, float scale_y, float translate_x, float translate_y,
+			float rotate, int interpolation)
 {
 	int xo, yo, xi, yi;
 	float xt, yt, xr, yr;
@@ -146,7 +146,7 @@ static void transform_image(int x, int y, struct ImBuf *ibuf1, struct ImBuf *out
 }
 
 static void do_transform(Scene *scene, Sequence *seq, float UNUSED(facf0), int x, int y,
-			  struct ImBuf *ibuf1,struct ImBuf *out)
+			struct ImBuf *ibuf1,struct ImBuf *out)
 {
 	TransformVars *transform = (TransformVars *)seq->effectdata;
 	float scale_x, scale_y, translate_x, translate_y, rotate_radians;
@@ -186,7 +186,7 @@ static struct ImBuf * do_transform_effect(
 	struct ImBuf * out = prepare_effect_imbufs(context,ibuf1, ibuf2, ibuf3);
 
 	do_transform(context.scene, seq, facf0,
-		     context.rectx, context.recty, ibuf1, out);
+		context.rectx, context.recty, ibuf1, out);
 
 	return out;
 }

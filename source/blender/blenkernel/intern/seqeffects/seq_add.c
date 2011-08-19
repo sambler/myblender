@@ -53,8 +53,8 @@
    ********************************************************************** */
 
 static void do_add_effect_byte(float facf0, float facf1, int x, int y,
-				   unsigned char *rect1, unsigned char *rect2,
-				   unsigned char *out)
+				unsigned char *rect1, unsigned char *rect2,
+				unsigned char *out)
 {
 	int col, xo, fac1, fac3;
 	char *rt1, *rt2, *rt;
@@ -142,10 +142,10 @@ static void do_add_effect_float(float facf0, float facf1, int x, int y,
 }
 
 static struct ImBuf * do_add_effect(SeqRenderData context,
-				    Sequence *UNUSED(seq), float UNUSED(cfra),
-				    float facf0, float facf1,
-				    struct ImBuf *ibuf1, struct ImBuf *ibuf2,
-				    struct ImBuf *ibuf3)
+				Sequence *UNUSED(seq), float UNUSED(cfra),
+				float facf0, float facf1,
+				struct ImBuf *ibuf1, struct ImBuf *ibuf2,
+				struct ImBuf *ibuf3)
 {
 	struct ImBuf * out = prepare_effect_imbufs(context,ibuf1, ibuf2, ibuf3);
 

@@ -79,8 +79,7 @@ static void copy_solid_color(Sequence *dst, Sequence *src)
 	dst->effectdata = MEM_dupallocN(src->effectdata);
 }
 
-static int early_out_color(struct Sequence *UNUSED(seq),
-			   float UNUSED(facf0), float UNUSED(facf1))
+static int early_out_color(struct Sequence *UNUSED(seq), float UNUSED(facf0), float UNUSED(facf1))
 {
 	return -1;
 }

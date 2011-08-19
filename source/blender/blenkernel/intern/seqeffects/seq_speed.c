@@ -59,8 +59,7 @@ static void init_speed_effect(Sequence *seq)
 	SpeedControlVars * v;
 
 	if(seq->effectdata) MEM_freeN(seq->effectdata);
-	seq->effectdata = MEM_callocN(sizeof(struct SpeedControlVars),
-					  "speedcontrolvars");
+	seq->effectdata = MEM_callocN(sizeof(struct SpeedControlVars), "speedcontrolvars");
 
 	v = (SpeedControlVars *)seq->effectdata;
 	v->globalSpeed = 1.0;
@@ -99,14 +98,13 @@ static void copy_speed_effect(Sequence *dst, Sequence *src)
 	v->length = 0;
 }
 
-static int early_out_speed(struct Sequence *UNUSED(seq),
-			  float UNUSED(facf0), float UNUSED(facf1))
+static int early_out_speed(struct Sequence *UNUSED(seq), float UNUSED(facf0), float UNUSED(facf1))
 {
 	return 1;
 }
 
 static void store_icu_yrange_speed(struct Sequence * seq,
-				   short UNUSED(adrcode), float * ymin, float * ymax)
+				short UNUSED(adrcode), float * ymin, float * ymax)
 {
 	SpeedControlVars * v = (SpeedControlVars *)seq->effectdata;
 
@@ -137,21 +135,16 @@ void sequence_effect_speed_rebuild_map(Scene *scene, Sequence * seq, int force)
 	/* if not already done, load / initialize data */
 	get_sequence_effect(seq);
 
-	if (	(force == FALSE) &&
-			(seq->len == v->length) &&
-			(v->frameMap != NULL)
-	) {
+	if ( (force == FALSE) && (seq->len == v->length) && (v->frameMap != NULL) ) {
 		return;
 	}
-	if (	(seq->seq1 == NULL) ||
-	        (seq->len < 1)
-	) { /* make coverity happy and check for (CID 598)
-						 input strip ... */
+	if ( (seq->seq1 == NULL) || (seq->len < 1) ) {
+		/* make coverity happy and check for (CID 598) input strip ... */
 		return;
 	}
 
 	/* XXX - new in 2.5x. should we use the animation system this way?
-	 * The fcurve is needed because many frames need evaluating at once - campbell */
+	* The fcurve is needed because many frames need evaluating at once - campbell */
 	fcu= id_data_find_fcurve(&scene->id, seq, &RNA_Sequence, "speed_factor", 0);
 
 
@@ -161,14 +154,14 @@ void sequence_effect_speed_rebuild_map(Scene *scene, Sequence * seq, int force)
 		v->length = seq->len;
 
 		v->frameMap = MEM_callocN(sizeof(float) * v->length,
-					  "speedcontrol frameMap");
+					"speedcontrol frameMap");
 	}
 
 	fallback_fac = 1.0;
 
 	if (seq->flag & SEQ_USE_EFFECT_DEFAULT_FADE) {
 		if (seq->seq1->enddisp != seq->seq1->start
-		    && seq->seq1->len != 0) {
+		&& seq->seq1->len != 0) {
 			fallback_fac = (float) seq->seq1->len /
 				(float) (seq->seq1->enddisp - seq->seq1->start);
 			flags = SEQ_SPEED_INTEGRATE;

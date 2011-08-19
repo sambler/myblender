@@ -225,8 +225,8 @@ static struct ImBuf * do_plugin_effect(
 	char *cp;
 	int float_rendering;
 	int use_temp_bufs = 0; /* Are needed since blur.c (and maybe some other
-				  old plugins) do very bad stuff
-				  with imbuf-internals */
+				old plugins) do very bad stuff
+				with imbuf-internals */
 
 	struct ImBuf * out = prepare_effect_imbufs(context,ibuf1, ibuf2, ibuf3);
 	int x = context.rectx;
@@ -316,7 +316,7 @@ static struct ImBuf * do_plugin_effect(
 }
 
 static int do_plugin_early_out(struct Sequence *UNUSED(seq),
-				   float UNUSED(facf0), float UNUSED(facf1))
+				float UNUSED(facf0), float UNUSED(facf1))
 {
 	return 0;
 }

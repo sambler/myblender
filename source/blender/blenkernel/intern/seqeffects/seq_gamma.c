@@ -74,27 +74,27 @@ static void makeGammaTables(float gamma)
 	/* we need two tables: one forward, one backward */
 	int i;
 
-	valid_gamma        = gamma;
-	valid_inv_gamma    = 1.0f / gamma;
-	color_step        = 1.0f / RE_GAMMA_TABLE_SIZE;
-	inv_color_step    = (float) RE_GAMMA_TABLE_SIZE;
+	valid_gamma		= gamma;
+	valid_inv_gamma	= 1.0f / gamma;
+	color_step		= 1.0f / RE_GAMMA_TABLE_SIZE;
+	inv_color_step	= (float) RE_GAMMA_TABLE_SIZE;
 
 	/* We could squeeze out the two range tables to gain some memory.        */
 	for (i = 0; i < RE_GAMMA_TABLE_SIZE; i++) {
-		color_domain_table[i]   = i * color_step;
-		gamma_range_table[i]     = pow(color_domain_table[i],
+		color_domain_table[i]	= i * color_step;
+		gamma_range_table[i]	= pow(color_domain_table[i],
 										valid_gamma);
-		inv_gamma_range_table[i] = pow(color_domain_table[i],
-										valid_inv_gamma);
+		inv_gamma_range_table[i]	= pow(color_domain_table[i],
+											valid_inv_gamma);
 	}
 
 	/* The end of the table should match 1.0 carefully. In order to avoid    */
 	/* rounding errors, we just set this explicitly. The last segment may    */
 	/* have a different length than the other segments, but our              */
 	/* interpolation is insensitive to that.                                 */
-	color_domain_table[RE_GAMMA_TABLE_SIZE]   = 1.0;
-	gamma_range_table[RE_GAMMA_TABLE_SIZE]     = 1.0;
-	inv_gamma_range_table[RE_GAMMA_TABLE_SIZE] = 1.0;
+	color_domain_table[RE_GAMMA_TABLE_SIZE]		= 1.0;
+	gamma_range_table[RE_GAMMA_TABLE_SIZE]		= 1.0;
+	inv_gamma_range_table[RE_GAMMA_TABLE_SIZE]	= 1.0;
 
 	/* To speed up calculations, we make these calc factor tables. They are  */
 	/* multiplication factors used in scaling the interpolation.             */
@@ -121,7 +121,7 @@ static float gammaCorrect(float c)
 	if (i < 0) res = -pow(abs(c), valid_gamma);
 	else if (i >= RE_GAMMA_TABLE_SIZE ) res = pow(c, valid_gamma);
 	else res = gamma_range_table[i] +
-			   ( (c - color_domain_table[i]) * gamfactor_table[i]);
+			( (c - color_domain_table[i]) * gamfactor_table[i]);
 
 	return res;
 } /* end of float gammaCorrect(float col) */
@@ -138,7 +138,7 @@ static float invGammaCorrect(float col)
 	if (i < 0) res = -pow(abs(col), valid_inv_gamma);
 	else if (i >= RE_GAMMA_TABLE_SIZE) res = pow(col, valid_inv_gamma);
 	else res = inv_gamma_range_table[i] +
-			   ( (col - color_domain_table[i]) * inv_gamfactor_table[i]);
+			( (col - color_domain_table[i]) * inv_gamfactor_table[i]);
 
 	return res;
 } /* end of float invGammaCorrect(float col) */
@@ -193,10 +193,8 @@ static void free_gammacross(Sequence * UNUSED(seq))
 }
 
 static void do_gammacross_effect_byte(float facf0, float UNUSED(facf1),
-					  int x, int y,
-					  unsigned char *rect1,
-					  unsigned char *rect2,
-					  unsigned char *out)
+				int x, int y,
+				unsigned char *rect1, unsigned char *rect2, unsigned char *out)
 {
 	int fac1, fac2, col;
 	int xo;
@@ -249,9 +247,8 @@ static void do_gammacross_effect_byte(float facf0, float UNUSED(facf1),
 }
 
 static void do_gammacross_effect_float(float facf0, float UNUSED(facf1),
-					   int x, int y,
-					   float *rect1, float *rect2,
-					   float *out)
+					int x, int y,
+					float *rect1, float *rect2, float *out)
 {
 	float fac1, fac2;
 	int xo;
@@ -270,9 +267,8 @@ static void do_gammacross_effect_float(float facf0, float UNUSED(facf1),
 		x= xo * 4;
 		while(x--) {
 
-			*rt= gammaCorrect(
-				fac1 * invGammaCorrect(*rt1)
-				+ fac2 * invGammaCorrect(*rt2));
+			*rt= gammaCorrect(fac1 * invGammaCorrect(*rt1)
+								+ fac2 * invGammaCorrect(*rt2));
 			rt1++; rt2++; rt++;
 		}
 
@@ -282,10 +278,8 @@ static void do_gammacross_effect_float(float facf0, float UNUSED(facf1),
 		x= xo * 4;
 		while(x--) {
 
-			*rt= gammaCorrect(
-				fac1*invGammaCorrect(*rt1)
-				+ fac2*invGammaCorrect(*rt2));
-
+			*rt= gammaCorrect(fac1*invGammaCorrect(*rt1)
+								+ fac2*invGammaCorrect(*rt2));
 			rt1++; rt2++; rt++;
 		}
 	}

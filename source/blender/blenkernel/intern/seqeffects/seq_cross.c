@@ -53,8 +53,7 @@
    ********************************************************************** */
 
 static void do_cross_effect_byte(float facf0, float facf1, int x, int y,
-			  char *rect1, char *rect2,
-			  char *out)
+			char *rect1, char *rect2, char *out)
 {
 	int fac1, fac2, fac3, fac4;
 	int xo;
@@ -101,7 +100,7 @@ static void do_cross_effect_byte(float facf0, float facf1, int x, int y,
 }
 
 static void do_cross_effect_float(float facf0, float facf1, int x, int y,
-			   float *rect1, float *rect2, float *out)
+			float *rect1, float *rect2, float *out)
 {
 	float fac1, fac2, fac3, fac4;
 	int xo;

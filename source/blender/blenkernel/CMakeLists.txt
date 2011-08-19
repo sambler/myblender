@@ -134,6 +134,21 @@ set(SRC
 	intern/script.c
 	intern/seqcache.c
 	intern/seqeffects.c
+	intern/seqeffects/seq_add.c
+	intern/seqeffects/seq_adjustment.c
+	intern/seqeffects/seq_alpha.c
+	intern/seqeffects/seq_cross.c
+	intern/seqeffects/seq_drop.c
+	intern/seqeffects/seq_gamma.c
+	intern/seqeffects/seq_glow.c
+	intern/seqeffects/seq_mul.c
+	intern/seqeffects/seq_multicam.c
+	intern/seqeffects/seq_plugin.c
+	intern/seqeffects/seq_solid_colour.c
+	intern/seqeffects/seq_sub.c
+	intern/seqeffects/seq_speed.c
+	intern/seqeffects/seq_transform.c
+	intern/seqeffects/seq_wipe.c
 	intern/sequencer.c
 	intern/shrinkwrap.c
 	intern/sketch.c

@@ -1,4 +1,4 @@
-# $Id: CMakeLists.txt 12931 2007-12-17 18:20:48Z theeth $
+# $Id$
 # ***** BEGIN GPL LICENSE BLOCK *****
 #
 # This program is free software; you can redistribute it and/or
@@ -15,45 +15,55 @@
 # along with this program; if not, write to the Free Software Foundation,
 # Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #
-# Contributor(s): Jacques Beaurain.
+# The Original Code is Copyright (C) 2011, Blender Foundation
+# All rights reserved.
+#
+# The Original Code is: all of this file.
+#
+# Contributor(s): Shane Ambler.
 #
 # ***** END GPL LICENSE BLOCK *****
 
-set(INC
-	../include
-	../../blenkernel
-	../../blenlib
-	../../blenloader
-	../../imbuf
-	../../makesdna
-	../../makesrna
-	../../sequencereffects
-	../../windowmanager
-	../../../../intern/guardedalloc
+set(INC 
+	.
+	../blenkernel
+	../blenlib
+	../blenloader
+	../imbuf
+	../makesdna
+	../makesrna
+	../../../intern/guardedalloc
 )
 
 set(INC_SYS
-	${GLEW_INCLUDE_PATH}
+
 )
 
 set(SRC
-	sequencer_add.c
-	sequencer_buttons.c
-	sequencer_draw.c
-	sequencer_edit.c
-	sequencer_ops.c
-	sequencer_scopes.c
-	sequencer_select.c
-	space_sequencer.c
-
-	sequencer_intern.h
+	intern/add.c
+	intern/adjustment.c
+	intern/alpha.c
+	intern/cross.c
+	intern/drop.c
+	intern/gamma.c
+	intern/glow.c
+	intern/mul.c
+	intern/multicam.c
+	intern/plugin.c
+	intern/seqeffects.c
+	intern/solid_colour.c
+	intern/speed.c
+	intern/sub.c
+	intern/transform.c
+	intern/utils.c
+	intern/wipe.c
+	
+	intern/seq_intern.h
+	SEQ_effects.h
 )
 
-if(WITH_AUDASPACE)
-	list(APPEND INC
-		../../../../intern/audaspace/intern
-	)
-	add_definitions(-DWITH_AUDASPACE)
+if(WITH_OPENMP)
+	add_definitions(-DPARALLEL=1)
 endif()
 
-blender_add_lib(bf_editor_space_sequencer "${SRC}" "${INC}" "${INC_SYS}")
+blender_add_lib(bf_sequencer_effects "${SRC}" "${INC}" "${INC_SYS}")

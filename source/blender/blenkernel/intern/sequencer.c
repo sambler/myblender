@@ -59,6 +59,7 @@
 #include "BKE_image.h"
 #include "BKE_main.h"
 #include "BKE_sequencer.h"
+#include "SEQ_effects.h"
 #include "BKE_fcurve.h"
 #include "BKE_scene.h"
 #include "RNA_access.h"

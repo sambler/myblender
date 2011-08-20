@@ -132,6 +132,7 @@ endif()
 		ge_videotex
 		bf_blenfont
 		bf_intern_audaspace
+		bf_sequencer_effects
 		blenkernel_blc
 		extern_binreloc
 		extern_minilzo

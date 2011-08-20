@@ -104,58 +104,6 @@ SeqRenderData seq_new_render_data(
 int seq_cmp_render_data(const SeqRenderData * a, const SeqRenderData * b);
 unsigned int seq_hash_render_data(const SeqRenderData * a);
 
-/* Wipe effect */
-enum {DO_SINGLE_WIPE, DO_DOUBLE_WIPE, DO_BOX_WIPE, DO_CROSS_WIPE,
-	DO_IRIS_WIPE,DO_CLOCK_WIPE};
-
-
-struct SeqEffectHandle {
-	/* constructors & destructor */
-	/* init & init_plugin are _only_ called on first creation */
-	void (*init)(struct Sequence *seq);
-	void (*init_plugin)(struct Sequence *seq, const char *fname);
-	
-	/* number of input strips needed 
-		(called directly after construction) */
-	int (*num_inputs)(void);
-	
-	/* load is called first time after readblenfile in
-		get_sequence_effect automatically */
-	void (*load)(struct Sequence *seq);
-	
-	/* duplicate */
-	void (*copy)(struct Sequence *dst, struct Sequence *src);
-	
-	/* destruct */
-	void (*free)(struct Sequence *seq);
-	
-	/* returns: -1: no input needed,
-	0: no early out, 
-	1: out = ibuf1, 
-	2: out = ibuf2 */
-	int (*early_out)(struct Sequence *seq, float facf0, float facf1); 
-	
-	/* stores the y-range of the effect IPO */
-	void (*store_icu_yrange)(struct Sequence * seq,
-                                 short adrcode, float *ymin, float *ymax);
-	
-	/* stores the default facf0 and facf1 if no IPO is present */
-	void (*get_default_fac)(struct Sequence *seq, float cfra,
-                                float * facf0, float * facf1);
-	
-	/* execute the effect
-           sequence effects are only required to either support
-           float-rects or byte-rects 
-           (mixed cases are handled one layer up...) */
-	
-	struct ImBuf* (*execute)(
-		SeqRenderData context,
-		struct Sequence *seq, float cfra,
-		float facf0, float facf1,
-		struct ImBuf *ibuf1, struct ImBuf *ibuf2,
-		struct ImBuf *ibuf3);
-};
-
 /* ********************* prototypes *************** */
 
 /* **********************************************************************
@@ -230,22 +178,6 @@ struct ImBuf * seq_stripelem_cache_get(
 void seq_stripelem_cache_put(
 	SeqRenderData context, struct Sequence * seq, 
 	float cfra, seq_stripelem_ibuf_t type, struct ImBuf * nval);
-
-/* **********************************************************************
-   seqeffects.c 
-
-   Sequencer effect strip managment functions
-   **********************************************************************
-*/
-
-/* intern */
-struct SeqEffectHandle get_sequence_blend(struct Sequence *seq);
-void sequence_effect_speed_rebuild_map(struct Scene *scene, struct Sequence *seq, int force);
-
-/* extern */
-struct SeqEffectHandle get_sequence_effect(struct Sequence *seq);
-int get_sequence_effect_num_inputs(int seq_type);
-
 
 /* **********************************************************************
    Sequencer editing functions

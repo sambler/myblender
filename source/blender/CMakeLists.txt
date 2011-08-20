@@ -87,6 +87,7 @@ set(SRC_DNA_INC
 add_subdirectory(editors)
 add_subdirectory(windowmanager)
 add_subdirectory(blenkernel)
+add_subdirectory(sequencereffects)
 add_subdirectory(blenlib)
 add_subdirectory(render)
 add_subdirectory(blenfont)

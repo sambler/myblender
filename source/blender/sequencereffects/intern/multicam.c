@@ -23,12 +23,13 @@
  * Contributor(s): 
  * - Blender Foundation, 2003-2009
  * - Peter Schlaile <peter [at] schlaile [dot] de> 2005/2006
+ * - Shane Ambler 2011
  *
  * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/blenkernel/intern/seqeffects/seq_adjustment.c
- *  \ingroup bke
+/** \file blender/sequencereffects/intern/multicam.c
+ *  \ingroup seq
  */
 
 #include <stdlib.h>
@@ -41,6 +42,7 @@
 #include "DNA_sequence_types.h"
 
 #include "BKE_sequencer.h"
+#include "SEQ_effects.h"
 #include "BKE_utildefines.h"
 
 #include "IMB_imbuf_types.h"
@@ -49,70 +51,48 @@
 #include "seq_intern.h"
 
 /* **********************************************************************
-   ADJUSTMENT
+   MULTICAM
    ********************************************************************** */
 
-/* no effect inputs for adjustment, we use give_ibuf_seq */
-static int num_inputs_adjustment(void)
+/* no effect inputs for multicam, we use give_ibuf_seq */
+static int num_inputs_multicam(void)
 {
 	return 0;
 }
 
-static int early_out_adjustment(struct Sequence *UNUSED(seq), float UNUSED(facf0), float UNUSED(facf1))
+static int early_out_multicam(struct Sequence *UNUSED(seq), float UNUSED(facf0), float UNUSED(facf1))
 {
 	return -1;
 }
 
-static struct ImBuf * do_adjustment_impl(SeqRenderData context, Sequence * seq,
-					float cfra)
-{
-	Editing * ed;
-	ListBase * seqbasep;
-	struct ImBuf * i = 0;
-
-	ed = context.scene->ed;
-
-	seqbasep = seq_seqbase(&ed->seqbase, seq);
-
-	if (seq->machine > 0) {
-		i = give_ibuf_seqbase(context, cfra, seq->machine - 1, seqbasep);
-	}
-
-	/* found nothing? so let's work the way up the metastrip stack, so
-		that it is possible to group a bunch of adjustment strips into
-		a metastrip and have that work on everything below the metastrip
-	*/
-
-	if (!i) {
-		Sequence * meta;
-
-		meta = seq_metastrip(&ed->seqbase, NULL, seq);
-
-		if (meta) {
-			i = do_adjustment_impl(context, meta, cfra);
-		}
-	}
-
-	return i;
-}
-
-static struct ImBuf * do_adjustment(
+static struct ImBuf * do_multicam(
 	SeqRenderData context, Sequence *seq, float cfra,
 	float UNUSED(facf0), float UNUSED(facf1),
 	struct ImBuf *UNUSED(ibuf1), struct ImBuf *UNUSED(ibuf2),
 	struct ImBuf *UNUSED(ibuf3))
 {
-	struct ImBuf * i = 0;
+	struct ImBuf * i;
 	struct ImBuf * out;
 	Editing * ed;
+	ListBase * seqbasep;
 
-	ed = context.scene->ed;
-
-	if (!ed) {
+	if (seq->multicam_source == 0 || seq->multicam_source >= seq->machine) {
 		return NULL;
 	}
 
-	i = do_adjustment_impl(context, seq, cfra);
+	ed = context.scene->ed;
+	if (!ed) {
+		return NULL;
+	}
+	seqbasep = seq_seqbase(&ed->seqbase, seq);
+	if (!seqbasep) {
+		return NULL;
+	}
+
+	i = give_ibuf_seqbase(context, cfra, seq->multicam_source, seqbasep);
+	if (!i) {
+		return NULL;
+	}
 
 	if (input_have_to_preprocess(context, seq, cfra)) {
 		out = IMB_dupImBuf(i);
@@ -125,10 +105,10 @@ static struct ImBuf * do_adjustment(
 }
 
 /* setup */
-void SeqConfigHandle_adjustment(struct SeqEffectHandle *hndl)
+void SeqConfigHandle_multicam(struct SeqEffectHandle *hndl)
 {
-	hndl->num_inputs = num_inputs_adjustment;
-	hndl->early_out = early_out_adjustment;
-	hndl->execute = do_adjustment;
+	hndl->num_inputs = num_inputs_multicam;
+	hndl->early_out = early_out_multicam;
+	hndl->execute = do_multicam;
 }
 

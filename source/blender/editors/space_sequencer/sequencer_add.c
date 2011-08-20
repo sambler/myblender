@@ -54,8 +54,8 @@
 #include "BKE_global.h"
 #include "BKE_main.h"
 #include "BKE_sequencer.h"
+#include "SEQ_effects.h"
 #include "BKE_report.h"
-
 
 #include "WM_api.h"
 #include "WM_types.h"

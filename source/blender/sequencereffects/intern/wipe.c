@@ -23,12 +23,13 @@
  * Contributor(s): 
  * - Blender Foundation, 2003-2009
  * - Peter Schlaile <peter [at] schlaile [dot] de> 2005/2006
- *
+ * - Shane Ambler 2011
+ * 
  * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/blenkernel/intern/seqeffects/seq_wipe.c
- *  \ingroup bke
+/** \file blender/sequencereffects/intern/wipe.c
+ *  \ingroup seq
  */
 
 #include <stdlib.h>
@@ -42,6 +43,7 @@
 #include "DNA_sequence_types.h"
 
 #include "BKE_sequencer.h"
+#include "SEQ_effects.h"
 #include "BKE_utildefines.h"
 
 #include "IMB_imbuf_types.h"

@@ -23,14 +23,15 @@
  * Contributor(s): 
  * - Blender Foundation, 2003-2009
  * - Peter Schlaile <peter [at] schlaile [dot] de> 2005/2006
+ * - Shane Ambler 2011
+ * - Shane Ambler 2011
  *
  * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/blenkernel/intern/seqeffects.c
- *  \ingroup bke
+/** \file blender/sequencereffects/intern/seqeffects.c
+ *  \ingroup seq
  */
-
 
 #include <stdlib.h>
 
@@ -41,6 +42,7 @@
 #include "DNA_sequence_types.h"
 
 #include "BKE_sequencer.h"
+#include "SEQ_effects.h"
 #include "BKE_utildefines.h"
 
 #include "IMB_imbuf_types.h"
@@ -49,22 +51,22 @@
 /* SeqConfigHandle_* routines are each located in the files containing the effects code
  * -- only called within get_sequence_effect_impl() */
 
-extern void SeqConfigHandle_add(struct SeqEffectHandle *hndl);			/* seq_add.c			*/
-extern void SeqConfigHandle_adjustment(struct SeqEffectHandle *hndl);	/* seq_adjustment.c		*/
-extern void SeqConfigHandle_alphaOver(struct SeqEffectHandle *hndl);	/* seq_alpha.c			*/
-extern void SeqConfigHandle_alphaUnder(struct SeqEffectHandle *hndl);	/* seq_alpha.c			*/
-extern void SeqConfigHandle_cross(struct SeqEffectHandle *hndl);		/* seq_cross.c			*/
-extern void SeqConfigHandle_gamma(struct SeqEffectHandle *hndl);		/* seq_gamma.c			*/
-extern void SeqConfigHandle_glow(struct SeqEffectHandle *hndl);			/* seq_glow.c			*/
-extern void SeqConfigHandle_mul(struct SeqEffectHandle *hndl);			/* seq_mul.c			*/
-extern void SeqConfigHandle_multicam(struct SeqEffectHandle *hndl);		/* seq_multicam.c		*/
-extern void SeqConfigHandle_overdrop(struct SeqEffectHandle *hndl);		/* seq_drop.c			*/
-extern void SeqConfigHandle_plugin(struct SeqEffectHandle *hndl);		/* seq_plugin.c			*/
-extern void SeqConfigHandle_solid_colour(struct SeqEffectHandle *hndl);	/* seq_solid_colour.c	*/
-extern void SeqConfigHandle_speed(struct SeqEffectHandle *hndl);		/* seq_speed.c			*/
-extern void SeqConfigHandle_sub(struct SeqEffectHandle *hndl);			/* seq_sub.c			*/
-extern void SeqConfigHandle_transform(struct SeqEffectHandle *hndl);	/* seq_transform.c		*/
-extern void SeqConfigHandle_wipe(struct SeqEffectHandle *hndl);			/* seq_wipe.c			*/
+extern void SeqConfigHandle_add(struct SeqEffectHandle *hndl);			/* add.c			*/
+extern void SeqConfigHandle_adjustment(struct SeqEffectHandle *hndl);	/* adjustment.c		*/
+extern void SeqConfigHandle_alphaOver(struct SeqEffectHandle *hndl);	/* alpha.c			*/
+extern void SeqConfigHandle_alphaUnder(struct SeqEffectHandle *hndl);	/* alpha.c			*/
+extern void SeqConfigHandle_cross(struct SeqEffectHandle *hndl);		/* cross.c			*/
+extern void SeqConfigHandle_gamma(struct SeqEffectHandle *hndl);		/* gamma.c			*/
+extern void SeqConfigHandle_glow(struct SeqEffectHandle *hndl);			/* glow.c			*/
+extern void SeqConfigHandle_mul(struct SeqEffectHandle *hndl);			/* mul.c			*/
+extern void SeqConfigHandle_multicam(struct SeqEffectHandle *hndl);		/* multicam.c		*/
+extern void SeqConfigHandle_overdrop(struct SeqEffectHandle *hndl);		/* drop.c			*/
+extern void SeqConfigHandle_plugin(struct SeqEffectHandle *hndl);		/* plugin.c			*/
+extern void SeqConfigHandle_solid_colour(struct SeqEffectHandle *hndl);	/* solid_colour.c	*/
+extern void SeqConfigHandle_speed(struct SeqEffectHandle *hndl);		/* speed.c			*/
+extern void SeqConfigHandle_sub(struct SeqEffectHandle *hndl);			/* sub.c			*/
+extern void SeqConfigHandle_transform(struct SeqEffectHandle *hndl);	/* transform.c		*/
+extern void SeqConfigHandle_wipe(struct SeqEffectHandle *hndl);			/* wipe.c			*/
 
 
 struct ImBuf * prepare_effect_imbufs(

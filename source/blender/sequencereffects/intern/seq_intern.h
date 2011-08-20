@@ -23,28 +23,29 @@
  * Contributor(s): 
  * - Blender Foundation, 2003-2009
  * - Peter Schlaile <peter [at] schlaile [dot] de> 2005/2006
+ * - Shane Ambler 2011
  *
  * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/blenkernel/intern/seqeffects/seq_intern.h
- *  \ingroup bke
+/** \file blender/sequencereffects/intern/intern.h
+ *  \ingroup seq
  */
 
 
 /* from seqeffects.c */
-extern struct ImBuf * prepare_effect_imbufs(SeqRenderData context, struct ImBuf *ibuf1, struct ImBuf *ibuf2, struct ImBuf *ibuf3);
+struct ImBuf * prepare_effect_imbufs(SeqRenderData context, struct ImBuf *ibuf1, struct ImBuf *ibuf2, struct ImBuf *ibuf3);
 
 
 /* The following are used by more than one effect - may or may not be useful for others */
-/* from seq_alpha.c */
-extern void do_alphaover_effect_byte(float facf0, float facf1, int x, int y, char *rect1, char *rect2, char *out);
-extern void do_alphaover_effect_float(float facf0, float facf1, int x, int y, float *rect1, float *rect2, float *out);
-extern void do_alphaunder_effect_byte(float facf0, float facf1, int x, int y, char *rect1, char *rect2, char *out);
-extern void do_alphaunder_effect_float(float facf0, float facf1, int x, int y, float *rect1, float *rect2, float *out);
+/* from alpha.c */
+void do_alphaover_effect_byte(float facf0, float facf1, int x, int y, char *rect1, char *rect2, char *out);
+void do_alphaover_effect_float(float facf0, float facf1, int x, int y, float *rect1, float *rect2, float *out);
+void do_alphaunder_effect_byte(float facf0, float facf1, int x, int y, char *rect1, char *rect2, char *out);
+void do_alphaunder_effect_float(float facf0, float facf1, int x, int y, float *rect1, float *rect2, float *out);
 
-/* from seq_cross.c */
-extern struct ImBuf* do_cross_effect(SeqRenderData context, Sequence *UNUSED(seq),
+/* from cross.c */
+struct ImBuf* do_cross_effect(SeqRenderData context, Sequence *UNUSED(seq),
 			float UNUSED(cfra), float facf0, float facf1, struct ImBuf *ibuf1,
 			struct ImBuf *ibuf2, struct ImBuf *ibuf3);
 

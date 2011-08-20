@@ -772,6 +772,7 @@ endif()
 		bf_ikplugin
 		bf_modifiers
 		bf_blenkernel
+		bf_sequencer_effects
 		bf_nodes
 		bf_gpu
 		bf_blenloader

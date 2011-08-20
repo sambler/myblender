@@ -23,12 +23,13 @@
  * Contributor(s): 
  * - Blender Foundation, 2003-2009
  * - Peter Schlaile <peter [at] schlaile [dot] de> 2005/2006
+ * - Shane Ambler 2011
  *
  * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/blenkernel/intern/seqeffects/seq_add.c
- *  \ingroup bke
+/** \file blender/sequencereffects/intern/sub.c
+ *  \ingroup seq
  */
 
 #include <stdlib.h>
@@ -41,6 +42,7 @@
 #include "DNA_sequence_types.h"
 
 #include "BKE_sequencer.h"
+#include "SEQ_effects.h"
 #include "BKE_utildefines.h"
 
 #include "IMB_imbuf_types.h"
@@ -49,12 +51,11 @@
 #include "seq_intern.h"
 
 /* **********************************************************************
-   ADD
+   SUB
    ********************************************************************** */
 
-static void do_add_effect_byte(float facf0, float facf1, int x, int y,
-				unsigned char *rect1, unsigned char *rect2,
-				unsigned char *out)
+static void do_sub_effect_byte(float facf0, float facf1, int x, int y,
+				char *rect1, char *rect2, char *out)
 {
 	int col, xo, fac1, fac3;
 	char *rt1, *rt2, *rt;
@@ -72,14 +73,14 @@ static void do_add_effect_byte(float facf0, float facf1, int x, int y,
 		x= xo;
 		while(x--) {
 
-			col= rt1[0]+ ((fac1*rt2[0])>>8);
-			if(col>255) rt[0]= 255; else rt[0]= col;
-			col= rt1[1]+ ((fac1*rt2[1])>>8);
-			if(col>255) rt[1]= 255; else rt[1]= col;
-			col= rt1[2]+ ((fac1*rt2[2])>>8);
-			if(col>255) rt[2]= 255; else rt[2]= col;
-			col= rt1[3]+ ((fac1*rt2[3])>>8);
-			if(col>255) rt[3]= 255; else rt[3]= col;
+			col= rt1[0]- ((fac1*rt2[0])>>8);
+			if(col<0) rt[0]= 0; else rt[0]= col;
+			col= rt1[1]- ((fac1*rt2[1])>>8);
+			if(col<0) rt[1]= 0; else rt[1]= col;
+			col= rt1[2]- ((fac1*rt2[2])>>8);
+			if(col<0) rt[2]= 0; else rt[2]= col;
+			col= rt1[3]- ((fac1*rt2[3])>>8);
+			if(col<0) rt[3]= 0; else rt[3]= col;
 
 			rt1+= 4; rt2+= 4; rt+= 4;
 		}
@@ -90,23 +91,22 @@ static void do_add_effect_byte(float facf0, float facf1, int x, int y,
 		x= xo;
 		while(x--) {
 
-			col= rt1[0]+ ((fac3*rt2[0])>>8);
-			if(col>255) rt[0]= 255; else rt[0]= col;
-			col= rt1[1]+ ((fac3*rt2[1])>>8);
-			if(col>255) rt[1]= 255; else rt[1]= col;
-			col= rt1[2]+ ((fac3*rt2[2])>>8);
-			if(col>255) rt[2]= 255; else rt[2]= col;
-			col= rt1[3]+ ((fac3*rt2[3])>>8);
-			if(col>255) rt[3]= 255; else rt[3]= col;
+			col= rt1[0]- ((fac3*rt2[0])>>8);
+			if(col<0) rt[0]= 0; else rt[0]= col;
+			col= rt1[1]- ((fac3*rt2[1])>>8);
+			if(col<0) rt[1]= 0; else rt[1]= col;
+			col= rt1[2]- ((fac3*rt2[2])>>8);
+			if(col<0) rt[2]= 0; else rt[2]= col;
+			col= rt1[3]- ((fac3*rt2[3])>>8);
+			if(col<0) rt[3]= 0; else rt[3]= col;
 
 			rt1+= 4; rt2+= 4; rt+= 4;
 		}
 	}
 }
 
-static void do_add_effect_float(float facf0, float facf1, int x, int y,
-				float *rect1, float *rect2,
-				float *out)
+static void do_sub_effect_float(float facf0, float facf1, int x, int y,
+				float *rect1, float *rect2, float *out)
 {
 	int xo;
 	float fac1, fac3;
@@ -124,7 +124,7 @@ static void do_add_effect_float(float facf0, float facf1, int x, int y,
 
 		x= xo * 4;
 		while(x--) {
-			*rt = *rt1 + fac1 * (*rt2);
+			*rt = *rt1 - fac1 * (*rt2);
 
 			rt1++; rt2++; rt++;
 		}
@@ -134,38 +134,38 @@ static void do_add_effect_float(float facf0, float facf1, int x, int y,
 
 		x= xo * 4;
 		while(x--) {
-			*rt = *rt1 + fac3 * (*rt2);
+			*rt = *rt1 - fac3 * (*rt2);
 
 			rt1++; rt2++; rt++;
 		}
 	}
 }
 
-static struct ImBuf * do_add_effect(SeqRenderData context,
-				Sequence *UNUSED(seq), float UNUSED(cfra),
-				float facf0, float facf1,
-				struct ImBuf *ibuf1, struct ImBuf *ibuf2,
-				struct ImBuf *ibuf3)
+static struct ImBuf * do_sub_effect(
+	SeqRenderData context, Sequence *UNUSED(seq), float UNUSED(cfra),
+	float facf0, float facf1,
+	struct ImBuf *ibuf1, struct ImBuf *ibuf2,
+	struct ImBuf *ibuf3)
 {
 	struct ImBuf * out = prepare_effect_imbufs(context,ibuf1, ibuf2, ibuf3);
 
 	if (out->rect_float) {
-		do_add_effect_float(
+		do_sub_effect_float(
 			facf0, facf1, context.rectx, context.recty,
 			ibuf1->rect_float, ibuf2->rect_float,
 			out->rect_float);
 	} else {
-		do_add_effect_byte(
+		do_sub_effect_byte(
 			facf0, facf1, context.rectx, context.recty,
-			(unsigned char*) ibuf1->rect, (unsigned char*) ibuf2->rect,
-			(unsigned char*) out->rect);
+			(char*) ibuf1->rect, (char*) ibuf2->rect,
+			(char*) out->rect);
 	}
 	return out;
 }
 
 /* setup */
-void SeqConfigHandle_add(struct SeqEffectHandle *hndl)
+void SeqConfigHandle_sub(struct SeqEffectHandle *hndl)
 {
-	hndl->execute = do_add_effect;
+	hndl->execute = do_sub_effect;
 }
 

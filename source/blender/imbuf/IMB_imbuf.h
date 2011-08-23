@@ -75,13 +75,13 @@
 
 /**
  *
- * @attention defined in ???
+ * @attention defined in IMB_imbuf_types.h
  */
 struct ImBuf;
 
 /**
  *
- * @attention defined in ???
+ * @attention defined in IMB_anim.h
  */
 struct anim;
 

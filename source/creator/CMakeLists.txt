@@ -25,9 +25,6 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-# So BUILDINFO and BLENDERPATH strings are automatically quoted
-cmake_policy(SET CMP0005 NEW)
-
 setup_libdirs()
 
 blender_include_dirs(
@@ -136,6 +133,7 @@ if(WIN32 AND NOT UNIX)
 endif()
 
 if(WITH_BUILDINFO)
+	add_definitions(-DWITH_BUILDINFO)
 	# --------------------------------------------------------------------------
 	# These defines could all be moved into the header below
 	string(REPLACE " " "\ " BUILDINFO_CFLAGS "${CMAKE_C_FLAGS}")
@@ -326,6 +324,7 @@ if(UNIX AND NOT APPLE)
 				${CMAKE_SOURCE_DIR}/release/freedesktop/icons/256x256
 			DESTINATION ${CMAKE_INSTALL_PREFIX}/share/icons/hicolor
 			PATTERN ".svn" EXCLUDE
+			PATTERN ".git" EXCLUDE
 			PATTERN "*.svg" EXCLUDE
 		)
 		install(
@@ -361,6 +360,7 @@ if(UNIX AND NOT APPLE)
 			DIRECTORY ${CMAKE_SOURCE_DIR}/release/bin/.blender/locale
 			DESTINATION ${TARGETDIR_VER}/datafiles
 			PATTERN ".svn" EXCLUDE
+			PATTERN ".git" EXCLUDE
 		)
 	endif()
 
@@ -370,6 +370,7 @@ if(UNIX AND NOT APPLE)
 		# 	DIRECTORY ${CMAKE_SOURCE_DIR}/release/plugins
 		# 	DESTINATION ${TARGETDIR_VER}
 		# 	PATTERN ".svn" EXCLUDE
+		# 	PATTERN ".git" EXCLUDE
 		# )
 
 	if(WITH_PYTHON)
@@ -378,6 +379,7 @@ if(UNIX AND NOT APPLE)
 			DIRECTORY ${CMAKE_SOURCE_DIR}/release/scripts
 			DESTINATION ${TARGETDIR_VER}
 			PATTERN ".svn" EXCLUDE
+			PATTERN ".git" EXCLUDE
 			PATTERN "__pycache__" EXCLUDE
 		)
 
@@ -389,6 +391,7 @@ if(UNIX AND NOT APPLE)
 				DIRECTORY ${PYTHON_LIBPATH}/python${PYTHON_VERSION}
 				DESTINATION ${TARGETDIR_VER}/python/lib
 				PATTERN ".svn" EXCLUDE
+				PATTERN ".git" EXCLUDE
 				PATTERN "__pycache__" EXCLUDE               # * any cache *
 				PATTERN "distutils" EXCLUDE                 # ./distutils
 				PATTERN "lib2to3" EXCLUDE                   # ./lib2to3
@@ -435,6 +438,7 @@ elseif(WIN32)
 			DIRECTORY ${CMAKE_SOURCE_DIR}/release/bin/.blender/locale
 			DESTINATION ${TARGETDIR_VER}/datafiles
 			PATTERN ".svn" EXCLUDE
+			PATTERN ".git" EXCLUDE
 		)
 
 		if(NOT CMAKE_CL_64)
@@ -454,6 +458,7 @@ elseif(WIN32)
 		DIRECTORY ${CMAKE_SOURCE_DIR}/release/bin/.blender/locale
 		DESTINATION ${TARGETDIR_VER}/datafiles/locale
 		PATTERN ".svn" EXCLUDE
+		PATTERN ".git" EXCLUDE
 	)
 
 	# plugins in blender 2.5 don't work at the moment.
@@ -462,6 +467,7 @@ elseif(WIN32)
 	# 	DIRECTORY ${CMAKE_SOURCE_DIR}/release/plugins
 	# 	DESTINATION ${TARGETDIR_VER}
 	# 	PATTERN ".svn" EXCLUDE
+	# 	PATTERN ".git" EXCLUDE
 	# )
 
 	if(WITH_PYTHON)
@@ -470,6 +476,7 @@ elseif(WIN32)
 			DIRECTORY ${CMAKE_SOURCE_DIR}/release/scripts
 			DESTINATION ${TARGETDIR_VER}
 			PATTERN ".svn" EXCLUDE
+			PATTERN ".git" EXCLUDE
 			PATTERN "__pycache__" EXCLUDE
 		)
 
@@ -547,11 +554,11 @@ elseif(WIN32)
 	if(WITH_CODEC_FFMPEG)
 		install(
 			FILES
-				${LIBDIR}/ffmpeg/lib/avcodec-52.dll
-				${LIBDIR}/ffmpeg/lib/avformat-52.dll
-				${LIBDIR}/ffmpeg/lib/avdevice-52.dll
-				${LIBDIR}/ffmpeg/lib/avutil-50.dll
-				${LIBDIR}/ffmpeg/lib/swscale-0.dll
+				${LIBDIR}/ffmpeg/lib/avcodec-53.dll
+				${LIBDIR}/ffmpeg/lib/avformat-53.dll
+				${LIBDIR}/ffmpeg/lib/avdevice-53.dll
+				${LIBDIR}/ffmpeg/lib/avutil-51.dll
+				${LIBDIR}/ffmpeg/lib/swscale-2.dll
 			DESTINATION ${TARGETDIR}
 		)
 
@@ -626,6 +633,7 @@ elseif(APPLE)
 			DIRECTORY ${from}
 			DESTINATION ${to}
 			PATTERN ".svn" EXCLUDE
+			PATTERN ".git" EXCLUDE
 			PATTERN "*.pyc" EXCLUDE
 			PATTERN "*.pyo" EXCLUDE
 			PATTERN "*.orig" EXCLUDE

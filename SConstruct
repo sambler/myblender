@@ -167,6 +167,13 @@ if sys.platform=='win32':
 
 env.SConscriptChdir(0)
 
+# Remove major kernel version from linux platform.
+# After Linus switched kernel to new version model this major version
+# shouldn't take much sense for building rules.
+
+if re.match('linux[0-9]+', platform):
+    platform = 'linux'
+
 crossbuild = B.arguments.get('BF_CROSS', None)
 if crossbuild and platform not in ('win32-vc', 'win64-vc'):
     platform = 'linuxcross'
@@ -263,7 +270,7 @@ if env['OURPLATFORM']=='darwin':
     else:
         print B.bc.OKGREEN + "Found recommended sdk :" + B.bc.ENDC + " using MacOSX10.5.sdk"
 
-    # for now, Mac builders must download and install the driver framework from 3Dconnexion
+    # for now, Mac builders must download and install the 3DxWare 10 Beta 4 driver framework from 3Dconnexion
     # necessary header file lives here when installed:
     # /Library/Frameworks/3DconnexionClient.framework/Versions/Current/Headers/ConnexionClientAPI.h
     if env['WITH_BF_3DMOUSE'] == 1 and not os.path.exists('/Library/Frameworks/3DconnexionClient.framework'):
@@ -552,7 +559,7 @@ if  env['OURPLATFORM']!='darwin':
                     scriptinstall.append(env.Install(dir=dir,source=source))
 
 #-- icons
-if env['OURPLATFORM']=='linux2':
+if env['OURPLATFORM']=='linux':
     iconlist = []
     icontargetlist = []
 
@@ -631,7 +638,7 @@ textinstall = env.Install(dir=env['BF_INSTALLDIR'], source=textlist)
 
 if  env['OURPLATFORM']=='darwin':
         allinstall = [blenderinstall, plugininstall, textinstall]
-elif env['OURPLATFORM']=='linux2':
+elif env['OURPLATFORM']=='linux':
         allinstall = [blenderinstall, dotblenderinstall, scriptinstall, plugininstall, textinstall, iconinstall]
 else:
         allinstall = [blenderinstall, dotblenderinstall, scriptinstall, plugininstall, textinstall]

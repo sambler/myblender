@@ -324,6 +324,7 @@ if(UNIX AND NOT APPLE)
 				${CMAKE_SOURCE_DIR}/release/freedesktop/icons/256x256
 			DESTINATION ${CMAKE_INSTALL_PREFIX}/share/icons/hicolor
 			PATTERN ".svn" EXCLUDE
+			PATTERN ".git" EXCLUDE
 			PATTERN "*.svg" EXCLUDE
 		)
 		install(
@@ -359,6 +360,7 @@ if(UNIX AND NOT APPLE)
 			DIRECTORY ${CMAKE_SOURCE_DIR}/release/bin/.blender/locale
 			DESTINATION ${TARGETDIR_VER}/datafiles
 			PATTERN ".svn" EXCLUDE
+			PATTERN ".git" EXCLUDE
 		)
 	endif()
 
@@ -368,6 +370,7 @@ if(UNIX AND NOT APPLE)
 		# 	DIRECTORY ${CMAKE_SOURCE_DIR}/release/plugins
 		# 	DESTINATION ${TARGETDIR_VER}
 		# 	PATTERN ".svn" EXCLUDE
+		# 	PATTERN ".git" EXCLUDE
 		# )
 
 	if(WITH_PYTHON)
@@ -376,6 +379,7 @@ if(UNIX AND NOT APPLE)
 			DIRECTORY ${CMAKE_SOURCE_DIR}/release/scripts
 			DESTINATION ${TARGETDIR_VER}
 			PATTERN ".svn" EXCLUDE
+			PATTERN ".git" EXCLUDE
 			PATTERN "__pycache__" EXCLUDE
 		)
 
@@ -387,6 +391,7 @@ if(UNIX AND NOT APPLE)
 				DIRECTORY ${PYTHON_LIBPATH}/python${PYTHON_VERSION}
 				DESTINATION ${TARGETDIR_VER}/python/lib
 				PATTERN ".svn" EXCLUDE
+				PATTERN ".git" EXCLUDE
 				PATTERN "__pycache__" EXCLUDE               # * any cache *
 				PATTERN "distutils" EXCLUDE                 # ./distutils
 				PATTERN "lib2to3" EXCLUDE                   # ./lib2to3
@@ -433,6 +438,7 @@ elseif(WIN32)
 			DIRECTORY ${CMAKE_SOURCE_DIR}/release/bin/.blender/locale
 			DESTINATION ${TARGETDIR_VER}/datafiles
 			PATTERN ".svn" EXCLUDE
+			PATTERN ".git" EXCLUDE
 		)
 
 		if(NOT CMAKE_CL_64)
@@ -452,6 +458,7 @@ elseif(WIN32)
 		DIRECTORY ${CMAKE_SOURCE_DIR}/release/bin/.blender/locale
 		DESTINATION ${TARGETDIR_VER}/datafiles/locale
 		PATTERN ".svn" EXCLUDE
+		PATTERN ".git" EXCLUDE
 	)
 
 	# plugins in blender 2.5 don't work at the moment.
@@ -460,6 +467,7 @@ elseif(WIN32)
 	# 	DIRECTORY ${CMAKE_SOURCE_DIR}/release/plugins
 	# 	DESTINATION ${TARGETDIR_VER}
 	# 	PATTERN ".svn" EXCLUDE
+	# 	PATTERN ".git" EXCLUDE
 	# )
 
 	if(WITH_PYTHON)
@@ -468,6 +476,7 @@ elseif(WIN32)
 			DIRECTORY ${CMAKE_SOURCE_DIR}/release/scripts
 			DESTINATION ${TARGETDIR_VER}
 			PATTERN ".svn" EXCLUDE
+			PATTERN ".git" EXCLUDE
 			PATTERN "__pycache__" EXCLUDE
 		)
 
@@ -624,6 +633,7 @@ elseif(APPLE)
 			DIRECTORY ${from}
 			DESTINATION ${to}
 			PATTERN ".svn" EXCLUDE
+			PATTERN ".git" EXCLUDE
 			PATTERN "*.pyc" EXCLUDE
 			PATTERN "*.pyo" EXCLUDE
 			PATTERN "*.orig" EXCLUDE

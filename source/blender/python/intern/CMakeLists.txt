@@ -54,6 +54,7 @@ set(SRC
 	bpy_rna_anim.c
 	bpy_rna_array.c
 	bpy_rna_callback.c
+	bpy_seq_effect.c
 	bpy_traceback.c
 	bpy_util.c
 	stubs.c
@@ -69,6 +70,7 @@ set(SRC
 	bpy_rna.h
 	bpy_rna_anim.h
 	bpy_rna_callback.h
+	bpy_seq_effect.h
 	bpy_traceback.h
 	bpy_util.h
 	../BPY_extern.h

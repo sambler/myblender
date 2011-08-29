@@ -419,7 +419,7 @@ static struct PyMethodDef bpy_seqeffect_methods[]= {
 
 static struct PyModuleDef bpy_seqeffect_module= {
 	PyModuleDef_HEAD_INIT,
-	"_bpy.sfx",
+	"_bpy.seqfx",
 	NULL,
 	-1,/* multiple "initialization" just copies the module dict. */
 	bpy_seqeffect_methods,

@@ -29,7 +29,7 @@ __all__ = (
     "ops",
     "path",
     "props",
-    "sfx",
+    "seqfx",
     "types",
     "utils",
     )
@@ -39,11 +39,10 @@ __all__ = (
 from _bpy import types, props, app, data, context
 
 # python modules
-from . import utils, path, ops, sfx
+from . import utils, path, ops, seqfx
 
 # fake operator module
 ops = ops.ops_fake_module
-#sfx = sfx.sfx_fake_module
 
 def main():
     import sys

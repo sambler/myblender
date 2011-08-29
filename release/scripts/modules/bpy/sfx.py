@@ -19,14 +19,14 @@
 # <pep8-80 compliant>
 
 # for slightly faster access
-from _bpy import sfx as sfx_module
+from _bpy import seqfx as seqfx_module
 
-# sfx_add = sfx_module.add
-sfx_dir = sfx_module.dir
-sfx_poll = sfx_module.poll
-sfx_call = sfx_module.call
-sfx_as_string = sfx_module.as_string
-sfx_get_rna = sfx_module.get_rna
+# sfx_add = seqfx_module.add
+sfx_dir = seqfx_module.dir
+sfx_poll = seqfx_module.poll
+sfx_call = seqfx_module.call
+sfx_as_string = seqfx_module.as_string
+sfx_get_rna = seqfx_module.get_rna
 
 
 class BPySfx(object):

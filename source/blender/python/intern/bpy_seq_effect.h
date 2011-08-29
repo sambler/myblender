@@ -37,6 +37,6 @@ typedef struct {
 	PyObject_HEAD /* required python macro   */
 } BPy_SeqEffect;
 
-PyObject *BPY_seqeffect2_module(void);
+PyObject *BPY_seqeffect_module(void);
 
 #endif

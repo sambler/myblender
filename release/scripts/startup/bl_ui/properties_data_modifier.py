@@ -230,9 +230,6 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         row.prop(md, "mid_level")
         row.prop(md, "strength")
 
-    def DYNAMIC_PAINT(self, layout, ob, md):
-        layout.label(text="See Dynamic Paint panel.")
-
     def EDGE_SPLIT(self, layout, ob, md):
         split = layout.split()
 

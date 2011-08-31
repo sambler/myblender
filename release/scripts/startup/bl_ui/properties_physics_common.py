@@ -65,7 +65,6 @@ class PHYSICS_PT_add(PhysicButtonsPanel, Panel):
         if(ob.type == 'MESH'):
             physics_add(self, col, context.collision, "Collision", 'COLLISION', 'MOD_PHYSICS', False)
             physics_add(self, col, context.cloth, "Cloth", 'CLOTH', 'MOD_CLOTH', True)
-            physics_add(self, col, context.dynamic_paint, "Dynamic Paint", 'DYNAMIC_PAINT', 'MOD_FLUIDSIM', True)
 
         col = split.column()
 

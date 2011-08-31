@@ -132,7 +132,6 @@ const char *includefiles[] = {
 	"DNA_anim_types.h",
 	"DNA_boid_types.h",
 	"DNA_smoke_types.h",
-	"DNA_dynamicpaint_types.h",
 	"DNA_speaker_types.h",
 
 	// empty string to indicate end of includefiles
@@ -1198,6 +1197,5 @@ int main(int argc, char ** argv)
 #include "DNA_anim_types.h"
 #include "DNA_boid_types.h"
 #include "DNA_smoke_types.h"
-#include "DNA_dynamicpaint_types.h"
 #include "DNA_speaker_types.h"
 /* end of list */

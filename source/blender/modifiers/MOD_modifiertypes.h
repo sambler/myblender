@@ -73,7 +73,6 @@ extern ModifierTypeInfo modifierType_Solidify;
 extern ModifierTypeInfo modifierType_Screw;
 extern ModifierTypeInfo modifierType_Warp;
 extern ModifierTypeInfo modifierType_Ocean;
-extern ModifierTypeInfo modifierType_DynamicPaint;
 
 /* MOD_util.c */
 void modifier_type_init(ModifierTypeInfo *types[]);

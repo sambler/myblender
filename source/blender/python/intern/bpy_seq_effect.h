@@ -29,14 +29,14 @@
 #ifndef BPY_SEQ_EFFECT_H
 #define BPY_SEQ_EFFECT_H
 
-extern PyTypeObject pysfx_base_Type;
+extern PyTypeObject pyseqfx_base_Type;
 
-#define BPy_SeqEffect_Check(v)	(PyObject_TypeCheck(v, &pysfx_base_Type))
+#define BPy_SeqEffect_Check(v)	(PyObject_TypeCheck(v, &pyseqfx_base_Type))
 
 typedef struct {
 	PyObject_HEAD /* required python macro   */
 } BPy_SeqEffect;
 
-PyObject *BPY_seqeffect_module(void);
+PyObject *BPY_seqfx_module(void);
 
 #endif

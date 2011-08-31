@@ -29,7 +29,7 @@
 
 
 /* Note, this module is not to be used directly by the user.
- * Internally its exposed as '_bpy.sfx', which provides functions for 'bpy.sfx', a python package.
+ * Internally its exposed as '_bpy.seqfx', which provides functions for 'bpy.seqfx', a python package.
  * */
 
 #include <Python.h>
@@ -61,7 +61,7 @@
 #define BPY_RELEASE_GIL
 
 
-static PyObject *pysfx_poll(PyObject *UNUSED(self), PyObject *args)
+static PyObject *pyseqfx_poll(PyObject *UNUSED(self), PyObject *args)
 {
 	wmOperatorType *ot;
 	char		*opname;
@@ -131,7 +131,7 @@ static PyObject *pysfx_poll(PyObject *UNUSED(self), PyObject *args)
 	return ret;
 }
 
-static PyObject *pysfx_call(PyObject *UNUSED(self), PyObject *args)
+static PyObject *pyseqfx_call(PyObject *UNUSED(self), PyObject *args)
 {
 	wmOperatorType *ot;
 	int error_val= 0;
@@ -300,7 +300,7 @@ static PyObject *pysfx_call(PyObject *UNUSED(self), PyObject *args)
 
 }
 
-static PyObject *pysfx_as_string(PyObject *UNUSED(self), PyObject *args)
+static PyObject *pyseqfx_as_string(PyObject *UNUSED(self), PyObject *args)
 {
 	wmOperatorType *ot;
 	PointerRNA ptr;
@@ -359,7 +359,7 @@ static PyObject *pysfx_as_string(PyObject *UNUSED(self), PyObject *args)
 	return pybuf;
 }
 
-static PyObject *pysfx_dir(PyObject *UNUSED(self))
+static PyObject *pyseqfx_dir(PyObject *UNUSED(self))
 {
 	GHashIterator *iter= WM_operatortype_iter();
 	PyObject *list= PyList_New(0), *name;
@@ -376,7 +376,7 @@ static PyObject *pysfx_dir(PyObject *UNUSED(self))
 	return list;
 }
 
-static PyObject *pysfx_getrna(PyObject *UNUSED(self), PyObject *value)
+static PyObject *pyseqfx_getrna(PyObject *UNUSED(self), PyObject *value)
 {
 	wmOperatorType *ot;
 	PointerRNA ptr;
@@ -408,29 +408,29 @@ static PyObject *pysfx_getrna(PyObject *UNUSED(self), PyObject *value)
 	return (PyObject *)pyrna;
 }
 
-static struct PyMethodDef bpy_seqeffect_methods[]= {
-	{"poll", (PyCFunction) pysfx_poll, METH_VARARGS, NULL},
-	{"call", (PyCFunction) pysfx_call, METH_VARARGS, NULL},
-	{"as_string", (PyCFunction) pysfx_as_string, METH_VARARGS, NULL},
-	{"dir", (PyCFunction) pysfx_dir, METH_NOARGS, NULL},
-	{"get_rna", (PyCFunction) pysfx_getrna, METH_O, NULL},
+static struct PyMethodDef bpy_seqfx_methods[]= {
+	{"poll", (PyCFunction) pyseqfx_poll, METH_VARARGS, NULL},
+	{"call", (PyCFunction) pyseqfx_call, METH_VARARGS, NULL},
+	{"as_string", (PyCFunction) pyseqfx_as_string, METH_VARARGS, NULL},
+	{"dir", (PyCFunction) pyseqfx_dir, METH_NOARGS, NULL},
+	{"get_rna", (PyCFunction) pyseqfx_getrna, METH_O, NULL},
 	{NULL, NULL, 0, NULL}
 };
 
-static struct PyModuleDef bpy_seqeffect_module= {
+static struct PyModuleDef bpy_seqfx_module= {
 	PyModuleDef_HEAD_INIT,
 	"_bpy.seqfx",
 	NULL,
 	-1,/* multiple "initialization" just copies the module dict. */
-	bpy_seqeffect_methods,
+	bpy_seqfx_methods,
 	NULL, NULL, NULL, NULL
 };
 
-PyObject *BPY_seqeffect_module(void)
+PyObject *BPY_seqfx_module(void)
 {
 	PyObject *submodule;
 
-	submodule= PyModule_Create(&bpy_seqeffect_module);
+	submodule= PyModule_Create(&bpy_seqfx_module);
 
 	return submodule;
 }

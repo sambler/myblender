@@ -271,7 +271,7 @@ void BPy_init_modules(void)
 	bpy_import_test("bpy_types");
 	PyModule_AddObject(mod, "props", BPY_rna_props());
 	PyModule_AddObject(mod, "ops", BPY_operator_module()); /* ops is now a python module that does the conversion from SOME_OT_foo -> some.foo */
-	PyModule_AddObject(mod, "seqfx", BPY_seqeffect_module()); /* sfx is a python module to add transition effects to the sequencer */
+	PyModule_AddObject(mod, "seqfx", BPY_seqfx_module()); /* seqfx is a python module to add transition effects to the sequencer */
 	PyModule_AddObject(mod, "app", BPY_app_struct());
 
 	/* bpy context */

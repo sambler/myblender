@@ -21,28 +21,28 @@
 # for slightly faster access
 from _bpy import seqfx as seqfx_module
 
-# sfx_add = seqfx_module.add
-sfx_dir = seqfx_module.dir
-sfx_poll = seqfx_module.poll
-sfx_call = seqfx_module.call
-sfx_as_string = seqfx_module.as_string
-sfx_get_rna = seqfx_module.get_rna
+# seqfx_add = seqfx_module.add
+seqfx_dir = seqfx_module.dir
+seqfx_poll = seqfx_module.poll
+seqfx_call = seqfx_module.call
+seqfx_as_string = seqfx_module.as_string
+seqfx_get_rna = seqfx_module.get_rna
 
 
-class BPySfx(object):
+class BPySeqfx(object):
     '''
     Fake module like class.
 
-     bpy.sfx
+     bpy.seqfx
     '''
 
     def __getattr__(self, module):
         '''
-        gets a bpy.sfx submodule
+        gets a bpy.seqfx submodule
         '''
         if module.startswith('__'):
             raise AttributeError(module)
-        return BPySfxSubMod(module)
+        return BPySeqfxSubMod(module)
 
     def __dir__(self):
 
@@ -53,7 +53,7 @@ class BPySfx(object):
             if not id_name.startswith('__'):
                 submodules.add(id_name)
 
-        for id_name in sfx_dir():
+        for id_name in seqfx_dir():
             id_split = id_name.split('_OT_', 1)
 
             if len(id_split) == 2:
@@ -64,14 +64,14 @@ class BPySfx(object):
         return list(submodules)
 
     def __repr__(self):
-        return "<module like class 'bpy.sfx'>"
+        return "<module like class 'bpy.seqfx'>"
 
 
-class BPySfxSubMod(object):
+class BPySeqfxSubMod(object):
     '''
     Utility class to fake submodules.
 
-    eg. bpy.sfx.object
+    eg. bpy.seqfx.object
     '''
     __keys__ = ('module',)
 
@@ -80,11 +80,11 @@ class BPySfxSubMod(object):
 
     def __getattr__(self, func):
         '''
-        gets a bpy.sfx.submodule function
+        gets a bpy.seqfx.submodule function
         '''
         if func.startswith('__'):
             raise AttributeError(func)
-        return BPySfxSubModOp(self.module, func)
+        return BPySeqfxSubModOp(self.module, func)
 
     def __dir__(self):
 
@@ -92,7 +92,7 @@ class BPySfxSubMod(object):
 
         module_upper = self.module.upper()
 
-        for id_name in sfx_dir():
+        for id_name in seqfx_dir():
             id_split = id_name.split('_OT_', 1)
             if len(id_split) == 2 and module_upper == id_split[0]:
                 functions.add(id_split[1])
@@ -100,20 +100,20 @@ class BPySfxSubMod(object):
         return list(functions)
 
     def __repr__(self):
-        return "<module like class 'bpy.sfx.%s'>" % self.module
+        return "<module like class 'bpy.seqfx.%s'>" % self.module
 
 
-class BPySfxSubModOp(object):
+class BPySeqfxSubModOp(object):
     '''
     Utility class to fake submodule operators.
 
-    eg. bpy.sfx.object.somefunc
+    eg. bpy.seqfx.object.somefunc
     '''
 
     __keys__ = ('module', 'func')
 
     def _get_doc(self):
-        return sfx_as_string(self.idname())
+        return seqfx_as_string(self.idname())
 
     @staticmethod
     def _parse_args(args):
@@ -151,8 +151,8 @@ class BPySfxSubModOp(object):
         self.func = func
 
     def poll(self, *args):
-        C_dict, C_exec = BPySfxSubModOp._parse_args(args)
-        return sfx_poll(self.idname_py(), C_dict, C_exec)
+        C_dict, C_exec = BPySeqfxSubModOp._parse_args(args)
+        return seqfx_poll(self.idname_py(), C_dict, C_exec)
 
     def idname(self):
         # submod.foo -> SUBMOD_OT_foo
@@ -170,16 +170,16 @@ class BPySfxSubModOp(object):
         wm = context.window_manager
 
         # run to account for any rna values the user changes.
-        BPySfxSubModOp._scene_update(context)
+        BPySeqfxSubModOp._scene_update(context)
 
         if args:
-            C_dict, C_exec = BPySfxSubModOp._parse_args(args)
-            ret = sfx_call(self.idname_py(), C_dict, kw, C_exec)
+            C_dict, C_exec = BPySeqfxSubModOp._parse_args(args)
+            ret = seqfx_call(self.idname_py(), C_dict, kw, C_exec)
         else:
-            ret = sfx_call(self.idname_py(), None, kw)
+            ret = seqfx_call(self.idname_py(), None, kw)
 
         if 'FINISHED' in ret and context.window_manager == wm:
-            BPySfxSubModOp._scene_update(context)
+            BPySeqfxSubModOp._scene_update(context)
 
         return ret
 
@@ -187,25 +187,26 @@ class BPySfxSubModOp(object):
         '''
         currently only used for 'bl_rna'
         '''
-        return sfx_get_rna(self.idname())
+        return seqfx_get_rna(self.idname())
 
     def __repr__(self):  # useful display, repr(op)
         import bpy
         idname = self.idname()
-        as_string = sfx_as_string(idname)
-        sfx_class = getattr(bpy.types, idname)
-        descr = sfx_class.bl_rna.description
+        as_string = seqfx_as_string(idname)
+        seqfx_class = getattr(bpy.types, idname)
+        descr = seqfx_class.bl_rna.description
         # XXX, workaround for not registering
         # every __doc__ to save time on load.
         if not descr:
-            descr = sfx_class.__doc__
+            descr = seqfx_class.__doc__
             if not descr:
                 descr = ""
 
         return "# %s\n%s" % (descr, as_string)
 
     def __str__(self):  # used for print(...)
-        return "<function bpy.sfx.%s.%s at 0x%x'>" % \
+        return "<function bpy.seqfx.%s.%s at 0x%x'>" % \
                 (self.module, self.func, id(self))
 
-sfx_fake_module = BPySfx()
+
+seqfx_fake_module = BPySeqfx()

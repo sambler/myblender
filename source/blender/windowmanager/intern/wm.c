@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/windowmanager/intern/wm.c
+ *  \ingroup wm
+ */
+
+
 #include <string.h>
 #include <stddef.h>
 
@@ -35,7 +40,11 @@
 
 #include "GHOST_C-api.h"
 
+#include "MEM_guardedalloc.h"
+
+#include "BLI_utildefines.h"
 #include "BLI_blenlib.h"
+#include "BLI_ghash.h"
 
 #include "BKE_blender.h"
 #include "BKE_context.h"
@@ -54,11 +63,9 @@
 #include "wm_draw.h"
 #include "wm.h"
 
-#include "MEM_guardedalloc.h"
-
 #include "ED_screen.h"
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 #include "BPY_extern.h"
 #endif
 
@@ -69,7 +76,7 @@
 void WM_operator_free(wmOperator *op)
 {
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 	if(op->py_instance) {
 		/* do this first incase there are any __del__ functions or
 		 * similar that use properties */
@@ -127,14 +134,13 @@ void wm_operator_register(bContext *C, wmOperator *op)
 	}
 	
 	/* so the console is redrawn */
-	WM_event_add_notifier(C, NC_SPACE|ND_SPACE_CONSOLE_REPORT, NULL);
+	WM_event_add_notifier(C, NC_SPACE|ND_SPACE_INFO_REPORT, NULL);
 	WM_event_add_notifier(C, NC_WM|ND_HISTORY, NULL);
 }
 
 
-void WM_operator_stack_clear(bContext *C)
+void WM_operator_stack_clear(wmWindowManager *wm)
 {
-	wmWindowManager *wm= CTX_wm_manager(C);
 	wmOperator *op;
 	
 	while((op= wm->operators.first)) {
@@ -142,19 +148,19 @@ void WM_operator_stack_clear(bContext *C)
 		WM_operator_free(op);
 	}
 	
-	WM_event_add_notifier(C, NC_WM|ND_HISTORY, NULL);
+	WM_main_add_notifier(NC_WM|ND_HISTORY, NULL);
 }
 
 /* ****************************************** */
 
-static ListBase menutypes = {NULL, NULL}; /* global menutype list */
+static GHash *menutypes_hash= NULL;
 
 MenuType *WM_menutype_find(const char *idname, int quiet)
 {
 	MenuType* mt;
 
 	if (idname[0]) {
-		mt= BLI_findstring(&menutypes, idname, offsetof(MenuType, idname));
+		mt= BLI_ghash_lookup(menutypes_hash, idname);
 		if(mt)
 			return mt;
 	}
@@ -167,29 +173,55 @@ MenuType *WM_menutype_find(const char *idname, int quiet)
 
 int WM_menutype_add(MenuType* mt)
 {
-	BLI_addtail(&menutypes, mt);
+	BLI_ghash_insert(menutypes_hash, (void *)mt->idname, mt);
 	return 1;
+}
+
+/* inefficient but only used for tooltip code */
+int WM_menutype_contains(MenuType* mt)
+{
+	int found= FALSE;
+
+	if(mt) {
+		GHashIterator *iter= BLI_ghashIterator_new(menutypes_hash);
+
+		for( ; !BLI_ghashIterator_isDone(iter); BLI_ghashIterator_step(iter)) {
+			if(mt == BLI_ghashIterator_getValue(iter)) {
+				found= TRUE;
+				break;
+			}
+		}
+		BLI_ghashIterator_free(iter);
+	}
+
+	return found;
 }
 
 void WM_menutype_freelink(MenuType* mt)
 {
-	BLI_freelinkN(&menutypes, mt);
+	BLI_ghash_remove(menutypes_hash, mt->idname, NULL, (GHashValFreeFP)MEM_freeN);
+}
+
+/* called on initialize WM_init() */
+void WM_menutype_init(void)
+{
+	menutypes_hash= BLI_ghash_new(BLI_ghashutil_strhash, BLI_ghashutil_strcmp, "menutypes_hash gh");
 }
 
 void WM_menutype_free(void)
 {
-	MenuType* mt= menutypes.first, *mt_next;
+	GHashIterator *iter= BLI_ghashIterator_new(menutypes_hash);
 
-	while(mt) {
-		mt_next= mt->next;
-
-		if(mt->ext.free)
+	for( ; !BLI_ghashIterator_isDone(iter); BLI_ghashIterator_step(iter)) {
+		MenuType *mt= BLI_ghashIterator_getValue(iter);
+		if(mt->ext.free) {
 			mt->ext.free(mt->ext.data);
-
-		WM_menutype_freelink(mt);
-
-		mt= mt_next;
+		}
 	}
+	BLI_ghashIterator_free(iter);
+
+	BLI_ghash_free(menutypes_hash, NULL, (GHashValFreeFP)MEM_freeN);
+	menutypes_hash= NULL;
 }
 
 /* ****************************************** */
@@ -200,12 +232,18 @@ void WM_keymap_init(bContext *C)
 
 	if(!wm->defaultconf)
 		wm->defaultconf= WM_keyconfig_new(wm, "Blender");
+	if(!wm->addonconf)
+		wm->addonconf= WM_keyconfig_new(wm, "Blender Addon");
+	if(!wm->userconf)
+		wm->userconf= WM_keyconfig_new(wm, "Blender User");
 	
-	if(wm && CTX_py_init_get(C) && (wm->initialized & WM_INIT_KEYMAP) == 0) {
+	if(CTX_py_init_get(C) && (wm->initialized & WM_INIT_KEYMAP) == 0) {
 		/* create default key config */
 		wm_window_keymap(wm->defaultconf);
 		ED_spacetypes_keymap(wm->defaultconf);
-		WM_keyconfig_userdef();
+
+		WM_keyconfig_update_tag(NULL, NULL);
+		WM_keyconfig_update(wm);
 
 		wm->initialized |= WM_INIT_KEYMAP;
 	}
@@ -232,12 +270,13 @@ void WM_check(bContext *C)
 
 		/* case: no open windows at all, for old file reads */
 		wm_window_add_ghostwindows(C, wm);
+	}
 
-		/* case: fileread */
-		if((wm->initialized & WM_INIT_WINDOW) == 0) {
-			ED_screens_initialize(wm);
-			wm->initialized |= WM_INIT_WINDOW;
-		}
+	/* case: fileread */
+	/* note: this runs in bg mode to set the screen context cb */
+	if((wm->initialized & WM_INIT_WINDOW) == 0) {
+		ED_screens_initialize(wm);
+		wm->initialized |= WM_INIT_WINDOW;
 	}
 }
 
@@ -274,7 +313,7 @@ void wm_add_default(bContext *C)
 	win= wm_window_new(C);
 	win->screen= screen;
 	screen->winid= win->winid;
-	BLI_strncpy(win->screenname, screen->id.name+2, 21);
+	BLI_strncpy(win->screenname, screen->id.name+2, sizeof(win->screenname));
 	
 	wm->winactive= win;
 	wm->file_saved= 1;

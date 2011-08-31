@@ -30,9 +30,16 @@
 *
 */
 
+/** \file blender/modifiers/intern/MOD_shrinkwrap.c
+ *  \ingroup modifiers
+ */
+
+
 #include <string.h>
 
-#include "BKE_utildefines.h"
+#include "BLI_string.h"
+#include "BLI_utildefines.h"
+
 #include "BKE_cdderivedmesh.h"
 #include "BKE_modifier.h"
 #include "BKE_shrinkwrap.h"
@@ -63,7 +70,7 @@ static void copyData(ModifierData *md, ModifierData *target)
 	tsmd->target	= smd->target;
 	tsmd->auxTarget = smd->auxTarget;
 
-	strcpy(tsmd->vgroup_name, smd->vgroup_name);
+	BLI_strncpy(tsmd->vgroup_name, smd->vgroup_name, sizeof(tsmd->vgroup_name));
 
 	tsmd->keepDist	= smd->keepDist;
 	tsmd->shrinkType= smd->shrinkType;
@@ -79,11 +86,11 @@ static CustomDataMask requiredDataMask(Object *UNUSED(ob), ModifierData *md)
 
 	/* ask for vertexgroups if we need them */
 	if(smd->vgroup_name[0])
-		dataMask |= (1 << CD_MDEFORMVERT);
+		dataMask |= CD_MASK_MDEFORMVERT;
 
 	if(smd->shrinkType == MOD_SHRINKWRAP_PROJECT
 	&& smd->projAxis == MOD_SHRINKWRAP_PROJECT_OVER_NORMAL)
-		dataMask |= (1 << CD_MVERT);
+		dataMask |= CD_MASK_MVERT;
 		
 	return dataMask;
 }
@@ -117,7 +124,7 @@ static void deformVerts(ModifierData *md, Object *ob,
 	if(dataMask)
 		dm= get_cddm(ob, NULL, dm, vertexCos);
 
-	shrinkwrapModifier_deform((ShrinkwrapModifierData*)md, md->scene, ob, dm, vertexCos, numVerts);
+	shrinkwrapModifier_deform((ShrinkwrapModifierData*)md, ob, dm, vertexCos, numVerts);
 
 	if(dm != derivedData)
 		dm->release(dm);
@@ -132,7 +139,7 @@ static void deformVertsEM(ModifierData *md, Object *ob, struct EditMesh *editDat
 	if(dataMask)
 		dm= get_cddm(ob, editData, dm, vertexCos);
 
-	shrinkwrapModifier_deform((ShrinkwrapModifierData*)md, md->scene, ob, dm, vertexCos, numVerts);
+	shrinkwrapModifier_deform((ShrinkwrapModifierData*)md, ob, dm, vertexCos, numVerts);
 
 	if(dm != derivedData)
 		dm->release(dm);
@@ -165,17 +172,19 @@ ModifierTypeInfo modifierType_Shrinkwrap = {
 
 	/* copyData */          copyData,
 	/* deformVerts */       deformVerts,
+	/* deformMatrices */    NULL,
 	/* deformVertsEM */     deformVertsEM,
-	/* deformMatricesEM */  0,
-	/* applyModifier */     0,
-	/* applyModifierEM */   0,
+	/* deformMatricesEM */  NULL,
+	/* applyModifier */     NULL,
+	/* applyModifierEM */   NULL,
 	/* initData */          initData,
 	/* requiredDataMask */  requiredDataMask,
-	/* freeData */          0,
+	/* freeData */          NULL,
 	/* isDisabled */        isDisabled,
 	/* updateDepgraph */    updateDepgraph,
-	/* dependsOnTime */     0,
-	/* dependsOnNormals */	0,
+	/* dependsOnTime */     NULL,
+	/* dependsOnNormals */	NULL,
 	/* foreachObjectLink */ foreachObjectLink,
-	/* foreachIDLink */     0,
+	/* foreachIDLink */     NULL,
+	/* foreachTexLink */    NULL,
 };

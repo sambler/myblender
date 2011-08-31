@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -25,8 +25,9 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
-/**
- * @file	GHOST_Window.h
+
+/** \file ghost/intern/GHOST_Window.h
+ *  \ingroup GHOST
  * Declaration of GHOST_Window class.
  */
 
@@ -75,9 +76,6 @@ public:
 	 * Constructor.
 	 * Creates a new window and opens it.
 	 * To check if the window was created properly, use the getValid() method.
-	 * @param title				The text shown in the title bar of the window.
-	 * @param left				The coordinate of the left edge of the window.
-	 * @param top				The coordinate of the top edge of the window.
 	 * @param width				The width the window.
 	 * @param heigh				The height the window.
 	 * @param state				The state the window is initially opened with.
@@ -86,9 +84,6 @@ public:
 	 * @param numOfAASamples	Number of samples used for AA (zero if no AA)
 	 */
 	GHOST_Window(
-		const STR_String& title, 
-		GHOST_TInt32 left,
-		GHOST_TInt32 top,
 		GHOST_TUns32 width,
 		GHOST_TUns32 height,
 		GHOST_TWindowState state,

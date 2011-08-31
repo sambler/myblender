@@ -1,37 +1,42 @@
 /*
  * $Id$
  *
- * ***** BEGIN LGPL LICENSE BLOCK *****
+ * ***** BEGIN GPL LICENSE BLOCK *****
  *
- * Copyright 2009 Jörg Hermann Müller
+ * Copyright 2009-2011 Jörg Hermann Müller
  *
  * This file is part of AudaSpace.
  *
- * AudaSpace is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
+ * Audaspace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
  * AudaSpace is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU Lesser General Public License
- * along with AudaSpace.  If not, see <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU General Public License
+ * along with Audaspace; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * ***** END LGPL LICENSE BLOCK *****
+ * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file audaspace/FX/AUD_DelayReader.cpp
+ *  \ingroup audfx
+ */
+
 
 #include "AUD_DelayReader.h"
 
 #include <cstring>
 
-AUD_DelayReader::AUD_DelayReader(AUD_IReader* reader, float delay) :
+AUD_DelayReader::AUD_DelayReader(AUD_Reference<AUD_IReader> reader, float delay) :
 		AUD_EffectReader(reader),
 		m_delay(int(delay * reader->getSpecs().rate)),
-		m_remdelay(int(delay * reader->getSpecs().rate)),
-		m_empty(true)
+		m_remdelay(int(delay * reader->getSpecs().rate))
 {
 }
 
@@ -64,49 +69,30 @@ int AUD_DelayReader::getPosition() const
 	return m_reader->getPosition() + m_delay;
 }
 
-void AUD_DelayReader::read(int & length, sample_t* & buffer)
+void AUD_DelayReader::read(int& length, bool& eos, sample_t* buffer)
 {
 	if(m_remdelay > 0)
 	{
 		AUD_Specs specs = m_reader->getSpecs();
 		int samplesize = AUD_SAMPLE_SIZE(specs);
 
-		if(m_buffer.getSize() < length * samplesize)
-		{
-			m_buffer.resize(length * samplesize);
-			m_empty = false;
-		}
-
-		buffer = m_buffer.getBuffer();
-
 		if(length > m_remdelay)
 		{
-			if(!m_empty)
-				memset(buffer, 0, m_remdelay * samplesize);
+			memset(buffer, 0, m_remdelay * samplesize);
 
 			int len = length - m_remdelay;
-			sample_t* buf;
-			m_reader->read(len, buf);
+			m_reader->read(len, eos, buffer + m_remdelay * specs.channels);
 
-			memcpy(buffer + m_remdelay * specs.channels,
-				   buf, len * samplesize);
-
-			if(len < length-m_remdelay)
-				length = m_remdelay + len;
+			length = m_remdelay + len;
 
 			m_remdelay = 0;
-			m_empty = false;
 		}
 		else
 		{
-			if(!m_empty)
-			{
-				memset(buffer, 0, length * samplesize);
-				m_empty = true;
-			}
+			memset(buffer, 0, length * samplesize);
 			m_remdelay -= length;
 		}
 	}
 	else
-		m_reader->read(length, buffer);
+		m_reader->read(length, eos, buffer);
 }

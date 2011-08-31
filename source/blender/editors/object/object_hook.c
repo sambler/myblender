@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/object/object_hook.c
+ *  \ingroup edobj
+ */
+
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -34,6 +39,7 @@
 #include "BLI_editVert.h"
 #include "BLI_listbase.h"
 #include "BLI_string.h"
+#include "BLI_utildefines.h"
 
 #include "DNA_curve_types.h"
 #include "DNA_lattice_types.h"
@@ -50,6 +56,7 @@
 #include "BKE_object.h"
 #include "BKE_report.h"
 #include "BKE_scene.h"
+#include "BKE_deform.h"
 
 #include "RNA_define.h"
 #include "RNA_access.h"
@@ -79,7 +86,7 @@ static int return_editmesh_indexar(EditMesh *em, int *tot, int **indexar, float 
 	*indexar= index= MEM_mallocN(4*totvert, "hook indexar");
 	*tot= totvert;
 	nr= 0;
-	cent[0]= cent[1]= cent[2]= 0.0;
+	zero_v3(cent);
 	
 	for(eve= em->verts.first; eve; eve= eve->next) {
 		if(eve->f & SELECT) {
@@ -96,30 +103,29 @@ static int return_editmesh_indexar(EditMesh *em, int *tot, int **indexar, float 
 
 static int return_editmesh_vgroup(Object *obedit, EditMesh *em, char *name, float *cent)
 {
-	MDeformVert *dvert;
-	EditVert *eve;
-	int i, totvert=0;
-	
-	cent[0]= cent[1]= cent[2]= 0.0;
-	
+	zero_v3(cent);
+
 	if(obedit->actdef) {
-		
+		const int defgrp_index= obedit->actdef-1;
+		int totvert=0;
+
+		MDeformVert *dvert;
+		EditVert *eve;
+
 		/* find the vertices */
 		for(eve= em->verts.first; eve; eve= eve->next) {
 			dvert= CustomData_em_get(&em->vdata, eve->data, CD_MDEFORMVERT);
 
 			if(dvert) {
-				for(i=0; i<dvert->totweight; i++){
-					if(dvert->dw[i].def_nr == (obedit->actdef-1)) {
-						totvert++;
-						add_v3_v3(cent, eve->co);
-					}
+				if(defvert_find_weight(dvert, defgrp_index) > 0.0f) {
+					add_v3_v3(cent, eve->co);
+					totvert++;
 				}
 			}
 		}
 		if(totvert) {
-			bDeformGroup *defGroup = BLI_findlink(&obedit->defbase, obedit->actdef-1);
-			strcpy(name, defGroup->name);
+			bDeformGroup *dg = BLI_findlink(&obedit->defbase, defgrp_index);
+			BLI_strncpy(name, dg->name, sizeof(dg->name));
 			mul_v3_fl(cent, 1.0f/(float)totvert);
 			return 1;
 		}
@@ -447,7 +453,7 @@ static void add_hook_object(Main *bmain, Scene *scene, Object *obedit, Object *o
 	hmd->indexar= indexar;
 	copy_v3_v3(hmd->cent, cent);
 	hmd->totindex= tot;
-	BLI_strncpy(hmd->name, name, 32);
+	BLI_strncpy(hmd->name, name, sizeof(hmd->name));
 	
 	/* matrix calculus */
 	/* vert x (obmat x hook->imat) x hook->obmat x ob->imat */
@@ -551,13 +557,13 @@ static int object_hook_remove_exec(bContext *C, wmOperator *op)
 	BLI_remlink(&ob->modifiers, (ModifierData *)hmd);
 	modifier_free((ModifierData *)hmd);
 	
-	DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	WM_event_add_notifier(C, NC_OBJECT|ND_MODIFIER, ob);
 	
 	return OPERATOR_FINISHED;
 }
 
-static EnumPropertyItem *hook_mod_itemf(bContext *C, PointerRNA *UNUSED(ptr), int *free)
+static EnumPropertyItem *hook_mod_itemf(bContext *C, PointerRNA *UNUSED(ptr), PropertyRNA *UNUSED(prop), int *free)
 {	
 	Object *ob = CTX_data_edit_object(C);
 	EnumPropertyItem tmp = {0, "", 0, "", ""};
@@ -646,7 +652,7 @@ static int object_hook_reset_exec(bContext *C, wmOperator *op)
 		}
 	}
 	
-	DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	WM_event_add_notifier(C, NC_OBJECT|ND_MODIFIER, ob);
 	
 	return OPERATOR_FINISHED;
@@ -702,7 +708,7 @@ static int object_hook_recenter_exec(bContext *C, wmOperator *op)
 	sub_v3_v3v3(hmd->cent, scene->cursor, ob->obmat[3]);
 	mul_m3_v3(imat, hmd->cent);
 	
-	DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	WM_event_add_notifier(C, NC_OBJECT|ND_MODIFIER, ob);
 	
 	return OPERATOR_FINISHED;
@@ -765,7 +771,7 @@ static int object_hook_assign_exec(bContext *C, wmOperator *op)
 	hmd->indexar= indexar;
 	hmd->totindex= tot;
 	
-	DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	WM_event_add_notifier(C, NC_OBJECT|ND_MODIFIER, ob);
 	
 	return OPERATOR_FINISHED;

@@ -1,27 +1,33 @@
 /*
  * $Id$
  *
- * ***** BEGIN LGPL LICENSE BLOCK *****
+ * ***** BEGIN GPL LICENSE BLOCK *****
  *
- * Copyright 2009 Jörg Hermann Müller
+ * Copyright 2009-2011 Jörg Hermann Müller
  *
  * This file is part of AudaSpace.
  *
- * AudaSpace is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
+ * Audaspace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
  * AudaSpace is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU Lesser General Public License
- * along with AudaSpace.  If not, see <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU General Public License
+ * along with Audaspace; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * ***** END LGPL LICENSE BLOCK *****
+ * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file audaspace/jack/AUD_JackDevice.h
+ *  \ingroup audjack
+ */
+
 
 #ifndef AUD_JACKDEVICE
 #define AUD_JACKDEVICE
@@ -87,9 +93,14 @@ private:
 	static int jack_sync(jack_transport_state_t state, jack_position_t* pos, void* data);
 
 	/**
-	 * Last Jack Transport playing state.
+	 * Next Jack Transport state (-1 if not expected to change).
 	 */
-	bool m_playing;
+	jack_transport_state_t m_nextState;
+
+	/**
+	 * Current jack transport status.
+	 */
+	jack_transport_state_t m_state;
 
 	/**
 	 * Syncronisation state.
@@ -111,12 +122,26 @@ private:
 	 */
 	pthread_t m_mixingThread;
 
+	/**
+	 * Mutex for mixing.
+	 */
 	pthread_mutex_t m_mixingLock;
 
+	/**
+	 * Condition for mixing.
+	 */
 	pthread_cond_t m_mixingCondition;
 
+	/**
+	 * Mixing thread function.
+	 * \param device The this pointer.
+	 * \return NULL.
+	 */
 	static void* runMixingThread(void* device);
 
+	/**
+	 * Updates the ring buffers.
+	 */
 	void updateRingBuffers();
 
 	// hide copy constructor and operator=
@@ -142,11 +167,39 @@ public:
 	 */
 	virtual ~AUD_JackDevice();
 
+	/**
+	 * Starts jack transport playback.
+	 */
 	void startPlayback();
+
+	/**
+	 * Stops jack transport playback.
+	 */
 	void stopPlayback();
+
+	/**
+	 * Seeks jack transport playback.
+	 * \param time The time to seek to.
+	 */
 	void seekPlayback(float time);
+
+	/**
+	 * Sets the sync callback for jack transport playback.
+	 * \param sync The callback function.
+	 * \param data The data for the function.
+	 */
 	void setSyncCallback(AUD_syncFunction sync, void* data);
+
+	/**
+	 * Retrieves the jack transport playback time.
+	 * \return The current time position.
+	 */
 	float getPlaybackPosition();
+
+	/**
+	 * Returns whether jack transport plays back.
+	 * \return Whether jack transport plays back.
+	 */
 	bool doesPlayback();
 };
 

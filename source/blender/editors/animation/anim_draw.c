@@ -1,6 +1,4 @@
-/**
- * $Id$
- *
+/*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -25,6 +23,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/animation/anim_draw.c
+ *  \ingroup edanimation
+ */
+
 #include "BLO_sys_types.h"
 
 #include "DNA_anim_types.h"
@@ -33,6 +36,7 @@
 #include "BLI_math.h"
 
 #include "BKE_context.h"
+#include "BKE_global.h"
 #include "BKE_nla.h"
 #include "BKE_object.h"
 
@@ -95,7 +99,7 @@ void ANIM_timecode_string_from_frame (char *str, Scene *scene, int power, short 
 			 *	to cope with 'half' frames, etc., which should be fine in most cases
 			 */
 			seconds= (int)cfra;
-			frames= (int)floor( ((cfra - seconds) * FPS) + 0.5f );
+			frames= (int)floor( (((double)cfra - (double)seconds) * FPS) + 0.5 );
 		}
 		else {
 			/* seconds (with pixel offset rounding) */
@@ -220,7 +224,10 @@ void ANIM_draw_cfra (const bContext *C, View2D *v2d, short flag)
 	vec[0]= (float)(scene->r.cfra * scene->r.framelen);
 	
 	UI_ThemeColor(TH_CFRAME);
-	glLineWidth(2.0);
+	if (flag & DRAWCFRA_WIDE)
+		glLineWidth(3.0);
+	else
+		glLineWidth(2.0);
 	
 	glBegin(GL_LINE_STRIP);
 		vec[1]= v2d->cur.ymin-500.0f;	/* XXX arbitrary... want it go to bottom */
@@ -232,19 +239,19 @@ void ANIM_draw_cfra (const bContext *C, View2D *v2d, short flag)
 	
 	/* Draw dark green line if slow-parenting/time-offset is enabled */
 	if (flag & DRAWCFRA_SHOW_TIMEOFS) {
-		Object *ob= (scene->basact) ? (scene->basact->object) : 0;
+		Object *ob= OBACT;
 		if(ob) {
 			float timeoffset= give_timeoffset(ob);
 			// XXX ob->ipoflag is depreceated!
 			if ((ob->ipoflag & OB_OFFS_OB) && (timeoffset != 0.0f)) {
 				vec[0]-= timeoffset; /* could avoid calling twice */
-			
+				
 				UI_ThemeColorShade(TH_CFRAME, -30);
-			
+				
 				glBegin(GL_LINE_STRIP);
 					/*vec[1]= v2d->cur.ymax;*/ // this is set already. this line is only included
 					glVertex2fv(vec);
-				
+					
 					vec[1]= v2d->cur.ymin;
 					glVertex2fv(vec);
 				glEnd();
@@ -300,6 +307,9 @@ AnimData *ANIM_nla_mapping_get(bAnimContext *ac, bAnimListElem *ale)
 	if (ac == NULL)
 		return NULL;
 	
+	/* abort if rendering - we may get some race condition issues... */
+	if (G.rendering) return NULL;
+	
 	/* handling depends on the type of animation-context we've got */
 	if (ale)
 		return ale->adt;
@@ -352,14 +362,13 @@ static short bezt_nlamapping_apply(KeyframeEditData *ked, BezTriple *bezt)
  */
 void ANIM_nla_mapping_apply_fcurve (AnimData *adt, FCurve *fcu, short restore, short only_keys)
 {
-	KeyframeEditData ked;
+	KeyframeEditData ked= {{NULL}};
 	KeyframeEditFunc map_cb;
 	
 	/* init edit data 
 	 *	- AnimData is stored in 'data'
 	 *	- only_keys is stored in 'i1'
 	 */
-	memset(&ked, 0, sizeof(KeyframeEditData));
 	ked.data= (void *)adt;
 	ked.i1= (int)only_keys;
 	
@@ -393,11 +402,11 @@ float ANIM_unit_mapping_get_factor (Scene *scene, ID *id, FCurve *fcu, short res
 			if (RNA_SUBTYPE_UNIT(RNA_property_subtype(prop)) == PROP_UNIT_ROTATION)
 			{
 				/* if the radians flag is not set, default to using degrees which need conversions */
-				if ((scene) && (scene->unit.flag & USER_UNIT_ROT_RADIANS) == 0) {
+				if ((scene) && (scene->unit.system_rotation == USER_UNIT_ROT_RADIANS) == 0) {
 					if (restore)
-						return M_PI / 180.0f;	/* degrees to radians */
+						return M_PI / 180.0;	/* degrees to radians */
 					else
-						return 180.0f / M_PI;	/* radians to degrees */
+						return 180.0 / M_PI;	/* radians to degrees */
 				}
 			}
 			
@@ -440,6 +449,9 @@ void ANIM_unit_mapping_apply_fcurve (Scene *scene, ID *id, FCurve *fcu, short fl
 	KeyframeEditFunc sel_cb;
 	float fac;
 	
+	/* abort if rendering - we may get some race condition issues... */
+	if (G.rendering) return;
+	
 	/* calculate mapping factor, and abort if nothing to change */
 	fac= ANIM_unit_mapping_get_factor(scene, id, fcu, (flag & ANIM_UNITCONV_RESTORE));
 	if (fac == 1.0f)
@@ -466,7 +478,7 @@ void ANIM_unit_mapping_apply_fcurve (Scene *scene, ID *id, FCurve *fcu, short fl
 	// TODO: only sel?
 	if (fcu->fpt) {
 		FPoint *fpt;
-		int i;
+		unsigned int i;
 		
 		for (i=0, fpt=fcu->fpt; i < fcu->totvert; i++, fpt++) {
 			/* apply unit mapping */

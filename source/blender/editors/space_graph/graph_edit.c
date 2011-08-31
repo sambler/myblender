@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,17 +27,25 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/space_graph/graph_edit.c
+ *  \ingroup spgraph
+ */
+
+
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include <float.h>
 
-#include "AUD_C-API.h"
+#ifdef WITH_AUDASPACE
+#  include "AUD_C-API.h"
+#endif
 
 #include "MEM_guardedalloc.h"
 
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
 #include "DNA_anim_types.h"
 #include "DNA_object_types.h"
@@ -53,6 +61,7 @@
 #include "BKE_report.h"
 
 #include "UI_interface.h"
+#include "UI_resources.h"
 #include "UI_view2d.h"
 
 #include "ED_anim_api.h"
@@ -60,6 +69,7 @@
 #include "ED_keyframes_edit.h"
 #include "ED_screen.h"
 #include "ED_transform.h"
+#include "ED_markers.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
@@ -73,14 +83,14 @@
 
 /* Get the min/max keyframes*/
 /* note: it should return total boundbox, filter for selection only can be argument... */
-void get_graph_keyframe_extents (bAnimContext *ac, float *xmin, float *xmax, float *ymin, float *ymax)
+void get_graph_keyframe_extents (bAnimContext *ac, float *xmin, float *xmax, float *ymin, float *ymax, const short selOnly)
 {
 	ListBase anim_data = {NULL, NULL};
 	bAnimListElem *ale;
 	int filter;
 	
 	/* get data to filter, from Dopesheet */
-	filter= (ANIMFILTER_VISIBLE | ANIMFILTER_CURVEVISIBLE | ANIMFILTER_CURVESONLY | ANIMFILTER_NODUPLIS);
+	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_CURVE_VISIBLE | ANIMFILTER_NODUPLIS);
 	ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 	
 	/* set large values to try to override */
@@ -99,7 +109,7 @@ void get_graph_keyframe_extents (bAnimContext *ac, float *xmin, float *xmax, flo
 			float unitFac;
 			
 			/* get range */
-			calc_fcurve_bounds(fcu, &txmin, &txmax, &tymin, &tymax);
+			calc_fcurve_bounds(fcu, &txmin, &txmax, &tymin, &tymax, selOnly);
 			
 			/* apply NLA scaling */
 			if (adt) {
@@ -118,6 +128,10 @@ void get_graph_keyframe_extents (bAnimContext *ac, float *xmin, float *xmax, flo
 			if ((ymin) && (tymin < *ymin)) 		*ymin= tymin;
 			if ((ymax) && (tymax > *ymax)) 		*ymax= tymax;
 		}
+		
+		/* ensure that the extents are not too extreme that view implodes...*/
+		if ((xmin && xmax) && (fabsf(*xmax - *xmin) < 0.1f)) *xmax += 0.1f;
+		if ((ymin && ymax) && (fabsf(*ymax - *ymin) < 0.1f)) *ymax += 0.1f;
 		
 		/* free memory */
 		BLI_freelistN(&anim_data);
@@ -155,7 +169,7 @@ static int graphkeys_previewrange_exec(bContext *C, wmOperator *UNUSED(op))
 		scene= ac.scene;
 	
 	/* set the range directly */
-	get_graph_keyframe_extents(&ac, &min, &max, NULL, NULL);
+	get_graph_keyframe_extents(&ac, &min, &max, NULL, NULL, FALSE);
 	scene->r.flag |= SCER_PRV_RANGE;
 	scene->r.psfra= (int)floor(min + 0.5f);
 	scene->r.pefra= (int)floor(max + 0.5f);
@@ -172,10 +186,11 @@ void GRAPH_OT_previewrange_set (wmOperatorType *ot)
 	/* identifiers */
 	ot->name= "Auto-Set Preview Range";
 	ot->idname= "GRAPH_OT_previewrange_set";
+	ot->description= "Automatically set Preview Range based on range of keyframes";
 	
 	/* api callbacks */
 	ot->exec= graphkeys_previewrange_exec;
-	ot->poll= graphop_visible_keyframes_poll;
+	ot->poll= ED_operator_graphedit_active; // XXX: unchecked poll to get fsamples working too, but makes modifier damage trickier...
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
@@ -183,37 +198,51 @@ void GRAPH_OT_previewrange_set (wmOperatorType *ot)
 
 /* ****************** View-All Operator ****************** */
 
-static int graphkeys_viewall_exec(bContext *C, wmOperator *UNUSED(op))
+static int graphkeys_viewall(bContext *C, const short selOnly)
 {
 	bAnimContext ac;
 	View2D *v2d;
 	float extra;
-	
+
 	/* get editor data */
 	if (ANIM_animdata_get_context(C, &ac) == 0)
 		return OPERATOR_CANCELLED;
 	v2d= &ac.ar->v2d;
-	
+
 	/* set the horizontal range, with an extra offset so that the extreme keys will be in view */
-	get_graph_keyframe_extents(&ac, &v2d->cur.xmin, &v2d->cur.xmax, &v2d->cur.ymin, &v2d->cur.ymax);
-	
+	get_graph_keyframe_extents(&ac, &v2d->cur.xmin, &v2d->cur.xmax, &v2d->cur.ymin, &v2d->cur.ymax, selOnly);
+
 	extra= 0.1f * (v2d->cur.xmax - v2d->cur.xmin);
 	v2d->cur.xmin -= extra;
 	v2d->cur.xmax += extra;
-	
+
 	extra= 0.1f * (v2d->cur.ymax - v2d->cur.ymin);
 	v2d->cur.ymin -= extra;
 	v2d->cur.ymax += extra;
-	
+
 	/* do View2D syncing */
 	UI_view2d_sync(CTX_wm_screen(C), CTX_wm_area(C), v2d, V2D_LOCK_COPY);
-	
+
 	/* set notifier that things have changed */
 	ED_area_tag_redraw(CTX_wm_area(C));
-	
+
 	return OPERATOR_FINISHED;
 }
+
+/* ......... */
+
+static int graphkeys_viewall_exec(bContext *C, wmOperator *UNUSED(op))
+{
+	/* whole range */
+	return graphkeys_viewall(C, FALSE);
+}
  
+static int graphkeys_view_selected_exec(bContext *C, wmOperator *UNUSED(op))
+{
+	/* only selected */
+	return graphkeys_viewall(C, TRUE);
+}
+
 void GRAPH_OT_view_all (wmOperatorType *ot)
 {
 	/* identifiers */
@@ -223,8 +252,23 @@ void GRAPH_OT_view_all (wmOperatorType *ot)
 	
 	/* api callbacks */
 	ot->exec= graphkeys_viewall_exec;
-	ot->poll= graphop_visible_keyframes_poll;
+	ot->poll= ED_operator_graphedit_active; // XXX: unchecked poll to get fsamples working too, but makes modifier damage trickier...
 	
+	/* flags */
+	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+}
+
+void GRAPH_OT_view_selected (wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name= "View Selected";
+	ot->idname= "GRAPH_OT_view_selected";
+	ot->description= "Reset viewable area to show selected keyframe range";
+
+	/* api callbacks */
+	ot->exec= graphkeys_view_selected_exec;
+	ot->poll= ED_operator_graphedit_active; // XXX: unchecked poll to get fsamples working too, but makes modifier damage trickier...
+
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 }
@@ -237,7 +281,7 @@ void GRAPH_OT_view_all (wmOperatorType *ot)
 /* Bake each F-Curve into a set of samples, and store as a ghost curve */
 static void create_ghost_curves (bAnimContext *ac, int start, int end)
 {	
-	SpaceIpo *sipo= (SpaceIpo *)ac->sa->spacedata.first;
+	SpaceIpo *sipo= (SpaceIpo *)ac->sl;
 	ListBase anim_data = {NULL, NULL};
 	bAnimListElem *ale;
 	int filter;
@@ -252,7 +296,7 @@ static void create_ghost_curves (bAnimContext *ac, int start, int end)
 	}
 	
 	/* filter data */
-	filter= (ANIMFILTER_VISIBLE | ANIMFILTER_CURVEVISIBLE | ANIMFILTER_SEL | ANIMFILTER_CURVESONLY | ANIMFILTER_NODUPLIS);
+	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_CURVE_VISIBLE | ANIMFILTER_SEL | ANIMFILTER_NODUPLIS);
 	ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 	
 	/* loop through filtered data and add keys between selected keyframes on every frame  */
@@ -357,7 +401,7 @@ static int graphkeys_clear_ghostcurves_exec(bContext *C, wmOperator *UNUSED(op))
 	/* get editor data */
 	if (ANIM_animdata_get_context(C, &ac) == 0)
 		return OPERATOR_CANCELLED;
-	sipo= (SpaceIpo *)ac.sa->spacedata.first;
+	sipo= (SpaceIpo *)ac.sl;
 		
 	/* if no ghost curves, don't do anything */
 	if (sipo->ghostCurves.first == NULL)
@@ -381,7 +425,7 @@ void GRAPH_OT_ghost_curves_clear (wmOperatorType *ot)
 	
 	/* api callbacks */
 	ot->exec= graphkeys_clear_ghostcurves_exec;
-	ot->poll= ED_operator_ipo_active;
+	ot->poll= ED_operator_graphedit_active;
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
@@ -393,7 +437,7 @@ void GRAPH_OT_ghost_curves_clear (wmOperatorType *ot)
 /* ******************** Insert Keyframes Operator ************************* */
 
 /* defines for insert keyframes tool */
-EnumPropertyItem prop_graphkeys_insertkey_types[] = {
+static EnumPropertyItem prop_graphkeys_insertkey_types[] = {
 	{1, "ALL", 0, "All Channels", ""},
 	{2, "SEL", 0, "Only Selected Channels", ""},
 	{0, NULL, 0, NULL, NULL}
@@ -406,12 +450,12 @@ static void insert_graph_keys(bAnimContext *ac, short mode)
 	bAnimListElem *ale;
 	int filter;
 	
+	ReportList *reports = ac->reports;
 	Scene *scene= ac->scene;
-	float cfra= (float)CFRA;
 	short flag = 0;
 	
 	/* filter data */
-	filter= (ANIMFILTER_VISIBLE | ANIMFILTER_CURVEVISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_CURVESONLY | ANIMFILTER_NODUPLIS);
+	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_CURVE_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_NODUPLIS);
 	if (mode == 2) filter |= ANIMFILTER_SEL;
 	
 	ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
@@ -423,6 +467,7 @@ static void insert_graph_keys(bAnimContext *ac, short mode)
 	for (ale= anim_data.first; ale; ale= ale->next) {
 		AnimData *adt= ANIM_nla_mapping_get(ac, ale);
 		FCurve *fcu= (FCurve *)ale->key_data;
+		float cfra;
 		
 		/* adjust current frame for NLA-mapping */
 		if (adt)
@@ -432,7 +477,7 @@ static void insert_graph_keys(bAnimContext *ac, short mode)
 			
 		/* if there's an id */
 		if (ale->id)
-			insert_keyframe(ale->id, NULL, ((fcu->grp)?(fcu->grp->name):(NULL)), fcu->rna_path, fcu->array_index, cfra, flag);
+			insert_keyframe(reports, ale->id, NULL, ((fcu->grp)?(fcu->grp->name):(NULL)), fcu->rna_path, fcu->array_index, cfra, flag);
 		else
 			insert_vert_fcurve(fcu, cfra, fcu->curval, 0);
 	}
@@ -507,19 +552,33 @@ static int graphkeys_click_insert_exec (bContext *C, wmOperator *op)
 	}
 	fcu = ale->data;
 	
-	/* get frame and value from props */
-	frame= RNA_float_get(op->ptr, "frame");
-	val= RNA_float_get(op->ptr, "value");
-	
-	/* apply inverse NLA-mapping to frame to get correct time in un-scaled action */
-	adt= ANIM_nla_mapping_get(&ac, ale);
-	frame= BKE_nla_tweakedit_remap(adt, frame, NLATIME_CONVERT_UNMAP);
-	
-	/* apply inverse unit-mapping to value to get correct value for F-Curves */
-	val *= ANIM_unit_mapping_get_factor(ac.scene, ale->id, fcu, 1);
-	
-	/* insert keyframe on the specified frame + value */
-	insert_vert_fcurve(fcu, frame, val, 0);
+	/* when there are F-Modifiers on the curve, only allow adding
+	 * keyframes if these will be visible after doing so...
+	 */
+	if (fcurve_is_keyframable(fcu)) {
+		/* get frame and value from props */
+		frame= RNA_float_get(op->ptr, "frame");
+		val= RNA_float_get(op->ptr, "value");
+		
+		/* apply inverse NLA-mapping to frame to get correct time in un-scaled action */
+		adt= ANIM_nla_mapping_get(&ac, ale);
+		frame= BKE_nla_tweakedit_remap(adt, frame, NLATIME_CONVERT_UNMAP);
+		
+		/* apply inverse unit-mapping to value to get correct value for F-Curves */
+		val *= ANIM_unit_mapping_get_factor(ac.scene, ale->id, fcu, 1);
+		
+		/* insert keyframe on the specified frame + value */
+		insert_vert_fcurve(fcu, frame, val, 0);
+	}
+	else {
+		/* warn about why this can't happen */
+		if (fcu->fpt)
+			BKE_report(op->reports, RPT_ERROR, "Keyframes cannot be added to sampled F-Curves");
+		else if (fcu->flag & FCURVE_PROTECTED)
+			BKE_report(op->reports, RPT_ERROR, "Active F-Curve is not editable");
+		else
+			BKE_report(op->reports, RPT_ERROR, "Remove F-Modifiers from F-Curve to add keyframes");
+	}
 	
 	/* free temp data */
 	MEM_freeN(ale);
@@ -591,7 +650,7 @@ static short copy_graph_keys (bAnimContext *ac)
 	free_anim_copybuf();
 	
 	/* filter data */
-	filter= (ANIMFILTER_VISIBLE | ANIMFILTER_CURVEVISIBLE | ANIMFILTER_CURVESONLY | ANIMFILTER_NODUPLIS);
+	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_CURVE_VISIBLE | ANIMFILTER_NODUPLIS);
 	ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 	
 	/* copy keyframes */
@@ -603,17 +662,18 @@ static short copy_graph_keys (bAnimContext *ac)
 	return ok;
 }
 
-static short paste_graph_keys (bAnimContext *ac)
+static short paste_graph_keys (bAnimContext *ac,
+	const eKeyPasteOffset offset_mode, const eKeyMergeMode merge_mode)
 {	
 	ListBase anim_data = {NULL, NULL};
 	int filter, ok=0;
 	
 	/* filter data */
-	filter= (ANIMFILTER_VISIBLE | ANIMFILTER_CURVEVISIBLE | ANIMFILTER_SEL | ANIMFILTER_FOREDIT | ANIMFILTER_CURVESONLY | ANIMFILTER_NODUPLIS);
+	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_CURVE_VISIBLE | ANIMFILTER_SEL | ANIMFILTER_FOREDIT | ANIMFILTER_NODUPLIS);
 	ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 	
 	/* paste keyframes */
-	ok= paste_animedit_keys(ac, &anim_data);
+	ok= paste_animedit_keys(ac, &anim_data, offset_mode, merge_mode);
 	
 	/* clean up */
 	BLI_freelistN(&anim_data);
@@ -661,14 +721,20 @@ void GRAPH_OT_copy (wmOperatorType *ot)
 static int graphkeys_paste_exec(bContext *C, wmOperator *op)
 {
 	bAnimContext ac;
+
+	const eKeyPasteOffset offset_mode= RNA_enum_get(op->ptr, "offset");
+	const eKeyMergeMode merge_mode= RNA_enum_get(op->ptr, "merge");
 	
 	/* get editor data */
 	if (ANIM_animdata_get_context(C, &ac) == 0)
 		return OPERATOR_CANCELLED;
 	
+	if(ac.reports==NULL) {
+		ac.reports= op->reports;
+	}
+
 	/* paste keyframes */
-	if (paste_graph_keys(&ac)) {
-		BKE_report(op->reports, RPT_ERROR, "No keyframes to paste");
+	if (paste_graph_keys(&ac, offset_mode, merge_mode)) {
 		return OPERATOR_CANCELLED;
 	}
 	
@@ -689,11 +755,15 @@ void GRAPH_OT_paste (wmOperatorType *ot)
 	ot->description= "Paste keyframes from copy/paste buffer for the selected channels, starting on the current frame";
 	
 	/* api callbacks */
+//	ot->invoke= WM_operator_props_popup; // better wait for graph redo panel
 	ot->exec= graphkeys_paste_exec;
 	ot->poll= graphop_editable_keyframes_poll;
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+
+	RNA_def_enum(ot->srna, "offset", keyframe_paste_offset_items, KEYFRAME_PASTE_OFFSET_CFRA_START, "Offset", "Paste time offset of keys");
+	RNA_def_enum(ot->srna, "merge", keyframe_paste_merge_items, KEYFRAME_PASTE_MERGE_MIX, "Type", "Method of merking pasted keys and existing");
 }
 
 /* ******************** Duplicate Keyframes Operator ************************* */
@@ -705,7 +775,7 @@ static void duplicate_graph_keys (bAnimContext *ac)
 	int filter;
 	
 	/* filter data */
-	filter= (ANIMFILTER_VISIBLE | ANIMFILTER_CURVEVISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_CURVESONLY | ANIMFILTER_NODUPLIS);
+	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_CURVE_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_NODUPLIS);
 	ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 	
 	/* loop through filtered data and delete selected keys */
@@ -742,9 +812,6 @@ static int graphkeys_duplicate_exec(bContext *C, wmOperator *UNUSED(op))
 static int graphkeys_duplicate_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 {
 	graphkeys_duplicate_exec(C, op);
-	
-	RNA_int_set(op->ptr, "mode", TFM_TRANSLATION);
-	WM_operator_name_call(C, "TRANSFORM_OT_transform", WM_OP_INVOKE_REGION_WIN, op->ptr);
 
 	return OPERATOR_FINISHED;
 }
@@ -765,7 +832,7 @@ void GRAPH_OT_duplicate (wmOperatorType *ot)
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 	
 	/* to give to transform */
-	RNA_def_int(ot->srna, "mode", TFM_TRANSLATION, 0, INT_MAX, "Mode", "", 0, INT_MAX);
+	RNA_def_enum(ot->srna, "mode", transform_mode_types, TFM_TRANSLATION, "Mode", "");
 }
 
 /* ******************** Delete Keyframes Operator ************************* */
@@ -777,7 +844,7 @@ static void delete_graph_keys (bAnimContext *ac)
 	int filter;
 	
 	/* filter data */
-	filter= (ANIMFILTER_VISIBLE | ANIMFILTER_CURVEVISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_CURVESONLY | ANIMFILTER_NODUPLIS);
+	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_CURVE_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_NODUPLIS);
 	ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 	
 	/* loop through filtered data and delete selected keys */
@@ -844,7 +911,7 @@ static void clean_graph_keys (bAnimContext *ac, float thresh)
 	int filter;
 	
 	/* filter data */
-	filter= (ANIMFILTER_VISIBLE | ANIMFILTER_CURVEVISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_SEL | ANIMFILTER_CURVESONLY | ANIMFILTER_NODUPLIS);
+	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_CURVE_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_SEL | ANIMFILTER_NODUPLIS);
 	ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 	
 	/* loop through filtered data and clean curves */
@@ -911,7 +978,7 @@ static void bake_graph_curves (bAnimContext *ac, int start, int end)
 	int filter;
 	
 	/* filter data */
-	filter= (ANIMFILTER_VISIBLE | ANIMFILTER_CURVEVISIBLE | ANIMFILTER_SEL | ANIMFILTER_FOREDIT | ANIMFILTER_CURVESONLY | ANIMFILTER_NODUPLIS);
+	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_CURVE_VISIBLE | ANIMFILTER_SEL | ANIMFILTER_FOREDIT | ANIMFILTER_NODUPLIS);
 	ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 	
 	/* loop through filtered data and add keys between selected keyframes on every frame  */
@@ -1014,6 +1081,7 @@ static float fcurve_samplingcb_sound (FCurve *UNUSED(fcu), void *data, float eva
 
 /* ------------------- */
 
+#ifdef WITH_AUDASPACE
 static int graphkeys_sound_bake_exec(bContext *C, wmOperator *op)
 {
 	bAnimContext ac;
@@ -1058,7 +1126,7 @@ static int graphkeys_sound_bake_exec(bContext *C, wmOperator *op)
 	end = CFRA + sbi.length - 1;
 
 	/* filter anim channels */
-	filter= (ANIMFILTER_VISIBLE | ANIMFILTER_CURVEVISIBLE | ANIMFILTER_SEL | ANIMFILTER_FOREDIT | ANIMFILTER_CURVESONLY | ANIMFILTER_NODUPLIS);
+	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_CURVE_VISIBLE | ANIMFILTER_SEL | ANIMFILTER_FOREDIT | ANIMFILTER_NODUPLIS);
 	ANIM_animdata_filter(&ac, &anim_data, filter, ac.data, ac.datatype);
 
 	/* loop through all selected F-Curves, replacing its data with the sound samples */
@@ -1083,6 +1151,17 @@ static int graphkeys_sound_bake_exec(bContext *C, wmOperator *op)
 
 	return OPERATOR_FINISHED;
 }
+
+#else //WITH_AUDASPACE
+
+static int graphkeys_sound_bake_exec(bContext *UNUSED(C), wmOperator *op)
+{
+	BKE_report(op->reports, RPT_ERROR, "Compiled without sound support");
+
+	return OPERATOR_CANCELLED;
+}
+
+#endif //WITH_AUDASPACE
 
 static int graphkeys_sound_bake_invoke (bContext *C, wmOperator *op, wmEvent *event)
 {
@@ -1136,7 +1215,7 @@ static void sample_graph_keys (bAnimContext *ac)
 	int filter;
 	
 	/* filter data */
-	filter= (ANIMFILTER_VISIBLE | ANIMFILTER_CURVEVISIBLE| ANIMFILTER_FOREDIT | ANIMFILTER_CURVESONLY | ANIMFILTER_NODUPLIS);
+	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_CURVE_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_NODUPLIS);
 	ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 	
 	/* loop through filtered data and add keys between selected keyframes on every frame  */
@@ -1190,10 +1269,17 @@ void GRAPH_OT_sample (wmOperatorType *ot)
 
 /* ******************** Set Extrapolation-Type Operator *********************** */
 
+/* defines for make/clear cyclic extrapolation tools */
+#define MAKE_CYCLIC_EXPO 	-1
+#define CLEAR_CYCLIC_EXPO 	-2
+
 /* defines for set extrapolation-type for selected keyframes tool */
-EnumPropertyItem prop_graphkeys_expo_types[] = {
+static EnumPropertyItem prop_graphkeys_expo_types[] = {
 	{FCURVE_EXTRAPOLATE_CONSTANT, "CONSTANT", 0, "Constant Extrapolation", ""},
 	{FCURVE_EXTRAPOLATE_LINEAR, "LINEAR", 0, "Linear Extrapolation", ""},
+	
+	{MAKE_CYCLIC_EXPO, "MAKE_CYCLIC", 0, "Make Cyclic (F-Modifier)", "Add Cycles F-Modifier if one doesn't exist already"},
+	{CLEAR_CYCLIC_EXPO, "CLEAR_CYCLIC", 0, "Clear Cyclic (F-Modifier)", "Remove Cycles F-Modifier if not needed anymore"},
 	{0, NULL, 0, NULL, NULL}
 };
 
@@ -1205,13 +1291,40 @@ static void setexpo_graph_keys(bAnimContext *ac, short mode)
 	int filter;
 	
 	/* filter data */
-	filter= (ANIMFILTER_VISIBLE | ANIMFILTER_CURVEVISIBLE | ANIMFILTER_SEL | ANIMFILTER_FOREDIT | ANIMFILTER_CURVESONLY | ANIMFILTER_NODUPLIS);
+	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_CURVE_VISIBLE | ANIMFILTER_SEL | ANIMFILTER_FOREDIT | ANIMFILTER_NODUPLIS);
 	ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 	
 	/* loop through setting mode per F-Curve */
 	for (ale= anim_data.first; ale; ale= ale->next) {
 		FCurve *fcu= (FCurve *)ale->data;
-		fcu->extend= mode;
+		
+		if (mode >= 0) {
+			/* just set mode setting */
+			fcu->extend= mode;
+		}
+		else {
+			/* shortcuts for managing Cycles F-Modifiers to make it easier to toggle cyclic animation 
+			 * without having to go through FModifier UI in Graph Editor to do so
+			 */
+			if (mode == MAKE_CYCLIC_EXPO) {
+				/* only add if one doesn't exist */
+				if (list_has_suitable_fmodifier(&fcu->modifiers, FMODIFIER_TYPE_CYCLES, -1) == 0) {
+					// TODO: add some more preset versions which set different extrapolation options?
+					add_fmodifier(&fcu->modifiers, FMODIFIER_TYPE_CYCLES);
+				}
+			}
+			else if (mode == CLEAR_CYCLIC_EXPO) {
+				/* remove all the modifiers fitting this description */
+				FModifier *fcm, *fcn=NULL;
+				
+				for (fcm = fcu->modifiers.first; fcm; fcm = fcn) {
+					fcn = fcm->next;
+					
+					if (fcm->type == FMODIFIER_TYPE_CYCLES)
+						remove_fmodifier(&fcu->modifiers, fcm);
+				}
+			}
+		}
 	}
 	
 	/* cleanup */
@@ -1274,7 +1387,7 @@ static void setipo_graph_keys(bAnimContext *ac, short mode)
 	KeyframeEditFunc set_cb= ANIM_editkeyframes_ipo(mode);
 	
 	/* filter data */
-	filter= (ANIMFILTER_VISIBLE | ANIMFILTER_CURVEVISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_CURVESONLY | ANIMFILTER_NODUPLIS);
+	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_CURVE_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_NODUPLIS);
 	ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 	
 	/* loop through setting BezTriple interpolation
@@ -1334,17 +1447,6 @@ void GRAPH_OT_interpolation_type (wmOperatorType *ot)
 
 /* ******************** Set Handle-Type Operator *********************** */
 
-EnumPropertyItem graphkeys_handle_type_items[] = {
-	{HD_FREE, "FREE", 0, "Free", ""},
-	{HD_VECT, "VECTOR", 0, "Vector", ""},
-	{HD_ALIGN, "ALIGNED", 0, "Aligned", ""},
-	{0, "", 0, "", ""},
-	{HD_AUTO, "AUTO", 0, "Auto", "Handles that are automatically adjusted upon moving the keyframe. Whole curve"},
-	{HD_AUTO_ANIM, "ANIM_CLAMPED", 0, "Auto Clamped", "Auto handles clamped to not overshoot. Whole curve"},
-	{0, NULL, 0, NULL, NULL}};
-
-/* ------------------- */
-
 /* this function is responsible for setting handle-type of selected keyframes */
 static void sethandles_graph_keys(bAnimContext *ac, short mode) 
 {
@@ -1356,7 +1458,7 @@ static void sethandles_graph_keys(bAnimContext *ac, short mode)
 	KeyframeEditFunc sel_cb= ANIM_editkeyframes_ok(BEZT_OK_SELECTED);
 	
 	/* filter data */
-	filter= (ANIMFILTER_VISIBLE | ANIMFILTER_CURVEVISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_CURVESONLY | ANIMFILTER_NODUPLIS);
+	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_CURVE_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_NODUPLIS);
 	ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 	
 	/* loop through setting flags for handles 
@@ -1367,12 +1469,6 @@ static void sethandles_graph_keys(bAnimContext *ac, short mode)
 		
 		/* any selected keyframes for editing? */
 		if (ANIM_fcurve_keyframes_loop(NULL, fcu, NULL, sel_cb, NULL)) {
-			/* for auto/auto-clamped, toggle the auto-handles flag on the F-Curve */
-			if (mode == HD_AUTO_ANIM)
-				fcu->flag |= FCURVE_AUTO_HANDLES;
-			else if (mode == HD_AUTO)
-				fcu->flag &= ~FCURVE_AUTO_HANDLES;
-			
 			/* change type of selected handles */
 			ANIM_fcurve_keyframes_loop(NULL, fcu, NULL, edit_cb, calchandles_fcurve);
 		}
@@ -1423,7 +1519,7 @@ static int graphkeys_handletype_exec(bContext *C, wmOperator *op)
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 	
 	/* id-props */
-	ot->prop= RNA_def_enum(ot->srna, "type", graphkeys_handle_type_items, 0, "Type", "");
+	ot->prop= RNA_def_enum(ot->srna, "type", keyframe_handle_type_items, 0, "Type", "");
 }
 
 /* ************************************************************************** */
@@ -1436,12 +1532,13 @@ static int graphkeys_handletype_exec(bContext *C, wmOperator *op)
  * of values to -180 degrees to 180 degrees.
  */
 
-#if 0 // XXX this is not ready for the primetime yet
- 
 /* set of three euler-rotation F-Curves */
 typedef struct tEulerFilter {
+	struct tEulerFilter *next, *prev;
+	
 	ID *id;							/* ID-block which owns the channels */
-	FCurve (*fcurves)[3];			/* 3 Pointers to F-Curves */				
+	FCurve *(fcurves[3]);			/* 3 Pointers to F-Curves */	
+	char *rna_path;					/* Pointer to one of the RNA Path's used by one of the F-Curves */
 } tEulerFilter;
  
 static int graphkeys_euler_filter_exec (bContext *C, wmOperator *op)
@@ -1453,7 +1550,8 @@ static int graphkeys_euler_filter_exec (bContext *C, wmOperator *op)
 	int filter;
 	
 	ListBase eulers = {NULL, NULL};
-	tEulerFilter *euf= NULL;	
+	tEulerFilter *euf= NULL;
+	int groups=0, failed=0;
 	
 	/* get editor data */
 	if (ANIM_animdata_get_context(C, &ac) == 0)
@@ -1463,11 +1561,11 @@ static int graphkeys_euler_filter_exec (bContext *C, wmOperator *op)
 	 * 	 1) Sets of three related rotation curves are identified from the selected channels,
 	 *		and are stored as a single 'operation unit' for the next step
 	 *	 2) Each set of three F-Curves is processed for each keyframe, with the values being
-	 * 		processed according to one of several ways.
+	 * 		processed as necessary
 	 */
 	 
 	/* step 1: extract only the rotation f-curves */
-	filter= (ANIMFILTER_VISIBLE | ANIMFILTER_SEL | ANIMFILTER_CURVEVISIBLE | ANIMFILTER_CURVESONLY | ANIMFILTER_FOREDIT | ANIMFILTER_NODUPLIS);
+	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_SEL | ANIMFILTER_CURVE_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_NODUPLIS);
 	ANIM_animdata_filter(&ac, &anim_data, filter, ac.data, ac.datatype);
 	
 	for (ale= anim_data.first; ale; ale= ale->next) {
@@ -1477,45 +1575,134 @@ static int graphkeys_euler_filter_exec (bContext *C, wmOperator *op)
 		 *	- only rotation curves
 		 *	- for pchan curves, make sure we're only using the euler curves
 		 */
-		if (strstr(fcu->rna_path, "rotation_euler") == 0)
+		if (strstr(fcu->rna_path, "rotation_euler") == NULL)
 			continue;
+		else if (ELEM3(fcu->array_index, 0, 1, 2) == 0) {
+			BKE_reportf(op->reports, RPT_WARNING,
+				"Euler Rotation F-Curve has invalid index (ID='%s', Path='%s', Index=%d)", 
+				(ale->id)? ale->id->name:"<No ID>", fcu->rna_path, fcu->array_index);
+			continue;
+		}
 		
-		/* check if current set of 3-curves is suitable to add this curve to 
-		 *	- things like whether the current set of curves is 'full' should be checked later only
-		 *	- first check if id-blocks are compatible
+		/* optimisation: assume that xyz curves will always be stored consecutively,
+		 * so if the paths or the ID's don't match up, then a curve needs to be added 
+		 * to a new group
 		 */
-		if ((euf) && (ale->id != euf->id)) {
-			/* if the paths match, add this curve to the set of curves */
-			// NOTE: simple string compare for now... could be a bit more fancy...
-			
+		if ((euf) && (euf->id == ale->id) && (strcmp(euf->rna_path, fcu->rna_path)==0)) {
+			/* this should be fine to add to the existing group then */
+			euf->fcurves[fcu->array_index]= fcu;
 		}
 		else {
 			/* just add to a new block */
 			euf= MEM_callocN(sizeof(tEulerFilter), "tEulerFilter");
 			BLI_addtail(&eulers, euf);
+			groups++;
 			
 			euf->id= ale->id;
+			euf->rna_path = fcu->rna_path; /* this should be safe, since we're only using it for a short time */
 			euf->fcurves[fcu->array_index]= fcu;
 		}
 	}
 	BLI_freelistN(&anim_data);
 	
+	if (groups == 0) {
+		BKE_report(op->reports, RPT_WARNING, "No Euler Rotation F-Curves to fix up");
+		return OPERATOR_CANCELLED;
+	}
+	
 	/* step 2: go through each set of curves, processing the values at each keyframe 
 	 *	- it is assumed that there must be a full set of keyframes at each keyframe position
 	 */
 	for (euf= eulers.first; euf; euf= euf->next) {
+		int f;
 		
+		/* sanity check: ensure that there are enough F-Curves to work on in this group */
+		// TODO: also enforce assumption that there be a full set of keyframes at each position by ensuring that totvert counts are same?
+		if (ELEM3(NULL, euf->fcurves[0], euf->fcurves[1], euf->fcurves[2])) {
+			/* report which components are missing */
+			BKE_reportf(op->reports, RPT_WARNING,
+				"Missing %s%s%s component(s) of euler rotation for ID='%s' and RNA-Path='%s'",
+				(euf->fcurves[0]==NULL)? "X":"",
+				(euf->fcurves[1]==NULL)? "Y":"",
+				(euf->fcurves[2]==NULL)? "Z":"",
+				euf->id->name, euf->rna_path);
+				
+			/* keep track of number of failed sets, and carry on to next group */
+			failed++;
+			continue;
+		}
+		
+		/* simple method: just treat any difference between keys of greater than 180 degrees as being a flip */
+		// FIXME: there are more complicated methods that will be needed to fix more cases than just some
+		for (f = 0; f < 3; f++) {
+			FCurve *fcu = euf->fcurves[f];
+			BezTriple *bezt, *prev=NULL;
+			unsigned int i;
+			
+			/* skip if not enough vets to do a decent analysis of... */
+			if (fcu->totvert <= 2)
+				continue;
+			
+			/* prev follows bezt, bezt = "current" point to be fixed */
+			for (i=0, bezt=fcu->bezt; i < fcu->totvert; i++, prev=bezt, bezt++) {
+				/* our method depends on determining a "difference" from the previous vert */
+				if (prev == NULL)
+					continue;
+				
+				/* > 180 degree flip? */
+				if (fabs(prev->vec[1][1] - bezt->vec[1][1]) >= M_PI) {
+					/* 360 degrees to add/subtract frame value until difference is acceptably small that there's no more flip */
+					const float fac = 2.0f * (float)M_PI;
+					
+					if (prev->vec[1][1] > bezt->vec[1][1]) {
+						while (fabsf(bezt->vec[1][1] - prev->vec[1][1]) >= (float)M_PI) {
+							bezt->vec[0][1] += fac;
+							bezt->vec[1][1] += fac;
+							bezt->vec[2][1] += fac;
+						}
+					}
+					else /* if (prev->vec[1][1] < bezt->vec[1][1]) */ {
+						while (fabsf(bezt->vec[1][1] - prev->vec[1][1]) >= (float)M_PI) {
+							bezt->vec[0][1] -= fac;
+							bezt->vec[1][1] -= fac;
+							bezt->vec[2][1] -= fac;
+						}
+					}
+				}
+			}
+		}
 	}
 	BLI_freelistN(&eulers);
 	
-	return OPERATOR_FINISHED;
+	/* updates + finishing warnings */
+	if (failed == groups) {
+		BKE_report(op->reports, RPT_ERROR, 
+			"No Euler Rotations could be corrected. Ensure each rotation has keys for all components, and that F-Curves for these are in consecutive XYZ order and selected.");
+		return OPERATOR_CANCELLED;
+	}
+	else {
+		if (failed) {
+			BKE_report(op->reports, RPT_ERROR,
+				"Some Euler Rotations couldn't be corrected due to missing/unselected/out-of-order F-Curves. Ensure each rotation has keys for all components, and that F-Curves for these are in consecutive XYZ order and selected.");
+		}
+		
+		/* validate keyframes after editing */
+		ANIM_editkeyframes_refresh(&ac);
+		
+		/* set notifier that keyframes have changed */
+		WM_event_add_notifier(C, NC_ANIMATION|ND_KEYFRAME|NA_EDITED, NULL);
+		
+		/* done at last */
+		return OPERATOR_FINISHED;
+	}
 }
  
 void GRAPH_OT_euler_filter (wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Euler Filter";
+	ot->name= "Euler Discontinuity Filter";
 	ot->idname= "GRAPH_OT_euler_filter";
+	ot->description= "Fixes the most common causes of gimbal lock in the selected Euler Rotation F-Curves";
 	
 	/* api callbacks */
 	ot->exec= graphkeys_euler_filter_exec;
@@ -1524,8 +1711,6 @@ void GRAPH_OT_euler_filter (wmOperatorType *ot)
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 }
-
-#endif // XXX this is not ready for the primetime yet
 
 /* ***************** Jump to Selected Frames Operator *********************** */
 
@@ -1546,7 +1731,7 @@ static int graphkeys_framejump_exec(bContext *C, wmOperator *UNUSED(op))
 	memset(&ked, 0, sizeof(KeyframeEditData));
 	
 	/* loop over action data, averaging values */
-	filter= (ANIMFILTER_VISIBLE | ANIMFILTER_CURVEVISIBLE | ANIMFILTER_CURVESONLY | ANIMFILTER_NODUPLIS);
+	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_CURVE_VISIBLE | ANIMFILTER_NODUPLIS);
 	ANIM_animdata_filter(&ac, &anim_data, filter, ac.data, ac.datatype);
 	
 	for (ale= anim_data.first; ale; ale= ale->next) {
@@ -1571,7 +1756,7 @@ static int graphkeys_framejump_exec(bContext *C, wmOperator *UNUSED(op))
 	
 	/* set the new current frame and cursor values, based on the average time and value */
 	if (ked.i1) {
-		SpaceIpo *sipo= ac.sa->spacedata.first;
+		SpaceIpo *sipo= (SpaceIpo *)ac.sl;
 		Scene *scene= ac.scene;
 		
 		/* take the average values, rounding to the nearest int for the current frame */
@@ -1604,7 +1789,7 @@ void GRAPH_OT_frame_jump (wmOperatorType *ot)
 /* ******************** Snap Keyframes Operator *********************** */
 
 /* defines for snap keyframes tool */
-EnumPropertyItem prop_graphkeys_snap_types[] = {
+static EnumPropertyItem prop_graphkeys_snap_types[] = {
 	{GRAPHKEYS_SNAP_CFRA, "CFRA", 0, "Current Frame", ""},
 	{GRAPHKEYS_SNAP_VALUE, "VALUE", 0, "Cursor Value", ""},
 	{GRAPHKEYS_SNAP_NEAREST_FRAME, "NEAREST_FRAME", 0, "Nearest Frame", ""}, // XXX as single entry?
@@ -1625,7 +1810,7 @@ static void snap_graph_keys(bAnimContext *ac, short mode)
 	KeyframeEditFunc edit_cb;
 	
 	/* filter data */
-	filter= (ANIMFILTER_VISIBLE | ANIMFILTER_CURVEVISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_CURVESONLY | ANIMFILTER_NODUPLIS);
+	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_CURVE_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_NODUPLIS);
 	ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 	
 	/* get beztriple editing callbacks */
@@ -1638,7 +1823,7 @@ static void snap_graph_keys(bAnimContext *ac, short mode)
 		ked.list.last= (ac->markers) ? ac->markers->last : NULL;
 	}
 	else if (mode == GRAPHKEYS_SNAP_VALUE) {
-		SpaceIpo *sipo= (SpaceIpo *)ac->sa->spacedata.first;
+		SpaceIpo *sipo= (SpaceIpo *)ac->sl;
 		ked.f1= (sipo) ? sipo->cursorVal : 0.0f;
 	}
 	
@@ -1712,7 +1897,7 @@ void GRAPH_OT_snap (wmOperatorType *ot)
 /* ******************** Mirror Keyframes Operator *********************** */
 
 /* defines for mirror keyframes tool */
-EnumPropertyItem prop_graphkeys_mirror_types[] = {
+static EnumPropertyItem prop_graphkeys_mirror_types[] = {
 	{GRAPHKEYS_MIRROR_CFRA, "CFRA", 0, "By Times over Current Frame", ""},
 	{GRAPHKEYS_MIRROR_VALUE, "VALUE", 0, "By Values over Cursor Value", ""},
 	{GRAPHKEYS_MIRROR_YAXIS, "YAXIS", 0, "By Times over Time=0", ""},
@@ -1743,13 +1928,7 @@ static void mirror_graph_keys(bAnimContext *ac, short mode)
 		TimeMarker *marker= NULL;
 		
 		/* find first selected marker */
-		if (ac->markers) {
-			for (marker= ac->markers->first; marker; marker=marker->next) {
-				if (marker->flag & SELECT) {
-					break;
-				}
-			}
-		}
+		marker= ED_markers_get_first_selected(ac->markers);
 		
 		/* store marker's time (if available) */
 		if (marker)
@@ -1758,12 +1937,12 @@ static void mirror_graph_keys(bAnimContext *ac, short mode)
 			return;
 	}
 	else if (mode == GRAPHKEYS_MIRROR_VALUE) {
-		SpaceIpo *sipo= (SpaceIpo *)ac->sa->spacedata.first;
+		SpaceIpo *sipo= (SpaceIpo *)ac->sl;
 		ked.f1= (sipo) ? sipo->cursorVal : 0.0f;
 	}
 	
 	/* filter data */
-	filter= (ANIMFILTER_VISIBLE | ANIMFILTER_CURVEVISIBLE| ANIMFILTER_FOREDIT | ANIMFILTER_CURVESONLY | ANIMFILTER_NODUPLIS);
+	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_CURVE_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_NODUPLIS);
 	ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 	
 	/* mirror keyframes */
@@ -1847,7 +2026,7 @@ static int graphkeys_smooth_exec(bContext *C, wmOperator *UNUSED(op))
 		return OPERATOR_CANCELLED;
 	
 	/* filter data */
-	filter= (ANIMFILTER_VISIBLE | ANIMFILTER_CURVEVISIBLE| ANIMFILTER_FOREDIT | ANIMFILTER_CURVESONLY | ANIMFILTER_NODUPLIS);
+	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_CURVE_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_NODUPLIS);
 	ANIM_animdata_filter(&ac, &anim_data, filter, ac.data, ac.datatype);
 	
 	/* smooth keyframes */
@@ -1896,7 +2075,7 @@ static int graph_fmodifier_add_invoke (bContext *C, wmOperator *op, wmEvent *UNU
 	uiLayout *layout;
 	int i;
 	
-	pup= uiPupMenuBegin(C, "Add F-Curve Modifier", 0);
+	pup= uiPupMenuBegin(C, "Add F-Curve Modifier", ICON_NONE);
 	layout= uiPupMenuLayout(pup);
 	
 	/* start from 1 to skip the 'Invalid' modifier type */
@@ -1909,7 +2088,7 @@ static int graph_fmodifier_add_invoke (bContext *C, wmOperator *op, wmEvent *UNU
 			continue;
 		
 		/* create operator menu item with relevant properties filled in */
-		props_ptr= uiItemFullO(layout, "GRAPH_OT_fmodifier_add", fmi->name, 0, NULL, WM_OP_EXEC_REGION_WIN, UI_ITEM_O_RETURN_PROPS);
+		props_ptr= uiItemFullO(layout, "GRAPH_OT_fmodifier_add", fmi->name, ICON_NONE, NULL, WM_OP_EXEC_REGION_WIN, UI_ITEM_O_RETURN_PROPS);
 			/* the only thing that gets set from the menu is the type of F-Modifier to add */
 		RNA_enum_set(&props_ptr, "type", i);
 			/* the following properties are just repeats of existing ones... */
@@ -1938,11 +2117,11 @@ static int graph_fmodifier_add_exec(bContext *C, wmOperator *op)
 	type= RNA_enum_get(op->ptr, "type");
 	
 	/* filter data */
-	filter= (ANIMFILTER_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_CURVESONLY | ANIMFILTER_NODUPLIS);
+	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_NODUPLIS);
 	if (RNA_boolean_get(op->ptr, "only_active"))
-		filter |= ANIMFILTER_ACTIVE;
+		filter |= ANIMFILTER_ACTIVE; // FIXME: enforce in this case only a single channel to get handled?
 	else
-		filter |= (ANIMFILTER_SEL|ANIMFILTER_CURVEVISIBLE);
+		filter |= (ANIMFILTER_SEL|ANIMFILTER_CURVE_VISIBLE);
 	ANIM_animdata_filter(&ac, &anim_data, filter, ac.data, ac.datatype);
 	
 	/* add f-modifier to each curve */
@@ -1954,7 +2133,7 @@ static int graph_fmodifier_add_exec(bContext *C, wmOperator *op)
 		fcm= add_fmodifier(&fcu->modifiers, type);
 		if (fcm)
 			set_active_fmodifier(&fcu->modifiers, fcm);
-		else { // TODO: stop when this happens?
+		else {
 			BKE_report(op->reports, RPT_ERROR, "Modifier couldn't be added. See console for details.");
 			break;
 		}
@@ -2061,7 +2240,7 @@ static int graph_fmodifier_paste_exec(bContext *C, wmOperator *op)
 		return OPERATOR_CANCELLED;
 	
 	/* filter data */
-	filter= (ANIMFILTER_VISIBLE | ANIMFILTER_CURVEVISIBLE | ANIMFILTER_SEL | ANIMFILTER_FOREDIT | ANIMFILTER_CURVESONLY);
+	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_CURVE_VISIBLE | ANIMFILTER_SEL | ANIMFILTER_FOREDIT);
 	ANIM_animdata_filter(&ac, &anim_data, filter, ac.data, ac.datatype);
 	
 	/* paste modifiers */
@@ -2100,7 +2279,7 @@ void GRAPH_OT_fmodifier_paste (wmOperatorType *ot)
 	
 	/* api callbacks */
 	ot->exec= graph_fmodifier_paste_exec;
-	ot->poll= graphop_editable_keyframes_poll;
+	ot->poll= graphop_active_fcurve_poll;
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;

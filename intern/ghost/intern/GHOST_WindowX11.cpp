@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file ghost/intern/GHOST_WindowX11.cpp
+ *  \ingroup GHOST
+ */
+
 
 #include "GHOST_WindowX11.h"
 #include "GHOST_SystemX11.h"
@@ -159,7 +164,7 @@ GHOST_WindowX11(
 	const bool stereoVisual,
 	const GHOST_TUns16 numOfAASamples
 ) :
-	GHOST_Window(title,left,top,width,height,state,type,stereoVisual,numOfAASamples),
+	GHOST_Window(width,height,state,type,stereoVisual,numOfAASamples),
 	m_context(NULL),
 	m_display(display),
 	m_normal_state(GHOST_kWindowStateNormal),
@@ -178,8 +183,22 @@ GHOST_WindowX11(
 	int natom;
 	int glxVersionMajor, glxVersionMinor; // As in GLX major.minor
 
+#ifdef WITH_X11_XINPUT
+	/* initialize incase X11 fails to load */
+	memset(&m_xtablet, 0, sizeof(m_xtablet));
+#endif
+
+	m_visual= NULL;
+
 	if (!glXQueryVersion(m_display, &glxVersionMajor, &glxVersionMinor)) {
 		printf("%s:%d: X11 glXQueryVersion() failed, verify working openGL system!\n", __FILE__, __LINE__);
+		
+		/* exit if this is the first window */
+		if(s_firstContext==NULL) {
+			printf("initial window could not find the GLX extension, exit!\n");
+			exit(1);
+		}
+
 		return;
 	}
 
@@ -211,6 +230,12 @@ GHOST_WindowX11(
 			if (samples == 0) {
 				/* All options exhausted, cannot continue */
 				printf("%s:%d: X11 glXChooseVisual() failed, verify working openGL system!\n", __FILE__, __LINE__);
+				
+				if(s_firstContext==NULL) {
+					printf("initial window could not find the GLX extension, exit!\n");
+					exit(1);
+				}
+				
 				return;
 			}
 		} else {
@@ -220,8 +245,6 @@ GHOST_WindowX11(
 			break;
 		}
 	}
-
-	memset(&m_xtablet, 0, sizeof(m_xtablet));
 
 	// Create a bunch of attributes needed to create an X window.
 
@@ -327,13 +350,15 @@ GHOST_WindowX11(
 	// we want this window treated.
 
 	XSizeHints * xsizehints = XAllocSizeHints();
-	xsizehints->flags = PPosition | PSize | PMinSize;
+	xsizehints->flags = PPosition | PSize | PMinSize | PMaxSize;
 	xsizehints->x = left;
 	xsizehints->y = top;
 	xsizehints->width = width;
 	xsizehints->height = height;
 	xsizehints->min_width= 320;  	// size hints, could be made apart of the ghost api
 	xsizehints->min_height= 240;	// limits are also arbitrary, but should not allow 1x1 window
+	xsizehints->max_width= 65535;
+	xsizehints->max_height= 65535;
 	XSetWMNormalHints(m_display, m_window, xsizehints);
 	XFree(xsizehints);
 
@@ -417,7 +442,9 @@ GHOST_WindowX11(
 
 	setTitle(title);
 
+#ifdef WITH_X11_XINPUT
 	initXInputDevices();
+#endif
 
 	// now set up the rendering context.
 	if (installDrawingContext(type) == GHOST_kSuccess) {
@@ -431,6 +458,7 @@ GHOST_WindowX11(
 	XFlush(m_display);
 }
 
+#ifdef WITH_X11_XINPUT
 /* 
 	Dummy function to get around IO Handler exiting if device invalid
 	Basically it will not crash blender now if you have a X device that 
@@ -470,6 +498,7 @@ static bool match_token(const char *haystack, const char *needle)
 	}
 	return FALSE;
 }
+
 
 /*	Determining if an X device is a Tablet style device is an imperfect science.
 **  We rely on common conventions around device names as well as the type reported
@@ -630,8 +659,9 @@ void GHOST_WindowX11::initXInputDevices()
 		}
 		XFree(version);
 	}
-}	
+}
 
+#endif /* WITH_X11_XINPUT */
 
 	Window 
 GHOST_WindowX11::
@@ -657,7 +687,7 @@ setTitle(
 	XChangeProperty(m_display, m_window,
 	                name, utf8str, 8, PropModeReplace,
 	                (const unsigned char*) title.ReadPtr(),
-	                strlen(title.ReadPtr()));
+	                title.Length());
 
 // This should convert to valid x11 string
 //  and getTitle would need matching change
@@ -1253,14 +1283,16 @@ GHOST_WindowX11::
 	if (m_custom_cursor) {
 		XFreeCursor(m_display, m_custom_cursor);
 	}
-	
+
+#ifdef WITH_X11_XINPUT
 	/* close tablet devices */
 	if(m_xtablet.StylusDevice)
 		XCloseDevice(m_display, m_xtablet.StylusDevice);
 	
 	if(m_xtablet.EraserDevice)
 		XCloseDevice(m_display, m_xtablet.EraserDevice);
-	
+#endif /* WITH_X11_XINPUT */
+
 	if (m_context != s_firstContext) {
 		glXDestroyContext(m_display, m_context);
 	}

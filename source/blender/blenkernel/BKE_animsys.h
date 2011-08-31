@@ -1,6 +1,4 @@
-/**
- * $Id$
- *
+/*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -28,6 +26,11 @@
 #ifndef BKE_ANIM_SYS_H
 #define BKE_ANIM_SYS_H
 
+/** \file BKE_animsys.h
+ *  \ingroup bke
+ *  \author Joshua Leung
+ */
+
 struct ID;
 struct ListBase;
 struct Main;
@@ -36,6 +39,7 @@ struct KeyingSet;
 struct KS_Path;
 
 struct PointerRNA;
+struct ReportList;
 struct bAction;
 struct bActionGroup;
 struct AnimMapper;
@@ -52,17 +56,26 @@ struct AnimData *BKE_animdata_from_id(struct ID *id);
 /* Add AnimData to the given ID-block */
 struct AnimData *BKE_id_add_animdata(struct ID *id);
 
+/* Set active action used by AnimData from the given ID-block */
+short BKE_animdata_set_action(struct ReportList *reports, struct ID *id, struct bAction *act);
+
 /* Free AnimData */
 void BKE_free_animdata(struct ID *id);
 
 /* Copy AnimData */
-struct AnimData *BKE_copy_animdata(struct AnimData *adt);
+struct AnimData *BKE_copy_animdata(struct AnimData *adt, const short do_action);
 
 /* Copy AnimData */
-int BKE_copy_animdata_id(struct ID *id_to, struct ID *id_from);
+int BKE_copy_animdata_id(struct ID *id_to, struct ID *id_from, const short do_action);
+
+/* Copy AnimData Actions */
+void BKE_copy_animdata_id_action(struct ID *id);
 
 /* Make Local */
 void BKE_animdata_make_local(struct AnimData *adt);
+
+/* Re-Assign ID's */
+void BKE_relink_animdata(struct AnimData *adt);
 
 /* ************************************* */
 /* KeyingSets API */
@@ -92,10 +105,18 @@ void BKE_keyingsets_free(struct ListBase *list);
 /* Path Fixing API */
 
 /* Fix all the paths for the given ID+AnimData */
-void BKE_animdata_fix_paths_rename(struct ID *owner_id, struct AnimData *adt, char *prefix, char *oldName, char *newName, int oldSubscript, int newSubscript, int verify_paths);
+void BKE_animdata_fix_paths_rename(struct ID *owner_id, struct AnimData *adt, const char *prefix, char *oldName, char *newName, int oldSubscript, int newSubscript, int verify_paths);
 
 /* Fix all the paths for the entire database... */
 void BKE_all_animdata_fix_paths_rename(char *prefix, char *oldName, char *newName);
+
+/* -------------------------------------- */
+
+/* Move animation data from src to destination if it's paths are based on basepaths */
+void BKE_animdata_separate_by_basepath(struct ID *srcID, struct ID *dstID, struct ListBase *basepaths);
+
+/* Move F-Curves from src to destination if it's path is based on basepath */
+void action_move_fcurves_by_basepath(struct bAction *srcAct, struct bAction *dstAct, const char basepath[]);
 
 /* ************************************* */
 /* Batch AnimData API */
@@ -117,10 +138,10 @@ void BKE_animdata_main_cb(struct Main *main, ID_AnimData_Edit_Callback func, voi
 /* In general, these ones should be called to do all animation evaluation */
 
 /* Evaluation loop for evaluating animation data  */
-void BKE_animsys_evaluate_animdata(struct ID *id, struct AnimData *adt, float ctime, short recalc);
+void BKE_animsys_evaluate_animdata(struct Scene *scene, struct ID *id, struct AnimData *adt, float ctime, short recalc);
 
 /* Evaluation of all ID-blocks with Animation Data blocks - Animation Data Only */
-void BKE_animsys_evaluate_all_animation(struct Main *main, float ctime);
+void BKE_animsys_evaluate_all_animation(struct Main *main, struct Scene *scene, float ctime);
 
 
 /* ------------ Specialised API --------------- */

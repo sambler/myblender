@@ -1,6 +1,4 @@
-/**
- * $Id$
- *
+/*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -24,6 +22,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/gpencil/gpencil_buttons.c
+ *  \ingroup edgpencil
+ */
+
  
 #include <stdio.h>
 #include <string.h>
@@ -66,15 +69,16 @@
 /* These are just 'dummy wrappers' around gpencil api calls */
 
 /* make layer active one after being clicked on */
-void gp_ui_activelayer_cb (bContext *C, void *gpd, void *gpl)
+static void gp_ui_activelayer_cb (bContext *C, void *gpd, void *gpl)
 {
+	/* make sure the layer we want to remove is the active one */
 	gpencil_layer_setactive(gpd, gpl);
-	
+
 	WM_event_add_notifier(C, NC_SCREEN|ND_GPENCIL|NA_EDITED, NULL); // XXX please work!
 }
 
 /* delete 'active' layer */
-void gp_ui_dellayer_cb (bContext *C, void *gpd, void *gpl)
+static void gp_ui_dellayer_cb (bContext *C, void *gpd, void *gpl)
 {
 	/* make sure the layer we want to remove is the active one */
 	gpencil_layer_setactive(gpd, gpl); 
@@ -83,10 +87,12 @@ void gp_ui_dellayer_cb (bContext *C, void *gpd, void *gpl)
 	WM_event_add_notifier(C, NC_SCREEN|ND_GPENCIL|NA_EDITED, NULL); // XXX please work!
 }
 
+
+
 /* ------- Drawing Code ------- */
 
 /* draw the controls for a given layer */
-static void gp_drawui_layer (uiLayout *layout, bGPdata *gpd, bGPDlayer *gpl)
+static void gp_drawui_layer (uiLayout *layout, bGPdata *gpd, bGPDlayer *gpl, const short is_v3d)
 {
 	uiLayout *box=NULL, *split=NULL;
 	uiLayout *col=NULL, *subcol=NULL;
@@ -117,9 +123,11 @@ static void gp_drawui_layer (uiLayout *layout, bGPdata *gpd, bGPDlayer *gpl)
 	subrow= uiLayoutRow(row, 0);
 	
 	/* active */
+	block= uiLayoutGetBlock(subrow);
 	icon= (gpl->flag & GP_LAYER_ACTIVE) ? ICON_RADIOBUT_ON : ICON_RADIOBUT_OFF;
-	uiItemR(subrow, &ptr, "active", 0, "", icon);
-	
+	but= uiDefIconBut(block, BUT, 0, icon, 0, 0, UI_UNIT_X, UI_UNIT_Y, NULL, 0.0, 0.0, 0.0, 0.0, "Set active layer");
+	uiButSetFunc(but, gp_ui_activelayer_cb, gpd, gpl);
+
 	/* locked */
 	icon= (gpl->flag & GP_LAYER_LOCKED) ? ICON_LOCKED : ICON_UNLOCKED;
 	uiItemR(subrow, &ptr, "lock", 0, "", icon);
@@ -138,10 +146,10 @@ static void gp_drawui_layer (uiLayout *layout, bGPdata *gpd, bGPDlayer *gpl)
 			sprintf(name, "%s (Hidden)", gpl->info);
 		else
 			sprintf(name, "%s (Locked)", gpl->info);
-		uiItemL(subrow, name, 0);
+		uiItemL(subrow, name, ICON_NONE);
 			
 		/* delete button (only if hidden but not locked!) */
-		if ((gpl->flag & GP_LAYER_HIDE) & !(gpl->flag & GP_LAYER_LOCKED)) {
+		if ((gpl->flag & GP_LAYER_HIDE) && !(gpl->flag & GP_LAYER_LOCKED)) {
 			/* right-align ............................... */
 			subrow= uiLayoutRow(row, 1);
 			uiLayoutSetAlignment(subrow, UI_LAYOUT_ALIGN_RIGHT);
@@ -165,7 +173,7 @@ static void gp_drawui_layer (uiLayout *layout, bGPdata *gpd, bGPDlayer *gpl)
 		uiBlockSetEmboss(block, UI_EMBOSS);
 		
 		/* name */
-		uiItemR(subrow, &ptr, "info", 0, "", 0);
+		uiItemR(subrow, &ptr, "info", 0, "", ICON_NONE);
 		
 		/* delete 'button' */
 		uiBlockSetEmboss(block, UI_EMBOSSN);
@@ -189,17 +197,17 @@ static void gp_drawui_layer (uiLayout *layout, bGPdata *gpd, bGPDlayer *gpl)
 		
 		/* color */
 		subcol= uiLayoutColumn(col, 1);
-			uiItemR(subcol, &ptr, "color", 0, "", 0);
-			uiItemR(subcol, &ptr, "alpha", UI_ITEM_R_SLIDER, NULL, 0);
+			uiItemR(subcol, &ptr, "color", 0, "", ICON_NONE);
+			uiItemR(subcol, &ptr, "alpha", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
 			
 		/* stroke thickness */
 		subcol= uiLayoutColumn(col, 1);
-			uiItemR(subcol, &ptr, "line_width", UI_ITEM_R_SLIDER, NULL, 0);
+			uiItemR(subcol, &ptr, "line_width", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
 		
 		/* debugging options */
 		if (G.f & G_DEBUG) {
 			subcol= uiLayoutColumn(col, 1);
-				uiItemR(subcol, &ptr, "show_points", 0, NULL, 0);
+				uiItemR(subcol, &ptr, "show_points", 0, NULL, ICON_NONE);
 		}
 		
 		/* right column ................... */
@@ -207,13 +215,15 @@ static void gp_drawui_layer (uiLayout *layout, bGPdata *gpd, bGPDlayer *gpl)
 		
 		/* onion-skinning */
 		subcol= uiLayoutColumn(col, 1);
-			uiItemR(subcol, &ptr, "use_onion_skinning", 0, "Onion Skinning", 0);
-			uiItemR(subcol, &ptr, "ghost_range_max", 0, "Frames", 0); // XXX shorter name here? i.e. GStep
+			uiItemR(subcol, &ptr, "use_onion_skinning", 0, "Onion Skinning", ICON_NONE);
+			uiItemR(subcol, &ptr, "ghost_range_max", 0, "Frames", ICON_NONE); // XXX shorter name here? i.e. GStep
 		
-		/* additional options... */
-		subcol= uiLayoutColumn(col, 1);
-			uiItemO(subcol, "Delete Frame", 0, "GPENCIL_OT_active_frame_delete");
-			uiItemO(subcol, "Convert...", 0, "GPENCIL_OT_convert");
+		/* 3d-view specific drawing options */
+		if (is_v3d) {
+			subcol= uiLayoutColumn(col, 0);
+				uiItemR(subcol, &ptr, "show_x_ray", 0, "X-Ray", ICON_NONE);
+		}
+		
 	}
 } 
 
@@ -231,6 +241,7 @@ static void draw_gpencil_panel (bContext *C, uiLayout *layout, bGPdata *gpd, Poi
 	bGPDlayer *gpl;
 	uiLayout *col, *row;
 	short v3d_stroke_opts = STROKE_OPTS_NORMAL;
+	const short is_v3d= CTX_wm_view3d(C) != NULL;
 	
 	/* make new PointerRNA for Grease Pencil block */
 	RNA_id_pointer_create((ID *)gpd, &gpd_ptr);
@@ -242,8 +253,11 @@ static void draw_gpencil_panel (bContext *C, uiLayout *layout, bGPdata *gpd, Poi
 		uiTemplateID(col, C, ctx_ptr, "grease_pencil", "GPENCIL_OT_data_add", NULL, "GPENCIL_OT_data_unlink"); 
 		
 		/* add new layer button - can be used even when no data, since it can add a new block too */
-		uiItemO(col, NULL, 0, "GPENCIL_OT_layer_add");
-	
+		uiItemO(col, "New Layer", ICON_NONE, "GPENCIL_OT_layer_add");
+		row= uiLayoutRow(col, 1);
+		uiItemO(row, "Delete Frame", ICON_NONE, "GPENCIL_OT_active_frame_delete");
+		uiItemO(row, "Convert", ICON_NONE, "GPENCIL_OT_convert");
+		
 	/* sanity checks... */
 	if (gpd == NULL)
 		return;
@@ -251,16 +265,16 @@ static void draw_gpencil_panel (bContext *C, uiLayout *layout, bGPdata *gpd, Poi
 	/* draw each layer --------------------------------------------- */
 	for (gpl= gpd->layers.first; gpl; gpl= gpl->next) {
 		col= uiLayoutColumn(layout, 1);
-			gp_drawui_layer(col, gpd, gpl);
+			gp_drawui_layer(col, gpd, gpl, is_v3d);
 	}
 	
 	/* draw gpd drawing settings first ------------------------------------- */
 	col= uiLayoutColumn(layout, 1);
 		/* label */
-		uiItemL(col, "Drawing Settings:", 0);
+		uiItemL(col, "Drawing Settings:", ICON_NONE);
 		
 		/* check whether advanced 3D-View drawing space options can be used */
-		if (CTX_wm_view3d(C)) {
+		if (is_v3d) {
 			if (gpd->flag & (GP_DATA_DEPTH_STROKE|GP_DATA_DEPTH_VIEW))
 				v3d_stroke_opts = STROKE_OPTS_V3D_ON;
 			else
@@ -269,16 +283,16 @@ static void draw_gpencil_panel (bContext *C, uiLayout *layout, bGPdata *gpd, Poi
 		
 		/* drawing space options */
 		row= uiLayoutRow(col, 1);
-			uiItemEnumR_string(row, &gpd_ptr, "draw_mode", "VIEW", NULL, 0);
-			uiItemEnumR_string(row, &gpd_ptr, "draw_mode", "CURSOR", NULL, 0);
+			uiItemEnumR_string(row, &gpd_ptr, "draw_mode", "VIEW", NULL, ICON_NONE);
+			uiItemEnumR_string(row, &gpd_ptr, "draw_mode", "CURSOR", NULL, ICON_NONE);
 		row= uiLayoutRow(col, 1);
 			uiLayoutSetActive(row, v3d_stroke_opts);
-			uiItemEnumR_string(row, &gpd_ptr, "draw_mode", "SURFACE", NULL, 0);
-			uiItemEnumR_string(row, &gpd_ptr, "draw_mode", "STROKE", NULL, 0);
+			uiItemEnumR_string(row, &gpd_ptr, "draw_mode", "SURFACE", NULL, ICON_NONE);
+			uiItemEnumR_string(row, &gpd_ptr, "draw_mode", "STROKE", NULL, ICON_NONE);
 		
 		row= uiLayoutRow(col, 0);
 			uiLayoutSetActive(row, v3d_stroke_opts==STROKE_OPTS_V3D_ON);
-			uiItemR(row, &gpd_ptr, "use_stroke_endpoints", 0, NULL, 0);
+			uiItemR(row, &gpd_ptr, "use_stroke_endpoints", 0, NULL, ICON_NONE);
 }	
 
 

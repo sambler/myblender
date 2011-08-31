@@ -1,6 +1,4 @@
-/**
- * $Id$
- *
+/*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -26,6 +24,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/space_time/space_time.c
+ *  \ingroup sptime
+ */
+
+
 #include <string.h>
 #include <stdio.h>
 
@@ -36,6 +39,7 @@
 
 #include "BLI_blenlib.h"
 #include "BLI_dlrbTree.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_context.h"
 #include "BKE_global.h"
@@ -55,6 +59,7 @@
 #include "UI_resources.h"
 #include "UI_view2d.h"
 
+#include "ED_space_api.h"
 #include "ED_markers.h"
 
 #include "time_intern.h"
@@ -64,16 +69,20 @@
 static void time_draw_sfra_efra(Scene *scene, View2D *v2d)
 {	
 	/* draw darkened area outside of active timeline 
-	 * frame range used is preview range or scene range */
-	UI_ThemeColorShade(TH_BACK, -25);
-
-	if (PSFRA < PEFRA) {
-		glRectf(v2d->cur.xmin, v2d->cur.ymin, (float)PSFRA, v2d->cur.ymax);
-		glRectf((float)PEFRA, v2d->cur.ymin, v2d->cur.xmax, v2d->cur.ymax);
-	}
-	else {
-		glRectf(v2d->cur.xmin, v2d->cur.ymin, v2d->cur.xmax, v2d->cur.ymax);
-	}
+	 * frame range used is preview range or scene range 
+	 */
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glEnable(GL_BLEND);
+		glColor4f(0.0f, 0.0f, 0.0f, 0.4f);
+		
+		if (PSFRA < PEFRA) {
+			glRectf(v2d->cur.xmin, v2d->cur.ymin, (float)PSFRA, v2d->cur.ymax);
+			glRectf((float)PEFRA, v2d->cur.ymin, v2d->cur.xmax, v2d->cur.ymax);
+		}
+		else {
+			glRectf(v2d->cur.xmin, v2d->cur.ymin, v2d->cur.xmax, v2d->cur.ymax);
+		}
+	glDisable(GL_BLEND);
 
 	UI_ThemeColorShade(TH_BACK, -60);
 	/* thin lines where the actual frames are */
@@ -83,25 +92,84 @@ static void time_draw_sfra_efra(Scene *scene, View2D *v2d)
 
 #define CACHE_DRAW_HEIGHT	3.0f
 
-static void time_draw_cache(SpaceTime *stime)
+static void time_draw_cache(SpaceTime *stime, Object *ob)
 {
-	SpaceTimeCache *stc;
+	PTCacheID *pid;
+	ListBase pidlist;
+	SpaceTimeCache *stc = stime->caches.first;
 	float yoffs=0.f;
 	
-	if (!(stime->cache_display & TIME_CACHE_DISPLAY))
+	if (!(stime->cache_display & TIME_CACHE_DISPLAY) || (!ob))
 		return;
-	
-	for (stc= stime->caches.first; stc; stc=stc->next) {
-		float col[4];
-		
-		if (!stc->array || !stc->ok)
+
+	BKE_ptcache_ids_from_object(&pidlist, ob, NULL, 0);
+
+	/* iterate over pointcaches on the active object, 
+	 * add spacetimecache and vertex array for each */
+	for(pid=pidlist.first; pid; pid=pid->next) {
+		float col[4], *fp;
+		int i, sta = pid->cache->startframe, end = pid->cache->endframe;
+		int len = (end - sta + 1)*4;
+
+		switch(pid->type) {
+			case PTCACHE_TYPE_SOFTBODY:
+				if (!(stime->cache_display & TIME_CACHE_SOFTBODY)) continue;
+				break;
+			case PTCACHE_TYPE_PARTICLES:
+				if (!(stime->cache_display & TIME_CACHE_PARTICLES))	continue;
+				break;
+			case PTCACHE_TYPE_CLOTH:
+				if (!(stime->cache_display & TIME_CACHE_CLOTH))	continue;
+				break;
+			case PTCACHE_TYPE_SMOKE_DOMAIN:
+			case PTCACHE_TYPE_SMOKE_HIGHRES:
+				if (!(stime->cache_display & TIME_CACHE_SMOKE))	continue;
+				break;
+		}
+
+		if(pid->cache->cached_frames == NULL)
 			continue;
+
+
+		/* make sure we have stc with correct array length */
+		if(stc == NULL || MEM_allocN_len(stc->array) != len*2*sizeof(float)) {
+			if(stc) {
+				MEM_freeN(stc->array);
+			}
+			else {
+				stc = MEM_callocN(sizeof(SpaceTimeCache), "spacetimecache");
+				BLI_addtail(&stime->caches, stc);
+			}
+
+			stc->array = MEM_callocN(len*2*sizeof(float), "SpaceTimeCache array");
+		}
+
+		/* fill the vertex array with a quad for each cached frame */
+		for (i=sta, fp=stc->array; i<=end; i++) {
+			if (pid->cache->cached_frames[i-sta]) {
+				fp[0] = (float)i-0.5f;
+				fp[1] = 0.0;
+				fp+=2;
+				
+				fp[0] = (float)i-0.5f;
+				fp[1] = 1.0;
+				fp+=2;
+				
+				fp[0] = (float)i+0.5f;
+				fp[1] = 1.0;
+				fp+=2;
+				
+				fp[0] = (float)i+0.5f;
+				fp[1] = 0.0;
+				fp+=2;
+			}
+		}
 		
 		glPushMatrix();
 		glTranslatef(0.0, (float)V2D_SCROLL_HEIGHT+yoffs, 0.0);
 		glScalef(1.0, CACHE_DRAW_HEIGHT, 0.0);
 		
-		switch(stc->type) {
+		switch(pid->type) {
 			case PTCACHE_TYPE_SOFTBODY:
 				col[0] = 1.0;	col[1] = 0.4;	col[2] = 0.02;
 				col[3] = 0.1;
@@ -124,17 +192,17 @@ static void time_draw_cache(SpaceTime *stime)
 		
 		glEnable(GL_BLEND);
 		
-		glRectf((float)stc->startframe, 0.0, (float)stc->endframe, 1.0);
+		glRectf((float)sta, 0.0, (float)end, 1.0);
 		
-		col[3] = 0.4;
-		if (stc->flag & PTCACHE_BAKED) {
-			col[0] -= 0.4;	col[1] -= 0.4;	col[2] -= 0.4;
+		col[3] = 0.4f;
+		if (pid->cache->flag & PTCACHE_BAKED) {
+			col[0] -= 0.4f;	col[1] -= 0.4f;	col[2] -= 0.4f;
 		}
 		glColor4fv(col);
 		
 		glEnableClientState(GL_VERTEX_ARRAY);
 		glVertexPointer(2, GL_FLOAT, 0, stc->array);
-		glDrawArrays(GL_QUADS, 0, stc->len);
+		glDrawArrays(GL_QUADS, 0, (fp-stc->array)/2);
 		glDisableClientState(GL_VERTEX_ARRAY);
 		
 		glDisable(GL_BLEND);
@@ -142,6 +210,19 @@ static void time_draw_cache(SpaceTime *stime)
 		glPopMatrix();
 		
 		yoffs += CACHE_DRAW_HEIGHT;
+
+		stc = stc->next;
+	}
+
+	BLI_freelistN(&pidlist);
+
+	/* free excessive caches */
+	while(stc) {
+		SpaceTimeCache *tmp = stc->next;
+		BLI_remlink(&stime->caches, stc);
+		MEM_freeN(stc->array);
+		MEM_freeN(stc);
+		stc = tmp;
 	}
 }
 
@@ -159,101 +240,10 @@ static void time_cache_free(SpaceTime *stime)
 	BLI_freelistN(&stime->caches);
 }
 
-static void time_cache_refresh(const bContext *C, SpaceTime *stime)
+static void time_cache_refresh(SpaceTime *stime)
 {
-	Object *ob = CTX_data_active_object(C);
-	PTCacheID *pid;
-	ListBase pidlist;
-	
+	/* Free previous caches to indicate full refresh */
 	time_cache_free(stime);
-	
-	if (!(stime->cache_display & TIME_CACHE_DISPLAY) || (!ob))
-		return;
-	
-	BKE_ptcache_ids_from_object(&pidlist, ob, NULL, 0);
-	
-	/* iterate over pointcaches on the active object, 
-	 * add spacetimecache and vertex array for each */
-	for(pid=pidlist.first; pid; pid=pid->next) {
-		SpaceTimeCache *stc;
-		float *fp, *array;
-		int i, len;
-		int sta, end;
-		
-		switch(pid->type) {
-			case PTCACHE_TYPE_SOFTBODY:
-				if (!(stime->cache_display & TIME_CACHE_SOFTBODY)) continue;
-				break;
-			case PTCACHE_TYPE_PARTICLES:
-				if (!(stime->cache_display & TIME_CACHE_PARTICLES))	continue;
-				break;
-			case PTCACHE_TYPE_CLOTH:
-				if (!(stime->cache_display & TIME_CACHE_CLOTH))	continue;
-				break;
-			case PTCACHE_TYPE_SMOKE_DOMAIN:
-			case PTCACHE_TYPE_SMOKE_HIGHRES:
-				if (!(stime->cache_display & TIME_CACHE_SMOKE))	continue;
-				break;
-		}
-
-		BKE_ptcache_id_time(pid, CTX_data_scene(C), 0, &sta, &end, NULL);
-		
-		if(pid->cache->cached_frames==NULL)
-			continue;
-		
-		stc= MEM_callocN(sizeof(SpaceTimeCache), "spacetimecache");
-		
-		stc->type = pid->type;
-		
-		if (pid->cache->flag & PTCACHE_BAKED)
-			stc->flag |= PTCACHE_BAKED;
-		if (pid->cache->flag & PTCACHE_DISK_CACHE)
-			stc->flag |= PTCACHE_DISK_CACHE;
-		
-		/* first allocate with maximum number of frames needed */
-		stc->startframe = sta;
-		stc->endframe = end;
-		len = (end - sta + 1)*4;
-		fp = array = MEM_callocN(len*2*sizeof(float), "temporary timeline cache array");
-		
-		/* fill the vertex array with a quad for each cached frame */
-		for (i=sta; i<=end; i++) {
-			
-			if (pid->cache->cached_frames[i-sta]) {
-				fp[0] = (float)i;
-				fp[1] = 0.0;
-				fp+=2;
-				
-				fp[0] = (float)i;
-				fp[1] = 1.0;
-				fp+=2;
-				
-				fp[0] = (float)(i+1);
-				fp[1] = 1.0;
-				fp+=2;
-				
-				fp[0] = (float)(i+1);
-				fp[1] = 0.0;
-				fp+=2;
-			}
-		}
-		/* update with final number of frames */
-		stc->len = (i-stc->startframe)*4;
-		stc->array = MEM_mallocN(stc->len*2*sizeof(float), "SpaceTimeCache array");
-		memcpy(stc->array, array, stc->len*2*sizeof(float));
-		
-		MEM_freeN(array);
-		array = NULL;
-		
-		stc->ok = 1;
-		
-		BLI_addtail(&stime->caches, stc);
-	}
-	
-	/* todo: sort time->caches list for consistent order */
-	// ...
-	
-	BLI_freelistN(&pidlist);
 }
 
 /* helper function - find actkeycolumn that occurs on cframe, or the nearest one if not found */
@@ -281,7 +271,7 @@ static ActKeyColumn *time_cfra_find_ak (ActKeyColumn *ak, float cframe)
 /* helper for time_draw_keyframes() */
 static void time_draw_idblock_keyframes(View2D *v2d, ID *id, short onlysel)
 {
-	bDopeSheet ads;
+	bDopeSheet ads= {NULL};
 	DLRBT_Tree keys;
 	ActKeyColumn *ak;
 	
@@ -289,8 +279,6 @@ static void time_draw_idblock_keyframes(View2D *v2d, ID *id, short onlysel)
 	BLI_dlrbTree_init(&keys);
 	
 	/* init dopesheet settings */
-	// FIXME: the ob_to_keylist function currently doesn't take this into account...
-	memset(&ads, 0, sizeof(bDopeSheet));
 	if (onlysel)
 		ads.filterflag |= ADS_FILTER_ONLYSEL;
 	
@@ -317,8 +305,8 @@ static void time_draw_idblock_keyframes(View2D *v2d, ID *id, short onlysel)
 			 (ak) && (ak->cfra <= v2d->cur.xmax); 
 			  ak=ak->next ) 
 		{
-			glVertex2f(ak->cfra, v2d->cur.ymin);
-			glVertex2f(ak->cfra, v2d->cur.ymax);
+			glVertex2f(ak->cfra, v2d->tot.ymin);
+			glVertex2f(ak->cfra, v2d->tot.ymax);
 		}
 	glEnd(); // GL_LINES
 		
@@ -378,17 +366,13 @@ static void time_draw_keyframes(const bContext *C, SpaceTime *stime, ARegion *ar
 
 /* ---------------- */
 
-static void time_refresh(const bContext *C, ScrArea *sa)
+static void time_refresh(const bContext *UNUSED(C), ScrArea *sa)
 {
-	SpaceTime *stime = (SpaceTime *)sa->spacedata.first;
-	ARegion *ar;
-	
 	/* find the main timeline region and refresh cache display*/
-	for (ar= sa->regionbase.first; ar; ar= ar->next) {
-		if (ar->regiontype==RGN_TYPE_WINDOW) {
-			time_cache_refresh(C, stime);
-			break;
-		}
+	ARegion *ar= BKE_area_find_region_type(sa, RGN_TYPE_WINDOW);
+	if(ar) {
+		SpaceTime *stime = (SpaceTime *)sa->spacedata.first;
+		time_cache_refresh(stime);
 	}
 }
 
@@ -402,6 +386,8 @@ static void time_listener(ScrArea *sa, wmNotifier *wmn)
 			switch (wmn->data) {
 				case ND_BONE_ACTIVE:
 				case ND_POINTCACHE:
+				case ND_MODIFIER:
+				case ND_PARTICLE:
 					ED_area_tag_refresh(sa);
 					ED_area_tag_redraw(sa);
 					break;
@@ -434,6 +420,12 @@ static void time_listener(ScrArea *sa, wmNotifier *wmn)
 					ED_area_tag_refresh(sa);
 					break;
 			}
+		case NC_WM:
+			switch (wmn->data) {
+				case ND_FILEREAD:
+					ED_area_tag_refresh(sa);
+					break;
+			}
 	}
 }
 
@@ -456,6 +448,7 @@ static void time_main_area_draw(const bContext *C, ARegion *ar)
 	/* draw entirely, view changes should be handled here */
 	Scene *scene= CTX_data_scene(C);
 	SpaceTime *stime= CTX_wm_space_time(C);
+	Object *obact = CTX_data_active_object(C);
 	View2D *v2d= &ar->v2d;
 	View2DGrid *grid;
 	View2DScrollers *scrollers;
@@ -466,9 +459,6 @@ static void time_main_area_draw(const bContext *C, ARegion *ar)
 	glClear(GL_COLOR_BUFFER_BIT);
 	
 	UI_view2d_view_ortho(v2d);
-
-	/* start and end frame */
-	time_draw_sfra_efra(scene, v2d);
 	
 	/* grid */
 	unit= (stime->flag & TIME_DRAWFRAMES)? V2D_UNIT_FRAMES: V2D_UNIT_SECONDS;
@@ -476,21 +466,26 @@ static void time_main_area_draw(const bContext *C, ARegion *ar)
 	UI_view2d_grid_draw(v2d, grid, (V2D_VERTICAL_LINES|V2D_VERTICAL_AXIS));
 	UI_view2d_grid_free(grid);
 	
-	/* keyframes */
-	if(!G.rendering) /* ANIM_nla_mapping_apply_fcurve() modifies curve data while rendering, possible race condition */
-		time_draw_keyframes(C, stime, ar);
+	/* start and end frame */
+	time_draw_sfra_efra(scene, v2d);
 	
 	/* current frame */
+	flag = DRAWCFRA_WIDE; /* this is only really needed on frames where there's a keyframe, but this will do... */
 	if ((stime->flag & TIME_DRAWFRAMES)==0) 	flag |= DRAWCFRA_UNIT_SECONDS;
 	if (stime->flag & TIME_CFRA_NUM) 			flag |= DRAWCFRA_SHOW_NUMBOX;
 	ANIM_draw_cfra(C, v2d, flag);
+	
+	UI_view2d_view_ortho(v2d);
+	
+	/* keyframes */
+	time_draw_keyframes(C, stime, ar);
 	
 	/* markers */
 	UI_view2d_view_orthoSpecial(ar, v2d, 1);
 	draw_markers_time(C, 0);
 	
 	/* caches */
-	time_draw_cache(stime);
+	time_draw_cache(stime, obact);
 	
 	/* reset view matrix */
 	UI_view2d_view_restore(C);
@@ -579,7 +574,7 @@ static SpaceLink *time_new(const bContext *C)
 	stime= MEM_callocN(sizeof(SpaceTime), "inittime");
 
 	stime->spacetype= SPACE_TIME;
-	stime->redraws= TIME_ALL_3D_WIN|TIME_ALL_ANIM_WIN;
+	stime->redraws= TIME_ALL_3D_WIN|TIME_ALL_ANIM_WIN; // XXX: depreceated
 	stime->flag |= TIME_DRAWFRAMES;
 
 	/* header */
@@ -647,7 +642,7 @@ static SpaceLink *time_duplicate(SpaceLink *sl)
 	SpaceTime *stime= (SpaceTime *)sl;
 	SpaceTime *stimen= MEM_dupallocN(stime);
 	
-	time_cache_free(stimen);
+	stimen->caches.first = stimen->caches.last = NULL;
 	
 	return (SpaceLink *)stimen;
 }

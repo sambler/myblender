@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/mesh/editmesh_add.c
+ *  \ingroup edmesh
+ */
+
+
 
 #include <stdlib.h>
 #include <string.h>
@@ -40,10 +45,12 @@
 
 #include "RNA_define.h"
 #include "RNA_access.h"
+#include "RNA_enum_types.h"
 
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
 #include "BLI_editVert.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_context.h"
 #include "BKE_depsgraph.h"
@@ -83,21 +90,21 @@ static float icovert[12][3] = {
 	{0.0f,0.0f,200.0f}
 };
 static short icoface[20][3] = {
-	{1,0,2},
+	{2,0,1},
 	{1,0,5},
-	{2,0,3},
-	{3,0,4},
-	{4,0,5},
+	{3,0,2},
+	{4,0,3},
+	{5,0,4},
 	{1,5,10},
 	{2,1,6},
 	{3,2,7},
 	{4,3,8},
 	{5,4,9},
-	{10,1,6},
-	{6,2,7},
-	{7,3,8},
-	{8,4,9},
-	{9,5,10},
+	{6,1,10},
+	{7,2,6},
+	{8,3,7},
+	{9,4,8},
+	{10,5,9},
 	{6,10,11},
 	{7,6,11},
 	{8,7,11},
@@ -114,12 +121,8 @@ static int dupli_extrude_cursor(bContext *C, wmOperator *op, wmEvent *event)
 	float min[3], max[3];
 	int done= 0;
 	short use_proj;
-	wmWindow *win= CTX_wm_window(C);
 
 	em_setup_viewcontext(C, &vc);
-
-	printf("\n%d %d\n", event->x, event->y);
-	printf("%d %d\n", win->eventstate->x, win->eventstate->y);
 
 	use_proj= (vc.scene->toolsettings->snap_flag & SCE_SNAP) &&	(vc.scene->toolsettings->snap_mode==SCE_SNAP_MODE_FACE);
 	
@@ -136,14 +139,17 @@ static int dupli_extrude_cursor(bContext *C, wmOperator *op, wmEvent *event)
 
 	/* call extrude? */
 	if(done) {
-		short rot_src= RNA_boolean_get(op->ptr, "rotate_source");
+		const short rot_src= RNA_boolean_get(op->ptr, "rotate_source");
 		EditEdge *eed;
 		float vec[3], cent[3], mat[3][3];
 		float nor[3]= {0.0, 0.0, 0.0};
 		
 		/* 2D normal calc */
-		float mval_f[2]= {(float)event->mval[0], (float)event->mval[1]};
-		
+		float mval_f[2];
+
+		mval_f[0]= (float)event->mval[0];
+		mval_f[1]= (float)event->mval[1];
+
 		done= 0;
 
 		/* calculate the normal for selected edges */
@@ -192,7 +198,7 @@ static int dupli_extrude_cursor(bContext *C, wmOperator *op, wmEvent *event)
 		copy_v3_v3(min, cent);
 		
 		mul_m4_v3(vc.obedit->obmat, min);	// view space
-		view3d_get_view_aligned_coordinate(&vc, min, event->mval);
+		view3d_get_view_aligned_coordinate(&vc, min, event->mval, TRUE);
 		mul_m4_v3(vc.obedit->imat, min); // back in object space
 		
 		sub_v3_v3(min, cent);
@@ -238,21 +244,18 @@ static int dupli_extrude_cursor(bContext *C, wmOperator *op, wmEvent *event)
 		
 		recalc_editnormals(vc.em);
 	}
-	else {
-		float mat[3][3],imat[3][3];
-		float *curs= give_cursor(vc.scene, vc.v3d);
+	else if(vc.em->selectmode & SCE_SELECT_VERTEX) {
+
+		float imat[4][4];
+		const float *curs= give_cursor(vc.scene, vc.v3d);
 		
 		copy_v3_v3(min, curs);
-		view3d_get_view_aligned_coordinate(&vc, min, event->mval);
-		
+		view3d_get_view_aligned_coordinate(&vc, min, event->mval, TRUE);
+
 		eve= addvertlist(vc.em, 0, NULL);
 
-		copy_m3_m4(mat, vc.obedit->obmat);
-		invert_m3_m3(imat, mat);
-		
-		copy_v3_v3(eve->co, min);
-		mul_m3_v3(imat, eve->co);
-		sub_v3_v3v3(eve->co, eve->co, vc.obedit->obmat[3]);
+		invert_m4_m4(imat, vc.obedit->obmat);
+		mul_v3_m4v3(eve->co, imat, min);
 		
 		eve->f= SELECT;
 	}
@@ -261,7 +264,7 @@ static int dupli_extrude_cursor(bContext *C, wmOperator *op, wmEvent *event)
 		EM_project_snap_verts(C, vc.ar, vc.obedit, vc.em);
 
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, vc.obedit->data); 
-	DAG_id_flush_update(vc.obedit->data, OB_RECALC_DATA);
+	DAG_id_tag_update(vc.obedit->data, 0);
 	
 	return OPERATOR_FINISHED;
 }
@@ -287,7 +290,7 @@ void MESH_OT_dupli_extrude_cursor(wmOperatorType *ot)
 /* ********************** */
 
 /* selected faces get hidden edges */
-int make_fgon(EditMesh *em, wmOperator *op, int make)
+static int make_fgon(EditMesh *em, wmOperator *op, int make)
 {
 	EditFace *efa;
 	EditEdge *eed;
@@ -359,13 +362,13 @@ int make_fgon(EditMesh *em, wmOperator *op, int make)
 		if(eve->f1==1) break;
 	}
 	if(eve) {
-		BKE_report(op->reports, RPT_ERROR, "Cannot make a polygon with interior vertices");
+		BKE_report(op->reports, RPT_WARNING, "Cannot make a polygon with interior vertices");
 		return 0;
 	}
 	
 	// check for faces
 	if(nor==NULL) {
-		BKE_report(op->reports, RPT_ERROR, "No faces were selected to make FGon");
+		BKE_report(op->reports, RPT_WARNING, "No faces were selected to make FGon");
 		return 0;
 	}
 
@@ -388,7 +391,7 @@ static int make_fgon_exec(bContext *C, wmOperator *op)
 	EditMesh *em= BKE_mesh_get_editmesh(((Mesh *)obedit->data));
 
 	if( make_fgon(em, op, 1) ) {
-		DAG_id_flush_update(obedit->data, OB_RECALC_DATA);	
+		DAG_id_tag_update(obedit->data, 0);
 		WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 
 		BKE_mesh_end_editmesh(obedit->data, em);
@@ -420,7 +423,7 @@ static int clear_fgon_exec(bContext *C, wmOperator *op)
 	EditMesh *em= BKE_mesh_get_editmesh(((Mesh *)obedit->data));
 	
 	if( make_fgon(em, op, 0) ) {
-		DAG_id_flush_update(obedit->data, OB_RECALC_DATA);	
+		DAG_id_tag_update(obedit->data, 0);
 		WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 		
 		BKE_mesh_end_editmesh(obedit->data, em);
@@ -666,7 +669,7 @@ static void fix_new_face(EditMesh *em, EditFace *eface)
 }
 
 /* only adds quads or trias when there's edges already */
-void addfaces_from_edgenet(EditMesh *em)
+static void addfaces_from_edgenet(EditMesh *em)
 {
 	EditVert *eve1, *eve2, *eve3, *eve4;
 	
@@ -709,7 +712,7 @@ void addfaces_from_edgenet(EditMesh *em)
 
 	EM_select_flush(em);
 	
-// XXX	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+// XXX	DAG_id_tag_update(obedit->data, 0);
 }
 
 static void addedgeface_mesh(EditMesh *em, wmOperator *op)
@@ -738,7 +741,7 @@ static void addedgeface_mesh(EditMesh *em, wmOperator *op)
 		eed= addedgelist(em, neweve[0], neweve[1], NULL);
 		EM_select_edge(eed, 1);
 
-		// XXX		DAG_id_flush_update(obedit->data, OB_RECALC_DATA);	
+		// XXX		DAG_id_tag_update(obedit->data, 0);
 		return;
 	}
 	else if(amount > 4) {
@@ -746,7 +749,7 @@ static void addedgeface_mesh(EditMesh *em, wmOperator *op)
 		return;
 	}
 	else if(amount<2) {
-		BKE_report(op->reports, RPT_ERROR, "More vertices are needed to make an edge/face");
+		BKE_report(op->reports, RPT_WARNING, "More vertices are needed to make an edge/face");
 		return;
 	}
 
@@ -758,7 +761,7 @@ static void addedgeface_mesh(EditMesh *em, wmOperator *op)
 			efa= addfacelist(em, neweve[0], neweve[1], neweve[2], 0, NULL, NULL);
 			EM_select_face(efa, 1);
 		}
-		else BKE_report(op->reports, RPT_ERROR, "The selected vertices already form a face");
+		else BKE_report(op->reports, RPT_WARNING, "The selected vertices already form a face");
 	}
 	else if(amount==4) {
 		/* this test survives when theres 2 triangles */
@@ -810,14 +813,14 @@ static void addedgeface_mesh(EditMesh *em, wmOperator *op)
 						else if( convex(neweve[0]->co, neweve[3]->co, neweve[1]->co, neweve[2]->co) ) {
 							efa= addfacelist(em, neweve[0], neweve[3], neweve[1], neweve[2], NULL, NULL);
 						}
-						else BKE_report(op->reports, RPT_ERROR, "cannot find nice quad from concave set of vertices");
+						else BKE_report(op->reports, RPT_WARNING, "cannot find nice quad from concave set of vertices");
 
 					}
 				}
 			}
-			else BKE_report(op->reports, RPT_ERROR, "The selected vertices already form a face");
+			else BKE_report(op->reports, RPT_WARNING, "The selected vertices already form a face");
 		}
-		else BKE_report(op->reports, RPT_ERROR, "The selected vertices already form a face");
+		else BKE_report(op->reports, RPT_WARNING, "The selected vertices already form a face");
 	}
 	
 	if(efa) {
@@ -836,7 +839,7 @@ static int addedgeface_mesh_exec(bContext *C, wmOperator *op)
 	
 	addedgeface_mesh(em, op);
 	
-	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);	
+	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 	
 	BKE_mesh_end_editmesh(obedit->data, em);
@@ -867,10 +870,10 @@ void MESH_OT_edge_face_add(wmOperatorType *ot)
 // this hack is only used so that scons+mingw + split-sources hack works
 	// ------------------------------- start copied code
 /* these are not the monkeys you are looking for */
-int monkeyo= 4;
-int monkeynv= 271;
-int monkeynf= 250;
-signed char monkeyv[271][3]= {
+static int monkeyo= 4;
+static int monkeynv= 271;
+static int monkeynf= 250;
+static signed char monkeyv[271][3]= {
 {-71,21,98},{-63,12,88},{-57,7,74},{-82,-3,79},{-82,4,92},
 {-82,17,100},{-92,21,102},{-101,12,95},{-107,7,83},
 {-117,31,84},{-109,31,95},{-96,31,102},{-92,42,102},
@@ -941,7 +944,7 @@ signed char monkeyv[271][3]= {
 {-26,-16,-42},{-17,49,-49},
 };
 
-signed char monkeyf[250][4]= {
+static signed char monkeyf[250][4]= {
 {27,4,5,26}, {25,4,5,24}, {3,6,5,4}, {1,6,5,2}, {5,6,7,4}, 
 {3,6,7,2}, {5,8,7,6}, {3,8,7,4}, {7,8,9,6}, 
 {5,8,9,4}, {7,10,9,8}, {5,10,9,6}, {9,10,11,8}, 
@@ -1053,15 +1056,13 @@ static void make_prim(Object *obedit, int type, float mat[4][4], int tot, int se
 		/* one segment first: the X axis */		
 		phi = (2*dia)/(float)(tot-1);
 		phid = (2*dia)/(float)(seg-1);
-		for(a=0;a<tot;a++) {
+		for(a=tot-1;a>=0;a--) {
 			vec[0] = (phi*a) - dia;
 			vec[1]= - dia;
 			vec[2]= 0.0f;
 			eve= addvertlist(em, vec, NULL);
 			eve->f= 1+2+4;
-			if (a) {
-				addedgelist(em, eve->prev, eve, NULL);
-			}
+			if(a < tot -1) addedgelist(em, eve->prev, eve, NULL);
 		}
 		/* extrude and translate */
 		vec[0]= vec[2]= 0.0;
@@ -1071,7 +1072,18 @@ static void make_prim(Object *obedit, int type, float mat[4][4], int tot, int se
 			extrudeflag_vert(obedit, em, 2, nor, 0);	// nor unused
 			translateflag(em, 2, vec);
 		}
+			
+		/* and now do imat */
+		eve= em->verts.first;
+		while(eve) {
+			if(eve->f & SELECT) {
+				mul_m4_v3(mat,eve->co);
+			}
+			eve= eve->next;
+		}
+		recalc_editnormals(em);
 		break;
+			
 	case PRIM_UVSPHERE: /*  UVsphere */
 		
 		/* clear all flags */
@@ -1085,13 +1097,13 @@ static void make_prim(Object *obedit, int type, float mat[4][4], int tot, int se
 		phi= 0; 
 		phid/=2;
 		for(a=0; a<=tot; a++) {
-			vec[0]= dia*sin(phi);
+			vec[0]= dia*sinf(phi);
 			vec[1]= 0.0;
-			vec[2]= dia*cos(phi);
+			vec[2]= dia*cosf(phi);
 			eve= addvertlist(em, vec, NULL);
 			eve->f= 1+2+4;
 			if(a==0) v1= eve;
-			else addedgelist(em, eve->prev, eve, NULL);
+			else addedgelist(em, eve, eve->prev, NULL);
 			phi+= phid;
 		}
 		
@@ -1117,6 +1129,7 @@ static void make_prim(Object *obedit, int type, float mat[4][4], int tot, int se
 			}
 			eve= eve->next;
 		}
+		recalc_editnormals(em);
 		break;
 	case PRIM_ICOSPHERE: /* Icosphere */
 		{
@@ -1204,13 +1217,16 @@ static void make_prim(Object *obedit, int type, float mat[4][4], int tot, int se
 		else if(ext==0) 
 			depth= 0.0f;
 	
-		/* vertices */
+		/* first vertex at 0° for circular objects */
+		if( ELEM3(type, PRIM_CIRCLE,PRIM_CYLINDER,PRIM_CONE) )
+			phi = 0.0f;
+			
 		vtop= vdown= v1= v2= 0;
 		for(b=0; b<=ext; b++) {
 			for(a=0; a<tot; a++) {
 				
-				vec[0]= dia*sin(phi);
-				vec[1]= dia*cos(phi);
+				vec[0]= dia*sinf(phi);
+				vec[1]= dia*cosf(phi);
 				vec[2]= b?depth:-depth;
 				
 				mul_m4_v3(mat, vec);
@@ -1306,16 +1322,16 @@ static void make_prim(Object *obedit, int type, float mat[4][4], int tot, int se
 	EM_stats_update(em);
 	/* simple selection flush OK, based on fact it's a single model */
 	EM_select_flush(em); /* flushes vertex -> edge -> face selection */
-	
-	if(type!=PRIM_PLANE && type!=PRIM_MONKEY)
-		EM_recalc_normal_direction(em, 0, 0);	/* otherwise monkey has eyes in wrong direction */
+
+	if(!ELEM5(type, PRIM_GRID, PRIM_PLANE, PRIM_ICOSPHERE, PRIM_UVSPHERE, PRIM_MONKEY))
+		EM_recalc_normal_direction(em, FALSE, TRUE);	/* otherwise monkey has eyes in wrong direction */
 
 	BKE_mesh_end_editmesh(obedit->data, em);
 }
 
 /* ********* add primitive operators ************* */
 
-static char *get_mesh_defname(int type)
+static const char *get_mesh_defname(int type)
 {
 	switch (type) {
 		case PRIM_PLANE: return "Plane";
@@ -1351,7 +1367,7 @@ static void make_prim_ext(bContext *C, float *loc, float *rot, int enter_editmod
 		ED_object_enter_editmode(C, EM_DO_UNDO|EM_IGNORE_LAYER); /* rare cases the active layer is messed up */
 		newob = 1;
 	}
-	else DAG_id_flush_update(&obedit->id, OB_RECALC_DATA);
+	else DAG_id_tag_update(&obedit->id, OB_RECALC_DATA);
 
 	scale= ED_object_new_primitive_matrix(C, obedit, loc, rot, mat);
 
@@ -1360,7 +1376,7 @@ static void make_prim_ext(bContext *C, float *loc, float *rot, int enter_editmod
 
 	make_prim(obedit, type, mat, tot, seg, subdiv, dia, depth, ext, fill);
 
-	DAG_id_flush_update(obedit->data, OB_RECALC_DATA);
+	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 
 
@@ -1555,7 +1571,7 @@ void MESH_OT_primitive_cone_add(wmOperatorType *ot)
 	RNA_def_int(ot->srna, "vertices", 32, INT_MIN, INT_MAX, "Vertices", "", 2, 500);
 	RNA_def_float(ot->srna, "radius", 1.0f, 0.0, FLT_MAX, "Radius", "", 0.001, 100.00);
 	RNA_def_float(ot->srna, "depth", 2.0f, 0.0, FLT_MAX, "Depth", "", 0.001, 100.00);
-	RNA_def_boolean(ot->srna, "cap_end", 0, "Cap End", "");
+	RNA_def_boolean(ot->srna, "cap_end", 1, "Cap End", "");
 
 	ED_object_add_generic_props(ot, TRUE);
 }
@@ -1722,7 +1738,7 @@ static int mesh_duplicate_exec(bContext *C, wmOperator *UNUSED(op))
 
 	BKE_mesh_end_editmesh(ob->data, em);
 
-	DAG_id_flush_update(ob->data, OB_RECALC_DATA);
+	DAG_id_tag_update(ob->data, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, ob->data);
 	
 	return OPERATOR_FINISHED;
@@ -1740,7 +1756,7 @@ static int mesh_duplicate_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(ev
 void MESH_OT_duplicate(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Duplicate";
+	ot->name= "Duplicate Mesh";
 	ot->description= "Duplicate selected vertices, edges or faces";
 	ot->idname= "MESH_OT_duplicate";
 	
@@ -1751,6 +1767,6 @@ void MESH_OT_duplicate(wmOperatorType *ot)
 	ot->poll= ED_operator_editmesh;
 	
 	/* to give to transform */
-	RNA_def_int(ot->srna, "mode", TFM_TRANSLATION, 0, INT_MAX, "Mode", "", 0, INT_MAX);
+	RNA_def_enum(ot->srna, "mode", transform_mode_types, TFM_TRANSLATION, "Mode", "");
 }
 

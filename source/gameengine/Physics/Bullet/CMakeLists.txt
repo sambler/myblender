@@ -24,30 +24,44 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-SET(SRC CcdPhysicsEnvironment.cpp CcdPhysicsController.cpp CcdGraphicController.cpp)
+# since this includes bullet we get errors from the headers too
+remove_strict_flags()
 
-SET(INC
+set(INC
 	.
 	../common
-	../../../../extern/bullet2/src
-	../../../../extern/glew/include
-	../../../../intern/moto/include
-	../../../../intern/guardedalloc
-	../../../kernel/gen_system
-	../../../../intern/string
-	../../Rasterizer
-	../../Ketsji
 	../../Expressions
 	../../GameLogic
+	../../Ketsji
+	../../Rasterizer
 	../../SceneGraph
-	../../../../source/blender/makesdna
-	../../../../source/blender/blenlib
-	../../../../source/blender/blenkernel
-	${PYTHON_INC}
+	../../../blender/blenkernel
+	../../../blender/blenlib
+	../../../blender/makesdna
+	../../../../extern/bullet2/src
+	../../../../intern/container
+	../../../../intern/guardedalloc
+	../../../../intern/moto/include
+	../../../../intern/string
 )
 
-IF(WITH_BULLET)
-	ADD_DEFINITIONS(-DUSE_BULLET)
-ENDIF(WITH_BULLET)
+set(INC_SYS
+	${GLEW_INCLUDE_PATH}
+	${PYTHON_INCLUDE_DIRS}
+)
 
-BLENDERLIB(bf_bullet "${SRC}" "${INC}")
+set(SRC
+	CcdPhysicsEnvironment.cpp
+	CcdPhysicsController.cpp
+	CcdGraphicController.cpp
+
+	CcdGraphicController.h
+	CcdPhysicsController.h
+	CcdPhysicsEnvironment.h
+)
+
+if(WITH_BULLET)
+	add_definitions(-DUSE_BULLET)
+endif()
+
+blender_add_lib(ge_phys_bullet "${SRC}" "${INC}" "${INC_SYS}")

@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/imbuf/intern/bmp.c
+ *  \ingroup imbuf
+ */
+
 
 #include "BLI_blenlib.h"
 
@@ -103,13 +108,15 @@ int imb_is_a_bmp(unsigned char *buf) {
 
 struct ImBuf *imb_bmp_decode(unsigned char *mem, size_t size, int flags)
 {
-	struct ImBuf *ibuf = 0;
+	struct ImBuf *ibuf = NULL;
 	BMPINFOHEADER bmi;
 	int x, y, depth, skip, i;
 	unsigned char *bmp, *rect;
 	unsigned short col;
+	
+	(void)size; /* unused */
 
-	if (checkbmp(mem) == 0) return(0);
+	if (checkbmp(mem) == 0) return(NULL);
 
 	if ((mem[0] == 'B') && (mem[1] == 'M')) {
 		/* skip fileheader */
@@ -193,12 +200,14 @@ static int putShortLSB(unsigned short us,FILE *ofile) {
 } 
 
 /* Found write info at http://users.ece.gatech.edu/~slabaugh/personal/c/bitmapUnix.c */
-int imb_savebmp(struct ImBuf *ibuf, char *name, int flags) {
+int imb_savebmp(struct ImBuf *ibuf, const char *name, int flags) {
 
 	BMPINFOHEADER infoheader;
 	int bytesize, extrabytes, x, y, t, ptr;
 	uchar *data;
 	FILE *ofile;
+	
+	(void)flags; /* unused */
 
 	extrabytes = (4 - ibuf->x*3 % 4) % 4;
 	bytesize = (ibuf->x * 3 + extrabytes) * ibuf->y;

@@ -1,4 +1,4 @@
-/**
+/*
  * SCA_2DFilterActuator.h
  *
  * $Id$
@@ -25,6 +25,10 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file SCA_2DFilterActuator.h
+ *  \ingroup gamelogic
+ */
+
 #ifndef __SCA_2DFILETRACTUATOR_H__
 #define __SCA_2DFILETRACTUATOR_H__
 
@@ -38,7 +42,6 @@ class SCA_2DFilterActuator : public SCA_IActuator
 
 private:
 	vector<STR_String> m_propNames;
-	void * m_gameObj;
 	RAS_2DFilterManager::RAS_2DFILTER_MODE m_type;
 	short m_disableMotionBlur;
 	float m_float_arg;

@@ -24,24 +24,34 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-FILE(GLOB SRC *.cpp)
-
-SET(INC
+set(INC
 	.
-	../../../../source/kernel/gen_system
-	../../../../intern/string
+	..
+	../../Expressions
+	../../GameLogic
+	../../Network
+	../../SceneGraph
+	../../../../intern/container
 	../../../../intern/moto/include
-	../../../../source/gameengine/Ketsji
-	../../../../source/gameengine/GameLogic
-	../../../../source/gameengine/Expressions
-	../../../../source/gameengine/SceneGraph
-	../../../../source/gameengine/Network
+	../../../../intern/string
 )
 
-IF(WITH_PYTHON)
-	LIST(APPEND INC ${PYTHON_INC})
-ELSE(WITH_PYTHON)
-	ADD_DEFINITIONS(-DDISABLE_PYTHON)
-ENDIF(WITH_PYTHON)
+set(INC_SYS
 
-BLENDERLIB(kx_network "${SRC}" "${INC}")
+)
+
+set(SRC
+	KX_NetworkEventManager.cpp
+	KX_NetworkMessageActuator.cpp
+	KX_NetworkMessageSensor.cpp
+	KX_NetworkObjectActuator.cpp
+	KX_NetworkObjectSensor.cpp
+
+	KX_NetworkEventManager.h
+	KX_NetworkMessageActuator.h
+	KX_NetworkMessageSensor.h
+	KX_NetworkObjectActuator.h
+	KX_NetworkObjectSensor.h
+)
+
+blender_add_lib(ge_logic_network "${SRC}" "${INC}" "${INC_SYS}")

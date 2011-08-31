@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -23,11 +23,16 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file GeometryExporter.h
+ *  \ingroup collada
+ */
+
 #ifndef __GEOMETRYEXPORTER_H__
 #define __GEOMETRYEXPORTER_H__
 
 #include <string>
 #include <vector>
+#include <set>
 
 #include "COLLADASWStreamWriter.h"
 #include "COLLADASWLibraryGeometries.h"
@@ -55,7 +60,7 @@ class GeometryExporter : COLLADASW::LibraryGeometries
 public:
 	GeometryExporter(COLLADASW::StreamWriter *sw);
 
-	void exportGeom(Scene *sce);
+	void exportGeom(Scene *sce, bool export_selected);
 
 	void operator()(Object *ob);
 
@@ -82,27 +87,31 @@ public:
 
 	void create_normals(std::vector<Normal> &nor, std::vector<Face> &ind, Mesh *me);
 	
-	std::string getIdBySemantics(std::string geom_id, COLLADASW::Semantics type, std::string other_suffix = "");
+	std::string getIdBySemantics(std::string geom_id, COLLADASW::InputSemantic::Semantics type, std::string other_suffix = "");
 	
-	COLLADASW::URI getUrlBySemantics(std::string geom_id, COLLADASW::Semantics type, std::string other_suffix = "");
+	COLLADASW::URI getUrlBySemantics(std::string geom_id, COLLADASW::InputSemantic::Semantics type, std::string other_suffix = "");
 
 	COLLADASW::URI makeUrl(std::string id);
 	
 	/* int getTriCount(MFace *faces, int totface);*/
+private:
+	std::set<std::string> exportedGeometry;
 };
 
 struct GeometryFunctor {
 	// f should have
 	// void operator()(Object* ob)
 	template<class Functor>
-	void forEachMeshObjectInScene(Scene *sce, Functor &f)
+	void forEachMeshObjectInScene(Scene *sce, Functor &f, bool export_selected)
 	{
 		
 		Base *base= (Base*) sce->base.first;
 		while(base) {
 			Object *ob = base->object;
 			
-			if (ob->type == OB_MESH && ob->data) {
+			if (ob->type == OB_MESH && ob->data
+				&& !(export_selected && !(ob->flag && SELECT))
+				&& ((sce->lay & ob->lay)!=0)) {
 				f(ob);
 			}
 			base= base->next;

@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -28,6 +28,10 @@
 #ifndef DEPSGRAPH_API
 #define DEPSGRAPH_API
 
+/** \file BKE_depsgraph.h
+ *  \ingroup bke
+ */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -47,22 +51,23 @@ struct GHash;
 /* **** DAG relation types *** */
 
 	/* scene link to object */
-#define DAG_RL_SCENE		1
+#define DAG_RL_SCENE		(1<<0)
 	/* object link to data */
-#define DAG_RL_DATA			2
+#define DAG_RL_DATA			(1<<1)
 
 	/* object changes object (parent, track, constraints) */
-#define DAG_RL_OB_OB		4
+#define DAG_RL_OB_OB		(1<<2)
 	/* object changes obdata (hooks, constraints) */
-#define DAG_RL_OB_DATA		8
+#define DAG_RL_OB_DATA		(1<<3)
 	/* data changes object (vertex parent) */
-#define DAG_RL_DATA_OB		16
+#define DAG_RL_DATA_OB		(1<<4)
 	/* data changes data (deformers) */
-#define DAG_RL_DATA_DATA	32
+#define DAG_RL_DATA_DATA	(1<<5)
 
-#define DAG_NO_RELATION		64
-#define DAG_RL_ALL			63
-#define DAG_RL_ALL_BUT_DATA 61
+#define DAG_NO_RELATION		(1<<6)
+
+#define DAG_RL_ALL_BUT_DATA (DAG_RL_SCENE|DAG_RL_OB_OB|DAG_RL_OB_DATA|DAG_RL_DATA_OB|DAG_RL_DATA_DATA)
+#define DAG_RL_ALL			(DAG_RL_ALL_BUT_DATA|DAG_RL_DATA)
 
 
 typedef void (*graph_action_func)(void * ob, void **data);
@@ -104,20 +109,19 @@ void	draw_all_deps(void);
 void	DAG_scene_sort(struct Main *bmain, struct Scene *sce);
 
 		/* flag all objects that need recalc because they're animated */
-void	DAG_scene_update_flags(struct Main *bmain, struct Scene *sce, unsigned int lay);
+void	DAG_scene_update_flags(struct Main *bmain, struct Scene *sce, unsigned int lay, const short do_time);
 		/* flushes all recalc flags in objects down the dependency tree */
-void	DAG_scene_flush_update(struct Main *bmain, struct Scene *sce, unsigned int lay, int time);
+void	DAG_scene_flush_update(struct Main *bmain, struct Scene *sce, unsigned int lay, const short do_time);
 		/* tag objects for update on file load */
-void	DAG_on_load_update(struct Main *bmain);
+void	DAG_on_visible_update(struct Main *bmain, const short do_time);
 
-		/* flag all IDs that need recalc because they're animated, influencing
-		   this ID only. only for objects currently */
-void	DAG_id_update_flags(struct ID *id);
-		/* flushes all recalc flags for this object down the dependency tree,
-		   but note the DAG only supports objects and object data currently */
-void	DAG_id_flush_update(struct ID *id, short flag);
 		/* when setting manual RECALC flags, call this afterwards */
 void	DAG_ids_flush_update(struct Main *bmain, int time);
+
+		/* tag datablock to get updated for the next redraw */
+void	DAG_id_tag_update(struct ID *id, short flag);
+		/* flush all tagged updates */
+void	DAG_ids_flush_tagged(struct Main *bmain);
 
 		/* (re)-create dependency graph for armature pose */
 void	DAG_pose_sort(struct Object *ob);

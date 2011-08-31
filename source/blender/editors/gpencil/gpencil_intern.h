@@ -1,6 +1,4 @@
-/**
- * $Id$
- *
+/*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -25,6 +23,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/gpencil/gpencil_intern.h
+ *  \ingroup edgpencil
+ */
+
 #ifndef ED_GPENCIL_INTERN_H
 #define ED_GPENCIL_INTERN_H
 

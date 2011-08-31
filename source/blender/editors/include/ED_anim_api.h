@@ -1,6 +1,4 @@
-/**
- * $Id$
- *
+/*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -26,6 +24,10 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file ED_anim_api.h
+ *  \ingroup editors
+ */
+
 #ifndef ED_ANIM_API_H
 #define ED_ANIM_API_H
 
@@ -35,7 +37,9 @@ struct AnimData;
 
 struct bContext;
 struct wmKeyConfig;
+struct ReportList;
 struct ScrArea;
+struct SpaceLink;
 struct ARegion;
 struct View2D;
 
@@ -50,6 +54,9 @@ struct FModifier;
 
 struct uiBlock;
 struct uiLayout;
+
+struct PointerRNA;
+struct PropertyRNA;
 
 /* ************************************************ */
 /* ANIMATION CHANNEL FILTERING */
@@ -67,17 +74,20 @@ typedef struct bAnimContext {
 	short mode;				/* editor->mode */
 	short spacetype;		/* sa->spacetype */
 	short regiontype;		/* active region -> type (channels or main) */
-	struct ScrArea *sa;		/* editor */ 
+	struct ScrArea *sa;		/* editor host */
+	struct SpaceLink *sl;	/* editor data */
 	struct ARegion *ar;		/* region within editor */
+	
+	struct bDopeSheet *ads; /* dopesheet data for editor (or which is being used) */
 	
 	struct Scene *scene;	/* active scene */
 	struct Object *obact;	/* active object */
 	ListBase *markers;		/* active set of markers */
-	ListBase *reports;		/* pointer to current reports list */			// XXX not yet used
+	
+	struct ReportList *reports;	/* pointer to current reports list */
 } bAnimContext;
 
 /* Main Data container types */
-// XXX was ACTCONT_*
 typedef enum eAnimCont_Types {
 	ANIMCONT_NONE = 0,		/* invalid or no data */
 	ANIMCONT_ACTION,		/* action (bAction) */
@@ -87,6 +97,7 @@ typedef enum eAnimCont_Types {
 	ANIMCONT_FCURVES,		/* animation F-Curves (bDopesheet) */
 	ANIMCONT_DRIVERS,		/* drivers (bDopesheet) */
 	ANIMCONT_NLA,			/* nla (bDopesheet) */
+	ANIMCONT_CHANNEL		/* animation channel (bAnimListElem) */	
 } eAnimCont_Types;
 
 /* --------------- Channels -------------------- */
@@ -102,17 +113,12 @@ typedef struct bAnimListElem {
 	int		flag;			/* copy of elem's flags for quick access */
 	int 	index;			/* for un-named data, the index of the data in it's collection */
 	
-	short	elemFlag;		/* flags for the list elem instance (not the data it represents) */
-	
 	short	datatype;		/* type of motion data to expect */
 	void	*key_data;		/* motion data - mostly F-Curves, but can be other types too */
 	
 	
 	struct ID *id;			/* ID block that channel is attached to */
 	struct AnimData *adt; 	/* source of the animation data attached to ID block (for convenience) */
-	
-	void 	*owner;			/* group or channel which acts as this channel's owner */
-	short	ownertype;		/* type of owner */
 } bAnimListElem;
 
 
@@ -120,7 +126,6 @@ typedef struct bAnimListElem {
  * NOTE: need to keep the order of these synchronised with the channels define code
  * 		which is used for drawing and handling channel lists for 
  */
-// XXX was ACTTYPE_*
 typedef enum eAnim_ChannelType {
 	ANIMTYPE_NONE= 0,
 	ANIMTYPE_ANIMDATA,
@@ -135,9 +140,6 @@ typedef enum eAnim_ChannelType {
 	
 	ANIMTYPE_FILLACTD,
 	ANIMTYPE_FILLDRIVERS,
-	ANIMTYPE_FILLMATD,
-	ANIMTYPE_FILLPARTD,
-	ANIMTYPE_FILLTEXD,
 	
 	ANIMTYPE_DSMAT,
 	ANIMTYPE_DSLAM,
@@ -151,6 +153,8 @@ typedef enum eAnim_ChannelType {
 	ANIMTYPE_DSARM,
 	ANIMTYPE_DSMESH,
 	ANIMTYPE_DSTEX,
+	ANIMTYPE_DSLAT,
+	ANIMTYPE_DSSPK,
 	
 	ANIMTYPE_SHAPEKEY,
 	
@@ -161,7 +165,7 @@ typedef enum eAnim_ChannelType {
 	ANIMTYPE_NLAACTION,
 	
 		/* always as last item, the total number of channel types... */
-	ANIMTYPE_NUM_TYPES,
+	ANIMTYPE_NUM_TYPES
 } eAnim_ChannelType;
 
 /* types of keyframe data in bAnimListElem */
@@ -175,32 +179,48 @@ typedef enum eAnim_KeyType {
 	ALE_SCE,			/* Scene summary */
 	ALE_OB,				/* Object summary */
 	ALE_ACT,			/* Action summary */
-	ALE_GROUP,			/* Action Group summary */
+	ALE_GROUP			/* Action Group summary */
 } eAnim_KeyType;
 
 /* ----------------- Filtering -------------------- */
 
-/* filtering flags  - under what circumstances should a channel be added */
-// XXX was ACTFILTER_*
+/* filtering flags  - under what circumstances should a channel be returned */
 typedef enum eAnimFilter_Flags {
-	ANIMFILTER_VISIBLE		= (1<<0),	/* should channels be visible (in terms of hierarchy only) */
-	ANIMFILTER_SEL			= (1<<1),	/* should channels be selected */
-	ANIMFILTER_UNSEL		= (1<<2),	/* should channels be NOT selected */
-	ANIMFILTER_FOREDIT		= (1<<3),	/* does editable status matter */
-	ANIMFILTER_CURVESONLY	= (1<<4),	/* don't include summary-channels, etc. */
-	ANIMFILTER_CHANNELS		= (1<<5),	/* make list for interface drawing */
-	ANIMFILTER_ACTGROUPED	= (1<<6),	/* belongs to the active actiongroup */
-	ANIMFILTER_CURVEVISIBLE	= (1<<7),	/* F-Curve is visible for editing/viewing in Graph Editor */
-	ANIMFILTER_ACTIVE		= (1<<8),	/* channel should be 'active' */
-	ANIMFILTER_ANIMDATA		= (1<<9),	/* only return the underlying AnimData blocks (not the tracks, etc.) data comes from */
-	ANIMFILTER_NLATRACKS	= (1<<10),	/* only include NLA-tracks */
-	ANIMFILTER_SELEDIT		= (1<<11),	/* link editability with selected status */
-	ANIMFILTER_NODUPLIS		= (1<<12),	/* duplicate entries for animation data attached to multi-user blocks must not occur */
+	/* data which channel represents is fits the dopesheet filters (i.e. scene visibility criteria) */
+	// XXX: it's hard to think of any examples where this *ISN'T* the case... perhaps becomes implicit?
+	ANIMFILTER_DATA_VISIBLE   = (1<<0),
+	/* channel is visible within the channel-list hierarchy (i.e. F-Curves within Groups in ActEdit) */
+	ANIMFILTER_LIST_VISIBLE   = (1<<1),
+	/* channel has specifically been tagged as visible in Graph Editor (* Graph Editor Only) */
+	ANIMFILTER_CURVE_VISIBLE  = (1<<2),
 	
-	/* all filters - the power inside the bracket must be the last power for left-shifts + 1 */
-	ANIMFILTER_ALLFILTERS	= ((1<<12) - 1)
+	/* include summary channels and "expanders" (for drawing/mouse-selection in channel list) */
+	ANIMFILTER_LIST_CHANNELS  = (1<<3),
+	
+	/* for its type, channel should be "active" one */
+	ANIMFILTER_ACTIVE         = (1<<4),
+	/* channel is a child of the active group (* Actions speciality) */
+	ANIMFILTER_ACTGROUPED     = (1<<5),
+	
+	/* channel must be selected/not-selected, but both must not be set together */
+	ANIMFILTER_SEL            = (1<<6),
+	ANIMFILTER_UNSEL          = (1<<7),
+	
+	/* editability status - must be editable to be included */
+	ANIMFILTER_FOREDIT        = (1<<8),
+	/* only selected animchannels should be considerable as editable - mainly for Graph Editor's option for keys on select curves only */
+	ANIMFILTER_SELEDIT        = (1<<9), 
+	
+	/* flags used to enforce certain data types */
+	// NOTE: the ones for curves and NLA tracks were redundant and have been removed for now...
+	ANIMFILTER_ANIMDATA       = (1<<10),
+	
+	/* duplicate entries for animation data attached to multi-user blocks must not occur */
+	ANIMFILTER_NODUPLIS       = (1<<11),
+	
+	/* for checking if we should keep some collapsed channel around (internal use only!) */
+	ANIMFILTER_TMP_PEEK       = (1<<30)
 } eAnimFilter_Flags;
-
 
 /* ---------- Flag Checking Macros ------------ */
 // xxx check on all of these flags again...
@@ -211,13 +231,9 @@ typedef enum eAnimFilter_Flags {
 #define EXPANDED_SCEC(sce) ((sce->flag & SCE_DS_COLLAPSED)==0)
 	/* 'Sub-Scene' channels (flags stored in Data block) */
 #define FILTER_WOR_SCED(wo) ((wo->flag & WO_DS_EXPAND))
-#define FILTER_NTREE_SCED(ntree) ((ntree->flag & NTREE_DS_EXPAND))
 	/* 'Object' channels */
 #define SEL_OBJC(base) ((base->flag & SELECT))
 #define EXPANDED_OBJC(ob) ((ob->nlaflag & OB_ADS_COLLAPSED)==0)
-	/* 'Sub-object' channels (flags stored in Object block) */
-#define FILTER_MAT_OBJC(ob) ((ob->nlaflag & OB_ADS_SHOWMATS))
-#define FILTER_PART_OBJC(ob) ((ob->nlaflag & OB_ADS_SHOWPARTS))
 	/* 'Sub-object' channels (flags stored in Data block) */
 #define FILTER_SKE_OBJD(key) ((key->flag & KEY_DS_EXPAND))
 #define FILTER_MAT_OBJD(ma) ((ma->flag & MA_DS_EXPAND))
@@ -228,27 +244,29 @@ typedef enum eAnimFilter_Flags {
 #define FILTER_MBALL_OBJD(mb) ((mb->flag2 & MB_DS_EXPAND))
 #define FILTER_ARM_OBJD(arm) ((arm->flag & ARM_DS_EXPAND))
 #define FILTER_MESH_OBJD(me) ((me->flag & ME_DS_EXPAND))
+#define FILTER_LATTICE_OBJD(lt) ((lt->flag & LT_DS_EXPAND))
+#define FILTER_SPK_OBJD(spk) ((spk->flag & SPK_DS_EXPAND))
+	/* Variable use expanders */
+#define FILTER_NTREE_DATA(ntree) ((ntree->flag & NTREE_DS_EXPAND))
+#define FILTER_TEX_DATA(tex) ((tex->flag & TEX_DS_EXPAND))
+
 	/* 'Sub-object/Action' channels (flags stored in Action) */
 #define SEL_ACTC(actc) ((actc->flag & ACT_SELECTED))
 #define EXPANDED_ACTC(actc) ((actc->flag & ACT_COLLAPSED)==0)
 	/* 'Sub-AnimData' channels */
 #define EXPANDED_DRVD(adt) ((adt->flag & ADT_DRIVERS_COLLAPSED)==0)
-	/* Texture expanders */
-#define FILTER_TEX_MATC(ma) ((ma->flag & MA_DS_SHOW_TEXS))
-#define FILTER_TEX_LAMC(la) ((la->flag & LA_DS_SHOW_TEXS))
-#define FILTER_TEX_WORC(wa) ((wo->flag & WO_DS_SHOW_TEXS))
-#define FILTER_TEX_DATA(tex) ((tex->flag & TEX_DS_EXPAND))
+
 
 /* Actions (also used for Dopesheet) */
 	/* Action Channel Group */
 #define EDITABLE_AGRP(agrp) ((agrp->flag & AGRP_PROTECTED)==0)
-#define EXPANDED_AGRP(agrp) \
-	( ( ((ac)->spacetype == SPACE_IPO) && (agrp->flag & AGRP_EXPANDED_G) ) || \
-	  ( ((ac)->spacetype != SPACE_IPO) && (agrp->flag & AGRP_EXPANDED)   ) )
+#define EXPANDED_AGRP(ac, agrp) \
+	( ((!(ac) || ((ac)->spacetype != SPACE_IPO)) && (agrp->flag & AGRP_EXPANDED)) || \
+	  (( (ac) && ((ac)->spacetype == SPACE_IPO)) && (agrp->flag & AGRP_EXPANDED_G)) )
 #define SEL_AGRP(agrp) ((agrp->flag & AGRP_SELECTED) || (agrp->flag & AGRP_ACTIVE))
 	/* F-Curve Channels */
 #define EDITABLE_FCU(fcu) ((fcu->flag & FCURVE_PROTECTED)==0)
-#define SEL_FCU(fcu) (fcu->flag & (FCURVE_ACTIVE|FCURVE_SELECTED))
+#define SEL_FCU(fcu) (fcu->flag & FCURVE_SELECTED)
 
 /* ShapeKey mode only */
 #define EDITABLE_SHAPEKEY(kb) ((kb->flag & KEYBLOCK_LOCKED)==0)
@@ -259,7 +277,7 @@ typedef enum eAnimFilter_Flags {
 #define EXPANDED_GPD(gpd) (gpd->flag & GP_DATA_EXPAND) 
 	/* Grease Pencil Layer settings */
 #define EDITABLE_GPL(gpl) ((gpl->flag & GP_LAYER_LOCKED)==0)
-#define SEL_GPL(gpl) ((gpl->flag & GP_LAYER_ACTIVE) || (gpl->flag & GP_LAYER_SELECT))
+#define SEL_GPL(gpl) (gpl->flag & GP_LAYER_SELECT)
 
 /* NLA only */
 #define SEL_NLT(nlt) (nlt->flag & NLATRACK_SELECTED)
@@ -284,11 +302,12 @@ typedef enum eAnimFilter_Flags {
 /* -------------- NLA Channel Defines -------------- */
 
 /* NLA channel heights */
-#define NLACHANNEL_FIRST			-16
-#define	NLACHANNEL_HEIGHT			24
-#define NLACHANNEL_HEIGHT_HALF	12
-#define	NLACHANNEL_SKIP			2
-#define NLACHANNEL_STEP			(NLACHANNEL_HEIGHT + NLACHANNEL_SKIP)
+// XXX: NLACHANNEL_FIRST isn't used?
+#define NLACHANNEL_FIRST			    -16
+#define	NLACHANNEL_HEIGHT(snla)	        ((snla && (snla->flag & SNLA_NOSTRIPCURVES)) ? 16 : 24)
+#define NLACHANNEL_HEIGHT_HALF(snla)	((snla && (snla->flag & SNLA_NOSTRIPCURVES)) ?  8 : 12)
+#define	NLACHANNEL_SKIP	                2
+#define NLACHANNEL_STEP(snla)           (NLACHANNEL_HEIGHT(snla) + NLACHANNEL_SKIP)
 
 /* channel widths */
 #define NLACHANNEL_NAMEWIDTH		200
@@ -301,7 +320,7 @@ typedef enum eAnimFilter_Flags {
 /* Obtain list of filtered Animation channels to operate on.
  * Returns the number of channels in the list
  */
-int ANIM_animdata_filter(bAnimContext *ac, ListBase *anim_data, int filter_mode, void *data, short datatype);
+size_t ANIM_animdata_filter(bAnimContext *ac, ListBase *anim_data, int filter_mode, void *data, short datatype);
 
 /* Obtain current anim-data context from Blender Context info.
  * Returns whether the operation was successful. 
@@ -325,17 +344,17 @@ typedef enum eAnimChannels_SetFlag {
 	ACHANNEL_SETFLAG_CLEAR = 0,		/* turn off */
 	ACHANNEL_SETFLAG_ADD,			/* turn on */
 	ACHANNEL_SETFLAG_INVERT,		/* on->off, off->on */
-	ACHANNEL_SETFLAG_TOGGLE,		/* some on -> all off // all on */
+	ACHANNEL_SETFLAG_TOGGLE			/* some on -> all off // all on */
 } eAnimChannels_SetFlag;
 
 /* types of settings for AnimChannels */
 typedef enum eAnimChannel_Settings {
-	 ACHANNEL_SETTING_SELECT = 0,
+	ACHANNEL_SETTING_SELECT = 0,
 	ACHANNEL_SETTING_PROTECT,			// warning: for drawing UI's, need to check if this is off (maybe inverse this later)
 	ACHANNEL_SETTING_MUTE,
 	ACHANNEL_SETTING_EXPAND,
 	ACHANNEL_SETTING_VISIBLE,			/* only for Graph Editor */
-	ACHANNEL_SETTING_SOLO,				/* only for NLA Tracks */
+	ACHANNEL_SETTING_SOLO				/* only for NLA Tracks */
 } eAnimChannel_Settings;
 
 
@@ -343,7 +362,7 @@ typedef enum eAnimChannel_Settings {
 typedef struct bAnimChannelType {
 	/* type data */
 		/* name of the channel type, for debugging */
-	char *channel_type_name;
+	const char *channel_type_name;
 	
 	/* drawing */
 		/* get RGB color that is used to draw the majority of the backdrop */
@@ -357,6 +376,8 @@ typedef struct bAnimChannelType {
 	
 	/* get name (for channel lists) */
 	void (*name)(bAnimListElem *ale, char *name);
+	/* get RNA property+pointer for editing the name */
+	short (*name_prop)(bAnimListElem *ale, struct PointerRNA *ptr, struct PropertyRNA **prop);
 	/* get icon (for channel lists) */
 	int (*icon)(bAnimListElem *ale);
 	
@@ -383,7 +404,7 @@ void ANIM_channel_debug_print_info(bAnimListElem *ale, short indent_level);
 /* Draw the given channel */
 void ANIM_channel_draw(bAnimContext *ac, bAnimListElem *ale, float yminc, float ymaxc);
 /* Draw the widgets for the given channel */
-void ANIM_channel_draw_widgets(bAnimContext *ac, bAnimListElem *ale, struct uiBlock *block, float yminc, float ymaxc);
+void ANIM_channel_draw_widgets(struct bContext *C, bAnimContext *ac, bAnimListElem *ale, struct uiBlock *block, float yminc, float ymaxc, size_t channel_index);
 
 
 /* ------------------------ Editing API -------------------------- */
@@ -443,6 +464,8 @@ enum {
 	DRAWCFRA_UNIT_SECONDS 	= (1<<1),
 		/* show time-offset line */
 	DRAWCFRA_SHOW_TIMEOFS	= (1<<2),
+		/* draw indicator extra wide (for timeline) */
+	DRAWCFRA_WIDE			= (1<<3)
 } eAnimEditDraw_CurrentFrame; 
 
 /* main call to draw current-frame indicator in an Animation Editor */
@@ -517,7 +540,7 @@ typedef enum eAnimUnitConv_Flags {
 		/* only touch selected BezTriples */
 	ANIM_UNITCONV_ONLYSEL	= (1<<2),
 		/* only touch selected vertices */
-	ANIM_UNITCONV_SELVERTS	= (1<<3),
+	ANIM_UNITCONV_SELVERTS	= (1<<3)
 } eAnimUnitConv_Flags;
 
 /* Get unit conversion factor for given ID + F-Curve */
@@ -576,6 +599,11 @@ void ED_keymap_animchannels(struct wmKeyConfig *keyconf);
 	/* generic time editing */
 void ED_operatortypes_anim(void);
 void ED_keymap_anim(struct wmKeyConfig *keyconf);
+	
+	/* space_graph */
+void ED_operatormacros_graph(void);
+	/* space_action */
+void ED_operatormacros_action(void);
 
 /* ************************************************ */
 

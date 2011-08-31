@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -21,6 +21,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file collada.h
+ *  \ingroup collada
+ */
+
 #ifndef BLENDER_COLLADA_H
 #define BLENDER_COLLADA_H
 
@@ -34,7 +39,7 @@ extern "C" {
 	 * both return 1 on success, 0 on error
 	 */
 	int collada_import(bContext *C, const char *filepath);
-	int collada_export(Scene *sce, const char *filepath);
+	int collada_export(Scene *sce, const char *filepath, int selected);
 #ifdef __cplusplus
 }
 #endif

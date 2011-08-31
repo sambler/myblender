@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,6 +27,10 @@
  */
 #ifndef DNA_WINDOWMANAGER_TYPES_H
 #define DNA_WINDOWMANAGER_TYPES_H
+
+/** \file DNA_windowmanager_types.h
+ *  \ingroup DNA
+ */
 
 #include "DNA_listBase.h"
 #include "DNA_vec_types.h"
@@ -82,6 +86,7 @@ enum ReportListFlags {
 	RPT_PRINT = 1,
 	RPT_STORE = 2,
 	RPT_FREE = 4,
+	RPT_OP_HOLD = 8 /* dont move them into the operator global list (caller will use) */
 };
 #
 #
@@ -90,8 +95,8 @@ typedef struct Report {
 	short type; /* ReportType */
 	short flag;
 	int len; /* strlen(message), saves some time calculating the word wrap  */
-	char *typestr;
-	char *message;
+	const char *typestr;
+	const char *message;
 } Report;
 
 /* saved in the wm, dont remove */
@@ -139,15 +144,17 @@ typedef struct wmWindowManager {
 	ListBase drags;			/* active dragged items */
 	
 	ListBase keyconfigs;				/* known key configurations */
-	struct wmKeyConfig *defaultconf;	/* default configuration, not saved */
+	struct wmKeyConfig *defaultconf;	/* default configuration */
+	struct wmKeyConfig *addonconf;		/* addon configuration */
+	struct wmKeyConfig *userconf;		/* user configuration */
 
 	ListBase timers;					/* active timers */
 	struct wmTimer *autosavetimer;		/* timer for auto save */
 } wmWindowManager;
 
 /* wmWindowManager.initialized */
-#define WM_INIT_WINDOW		1<<0
-#define WM_INIT_KEYMAP		1<<1
+#define WM_INIT_WINDOW		(1<<0)
+#define WM_INIT_KEYMAP		(1<<1)
 
 /* the savable part, rest of data is local in ghostwinlay */
 typedef struct wmWindow {
@@ -169,9 +176,10 @@ typedef struct wmWindow {
 	short monitor;		/* multiscreen... no idea how to store yet */
 	short active;		/* set to 1 if an active window, for quick rejects */
 	short cursor;		/* current mouse cursor type */
-	short lastcursor;	/* for temp waitcursor */
+	short lastcursor;	/* previous cursor when setting modal one */
+	short modalcursor;	/* the current modal cursor */
 	short addmousemove;	/* internal: tag this for extra mousemove event, makes cursors/buttons active on UI switching */
-	short pad2[2];
+	short pad2;
 
 	struct wmEvent *eventstate;	/* storage for event system */
 	
@@ -228,20 +236,31 @@ typedef struct wmKeyMapItem {
 
 	/* runtime */
 	short maptype;					/* keymap editor */
-	short id;						/* unique identifier */
+	short id;						/* unique identifier. Positive for kmi that override builtins, negative otherwise */
 	short pad;
 	struct PointerRNA *ptr;			/* rna pointer to access properties */
 } wmKeyMapItem;
 
+/* used instead of wmKeyMapItem for diff keymaps */
+typedef struct wmKeyMapDiffItem {
+	struct wmKeyMapDiffItem *next, *prev;
+
+	wmKeyMapItem *remove_item;
+	wmKeyMapItem *add_item;
+} wmKeyMapDiffItem;
+
 /* wmKeyMapItem.flag */
-#define KMI_INACTIVE	1
-#define KMI_EXPANDED	2
+#define KMI_INACTIVE		1
+#define KMI_EXPANDED		2
+#define KMI_USER_MODIFIED	4
+#define KMI_UPDATE			8
 
 /* stored in WM, the actively used keymaps */
 typedef struct wmKeyMap {
 	struct wmKeyMap *next, *prev;
 	
 	ListBase items;
+	ListBase diff_items;
 	
 	char idname[64];	/* global editor keymaps, or for more per space/region */
 	short spaceid;		/* same IDs as in DNA_space_types.h */
@@ -257,9 +276,12 @@ typedef struct wmKeyMap {
 
 /* wmKeyMap.flag */
 #define KEYMAP_MODAL				1	/* modal map, not using operatornames */
-#define KEYMAP_USER					2	/* user created keymap */
+#define KEYMAP_USER					2	/* user keymap */
 #define KEYMAP_EXPANDED				4
 #define KEYMAP_CHILDREN_EXPANDED	8
+#define KEYMAP_DIFF					16	/* diff keymap for user preferences */
+#define KEYMAP_USER_MODIFIED		32	/* keymap has user modifications */
+#define KEYMAP_UPDATE				64
 
 typedef struct wmKeyConfig {
 	struct wmKeyConfig *next, *prev;
@@ -298,22 +320,22 @@ typedef struct wmOperator {
 
 } wmOperator;
 
-/* operator type exec(), invoke() modal(), return values */
-#define OPERATOR_RUNNING_MODAL	1
-#define OPERATOR_CANCELLED		2
-#define OPERATOR_FINISHED		4
+
+/* operator type return flags: exec(), invoke() modal(), return values */
+#define OPERATOR_RUNNING_MODAL	(1<<0)
+#define OPERATOR_CANCELLED		(1<<1)
+#define OPERATOR_FINISHED		(1<<2)
 /* add this flag if the event should pass through */
-#define OPERATOR_PASS_THROUGH	8
+#define OPERATOR_PASS_THROUGH	(1<<3)
 /* in case operator got executed outside WM code... like via fileselect */
-#define OPERATOR_HANDLED		16
+#define OPERATOR_HANDLED		(1<<4)
+
+#define OPERATOR_FLAGS_ALL		((1<<5)-1)
+
+/* sanity checks for debug mode only */
+#define OPERATOR_RETVAL_CHECK(ret) BLI_assert(ret != 0 && (ret & OPERATOR_FLAGS_ALL) == ret)
 
 /* wmOperator flag */
 #define OP_GRAB_POINTER			1
-
-typedef enum wmRadialControlMode {
-	WM_RADIALCONTROL_SIZE,
-	WM_RADIALCONTROL_STRENGTH,
-	WM_RADIALCONTROL_ANGLE,
-} wmRadialControlMode;
 
 #endif /* DNA_WINDOWMANAGER_TYPES_H */

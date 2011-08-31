@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -23,6 +23,10 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file ImageExporter.h
+ *  \ingroup collada
+ */
+
 #ifndef __IMAGEEXPORTER_H__
 #define __IMAGEEXPORTER_H__
 
@@ -43,8 +47,10 @@ class ImagesExporter: COLLADASW::LibraryImages
 public:
 	ImagesExporter(COLLADASW::StreamWriter *sw, const char* filename);
 	
-	void exportImages(Scene *sce);
+	void exportImages(Scene *sce, bool export_selected);
 	void operator()(Material *ma, Object *ob);
+private:
+	bool hasImages(Scene *sce);
 };
 
 #endif

@@ -30,11 +30,17 @@
 *
 */
 
+/** \file blender/modifiers/intern/MOD_decimate.c
+ *  \ingroup modifiers
+ */
+
+
 #include "DNA_meshdata_types.h"
 
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
-#include "BKE_utildefines.h"
+
 #include "BKE_cdderivedmesh.h"
 #include "BKE_mesh.h"
 #include "BKE_modifier.h"
@@ -42,8 +48,11 @@
 
 #include "MEM_guardedalloc.h"
 
+#ifdef WITH_MOD_DECIMATE
 #include "LOD_decimation.h"
+#endif
 
+#include "MOD_util.h"
 
 static void initData(ModifierData *md)
 {
@@ -60,6 +69,7 @@ static void copyData(ModifierData *md, ModifierData *target)
 	tdmd->percent = dmd->percent;
 }
 
+#ifdef WITH_MOD_DECIMATE
 static DerivedMesh *applyModifier(ModifierData *md, Object *UNUSED(ob),
 						DerivedMesh *derivedData,
 						int UNUSED(useRenderParams),
@@ -176,7 +186,15 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *UNUSED(ob),
 exit:
 		return result;
 }
-
+#else // WITH_MOD_DECIMATE
+static DerivedMesh *applyModifier(ModifierData *UNUSED(md), Object *UNUSED(ob),
+						DerivedMesh *derivedData,
+						int UNUSED(useRenderParams),
+						int UNUSED(isFinalCalc))
+{
+	return derivedData;
+}
+#endif // WITH_MOD_DECIMATE
 
 ModifierTypeInfo modifierType_Decimate = {
 	/* name */              "Decimate",
@@ -185,18 +203,20 @@ ModifierTypeInfo modifierType_Decimate = {
 	/* type */              eModifierTypeType_Nonconstructive,
 	/* flags */             eModifierTypeFlag_AcceptsMesh,
 	/* copyData */          copyData,
-	/* deformVerts */       0,
-	/* deformVertsEM */     0,
-	/* deformMatricesEM */  0,
+	/* deformVerts */       NULL,
+	/* deformMatrices */    NULL,
+	/* deformVertsEM */     NULL,
+	/* deformMatricesEM */  NULL,
 	/* applyModifier */     applyModifier,
-	/* applyModifierEM */   0,
+	/* applyModifierEM */   NULL,
 	/* initData */          initData,
-	/* requiredDataMask */  0,
-	/* freeData */          0,
-	/* isDisabled */        0,
-	/* updateDepgraph */    0,
-	/* dependsOnTime */     0,
-	/* dependsOnNormals */	0,
-	/* foreachObjectLink */ 0,
-	/* foreachIDLink */     0,
+	/* requiredDataMask */  NULL,
+	/* freeData */          NULL,
+	/* isDisabled */        NULL,
+	/* updateDepgraph */    NULL,
+	/* dependsOnTime */     NULL,
+	/* dependsOnNormals */	NULL,
+	/* foreachObjectLink */ NULL,
+	/* foreachIDLink */     NULL,
+	/* foreachTexLink */    NULL,
 };

@@ -30,12 +30,20 @@
 *
 */
 
+/** \file blender/modifiers/intern/MOD_armature.c
+ *  \ingroup modifiers
+ */
+
+
 #include <string.h>
 
 #include "DNA_armature_types.h"
 #include "DNA_object_types.h"
+#include "DNA_mesh_types.h"
 
-#include "BKE_utildefines.h"
+#include "BLI_utildefines.h"
+
+
 #include "BKE_cdderivedmesh.h"
 #include "BKE_lattice.h"
 #include "BKE_modifier.h"
@@ -61,6 +69,7 @@ static void copyData(ModifierData *md, ModifierData *target)
 
 	tamd->object = amd->object;
 	tamd->deformflag = amd->deformflag;
+	tamd->multi = amd->multi;
 	strncpy(tamd->defgrp_name, amd->defgrp_name, 32);
 }
 
@@ -69,7 +78,7 @@ static CustomDataMask requiredDataMask(Object *UNUSED(ob), ModifierData *UNUSED(
 	CustomDataMask dataMask = 0;
 
 	/* ask for vertexgroups */
-	dataMask |= (1 << CD_MDEFORMVERT);
+	dataMask |= CD_MASK_MDEFORMVERT;
 
 	return dataMask;
 }
@@ -118,8 +127,8 @@ static void deformVerts(ModifierData *md, Object *ob,
 	modifier_vgroup_cache(md, vertexCos); /* if next modifier needs original vertices */
 	
 	armature_deform_verts(amd->object, ob, derivedData, vertexCos, NULL,
-				  numVerts, amd->deformflag, 
-	 (float(*)[3])amd->prevCos, amd->defgrp_name);
+		numVerts, amd->deformflag, (float(*)[3])amd->prevCos, amd->defgrp_name);
+
 	/* free cache */
 	if(amd->prevCos) {
 		MEM_freeN(amd->prevCos);
@@ -136,8 +145,16 @@ static void deformVertsEM(
 
 	if(!derivedData) dm = CDDM_from_editmesh(editData, ob->data);
 
-	armature_deform_verts(amd->object, ob, dm, vertexCos, NULL, numVerts,
-				  amd->deformflag, NULL, amd->defgrp_name);
+	modifier_vgroup_cache(md, vertexCos); /* if next modifier needs original vertices */
+
+	armature_deform_verts(amd->object, ob, dm, vertexCos, NULL,
+		numVerts, amd->deformflag, (float(*)[3])amd->prevCos, amd->defgrp_name);
+
+	/* free cache */
+	if(amd->prevCos) {
+		MEM_freeN(amd->prevCos);
+		amd->prevCos= NULL;
+	}
 
 	if(!derivedData) dm->release(dm);
 }
@@ -158,6 +175,19 @@ static void deformMatricesEM(
 	if(!derivedData) dm->release(dm);
 }
 
+static void deformMatrices(ModifierData *md, Object *ob, DerivedMesh *derivedData,
+						   float (*vertexCos)[3], float (*defMats)[3][3], int numVerts)
+{
+	ArmatureModifierData *amd = (ArmatureModifierData*) md;
+	DerivedMesh *dm = derivedData;
+
+	if(!derivedData) dm = CDDM_from_mesh((Mesh*)ob->data, ob);
+
+	armature_deform_verts(amd->object, ob, dm, vertexCos, defMats, numVerts,
+				  amd->deformflag, NULL, amd->defgrp_name);
+
+	if(!derivedData) dm->release(dm);
+}
 
 ModifierTypeInfo modifierType_Armature = {
 	/* name */              "Armature",
@@ -169,17 +199,19 @@ ModifierTypeInfo modifierType_Armature = {
 
 	/* copyData */          copyData,
 	/* deformVerts */       deformVerts,
+	/* deformMatrices */    deformMatrices,
 	/* deformVertsEM */     deformVertsEM,
 	/* deformMatricesEM */  deformMatricesEM,
-	/* applyModifier */     0,
-	/* applyModifierEM */   0,
+	/* applyModifier */     NULL,
+	/* applyModifierEM */   NULL,
 	/* initData */          initData,
 	/* requiredDataMask */  requiredDataMask,
-	/* freeData */          0,
+	/* freeData */          NULL,
 	/* isDisabled */        isDisabled,
 	/* updateDepgraph */    updateDepgraph,
-	/* dependsOnTime */     0,
-	/* dependsOnNormals */	0,
+	/* dependsOnTime */     NULL,
+	/* dependsOnNormals */	NULL,
 	/* foreachObjectLink */ foreachObjectLink,
-	/* foreachIDLink */     0,
+	/* foreachIDLink */     NULL,
+	/* foreachTexLink */    NULL,
 };

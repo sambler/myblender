@@ -1,6 +1,4 @@
-/**
- * blenlib/BKE_curve.h (mar-2001 nzc)
- *	
+/*
  * $Id$ 
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -31,6 +29,11 @@
 #ifndef BKE_CURVE_H
 #define BKE_CURVE_H
 
+/** \file BKE_curve.h
+ *  \ingroup bke
+ *  \since March 2001
+ *  \author nzc
+ */
 struct Curve;
 struct ListBase;
 struct Object;
@@ -48,13 +51,13 @@ struct BevList;
 #define SEGMENTSV(nu)	    ( ((nu)->flagv & CU_NURB_CYCLIC) ? (nu)->pntsv : (nu)->pntsv-1 )
 
 #define CU_DO_TILT(cu, nu) (((nu->flag & CU_2D) && (cu->flag & CU_3D)==0) ? 0 : 1)
-#define CU_DO_RADIUS(cu, nu) ((CU_DO_TILT(cu, nu) || ((cu)->flag & CU_PATH_RADIUS) || (cu)->bevobj || (cu)->ext1!=0.0 || (cu)->ext2!=0.0) ? 1:0)
+#define CU_DO_RADIUS(cu, nu) ((CU_DO_TILT(cu, nu) || ((cu)->flag & CU_PATH_RADIUS) || (cu)->bevobj || (cu)->ext1!=0.0f || (cu)->ext2!=0.0f) ? 1:0)
 
 
 void unlink_curve( struct Curve *cu);
 void free_curve( struct Curve *cu);
 void BKE_free_editfont(struct Curve *cu);
-struct Curve *add_curve(char *name, int type);
+struct Curve *add_curve(const char *name, int type);
 struct Curve *copy_curve( struct Curve *cu);
 void make_local_curve( struct Curve *cu);
 short curve_type( struct Curve *cu);
@@ -72,7 +75,7 @@ void minmaxNurb( struct Nurb *nu, float *min, float *max);
 void nurbs_knot_calc_u(struct Nurb *nu);
 void nurbs_knot_calc_v(struct Nurb *nu);
 
-void makeNurbfaces(struct Nurb *nu, float *coord_array, int rowstride);
+void makeNurbfaces(struct Nurb *nu, float *coord_array, int rowstride, int resolu, int resolv);
 void makeNurbcurve(struct Nurb *nu, float *coord_array, float *tilt_array, float *radius_array, float *weight_array, int resolu, int stride);
 void forward_diff_bezier(float q0, float q1, float q2, float q3, float *p, int it, int stride);
 float *make_orco_curve(struct Scene *scene, struct Object *ob);
@@ -112,5 +115,6 @@ int minmax_curve(struct Curve *cu, float min[3], float max[3]);
 int curve_center_median(struct Curve *cu, float cent[3]);
 int curve_center_bounds(struct Curve *cu, float cent[3]);
 void curve_translate(struct Curve *cu, float offset[3], int do_keys);
+void curve_delete_material_index(struct Curve *cu, int index);
 #endif
 

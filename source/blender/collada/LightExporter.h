@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -23,12 +23,17 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file LightExporter.h
+ *  \ingroup collada
+ */
+
 #ifndef __LIGHTEXPORTER_H__
 #define __LIGHTEXPORTER_H__
 
 #include "COLLADASWStreamWriter.h"
 #include "COLLADASWLibraryLights.h"
 
+#include "DNA_lamp_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 
@@ -36,8 +41,10 @@ class LightsExporter: COLLADASW::LibraryLights
 {
 public:
 	LightsExporter(COLLADASW::StreamWriter *sw);
-	void exportLights(Scene *sce);
+	void exportLights(Scene *sce, bool export_selected);
 	void operator()(Object *ob);
+private:
+	bool exportBlenderProfile(COLLADASW::Light &cla, Lamp *la);
 };
 
 #endif

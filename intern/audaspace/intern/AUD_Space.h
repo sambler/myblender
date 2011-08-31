@@ -1,27 +1,33 @@
 /*
  * $Id$
  *
- * ***** BEGIN LGPL LICENSE BLOCK *****
+ * ***** BEGIN GPL LICENSE BLOCK *****
  *
- * Copyright 2009 Jörg Hermann Müller
+ * Copyright 2009-2011 Jörg Hermann Müller
  *
  * This file is part of AudaSpace.
  *
- * AudaSpace is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
+ * Audaspace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
  * AudaSpace is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU Lesser General Public License
- * along with AudaSpace.  If not, see <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU General Public License
+ * along with Audaspace; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * ***** END LGPL LICENSE BLOCK *****
+ * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file audaspace/intern/AUD_Space.h
+ *  \ingroup audaspaceintern
+ */
+
 
 #ifndef AUD_SPACE
 #define AUD_SPACE
@@ -34,6 +40,12 @@
 #define AUD_SAMPLE_SIZE(specs) (specs.channels * sizeof(sample_t))
 /// Throws a AUD_Exception with the provided error code.
 #define AUD_THROW(exception, errorstr) { AUD_Exception e; e.error = exception; e.str = errorstr; throw e; }
+
+/// Compares two audio data specifications.
+#define AUD_COMPARE_SPECS(s1, s2) ((s1.rate == s2.rate) && (s1.channels == s2.channels))
+
+/// Returns the bit for a channel mask.
+#define AUD_CHANNEL_BIT(channel) (0x01 << channel)
 
 /// Returns the smaller of the two values.
 #define AUD_MIN(a, b) (((a) < (b)) ? (a) : (b))
@@ -73,9 +85,23 @@ typedef enum
 	AUD_CHANNELS_SURROUND5  = 5,	/// 5 channel surround sound.
 	AUD_CHANNELS_SURROUND51 = 6,	/// 5.1 surround sound.
 	AUD_CHANNELS_SURROUND61 = 7,	/// 6.1 surround sound.
-	AUD_CHANNELS_SURROUND71 = 8,	/// 7.1 surround sound.
-	AUD_CHANNELS_SURROUND72 = 9		/// 7.2 surround sound.
+	AUD_CHANNELS_SURROUND71 = 8	/// 7.1 surround sound.
 } AUD_Channels;
+
+/// The channel names.
+typedef enum
+{
+	AUD_CHANNEL_FRONT_LEFT = 0,
+	AUD_CHANNEL_FRONT_RIGHT,
+	AUD_CHANNEL_FRONT_CENTER,
+	AUD_CHANNEL_LFE,
+	AUD_CHANNEL_REAR_LEFT,
+	AUD_CHANNEL_REAR_RIGHT,
+	AUD_CHANNEL_REAR_CENTER,
+	AUD_CHANNEL_SIDE_LEFT,
+	AUD_CHANNEL_SIDE_RIGHT,
+	AUD_CHANNEL_MAX
+} AUD_Channel;
 
 /**
  * The sample rate tells how many samples are played back within one second.
@@ -94,7 +120,7 @@ typedef enum
 	AUD_RATE_88200   = 88200,		/// 88200 Hz.
 	AUD_RATE_96000   = 96000,		/// 96000 Hz.
 	AUD_RATE_192000  = 192000		/// 192000 Hz.
-} AUD_SampleRate;
+} AUD_DefaultSampleRate;
 
 /// Status of a playback handle.
 typedef enum
@@ -115,7 +141,7 @@ typedef enum
 	AUD_ERROR_FFMPEG,
 	AUD_ERROR_OPENAL,
 	AUD_ERROR_SDL,
-	AUD_ERROR_JACK,
+	AUD_ERROR_JACK
 } AUD_Error;
 
 /// Fading types.
@@ -134,14 +160,53 @@ typedef enum
 	AUD_DISTANCE_MODEL_LINEAR,
 	AUD_DISTANCE_MODEL_LINEAR_CLAMPED,
 	AUD_DISTANCE_MODEL_EXPONENT,
-	AUD_DISTANCE_MODEL_EXPONENT_CLAMPED,
+	AUD_DISTANCE_MODEL_EXPONENT_CLAMPED
 } AUD_DistanceModel;
+
+/// Possible animatable properties for Sequencer Factories and Entries.
+typedef enum
+{
+	AUD_AP_VOLUME,
+	AUD_AP_PANNING,
+	AUD_AP_PITCH,
+	AUD_AP_LOCATION,
+	AUD_AP_ORIENTATION
+} AUD_AnimateablePropertyType;
+
+/// Container formats for writers.
+typedef enum
+{
+	AUD_CONTAINER_INVALID = 0,
+	AUD_CONTAINER_AC3,
+	AUD_CONTAINER_FLAC,
+	AUD_CONTAINER_MATROSKA,
+	AUD_CONTAINER_MP2,
+	AUD_CONTAINER_MP3,
+	AUD_CONTAINER_OGG,
+	AUD_CONTAINER_WAV
+} AUD_Container;
+
+/// Audio codecs for writers.
+typedef enum
+{
+	AUD_CODEC_INVALID = 0,
+	AUD_CODEC_AAC,
+	AUD_CODEC_AC3,
+	AUD_CODEC_FLAC,
+	AUD_CODEC_MP2,
+	AUD_CODEC_MP3,
+	AUD_CODEC_PCM,
+	AUD_CODEC_VORBIS
+} AUD_Codec;
 
 /// Sample type.(float samples)
 typedef float sample_t;
 
 /// Sample data type (format samples)
 typedef unsigned char data_t;
+
+/// Sample rate type.
+typedef double AUD_SampleRate;
 
 /// Specification of a sound source.
 typedef struct

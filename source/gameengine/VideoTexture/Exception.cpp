@@ -1,3 +1,6 @@
+/** \file gameengine/VideoTexture/Exception.cpp
+ *  \ingroup bgevideotex
+ */
 /* $Id$
 -----------------------------------------------------------------------------
 This source file is part of VideoTexture library
@@ -102,7 +105,7 @@ Exception::Exception (ExceptionID & expID, RESULT rslt, const char * fil, int li
 : m_expID (&expID), m_hRslt (rslt)
 {
 	// set file and line
-	if (strlen(fil) > 0 || lin > 0)
+	if (fil[0] != '\0' || lin > 0)
 		setFileLine (fil, lin);
 }
 

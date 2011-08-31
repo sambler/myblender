@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -23,28 +23,57 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
-#include "COLLADABUUtils.h"
+/** \file blender/collada/MaterialExporter.cpp
+ *  \ingroup collada
+ */
+
+
 
 #include "MaterialExporter.h"
+#include "COLLADABUUtils.h"
 #include "collada_internal.h"
 
 MaterialsExporter::MaterialsExporter(COLLADASW::StreamWriter *sw): COLLADASW::LibraryMaterials(sw){}
 
-void MaterialsExporter::exportMaterials(Scene *sce)
+void MaterialsExporter::exportMaterials(Scene *sce, bool export_selected)
 {
-	openLibrary();
+	if(hasMaterials(sce)) {
+		openLibrary();
 
-	MaterialFunctor mf;
-	mf.forEachMaterialInScene<MaterialsExporter>(sce, *this);
+		MaterialFunctor mf;
+		mf.forEachMaterialInScene<MaterialsExporter>(sce, *this, export_selected);
 
-	closeLibrary();
+		closeLibrary();
+	}
+}
+
+
+bool MaterialsExporter::hasMaterials(Scene *sce)
+{
+	Base *base = (Base *)sce->base.first;
+	
+	while(base) {
+		Object *ob= base->object;
+		int a;
+		for(a = 0; a < ob->totcol; a++)
+		{
+			Material *ma = give_current_material(ob, a+1);
+
+			// no material, but check all of the slots
+			if (!ma) continue;
+
+			return true;
+		}
+		base= base->next;
+	}
+	return false;
 }
 
 void MaterialsExporter::operator()(Material *ma, Object *ob)
 {
 	std::string name(id_name(ma));
 
-	openMaterial(translate_id(name), name);
+	openMaterial(get_material_id(ma), name);
 
 	std::string efid = translate_id(name) + "-effect";
 	addInstanceEffect(COLLADASW::URI(COLLADABU::Utils::EMPTY_STRING, efid));

@@ -1,8 +1,4 @@
-/**
- * blenlib/DNA_ID.h (mar-2001 nzc)
- *
- * ID and Library types, which are fundamental for sdna,
- *
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -32,6 +28,11 @@
  */
 #ifndef DNA_ID_H
 #define DNA_ID_H
+
+/** \file DNA_ID.h
+ *  \ingroup DNA
+ *  \brief ID and Library types, which are fundamental for sdna.
+ */
 
 #include "DNA_listBase.h"
 
@@ -122,13 +123,16 @@ typedef struct Library {
 	struct Library *parent;	/* set for indirectly linked libs, used in the outliner and while reading */
 } Library;
 
-#define PREVIEW_MIPMAPS 2
-#define PREVIEW_MIPMAP_ZERO 0
-#define PREVIEW_MIPMAP_LARGE 1
+enum eIconSizes {
+	ICON_SIZE_ICON,
+	ICON_SIZE_PREVIEW,
+};
+#define NUM_ICON_SIZES (ICON_SIZE_PREVIEW + 1)
 
 typedef struct PreviewImage {
+	/* All values of 2 are really NUM_ICON_SIZES */
 	unsigned int w[2];
-	unsigned int h[2];	
+	unsigned int h[2];
 	short changed[2];
 	short changed_timestamp[2];
 	unsigned int * rect[2];
@@ -174,6 +178,7 @@ typedef struct PreviewImage {
 #define ID_SCRN		MAKE_ID2('S', 'N') /* (depreciated?) */
 #define ID_VF		MAKE_ID2('V', 'F') /* VectorFont */
 #define ID_TXT		MAKE_ID2('T', 'X') /* Text */
+#define ID_SPK		MAKE_ID2('S', 'K') /* Speaker */
 #define ID_SO		MAKE_ID2('S', 'O') /* Sound */
 #define ID_GR		MAKE_ID2('G', 'R') /* Group */
 #define ID_ID		MAKE_ID2('I', 'D') /* (internal use only) */
@@ -199,6 +204,11 @@ typedef struct PreviewImage {
 
 #define ID_REAL_USERS(id) (((ID *)id)->us - ((((ID *)id)->flag & LIB_FAKEUSER) ? 1:0))
 
+#ifdef GS
+#undef GS
+#endif
+#define GS(a)	(*((short *)(a)))
+
 /* id->flag: set frist 8 bits always at zero while reading */
 #define LIB_LOCAL		0
 #define LIB_EXTERN		1
@@ -215,6 +225,8 @@ typedef struct PreviewImage {
 #define LIB_DOIT		1024
 /* tag existing data before linking so we know what is new */
 #define LIB_PRE_EXISTING	2048
+/* runtime */
+#define LIB_ID_RECALC		4096
 
 #ifdef __cplusplus
 }

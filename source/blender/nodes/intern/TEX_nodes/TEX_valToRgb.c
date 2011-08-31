@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,7 +27,13 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/nodes/intern/TEX_nodes/TEX_valToRgb.c
+ *  \ingroup texnodes
+ */
+
+
 #include "../TEX_util.h"
+#include "TEX_node.h"
 
 /* **************** VALTORGB ******************** */
 static bNodeSocketType valtorgb_in[]= {
@@ -58,32 +64,28 @@ static void valtorgb_init(bNode *node)
 	node->storage = add_colorband(1);
 }
 
-bNodeType tex_node_valtorgb= {
-	/* *next,*prev */	NULL, NULL,
-	/* type code   */	TEX_NODE_VALTORGB,
-	/* name        */	"ColorRamp",
-	/* width+range */	240, 200, 300,
-	/* class+opts  */	NODE_CLASS_CONVERTOR, NODE_OPTIONS,
-	/* input sock  */	valtorgb_in,
-	/* output sock */	valtorgb_out,
-	/* storage     */	"ColorBand",
-	/* execfunc    */	valtorgb_exec,
-	/* butfunc     */	NULL,
-	/* initfunc    */	valtorgb_init,
-	/* freestoragefunc    */	node_free_standard_storage,
-	/* copystoragefunc    */	node_copy_standard_storage,
-	/* id          */	NULL
+void register_node_type_tex_valtorgb(ListBase *lb)
+{
+	static bNodeType ntype;
 	
-};
+	node_type_base(&ntype, TEX_NODE_VALTORGB, "ColorRamp", NODE_CLASS_CONVERTOR, NODE_OPTIONS,
+				   valtorgb_in, valtorgb_out);
+	node_type_size(&ntype, 240, 200, 300);
+	node_type_init(&ntype, valtorgb_init);
+	node_type_storage(&ntype, "ColorBand", node_free_standard_storage, node_copy_standard_storage);
+	node_type_exec(&ntype, valtorgb_exec);
+	
+	nodeRegisterType(lb, &ntype);
+}
 
 /* **************** RGBTOBW ******************** */
 static bNodeSocketType rgbtobw_in[]= {
-   {	SOCK_RGBA, 1, "Color",			0.5f, 0.5f, 0.5f, 1.0f, 0.0f, 1.0f},
-   {	-1, 0, ""	}
+	{	SOCK_RGBA, 1, "Color",			0.5f, 0.5f, 0.5f, 1.0f, 0.0f, 1.0f},
+	{	-1, 0, ""	}
 };
 static bNodeSocketType rgbtobw_out[]= {
-   {	SOCK_VALUE, 0, "Val",			0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f},
-   {	-1, 0, ""	}
+	{	SOCK_VALUE, 0, "Val",			0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f},
+	{	-1, 0, ""	}
 };
 
 
@@ -100,21 +102,15 @@ static void rgbtobw_exec(void *data, bNode *node, bNodeStack **in, bNodeStack **
 	tex_output(node, in, out[0], &rgbtobw_valuefn, data);
 }
 
-bNodeType tex_node_rgbtobw= {
-	/* *next,*prev */	NULL, NULL,
-	/* type code   */	TEX_NODE_RGBTOBW,
-	/* name        */	"RGB to BW",
-	/* width+range */	80, 40, 120,
-	/* class+opts  */	NODE_CLASS_CONVERTOR, 0,
-	/* input sock  */	rgbtobw_in,
-	/* output sock */	rgbtobw_out,
-	/* storage     */	"",
-	/* execfunc    */	rgbtobw_exec,
-	/* butfunc     */	NULL,
-	/* initfunc    */	NULL,
-	/* freestoragefunc    */	NULL,
-	/* copystoragefunc    */	NULL,
-	/* id          */	NULL
-
-};
+void register_node_type_tex_rgbtobw(ListBase *lb)
+{
+	static bNodeType ntype;
+	
+	node_type_base(&ntype, TEX_NODE_RGBTOBW, "RGB to BW", NODE_CLASS_CONVERTOR, 0,
+				   rgbtobw_in, rgbtobw_out);
+	node_type_size(&ntype, 80, 40, 120);
+	node_type_exec(&ntype, rgbtobw_exec);
+	
+	nodeRegisterType(lb, &ntype);
+}
 

@@ -1,30 +1,96 @@
 /*
  * $Id$
  *
- * ***** BEGIN LGPL LICENSE BLOCK *****
+ * ***** BEGIN GPL LICENSE BLOCK *****
  *
- * Copyright 2009 Jörg Hermann Müller
+ * Copyright 2009-2011 Jörg Hermann Müller
  *
  * This file is part of AudaSpace.
  *
- * AudaSpace is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
+ * Audaspace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
  * AudaSpace is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU Lesser General Public License
- * along with AudaSpace.  If not, see <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU General Public License
+ * along with Audaspace; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * ***** END LGPL LICENSE BLOCK *****
+ * ***** END GPL LICENSE BLOCK *****
+ */
+
+/** \file audaspace/intern/AUD_Reference.h
+ *  \ingroup audaspaceintern
  */
 
 #ifndef AUD_REFERENCE
 #define AUD_REFERENCE
+
+#include <map>
+#include <cstddef>
+
+// #define MEM_DEBUG
+
+#ifdef MEM_DEBUG
+#include <iostream>
+#include <typeinfo>
+#endif
+
+/**
+ * This class handles the reference counting.
+ */
+class AUD_ReferenceHandler
+{
+private:
+	/**
+	 * Saves the reference counts.
+	 */
+	static std::map<void*, unsigned int> m_references;
+
+public:
+	/**
+	 * Reference increment.
+	 * \param reference The reference.
+	 */
+	static inline void incref(void* reference)
+	{
+		if(!reference)
+			return;
+
+		std::map<void*, unsigned int>::iterator result = m_references.find(reference);
+		if(result != m_references.end())
+		{
+			m_references[reference]++;
+		}
+		else
+		{
+			m_references[reference] = 1;
+		}
+	}
+
+	/**
+	 * Reference decrement.
+	 * \param reference The reference.
+	 * \return Whether the reference has to be deleted.
+	 */
+	static inline bool decref(void* reference)
+	{
+		if(!reference)
+			return false;
+
+		if(!--m_references[reference])
+		{
+			m_references.erase(reference);
+			return true;
+		}
+		return false;
+	}
+};
 
 template <class T>
 /**
@@ -35,18 +101,28 @@ class AUD_Reference
 private:
 	/// The reference.
 	T* m_reference;
-	/// The reference counter.
-	int* m_refcount;
+	void* m_original;
 public:
 	/**
 	 * Creates a new reference counter.
 	 * \param reference The reference.
 	 */
-	AUD_Reference(T* reference = 0)
+	template <class U>
+	AUD_Reference(U* reference)
 	{
-		m_reference = reference;
-		m_refcount = new int;
-		*m_refcount = 1;
+		m_original = reference;
+		m_reference = dynamic_cast<T*>(reference);
+		AUD_ReferenceHandler::incref(m_original);
+#ifdef MEM_DEBUG
+		if(m_reference != NULL)
+			std::cerr << "+" << typeid(*m_reference).name() << std::endl;
+#endif
+	}
+
+	AUD_Reference()
+	{
+		m_original = NULL;
+		m_reference = NULL;
 	}
 
 	/**
@@ -55,9 +131,25 @@ public:
 	 */
 	AUD_Reference(const AUD_Reference& ref)
 	{
+		m_original = ref.m_original;
 		m_reference = ref.m_reference;
-		m_refcount = ref.m_refcount;
-		(*m_refcount)++;
+		AUD_ReferenceHandler::incref(m_original);
+#ifdef MEM_DEBUG
+		if(m_reference != NULL)
+			std::cerr << "+" << typeid(*m_reference).name() << std::endl;
+#endif
+	}
+
+	template <class U>
+	explicit AUD_Reference(const AUD_Reference<U>& ref)
+	{
+		m_original = ref.get();
+		m_reference = dynamic_cast<T*>(ref.get());
+		AUD_ReferenceHandler::incref(m_original);
+#ifdef MEM_DEBUG
+		if(m_reference != NULL)
+			std::cerr << "+" << typeid(*m_reference).name() << std::endl;
+#endif
 	}
 
 	/**
@@ -66,15 +158,12 @@ public:
 	 */
 	~AUD_Reference()
 	{
-		(*m_refcount)--;
-		if(*m_refcount == 0)
-		{
-			if(m_reference)
-			{
-				delete m_reference;
-			}
-			delete m_refcount;
-		}
+#ifdef MEM_DEBUG
+		if(m_reference != NULL)
+			std::cerr << "-" << typeid(*m_reference).name() << std::endl;
+#endif
+		if(AUD_ReferenceHandler::decref(m_original))
+			delete m_reference;
 	}
 
 	/**
@@ -86,30 +175,75 @@ public:
 		if(&ref == this)
 			return *this;
 
-		(*m_refcount)--;
-		if(*m_refcount == 0)
-		{
-			if(m_reference)
-			{
-				delete m_reference;
-			}
-			delete m_refcount;
-		}
+#ifdef MEM_DEBUG
+		if(m_reference != NULL)
+			std::cerr << "-" << typeid(*m_reference).name() << std::endl;
+#endif
+		if(AUD_ReferenceHandler::decref(m_original))
+			delete m_reference;
 
+		m_original = ref.m_original;
 		m_reference = ref.m_reference;
-		m_refcount = ref.m_refcount;
-		(*m_refcount)++;
+		AUD_ReferenceHandler::incref(m_original);
+#ifdef MEM_DEBUG
+		if(m_reference != NULL)
+			std::cerr << "+" << typeid(*m_reference).name() << std::endl;
+#endif
 
 		return *this;
 	}
 
 	/**
+	 * Returns whether the reference is NULL.
+	 */
+	inline bool isNull() const
+	{
+		return m_reference == NULL;
+	}
+
+	/**
 	 * Returns the reference.
 	 */
-	T* get() const
+	inline T* get() const
+	{
+		return m_reference;
+	}
+
+	/**
+	 * Returns the original pointer.
+	 */
+	inline void* getOriginal() const
+	{
+		return m_original;
+	}
+
+	/**
+	 * Returns the reference.
+	 */
+	inline T& operator*() const
+	{
+		return *m_reference;
+	}
+
+	/**
+	 * Returns the reference.
+	 */
+	inline T* operator->() const
 	{
 		return m_reference;
 	}
 };
+
+template<class T, class U>
+inline bool operator==(const AUD_Reference<T>& a, const AUD_Reference<U>& b)
+{
+	return a.getOriginal() == b.getOriginal();
+}
+
+template<class T, class U>
+inline bool operator!=(const AUD_Reference<T>& a, const AUD_Reference<U>& b)
+{
+	return a.getOriginal() != b.getOriginal();
+}
 
 #endif // AUD_REFERENCE

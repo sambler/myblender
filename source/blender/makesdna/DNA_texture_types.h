@@ -1,6 +1,4 @@
-/**
- * blenlib/DNA_texture_types.h (mar-2001 nzc)
- *
+/*
  * $Id$ 
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -31,6 +29,12 @@
 #ifndef DNA_TEXTURE_TYPES_H
 #define DNA_TEXTURE_TYPES_H
 
+/** \file DNA_texture_types.h
+ *  \ingroup DNA
+ *  \since mar-2001
+ *  \author nzc
+ */
+
 #include "DNA_ID.h"
 #include "DNA_image_types.h" /* ImageUser */
 
@@ -48,6 +52,7 @@ struct Tex;
 struct Image;
 struct PreviewImage;
 struct ImBuf;
+struct CurveMapping;
 
 typedef struct MTex {
 
@@ -77,9 +82,9 @@ typedef struct MTex {
 	float densfac, scatterfac, reflfac;
 
 	/* particles */
-	float timefac, lengthfac, clumpfac;
-	float kinkfac, roughfac, padensfac;
-	float lifefac, sizefac, ivelfac, pvelfac;
+	float timefac, lengthfac, clumpfac, dampfac;
+	float kinkfac, roughfac, padensfac, gravityfac;
+	float lifefac, sizefac, ivelfac, fieldfac;
 
 	/* lamp */
 	float shadowfac;
@@ -177,9 +182,10 @@ typedef struct PointDensity {
 	short pdpad3[3];
 	float noise_fac;
 	
-	float speed_scale;
+	float speed_scale, falloff_speed_scale, pdpad2;
 	struct ColorBand *coba;	/* for time -> color */
 	
+	struct CurveMapping *falloff_curve; /* falloff density curve */	
 } PointDensity;
 
 typedef struct VoxelData {
@@ -224,7 +230,7 @@ typedef struct Tex {
 	float vn_mexp;
 	short vn_distm, vn_coltype;
 
-	short noisedepth, noisetype;
+	short noisedepth, noisetype; /* noisedepth MUST be <= 30 else we get floating point exceptions */
 
 	/* newnoise: noisebasis type for clouds/marble/etc, noisebasis2 only used for distorted noise */
 	short noisebasis, noisebasis2;
@@ -336,6 +342,7 @@ typedef struct TexMapping {
 #define TEX_NORMALMAP	2048
 #define TEX_GAUSS_MIP	4096
 #define TEX_FILTER_MIN	8192
+#define TEX_DERIVATIVEMAP	16384
 
 /* texfilter */
 // TXF_BOX -> blender's old texture filtering method
@@ -454,7 +461,11 @@ typedef struct TexMapping {
 #define MTEX_VIEWSPACE		16
 #define MTEX_DUPLI_MAPTO	32
 #define MTEX_OB_DUPLI_ORIG	64
-#define MTEX_NEW_BUMP		128
+#define MTEX_COMPAT_BUMP	128
+#define MTEX_3TAP_BUMP		256
+#define MTEX_5TAP_BUMP		512
+#define MTEX_BUMP_OBJECTSPACE	1024
+#define MTEX_BUMP_TEXTURESPACE	2048
 
 /* blendtype */
 #define MTEX_BLEND		0
@@ -509,6 +520,8 @@ typedef struct TexMapping {
 #define TEX_PD_FALLOFF_SOFT		2
 #define TEX_PD_FALLOFF_CONSTANT	3
 #define TEX_PD_FALLOFF_ROOT		4
+#define TEX_PD_FALLOFF_PARTICLE_AGE 5
+#define TEX_PD_FALLOFF_PARTICLE_VEL 6
 
 /* psys_cache_space */
 #define TEX_PD_OBJECTLOC	0
@@ -516,8 +529,8 @@ typedef struct TexMapping {
 #define TEX_PD_WORLDSPACE	2
 
 /* flag */
-#define TEX_PD_TURBULENCE	1
-
+#define TEX_PD_TURBULENCE		1
+#define TEX_PD_FALLOFF_CURVE	2
 
 /* noise_influence */
 #define TEX_PD_NOISE_STATIC		0
@@ -552,6 +565,8 @@ typedef struct TexMapping {
 #define TEX_VD_RAW_16BIT		2
 #define TEX_VD_IMAGE_SEQUENCE	3
 #define TEX_VD_SMOKE			4
+/* for voxels which use VoxelData->source_path */
+#define TEX_VD_IS_SOURCE_PATH(_format) (ELEM3(_format, TEX_VD_BLENDERVOXEL, TEX_VD_RAW_8BIT, TEX_VD_RAW_16BIT))
 
 /* smoke data types */
 #define TEX_VD_SMOKEDENSITY		0

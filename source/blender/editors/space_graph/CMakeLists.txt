@@ -19,17 +19,38 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-FILE(GLOB SRC *.c)
-
-SET(INC
+set(INC
 	../include
 	../../blenkernel
 	../../blenlib
+	../../blenloader
 	../../makesdna
 	../../makesrna
 	../../windowmanager
 	../../../../intern/guardedalloc
-	../../../../intern/audaspace/intern
 )
 
-BLENDERLIB(bf_editor_space_graph "${SRC}" "${INC}")
+set(INC_SYS
+	${GLEW_INCLUDE_PATH}
+)
+
+set(SRC
+	graph_buttons.c
+	graph_draw.c
+	graph_edit.c
+	graph_ops.c
+	graph_select.c
+	graph_utils.c
+	space_graph.c
+
+	graph_intern.h
+)
+
+if(WITH_AUDASPACE)
+	list(APPEND INC
+		../../../../intern/audaspace/intern
+	)
+	add_definitions(-DWITH_AUDASPACE)
+endif()
+
+blender_add_lib(bf_editor_space_graph "${SRC}" "${INC}" "${INC_SYS}")

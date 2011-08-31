@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,27 +26,29 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/space_script/script_header.c
+ *  \ingroup spscript
+ */
+
+
 #include <string.h>
 #include <stdio.h>
 
-
-
 #include "BLI_blenlib.h"
-#include "BKE_utildefines.h"
+#include "BLI_utildefines.h"
+
+
 #include "BKE_context.h"
 
 #include "ED_screen.h"
 #include "ED_types.h"
 #include "ED_util.h"
 
-
-
 #include "UI_interface.h"
 #include "UI_resources.h"
 #include "UI_view2d.h"
 
 #include "script_intern.h"
-
 
 /* ************************ header area region *********************** */
 
@@ -81,10 +83,10 @@ static uiBlock *dummy_viewmenu(bContext *C, ARegion *ar, void *UNUSED(arg))
 	return block;
 }
 
-static void do_script_buttons(bContext *UNUSED(C), void *UNUSED(arg), int event)
+static void do_script_buttons(bContext *UNUSED(C), void *UNUSED(arg), int UNUSED(event))
 {
-	switch(event) {
-	}
+	//switch(event) {
+	//}
 }
 
 
@@ -104,14 +106,14 @@ void script_header_buttons(const bContext *C, ARegion *ar)
 		
 		xmax= GetButStringLength("View");
 		uiDefPulldownBut(block, dummy_viewmenu, CTX_wm_area(C), 
-						 "View", xco, yco-2, xmax-3, 24, "");
-		xco+=XIC+xmax;
+						 "View", xco, yco-2, xmax-3, UI_UNIT_Y, "");
+		xco+=UI_UNIT_X+xmax;
 	}
 	
 	uiBlockSetEmboss(block, UI_EMBOSS);
 
 	/* always as last  */
-	UI_view2d_totRect_set(&ar->v2d, xco+XIC+80, ar->v2d.tot.ymax-ar->v2d.tot.ymin);
+	UI_view2d_totRect_set(&ar->v2d, xco+UI_UNIT_X+80, ar->v2d.tot.ymax-ar->v2d.tot.ymin);
 	
 	uiEndBlock(C, block);
 	uiDrawBlock(C, block);

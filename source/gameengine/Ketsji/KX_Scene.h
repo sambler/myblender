@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file KX_Scene.h
+ *  \ingroup ketsji
+ */
+
 #ifndef __KX_SCENE_H
 #define __KX_SCENE_H
 
@@ -36,8 +41,8 @@
 #include <set>
 #include <list>
 
-#include "GEN_Map.h"
-#include "GEN_HashedPtr.h"
+#include "CTR_Map.h"
+#include "CTR_HashedPtr.h"
 #include "SG_IObject.h"
 #include "SCA_IScene.h"
 #include "MT_Transform.h"
@@ -56,7 +61,7 @@ struct SM_MaterialProps;
 struct SM_ShapeProps;
 struct Scene;
 
-class GEN_HashedPtr;
+class CTR_HashedPtr;
 class CListValue;
 class CValue;
 class SCA_LogicManager;
@@ -99,7 +104,7 @@ class KX_Scene : public PyObjectPlus, public SCA_IScene
 {
 	Py_Header;
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 	PyObject*	m_attr_dict;
 	PyObject*	m_draw_call_pre;
 	PyObject*	m_draw_call_post;
@@ -136,6 +141,13 @@ protected:
 	 * The set of cameras for this scene
 	 */
 	list<class KX_Camera*>       m_cameras;
+
+	/**
+	 * The set of fonts for this scene
+	 */
+	list<class KX_FontObject*>       m_fonts;
+
+
 	/**
 	 * Various SCA managers used by the scene
 	 */
@@ -195,7 +207,7 @@ protected:
 	 * used in AddReplicaObject to map game objects to their
 	 * replicas so pointers can be updated.
 	 */
-	GEN_Map	<GEN_HashedPtr, void*> m_map_gameobject_to_replica;
+	CTR_Map	<CTR_HashedPtr, void*> m_map_gameobject_to_replica;
 
 	/**
 	 * Another temporary variable outstaying its welcome
@@ -328,6 +340,7 @@ public:
 	 */
 	void LogicBeginFrame(double curtime);
 	void LogicUpdateFrame(double curtime, bool frame);
+	void UpdateAnimations(double curtime);
 
 		void						
 	LogicEndFrame(
@@ -360,6 +373,27 @@ public:
 		SCA_TimeEventManager*	
 	GetTimeEventManager(
 	);
+
+	/** Font Routines */
+		
+		list<class KX_FontObject*>*
+	GetFonts(
+	);
+
+	/** Find a font in the scene by pointer. */
+		KX_FontObject*              
+	FindFont(
+		KX_FontObject*
+	);
+
+	/** Add a camera to this scene. */
+		void                    
+	AddFont(
+		KX_FontObject*
+	);
+
+
+	/** Camera Routines */
 
 		list<class KX_Camera*>*
 	GetCameras(
@@ -532,6 +566,8 @@ public:
 	void SetPhysicsEnvironment(class PHY_IPhysicsEnvironment*	physEnv);
 
 	void	SetGravity(const MT_Vector3& gravity);
+
+	short GetAnimationFPS();
 	
 	/**
 	 * Sets the node tree for this scene.
@@ -544,7 +580,7 @@ public:
 	void Update2DFilter(vector<STR_String>& propNames, void* gameObj, RAS_2DFilterManager::RAS_2DFILTER_MODE filtermode, int pass, STR_String& text);
 	void Render2DFilters(RAS_ICanvas* canvas);
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 	/* --------------------------------------------------------------------- */
 	/* Python interface ---------------------------------------------------- */
 	/* --------------------------------------------------------------------- */

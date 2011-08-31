@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -26,6 +26,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file ghost/intern/GHOST_EventManager.cpp
+ *  \ingroup GHOST
+ */
+
+
 /**
 
  * $Id$
@@ -37,7 +42,7 @@
 #include "GHOST_EventManager.h"
 #include <algorithm>
 #include "GHOST_Debug.h"
-
+#include <stdio.h> // [mce] temp debug
 
 GHOST_EventManager::GHOST_EventManager()
 {

@@ -143,12 +143,17 @@ extern "C" {
 	GHOST_TDragnDropTypes m_draggedObjectType;
 }
 - (void)setSystemAndWindowCocoa:(GHOST_SystemCocoa *)sysCocoa windowCocoa:(GHOST_WindowCocoa *)winCocoa;
+- (GHOST_SystemCocoa*)systemCocoa;
 @end
 @implementation CocoaWindow
 - (void)setSystemAndWindowCocoa:(GHOST_SystemCocoa *)sysCocoa windowCocoa:(GHOST_WindowCocoa *)winCocoa
 {
 	systemCocoa = sysCocoa;
 	associatedWindow = winCocoa;
+}
+- (GHOST_SystemCocoa*)systemCocoa
+{
+	return systemCocoa;
 }
 
 -(BOOL)canBecomeKeyWindow
@@ -236,9 +241,18 @@ extern "C" {
 //We need to subclass it in order to give Cocoa the feeling key events are trapped
 @interface CocoaOpenGLView : NSOpenGLView
 {
+	GHOST_SystemCocoa *systemCocoa;
+	GHOST_WindowCocoa *associatedWindow;
 }
+- (void)setSystemAndWindowCocoa:(GHOST_SystemCocoa *)sysCocoa windowCocoa:(GHOST_WindowCocoa *)winCocoa;
 @end
 @implementation CocoaOpenGLView
+
+- (void)setSystemAndWindowCocoa:(GHOST_SystemCocoa *)sysCocoa windowCocoa:(GHOST_WindowCocoa *)winCocoa
+{
+	systemCocoa = sysCocoa;
+	associatedWindow = winCocoa;
+}
 
 - (BOOL)acceptsFirstResponder
 {
@@ -289,6 +303,7 @@ extern "C" {
     else
     {
         [super drawRect:rect];
+        systemCocoa->handleWindowEvent(GHOST_kEventWindowUpdate, associatedWindow);
     }
 }
 
@@ -303,14 +318,14 @@ GHOST_WindowCocoa::GHOST_WindowCocoa(
 	GHOST_SystemCocoa *systemCocoa,
 	const STR_String& title,
 	GHOST_TInt32 left,
-	GHOST_TInt32 top,
+	GHOST_TInt32 bottom,
 	GHOST_TUns32 width,
 	GHOST_TUns32 height,
 	GHOST_TWindowState state,
 	GHOST_TDrawingContextType type,
 	const bool stereoVisual, const GHOST_TUns16 numOfAASamples
 ) :
-	GHOST_Window(title, left, top, width, height, state, GHOST_kDrawingContextTypeNone, stereoVisual, numOfAASamples),
+	GHOST_Window(width, height, state, GHOST_kDrawingContextTypeNone, stereoVisual, numOfAASamples),
 	m_customCursor(0)
 {
 	NSOpenGLPixelFormatAttribute pixelFormatAttrsWindow[40];
@@ -322,13 +337,12 @@ GHOST_WindowCocoa::GHOST_WindowCocoa(
 	
 	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
 	
-
 	//Creates the window
 	NSRect rect;
 	NSSize	minSize;
 	
 	rect.origin.x = left;
-	rect.origin.y = top;
+	rect.origin.y = bottom;
 	rect.size.width = width;
 	rect.size.height = height;
 	
@@ -420,6 +434,8 @@ GHOST_WindowCocoa::GHOST_WindowCocoa(
 	//Creates the OpenGL View inside the window
 	m_openGLView = [[CocoaOpenGLView alloc] initWithFrame:rect
 												 pixelFormat:pixelFormat];
+
+	[m_openGLView setSystemAndWindowCocoa:systemCocoa windowCocoa:this];
 	
 	[pixelFormat release];
 	
@@ -456,9 +472,13 @@ GHOST_WindowCocoa::GHOST_WindowCocoa(
 
 GHOST_WindowCocoa::~GHOST_WindowCocoa()
 {
-	if (m_customCursor) delete m_customCursor;
-
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+
+	if (m_customCursor) {
+		[m_customCursor release];
+		m_customCursor = nil;
+	}
+
 	[m_openGLView release];
 	
 	if (m_window) {
@@ -493,7 +513,7 @@ void GHOST_WindowCocoa::setTitle(const STR_String& title)
     GHOST_ASSERT(getValid(), "GHOST_WindowCocoa::setTitle(): window invalid")
 	NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
 
-	NSString *windowTitle = [[NSString alloc] initWithCString:title encoding:NSISOLatin1StringEncoding];
+	NSString *windowTitle = [[NSString alloc] initWithCString:title encoding:NSUTF8StringEncoding];
 	
 	//Set associated file if applicable
 	if (windowTitle && [windowTitle hasPrefix:@"Blender"])
@@ -512,7 +532,7 @@ void GHOST_WindowCocoa::setTitle(const STR_String& title)
 			[m_window setTitle:[associatedFileName lastPathComponent]];
 
 			//Blender used file open/save functions converte file names into legal URL ones
-			associatedFileName = [associatedFileName stringByAddingPercentEscapesUsingEncoding:NSISOLatin1StringEncoding];
+			associatedFileName = [associatedFileName stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding];
 			@try {
 				[m_window setRepresentedFilename:associatedFileName];
 			}
@@ -683,7 +703,30 @@ GHOST_TWindowState GHOST_WindowCocoa::getState() const
 void GHOST_WindowCocoa::screenToClient(GHOST_TInt32 inX, GHOST_TInt32 inY, GHOST_TInt32& outX, GHOST_TInt32& outY) const
 {
 	GHOST_ASSERT(getValid(), "GHOST_WindowCocoa::screenToClient(): window invalid")
-	
+
+	screenToClientIntern(inX, inY, outX, outY);
+
+	/* switch y to match ghost convention */
+	GHOST_Rect cBnds;
+	getClientBounds(cBnds);
+	outY = (cBnds.getHeight() - 1) - outY;
+}
+
+
+void GHOST_WindowCocoa::clientToScreen(GHOST_TInt32 inX, GHOST_TInt32 inY, GHOST_TInt32& outX, GHOST_TInt32& outY) const
+{
+	GHOST_ASSERT(getValid(), "GHOST_WindowCocoa::clientToScreen(): window invalid")
+
+	/* switch y to match ghost convention */
+	GHOST_Rect cBnds;
+	getClientBounds(cBnds);
+	inY = (cBnds.getHeight() - 1) - inY;
+
+	clientToScreenIntern(inX, inY, outX, outY);
+}
+
+void GHOST_WindowCocoa::screenToClientIntern(GHOST_TInt32 inX, GHOST_TInt32 inY, GHOST_TInt32& outX, GHOST_TInt32& outY) const
+{
 	NSPoint screenCoord;
 	NSPoint baseCoord;
 	
@@ -696,11 +739,8 @@ void GHOST_WindowCocoa::screenToClient(GHOST_TInt32 inX, GHOST_TInt32 inY, GHOST
 	outY = baseCoord.y;
 }
 
-
-void GHOST_WindowCocoa::clientToScreen(GHOST_TInt32 inX, GHOST_TInt32 inY, GHOST_TInt32& outX, GHOST_TInt32& outY) const
+void GHOST_WindowCocoa::clientToScreenIntern(GHOST_TInt32 inX, GHOST_TInt32 inY, GHOST_TInt32& outX, GHOST_TInt32& outY) const
 {
-	GHOST_ASSERT(getValid(), "GHOST_WindowCocoa::clientToScreen(): window invalid")
-	
 	NSPoint screenCoord;
 	NSPoint baseCoord;
 	
@@ -777,12 +817,15 @@ GHOST_TSuccess GHOST_WindowCocoa::setState(GHOST_TWindowState state)
 				[tmpWindow setReleasedWhenClosed:NO];
 				[tmpWindow setAcceptsMouseMovedEvents:YES];
 				[tmpWindow setDelegate:[m_window delegate]];
+				[tmpWindow setSystemAndWindowCocoa:[m_window systemCocoa] windowCocoa:this];
+				[tmpWindow registerForDraggedTypes:[NSArray arrayWithObjects:NSFilenamesPboardType,
+												   NSStringPboardType, NSTIFFPboardType, nil]];
 				
 				//Assign the openGL view to the new window
 				[tmpWindow setContentView:m_openGLView];
 				
 				//Show the new window
-				[tmpWindow makeKeyAndOrderFront:nil];
+				[tmpWindow makeKeyAndOrderFront:m_openGLView];
 				//Close and release old window
 				[m_window setDelegate:nil]; // To avoid the notification of "window closed" event
 				[m_window close];
@@ -835,6 +878,11 @@ GHOST_TSuccess GHOST_WindowCocoa::setState(GHOST_TWindowState state)
 				[tmpWindow setReleasedWhenClosed:NO];
 				[tmpWindow setAcceptsMouseMovedEvents:YES];
 				[tmpWindow setDelegate:[m_window delegate]];
+				[tmpWindow setSystemAndWindowCocoa:[m_window systemCocoa] windowCocoa:this];
+				[tmpWindow registerForDraggedTypes:[NSArray arrayWithObjects:NSFilenamesPboardType,
+												   NSStringPboardType, NSTIFFPboardType, nil]];
+				//Forbid to resize the window below the blender defined minimum one
+				[tmpWindow setContentMinSize:NSMakeSize(320, 240)];
 				
 				//Assign the openGL view to the new window
 				[tmpWindow setContentView:m_openGLView];
@@ -1194,7 +1242,7 @@ GHOST_TSuccess GHOST_WindowCocoa::setWindowCursorGrab(GHOST_TGrabCursorMode mode
 			NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
 
 			m_systemCocoa->getCursorPosition(x_old,y_old);
-			screenToClient(x_old, y_old, m_cursorGrabInitPos[0], m_cursorGrabInitPos[1]);
+			screenToClientIntern(x_old, y_old, m_cursorGrabInitPos[0], m_cursorGrabInitPos[1]);
 			//Warp position is stored in client (window base) coordinates
 			setCursorGrabAccum(0, 0);
 			

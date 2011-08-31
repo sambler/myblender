@@ -1,4 +1,4 @@
-/**
+/*
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -26,7 +26,13 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/nodes/intern/TEX_nodes/TEX_hueSatVal.c
+ *  \ingroup texnodes
+ */
+
+
 #include "../TEX_util.h"
+#include "TEX_node.h"
 
 
 static bNodeSocketType inputs[]= {
@@ -49,11 +55,11 @@ static void do_hue_sat_fac(bNode *UNUSED(node), float *out, float hue, float sat
 		
 		rgb_to_hsv(in[0], in[1], in[2], hsv, hsv+1, hsv+2);
 		hsv[0]+= (hue - 0.5f);
-		if(hsv[0]>1.0) hsv[0]-=1.0; else if(hsv[0]<0.0) hsv[0]+= 1.0;
+		if(hsv[0]>1.0f) hsv[0]-=1.0f; else if(hsv[0]<0.0f) hsv[0]+= 1.0f;
 		hsv[1]*= sat;
-		if(hsv[1]>1.0) hsv[1]= 1.0; else if(hsv[1]<0.0) hsv[1]= 0.0;
+		if(hsv[1]>1.0f) hsv[1]= 1.0f; else if(hsv[1]<0.0f) hsv[1]= 0.0f;
 		hsv[2]*= val;
-		if(hsv[2]>1.0) hsv[2]= 1.0; else if(hsv[2]<0.0) hsv[2]= 0.0;
+		if(hsv[2]>1.0f) hsv[2]= 1.0f; else if(hsv[2]<0.0f) hsv[2]= 0.0f;
 		hsv_to_rgb(hsv[0], hsv[1], hsv[2], col, col+1, col+2);
 		
 		out[0]= mfac*in[0] + fac*col[0];
@@ -87,22 +93,14 @@ static void exec(void *data, bNode *node, bNodeStack **in, bNodeStack **out)
 	tex_output(node, in, out[0], &colorfn, data);
 }
 
-bNodeType tex_node_hue_sat= {
-	/* *next,*prev */	NULL, NULL,
-	/* type code   */	TEX_NODE_HUE_SAT,
-	/* name        */	"Hue Saturation Value",
-	/* width+range */	150, 80, 250,
-	/* class+opts  */	NODE_CLASS_OP_COLOR, NODE_OPTIONS,
-	/* input sock  */	inputs,
-	/* output sock */	outputs,
-	/* storage     */	"", 
-	/* execfunc    */	exec,
-	/* butfunc     */	NULL,
-	/* initfunc    */	NULL,
-	/* freestoragefunc    */	NULL,
-	/* copystoragefunc    */	NULL,
-	/* id          */	NULL
+void register_node_type_tex_hue_sat(ListBase *lb)
+{
+	static bNodeType ntype;
 	
-};
-
-
+	node_type_base(&ntype, TEX_NODE_HUE_SAT, "Hue Saturation Value", NODE_CLASS_OP_COLOR, NODE_OPTIONS,
+				   inputs, outputs);
+	node_type_size(&ntype, 150, 80, 250);
+	node_type_exec(&ntype, exec);
+	
+	nodeRegisterType(lb, &ntype);
+}

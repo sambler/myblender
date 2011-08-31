@@ -24,45 +24,79 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-FILE(GLOB SRC *.cpp)
+remove_strict_flags()
 
-IF(APPLE)
-SET(INC
-  .
-  ../blenlib
-  ../blenkernel
-  ../windowmanager
-  ../makesdna
-  ../makesrna
-  ../editors/include
-  ../../../intern/guardedalloc
-  ${OPENCOLLADA_INC}/COLLADAStreamWriter
-  ${OPENCOLLADA_INC}/COLLADABaseUtils
-  ${OPENCOLLADA_INC}/COLLADAFramework
-  ${OPENCOLLADA_INC}/COLLADASaxFrameworkLoader 
+set(INC
+	.
+	../blenkernel
+	../blenlib
+	../blenloader
+	../editors/include
+	../makesdna
+	../makesrna
+	../windowmanager
+	../../../intern/guardedalloc
 )
 
-ELSE(APPLE)
-
-SET(INC
-  .
-  ../blenlib
-  ../blenkernel
-  ../windowmanager
-  ../makesdna
-  ../makesrna
-  ../editors/include
-  ../../../intern/guardedalloc
-  ${OPENCOLLADA_INC}/COLLADAStreamWriter/include
-  ${OPENCOLLADA_INC}/COLLADABaseUtils/include
-  ${OPENCOLLADA_INC}/COLLADAFramework/include
-  ${OPENCOLLADA_INC}/COLLADASaxFrameworkLoader/include 
+set(INC_SYS
+	${OPENCOLLADA_INCLUDE_DIRS}
 )
 
-ENDIF(APPLE)
+set(SRC
+	AnimationImporter.cpp
+	AnimationExporter.cpp
+	ArmatureExporter.cpp
+	ArmatureImporter.cpp
+	CameraExporter.cpp
+	DocumentExporter.cpp
+	DocumentImporter.cpp
+	EffectExporter.cpp
+	ExtraHandler.cpp
+	ExtraTags.cpp
+	GeometryExporter.cpp
+	ImageExporter.cpp
+	InstanceWriter.cpp
+	LightExporter.cpp
+	MaterialExporter.cpp
+	MeshImporter.cpp
+	SkinInfo.cpp
+	TransformReader.cpp
+	TransformWriter.cpp
+	collada.cpp
+	collada_internal.cpp
+	collada_utils.cpp
 
-IF(WITH_BUILDINFO)
-	ADD_DEFINITIONS(-DNAN_BUILDINFO)
-ENDIF(WITH_BUILDINFO)
+	AnimationImporter.h
+	AnimationExporter.h	
+	ArmatureExporter.h
+	ArmatureImporter.h
+	CameraExporter.h
+	DocumentExporter.h
+	DocumentImporter.h
+	EffectExporter.h
+	ExtraHandler.h
+	ExtraTags.h
+	GeometryExporter.h
+	ImageExporter.h
+	InstanceWriter.h
+	LightExporter.h
+	MaterialExporter.h
+	MeshImporter.h
+	SkinInfo.h
+	TransformReader.h
+	TransformWriter.h
+	collada.h
+	collada_internal.h
+	collada_utils.h
+)
 
-BLENDERLIB(bf_collada "${SRC}" "${INC}")
+if(WITH_BUILDINFO)
+	add_definitions(-DWITH_BUILDINFO)
+endif()
+
+if(CMAKE_COMPILER_IS_GNUCXX)
+	# COLLADAFWArray.h gives error with gcc 4.5
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fpermissive")
+endif()
+
+blender_add_lib(bf_collada "${SRC}" "${INC}" "${INC_SYS}")

@@ -1,6 +1,4 @@
-/**
- * $Id$
- *
+/*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -27,6 +25,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/space_action/action_edit.c
+ *  \ingroup spaction
+ */
+
+
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,8 +38,10 @@
 
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
 #include "DNA_anim_types.h"
+#include "DNA_gpencil_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 
@@ -53,10 +58,12 @@
 #include "UI_view2d.h"
 
 #include "ED_anim_api.h"
+#include "ED_gpencil.h"
 #include "ED_keyframing.h"
 #include "ED_keyframes_edit.h"
 #include "ED_screen.h"
 #include "ED_transform.h"
+#include "ED_markers.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
@@ -72,26 +79,42 @@
 
 static int act_new_exec(bContext *C, wmOperator *UNUSED(op))
 {
-	bAction *action;
 	PointerRNA ptr, idptr;
 	PropertyRNA *prop;
 
-	// XXX need to restore behaviour to copy old actions...
-	action= add_empty_action("Action");
-
 	/* hook into UI */
 	uiIDContextProperty(C, &ptr, &prop);
-
-	if(prop) {
-		/* when creating new ID blocks, use is already 1, but RNA
-		 * pointer se also increases user, so this compensates it */
+	
+	if (prop) {
+		bAction *action=NULL, *oldact=NULL;
+		PointerRNA oldptr;
+		
+		/* create action - the way to do this depends on whether we've got an
+		 * existing one there already, in which case we make a copy of it
+		 * (which is useful for "versioning" actions within the same file)
+		 */
+		oldptr = RNA_property_pointer_get(&ptr, prop);
+		oldact = (bAction *)oldptr.id.data;
+		
+		if (oldact && GS(oldact->id.name)==ID_AC) {
+			/* make a copy of the existing action */
+			action= copy_action(oldact);
+		}
+		else {
+			/* just make a new (empty) action */
+			action= add_empty_action("Action");
+		}
+		
+		/* when creating new ID blocks, use is already 1 (fake user), 
+		 * but RNA pointer use also increases user, so this compensates it 
+		 */
 		action->id.us--;
-
+		
 		RNA_id_pointer_create(&action->id, &idptr);
 		RNA_property_pointer_set(&ptr, prop, idptr);
 		RNA_property_update(C, &ptr, prop);
 	}
-
+	
 	/* set notifier that keyframes have changed */
 	WM_event_add_notifier(C, NC_ANIMATION|ND_KEYFRAME|NA_EDITED, NULL);
 	
@@ -101,7 +124,7 @@ static int act_new_exec(bContext *C, wmOperator *UNUSED(op))
 void ACTION_OT_new (wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "New";
+	ot->name= "New Action";
 	ot->idname= "ACTION_OT_new";
 	ot->description= "Create new action";
 	
@@ -115,19 +138,102 @@ void ACTION_OT_new (wmOperatorType *ot)
 }
 
 /* ************************************************************************** */
+/* POSE MARKERS STUFF */
+
+/* *************************** Localise Markers ***************************** */
+
+/* ensure that there is:
+ *	1) an active action editor
+ * 	2) that the mode will have an active action available 
+ * 	3) that the set of markers being shown are the scene markers, not the list we're merging
+ *	4) that there are some selected markers
+ */
+static int act_markers_make_local_poll(bContext *C)
+{
+	SpaceAction *sact = CTX_wm_space_action(C);
+	
+	/* 1) */
+	if (sact == NULL)
+		return 0;
+	
+	/* 2) */
+	if (ELEM(sact->mode, SACTCONT_ACTION, SACTCONT_SHAPEKEY) == 0)
+		return 0;
+	if (sact->action == NULL)
+		return 0;
+		
+	/* 3) */
+	if (sact->flag & SACTION_POSEMARKERS_SHOW)
+		return 0;
+		
+	/* 4) */
+	return ED_markers_get_first_selected(ED_context_get_markers(C)) != NULL;
+}
+
+static int act_markers_make_local_exec (bContext *C, wmOperator *UNUSED(op))
+{	
+	ListBase *markers = ED_context_get_markers(C);
+	
+	SpaceAction *sact = CTX_wm_space_action(C);
+	bAction *act = (sact)? sact->action : NULL;
+	
+	TimeMarker *marker, *markern=NULL;
+	
+	/* sanity checks */
+	if (ELEM(NULL, markers, act))
+		return OPERATOR_CANCELLED;
+		
+	/* migrate markers */
+	for (marker = markers->first; marker; marker = markern) {
+		markern = marker->next;
+		
+		/* move if marker is selected */
+		if (marker->flag & SELECT) {
+			BLI_remlink(markers, marker);
+			BLI_addtail(&act->markers, marker);
+		}
+	}
+	
+	/* now enable the "show posemarkers only" setting, so that we can see that something did happen */
+	sact->flag |= SACTION_POSEMARKERS_SHOW;
+	
+	/* notifiers - both sets, as this change affects both */
+	WM_event_add_notifier(C, NC_SCENE|ND_MARKERS, NULL);
+	WM_event_add_notifier(C, NC_ANIMATION|ND_MARKERS, NULL);
+	
+	return OPERATOR_FINISHED;
+}
+
+void ACTION_OT_markers_make_local (wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name= "Make Markers Local";
+	ot->idname= "ACTION_OT_markers_make_local";
+	ot->description= "Move selected scene markers to the active Action as local 'pose' markers";
+	
+	/* callbacks */
+	ot->exec = act_markers_make_local_exec;
+	ot->poll = act_markers_make_local_poll;
+	
+	/* flags */
+	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+}
+
+/* ************************************************************************** */
 /* KEYFRAME-RANGE STUFF */
 
 /* *************************** Calculate Range ************************** */
 
 /* Get the min/max keyframes*/
-static void get_keyframe_extents (bAnimContext *ac, float *min, float *max)
+static void get_keyframe_extents (bAnimContext *ac, float *min, float *max, const short onlySel)
 {
 	ListBase anim_data = {NULL, NULL};
 	bAnimListElem *ale;
 	int filter;
 	
 	/* get data to filter, from Action or Dopesheet */
-	filter= (ANIMFILTER_VISIBLE | ANIMFILTER_SEL | ANIMFILTER_CURVESONLY | ANIMFILTER_NODUPLIS);
+	// XXX: what is sel doing here?!
+	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_LIST_VISIBLE | ANIMFILTER_SEL /*| ANIMFILTER_CURVESONLY*/ | ANIMFILTER_NODUPLIS);
 	ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 	
 	/* set large values to try to override */
@@ -142,8 +248,8 @@ static void get_keyframe_extents (bAnimContext *ac, float *min, float *max)
 			FCurve *fcu= (FCurve *)ale->key_data;
 			float tmin, tmax;
 			
-			/* get range and apply necessary scaling before */
-			calc_fcurve_range(fcu, &tmin, &tmax);
+			/* get range and apply necessary scaling before processing */
+			calc_fcurve_range(fcu, &tmin, &tmax, onlySel);
 			
 			if (adt) {
 				tmin= BKE_nla_tweakedit_remap(adt, tmin, NLATIME_CONVERT_MAP);
@@ -188,7 +294,7 @@ static int actkeys_previewrange_exec(bContext *C, wmOperator *UNUSED(op))
 		scene= ac.scene;
 	
 	/* set the range directly */
-	get_keyframe_extents(&ac, &min, &max);
+	get_keyframe_extents(&ac, &min, &max, FALSE);
 	scene->r.flag |= SCER_PRV_RANGE;
 	scene->r.psfra= (int)floor(min + 0.5f);
 	scene->r.pefra= (int)floor(max + 0.5f);
@@ -217,7 +323,7 @@ void ACTION_OT_previewrange_set (wmOperatorType *ot)
 
 /* ****************** View-All Operator ****************** */
 
-static int actkeys_viewall_exec(bContext *C, wmOperator *UNUSED(op))
+static int actkeys_viewall(bContext *C, const short onlySel)
 {
 	bAnimContext ac;
 	View2D *v2d;
@@ -229,7 +335,7 @@ static int actkeys_viewall_exec(bContext *C, wmOperator *UNUSED(op))
 	v2d= &ac.ar->v2d;
 	
 	/* set the horizontal range, with an extra offset so that the extreme keys will be in view */
-	get_keyframe_extents(&ac, &v2d->cur.xmin, &v2d->cur.xmax);
+	get_keyframe_extents(&ac, &v2d->cur.xmin, &v2d->cur.xmax, onlySel);
 	
 	extra= 0.1f * (v2d->cur.xmax - v2d->cur.xmin);
 	v2d->cur.xmin -= extra;
@@ -247,6 +353,20 @@ static int actkeys_viewall_exec(bContext *C, wmOperator *UNUSED(op))
 	
 	return OPERATOR_FINISHED;
 }
+
+/* ......... */
+
+static int actkeys_viewall_exec(bContext *C, wmOperator *UNUSED(op))
+{	
+	/* whole range */
+	return actkeys_viewall(C, FALSE);
+}
+
+static int actkeys_viewsel_exec(bContext *C, wmOperator *UNUSED(op))
+{
+	/* only selected */
+	return actkeys_viewall(C, TRUE);
+}
  
 void ACTION_OT_view_all (wmOperatorType *ot)
 {
@@ -257,6 +377,21 @@ void ACTION_OT_view_all (wmOperatorType *ot)
 	
 	/* api callbacks */
 	ot->exec= actkeys_viewall_exec;
+	ot->poll= ED_operator_action_active;
+	
+	/* flags */
+	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+}
+
+void ACTION_OT_view_selected (wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name= "View Selected";
+	ot->idname= "ACTION_OT_view_selected";
+	ot->description= "Reset viewable area to show selected keyframes range";
+	
+	/* api callbacks */
+	ot->exec= actkeys_viewsel_exec;
 	ot->poll= ED_operator_action_active;
 	
 	/* flags */
@@ -278,7 +413,7 @@ static short copy_action_keys (bAnimContext *ac)
 	free_anim_copybuf();
 	
 	/* filter data */
-	filter= (ANIMFILTER_VISIBLE | ANIMFILTER_CURVESONLY | ANIMFILTER_NODUPLIS);
+	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_LIST_VISIBLE /*| ANIMFILTER_CURVESONLY*/ | ANIMFILTER_NODUPLIS);
 	ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 	
 	/* copy keyframes */
@@ -291,17 +426,18 @@ static short copy_action_keys (bAnimContext *ac)
 }
 
 
-static short paste_action_keys (bAnimContext *ac)
+static short paste_action_keys (bAnimContext *ac,
+	const eKeyPasteOffset offset_mode, const eKeyMergeMode merge_mode)
 {	
 	ListBase anim_data = {NULL, NULL};
 	int filter, ok=0;
 	
 	/* filter data */
-	filter= (ANIMFILTER_VISIBLE | ANIMFILTER_SEL | ANIMFILTER_FOREDIT | ANIMFILTER_CURVESONLY | ANIMFILTER_NODUPLIS);
+	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_LIST_VISIBLE | ANIMFILTER_SEL | ANIMFILTER_FOREDIT /*| ANIMFILTER_CURVESONLY*/ | ANIMFILTER_NODUPLIS);
 	ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 	
 	/* paste keyframes */
-	ok= paste_animedit_keys(ac, &anim_data);
+	ok= paste_animedit_keys(ac, &anim_data, offset_mode, merge_mode);
 	
 	/* clean up */
 	BLI_freelistN(&anim_data);
@@ -341,29 +477,35 @@ void ACTION_OT_copy (wmOperatorType *ot)
 	ot->description= "Copy selected keyframes to the copy/paste buffer";
 	
 	/* api callbacks */
+//	ot->invoke= WM_operator_props_popup; // better wait for graph redo panel
 	ot->exec= actkeys_copy_exec;
 	ot->poll= ED_operator_action_active;
-	
+
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 }
 
-
-
 static int actkeys_paste_exec(bContext *C, wmOperator *op)
 {
 	bAnimContext ac;
+
+	const eKeyPasteOffset offset_mode= RNA_enum_get(op->ptr, "offset");
+	const eKeyMergeMode merge_mode= RNA_enum_get(op->ptr, "merge");
 	
 	/* get editor data */
 	if (ANIM_animdata_get_context(C, &ac) == 0)
 		return OPERATOR_CANCELLED;
+	
+	if(ac.reports==NULL) {
+		ac.reports= op->reports;
+	}
 	
 	/* paste keyframes */
 	if (ac.datatype == ANIMCONT_GPENCIL) {
 		// FIXME...
 	}
 	else {
-		if (paste_action_keys(&ac)) {
+		if (paste_action_keys(&ac, offset_mode, merge_mode)) {
 			BKE_report(op->reports, RPT_ERROR, "No keyframes to paste");
 			return OPERATOR_CANCELLED;
 		}
@@ -391,12 +533,15 @@ void ACTION_OT_paste (wmOperatorType *ot)
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+
+	RNA_def_enum(ot->srna, "offset", keyframe_paste_offset_items, KEYFRAME_PASTE_OFFSET_CFRA_START, "Offset", "Paste time offset of keys");
+	RNA_def_enum(ot->srna, "merge", keyframe_paste_merge_items, KEYFRAME_PASTE_MERGE_MIX, "Type", "Method of merking pasted keys and existing");
 }
 
 /* ******************** Insert Keyframes Operator ************************* */
 
 /* defines for insert keyframes tool */
-EnumPropertyItem prop_actkeys_insertkey_types[] = {
+static EnumPropertyItem prop_actkeys_insertkey_types[] = {
 	{1, "ALL", 0, "All Channels", ""},
 	{2, "SEL", 0, "Only Selected Channels", ""},
 	{3, "GROUP", 0, "In Active Group", ""}, // xxx not in all cases
@@ -410,12 +555,12 @@ static void insert_action_keys(bAnimContext *ac, short mode)
 	bAnimListElem *ale;
 	int filter;
 	
+	ReportList *reports = ac->reports;
 	Scene *scene= ac->scene;
-	float cfra= (float)CFRA;
 	short flag = 0;
 	
 	/* filter data */
-	filter= (ANIMFILTER_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_CURVESONLY | ANIMFILTER_NODUPLIS);
+	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_LIST_VISIBLE | ANIMFILTER_FOREDIT /*| ANIMFILTER_CURVESONLY*/ | ANIMFILTER_NODUPLIS);
 	if (mode == 2) 			filter |= ANIMFILTER_SEL;
 	else if (mode == 3) 	filter |= ANIMFILTER_ACTGROUPED;
 	
@@ -428,6 +573,7 @@ static void insert_action_keys(bAnimContext *ac, short mode)
 	for (ale= anim_data.first; ale; ale= ale->next) {
 		AnimData *adt= ANIM_nla_mapping_get(ac, ale);
 		FCurve *fcu= (FCurve *)ale->key_data;
+		float cfra;
 		
 		/* adjust current frame for NLA-scaling */
 		if (adt)
@@ -437,7 +583,7 @@ static void insert_action_keys(bAnimContext *ac, short mode)
 			
 		/* if there's an id */
 		if (ale->id)
-			insert_keyframe(ale->id, NULL, ((fcu->grp)?(fcu->grp->name):(NULL)), fcu->rna_path, fcu->array_index, cfra, flag);
+			insert_keyframe(reports, ale->id, NULL, ((fcu->grp)?(fcu->grp->name):(NULL)), fcu->rna_path, fcu->array_index, cfra, flag);
 		else
 			insert_vert_fcurve(fcu, cfra, fcu->curval, 0);
 	}
@@ -502,17 +648,17 @@ static void duplicate_action_keys (bAnimContext *ac)
 	
 	/* filter data */
 	if (ac->datatype == ANIMCONT_GPENCIL)
-		filter= (ANIMFILTER_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_NODUPLIS);
+		filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_LIST_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_NODUPLIS);
 	else
-		filter= (ANIMFILTER_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_CURVESONLY | ANIMFILTER_NODUPLIS);
+		filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_LIST_VISIBLE | ANIMFILTER_FOREDIT /*| ANIMFILTER_CURVESONLY*/ | ANIMFILTER_NODUPLIS);
 	ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 	
 	/* loop through filtered data and delete selected keys */
 	for (ale= anim_data.first; ale; ale= ale->next) {
-		//if (ale->type == ANIMTYPE_GPLAYER)
-		//	delete_gplayer_frames((bGPDlayer *)ale->data);
-		//else
+		if (ale->type == ANIMTYPE_FCURVE)
 			duplicate_fcurve_keys((FCurve *)ale->key_data);
+		else
+			duplicate_gplayer_frames((bGPDlayer *)ale->data);
 	}
 	
 	/* free filtered list */
@@ -545,9 +691,6 @@ static int actkeys_duplicate_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED
 {
 	actkeys_duplicate_exec(C, op);
 	
-	RNA_int_set(op->ptr, "mode", TFM_TIME_TRANSLATE);
-	WM_operator_name_call(C, "TRANSFORM_OT_transform", WM_OP_INVOKE_REGION_WIN, op->ptr);
-
 	return OPERATOR_FINISHED;
 }
  
@@ -567,7 +710,7 @@ void ACTION_OT_duplicate (wmOperatorType *ot)
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 	
 	/* to give to transform */
-	RNA_def_int(ot->srna, "mode", TFM_TIME_TRANSLATE, 0, INT_MAX, "Mode", "", 0, INT_MAX);
+	RNA_def_enum(ot->srna, "mode", transform_mode_types, TFM_TRANSLATION, "Mode", "");
 }
 
 /* ******************** Delete Keyframes Operator ************************* */
@@ -580,9 +723,9 @@ static void delete_action_keys (bAnimContext *ac)
 	
 	/* filter data */
 	if (ac->datatype == ANIMCONT_GPENCIL)
-		filter= (ANIMFILTER_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_NODUPLIS);
+		filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_LIST_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_NODUPLIS);
 	else
-		filter= (ANIMFILTER_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_CURVESONLY | ANIMFILTER_NODUPLIS);
+		filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_LIST_VISIBLE | ANIMFILTER_FOREDIT /*| ANIMFILTER_CURVESONLY*/ | ANIMFILTER_NODUPLIS);
 	ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 	
 	/* loop through filtered data and delete selected keys */
@@ -598,8 +741,8 @@ static void delete_action_keys (bAnimContext *ac)
 			if ((fcu->totvert == 0) && (list_has_suitable_fmodifier(&fcu->modifiers, 0, FMI_TYPE_GENERATE_CURVE) == 0))
 				ANIM_fcurve_delete_from_animdata(ac, adt, fcu);
 		}
-		//else
-		//	delete_gplayer_frames((bGPDlayer *)ale->data);
+		else
+			delete_gplayer_frames((bGPDlayer *)ale->data);
 	}
 	
 	/* free filtered list */
@@ -653,7 +796,7 @@ static void clean_action_keys (bAnimContext *ac, float thresh)
 	int filter;
 	
 	/* filter data */
-	filter= (ANIMFILTER_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_SEL | ANIMFILTER_CURVESONLY | ANIMFILTER_NODUPLIS);
+	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_LIST_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_SEL /*| ANIMFILTER_CURVESONLY*/ | ANIMFILTER_NODUPLIS);
 	ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 	
 	/* loop through filtered data and clean curves */
@@ -721,7 +864,7 @@ static void sample_action_keys (bAnimContext *ac)
 	int filter;
 	
 	/* filter data */
-	filter= (ANIMFILTER_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_CURVESONLY | ANIMFILTER_NODUPLIS);
+	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_LIST_VISIBLE | ANIMFILTER_FOREDIT /*| ANIMFILTER_CURVESONLY*/ | ANIMFILTER_NODUPLIS);
 	ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 	
 	/* loop through filtered data and add keys between selected keyframes on every frame  */
@@ -776,10 +919,17 @@ void ACTION_OT_sample (wmOperatorType *ot)
 
 /* ******************** Set Extrapolation-Type Operator *********************** */
 
+/* defines for make/clear cyclic extrapolation tools */
+#define MAKE_CYCLIC_EXPO 	-1
+#define CLEAR_CYCLIC_EXPO 	-2
+
 /* defines for set extrapolation-type for selected keyframes tool */
-EnumPropertyItem prop_actkeys_expo_types[] = {
+static EnumPropertyItem prop_actkeys_expo_types[] = {
 	{FCURVE_EXTRAPOLATE_CONSTANT, "CONSTANT", 0, "Constant Extrapolation", ""},
 	{FCURVE_EXTRAPOLATE_LINEAR, "LINEAR", 0, "Linear Extrapolation", ""},
+	
+	{MAKE_CYCLIC_EXPO, "MAKE_CYCLIC", 0, "Make Cyclic (F-Modifier)", "Add Cycles F-Modifier if one doesn't exist already"},
+	{CLEAR_CYCLIC_EXPO, "CLEAR_CYCLIC", 0, "Clear Cyclic (F-Modifier)", "Remove Cycles F-Modifier if not needed anymore"},
 	{0, NULL, 0, NULL, NULL}
 };
 
@@ -791,13 +941,40 @@ static void setexpo_action_keys(bAnimContext *ac, short mode)
 	int filter;
 	
 	/* filter data */
-	filter= (ANIMFILTER_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_SEL | ANIMFILTER_CURVESONLY | ANIMFILTER_NODUPLIS);
+	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_LIST_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_SEL /*| ANIMFILTER_CURVESONLY*/ | ANIMFILTER_NODUPLIS);
 	ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 	
 	/* loop through setting mode per F-Curve */
 	for (ale= anim_data.first; ale; ale= ale->next) {
 		FCurve *fcu= (FCurve *)ale->data;
-		fcu->extend= mode;
+		
+		if (mode >= 0) {
+			/* just set mode setting */
+			fcu->extend= mode;
+		}
+		else {
+			/* shortcuts for managing Cycles F-Modifiers to make it easier to toggle cyclic animation 
+			 * without having to go through FModifier UI in Graph Editor to do so
+			 */
+			if (mode == MAKE_CYCLIC_EXPO) {
+				/* only add if one doesn't exist */
+				if (list_has_suitable_fmodifier(&fcu->modifiers, FMODIFIER_TYPE_CYCLES, -1) == 0) {
+					// TODO: add some more preset versions which set different extrapolation options?
+					add_fmodifier(&fcu->modifiers, FMODIFIER_TYPE_CYCLES);
+				}
+			}
+			else if (mode == CLEAR_CYCLIC_EXPO) {
+				/* remove all the modifiers fitting this description */
+				FModifier *fcm, *fcn=NULL;
+				
+				for (fcm = fcu->modifiers.first; fcm; fcm = fcn) {
+					fcn = fcm->next;
+					
+					if (fcm->type == FMODIFIER_TYPE_CYCLES)
+						remove_fmodifier(&fcu->modifiers, fcm);
+				}
+			}
+		}
 	}
 	
 	/* cleanup */
@@ -862,7 +1039,7 @@ static void setipo_action_keys(bAnimContext *ac, short mode)
 	KeyframeEditFunc set_cb= ANIM_editkeyframes_ipo(mode);
 	
 	/* filter data */
-	filter= (ANIMFILTER_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_CURVESONLY | ANIMFILTER_NODUPLIS);
+	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_LIST_VISIBLE | ANIMFILTER_FOREDIT /*| ANIMFILTER_CURVESONLY*/ | ANIMFILTER_NODUPLIS);
 	ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 	
 	/* loop through setting BezTriple interpolation
@@ -924,17 +1101,6 @@ void ACTION_OT_interpolation_type (wmOperatorType *ot)
 
 /* ******************** Set Handle-Type Operator *********************** */
 
-EnumPropertyItem actkeys_handle_type_items[] = {
-	{HD_FREE, "FREE", 0, "Free", ""},
-	{HD_VECT, "VECTOR", 0, "Vector", ""},
-	{HD_ALIGN, "ALIGNED", 0, "Aligned", ""},
-	{0, "", 0, "", ""},
-	{HD_AUTO, "AUTO", 0, "Auto", "Handles that are automatically adjusted upon moving the keyframe"},
-	{HD_AUTO_ANIM, "ANIM_CLAMPED", 0, "Auto Clamped", "Auto handles clamped to not overshoot"},
-	{0, NULL, 0, NULL, NULL}};
-
-/* ------------------- */
-
 /* this function is responsible for setting handle-type of selected keyframes */
 static void sethandles_action_keys(bAnimContext *ac, short mode) 
 {
@@ -946,7 +1112,7 @@ static void sethandles_action_keys(bAnimContext *ac, short mode)
 	KeyframeEditFunc sel_cb= ANIM_editkeyframes_ok(BEZT_OK_SELECTED);
 	
 	/* filter data */
-	filter= (ANIMFILTER_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_CURVESONLY | ANIMFILTER_NODUPLIS);
+	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_LIST_VISIBLE | ANIMFILTER_FOREDIT /*| ANIMFILTER_CURVESONLY*/ | ANIMFILTER_NODUPLIS);
 	ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 	
 	/* loop through setting flags for handles 
@@ -957,12 +1123,6 @@ static void sethandles_action_keys(bAnimContext *ac, short mode)
 		
 		/* any selected keyframes for editing? */
 		if (ANIM_fcurve_keyframes_loop(NULL, fcu, NULL, sel_cb, NULL)) {
-			/* for auto/auto-clamped, toggle the auto-handles flag on the F-Curve */
-			if (mode == HD_AUTO_ANIM)
-				fcu->flag |= FCURVE_AUTO_HANDLES;
-			else if (mode == HD_AUTO)
-				fcu->flag &= ~FCURVE_AUTO_HANDLES;
-			
 			/* change type of selected handles */
 			ANIM_fcurve_keyframes_loop(NULL, fcu, NULL, edit_cb, calchandles_fcurve);
 		}
@@ -1016,7 +1176,7 @@ void ACTION_OT_handle_type (wmOperatorType *ot)
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 	
 	/* id-props */
-	ot->prop= RNA_def_enum(ot->srna, "type", actkeys_handle_type_items, 0, "Type", "");
+	ot->prop= RNA_def_enum(ot->srna, "type", keyframe_handle_type_items, 0, "Type", "");
 }
 
 /* ******************** Set Keyframe-Type Operator *********************** */
@@ -1030,7 +1190,7 @@ static void setkeytype_action_keys(bAnimContext *ac, short mode)
 	KeyframeEditFunc set_cb= ANIM_editkeyframes_keytype(mode);
 	
 	/* filter data */
-	filter= (ANIMFILTER_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_CURVESONLY | ANIMFILTER_NODUPLIS);
+	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_LIST_VISIBLE | ANIMFILTER_FOREDIT /*| ANIMFILTER_CURVESONLY*/ | ANIMFILTER_NODUPLIS);
 	ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 	
 	/* loop through setting BezTriple interpolation
@@ -1076,7 +1236,7 @@ void ACTION_OT_keyframe_type (wmOperatorType *ot)
 	/* identifiers */
 	ot->name= "Set Keyframe Type";
 	ot->idname= "ACTION_OT_keyframe_type";
-	ot->description= "Set type of keyframe for the seleced keyframes";
+	ot->description= "Set type of keyframe for the selected keyframes";
 	
 	/* api callbacks */
 	ot->invoke= WM_menu_invoke;
@@ -1102,17 +1262,15 @@ static int actkeys_framejump_exec(bContext *C, wmOperator *UNUSED(op))
 	ListBase anim_data= {NULL, NULL};
 	bAnimListElem *ale;
 	int filter;
-	KeyframeEditData ked;
+	KeyframeEditData ked= {{NULL}};
 	
 	/* get editor data */
 	if (ANIM_animdata_get_context(C, &ac) == 0)
 		return OPERATOR_CANCELLED;
 	
-	/* init edit data */
-	memset(&ked, 0, sizeof(KeyframeEditData));
-	
+	/* init edit data */	
 	/* loop over action data, averaging values */
-	filter= (ANIMFILTER_VISIBLE | ANIMFILTER_CURVESONLY | ANIMFILTER_NODUPLIS);
+	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_LIST_VISIBLE /*| ANIMFILTER_CURVESONLY */ | ANIMFILTER_NODUPLIS);
 	ANIM_animdata_filter(&ac, &anim_data, filter, ac.data, ac.datatype);
 	
 	for (ale= anim_data.first; ale; ale= ale->next) {
@@ -1159,7 +1317,7 @@ void ACTION_OT_frame_jump (wmOperatorType *ot)
 /* ******************** Snap Keyframes Operator *********************** */
 
 /* defines for snap keyframes tool */
-EnumPropertyItem prop_actkeys_snap_types[] = {
+static EnumPropertyItem prop_actkeys_snap_types[] = {
 	{ACTKEYS_SNAP_CFRA, "CFRA", 0, "Current frame", ""},
 	{ACTKEYS_SNAP_NEAREST_FRAME, "NEAREST_FRAME", 0, "Nearest Frame", ""}, // XXX as single entry?
 	{ACTKEYS_SNAP_NEAREST_SECOND, "NEAREST_SECOND", 0, "Nearest Second", ""}, // XXX as single entry?
@@ -1174,20 +1332,19 @@ static void snap_action_keys(bAnimContext *ac, short mode)
 	bAnimListElem *ale;
 	int filter;
 	
-	KeyframeEditData ked;
+	KeyframeEditData ked= {{NULL}};
 	KeyframeEditFunc edit_cb;
 	
 	/* filter data */
 	if (ac->datatype == ANIMCONT_GPENCIL)
-		filter= (ANIMFILTER_VISIBLE | ANIMFILTER_FOREDIT);
+		filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_LIST_VISIBLE | ANIMFILTER_FOREDIT);
 	else
-		filter= (ANIMFILTER_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_CURVESONLY | ANIMFILTER_NODUPLIS);
+		filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_LIST_VISIBLE | ANIMFILTER_FOREDIT /*| ANIMFILTER_CURVESONLY*/ | ANIMFILTER_NODUPLIS);
 	ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 	
 	/* get beztriple editing callbacks */
 	edit_cb= ANIM_editkeyframes_snap(mode);
-	
-	memset(&ked, 0, sizeof(KeyframeEditData)); 
+
 	ked.scene= ac->scene;
 	if (mode == ACTKEYS_SNAP_NEAREST_MARKER) {
 		ked.list.first= (ac->markers) ? ac->markers->first : NULL;
@@ -1260,7 +1417,7 @@ void ACTION_OT_snap (wmOperatorType *ot)
 /* ******************** Mirror Keyframes Operator *********************** */
 
 /* defines for mirror keyframes tool */
-EnumPropertyItem prop_actkeys_mirror_types[] = {
+static EnumPropertyItem prop_actkeys_mirror_types[] = {
 	{ACTKEYS_MIRROR_CFRA, "CFRA", 0, "By Times over Current frame", ""},
 	{ACTKEYS_MIRROR_XAXIS, "XAXIS", 0, "By Values over Value=0", ""},
 	{ACTKEYS_MIRROR_MARKER, "MARKER", 0, "By Times over First Selected Marker", ""},
@@ -1274,13 +1431,12 @@ static void mirror_action_keys(bAnimContext *ac, short mode)
 	bAnimListElem *ale;
 	int filter;
 	
-	KeyframeEditData ked;
+	KeyframeEditData ked= {{NULL}};
 	KeyframeEditFunc edit_cb;
 	
 	/* get beztriple editing callbacks */
 	edit_cb= ANIM_editkeyframes_mirror(mode);
-	
-	memset(&ked, 0, sizeof(KeyframeEditData)); 
+
 	ked.scene= ac->scene;
 	
 	/* for 'first selected marker' mode, need to find first selected marker first! */
@@ -1289,13 +1445,7 @@ static void mirror_action_keys(bAnimContext *ac, short mode)
 		TimeMarker *marker= NULL;
 		
 		/* find first selected marker */
-		if (ac->markers) {
-			for (marker= ac->markers->first; marker; marker=marker->next) {
-				if (marker->flag & SELECT) {
-					break;
-				}
-			}
-		}
+		marker= ED_markers_get_first_selected(ac->markers);
 		
 		/* store marker's time (if available) */
 		if (marker)
@@ -1306,9 +1456,9 @@ static void mirror_action_keys(bAnimContext *ac, short mode)
 	
 	/* filter data */
 	if (ac->datatype == ANIMCONT_GPENCIL)
-		filter= (ANIMFILTER_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_NODUPLIS);
+		filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_LIST_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_NODUPLIS);
 	else
-		filter= (ANIMFILTER_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_CURVESONLY | ANIMFILTER_NODUPLIS);
+		filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_LIST_VISIBLE | ANIMFILTER_FOREDIT /*| ANIMFILTER_CURVESONLY*/ | ANIMFILTER_NODUPLIS);
 	ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 	
 	/* mirror keyframes */

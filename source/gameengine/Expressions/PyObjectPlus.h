@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,6 +27,13 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file PyObjectPlus.h
+ *  \ingroup expressions
+ */
+
+/* for now keep weakrefs optional */
+#define USE_WEAKREFS
+
 #ifndef _adr_py_lib_h_				// only process once,
 #define _adr_py_lib_h_				// even if multiply included
 
@@ -38,15 +45,17 @@
 #include "STR_String.h"
 #include "MT_Vector3.h"
 #include "SG_QList.h"
+#include <stddef.h>
 
 /*------------------------------
  * Python defines
 ------------------------------*/
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 #ifdef USE_MATHUTILS
 extern "C" {
-#include "../../blender/python/generic/mathutils.h" /* so we can have mathutils callbacks */
+#include "../../blender/python/mathutils/mathutils.h" /* so we can have mathutils callbacks */
+#include "../../blender/python/generic/py_capi_utils.h" /* for PyC_LineSpit only */
 }
 #endif
 
@@ -91,6 +100,9 @@ typedef struct PyObjectPlus_Proxy {
 	void *ptr;					// optional pointer to generic structure, the structure holds no reference to this proxy
 	bool py_owns;		// true if the object pointed by ref should be deleted when the proxy is deleted
 	bool py_ref;		// true if proxy is connected to a GE object (ref is used)
+#ifdef USE_WEAKREFS
+	PyObject *in_weakreflist; // weak reference enabler
+#endif
 } PyObjectPlus_Proxy;
 
 #define BGE_PROXY_ERROR_MSG "Blender Game Engine data has been freed, cannot use this python variable"
@@ -98,6 +110,9 @@ typedef struct PyObjectPlus_Proxy {
 #define BGE_PROXY_PTR(_self) (((PyObjectPlus_Proxy *)_self)->ptr)
 #define BGE_PROXY_PYOWNS(_self) (((PyObjectPlus_Proxy *)_self)->py_owns)
 #define BGE_PROXY_PYREF(_self) (((PyObjectPlus_Proxy *)_self)->py_ref)
+#ifdef USE_WEAKREFS
+	#define BGE_PROXY_WKREF(_self) (((PyObjectPlus_Proxy *)_self)->in_weakreflist)
+#endif
 
 /* Note, sometimes we dont care what BGE type this is as long as its a proxy */
 #define BGE_PROXY_CHECK_TYPE(_type) ((_type)->tp_dealloc == PyObjectPlus::py_base_dealloc)
@@ -169,35 +184,35 @@ typedef struct PyObjectPlus_Proxy {
 #define KX_PYMETHOD(class_name, method_name)			\
 	PyObject* Py##method_name(PyObject* args, PyObject* kwds); \
 	static PyObject* sPy##method_name( PyObject* self, PyObject* args, PyObject* kwds) { \
-		if(BGE_PROXY_REF(self)==NULL) { PyErr_SetString(PyExc_SystemError, #class_name "." #method_name "() - " BGE_PROXY_ERROR_MSG); return NULL; } \
+		if(BGE_PROXY_REF(self)==NULL) { PyErr_SetString(PyExc_RuntimeError, #class_name "." #method_name "() - " BGE_PROXY_ERROR_MSG); return NULL; } \
 		return ((class_name*)BGE_PROXY_REF(self))->Py##method_name(args, kwds);		\
 	}; \
 
 #define KX_PYMETHOD_VARARGS(class_name, method_name)			\
 	PyObject* Py##method_name(PyObject* args); \
 	static PyObject* sPy##method_name( PyObject* self, PyObject* args) { \
-		if(BGE_PROXY_REF(self)==NULL) { PyErr_SetString(PyExc_SystemError, #class_name "." #method_name "() - " BGE_PROXY_ERROR_MSG); return NULL; } \
+		if(BGE_PROXY_REF(self)==NULL) { PyErr_SetString(PyExc_RuntimeError, #class_name "." #method_name "() - " BGE_PROXY_ERROR_MSG); return NULL; } \
 		return ((class_name*)BGE_PROXY_REF(self))->Py##method_name(args);		\
 	}; \
 
 #define KX_PYMETHOD_NOARGS(class_name, method_name)			\
 	PyObject* Py##method_name(); \
 	static PyObject* sPy##method_name( PyObject* self) { \
-		if(BGE_PROXY_REF(self)==NULL) { PyErr_SetString(PyExc_SystemError, #class_name "." #method_name "() - " BGE_PROXY_ERROR_MSG); return NULL; } \
+		if(BGE_PROXY_REF(self)==NULL) { PyErr_SetString(PyExc_RuntimeError, #class_name "." #method_name "() - " BGE_PROXY_ERROR_MSG); return NULL; } \
 		return ((class_name*)BGE_PROXY_REF(self))->Py##method_name();		\
 	}; \
 	
 #define KX_PYMETHOD_O(class_name, method_name)			\
 	PyObject* Py##method_name(PyObject* value); \
 	static PyObject* sPy##method_name( PyObject* self, PyObject* value) { \
-		if(BGE_PROXY_REF(self)==NULL) { PyErr_SetString(PyExc_SystemError, #class_name "." #method_name "(value) - " BGE_PROXY_ERROR_MSG); return NULL; } \
+		if(BGE_PROXY_REF(self)==NULL) { PyErr_SetString(PyExc_RuntimeError, #class_name "." #method_name "(value) - " BGE_PROXY_ERROR_MSG); return NULL; } \
 		return ((class_name*)BGE_PROXY_REF(self))->Py##method_name(value);		\
 	}; \
 
 #define KX_PYMETHOD_DOC(class_name, method_name)			\
 	PyObject* Py##method_name(PyObject* args, PyObject* kwds); \
 	static PyObject* sPy##method_name( PyObject* self, PyObject* args, PyObject* kwds) { \
-		if(BGE_PROXY_REF(self)==NULL) { PyErr_SetString(PyExc_SystemError, #class_name "." #method_name "(...) - " BGE_PROXY_ERROR_MSG); return NULL; } \
+		if(BGE_PROXY_REF(self)==NULL) { PyErr_SetString(PyExc_RuntimeError, #class_name "." #method_name "(...) - " BGE_PROXY_ERROR_MSG); return NULL; } \
 		return ((class_name*)BGE_PROXY_REF(self))->Py##method_name(args, kwds);		\
 	}; \
     static const char method_name##_doc[]; \
@@ -205,7 +220,7 @@ typedef struct PyObjectPlus_Proxy {
 #define KX_PYMETHOD_DOC_VARARGS(class_name, method_name)			\
 	PyObject* Py##method_name(PyObject* args); \
 	static PyObject* sPy##method_name( PyObject* self, PyObject* args) { \
-		if(BGE_PROXY_REF(self)==NULL) { PyErr_SetString(PyExc_SystemError, #class_name "." #method_name "(...) - " BGE_PROXY_ERROR_MSG); return NULL; } \
+		if(BGE_PROXY_REF(self)==NULL) { PyErr_SetString(PyExc_RuntimeError, #class_name "." #method_name "(...) - " BGE_PROXY_ERROR_MSG); return NULL; } \
 		return ((class_name*)BGE_PROXY_REF(self))->Py##method_name(args);		\
 	}; \
     static const char method_name##_doc[]; \
@@ -213,7 +228,7 @@ typedef struct PyObjectPlus_Proxy {
 #define KX_PYMETHOD_DOC_O(class_name, method_name)			\
 	PyObject* Py##method_name(PyObject* value); \
 	static PyObject* sPy##method_name( PyObject* self, PyObject* value) { \
-		if(BGE_PROXY_REF(self)==NULL) { PyErr_SetString(PyExc_SystemError, #class_name "." #method_name "(value) - " BGE_PROXY_ERROR_MSG); return NULL; } \
+		if(BGE_PROXY_REF(self)==NULL) { PyErr_SetString(PyExc_RuntimeError, #class_name "." #method_name "(value) - " BGE_PROXY_ERROR_MSG); return NULL; } \
 		return ((class_name*)BGE_PROXY_REF(self))->Py##method_name(value);		\
 	}; \
     static const char method_name##_doc[]; \
@@ -221,7 +236,7 @@ typedef struct PyObjectPlus_Proxy {
 #define KX_PYMETHOD_DOC_NOARGS(class_name, method_name)			\
 	PyObject* Py##method_name(); \
 	static PyObject* sPy##method_name( PyObject* self) { \
-		if(BGE_PROXY_REF(self)==NULL) { PyErr_SetString(PyExc_SystemError, #class_name "." #method_name "() - " BGE_PROXY_ERROR_MSG); return NULL; } \
+		if(BGE_PROXY_REF(self)==NULL) { PyErr_SetString(PyExc_RuntimeError, #class_name "." #method_name "() - " BGE_PROXY_ERROR_MSG); return NULL; } \
 		return ((class_name*)BGE_PROXY_REF(self))->Py##method_name();		\
 	}; \
     static const char method_name##_doc[]; \
@@ -240,12 +255,15 @@ typedef struct PyObjectPlus_Proxy {
 #define KX_PYMETHODTABLE_NOARGS(class_name, method_name) \
 	{#method_name , (PyCFunction) class_name::sPy##method_name, METH_NOARGS, (const char *)class_name::method_name##_doc}
 
+#define KX_PYMETHODTABLE_KEYWORDS(class_name, method_name) \
+	{#method_name , (PyCFunction) class_name::sPy##method_name, METH_VARARGS|METH_KEYWORDS, (const char *)class_name::method_name##_doc}
+
 /**
  * Function implementation macro
  */
 #define KX_PYMETHODDEF_DOC(class_name, method_name, doc_string) \
 const char class_name::method_name##_doc[] = doc_string; \
-PyObject* class_name::Py##method_name(PyObject* args, PyObject*)
+PyObject* class_name::Py##method_name(PyObject* args, PyObject* kwds)
 
 #define KX_PYMETHODDEF_DOC_VARARGS(class_name, method_name, doc_string) \
 const char class_name::method_name##_doc[] = doc_string; \
@@ -459,7 +477,7 @@ typedef struct KX_PYATTRIBUTE_DEF {
 ------------------------------*/
 typedef PyTypeObject * PyParentObject;				// Define the PyParent Object
 
-#else // DISABLE_PYTHON
+#else // WITH_PYTHON
 
 #ifdef WITH_CXX_GUARDEDALLOC
 #define Py_Header \
@@ -505,7 +523,7 @@ public:
 	
 	virtual ~PyObjectPlus();					// destructor
 	
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 	PyObject *m_proxy; /* actually a PyObjectPlus_Proxy */
 
 	/* These static functions are referenced by ALL PyObjectPlus_Proxy types
@@ -561,7 +579,7 @@ public:
 	static bool			m_ignore_deprecation_warnings;
 };
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 PyObject *py_getattr_dict(PyObject *pydict, PyObject *tp_dict);
 #endif
 

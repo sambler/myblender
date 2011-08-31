@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -26,8 +26,15 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file gameengine/SceneGraph/SG_IObject.cpp
+ *  \ingroup bgesg
+ */
+
+
 #include "SG_IObject.h"
 #include "SG_Controller.h"
+
+#include <algorithm>
 
 SG_Stage gSG_Stage = SG_STAGE_UNKNOWN;
 
@@ -65,6 +72,16 @@ AddSGController(
 }
 
 	void				
+SG_IObject::
+RemoveSGController(
+	SG_Controller* cont
+) {
+	SGControllerList::iterator contit;
+
+	m_SGcontrollers.erase(std::remove(m_SGcontrollers.begin(), m_SGcontrollers.end(), cont));
+}
+
+	void
 SG_IObject::
 RemoveAllControllers(
 ) { 

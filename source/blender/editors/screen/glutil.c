@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,15 +25,20 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/screen/glutil.c
+ *  \ingroup edscr
+ */
+
+
 #include <stdio.h>
-#include <math.h>
 #include <string.h>
 
 #include "MEM_guardedalloc.h"
 
 #include "DNA_vec_types.h"
 
-#include "BKE_utildefines.h"
+#include "BLI_utildefines.h"
+
 #include "BKE_colortools.h"
 
 #include "BLI_math.h"
@@ -85,6 +90,44 @@ GLubyte stipple_quarttone[128] = {
 	136,136,136,136,0,0,0,0,34,34,34,34,0,0,0,0,
 	136,136,136,136,0,0,0,0,34,34,34,34,0,0,0,0,
 	136,136,136,136,0,0,0,0,34,34,34,34,0,0,0,0};
+
+
+GLubyte stipple_diag_stripes_pos[128] = {
+    0x00, 0xff, 0x00, 0xff, 0x01, 0xfe, 0x01, 0xfe,
+	0x03, 0xfc, 0x03, 0xfc, 0x07, 0xf8, 0x07, 0xf8,
+	0x0f, 0xf0, 0x0f, 0xf0, 0x1f, 0xe0, 0x1f, 0xe0,
+	0x3f, 0xc0, 0x3f, 0xc0, 0x7f, 0x80, 0x7f, 0x80,
+	0xff, 0x00, 0xff, 0x00, 0xfe, 0x01, 0xfe, 0x01,
+	0xfc, 0x03, 0xfc, 0x03, 0xf8, 0x07, 0xf8, 0x07,
+	0xf0, 0x0f, 0xf0, 0x0f, 0xe0, 0x1f, 0xe0, 0x1f,
+	0xc0, 0x3f, 0xc0, 0x3f, 0x80, 0x7f, 0x80, 0x7f,
+	0x00, 0xff, 0x00, 0xff, 0x01, 0xfe, 0x01, 0xfe,
+	0x03, 0xfc, 0x03, 0xfc, 0x07, 0xf8, 0x07, 0xf8,
+	0x0f, 0xf0, 0x0f, 0xf0, 0x1f, 0xe0, 0x1f, 0xe0,
+	0x3f, 0xc0, 0x3f, 0xc0, 0x7f, 0x80, 0x7f, 0x80,
+	0xff, 0x00, 0xff, 0x00, 0xfe, 0x01, 0xfe, 0x01,
+	0xfc, 0x03, 0xfc, 0x03, 0xf8, 0x07, 0xf8, 0x07,
+	0xf0, 0x0f, 0xf0, 0x0f, 0xe0, 0x1f, 0xe0, 0x1f,
+	0xc0, 0x3f, 0xc0, 0x3f, 0x80, 0x7f, 0x80, 0x7f};
+
+
+GLubyte stipple_diag_stripes_neg[128] = {
+    0xff, 0x00, 0xff, 0x00, 0xfe, 0x01, 0xfe, 0x01,
+	0xfc, 0x03, 0xfc, 0x03, 0xf8, 0x07, 0xf8, 0x07,
+	0xf0, 0x0f, 0xf0, 0x0f, 0xe0, 0x1f, 0xe0, 0x1f,
+	0xc0, 0x3f, 0xc0, 0x3f, 0x80, 0x7f, 0x80, 0x7f,
+	0x00, 0xff, 0x00, 0xff, 0x01, 0xfe, 0x01, 0xfe,
+	0x03, 0xfc, 0x03, 0xfc, 0x07, 0xf8, 0x07, 0xf8,
+	0x0f, 0xf0, 0x0f, 0xf0, 0x1f, 0xe0, 0x1f, 0xe0,
+	0x3f, 0xc0, 0x3f, 0xc0, 0x7f, 0x80, 0x7f, 0x80,
+	0xff, 0x00, 0xff, 0x00, 0xfe, 0x01, 0xfe, 0x01,
+	0xfc, 0x03, 0xfc, 0x03, 0xf8, 0x07, 0xf8, 0x07,
+	0xf0, 0x0f, 0xf0, 0x0f, 0xe0, 0x1f, 0xe0, 0x1f,
+	0xc0, 0x3f, 0xc0, 0x3f, 0x80, 0x7f, 0x80, 0x7f,
+	0x00, 0xff, 0x00, 0xff, 0x01, 0xfe, 0x01, 0xfe,
+	0x03, 0xfc, 0x03, 0xfc, 0x07, 0xf8, 0x07, 0xf8,
+	0x0f, 0xf0, 0x0f, 0xf0, 0x1f, 0xe0, 0x1f, 0xe0,
+	0x3f, 0xc0, 0x3f, 0xc0, 0x7f, 0x80, 0x7f, 0x80};
 
 
 void fdrawbezier(float vec[4][3])
@@ -341,7 +384,7 @@ void glutil_draw_filled_arc(float start, float angle, float radius, int nsegment
 		float t= (float) i/(nsegments-1);
 		float cur= start + t*angle;
 		
-		glVertex2f(cos(cur)*radius, sin(cur)*radius);
+		glVertex2f(cosf(cur)*radius, sinf(cur)*radius);
 	}
 	glEnd();
 }
@@ -354,7 +397,7 @@ void glutil_draw_lined_arc(float start, float angle, float radius, int nsegments
 		float t= (float) i/(nsegments-1);
 		float cur= start + t*angle;
 		
-		glVertex2f(cos(cur)*radius, sin(cur)*radius);
+		glVertex2f(cosf(cur)*radius, sinf(cur)*radius);
 	}
 	glEnd();
 }
@@ -528,7 +571,7 @@ void glaDrawPixelsTex(float x, float y, int img_w, int img_h, int format, void *
 }
 
 /* row_w is unused but kept for completeness */
-void glaDrawPixelsSafe_to32(float fx, float fy, int img_w, int img_h, int UNUSED(row_w), float *rectf, int gamma_correct)
+void glaDrawPixelsSafe_to32(float fx, float fy, int img_w, int img_h, int UNUSED(row_w), float *rectf, int do_gamma_correct)
 {
 	unsigned char *rect32;
 	
@@ -537,7 +580,7 @@ void glaDrawPixelsSafe_to32(float fx, float fy, int img_w, int img_h, int UNUSED
 	
 	rect32= MEM_mallocN(img_w*img_h*sizeof(int), "temp 32 bits");
 	
-	if (gamma_correct) {
+	if (do_gamma_correct) {
 		floatbuf_to_srgb_byte(rectf, rect32, 0, img_w, 0, img_h, img_w);
 	} else {
 		floatbuf_to_byte(rectf, rect32, 0, img_w, 0, img_h, img_w);
@@ -756,24 +799,24 @@ void bglBegin(int mode)
 	if(mode==GL_POINTS) {
 		float value[4];
 		glGetFloatv(GL_POINT_SIZE_RANGE, value);
-		if(value[1]<2.0) {
+		if(value[1] < 2.0f) {
 			glGetFloatv(GL_POINT_SIZE, value);
-			pointhack= floor(value[0]+0.5);
+			pointhack= floor(value[0] + 0.5f);
 			if(pointhack>4) pointhack= 4;
 		}
 		else glBegin(mode);
 	}
 }
 
-int bglPointHack() {
+int bglPointHack(void) {
 	float value[4];
-	int pointhack;
+	int pointhack_px;
 	glGetFloatv(GL_POINT_SIZE_RANGE, value);
-	if(value[1]<2.0) {
+	if(value[1] < 2.0f) {
 		glGetFloatv(GL_POINT_SIZE, value);
-		pointhack= floor(value[0]+0.5);
-		if(pointhack>4) pointhack= 4;
-		return pointhack;
+		pointhack_px= floorf(value[0]+0.5f);
+		if(pointhack_px>4) pointhack_px= 4;
+		return pointhack_px;
 	}
 	return 0;
 }
@@ -784,7 +827,7 @@ void bglVertex3fv(float *vec)
 	case GL_POINTS:
 		if(pointhack) {
 			glRasterPos3fv(vec);
-			glBitmap(pointhack, pointhack, (float)pointhack/2.0, (float)pointhack/2.0, 0.0, 0.0, Squaredot);
+			glBitmap(pointhack, pointhack, (float)pointhack/2.0f, (float)pointhack/2.0f, 0.0, 0.0, Squaredot);
 		}
 		else glVertex3fv(vec);
 		break;
@@ -797,7 +840,7 @@ void bglVertex3f(float x, float y, float z)
 	case GL_POINTS:
 		if(pointhack) {
 			glRasterPos3f(x, y, z);
-			glBitmap(pointhack, pointhack, (float)pointhack/2.0, (float)pointhack/2.0, 0.0, 0.0, Squaredot);
+			glBitmap(pointhack, pointhack, (float)pointhack/2.0f, (float)pointhack/2.0f, 0.0, 0.0, Squaredot);
 		}
 		else glVertex3f(x, y, z);
 		break;
@@ -855,7 +898,7 @@ void bglPolygonOffset(float viewdist, float dist)
 {
 	static float winmat[16], offset=0.0;	
 	
-	if(dist!=0.0) {
+	if(dist != 0.0f) {
 		float offs;
 		
 		// glEnable(GL_POLYGON_OFFSET_FILL);
@@ -867,8 +910,8 @@ void bglPolygonOffset(float viewdist, float dist)
 		
 		/* dist is from camera to center point */
 		
-		if(winmat[15]>0.5) offs= 0.00001*dist*viewdist;  // ortho tweaking
-		else offs= 0.0005*dist;  // should be clipping value or so...
+		if(winmat[15]>0.5f) offs= 0.00001f*dist*viewdist;  // ortho tweaking
+		else offs= 0.0005f*dist;  // should be clipping value or so...
 		
 		winmat[14]-= offs;
 		offset+= offs;

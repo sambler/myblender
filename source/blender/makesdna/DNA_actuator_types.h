@@ -1,6 +1,4 @@
-/**
- * blenlib/DNA_actuator_types.h (mar-2001 nzc)
- *	
+/*
  * $Id$ 
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -28,6 +26,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file DNA_actuator_types.h
+ *  \ingroup DNA
+ */
+
 #ifndef DNA_ACTUATOR_TYPES_H
 #define DNA_ACTUATOR_TYPES_H
 
@@ -48,14 +51,17 @@ typedef struct bAddObjectActuator {
 typedef struct bActionActuator {								
 	struct bAction *act;	/* Pointer to action */				
 	short	type, flag;		/* Playback type */  // not in use
-	int	sta, end;		/* Start & End frames */			
+	float	sta, end;		/* Start & End frames */			
 	char	name[32];		/* For property-driven playback */	
 	char	frameProp[32];	/* Set this property to the actions current frame */
 	short	blendin;		/* Number of frames of blending */
 	short	priority;		/* Execution priority */
+	short	layer;			/* Animation layer */
 	short	end_reset;	/* Ending the actuator (negative pulse) wont reset the the action to its starting frame */
 	short	strideaxis;		/* Displacement axis */
+	short	pad;
 	float	stridelength;	/* Displacement incurred by cycle */ // not in use
+	float	layer_weight;	/* How much of the previous layer to use for blending. (<0 = disable, 0 = add mode) */
 } bActionActuator;												
 
 typedef struct Sound3D
@@ -112,14 +118,15 @@ typedef struct bObjectActuator {
 	short damping;
 	float forceloc[3], forcerot[3];
 	float pad[3], pad1[3];
-	float dloc[3], drot[3];
+	float dloc[3], drot[3]; /* angle in radians */
 	float linearvelocity[3], angularvelocity[3];
 	struct Object *reference;
 } bObjectActuator;
 
+/* deprecated, handled by bActionActuator now */
 typedef struct bIpoActuator {
 	short flag, type;
-	int sta, end;
+	float sta, end;
 	char name[32];
 	char frameProp[32];	/* Set this property to the actions current frame */
 	
@@ -130,7 +137,7 @@ typedef struct bIpoActuator {
 typedef struct bCameraActuator {
 	struct Object *ob;
 	float height, min, max;
-	float pad;
+	float damping;
 	short pad1, axis;
 	float pad2;
 } bCameraActuator ;
@@ -227,14 +234,14 @@ typedef struct bActuator {
 	struct bActuator *next, *prev, *mynew;
 	short type;
 	/**
-	 * Tells what type of actuator data <data> holds. 
+	 * Tells what type of actuator data \ref data holds. 
 	 */
 	short flag;
 	short otype, go;
 	char name[32];
 
 	/**
-	 * Data must point to an object actuator type struct.
+	 * data must point to an object actuator type struct.
 	 */
 	void *data;
 

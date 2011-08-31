@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file RAS_OpenGLRasterizer.h
+ *  \ingroup bgerastogl
+ */
+
 #ifndef __RAS_OPENGLRASTERIZER
 #define __RAS_OPENGLRASTERIZER
 
@@ -88,6 +93,8 @@ class RAS_OpenGLRasterizer : public RAS_IRasterizer
 	float			m_focallength;
 	bool			m_setfocallength;
 	int				m_noOfScanlines;
+
+	short			m_prevafvalue;
 
 	//motion blur
 	int	m_motionblur;
@@ -288,6 +295,9 @@ public:
 
 	virtual void	SetBlendingMode(int blendmode);
 	virtual void	SetFrontFace(bool ccw);
+	
+	virtual void	SetAnisotropicFiltering(short level);
+	virtual short	GetAnisotropicFiltering();
 	
 	
 #ifdef WITH_CXX_GUARDEDALLOC

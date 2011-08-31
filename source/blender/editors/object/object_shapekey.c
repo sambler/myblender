@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/object/object_shapekey.c
+ *  \ingroup edobj
+ */
+
+
 #include <math.h>
 #include <string.h>
 
@@ -38,6 +43,7 @@
 
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
 #include "DNA_curve_types.h"
 #include "DNA_key_types.h"
@@ -155,7 +161,7 @@ static int ED_object_shape_key_remove(bContext *C, Object *ob)
 		free_libblock_us(&(bmain->key), key);
 	}
 	
-	DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	WM_event_add_notifier(C, NC_OBJECT|ND_DRAW, ob);
 
 	return 1;
@@ -197,9 +203,9 @@ static int object_shape_key_mirror(bContext *C, Object *ob)
 						fp1= ((float *)kb->data) + i1*3;
 						fp2= ((float *)kb->data) + i2*3;
 
-						VECCOPY(tvec,	fp1);
-						VECCOPY(fp1,	fp2);
-						VECCOPY(fp2,	tvec);
+						copy_v3_v3(tvec,	fp1);
+						copy_v3_v3(fp1,	fp2);
+						copy_v3_v3(fp2,	tvec);
 
 						/* flip x axis */
 						fp1[0] = -fp1[0];
@@ -211,12 +217,51 @@ static int object_shape_key_mirror(bContext *C, Object *ob)
 
 			mesh_octree_table(ob, NULL, NULL, 'e');
 		}
-		/* todo, other types? */
+		else if (ob->type == OB_LATTICE) {
+			Lattice *lt= ob->data;
+			int i1, i2;
+			float *fp1, *fp2;
+			int u, v, w;
+			/* half but found up odd value */
+			const int pntsu_half = (((lt->pntsu / 2) + (lt->pntsu % 2))) ;
+
+			/* currently editmode isnt supported by mesh so
+			 * ignore here for now too */
+
+			/* if(lt->editlatt) lt= lt->editlatt->latt; */
+
+			for(w=0; w<lt->pntsw; w++) {
+				for(v=0; v<lt->pntsv; v++) {
+					for(u=0; u<pntsu_half; u++) {
+						int u_inv= (lt->pntsu - 1) - u;
+						float tvec[3];
+						if(u == u_inv) {
+							i1= LT_INDEX(lt, u, v, w);
+							fp1= ((float *)kb->data) + i1*3;
+							fp1[0]= -fp1[0];
+						}
+						else {
+							i1= LT_INDEX(lt, u, v, w);
+							i2= LT_INDEX(lt, u_inv, v, w);
+
+							fp1= ((float *)kb->data) + i1*3;
+							fp2= ((float *)kb->data) + i2*3;
+
+							copy_v3_v3(tvec, fp1);
+							copy_v3_v3(fp1, fp2);
+							copy_v3_v3(fp2, tvec);
+							fp1[0]= -fp1[0];
+							fp2[0]= -fp2[0];
+						}
+					}
+				}
+			}
+		}
 
 		MEM_freeN(tag_elem);
 	}
 	
-	DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	WM_event_add_notifier(C, NC_OBJECT|ND_DRAW, ob);
 
 	return 1;
@@ -253,8 +298,8 @@ void OBJECT_OT_shape_key_add(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Add Shape Key";
-	ot->name= "Add shape key to the object.";
 	ot->idname= "OBJECT_OT_shape_key_add";
+	ot->description= "Add shape key to the object";
 	
 	/* api callbacks */
 	ot->poll= shape_key_mode_poll;
@@ -281,8 +326,8 @@ void OBJECT_OT_shape_key_remove(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Remove Shape Key";
-	ot->name= "Remove shape key from the object.";
 	ot->idname= "OBJECT_OT_shape_key_remove";
+	ot->description= "Remove shape key from the object";
 	
 	/* api callbacks */
 	ot->poll= shape_key_mode_poll;
@@ -304,7 +349,7 @@ static int shape_key_clear_exec(bContext *C, wmOperator *UNUSED(op))
 	for(kb=key->block.first; kb; kb=kb->next)
 		kb->curval= 0.0f;
 
-	DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	WM_event_add_notifier(C, NC_OBJECT|ND_DRAW, ob);
 	
 	return OPERATOR_FINISHED;
@@ -392,7 +437,7 @@ static int shape_key_move_exec(bContext *C, wmOperator *op)
 		}
 	}
 
-	DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	WM_event_add_notifier(C, NC_OBJECT|ND_DRAW, ob);
 
 	return OPERATOR_FINISHED;

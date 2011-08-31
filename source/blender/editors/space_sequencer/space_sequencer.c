@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/space_sequencer/space_sequencer.c
+ *  \ingroup spseq
+ */
+
+
 #include <string.h>
 #include <stdio.h>
 
@@ -36,12 +41,15 @@
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
 #include "BLI_path_util.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_context.h"
 #include "BKE_screen.h"
 #include "BKE_sequencer.h"
 #include "BKE_global.h"
 
+#include "ED_space_api.h"
+#include "ED_sequencer.h"
 #include "ED_screen.h"
 #include "ED_view3d.h" /* only for sequencer view3d drawing callback */
 
@@ -58,16 +66,13 @@
 ARegion *sequencer_has_buttons_region(ScrArea *sa)
 {
 	ARegion *ar, *arnew;
-	
-	for(ar= sa->regionbase.first; ar; ar= ar->next)
-		if(ar->regiontype==RGN_TYPE_UI)
-			return ar;
+
+	ar= BKE_area_find_region_type(sa, RGN_TYPE_UI);
+	if(ar) return ar;
 	
 	/* add subdiv level; after header */
-	for(ar= sa->regionbase.first; ar; ar= ar->next)
-		if(ar->regiontype==RGN_TYPE_HEADER)
-			break;
-	
+	ar= BKE_area_find_region_type(sa, RGN_TYPE_HEADER);
+
 	/* is error! */
 	if(ar==NULL) return NULL;
 	
@@ -82,7 +87,7 @@ ARegion *sequencer_has_buttons_region(ScrArea *sa)
 	return arnew;
 }
 
-ARegion *sequencer_find_region(ScrArea *sa, short type)
+static ARegion *sequencer_find_region(ScrArea *sa, short type)
 {
 	ARegion *ar=NULL;
 	
@@ -218,7 +223,7 @@ static SpaceLink *sequencer_new(const bContext *C)
 	ar->v2d.cur= ar->v2d.tot;
 	
 	ar->v2d.min[0]= 10.0f;
-	ar->v2d.min[1]= 4.0f;
+	ar->v2d.min[1]= 0.5f;
 	
 	ar->v2d.max[0]= MAXFRAMEF;
 	ar->v2d.max[1]= MAXSEQ;
@@ -334,6 +339,7 @@ static void sequencer_drop_copy(wmDrag *drag, wmDropBox *drop)
 		
 		RNA_string_set(drop->ptr, "directory", dir);
 
+		RNA_collection_clear(drop->ptr, "files");
 		RNA_collection_add(drop->ptr, "files", &itemptr);
 		RNA_string_set(&itemptr, "name", file);
 	}
@@ -517,7 +523,7 @@ void ED_spacetype_sequencer(void)
 	art->init= sequencer_main_area_init;
 	art->draw= sequencer_main_area_draw;
 	art->listener= sequencer_main_area_listener;
-	art->keymapflag= ED_KEYMAP_VIEW2D|ED_KEYMAP_FRAMES|ED_KEYMAP_ANIMATION;
+	art->keymapflag= ED_KEYMAP_VIEW2D|ED_KEYMAP_MARKERS|ED_KEYMAP_FRAMES|ED_KEYMAP_ANIMATION;
 
 	BLI_addhead(&st->regiontypes, art);
 

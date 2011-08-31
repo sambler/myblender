@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,11 +26,17 @@
  * Making screendumps.
  */
 
+/** \file blender/editors/screen/screendump.c
+ *  \ingroup edscr
+ */
+
+
 #include <string.h>
 
 #include "MEM_guardedalloc.h"
 
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 
 #include "IMB_imbuf_types.h"
 #include "IMB_imbuf.h"
@@ -42,6 +48,7 @@
 
 #include "BKE_context.h"
 #include "BKE_global.h"
+#include "BKE_main.h"
 #include "BKE_image.h"
 #include "BKE_report.h"
 #include "BKE_writeavi.h"
@@ -64,39 +71,6 @@ typedef struct ScreenshotData {
 	unsigned int *dumprect;
 	int dumpsx, dumpsy;
 } ScreenshotData;
-
-static int screenshot_exec(bContext *C, wmOperator *op)
-{
-	ScreenshotData *scd= op->customdata;
-	
-	if(scd && scd->dumprect) {
-		Scene *scene= CTX_data_scene(C);
-		ImBuf *ibuf;
-		char path[FILE_MAX];
-	
-		RNA_string_get(op->ptr, "filepath", path);
-	
-		strcpy(G.ima, path);
-		BLI_path_abs(path, G.sce);
-		
-		/* BKE_add_image_extension() checks for if extension was already set */
-		if(scene->r.scemode & R_EXTENSION) 
-			if(strlen(path)<FILE_MAXDIR+FILE_MAXFILE-5)
-				BKE_add_image_extension(path, scene->r.imtype);
-		
-		ibuf= IMB_allocImBuf(scd->dumpsx, scd->dumpsy, 24, 0);
-		ibuf->rect= scd->dumprect;
-		
-		BKE_write_ibuf(scene, ibuf, path, scene->r.imtype, scene->r.subimtype, scene->r.quality);
-
-		IMB_freeImBuf(ibuf);
-
-		MEM_freeN(scd->dumprect);
-		MEM_freeN(scd);
-		op->customdata= NULL;
-	}
-	return OPERATOR_FINISHED;
-}
 
 /* get shot from frontbuffer */
 static unsigned int *screenshot(bContext *C, int *dumpsx, int *dumpsy, int fscreen)
@@ -131,8 +105,8 @@ static unsigned int *screenshot(bContext *C, int *dumpsx, int *dumpsy, int fscre
 	return dumprect;
 }
 
-
-static int screenshot_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
+/* call from both exec and invoke */
+static int screenshot_data_create(bContext *C, wmOperator *op)
 {
 	unsigned int *dumprect;
 	int dumpsx, dumpsy;
@@ -145,7 +119,68 @@ static int screenshot_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event)
 		scd->dumpsy= dumpsy;
 		scd->dumprect= dumprect;
 		op->customdata= scd;
-		
+		return TRUE;
+	}
+	else {
+		op->customdata= NULL;
+		return FALSE;
+	}
+}
+
+static void screenshot_data_free(wmOperator *op)
+{
+	ScreenshotData *scd= op->customdata;
+
+	if(scd) {
+		if(scd->dumprect)
+			MEM_freeN(scd->dumprect);
+		MEM_freeN(scd);
+		op->customdata= NULL;
+	}
+}
+
+static int screenshot_exec(bContext *C, wmOperator *op)
+{
+	ScreenshotData *scd= op->customdata;
+
+	if(scd == NULL) {
+		/* when running exec directly */
+		screenshot_data_create(C, op);
+		scd= op->customdata;
+	}
+
+	if(scd) {
+		if(scd->dumprect) {
+			Scene *scene= CTX_data_scene(C);
+			ImBuf *ibuf;
+			char path[FILE_MAX];
+
+			RNA_string_get(op->ptr, "filepath", path);
+
+			strcpy(G.ima, path);
+			BLI_path_abs(path, G.main->name);
+
+			/* BKE_add_image_extension() checks for if extension was already set */
+			if(scene->r.scemode & R_EXTENSION)
+				if(strlen(path)<FILE_MAXDIR+FILE_MAXFILE-5)
+					BKE_add_image_extension(path, scene->r.imtype);
+
+			ibuf= IMB_allocImBuf(scd->dumpsx, scd->dumpsy, 24, 0);
+			ibuf->rect= scd->dumprect;
+
+			BKE_write_ibuf(ibuf, path, scene->r.imtype, scene->r.subimtype, scene->r.quality);
+
+			IMB_freeImBuf(ibuf);
+		}
+	}
+
+	screenshot_data_free(op);
+	return OPERATOR_FINISHED;
+}
+
+static int screenshot_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
+{
+	if(screenshot_data_create(C, op)) {
 		if(RNA_property_is_set(op->ptr, "filepath"))
 			return screenshot_exec(C, op);
 		
@@ -158,20 +193,29 @@ static int screenshot_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event)
 	return OPERATOR_CANCELLED;
 }
 
+static int screenshot_cancel(bContext *UNUSED(C), wmOperator *op)
+{
+	screenshot_data_free(op);
+	return OPERATOR_CANCELLED;
+}
 
 void SCREEN_OT_screenshot(wmOperatorType *ot)
 {
+	PropertyRNA *prop;
+
 	ot->name= "Save Screenshot"; /* weak: opname starting with 'save' makes filewindow give save-over */
 	ot->idname= "SCREEN_OT_screenshot";
 	
 	ot->invoke= screenshot_invoke;
 	ot->exec= screenshot_exec;
 	ot->poll= WM_operator_winactive;
+	ot->cancel= screenshot_cancel;
 	
 	ot->flag= 0;
 	
 	WM_operator_properties_filesel(ot, FOLDERFILE|IMAGEFILE, FILE_SPECIAL, FILE_SAVE, WM_FILESEL_FILEPATH);
-	RNA_def_boolean(ot->srna, "full", 1, "Full Screen", "");
+	prop= RNA_def_boolean(ot->srna, "full", 1, "Full Screen", "");
+	RNA_def_property_flag(prop, PROP_HIDDEN); /* hide because once the file sel is displayed, the option no longer does anything */
 }
 
 /* *************** screenshot movie job ************************* */
@@ -255,10 +299,10 @@ static void screenshot_startjob(void *sjv, short *stop, short *do_update, float 
 				char name[FILE_MAXDIR+FILE_MAXFILE];
 				int ok;
 				
-				BKE_makepicstring(name, rd.pic, cfra, rd.imtype, rd.scemode & R_EXTENSION);
+				BKE_makepicstring(name, rd.pic, cfra, rd.imtype, rd.scemode & R_EXTENSION, TRUE);
 				
 				ibuf->rect= sj->dumprect;
-				ok= BKE_write_ibuf(sj->scene, ibuf, name, rd.imtype, rd.subimtype, rd.quality);
+				ok= BKE_write_ibuf(ibuf, name, rd.imtype, rd.subimtype, rd.quality);
 				
 				if(ok==0) {
 					printf("Write error: cannot save %s\n", name);

@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -20,6 +20,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/armature/editarmature_sketch.c
+ *  \ingroup edarmature
+ */
+
+
 #include <string.h>
 #include <math.h>
 #include <float.h>
@@ -35,6 +40,7 @@
 
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 #include "BLI_graph.h"
 #include "BLI_ghash.h"
 
@@ -75,9 +81,12 @@ typedef struct SK_GestureAction {
 	GestureApplyFct		apply;
 } SK_GestureAction;
 
-SK_Point boneSnap;
-int    LAST_SNAP_POINT_VALID = 0;
-float  LAST_SNAP_POINT[3];
+#if 0 /* UNUSED 2.5 */
+static SK_Point boneSnap;
+#endif
+
+static int    LAST_SNAP_POINT_VALID = 0;
+static float  LAST_SNAP_POINT[3];
 
 
 typedef struct SK_StrokeIterator {
@@ -105,10 +114,6 @@ typedef struct SK_StrokeIterator {
 
 void initStrokeIterator(BArcIterator *iter, SK_Stroke *stk, int start, int end);
 
-void sk_deleteSelectedStrokes(SK_Sketch *sketch);
-
-SK_Point *sk_lastStrokePoint(SK_Stroke *stk);
-
 int sk_detectCutGesture(bContext *C, SK_Gesture *gest, SK_Sketch *sketch);
 void sk_applyCutGesture(bContext *C, SK_Gesture *gest, SK_Sketch *sketch);
 int sk_detectTrimGesture(bContext *C, SK_Gesture *gest, SK_Sketch *sketch);
@@ -132,7 +137,7 @@ int sk_hasOverdraw(SK_Sketch *sketch, SK_Stroke *stk);
 
 /******************** GESTURE ACTIONS ******************************/
 
-SK_GestureAction GESTURE_ACTIONS[] =
+static SK_GestureAction GESTURE_ACTIONS[] =
 	{
 		{"Cut", sk_detectCutGesture, sk_applyCutGesture},
 		{"Trim", sk_detectTrimGesture, sk_applyTrimGesture},
@@ -146,10 +151,10 @@ SK_GestureAction GESTURE_ACTIONS[] =
 
 /******************** TEMPLATES UTILS *************************/
 
-char  *TEMPLATES_MENU = NULL;
-int    TEMPLATES_CURRENT = 0;
-GHash *TEMPLATES_HASH = NULL;
-RigGraph *TEMPLATE_RIGG = NULL;
+static char  *TEMPLATES_MENU = NULL;
+static int    TEMPLATES_CURRENT = 0;
+static GHash *TEMPLATES_HASH = NULL;
+static RigGraph *TEMPLATE_RIGG = NULL;
 
 void BIF_makeListTemplates(const bContext *C)
 {
@@ -243,7 +248,7 @@ int   BIF_currentTemplate(const bContext *C)
 	return TEMPLATES_CURRENT;
 }
 
-RigGraph* sk_makeTemplateGraph(const bContext *C, Object *ob)
+static RigGraph* sk_makeTemplateGraph(const bContext *C, Object *ob)
 {
 	Object *obedit = CTX_data_edit_object(C);
 	if (ob == obedit)
@@ -287,7 +292,7 @@ int BIF_nbJointsTemplate(const bContext *C)
 	}
 }
 
-char * BIF_nameBoneTemplate(const bContext *C)
+const char * BIF_nameBoneTemplate(const bContext *C)
 {
 	ToolSettings *ts = CTX_data_tool_settings(C);
 	SK_Sketch *stk = contextSketch(C, 1);
@@ -351,7 +356,7 @@ void  BIF_setTemplate(bContext *C, int index)
 
 /*********************** CONVERSION ***************************/
 
-void sk_autoname(bContext *C, ReebArc *arc)
+static void sk_autoname(bContext *C, ReebArc *arc)
 {
 	ToolSettings *ts = CTX_data_tool_settings(C);
 	if (ts->skgen_retarget_options & SK_RETARGET_AUTONAME)
@@ -369,16 +374,16 @@ void sk_autoname(bContext *C, ReebArc *arc)
 			int valid = 0;
 			int caps = 0;
 
-			if (BLI_streq(side, ""))
+			if (side[0] == '\0')
 			{
 				valid = 1;
 			}
-			else if (BLI_streq(side, "R") || BLI_streq(side, "L"))
+			else if (strcmp(side, "R")==0 || strcmp(side, "L")==0)
 			{
 				valid = 1;
 				caps = 1;
 			}
-			else if (BLI_streq(side, "r") || BLI_streq(side, "l"))
+			else if (strcmp(side, "r")==0 || strcmp(side, "l")==0)
 			{
 				valid = 1;
 				caps = 0;
@@ -399,7 +404,7 @@ void sk_autoname(bContext *C, ReebArc *arc)
 	}
 }
 
-ReebNode *sk_pointToNode(SK_Point *pt, float imat[][4], float tmat[][3])
+static ReebNode *sk_pointToNode(SK_Point *pt, float imat[][4], float tmat[][3])
 {
 	ReebNode *node;
 
@@ -413,7 +418,7 @@ ReebNode *sk_pointToNode(SK_Point *pt, float imat[][4], float tmat[][3])
 	return node;
 }
 
-ReebArc *sk_strokeToArc(SK_Stroke *stk, float imat[][4], float tmat[][3])
+static ReebArc *sk_strokeToArc(SK_Stroke *stk, float imat[][4], float tmat[][3])
 {
 	ReebArc *arc;
 	int i;
@@ -437,7 +442,7 @@ ReebArc *sk_strokeToArc(SK_Stroke *stk, float imat[][4], float tmat[][3])
 	return arc;
 }
 
-void sk_retargetStroke(bContext *C, SK_Stroke *stk)
+static void sk_retargetStroke(bContext *C, SK_Stroke *stk)
 {
 	ToolSettings *ts = CTX_data_tool_settings(C);
 	Object *obedit = CTX_data_edit_object(C);
@@ -468,7 +473,7 @@ void sk_retargetStroke(bContext *C, SK_Stroke *stk)
 
 /**************************************************************/
 
-void sk_cancelStroke(SK_Sketch *sketch)
+static void sk_cancelStroke(SK_Sketch *sketch)
 {
 	if (sketch->active_stroke != NULL)
 	{
@@ -478,18 +483,18 @@ void sk_cancelStroke(SK_Sketch *sketch)
 }
 
 
-float sk_clampPointSize(SK_Point *pt, float size)
+static float sk_clampPointSize(SK_Point *pt, float size)
 {
 	return MAX2(size * pt->size, size / 2);
 }
 
-void sk_drawPoint(GLUquadric *quad, SK_Point *pt, float size)
+static void sk_drawPoint(GLUquadric *quad, SK_Point *pt, float size)
 {
 	glTranslatef(pt->p[0], pt->p[1], pt->p[2]);
 	gluSphere(quad, sk_clampPointSize(pt, size), 8, 8);
 }
 
-void sk_drawEdge(GLUquadric *quad, SK_Point *pt0, SK_Point *pt1, float size)
+static void sk_drawEdge(GLUquadric *quad, SK_Point *pt0, SK_Point *pt1, float size)
 {
 	float vec1[3], vec2[3] = {0, 0, 1}, axis[3];
 	float angle, length;
@@ -510,7 +515,7 @@ void sk_drawEdge(GLUquadric *quad, SK_Point *pt0, SK_Point *pt1, float size)
 	gluCylinder(quad, sk_clampPointSize(pt1, size), sk_clampPointSize(pt0, size), length, 8, 8);
 }
 
-void sk_drawNormal(GLUquadric *quad, SK_Point *pt, float size, float height)
+static void sk_drawNormal(GLUquadric *quad, SK_Point *pt, float size, float height)
 {
 	float vec2[3] = {0, 0, 1}, axis[3];
 	float angle;
@@ -534,7 +539,7 @@ void sk_drawNormal(GLUquadric *quad, SK_Point *pt, float size, float height)
 	glPopMatrix();
 }
 
-void sk_drawStroke(SK_Stroke *stk, int id, float color[3], int start, int end)
+static void sk_drawStroke(SK_Stroke *stk, int id, float color[3], int start, int end)
 {
 	float rgb[3];
 	int i;
@@ -610,7 +615,7 @@ void sk_drawStroke(SK_Stroke *stk, int id, float color[3], int start, int end)
 	gluDeleteQuadric(quad);
 }
 
-void drawSubdividedStrokeBy(ToolSettings *toolsettings, BArcIterator *iter, NextSubdivisionFunc next_subdividion)
+static void drawSubdividedStrokeBy(ToolSettings *toolsettings, BArcIterator *iter, NextSubdivisionFunc next_subdividion)
 {
 	SK_Stroke *stk = ((SK_StrokeIterator*)iter)->stroke;
 	float head[3], tail[3];
@@ -646,7 +651,7 @@ void drawSubdividedStrokeBy(ToolSettings *toolsettings, BArcIterator *iter, Next
 	gluDeleteQuadric(quad);
 }
 
-void sk_drawStrokeSubdivision(ToolSettings *toolsettings, SK_Stroke *stk)
+static void sk_drawStrokeSubdivision(ToolSettings *toolsettings, SK_Stroke *stk)
 {
 	int head_index = -1;
 	int i;
@@ -697,7 +702,7 @@ void sk_drawStrokeSubdivision(ToolSettings *toolsettings, SK_Stroke *stk)
 	}
 }
 
-SK_Point *sk_snapPointStroke(bContext *C, SK_Stroke *stk, short mval[2], int *dist, int *index, int all_pts)
+static SK_Point *sk_snapPointStroke(bContext *C, SK_Stroke *stk, int mval[2], int *dist, int *index, int all_pts)
 {
 	ARegion *ar = CTX_wm_region(C);
 	SK_Point *pt = NULL;
@@ -730,7 +735,8 @@ SK_Point *sk_snapPointStroke(bContext *C, SK_Stroke *stk, short mval[2], int *di
 	return pt;
 }
 
-SK_Point *sk_snapPointArmature(bContext *C, Object *ob, ListBase *ebones, short mval[2], int *dist)
+#if 0 /* UNUSED 2.5 */
+static SK_Point *sk_snapPointArmature(bContext *C, Object *ob, ListBase *ebones, int mval[2], int *dist)
 {
 	ARegion *ar = CTX_wm_region(C);
 	SK_Point *pt = NULL;
@@ -777,6 +783,7 @@ SK_Point *sk_snapPointArmature(bContext *C, Object *ob, ListBase *ebones, short 
 
 	return pt;
 }
+#endif
 
 void sk_resetOverdraw(SK_Sketch *sketch)
 {
@@ -794,7 +801,7 @@ int sk_hasOverdraw(SK_Sketch *sketch, SK_Stroke *stk)
 			(sketch->over.start != -1 || sketch->over.end != -1);
 }
 
-void sk_updateOverdraw(bContext *C, SK_Sketch *sketch, SK_Stroke *stk, SK_DrawData *dd)
+static void sk_updateOverdraw(bContext *C, SK_Sketch *sketch, SK_Stroke *stk, SK_DrawData *dd)
 {
 	if (sketch->over.target == NULL)
 	{
@@ -871,7 +878,7 @@ void sk_updateOverdraw(bContext *C, SK_Sketch *sketch, SK_Stroke *stk, SK_DrawDa
 }
 
 /* return 1 on reverse needed */
-int sk_adjustIndexes(SK_Sketch *sketch, int *start, int *end)
+static int sk_adjustIndexes(SK_Sketch *sketch, int *start, int *end)
 {
 	int retval = 0;
 
@@ -899,7 +906,7 @@ int sk_adjustIndexes(SK_Sketch *sketch, int *start, int *end)
 	return retval;
 }
 
-void sk_endOverdraw(SK_Sketch *sketch)
+static void sk_endOverdraw(SK_Sketch *sketch)
 {
 	SK_Stroke *stk = sketch->active_stroke;
 
@@ -928,7 +935,7 @@ void sk_endOverdraw(SK_Sketch *sketch)
 }
 
 
-void sk_startStroke(SK_Sketch *sketch)
+static void sk_startStroke(SK_Sketch *sketch)
 {
 	SK_Stroke *stk = sk_createStroke();
 
@@ -938,7 +945,7 @@ void sk_startStroke(SK_Sketch *sketch)
 	sk_resetOverdraw(sketch);
 }
 
-void sk_endStroke(bContext *C, SK_Sketch *sketch)
+static void sk_endStroke(bContext *C, SK_Sketch *sketch)
 {
 	ToolSettings *ts = CTX_data_tool_settings(C);
 	sk_shrinkStrokeBuffer(sketch->active_stroke);
@@ -951,7 +958,7 @@ void sk_endStroke(bContext *C, SK_Sketch *sketch)
 	sketch->active_stroke = NULL;
 }
 
-void sk_updateDrawData(SK_DrawData *dd)
+static void sk_updateDrawData(SK_DrawData *dd)
 {
 	dd->type = PT_CONTINUOUS;
 
@@ -959,7 +966,7 @@ void sk_updateDrawData(SK_DrawData *dd)
 	dd->previous_mval[1] = dd->mval[1];
 }
 
-float sk_distanceDepth(bContext *C, float p1[3], float p2[3])
+static float sk_distanceDepth(bContext *C, float p1[3], float p2[3])
 {
 	ARegion *ar = CTX_wm_region(C);
 	RegionView3D *rv3d = ar->regiondata;
@@ -980,7 +987,7 @@ float sk_distanceDepth(bContext *C, float p1[3], float p2[3])
 	return distance;
 }
 
-void sk_interpolateDepth(bContext *C, SK_Stroke *stk, int start, int end, float length, float distance)
+static void sk_interpolateDepth(bContext *C, SK_Stroke *stk, int start, int end, float length, float distance)
 {
 	ARegion *ar = CTX_wm_region(C);
 	ScrArea *sa = CTX_wm_area(C);
@@ -998,7 +1005,7 @@ void sk_interpolateDepth(bContext *C, SK_Stroke *stk, int start, int end, float 
 		float pval[2];
 
 		project_float(ar, stk->points[i].p, pval);
-		viewray(ar, v3d, pval, ray_start, ray_normal);
+		ED_view3d_win_to_ray(ar, v3d, pval, ray_start, ray_normal);
 
 		mul_v3_fl(ray_normal, distance * progress / length);
 		add_v3_v3(stk->points[i].p, ray_normal);
@@ -1007,7 +1014,7 @@ void sk_interpolateDepth(bContext *C, SK_Stroke *stk, int start, int end, float 
 	}
 }
 
-void sk_projectDrawPoint(bContext *C, float vec[3], SK_Stroke *stk, SK_DrawData *dd)
+static void sk_projectDrawPoint(bContext *C, float vec[3], SK_Stroke *stk, SK_DrawData *dd)
 {
 	ARegion *ar = CTX_wm_region(C);
 	/* copied from grease pencil, need fixing */
@@ -1015,6 +1022,7 @@ void sk_projectDrawPoint(bContext *C, float vec[3], SK_Stroke *stk, SK_DrawData 
 	short cval[2];
 	float fp[3] = {0, 0, 0};
 	float dvec[3];
+	float mval_f[2];
 
 	if (last != NULL)
 	{
@@ -1025,11 +1033,12 @@ void sk_projectDrawPoint(bContext *C, float vec[3], SK_Stroke *stk, SK_DrawData 
 
 	/* method taken from editview.c - mouse_cursor() */
 	project_short_noclip(ar, fp, cval);
-	window_to_3d_delta(ar, dvec, cval[0] - dd->mval[0], cval[1] - dd->mval[1]);
+	VECSUB2D(mval_f, cval, dd->mval);
+	ED_view3d_win_to_delta(ar, mval_f, dvec);
 	sub_v3_v3v3(vec, fp, dvec);
 }
 
-int sk_getStrokeDrawPoint(bContext *C, SK_Point *pt, SK_Sketch *UNUSED(sketch), SK_Stroke *stk, SK_DrawData *dd)
+static int sk_getStrokeDrawPoint(bContext *C, SK_Point *pt, SK_Sketch *UNUSED(sketch), SK_Stroke *stk, SK_DrawData *dd)
 {
 	pt->type = dd->type;
 	pt->mode = PT_PROJECT;
@@ -1038,7 +1047,7 @@ int sk_getStrokeDrawPoint(bContext *C, SK_Point *pt, SK_Sketch *UNUSED(sketch), 
 	return 1;
 }
 
-int sk_addStrokeDrawPoint(bContext *C, SK_Sketch *sketch, SK_Stroke *stk, SK_DrawData *dd)
+static int sk_addStrokeDrawPoint(bContext *C, SK_Sketch *sketch, SK_Stroke *stk, SK_DrawData *dd)
 {
 	ARegion *ar = CTX_wm_region(C);
 	RegionView3D *rv3d = ar->regiondata;
@@ -1053,7 +1062,7 @@ int sk_addStrokeDrawPoint(bContext *C, SK_Sketch *sketch, SK_Stroke *stk, SK_Dra
 	return 1;
 }
 
-int sk_getStrokeSnapPoint(bContext *C, SK_Point *pt, SK_Sketch *sketch, SK_Stroke *stk, SK_DrawData *dd)
+static int sk_getStrokeSnapPoint(bContext *C, SK_Point *pt, SK_Sketch *sketch, SK_Stroke *stk, SK_DrawData *dd)
 {
 	ToolSettings *ts = CTX_data_tool_settings(C);
 	int point_added = 0;
@@ -1209,7 +1218,7 @@ int sk_getStrokeSnapPoint(bContext *C, SK_Point *pt, SK_Sketch *sketch, SK_Strok
 	return point_added;
 }
 
-int sk_addStrokeSnapPoint(bContext *C, SK_Sketch *sketch, SK_Stroke *stk, SK_DrawData *dd)
+static int sk_addStrokeSnapPoint(bContext *C, SK_Sketch *sketch, SK_Stroke *stk, SK_DrawData *dd)
 {
 	int point_added;
 	ARegion *ar = CTX_wm_region(C);
@@ -1260,7 +1269,7 @@ int sk_addStrokeSnapPoint(bContext *C, SK_Sketch *sketch, SK_Stroke *stk, SK_Dra
 	return point_added;
 }
 
-void sk_addStrokePoint(bContext *C, SK_Sketch *sketch, SK_Stroke *stk, SK_DrawData *dd, short snap)
+static void sk_addStrokePoint(bContext *C, SK_Sketch *sketch, SK_Stroke *stk, SK_DrawData *dd, short snap)
 {
 	ToolSettings *ts = CTX_data_tool_settings(C);
 	int point_added = 0;
@@ -1281,7 +1290,7 @@ void sk_addStrokePoint(bContext *C, SK_Sketch *sketch, SK_Stroke *stk, SK_DrawDa
 	}
 }
 
-void sk_getStrokePoint(bContext *C, SK_Point *pt, SK_Sketch *sketch, SK_Stroke *stk, SK_DrawData *dd, short snap)
+static void sk_getStrokePoint(bContext *C, SK_Point *pt, SK_Sketch *sketch, SK_Stroke *stk, SK_DrawData *dd, short snap)
 {
 	int point_added = 0;
 
@@ -1469,7 +1478,7 @@ static int iteratorStopped(void *arg)
 	}
 }
 
-void sk_convertStroke(bContext *C, SK_Stroke *stk)
+static void sk_convertStroke(bContext *C, SK_Stroke *stk)
 {
 	Object *obedit = CTX_data_edit_object(C);
 	ToolSettings *ts = CTX_data_tool_settings(C);
@@ -1561,7 +1570,7 @@ void sk_convertStroke(bContext *C, SK_Stroke *stk)
 	}
 }
 
-void sk_convert(bContext *C, SK_Sketch *sketch)
+static void sk_convert(bContext *C, SK_Sketch *sketch)
 {
 	ToolSettings *ts = CTX_data_tool_settings(C);
 	SK_Stroke *stk;
@@ -1587,7 +1596,7 @@ void sk_convert(bContext *C, SK_Sketch *sketch)
 
 
 /* returns the number of self intersections */
-int sk_getSelfIntersections(bContext *C, ListBase *list, SK_Stroke *gesture)
+static int sk_getSelfIntersections(bContext *C, ListBase *list, SK_Stroke *gesture)
 {
 	ARegion *ar = CTX_wm_region(C);
 	int added = 0;
@@ -1636,7 +1645,7 @@ int sk_getSelfIntersections(bContext *C, ListBase *list, SK_Stroke *gesture)
 	return added;
 }
 
-int cmpIntersections(void *i1, void *i2)
+static int cmpIntersections(void *i1, void *i2)
 {
 	SK_Intersection *isect1 = i1, *isect2 = i2;
 
@@ -1668,7 +1677,7 @@ int cmpIntersections(void *i1, void *i2)
 
 
 /* returns the maximum number of intersections per stroke */
-int sk_getIntersections(bContext *C, ListBase *list, SK_Sketch *sketch, SK_Stroke *gesture)
+static int sk_getIntersections(bContext *C, ListBase *list, SK_Sketch *sketch, SK_Stroke *gesture)
 {
 	ARegion *ar = CTX_wm_region(C);
 	ScrArea *sa = CTX_wm_area(C);
@@ -1714,7 +1723,7 @@ int sk_getIntersections(bContext *C, ListBase *list, SK_Sketch *sketch, SK_Strok
 
 					mval[0] = vi[0];
 					mval[1] = vi[1];
-					viewline(ar, v3d, mval, ray_start, ray_end);
+					ED_view3d_win_to_segment_clip(ar, v3d, mval, ray_start, ray_end);
 
 					isect_line_line_v3(	stk->points[s_i].p,
 										stk->points[s_i + 1].p,
@@ -1738,7 +1747,7 @@ int sk_getIntersections(bContext *C, ListBase *list, SK_Sketch *sketch, SK_Strok
 	return added;
 }
 
-int sk_getSegments(SK_Stroke *segments, SK_Stroke *gesture)
+static int sk_getSegments(SK_Stroke *segments, SK_Stroke *gesture)
 {
 	SK_StrokeIterator sk_iter;
 	BArcIterator *iter = (BArcIterator*)&sk_iter;
@@ -2127,7 +2136,7 @@ static void sk_freeGesture(SK_Gesture *gest)
 	BLI_freelistN(&gest->self_intersections);
 }
 
-void sk_applyGesture(bContext *C, SK_Sketch *sketch)
+static void sk_applyGesture(bContext *C, SK_Sketch *sketch)
 {
 	SK_Gesture gest;
 	SK_GestureAction *act;
@@ -2150,7 +2159,7 @@ void sk_applyGesture(bContext *C, SK_Sketch *sketch)
 /********************************************/
 
 
-int sk_selectStroke(bContext *C, SK_Sketch *sketch, short mval[2], int extend)
+static int sk_selectStroke(bContext *C, SK_Sketch *sketch, const int mval[2], int extend)
 {
 	ViewContext vc;
 	rcti rect;
@@ -2201,7 +2210,8 @@ int sk_selectStroke(bContext *C, SK_Sketch *sketch, short mval[2], int extend)
 	return 0;
 }
 
-void sk_queueRedrawSketch(SK_Sketch *sketch)
+#if 0 /* UNUSED 2.5 */
+static void sk_queueRedrawSketch(SK_Sketch *sketch)
 {
 	if (sketch->active_stroke != NULL)
 	{
@@ -2214,8 +2224,9 @@ void sk_queueRedrawSketch(SK_Sketch *sketch)
 		}
 	}
 }
+#endif
 
-void sk_drawSketch(Scene *scene, View3D *UNUSED(v3d), SK_Sketch *sketch, int with_names)
+static void sk_drawSketch(Scene *scene, View3D *UNUSED(v3d), SK_Sketch *sketch, int with_names)
 {
 	ToolSettings *ts= scene->toolsettings;
 	SK_Stroke *stk;
@@ -2343,7 +2354,7 @@ void sk_drawSketch(Scene *scene, View3D *UNUSED(v3d), SK_Sketch *sketch, int wit
 	}
 }
 
-int sk_finish_stroke(bContext *C, SK_Sketch *sketch)
+static int sk_finish_stroke(bContext *C, SK_Sketch *sketch)
 {
 	ToolSettings *ts = CTX_data_tool_settings(C);
 
@@ -2378,7 +2389,7 @@ int sk_finish_stroke(bContext *C, SK_Sketch *sketch)
 	return 0;
 }
 
-void sk_start_draw_stroke(SK_Sketch *sketch)
+static void sk_start_draw_stroke(SK_Sketch *sketch)
 {
 	if (sketch->active_stroke == NULL)
 	{
@@ -2389,12 +2400,12 @@ void sk_start_draw_stroke(SK_Sketch *sketch)
 	}
 }
 
-void sk_start_draw_gesture(SK_Sketch *sketch)
+static void sk_start_draw_gesture(SK_Sketch *sketch)
 {
 	sketch->gesture = sk_createStroke();
 }
 
-int sk_draw_stroke(bContext *C, SK_Sketch *sketch, SK_Stroke *stk, SK_DrawData *dd, short snap)
+static int sk_draw_stroke(bContext *C, SK_Sketch *sketch, SK_Stroke *stk, SK_DrawData *dd, short snap)
 {
 	if (sk_stroke_filtermval(dd))
 	{
@@ -2460,10 +2471,11 @@ static int sketch_delete(bContext *C, wmOperator *UNUSED(op), wmEvent *UNUSED(ev
 		sk_deleteSelectedStrokes(sketch);
 //			allqueue(REDRAWVIEW3D, 0);
 	}
+	WM_event_add_notifier(C, NC_SCREEN|ND_SKETCH|NA_REMOVED, NULL);
 	return OPERATOR_FINISHED;
 }
 
-void BIF_sk_selectStroke(bContext *C, short mval[2], short extend)
+void BIF_sk_selectStroke(bContext *C, const int mval[2], short extend)
 {
 	ToolSettings *ts = CTX_data_tool_settings(C);
 	SK_Sketch *sketch = contextSketch(C, 0);
@@ -2771,7 +2783,7 @@ int ED_operator_sketch_mode_active_stroke(bContext *C)
 	}
 }
 
-int ED_operator_sketch_mode_gesture(bContext *C)
+static int ED_operator_sketch_mode_gesture(bContext *C)
 {
 	ToolSettings *ts = CTX_data_tool_settings(C);
 	SK_Sketch *sketch = contextSketch(C, 0);

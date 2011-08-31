@@ -1,3 +1,6 @@
+/** \file elbeem/intern/solver_init.cpp
+ *  \ingroup elbeem
+ */
 /******************************************************************************
  *
  * El'Beem - Free Surface Fluid Simulation with the Lattice Boltzmann Method
@@ -536,6 +539,15 @@ void LbmFsgrSolver::parseAttrList()
 
 
 /******************************************************************************
+ * (part of enabling chapter 6 of "Free Surface Flows with Moving and Deforming Objects for LBM")
+ *****************************************************************************/
+void LbmFsgrSolver::setSurfGenSettings(short value)
+{
+	mFsSurfGenSetting = value;
+}
+
+
+/******************************************************************************
  * Initialize omegas and forces on all levels (for init/timestep change)
  *****************************************************************************/
 void LbmFsgrSolver::initLevelOmegas()
@@ -1001,7 +1013,7 @@ bool LbmFsgrSolver::initializeSolverMemory()
 	preinitGrids();
 	for(int lev=0; lev<=mMaxRefine; lev++) {
 		FSGR_FORIJK_BOUNDS(lev) {
-			RFLAG(lev,i,j,k,0) = RFLAG(lev,i,j,k,0) = 0; // reset for changeFlag usage
+			RFLAG(lev,i,j,k,0) = 0, RFLAG(lev,i,j,k,0) = 0; // reset for changeFlag usage
 			if(!mAllfluid) {
 				initEmptyCell(lev, i,j,k, CFEmpty, -1.0, -1.0); 
 			} else {

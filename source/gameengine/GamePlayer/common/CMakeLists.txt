@@ -24,8 +24,43 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-SET(SRC 
-	bmfont.cpp
+set(INC
+	.
+	../ghost
+	../../BlenderRoutines
+	../../Converter
+	../../Expressions
+	../../GameLogic
+	../../Ketsji
+	../../Network
+	../../Network/LoopBackNetwork
+	../../Physics/common
+	../../Rasterizer
+	../../Rasterizer/RAS_OpenGLRasterizer
+	../../SceneGraph
+	../../../blender
+	../../../blender/blenfont
+	../../../blender/blenkernel
+	../../../blender/blenlib
+	../../../blender/blenloader
+	../../../blender/gpu
+	../../../blender/imbuf
+	../../../blender/makesdna
+	../../../../intern/container
+	../../../../intern/ghost
+	../../../../intern/guardedalloc
+	../../../../intern/moto/include
+	../../../../intern/string
+)
+
+set(INC_SYS
+	${GLEW_INCLUDE_PATH}
+	${PYTHON_INCLUDE_DIRS}
+	${PNG_INCLUDE_DIR}
+	${ZLIB_INCLUDE_DIRS}
+)
+
+set(SRC 
 	GPC_Canvas.cpp
 	GPC_Engine.cpp
 	GPC_KeyboardDevice.cpp
@@ -35,42 +70,19 @@ SET(SRC
 	GPC_RawLogoArrays.cpp
 	GPC_RenderTools.cpp
 	GPC_System.cpp
+	bmfont.cpp
+
+	GPC_Canvas.h
+	GPC_Engine.h
+	GPC_KeyboardDevice.h
+	GPC_MouseDevice.h
+	GPC_RawImage.h
+	GPC_RawLoadDotBlendArray.h
+	GPC_RawLogoArrays.h
+	GPC_RenderTools.h
+	GPC_System.h
 )
 
-SET(INC
-	.
-	../../../../intern/string
-	../../../../intern/ghost
-	../../../../intern/guardedalloc
-	../../../../intern/moto/include
-	../../../../source/gameengine/Rasterizer/RAS_OpenGLRasterizer
-	../../../../source/kernel/gen_system
-	../../../../source/kernel/gen_messaging
-	../../../../source/gameengine/Converter
-	../../../../source/blender/imbuf
-	../../../../source/gameengine/Ketsji
-	../../../../source/blender/blenlib
-	../../../../source/blender/blenkernel
-	../../../../source/blender
-	../../../../source/blender/include
-	../../../../source/blender/makesdna
-	../../../../source/gameengine/Rasterizer
-	../../../../source/gameengine/GameLogic
-	../../../../source/gameengine/Expressions
-	../../../../source/gameengine/Network
-	../../../../source/gameengine/SceneGraph
-	../../../../source/gameengine/Physics/common
-	../../../../source/gameengine/Network/LoopBackNetwork
-	../../../../source/gameengine/GamePlayer/ghost
-	../../../../source/blender/misc
-	../../../../source/blender/blenloader
-	../../../../source/blender/gpu
-	../../../../extern/glew/include
-	${PYTHON_INC}
-	${PNG_INC}
-	${ZLIB_INC}
-)
+add_definitions(-DGLEW_STATIC)
 
-ADD_DEFINITIONS(-DGLEW_STATIC)
-
-BLENDERLIB_NOLIST(gp_common "${SRC}" "${INC}")
+blender_add_lib_nolist(ge_player_common "${SRC}" "${INC}" "${INC_SYS}")

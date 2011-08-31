@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,15 +27,22 @@
  * ***** END GPL LICENSE BLOCK *****
  * return info about ID types
  */
+
+/** \file blender/blenkernel/intern/idcode.c
+ *  \ingroup bke
+ */
+
  
 #include <stdlib.h>
 #include <string.h>
 
 #include "DNA_ID.h"
 
+#include "BKE_idcode.h"
+
 typedef struct {
 	unsigned short code;
-	char *name, *plural;
+	const char *name, *plural;
 	
 	int flags;
 #define IDTYPE_FLAGS_ISLINKABLE	(1<<0)
@@ -66,7 +73,8 @@ static IDType idtypes[]= {
 	{ ID_SCE,		"Scene",	"scenes",		IDTYPE_FLAGS_ISLINKABLE}, 
 	{ ID_SCR,		"Screen",	"screens",		0}, 
 	{ ID_SEQ,		"Sequence",	"sequences",	0}, /* not actually ID data */
-	{ ID_SO,		"Sound",	"sounds",		IDTYPE_FLAGS_ISLINKABLE}, 
+	{ ID_SPK,		"Speaker",	"speakers",		IDTYPE_FLAGS_ISLINKABLE},
+	{ ID_SO,		"Sound",	"sounds",		IDTYPE_FLAGS_ISLINKABLE},
 	{ ID_TE,		"Texture",	"textures",		IDTYPE_FLAGS_ISLINKABLE}, 
 	{ ID_TXT,		"Text",		"texts",		IDTYPE_FLAGS_ISLINKABLE}, 
 	{ ID_VF,		"VFont",	"fonts",		IDTYPE_FLAGS_ISLINKABLE}, 
@@ -125,4 +133,9 @@ const char *BKE_idcode_to_name_plural(int code)
 	IDType *idt= idtype_from_code(code);
 	
 	return idt?idt->plural:NULL;
+}
+
+int BKE_idcode_iter_step(int *index)
+{
+	return (*index < nidtypes) ? idtypes[(*index)++].code : 0;
 }

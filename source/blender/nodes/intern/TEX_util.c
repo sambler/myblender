@@ -1,4 +1,4 @@
-/**
+/*
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -25,18 +25,23 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/nodes/intern/TEX_util.c
+ *  \ingroup nodes
+ */
+
  
 /*
 	HOW TEXTURE NODES WORK
 
-	In contrast to Shader nodes, which place a colour into the output
+	In contrast to Shader nodes, which place a color into the output
 	stack when executed, Texture nodes place a TexDelegate* there. To
-	obtain a colour value from this, a node further up the chain reads
+	obtain a color value from this, a node further up the chain reads
 	the TexDelegate* from its input stack, and uses tex_call_delegate to
-	retrieve the colour from the delegate.
+	retrieve the color from the delegate.
  
 	comments: (ton)
-    
+
 	This system needs recode, a node system should rely on the stack, and 
 	callbacks for nodes only should evaluate own node, not recursively go
 	over other previous ones.
@@ -57,7 +62,7 @@ void tex_call_delegate(TexDelegate *dg, float *out, TexParams *params, short thr
 	}
 }
 
-void tex_input(float *out, int sz, bNodeStack *in, TexParams *params, short thread)
+static void tex_input(float *out, int sz, bNodeStack *in, TexParams *params, short thread)
 {
 	TexDelegate *dg = in->data;
 	if(dg) {
@@ -119,7 +124,7 @@ void tex_do_preview(bNode *node, float *co, float *col)
 		int xs= ((co[0] + 1.0f)*0.5f)*preview->xsize;
 		int ys= ((co[1] + 1.0f)*0.5f)*preview->ysize;
 
-		nodeAddToPreview(node, col, xs, ys);
+		nodeAddToPreview(node, col, xs, ys, 0); /* 0 = no color management */
 	}
 }
 
@@ -181,6 +186,7 @@ int ntreeTexExecTree(
 	MTex *mtex
 ){
 	TexCallData data;
+	float *nor= texres->nor;
 	int retval = TEX_INT;
 
 	data.co = co;
@@ -199,6 +205,9 @@ int ntreeTexExecTree(
 
 	if(texres->nor) retval |= TEX_NOR;
 	retval |= TEX_RGB;
+	/* confusing stuff; the texture output node sets this to NULL to indicate no normal socket was set
+	   however, the texture code checks this for other reasons (namely, a normal is required for material) */
+	texres->nor= nor;
 
 	return retval;
 }

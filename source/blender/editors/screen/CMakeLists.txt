@@ -19,13 +19,12 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-FILE(GLOB SRC *.c)
-
-SET(INC
+set(INC
 	../include
 	../../blenfont
 	../../blenkernel
 	../../blenlib
+	../../blenloader
 	../../imbuf
 	../../makesdna
 	../../makesrna
@@ -33,8 +32,19 @@ SET(INC
 	../../../../intern/guardedalloc
 )
 
-IF(WIN32)
-	LIST(APPEND INC ${PTHREADS_INC})
-ENDIF(WIN32)
+set(INC_SYS
+	${GLEW_INCLUDE_PATH}
+)
 
-BLENDERLIB(bf_editor_screen "${SRC}" "${INC}")
+set(SRC
+	area.c
+	glutil.c
+	screen_context.c
+	screen_edit.c
+	screen_ops.c
+	screendump.c
+
+	screen_intern.h
+)
+
+blender_add_lib(bf_editor_screen "${SRC}" "${INC}" "${INC_SYS}")

@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file gameengine/Rasterizer/RAS_OpenGLRasterizer/RAS_OpenGLRasterizer.cpp
+ *  \ingroup bgerastogl
+ */
+
  
 #include <math.h>
 #include <stdlib.h>
@@ -94,12 +99,16 @@ RAS_OpenGLRasterizer::RAS_OpenGLRasterizer(RAS_ICanvas* canvas)
 		hinterlace_mask[i] = (i&1)*0xFFFFFFFF;
 	}
 	hinterlace_mask[32] = 0;
+
+	m_prevafvalue = GPU_get_anisotropic();
 }
 
 
 
 RAS_OpenGLRasterizer::~RAS_OpenGLRasterizer()
 {
+	// Restore the previous AF value
+	GPU_set_anisotropic(m_prevafvalue);
 }
 
 bool RAS_OpenGLRasterizer::Init()
@@ -119,15 +128,15 @@ bool RAS_OpenGLRasterizer::Init()
 	glFrontFace(GL_CCW);
 	m_last_frontface = true;
 
-	glClearColor(m_redback,m_greenback,m_blueback,m_alphaback);
-	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-
 	m_redback = 0.4375;
 	m_greenback = 0.4375;
 	m_blueback = 0.4375;
 	m_alphaback = 0.0;
+
+	glClearColor(m_redback,m_greenback,m_blueback,m_alphaback);
+	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
 
 	glShadeModel(GL_SMOOTH);
 
@@ -298,6 +307,8 @@ bool RAS_OpenGLRasterizer::BeginFrame(int drawingmode, double time)
 
 	glShadeModel(GL_SMOOTH);
 
+	glEnable(GL_MULTISAMPLE_ARB);
+
 	m_2DCanvas->BeginFrame();
 	
 	return true;
@@ -382,6 +393,9 @@ void RAS_OpenGLRasterizer::EndFrame()
 	FlushDebugLines();
 
 	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+
+	glDisable(GL_MULTISAMPLE_ARB);
+
 	m_2DCanvas->EndFrame();
 }	
 
@@ -731,6 +745,7 @@ static RAS_MeshSlot *current_ms;
 static RAS_MeshObject *current_mesh;
 static int current_blmat_nr;
 static GPUVertexAttribs current_gpu_attribs;
+static Image *current_image;
 static int CheckMaterialDM(int matnr, void *attribs)
 {
 	// only draw the current material
@@ -741,6 +756,8 @@ static int CheckMaterialDM(int matnr, void *attribs)
 		memcpy(gattribs, &current_gpu_attribs, sizeof(GPUVertexAttribs));
 	return 1;
 }
+
+/*
 static int CheckTexfaceDM(void *mcol, int index)
 {
 
@@ -748,6 +765,34 @@ static int CheckTexfaceDM(void *mcol, int index)
 	RAS_Polygon* polygon = (index >= 0 && index < current_mesh->NumPolygons()) ?
 		current_mesh->GetPolygon(index) : NULL;
 	if (polygon && polygon->GetMaterial() == current_bucket) {
+		// must handle color.
+		if (current_wireframe)
+			return 2;
+		if (current_ms->m_bObjectColor) {
+			MT_Vector4& rgba = current_ms->m_RGBAcolor;
+			glColor4d(rgba[0], rgba[1], rgba[2], rgba[3]);
+			// don't use mcol
+			return 2;
+		}
+		if (!mcol) {
+			// we have to set the color from the material
+			unsigned char rgba[4];
+			current_polymat->GetMaterialRGBAColor(rgba);
+			glColor4ubv((const GLubyte *)rgba);
+			return 2;
+		}
+		return 1;
+	}
+	return 0;
+}
+*/
+
+static int CheckTexDM(MTFace *tface, MCol *mcol, int matnr)
+{
+
+	// index is the original face index, retrieve the polygon
+	if (matnr == current_blmat_nr &&
+		(tface == NULL || tface->tpage == current_image)) {
 		// must handle color.
 		if (current_wireframe)
 			return 2;
@@ -783,7 +828,14 @@ void RAS_OpenGLRasterizer::IndexPrimitivesInternal(RAS_MeshSlot& ms, bool multi)
 		current_ms = &ms;
 		current_mesh = ms.m_mesh;
 		current_wireframe = wireframe;
-		MCol *mcol = (MCol*)ms.m_pDerivedMesh->getFaceDataArray(ms.m_pDerivedMesh, CD_MCOL);
+		// MCol *mcol = (MCol*)ms.m_pDerivedMesh->getFaceDataArray(ms.m_pDerivedMesh, CD_MCOL); /* UNUSED */
+
+		// handle two-side
+		if (current_polymat->GetDrawingMode() & RAS_IRasterizer::KX_TWOSIDE)
+			this->SetCullFace(false);
+		else
+			this->SetCullFace(true);
+
 		if (current_polymat->GetFlag() & RAS_BLENDERGLSL) {
 			// GetMaterialIndex return the original mface material index, 
 			// increment by 1 to match what derived mesh is doing
@@ -800,7 +852,10 @@ void RAS_OpenGLRasterizer::IndexPrimitivesInternal(RAS_MeshSlot& ms, bool multi)
 			ms.m_pDerivedMesh->drawFacesGLSL(ms.m_pDerivedMesh, CheckMaterialDM);
 			GPU_set_material_blend_mode(current_blend_mode);
 		} else {
-			ms.m_pDerivedMesh->drawMappedFacesTex(ms.m_pDerivedMesh, CheckTexfaceDM, mcol);
+			//ms.m_pDerivedMesh->drawMappedFacesTex(ms.m_pDerivedMesh, CheckTexfaceDM, mcol);
+			current_blmat_nr = current_polymat->GetMaterialIndex();
+			current_image = current_polymat->GetBlenderImage();
+			ms.m_pDerivedMesh->drawFacesTex(ms.m_pDerivedMesh, CheckTexDM);
 		}
 		return;
 	}
@@ -1153,3 +1208,12 @@ void RAS_OpenGLRasterizer::SetFrontFace(bool ccw)
 	m_last_frontface = ccw;
 }
 
+void RAS_OpenGLRasterizer::SetAnisotropicFiltering(short level)
+{
+	GPU_set_anisotropic((float)level);
+}
+
+short RAS_OpenGLRasterizer::GetAnisotropicFiltering()
+{
+	return (short)GPU_get_anisotropic();
+}

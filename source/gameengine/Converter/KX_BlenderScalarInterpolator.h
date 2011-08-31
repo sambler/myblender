@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file KX_BlenderScalarInterpolator.h
+ *  \ingroup bgeconv
+ */
+
 #ifndef __KX_SCALARINTERPOLATOR_H
 #define __KX_SCALARINTERPOLATOR_H
 
@@ -61,7 +66,7 @@ public:
 
 class BL_InterpolatorList : public std::vector<KX_IScalarInterpolator *> {
 public:
-	BL_InterpolatorList(struct AnimData *adt);
+	BL_InterpolatorList(struct bAction *action);
 	~BL_InterpolatorList();
 
 	KX_IScalarInterpolator *GetScalarInterpolator(const char *rna_path, int array_index);	

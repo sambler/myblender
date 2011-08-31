@@ -1,4 +1,4 @@
-/**
+/*
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -24,6 +24,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/space_sequencer/sequencer_select.c
+ *  \ingroup spseq
+ */
+
+
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
@@ -35,9 +40,9 @@
 #endif
 #include <sys/types.h>
 
-
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
 #include "DNA_scene_types.h"
 
@@ -60,7 +65,7 @@
 #include "sequencer_intern.h"
 static void *find_nearest_marker(int UNUSED(d1), int UNUSED(d2)) {return NULL;}
 	
-void select_surrounding_handles(Scene *scene, Sequence *test) /* XXX BRING BACK */
+static void select_surrounding_handles(Scene *scene, Sequence *test) /* XXX BRING BACK */
 {
 	Sequence *neighbor;
 	
@@ -154,7 +159,7 @@ void select_surround_from_last(Scene *scene)
 #endif
 
 
-void select_single_seq(Scene *scene, Sequence *seq, int deselect_all) /* BRING BACK */
+static void UNUSED_FUNCTION(select_single_seq)(Scene *scene, Sequence *seq, int deselect_all) /* BRING BACK */
 {
 	Editing *ed= seq_give_editing(scene, FALSE);
 	
@@ -176,8 +181,8 @@ void select_single_seq(Scene *scene, Sequence *seq, int deselect_all) /* BRING B
 
 // remove this function, replace with invert operator
 //void swap_select_seq(Scene *scene)
-
-void select_neighbor_from_last(Scene *scene, int lr)
+#if 0
+static void select_neighbor_from_last(Scene *scene, int lr)
 {
 	Sequence *seq= seq_active_get(scene);
 	Sequence *neighbor;
@@ -206,7 +211,7 @@ void select_neighbor_from_last(Scene *scene, int lr)
 	if (change) {
 	}
 }
-
+#endif
 
 /* (de)select operator */
 static int sequencer_deselect_exec(bContext *C, wmOperator *UNUSED(op))
@@ -293,7 +298,6 @@ void SEQUENCER_OT_select_inverse(struct wmOperatorType *ot)
 
 static int sequencer_select_invoke(bContext *C, wmOperator *op, wmEvent *event)
 {
-	ARegion *ar= CTX_wm_region(C);
 	View2D *v2d= UI_view2d_fromcontext(C);
 	Scene *scene= CTX_data_scene(C);
 	Editing *ed= seq_give_editing(scene, FALSE);
@@ -301,8 +305,6 @@ static int sequencer_select_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	short linked_handle= RNA_boolean_get(op->ptr, "linked_handle");
 	short left_right= RNA_boolean_get(op->ptr, "left_right");
 	short linked_time= RNA_boolean_get(op->ptr, "linked_time");
-
-	short mval[2];	
 	
 	Sequence *seq,*neighbor, *act_orig;
 	int hand,sel_side;
@@ -313,10 +315,7 @@ static int sequencer_select_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	
 	marker=find_nearest_marker(SCE_MARKERS, 1); //XXX - dummy function for now
 	
-	mval[0]= event->x - ar->winrct.xmin;
-	mval[1]= event->y - ar->winrct.ymin;
-	
-	seq= find_nearest_seq(scene, v2d, &hand, mval);
+	seq= find_nearest_seq(scene, v2d, &hand, event->mval);
 
 	// XXX - not nice, Ctrl+RMB needs to do left_right only when not over a strip
 	if(seq && linked_time && left_right)
@@ -342,7 +341,7 @@ static int sequencer_select_invoke(bContext *C, wmOperator *op, wmEvent *event)
 		/* use different logic for this */
 		float x;
 		deselect_all_seq(scene);
-		UI_view2d_region_to_view(v2d, mval[0], mval[1], &x, NULL);
+		UI_view2d_region_to_view(v2d, event->mval[0], event->mval[1], &x, NULL);
 
 		SEQP_BEGIN(ed, seq) {
 			if (x < CFRA) {
@@ -363,16 +362,16 @@ static int sequencer_select_invoke(bContext *C, wmOperator *op, wmEvent *event)
 		{
 			SpaceSeq *sseq= CTX_wm_space_seq(C);
 			if (sseq && sseq->flag & SEQ_MARKER_TRANS) {
-				TimeMarker *marker;
+				TimeMarker *tmarker;
 
-				for (marker= scene->markers.first; marker; marker= marker->next) {
-					if(	((x < CFRA) && marker->frame < CFRA) ||
-						((x >= CFRA) && marker->frame >= CFRA)
+				for (tmarker= scene->markers.first; tmarker; tmarker= tmarker->next) {
+					if(	((x < CFRA) && tmarker->frame < CFRA) ||
+						((x >= CFRA) && tmarker->frame >= CFRA)
 					) {
-						marker->flag |= SELECT;
+						tmarker->flag |= SELECT;
 					}
 					else {
-						marker->flag &= ~SELECT;
+						tmarker->flag &= ~SELECT;
 					}
 				}
 			}
@@ -484,7 +483,7 @@ static int sequencer_select_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	/* marker transform */
 #if 0 // XXX probably need to redo this differently for 2.5
 	if (marker) {
-		short mval[2], xo, yo;
+		int mval[2], xo, yo;
 //		getmouseco_areawin(mval);
 		xo= mval[0]; 
 		yo= mval[1];
@@ -647,20 +646,15 @@ void SEQUENCER_OT_select_less(wmOperatorType *ot)
 static int sequencer_select_linked_pick_invoke(bContext *C, wmOperator *op, wmEvent *event)
 {
 	Scene *scene= CTX_data_scene(C);
-	ARegion *ar= CTX_wm_region(C);
 	View2D *v2d= UI_view2d_fromcontext(C);
 	
 	short extend= RNA_boolean_get(op->ptr, "extend");
-	short mval[2];	
 	
 	Sequence *mouse_seq;
 	int selected, hand;
-	
-	mval[0]= event->x - ar->winrct.xmin;
-	mval[1]= event->y - ar->winrct.ymin;
-	
+
 	/* this works like UV, not mesh */
-	mouse_seq= find_nearest_seq(scene, v2d, &hand, mval);
+	mouse_seq= find_nearest_seq(scene, v2d, &hand, event->mval);
 	if (!mouse_seq)
 		return OPERATOR_FINISHED; /* user error as with mesh?? */
 	
@@ -832,7 +826,7 @@ static int sequencer_borderselect_exec(bContext *C, wmOperator *op)
 	rcti rect;
 	rctf rectf, rq;
 	short selecting = (RNA_int_get(op->ptr, "gesture_mode")==GESTURE_MODAL_SELECT);
-	short mval[2];
+	int mval[2];
 
 	if(ed==NULL)
 		return OPERATOR_CANCELLED;
@@ -852,7 +846,7 @@ static int sequencer_borderselect_exec(bContext *C, wmOperator *op)
 	for(seq= ed->seqbasep->first; seq; seq= seq->next) {
 		seq_rectf(seq, &rq);
 		
-		if(BLI_isect_rctf(&rq, &rectf, 0)) {
+		if(BLI_isect_rctf(&rq, &rectf, NULL)) {
 			if(selecting)		seq->flag |= SELECT;
 			else				seq->flag &= ~SEQ_ALLSEL;
 			recurs_sel_seq(seq);
@@ -877,6 +871,7 @@ void SEQUENCER_OT_select_border(wmOperatorType *ot)
 	ot->invoke= WM_border_select_invoke;
 	ot->exec= sequencer_borderselect_exec;
 	ot->modal= WM_border_select_modal;
+	ot->cancel= WM_border_select_cancel;
 	
 	ot->poll= ED_operator_sequencer_active;
 	

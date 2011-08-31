@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
  * GHOST Blender Player application implementation file.
  */
+
+/** \file gameengine/GamePlayer/ghost/GPG_Application.cpp
+ *  \ingroup player
+ */
+
 
 #ifdef WIN32
 	#pragma warning (disable:4786) // suppress stl-MSVC debug info warning
@@ -64,11 +69,11 @@ extern "C"
  **********************************/
 
 
-#include "SYS_System.h"
+#include "BL_System.h"
 #include "KX_KetsjiEngine.h"
 
 // include files needed by "KX_BlenderSceneConverter.h"
-#include "GEN_Map.h"
+#include "CTR_Map.h"
 #include "SCA_IActuator.h"
 #include "RAS_MeshObject.h"
 #include "RAS_OpenGLRasterizer.h"
@@ -228,7 +233,8 @@ static HWND findGhostWindowHWND(GHOST_IWindow* window)
 bool GPG_Application::startScreenSaverPreview(
 	HWND parentWindow,
 	const bool stereoVisual,
-	const int stereoMode)
+	const int stereoMode,
+	const GHOST_TUns16 samples)
 {
 	bool success = false;
 
@@ -240,7 +246,7 @@ bool GPG_Application::startScreenSaverPreview(
 		STR_String title = "";
 							
 		m_mainWindow = fSystem->createWindow(title, 0, 0, windowWidth, windowHeight, GHOST_kWindowStateMinimized,
-			GHOST_kDrawingContextTypeOpenGL, stereoVisual);
+			GHOST_kDrawingContextTypeOpenGL, stereoVisual, samples);
 		if (!m_mainWindow) {
 			printf("error: could not create main window\n");
 			exit(-1);
@@ -282,9 +288,10 @@ bool GPG_Application::startScreenSaverFullScreen(
 		int height,
 		int bpp,int frequency,
 		const bool stereoVisual,
-		const int stereoMode)
+		const int stereoMode,
+		const GHOST_TUns16 samples)
 {
-	bool ret = startFullScreen(width, height, bpp, frequency, stereoVisual, stereoMode);
+	bool ret = startFullScreen(width, height, bpp, frequency, stereoVisual, stereoMode, samples);
 	if (ret)
 	{
 		HWND ghost_hwnd = findGhostWindowHWND(m_mainWindow);
@@ -306,13 +313,14 @@ bool GPG_Application::startWindow(STR_String& title,
 	int windowWidth,
 	int windowHeight,
 	const bool stereoVisual,
-	const int stereoMode)
+	const int stereoMode,
+	const GHOST_TUns16 samples)
 {
 	bool success;
 	// Create the main window
 	//STR_String title ("Blender Player - GHOST");
 	m_mainWindow = fSystem->createWindow(title, windowLeft, windowTop, windowWidth, windowHeight, GHOST_kWindowStateNormal,
-		GHOST_kDrawingContextTypeOpenGL, stereoVisual);
+		GHOST_kDrawingContextTypeOpenGL, stereoVisual, samples);
 	if (!m_mainWindow) {
 		printf("error: could not create main window\n");
 		exit(-1);
@@ -334,10 +342,13 @@ bool GPG_Application::startWindow(STR_String& title,
 bool GPG_Application::startEmbeddedWindow(STR_String& title,
 	const GHOST_TEmbedderWindowID parentWindow, 
 	const bool stereoVisual, 
-	const int stereoMode) {
-
-	m_mainWindow = fSystem->createWindow(title, 0, 0, 0, 0, GHOST_kWindowStateNormal,
-		GHOST_kDrawingContextTypeOpenGL, stereoVisual, parentWindow);
+	const int stereoMode,
+	const GHOST_TUns16 samples) {
+	GHOST_TWindowState state = GHOST_kWindowStateNormal;
+	if (parentWindow != 0)
+		state = GHOST_kWindowStateEmbedded;
+	m_mainWindow = fSystem->createWindow(title, 0, 0, 0, 0, state,
+		GHOST_kDrawingContextTypeOpenGL, stereoVisual, samples, parentWindow);
 
 	if (!m_mainWindow) {
 		printf("error: could not create main window\n");
@@ -358,7 +369,8 @@ bool GPG_Application::startFullScreen(
 		int height,
 		int bpp,int frequency,
 		const bool stereoVisual,
-		const int stereoMode)
+		const int stereoMode,
+		const GHOST_TUns16 samples)
 {
 	bool success;
 	// Create the main window
@@ -436,6 +448,7 @@ bool GPG_Application::processEvent(GHOST_IEvent* event)
 
 
 		case GHOST_kEventWindowClose:
+		case GHOST_kEventQuit:
 			m_exitRequested = KX_EXIT_REQUEST_OUTSIDE;
 			break;
 
@@ -532,6 +545,7 @@ bool GPG_Application::initEngine(GHOST_IWindow* window, const int stereoMode)
 		bool frameRate = (SYS_GetCommandLineInt(syshandle, "show_framerate", 0) != 0);
 		bool useLists = (SYS_GetCommandLineInt(syshandle, "displaylists", gm->flag & GAME_DISPLAY_LISTS) != 0);
 		bool nodepwarnings = (SYS_GetCommandLineInt(syshandle, "ignore_deprecation_warnings", 1) != 0);
+		bool restrictAnimFPS = gm->flag & GAME_RESTRICT_ANIM_UPDATES;
 
 		if(GLEW_ARB_multitexture && GLEW_VERSION_1_1)
 			m_blendermat = (SYS_GetCommandLineInt(syshandle, "blender_material", 1) != 0);
@@ -546,7 +560,10 @@ bool GPG_Application::initEngine(GHOST_IWindow* window, const int stereoMode)
 		if (!m_canvas)
 			return false;
 				
-		m_canvas->Init();				
+		m_canvas->Init();
+		if (gm->flag & GAME_SHOW_MOUSE)
+			m_canvas->SetMouseState(RAS_ICanvas::MOUSE_NORMAL);				
+
 		m_rendertools = new GPC_RenderTools();
 		if (!m_rendertools)
 			goto initFailed;
@@ -600,14 +617,17 @@ bool GPG_Application::initEngine(GHOST_IWindow* window, const int stereoMode)
 		m_ketsjiengine->SetCanvas(m_canvas);
 		m_ketsjiengine->SetRenderTools(m_rendertools);
 		m_ketsjiengine->SetRasterizer(m_rasterizer);
-		m_ketsjiengine->SetNetworkDevice(m_networkdevice);
 
 		m_ketsjiengine->SetTimingDisplay(frameRate, false, false);
-
+#ifdef WITH_PYTHON
 		CValue::SetDeprecationWarnings(nodepwarnings);
+#else
+		(void)nodepwarnings;
+#endif
 
 		m_ketsjiengine->SetUseFixedTime(fixed_framerate);
 		m_ketsjiengine->SetTimingDisplay(frameRate, profile, properties);
+		m_ketsjiengine->SetRestrictAnimationFPS(restrictAnimFPS);
 
 		m_engineInitialized = true;
 	}
@@ -677,20 +697,21 @@ bool GPG_Application::startEngine(void)
 			m_startScene,
 			m_canvas);
 		
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 			// some python things
 			PyObject *gameLogic, *gameLogic_keys;
 			setupGamePython(m_ketsjiengine, startscene, m_maggie, NULL, &gameLogic, &gameLogic_keys, m_argc, m_argv);
-#endif // DISABLE_PYTHON
+#endif // WITH_PYTHON
 
 		//initialize Dome Settings
 		if(m_startScene->gm.stereoflag == STEREO_DOME)
 			m_ketsjiengine->InitDome(m_startScene->gm.dome.res, m_startScene->gm.dome.mode, m_startScene->gm.dome.angle, m_startScene->gm.dome.resbuf, m_startScene->gm.dome.tilt, m_startScene->gm.dome.warptext);
 
+#ifdef WITH_PYTHON
 		// Set the GameLogic.globalDict from marshal'd data, so we can
 		// load new blend files and keep data in GameLogic.globalDict
 		loadGamePythonConfig(m_pyGlobalDictString, m_pyGlobalDictString_Length);
-		
+#endif		
 		m_sceneconverter->ConvertScene(
 			startscene,
 			m_rendertools,
@@ -723,6 +744,7 @@ bool GPG_Application::startEngine(void)
 
 void GPG_Application::stopEngine()
 {
+#ifdef WITH_PYTHON
 	// GameLogic.globalDict gets converted into a buffer, and sorted in
 	// m_pyGlobalDictString so we can restore after python has stopped
 	// and started between .blend file loads.
@@ -735,6 +757,8 @@ void GPG_Application::stopEngine()
 	
 	// when exiting the mainloop
 	exitGamePythonScripting();
+#endif
+	
 	m_ketsjiengine->StopEngine();
 	m_networkdevice->Disconnect();
 
@@ -795,7 +819,6 @@ void GPG_Application::exitEngine()
 		m_canvas = 0;
 	}
 
-	IMB_exit();
 	GPU_extensions_exit();
 
 	m_exitRequested = 0;

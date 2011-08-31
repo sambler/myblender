@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,19 +26,27 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/space_graph/graph_ops.c
+ *  \ingroup spgraph
+ */
+
+
 #include <stdlib.h>
 #include <math.h>
 
-
 #include "DNA_scene_types.h"
+#include "DNA_anim_types.h"
 
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_context.h"
 #include "BKE_sound.h"
 
 #include "UI_view2d.h"
 
+#include "ED_anim_api.h"
+#include "ED_markers.h"
 #include "ED_screen.h"
 #include "ED_transform.h"
 
@@ -95,18 +103,13 @@ static void graphview_cursor_setprops(bContext *C, wmOperator *op, wmEvent *even
 {
 	ARegion *ar= CTX_wm_region(C);
 	float viewx, viewy;
-	int x, y;
-	
+
 	/* abort if not active region (should not really be possible) */
 	if (ar == NULL)
 		return;
-	
-	/* convert screen coordinates to region coordinates */
-	x= event->x - ar->winrct.xmin;
-	y= event->y - ar->winrct.ymin;
-	
+
 	/* convert from region coordinates to View2D 'tot' space */
-	UI_view2d_region_to_view(&ar->v2d, x, y, &viewx, &viewy);
+	UI_view2d_region_to_view(&ar->v2d, event->mval[0], event->mval[1], &viewx, &viewy);
 	
 	/* store the values in the operator properties */
 		/* frame is rounded to the nearest int, since frames are ints */
@@ -158,7 +161,7 @@ static int graphview_cursor_modal(bContext *C, wmOperator *op, wmEvent *event)
 	return OPERATOR_RUNNING_MODAL;
 }
 
-void GRAPH_OT_cursor_set(wmOperatorType *ot)
+static void GRAPH_OT_cursor_set(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Set Cursor";
@@ -169,7 +172,7 @@ void GRAPH_OT_cursor_set(wmOperatorType *ot)
 	ot->exec= graphview_cursor_exec;
 	ot->invoke= graphview_cursor_invoke;
 	ot->modal= graphview_cursor_modal;
-	ot->poll= ED_operator_ipo_active;
+	ot->poll= ED_operator_graphedit_active;
 	
 	/* flags */
 	ot->flag= OPTYPE_BLOCKING|OPTYPE_UNDO;
@@ -198,15 +201,16 @@ static int view_toggle_handles_exec (bContext *C, wmOperator *UNUSED(op))
 	return OPERATOR_FINISHED;
 }
 
-void GRAPH_OT_view_togglehandles (wmOperatorType *ot)
+static void GRAPH_OT_view_togglehandles (wmOperatorType *ot)
 {
 	/* identification */
 	ot->name= "Show/Hide All Handles";
 	ot->idname= "GRAPH_OT_handles_view_toggle";
+	ot->description= "Toggle whether handles are drawn on all keyframes that need them";
 	
 	/* callbacks */
 	ot->exec= view_toggle_handles_exec;
-	ot->poll= ED_operator_ipo_active;
+	ot->poll= ED_operator_graphedit_active;
 }
 
 /* ************************** registration - operator types **********************************/
@@ -219,6 +223,7 @@ void graphedit_operatortypes(void)
 	
 	WM_operatortype_append(GRAPH_OT_previewrange_set);
 	WM_operatortype_append(GRAPH_OT_view_all);
+	WM_operatortype_append(GRAPH_OT_view_selected);
 	WM_operatortype_append(GRAPH_OT_properties);
 	
 	WM_operatortype_append(GRAPH_OT_ghost_curves_create);
@@ -233,6 +238,7 @@ void graphedit_operatortypes(void)
 	WM_operatortype_append(GRAPH_OT_select_linked);
 	WM_operatortype_append(GRAPH_OT_select_more);
 	WM_operatortype_append(GRAPH_OT_select_less);
+	WM_operatortype_append(GRAPH_OT_select_leftright);
 	
 		/* editing */
 	WM_operatortype_append(GRAPH_OT_snap);
@@ -246,6 +252,7 @@ void graphedit_operatortypes(void)
 	WM_operatortype_append(GRAPH_OT_sound_bake);
 	WM_operatortype_append(GRAPH_OT_smooth);
 	WM_operatortype_append(GRAPH_OT_clean);
+	WM_operatortype_append(GRAPH_OT_euler_filter);
 	WM_operatortype_append(GRAPH_OT_delete);
 	WM_operatortype_append(GRAPH_OT_duplicate);
 	
@@ -260,6 +267,20 @@ void graphedit_operatortypes(void)
 	WM_operatortype_append(GRAPH_OT_fmodifier_copy);
 	WM_operatortype_append(GRAPH_OT_fmodifier_paste);
 }
+
+void ED_operatormacros_graph(void)
+{
+	wmOperatorType *ot;
+	wmOperatorTypeMacro *otmacro;
+	
+	ot= WM_operatortype_append_macro("GRAPH_OT_duplicate_move", "Duplicate", OPTYPE_UNDO|OPTYPE_REGISTER);
+	if (ot) {
+		WM_operatortype_macro_define(ot, "GRAPH_OT_duplicate");
+		otmacro= WM_operatortype_macro_define(ot, "TRANSFORM_OT_transform");
+		RNA_enum_set(otmacro->ptr, "mode", TFM_TIME_DUPLICATE);
+	}
+}
+
 
 /* ************************** registration - keymaps **********************************/
 
@@ -285,20 +306,28 @@ static void graphedit_keymap_keyframes (wmKeyConfig *keyconf, wmKeyMap *keymap)
 	kmi= WM_keymap_add_item(keymap, "GRAPH_OT_clickselect", SELECTMOUSE, KM_PRESS, KM_ALT|KM_SHIFT, 0);
 		RNA_boolean_set(kmi->ptr, "extend", 1);
 		RNA_boolean_set(kmi->ptr, "column", 1);
-	kmi= WM_keymap_add_item(keymap, "GRAPH_OT_clickselect", SELECTMOUSE, KM_PRESS, KM_CTRL, 0);
-		RNA_enum_set(kmi->ptr, "left_right", GRAPHKEYS_LRSEL_TEST);
 	kmi= WM_keymap_add_item(keymap, "GRAPH_OT_clickselect", SELECTMOUSE, KM_PRESS, KM_CTRL|KM_ALT, 0);
 		RNA_boolean_set(kmi->ptr, "curves", 1);
 	kmi= WM_keymap_add_item(keymap, "GRAPH_OT_clickselect", SELECTMOUSE, KM_PRESS, KM_CTRL|KM_ALT|KM_SHIFT, 0);
 		RNA_boolean_set(kmi->ptr, "curves", 1);
 		RNA_boolean_set(kmi->ptr, "extend", 1);
 	
+	/* select left/right */
+	WM_keymap_add_item(keymap, "GRAPH_OT_select_leftright", SELECTMOUSE, KM_PRESS, KM_CTRL, 0);
+	kmi= WM_keymap_add_item(keymap, "GRAPH_OT_select_leftright", SELECTMOUSE, KM_PRESS, KM_CTRL|KM_SHIFT, 0);
+		RNA_boolean_set(kmi->ptr, "extend", 1);
+	
+	kmi= WM_keymap_add_item(keymap, "GRAPH_OT_select_leftright", LEFTBRACKETKEY, KM_PRESS, 0, 0);
+		RNA_enum_set(kmi->ptr, "mode", GRAPHKEYS_LRSEL_LEFT);
+	kmi= WM_keymap_add_item(keymap, "GRAPH_OT_select_leftright", RIGHTBRACKETKEY, KM_PRESS, 0, 0);
+		RNA_enum_set(kmi->ptr, "mode", GRAPHKEYS_LRSEL_RIGHT);
+	
 		/* deselect all */
 	WM_keymap_add_item(keymap, "GRAPH_OT_select_all_toggle", AKEY, KM_PRESS, 0, 0);
 	RNA_boolean_set(WM_keymap_add_item(keymap, "GRAPH_OT_select_all_toggle", IKEY, KM_PRESS, KM_CTRL, 0)->ptr, "invert", 1);
 	
 		/* borderselect */
-	kmi = WM_keymap_add_item(keymap, "GRAPH_OT_select_border", BKEY, KM_PRESS, 0, 0);
+	WM_keymap_add_item(keymap, "GRAPH_OT_select_border", BKEY, KM_PRESS, 0, 0);
 	kmi = WM_keymap_add_item(keymap, "GRAPH_OT_select_border", BKEY, KM_PRESS, KM_ALT, 0);
 		RNA_boolean_set(kmi->ptr, "axis_range", 1);
 		
@@ -331,10 +360,9 @@ static void graphedit_keymap_keyframes (wmKeyConfig *keyconf, wmKeyMap *keymap)
 	WM_keymap_add_item(keymap, "GRAPH_OT_snap", SKEY, KM_PRESS, KM_SHIFT, 0);
 	WM_keymap_add_item(keymap, "GRAPH_OT_mirror", MKEY, KM_PRESS, KM_SHIFT, 0);
 	
-	WM_keymap_add_item(keymap, "GRAPH_OT_handle_type", HKEY, KM_PRESS, 0, 0);
-	WM_keymap_add_item(keymap, "GRAPH_OT_interpolation_type", TKEY, KM_PRESS, KM_SHIFT, 0);
-	WM_keymap_add_item(keymap, "GRAPH_OT_extrapolation_type", EKEY, KM_PRESS, KM_SHIFT, 0);
-	
+	WM_keymap_add_item(keymap, "GRAPH_OT_handle_type", VKEY, KM_PRESS, 0, 0);
+
+	WM_keymap_add_item(keymap, "GRAPH_OT_interpolation_type", TKEY, KM_PRESS, 0, 0);
 	
 		/* destructive */
 	WM_keymap_add_item(keymap, "GRAPH_OT_clean", OKEY, KM_PRESS, 0, 0);
@@ -346,11 +374,11 @@ static void graphedit_keymap_keyframes (wmKeyConfig *keyconf, wmKeyMap *keymap)
 	WM_keymap_add_item(keymap, "GRAPH_OT_delete", XKEY, KM_PRESS, 0, 0);
 	WM_keymap_add_item(keymap, "GRAPH_OT_delete", DELKEY, KM_PRESS, 0, 0);
 	
-	WM_keymap_add_item(keymap, "GRAPH_OT_duplicate", DKEY, KM_PRESS, KM_SHIFT, 0);
+	WM_keymap_add_item(keymap, "GRAPH_OT_duplicate_move", DKEY, KM_PRESS, KM_SHIFT, 0);
 	
 		/* insertkey */
 	WM_keymap_add_item(keymap, "GRAPH_OT_keyframe_insert", IKEY, KM_PRESS, 0, 0);
-	WM_keymap_add_item(keymap, "GRAPH_OT_click_insert", LEFTMOUSE, KM_PRESS, KM_CTRL, 0);
+	WM_keymap_add_item(keymap, "GRAPH_OT_click_insert", LEFTMOUSE, KM_CLICK, KM_CTRL, 0);
 	
 		/* copy/paste */
 	WM_keymap_add_item(keymap, "GRAPH_OT_copy", CKEY, KM_PRESS, KM_CTRL, 0);
@@ -359,6 +387,7 @@ static void graphedit_keymap_keyframes (wmKeyConfig *keyconf, wmKeyMap *keymap)
 		/* auto-set range */
 	WM_keymap_add_item(keymap, "GRAPH_OT_previewrange_set", PKEY, KM_PRESS, KM_CTRL|KM_ALT, 0);
 	WM_keymap_add_item(keymap, "GRAPH_OT_view_all", HOMEKEY, KM_PRESS, 0, 0);
+	WM_keymap_add_item(keymap, "GRAPH_OT_view_selected", PADPERIOD, KM_PRESS, 0, 0);
 	
 		/* F-Modifiers */
 	RNA_boolean_set(WM_keymap_add_item(keymap, "GRAPH_OT_fmodifier_add", MKEY, KM_PRESS, KM_CTRL|KM_SHIFT, 0)->ptr, "only_active", 0);
@@ -371,6 +400,9 @@ static void graphedit_keymap_keyframes (wmKeyConfig *keyconf, wmKeyMap *keymap)
 	
 	/* transform system */
 	transform_keymap_for_space(keyconf, keymap, SPACE_IPO);
+	
+	/* special markers hotkeys for anim editors: see note in definition of this function */
+	ED_marker_keymap_animedit_conflictfree(keymap);
 }
 
 /* --------------- */
@@ -382,6 +414,8 @@ void graphedit_keymap(wmKeyConfig *keyconf)
 	/* keymap for all regions */
 	keymap= WM_keymap_find(keyconf, "Graph Editor Generic", SPACE_IPO, 0);
 	WM_keymap_add_item(keymap, "GRAPH_OT_properties", NKEY, KM_PRESS, 0, 0);
+		/* extrapolation works on channels, not keys */
+	WM_keymap_add_item(keymap, "GRAPH_OT_extrapolation_type", EKEY, KM_PRESS, KM_SHIFT, 0);
 
 	/* channels */
 	/* Channels are not directly handled by the Graph Editor module, but are inherited from the Animation module. 

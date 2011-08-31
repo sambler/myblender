@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/space_logic/logic_ops.c
+ *  \ingroup splogic
+ */
+
 #include <stddef.h>
 
 #include "DNA_object_types.h"
@@ -33,11 +38,13 @@
 #include "DNA_actuator_types.h"
 
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_context.h"
 #include "BKE_main.h"
 #include "BKE_sca.h"
 
+#include "ED_logic.h"
 #include "ED_object.h"
 #include "ED_screen.h"
 
@@ -51,7 +58,6 @@
 #include "logic_intern.h"
 
 /* ************* Generic Operator Helpers ************* */
-
 static int edit_sensor_poll(bContext *C)
 {
 	PointerRNA ptr= CTX_data_pointer_get_type(C, "sensor", &RNA_Sensor);
@@ -246,7 +252,7 @@ static int sensor_remove_exec(bContext *C, wmOperator *op)
 		return OPERATOR_CANCELLED;
 }
 
-void LOGIC_OT_sensor_remove(wmOperatorType *ot)
+static void LOGIC_OT_sensor_remove(wmOperatorType *ot)
 {
 	ot->name= "Remove Sensor";
 	ot->description= "Remove a sensor from the active object";
@@ -298,7 +304,7 @@ static int sensor_add_exec(bContext *C, wmOperator *op)
 	return OPERATOR_FINISHED;
 }
 
-void LOGIC_OT_sensor_add(wmOperatorType *ot)
+static void LOGIC_OT_sensor_add(wmOperatorType *ot)
 {
 	PropertyRNA *prop;
 	
@@ -349,7 +355,7 @@ static int controller_remove_exec(bContext *C, wmOperator *op)
 		return OPERATOR_CANCELLED;
 }
 
-void LOGIC_OT_controller_remove(wmOperatorType *ot)
+static void LOGIC_OT_controller_remove(wmOperatorType *ot)
 {
 	ot->name= "Remove Controller";
 	ot->description= "Remove a controller from the active object";
@@ -415,7 +421,7 @@ static int controller_add_exec(bContext *C, wmOperator *op)
 	return OPERATOR_FINISHED;
 }
 
-void LOGIC_OT_controller_add(wmOperatorType *ot)
+static void LOGIC_OT_controller_add(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Add Controller";
@@ -463,7 +469,7 @@ static int actuator_remove_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(e
 		return OPERATOR_CANCELLED;
 }
 
-void LOGIC_OT_actuator_remove(wmOperatorType *ot)
+static void LOGIC_OT_actuator_remove(wmOperatorType *ot)
 {
 	ot->name= "Remove Actuator";
 	ot->description= "Remove a actuator from the active object";
@@ -515,7 +521,7 @@ static int actuator_add_exec(bContext *C, wmOperator *op)
 	return OPERATOR_FINISHED;
 }
 
-void LOGIC_OT_actuator_add(wmOperatorType *ot)
+static void LOGIC_OT_actuator_add(wmOperatorType *ot)
 {
 	PropertyRNA *prop;
 	
@@ -571,11 +577,11 @@ static int sensor_move_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event
 		return OPERATOR_CANCELLED;
 }
 
-void LOGIC_OT_sensor_move(wmOperatorType *ot)
+static void LOGIC_OT_sensor_move(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Move Sensor";
-	ot->description = "Move Densor";
+	ot->description = "Move Sensor";
 	ot->idname= "LOGIC_OT_sensor_move";
 	
 	/* api callbacks */
@@ -616,7 +622,7 @@ static int controller_move_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(e
 		return OPERATOR_CANCELLED;
 }
 
-void LOGIC_OT_controller_move(wmOperatorType *ot)
+static void LOGIC_OT_controller_move(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Move Controller";
@@ -661,7 +667,7 @@ static int actuator_move_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(eve
 		return OPERATOR_CANCELLED;
 }
 
-void LOGIC_OT_actuator_move(wmOperatorType *ot)
+static void LOGIC_OT_actuator_move(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Move Actuator";

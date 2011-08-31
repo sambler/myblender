@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/space_buttons/buttons_ops.c
+ *  \ingroup spbuttons
+ */
+
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -36,18 +41,22 @@
 #include "BLI_path_util.h"
 #include "BLI_storage.h"
 #include "BLI_string.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_context.h"
 #include "BKE_global.h"
+#include "BKE_main.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
 
 #include "ED_screen.h"
+#include "ED_util.h"
 
 #include "RNA_access.h"
 
 #include "UI_interface.h"
+#include "UI_resources.h"
 
 #include "buttons_intern.h"	// own include
 
@@ -63,7 +72,7 @@ static int toolbox_invoke(bContext *C, wmOperator *UNUSED(op), wmEvent *UNUSED(e
 
 	RNA_pointer_create(&sc->id, &RNA_SpaceProperties, sbuts, &ptr);
 
-	pup= uiPupMenuBegin(C, "Align", 0);
+	pup= uiPupMenuBegin(C, "Align", ICON_NONE);
 	layout= uiPupMenuLayout(pup);
 	uiItemsEnumR(layout, &ptr, "align");
 	uiPupMenuEnd(C, pup);
@@ -95,31 +104,48 @@ static int file_browse_exec(bContext *C, wmOperator *op)
 	FileBrowseOp *fbo= op->customdata;
 	ID *id;
 	char *base, *str, path[FILE_MAX];
+	const char *path_prop= RNA_struct_find_property(op->ptr, "directory") ? "directory" : "filepath";
 	
-	if (RNA_property_is_set(op->ptr, "filepath")==0 || fbo==NULL)
+	if (RNA_property_is_set(op->ptr, path_prop)==0 || fbo==NULL)
 		return OPERATOR_CANCELLED;
 	
-	str= RNA_string_get_alloc(op->ptr, "filepath", 0, 0);
+	str= RNA_string_get_alloc(op->ptr, path_prop, NULL, 0);
 
 	/* add slash for directories, important for some properties */
 	if(RNA_property_subtype(fbo->prop) == PROP_DIRPATH) {
+		char name[FILE_MAX];
+		
 		id = fbo->ptr.id.data;
-		base = (id && id->lib)? id->lib->filepath: G.sce;
+		base = (id && id->lib)? id->lib->filepath: G.main->name;
 
 		BLI_strncpy(path, str, FILE_MAX);
 		BLI_path_abs(path, base);
-
+		
 		if(BLI_is_dir(path)) {
 			str = MEM_reallocN(str, strlen(str)+2);
 			BLI_add_slash(str);
 		}
+		else
+			BLI_splitdirstring(str, name);
 	}
 
 	RNA_property_string_set(&fbo->ptr, fbo->prop, str);
 	RNA_property_update(C, &fbo->ptr, fbo->prop);
 	MEM_freeN(str);
 
+
+	/* special, annoying exception, filesel on redo panel [#26618] */
+	{
+		wmOperator *redo_op= WM_operator_last_redo(C);
+		if(redo_op) {
+			if(fbo->ptr.data == redo_op->ptr->data) {
+				ED_undo_operator_repeat(C, redo_op);
+			}
+		}
+	}
+
 	MEM_freeN(op->customdata);
+
 	return OPERATOR_FINISHED;
 }
 
@@ -143,7 +169,7 @@ static int file_browse_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	if(!prop)
 		return OPERATOR_CANCELLED;
 
-	str= RNA_property_string_get_alloc(&ptr, prop, 0, 0);
+	str= RNA_property_string_get_alloc(&ptr, prop, NULL, 0);
 
 	/* useful yet irritating feature, Shift+Click to open the file
 	 * Alt+Click to browse a folder in the OS's browser */
@@ -166,18 +192,21 @@ static int file_browse_invoke(bContext *C, wmOperator *op, wmEvent *event)
 		return OPERATOR_CANCELLED;
 	}
 	else {
+		const char *path_prop= RNA_struct_find_property(op->ptr, "directory") ? "directory" : "filepath";
 		fbo= MEM_callocN(sizeof(FileBrowseOp), "FileBrowseOp");
 		fbo->ptr= ptr;
 		fbo->prop= prop;
 		op->customdata= fbo;
 
-		RNA_string_set(op->ptr, "filepath", str);
+		RNA_string_set(op->ptr, path_prop, str);
 		MEM_freeN(str);
 
-		if(RNA_struct_find_property(op->ptr, "relative_path"))
-			if(!RNA_property_is_set(op->ptr, "relative_path"))
-				RNA_boolean_set(op->ptr, "relative_path", U.flag & USER_RELPATHS);
-
+		if(RNA_struct_find_property(op->ptr, "relative_path")) {
+			if(!RNA_property_is_set(op->ptr, "relative_path")) {
+				/* annoying exception!, if were dealign with the user prefs, default relative to be off */
+				RNA_boolean_set(op->ptr, "relative_path", U.flag & USER_RELPATHS && (ptr.data != &U));
+			}
+		}
 		WM_event_add_fileselect(C, op);
 
 		return OPERATOR_RUNNING_MODAL;
@@ -200,3 +229,19 @@ void BUTTONS_OT_file_browse(wmOperatorType *ot)
 	WM_operator_properties_filesel(ot, 0, FILE_SPECIAL, FILE_OPENFILE, WM_FILESEL_FILEPATH|WM_FILESEL_RELPATH);
 }
 
+/* second operator, only difference from BUTTONS_OT_file_browse is WM_FILESEL_DIRECTORY */
+void BUTTONS_OT_directory_browse(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name= "Accept";
+	ot->description="Open a directory browser, Hold Shift to open the file, Alt to browse containing directory";
+	ot->idname= "BUTTONS_OT_directory_browse";
+
+	/* api callbacks */
+	ot->invoke= file_browse_invoke;
+	ot->exec= file_browse_exec;
+	ot->cancel= file_browse_cancel;
+
+	/* properties */
+	WM_operator_properties_filesel(ot, 0, FILE_SPECIAL, FILE_OPENFILE, WM_FILESEL_DIRECTORY|WM_FILESEL_RELPATH);
+}

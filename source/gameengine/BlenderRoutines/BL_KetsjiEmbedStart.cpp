@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
  * Blender's Ketsji startpoint
  */
+
+/** \file gameengine/BlenderRoutines/BL_KetsjiEmbedStart.cpp
+ *  \ingroup blroutines
+ */
+
 
 #include <signal.h>
 #include <stdlib.h>
@@ -59,7 +64,7 @@
 
 #include "NG_LoopBackNetworkDeviceInterface.h"
 
-#include "SYS_System.h"
+#include "BL_System.h"
 
 #include "GPU_extensions.h"
 #include "Value.h"
@@ -76,8 +81,10 @@ extern "C" {
 #include "DNA_windowmanager_types.h"
 #include "BKE_global.h"
 #include "BKE_report.h"
+/* #include "BKE_screen.h" */ /* cant include this because of 'new' function name */
+extern float BKE_screen_view3d_zoom_to_fac(float camzoom);
 
-#include "BKE_utildefines.h"
+
 //XXX #include "BIF_screen.h"
 //XXX #include "BIF_scrarea.h"
 
@@ -88,8 +95,6 @@ extern "C" {
 #include "BKE_ipo.h"
 	/***/
 
-#include "AUD_C-API.h"
-
 //XXX #include "BSE_headerbuttons.h"
 #include "BKE_context.h"
 #include "../../blender/windowmanager/WM_types.h"
@@ -99,6 +104,11 @@ extern "C" {
 }
 #endif
 
+#ifdef WITH_AUDASPACE
+#  include "AUD_C-API.h"
+#  include "AUD_I3DDevice.h"
+#  include "AUD_IDevice.h"
+#endif
 
 static BlendFileData *load_game_data(char *filename)
 {
@@ -141,10 +151,10 @@ extern "C" void StartKetsjiShell(struct bContext *C, struct ARegion *ar, rcti *c
 	BlendFileData *bfd= NULL;
 
 	BLI_strncpy(pathname, blenderdata->name, sizeof(pathname));
-	BLI_strncpy(oldsce, G.sce, sizeof(oldsce));
-#ifndef DISABLE_PYTHON
+	BLI_strncpy(oldsce, G.main->name, sizeof(oldsce));
+#ifdef WITH_PYTHON
 	resetGamePythonPath(); // need this so running a second time wont use an old blendfiles path
-	setGamePythonPath(G.sce);
+	setGamePythonPath(G.main->name);
 
 	// Acquire Python's GIL (global interpreter lock)
 	// so we can safely run Python code and API calls
@@ -172,15 +182,23 @@ extern "C" void StartKetsjiShell(struct bContext *C, struct ARegion *ar, rcti *c
 		bool frameRate = (SYS_GetCommandLineInt(syshandle, "show_framerate", 0) != 0);
 		bool animation_record = (SYS_GetCommandLineInt(syshandle, "animation_record", 0) != 0);
 		bool displaylists = (SYS_GetCommandLineInt(syshandle, "displaylists", 0) != 0);
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 		bool nodepwarnings = (SYS_GetCommandLineInt(syshandle, "ignore_deprecation_warnings", 0) != 0);
 #endif
 		bool novertexarrays = (SYS_GetCommandLineInt(syshandle, "novertexarrays", 0) != 0);
+		bool mouse_state = startscene->gm.flag & GAME_SHOW_MOUSE;
+		bool restrictAnimFPS = startscene->gm.flag & GAME_RESTRICT_ANIM_UPDATES;
+
 		if(animation_record) usefixed= true; /* override since you's always want fixed time for sim recording */
 
 		// create the canvas, rasterizer and rendertools
 		RAS_ICanvas* canvas = new KX_BlenderCanvas(win, area_rect, ar);
-		canvas->SetMouseState(RAS_ICanvas::MOUSE_INVISIBLE);
+		
+		// default mouse state set on render panel
+		if (mouse_state)
+			canvas->SetMouseState(RAS_ICanvas::MOUSE_NORMAL);
+		else
+			canvas->SetMouseState(RAS_ICanvas::MOUSE_INVISIBLE);
 		RAS_IRenderTools* rendertools = new KX_BlenderRenderTools();
 		RAS_IRasterizer* rasterizer = NULL;
 		
@@ -217,11 +235,11 @@ extern "C" void StartKetsjiShell(struct bContext *C, struct ARegion *ar, rcti *c
 		ketsjiengine->SetCanvas(canvas);
 		ketsjiengine->SetRenderTools(rendertools);
 		ketsjiengine->SetRasterizer(rasterizer);
-		ketsjiengine->SetNetworkDevice(networkdevice);
 		ketsjiengine->SetUseFixedTime(usefixed);
 		ketsjiengine->SetTimingDisplay(frameRate, profile, properties);
+		ketsjiengine->SetRestrictAnimationFPS(restrictAnimFPS);
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 		CValue::SetDeprecationWarnings(nodepwarnings);
 #endif
 
@@ -235,37 +253,22 @@ extern "C" void StartKetsjiShell(struct bContext *C, struct ARegion *ar, rcti *c
 		}
 
 		// some blender stuff
-		MT_CmMatrix4x4 projmat;
-		MT_CmMatrix4x4 viewmat;
 		float camzoom;
-		int i;
-
-		for (i = 0; i < 16; i++)
-		{
-			float *viewmat_linear= (float*) rv3d->viewmat;
-			viewmat.setElem(i, viewmat_linear[i]);
-		}
-		for (i = 0; i < 16; i++)
-		{
-			float *projmat_linear= (float*) rv3d->winmat;
-			projmat.setElem(i, projmat_linear[i]);
-		}
+		int draw_letterbox = 0;
 		
 		if(rv3d->persp==RV3D_CAMOB) {
 			if(startscene->gm.framing.type == SCE_GAMEFRAMING_BARS) { /* Letterbox */
 				camzoom = 1.0f;
+				draw_letterbox = 1;
 			}
 			else {
-				camzoom = (1.41421 + (rv3d->camzoom / 50.0));
-				camzoom *= camzoom;
-				camzoom = 4.0 / camzoom;
+				camzoom = 1.0 / BKE_screen_view3d_zoom_to_fac(rv3d->camzoom);
 			}
 		}
 		else {
 			camzoom = 2.0;
 		}
 
-		
 
 		ketsjiengine->SetDrawType(v3d->drawtype);
 		ketsjiengine->SetCameraZoom(camzoom);
@@ -309,10 +312,10 @@ extern "C" void StartKetsjiShell(struct bContext *C, struct ARegion *ar, rcti *c
 				startscenename = bfd->curscene->id.name + 2;
 
 				if(blenderdata) {
-					BLI_strncpy(G.sce, blenderdata->name, sizeof(G.sce));
+					BLI_strncpy(G.main->name, blenderdata->name, sizeof(G.main->name));
 					BLI_strncpy(pathname, blenderdata->name, sizeof(pathname));
-#ifndef DISABLE_PYTHON
-					setGamePythonPath(G.sce);
+#ifdef WITH_PYTHON
+					setGamePythonPath(G.main->name);
 #endif
 				}
 			}
@@ -347,8 +350,8 @@ extern "C" void StartKetsjiShell(struct bContext *C, struct ARegion *ar, rcti *c
 			{
 				ketsjiengine->EnableCameraOverride(startscenename);
 				ketsjiengine->SetCameraOverrideUseOrtho((rv3d->persp == RV3D_ORTHO));
-				ketsjiengine->SetCameraOverrideProjectionMatrix(projmat);
-				ketsjiengine->SetCameraOverrideViewMatrix(viewmat);
+				ketsjiengine->SetCameraOverrideProjectionMatrix(MT_CmMatrix4x4(rv3d->winmat));
+				ketsjiengine->SetCameraOverrideViewMatrix(MT_CmMatrix4x4(rv3d->viewmat));
 				ketsjiengine->SetCameraOverrideClipping(v3d->near, v3d->far);
 				ketsjiengine->SetCameraOverrideLens(v3d->lens);
 			}
@@ -382,20 +385,24 @@ extern "C" void StartKetsjiShell(struct bContext *C, struct ARegion *ar, rcti *c
 				scene,
 				canvas);
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 			// some python things
 			PyObject *gameLogic, *gameLogic_keys;
 			setupGamePython(ketsjiengine, startscene, blenderdata, pyGlobalDict, &gameLogic, &gameLogic_keys, 0, NULL);
-#endif // DISABLE_PYTHON
+#endif // WITH_PYTHON
 
 			//initialize Dome Settings
 			if(scene->gm.stereoflag == STEREO_DOME)
 				ketsjiengine->InitDome(scene->gm.dome.res, scene->gm.dome.mode, scene->gm.dome.angle, scene->gm.dome.resbuf, scene->gm.dome.tilt, scene->gm.dome.warptext);
 
 			// initialize 3D Audio Settings
-			AUD_setSpeedOfSound(scene->audio.speed_of_sound);
-			AUD_setDopplerFactor(scene->audio.doppler_factor);
-			AUD_setDistanceModel(AUD_DistanceModel(scene->audio.distance_model));
+			AUD_I3DDevice* dev = AUD_get3DDevice();
+			if(dev)
+			{
+				dev->setSpeedOfSound(scene->audio.speed_of_sound);
+				dev->setDopplerFactor(scene->audio.doppler_factor);
+				dev->setDistanceModel(AUD_DistanceModel(scene->audio.distance_model));
+			}
 
 			// from see blender.c:
 			// FIXME: this version patching should really be part of the file-reading code,
@@ -432,10 +439,20 @@ extern "C" void StartKetsjiShell(struct bContext *C, struct ARegion *ar, rcti *c
 					exitrequested = ketsjiengine->GetExitCode();
 					
 					// kick the engine
-					bool render = ketsjiengine->NextFrame(); // XXX 2.5 Bug, This is never true! FIXME-  Campbell
+					bool render = ketsjiengine->NextFrame();
 					
 					if (render)
 					{
+						if(draw_letterbox) {
+							// Clear screen to border color
+							// We do this here since we set the canvas to be within the frames. This means the engine
+							// itself is unaware of the extra space, so we clear the whole region for it.
+							glClearColor(scene->gm.framing.col[0], scene->gm.framing.col[1], scene->gm.framing.col[2], 1.0f);
+							glViewport(ar->winrct.xmin, ar->winrct.ymin,
+								ar->winrct.xmax - ar->winrct.xmin, ar->winrct.ymax - ar->winrct.ymin);
+							glClear(GL_COLOR_BUFFER_BIT);
+						}
+
 						// render the frame
 						ketsjiengine->Render();
 					}
@@ -471,13 +488,16 @@ extern "C" void StartKetsjiShell(struct bContext *C, struct ARegion *ar, rcti *c
 						wm_event_free(event);
 					}
 					
+					if(win != CTX_wm_window(C)) {
+						exitrequested= KX_EXIT_REQUEST_OUTSIDE; /* window closed while bge runs */
+					}
 				}
 				printf("Blender Game Engine Finished\n");
 				exitstring = ketsjiengine->GetExitString();
 
 
 				// when exiting the mainloop
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 				// Clears the dictionary by hand:
 				// This prevents, extra references to global variables
 				// inside the GameLogic dictionary when the python interpreter is finalized.
@@ -499,7 +519,7 @@ extern "C" void StartKetsjiShell(struct bContext *C, struct ARegion *ar, rcti *c
 				gameLogic_keys_new = NULL;
 #endif
 				ketsjiengine->StopEngine();
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 				exitGamePythonScripting();
 #endif
 				networkdevice->Disconnect();
@@ -510,7 +530,7 @@ extern "C" void StartKetsjiShell(struct bContext *C, struct ARegion *ar, rcti *c
 				sceneconverter = NULL;
 			}
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 			Py_DECREF(gameLogic_keys);
 			gameLogic_keys = NULL;
 #endif
@@ -521,8 +541,11 @@ extern "C" void StartKetsjiShell(struct bContext *C, struct ARegion *ar, rcti *c
 			startscene->camera= tmp_camera;
 		}
 
-		// set the cursor back to normal
-		canvas->SetMouseState(RAS_ICanvas::MOUSE_NORMAL);
+		if(exitrequested != KX_EXIT_REQUEST_OUTSIDE)
+		{
+			// set the cursor back to normal
+			canvas->SetMouseState(RAS_ICanvas::MOUSE_NORMAL);
+		}
 		
 		// clean up some stuff
 		if (ketsjiengine)
@@ -564,7 +587,10 @@ extern "C" void StartKetsjiShell(struct bContext *C, struct ARegion *ar, rcti *c
 		{
 			delete canvas;
 			canvas = NULL;
-                }
+		}
+
+		// stop all remaining playing sounds
+		AUD_getDevice()->stopAll();
 	
 	} while (exitrequested == KX_EXIT_REQUEST_RESTART_GAME || exitrequested == KX_EXIT_REQUEST_START_OTHER_GAME);
 	
@@ -573,9 +599,9 @@ extern "C" void StartKetsjiShell(struct bContext *C, struct ARegion *ar, rcti *c
 
 	if (bfd) BLO_blendfiledata_free(bfd);
 
-	BLI_strncpy(G.sce, oldsce, sizeof(G.sce));
+	BLI_strncpy(G.main->name, oldsce, sizeof(G.main->name));
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 	Py_DECREF(pyGlobalDict);
 
 	// Release Python's GIL

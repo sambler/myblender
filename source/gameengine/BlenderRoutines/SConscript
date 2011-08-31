@@ -4,10 +4,10 @@ Import ('env')
 sources = env.Glob('*.cpp')
 defs = [ 'GLEW_STATIC' ]
 
-incs = '. #source/kernel/gen_system #intern/string #intern/guardedalloc'
+incs = '. #intern/string #intern/guardedalloc'
 incs += ' #source/gameengine/Rasterizer/RAS_OpenGLRasterizer'
 incs += ' #source/gameengine/Converter #source/blender/imbuf'
-incs += ' #intern/ghost/include'
+incs += ' #intern/ghost/include #intern/container'
 incs += ' #intern/audaspace/intern'
 incs += ' #intern/moto/include #source/gameengine/Ketsji #source/blender/blenlib'
 incs += ' #source/blender/blenkernel #source/blender'
@@ -27,8 +27,7 @@ if env['WITH_BF_FFMPEG']:
 
 if env['WITH_BF_PYTHON']:
     incs += ' ' + env['BF_PYTHON_INC']
-else:
-    defs.append('DISABLE_PYTHON')
+    defs.append('WITH_PYTHON')
 
 if env['WITH_BF_CXX_GUARDEDALLOC']:
     defs.append('WITH_CXX_GUARDEDALLOC')
@@ -36,4 +35,4 @@ if env['WITH_BF_CXX_GUARDEDALLOC']:
 incs += ' ' + env['BF_BULLET_INC']
 incs += ' ' + env['BF_OPENGL_INC']
 
-env.BlenderLib ( 'bf_bloutines', sources, Split(incs), defs, libtype=['core','player'], priority=[300,35] , cxx_compileflags=env['BGE_CXXFLAGS'])
+env.BlenderLib ( 'ge_blen_routines', sources, Split(incs), defs, libtype=['core','player'], priority=[300,35] , cxx_compileflags=env['BGE_CXXFLAGS'])

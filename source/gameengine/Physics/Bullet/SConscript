@@ -4,7 +4,6 @@ Import ('env')
 sources = 'CcdPhysicsEnvironment.cpp CcdPhysicsController.cpp CcdGraphicController.cpp'
 
 incs = '. ../common'
-incs += ' #source/kernel/gen_system'
 incs += ' #intern/string'
 incs += ' #intern/moto/include'
 incs += ' #extern/glew/include'
@@ -17,6 +16,7 @@ incs += ' #source/blender/makesdna'
 incs += ' #source/blender/blenkernel'
 incs += ' #source/blender/blenlib'
 incs += ' #intern/guardedalloc'
+incs += ' #intern/container'
 
 incs += ' ' + env['BF_BULLET_INC']
 
@@ -24,8 +24,7 @@ defs = []
 
 if env['WITH_BF_PYTHON']:
     incs += ' ' + env['BF_PYTHON_INC']
-else:
-    defs.append('DISABLE_PYTHON')
+    defs.append('WITH_PYTHON')
 
 if env['WITH_BF_CXX_GUARDEDALLOC']:
     defs.append('WITH_CXX_GUARDEDALLOC')
@@ -33,4 +32,4 @@ if env['WITH_BF_CXX_GUARDEDALLOC']:
 if env['WITH_BF_BULLET']:
     defs.append('USE_BULLET')
 
-env.BlenderLib ( 'bf_bullet', Split(sources), Split(incs), defs, libtype=['core','player'], priority=[350,50], cxx_compileflags=env['BGE_CXXFLAGS'])
+env.BlenderLib ( 'ge_phys_bullet', Split(sources), Split(incs), defs, libtype=['core','player'], priority=[350,50], cxx_compileflags=env['BGE_CXXFLAGS'])

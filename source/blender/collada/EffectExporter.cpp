@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -22,6 +22,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/collada/EffectExporter.cpp
+ *  \ingroup collada
+ */
+
 
 #include <map>
 
@@ -50,15 +55,66 @@ static std::string getActiveUVLayerName(Object *ob)
 	return "";
 }
 
-
 EffectsExporter::EffectsExporter(COLLADASW::StreamWriter *sw) : COLLADASW::LibraryEffects(sw){}
-void EffectsExporter::exportEffects(Scene *sce)
-{
-	openLibrary();
-	MaterialFunctor mf;
-	mf.forEachMaterialInScene<EffectsExporter>(sce, *this);
 
-	closeLibrary();
+bool EffectsExporter::hasEffects(Scene *sce)
+{
+	Base *base = (Base *)sce->base.first;
+	
+	while(base) {
+		Object *ob= base->object;
+		int a;
+		for(a = 0; a < ob->totcol; a++)
+		{
+			Material *ma = give_current_material(ob, a+1);
+
+			// no material, but check all of the slots
+			if (!ma) continue;
+
+			return true;
+		}
+		base= base->next;
+	}
+	return false;
+}
+
+void EffectsExporter::exportEffects(Scene *sce, bool export_selected)
+{
+	if(hasEffects(sce)) {
+		openLibrary();
+		MaterialFunctor mf;
+		mf.forEachMaterialInScene<EffectsExporter>(sce, *this, export_selected);
+
+		closeLibrary();
+	}
+}
+
+void EffectsExporter::writeBlinn(COLLADASW::EffectProfile &ep, Material *ma)
+{
+	COLLADASW::ColorOrTexture cot;
+	ep.setShaderType(COLLADASW::EffectProfile::BLINN);
+	// shininess
+	ep.setShininess(ma->har, false , "shininess");
+	// specular
+	cot = getcol(ma->specr, ma->specg, ma->specb, 1.0f);
+	ep.setSpecular(cot, false , "specular" );
+}
+
+void EffectsExporter::writeLambert(COLLADASW::EffectProfile &ep, Material *ma)
+{
+	COLLADASW::ColorOrTexture cot;
+	ep.setShaderType(COLLADASW::EffectProfile::LAMBERT);
+}
+
+void EffectsExporter::writePhong(COLLADASW::EffectProfile &ep, Material *ma)
+{
+	COLLADASW::ColorOrTexture cot;
+	ep.setShaderType(COLLADASW::EffectProfile::PHONG);
+	// shininess
+	ep.setShininess(ma->har , false , "shininess" );
+	// specular
+	cot = getcol(ma->specr, ma->specg, ma->specb, 1.0f);
+	ep.setSpecular(cot, false , "specular" );
 }
 
 void EffectsExporter::operator()(Material *ma, Object *ob)
@@ -73,26 +129,31 @@ void EffectsExporter::operator()(Material *ma, Object *ob)
 	ep.setProfileType(COLLADASW::EffectProfile::COMMON);
 	ep.openProfile();
 	// set shader type - one of three blinn, phong or lambert
-	if (ma->spec_shader == MA_SPEC_BLINN) {
-		ep.setShaderType(COLLADASW::EffectProfile::BLINN);
-		// shininess
-		ep.setShininess(ma->har);
+	if(ma->spec>0.0f) {
+		if (ma->spec_shader == MA_SPEC_BLINN) {
+			writeBlinn(ep, ma);
+		}
+		else {
+			// \todo figure out handling of all spec+diff shader combos blender has, for now write phong
+			// for now set phong in case spec shader is not blinn
+			writePhong(ep, ma);
+		}
+	} else {
+		if(ma->diff_shader == MA_DIFF_LAMBERT) {
+			writeLambert(ep, ma);
+		}
+		else {
+		// \todo figure out handling of all spec+diff shader combos blender has, for now write phong
+		writePhong(ep, ma);
+		}
 	}
-	else if (ma->spec_shader == MA_SPEC_PHONG) {
-		ep.setShaderType(COLLADASW::EffectProfile::PHONG);
-		// shininess
-		ep.setShininess(ma->har);
-	}
-	else {
-		// XXX write warning "Current shader type is not supported" 
-		ep.setShaderType(COLLADASW::EffectProfile::LAMBERT);
-	}
+	
 	// index of refraction
 	if (ma->mode & MA_RAYTRANSP) {
-		ep.setIndexOfRefraction(ma->ang);
+		ep.setIndexOfRefraction(ma->ang, false , "index_of_refraction");
 	}
 	else {
-		ep.setIndexOfRefraction(1.0f);
+		ep.setIndexOfRefraction(1.0f, false , "index_of_refraction");
 	}
 
 	COLLADASW::ColorOrTexture cot;
@@ -100,22 +161,22 @@ void EffectsExporter::operator()(Material *ma, Object *ob)
 	// transparency
 	if (ma->mode & MA_TRANSP) {
 		// Tod: because we are in A_ONE mode transparency is calculated like this:
-		ep.setTransparency(ma->alpha);
+		ep.setTransparency(ma->alpha, false , "transparency");
 		// cot = getcol(1.0f, 1.0f, 1.0f, 1.0f);
 		// ep.setTransparent(cot);
 	}
 
 	// emission
 	cot=getcol(ma->emit, ma->emit, ma->emit, 1.0f);
-	ep.setEmission(cot);
+	ep.setEmission(cot, false , "emission");
 
 	// diffuse multiplied by diffuse intensity
 	cot = getcol(ma->r * ma->ref, ma->g * ma->ref, ma->b * ma->ref, 1.0f);
-	ep.setDiffuse(cot);
+	ep.setDiffuse(cot, false , "diffuse");
 
 	// ambient
 	cot = getcol(ma->ambr, ma->ambg, ma->ambb, 1.0f);
-	ep.setAmbient(cot);
+	ep.setAmbient(cot, false , "ambient");
 
 	// reflective, reflectivity
 	if (ma->mode & MA_RAYMIRROR) {
@@ -132,7 +193,7 @@ void EffectsExporter::operator()(Material *ma, Object *ob)
 	// specular
 	if (ep.getShaderType() != COLLADASW::EffectProfile::LAMBERT) {
 		cot = getcol(ma->specr * ma->spec, ma->specg * ma->spec, ma->specb * ma->spec, 1.0f);
-		ep.setSpecular(cot);
+		ep.setSpecular(cot, false , "specular");
 	}	
 
 	// XXX make this more readable if possible
@@ -212,20 +273,20 @@ void EffectsExporter::operator()(Material *ma, Object *ob)
 		std::string uvname = strlen(t->uvname) ? t->uvname : active_uv;
 
 		// color
-		if (t->mapto & MAP_COL) {
-			ep.setDiffuse(createTexture(ima, uvname, sampler));
+		if (t->mapto & (MAP_COL | MAP_COLSPEC)) {
+			ep.setDiffuse(createTexture(ima, uvname, sampler), false , "diffuse");
 		}
 		// ambient
 		if (t->mapto & MAP_AMB) {
-			ep.setAmbient(createTexture(ima, uvname, sampler));
+			ep.setAmbient(createTexture(ima, uvname, sampler), false , "ambient");
 		}
 		// specular
 		if (t->mapto & MAP_SPEC) {
-			ep.setSpecular(createTexture(ima, uvname, sampler));
+			ep.setSpecular(createTexture(ima, uvname, sampler), false , "specular");
 		}
 		// emission
 		if (t->mapto & MAP_EMIT) {
-			ep.setEmission(createTexture(ima, uvname, sampler));
+			ep.setEmission(createTexture(ima, uvname, sampler), false , "emission");
 		}
 		// reflective
 		if (t->mapto & MAP_REF) {
@@ -258,7 +319,7 @@ void EffectsExporter::operator()(Material *ma, Object *ob)
 			twoSided = true;
 	}
 	if (twoSided)
-		ep.addExtraTechniqueParameter("GOOGLEEARTH", "show_double_sided", 1);
+		ep.addExtraTechniqueParameter("GOOGLEEARTH", "double_sided", 1);
 	ep.addExtraTechniques(mSW);
 
 	ep.closeProfile();

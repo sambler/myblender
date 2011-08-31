@@ -34,17 +34,24 @@
 *
 */
 
+/** \file blender/blenkernel/intern/modifier.c
+ *  \ingroup bke
+ */
+
+
 #include <stddef.h>
 #include <string.h>
 #include <stdarg.h>
 #include <math.h>
 #include <float.h>
 
+#include "MEM_guardedalloc.h"
+
 #include "DNA_armature_types.h"
 #include "DNA_object_types.h"
 #include "DNA_meshdata_types.h"
 
-#include "MEM_guardedalloc.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_bmesh.h"
 #include "BKE_cloth.h"
@@ -55,7 +62,7 @@
 
 ModifierTypeInfo *modifierType_getInfo(ModifierType type)
 {
-	static ModifierTypeInfo *types[NUM_MODIFIER_TYPES];
+	static ModifierTypeInfo *types[NUM_MODIFIER_TYPES]= {NULL};
 	static int types_init = 1;
 
 	if (types_init) {
@@ -147,14 +154,14 @@ ModifierData *modifiers_findByName(Object *ob, const char *name)
 void modifiers_clearErrors(Object *ob)
 {
 	ModifierData *md = ob->modifiers.first;
-	int qRedraw = 0;
+	/* int qRedraw = 0; */
 
 	for (; md; md=md->next) {
 		if (md->error) {
 			MEM_freeN(md->error);
 			md->error = NULL;
 
-			qRedraw = 1;
+			/* qRedraw = 1; */
 		}
 	}
 }
@@ -188,6 +195,18 @@ void modifiers_foreachIDLink(Object *ob, IDWalkFunc walk, void *userData)
 	}
 }
 
+void modifiers_foreachTexLink(Object *ob, TexWalkFunc walk, void *userData)
+{
+	ModifierData *md = ob->modifiers.first;
+
+	for (; md; md=md->next) {
+		ModifierTypeInfo *mti = modifierType_getInfo(md->type);
+
+		if(mti->foreachTexLink)
+			mti->foreachTexLink(md, ob, walk, userData);
+	}
+}
+
 void modifier_copyData(ModifierData *md, ModifierData *target)
 {
 	ModifierTypeInfo *mti = modifierType_getInfo(md->type);
@@ -216,14 +235,15 @@ int modifier_sameTopology(ModifierData *md)
 	return ( mti->type == eModifierTypeType_OnlyDeform || mti->type == eModifierTypeType_Nonconstructive);
 }
 
-void modifier_setError(ModifierData *md, char *format, ...)
+void modifier_setError(ModifierData *md, const char *format, ...)
 {
-	char buffer[2048];
+	char buffer[512];
 	va_list ap;
 
 	va_start(ap, format);
-	vsprintf(buffer, format, ap);
+	vsnprintf(buffer, sizeof(buffer), format, ap);
 	va_end(ap);
+	buffer[sizeof(buffer) - 1]= '\0';
 
 	if (md->error)
 		MEM_freeN(md->error);
@@ -236,12 +256,18 @@ void modifier_setError(ModifierData *md, char *format, ...)
  * there
  * 
  * also used in transform_conversion.c, to detect CrazySpace [tm] (2nd arg
- * then is NULL)
+ * then is NULL) 
+ * also used for some mesh tools to give warnings
  */
 int modifiers_getCageIndex(struct Scene *scene, Object *ob, int *lastPossibleCageIndex_r, int virtual_)
 {
 	ModifierData *md = (virtual_)? modifiers_getVirtualModifierList(ob): ob->modifiers.first;
 	int i, cageIndex = -1;
+
+	if(lastPossibleCageIndex_r) {
+		/* ensure the value is initialized */
+		*lastPossibleCageIndex_r= -1;
+	}
 
 	/* Find the last modifier acting on the cage. */
 	for (i=0; md; i++,md=md->next) {

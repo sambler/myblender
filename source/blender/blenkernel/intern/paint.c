@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -23,7 +25,12 @@
  * Contributor(s): none yet.
  *
  * ***** END GPL LICENSE BLOCK *****
- */ 
+ */
+
+/** \file blender/blenkernel/intern/paint.c
+ *  \ingroup bke
+ */
+
 
 
 #include "DNA_object_types.h"
@@ -31,7 +38,9 @@
 #include "DNA_scene_types.h"
 #include "DNA_brush_types.h"
 
-#include "BKE_utildefines.h"
+#include "BLI_utildefines.h"
+
+
 #include "BKE_brush.h"
 #include "BKE_library.h"
 #include "BKE_paint.h"
@@ -76,8 +85,11 @@ Brush *paint_brush(Paint *p)
 
 void paint_brush_set(Paint *p, Brush *br)
 {
-	if(p)
+	if(p) {
+		id_us_min((ID *)p->brush);
+		id_us_plus((ID *)br);
 		p->brush= br;
+	}
 }
 
 int paint_facesel_test(Object *ob)
@@ -101,12 +113,17 @@ void paint_init(Paint *p, const char col[3])
 	p->flags |= PAINT_SHOW_BRUSH;
 }
 
-void free_paint(Paint *UNUSED(paint))
+void free_paint(Paint *paint)
 {
-	/* nothing */
+	id_us_min((ID *)paint->brush);
 }
 
+/* called when copying scene settings, so even if 'src' and 'tar' are the same
+ * still do a id_us_plus(), rather then if we were copying betweem 2 existing
+ * scenes where a matching value should decrease the existing user count as
+ * with paint_brush_set() */
 void copy_paint(Paint *src, Paint *tar)
 {
 	tar->brush= src->brush;
+	id_us_plus((ID *)tar->brush);
 }

@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,24 +26,29 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/space_node/node_buttons.c
+ *  \ingroup spnode
+ */
+
+
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
 #include <float.h>
 
+#include "MEM_guardedalloc.h"
+
 #include "DNA_node_types.h"
 #include "DNA_scene_types.h"
-
-#include "MEM_guardedalloc.h"
 
 #include "BLI_math.h"
 #include "BLI_blenlib.h"
 #include "BLI_rand.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_context.h"
 #include "BKE_node.h"
 #include "BKE_screen.h"
-
 
 #include "WM_api.h"
 #include "WM_types.h"
@@ -107,12 +112,14 @@ static void active_node_panel(const bContext *C, Panel *pa)
 	uiBlockSetHandleFunc(block, do_node_region_buttons, NULL);
 	
 	/* draw this node's name, etc. */
+	uiItemR(layout, &ptr, "label", 0, NULL, ICON_NODE);
+	uiItemS(layout);
 	uiItemR(layout, &ptr, "name", 0, NULL, ICON_NODE);
-	// TODO: a separator would be nice...
+	uiItemS(layout);
 	
 	/* draw this node's settings */
-	if (node->typeinfo && node->typeinfo->uifunc)
-		node->typeinfo->uifunc(layout, (bContext *)C, &ptr);
+	if (node->typeinfo && node->typeinfo->uifuncbut)
+		node->typeinfo->uifuncbut(layout, (bContext *)C, &ptr);
 }
 
 /* ******************* node buttons registration ************** */

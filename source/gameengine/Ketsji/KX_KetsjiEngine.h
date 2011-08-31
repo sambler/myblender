@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
  *
  */
+
+/** \file KX_KetsjiEngine.h
+ *  \ingroup ketsji
+ */
+
 #ifndef __KX_KETSJI_ENGINE
 #define __KX_KETSJI_ENGINE
 
@@ -70,7 +75,7 @@ private:
 	class RAS_IRenderTools*				m_rendertools;
 	class KX_ISceneConverter*			m_sceneconverter;
 	class NG_NetworkDeviceInterface*		m_networkdevice;
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 	/* borrowed from sys.modules["__main__"], dont manage ref's */
 	PyObject*					m_pythondictionary;
 #endif
@@ -103,12 +108,15 @@ private:
 	double				m_frameTime;//discrete timestamp of the 'game logic frame'
 	double				m_clockTime;//current time
 	double				m_previousClockTime;//previous clock time
+	double				m_previousAnimTime; //the last time animations were updated
 	double				m_remainingTime;
 
 	static int				m_maxLogicFrame;	/* maximum number of consecutive logic frame */
 	static int				m_maxPhysicsFrame;	/* maximum number of consecutive physics frame */
 	static double			m_ticrate;
 	static double			m_anim_framerate; /* for animation playback only - ipo and action */
+
+	static bool				m_restrict_anim_fps;
 
 	static double			m_suspendedtime;
 	static double			m_suspendeddelta;
@@ -142,9 +150,9 @@ private:
 		tc_first = 0,
 		tc_physics = 0,
 		tc_logic,
+		tc_animations,
 		tc_network,
 		tc_scenegraph,
-		tc_sound,
 		tc_rasterizer,
 		tc_services,	// time spend in miscelaneous activities
 		tc_overhead,	// profile info drawing overhead
@@ -190,7 +198,7 @@ private:
 	void					RenderDebugProperties();
 	void					RenderShadowBuffers(KX_Scene *scene);
 	void					SetBackGround(KX_WorldInfo* worldinfo);
-	void					DoSound(KX_Scene* scene);
+	void					RenderFonts(KX_Scene* scene);
 
 public:
 	KX_KetsjiEngine(class KX_ISystem* system);
@@ -204,7 +212,7 @@ public:
 	void			SetCanvas(RAS_ICanvas* canvas);
 	void			SetRenderTools(RAS_IRenderTools* rendertools);
 	void			SetRasterizer(RAS_IRasterizer* rasterizer);
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 	void			SetPyNamespace(PyObject* pythondictionary);
 	PyObject*		GetPyNamespace(){return m_pythondictionary;};
 #endif
@@ -313,6 +321,16 @@ public:
 	 * Sets the maximum number of physics frame before render frame
 	 */
 	static void SetMaxPhysicsFrame(int frame);
+
+	/**
+	 * Gets whether or not to lock animation updates to the animframerate
+	 */
+	static bool GetRestrictAnimationFPS();
+
+	/**
+	 * Sets whether or not to lock animation updates to the animframerate
+	 */
+	static void SetRestrictAnimationFPS(bool bRestrictAnimFPS);
 
 	/**
 	 * Gets the framerate for playing animations. (actions and ipos)

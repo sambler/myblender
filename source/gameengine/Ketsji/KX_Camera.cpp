@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
  * Camera in the gameengine. Cameras are also used for views.
  */
+
+/** \file gameengine/Ketsji/KX_Camera.cpp
+ *  \ingroup ketsji
+ */
+
  
 #include "GL/glew.h"
 #include "KX_Camera.h"
@@ -382,7 +387,7 @@ int KX_Camera::BoxInsideFrustum(const MT_Point3 *box)
 	for( unsigned int p = 0; p < 6 ; p++ )
 	{
 		unsigned int behindCount = 0;
-		// 8 box verticies.
+		// 8 box vertices.
 		for (unsigned int v = 0; v < 8 ; v++)
 		{
 			if (m_planes[p][0]*box[v][0] + m_planes[p][1]*box[v][1] + m_planes[p][2]*box[v][2] + m_planes[p][3] < 0.)
@@ -398,7 +403,7 @@ int KX_Camera::BoxInsideFrustum(const MT_Point3 *box)
 			insideCount++;
 	}
 	
-	// All box verticies are on the front side of all frustum planes.
+	// All box vertices are on the front side of all frustum planes.
 	if (insideCount == 6)
 		return INSIDE;
 	
@@ -474,7 +479,7 @@ int KX_Camera::GetViewportTop() const
 	return m_camdata.m_viewporttop;
 }
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 //----------------------------------------------------------------------------
 //Python
 
@@ -706,6 +711,7 @@ int KX_Camera::pyattr_set_perspective(void *self_v, const KX_PYATTRIBUTE_DEF *at
 	}
 	
 	self->m_camdata.m_perspective= param;
+	self->InvalidateProjectionMatrix();
 	return PY_SET_ATTR_SUCCESS;
 }
 
@@ -917,6 +923,8 @@ KX_PYMETHODDEF_DOC_O(KX_Camera, getScreenPosition,
 
 	if (!PyVecTo(value, vect))
 	{
+		PyErr_Clear();
+
 		if(ConvertPythonToGameObject(value, &obj, true, ""))
 		{
 			PyErr_Clear();
@@ -1014,10 +1022,8 @@ KX_PYMETHODDEF_DOC_VARARGS(KX_Camera, getScreenRay,
 		return NULL;
 
 	PyObject* argValue = PyTuple_New(2);
-	if (argValue) {
-		PyTuple_SET_ITEM(argValue, 0, PyFloat_FromDouble(x));
-		PyTuple_SET_ITEM(argValue, 1, PyFloat_FromDouble(y));
-	}
+	PyTuple_SET_ITEM(argValue, 0, PyFloat_FromDouble(x));
+	PyTuple_SET_ITEM(argValue, 1, PyFloat_FromDouble(y));
 
 	if(!PyVecTo(PygetScreenVect(argValue), vect))
 	{

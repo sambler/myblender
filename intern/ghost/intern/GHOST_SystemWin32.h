@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -25,8 +25,9 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
-/**
- * @file	GHOST_SystemWin32.h
+
+/** \file ghost/intern/GHOST_SystemWin32.h
+ *  \ingroup GHOST
  * Declaration of GHOST_SystemWin32 class.
  */
 
@@ -37,14 +38,16 @@
 #error WIN32 only!
 #endif // WIN32
 
+#define _WIN32_WINNT 0x501 // require Windows XP or newer
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <ole2.h> // for drag-n-drop
 
 #include "GHOST_System.h"
 
 #if defined(__CYGWIN32__)
 #	define __int64 long long
 #endif
-
 
 class GHOST_EventButton;
 class GHOST_EventCursor;
@@ -188,26 +191,6 @@ public:
 	virtual void putClipboard(GHOST_TInt8 *buffer, bool selection) const;
 
 	/**
-	 * Determine the base dir in which shared resources are located. It will first try to use
-	 * "unpack and run" path, then look for properly installed path, not including versioning.
-	 * @return Unsigned char string pointing to system dir (eg /usr/share/).
-	 */
-	virtual const GHOST_TUns8* getSystemDir() const;
-
-	/**
-	 * Determine the base dir in which user configuration is stored, not including versioning.
-	 * If needed, it will create the base directory.
-	 * @return Unsigned char string pointing to user dir (eg ~/).
-	 */
-	 virtual const GHOST_TUns8* getUserDir() const;
-
-	 /**
-	  * Determine the directory of the current binary
-	  * @return Unsigned char string pointing to the binary dir
-	  */
-	 virtual const GHOST_TUns8* getBinaryDir() const;
-
-	/**
 	 * Creates a drag'n'drop event and pushes it immediately onto the event queue. 
 	 * Called by GHOST_DropTargetWin32 class.
 	 * @param eventType The type of drag'n'drop event
@@ -235,11 +218,23 @@ protected:
 	
 	/**
 	 * Converts raw WIN32 key codes from the wndproc to GHOST keys.
-	 * @param wParam	The wParam from the wndproc
-	 * @param lParam	The lParam from the wndproc
+	 * @param window->	The window for this handling
+	 * @param vKey		The virtual key from hardKey
+	 * @param ScanCode	The ScanCode of pressed key (simular to PS/2 Set 1)
+	 * @param extend	Flag if key is not primerly (left or right)
 	 * @return The GHOST key (GHOST_kKeyUnknown if no match).
 	 */
-	virtual GHOST_TKey convertKey(GHOST_IWindow *window, WPARAM wParam, LPARAM lParam) const;
+	virtual GHOST_TKey convertKey(GHOST_IWindow *window, short vKey, short ScanCode, short extend) const;
+
+	/**
+	 * Catches raw WIN32 key codes from WM_INPUT in the wndproc.
+	 * @param window	The window for this handling
+	 * @param raw		RawInput structure with detailed info about the key event
+	 * @param keyDown	Pointer flag that specify if a key is down
+	 * @param vk		Pointer to virtual key
+	 * @return The GHOST key (GHOST_kKeyUnknown if no match).
+	 */
+	virtual GHOST_TKey hardKey(GHOST_IWindow *window, RAWINPUT const& raw, int * keyDown, char * vk);
 
 	/**
 	 * Creates modifier key event(s) and updates the key data stored locally (m_modifierKeys).
@@ -280,10 +275,18 @@ protected:
 	 * In most cases this is a straightforward conversion of key codes.
 	 * For the modifier keys however, we want to distinguish left and right keys.
 	 * @param window	The window receiving the event (the active window).
-	 * @param wParam	The wParam from the wndproc
-	 * @param lParam	The lParam from the wndproc
+	 * @param raw		RawInput structure with detailed info about the key event
 	 */
-	static GHOST_EventKey* processKeyEvent(GHOST_IWindow *window, bool keyDown, WPARAM wParam, LPARAM lParam);
+	static GHOST_EventKey* processKeyEvent(GHOST_IWindow *window, RAWINPUT const& raw);
+
+	/**
+	 * Process special keys (VK_OEM_*), to see if current key layout
+	 * gives us anything special, like ! on french AZERTY.
+	 * @param window	The window receiving the event (the active window).
+	 * @param vKey		The virtual key from hardKey
+	 * @param ScanCode	The ScanCode of pressed key (simular to PS/2 Set 1)
+	 */
+	virtual GHOST_TKey processSpecialKey(GHOST_IWindow *window, short vKey, short scanCode) const;
 
 	/** 
 	 * Creates a window event.
@@ -292,12 +295,24 @@ protected:
 	 * @return The event created.
 	 */
 	static GHOST_Event* processWindowEvent(GHOST_TEventType type, GHOST_IWindow* window);
-	/** 
+
+	/**
 	 * Handles minimum window size.
 	 * @param minmax	The MINMAXINFO structure.
 	 */
 	static void processMinMaxInfo(MINMAXINFO * minmax);
-	
+
+#ifdef WITH_INPUT_NDOF
+	/**
+	 * Handles Motion and Button events from a SpaceNavigator or related device.
+	 * Instead of returning an event object, this function communicates directly
+	 * with the GHOST_NDOFManager.
+	 * @param raw		RawInput structure with detailed info about the NDOF event
+	 * @return Whether an event was generated and sent.
+	 */
+	bool processNDOF(RAWINPUT const& raw);
+#endif
+
 	/**
 	 * Returns the local state of the modifier keys (from the message queue).
 	 * @param keys The state of the keys.
@@ -314,13 +329,24 @@ protected:
 	/**
 	 * Check current key layout for AltGr
 	 */
-	inline virtual void keyboardAltGr();
+	inline virtual void handleKeyboardChange(void);
 
 	/**
 	 * Windows call back routine for our window class.
 	 */
 	static LRESULT WINAPI s_wndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
+	/**
+ * Toggles console
+ * @action	0 - Hides
+ *			1 - Shows
+ *			2 - Toggles
+ *			3 - Hides if it runs not from  command line
+ *			* - Does nothing
+ * @return current status (1 -visible, 0 - hidden)
+ */
+	int toggleConsole(int action);
+	
 	/** The current state of the modifier keys. */
 	GHOST_ModifierKeys m_modifierKeys;
 	/** State variable set at initialization. */
@@ -331,6 +357,13 @@ protected:
 	__int64 m_start;
 	/** AltGr on current keyboard layout. */
 	bool m_hasAltGr;
+	/** language identifier. */
+	WORD m_langId;
+	/** stores keyboard layout. */
+	HKL m_keylayout;
+
+	/** Console status */
+	int m_consoleStatus;
 };
 
 inline void GHOST_SystemWin32::retrieveModifierKeys(GHOST_ModifierKeys& keys) const
@@ -343,13 +376,17 @@ inline void GHOST_SystemWin32::storeModifierKeys(const GHOST_ModifierKeys& keys)
 	m_modifierKeys = keys;
 }
 
-inline void GHOST_SystemWin32::keyboardAltGr()
+inline void GHOST_SystemWin32::handleKeyboardChange(void)
 {
-	HKL keylayout = GetKeyboardLayout(0); // get keylayout for current thread
+	m_keylayout = GetKeyboardLayout(0); // get keylayout for current thread
 	int i;
 	SHORT s;
+
+	// save the language identifier.
+	m_langId = LOWORD(m_keylayout);
+
 	for(m_hasAltGr = false, i = 32; i < 256; ++i) {
-		s = VkKeyScanEx((char)i, keylayout);
+		s = VkKeyScanEx((char)i, m_keylayout);
 		// s == -1 means no key that translates passed char code
 		// high byte contains shift state. bit 2 ctrl pressed, bit 4 alt pressed
 		// if both are pressed, we have AltGr keycombo on keylayout
@@ -359,6 +396,4 @@ inline void GHOST_SystemWin32::keyboardAltGr()
 		}
 	}
 }
-
 #endif // _GHOST_SYSTEM_WIN32_H_
-

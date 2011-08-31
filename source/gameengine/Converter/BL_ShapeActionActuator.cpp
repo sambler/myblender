@@ -1,4 +1,4 @@
-/**
+/*
 * $Id$
 *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
 */
 
+/** \file gameengine/Converter/BL_ShapeActionActuator.cpp
+ *  \ingroup bgeconv
+ */
+
+
 #if defined (__sgi)
 #include <math.h>
 #else
@@ -48,16 +53,55 @@
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
 #include "MT_Matrix4x4.h"
-#include "BKE_utildefines.h"
+
 #include "FloatValue.h"
 #include "PyObjectPlus.h"
 
 extern "C" {
 	#include "BKE_animsys.h"
+	#include "BKE_key.h"
+	#include "RNA_access.h"
 }
+
+BL_ShapeActionActuator::BL_ShapeActionActuator(SCA_IObject* gameobj,
+					const STR_String& propname,
+					const STR_String& framepropname,
+					float starttime,
+					float endtime,
+					struct bAction *action,
+					short	playtype,
+					short	blendin,
+					short	priority,
+					float	stride) 
+	: SCA_IActuator(gameobj, KX_ACT_SHAPEACTION),
+		
+	m_lastpos(0, 0, 0),
+	m_blendframe(0),
+	m_flag(0),
+	m_startframe (starttime),
+	m_endframe(endtime) ,
+	m_starttime(0),
+	m_localtime(starttime),
+	m_lastUpdate(-1),
+	m_blendin(blendin),
+	m_blendstart(0),
+	m_stridelength(stride),
+	m_playtype(playtype),
+	m_priority(priority),
+	m_action(action),
+	m_framepropname(framepropname),	
+	m_propname(propname)
+{
+	m_idptr = new PointerRNA();
+	BL_DeformableGameObject *obj = (BL_DeformableGameObject*)GetParent();
+	BL_ShapeDeformer *shape_deformer = dynamic_cast<BL_ShapeDeformer*>(obj->GetDeformer());
+	RNA_id_pointer_create(&shape_deformer->GetKey()->id, m_idptr);
+};
 
 BL_ShapeActionActuator::~BL_ShapeActionActuator()
 {
+	if (m_idptr)
+		delete m_idptr;
 }
 
 void BL_ShapeActionActuator::ProcessReplica()
@@ -226,6 +270,16 @@ bool BL_ShapeActionActuator::Update(double curtime, bool frame)
 			apply=false;
 		}
 		break;
+	case ACT_ACTION_PINGPONG:
+		if (bPositiveEvent){
+			if (!(m_flag & ACT_FLAG_LOCKINPUT)){
+				m_flag &= ~ACT_FLAG_KEYUP;
+				m_localtime = m_starttime;
+				m_starttime = curtime;
+				m_flag |= ACT_FLAG_LOCKINPUT;
+			}
+		}
+		break;
 	case ACT_ACTION_FLIPPER:
 		if (bPositiveEvent){
 			if (!(m_flag & ACT_FLAG_LOCKINPUT)){
@@ -300,6 +354,18 @@ bool BL_ShapeActionActuator::Update(double curtime, bool frame)
 		break;
 	case ACT_ACTION_LOOP_STOP:
 		break;
+	case ACT_ACTION_PINGPONG:
+		if (wrap){
+			if (!(m_flag & ACT_FLAG_REVERSE))
+				m_localtime = m_endframe;
+			else 
+				m_localtime = m_startframe;
+
+			m_flag &= ~ACT_FLAG_LOCKINPUT;
+			m_flag ^= ACT_FLAG_REVERSE; //flip direction
+			keepgoing = false;
+		}
+		break;
 	case ACT_ACTION_FLIPPER:
 		if (wrap){
 			if (!(m_flag & ACT_FLAG_REVERSE)){
@@ -355,7 +421,11 @@ bool BL_ShapeActionActuator::Update(double curtime, bool frame)
 
 		/* Priority test */
 		if (obj->SetActiveAction(this, priority, curtime)){
-			Key *key = obj->GetKey();
+			BL_ShapeDeformer *shape_deformer = dynamic_cast<BL_ShapeDeformer*>(obj->GetDeformer());
+			Key *key = NULL;
+
+			if (shape_deformer)
+				key = shape_deformer->GetKey();
 
 			if (!key) {
 				// this could happen if the mesh was changed in the middle of an action
@@ -370,10 +440,14 @@ bool BL_ShapeActionActuator::Update(double curtime, bool frame)
 					obj->GetShape(m_blendshape);
 					m_blendstart = curtime;
 				}
-				// only interested in shape channel
 
-				// in 2.4x was // extract_ipochannels_from_action(&tchanbase, &key->id, m_action, "Shape", m_localtime);
-				BKE_animsys_evaluate_animdata(&key->id, key->adt, m_localtime, ADT_RECALC_ANIM);
+				KeyBlock *kb;
+				// We go through and clear out the keyblocks so there isn't any interference
+				// from other shape actions
+				for (kb=(KeyBlock*)key->block.first; kb; kb=(KeyBlock*)kb->next)
+					kb->curval = 0.f;
+
+				animsys_evaluate_action(m_idptr, m_action, NULL, m_localtime);
 
 				// XXX - in 2.5 theres no way to do this. possibly not that important to support - Campbell
 				if (0) { // XXX !execute_ipochannels(&tchanbase)) {
@@ -408,7 +482,7 @@ bool BL_ShapeActionActuator::Update(double curtime, bool frame)
 	return keepgoing;
 };
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 
 /* ------------------------------------------------------------------------- */
 /* Python functions                                                          */
@@ -491,4 +565,4 @@ int BL_ShapeActionActuator::pyattr_set_action(void *self_v, const KX_PYATTRIBUTE
 
 }
 
-#endif // DISABLE_PYTHON
+#endif // WITH_PYTHON

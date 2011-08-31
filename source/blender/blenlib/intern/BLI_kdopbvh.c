@@ -1,4 +1,4 @@
-/**
+/*
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -26,11 +26,18 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/blenlib/intern/BLI_kdopbvh.c
+ *  \ingroup bli
+ */
+
+
 #include <assert.h>
 
 #include "MEM_guardedalloc.h"
 
-#include "BKE_utildefines.h"
+#include "BLI_utildefines.h"
+
+
 
 #include "BLI_kdopbvh.h"
 #include "BLI_math.h"
@@ -159,7 +166,8 @@ static float KDOP_AXES[13][3] =
 	heap[parent] = element;							\
 }
 
-int ADJUST_MEMORY(void *local_memblock, void **memblock, int new_size, int *max_size, int size_per_item)
+#if 0
+static int ADJUST_MEMORY(void *local_memblock, void **memblock, int new_size, int *max_size, int size_per_item)
 {
 	int   new_max_size = *max_size * 2;
 	void *new_memblock = NULL;
@@ -184,7 +192,7 @@ int ADJUST_MEMORY(void *local_memblock, void **memblock, int new_size, int *max_
 	else
 		return FALSE;
 }
-
+#endif
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 // Introsort 
@@ -1126,19 +1134,20 @@ static void traverse(BVHOverlapData *data, BVHNode *node1, BVHNode *node2)
 	return;
 }
 
-BVHTreeOverlap *BLI_bvhtree_overlap(BVHTree *tree1, BVHTree *tree2, int *result)
+BVHTreeOverlap *BLI_bvhtree_overlap(BVHTree *tree1, BVHTree *tree2, unsigned int *result)
 {
-	int j, total = 0;
+	int j;
+	unsigned int total = 0;
 	BVHTreeOverlap *overlap = NULL, *to = NULL;
 	BVHOverlapData **data;
 	
 	// check for compatibility of both trees (can't compare 14-DOP with 18-DOP)
 	if((tree1->axis != tree2->axis) && (tree1->axis == 14 || tree2->axis == 14) && (tree1->axis == 18 || tree2->axis == 18))
-		return 0;
+		return NULL;
 	
 	// fast check root nodes for collision before doing big splitting + traversal
 	if(!tree_overlap(tree1->nodes[tree1->totleaf], tree2->nodes[tree2->totleaf], MIN2(tree1->start_axis, tree2->start_axis), MIN2(tree1->stop_axis, tree2->stop_axis)))
-		return 0;
+		return NULL;
 
 	data = MEM_callocN(sizeof(BVHOverlapData *)* tree1->tree_type, "BVHOverlapData_star");
 	
@@ -1485,7 +1494,7 @@ static float fast_ray_nearest_hit(const BVHRayCastData *data, const BVHNode *nod
 	float t2z = (bv[data->index[5]] - data->ray.origin[2]) * data->idot_axis[2];
 
 	if(t1x > t2y || t2x < t1y || t1x > t2z || t2x < t1z || t1y > t2z || t2y < t1z) return FLT_MAX;
-	if(t2x < 0.0 || t2y < 0.0 || t2z < 0.0) return FLT_MAX;
+	if(t2x < 0.0f || t2y < 0.0f || t2z < 0.0f) return FLT_MAX;
 	if(t1x > data->hit.dist || t1y > data->hit.dist || t1z > data->hit.dist) return FLT_MAX;
 
 	dist = t1x;
@@ -1590,11 +1599,11 @@ int BLI_bvhtree_ray_cast(BVHTree *tree, const float *co, const float *dir, float
 		data.ray_dot_axis[i] = INPR( data.ray.direction, KDOP_AXES[i]);
 		data.idot_axis[i] = 1.0f / data.ray_dot_axis[i];
 
-		if(fabs(data.ray_dot_axis[i]) < FLT_EPSILON)
+		if(fabsf(data.ray_dot_axis[i]) < FLT_EPSILON)
 		{
 			data.ray_dot_axis[i] = 0.0;
 		}
-		data.index[2*i] = data.idot_axis[i] < 0.0 ? 1 : 0;
+		data.index[2*i] = data.idot_axis[i] < 0.0f ? 1 : 0;
 		data.index[2*i+1] = 1 - data.index[2*i];
 		data.index[2*i]	  += 2*i;
 		data.index[2*i+1] += 2*i;
@@ -1645,7 +1654,7 @@ float BLI_bvhtree_bb_raycast(float *bv, float *light_start, float *light_end, fl
 	
 	dist = ray_nearest_hit(&data, bv);
 	
-	if(dist > 0.0)
+	if(dist > 0.0f)
 	{
 		VECADDFAC(pos, light_start, data.ray.direction, dist);
 	}
@@ -1678,13 +1687,13 @@ static void dfs_range_query(RangeQueryData *data, BVHNode *node)
 {
 	if(node->totnode == 0)
 	{
-
+#if 0	/*UNUSED*/
 		//Calculate the node min-coords (if the node was a point then this is the point coordinates)
 		float co[3];
 		co[0] = node->bv[0];
 		co[1] = node->bv[2];
 		co[2] = node->bv[4];
-
+#endif
 	}
 	else
 	{

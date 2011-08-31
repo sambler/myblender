@@ -1,4 +1,4 @@
-/**
+/*
  * Functions for writing avi-format files.
  * Added interface for generic movie support (ton)
  *
@@ -31,6 +31,11 @@
  * 
  */
 
+/** \file blender/blenkernel/intern/writeavi.c
+ *  \ingroup bke
+ */
+
+
 #include <string.h>
 
 #include "MEM_guardedalloc.h"
@@ -38,10 +43,12 @@
 #include "DNA_scene_types.h"
 
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_global.h"
+#include "BKE_main.h"
 #include "BKE_report.h"
-#include "BKE_utildefines.h"
+
 #include "BKE_writeavi.h"
 #include "AVI_avi.h"
 
@@ -98,13 +105,18 @@ bMovieHandle *BKE_get_movie_handle(int imtype)
 		mh.get_movie_path = filepath_ffmpeg;
 	}
 #endif
+#ifdef WITH_FRAMESERVER
 	if (imtype == R_FRAMESERVER) {
 		mh.start_movie = start_frameserver;
 		mh.append_movie = append_frameserver;
 		mh.end_movie = end_frameserver;
 		mh.get_next_frame = frameserver_loop;
 	}
-	
+#endif
+
+	/* incase all above are disabled */
+	(void)imtype;
+
 	return &mh;
 }
 
@@ -119,7 +131,7 @@ static void filepath_avi (char *string, RenderData *rd)
 	if (string==NULL) return;
 
 	strcpy(string, rd->pic);
-	BLI_path_abs(string, G.sce);
+	BLI_path_abs(string, G.main->name);
 
 	BLI_make_existing_file(string);
 
@@ -151,7 +163,7 @@ static int start_avi(Scene *scene, RenderData *rd, int rectx, int recty, ReportL
 	avi = MEM_mallocN (sizeof(AviMovie), "avimovie");
 
 	/* RPW 11-21-2002 
-	 if (rd->imtype != AVI_FORMAT_MJPEG) format = AVI_FORMAT_AVI_RGB;
+	if (rd->imtype != AVI_FORMAT_MJPEG) format = AVI_FORMAT_AVI_RGB;
 	*/
 	if (rd->imtype != R_AVIJPEG ) format = AVI_FORMAT_AVI_RGB;
 	else format = AVI_FORMAT_MJPEG;
@@ -212,7 +224,7 @@ static int append_avi(RenderData *UNUSED(rd), int frame, int *pixels, int rectx,
 	return 1;
 }
 
-void end_avi(void)
+static void end_avi(void)
 {
 	if (avi == NULL) return;
 

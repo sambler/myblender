@@ -25,26 +25,36 @@
 # ***** END GPL LICENSE BLOCK *****
 
 # Otherwise we get warnings here that we cant fix in external projects
-STRING(REGEX REPLACE "-Wunused-parameter" "" CMAKE_C_FLAGS ${CMAKE_C_FLAGS})
+remove_strict_flags()
 
-IF(WITH_BULLET)
-	ADD_SUBDIRECTORY(bullet2)
-ENDIF(WITH_BULLET)
+if(WITH_BULLET)
+	add_subdirectory(bullet2)
+endif()
 
-IF(CMAKE_SYSTEM_NAME MATCHES "Linux")
-	ADD_SUBDIRECTORY(binreloc)
-ENDIF(CMAKE_SYSTEM_NAME MATCHES "Linux")
+if(WITH_MOD_CLOTH_ELTOPO)
+	add_subdirectory(eltopo)
+endif()
 
-ADD_SUBDIRECTORY(glew)
+if(WITH_BINRELOC)
+	add_subdirectory(binreloc)
+endif()
 
-IF(WITH_IMAGE_OPENJPEG)
-	ADD_SUBDIRECTORY(libopenjpeg)
-ENDIF(WITH_IMAGE_OPENJPEG)
+if(WITH_BUILTIN_GLEW)
+	add_subdirectory(glew)
+endif()
 
-IF(WITH_LZO)
-	ADD_SUBDIRECTORY(lzo)
-ENDIF(WITH_LZO)
+if(WITH_IMAGE_OPENJPEG AND (NOT UNIX OR APPLE))
+	add_subdirectory(libopenjpeg)
+endif()
 
-IF(WITH_LZMA)
-	ADD_SUBDIRECTORY(lzma)
-ENDIF(WITH_LZMA)
+if(WITH_IMAGE_REDCODE)
+	add_subdirectory(libredcode)
+endif()
+
+if(WITH_LZO)
+	add_subdirectory(lzo)
+endif()
+
+if(WITH_LZMA)
+	add_subdirectory(lzma)
+endif()

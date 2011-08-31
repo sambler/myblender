@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -26,6 +26,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file iksolver/intern/IK_QTask.cpp
+ *  \ingroup iksolver
+ */
+
 
 #include "IK_QTask.h"
 
@@ -90,10 +95,10 @@ void IK_QPositionTask::ComputeJacobian(IK_QJacobian& jacobian)
 			MT_Vector3 axis = seg->Axis(i)*m_weight;
 
 			if (seg->Translational())
-				jacobian.SetDerivatives(m_id, seg->DoFId()+i, axis);
+				jacobian.SetDerivatives(m_id, seg->DoFId()+i, axis, 1e2);
 			else {
 				MT_Vector3 pa = p.cross(axis);
-				jacobian.SetDerivatives(m_id, seg->DoFId()+i, pa);
+				jacobian.SetDerivatives(m_id, seg->DoFId()+i, pa, 1e0);
 			}
 		}
 	}
@@ -142,10 +147,10 @@ void IK_QOrientationTask::ComputeJacobian(IK_QJacobian& jacobian)
 		for (i = 0; i < seg->NumberOfDoF(); i++) {
 
 			if (seg->Translational())
-				jacobian.SetDerivatives(m_id, seg->DoFId()+i, MT_Vector3(0, 0, 0));
+				jacobian.SetDerivatives(m_id, seg->DoFId()+i, MT_Vector3(0, 0, 0), 1e2);
 			else {
 				MT_Vector3 axis = seg->Axis(i)*m_weight;
-				jacobian.SetDerivatives(m_id, seg->DoFId()+i, axis);
+				jacobian.SetDerivatives(m_id, seg->DoFId()+i, axis, 1e0);
 			}
 		}
 }
@@ -197,10 +202,10 @@ void IK_QCenterOfMassTask::JacobianSegment(IK_QJacobian& jacobian, MT_Vector3& c
 		axis *= /*segment->Mass()**/m_total_mass_inv;
 		
 		if (segment->Translational())
-			jacobian.SetDerivatives(m_id, segment->DoFId()+i, axis);
+			jacobian.SetDerivatives(m_id, segment->DoFId()+i, axis, 1e2);
 		else {
 			MT_Vector3 pa = axis.cross(p);
-			jacobian.SetDerivatives(m_id, segment->DoFId()+i, pa);
+			jacobian.SetDerivatives(m_id, segment->DoFId()+i, pa, 1e0);
 		}
 	}
 	

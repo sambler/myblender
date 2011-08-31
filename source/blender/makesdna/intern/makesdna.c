@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,9 +25,13 @@
  * Contributor(s): none yet.
  *
  * ***** END GPL LICENSE BLOCK *****
+ */
+
+/**  \file makesdna.c
+ *   \brief Struct muncher for making SDNA.
+ *   \ingroup DNA
  *
- * Struct muncher for making SDNA
- *
+ * \section aboutmakesdnac About makesdna tool
  * Originally by Ton, some mods by Frank, and some cleaning and
  * extension by Nzc.
  *
@@ -42,7 +46,7 @@
  * and the offsets for reaching a particular one.
  *
  * There is a facility to get verbose output from sdna. Search for
- * debugSDNA. This int can be set to 0 (no output) to some int. Higher
+ * \ref debugSDNA. This int can be set to 0 (no output) to some int. Higher
  * numbers give more output.
  * */
 
@@ -62,7 +66,7 @@
 
 /* Included the path relative from /source/blender/ here, so we can move     */
 /* headers around with more freedom.                                         */
-char *includefiles[] = {
+const char *includefiles[] = {
 
 	// if you add files here, please add them at the end
 	// of makesdna.c (this file) as well
@@ -128,44 +132,49 @@ char *includefiles[] = {
 	"DNA_anim_types.h",
 	"DNA_boid_types.h",
 	"DNA_smoke_types.h",
+	"DNA_speaker_types.h",
 
 	// empty string to indicate end of includefiles
 	""
 };
 
-int maxdata= 500000, maxnr= 50000;
-int nr_names=0;
-int nr_types=0;
-int nr_structs=0;
-char **names, *namedata;		/* at address names[a] is string a */
-char **types, *typedata;		/* at address types[a] is string a */
-short *typelens;				/* at typelens[a] is de length of type a */
-short *alphalens;			    /* contains sizes as they are calculated on the DEC Alpha (64 bits) */
-short **structs, *structdata;	/* at sp= structs[a] is the first address of a struct definition
-								   sp[0] is type number
-								   sp[1] is amount of elements
-								   sp[2] sp[3] is typenr,  namenr (etc) */
-/*
+static int maxdata= 500000, maxnr= 50000;
+static int nr_names=0;
+static int nr_types=0;
+static int nr_structs=0;
+static char **names, *namedata;		/* at address names[a] is string a */
+static char **types, *typedata;		/* at address types[a] is string a */
+static short *typelens;				/* at typelens[a] is de length of type a */
+static short *alphalens;			/* contains sizes as they are calculated on the DEC Alpha (64 bits), infact any 64bit system */
+static short **structs, *structdata;/* at sp= structs[a] is the first address of a struct definition
+								       sp[0] is type number
+							    	   sp[1] is amount of elements
+							    	   sp[2] sp[3] is typenr,  namenr (etc) */
+/**
+ * Variable to control debug output of makesdna.
  * debugSDNA:
  *  - 0 = no output, except errors
  *  - 1 = detail actions
  *  - 2 = full trace, tell which names and types were found
  *  - 4 = full trace, plus all gritty details
  */
-int debugSDNA = 0;
-int additional_slen_offset;
+static int debugSDNA = 0;
+static int additional_slen_offset;
 
 /* ************************************************************************** */
 /* Functions                                                                  */
 /* ************************************************************************** */
 
 /**
- * Add type <str> to struct indexed by <len>, if it was not yet found.
+ * Add type \c str to struct indexed by \c len, if it was not yet found.
+ * \param str char
+ * \param len int
  */
-int add_type(char *str, int len);
+int add_type(const char *str, int len);
 
 /**
- * Add variable <str> to 
+ * Add variable \c str to 
+ * \param str
  */
 int add_name(char *str);
 
@@ -214,7 +223,7 @@ void printStructLenghts(void);
 
 /* ************************* MAKEN DNA ********************** */
 
-int add_type(char *str, int len)
+int add_type(const char *str, int len)
 {
 	int nr;
 	char *cp;
@@ -244,7 +253,7 @@ int add_type(char *str, int len)
 	
 	if(nr_types>=maxnr) {
 		printf("too many types\n");
-		return nr_types-1;;
+		return nr_types-1;
 	}
 	nr_types++;
 	
@@ -269,7 +278,7 @@ int add_name(char *str)
 
 	additional_slen_offset = 0;
 	
-	if((str[0]==0) /*  || (str[1]==0) */) return -1;
+	if(str[0]==0 /*  || (str[1]==0) */) return -1;
 
 	if (str[0] == '(' && str[1] == '*') {
 		/* we handle function pointer and special array cases here, e.g.
@@ -281,7 +290,6 @@ int add_name(char *str)
 		if (debugSDNA > 3) printf("\t\t\t\t*** Function pointer or multidim array pointer found\n");
 		/* functionpointer: transform the type (sometimes) */
 		i = 0;
-		j = 0;
 
 		while (str[i] != ')') {
 			buf[i] = str[i];
@@ -608,7 +616,7 @@ int convert_include(char *filename)
 										sp[0]= type;
 										sp[1]= name;
 
-										if ((debugSDNA>1) && (names[name] != 0 )) printf("%s |", names[name]);
+										if ((debugSDNA>1) && (names[name] != NULL)) printf("%s |", names[name]);
 
 										structpoin[1]++;
 										sp+= 2;
@@ -623,7 +631,7 @@ int convert_include(char *filename)
 
 									sp[0]= type;
 									sp[1]= name;
-									if ((debugSDNA > 1) && (names[name] != 0 )) printf("%s ||", names[name]);
+									if ((debugSDNA > 1) && (names[name] != NULL)) printf("%s ||", names[name]);
 
 									structpoin[1]++;
 									sp+= 2;
@@ -653,7 +661,7 @@ int convert_include(char *filename)
 int arraysize(char *astr, int len)
 {
 	int a, mul=1;
-	char str[100], *cp=0;
+	char str[100], *cp=NULL;
 
 	memcpy(str, astr, len+1);
 	
@@ -663,6 +671,8 @@ int arraysize(char *astr, int len)
 		}
 		else if( str[a]==']' && cp) {
 			str[a]= 0;
+			/* if 'cp' is a preprocessor definition, it will evaluate to 0,
+			 * the caller needs to check for this case and throw an error */
 			mul*= atoi(cp);
 		}
 	}
@@ -706,7 +716,12 @@ static int calculate_structlens(int firststruct)
 						/* has the name an extra length? (array) */
 						mul= 1;
 						if( cp[namelen-1]==']') mul= arraysize(cp, namelen);
-						
+
+						if (mul == 0) {
+							printf("Zero array size found or could not parse %s: '%.*s'\n", types[structtype], namelen + 1, cp);
+							dna_error = 1;
+						}
+
 						/* 4-8 aligned/ */
 						if(sizeof(void *) == 4) {
 							if (len % 4) {
@@ -736,7 +751,12 @@ static int calculate_structlens(int firststruct)
 						/* has the name an extra length? (array) */
 						mul= 1;
 						if( cp[namelen-1]==']') mul= arraysize(cp, namelen);
-						
+
+						if (mul == 0) {
+							printf("Zero array size found or could not parse %s: '%.*s'\n", types[structtype], namelen + 1, cp);
+							dna_error = 1;
+						}
+
 						/* struct alignment */
 						if(type >= firststruct) {
 							if(sizeof(void *)==8 && (len % 8) ) {
@@ -848,12 +868,13 @@ void dna_write(FILE *file, void *pntr, int size)
 
 void printStructLenghts(void)
 {
-	int a, unknown= nr_structs, lastunknown, structtype;
+	int a, unknown= nr_structs, structtype;
+	/*int lastunknown;*/ /*UNUSED*/
 	short *structpoin;
 	printf("\n\n*** All detected structs:\n");
 
 	while(unknown) {
-		lastunknown= unknown;
+		/*lastunknown= unknown;*/ /*UNUSED*/
 		unknown= 0;
 		
 		/* check all structs... */
@@ -869,7 +890,7 @@ void printStructLenghts(void)
 }
 
 
-int make_structDNA(char *baseDirectory, FILE *file)
+static int make_structDNA(char *baseDirectory, FILE *file)
 {
 	int len, i;
 	short *sp;
@@ -1058,7 +1079,7 @@ int make_structDNA(char *baseDirectory, FILE *file)
 	MEM_freeN(names);
 	MEM_freeN(types);
 	MEM_freeN(typelens);
-    MEM_freeN(alphalens);
+	MEM_freeN(alphalens);
 	MEM_freeN(structs);
 
 	if (debugSDNA > -1) printf("done.\n");
@@ -1176,4 +1197,5 @@ int main(int argc, char ** argv)
 #include "DNA_anim_types.h"
 #include "DNA_boid_types.h"
 #include "DNA_smoke_types.h"
+#include "DNA_speaker_types.h"
 /* end of list */

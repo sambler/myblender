@@ -1,6 +1,4 @@
-/**
- * $Id$
- *
+/*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -25,6 +23,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/space_time/time_intern.h
+ *  \ingroup sptime
+ */
+
 
 #ifndef ED_TIME_INTERN_H
 #define ED_TIME_INTERN_H

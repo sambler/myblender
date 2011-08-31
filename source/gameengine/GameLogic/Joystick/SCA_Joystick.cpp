@@ -1,4 +1,4 @@
-/**
+/*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -24,6 +24,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file gameengine/GameLogic/Joystick/SCA_Joystick.cpp
+ *  \ingroup gamelogic
+ */
+
 #ifndef DISABLE_SDL
 #include <SDL.h>
 #endif
@@ -84,7 +89,7 @@ SCA_Joystick *SCA_Joystick::GetInstance( short int joyindex )
 	{
 		int i;
 		// do this once only
-		if(SDL_InitSubSystem(SDL_INIT_JOYSTICK | SDL_INIT_VIDEO ) == -1 ){
+		if(SDL_InitSubSystem(SDL_INIT_JOYSTICK | SDL_INIT_VIDEO) == -1 ){
 			echo("Error-Initializing-SDL: " << SDL_GetError());
 			return NULL;
 		}
@@ -119,7 +124,7 @@ void SCA_Joystick::ReleaseInstance()
 			m_instance[i]= NULL;
 		}
 
-		SDL_QuitSubSystem(SDL_INIT_JOYSTICK | SDL_INIT_VIDEO );
+		SDL_QuitSubSystem(SDL_INIT_JOYSTICK | SDL_INIT_VIDEO);
 #endif
 	}
 }

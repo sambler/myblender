@@ -1,4 +1,4 @@
-/**
+/*
  * Jitter offset table
  *
  * $Id$
@@ -28,6 +28,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/render/intern/source/gammaCorrectionTables.c
+ *  \ingroup render
+ */
+
 
 #include "gammaCorrectionTables.h"
 #include <stdlib.h>
@@ -102,7 +107,7 @@ void makeGammaTables(float gamma)
 	int i;
 
 	valid_gamma        = gamma;
-	valid_inv_gamma    = 1.0 / gamma;
+	valid_inv_gamma    = 1.0f / gamma;
 	color_step        = 1.0 / RE_GAMMA_TABLE_SIZE;
 	inv_color_step    = (float) RE_GAMMA_TABLE_SIZE; 
 

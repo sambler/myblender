@@ -1,27 +1,33 @@
 /*
  * $Id$
  *
- * ***** BEGIN LGPL LICENSE BLOCK *****
+ * ***** BEGIN GPL LICENSE BLOCK *****
  *
- * Copyright 2009 Jörg Hermann Müller
+ * Copyright 2009-2011 Jörg Hermann Müller
  *
  * This file is part of AudaSpace.
  *
- * AudaSpace is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
+ * Audaspace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
  * AudaSpace is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU Lesser General Public License
- * along with AudaSpace.  If not, see <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU General Public License
+ * along with Audaspace; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * ***** END LGPL LICENSE BLOCK *****
+ * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file audaspace/intern/AUD_Mixer.cpp
+ *  \ingroup audaspaceintern
+ */
+
 
 #include "AUD_Mixer.h"
 #include "AUD_IReader.h"
@@ -67,43 +73,37 @@ AUD_DeviceSpecs AUD_Mixer::getSpecs() const
 	return m_specs;
 }
 
-void AUD_Mixer::add(sample_t* buffer, int start, int length, float volume)
+void AUD_Mixer::setSpecs(AUD_Specs specs)
 {
-	AUD_MixerBuffer buf;
-	buf.buffer = buffer;
-	buf.start = start;
-	buf.length = length;
-	buf.volume = volume;
-	m_buffers.push_back(buf);
+	m_specs.specs = specs;
 }
 
-void AUD_Mixer::superpose(data_t* buffer, int length, float volume)
+void AUD_Mixer::clear(int length)
 {
-	AUD_MixerBuffer buf;
+	m_buffer.assureSize(length * m_specs.channels * AUD_SAMPLE_SIZE(m_specs));
 
-	int channels = m_specs.channels;
+	m_length = length;
 
-	if(m_buffer.getSize() < length * channels * 4)
-		m_buffer.resize(length * channels * 4);
+	memset(m_buffer.getBuffer(), 0, length * m_specs.channels * AUD_SAMPLE_SIZE(m_specs));
+}
 
+void AUD_Mixer::mix(sample_t* buffer, int start, int length, float volume)
+{
 	sample_t* out = m_buffer.getBuffer();
-	sample_t* in;
 
-	memset(out, 0, length * channels * 4);
+	length = (AUD_MIN(m_length, length + start) - start) * m_specs.channels;
+	start *= m_specs.channels;
 
-	int end;
+	for(int i = 0; i < length; i++)
+		out[i + start] += buffer[i] * volume;
+}
 
-	while(!m_buffers.empty())
-	{
-		buf = m_buffers.front();
-		m_buffers.pop_front();
+void AUD_Mixer::read(data_t* buffer, float volume)
+{
+	sample_t* out = m_buffer.getBuffer();
 
-		end = buf.length * channels;
-		in = buf.buffer;
+	for(int i = 0; i < m_length * m_specs.channels; i++)
+		out[i] *= volume;
 
-		for(int i = 0; i < end; i++)
-			out[i + buf.start * channels] += in[i] * buf.volume * volume;
-	}
-
-	m_convert(buffer, (data_t*) out, length * channels);
+	m_convert(buffer, (data_t*) out, m_length * m_specs.channels);
 }

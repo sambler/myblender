@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -25,8 +25,9 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
-/**
- * @file	GHOST_WindowWin32.h
+
+/** \file ghost/intern/GHOST_WindowWin32.h
+ *  \ingroup GHOST
  * Declaration of GHOST_WindowWin32 class.
  */
 
@@ -38,7 +39,10 @@
 #endif // WIN32
 
 #include "GHOST_Window.h"
+#include "GHOST_TaskbarWin32.h"
 
+#define _WIN32_WINNT 0x501 // require Windows XP or newer
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
 
@@ -88,6 +92,7 @@ public:
 		GHOST_TDrawingContextType type = GHOST_kDrawingContextTypeNone,
 		const bool stereoVisual = false,
 		const GHOST_TUns16 numOfAASamples = 0,
+		GHOST_TEmbedderWindowID parentWindowHwnd=0,
 		GHOST_TSuccess msEnabled = GHOST_kFailure,
 		int msPixelFormat = 0
 	);
@@ -218,6 +223,17 @@ public:
 	virtual GHOST_TSuccess invalidate();
 
 	/**
+     * Sets the progress bar value displayed in the window/application icon
+	 * @param progress The progress %
+	 */
+	virtual GHOST_TSuccess setProgressBar(float progress);
+	
+	/**
+	 * Hides the progress bar in the icon
+	 */
+	virtual GHOST_TSuccess endProgressBar();
+	
+	/**
 	 * Returns the name of the window class.
 	 * @return The name of the window class.
 	 */
@@ -228,9 +244,13 @@ public:
 	 * for any real button press, controls mouse
 	 * capturing).
 	 *
-	 * @param press True the event was a button press.
+	 * @param press	
+	 *		0 - mouse pressed
+	 *		1 - mouse released
+	 *		2 - operator grab
+	 *		3 - operator ungrab
 	 */
-	void registerMouseClickEvent(bool press);
+	void registerMouseClickEvent(int press);
 
 	/**
 	 * Inform the window that it has lost mouse capture,
@@ -319,10 +339,16 @@ protected:
 	static HDC s_firstHDC;
 	/** Flag for if window has captured the mouse */
 	bool m_hasMouseCaptured;
+	/** Flag if an operator grabs the mouse with WM_cursor_grab/ungrab() 
+	 * Multiple grabs must be realesed with a single ungrab*/
+	bool m_hasGrabMouse;
 	/** Count of number of pressed buttons */
 	int m_nPressedButtons;
 	/** HCURSOR structure of the custom cursor */
 	HCURSOR m_customCursor;
+
+	/** ITaskbarList3 structure for progress bar*/
+	ITaskbarList3 * m_Bar;
 
 	static LPCSTR s_windowClassName;
 	static const int s_maxTitleLength;
@@ -358,6 +384,9 @@ protected:
 
 	/** The GHOST_System passes this to wm if this window is being replaced */
 	GHOST_Window *m_nextWindow;
+
+	/** Hwnd to parent window */
+	GHOST_TEmbedderWindowID m_parentWindowHwnd;
 };
 
 #endif // _GHOST_WINDOW_WIN32_H_

@@ -1,6 +1,4 @@
-/**
- * $Id$
- *
+/*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -26,6 +24,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/animation/fmodifier_ui.c
+ *  \ingroup edanimation
+ */
+
+
 /* User-Interface Stuff for F-Modifiers:
  * This file defines the (C-Coded) templates + editing callbacks needed 
  * by the interface stuff or F-Modifiers, as used by F-Curves in the Graph Editor,
@@ -43,6 +46,7 @@
 #include "MEM_guardedalloc.h"
 
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_context.h"
 #include "BKE_fcurve.h"
@@ -52,9 +56,11 @@
 
 #include "RNA_access.h"
 
-
 #include "UI_interface.h"
 #include "UI_resources.h"
+
+#include "ED_anim_api.h"
+#include "ED_util.h"
 
 /* ********************************************** */
 /* UI STUFF */
@@ -92,6 +98,8 @@ static void delete_fmodifier_cb (bContext *C, void *fmods_v, void *fcm_v)
 	
 	/* remove the given F-Modifier from the active modifier-stack */
 	remove_fmodifier(modifiers, fcm);
+
+	ED_undo_push(C, "Delete F-Curve Modifier");
 	
 	/* send notifiers */
 	// XXX for now, this is the only way to get updates in all the right places... but would be nice to have a special one in this case 
@@ -152,7 +160,7 @@ static void draw_modifier__generator(uiLayout *layout, ID *id, FModifier *fcm, s
 					if (i == 1)
 						strcpy(xval, "x");
 					else
-						sprintf(xval, "x^%d", i);
+						sprintf(xval, "x^%u", i);
 					uiDefBut(block, LABEL, 1, xval, 0, 0, 50, 20, NULL, 0.0, 0.0, 0, 0, "Power of x");
 				}
 				
@@ -225,14 +233,14 @@ static void draw_modifier__fn_generator(uiLayout *layout, ID *id, FModifier *fcm
 	
 	/* add the settings */
 	col= uiLayoutColumn(layout, 1);
-		uiItemR(col, &ptr, "function_type", 0, "", 0);
-		uiItemR(col, &ptr, "use_additive", UI_ITEM_R_TOGGLE, NULL, 0);
+		uiItemR(col, &ptr, "function_type", 0, "", ICON_NONE);
+		uiItemR(col, &ptr, "use_additive", UI_ITEM_R_TOGGLE, NULL, ICON_NONE);
 	
 	col= uiLayoutColumn(layout, 0); // no grouping for now
-		uiItemR(col, &ptr, "amplitude", 0, NULL, 0);
-		uiItemR(col, &ptr, "phase_multiplier", 0, NULL, 0);
-		uiItemR(col, &ptr, "phase_offset", 0, NULL, 0);
-		uiItemR(col, &ptr, "value_offset", 0, NULL, 0);
+		uiItemR(col, &ptr, "amplitude", 0, NULL, ICON_NONE);
+		uiItemR(col, &ptr, "phase_multiplier", 0, NULL, ICON_NONE);
+		uiItemR(col, &ptr, "phase_offset", 0, NULL, ICON_NONE);
+		uiItemR(col, &ptr, "value_offset", 0, NULL, ICON_NONE);
 }
 
 /* --------------- */
@@ -253,15 +261,15 @@ static void draw_modifier__cycles(uiLayout *layout, ID *id, FModifier *fcm, shor
 	
 	/* before range */
 	col= uiLayoutColumn(split, 1);
-		uiItemL(col, "Before:", 0);
-		uiItemR(col, &ptr, "mode_before", 0, "", 0);
-		uiItemR(col, &ptr, "cycles_before", 0, NULL, 0);
+		uiItemL(col, "Before:", ICON_NONE);
+		uiItemR(col, &ptr, "mode_before", 0, "", ICON_NONE);
+		uiItemR(col, &ptr, "cycles_before", 0, NULL, ICON_NONE);
 		
 	/* after range */
 	col= uiLayoutColumn(split, 1);
-		uiItemL(col, "After:", 0);
-		uiItemR(col, &ptr, "mode_after", 0, "", 0);
-		uiItemR(col, &ptr, "cycles_after", 0, NULL, 0);
+		uiItemL(col, "After:", ICON_NONE);
+		uiItemR(col, &ptr, "mode_after", 0, "", ICON_NONE);
+		uiItemR(col, &ptr, "cycles_after", 0, NULL, ICON_NONE);
 }
 
 /* --------------- */
@@ -276,25 +284,25 @@ static void draw_modifier__noise(uiLayout *layout, ID *id, FModifier *fcm, short
 	RNA_pointer_create(id, &RNA_FModifierNoise, fcm, &ptr);
 	
 	/* blending mode */
-	uiItemR(layout, &ptr, "blend_type", 0, NULL, 0);
+	uiItemR(layout, &ptr, "blend_type", 0, NULL, ICON_NONE);
 	
 	/* split into 2 columns */
 	split= uiLayoutSplit(layout, 0.5f, 0);
 	
 	/* col 1 */
 	col= uiLayoutColumn(split, 0);
-		uiItemR(col, &ptr, "scale", 0, NULL, 0);
-		uiItemR(col, &ptr, "strength", 0, NULL, 0);
+		uiItemR(col, &ptr, "scale", 0, NULL, ICON_NONE);
+		uiItemR(col, &ptr, "strength", 0, NULL, ICON_NONE);
 	
 	/* col 2 */
 	col= uiLayoutColumn(split, 0);
-		uiItemR(col, &ptr, "phase", 0, NULL, 0);
-		uiItemR(col, &ptr, "depth", 0, NULL, 0);
+		uiItemR(col, &ptr, "phase", 0, NULL, ICON_NONE);
+		uiItemR(col, &ptr, "depth", 0, NULL, ICON_NONE);
 }
 
 /* --------------- */
 
-#define BINARYSEARCH_FRAMEEQ_THRESH	0.0001
+#define BINARYSEARCH_FRAMEEQ_THRESH	0.0001f
 
 /* Binary search algorithm for finding where to insert Envelope Data Point.
  * Returns the index to insert at (data already at that index will be offset if replace is 0)
@@ -436,9 +444,9 @@ static void fmod_envelope_deletepoint_cb (bContext *UNUSED(C), void *fcm_dv, voi
 	if (env->totvert > 1) {
 		/* allocate a new smaller array */
 		fedn= MEM_callocN(sizeof(FCM_EnvelopeData)*(env->totvert-1), "FCM_EnvelopeData");
-		
-		memcpy(fedn, &env->data, sizeof(FCM_EnvelopeData)*(index));
-		memcpy(&fedn[index], &env->data[index+1], sizeof(FCM_EnvelopeData)*(env->totvert-index-1));
+
+		memcpy(fedn, env->data, sizeof(FCM_EnvelopeData)*(index));
+		memcpy(fedn + index, env->data + (index + 1), sizeof(FCM_EnvelopeData)*((env->totvert - index)-1));
 		
 		/* free old array, and set the new */
 		MEM_freeN(env->data);
@@ -447,8 +455,10 @@ static void fmod_envelope_deletepoint_cb (bContext *UNUSED(C), void *fcm_dv, voi
 	}
 	else {
 		/* just free array, since the only vert was deleted */
-		if (env->data) 
+		if (env->data) {
 			MEM_freeN(env->data);
+			env->data= NULL;
+		}
 		env->totvert= 0;
 	}
 }
@@ -469,12 +479,12 @@ static void draw_modifier__envelope(uiLayout *layout, ID *id, FModifier *fcm, sh
 	
 	/* general settings */
 	col= uiLayoutColumn(layout, 1);
-		uiItemL(col, "Envelope:", 0);
-		uiItemR(col, &ptr, "reference_value", 0, NULL, 0);
+		uiItemL(col, "Envelope:", ICON_NONE);
+		uiItemR(col, &ptr, "reference_value", 0, NULL, ICON_NONE);
 		
 		row= uiLayoutRow(col, 1);
-			uiItemR(row, &ptr, "default_min", 0, "Min", 0);
-			uiItemR(row, &ptr, "default_max", 0, "Max", 0);
+			uiItemR(row, &ptr, "default_min", 0, "Min", ICON_NONE);
+			uiItemR(row, &ptr, "default_max", 0, "Max", ICON_NONE);
 			
 	/* control points header */
 	// TODO: move this control-point control stuff to using the new special widgets for lists
@@ -526,13 +536,13 @@ static void draw_modifier__limits(uiLayout *layout, ID *id, FModifier *fcm, shor
 		
 		/* x-minimum */
 		col= uiLayoutColumn(split, 1);
-			uiItemR(col, &ptr, "use_min_x", 0, NULL, 0);
-			uiItemR(col, &ptr, "min_x", 0, NULL, 0);
+			uiItemR(col, &ptr, "use_min_x", 0, NULL, ICON_NONE);
+			uiItemR(col, &ptr, "min_x", 0, NULL, ICON_NONE);
 			
 		/* y-minimum*/
 		col= uiLayoutColumn(split, 1);
-			uiItemR(col, &ptr, "use_min_y", 0, NULL, 0);
-			uiItemR(col, &ptr, "min_y", 0, NULL, 0);
+			uiItemR(col, &ptr, "use_min_y", 0, NULL, ICON_NONE);
+			uiItemR(col, &ptr, "min_y", 0, NULL, ICON_NONE);
 	}
 	
 	/* row 2: maximum */
@@ -544,13 +554,13 @@ static void draw_modifier__limits(uiLayout *layout, ID *id, FModifier *fcm, shor
 		
 		/* x-minimum */
 		col= uiLayoutColumn(split, 1);
-			uiItemR(col, &ptr, "use_max_x", 0, NULL, 0);
-			uiItemR(col, &ptr, "max_x", 0, NULL, 0);
+			uiItemR(col, &ptr, "use_max_x", 0, NULL, ICON_NONE);
+			uiItemR(col, &ptr, "max_x", 0, NULL, ICON_NONE);
 			
 		/* y-minimum*/
 		col= uiLayoutColumn(split, 1);
-			uiItemR(col, &ptr, "use_max_y", 0, NULL, 0);
-			uiItemR(col, &ptr, "max_y", 0, NULL, 0);
+			uiItemR(col, &ptr, "use_max_y", 0, NULL, ICON_NONE);
+			uiItemR(col, &ptr, "max_y", 0, NULL, ICON_NONE);
 	}
 }
 
@@ -567,24 +577,24 @@ static void draw_modifier__stepped(uiLayout *layout, ID *id, FModifier *fcm, sho
 	
 	/* block 1: "stepping" settings */
 	col= uiLayoutColumn(layout, 0);
-		uiItemR(col, &ptr, "frame_step", 0, NULL, 0);
-		uiItemR(col, &ptr, "frame_offset", 0, NULL, 0);
+		uiItemR(col, &ptr, "frame_step", 0, NULL, ICON_NONE);
+		uiItemR(col, &ptr, "frame_offset", 0, NULL, ICON_NONE);
 		
 	/* block 2: start range settings */
 	col= uiLayoutColumn(layout, 1);
-		uiItemR(col, &ptr, "use_frame_start", 0, NULL, 0);
+		uiItemR(col, &ptr, "use_frame_start", 0, NULL, ICON_NONE);
 		
 		subcol = uiLayoutColumn(col, 1);
 		uiLayoutSetActive(subcol, RNA_boolean_get(&ptr, "use_frame_start"));
-			uiItemR(subcol, &ptr, "frame_start", 0, NULL, 0);
+			uiItemR(subcol, &ptr, "frame_start", 0, NULL, ICON_NONE);
 			
 	/* block 3: end range settings */
 	col= uiLayoutColumn(layout, 1);
-		uiItemR(col, &ptr, "use_frame_end", 0, NULL, 0);
+		uiItemR(col, &ptr, "use_frame_end", 0, NULL, ICON_NONE);
 		
 		subcol = uiLayoutColumn(col, 1);
 		uiLayoutSetActive(subcol, RNA_boolean_get(&ptr, "use_frame_end"));
-			uiItemR(subcol, &ptr, "frame_end", 0, NULL, 0);
+			uiItemR(subcol, &ptr, "frame_end", 0, NULL, ICON_NONE);
 }
 
 /* --------------- */
@@ -592,7 +602,7 @@ static void draw_modifier__stepped(uiLayout *layout, ID *id, FModifier *fcm, sho
 void ANIM_uiTemplate_fmodifier_draw (uiLayout *layout, ID *id, ListBase *modifiers, FModifier *fcm)
 {
 	FModifierTypeInfo *fmi= fmodifier_get_typeinfo(fcm);
-	uiLayout *box, *row, *subrow;
+	uiLayout *box, *row, *subrow, *col;
 	uiBlock *block;
 	uiBut *but;
 	short width= 314;
@@ -610,30 +620,30 @@ void ANIM_uiTemplate_fmodifier_draw (uiLayout *layout, ID *id, ListBase *modifie
 		block= uiLayoutGetBlock(row); // err...
 		
 		/* left-align -------------------------------------------- */
-		subrow= uiLayoutRow(row, 0);
+		subrow= uiLayoutRow(row, 1);
 		uiLayoutSetAlignment(subrow, UI_LAYOUT_ALIGN_LEFT);
 		
 		uiBlockSetEmboss(block, UI_EMBOSSN);
 		
 		/* expand */
-		uiItemR(subrow, &ptr, "show_expanded", UI_ITEM_R_ICON_ONLY, "", 0);
+		uiItemR(subrow, &ptr, "show_expanded", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
 		
 		/* checkbox for 'active' status (for now) */
-		uiItemR(subrow, &ptr, "active", UI_ITEM_R_ICON_ONLY, "", 0);
+		uiItemR(subrow, &ptr, "active", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
 		
 		/* name */
 		if (fmi)
-			uiItemL(subrow, fmi->name, 0);
+			uiItemL(subrow, fmi->name, ICON_NONE);
 		else
-			uiItemL(subrow, "<Unknown Modifier>", 0);
+			uiItemL(subrow, "<Unknown Modifier>", ICON_NONE);
 		
 		/* right-align ------------------------------------------- */
-		subrow= uiLayoutRow(row, 0);
+		subrow= uiLayoutRow(row, 1);
 		uiLayoutSetAlignment(subrow, UI_LAYOUT_ALIGN_RIGHT);
 		
 		
 		/* 'mute' button */
-		uiItemR(subrow, &ptr, "mute", UI_ITEM_R_ICON_ONLY, "", 0);
+		uiItemR(subrow, &ptr, "mute", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
 		
 		uiBlockSetEmboss(block, UI_EMBOSSN);
 		
@@ -681,6 +691,44 @@ void ANIM_uiTemplate_fmodifier_draw (uiLayout *layout, ID *id, ListBase *modifie
 			
 			default: /* unknown type */
 				break;
+		}
+		
+		/* one last panel below this: FModifier range */
+		// TODO: experiment with placement of this
+		{
+			box = uiLayoutBox(layout);
+			
+			/* restricted range ----------------------------------------------------- */
+			col = uiLayoutColumn(box, 1);
+			
+			/* top row: use restricted range */
+			row= uiLayoutRow(col, 1);
+			uiItemR(row, &ptr, "use_restricted_range", 0, NULL, ICON_NONE);
+			
+			if (fcm->flag & FMODIFIER_FLAG_RANGERESTRICT) {
+				/* second row: settings */
+				row = uiLayoutRow(col, 1);
+				
+				uiItemR(row, &ptr, "frame_start", 0, "Start", ICON_NONE);
+				uiItemR(row, &ptr, "frame_end", 0, "End", ICON_NONE);
+				
+				/* third row: blending influence */
+				row = uiLayoutRow(col, 1);
+				
+				uiItemR(row, &ptr, "blend_in", 0, "In", ICON_NONE);
+				uiItemR(row, &ptr, "blend_out", 0, "Out", ICON_NONE);
+			}
+			
+			/* influence -------------------------------------------------------------- */
+			col = uiLayoutColumn(box, 1);
+			
+			/* top row: use influence */
+			uiItemR(col, &ptr, "use_influence", 0, NULL, ICON_NONE);
+			
+			if (fcm->flag & FMODIFIER_FLAG_USEINFLUENCE) {
+				/* second row: influence value */
+				uiItemR(col, &ptr, "influence", 0, NULL, ICON_NONE);
+			}
 		}
 	}
 }

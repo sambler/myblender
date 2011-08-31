@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,20 +27,26 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file gameengine/Converter/BL_ArmatureObject.cpp
+ *  \ingroup bgeconv
+ */
+
+
 #include "BL_ArmatureObject.h"
 #include "BL_ActionActuator.h"
 #include "KX_BlenderSceneConverter.h"
 #include "MEM_guardedalloc.h"
 #include "BLI_blenlib.h"
-#include "BLI_ghash.h"
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
+#include "BLI_ghash.h"
 #include "BIK_api.h"
 #include "BKE_action.h"
 #include "BKE_armature.h"
-#include "BKE_utildefines.h"
+
 #include "BKE_constraint.h"
-#include "GEN_Map.h"
-#include "GEN_HashedPtr.h"
+#include "CTR_Map.h"
+#include "CTR_HashedPtr.h"
 #include "MEM_guardedalloc.h"
 #include "DNA_action_types.h"
 #include "DNA_armature_types.h"
@@ -212,7 +218,8 @@ BL_ArmatureObject::BL_ArmatureObject(
 				void* sgReplicationInfo, 
 				SG_Callbacks callbacks, 
 				Object *armature,
-				Scene *scene)
+				Scene *scene,
+				int vert_deform_type)
 
 :	KX_GameObject(sgReplicationInfo,callbacks),
 	m_controlledConstraints(),
@@ -226,7 +233,8 @@ BL_ArmatureObject::BL_ArmatureObject(
 	m_activePriority(999),
 	m_constraintNumber(0),
 	m_channelNumber(0),
-	m_lastapplyframe(0.0)
+	m_lastapplyframe(0.0),
+	m_vert_deform_type(vert_deform_type)
 {
 	m_armature = (bArmature *)armature->data;
 
@@ -292,6 +300,7 @@ void BL_ArmatureObject::LoadConstraints(KX_BlenderSceneConverter* converter)
 			case CONSTRAINT_TYPE_CLAMPTO:
 			case CONSTRAINT_TYPE_TRANSFORM:
 			case CONSTRAINT_TYPE_DISTLIMIT:
+			case CONSTRAINT_TYPE_TRANSLIKE:
 				cti = constraint_get_typeinfo(pcon);
 				gametarget = gamesubtarget = NULL;
 				if (cti && cti->get_constraint_targets) {
@@ -433,7 +442,7 @@ void BL_ArmatureObject::ReParentLogic()
 	KX_GameObject::ReParentLogic();
 }
 
-void BL_ArmatureObject::Relink(GEN_Map<GEN_HashedPtr, void*> *obj_map)
+void BL_ArmatureObject::Relink(CTR_Map<CTR_HashedPtr, void*> *obj_map)
 {
 	SG_DList::iterator<BL_ArmatureConstraint> cit(m_controlledConstraints);
 	for (cit.begin(); !cit.end(); ++cit) {
@@ -594,7 +603,7 @@ float BL_ArmatureObject::GetBoneLength(Bone* bone) const
 	return (float)(MT_Point3(bone->head) - MT_Point3(bone->tail)).length();
 }
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 
 // PYTHON
 
@@ -661,4 +670,4 @@ KX_PYMETHODDEF_DOC_NOARGS(BL_ArmatureObject, update,
 	Py_RETURN_NONE;
 }
 
-#endif // DISABLE_PYTHON
+#endif // WITH_PYTHON

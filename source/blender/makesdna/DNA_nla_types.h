@@ -1,6 +1,4 @@
-/**
- * $Id$
- *
+/*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -29,6 +27,10 @@
 
 #ifndef DNA_NLA_TYPES_H
 #define DNA_NLA_TYPES_H
+
+/** \file DNA_nla_types.h
+ *  \ingroup DNA
+ */
 
 #include "DNA_listBase.h"
 

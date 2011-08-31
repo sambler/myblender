@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,12 +25,15 @@
  * Contributor(s): none yet.
  *
  * ***** END GPL LICENSE BLOCK *****
- * General operations, lookup, etc. for materials.
  */
 
 #ifndef BKE_MATERIAL_H
 #define BKE_MATERIAL_H
 
+/** \file BKE_material.h
+ *  \ingroup bke
+ *  \brief General operations, lookup, etc. for materials.
+ */
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -45,11 +48,14 @@ struct Object;
 void init_def_material(void);
 void free_material(struct Material *sc); 
 void test_object_materials(struct ID *id);
+void resize_object_material(struct Object *ob, const short totcol);
 void init_material(struct Material *ma);
-struct Material *add_material(char *name);
+struct Material *add_material(const char *name);
 struct Material *copy_material(struct Material *ma);
+struct Material *localize_material(struct Material *ma);
 struct Material *give_node_material(struct Material *ma); /* returns node material or self */
 void make_local_material(struct Material *ma);
+void extern_local_matarar(struct Material **matar, short totcol);
 
 void automatname(struct Material *);
 
@@ -72,7 +78,7 @@ int object_remove_material_slot(struct Object *ob);
 
 /* rna api */
 void material_append_id(struct ID *id, struct Material *ma);
-struct Material *material_pop_id(struct ID *id, int index);
+struct Material *material_pop_id(struct ID *id, int index, int remove_material_slot);
 
 /* rendering */
 

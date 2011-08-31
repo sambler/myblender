@@ -24,43 +24,78 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-FILE(GLOB SRC *.cpp)
-
-SET(INC
+set(INC
 	.
-	../../../source/gameengine/Ketsji
-	../../../source/gameengine/Expressions
-	../../../source/gameengine/GameLogic
-	../../../source/gameengine/SceneGraph
-	../../../source/gameengine/Rasterizer
-	../../../source/gameengine/Rasterizer/RAS_OpenGLRasterizer
-	../../../source/gameengine/BlenderRoutines
-	../../../source/blender/include
-	../../../source/blender/blenlib
-	../../../source/blender/blenkernel
-	../../../source/blender/makesdna
-	../../../source/blender/editors/include
-	../../../source/blender/imbuf
-	../../../source/blender/python
-	../../../source/blender/python/generic
-	../../../source/blender/gpu
-	../../../source/kernel/gen_system
-	../../../intern/string
-	../../../intern/moto/include
+	../BlenderRoutines
+	../Expressions
+	../GameLogic
+	../Ketsji
+	../Rasterizer
+	../Rasterizer/RAS_OpenGLRasterizer
+	../SceneGraph
+	../../blender/blenkernel
+	../../blender/blenlib
+	../../blender/editors/include
+	../../blender/gpu
+	../../blender/imbuf
+	../../blender/makesdna
+	../../blender/python
+	../../blender/python/generic
+	../../../intern/container
+	../../../intern/ffmpeg
 	../../../intern/guardedalloc
-	../../../extern/glew/include
+	../../../intern/moto/include
+	../../../intern/string
 )
 
-IF(WITH_FFMPEG)
-	SET(INC ${INC} ${FFMPEG_INC} ${PTHREADS_INC})
-	ADD_DEFINITIONS(-DWITH_FFMPEG)
-	ADD_DEFINITIONS(-D__STDC_CONSTANT_MACROS)
-ENDIF(WITH_FFMPEG)
+set(INC_SYS
+	${GLEW_INCLUDE_PATH}
+)
 
-IF(WITH_PYTHON)
-	LIST(APPEND INC ${PYTHON_INC})
-ELSE(WITH_PYTHON)
-	ADD_DEFINITIONS(-DDISABLE_PYTHON)
-ENDIF(WITH_PYTHON)
+set(SRC
+	Exception.cpp
+	FilterBase.cpp
+	FilterBlueScreen.cpp
+	FilterColor.cpp
+	FilterNormal.cpp
+	FilterSource.cpp
+	ImageBase.cpp
+	ImageBuff.cpp
+	ImageMix.cpp
+	ImageRender.cpp
+	ImageViewport.cpp
+	PyTypeList.cpp
+	Texture.cpp
+	VideoBase.cpp
+	VideoFFmpeg.cpp
+	blendVideoTex.cpp
 
-BLENDERLIB(bf_videotex "${SRC}" "${INC}")
+	BlendType.h
+	Common.h
+	Exception.h
+	FilterBase.h
+	FilterBlueScreen.h
+	FilterColor.h
+	FilterNormal.h
+	FilterSource.h
+	ImageBase.h
+	ImageBuff.h
+	ImageMix.h
+	ImageRender.h
+	ImageViewport.h
+	PyTypeList.h
+	Texture.h
+	VideoBase.h
+	VideoFFmpeg.h
+)
+
+if(WITH_CODEC_FFMPEG)
+	list(APPEND INC_SYS
+		${FFMPEG_INCLUDE_DIRS}
+		${PTHREADS_INCLUDE_DIRS}
+	)
+	add_definitions(-DWITH_FFMPEG)
+	add_definitions(-D__STDC_CONSTANT_MACROS)
+endif()
+
+blender_add_lib(ge_videotex "${SRC}" "${INC}" "${INC_SYS}")

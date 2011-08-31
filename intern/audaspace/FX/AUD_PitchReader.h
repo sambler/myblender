@@ -1,27 +1,33 @@
 /*
  * $Id$
  *
- * ***** BEGIN LGPL LICENSE BLOCK *****
+ * ***** BEGIN GPL LICENSE BLOCK *****
  *
- * Copyright 2009 Jörg Hermann Müller
+ * Copyright 2009-2011 Jörg Hermann Müller
  *
  * This file is part of AudaSpace.
  *
- * AudaSpace is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
+ * Audaspace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
  * AudaSpace is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU Lesser General Public License
- * along with AudaSpace.  If not, see <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU General Public License
+ * along with Audaspace; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * ***** END LGPL LICENSE BLOCK *****
+ * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file audaspace/FX/AUD_PitchReader.h
+ *  \ingroup audfx
+ */
+
 
 #ifndef AUD_PITCHREADER
 #define AUD_PITCHREADER
@@ -37,7 +43,7 @@ private:
 	/**
 	 * The pitch level.
 	 */
-	const float m_pitch;
+	float m_pitch;
 
 	// hide copy constructor and operator=
 	AUD_PitchReader(const AUD_PitchReader&);
@@ -47,11 +53,23 @@ public:
 	/**
 	 * Creates a new pitch reader.
 	 * \param reader The reader to read from.
-	 * \param pitch The size of the buffer.
+	 * \param pitch The pitch value.
 	 */
-	AUD_PitchReader(AUD_IReader* reader, float pitch);
+	AUD_PitchReader(AUD_Reference<AUD_IReader> reader, float pitch);
 
 	virtual AUD_Specs getSpecs() const;
+
+	/**
+	 * Retrieves the pitch.
+	 * \return The current pitch value.
+	 */
+	float getPitch() const;
+
+	/**
+	 * Sets the pitch.
+	 * \param pitch The new pitch value.
+	 */
+	void setPitch(float pitch);
 };
 
 #endif //AUD_PITCHREADER

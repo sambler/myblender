@@ -19,12 +19,11 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-FILE(GLOB SRC *.c)
-
-SET(INC
+set(INC
 	../include
 	../../blenkernel
 	../../blenlib
+	../../blenloader
 	../../makesdna
 	../../makesrna
 	../../windowmanager
@@ -32,16 +31,27 @@ SET(INC
 	../../../../intern/guardedalloc
 )
 
-IF(NOT WITH_FLUID)
-	ADD_DEFINITIONS(-DDISABLE_ELBEEM)
-ENDIF(NOT WITH_FLUID)
+set(INC_SYS
+	${GLEW_INCLUDE_PATH}
+)
 
-IF(WITH_OPENMP)
-		ADD_DEFINITIONS(-DPARALLEL=1)
-ENDIF(WITH_OPENMP)
+set(SRC
+	particle_boids.c
+	particle_edit.c
+	particle_object.c
+	physics_fluid.c
+	physics_ops.c
+	physics_pointcache.c
 
-IF(WIN32)
-	LIST(APPEND INC ${PTHREADS_INC})
-ENDIF(WIN32)
+	physics_intern.h
+)
 
-BLENDERLIB(bf_editor_physics "${SRC}" "${INC}")
+if(NOT WITH_MOD_FLUID)
+	add_definitions(-DDISABLE_ELBEEM)
+endif()
+
+if(WITH_OPENMP)
+	add_definitions(-DPARALLEL=1)
+endif()
+
+blender_add_lib(bf_editor_physics "${SRC}" "${INC}" "${INC_SYS}")

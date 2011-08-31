@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file ED_mesh.h
+ *  \ingroup editors
+ */
+
 #ifndef ED_MESH_H
 #define ED_MESH_H
 
@@ -51,6 +56,9 @@ struct MDeformWeight;
 struct MDeformVert;
 struct Scene;
 struct Mesh;
+struct MFace;
+struct MEdge;
+struct MVert;
 struct MCol;
 struct UvVertMap;
 struct UvMapVert;
@@ -98,10 +106,6 @@ void		ED_keymap_mesh(struct wmKeyConfig *keyconf);
 
 
 /* editmesh.c */
-
-void		ED_spacetypes_init(void);
-void		ED_keymap_mesh(struct wmKeyConfig *keyconf);
-
 void		make_editMesh(struct Scene *scene, struct Object *ob);
 void		load_editMesh(struct Scene *scene, struct Object *ob);
 void		remake_editMesh(struct Scene *scene, struct Object *ob);
@@ -117,7 +121,7 @@ struct EditFace	*EM_get_face_for_index(int index);
 int			EM_texFaceCheck(struct EditMesh *em);
 int			EM_vertColorCheck(struct EditMesh *em);
 
-void		undo_push_mesh(struct bContext *C, char *name);
+void		undo_push_mesh(struct bContext *C, const char *name);
 
 
 /* editmesh_lib.c */
@@ -165,9 +169,9 @@ void EM_project_snap_verts(struct bContext *C, struct ARegion *ar, struct Object
 extern unsigned int em_vertoffs, em_solidoffs, em_wireoffs;
 
 void		EM_cache_x_mirror_vert(struct Object *ob, struct EditMesh *em);
-int			mouse_mesh(struct bContext *C, short mval[2], short extend);
+int			mouse_mesh(struct bContext *C, const int mval[2], short extend);
 int			EM_check_backbuf(unsigned int index);
-int			EM_mask_init_backbuf_border(struct ViewContext *vc, short mcords[][2], short tot, short xmin, short ymin, short xmax, short ymax);
+int			EM_mask_init_backbuf_border(struct ViewContext *vc, int mcords[][2], short tot, short xmin, short ymin, short xmax, short ymax);
 void		EM_free_backbuf(void);
 int			EM_init_backbuf_border(struct ViewContext *vc, short xmin, short ymin, short xmax, short ymax);
 int			EM_init_backbuf_circle(struct ViewContext *vc, short xs, short ys, short rads);
@@ -181,12 +185,16 @@ void		EM_deselect_by_material(struct EditMesh *em, int index);
 void		EM_automerge(struct Scene *scene, struct Object *obedit, int update);
 
 /* editface.c */
+void paintface_flush_flags(struct Object *ob);
 struct MTFace	*EM_get_active_mtface(struct EditMesh *em, struct EditFace **act_efa, struct MCol **mcol, int sloppy);
-int face_select(struct bContext *C, struct Object *ob, short mval[2], int extend);
-void face_borderselect(struct bContext *C, struct Object *ob, struct rcti *rect, int select, int extend);
-void selectall_tface(struct Object *ob, int action);
-void select_linked_tfaces(struct bContext *C, struct Object *ob, short mval[2], int mode);
-int minmax_tface(struct Object *ob, float *min, float *max);
+int paintface_mouse_select(struct bContext *C, struct Object *ob, const int mval[2], int extend);
+int do_paintface_box_select(struct ViewContext *vc, struct rcti *rect, int select, int extend);
+void paintface_deselect_all_visible(struct Object *ob, int action, short flush_flags);
+void paintface_select_linked(struct bContext *C, struct Object *ob, int mval[2], int mode);
+int paintface_minmax(struct Object *ob, float *min, float *max);
+
+void paintface_hide(struct Object *ob, const int unselected);
+void paintface_reveal(struct Object *ob);
 
 /* object_vgroup.c */
 
@@ -195,12 +203,15 @@ int minmax_tface(struct Object *ob, float *min, float *max);
 #define WEIGHT_SUBTRACT 3
 
 struct bDeformGroup		*ED_vgroup_add(struct Object *ob);
-struct bDeformGroup		*ED_vgroup_add_name(struct Object *ob, char *name);
-void					ED_vgroup_select_by_name(struct Object *ob, char *name);
-void					ED_vgroup_data_create(struct ID *id);
+struct bDeformGroup		*ED_vgroup_add_name(struct Object *ob, const char *name);
+void 					ED_vgroup_delete(struct Object *ob, struct bDeformGroup *defgroup);
+void					ED_vgroup_select_by_name(struct Object *ob, const char *name);
+int						ED_vgroup_data_create(struct ID *id);
 int						ED_vgroup_give_array(struct ID *id, struct MDeformVert **dvert_arr, int *dvert_tot);
 int						ED_vgroup_copy_array(struct Object *ob, struct Object *ob_from);
-void					ED_vgroup_mirror(struct Object *ob, int mirror_weights, int flip_vgroups);
+void					ED_vgroup_mirror(struct Object *ob, const short mirror_weights, const short flip_vgroups);
+
+int						ED_vgroup_object_is_edit_mode(struct Object *ob);
 
 void		ED_vgroup_vert_add(struct Object *ob, struct bDeformGroup *dg, int vertnum,  float weight, int assignmode);
 void		ED_vgroup_vert_remove(struct Object *ob, struct bDeformGroup *dg, int vertnum);

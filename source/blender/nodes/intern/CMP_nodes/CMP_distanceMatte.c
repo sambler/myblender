@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/nodes/intern/CMP_nodes/CMP_distanceMatte.c
+ *  \ingroup cmpnodes
+ */
+
+
 #include "../CMP_util.h"
 
 /* ******************* channel Distance Matte ********************************* */
@@ -48,42 +53,42 @@ static void do_distance_matte(bNode *node, float *out, float *in)
 {
 	NodeChroma *c= (NodeChroma *)node->storage;
 	float tolerence=c->t1;
-   float falloff=c->t2;
+	float falloff=c->t2;
 	float distance;
-   float alpha;
-   
-   distance=sqrt((c->key[0]-in[0])*(c->key[0]-in[0]) +
+	float alpha;
+
+	distance=sqrt((c->key[0]-in[0])*(c->key[0]-in[0]) +
 				  (c->key[1]-in[1])*(c->key[1]-in[1]) +
 				  (c->key[2]-in[2])*(c->key[2]-in[2]));
 
-   VECCOPY(out, in);
+	VECCOPY(out, in);
 
-   /*make 100% transparent */
-   if(distance < tolerence) {
-	  out[3]=0.0;
-   }
-   /*in the falloff region, make partially transparent */
-   else if(distance < falloff+tolerence){
-	  distance=distance-tolerence;
-	  alpha=distance/falloff;
-	   /*only change if more transparent than before */
-	  if(alpha < in[3]) {
-		 out[3]=alpha;
-	  }
-	  else { /* leave as before */
-		 out[3]=in[3];
-	  }
-   }
-   else {
-	  out[3]=in[3];
-   }
+	/*make 100% transparent */
+	if(distance < tolerence) {
+		out[3]=0.0;
+	}
+	/*in the falloff region, make partially transparent */
+	else if(distance < falloff+tolerence){
+		distance=distance-tolerence;
+		alpha=distance/falloff;
+		/*only change if more transparent than before */
+		if(alpha < in[3]) {
+			out[3]=alpha;
+		}
+		else { /* leave as before */
+			out[3]=in[3];
+		}
+	}
+	else {
+		out[3]=in[3];
+	}
 }
 
 static void node_composit_exec_distance_matte(void *data, bNode *node, bNodeStack **in, bNodeStack **out)
 {
 	/*
-	Losely based on the Sequencer chroma key plug-in, but enhanced to work in other color spaces and
-	uses a differnt difference function (suggested in forums of vfxtalk.com).
+	Loosely based on the Sequencer chroma key plug-in, but enhanced to work in other color spaces and
+	uses a different difference function (suggested in forums of vfxtalk.com).
 	*/
 	CompBuf *workbuf;
 	CompBuf *inbuf;
@@ -119,27 +124,25 @@ static void node_composit_exec_distance_matte(void *data, bNode *node, bNodeStac
 
 static void node_composit_init_distance_matte(bNode *node)
 {
-   NodeChroma *c= MEM_callocN(sizeof(NodeChroma), "node chroma");
-   node->storage= c;
-   c->t1= 0.1f;
-   c->t2= 0.1f;
+	NodeChroma *c= MEM_callocN(sizeof(NodeChroma), "node chroma");
+	node->storage= c;
+	c->t1= 0.1f;
+	c->t2= 0.1f;
 }
 
-bNodeType cmp_node_distance_matte={
-	/* *next,*prev */	NULL, NULL,
-	/* type code   */	CMP_NODE_DIST_MATTE,
-	/* name        */	"Distance Key",
-	/* width+range */	200, 80, 250,
-	/* class+opts  */	NODE_CLASS_MATTE, NODE_PREVIEW|NODE_OPTIONS,
-	/* input sock  */	cmp_node_distance_matte_in,
-	/* output sock */	cmp_node_distance_matte_out,
-	/* storage     */	"NodeChroma",
-	/* execfunc    */	node_composit_exec_distance_matte,
-	/* butfunc     */	NULL,
-	/* initfunc    */	node_composit_init_distance_matte,
-	/* freestoragefunc    */	node_free_standard_storage,
-	/* copystoragefunc    */	node_copy_standard_storage,
-	/* id          */	NULL
-};
+void register_node_type_cmp_distance_matte(ListBase *lb)
+{
+	static bNodeType ntype;
+
+	node_type_base(&ntype, CMP_NODE_DIST_MATTE, "Distance Key", NODE_CLASS_MATTE, NODE_PREVIEW|NODE_OPTIONS,
+		cmp_node_distance_matte_in, cmp_node_distance_matte_out);
+	node_type_size(&ntype, 200, 80, 250);
+	node_type_init(&ntype, node_composit_init_distance_matte);
+	node_type_storage(&ntype, "NodeChroma", node_free_standard_storage, node_copy_standard_storage);
+	node_type_exec(&ntype, node_composit_exec_distance_matte);
+
+	nodeRegisterType(lb, &ntype);
+}
+
 
 

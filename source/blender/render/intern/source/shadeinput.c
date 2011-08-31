@@ -1,4 +1,4 @@
-/**
+/*
 * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/render/intern/source/shadeinput.c
+ *  \ingroup render
+ */
+
+
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
@@ -32,6 +37,7 @@
 
 #include "BLI_math.h"
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 
 #include "DNA_curve_types.h"
 #include "DNA_group_types.h"
@@ -40,7 +46,7 @@
 #include "DNA_material_types.h"
 
 #include "BKE_colortools.h"
-#include "BKE_utildefines.h"
+
 #include "BKE_node.h"
 
 /* local include */
@@ -132,16 +138,21 @@ void shade_material_loop(ShadeInput *shi, ShadeResult *shr)
 	/* depth >= 1 when ray-shading */
 	if(shi->depth==0 || shi->volume_depth > 0) {
 		if(R.r.mode & R_RAYTRACE) {
-			if(shi->ray_mirror!=0.0f || ((shi->mat->mode & MA_TRANSP) && (shi->mat->mode & MA_RAYTRANSP) && shr->alpha!=1.0f)) {
+			if(shi->ray_mirror!=0.0f || ((shi->mode & MA_TRANSP) && (shi->mode & MA_RAYTRANSP) && shr->alpha!=1.0f)) {
 				/* ray trace works on combined, but gives pass info */
 				ray_trace(shi, shr);
 			}
 		}
 		/* disable adding of sky for raytransp */
-		if((shi->mat->mode & MA_TRANSP) && (shi->mat->mode & MA_RAYTRANSP))
+		if((shi->mode & MA_TRANSP) && (shi->mode & MA_RAYTRANSP))
 			if((shi->layflag & SCE_LAY_SKY) && (R.r.alphamode==R_ADDSKY))
 				shr->alpha= 1.0f;
-	}	
+	}
+	
+	if(R.r.mode & R_RAYTRACE) {
+		if (R.render_volumes_inside.first)
+			shade_volume_inside(shi, shr);
+	}
 }
 
 
@@ -163,11 +174,8 @@ void shade_input_do_shade(ShadeInput *shi, ShadeResult *shr)
 		shade_input_init_material(shi);
 		
 		if (shi->mat->material_type == MA_TYPE_VOLUME) {
-			if(R.r.mode & R_RAYTRACE) {			
-				if (R.render_volumes_inside.first)
-					shade_volume_inside(shi, shr);
-				else
-					shade_volume_outside(shi, shr);
+			if(R.r.mode & R_RAYTRACE) {
+				shade_volume_outside(shi, shr);
 			}
 		} else { /* MA_TYPE_SURFACE, MA_TYPE_WIRE */
 			shade_material_loop(shi, shr);
@@ -283,9 +291,9 @@ void shade_input_set_triangle_i(ShadeInput *shi, ObjectInstanceRen *obi, VlakRen
 		VECCOPY(shi->n3, shi->v3->n);
 
 		if(obi->flag & R_TRANSFORMED) {
-			mul_m3_v3(obi->nmat, shi->n1);
-			mul_m3_v3(obi->nmat, shi->n2);
-			mul_m3_v3(obi->nmat, shi->n3);
+			mul_m3_v3(obi->nmat, shi->n1); normalize_v3(shi->n1);
+			mul_m3_v3(obi->nmat, shi->n2); normalize_v3(shi->n2);
+			mul_m3_v3(obi->nmat, shi->n3); normalize_v3(shi->n3);
 		}
 	}
 }
@@ -295,7 +303,7 @@ void shade_input_set_triangle_i(ShadeInput *shi, ObjectInstanceRen *obi, VlakRen
  */
 
 /* copy data from face to ShadeInput, scanline case */
-void shade_input_set_triangle(ShadeInput *shi, volatile int obi, volatile int facenr, int normal_flip)
+void shade_input_set_triangle(ShadeInput *shi, volatile int obi, volatile int facenr, int UNUSED(normal_flip))
 {
 	if(facenr>0) {
 		shi->obi= &R.objectinstance[obi];
@@ -427,10 +435,10 @@ void shade_input_set_strand_texco(ShadeInput *shi, StrandRen *strand, StrandVert
 			mul_m4_v3(R.viewinv, shi->gl);
 			
 			if(shi->osatex) {
-				VECCOPY(shi->dxgl, shi->dxco);
-				mul_m3_v3(R.imat, shi->dxco);
-				VECCOPY(shi->dygl, shi->dyco);
-				mul_m3_v3(R.imat, shi->dyco);
+				VECCOPY(shi->dxgl, shi->dxco); 
+				mul_mat3_m4_v3(R.viewinv, shi->dxgl); 
+				VECCOPY(shi->dygl, shi->dyco); 
+				mul_mat3_m4_v3(R.viewinv, shi->dygl);
 			}
 		}
 
@@ -535,11 +543,6 @@ void shade_input_set_strand_texco(ShadeInput *shi, StrandRen *strand, StrandVert
 			shi->orn[2]= -shi->vn[2];
 		}
 
-		if(texco & TEXCO_REFL) {
-			/* mirror reflection color textures (and envmap) */
-			calc_R_ref(shi);    /* wrong location for normal maps! XXXXXXXXXXXXXX */
-		}
-
 		if(texco & TEXCO_STRESS) {
 			/* not supported */
 		}
@@ -574,7 +577,7 @@ void shade_input_set_strand_texco(ShadeInput *shi, StrandRen *strand, StrandVert
 		}
 	}
 	
-	if (R.r.color_mgt_flag & R_COLOR_MANAGEMENT) {
+	if (shi->do_manage) {
 		if(mode & (MA_VERTEXCOL|MA_VERTEXCOLP|MA_FACETEXTURE)) {
 			srgb_to_linearrgb_v3_v3(shi->vcol, shi->vcol);
 		}
@@ -625,14 +628,14 @@ void shade_input_calc_viewco(ShadeInput *shi, float x, float y, float z, float *
 				dxco[0]= fx;
 				dxco[1]= 0.0f;
 				if(shi->facenor[2]!=0.0f)
-					dxco[2]= (shi->facenor[0]*fx)/shi->facenor[2];
+					dxco[2]= -(shi->facenor[0]*fx)/shi->facenor[2];
 				else 
 					dxco[2]= 0.0f;
 				
 				dyco[0]= 0.0f;
 				dyco[1]= fy;
 				if(shi->facenor[2]!=0.0f)
-					dyco[2]= (shi->facenor[1]*fy)/shi->facenor[2];
+					dyco[2]= -(shi->facenor[1]*fy)/shi->facenor[2];
 				else 
 					dyco[2]= 0.0f;
 				
@@ -768,7 +771,8 @@ void shade_input_set_uv(ShadeInput *shi)
 			t00= v3[axis1]-v1[axis1]; t01= v3[axis2]-v1[axis2];
 			t10= v3[axis1]-v2[axis1]; t11= v3[axis2]-v2[axis2];
 
-			detsh= 1.0f/(t00*t11-t10*t01);
+			detsh= (t00*t11-t10*t01);
+			detsh= (detsh != 0.0f)? 1.0f/detsh: 0.0f;
 			t00*= detsh; t01*=detsh; 
 			t10*=detsh; t11*=detsh;
 
@@ -816,11 +820,17 @@ void shade_input_set_normals(ShadeInput *shi)
 		shi->vn[0]= l*n3[0]-u*n1[0]-v*n2[0];
 		shi->vn[1]= l*n3[1]-u*n1[1]-v*n2[1];
 		shi->vn[2]= l*n3[2]-u*n1[2]-v*n2[2];
+
+		// use unnormalized normal (closer to games)
+		VECCOPY(shi->nmapnorm, shi->vn);
 		
 		normalize_v3(shi->vn);
 	}
 	else
+	{
 		VECCOPY(shi->vn, shi->facenor);
+		VECCOPY(shi->nmapnorm, shi->vn);
+	}
 	
 	/* used in nodes */
 	VECCOPY(shi->vno, shi->vn);
@@ -830,6 +840,36 @@ void shade_input_set_normals(ShadeInput *shi)
 		if(dot_v3v3(shi->facenor, shi->view) < 0.0f)
 			shade_input_flip_normals(shi);
 }
+
+/* XXX shi->flippednor messes up otherwise */
+void shade_input_set_vertex_normals(ShadeInput *shi)
+{
+	float u= shi->u, v= shi->v;
+	float l= 1.0f+u+v;
+	
+	/* calculate vertexnormals */
+	if(shi->vlr->flag & R_SMOOTH) {
+		float *n1= shi->n1, *n2= shi->n2, *n3= shi->n3;
+		
+		shi->vn[0]= l*n3[0]-u*n1[0]-v*n2[0];
+		shi->vn[1]= l*n3[1]-u*n1[1]-v*n2[1];
+		shi->vn[2]= l*n3[2]-u*n1[2]-v*n2[2];
+		
+		// use unnormalized normal (closer to games)
+		VECCOPY(shi->nmapnorm, shi->vn);
+		
+		normalize_v3(shi->vn);
+	}
+	else
+	{
+		VECCOPY(shi->vn, shi->facenor);
+		VECCOPY(shi->nmapnorm, shi->vn);
+	}
+	
+	/* used in nodes */
+	VECCOPY(shi->vno, shi->vn);
+}
+
 
 /* use by raytrace, sss, bake to flip into the right direction */
 void shade_input_flip_normals(ShadeInput *shi)
@@ -845,6 +885,10 @@ void shade_input_flip_normals(ShadeInput *shi)
 	shi->vno[0]= -shi->vno[0];
 	shi->vno[1]= -shi->vno[1];
 	shi->vno[2]= -shi->vno[2];
+
+	shi->nmapnorm[0] = -shi->nmapnorm[0];
+	shi->nmapnorm[1] = -shi->nmapnorm[1];
+	shi->nmapnorm[2] = -shi->nmapnorm[2];
 
 	shi->flippednor= !shi->flippednor;
 }
@@ -921,21 +965,32 @@ void shade_input_set_shade_texco(ShadeInput *shi)
 
 			if(tangent) {
 				int j1= shi->i1, j2= shi->i2, j3= shi->i3;
+				float c0[3], c1[3], c2[3];
 
 				vlr_set_uv_indices(shi->vlr, &j1, &j2, &j3);
 
-				s1= &tangent[j1*3];
-				s2= &tangent[j2*3];
-				s3= &tangent[j3*3];
+				VECCOPY(c0, &tangent[j1*4]);
+				VECCOPY(c1, &tangent[j2*4]);
+				VECCOPY(c2, &tangent[j3*4]);
 
-				shi->nmaptang[0]= (tl*s3[0] - tu*s1[0] - tv*s2[0]);
-				shi->nmaptang[1]= (tl*s3[1] - tu*s1[1] - tv*s2[1]);
-				shi->nmaptang[2]= (tl*s3[2] - tu*s1[2] - tv*s2[2]);
-
+				// keeping tangents normalized at vertex level
+				// corresponds better to how it's done in game engines
 				if(obi->flag & R_TRANSFORMED)
-					mul_m3_v3(obi->nmat, shi->nmaptang);
+				{
+					mul_mat3_m4_v3(obi->mat, c0); normalize_v3(c0);
+					mul_mat3_m4_v3(obi->mat, c1); normalize_v3(c1);
+					mul_mat3_m4_v3(obi->mat, c2); normalize_v3(c2);
+				}
+				
+				// we don't normalize the interpolated TBN tangent
+				// corresponds better to how it's done in game engines
+				shi->nmaptang[0]= (tl*c2[0] - tu*c0[0] - tv*c1[0]);
+				shi->nmaptang[1]= (tl*c2[1] - tu*c0[1] - tv*c1[1]);
+				shi->nmaptang[2]= (tl*c2[2] - tu*c0[2] - tv*c1[2]);
 
-				normalize_v3(shi->nmaptang);
+				// the sign is the same for all 3 vertices of any
+				// non degenerate triangle.
+				shi->nmaptang[3]= tangent[j1*4+3];
 			}
 		}
 	}
@@ -1009,13 +1064,10 @@ void shade_input_set_shade_texco(ShadeInput *shi)
 			VECCOPY(shi->gl, shi->co);
 			mul_m4_v3(R.viewinv, shi->gl);
 			if(shi->osatex) {
-				VECCOPY(shi->dxgl, shi->dxco);
-				// TXF: bug was here, but probably should be in convertblender.c, R.imat only valid if there is a world
-				//mul_m3_v3(R.imat, shi->dxco);
-				mul_mat3_m4_v3(R.viewinv, shi->dxco);
-				VECCOPY(shi->dygl, shi->dyco);
-				//mul_m3_v3(R.imat, shi->dyco);
-				mul_mat3_m4_v3(R.viewinv, shi->dyco);
+				VECCOPY(shi->dxgl, shi->dxco); 
+				mul_mat3_m4_v3(R.viewinv, shi->dxgl); 
+				VECCOPY(shi->dygl, shi->dyco); 
+				mul_mat3_m4_v3(R.viewinv, shi->dygl);
 			}
 		}
 		
@@ -1149,11 +1201,6 @@ void shade_input_set_shade_texco(ShadeInput *shi)
 			shi->orn[2]= -shi->vn[2];
 		}
 		
-		if(texco & TEXCO_REFL) {
-			/* mirror reflection color textures (and envmap) */
-			calc_R_ref(shi);	/* wrong location for normal maps! XXXXXXXXXXXXXX */
-		}
-		
 		if(texco & TEXCO_STRESS) {
 			float *s1, *s2, *s3;
 			
@@ -1226,8 +1273,9 @@ void shade_input_set_shade_texco(ShadeInput *shi)
 				s11= ho3[1]/ho3[3] - ho2[1]/ho2[3];
 				
 				detsh= s00*s11-s10*s01;
-				s00/= detsh; s01/=detsh; 
-				s10/=detsh; s11/=detsh;
+				detsh= (detsh != 0.0f)? 1.0f/detsh: 0.0f;
+				s00*= detsh; s01*=detsh; 
+				s10*=detsh; s11*=detsh;
 				
 				/* recalc u and v again */
 				hox= x/Zmulx -1.0f;
@@ -1259,7 +1307,7 @@ void shade_input_set_shade_texco(ShadeInput *shi)
 	} /* else {
 	 Note! For raytracing winco is not set, important because thus means all shader input's need to have their variables set to zero else in-initialized values are used
 	*/
-	if (R.r.color_mgt_flag & R_COLOR_MANAGEMENT) {
+	if (shi->do_manage) {
 		if(mode & (MA_VERTEXCOL|MA_VERTEXCOLP|MA_FACETEXTURE)) {
 			srgb_to_linearrgb_v3_v3(shi->vcol, shi->vcol);
 		}
@@ -1278,6 +1326,7 @@ void shade_input_initialize(ShadeInput *shi, RenderPart *pa, RenderLayer *rl, in
 	shi->sample= sample;
 	shi->thread= pa->thread;
 	shi->do_preview= (R.r.scemode & R_MATNODE_PREVIEW) != 0;
+	shi->do_manage= (R.r.color_mgt_flag & R_COLOR_MANAGEMENT);
 	shi->lay= rl->lay;
 	shi->layflag= rl->layflag;
 	shi->passflag= rl->passflag;
@@ -1358,7 +1407,10 @@ void shade_samples_fill_with_ps(ShadeSample *ssamp, PixStr *ps, int x, int y)
 						shi->samplenr= R.shadowsamplenr[shi->thread]++;	/* this counter is not being reset per pixel */
 						shade_input_set_viewco(shi, x, y, xs, ys, (float)ps->z);
 						shade_input_set_uv(shi);
-						shade_input_set_normals(shi);
+						if(shi_cp==0)
+							shade_input_set_normals(shi);
+						else  /* XXX shi->flippednor messes up otherwise */
+							shade_input_set_vertex_normals(shi);
 						
 						shi_cp= 1;
 						shi++;
@@ -1405,7 +1457,7 @@ int shade_samples(ShadeSample *ssamp, PixStr *ps, int x, int y)
 		shade_samples_do_AO(ssamp);
 		
 		/* if shade (all shadepinputs have same passflag) */
-		if(ssamp->shi[0].passflag & ~(SCE_PASS_Z|SCE_PASS_INDEXOB)) {
+		if(ssamp->shi[0].passflag & ~(SCE_PASS_Z|SCE_PASS_INDEXOB|SCE_PASS_INDEXMA)) {
 
 			for(samp=0; samp<ssamp->tot; samp++, shi++, shr++) {
 				shade_input_set_shade_texco(shi);

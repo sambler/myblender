@@ -1,5 +1,4 @@
-/**
- *	
+/*
  * $Id$ 
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -29,6 +28,10 @@
  */
 #ifndef BKE_MODIFIER_H
 #define BKE_MODIFIER_H
+
+/** \file BKE_modifier.h
+ *  \ingroup bke
+ */
 
 #include "DNA_modifier_types.h"		/* needed for all enum typdefs */
 #include "BKE_customdata.h"
@@ -98,6 +101,7 @@ typedef enum {
 
 typedef void (*ObjectWalkFunc)(void *userData, struct Object *ob, struct Object **obpoin);
 typedef void (*IDWalkFunc)(void *userData, struct Object *ob, struct ID **idpoin);
+typedef void (*TexWalkFunc)(void *userData, struct Object *ob, struct ModifierData *md, const char *propname);
 
 typedef struct ModifierTypeInfo {
 	/* The user visible name for this modifier */
@@ -133,6 +137,12 @@ typedef struct ModifierTypeInfo {
 						struct DerivedMesh *derivedData,
 						float (*vertexCos)[3], int numVerts,
 						int useRenderParams, int isFinalCalc);
+
+	/* Like deformMatricesEM but called from object mode (for supporting modifiers in sculpt mode) */
+	void (*deformMatrices)(
+				struct ModifierData *md, struct Object *ob,
+				struct DerivedMesh *derivedData,
+				float (*vertexCos)[3], float (*defMats)[3][3], int numVerts);
 
 	/* Like deformVerts but called during editmode (for supporting modifiers)
 	 */
@@ -275,6 +285,16 @@ typedef struct ModifierTypeInfo {
 	 */
 	void (*foreachIDLink)(struct ModifierData *md, struct Object *ob,
 						  IDWalkFunc walk, void *userData);
+
+	/* Should call the given walk function for each texture that the
+	 * modifier data stores. This is used for finding all textures in
+	 * the context for the UI.
+	 *
+	 * This function is optional. If it is not present, it will be
+	 * assumed the modifier has no textures.
+	 */
+	void (*foreachTexLink)(struct ModifierData *md, struct Object *ob,
+						  TexWalkFunc walk, void *userData);
 } ModifierTypeInfo;
 
 ModifierTypeInfo *modifierType_getInfo (ModifierType type);
@@ -294,7 +314,11 @@ int           modifier_couldBeCage(struct Scene *scene, struct ModifierData *md)
 int           modifier_isCorrectableDeformed(struct ModifierData *md);
 int			  modifier_sameTopology(ModifierData *md);
 int           modifier_isEnabled(struct Scene *scene, struct ModifierData *md, int required_mode);
-void          modifier_setError(struct ModifierData *md, char *format, ...);
+void          modifier_setError(struct ModifierData *md, const char *format, ...)
+#ifdef __GNUC__
+__attribute__ ((format (printf, 2, 3)))
+#endif
+;
 
 void          modifiers_foreachObjectLink(struct Object *ob,
 										  ObjectWalkFunc walk,
@@ -302,6 +326,10 @@ void          modifiers_foreachObjectLink(struct Object *ob,
 void          modifiers_foreachIDLink(struct Object *ob,
 									  IDWalkFunc walk,
 									  void *userData);
+void          modifiers_foreachTexLink(struct Object *ob,
+									  TexWalkFunc walk,
+									  void *userData);
+
 struct ModifierData  *modifiers_findByType(struct Object *ob, ModifierType type);
 struct ModifierData  *modifiers_findByName(struct Object *ob, const char *name);
 void          modifiers_clearErrors(struct Object *ob);

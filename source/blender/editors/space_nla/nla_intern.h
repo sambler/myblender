@@ -1,6 +1,4 @@
-/**
- * $Id$
- *
+/*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -25,6 +23,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/space_nla/nla_intern.h
+ *  \ingroup spnla
+ */
+
 #ifndef ED_NLA_INTERN_H
 #define ED_NLA_INTERN_H
 
@@ -60,13 +63,14 @@ enum {
 	NLAEDIT_LRSEL_TEST	= -1,
 	NLAEDIT_LRSEL_NONE,
 	NLAEDIT_LRSEL_LEFT,
-	NLAEDIT_LRSEL_RIGHT,
+	NLAEDIT_LRSEL_RIGHT
 } eNlaEdit_LeftRightSelect_Mode;
 
 /* --- */
 
 void NLA_OT_select_all_toggle(wmOperatorType *ot);
 void NLA_OT_select_border(wmOperatorType *ot);
+void NLA_OT_select_leftright(wmOperatorType *ot);
 void NLA_OT_click_select(wmOperatorType *ot);
 
 /* **************************************** */
@@ -78,7 +82,7 @@ enum {
 	NLAEDIT_SNAP_CFRA = 1,
 	NLAEDIT_SNAP_NEAREST_FRAME,
 	NLAEDIT_SNAP_NEAREST_SECOND,
-	NLAEDIT_SNAP_NEAREST_MARKER,	
+	NLAEDIT_SNAP_NEAREST_MARKER
 } eNlaEdit_Snap_Mode;
 
 /* --- */
@@ -88,8 +92,12 @@ void NLA_OT_tweakmode_exit(wmOperatorType *ot);
 
 /* --- */
 
+void NLA_OT_view_all(wmOperatorType *ot);
+void NLA_OT_view_selected(wmOperatorType *ot);
+
 void NLA_OT_actionclip_add(wmOperatorType *ot);
 void NLA_OT_transition_add(wmOperatorType *ot);
+void NLA_OT_soundclip_add(wmOperatorType *ot);
 
 void NLA_OT_meta_add(wmOperatorType *ot);
 void NLA_OT_meta_remove(wmOperatorType *ot);
@@ -100,6 +108,7 @@ void NLA_OT_split(wmOperatorType *ot);
 
 void NLA_OT_mute_toggle(wmOperatorType *ot);
 
+void NLA_OT_swap(wmOperatorType *ot);
 void NLA_OT_move_up(wmOperatorType *ot);
 void NLA_OT_move_down(wmOperatorType *ot);
 

@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL/BL DUAL LICENSE BLOCK *****
@@ -30,21 +30,29 @@
  * ***** END GPL/BL DUAL LICENSE BLOCK *****
  */
 
+/** \file UI_resources.h
+ *  \ingroup editorui
+ */
+
 #ifndef UI_RESOURCES_H
 #define UI_RESOURCES_H
 
 /* elubie: TODO: move the typedef for icons to UI_interface_icons.h */
 /* and add/replace include of UI_resources.h by UI_interface_icons.h */
-#define DEF_ICON(name) name,
+#define DEF_ICON(name) ICON_##name,
+#define DEF_VICO(name) VICO_##name,
 
 typedef enum {
-#define BIFICONID_FIRST		(ICON_BLENDER)
 	/* ui */
 #include "UI_icons.h"
 	BIFICONID_LAST
-#define BIFNICONIDS			(BIFICONID_LAST-BIFICONID_FIRST + 1)
 } BIFIconID;
+
+#define BIFICONID_FIRST		(ICON_NONE)
+#define BIFNICONIDS			(BIFICONID_LAST-BIFICONID_FIRST + 1)
+
 #undef DEF_ICON
+#undef DEF_VICO
 
 
 typedef enum {
@@ -153,6 +161,7 @@ enum {
 	TH_VERTEX,
 	TH_VERTEX_SELECT,
 	TH_VERTEX_SIZE,
+	TH_OUTLINE_WIDTH,
 	TH_EDGE,
 	TH_EDGE_SELECT,
 	TH_EDGE_SEAM,
@@ -174,10 +183,12 @@ enum {
 	TH_HANDLE_AUTO,
 	TH_HANDLE_VECT,
 	TH_HANDLE_ALIGN,
+	TH_HANDLE_AUTOCLAMP,
 	TH_HANDLE_SEL_FREE,
 	TH_HANDLE_SEL_AUTO,
 	TH_HANDLE_SEL_VECT,
 	TH_HANDLE_SEL_ALIGN,
+	TH_HANDLE_SEL_AUTOCLAMP,
 
 	TH_ACTIVE_SPLINE,
 	TH_LASTSEL_POINT,
@@ -195,6 +206,8 @@ enum {
 	TH_STRIP_SELECT,
 	
 	TH_LAMP,
+
+	TH_SPEAKER,
 	
 	TH_NODE,
 	TH_NODE_IN_OUT,
@@ -230,6 +243,12 @@ enum {
 	TH_PREVIEW_BACK,
 	
 	TH_EDGE_CREASE,
+
+	TH_DRAWEXTRA_EDGELEN,
+	TH_DRAWEXTRA_FACEAREA,
+	TH_DRAWEXTRA_FACEANG,
+
+	TH_NODE_CURVING
 };
 /* XXX WARNING: previous is saved in file, so do not change order! */
 
@@ -268,17 +287,17 @@ void 	UI_GetThemeColor3fv(int colorid, float *col);
 void 	UI_GetThemeColorShade3fv(int colorid, int offset, float *col);
 
 // get the 3 or 4 byte values
-void 	UI_GetThemeColor3ubv(int colorid, char *col);
-void 	UI_GetThemeColor4ubv(int colorid, char *col);
+void 	UI_GetThemeColor3ubv(int colorid, unsigned char col[3]);
+void 	UI_GetThemeColor4ubv(int colorid, unsigned char col[4]);
 
 // get a theme color from specified space type
-void	UI_GetThemeColorType4ubv(int colorid, int spacetype, char *col);
+void	UI_GetThemeColorType4ubv(int colorid, int spacetype, char col[4]);
 
 // blends and shades between two color pointers
-void	UI_ColorPtrBlendShade3ubv(char *cp1, char *cp2, float fac, int offset);
+void	UI_ColorPtrBlendShade3ubv(const unsigned char cp1[3], const unsigned char cp2[3], float fac, int offset);
 
 // get a 3 byte color, blended and shaded between two other char color pointers
-void	UI_GetColorPtrBlendShade3ubv(char *cp1, char *cp2, char *col, float fac, int offset);
+void	UI_GetColorPtrBlendShade3ubv(const unsigned char cp1[3], const unsigned char cp2[3], unsigned char col[3], float fac, int offset);
 
 // clear the openGL ClearColor using the input colorid
 void	UI_ThemeClearColor(int colorid);
@@ -287,9 +306,8 @@ void	UI_ThemeClearColor(int colorid);
 void 	UI_SetTheme(int spacetype, int regionid);
 
 /* only for buttons in theme editor! */
-char 	*UI_ThemeGetColorPtr(struct bTheme *btheme, int spacetype, int colorid);
-char 	*UI_ThemeColorsPup(int spacetype);
+const unsigned char 	*UI_ThemeGetColorPtr(struct bTheme *btheme, int spacetype, int colorid);
 
-void UI_make_axis_color(char *src_col, char *dst_col, char axis);
+void UI_make_axis_color(const unsigned char *src_col, unsigned char *dst_col, const char axis);
 
 #endif /*  UI_ICONS_H */

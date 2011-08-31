@@ -1,4 +1,4 @@
-/**
+/*
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -26,7 +26,14 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/nodes/intern/TEX_nodes/TEX_texture.c
+ *  \ingroup texnodes
+ */
+
+
 #include "../TEX_util.h"
+#include "TEX_node.h"
+
 #include "RE_shader_ext.h"
 
 static bNodeSocketType inputs[]= {
@@ -42,18 +49,18 @@ static bNodeSocketType outputs[]= {
 
 static void colorfn(float *out, TexParams *p, bNode *node, bNodeStack **in, short thread)
 {
+	Tex *nodetex = (Tex *)node->id;
 	static float red[] = {1,0,0,1};
 	static float white[] = {1,1,1,1};
-	float *co = p->co;
-	
-	Tex *nodetex = (Tex *)node->id;
+	float co[3], dxt[3], dyt[3];
+
+	copy_v3_v3(co, p->co);
+	copy_v3_v3(dxt, p->dxt);
+	copy_v3_v3(dyt, p->dyt);
 	
 	if(node->custom2 || node->need_exec==0) {
 		/* this node refers to its own texture tree! */
-		QUATCOPY(
-			out,
-			(fabs(co[0] - co[1]) < .01) ? white : red 
-		);
+		QUATCOPY(out, (fabs(co[0] - co[1]) < .01) ? white : red );
 	}
 	else if(nodetex) {
 		TexResult texres;
@@ -63,9 +70,9 @@ static void colorfn(float *out, TexParams *p, bNode *node, bNodeStack **in, shor
 		
 		tex_input_rgba(col1, in[0], p, thread);
 		tex_input_rgba(col2, in[1], p, thread);
-		
+
 		texres.nor = nor;
-		textype = multitex_nodes(nodetex, co, p->dxt, p->dyt, p->osatex,
+		textype = multitex_nodes(nodetex, co, dxt, dyt, p->osatex,
 			&texres, thread, 0, p->shi, p->mtex);
 		
 		if(textype & TEX_RGB) {
@@ -83,21 +90,14 @@ static void exec(void *data, bNode *node, bNodeStack **in, bNodeStack **out)
 	tex_output(node, in, out[0], &colorfn, data);
 }
 
-bNodeType tex_node_texture= {
-	/* *next,*prev */	NULL, NULL,
-	/* type code   */	TEX_NODE_TEXTURE,
-	/* name        */	"Texture",
-	/* width+range */	120, 80, 240,
-	/* class+opts  */	NODE_CLASS_INPUT, NODE_OPTIONS|NODE_PREVIEW,
-	/* input sock  */	inputs,
-	/* output sock */	outputs,
-	/* storage     */	"",
-	/* execfunc    */	exec,
-	/* butfunc     */	NULL,
-	/* initfunc        */   NULL,
-	/* freestoragefunc */   NULL,
-	/* copystoragefunc */   NULL, 
-	/* id          */	NULL
+void register_node_type_tex_texture(ListBase *lb)
+{
+	static bNodeType ntype;
 	
-};
-
+	node_type_base(&ntype, TEX_NODE_TEXTURE, "Texture", NODE_CLASS_INPUT, NODE_PREVIEW|NODE_OPTIONS,
+				   inputs, outputs);
+	node_type_size(&ntype, 120, 80, 240);
+	node_type_exec(&ntype, exec);
+	
+	nodeRegisterType(lb, &ntype);
+}

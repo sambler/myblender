@@ -24,13 +24,18 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-FILE(GLOB SRC intern/*.c)
+if(WITH_CODEC_FFMPEG)
+	# FFMPEG gives warnigns which are hard to avoid across multiple versions.
+	remove_strict_flags()
+endif()
 
-SET(INC 
+set(INC 
 	.
 	../avi
+	../blenfont
 	../blenlib
 	../blenloader
+	../editors/include
 	../gpu
 	../ikplugin
 	../imbuf
@@ -38,99 +43,318 @@ SET(INC
 	../makesrna
 	../modifiers
 	../nodes
-	../editors/include
 	../render/extern/include
-	../../../extern/glew/include
-	../../../intern/audaspace/intern
-	../../../intern/bsp/extern ../blenfont
+	../../../intern/bsp/extern
 	../../../intern/decimation/extern
 	../../../intern/elbeem/extern
 	../../../intern/guardedalloc
 	../../../intern/iksolver/extern
 	../../../intern/memutil
+	../../../intern/mikktspace
 	../../../intern/opennl/extern
 	../../../intern/smoke/extern
-    ../../../source/blender/windowmanager # XXX - BAD LEVEL CALL WM_api.h
-	${ZLIB_INC}
+
+	# XXX - BAD LEVEL CALL WM_api.h
+	../windowmanager
 )
 
+set(INC_SYS
+	${GLEW_INCLUDE_PATH}
+	${ZLIB_INCLUDE_DIRS}
+)
 
-ADD_DEFINITIONS(-DGLEW_STATIC)
+set(SRC
+	intern/BME_Customdata.c
+	intern/BME_conversions.c
+	intern/BME_eulers.c
+	intern/BME_mesh.c
+	intern/BME_structure.c
+	intern/BME_tools.c
+	intern/CCGSubSurf.c
+	intern/DerivedMesh.c
+	intern/action.c
+	intern/anim.c
+	intern/anim_sys.c
+	intern/armature.c
+	intern/blender.c
+	intern/bmfont.c
+	intern/boids.c
+	intern/booleanops_mesh.c
+	intern/brush.c
+	intern/bullet.c
+	intern/bvhutils.c
+	intern/cdderivedmesh.c
+	intern/cloth.c
+	intern/collision.c
+	intern/colortools.c
+	intern/constraint.c
+	intern/context.c
+	intern/curve.c
+	intern/customdata.c
+	intern/customdata_file.c
+	intern/deform.c
+	intern/depsgraph.c
+	intern/displist.c
+	intern/effect.c
+	intern/fcurve.c
+	intern/fluidsim.c
+	intern/fmodifier.c
+	intern/font.c
+	intern/gpencil.c
+	intern/group.c
+	intern/icons.c
+	intern/idcode.c
+	intern/idprop.c
+	intern/image.c
+	intern/image_gen.c
+	intern/implicit.c
+	intern/ipo.c
+	intern/key.c
+	intern/lattice.c
+	intern/library.c
+	intern/material.c
+	intern/mball.c
+	intern/mesh.c
+	intern/mesh_validate.c
+	intern/modifier.c
+	intern/multires.c
+	intern/nla.c
+	intern/node.c
+	intern/object.c
+	intern/packedFile.c
+	intern/paint.c
+	intern/particle.c
+	intern/particle_system.c
+	intern/pointcache.c
+	intern/property.c
+	intern/report.c
+	intern/sca.c
+	intern/scene.c
+	intern/screen.c
+	intern/script.c
+	intern/seqcache.c
+	intern/seqeffects.c
+	intern/sequencer.c
+	intern/shrinkwrap.c
+	intern/sketch.c
+	intern/smoke.c
+	intern/softbody.c
+	intern/sound.c
+	intern/speaker.c
+	intern/subsurf_ccg.c
+	intern/suggestions.c
+	intern/text.c
+	intern/texture.c
+	intern/unit.c
+	intern/world.c
+	intern/writeavi.c
+	intern/writeffmpeg.c
+	intern/writeframeserver.c
+	
+	BKE_DerivedMesh.h
+	BKE_action.h
+	BKE_anim.h
+	BKE_animsys.h
+	BKE_armature.h
+	BKE_array_mallocn.h
+	BKE_blender.h
+	BKE_bmesh.h
+	BKE_bmeshCustomData.h
+	BKE_bmfont.h
+	BKE_bmfont_types.h
+	BKE_boids.h
+	BKE_booleanops_mesh.h
+	BKE_brush.h
+	BKE_bullet.h
+	BKE_bvhutils.h
+	BKE_cdderivedmesh.h
+	BKE_cloth.h
+	BKE_collision.h
+	BKE_colortools.h
+	BKE_constraint.h
+	BKE_context.h
+	BKE_curve.h
+	BKE_customdata.h
+	BKE_customdata_file.h
+	BKE_deform.h
+	BKE_depsgraph.h
+	BKE_displist.h
+	BKE_effect.h
+	BKE_endian.h
+	BKE_fcurve.h
+	BKE_fluidsim.h
+	BKE_font.h
+	BKE_global.h
+	BKE_gpencil.h
+	BKE_group.h
+	BKE_icons.h
+	BKE_idcode.h
+	BKE_idprop.h
+	BKE_image.h
+	BKE_ipo.h
+	BKE_key.h
+	BKE_lattice.h
+	BKE_library.h
+	BKE_main.h
+	BKE_material.h
+	BKE_mball.h
+	BKE_mesh.h
+	BKE_modifier.h
+	BKE_multires.h
+	BKE_nla.h
+	BKE_node.h
+	BKE_object.h
+	BKE_packedFile.h
+	BKE_paint.h
+	BKE_particle.h
+	BKE_plugin_types.h
+	BKE_pointcache.h
+	BKE_property.h
+	BKE_report.h
+	BKE_sca.h
+	BKE_scene.h
+	BKE_screen.h
+	BKE_script.h
+	BKE_sequencer.h
+	BKE_shrinkwrap.h
+	BKE_sketch.h
+	BKE_smoke.h
+	BKE_softbody.h
+	BKE_sound.h
+	BKE_speaker.h
+	BKE_subsurf.h
+	BKE_suggestions.h
+	BKE_text.h
+	BKE_texture.h
+	BKE_unit.h
+	BKE_utildefines.h
+	BKE_world.h
+	BKE_writeavi.h
+	BKE_writeffmpeg.h
+	BKE_writeframeserver.h
+	depsgraph_private.h
+	intern/CCGSubSurf.h
+	intern/bmesh_private.h
+	nla_private.h
+)
 
-IF(WITH_BULLET)
-	LIST(APPEND INC ../../../extern/bullet2/src)
-	ADD_DEFINITIONS(-DUSE_BULLET)
-ENDIF(WITH_BULLET)
+add_definitions(-DGLEW_STATIC)
 
-IF(WITH_IMAGE_OPENEXR)
-	ADD_DEFINITIONS(-DWITH_OPENEXR)
-ENDIF(WITH_IMAGE_OPENEXR)
+if(WITH_AUDASPACE)
+	list(APPEND INC
+		../../../intern/audaspace/intern
+	)
+	add_definitions(-DWITH_AUDASPACE)
+endif()
 
-IF(WITH_IMAGE_TIFF)
-	ADD_DEFINITIONS(-DWITH_TIFF)
-ENDIF(WITH_IMAGE_TIFF)
+if(WITH_BULLET)
+	list(APPEND INC
+		../../../extern/bullet2/src
+	)
+	add_definitions(-DUSE_BULLET)
+endif()
 
-IF(WITH_IMAGE_OPENJPEG)
-	ADD_DEFINITIONS(-DWITH_OPENJPEG)
-ENDIF(WITH_IMAGE_OPENJPEG)
+if(WITH_MOD_CLOTH_ELTOPO)
+	list(APPEND INC
+		../../../extern/eltopo
+	)
+	add_definitions(-DWITH_ELTOPO)
+endif()
 
-IF(WITH_IMAGE_DDS)
-	ADD_DEFINITIONS(-DWITH_DDS)
-ENDIF(WITH_IMAGE_DDS)
+if(WITH_IMAGE_OPENEXR)
+	add_definitions(-DWITH_OPENEXR)
+endif()
 
-IF(WITH_IMAGE_CINEON)
-	ADD_DEFINITIONS(-DWITH_CINEON)
-ENDIF(WITH_IMAGE_CINEON)
+if(WITH_IMAGE_TIFF)
+	add_definitions(-DWITH_TIFF)
+endif()
 
-IF(WITH_IMAGE_HDR)
-	ADD_DEFINITIONS(-DWITH_HDR)
-ENDIF(WITH_IMAGE_HDR)
+if(WITH_IMAGE_OPENJPEG)
+	add_definitions(-DWITH_OPENJPEG)
+endif()
 
-IF(WITH_QUICKTIME)
-	LIST(APPEND INC ../quicktime ${QUICKTIME_INC})
-	ADD_DEFINITIONS(-DWITH_QUICKTIME)
-ENDIF(WITH_QUICKTIME)
+if(WITH_IMAGE_DDS)
+	add_definitions(-DWITH_DDS)
+endif()
 
-IF(WITH_FFMPEG)
-	LIST(APPEND INC ${FFMPEG_INC})
-	ADD_DEFINITIONS(-DWITH_FFMPEG)
-ENDIF(WITH_FFMPEG)
+if(WITH_IMAGE_CINEON)
+	add_definitions(-DWITH_CINEON)
+endif()
 
-IF(WITH_LCMS)
-	LIST(APPEND INC ${LCMS_INCLUDE_DIR})
-	ADD_DEFINITIONS(-DWITH_LCMS)
-ENDIF(WITH_LCMS)
+if(WITH_IMAGE_FRAMESERVER)
+	add_definitions(-DWITH_FRAMESERVER)
+endif()
 
-IF(WITH_PYTHON)
-	LIST(APPEND INC ../python ${PYTHON_INC})
-ELSE(WITH_PYTHON)
-	ADD_DEFINITIONS(-DDISABLE_PYTHON)
-ENDIF(WITH_PYTHON)
+if(WITH_IMAGE_HDR)
+	add_definitions(-DWITH_HDR)
+endif()
 
-IF(WITH_OPENMP)
-	ADD_DEFINITIONS(-DPARALLEL=1)
-ENDIF(WITH_OPENMP)
+if(WITH_CODEC_QUICKTIME)
+	list(APPEND INC
+		../quicktime
+	)
+	list(APPEND INC_SYS
+		${QUICKTIME_INCLUDE_DIRS}
+	)
+	add_definitions(-DWITH_QUICKTIME)
+endif()
 
-IF(NOT WITH_FLUID)
-	ADD_DEFINITIONS(-DDISABLE_ELBEEM)
-ENDIF(NOT WITH_FLUID)
+if(WITH_CODEC_FFMPEG)
+	list(APPEND INC
+		../../../intern/ffmpeg
+	)
+	list(APPEND INC_SYS
+		${FFMPEG_INCLUDE_DIRS}
+	)
+	add_definitions(-DWITH_FFMPEG)
+endif()
 
-IF(WITH_JACK)
-	ADD_DEFINITIONS(-DWITH_JACK)
-ENDIF(WITH_JACK)
+if(WITH_PYTHON)
+	list(APPEND INC
+		../python
+	)
+	list(APPEND INC_SYS
+		${PYTHON_INCLUDE_DIRS}
+	)
+	add_definitions(-DWITH_PYTHON)
 
-IF(WITH_LZO)
-	LIST(APPEND INC ../../../extern/lzo/minilzo)
-	ADD_DEFINITIONS(-DWITH_LZO)
-ENDIF(WITH_LZO)
+	if(WITH_PYTHON_SECURITY)
+		add_definitions(-DWITH_PYTHON_SECURITY)
+	endif()
+endif()
 
-IF(WITH_LZMA)
-	LIST(APPEND INC ../../../extern/lzma)
-	ADD_DEFINITIONS(-DWITH_LZMA)
-ENDIF(WITH_LZMA)
+if(WITH_OPENMP)
+	add_definitions(-DPARALLEL=1)
+endif()
 
-IF(WIN32)
-	LIST(APPEND INC ${PTHREADS_INC})
-ENDIF(WIN32)
+if(NOT WITH_MOD_FLUID)
+	add_definitions(-DDISABLE_ELBEEM)
+endif()
 
-BLENDERLIB(bf_blenkernel "${SRC}" "${INC}")
+if(WITH_MOD_SMOKE)
+	add_definitions(-DWITH_SMOKE)
+endif()
+
+if(WITH_JACK)
+	add_definitions(-DWITH_JACK)
+endif()
+
+if(WITH_LZO)
+	list(APPEND INC_SYS
+		../../../extern/lzo/minilzo
+	)
+	add_definitions(-DWITH_LZO)
+endif()
+
+if(WITH_LZMA)
+	list(APPEND INC_SYS
+		../../../extern/lzma
+	)
+	add_definitions(-DWITH_LZMA)
+endif()
+
+if(MSVC)
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /WX")
+endif()
+
+blender_add_lib(bf_blenkernel "${SRC}" "${INC}" "${INC_SYS}")

@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -20,6 +20,10 @@
  * Contributor(s): Chingiz Dyussenov, Arystanbek Dyussenov, Nathan Letwory.
  *
  * ***** END GPL LICENSE BLOCK *****
+ */
+
+/** \file MeshImporter.h
+ *  \ingroup collada
  */
 
 #ifndef __BC__MESHIMPORTER_H__
@@ -65,12 +69,14 @@ public:
 	void print();
 #endif
 
-	void getUV(int uv_index[2], float *uv);
+	void getUV(int uv_index, float *uv);
 };
 
 class MeshImporter : public MeshImporterBase
 {
 private:
+
+	UnitConverter *unitconverter;
 
 	Scene *scene;
 	ArmatureImporter *armature_importer;
@@ -85,6 +91,7 @@ private:
 	};
 	typedef std::map<COLLADAFW::MaterialId, std::vector<Primitive> > MaterialIdPrimitiveArrayMap;
 	std::map<COLLADAFW::UniqueId, MaterialIdPrimitiveArrayMap> geom_uid_mat_mapping_map; // crazy name!
+	std::multimap<COLLADAFW::UniqueId, COLLADAFW::UniqueId> materials_mapped_to_geom; //< materials that have already been mapped to a geometry. A pair of geom uid and mat uid, one geometry can have several materials
 	
 
 	void set_face_indices(MFace *mface, unsigned int *indices, bool quad);
@@ -116,12 +123,10 @@ private:
 	// TODO: import uv set names
 	void read_faces(COLLADAFW::Mesh *mesh, Mesh *me, int new_tris);
 
-	void get_vector(float v[3], COLLADAFW::MeshVertexData& arr, int i);
+	void get_vector(float v[3], COLLADAFW::MeshVertexData& arr, int i, int stride);
 
 	bool flat_face(unsigned int *nind, COLLADAFW::MeshVertexData& nor, int count);
 	
-	UnitConverter *unitconverter;
-
 public:
 
 	MeshImporter(UnitConverter *unitconv, ArmatureImporter *arm, Scene *sce);

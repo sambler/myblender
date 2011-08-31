@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,20 +25,29 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/interface/interface_ops.c
+ *  \ingroup edinterface
+ */
+
+
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
-
 
 #include "MEM_guardedalloc.h"
 
 #include "DNA_scene_types.h"
 #include "DNA_screen_types.h"
+#include "DNA_text_types.h" /* for UI_OT_reports_to_text */
 
 #include "BLI_blenlib.h"
 #include "BLI_math_color.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_context.h"
+#include "BKE_global.h"
+#include "BKE_text.h" /* for UI_OT_reports_to_text */
+#include "BKE_report.h"
 
 #include "RNA_access.h"
 #include "RNA_define.h"
@@ -88,7 +97,7 @@ static int eyedropper_cancel(bContext *C, wmOperator *op)
 	return OPERATOR_CANCELLED;
 }
 
-static void eyedropper_sample(bContext *C, Eyedropper *eye, short mx, short my)
+static void eyedropper_sample(bContext *C, Eyedropper *eye, int mx, int my)
 {
 	if(RNA_property_type(eye->prop) == PROP_FLOAT) {
 		const int color_manage = CTX_data_scene(C)->r.color_mgt_flag & R_COLOR_MANAGEMENT;
@@ -173,7 +182,7 @@ static int eyedropper_poll(bContext *C)
 	else return 1;
 }
 
-void UI_OT_eyedropper(wmOperatorType *ot)
+static void UI_OT_eyedropper(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Eyedropper";
@@ -203,7 +212,7 @@ static int reset_default_theme_exec(bContext *C, wmOperator *UNUSED(op))
 	return OPERATOR_FINISHED;
 }
 
-void UI_OT_reset_default_theme(wmOperatorType *ot)
+static void UI_OT_reset_default_theme(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Reset to Default Theme";
@@ -243,7 +252,7 @@ static int copy_data_path_button_exec(bContext *C, wmOperator *UNUSED(op))
 	return (success)? OPERATOR_FINISHED: OPERATOR_CANCELLED;
 }
 
-void UI_OT_copy_data_path_button(wmOperatorType *ot)
+static void UI_OT_copy_data_path_button(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Copy Data Path";
@@ -293,7 +302,7 @@ static int reset_default_button_exec(bContext *C, wmOperator *op)
 	return (success)? OPERATOR_FINISHED: OPERATOR_CANCELLED;
 }
 
-void UI_OT_reset_default_button(wmOperatorType *ot)
+static void UI_OT_reset_default_button(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Reset to Default Value";
@@ -385,7 +394,7 @@ static int copy_to_selected_button_exec(bContext *C, wmOperator *op)
 	return (success)? OPERATOR_FINISHED: OPERATOR_CANCELLED;
 }
 
-void UI_OT_copy_to_selected_button(wmOperatorType *ot)
+static void UI_OT_copy_to_selected_button(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Copy To Selected";
@@ -402,7 +411,51 @@ void UI_OT_copy_to_selected_button(wmOperatorType *ot)
 	/* properties */
 	RNA_def_boolean(ot->srna, "all", 1, "All", "Reset to default values all elements of the array.");
 }
- 
+
+/* Reports to Textblock Operator ------------------------ */
+
+/* FIXME: this is just a temporary operator so that we can see all the reports somewhere 
+ * when there are too many to display...
+ */
+
+static int reports_to_text_poll(bContext *C)
+{
+	return CTX_wm_reports(C) != NULL;
+}
+
+static int reports_to_text_exec(bContext *C, wmOperator *UNUSED(op))
+{
+	ReportList *reports = CTX_wm_reports(C);
+	Text *txt;
+	char *str;
+	
+	/* create new text-block to write to */
+	txt = add_empty_text("Recent Reports");
+	
+	/* convert entire list to a display string, and add this to the text-block
+	 *	- if commandline debug option enabled, show debug reports too
+	 *	- otherwise, up to info (which is what users normally see)
+	 */
+	str = BKE_reports_string(reports, (G.f & G_DEBUG)? RPT_DEBUG : RPT_INFO);
+	
+	write_text(txt, str);
+	MEM_freeN(str);
+	
+	return OPERATOR_FINISHED;
+}
+
+static void UI_OT_reports_to_textblock(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name= "Reports to Text Block";
+	ot->idname= "UI_OT_reports_to_textblock";
+	ot->description= "Write the reports ";
+	
+	/* callbacks */
+	ot->poll= reports_to_text_poll;
+	ot->exec= reports_to_text_exec;
+}
+
 /* ********************************************************* */
 /* Registration */
 
@@ -413,5 +466,6 @@ void UI_buttons_operatortypes(void)
 	WM_operatortype_append(UI_OT_copy_data_path_button);
 	WM_operatortype_append(UI_OT_reset_default_button);
 	WM_operatortype_append(UI_OT_copy_to_selected_button);
+	WM_operatortype_append(UI_OT_reports_to_textblock); // XXX: temp?
 }
 

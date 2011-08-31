@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -17,10 +17,15 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributors: Amorilia (amorilia@gamebox.net)
+ * Contributors: Amorilia (amorilia@users.sourceforge.net)
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/imbuf/intern/dds/dds_api.h
+ *  \ingroup imbdds
+ */
+
 
 #ifndef _DDS_API_H
 #define _DDS_API_H
@@ -29,7 +34,7 @@
 extern "C" {
 #endif
 
-int  	      imb_save_dds(struct ImBuf *ibuf, char *name, int flags);
+int  	      imb_save_dds(struct ImBuf *ibuf, const char *name, int flags);
 int           imb_is_a_dds(unsigned char *mem); /* use only first 32 bytes of mem */
 struct ImBuf *imb_load_dds(unsigned char *mem, size_t size, int flags);
 

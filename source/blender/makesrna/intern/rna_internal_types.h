@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -22,8 +22,13 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
-#ifndef RNA_INTERNAL_TYPES
-#define RNA_INTERNAL_TYPES
+/** \file blender/makesrna/intern/rna_internal_types.h
+ *  \ingroup RNA
+ */
+
+
+#ifndef RNA_INTERNAL_TYPES_H
+#define RNA_INTERNAL_TYPES_H
 
 #include "DNA_listBase.h"
 
@@ -36,6 +41,7 @@ struct FunctionRNA;
 struct ReportList;
 struct CollectionPropertyIterator;
 struct bContext;
+struct EnumProperty;
 struct IDProperty;
 struct GHash;
 struct Main;
@@ -56,6 +62,7 @@ struct Scene;
 /* Function Callbacks */
 
 typedef void (*UpdateFunc)(struct Main *main, struct Scene *scene, struct PointerRNA *ptr);
+typedef void (*ContextPropUpdateFunc)(struct bContext *C, struct PointerRNA *ptr, struct PropertyRNA *prop);
 typedef void (*ContextUpdateFunc)(struct bContext *C, struct PointerRNA *ptr);
 typedef int (*EditableFunc)(struct PointerRNA *ptr);
 typedef int (*ItemEditableFunc)(struct PointerRNA *ptr, int index);
@@ -83,7 +90,7 @@ typedef int (*PropStringLengthFunc)(struct PointerRNA *ptr);
 typedef void (*PropStringSetFunc)(struct PointerRNA *ptr, const char *value);
 typedef int (*PropEnumGetFunc)(struct PointerRNA *ptr);
 typedef void (*PropEnumSetFunc)(struct PointerRNA *ptr, int value);
-typedef EnumPropertyItem *(*PropEnumItemFunc)(struct bContext *C, struct PointerRNA *ptr, int *free);
+typedef EnumPropertyItem *(*PropEnumItemFunc)(struct bContext *C, struct PointerRNA *ptr, struct PropertyRNA *prop, int *free);
 typedef PointerRNA (*PropPointerGetFunc)(struct PointerRNA *ptr);
 typedef StructRNA* (*PropPointerTypeFunc)(struct PointerRNA *ptr);
 typedef void (*PropPointerSetFunc)(struct PointerRNA *ptr, const PointerRNA value);
@@ -93,8 +100,8 @@ typedef void (*PropCollectionNextFunc)(struct CollectionPropertyIterator *iter);
 typedef void (*PropCollectionEndFunc)(struct CollectionPropertyIterator *iter);
 typedef PointerRNA (*PropCollectionGetFunc)(struct CollectionPropertyIterator *iter);
 typedef int (*PropCollectionLengthFunc)(struct PointerRNA *ptr);
-typedef PointerRNA (*PropCollectionLookupIntFunc)(struct PointerRNA *ptr, int key);
-typedef PointerRNA (*PropCollectionLookupStringFunc)(struct PointerRNA *ptr, const char *key);
+typedef int (*PropCollectionLookupIntFunc)(struct PointerRNA *ptr, int key, struct PointerRNA *r_ptr);
+typedef int (*PropCollectionLookupStringFunc)(struct PointerRNA *ptr, const char *key, struct PointerRNA *r_ptr);
 
 /* Container - generic abstracted container of RNA properties */
 typedef struct ContainerRNA {
@@ -108,7 +115,7 @@ struct FunctionRNA {
 	/* structs are containers of properties */
 	ContainerRNA cont;
 
-	/* unique identifier */
+	/* unique identifier, keep after 'cont' */
 	const char *identifier;
 	/* various options */
 	int flag;
@@ -171,6 +178,10 @@ struct PropertyRNA {
 	 * any property can have this but should only be used for collections and arrays
 	 * since python will convert int/bool/pointer's */
 	struct StructRNA *srna;	/* attributes attached directly to this collection */
+
+	/* python handle to hold all callbacks
+	 * (in a pointer array at the moment, may later be a tuple) */
+	void *py_data;
 };
 
 /* Property Types */
@@ -245,6 +256,7 @@ typedef struct EnumPropertyRNA {
 	PropEnumGetFunc get;
 	PropEnumSetFunc set;
 	PropEnumItemFunc itemf;
+	void *py_data; /* store py callback here */
 
 	EnumPropertyItem *item;
 	int totitem;
@@ -283,13 +295,14 @@ struct StructRNA {
 	/* structs are containers of properties */
 	ContainerRNA cont;
 
+	/* unique identifier, keep after 'cont' */
+	const char *identifier;
+
 	/* python type, this is a subtype of pyrna_struct_Type but used so each struct can have its own type
 	 * which is useful for subclassing RNA */
 	void *py_type;
 	void *blender_type;
 	
-	/* unique identifier */
-	const char *identifier;
 	/* various options */
 	int flag;
 
@@ -324,6 +337,7 @@ struct StructRNA {
 	/* function to register/unregister subclasses */
 	StructRegisterFunc reg; 
 	StructUnregisterFunc unreg; 
+	StructInstanceFunc instance;
 
 	/* callback to get id properties */
 	IDPropertiesFunc idproperties;
@@ -340,5 +354,6 @@ struct BlenderRNA {
 	ListBase structs;
 };
 
-#endif /* RNA_INTERNAL_TYPES */
+#define CONTAINER_RNA_ID(cont) (*(const char **)(((ContainerRNA *)(cont))+1))
 
+#endif /* RNA_INTERNAL_TYPES_H */

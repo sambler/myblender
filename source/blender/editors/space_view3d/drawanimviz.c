@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,10 +27,16 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/space_view3d/drawanimviz.c
+ *  \ingroup spview3d
+ */
+
+
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
 
+#include "BLO_sys_types.h"
 
 #include "DNA_anim_types.h"
 #include "DNA_armature_types.h"
@@ -78,7 +84,6 @@ void draw_motion_paths_init(View3D *v3d, ARegion *ar)
  * 	- assumes that the viewport has already been initialised properly
  *		i.e. draw_motion_paths_init() has been called
  */
-// FIXME: the text is still drawn in the wrong space - it includes the current transforms of the object still...
 void draw_motion_path_instance(Scene *scene, 
 			Object *ob, bPoseChannel *pchan, bAnimVizSettings *avs, bMotionPath *mpath)
 {
@@ -112,7 +117,11 @@ void draw_motion_path_instance(Scene *scene,
 		len = mpath->length;
 		mpv_start= mpath->points;
 	}
-	
+
+	if(len <= 0) {
+		return;
+	}
+
 	/* draw curve-line of path */
 	glShadeModel(GL_SMOOTH);
 	
@@ -201,15 +210,24 @@ void draw_motion_path_instance(Scene *scene,
 		UI_ThemeColor(TH_TEXT_HI);
 	}
 	
+	// XXX, this isnt up to date but probably should be kept so.
+	invert_m4_m4(ob->imat, ob->obmat);
+	
 	/* Draw frame numbers at each framestep value */
 	if (avs->path_viewflag & MOTIONPATH_VIEW_FNUMS) {
+		unsigned char col[4];
+		UI_GetThemeColor3ubv(TH_TEXT_HI, col);
+		col[3]= 255;
+
 		for (i=0, mpv=mpv_start; i < len; i+=stepsize, mpv+=stepsize) {
 			char str[32];
+			float co[3];
 			
 			/* only draw framenum if several consecutive highlighted points don't occur on same point */
 			if (i == 0) {
 				sprintf(str, "%d", (i+sfra));
-				view3d_cached_text_draw_add(mpv->co[0], mpv->co[1], mpv->co[2], str, 0, 0);
+				mul_v3_m4v3(co, ob->imat, mpv->co);
+				view3d_cached_text_draw_add(co, str, 0, V3D_CACHE_TEXT_WORLDSPACE|V3D_CACHE_TEXT_ASCII, col);
 			}
 			else if ((i > stepsize) && (i < len-stepsize)) { 
 				bMotionPathVert *mpvP = (mpv - stepsize);
@@ -217,7 +235,8 @@ void draw_motion_path_instance(Scene *scene,
 				
 				if ((equals_v3v3(mpv->co, mpvP->co)==0) || (equals_v3v3(mpv->co, mpvN->co)==0)) {
 					sprintf(str, "%d", (sfra+i));
-					view3d_cached_text_draw_add(mpv->co[0], mpv->co[1], mpv->co[2], str, 0, 0);
+					mul_v3_m4v3(co, ob->imat, mpv->co);
+					view3d_cached_text_draw_add(co, str, 0, V3D_CACHE_TEXT_WORLDSPACE|V3D_CACHE_TEXT_ASCII, col);
 				}
 			}
 		}
@@ -225,6 +244,8 @@ void draw_motion_path_instance(Scene *scene,
 	
 	/* Keyframes - dots and numbers */
 	if (avs->path_viewflag & MOTIONPATH_VIEW_KFRAS) {
+		unsigned char col[4];
+
 		AnimData *adt= BKE_animdata_from_id(&ob->id);
 		DLRBT_Tree keys;
 		
@@ -250,8 +271,11 @@ void draw_motion_path_instance(Scene *scene,
 		}
 		
 		/* Draw slightly-larger yellow dots at each keyframe */
-		UI_ThemeColor(TH_VERTEX_SELECT);
+		UI_GetThemeColor3ubv(TH_VERTEX_SELECT, col);
+		col[3]= 255;
+
 		glPointSize(4.0f); // XXX perhaps a bit too big
+		glColor3ubv(col);
 		
 		glBegin(GL_POINTS);
 		for (i=0, mpv=mpv_start; i < len; i++, mpv++) {
@@ -266,6 +290,7 @@ void draw_motion_path_instance(Scene *scene,
 		
 		/* Draw frame numbers of keyframes  */
 		if (avs->path_viewflag & MOTIONPATH_VIEW_KFNOS) {
+			float co[3];
 			for (i=0, mpv=mpv_start; i < len; i++, mpv++) {
 				float mframe= (float)(sfra + i);
 				
@@ -273,7 +298,8 @@ void draw_motion_path_instance(Scene *scene,
 					char str[32];
 					
 					sprintf(str, "%d", (sfra+i));
-					view3d_cached_text_draw_add(mpv->co[0], mpv->co[1], mpv->co[2], str, 0, 0);
+					mul_v3_m4v3(co, ob->imat, mpv->co);
+					view3d_cached_text_draw_add(co, str, 0, V3D_CACHE_TEXT_WORLDSPACE|V3D_CACHE_TEXT_ASCII, col);
 				}
 			}
 		}
@@ -367,7 +393,7 @@ static void draw_ghost_poses_range(Scene *scene, View3D *v3d, ARegion *ar, Base 
 		colfac = (end - (float)CFRA) / range;
 		UI_ThemeColorShadeAlpha(TH_WIRE, 0, -128-(int)(120.0*sqrt(colfac)));
 		
-		BKE_animsys_evaluate_animdata(&ob->id, adt, (float)CFRA, ADT_RECALC_ALL);
+		BKE_animsys_evaluate_animdata(scene, &ob->id, adt, (float)CFRA, ADT_RECALC_ALL);
 		where_is_pose(scene, ob);
 		draw_pose_bones(scene, v3d, ar, base, OB_WIRE);
 	}
@@ -446,7 +472,7 @@ static void draw_ghost_poses_keys(Scene *scene, View3D *v3d, ARegion *ar, Base *
 		
 		CFRA= (int)ak->cfra;
 		
-		BKE_animsys_evaluate_animdata(&ob->id, adt, (float)CFRA, ADT_RECALC_ALL);
+		BKE_animsys_evaluate_animdata(scene, &ob->id, adt, (float)CFRA, ADT_RECALC_ALL);
 		where_is_pose(scene, ob);
 		draw_pose_bones(scene, v3d, ar, base, OB_WIRE);
 	}
@@ -516,7 +542,7 @@ static void draw_ghost_poses(Scene *scene, View3D *v3d, ARegion *ar, Base *base)
 			CFRA= (int)BKE_nla_tweakedit_remap(adt, actframe+ctime, NLATIME_CONVERT_MAP);
 			
 			if (CFRA != cfrao) {
-				BKE_animsys_evaluate_animdata(&ob->id, adt, (float)CFRA, ADT_RECALC_ALL);
+				BKE_animsys_evaluate_animdata(scene, &ob->id, adt, (float)CFRA, ADT_RECALC_ALL);
 				where_is_pose(scene, ob);
 				draw_pose_bones(scene, v3d, ar, base, OB_WIRE);
 			}
@@ -531,7 +557,7 @@ static void draw_ghost_poses(Scene *scene, View3D *v3d, ARegion *ar, Base *base)
 			CFRA= (int)BKE_nla_tweakedit_remap(adt, actframe-ctime, NLATIME_CONVERT_MAP);
 			
 			if (CFRA != cfrao) {
-				BKE_animsys_evaluate_animdata(&ob->id, adt, (float)CFRA, ADT_RECALC_ALL);
+				BKE_animsys_evaluate_animdata(scene, &ob->id, adt, (float)CFRA, ADT_RECALC_ALL);
 				where_is_pose(scene, ob);
 				draw_pose_bones(scene, v3d, ar, base, OB_WIRE);
 			}

@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -28,6 +28,11 @@
  * editarmature.c: Interface for creating and posing armature objects
  */
 
+/** \file blender/editors/armature/editarmature_generate.c
+ *  \ingroup edarmature
+ */
+
+
 #include <string.h>
 #include <math.h>
 #include <float.h>
@@ -39,8 +44,9 @@
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
 #include "BLI_graph.h"
+#include "BLI_utildefines.h"
  
-#include "BKE_utildefines.h"
+
 
 #include "ED_armature.h"
 #include "armature_intern.h"
@@ -50,18 +56,12 @@ void setBoneRollFromNormal(EditBone *bone, float *no, float UNUSED(invmat[][4]),
 {
 	if (no != NULL && !is_zero_v3(no))
 	{
-		float tangent[3], vec[3], normal[3];
+		float normal[3];
 
-		VECCOPY(normal, no);	
+		copy_v3_v3(normal, no);	
 		mul_m3_v3(tmat, normal);
-
-		sub_v3_v3v3(tangent, bone->tail, bone->head);
-		project_v3_v3v3(vec, tangent, normal);
-		sub_v3_v3(normal, vec);
 		
-		normalize_v3(normal);
-		
-		bone->roll = ED_rollBoneToVector(bone, normal);
+		bone->roll = ED_rollBoneToVector(bone, normal, FALSE);
 	}
 }
 

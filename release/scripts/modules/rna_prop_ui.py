@@ -58,7 +58,24 @@ def rna_idprop_ui_prop_clear(item, prop):
         pass
 
 
-def draw(layout, context, context_member, use_edit=True):
+def rna_idprop_context_value(context, context_member, property_type):
+    space = context.space_data
+
+    if space is None or isinstance(space, bpy.types.SpaceProperties):
+        pin_id = space.pin_id
+    else:
+        pin_id = None
+
+    if pin_id and isinstance(pin_id, property_type):
+        rna_item = pin_id
+        context_member = "space_data.pin_id"
+    else:
+        rna_item = eval("context." + context_member)
+
+    return rna_item, context_member
+
+
+def draw(layout, context, context_member, property_type, use_edit=True):
 
     def assign_props(prop, val, key):
         prop.data_path = context_member
@@ -69,11 +86,13 @@ def draw(layout, context, context_member, use_edit=True):
         except:
             pass
 
-    rna_item = eval("context." + context_member)
+    rna_item, context_member = rna_idprop_context_value(context, context_member, property_type)
 
     # poll should really get this...
     if not rna_item:
         return
+
+    assert(isinstance(rna_item, property_type))
 
     items = rna_item.items()
     items.sort()
@@ -92,12 +111,16 @@ def draw(layout, context, context_member, use_edit=True):
             continue
 
         row = layout.row()
-        convert_to_pyobject = getattr(val, "convert_to_pyobject", None)
+        to_dict = getattr(val, "to_dict", None)
+        to_list = getattr(val, "to_list", None)
 
-        val_orig = val
-        if convert_to_pyobject:
-            val_draw = val = val.convert_to_pyobject()
-            val_draw = str(val_draw)
+        # val_orig = val  # UNUSED
+        if to_dict:
+            val = to_dict()
+            val_draw = str(val)
+        elif to_list:
+            val = to_list()
+            val_draw = str(val)
         else:
             val_draw = val
 
@@ -112,7 +135,7 @@ def draw(layout, context, context_member, use_edit=True):
         row.label(text=key)
 
         # explicit exception for arrays
-        if convert_to_pyobject and not hasattr(val_orig, "len"):
+        if to_dict or to_list:
             row.label(text=val_draw)
         else:
             if key in rna_properties:
@@ -139,7 +162,16 @@ class PropertyPanel():
 
     @classmethod
     def poll(cls, context):
-        return bool(eval("context.%s" % cls._context_path))
+        rna_item, context_member = rna_idprop_context_value(context, cls._context_path, cls._property_type)
+        return bool(rna_item)
+
+    """
+    def draw_header(self, context):
+        rna_item, context_member = rna_idprop_context_value(context, self._context_path, self._property_type)
+        tot = len(rna_item.keys())
+        if tot:
+            self.layout().label("%d:" % tot)
+    """
 
     def draw(self, context):
-        draw(self.layout, context, self._context_path)
+        draw(self.layout, context, self._context_path, self._property_type)

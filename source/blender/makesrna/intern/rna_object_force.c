@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -22,6 +22,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/makesrna/intern/rna_object_force.c
+ *  \ingroup RNA
+ */
+
+
 #include <stdlib.h>
 
 #include "RNA_define.h"
@@ -38,7 +43,7 @@
 #include "WM_api.h"
 #include "WM_types.h"
 
-EnumPropertyItem effector_shape_items[] = {
+static EnumPropertyItem effector_shape_items[] = {
 	{PFIELD_SHAPE_POINT, "POINT", 0, "Point", ""},
 	{PFIELD_SHAPE_PLANE, "PLANE", 0, "Plane", ""},
 	{PFIELD_SHAPE_SURFACE, "SURFACE", 0, "Surface", ""},
@@ -46,20 +51,23 @@ EnumPropertyItem effector_shape_items[] = {
 	{0, NULL, 0, NULL, NULL}
 };
 
-EnumPropertyItem curve_shape_items[] = {
+#ifdef RNA_RUNTIME
+
+/* type spesific return values only used from functions */
+static EnumPropertyItem curve_shape_items[] = {
 	{PFIELD_SHAPE_POINT, "POINT", 0, "Point", ""},
 	{PFIELD_SHAPE_PLANE, "PLANE", 0, "Plane", ""},
 	{PFIELD_SHAPE_SURFACE, "SURFACE", 0, "Curve", ""},
 	{0, NULL, 0, NULL, NULL}
 };
 
-EnumPropertyItem empty_shape_items[] = {
+static EnumPropertyItem empty_shape_items[] = {
 	{PFIELD_SHAPE_POINT, "POINT", 0, "Point", ""},
 	{PFIELD_SHAPE_PLANE, "PLANE", 0, "Plane", ""},
 	{0, NULL, 0, NULL, NULL}
 };
 
-EnumPropertyItem vortex_shape_items[] = {
+static EnumPropertyItem vortex_shape_items[] = {
 	{PFIELD_SHAPE_POINT, "POINT", 0, "Point", ""},
 	{PFIELD_SHAPE_PLANE, "PLANE", 0, "Plane", ""},
 	{PFIELD_SHAPE_SURFACE, "SURFACE", 0, "Surface falloff (New)", ""},
@@ -67,20 +75,18 @@ EnumPropertyItem vortex_shape_items[] = {
 	{0, NULL, 0, NULL, NULL}
 };
 
-EnumPropertyItem curve_vortex_shape_items[] = {
+static EnumPropertyItem curve_vortex_shape_items[] = {
 	{PFIELD_SHAPE_POINT, "POINT", 0, "Point", ""},
 	{PFIELD_SHAPE_PLANE, "PLANE", 0, "Plane", ""},
 	{PFIELD_SHAPE_SURFACE, "SURFACE", 0, "Curve (New)", ""},
 	{0, NULL, 0, NULL, NULL}
 };
 
-EnumPropertyItem empty_vortex_shape_items[] = {
+static EnumPropertyItem empty_vortex_shape_items[] = {
 	{PFIELD_SHAPE_POINT, "POINT", 0, "Point", ""},
 	{PFIELD_SHAPE_PLANE, "PLANE", 0, "Plane", ""},
 	{0, NULL, 0, NULL, NULL}
 };
-
-#ifdef RNA_RUNTIME
 
 #include "MEM_guardedalloc.h"
 
@@ -96,7 +102,7 @@ EnumPropertyItem empty_vortex_shape_items[] = {
 
 #include "ED_object.h"
 
-static void rna_Cache_change(Main *bmain, Scene *scene, PointerRNA *ptr)
+static void rna_Cache_change(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
 {
 	Object *ob = (Object*)ptr->id.data;
 	PointCache *cache = (PointCache*)ptr->data;
@@ -110,20 +116,24 @@ static void rna_Cache_change(Main *bmain, Scene *scene, PointerRNA *ptr)
 
 	BKE_ptcache_ids_from_object(&pidlist, ob, NULL, 0);
 
-	DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 
 	for(pid=pidlist.first; pid; pid=pid->next) {
 		if(pid->cache==cache)
 			break;
 	}
 
-	if(pid)
+	if(pid) {
+		/* Just make sure this wasn't changed. */
+		if(pid->type == PTCACHE_TYPE_SMOKE_DOMAIN)
+			cache->step = 1;
 		BKE_ptcache_update_info(pid);
+	}
 
 	BLI_freelistN(&pidlist);
 }
 
-static void rna_Cache_toggle_disk_cache(Main *bmain, Scene *scene, PointerRNA *ptr)
+static void rna_Cache_toggle_disk_cache(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
 {
 	Object *ob = (Object*)ptr->id.data;
 	PointCache *cache = (PointCache*)ptr->data;
@@ -140,20 +150,22 @@ static void rna_Cache_toggle_disk_cache(Main *bmain, Scene *scene, PointerRNA *p
 			break;
 	}
 
-	if(pid)
+	/* smoke can only use disk cache */
+	if(pid && pid->type != PTCACHE_TYPE_SMOKE_DOMAIN)
 		BKE_ptcache_toggle_disk_cache(pid);
+	else
+		cache->flag ^= PTCACHE_DISK_CACHE;
 
 	BLI_freelistN(&pidlist);
 }
 
-static void rna_Cache_idname_change(Main *bmain, Scene *scene, PointerRNA *ptr)
+static void rna_Cache_idname_change(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
 {
 	Object *ob = (Object*)ptr->id.data;
 	PointCache *cache = (PointCache*)ptr->data;
 	PTCacheID *pid = NULL, *pid2= NULL;
 	ListBase pidlist;
 	int new_name = 1;
-	char name[80];
 
 	if(!ob)
 		return;
@@ -171,17 +183,15 @@ static void rna_Cache_idname_change(Main *bmain, Scene *scene, PointerRNA *ptr)
 		if(!pid)
 			return;
 
-		cache->flag |= (PTCACHE_BAKED|PTCACHE_DISK_CACHE|PTCACHE_SIMULATION_VALID);
-		cache->flag &= ~(PTCACHE_OUTDATED|PTCACHE_FRAMES_SKIPPED);
-
 		BKE_ptcache_load_external(pid);
-		DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+
+		DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	}
 	else {
 		for(pid=pidlist.first; pid; pid=pid->next) {
 			if(pid->cache==cache)
 				pid2 = pid;
-			else if(strcmp(cache->name, "") && strcmp(cache->name,pid->cache->name)==0) {
+			else if(cache->name[0] != '\0' && strcmp(cache->name,pid->cache->name)==0) {
 				/*TODO: report "name exists" to user */
 				strcpy(cache->name, cache->prev_name);
 				new_name = 0;
@@ -190,19 +200,13 @@ static void rna_Cache_idname_change(Main *bmain, Scene *scene, PointerRNA *ptr)
 
 		if(new_name) {
 			if(pid2 && cache->flag & PTCACHE_DISK_CACHE) {
-				/* TODO: change to simple file rename */
-				strcpy(name, cache->name);
-				strcpy(cache->name, cache->prev_name);
+				char old_name[80];
+				char new_name[80];
 
-				cache->flag &= ~PTCACHE_DISK_CACHE;
+				strcpy(old_name, cache->prev_name);
+				strcpy(new_name, cache->name);
 
-				BKE_ptcache_toggle_disk_cache(pid2);
-
-				strcpy(cache->name, name);
-
-				cache->flag |= PTCACHE_DISK_CACHE;
-
-				BKE_ptcache_toggle_disk_cache(pid2);
+				BKE_ptcache_disk_cache_rename(pid2, old_name, new_name);
 			}
 
 			strcpy(cache->prev_name, cache->name);
@@ -317,12 +321,23 @@ static void rna_PointCache_frame_step_range(PointerRNA *ptr, int *min, int *max)
 	BLI_freelistN(&pidlist);
 }
 
-static char *rna_CollisionSettings_path(PointerRNA *ptr)
+static char *rna_CollisionSettings_path(PointerRNA *UNUSED(ptr))
 {
+	/* both methods work ok, but return the shorter path */
+#if 0
 	Object *ob= (Object*)ptr->id.data;
 	ModifierData *md = (ModifierData *)modifiers_findByType(ob, eModifierType_Collision);
-	
-	return BLI_sprintfN("modifiers[\"%s\"].settings", md->name);
+
+	if(md) {
+		return BLI_sprintfN("modifiers[\"%s\"].settings", md->name);
+	}
+	else {
+		return BLI_strdup("");
+	}
+#else
+	/* more reliable */
+	return BLI_strdup("collision");
+#endif
 }
 
 static int rna_SoftBodySettings_use_edges_get(PointerRNA *ptr)
@@ -467,22 +482,22 @@ static int particle_id_check(PointerRNA *ptr)
 	return (GS(id->name) == ID_PA);
 }
 
-static void rna_FieldSettings_update(Main *bmain, Scene *scene, PointerRNA *ptr)
+static void rna_FieldSettings_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
 {
 	if(particle_id_check(ptr)) {
 		ParticleSettings *part = (ParticleSettings*)ptr->id.data;
 
 		if(part->pd->forcefield != PFIELD_TEXTURE && part->pd->tex) {
 			part->pd->tex->id.us--;
-			part->pd->tex= 0;
+			part->pd->tex= NULL;
 		}
 
 		if(part->pd2->forcefield != PFIELD_TEXTURE && part->pd2->tex) {
 			part->pd2->tex->id.us--;
-			part->pd2->tex= 0;
+			part->pd2->tex= NULL;
 		}
 
-		DAG_id_flush_update(&part->id, OB_RECALC_ALL|PSYS_RECALC_RESET);
+		DAG_id_tag_update(&part->id, OB_RECALC_OB|OB_RECALC_DATA|OB_RECALC_TIME|PSYS_RECALC_RESET);
 		WM_main_add_notifier(NC_OBJECT|ND_DRAW, NULL);
 
 	}
@@ -491,10 +506,10 @@ static void rna_FieldSettings_update(Main *bmain, Scene *scene, PointerRNA *ptr)
 
 		if(ob->pd->forcefield != PFIELD_TEXTURE && ob->pd->tex) {
 			ob->pd->tex->id.us--;
-			ob->pd->tex= 0;
+			ob->pd->tex= NULL;
 		}
 
-		DAG_id_flush_update(&ob->id, OB_RECALC_OB);
+		DAG_id_tag_update(&ob->id, OB_RECALC_OB);
 		WM_main_add_notifier(NC_OBJECT|ND_DRAW, ob);
 	}
 }
@@ -524,7 +539,7 @@ static void rna_FieldSettings_shape_update(Main *bmain, Scene *scene, PointerRNA
 static void rna_FieldSettings_dependency_update(Main *bmain, Scene *scene, PointerRNA *ptr)
 {
 	if(particle_id_check(ptr)) {
-		DAG_id_flush_update((ID*)ptr->id.data, OB_RECALC_ALL|PSYS_RECALC_RESET);
+		DAG_id_tag_update((ID*)ptr->id.data, OB_RECALC_OB|OB_RECALC_DATA|OB_RECALC_TIME|PSYS_RECALC_RESET);
 	}
 	else {
 		Object *ob= (Object*)ptr->id.data;
@@ -541,9 +556,9 @@ static void rna_FieldSettings_dependency_update(Main *bmain, Scene *scene, Point
 		DAG_scene_sort(bmain, scene);
 
 		if(ob->type == OB_CURVE && ob->pd->forcefield == PFIELD_GUIDE)
-			DAG_id_flush_update(&ob->id, OB_RECALC_ALL);
+			DAG_id_tag_update(&ob->id, OB_RECALC_OB|OB_RECALC_DATA|OB_RECALC_TIME);
 		else
-			DAG_id_flush_update(&ob->id, OB_RECALC_OB);
+			DAG_id_tag_update(&ob->id, OB_RECALC_OB);
 
 		WM_main_add_notifier(NC_OBJECT|ND_DRAW, ob);
 	}
@@ -573,9 +588,9 @@ static char *rna_FieldSettings_path(PointerRNA *ptr)
 	return NULL;
 }
 
-static void rna_EffectorWeight_update(Main *bmain, Scene *scene, PointerRNA *ptr)
+static void rna_EffectorWeight_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
 {
-	DAG_id_flush_update((ID*)ptr->id.data, OB_RECALC_DATA|PSYS_RECALC_RESET);
+	DAG_id_tag_update((ID*)ptr->id.data, OB_RECALC_DATA|PSYS_RECALC_RESET);
 
 	WM_main_add_notifier(NC_OBJECT|ND_DRAW, NULL);
 }
@@ -584,7 +599,7 @@ static void rna_EffectorWeight_dependency_update(Main *bmain, Scene *scene, Poin
 {
 	DAG_scene_sort(bmain, scene);
 
-	DAG_id_flush_update((ID*)ptr->id.data, OB_RECALC_DATA|PSYS_RECALC_RESET);
+	DAG_id_tag_update((ID*)ptr->id.data, OB_RECALC_DATA|PSYS_RECALC_RESET);
 
 	WM_main_add_notifier(NC_OBJECT|ND_DRAW, NULL);
 }
@@ -647,24 +662,24 @@ static void rna_CollisionSettings_dependency_update(Main *bmain, Scene *scene, P
 	WM_main_add_notifier(NC_OBJECT|ND_DRAW, ob);
 }
 
-static void rna_CollisionSettings_update(Main *bmain, Scene *scene, PointerRNA *ptr)
+static void rna_CollisionSettings_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
 {
 	Object *ob= (Object*)ptr->id.data;
 
-	DAG_id_flush_update(&ob->id, OB_RECALC_ALL);
+	DAG_id_tag_update(&ob->id, OB_RECALC_OB|OB_RECALC_DATA|OB_RECALC_TIME);
 	WM_main_add_notifier(NC_OBJECT|ND_DRAW, ob);
 }
 
-static void rna_softbody_update(Main *bmain, Scene *scene, PointerRNA *ptr)
+static void rna_softbody_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
 {
 	Object *ob= (Object*)ptr->id.data;
 
-	DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	WM_main_add_notifier(NC_OBJECT|ND_MODIFIER, ob);
 }
 
 
-static EnumPropertyItem *rna_Effector_shape_itemf(bContext *C, PointerRNA *ptr, int *free)
+static EnumPropertyItem *rna_Effector_shape_itemf(bContext *UNUSED(C), PointerRNA *ptr, PropertyRNA *UNUSED(prop), int *UNUSED(free))
 {
 	Object *ob= NULL;
 
@@ -720,6 +735,12 @@ static void rna_def_pointcache(BlenderRNA *brna)
 	StructRNA *srna;
 	PropertyRNA *prop;
 
+	static EnumPropertyItem point_cache_compress_items[] = {
+		{PTCACHE_COMPRESS_NO, "NO", 0, "No", "No compression"},
+		{PTCACHE_COMPRESS_LZO, "LIGHT", 0, "Light", "Fast but not so effective compression"},
+		{PTCACHE_COMPRESS_LZMA, "HEAVY", 0, "Heavy", "Effective but slow compression"},
+		{0, NULL, 0, NULL, NULL}};
+
 	srna= RNA_def_struct(brna, "PointCache", NULL);
 	RNA_def_struct_ui_text(srna, "Point Cache", "Point cache for physics simulations");
 	RNA_def_struct_ui_icon(srna, ICON_PHYSICS);
@@ -746,6 +767,10 @@ static void rna_def_pointcache(BlenderRNA *brna)
 	RNA_def_property_range(prop, -1, 100);
 	RNA_def_property_ui_text(prop, "Cache Index", "Index number of cache files");
 	RNA_def_property_update(prop, NC_OBJECT, "rna_Cache_idname_change");
+
+	prop= RNA_def_property(srna, "compression", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_items(prop, point_cache_compress_items);
+	RNA_def_property_ui_text(prop, "Cache Compression", "Compression method to be used");
 
 	/* flags */
 	prop= RNA_def_property(srna, "is_baked", PROP_BOOLEAN, PROP_NONE);
@@ -795,7 +820,7 @@ static void rna_def_pointcache(BlenderRNA *brna)
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", PTCACHE_EXTERNAL);
 	RNA_def_property_ui_text(prop, "External", "Read cache from an external location");
 	RNA_def_property_update(prop, NC_OBJECT, "rna_Cache_idname_change");
-    
+
 	prop= RNA_def_property(srna, "use_library_path", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_negative_sdna(prop, NULL, "flag", PTCACHE_IGNORE_LIBPATH);
 	RNA_def_property_ui_text(prop, "Library Path", "Use this files path when library linked into another file.");
@@ -885,13 +910,6 @@ static void rna_def_collision(BlenderRNA *brna)
 	RNA_def_property_range(prop, 0.0f, 1.0f);
 	RNA_def_property_ui_text(prop, "Damping", "Amount of damping during collision");
 	RNA_def_property_update(prop, 0, "rna_CollisionSettings_update");
-	
-	/* Does this belong here?
-	prop= RNA_def_property(srna, "collision_stack", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "softflag", OB_SB_COLLFINAL);
-	RNA_def_property_ui_text(prop, "Collision from Stack", "Pick collision object from modifier stack (softbody only)");
-	RNA_def_property_update(prop, 0, "rna_CollisionSettings_update");
-	*/
 
 	prop= RNA_def_property(srna, "absorption", PROP_FLOAT, PROP_FACTOR);
 	RNA_def_property_range(prop, 0.0f, 1.0f);
@@ -1030,18 +1048,18 @@ static void rna_def_field(BlenderRNA *brna)
 	
 	static EnumPropertyItem field_type_items[] = {
 		{0, "NONE", 0, "None", ""},
-		{PFIELD_FORCE, "FORCE", ICON_FORCE_FORCE, "Force", ""},
-		{PFIELD_WIND, "WIND", ICON_FORCE_WIND, "Wind", ""},
-		{PFIELD_VORTEX, "VORTEX", ICON_FORCE_VORTEX, "Vortex", ""},
-		{PFIELD_MAGNET, "MAGNET", ICON_FORCE_MAGNETIC, "Magnetic", ""},
-		{PFIELD_HARMONIC, "HARMONIC", ICON_FORCE_HARMONIC, "Harmonic", ""},
-		{PFIELD_CHARGE, "CHARGE", ICON_FORCE_CHARGE, "Charge", ""},
-		{PFIELD_LENNARDJ, "LENNARDJ", ICON_FORCE_LENNARDJONES, "Lennard-Jones", ""},
-		{PFIELD_TEXTURE, "TEXTURE", ICON_FORCE_TEXTURE, "Texture", ""},
-		{PFIELD_GUIDE, "GUIDE", ICON_FORCE_CURVE, "Curve Guide", ""},
+		{PFIELD_FORCE, "FORCE", ICON_FORCE_FORCE, "Force", "Gives a radial field toward the center of object"},
+		{PFIELD_WIND, "WIND", ICON_FORCE_WIND, "Wind", "Gives a constant force along the force objects local Z axis"},
+		{PFIELD_VORTEX, "VORTEX", ICON_FORCE_VORTEX, "Vortex", "Gives a spiraling force that twists the force objects local Z axis"},
+		{PFIELD_MAGNET, "MAGNET", ICON_FORCE_MAGNETIC, "Magnetic", "Forcefield depends on the speed of the particles"},
+		{PFIELD_HARMONIC, "HARMONIC", ICON_FORCE_HARMONIC, "Harmonic", "The source of this force field is the zero point of a harmonic oscillator"},
+		{PFIELD_CHARGE, "CHARGE", ICON_FORCE_CHARGE, "Charge", "Spherical forcefield based on the charge of particles, only influences other charge force fields"},
+		{PFIELD_LENNARDJ, "LENNARDJ", ICON_FORCE_LENNARDJONES, "Lennard-Jones", "Forcefield based on the Lennard-Jones potential"},
+		{PFIELD_TEXTURE, "TEXTURE", ICON_FORCE_TEXTURE, "Texture", "Forcefield based on a texture"},
+		{PFIELD_GUIDE, "GUIDE", ICON_FORCE_CURVE, "Curve Guide", "Creates a force along a curve object"},
 		{PFIELD_BOID, "BOID", ICON_FORCE_BOID, "Boid", ""},
-		{PFIELD_TURBULENCE, "TURBULENCE", ICON_FORCE_TURBULENCE, "Turbulence", ""},
-		{PFIELD_DRAG, "DRAG", ICON_FORCE_DRAG, "Drag", ""},
+		{PFIELD_TURBULENCE, "TURBULENCE", ICON_FORCE_TURBULENCE, "Turbulence", "Creates turbulence with a noise field"},
+		{PFIELD_DRAG, "DRAG", ICON_FORCE_DRAG, "Drag", "Creates a force that dampens motion"},
 		{0, NULL, 0, NULL, NULL}};
 
 	static EnumPropertyItem falloff_items[] = {
@@ -1101,7 +1119,7 @@ static void rna_def_field(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "falloff_type", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "falloff");
 	RNA_def_property_enum_items(prop, falloff_items);
-	RNA_def_property_ui_text(prop, "Fall-Off", "Fall-off shape");
+	RNA_def_property_ui_text(prop, "Fall-Off", "");
 	RNA_def_property_update(prop, 0, "rna_FieldSettings_update");
 	
 	prop= RNA_def_property(srna, "texture_mode", PROP_ENUM, PROP_NONE);
@@ -1160,7 +1178,7 @@ static void rna_def_field(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "size", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "f_size");
 	RNA_def_property_range(prop, 0.0f, 10.0f);
-	RNA_def_property_ui_text(prop, "Size", "Size of the noise");
+	RNA_def_property_ui_text(prop, "Size", "Size of the turbulence");
 	RNA_def_property_update(prop, 0, "rna_FieldSettings_update");
 
 	prop= RNA_def_property(srna, "rest_length", PROP_FLOAT, PROP_NONE);
@@ -1214,7 +1232,7 @@ static void rna_def_field(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "noise", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "f_noise");
 	RNA_def_property_range(prop, 0.0f, 10.0f);
-	RNA_def_property_ui_text(prop, "Noise", "Noise of the force");
+	RNA_def_property_ui_text(prop, "Noise", "Amount of noise for the force strength");
 	RNA_def_property_update(prop, 0, "rna_FieldSettings_update");
 
 	prop= RNA_def_property(srna, "seed", PROP_INT, PROP_UNSIGNED);
@@ -1439,7 +1457,7 @@ static void rna_def_softbody(BlenderRNA *brna)
 {
 	StructRNA *srna;
 	PropertyRNA *prop;
-	int matrix_dimsize[]= {3, 3};
+	const int matrix_dimsize[]= {3, 3};
 
 	
 	static EnumPropertyItem collision_type_items[] = {
@@ -1552,20 +1570,20 @@ static void rna_def_softbody(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Damp", "Edge spring friction");
 	RNA_def_property_update(prop, 0, "rna_softbody_update");
 	
-	prop= RNA_def_property(srna, "spring_length", PROP_FLOAT, PROP_NONE);
-	RNA_def_property_float_sdna(prop, NULL, "springpreload");
+	prop= RNA_def_property(srna, "spring_length", PROP_INT, PROP_NONE);
+	RNA_def_property_int_sdna(prop, NULL, "springpreload");
 	RNA_def_property_range(prop, 0.0f, 200.0f);
 	RNA_def_property_ui_text(prop, "SL", "Alter spring length to shrink/blow up (unit %) 0 to disable");
 	RNA_def_property_update(prop, 0, "rna_softbody_update");
 	
-	prop= RNA_def_property(srna, "aero", PROP_FLOAT, PROP_NONE);
-	RNA_def_property_float_sdna(prop, NULL, "aeroedge");
+	prop= RNA_def_property(srna, "aero", PROP_INT, PROP_NONE);
+	RNA_def_property_int_sdna(prop, NULL, "aeroedge");
 	RNA_def_property_range(prop, 0.0f, 30000.0f);
 	RNA_def_property_ui_text(prop, "Aero", "Make edges 'sail'");
 	RNA_def_property_update(prop, 0, "rna_softbody_update");
 	
-	prop= RNA_def_property(srna, "plastic", PROP_FLOAT, PROP_NONE);
-	RNA_def_property_float_sdna(prop, NULL, "plastic");
+	prop= RNA_def_property(srna, "plastic", PROP_INT, PROP_NONE);
+	RNA_def_property_int_sdna(prop, NULL, "plastic");
 	RNA_def_property_range(prop, 0.0f, 100.0f);
 	RNA_def_property_ui_text(prop, "Plastic", "Permanent deform");
 	RNA_def_property_update(prop, 0, "rna_softbody_update");
@@ -1644,7 +1662,7 @@ static void rna_def_softbody(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "fuzzy", PROP_INT, PROP_NONE);
 	RNA_def_property_int_sdna(prop, NULL, "fuzzyness");
 	RNA_def_property_range(prop, 1, 100);
-	RNA_def_property_ui_text(prop, "Fuzzy", "Fuzziness while on collision, high values make collsion handling faster but less stable");
+	RNA_def_property_ui_text(prop, "Fuzzy", "Fuzziness while on collision, high values make collision handling faster but less stable");
 	RNA_def_property_update(prop, 0, "rna_softbody_update");
 	
 	prop= RNA_def_property(srna, "use_auto_step", PROP_BOOLEAN, PROP_NONE);

@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -22,6 +22,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/space_info/info_stats.c
+ *  \ingroup spinfo
+ */
+
+
 #include <stdio.h>
 #include <string.h>
 
@@ -34,14 +39,16 @@
 #include "DNA_meta_types.h"
 #include "DNA_scene_types.h"
 
+#include "BLI_utildefines.h"
+
 #include "BKE_anim.h"
 #include "BKE_displist.h"
 #include "BKE_DerivedMesh.h"
 #include "BKE_key.h"
 #include "BKE_mesh.h"
 #include "BKE_particle.h"
-#include "BKE_utildefines.h"
 
+#include "ED_info.h"
 #include "ED_armature.h"
 #include "ED_mesh.h"
 #include "ED_curve.h" /* for ED_curve_editnurbs */
@@ -91,13 +98,12 @@ static void stats_object(Object *ob, int sel, int totob, SceneStats *stats)
 	case OB_SURF:
 	case OB_CURVE:
 	case OB_FONT: {
-		Curve *cu= ob->data;
 		int tot= 0, totf= 0;
 
 		stats->totcurve += totob;
 
-		if(cu->disp.first)
-			count_displist(&cu->disp, &tot, &totf);
+		if(ob->disp.first)
+			count_displist(&ob->disp, &tot, &totf);
 
 		tot *= totob;
 		totf *= totob;
@@ -327,12 +333,10 @@ static void stats_dupli_object(Base *base, Object *ob, SceneStats *stats)
 /* Statistics displayed in info header. Called regularly on scene changes. */
 static void stats_update(Scene *scene)
 {
-	SceneStats stats;
+	SceneStats stats= {0};
 	Object *ob= (scene->basact)? scene->basact->object: NULL;
 	Base *base;
 	
-	memset(&stats, 0, sizeof(stats));
-
 	if(scene->obedit) {
 		/* Edit Mode */
 		stats_object_edit(scene->obedit, &stats);
@@ -341,7 +345,7 @@ static void stats_update(Scene *scene)
 		/* Pose Mode */
 		stats_object_pose(ob, &stats);
 	}
-	else if(ob && (ob->flag & (OB_MODE_SCULPT|OB_MODE_VERTEX_PAINT|OB_MODE_WEIGHT_PAINT|OB_MODE_TEXTURE_PAINT))) {
+	else if(ob && (ob->flag & OB_MODE_ALL_PAINT)) {
 		/* Sculpt and Paint Mode */
 		stats_object_paint(ob, &stats);
 	}
@@ -353,13 +357,14 @@ static void stats_update(Scene *scene)
 	}
 
 	if(!scene->stats)
-		scene->stats= MEM_mallocN(sizeof(SceneStats), "SceneStats");
+		scene->stats= MEM_callocN(sizeof(SceneStats), "SceneStats");
 
 	*(scene->stats)= stats;
 }
 
 static void stats_string(Scene *scene)
 {
+	extern char versionstr[]; /* from blender.c */
 	SceneStats *stats= scene->stats;
 	Object *ob= (scene->basact)? scene->basact->object: NULL;
 	uintptr_t mem_in_use, mmap_in_use;
@@ -370,11 +375,13 @@ static void stats_string(Scene *scene)
 	mmap_in_use= MEM_get_mapped_memory_in_use();
 
 	/* get memory statistics */
-	s= memstr + sprintf(memstr, " | Mem:%.2fM", ((mem_in_use-mmap_in_use)>>10)/1024.0);
+	s= memstr + sprintf(memstr, " | Mem:%.2fM", (double)((mem_in_use-mmap_in_use)>>10)/1024.0);
 	if(mmap_in_use)
-		sprintf(s, " (%.2fM)", ((mmap_in_use)>>10)/1024.0);
+		sprintf(s, " (%.2fM)", (double)((mmap_in_use)>>10)/1024.0);
 
 	s= stats->infostr;
+	
+	s+= sprintf(s, "%s | ", versionstr);
 
 	if(scene->obedit) {
 		if(ob_get_keyblock(scene->obedit))
@@ -420,7 +427,7 @@ void ED_info_stats_clear(Scene *scene)
 	}
 }
 
-char *ED_info_stats_string(Scene *scene)
+const char *ED_info_stats_string(Scene *scene)
 {
 	if(!scene->stats)
 		stats_update(scene);

@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -24,6 +24,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/render/intern/include/render_types.h
+ *  \ingroup render
+ */
+
 
 #ifndef RENDER_TYPES_H
 #define RENDER_TYPES_H
@@ -55,6 +60,7 @@ struct RenderBuckets;
 struct ObjectInstanceRen;
 struct RayObject;
 struct RayFace;
+struct ReportList;
 struct Main;
 
 #define TABLEINITSIZE 1024
@@ -131,7 +137,8 @@ struct Render
 	ThreadRWMutex resultmutex;
 	
 	/* window size, display rect, viewplane */
-	int winx, winy;
+	int winx, winy;			/* buffer width and height with percentage applied
+							 * without border & crop. convert to long before multiplying together to avoid overflow. */
 	rcti disprect;			/* part within winx winy */
 	rctf viewplane;			/* mapped on winx winy */
 	float viewdx, viewdy;	/* size of 1 pixel */
@@ -176,6 +183,7 @@ struct Render
 	Scene *scene;
 	RenderData r;
 	World wrld;
+	struct Object *camera_override;
 	unsigned int lay;
 	
 	ListBase parts;
@@ -207,7 +215,7 @@ struct Render
 	ListBase instancetable;
 	int totinstance;
 
-	struct Image *backbuf, *bakebuf;
+	struct Image *bakebuf;
 	
 	struct GHash *orco_hash;
 
@@ -240,13 +248,14 @@ struct Render
 	void (*progress)(void *handle, float i);
 	void *prh;
 	
+	void (*draw_lock)(void *handle, int i);
+	void *dlh;
 	int (*test_break)(void *handle);
 	void *tbh;
 	
-	void (*error)(void *handle, char *str);
-	void *erh;
-	
 	RenderStats i;
+
+	struct ReportList *reports;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -432,7 +441,9 @@ typedef struct StrandBuffer {
 	int overrideuv;
 	int flag, maxdepth;
 	float adaptcos, minwidth, widthfade;
-
+	
+	float maxwidth;	/* for cliptest of strands in blender unit */
+	
 	float winmat[4][4];
 	int winx, winy;
 } StrandBuffer;
@@ -475,6 +486,7 @@ typedef struct VolPrecachePart
 	float bbmin[3];
 	float voxel[3];
 	int working, done;
+	struct Render *re;
 } VolPrecachePart;
 
 typedef struct VolumePrecache
@@ -604,6 +616,7 @@ typedef struct LampRen {
 #define R_DIVIDE_24		32	
 /* vertex normals are tangent or view-corrected vector, for hair strands */
 #define R_TANGENT		64		
+#define R_TRACEBLE		128
 
 /* strandbuffer->flag */
 #define R_STRAND_BSPLINE	1

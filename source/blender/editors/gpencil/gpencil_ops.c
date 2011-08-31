@@ -1,6 +1,4 @@
-/**
- * $Id$
- *
+/*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -25,6 +23,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/gpencil/gpencil_ops.c
+ *  \ingroup edgpencil
+ */
+
+
 #include <stdlib.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -37,6 +40,8 @@
 #include "WM_types.h"
 
 #include "RNA_access.h"
+
+#include "ED_gpencil.h"
 
 #include "gpencil_intern.h"
 

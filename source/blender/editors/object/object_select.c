@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/object/object_select.c
+ *  \ingroup edobj
+ */
+
+
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,6 +37,7 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "DNA_anim_types.h"
 #include "DNA_group_types.h"
 #include "DNA_material_types.h"
 #include "DNA_modifier_types.h"
@@ -42,6 +48,7 @@
 #include "BLI_listbase.h"
 #include "BLI_rand.h"
 #include "BLI_string.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_context.h"
 #include "BKE_group.h"
@@ -51,14 +58,18 @@
 #include "BKE_property.h"
 #include "BKE_report.h"
 #include "BKE_scene.h"
+#include "BKE_library.h"
 #include "BKE_deform.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
 
+#include "ED_object.h"
 #include "ED_screen.h"
+#include "ED_keyframing.h"
 
 #include "UI_interface.h"
+#include "UI_resources.h"
 
 #include "RNA_access.h"
 #include "RNA_define.h"
@@ -148,7 +159,7 @@ void OBJECT_OT_select_by_type(wmOperatorType *ot)
 	/* api callbacks */
 	ot->invoke= WM_menu_invoke;
 	ot->exec= object_select_by_type_exec;
-	ot->poll= ED_operator_scene_editable;
+	ot->poll= ED_operator_objectmode;
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
@@ -178,7 +189,7 @@ static int object_select_linked_exec(bContext *C, wmOperator *op)
 	Object *ob;
 	void *obdata = NULL;
 	Material *mat = NULL, *mat1;
-	Tex *tex=0;
+	Tex *tex= NULL;
 	int a, b;
 	int nr = RNA_enum_get(op->ptr, "type");
 	short changed = 0, extend;
@@ -213,15 +224,15 @@ static int object_select_linked_exec(bContext *C, wmOperator *op)
 		return OPERATOR_CANCELLED;
 	}
 	else if(nr==2) {
-		if(ob->data==0) return OPERATOR_CANCELLED;
+		if(ob->data==NULL) return OPERATOR_CANCELLED;
 		obdata= ob->data;
 	}
 	else if(nr==3 || nr==4) {
 		mat= give_current_material(ob, ob->actcol);
-		if(mat==0) return OPERATOR_CANCELLED;
+		if(mat==NULL) return OPERATOR_CANCELLED;
 		if(nr==4) {
 			if(mat->mtex[ (int)mat->texact ]) tex= mat->mtex[ (int)mat->texact ]->tex;
-			if(tex==0) return OPERATOR_CANCELLED;
+			if(tex==NULL) return OPERATOR_CANCELLED;
 		}
 	}
 	else if(nr==5) {
@@ -330,7 +341,7 @@ void OBJECT_OT_select_linked(wmOperatorType *ot)
 	/* api callbacks */
 	ot->invoke= WM_menu_invoke;
 	ot->exec= object_select_linked_exec;
-	ot->poll= ED_operator_scene_editable;
+	ot->poll= ED_operator_objectmode;
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
@@ -354,6 +365,7 @@ static EnumPropertyItem prop_select_grouped_types[] = {
 	{9, "PASS", 0, "Pass", "Render pass Index"},
 	{10, "COLOR", 0, "Color", "Object Color"},
 	{11, "PROPERTIES", 0, "Properties", "Game Properties"},
+	{12, "KEYINGSET", 0, "Keying Set", "Objects included in active Keying Set"},
 	{0, NULL, 0, NULL, NULL}
 };
 
@@ -430,7 +442,7 @@ static short select_grouped_group(bContext *C, Object *ob)	/* Select objects in 
 	}
 
 	/* build the menu. */
-	pup= uiPupMenuBegin(C, "Select Group", 0);
+	pup= uiPupMenuBegin(C, "Select Group", ICON_NONE);
 	layout= uiPupMenuLayout(pup);
 
 	for (i=0; i<group_count; i++) {
@@ -565,6 +577,42 @@ static short select_grouped_gameprops(bContext *C, Object *ob)
 	return changed;
 }
 
+static short select_grouped_keyingset(bContext *C, Object *UNUSED(ob))
+{
+	KeyingSet *ks = ANIM_scene_get_active_keyingset(CTX_data_scene(C));
+	short changed = 0;
+	
+	/* firstly, validate KeyingSet */
+	if ((ks == NULL) || (ANIM_validate_keyingset(C, NULL, ks) != 0))
+		return 0;
+	
+	/* select each object that Keying Set refers to */
+	// TODO: perhaps to be more in line with the rest of these, we should only take objects 
+	// if the passed in object is included in this too
+	CTX_DATA_BEGIN(C, Base*, base, selectable_bases) 
+	{
+		/* only check for this object if it isn't selected already, to limit time wasted */
+		if ((base->flag & SELECT) == 0) {
+			KS_Path *ksp;
+			
+			/* this is the slow way... we could end up with > 500 items here, 
+			 * with none matching, but end up doing this on 1000 objects...
+			 */
+			for (ksp = ks->paths.first; ksp; ksp = ksp->next) {
+				/* if id matches, select then stop looping (match found) */
+				if (ksp->id == (ID *)base->object) {
+					ED_base_object_select(base, BA_SELECT);
+					changed = 1;
+					break;
+				}
+			}
+		}
+	}
+	CTX_DATA_END;
+		
+	return changed;
+}
+
 static int object_select_grouped_exec(bContext *C, wmOperator *op)
 {
 	Scene *scene= CTX_data_scene(C);
@@ -583,7 +631,7 @@ static int object_select_grouped_exec(bContext *C, wmOperator *op)
 	}
 	
 	ob= OBACT;
-	if(ob==0){ 
+	if(ob==NULL) { 
 		BKE_report(op->reports, RPT_ERROR, "No Active Object");
 		return OPERATOR_CANCELLED;
 	}
@@ -599,6 +647,7 @@ static int object_select_grouped_exec(bContext *C, wmOperator *op)
 	else if(nr==9)	changed |= select_grouped_index_object(C, ob);
 	else if(nr==10)	changed |= select_grouped_color(C, ob);
 	else if(nr==11)	changed |= select_grouped_gameprops(C, ob);
+	else if(nr==12) changed |= select_grouped_keyingset(C, ob);
 	
 	if (changed) {
 		WM_event_add_notifier(C, NC_SCENE|ND_OB_SELECT, CTX_data_scene(C));
@@ -618,7 +667,7 @@ void OBJECT_OT_select_grouped(wmOperatorType *ot)
 	/* api callbacks */
 	ot->invoke= WM_menu_invoke;
 	ot->exec= object_select_grouped_exec;
-	ot->poll= ED_operator_scene_editable;
+	ot->poll= ED_operator_objectmode;
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
@@ -667,7 +716,7 @@ void OBJECT_OT_select_by_layer(wmOperatorType *ot)
 	/* api callbacks */
 	/*ot->invoke = XXX - need a int grid popup*/
 	ot->exec= object_select_by_layer_exec;
-	ot->poll= ED_operator_scene_editable;
+	ot->poll= ED_operator_objectmode;
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
@@ -705,7 +754,7 @@ void OBJECT_OT_select_inverse(wmOperatorType *ot)
 	
 	/* api callbacks */
 	ot->exec= object_select_inverse_exec;
-	ot->poll= ED_operator_scene_editable;
+	ot->poll= ED_operator_objectmode;
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
@@ -766,7 +815,7 @@ void OBJECT_OT_select_all(wmOperatorType *ot)
 	
 	/* api callbacks */
 	ot->exec= object_select_all_exec;
-	ot->poll= ED_operator_scene_editable;
+	ot->poll= ED_operator_objectmode;
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
@@ -815,7 +864,7 @@ void OBJECT_OT_select_same_group(wmOperatorType *ot)
 	
 	/* api callbacks */
 	ot->exec= object_select_same_group_exec;
-	ot->poll= ED_operator_scene_editable;
+	ot->poll= ED_operator_objectmode;
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
@@ -826,21 +875,26 @@ void OBJECT_OT_select_same_group(wmOperatorType *ot)
 /**************************** Select Mirror ****************************/
 static int object_select_mirror_exec(bContext *C, wmOperator *op)
 {
+	Scene *scene= CTX_data_scene(C);
 	short extend;
 	
 	extend= RNA_boolean_get(op->ptr, "extend");
 	
 	CTX_DATA_BEGIN(C, Base*, primbase, selected_bases) {
-
 		char tmpname[32];
-		flip_side_name(tmpname, primbase->object->id.name+2, TRUE);
 
-		CTX_DATA_BEGIN(C, Base*, secbase, visible_bases) {
-			if(!strcmp(secbase->object->id.name+2, tmpname)) {
-				ED_base_object_select(secbase, BA_SELECT);
+		flip_side_name(tmpname, primbase->object->id.name+2, TRUE);
+		
+		if(strcmp(tmpname, primbase->object->id.name+2)!=0) { /* names differ */
+			Object *ob= (Object *)find_id("OB", tmpname);
+			if(ob) {
+				Base *secbase= object_in_scene(ob, scene);
+
+				if(secbase) {
+					ED_base_object_select(secbase, BA_SELECT);
+				}
 			}
 		}
-		CTX_DATA_END;
 		
 		if (extend == 0) ED_base_object_select(primbase, BA_DESELECT);
 		
@@ -863,7 +917,7 @@ void OBJECT_OT_select_mirror(wmOperatorType *ot)
 	
 	/* api callbacks */
 	ot->exec= object_select_mirror_exec;
-	ot->poll= ED_operator_scene_editable;
+	ot->poll= ED_operator_objectmode;
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
@@ -879,8 +933,11 @@ static int object_select_name_exec(bContext *C, wmOperator *op)
 	short changed = 0;
 
 	if(!extend) {
-		CTX_DATA_BEGIN(C, Base*, base, visible_bases) {
-			ED_base_object_select(base, BA_DESELECT);
+		CTX_DATA_BEGIN(C, Base*, base, selectable_bases) {
+			if(base->flag & SELECT) {
+				ED_base_object_select(base, BA_DESELECT);
+				changed= 1;
+			}
 		}
 		CTX_DATA_END;
 	}
@@ -917,7 +974,7 @@ void OBJECT_OT_select_name(wmOperatorType *ot)
 
 	/* api callbacks */
 	ot->exec= object_select_name_exec;
-	ot->poll= ED_operator_scene_editable;
+	ot->poll= ED_operator_objectmode;
 
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
@@ -965,7 +1022,7 @@ void OBJECT_OT_select_random(wmOperatorType *ot)
 	/* api callbacks */
 	/*ot->invoke= object_select_random_invoke XXX - need a number popup ;*/
 	ot->exec = object_select_random_exec;
-	ot->poll= ED_operator_scene_editable;
+	ot->poll= ED_operator_objectmode;
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;

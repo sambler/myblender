@@ -16,38 +16,68 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
-# <pep8 compliant>
+# <pep8-80 compliant>
 
 """
 This module contains utility functions specific to blender but
 not assosiated with blenders internal data.
 """
 
+__all__ = (
+    "blend_paths",
+    "keyconfig_set",
+    "load_scripts",
+    "modules_from_path",
+    "preset_find",
+    "preset_paths",
+    "refresh_script_paths",
+    "register_class",
+    "register_module",
+    "resource_path",
+    "script_paths",
+    "smpte_from_frame",
+    "smpte_from_seconds",
+    "unregister_class",
+    "unregister_module",
+    "user_resource",
+    "user_script_path",
+    )
+
+from _bpy import register_class, unregister_class, blend_paths, resource_path
+from _bpy import script_paths as _bpy_script_paths
+from _bpy import user_resource as _user_resource
+
 import bpy as _bpy
 import os as _os
 import sys as _sys
 
-from _bpy import blend_paths, user_resource
-from _bpy import script_paths as _bpy_script_paths
+import addon_utils as _addon_utils
+
+_script_module_dirs = "startup", "modules"
 
 
 def _test_import(module_name, loaded_modules):
-    import traceback
-    import time
+    use_time = _bpy.app.debug
+
     if module_name in loaded_modules:
         return None
     if "." in module_name:
-        print("Ignoring '%s', can't import files containing multiple periods." % module_name)
+        print("Ignoring '%s', can't import files containing "
+              "multiple periods." % module_name)
         return None
 
-    t = time.time()
+    if use_time:
+        import time
+        t = time.time()
+
     try:
         mod = __import__(module_name)
     except:
+        import traceback
         traceback.print_exc()
         return None
 
-    if _bpy.app.debug:
+    if use_time:
         print("time %s %.4f" % (module_name, time.time() - t))
 
     loaded_modules.add(mod.__name__)  # should match mod.__name__ too
@@ -65,14 +95,12 @@ def modules_from_path(path, loaded_modules):
 
     :arg path: this path is scanned for scripts and packages.
     :type path: string
-    :arg loaded_modules: already loaded module names, files matching these names will be ignored.
+    :arg loaded_modules: already loaded module names, files matching these
+       names will be ignored.
     :type loaded_modules: set
     :return: all loaded modules.
     :rtype: list
     """
-    import traceback
-    import time
-
     modules = []
 
     for mod_name, mod_path in _bpy.path.module_names(path):
@@ -91,18 +119,20 @@ def load_scripts(reload_scripts=False, refresh_scripts=False):
     """
     Load scripts and run each modules register function.
 
-    :arg reload_scripts: Causes all scripts to have their unregister method called before loading.
+    :arg reload_scripts: Causes all scripts to have their unregister method
+       called before loading.
     :type reload_scripts: bool
-    :arg refresh_scripts: only load scripts which are not already loaded as modules.
+    :arg refresh_scripts: only load scripts which are not already loaded
+       as modules.
     :type refresh_scripts: bool
     """
-    import traceback
-    import time
+    use_time = _bpy.app.debug
 
-    # must be set back to True on exits
-    _bpy_types._register_immediate = False
+    prefs = _bpy.context.user_preferences
 
-    t_main = time.time()
+    if use_time:
+        import time
+        t_main = time.time()
 
     loaded_modules = set()
 
@@ -111,35 +141,38 @@ def load_scripts(reload_scripts=False, refresh_scripts=False):
 
     if reload_scripts:
         _bpy_types.TypeMap.clear()
-        _bpy_types.PropertiesMap.clear()
 
-        # just unload, dont change user defaults, this means we can sync to reload.
-        # note that they will only actually reload of the modification time changes.
-        # this `wont` work for packages so... its not perfect.
-        for module_name in [ext.module for ext in _bpy.context.user_preferences.addons]:
-            addon_disable(module_name, default_set=False)
+        # just unload, dont change user defaults, this means we can sync
+        # to reload. note that they will only actually reload of the
+        # modification time changes. This `wont` work for packages so...
+        # its not perfect.
+        for module_name in [ext.module for ext in prefs.addons]:
+            _addon_utils.disable(module_name, default_set=False)
 
     def register_module_call(mod):
-        _bpy_types._register_module(mod.__name__)
         register = getattr(mod, "register", None)
         if register:
             try:
                 register()
             except:
+                import traceback
                 traceback.print_exc()
         else:
-            print("\nWarning! '%s' has no register function, this is now a requirement for registerable scripts." % mod.__file__)
+            print("\nWarning! '%s' has no register function, "
+                  "this is now a requirement for registerable scripts." %
+                  mod.__file__)
 
     def unregister_module_call(mod):
-        _bpy_types._unregister_module(mod.__name__)
         unregister = getattr(mod, "unregister", None)
         if unregister:
             try:
                 unregister()
             except:
+                import traceback
                 traceback.print_exc()
 
     def test_reload(mod):
+        import imp
         # reloading this causes internal errors
         # because the classes from this module are stored internally
         # possibly to refresh internal references too but for now, best not to.
@@ -147,8 +180,9 @@ def load_scripts(reload_scripts=False, refresh_scripts=False):
             return mod
 
         try:
-            return reload(mod)
+            return imp.reload(mod)
         except:
+            import traceback
             traceback.print_exc()
 
     def test_register(mod):
@@ -167,7 +201,8 @@ def load_scripts(reload_scripts=False, refresh_scripts=False):
     if reload_scripts:
 
         # module names -> modules
-        _global_loaded_modules[:] = [_sys.modules[mod_name] for mod_name in _global_loaded_modules]
+        _global_loaded_modules[:] = [_sys.modules[mod_name]
+                                     for mod_name in _global_loaded_modules]
 
         # loop over and unload all scripts
         _global_loaded_modules.reverse()
@@ -179,10 +214,8 @@ def load_scripts(reload_scripts=False, refresh_scripts=False):
 
         _global_loaded_modules[:] = []
 
-    user_path = user_script_path()
-
     for base_path in script_paths():
-        for path_subdir in ("", "ui", "op", "io", "keyingsets", "modules"):
+        for path_subdir in _script_module_dirs:
             path = _os.path.join(base_path, path_subdir)
             if _os.path.isdir(path):
                 _sys_path_ensure(path)
@@ -191,39 +224,37 @@ def load_scripts(reload_scripts=False, refresh_scripts=False):
                 if path_subdir == "modules":
                     continue
 
-                if user_path != base_path and path_subdir == "":
-                    continue  # avoid loading 2.4x scripts
-
                 for mod in modules_from_path(path, loaded_modules):
                     test_register(mod)
 
-    _bpy_types._register_immediate = True
-
-    # deal with addons seperately
-    addon_reset_all()
-
+    # deal with addons separately
+    _addon_utils.reset_all(reload_scripts)
 
     # run the active integration preset
-    filepath = preset_find(_bpy.context.user_preferences.inputs.active_keyconfig, "keyconfig")
+    filepath = preset_find(prefs.inputs.active_keyconfig, "keyconfig")
+
     if filepath:
         keyconfig_set(filepath)
-
 
     if reload_scripts:
         import gc
         print("gc.collect() -> %d" % gc.collect())
 
-    if _bpy.app.debug:
+    if use_time:
         print("Python Script Load Time %.4f" % (time.time() - t_main))
 
 
 # base scripts
-_scripts = _os.path.join(_os.path.dirname(__file__), _os.path.pardir, _os.path.pardir)
+_scripts = _os.path.join(_os.path.dirname(__file__),
+                         _os.path.pardir,
+                         _os.path.pardir,
+                         )
 _scripts = (_os.path.normpath(_scripts), )
 
 
 def user_script_path():
-    path = _bpy.context.user_preferences.filepaths.script_directory
+    prefs = _bpy.context.user_preferences
+    path = prefs.filepaths.script_directory
 
     if path:
         path = _os.path.normpath(path)
@@ -232,27 +263,44 @@ def user_script_path():
         return None
 
 
-def script_paths(subdir=None, user=True):
+def script_paths(subdir=None, user_pref=True, all=False):
     """
-    Returns a list of valid script paths from the home directory and user preferences.
+    Returns a list of valid script paths.
 
-    Accepts any number of string arguments which are joined to make a path.
+    :arg subdir: Optional subdir.
+    :type subdir: string
+    :arg user_pref: Include the user preference script path.
+    :type user_pref: bool
+    :arg all: Include local, user and system paths rather just the paths
+       blender uses.
+    :type all: bool
+    :return: script paths.
+    :rtype: list
     """
     scripts = list(_scripts)
+    prefs = _bpy.context.user_preferences
 
     # add user scripts dir
-    if user:
-        user_script_path = _bpy.context.user_preferences.filepaths.script_directory
+    if user_pref:
+        user_script_path = prefs.filepaths.script_directory
     else:
         user_script_path = None
 
-    for path in _bpy_script_paths() + (user_script_path, ):
+    if all:
+        # all possible paths
+        base_paths = tuple(_os.path.join(resource_path(res), "scripts")
+                           for res in ('LOCAL', 'USER', 'SYSTEM'))
+    else:
+        # only paths blender uses
+        base_paths = _bpy_script_paths()
+
+    for path in base_paths + (user_script_path, ):
         if path:
             path = _os.path.normpath(path)
             if path not in scripts and _os.path.isdir(path):
                 scripts.append(path)
 
-    if not subdir:
+    if subdir is None:
         return scripts
 
     script_paths = []
@@ -264,17 +312,42 @@ def script_paths(subdir=None, user=True):
     return script_paths
 
 
+def refresh_script_paths():
+    """
+    Run this after creating new script paths to update sys.path
+    """
+
+    for base_path in script_paths():
+        for path_subdir in _script_module_dirs:
+            path = _os.path.join(base_path, path_subdir)
+            if _os.path.isdir(path):
+                _sys_path_ensure(path)
+
+    for path in _addon_utils.paths():
+        _sys_path_ensure(path)
+        path = _os.path.join(path, "modules")
+        if _os.path.isdir(path):
+            _sys_path_ensure(path)
+
+
 _presets = _os.path.join(_scripts[0], "presets")  # FIXME - multiple paths
 
 
 def preset_paths(subdir):
     """
     Returns a list of paths for a specific preset.
+
+    :arg subdir: preset subdirectory (must not be an absolute path).
+    :type subdir: string
+    :return: script paths.
+    :rtype: list
     """
     dirs = []
-    for path in script_paths("presets"):
+    for path in script_paths("presets", all=True):
         directory = _os.path.join(path, subdir)
-        if _os.path.isdir(directory):
+        if not directory.startswith(path):
+            raise Exception("invalid subdir given %r" % subdir)
+        elif _os.path.isdir(directory):
             dirs.append(directory)
     return dirs
 
@@ -327,177 +400,12 @@ def smpte_from_frame(frame, fps=None, fps_base=None):
     return smpte_from_seconds((frame * fps_base) / fps, fps)
 
 
-def addon_check(module_name):
-    """
-    Returns the loaded state of the addon.
-
-    :arg module_name: The name of the addon and module.
-    :type module_name: string
-    :return: (loaded_default, loaded_state)
-    :rtype: tuple of booleans
-    """
-    loaded_default = module_name in _bpy.context.user_preferences.addons
-
-    mod = _sys.modules.get(module_name)
-    loaded_state = mod and getattr(mod, "__addon_enabled__", Ellipsis)
-
-    if loaded_state is Ellipsis:
-        print("Warning: addon-module %r found module but without"
-               " __addon_enabled__ field, possible name collision from file: %r" %
-               (module_name, getattr(mod, "__file__", "<unknown>")))
-
-        loaded_state = False
-
-    return loaded_default, loaded_state
-
-
-def addon_enable(module_name, default_set=True):
-    """
-    Enables an addon by name.
-
-    :arg module_name: The name of the addon and module.
-    :type module_name: string
-    :return: the loaded module or None on failier.
-    :rtype: module
-    """
-    # note, this still gets added to _bpy_types.TypeMap
-
-    import os
-    import sys
-    import bpy_types as _bpy_types
-
-
-    _bpy_types._register_immediate = False
-
-    def handle_error():
-        import traceback
-        traceback.print_exc()
-        _bpy_types._register_immediate = True
-
-
-    # reload if the mtime changes
-    mod = sys.modules.get(module_name)
-    if mod:
-        mod.__addon_enabled__ = False
-        mtime_orig = getattr(mod, "__time__", 0)
-        mtime_new = os.path.getmtime(mod.__file__)
-        if mtime_orig != mtime_new:
-            print("module changed on disk:", mod.__file__, "reloading...")
-
-            try:
-                reload(mod)
-            except:
-                handle_error()
-                del sys.modules[module_name]
-                return None
-            mod.__addon_enabled__ = False
-
-    # Split registering up into 3 steps so we can undo if it fails par way through
-    # 1) try import
-    try:
-        mod = __import__(module_name)
-        mod.__time__ = os.path.getmtime(mod.__file__)
-        mod.__addon_enabled__ = False
-    except:
-        handle_error()
-        return None
-
-    # 2) try register collected modules
-    try:
-        _bpy_types._register_module(module_name)
-    except:
-        handle_error()
-        del sys.modules[module_name]
-        return None
-
-    # 3) try run the modules register function
-    try:
-        mod.register()
-    except:
-        handle_error()
-        _bpy_types._unregister_module(module_name)
-        del sys.modules[module_name]
-        return None
-
-    # * OK loaded successfully! *
-    if default_set:
-        # just incase its enabled alredy
-        ext = _bpy.context.user_preferences.addons.get(module_name)
-        if not ext:
-            ext = _bpy.context.user_preferences.addons.new()
-            ext.module = module_name
-    
-    _bpy_types._register_immediate = True
-
-    mod.__addon_enabled__ = True
-
-    print("\tbpy.utils.addon_enable", mod.__name__)
-
-    return mod
-
-
-def addon_disable(module_name, default_set=True):
-    """
-    Disables an addon by name.
-
-    :arg module_name: The name of the addon and module.
-    :type module_name: string
-    """
-    import traceback
-    import bpy_types as _bpy_types
-
-    mod = _sys.modules.get(module_name)
-
-    # possible this addon is from a previous session and didnt load a module this time.
-    # so even if the module is not found, still disable the addon in the user prefs.
-    if mod:
-        mod.__addon_enabled__ = False
-
-        try:
-            _bpy_types._unregister_module(module_name, free=False)  # dont free because we may want to enable again.
-            mod.unregister()
-        except:
-            traceback.print_exc()
-    else:
-        print("addon_disable", module_name, "not loaded")
-
-    # could be in more then once, unlikely but better do this just incase.
-    addons = _bpy.context.user_preferences.addons
-
-    if default_set:
-        while module_name in addons:
-            addon = addons.get(module_name)
-            if addon:
-                addons.remove(addon)
-    
-    print("\tbpy.utils.addon_disable", module_name)
-
-
-def addon_reset_all():
-    """
-    Sets the addon state based on the user preferences.
-    """
-
-    paths = script_paths("addons") + script_paths("addons_contrib")
-
-    for path in paths:
-        _sys_path_ensure(path)
-        for mod_name, mod_path in _bpy.path.module_names(path):
-            is_enabled, is_loaded = addon_check(mod_name)
-            if is_enabled == is_loaded:
-                pass
-            elif is_enabled:
-                addon_enable(mod_name)
-            elif is_loaded:
-                print("\taddon_reset_all unloading", mod_name)
-                addon_disable(mod_name)
-
 def preset_find(name, preset_path, display_name=False):
     if not name:
         return None
-    
+
     for directory in preset_paths(preset_path):
-        
+
         if display_name:
             filename = ""
             for fn in _os.listdir(directory):
@@ -516,14 +424,17 @@ def preset_find(name, preset_path, display_name=False):
 def keyconfig_set(filepath):
     from os.path import basename, splitext
 
-    print("loading preset:", filepath)
+    if _bpy.app.debug:
+        print("loading preset:", filepath)
+
     keyconfigs = _bpy.context.window_manager.keyconfigs
-    kc_orig = keyconfigs.active
 
     keyconfigs_old = keyconfigs[:]
 
     try:
-        exec(compile(open(filepath).read(), filepath, 'exec'), {"__file__": filepath})
+        file = open(filepath)
+        exec(compile(file.read(), filepath, 'exec'), {"__file__": filepath})
+        file.close()
     except:
         import traceback
         traceback.print_exc()
@@ -540,8 +451,93 @@ def keyconfig_set(filepath):
             keyconfigs.remove(kc_dupe)
         else:
             break
-    
+
     kc_new.name = name
     keyconfigs.active = kc_new
 
 
+def user_resource(type, path="", create=False):
+    """
+    Return a user resource path (normally from the users home directory).
+
+    :arg type: Resource type in ['DATAFILES', 'CONFIG', 'SCRIPTS', 'AUTOSAVE'].
+    :type type: string
+    :arg subdir: Optional subdirectory.
+    :type subdir: string
+    :arg create: Treat the path as a directory and create
+       it if its not existing.
+    :type create: boolean
+    :return: a path.
+    :rtype: string
+    """
+
+    target_path = _user_resource(type, path)
+
+    if create:
+        # should always be true.
+        if target_path:
+            # create path if not existing.
+            if not _os.path.exists(target_path):
+                try:
+                    _os.makedirs(target_path)
+                except:
+                    import traceback
+                    traceback.print_exc()
+                    target_path = ""
+            elif not _os.path.isdir(target_path):
+                print("Path %r found but isn't a directory!" % target_path)
+                target_path = ""
+
+    return target_path
+
+
+def _bpy_module_classes(module, is_registered=False):
+    typemap_list = _bpy_types.TypeMap.get(module, ())
+    i = 0
+    while i < len(typemap_list):
+        cls_weakref = typemap_list[i]
+        cls = cls_weakref()
+
+        if cls is None:
+            del typemap_list[i]
+        else:
+            if is_registered == cls.is_registered:
+                yield cls
+            i += 1
+
+
+def register_module(module, verbose=False):
+    if verbose:
+        print("bpy.utils.register_module(%r): ..." % module)
+    cls = None
+    for cls in _bpy_module_classes(module, is_registered=False):
+        if verbose:
+            print("    %r" % cls)
+        try:
+            register_class(cls)
+        except:
+            print("bpy.utils.register_module(): "
+                  "failed to registering class %r" % cls)
+            import traceback
+            traceback.print_exc()
+    if verbose:
+        print("done.\n")
+    if cls is None:
+        raise Exception("register_module(%r): defines no classes" % module)
+
+
+def unregister_module(module, verbose=False):
+    if verbose:
+        print("bpy.utils.unregister_module(%r): ..." % module)
+    for cls in _bpy_module_classes(module, is_registered=True):
+        if verbose:
+            print("    %r" % cls)
+        try:
+            unregister_class(cls)
+        except:
+            print("bpy.utils.unregister_module(): "
+                  "failed to unregistering class %r" % cls)
+            import traceback
+            traceback.print_exc()
+    if verbose:
+        print("done.\n")

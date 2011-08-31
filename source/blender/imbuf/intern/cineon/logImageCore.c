@@ -1,3 +1,6 @@
+/** \file blender/imbuf/intern/cineon/logImageCore.c
+ *  \ingroup imbcineon
+ */
 /*
  *	 Cineon image file format library routines.
  *
@@ -154,7 +157,7 @@ ntohf(R32 f) {
 #define UNDEF_FLOAT 0x7F800000
 
 R32
-undefined() {
+undefined(void) {
 	Hack hack;
 	hack.i = UNDEF_FLOAT;
 	return hack.f;

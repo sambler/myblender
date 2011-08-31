@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,26 +25,36 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/object/object_add.c
+ *  \ingroup edobj
+ */
+
+
 #include <stdlib.h>
 #include <string.h>
 
 #include "MEM_guardedalloc.h"
 
+#include "DNA_anim_types.h"
 #include "DNA_curve_types.h"
 #include "DNA_group_types.h"
 #include "DNA_lamp_types.h"
+#include "DNA_key_types.h"
 #include "DNA_material_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_meta_types.h"
 #include "DNA_object_fluidsim.h"
 #include "DNA_object_force.h"
 #include "DNA_scene_types.h"
+#include "DNA_speaker_types.h"
 #include "DNA_vfont_types.h"
 
 #include "BLI_math.h"
 #include "BLI_listbase.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_anim.h"
+#include "BKE_animsys.h"
 #include "BKE_armature.h"
 #include "BKE_constraint.h"
 #include "BKE_context.h"
@@ -56,15 +66,18 @@
 #include "BKE_group.h"
 #include "BKE_lattice.h"
 #include "BKE_library.h"
+#include "BKE_key.h"
 #include "BKE_main.h"
 #include "BKE_material.h"
 #include "BKE_mball.h"
 #include "BKE_mesh.h"
 #include "BKE_modifier.h"
+#include "BKE_nla.h"
 #include "BKE_object.h"
 #include "BKE_particle.h"
 #include "BKE_report.h"
 #include "BKE_sca.h"
+#include "BKE_speaker.h"
 #include "BKE_texture.h"
 
 #include "RNA_access.h"
@@ -104,15 +117,16 @@ void ED_object_location_from_view(bContext *C, float *loc)
 
 void ED_object_rotation_from_view(bContext *C, float *rot)
 {
-	RegionView3D *rv3d= ED_view3d_context_rv3d(C);
-	
+	RegionView3D *rv3d= CTX_wm_region_view3d(C);
 	if(rv3d) {
-		rv3d->viewquat[0]= -rv3d->viewquat[0];
-		quat_to_eul( rot, rv3d->viewquat);
-		rv3d->viewquat[0]= -rv3d->viewquat[0];
+		float quat[4];
+		copy_qt_qt(quat, rv3d->viewquat);
+		quat[0]= -quat[0];
+		quat_to_eul(rot, quat);
 	}
-	else
-		rot[0] = rot[1] = rot[2] = 0.f;
+	else {
+		zero_v3(rot);
+	}
 }
 
 void ED_object_base_init_transform(bContext *C, Base *base, float *loc, float *rot)
@@ -164,15 +178,17 @@ float ED_object_new_primitive_matrix(bContext *C, Object *obedit, float *loc, fl
 void ED_object_add_generic_props(wmOperatorType *ot, int do_editmode)
 {
 	PropertyRNA *prop;
-	RNA_def_boolean(ot->srna, "view_align", 0, "Align to View", "Align the new object to the view.");
+	
+	/* note: this property gets hidden for add-camera operator */
+	RNA_def_boolean(ot->srna, "view_align", 0, "Align to View", "Align the new object to the view");
 
 	if(do_editmode) {
-		prop= RNA_def_boolean(ot->srna, "enter_editmode", 0, "Enter Editmode", "Enter editmode when adding this object.");
+		prop= RNA_def_boolean(ot->srna, "enter_editmode", 0, "Enter Editmode", "Enter editmode when adding this object");
 		RNA_def_property_flag(prop, PROP_HIDDEN);
 	}
 	
-	RNA_def_float_vector_xyz(ot->srna, "location", 3, NULL, -FLT_MAX, FLT_MAX, "Location", "Location for the newly added object.", -FLT_MAX, FLT_MAX);
-	RNA_def_float_rotation(ot->srna, "rotation", 3, NULL, -FLT_MAX, FLT_MAX, "Rotation", "Rotation for the newly added object", -FLT_MAX, FLT_MAX);
+	RNA_def_float_vector_xyz(ot->srna, "location", 3, NULL, -FLT_MAX, FLT_MAX, "Location", "Location for the newly added object", -FLT_MAX, FLT_MAX);
+	RNA_def_float_rotation(ot->srna, "rotation", 3, NULL, -FLT_MAX, FLT_MAX, "Rotation", "Rotation for the newly added object", (float)-M_PI * 2.0f, (float)M_PI * 2.0f);
 	
 	prop = RNA_def_boolean_layer_member(ot->srna, "layers", 20, NULL, "Layer", "");
 	RNA_def_property_flag(prop, PROP_HIDDEN);
@@ -255,11 +271,15 @@ int ED_object_add_generic_get_opts(bContext *C, wmOperator *op, float *loc, floa
 		view_align = FALSE;
 	else if (RNA_property_is_set(op->ptr, "view_align"))
 		view_align = RNA_boolean_get(op->ptr, "view_align");
-	else
+	else {
 		view_align = U.flag & USER_ADD_VIEWALIGNED;
-
-	if (view_align)
+		RNA_boolean_set(op->ptr, "view_align", view_align);
+	}
+	
+	if (view_align) {
 		ED_object_rotation_from_view(C, rot);
+		RNA_float_set_array(op->ptr, "rotation", rot);
+	}
 	else
 		RNA_float_get_array(op->ptr, "rotation", rot);
 	
@@ -275,6 +295,7 @@ int ED_object_add_generic_get_opts(bContext *C, wmOperator *op, float *loc, floa
 }
 
 /* for object add primitive operators */
+/* do not call undo push in this function (users of this function have to) */
 Object *ED_object_add_type(bContext *C, int type, float *loc, float *rot, int enter_editmode, unsigned int layer)
 {
 	Main *bmain= CTX_data_main(C);
@@ -331,7 +352,7 @@ void OBJECT_OT_add(wmOperatorType *ot)
 	ot->invoke= ED_object_add_generic_invoke;
 	ot->exec= object_add_exec;
 	
-	ot->poll= ED_operator_scene_editable;
+	ot->poll= ED_operator_objectmode;
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
@@ -398,13 +419,15 @@ static Object *effector_add_type(bContext *C, wmOperator *op, int type)
 
 	ob->pd= object_add_collision_fields(type);
 
+	DAG_scene_sort(CTX_data_main(C), CTX_data_scene(C));
+
 	return ob;
 }
 
 /* for object add operator */
 static int effector_add_exec(bContext *C, wmOperator *op)
 {
-	if(effector_add_type(C, op, RNA_int_get(op->ptr, "type")) == NULL)
+	if(effector_add_type(C, op, RNA_enum_get(op->ptr, "type")) == NULL)
 		return OPERATOR_CANCELLED;
 
 	return OPERATOR_FINISHED;
@@ -421,7 +444,7 @@ void OBJECT_OT_effector_add(wmOperatorType *ot)
 	ot->invoke= WM_menu_invoke;
 	ot->exec= effector_add_exec;
 	
-	ot->poll= ED_operator_scene_editable;
+	ot->poll= ED_operator_objectmode;
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
@@ -465,6 +488,8 @@ static int object_camera_add_exec(bContext *C, wmOperator *op)
 
 void OBJECT_OT_camera_add(wmOperatorType *ot)
 {
+	PropertyRNA *prop;
+	
 	/* identifiers */
 	ot->name= "Add Camera";
 	ot->description = "Add a camera object to the scene";
@@ -472,30 +497,25 @@ void OBJECT_OT_camera_add(wmOperatorType *ot)
 	
 	/* api callbacks */
 	ot->exec= object_camera_add_exec;
-	ot->poll= ED_operator_scene_editable;
+	ot->poll= ED_operator_objectmode;
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 		
 	ED_object_add_generic_props(ot, TRUE);
+	
+	/* hide this for cameras, default */
+	prop= RNA_struct_type_find_property(ot->srna, "view_align");
+	RNA_def_property_flag(prop, PROP_HIDDEN);
+
 }
 
 
 /* ***************** add primitives *************** */
-
-static EnumPropertyItem prop_metaball_types[]= {
-	{MB_BALL, "MBALL_BALL", ICON_META_BALL, "Meta Ball", ""},
-	{MB_TUBE, "MBALL_CAPSULE", ICON_META_CAPSULE, "Meta Capsule", ""},
-	{MB_PLANE, "MBALL_PLANE", ICON_META_PLANE, "Meta Plane", ""},
-	{MB_CUBE, "MBALL_CUBE", ICON_META_CUBE, "Meta Cube", ""},
-	{MB_ELIPSOID, "MBALL_ELLIPSOID", ICON_META_ELLIPSOID, "Meta Ellipsoid", ""},
-	{0, NULL, 0, NULL, NULL}
-};
-
 static int object_metaball_add_exec(bContext *C, wmOperator *op)
 {
 	Object *obedit= CTX_data_edit_object(C);
-	MetaElem *elem;
+	/*MetaElem *elem;*/ /*UNUSED*/
 	int newob= 0;
 	int enter_editmode;
 	unsigned int layer;
@@ -511,11 +531,11 @@ static int object_metaball_add_exec(bContext *C, wmOperator *op)
 		obedit= ED_object_add_type(C, OB_MBALL, loc, rot, TRUE, layer);
 		newob = 1;
 	}
-	else DAG_id_flush_update(&obedit->id, OB_RECALC_DATA);
+	else DAG_id_tag_update(&obedit->id, OB_RECALC_DATA);
 	
 	ED_object_new_primitive_matrix(C, obedit, loc, rot, mat);
 	
-	elem= (MetaElem*)add_metaball_primitive(C, mat, RNA_enum_get(op->ptr, "type"), newob);
+	/* elem= (MetaElem *) */ add_metaball_primitive(C, mat, RNA_enum_get(op->ptr, "type"), newob);
 
 	/* userdef */
 	if (newob && !enter_editmode) {
@@ -535,7 +555,7 @@ static int object_metaball_add_invoke(bContext *C, wmOperator *op, wmEvent *UNUS
 
 	object_add_generic_invoke_options(C, op);
 
-	pup= uiPupMenuBegin(C, op->type->name, 0);
+	pup= uiPupMenuBegin(C, op->type->name, ICON_NONE);
 	layout= uiPupMenuLayout(pup);
 	if(!obedit || obedit->type == OB_MBALL)
 		uiItemsEnumO(layout, op->type->idname, "type");
@@ -561,7 +581,7 @@ void OBJECT_OT_metaball_add(wmOperatorType *ot)
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 	
-	RNA_def_enum(ot->srna, "type", prop_metaball_types, 0, "Primitive", "");
+	RNA_def_enum(ot->srna, "type", metaelem_type_items, 0, "Primitive", "");
 	ED_object_add_generic_props(ot, TRUE);
 }
 
@@ -596,7 +616,7 @@ void OBJECT_OT_text_add(wmOperatorType *ot)
 	/* api callbacks */
 	ot->invoke= ED_object_add_generic_invoke;
 	ot->exec= object_add_text_exec;
-	ot->poll= ED_operator_scene_editable;
+	ot->poll= ED_operator_objectmode;
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
@@ -607,7 +627,7 @@ static int object_armature_add_exec(bContext *C, wmOperator *op)
 {
 	Object *obedit= CTX_data_edit_object(C);
 	View3D *v3d= CTX_wm_view3d(C);
-	RegionView3D *rv3d= NULL;
+	RegionView3D *rv3d= CTX_wm_region_view3d(C);
 	int newob= 0;
 	int enter_editmode;
 	unsigned int layer;
@@ -622,15 +642,12 @@ static int object_armature_add_exec(bContext *C, wmOperator *op)
 		ED_object_enter_editmode(C, 0);
 		newob = 1;
 	}
-	else DAG_id_flush_update(&obedit->id, OB_RECALC_DATA);
+	else DAG_id_tag_update(&obedit->id, OB_RECALC_DATA);
 	
 	if(obedit==NULL) {
-		BKE_report(op->reports, RPT_ERROR, "Cannot create editmode armature.");
+		BKE_report(op->reports, RPT_ERROR, "Cannot create editmode armature");
 		return OPERATOR_CANCELLED;
 	}
-	
-	if(v3d) 
-		rv3d= CTX_wm_region(C)->regiondata;
 	
 	/* v3d and rv3d are allowed to be NULL */
 	add_primitive_bone(CTX_data_scene(C), v3d, rv3d);
@@ -654,14 +671,14 @@ void OBJECT_OT_armature_add(wmOperatorType *ot)
 	/* api callbacks */
 	ot->invoke= ED_object_add_generic_invoke;
 	ot->exec= object_armature_add_exec;
-	ot->poll= ED_operator_scene_editable;
+	ot->poll= ED_operator_objectmode;
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 	ED_object_add_generic_props(ot, TRUE);
 }
 
-static char *get_lamp_defname(int type)
+static const char *get_lamp_defname(int type)
 {
 	switch (type) {
 		case LA_LOCAL: return "Point";
@@ -687,9 +704,7 @@ static int object_lamp_add_exec(bContext *C, wmOperator *op)
 		return OPERATOR_CANCELLED;
 
 	ob= ED_object_add_type(C, OB_LAMP, loc, rot, FALSE, layer);
-	if(ob && ob->data)
-		((Lamp*)ob->data)->type= type;
-	
+	((Lamp*)ob->data)->type= type;
 	rename_id((ID *)ob, get_lamp_defname(type));
 	rename_id((ID *)ob->data, get_lamp_defname(type));
 	
@@ -714,7 +729,7 @@ void OBJECT_OT_lamp_add(wmOperatorType *ot)
 	/* api callbacks */
 	ot->invoke= WM_menu_invoke;
 	ot->exec= object_lamp_add_exec;
-	ot->poll= ED_operator_scene_editable;
+	ot->poll= ED_operator_objectmode;
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
@@ -757,6 +772,61 @@ static int group_instance_add_exec(bContext *C, wmOperator *op)
 	return OPERATOR_CANCELLED;
 }
 
+static int object_speaker_add_exec(bContext *C, wmOperator *op)
+{
+	Object *ob;
+	int enter_editmode;
+	unsigned int layer;
+	float loc[3], rot[3];
+	Scene *scene = CTX_data_scene(C);
+
+	object_add_generic_invoke_options(C, op);
+	if(!ED_object_add_generic_get_opts(C, op, loc, rot, &enter_editmode, &layer))
+		return OPERATOR_CANCELLED;
+
+	ob= ED_object_add_type(C, OB_SPEAKER, loc, rot, FALSE, layer);
+	
+	/* to make it easier to start using this immediately in NLA, a default sound clip is created
+	 * ready to be moved around to retime the sound and/or make new sound clips
+	 */
+	{
+		/* create new data for NLA hierarchy */
+		AnimData *adt = BKE_id_add_animdata(&ob->id);
+		NlaTrack *nlt = add_nlatrack(adt, NULL);
+		NlaStrip *strip = add_nla_soundstrip(CTX_data_scene(C), ob->data);
+		strip->start = CFRA;
+		strip->end += strip->start;
+		
+		/* hook them up */
+		BKE_nlatrack_add_strip(nlt, strip);
+		
+		/* auto-name the strip, and give the track an interesting name  */
+		strcpy(nlt->name, "SoundTrack");
+		BKE_nlastrip_validate_name(adt, strip);
+		
+		WM_event_add_notifier(C, NC_ANIMATION|ND_NLA|NA_EDITED, NULL);
+	}
+
+	return OPERATOR_FINISHED;
+}
+
+void OBJECT_OT_speaker_add(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name= "Add Speaker";
+	ot->description = "Add a speaker object to the scene";
+	ot->idname= "OBJECT_OT_speaker_add";
+
+	/* api callbacks */
+	ot->exec= object_speaker_add_exec;
+	ot->poll= ED_operator_objectmode;
+
+	/* flags */
+	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+
+	ED_object_add_generic_props(ot, TRUE);
+}
+
 /* only used as menu */
 void OBJECT_OT_group_instance_add(wmOperatorType *ot)
 {
@@ -771,7 +841,7 @@ void OBJECT_OT_group_instance_add(wmOperatorType *ot)
 	ot->invoke= WM_enum_search_invoke;
 	ot->exec= group_instance_add_exec;
 
-	ot->poll= ED_operator_scene_editable;
+	ot->poll= ED_operator_objectmode;
 
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
@@ -799,14 +869,14 @@ static int object_delete_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	Main *bmain= CTX_data_main(C);
 	Scene *scene= CTX_data_scene(C);
-	int islamp= 0;
+	/* int islamp= 0; */ /* UNUSED */
 	
 	if(CTX_data_edit_object(C)) 
 		return OPERATOR_CANCELLED;
 	
 	CTX_DATA_BEGIN(C, Base*, base, selected_bases) {
 
-		if(base->object->type==OB_LAMP) islamp= 1;
+		/* if(base->object->type==OB_LAMP) islamp= 1; */
 
 		/* deselect object -- it could be used in other scenes */
 		base->object->flag &= ~SELECT;
@@ -815,8 +885,6 @@ static int object_delete_exec(bContext *C, wmOperator *UNUSED(op))
 		ED_base_object_free_and_unlink(bmain, scene, base);
 	}
 	CTX_DATA_END;
-
-	if(islamp) reshadeall_displist(scene);	/* only frees displist */
 
 	DAG_scene_sort(bmain, scene);
 	DAG_ids_flush_update(bmain, 0);
@@ -837,20 +905,13 @@ void OBJECT_OT_delete(wmOperatorType *ot)
 	/* api callbacks */
 	ot->invoke= WM_operator_confirm;
 	ot->exec= object_delete_exec;
-	ot->poll= ED_operator_scene_editable;
+	ot->poll= ED_operator_objectmode;
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 }
 
 /**************************** Copy Utilities ******************************/
-
-static void copy_object__forwardModifierLinks(void *UNUSED(userData), Object *UNUSED(ob),
-											  ID **idpoin)
-{
-	/* this is copied from ID_NEW; it might be better to have a macro */
-	if(*idpoin && (*idpoin)->newid) *idpoin = (*idpoin)->newid;
-}
 
 /* after copying objects, copied data should get new pointers */
 static void copy_object_set_idnew(bContext *C, int dupflag)
@@ -862,17 +923,7 @@ static void copy_object_set_idnew(bContext *C, int dupflag)
 	
 	/* XXX check object pointers */
 	CTX_DATA_BEGIN(C, Object*, ob, selected_editable_objects) {
-		relink_constraints(&ob->constraints);
-		if (ob->pose){
-			bPoseChannel *chan;
-			for (chan = ob->pose->chanbase.first; chan; chan=chan->next){
-				relink_constraints(&chan->constraints);
-			}
-		}
-		modifiers_foreachIDLink(ob, copy_object__forwardModifierLinks, NULL);
-		ID_NEW(ob->parent);
-		ID_NEW(ob->proxy);
-		ID_NEW(ob->proxy_group);
+		object_relink(ob);
 	}
 	CTX_DATA_END;
 	
@@ -978,14 +1029,19 @@ static void make_object_duplilist_real(bContext *C, Scene *scene, Base *base)
 		basen->lay= base->lay;
 		BLI_addhead(&scene->base, basen);	/* addhead: othwise eternal loop */
 		basen->object= ob;
-		ob->ipo= NULL;		/* make sure apply works */
-		ob->parent= ob->track= NULL;
+		
+		/* make sure apply works */
+		BKE_free_animdata(&ob->id);	
+		ob->adt = NULL;
+		
+		ob->parent= NULL;
+		ob->constraints.first= ob->constraints.last= NULL;
 		ob->disp.first= ob->disp.last= NULL;
 		ob->transflag &= ~OB_DUPLI;	
 		ob->lay= base->lay;
 		
 		copy_m4_m4(ob->obmat, dob->mat);
-		object_apply_mat4(ob, ob->obmat);
+		object_apply_mat4(ob, ob->obmat, FALSE, FALSE);
 	}
 	
 	copy_object_set_idnew(C, 0);
@@ -1029,7 +1085,7 @@ void OBJECT_OT_duplicates_make_real(wmOperatorType *ot)
 	/* api callbacks */
 	ot->exec= object_duplicates_make_real_exec;
 	
-	ot->poll= ED_operator_scene_editable;
+	ot->poll= ED_operator_objectmode;
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
@@ -1044,9 +1100,7 @@ static EnumPropertyItem convert_target_items[]= {
 
 static void curvetomesh(Scene *scene, Object *ob) 
 {
-	Curve *cu= ob->data;
-	
-	if(cu->disp.first==0)
+	if(ob->disp.first == NULL)
 		makeDispListCurveTypes(scene, ob, 0); /* force creation */
 
 	nurbs_to_mesh(ob); /* also does users */
@@ -1074,7 +1128,7 @@ static Base *duplibase_for_convert(Scene *scene, Base *base, Object *ob)
 	}
 
 	obn= copy_object(ob);
-	obn->recalc |= OB_RECALC_ALL;
+	obn->recalc |= OB_RECALC_OB|OB_RECALC_DATA|OB_RECALC_TIME;
 
 	basen= MEM_mallocN(sizeof(Base), "duplibase");
 	*basen= *base;
@@ -1099,8 +1153,8 @@ static int convert_exec(bContext *C, wmOperator *op)
 	Nurb *nu;
 	MetaBall *mb;
 	Mesh *me;
-	int target= RNA_enum_get(op->ptr, "target");
-	int keep_original= RNA_boolean_get(op->ptr, "keep_original");
+	const short target= RNA_enum_get(op->ptr, "target");
+	const short keep_original= RNA_boolean_get(op->ptr, "keep_original");
 	int a, mballConverted= 0;
 
 	/* don't forget multiple users! */
@@ -1109,16 +1163,30 @@ static int convert_exec(bContext *C, wmOperator *op)
 	CTX_DATA_BEGIN(C, Base*, base, selected_editable_bases) {
 		ob= base->object;
 		ob->flag &= ~OB_DONE;
+
+		/* flag data thats not been edited (only needed for !keep_original) */
+		if(ob->data) {
+			((ID *)ob->data)->flag |= LIB_DOIT;
+		}
 	}
 	CTX_DATA_END;
 
 	CTX_DATA_BEGIN(C, Base*, base, selected_editable_bases) {
 		ob= base->object;
 
-		if(ob->flag & OB_DONE) {
+		if(ob->flag & OB_DONE || !IS_TAGGED(ob->data)) {
 			if (ob->type != target) {
 				base->flag &= ~SELECT;
 				ob->flag &= ~SELECT;
+			}
+
+			/* obdata already modified */
+			if(!IS_TAGGED(ob->data)) {
+				/* When 2 objects with linked data are selected, converting both
+				 * would keep modifiers on all but the converted object [#26003] */
+				if(ob->type == OB_MESH) {
+					object_free_modifiers(ob);	/* after derivedmesh calls! */
+				}
 			}
 		}
 		else if (ob->type==OB_MESH && target == OB_CURVE) {
@@ -1158,7 +1226,7 @@ static int convert_exec(bContext *C, wmOperator *op)
 				newob->data= copy_mesh(me);
 			} else {
 				newob = ob;
-				ob->recalc |= OB_RECALC_ALL;
+				ob->recalc |= OB_RECALC_OB|OB_RECALC_DATA|OB_RECALC_TIME;
 			}
 
 			/* make new mesh data from the original copy */
@@ -1191,26 +1259,26 @@ static int convert_exec(bContext *C, wmOperator *op)
 
 			cu= newob->data;
 
-			if (!cu->disp.first)
+			if (!newob->disp.first)
 				makeDispListCurveTypes(scene, newob, 0);
 
 			newob->type= OB_CURVE;
 
 			if(cu->vfont) {
 				cu->vfont->id.us--;
-				cu->vfont= 0;
+				cu->vfont= NULL;
 			}
 			if(cu->vfontb) {
 				cu->vfontb->id.us--;
-				cu->vfontb= 0;
+				cu->vfontb= NULL;
 			}
 			if(cu->vfonti) {
 				cu->vfonti->id.us--;
-				cu->vfonti= 0;
+				cu->vfonti= NULL;
 			}
 			if(cu->vfontbi) {
 				cu->vfontbi->id.us--;
-				cu->vfontbi= 0;
+				cu->vfontbi= NULL;
 			}
 
 			if (!keep_original) {
@@ -1219,7 +1287,7 @@ static int convert_exec(bContext *C, wmOperator *op)
 					for(ob1= bmain->object.first; ob1; ob1=ob1->id.next) {
 						if(ob1->data==ob->data) {
 							ob1->type= OB_CURVE;
-							ob1->recalc |= OB_RECALC_ALL;
+							ob1->recalc |= OB_RECALC_OB|OB_RECALC_DATA|OB_RECALC_TIME;
 						}
 					}
 				}
@@ -1228,8 +1296,12 @@ static int convert_exec(bContext *C, wmOperator *op)
 			for(nu=cu->nurb.first; nu; nu=nu->next)
 				nu->charidx= 0;
 
-			if(target == OB_MESH)
+			if(target == OB_MESH) {
 				curvetomesh(scene, newob);
+
+				/* meshes doesn't use displist */
+				freedisplist(&newob->disp);
+			}
 		}
 		else if(ELEM(ob->type, OB_CURVE, OB_SURF)) {
 			ob->flag |= OB_DONE;
@@ -1246,18 +1318,16 @@ static int convert_exec(bContext *C, wmOperator *op)
 					newob->data= copy_curve(ob->data);
 				} else {
 					newob= ob;
+
+					/* meshes doesn't use displist */
+					freedisplist(&newob->disp);
 				}
 
 				curvetomesh(scene, newob);
 			}
 		}
-		else if(ob->type==OB_MBALL) {
+		else if(ob->type==OB_MBALL && target == OB_MESH) {
 			Object *baseob;
-
-			if (target != OB_MESH) {
-				ob->flag |= OB_DONE;
-				continue;
-			}
 
 			base->flag &= ~SELECT;
 			ob->flag &= ~SELECT;
@@ -1300,11 +1370,12 @@ static int convert_exec(bContext *C, wmOperator *op)
 
 				mballConverted= 1;
 			}
-			else
-				continue;
 		}
-		else
+		else {
 			continue;
+		}
+
+		/* tag obdata if it was been changed */
 
 		/* If the original object is active then make this object active */
 		if(basen) {
@@ -1316,8 +1387,9 @@ static int convert_exec(bContext *C, wmOperator *op)
 			basen= NULL;
 		}
 
-		if (!keep_original) {
-			DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+		if (!keep_original && (ob->flag & OB_DONE)) {
+			DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
+			((ID *)ob->data)->flag &= ~LIB_DOIT; /* flag not to convert this datablock again */
 		}
 
 		/* delete original if needed */
@@ -1371,7 +1443,7 @@ static int convert_exec(bContext *C, wmOperator *op)
 void OBJECT_OT_convert(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Convert";
+	ot->name= "Convert to";
 	ot->description = "Convert selected objects to another type";
 	ot->idname= "OBJECT_OT_convert";
 	
@@ -1384,8 +1456,8 @@ void OBJECT_OT_convert(wmOperatorType *ot)
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 
 	/* properties */
-	ot->prop= RNA_def_enum(ot->srna, "target", convert_target_items, OB_MESH, "Target", "Type of object to convert to.");
-	RNA_def_boolean(ot->srna, "keep_original", 0, "Keep Original", "Keep original objects instead of replacing them.");
+	ot->prop= RNA_def_enum(ot->srna, "target", convert_target_items, OB_MESH, "Target", "Type of object to convert to");
+	RNA_def_boolean(ot->srna, "keep_original", 0, "Keep Original", "Keep original objects instead of replacing them");
 }
 
 /**************************** Duplicate ************************/
@@ -1412,7 +1484,7 @@ static Base *object_add_duplicate_internal(Main *bmain, Scene *scene, Base *base
 	}
 	else {
 		obn= copy_object(ob);
-		obn->recalc |= OB_RECALC_ALL;
+		obn->recalc |= OB_RECALC_OB|OB_RECALC_DATA|OB_RECALC_TIME;
 		
 		basen= MEM_mallocN(sizeof(Base), "duplibase");
 		*basen= *base;
@@ -1428,37 +1500,10 @@ static Base *object_add_duplicate_internal(Main *bmain, Scene *scene, Base *base
 		}
 		
 		/* duplicates using userflags */
-#if 0 // XXX old animation system				
-		if(dupflag & USER_DUP_IPO) {
-			bConstraintChannel *chan;
-			id= (ID *)obn->ipo;
-			
-			if(id) {
-				ID_NEW_US( obn->ipo)
-				else obn->ipo= copy_ipo(obn->ipo);
-				id->us--;
-			}
-			/* Handle constraint ipos */
-			for (chan=obn->constraintChannels.first; chan; chan=chan->next){
-				id= (ID *)chan->ipo;
-				if(id) {
-					ID_NEW_US( chan->ipo)
-					else chan->ipo= copy_ipo(chan->ipo);
-					id->us--;
-				}
-			}
+		if(dupflag & USER_DUP_ACT) {
+			BKE_copy_animdata_id_action(&obn->id);
 		}
-		if(dupflag & USER_DUP_ACT){ /* Not buttons in the UI to modify this, add later? */
-			id= (ID *)obn->action;
-			if (id){
-				ID_NEW_US(obn->action)
-				else{
-					obn->action= copy_action(obn->action);
-				}
-				id->us--;
-			}
-		}
-#endif // XXX old animation system
+		
 		if(dupflag & USER_DUP_MAT) {
 			for(a=0; a<obn->totcol; a++) {
 				id= (ID *)obn->mat[a];
@@ -1466,6 +1511,10 @@ static Base *object_add_duplicate_internal(Main *bmain, Scene *scene, Base *base
 					ID_NEW_US(obn->mat[a])
 					else obn->mat[a]= copy_material(obn->mat[a]);
 					id->us--;
+					
+					if(dupflag & USER_DUP_ACT) {
+						BKE_copy_animdata_id_action(&obn->mat[a]->id);
+					}
 				}
 			}
 		}
@@ -1476,6 +1525,11 @@ static Base *object_add_duplicate_internal(Main *bmain, Scene *scene, Base *base
 				if(id) {
 					ID_NEW_US(psys->part)
 					else psys->part= psys_copy_settings(psys->part);
+					
+					if(dupflag & USER_DUP_ACT) {
+						BKE_copy_animdata_id_action(&psys->part->id);
+					}
+
 					id->us--;
 				}
 			}
@@ -1543,7 +1597,10 @@ static Base *object_add_duplicate_internal(Main *bmain, Scene *scene, Base *base
 			case OB_LAMP:
 				if(dupflag & USER_DUP_LAMP) {
 					ID_NEW_US2(obn->data )
-					else obn->data= copy_lamp(obn->data);
+					else {
+						obn->data= copy_lamp(obn->data);
+						didit= 1;
+					}
 					id->us--;
 				}
 				break;
@@ -1567,29 +1624,56 @@ static Base *object_add_duplicate_internal(Main *bmain, Scene *scene, Base *base
 			case OB_LATTICE:
 				if(dupflag!=0) {
 					ID_NEW_US2(obn->data )
-					else obn->data= copy_lattice(obn->data);
+					else {
+						obn->data= copy_lattice(obn->data);
+						didit= 1;
+					}
 					id->us--;
 				}
 				break;
 			case OB_CAMERA:
 				if(dupflag!=0) {
 					ID_NEW_US2(obn->data )
-					else obn->data= copy_camera(obn->data);
+					else {
+						obn->data= copy_camera(obn->data);
+						didit= 1;
+					}
 					id->us--;
 				}
 				break;
+			case OB_SPEAKER:
+				if(dupflag!=0) {
+					ID_NEW_US2(obn->data )
+					else {
+						obn->data= copy_speaker(obn->data);
+						didit= 1;
+					}
+					id->us--;
+				}
+				break;
+
 		}
-		
-		if(dupflag & USER_DUP_MAT) {
-			matarar= give_matarar(obn);
-			if(didit && matarar) {
-				for(a=0; a<obn->totcol; a++) {
-					id= (ID *)(*matarar)[a];
-					if(id) {
-						ID_NEW_US( (*matarar)[a] )
-						else (*matarar)[a]= copy_material((*matarar)[a]);
-						
-						id->us--;
+
+		/* check if obdata is copied */
+		if(didit) {
+			Key *key = ob_get_key(obn);
+			
+			if(dupflag & USER_DUP_ACT) {
+				BKE_copy_animdata_id_action((ID *)obn->data);
+				if(key) BKE_copy_animdata_id_action((ID*)key);
+			}
+			
+			if(dupflag & USER_DUP_MAT) {
+				matarar= give_matarar(obn);
+				if(matarar) {
+					for(a=0; a<obn->totcol; a++) {
+						id= (ID *)(*matarar)[a];
+						if(id) {
+							ID_NEW_US( (*matarar)[a] )
+							else (*matarar)[a]= copy_material((*matarar)[a]);
+							
+							id->us--;
+						}
 					}
 				}
 			}
@@ -1599,7 +1683,8 @@ static Base *object_add_duplicate_internal(Main *bmain, Scene *scene, Base *base
 }
 
 /* single object duplicate, if dupflag==0, fully linked, else it uses the flags given */
-/* leaves selection of base/object unaltered */
+/* leaves selection of base/object unaltered.
+ * note: don't call this within a loop since clear_* funcs loop over the entire database. */
 Base *ED_object_add_duplicate(Main *bmain, Scene *scene, Base *base, int dupflag)
 {
 	Base *basen;
@@ -1614,6 +1699,10 @@ Base *ED_object_add_duplicate(Main *bmain, Scene *scene, Base *base, int dupflag
 	}
 
 	ob= basen->object;
+
+	/* link own references to the newly duplicated data [#26816] */
+	object_relink(ob);
+	set_sca_new_poins_ob(ob);
 
 	DAG_scene_sort(bmain, scene);
 	ED_render_id_flush_update(bmain, ob->data);
@@ -1646,8 +1735,10 @@ static int duplicate_exec(bContext *C, wmOperator *op)
 		/* new object becomes active */
 		if(BASACT==base)
 			ED_base_object_activate(C, basen);
-		
-		ED_render_id_flush_update(bmain, basen->object->data);
+
+		if(basen->object->data) {
+			DAG_id_tag_update(basen->object->data, 0);
+		}
 	}
 	CTX_DATA_END;
 
@@ -1666,39 +1757,25 @@ void OBJECT_OT_duplicate(wmOperatorType *ot)
 	PropertyRNA *prop;
 	
 	/* identifiers */
-	ot->name= "Duplicate";
+	ot->name= "Duplicate Objects";
 	ot->description = "Duplicate selected objects";
 	ot->idname= "OBJECT_OT_duplicate";
 	
 	/* api callbacks */
 	ot->exec= duplicate_exec;
-	ot->poll= ED_operator_scene_editable;
+	ot->poll= ED_operator_objectmode;
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 	
 	/* to give to transform */
-	RNA_def_boolean(ot->srna, "linked", 0, "Linked", "Duplicate object but not object data, linking to the original data.");
-	prop= RNA_def_int(ot->srna, "mode", TFM_TRANSLATION, 0, INT_MAX, "Mode", "", 0, INT_MAX);
+	RNA_def_boolean(ot->srna, "linked", 0, "Linked", "Duplicate object but not object data, linking to the original data");
+	prop= RNA_def_enum(ot->srna, "mode", transform_mode_types, TFM_TRANSLATION, "Mode", "");
 	RNA_def_property_flag(prop, PROP_HIDDEN);
 }
 
 /* **************** add named object, for dragdrop ************* */
 
-/* contextual operator dupli */
-
-static int add_named_poll(bContext *C)
-{
-	if(!ED_operator_scene_editable(C)) {
-		return 0;
-	} else {
-		Object *ob= CTX_data_active_object(C);
-		if(ob && ob->mode != OB_MODE_OBJECT)
-			return 0;
-		else
-			return 1;
-	}
-}
 
 static int add_named_exec(bContext *C, wmOperator *op)
 {
@@ -1757,13 +1834,13 @@ void OBJECT_OT_add_named(wmOperatorType *ot)
 	
 	/* api callbacks */
 	ot->exec= add_named_exec;
-	ot->poll= add_named_poll;
+	ot->poll= ED_operator_objectmode;
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 	
-	RNA_def_boolean(ot->srna, "linked", 0, "Linked", "Duplicate object but not object data, linking to the original data.");
-	RNA_def_string(ot->srna, "name", "Cube", 24, "Name", "Object name to add.");
+	RNA_def_boolean(ot->srna, "linked", 0, "Linked", "Duplicate object but not object data, linking to the original data");
+	RNA_def_string(ot->srna, "name", "Cube", 24, "Name", "Object name to add");
 }
 
 
@@ -1788,11 +1865,11 @@ static int join_exec(bContext *C, wmOperator *op)
 	Object *ob= CTX_data_active_object(C);
 
 	if(scene->obedit) {
-		BKE_report(op->reports, RPT_ERROR, "This data does not support joining in editmode.");
+		BKE_report(op->reports, RPT_ERROR, "This data does not support joining in editmode");
 		return OPERATOR_CANCELLED;
 	}
 	else if(object_data_is_libdata(ob)) {
-		BKE_report(op->reports, RPT_ERROR, "Can't edit external libdata.");
+		BKE_report(op->reports, RPT_ERROR, "Can't edit external libdata");
 		return OPERATOR_CANCELLED;
 	}
 
@@ -1841,11 +1918,11 @@ static int join_shapes_exec(bContext *C, wmOperator *op)
 	Object *ob= CTX_data_active_object(C);
 	
 	if(scene->obedit) {
-		BKE_report(op->reports, RPT_ERROR, "This data does not support joining in editmode.");
+		BKE_report(op->reports, RPT_ERROR, "This data does not support joining in editmode");
 		return OPERATOR_CANCELLED;
 	}
 	else if(object_data_is_libdata(ob)) {
-		BKE_report(op->reports, RPT_ERROR, "Can't edit external libdata.");
+		BKE_report(op->reports, RPT_ERROR, "Can't edit external libdata");
 		return OPERATOR_CANCELLED;
 	}
 	

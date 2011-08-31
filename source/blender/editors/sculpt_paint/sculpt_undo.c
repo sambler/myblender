@@ -30,9 +30,15 @@
  *
  */
 
+/** \file blender/editors/sculpt_paint/sculpt_undo.c
+ *  \ingroup edsculpt
+ */
+
+
 #include "MEM_guardedalloc.h"
 
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 #include "BLI_ghash.h"
 #include "BLI_threads.h"
 
@@ -48,9 +54,12 @@
 #include "BKE_multires.h"
 #include "BKE_paint.h"
 #include "BKE_key.h"
+#include "BKE_mesh.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
+
+#include "GPU_buffers.h"
 
 #include "ED_sculpt.h"
 #include "paint_intern.h"
@@ -64,9 +73,18 @@ static void update_cb(PBVHNode *node, void *unused)
 	BLI_pbvh_node_mark_update(node);
 }
 
+static void sculpt_restore_deformed(SculptSession *ss, SculptUndoNode *unode, int uindex, int oindex, float coord[3])
+{
+	if(unode->orig_co) {
+		swap_v3_v3(coord, unode->orig_co[uindex]);
+		copy_v3_v3(unode->co[uindex], ss->deform_cos[oindex]);
+	} else swap_v3_v3(coord, unode->co[uindex]);
+}
+
 static void sculpt_undo_restore(bContext *C, ListBase *lb)
 {
 	Scene *scene = CTX_data_scene(C);
+	Sculpt *sd = CTX_data_tool_settings(C)->sculpt;
 	Object *ob = CTX_data_active_object(C);
 	DerivedMesh *dm = mesh_get_derived_final(scene, ob, 0);
 	SculptSession *ss = ob->sculpt;
@@ -76,30 +94,27 @@ static void sculpt_undo_restore(bContext *C, ListBase *lb)
 	int *index;
 	int i, j, update= 0;
 
-	sculpt_update_mesh_elements(scene, ob, 0);
+	sculpt_update_mesh_elements(scene, sd, ob, 0);
 
 	for(unode=lb->first; unode; unode=unode->next) {
 		if(!(strcmp(unode->idname, ob->id.name)==0))
 			continue;
 
 		if(unode->maxvert) {
-			char *shapeName= (char*)unode->shapeName;
-
 			/* regular mesh restore */
 			if(ss->totvert != unode->maxvert)
 				continue;
 
-			if (ss->kb && strcmp(ss->kb->name, shapeName)) {
+			if (ss->kb && strcmp(ss->kb->name, unode->shapeName)) {
 				/* shape key has been changed before calling undo operator */
 
 				Key *key= ob_get_key(ob);
-				KeyBlock *kb= key_get_named_keyblock(key, shapeName);
+				KeyBlock *kb= key_get_named_keyblock(key, unode->shapeName);
 
 				if (kb) {
 					ob->shapenr= BLI_findindex(&key->block, kb) + 1;
-					ob->shapeflag|= OB_SHAPE_LOCK;
 
-					sculpt_update_mesh_elements(scene, ob, 0);
+					sculpt_update_mesh_elements(scene, sd, ob, 0);
 					WM_event_add_notifier(C, NC_OBJECT|ND_DATA, ob);
 				} else {
 					/* key has been removed -- skip this undo node */
@@ -114,8 +129,13 @@ static void sculpt_undo_restore(bContext *C, ListBase *lb)
 				float (*vertCos)[3];
 				vertCos= key_to_vertcos(ob, ss->kb);
 
-				for(i=0; i<unode->totvert; i++)
-					swap_v3_v3(vertCos[index[i]], unode->co[i]);
+				for(i=0; i<unode->totvert; i++) {
+					if(ss->modifiers_active) sculpt_restore_deformed(ss, unode, i, index[i], vertCos[index[i]]);
+					else {
+						if(unode->orig_co) swap_v3_v3(vertCos[index[i]], unode->orig_co[i]);
+						else swap_v3_v3(vertCos[index[i]], unode->co[i]);
+					}
+				}
 
 				/* propagate new coords to keyblock */
 				sculpt_vertcos_to_key(ob, ss->kb, vertCos);
@@ -127,7 +147,11 @@ static void sculpt_undo_restore(bContext *C, ListBase *lb)
 				MEM_freeN(vertCos);
 			} else {
 				for(i=0; i<unode->totvert; i++) {
-					swap_v3_v3(mvert[index[i]].co, unode->co[i]);
+					if(ss->modifiers_active) sculpt_restore_deformed(ss, unode, i, index[i], mvert[index[i]].co);
+					else {
+						if(unode->orig_co) swap_v3_v3(mvert[index[i]].co, unode->orig_co[i]);
+						else swap_v3_v3(mvert[index[i]].co, unode->co[i]);
+					}
 					mvert[index[i]].flag |= ME_VERT_PBVH_UPDATE;
 				}
 			}
@@ -159,6 +183,7 @@ static void sculpt_undo_restore(bContext *C, ListBase *lb)
 	}
 
 	if(update) {
+		int tag_update= 0;
 		/* we update all nodes still, should be more clever, but also
 		   needs to work correct when exiting/entering sculpt mode and
 		   the nodes get recreated, though in that case it could do all */
@@ -168,8 +193,21 @@ static void sculpt_undo_restore(bContext *C, ListBase *lb)
 		if((mmd=sculpt_multires_active(scene, ob)))
 			multires_mark_as_modified(ob);
 
-		if(ss->modifiers_active || ((Mesh*)ob->data)->id.us > 1)
-			DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+		tag_update= ((Mesh*)ob->data)->id.us > 1;
+
+		if(ss->modifiers_active) {
+			Mesh *me= ob->data;
+			mesh_calc_normals(me->mvert, me->totvert, me->mface, me->totface, NULL);
+
+			sculpt_free_deformMats(ss);
+			tag_update|= 1;
+		}
+
+		if(tag_update)
+			DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
+
+		/* for non-PBVH drawing, need to recreate VBOs */
+		GPU_drawobject_free(ob->derivedFinal);
 	}
 }
 
@@ -188,6 +226,8 @@ static void sculpt_undo_free(ListBase *lb)
 			MEM_freeN(unode->grids);
 		if(unode->layer_disp)
 			MEM_freeN(unode->layer_disp);
+		if(unode->orig_co)
+			MEM_freeN(unode->orig_co);
 	}
 }
 
@@ -206,10 +246,10 @@ SculptUndoNode *sculpt_undo_get_node(PBVHNode *node)
 	return NULL;
 }
 
-SculptUndoNode *sculpt_undo_push_node(SculptSession *ss, PBVHNode *node)
+SculptUndoNode *sculpt_undo_push_node(Object *ob, PBVHNode *node)
 {
 	ListBase *lb= undo_paint_push_get_list(UNDO_PAINT_MESH);
-	Object *ob= ss->ob;
+	SculptSession *ss = ob->sculpt;
 	SculptUndoNode *unode;
 	int totvert, allvert, totgrid, maxgrid, gridsize, *grids;
 
@@ -249,6 +289,9 @@ SculptUndoNode *sculpt_undo_push_node(SculptSession *ss, PBVHNode *node)
 		unode->index= MEM_mapallocN(sizeof(int)*allvert, "SculptUndoNode.index");
 	}
 
+	if(ss->modifiers_active)
+		unode->orig_co= MEM_callocN(allvert*sizeof(*unode->orig_co), "undoSculpt orig_cos");
+
 	BLI_unlock_thread(LOCK_CUSTOM1);
 
 	/* copy threaded, hopefully this is the performance critical part */
@@ -260,6 +303,9 @@ SculptUndoNode *sculpt_undo_push_node(SculptSession *ss, PBVHNode *node)
 			if(vd.no) VECCOPY(unode->no[vd.i], vd.no)
 			else normal_float_to_short_v3(unode->no[vd.i], vd.fno);
 			if(vd.vert_indices) unode->index[vd.i]= vd.vert_indices[vd.i];
+
+			if(ss->modifiers_active)
+				copy_v3_v3(unode->orig_co[vd.i], ss->orig_cos[unode->index[vd.i]]);
 		}
 		BLI_pbvh_vertex_iter_end;
 	}
@@ -268,13 +314,13 @@ SculptUndoNode *sculpt_undo_push_node(SculptSession *ss, PBVHNode *node)
 		memcpy(unode->grids, grids, sizeof(int)*totgrid);
 
 	/* store active shape key */
-	if(ss->kb) BLI_strncpy((char*)unode->shapeName, ss->kb->name, sizeof(ss->kb->name));
+	if(ss->kb) BLI_strncpy(unode->shapeName, ss->kb->name, sizeof(ss->kb->name));
 	else unode->shapeName[0]= '\0';
 
 	return unode;
 }
 
-void sculpt_undo_push_begin(char *name)
+void sculpt_undo_push_begin(const char *name)
 {
 	undo_paint_push_begin(UNDO_PAINT_MESH, name,
 		sculpt_undo_restore, sculpt_undo_free);

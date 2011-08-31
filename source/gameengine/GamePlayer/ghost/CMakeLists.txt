@@ -24,52 +24,58 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-SET(SRC 
-	GPG_Application.cpp
-	GPG_Canvas.cpp
-	GPG_ghost.cpp
-	GPG_KeyboardDevice.cpp
-	GPG_System.cpp
-)
-
-SET(INC
+set(INC
 	.
-	../../../../intern/string
+	../common
+	../../BlenderRoutines
+	../../Converter
+	../../Expressions
+	../../GameLogic
+	../../Ketsji
+	../../Network
+	../../Network/LoopBackNetwork
+	../../Physics/common
+	../../Rasterizer
+	../../Rasterizer/RAS_OpenGLRasterizer
+	../../SceneGraph
+	../../../blender
+	../../../blender/blenfont
+	../../../blender/blenkernel
+	../../../blender/blenlib
+	../../../blender/blenloader
+	../../../blender/gpu
+	../../../blender/imbuf
+	../../../blender/makesdna
+	../../../blender/makesrna
+	../../../../intern/container
 	../../../../intern/ghost
 	../../../../intern/guardedalloc
 	../../../../intern/moto/include
-	../../../../source/gameengine/Rasterizer/RAS_OpenGLRasterizer
-	../../../../source/kernel/gen_system
-	../../../../source/kernel/gen_messaging
-	../../../../source/gameengine/Converter
-	../../../../source/blender/imbuf
-	../../../../source/gameengine/Ketsji
-	../../../../source/blender/blenlib
-	../../../../source/blender/blenkernel
-	../../../../source/blender/readblenfile
-	../../../../source/blender
-	../../../../source/blender/include
-	../../../../source/blender/makesdna
-	../../../../source/blender/makesrna
-	../../../../source/gameengine/Rasterizer
-	../../../../source/gameengine/GameLogic
-	../../../../source/gameengine/Expressions
-	../../../../source/gameengine/Network
-	../../../../source/gameengine/SceneGraph
-	../../../../source/gameengine/Physics/common
-	../../../../source/gameengine/Network/LoopBackNetwork
-	../../../../source/gameengine/GamePlayer/common
-	../../../../source/blender/misc
-	../../../../source/blender/blenloader
-	../../../../source/blender/gpu
-	../../../../extern/glew/include
-	${PYTHON_INC}
+	../../../../intern/string
 )
 
-ADD_DEFINITIONS(-DGLEW_STATIC)
+set(INC_SYS
+	${GLEW_INCLUDE_PATH}
+	${PYTHON_INCLUDE_DIRS}
+)
 
-IF(WITH_FFMPEG)
-	ADD_DEFINITIONS(-DWITH_FFMPEG)
-ENDIF(WITH_FFMPEG)
+set(SRC 
+	GPG_Application.cpp
+	GPG_Canvas.cpp
+	GPG_KeyboardDevice.cpp
+	GPG_System.cpp
+	GPG_ghost.cpp
 
-BLENDERLIB_NOLIST(gp_ghost "${SRC}" "${INC}")
+	GPG_Application.h
+	GPG_Canvas.h
+	GPG_KeyboardDevice.h
+	GPG_System.h
+)
+
+add_definitions(-DGLEW_STATIC)
+
+if(WITH_CODEC_FFMPEG)
+	add_definitions(-DWITH_FFMPEG)
+endif()
+
+blender_add_lib_nolist(ge_player_ghost "${SRC}" "${INC}" "${INC_SYS}")

@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file ED_object.h
+ *  \ingroup editors
+ */
+
 #ifndef ED_OBJECT_H
 #define ED_OBJECT_H
 
@@ -103,10 +108,7 @@ int ED_object_add_generic_get_opts(struct bContext *C, struct wmOperator *op, fl
 struct Object *ED_object_add_type(struct bContext *C, int type, float *loc, float *rot, int enter_editmode, unsigned int layer);
 
 void ED_object_single_users(struct Main *bmain, struct Scene *scene, int full);
-
-/* cleanup */
-int object_is_libdata(struct Object *ob);
-int object_data_is_libdata(struct Object *ob);
+void ED_object_single_user(struct Scene *scene, struct Object *ob);
 
 /* object motion paths */
 void ED_objects_clear_paths(struct bContext *C);
@@ -124,8 +126,8 @@ void ED_object_constraint_update(struct Object *ob);
 void ED_object_constraint_dependency_update(struct Main *bmain, struct Scene *scene, struct Object *ob);
 
 /* object_lattice.c */
-int  mouse_lattice(struct bContext *C, short mval[2], int extend);
-void undo_push_lattice(struct bContext *C, char *name);
+int  mouse_lattice(struct bContext *C, const int mval[2], int extend);
+void undo_push_lattice(struct bContext *C, const char *name);
 
 /* object_lattice.c */
 
@@ -137,7 +139,7 @@ enum {
 	MODIFIER_APPLY_SHAPE,
 } eModifier_Apply_Mode;
 
-struct ModifierData *ED_object_modifier_add(struct ReportList *reports, struct Main *bmain, struct Scene *scene, struct Object *ob, char *name, int type);
+struct ModifierData *ED_object_modifier_add(struct ReportList *reports, struct Main *bmain, struct Scene *scene, struct Object *ob, const char *name, int type);
 int ED_object_modifier_remove(struct ReportList *reports, struct Main *bmain, struct Scene *scene, struct Object *ob, struct ModifierData *md);
 int ED_object_modifier_move_down(struct ReportList *reports, struct Object *ob, struct ModifierData *md);
 int ED_object_modifier_move_up(struct ReportList *reports, struct Object *ob, struct ModifierData *md);

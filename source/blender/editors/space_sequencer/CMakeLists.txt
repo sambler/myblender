@@ -19,18 +19,40 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-FILE(GLOB SRC *.c)
-
-SET(INC
+set(INC
 	../include
 	../../blenkernel
 	../../blenlib
+	../../blenloader
 	../../imbuf
 	../../makesdna
 	../../makesrna
 	../../windowmanager
 	../../../../intern/guardedalloc
-	../../../../intern/audaspace/intern
 )
 
-BLENDERLIB(bf_editor_space_sequencer "${SRC}" "${INC}")
+set(INC_SYS
+	${GLEW_INCLUDE_PATH}
+)
+
+set(SRC
+	sequencer_add.c
+	sequencer_buttons.c
+	sequencer_draw.c
+	sequencer_edit.c
+	sequencer_ops.c
+	sequencer_scopes.c
+	sequencer_select.c
+	space_sequencer.c
+
+	sequencer_intern.h
+)
+
+if(WITH_AUDASPACE)
+	list(APPEND INC
+		../../../../intern/audaspace/intern
+	)
+	add_definitions(-DWITH_AUDASPACE)
+endif()
+
+blender_add_lib(bf_editor_space_sequencer "${SRC}" "${INC}" "${INC_SYS}")

@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/windowmanager/intern/wm_gesture.c
+ *  \ingroup wm
+ */
+
+
 #include "DNA_screen_types.h"
 #include "DNA_vec_types.h"
 #include "DNA_userdef_types.h"
@@ -37,9 +42,10 @@
 #include "BLI_editVert.h"	/* lasso tessellation */
 #include "BLI_math.h"
 #include "BLI_scanfill.h"	/* lasso tessellation */
+#include "BLI_utildefines.h"
 
 #include "BKE_context.h"
-#include "BKE_utildefines.h"
+
 
 #include "WM_api.h"
 #include "WM_types.h"
@@ -128,7 +134,7 @@ int wm_gesture_evaluate(wmGesture *gesture)
 		int dx= rect->xmax - rect->xmin;
 		int dy= rect->ymax - rect->ymin;
 		if(ABS(dx)+ABS(dy) > TWEAK_THRESHOLD) {
-			int theta= (int)floor(4.0f*atan2((float)dy, (float)dx)/M_PI + 0.5);
+			int theta= (int)floor(4.0f*atan2f((float)dy, (float)dx)/(float)M_PI + 0.5f);
 			int val= EVT_GESTURE_W;
 			
 			if(theta==0) val= EVT_GESTURE_E;
@@ -232,8 +238,12 @@ static void draw_filled_lasso(wmGesture *gt)
 	int i;
 	
 	for (i=0; i<gt->points; i++, lasso+=2) {
-		float co[3] = {(float)lasso[0], (float)lasso[1], 0.f};
-		
+		float co[3];
+
+		co[0]= (float)lasso[0];
+		co[1]= (float)lasso[1];
+		co[2]= 0.0f;
+
 		v = BLI_addfillvert(co);
 		if (lastv)
 			e = BLI_addfilledge(lastv, v);
@@ -272,7 +282,6 @@ static void wm_gesture_draw_lasso(wmGesture *gt)
 	glColor3ub(96, 96, 96);
 	glLineStipple(1, 0xAAAA);
 	glBegin(GL_LINE_STRIP);
-	lasso= (short *)gt->customdata;
 	for(i=0; i<gt->points; i++, lasso+=2)
 		glVertex2sv(lasso);
 	if(gt->type==WM_GESTURE_LASSO)
@@ -321,8 +330,8 @@ void wm_gesture_draw(wmWindow *win)
 		
 		if(gt->type==WM_GESTURE_RECT)
 			wm_gesture_draw_rect(gt);
-		else if(gt->type==WM_GESTURE_TWEAK)
-			wm_gesture_draw_line(gt);
+//		else if(gt->type==WM_GESTURE_TWEAK)
+//			wm_gesture_draw_line(gt);
 		else if(gt->type==WM_GESTURE_CIRCLE)
 			wm_gesture_draw_circle(gt);
 		else if(gt->type==WM_GESTURE_CROSS_RECT) {

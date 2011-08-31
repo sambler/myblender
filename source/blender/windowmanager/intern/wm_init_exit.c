@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/windowmanager/intern/wm_init_exit.c
+ *  \ingroup wm
+ */
+
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -43,6 +48,7 @@
 
 #include "BKE_blender.h"
 #include "BKE_context.h"
+#include "BKE_screen.h"
 #include "BKE_curve.h"
 #include "BKE_displist.h"
 #include "BKE_DerivedMesh.h"
@@ -52,20 +58,25 @@
 #include "BKE_main.h"
 #include "BKE_mball.h"
 #include "BKE_report.h"
-#include "BKE_utildefines.h"
+
 #include "BKE_packedFile.h"
 #include "BKE_sequencer.h" /* free seq clipboard */
 #include "BKE_material.h" /* clear_matcopybuf */
 
 #include "BLI_blenlib.h"
+#include "BLI_winstuff.h"
 
 #include "RE_pipeline.h"		/* RE_ free stuff */
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 #include "BPY_extern.h"
 #endif
 
-#include "SYS_System.h"
+#ifdef WITH_GAMEENGINE
+#include "BL_System.h"
+#endif
+#include "GHOST_Path-api.h"
+#include "GHOST_C-api.h"
 
 #include "RNA_define.h"
 
@@ -95,7 +106,6 @@
 
 #include "BKE_depsgraph.h"
 #include "BKE_sound.h"
-#include "GHOST_C-api.h"
 
 static void wm_init_reports(bContext *C)
 {
@@ -106,18 +116,19 @@ static void wm_free_reports(bContext *C)
 	BKE_reports_clear(CTX_wm_reports(C));
 }
 
-
+int wm_start_with_console = 0; /* used in creator.c */
 
 /* only called once, for startup */
-void WM_init(bContext *C, int argc, char **argv)
+void WM_init(bContext *C, int argc, const char **argv)
 {
-
 	if (!G.background) {
 		wm_ghost_init(C);	/* note: it assigns C to ghost! */
 		wm_init_cursor_data();
 	}
+	GHOST_CreateSystemPaths();
 	wm_operatortype_init();
-	
+	WM_menutype_init();
+
 	set_free_windowmanager_cb(wm_close_and_free);	/* library.c */
 	set_blender_test_break_cb(wm_window_testbreak); /* blender.c */
 	DAG_editors_update_cb(ED_render_id_flush_update); /* depsgraph.c */
@@ -127,11 +138,10 @@ void WM_init(bContext *C, int argc, char **argv)
 	ED_file_init();			/* for fsmenu */
 	ED_init_node_butfuncs();	
 	
-	BLF_init(11, U.dpi);
+	BLF_init(11, U.dpi); /* Please update source/gamengine/GamePlayer/GPG_ghost.cpp if you change this */
 	BLF_lang_init();
-	
 	/* get the default database, plus a wm */
-	WM_read_homefile(C, NULL);
+	WM_read_homefile(C, NULL, G.factory_startup);
 
 	/* note: there is a bug where python needs initializing before loading the
 	 * startup.blend because it may contain PyDrivers. It also needs to be after
@@ -141,17 +151,28 @@ void WM_init(bContext *C, int argc, char **argv)
 	 * before WM_read_homefile() or make py-drivers check if python is running.
 	 * Will try fix when the crash can be repeated. - campbell. */
 
-#ifndef DISABLE_PYTHON
-	BPY_set_context(C); /* necessary evil */
-	BPY_start_python(argc, argv);
-	BPY_load_user_modules(C);
+#ifdef WITH_PYTHON
+	BPY_context_set(C); /* necessary evil */
+	BPY_python_start(argc, argv);
+
+	BPY_driver_reset();
+	BPY_app_handlers_reset(); /* causes addon callbacks to be freed [#28068],
+	                           * but this is actually what we want. */
+	BPY_modules_load_user(C);
+#else
+	(void)argc; /* unused */
+	(void)argv; /* unused */
 #endif
+
+	if (!G.background && !wm_start_with_console)
+		GHOST_toggleConsole(3);
 
 	wm_init_reports(C); /* reports cant be initialized before the wm */
 
 	if (!G.background) {
 		GPU_extensions_init();
 		GPU_set_mipmap(!(U.gameflags & USER_DISABLE_MIPMAP));
+		GPU_set_anisotropic(U.anisotropic_filter);
 	
 		UI_init();
 	}
@@ -163,15 +184,15 @@ void WM_init(bContext *C, int argc, char **argv)
 		
 	ED_preview_init_dbase();
 	
-	G.ndofdevice = -1;	/* XXX bad initializer, needs set otherwise buttons show! */
-	
-	read_history();
+	WM_read_history();
 
-	if(G.sce[0] == 0)
-		BLI_make_file_string("/", G.sce, BLI_getDefaultDocumentFolder(), "untitled.blend");
+	/* allow a path of "", this is what happens when making a new file */
+	/*
+	if(G.main->name[0] == 0)
+		BLI_make_file_string("/", G.main->name, BLI_getDefaultDocumentFolder(), "untitled.blend");
+	*/
 
-	BLI_strncpy(G.lib, G.sce, FILE_MAX);
-
+	BLI_strncpy(G.lib, G.main->name, FILE_MAX);
 }
 
 void WM_init_splash(bContext *C)
@@ -212,7 +233,7 @@ int WM_init_game(bContext *C)
 	wmWindow* win;
 
 	ScrArea *sa;
-	ARegion *ar;
+	ARegion *ar= NULL;
 
 	Scene *scene= CTX_data_scene(C);
 
@@ -229,15 +250,7 @@ int WM_init_game(bContext *C)
 		CTX_wm_window_set(C, win);
 
 	sa = biggest_view3d(C);
-
-	if(sa)
-	{
-		for(ar=sa->regionbase.first; ar; ar=ar->next) {
-			if(ar->regiontype == RGN_TYPE_WINDOW) {
-				break;
-			}
-		}
-	}
+	ar= BKE_area_find_region_type(sa, RGN_TYPE_WINDOW);
 
 	// if we have a valid 3D view
 	if (sa && ar) {
@@ -261,19 +274,23 @@ int WM_init_game(bContext *C)
 
 		/* full screen the area */
 		if(!sa->full) {
-			ED_screen_full_toggle(C, wm->windows.first, sa);
+			ED_screen_full_toggle(C, win, sa);
 		}
 
 		/* Fullscreen */
 		if(scene->gm.fullscreen) {
 			WM_operator_name_call(C, "WM_OT_window_fullscreen_toggle", WM_OP_EXEC_DEFAULT, NULL);
 			wm_get_screensize(&ar->winrct.xmax, &ar->winrct.ymax);
+			ar->winx = ar->winrct.xmax + 1;
+			ar->winy = ar->winrct.ymax + 1;
 		}
 		else
 		{
 			GHOST_RectangleHandle rect = GHOST_GetClientBounds(win->ghostwin);
 			ar->winrct.ymax = GHOST_GetHeightRectangle(rect);
 			ar->winrct.xmax = GHOST_GetWidthRectangle(rect);
+			ar->winx = ar->winrct.xmax + 1;
+			ar->winy = ar->winrct.ymax + 1;
 			GHOST_DisposeRectangle(rect);
 		}
 
@@ -313,15 +330,14 @@ static void free_openrecent(void)
 
 /* bad stuff*/
 
-extern ListBase editelems;
 extern wchar_t *copybuf;
 extern wchar_t *copybufinfo;
 
 	// XXX copy/paste buffer stuff...
-extern void free_anim_copybuf(); 
-extern void free_anim_drivers_copybuf(); 
-extern void free_fmodifiers_copybuf(); 
-extern void free_posebuf(); 
+extern void free_anim_copybuf(void); 
+extern void free_anim_drivers_copybuf(void); 
+extern void free_fmodifiers_copybuf(void); 
+extern void free_posebuf(void); 
 
 /* called in creator.c even... tsk, split this! */
 void WM_exit(bContext *C)
@@ -329,6 +345,7 @@ void WM_exit(bContext *C)
 	wmWindow *win;
 
 	sound_exit();
+
 
 	/* first wrap up running stuff, we assume only the active WM is running */
 	/* modal handlers are on window level freed, others too? */
@@ -364,7 +381,6 @@ void WM_exit(bContext *C)
 	
 	BKE_freecubetable();
 	
-	fastshade_free_render();	/* shaded view */
 	ED_preview_free_dbase();	/* frees a Main dbase, before free_blender! */
 
 	if(C && CTX_wm_manager(C))
@@ -378,10 +394,6 @@ void WM_exit(bContext *C)
 	free_anim_drivers_copybuf();
 	free_fmodifiers_copybuf();
 	free_posebuf();
-//	free_vertexpaint();
-//	free_imagepaint();
-	
-//	fsmenu_free();
 
 	BLF_exit();
 	
@@ -393,7 +405,7 @@ void WM_exit(bContext *C)
 //	free_txt_data();
 	
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 	/* XXX - old note */
 	/* before free_blender so py's gc happens while library still exists */
 	/* needed at least for a rare sigsegv that can happen in pydrivers */
@@ -401,14 +413,10 @@ void WM_exit(bContext *C)
 	/* Update for blender 2.5, move after free_blender because blender now holds references to PyObject's
 	 * so decref'ing them after python ends causes bad problems every time
 	 * the pyDriver bug can be fixed if it happens again we can deal with it then */
-	BPY_end_python();
+	BPY_python_end();
 #endif
 
-	if (!G.background) {
-// XXX		UI_filelist_free_icons();
-	}
-	
-	GPU_buffer_pool_free(0);
+	GPU_global_buffer_pool_free();
 	GPU_free_unused_buffers();
 	GPU_extensions_exit();
 	
@@ -424,16 +432,19 @@ void WM_exit(bContext *C)
 	UI_exit();
 	BKE_userdef_free();
 
-	RNA_exit(); /* should be after BPY_end_python so struct python slots are cleared */
+	RNA_exit(); /* should be after BPY_python_end so struct python slots are cleared */
 	
 	wm_ghost_exit();
 
 	CTX_free(C);
-	
+#ifdef WITH_GAMEENGINE
 	SYS_DeleteSystem(SYS_GetSystem());
+#endif
+	
+	GHOST_DisposeSystemPaths();
 
 	if(MEM_get_memory_blocks_in_use()!=0) {
-		printf("Error Totblock: %d\n", MEM_get_memory_blocks_in_use());
+		printf("Error: Not freed memory blocks: %d\n", MEM_get_memory_blocks_in_use());
 		MEM_printmemlist();
 	}
 	wm_autosave_delete();
@@ -447,7 +458,6 @@ void WM_exit(bContext *C)
 		getchar();
 	}
 #endif 
-	
 	exit(G.afbreek==1);
 }
 

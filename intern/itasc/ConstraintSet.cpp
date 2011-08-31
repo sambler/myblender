@@ -1,3 +1,6 @@
+/** \file itasc/ConstraintSet.cpp
+ *  \ingroup itasc
+ */
 /* $Id$
  * ConstraintSet.cpp
  *
@@ -131,6 +134,7 @@ bool ConstraintSet::setControlParameter(int id, ConstraintAction action, double 
 		break;
 	default:
 		assert(action==ACT_NONE);
+		break;
 	}
 	return setControlParameters(&values, 1, timestep);
 }

@@ -29,6 +29,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/blenkernel/intern/text.c
+ *  \ingroup bke
+ */
+
+
 #include <string.h> /* strstr */
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -36,6 +41,7 @@
 #include "MEM_guardedalloc.h"
 
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 
 #include "DNA_constraint_types.h"
 #include "DNA_controller_types.h"
@@ -51,9 +57,9 @@
 #include "BKE_library.h"
 #include "BKE_main.h"
 #include "BKE_text.h"
-#include "BKE_utildefines.h"
 
-#ifndef DISABLE_PYTHON
+
+#ifdef WITH_PYTHON
 #include "BPY_extern.h"
 #endif
 
@@ -93,7 +99,7 @@ TMARK_EDITALL is set the group ID defines which other markers should be edited.
 The mrk->clr field is used to visually group markers where the flags may not
 match. A template system, for example, may allow editing of repeating tokens
 (in one group) but include other marked positions (in another group) all in the
-same template with the same colour.
+same template with the same color.
 
 Undo
 --
@@ -167,12 +173,12 @@ void free_text(Text *text)
 
 	if(text->name) MEM_freeN(text->name);
 	MEM_freeN(text->undo_buf);
-#ifndef DISABLE_PYTHON
-	if (text->compiled) BPY_free_compiled_text(text);
+#ifdef WITH_PYTHON
+	if (text->compiled) BPY_text_free_code(text);
 #endif
 }
 
-Text *add_empty_text(char *name) 
+Text *add_empty_text(const char *name) 
 {
 	Main *bmain= G.main;
 	Text *ta;
@@ -232,7 +238,7 @@ static void cleanup_textline(TextLine * tl)
 int reopen_text(Text *text)
 {
 	FILE *fp;
-	int i, llen, len, res;
+	int i, llen, len;
 	unsigned char *buffer;
 	TextLine *tmp;
 	char str[FILE_MAXDIR+FILE_MAXFILE];
@@ -241,7 +247,7 @@ int reopen_text(Text *text)
 	if (!text || !text->name) return 0;
 	
 	BLI_strncpy(str, text->name, FILE_MAXDIR+FILE_MAXFILE);
-	BLI_path_abs(str, G.sce);
+	BLI_path_abs(str, G.main->name);
 	
 	fp= fopen(str, "r");
 	if(fp==NULL) return 0;
@@ -275,11 +281,10 @@ int reopen_text(Text *text)
 
 	fclose(fp);
 
-	res= stat(str, &st);
+	stat(str, &st);
 	text->mtime= st.st_mtime;
 	
 	text->nlines=0;
-	i=0;
 	llen=0;
 	for(i=0; i<len; i++) {
 		if (buffer[i]=='\n') {
@@ -325,11 +330,11 @@ int reopen_text(Text *text)
 	return 1;
 }
 
-Text *add_text(char *file, const char *relpath) 
+Text *add_text(const char *file, const char *relpath) 
 {
 	Main *bmain= G.main;
 	FILE *fp;
-	int i, llen, len, res;
+	int i, llen, len;
 	unsigned char *buffer;
 	TextLine *tmp;
 	Text *ta;
@@ -369,11 +374,10 @@ Text *add_text(char *file, const char *relpath)
 
 	fclose(fp);
 
-	res= stat(str, &st);
+	stat(str, &st);
 	ta->mtime= st.st_mtime;
 	
 	ta->nlines=0;
-	i=0;
 	llen=0;
 	for(i=0; i<len; i++) {
 		if (buffer[i]=='\n') {
@@ -396,7 +400,13 @@ Text *add_text(char *file, const char *relpath)
 		llen++;
 	}
 
-	if (llen!=0 || ta->nlines==0) {
+	/* create new line in cases:
+	   - rest of line (if last line in file hasn't got \n terminator).
+	     in this case content of such line would be used to fill text line buffer
+	   - file is empty. in this case new line is needed to start editing from.
+	   - last characted in buffer is \n. in this case new line is needed to
+	     deal with newline at end of file. (see [#28087]) (sergey) */
+	if (llen!=0 || ta->nlines==0 || buffer[len-1]=='\n') {
 		tmp= (TextLine*) MEM_mallocN(sizeof(TextLine), "textline");
 		tmp->line= (char*) MEM_mallocN(llen+1, "textline_string");
 		tmp->format= NULL;
@@ -521,7 +531,7 @@ void unlink_text(Main *bmain, Text *text)
 		}
 		
 		if(update)
-			DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+			DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	}
 
 	/* pynodes */
@@ -559,7 +569,7 @@ void clear_text(Text *text) /* called directly from rna */
 	txt_make_dirty(text);
 }
 
-void write_text(Text *text, char *str) /* called directly from rna */
+void write_text(Text *text, const char *str) /* called directly from rna */
 {
 	int oldstate;
 
@@ -585,7 +595,7 @@ static void make_new_line (TextLine *line, char *newline)
 	line->format= NULL;
 }
 
-static TextLine *txt_new_line(char *str)
+static TextLine *txt_new_line(const char *str)
 {
 	TextLine *tmp;
 
@@ -683,8 +693,8 @@ int txt_get_span (TextLine *from, TextLine *to)
 static void txt_make_dirty (Text *text)
 {
 	text->flags |= TXT_ISDIRTY;
-#ifndef DISABLE_PYTHON
-	if (text->compiled) BPY_free_compiled_text(text);
+#ifdef WITH_PYTHON
+	if (text->compiled) BPY_text_free_code(text);
 #endif
 }
 
@@ -991,8 +1001,8 @@ void txt_move_to (Text *text, unsigned int line, unsigned int ch, short sel)
 		if ((*linep)->next) *linep= (*linep)->next;
 		else break;
 	}
-	if (ch>(*linep)->len)
-		ch= (*linep)->len;
+	if (ch>(unsigned int)((*linep)->len))
+		ch= (unsigned int)((*linep)->len);
 	*charp= ch;
 	
 	if(!sel) txt_pop_sel(text);
@@ -1228,23 +1238,19 @@ char *txt_to_buf (Text *text)
 	return buf;
 }
 
-int txt_find_string(Text *text, char *findstr, int wrap)
+int txt_find_string(Text *text, char *findstr, int wrap, int match_case)
 {
 	TextLine *tl, *startl;
 	char *s= NULL;
-	int oldcl, oldsl, oldcc, oldsc;
 
 	if (!text || !text->curl || !text->sell) return 0;
 	
 	txt_order_cursors(text);
 
-	oldcl= txt_get_span(text->lines.first, text->curl);
-	oldsl= txt_get_span(text->lines.first, text->sell);
 	tl= startl= text->sell;
-	oldcc= text->curc;
-	oldsc= text->selc;
 	
-	s= strstr(&tl->line[text->selc], findstr);
+	if(match_case) s= strstr(&tl->line[text->selc], findstr);
+	else s= BLI_strcasestr(&tl->line[text->selc], findstr);
 	while (!s) {
 		tl= tl->next;
 		if (!tl) {
@@ -1254,7 +1260,8 @@ int txt_find_string(Text *text, char *findstr, int wrap)
 				break;
 		}
 
-		s= strstr(tl->line, findstr);
+		if(match_case) s= strstr(tl->line, findstr);
+		else s= BLI_strcasestr(tl->line, findstr);
 		if (tl==startl)
 			break;
 	}
@@ -1346,9 +1353,19 @@ char *txt_sel_to_buf (Text *text)
 	return buf;
 }
 
+static void txt_shift_markers(Text *text, int lineno, int count)
+{
+	TextMarker *marker;
+
+	for (marker=text->markers.first; marker; marker= marker->next)
+		if (marker->lineno>=lineno) {
+			marker->lineno+= count;
+		}
+}
+
 void txt_insert_buf(Text *text, const char *in_buffer)
 {
-	int i=0, l=0, j, u, len;
+	int i=0, l=0, j, u, len, lineno= -1, count= 0;
 	TextLine *add;
 
 	if (!text) return;
@@ -1363,7 +1380,7 @@ void txt_insert_buf(Text *text, const char *in_buffer)
 
 	/* Read the first line (or as close as possible */
 	while (in_buffer[i] && in_buffer[i]!='\n') {
-		txt_add_char(text, in_buffer[i]);
+		txt_add_raw_char(text, in_buffer[i]);
 		i++;
 	}
 	
@@ -1373,6 +1390,7 @@ void txt_insert_buf(Text *text, const char *in_buffer)
 
 	/* Read as many full lines as we can */
 	len= strlen(in_buffer);
+	lineno= txt_get_span(text->lines.first, text->curl);
 
 	while (i<len) {
 		l=0;
@@ -1385,15 +1403,28 @@ void txt_insert_buf(Text *text, const char *in_buffer)
 			add= txt_new_linen(in_buffer +(i-l), l);
 			BLI_insertlinkbefore(&text->lines, text->curl, add);
 			i++;
+			count++;
 		} else {
+			if(count) {
+				txt_shift_markers(text, lineno, count);
+				count= 0;
+			}
+
 			for (j= i-l; j<i && j<(int)strlen(in_buffer); j++) {
-				txt_add_char(text, in_buffer[j]);
+				txt_add_raw_char(text, in_buffer[j]);
 			}
 			break;
 		}
 	}
-	
+
+	if(count) {
+		txt_shift_markers(text, lineno, count);
+		count= 0;
+	}
+
 	undoing= u;
+
+	(void)count;
 }
 
 /******************/
@@ -1431,7 +1462,7 @@ void txt_print_undo(Text *text)
 {
 	int i= 0;
 	int op;
-	char *ops;
+	const char *ops;
 	int linep, charp;
 	
 	dump_buffer(text);
@@ -1868,13 +1899,13 @@ void txt_do_undo(Text *text)
 
 			
 			if (op==UNDO_INDENT) {
-				unindent(text);
+				txt_unindent(text);
 			} else if (op== UNDO_UNINDENT) {
-				indent(text);
+				txt_indent(text);
 			} else if (op == UNDO_COMMENT) {
-				uncomment(text);
+				txt_uncomment(text);
 			} else if (op == UNDO_UNCOMMENT) {
-				comment(text);
+				txt_comment(text);
 			}
 
 			text->undo_pos--;
@@ -2044,6 +2075,7 @@ void txt_do_redo(Text *text)
 			linep= linep+(text->undo_buf[text->undo_pos]<<8); text->undo_pos++;
 			linep= linep+(text->undo_buf[text->undo_pos]<<16); text->undo_pos++;
 			linep= linep+(text->undo_buf[text->undo_pos]<<24); text->undo_pos++;
+			(void)linep;
 
 			break;
 		case UNDO_INDENT:
@@ -2083,13 +2115,13 @@ void txt_do_redo(Text *text)
 			}
 
 			if (op==UNDO_INDENT) {
-				indent(text);
+				txt_indent(text);
 			} else if (op== UNDO_UNINDENT) {
-				unindent(text);
+				txt_unindent(text);
 			} else if (op == UNDO_COMMENT) {
-				comment(text);
+				txt_comment(text);
 			} else if (op == UNDO_UNCOMMENT) {
-				uncomment(text);
+				txt_uncomment(text);
 			}
 			break;
 		default:
@@ -2219,7 +2251,6 @@ static void txt_combine_lines (Text *text, TextLine *linea, TextLine *lineb)
 		} while (mrk && mrk->lineno==lineno);
 	}
 	if (lineno==-1) lineno= txt_get_span(text->lines.first, lineb);
-	if (!mrk) mrk= text->markers.first;
 	
 	tmp= MEM_mallocN(linea->len+lineb->len+1, "textline_string");
 	
@@ -2374,7 +2405,7 @@ static void txt_convert_tab_to_spaces (Text *text)
 	txt_insert_buf(text, sb);
 }
 
-int txt_add_char (Text *text, char add) 
+static int txt_add_char_intern (Text *text, char add, int replace_tabs)
 {
 	int len, lineno;
 	char *tmp;
@@ -2388,8 +2419,8 @@ int txt_add_char (Text *text, char add)
 		return 1;
 	}
 	
-	/* insert spaces rather then tabs */
-	if (add == '\t' && text->flags & TXT_TABSTOSPACES) {
+	/* insert spaces rather than tabs */
+	if (add == '\t' && replace_tabs) {
 		txt_convert_tab_to_spaces(text);
 		return 1;
 	}
@@ -2425,6 +2456,16 @@ int txt_add_char (Text *text, char add)
 
 	if(!undoing) txt_undo_add_charop(text, UNDO_INSERT, add);
 	return 1;
+}
+
+int txt_add_char (Text *text, char add)
+{
+	return txt_add_char_intern(text, add, text->flags & TXT_TABSTOSPACES);
+}
+
+int txt_add_raw_char (Text *text, char add)
+{
+	return txt_add_char_intern(text, add, 0);
 }
 
 void txt_delete_selected(Text *text)
@@ -2465,18 +2506,18 @@ int txt_replace_char (Text *text, char add)
 	return 1;
 }
 
-void indent(Text *text)
+void txt_indent(Text *text)
 {
 	int len, num;
 	char *tmp;
 
-	char *add = "\t";
+	const char *add = "\t";
 	int indentlen = 1;
 	
 	/* hardcoded: TXT_TABSIZE = 4 spaces: */
 	int spaceslen = TXT_TABSIZE;
 
-	/* insert spaces rather then tabs */
+	/* insert spaces rather than tabs */
 	if (text->flags & TXT_TABSTOSPACES){
 		add = tab_to_spaces;
 		indentlen = spaceslen;
@@ -2528,16 +2569,16 @@ void indent(Text *text)
 	}
 }
 
-void unindent(Text *text)
+void txt_unindent(Text *text)
 {
 	int num = 0;
-	char *remove = "\t";
+	const char *remove = "\t";
 	int indent = 1;
 	
 	/* hardcoded: TXT_TABSIZE = 4 spaces: */
 	int spaceslen = TXT_TABSIZE;
 
-	/* insert spaces rather then tabs */
+	/* insert spaces rather than tabs */
 	if (text->flags & TXT_TABSTOSPACES){
 		remove = tab_to_spaces;
 		indent = spaceslen;
@@ -2586,7 +2627,7 @@ void unindent(Text *text)
 	}
 }
 
-void comment(Text *text)
+void txt_comment(Text *text)
 {
 	int len, num;
 	char *tmp;
@@ -2594,7 +2635,7 @@ void comment(Text *text)
 	
 	if (!text) return;
 	if (!text->curl) return;
-	if (!text->sell) return;// Need to change this need to check if only one line is selected ot more then one
+	if (!text->sell) return;// Need to change this need to check if only one line is selected to more then one
 
 	num = 0;
 	while (TRUE)
@@ -2638,7 +2679,7 @@ void comment(Text *text)
 	}
 }
 
-void uncomment(Text *text)
+void txt_uncomment(Text *text)
 {
 	int num = 0;
 	char remove = '#';
@@ -2694,7 +2735,7 @@ int setcurr_tab_spaces (Text *text, int space)
 	const char *word = ":";
 	const char *comm = "#";
 	const char indent= (text->flags & TXT_TABSTOSPACES) ? ' ' : '\t';
-	static char *back_words[]= {"return", "break", "continue", "pass", "yield", NULL};
+	static const char *back_words[]= {"return", "break", "continue", "pass", "yield", NULL};
 	if (!text) return 0;
 	if (!text->curl) return 0;
 
@@ -2710,19 +2751,24 @@ int setcurr_tab_spaces (Text *text, int space)
 	}
 	if(strstr(text->curl->line, word))
 	{
-		//if we find a : then add a tab but not if it is in a comment
-		int a, indent = 0;
-		for(a=0; text->curl->line[a] != '\0'; a++)
+		/* if we find a ':' on this line, then add a tab but not if it is:
+		 * 	1) in a comment
+		 * 	2) within an identifier
+		 *	3) after the cursor (text->curc), i.e. when creating space before a function def [#25414] 
+		 */
+		int a, is_indent = 0;
+		for(a=0; (a < text->curc) && (text->curl->line[a] != '\0'); a++)
 		{
-			if (text->curl->line[a]=='#') {
+			char ch= text->curl->line[a];
+			if (ch=='#') {
 				break;
-			} else if (text->curl->line[a]==':') {
-				indent = 1;
-			} else if (text->curl->line[a]==']') {
-				indent = 0;
+			} else if (ch==':') {
+				is_indent = 1;
+			} else if (ch!=' ' && ch!='\t') {
+				is_indent = 0;
 			}
 		}
-		if (indent) {
+		if (is_indent) {
 			i += space;
 		}
 	}
@@ -2746,7 +2792,7 @@ int setcurr_tab_spaces (Text *text, int space)
 /*********************************/
 
 /* Creates and adds a marker to the list maintaining sorted order */
-void txt_add_marker(Text *text, TextLine *line, int start, int end, char color[4], int group, int flags) {
+void txt_add_marker(Text *text, TextLine *line, int start, int end, const unsigned char color[4], int group, int flags) {
 	TextMarker *tmp, *marker;
 
 	marker= MEM_mallocN(sizeof(TextMarker), "text_marker");

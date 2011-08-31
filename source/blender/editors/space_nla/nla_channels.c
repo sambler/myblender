@@ -1,6 +1,4 @@
-/**
- * $Id$
- *
+/*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -26,6 +24,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/space_nla/nla_channels.c
+ *  \ingroup spnla
+ */
+
+
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -35,10 +38,10 @@
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 
-
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
 #include "BLI_rand.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_animsys.h"
 #include "BKE_nla.h"
@@ -76,13 +79,14 @@ static int mouse_nla_channels (bAnimContext *ac, float x, int channel_index, sho
 	ListBase anim_data = {NULL, NULL};
 	bAnimListElem *ale;
 	int filter;
+	
 	View2D *v2d= &ac->ar->v2d;
 	int notifierFlags = 0;
 	
 	/* get the channel that was clicked on */
 		/* filter channels */
-	filter= (ANIMFILTER_VISIBLE | ANIMFILTER_CHANNELS);
-	filter= ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
+	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_LIST_VISIBLE | ANIMFILTER_LIST_CHANNELS);
+	ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 	
 		/* get channel from index */
 	ale= BLI_findlink(&anim_data, channel_index);
@@ -173,6 +177,8 @@ static int mouse_nla_channels (bAnimContext *ac, float x, int channel_index, sho
 		case ANIMTYPE_DSARM:
 		case ANIMTYPE_DSMESH:
 		case ANIMTYPE_DSTEX:
+		case ANIMTYPE_DSLAT:
+		case ANIMTYPE_DSSPK:
 		{
 			/* sanity checking... */
 			if (ale->adt) {
@@ -295,10 +301,10 @@ static int mouse_nla_channels (bAnimContext *ac, float x, int channel_index, sho
 static int nlachannels_mouseclick_invoke(bContext *C, wmOperator *op, wmEvent *event)
 {
 	bAnimContext ac;
-	Scene *scene;
+	SpaceNla *snla;
 	ARegion *ar;
 	View2D *v2d;
-	int mval[2], channel_index;
+	int channel_index;
 	int notifierFlags = 0;
 	short selectmode;
 	float x, y;
@@ -308,13 +314,9 @@ static int nlachannels_mouseclick_invoke(bContext *C, wmOperator *op, wmEvent *e
 		return OPERATOR_CANCELLED;
 		
 	/* get useful pointers from animation context data */
-	scene= ac.scene;
+	snla= (SpaceNla *)ac.sl;
 	ar= ac.ar;
 	v2d= &ar->v2d;
-	
-	/* get mouse coordinates (in region coordinates) */
-	mval[0]= (event->x - ar->winrct.xmin);
-	mval[1]= (event->y - ar->winrct.ymin);
 	
 	/* select mode is either replace (deselect all, then add) or add/extend */
 	if (RNA_boolean_get(op->ptr, "extend"))
@@ -327,8 +329,8 @@ static int nlachannels_mouseclick_invoke(bContext *C, wmOperator *op, wmEvent *e
 	 *		so that the tops of channels get caught ok. Since NLACHANNEL_FIRST is really NLACHANNEL_HEIGHT, we simply use
 	 *		NLACHANNEL_HEIGHT_HALF.
 	 */
-	UI_view2d_region_to_view(v2d, mval[0], mval[1], &x, &y);
-	UI_view2d_listview_view_to_cell(v2d, NLACHANNEL_NAMEWIDTH, NLACHANNEL_STEP, 0, (float)NLACHANNEL_HEIGHT_HALF, x, y, NULL, &channel_index);
+	UI_view2d_region_to_view(v2d, event->mval[0], event->mval[1], &x, &y);
+	UI_view2d_listview_view_to_cell(v2d, NLACHANNEL_NAMEWIDTH, NLACHANNEL_STEP(snla), 0, (float)NLACHANNEL_HEIGHT_HALF(snla), x, y, NULL, &channel_index);
 	
 	/* handle mouse-click in the relevant channel then */
 	notifierFlags= mouse_nla_channels(&ac, x, channel_index, selectmode);
@@ -342,8 +344,9 @@ static int nlachannels_mouseclick_invoke(bContext *C, wmOperator *op, wmEvent *e
 void NLA_OT_channels_click (wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Mouse Click on Channels";
+	ot->name= "Mouse Click on NLA Channels";
 	ot->idname= "NLA_OT_channels_click";
+	ot->description= "Handle clicks to select NLA channels";
 	
 	/* api callbacks */
 	ot->invoke= nlachannels_mouseclick_invoke;
@@ -378,12 +381,12 @@ static int nlaedit_add_tracks_exec (bContext *C, wmOperator *op)
 		return OPERATOR_CANCELLED;
 		
 	/* get a list of the AnimData blocks being shown in the NLA */
-	filter= (ANIMFILTER_VISIBLE | ANIMFILTER_NLATRACKS | ANIMFILTER_SEL);
+	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_LIST_VISIBLE | ANIMFILTER_SEL);
 	ANIM_animdata_filter(&ac, &anim_data, filter, ac.data, ac.datatype);
 	
 	/* add tracks... */
 	for (ale= anim_data.first; ale; ale= ale->next) {
-		if(ale->type == ANIMTYPE_NLATRACK) {
+		if (ale->type == ANIMTYPE_NLATRACK) {
 			NlaTrack *nlt= (NlaTrack *)ale->data;
 			AnimData *adt= ale->adt;
 			
@@ -446,7 +449,7 @@ static int nlaedit_delete_tracks_exec (bContext *C, wmOperator *UNUSED(op))
 		return OPERATOR_CANCELLED;
 		
 	/* get a list of the AnimData blocks being shown in the NLA */
-	filter= (ANIMFILTER_VISIBLE | ANIMFILTER_NLATRACKS | ANIMFILTER_SEL);
+	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_LIST_VISIBLE | ANIMFILTER_SEL);
 	ANIM_animdata_filter(&ac, &anim_data, filter, ac.data, ac.datatype);
 	
 	/* delete tracks */
@@ -454,6 +457,12 @@ static int nlaedit_delete_tracks_exec (bContext *C, wmOperator *UNUSED(op))
 		if(ale->type == ANIMTYPE_NLATRACK) {
 			NlaTrack *nlt= (NlaTrack *)ale->data;
 			AnimData *adt= ale->adt;
+			
+			/* if track is currently 'solo', then AnimData should have its
+			 * 'has solo' flag disabled
+			 */
+			if (nlt->flag & NLATRACK_SOLO)
+				adt->flag &= ~ADT_NLA_SOLO_TRACK;
 			
 			/* call delete on this track - deletes all strips too */
 			free_nlatrack(&adt->nla_tracks, nlt);

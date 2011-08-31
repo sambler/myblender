@@ -1,4 +1,4 @@
-/**
+/*
 * $Id$
 *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -28,17 +28,27 @@
 * Convert Blender actuators for use in the GameEngine
 */
 
+/** \file gameengine/Converter/KX_ConvertActuators.cpp
+ *  \ingroup bgeconv
+ */
+
+
 #if defined(WIN32) && !defined(FREE_WINDOWS)
 #pragma warning (disable : 4786) 
 #endif //WIN32
 
-#define BLENDER_HACK_DTIME 0.02
+#include <math.h>
 
 #include "MEM_guardedalloc.h"
 
 #include "KX_BlenderSceneConverter.h"
 #include "KX_ConvertActuators.h"
-#include "AUD_C-API.h"
+
+#ifdef WITH_AUDASPACE
+#  include "AUD_C-API.h"
+#  include "AUD_ChannelMapperFactory.h"
+#endif
+
 // Actuators
 //SCA logiclibrary native logicbricks
 #include "SCA_PropertyActuator.h"
@@ -72,6 +82,7 @@
 /* This little block needed for linking to Blender... */
 #include "BKE_text.h"
 #include "BLI_blenlib.h"
+#include "BLI_math_base.h"
 
 #define FILE_MAX 240 // repeated here to avoid dependency from BKE_utildefines.h
 
@@ -89,6 +100,7 @@
 #include "BL_ActionActuator.h"
 #include "BL_ShapeActionActuator.h"
 #include "BL_ArmatureActuator.h"
+#include "BL_Action.h"
 /* end of blender include block */
 
 #include "BL_BlenderDataConversion.h"
@@ -151,13 +163,6 @@ void BL_ConvertActuators(char* maggiename,
 					KX_BLENDERTRUNC(obact->angularvelocity[2]));
 				short damping = obact->damping;
 				
-				drotvec /=		BLENDER_HACK_DTIME;
-				//drotvec /=		BLENDER_HACK_DTIME;
-				drotvec *= MT_2_PI/360.0;
-				//dlocvec /= BLENDER_HACK_DTIME;
-				//linvelvec /=	BLENDER_HACK_DTIME;
-				//angvelvec /=	BLENDER_HACK_DTIME;
-				
 				/* Blender uses a bit vector internally for the local-flags. In */
 				/* KX, we have four bools. The compiler should be smart enough  */
 				/* to do the right thing. We need to explicitly convert here!   */
@@ -193,30 +198,37 @@ void BL_ConvertActuators(char* maggiename,
 			}
 		case ACT_ACTION:
 			{
-				if (blenderobject->type==OB_ARMATURE){
-					bActionActuator* actact = (bActionActuator*) bact->data;
-					STR_String propname = (actact->name ? actact->name : "");
-					STR_String propframe = (actact->frameProp ? actact->frameProp : "");
+				bActionActuator* actact = (bActionActuator*) bact->data;
+				STR_String propname = (actact->name ? actact->name : "");
+				STR_String propframe = (actact->frameProp ? actact->frameProp : "");
+
+				short ipo_flags = 0;
+
+				// Convert flags
+				if (actact->flag & ACT_IPOFORCE) ipo_flags |= BL_Action::ACT_IPOFLAG_FORCE;
+				if (actact->flag & ACT_IPOLOCAL) ipo_flags |= BL_Action::ACT_IPOFLAG_LOCAL;
+				if (actact->flag & ACT_IPOADD) ipo_flags |= BL_Action::ACT_IPOFLAG_ADD;
+				if (actact->flag & ACT_IPOCHILD) ipo_flags |= BL_Action::ACT_IPOFLAG_CHILD;
 					
-					BL_ActionActuator* tmpbaseact = new BL_ActionActuator(
-						gameobj,
-						propname,
-						propframe,
-						actact->sta,
-						actact->end,
-						actact->act,
-						actact->type, // + 1, because Blender starts to count at zero,
-						actact->blendin,
-						actact->priority,
-						actact->end_reset,
-						actact->stridelength
-						// Ketsji at 1, because zero is reserved for "NoDef"
-						);
-					baseact= tmpbaseact;
-					break;
-				}
-				else
-					printf ("Discarded action actuator from non-armature object [%s]\n", blenderobject->id.name+2);
+				BL_ActionActuator* tmpbaseact = new BL_ActionActuator(
+					gameobj,
+					propname,
+					propframe,
+					actact->sta,
+					actact->end,
+					actact->act,
+					actact->type, // + 1, because Blender starts to count at zero,
+					actact->blendin,
+					actact->priority,
+					actact->layer,
+					actact->layer_weight,
+					ipo_flags,
+					actact->end_reset,
+					actact->stridelength
+					// Ketsji at 1, because zero is reserved for "NoDef"
+					);
+				baseact= tmpbaseact;
+				break;
 			}
 		case ACT_SHAPEACTION:
 			{
@@ -288,7 +300,8 @@ void BL_ConvertActuators(char* maggiename,
 						camact->height,
 						camact->min,
 						camact->max,
-						camact->axis=='x');
+						camact->axis=='x',
+						camact->damping);
 					baseact = tmpcamact;
 				}
 				break;
@@ -376,7 +389,7 @@ void BL_ConvertActuators(char* maggiename,
 				{
 					bSound* sound = soundact->sound;
 					bool is3d = soundact->flag & ACT_SND_3D_SOUND ? true : false;
-					AUD_Sound* snd_sound = NULL;
+					AUD_Reference<AUD_IFactory> snd_sound;
 					KX_3DSoundSettings settings;
 					settings.cone_inner_angle = soundact->sound3D.cone_inner_angle;
 					settings.cone_outer_angle = soundact->sound3D.cone_outer_angle;
@@ -394,12 +407,28 @@ void BL_ConvertActuators(char* maggiename,
 										"\" has no sound datablock." << std::endl;
 					}
 					else
-						snd_sound = sound->playback_handle;
+					{
+						snd_sound = *reinterpret_cast<AUD_Reference<AUD_IFactory>*>(sound->playback_handle);
+
+						// if sound shall be 3D but isn't mono, we have to make it mono!
+						if(is3d)
+						{
+							AUD_Reference<AUD_IReader> reader = snd_sound->createReader();
+							if(reader->getSpecs().channels != AUD_CHANNELS_MONO)
+							{
+								AUD_DeviceSpecs specs;
+								specs.channels = AUD_CHANNELS_MONO;
+								specs.rate = AUD_RATE_INVALID;
+								specs.format = AUD_FORMAT_INVALID;
+								snd_sound = new AUD_ChannelMapperFactory(snd_sound, specs);
+							}
+						}
+					}
 					KX_SoundActuator* tmpsoundact =
 						new KX_SoundActuator(gameobj,
 						snd_sound,
 						soundact->volume,
-						exp((soundact->pitch / 12.0) * log(2.0)),
+						(float)(exp((soundact->pitch / 12.0) * M_LN2)),
 						is3d,
 						settings,
 						soundActuatorType);
@@ -546,8 +575,8 @@ void BL_ConvertActuators(char* maggiename,
 				/* convert settings... degrees in the ui become radians  */ 
 				/* internally                                            */ 
 				if (conact->type == ACT_CONST_TYPE_ORI) {
-					min = (MT_2_PI * conact->minloc[0])/360.0;
-					max = (MT_2_PI * conact->maxloc[0])/360.0;
+					min = (float)((MT_2_PI * conact->minloc[0])/360.0);
+					max = (float)((MT_2_PI * conact->maxloc[0])/360.0);
 					switch (conact->mode) {
 					case ACT_CONST_DIRPX:
 						locrot = KX_ConstraintActuator::KX_ACT_CONSTRAINT_ORIX;
@@ -646,18 +675,18 @@ void BL_ConvertActuators(char* maggiename,
 						break;
 					case ACT_CONST_ROTX:
 						locrot = KX_ConstraintActuator::KX_ACT_CONSTRAINT_ROTX;
-						min = MT_2_PI * conact->minrot[0] / 360.0;
-						max = MT_2_PI * conact->maxrot[0] / 360.0;
+						min = conact->minrot[0] * (float)MT_RADS_PER_DEG;
+						max = conact->maxrot[0] * (float)MT_RADS_PER_DEG;
 						break;
 					case ACT_CONST_ROTY:
 						locrot = KX_ConstraintActuator::KX_ACT_CONSTRAINT_ROTY;
-						min = MT_2_PI * conact->minrot[1] / 360.0;
-						max = MT_2_PI * conact->maxrot[1] / 360.0;
+						min = conact->minrot[1] * (float)MT_RADS_PER_DEG;
+						max = conact->maxrot[1] * (float)MT_RADS_PER_DEG;
 						break;
 					case ACT_CONST_ROTZ:
 						locrot = KX_ConstraintActuator::KX_ACT_CONSTRAINT_ROTZ;
-						min = MT_2_PI * conact->minrot[2] / 360.0;
-						max = MT_2_PI * conact->maxrot[2] / 360.0;
+						min = conact->minrot[2] * (float)MT_RADS_PER_DEG;
+						max = conact->maxrot[2] * (float)MT_RADS_PER_DEG;
 						break;
 					default:
 						; /* error */ 

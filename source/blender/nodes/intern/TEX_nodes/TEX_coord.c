@@ -1,4 +1,4 @@
-/**
+/*
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -26,7 +26,13 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/nodes/intern/TEX_nodes/TEX_coord.c
+ *  \ingroup texnodes
+ */
+
+
 #include "../TEX_util.h"
+#include "TEX_node.h"
 
 static bNodeSocketType outputs[]= { 
 	{ SOCK_VECTOR, 0, "Coordinates", 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 1.0f },
@@ -45,20 +51,15 @@ static void exec(void *data, bNode *node, bNodeStack **in, bNodeStack **out)
 	tex_output(node, in, out[0], &vectorfn, data);
 }
 
-bNodeType tex_node_coord= {
-	/* *next,*prev */	NULL, NULL,
-	/* type code   */	TEX_NODE_COORD,
-	/* name        */	"Coordinates",
-	/* width+range */	120, 110, 160,
-	/* class+opts  */	NODE_CLASS_INPUT, NODE_OPTIONS,
-	/* input sock  */	NULL,
-	/* output sock */	outputs,
-	/* storage     */	"node_coord",
-	/* execfunc    */	exec,
-	/* butfunc     */	NULL,
-	/* initfunc    */	NULL,
-	/* freestoragefunc    */	NULL,
-	/* copystoragefunc    */	NULL,
-	/* id          */	NULL
-};
-
+void register_node_type_tex_coord(ListBase *lb)
+{
+	static bNodeType ntype;
+	
+	node_type_base(&ntype, TEX_NODE_COORD, "Coordinates", NODE_CLASS_INPUT, NODE_OPTIONS,
+				   NULL, outputs);
+	node_type_size(&ntype, 120, 110, 160);
+	node_type_storage(&ntype, "node_coord", NULL, NULL);
+	node_type_exec(&ntype, exec);
+	
+	nodeRegisterType(lb, &ntype);
+}

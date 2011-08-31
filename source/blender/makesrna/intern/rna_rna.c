@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -21,6 +21,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/makesrna/intern/rna_rna.c
+ *  \ingroup RNA
+ */
+
 
 #include <stdlib.h>
 
@@ -54,6 +59,7 @@ EnumPropertyItem property_unit_items[] = {
 
 #ifdef RNA_RUNTIME
 #include "MEM_guardedalloc.h"
+#include "BLI_utildefines.h"
 #include "BLI_ghash.h"
 
 /* Struct */
@@ -115,11 +121,12 @@ static int rna_idproperty_known(CollectionPropertyIterator *iter, void *data)
 
 	/* function to skip any id properties that are already known by RNA,
 	 * for the second loop where we go over unknown id properties */
+	do {
+		for(prop= ptype->cont.properties.first; prop; prop=prop->next)
+			if((prop->flag & PROP_BUILTIN) == 0 && strcmp(prop->identifier, idprop->name) == 0)
+				return 1;
+	} while((ptype=ptype->base));
 
-	for(prop= ptype->cont.properties.first; prop; prop=prop->next)
-		if(strcmp(prop->identifier, idprop->name) == 0)
-			return 1;
-	
 	return 0;
 }
 
@@ -299,13 +306,12 @@ PointerRNA rna_builtin_properties_get(CollectionPropertyIterator *iter)
 	return rna_Struct_properties_get(iter);
 }
 
-PointerRNA rna_builtin_properties_lookup_string(PointerRNA *ptr, const char *key)
+int rna_builtin_properties_lookup_string(PointerRNA *ptr, const char *key, PointerRNA *r_ptr)
 {
 	StructRNA *srna;
 	PropertyRNA *prop;
-	PointerRNA propptr;
+	PointerRNA propptr= {{NULL}};
 
-	memset(&propptr, 0, sizeof(propptr));
 	srna= ptr->type;
 
 	do {
@@ -315,22 +321,27 @@ PointerRNA rna_builtin_properties_lookup_string(PointerRNA *ptr, const char *key
 			if(prop) {
 				propptr.type= &RNA_Property;
 				propptr.data= prop;
-				return propptr;
+
+				*r_ptr= propptr;
+				return TRUE;
 			}
 		}
+		else {
+			for(prop=srna->cont.properties.first; prop; prop=prop->next) {
+				if(!(prop->flag & PROP_BUILTIN) && strcmp(prop->identifier, key)==0) {
+					propptr.type= &RNA_Property;
+					propptr.data= prop;
 
-		for(prop=srna->cont.properties.first; prop; prop=prop->next) {
-			if(!(prop->flag & PROP_BUILTIN) && strcmp(prop->identifier, key)==0) {
-				propptr.type= &RNA_Property;
-				propptr.data= prop;
-				return propptr;
+					*r_ptr= propptr;
+					return TRUE;
+				}
 			}
 		}
 	} while((srna=srna->base));
 
 	/* this was used pre 2.5beta0, now ID property access uses python's
 	 * getitem style access
-	 * - ob["foo"] rather then ob.foo */
+	 * - ob["foo"] rather than ob.foo */
 #if 0
 	if(ptr->data) {
 		IDProperty *group, *idp;
@@ -342,13 +353,15 @@ PointerRNA rna_builtin_properties_lookup_string(PointerRNA *ptr, const char *key
 				if(strcmp(idp->name, key) == 0) {
 					propptr.type= &RNA_Property;
 					propptr.data= idp;
-					return propptr;
+
+					*r_ptr= propptr;
+					return TRUE;
 				}
 			}
 		}
 	}
 #endif
-	return propptr;
+	return FALSE;
 }
 
 PointerRNA rna_builtin_type_get(PointerRNA *ptr)
@@ -472,6 +485,25 @@ static int rna_Property_is_never_none_get(PointerRNA *ptr)
 {
 	PropertyRNA *prop= (PropertyRNA*)ptr->data;
 	return prop->flag & PROP_NEVER_NULL ? 1:0;
+}
+
+static int rna_Property_is_hidden_get(PointerRNA *ptr)
+{
+	PropertyRNA *prop= (PropertyRNA*)ptr->data;
+	return prop->flag & PROP_HIDDEN ? 1:0;
+}
+
+static int rna_Property_is_skip_save_get(PointerRNA *ptr)
+{
+	PropertyRNA *prop= (PropertyRNA*)ptr->data;
+	return prop->flag & PROP_SKIP_SAVE ? 1:0;
+}
+
+
+static int rna_Property_is_enum_flag_get(PointerRNA *ptr)
+{
+	PropertyRNA *prop= (PropertyRNA*)ptr->data;
+	return prop->flag & PROP_ENUM_FLAG ? 1:0;
 }
 
 static int rna_Property_array_length_get(PointerRNA *ptr)
@@ -672,7 +704,7 @@ static int rna_StringProperty_max_length_get(PointerRNA *ptr)
 	return ((StringPropertyRNA*)prop)->maxlength;
 }
 
-static EnumPropertyItem *rna_EnumProperty_default_itemf(bContext *C, PointerRNA *ptr, int *free)
+static EnumPropertyItem *rna_EnumProperty_default_itemf(bContext *C, PointerRNA *ptr, PropertyRNA *UNUSED(prop), int *free)
 {
 	PropertyRNA *prop= (PropertyRNA*)ptr->data;
 	EnumPropertyRNA *eprop;
@@ -688,7 +720,7 @@ static EnumPropertyItem *rna_EnumProperty_default_itemf(bContext *C, PointerRNA 
 		return eprop->item;
 	}
 
-	return eprop->itemf(C, ptr, free);
+	return eprop->itemf(C, ptr, prop, free);
 }
 
 /* XXX - not sure this is needed? */
@@ -709,12 +741,12 @@ static int rna_enum_check_separator(CollectionPropertyIterator *iter, void *data
 static void rna_EnumProperty_items_begin(CollectionPropertyIterator *iter, PointerRNA *ptr)
 {
 	PropertyRNA *prop= (PropertyRNA*)ptr->data;
-	EnumPropertyRNA *eprop;
+	// EnumPropertyRNA *eprop; // UNUSED
 	EnumPropertyItem *item= NULL;
 	int totitem, free= 0;
 	
 	rna_idproperty_check(&prop, ptr);
-	eprop= (EnumPropertyRNA*)prop;
+	// eprop= (EnumPropertyRNA*)prop;
 	
 	RNA_property_enum_items(NULL, ptr, prop, &item, &totitem, &free);
 	rna_iterator_array_begin(iter, (void*)item, sizeof(EnumPropertyItem), totitem, free, rna_enum_check_separator);
@@ -836,34 +868,29 @@ static int rna_BlenderRNA_structs_length(PointerRNA *ptr)
 {
 	return BLI_countlist(&((BlenderRNA*)ptr->data)->structs);
 }
-static PointerRNA rna_BlenderRNA_structs_lookup_int(PointerRNA *ptr, int index)
+static int rna_BlenderRNA_structs_lookup_int(PointerRNA *ptr, int index, PointerRNA *r_ptr)
 {
 	StructRNA *srna= BLI_findlink(&((BlenderRNA*)ptr->data)->structs, index);
 
 	if(srna) {
-		PointerRNA r_ptr;
-		RNA_pointer_create(NULL, &RNA_Struct, srna, &r_ptr);
-		return r_ptr;
+		RNA_pointer_create(NULL, &RNA_Struct, srna, r_ptr);
+		return TRUE;
 	}
 	else {
-		return PointerRNA_NULL;
+		return FALSE;
 	}
 }
-static PointerRNA rna_BlenderRNA_structs_lookup_string(PointerRNA *ptr, const char *key)
+static int rna_BlenderRNA_structs_lookup_string(PointerRNA *ptr, const char *key, PointerRNA *r_ptr)
 {
 	StructRNA *srna= ((BlenderRNA*)ptr->data)->structs.first;
-	for(; srna; srna=srna->cont.next)
-		if(key[0] == srna->identifier[0] && strcmp(key, srna->identifier)==0)
-			break;
+	for(; srna; srna=srna->cont.next) {
+		if(key[0] == srna->identifier[0] && strcmp(key, srna->identifier)==0) {
+			RNA_pointer_create(NULL, &RNA_Struct, srna, r_ptr);
+			return TRUE;
+		}
+	}
 
-	if(srna) {
-		PointerRNA r_ptr;
-		RNA_pointer_create(NULL, &RNA_Struct, srna, &r_ptr);
-		return r_ptr;
-	}
-	else {
-		return PointerRNA_NULL;
-	}
+	return FALSE;
 }
 
 
@@ -947,6 +974,7 @@ static void rna_def_property(BlenderRNA *brna)
 		{PROP_QUATERNION, "QUATERNION", 0, "Quaternion", ""},
 		{PROP_XYZ, "XYZ", 0, "XYZ", ""},
 		{PROP_COLOR_GAMMA, "COLOR_GAMMA", 0, "Gamma Corrected Color", ""},
+		{PROP_COORDS, "COORDINATES", 0, "Vector Coordinates", ""},
 		{PROP_LAYER, "LAYER", 0, "Layer", ""},
 		{PROP_LAYER_MEMBER, "LAYER_MEMBERSHIP", 0, "Layer Membership", ""},
 		{0, NULL, 0, NULL, NULL}};
@@ -1011,6 +1039,16 @@ static void rna_def_property(BlenderRNA *brna)
 	RNA_def_property_boolean_funcs(prop, "rna_Property_is_never_none_get", NULL);
 	RNA_def_property_ui_text(prop, "Never None", "True when this value can't be set to None");
 
+	prop= RNA_def_property(srna, "is_hidden", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+	RNA_def_property_boolean_funcs(prop, "rna_Property_is_hidden_get", NULL);
+	RNA_def_property_ui_text(prop, "Hidden", "True when the property is hidden");
+
+	prop= RNA_def_property(srna, "is_skip_save", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+	RNA_def_property_boolean_funcs(prop, "rna_Property_is_skip_save_get", NULL);
+	RNA_def_property_ui_text(prop, "Skip Save", "True when the property is not saved in presets");
+
 	prop= RNA_def_property(srna, "is_output", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
 	RNA_def_property_boolean_funcs(prop, "rna_Property_use_output_get", NULL);
@@ -1029,7 +1067,12 @@ static void rna_def_property(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "is_runtime", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
 	RNA_def_property_boolean_funcs(prop, "rna_Property_runtime_get", NULL);
-	RNA_def_property_ui_text(prop, "Read Only", "Property is editable through RNA");
+	RNA_def_property_ui_text(prop, "Runtime", "Property has been dynamically created at runtime");
+
+	prop= RNA_def_property(srna, "is_enum_flag", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+	RNA_def_property_boolean_funcs(prop, "rna_Property_is_enum_flag_get", NULL);
+	RNA_def_property_ui_text(prop, "Enum Flag", "True when multiple enums ");
 }
 
 static void rna_def_function(BlenderRNA *brna)
@@ -1195,7 +1238,15 @@ static void rna_def_enum_property(BlenderRNA *brna, StructRNA *srna)
 	RNA_def_property_enum_funcs(prop, "rna_EnumProperty_default_get", NULL, "rna_EnumProperty_default_itemf");
 	RNA_def_property_ui_text(prop, "Default", "Default value for this enum");
 
-	prop= RNA_def_property(srna, "items", PROP_COLLECTION, PROP_NONE);
+	/* same 'default' but uses 'PROP_ENUM_FLAG' */
+	prop= RNA_def_property(srna, "default_flag", PROP_ENUM, PROP_NONE);
+	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+	RNA_def_property_flag(prop, PROP_ENUM_FLAG);
+	RNA_def_property_enum_items(prop, default_dummy_items);
+	RNA_def_property_enum_funcs(prop, "rna_EnumProperty_default_get", NULL, "rna_EnumProperty_default_itemf");
+	RNA_def_property_ui_text(prop, "Default", "Default value for this enum");
+
+	prop= RNA_def_property(srna, "enum_items", PROP_COLLECTION, PROP_NONE);
 	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
 	RNA_def_property_struct_type(prop, "EnumPropertyItem");
 	RNA_def_property_collection_funcs(prop, "rna_EnumProperty_items_begin", "rna_iterator_array_next", "rna_iterator_array_end", "rna_iterator_array_get", 0, 0, 0);

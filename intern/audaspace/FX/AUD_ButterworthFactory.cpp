@@ -1,27 +1,33 @@
 /*
  * $Id$
  *
- * ***** BEGIN LGPL LICENSE BLOCK *****
+ * ***** BEGIN GPL LICENSE BLOCK *****
  *
- * Copyright 2009 Jörg Hermann Müller
+ * Copyright 2009-2011 Jörg Hermann Müller
  *
  * This file is part of AudaSpace.
  *
- * AudaSpace is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
+ * Audaspace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
  * AudaSpace is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU Lesser General Public License
- * along with AudaSpace.  If not, see <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU General Public License
+ * along with Audaspace; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * ***** END LGPL LICENSE BLOCK *****
+ * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file audaspace/FX/AUD_ButterworthFactory.cpp
+ *  \ingroup audfx
+ */
+
 
 #include "AUD_ButterworthFactory.h"
 #include "AUD_IIRFilterReader.h"
@@ -35,19 +41,18 @@
 #define BWPB41 0.76536686473
 #define BWPB42 1.84775906502
 
-AUD_ButterworthFactory::AUD_ButterworthFactory(AUD_IFactory* factory,
+AUD_ButterworthFactory::AUD_ButterworthFactory(AUD_Reference<AUD_IFactory> factory,
 											   float frequency) :
-		AUD_EffectFactory(factory),
+		AUD_DynamicIIRFilterFactory(factory),
 		m_frequency(frequency)
 {
 }
 
-AUD_IReader* AUD_ButterworthFactory::createReader() const
+void AUD_ButterworthFactory::recalculateCoefficients(AUD_SampleRate rate,
+													 std::vector<float> &b,
+													 std::vector<float> &a)
 {
-	AUD_IReader* reader = getReader();
-
-	// calculate coefficients
-	float omega = 2 * tan(m_frequency * M_PI / reader->getSpecs().rate);
+	float omega = 2 * tan(m_frequency * M_PI / rate);
 	float o2 = omega * omega;
 	float o4 = o2 * o2;
 	float x1 = o2 + 2 * BWPB41 * omega + 4;
@@ -56,7 +61,6 @@ AUD_IReader* AUD_ButterworthFactory::createReader() const
 	float y2 = o2 - 2 * BWPB42 * omega + 4;
 	float o228 = 2 * o2 - 8;
 	float norm = x1 * x2;
-	std::vector<float> a, b;
 	a.push_back(1);
 	a.push_back((x1 + x2) * o228 / norm);
 	a.push_back((x1 * y2 + x2 * y1 + o228 * o228) / norm);
@@ -67,6 +71,4 @@ AUD_IReader* AUD_ButterworthFactory::createReader() const
 	b.push_back(6 * o4 / norm);
 	b.push_back(b[1]);
 	b.push_back(b[0]);
-
-	return new AUD_IIRFilterReader(reader, b, a);
 }

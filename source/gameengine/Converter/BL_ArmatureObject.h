@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,10 @@
  * Contributor(s): none yet.
  *
  * ***** END GPL LICENSE BLOCK *****
+ */
+
+/** \file BL_ArmatureObject.h
+ *  \ingroup bgeconv
  */
 
 #ifndef BL_ARMATUREOBJECT
@@ -56,7 +60,7 @@ public:
 	short GetActivePriority();
 	virtual void ProcessReplica();
 	virtual void ReParentLogic();
-	virtual void Relink(GEN_Map<GEN_HashedPtr, void*> *obj_map);
+	virtual void Relink(CTR_Map<CTR_HashedPtr, void*> *obj_map);
 	virtual bool UnlinkObject(SCA_IObject* clientobj);
 
 	class BL_ActionActuator * GetActiveAction();
@@ -65,7 +69,8 @@ public:
 		void* sgReplicationInfo,
 		SG_Callbacks callbacks,
 		Object *armature,
-		Scene *scene
+		Scene *scene,
+		int vert_deform_type
 	);
 	virtual ~BL_ArmatureObject();
 
@@ -85,6 +90,8 @@ public:
 	const struct Scene * GetScene() const { return m_scene; }
 	
 	Object* GetArmatureObject() {return m_objArma;}
+
+	int GetVertDeformType() {return m_vert_deform_type;}
 
 	// for constraint python API
 	void LoadConstraints(KX_BlenderSceneConverter* converter);
@@ -108,14 +115,14 @@ public:
 
 	virtual int GetGameObjectType() { return OBJ_ARMATURE; }
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 
 	// PYTHON
 	static PyObject* pyattr_get_constraints(void *self_v, const KX_PYATTRIBUTE_DEF *attrdef);
 	static PyObject* pyattr_get_channels(void *self_v, const KX_PYATTRIBUTE_DEF *attrdef);
 	KX_PYMETHOD_DOC_NOARGS(BL_ArmatureObject, update);
 
-#endif // DISABLE_PYTHON
+#endif // WITH_PYTHON
 
 protected:
 	/* list element: BL_ArmatureConstraint. Use SG_DListHead to have automatic list replication */
@@ -132,6 +139,7 @@ protected:
 	double  m_timestep;		// delta since last pose evaluation.
 	class BL_ActionActuator *m_activeAct;
 	short	m_activePriority;
+	int		m_vert_deform_type;
 	size_t  m_constraintNumber;
 	size_t  m_channelNumber;
 	// store the original armature object matrix

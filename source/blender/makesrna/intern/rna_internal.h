@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -21,6 +21,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/makesrna/intern/rna_internal.h
+ *  \ingroup RNA
+ */
+
 
 #ifndef RNA_INTERNAL_H
 #define RNA_INTERNAL_H
@@ -163,6 +168,7 @@ void RNA_def_sensor(struct BlenderRNA *brna);
 void RNA_def_sequencer(struct BlenderRNA *brna);
 void RNA_def_smoke(struct BlenderRNA *brna);
 void RNA_def_space(struct BlenderRNA *brna);
+void RNA_def_speaker(struct BlenderRNA *brna);
 void RNA_def_test(struct BlenderRNA *brna);
 void RNA_def_text(struct BlenderRNA *brna);
 void RNA_def_texture(struct BlenderRNA *brna);
@@ -182,7 +188,7 @@ void rna_def_animviz_common(struct StructRNA *srna);
 void rna_def_motionpath_common(struct StructRNA *srna);
 
 void rna_def_texmat_common(struct StructRNA *srna, const char *texspace_editable);
-void rna_def_mtex_common(struct BlenderRNA *brna, struct StructRNA *srna, const char *begin, const char *activeget, const char *activeset, const char *structname, const char *structname_slots, const char *update);
+void rna_def_mtex_common(struct BlenderRNA *brna, struct StructRNA *srna, const char *begin, const char *activeget, const char *activeset, const char *activeeditable, const char *structname, const char *structname_slots, const char *update);
 void rna_def_render_layer_common(struct StructRNA *srna, int scene);
 
 void rna_ID_name_get(struct PointerRNA *ptr, char *value);
@@ -191,10 +197,10 @@ void rna_ID_name_set(struct PointerRNA *ptr, const char *value);
 struct StructRNA *rna_ID_refine(struct PointerRNA *ptr);
 struct IDProperty *rna_ID_idprops(struct PointerRNA *ptr, int create);
 void rna_ID_fake_user_set(struct PointerRNA *ptr, int value);
-struct IDProperty *rna_IDPropertyGroup_idprops(struct PointerRNA *ptr, int create);
-void rna_IDPropertyGroup_unregister(const struct bContext *C, struct StructRNA *type);
-struct StructRNA *rna_IDPropertyGroup_register(const struct bContext *C, struct ReportList *reports, void *data, const char *identifier, StructValidateFunc validate, StructCallbackFunc call, StructFreeFunc free);
-struct StructRNA* rna_IDPropertyGroup_refine(struct PointerRNA *ptr);
+struct IDProperty *rna_PropertyGroup_idprops(struct PointerRNA *ptr, int create);
+void rna_PropertyGroup_unregister(struct Main *bmain, struct StructRNA *type);
+struct StructRNA *rna_PropertyGroup_register(struct Main *bmain, struct ReportList *reports, void *data, const char *identifier, StructValidateFunc validate, StructCallbackFunc call, StructFreeFunc free);
+struct StructRNA* rna_PropertyGroup_refine(struct PointerRNA *ptr);
 
 void rna_object_vgroup_name_index_get(struct PointerRNA *ptr, char *value, int index);
 int rna_object_vgroup_name_index_length(struct PointerRNA *ptr, int index);
@@ -217,6 +223,9 @@ int rna_Curve_object_poll(struct PointerRNA *ptr, struct PointerRNA value);
 int rna_Lattice_object_poll(struct PointerRNA *ptr, struct PointerRNA value);
 int rna_Mesh_object_poll(struct PointerRNA *ptr, struct PointerRNA value);
 
+/* basic poll functions for actions (to prevent actions getting set in wrong places) */
+int rna_Action_id_poll(struct PointerRNA *ptr, struct PointerRNA value);
+int rna_Action_actedit_assign_poll(struct PointerRNA *ptr, struct PointerRNA value);
 
 char *rna_TextureSlot_path(struct PointerRNA *ptr);
 
@@ -230,9 +239,12 @@ void RNA_api_image(struct StructRNA *srna);
 void RNA_api_operator(struct StructRNA *srna);
 void RNA_api_macro(struct StructRNA *srna);
 void RNA_api_keyconfig(struct StructRNA *srna);
+void RNA_api_keyconfigs(struct StructRNA *srna);
 void RNA_api_keyingset(struct StructRNA *srna);
 void RNA_api_keymap(struct StructRNA *srna);
+void RNA_api_keymaps(struct StructRNA *srna);
 void RNA_api_keymapitem(struct StructRNA *srna);
+void RNA_api_keymapitems(struct StructRNA *srna);
 void RNA_api_area(struct StructRNA *srna);
 void RNA_api_main(struct StructRNA *srna);
 void RNA_api_material(StructRNA *srna);
@@ -249,6 +261,7 @@ void RNA_api_wm(struct StructRNA *srna);
 void RNA_api_sensor(struct StructRNA *srna);
 void RNA_api_controller(struct StructRNA *srna);
 void RNA_api_actuator(struct StructRNA *srna);
+void RNA_api_environment_map(struct StructRNA *srna);
 
 /* main collection functions */
 void RNA_def_main_cameras(BlenderRNA *brna, PropertyRNA *cprop);
@@ -271,6 +284,7 @@ void RNA_def_main_brushes(BlenderRNA *brna, PropertyRNA *cprop);
 void RNA_def_main_worlds(BlenderRNA *brna, PropertyRNA *cprop);
 void RNA_def_main_groups(BlenderRNA *brna, PropertyRNA *cprop);
 void RNA_def_main_texts(BlenderRNA *brna, PropertyRNA *cprop);
+void RNA_def_main_speakers(BlenderRNA *brna, PropertyRNA *cprop);
 void RNA_def_main_sounds(BlenderRNA *brna, PropertyRNA *cprop);
 void RNA_def_main_armatures(BlenderRNA *brna, PropertyRNA *cprop);
 void RNA_def_main_actions(BlenderRNA *brna, PropertyRNA *cprop);
@@ -279,19 +293,19 @@ void RNA_def_main_gpencil(BlenderRNA *brna, PropertyRNA *cprop);
 
 /* ID Properties */
 
-extern StringPropertyRNA rna_IDProperty_string;
-extern IntPropertyRNA rna_IDProperty_int;
-extern IntPropertyRNA rna_IDProperty_int_array;
-extern FloatPropertyRNA rna_IDProperty_float;
-extern FloatPropertyRNA rna_IDProperty_float_array;
-extern PointerPropertyRNA rna_IDProperty_group;
-extern CollectionPropertyRNA rna_IDProperty_collection;
-extern CollectionPropertyRNA rna_IDProperty_idp_array;
-extern FloatPropertyRNA rna_IDProperty_double;
-extern FloatPropertyRNA rna_IDProperty_double_array;
+extern StringPropertyRNA rna_PropertyGroupItem_string;
+extern IntPropertyRNA rna_PropertyGroupItem_int;
+extern IntPropertyRNA rna_PropertyGroupItem_int_array;
+extern FloatPropertyRNA rna_PropertyGroupItem_float;
+extern FloatPropertyRNA rna_PropertyGroupItem_float_array;
+extern PointerPropertyRNA rna_PropertyGroupItem_group;
+extern CollectionPropertyRNA rna_PropertyGroupItem_collection;
+extern CollectionPropertyRNA rna_PropertyGroupItem_idp_array;
+extern FloatPropertyRNA rna_PropertyGroupItem_double;
+extern FloatPropertyRNA rna_PropertyGroupItem_double_array;
 
-extern StructRNA RNA_IDProperty;
-extern StructRNA RNA_IDPropertyGroup;
+extern StructRNA RNA_PropertyGroupItem;
+extern StructRNA RNA_PropertyGroup;
 
 struct IDProperty *rna_idproperty_check(struct PropertyRNA **prop, struct PointerRNA *ptr);
 
@@ -301,7 +315,7 @@ void rna_builtin_properties_begin(struct CollectionPropertyIterator *iter, struc
 void rna_builtin_properties_next(struct CollectionPropertyIterator *iter);
 PointerRNA rna_builtin_properties_get(struct CollectionPropertyIterator *iter);
 PointerRNA rna_builtin_type_get(struct PointerRNA *ptr);
-PointerRNA rna_builtin_properties_lookup_string(PointerRNA *ptr, const char *key);
+int rna_builtin_properties_lookup_string(PointerRNA *ptr, const char *key, PointerRNA *r_ptr);
 
 /* Iterators */
 
@@ -321,9 +335,15 @@ PointerRNA rna_listbase_lookup_int(PointerRNA *ptr, StructRNA *type, struct List
 
 typedef struct ArrayIterator {
 	char *ptr;
-	char *endptr;
+	char *endptr;	/* past the last valid pointer, only for comparisons, ignores skipped values */
 	void *free_ptr; /* will be free'd if set */
 	int itemsize;
+
+	/* array length with no skip functins applied, take care not to compare against index from animsys or python indices */
+	int length;
+
+	/* optional skip function, when set the array as viewed by rna can contain only a subset of the members.
+	 * this changes indices so quick array index lookups are not possible when skip function is used. */
 	IteratorSkipFunc skip;
 } ArrayIterator;
 
@@ -356,9 +376,9 @@ int rna_parameter_size(struct PropertyRNA *parm);
 int rna_parameter_size_alloc(struct PropertyRNA *parm);
 
 // XXX, these should not need to be defined here~!
-struct MTex *rna_mtex_texture_slots_add(struct ID *self, struct ReportList *reports);
-struct MTex *rna_mtex_texture_slots_create(struct ID *self, struct ReportList *reports, int index);
-void rna_mtex_texture_slots_clear(struct ID *self, struct ReportList *reports, int index);
+struct MTex *rna_mtex_texture_slots_add(struct ID *self, struct bContext *C, struct ReportList *reports);
+struct MTex *rna_mtex_texture_slots_create(struct ID *self, struct bContext *C, struct ReportList *reports, int index);
+void rna_mtex_texture_slots_clear(struct ID *self, struct bContext *C, struct ReportList *reports, int index);
 
 #endif /* RNA_INTERNAL_H */
 

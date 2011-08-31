@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/windowmanager/WM_types.h
+ *  \ingroup wm
+ */
+
 #ifndef WM_TYPES_H
 #define WM_TYPES_H
 
@@ -55,6 +60,11 @@ struct ImBuf;
 #define OPTYPE_BLOCKING		4	/* let blender grab all input from the WM (X11) */
 #define OPTYPE_MACRO		8
 #define OPTYPE_GRAB_POINTER	16	/* */
+#define OPTYPE_PRESET		32	/* show preset menu */
+#define OPTYPE_INTERNAL		64	/* some operators are mainly for internal use
+								 * and don't make sense to be accessed from the
+								 * search menu, even if poll() returns TRUE.
+								 * currently only used for the search toolbox */
 
 /* context to call operator in for WM_operator_name_call */
 /* rna_ui.c contains EnumPropertyItem's of these, keep in sync */
@@ -172,6 +182,8 @@ typedef struct wmNotifier {
 #define ND_GPENCIL			(5<<16)
 #define ND_EDITOR_CHANGED	(6<<16) /*sent to new editors after switching to them*/
 #define ND_SCREENSET		(7<<16)
+#define ND_SKETCH			(8<<16)
+#define ND_SUBWINACTIVE		(9<<16)
 
 	/* NC_SCENE Scene */
 #define ND_SCENEBROWSE		(1<<16)
@@ -191,6 +203,7 @@ typedef struct wmNotifier {
 #define ND_TOOLSETTINGS		(15<<16)
 #define ND_LAYER			(16<<16)
 #define ND_FRAME_RANGE		(17<<16)
+#define ND_TRANSFORM_DONE	(18<<16)
 #define ND_WORLD			(92<<16)
 #define ND_LAYER_CONTENT	(101<<16)
 
@@ -219,6 +232,7 @@ typedef struct wmNotifier {
 
 	/* NC_WORLD World */
 #define	ND_WORLD_DRAW		(45<<16)
+#define	ND_WORLD_STARS		(46<<16)
 
 	/* NC_TEXT Text */
 #define ND_CURSOR			(50<<16)
@@ -241,23 +255,23 @@ typedef struct wmNotifier {
 
 	/* NC_SPACE */
 #define ND_SPACE_CONSOLE		(1<<16) /* general redraw */
-#define ND_SPACE_CONSOLE_REPORT	(2<<16) /* update for reports, could specify type */
-#define ND_SPACE_INFO			(2<<16)
-#define ND_SPACE_IMAGE			(3<<16)
-#define ND_SPACE_FILE_PARAMS	(4<<16)
-#define ND_SPACE_FILE_LIST		(5<<16)
-#define ND_SPACE_NODE			(6<<16)
-#define ND_SPACE_OUTLINER		(7<<16)
-#define ND_SPACE_VIEW3D			(8<<16)
-#define ND_SPACE_PROPERTIES		(9<<16)
-#define ND_SPACE_TEXT			(10<<16)
-#define ND_SPACE_TIME			(11<<16)
-#define ND_SPACE_GRAPH			(12<<16)
-#define ND_SPACE_DOPESHEET		(13<<16)
-#define ND_SPACE_NLA			(14<<16)
-#define ND_SPACE_SEQUENCER		(15<<16)
-#define ND_SPACE_NODE_VIEW		(16<<16)
-#define ND_SPACE_CHANGED		(17<<16) /*sent to a new editor type after it's replaced an old one*/
+#define ND_SPACE_INFO_REPORT	(2<<16) /* update for reports, could specify type */
+#define ND_SPACE_INFO			(3<<16)
+#define ND_SPACE_IMAGE			(4<<16)
+#define ND_SPACE_FILE_PARAMS	(5<<16)
+#define ND_SPACE_FILE_LIST		(6<<16)
+#define ND_SPACE_NODE			(7<<16)
+#define ND_SPACE_OUTLINER		(8<<16)
+#define ND_SPACE_VIEW3D			(9<<16)
+#define ND_SPACE_PROPERTIES		(10<<16)
+#define ND_SPACE_TEXT			(11<<16)
+#define ND_SPACE_TIME			(12<<16)
+#define ND_SPACE_GRAPH			(13<<16)
+#define ND_SPACE_DOPESHEET		(14<<16)
+#define ND_SPACE_NLA			(15<<16)
+#define ND_SPACE_SEQUENCER		(16<<16)
+#define ND_SPACE_NODE_VIEW		(17<<16)
+#define ND_SPACE_CHANGED		(18<<16) /*sent to a new editor type after it's replaced an old one*/
 
 /* subtype, 256 entries too */
 #define NOTE_SUBTYPE		0x0000FF00
@@ -325,8 +339,8 @@ typedef struct wmEvent {
 	
 	short type;			/* event code itself (short, is also in keymap) */
 	short val;			/* press, release, scrollvalue */
-	short x, y;			/* mouse pointer position, screen coord */
-	short mval[2];		/* region mouse position, name convention pre 2.5 :) */
+	int x, y;			/* mouse pointer position, screen coord */
+	int mval[2];		/* region mouse position, name convention pre 2.5 :) */
 	short unicode;		/* future, ghost? */
 	char ascii;			/* from ghost */
 	char pad;
@@ -334,9 +348,9 @@ typedef struct wmEvent {
 	/* previous state */
 	short prevtype;
 	short prevval;
-	short prevx, prevy;
+	int prevx, prevy;
 	double prevclicktime;
-	short prevclickx, prevclicky;
+	int prevclickx, prevclicky;
 	
 	/* modifier states */
 	short shift, ctrl, alt, oskey;	/* oskey is apple or windowskey, value denotes order of pressed */
@@ -363,6 +377,32 @@ typedef struct wmTabletData {
 	float Ytilt;		/* as above */
 } wmTabletData;
 
+typedef enum { // motion progress, for modal handlers
+	P_NOT_STARTED,
+	P_STARTING,    // <--
+	P_IN_PROGRESS, // <-- only these are sent for NDOF motion
+	P_FINISHING,   // <--
+	P_FINISHED
+	} wmProgress;
+
+typedef struct wmNDOFMotionData {
+	/* awfully similar to GHOST_TEventNDOFMotionData... */
+	// Each component normally ranges from -1 to +1, but can exceed that.
+	// These use blender standard view coordinates, with positive rotations being CCW about the axis.
+	union {
+		float tvec[3]; // translation
+		struct { float tx, ty, tz; };
+		};
+	union {
+		float rvec[3]; // rotation:
+		struct { float rx, ry, rz; };
+		};
+		// axis = (rx,ry,rz).normalized
+		// amount = (rx,ry,rz).magnitude [in revolutions, 1.0 = 360 deg]
+	float dt; // time since previous NDOF Motion event
+	wmProgress progress; // is this the first event, the last, or one of many in between?
+} wmNDOFMotionData;
+
 typedef struct wmTimer {
 	struct wmTimer *next, *prev;
 	
@@ -383,11 +423,9 @@ typedef struct wmTimer {
 
 
 typedef struct wmOperatorType {
-	struct wmOperatorType *next, *prev;
-
-	char *name;		/* text for ui, undo */
-	char *idname;		/* unique identifier */
-	char *description;	/* tooltips and python docs */
+	const char *name;		/* text for ui, undo */
+	const char *idname;		/* unique identifier */
+	const char *description;	/* tooltips and python docs */
 
 	/* this callback executes the operator without any interactive input,
 	 * parameters may be provided through operator properties. cannot use
@@ -459,9 +497,9 @@ enum {
 
 typedef struct wmReport {
 	struct wmReport *next, *prev;
-	int type;
 	const char *typestr;
 	char *message;
+	int type;
 } wmReport;
 
 /* *************** Drag and drop *************** */
@@ -479,14 +517,14 @@ typedef struct wmDrag {
 	
 	int icon, type;					/* type, see WM_DRAG defines above */
 	void *poin;
-	char path[FILE_MAX];
+	char path[240]; /* FILE_MAX */
 	double value;
 	
 	struct ImBuf *imb;						/* if no icon but imbuf should be drawn around cursor */
 	float scale;
-	short sx, sy;
+	int sx, sy;
 	
-	char opname[FILE_MAX];			/* if set, draws operator name*/
+	char opname[240]; /* FILE_MAX */			/* if set, draws operator name*/
 } wmDrag;
 
 /* dropboxes are like keymaps, part of the screen/area/region definition */
@@ -502,7 +540,8 @@ typedef struct wmDropBox {
 	
 	/* if poll survives, operator is called */
 	wmOperatorType *ot;				/* not saved in file, so can be pointer */
-
+	short opcontext;				/* default invoke */
+	
 	struct IDProperty *properties;			/* operator properties, assigned to ptr->data and can be written to a file */
 	struct PointerRNA *ptr;			/* rna pointer to access properties */
 

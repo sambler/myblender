@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/ikplugin/intern/itasc_plugin.cpp
+ *  \ingroup ikplugin
+ */
+
+
 #include <stdlib.h>
 #include <string.h>
 #include <vector>
@@ -49,6 +54,7 @@ extern "C" {
 #include "BIK_api.h"
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_global.h"
 #include "BKE_armature.h"
@@ -854,13 +860,11 @@ static int convert_channels(IK_Scene *ikscene, PoseTree *tree)
 {
 	IK_Channel *ikchan;
 	bPoseChannel *pchan;
-	Bone *bone;
 	int a, flag, njoint;
 
 	njoint = 0;
 	for(a=0, ikchan = ikscene->channels; a<ikscene->numchan; ++a, ++ikchan) {
 		pchan= tree->pchan[a];
-		bone= pchan->bone;
 		ikchan->pchan = pchan;
 		ikchan->parent = (a>0) ? tree->parent[a] : -1;
 		ikchan->owner = ikscene->blArmature;

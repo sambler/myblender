@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -23,6 +23,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/collada/TransformWriter.cpp
+ *  \ingroup collada
+ */
+
+
 #include "BKE_object.h"
 
 #include "TransformWriter.h"
@@ -43,9 +48,15 @@ void TransformWriter::add_node_transform(COLLADASW::Node& node, float mat[][4], 
 		copy_m4_m4(local, mat);
 	}
 
+	double dmat[4][4];
+	UnitConverter* converter = new UnitConverter();
+    converter->mat4_to_dae_double(dmat,local);
+
 	TransformBase::decompose(local, loc, rot, NULL, scale);
-	
-	add_transform(node, loc, rot, scale);
+	if ( node.getType() == COLLADASW::Node::JOINT)
+		node.addMatrix("transform",dmat);
+	else
+		add_transform(node, loc, rot, scale);
 }
 
 void TransformWriter::add_node_transform_ob(COLLADASW::Node& node, Object *ob)
@@ -93,8 +104,12 @@ void TransformWriter::add_node_transform_identity(COLLADASW::Node& node)
 void TransformWriter::add_transform(COLLADASW::Node& node, float loc[3], float rot[3], float scale[3])
 {
 	node.addTranslate("location", loc[0], loc[1], loc[2]);
-	node.addRotateZ("rotationZ", COLLADABU::Math::Utils::radToDegF(rot[2]));
+	/*node.addRotateZ("rotationZ", COLLADABU::Math::Utils::radToDegF(rot[2]));
 	node.addRotateY("rotationY", COLLADABU::Math::Utils::radToDegF(rot[1]));
-	node.addRotateX("rotationX", COLLADABU::Math::Utils::radToDegF(rot[0]));
+	node.addRotateX("rotationX", COLLADABU::Math::Utils::radToDegF(rot[0]));*/
+	node.addRotateZ("rotationZ", rot[2] * 180.0f/M_PI);
+	node.addRotateY("rotationY", (rot[1]* 180.0f/M_PI));
+	node.addRotateX("rotationX", (rot[0]* 180.0f/M_PI));
+
 	node.addScale("scale", scale[0], scale[1], scale[2]);
 }

@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -22,6 +22,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/makesrna/intern/rna_main.c
+ *  \ingroup RNA
+ */
+
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -37,9 +42,21 @@
 
 /* all the list begin functions are added manually here, Main is not in SDNA */
 
+static int rna_Main_is_saved_get(PointerRNA *UNUSED(ptr))
+{
+	return G.relbase_valid;
+}
+
 static int rna_Main_is_dirty_get(PointerRNA *ptr)
 {
-	return !G.relbase_valid;
+	/* XXX, not totally nice to do it this way, should store in main ? */
+	Main *bmain= (Main*)ptr->data;
+	wmWindowManager *wm;
+	for(wm= bmain->wm.first; wm; wm= wm->id.next) {
+		return !wm->file_saved;
+	}
+
+	return TRUE;
 }
 
 static void rna_Main_filepath_get(PointerRNA *ptr, char *value)
@@ -170,6 +187,12 @@ static void rna_Main_text_begin(CollectionPropertyIterator *iter, PointerRNA *pt
 	rna_iterator_listbase_begin(iter, &bmain->text, NULL);
 }
 
+static void rna_Main_speaker_begin(CollectionPropertyIterator *iter, PointerRNA *ptr)
+{
+	Main *bmain= (Main*)ptr->data;
+	rna_iterator_listbase_begin(iter, &bmain->speaker, NULL);
+}
+
 static void rna_Main_sound_begin(CollectionPropertyIterator *iter, PointerRNA *ptr)
 {
 	Main *bmain= (Main*)ptr->data;
@@ -277,9 +300,10 @@ void RNA_def_main(BlenderRNA *brna)
 		{"brushes", "Brush", "rna_Main_brush_begin", "Brushes", "Brush datablocks.", RNA_def_main_brushes},
 		{"worlds", "World", "rna_Main_world_begin", "Worlds", "World datablocks.", RNA_def_main_worlds},
 		{"groups", "Group", "rna_Main_group_begin", "Groups", "Group datablocks.", RNA_def_main_groups},
-		{"shape_keys", "Key", "rna_Main_key_begin", "Keys", "Key datablocks.", NULL},
+		{"shape_keys", "Key", "rna_Main_key_begin", "Shape Keys", "Shape Key datablocks.", NULL},
 		{"scripts", "ID", "rna_Main_script_begin", "Scripts", "Script datablocks (DEPRECATED).", NULL},
 		{"texts", "Text", "rna_Main_text_begin", "Texts", "Text datablocks.", RNA_def_main_texts},
+		{"speakers", "Speaker", "rna_Main_speaker_begin", "Speakers", "Speaker datablocks.", RNA_def_main_speakers},
 		{"sounds", "Sound", "rna_Main_sound_begin", "Sounds", "Sound datablocks.", RNA_def_main_sounds},
 		{"armatures", "Armature", "rna_Main_armature_begin", "Armatures", "Armature datablocks.", RNA_def_main_armatures},
 		{"actions", "Action", "rna_Main_action_begin", "Actions", "Action datablocks.", RNA_def_main_actions},
@@ -302,6 +326,11 @@ void RNA_def_main(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "is_dirty", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
 	RNA_def_property_boolean_funcs(prop, "rna_Main_is_dirty_get", NULL);
+	RNA_def_property_ui_text(prop, "File is Saved", "Have recent edits been saved to disk");
+
+	prop= RNA_def_property(srna, "is_saved", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+	RNA_def_property_boolean_funcs(prop, "rna_Main_is_saved_get", NULL);
 	RNA_def_property_ui_text(prop, "File is Saved", "Has the current session been saved to disk as a .blend file");
 
 	for(i=0; lists[i].name; i++)

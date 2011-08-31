@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/interface/interface_draw.c
+ *  \ingroup edinterface
+ */
+
+
 #include <math.h>
 #include <string.h>
 
@@ -33,10 +38,12 @@
 #include "DNA_screen_types.h"
 
 #include "BLI_math.h"
+#include "BLI_rect.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_colortools.h"
 #include "BKE_texture.h"
-#include "BKE_utildefines.h"
+
 
 #include "IMB_imbuf.h"
 #include "IMB_imbuf_types.h"
@@ -133,17 +140,15 @@ void uiDrawBox(int mode, float minx, float miny, float maxx, float maxy, float r
 	glEnd();
 }
 
-static void round_box_shade_col(float *col1, float *col2, float fac)
+static void round_box_shade_col(const float col1[3], float const col2[3], const float fac)
 {
 	float col[3];
 
-	col[0]= (fac*col1[0] + (1.0-fac)*col2[0]);
-	col[1]= (fac*col1[1] + (1.0-fac)*col2[1]);
-	col[2]= (fac*col1[2] + (1.0-fac)*col2[2]);
-	
+	col[0]= (fac*col1[0] + (1.0f-fac)*col2[0]);
+	col[1]= (fac*col1[1] + (1.0f-fac)*col2[1]);
+	col[2]= (fac*col1[2] + (1.0f-fac)*col2[2]);
 	glColor3fv(col);
 }
-
 
 /* linear horizontal shade within button or in outline */
 /* view2d scrollers use it */
@@ -151,7 +156,8 @@ void uiDrawBoxShade(int mode, float minx, float miny, float maxx, float maxy, fl
 {
 	float vec[7][2]= {{0.195, 0.02}, {0.383, 0.067}, {0.55, 0.169}, {0.707, 0.293},
 					  {0.831, 0.45}, {0.924, 0.617}, {0.98, 0.805}};
-	float div= maxy-miny;
+	const float div= maxy - miny;
+	const float idiv= 1.0f / div;
 	float coltop[3], coldown[3], color[4];
 	int a;
 	
@@ -163,12 +169,12 @@ void uiDrawBoxShade(int mode, float minx, float miny, float maxx, float maxy, fl
 	glGetFloatv(GL_CURRENT_COLOR, color);
 
 	/* 'shade' defines strength of shading */	
-	coltop[0]= color[0]+shadetop; if(coltop[0]>1.0) coltop[0]= 1.0;
-	coltop[1]= color[1]+shadetop; if(coltop[1]>1.0) coltop[1]= 1.0;
-	coltop[2]= color[2]+shadetop; if(coltop[2]>1.0) coltop[2]= 1.0;
-	coldown[0]= color[0]+shadedown; if(coldown[0]<0.0) coldown[0]= 0.0;
-	coldown[1]= color[1]+shadedown; if(coldown[1]<0.0) coldown[1]= 0.0;
-	coldown[2]= color[2]+shadedown; if(coldown[2]<0.0) coldown[2]= 0.0;
+	coltop[0]= color[0]+shadetop; if(coltop[0]>1.0f) coltop[0]= 1.0f;
+	coltop[1]= color[1]+shadetop; if(coltop[1]>1.0f) coltop[1]= 1.0f;
+	coltop[2]= color[2]+shadetop; if(coltop[2]>1.0f) coltop[2]= 1.0f;
+	coldown[0]= color[0]+shadedown; if(coldown[0]<0.0f) coldown[0]= 0.0f;
+	coldown[1]= color[1]+shadedown; if(coldown[1]<0.0f) coldown[1]= 0.0f;
+	coldown[2]= color[2]+shadedown; if(coldown[2]<0.0f) coldown[2]= 0.0f;
 
 	glShadeModel(GL_SMOOTH);
 	glBegin(mode);
@@ -180,11 +186,11 @@ void uiDrawBoxShade(int mode, float minx, float miny, float maxx, float maxy, fl
 		glVertex2f(maxx-rad, miny);
 		
 		for(a=0; a<7; a++) {
-			round_box_shade_col(coltop, coldown, vec[a][1]/div);
+			round_box_shade_col(coltop, coldown, vec[a][1]*idiv);
 			glVertex2f(maxx-rad+vec[a][0], miny+vec[a][1]);
 		}
 		
-		round_box_shade_col(coltop, coldown, rad/div);
+		round_box_shade_col(coltop, coldown, rad*idiv);
 		glVertex2f(maxx, miny+rad);
 	}
 	else {
@@ -195,11 +201,11 @@ void uiDrawBoxShade(int mode, float minx, float miny, float maxx, float maxy, fl
 	/* corner right-top */
 	if(roundboxtype & 2) {
 		
-		round_box_shade_col(coltop, coldown, (div-rad)/div);
+		round_box_shade_col(coltop, coldown, (div-rad)*idiv);
 		glVertex2f(maxx, maxy-rad);
 		
 		for(a=0; a<7; a++) {
-			round_box_shade_col(coltop, coldown, (div-rad+vec[a][1])/div);
+			round_box_shade_col(coltop, coldown, (div-rad+vec[a][1])*idiv);
 			glVertex2f(maxx-vec[a][1], maxy-rad+vec[a][0]);
 		}
 		round_box_shade_col(coltop, coldown, 1.0);
@@ -217,11 +223,11 @@ void uiDrawBoxShade(int mode, float minx, float miny, float maxx, float maxy, fl
 		glVertex2f(minx+rad, maxy);
 		
 		for(a=0; a<7; a++) {
-			round_box_shade_col(coltop, coldown, (div-vec[a][1])/div);
+			round_box_shade_col(coltop, coldown, (div-vec[a][1])*idiv);
 			glVertex2f(minx+rad-vec[a][0], maxy-vec[a][1]);
 		}
 		
-		round_box_shade_col(coltop, coldown, (div-rad)/div);
+		round_box_shade_col(coltop, coldown, (div-rad)*idiv);
 		glVertex2f(minx, maxy-rad);
 	}
 	else {
@@ -232,11 +238,11 @@ void uiDrawBoxShade(int mode, float minx, float miny, float maxx, float maxy, fl
 	/* corner left-bottom */
 	if(roundboxtype & 8) {
 		
-		round_box_shade_col(coltop, coldown, rad/div);
+		round_box_shade_col(coltop, coldown, rad*idiv);
 		glVertex2f(minx, miny+rad);
 		
 		for(a=0; a<7; a++) {
-			round_box_shade_col(coltop, coldown, (rad-vec[a][1])/div);
+			round_box_shade_col(coltop, coldown, (rad-vec[a][1])*idiv);
 			glVertex2f(minx+vec[a][1], miny+rad-vec[a][0]);
 		}
 		
@@ -258,7 +264,8 @@ void uiDrawBoxVerticalShade(int mode, float minx, float miny, float maxx, float 
 {
 	float vec[7][2]= {{0.195, 0.02}, {0.383, 0.067}, {0.55, 0.169}, {0.707, 0.293},
 					  {0.831, 0.45}, {0.924, 0.617}, {0.98, 0.805}};
-	float div= maxx-minx;
+	const float div= maxx - minx;
+	const float idiv= 1.0f / div;
 	float colLeft[3], colRight[3], color[4];
 	int a;
 	
@@ -270,12 +277,12 @@ void uiDrawBoxVerticalShade(int mode, float minx, float miny, float maxx, float 
 	glGetFloatv(GL_CURRENT_COLOR, color);
 
 	/* 'shade' defines strength of shading */	
-	colLeft[0]= color[0]+shadeLeft; if(colLeft[0]>1.0) colLeft[0]= 1.0;
-	colLeft[1]= color[1]+shadeLeft; if(colLeft[1]>1.0) colLeft[1]= 1.0;
-	colLeft[2]= color[2]+shadeLeft; if(colLeft[2]>1.0) colLeft[2]= 1.0;
-	colRight[0]= color[0]+shadeRight; if(colRight[0]<0.0) colRight[0]= 0.0;
-	colRight[1]= color[1]+shadeRight; if(colRight[1]<0.0) colRight[1]= 0.0;
-	colRight[2]= color[2]+shadeRight; if(colRight[2]<0.0) colRight[2]= 0.0;
+	colLeft[0]= color[0]+shadeLeft; if(colLeft[0]>1.0f) colLeft[0]= 1.0f;
+	colLeft[1]= color[1]+shadeLeft; if(colLeft[1]>1.0f) colLeft[1]= 1.0f;
+	colLeft[2]= color[2]+shadeLeft; if(colLeft[2]>1.0f) colLeft[2]= 1.0f;
+	colRight[0]= color[0]+shadeRight; if(colRight[0]<0.0f) colRight[0]= 0.0f;
+	colRight[1]= color[1]+shadeRight; if(colRight[1]<0.0f) colRight[1]= 0.0f;
+	colRight[2]= color[2]+shadeRight; if(colRight[2]<0.0f) colRight[2]= 0.0f;
 
 	glShadeModel(GL_SMOOTH);
 	glBegin(mode);
@@ -286,11 +293,11 @@ void uiDrawBoxVerticalShade(int mode, float minx, float miny, float maxx, float 
 		glVertex2f(maxx-rad, miny);
 		
 		for(a=0; a<7; a++) {
-			round_box_shade_col(colLeft, colRight, vec[a][0]/div);
+			round_box_shade_col(colLeft, colRight, vec[a][0]*idiv);
 			glVertex2f(maxx-rad+vec[a][0], miny+vec[a][1]);
 		}
 		
-		round_box_shade_col(colLeft, colRight, rad/div);
+		round_box_shade_col(colLeft, colRight, rad*idiv);
 		glVertex2f(maxx, miny+rad);
 	}
 	else {
@@ -305,10 +312,10 @@ void uiDrawBoxVerticalShade(int mode, float minx, float miny, float maxx, float 
 		
 		for(a=0; a<7; a++) {
 			
-			round_box_shade_col(colLeft, colRight, (div-rad-vec[a][0])/div);
+			round_box_shade_col(colLeft, colRight, (div-rad-vec[a][0])*idiv);
 			glVertex2f(maxx-vec[a][1], maxy-rad+vec[a][0]);
 		}
-		round_box_shade_col(colLeft, colRight, (div-rad)/div);
+		round_box_shade_col(colLeft, colRight, (div-rad)*idiv);
 		glVertex2f(maxx-rad, maxy);
 	}
 	else {
@@ -318,11 +325,11 @@ void uiDrawBoxVerticalShade(int mode, float minx, float miny, float maxx, float 
 	
 	/* corner left-top */
 	if(roundboxtype & 1) {
-		round_box_shade_col(colLeft, colRight, (div-rad)/div);
+		round_box_shade_col(colLeft, colRight, (div-rad)*idiv);
 		glVertex2f(minx+rad, maxy);
 		
 		for(a=0; a<7; a++) {
-			round_box_shade_col(colLeft, colRight, (div-rad+vec[a][0])/div);
+			round_box_shade_col(colLeft, colRight, (div-rad+vec[a][0])*idiv);
 			glVertex2f(minx+rad-vec[a][0], maxy-vec[a][1]);
 		}
 		
@@ -340,7 +347,7 @@ void uiDrawBoxVerticalShade(int mode, float minx, float miny, float maxx, float 
 		glVertex2f(minx, miny+rad);
 		
 		for(a=0; a<7; a++) {
-			round_box_shade_col(colLeft, colRight, (vec[a][0])/div);
+			round_box_shade_col(colLeft, colRight, (vec[a][0])*idiv);
 			glVertex2f(minx+vec[a][1], miny+rad-vec[a][0]);
 		}
 		
@@ -379,13 +386,14 @@ void uiRoundRect(float minx, float miny, float maxx, float maxy, float rad)
 }
 
 /* plain fake antialiased unfilled round rectangle */
-void uiRoundRectFakeAA(float minx, float miny, float maxx, float maxy, float rad, float asp)
+#if 0 /* UNUSED 2.5 */
+static void uiRoundRectFakeAA(float minx, float miny, float maxx, float maxy, float rad, float asp)
 {
 	float color[4], alpha;
 	float raddiff;
 	int i, passes=4;
 	
-	/* get the colour and divide up the alpha */
+	/* get the color and divide up the alpha */
 	glGetFloatv(GL_CURRENT_COLOR, color);
 	alpha = 1; //color[3];
 	color[3]= 0.5*alpha/(float)passes;
@@ -406,6 +414,7 @@ void uiRoundRectFakeAA(float minx, float miny, float maxx, float maxy, float rad
 	color[3] = alpha;
 	glColor4fv(color);
 }
+#endif
 
 /* (old, used in outliner) plain antialiased filled box */
 void uiRoundBox(float minx, float miny, float maxx, float maxy, float rad)
@@ -462,6 +471,9 @@ void uiEmboss(float x1, float y1, float x2, float y2, int sel)
 
 void ui_draw_but_IMAGE(ARegion *UNUSED(ar), uiBut *UNUSED(but), uiWidgetColors *UNUSED(wcol), rcti *rect)
 {
+#ifdef WITH_HEADLESS
+	(void)rect;
+#else
 	extern char datatoc_splash_png[];
 	extern int datatoc_splash_png_size;
 	ImBuf *ibuf;
@@ -498,6 +510,7 @@ void ui_draw_but_IMAGE(ARegion *UNUSED(ar), uiBut *UNUSED(but), uiWidgetColors *
 	*/
 	
 	IMB_freeImBuf(ibuf);
+#endif
 }
 
 #if 0
@@ -516,15 +529,12 @@ static void ui_draw_but_CHARTAB(uiBut *but)
 	int result = 0;
 	int charmax = G.charmax;
 	
-	/* <builtin> font in use. There are TTF <builtin> and non-TTF <builtin> fonts */
-	if(!strcmp(G.selfont->name, "<builtin>"))
-	{
-		if(G.ui_international == TRUE)
-		{
+	/* FO_BUILTIN_NAME font in use. There are TTF FO_BUILTIN_NAME and non-TTF FO_BUILTIN_NAME fonts */
+	if(!strcmp(G.selfont->name, FO_BUILTIN_NAME)) {
+		if(G.ui_international == TRUE) {
 			charmax = 0xff;
 		}
-		else
-		{
+		else {
 			charmax = 0xff;
 		}
 	}
@@ -548,30 +558,24 @@ static void ui_draw_but_CHARTAB(uiBut *but)
 
 	cs = G.charstart;
 
-	/* Set the font, in case it is not <builtin> font */
-	if(G.selfont && strcmp(G.selfont->name, "<builtin>"))
-	{
-		char tmpStr[256];
-
+	/* Set the font, in case it is not FO_BUILTIN_NAME font */
+	if(G.selfont && strcmp(G.selfont->name, FO_BUILTIN_NAME)) {
 		// Is the font file packed, if so then use the packed file
-		if(G.selfont->packedfile)
-		{
+		if(G.selfont->packedfile) {
 			pf = G.selfont->packedfile;		
 			FTF_SetFont(pf->data, pf->size, 14.0);
 		}
-		else
-		{
+		else {
+			char tmpStr[256];
 			int err;
 
-			strcpy(tmpStr, G.selfont->name);
-			BLI_path_abs(tmpStr, G.sce);
+			BLI_strncpy(tmpStr, G.selfont->name, sizeof(tmpStr));
+			BLI_path_abs(tmpStr, G.main->name);
 			err = FTF_SetFont((unsigned char *)tmpStr, 0, 14.0);
 		}
 	}
-	else
-	{
-		if(G.ui_international == TRUE)
-		{
+	else {
+		if(G.ui_international == TRUE) {
 			FTF_SetFont((unsigned char *) datatoc_bfont_ttf, datatoc_bfont_ttf_size, 14.0);
 		}
 	}
@@ -583,8 +587,7 @@ static void ui_draw_but_CHARTAB(uiBut *but)
 	glRectf((rect->xmin), (rect->ymin), (rect->xmax), (rect->ymax));
 
 	glColor3ub(0,  0,  0);
-	for(y = 0; y < 6; y++)
-	{
+	for(y = 0; y < 6; y++) {
 		// Do not draw more than the category allows
 		if(cs > charmax) break;
 
@@ -605,9 +608,9 @@ static void ui_draw_but_CHARTAB(uiBut *but)
 			memset(wstr, 0, sizeof(wchar_t)*2);
 			memset(ustr, 0, 16);
 
-			// Set the font to be either unicode or <builtin>				
+			// Set the font to be either unicode or FO_BUILTIN_NAME	
 			wstr[0] = cs;
-			if(strcmp(G.selfont->name, "<builtin>"))
+			if(strcmp(G.selfont->name, FO_BUILTIN_NAME))
 			{
 				wcs2utf8s((char *)ustr, (wchar_t *)wstr);
 			}
@@ -624,7 +627,7 @@ static void ui_draw_but_CHARTAB(uiBut *but)
 				}
 			}
 
-			if((G.selfont && strcmp(G.selfont->name, "<builtin>")) || (G.selfont && !strcmp(G.selfont->name, "<builtin>") && G.ui_international == TRUE))
+			if((G.selfont && strcmp(G.selfont->name, FO_BUILTIN_NAME)) || (G.selfont && !strcmp(G.selfont->name, FO_BUILTIN_NAME) && G.ui_international == TRUE))
 			{
 				float wid;
 				float llx, lly, llz, urx, ury, urz;
@@ -664,23 +667,19 @@ static void ui_draw_but_CHARTAB(uiBut *but)
 	glShadeModel(GL_FLAT);
 
 	/* Return Font Settings to original */
-	if(U.fontsize && U.fontname[0])
-	{
+	if(U.fontsize && U.fontname[0]) {
 		result = FTF_SetFont((unsigned char *)U.fontname, 0, U.fontsize);
 	}
-	else if (U.fontsize)
-	{
+	else if (U.fontsize) {
 		result = FTF_SetFont((unsigned char *) datatoc_bfont_ttf, datatoc_bfont_ttf_size, U.fontsize);
 	}
 
-	if (result == 0)
-	{
+	if (result == 0) {
 		result = FTF_SetFont((unsigned char *) datatoc_bfont_ttf, datatoc_bfont_ttf_size, 11);
 	}
 	
 	/* resets the font size */
-	if(G.ui_international == TRUE)
-	{
+	if(G.ui_international == TRUE) {
 		// uiSetCurFont(but->block, UI_HELV);
 	}
 }
@@ -714,7 +713,7 @@ static void draw_scope_end(rctf *rect, GLint *scissor)
 	uiDrawBox(GL_LINE_LOOP, rect->xmin-1, rect->ymin, rect->xmax+1, rect->ymax+1, 3.0f);
 }
 
-void histogram_draw_one(float r, float g, float b, float alpha, float x, float y, float w, float h, float *data, int res)
+static void histogram_draw_one(float r, float g, float b, float alpha, float x, float y, float w, float h, float *data, int res)
 {
 	int i;
 	
@@ -756,8 +755,6 @@ void ui_draw_but_HISTOGRAM(ARegion *ar, uiBut *but, uiWidgetColors *UNUSED(wcol)
 	float w, h;
 	//float alpha;
 	GLint scissor[4];
-	
-	if (hist==NULL) { printf("hist is null \n"); return; }
 	
 	rect.xmin = (float)recti->xmin+1;
 	rect.xmax = (float)recti->xmax-1;
@@ -807,7 +804,7 @@ void ui_draw_but_WAVEFORM(ARegion *ar, uiBut *but, uiWidgetColors *UNUSED(wcol),
 	int i, c;
 	float w, w3, h, alpha, yofs;
 	GLint scissor[4];
-	float colors[3][3] = {{1,0,0},{0,1,0},{0,0,1}};
+	float colors[3][3]= MAT3_UNITY;
 	float colorsycc[3][3] = {{1,0,1},{1,1,0},{0,1,1}};
 	float colors_alpha[3][3], colorsycc_alpha[3][3]; /* colors  pre multiplied by alpha for speed up */
 	float min, max;
@@ -855,7 +852,7 @@ void ui_draw_but_WAVEFORM(ARegion *ar, uiBut *but, uiWidgetColors *UNUSED(wcol),
 		sprintf(str,"%-3d",i*20);
 		str[3]='\0';
 		fdrawline(rect.xmin+22, yofs+(i/5.f)*h, rect.xmax+1, yofs+(i/5.f)*h);
-		BLF_draw_default(rect.xmin+1, yofs-5+(i/5.f)*h, 0, str);
+		BLF_draw_default(rect.xmin+1, yofs-5+(i/5.f)*h, 0, str, sizeof(str)-1);
 		/* in the loop because blf_draw reset it */
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
@@ -943,9 +940,9 @@ void ui_draw_but_WAVEFORM(ARegion *ar, uiBut *but, uiWidgetColors *UNUSED(wcol),
 			/* min max */
 			for (c=0; c<3; c++) {
 				if (scopes->wavefrm_mode == SCOPES_WAVEFRM_RGB)
-					glColor3f(colors[c][0]*0.75, colors[c][1]*0.75, colors[c][2]*0.75);
+					glColor3f(colors[c][0]*0.75f, colors[c][1]*0.75f, colors[c][2]*0.75f);
 				else
-					glColor3f(colorsycc[c][0]*0.75, colorsycc[c][1]*0.75, colorsycc[c][2]*0.75);
+					glColor3f(colorsycc[c][0]*0.75f, colorsycc[c][1]*0.75f, colorsycc[c][2]*0.75f);
 				min= yofs+scopes->minmax[c][0]*h;
 				max= yofs+scopes->minmax[c][1]*h;
 				CLAMP(min, rect.ymin, rect.ymax);
@@ -960,17 +957,17 @@ void ui_draw_but_WAVEFORM(ARegion *ar, uiBut *but, uiWidgetColors *UNUSED(wcol),
 	draw_scope_end(&rect, scissor);
 }
 
-float polar_to_x(float center, float diam, float ampli, float angle)
+static float polar_to_x(float center, float diam, float ampli, float angle)
 {
 	return center + diam * ampli * cosf(angle);
 }
 
-float polar_to_y(float center, float diam, float ampli, float angle)
+static float polar_to_y(float center, float diam, float ampli, float angle)
 {
 	return center + diam * ampli * sinf(angle);
 }
 
-void vectorscope_draw_target(float centerx, float centery, float diam, float r, float g, float b)
+static void vectorscope_draw_target(float centerx, float centery, float diam, float r, float g, float b)
 {
 	float y,u,v;
 	float tangle=0.f, tampli;
@@ -978,15 +975,15 @@ void vectorscope_draw_target(float centerx, float centery, float diam, float r, 
 
 	rgb_to_yuv(r,g,b, &y, &u, &v);
 	if (u>0 && v>=0) tangle=atanf(v/u);
-	else if (u>0 && v<0) tangle=atanf(v/u)+2*M_PI;
-	else if (u<0) tangle=atanf(v/u)+M_PI;
-	else if (u==0 && v>0) tangle=M_PI/2.0f;
-	else if (u==0 && v<0) tangle=-M_PI/2.0f;
+	else if (u>0 && v<0) tangle= atanf(v/u) + 2.0f * (float)M_PI;
+	else if (u<0) tangle=atanf(v/u) + (float)M_PI;
+	else if (u==0 && v > 0.0f) tangle= (float)M_PI/2.0f;
+	else if (u==0 && v < 0.0f) tangle=-(float)M_PI/2.0f;
 	tampli= sqrtf(u*u+v*v);
 
 	/* small target vary by 2.5 degree and 2.5 IRE unit */
 	glColor4f(1.0f, 1.0f, 1.0, 0.12f);
-	dangle= 2.5*M_PI/180.0f;
+	dangle= 2.5f*(float)M_PI/180.0f;
 	dampli= 2.5f/200.0f;
 	glBegin(GL_LINE_STRIP);
 	glVertex2f(polar_to_x(centerx,diam,tampli+dampli,tangle+dangle), polar_to_y(centery,diam,tampli+dampli,tangle+dangle));
@@ -997,9 +994,9 @@ void vectorscope_draw_target(float centerx, float centery, float diam, float r, 
 	glEnd();
 	/* big target vary by 10 degree and 20% amplitude */
 	glColor4f(1.0f, 1.0f, 1.0, 0.12f);
-	dangle= 10*M_PI/180.0f;
-	dampli= 0.2*tampli;
-	dangle2= 5.0f*M_PI/180.0f;
+	dangle= 10.0f*(float)M_PI/180.0f;
+	dampli= 0.2f*tampli;
+	dangle2= 5.0f*(float)M_PI/180.0f;
 	dampli2= 0.5f*dampli;
 	glBegin(GL_LINE_STRIP);
 	glVertex2f(polar_to_x(centerx,diam,tampli+dampli-dampli2,tangle+dangle), polar_to_y(centery,diam,tampli+dampli-dampli2,tangle+dangle));
@@ -1110,7 +1107,7 @@ void ui_draw_but_COLORBAND(uiBut *but, uiWidgetColors *UNUSED(wcol), rcti *rect)
 	ColorBand *coba;
 	CBData *cbd;
 	float x1, y1, sizex, sizey;
-	float dx, v3[2], v1[2], v2[2], v1a[2], v2a[2];
+	float v3[2], v1[2], v2[2], v1a[2], v2a[2];
 	int a;
 	float pos, colf[4]= {0,0,0,0}; /* initialize incase the colorband isnt valid */
 		
@@ -1121,18 +1118,17 @@ void ui_draw_but_COLORBAND(uiBut *but, uiWidgetColors *UNUSED(wcol), rcti *rect)
 	y1= rect->ymin;
 	sizex= rect->xmax-x1;
 	sizey= rect->ymax-y1;
-	
+
 	/* first background, to show tranparency */
-	dx= sizex/12.0;
-	v1[0]= x1;
-	for(a=0; a<12; a++) {
-		if(a & 1) glColor3f(0.3, 0.3, 0.3); else glColor3f(0.8, 0.8, 0.8);
-		glRectf(v1[0], y1, v1[0]+dx, y1+0.5*sizey);
-		if(a & 1) glColor3f(0.8, 0.8, 0.8); else glColor3f(0.3, 0.3, 0.3);
-		glRectf(v1[0], y1+0.5*sizey, v1[0]+dx, y1+sizey);
-		v1[0]+= dx;
-	}
-	
+
+	glColor4ub(UI_TRANSP_DARK, UI_TRANSP_DARK, UI_TRANSP_DARK, 255);
+	glRectf(x1, y1, x1+sizex, y1+sizey);
+	glEnable(GL_POLYGON_STIPPLE);
+	glColor4ub(UI_TRANSP_LIGHT, UI_TRANSP_LIGHT, UI_TRANSP_LIGHT, 255);
+	glPolygonStipple(checker_stipple_sml);
+	glRectf(x1, y1, x1+sizex, y1+sizey);
+	glDisable(GL_POLYGON_STIPPLE);
+
 	glShadeModel(GL_FLAT);
 	glEnable(GL_BLEND);
 	
@@ -1170,9 +1166,9 @@ void ui_draw_but_COLORBAND(uiBut *but, uiWidgetColors *UNUSED(wcol), rcti *rect)
 	/* help lines */
 	v1[0]= v2[0]=v3[0]= x1;
 	v1[1]= y1;
-	v1a[1]= y1+0.25*sizey;
-	v2[1]= y1+0.5*sizey;
-	v2a[1]= y1+0.75*sizey;
+	v1a[1]= y1+0.25f*sizey;
+	v2[1]= y1+0.5f*sizey;
+	v2a[1]= y1+0.75f*sizey;
 	v3[1]= y1+sizey;
 	
 	
@@ -1322,7 +1318,7 @@ static void ui_draw_but_curve_grid(rcti *rect, float zoomx, float zoomy, float o
 	glBegin(GL_LINES);
 	dx= step*zoomx;
 	fx= rect->xmin + zoomx*(-offsx);
-	if(fx > rect->xmin) fx -= dx*( floor(fx-rect->xmin));
+	if(fx > rect->xmin) fx -= dx*(floorf(fx-rect->xmin));
 	while(fx < rect->xmax) {
 		glVertex2f(fx, rect->ymin); 
 		glVertex2f(fx, rect->ymax);
@@ -1331,7 +1327,7 @@ static void ui_draw_but_curve_grid(rcti *rect, float zoomx, float zoomy, float o
 	
 	dy= step*zoomy;
 	fy= rect->ymin + zoomy*(-offsy);
-	if(fy > rect->ymin) fy -= dy*( floor(fy-rect->ymin));
+	if(fy > rect->ymin) fy -= dy*(floorf(fy-rect->ymin));
 	while(fy < rect->ymax) {
 		glVertex2f(rect->xmin, fy); 
 		glVertex2f(rect->xmax, fy);
@@ -1341,7 +1337,7 @@ static void ui_draw_but_curve_grid(rcti *rect, float zoomx, float zoomy, float o
 	
 }
 
-static void glColor3ubvShade(char *col, int shade)
+static void glColor3ubvShade(unsigned char *col, int shade)
 {
 	glColor3ub(col[0]-shade>0?col[0]-shade:0, 
 			   col[1]-shade>0?col[1]-shade:0,
@@ -1355,6 +1351,7 @@ void ui_draw_but_CURVE(ARegion *ar, uiBut *but, uiWidgetColors *wcol, rcti *rect
 	CurveMapPoint *cmp;
 	float fx, fy, fac[2], zoomx, zoomy, offsx, offsy;
 	GLint scissor[4];
+	rcti scissor_new;
 	int a;
 
 	cumap= (CurveMapping *)(but->editcumap? but->editcumap: but->poin);
@@ -1362,17 +1359,22 @@ void ui_draw_but_CURVE(ARegion *ar, uiBut *but, uiWidgetColors *wcol, rcti *rect
 	
 	/* need scissor test, curve can draw outside of boundary */
 	glGetIntegerv(GL_VIEWPORT, scissor);
-	glScissor(ar->winrct.xmin + rect->xmin, ar->winrct.ymin+rect->ymin, rect->xmax-rect->xmin, rect->ymax-rect->ymin);
+	scissor_new.xmin= ar->winrct.xmin + rect->xmin;
+	scissor_new.ymin= ar->winrct.ymin + rect->ymin;
+	scissor_new.xmax= ar->winrct.xmin + rect->xmax;
+	scissor_new.ymax= ar->winrct.ymin + rect->ymax;
+	BLI_isect_rcti(&scissor_new, &ar->winrct, &scissor_new);
+	glScissor(scissor_new.xmin, scissor_new.ymin, scissor_new.xmax-scissor_new.xmin, scissor_new.ymax-scissor_new.ymin);
 	
 	/* calculate offset and zoom */
-	zoomx= (rect->xmax-rect->xmin-2.0*but->aspect)/(cumap->curr.xmax - cumap->curr.xmin);
-	zoomy= (rect->ymax-rect->ymin-2.0*but->aspect)/(cumap->curr.ymax - cumap->curr.ymin);
+	zoomx= (rect->xmax-rect->xmin-2.0f*but->aspect)/(cumap->curr.xmax - cumap->curr.xmin);
+	zoomy= (rect->ymax-rect->ymin-2.0f*but->aspect)/(cumap->curr.ymax - cumap->curr.ymin);
 	offsx= cumap->curr.xmin-but->aspect/zoomx;
 	offsy= cumap->curr.ymin-but->aspect/zoomy;
 	
 	/* backdrop */
 	if(cumap->flag & CUMA_DO_CLIP) {
-		glColor3ubvShade(wcol->inner, -20);
+		glColor3ubvShade((unsigned char *)wcol->inner, -20);
 		glRectf(rect->xmin, rect->ymin, rect->xmax, rect->ymax);
 		glColor3ubv((unsigned char*)wcol->inner);
 		glRectf(rect->xmin + zoomx*(cumap->clipr.xmin-offsx),
@@ -1386,13 +1388,13 @@ void ui_draw_but_CURVE(ARegion *ar, uiBut *but, uiWidgetColors *wcol, rcti *rect
 	}
 		
 	/* grid, every .25 step */
-	glColor3ubvShade(wcol->inner, -16);
+	glColor3ubvShade((unsigned char *)wcol->inner, -16);
 	ui_draw_but_curve_grid(rect, zoomx, zoomy, offsx, offsy, 0.25f);
 	/* grid, every 1.0 step */
-	glColor3ubvShade(wcol->inner, -24);
+	glColor3ubvShade((unsigned char *)wcol->inner, -24);
 	ui_draw_but_curve_grid(rect, zoomx, zoomy, offsx, offsy, 1.0f);
 	/* axes */
-	glColor3ubvShade(wcol->inner, -50);
+	glColor3ubvShade((unsigned char *)wcol->inner, -50);
 	glBegin(GL_LINES);
 	glVertex2f(rect->xmin, rect->ymin + zoomy*(-offsy));
 	glVertex2f(rect->xmax, rect->ymin + zoomy*(-offsy));
@@ -1526,9 +1528,9 @@ static void ui_shadowbox(float minx, float miny, float maxx, float maxy, float s
 	glBegin(GL_POLYGON);
 	glColor4ub(0, 0, 0, alpha);
 	glVertex2f(maxx, miny);
-	glVertex2f(maxx, maxy-0.3*shadsize);
+	glVertex2f(maxx, maxy-0.3f*shadsize);
 	glColor4ub(0, 0, 0, 0);
-	glVertex2f(maxx+shadsize, maxy-0.75*shadsize);
+	glVertex2f(maxx+shadsize, maxy-0.75f*shadsize);
 	glVertex2f(maxx+shadsize, miny);
 	glEnd();
 	
@@ -1538,18 +1540,18 @@ static void ui_shadowbox(float minx, float miny, float maxx, float maxy, float s
 	glVertex2f(maxx, miny);
 	glColor4ub(0, 0, 0, 0);
 	glVertex2f(maxx+shadsize, miny);
-	glVertex2f(maxx+0.7*shadsize, miny-0.7*shadsize);
+	glVertex2f(maxx+0.7f*shadsize, miny-0.7f*shadsize);
 	glVertex2f(maxx, miny-shadsize);
 	glEnd();
 	
 	/* bottom quad */		
 	glBegin(GL_POLYGON);
 	glColor4ub(0, 0, 0, alpha);
-	glVertex2f(minx+0.3*shadsize, miny);
+	glVertex2f(minx+0.3f*shadsize, miny);
 	glVertex2f(maxx, miny);
 	glColor4ub(0, 0, 0, 0);
 	glVertex2f(maxx, miny-shadsize);
-	glVertex2f(minx+0.5*shadsize, miny-shadsize);
+	glVertex2f(minx+0.5f*shadsize, miny-shadsize);
 	glEnd();
 	
 	glDisable(GL_BLEND);
@@ -1566,8 +1568,9 @@ void uiDrawBoxShadow(unsigned char alpha, float minx, float miny, float maxx, fl
 }
 
 
-void ui_dropshadow(rctf *rct, float radius, float aspect, int select)
+void ui_dropshadow(rctf *rct, float radius, float aspect, int UNUSED(select))
 {
+	int i;
 	float rad;
 	float a;
 	char alpha= 2;
@@ -1578,9 +1581,19 @@ void ui_dropshadow(rctf *rct, float radius, float aspect, int select)
 		rad= (rct->ymax-rct->ymin-10.0f)/2.0f;
 	else
 		rad= radius;
-	
-	if(select) a= 12.0f*aspect; else a= 12.0f*aspect;
-	for(; a>0.0f; a-=aspect) {
+
+	i= 12;
+#if 0
+	if(select) {
+		a= i*aspect; /* same as below */
+	}
+	else
+#endif
+	{
+		a= i*aspect;
+	}
+
+	for(; i--; a-=aspect) {
 		/* alpha ranges from 2 to 20 or so */
 		glColor4ub(0, 0, 0, alpha);
 		alpha+= 2;
@@ -1591,7 +1604,7 @@ void ui_dropshadow(rctf *rct, float radius, float aspect, int select)
 	/* outline emphasis */
 	glEnable( GL_LINE_SMOOTH );
 	glColor4ub(0, 0, 0, 100);
-	uiDrawBox(GL_LINE_LOOP, rct->xmin-0.5f, rct->ymin-0.5f, rct->xmax+0.5f, rct->ymax+0.5f, radius);
+	uiDrawBox(GL_LINE_LOOP, rct->xmin-0.5f, rct->ymin-0.5f, rct->xmax+0.5f, rct->ymax+0.5f, radius+0.5f);
 	glDisable( GL_LINE_SMOOTH );
 	
 	glDisable(GL_BLEND);

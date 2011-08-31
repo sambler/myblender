@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,10 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file BIF_glutil.h
+ *  \ingroup editorui
+ */
+
 #ifndef BIF_GLUTIL_H
 #define BIF_GLUTIL_H
 
@@ -48,6 +52,8 @@ void fdrawXORcirc(float xofs, float yofs, float rad);
 /* glStipple defines */
 extern unsigned char stipple_halftone[128];
 extern unsigned char stipple_quarttone[128];
+extern unsigned char stipple_diag_stripes_pos[128];
+extern unsigned char stipple_diag_stripes_neg[128];
 
 	/**
 	 * Draw a lined (non-looping) arc with the given
@@ -197,7 +203,7 @@ void gla2DSetMap(gla2DDrawInfo *di, struct rctf *rect);
 /* use this for platform hacks. glPointSize is solved here */
 void bglBegin(int mode);
 void bglEnd(void);
-int bglPointHack();
+int bglPointHack(void);
 void bglVertex3fv(float *vec);
 void bglVertex3f(float x, float y, float z);
 void bglVertex2fv(float *vec);

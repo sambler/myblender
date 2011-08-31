@@ -1,3 +1,6 @@
+/** \file gameengine/Ketsji/KX_BlenderMaterial.cpp
+ *  \ingroup ketsji
+ */
 
 // ------------------------------------
 // ...
@@ -82,6 +85,7 @@ void KX_BlenderMaterial::Initialize(
 	m_flag |= (mMaterial->IdMode>=ONETEX)? RAS_MULTITEX: 0;
 	m_flag |= ((mMaterial->ras_mode & USE_LIGHT)!=0)? RAS_MULTILIGHT: 0;
 	m_flag |= (mMaterial->glslmat)? RAS_BLENDERGLSL: 0;
+	m_flag |= ((mMaterial->ras_mode & CAST_SHADOW)!=0)? RAS_CASTSHADOW: 0;
 
 	// figure max
 	int enabled = mMaterial->num_enabled;
@@ -783,7 +787,7 @@ void KX_BlenderMaterial::SetBlenderGLSLShader(int layer)
 	}
 }
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 
 PyMethodDef KX_BlenderMaterial::Methods[] = 
 {
@@ -967,4 +971,4 @@ KX_PYMETHODDEF_DOC( KX_BlenderMaterial, setBlending , "setBlending( bge.logic.sr
 	return NULL;
 }
 
-#endif // DISABLE_PYTHON
+#endif // WITH_PYTHON

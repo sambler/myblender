@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -25,9 +25,15 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file ghost/intern/GHOST_DropTargetWin32.cpp
+ *  \ingroup GHOST
+ */
+
  
 #include "GHOST_Debug.h"
 #include "GHOST_DropTargetWin32.h"
+#include <ShellApi.h>
 
 #ifdef GHOST_DEBUG
 // utility

@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -25,6 +25,13 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file gameengine/GameLogic/SCA_ILogicBrick.cpp
+ *  \ingroup gamelogic
+ */
+
+
+#include <stddef.h>
 
 #include "SCA_ILogicBrick.h"
 #include "PyObjectPlus.h"
@@ -71,7 +78,7 @@ void SCA_ILogicBrick::ReParent(SCA_IObject* parent)
 	m_gameobj = parent;
 }
 
-void SCA_ILogicBrick::Relink(GEN_Map<GEN_HashedPtr, void*> *obj_map)
+void SCA_ILogicBrick::Relink(CTR_Map<CTR_HashedPtr, void*> *obj_map)
 {
 	// nothing to do
 }
@@ -169,7 +176,7 @@ CValue* SCA_ILogicBrick::GetEvent()
 
 
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 
 /* python stuff */
 
@@ -253,4 +260,4 @@ PyObject* SCA_ILogicBrick::BoolToPyArg(bool boolarg)
 	return PyLong_FromSsize_t(boolarg? KX_TRUE: KX_FALSE);	
 }
 
-#endif // DISABLE_PYTHON
+#endif // WITH_PYTHON

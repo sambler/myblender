@@ -1,5 +1,4 @@
-/**
- *
+/*
  * $Id$ 
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -21,10 +20,15 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
-#include "DNA_listBase.h"
-
 #ifndef DNA_MODIFIER_TYPES_H
 #define DNA_MODIFIER_TYPES_H
+
+/** \file DNA_modifier_types.h
+ *  \ingroup DNA
+ */
+
+#include "DNA_listBase.h"
+
 
 #define MODSTACK_DEBUG 1
 
@@ -66,8 +70,6 @@ typedef enum ModifierType {
 	eModifierType_ShapeKey,
 	eModifierType_Solidify,
 	eModifierType_Screw,
-	/* placeholder, keep this so durian files load in
-	 * trunk with the correct modifier once its merged */
 	eModifierType_Warp,
 	NUM_MODIFIER_TYPES
 } ModifierType;
@@ -79,6 +81,7 @@ typedef enum ModifierMode {
 	eModifierMode_OnCage = (1<<3),
 	eModifierMode_Expanded = (1<<4),
 	eModifierMode_Virtual = (1<<5),
+	eModifierMode_ApplyOnSpline = (1<<6),
 	eModifierMode_DisableTemporary = (1 << 31)
 } ModifierMode;
 
@@ -101,6 +104,17 @@ typedef enum {
 	eSubsurfModifierFlag_ControlEdges = (1<<2),
 	eSubsurfModifierFlag_SubsurfUv = (1<<3)
 } SubsurfModifierFlag;
+
+/* not a real modifier */
+typedef struct MappingInfoModifierData {
+	ModifierData modifier;
+
+	struct Tex *texture;
+	struct Object *map_object;
+	char uvlayer_name[32];
+	int uvlayer_tmp;
+	int texmapping;
+} MappingInfoModifierData;
 
 typedef struct SubsurfModifierData {
 	ModifierData modifier;
@@ -209,30 +223,32 @@ typedef struct ArrayModifierData {
 #define MOD_ARR_FITCURVE   2
 
 /* ArrayModifierData->offset_type */
-#define MOD_ARR_OFF_CONST    1<<0
-#define MOD_ARR_OFF_RELATIVE 1<<1
-#define MOD_ARR_OFF_OBJ      1<<2
+#define MOD_ARR_OFF_CONST    (1<<0)
+#define MOD_ARR_OFF_RELATIVE (1<<1)
+#define MOD_ARR_OFF_OBJ      (1<<2)
 
 /* ArrayModifierData->flags */
-#define MOD_ARR_MERGE      1<<0
-#define MOD_ARR_MERGEFINAL 1<<1
+#define MOD_ARR_MERGE      (1<<0)
+#define MOD_ARR_MERGEFINAL (1<<1)
 
 typedef struct MirrorModifierData {
 	ModifierData modifier;
 
-	short axis, flag;
+	short axis; /* deprecated, use flag instead */
+	short flag;
 	float tolerance;
 	struct Object *mirror_ob;
 } MirrorModifierData;
 
 /* MirrorModifierData->flag */
-#define MOD_MIR_CLIPPING	1<<0
-#define MOD_MIR_MIRROR_U	1<<1
-#define MOD_MIR_MIRROR_V	1<<2
-#define MOD_MIR_AXIS_X		1<<3
-#define MOD_MIR_AXIS_Y		1<<4
-#define MOD_MIR_AXIS_Z		1<<5
-#define MOD_MIR_VGROUP		1<<6
+#define MOD_MIR_CLIPPING	(1<<0)
+#define MOD_MIR_MIRROR_U	(1<<1)
+#define MOD_MIR_MIRROR_V	(1<<2)
+#define MOD_MIR_AXIS_X		(1<<3)
+#define MOD_MIR_AXIS_Y		(1<<4)
+#define MOD_MIR_AXIS_Z		(1<<5)
+#define MOD_MIR_VGROUP		(1<<6)
+#define MOD_MIR_NO_MERGE	(1<<7)
 
 typedef struct EdgeSplitModifierData {
 	ModifierData modifier;
@@ -242,8 +258,8 @@ typedef struct EdgeSplitModifierData {
 } EdgeSplitModifierData;
 
 /* EdgeSplitModifierData->flags */
-#define MOD_EDGESPLIT_FROMANGLE   1<<1
-#define MOD_EDGESPLIT_FROMFLAG    1<<2
+#define MOD_EDGESPLIT_FROMANGLE   (1<<1)
+#define MOD_EDGESPLIT_FROMFLAG    (1<<2)
 
 typedef struct BevelModifierData {
 	ModifierData modifier;
@@ -285,15 +301,19 @@ typedef struct SmokeModifierData {
 typedef struct DisplaceModifierData {
 	ModifierData modifier;
 
+	/* keep in sync with MappingInfoModifierData */
 	struct Tex *texture;
+	struct Object *map_object;
+	char uvlayer_name[32];
+	int uvlayer_tmp;
+	int texmapping;
+	int pad10;
+	/* end MappingInfoModifierData */
+
 	float strength;
 	int direction;
 	char defgrp_name[32];
 	float midlevel;
-	int texmapping;
-	struct Object *map_object;
-	char uvlayer_name[32];
-	int uvlayer_tmp, pad;
 } DisplaceModifierData;
 
 /* DisplaceModifierData->direction */
@@ -330,7 +350,7 @@ typedef struct UVProjectModifierData {
 #define MOD_UVPROJECT_MAXPROJECTORS 10
 
 /* UVProjectModifierData->flags */
-#define MOD_UVPROJECT_OVERRIDEIMAGE 1<<0
+#define MOD_UVPROJECT_OVERRIDEIMAGE (1<<0)
 
 typedef struct DecimateModifierData {
 	ModifierData modifier;
@@ -383,13 +403,13 @@ enum {
 };
 
 /* WaveModifierData.flag */
-#define MOD_WAVE_X      1<<1
-#define MOD_WAVE_Y      1<<2
-#define MOD_WAVE_CYCL   1<<3
-#define MOD_WAVE_NORM   1<<4
-#define MOD_WAVE_NORM_X 1<<5
-#define MOD_WAVE_NORM_Y 1<<6
-#define MOD_WAVE_NORM_Z 1<<7
+#define MOD_WAVE_X      (1<<1)
+#define MOD_WAVE_Y      (1<<2)
+#define MOD_WAVE_CYCL   (1<<3)
+#define MOD_WAVE_NORM   (1<<4)
+#define MOD_WAVE_NORM_X (1<<5)
+#define MOD_WAVE_NORM_Y (1<<6)
+#define MOD_WAVE_NORM_Z (1<<7)
 
 typedef struct WaveModifierData {
 	ModifierData modifier;
@@ -467,7 +487,7 @@ typedef struct CollisionModifierData {
 	
 	unsigned int numverts;
 	unsigned int numfaces;
-	float time, pad;		/* cfra time of modifier */
+	float time_x, time_xnew;		/* cfra time of modifier */
 	struct BVHTree *bvhtree; /* bounding volume hierarchy for this cloth object */
 } CollisionModifierData;
 
@@ -547,12 +567,9 @@ typedef struct MeshDeformModifierData {
 } MeshDeformModifierData;
 
 typedef enum {
-	eParticleSystemFlag_Loaded =		(1<<0),
-	eParticleSystemFlag_Pars =			(1<<1),
-	eParticleSystemFlag_FromCurve =		(1<<2),
-	eParticleSystemFlag_DM_changed =	(1<<3),
-	eParticleSystemFlag_Disabled =		(1<<4),
-	eParticleSystemFlag_psys_updated =	(1<<5),
+	eParticleSystemFlag_Pars =			(1<<0),
+	eParticleSystemFlag_psys_updated =	(1<<1),
+	eParticleSystemFlag_file_loaded =	(1<<2),
 } ParticleSystemModifierFlag;
 
 typedef struct ParticleSystemModifierData {
@@ -584,7 +601,7 @@ typedef struct ParticleInstanceModifierData {
 typedef enum {
 	eExplodeFlag_CalcFaces =	(1<<0),
 	eExplodeFlag_PaSize =		(1<<1),
-	eExplodeFlag_EdgeSplit =	(1<<2),
+	eExplodeFlag_EdgeCut =		(1<<2),
 	eExplodeFlag_Unborn =		(1<<3),
 	eExplodeFlag_Alive =		(1<<4),
 	eExplodeFlag_Dead =			(1<<5),
@@ -595,6 +612,7 @@ typedef struct ExplodeModifierData {
 	int *facepa;
 	short flag, vgroup;
 	float protect;
+	char uvname[32];
 } ExplodeModifierData;
 
 typedef struct MultiresModifierData {
@@ -606,6 +624,7 @@ typedef struct MultiresModifierData {
 
 typedef enum {
 	eMultiresModifierFlag_ControlEdges = (1<<0),
+	eMultiresModifierFlag_PlainUv = (1<<1),
 } MultiresModifierFlag;
 
 typedef struct FluidsimModifierData {
@@ -693,20 +712,23 @@ typedef struct ShapeKeyModifierData {
 typedef struct SolidifyModifierData {
 	ModifierData modifier;
 
-	char defgrp_name[32];		/* name of vertex group to use */
+	char defgrp_name[32];	/* name of vertex group to use */
 	float offset;			/* new surface offset level*/
 	float offset_fac;		/* midpoint of the offset  */
+	float offset_fac_vg;	/* factor for the minimum weight to use when vgroups are used, avoids 0.0 weights giving duplicate geometry */
 	float crease_inner;
 	float crease_outer;
 	float crease_rim;
 	int flag;
+	short mat_ofs;
+	short mat_ofs_rim;
 } SolidifyModifierData;
 
 #define MOD_SOLIDIFY_RIM			(1<<0)
 #define MOD_SOLIDIFY_EVEN			(1<<1)
 #define MOD_SOLIDIFY_NORMAL_CALC	(1<<2)
 #define MOD_SOLIDIFY_VGROUP_INV		(1<<3)
-#define MOD_SOLIDIFY_RIM_MATERIAL	(1<<4)
+#define MOD_SOLIDIFY_RIM_MATERIAL	(1<<4) /* deprecated, used in do_versions */
 
 typedef struct ScrewModifierData {
 	ModifierData modifier;
@@ -725,5 +747,42 @@ typedef struct ScrewModifierData {
 #define MOD_SCREW_OBJECT_OFFSET	(1<<2)
 // #define MOD_SCREW_OBJECT_ANGLE	(1<<4)
 
+typedef struct WarpModifierData {
+	ModifierData modifier;
+
+	/* keep in sync with MappingInfoModifierData */
+	struct Tex *texture;
+	struct Object *map_object;
+	char uvlayer_name[32];
+	int uvlayer_tmp;
+	int texmapping;
+	int pad10;
+	/* end MappingInfoModifierData */
+
+	float strength;
+
+	struct Object *object_from;
+	struct Object *object_to;
+	struct CurveMapping *curfalloff;
+	char defgrp_name[32];			/* optional vertexgroup name */
+	float falloff_radius;
+	char flag; /* not used yet */
+	char falloff_type;
+	char pad[2];
+} WarpModifierData;
+
+#define MOD_WARP_VOLUME_PRESERVE 1
+
+typedef enum {
+	eWarp_Falloff_None =		0,
+	eWarp_Falloff_Curve =		1,
+	eWarp_Falloff_Sharp =		2, /* PROP_SHARP */
+	eWarp_Falloff_Smooth =		3, /* PROP_SMOOTH */
+	eWarp_Falloff_Root =		4, /* PROP_ROOT */
+	eWarp_Falloff_Linear =		5, /* PROP_LIN */
+	eWarp_Falloff_Const =		6, /* PROP_CONST */
+	eWarp_Falloff_Sphere =		7, /* PROP_SPHERE */
+	/* PROP_RANDOM not used */
+} WarpModifierFalloff;
 
 #endif

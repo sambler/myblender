@@ -2524,7 +2524,7 @@ static void draw_em_fancy(Scene *scene, View3D *v3d, RegionView3D *rv3d, Object 
 		if(ob->use_cust_wire_colour == OB_CUSTOM_WIRE)
 			glColor3fv(ob->cust_wire_colour);
 		else
-		UI_ThemeColor(TH_WIRE);
+			UI_ThemeColor(TH_WIRE);
 
 		bglPolygonOffset(rv3d->dist, 1.0);
 		glDepthMask(0);
@@ -2809,6 +2809,7 @@ static void draw_mesh_fancy(Scene *scene, ARegion *ar, View3D *v3d, RegionView3D
                     glColor3fv(ob->cust_wire_colour);
                 else
 				UI_ThemeColor(TH_WIRE);
+					UI_ThemeColor(TH_WIRE);
 			}
 			if(!ob->sculpt && (v3d->flag2 & V3D_RENDER_OVERRIDE)==0)
 				dm->drawLooseEdges(dm);
@@ -2865,10 +2866,10 @@ static void draw_mesh_fancy(Scene *scene, ARegion *ar, View3D *v3d, RegionView3D
 				if(ob->dtx & OB_DRAWWIRE && flag==DRAW_CONSTCOLOR)
 					glColor3ub(80,80,80);
 				else {
-                    if(ob->use_cust_wire_colour == OB_CUSTOM_WIRE)
-                        glColor3fv(ob->cust_wire_colour);
-				else
-					UI_ThemeColor(TH_WIRE);
+					if(ob->use_cust_wire_colour == OB_CUSTOM_WIRE)
+						glColor3fv(ob->cust_wire_colour);
+					else
+						UI_ThemeColor(TH_WIRE);
 			}
 		}
 	}
@@ -4867,8 +4868,8 @@ static void drawnurb(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *base, 
 
 	/* DispList */
 	if( (ob->use_cust_wire_colour == OB_CUSTOM_WIRE) && !(ob->mode & OB_MODE_EDIT) )
-        glColor3fv(ob->cust_wire_colour);
-    else
+		glColor3fv(ob->cust_wire_colour);
+	else
 		UI_ThemeColor(TH_WIRE);
 	drawDispList(scene, v3d, rv3d, base, dt);
 
@@ -5616,7 +5617,7 @@ static void drawWireExtra(Scene *scene, RegionView3D *rv3d, Object *ob)
 			if(ob->dtx & OB_DRAWWIRE) {
 				if(ob->use_cust_wire_colour == OB_CUSTOM_WIRE)
 					glColor3fv(ob->cust_wire_colour);
-                else
+				else
 					glColor3ub(80,80,80);
 			} else {
 				if(ob->use_cust_wire_colour == OB_CUSTOM_WIRE)
@@ -6003,8 +6004,8 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, int flag)
 					cpack(0xff44ff);
 					if(ob->use_cust_wire_colour == OB_CUSTOM_WIRE)
 						glColor3fv(ob->cust_wire_colour);
-                    else
-					UI_ThemeColor(TH_WIRE);
+					else
+						UI_ThemeColor(TH_WIRE);
 					copy_v3_v3(vec1, ob->orig);
 					copy_v3_v3(vec2, ob->orig);
 					vec1[0] += cu->linewidth;

@@ -259,11 +259,10 @@ typedef struct Object {
 	ListBase pc_ids;
 	ListBase *duplilist;	/* for temporary dupli list storage, only for use by RNA API */
 
-	float ima_ofs[2];		/* offset for image empties */
-	char pad3[8];
+    int use_cust_wire_colour;       /* Use Custom Wire Colour - use int for alignment */
+    float cust_wire_colour[3];      /* custom wireframe colour */
 
-	int use_cust_wire_colour;       /* Use Custom Wire Colour - use int for alignment */
-	float cust_wire_colour[3];      /* custom wireframe colour */
+	float ima_ofs[2];		/* offset for image empties */
 } Object;
 
 /* Warning, this is not used anymore because hooks are now modifiers */
@@ -487,7 +486,6 @@ typedef struct DupliObject {
 #define OB_LOCK_RIGID_BODY_X_ROT_AXIS	32
 #define OB_LOCK_RIGID_BODY_Y_ROT_AXIS	64
 #define OB_LOCK_RIGID_BODY_Z_ROT_AXIS	128
-#define OB_IGNORE_ANIM_RECORDING	256
 
 /* #define OB_LIFE			(OB_PROP|OB_DYNAMIC|OB_ACTOR|OB_MAINACTOR|OB_CHILD) */
 

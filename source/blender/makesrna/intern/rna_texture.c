@@ -163,6 +163,7 @@ static void rna_Texture_voxeldata_image_update(Main *bmain, Scene *scene, Pointe
 	rna_Texture_voxeldata_update(bmain, scene, ptr);
 }
 
+
 /* Used for Texture Properties, used (also) for/in Nodes */
 static void rna_Texture_nodes_update(Main *bmain, Scene *scene, PointerRNA *ptr)
 {

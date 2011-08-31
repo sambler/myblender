@@ -472,8 +472,6 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         
         #col.prop(md, "bake_foam_fade")
         
-        
-        
     
     def PARTICLE_INSTANCE(self, layout, ob, md):
         layout.prop(md, "object")

@@ -64,6 +64,26 @@ typedef struct WipeZone {
 	float pythangle;
 } WipeZone;
 
+/* direction and types match up with array defs in rna_sequencer.c
+ * left and right directions are imitated by using a rotation of 90 or 270 */
+
+/* wipe directions */
+enum {
+	DIR_FORWARD		= 0, /* down, outwards, clockwise */
+	DIR_REVERSE		= 1  /* up, inwards, anti-clockwise */
+};
+
+/* Wipe types */
+enum {
+	TYPE_SINGLE_WIPE	= 0,
+	TYPE_DOUBLE_WIPE	= 1,
+	TYPE_BOX_WIPE		= 2,
+	TYPE_CROSS_WIPE		= 3,
+	TYPE_IRIS_WIPE		= 4,
+	TYPE_CLOCK_WIPE		= 5
+
+};
+
 static void precalc_wipe_zone(WipeZone *wipezone, WipeVars *wipe, int xo, int yo)
 {
 	wipezone->flip = (wipe->angle < 0);
@@ -73,10 +93,26 @@ static void precalc_wipe_zone(WipeZone *wipezone, WipeVars *wipe, int xo, int yo
 	wipezone->width = (int)(wipe->edgeWidth*((xo+yo)/2.0f));
 	wipezone->pythangle = 1.0f/sqrtf(wipe->angle*wipe->angle + 1.0f);
 
-	if(wipe->wipetype == DO_SINGLE_WIPE)
-		wipezone->invwidth = 1.0f/wipezone->width;
-	else
-		wipezone->invwidth = 1.0f/(0.5f*wipezone->width);
+	switch (wipe->wipetype) {
+		case TYPE_SINGLE_WIPE:
+			wipezone->invwidth = 1.0f/wipezone->width;
+			break;
+		case TYPE_DOUBLE_WIPE:
+			wipezone->invwidth = 1.0f/(0.5f*wipezone->width);
+			break;
+		case TYPE_BOX_WIPE:
+
+			break;
+		case TYPE_CROSS_WIPE:
+
+			break;
+		case TYPE_IRIS_WIPE:
+
+			break;
+		case TYPE_CLOCK_WIPE:
+
+			break;
+	}
 }
 
 // This function calculates the blur band for the wipe effects
@@ -124,16 +160,16 @@ float hyp3,hyp4,b4,b5
 
 	posy = facf0 * yo;
 
-	if(wipe->forward){
-		posx = facf0 * xo;
-		posy = facf0 * yo;
-	} else{
+	if(wipe->forward == DIR_FORWARD){
 		posx = xo - facf0 * xo;
 		posy = yo - facf0 * yo;
+	} else{
+		posx = facf0 * xo;
+		posy = facf0 * yo;
 	}
 
 	switch (wipe->wipetype) {
-		case DO_SINGLE_WIPE:
+		case TYPE_SINGLE_WIPE:
 			width = wipezone->width;
 			hwidth = width*0.5f;
 
@@ -154,21 +190,20 @@ float hyp3,hyp4,b4,b5
 				b2 = temp1;
 			}
 
-			if(wipe->forward) {
-				if(b1 < b2)
-					output = in_band(wipezone,width,hyp,facf0,1,1);
-				else
-					output = in_band(wipezone,width,hyp,facf0,0,1);
-			}
-			else {
+			if(wipe->forward == DIR_FORWARD) {
 				if(b1 < b2)
 					output = in_band(wipezone,width,hyp,facf0,0,1);
 				else
 					output = in_band(wipezone,width,hyp,facf0,1,1);
+			} else {
+				if(b1 < b2)
+					output = in_band(wipezone,width,hyp,facf0,1,1);
+				else
+					output = in_band(wipezone,width,hyp,facf0,0,1);
 			}
 		break;
 
-		case DO_DOUBLE_WIPE:
+		case TYPE_DOUBLE_WIPE:
 			if(!wipe->forward)
 				facf0 = 1.0f-facf0;   // Go the other direction
 
@@ -211,7 +246,7 @@ float hyp3,hyp4,b4,b5
 			}
 			if(!wipe->forward)output = 1-output;
 		break;
-		case DO_CLOCK_WIPE:
+		case TYPE_CLOCK_WIPE:
 			/*
 				temp1: angle of effect center in rads
 				temp2: angle of line through (halfx,halfy) and (x,y) in rads
@@ -253,10 +288,10 @@ float hyp3,hyp4,b4,b5
 			if(wipe->forward) output = 1 - output;
 		break;
 	/* BOX WIPE IS NOT WORKING YET */
-	/* case DO_CROSS_WIPE: */
+	/* case TYPE_CROSS_WIPE: */
 	/* BOX WIPE IS NOT WORKING YET */
 	/*
-		case DO_BOX_WIPE:
+		case TYPE_BOX_WIPE:
 			if(invert)facf0 = 1-facf0;
 
 			width = (int)(wipe->edgeWidth*((xo+yo)/2.0));
@@ -314,7 +349,7 @@ float hyp3,hyp4,b4,b5
 
 		break;
 */
-		case DO_IRIS_WIPE:
+		case TYPE_IRIS_WIPE:
 			if(xo > yo) yo = xo;
 			else xo = yo;
 

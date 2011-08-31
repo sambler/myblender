@@ -29,7 +29,7 @@
  *  \ingroup seq
  */
 
-/* Contains utility functions that are shared between effects */
+/* Collection of utility functions that are shared between effects */
 
 #include <math.h>
 #include <stdlib.h>

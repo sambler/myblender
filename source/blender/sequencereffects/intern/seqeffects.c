@@ -195,7 +195,6 @@ static void get_default_fac_fade(struct Sequence *seq, float cfra,
 static struct SeqEffectHandle get_sequence_effect_impl(int seq_type)
 {
 	struct SeqEffectHandle rval;
-	int sequence_type = seq_type;
 
 	rval.init = init_noop;
 	rval.init_plugin = init_plugin_noop;
@@ -208,7 +207,7 @@ static struct SeqEffectHandle get_sequence_effect_impl(int seq_type)
 	rval.execute = NULL;
 	rval.copy = NULL;
 
-	switch (sequence_type) {
+	switch (seq_type) {
 	case SEQ_CROSS:
 		rval.early_out = early_out_fade;
 		rval.get_default_fac = get_default_fac_fade;

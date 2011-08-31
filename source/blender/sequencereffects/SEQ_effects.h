@@ -41,11 +41,6 @@ struct Scene;
 struct Sequence;
 struct SeqRenderData;
 
-/* Wipe effect */
-enum {DO_SINGLE_WIPE, DO_DOUBLE_WIPE, DO_BOX_WIPE, DO_CROSS_WIPE,
-	DO_IRIS_WIPE,DO_CLOCK_WIPE};
-
-
 struct SeqEffectHandle {
 	/* constructors & destructor */
 	/* init & init_plugin are _only_ called on first creation */

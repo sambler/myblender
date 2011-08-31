@@ -1556,20 +1556,22 @@ static void rna_def_wipe(BlenderRNA *brna)
 {
 	StructRNA *srna;
 	PropertyRNA *prop;
-	
+
+	/* enum entries in wipe.c need to match up with these */
 	static const EnumPropertyItem wipe_type_items[]= {
-		{0, "SINGLE", 0, "Single", ""}, 
-		{1, "DOUBLE", 0, "Double", ""}, 
-		/* not used yet {2, "BOX", 0, "Box", ""}, */
-		/* not used yet {3, "CROSS", 0, "Cross", ""}, */
-		{4, "IRIS", 0, "Iris", ""}, 
-		{5, "CLOCK", 0, "Clock", ""}, 	
+		{0, "SINGLE", 0, "Single", ""},
+		{1, "DOUBLE", 0, "Double", ""},
+		{2, "BOX", 0, "Box", ""},
+		{3, "CROSS", 0, "Cross", ""},
+		{4, "IRIS", 0, "Iris", ""},
+		{5, "CLOCK", 0, "Clock", ""},
+
 		{0, NULL, 0, NULL, NULL}
 	};
 
 	static const EnumPropertyItem wipe_direction_items[]= {
-		{0, "OUT", 0, "Out", ""},
-		{1, "IN", 0, "In", ""},
+		{0, "DOWN", 0, "Forward", ""},
+		{1, "UP", 0, "Reverse", ""},
 		{0, NULL, 0, NULL, NULL}
 	};
 
@@ -1586,11 +1588,11 @@ static void rna_def_wipe(BlenderRNA *brna)
 #if 1 /* expose as radians */
 	prop= RNA_def_property(srna, "angle", PROP_FLOAT, PROP_ANGLE);
 	RNA_def_property_float_funcs(prop, "rna_WipeSequence_angle_get", "rna_WipeSequence_angle_set", NULL);
-	RNA_def_property_range(prop, DEG2RAD(-90.0), DEG2RAD(90.0));
+	RNA_def_property_range(prop, DEG2RAD(-180.0f), DEG2RAD(180.0f));
 #else
 	prop= RNA_def_property(srna, "angle", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "angle");
-	RNA_def_property_range(prop, -90.0f, 90.0f);
+	RNA_def_property_range(prop, -180.0f, 180.0f);
 #endif
 	RNA_def_property_ui_text(prop, "Angle", "Edge angle");
 	RNA_def_property_update(prop, NC_SCENE|ND_SEQUENCER, "rna_Sequence_update");
@@ -1604,7 +1606,7 @@ static void rna_def_wipe(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "transition_type", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "wipetype");
 	RNA_def_property_enum_items(prop, wipe_type_items);
-	RNA_def_property_ui_text(prop, "Transition Type", "");
+	RNA_def_property_ui_text(prop, "Transition Type", "Type of transition");
 	RNA_def_property_update(prop, NC_SCENE|ND_SEQUENCER, "rna_Sequence_update");
 }
 

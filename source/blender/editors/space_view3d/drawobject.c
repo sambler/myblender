@@ -45,6 +45,7 @@
 #include "DNA_meta_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_smoke_types.h"
+#include "DNA_speaker_types.h"
 #include "DNA_world_types.h"
 #include "DNA_armature_types.h"
 
@@ -1491,6 +1492,47 @@ static void drawcamera(Scene *scene, View3D *v3d, RegionView3D *rv3d, Object *ob
 	}
 }
 
+/* flag similar to draw_object() */
+static void drawspeaker(Scene *UNUSED(scene), View3D *UNUSED(v3d), RegionView3D *UNUSED(rv3d), Object *UNUSED(ob), int UNUSED(flag))
+{
+	//Speaker *spk = ob->data;
+
+	float vec[3];
+	int i, j;
+
+	glEnable(GL_BLEND);
+
+	for(j = 0; j < 3; j++) {
+		vec[2] = 0.25f * j -0.125f;
+
+		glBegin(GL_LINE_LOOP);
+		for(i = 0; i < 16; i++) {
+			vec[0] = cosf(M_PI * i / 8.0f) * (j == 0 ? 0.5f : 0.25f);
+			vec[1] = sinf(M_PI * i / 8.0f) * (j == 0 ? 0.5f : 0.25f);
+			glVertex3fv(vec);
+		}
+		glEnd();
+	}
+
+	for(j = 0; j < 4; j++) {
+		vec[0] = (((j + 1) % 2) * (j - 1)) * 0.5f;
+		vec[1] = ((j % 2) * (j - 2)) * 0.5f;
+		glBegin(GL_LINE_STRIP);
+		for(i = 0; i < 3; i++) {
+			if(i == 1) {
+				vec[0] *= 0.5f;
+				vec[1] *= 0.5f;
+			}
+
+			vec[2] = 0.25f * i -0.125f;
+			glVertex3fv(vec);
+		}
+		glEnd();
+	}
+
+	glDisable(GL_BLEND);
+}
+
 static void lattice_draw_verts(Lattice *lt, DispList *dl, short sel)
 {
 	BPoint *bp = lt->def;
@@ -2030,6 +2072,28 @@ static int draw_dm_faces_sel__setDrawOptions(void *userData, int index, int *UNU
 	return 0;
 }
 
+static int draw_dm_faces_sel__compareDrawOptions(void *userData, int index, int next_index)
+{
+	struct { unsigned char *cols[3]; EditFace *efa_act; } * data = userData;
+	EditFace *efa = EM_get_face_for_index(index);
+	EditFace *next_efa = EM_get_face_for_index(next_index);
+	unsigned char *col, *next_col;
+
+	if(efa == next_efa)
+		return 1;
+
+	if(efa == data->efa_act || next_efa == data->efa_act)
+		return 0;
+
+	col = data->cols[(efa->f&SELECT)?1:0];
+	next_col = data->cols[(next_efa->f&SELECT)?1:0];
+
+	if(col[3]==0 || next_col[3]==0)
+		return 0;
+
+	return col == next_col;
+}
+
 /* also draws the active face */
 static void draw_dm_faces_sel(DerivedMesh *dm, unsigned char *baseCol, unsigned char *selCol, unsigned char *actCol, EditFace *efa_act) 
 {
@@ -2039,7 +2103,7 @@ static void draw_dm_faces_sel(DerivedMesh *dm, unsigned char *baseCol, unsigned 
 	data.cols[2] = actCol;
 	data.efa_act = efa_act;
 
-	dm->drawMappedFaces(dm, draw_dm_faces_sel__setDrawOptions, &data, 0, GPU_enable_material);
+	dm->drawMappedFaces(dm, draw_dm_faces_sel__setDrawOptions, &data, 0, GPU_enable_material, draw_dm_faces_sel__compareDrawOptions);
 }
 
 static int draw_dm_creases__setDrawOptions(void *UNUSED(userData), int index)
@@ -2449,7 +2513,7 @@ static void draw_em_fancy(Scene *scene, View3D *v3d, RegionView3D *rv3d, Object 
 			glEnable(GL_LIGHTING);
 			glFrontFace((ob->transflag&OB_NEG_SCALE)?GL_CW:GL_CCW);
 
-			finalDM->drawMappedFaces(finalDM, draw_em_fancy__setFaceOpts, NULL, 0, GPU_enable_material);
+			finalDM->drawMappedFaces(finalDM, draw_em_fancy__setFaceOpts, NULL, 0, GPU_enable_material, NULL);
 
 			glFrontFace(GL_CCW);
 			glDisable(GL_LIGHTING);
@@ -2458,8 +2522,8 @@ static void draw_em_fancy(Scene *scene, View3D *v3d, RegionView3D *rv3d, Object 
 		// Setup for drawing wire over, disable zbuffer
 		// write to show selected edge wires better
 		if(ob->use_cust_wire_colour == OB_CUSTOM_WIRE)
-            glColor3fv(ob->cust_wire_colour);
-        else
+			glColor3fv(ob->cust_wire_colour);
+		else
 		UI_ThemeColor(TH_WIRE);
 
 		bglPolygonOffset(rv3d->dist, 1.0);
@@ -2670,7 +2734,7 @@ static void draw_mesh_fancy(Scene *scene, ARegion *ar, View3D *v3d, RegionView3D
 			if(base->flag & SELECT)
 				UI_ThemeColor((ob==OBACT)?TH_ACTIVE:TH_SELECT);
 			else if(ob->use_cust_wire_colour == OB_CUSTOM_WIRE)
-                glColor3fv(ob->cust_wire_colour);
+				glColor3fv(ob->cust_wire_colour);
 			else
 				UI_ThemeColor(TH_WIRE);
 
@@ -2683,7 +2747,7 @@ static void draw_mesh_fancy(Scene *scene, ARegion *ar, View3D *v3d, RegionView3D
 			/* weight paint in solid mode, special case. focus on making the weights clear
 			 * rather than the shading, this is also forced in wire view */
 			GPU_enable_material(0, NULL);
-			dm->drawMappedFaces(dm, wpaint__setSolidDrawOptions, me->mface, 1, GPU_enable_material);
+			dm->drawMappedFaces(dm, wpaint__setSolidDrawOptions, me->mface, 1, GPU_enable_material, NULL);
 		
 			bglPolygonOffset(rv3d->dist, 1.0);
 			glDepthMask(0);	// disable write in zbuffer, selected edge wires show better
@@ -2766,7 +2830,7 @@ static void draw_mesh_fancy(Scene *scene, ARegion *ar, View3D *v3d, RegionView3D
 				glEnable(GL_LIGHTING);
 				glEnable(GL_COLOR_MATERIAL);
 
-				dm->drawMappedFaces(dm, wpaint__setSolidDrawOptions, me->mface, 1, GPU_enable_material);
+				dm->drawMappedFaces(dm, wpaint__setSolidDrawOptions, me->mface, 1, GPU_enable_material, NULL);
 				glDisable(GL_COLOR_MATERIAL);
 				glDisable(GL_LIGHTING);
 
@@ -2774,10 +2838,10 @@ static void draw_mesh_fancy(Scene *scene, ARegion *ar, View3D *v3d, RegionView3D
 			}
 			else if(ob->mode & (OB_MODE_VERTEX_PAINT|OB_MODE_TEXTURE_PAINT)) {
 				if(me->mcol)
-					dm->drawMappedFaces(dm, wpaint__setSolidDrawOptions, NULL, 1, GPU_enable_material);
+					dm->drawMappedFaces(dm, wpaint__setSolidDrawOptions, NULL, 1, GPU_enable_material, NULL);
 				else {
 					glColor3f(1.0f, 1.0f, 1.0f);
-					dm->drawMappedFaces(dm, wpaint__setSolidDrawOptions, NULL, 0, GPU_enable_material);
+					dm->drawMappedFaces(dm, wpaint__setSolidDrawOptions, NULL, 0, GPU_enable_material, NULL);
 				}
 			}
 		}
@@ -4805,7 +4869,7 @@ static void drawnurb(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *base, 
 	if( (ob->use_cust_wire_colour == OB_CUSTOM_WIRE) && !(ob->mode & OB_MODE_EDIT) )
         glColor3fv(ob->cust_wire_colour);
     else
-	UI_ThemeColor(TH_WIRE);
+		UI_ThemeColor(TH_WIRE);
 	drawDispList(scene, v3d, rv3d, base, dt);
 
 	if(v3d->zbuf) glDisable(GL_DEPTH_TEST);
@@ -4836,9 +4900,9 @@ static void drawnurb(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *base, 
 	if(cu->flag & CU_3D && ts->normalsize > 0.0015f && (cu->drawflag & CU_HIDE_NORMALS)==0) {
 
 		if( (ob->use_cust_wire_colour == OB_CUSTOM_WIRE) && !(ob->mode & OB_MODE_EDIT) )
-            glColor3fv(ob->cust_wire_colour);
-        else
-		UI_ThemeColor(TH_WIRE);
+			glColor3fv(ob->cust_wire_colour);
+		else
+			UI_ThemeColor(TH_WIRE);
 		for (bl=cu->bev.first,nu=nurb; nu && bl; bl=bl->next,nu=nu->next) {
 			BevPoint *bevp= (BevPoint *)(bl+1);		
 			int nr= bl->nr;
@@ -5115,9 +5179,9 @@ static int drawmball(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *base, 
 
 	if(mb->editelems) {
 		if(ob->use_cust_wire_colour == OB_CUSTOM_WIRE)
-            glColor3fv(ob->cust_wire_colour);
-        else
-		UI_ThemeColor(TH_WIRE);
+			glColor3fv(ob->cust_wire_colour);
+		else
+			UI_ThemeColor(TH_WIRE);
 		if((G.f & G_PICKSEL)==0 ) drawDispList(scene, v3d, rv3d, base, dt);
 		ml= mb->editelems->first;
 	}
@@ -5137,9 +5201,9 @@ static int drawmball(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *base, 
 		else UI_ThemeColor(TH_SELECT);
 	}
 	else if(ob->use_cust_wire_colour == OB_CUSTOM_WIRE)
-        glColor3fv(ob->cust_wire_colour);
-    else
-        UI_ThemeColor(TH_WIRE);
+		glColor3fv(ob->cust_wire_colour);
+	else
+		UI_ThemeColor(TH_WIRE);
 
 	invert_m4_m4(imat, rv3d->viewmatob);
 	normalize_v3(imat[0]);
@@ -5550,15 +5614,15 @@ static void drawWireExtra(Scene *scene, RegionView3D *rv3d, Object *ob)
 			UI_ThemeColor(TH_GROUP);
 		else {
 			if(ob->dtx & OB_DRAWWIRE) {
-                if(ob->use_cust_wire_colour == OB_CUSTOM_WIRE)
-                    glColor3fv(ob->cust_wire_colour);
+				if(ob->use_cust_wire_colour == OB_CUSTOM_WIRE)
+					glColor3fv(ob->cust_wire_colour);
                 else
-				glColor3ub(80,80,80);
+					glColor3ub(80,80,80);
 			} else {
 				if(ob->use_cust_wire_colour == OB_CUSTOM_WIRE)
-                    glColor3fv(ob->cust_wire_colour);
-                else
-				UI_ThemeColor(TH_WIRE);
+					glColor3fv(ob->cust_wire_colour);
+				else
+					UI_ThemeColor(TH_WIRE);
 			}
 		}
 	}
@@ -5812,11 +5876,14 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, int flag)
 		if( (!scene->obedit) && (G.moving & G_TRANSFORM_OBJ) && (base->flag & (SELECT+BA_WAS_SEL))) UI_ThemeColor(TH_TRANSFORM);
 		else {
 
-			if(ob->type==OB_LAMP) UI_ThemeColor(TH_LAMP);
+			if(ob->type==OB_LAMP)
+				UI_ThemeColor(TH_LAMP);
+			else if(ob->type==OB_SPEAKER)
+				UI_ThemeColor(TH_SPEAKER);
 			else if(ob->use_cust_wire_colour == OB_CUSTOM_WIRE)
-                glColor3fv(ob->cust_wire_colour);
-            else
-                UI_ThemeColor(TH_WIRE);
+				glColor3fv(ob->cust_wire_colour);			
+			else
+				UI_ThemeColor(TH_WIRE);
 
 			if((scene->basact)==base) {
 				if(base->flag & (SELECT+BA_WAS_SEL)) UI_ThemeColor(TH_ACTIVE);
@@ -5935,7 +6002,7 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, int flag)
 				if (cu->linewidth != 0.0f) {
 					cpack(0xff44ff);
 					if(ob->use_cust_wire_colour == OB_CUSTOM_WIRE)
-                        glColor3fv(ob->cust_wire_colour);
+						glColor3fv(ob->cust_wire_colour);
                     else
 					UI_ThemeColor(TH_WIRE);
 					copy_v3_v3(vec1, ob->orig);
@@ -5958,7 +6025,7 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, int flag)
 						if (i == (cu->actbox-1))
 							UI_ThemeColor(TH_ACTIVE);
 						else if(ob->use_cust_wire_colour == OB_CUSTOM_WIRE)
-                            glColor3fv(ob->cust_wire_colour);
+							glColor3fv(ob->cust_wire_colour);
 						else
 							UI_ThemeColor(TH_WIRE);
 						vec1[0] = (cu->xof * cu->fsize) + cu->tb[i].x;
@@ -6067,6 +6134,10 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, int flag)
 		case OB_CAMERA:
 			if((v3d->flag2 & V3D_RENDER_OVERRIDE)==0 || (rv3d->persp==RV3D_CAMOB && v3d->camera==ob)) /* special exception for active camera */
 				drawcamera(scene, v3d, rv3d, ob, flag);
+			break;
+		case OB_SPEAKER:
+			if((v3d->flag2 & V3D_RENDER_OVERRIDE)==0)
+				drawspeaker(scene, v3d, rv3d, ob, flag);
 			break;
 		case OB_LATTICE:
 			if((v3d->flag2 & V3D_RENDER_OVERRIDE)==0) {
@@ -6497,7 +6568,7 @@ static void bbs_mesh_solid_EM(Scene *scene, View3D *v3d, Object *ob, DerivedMesh
 	cpack(0);
 
 	if (facecol) {
-		dm->drawMappedFaces(dm, bbs_mesh_solid__setSolidDrawOptions, (void*)(intptr_t) 1, 0, GPU_enable_material);
+		dm->drawMappedFaces(dm, bbs_mesh_solid__setSolidDrawOptions, (void*)(intptr_t) 1, 0, GPU_enable_material, NULL);
 
 		if(check_ob_drawface_dot(scene, v3d, ob->dt)) {
 			glPointSize(UI_GetThemeValuef(TH_FACEDOT_SIZE));
@@ -6508,7 +6579,7 @@ static void bbs_mesh_solid_EM(Scene *scene, View3D *v3d, Object *ob, DerivedMesh
 		}
 
 	} else {
-		dm->drawMappedFaces(dm, bbs_mesh_solid__setSolidDrawOptions, (void*) 0, 0, GPU_enable_material);
+		dm->drawMappedFaces(dm, bbs_mesh_solid__setSolidDrawOptions, (void*) 0, 0, GPU_enable_material, NULL);
 	}
 }
 
@@ -6537,8 +6608,8 @@ static void bbs_mesh_solid(Scene *scene, Object *ob)
 	
 	glColor3ub(0, 0, 0);
 		
-	if((me->editflag & ME_EDIT_PAINT_MASK))	dm->drawMappedFaces(dm, bbs_mesh_solid_hide__setDrawOpts, me, 0, GPU_enable_material);
-	else									dm->drawMappedFaces(dm, bbs_mesh_solid__setDrawOpts, me, 0, GPU_enable_material);
+	if((me->editflag & ME_EDIT_PAINT_MASK))	dm->drawMappedFaces(dm, bbs_mesh_solid_hide__setDrawOpts, me, 0, GPU_enable_material, NULL);
+	else									dm->drawMappedFaces(dm, bbs_mesh_solid__setDrawOpts, me, 0, GPU_enable_material, NULL);
 
 	dm->release(dm);
 }
@@ -6645,7 +6716,7 @@ static void draw_object_mesh_instance(Scene *scene, View3D *v3d, RegionView3D *r
 			GPU_end_object_materials();
 		}
 		else if(edm)
-			edm->drawMappedFaces(edm, NULL, NULL, 0, GPU_enable_material);
+			edm->drawMappedFaces(edm, NULL, NULL, 0, GPU_enable_material, NULL);
 		
 		glDisable(GL_LIGHTING);
 	}

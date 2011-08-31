@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -97,6 +95,7 @@ void POSE_OT_rot_clear(struct wmOperatorType *ot);
 void POSE_OT_loc_clear(struct wmOperatorType *ot);
 void POSE_OT_scale_clear(struct wmOperatorType *ot);
 void POSE_OT_transforms_clear(struct wmOperatorType *ot);
+void POSE_OT_user_transforms_clear(struct wmOperatorType *ot);
 
 void POSE_OT_copy(struct wmOperatorType *ot);
 void POSE_OT_paste(struct wmOperatorType *ot);
@@ -112,6 +111,8 @@ void POSE_OT_select_flip_active(struct wmOperatorType *ot);
 
 void POSE_OT_group_add(struct wmOperatorType *ot);
 void POSE_OT_group_remove(struct wmOperatorType *ot);
+void POSE_OT_group_move(struct wmOperatorType *ot);
+void POSE_OT_group_sort(struct wmOperatorType *ot);
 void POSE_OT_group_assign(struct wmOperatorType *ot);
 void POSE_OT_group_unassign(struct wmOperatorType *ot);
 void POSE_OT_group_select(struct wmOperatorType *ot);
@@ -122,6 +123,8 @@ void POSE_OT_paths_clear(struct wmOperatorType *ot);
 
 void POSE_OT_autoside_names(struct wmOperatorType *ot);
 void POSE_OT_flip_names(struct wmOperatorType *ot);
+
+void POSE_OT_rotation_mode_set(struct wmOperatorType *ot);
 
 void POSE_OT_quaternions_flip(struct wmOperatorType *ot);
 

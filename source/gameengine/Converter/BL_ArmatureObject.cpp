@@ -45,8 +45,8 @@
 #include "BKE_armature.h"
 
 #include "BKE_constraint.h"
-#include "GEN_Map.h"
-#include "GEN_HashedPtr.h"
+#include "CTR_Map.h"
+#include "CTR_HashedPtr.h"
 #include "MEM_guardedalloc.h"
 #include "DNA_action_types.h"
 #include "DNA_armature_types.h"
@@ -218,7 +218,8 @@ BL_ArmatureObject::BL_ArmatureObject(
 				void* sgReplicationInfo, 
 				SG_Callbacks callbacks, 
 				Object *armature,
-				Scene *scene)
+				Scene *scene,
+				int vert_deform_type)
 
 :	KX_GameObject(sgReplicationInfo,callbacks),
 	m_controlledConstraints(),
@@ -232,7 +233,8 @@ BL_ArmatureObject::BL_ArmatureObject(
 	m_activePriority(999),
 	m_constraintNumber(0),
 	m_channelNumber(0),
-	m_lastapplyframe(0.0)
+	m_lastapplyframe(0.0),
+	m_vert_deform_type(vert_deform_type)
 {
 	m_armature = (bArmature *)armature->data;
 
@@ -298,6 +300,7 @@ void BL_ArmatureObject::LoadConstraints(KX_BlenderSceneConverter* converter)
 			case CONSTRAINT_TYPE_CLAMPTO:
 			case CONSTRAINT_TYPE_TRANSFORM:
 			case CONSTRAINT_TYPE_DISTLIMIT:
+			case CONSTRAINT_TYPE_TRANSLIKE:
 				cti = constraint_get_typeinfo(pcon);
 				gametarget = gamesubtarget = NULL;
 				if (cti && cti->get_constraint_targets) {
@@ -439,7 +442,7 @@ void BL_ArmatureObject::ReParentLogic()
 	KX_GameObject::ReParentLogic();
 }
 
-void BL_ArmatureObject::Relink(GEN_Map<GEN_HashedPtr, void*> *obj_map)
+void BL_ArmatureObject::Relink(CTR_Map<CTR_HashedPtr, void*> *obj_map)
 {
 	SG_DList::iterator<BL_ArmatureConstraint> cit(m_controlledConstraints);
 	for (cit.begin(); !cit.end(); ++cit) {

@@ -360,6 +360,15 @@ static int transform_modal(bContext *C, wmOperator *op, wmEvent *event)
 
 	TransInfo *t = op->customdata;
 
+#if 0
+	// stable 2D mouse coords map to different 3D coords while the 3D mouse is active
+	// in other words, 2D deltas are no longer good enough!
+	// disable until individual 'transformers' behave better
+
+	if (event->type == NDOF_MOTION)
+		return OPERATOR_PASS_THROUGH;
+#endif
+
 	/* XXX insert keys are called here, and require context */
 	t->context= C;
 	exit_code = transformEvent(t, event);
@@ -495,11 +504,15 @@ void Transform_Properties(struct wmOperatorType *ot, int flags)
 	{
 		RNA_def_boolean(ot->srna, "texture_space", 0, "Edit Object data texture space", "");
 	}
-	
+
+	if (flags & P_CORRECT_UV)
+	{
+		RNA_def_boolean(ot->srna, "correct_uv", 0, "Correct UV coords when transforming", "");
+	}
+
 	// Add confirm method all the time. At the end because it's not really that important and should be hidden only in log, not in keymap edit
 	/*prop =*/ RNA_def_boolean(ot->srna, "release_confirm", 0, "Confirm on Release", "Always confirm operation when releasing button");
 	//RNA_def_property_flag(prop, PROP_HIDDEN);
-	RNA_def_int(ot->srna, "launch_event", 0, 0, INT_MAX, "Launch Event", "", 0, INT_MAX);
 }
 
 void TRANSFORM_OT_translate(struct wmOperatorType *ot)
@@ -515,7 +528,7 @@ void TRANSFORM_OT_translate(struct wmOperatorType *ot)
 	ot->exec   = transform_exec;
 	ot->modal  = transform_modal;
 	ot->cancel  = transform_cancel;
-	ot->poll   = ED_operator_areaactive;
+	ot->poll   = ED_operator_screenactive;
 
 	RNA_def_float_vector_xyz(ot->srna, "value", 3, NULL, -FLT_MAX, FLT_MAX, "Vector", "", -FLT_MAX, FLT_MAX);
 
@@ -535,7 +548,7 @@ void TRANSFORM_OT_resize(struct wmOperatorType *ot)
 	ot->exec   = transform_exec;
 	ot->modal  = transform_modal;
 	ot->cancel  = transform_cancel;
-	ot->poll   = ED_operator_areaactive;
+	ot->poll   = ED_operator_screenactive;
 
 	RNA_def_float_vector(ot->srna, "value", 3, VecOne, -FLT_MAX, FLT_MAX, "Vector", "", -FLT_MAX, FLT_MAX);
 
@@ -556,7 +569,7 @@ void TRANSFORM_OT_trackball(struct wmOperatorType *ot)
 	ot->exec   = transform_exec;
 	ot->modal  = transform_modal;
 	ot->cancel  = transform_cancel;
-	ot->poll   = ED_operator_areaactive;
+	ot->poll   = ED_operator_screenactive;
 
 	RNA_def_float_vector(ot->srna, "value", 2, VecOne, -FLT_MAX, FLT_MAX, "angle", "", -FLT_MAX, FLT_MAX);
 
@@ -576,7 +589,7 @@ void TRANSFORM_OT_rotate(struct wmOperatorType *ot)
 	ot->exec   = transform_exec;
 	ot->modal  = transform_modal;
 	ot->cancel  = transform_cancel;
-	ot->poll   = ED_operator_areaactive;
+	ot->poll   = ED_operator_screenactive;
 
 	RNA_def_float_rotation(ot->srna, "value", 1, NULL, -FLT_MAX, FLT_MAX, "Angle", "", -M_PI*2, M_PI*2);
 
@@ -619,7 +632,7 @@ void TRANSFORM_OT_warp(struct wmOperatorType *ot)
 	ot->exec   = transform_exec;
 	ot->modal  = transform_modal;
 	ot->cancel  = transform_cancel;
-	ot->poll   = ED_operator_areaactive;
+	ot->poll   = ED_operator_screenactive;
 
 	RNA_def_float_rotation(ot->srna, "value", 1, NULL, -FLT_MAX, FLT_MAX, "Angle", "", 0, 1);
 
@@ -640,7 +653,7 @@ void TRANSFORM_OT_shear(struct wmOperatorType *ot)
 	ot->exec   = transform_exec;
 	ot->modal  = transform_modal;
 	ot->cancel  = transform_cancel;
-	ot->poll   = ED_operator_areaactive;
+	ot->poll   = ED_operator_screenactive;
 
 	RNA_def_float(ot->srna, "value", 0, -FLT_MAX, FLT_MAX, "Offset", "", -FLT_MAX, FLT_MAX);
 
@@ -661,7 +674,7 @@ void TRANSFORM_OT_push_pull(struct wmOperatorType *ot)
 	ot->exec   = transform_exec;
 	ot->modal  = transform_modal;
 	ot->cancel  = transform_cancel;
-	ot->poll   = ED_operator_areaactive;
+	ot->poll   = ED_operator_screenactive;
 
 	RNA_def_float(ot->srna, "value", 0, -FLT_MAX, FLT_MAX, "Distance", "", -FLT_MAX, FLT_MAX);
 
@@ -702,7 +715,7 @@ void TRANSFORM_OT_tosphere(struct wmOperatorType *ot)
 	ot->exec   = transform_exec;
 	ot->modal  = transform_modal;
 	ot->cancel  = transform_cancel;
-	ot->poll   = ED_operator_areaactive;
+	ot->poll   = ED_operator_screenactive;
 
 	RNA_def_float_factor(ot->srna, "value", 0, 0, 1, "Factor", "", 0, 1);
 
@@ -722,7 +735,7 @@ void TRANSFORM_OT_mirror(struct wmOperatorType *ot)
 	ot->exec   = transform_exec;
 	ot->modal  = transform_modal;
 	ot->cancel  = transform_cancel;
-	ot->poll   = ED_operator_areaactive;
+	ot->poll   = ED_operator_screenactive;
 
 	Transform_Properties(ot, P_CONSTRAINT|P_PROPORTIONAL);
 }
@@ -743,8 +756,8 @@ void TRANSFORM_OT_edge_slide(struct wmOperatorType *ot)
 	ot->poll   = ED_operator_editmesh;
 
 	RNA_def_float_factor(ot->srna, "value", 0, -1.0f, 1.0f, "Factor", "", -1.0f, 1.0f);
-	
-	Transform_Properties(ot, P_MIRROR|P_SNAP);
+
+	Transform_Properties(ot, P_MIRROR|P_SNAP|P_CORRECT_UV);
 }
 
 void TRANSFORM_OT_edge_crease(struct wmOperatorType *ot)
@@ -802,7 +815,7 @@ void TRANSFORM_OT_transform(struct wmOperatorType *ot)
 	ot->exec   = transform_exec;
 	ot->modal  = transform_modal;
 	ot->cancel  = transform_cancel;
-	ot->poll   = ED_operator_areaactive;
+	ot->poll   = ED_operator_screenactive;
 
 	prop= RNA_def_enum(ot->srna, "mode", transform_mode_types, TFM_TRANSLATION, "Mode", "");
 	RNA_def_property_flag(prop, PROP_HIDDEN);
@@ -898,7 +911,7 @@ void transform_keymap_for_space(wmKeyConfig *keyconf, wmKeyMap *keymap, int spac
 			km= WM_keymap_add_item(keymap, "TRANSFORM_OT_transform", SKEY, KM_PRESS, 0, 0);
 			RNA_enum_set(km->ptr, "mode", TFM_TIME_SCALE);
 			
-			km= WM_keymap_add_item(keymap, "TRANSFORM_OT_transform", TKEY, KM_PRESS, 0, 0);
+			km= WM_keymap_add_item(keymap, "TRANSFORM_OT_transform", TKEY, KM_PRESS, KM_SHIFT, 0);
 			RNA_enum_set(km->ptr, "mode", TFM_TIME_SLIDE);
 			break;
 		case SPACE_IPO:
@@ -954,6 +967,8 @@ void transform_keymap_for_space(wmKeyConfig *keyconf, wmKeyMap *keymap, int spac
 			WM_keymap_add_item(keymap, OP_ROTATION, RKEY, KM_PRESS, 0, 0);
 
 			WM_keymap_add_item(keymap, OP_RESIZE, SKEY, KM_PRESS, 0, 0);
+
+			WM_keymap_add_item(keymap, OP_SHEAR, SKEY, KM_PRESS, KM_ALT|KM_CTRL|KM_SHIFT, 0);
 
 			WM_keymap_add_item(keymap, "TRANSFORM_OT_mirror", MKEY, KM_PRESS, KM_CTRL, 0);
 

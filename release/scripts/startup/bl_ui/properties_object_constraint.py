@@ -18,6 +18,7 @@
 
 # <pep8 compliant>
 import bpy
+from bpy.types import Panel
 
 
 class ConstraintButtonsPanel():
@@ -234,7 +235,6 @@ class ConstraintButtonsPanel():
         row.label()
 
     def LIMIT_ROTATION(self, context, layout, con):
-
         split = layout.split()
 
         col = split.column(align=True)
@@ -258,9 +258,7 @@ class ConstraintButtonsPanel():
         sub.prop(con, "min_z", text="Min")
         sub.prop(con, "max_z", text="Max")
 
-        row = layout.row()
-        row.prop(con, "use_transform_limit")
-        row.label()
+        layout.prop(con, "use_transform_limit")
 
         row = layout.row()
         row.label(text="Convert:")
@@ -476,6 +474,10 @@ class ConstraintButtonsPanel():
         row.label(text="Clamp Region:")
         row.prop(con, "limit_mode", text="")
 
+        row = layout.row()
+        row.prop(con, "use_transform_limit")
+        row.label()
+
     def STRETCH_TO(self, context, layout, con):
         self.target_template(layout, con)
 
@@ -651,6 +653,24 @@ class ConstraintButtonsPanel():
         sub.prop(con, "from_min_z", text="Min")
         sub.prop(con, "from_max_z", text="Max")
 
+        col = layout.column()
+        row = col.row()
+        row.label(text="Source to Destination Mapping:")
+
+        # note: chr(187) is the ASCII arrow ( >> ). Blender Text Editor can't
+        # open it. Thus we are using the hardcoded value instead.
+        row = col.row()
+        row.prop(con, "map_to_x_from", expand=False, text="")
+        row.label(text=" %s    X" % chr(187))
+
+        row = col.row()
+        row.prop(con, "map_to_y_from", expand=False, text="")
+        row.label(text=" %s    Y" % chr(187))
+
+        row = col.row()
+        row.prop(con, "map_to_z_from", expand=False, text="")
+        row.label(text=" %s    Z" % chr(187))
+
         split = layout.split()
 
         col = split.column()
@@ -661,7 +681,6 @@ class ConstraintButtonsPanel():
 
         col = split.column()
         col.label(text="X:")
-        col.row().prop(con, "map_to_x_from", expand=True)
 
         sub = col.column(align=True)
         sub.prop(con, "to_min_x", text="Min")
@@ -669,7 +688,6 @@ class ConstraintButtonsPanel():
 
         col = split.column()
         col.label(text="Y:")
-        col.row().prop(con, "map_to_y_from", expand=True)
 
         sub = col.column(align=True)
         sub.prop(con, "to_min_y", text="Min")
@@ -677,7 +695,6 @@ class ConstraintButtonsPanel():
 
         col = split.column()
         col.label(text="Z:")
-        col.row().prop(con, "map_to_z_from", expand=True)
 
         sub = col.column(align=True)
         sub.prop(con, "to_min_z", text="Min")
@@ -740,7 +757,7 @@ class ConstraintButtonsPanel():
         layout.label("Blender 2.5 has no py-constraints")
 
 
-class OBJECT_PT_constraints(ConstraintButtonsPanel, bpy.types.Panel):
+class OBJECT_PT_constraints(ConstraintButtonsPanel, Panel):
     bl_label = "Object Constraints"
     bl_context = "constraint"
 
@@ -764,7 +781,7 @@ class OBJECT_PT_constraints(ConstraintButtonsPanel, bpy.types.Panel):
             self.draw_constraint(context, con)
 
 
-class BONE_PT_constraints(ConstraintButtonsPanel, bpy.types.Panel):
+class BONE_PT_constraints(ConstraintButtonsPanel, Panel):
     bl_label = "Bone Constraints"
     bl_context = "bone_constraint"
 

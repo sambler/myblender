@@ -246,7 +246,7 @@ static int object_clear_transform_generic_exec(bContext *C, wmOperator *op,
 			}
 			
 			/* tag for updates */
-			ob->recalc |= OB_RECALC_OB;
+			DAG_id_tag_update(&ob->id, OB_RECALC_OB);
 		}
 	}
 	CTX_DATA_END;
@@ -341,7 +341,8 @@ static int object_origin_clear_exec(bContext *C, wmOperator *UNUSED(op))
 			negate_v3_v3(v3, v1);
 			mul_m3_v3(mat, v3);
 		}
-		ob->recalc |= OB_RECALC_OB;
+
+		DAG_id_tag_update(&ob->id, OB_RECALC_OB);
 	}
 	CTX_DATA_END;
 
@@ -515,6 +516,7 @@ static int apply_objects_internal(bContext *C, ReportList *reports, int apply_lo
 						mul_m4_v3(mat, bezt->vec[2]);
 						bezt->radius *= scale;
 					}
+					calchandlesNurb(nu);
 				}
 				else {
 					a= nu->pntsu*nu->pntsv;
@@ -870,7 +872,7 @@ static int object_origin_set_exec(bContext *C, wmOperator *op)
 								(ob->dup_group==ob_other->dup_group && (ob->transflag|ob_other->transflag) & OB_DUPLIGROUP) )
 					) {
 						ob_other->flag |= OB_DONE;
-						ob_other->recalc= OB_RECALC_OB|OB_RECALC_DATA;
+						DAG_id_tag_update(&ob_other->id, OB_RECALC_OB|OB_RECALC_DATA);
 
 						copy_v3_v3(centn, cent);
 						mul_mat3_m4_v3(ob_other->obmat, centn); /* ommit translation part */
@@ -889,11 +891,9 @@ static int object_origin_set_exec(bContext *C, wmOperator *op)
 	}
 	CTX_DATA_END;
 
-	for (tob= bmain->object.first; tob; tob= tob->id.next) {
-		if(tob->data && (((ID *)tob->data)->flag & LIB_DOIT)) {
-			tob->recalc= OB_RECALC_OB|OB_RECALC_DATA;
-		}
-	}
+	for (tob= bmain->object.first; tob; tob= tob->id.next)
+		if(tob->data && (((ID *)tob->data)->flag & LIB_DOIT))
+			DAG_id_tag_update(&tob->id, OB_RECALC_OB|OB_RECALC_DATA);
 
 	if (tot_change) {
 		DAG_ids_flush_update(bmain, 0);

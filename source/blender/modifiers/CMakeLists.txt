@@ -25,15 +25,19 @@
 # ***** END GPL LICENSE BLOCK *****
 
 set(INC 
-	. ./intern
+	.
+	intern
+	../blenkernel
+	../blenkernel/intern
 	../blenlib
 	../blenloader
 	../makesdna
-	../blenkernel
-	../blenkernel/intern
 	../render/extern/include
-	../../../intern/guardedalloc
 	../../../intern/elbeem/extern
+	../../../intern/guardedalloc
+)
+
+set(INC_SYS
 	${ZLIB_INCLUDE_DIRS}
 )
 
@@ -89,12 +93,16 @@ if(WITH_MOD_BOOLEAN)
 	list(APPEND SRC
 		intern/MOD_boolean_util.c
 	)
-	list(APPEND INC ../../../intern/bsp/extern)
+	list(APPEND INC
+		../../../intern/bsp/extern
+	)
 endif()
 
 if(WITH_MOD_DECIMATE)
 	add_definitions(-DWITH_MOD_DECIMATE)
-	list(APPEND INC ../../../intern/decimation/extern)
+	list(APPEND INC
+		../../../intern/decimation/extern
+	)
 endif()
 
 if(NOT WITH_MOD_FLUID)
@@ -105,4 +113,4 @@ if(WITH_OPENMP)
 	add_definitions(-DPARALLEL=1)
 endif()
 
-blender_add_lib(bf_modifiers "${SRC}" "${INC}")
+blender_add_lib(bf_modifiers "${SRC}" "${INC}" "${INC_SYS}")

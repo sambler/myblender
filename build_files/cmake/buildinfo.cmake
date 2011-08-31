@@ -14,7 +14,7 @@ if(EXISTS ${SOURCE_DIR}/.svn/)
 	endif()
 endif()
 
-set(MY_WC_REVISION "36461")
+set(MY_WC_REVISION "39821")
 
 # BUILD_PLATFORM and BUILD_PLATFORM are taken from CMake
 # but BUILD_DATE and BUILD_TIME are plataform dependant
@@ -29,9 +29,9 @@ endif()
 
 # Write a file with the SVNVERSION define
 file(WRITE buildinfo.h.txt
-	"#define BUILD_REV ${MY_WC_REVISION}\n"
-	"#define BUILD_DATE ${BUILD_DATE}\n"
-	"#define BUILD_TIME ${BUILD_TIME}\n"
+	"#define BUILD_REV \"${MY_WC_REVISION}\"\n"
+	"#define BUILD_DATE \"${BUILD_DATE}\"\n"
+	"#define BUILD_TIME \"${BUILD_TIME}\"\n"
 )
 
 # Copy the file to the final header only if the version changes

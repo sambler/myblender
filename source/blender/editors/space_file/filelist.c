@@ -59,6 +59,7 @@
 #include "BKE_context.h"
 #include "BKE_global.h"
 #include "BKE_library.h"
+#include "BKE_icons.h"
 #include "BKE_main.h"
 #include "BKE_report.h"
 #include "BLO_readfile.h"
@@ -372,7 +373,11 @@ void filelist_init_icons(void)
 	short x, y, k;
 	ImBuf *bbuf;
 	ImBuf *ibuf;
+#ifdef WITH_HEADLESS
+	bbuf = NULL;
+#else
 	bbuf = IMB_ibImageFromMemory((unsigned char*)datatoc_prvicons, datatoc_prvicons_size, IB_rect);
+#endif
 	if (bbuf) {
 		for (y=0; y<SPECIAL_IMG_ROWS; y++) {
 			for (x=0; x<SPECIAL_IMG_COLS; x++) {
@@ -433,7 +438,7 @@ void folderlist_pushdir(ListBase* folderlist, const char *dir)
 
 	// check if already exists
 	if(previous_folder && previous_folder->foldername){
-		if(! strcmp(previous_folder->foldername, dir)){
+		if(BLI_path_cmp(previous_folder->foldername, dir)==0){
 			return;
 		}
 	}
@@ -595,28 +600,6 @@ void filelist_imgsize(struct FileList* filelist, short w, short h)
 short filelist_changed(struct FileList* filelist)
 {
 	return filelist->changed;
-}
-
-static struct ImBuf * filelist_loadimage(struct FileList* filelist, int index)
-{
-	ImBuf *imb = NULL;
-	int fidx = 0;
-	
-	if ( (index < 0) || (index >= filelist->numfiltered) ) {
-		return NULL;
-	}
-	fidx = filelist->fidx[index];
-	imb = filelist->filelist[fidx].image;
-	if (!imb)
-	{
-		if ( (filelist->filelist[fidx].flags & IMAGEFILE) || (filelist->filelist[fidx].flags & MOVIEFILE) ) {
-			imb = IMB_thumb_read(filelist->filelist[fidx].path, THB_NORMAL);
-		} 
-		if (imb) {
-			filelist->filelist[fidx].image = imb;
-		} 
-	}
-	return imb;
 }
 
 struct ImBuf * filelist_getimage(struct FileList* filelist, int index)
@@ -910,6 +893,8 @@ void filelist_select_file(struct FileList* filelist, int index, FileSelType sele
 		int check_ok = 0; 
 		switch (check) {
 			case CHECK_DIRS:
+				check_ok = S_ISDIR(file->type);
+				break;
 			case CHECK_ALL:
 				check_ok = 1;
 				break;
@@ -999,7 +984,7 @@ static int groupname_to_code(char *group)
 
 	return BKE_idcode_from_name(buf);
 }
-
+ 
 void filelist_from_library(struct FileList* filelist)
 {
 	LinkNode *l, *names, *previews;
@@ -1070,9 +1055,9 @@ void filelist_from_library(struct FileList* filelist)
 			PreviewImage *img= l->link;
 			
 			if (img) {
-				unsigned int w = img->w[PREVIEW_MIPMAP_LARGE];
-				unsigned int h = img->h[PREVIEW_MIPMAP_LARGE];
-				unsigned int *rect = img->rect[PREVIEW_MIPMAP_LARGE];
+				unsigned int w = img->w[ICON_SIZE_PREVIEW];
+				unsigned int h = img->h[ICON_SIZE_PREVIEW];
+				unsigned int *rect = img->rect[ICON_SIZE_PREVIEW];
 
 				/* first allocate imbuf for copying preview into it */
 				if (w > 0 && h > 0 && rect) {
@@ -1086,7 +1071,7 @@ void filelist_from_library(struct FileList* filelist)
 	}
 
 	BLI_linklist_free(names, free);
-	if (previews) BLI_linklist_free(previews, (void(*)(void*)) MEM_freeN);
+	if (previews) BLI_linklist_free(previews, BKE_previewimg_freefunc);
 
 	filelist_sort(filelist, FILE_SORT_ALPHA);
 
@@ -1120,7 +1105,7 @@ void filelist_from_main(struct FileList *filelist)
 	if( filelist->dir[0]==0) {
 		
 		/* make directories */
-		filelist->numfiles= 23;
+		filelist->numfiles= 24;
 		filelist->filelist= (struct direntry *)malloc(filelist->numfiles * sizeof(struct direntry));
 		
 		for(a=0; a<filelist->numfiles; a++) {
@@ -1150,6 +1135,7 @@ void filelist_from_main(struct FileList *filelist)
 		filelist->filelist[20].relname= BLI_strdup("Armature");
 		filelist->filelist[21].relname= BLI_strdup("Action");
 		filelist->filelist[22].relname= BLI_strdup("NodeTree");
+		filelist->filelist[23].relname= BLI_strdup("Speaker");
 		filelist_sort(filelist, FILE_SORT_ALPHA);
 	}
 	else {

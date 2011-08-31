@@ -35,6 +35,7 @@
 
 #include "DNA_ID.h"
 #include "DNA_vfont_types.h"
+#include "DNA_material_types.h"
 #include "DNA_object_types.h"
 
 #include "WM_types.h"
@@ -66,6 +67,7 @@ EnumPropertyItem id_type_items[] = {
 	{ID_PA, "PARTICLE", ICON_PARTICLE_DATA, "Particle", ""},
 	{ID_SCE, "SCENE", ICON_SCENE_DATA, "Scene", ""},
 	{ID_SCR, "SCREEN", ICON_SPLITSCREEN, "Screen", ""},
+	{ID_SPK, "SPEAKER", ICON_SPEAKER, "Speaker", ""},
 	{ID_SO, "SOUND", ICON_PLAY_AUDIO, "Sound", ""},
 	{ID_TXT, "TEXT", ICON_TEXT, "Text", ""},
 	{ID_TE, "TEXTURE", ICON_TEXTURE_DATA, "Texture", ""},
@@ -136,6 +138,7 @@ short RNA_type_to_ID_code(StructRNA *type)
 	if(RNA_struct_is_a(type, &RNA_ParticleSettings)) return ID_PA;
 	if(RNA_struct_is_a(type, &RNA_Scene)) return ID_SCE;
 	if(RNA_struct_is_a(type, &RNA_Screen)) return ID_SCR;
+	if(RNA_struct_is_a(type, &RNA_Speaker)) return ID_SPK;
 	if(RNA_struct_is_a(type, &RNA_Sound)) return ID_SO;
 	if(RNA_struct_is_a(type, &RNA_Text)) return ID_TXT;
 	if(RNA_struct_is_a(type, &RNA_Texture)) return ID_TE;
@@ -169,6 +172,7 @@ StructRNA *ID_code_to_RNA_type(short idcode)
 		case ID_PA: return &RNA_ParticleSettings;
 		case ID_SCE: return &RNA_Scene;
 		case ID_SCR: return &RNA_Screen;
+		case ID_SPK: return &RNA_Speaker;
 		case ID_SO: return &RNA_Sound;
 		case ID_TXT: return &RNA_Text;
 		case ID_TE: return &RNA_Texture;
@@ -205,17 +209,17 @@ void rna_ID_fake_user_set(PointerRNA *ptr, int value)
 	}
 }
 
-IDProperty *rna_PropertyGroup_idprops(PointerRNA *ptr, int create)
+IDProperty *rna_PropertyGroup_idprops(PointerRNA *ptr, int UNUSED(create))
 {
 	return ptr->data;
 }
 
-void rna_PropertyGroup_unregister(const bContext *C, StructRNA *type)
+void rna_PropertyGroup_unregister(Main *UNUSED(bmain), StructRNA *type)
 {
 	RNA_struct_free(&BLENDER_RNA, type);
 }
 
-StructRNA *rna_PropertyGroup_register(bContext *C, ReportList *reports, void *data, const char *identifier, StructValidateFunc validate, StructCallbackFunc call, StructFreeFunc free)
+StructRNA *rna_PropertyGroup_register(Main *UNUSED(bmain), ReportList *reports, void *data, const char *identifier, StructValidateFunc validate, StructCallbackFunc UNUSED(call), StructFreeFunc UNUSED(free))
 {
 	PointerRNA dummyptr;
 
@@ -384,7 +388,7 @@ static void rna_def_ID_properties(BlenderRNA *brna)
 	RNA_def_struct_sdna(srna, "IDPropertyGroup");
 	RNA_def_struct_ui_text(srna, "ID Property Group", "Group of ID properties");
 	RNA_def_struct_idprops_func(srna, "rna_PropertyGroup_idprops");
-	RNA_def_struct_register_funcs(srna, "rna_PropertyGroup_register", "rna_PropertyGroup_unregister");
+	RNA_def_struct_register_funcs(srna, "rna_PropertyGroup_register", "rna_PropertyGroup_unregister", NULL);
 	RNA_def_struct_refine_func(srna, "rna_PropertyGroup_refine");
 
 	/* important so python types can have their name used in list views
@@ -410,15 +414,16 @@ static void rna_def_ID_materials(BlenderRNA *brna)
 	RNA_def_struct_ui_text(srna, "ID Materials", "Collection of materials");
 
 	func= RNA_def_function(srna, "append", "material_append_id");
-	RNA_def_function_ui_description(func, "Add a new material to Mesh.");
+	RNA_def_function_ui_description(func, "Add a new material to the data block.");
 	parm= RNA_def_pointer(func, "material", "Material", "", "Material to add.");
 	RNA_def_property_flag(parm, PROP_REQUIRED);
 	
 	func= RNA_def_function(srna, "pop", "material_pop_id");
-	RNA_def_function_ui_description(func, "Add a new material to Mesh.");
-	parm= RNA_def_int(func, "index", 0, 0, INT_MAX, "", "Frame number to set.", 0, INT_MAX);
+	RNA_def_function_ui_description(func, "Remove a material from the data block.");
+	parm= RNA_def_int(func, "index", 0, 0, MAXMAT, "", "Index of material to remove.", 0, MAXMAT);
 	RNA_def_property_flag(parm, PROP_REQUIRED);
-	parm= RNA_def_pointer(func, "material", "Material", "", "Material to add.");
+	RNA_def_boolean(func, "update_data", 0, "", "Update data by re-adjusting the material slots assigned.");
+	parm= RNA_def_pointer(func, "material", "Material", "", "Material to remove.");
 	RNA_def_function_return(func, parm);
 }
 

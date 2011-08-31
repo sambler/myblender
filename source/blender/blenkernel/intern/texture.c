@@ -41,9 +41,8 @@
 
 #include "MEM_guardedalloc.h"
 
-#include "PIL_dynlib.h"
-
 #include "BLI_blenlib.h"
+#include "BLI_dynlib.h"
 #include "BLI_math.h"
 #include "BLI_kdopbvh.h"
 #include "BLI_utildefines.h"
@@ -83,7 +82,7 @@ int test_dlerr(const char *name, const char *symbol)
 {
 	char *err;
 	
-	err= PIL_dynlib_get_error_as_string(NULL);
+	err= BLI_dynlib_get_error_as_string(NULL);
 	if(err) {
 		printf("var1: %s, var2: %s, var3: %s\n", name, symbol, err);
 		return 1;
@@ -109,19 +108,19 @@ void open_plugin_tex(PluginTex *pit)
 	pit->instance_init= NULL;
 	
 	/* clear the error list */
-	PIL_dynlib_get_error_as_string(NULL);
+	BLI_dynlib_get_error_as_string(NULL);
 
-	/* no PIL_dynlib_close! multiple opened plugins... */
-	/* if(pit->handle) PIL_dynlib_close(pit->handle); */
+	/* no BLI_dynlib_close! multiple opened plugins... */
+	/* if(pit->handle) BLI_dynlib_close(pit->handle); */
 	/* pit->handle= 0; */
 
 	/* open the needed object */
-	pit->handle= PIL_dynlib_open(pit->name);
+	pit->handle= BLI_dynlib_open(pit->name);
 	if(test_dlerr(pit->name, pit->name)) return;
 
 	if (pit->handle != NULL) {
 		/* find the address of the version function */
-		version= (int (*)(void)) PIL_dynlib_find_symbol(pit->handle, "plugin_tex_getversion");
+		version= (int (*)(void)) BLI_dynlib_find_symbol(pit->handle, "plugin_tex_getversion");
 		if (test_dlerr(pit->name, "plugin_tex_getversion")) return;
 		
 		if (version != NULL) {
@@ -130,7 +129,7 @@ void open_plugin_tex(PluginTex *pit)
 				int (*info_func)(PluginInfo *);
 				PluginInfo *info= (PluginInfo*) MEM_mallocN(sizeof(PluginInfo), "plugin_info"); 
 
-				info_func= (int (*)(PluginInfo *))PIL_dynlib_find_symbol(pit->handle, "plugin_getinfo");
+				info_func= (int (*)(PluginInfo *))BLI_dynlib_find_symbol(pit->handle, "plugin_getinfo");
 				if (!test_dlerr(pit->name, "plugin_getinfo")) {
 					info->instance_init = NULL;
 
@@ -201,7 +200,7 @@ void free_plugin_tex(PluginTex *pit)
 {
 	if(pit==NULL) return;
 		
-	/* no PIL_dynlib_close: same plugin can be opened multiple times, 1 handle */
+	/* no BLI_dynlib_close: same plugin can be opened multiple times, 1 handle */
 	MEM_freeN(pit);	
 }
 
@@ -1019,7 +1018,7 @@ void autotexname(Tex *tex)
 
 Tex *give_current_object_texture(Object *ob)
 {
-	Material *ma;
+	Material *ma, *node_ma;
 	Tex *tex= NULL;
 	
 	if(ob==NULL) return NULL;
@@ -1029,6 +1028,10 @@ Tex *give_current_object_texture(Object *ob)
 		tex= give_current_lamp_texture(ob->data);
 	} else {
 		ma= give_current_material(ob, ob->actcol);
+
+		if((node_ma=give_node_material(ma)))
+			ma= node_ma;
+
 		tex= give_current_material_texture(ma);
 	}
 	
@@ -1094,17 +1097,6 @@ Tex *give_current_material_texture(Material *ma)
 			tex= (Tex *)node->id;
 			ma= NULL;
 		}
-		else {
-			node= nodeGetActiveID(ma->nodetree, ID_MA);
-			if(node) {
-				ma= (Material*)node->id;
-				if(ma) {
-					mtex= ma->mtex[(int)(ma->texact)];
-					if(mtex) tex= mtex->tex;
-				}
-			}
-		}
-		return tex;
 	}
 
 	if(ma) {
@@ -1179,11 +1171,6 @@ void set_current_material_texture(Material *ma, Tex *newtex)
 			id_us_plus(&newtex->id);
 			ma= NULL;
 		}
-		else {
-			node= nodeGetActiveID(ma->nodetree, ID_MA);
-			if(node)
-				ma= (Material*)node->id;
-		}
 	}
 	if(ma) {
 		int act= (int)ma->texact;
@@ -1203,6 +1190,20 @@ void set_current_material_texture(Material *ma, Tex *newtex)
 			ma->mtex[act]= NULL;
 		}
 	}
+}
+
+int has_current_material_texture(Material *ma)
+{
+	bNode *node;
+
+	if(ma && ma->use_nodes && ma->nodetree) {
+		node= nodeGetActiveID(ma->nodetree, ID_TE);
+
+		if(node)
+			return 1;
+	}
+
+	return (ma != NULL);
 }
 
 Tex *give_current_world_texture(World *world)
@@ -1575,6 +1576,10 @@ int BKE_texture_dependsOnTime(const struct Tex *texture)
 	}
 	else if(texture->adt) {
 		// assume anything in adt means the texture is animated
+		return 1;
+	}
+	else if(texture->type == TEX_NOISE) {
+		// noise always varies with time
 		return 1;
 	}
 	return 0;

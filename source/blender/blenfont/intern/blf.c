@@ -369,28 +369,28 @@ void BLF_position(int fontid, float x, float y, float z)
 			za= 1.0f;
 		}
 
-		remainder= x - floor(x);
-		if (remainder > 0.4 && remainder < 0.6) {
-			if (remainder < 0.5)
-				x -= 0.1 * xa;
+		remainder= x - floorf(x);
+		if (remainder > 0.4f && remainder < 0.6f) {
+			if (remainder < 0.5f)
+				x -= 0.1f * xa;
 			else
-				x += 0.1 * xa;
+				x += 0.1f * xa;
 		}
 
-		remainder= y - floor(y);
-		if (remainder > 0.4 && remainder < 0.6) {
-			if (remainder < 0.5)
-				y -= 0.1 * ya;
+		remainder= y - floorf(y);
+		if (remainder > 0.4f && remainder < 0.6f) {
+			if (remainder < 0.5f)
+				y -= 0.1f * ya;
 			else
-				y += 0.1 * ya;
+				y += 0.1f * ya;
 		}
 
-		remainder= z - floor(z);
-		if (remainder > 0.4 && remainder < 0.6) {
-			if (remainder < 0.5)
-				z -= 0.1 * za;
+		remainder= z - floorf(z);
+		if (remainder > 0.4f && remainder < 0.6f) {
+			if (remainder < 0.5f)
+				z -= 0.1f * za;
 			else
-				z += 0.1 * za;
+				z += 0.1f * za;
 		}
 
 		font->pos[0]= x;
@@ -577,6 +577,54 @@ float BLF_height(int fontid, const char *str)
 	font= BLF_get(fontid);
 	if (font)
 		return(blf_font_height(font, str));
+	return(0.0f);
+}
+
+float BLF_height_max(int fontid)
+{
+	FontBLF *font;
+
+	font= BLF_get(fontid);
+	if (font) {
+		if(font->glyph_cache)
+			return(font->glyph_cache->max_glyph_height);
+	}
+	return(0.0f);
+}
+
+float BLF_width_max(int fontid)
+{
+	FontBLF *font;
+
+	font= BLF_get(fontid);
+	if (font) {
+		if(font->glyph_cache)
+			return(font->glyph_cache->max_glyph_width);
+	}
+	return(0.0f);
+}
+
+float BLF_descender(int fontid)
+{
+	FontBLF *font;
+
+	font= BLF_get(fontid);
+	if (font) {
+		if(font->glyph_cache)
+			return(font->glyph_cache->descender);
+	}
+	return(0.0f);
+}
+
+float BLF_ascender(int fontid)
+{
+	FontBLF *font;
+
+	font= BLF_get(fontid);
+	if (font) {
+		if(font->glyph_cache)
+			return(font->glyph_cache->ascender);
+	}
 	return(0.0f);
 }
 

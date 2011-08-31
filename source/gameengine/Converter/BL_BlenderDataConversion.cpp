@@ -143,9 +143,11 @@ extern "C" {
 #include "BKE_customdata.h"
 #include "BKE_cdderivedmesh.h"
 #include "BKE_DerivedMesh.h"
+#include "BKE_material.h" /* give_current_material */
+
+extern Material defmaterial;	/* material.c */
 }
 
-#include "BKE_material.h" /* give_current_material */
 /* end of blender include block */
 
 #include "KX_BlenderInputDevice.h"
@@ -156,7 +158,7 @@ extern "C" {
 #include "KX_ScalarInterpolator.h"
 
 #include "KX_IpoConvert.h"
-#include "SYS_System.h"
+#include "BL_System.h"
 
 #include "SG_Node.h"
 #include "SG_BBox.h"
@@ -348,6 +350,8 @@ bool ConvertMaterial(
 
 		// use lighting?
 		material->ras_mode |= ( mat->mode & MA_SHLESS )?0:USE_LIGHT;
+		// cast shadows?
+		material->ras_mode |= ( mat->mode & MA_SHADBUF )?CAST_SHADOW:0;
 		MTex *mttmp = 0;
 		numchan = getNumTexChannels(mat);
 		int valid_index = 0;
@@ -460,7 +464,9 @@ bool ConvertMaterial(
 							}
 						}
 					}
-					material->flag[i] |= (mat->ipo!=0)?HASIPO:0;
+#if 0				/* this flag isnt used anymore */
+					material->flag[i] |= (BKE_animdata_from_id(mat->id) != NULL) ? HASIPO : 0;
+#endif
 					/// --------------------------------
 					// mapping methods
 					material->mapping[i].mapping |= ( mttmp->texco  & TEXCO_REFL	)?USEREFL:0;
@@ -834,6 +840,11 @@ RAS_MeshObject* BL_ConvertMesh(Mesh* mesh, Object* blenderobj, KX_Scene* scene, 
 			ma = give_current_material(blenderobj, mface->mat_nr+1);
 		else
 			ma = mesh->mat ? mesh->mat[mface->mat_nr]:NULL;
+
+		/* ckeck for texface since texface _only_ is used as a fallback */
+		if(ma == NULL && tface == NULL) {
+			ma= &defmaterial;
+		}
 
 		{
 			bool visible = true;
@@ -1472,7 +1483,7 @@ void BL_CreatePhysicsObjectNew(KX_GameObject* gameobj,
 		{
 			objprop.m_gamesoftFlag = OB_BSB_BENDING_CONSTRAINTS | OB_BSB_SHAPE_MATCHING | OB_BSB_AERO_VPOINT;
 			
-			objprop.m_soft_linStiff = 0.5;;
+			objprop.m_soft_linStiff = 0.5;
 			objprop.m_soft_angStiff = 1.f;		/* angular stiffness 0..1 */
 			objprop.m_soft_volume= 1.f;			/* volume preservation 0..1 */
 
@@ -1673,8 +1684,6 @@ static KX_LightObject *gamelight_from_blamp(Object *ob, Lamp *la, unsigned int l
 
 	gamelight = new KX_LightObject(kxscene, KX_Scene::m_callbacks, rendertools,
 		lightobj, glslmat);
-
-	BL_ConvertLampIpos(la, gamelight, converter);
 	
 	return gamelight;
 }
@@ -1686,8 +1695,6 @@ static KX_Camera *gamecamera_from_bcamera(Object *ob, KX_Scene *kxscene, KX_Blen
 	
 	gamecamera= new KX_Camera(kxscene, KX_Scene::m_callbacks, camdata);
 	gamecamera->SetName(ca->id.name + 2);
-	
-	BL_ConvertCameraIpos(ca, gamecamera, converter);
 	
 	return gamecamera;
 }
@@ -1798,11 +1805,13 @@ static KX_GameObject *gameobject_from_blenderobject(
 	
 	case OB_ARMATURE:
 	{
+		bArmature *arm = (bArmature*)ob->data;
 		gameobj = new BL_ArmatureObject(
 			kxscene,
 			KX_Scene::m_callbacks,
 			ob,
-			kxscene->GetBlenderScene() // handle
+			kxscene->GetBlenderScene(), // handle
+			arm->gevertdeformer
 		);
 		/* Get the current pose from the armature object and apply it as the rest pose */
 		break;
@@ -1967,8 +1976,8 @@ void BL_ConvertBlenderObjects(struct Main* maggie,
 			frame_type = RAS_FrameSettings::e_frame_scale;
 		}
 		
-		aspect_width = blenderscene->gm.xsch;
-		aspect_height = blenderscene->gm.ysch;
+		aspect_width = blenderscene->r.xsch*blenderscene->r.xasp;
+		aspect_height = blenderscene->r.ysch*blenderscene->r.yasp;
 	}
 	
 	RAS_FrameSettings frame_settings(
@@ -2081,8 +2090,7 @@ void BL_ConvertBlenderObjects(struct Main* maggie,
 			gameobj->NodeSetLocalOrientation(MT_Matrix3x3(eulxyz));
 			gameobj->NodeSetLocalScale(scale);
 			gameobj->NodeUpdateGS(0);
-			
-			BL_ConvertIpos(blenderobject,gameobj,converter);
+
 			BL_ConvertMaterialIpos(blenderobject, gameobj, converter);
 			
 			sumolist->Add(gameobj->AddRef());
@@ -2271,8 +2279,7 @@ void BL_ConvertBlenderObjects(struct Main* maggie,
 							gameobj->NodeSetLocalOrientation(MT_Matrix3x3(eulxyz));
 							gameobj->NodeSetLocalScale(scale);
 							gameobj->NodeUpdateGS(0);
-							
-							BL_ConvertIpos(blenderobject,gameobj,converter);
+	
 							BL_ConvertMaterialIpos(blenderobject,gameobj, converter);	
 					
 							sumolist->Add(gameobj->AddRef());
@@ -2598,6 +2605,9 @@ void BL_ConvertBlenderObjects(struct Main* maggie,
 		bConstraint *curcon;
 		conlist = get_active_constraints2(blenderobject);
 
+		if((gameobj->GetLayer()&activeLayerBitInfo)==0)
+			continue;
+
 		if (conlist) {
 			for (curcon = (bConstraint *)conlist->first; curcon; curcon=(bConstraint *)curcon->next) {
 				if (curcon->type==CONSTRAINT_TYPE_RIGIDBODYJOINT){
@@ -2611,7 +2621,7 @@ void BL_ConvertBlenderObjects(struct Main* maggie,
 						if (dat->tar)
 						{
 							KX_GameObject *gotar=getGameOb(dat->tar->id.name+2,sumolist);
-							if (gotar && gotar->GetPhysicsController())
+							if (gotar && ((gotar->GetLayer()&activeLayerBitInfo)!=0) && gotar->GetPhysicsController())
 								physctr2 = (PHY_IPhysicsController*) gotar->GetPhysicsController()->GetUserData();
 						}
 

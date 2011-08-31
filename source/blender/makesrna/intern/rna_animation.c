@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -74,36 +72,7 @@ static int rna_AnimData_action_editable(PointerRNA *ptr)
 static void rna_AnimData_action_set(PointerRNA *ptr, PointerRNA value)
 {
 	ID *ownerId = (ID *)ptr->id.data;
-	AnimData *adt = (AnimData *)ptr->data;
-	
-	/* assume that AnimData's action can in fact be edited... */
-	if ((value.data) && (ownerId)) {
-		bAction *act = (bAction *)value.data;
-		
-		/* action must have same type as owner */
-		if (ownerId) {
-			if (ELEM(act->idroot, 0, GS(ownerId->name))) {
-				/* can set */
-				adt->action = act;
-			}
-			else {
-				/* cannot set */
-				printf("ERROR: Couldn't set Action '%s' onto ID '%s', as it doesn't have suitably rooted paths for this purpose\n", 
-						act->id.name+2, ownerId->name);
-			}
-		}
-		else {
-			/* cannot tell if we can set, so let's just be generous... */
-			printf("Warning: Set Action '%s' onto AnimData block with an unknown ID-owner. May have attached invalid data\n",
-					act->id.name+2);
-				
-			adt->action = act;
-		}
-	}
-	else {
-		/* just clearing the action... */
-		adt->action = NULL;
-	}
+	BKE_animdata_set_action(NULL, ownerId, value.data);
 }
 
 /* ****************************** */
@@ -188,7 +157,7 @@ static StructRNA *rna_KeyingSetInfo_refine(PointerRNA *ptr)
 	return (ksi->ext.srna)? ksi->ext.srna: &RNA_KeyingSetInfo;
 }
 
-static void rna_KeyingSetInfo_unregister(const bContext *C, StructRNA *type)
+static void rna_KeyingSetInfo_unregister(Main *bmain, StructRNA *type)
 {
 	KeyingSetInfo *ksi= RNA_struct_blender_type_get(type);
 
@@ -200,10 +169,10 @@ static void rna_KeyingSetInfo_unregister(const bContext *C, StructRNA *type)
 	RNA_struct_free(&BLENDER_RNA, type);
 	
 	/* unlink Blender-side data */
-	ANIM_keyingset_info_unregister(C, ksi);
+	ANIM_keyingset_info_unregister(bmain, ksi);
 }
 
-static StructRNA *rna_KeyingSetInfo_register(bContext *C, ReportList *reports, void *data, const char *identifier, StructValidateFunc validate, StructCallbackFunc call, StructFreeFunc free)
+static StructRNA *rna_KeyingSetInfo_register(Main *bmain, ReportList *reports, void *data, const char *identifier, StructValidateFunc validate, StructCallbackFunc call, StructFreeFunc free)
 {
 	KeyingSetInfo dummyksi = {NULL};
 	KeyingSetInfo *ksi;
@@ -226,7 +195,7 @@ static StructRNA *rna_KeyingSetInfo_register(bContext *C, ReportList *reports, v
 	/* check if we have registered this info before, and remove it */
 	ksi = ANIM_keyingset_info_find_named(dummyksi.idname);
 	if (ksi && ksi->ext.srna)
-		rna_KeyingSetInfo_unregister(C, ksi->ext.srna);
+		rna_KeyingSetInfo_unregister(bmain, ksi->ext.srna);
 	
 	/* create a new KeyingSetInfo type */
 	ksi= MEM_callocN(sizeof(KeyingSetInfo), "python keying set info");
@@ -509,7 +478,7 @@ static void rna_def_keyingset_info(BlenderRNA *brna)
 	RNA_def_struct_sdna(srna, "KeyingSetInfo");
 	RNA_def_struct_ui_text(srna, "Keying Set Info", "Callback function defines for builtin Keying Sets");
 	RNA_def_struct_refine_func(srna, "rna_KeyingSetInfo_refine");
-	RNA_def_struct_register_funcs(srna, "rna_KeyingSetInfo_register", "rna_KeyingSetInfo_unregister");
+	RNA_def_struct_register_funcs(srna, "rna_KeyingSetInfo_register", "rna_KeyingSetInfo_unregister", NULL);
 	
 	/* Properties --------------------- */
 	
@@ -695,7 +664,7 @@ static void rna_def_keyingset(BlenderRNA *brna)
 	/* Name */
 	prop= RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
 	RNA_def_property_ui_text(prop, "Name", "");
-	RNA_def_struct_ui_icon(srna, ICON_KEY_HLT); // TODO: we need a dedicated icon
+	RNA_def_struct_ui_icon(srna, ICON_KEYINGSET);
 	RNA_def_struct_name_property(srna, prop);
 	RNA_def_property_update(prop, NC_SCENE|ND_KEYINGSET|NA_RENAME, NULL);
 	

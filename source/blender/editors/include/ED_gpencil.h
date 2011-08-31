@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -56,7 +54,7 @@ struct wmKeyConfig;
  * Used as part of the 'stroke cache' used during drawing of new strokes
  */
 typedef struct tGPspoint {
-	short x, y;				/* x and y coordinates of cursor (in relative to area) */
+	int x, y;				/* x and y coordinates of cursor (in relative to area) */
 	float pressure;			/* pressure of tablet at this point */
 } tGPspoint;
 

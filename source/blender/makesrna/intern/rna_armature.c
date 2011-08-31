@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -52,7 +50,7 @@
 #include "ED_armature.h"
 #include "BKE_armature.h"
 
-static void rna_Armature_update_data(Main *bmain, Scene *scene, PointerRNA *ptr)
+static void rna_Armature_update_data(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
 {
 	ID *id= ptr->id.data;
 
@@ -126,7 +124,7 @@ void rna_Armature_edit_bone_remove(bArmature *arm, ReportList *reports, EditBone
 	ED_armature_edit_bone_remove(arm, ebone);
 }
 
-static void rna_Armature_update_layers(Main *bmain, Scene *scene, PointerRNA *ptr)
+static void rna_Armature_update_layers(Main *bmain, Scene *UNUSED(scene), PointerRNA *ptr)
 {
 	bArmature *arm= ptr->id.data;
 	Object *ob;
@@ -140,7 +138,7 @@ static void rna_Armature_update_layers(Main *bmain, Scene *scene, PointerRNA *pt
 	WM_main_add_notifier(NC_GEOM|ND_DATA, arm);
 }
 
-static void rna_Armature_redraw_data(Main *bmain, Scene *scene, PointerRNA *ptr)
+static void rna_Armature_redraw_data(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
 {
 	ID *id= ptr->id.data;
 
@@ -149,7 +147,20 @@ static void rna_Armature_redraw_data(Main *bmain, Scene *scene, PointerRNA *ptr)
 
 static char *rna_Bone_path(PointerRNA *ptr)
 {
-	return BLI_sprintfN("bones[\"%s\"]", ((Bone*)ptr->data)->name);
+	Bone *bone = (Bone*)ptr->data;
+	
+	/* special exception for trying to get the path where ID-block is Object
+	 *	- this will be assumed to be from a Pose Bone...
+	 */
+	if (ptr->id.data) {
+		ID *id = (ID *)ptr->id.data;
+		
+		if (GS(id->name) == ID_OB)
+			return BLI_sprintfN("pose.bones[\"%s\"].bone", bone->name);
+	}
+	
+	/* from armature... */
+	return BLI_sprintfN("bones[\"%s\"]", bone->name);
 }
 
 static IDProperty *rna_Bone_idprops(PointerRNA *ptr, int create)
@@ -496,6 +507,7 @@ static void rna_def_bone_common(StructRNA *srna, int editbone)
 	
 	prop= RNA_def_property(srna, "head_radius", PROP_FLOAT, PROP_UNSIGNED);
 	if(editbone) RNA_def_property_update(prop, 0, "rna_Armature_editbone_transform_update");
+	else RNA_def_property_update(prop, 0, "rna_Armature_update_data");
 	RNA_def_property_float_sdna(prop, NULL, "rad_head");
 	//RNA_def_property_range(prop, 0, 1000);  // XXX range is 0 to lim, where lim= 10000.0f*MAX2(1.0, view3d->grid);
 	RNA_def_property_ui_range(prop, 0.01, 100, 0.1, 3);
@@ -503,6 +515,7 @@ static void rna_def_bone_common(StructRNA *srna, int editbone)
 	
 	prop= RNA_def_property(srna, "tail_radius", PROP_FLOAT, PROP_UNSIGNED);
 	if(editbone) RNA_def_property_update(prop, 0, "rna_Armature_editbone_transform_update");
+	else RNA_def_property_update(prop, 0, "rna_Armature_update_data");
 	RNA_def_property_float_sdna(prop, NULL, "rad_tail");
 	//RNA_def_property_range(prop, 0, 1000);  // XXX range is 0 to lim, where lim= 10000.0f*MAX2(1.0, view3d->grid);
 	RNA_def_property_ui_range(prop, 0.01, 100, 0.1, 3);
@@ -801,6 +814,11 @@ static void rna_def_armature(BlenderRNA *brna)
 		{ARM_LINE, "STICK", 0, "Stick", "Display bones as simple 2D lines with dots"},
 		{ARM_B_BONE, "BBONE", 0, "B-Bone", "Display bones as boxes, showing subdivision and B-Splines"},
 		{ARM_ENVELOPE, "ENVELOPE", 0, "Envelope", "Display bones as extruded spheres, showing deformation influence volume"},
+		{ARM_WIRE, "WIRE", 0, "Wire", "Display bones as thin wires, showing subdivision and B-Splines"},
+		{0, NULL, 0, NULL, NULL}};
+	static EnumPropertyItem prop_vdeformer[] = {
+		{ARM_VDEF_BLENDER, "BLENDER", 0, "Blender", "Uses Blender's armature vertex deformation"},
+		{ARM_VDEF_BGE_CPU, "BGE_CPU", 0, "BGE", "Uses vertex deformation code optimized for the BGE"},
 		{0, NULL, 0, NULL, NULL}};
 	static EnumPropertyItem prop_ghost_type_items[] = {
 		{ARM_GHOST_CUR, "CURRENT_FRAME", 0, "Around Frame", "Display Ghosts of poses within a fixed number of frames around the current frame"},
@@ -846,6 +864,13 @@ static void rna_def_armature(BlenderRNA *brna)
 	RNA_def_property_enum_sdna(prop, NULL, "drawtype");
 	RNA_def_property_enum_items(prop, prop_drawtype_items);
 	RNA_def_property_ui_text(prop, "Draw Type", "");
+	RNA_def_property_update(prop, 0, "rna_Armature_redraw_data");
+	RNA_def_property_flag(prop, PROP_LIB_EXCEPTION);
+
+	prop= RNA_def_property(srna, "vert_deformer", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "gevertdeformer");
+	RNA_def_property_enum_items(prop, prop_vdeformer);
+	RNA_def_property_ui_text(prop, "Vertex Deformer", "");
 	RNA_def_property_update(prop, 0, "rna_Armature_redraw_data");
 	RNA_def_property_flag(prop, PROP_LIB_EXCEPTION);
 	

@@ -43,7 +43,6 @@ typedef struct VoxelDataHeader
 	int frames;
 } VoxelDataHeader;
 
-void cache_voxeldata(Tex *tex, int scene_frame);
 void make_voxeldata(struct Render *re);
 void free_voxeldata(struct Render *re);
 int voxeldatatex(struct Tex *tex, float *texvec, struct TexResult *texres);

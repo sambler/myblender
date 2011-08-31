@@ -246,7 +246,7 @@ static int object_clear_transform_generic_exec(bContext *C, wmOperator *op,
 			}
 			
 			/* tag for updates */
-			ob->recalc |= OB_RECALC_OB;
+			DAG_id_tag_update(&ob->id, OB_RECALC_OB);
 		}
 	}
 	CTX_DATA_END;
@@ -341,7 +341,8 @@ static int object_origin_clear_exec(bContext *C, wmOperator *UNUSED(op))
 			negate_v3_v3(v3, v1);
 			mul_m3_v3(mat, v3);
 		}
-		ob->recalc |= OB_RECALC_OB;
+
+		DAG_id_tag_update(&ob->id, OB_RECALC_OB);
 	}
 	CTX_DATA_END;
 
@@ -386,7 +387,7 @@ static void ignore_parent_tx(Main *bmain, Scene *scene, Object *ob )
 	}
 }
 
-static int apply_objects_internal(bContext *C, ReportList *reports, int apply_loc, int apply_scale, int apply_rot)
+static int apply_objects_internal(bContext *C, ReportList *reports, int apply_loc, int apply_rot, int apply_scale)
 {
 	Main *bmain= CTX_data_main(C);
 	Scene *scene= CTX_data_scene(C);
@@ -515,6 +516,7 @@ static int apply_objects_internal(bContext *C, ReportList *reports, int apply_lo
 						mul_m4_v3(mat, bezt->vec[2]);
 						bezt->radius *= scale;
 					}
+					calchandlesNurb(nu);
 				}
 				else {
 					a= nu->pntsu*nu->pntsv;
@@ -595,64 +597,37 @@ void OBJECT_OT_visual_transform_apply(wmOperatorType *ot)
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 }
 
-static int location_apply_exec(bContext *C, wmOperator *op)
+static int object_transform_apply_exec(bContext *C, wmOperator *op)
 {
-	return apply_objects_internal(C, op->reports, 1, 0, 0);
+	const int loc= RNA_boolean_get(op->ptr, "location");
+	const int rot= RNA_boolean_get(op->ptr, "rotation");
+	const int sca= RNA_boolean_get(op->ptr, "scale");
+
+	if(loc || rot || sca) {
+		return apply_objects_internal(C, op->reports, loc, rot, sca);
+	}
+	else {
+		return OPERATOR_CANCELLED;
+	}
 }
 
-void OBJECT_OT_location_apply(wmOperatorType *ot)
+void OBJECT_OT_transform_apply(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Apply Location";
-	ot->description = "Apply the object's location to its data";
-	ot->idname= "OBJECT_OT_location_apply";
-	
-	/* api callbacks */
-	ot->exec= location_apply_exec;
-	ot->poll= ED_operator_objectmode; /* editmode will crash */
-	
-	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
-}
+	ot->name= "Apply Object Transform";
+	ot->description = "Apply the object's transformation to its data";
+	ot->idname= "OBJECT_OT_transform_apply";
 
-static int scale_apply_exec(bContext *C, wmOperator *op)
-{
-	return apply_objects_internal(C, op->reports, 0, 1, 0);
-}
-
-void OBJECT_OT_scale_apply(wmOperatorType *ot)
-{
-	/* identifiers */
-	ot->name= "Apply Scale";
-	ot->description = "Apply the object's scale to its data";
-	ot->idname= "OBJECT_OT_scale_apply";
-	
 	/* api callbacks */
-	ot->exec= scale_apply_exec;
+	ot->exec= object_transform_apply_exec;
 	ot->poll= ED_operator_objectmode;
-	
+
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
-}
 
-static int rotation_apply_exec(bContext *C, wmOperator *op)
-{
-	return apply_objects_internal(C, op->reports, 0, 0, 1);
-}
-
-void OBJECT_OT_rotation_apply(wmOperatorType *ot)
-{
-	/* identifiers */
-	ot->name= "Apply Rotation";
-	ot->description = "Apply the object's rotation to its data";
-	ot->idname= "OBJECT_OT_rotation_apply";
-	
-	/* api callbacks */
-	ot->exec= rotation_apply_exec;
-	ot->poll= ED_operator_objectmode;
-	
-	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	RNA_def_boolean(ot->srna, "location", 0, "Location", "");
+	RNA_def_boolean(ot->srna, "rotation", 0, "Rotation", "");
+	RNA_def_boolean(ot->srna, "scale", 0, "Scale", "");
 }
 
 /********************* Set Object Center ************************/
@@ -897,7 +872,7 @@ static int object_origin_set_exec(bContext *C, wmOperator *op)
 								(ob->dup_group==ob_other->dup_group && (ob->transflag|ob_other->transflag) & OB_DUPLIGROUP) )
 					) {
 						ob_other->flag |= OB_DONE;
-						ob_other->recalc= OB_RECALC_OB|OB_RECALC_DATA;
+						DAG_id_tag_update(&ob_other->id, OB_RECALC_OB|OB_RECALC_DATA);
 
 						copy_v3_v3(centn, cent);
 						mul_mat3_m4_v3(ob_other->obmat, centn); /* ommit translation part */
@@ -916,11 +891,9 @@ static int object_origin_set_exec(bContext *C, wmOperator *op)
 	}
 	CTX_DATA_END;
 
-	for (tob= bmain->object.first; tob; tob= tob->id.next) {
-		if(tob->data && (((ID *)tob->data)->flag & LIB_DOIT)) {
-			tob->recalc= OB_RECALC_OB|OB_RECALC_DATA;
-		}
-	}
+	for (tob= bmain->object.first; tob; tob= tob->id.next)
+		if(tob->data && (((ID *)tob->data)->flag & LIB_DOIT))
+			DAG_id_tag_update(&tob->id, OB_RECALC_OB|OB_RECALC_DATA);
 
 	if (tot_change) {
 		DAG_ids_flush_update(bmain, 0);

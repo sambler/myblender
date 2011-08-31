@@ -45,7 +45,7 @@
 
 #include "PIL_time.h"
 
-#include "BLI_math_color.h"
+#include "BLI_math.h"
 #include "BLI_threads.h"
 #include "BLI_string.h"
 #include "BLI_utildefines.h"
@@ -57,10 +57,6 @@
 #include "BKE_global.h"
 #include "BKE_image.h"
 #include "BKE_paint.h"
-
-#ifdef WITH_LCMS
-#include "BKE_colortools.h"
-#endif
 
 #include "BIF_gl.h"
 #include "BIF_glutil.h"
@@ -133,7 +129,7 @@ static void draw_render_info(Scene *scene, Image *ima, ARegion *ar)
 	BKE_image_release_renderresult(scene, ima);
 }
 
-void draw_image_info(ARegion *ar, int channels, int x, int y, char *cp, float *fp, int *zp, float *zpf)
+void draw_image_info(ARegion *ar, int color_manage, int channels, int x, int y, char *cp, float *fp, int *zp, float *zpf)
 {
 	char str[256];
 	float dx= 6;
@@ -149,6 +145,7 @@ void draw_image_info(ARegion *ar, int channels, int x, int y, char *cp, float *f
 	unsigned char blue[3] = {255, 255, 255};
 	#endif
 	float hue=0, sat=0, val=0, lum=0, u=0, v=0;
+	float col[4], finalcol[4];
 
 	glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
 	glEnable(GL_BLEND);
@@ -230,31 +227,47 @@ void draw_image_info(ARegion *ar, int channels, int x, int y, char *cp, float *f
 		}
 	}
 	
-	glDisable(GL_BLEND);
+	/* color rectangle */
 	if (channels==1) {
 		if (fp)
-			glColor3f(fp[0], fp[0], fp[0]);
+			col[0] = col[1] = col[2] = fp[0];
 		else if (cp)
-			glColor3ub(cp[0], cp[0], cp[0]);
+			col[0] = col[1] = col[2] = (float)cp[0]/255.0f;
 		else
-			glColor3ub(0, 0, 0);
+			col[0] = col[1] = col[2] = 0.0f;
 	}
 	else if (channels==3) {
 		if (fp)
-			glColor3fv(fp);
-		else if (cp)
-			glColor3ub(cp[0], cp[1], cp[2]);
+			copy_v3_v3(col, fp);
+		else if (cp) {
+			col[0] = (float)cp[0]/255.0f;
+			col[1] = (float)cp[1]/255.0f;
+			col[2] = (float)cp[2]/255.0f;
+		}
 		else
-			glColor3ub(0, 0, 0);
+			zero_v3(col);
 	}
 	else if (channels==4) {
 		if (fp)
-			glColor4fv(fp);
-		else if (cp)
-			glColor4ub(cp[0], cp[1], cp[2], cp[3]);
+			copy_v4_v4(col, fp);
+		else if (cp) {
+			col[0] = (float)cp[0]/255.0f;
+			col[1] = (float)cp[1]/255.0f;
+			col[2] = (float)cp[2]/255.0f;
+			col[3] = (float)cp[3]/255.0f;
+		}
 		else
-			glColor3ub(0, 0, 0);
+			zero_v4(col);
 	}
+	if (color_manage) {
+		linearrgb_to_srgb_v3_v3(finalcol, col);
+		finalcol[3] = col[3];
+	}
+	else {
+		copy_v4_v4(finalcol, col);
+	}
+	glDisable(GL_BLEND);
+	glColor3fv(finalcol);
 	dx += 5;
 	glBegin(GL_QUADS);
 	glVertex2f(dx, 3);
@@ -315,6 +328,8 @@ void draw_image_info(ARegion *ar, int channels, int x, int y, char *cp, float *f
 		BLF_draw_ascii(blf_mono_font, str, sizeof(str));
 		dx += BLF_width(blf_mono_font, str);
 	}
+
+	(void)dx;
 }
 
 /* image drawing */
@@ -433,20 +448,6 @@ static void sima_draw_alpha_pixelsf(float x1, float y1, int rectx, int recty, fl
 //	glColorMask(1, 1, 1, 1);
 }
 
-#ifdef WITH_LCMS
-static int sima_draw_colorcorrected_pixels(float x1, float y1, ImBuf *ibuf)
-{
-	colorcorrection_do_ibuf(ibuf, "MONOSCNR.ICM"); /* path is hardcoded here, find some place better */
-
-	if(ibuf->crect) {
-		glaDrawPixelsSafe(x1, y1, ibuf->x, ibuf->y, ibuf->x, GL_RGBA, GL_UNSIGNED_BYTE, ibuf->crect);
-		return 1;
-	}
-
-	return 0;
-}
-#endif
-
 static void sima_draw_zbuf_pixels(float x1, float y1, int rectx, int recty, int *recti)
 {
 	/* zbuffer values are signed, so we need to shift color range */
@@ -525,17 +526,6 @@ static void draw_image_buffer(SpaceImage *sima, ARegion *ar, Scene *scene, Image
 		else if(ibuf->channels==1)
 			sima_draw_zbuffloat_pixels(scene, x, y, ibuf->x, ibuf->y, ibuf->rect_float);
 	}
-#ifdef WITH_LCMS
-	else if(sima->flag & SI_COLOR_CORRECTION) {
-		image_verify_buffer_float(ima, ibuf, color_manage);
-		
-		if(sima_draw_colorcorrected_pixels(x, y, ibuf)==0) {
-			unsigned char col1[3]= {100, 0, 100}, col2[3]= {160, 0, 160}; /* pink says 'warning' in blender land */
-			sima_draw_alpha_backdrop(x, y, ibuf->x, ibuf->y, zoomx, zoomy, col1, col2);
-		}
-
-	}
-#endif
 	else {
 		if(sima->flag & SI_USE_ALPHA) {
 			unsigned char col1[3]= {100, 100, 100}, col2[3]= {160, 160, 160};
@@ -683,7 +673,7 @@ static void draw_image_view_tool(Scene *scene)
 {
 	ToolSettings *settings= scene->toolsettings;
 	Brush *brush= settings->imapaint.brush;
-	short mval[2];
+	int mval[2];
 	float radius;
 	int draw= 0;
 

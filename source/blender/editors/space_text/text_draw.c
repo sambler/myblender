@@ -907,9 +907,12 @@ static void text_update_drawcache(SpaceText *st, ARegion *ar)
 
 void text_drawcache_tag_update(SpaceText *st, int full)
 {
-	DrawCache *drawcache= (DrawCache *)st->drawcache;
-
-	if(drawcache) {
+	/* this happens if text editor ops are caled from python */
+	if (st == NULL)
+		return;
+		
+	if(st->drawcache) {
+		DrawCache *drawcache= (DrawCache *)st->drawcache;
 		Text *txt= st->text;
 
 		if(drawcache->update_flag) {
@@ -1495,6 +1498,8 @@ static void draw_cursor(SpaceText *st, ARegion *ar)
 				glRecti(x-4, y, ar->winx, y-st->lheight),  y-=st->lheight;
 
 			glRecti(x-4, y, x+toc*st->cwidth, y-st->lheight);  y-=st->lheight;
+
+			(void)y;
 		}
 	}
 	else {

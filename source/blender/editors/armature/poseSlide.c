@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -93,7 +91,8 @@
 /* Temporary data shared between these operators */
 typedef struct tPoseSlideOp {
 	Scene *scene;		/* current scene */
-	ARegion *ar;		/* region that we're operating in (needed for  */
+	ScrArea *sa;		/* area that we're operating in (needed for modal()) */
+	ARegion *ar;		/* region that we're operating in (needed for modal()) */
 	Object *ob;			/* active object that Pose Info comes from */
 	bArmature *arm;		/* armature for pose */
 	
@@ -132,6 +131,7 @@ static int pose_slide_init (bContext *C, wmOperator *op, short mode)
 	pso->scene= CTX_data_scene(C);
 	pso->ob= ED_object_pose_armature(CTX_data_active_object(C));
 	pso->arm= (pso->ob)? pso->ob->data : NULL;
+	pso->sa= CTX_wm_area(C); /* only really needed when doing modal() */
 	pso->ar= CTX_wm_region(C); /* only really needed when doing modal() */
 	
 	pso->cframe= pso->scene->r.cfra;
@@ -519,6 +519,33 @@ static void pose_slide_reset (tPoseSlideOp *pso)
 
 /* ------------------------------------ */
 
+/* draw percentage indicator in header */
+static void pose_slide_draw_status (tPoseSlideOp *pso)
+{
+	char statusStr[32];
+	char mode[32];
+	
+	switch (pso->mode) {
+		case POSESLIDE_PUSH:
+			strcpy(mode, "Push Pose");
+			break;
+		case POSESLIDE_RELAX:
+			strcpy(mode, "Relax Pose");
+			break;
+		case POSESLIDE_BREAKDOWN:
+			strcpy(mode, "Breakdown");
+			break;
+		
+		default:
+			// unknown
+			strcpy(mode, "Sliding-Tool");
+			break;
+	}
+	
+	sprintf(statusStr, "%s: %d %%", mode, (int)(pso->percentage*100.0f));
+	ED_area_headerprint(pso->sa, statusStr);
+}
+
 /* common code for invoke() methods */
 static int pose_slide_invoke_common (bContext *C, wmOperator *op, tPoseSlideOp *pso)
 {
@@ -587,6 +614,9 @@ static int pose_slide_invoke_common (bContext *C, wmOperator *op, tPoseSlideOp *
 	/* set cursor to indicate modal */
 	WM_cursor_modal(win, BC_EW_SCROLLCURSOR);
 	
+	/* header print */
+	pose_slide_draw_status(pso);
+	
 	/* add a modal handler for this operator */
 	WM_event_add_modal_handler(C, op);
 	return OPERATOR_RUNNING_MODAL;
@@ -601,7 +631,8 @@ static int pose_slide_modal (bContext *C, wmOperator *op, wmEvent *evt)
 	switch (evt->type) {
 		case LEFTMOUSE:	/* confirm */
 		{
-			/* return to normal cursor */
+			/* return to normal cursor and header status */
+			ED_area_headerprint(pso->sa, NULL);
 			WM_cursor_restore(win);
 			
 			/* insert keyframes as required... */
@@ -615,7 +646,8 @@ static int pose_slide_modal (bContext *C, wmOperator *op, wmEvent *evt)
 		case ESCKEY:	/* cancel */
 		case RIGHTMOUSE: 
 		{
-			/* return to normal cursor */
+			/* return to normal cursor and header status */
+			ED_area_headerprint(pso->sa, NULL);
 			WM_cursor_restore(win);
 			
 			/* reset transforms back to original state */
@@ -638,6 +670,9 @@ static int pose_slide_modal (bContext *C, wmOperator *op, wmEvent *evt)
 			 */
 			pso->percentage= (evt->x - pso->ar->winrct.xmin) / ((float)pso->ar->winx);
 			RNA_float_set(op->ptr, "percentage", pso->percentage);
+			
+			/* update percentage indicator in header */
+			pose_slide_draw_status(pso);
 			
 			/* reset transforms (to avoid accumulation errors) */
 			pose_slide_reset(pso);
@@ -989,57 +1024,61 @@ static float pose_propagate_get_boneHoldEndFrame (Object *ob, tPChanFCurveLink *
 }
 
 /* get reference value from F-Curve using RNA */
-static float pose_propagate_get_refVal (Object *ob, FCurve *fcu)
+static short pose_propagate_get_refVal (Object *ob, FCurve *fcu, float *value)
 {
 	PointerRNA id_ptr, ptr;
 	PropertyRNA *prop;
-	float value;
+	short found= FALSE;
 	
 	/* base pointer is always the object -> id_ptr */
 	RNA_id_pointer_create(&ob->id, &id_ptr);
 	
 	/* resolve the property... */
 	if (RNA_path_resolve(&id_ptr, fcu->rna_path, &ptr, &prop)) {
-		if (RNA_property_array_check(&ptr, prop)) {
+		if (RNA_property_array_check(prop)) {
 			/* array */
-			if (fcu->array_index < RNA_property_array_length(&ptr, prop)) {	
+			if (fcu->array_index < RNA_property_array_length(&ptr, prop)) {
+				found= TRUE;
 				switch (RNA_property_type(prop)) {
 					case PROP_BOOLEAN:
-						value= (float)RNA_property_boolean_get_index(&ptr, prop, fcu->array_index);
+						*value= (float)RNA_property_boolean_get_index(&ptr, prop, fcu->array_index);
 						break;
 					case PROP_INT:
-						value= (float)RNA_property_int_get_index(&ptr, prop, fcu->array_index);
+						*value= (float)RNA_property_int_get_index(&ptr, prop, fcu->array_index);
 						break;
 					case PROP_FLOAT:
-						value= RNA_property_float_get_index(&ptr, prop, fcu->array_index);
+						*value= RNA_property_float_get_index(&ptr, prop, fcu->array_index);
 						break;
 					default:
+						found= FALSE;
 						break;
 				}
 			}
 		}
 		else {
 			/* not an array */
+			found= TRUE;
 			switch (RNA_property_type(prop)) {
 				case PROP_BOOLEAN:
-					value= (float)RNA_property_boolean_get(&ptr, prop);
+					*value= (float)RNA_property_boolean_get(&ptr, prop);
 					break;
 				case PROP_INT:
-					value= (float)RNA_property_int_get(&ptr, prop);
+					*value= (float)RNA_property_int_get(&ptr, prop);
 					break;
 				case PROP_ENUM:
-					value= (float)RNA_property_enum_get(&ptr, prop);
+					*value= (float)RNA_property_enum_get(&ptr, prop);
 					break;
 				case PROP_FLOAT:
-					value= RNA_property_float_get(&ptr, prop);
+					*value= RNA_property_float_get(&ptr, prop);
 					break;
 				default:
+					found= FALSE;
 					break;
 			}
 		}
 	}
 	
-	return value;
+	return found;
 }
 
 /* propagate just works along each F-Curve in turn */
@@ -1062,7 +1101,8 @@ static void pose_propagate_fcurve (wmOperator *op, Object *ob, FCurve *fcu,
 	 * doesn't need to firstly keyframe the pose (though this doesn't mean that 
 	 * they can't either)
 	 */
-	refVal = pose_propagate_get_refVal(ob, fcu);
+	if( !pose_propagate_get_refVal(ob, fcu, &refVal))
+		return;
 	
 	/* find the first keyframe to start propagating from 
 	 *	- if there's a keyframe on the current frame, we probably want to save this value there too

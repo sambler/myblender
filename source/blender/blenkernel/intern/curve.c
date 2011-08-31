@@ -63,7 +63,8 @@
 #include "BKE_key.h"  
 #include "BKE_library.h"  
 #include "BKE_main.h"  
-#include "BKE_object.h"  
+#include "BKE_object.h"
+#include "BKE_material.h"
 
 
 #include "ED_curve.h"
@@ -216,10 +217,22 @@ Curve *copy_curve(Curve *cu)
 	return cun;
 }
 
+static void extern_local_curve(Curve *cu)
+{	
+	id_lib_extern((ID *)cu->vfont);
+	id_lib_extern((ID *)cu->vfontb);	
+	id_lib_extern((ID *)cu->vfonti);
+	id_lib_extern((ID *)cu->vfontbi);
+	
+	if(cu->mat) {
+		extern_local_matarar(cu->mat, cu->totcol);
+	}
+}
+
 void make_local_curve(Curve *cu)
 {
-	Object *ob = NULL;
-	Curve *cun;
+	Main *bmain= G.main;
+	Object *ob;
 	int local=0, lib=0;
 	
 	/* - when there are only lib users: don't do
@@ -229,47 +242,41 @@ void make_local_curve(Curve *cu)
 	
 	if(cu->id.lib==NULL) return;
 
-	if(cu->vfont) cu->vfont->id.lib= NULL;
-	if(cu->vfontb) cu->vfontb->id.lib= NULL;
-	if(cu->vfonti) cu->vfonti->id.lib= NULL;
-	if(cu->vfontbi) cu->vfontbi->id.lib= NULL;
-
 	if(cu->id.us==1) {
 		cu->id.lib= NULL;
 		cu->id.flag= LIB_LOCAL;
-		new_id(NULL, (ID *)cu, NULL);
+
+		new_id(&bmain->curve, (ID *)cu, NULL);
+		extern_local_curve(cu);
 		return;
 	}
-	
-	ob= G.main->object.first;
-	while(ob) {
-		if(ob->data==cu) {
+
+	for(ob= bmain->object.first; ob && ELEM(0, lib, local); ob= ob->id.next) {
+		if(ob->data == cu) {
 			if(ob->id.lib) lib= 1;
 			else local= 1;
 		}
-		ob= ob->id.next;
 	}
-	
+
 	if(local && lib==0) {
 		cu->id.lib= NULL;
 		cu->id.flag= LIB_LOCAL;
-		new_id(NULL, (ID *)cu, NULL);
+
+		new_id(&bmain->curve, (ID *)cu, NULL);
+		extern_local_curve(cu);
 	}
 	else if(local && lib) {
-		cun= copy_curve(cu);
+		Curve *cun= copy_curve(cu);
 		cun->id.us= 0;
-		
-		ob= G.main->object.first;
-		while(ob) {
+
+		for(ob= bmain->object.first; ob; ob= ob->id.next) {
 			if(ob->data==cu) {
-				
 				if(ob->id.lib==NULL) {
 					ob->data= cun;
 					cun->id.us++;
 					cu->id.us--;
 				}
 			}
-			ob= ob->id.next;
 		}
 	}
 }
@@ -573,46 +580,47 @@ void addNurbPointsBezier(Nurb *nu, int number)
 /* ~~~~~~~~~~~~~~~~~~~~Non Uniform Rational B Spline calculations ~~~~~~~~~~~ */
 
 
-static void calcknots(float *knots, short aantal, short order, short type)
-/* knots: number of pnts NOT corrected for cyclic */
-/* type;	 0: uniform, 1: endpoints, 2: bezier */
+static void calcknots(float *knots, const short pnts, const short order, const short flag)
 {
+	/* knots: number of pnts NOT corrected for cyclic */
+	const int pnts_order= pnts + order;
 	float k;
-	int a, t;
+	int a;
 
-		t = aantal+order;
-	if(type==0) {
-
-		for(a=0;a<t;a++) {
-			knots[a]= (float)a;
-		}
-	}
-	else if(type==1) {
+	switch(flag & (CU_NURB_ENDPOINT|CU_NURB_BEZIER)) {
+	case CU_NURB_ENDPOINT:
 		k= 0.0;
-		for(a=1;a<=t;a++) {
+		for(a=1; a <= pnts_order; a++) {
 			knots[a-1]= k;
-			if(a>=order && a<=aantal) k+= 1.0f;
+			if(a >= order && a <= pnts) k+= 1.0f;
 		}
-	}
-	else if(type==2) {
-		/* Warning, the order MUST be 2 or 4, if this is not enforced, the displist will be corrupt */
+		break;
+	case CU_NURB_BEZIER:
+		/* Warning, the order MUST be 2 or 4,
+		 * if this is not enforced, the displist will be corrupt */
 		if(order==4) {
 			k= 0.34;
-			for(a=0;a<t;a++) {
+			for(a=0; a < pnts_order; a++) {
 				knots[a]= floorf(k);
 				k+= (1.0f/3.0f);
 			}
 		}
 		else if(order==3) {
 			k= 0.6f;
-			for(a=0;a<t;a++) {
-				if(a>=order && a<=aantal) k+= 0.5f;
+			for(a=0; a < pnts_order; a++) {
+				if(a >= order && a <= pnts) k+= 0.5f;
 				knots[a]= floorf(k);
 			}
 		}
 		else {
 			printf("bez nurb curve order is not 3 or 4, should never happen\n");
 		}
+		break;
+	default:
+		for(a=0; a < pnts_order; a++) {
+			knots[a]= (float)a;
+		}
+		break;
 	}
 }
 
@@ -655,7 +663,7 @@ static void makeknots(Nurb *nu, short uv)
 					calcknots(nu->knotsu, nu->pntsu, nu->orderu, 0);  /* cyclic should be uniform */
 					makecyclicknots(nu->knotsu, nu->pntsu, nu->orderu);
 				} else {
-					calcknots(nu->knotsu, nu->pntsu, nu->orderu, nu->flagu>>1);
+					calcknots(nu->knotsu, nu->pntsu, nu->orderu, nu->flagu);
 				}
 			}
 			else nu->knotsu= NULL;
@@ -668,7 +676,7 @@ static void makeknots(Nurb *nu, short uv)
 					calcknots(nu->knotsv, nu->pntsv, nu->orderv, 0);  /* cyclic should be uniform */
 					makecyclicknots(nu->knotsv, nu->pntsv, nu->orderv);
 				} else {
-					calcknots(nu->knotsv, nu->pntsv, nu->orderv, nu->flagv>>1);
+					calcknots(nu->knotsv, nu->pntsv, nu->orderv, nu->flagv);
 				}
 			}
 			else nu->knotsv= NULL;
@@ -1852,7 +1860,7 @@ static void make_bevel_list_3D_minimum_twist(BevList *bl)
 		 * do this by calculating the tilt angle difference, then apply
 		 * the rotation gradually over the entire curve
 		 *
-		 * note that the split is between last and second last, rather then first/last as youd expect.
+		 * note that the split is between last and second last, rather than first/last as youd expect.
 		 *
 		 * real order is like this
 		 * 0,1,2,3,4 --> 1,2,3,4,0
@@ -2424,6 +2432,7 @@ void calchandleNurb(BezTriple *bezt, BezTriple *prev, BezTriple *next, int mode)
 {
 	float *p1,*p2,*p3, pt[3];
 	float dx1,dy1,dz1,dx,dy,dz,vx,vy,vz,len,len1,len2;
+	const float eps= 1e-5;
 
 	if(bezt->h1==0 && bezt->h2==0) return;
 
@@ -2464,7 +2473,7 @@ void calchandleNurb(BezTriple *bezt, BezTriple *prev, BezTriple *next, int mode)
 	if(len2==0.0f) len2=1.0f;
 
 
-	if(bezt->h1==HD_AUTO || bezt->h2==HD_AUTO) {    /* auto */
+	if(ELEM(bezt->h1,HD_AUTO,HD_AUTO_ANIM) || ELEM(bezt->h2,HD_AUTO,HD_AUTO_ANIM)) {    /* auto */
 		vx= dx1/len2 + dx/len1;
 		vy= dy1/len2 + dy/len1;
 		vz= dz1/len2 + dz/len1;
@@ -2475,13 +2484,13 @@ void calchandleNurb(BezTriple *bezt, BezTriple *prev, BezTriple *next, int mode)
 			if(len1>5.0f*len2) len1= 5.0f*len2;	
 			if(len2>5.0f*len1) len2= 5.0f*len1;
 			
-			if(bezt->h1==HD_AUTO) {
+			if(ELEM(bezt->h1,HD_AUTO,HD_AUTO_ANIM)) {
 				len1/=len;
 				*(p2-3)= *p2-vx*len1;
 				*(p2-2)= *(p2+1)-vy*len1;
 				*(p2-1)= *(p2+2)-vz*len1;
 				
-				if(mode==2 && next && prev) {	// keep horizontal if extrema
+				if((bezt->h1==HD_AUTO_ANIM) && next && prev) {	// keep horizontal if extrema
 					float ydiff1= prev->vec[1][1] - bezt->vec[1][1];
 					float ydiff2= next->vec[1][1] - bezt->vec[1][1];
 					if( (ydiff1 <= 0.0f && ydiff2 <= 0.0f) || (ydiff1 >= 0.0f && ydiff2 >= 0.0f) ) {
@@ -2503,13 +2512,13 @@ void calchandleNurb(BezTriple *bezt, BezTriple *prev, BezTriple *next, int mode)
 					}
 				}
 			}
-			if(bezt->h2==HD_AUTO) {
+			if(ELEM(bezt->h2,HD_AUTO,HD_AUTO_ANIM)) {
 				len2/=len;
 				*(p2+3)= *p2+vx*len2;
 				*(p2+4)= *(p2+1)+vy*len2;
 				*(p2+5)= *(p2+2)+vz*len2;
 				
-				if(mode==2 && next && prev) {	// keep horizontal if extrema
+				if((bezt->h2==HD_AUTO_ANIM) && next && prev) {	// keep horizontal if extrema
 					float ydiff1= prev->vec[1][1] - bezt->vec[1][1];
 					float ydiff2= next->vec[1][1] - bezt->vec[1][1];
 					if( (ydiff1 <= 0.0f && ydiff2 <= 0.0f) || (ydiff1 >= 0.0f && ydiff2 >= 0.0f) ) {
@@ -2580,30 +2589,38 @@ void calchandleNurb(BezTriple *bezt, BezTriple *prev, BezTriple *next, int mode)
 
 	if(bezt->f1 & SELECT) { /* order of calculation */
 		if(bezt->h2==HD_ALIGN) {	/* aligned */
-			len= len2/len1;
-			p2[3]= p2[0]+len*(p2[0]-p2[-3]);
-			p2[4]= p2[1]+len*(p2[1]-p2[-2]);
-			p2[5]= p2[2]+len*(p2[2]-p2[-1]);
+			if(len1>eps) {
+				len= len2/len1;
+				p2[3]= p2[0]+len*(p2[0]-p2[-3]);
+				p2[4]= p2[1]+len*(p2[1]-p2[-2]);
+				p2[5]= p2[2]+len*(p2[2]-p2[-1]);
+			}
 		}
 		if(bezt->h1==HD_ALIGN) {
-			len= len1/len2;
-			p2[-3]= p2[0]+len*(p2[0]-p2[3]);
-			p2[-2]= p2[1]+len*(p2[1]-p2[4]);
-			p2[-1]= p2[2]+len*(p2[2]-p2[5]);
+			if(len2>eps) {
+				len= len1/len2;
+				p2[-3]= p2[0]+len*(p2[0]-p2[3]);
+				p2[-2]= p2[1]+len*(p2[1]-p2[4]);
+				p2[-1]= p2[2]+len*(p2[2]-p2[5]);
+			}
 		}
 	}
 	else {
 		if(bezt->h1==HD_ALIGN) {
-			len= len1/len2;
-			p2[-3]= p2[0]+len*(p2[0]-p2[3]);
-			p2[-2]= p2[1]+len*(p2[1]-p2[4]);
-			p2[-1]= p2[2]+len*(p2[2]-p2[5]);
+			if(len2>eps) {
+				len= len1/len2;
+				p2[-3]= p2[0]+len*(p2[0]-p2[3]);
+				p2[-2]= p2[1]+len*(p2[1]-p2[4]);
+				p2[-1]= p2[2]+len*(p2[2]-p2[5]);
+			}
 		}
 		if(bezt->h2==HD_ALIGN) {	/* aligned */
-			len= len2/len1;
-			p2[3]= p2[0]+len*(p2[0]-p2[-3]);
-			p2[4]= p2[1]+len*(p2[1]-p2[-2]);
-			p2[5]= p2[2]+len*(p2[2]-p2[-1]);
+			if(len1>eps) {
+				len= len2/len1;
+				p2[3]= p2[0]+len*(p2[0]-p2[-3]);
+				p2[4]= p2[1]+len*(p2[1]-p2[-2]);
+				p2[5]= p2[2]+len*(p2[2]-p2[-1]);
+			}
 		}
 	}
 }
@@ -2657,15 +2674,15 @@ void testhandlesNurb(Nurb *nu)
 		if(bezt->f1 & SELECT) flag++;
 		if(bezt->f2 & SELECT) flag += 2;
 		if(bezt->f3 & SELECT) flag += 4;
-
+		
 		if( !(flag==0 || flag==7) ) {
-			if(bezt->h1==HD_AUTO) {   /* auto */
+			if(ELEM(bezt->h1, HD_AUTO, HD_AUTO_ANIM)) {   /* auto */
 				bezt->h1= HD_ALIGN;
 			}
-			if(bezt->h2==HD_AUTO) {   /* auto */
+			if(ELEM(bezt->h2, HD_AUTO, HD_AUTO_ANIM)) {   /* auto */
 				bezt->h2= HD_ALIGN;
 			}
-
+			
 			if(bezt->h1==HD_VECT) {   /* vector */
 				if(flag < 4) bezt->h1= 0;
 			}
@@ -2675,7 +2692,7 @@ void testhandlesNurb(Nurb *nu)
 		}
 		bezt++;
 	}
-
+	
 	calchandlesNurb(nu);
 }
 
@@ -3239,6 +3256,31 @@ void curve_translate(Curve *cu, float offset[3], int do_keys)
 			float *fp= kb->data;
 			for (i= kb->totelem; i--; fp+=3) {
 				add_v3_v3(fp, offset);
+			}
+		}
+	}
+}
+
+void curve_delete_material_index(Curve *cu, int index)
+{
+	const int curvetype= curve_type(cu);
+
+	if(curvetype == OB_FONT) {
+		struct CharInfo *info= cu->strinfo;
+		int i;
+		for(i= cu->len-1; i >= 0; i--, info++) {
+			if (info->mat_nr && info->mat_nr>=index) {
+				info->mat_nr--;
+			}
+		}
+	}
+	else {
+		Nurb *nu;
+
+		for (nu= cu->nurb.first; nu; nu= nu->next) {
+			if(nu->mat_nr && nu->mat_nr>=index) {
+				nu->mat_nr--;
+				if (curvetype == OB_CURVE) nu->charidx--;
 			}
 		}
 	}

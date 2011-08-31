@@ -54,7 +54,7 @@
 extern "C" {
 	#include "bpy_internal_import.h"  /* from the blender python api, but we want to import text too! */
 	#include "py_capi_utils.h"
-	#include "mathutils.h" // Blender.Mathutils module copied here so the blenderlayer can use.
+	#include "mathutils.h" // 'mathutils' module copied here so the blenderlayer can use.
 	#include "bgl.h"
 	#include "blf_py_api.h"
 
@@ -113,6 +113,7 @@ extern "C" {
 #include "NG_NetworkScene.h" //Needed for sendMessage()
 
 #include "BL_Shader.h"
+#include "BL_Action.h"
 
 #include "KX_PyMath.h"
 
@@ -327,7 +328,7 @@ static PyObject* gPyLoadGlobalDict(PyObject*)
 {
 	char marshal_path[512];
 	char *marshal_buffer = NULL;
-	unsigned int marshal_length;
+	size_t marshal_length;
 	FILE *fp = NULL;
 	int result;
 
@@ -338,7 +339,7 @@ static PyObject* gPyLoadGlobalDict(PyObject*)
 	if (fp) {
 		// obtain file size:
 		fseek (fp, 0, SEEK_END);
-		marshal_length = ftell(fp);
+		marshal_length = (size_t)ftell(fp);
 		rewind(fp);
 
 		marshal_buffer = (char*)malloc (sizeof(char)*marshal_length);
@@ -1207,6 +1208,28 @@ static PyObject* gPyGetMaterialType(PyObject*)
 	return PyLong_FromSsize_t(flag);
 }
 
+static PyObject* gPySetAnisotropicFiltering(PyObject*, PyObject* args)
+{
+	short level;
+
+	if (!PyArg_ParseTuple(args, "h:setAnisotropicFiltering", &level))
+		return NULL;
+
+	if (level != 1 && level != 2 && level != 4 && level != 8 && level != 16) {
+		PyErr_SetString(PyExc_ValueError, "Rasterizer.setAnisotropicFiltering(level): Expected value of 1, 2, 4, 8, or 16 for value");
+		return NULL;
+	}
+
+	gp_Rasterizer->SetAnisotropicFiltering(level);
+
+	Py_RETURN_NONE;
+}
+
+static PyObject* gPyGetAnisotropicFiltering(PyObject*, PyObject* args)
+{
+	return PyLong_FromLong(gp_Rasterizer->GetAnisotropicFiltering());
+}
+
 static PyObject* gPyDrawLine(PyObject*, PyObject* args)
 {
 	PyObject* ob_from;
@@ -1271,6 +1294,10 @@ static struct PyMethodDef rasterizer_methods[] = {
    METH_VARARGS, "set the state of a GLSL material setting"},
   {"getGLSLMaterialSetting",(PyCFunction) gPyGetGLSLMaterialSetting,
    METH_VARARGS, "get the state of a GLSL material setting"},
+  {"setAnisotropicFiltering", (PyCFunction) gPySetAnisotropicFiltering,
+  METH_VARARGS, "set the anisotropic filtering level (must be one of 1, 2, 4, 8, 16)"},
+  {"getAnisotropicFiltering", (PyCFunction) gPyGetAnisotropicFiltering,
+  METH_VARARGS, "get the anisotropic filtering level"},
   {"drawLine", (PyCFunction) gPyDrawLine,
    METH_VARARGS, "draw a line on the screen"},
   { NULL, (PyCFunction) NULL, 0, NULL }
@@ -1628,6 +1655,11 @@ PyObject* initGameLogic(KX_KetsjiEngine *engine, KX_Scene* scene) // quick hack 
 	KX_MACRO_addTypesToDict(d, ROT_MODE_ZXY, ROT_MODE_ZXY);
 	KX_MACRO_addTypesToDict(d, ROT_MODE_ZYX, ROT_MODE_ZYX);
 
+	/* BL_Action play modes */
+	KX_MACRO_addTypesToDict(d, KX_ACTION_MODE_PLAY, BL_Action::ACT_MODE_PLAY);
+	KX_MACRO_addTypesToDict(d, KX_ACTION_MODE_LOOP, BL_Action::ACT_MODE_LOOP);
+	KX_MACRO_addTypesToDict(d, KX_ACTION_MODE_PING_PONG, BL_Action::ACT_MODE_PING_PONG);
+
 	// Check for errors
 	if (PyErr_Occurred())
     {
@@ -1749,7 +1781,7 @@ static void restorePySysObjects(void)
 
 // Copied from bpy_interface.c
 static struct _inittab bge_internal_modules[]= {
-	{(char *)"mathutils", BPyInit_mathutils},
+	{(char *)"mathutils", PyInit_mathutils},
 	{(char *)"bgl", BPyInit_bgl},
 	{(char *)"blf", BPyInit_blf},
 	{(char *)"aud", AUD_initPython},
@@ -1781,7 +1813,7 @@ PyObject* initGamePlayerPythonScripting(const STR_String& progname, TPythonSecur
 	PyImport_ExtendInittab(bge_internal_modules);
 
 	/* find local python installation */
-	PyC_SetHomePath(BLI_get_folder(BLENDER_PYTHON, NULL));
+	PyC_SetHomePath(BLI_get_folder(BLENDER_SYSTEM_PYTHON, NULL));
 
 	Py_Initialize();
 	

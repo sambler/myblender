@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -58,6 +56,7 @@
 #include "UI_view2d.h"
 
 #include "ED_space_api.h"
+#include "ED_screen.h"
 #include "ED_anim_api.h"
 #include "ED_markers.h"
 
@@ -76,6 +75,8 @@ static SpaceLink *action_new(const bContext *C)
 	
 	saction->autosnap = SACTSNAP_FRAME;
 	saction->mode= SACTCONT_DOPESHEET;
+	
+	saction->ads.filterflag |= ADS_FILTER_SUMMARY;
 	
 	/* header */
 	ar= MEM_callocN(sizeof(ARegion), "header for action");
@@ -402,6 +403,13 @@ static void action_listener(ScrArea *sa, wmNotifier *wmn)
 				default: /* just redrawing the view will do */
 					ED_area_tag_redraw(sa);
 					break;
+			}
+			break;
+		case NC_NODE:
+			if (wmn->action == NA_SELECTED) {
+				/* selection changed, so force refresh to flush (needs flag set to do syncing) */
+				saction->flag |= SACTION_TEMP_NEEDCHANSYNC;
+				ED_area_tag_refresh(sa);
 			}
 			break;
 		case NC_SPACE:

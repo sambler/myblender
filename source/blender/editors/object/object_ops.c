@@ -65,9 +65,7 @@ void ED_operatortypes_object(void)
 	WM_operatortype_append(OBJECT_OT_scale_clear);
 	WM_operatortype_append(OBJECT_OT_origin_clear);
 	WM_operatortype_append(OBJECT_OT_visual_transform_apply);
-	WM_operatortype_append(OBJECT_OT_location_apply);
-	WM_operatortype_append(OBJECT_OT_scale_apply);
-	WM_operatortype_append(OBJECT_OT_rotation_apply);
+	WM_operatortype_append(OBJECT_OT_transform_apply);
 	WM_operatortype_append(OBJECT_OT_origin_set);
 	
 	WM_operatortype_append(OBJECT_OT_mode_set);
@@ -119,6 +117,7 @@ void ED_operatortypes_object(void)
 	WM_operatortype_append(OBJECT_OT_armature_add);
 	WM_operatortype_append(OBJECT_OT_lamp_add);
 	WM_operatortype_append(OBJECT_OT_camera_add);
+	WM_operatortype_append(OBJECT_OT_speaker_add);
 	WM_operatortype_append(OBJECT_OT_add);
 	WM_operatortype_append(OBJECT_OT_add_named);
 	WM_operatortype_append(OBJECT_OT_effector_add);

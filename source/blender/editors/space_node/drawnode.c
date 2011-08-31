@@ -423,6 +423,7 @@ static void node_shader_buts_dynamic(uiLayout *layout, bContext *C, PointerRNA *
 /* only once called */
 static void node_shader_set_butfunc(bNodeType *ntype)
 {
+	ntype->uifuncbut = NULL;
 	switch(ntype->type) {
 		/* case NODE_GROUP:	 note, typeinfo for group is generated... see "XXX ugly hack" */
 
@@ -472,6 +473,7 @@ static void node_shader_set_butfunc(bNodeType *ntype)
 		default:
 			ntype->uifunc= NULL;
 	}
+		if (ntype->uifuncbut == NULL) ntype->uifuncbut = ntype->uifunc;
 }
 
 /* ****************** BUTTON CALLBACKS FOR COMPOSITE NODES ***************** */
@@ -482,6 +484,7 @@ static void node_composit_buts_image(uiLayout *layout, bContext *C, PointerRNA *
 	bNode *node= ptr->data;
 	PointerRNA imaptr;
 	PropertyRNA *prop;
+	int source;
 	
 	uiTemplateID(layout, C, ptr, "image", NULL, "IMAGE_OT_open", NULL);
 	
@@ -495,7 +498,19 @@ static void node_composit_buts_image(uiLayout *layout, bContext *C, PointerRNA *
 	
 	uiItemR(col, &imaptr, "source", 0, NULL, ICON_NONE);
 	
-	if (ELEM(RNA_enum_get(&imaptr, "source"), IMA_SRC_SEQUENCE, IMA_SRC_MOVIE)) {
+	source= RNA_enum_get(&imaptr, "source");
+
+	if(source == IMA_SRC_SEQUENCE) {
+		/* don't use iuser->framenr directly because it may not be updated if auto-refresh is off */
+		Scene *scene= CTX_data_scene(C);
+		ImageUser *iuser= node->storage;
+		char tstr[32];
+		const int framenr= BKE_image_user_get_frame(iuser, CFRA, 0);
+		BLI_snprintf(tstr, sizeof(tstr), "Frame: %d", framenr);
+		uiItemL(layout, tstr, ICON_NONE);
+	}
+
+	if (ELEM(source, IMA_SRC_SEQUENCE, IMA_SRC_MOVIE)) {
 		col= uiLayoutColumn(layout, 1);
 		uiItemR(col, ptr, "frame_duration", 0, NULL, ICON_NONE);
 		uiItemR(col, ptr, "frame_start", 0, NULL, ICON_NONE);
@@ -849,7 +864,7 @@ static void node_composit_buts_color_spill(uiLayout *layout, bContext *UNUSED(C)
 
 	uiItemR(col, ptr, "ratio", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
 	uiItemR(col, ptr, "use_unspill", 0, NULL, ICON_NONE);
-	if (RNA_enum_get(ptr, "use_unspill")== 1) {
+	if (RNA_boolean_get(ptr, "use_unspill")== 1) {
 		uiItemR(col, ptr, "unspill_red", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
 		uiItemR(col, ptr, "unspill_green", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
 		uiItemR(col, ptr, "unspill_blue", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
@@ -1023,6 +1038,32 @@ static void node_composit_buts_colorbalance(uiLayout *layout, bContext *UNUSED(C
 	}
 
 }
+static void node_composit_buts_colorbalance_but(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
+{
+	uiItemR(layout, ptr, "correction_method", 0, NULL, ICON_NONE);
+
+	if (RNA_enum_get(ptr, "correction_method")== 0) {
+
+	uiTemplateColorWheel(layout, ptr, "lift", 1, 1, 0, 1);
+		uiItemR(layout, ptr, "lift", 0, NULL, ICON_NONE);
+
+		uiTemplateColorWheel(layout, ptr, "gamma", 1, 1, 1, 1);
+		uiItemR(layout, ptr, "gamma", 0, NULL, ICON_NONE);
+
+		uiTemplateColorWheel(layout, ptr, "gain", 1, 1, 1, 1);
+		uiItemR(layout, ptr, "gain", 0, NULL, ICON_NONE);
+	} else {
+		uiTemplateColorWheel(layout, ptr, "offset", 1, 1, 0, 1);
+		uiItemR(layout, ptr, "offset", 0, NULL, ICON_NONE);
+
+		uiTemplateColorWheel(layout, ptr, "power", 1, 1, 0, 1);
+		uiItemR(layout, ptr, "power", 0, NULL, ICON_NONE);
+
+		uiTemplateColorWheel(layout, ptr, "slope", 1, 1, 0, 1);
+		uiItemR(layout, ptr, "slope", 0, NULL, ICON_NONE);
+	}
+}
+
 
 static void node_composit_buts_huecorrect(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
@@ -1037,6 +1078,7 @@ static void node_composit_buts_ycc(uiLayout *layout, bContext *UNUSED(C), Pointe
 /* only once called */
 static void node_composit_set_butfunc(bNodeType *ntype)
 {
+	ntype->uifuncbut = NULL;
 	switch(ntype->type) {
 		/* case NODE_GROUP:	 note, typeinfo for group is generated... see "XXX ugly hack" */
 
@@ -1171,6 +1213,7 @@ static void node_composit_set_butfunc(bNodeType *ntype)
 			break;
 		case CMP_NODE_COLORBALANCE:
 			ntype->uifunc=node_composit_buts_colorbalance;
+			ntype->uifuncbut=node_composit_buts_colorbalance_but;
 			break;
 		case CMP_NODE_HUECORRECT:
 			ntype->uifunc=node_composit_buts_huecorrect;
@@ -1185,6 +1228,8 @@ static void node_composit_set_butfunc(bNodeType *ntype)
 		default:
 			ntype->uifunc= NULL;
 	}
+	if (ntype->uifuncbut == NULL) ntype->uifuncbut = ntype->uifunc;
+
 }
 
 /* ****************** BUTTON CALLBACKS FOR TEXTURE NODES ***************** */
@@ -1295,6 +1340,7 @@ static void node_texture_buts_output(uiLayout *layout, bContext *UNUSED(C), Poin
 /* only once called */
 static void node_texture_set_butfunc(bNodeType *ntype)
 {
+    ntype->uifuncbut = NULL;
 	if( ntype->type >= TEX_NODE_PROC && ntype->type < TEX_NODE_PROC_MAX ) {
 		ntype->uifunc = node_texture_buts_proc;
 	}
@@ -1339,6 +1385,7 @@ static void node_texture_set_butfunc(bNodeType *ntype)
 		default:
 			ntype->uifunc= NULL;
 	}
+        if (ntype->uifuncbut == NULL) ntype->uifuncbut = ntype->uifunc;
 }
 
 /* ******* init draw callbacks for all tree types, only called in usiblender.c, once ************* */
@@ -1442,7 +1489,7 @@ void draw_nodespace_back_pix(ARegion *ar, SpaceNode *snode, int color_manage)
 	}
 }
 
-void draw_nodespace_color_info(ARegion *ar, int channels, int x, int y, char *cp, float *fp)
+void draw_nodespace_color_info(ARegion *ar, int color_manage, int channels, int x, int y, char *cp, float *fp)
 {
 	char str[256];
 	float dx= 6;
@@ -1458,6 +1505,7 @@ void draw_nodespace_color_info(ARegion *ar, int channels, int x, int y, char *cp
 	unsigned char blue[3] = {255, 255, 255};
 	#endif
 	float hue=0, sat=0, val=0, lum=0, u=0, v=0;
+	float col[4], finalcol[4];
 
 	glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
 	glEnable(GL_BLEND);
@@ -1541,31 +1589,47 @@ void draw_nodespace_color_info(ARegion *ar, int channels, int x, int y, char *cp
 		}
 	}
 	
-	glDisable(GL_BLEND);
+	/* color rectangle */
 	if (channels==1) {
 		if (fp)
-			glColor3f(fp[0], fp[0], fp[0]);
+			col[0] = col[1] = col[2] = fp[0];
 		else if (cp)
-			glColor3ub(cp[0], cp[0], cp[0]);
+			col[0] = col[1] = col[2] = (float)cp[0]/255.0f;
 		else
-			glColor3ub(0, 0, 0);
+			col[0] = col[1] = col[2] = 0.0f;
 	}
 	else if (channels==3) {
 		if (fp)
-			glColor3fv(fp);
-		else if (cp)
-			glColor3ub(cp[0], cp[1], cp[2]);
+			copy_v3_v3(col, fp);
+		else if (cp) {
+			col[0] = (float)cp[0]/255.0f;
+			col[1] = (float)cp[1]/255.0f;
+			col[2] = (float)cp[2]/255.0f;
+		}
 		else
-			glColor3ub(0, 0, 0);
+			zero_v3(col);
 	}
 	else if (channels==4) {
 		if (fp)
-			glColor4fv(fp);
-		else if (cp)
-			glColor4ub(cp[0], cp[1], cp[2], cp[3]);
+			copy_v4_v4(col, fp);
+		else if (cp) {
+			col[0] = (float)cp[0]/255.0f;
+			col[1] = (float)cp[1]/255.0f;
+			col[2] = (float)cp[2]/255.0f;
+			col[3] = (float)cp[3]/255.0f;
+		}
 		else
-			glColor3ub(0, 0, 0);
+			zero_v4(col);
 	}
+	if (color_manage) {
+		linearrgb_to_srgb_v3_v3(finalcol, col);
+		finalcol[3] = col[3];
+	}
+	else {
+		copy_v4_v4(finalcol, col);
+	}
+	glDisable(GL_BLEND);
+	glColor3fv(finalcol);
 	dx += 5;
 	glBegin(GL_QUADS);
 	glVertex2f(dx, 3);
@@ -1626,6 +1690,8 @@ void draw_nodespace_color_info(ARegion *ar, int channels, int x, int y, char *cp
 		BLF_draw_ascii(blf_mono_font, str, sizeof(str));
 		dx += BLF_width(blf_mono_font, str);
 	}
+
+	(void)dx;
 }
 
 #if 0
@@ -1702,8 +1768,8 @@ int node_link_bezier_points(View2D *v2d, SpaceNode *snode, bNodeLink *link, floa
 		vec[3][0]= snode->mx;
 		vec[3][1]= snode->my;
 	}
-	
-	dist= 0.5f*ABS(vec[0][0] - vec[3][0]);
+
+	dist= UI_GetThemeValue(TH_NODE_CURVING)*0.10f*ABS(vec[0][0] - vec[3][0]);
 	
 	/* check direction later, for top sockets */
 	vec[1][0]= vec[0][0]+dist;
@@ -1803,10 +1869,17 @@ void node_draw_link(View2D *v2d, SpaceNode *snode, bNodeLink *link)
 		else {
 			/* check cyclic */
 			if(link->fromnode->level >= link->tonode->level && link->tonode->level!=0xFFF) {
-				if(link->fromnode->flag & SELECT)
-					th_col1= TH_EDGE_SELECT;
-				if(link->tonode->flag & SELECT)
-					th_col2= TH_EDGE_SELECT;
+				/* special indicated link, on drop-node */
+				if(link->flag & NODE_LINKFLAG_HILITE) {
+					th_col1= th_col2= TH_ACTIVE;
+				}
+				else {
+					/* regular link */
+					if(link->fromnode->flag & SELECT)
+						th_col1= TH_EDGE_SELECT;
+					if(link->tonode->flag & SELECT)
+						th_col2= TH_EDGE_SELECT;
+				}
 				do_shaded= 1;
 				do_triple= 1;
 			}				

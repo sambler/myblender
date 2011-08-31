@@ -42,7 +42,7 @@
 
 /* all the list begin functions are added manually here, Main is not in SDNA */
 
-static int rna_Main_is_saved_get(PointerRNA *ptr)
+static int rna_Main_is_saved_get(PointerRNA *UNUSED(ptr))
 {
 	return G.relbase_valid;
 }
@@ -50,8 +50,9 @@ static int rna_Main_is_saved_get(PointerRNA *ptr)
 static int rna_Main_is_dirty_get(PointerRNA *ptr)
 {
 	/* XXX, not totally nice to do it this way, should store in main ? */
+	Main *bmain= (Main*)ptr->data;
 	wmWindowManager *wm;
-	for(wm= G.main->wm.first; wm; wm= wm->id.next) {
+	for(wm= bmain->wm.first; wm; wm= wm->id.next) {
 		return !wm->file_saved;
 	}
 
@@ -186,6 +187,12 @@ static void rna_Main_text_begin(CollectionPropertyIterator *iter, PointerRNA *pt
 	rna_iterator_listbase_begin(iter, &bmain->text, NULL);
 }
 
+static void rna_Main_speaker_begin(CollectionPropertyIterator *iter, PointerRNA *ptr)
+{
+	Main *bmain= (Main*)ptr->data;
+	rna_iterator_listbase_begin(iter, &bmain->speaker, NULL);
+}
+
 static void rna_Main_sound_begin(CollectionPropertyIterator *iter, PointerRNA *ptr)
 {
 	Main *bmain= (Main*)ptr->data;
@@ -296,6 +303,7 @@ void RNA_def_main(BlenderRNA *brna)
 		{"shape_keys", "Key", "rna_Main_key_begin", "Shape Keys", "Shape Key datablocks.", NULL},
 		{"scripts", "ID", "rna_Main_script_begin", "Scripts", "Script datablocks (DEPRECATED).", NULL},
 		{"texts", "Text", "rna_Main_text_begin", "Texts", "Text datablocks.", RNA_def_main_texts},
+		{"speakers", "Speaker", "rna_Main_speaker_begin", "Speakers", "Speaker datablocks.", RNA_def_main_speakers},
 		{"sounds", "Sound", "rna_Main_sound_begin", "Sounds", "Sound datablocks.", RNA_def_main_sounds},
 		{"armatures", "Armature", "rna_Main_armature_begin", "Armatures", "Armature datablocks.", RNA_def_main_armatures},
 		{"actions", "Action", "rna_Main_action_begin", "Actions", "Action datablocks.", RNA_def_main_actions},

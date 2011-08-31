@@ -213,12 +213,12 @@ void blf_font_buffer(FontBLF *font, const char *str)
 {
 	unsigned char *cbuf;
 	unsigned int c;
-	unsigned char b_col_char[3];
+	unsigned char b_col_char[4];
 	GlyphBLF *g, *g_prev;
 	FT_Vector delta;
 	FT_UInt glyph_index;
 	float a, *fbuf;
-	int pen_x, y, x, yb;
+	int pen_x, y, x;
 	int i, has_kerning, st, chx, chy;
 
 	if (!font->glyph_cache || (!font->b_fbuf && !font->b_cbuf))
@@ -232,6 +232,7 @@ void blf_font_buffer(FontBLF *font, const char *str)
 	b_col_char[0]= font->b_col[0] * 255;
 	b_col_char[1]= font->b_col[1] * 255;
 	b_col_char[2]= font->b_col[2] * 255;
+	b_col_char[3]= font->b_col[3] * 255;
 
 	while (str[i]) {
 		int pen_y;
@@ -276,29 +277,39 @@ void blf_font_buffer(FontBLF *font, const char *str)
 			/* dont draw beyond the buffer bounds */
 			int width_clip= g->width;
 			int height_clip= g->height;
+			int yb_start= g->pitch < 0 ? 0 : g->height-1;
 
 			if (width_clip + chx > font->bw)	width_clip  -= chx + width_clip - font->bw;
 			if (height_clip + pen_y > font->bh) height_clip -= pen_y + height_clip - font->bh;
-
-			yb= g->pitch < 0 ? 0 : g->height-1;
 			
+			/* drawing below the image? */
+			if(pen_y < 0) {
+				yb_start += (g->pitch < 0) ? -pen_y : pen_y;
+				height_clip += pen_y;
+				pen_y= 0;
+			}
+
 			if (font->b_fbuf) {
+				int yb= yb_start;
 				for (y=(chy >= 0 ? 0:-chy); y < height_clip; y++) {
 					for (x=(chx >= 0 ? 0:-chx); x < width_clip; x++) {
 						
 						a= *(g->bitmap + x + (yb * g->pitch)) / 255.0f;
 
 						if(a > 0.0f) {
+							float alphatest;
 							fbuf= font->b_fbuf + font->bch * ((chx + x) + ((pen_y + y)*font->bw));
 							if (a >= 1.0f) {
 								fbuf[0]= font->b_col[0];
 								fbuf[1]= font->b_col[1];
 								fbuf[2]= font->b_col[2];
+								fbuf[3]= (alphatest= (fbuf[3] + (font->b_col[3]))) < 1.0f ? alphatest : 1.0f;
 							}
 							else {
 								fbuf[0]= (font->b_col[0]*a) + (fbuf[0] * (1-a));
 								fbuf[1]= (font->b_col[1]*a) + (fbuf[1] * (1-a));
 								fbuf[2]= (font->b_col[2]*a) + (fbuf[2] * (1-a));
+								fbuf[3]= (alphatest= (fbuf[3] + (font->b_col[3]*a))) < 1.0f ? alphatest : 1.0f;
 							}
 						}
 					}
@@ -311,21 +322,25 @@ void blf_font_buffer(FontBLF *font, const char *str)
 			}
 
 			if (font->b_cbuf) {
+				int yb= yb_start;
 				for (y= 0; y < height_clip; y++) {
 					for (x= 0; x < width_clip; x++) {
 						a= *(g->bitmap + x + (yb * g->pitch)) / 255.0f;
 
 						if(a > 0.0f) {
+							int alphatest;
 							cbuf= font->b_cbuf + font->bch * ((chx + x) + ((pen_y + y)*font->bw));
 							if (a >= 1.0f) {
 								cbuf[0]= b_col_char[0];
 								cbuf[1]= b_col_char[1];
 								cbuf[2]= b_col_char[2];
+								cbuf[3]= (alphatest= ((int)cbuf[3] + (int)b_col_char[3])) < 255 ? alphatest : 255;
 							}
 							else {
 								cbuf[0]= (b_col_char[0]*a) + (cbuf[0] * (1-a));
 								cbuf[1]= (b_col_char[1]*a) + (cbuf[1] * (1-a));
 								cbuf[2]= (b_col_char[2]*a) + (cbuf[2] * (1-a));
+								cbuf[3]= (alphatest= ((int)cbuf[3] + (int)((font->b_col[3]*a)*255.0f))) < 255 ? alphatest : 255;
 							}
 						}
 					}

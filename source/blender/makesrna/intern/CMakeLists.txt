@@ -79,6 +79,7 @@ set(DEFSRC
 	rna_smoke.c
 	rna_sound.c
 	rna_space.c
+	rna_speaker.c
 	rna_test.c
 	rna_text.c
 	rna_texture.c
@@ -101,6 +102,7 @@ set(APISRC
 	rna_main_api.c
 	rna_material_api.c
 	rna_mesh_api.c
+	rna_texture_api.c
 	rna_object_api.c
 	rna_pose_api.c
 	rna_scene_api.c
@@ -132,7 +134,13 @@ set(SRC
 )
 
 set(INC
+
 )
+
+set(INC_SYS
+
+)
+
 
 if(WITH_PYTHON)
 	add_definitions(-DWITH_PYTHON)
@@ -166,19 +174,26 @@ if(WITH_IMAGE_HDR)
 	add_definitions(-DWITH_HDR)
 endif()
 
+if(WITH_IMAGE_FRAMESERVER)
+	add_definitions(-DWITH_FRAMESERVER)
+endif()
+
+if(WITH_AUDASPACE)
+	add_definitions(-DWITH_AUDASPACE)
+endif()
+
 if(WITH_CODEC_QUICKTIME)
-	list(APPEND INC ../../quicktime)
+	list(APPEND INC
+		../../quicktime
+	)
 	add_definitions(-DWITH_QUICKTIME)
 endif()
 
 if(WITH_CODEC_FFMPEG)
-	list(APPEND INC ${FFMPEG_INC})
+	list(APPEND INC_SYS
+		${FFMPEG_INCLUDE_DIRS}
+	)
 	add_definitions(-DWITH_FFMPEG)
-endif()
-
-if(WITH_LCMS)
-	list(APPEND INC ${LCMS_INCLUDE_DIR})
-	add_definitions(-DWITH_LCMS)
 endif()
 
 if(NOT WITH_MOD_FLUID)
@@ -223,11 +238,15 @@ blender_include_dirs(
 	../../../../intern/audaspace/intern
 	../../../../intern/guardedalloc
 	../../../../intern/memutil
-    ${GLEW_INCLUDE_PATH}
+)
+
+blender_include_dirs_sys(
+	${GLEW_INCLUDE_PATH}
 )
 
 add_executable(makesrna ${SRC} ${SRC_RNA_INC} ${SRC_DNA_INC})
 target_link_libraries(makesrna bf_dna)
+target_link_libraries(makesrna bf_dna_blenlib)
 
 # Output rna_*_gen.c
 # note (linux only): with crashes try add this after COMMAND: valgrind --leak-check=full --track-origins=yes
@@ -248,4 +267,4 @@ set(SRC
 	rna_nodetree_types.h
 )
 
-blender_add_lib(bf_rna "${SRC}" "${INC}")
+blender_add_lib(bf_rna "${SRC}" "${INC}" "${INC_SYS}")

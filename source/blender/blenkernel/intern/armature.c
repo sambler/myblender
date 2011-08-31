@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -137,39 +135,42 @@ void free_armature(bArmature *arm)
 
 void make_local_armature(bArmature *arm)
 {
+	Main *bmain= G.main;
 	int local=0, lib=0;
 	Object *ob;
-	bArmature *newArm;
-	
-	if (arm->id.lib==NULL)
-		return;
+
+	if (arm->id.lib==NULL) return;
 	if (arm->id.us==1) {
 		arm->id.lib= NULL;
 		arm->id.flag= LIB_LOCAL;
-		new_id(NULL, (ID*)arm, NULL);
+		new_id(&bmain->armature, (ID*)arm, NULL);
 		return;
 	}
-	
+
+	for(ob= bmain->object.first; ob && ELEM(0, lib, local); ob= ob->id.next) {
+		if(ob->data == arm) {
+			if(ob->id.lib) lib= 1;
+			else local= 1;
+		}
+	}
+
 	if(local && lib==0) {
 		arm->id.lib= NULL;
 		arm->id.flag= LIB_LOCAL;
-		new_id(NULL, (ID *)arm, NULL);
+		new_id(&bmain->armature, (ID *)arm, NULL);
 	}
 	else if(local && lib) {
-		newArm= copy_armature(arm);
-		newArm->id.us= 0;
+		bArmature *armn= copy_armature(arm);
+		armn->id.us= 0;
 		
-		ob= G.main->object.first;
-		while(ob) {
-			if(ob->data==arm) {
-				
+		for(ob= bmain->object.first; ob; ob= ob->id.next) {
+			if(ob->data == arm) {
 				if(ob->id.lib==NULL) {
-					ob->data= newArm;
-					newArm->id.us++;
+					ob->data= armn;
+					armn->id.us++;
 					arm->id.us--;
 				}
 			}
-			ob= ob->id.next;
 		}
 	}
 }
@@ -1340,8 +1341,12 @@ void vec_roll_to_mat3(float *vec, float roll, float mat[][3])
 	cross_v3_v3v3(axis,target,nor);
 
 	/* was 0.0000000000001, caused bug [#23954], smaller values give unstable
-	 * roll when toggling editmode */
-	if (dot_v3v3(axis,axis) > 0.00001f) {
+	 * roll when toggling editmode.
+	 *
+	 * was 0.00001, causes bug [#27675], with 0.00000495,
+	 * so a value inbetween these is needed.
+	 */
+	if (dot_v3v3(axis,axis) > 0.000001f) {
 		/* if nor is *not* a multiple of target ... */
 		normalize_v3(axis);
 		

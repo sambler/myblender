@@ -67,7 +67,7 @@
 #include "SCA_IController.h"
 #include "SCA_IActuator.h"
 #include "SG_Node.h"
-#include "SYS_System.h"
+#include "BL_System.h"
 #include "SG_Controller.h"
 #include "SG_IObject.h"
 #include "SG_Tree.h"
@@ -1502,7 +1502,12 @@ void KX_Scene::LogicBeginFrame(double curtime)
 	m_logicmgr->BeginFrame(curtime, 1.0/KX_KetsjiEngine::GetTicRate());
 }
 
-
+void KX_Scene::UpdateAnimations(double curtime)
+{
+	// Update any animations
+	for (int i=0; i<GetObjectList()->GetCount(); ++i)
+		((KX_GameObject*)GetObjectList()->GetValue(i))->UpdateActionManager(curtime);
+}
 
 void KX_Scene::LogicUpdateFrame(double curtime, bool frame)
 {
@@ -1514,7 +1519,7 @@ void KX_Scene::LogicUpdateFrame(double curtime, bool frame)
 void KX_Scene::LogicEndFrame()
 {
 	m_logicmgr->EndFrame();
-	int numobj = m_euthanasyobjects->GetCount();
+	int numobj;
 
 	KX_GameObject* obj;
 
@@ -1666,6 +1671,11 @@ void KX_Scene::setSuspendedDelta(double suspendeddelta)
 double KX_Scene::getSuspendedDelta()
 {
 	return m_suspendeddelta;
+}
+
+short KX_Scene::GetAnimationFPS()
+{
+	return m_blenderScene->r.frs_sec;
 }
 
 #ifdef USE_BULLET

@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -55,6 +53,7 @@ EnumPropertyItem keyingset_path_grouping_items[] = {
 #ifdef RNA_RUNTIME
 
 #include "BKE_animsys.h"
+#include "BKE_fcurve.h"
 #include "BKE_nla.h"
 
 #include "WM_api.h"
@@ -73,36 +72,7 @@ static int rna_AnimData_action_editable(PointerRNA *ptr)
 static void rna_AnimData_action_set(PointerRNA *ptr, PointerRNA value)
 {
 	ID *ownerId = (ID *)ptr->id.data;
-	AnimData *adt = (AnimData *)ptr->data;
-	
-	/* assume that AnimData's action can in fact be edited... */
-	if ((value.data) && (ownerId)) {
-		bAction *act = (bAction *)value.data;
-		
-		/* action must have same type as owner */
-		if (ownerId) {
-			if (ELEM(act->idroot, 0, GS(ownerId->name))) {
-				/* can set */
-				adt->action = act;
-			}
-			else {
-				/* cannot set */
-				printf("ERROR: Couldn't set Action '%s' onto ID '%s', as it doesn't have suitably rooted paths for this purpose\n", 
-						act->id.name+2, ownerId->name);
-			}
-		}
-		else {
-			/* cannot tell if we can set, so let's just be generous... */
-			printf("Warning: Set Action '%s' onto AnimData block with an unknown ID-owner. May have attached invalid data\n",
-					act->id.name+2);
-				
-			adt->action = act;
-		}
-	}
-	else {
-		/* just clearing the action... */
-		adt->action = NULL;
-	}
+	BKE_animdata_set_action(NULL, ownerId, value.data);
 }
 
 /* ****************************** */
@@ -187,7 +157,7 @@ static StructRNA *rna_KeyingSetInfo_refine(PointerRNA *ptr)
 	return (ksi->ext.srna)? ksi->ext.srna: &RNA_KeyingSetInfo;
 }
 
-static void rna_KeyingSetInfo_unregister(const bContext *C, StructRNA *type)
+static void rna_KeyingSetInfo_unregister(Main *bmain, StructRNA *type)
 {
 	KeyingSetInfo *ksi= RNA_struct_blender_type_get(type);
 
@@ -199,10 +169,10 @@ static void rna_KeyingSetInfo_unregister(const bContext *C, StructRNA *type)
 	RNA_struct_free(&BLENDER_RNA, type);
 	
 	/* unlink Blender-side data */
-	ANIM_keyingset_info_unregister(C, ksi);
+	ANIM_keyingset_info_unregister(bmain, ksi);
 }
 
-static StructRNA *rna_KeyingSetInfo_register(bContext *C, ReportList *reports, void *data, const char *identifier, StructValidateFunc validate, StructCallbackFunc call, StructFreeFunc free)
+static StructRNA *rna_KeyingSetInfo_register(Main *bmain, ReportList *reports, void *data, const char *identifier, StructValidateFunc validate, StructCallbackFunc call, StructFreeFunc free)
 {
 	KeyingSetInfo dummyksi = {NULL};
 	KeyingSetInfo *ksi;
@@ -225,7 +195,7 @@ static StructRNA *rna_KeyingSetInfo_register(bContext *C, ReportList *reports, v
 	/* check if we have registered this info before, and remove it */
 	ksi = ANIM_keyingset_info_find_named(dummyksi.idname);
 	if (ksi && ksi->ext.srna)
-		rna_KeyingSetInfo_unregister(C, ksi->ext.srna);
+		rna_KeyingSetInfo_unregister(bmain, ksi->ext.srna);
 	
 	/* create a new KeyingSetInfo type */
 	ksi= MEM_callocN(sizeof(KeyingSetInfo), "python keying set info");
@@ -457,6 +427,24 @@ static void rna_NlaTrack_active_set(PointerRNA *ptr, PointerRNA value)
 	BKE_nlatrack_set_active(&adt->nla_tracks, track);
 }
 
+
+static FCurve *rna_Driver_from_existing(AnimData *adt, bContext *C, FCurve *src_driver)
+{
+	/* verify that we've got a driver to duplicate */
+	if (ELEM(NULL, src_driver, src_driver->driver)) {
+		BKE_reportf(CTX_wm_reports(C), RPT_ERROR, "No valid driver data to create copy of");
+		return NULL;
+	}
+	else {
+		/* just make a copy of the existing one and add to self */
+		FCurve *new_fcu = copy_fcurve(src_driver);
+		
+		// XXX: if we impose any ordering on these someday, this will be problematic
+		BLI_addtail(&adt->drivers, new_fcu);
+		return new_fcu;
+	}
+}
+
 #else
 
 /* helper function for Keying Set -> keying settings */
@@ -490,7 +478,7 @@ static void rna_def_keyingset_info(BlenderRNA *brna)
 	RNA_def_struct_sdna(srna, "KeyingSetInfo");
 	RNA_def_struct_ui_text(srna, "Keying Set Info", "Callback function defines for builtin Keying Sets");
 	RNA_def_struct_refine_func(srna, "rna_KeyingSetInfo_refine");
-	RNA_def_struct_register_funcs(srna, "rna_KeyingSetInfo_register", "rna_KeyingSetInfo_unregister");
+	RNA_def_struct_register_funcs(srna, "rna_KeyingSetInfo_register", "rna_KeyingSetInfo_unregister", NULL);
 	
 	/* Properties --------------------- */
 	
@@ -676,7 +664,7 @@ static void rna_def_keyingset(BlenderRNA *brna)
 	/* Name */
 	prop= RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
 	RNA_def_property_ui_text(prop, "Name", "");
-	RNA_def_struct_ui_icon(srna, ICON_KEY_HLT); // TODO: we need a dedicated icon
+	RNA_def_struct_ui_icon(srna, ICON_KEYINGSET);
 	RNA_def_struct_name_property(srna, prop);
 	RNA_def_property_update(prop, NC_SCENE|ND_KEYINGSET|NA_RENAME, NULL);
 	
@@ -724,7 +712,7 @@ static void rna_api_animdata_nla_tracks(BlenderRNA *brna, PropertyRNA *cprop)
 	
 	func = RNA_def_function(srna, "new", "rna_NlaTrack_new");
 	RNA_def_function_flag(func, FUNC_USE_CONTEXT);
-	RNA_def_function_ui_description(func, "Add a new NLA Tracks");
+	RNA_def_function_ui_description(func, "Add a new NLA Track");
 	RNA_def_pointer(func, "prev", "NlaTrack", "", "NLA Track to add the new one after.");
 	/* return type */
 	parm = RNA_def_pointer(func, "track", "NlaTrack", "", "New NLA Track.");
@@ -743,6 +731,28 @@ static void rna_api_animdata_nla_tracks(BlenderRNA *brna, PropertyRNA *cprop)
 	RNA_def_property_ui_text(prop, "Active Constraint", "Active Object constraint");
 	/* XXX: should (but doesn't) update the active track in the NLA window */
 	RNA_def_property_update(prop, NC_ANIMATION|ND_NLA|NA_SELECTED, NULL);
+}
+
+static void rna_api_animdata_drivers(BlenderRNA *brna, PropertyRNA *cprop)
+{
+	StructRNA *srna;
+	PropertyRNA *parm;
+	FunctionRNA *func;
+
+	// PropertyRNA *prop;
+	
+	RNA_def_property_srna(cprop, "AnimDataDrivers");
+	srna= RNA_def_struct(brna, "AnimDataDrivers", NULL);
+	RNA_def_struct_sdna(srna, "AnimData");
+	RNA_def_struct_ui_text(srna, "Drivers", "Collection of Driver F-Curves");
+	
+	func = RNA_def_function(srna, "from_existing", "rna_Driver_from_existing");
+	RNA_def_function_flag(func, FUNC_USE_CONTEXT);
+	RNA_def_function_ui_description(func, "Add a new driver given an existing one");
+	RNA_def_pointer(func, "src_driver", "FCurve", "", "Existing Driver F-Curve to use as template for a new one");
+	/* return type */
+	parm = RNA_def_pointer(func, "driver", "FCurve", "", "New Driver F-Curve.");
+	RNA_def_function_return(func, parm);
 }
 
 void rna_def_animdata_common(StructRNA *srna)
@@ -774,7 +784,7 @@ void rna_def_animdata(BlenderRNA *brna)
 	/* Active Action */
 	prop= RNA_def_property(srna, "action", PROP_POINTER, PROP_NONE);
 	RNA_def_property_flag(prop, PROP_EDITABLE); /* this flag as well as the dynamic test must be defined for this to be editable... */
-	RNA_def_property_pointer_funcs(prop, NULL, NULL, NULL, "rna_Action_id_poll");
+	RNA_def_property_pointer_funcs(prop, NULL, "rna_AnimData_action_set", NULL, "rna_Action_id_poll");
 	RNA_def_property_editable_func(prop, "rna_AnimData_action_editable");
 	RNA_def_property_ui_text(prop, "Action", "Active Action for this datablock");
 	RNA_def_property_update(prop, NC_ANIMATION, NULL); /* this will do? */
@@ -804,6 +814,8 @@ void rna_def_animdata(BlenderRNA *brna)
 	RNA_def_property_collection_sdna(prop, NULL, "drivers", NULL);
 	RNA_def_property_struct_type(prop, "FCurve");
 	RNA_def_property_ui_text(prop, "Drivers", "The Drivers/Expressions for this datablock");
+	
+	rna_api_animdata_drivers(brna, prop);
 	
 	/* General Settings */
 	prop= RNA_def_property(srna, "use_nla", PROP_BOOLEAN, PROP_NONE);

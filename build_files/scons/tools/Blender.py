@@ -350,7 +350,7 @@ def buildinfo(lenv, build_type):
     build_time = time.strftime ("%H:%M:%S")
     build_rev = os.popen('svnversion').read()[:-1] # remove \n
     if build_rev == '': 
-        build_rev = '39821'
+        build_rev = '39868'
     if lenv['BF_DEBUG']:
         build_type = "Debug"
         build_cflags = ' '.join(lenv['CFLAGS'] + lenv['CCFLAGS'] + lenv['BF_DEBUG_CCFLAGS'] + lenv['CPPFLAGS'])
@@ -536,7 +536,7 @@ def AppIt(target=None, source=None, env=None):
     print("Installing to %s"%(installdir))
     # TODO, use tar.
     python_zip = 'python_' + osxarch + '.zip' # set specific python_arch.zip
-    if env['WITH_BF_STATICPYTHON'] == 'True':
+    if env['WITH_OSX_STATICPYTHON']:
         print("unzipping to app-bundle: %s"%(python_zip))
     else:
         print("dynamic build - make sure to have python3.x-framework installed")
@@ -572,14 +572,11 @@ def AppIt(target=None, source=None, env=None):
     commands.getoutput(cmd)
     cmd = 'cp %s/release/bin/%s/.Blanguages %s/%s.app/Contents/Resources/'%(bldroot,VERSION,installdir,binary)
     commands.getoutput(cmd)
-    if env['WITH_BF_STATICPYTHON'] == 'True':
-        cmd = 'mkdir %s/%s.app/Contents/MacOS/%s/python/'%(builddir,binary, VERSION)
+    if env['WITH_OSX_STATICPYTHON']:
+        cmd = 'mkdir %s/%s.app/Contents/MacOS/%s/python/'%(installdir,binary, VERSION)
         commands.getoutput(cmd)
-        cmd = 'unzip -q %s/release/%s -d %s/%s.app/Contents/MacOS/%s/python/'%(libdir,python_zip,builddir,binary,VERSION)
+        cmd = 'unzip -q %s/release/%s -d %s/%s.app/Contents/MacOS/%s/python/'%(libdir,python_zip,installdir,binary,VERSION)
         commands.getoutput(cmd) 
-
-    cmd = 'cp -R -L %s/release/scripts %s/%s.app/Contents/MacOS/%s/'%(bldroot,installdir,binary,VERSION)
-    commands.getoutput(cmd)
 
     if binary == 'blender':#not copy everything for blenderplayer
         cmd = 'cp -R %s/release/scripts %s/%s.app/Contents/MacOS/%s/'%(bldroot,installdir,binary,VERSION)

@@ -313,7 +313,7 @@ static struct ImBuf * do_gammacross_effect(
 }
 
 /* setup */
-void SeqConfigHandle_gamma(struct SeqEffectHandle *hndl)
+void SeqConfig_gamma(SeqEffect *hndl)
 {
 	hndl->init = init_gammacross;
 	hndl->load = load_gammacross;

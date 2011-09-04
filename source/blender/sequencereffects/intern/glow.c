@@ -582,7 +582,7 @@ static struct ImBuf * do_glow_effect(
 }
 
 /* setup */
-void SeqConfigHandle_glow(struct SeqEffectHandle *hndl)
+void SeqConfig_glow(SeqEffect *hndl)
 {
 	hndl->init = init_glow_effect;
 	hndl->num_inputs = num_inputs_glow;

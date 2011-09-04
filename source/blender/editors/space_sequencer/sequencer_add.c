@@ -582,7 +582,7 @@ static int sequencer_add_effect_strip_exec(bContext *C, wmOperator *op)
 
 	Sequence *seq;	/* generic strip vars */
 	Strip *strip;
-	struct SeqEffectHandle sh;
+	SeqEffect sh;
 
 	int start_frame, end_frame, channel, type; /* operator props */
 	

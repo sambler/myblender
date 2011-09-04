@@ -386,13 +386,13 @@ static struct ImBuf* do_alphaunder_effect(
 }
 
 /* setup */
-void SeqConfigHandle_alphaOver(struct SeqEffectHandle *hndl)
+void SeqConfig_alphaOver(SeqEffect *hndl)
 {
 	hndl->init = init_alpha_over_or_under;
 	hndl->execute = do_alphaover_effect;
 }
 
-void SeqConfigHandle_alphaUnder(struct SeqEffectHandle *hndl)
+void SeqConfig_alphaUnder(SeqEffect *hndl)
 {
 	hndl->init = init_alpha_over_or_under;
 	hndl->execute = do_alphaunder_effect;

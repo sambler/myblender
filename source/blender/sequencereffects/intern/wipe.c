@@ -532,7 +532,7 @@ static struct ImBuf * do_wipe_effect(
 }
 
 /* setup */
-void SeqConfigHandle_wipe(struct SeqEffectHandle *hndl)
+void SeqConfig_wipe(SeqEffect *hndl)
 {
 	hndl->init = init_wipe_effect;
 	hndl->num_inputs = num_inputs_wipe;

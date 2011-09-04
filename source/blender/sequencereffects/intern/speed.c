@@ -228,7 +228,7 @@ void sequence_effect_speed_rebuild_map(Scene *scene, Sequence * seq, int force)
 }
 
 /* setup */
-void SeqConfigHandle_speed(struct SeqEffectHandle *hndl)
+void SeqConfig_speed(SeqEffect *hndl)
 {
     hndl->init = init_speed_effect;
 	hndl->num_inputs = num_inputs_speed;

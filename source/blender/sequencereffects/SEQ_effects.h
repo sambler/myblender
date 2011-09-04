@@ -36,12 +36,30 @@
  *  \ingroup seq
  */
 
+struct IDProperty;
 struct ImBuf;
 struct Scene;
 struct Sequence;
 struct SeqRenderData;
 
-struct SeqEffectHandle {
+typedef struct SeqEffect {
+	struct SeqEffect  *next, *prev;
+
+	/* saved */
+	char *idname;				/* unique identifier */
+	IDProperty *properties;		/* saved, user-settable properties */
+
+	/* runtime */
+	char *name;					/* text for ui, undo */
+	char *description;			/* tooltips and python docs */
+
+	void *customdata;			/* custom storage, only while operator runs */
+	void *py_instance;			/* python stores the class instance here */
+
+	struct PointerRNA *ptr;		/* rna pointer to access properties */
+	struct ReportList *reports;	/* errors and warnings storage */
+
+
 	/* constructors & destructor */
 	/* init & init_plugin are _only_ called on first creation */
 	void (*init)(struct Sequence *seq);
@@ -86,7 +104,7 @@ struct SeqEffectHandle {
 		float facf0, float facf1,
 		struct ImBuf *ibuf1, struct ImBuf *ibuf2,
 		struct ImBuf *ibuf3);
-};
+} SeqEffect;
 
 /* **********************************************************************
    seqeffects.c
@@ -95,8 +113,8 @@ struct SeqEffectHandle {
    **********************************************************************
 */
 
-struct SeqEffectHandle get_sequence_effect(struct Sequence *seq);
-struct SeqEffectHandle get_sequence_blend(struct Sequence *seq);
+SeqEffect get_sequence_effect(struct Sequence *seq);
+SeqEffect get_sequence_blend(struct Sequence *seq);
 int get_sequence_effect_num_inputs(int seq_type);
 void sequence_effect_speed_rebuild_map(struct Scene *scene, struct Sequence *seq, int force);
 

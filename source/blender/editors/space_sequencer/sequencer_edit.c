@@ -245,7 +245,7 @@ void seq_rectf(Sequence *seq, rctf *rectf)
 static void UNUSED_FUNCTION(change_plugin_seq)(Scene *scene, char *str) /* called from fileselect */
 {
 	Editing *ed= seq_give_editing(scene, FALSE);
-	struct SeqEffectHandle sh;
+	SeqEffect sh;
 	Sequence *last_seq= seq_active_get(scene);
 
 	if(last_seq==NULL || last_seq->type != SEQ_PLUGIN) return;
@@ -2904,7 +2904,7 @@ static int sequencer_change_effect_type_exec(bContext *C, wmOperator *op)
 	const int new_type= RNA_enum_get(op->ptr, "type");
 
 	/* free previous effect and init new effect */
-	struct SeqEffectHandle sh;
+	SeqEffect sh;
 
 	if ((seq->type & SEQ_EFFECT) == 0) {
 		return OPERATOR_CANCELLED;

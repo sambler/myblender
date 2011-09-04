@@ -39,6 +39,7 @@
 
 #include "BLI_utildefines.h"
 
+#include "DNA_ID.h"
 #include "DNA_sequence_types.h"
 
 #include "BKE_sequencer.h"
@@ -48,26 +49,27 @@
 #include "IMB_imbuf_types.h"
 #include "IMB_imbuf.h"
 
-/* SeqConfigHandle_* routines are each located in the files containing the effects code
+/* SeqConfig_* routines are each located in the files containing the effects code
  * -- only called within get_sequence_effect_impl() */
 
-extern void SeqConfigHandle_add(struct SeqEffectHandle *hndl);			/* add.c			*/
-extern void SeqConfigHandle_adjustment(struct SeqEffectHandle *hndl);	/* adjustment.c		*/
-extern void SeqConfigHandle_alphaOver(struct SeqEffectHandle *hndl);	/* alpha.c			*/
-extern void SeqConfigHandle_alphaUnder(struct SeqEffectHandle *hndl);	/* alpha.c			*/
-extern void SeqConfigHandle_cross(struct SeqEffectHandle *hndl);		/* cross.c			*/
-extern void SeqConfigHandle_gamma(struct SeqEffectHandle *hndl);		/* gamma.c			*/
-extern void SeqConfigHandle_glow(struct SeqEffectHandle *hndl);			/* glow.c			*/
-extern void SeqConfigHandle_mul(struct SeqEffectHandle *hndl);			/* mul.c			*/
-extern void SeqConfigHandle_multicam(struct SeqEffectHandle *hndl);		/* multicam.c		*/
-extern void SeqConfigHandle_overdrop(struct SeqEffectHandle *hndl);		/* drop.c			*/
-extern void SeqConfigHandle_plugin(struct SeqEffectHandle *hndl);		/* plugin.c			*/
-extern void SeqConfigHandle_solid_colour(struct SeqEffectHandle *hndl);	/* solid_colour.c	*/
-extern void SeqConfigHandle_speed(struct SeqEffectHandle *hndl);		/* speed.c			*/
-extern void SeqConfigHandle_sub(struct SeqEffectHandle *hndl);			/* sub.c			*/
-extern void SeqConfigHandle_transform(struct SeqEffectHandle *hndl);	/* transform.c		*/
-extern void SeqConfigHandle_wipe(struct SeqEffectHandle *hndl);			/* wipe.c			*/
+extern void SeqConfig_add(SeqEffect *hndl);				/* add.c			*/
+extern void SeqConfig_adjustment(SeqEffect *hndl);		/* adjustment.c		*/
+extern void SeqConfig_alphaOver(SeqEffect *hndl);		/* alpha.c			*/
+extern void SeqConfig_alphaUnder(SeqEffect *hndl);		/* alpha.c			*/
+extern void SeqConfig_cross(SeqEffect *hndl);			/* cross.c			*/
+extern void SeqConfig_gamma(SeqEffect *hndl);			/* gamma.c			*/
+extern void SeqConfig_glow(SeqEffect *hndl);			/* glow.c			*/
+extern void SeqConfig_mul(SeqEffect *hndl);				/* mul.c			*/
+extern void SeqConfig_multicam(SeqEffect *hndl);		/* multicam.c		*/
+extern void SeqConfig_overdrop(SeqEffect *hndl);		/* drop.c			*/
+extern void SeqConfig_plugin(SeqEffect *hndl);			/* plugin.c			*/
+extern void SeqConfig_solid_colour(SeqEffect *hndl);	/* solid_colour.c	*/
+extern void SeqConfig_speed(SeqEffect *hndl);			/* speed.c			*/
+extern void SeqConfig_sub(SeqEffect *hndl);				/* sub.c			*/
+extern void SeqConfig_transform(SeqEffect *hndl);		/* transform.c		*/
+extern void SeqConfig_wipe(SeqEffect *hndl);			/* wipe.c			*/
 
+static SeqEffect *fxList = NULL;
 
 struct ImBuf * prepare_effect_imbufs(
 	SeqRenderData context,
@@ -192,9 +194,9 @@ static void get_default_fac_fade(struct Sequence *seq, float cfra,
 	*facf1 /= seq->len;
 }
 
-static struct SeqEffectHandle get_sequence_effect_impl(int seq_type)
+static SeqEffect get_sequence_effect_impl(int seq_type)
 {
-	struct SeqEffectHandle rval;
+	SeqEffect rval;
 
 	rval.init = init_noop;
 	rval.init_plugin = init_plugin_noop;
@@ -211,60 +213,60 @@ static struct SeqEffectHandle get_sequence_effect_impl(int seq_type)
 	case SEQ_CROSS:
 		rval.early_out = early_out_fade;
 		rval.get_default_fac = get_default_fac_fade;
-		SeqConfigHandle_cross(&rval);
+		SeqConfig_cross(&rval);
 		break;
 	case SEQ_GAMCROSS:
 		rval.early_out = early_out_fade;
 		rval.get_default_fac = get_default_fac_fade;
-		SeqConfigHandle_gamma(&rval);
+		SeqConfig_gamma(&rval);
 		break;
 	case SEQ_ADD:
 		rval.early_out = early_out_mul_input2;
-		SeqConfigHandle_add(&rval);
+		SeqConfig_add(&rval);
 		break;
 	case SEQ_SUB:
 		rval.early_out = early_out_mul_input2;
-		SeqConfigHandle_sub(&rval);
+		SeqConfig_sub(&rval);
 		break;
 	case SEQ_MUL:
 		rval.early_out = early_out_mul_input2;
-		SeqConfigHandle_mul(&rval);
+		SeqConfig_mul(&rval);
 		break;
 	case SEQ_ALPHAOVER:
-		SeqConfigHandle_alphaOver(&rval);
+		SeqConfig_alphaOver(&rval);
 		break;
 	case SEQ_OVERDROP:
-		SeqConfigHandle_overdrop(&rval);
+		SeqConfig_overdrop(&rval);
 		break;
 	case SEQ_ALPHAUNDER:
-		SeqConfigHandle_alphaUnder(&rval);
+		SeqConfig_alphaUnder(&rval);
 		break;
 	case SEQ_WIPE:
 		rval.early_out = early_out_fade;
 		rval.get_default_fac = get_default_fac_fade;
-		SeqConfigHandle_wipe(&rval);
+		SeqConfig_wipe(&rval);
 		break;
 	case SEQ_GLOW:
-		SeqConfigHandle_glow(&rval);
+		SeqConfig_glow(&rval);
 		break;
 	case SEQ_TRANSFORM:
-		SeqConfigHandle_transform(&rval);
+		SeqConfig_transform(&rval);
 		break;
 	case SEQ_SPEED:
-		SeqConfigHandle_speed(&rval);
+		SeqConfig_speed(&rval);
 		break;
 	case SEQ_COLOR:
-		SeqConfigHandle_solid_colour(&rval);
+		SeqConfig_solid_colour(&rval);
 		break;
 	case SEQ_PLUGIN:
 		rval.get_default_fac = get_default_fac_fade;
-		SeqConfigHandle_plugin(&rval);
+		SeqConfig_plugin(&rval);
 		break;
 	case SEQ_MULTICAM:
-		SeqConfigHandle_multicam(&rval);
+		SeqConfig_multicam(&rval);
 		break;
 	case SEQ_ADJUSTMENT:
-		SeqConfigHandle_adjustment(&rval);
+		SeqConfig_adjustment(&rval);
 		break;
 	}
 
@@ -272,9 +274,9 @@ static struct SeqEffectHandle get_sequence_effect_impl(int seq_type)
 }
 
 
-struct SeqEffectHandle get_sequence_effect(Sequence * seq)
+SeqEffect get_sequence_effect(Sequence * seq)
 {
-	struct SeqEffectHandle rval= {NULL};
+	SeqEffect rval= {NULL};
 
 	if (seq->type & SEQ_EFFECT) {
 		rval = get_sequence_effect_impl(seq->type);
@@ -287,9 +289,9 @@ struct SeqEffectHandle get_sequence_effect(Sequence * seq)
 	return rval;
 }
 
-struct SeqEffectHandle get_sequence_blend(Sequence * seq)
+SeqEffect get_sequence_blend(Sequence * seq)
 {
-	struct SeqEffectHandle rval= {NULL};
+	SeqEffect rval= {NULL};
 
 	if (seq->blend_mode != 0) {
 		rval = get_sequence_effect_impl(seq->blend_mode);
@@ -304,7 +306,7 @@ struct SeqEffectHandle get_sequence_blend(Sequence * seq)
 
 int get_sequence_effect_num_inputs(int seq_type)
 {
-	struct SeqEffectHandle rval = get_sequence_effect_impl(seq_type);
+	SeqEffect rval = get_sequence_effect_impl(seq_type);
 
 	int cnt = rval.num_inputs();
 	if (rval.execute) {

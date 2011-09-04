@@ -127,7 +127,7 @@ static struct ImBuf * do_adjustment(
 }
 
 /* setup */
-void SeqConfigHandle_adjustment(struct SeqEffectHandle *hndl)
+void SeqConfig_adjustment(SeqEffect *hndl)
 {
 	hndl->num_inputs = num_inputs_adjustment;
 	hndl->early_out = early_out_adjustment;

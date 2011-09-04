@@ -166,7 +166,7 @@ static struct ImBuf * do_add_effect(SeqRenderData context,
 }
 
 /* setup */
-void SeqConfigHandle_add(struct SeqEffectHandle *hndl)
+void SeqConfig_add(SeqEffect *hndl)
 {
 	hndl->execute = do_add_effect;
 }

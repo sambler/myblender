@@ -164,7 +164,7 @@ static struct ImBuf * do_sub_effect(
 }
 
 /* setup */
-void SeqConfigHandle_sub(struct SeqEffectHandle *hndl)
+void SeqConfig_sub(SeqEffect *hndl)
 {
 	hndl->execute = do_sub_effect;
 }

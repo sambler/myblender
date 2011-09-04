@@ -189,7 +189,7 @@ void seq_free_sequence(Scene *scene, Sequence *seq)
 	if(seq->anim) IMB_free_anim(seq->anim);
 
 	if (seq->type & SEQ_EFFECT) {
-		struct SeqEffectHandle sh = get_sequence_effect(seq);
+		SeqEffect sh = get_sequence_effect(seq);
 
 		sh.free(seq);
 	}
@@ -1807,7 +1807,7 @@ static ImBuf* seq_render_effect_strip_impl(
 	float fac, facf;
 	int early_out;
 	int i;
-	struct SeqEffectHandle sh = get_sequence_effect(seq);
+	SeqEffect sh = get_sequence_effect(seq);
 	FCurve *fcu= NULL;
 	ImBuf * ibuf[3];
 	Sequence *input[3];
@@ -2222,7 +2222,7 @@ static int seq_must_swap_input_in_blend_mode(Sequence * seq)
 
 static int seq_get_early_out_for_blend_mode(Sequence * seq)
 {
-	struct SeqEffectHandle sh = get_sequence_blend(seq);
+	SeqEffect sh = get_sequence_blend(seq);
 	float facf = seq->blend_opacity / 100.0f;
 	int early_out = sh.early_out(seq, facf, facf);
 	
@@ -2327,7 +2327,7 @@ static ImBuf* seq_render_strip_stack(
 		Sequence * seq = seq_arr[i];
 
 		if (seq_get_early_out_for_blend_mode(seq) == EARLY_DO_EFFECT) {
-			struct SeqEffectHandle sh = get_sequence_blend(seq);
+			SeqEffect sh = get_sequence_blend(seq);
 			ImBuf * ibuf1 = out;
 			ImBuf * ibuf2 = seq_render_strip(context, seq, cfra);
 
@@ -3788,7 +3788,7 @@ static Sequence *seq_dupli(struct Scene *scene, struct Scene *scene_to, Sequence
 		if(seq->seq3 && seq->seq3->tmp) seqn->seq3= seq->seq3->tmp;
 
 		if (seq->type & SEQ_EFFECT) {
-			struct SeqEffectHandle sh;
+			SeqEffect sh;
 			sh = get_sequence_effect(seq);
 			if(sh.copy)
 				sh.copy(seq, seqn);

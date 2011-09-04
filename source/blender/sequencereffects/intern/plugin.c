@@ -330,7 +330,7 @@ static void free_plugin(struct Sequence * seq)
 }
 
 /* setup */
-void SeqConfigHandle_plugin(struct SeqEffectHandle *hndl)
+void SeqConfig_plugin(SeqEffect *hndl)
 {
 	hndl->init_plugin = init_plugin;
 	hndl->num_inputs = num_inputs_plugin;

@@ -105,7 +105,7 @@ static struct ImBuf * do_multicam(
 }
 
 /* setup */
-void SeqConfigHandle_multicam(struct SeqEffectHandle *hndl)
+void SeqConfig_multicam(SeqEffect *hndl)
 {
 	hndl->num_inputs = num_inputs_multicam;
 	hndl->early_out = early_out_multicam;

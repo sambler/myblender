@@ -189,7 +189,7 @@ static struct ImBuf * do_transform_effect(
 }
 
 /* setup */
-void SeqConfigHandle_transform(struct SeqEffectHandle *hndl)
+void SeqConfig_transform(SeqEffect *hndl)
 {
 	hndl->init = init_transform_effect;
 	hndl->num_inputs = num_inputs_transform;

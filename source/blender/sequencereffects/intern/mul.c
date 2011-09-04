@@ -174,7 +174,7 @@ static struct ImBuf * do_mul_effect(
 }
 
 /* setup */
-void SeqConfigHandle_mul(struct SeqEffectHandle *hndl)
+void SeqConfig_mul(SeqEffect *hndl)
 {
 	hndl->execute = do_mul_effect;
 }

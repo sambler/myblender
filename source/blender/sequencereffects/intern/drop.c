@@ -171,7 +171,7 @@ struct ImBuf * do_overdrop_effect(SeqRenderData context, Sequence *UNUSED(seq),
 
 
 /* setup */
-void SeqConfigHandle_overdrop(struct SeqEffectHandle *hndl)
+void SeqConfig_overdrop(SeqEffect *hndl)
 {
 	hndl->execute = do_overdrop_effect;
 }

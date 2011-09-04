@@ -169,7 +169,7 @@ static struct ImBuf * do_solid_color(
 }
 
 /* setup */
-void SeqConfigHandle_solid_colour(struct SeqEffectHandle *hndl)
+void SeqConfig_solid_colour(SeqEffect *hndl)
 {
 	hndl->init = init_solid_color;
 	hndl->num_inputs = num_inputs_color;

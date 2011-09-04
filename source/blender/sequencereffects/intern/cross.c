@@ -174,7 +174,7 @@ struct ImBuf* do_cross_effect(
 }
 
 /* setup */
-void SeqConfigHandle_cross(struct SeqEffectHandle *hndl)
+void SeqConfig_cross(SeqEffect *hndl)
 {
 	hndl->execute = do_cross_effect;
 }

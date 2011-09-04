@@ -718,7 +718,7 @@ static void rna_WipeSequence_angle_set(PointerRNA *ptr, float value)
 {
 	Sequence *seq= (Sequence *)(ptr->data);
 	value= RAD2DEGF(value);
-	CLAMP(value, -90.0f, 90.0f);
+	CLAMP(value, -180.0f, 180.0f);
 	((WipeVars *)seq->effectdata)->angle= value;
 }
 

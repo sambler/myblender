@@ -211,9 +211,9 @@ static void clouds_map_inputs(Tex *tex, bNodeStack **in, TexParams *p, short thr
 ProcDef(clouds)
 
 /* --- Planet --- */
-static bNodeSocketType planet_inputs[]= {
+static bNodeSocketTemplate planet_inputs[]= {
 	COMMON_INPUTS,
-	{ SOCK_VALUE, 1, "Size",       0.25f, 0.0f, 0.0f, 0.0f,   0.0001f, 2.0f },
+	{ SOCK_FLOAT, 1, "Size",       0.25f, 0.0f, 0.0f, 0.0f,   0.0001f, 2.0f, PROP_UNSIGNED },
 	{ -1, 0, "" }
 };
 static void planet_map_inputs(Tex *tex, bNodeStack **in, TexParams *p, short thread)

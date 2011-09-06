@@ -87,6 +87,7 @@
 #include "ED_object.h"
 #include "ED_markers.h"
 #include "ED_mesh.h"
+#include "ED_node.h"
 #include "ED_types.h"
 #include "ED_uvedit.h"
 #include "ED_curve.h" /* for ED_curve_editnurbs */
@@ -356,7 +357,7 @@ static bKinematicConstraint *has_targetless_ik(bPoseChannel *pchan)
 	bConstraint *con= pchan->constraints.first;
 
 	for(;con; con= con->next) {
-		if(con->type==CONSTRAINT_TYPE_KINEMATIC && (con->enforce!=0.0)) {
+		if(con->type==CONSTRAINT_TYPE_KINEMATIC && (con->enforce!=0.0f)) {
 			bKinematicConstraint *data= con->data;
 
 			if(data->tar==NULL)
@@ -690,7 +691,7 @@ int count_set_pose_transflags(int *out_mode, short around, Object *ob)
 	for (pchan = ob->pose->chanbase.first; pchan; pchan = pchan->next) {
 		bone = pchan->bone;
 		if (PBONE_VISIBLE(arm, bone)) {
-			if ((bone->flag & BONE_SELECTED) && !(ob->proxy && pchan->bone->layer & arm->layer_protected))
+			if ((bone->flag & BONE_SELECTED))
 				bone->flag |= BONE_TRANSFORM;
 			else
 				bone->flag &= ~BONE_TRANSFORM;
@@ -757,7 +758,7 @@ static void pchan_autoik_adjust (bPoseChannel *pchan, short chainlen)
 
 	/* check if pchan has ik-constraint */
 	for (con= pchan->constraints.first; con; con= con->next) {
-		if (con->type == CONSTRAINT_TYPE_KINEMATIC && (con->enforce!=0.0)) {
+		if (con->type == CONSTRAINT_TYPE_KINEMATIC && (con->enforce!=0.0f)) {
 			bKinematicConstraint *data= con->data;
 			
 			/* only accept if a temporary one (for auto-ik) */
@@ -1742,10 +1743,10 @@ static void createTransParticleVerts(bContext *C, TransInfo *t)
 				td->ival = *(key->time);
 				/* abuse size and quat for min/max values */
 				td->flag |= TD_NO_EXT;
-				if(k==0) tx->size = 0;
+				if(k==0) tx->size = NULL;
 				else tx->size = (key - 1)->time;
 
-				if(k == point->totkey - 1) tx->quat = 0;
+				if(k == point->totkey - 1) tx->quat = NULL;
 				else tx->quat = (key + 1)->time;
 			}
 
@@ -2056,27 +2057,25 @@ static void createTransEditVerts(bContext *C, TransInfo *t)
 	if(propmode) editmesh_set_connectivity_distance(em, mtx);
 
 	/* detect CrazySpace [tm] */
-	if(propmode==0) {
-		if(modifiers_getCageIndex(t->scene, t->obedit, NULL, 1)>=0) {
-			if(modifiers_isCorrectableDeformed(t->obedit)) {
-				/* check if we can use deform matrices for modifier from the
-				   start up to stack, they are more accurate than quats */
-				totleft= editmesh_get_first_deform_matrices(t->scene, t->obedit, em, &defmats, &defcos);
+	if(modifiers_getCageIndex(t->scene, t->obedit, NULL, 1)>=0) {
+		if(modifiers_isCorrectableDeformed(t->obedit)) {
+			/* check if we can use deform matrices for modifier from the
+			   start up to stack, they are more accurate than quats */
+			totleft= editmesh_get_first_deform_matrices(t->scene, t->obedit, em, &defmats, &defcos);
 
-				/* if we still have more modifiers, also do crazyspace
-				   correction with quats, relative to the coordinates after
-				   the modifiers that support deform matrices (defcos) */
-				if(totleft > 0) {
-					mappedcos= crazyspace_get_mapped_editverts(t->scene, t->obedit);
-					quats= MEM_mallocN( (t->total)*sizeof(float)*4, "crazy quats");
-					crazyspace_set_quats_editmesh(em, (float*)defcos, mappedcos, quats);
-					if(mappedcos)
-						MEM_freeN(mappedcos);
-				}
-
-				if(defcos)
-					MEM_freeN(defcos);
+			/* if we still have more modifiers, also do crazyspace
+			   correction with quats, relative to the coordinates after
+			   the modifiers that support deform matrices (defcos) */
+			if(totleft > 0) {
+				mappedcos= crazyspace_get_mapped_editverts(t->scene, t->obedit);
+				quats= MEM_mallocN( (t->total)*sizeof(float)*4, "crazy quats");
+				crazyspace_set_quats_editmesh(em, (float*)defcos, mappedcos, quats);
+				if(mappedcos)
+					MEM_freeN(mappedcos);
 			}
+
+			if(defcos)
+				MEM_freeN(defcos);
 		}
 	}
 
@@ -2184,6 +2183,12 @@ void flushTransNodes(TransInfo *t)
 		td->loc2d[0]= td->loc[0];
 		td->loc2d[1]= td->loc[1];
 	}
+	
+	/* handle intersection with noodles */
+	if(t->total==1) {
+		ED_node_link_intersect_test(t->sa, 1);
+	}
+	
 }
 
 /* *** SEQUENCE EDITOR *** */
@@ -2481,6 +2486,7 @@ static short FrameOnMouseSide(char side, float frame, float cframe)
 static void createTransNlaData(bContext *C, TransInfo *t)
 {
 	Scene *scene= t->scene;
+	SpaceNla *snla = NULL;
 	TransData *td = NULL;
 	TransDataNla *tdn = NULL;
 	
@@ -2494,9 +2500,10 @@ static void createTransNlaData(bContext *C, TransInfo *t)
 	/* determine what type of data we are operating on */
 	if (ANIM_animdata_get_context(C, &ac) == 0)
 		return;
+	snla = (SpaceNla *)ac.sl;
 	
 	/* filter data */
-	filter= (ANIMFILTER_VISIBLE | ANIMFILTER_NLATRACKS | ANIMFILTER_FOREDIT);
+	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_LIST_VISIBLE | ANIMFILTER_FOREDIT);
 	ANIM_animdata_filter(&ac, &anim_data, filter, ac.data, ac.datatype);
 	
 	/* which side of the current frame should be allowed */
@@ -2579,7 +2586,7 @@ static void createTransNlaData(bContext *C, TransInfo *t)
 						tdn->strip= strip;
 						tdn->trackIndex= BLI_findindex(&adt->nla_tracks, nlt);
 						
-						yval= (float)(tdn->trackIndex * NLACHANNEL_STEP);
+						yval= (float)(tdn->trackIndex * NLACHANNEL_STEP(snla));
 						
 						tdn->h1[0]= strip->start;
 						tdn->h1[1]= yval;
@@ -2615,6 +2622,7 @@ static void createTransNlaData(bContext *C, TransInfo *t)
 								unit_m3(td->smtx);
 							}
 							else {
+								/* time scaling only needs single value */
 								td->val= &tdn->h1[0];
 								td->ival= tdn->h1[0];
 							}
@@ -2646,6 +2654,7 @@ static void createTransNlaData(bContext *C, TransInfo *t)
 								unit_m3(td->smtx);
 							}
 							else {
+								/* time scaling only needs single value */
 								td->val= &tdn->h2[0];
 								td->ival= tdn->h2[0];
 							}
@@ -2666,7 +2675,7 @@ static void createTransNlaData(bContext *C, TransInfo *t)
 			}
 		}
 	}
-
+	
 	/* cleanup temp list */
 	BLI_freelistN(&anim_data);
 }
@@ -2681,7 +2690,7 @@ static void createTransNlaData(bContext *C, TransInfo *t)
 static void posttrans_gpd_clean (bGPdata *gpd)
 {
 	bGPDlayer *gpl;
-
+	
 	for (gpl= gpd->layers.first; gpl; gpl= gpl->next) {
 		ListBase sel_buffer = {NULL, NULL};
 		bGPDframe *gpf, *gpfn;
@@ -2804,7 +2813,7 @@ static void posttrans_fcurve_clean (FCurve *fcu)
 			if (BEZSELECTED(bezt) == 0) {
 				/* check beztriple should be removed according to cache */
 				for (index= 0; index < len; index++) {
-					if (IS_EQ(bezt->vec[1][0], selcache[index])) {
+					if (IS_EQF(bezt->vec[1][0], selcache[index])) {
 						delete_fcurve_key(fcu, i, 0);
 						break;
 					}
@@ -2834,7 +2843,7 @@ static void posttrans_action_clean (bAnimContext *ac, bAction *act)
 	int filter;
 
 	/* filter data */
-	filter= (ANIMFILTER_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_CURVESONLY);
+	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_FOREDIT /*| ANIMFILTER_CURVESONLY*/);
 	ANIM_animdata_filter(ac, &anim_data, filter, act, ANIMCONT_ACTION);
 
 	/* loop through relevant data, removing keyframes as appropriate
@@ -2842,7 +2851,7 @@ static void posttrans_action_clean (bAnimContext *ac, bAction *act)
 	 */
 	for (ale= anim_data.first; ale; ale= ale->next) {
 		AnimData *adt= ANIM_nla_mapping_get(ac, ale);
-
+		
 		if (adt) {
 			ANIM_nla_mapping_apply_fcurve(adt, ale->key_data, 0, 1);
 			posttrans_fcurve_clean(ale->key_data);
@@ -2977,7 +2986,7 @@ void flushTransGPactionData (TransInfo *t)
 
 	/* flush data! */
 	for (i = 0; i < t->total; i++, tfd++) {
-		*(tfd->sdata)= (int)floor(tfd->val + 0.5);
+		*(tfd->sdata)= (int)floor(tfd->val + 0.5f);
 	}
 }
 
@@ -3036,9 +3045,9 @@ static void createTransActionData(bContext *C, TransInfo *t)
 	
 	/* filter data */
 	if (ac.datatype == ANIMCONT_GPENCIL)
-		filter= (ANIMFILTER_VISIBLE | ANIMFILTER_FOREDIT);
+		filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_FOREDIT);
 	else
-		filter= (ANIMFILTER_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_CURVESONLY);
+		filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_FOREDIT /*| ANIMFILTER_CURVESONLY*/);
 	ANIM_animdata_filter(&ac, &anim_data, filter, ac.data, ac.datatype);
 	
 	/* which side of the current frame should be allowed */
@@ -3131,10 +3140,16 @@ static void createTransActionData(bContext *C, TransInfo *t)
 		float min=999999999.0f, max=-999999999.0f;
 		int i;
 		
-		td= (t->data + 1);
-		for (i=1; i < count; i+=3, td+=3) {
+		td= t->data;
+		for (i=0; i < count; i++, td++) {
 			if (min > *(td->val)) min= *(td->val);
 			if (max < *(td->val)) max= *(td->val);
+		}
+		
+		if (min == max) {
+			/* just use the current frame ranges */
+			min = (float)PSFRA;
+			max = (float)PEFRA;
 		}
 		
 		/* minx/maxx values used by TimeSlide are stored as a
@@ -3257,7 +3272,7 @@ static void createTransGraphEditData(bContext *C, TransInfo *t)
 		return;
 	
 	/* filter data */
-	filter= (ANIMFILTER_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_CURVESONLY | ANIMFILTER_CURVEVISIBLE);
+	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_CURVE_VISIBLE);
 	ANIM_animdata_filter(&ac, &anim_data, filter, ac.data, ac.datatype);
 	
 	/* which side of the current frame should be allowed */
@@ -3360,8 +3375,8 @@ static void createTransGraphEditData(bContext *C, TransInfo *t)
 		mul_v3_fl(mtx[1], yscale);
 		
 		/* smtx is global (i.e. view) to data conversion */
-		if (IS_EQ(xscale, 0.0f) == 0) mul_v3_fl(smtx[0], 1.0f/xscale);
-		if (IS_EQ(yscale, 0.0f) == 0) mul_v3_fl(smtx[1], 1.0f/yscale);
+		if (IS_EQF(xscale, 0.0f) == 0) mul_v3_fl(smtx[0], 1.0f/xscale);
+		if (IS_EQF(yscale, 0.0f) == 0) mul_v3_fl(smtx[1], 1.0f/yscale);
 	}
 	
 	/* loop 2: build transdata arrays */
@@ -3437,7 +3452,7 @@ static void createTransGraphEditData(bContext *C, TransInfo *t)
 				 *	  then check if we're using auto-handles.
 				 *	- If so, change them auto-handles to aligned handles so that handles get affected too
 				 */
-				if ((bezt->h1 == HD_AUTO) && (bezt->h2 == HD_AUTO) && ELEM(t->mode, TFM_ROTATION, TFM_RESIZE)) {
+				if (ELEM(bezt->h1, HD_AUTO, HD_AUTO_ANIM) && ELEM(bezt->h2, HD_AUTO, HD_AUTO_ANIM) && ELEM(t->mode, TFM_ROTATION, TFM_RESIZE)) {
 					if (hdata && (sel1) && (sel3)) {
 						bezt->h1= HD_ALIGN;
 						bezt->h2= HD_ALIGN;
@@ -3543,11 +3558,12 @@ static void sort_time_beztmaps (BeztMap *bezms, int totvert, const short UNUSED(
 }
 
 /* This function firstly adjusts the pointers that the transdata has to each BezTriple */
-static void beztmap_to_data (TransInfo *t, FCurve *fcu, BeztMap *bezms, int totvert, const short use_handle)
+static void beztmap_to_data (TransInfo *t, FCurve *fcu, BeztMap *bezms, int totvert, const short UNUSED(use_handle))
 {
 	BezTriple *bezts = fcu->bezt;
 	BeztMap *bezm;
-	TransData2D *td;
+	TransData2D *td2d;
+	TransData *td;
 	int i, j;
 	char *adjusted;
 	
@@ -3563,43 +3579,50 @@ static void beztmap_to_data (TransInfo *t, FCurve *fcu, BeztMap *bezms, int totv
 		/* loop through transdata, testing if we have a hit
 		 * for the handles (vec[0]/vec[2]), we must also check if they need to be swapped...
 		 */
-		td= t->data2d;
-		for (j= 0; j < t->total; j++, td++) {
+		td2d= t->data2d;
+		td= t->data;
+		for (j= 0; j < t->total; j++, td2d++, td++) {
 			/* skip item if already marked */
 			if (adjusted[j] != 0) continue;
 			
-			/* only selected verts */
-			if (bezm->pipo == BEZT_IPO_BEZ) {
-				if (use_handle && bezm->bezt->f1 & SELECT) {
-					if (td->loc2d == bezm->bezt->vec[0]) {
-						if (bezm->swapHs == 1)
-							td->loc2d= (bezts + bezm->newIndex)->vec[2];
-						else
-							td->loc2d= (bezts + bezm->newIndex)->vec[0];
-						adjusted[j] = 1;
-					}
-				}
+			/* update all transdata pointers, no need to check for selections etc,
+			 * since only points that are really needed were created as transdata
+			 */
+			if (td2d->loc2d == bezm->bezt->vec[0]) {
+				if (bezm->swapHs == 1)
+					td2d->loc2d= (bezts + bezm->newIndex)->vec[2];
+				else
+					td2d->loc2d= (bezts + bezm->newIndex)->vec[0];
+				adjusted[j] = 1;
 			}
-			if (bezm->cipo == BEZT_IPO_BEZ) {
-				if (use_handle && bezm->bezt->f3 & SELECT) {
-					if (td->loc2d == bezm->bezt->vec[2]) {
-						if (bezm->swapHs == 1)
-							td->loc2d= (bezts + bezm->newIndex)->vec[0];
-						else
-							td->loc2d= (bezts + bezm->newIndex)->vec[2];
-						adjusted[j] = 1;
-					}
-				}
+			else if (td2d->loc2d == bezm->bezt->vec[2]) {
+				if (bezm->swapHs == 1)
+					td2d->loc2d= (bezts + bezm->newIndex)->vec[0];
+				else
+					td2d->loc2d= (bezts + bezm->newIndex)->vec[2];
+				adjusted[j] = 1;
 			}
-			if (bezm->bezt->f2 & SELECT) {
-				if (td->loc2d == bezm->bezt->vec[1]) {
-					td->loc2d= (bezts + bezm->newIndex)->vec[1];
+			else if (td2d->loc2d == bezm->bezt->vec[1]) {
+				td2d->loc2d= (bezts + bezm->newIndex)->vec[1];
 					
-					/* if only control point is selected, the handle pointers need to be updated as well */
-					td->h1= (bezts + bezm->newIndex)->vec[0];
-					td->h2= (bezts + bezm->newIndex)->vec[2];
+				/* if only control point is selected, the handle pointers need to be updated as well */
+				if(td2d->h1)
+					td2d->h1= (bezts + bezm->newIndex)->vec[0];
+				if(td2d->h2)
+					td2d->h2= (bezts + bezm->newIndex)->vec[2];
 					
-					adjusted[j] = 1;
+				adjusted[j] = 1;
+			}
+
+			/* the handle type pointer has to be updated too */
+			if (adjusted[j] && td->flag & TD_BEZTRIPLE && td->hdata) {
+				if(bezm->swapHs == 1) {
+					td->hdata->h1 = &(bezts + bezm->newIndex)->h2;
+					td->hdata->h2 = &(bezts + bezm->newIndex)->h1;
+				}
+				else {
+					td->hdata->h1 = &(bezts + bezm->newIndex)->h1;
+					td->hdata->h2 = &(bezts + bezm->newIndex)->h2;
 				}
 			}
 		}
@@ -3631,6 +3654,7 @@ void remake_graph_transdata (TransInfo *t, ListBase *anim_data)
 			BeztMap *bezm;
 			
 			/* adjust transform-data pointers */
+			/* note, none of these functions use 'use_handle', it could be removed */
 			bezm= bezt_to_beztmaps(fcu->bezt, fcu->totvert, use_handle);
 			sort_time_beztmaps(bezm, fcu->totvert, use_handle);
 			beztmap_to_data(t, fcu, bezm, fcu->totvert, use_handle);
@@ -3690,7 +3714,7 @@ void flushTransGraphData(TransInfo *t)
 		
 		/* if int-values only, truncate to integers */
 		if (td->flag & TD_INTVALUES)
-			td2d->loc2d[1]= (float)((int)td2d->loc[1]);
+			td2d->loc2d[1]= floorf(td2d->loc[1] + 0.5f);
 		else
 			td2d->loc2d[1]= td2d->loc[1];
 		
@@ -3716,27 +3740,8 @@ void flushTransGraphData(TransInfo *t)
  * seq->depth must be set before running this function so we know if the strips
  * are root level or not
  */
-#define XXX_DURIAN_ANIM_TX_HACK
 static void SeqTransInfo(TransInfo *t, Sequence *seq, int *recursive, int *count, int *flag)
 {
- 
-#ifdef XXX_DURIAN_ANIM_TX_HACK
-	/* hack */
-	if((seq->flag & SELECT)==0 && seq->type & SEQ_EFFECT) {
-		Sequence *seq_t[3];
-		int i;
-
-		seq_t[0]= seq->seq1;
-		seq_t[1]= seq->seq2;
-		seq_t[2]= seq->seq3;
-
-		for(i=0; i<3; i++) {
-			if (seq_t[i] && ((seq_t[i])->flag & SELECT) && !(seq_t[i]->flag & SEQ_LOCK) && !(seq_t[i]->flag & (SEQ_LEFTSEL|SEQ_RIGHTSEL)))
-				seq->flag |= SELECT;
-		}
-	}
-#endif
-    
 	/* for extend we need to do some tricks */
 	if (t->mode == TFM_TIME_EXTEND) {
 
@@ -4007,6 +4012,7 @@ static void freeSeqData(TransInfo *t)
 				}
 
 				if(overlap) {
+					int has_effect= 0;
 					for(seq= seqbasep->first; seq; seq= seq->next)
 						seq->tmp= NULL;
 
@@ -4015,12 +4021,47 @@ static void freeSeqData(TransInfo *t)
 					for(a=0; a<t->total; a++, td++) {
 						seq= ((TransDataSeq *)td->extra)->seq;
 						if ((seq != seq_prev)) {
-							/* Tag seq with a non zero value, used by shuffle_seq_time to identify the ones to shuffle */
-							seq->tmp= (void*)1;
+							/* check effects strips, we cant change their time */
+							if((seq->type & SEQ_EFFECT) && seq->seq1) {
+								has_effect= TRUE;
+							}
+							else {
+								/* Tag seq with a non zero value, used by shuffle_seq_time to identify the ones to shuffle */
+								seq->tmp= (void*)1;
+							}
 						}
 					}
 
 					shuffle_seq_time(seqbasep, t->scene);
+
+					if(has_effect) {
+						/* update effects strips based on strips just moved in time */
+						td= t->data;
+						seq_prev= NULL;
+						for(a=0; a<t->total; a++, td++) {
+							seq= ((TransDataSeq *)td->extra)->seq;
+							if ((seq != seq_prev)) {
+								if((seq->type & SEQ_EFFECT) && seq->seq1) {
+									calc_sequence(t->scene, seq);
+								}
+							}
+						}
+
+						/* now if any effects _still_ overlap, we need to move them up */
+						td= t->data;
+						seq_prev= NULL;
+						for(a=0; a<t->total; a++, td++) {
+							seq= ((TransDataSeq *)td->extra)->seq;
+							if ((seq != seq_prev)) {
+								if((seq->type & SEQ_EFFECT) && seq->seq1) {
+									if(seq_test_overlap(seqbasep, seq)) {
+										shuffle_seq(seqbasep, seq, t->scene);
+									}
+								}
+							}
+						}
+						/* done with effects */
+					}
 				}
 			}
 #endif
@@ -4060,6 +4101,7 @@ static void freeSeqData(TransInfo *t)
 
 static void createTransSeqData(bContext *C, TransInfo *t)
 {
+#define XXX_DURIAN_ANIM_TX_HACK
 
 	View2D *v2d= UI_view2d_fromcontext(C);
 	Scene *scene= t->scene;
@@ -4090,6 +4132,24 @@ static void createTransSeqData(bContext *C, TransInfo *t)
 		t->frame_side = 'B';
 	}
 
+#ifdef XXX_DURIAN_ANIM_TX_HACK
+	{
+		Sequence *seq;
+		for(seq= ed->seqbasep->first; seq; seq= seq->next) {
+			/* hack */
+			if((seq->flag & SELECT)==0 && seq->type & SEQ_EFFECT) {
+				Sequence *seq_user;
+				int i;
+				for(i=0; i<3; i++) {
+					seq_user= *((&seq->seq1) + i);
+					if (seq_user && (seq_user->flag & SELECT) && !(seq_user->flag & SEQ_LOCK) && !(seq_user->flag & (SEQ_LEFTSEL|SEQ_RIGHTSEL))) {
+						seq->flag |= SELECT;
+					}
+				}
+			}
+		}
+	}
+#endif
 
 	count = SeqTransCount(t, ed->seqbasep, 0);
 
@@ -4109,6 +4169,8 @@ static void createTransSeqData(bContext *C, TransInfo *t)
 
 	/* loop 2: build transdata array */
 	SeqToTransData_Recursive(t, ed->seqbasep, td, td2d, tdsq);
+
+#undef XXX_DURIAN_ANIM_TX_HACK
 }
 
 
@@ -4130,7 +4192,7 @@ static short constraints_list_needinv(TransInfo *t, ListBase *list)
 	if (list) {
 		for (con= list->first; con; con=con->next) {
 			/* only consider constraint if it is enabled, and has influence on result */
-			if ((con->flag & CONSTRAINT_DISABLE)==0 && (con->enforce!=0.0)) {
+			if ((con->flag & CONSTRAINT_DISABLE)==0 && (con->enforce!=0.0f)) {
 				/* (affirmative) returns for specific constraints here... */
 					/* constraints that require this regardless  */
 				if (con->type == CONSTRAINT_TYPE_CHILDOF) return 1;
@@ -4672,7 +4734,7 @@ void special_aftertrans_update(bContext *C, TransInfo *t)
 	Object *ob;
 //	short redrawipo=0, resetslowpar=1;
 	int cancelled= (t->state == TRANS_CANCEL);
-	short duplicate= (t->undostr && strstr(t->undostr, "Duplicate")) ? 1 : 0; /* see bugreport #21229 for reasons for this data */
+	short duplicate= (t->mode == TFM_TIME_DUPLICATE);
 	
 	/* early out when nothing happened */
 	if (t->total == 0 || t->mode == TFM_DUMMY)
@@ -4700,16 +4762,23 @@ void special_aftertrans_update(bContext *C, TransInfo *t)
 
 			if(t->mode == TFM_SEQ_SLIDE) {
 				if(t->frame_side == 'B')
-					scene_marker_tfm_translate(t->scene, floor(t->values[0] + 0.5f), SELECT);
+					ED_markers_post_apply_transform(&t->scene->markers, t->scene, TFM_TIME_TRANSLATE, t->vec[0], t->frame_side);
 			}
 			else if (ELEM(t->frame_side, 'L', 'R')) {
-				scene_marker_tfm_extend(t->scene, floor(t->vec[0] + 0.5f), SELECT, t->scene->r.cfra, t->frame_side);
+				ED_markers_post_apply_transform(&t->scene->markers, t->scene, TFM_TIME_EXTEND, t->vec[0], t->frame_side);
 			}
 		}
 
 	}
 	else if (t->spacetype == SPACE_NODE) {
-		/* pass */
+		SpaceNode *snode= (SpaceNode *)t->sa->spacedata.first;
+		ED_node_update_hierarchy(C, snode->edittree);
+		
+		if(cancelled == 0)
+			ED_node_link_insert(t->sa);
+		
+		/* clear link line */
+		ED_node_link_intersect_test(t->sa, 0);
 	}
 	else if (t->spacetype == SPACE_ACTION) {
 		SpaceAction *saction= (SpaceAction *)t->sa->spacedata.first;
@@ -4724,7 +4793,7 @@ void special_aftertrans_update(bContext *C, TransInfo *t)
 		if (ELEM(ac.datatype, ANIMCONT_DOPESHEET, ANIMCONT_SHAPEKEY)) {
 			ListBase anim_data = {NULL, NULL};
 			bAnimListElem *ale;
-			short filter= (ANIMFILTER_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_CURVESONLY);
+			short filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_FOREDIT /*| ANIMFILTER_CURVESONLY*/);
 			
 			/* get channels to work on */
 			ANIM_animdata_filter(&ac, &anim_data, filter, ac.data, ac.datatype);
@@ -4734,6 +4803,11 @@ void special_aftertrans_update(bContext *C, TransInfo *t)
 				AnimData *adt= ANIM_nla_mapping_get(&ac, ale);
 				FCurve *fcu= (FCurve *)ale->key_data;
 				
+				/* 3 cases here for curve cleanups:
+				 * 1) NOTRANSKEYCULL on     -> cleanup of duplicates shouldn't be done
+				 * 2) cancelled == 0        -> user confirmed the transform, so duplicates should be removed
+				 * 3) cancelled + duplicate -> user cancelled the transform, but we made duplicates, so get rid of these
+				 */
 				if ( (saction->flag & SACTION_NOTRANSKEYCULL)==0 &&
 					 ((cancelled == 0) || (duplicate)) )
 				{
@@ -4760,48 +4834,62 @@ void special_aftertrans_update(bContext *C, TransInfo *t)
 					DAG_id_tag_update(&ob->id, OB_RECALC_OB);
 			}
 			
-			/* Do curve cleanups? */
+			/* 3 cases here for curve cleanups:
+			 * 1) NOTRANSKEYCULL on     -> cleanup of duplicates shouldn't be done
+			 * 2) cancelled == 0        -> user confirmed the transform, so duplicates should be removed
+			 * 3) cancelled + duplicate -> user cancelled the transform, but we made duplicates, so get rid of these
+			 */
 			if ( (saction->flag & SACTION_NOTRANSKEYCULL)==0 &&
 				 ((cancelled == 0) || (duplicate)) )
 			{
 				posttrans_action_clean(&ac, (bAction *)ac.data);
 			}
 		}
-
-		/* marker transform, not especially nice but we may want to move markers
-		 * at the same time as keyframes in the dope sheet. */
-		if ((saction->flag & SACTION_MARKERS_MOVE) && (cancelled == 0)) {
-			/* cant use , TFM_TIME_EXTEND
-			 * for some reason EXTEND is changed into TRANSLATE, so use frame_side instead */
-
-			if(t->mode == TFM_TIME_TRANSLATE) {
-				if(t->frame_side == 'B')
-					scene_marker_tfm_translate(t->scene, floor(t->vec[0] + 0.5f), SELECT);
-				else if (ELEM(t->frame_side, 'L', 'R'))
-					scene_marker_tfm_extend(t->scene, floor(t->vec[0] + 0.5f), SELECT, t->scene->r.cfra, t->frame_side);
-			}
-			else if(t->mode == TFM_TIME_SCALE) {
-				scene_marker_tfm_scale(t->scene, t->vec[0], SELECT);
-			}
-		}
-		
 		else if (ac.datatype == ANIMCONT_GPENCIL) {
 			/* remove duplicate frames and also make sure points are in order! */
-			if ((cancelled == 0) || (duplicate))
+				/* 3 cases here for curve cleanups:
+				 * 1) NOTRANSKEYCULL on     -> cleanup of duplicates shouldn't be done
+				 * 2) cancelled == 0        -> user confirmed the transform, so duplicates should be removed
+				 * 3) cancelled + duplicate -> user cancelled the transform, but we made duplicates, so get rid of these
+				 */
+			if ( (saction->flag & SACTION_NOTRANSKEYCULL)==0 &&
+				 ((cancelled == 0) || (duplicate)) )
 			{
 				bGPdata *gpd;
 				
 				// XXX: BAD! this get gpencil datablocks directly from main db...
 				// but that's how this currently works :/
 				for (gpd = G.main->gpencil.first; gpd; gpd = gpd->id.next) {
-					if (ID_REAL_USERS(gpd) > 1)
+					if (ID_REAL_USERS(gpd))
 						posttrans_gpd_clean(gpd);
 				}
 			}
 		}
 		
+		/* marker transform, not especially nice but we may want to move markers
+		 * at the same time as keyframes in the dope sheet. 
+		 */
+		if ((saction->flag & SACTION_MARKERS_MOVE) && (cancelled == 0)) {
+			if (t->mode == TFM_TIME_TRANSLATE) {
+#if 0
+				if (ELEM(t->frame_side, 'L', 'R')) { /* TFM_TIME_EXTEND */
+					/* same as below */
+					ED_markers_post_apply_transform(ED_context_get_markers(C), t->scene, t->mode, t->vec[0], t->frame_side);
+				}
+				else /* TFM_TIME_TRANSLATE */
+#endif
+				{
+					ED_markers_post_apply_transform(ED_context_get_markers(C), t->scene, t->mode, t->vec[0], t->frame_side);
+				}
+			}
+			else if (t->mode == TFM_TIME_SCALE) {
+				ED_markers_post_apply_transform(ED_context_get_markers(C), t->scene, t->mode, t->vec[0], t->frame_side);
+			}
+		}
+		
 		/* make sure all F-Curves are set correctly */
-		ANIM_editkeyframes_refresh(&ac);
+		if (ac.datatype != ANIMCONT_GPENCIL)
+			ANIM_editkeyframes_refresh(&ac);
 		
 		/* clear flag that was set for time-slide drawing */
 		saction->flag &= ~SACTION_MOVING;
@@ -4818,7 +4906,7 @@ void special_aftertrans_update(bContext *C, TransInfo *t)
 		{
 			ListBase anim_data = {NULL, NULL};
 			bAnimListElem *ale;
-			short filter= (ANIMFILTER_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_CURVESONLY | ANIMFILTER_CURVEVISIBLE);
+			short filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_CURVE_VISIBLE);
 			
 			/* get channels to work on */
 			ANIM_animdata_filter(&ac, &anim_data, filter, ac.data, ac.datatype);
@@ -4827,13 +4915,18 @@ void special_aftertrans_update(bContext *C, TransInfo *t)
 				AnimData *adt= ANIM_nla_mapping_get(&ac, ale);
 				FCurve *fcu= (FCurve *)ale->key_data;
 				
+				/* 3 cases here for curve cleanups:
+				 * 1) NOTRANSKEYCULL on     -> cleanup of duplicates shouldn't be done
+				 * 2) cancelled == 0        -> user confirmed the transform, so duplicates should be removed
+				 * 3) cancelled + duplicate -> user cancelled the transform, but we made duplicates, so get rid of these
+				 */
 				if ( (sipo->flag & SIPO_NOTRANSKEYCULL)==0 &&
 					 ((cancelled == 0) || (duplicate)) )
 				{
 					if (adt) {
-						ANIM_nla_mapping_apply_fcurve(adt, fcu, 0, 1);
+						ANIM_nla_mapping_apply_fcurve(adt, fcu, 0, 0);
 						posttrans_fcurve_clean(fcu);
-						ANIM_nla_mapping_apply_fcurve(adt, fcu, 1, 1);
+						ANIM_nla_mapping_apply_fcurve(adt, fcu, 1, 0);
 					}
 					else
 						posttrans_fcurve_clean(fcu);
@@ -4863,7 +4956,7 @@ void special_aftertrans_update(bContext *C, TransInfo *t)
 		{
 			ListBase anim_data = {NULL, NULL};
 			bAnimListElem *ale;
-			short filter= (ANIMFILTER_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_NLATRACKS);
+			short filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_FOREDIT);
 			
 			/* get channels to work on */
 			ANIM_animdata_filter(&ac, &anim_data, filter, ac.data, ac.datatype);
@@ -4895,21 +4988,23 @@ void special_aftertrans_update(bContext *C, TransInfo *t)
 	}
 	else if ((t->flag & T_POSE) && (t->poseobj)) {
 		bArmature *arm;
-		bPose	*pose;
 		bPoseChannel *pchan;
 		short targetless_ik= 0;
 
 		ob= t->poseobj;
 		arm= ob->data;
-		pose= ob->pose;
 
 		if((t->flag & T_AUTOIK) && (t->options & CTX_AUTOCONFIRM)) {
 			/* when running transform non-interactively (operator exec),
 			 * we need to update the pose otherwise no updates get called during
 			 * transform and the auto-ik is not applied. see [#26164] */
-			struct Object *ob=t->poseobj;
-			where_is_pose(t->scene, ob);
+			struct Object *pose_ob=t->poseobj;
+			where_is_pose(t->scene, pose_ob);
 		}
+
+		/* set BONE_TRANSFORM flags for autokey, manipulator draw might have changed them */
+		if (!cancelled && (t->mode != TFM_DUMMY))
+			count_set_pose_transflags(&t->mode, t->around, ob);
 
 		/* if target-less IK grabbing, we calculate the pchan transforms and clear flag */
 		if (!cancelled && t->mode==TFM_TRANSLATION)
@@ -5011,10 +5106,6 @@ void special_aftertrans_update(bContext *C, TransInfo *t)
 #if 0 // TRANSFORM_FIX_ME
 	if(resetslowpar)
 		reset_slowparents();
-
-	/* note; should actually only be done for all objects when a lamp is moved... (ton) */
-	if(t->spacetype==SPACE_VIEW3D && G.vd->drawtype == OB_SHADED)
-		reshadeall_displist();
 #endif
 }
 
@@ -5059,7 +5150,7 @@ static void createTransObject(bContext *C, TransInfo *t)
 		}
 		
 		/* select linked objects, but skip them later */
-		if (ob->id.lib != 0) {
+		if (ob->id.lib != NULL) {
 			td->flag |= TD_SKIP;
 		}
 		
@@ -5105,6 +5196,11 @@ static void NodeToTransData(TransData *td, TransData2D *td2d, bNode *node)
 	td2d->loc2d = &node->locx; /* current location */
 
 	td->flag = 0;
+	/* exclude nodes whose parent is also transformed */
+	if (node->parent && (node->parent->flag & NODE_TRANSFORM)) {
+		td->flag |= TD_SKIP;
+	}
+
 	td->loc = td2d->loc;
 	VECCOPY(td->center, td->loc);
 	VECCOPY(td->iloc, td->loc);
@@ -5125,6 +5221,16 @@ static void createTransNodeData(bContext *C, TransInfo *t)
 {
 	TransData *td;
 	TransData2D *td2d;
+	SpaceNode *snode= t->sa->spacedata.first;
+	bNode *node;
+
+	/* set transform flags on nodes */
+	for (node=snode->edittree->nodes.first; node; node=node->next) {
+		if ((node->flag & NODE_SELECT) || (node->parent && (node->parent->flag & NODE_TRANSFORM)))
+			node->flag |= NODE_TRANSFORM;
+		else
+			node->flag &= ~NODE_TRANSFORM;
+	}
 
 	t->total= CTX_DATA_COUNT(C, selected_nodes);
 
@@ -5293,7 +5399,7 @@ void createTransData(bContext *C, TransInfo *t)
 			sort_trans_data_dist(t);
 		}
 
-		if (t->ar->regiontype == RGN_TYPE_WINDOW)
+		if ((t->spacetype == SPACE_VIEW3D) && (t->ar->regiontype == RGN_TYPE_WINDOW))
 		{
 			View3D *v3d = t->view;
 			RegionView3D *rv3d = CTX_wm_region_view3d(C);

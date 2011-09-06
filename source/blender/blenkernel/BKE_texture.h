@@ -81,6 +81,7 @@ void default_mtex(struct MTex *mtex);
 struct MTex *add_mtex(void);
 struct MTex *add_mtex_id(struct ID *id, int slot);
 struct Tex *copy_texture(struct Tex *tex);
+struct Tex *localize_texture(struct Tex *tex);
 void make_local_texture(struct Tex *tex);
 void autotexname(struct Tex *tex);
 
@@ -101,6 +102,8 @@ void set_current_world_texture(struct World *wo, struct Tex *tex);
 void set_current_material_texture(struct Material *ma, struct Tex *tex);
 void set_current_lamp_texture(struct Lamp *la, struct Tex *tex);
 void set_current_particle_texture(struct ParticleSettings *part, struct Tex *tex);
+
+int has_current_material_texture(struct Material *ma);
 
 struct TexMapping *add_mapping(void);
 void init_mapping(struct TexMapping *texmap);

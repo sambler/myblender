@@ -194,6 +194,7 @@ static void occ_shade(ShadeSample *ssamp, ObjectInstanceRen *obi, VlakRen *vlr, 
 	if(shi->obr->ob && shi->obr->ob->transflag & OB_NEG_SCALE) {
 		negate_v3(shi->vn);
 		negate_v3(shi->vno);
+		negate_v3(shi->nmapnorm);
 	}
 
 	/* init material vars */
@@ -613,7 +614,8 @@ static void occ_build_recursive(OcclusionTree *tree, OccNode *node, int begin, i
 
 	/* compute maximum distance from center */
 	node->dco= 0.0f;
-	occ_build_dco(tree, node, node->co, &node->dco);
+	if(node->area > 0.0f)
+		occ_build_dco(tree, node, node->co, &node->dco);
 }
 
 static void occ_build_sh_normalize(OccNode *node)
@@ -1412,7 +1414,7 @@ static void sample_occ_tree(Render *re, OcclusionTree *tree, OccFace *exclude, f
 	if(env) {
 		/* sky shading using bent normal */
 		if(ELEM(envcolor, WO_AOSKYCOL, WO_AOSKYTEX)) {
-			fac= 0.5*(1.0f+bn[0]*re->grvec[0]+ bn[1]*re->grvec[1]+ bn[2]*re->grvec[2]);
+			fac= 0.5f*(1.0f+bn[0]*re->grvec[0]+ bn[1]*re->grvec[1]+ bn[2]*re->grvec[2]);
 			env[0]= (1.0f-fac)*re->wrld.horr + fac*re->wrld.zenr;
 			env[1]= (1.0f-fac)*re->wrld.horg + fac*re->wrld.zeng;
 			env[2]= (1.0f-fac)*re->wrld.horb + fac*re->wrld.zenb;

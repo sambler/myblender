@@ -45,6 +45,7 @@
 #include "DNA_meta_types.h"
 #include "DNA_particle_types.h"
 #include "DNA_scene_types.h"
+#include "DNA_speaker_types.h"
 #include "DNA_world_types.h"
 #include "DNA_object_types.h"
 
@@ -75,6 +76,7 @@
 #include "BKE_report.h"
 #include "BKE_sca.h"
 #include "BKE_scene.h"
+#include "BKE_speaker.h"
 #include "BKE_texture.h"
 
 #include "WM_api.h"
@@ -360,7 +362,7 @@ static int make_proxy_exec (bContext *C, wmOperator *op)
 }
 
 /* Generic itemf's for operators that take library args */
-static EnumPropertyItem *proxy_group_object_itemf(bContext *C, PointerRNA *UNUSED(ptr), int *free)
+static EnumPropertyItem *proxy_group_object_itemf(bContext *C, PointerRNA *UNUSED(ptr), PropertyRNA *UNUSED(prop), int *free)
 {
 	EnumPropertyItem item_tmp= {0}, *item= NULL;
 	int totitem= 0;
@@ -402,7 +404,7 @@ void OBJECT_OT_proxy_make (wmOperatorType *ot)
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 	
 	/* properties */
-	RNA_def_string(ot->srna, "object", "", 19, "Proxy Object", "Name of lib-linked/grouped object to make a proxy for.");
+	RNA_def_string(ot->srna, "object", "", MAX_ID_NAME-2, "Proxy Object", "Name of lib-linked/grouped object to make a proxy for.");
 	prop= RNA_def_enum(ot->srna, "type", DummyRNA_DEFAULT_items, 0, "Type", "Group object"); /* XXX, relies on hard coded ID at the moment */
 	RNA_def_enum_funcs(prop, proxy_group_object_itemf);
 	ot->prop= prop;
@@ -446,6 +448,7 @@ static int parent_clear_exec(bContext *C, wmOperator *op)
 	DAG_scene_sort(bmain, scene);
 	DAG_ids_flush_update(bmain, 0);
 	WM_event_add_notifier(C, NC_OBJECT|ND_TRANSFORM, NULL);
+	WM_event_add_notifier(C, NC_OBJECT|ND_PARENT, NULL);
 
 	return OPERATOR_FINISHED;
 }
@@ -970,8 +973,8 @@ static int track_set_exec(bContext *C, wmOperator *op)
 				data->tar = obact;
 				ob->recalc |= OB_RECALC_OB|OB_RECALC_DATA|OB_RECALC_TIME;
 				
-				/* Lamp and Camera track differently by default */
-				if (ob->type == OB_LAMP || ob->type == OB_CAMERA)
+				/* Lamp, Camera and Speaker track differently by default */
+				if (ob->type == OB_LAMP || ob->type == OB_CAMERA || ob->type == OB_SPEAKER)
 					data->trackflag = TRACK_nZ;
 			}
 		}
@@ -989,8 +992,8 @@ static int track_set_exec(bContext *C, wmOperator *op)
 				data->tar = obact;
 				ob->recalc |= OB_RECALC_OB|OB_RECALC_DATA|OB_RECALC_TIME;
 				
-				/* Lamp and Camera track differently by default */
-				if (ob->type == OB_LAMP || ob->type == OB_CAMERA) {
+				/* Lamp, Camera and Speaker track differently by default */
+				if (ob->type == OB_LAMP || ob->type == OB_CAMERA || ob->type == OB_SPEAKER) {
 					data->reserved1 = TRACK_nZ;
 					data->reserved2 = UP_Y;
 				}
@@ -1010,8 +1013,8 @@ static int track_set_exec(bContext *C, wmOperator *op)
 				data->tar = obact;
 				ob->recalc |= OB_RECALC_OB|OB_RECALC_DATA|OB_RECALC_TIME;
 				
-				/* Lamp and Camera track differently by default */
-				if (ob->type == OB_LAMP || ob->type == OB_CAMERA) {
+				/* Lamp, Camera and Speaker track differently by default */
+				if (ob->type == OB_LAMP || ob->type == OB_CAMERA || ob->type == OB_SPEAKER) {
 					data->trackflag = TRACK_nZ;
 					data->lockflag = LOCK_Y;
 				}
@@ -1095,7 +1098,7 @@ static int move_to_layer_exec(bContext *C, wmOperator *op)
 	Scene *scene= CTX_data_scene(C);
 	View3D *v3d= CTX_wm_view3d(C);
 	unsigned int lay, local;
-	int islamp= 0;
+	/* int islamp= 0; */ /* UNUSED */
 	
 	lay= move_to_layer_init(C, op);
 	lay &= 0xFFFFFF;
@@ -1111,7 +1114,7 @@ static int move_to_layer_exec(bContext *C, wmOperator *op)
 			base->object->lay= lay;
 			base->object->flag &= ~SELECT;
 			base->flag &= ~SELECT;
-			if(base->object->type==OB_LAMP) islamp= 1;
+			/* if(base->object->type==OB_LAMP) islamp= 1; */
 		}
 		CTX_DATA_END;
 	}
@@ -1123,12 +1126,10 @@ static int move_to_layer_exec(bContext *C, wmOperator *op)
 			local= base->lay & 0xFF000000;  
 			base->lay= lay + local;
 			base->object->lay= lay;
-			if(base->object->type==OB_LAMP) islamp= 1;
+			/* if(base->object->type==OB_LAMP) islamp= 1; */
 		}
 		CTX_DATA_END;
 	}
-
-	if(islamp) reshadeall_displist(scene);	/* only frees */
 	
 	/* warning, active object may be hidden now */
 	
@@ -1254,7 +1255,7 @@ static int allow_make_links_data(int ev, Object *ob, Object *obt)
 static int make_links_data_exec(bContext *C, wmOperator *op)
 {
 	Main *bmain= CTX_data_main(C);
-	int event = RNA_int_get(op->ptr, "type");
+	int event = RNA_enum_get(op->ptr, "type");
 	Object *ob;
 	ID *id;
 	int a;
@@ -1320,7 +1321,7 @@ void OBJECT_OT_make_links_scene(wmOperatorType *ot)
 
 	/* identifiers */
 	ot->name= "Link Objects to Scene";
-	ot->description = "Make linked data local to each object";
+	ot->description = "Link selection to another scene";
 	ot->idname= "OBJECT_OT_make_links_scene";
 
 	/* api callbacks */
@@ -1354,7 +1355,7 @@ void OBJECT_OT_make_links_data(wmOperatorType *ot)
 
 	/* api callbacks */
 	ot->exec= make_links_data_exec;
-	ot->poll= ED_operator_objectmode;
+	ot->poll= ED_operator_object_active;
 
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
@@ -1365,11 +1366,6 @@ void OBJECT_OT_make_links_data(wmOperatorType *ot)
 
 
 /**************************** Make Single User ********************************/
-
-static void single_object_users__forwardModifierLinks(void *UNUSED(userData), Object *UNUSED(ob), Object **obpoin)
-{
-	ID_NEW(*obpoin);
-}
 
 static void single_object_users(Scene *scene, View3D *v3d, int flag)	
 {
@@ -1402,22 +1398,24 @@ static void single_object_users(Scene *scene, View3D *v3d, int flag)
 	
 	/* object pointers */
 	for(base= FIRSTBASE; base; base= base->next) {
-		ob= base->object;
-		if(ob->id.lib==NULL) {
-			relink_constraints(&base->object->constraints);
-			if (base->object->pose){
-				bPoseChannel *chan;
-				for (chan = base->object->pose->chanbase.first; chan; chan=chan->next){
-					relink_constraints(&chan->constraints);
-				}
-			}
-			modifiers_foreachObjectLink(base->object, single_object_users__forwardModifierLinks, NULL);
-			
-			ID_NEW(ob->parent);
-		}
+		object_relink(base->object);
 	}
 
 	set_sca_new_poins();
+}
+
+/* not an especially efficient function, only added so the single user
+ * button can be functional.*/
+void ED_object_single_user(Scene *scene, Object *ob)
+{
+	Base *base;
+
+	for(base= FIRSTBASE; base; base= base->next) {
+		if(base->object == ob)  base->flag |=  OB_DONE;
+		else					base->flag &= ~OB_DONE;
+	}
+
+	single_object_users(scene, NULL, OB_DONE);
 }
 
 static void new_id_matar(Material **matar, int totcol)
@@ -1427,7 +1425,7 @@ static void new_id_matar(Material **matar, int totcol)
 	
 	for(a=0; a<totcol; a++) {
 		id= (ID *)matar[a];
-		if(id && id->lib==0) {
+		if(id && id->lib == NULL) {
 			if(id->newid) {
 				matar[a]= (Material *)id->newid;
 				id_us_plus(id->newid);
@@ -1499,6 +1497,9 @@ static void single_obdata_users(Main *bmain, Scene *scene, int flag)
 					ob->data= copy_armature(ob->data);
 					armature_rebuild_pose(ob, ob->data);
 					break;
+				case OB_SPEAKER:
+					ob->data= copy_speaker(ob->data);
+					break;
 				default:
 					if (G.f & G_DEBUG)
 						printf("ERROR single_obdata_users: can't copy %s\n", id->name);
@@ -1560,11 +1561,12 @@ static void single_mat_users(Scene *scene, int flag, int do_textures)
 
 						if(do_textures) {
 							for(b=0; b<MAX_MTEX; b++) {
-								if(ma->mtex[b] && ma->mtex[b]->tex) {
-									tex= ma->mtex[b]->tex;
+								if(ma->mtex[b] && (tex= ma->mtex[b]->tex)) {
 									if(tex->id.us>1) {
-										ma->mtex[b]->tex= copy_texture(tex);
 										tex->id.us--;
+										tex= copy_texture(tex);
+										BKE_copy_animdata_id_action(&tex->id);
+										ma->mtex[b]->tex= tex;
 									}
 								}
 							}
@@ -1581,7 +1583,7 @@ static void do_single_tex_user(Tex **from)
 	Tex *tex, *texn;
 	
 	tex= *from;
-	if(tex==0) return;
+	if(tex==NULL) return;
 	
 	if(tex->id.newid) {
 		*from= (Tex *)tex->id.newid;
@@ -1677,6 +1679,7 @@ void ED_object_single_users(Main *bmain, Scene *scene, int full)
 
 	if(full) {
 		single_obdata_users(bmain, scene, 0);
+		single_object_action_users(scene, 0);
 		single_mat_users_expand(bmain);
 		single_tex_users_expand(bmain);
 	}
@@ -1835,11 +1838,12 @@ static int make_single_user_exec(bContext *C, wmOperator *op)
 		single_obdata_users(bmain, scene, flag);
 
 	if(RNA_boolean_get(op->ptr, "material"))
-		single_mat_users(scene, flag, FALSE);
+		single_mat_users(scene, flag, RNA_boolean_get(op->ptr, "texture"));
 
+#if 0 /* can't do this separate from materials */
 	if(RNA_boolean_get(op->ptr, "texture"))
 		single_mat_users(scene, flag, TRUE);
-
+#endif
 	if(RNA_boolean_get(op->ptr, "animation"))
 		single_object_action_users(scene, flag);
 

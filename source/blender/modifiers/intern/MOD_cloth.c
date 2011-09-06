@@ -190,6 +190,19 @@ static void freeData(ModifierData *md)
 	}
 }
 
+static void foreachIDLink(ModifierData *md, Object *ob,
+					   IDWalkFunc walk, void *userData)
+{
+	ClothModifierData *clmd = (ClothModifierData*) md;
+
+	if(clmd->coll_parms) {
+		walk(userData, ob, (ID **)&clmd->coll_parms->group);
+	}
+
+	if(clmd->sim_parms && clmd->sim_parms->effector_weights) {
+		walk(userData, ob, (ID **)&clmd->sim_parms->effector_weights->group);
+	}
+}
 
 ModifierTypeInfo modifierType_Cloth = {
 	/* name */              "Cloth",
@@ -201,19 +214,20 @@ ModifierTypeInfo modifierType_Cloth = {
 							| eModifierTypeFlag_Single,
 
 	/* copyData */          copyData,
-	/* deformVerts */       0,
-	/* deformMatrices */    0,
-	/* deformVertsEM */     0,
-	/* deformMatricesEM */  0,
+	/* deformVerts */       NULL,
+	/* deformMatrices */    NULL,
+	/* deformVertsEM */     NULL,
+	/* deformMatricesEM */  NULL,
 	/* applyModifier */     applyModifier,
-	/* applyModifierEM */   0,
+	/* applyModifierEM */   NULL,
 	/* initData */          initData,
 	/* requiredDataMask */  requiredDataMask,
 	/* freeData */          freeData,
-	/* isDisabled */        0,
+	/* isDisabled */        NULL,
 	/* updateDepgraph */    updateDepgraph,
 	/* dependsOnTime */     dependsOnTime,
-	/* dependsOnNormals */	0,
-	/* foreachObjectLink */ 0,
-	/* foreachIDLink */     0,
+	/* dependsOnNormals */	NULL,
+	/* foreachObjectLink */ NULL,
+	/* foreachIDLink */     foreachIDLink,
+	/* foreachTexLink */    NULL,
 };

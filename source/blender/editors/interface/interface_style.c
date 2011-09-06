@@ -83,7 +83,7 @@ static uiStyle *ui_style_new(ListBase *styles, const char *name)
 	BLI_addtail(styles, style);
 	BLI_strncpy(style->name, name, MAX_STYLE_NAME);
 	
-	style->panelzoom= 1.0;
+	style->panelzoom= 1.0; /* unused */
 
 	style->paneltitle.uifont_id= UIFONT_DEFAULT;
 	style->paneltitle.points= 12;
@@ -149,14 +149,20 @@ void uiStyleFontDrawExt(uiFontStyle *fs, rcti *rect, const char *str,
 	int xofs=0, yofs;
 	
 	uiStyleFontSet(fs);
-	
-	height= BLF_height(fs->uifont_id, "2"); /* correct offset is on baseline, the j is below that */
-	yofs= floor( 0.5f*(rect->ymax - rect->ymin - height));
 
-	if(fs->align==UI_STYLE_TEXT_CENTER)
+	height= BLF_ascender(fs->uifont_id);
+	yofs= ceil( 0.5f*(rect->ymax - rect->ymin - height));
+
+	if(fs->align==UI_STYLE_TEXT_CENTER) {
 		xofs= floor( 0.5f*(rect->xmax - rect->xmin - BLF_width(fs->uifont_id, str)));
-	else if(fs->align==UI_STYLE_TEXT_RIGHT)
+		/* don't center text if it chops off the start of the text, 2 gives some margin */
+		if(xofs < 2) {
+			xofs= 2;
+		}
+	}
+	else if(fs->align==UI_STYLE_TEXT_RIGHT) {
 		xofs= rect->xmax - rect->xmin - BLF_width(fs->uifont_id, str) - 1;
+	}
 	
 	/* clip is very strict, so we give it some space */
 	BLF_clipping(fs->uifont_id, rect->xmin-1, rect->ymin-4, rect->xmax+1, rect->ymax+4);
@@ -200,9 +206,9 @@ void uiStyleFontDrawRotated(uiFontStyle *fs, rcti *rect, const char *str)
 
 	uiStyleFontSet(fs);
 
-	height= BLF_height(fs->uifont_id, "2");	/* correct offset is on baseline, the j is below that */
+	height= BLF_ascender(fs->uifont_id);
 	/* becomes x-offset when rotated */
-	xofs= floor( 0.5f*(rect->ymax - rect->ymin - height)) + 1;
+	xofs= ceil( 0.5f*(rect->ymax - rect->ymin - height));
 
 	/* ignore UI_STYLE, always aligned to top */
 
@@ -291,7 +297,9 @@ void uiStyleInit(void)
 	uiStyle *style= U.uistyles.first;
 	
 	/* recover from uninitialized dpi */
-	CLAMP(U.dpi, 72, 240);
+	if(U.dpi == 0)
+		U.dpi= 72;
+	CLAMP(U.dpi, 48, 128);
 	
 	/* default builtin */
 	if(font==NULL) {

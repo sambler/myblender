@@ -84,6 +84,7 @@ static void sculpt_restore_deformed(SculptSession *ss, SculptUndoNode *unode, in
 static void sculpt_undo_restore(bContext *C, ListBase *lb)
 {
 	Scene *scene = CTX_data_scene(C);
+	Sculpt *sd = CTX_data_tool_settings(C)->sculpt;
 	Object *ob = CTX_data_active_object(C);
 	DerivedMesh *dm = mesh_get_derived_final(scene, ob, 0);
 	SculptSession *ss = ob->sculpt;
@@ -93,30 +94,27 @@ static void sculpt_undo_restore(bContext *C, ListBase *lb)
 	int *index;
 	int i, j, update= 0;
 
-	sculpt_update_mesh_elements(scene, ob, 0);
+	sculpt_update_mesh_elements(scene, sd, ob, 0);
 
 	for(unode=lb->first; unode; unode=unode->next) {
 		if(!(strcmp(unode->idname, ob->id.name)==0))
 			continue;
 
 		if(unode->maxvert) {
-			char *shapeName= (char*)unode->shapeName;
-
 			/* regular mesh restore */
 			if(ss->totvert != unode->maxvert)
 				continue;
 
-			if (ss->kb && strcmp(ss->kb->name, shapeName)) {
+			if (ss->kb && strcmp(ss->kb->name, unode->shapeName)) {
 				/* shape key has been changed before calling undo operator */
 
 				Key *key= ob_get_key(ob);
-				KeyBlock *kb= key_get_named_keyblock(key, shapeName);
+				KeyBlock *kb= key_get_named_keyblock(key, unode->shapeName);
 
 				if (kb) {
 					ob->shapenr= BLI_findindex(&key->block, kb) + 1;
-					ob->shapeflag|= OB_SHAPE_LOCK;
 
-					sculpt_update_mesh_elements(scene, ob, 0);
+					sculpt_update_mesh_elements(scene, sd, ob, 0);
 					WM_event_add_notifier(C, NC_OBJECT|ND_DATA, ob);
 				} else {
 					/* key has been removed -- skip this undo node */
@@ -248,10 +246,10 @@ SculptUndoNode *sculpt_undo_get_node(PBVHNode *node)
 	return NULL;
 }
 
-SculptUndoNode *sculpt_undo_push_node(SculptSession *ss, PBVHNode *node)
+SculptUndoNode *sculpt_undo_push_node(Object *ob, PBVHNode *node)
 {
 	ListBase *lb= undo_paint_push_get_list(UNDO_PAINT_MESH);
-	Object *ob= ss->ob;
+	SculptSession *ss = ob->sculpt;
 	SculptUndoNode *unode;
 	int totvert, allvert, totgrid, maxgrid, gridsize, *grids;
 
@@ -316,7 +314,7 @@ SculptUndoNode *sculpt_undo_push_node(SculptSession *ss, PBVHNode *node)
 		memcpy(unode->grids, grids, sizeof(int)*totgrid);
 
 	/* store active shape key */
-	if(ss->kb) BLI_strncpy((char*)unode->shapeName, ss->kb->name, sizeof(ss->kb->name));
+	if(ss->kb) BLI_strncpy(unode->shapeName, ss->kb->name, sizeof(ss->kb->name));
 	else unode->shapeName[0]= '\0';
 
 	return unode;

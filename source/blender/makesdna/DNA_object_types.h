@@ -145,7 +145,13 @@ typedef struct Object {
 	float obmat[4][4];		/* final worldspace matrix with constraints & animsys applied */
 	float parentinv[4][4]; /* inverse result of parent, so that object doesn't 'stick' to parent */
 	float constinv[4][4]; /* inverse result of constraints. doesn't include effect of parent or object local transform */
-	float imat[4][4];	/* inverse matrix of 'obmat' for during render, old game engine, temporally: ipokeys of transform  */
+	float imat[4][4];	/* inverse matrix of 'obmat' for any other use than rendering! */
+	
+	/* Previously 'imat' was used at render time, but as other places use it too
+	 * the interactive ui of 2.5 creates problems. So now only 'imat_ren' should
+	 * be used when ever the inverse of ob->obmat * re->viewmat is needed! - jahka
+	 */
+	float imat_ren[4][4];
 	
 	unsigned int lay;				/* copy of Base */
 	
@@ -244,15 +250,17 @@ typedef struct Object {
 	struct FluidsimSettings *fluidsimSettings; /* if fluidsim enabled, store additional settings */
 
 	struct DerivedMesh *derivedDeform, *derivedFinal;
-	int lastDataMask;			/* the custom data layer mask that was last used to calculate derivedDeform and derivedFinal */
+	unsigned int lastDataMask;   /* the custom data layer mask that was last used to calculate derivedDeform and derivedFinal */
+	unsigned int customdata_mask; /* (extra) custom data layer mask to use for creating derivedmesh, set by depsgraph */
 	unsigned int state;			/* bit masks of game controllers that are active */
 	unsigned int init_state;	/* bit masks of initial state as recorded by the users */
-
-	int pad2;
 
 	ListBase gpulamp;		/* runtime, for lamps only */
 	ListBase pc_ids;
 	ListBase *duplilist;	/* for temporary dupli list storage, only for use by RNA API */
+
+	float ima_ofs[2];		/* offset for image empties */
+	char pad3[8];
 } Object;
 
 /* Warning, this is not used anymore because hooks are now modifiers */
@@ -282,10 +290,6 @@ typedef struct DupliObject {
 	float orco[3], uv[2];
 } DupliObject;
 
-/* this work object is defined in object.c */
-extern Object workob;
-
-
 /* **************** OBJECT ********************* */
 
 /* used many places... should be specialized  */
@@ -301,6 +305,8 @@ extern Object workob;
 
 #define OB_LAMP			10
 #define OB_CAMERA		11
+
+#define OB_SPEAKER		12
 
 // #define OB_WAVE			21
 #define OB_LATTICE		22
@@ -393,6 +399,7 @@ extern Object workob;
 #define OB_CUBE			5
 #define OB_EMPTY_SPHERE	6
 #define OB_EMPTY_CONE	7
+#define OB_EMPTY_IMAGE	8
 
 /* boundtype */
 #define OB_BOUND_BOX		0

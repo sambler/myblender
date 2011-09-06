@@ -69,8 +69,10 @@ int BLI_gzip(const char *from, const char *to) {
 	int readsize = 0;
 	int rval= 0, err;
 	gzFile gzfile;
-	
-	gzfile = gzopen(to, "wb"); 
+
+	/* level 1 is very close to 3 (the default) in terms of file size,
+	 * but about twice as fast, best use for speedy saving - campbell */
+	gzfile = gzopen(to, "wb1");
 	if(gzfile == NULL)
 		return -1;
 	
@@ -133,13 +135,13 @@ int BLI_is_writable(const char *filename)
 
 int BLI_touch(const char *file)
 {
-   FILE *f = fopen(file,"r+b");
-   if (f != NULL) {
+	FILE *f = fopen(file,"r+b");
+	if (f != NULL) {
 		char c = getc(f);
 		rewind(f);
 		putc(c,f);
 	} else {
-	   f = fopen(file,"wb");
+		f = fopen(file,"wb");
 	}
 	if (f) {
 		fclose(f);
@@ -225,7 +227,8 @@ int BLI_copy_fileops(const char *file, const char *to) {
 
 int BLI_link(const char *file, const char *to) {
 	callLocalErrorCallBack("Linking files is unsupported on Windows");
-	
+	(void)file;
+	(void)to;
 	return 1;
 }
 

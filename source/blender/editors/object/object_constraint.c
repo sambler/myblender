@@ -567,7 +567,8 @@ static bConstraint *edit_constraint_property_get(wmOperator *op, Object *ob, int
 	}
 	
 	con = constraints_findByName(list, constraint_name);
-	printf("constraint found = %p, %s\n", (void *)con, (con)?con->name:"<Not found>");
+	//if (G.f & G_DEBUG)
+	//printf("constraint found = %p, %s\n", (void *)con, (con)?con->name:"<Not found>");
 
 	if (con && (type != 0) && (con->type != type))
 		con = NULL;
@@ -844,13 +845,19 @@ static int constraint_delete_exec (bContext *C, wmOperator *UNUSED(op))
 	Object *ob= ptr.id.data;
 	bConstraint *con= ptr.data;
 	ListBase *lb = get_constraint_lb(ob, con, NULL);
-	
+	const short is_ik= ELEM(con->type, CONSTRAINT_TYPE_KINEMATIC, CONSTRAINT_TYPE_SPLINEIK);
+
 	/* free the constraint */
 	if (remove_constraint(lb, con)) {
 		/* there's no active constraint now, so make sure this is the case */
 		constraints_set_active(lb, NULL);
 		
 		ED_object_constraint_update(ob); /* needed to set the flags on posebones correctly */
+
+		/* ITASC needs to be rebuilt once a constraint is removed [#26920] */
+		if(is_ik) {
+			BIK_clear_data(ob->pose);
+		}
 
 		/* notifiers */
 		WM_event_add_notifier(C, NC_OBJECT|ND_CONSTRAINT|NA_REMOVED, ob);
@@ -993,6 +1000,8 @@ static int pose_constraints_clear_exec(bContext *C, wmOperator *UNUSED(op))
 	/* force depsgraph to get recalculated since relationships removed */
 	DAG_scene_sort(bmain, scene);		/* sort order of objects */	
 	
+	/* note, calling BIK_clear_data() isnt needed here */
+
 	/* do updates */
 	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	WM_event_add_notifier(C, NC_OBJECT|ND_CONSTRAINT, ob);
@@ -1003,7 +1012,7 @@ static int pose_constraints_clear_exec(bContext *C, wmOperator *UNUSED(op))
 void POSE_OT_constraints_clear(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name = "Clear Constraints";
+	ot->name = "Clear Pose Constraints";
 	ot->idname= "POSE_OT_constraints_clear";
 	ot->description= "Clear all the constraints for the selected bones";
 	
@@ -1038,7 +1047,7 @@ static int object_constraints_clear_exec(bContext *C, wmOperator *UNUSED(op))
 void OBJECT_OT_constraints_clear(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name = "Clear Constraints";
+	ot->name = "Clear Object Constraints";
 	ot->idname= "OBJECT_OT_constraints_clear";
 	ot->description= "Clear all the constraints for the active Object only";
 	
@@ -1106,14 +1115,19 @@ static int object_constraint_copy_exec(bContext *C, wmOperator *UNUSED(op))
 	CTX_DATA_BEGIN(C, Object*, ob, selected_editable_objects) 
 	{
 		/* if we're not handling the object we're copying from, copy all constraints over */
-		if (obact != ob)
+		if (obact != ob) {
 			copy_constraints(&ob->constraints, &obact->constraints, TRUE);
+			DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
+		}
 	}
 	CTX_DATA_END;
 	
 	/* force depsgraph to get recalculated since new relationships added */
 	DAG_scene_sort(bmain, scene);		/* sort order of objects */
-
+	
+	/* notifiers for updates */
+	WM_event_add_notifier(C, NC_OBJECT|ND_CONSTRAINT|NA_ADDED, NULL);
+	
 	return OPERATOR_FINISHED;
 }
 

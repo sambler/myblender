@@ -54,7 +54,7 @@
 extern "C" {
 	#include "bpy_internal_import.h"  /* from the blender python api, but we want to import text too! */
 	#include "py_capi_utils.h"
-	#include "mathutils.h" // Blender.Mathutils module copied here so the blenderlayer can use.
+	#include "mathutils.h" // 'mathutils' module copied here so the blenderlayer can use.
 	#include "bgl.h"
 	#include "blf_py_api.h"
 
@@ -113,6 +113,7 @@ extern "C" {
 #include "NG_NetworkScene.h" //Needed for sendMessage()
 
 #include "BL_Shader.h"
+#include "BL_Action.h"
 
 #include "KX_PyMath.h"
 
@@ -327,7 +328,7 @@ static PyObject* gPyLoadGlobalDict(PyObject*)
 {
 	char marshal_path[512];
 	char *marshal_buffer = NULL;
-	unsigned int marshal_length;
+	size_t marshal_length;
 	FILE *fp = NULL;
 	int result;
 
@@ -338,7 +339,7 @@ static PyObject* gPyLoadGlobalDict(PyObject*)
 	if (fp) {
 		// obtain file size:
 		fseek (fp, 0, SEEK_END);
-		marshal_length = ftell(fp);
+		marshal_length = (size_t)ftell(fp);
 		rewind(fp);
 
 		marshal_buffer = (char*)malloc (sizeof(char)*marshal_length);
@@ -388,10 +389,10 @@ static PyObject* gPyGetSpectrum(PyObject*)
 {
 	PyObject* resultlist = PyList_New(512);
 
-        for (int index = 0; index < 512; index++)
-        {
-                PyList_SET_ITEM(resultlist, index, PyFloat_FromDouble(0.0));
-        }
+	for (int index = 0; index < 512; index++)
+	{
+		PyList_SET_ITEM(resultlist, index, PyFloat_FromDouble(0.0));
+	}
 
 	return resultlist;
 }
@@ -478,13 +479,13 @@ static PyObject* gPyGetBlendFileList(PyObject*, PyObject* args)
 	char cpath[sizeof(gp_GamePythonPath)];
 	char *searchpath = NULL;
 	PyObject* list, *value;
-	
-    DIR *dp;
-    struct dirent *dirp;
-	
+
+	DIR *dp;
+	struct dirent *dirp;
+
 	if (!PyArg_ParseTuple(args, "|s:getBlendFileList", &searchpath))
 		return NULL;
-	
+
 	list = PyList_New(0);
 	
 	if (searchpath) {
@@ -494,23 +495,23 @@ static PyObject* gPyGetBlendFileList(PyObject*, PyObject* args)
 		/* Get the dir only */
 		BLI_split_dirfile(gp_GamePythonPath, cpath, NULL);
 	}
-	
-    if((dp  = opendir(cpath)) == NULL) {
+
+	if((dp  = opendir(cpath)) == NULL) {
 		/* todo, show the errno, this shouldnt happen anyway if the blendfile is readable */
 		fprintf(stderr, "Could not read directoty (%s) failed, code %d (%s)\n", cpath, errno, strerror(errno));
 		return list;
-    }
+	}
 	
-    while ((dirp = readdir(dp)) != NULL) {
+	while ((dirp = readdir(dp)) != NULL) {
 		if (BLI_testextensie(dirp->d_name, ".blend")) {
 			value= PyUnicode_DecodeFSDefault(dirp->d_name);
 			PyList_Append(list, value);
 			Py_DECREF(value);
 		}
-    }
+	}
 	
-    closedir(dp);
-    return list;
+	closedir(dp);
+	return list;
 }
 
 static char gPyAddScene_doc[] = 
@@ -638,7 +639,7 @@ static PyObject *pyPrintExt(PyObject *,PyObject *,PyObject *)
 	Py_RETURN_NONE;
 }
 
-static PyObject *gLibLoad(PyObject*, PyObject* args)
+static PyObject *gLibLoad(PyObject*, PyObject* args, PyObject* kwds)
 {
 	KX_Scene *kx_scene= gp_KetsjiScene;
 	char *path;
@@ -646,20 +647,37 @@ static PyObject *gLibLoad(PyObject*, PyObject* args)
 	Py_buffer py_buffer;
 	py_buffer.buf = NULL;
 	char *err_str= NULL;
+
+	short options=0;
+	int load_actions=0, verbose=0;
+
+	static const char *kwlist[] = {"path", "group", "buffer", "load_actions", "verbose", NULL};
 	
-	if (!PyArg_ParseTuple(args,"ss|y*:LibLoad",&path, &group, &py_buffer))
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "ss|y*ii:LibLoad", const_cast<char**>(kwlist),
+									&path, &group, &py_buffer, &load_actions, &verbose))
 		return NULL;
+
+	/* setup options */
+	if (load_actions != 0)
+		options |= KX_BlenderSceneConverter::LIB_LOAD_LOAD_ACTIONS;
+	if (verbose != 0)
+		options |= KX_BlenderSceneConverter::LIB_LOAD_VERBOSE;
 
 	if (!py_buffer.buf)
 	{
-		if(kx_scene->GetSceneConverter()->LinkBlendFilePath(path, group, kx_scene, &err_str)) {
+		char abs_path[FILE_MAX];
+		// Make the path absolute
+		BLI_strncpy(abs_path, path, sizeof(abs_path));
+		BLI_path_abs(abs_path, gp_GamePythonPath);
+
+		if(kx_scene->GetSceneConverter()->LinkBlendFilePath(abs_path, group, kx_scene, &err_str, options)) {
 			Py_RETURN_TRUE;
 		}
 	}
 	else
 	{
 
-		if(kx_scene->GetSceneConverter()->LinkBlendFileMemory(py_buffer.buf, py_buffer.len, path, group, kx_scene, &err_str))	{
+		if(kx_scene->GetSceneConverter()->LinkBlendFileMemory(py_buffer.buf, py_buffer.len, path, group, kx_scene, &err_str, options))	{
 			PyBuffer_Release(&py_buffer);
 			Py_RETURN_TRUE;
 		}
@@ -793,7 +811,7 @@ static struct PyMethodDef game_methods[] = {
 	{"PrintMemInfo", (PyCFunction)pyPrintStats, METH_NOARGS, (const char *)"Print engine stastics"},
 	
 	/* library functions */
-	{"LibLoad", (PyCFunction)gLibLoad, METH_VARARGS, (const char *)""},
+	{"LibLoad", (PyCFunction)gLibLoad, METH_VARARGS|METH_KEYWORDS, (const char *)""},
 	{"LibNew", (PyCFunction)gLibNew, METH_VARARGS, (const char *)""},
 	{"LibFree", (PyCFunction)gLibFree, METH_VARARGS, (const char *)""},
 	{"LibList", (PyCFunction)gLibList, METH_VARARGS, (const char *)""},
@@ -926,12 +944,12 @@ static PyObject* gPySetBackgroundColor(PyObject*, PyObject* value)
 	
 	if (gp_Canvas)
 	{
-		gp_Rasterizer->SetBackColor(vec[0], vec[1], vec[2], vec[3]);
+		gp_Rasterizer->SetBackColor((float)vec[0], (float)vec[1], (float)vec[2], (float)vec[3]);
 	}
 
 	KX_WorldInfo *wi = gp_KetsjiScene->GetWorldInfo();
 	if (wi->hasWorld())
-		wi->setBackColor(vec[0], vec[1], vec[2]);
+		wi->setBackColor((float)vec[0], (float)vec[1], (float)vec[2]);
 
 	Py_RETURN_NONE;
 }
@@ -949,7 +967,7 @@ static PyObject* gPySetMistColor(PyObject*, PyObject* value)
 		PyErr_SetString(PyExc_RuntimeError, "Rasterizer.setMistColor(color), Rasterizer not available");
 		return NULL;
 	}	
-	gp_Rasterizer->SetFogColor(vec[0], vec[1], vec[2]);
+	gp_Rasterizer->SetFogColor((float)vec[0], (float)vec[1], (float)vec[2]);
 	
 	Py_RETURN_NONE;
 }
@@ -1014,7 +1032,7 @@ static PyObject* gPySetAmbientColor(PyObject*, PyObject* value)
 		PyErr_SetString(PyExc_RuntimeError, "Rasterizer.setAmbientColor(color), Rasterizer not available");
 		return NULL;
 	}	
-	gp_Rasterizer->SetAmbientColor(vec[0], vec[1], vec[2]);
+	gp_Rasterizer->SetAmbientColor((float)vec[0], (float)vec[1], (float)vec[2]);
 	
 	Py_RETURN_NONE;
 }
@@ -1190,6 +1208,28 @@ static PyObject* gPyGetMaterialType(PyObject*)
 	return PyLong_FromSsize_t(flag);
 }
 
+static PyObject* gPySetAnisotropicFiltering(PyObject*, PyObject* args)
+{
+	short level;
+
+	if (!PyArg_ParseTuple(args, "h:setAnisotropicFiltering", &level))
+		return NULL;
+
+	if (level != 1 && level != 2 && level != 4 && level != 8 && level != 16) {
+		PyErr_SetString(PyExc_ValueError, "Rasterizer.setAnisotropicFiltering(level): Expected value of 1, 2, 4, 8, or 16 for value");
+		return NULL;
+	}
+
+	gp_Rasterizer->SetAnisotropicFiltering(level);
+
+	Py_RETURN_NONE;
+}
+
+static PyObject* gPyGetAnisotropicFiltering(PyObject*, PyObject* args)
+{
+	return PyLong_FromLong(gp_Rasterizer->GetAnisotropicFiltering());
+}
+
 static PyObject* gPyDrawLine(PyObject*, PyObject* args)
 {
 	PyObject* ob_from;
@@ -1254,6 +1294,10 @@ static struct PyMethodDef rasterizer_methods[] = {
    METH_VARARGS, "set the state of a GLSL material setting"},
   {"getGLSLMaterialSetting",(PyCFunction) gPyGetGLSLMaterialSetting,
    METH_VARARGS, "get the state of a GLSL material setting"},
+  {"setAnisotropicFiltering", (PyCFunction) gPySetAnisotropicFiltering,
+  METH_VARARGS, "set the anisotropic filtering level (must be one of 1, 2, 4, 8, 16)"},
+  {"getAnisotropicFiltering", (PyCFunction) gPyGetAnisotropicFiltering,
+  METH_VARARGS, "get the anisotropic filtering level"},
   {"drawLine", (PyCFunction) gPyDrawLine,
    METH_VARARGS, "draw a line on the screen"},
   { NULL, (PyCFunction) NULL, 0, NULL }
@@ -1611,183 +1655,18 @@ PyObject* initGameLogic(KX_KetsjiEngine *engine, KX_Scene* scene) // quick hack 
 	KX_MACRO_addTypesToDict(d, ROT_MODE_ZXY, ROT_MODE_ZXY);
 	KX_MACRO_addTypesToDict(d, ROT_MODE_ZYX, ROT_MODE_ZYX);
 
+	/* BL_Action play modes */
+	KX_MACRO_addTypesToDict(d, KX_ACTION_MODE_PLAY, BL_Action::ACT_MODE_PLAY);
+	KX_MACRO_addTypesToDict(d, KX_ACTION_MODE_LOOP, BL_Action::ACT_MODE_LOOP);
+	KX_MACRO_addTypesToDict(d, KX_ACTION_MODE_PING_PONG, BL_Action::ACT_MODE_PING_PONG);
+
 	// Check for errors
 	if (PyErr_Occurred())
-    {
+	{
 		Py_FatalError("can't initialize module bge.logic");
-    }
+	}
 
 	return m;
-}
-
-// Python Sandbox code
-// override builtin functions import() and open()
-
-
-PyObject *KXpy_open(PyObject *self, PyObject *args) {
-	PyErr_SetString(PyExc_RuntimeError, "Sandbox: open() function disabled!\nGame Scripts should not use this function.");
-	return NULL;
-}
-
-PyObject *KXpy_file(PyObject *self, PyObject *args) {
-	PyErr_SetString(PyExc_RuntimeError, "Sandbox: file() function disabled!\nGame Scripts should not use this function.");
-	return NULL;
-}
-
-PyObject *KXpy_execfile(PyObject *self, PyObject *args) {
-	PyErr_SetString(PyExc_RuntimeError, "Sandbox: execfile() function disabled!\nGame Scripts should not use this function.");
-	return NULL;
-}
-
-PyObject *KXpy_compile(PyObject *self, PyObject *args) {
-	PyErr_SetString(PyExc_RuntimeError, "Sandbox: compile() function disabled!\nGame Scripts should not use this function.");
-	return NULL;
-}
-
-PyObject *KXpy_import(PyObject *self, PyObject *args)
-{
-	char *name;
-	int found;
-	PyObject *globals = NULL;
-	PyObject *locals = NULL;
-	PyObject *fromlist = NULL;
-	PyObject *l, *m, *n;
-	int level; /* not used yet */
-	
-	if (!PyArg_ParseTuple(args, "s|OOOi:m_import",
-	        &name, &globals, &locals, &fromlist, &level))
-	    return NULL;
-
-	/* check for builtin modules */
-	m = PyImport_AddModule("sys");
-	l = PyObject_GetAttrString(m, "builtin_module_names");
-	n = PyUnicode_FromString(name);
-	
-	if (PySequence_Contains(l, n)) {
-		return PyImport_ImportModuleEx(name, globals, locals, fromlist);
-	}
-
-	/* quick hack for GamePython modules 
-		TODO: register builtin modules properly by ExtendInittab */
-	if (!strcmp(name, "GameLogic") || !strcmp(name, "GameKeys") || !strcmp(name, "PhysicsConstraints") ||
-		!strcmp(name, "Rasterizer") || !strcmp(name, "mathutils") || !strcmp(name, "bgl") || !strcmp(name, "geometry")) {
-		return PyImport_ImportModuleEx(name, globals, locals, fromlist);
-	}
-	
-	/* Import blender texts as python modules */
-	m= bpy_text_import_name(name, &found);
-	if (m)
-		return m;
-	
-	if(found==0) /* if its found but could not import then it has its own error */
-		PyErr_Format(PyExc_ImportError, "Import of external Module %.20s not allowed.", name);
-	
-	return NULL;
-
-}
-
-PyObject *KXpy_reload(PyObject *self, PyObject *args) {
-	
-	/* Used to be sandboxed, bettet to allow importing of internal text only */ 
-#if 0
-	PyErr_SetString(PyExc_RuntimeError, "Sandbox: reload() function disabled!\nGame Scripts should not use this function.");
-	return NULL;
-#endif
-	int found;
-	PyObject *module = NULL;
-	PyObject *newmodule = NULL;
-
-	/* check for a module arg */
-	if( !PyArg_ParseTuple( args, "O:bpy_reload_meth", &module ) )
-		return NULL;
-	
-	newmodule= bpy_text_reimport( module, &found );
-	if (newmodule)
-		return newmodule;
-	
-	if (found==0) /* if its found but could not import then it has its own error */
-		PyErr_SetString(PyExc_ImportError, "reload(module): failed to reload from blenders internal text");
-	
-	return newmodule;
-}
-
-/* override python file type functions */
-#if 0
-static int
-file_init(PyObject *self, PyObject *args, PyObject *kwds)
-{
-	KXpy_file(NULL, NULL);
-	return -1;
-}
-
-static PyObject *
-file_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
-{
-	return KXpy_file(NULL, NULL);
-}
-#endif
-
-static PyMethodDef meth_open[] = {{ "open", KXpy_open, METH_VARARGS, "(disabled)"}};
-static PyMethodDef meth_reload[] = {{ "reload", KXpy_reload, METH_VARARGS, "(disabled)"}};
-static PyMethodDef meth_file[] = {{ "file", KXpy_file, METH_VARARGS, "(disabled)"}};
-static PyMethodDef meth_execfile[] = {{ "execfile", KXpy_execfile, METH_VARARGS, "(disabled)"}};
-static PyMethodDef meth_compile[] = {{ "compile", KXpy_compile, METH_VARARGS, "(disabled)"}};
-
-static PyMethodDef meth_import[] = {{ "import", KXpy_import, METH_VARARGS, "our own import"}};
-
-//static PyObject *g_oldopen = 0;
-//static PyObject *g_oldimport = 0;
-//static int g_security = 0;
-
-static void setSandbox(TPythonSecurityLevel level)
-{
-    PyObject *m = PyImport_AddModule("__builtin__");
-    PyObject *d = PyModule_GetDict(m);
-	PyObject *item;
-	switch (level) {
-	case psl_Highest:
-		//if (!g_security) {
-			//g_oldopen = PyDict_GetItemString(d, "open");
-	
-			// functions we cant trust
-			PyDict_SetItemString(d, "open", item=PyCFunction_New(meth_open, NULL));			Py_DECREF(item);
-			PyDict_SetItemString(d, "reload", item=PyCFunction_New(meth_reload, NULL));		Py_DECREF(item);
-			PyDict_SetItemString(d, "file", item=PyCFunction_New(meth_file, NULL));			Py_DECREF(item);
-			PyDict_SetItemString(d, "execfile", item=PyCFunction_New(meth_execfile, NULL));	Py_DECREF(item);
-			PyDict_SetItemString(d, "compile", item=PyCFunction_New(meth_compile, NULL));		Py_DECREF(item);
-			
-			// our own import
-			PyDict_SetItemString(d, "__import__", PyCFunction_New(meth_import, NULL));
-			//g_security = level;
-			
-			// Overiding file dosnt stop it being accessed if your sneaky
-			//    f =  [ t for t in (1).__class__.__mro__[-1].__subclasses__() if t.__name__ == 'file'][0]('/some_file.txt', 'w')
-			//    f.write('...')
-			// so overwrite the file types functions. be very careful here still, since python uses python.
-			// ps - python devs frown deeply upon this.
-	
-			/* this could mess up pythons internals, if we are serious about sandboxing
-			 * issues like the one above need to be solved, possibly modify __subclasses__ is safer? */
-#if 0
-			PyFile_Type.tp_init = file_init;
-			PyFile_Type.tp_new = file_new;
-#endif
-		//}
-		break;
-	/*
-	case psl_Lowest:
-		if (g_security) {
-			PyDict_SetItemString(d, "open", g_oldopen);
-			PyDict_SetItemString(d, "__import__", g_oldimport);
-			g_security = level;
-		}
-	*/
-	default:
-			/* Allow importing internal text, from bpy_internal_import.py */
-			PyDict_SetItemString(d, "reload", item=PyCFunction_New(&bpy_reload_meth, NULL));		Py_DECREF(item);
-			PyDict_SetItemString(d, "__import__", item=PyCFunction_New(&bpy_import_meth, NULL));	Py_DECREF(item);
-		break;
-	}
 }
 
 /* Explanation of 
@@ -1900,8 +1779,18 @@ static void restorePySysObjects(void)
 //	PyObject_Print(sys_path, stderr, 0);
 }
 
+// Copied from bpy_interface.c
+static struct _inittab bge_internal_modules[]= {
+	{(char *)"mathutils", PyInit_mathutils},
+	{(char *)"bgl", BPyInit_bgl},
+	{(char *)"blf", BPyInit_blf},
+	{(char *)"aud", AUD_initPython},
+	{NULL, NULL}
+};
+
 /**
  * Python is not initialised.
+ * see bpy_interface.c's BPY_python_start() which shares the same functionality in blender.
  */
 PyObject* initGamePlayerPythonScripting(const STR_String& progname, TPythonSecurityLevel level, Main *maggie, int argc, char** argv)
 {
@@ -1919,6 +1808,13 @@ PyObject* initGamePlayerPythonScripting(const STR_String& progname, TPythonSecur
 #endif
 	Py_NoSiteFlag=1;
 	Py_FrozenFlag=1;
+
+	/* must run before python initializes */
+	PyImport_ExtendInittab(bge_internal_modules);
+
+	/* find local python installation */
+	PyC_SetHomePath(BLI_get_folder(BLENDER_SYSTEM_PYTHON, NULL));
+
 	Py_Initialize();
 	
 	if(argv && first_time) { /* browser plugins dont currently set this */
@@ -1933,8 +1829,15 @@ PyObject* initGamePlayerPythonScripting(const STR_String& progname, TPythonSecur
 		PySys_SetObject("argv", py_argv);
 		Py_DECREF(py_argv);
 	}
-	
-	setSandbox(level);
+
+	bpy_import_init(PyEval_GetBuiltins());
+
+	/* mathutils types are used by the BGE even if we dont import them */
+	{
+		PyObject *mod= PyImport_ImportModuleLevel((char *)"mathutils", NULL, NULL, NULL, 0);
+		Py_DECREF(mod);
+	}
+
 	initPyTypes();
 	
 	bpy_import_main_set(maggie);
@@ -1979,7 +1882,6 @@ PyObject* initGamePythonScripting(const STR_String& progname, TPythonSecurityLev
 	Py_NoSiteFlag=1;
 	Py_FrozenFlag=1;
 
-	setSandbox(level);
 	initPyTypes();
 	
 	bpy_import_main_set(maggie);
@@ -2028,11 +1930,6 @@ void setupGamePython(KX_KetsjiEngine* ketsjiengine, KX_Scene* startscene, Main *
 
 	initGameKeys();
 	initPythonConstraintBinding();
-	initMathutils();
-	initGeometry();
-	initBGL();
-	initBLF();
-	AUD_initPython();
 	initVideoTexture();
 
 	/* could be done a lot more nicely, but for now a quick way to get bge.* working */
@@ -2057,12 +1954,12 @@ PyObject* initRasterizer(RAS_IRasterizer* rasty,RAS_ICanvas* canvas)
 	gp_Rasterizer = rasty;
 
 
-  PyObject* m;
-  PyObject* d;
-  PyObject* item;
+	PyObject* m;
+	PyObject* d;
+	PyObject* item;
 
 	/* Use existing module where possible
-	 * be careful not to init any runtime vars after this */
+  * be careful not to init any runtime vars after this */
 	m = PyImport_ImportModule( "Rasterizer" );
 	if(m) {
 		Py_DECREF(m);
@@ -2070,32 +1967,32 @@ PyObject* initRasterizer(RAS_IRasterizer* rasty,RAS_ICanvas* canvas)
 	}
 	else {
 		PyErr_Clear();
-	
+
 		// Create the module and add the functions
 		m = PyModule_Create(&Rasterizer_module_def);
 		PyDict_SetItemString(PySys_GetObject("modules"), Rasterizer_module_def.m_name, m);
 	}
 
-  // Add some symbolic constants to the module
-  d = PyModule_GetDict(m);
-  ErrorObject = PyUnicode_FromString("Rasterizer.error");
-  PyDict_SetItemString(d, "error", ErrorObject);
-  Py_DECREF(ErrorObject);
+	// Add some symbolic constants to the module
+	d = PyModule_GetDict(m);
+	ErrorObject = PyUnicode_FromString("Rasterizer.error");
+	PyDict_SetItemString(d, "error", ErrorObject);
+	Py_DECREF(ErrorObject);
 
-  /* needed for get/setMaterialType */
-  KX_MACRO_addTypesToDict(d, KX_TEXFACE_MATERIAL, KX_TEXFACE_MATERIAL);
-  KX_MACRO_addTypesToDict(d, KX_BLENDER_MULTITEX_MATERIAL, KX_BLENDER_MULTITEX_MATERIAL);
-  KX_MACRO_addTypesToDict(d, KX_BLENDER_GLSL_MATERIAL, KX_BLENDER_GLSL_MATERIAL);
+	/* needed for get/setMaterialType */
+	KX_MACRO_addTypesToDict(d, KX_TEXFACE_MATERIAL, KX_TEXFACE_MATERIAL);
+	KX_MACRO_addTypesToDict(d, KX_BLENDER_MULTITEX_MATERIAL, KX_BLENDER_MULTITEX_MATERIAL);
+	KX_MACRO_addTypesToDict(d, KX_BLENDER_GLSL_MATERIAL, KX_BLENDER_GLSL_MATERIAL);
 
-  // XXXX Add constants here
+	// XXXX Add constants here
 
-  // Check for errors
-  if (PyErr_Occurred())
-    {
-      Py_FatalError("can't initialize module Rasterizer");
-    }
+	// Check for errors
+	if (PyErr_Occurred())
+	{
+		Py_FatalError("can't initialize module Rasterizer");
+	}
 
-  return d;
+	return d;
 }
 
 
@@ -2334,31 +2231,11 @@ PyObject* initGameKeys()
 
 	// Check for errors
 	if (PyErr_Occurred())
-    {
+	{
 		Py_FatalError("can't initialize module GameKeys");
-    }
+	}
 
 	return d;
-}
-
-PyObject* initMathutils()
-{
-	return BPyInit_mathutils();
-}
-
-PyObject* initGeometry()
-{
-	return BPyInit_mathutils_geometry();
-}
-
-PyObject* initBGL()
-{
-	return BPyInit_bgl();
-}
-
-PyObject* initBLF()
-{
-	return BPyInit_blf();
 }
 
 // utility function for loading and saving the globalDict

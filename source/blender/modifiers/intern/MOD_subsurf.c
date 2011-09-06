@@ -35,7 +35,7 @@
  */
 
 
-#include "stddef.h"
+#include <stddef.h>
 
 #include "DNA_scene_types.h"
 #include "DNA_object_types.h"
@@ -91,7 +91,7 @@ static int isDisabled(ModifierData *md, int useRenderParams)
 	return get_render_subsurf_level(&md->scene->r, levels) == 0;
 }
 
-static DerivedMesh *applyModifier(ModifierData *md, Object *UNUSED(ob),
+static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 						DerivedMesh *derivedData,
 						int useRenderParams,
 						int isFinalCalc)
@@ -100,7 +100,7 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *UNUSED(ob),
 	DerivedMesh *result;
 
 	result = subsurf_make_derived_from_derived(derivedData, smd,
-			useRenderParams, NULL, isFinalCalc, 0);
+			useRenderParams, NULL, isFinalCalc, 0, (ob->flag & OB_MODE_EDIT));
 	
 	if(useRenderParams || !isFinalCalc) {
 		DerivedMesh *cddm= CDDM_copy(result);
@@ -119,7 +119,7 @@ static DerivedMesh *applyModifierEM(ModifierData *md, Object *UNUSED(ob),
 	DerivedMesh *result;
 
 	result = subsurf_make_derived_from_derived(derivedData, smd, 0,
-			NULL, 0, 1);
+			NULL, 0, 1, 1);
 
 	return result;
 }
@@ -137,19 +137,21 @@ ModifierTypeInfo modifierType_Subsurf = {
 							| eModifierTypeFlag_AcceptsCVs,
 
 	/* copyData */          copyData,
-	/* deformVerts */       0,
-	/* deformMatrices */    0,
-	/* deformVertsEM */     0,
-	/* deformMatricesEM */  0,
+	/* deformVerts */       NULL,
+	/* deformMatrices */    NULL,
+	/* deformVertsEM */     NULL,
+	/* deformMatricesEM */  NULL,
 	/* applyModifier */     applyModifier,
 	/* applyModifierEM */   applyModifierEM,
 	/* initData */          initData,
-	/* requiredDataMask */  0,
+	/* requiredDataMask */  NULL,
 	/* freeData */          freeData,
 	/* isDisabled */        isDisabled,
-	/* updateDepgraph */    0,
-	/* dependsOnTime */     0,
-	/* dependsOnNormals */	0,
-	/* foreachObjectLink */ 0,
-	/* foreachIDLink */     0,
+	/* updateDepgraph */    NULL,
+	/* dependsOnTime */     NULL,
+	/* dependsOnNormals */	NULL,
+	/* foreachObjectLink */ NULL,
+	/* foreachIDLink */     NULL,
+	/* foreachTexLink */    NULL,
 };
+

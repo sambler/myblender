@@ -49,7 +49,7 @@
 #ifdef WITH_PYTHON
 #ifdef USE_MATHUTILS
 extern "C" {
-#include "../../blender/python/generic/mathutils.h" /* so we can have mathutils callbacks */
+#include "../../blender/python/mathutils/mathutils.h" /* so we can have mathutils callbacks */
 }
 #endif
 
@@ -114,7 +114,7 @@ bool PyVecTo(PyObject* pyval, T& vec)
 	
 	if(VectorObject_Check(pyval)) {
 		VectorObject *pyvec= (VectorObject *)pyval;
-		if(!BaseMath_ReadCallback(pyvec)) {
+		if(BaseMath_ReadCallback(pyvec) == -1) {
 			return false; /* exception raised */
 		}
 		if (pyvec->size != Size(vec)) {
@@ -126,7 +126,7 @@ bool PyVecTo(PyObject* pyval, T& vec)
 	}
 	else if(QuaternionObject_Check(pyval)) {
 		QuaternionObject *pyquat= (QuaternionObject *)pyval;
-		if(!BaseMath_ReadCallback(pyquat)) {
+		if(BaseMath_ReadCallback(pyquat) == -1) {
 			return false; /* exception raised */
 		}
 		if (4 != Size(vec)) {
@@ -139,7 +139,7 @@ bool PyVecTo(PyObject* pyval, T& vec)
 	}
 	else if(EulerObject_Check(pyval)) {
 		EulerObject *pyeul= (EulerObject *)pyval;
-		if(!BaseMath_ReadCallback(pyeul)) {
+		if(BaseMath_ReadCallback(pyeul) == -1) {
 			return false; /* exception raised */
 		}
 		if (3 != Size(vec)) {

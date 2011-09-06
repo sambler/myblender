@@ -100,8 +100,7 @@
 static int totnum,actnum;
 static struct direntry *files;
 
-static struct ListBase dirbase_={
-	0,0};
+static struct ListBase dirbase_={NULL, NULL};
 static struct ListBase *dirbase = &dirbase_;
 
 /* can return NULL when the size is not big enough */
@@ -339,7 +338,7 @@ void BLI_adddirstrings(void)
 			if ( pwuser ) {
 				BLI_strncpy(file->owner, pwuser->pw_name, sizeof(file->owner));
 			} else {
-				snprintf(file->owner, sizeof(file->owner), "%d", file->s.st_uid);
+				BLI_snprintf(file->owner, sizeof(file->owner), "%d", file->s.st_uid);
 			}
 		}
 #endif
@@ -400,7 +399,7 @@ unsigned int BLI_getdir(const char *dirname,  struct direntry **filelist)
 	// filesel.c:freefilelist()
 
 	actnum = totnum = 0;
-	files = 0;
+	files = NULL;
 
 	BLI_builddir(dirname,"");
 	BLI_adddirstrings();
@@ -479,7 +478,7 @@ LinkNode *BLI_read_file_as_lines(const char *name)
 	FILE *fp= fopen(name, "r");
 	LinkNode *lines= NULL;
 	char *buf;
-	int size;
+	int64_t size;
 
 	if (!fp) return NULL;
 		

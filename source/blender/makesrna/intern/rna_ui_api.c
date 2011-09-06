@@ -46,7 +46,7 @@ static void rna_uiItemR(uiLayout *layout, PointerRNA *ptr, const char *propname,
 	int flag= 0;
 
 	if(!prop) {
-		printf("rna_uiItemR: property not found: %s.%s\n", RNA_struct_identifier(ptr->type), propname);
+		RNA_warning("rna_uiItemR: property not found: %s.%s\n", RNA_struct_identifier(ptr->type), propname);
 		return;
 	}
 
@@ -389,7 +389,7 @@ void RNA_api_ui_layout(StructRNA *srna)
 	RNA_def_function_flag(func, FUNC_USE_CONTEXT);
 	api_ui_item_rna_common(func);
 	parm= RNA_def_pointer(func, "image_user", "ImageUser", "", "");
-	RNA_def_property_flag(parm, PROP_REQUIRED|PROP_RNAPTR);
+	RNA_def_property_flag(parm, PROP_REQUIRED|PROP_RNAPTR|PROP_NEVER_NULL);
 	RNA_def_boolean(func, "compact", 0, "", "Use more compact layout.");
 
 	func= RNA_def_function(srna, "template_list", "uiTemplateList");
@@ -413,6 +413,9 @@ void RNA_api_ui_layout(StructRNA *srna)
 	RNA_def_function(srna, "template_operator_search", "uiTemplateOperatorSearch");
 
 	func= RNA_def_function(srna, "template_header_3D", "uiTemplateHeader3D");
+	RNA_def_function_flag(func, FUNC_USE_CONTEXT);
+
+	func= RNA_def_function(srna, "template_edit_mode_selection", "uiTemplateEditModeSelection");
 	RNA_def_function_flag(func, FUNC_USE_CONTEXT);
 	
 	func= RNA_def_function(srna, "template_reports_banner", "uiTemplateReportsBanner");

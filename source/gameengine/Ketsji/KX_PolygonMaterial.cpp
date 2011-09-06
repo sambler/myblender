@@ -172,7 +172,7 @@ void KX_PolygonMaterial::DefaultActivate(RAS_IRasterizer* rasty, TCachingInfo& c
 
 		cachingInfo = GetCachingInfo();
 
-		if ((m_drawingmode & 4)&& (rasty->GetDrawingMode() == RAS_IRasterizer::KX_TEXTURED))
+		if ((m_drawingmode & RAS_IRasterizer::KX_TEX)&& (rasty->GetDrawingMode() == RAS_IRasterizer::KX_TEXTURED))
 		{
 			Image *ima = (Image*)m_tface->tpage;
 			GPU_update_image_time(ima, rasty->GetTime());
@@ -187,7 +187,7 @@ void KX_PolygonMaterial::DefaultActivate(RAS_IRasterizer* rasty, TCachingInfo& c
 			rasty->SetCullFace(true);
 
 		if ((m_drawingmode & RAS_IRasterizer::KX_LINES) ||
-		    (rasty->GetDrawingMode() <= RAS_IRasterizer::KX_WIREFRAME))
+		        (rasty->GetDrawingMode() <= RAS_IRasterizer::KX_WIREFRAME))
 			rasty->SetLines(true);
 		else
 			rasty->SetLines(false);

@@ -165,8 +165,11 @@ static void id_drop_copy(wmDrag *drag, wmDropBox *drop)
 {
 	char text[64];
 	ID *id= drag->poin;
+	char id_esc[(sizeof(id->name) - 2) * 2];
 
-	snprintf(text, sizeof(text), "bpy.data.%s['%s']", BKE_idcode_to_name_plural(GS(id->name)), id->name+2);	
+	BLI_strescape(id_esc, id->name+2, sizeof(id_esc));
+
+	BLI_snprintf(text, sizeof(text), "bpy.data.%s[\"%s\"]", BKE_idcode_to_name_plural(GS(id->name)), id_esc);
 
 	/* copy drag path to properties */
 	RNA_string_set(drop->ptr, "text", text);
@@ -182,8 +185,8 @@ static int path_drop_poll(bContext *UNUSED(C), wmDrag *drag, wmEvent *UNUSED(eve
 
 static void path_drop_copy(wmDrag *drag, wmDropBox *drop)
 {
-    char pathname[FILE_MAXDIR+FILE_MAXFILE+2];
-    snprintf(pathname, sizeof(pathname), "\"%s\"", drag->path);
+	char pathname[FILE_MAXDIR+FILE_MAXFILE+2];
+	BLI_snprintf(pathname, sizeof(pathname), "\"%s\"", drag->path);
 	RNA_string_set(drop->ptr, "text", pathname);
 }
 
@@ -304,6 +307,7 @@ static void console_keymap(struct wmKeyConfig *keyconf)
 	
 	RNA_enum_set(WM_keymap_add_item(keymap, "CONSOLE_OT_delete", DELKEY, KM_PRESS, 0, 0)->ptr, "type", DEL_NEXT_CHAR);
 	RNA_enum_set(WM_keymap_add_item(keymap, "CONSOLE_OT_delete", BACKSPACEKEY, KM_PRESS, 0, 0)->ptr, "type", DEL_PREV_CHAR);
+	RNA_enum_set(WM_keymap_add_item(keymap, "CONSOLE_OT_delete", BACKSPACEKEY, KM_PRESS, KM_SHIFT, 0)->ptr, "type", DEL_PREV_CHAR);  /* same as above [#26623] */
 
 #ifdef WITH_PYTHON
 	WM_keymap_add_item(keymap, "CONSOLE_OT_execute", RETKEY, KM_PRESS, 0, 0); /* python operator - space_text.py */

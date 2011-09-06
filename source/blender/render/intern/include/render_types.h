@@ -60,6 +60,7 @@ struct RenderBuckets;
 struct ObjectInstanceRen;
 struct RayObject;
 struct RayFace;
+struct ReportList;
 struct Main;
 
 #define TABLEINITSIZE 1024
@@ -182,6 +183,7 @@ struct Render
 	Scene *scene;
 	RenderData r;
 	World wrld;
+	struct Object *camera_override;
 	unsigned int lay;
 	
 	ListBase parts;
@@ -213,7 +215,7 @@ struct Render
 	ListBase instancetable;
 	int totinstance;
 
-	struct Image *backbuf, *bakebuf;
+	struct Image *bakebuf;
 	
 	struct GHash *orco_hash;
 
@@ -246,13 +248,14 @@ struct Render
 	void (*progress)(void *handle, float i);
 	void *prh;
 	
+	void (*draw_lock)(void *handle, int i);
+	void *dlh;
 	int (*test_break)(void *handle);
 	void *tbh;
 	
-	void (*error)(void *handle, const char *str);
-	void *erh;
-	
 	RenderStats i;
+
+	struct ReportList *reports;
 };
 
 /* ------------------------------------------------------------------------- */
@@ -483,6 +486,7 @@ typedef struct VolPrecachePart
 	float bbmin[3];
 	float voxel[3];
 	int working, done;
+	struct Render *re;
 } VolPrecachePart;
 
 typedef struct VolumePrecache

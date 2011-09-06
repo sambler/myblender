@@ -48,8 +48,8 @@
  *  \ingroup MEM
  */
 
-#ifndef BLO_SYS_TYPES_H
-#define BLO_SYS_TYPES_H
+#ifndef MEM_SYS_TYPES_H
+#define MEM_SYS_TYPES_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -88,7 +88,7 @@ typedef unsigned long uintptr_t;
 #define _UINTPTR_T_DEFINED
 #endif
 
-#elif defined(__linux__) || defined(__NetBSD__)
+#elif defined(__linux__) || defined(__NetBSD__) || defined(__OpenBSD__)
 
 	/* Linux-i386, Linux-Alpha, Linux-ppc */
 #include <stdint.h>
@@ -127,5 +127,5 @@ typedef unsigned long uintptr_t;
 }
 #endif
 
-#endif /* eof */
+#endif /* MEM_SYS_TYPES_H */
 

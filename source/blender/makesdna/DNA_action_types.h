@@ -1,6 +1,4 @@
-/*  
- * $Id$
- *
+/* 
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -303,8 +301,8 @@ typedef enum eRotationModes {
 		/* quaternion rotations (default, and for older Blender versions) */
 	ROT_MODE_QUAT	= 0,
 		/* euler rotations - keep in sync with enum in BLI_math.h */
-	ROT_MODE_EUL = 1,		/* Blender 'default' (classic) - must be as 1 to sync with arithb defines */
-	ROT_MODE_XYZ = 1,		/* Blender 'default' (classic) - must be as 1 to sync with arithb defines */
+	ROT_MODE_EUL = 1,		/* Blender 'default' (classic) - must be as 1 to sync with BLI_math_rotation.h defines */
+	ROT_MODE_XYZ = 1,
 	ROT_MODE_XZY,
 	ROT_MODE_YXZ,
 	ROT_MODE_YZX,
@@ -487,6 +485,9 @@ typedef struct bAction {
 	
 	int flag;			/* settings for this action */
 	int active_marker;	/* index of the active marker */
+	
+	int idroot;			/* type of ID-blocks that action can be assigned to (if 0, will be set to whatever ID first evaluates it) */
+	int pad;
 } bAction;
 
 
@@ -511,10 +512,14 @@ typedef struct bDopeSheet {
 	ID 		*source;			/* currently ID_SCE (for Dopesheet), and ID_SC (for Grease Pencil) */
 	ListBase chanbase;			/* cache for channels (only initialised when pinned) */  // XXX not used!
 	
-	struct Group *filter_grp;	/* object group for ADS_FILTER_ONLYOBGROUP filtering option */ 
+	struct Group *filter_grp;	/* object group for ADS_FILTER_ONLYOBGROUP filtering option */
+	char searchstr[64];			/* string to search for in displayed names of F-Curves for ADS_FILTER_BY_FCU_NAME filtering option */
 	
 	int filterflag;				/* flags to use for filtering data */
 	int flag;					/* standard flags */
+	
+	int renameIndex;			/* index+1 of channel to rename - only gets set by renaming operator */
+	int pad;
 } bDopeSheet;
 
 
@@ -548,20 +553,23 @@ typedef enum eDopeSheet_FilterFlag {
 	ADS_FILTER_NOARM			= (1<<18),
 	ADS_FILTER_NONTREE			= (1<<19),
 	ADS_FILTER_NOTEX			= (1<<20),
+	ADS_FILTER_NOSPK			= (1<<21),
 	
 		/* NLA-specific filters */
 	ADS_FILTER_NLA_NOACT		= (1<<25),	/* if the AnimData block has no NLA data, don't include to just show Action-line */
 	
 		/* general filtering 3 */
 	ADS_FILTER_INCL_HIDDEN		= (1<<26),	/* include 'hidden' channels too (i.e. those from hidden Objects/Bones) */
+	ADS_FILTER_BY_FCU_NAME		= (1<<27),	/* for F-Curves, filter by the displayed name (i.e. to isolate all Location curves only) */
 	
 		/* combination filters (some only used at runtime) */
-	ADS_FILTER_NOOBDATA = (ADS_FILTER_NOCAM|ADS_FILTER_NOMAT|ADS_FILTER_NOLAM|ADS_FILTER_NOCUR|ADS_FILTER_NOPART|ADS_FILTER_NOARM)
+	ADS_FILTER_NOOBDATA = (ADS_FILTER_NOCAM|ADS_FILTER_NOMAT|ADS_FILTER_NOLAM|ADS_FILTER_NOCUR|ADS_FILTER_NOPART|ADS_FILTER_NOARM|ADS_FILTER_NOSPK)
 } eDopeSheet_FilterFlag;	
 
 /* DopeSheet general flags */
 typedef enum eDopeSheet_Flag {
-	ADS_FLAG_SUMMARY_COLLAPSED	= (1<<0)	/* when summary is shown, it is collapsed, so all other channels get hidden */
+	ADS_FLAG_SUMMARY_COLLAPSED	= (1<<0),	/* when summary is shown, it is collapsed, so all other channels get hidden */
+	ADS_FLAG_SHOW_DBFILTERS		= (1<<1)	/* show filters for datablocks */
 } eDopeSheet_Flag;
 
 

@@ -272,10 +272,10 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 
 	/* will the screw be closed?
 	 * Note! smaller then FLT_EPSILON*100 gives problems with float precision so its never closed. */
-	if (fabs(screw_ofs) <= (FLT_EPSILON*100) && fabs(fabs(angle) - (M_PI * 2)) <= (FLT_EPSILON*100)) {
+	if (fabsf(screw_ofs) <= (FLT_EPSILON*100.0f) && fabsf(fabsf(angle) - ((float)M_PI * 2.0f)) <= (FLT_EPSILON*100.0f)) {
 		close= 1;
 		step_tot--;
-		if(step_tot < 2) step_tot= 2;
+		if(step_tot < 3) step_tot= 3;
 	
 		maxVerts =	totvert  * step_tot; /* -1 because we're joining back up */
 		maxEdges =	(totvert * step_tot) + /* these are the edges between new verts */
@@ -286,7 +286,7 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 	}
 	else {
 		close= 0;
-		if(step_tot < 2) step_tot= 2;
+		if(step_tot < 3) step_tot= 3;
 
 		maxVerts =	totvert  * step_tot; /* -1 because we're joining back up */
 		maxEdges =	(totvert * (step_tot-1)) + /* these are the edges between new verts */
@@ -888,19 +888,20 @@ ModifierTypeInfo modifierType_Screw = {
 							| eModifierTypeFlag_EnableInEditmode,
 
 	/* copyData */          copyData,
-	/* deformVerts */       0,
-	/* deformMatrices */    0,
-	/* deformVertsEM */     0,
-	/* deformMatricesEM */  0,
+	/* deformVerts */       NULL,
+	/* deformMatrices */    NULL,
+	/* deformVertsEM */     NULL,
+	/* deformMatricesEM */  NULL,
 	/* applyModifier */     applyModifier,
 	/* applyModifierEM */   applyModifierEM,
 	/* initData */          initData,
-	/* requiredDataMask */  0,
-	/* freeData */          0,
-	/* isDisabled */        0,
+	/* requiredDataMask */  NULL,
+	/* freeData */          NULL,
+	/* isDisabled */        NULL,
 	/* updateDepgraph */    updateDepgraph,
 	/* dependsOnTime */     dependsOnTime,
-	/* dependsOnNormals */	0,
+	/* dependsOnNormals */	NULL,
 	/* foreachObjectLink */ foreachObjectLink,
-	/* foreachIDLink */     0,
+	/* foreachIDLink */     NULL,
+	/* foreachTexLink */    NULL,
 };

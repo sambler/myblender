@@ -35,7 +35,7 @@
  */
 
 
-#include "stddef.h"
+#include <stddef.h>
 
 #include "MEM_guardedalloc.h"
 
@@ -43,6 +43,7 @@
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_smoke_types.h"
+#include "DNA_object_force.h"
 
 #include "BLI_utildefines.h"
 
@@ -147,6 +148,21 @@ static void updateDepgraph(ModifierData *md, DagForest *forest,
 	}
 }
 
+static void foreachIDLink(ModifierData *md, Object *ob,
+					   IDWalkFunc walk, void *userData)
+{
+	SmokeModifierData *smd = (SmokeModifierData*) md;
+
+	if(smd->type==MOD_SMOKE_TYPE_DOMAIN && smd->domain) {
+		walk(userData, ob, (ID **)&smd->domain->coll_group);
+		walk(userData, ob, (ID **)&smd->domain->fluid_group);
+		walk(userData, ob, (ID **)&smd->domain->eff_group);
+
+		if(smd->domain->effector_weights) {
+			walk(userData, ob, (ID **)&smd->domain->effector_weights->group);
+		}
+	}
+}
 
 ModifierTypeInfo modifierType_Smoke = {
 	/* name */              "Smoke",
@@ -159,18 +175,19 @@ ModifierTypeInfo modifierType_Smoke = {
 
 	/* copyData */          copyData,
 	/* deformVerts */       deformVerts,
-	/* deformMatrices */    0,
-	/* deformVertsEM */     0,
-	/* deformMatricesEM */  0,
-	/* applyModifier */     0,
-	/* applyModifierEM */   0,
+	/* deformMatrices */    NULL,
+	/* deformVertsEM */     NULL,
+	/* deformMatricesEM */  NULL,
+	/* applyModifier */     NULL,
+	/* applyModifierEM */   NULL,
 	/* initData */          initData,
-	/* requiredDataMask */  0,
+	/* requiredDataMask */  NULL,
 	/* freeData */          freeData,
-	/* isDisabled */        0,
+	/* isDisabled */        NULL,
 	/* updateDepgraph */    updateDepgraph,
 	/* dependsOnTime */     dependsOnTime,
-	/* dependsOnNormals */	0,
-	/* foreachObjectLink */ 0,
-	/* foreachIDLink */     0,
+	/* dependsOnNormals */	NULL,
+	/* foreachObjectLink */ NULL,
+	/* foreachIDLink */     foreachIDLink,
+	/* foreachTexLink */    NULL
 };

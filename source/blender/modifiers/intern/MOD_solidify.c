@@ -48,6 +48,7 @@
 
 
 #include "MOD_modifiertypes.h"
+#include "MOD_util.h"
 
 #include "MEM_guardedalloc.h"
 
@@ -214,6 +215,11 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 	const int numEdges = dm->getNumEdges(dm);
 	const int numFaces = dm->getNumFaces(dm);
 
+	/* only use material offsets if we have 2 or more materials  */
+	const short mat_nr_max= ob->totcol > 1 ? ob->totcol - 1 : 0;
+	const short mat_ofs= mat_nr_max ? smd->mat_ofs : 0;
+	const short mat_ofs_rim= mat_nr_max ? smd->mat_ofs_rim : 0;
+
 	/* use for edges */
 	int *new_vert_arr= NULL;
 	int newFaces = 0;
@@ -226,16 +232,17 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 
 	float (*vert_nors)[3]= NULL;
 
-	float const ofs_orig=				- (((-smd->offset_fac + 1.0f) * 0.5f) * smd->offset);
-	float const ofs_new= smd->offset	- (((-smd->offset_fac + 1.0f) * 0.5f) * smd->offset);
+	const float ofs_orig=				- (((-smd->offset_fac + 1.0f) * 0.5f) * smd->offset);
+	const float ofs_new= smd->offset	- (((-smd->offset_fac + 1.0f) * 0.5f) * smd->offset);
+	const float offset_fac_vg= smd->offset_fac_vg;
+	const float offset_fac_vg_inv= 1.0f - smd->offset_fac_vg;
 
 	/* weights */
-	MDeformVert *dvert= NULL, *dv= NULL;
+	MDeformVert *dvert, *dv= NULL;
 	const int defgrp_invert = ((smd->flag & MOD_SOLIDIFY_VGROUP_INV) != 0);
-	const int defgrp_index= defgroup_name_index(ob, smd->defgrp_name);
+	int defgrp_index;
 
-	if (defgrp_index >= 0)
-		dvert = dm->getVertDataArray(dm, CD_MDEFORMVERT);
+	modifier_get_vgroup(ob, dm, smd->defgrp_name, &dvert, &defgrp_index);
 
 	orig_mface = dm->getFaceArray(dm);
 	orig_medge = dm->getEdgeArray(dm);
@@ -360,6 +367,11 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 				DM_swap_face_data(result, i+numFaces, corner_indices);
 				test_index_face(mf, &result->faceData, numFaces, is_quad ? 4:3);
 			}
+
+			if(mat_ofs) {
+				mf->mat_nr += mat_ofs;
+				CLAMP(mf->mat_nr, 0, mat_nr_max);
+			}
 		}
 	}
 
@@ -381,8 +393,9 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 			dv= dvert;
 			for(i=0; i<numVerts; i++, mv++) {
 				if(dv) {
-					if(defgrp_invert)	scalar_short_vgroup = scalar_short * (1.0f - defvert_find_weight(dv, defgrp_index));
-					else				scalar_short_vgroup = scalar_short * defvert_find_weight(dv, defgrp_index);
+					if(defgrp_invert)	scalar_short_vgroup = 1.0f - defvert_find_weight(dv, defgrp_index);
+					else				scalar_short_vgroup = defvert_find_weight(dv, defgrp_index);
+					scalar_short_vgroup= (offset_fac_vg + (scalar_short_vgroup * offset_fac_vg_inv)) * scalar_short;
 					dv++;
 				}
 				VECADDFAC(mv->co, mv->co, mv->no, scalar_short_vgroup);
@@ -395,8 +408,9 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 			dv= dvert;
 			for(i=0; i<numVerts; i++, mv++) {
 				if(dv) {
-					if(defgrp_invert)	scalar_short_vgroup = scalar_short * (1.0f - defvert_find_weight(dv, defgrp_index));
-					else				scalar_short_vgroup = scalar_short * defvert_find_weight(dv, defgrp_index);
+					if(defgrp_invert)	scalar_short_vgroup = 1.0f - defvert_find_weight(dv, defgrp_index);
+					else				scalar_short_vgroup = defvert_find_weight(dv, defgrp_index);
+					scalar_short_vgroup= (offset_fac_vg + (scalar_short_vgroup * offset_fac_vg_inv)) * scalar_short;
 					dv++;
 				}
 				VECADDFAC(mv->co, mv->co, mv->no, scalar_short_vgroup);
@@ -456,15 +470,21 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 
 		/* vertex group support */
 		if(dvert) {
+			float scalar;
+
 			dv= dvert;
 			if(defgrp_invert) {
 				for(i=0; i<numVerts; i++, dv++) {
-					vert_angles[i] *= (1.0f - defvert_find_weight(dv, defgrp_index));
+					scalar= 1.0f - defvert_find_weight(dv, defgrp_index);
+					scalar= offset_fac_vg + (scalar * offset_fac_vg_inv);
+					vert_angles[i] *= scalar;
 				}
 			}
 			else {
 				for(i=0; i<numVerts; i++, dv++) {
-					vert_angles[i] *= defvert_find_weight(dv, defgrp_index);
+					scalar= defvert_find_weight(dv, defgrp_index);
+					scalar= offset_fac_vg + (scalar * offset_fac_vg_inv);
+					vert_angles[i] *= scalar;
 				}
 			}
 		}
@@ -520,9 +540,6 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 		float (*edge_vert_nos)[3]= MEM_callocN(sizeof(float) * numVerts * 3, "solidify_edge_nos");
 		float nor[3];
 #endif
-		/* maximum value -1, so we have room to increase */
-		const short mat_nr_shift= (smd->flag & MOD_SOLIDIFY_RIM_MATERIAL) ? ob->totcol-1 : -1;
-
 		const unsigned char crease_rim= smd->crease_rim * 255.0f;
 		const unsigned char crease_outer= smd->crease_outer * 255.0f;
 		const unsigned char crease_inner= smd->crease_inner * 255.0f;
@@ -582,14 +599,22 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 			}
 			
 			/* use the next material index if option enabled */
-			if(mf->mat_nr < mat_nr_shift)
-				mf->mat_nr++;
-
-			if(crease_outer)
-				ed->crease= crease_outer;
+			if(mat_ofs_rim) {
+				mf->mat_nr += mat_ofs_rim;
+				CLAMP(mf->mat_nr, 0, mat_nr_max);
+			}
+			if(crease_outer) {
+				/* crease += crease_outer; without wrapping */
+				unsigned char *cr= (unsigned char *)&(ed->crease);
+				int tcr= *cr + crease_outer;
+				*cr= tcr > 255 ? 255 : tcr;
+			}
 
 			if(crease_inner) {
-				medge[numEdges + eidx].crease= crease_inner;
+				/* crease += crease_inner; without wrapping */
+				unsigned char *cr= (unsigned char *)&(medge[numEdges + eidx].crease);
+				int tcr= *cr + crease_inner;
+				*cr= tcr > 255 ? 255 : tcr;
 			}
 			
 #ifdef SOLIDIFY_SIDE_NORMALS
@@ -626,6 +651,11 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 		MEM_freeN(new_edge_arr);
 		MEM_freeN(edge_users);
 		MEM_freeN(edge_order);
+	}
+
+	/* must recalculate normals with vgroups since they can displace unevenly [#26888] */
+	if(dvert) {
+		CDDM_calc_normals(result);
 	}
 
 	return result;
@@ -669,5 +699,6 @@ ModifierTypeInfo modifierType_Solidify = {
 	/* dependsOnTime */     NULL,
 	/* dependsOnNormals */	NULL,
 	/* foreachObjectLink */ NULL,
-	/* foreachIDLink */     NULL
+	/* foreachIDLink */     NULL,
+	/* foreachTexLink */    NULL,
 };

@@ -558,11 +558,11 @@ void shrinkwrapModifier_deform(ShrinkwrapModifierData *smd, Object *ob, DerivedM
 		//Using vertexs positions/normals as if a subsurface was applied 
 		if(smd->subsurfLevels)
 		{
-			SubsurfModifierData ssmd= {{0}};
+			SubsurfModifierData ssmd= {{NULL}};
 			ssmd.subdivType	= ME_CC_SUBSURF;		//catmull clark
 			ssmd.levels		= smd->subsurfLevels;	//levels
 
-			ss_mesh = subsurf_make_derived_from_derived(dm, &ssmd, FALSE, NULL, 0, 0);
+			ss_mesh = subsurf_make_derived_from_derived(dm, &ssmd, FALSE, NULL, 0, 0, (ob->mode & OB_MODE_EDIT));
 
 			if(ss_mesh)
 			{

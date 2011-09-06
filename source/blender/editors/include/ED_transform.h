@@ -77,6 +77,7 @@ enum {
 	TFM_TIME_SLIDE,
 	TFM_TIME_SCALE,
 	TFM_TIME_EXTEND,
+	TFM_TIME_DUPLICATE,
 	TFM_BAKE_TIME,
 	TFM_BEVEL,
 	TFM_BWEIGHT,
@@ -147,6 +148,7 @@ void BIF_selectOrientation(void);
 #define P_ALIGN_SNAP	(P_GEO_SNAP|(1 << 5))
 #define P_CONSTRAINT	(1 << 6)
 #define P_OPTIONS		(1 << 7)
+#define P_CORRECT_UV 	(1 << 8)
 
 void Transform_Properties(struct wmOperatorType *ot, int flags);
 

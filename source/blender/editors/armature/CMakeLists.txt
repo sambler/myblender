@@ -22,13 +22,17 @@
 set(INC
 	../include
 	../../blenkernel
-	../../blenloader
 	../../blenlib
+	../../blenloader
 	../../makesdna
 	../../makesrna
 	../../windowmanager
 	../../../../intern/guardedalloc
 	../../../../intern/opennl/extern
+)
+
+set(INC_SYS
+	${GLEW_INCLUDE_PATH}
 )
 
 set(SRC
@@ -51,4 +55,4 @@ set(SRC
 	reeb.h
 )
 
-blender_add_lib(bf_editor_armature "${SRC}" "${INC}")
+blender_add_lib(bf_editor_armature "${SRC}" "${INC}" "${INC_SYS}")

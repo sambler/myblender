@@ -38,8 +38,7 @@
  *  \ingroup modifiers
  */
 
-
-
+#include <stdio.h>
 
 #include "BLI_utildefines.h"
 
@@ -58,24 +57,25 @@ ModifierTypeInfo modifierType_None = {
 	/* name */              "None",
 	/* structName */        "ModifierData",
 	/* structSize */        sizeof(ModifierData),
-	/* type */              eModifierType_None,
+	/* type */              eModifierTypeType_None,
 	/* flags */             eModifierTypeFlag_AcceptsMesh
 							| eModifierTypeFlag_AcceptsCVs,
 
-	/* copyData */          0,
-	/* deformVerts */       0,
-	/* deformMatrices */    0,
-	/* deformVertsEM */     0,
-	/* deformMatricesEM */  0,
-	/* applyModifier */     0,
-	/* applyModifierEM */   0,
-	/* initData */          0,
-	/* requiredDataMask */  0,
-	/* freeData */          0,
+	/* copyData */          NULL,
+	/* deformVerts */       NULL,
+	/* deformMatrices */    NULL,
+	/* deformVertsEM */     NULL,
+	/* deformMatricesEM */  NULL,
+	/* applyModifier */     NULL,
+	/* applyModifierEM */   NULL,
+	/* initData */          NULL,
+	/* requiredDataMask */  NULL,
+	/* freeData */          NULL,
 	/* isDisabled */        isDisabled,
-	/* updateDepgraph */    0,
-	/* dependsOnTime */     0,
-	/* dependsOnNormals */	0,
-	/* foreachObjectLink */ 0,
-	/* foreachIDLink */     0,
+	/* updateDepgraph */    NULL,
+	/* dependsOnTime */     NULL,
+	/* dependsOnNormals */	NULL,
+	/* foreachObjectLink */ NULL,
+	/* foreachIDLink */     NULL,
+	/* foreachTexLink */    NULL,
 };

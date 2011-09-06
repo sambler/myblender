@@ -389,6 +389,44 @@ class MeshFace(StructRNA):
         return ord_ind(verts[0], verts[1]), ord_ind(verts[1], verts[2]), ord_ind(verts[2], verts[3]), ord_ind(verts[3], verts[0])
 
 
+class SequenceEffect(bpy_types.ID):
+    __slots__ = ()
+
+    @property
+    def pixmap_result(self):
+        ''' the frame that has our finished effect for this frame '''
+        return 0
+
+    @property
+    def pixmap_source(self):
+        ''' the frame that the effect is removing '''
+        return 0
+
+    @property
+    def pixmap_dest(self):
+        ''' the frame that is replacing previous image '''
+        return 0
+
+    @property
+    def progress(self):
+        ''' float representing the progress of the effect '''
+        return 0.5
+
+    @property
+    def blur_width(self):
+        ''' blur width '''
+        return 0
+
+    @property
+    def direction(self):
+        ''' forward or reverse '''
+        return 1
+
+    @property
+    def angle(self):
+        ''' the angle setting - rotate effect clockwise by x degrees '''
+        return 90
+
 class Text(bpy_types.ID):
     __slots__ = ()
 

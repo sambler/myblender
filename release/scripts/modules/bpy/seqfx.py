@@ -21,13 +21,14 @@
 # for slightly faster access
 from _bpy import seqfx as seqfx_module
 
-# seqfx_add = seqfx_module.add
-seqfx_dir = seqfx_module.dir
-seqfx_poll = seqfx_module.poll
-seqfx_call = seqfx_module.call
-seqfx_as_string = seqfx_module.as_string
-seqfx_get_rna = seqfx_module.get_rna
-
+# add = seqfx_module.add
+#init = seqfx_module.dir
+#poll = seqfx_module.poll
+#call = seqfx_module.call
+#as_string = seqfx_module.as_string
+#get_rna = seqfx_module.get_rna
+store_icu_range = seqfx_module.store_icu_range
+get_default_fac = seqfx_module.get_default_fac
 
 class BPySeqfx(object):
     '''
@@ -53,7 +54,7 @@ class BPySeqfx(object):
             if not id_name.startswith('__'):
                 submodules.add(id_name)
 
-        for id_name in seqfx_dir():
+        for id_name in dir():
             id_split = id_name.split('_OT_', 1)
 
             if len(id_split) == 2:
@@ -92,7 +93,7 @@ class BPySeqfxSubMod(object):
 
         module_upper = self.module.upper()
 
-        for id_name in seqfx_dir():
+        for id_name in dir():
             id_split = id_name.split('_OT_', 1)
             if len(id_split) == 2 and module_upper == id_split[0]:
                 functions.add(id_split[1])
@@ -113,7 +114,7 @@ class BPySeqfxSubModOp(object):
     __keys__ = ('module', 'func')
 
     def _get_doc(self):
-        return seqfx_as_string(self.idname())
+        return as_string(self.idname())
 
     @staticmethod
     def _parse_args(args):
@@ -152,7 +153,7 @@ class BPySeqfxSubModOp(object):
 
     def poll(self, *args):
         C_dict, C_exec = BPySeqfxSubModOp._parse_args(args)
-        return seqfx_poll(self.idname_py(), C_dict, C_exec)
+        return poll(self.idname_py(), C_dict, C_exec)
 
     def idname(self):
         # submod.foo -> SUBMOD_OT_foo
@@ -174,9 +175,9 @@ class BPySeqfxSubModOp(object):
 
         if args:
             C_dict, C_exec = BPySeqfxSubModOp._parse_args(args)
-            ret = seqfx_call(self.idname_py(), C_dict, kw, C_exec)
+            ret = call(self.idname_py(), C_dict, kw, C_exec)
         else:
-            ret = seqfx_call(self.idname_py(), None, kw)
+            ret = call(self.idname_py(), None, kw)
 
         if 'FINISHED' in ret and context.window_manager == wm:
             BPySeqfxSubModOp._scene_update(context)
@@ -187,12 +188,12 @@ class BPySeqfxSubModOp(object):
         '''
         currently only used for 'bl_rna'
         '''
-        return seqfx_get_rna(self.idname())
+        return get_rna(self.idname())
 
     def __repr__(self):  # useful display, repr(op)
         import bpy
         idname = self.idname()
-        as_string = seqfx_as_string(idname)
+        as_string = as_string(idname)
         seqfx_class = getattr(bpy.types, idname)
         descr = seqfx_class.bl_rna.description
         # XXX, workaround for not registering

@@ -231,6 +231,7 @@ blender_include_dirs(
 	../../imbuf
 	../../ikplugin
 	../../makesdna
+	../../sequencereffects
 	../../windowmanager
 	../../editors/include
 	../../render/extern/include

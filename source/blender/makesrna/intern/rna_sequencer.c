@@ -44,6 +44,7 @@
 #include "BKE_global.h"
 #include "BKE_sequencer.h"
 #include "BKE_sound.h"
+#include "SEQ_effects.h"
 
 #include "MEM_guardedalloc.h"
 
@@ -51,6 +52,98 @@
 #include "BLI_math.h"
 
 #ifdef RNA_RUNTIME
+
+/* manage the runtime list of available effects */
+ListBase S_effects = {NULL, NULL};
+
+/*static SeqEffect internal_effects = {
+	{NULL,NULL,"ADDFX","Add",NULL,NULL,NULL,NULL,NULL},
+
+};*/
+
+void SE_effects_init(void)
+{
+	/* BLI_addtail(&S_effects, &internal_effects); */
+	/* we don't use a starting list - each effect is registered individually
+	 * so we start with a blank list */
+	 SE_effects_exit();
+}
+
+void SE_effects_exit(void)
+{
+	SeqEffect *effect, *next;
+
+	for(effect=S_effects.first; effect; effect=next) {
+		next= effect->next;
+
+		/* TODO should unregister not just unlink? */
+		BLI_remlink(&S_effects, effect);
+
+			MEM_freeN(effect);
+		}
+}
+
+static void rna_SequenceEffect_unregister(Main *UNUSED(bmain), StructRNA *type)
+{
+	SeqEffect *effect= RNA_struct_blender_type_get(type);
+
+	if(!effect)
+		return;
+
+	RNA_struct_free_extension(type, &effect->customdata);
+	BLI_freelinkN(&S_effects, effect);
+	RNA_struct_free(&BLENDER_RNA, type);
+}
+
+static StructRNA *rna_SequenceEffect_register(Main *bmain, ReportList *reports, void *data, const char *identifier, StructValidateFunc validate, StructCallbackFunc call, StructFreeFunc free)
+{
+	SeqEffect *fx, dummyet = {NULL};
+	SeqEffect dummyfx= {NULL};
+	PointerRNA dummyptr;
+	int have_function[1];
+
+//	dummyfx.type= &dummyet;
+	RNA_pointer_create(NULL, &RNA_SequenceEffect, &dummyfx, &dummyptr);
+
+	/* validate the python class */
+	if(validate(&dummyptr, data, have_function) != 0)
+		return NULL;
+
+	if(strlen(identifier) >= sizeof(dummyet.idname)) {
+		BKE_reportf(reports, RPT_ERROR, "registering SequenceEffect class: '%s' is too long, maximum length is %d.", identifier, (int)sizeof(dummyet.idname));
+		return NULL;
+	}
+
+	/* check if we have registered this engine type before, and remove it */
+	for(fx=S_effects.first; fx; fx=fx->next) {
+		if(strcmp(fx->idname, dummyet.idname) == 0) {
+			if(fx->ptr)
+				rna_SequenceEffect_unregister(bmain, fx->ptr);
+			break;
+		}
+	}
+
+	/* create a new effect */
+	fx= MEM_callocN(sizeof(SeqEffect), "Sequencer Effect");
+	memcpy(fx, &dummyet, sizeof(dummyet));
+
+//	fx->ptr.srna= RNA_def_struct(&BLENDER_RNA, fx->idname, "SequenceEffect");
+	fx->customdata= data;
+//	fx->ptr.call= call;
+//	fx->ptr.free= free;
+//	RNA_struct_blender_type_set(fx->ptr.srna, fx);
+
+	BLI_addtail(&S_effects, fx);
+
+	return fx->ptr;
+}
+
+static StructRNA* rna_SequenceEffect_refine(PointerRNA *ptr)
+{
+//	SeqEffect *effect= (SeqEffect*)ptr->customdata;
+//	return (effect->type && effect->type->ptr)? effect->type->ptr: &RNA_SequenceEffect;
+	return NULL;
+}
 
 /* build a temp referene to the parent */
 static void meta_tmp_ref(Sequence *seq_par, Sequence *seq)
@@ -728,7 +821,6 @@ static float rna_WipeSequence_angle_get(PointerRNA *ptr)
 
 	return DEG2RADF(((WipeVars *)seq->effectdata)->angle);
 }
-
 
 #else
 
@@ -1552,6 +1644,95 @@ static void rna_def_plugin(BlenderRNA *brna)
 	/* plugin properties need custom wrapping code like ID properties */
 }
 
+static void rna_def_sequence_effect(BlenderRNA *brna)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+	FunctionRNA *func;
+
+	srna= RNA_def_struct(brna, "SequenceEffect", NULL);
+	RNA_def_struct_sdna(srna, "SequenceEffect");
+	RNA_def_struct_ui_text(srna, "Sequence Effect", "Sequence Effect");
+	RNA_def_struct_refine_func(srna, "rna_SequenceEffect_refine");
+	RNA_def_struct_register_funcs(srna, "rna_SequenceEffect_register", "rna_SequenceEffect_unregister", NULL);
+
+	/* render */
+	func= RNA_def_function(srna, "execute", NULL);
+	RNA_def_function_ui_description(func, "Create frame for effect.");
+	RNA_def_function_flag(func, FUNC_REGISTER);
+	RNA_def_pointer(func, "scene", "Scene", "", "");
+
+//	srna= RNA_def_struct(brna, "RenderEngine", NULL);
+//	RNA_def_struct_sdna(srna, "RenderEngine");
+//	RNA_def_struct_ui_text(srna, "Render Engine", "Render engine");
+//	RNA_def_struct_refine_func(srna, "rna_RenderEngine_refine");
+//	RNA_def_struct_register_funcs(srna, "rna_RenderEngine_register", "rna_RenderEngine_unregister", NULL);
+//
+//	/* render */
+//	func= RNA_def_function(srna, "render", NULL);
+//	RNA_def_function_ui_description(func, "Render scene into an image.");
+//	RNA_def_function_flag(func, FUNC_REGISTER);
+//	RNA_def_pointer(func, "scene", "Scene", "", "");
+//
+//	func= RNA_def_function(srna, "begin_result", "RE_engine_begin_result");
+//	prop= RNA_def_int(func, "x", 0, 0, INT_MAX, "X", "", 0, INT_MAX);
+//	RNA_def_property_flag(prop, PROP_REQUIRED);
+//	prop= RNA_def_int(func, "y", 0, 0, INT_MAX, "Y", "", 0, INT_MAX);
+//	RNA_def_property_flag(prop, PROP_REQUIRED);
+//	prop= RNA_def_int(func, "w", 0, 0, INT_MAX, "Width", "", 0, INT_MAX);
+//	RNA_def_property_flag(prop, PROP_REQUIRED);
+//	prop= RNA_def_int(func, "h", 0, 0, INT_MAX, "Height", "", 0, INT_MAX);
+//	RNA_def_property_flag(prop, PROP_REQUIRED);
+//	prop= RNA_def_pointer(func, "result", "RenderResult", "Result", "");
+//	RNA_def_function_return(func, prop);
+//
+//	func= RNA_def_function(srna, "update_result", "RE_engine_update_result");
+//	prop= RNA_def_pointer(func, "result", "RenderResult", "Result", "");
+//	RNA_def_property_flag(prop, PROP_REQUIRED);
+//
+//	func= RNA_def_function(srna, "end_result", "RE_engine_end_result");
+//	prop= RNA_def_pointer(func, "result", "RenderResult", "Result", "");
+//	RNA_def_property_flag(prop, PROP_REQUIRED);
+//
+//	func= RNA_def_function(srna, "test_break", "RE_engine_test_break");
+//	prop= RNA_def_boolean(func, "do_break", 0, "Break", "");
+//	RNA_def_function_return(func, prop);
+//
+//	func= RNA_def_function(srna, "update_stats", "RE_engine_update_stats");
+//	prop= RNA_def_string(func, "stats", "", 0, "Stats", "");
+//	RNA_def_property_flag(prop, PROP_REQUIRED);
+//	prop= RNA_def_string(func, "info", "", 0, "Info", "");
+//	RNA_def_property_flag(prop, PROP_REQUIRED);
+//
+//	func= RNA_def_function(srna, "report", "RE_engine_report");
+//	prop= RNA_def_enum_flag(func, "type", wm_report_items, 0, "Type", "");
+//	RNA_def_property_flag(prop, PROP_REQUIRED);
+//	prop= RNA_def_string(func, "message", "", 0, "Report Message", "");
+//	RNA_def_property_flag(prop, PROP_REQUIRED);
+//
+//	/* registration */
+//	RNA_define_verify_sdna(0);
+//
+//	prop= RNA_def_property(srna, "bl_idname", PROP_STRING, PROP_NONE);
+//	RNA_def_property_string_sdna(prop, NULL, "type->idname");
+//	RNA_def_property_flag(prop, PROP_REGISTER|PROP_NEVER_CLAMP);
+//
+//	prop= RNA_def_property(srna, "bl_label", PROP_STRING, PROP_NONE);
+//	RNA_def_property_string_sdna(prop, NULL, "type->name");
+//	RNA_def_property_flag(prop, PROP_REGISTER);
+//
+//	prop= RNA_def_property(srna, "bl_use_preview", PROP_BOOLEAN, PROP_NONE);
+//	RNA_def_property_boolean_sdna(prop, NULL, "type->flag", RE_DO_PREVIEW);
+//	RNA_def_property_flag(prop, PROP_REGISTER_OPTIONAL);
+//
+//	prop= RNA_def_property(srna, "bl_use_postprocess", PROP_BOOLEAN, PROP_NONE);
+//	RNA_def_property_boolean_negative_sdna(prop, NULL, "type->flag", RE_DO_ALL);
+//	RNA_def_property_flag(prop, PROP_REGISTER_OPTIONAL);
+//
+//	RNA_define_verify_sdna(1);
+
+}
+
 static void rna_def_wipe(BlenderRNA *brna)
 {
 	StructRNA *srna;
@@ -1782,6 +1963,7 @@ void RNA_def_sequencer(BlenderRNA *brna)
 	rna_def_strip_transform(brna);
 
 	rna_def_sequence(brna);
+	rna_def_sequence_effect(brna);
 	rna_def_editor(brna);
 
 	rna_def_image(brna);

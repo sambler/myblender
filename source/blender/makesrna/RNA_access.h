@@ -402,6 +402,7 @@ extern StructRNA RNA_Sequence;
 extern StructRNA RNA_SequenceColorBalance;
 extern StructRNA RNA_SequenceCrop;
 extern StructRNA RNA_SequenceEditor;
+extern StructRNA RNA_SequenceEffect;
 extern StructRNA RNA_SequenceElement;
 extern StructRNA RNA_SequenceProxy;
 extern StructRNA RNA_SequenceTransform;

@@ -45,15 +45,11 @@ struct SeqRenderData;
 typedef struct SeqEffect {
 	struct SeqEffect  *next, *prev;
 
-	/* saved */
-	char *idname;				/* unique identifier */
-	IDProperty *properties;		/* saved, user-settable properties */
-
-	/* runtime */
-	char *name;					/* text for ui, undo */
+	char *idname[64];				/* unique identifier */
+	char *name[64];					/* text for ui, undo */
 	char *description;			/* tooltips and python docs */
 
-	void *customdata;			/* custom storage, only while operator runs */
+	void *customdata;			/* custom storage, only while effect runs */
 	void *py_instance;			/* python stores the class instance here */
 
 	struct PointerRNA *ptr;		/* rna pointer to access properties */

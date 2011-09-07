@@ -4201,8 +4201,15 @@ static void direct_link_modifiers(FileData *fd, ListBase *lb)
 			omd->oceancache = NULL;
 			omd->ocean = NULL;
 			omd->refresh = (MOD_OCEAN_REFRESH_ADD|MOD_OCEAN_REFRESH_RESET|MOD_OCEAN_REFRESH_SIM);
+		}
+		else if (md->type==eModifierType_WeightVGEdit) {
+			WeightVGEditModifierData *wmd = (WeightVGEditModifierData*) md;
+
+			wmd->cmap_curve = newdataadr(fd, wmd->cmap_curve);
+			if(wmd->cmap_curve)
+				direct_link_curvemapping(fd, wmd->cmap_curve);
+		}
 	}
-}
 }
 
 static void direct_link_object(FileData *fd, Object *ob)

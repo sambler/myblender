@@ -800,7 +800,7 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         col.prop(md, "narrowness", slider=True)
 
     @staticmethod
-    def weight_vg_mask(layout, ob, md):
+    def vertex_weight_mask(layout, ob, md):
         layout.label(text="Influence/Mask Options:")
         split = layout.split()
         col1 = split.column()
@@ -860,7 +860,7 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
 
             # Common mask options…
             layout.separator()
-            self.weight_vg_mask(layout, ob, md)
+            self.vertex_weight_mask(layout, ob, md)
 
     def VERTEX_WEIGHT_MIX(self, layout, ob, md):
         if ob.type == 'MESH':
@@ -885,7 +885,7 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
 
             # Common mask options…
             layout.separator()
-            self.weight_vg_mask(layout, ob, md)
+            self.vertex_weight_mask(layout, ob, md)
 
     def VERTEX_WEIGHT_PROXIMITY(self, layout, ob, md):
         if ob.type == 'MESH':
@@ -912,7 +912,7 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
 
             # Common mask options…
             layout.separator()
-            self.weight_vg_mask(layout, ob, md)
+            self.vertex_weight_mask(layout, ob, md)
 
 if __name__ == "__main__":  # only for live edit.
     bpy.utils.register_module(__name__)

@@ -877,7 +877,7 @@ typedef struct WeightVGEditModifierData {
 	int		mask_tex_mapping;
 	char	mask_tex_uvlayer_name[32]; /* Name of the UV layer. */
 
-	/* Padding… */
+	/* Padding... */
 	int pad_i1;
 } WeightVGEditModifierData;
 
@@ -922,7 +922,7 @@ typedef struct WeightVGMixModifierData {
 	int		mask_tex_mapping;          /* How to map the texture! */
 	char	mask_tex_uvlayer_name[32]; /* Name of the UV layer. */
 
-	/* Padding… */
+	/* Padding... */
 	int pad_i1;
 } WeightVGMixModifierData;
 

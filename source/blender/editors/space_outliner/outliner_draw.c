@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -238,7 +236,7 @@ static int group_select_flag(Group *gr)
 	return 0;
 }
 
-static void restrictbutton_gr_restrict_flag(void *poin, void *poin2, int flag)
+void restrictbutton_gr_restrict_flag(void *poin, void *poin2, int flag)
 {	
 	Scene *scene = (Scene *)poin;		
 	GroupObject *gob;
@@ -927,13 +925,7 @@ static void tselem_draw_icon(uiBlock *block, int xmax, float x, float y, TreeSto
 			case TSE_NLA_ACTION:
 				UI_icon_draw(x, y, ICON_ACTION); break;
 			case TSE_DRIVER_BASE:
-
-#if 0		// GSOC_PEPPER
-
 				UI_icon_draw(x, y, ICON_DRIVER); break;
-
-#endif		// GSOC_PEPPER
-
 			case TSE_DEFGROUP_BASE:
 				UI_icon_draw(x, y, ICON_GROUP_VERTEX); break;
 			case TSE_BONE:
@@ -1092,14 +1084,8 @@ static void tselem_draw_icon(uiBlock *block, int xmax, float x, float y, TreeSto
 				tselem_draw_icon_uibut(&arg, ICON_OUTLINER_OB_FONT); break;
 			case OB_SURF: 
 				tselem_draw_icon_uibut(&arg, ICON_OUTLINER_OB_SURFACE); break;
-
-#if 0		// GSOC_PEPPER
-
 			case OB_SPEAKER:
 				tselem_draw_icon_uibut(&arg, ICON_OUTLINER_OB_SPEAKER); break;
-
-#endif		// GSOC_PEPPER
-
 			case OB_EMPTY: 
 				tselem_draw_icon_uibut(&arg, ICON_OUTLINER_OB_EMPTY); break;
 		
@@ -1143,15 +1129,9 @@ static void tselem_draw_icon(uiBlock *block, int xmax, float x, float y, TreeSto
 				tselem_draw_icon_uibut(&arg, ICON_TEXTURE_DATA); break;
 			case ID_IM:
 				tselem_draw_icon_uibut(&arg, ICON_IMAGE_DATA); break;
-
-#if 0		// GSOC_PEPPER
-
 			case ID_SPK:
 			case ID_SO:
 				tselem_draw_icon_uibut(&arg, ICON_OUTLINER_DATA_SPEAKER); break;
-
-#endif		// GSOC_PEPPER
-
 			case ID_AR:
 				tselem_draw_icon_uibut(&arg, ICON_OUTLINER_DATA_ARMATURE); break;
 			case ID_CA:
@@ -1257,14 +1237,17 @@ static void outliner_draw_tree_element(bContext *C, uiBlock *block, Scene *scene
 		
 		glEnable(GL_BLEND);
 
-        /* start by highlighting search matches */
-		/* we don't expand items when searching in the datablocks but we 
-		    still want to highlight any filter matches. */
-        if( (SEARCHING_OUTLINER(soops) || (soops->outlinevis==SO_DATABLOCKS && soops->search_string[0]!=0)) && (tselem->flag & TSE_SEARCHMATCH) ) {
-            /* TODO - add search highlight colour to theme? */
-            glColor4f(0.0f, 0.6f, 0.0f, 0.3f);
-            glRecti(startx, *starty+1, ar->v2d.cur.xmax, *starty+UI_UNIT_Y-1);
-        }
+		/* start by highlighting search matches 
+		 *	we don't expand items when searching in the datablocks but we 
+		 *	still want to highlight any filter matches. 
+		 */
+		if ( (SEARCHING_OUTLINER(soops) || (soops->outlinevis==SO_DATABLOCKS && soops->search_string[0]!=0)) && 
+			 (tselem->flag & TSE_SEARCHMATCH)) 
+		{
+			/* TODO - add search highlight colour to theme? */
+			glColor4f(0.2f, 0.5f, 0.2f, 0.3f);
+			glRecti(startx, *starty+1, ar->v2d.cur.xmax, *starty+UI_UNIT_Y-1);
+		}
 
 		/* colors for active/selected data */
 		if(tselem->type==0) {

@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -52,13 +50,7 @@
 #include "DNA_scene_types.h"
 #include "DNA_world_types.h"
 #include "DNA_sequence_types.h"
-
-#if 0 // GSOC_PEPPER
-
 #include "DNA_speaker_types.h"
-
-#endif // GSOC_PEPPER
-
 #include "DNA_object_types.h"
 
 #include "BLI_blenlib.h"
@@ -230,8 +222,14 @@ void outliner_free_tree(ListBase *lb)
 	}
 }
 
+void outliner_cleanup_tree(SpaceOops *soops)
+{
+	outliner_free_tree(&soops->tree);
+	outliner_storage_cleanup(soops);
+}
+
 /* Find ith item from the treestore */
-TreeElement *outliner_find_tree_element(ListBase *lb, int store_index)
+static TreeElement *outliner_find_tree_element(ListBase *lb, int store_index)
 {
 	TreeElement *te= lb->first, *tes;
 	while(te) {
@@ -723,9 +721,6 @@ static void outliner_add_id_contents(SpaceOops *soops, TreeElement *te, TreeStor
 			}
 		}
 			break;
-
-#if 0 // GSOC_PEPPER
-
 		case ID_SPK:
 			{
 				Speaker *spk= (Speaker *)id;
@@ -734,9 +729,6 @@ static void outliner_add_id_contents(SpaceOops *soops, TreeElement *te, TreeStor
 					outliner_add_element(soops, &te->subtree, spk, te, TSE_ANIM_DATA, 0);
 			}
 			break;
-
-#endif // GSOC_PEPPER
-
 		case ID_WO:
 		{
 			World *wrld= (World *)id;
@@ -837,8 +829,8 @@ static TreeElement *outliner_add_element(SpaceOops *soops, ListBase *lb, void *i
 	
 	/* if we are searching for something expand to see child elements */
 	if(SEARCHING_OUTLINER(soops))
-        tselem->flag |= TSE_CHILDSEARCH;
-    
+		tselem->flag |= TSE_CHILDSEARCH;
+	
 	te->parent= parent;
 	te->index= index;	// for data arays
 	if(ELEM3(type, TSE_SEQUENCE, TSE_SEQ_STRIP, TSE_SEQUENCE_DUP));
@@ -993,8 +985,8 @@ static TreeElement *outliner_add_element(SpaceOops *soops, ListBase *lb, void *i
 			else
 				te->name= (char*)RNA_struct_ui_name(ptr->type);
 
-            /* If searching don't expand RNA entries */
-            if(SEARCHING_OUTLINER(soops) && BLI_strcasecmp("RNA",te->name)==0) tselem->flag &= ~TSE_CHILDSEARCH;
+			/* If searching don't expand RNA entries */
+			if(SEARCHING_OUTLINER(soops) && BLI_strcasecmp("RNA",te->name)==0) tselem->flag &= ~TSE_CHILDSEARCH;
 
 			iterprop= RNA_struct_iterator_property(ptr->type);
 			tot= RNA_property_collection_length(ptr, iterprop);
@@ -1025,8 +1017,8 @@ static TreeElement *outliner_add_element(SpaceOops *soops, ListBase *lb, void *i
 			te->directdata= prop;
 			te->rnaptr= *ptr;
 
-            /* If searching don't expand RNA entries */
-            if(SEARCHING_OUTLINER(soops) && BLI_strcasecmp("RNA",te->name)==0) tselem->flag &= ~TSE_CHILDSEARCH;
+			/* If searching don't expand RNA entries */
+			if(SEARCHING_OUTLINER(soops) && BLI_strcasecmp("RNA",te->name)==0) tselem->flag &= ~TSE_CHILDSEARCH;
 
 			if(proptype == PROP_POINTER) {
 				pptr= RNA_property_pointer_get(ptr, prop);
@@ -1387,8 +1379,8 @@ static int outliner_filter_tree(SpaceOops *soops, ListBase *lb)
 			tselem= TREESTORE(te);
 			
 			/* flag as not a found item */
-            tselem->flag &= ~TSE_SEARCHMATCH;
-            
+			tselem->flag &= ~TSE_SEARCHMATCH;
+			
 			if ((!TSELEM_OPEN(tselem,soops)) || outliner_filter_tree(soops, &te->subtree)==0) { 
 				outliner_free_tree(&te->subtree);
 				BLI_remlink(lb, te);
@@ -1398,11 +1390,11 @@ static int outliner_filter_tree(SpaceOops *soops, ListBase *lb)
 			}
 		}
 		else {
-		    tselem= TREESTORE(te);
-            
-            /* flag as a found item - we can then highlight it */
-            tselem->flag |= TSE_SEARCHMATCH;
-            
+			tselem= TREESTORE(te);
+			
+			/* flag as a found item - we can then highlight it */
+			tselem->flag |= TSE_SEARCHMATCH;
+			
 			/* filter subtree too */
 			outliner_filter_tree(soops, &te->subtree);
 		}
@@ -1429,9 +1421,9 @@ void outliner_build_tree(Main *mainvar, Scene *scene, SpaceOops *soops)
 	 - NOT in datablocks view - searching all datablocks takes way too long to be useful
 	 - this variable is only set once per tree build */
 	if(soops->search_string[0]!=0 && soops->outlinevis!=SO_DATABLOCKS)
-        soops->search_flags |= SO_SEARCH_RECURSIVE;
-    else
-        soops->search_flags &= ~SO_SEARCH_RECURSIVE;
+		soops->search_flags |= SO_SEARCH_RECURSIVE;
+	else
+		soops->search_flags &= ~SO_SEARCH_RECURSIVE;
 
 	if(soops->tree.first && (soops->storeflag & SO_TREESTORE_REDRAW))
 		return;

@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -124,9 +122,30 @@ typedef struct TreeElement {
 #define OL_TOGW OL_TOG_RESTRICT_VIEWX
 
 #define OL_RNA_COLX			(UI_UNIT_X*15)
-#define OL_RNA_COL_SIZEX	(UI_UNIT_X*7.5)
-#define OL_RNA_COL_SPACEX	(UI_UNIT_X*2.5)
+#define OL_RNA_COL_SIZEX	(UI_UNIT_X*7.5f)
+#define OL_RNA_COL_SPACEX	(UI_UNIT_X*2.5f)
 
+
+/* Outliner Searching --
+
+   Are we looking for something in the outliner?
+   If so finding matches in child items makes it more useful
+
+	 - We want to flag parents to act as being open to filter child matches 
+	 - and also flag matches so we can highlight them
+	 - Flags are stored in TreeStoreElem->flag
+	 - Flag options defined in DNA_outliner_types.h
+	 - SO_SEARCH_RECURSIVE defined in DNA_space_types.h
+	 
+	 - NOT in datablocks view - searching all datablocks takes way too long 
+		to be useful
+	 - not searching into RNA items helps but isn't the complete solution
+	*/
+
+#define SEARCHING_OUTLINER(sov)   (sov->search_flags & SO_SEARCH_RECURSIVE)
+
+/* is the currrent element open? if so we also show children */
+#define TSELEM_OPEN(telm,sv)	( (telm->flag & TSE_CLOSED)==0 || (SEARCHING_OUTLINER(sv) && (telm->flag & TSE_CHILDSEARCH)) )
 
 /* Outliner Searching --
 
@@ -152,6 +171,7 @@ typedef struct TreeElement {
 /* outliner_tree.c ----------------------------------------------- */
 
 void outliner_free_tree(ListBase *lb);
+void outliner_cleanup_tree(struct SpaceOops *soops);
 
 TreeElement *outliner_find_tse(struct SpaceOops *soops, TreeStoreElem *tse);
 TreeElement *outliner_find_id(struct SpaceOops *soops, ListBase *lb, struct ID *id);
@@ -162,11 +182,9 @@ void outliner_build_tree(struct Main *mainvar, struct Scene *scene, struct Space
 /* outliner_draw.c ---------------------------------------------- */
 
 void draw_outliner(const struct bContext *C);
+void restrictbutton_gr_restrict_flag(void *poin, void *poin2, int flag);
 
 /* outliner_select.c -------------------------------------------- */
-
-void outliner_select(struct SpaceOops *soops, ListBase *lb, int *index, short *selecting);
-
 int tree_element_type_active(struct bContext *C, struct Scene *scene, struct SpaceOops *soops, TreeElement *te, TreeStoreElem *tselem, int set);
 int tree_element_active(struct bContext *C, struct Scene *scene, SpaceOops *soops, TreeElement *te, int set);
 
@@ -183,6 +201,13 @@ void outliner_set_flag(struct SpaceOops *soops, ListBase *lb, short flag, short 
 void object_toggle_visibility_cb(struct bContext *C, struct Scene *scene, TreeElement *te, struct TreeStoreElem *tsep, struct TreeStoreElem *tselem);
 void object_toggle_selectability_cb(struct bContext *C, struct Scene *scene, TreeElement *te, struct TreeStoreElem *tsep, struct TreeStoreElem *tselem);
 void object_toggle_renderability_cb(struct bContext *C, struct Scene *scene, TreeElement *te, struct TreeStoreElem *tsep, struct TreeStoreElem *tselem);
+
+
+void group_toggle_visibility_cb(struct bContext *C, struct Scene *scene, TreeElement *te, struct TreeStoreElem *tsep, struct TreeStoreElem *tselem);
+void group_toggle_selectability_cb(struct bContext *C, struct Scene *scene, TreeElement *te, struct TreeStoreElem *tsep, struct TreeStoreElem *tselem);
+void group_toggle_renderability_cb(struct bContext *C, struct Scene *scene, TreeElement *te, struct TreeStoreElem *tsep, struct TreeStoreElem *tselem);
+
+void item_rename_cb(struct bContext *C, struct Scene *scene, TreeElement *te, struct TreeStoreElem *tsep, struct TreeStoreElem *tselem);
 
 /* ...................................................... */
 

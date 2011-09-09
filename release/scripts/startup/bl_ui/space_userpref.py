@@ -773,7 +773,18 @@ class USERPREF_MT_ndof_settings(Menu):
 
             layout.separator()
             layout.label(text="orbit options")
-            layout.prop(input_prefs, "ndof_orbit_invert_axes")
+            if input_prefs.view_rotate_method == 'TRACKBALL':
+                layout.prop(input_prefs, "ndof_roll_invert_axis")
+                layout.prop(input_prefs, "ndof_tilt_invert_axis")
+                layout.prop(input_prefs, "ndof_rotate_invert_axis")
+            else:
+                layout.prop(input_prefs, "ndof_orbit_invert_axes")
+
+            layout.separator()
+            layout.label(text="pan options")
+            layout.prop(input_prefs, "ndof_panx_invert_axis")
+            layout.prop(input_prefs, "ndof_pany_invert_axis")
+            layout.prop(input_prefs, "ndof_panz_invert_axis")
 
             layout.separator()
             layout.label(text="fly options")
@@ -1106,7 +1117,10 @@ class WM_OT_addon_disable(Operator):
     bl_idname = "wm.addon_disable"
     bl_label = "Disable Add-On"
 
-    module = StringProperty(name="Module", description="Module name of the addon to disable")
+    module = StringProperty(
+            name="Module",
+            description="Module name of the addon to disable",
+            )
 
     def execute(self, context):
         addon_utils.disable(self.module)
@@ -1118,16 +1132,35 @@ class WM_OT_addon_install(Operator):
     bl_idname = "wm.addon_install"
     bl_label = "Install Add-On..."
 
-    overwrite = BoolProperty(name="Overwrite", description="Remove existing addons with the same ID", default=True)
+    overwrite = BoolProperty(
+            name="Overwrite",
+            description="Remove existing addons with the same ID",
+            default=True,
+            )
     target = EnumProperty(
             name="Target Path",
             items=(('DEFAULT', "Default", ""),
-                   ('PREFS', "User Prefs", "")))
+                   ('PREFS', "User Prefs", "")),
+            )
 
-    filepath = StringProperty(name="File Path", description="File path to write file to")
-    filter_folder = BoolProperty(name="Filter folders", description="", default=True, options={'HIDDEN'})
-    filter_python = BoolProperty(name="Filter python", description="", default=True, options={'HIDDEN'})
-    filter_glob = StringProperty(default="*.py;*.zip", options={'HIDDEN'})
+    filepath = StringProperty(
+            name="File Path",
+            description="File path to write file to",
+            )
+    filter_folder = BoolProperty(
+            name="Filter folders",
+            default=True,
+            options={'HIDDEN'},
+            )
+    filter_python = BoolProperty(
+            name="Filter python",
+            default=True,
+            options={'HIDDEN'},
+            )
+    filter_glob = StringProperty(
+            default="*.py;*.zip",
+            options={'HIDDEN'},
+            )
 
     @staticmethod
     def _module_remove(path_addons, module):
@@ -1264,7 +1297,10 @@ class WM_OT_addon_remove(Operator):
     bl_idname = "wm.addon_remove"
     bl_label = "Remove Add-On"
 
-    module = StringProperty(name="Module", description="Module name of the addon to remove")
+    module = StringProperty(
+            name="Module",
+            description="Module name of the addon to remove",
+            )
 
     @staticmethod
     def path_from_addon(module):
@@ -1312,7 +1348,10 @@ class WM_OT_addon_expand(Operator):
     bl_idname = "wm.addon_expand"
     bl_label = ""
 
-    module = StringProperty(name="Module", description="Module name of the addon to expand")
+    module = StringProperty(
+            name="Module",
+            description="Module name of the addon to expand",
+            )
 
     def execute(self, context):
         module_name = self.module

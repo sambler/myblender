@@ -71,10 +71,11 @@ typedef enum ModifierType {
 	eModifierType_Solidify,
 	eModifierType_Screw,
 	eModifierType_Warp,
+	eModifierType_Ocean,
 	eModifierType_WeightVGEdit,
 	eModifierType_WeightVGMix,
 	eModifierType_WeightVGProximity,
-	eModifierType_Ocean,
+	eModifierType_NavMesh,
 	NUM_MODIFIER_TYPES
 } ModifierType;
 
@@ -807,6 +808,10 @@ typedef struct OceanModifierData {
 
 #define MOD_OCEAN_GENERATE_FOAM	1
 #define MOD_OCEAN_GENERATE_NORMALS	2
+
+typedef struct NavMeshModifierData {
+	ModifierData modifier;
+} NavMeshModifierData;
 
 typedef struct WarpModifierData {
 	ModifierData modifier;

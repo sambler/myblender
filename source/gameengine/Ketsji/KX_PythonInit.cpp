@@ -87,6 +87,8 @@ extern "C" {
 #include "KX_GameActuator.h"
 #include "KX_ParentActuator.h"
 #include "KX_SCA_DynamicActuator.h"
+#include "KX_SteeringActuator.h"
+#include "KX_NavMeshObject.h"
 
 #include "SCA_IInputDevice.h"
 #include "SCA_PropertySensor.h"
@@ -179,6 +181,13 @@ void	KX_RasterizerDrawDebugLine(const MT_Vector3& from,const MT_Vector3& to,cons
 {
 	if (gp_Rasterizer)
 		gp_Rasterizer->DrawDebugLine(from,to,color);
+}
+
+void	KX_RasterizerDrawDebugCircle(const MT_Vector3& center, const MT_Scalar radius, const MT_Vector3& color,
+									 const MT_Vector3& normal, int nsector)
+{
+	if (gp_Rasterizer)
+		gp_Rasterizer->DrawDebugCircle(center, radius, color, normal, nsector);
 }
 
 #ifdef WITH_PYTHON
@@ -389,10 +398,10 @@ static PyObject* gPyGetSpectrum(PyObject*)
 {
 	PyObject* resultlist = PyList_New(512);
 
-        for (int index = 0; index < 512; index++)
-        {
-                PyList_SET_ITEM(resultlist, index, PyFloat_FromDouble(0.0));
-        }
+	for (int index = 0; index < 512; index++)
+	{
+		PyList_SET_ITEM(resultlist, index, PyFloat_FromDouble(0.0));
+	}
 
 	return resultlist;
 }
@@ -479,13 +488,13 @@ static PyObject* gPyGetBlendFileList(PyObject*, PyObject* args)
 	char cpath[sizeof(gp_GamePythonPath)];
 	char *searchpath = NULL;
 	PyObject* list, *value;
-	
-    DIR *dp;
-    struct dirent *dirp;
-	
+
+	DIR *dp;
+	struct dirent *dirp;
+
 	if (!PyArg_ParseTuple(args, "|s:getBlendFileList", &searchpath))
 		return NULL;
-	
+
 	list = PyList_New(0);
 	
 	if (searchpath) {
@@ -495,23 +504,23 @@ static PyObject* gPyGetBlendFileList(PyObject*, PyObject* args)
 		/* Get the dir only */
 		BLI_split_dirfile(gp_GamePythonPath, cpath, NULL);
 	}
-	
-    if((dp  = opendir(cpath)) == NULL) {
+
+	if((dp  = opendir(cpath)) == NULL) {
 		/* todo, show the errno, this shouldnt happen anyway if the blendfile is readable */
 		fprintf(stderr, "Could not read directoty (%s) failed, code %d (%s)\n", cpath, errno, strerror(errno));
 		return list;
-    }
+	}
 	
-    while ((dirp = readdir(dp)) != NULL) {
+	while ((dirp = readdir(dp)) != NULL) {
 		if (BLI_testextensie(dirp->d_name, ".blend")) {
 			value= PyUnicode_DecodeFSDefault(dirp->d_name);
 			PyList_Append(list, value);
 			Py_DECREF(value);
 		}
-    }
+	}
 	
-    closedir(dp);
-    return list;
+	closedir(dp);
+	return list;
 }
 
 static char gPyAddScene_doc[] = 
@@ -725,7 +734,7 @@ static PyObject *gLibNew(PyObject*, PyObject* args)
 	if(idcode==ID_ME) {
 		PyObject *ret= PyList_New(0);
 		PyObject *item;
-		for(int i= 0; i < PyList_GET_SIZE(names); i++) {
+		for(Py_ssize_t i= 0; i < PyList_GET_SIZE(names); i++) {
 			name= _PyUnicode_AsString(PyList_GET_ITEM(names, i));
 			if(name) {
 				RAS_MeshObject *meshobj= kx_scene->GetSceneConverter()->ConvertMeshSpecial(kx_scene, maggie, name);
@@ -1655,6 +1664,16 @@ PyObject* initGameLogic(KX_KetsjiEngine *engine, KX_Scene* scene) // quick hack 
 	KX_MACRO_addTypesToDict(d, ROT_MODE_ZXY, ROT_MODE_ZXY);
 	KX_MACRO_addTypesToDict(d, ROT_MODE_ZYX, ROT_MODE_ZYX);
 
+	/* Steering actuator */
+	KX_MACRO_addTypesToDict(d, KX_STEERING_SEEK, KX_SteeringActuator::KX_STEERING_SEEK);
+	KX_MACRO_addTypesToDict(d, KX_STEERING_FLEE, KX_SteeringActuator::KX_STEERING_FLEE);
+	KX_MACRO_addTypesToDict(d, KX_STEERING_PATHFOLLOWING, KX_SteeringActuator::KX_STEERING_PATHFOLLOWING);
+
+	/* KX_NavMeshObject render mode */
+	KX_MACRO_addTypesToDict(d, RM_WALLS, KX_NavMeshObject::RM_WALLS);
+	KX_MACRO_addTypesToDict(d, RM_POLYS, KX_NavMeshObject::RM_POLYS);
+	KX_MACRO_addTypesToDict(d, RM_TRIS, KX_NavMeshObject::RM_TRIS);
+
 	/* BL_Action play modes */
 	KX_MACRO_addTypesToDict(d, KX_ACTION_MODE_PLAY, BL_Action::ACT_MODE_PLAY);
 	KX_MACRO_addTypesToDict(d, KX_ACTION_MODE_LOOP, BL_Action::ACT_MODE_LOOP);
@@ -1662,9 +1681,9 @@ PyObject* initGameLogic(KX_KetsjiEngine *engine, KX_Scene* scene) // quick hack 
 
 	// Check for errors
 	if (PyErr_Occurred())
-    {
+	{
 		Py_FatalError("can't initialize module bge.logic");
-    }
+	}
 
 	return m;
 }
@@ -1751,7 +1770,7 @@ static void initPySysObjects(Main *maggie)
 	
 	initPySysObjects__append(sys_path, gp_GamePythonPath);
 	
-//	fprintf(stderr, "\nNew Path: %d ", PyList_Size(sys_path));
+//	fprintf(stderr, "\nNew Path: %d ", PyList_GET_SIZE(sys_path));
 //	PyObject_Print(sys_path, stderr, 0);
 }
 
@@ -1775,7 +1794,7 @@ static void restorePySysObjects(void)
 	gp_OrigPythonSysModules= NULL;	
 	
 	
-//	fprintf(stderr, "\nRestore Path: %d ", PyList_Size(sys_path));
+//	fprintf(stderr, "\nRestore Path: %d ", PyList_GET_SIZE(sys_path));
 //	PyObject_Print(sys_path, stderr, 0);
 }
 
@@ -1954,12 +1973,12 @@ PyObject* initRasterizer(RAS_IRasterizer* rasty,RAS_ICanvas* canvas)
 	gp_Rasterizer = rasty;
 
 
-  PyObject* m;
-  PyObject* d;
-  PyObject* item;
+	PyObject* m;
+	PyObject* d;
+	PyObject* item;
 
 	/* Use existing module where possible
-	 * be careful not to init any runtime vars after this */
+  * be careful not to init any runtime vars after this */
 	m = PyImport_ImportModule( "Rasterizer" );
 	if(m) {
 		Py_DECREF(m);
@@ -1967,32 +1986,32 @@ PyObject* initRasterizer(RAS_IRasterizer* rasty,RAS_ICanvas* canvas)
 	}
 	else {
 		PyErr_Clear();
-	
+
 		// Create the module and add the functions
 		m = PyModule_Create(&Rasterizer_module_def);
 		PyDict_SetItemString(PySys_GetObject("modules"), Rasterizer_module_def.m_name, m);
 	}
 
-  // Add some symbolic constants to the module
-  d = PyModule_GetDict(m);
-  ErrorObject = PyUnicode_FromString("Rasterizer.error");
-  PyDict_SetItemString(d, "error", ErrorObject);
-  Py_DECREF(ErrorObject);
+	// Add some symbolic constants to the module
+	d = PyModule_GetDict(m);
+	ErrorObject = PyUnicode_FromString("Rasterizer.error");
+	PyDict_SetItemString(d, "error", ErrorObject);
+	Py_DECREF(ErrorObject);
 
-  /* needed for get/setMaterialType */
-  KX_MACRO_addTypesToDict(d, KX_TEXFACE_MATERIAL, KX_TEXFACE_MATERIAL);
-  KX_MACRO_addTypesToDict(d, KX_BLENDER_MULTITEX_MATERIAL, KX_BLENDER_MULTITEX_MATERIAL);
-  KX_MACRO_addTypesToDict(d, KX_BLENDER_GLSL_MATERIAL, KX_BLENDER_GLSL_MATERIAL);
+	/* needed for get/setMaterialType */
+	KX_MACRO_addTypesToDict(d, KX_TEXFACE_MATERIAL, KX_TEXFACE_MATERIAL);
+	KX_MACRO_addTypesToDict(d, KX_BLENDER_MULTITEX_MATERIAL, KX_BLENDER_MULTITEX_MATERIAL);
+	KX_MACRO_addTypesToDict(d, KX_BLENDER_GLSL_MATERIAL, KX_BLENDER_GLSL_MATERIAL);
 
-  // XXXX Add constants here
+	// XXXX Add constants here
 
-  // Check for errors
-  if (PyErr_Occurred())
-    {
-      Py_FatalError("can't initialize module Rasterizer");
-    }
+	// Check for errors
+	if (PyErr_Occurred())
+	{
+		Py_FatalError("can't initialize module Rasterizer");
+	}
 
-  return d;
+	return d;
 }
 
 
@@ -2231,9 +2250,9 @@ PyObject* initGameKeys()
 
 	// Check for errors
 	if (PyErr_Occurred())
-    {
+	{
 		Py_FatalError("can't initialize module GameKeys");
-    }
+	}
 
 	return d;
 }

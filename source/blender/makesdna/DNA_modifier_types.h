@@ -74,6 +74,7 @@ typedef enum ModifierType {
 	eModifierType_WeightVGEdit,
 	eModifierType_WeightVGMix,
 	eModifierType_WeightVGProximity,
+	eModifierType_NavMesh,
 	NUM_MODIFIER_TYPES
 } ModifierType;
 
@@ -748,6 +749,10 @@ typedef struct ScrewModifierData {
 #define MOD_SCREW_NORMAL_CALC	(1<<1)
 #define MOD_SCREW_OBJECT_OFFSET	(1<<2)
 // #define MOD_SCREW_OBJECT_ANGLE	(1<<4)
+
+typedef struct NavMeshModifierData {
+	ModifierData modifier;
+} NavMeshModifierData;
 
 typedef struct WarpModifierData {
 	ModifierData modifier;

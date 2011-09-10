@@ -190,6 +190,8 @@ static StructRNA* rna_Modifier_refine(struct PointerRNA *ptr)
 			return &RNA_ScrewModifier;
 		case eModifierType_Warp:
 			return &RNA_WarpModifier;
+		case eModifierType_Ocean:
+			return &RNA_OceanModifier;
 		case eModifierType_NavMesh:
 			return &RNA_NavMeshModifier;
 		case eModifierType_WeightVGEdit:
@@ -198,8 +200,6 @@ static StructRNA* rna_Modifier_refine(struct PointerRNA *ptr)
 			return &RNA_VertexWeightMixModifier;
 		case eModifierType_WeightVGProximity:
 			return &RNA_VertexWeightProximityModifier;
-		case eModifierType_Ocean:
-			return &RNA_OceanModifier;
 		default:
 			return &RNA_Modifier;
 	}
@@ -3105,11 +3105,11 @@ void RNA_def_modifier(BlenderRNA *brna)
 	rna_def_modifier_smoke(brna);
 	rna_def_modifier_solidify(brna);
 	rna_def_modifier_screw(brna);
+	rna_def_modifier_ocean(brna);
 	rna_def_modifier_navmesh(brna);
 	rna_def_modifier_weightvgedit(brna);
 	rna_def_modifier_weightvgmix(brna);
 	rna_def_modifier_weightvgproximity(brna);
-	rna_def_modifier_ocean(brna);
 }
 
 #endif

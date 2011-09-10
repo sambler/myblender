@@ -416,7 +416,11 @@ const unsigned char *UI_ThemeGetColorPtr(bTheme *btheme, int spacetype, int colo
 					
 			case TH_PREVIEW_BACK:
 				cp= ts->preview_back;
-				break;	
+				break;
+
+			case TH_MATCH:
+				cp= ts->match;
+				break;
 			}
 		}
 	}
@@ -762,7 +766,8 @@ void ui_theme_init_default(void)
 	/* space oops */
 	btheme->toops= btheme->tv3d;
 	SETCOLF(btheme->toops.back, 	0.45, 0.45, 0.45, 1.0);
-	
+	SETCOLF(btheme->toops.match, 	0.2, 0.5, 0.2, 0.3);	/* highlighting search match - soft green*/
+
 	/* space info */
 	btheme->tinfo= btheme->tv3d;
 	SETCOLF(btheme->tinfo.back, 	0.45, 0.45, 0.45, 1.0);
@@ -1593,6 +1598,13 @@ void init_userdef_do_versions(void)
 
 		for(btheme= U.themes.first; btheme; btheme= btheme->next) {
 			btheme->tv3d.speaker[3] = 255;
+		}
+	}
+
+	if (bmain->versionfile < 259 || (bmain->versionfile == 259 && bmain->subversionfile < 3)) {
+		bTheme *btheme;
+		for(btheme= U.themes.first; btheme; btheme= btheme->next) {
+			SETCOLF(btheme->toops.match, 0.2, 0.5, 0.2, 0.3);
 		}
 	}
 

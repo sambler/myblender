@@ -248,7 +248,9 @@ enum {
 	TH_DRAWEXTRA_FACEAREA,
 	TH_DRAWEXTRA_FACEANG,
 
-	TH_NODE_CURVING
+	TH_NODE_CURVING,
+
+	TH_MATCH	/* highlight colour for search matches */
 };
 /* XXX WARNING: previous is saved in file, so do not change order! */
 

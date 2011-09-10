@@ -1244,8 +1244,10 @@ static void outliner_draw_tree_element(bContext *C, uiBlock *block, Scene *scene
 		if ( (SEARCHING_OUTLINER(soops) || (soops->outlinevis==SO_DATABLOCKS && soops->search_string[0]!=0)) && 
 			 (tselem->flag & TSE_SEARCHMATCH)) 
 		{
-			/* TODO - add search highlight colour to theme? */
-			glColor4f(0.2f, 0.5f, 0.2f, 0.3f);
+			char col[4];
+			UI_GetThemeColorType4ubv(TH_MATCH, SPACE_OUTLINER, col);
+			col[3]=100;
+			glColor4ubv((GLubyte *)col);
 			glRecti(startx, *starty+1, ar->v2d.cur.xmax, *starty+UI_UNIT_Y-1);
 		}
 

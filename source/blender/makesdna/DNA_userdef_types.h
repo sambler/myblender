@@ -239,7 +239,9 @@ typedef struct ThemeSpace {
 	char hpad[7];
 	
 	char preview_back[4];
-	
+
+	char match[4];	// outliner - filter match
+
 } ThemeSpace;
 
 

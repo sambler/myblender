@@ -210,7 +210,7 @@ static int dupli_extrude_cursor(bContext *C, wmOperator *op, wmEvent *event)
 			
 			copy_v3_v3(vec, min);
 			normalize_v3(vec);
-			dot= INPR(vec, nor);
+			dot= dot_v3v3(vec, nor);
 
 			if( fabs(dot)<0.999) {
 				float cross[3], si, q1[4];
@@ -1682,8 +1682,8 @@ void MESH_OT_primitive_uv_sphere_add(wmOperatorType *ot)
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 	
 	/* props */
-	RNA_def_int(ot->srna, "segments", 32, INT_MIN, INT_MAX, "Segments", "", 3, 500);
-	RNA_def_int(ot->srna, "ring_count", 16, INT_MIN, INT_MAX, "Rings", "", 3, 500);
+	RNA_def_int(ot->srna, "segments", 32, 3, INT_MAX, "Segments", "", 3, 500);
+	RNA_def_int(ot->srna, "ring_count", 16, 3, INT_MAX, "Rings", "", 3, 500);
 	RNA_def_float(ot->srna, "size", 1.0f, 0.0, FLT_MAX, "Size", "", 0.001, 100.00);
 
 	ED_object_add_generic_props(ot, TRUE);

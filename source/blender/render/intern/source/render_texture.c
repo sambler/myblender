@@ -125,7 +125,7 @@ static void init_render_texture(Render *re, Tex *tex)
 	}
 	
 	if(tex->nodetree && tex->use_nodes) {
-		ntreeBeginExecTree(tex->nodetree); /* has internal flag to detect it only does it once */
+		ntreeTexBeginExecTree(tex->nodetree, 1); /* has internal flag to detect it only does it once */
 	}
 }
 
@@ -144,8 +144,8 @@ void init_render_textures(Render *re)
 
 static void end_render_texture(Tex *tex)
 {
-	if(tex && tex->use_nodes && tex->nodetree)
-		ntreeEndExecTree(tex->nodetree);
+	if(tex && tex->use_nodes && tex->nodetree && tex->nodetree->execdata)
+		ntreeTexEndExecTree(tex->nodetree->execdata, 1);
 }
 
 void end_render_textures(Render *re)
@@ -2526,7 +2526,7 @@ void do_material_tex(ShadeInput *shi)
 							nor[1]= Tnor*norfac*texres.nor[1];
 							nor[2]= Tnor*norfac*texres.nor[2];
 							
-							dot= 0.5f + 0.5f*INPR(nor, shi->vn);
+							dot= 0.5f + 0.5f * dot_v3v3(nor, shi->vn);
 							
 							shi->vn[0]+= dot*nor[0];
 							shi->vn[1]+= dot*nor[1];

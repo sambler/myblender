@@ -9248,7 +9248,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 							simasel->prv_w = 96;
 							simasel->flag = 7; /* ??? elubie */
 							strcpy (simasel->dir,  U.textudir);	/* TON */
-							strcpy (simasel->file, "");
+							simasel->file[0]= '\0';
 							
 							simasel->returnfunc     =  NULL;
 							simasel->title[0]       =  0;
@@ -9478,7 +9478,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 								
 								/* clear old targets to avoid problems */
 								data->tar = NULL;
-								strcpy(data->subtarget, "");
+								data->subtarget[0]= '\0';
 							}
 						}
 						else if (con->type == CONSTRAINT_TYPE_LOCLIKE) {
@@ -9508,7 +9508,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 						
 						/* clear old targets to avoid problems */
 						data->tar = NULL;
-						strcpy(data->subtarget, "");
+						data->subtarget[0]= '\0';
 					}
 				}
 				else if (con->type == CONSTRAINT_TYPE_LOCLIKE) {

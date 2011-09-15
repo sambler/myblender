@@ -642,11 +642,7 @@ elseif(WIN32)
 			set(GETTEXT ${LIBDIR}/gettext)
 			set(GETTEXT_INC ${GETTEXT}/include)
 			set(GETTEXT_LIBPATH ${GETTEXT}/lib)
-			if(CMAKE_CL_64)
-				set(GETTEXT_LIB gettext)
-			else()
-				set(GETTEXT_LIB gnu_gettext)
-			endif()
+			set(GETTEXT_LIB gnu_gettext)
 		endif()
 
 		if(CMAKE_CL_64)
@@ -702,7 +698,7 @@ elseif(WIN32)
 				${LIBDIR}/opencollada/lib/ftoa.lib
 				${LIBDIR}/opencollada/lib/UTF.lib
 			)
-			set(PCRE_LIB
+			set(PCRE_LIBRARIES
 				${LIBDIR}/opencollada/lib/pcre.lib
 			)
 		endif()
@@ -844,7 +840,7 @@ elseif(WIN32)
 			)
 			set(OPENCOLLADA_LIBPATH ${OPENCOLLADA}/lib ${OPENCOLLADA}/lib)
 			set(OPENCOLLADA_LIBRARIES OpenCOLLADAStreamWriter OpenCOLLADASaxFrameworkLoader OpenCOLLADAFramework OpenCOLLADABaseUtils GeneratedSaxParser UTF MathMLSolver expat pcre buffer ftoa)
-			set(PCRE_LIB pcre)
+			set(PCRE_LIBRARIES pcre)
 		endif()
 		
 		if(WITH_CODEC_FFMPEG)
@@ -1082,7 +1078,7 @@ elseif(APPLE)
 		#pcre is bundled with openCollada
 		#set(PCRE ${LIBDIR}/pcre)
 		#set(PCRE_LIBPATH ${PCRE}/lib)
-		set(PCRE_LIB pcre)
+		set(PCRE_LIBRARIES pcre)
 		#libxml2 is used
 		#set(EXPAT ${LIBDIR}/expat)
 		#set(EXPAT_LIBPATH ${EXPAT}/lib)

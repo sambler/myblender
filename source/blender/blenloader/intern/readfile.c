@@ -2142,7 +2142,7 @@ static void lib_verify_nodetree(Main *main, int UNUSED(open))
 			ntreetype->foreach_nodetree(main, NULL, lib_nodetree_init_types_cb);
 	}
 	for(ntree= main->nodetree.first; ntree; ntree= ntree->id.next)
-		ntreeInitTypes(ntree);
+		lib_nodetree_init_types_cb(NULL, NULL, ntree);
 	
 	{
 		int has_old_groups=0;
@@ -3967,7 +3967,6 @@ static void direct_link_pose(FileData *fd, bPose *pose)
 			direct_link_motionpath(fd, pchan->mpath);
 		
 		pchan->iktree.first= pchan->iktree.last= NULL;
-		pchan->path= NULL;
 		
 		/* incase this value changes in future, clamp else we get undefined behavior */
 		CLAMP(pchan->rotmode, ROT_MODE_MIN, ROT_MODE_MAX);

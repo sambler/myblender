@@ -1,5 +1,5 @@
 /*
- * $Id:
+ * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -23,14 +23,16 @@
  * Contributor(s): Campbell Barton.
  *
  * ***** END GPL LICENSE BLOCK *****
- * 
+ *
  */
- 
+
  /** \file blender/blenlib/intern/string_utf8.c
  *  \ingroup bli
  */
- 
+
 #include <string.h>
+
+#include "BLI_string.h"
 
 /* from libswish3, originally called u8_isvalid(),
  * modified to return the index of the bad character (byte index not utf).

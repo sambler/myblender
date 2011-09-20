@@ -34,9 +34,6 @@
 #include <Python.h>
 #include <stddef.h>
 
-#include "compile.h"	/* for the PyCodeObject */
-#include "eval.h"		/* for PyEval_EvalCode */
-
 #include "bpy_internal_import.h"
 
 #include "MEM_guardedalloc.h"
@@ -51,7 +48,6 @@
  /* UNUSED */	
 #include "BKE_text.h" /* txt_to_buf */	
 #include "BKE_main.h"
-#include "BKE_global.h" /* grr, only for G.main->name */
 
 static Main *bpy_import_main= NULL;
 
@@ -97,7 +93,7 @@ void bpy_import_main_set(struct Main *maggie)
 /* returns a dummy filename for a textblock so we can tell what file a text block comes from */
 void bpy_text_filename_get(char *fn, size_t fn_len, Text *text)
 {
-	BLI_snprintf(fn, fn_len, "%s%c%s", text->id.lib ? text->id.lib->filepath : G.main->name, SEP, text->id.name+2);
+	BLI_snprintf(fn, fn_len, "%s%c%s", text->id.lib ? text->id.lib->filepath : bpy_import_main->name, SEP, text->id.name+2);
 }
 
 PyObject *bpy_text_import(Text *text)
@@ -221,7 +217,7 @@ PyObject *bpy_text_reimport(PyObject *module, int *found)
 }
 
 
-static PyObject *blender_import(PyObject *UNUSED(self), PyObject *args, PyObject * kw)
+static PyObject *blender_import(PyObject *UNUSED(self), PyObject *args, PyObject *kw)
 {
 	PyObject *exception, *err, *tb;
 	char *name;
@@ -274,7 +270,7 @@ static PyObject *blender_import(PyObject *UNUSED(self), PyObject *args, PyObject
  * our reload() module, to handle reloading in-memory scripts
  */
 
-static PyObject *blender_reload(PyObject *UNUSED(self), PyObject * module)
+static PyObject *blender_reload(PyObject *UNUSED(self), PyObject *module)
 {
 	PyObject *exception, *err, *tb;
 	PyObject *newmodule= NULL;
@@ -348,7 +344,7 @@ void bpy_text_clear_modules(int clear_all)
 	
 	/* looping over the dict */
 	PyObject *key, *value;
-	int pos= 0;
+	Py_ssize_t pos= 0;
 	
 	/* new list */
 	PyObject *list;
@@ -378,7 +374,7 @@ void bpy_text_clear_modules(int clear_all)
 	}
 	
 	/* remove all our modules */
-	for(pos=0; pos < PyList_Size(list); pos++) {
+	for(pos=0; pos < PyList_GET_SIZE(list); pos++) {
 		/* PyObject_Print(key, stderr, 0); */
 		key= PyList_GET_ITEM(list, pos);
 		PyDict_DelItem(modules, key);

@@ -61,15 +61,15 @@
 #include "BKE_scene.h"
 #include "BKE_subsurf.h"
 
-
-#include "BIF_gl.h"
-#include "BIF_glutil.h"
+#include "GL/glew.h"
 
 #include "GPU_draw.h"
 #include "GPU_extensions.h"
 #include "GPU_material.h"
 
 #include "CCGSubSurf.h"
+
+extern GLubyte stipple_quarttone[128]; /* glutil.c, bad level data */
 
 static int ccgDM_getVertMapIndex(CCGSubSurf *ss, CCGVert *v);
 static int ccgDM_getEdgeMapIndex(CCGSubSurf *ss, CCGEdge *e);
@@ -968,8 +968,9 @@ static void ccgDM_copyFinalFaceArray(DerivedMesh *dm, MFace *mface)
 	for(index = 0; index < totface; index++) {
 		CCGFace *f = ccgdm->faceMap[index].face;
 		int x, y, S, numVerts = ccgSubSurf_getFaceNumVerts(f);
-		int flag = (faceFlags)? faceFlags[index*2]: ME_SMOOTH;
-		int mat_nr = (faceFlags)? faceFlags[index*2+1]: 0;
+		/* keep types in sync with MFace, avoid many conversions */
+		char flag = (faceFlags)? faceFlags[index*2]: ME_SMOOTH;
+		short mat_nr = (faceFlags)? faceFlags[index*2+1]: 0;
 
 		for(S = 0; S < numVerts; S++) {
 			for(y = 0; y < gridSize - 1; y++) {
@@ -1176,7 +1177,8 @@ static void ccgDM_drawEdges(DerivedMesh *dm, int drawLooseEdges, int UNUSED(draw
 	CCGSubSurf *ss = ccgdm->ss;
 	CCGEdgeIterator *ei = ccgSubSurf_getEdgeIterator(ss);
 	CCGFaceIterator *fi = ccgSubSurf_getFaceIterator(ss);
-	int i, edgeSize = ccgSubSurf_getEdgeSize(ss);
+	int i, j, edgeSize = ccgSubSurf_getEdgeSize(ss);
+	int totedge = ccgSubSurf_getNumEdges(ss);
 	int gridSize = ccgSubSurf_getGridSize(ss);
 	int useAging;
 
@@ -1184,11 +1186,14 @@ static void ccgDM_drawEdges(DerivedMesh *dm, int drawLooseEdges, int UNUSED(draw
 
 	ccgSubSurf_getUseAgeCounts(ss, &useAging, NULL, NULL, NULL);
 
-	for (; !ccgEdgeIterator_isStopped(ei); ccgEdgeIterator_next(ei)) {
-		CCGEdge *e = ccgEdgeIterator_getCurrent(ei);
+	for (j=0; j< totedge; j++) {
+		CCGEdge *e = ccgdm->edgeMap[j].edge;
 		DMGridData *edgeData = ccgSubSurf_getEdgeDataArray(ss, e);
 
 		if (!drawLooseEdges && !ccgSubSurf_getEdgeNumFaces(e))
+			continue;
+
+		if(ccgdm->edgeFlags && !(ccgdm->edgeFlags[j] & ME_EDGEDRAW))
 			continue;
 
 		if (useAging && !(G.f&G_BACKBUFSEL)) {
@@ -1370,11 +1375,10 @@ static void ccgDM_drawMappedFacesGLSL(DerivedMesh *dm, int (*setMaterial)(int, v
 	CCGFaceIterator *fi = ccgSubSurf_getFaceIterator(ss);
 	GPUVertexAttribs gattribs;
 	DMVertexAttribs attribs= {{{NULL}}};
-	MTFace *tf = dm->getFaceDataArray(dm, CD_MTFACE);
+	/* MTFace *tf = dm->getFaceDataArray(dm, CD_MTFACE); */ /* UNUSED */
 	int gridSize = ccgSubSurf_getGridSize(ss);
 	int gridFaces = gridSize - 1;
 	int edgeSize = ccgSubSurf_getEdgeSize(ss);
-	int transp, orig_transp, new_transp;
 	char *faceFlags = ccgdm->faceFlags;
 	int a, b, i, doDraw, numVerts, matnr, new_matnr, totface;
 
@@ -1382,8 +1386,6 @@ static void ccgDM_drawMappedFacesGLSL(DerivedMesh *dm, int (*setMaterial)(int, v
 
 	doDraw = 0;
 	matnr = -1;
-	transp = GPU_get_material_blend_mode();
-	orig_transp = transp;
 
 #define PASSATTRIB(dx, dy, vert) {												\
 	if(attribs.totorco) {														\
@@ -1433,18 +1435,6 @@ static void ccgDM_drawMappedFacesGLSL(DerivedMesh *dm, int (*setMaterial)(int, v
 		if(!doDraw || (setDrawOptions && (origIndex != ORIGINDEX_NONE) && !setDrawOptions(userData, origIndex))) {
 			a += gridFaces*gridFaces*numVerts;
 			continue;
-		}
-
-		if(tf) {
-			new_transp = tf[i].transp;
-
-			if(new_transp != transp) {
-				if(new_transp == GPU_BLEND_SOLID && orig_transp != GPU_BLEND_SOLID)
-					GPU_set_material_blend_mode(orig_transp);
-				else
-					GPU_set_material_blend_mode(new_transp);
-				transp = new_transp;
-			}
 		}
 
 		glShadeModel(drawSmooth? GL_SMOOTH: GL_FLAT);
@@ -1775,13 +1765,17 @@ static void ccgDM_drawUVEdges(DerivedMesh *dm)
 	}
 }
 
-static void ccgDM_drawMappedFaces(DerivedMesh *dm, int (*setDrawOptions)(void *userData, int index, int *drawSmooth_r), void *userData, int useColors, int (*setMaterial)(int, void *attribs)) {
+static void ccgDM_drawMappedFaces(DerivedMesh *dm, int (*setDrawOptions)(void *userData, int index, int *drawSmooth_r), void *userData, int useColors, int (*setMaterial)(int, void *attribs),
+			int (*compareDrawOptions)(void *userData, int cur_index, int next_index)) {
 	CCGDerivedMesh *ccgdm = (CCGDerivedMesh*) dm;
 	CCGSubSurf *ss = ccgdm->ss;
 	MCol *mcol= NULL;
 	int i, gridSize = ccgSubSurf_getGridSize(ss);
 	char *faceFlags = ccgdm->faceFlags;
 	int gridFaces = gridSize - 1, totface;
+
+	/* currently unused -- each original face is handled separately */
+	(void)compareDrawOptions;
 
 	if(useColors) {
 		mcol = dm->getFaceDataArray(dm, CD_WEIGHT_MCOL);
@@ -2617,7 +2611,7 @@ struct DerivedMesh *subsurf_make_derived_from_derived(
 						struct DerivedMesh *dm,
 						struct SubsurfModifierData *smd,
 						int useRenderParams, float (*vertCos)[3],
-						int isFinalCalc, int editMode)
+						int isFinalCalc, int forEditMode, int inEditMode)
 {
 	int useSimple = smd->subdivType == ME_SIMPLE_SUBSURF;
 	int useAging = smd->flags & eSubsurfModifierFlag_DebugIncr;
@@ -2625,7 +2619,7 @@ struct DerivedMesh *subsurf_make_derived_from_derived(
 	int drawInteriorEdges = !(smd->flags & eSubsurfModifierFlag_ControlEdges);
 	CCGDerivedMesh *result;
 
-	if(editMode) {
+	if(forEditMode) {
 		int levels= (smd->modifier.scene)? get_render_subsurf_level(&smd->modifier.scene->r, smd->levels): smd->levels;
 
 		smd->emCache = _getSubSurf(smd->emCache, levels, useAging, 0,
@@ -2656,7 +2650,7 @@ struct DerivedMesh *subsurf_make_derived_from_derived(
 		int useAging = smd->flags & eSubsurfModifierFlag_DebugIncr;
 		int levels= (smd->modifier.scene)? get_render_subsurf_level(&smd->modifier.scene->r, smd->levels): smd->levels;
 		CCGSubSurf *ss;
-		
+
 		/* It is quite possible there is a much better place to do this. It
 		 * depends a bit on how rigourously we expect this function to never
 		 * be called in editmode. In semi-theory we could share a single
@@ -2664,8 +2658,11 @@ struct DerivedMesh *subsurf_make_derived_from_derived(
 		 * the same so we would need some way of converting them. Its probably
 		 * not worth the effort. But then why am I even writing this long
 		 * comment that no one will read? Hmmm. - zr
+		 *
+		 * Addendum: we can't really ensure that this is never called in edit
+		 * mode, so now we have a parameter to verify it. - brecht
 		 */
-		if(smd->emCache) {
+		if(!inEditMode && smd->emCache) {
 			ccgSubSurf_free(smd->emCache);
 			smd->emCache = NULL;
 		}

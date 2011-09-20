@@ -2714,7 +2714,7 @@ static PBool p_chart_abf_solve(PChart *chart)
 				break;
 
 			if (!p_abf_matrix_invert(&sys, chart)) {
-				param_warning("ABF failed to invert matrix.");
+				param_warning("ABF failed to invert matrix");
 				p_abf_free_system(&sys);
 				return P_FALSE;
 			}
@@ -2723,7 +2723,7 @@ static PBool p_chart_abf_solve(PChart *chart)
 		}
 
 		if (i == ABF_MAX_ITER) {
-			param_warning("ABF maximum iterations reached.");
+			param_warning("ABF maximum iterations reached");
 			p_abf_free_system(&sys);
 			return P_FALSE;
 		}
@@ -3831,7 +3831,7 @@ static void p_smooth(PChart *chart)
 		if (hedges) MEM_freeN(hedges);
 		if (vedges) MEM_freeN(vedges);
 
-		// printf("Not enough memory for area smoothing grid.");
+		// printf("Not enough memory for area smoothing grid");
 		return;
 	}
 
@@ -3981,7 +3981,7 @@ static void p_smooth(PChart *chart)
 		if (triangles) MEM_freeN(triangles);
 		if (tri) MEM_freeN(tri);
 
-		// printf("Not enough memory for area smoothing grid.");
+		// printf("Not enough memory for area smoothing grid");
 		return;
 	}
 
@@ -4140,7 +4140,7 @@ void param_construct_end(ParamHandle *handle, ParamBool fill, ParamBool impl)
 
 	param_assert(phandle->state == PHANDLE_STATE_ALLOCATED);
 
-	phandle->ncharts = p_connect_pairs(phandle, impl);
+	phandle->ncharts = p_connect_pairs(phandle, (PBool)impl);
 	phandle->charts = p_split_charts(phandle, chart, phandle->ncharts);
 
 	p_chart_delete(phandle->construction_chart);
@@ -4189,7 +4189,7 @@ void param_lscm_begin(ParamHandle *handle, ParamBool live, ParamBool abf)
 	for (i = 0; i < phandle->ncharts; i++) {
 		for (f=phandle->charts[i]->faces; f; f=f->nextlink)
 			p_face_backup_uvs(f);
-		p_chart_lscm_begin(phandle->charts[i], live, abf);
+		p_chart_lscm_begin(phandle->charts[i], (PBool)live, (PBool)abf);
 	}
 }
 

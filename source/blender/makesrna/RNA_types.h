@@ -39,10 +39,12 @@ extern "C" {
 struct ParameterList;
 struct FunctionRNA;
 struct PropertyRNA;
+struct EnumPropertyRNA;
 struct StructRNA;
 struct BlenderRNA;
 struct IDProperty;
 struct bContext;
+struct Main;
 struct ReportList;
 
 /** Pointer
@@ -97,7 +99,10 @@ typedef enum PropertyUnit {
 
 #define RNA_ENUM_BITFLAG_SIZE 32
 
-/* also update enums in bpy_props.c when adding items here */
+/* also update enums in bpy_props.c when adding items here
+ * watch it: these values are written to files as part of
+ * node socket button subtypes!
+ */
 typedef enum PropertySubType {
 	PROP_NONE = 0,
 
@@ -157,6 +162,8 @@ typedef enum PropertyFlag {
 
 	/* hidden in  the user interface */
 	PROP_HIDDEN = 1<<19,
+	/* do not write in presets */
+	PROP_SKIP_SAVE = 1<<28,
 
 	/* function paramater flags */
 	PROP_REQUIRED = 1<<2,
@@ -188,6 +195,7 @@ typedef enum PropertyFlag {
 
 	/* need context for update function */
 	PROP_CONTEXT_UPDATE = 1<<22,
+	PROP_CONTEXT_PROPERTY_UPDATE = (1<<22)|(1<<27),
 
 	/* Use for arrays or for any data that should not have a referene kept
 	 * most common case is functions that return arrays where the array */
@@ -254,7 +262,8 @@ typedef struct EnumPropertyItem {
 	const char *description;
 } EnumPropertyItem;
 
-typedef EnumPropertyItem *(*EnumPropertyItemFunc)(struct bContext *C, PointerRNA *ptr, int *free);
+/* this is a copy of 'PropEnumItemFunc' defined in rna_internal_types.h */
+typedef EnumPropertyItem *(*EnumPropertyItemFunc)(struct bContext *C, PointerRNA *ptr, struct PropertyRNA *prop, int *free);
 
 typedef struct PropertyRNA PropertyRNA;
 
@@ -275,7 +284,7 @@ typedef struct ParameterList {
 
 typedef struct ParameterIterator {
 	struct ParameterList *parms;
-	PointerRNA funcptr;
+	/* PointerRNA funcptr; */ /*UNUSED*/
 	void *data;
 	int size, offset;
 
@@ -329,9 +338,10 @@ typedef enum StructFlag {
 typedef int (*StructValidateFunc)(struct PointerRNA *ptr, void *data, int *have_function);
 typedef int (*StructCallbackFunc)(struct bContext *C, struct PointerRNA *ptr, struct FunctionRNA *func, ParameterList *list);
 typedef void (*StructFreeFunc)(void *data);
-typedef struct StructRNA *(*StructRegisterFunc)(struct bContext *C, struct ReportList *reports, void *data,
+typedef struct StructRNA *(*StructRegisterFunc)(struct Main *bmain, struct ReportList *reports, void *data,
 	const char *identifier, StructValidateFunc validate, StructCallbackFunc call, StructFreeFunc free);
-typedef void (*StructUnregisterFunc)(const struct bContext *C, struct StructRNA *type);
+typedef void (*StructUnregisterFunc)(struct Main *bmain, struct StructRNA *type);
+typedef void **(*StructInstanceFunc)(PointerRNA *ptr);
 
 typedef struct StructRNA StructRNA;
 

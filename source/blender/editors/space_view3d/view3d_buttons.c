@@ -210,7 +210,7 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 		BPoint *bp;
 		BezTriple *bezt;
 		int a;
-		ListBase *nurbs= ED_curve_editnurbs(cu);
+		ListBase *nurbs= curve_editnurbs(cu);
 
 		nu= nurbs->first;
 		while(nu) {
@@ -457,7 +457,7 @@ static void v3d_editvertex_buts(uiLayout *layout, View3D *v3d, Object *ob, float
 			BPoint *bp;
 			BezTriple *bezt;
 			int a;
-			ListBase *nurbs= ED_curve_editnurbs(cu);
+			ListBase *nurbs= curve_editnurbs(cu);
 
 			nu= nurbs->first;
 			while(nu) {
@@ -887,9 +887,9 @@ static void v3d_posearmature_buts(uiLayout *layout, Object *ob)
 		quat_to_eul( tfp->ob_eul,pchan->quat);
 	else
 		copy_v3_v3(tfp->ob_eul, pchan->eul);
-	tfp->ob_eul[0]*= 180.0/M_PI;
-	tfp->ob_eul[1]*= 180.0/M_PI;
-	tfp->ob_eul[2]*= 180.0/M_PI;
+	tfp->ob_eul[0]*= RAD2DEGF(1.0f);
+	tfp->ob_eul[1]*= RAD2DEGF(1.0f);
+	tfp->ob_eul[2]*= RAD2DEGF(1.0f);
 	
 	uiDefBut(block, LABEL, 0, "Location:",			0, 240, 100, 20, 0, 0, 0, 0, 0, "");
 	uiBlockBeginAlign(block);
@@ -966,12 +966,12 @@ static void v3d_editarmature_buts(uiLayout *layout, Object *ob)
 	
 	ebone= arm->act_edbone;
 
-	if (!ebone || (ebone->layer & arm->layer)==0)
+	if (!ebone || (ebone->layer & arm->layer)==0) {
+		uiItemL(layout, "Nothing selected", ICON_NONE);
 		return;
-	
+	}
 //	row= uiLayoutRow(layout, 0);
 	RNA_pointer_create(&arm->id, &RNA_EditBone, ebone, &eboneptr);
-
 
 	col= uiLayoutColumn(layout, 0);
 	uiItemR(col, &eboneptr, "head", 0, "Head", ICON_NONE);
@@ -1097,9 +1097,9 @@ static void do_view3d_region_buttons(bContext *C, void *UNUSED(index), int event
 			if (!pchan) return;
 			
 			/* make a copy to eul[3], to allow TAB on buttons to work */
-			eul[0]= (float)M_PI*tfp->ob_eul[0]/180.0f;
-			eul[1]= (float)M_PI*tfp->ob_eul[1]/180.0f;
-			eul[2]= (float)M_PI*tfp->ob_eul[2]/180.0f;
+			eul[0]= DEG2RADF(tfp->ob_eul[0]);
+			eul[1]= DEG2RADF(tfp->ob_eul[1]);
+			eul[2]= DEG2RADF(tfp->ob_eul[2]);
 			
 			if (pchan->rotmode == ROT_MODE_AXISANGLE) {
 				float quat[4];
@@ -1256,7 +1256,7 @@ static void view3d_panel_object(const bContext *C, Panel *pa)
 
 	if(ob==obedit) {
 		if(ob->type==OB_ARMATURE) v3d_editarmature_buts(col, ob);
-		if(ob->type==OB_MBALL) v3d_editmetaball_buts(col, ob);
+		else if(ob->type==OB_MBALL) v3d_editmetaball_buts(col, ob);
 		else v3d_editvertex_buts(col, v3d, ob, lim);
 	}
 	else if(ob->mode & OB_MODE_POSE) {

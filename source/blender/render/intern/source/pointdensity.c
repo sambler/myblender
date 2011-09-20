@@ -104,10 +104,10 @@ static void pointdensity_cache_psys(Render *re, PointDensity *pd, Object *ob, Pa
 {
 	DerivedMesh* dm;
 	ParticleKey state;
-	ParticleSimulationData sim= {0};
+	ParticleSimulationData sim= {NULL};
 	ParticleData *pa=NULL;
 	float cfra = BKE_curframe(re->scene);
-	int i, childexists;
+	int i /*, childexists*/ /* UNUSED */;
 	int total_particles, offset=0;
 	int data_used = point_data_used(pd);
 	float partco[3];
@@ -143,9 +143,11 @@ static void pointdensity_cache_psys(Render *re, PointDensity *pd, Object *ob, Pa
 	pd->totpoints = total_particles;
 	if (data_used & POINT_DATA_VEL) offset = pd->totpoints*3;
 	
+#if 0 /* UNUSED */
 	if (psys->totchild > 0 && !(psys->part->draw & PART_DRAW_PARENT))
 		childexists = 1;
-	
+#endif
+
 	for (i=0, pa=psys->particles; i < total_particles; i++, pa++) {
 
 		state.time = cfra;
@@ -362,10 +364,18 @@ static void accum_density(void *userdata, int index, float squared_dist)
 		density = pdr->squared_radius;
 	else if (pdr->falloff_type == TEX_PD_FALLOFF_ROOT)
 		density = sqrt(dist);
-	else if (pdr->falloff_type == TEX_PD_FALLOFF_PARTICLE_AGE)
-		density = dist*MIN2(pdr->point_data[pdr->offset + index], 1.0f);
-	else if (pdr->falloff_type == TEX_PD_FALLOFF_PARTICLE_VEL)
-		density = dist*len_v3(pdr->point_data + index*3)*pdr->velscale;
+	else if (pdr->falloff_type == TEX_PD_FALLOFF_PARTICLE_AGE) {
+		if (pdr->point_data_used & POINT_DATA_LIFE)
+			density = dist*MIN2(pdr->point_data[pdr->offset + index], 1.0f);
+		else
+			density = dist;
+	}
+	else if (pdr->falloff_type == TEX_PD_FALLOFF_PARTICLE_VEL) {
+		if (pdr->point_data_used & POINT_DATA_VEL)
+			density = dist*len_v3(pdr->point_data + index*3)*pdr->velscale;
+		else
+			density = dist;
+	}
 	
 	if (pdr->density_curve && dist != 0.0f) {
 		density = curvemapping_evaluateF(pdr->density_curve, 0, density/dist)*dist;

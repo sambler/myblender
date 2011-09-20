@@ -18,9 +18,11 @@
 
 # <pep8 compliant>
 import bpy
+from bpy.types import Header, Menu
+from blf import gettext as _
 
 
-class TIME_HT_header(bpy.types.Header):
+class TIME_HT_header(Header):
     bl_space_type = 'TIMELINE'
 
     def draw(self, context):
@@ -34,20 +36,19 @@ class TIME_HT_header(bpy.types.Header):
         row.template_header()
 
         if context.area.show_menus:
-            sub = row.row(align=True)
-            sub.menu("TIME_MT_view")
-            sub.menu("TIME_MT_frame")
-            sub.menu("TIME_MT_playback")
+            row.menu("TIME_MT_view")
+            row.menu("TIME_MT_frame")
+            row.menu("TIME_MT_playback")
 
         layout.prop(scene, "use_preview_range", text="", toggle=True)
 
         row = layout.row(align=True)
         if not scene.use_preview_range:
-            row.prop(scene, "frame_start", text="Start")
-            row.prop(scene, "frame_end", text="End")
+            row.prop(scene, "frame_start", text=_("Start"))
+            row.prop(scene, "frame_end", text=_("End"))
         else:
-            row.prop(scene, "frame_preview_start", text="Start")
-            row.prop(scene, "frame_preview_end", text="End")
+            row.prop(scene, "frame_preview_start", text=_("Start"))
+            row.prop(scene, "frame_preview_end", text=_("End"))
 
         layout.prop(scene, "frame_current", text="")
 
@@ -91,7 +92,7 @@ class TIME_HT_header(bpy.types.Header):
         row.operator("anim.keyframe_delete", text="", icon='KEY_DEHLT')
 
 
-class TIME_MT_view(bpy.types.Menu):
+class TIME_MT_view(Menu):
     bl_label = "View"
 
     def draw(self, context):
@@ -116,7 +117,7 @@ class TIME_MT_view(bpy.types.Menu):
         layout.operator("marker.camera_bind")
 
 
-class TIME_MT_cache(bpy.types.Menu):
+class TIME_MT_cache(Menu):
     bl_label = "Cache"
 
     def draw(self, context):
@@ -136,20 +137,20 @@ class TIME_MT_cache(bpy.types.Menu):
         col.prop(st, "cache_smoke")
 
 
-class TIME_MT_frame(bpy.types.Menu):
+class TIME_MT_frame(Menu):
     bl_label = "Frame"
 
     def draw(self, context):
         layout = self.layout
 
-        layout.operator("marker.add", text="Add Marker")
-        layout.operator("marker.duplicate", text="Duplicate Marker")
-        layout.operator("marker.delete", text="Delete Marker")
+        layout.operator("marker.add", text=_("Add Marker"))
+        layout.operator("marker.duplicate", text=_("Duplicate Marker"))
+        layout.operator("marker.delete", text=_("Delete Marker"))
 
         layout.separator()
 
-        layout.operator("marker.rename", text="Rename Marker")
-        layout.operator("marker.move", text="Grab/Move Marker")
+        layout.operator("marker.rename", text=_("Rename Marker"))
+        layout.operator("marker.move", text=_("Grab/Move Marker"))
 
         layout.separator()
 
@@ -162,7 +163,7 @@ class TIME_MT_frame(bpy.types.Menu):
         sub.menu("TIME_MT_autokey")
 
 
-class TIME_MT_playback(bpy.types.Menu):
+class TIME_MT_playback(Menu):
     bl_label = "Playback"
 
     def draw(self, context):
@@ -181,13 +182,13 @@ class TIME_MT_playback(bpy.types.Menu):
 
         layout.separator()
 
-        layout.prop(scene, "use_frame_drop", text="Frame Dropping")
-        layout.prop(scene, "use_audio_sync", text="AV-sync", icon='SPEAKER')
+        layout.prop(scene, "use_frame_drop", text=_("Frame Dropping"))
+        layout.prop(scene, "use_audio_sync", text=_("AV-sync"), icon='SPEAKER')
         layout.prop(scene, "use_audio")
         layout.prop(scene, "use_audio_scrub")
 
 
-class TIME_MT_autokey(bpy.types.Menu):
+class TIME_MT_autokey(Menu):
     bl_label = "Auto-Keyframing Mode"
 
     def draw(self, context):

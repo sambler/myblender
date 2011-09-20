@@ -32,6 +32,7 @@ endif()
 set(INC 
 	.
 	../avi
+	../blenfont
 	../blenlib
 	../blenloader
 	../gpu
@@ -41,19 +42,22 @@ set(INC
 	../makesrna
 	../modifiers
 	../nodes
-	../editors/include
 	../render/extern/include
-	../../../intern/audaspace/intern
-	../../../intern/bsp/extern ../blenfont
+	../../../intern/bsp/extern
 	../../../intern/decimation/extern
 	../../../intern/elbeem/extern
 	../../../intern/guardedalloc
 	../../../intern/iksolver/extern
 	../../../intern/memutil
+	../../../intern/mikktspace
 	../../../intern/opennl/extern
 	../../../intern/smoke/extern
-	../../../intern/mikktspace
-	../../../source/blender/windowmanager # XXX - BAD LEVEL CALL WM_api.h
+
+	# XXX - BAD LEVEL CALL WM_api.h
+	../windowmanager
+)
+
+set(INC_SYS
 	${GLEW_INCLUDE_PATH}
 	${ZLIB_INCLUDE_DIRS}
 )
@@ -135,6 +139,7 @@ set(SRC
 	intern/smoke.c
 	intern/softbody.c
 	intern/sound.c
+	intern/speaker.c
 	intern/subsurf_ccg.c
 	intern/suggestions.c
 	intern/text.c
@@ -174,7 +179,6 @@ set(SRC
 	BKE_depsgraph.h
 	BKE_displist.h
 	BKE_effect.h
-	BKE_endian.h
 	BKE_fcurve.h
 	BKE_fluidsim.h
 	BKE_font.h
@@ -215,6 +219,7 @@ set(SRC
 	BKE_smoke.h
 	BKE_softbody.h
 	BKE_sound.h
+	BKE_speaker.h
 	BKE_subsurf.h
 	BKE_suggestions.h
 	BKE_text.h
@@ -233,13 +238,24 @@ set(SRC
 
 add_definitions(-DGLEW_STATIC)
 
+if(WITH_AUDASPACE)
+	list(APPEND INC
+		../../../intern/audaspace/intern
+	)
+	add_definitions(-DWITH_AUDASPACE)
+endif()
+
 if(WITH_BULLET)
-	list(APPEND INC ../../../extern/bullet2/src)
+	list(APPEND INC
+		../../../extern/bullet2/src
+	)
 	add_definitions(-DUSE_BULLET)
 endif()
 
 if(WITH_MOD_CLOTH_ELTOPO)
-	list(APPEND INC ../../../extern/eltopo)
+	list(APPEND INC
+		../../../extern/eltopo
+	)
 	add_definitions(-DWITH_ELTOPO)
 endif()
 
@@ -263,27 +279,41 @@ if(WITH_IMAGE_CINEON)
 	add_definitions(-DWITH_CINEON)
 endif()
 
+if(WITH_IMAGE_FRAMESERVER)
+	add_definitions(-DWITH_FRAMESERVER)
+endif()
+
 if(WITH_IMAGE_HDR)
 	add_definitions(-DWITH_HDR)
 endif()
 
 if(WITH_CODEC_QUICKTIME)
-	list(APPEND INC ../quicktime ${QUICKTIME_INC})
+	list(APPEND INC
+		../quicktime
+	)
+	list(APPEND INC_SYS
+		${QUICKTIME_INCLUDE_DIRS}
+	)
 	add_definitions(-DWITH_QUICKTIME)
 endif()
 
 if(WITH_CODEC_FFMPEG)
-	list(APPEND INC ${FFMPEG_INC})
+	list(APPEND INC
+		../../../intern/ffmpeg
+	)
+	list(APPEND INC_SYS
+		${FFMPEG_INCLUDE_DIRS}
+	)
 	add_definitions(-DWITH_FFMPEG)
 endif()
 
-if(WITH_LCMS)
-	list(APPEND INC ${LCMS_INCLUDE_DIR})
-	add_definitions(-DWITH_LCMS)
-endif()
-
 if(WITH_PYTHON)
-	list(APPEND INC ../python ${PYTHON_INCLUDE_DIRS})
+	list(APPEND INC
+		../python
+	)
+	list(APPEND INC_SYS
+		${PYTHON_INCLUDE_DIRS}
+	)
 	add_definitions(-DWITH_PYTHON)
 
 	if(WITH_PYTHON_SECURITY)
@@ -299,22 +329,40 @@ if(NOT WITH_MOD_FLUID)
 	add_definitions(-DDISABLE_ELBEEM)
 endif()
 
+if(WITH_MOD_SMOKE)
+	add_definitions(-DWITH_SMOKE)
+endif()
+
 if(WITH_JACK)
 	add_definitions(-DWITH_JACK)
 endif()
 
 if(WITH_LZO)
-	list(APPEND INC ../../../extern/lzo/minilzo)
+	list(APPEND INC_SYS
+		../../../extern/lzo/minilzo
+	)
 	add_definitions(-DWITH_LZO)
 endif()
 
 if(WITH_LZMA)
-	list(APPEND INC ../../../extern/lzma)
+	list(APPEND INC_SYS
+		../../../extern/lzma
+	)
 	add_definitions(-DWITH_LZMA)
+endif()
+
+if(WITH_GAMEENGINE)
+	list(APPEND INC_SYS
+	../../../extern/recastnavigation
+	)
+	list(APPEND SRC
+		intern/navmesh_conversion.c
+		BKE_navmesh_conversion.h
+	)
 endif()
 
 if(MSVC)
 	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /WX")
 endif()
 
-blender_add_lib(bf_blenkernel "${SRC}" "${INC}")
+blender_add_lib(bf_blenkernel "${SRC}" "${INC}" "${INC_SYS}")

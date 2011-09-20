@@ -48,6 +48,7 @@
 #include "BLI_rand.h"
 
 #include "DNA_meshdata_types.h"
+#include "DNA_node_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_brush_types.h"
@@ -99,33 +100,6 @@ void ED_sculpt_force_update(bContext *C)
 
 	if(ob && (ob->mode & OB_MODE_SCULPT))
 		multires_force_update(ob);
-}
-
-void ED_sculpt_modifiers_changed(Object *ob)
-{
-	SculptSession *ss= ob->sculpt;
-
-	if(!ss->cache) {
-		/* we free pbvh on changes, except during sculpt since it can't deal with
-		   changing PVBH node organization, we hope topology does not change in
-		   the meantime .. weak */
-		if(ss->pbvh) {
-				BLI_pbvh_free(ss->pbvh);
-				ss->pbvh= NULL;
-		}
-
-		sculpt_free_deformMats(ob->sculpt);
-	} else {
-		PBVHNode **nodes;
-		int n, totnode;
-
-		BLI_pbvh_search_gather(ss->pbvh, NULL, NULL, &nodes, &totnode);
-
-		for(n = 0; n < totnode; n++)
-			BLI_pbvh_node_mark_update(nodes[n]);
-
-		MEM_freeN(nodes);
-	}
 }
 
 /* Sculpt mode handles multires differently from regular meshes, but only if
@@ -281,7 +255,7 @@ static int sculpt_get_redraw_rect(ARegion *ar, RegionView3D *rv3d,
 	float bb_min[3], bb_max[3], pmat[4][4];
 	int i, j, k;
 
-	view3d_get_object_project_mat(rv3d, ob, pmat);
+	ED_view3d_ob_project_mat_get(rv3d, ob, pmat);
 
 	if(!pbvh)
 		return 0;
@@ -301,7 +275,7 @@ static int sculpt_get_redraw_rect(ARegion *ar, RegionView3D *rv3d,
 				vec[0] = i ? bb_min[0] : bb_max[0];
 				vec[1] = j ? bb_min[1] : bb_max[1];
 				vec[2] = k ? bb_min[2] : bb_max[2];
-				view3d_project_float(ar, vec, proj, pmat);
+				ED_view3d_project_float(ar, vec, proj, pmat);
 				rect->xmin = MIN2(rect->xmin, proj[0]);
 				rect->xmax = MAX2(rect->xmax, proj[0]);
 				rect->ymin = MIN2(rect->ymin, proj[1]);
@@ -357,7 +331,7 @@ void sculpt_get_redraw_planes(float planes[4][4], ARegion *ar,
 	rect.ymax -= 2;
 #endif
 
-	view3d_calculate_clipping(&bb, planes, &mats, &rect);
+	ED_view3d_calc_clipping(&bb, planes, &mats, &rect);
 	mul_m4_fl(planes, -1.0f);
 
 	/* clear redraw flag from nodes */
@@ -912,7 +886,7 @@ static void calc_sculpt_normal(Sculpt *sd, Object *ob, float an[3], PBVHNode **n
 	{
 		switch (brush->sculpt_plane) {
 			case SCULPT_DISP_DIR_VIEW:
-				viewvector(ss->cache->vc->rv3d, ss->cache->vc->rv3d->twmat[3], an);
+				ED_view3d_global_to_vector(ss->cache->vc->rv3d, ss->cache->vc->rv3d->twmat[3], an);
 				break;
 
 			case SCULPT_DISP_DIR_X:
@@ -1823,7 +1797,7 @@ static void calc_sculpt_plane(Sculpt *sd, Object *ob, PBVHNode **nodes, int totn
 	{
 		switch (brush->sculpt_plane) {
 			case SCULPT_DISP_DIR_VIEW:
-				viewvector(ss->cache->vc->rv3d, ss->cache->vc->rv3d->twmat[3], an);
+				ED_view3d_global_to_vector(ss->cache->vc->rv3d, ss->cache->vc->rv3d->twmat[3], an);
 				break;
 
 			case SCULPT_DISP_DIR_X:
@@ -2693,17 +2667,6 @@ static void sculpt_update_tex(Sculpt *sd, SculptSession *ss)
 	}
 }
 
-void sculpt_free_deformMats(SculptSession *ss)
-{
-	if(ss->orig_cos) MEM_freeN(ss->orig_cos);
-	if(ss->deform_cos) MEM_freeN(ss->deform_cos);
-	if(ss->deform_imats) MEM_freeN(ss->deform_imats);
-
-	ss->orig_cos = NULL;
-	ss->deform_cos = NULL;
-	ss->deform_imats = NULL;
-}
-
 void sculpt_update_mesh_elements(Scene *scene, Sculpt *sd, Object *ob, int need_fmap)
 {
 	DerivedMesh *dm = mesh_get_derived_final(scene, ob, CD_MASK_BAREMESH);
@@ -2740,7 +2703,7 @@ void sculpt_update_mesh_elements(Scene *scene, Sculpt *sd, Object *ob, int need_
 		if(!ss->orig_cos) {
 			int a;
 
-			sculpt_free_deformMats(ss);
+			free_sculptsession_deformMats(ss);
 
 			if(ss->kb) ss->orig_cos = key_to_vertcos(ob, ss->kb);
 			else ss->orig_cos = mesh_getVertexCos(ob->data, NULL);
@@ -2751,7 +2714,7 @@ void sculpt_update_mesh_elements(Scene *scene, Sculpt *sd, Object *ob, int need_
 			for(a = 0; a < ((Mesh*)ob->data)->totvert; ++a)
 				invert_m3(ss->deform_imats[a]);
 		}
-	} else sculpt_free_deformMats(ss);
+	} else free_sculptsession_deformMats(ss);
 
 	/* if pbvh is deformed, key block is already applied to it */
 	if (ss->kb && !BLI_pbvh_isDeformed(ss->pbvh)) {
@@ -2926,7 +2889,7 @@ static void sculpt_update_cache_invariants(bContext* C, Sculpt *sd, SculptSessio
 	cache->mats = MEM_callocN(sizeof(bglMats), "sculpt bglMats");
 	view3d_get_transformation(vc->ar, vc->rv3d, vc->obact, cache->mats);
 
-	viewvector(cache->vc->rv3d, cache->vc->rv3d->twmat[3], cache->true_view_normal);
+	ED_view3d_global_to_vector(cache->vc->rv3d, cache->vc->rv3d->twmat[3], cache->true_view_normal);
 	/* Initialize layer brush displacements and persistent coords */
 	if(brush->sculpt_tool == SCULPT_TOOL_LAYER) {
 		/* not supported yet for multires */
@@ -2979,7 +2942,7 @@ static void sculpt_update_brush_delta(Sculpt *sd, Object *ob, Brush *brush)
 		 SCULPT_TOOL_GRAB, SCULPT_TOOL_NUDGE,
 		 SCULPT_TOOL_CLAY_TUBES, SCULPT_TOOL_SNAKE_HOOK,
 		 SCULPT_TOOL_THUMB)) {
-		float grab_location[3], imat[4][4], delta[3];
+		float grab_location[3], imat[4][4], delta[3], loc[3];
 
 		if(cache->first_time) {
 			copy_v3_v3(cache->orig_grab_location,
@@ -2989,13 +2952,10 @@ static void sculpt_update_brush_delta(Sculpt *sd, Object *ob, Brush *brush)
 			add_v3_v3(cache->true_location, cache->grab_delta);
 
 		/* compute 3d coordinate at same z from original location + mouse */
-		initgrabz(cache->vc->rv3d,
-			  cache->orig_grab_location[0],
-			  cache->orig_grab_location[1],
-			  cache->orig_grab_location[2]);
+		mul_v3_m4v3(loc, ob->obmat, cache->orig_grab_location);
+		initgrabz(cache->vc->rv3d, loc[0], loc[1], loc[2]);
 
-		window_to_3d_delta(cache->vc->ar, grab_location,
-				   cache->mouse[0], cache->mouse[1]);
+		ED_view3d_win_to_delta(cache->vc->ar, cache->mouse, grab_location);
 
 		/* compute delta to move verts by */
 		if(!cache->first_time) {
@@ -3036,7 +2996,7 @@ static void sculpt_update_brush_delta(Sculpt *sd, Object *ob, Brush *brush)
 			copy_v3_v3(cache->true_location, cache->orig_grab_location);
 
 			sd->draw_anchored = 1;
-			copy_v3_v3(sd->anchored_initial_mouse, cache->initial_mouse);
+			copy_v2_v2(sd->anchored_initial_mouse, cache->initial_mouse);
 			sd->anchored_size = cache->pixel_radius;
 		}
 	}
@@ -3089,9 +3049,6 @@ static void sculpt_update_cache_variants(bContext *C, Sculpt *sd, Object *ob, st
 		else {
 			cache->initial_radius= brush_unprojected_radius(brush);
 		}
-
-		if (ELEM(brush->sculpt_tool, SCULPT_TOOL_GRAB, SCULPT_TOOL_SNAKE_HOOK))
-			cache->initial_radius *= 2.0f;
 	}
 
 	if(brush_use_size_pressure(brush)) {
@@ -3247,7 +3204,7 @@ int sculpt_stroke_get_location(bContext *C, struct PaintStroke *stroke, float ou
 
 	sculpt_stroke_modifiers_check(C, ob);
 
-	viewline(vc->ar, vc->v3d, mval, ray_start, ray_end);
+	ED_view3d_win_to_segment_clip(vc->ar, vc->v3d, mval, ray_start, ray_end);
 
 	invert_m4_m4(obimat, ob->obmat);
 	mul_m4_v3(obimat, ray_start);
@@ -3279,7 +3236,7 @@ static void sculpt_brush_init_tex(Sculpt *sd, SculptSession *ss)
 
 	/* init mtex nodes */
 	if(mtex->tex && mtex->tex->nodetree)
-		ntreeBeginExecTree(mtex->tex->nodetree); /* has internal flag to detect it only does it once */
+		ntreeTexBeginExecTree(mtex->tex->nodetree, 1); /* has internal flag to detect it only does it once */
 
 	/* TODO: Shouldn't really have to do this at the start of every
 	   stroke, but sculpt would need some sort of notification when
@@ -3287,18 +3244,23 @@ static void sculpt_brush_init_tex(Sculpt *sd, SculptSession *ss)
 	sculpt_update_tex(sd, ss);
 }
 
-static int sculpt_brush_stroke_init(bContext *C, ReportList *UNUSED(reports))
+static int sculpt_brush_stroke_init(bContext *C, wmOperator *op)
 {
 	Scene *scene= CTX_data_scene(C);
 	Object *ob= CTX_data_active_object(C);
 	Sculpt *sd = CTX_data_tool_settings(C)->sculpt;
 	SculptSession *ss = CTX_data_active_object(C)->sculpt;
 	Brush *brush = paint_brush(&sd->paint);
+	int mode= RNA_enum_get(op->ptr, "mode");
+	int is_smooth= 0;
 
 	view3d_operator_needs_opengl(C);
 	sculpt_brush_init_tex(sd, ss);
 
-	sculpt_update_mesh_elements(scene, sd, ob, brush->sculpt_tool == SCULPT_TOOL_SMOOTH);
+	is_smooth|= mode == BRUSH_STROKE_SMOOTH;
+	is_smooth|= brush->sculpt_tool == SCULPT_TOOL_SMOOTH;
+
+	sculpt_update_mesh_elements(scene, sd, ob, is_smooth);
 
 	return 1;
 }
@@ -3330,7 +3292,7 @@ static void sculpt_restore_mesh(Sculpt *sd, SculptSession *ss)
 
 				BLI_pbvh_vertex_iter_begin(ss->pbvh, nodes[n], vd, PBVH_ITER_UNIQUE) {
 					copy_v3_v3(vd.co, unode->co[vd.i]);
-					if(vd.no) VECCOPY(vd.no, unode->no[vd.i])
+					if(vd.no) copy_v3_v3_short(vd.no, unode->no[vd.i]);
 					else normal_short_to_float_v3(vd.fno, unode->no[vd.i]);
 
 					if(vd.mvert) vd.mvert->flag |= ME_VERT_PBVH_UPDATE;
@@ -3455,7 +3417,7 @@ static void sculpt_brush_exit_tex(Sculpt *sd)
 	MTex *mtex= &brush->mtex;
 
 	if(mtex->tex && mtex->tex->nodetree)
-		ntreeEndExecTree(mtex->tex->nodetree);
+		ntreeTexEndExecTree(mtex->tex->nodetree->execdata, 1);
 }
 
 static void sculpt_stroke_done(bContext *C, struct PaintStroke *UNUSED(stroke))
@@ -3514,7 +3476,7 @@ static int sculpt_brush_stroke_invoke(bContext *C, wmOperator *op, wmEvent *even
 	struct PaintStroke *stroke;
 	int ignore_background_click;
 
-	if(!sculpt_brush_stroke_init(C, op->reports))
+	if(!sculpt_brush_stroke_init(C, op))
 		return OPERATOR_CANCELLED;
 
 	stroke = paint_stroke_new(C, sculpt_stroke_get_location,
@@ -3543,7 +3505,7 @@ static int sculpt_brush_stroke_invoke(bContext *C, wmOperator *op, wmEvent *even
 
 static int sculpt_brush_stroke_exec(bContext *C, wmOperator *op)
 {
-	if(!sculpt_brush_stroke_init(C, op->reports))
+	if(!sculpt_brush_stroke_init(C, op))
 		return OPERATOR_CANCELLED;
 
 	op->customdata = paint_stroke_new(C, sculpt_stroke_get_location, sculpt_stroke_test_start,
@@ -3553,6 +3515,24 @@ static int sculpt_brush_stroke_exec(bContext *C, wmOperator *op)
 	paint_stroke_exec(C, op);
 
 	return OPERATOR_FINISHED;
+}
+
+static int sculpt_brush_stroke_cancel(bContext *C, wmOperator *op)
+{
+	Object *ob= CTX_data_active_object(C);
+	SculptSession *ss = ob->sculpt;
+	Sculpt *sd = CTX_data_tool_settings(C)->sculpt;
+
+	paint_stroke_cancel(C, op);
+
+	if(ss->cache) {
+		sculpt_cache_free(ss->cache);
+		ss->cache = NULL;
+	}
+
+	sculpt_brush_exit_tex(sd);
+
+	return OPERATOR_CANCELLED;
 }
 
 static void SCULPT_OT_brush_stroke(wmOperatorType *ot)
@@ -3573,6 +3553,7 @@ static void SCULPT_OT_brush_stroke(wmOperatorType *ot)
 	ot->modal= paint_stroke_modal;
 	ot->exec= sculpt_brush_stroke_exec;
 	ot->poll= sculpt_poll;
+	ot->cancel= sculpt_brush_stroke_cancel;
 
 	/* flags (sculpt does own undo? (ton) */
 	ot->flag= OPTYPE_BLOCKING;

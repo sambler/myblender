@@ -41,12 +41,6 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#ifdef WIN32	/* Windos */
-#ifndef snprintf
-#define snprintf _snprintf
-#endif
-#endif
-
 #include "MEM_guardedalloc.h"
 
 /* types */
@@ -56,6 +50,7 @@
 #include "DNA_object_fluidsim.h"	
 
 #include "BLI_blenlib.h"
+#include "BLI_fileops.h"
 #include "BLI_threads.h"
 #include "BLI_math.h"
 #include "BLI_utildefines.h"
@@ -125,7 +120,7 @@ static void get_fluid_gravity(float *gravity, Scene *scene, FluidsimSettings *fs
 	if (scene->physics_settings.flag & PHYS_GLOBAL_GRAVITY) {
 		copy_v3_v3(gravity, scene->physics_settings.gravity);
 	} else {
-		copy_v3_v3(gravity, &fss->gravx);
+		copy_v3_v3(gravity, fss->grav);
 	}
 }
 
@@ -154,8 +149,8 @@ static int fluid_is_animated_mesh(FluidsimSettings *fss)
 #if 0
 /* helper function */
 void fluidsimGetGeometryObjFilename(Object *ob, char *dst) { //, char *srcname) {
-	//snprintf(dst,FILE_MAXFILE, "%s_cfgdata_%s.bobj.gz", srcname, ob->id.name);
-	snprintf(dst,FILE_MAXFILE, "fluidcfgdata_%s.bobj.gz", ob->id.name);
+	//BLI_snprintf(dst,FILE_MAXFILE, "%s_cfgdata_%s.bobj.gz", srcname, ob->id.name);
+	BLI_snprintf(dst,FILE_MAXFILE, "fluidcfgdata_%s.bobj.gz", ob->id.name);
 }
 #endif
 
@@ -443,7 +438,7 @@ static void fluid_init_all_channels(bContext *C, Object *UNUSED(fsDomain), Fluid
 			Object *ob = fobj->object;
 			FluidsimModifierData *fluidmd = (FluidsimModifierData *)modifiers_findByType(ob, eModifierType_Fluidsim);
 			float active= (float)(fluidmd->fss->flag & OB_FLUIDSIM_ACTIVE);
-			float rot_d[3], old_rot[3] = {0.f, 0.f, 0.f};
+			float rot_d[3] = {0.f, 0.f, 0.f}, old_rot[3] = {0.f, 0.f, 0.f};
 			
 			if (ELEM(fluidmd->fss->type, OB_FLUIDSIM_DOMAIN, OB_FLUIDSIM_PARTICLE))
 				continue;
@@ -599,7 +594,7 @@ static int fluid_validate_scene(ReportList *reports, Scene *scene, Object *fsDom
 			}
 			/* if there's more than one domain, cancel */
 			else if (fsDomain && ob != fsDomain) {
-				BKE_report(reports, RPT_ERROR, "There should be only one domain object.");
+				BKE_report(reports, RPT_ERROR, "There should be only one domain object");
 				return 0;
 			}
 		}
@@ -617,17 +612,17 @@ static int fluid_validate_scene(ReportList *reports, Scene *scene, Object *fsDom
 		fsDomain = newdomain;
 	
 	if (!fsDomain) {
-		BKE_report(reports, RPT_ERROR, "No domain object found.");
+		BKE_report(reports, RPT_ERROR, "No domain object found");
 		return 0;
 	}
 	
 	if (channelObjCount>=255) {
-		BKE_report(reports, RPT_ERROR, "Cannot bake with more then 256 objects.");
+		BKE_report(reports, RPT_ERROR, "Cannot bake with more then 256 objects");
 		return 0;
 	}
 	
 	if (fluidInputCount == 0) {
-		BKE_report(reports, RPT_ERROR, "No fluid input objects in the scene.");
+		BKE_report(reports, RPT_ERROR, "No fluid input objects in the scene");
 		return 0;
 	}
 	
@@ -721,15 +716,17 @@ typedef struct FluidBakeJob {
 
 static void fluidbake_free(void *customdata)
 {
-	FluidBakeJob *fb= customdata;
+	FluidBakeJob *fb= (FluidBakeJob *)customdata;
 	MEM_freeN(fb);
 }
 
 /* called by fluidbake, only to check job 'stop' value */
-static int fluidbake_breakjob(void *UNUSED(customdata))
+static int fluidbake_breakjob(void *customdata)
 {
-	//FluidBakeJob *fb= (FluidBakeJob *)customdata;
-	//return *(fb->stop);
+	FluidBakeJob *fb= (FluidBakeJob *)customdata;
+
+	if(fb->stop && *(fb->stop))
+		return 1;
 	
 	/* this is not nice yet, need to make the jobs list template better 
 	 * for identifying/acting upon various different jobs */
@@ -740,7 +737,7 @@ static int fluidbake_breakjob(void *UNUSED(customdata))
 /* called by fluidbake, wmJob sends notifier */
 static void fluidbake_updatejob(void *customdata, float progress)
 {
-	FluidBakeJob *fb= customdata;
+	FluidBakeJob *fb= (FluidBakeJob *)customdata;
 	
 	*(fb->do_update)= 1;
 	*(fb->progress)= progress;
@@ -748,7 +745,7 @@ static void fluidbake_updatejob(void *customdata, float progress)
 
 static void fluidbake_startjob(void *customdata, short *stop, short *do_update, float *progress)
 {
-	FluidBakeJob *fb= customdata;
+	FluidBakeJob *fb= (FluidBakeJob *)customdata;
 	
 	fb->stop= stop;
 	fb->do_update = do_update;
@@ -763,7 +760,7 @@ static void fluidbake_startjob(void *customdata, short *stop, short *do_update, 
 
 static void fluidbake_endjob(void *customdata)
 {
-	FluidBakeJob *fb= customdata;
+	FluidBakeJob *fb= (FluidBakeJob *)customdata;
 	
 	if (fb->settings) {
 		MEM_freeN(fb->settings);
@@ -809,6 +806,44 @@ static void fluidbake_free_data(FluidAnimChannels *channels, ListBase *fobjects,
 	}
 }
 
+/* copied from rna_fluidsim.c: fluidsim_find_lastframe() */
+static void fluidsim_delete_until_lastframe(FluidsimSettings *fss)
+{
+	char targetDir[FILE_MAXFILE+FILE_MAXDIR], targetFile[FILE_MAXFILE+FILE_MAXDIR];
+	char targetDirVel[FILE_MAXFILE+FILE_MAXDIR], targetFileVel[FILE_MAXFILE+FILE_MAXDIR];
+	char previewDir[FILE_MAXFILE+FILE_MAXDIR], previewFile[FILE_MAXFILE+FILE_MAXDIR];
+	int curFrame = 1, exists = 0;
+
+	BLI_snprintf(targetDir, sizeof(targetDir), "%sfluidsurface_final_####.bobj.gz", fss->surfdataPath);
+	BLI_snprintf(targetDirVel, sizeof(targetDir), "%sfluidsurface_final_####.bvel.gz", fss->surfdataPath);
+	BLI_snprintf(previewDir, sizeof(targetDir), "%sfluidsurface_preview_####.bobj.gz", fss->surfdataPath);
+
+	BLI_path_abs(targetDir, G.main->name);
+	BLI_path_abs(targetDirVel, G.main->name);
+	BLI_path_abs(previewDir, G.main->name);
+
+	do {
+		BLI_strncpy(targetFile, targetDir, sizeof(targetFile));
+		BLI_strncpy(targetFileVel, targetDirVel, sizeof(targetFileVel));
+		BLI_strncpy(previewFile, previewDir, sizeof(previewFile));
+
+		BLI_path_frame(targetFile, curFrame, 0);
+		BLI_path_frame(targetFileVel, curFrame, 0);
+		BLI_path_frame(previewFile, curFrame, 0);
+
+		curFrame++;
+
+		if((exists = BLI_exist(targetFile)))
+		{
+			BLI_delete(targetFile, 0, 0);
+			BLI_delete(targetFileVel, 0, 0);
+			BLI_delete(previewFile, 0, 0);
+		}
+	} while(exists);
+
+	return;
+}
+
 static int fluidsimBake(bContext *C, ReportList *reports, Object *fsDomain)
 {
 	Scene *scene= CTX_data_scene(C);
@@ -847,14 +882,14 @@ static int fluidsimBake(bContext *C, ReportList *reports, Object *fsDomain)
 	if(getenv(strEnvName)) {
 		int dlevel = atoi(getenv(strEnvName));
 		elbeemSetDebugLevel(dlevel);
-		snprintf(debugStrBuffer,256,"fluidsimBake::msg: Debug messages activated due to envvar '%s'\n",strEnvName); 
+		BLI_snprintf(debugStrBuffer,256,"fluidsimBake::msg: Debug messages activated due to envvar '%s'\n",strEnvName); 
 		elbeemDebugOut(debugStrBuffer);
 	}
 	
 	/* make sure it corresponds to startFrame setting (old: noFrames = scene->r.efra - scene->r.sfra +1) */;
 	noFrames = scene->r.efra - 0;
 	if(noFrames<=0) {
-		BKE_report(reports, RPT_ERROR, "No frames to export - check your animation range settings.");
+		BKE_report(reports, RPT_ERROR, "No frames to export - check your animation range settings");
 		fluidbake_free_data(channels, fobjects, fsset, fb);
 		return 0;
 	}
@@ -878,10 +913,13 @@ static int fluidsimBake(bContext *C, ReportList *reports, Object *fsDomain)
 	
 	// reset last valid frame
 	domainSettings->lastgoodframe = -1;
+
+	/* delete old baked files */
+	fluidsim_delete_until_lastframe(domainSettings);
 	
 	/* rough check of settings... */
 	if(domainSettings->previewresxyz > domainSettings->resolutionxyz) {
-		snprintf(debugStrBuffer,256,"fluidsimBake::warning - Preview (%d) >= Resolution (%d)... setting equal.\n", domainSettings->previewresxyz ,  domainSettings->resolutionxyz); 
+		BLI_snprintf(debugStrBuffer,256,"fluidsimBake::warning - Preview (%d) >= Resolution (%d)... setting equal.\n", domainSettings->previewresxyz ,  domainSettings->resolutionxyz); 
 		elbeemDebugOut(debugStrBuffer);
 		domainSettings->previewresxyz = domainSettings->resolutionxyz;
 	}
@@ -901,7 +939,7 @@ static int fluidsimBake(bContext *C, ReportList *reports, Object *fsDomain)
 	} else {
 		gridlevels = domainSettings->maxRefine;
 	}
-	snprintf(debugStrBuffer,256,"fluidsimBake::msg: Baking %s, refine: %d\n", fsDomain->id.name , gridlevels ); 
+	BLI_snprintf(debugStrBuffer,256,"fluidsimBake::msg: Baking %s, refine: %d\n", fsDomain->id.name , gridlevels ); 
 	elbeemDebugOut(debugStrBuffer);
 	
 	
@@ -953,9 +991,9 @@ static int fluidsimBake(bContext *C, ReportList *reports, Object *fsDomain)
 	/* ******** init domain object's matrix ******** */
 	copy_m4_m4(domainMat, fsDomain->obmat);
 	if(!invert_m4_m4(invDomMat, domainMat)) {
-		snprintf(debugStrBuffer,256,"fluidsimBake::error - Invalid obj matrix?\n"); 
+		BLI_snprintf(debugStrBuffer,256,"fluidsimBake::error - Invalid obj matrix?\n"); 
 		elbeemDebugOut(debugStrBuffer);
-		BKE_report(reports, RPT_ERROR, "Invalid object matrix."); 
+		BKE_report(reports, RPT_ERROR, "Invalid object matrix"); 
 
 		fluidbake_free_data(channels, fobjects, fsset, fb);
 		return 0;
@@ -1018,6 +1056,13 @@ static int fluidsimBake(bContext *C, ReportList *reports, Object *fsDomain)
 	else if (domainSettings->typeFlags&OB_FSBND_PARTSLIP)	fsset->domainobsType = FLUIDSIM_OBSTACLE_PARTSLIP;
 	else if (domainSettings->typeFlags&OB_FSBND_FREESLIP)	fsset->domainobsType = FLUIDSIM_OBSTACLE_FREESLIP;
 	fsset->domainobsPartslip = domainSettings->partSlipValue;
+
+	/* use domainobsType also for surface generation flag (bit: >=64) */
+	if(domainSettings->typeFlags & OB_FSSG_NOOBS)
+		fsset->mFsSurfGenSetting = FLUIDSIM_FSSG_NOOBS;
+	else
+		fsset->mFsSurfGenSetting = 0; // "normal" mode
+
 	fsset->generateVertexVectors = (domainSettings->domainNovecgen==0);
 
 	// init blender domain transform matrix

@@ -494,7 +494,7 @@ static int removedoublesflag_exec(bContext *C, wmOperator *op)
 		WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 	}
 
-	BKE_reportf(op->reports, RPT_INFO, "Removed %d vert%s.", count, (count==1)?"ex":"ices");
+	BKE_reportf(op->reports, RPT_INFO, "Removed %d vert%s", count, (count==1)?"ex":"ices");
 
 	BKE_mesh_end_editmesh(obedit->data, em);
 
@@ -762,7 +762,7 @@ static EnumPropertyItem extrude_items[] = {
 		{0, NULL, 0, NULL, NULL}};
 
 
-static EnumPropertyItem *mesh_extrude_itemf(bContext *C, PointerRNA *UNUSED(ptr), int *free)
+static EnumPropertyItem *mesh_extrude_itemf(bContext *C, PointerRNA *UNUSED(ptr), PropertyRNA *UNUSED(prop), int *free)
 {
 	EnumPropertyItem *item= NULL;
 	Object *obedit= CTX_data_edit_object(C);
@@ -1466,8 +1466,8 @@ static void alter_co(float *co, EditEdge *edge, float smooth, float fractal, int
 		sub_v3_v3v3(nor, edge->v1->co, edge->v2->co);
 		len= 0.5f*normalize_v3(nor);
 
-		VECCOPY(nor1, edge->v1->no);
-		VECCOPY(nor2, edge->v2->no);
+		copy_v3_v3(nor1, edge->v1->no);
+		copy_v3_v3(nor2, edge->v2->no);
 
 		/* cosine angle */
 		fac= nor[0]*nor1[0] + nor[1]*nor1[1] + nor[2]*nor1[2] ;
@@ -2675,7 +2675,7 @@ void esubdivideflag(Object *obedit, EditMesh *em, int flag, float smooth, float 
 	}
 
 	for (; md; md=md->next) {
-		if (md->type==eModifierType_Mirror) {
+		if ((md->type==eModifierType_Mirror) && (md->mode & eModifierMode_Realtime)) {
 			MirrorModifierData *mmd = (MirrorModifierData*) md;
 
 			if(mmd->flag & MOD_MIR_CLIPPING) {
@@ -3234,13 +3234,13 @@ static float measure_facepair(EditVert *v1, EditVert *v2, EditVert *v3, EditVert
 	normal_tri_v3( noA2,v1->co, v3->co, v4->co);
 
 	if(noA1[0] == noA2[0] && noA1[1] == noA2[1] && noA1[2] == noA2[2]) normalADiff = 0.0;
-	else normalADiff = RAD2DEGF(angle_v2v2(noA1, noA2));
+	else normalADiff = RAD2DEGF(angle_v3v3(noA1, noA2));
 		//if(!normalADiff) normalADiff = 179;
 	normal_tri_v3( noB1,v2->co, v3->co, v4->co);
 	normal_tri_v3( noB2,v4->co, v1->co, v2->co);
 
 	if(noB1[0] == noB2[0] && noB1[1] == noB2[1] && noB1[2] == noB2[2]) normalBDiff = 0.0;
-	else normalBDiff = RAD2DEGF(angle_v2v2(noB1, noB2));
+	else normalBDiff = RAD2DEGF(angle_v3v3(noB1, noB2));
 		//if(!normalBDiff) normalBDiff = 179;
 
 	measure += (normalADiff/360) + (normalBDiff/360);
@@ -3255,10 +3255,10 @@ static float measure_facepair(EditVert *v1, EditVert *v2, EditVert *v3, EditVert
 	diff = 0.0;
 
 	diff = (
-		fabsf(RAD2DEGF(angle_v2v2(edgeVec1, edgeVec2)) - 90) +
-		fabsf(RAD2DEGF(angle_v2v2(edgeVec2, edgeVec3)) - 90) +
-		fabsf(RAD2DEGF(angle_v2v2(edgeVec3, edgeVec4)) - 90) +
-		fabsf(RAD2DEGF(angle_v2v2(edgeVec4, edgeVec1)) - 90)) / 360;
+		fabsf(RAD2DEGF(angle_v3v3(edgeVec1, edgeVec2)) - 90) +
+		fabsf(RAD2DEGF(angle_v3v3(edgeVec2, edgeVec3)) - 90) +
+		fabsf(RAD2DEGF(angle_v3v3(edgeVec3, edgeVec4)) - 90) +
+		fabsf(RAD2DEGF(angle_v3v3(edgeVec4, edgeVec1)) - 90)) / 360;
 	if(!diff) return 0.0;
 
 	measure +=  diff;
@@ -3887,7 +3887,7 @@ void MESH_OT_edge_rotate(wmOperatorType *ot)
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 
 	/* props */
-	RNA_def_enum(ot->srna, "direction", direction_items, DIRECTION_CW, "Direction", "Direction to rotate the edge around.");
+	RNA_def_enum(ot->srna, "direction", direction_items, DIRECTION_CW, "Direction", "Direction to rotate the edge around");
 }
 
 
@@ -3895,7 +3895,7 @@ void MESH_OT_edge_rotate(wmOperatorType *ot)
 
   /* XXX old bevel not ported yet */
 
-static void bevel_menu(EditMesh *em)
+static void UNUSED_FUNCTION(bevel_menu)(EditMesh *em)
 {
 	BME_Mesh *bm;
 	BME_TransData_Head *td;
@@ -3967,6 +3967,7 @@ short sharesFace(EditMesh *em, EditEdge* e1, EditEdge* e2)
 	return 0;
 }
 
+#if 0
 
 typedef struct SlideUv {
 	float origuv[2];
@@ -3980,7 +3981,6 @@ typedef struct SlideVert {
 	EditVert origvert;
 } SlideVert;
 
-#if 0
 int EdgeSlide(EditMesh *em, wmOperator *op, short immediate, float imperc)
 {
 	return 0;
@@ -4011,7 +4011,7 @@ useless:
 	LinkNode *fuv_link;
 
 	short event, draw=1;
-	short mval[2], mvalo[2];
+	int mval[2], mvalo[2];
 	char str[128];
 	float labda = 0.0f;
 
@@ -4416,7 +4416,7 @@ useless:
 	percp = -1;
 	while(draw) {
 		 /* For the % calculation */
-		short mval[2];
+		int mval[2];
 		float rc[2];
 		float v2[2], v3[2];
 		EditVert *centerVert, *upVert, *downVert;
@@ -4867,12 +4867,12 @@ void mesh_set_face_flags(EditMesh *em, short mode)
 /********************** Rip Operator *************************/
 
 /* helper to find edge for edge_rip */
-static float mesh_rip_edgedist(ARegion *ar, float mat[][4], float *co1, float *co2, const short mval[2])
+static float mesh_rip_edgedist(ARegion *ar, float mat[][4], float *co1, float *co2, const int mval[2])
 {
-	float vec1[3], vec2[3], mvalf[2];
+	float vec1[2], vec2[2], mvalf[2];
 
-	view3d_project_float(ar, co1, vec1, mat);
-	view3d_project_float(ar, co2, vec2, mat);
+	ED_view3d_project_float(ar, co1, vec1, mat);
+	ED_view3d_project_float(ar, co2, vec2, mat);
 	mvalf[0]= (float)mval[0];
 	mvalf[1]= (float)mval[1];
 
@@ -4910,12 +4910,13 @@ static int mesh_rip_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	EditEdge *eed, *seed= NULL;
 	EditFace *efa, *sefa= NULL;
 	float projectMat[4][4], vec[3], dist, mindist;
-	short doit= 1, *mval= event->mval;
+	short doit= 1;
+	int *mval= event->mval;
 
 	/* select flush... vertices are important */
 	EM_selectmode_set(em);
 
-	view3d_get_object_project_mat(rv3d, obedit, projectMat);
+	ED_view3d_ob_project_mat_get(rv3d, obedit, projectMat);
 
 	/* find best face, exclude triangles and break on face select or faces with 2 edges select */
 	mindist= 1000000.0f;
@@ -4932,7 +4933,7 @@ static int mesh_rip_invoke(bContext *C, wmOperator *op, wmEvent *event)
 
 			if(totsel>1)
 				break;
-			view3d_project_float(ar, efa->cent, vec, projectMat);
+			ED_view3d_project_float(ar, efa->cent, vec, projectMat);
 			dist= sqrt( (vec[0]-mval[0])*(vec[0]-mval[0]) + (vec[1]-mval[1])*(vec[1]-mval[1]) );
 			if(dist<mindist) {
 				mindist= dist;
@@ -5262,7 +5263,7 @@ static int blend_from_shape_exec(bContext *C, wmOperator *op)
 	return OPERATOR_FINISHED;
 }
 
-static EnumPropertyItem *shape_itemf(bContext *C, PointerRNA *UNUSED(ptr), int *free)
+static EnumPropertyItem *shape_itemf(bContext *C, PointerRNA *UNUSED(ptr), PropertyRNA *UNUSED(prop), int *free)
 {	
 	Object *obedit= CTX_data_edit_object(C);
 	Mesh *me= (obedit) ? obedit->data : NULL;
@@ -5312,10 +5313,10 @@ void MESH_OT_blend_from_shape(wmOperatorType *ot)
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 
 	/* properties */
-	prop= RNA_def_enum(ot->srna, "shape", shape_items, 0, "Shape", "Shape key to use for blending.");
+	prop= RNA_def_enum(ot->srna, "shape", shape_items, 0, "Shape", "Shape key to use for blending");
 	RNA_def_enum_funcs(prop, shape_itemf);
-	RNA_def_float(ot->srna, "blend", 1.0f, -FLT_MAX, FLT_MAX, "Blend", "Blending factor.", -2.0f, 2.0f);
-	RNA_def_boolean(ot->srna, "add", 0, "Add", "Add rather then blend between shapes.");
+	RNA_def_float(ot->srna, "blend", 1.0f, -FLT_MAX, FLT_MAX, "Blend", "Blending factor", -2.0f, 2.0f);
+	RNA_def_boolean(ot->srna, "add", 0, "Add", "Add rather than blend between shapes");
 }
 
 /************************ Merge Operator *************************/
@@ -5956,7 +5957,7 @@ static int merge_exec(bContext *C, wmOperator *op)
 
 	recalc_editnormals(em);
 	
-	BKE_reportf(op->reports, RPT_INFO, "Removed %d vert%s.", count, (count==1)?"ex":"ices");
+	BKE_reportf(op->reports, RPT_INFO, "Removed %d vert%s", count, (count==1)?"ex":"ices");
 
 	BKE_mesh_end_editmesh(obedit->data, em);
 
@@ -5974,7 +5975,7 @@ static EnumPropertyItem merge_type_items[]= {
 	{5, "COLLAPSE", 0, "Collapse", ""},
 	{0, NULL, 0, NULL, NULL}};
 
-static EnumPropertyItem *merge_type_itemf(bContext *C, PointerRNA *UNUSED(ptr), int *free)
+static EnumPropertyItem *merge_type_itemf(bContext *C, PointerRNA *UNUSED(ptr), PropertyRNA *UNUSED(prop), int *free)
 {	
 	Object *obedit= CTX_data_edit_object(C);
 	EnumPropertyItem *item= NULL;
@@ -6028,10 +6029,10 @@ void MESH_OT_merge(wmOperatorType *ot)
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 
 	/* properties */
-	prop= RNA_def_enum(ot->srna, "type", merge_type_items, 3, "Type", "Merge method to use.");
+	prop= RNA_def_enum(ot->srna, "type", merge_type_items, 3, "Type", "Merge method to use");
 	RNA_def_enum_funcs(prop, merge_type_itemf);
 	ot->prop= prop;
-	RNA_def_boolean(ot->srna, "uvs", 0, "UVs", "Move UVs according to merge.");
+	RNA_def_boolean(ot->srna, "uvs", 0, "UVs", "Move UVs according to merge");
 }
 
 /************************ Vertex Path Operator *************************/
@@ -6235,7 +6236,7 @@ void MESH_OT_select_vertex_path(wmOperatorType *ot)
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 
 	/* properties */
-	ot->prop= RNA_def_enum(ot->srna, "type", type_items, PATH_SELECT_EDGE_LENGTH, "Type", "Method to compute distance.");
+	ot->prop= RNA_def_enum(ot->srna, "type", type_items, PATH_SELECT_EDGE_LENGTH, "Type", "Method to compute distance");
 }
 
 /********************** Region/Loop Operators *************************/
@@ -6490,7 +6491,7 @@ static int mesh_rotate_uvs(bContext *C, wmOperator *op)
 	int dir= RNA_enum_get(op->ptr, "direction");
 
 	if (!EM_texFaceCheck(em)) {
-		BKE_report(op->reports, RPT_WARNING, "Mesh has no uv/image layers.");
+		BKE_report(op->reports, RPT_WARNING, "Mesh has no uv/image layers");
 		BKE_mesh_end_editmesh(obedit->data, em);
 		return OPERATOR_CANCELLED;
 	}
@@ -6564,7 +6565,7 @@ static int mesh_mirror_uvs(bContext *C, wmOperator *op)
 	int axis= RNA_enum_get(op->ptr, "axis");
 
 	if (!EM_texFaceCheck(em)) {
-		BKE_report(op->reports, RPT_WARNING, "Mesh has no uv/image layers.");
+		BKE_report(op->reports, RPT_WARNING, "Mesh has no uv/image layers");
 		BKE_mesh_end_editmesh(obedit->data, em);
 		return OPERATOR_CANCELLED;
 	}
@@ -6652,7 +6653,7 @@ static int mesh_rotate_colors(bContext *C, wmOperator *op)
 	int dir= RNA_enum_get(op->ptr, "direction");
 
 	if (!EM_vertColorCheck(em)) {
-		BKE_report(op->reports, RPT_WARNING, "Mesh has no color layers.");
+		BKE_report(op->reports, RPT_WARNING, "Mesh has no color layers");
 		BKE_mesh_end_editmesh(obedit->data, em);
 		return OPERATOR_CANCELLED;
 	}
@@ -6768,7 +6769,7 @@ void MESH_OT_uvs_rotate(wmOperatorType *ot)
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 
 	/* props */
-	RNA_def_enum(ot->srna, "direction", direction_items, DIRECTION_CW, "Direction", "Direction to rotate UVs around.");
+	RNA_def_enum(ot->srna, "direction", direction_items, DIRECTION_CW, "Direction", "Direction to rotate UVs around");
 }
 
 void MESH_OT_uvs_mirror(wmOperatorType *ot)
@@ -6786,7 +6787,7 @@ void MESH_OT_uvs_mirror(wmOperatorType *ot)
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 
 	/* props */
-	RNA_def_enum(ot->srna, "axis", axis_items_xy, DIRECTION_CW, "Axis", "Axis to mirror UVs around.");
+	RNA_def_enum(ot->srna, "axis", axis_items_xy, DIRECTION_CW, "Axis", "Axis to mirror UVs around");
 }
 
 void MESH_OT_colors_rotate(wmOperatorType *ot)
@@ -6804,7 +6805,7 @@ void MESH_OT_colors_rotate(wmOperatorType *ot)
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 
 	/* props */
-	RNA_def_enum(ot->srna, "direction", direction_items, DIRECTION_CW, "Direction", "Direction to rotate edge around.");
+	RNA_def_enum(ot->srna, "direction", direction_items, DIRECTION_CW, "Direction", "Direction to rotate edge around");
 }
 
 void MESH_OT_colors_mirror(wmOperatorType *ot)
@@ -6822,7 +6823,7 @@ void MESH_OT_colors_mirror(wmOperatorType *ot)
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 
 	/* props */
-	RNA_def_enum(ot->srna, "axis", axis_items_xy, DIRECTION_CW, "Axis", "Axis to mirror colors around.");
+	RNA_def_enum(ot->srna, "axis", axis_items_xy, DIRECTION_CW, "Axis", "Axis to mirror colors around");
 }
 
 /********************** Subdivide Operator *************************/
@@ -6867,8 +6868,8 @@ void MESH_OT_subdivide(wmOperatorType *ot)
 
 	/* properties */
 	RNA_def_int(ot->srna, "number_cuts", 1, 1, INT_MAX, "Number of Cuts", "", 1, 10);
-	RNA_def_float(ot->srna, "smoothness", 0.0f, 0.0f, FLT_MAX, "Smoothness", "Smoothness factor.", 0.0f, 1.0f);
-	RNA_def_float(ot->srna, "fractal", 0.0, 0.0f, FLT_MAX, "Fractal", "Fractal randomness factor.", 0.0f, 1000.0f);
+	RNA_def_float(ot->srna, "smoothness", 0.0f, 0.0f, FLT_MAX, "Smoothness", "Smoothness factor", 0.0f, 1.0f);
+	RNA_def_float(ot->srna, "fractal", 0.0, 0.0f, FLT_MAX, "Fractal", "Fractal randomness factor", 0.0f, 1000.0f);
 	RNA_def_enum(ot->srna, "corner_cut_pattern", corner_type_items, SUBDIV_CORNER_INNERVERT, "Corner Cut Pattern", "Topology pattern to use to fill a face after cutting across its corner");
 }
 
@@ -7342,7 +7343,7 @@ void MESH_OT_sort_faces(wmOperatorType *ot)
 
 	/* identifiers */
 	ot->name= "Sort Faces"; // XXX (Ctrl to reverse)%t|
-	ot->description= "The faces of the active Mesh Object are sorted, based on the current view.";
+	ot->description= "The faces of the active Mesh Object are sorted, based on the current view";
 	ot->idname= "MESH_OT_sort_faces";
 
 	/* api callbacks */

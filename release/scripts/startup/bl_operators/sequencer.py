@@ -19,11 +19,12 @@
 # <pep8 compliant>
 
 import bpy
+from bpy.types import Operator
 
 from bpy.props import IntProperty
 
 
-class SequencerCrossfadeSounds(bpy.types.Operator):
+class SequencerCrossfadeSounds(Operator):
     '''Do crossfading volume animation of two selected sound strips.'''
 
     bl_idname = "sequencer.crossfade_sounds"
@@ -50,7 +51,7 @@ class SequencerCrossfadeSounds(bpy.types.Operator):
                     seq2 = None
                     break
         if seq2 is None:
-            self.report({'ERROR'}, "Select 2 sound strips.")
+            self.report({'ERROR'}, "Select 2 sound strips")
             return {'CANCELLED'}
         if seq1.frame_final_start > seq2.frame_final_start:
             s = seq1
@@ -70,19 +71,23 @@ class SequencerCrossfadeSounds(bpy.types.Operator):
             context.scene.frame_current = tempcfra
             return {'FINISHED'}
         else:
-            self.report({'ERROR'}, "The selected strips don't overlap.")
+            self.report({'ERROR'}, "The selected strips don't overlap")
             return {'CANCELLED'}
 
 
-class SequencerCutMulticam(bpy.types.Operator):
+class SequencerCutMulticam(Operator):
     '''Cut multicam strip and select camera.'''
 
     bl_idname = "sequencer.cut_multicam"
     bl_label = "Cut multicam"
     bl_options = {'REGISTER', 'UNDO'}
 
-    camera = IntProperty(name="Camera",
-            default=1, min=1, max=32, soft_min=1, soft_max=32)
+    camera = IntProperty(
+            name="Camera",
+            min=1, max=32,
+            soft_min=1, soft_max=32,
+            default=1,
+            )
 
     @classmethod
     def poll(cls, context):
@@ -112,7 +117,7 @@ class SequencerCutMulticam(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class SequencerDeinterlaceSelectedMovies(bpy.types.Operator):
+class SequencerDeinterlaceSelectedMovies(Operator):
     '''Deinterlace all selected movie sources.'''
 
     bl_idname = "sequencer.deinterlace_selected_movies"

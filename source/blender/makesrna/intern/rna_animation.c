@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -74,36 +72,7 @@ static int rna_AnimData_action_editable(PointerRNA *ptr)
 static void rna_AnimData_action_set(PointerRNA *ptr, PointerRNA value)
 {
 	ID *ownerId = (ID *)ptr->id.data;
-	AnimData *adt = (AnimData *)ptr->data;
-	
-	/* assume that AnimData's action can in fact be edited... */
-	if ((value.data) && (ownerId)) {
-		bAction *act = (bAction *)value.data;
-		
-		/* action must have same type as owner */
-		if (ownerId) {
-			if (ELEM(act->idroot, 0, GS(ownerId->name))) {
-				/* can set */
-				adt->action = act;
-			}
-			else {
-				/* cannot set */
-				printf("ERROR: Couldn't set Action '%s' onto ID '%s', as it doesn't have suitably rooted paths for this purpose\n", 
-						act->id.name+2, ownerId->name);
-			}
-		}
-		else {
-			/* cannot tell if we can set, so let's just be generous... */
-			printf("Warning: Set Action '%s' onto AnimData block with an unknown ID-owner. May have attached invalid data\n",
-					act->id.name+2);
-				
-			adt->action = act;
-		}
-	}
-	else {
-		/* just clearing the action... */
-		adt->action = NULL;
-	}
+	BKE_animdata_set_action(NULL, ownerId, value.data);
 }
 
 /* ****************************** */
@@ -188,7 +157,7 @@ static StructRNA *rna_KeyingSetInfo_refine(PointerRNA *ptr)
 	return (ksi->ext.srna)? ksi->ext.srna: &RNA_KeyingSetInfo;
 }
 
-static void rna_KeyingSetInfo_unregister(const bContext *C, StructRNA *type)
+static void rna_KeyingSetInfo_unregister(Main *bmain, StructRNA *type)
 {
 	KeyingSetInfo *ksi= RNA_struct_blender_type_get(type);
 
@@ -200,10 +169,10 @@ static void rna_KeyingSetInfo_unregister(const bContext *C, StructRNA *type)
 	RNA_struct_free(&BLENDER_RNA, type);
 	
 	/* unlink Blender-side data */
-	ANIM_keyingset_info_unregister(C, ksi);
+	ANIM_keyingset_info_unregister(bmain, ksi);
 }
 
-static StructRNA *rna_KeyingSetInfo_register(bContext *C, ReportList *reports, void *data, const char *identifier, StructValidateFunc validate, StructCallbackFunc call, StructFreeFunc free)
+static StructRNA *rna_KeyingSetInfo_register(Main *bmain, ReportList *reports, void *data, const char *identifier, StructValidateFunc validate, StructCallbackFunc call, StructFreeFunc free)
 {
 	KeyingSetInfo dummyksi = {NULL};
 	KeyingSetInfo *ksi;
@@ -219,14 +188,14 @@ static StructRNA *rna_KeyingSetInfo_register(bContext *C, ReportList *reports, v
 		return NULL;
 	
 	if (strlen(identifier) >= sizeof(dummyksi.idname)) {
-		BKE_reportf(reports, RPT_ERROR, "registering keying set info class: '%s' is too long, maximum length is %d.", identifier, (int)sizeof(dummyksi.idname));
+		BKE_reportf(reports, RPT_ERROR, "Registering keying set info class: '%s' is too long, maximum length is %d", identifier, (int)sizeof(dummyksi.idname));
 		return NULL;
 	}
 	
 	/* check if we have registered this info before, and remove it */
 	ksi = ANIM_keyingset_info_find_named(dummyksi.idname);
 	if (ksi && ksi->ext.srna)
-		rna_KeyingSetInfo_unregister(C, ksi->ext.srna);
+		rna_KeyingSetInfo_unregister(bmain, ksi->ext.srna);
 	
 	/* create a new KeyingSetInfo type */
 	ksi= MEM_callocN(sizeof(KeyingSetInfo), "python keying set info");
@@ -283,7 +252,7 @@ static void rna_ksPath_RnaPath_get(PointerRNA *ptr, char *value)
 	if (ksp->rna_path)
 		strcpy(value, ksp->rna_path);
 	else
-		strcpy(value, "");
+		value[0]= '\0';
 }
 
 static int rna_ksPath_RnaPath_length(PointerRNA *ptr)
@@ -384,7 +353,7 @@ static KS_Path *rna_KeyingSet_paths_add(KeyingSet *keyingset, ReportList *report
 		keyingset->active_path= BLI_countlist(&keyingset->paths); 
 	}
 	else {
-		BKE_report(reports, RPT_ERROR, "Keying Set Path could not be added.");
+		BKE_report(reports, RPT_ERROR, "Keying Set Path could not be added");
 	}
 	
 	/* return added path */
@@ -403,7 +372,7 @@ static void rna_KeyingSet_paths_remove(KeyingSet *keyingset, ReportList *reports
 		keyingset->active_path = 0;
 	}
 	else {
-		BKE_report(reports, RPT_ERROR, "Keying Set Path could not be removed.");
+		BKE_report(reports, RPT_ERROR, "Keying Set Path could not be removed");
 	}
 }
 
@@ -423,7 +392,7 @@ static void rna_KeyingSet_paths_clear(KeyingSet *keyingset, ReportList *reports)
 		keyingset->active_path = 0;
 	}
 	else {
-		BKE_report(reports, RPT_ERROR, "Keying Set Paths could not be removed.");
+		BKE_report(reports, RPT_ERROR, "Keying Set Paths could not be removed");
 	}
 }
 
@@ -509,7 +478,7 @@ static void rna_def_keyingset_info(BlenderRNA *brna)
 	RNA_def_struct_sdna(srna, "KeyingSetInfo");
 	RNA_def_struct_ui_text(srna, "Keying Set Info", "Callback function defines for builtin Keying Sets");
 	RNA_def_struct_refine_func(srna, "rna_KeyingSetInfo_refine");
-	RNA_def_struct_register_funcs(srna, "rna_KeyingSetInfo_register", "rna_KeyingSetInfo_unregister");
+	RNA_def_struct_register_funcs(srna, "rna_KeyingSetInfo_register", "rna_KeyingSetInfo_unregister", NULL);
 	
 	/* Properties --------------------- */
 	
@@ -639,27 +608,31 @@ static void rna_def_keyingset_paths(BlenderRNA *brna, PropertyRNA *cprop)
 	
 	/* Add Path */
 	func= RNA_def_function(srna, "add", "rna_KeyingSet_paths_add");
-	RNA_def_function_ui_description(func, "Add a new path for the Keying Set.");
+	RNA_def_function_ui_description(func, "Add a new path for the Keying Set");
 	RNA_def_function_flag(func, FUNC_USE_REPORTS);
 		/* return arg */
 	parm= RNA_def_pointer(func, "ksp", "KeyingSetPath", "New Path", "Path created and added to the Keying Set");
 		RNA_def_function_return(func, parm);
 		/* ID-block for target */
-	parm= RNA_def_pointer(func, "target_id", "ID", "Target ID", "ID-Datablock for the destination."); 
+	parm= RNA_def_pointer(func, "target_id", "ID", "Target ID", "ID-Datablock for the destination"); 
 		RNA_def_property_flag(parm, PROP_REQUIRED);
 		/* rna-path */
-	parm= RNA_def_string(func, "data_path", "", 256, "Data-Path", "RNA-Path to destination property."); // xxx hopefully this is long enough
+	parm= RNA_def_string(func, "data_path", "", 256, "Data-Path", "RNA-Path to destination property"); // xxx hopefully this is long enough
 		RNA_def_property_flag(parm, PROP_REQUIRED);
 		/* index (defaults to -1 for entire array) */
-	RNA_def_int(func, "index", -1, -1, INT_MAX, "Index", "The index of the destination property (i.e. axis of Location/Rotation/etc.), or -1 for the entire array.", 0, INT_MAX);
+	RNA_def_int(func, "index", -1, -1, INT_MAX, "Index",
+	            "The index of the destination property (i.e. axis of Location/Rotation/etc.), "
+	            "or -1 for the entire array", 0, INT_MAX);
 		/* grouping */
-	RNA_def_enum(func, "group_method", keyingset_path_grouping_items, KSP_GROUP_KSNAME, "Grouping Method", "Method used to define which Group-name to use.");
-	RNA_def_string(func, "group_name", "", 64, "Group Name", "Name of Action Group to assign destination to (only if grouping mode is to use this name).");
+	RNA_def_enum(func, "group_method", keyingset_path_grouping_items, KSP_GROUP_KSNAME,
+	             "Grouping Method", "Method used to define which Group-name to use");
+	RNA_def_string(func, "group_name", "", 64, "Group Name",
+	               "Name of Action Group to assign destination to (only if grouping mode is to use this name)");
 
 
 	/* Remove Path */
 	func= RNA_def_function(srna, "remove", "rna_KeyingSet_paths_remove");
-	RNA_def_function_ui_description(func, "Remove the given path from the Keying Set.");
+	RNA_def_function_ui_description(func, "Remove the given path from the Keying Set");
 	RNA_def_function_flag(func, FUNC_USE_REPORTS);
 		/* path to remove */
 	parm= RNA_def_pointer(func, "path", "KeyingSetPath", "Path", ""); 
@@ -668,7 +641,7 @@ static void rna_def_keyingset_paths(BlenderRNA *brna, PropertyRNA *cprop)
 
 	/* Remove All Paths */
 	func= RNA_def_function(srna, "clear", "rna_KeyingSet_paths_clear");
-	RNA_def_function_ui_description(func, "Remove all the paths from the Keying Set.");
+	RNA_def_function_ui_description(func, "Remove all the paths from the Keying Set");
 	RNA_def_function_flag(func, FUNC_USE_REPORTS);
 	
 	prop= RNA_def_property(srna, "active", PROP_POINTER, PROP_NONE);
@@ -695,7 +668,7 @@ static void rna_def_keyingset(BlenderRNA *brna)
 	/* Name */
 	prop= RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
 	RNA_def_property_ui_text(prop, "Name", "");
-	RNA_def_struct_ui_icon(srna, ICON_KEY_HLT); // TODO: we need a dedicated icon
+	RNA_def_struct_ui_icon(srna, ICON_KEYINGSET);
 	RNA_def_struct_name_property(srna, prop);
 	RNA_def_property_update(prop, NC_SCENE|ND_KEYINGSET|NA_RENAME, NULL);
 	
@@ -744,15 +717,15 @@ static void rna_api_animdata_nla_tracks(BlenderRNA *brna, PropertyRNA *cprop)
 	func = RNA_def_function(srna, "new", "rna_NlaTrack_new");
 	RNA_def_function_flag(func, FUNC_USE_CONTEXT);
 	RNA_def_function_ui_description(func, "Add a new NLA Track");
-	RNA_def_pointer(func, "prev", "NlaTrack", "", "NLA Track to add the new one after.");
+	RNA_def_pointer(func, "prev", "NlaTrack", "", "NLA Track to add the new one after");
 	/* return type */
-	parm = RNA_def_pointer(func, "track", "NlaTrack", "", "New NLA Track.");
+	parm = RNA_def_pointer(func, "track", "NlaTrack", "", "New NLA Track");
 	RNA_def_function_return(func, parm);
 	
 	func = RNA_def_function(srna, "remove", "rna_NlaTrack_remove");
 	RNA_def_function_flag(func, FUNC_USE_CONTEXT);
-	RNA_def_function_ui_description(func, "Remove a NLA Track.");
-	parm = RNA_def_pointer(func, "track", "NlaTrack", "", "NLA Track to remove.");
+	RNA_def_function_ui_description(func, "Remove a NLA Track");
+	parm = RNA_def_pointer(func, "track", "NlaTrack", "", "NLA Track to remove");
 	RNA_def_property_flag(parm, PROP_REQUIRED|PROP_NEVER_NULL);
 
 	prop= RNA_def_property(srna, "active", PROP_POINTER, PROP_NONE);
@@ -782,7 +755,7 @@ static void rna_api_animdata_drivers(BlenderRNA *brna, PropertyRNA *cprop)
 	RNA_def_function_ui_description(func, "Add a new driver given an existing one");
 	RNA_def_pointer(func, "src_driver", "FCurve", "", "Existing Driver F-Curve to use as template for a new one");
 	/* return type */
-	parm = RNA_def_pointer(func, "driver", "FCurve", "", "New Driver F-Curve.");
+	parm = RNA_def_pointer(func, "driver", "FCurve", "", "New Driver F-Curve");
 	RNA_def_function_return(func, parm);
 }
 

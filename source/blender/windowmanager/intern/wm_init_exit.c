@@ -48,6 +48,7 @@
 
 #include "BKE_blender.h"
 #include "BKE_context.h"
+#include "BKE_screen.h"
 #include "BKE_curve.h"
 #include "BKE_displist.h"
 #include "BKE_DerivedMesh.h"
@@ -98,6 +99,7 @@
 
 #include "UI_interface.h"
 #include "BLF_api.h"
+#include "BLF_translation.h"
 
 #include "GPU_buffers.h"
 #include "GPU_extensions.h"
@@ -115,7 +117,7 @@ static void wm_free_reports(bContext *C)
 	BKE_reports_clear(CTX_wm_reports(C));
 }
 
-int wm_start_with_console = 0;
+int wm_start_with_console = 0; /* used in creator.c */
 
 /* only called once, for startup */
 void WM_init(bContext *C, int argc, const char **argv)
@@ -126,7 +128,8 @@ void WM_init(bContext *C, int argc, const char **argv)
 	}
 	GHOST_CreateSystemPaths();
 	wm_operatortype_init();
-	
+	WM_menutype_init();
+
 	set_free_windowmanager_cb(wm_close_and_free);	/* library.c */
 	set_blender_test_break_cb(wm_window_testbreak); /* blender.c */
 	DAG_editors_update_cb(ED_render_id_flush_update); /* depsgraph.c */
@@ -141,6 +144,8 @@ void WM_init(bContext *C, int argc, const char **argv)
 	/* get the default database, plus a wm */
 	WM_read_homefile(C, NULL, G.factory_startup);
 
+	BLF_lang_set(NULL);
+
 	/* note: there is a bug where python needs initializing before loading the
 	 * startup.blend because it may contain PyDrivers. It also needs to be after
 	 * initializing space types and other internal data.
@@ -154,6 +159,8 @@ void WM_init(bContext *C, int argc, const char **argv)
 	BPY_python_start(argc, argv);
 
 	BPY_driver_reset();
+	BPY_app_handlers_reset(); /* causes addon callbacks to be freed [#28068],
+	                           * but this is actually what we want. */
 	BPY_modules_load_user(C);
 #else
 	(void)argc; /* unused */
@@ -168,6 +175,7 @@ void WM_init(bContext *C, int argc, const char **argv)
 	if (!G.background) {
 		GPU_extensions_init();
 		GPU_set_mipmap(!(U.gameflags & USER_DISABLE_MIPMAP));
+		GPU_set_anisotropic(U.anisotropic_filter);
 	
 		UI_init();
 	}
@@ -178,8 +186,6 @@ void WM_init(bContext *C, int argc, const char **argv)
 	//	glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
 		
 	ED_preview_init_dbase();
-	
-	G.ndofdevice = -1;	/* XXX bad initializer, needs set otherwise buttons show! */
 	
 	WM_read_history();
 
@@ -247,15 +253,7 @@ int WM_init_game(bContext *C)
 		CTX_wm_window_set(C, win);
 
 	sa = biggest_view3d(C);
-
-	if(sa)
-	{
-		for(ar=sa->regionbase.first; ar; ar=ar->next) {
-			if(ar->regiontype == RGN_TYPE_WINDOW) {
-				break;
-			}
-		}
-	}
+	ar= BKE_area_find_region_type(sa, RGN_TYPE_WINDOW);
 
 	// if we have a valid 3D view
 	if (sa && ar) {
@@ -301,6 +299,8 @@ int WM_init_game(bContext *C)
 
 		WM_operator_name_call(C, "VIEW3D_OT_game_start", WM_OP_EXEC_DEFAULT, NULL);
 
+		sound_exit();
+
 		return 1;
 	}
 	else
@@ -335,7 +335,6 @@ static void free_openrecent(void)
 
 /* bad stuff*/
 
-extern ListBase editelems;
 extern wchar_t *copybuf;
 extern wchar_t *copybufinfo;
 
@@ -346,7 +345,8 @@ extern void free_fmodifiers_copybuf(void);
 extern void free_posebuf(void); 
 
 /* called in creator.c even... tsk, split this! */
-void WM_exit(bContext *C)
+/* note, doesnt run exit() call WM_exit() for that */
+void WM_exit_ext(bContext *C, const short do_python)
 {
 	wmWindow *win;
 
@@ -382,12 +382,11 @@ void WM_exit(bContext *C)
 	BIF_freeTemplates(C);
 	
 	free_ttfont(); /* bke_font.h */
-	
+
 	free_openrecent();
 	
 	BKE_freecubetable();
 	
-	fastshade_free_render();	/* shaded view */
 	ED_preview_free_dbase();	/* frees a Main dbase, before free_blender! */
 
 	if(C && CTX_wm_manager(C))
@@ -401,12 +400,12 @@ void WM_exit(bContext *C)
 	free_anim_drivers_copybuf();
 	free_fmodifiers_copybuf();
 	free_posebuf();
-//	free_vertexpaint();
-//	free_imagepaint();
-	
-//	fsmenu_free();
 
 	BLF_exit();
+
+#ifdef INTERNATIONAL
+	BLF_free_unifont();
+#endif
 	
 	ANIM_keyingset_infos_exit();
 	
@@ -417,21 +416,20 @@ void WM_exit(bContext *C)
 	
 
 #ifdef WITH_PYTHON
-	/* XXX - old note */
-	/* before free_blender so py's gc happens while library still exists */
-	/* needed at least for a rare sigsegv that can happen in pydrivers */
+	/* option not to close python so we can use 'atexit' */
+	if(do_python) {
+		/* XXX - old note */
+		/* before free_blender so py's gc happens while library still exists */
+		/* needed at least for a rare sigsegv that can happen in pydrivers */
 
-	/* Update for blender 2.5, move after free_blender because blender now holds references to PyObject's
-	 * so decref'ing them after python ends causes bad problems every time
-	 * the pyDriver bug can be fixed if it happens again we can deal with it then */
-	BPY_python_end();
+		/* Update for blender 2.5, move after free_blender because blender now holds references to PyObject's
+		 * so decref'ing them after python ends causes bad problems every time
+		 * the pyDriver bug can be fixed if it happens again we can deal with it then */
+		BPY_python_end();
+	}
 #endif
 
-	if (!G.background) {
-// XXX		UI_filelist_free_icons();
-	}
-	
-	GPU_buffer_pool_free(NULL);
+	GPU_global_buffer_pool_free();
 	GPU_free_unused_buffers();
 	GPU_extensions_exit();
 	
@@ -473,6 +471,10 @@ void WM_exit(bContext *C)
 		getchar();
 	}
 #endif 
-	exit(G.afbreek==1);
 }
 
+void WM_exit(bContext *C)
+{
+	WM_exit_ext(C, 1);
+	exit(G.afbreek==1);
+}

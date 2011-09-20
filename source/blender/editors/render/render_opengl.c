@@ -149,7 +149,7 @@ static void screen_opengl_render_apply(OGLRender *oglrender)
 			rctf viewplane;
 			float clipsta, clipend;
 
-			int is_ortho= get_view3d_viewplane(v3d, rv3d, sizex, sizey, &viewplane, &clipsta, &clipend, NULL);
+			int is_ortho= ED_view3d_viewplane_get(v3d, rv3d, sizex, sizey, &viewplane, &clipsta, &clipend, NULL);
 			if(is_ortho) orthographic_m4(winmat, viewplane.xmin, viewplane.xmax, viewplane.ymin, viewplane.ymax, -clipend, clipend);
 			else  perspective_m4(winmat, viewplane.xmin, viewplane.xmax, viewplane.ymin, viewplane.ymax, clipsta, clipend);
 		}
@@ -220,6 +220,11 @@ static void screen_opengl_render_apply(OGLRender *oglrender)
 		if(oglrender->write_still) {
 			char name[FILE_MAX];
 			int ok;
+
+			if(scene->r.planes == 8) {
+				IMB_color_to_bw(ibuf);
+			}
+
 			BKE_makepicstring(name, scene->r.pic, scene->r.cfra, scene->r.imtype, scene->r.scemode & R_EXTENSION, FALSE);
 			ok= BKE_write_ibuf(ibuf, name, scene->r.imtype, scene->r.subimtype, scene->r.quality); /* no need to stamp here */
 			if(ok)	printf("OpenGL Render written to '%s'\n", name);
@@ -255,12 +260,12 @@ static int screen_opengl_render_init(bContext *C, wmOperator *op)
 		return 0;
 	
 	if(!is_view_context && scene->camera==NULL) {
-		BKE_report(op->reports, RPT_ERROR, "Scene has no camera.");
+		BKE_report(op->reports, RPT_ERROR, "Scene has no camera");
 		return 0;
 	}
 
 	if(!is_animation && is_write_still && BKE_imtype_is_movie(scene->r.imtype)) {
-		BKE_report(op->reports, RPT_ERROR, "Can't write a single file with an animation format selected.");
+		BKE_report(op->reports, RPT_ERROR, "Can't write a single file with an animation format selected");
 		return 0;
 	}
 
@@ -433,6 +438,24 @@ static int screen_opengl_render_anim_step(bContext *C, wmOperator *op)
 	ibuf= BKE_image_acquire_ibuf(oglrender->ima, &oglrender->iuser, &lock);
 
 	if(ibuf) {
+		/* color -> greyscale */
+		/* editing directly would alter the render view */
+		if(scene->r.planes == 8) {
+			ImBuf *ibuf_bw= IMB_dupImBuf(ibuf);
+			IMB_color_to_bw(ibuf_bw);
+			// IMB_freeImBuf(ibuf); /* owned by the image */
+			ibuf= ibuf_bw;
+		}
+		else {
+			/* this is lightweight & doesnt re-alloc the buffers, only do this
+			 * to save the correct bit depth since the image is always RGBA */
+			ImBuf *ibuf_cpy= IMB_allocImBuf(ibuf->x, ibuf->y, scene->r.planes, 0);
+			ibuf_cpy->rect= ibuf->rect;
+			ibuf_cpy->rect_float= ibuf->rect_float;
+			ibuf_cpy->zbuf_float= ibuf->zbuf_float;
+			ibuf= ibuf_cpy;
+		}
+
 		if(BKE_imtype_is_movie(scene->r.imtype)) {
 			ok= oglrender->mh->append_movie(&scene->r, CFRA, (int*)ibuf->rect, oglrender->sizex, oglrender->sizey, oglrender->reports);
 			if(ok) {
@@ -453,6 +476,9 @@ static int screen_opengl_render_anim_step(bContext *C, wmOperator *op)
 				BKE_reportf(op->reports, RPT_INFO, "Saved file: %s", name);
 			}
 		}
+
+		/* imbuf knows which rects are not part of ibuf */
+		IMB_freeImBuf(ibuf);
 	}
 
 	BKE_image_release_ibuf(oglrender->ima, lock);
@@ -527,7 +553,7 @@ static int screen_opengl_render_invoke(bContext *C, wmOperator *op, wmEvent *eve
 	}
 	
 	oglrender= op->customdata;
-	screen_set_image_output(C, event->x, event->y);
+	render_view_open(C, event->x, event->y);
 	
 	WM_event_add_modal_handler(C, op);
 	oglrender->timer= WM_event_add_timer(CTX_wm_manager(C), CTX_wm_window(C), TIMER, 0.01f);
@@ -585,7 +611,7 @@ void RENDER_OT_opengl(wmOperatorType *ot)
 
 	RNA_def_boolean(ot->srna, "animation", 0, "Animation", "Render files from the animation range of this scene");
 	RNA_def_boolean(ot->srna, "write_still", 0, "Write Image", "Save rendered the image to the output path (used only when animation is disabled)");
-	RNA_def_boolean(ot->srna, "view_context", 1, "View Context", "Use the current 3D view for rendering, else use scene settings.");
+	RNA_def_boolean(ot->srna, "view_context", 1, "View Context", "Use the current 3D view for rendering, else use scene settings");
 }
 
 /* function for getting an opengl buffer from a View3D, used by sequencer */

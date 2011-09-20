@@ -37,6 +37,7 @@
 
 #include <string.h>
 
+#include "DNA_lattice_types.h"
 #include "DNA_modifier_types.h"
 #include "DNA_object_types.h"
 #include "DNA_curve_types.h"
@@ -47,6 +48,8 @@
 #include "BLI_math_matrix.h"
 
 #include "BKE_cdderivedmesh.h"
+#include "BKE_deform.h"
+#include "BKE_lattice.h"
 #include "BKE_mesh.h"
 #include "BKE_displist.h"
 
@@ -239,6 +242,19 @@ DerivedMesh *get_dm(Object *ob, struct EditMesh *em, DerivedMesh *dm, float (*ve
 	return dm;
 }
 
+void modifier_get_vgroup(Object *ob, DerivedMesh *dm, const char *name, MDeformVert **dvert, int *defgrp_index)
+{
+	*defgrp_index = defgroup_name_index(ob, name);
+	*dvert = NULL;
+
+	if(*defgrp_index >= 0) {
+		if(ob->type == OB_LATTICE)
+			*dvert = lattice_get_deform_verts(ob);
+		else if(dm)
+			*dvert = dm->getVertDataArray(dm, CD_MDEFORMVERT);
+	}
+}
+
 /* only called by BKE_modifier.h/modifier.c */
 void modifier_type_init(ModifierTypeInfo *types[])
 {
@@ -279,5 +295,9 @@ void modifier_type_init(ModifierTypeInfo *types[])
 	INIT_TYPE(Solidify);
 	INIT_TYPE(Screw);
 	INIT_TYPE(Warp);
+	INIT_TYPE(NavMesh);
+	INIT_TYPE(WeightVGEdit);
+	INIT_TYPE(WeightVGMix);
+	INIT_TYPE(WeightVGProximity);
 #undef INIT_TYPE
 }

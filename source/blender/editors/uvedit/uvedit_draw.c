@@ -275,7 +275,7 @@ static void draw_uvs_stretch(SpaceImage *sima, Scene *scene, EditMesh *em, MTFac
 						VECSUB2D(av4, tf_uv[2], tf_uv[3]); normalize_v2(av4);
 						
 						/* This is the correct angle however we are only comparing angles
-						 * uvang1 = 90-((angle_normalized_v2v2(av1, av2) * 180.0/M_PI)-90);*/
+						 * uvang1 = 90-((angle_normalized_v2v2(av1, av2) * RAD2DEGF(1.0f))-90);*/
 						uvang1 = angle_normalized_v2v2(av1, av2);
 						uvang2 = angle_normalized_v2v2(av2, av3);
 						uvang3 = angle_normalized_v2v2(av3, av4);
@@ -288,7 +288,7 @@ static void draw_uvs_stretch(SpaceImage *sima, Scene *scene, EditMesh *em, MTFac
 						VECSUB(av4, efa->v3->co, efa->v4->co); normalize_v3(av4);
 						
 						/* This is the correct angle however we are only comparing angles
-						 * ang1 = 90-((angle_normalized_v3v3(av1, av2) * 180.0/M_PI)-90);*/
+						 * ang1 = 90-((angle_normalized_v3v3(av1, av2) * RAD2DEGF(1.0f))-90);*/
 						ang1 = angle_normalized_v3v3(av1, av2);
 						ang2 = angle_normalized_v3v3(av2, av3);
 						ang3 = angle_normalized_v3v3(av3, av4);
@@ -474,7 +474,7 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, Object *obedit)
 	if(sima->flag & SI_DRAW_STRETCH) {
 		draw_uvs_stretch(sima, scene, em, activetf);
 	}
-	else if(me->drawflag & ME_DRAWFACES) {
+	else if(!(sima->flag & SI_NO_DRAWFACES)) {
 		/* draw transparent faces */
 		UI_GetThemeColor4ubv(TH_FACE, col1);
 		UI_GetThemeColor4ubv(TH_FACE_SELECT, col2);

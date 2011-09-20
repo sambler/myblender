@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -50,6 +48,7 @@
 #include "BKE_main.h"
 #include "BKE_report.h"
 #include "BKE_scene.h"
+#include "BKE_screen.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
@@ -338,7 +337,7 @@ void debug_markers_print_list(ListBase *markers)
 	printf("List of markers follows: -----\n");
 	
 	for (marker = markers->first; marker; marker = marker->next) {
-		printf("\t'%s' on %d at %p with %d\n", marker->name, marker->frame, (void *)marker, marker->flag);
+		printf("\t'%s' on %d at %p with %u\n", marker->name, marker->frame, (void *)marker, marker->flag);
 	}
 	
 	printf("End of list ------------------\n");
@@ -717,7 +716,7 @@ static void ed_marker_move_apply(wmOperator *op)
 }
 
 /* only for modal */
-static void ed_marker_move_cancel(bContext *C, wmOperator *op)
+static int ed_marker_move_cancel(bContext *C, wmOperator *op)
 {
 	RNA_int_set(op->ptr, "frames", 0);
 	ed_marker_move_apply(op);
@@ -725,6 +724,8 @@ static void ed_marker_move_cancel(bContext *C, wmOperator *op)
 	
 	WM_event_add_notifier(C, NC_SCENE|ND_MARKERS, NULL);
 	WM_event_add_notifier(C, NC_ANIMATION|ND_MARKERS, NULL);
+
+	return OPERATOR_CANCELLED;
 }
 
 
@@ -886,6 +887,7 @@ static void MARKER_OT_move(wmOperatorType *ot)
 	ot->invoke= ed_marker_move_invoke_wrapper;
 	ot->modal= ed_marker_move_modal;
 	ot->poll= ed_markers_poll_selected_markers;
+	ot->cancel= ed_marker_move_cancel;
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO|OPTYPE_BLOCKING|OPTYPE_GRAB_POINTER;
@@ -980,6 +982,7 @@ static void MARKER_OT_duplicate(wmOperatorType *ot)
 	ot->invoke= ed_marker_duplicate_invoke_wrapper;
 	ot->modal= ed_marker_move_modal;
 	ot->poll= ed_markers_poll_selected_markers;
+	ot->cancel= ed_marker_move_cancel;
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
@@ -1185,6 +1188,7 @@ static void MARKER_OT_select_border(wmOperatorType *ot)
 	ot->exec= ed_marker_border_select_exec;
 	ot->invoke= ed_marker_select_border_invoke_wrapper;
 	ot->modal= WM_border_select_modal;
+	ot->cancel= WM_border_select_cancel;
 	
 	ot->poll= ed_markers_poll_markers_exist;
 	
@@ -1411,7 +1415,9 @@ static void MARKER_OT_make_links_scene(wmOperatorType *ot)
 
 static int ed_marker_camera_bind_exec(bContext *C, wmOperator *UNUSED(op))
 {
+	bScreen *sc= CTX_wm_screen(C);
 	Scene *scene= CTX_data_scene(C);
+	Object *ob = CTX_data_active_object(C);
 	ListBase *markers= ED_context_get_markers(C);
 	TimeMarker *marker;
 
@@ -1419,10 +1425,15 @@ static int ed_marker_camera_bind_exec(bContext *C, wmOperator *UNUSED(op))
 	if(marker == NULL)
 		return OPERATOR_CANCELLED;
 
-	marker->camera= scene->camera;
+	marker->camera= ob;
+
+	/* camera may have changes */
+	scene_camera_switch_update(scene);
+	BKE_screen_view3d_scene_sync(sc);
 
 	WM_event_add_notifier(C, NC_SCENE|ND_MARKERS, NULL);
 	WM_event_add_notifier(C, NC_ANIMATION|ND_MARKERS, NULL);
+	WM_event_add_notifier(C, NC_SCENE|NA_EDITED, scene); /* so we get view3d redraws */
 
 	return OPERATOR_FINISHED;
 }
@@ -1494,4 +1505,15 @@ void ED_marker_keymap(wmKeyConfig *keyconf)
 #ifdef DURIAN_CAMERA_SWITCH
 	WM_keymap_add_item(keymap, "MARKER_OT_camera_bind", BKEY, KM_PRESS, KM_CTRL, 0);
 #endif
+}
+
+/* to be called from animation editor keymaps, see note below */
+void ED_marker_keymap_animedit_conflictfree(wmKeyMap *keymap)
+{
+	/* duplicate of some marker-hotkeys but without the bounds checking
+	 * since these are handy to be able to do unrestricted and won't conflict
+	 * with primary function hotkeys (Usability tweak [#27469])
+	 */
+	WM_keymap_add_item(keymap, "MARKER_OT_add", MKEY, KM_PRESS, 0, 0);
+	WM_keymap_add_item(keymap, "MARKER_OT_rename", MKEY, KM_PRESS, KM_CTRL, 0);
 }

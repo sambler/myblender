@@ -381,9 +381,7 @@ Image *BKE_add_image_file(const char *name)
 	ima= image_alloc(libname, IMA_SRC_FILE, IMA_TYPE_IMAGE);
 	BLI_strncpy(ima->name, name, sizeof(ima->name));
 	
-	/* do a wild guess! */
-	if(BLI_testextensie(name, ".avi") || BLI_testextensie(name, ".mov")
-			|| BLI_testextensie(name, ".mpg")  || BLI_testextensie(name, ".mp4"))
+	if(BLI_testextensie_array(name, imb_ext_movie))
 		ima->source= IMA_SRC_MOVIE;
 	
 	return ima;
@@ -434,6 +432,7 @@ Image *BKE_add_image_size(unsigned int width, unsigned int height, const char *n
 		ima->gen_x= width;
 		ima->gen_y= height;
 		ima->gen_type= uvtestgrid;
+		ima->gen_flag |= (floatbuf ? IMA_GEN_FLOAT : 0);
 		
 		ibuf= add_ibuf_size(width, height, name, depth, floatbuf, uvtestgrid, color);
 		image_assign_ibuf(ima, ibuf, IMA_NO_INDEX, 0);
@@ -593,7 +592,7 @@ void BKE_image_print_memlist(void)
 	for(ima= G.main->image.first; ima; ima= ima->id.next)
 		totsize += image_mem_size(ima);
 
-	printf("\ntotal image memory len: %.3lf MB\n", (double)totsize/(double)(1024*1024));
+	printf("\ntotal image memory len: %.3f MB\n", (double)totsize/(double)(1024*1024));
 
 	for(ima= G.main->image.first; ima; ima= ima->id.next) {
 		size= image_mem_size(ima);
@@ -1031,7 +1030,7 @@ void BKE_stamp_buf(Scene *scene, Object *camera, unsigned char *rect, float *rec
 	BLF_buffer_col(mono, scene->r.fg_stamp[0], scene->r.fg_stamp[1], scene->r.fg_stamp[2], 1.0);
 	pad= BLF_width_max(mono);
 
-	/* use 'h_fixed' rather then 'h', aligns better */
+	/* use 'h_fixed' rather than 'h', aligns better */
 	h_fixed= BLF_height_max(mono);
 	y_ofs = -BLF_descender(mono);
 
@@ -1372,15 +1371,15 @@ void BKE_makepicstring(char *string, const char *base, int frame, int imtype, co
 }
 
 /* used by sequencer too */
-struct anim *openanim(char *name, int flags)
+struct anim *openanim(char *name, int flags, int streamindex)
 {
 	struct anim *anim;
 	struct ImBuf *ibuf;
 	
-	anim = IMB_open_anim(name, flags);
+	anim = IMB_open_anim(name, flags, streamindex);
 	if (anim == NULL) return NULL;
 
-	ibuf = IMB_anim_absolute(anim, 0);
+	ibuf = IMB_anim_absolute(anim, 0, IMB_TC_NONE, IMB_PROXY_NONE);
 	if (ibuf == NULL) {
 		if(BLI_exists(name))
 			printf("not an anim: %s\n", name);
@@ -1774,20 +1773,26 @@ static ImBuf *image_load_movie_file(Image *ima, ImageUser *iuser, int frame)
 		else
 			BLI_path_abs(str, G.main->name);
 		
-		ima->anim = openanim(str, IB_rect);
+		/* FIXME: make several stream accessible in image editor, too*/
+		ima->anim = openanim(str, IB_rect, 0);
 		
 		/* let's initialize this user */
 		if(ima->anim && iuser && iuser->frames==0)
-			iuser->frames= IMB_anim_get_duration(ima->anim);
+			iuser->frames= IMB_anim_get_duration(ima->anim,
+							     IMB_TC_RECORD_RUN);
 	}
 	
 	if(ima->anim) {
-		int dur = IMB_anim_get_duration(ima->anim);
+		int dur = IMB_anim_get_duration(ima->anim,
+						IMB_TC_RECORD_RUN);
 		int fra= frame-1;
 		
 		if(fra<0) fra = 0;
 		if(fra>(dur-1)) fra= dur-1;
-		ibuf = IMB_anim_absolute(ima->anim, fra);
+		ibuf = IMB_makeSingleUser(
+			IMB_anim_absolute(ima->anim, fra,
+					  IMB_TC_RECORD_RUN,
+					  IMB_PROXY_NONE));
 		
 		if(ibuf) {
 			image_initialize_after_load(ima, ibuf);
@@ -2174,7 +2179,7 @@ ImBuf *BKE_image_acquire_ibuf(Image *ima, ImageUser *iuser, void **lock_r)
 				/* UV testgrid or black or solid etc */
 				if(ima->gen_x==0) ima->gen_x= 1024;
 				if(ima->gen_y==0) ima->gen_y= 1024;
-				ibuf= add_ibuf_size(ima->gen_x, ima->gen_y, ima->name, 24, 0, ima->gen_type, color);
+				ibuf= add_ibuf_size(ima->gen_x, ima->gen_y, ima->name, 24, (ima->gen_flag & IMA_GEN_FLOAT) != 0, ima->gen_type, color);
 				image_assign_ibuf(ima, ibuf, IMA_NO_INDEX, 0);
 				ima->ok= IMA_OK_LOADED;
 			}
@@ -2285,3 +2290,20 @@ void BKE_image_user_calc_frame(ImageUser *iuser, int cfra, int fieldnr)
 	iuser->framenr= framenr;
 	if(iuser->ok==0) iuser->ok= 1;
 }
+
+int BKE_image_has_alpha(struct Image *image)
+{
+	ImBuf *ibuf;
+	void *lock;
+	int depth;
+	
+	ibuf= BKE_image_acquire_ibuf(image, NULL, &lock);
+	depth = (ibuf?ibuf->depth:0);
+	BKE_image_release_ibuf(image, lock);
+
+	if (depth == 32)
+		return 1;
+	else
+		return 0;
+}
+

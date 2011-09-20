@@ -62,7 +62,9 @@ extern "C"
 #include "BKE_global.h"	
 #include "BKE_icons.h"	
 #include "BKE_node.h"	
-#include "BKE_report.h"	
+#include "BKE_report.h"
+#include "BKE_library.h"
+#include "BLI_threads.h"
 #include "BLI_blenlib.h"
 #include "DNA_scene_types.h"
 #include "DNA_userdef_types.h"
@@ -70,6 +72,7 @@ extern "C"
 #include "BLO_runtime.h"
 #include "IMB_imbuf.h"
 #include "BKE_text.h"
+#include "BKE_sound.h"
 	
 	int GHOST_HACK_getFirstFile(char buf[]);
 	
@@ -78,6 +81,7 @@ extern char btempdir[];		/* use this to store a valid temp directory */
 
 // For BLF
 #include "BLF_api.h"
+#include "BLF_translation.h"
 extern int datatoc_bfont_ttf_size;
 extern char datatoc_bfont_ttf[];
 
@@ -345,7 +349,9 @@ int main(int argc, char** argv)
 	bool fullScreen = false;
 	bool fullScreenParFound = false;
 	bool windowParFound = false;
+#ifdef WIN32
 	bool closeConsole = true;
+#endif
 	RAS_IRasterizer::StereoMode stereomode = RAS_IRasterizer::RAS_STEREO_NOSTEREO;
 	bool stereoWindow = false;
 	bool stereoParFound = false;
@@ -375,12 +381,12 @@ int main(int argc, char** argv)
 #endif /* __linux__ */
 	BLI_where_am_i(bprogname, sizeof(bprogname), argv[0]);
 #ifdef __APPLE__
-    // Can't use Carbon right now because of double defined type ID (In Carbon.h and DNA_ID.h, sigh)
-    /*
-    IBNibRef 		nibRef;
-    WindowRef 		window;
-    OSStatus		err;
-	
+	// Can't use Carbon right now because of double defined type ID (In Carbon.h and DNA_ID.h, sigh)
+	/*
+	IBNibRef 		nibRef;
+	WindowRef 		window;
+	OSStatus		err;
+
 	  // Create a Nib reference passing the name of the nib file (without the .nib extension)
 	  // CreateNibReference only searches into the application bundle.
 	  err = ::CreateNibReference(CFSTR("main"), &nibRef);
@@ -393,8 +399,12 @@ int main(int argc, char** argv)
 		
 		  // We don't need the nib reference anymore.
 		  ::DisposeNibReference(nibRef);
-    */
+	*/
 #endif // __APPLE__
+	
+	// We don't use threads directly in the BGE, but we need to call this so things like
+	// freeing up GPU_Textures works correctly.
+	BLI_threadapi_init();
 
 	RNA_init();
 
@@ -402,13 +412,20 @@ int main(int argc, char** argv)
 	
 	initglobals();
 
+	// We load our own G.main, so free the one that initglobals() gives us
+	free_main(G.main);
+	G.main = NULL;
+
 	IMB_init();
 
 	// Setup builtin font for BLF (mostly copied from creator.c, wm_init_exit.c and interface_style.c)
 	BLF_init(11, U.dpi);
 	BLF_lang_init();
+	BLF_lang_encoding("");
+	BLF_lang_set("");
+
 	BLF_load_mem("default", (unsigned char*)datatoc_bfont_ttf, datatoc_bfont_ttf_size);
- 
+
 	// Parse command line options
 #if defined(DEBUG)
 	printf("argv[0] = '%s'\n", argv[0]);
@@ -442,6 +459,11 @@ int main(int argc, char** argv)
 	U.audiorate = 44100;
 	U.audioformat = 0x24;
 	U.audiochannels = 2;
+
+	// XXX this one too
+	U.anisotropic_filter = 2;
+
+	sound_init_once();
 
 	/* if running blenderplayer the last argument can't be parsed since it has to be the filename. */
 	isBlenderPlayer = !BLO_is_a_runtime(argv[0]);
@@ -570,7 +592,9 @@ int main(int argc, char** argv)
 				break;
 			case 'c':
 				i++;
+#ifdef WIN32
 				closeConsole = false;
+#endif
 				break;
 			case 's':  // stereo
 				i++;
@@ -694,6 +718,8 @@ int main(int argc, char** argv)
 		{
 			GPU_set_mipmap(0);
 		}
+
+		GPU_set_anisotropic(U.anisotropic_filter);
 		
 		// Create the system
 		if (GHOST_ISystem::createSystem() == GHOST_kSuccess)
@@ -724,6 +750,11 @@ int main(int argc, char** argv)
 				if(filename[0])
 					BLI_path_cwd(filename);
 				
+
+				// fill the GlobalSettings with the first scene files
+				// those may change during the game and persist after using Game Actuator
+				GlobalSettings gs;
+
 				do
 				{
 					// Read the Blender file
@@ -777,8 +808,12 @@ int main(int argc, char** argv)
 						Scene *scene = bfd->curscene;
 						G.main = maggie;
 
-						if (firstTimeRunning)
+						if (firstTimeRunning) {
 							G.fileflags  = bfd->fileflags;
+
+							gs.matmode= scene->gm.matmode;
+							gs.glslflag= scene->gm.flag;
+						}
 
 						//Seg Fault; icon.c gIcons == 0
 						BKE_icons_init(1);
@@ -839,7 +874,7 @@ int main(int argc, char** argv)
 						}
 						
 						//					GPG_Application app (system, maggie, startscenename);
-						app.SetGameEngineData(maggie, scene, argc, argv); /* this argc cant be argc_py_clamped, since python uses it */
+						app.SetGameEngineData(maggie, scene, &gs, argc, argv); /* this argc cant be argc_py_clamped, since python uses it */
 						BLI_strncpy(pathname, maggie->name, sizeof(pathname));
 						if(G.main != maggie) {
 							BLI_strncpy(G.main->name, maggie->name, sizeof(G.main->name));
@@ -935,6 +970,7 @@ int main(int argc, char** argv)
 							{
 								run = false;
 								exitstring = app.getExitString();
+								gs = *app.getGlobalSettings();
 							}
 						}
 						app.StopGameEngine();
@@ -962,6 +998,11 @@ int main(int argc, char** argv)
 	// Cleanup
 	RNA_exit();
 	BLF_exit();
+
+#ifdef INTERNATIONAL
+	BLF_free_unifont();
+#endif
+
 	IMB_exit();
 	free_nodesystem();
 

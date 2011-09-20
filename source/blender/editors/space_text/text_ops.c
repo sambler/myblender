@@ -36,6 +36,7 @@
 #include <string.h>
 #include <ctype.h> /* ispunct */
 #include <sys/stat.h>
+#include <errno.h>
 
 #include "MEM_guardedalloc.h"
 
@@ -191,11 +192,12 @@ static int new_exec(bContext *C, wmOperator *UNUSED(op))
 void TEXT_OT_new(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "New";
+	ot->name= "Create Text Block";
 	ot->idname= "TEXT_OT_new";
 	ot->description= "Create a new text data block";
 	
 	/* api callbacks */
+	ot->invoke= WM_operator_confirm;
 	ot->exec= new_exec;
 	ot->poll= text_new_poll;
 	
@@ -449,15 +451,14 @@ static void txt_write_file(Text *text, ReportList *reports)
 	FILE *fp;
 	TextLine *tmp;
 	struct stat st;
-	int res;
-	char file[FILE_MAXDIR+FILE_MAXFILE];
+	char filepath[FILE_MAXDIR+FILE_MAXFILE];
 	
-	BLI_strncpy(file, text->name, FILE_MAXDIR+FILE_MAXFILE);
-	BLI_path_abs(file, G.main->name);
+	BLI_strncpy(filepath, text->name, FILE_MAXDIR+FILE_MAXFILE);
+	BLI_path_abs(filepath, G.main->name);
 	
-	fp= fopen(file, "w");
+	fp= fopen(filepath, "w");
 	if(fp==NULL) {
-		BKE_report(reports, RPT_ERROR, "Unable to save file.");
+		BKE_reportf(reports, RPT_ERROR, "Unable to save \"%s\": %s", filepath, errno ? strerror(errno) : "Unknown error writing file");
 		return;
 	}
 
@@ -471,8 +472,13 @@ static void txt_write_file(Text *text, ReportList *reports)
 	
 	fclose (fp);
 
-	res= stat(file, &st);
-	text->mtime= st.st_mtime;
+	if(stat(filepath, &st) == 0) {
+		text->mtime= st.st_mtime;
+	}
+	else {
+		text->mtime= 0;
+		BKE_reportf(reports, RPT_WARNING, "Unable to stat \"%s\": %s", filepath, errno ? strerror(errno) : "Unknown error starrng file");
+	}
 	
 	if(text->flags & TXT_ISDIRTY)
 		text->flags ^= TXT_ISDIRTY;
@@ -813,7 +819,7 @@ void TEXT_OT_paste(wmOperatorType *ot)
 	ot->poll= text_edit_poll;
 	
 	/* properties */
-	RNA_def_boolean(ot->srna, "selection", 0, "Selection", "Paste text selected elsewhere rather than copied, X11 only.");
+	RNA_def_boolean(ot->srna, "selection", 0, "Selection", "Paste text selected elsewhere rather than copied (X11 only)");
 }
 
 /******************* copy operator *********************/
@@ -894,7 +900,7 @@ static int indent_exec(bContext *C, wmOperator *UNUSED(op))
 
 	if(txt_has_sel(text)) {
 		txt_order_cursors(text);
-		indent(text);
+		txt_indent(text);
 	}
 	else
 		txt_add_char(text, '\t');
@@ -929,7 +935,7 @@ static int unindent_exec(bContext *C, wmOperator *UNUSED(op))
 		text_drawcache_tag_update(CTX_wm_space_text(C), 0);
 
 		txt_order_cursors(text);
-		unindent(text);
+		txt_unindent(text);
 
 		text_update_edited(text);
 
@@ -1011,7 +1017,7 @@ static int comment_exec(bContext *C, wmOperator *UNUSED(op))
 		text_drawcache_tag_update(CTX_wm_space_text(C), 0);
 
 		txt_order_cursors(text);
-		comment(text);
+		txt_comment(text);
 		text_update_edited(text);
 
 		text_update_cursor_moved(C);
@@ -1044,7 +1050,7 @@ static int uncomment_exec(bContext *C, wmOperator *UNUSED(op))
 		text_drawcache_tag_update(CTX_wm_space_text(C), 0);
 
 		txt_order_cursors(text);
-		uncomment(text);
+		txt_uncomment(text);
 		text_update_edited(text);
 
 		text_update_cursor_moved(C);
@@ -1208,7 +1214,7 @@ void TEXT_OT_convert_whitespace(wmOperatorType *ot)
 	ot->poll= text_edit_poll;
 
 	/* properties */
-	RNA_def_enum(ot->srna, "type", whitespace_type_items, TO_SPACES, "type", "Type of whitespace to convert to.");
+	RNA_def_enum(ot->srna, "type", whitespace_type_items, TO_SPACES, "Type", "Type of whitespace to convert to");
 }
 
 /******************* select all operator *********************/
@@ -1901,7 +1907,7 @@ void TEXT_OT_move(wmOperatorType *ot)
 	ot->poll= text_edit_poll;
 
 	/* properties */
-	RNA_def_enum(ot->srna, "type", move_type_items, LINE_BEGIN, "Type", "Where to move cursor to.");
+	RNA_def_enum(ot->srna, "type", move_type_items, LINE_BEGIN, "Type", "Where to move cursor to");
 }
 
 /******************* move select operator ********************/
@@ -1925,7 +1931,7 @@ void TEXT_OT_move_select(wmOperatorType *ot)
 	ot->poll= text_space_edit_poll;
 
 	/* properties */
-	RNA_def_enum(ot->srna, "type", move_type_items, LINE_BEGIN, "Type", "Where to move cursor to, to make a selection.");
+	RNA_def_enum(ot->srna, "type", move_type_items, LINE_BEGIN, "Type", "Where to move cursor to, to make a selection");
 }
 
 /******************* jump operator *********************/
@@ -1968,7 +1974,7 @@ void TEXT_OT_jump(wmOperatorType *ot)
 	ot->poll= text_edit_poll;
 
 	/* properties */
-	RNA_def_int(ot->srna, "line", 1, 1, INT_MAX, "Line", "Line number to jump to.", 1, 10000);
+	RNA_def_int(ot->srna, "line", 1, 1, INT_MAX, "Line", "Line number to jump to", 1, 10000);
 }
 
 /******************* delete operator **********************/
@@ -2020,7 +2026,7 @@ void TEXT_OT_delete(wmOperatorType *ot)
 	ot->poll= text_edit_poll;
 
 	/* properties */
-	RNA_def_enum(ot->srna, "type", delete_type_items, DEL_NEXT_CHAR, "Type", "Which part of the text to delete.");
+	RNA_def_enum(ot->srna, "type", delete_type_items, DEL_NEXT_CHAR, "Type", "Which part of the text to delete");
 }
 
 /******************* toggle overwrite operator **********************/
@@ -2109,7 +2115,7 @@ static void scroll_apply(bContext *C, wmOperator *op, wmEvent *event)
 	SpaceText *st= CTX_wm_space_text(C);
 	ARegion *ar= CTX_wm_region(C);
 	TextScroll *tsc= op->customdata;
-	short mval[2]= {event->x, event->y};
+	int mval[2]= {event->x, event->y};
 	short txtdelta[2] = {0, 0};
 
 	text_update_character_width(st);
@@ -2257,7 +2263,7 @@ void TEXT_OT_scroll(wmOperatorType *ot)
 	ot->flag= OPTYPE_BLOCKING|OPTYPE_GRAB_POINTER;
 
 	/* properties */
-	RNA_def_int(ot->srna, "lines", 1, INT_MIN, INT_MAX, "Lines", "Number of lines to scroll.", -100, 100);
+	RNA_def_int(ot->srna, "lines", 1, INT_MIN, INT_MAX, "Lines", "Number of lines to scroll", -100, 100);
 }
 
 /******************** scroll bar operator *******************/
@@ -2283,7 +2289,7 @@ static int scroll_bar_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	SpaceText *st= CTX_wm_space_text(C);
 	ARegion *ar= CTX_wm_region(C);
 	TextScroll *tsc;
-	const short *mval= event->mval;
+	const int *mval= event->mval;
 	int zone= -1;
 
 	if(RNA_property_is_set(op->ptr, "lines"))
@@ -2339,7 +2345,7 @@ void TEXT_OT_scroll_bar(wmOperatorType *ot)
 	ot->flag= OPTYPE_BLOCKING;
 
 	/* properties */
-	RNA_def_int(ot->srna, "lines", 1, INT_MIN, INT_MAX, "Lines", "Number of lines to scroll.", -100, 100);
+	RNA_def_int(ot->srna, "lines", 1, INT_MIN, INT_MAX, "Lines", "Number of lines to scroll", -100, 100);
 }
 
 /******************* set selection operator **********************/
@@ -2630,7 +2636,7 @@ void TEXT_OT_selection_set(wmOperatorType *ot)
 	ot->poll= text_region_edit_poll;
 
 	/* properties */
-	RNA_def_boolean(ot->srna, "select", 0, "Select", "Set selection end rather than cursor.");
+	RNA_def_boolean(ot->srna, "select", 0, "Select", "Set selection end rather than cursor");
 }
 
 /******************* set cursor operator **********************/
@@ -2694,7 +2700,7 @@ static int line_number_invoke(bContext *C, wmOperator *UNUSED(op), wmEvent *even
 	SpaceText *st= CTX_wm_space_text(C);
 	Text *text= CTX_data_edit_text(C);
 	ARegion *ar= CTX_wm_region(C);
-	const short *mval= event->mval;
+	const int *mval= event->mval;
 	double time;
 	static int jump_to= 0;
 	static double last_jump= 0;
@@ -2814,7 +2820,7 @@ void TEXT_OT_insert(wmOperatorType *ot)
 	ot->poll= text_edit_poll;
 
 	/* properties */
-	RNA_def_string(ot->srna, "text", "", 0, "Text", "Text to insert at the cursor position.");
+	RNA_def_string(ot->srna, "text", "", 0, "Text", "Text to insert at the cursor position");
 }
 
 /******************* find operator *********************/
@@ -3163,7 +3169,7 @@ void TEXT_OT_resolve_conflict(wmOperatorType *ot)
 	ot->poll= save_poll;
 
 	/* properties */
-	RNA_def_enum(ot->srna, "resolution", resolution_items, RESOLVE_IGNORE, "Resolution", "How to solve conflict due to different in internal and external text.");
+	RNA_def_enum(ot->srna, "resolution", resolution_items, RESOLVE_IGNORE, "Resolution", "How to solve conflict due to differences in internal and external text");
 }
 
 /********************** to 3d object operator *****************/
@@ -3193,7 +3199,7 @@ void TEXT_OT_to_3d_object(wmOperatorType *ot)
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 
 	/* properties */
-	RNA_def_boolean(ot->srna, "split_lines", 0, "Split Lines", "Create one object per line in the text.");
+	RNA_def_boolean(ot->srna, "split_lines", 0, "Split Lines", "Create one object per line in the text");
 }
 
 

@@ -122,12 +122,7 @@ __attribute__ ((format (printf, 1, 2)))
 #endif
 ;
 
-	/**
-	 * Compare two strings
-	 * 
-	 * @retval True if the strings are equal, false otherwise.
-	 */
-int BLI_streq(const char *a, const char *b);
+size_t BLI_strescape(char *dst, const char *src, const size_t maxlen);
 
 	/**
 	 * Compare two strings without regard to case.
@@ -144,6 +139,12 @@ size_t BLI_strnlen(const char *str, size_t maxlen);
 
 void BLI_timestr(double _time, char *str); /* time var is global */
 
+void BLI_ascii_strtolower(char *str, int len);
+void BLI_ascii_strtoupper(char *str, int len);
+
+
+/* string_utf8.c - may move these into their own header some day - campbell */
+char *BLI_strncpy_utf8(char *dst, const char *src, size_t maxncpy);
 int BLI_utf8_invalid_byte(const char *str, int length);
 int BLI_utf8_invalid_strip(char *str, int length);
 

@@ -37,10 +37,6 @@
 #include <stdlib.h>
 #include <float.h>
 
-#ifdef WITH_LCMS
-#include <lcms.h>
-#endif
-
 #include "MEM_guardedalloc.h"
 
 #include "DNA_color_types.h"
@@ -171,14 +167,14 @@ CurveMapping *curvemapping_copy(CurveMapping *cumap)
 	return NULL;
 }
 
-void curvemapping_set_black_white(CurveMapping *cumap, float *black, float *white)
+void curvemapping_set_black_white(CurveMapping *cumap, const float black[3], const float white[3])
 {
 	int a;
 	
 	if(white)
-		VECCOPY(cumap->white, white);
+		copy_v3_v3(cumap->white, white);
 	if(black)
-		VECCOPY(cumap->black, black);
+		copy_v3_v3(cumap->black, black);
 	
 	for(a=0; a<3; a++) {
 		if(cumap->white[a]==cumap->black[a])
@@ -436,7 +432,7 @@ static void calchandle_curvemap(BezTriple *bezt, BezTriple *prev, BezTriple *nex
 
 /* in X, out Y. 
    X is presumed to be outside first or last */
-static float curvemap_calc_extend(CurveMap *cuma, float x, float *first, float *last)
+static float curvemap_calc_extend(CurveMap *cuma, float x, const float first[2], const float last[2])
 {
 	if(x <= first[0]) {
 		if((cuma->flag & CUMA_EXTEND_EXTRAPOLATE)==0) {
@@ -757,7 +753,7 @@ float curvemapping_evaluateF(CurveMapping *cumap, int cur, float value)
 }
 
 /* vector case */
-void curvemapping_evaluate3F(CurveMapping *cumap, float *vecout, const float *vecin)
+void curvemapping_evaluate3F(CurveMapping *cumap, float vecout[3], const float vecin[3])
 {
 	vecout[0]= curvemapping_evaluateF(cumap, 0, vecin[0]);
 	vecout[1]= curvemapping_evaluateF(cumap, 1, vecin[1]);
@@ -765,7 +761,7 @@ void curvemapping_evaluate3F(CurveMapping *cumap, float *vecout, const float *ve
 }
 
 /* RGB case, no black/white points, no premult */
-void curvemapping_evaluateRGBF(CurveMapping *cumap, float *vecout, const float *vecin)
+void curvemapping_evaluateRGBF(CurveMapping *cumap, float vecout[3], const float vecin[3])
 {
 	vecout[0]= curvemapping_evaluateF(cumap, 0, curvemapping_evaluateF(cumap, 3, vecin[0]));
 	vecout[1]= curvemapping_evaluateF(cumap, 1, curvemapping_evaluateF(cumap, 3, vecin[1]));
@@ -774,7 +770,7 @@ void curvemapping_evaluateRGBF(CurveMapping *cumap, float *vecout, const float *
 
 
 /* RGB with black/white points and premult. tables are checked */
-void curvemapping_evaluate_premulRGBF(CurveMapping *cumap, float *vecout, const float *vecin)
+void curvemapping_evaluate_premulRGBF(CurveMapping *cumap, float vecout[3], const float vecin[3])
 {
 	float fac;
 	
@@ -788,60 +784,6 @@ void curvemapping_evaluate_premulRGBF(CurveMapping *cumap, float *vecout, const 
 	vecout[2]= curvemap_evaluateF(cumap->cm+2, fac);
 }
 
-
-#ifdef WITH_LCMS
-/* basic error handler, if we dont do this blender will exit */
-static int ErrorReportingFunction(int ErrorCode, const char *ErrorText)
-{
-	fprintf(stderr, "%s:%d\n", ErrorText, ErrorCode);
-	return 1;
-}
-#endif
-
-void colorcorrection_do_ibuf(ImBuf *ibuf, const char *profile)
-{
-#ifdef WITH_LCMS
-	if (ibuf->crect == NULL)
-	{
-		cmsHPROFILE proofingProfile;
-		
-		/* TODO, move to initialization area of code */
-		//cmsSetLogErrorHandler(ErrorReportingFunction);
-		cmsSetErrorHandler(ErrorReportingFunction);
-		
-		/* will return NULL if the file isn't fount */
-		proofingProfile = cmsOpenProfileFromFile(profile, "r");
-
-		cmsErrorAction(LCMS_ERROR_SHOW);
-
-		if(proofingProfile) {
-			cmsHPROFILE imageProfile;
-			cmsHTRANSFORM hTransform;
-
-			ibuf->crect = MEM_mallocN(ibuf->x*ibuf->y*sizeof(int), "imbuf crect");
-
-			imageProfile  = cmsCreate_sRGBProfile();
-
-
-			hTransform = cmsCreateProofingTransform(imageProfile, TYPE_RGBA_8, imageProfile, TYPE_RGBA_8, 
-												  proofingProfile,
-												  INTENT_ABSOLUTE_COLORIMETRIC,
-												  INTENT_ABSOLUTE_COLORIMETRIC,
-												  cmsFLAGS_SOFTPROOFING);
-		
-			cmsDoTransform(hTransform, ibuf->rect, ibuf->crect, ibuf->x * ibuf->y);
-
-			cmsDeleteTransform(hTransform);
-			cmsCloseProfile(imageProfile);
-			cmsCloseProfile(proofingProfile);
-		}
-	}
-#else
-	/* unused */
-	(void)ibuf;
-	(void)profile;
-#endif
-}
 
 /* only used for image editor curves */
 void curvemapping_do_ibuf(CurveMapping *cumap, ImBuf *ibuf)

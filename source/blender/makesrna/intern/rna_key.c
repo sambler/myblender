@@ -76,7 +76,7 @@ void rna_ShapeKey_name_set(PointerRNA *ptr, const char *value)
 	BLI_strncpy(oldname, kb->name, sizeof(kb->name));
 	
 	/* copy the new name into the name slot */
-	BLI_strncpy(kb->name, value, sizeof(kb->name));
+	BLI_strncpy_utf8(kb->name, value, sizeof(kb->name));
 	
 	/* make sure the name is truly unique */
 	if (ptr->id.data) {
@@ -521,7 +521,7 @@ static void rna_def_keyblock(BlenderRNA *brna)
 	RNA_def_struct_ui_icon(srna, ICON_SHAPEKEY_DATA);
 
 	prop= RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
-	RNA_def_property_ui_text(prop, "Name", "");
+	RNA_def_property_ui_text(prop, "Name", "Name of Shape Key");
 	RNA_def_property_string_funcs(prop, NULL, NULL, "rna_ShapeKey_name_set");
 	RNA_def_struct_name_property(srna, prop);
 

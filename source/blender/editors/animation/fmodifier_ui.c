@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -162,7 +160,7 @@ static void draw_modifier__generator(uiLayout *layout, ID *id, FModifier *fcm, s
 					if (i == 1)
 						strcpy(xval, "x");
 					else
-						sprintf(xval, "x^%d", i);
+						sprintf(xval, "x^%u", i);
 					uiDefBut(block, LABEL, 1, xval, 0, 0, 50, 20, NULL, 0.0, 0.0, 0, 0, "Power of x");
 				}
 				
@@ -604,7 +602,7 @@ static void draw_modifier__stepped(uiLayout *layout, ID *id, FModifier *fcm, sho
 void ANIM_uiTemplate_fmodifier_draw (uiLayout *layout, ID *id, ListBase *modifiers, FModifier *fcm)
 {
 	FModifierTypeInfo *fmi= fmodifier_get_typeinfo(fcm);
-	uiLayout *box, *row, *subrow;
+	uiLayout *box, *row, *subrow, *col;
 	uiBlock *block;
 	uiBut *but;
 	short width= 314;
@@ -622,7 +620,7 @@ void ANIM_uiTemplate_fmodifier_draw (uiLayout *layout, ID *id, ListBase *modifie
 		block= uiLayoutGetBlock(row); // err...
 		
 		/* left-align -------------------------------------------- */
-		subrow= uiLayoutRow(row, 0);
+		subrow= uiLayoutRow(row, 1);
 		uiLayoutSetAlignment(subrow, UI_LAYOUT_ALIGN_LEFT);
 		
 		uiBlockSetEmboss(block, UI_EMBOSSN);
@@ -640,7 +638,7 @@ void ANIM_uiTemplate_fmodifier_draw (uiLayout *layout, ID *id, ListBase *modifie
 			uiItemL(subrow, "<Unknown Modifier>", ICON_NONE);
 		
 		/* right-align ------------------------------------------- */
-		subrow= uiLayoutRow(row, 0);
+		subrow= uiLayoutRow(row, 1);
 		uiLayoutSetAlignment(subrow, UI_LAYOUT_ALIGN_RIGHT);
 		
 		
@@ -650,7 +648,7 @@ void ANIM_uiTemplate_fmodifier_draw (uiLayout *layout, ID *id, ListBase *modifie
 		uiBlockSetEmboss(block, UI_EMBOSSN);
 		
 		/* delete button */
-		but= uiDefIconBut(block, BUT, B_REDR, ICON_X, 0, 0, UI_UNIT_X, UI_UNIT_Y, NULL, 0.0, 0.0, 0.0, 0.0, "Delete F-Curve Modifier.");
+		but= uiDefIconBut(block, BUT, B_REDR, ICON_X, 0, 0, UI_UNIT_X, UI_UNIT_Y, NULL, 0.0, 0.0, 0.0, 0.0, "Delete F-Curve Modifier");
 		uiButSetFunc(but, delete_fmodifier_cb, modifiers, fcm);
 		
 		uiBlockSetEmboss(block, UI_EMBOSS);
@@ -693,6 +691,44 @@ void ANIM_uiTemplate_fmodifier_draw (uiLayout *layout, ID *id, ListBase *modifie
 			
 			default: /* unknown type */
 				break;
+		}
+		
+		/* one last panel below this: FModifier range */
+		// TODO: experiment with placement of this
+		{
+			box = uiLayoutBox(layout);
+			
+			/* restricted range ----------------------------------------------------- */
+			col = uiLayoutColumn(box, 1);
+			
+			/* top row: use restricted range */
+			row= uiLayoutRow(col, 1);
+			uiItemR(row, &ptr, "use_restricted_range", 0, NULL, ICON_NONE);
+			
+			if (fcm->flag & FMODIFIER_FLAG_RANGERESTRICT) {
+				/* second row: settings */
+				row = uiLayoutRow(col, 1);
+				
+				uiItemR(row, &ptr, "frame_start", 0, "Start", ICON_NONE);
+				uiItemR(row, &ptr, "frame_end", 0, "End", ICON_NONE);
+				
+				/* third row: blending influence */
+				row = uiLayoutRow(col, 1);
+				
+				uiItemR(row, &ptr, "blend_in", 0, "In", ICON_NONE);
+				uiItemR(row, &ptr, "blend_out", 0, "Out", ICON_NONE);
+			}
+			
+			/* influence -------------------------------------------------------------- */
+			col = uiLayoutColumn(box, 1);
+			
+			/* top row: use influence */
+			uiItemR(col, &ptr, "use_influence", 0, NULL, ICON_NONE);
+			
+			if (fcm->flag & FMODIFIER_FLAG_USEINFLUENCE) {
+				/* second row: influence value */
+				uiItemR(col, &ptr, "influence", 0, NULL, ICON_NONE);
+			}
 		}
 	}
 }

@@ -50,6 +50,7 @@
 #include "BKE_main.h"
 
 #include "BLF_api.h"
+#include "BLF_translation.h"
 
 #include "IMB_imbuf_types.h"
  
@@ -73,12 +74,6 @@
 #include "filelist.h"
 
 #include "file_intern.h"	// own include
-
-/* ui geometry */
-#define IMASEL_BUTTONS_HEIGHT 40
-#define IMASEL_BUTTONS_MARGIN 6
-#define TILE_BORDER_X 8
-#define TILE_BORDER_Y 8
 
 /* button events */
 enum {
@@ -187,20 +182,22 @@ void file_draw_buttons(const bContext *C, ARegion *ar)
 		but = uiDefButTextO(block, TEX, "FILE_OT_directory", 0, "",
 				 min_x, line1_y, line1_w-chan_offs, btn_h, 
 				 params->dir, 0.0, (float)FILE_MAX-1, 0, 0, 
-				 "File path.");
+				 UI_translate_do_tooltip(N_("File path")));
 		uiButSetCompleteFunc(but, autocomplete_directory, NULL);
 		uiButSetFlag(but, UI_BUT_NO_UTF8);
 
-		but = uiDefBut(block, TEX, B_FS_FILENAME, "",
-				 min_x, line2_y, line2_w-chan_offs, btn_h,
-				 params->file, 0.0, (float)FILE_MAXFILE-1, 0, 0, 
-				 overwrite_alert ?"File name, overwrite existing." : "File name.");
-		uiButSetCompleteFunc(but, autocomplete_file, NULL);
-		uiButSetFlag(but, UI_BUT_NO_UTF8);
-		
-		/* check if this overrides a file and if the operator option is used */
-		if(overwrite_alert) {
-			uiButSetFlag(but, UI_BUT_REDALERT);
+		if((params->flag & FILE_DIRSEL_ONLY) == 0) {
+			but = uiDefBut(block, TEX, B_FS_FILENAME, "",
+					 min_x, line2_y, line2_w-chan_offs, btn_h,
+					 params->file, 0.0, (float)FILE_MAXFILE-1, 0, 0,
+					 UI_translate_do_tooltip(overwrite_alert ?N_("File name, overwrite existing") : N_("File name")));
+			uiButSetCompleteFunc(but, autocomplete_file, NULL);
+			uiButSetFlag(but, UI_BUT_NO_UTF8);
+
+			/* check if this overrides a file and if the operator option is used */
+			if(overwrite_alert) {
+				uiButSetFlag(but, UI_BUT_REDALERT);
+			}
 		}
 		
 		/* clear func */
@@ -208,18 +205,18 @@ void file_draw_buttons(const bContext *C, ARegion *ar)
 	}
 	
 	/* Filename number increment / decrement buttons. */
-	if (fnumbuttons) {
+	if (fnumbuttons && (params->flag & FILE_DIRSEL_ONLY) == 0) {
 		uiBlockBeginAlign(block);
 		but = uiDefIconButO(block, BUT, "FILE_OT_filenum", 0, ICON_ZOOMOUT,
 				min_x + line2_w + separator - chan_offs, line2_y, 
 				btn_fn_w, btn_h, 
-				"Decrement the filename number");    
+				UI_translate_do_tooltip(N_("Decrement the filename number")));    
 		RNA_int_set(uiButGetOperatorPtrRNA(but), "increment", -1); 
 	
 		but = uiDefIconButO(block, BUT, "FILE_OT_filenum", 0, ICON_ZOOMIN, 
 				min_x + line2_w + separator + btn_fn_w - chan_offs, line2_y, 
 				btn_fn_w, btn_h, 
-				"Increment the filename number");    
+				UI_translate_do_tooltip(N_("Increment the filename number")));    
 		RNA_int_set(uiButGetOperatorPtrRNA(but), "increment", 1); 
 		uiBlockEndAlign(block);
 	}
@@ -230,9 +227,9 @@ void file_draw_buttons(const bContext *C, ARegion *ar)
 		uiDefButO(block, BUT, "FILE_OT_execute", WM_OP_EXEC_REGION_WIN, params->title,
 			max_x - loadbutton, line1_y, loadbutton, btn_h, 
 			params->title);
-		uiDefButO(block, BUT, "FILE_OT_cancel", WM_OP_EXEC_REGION_WIN, "Cancel",
+		uiDefButO(block, BUT, "FILE_OT_cancel", WM_OP_EXEC_REGION_WIN, UI_translate_do_iface(N_("Cancel")),
 			max_x - loadbutton, line2_y, loadbutton, btn_h, 
-			"Cancel");
+			UI_translate_do_tooltip(N_("Cancel")));
 	}
 	
 	uiEndBlock(C, block);
@@ -243,7 +240,7 @@ void file_draw_buttons(const bContext *C, ARegion *ar)
 static void draw_tile(int sx, int sy, int width, int height, int colorid, int shade)
 {	
 	UI_ThemeColorShade(colorid, shade);
-	uiSetRoundBox(15);
+	uiSetRoundBox(UI_CNR_ALL);
 	uiRoundBox((float)sx, (float)(sy - height), (float)(sx + width), (float)sy, 5.0f);
 }
 
@@ -299,7 +296,7 @@ static void file_draw_icon(uiBlock *block, char *path, int sx, int sy, int icon,
 
 static void file_draw_string(int sx, int sy, const char* string, float width, int height, short align)
 {
-	uiStyle *style= U.uistyles.first;
+	uiStyle *style= UI_GetStyle();
 	uiFontStyle fs = style->widgetlabel;
 	rcti rect;
 	char fname[FILE_MAXFILE];
@@ -511,7 +508,7 @@ void file_draw_list(const bContext *C, ARegion *ar)
 				draw_tile(sx, sy-1, layout->tile_w+4, sfile->layout->tile_h+layout->tile_border_y, colorid, shade);
 			}
 		}
-		uiSetRoundBox(0);
+		uiSetRoundBox(UI_CNR_NONE);
 
 		if ( FILE_IMGDISPLAY == params->display ) {
 			is_icon = 0;
@@ -523,8 +520,8 @@ void file_draw_list(const bContext *C, ARegion *ar)
 			
 			file_draw_preview(block, file, sx, sy, imb, layout, !is_icon && (file->flags & IMAGEFILE));
 		} else {
-			file_draw_icon(block, file->path, sx, sy-3, get_file_icon(file), ICON_DEFAULT_WIDTH, ICON_DEFAULT_WIDTH);
-			sx += ICON_DEFAULT_WIDTH + 4;
+			file_draw_icon(block, file->path, sx, sy-(UI_UNIT_Y / 6), get_file_icon(file), ICON_DEFAULT_WIDTH_SCALE, ICON_DEFAULT_WIDTH_SCALE);
+			sx += ICON_DEFAULT_WIDTH_SCALE + 4;
 		}
 
 		UI_ThemeColor4(TH_TEXT);

@@ -105,8 +105,8 @@ void constraintNumInput(TransInfo *t, float vec[3])
 		if (getConstraintSpaceDimension(t) == 2) {
 			int axis = mode & (CON_AXIS0|CON_AXIS1|CON_AXIS2);
 			if (axis == (CON_AXIS0|CON_AXIS1)) {
-				vec[0] = vec[0];
-				vec[1] = vec[1];
+				/* vec[0] = vec[0]; */ /* same */
+				/* vec[1] = vec[1]; */ /* same */
 				vec[2] = nval;
 			}
 			else if (axis == (CON_AXIS1|CON_AXIS2)) {
@@ -115,14 +115,14 @@ void constraintNumInput(TransInfo *t, float vec[3])
 				vec[0] = nval;
 			}
 			else if (axis == (CON_AXIS0|CON_AXIS2)) {
-				vec[0] = vec[0];
+				/* vec[0] = vec[0]; */  /* same */
 				vec[2] = vec[1];
 				vec[1] = nval;
 			}
 		}
 		else if (getConstraintSpaceDimension(t) == 1) {
 			if (mode & CON_AXIS0) {
-				vec[0] = vec[0];
+				/* vec[0] = vec[0]; */ /* same */
 				vec[1] = nval;
 				vec[2] = nval;
 			}
@@ -239,7 +239,7 @@ static void axisProjection(TransInfo *t, float axis[3], float in[3], float out[3
 		if(factor<0.0f) factor*= -factor;
 		else factor*= factor;
 
-		VECCOPY(out, axis);
+		copy_v3_v3(out, axis);
 		normalize_v3(out);
 		mul_v3_fl(out, -factor);	/* -factor makes move down going backwards */
 	}
@@ -261,7 +261,7 @@ static void axisProjection(TransInfo *t, float axis[3], float in[3], float out[3
 		/* give arbitrary large value if projection is impossible */
 		factor = dot_v3v3(axis, norm);
 		if (1.0f - fabsf(factor) < 0.0002f) {
-			VECCOPY(out, axis);
+			copy_v3_v3(out, axis);
 			if (factor > 0) {
 				mul_v3_fl(out, 1000000000.0f);
 			} else {
@@ -300,7 +300,7 @@ static void planeProjection(TransInfo *t, float in[3], float out[3]) {
 	}
 	factor = dot_v3v3(vec, vec) / factor;
 
-	VECCOPY(vec, norm);
+	copy_v3_v3(vec, norm);
 	mul_v3_fl(vec, factor);
 
 	add_v3_v3v3(out, in, vec);
@@ -317,7 +317,7 @@ static void planeProjection(TransInfo *t, float in[3], float out[3]) {
 
 static void applyAxisConstraintVec(TransInfo *t, TransData *td, float in[3], float out[3], float pvec[3])
 {
-	VECCOPY(out, in);
+	copy_v3_v3(out, in);
 	if (!td && t->con.mode & CON_APPLY) {
 		mul_m3_v3(t->con.pmtx, out);
 
@@ -332,13 +332,13 @@ static void applyAxisConstraintVec(TransInfo *t, TransData *td, float in[3], flo
 				float c[3];
 
 				if (t->con.mode & CON_AXIS0) {
-					VECCOPY(c, t->con.mtx[0]);
+					copy_v3_v3(c, t->con.mtx[0]);
 				}
 				else if (t->con.mode & CON_AXIS1) {
-					VECCOPY(c, t->con.mtx[1]);
+					copy_v3_v3(c, t->con.mtx[1]);
 				}
 				else if (t->con.mode & CON_AXIS2) {
-					VECCOPY(c, t->con.mtx[2]);
+					copy_v3_v3(c, t->con.mtx[2]);
 				}
 				axisProjection(t, c, in, out);
 			}
@@ -360,7 +360,7 @@ static void applyAxisConstraintVec(TransInfo *t, TransData *td, float in[3], flo
 
 static void applyObjectConstraintVec(TransInfo *t, TransData *td, float in[3], float out[3], float pvec[3])
 {
-	VECCOPY(out, in);
+	copy_v3_v3(out, in);
 	if (t->con.mode & CON_APPLY) {
 		if (!td) {
 			mul_m3_v3(t->con.pmtx, out);
@@ -373,18 +373,18 @@ static void applyObjectConstraintVec(TransInfo *t, TransData *td, float in[3], f
 				float c[3];
 
 				if (t->con.mode & CON_AXIS0) {
-					VECCOPY(c, t->con.mtx[0]);
+					copy_v3_v3(c, t->con.mtx[0]);
 				}
 				else if (t->con.mode & CON_AXIS1) {
-					VECCOPY(c, t->con.mtx[1]);
+					copy_v3_v3(c, t->con.mtx[1]);
 				}
 				else if (t->con.mode & CON_AXIS2) {
-					VECCOPY(c, t->con.mtx[2]);
+					copy_v3_v3(c, t->con.mtx[2]);
 				}
 				axisProjection(t, c, in, out);
 			}
 			postConstraintChecks(t, out, pvec);
-			VECCOPY(out, pvec);
+			copy_v3_v3(out, pvec);
 		}
 		else {
 			int i=0;
@@ -481,15 +481,15 @@ static void applyAxisConstraintRot(TransInfo *t, TransData *td, float vec[3], fl
 		switch(mode) {
 		case CON_AXIS0:
 		case (CON_AXIS1|CON_AXIS2):
-			VECCOPY(vec, t->con.mtx[0]);
+			copy_v3_v3(vec, t->con.mtx[0]);
 			break;
 		case CON_AXIS1:
 		case (CON_AXIS0|CON_AXIS2):
-			VECCOPY(vec, t->con.mtx[1]);
+			copy_v3_v3(vec, t->con.mtx[1]);
 			break;
 		case CON_AXIS2:
 		case (CON_AXIS0|CON_AXIS1):
-			VECCOPY(vec, t->con.mtx[2]);
+			copy_v3_v3(vec, t->con.mtx[2]);
 			break;
 		}
 		/* don't flip axis if asked to or if num input */
@@ -528,15 +528,15 @@ static void applyObjectConstraintRot(TransInfo *t, TransData *td, float vec[3], 
 		switch(mode) {
 		case CON_AXIS0:
 		case (CON_AXIS1|CON_AXIS2):
-			VECCOPY(vec, td->axismtx[0]);
+			copy_v3_v3(vec, td->axismtx[0]);
 			break;
 		case CON_AXIS1:
 		case (CON_AXIS0|CON_AXIS2):
-			VECCOPY(vec, td->axismtx[1]);
+			copy_v3_v3(vec, td->axismtx[1]);
 			break;
 		case CON_AXIS2:
 		case (CON_AXIS0|CON_AXIS1):
-			VECCOPY(vec, td->axismtx[2]);
+			copy_v3_v3(vec, td->axismtx[2]);
 			break;
 		}
 		if (angle && (mode & CON_NOFLIP) == 0 && hasNumInput(&t->num) == 0) {
@@ -665,7 +665,7 @@ void drawConstraint(TransInfo *t)
 			char col2[3] = {255,255,255};
 			int depth_test_enabled;
 
-			convertViewVec(t, vec, (short)(t->mval[0] - t->con.imval[0]), (short)(t->mval[1] - t->con.imval[1]));
+			convertViewVec(t, vec, (t->mval[0] - t->con.imval[0]), (t->mval[1] - t->con.imval[1]));
 			add_v3_v3(vec, tc->center);
 
 			drawLine(t, tc->center, tc->mtx[0], 'X', 0);
@@ -724,7 +724,7 @@ void drawPropCircle(const struct bContext *C, TransInfo *t)
 
 		glPushMatrix();
 
-		VECCOPY(center, t->center);
+		copy_v3_v3(center, t->center);
 
 		if((t->spacetype == SPACE_VIEW3D) && t->obedit)
 		{
@@ -897,7 +897,7 @@ static void setNearestAxis3d(TransInfo *t)
 	zfac = len_v3(t->persinv[0]) * 2.0f/t->ar->winx * zfac * 30.0f;
 
 	for (i = 0; i<3; i++) {
-		VECCOPY(axis, t->con.mtx[i]);
+		copy_v3_v3(axis, t->con.mtx[i]);
 
 		mul_v3_fl(axis, zfac);
 		/* now we can project to get window coordinate */

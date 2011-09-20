@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -139,7 +137,7 @@ static TimeMarker *rna_Action_pose_markers_new(bAction *act, ReportList *reports
 	TimeMarker *marker = MEM_callocN(sizeof(TimeMarker), "TimeMarker");
 	marker->flag= 1;
 	marker->frame= 1;
-	BLI_strncpy(marker->name, name, sizeof(marker->name));
+	BLI_strncpy_utf8(marker->name, name, sizeof(marker->name));
 	BLI_addtail(&act->markers, marker);
 	return marker;
 }
@@ -191,8 +189,9 @@ static void rna_Action_active_pose_marker_index_range(PointerRNA *ptr, int *min,
 
 
 static void rna_Action_frame_range_get(PointerRNA *ptr,float *values)
-{
-	calc_action_range(ptr->id.data, values, values+1, 1);
+{	/* don't include modifiers because they too easily can have very large
+	 * ranges: MINAFRAMEF to MAXFRAMEF. */
+	calc_action_range(ptr->id.data, values, values+1, FALSE);
 }
 
 
@@ -257,9 +256,17 @@ static void rna_def_dopesheet(BlenderRNA *brna)
 	RNA_def_struct_ui_text(srna, "DopeSheet", "Settings for filtering the channels shown in Animation Editors");
 	
 	/* Source of DopeSheet data */
+	// XXX: make this obsolete?
 	prop= RNA_def_property(srna, "source", PROP_POINTER, PROP_NONE);
 	RNA_def_property_struct_type(prop, "ID");
 	RNA_def_property_ui_text(prop, "Source", "ID-Block representing source data, currently ID_SCE (for Dopesheet), and ID_SC (for Grease Pencil)");
+	
+	/* Show datablock filters */
+	prop= RNA_def_property(srna, "show_datablock_filters", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", ADS_FLAG_SHOW_DBFILTERS);
+	RNA_def_property_ui_text(prop, "Show Datablock Filters", "Show options for whether channels related to certain types of data are included");
+	RNA_def_property_ui_icon(prop, ICON_DISCLOSURE_TRI_RIGHT, -1);
+	RNA_def_property_update(prop, NC_ANIMATION|ND_ANIMCHAN, NULL);
 	
 	/* General Filtering Settings */
 	prop= RNA_def_property(srna, "show_only_selected", PROP_BOOLEAN, PROP_NONE);
@@ -409,6 +416,12 @@ static void rna_def_dopesheet(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Display Node", "Include visualization of Node related Animation data");
 	RNA_def_property_ui_icon(prop, ICON_NODETREE, 0);
 	RNA_def_property_update(prop, NC_ANIMATION|ND_ANIMCHAN|NA_EDITED, NULL);
+
+	prop= RNA_def_property(srna, "show_speakers", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_negative_sdna(prop, NULL, "filterflag", ADS_FILTER_NOSPK);
+	RNA_def_property_ui_text(prop, "Display Speaker", "Include visualization of Speaker related Animation data");
+	RNA_def_property_ui_icon(prop, ICON_SPEAKER, 0);
+	RNA_def_property_update(prop, NC_ANIMATION|ND_ANIMCHAN|NA_EDITED, NULL);
 }
 
 static void rna_def_action_group(BlenderRNA *brna)
@@ -476,8 +489,8 @@ static void rna_def_action_groups(BlenderRNA *brna, PropertyRNA *cprop)
 	RNA_def_struct_ui_text(srna, "Action Groups", "Collection of action groups");
 
 	func= RNA_def_function(srna, "new", "rna_Action_groups_new");
-	RNA_def_function_ui_description(func, "Add a keyframe to the curve.");
-	parm= RNA_def_string(func, "name", "Group", 0, "", "New name for the action group.");
+	RNA_def_function_ui_description(func, "Add a keyframe to the curve");
+	parm= RNA_def_string(func, "name", "Group", 0, "", "New name for the action group");
 	RNA_def_property_flag(parm, PROP_REQUIRED);
 
 	parm= RNA_def_pointer(func, "action_group", "ActionGroup", "", "Newly created action group");
@@ -485,9 +498,9 @@ static void rna_def_action_groups(BlenderRNA *brna, PropertyRNA *cprop)
 
 
 	func= RNA_def_function(srna, "remove", "rna_Action_groups_remove");
-	RNA_def_function_ui_description(func, "Remove action group.");
+	RNA_def_function_ui_description(func, "Remove action group");
 	RNA_def_function_flag(func, FUNC_USE_REPORTS);
-	parm= RNA_def_pointer(func, "action_group", "ActionGroup", "", "Action group to remove.");
+	parm= RNA_def_pointer(func, "action_group", "ActionGroup", "", "Action group to remove");
 	RNA_def_property_flag(parm, PROP_REQUIRED|PROP_NEVER_NULL);
 }
 
@@ -504,21 +517,21 @@ static void rna_def_action_fcurves(BlenderRNA *brna, PropertyRNA *cprop)
 	RNA_def_struct_ui_text(srna, "Action FCurves", "Collection of action fcurves");
 
 	func= RNA_def_function(srna, "new", "rna_Action_fcurve_new");
-	RNA_def_function_ui_description(func, "Add a keyframe to the curve.");
+	RNA_def_function_ui_description(func, "Add a keyframe to the curve");
 	RNA_def_function_flag(func, FUNC_USE_REPORTS);
-	parm= RNA_def_string(func, "data_path", "", 0, "Data Path", "FCurve data path to use.");
+	parm= RNA_def_string(func, "data_path", "", 0, "Data Path", "FCurve data path to use");
 	RNA_def_property_flag(parm, PROP_REQUIRED);
-	RNA_def_int(func, "index", 0, 0, INT_MAX, "Index", "Array index.", 0, INT_MAX);
-	RNA_def_string(func, "action_group", "", 0, "Action Group", "Acton group to add this fcurve into.");
+	RNA_def_int(func, "index", 0, 0, INT_MAX, "Index", "Array index", 0, INT_MAX);
+	RNA_def_string(func, "action_group", "", 0, "Action Group", "Acton group to add this fcurve into");
 
 	parm= RNA_def_pointer(func, "fcurve", "FCurve", "", "Newly created fcurve");
 	RNA_def_function_return(func, parm);
 
 
 	func= RNA_def_function(srna, "remove", "rna_Action_fcurve_remove");
-	RNA_def_function_ui_description(func, "Remove action group.");
+	RNA_def_function_ui_description(func, "Remove action group");
 	RNA_def_function_flag(func, FUNC_USE_REPORTS);
-	parm= RNA_def_pointer(func, "fcurve", "FCurve", "", "FCurve to remove.");
+	parm= RNA_def_pointer(func, "fcurve", "FCurve", "", "FCurve to remove");
 	RNA_def_property_flag(parm, PROP_REQUIRED|PROP_NEVER_NULL);
 }
 
@@ -536,18 +549,18 @@ static void rna_def_action_pose_markers(BlenderRNA *brna, PropertyRNA *cprop)
 	RNA_def_struct_ui_text(srna, "Action Pose Markers", "Collection of timeline markers");
 
 	func= RNA_def_function(srna, "new", "rna_Action_pose_markers_new");
-	RNA_def_function_ui_description(func, "Add a pose marker to the action.");
+	RNA_def_function_ui_description(func, "Add a pose marker to the action");
 	RNA_def_function_flag(func, FUNC_USE_REPORTS);
-	parm= RNA_def_string(func, "name", "Marker", 0, "", "New name for the marker (not unique).");
+	parm= RNA_def_string(func, "name", "Marker", 0, "", "New name for the marker (not unique)");
 	RNA_def_property_flag(parm, PROP_REQUIRED);
 
 	parm= RNA_def_pointer(func, "marker", "TimelineMarker", "", "Newly created marker");
 	RNA_def_function_return(func, parm);
 
 	func= RNA_def_function(srna, "remove", "rna_Action_pose_markers_remove");
-	RNA_def_function_ui_description(func, "Remove a timeline marker.");
+	RNA_def_function_ui_description(func, "Remove a timeline marker");
 	RNA_def_function_flag(func, FUNC_USE_REPORTS);
-	parm= RNA_def_pointer(func, "marker", "TimelineMarker", "", "Timeline marker to remove.");
+	parm= RNA_def_pointer(func, "marker", "TimelineMarker", "", "Timeline marker to remove");
 	RNA_def_property_flag(parm, PROP_REQUIRED|PROP_NEVER_NULL);
 	
 	prop= RNA_def_property(srna, "active", PROP_POINTER, PROP_NONE);

@@ -235,10 +235,9 @@ int ED_mesh_uv_texture_remove(bContext *C, Object *ob, Mesh *me)
 	return 1;
 }
 
-int ED_mesh_color_add(bContext *C, Scene *scene, Object *ob, Mesh *me, const char *name, int active_set)
+int ED_mesh_color_add(bContext *C, Scene *UNUSED(scene), Object *UNUSED(ob), Mesh *me, const char *name, int active_set)
 {
 	EditMesh *em;
-	MCol *mcol;
 	int layernum;
 
 	if(me->edit_mesh) {
@@ -261,8 +260,6 @@ int ED_mesh_color_add(bContext *C, Scene *scene, Object *ob, Mesh *me, const cha
 		if(layernum >= MAX_MCOL)
 			return 0;
 
-		mcol= me->mcol;
-
 		if(me->mcol)
 			CustomData_add_layer_named(&me->fdata, CD_MCOL, CD_DUPLICATE, me->mcol, me->totface, name);
 		else
@@ -272,9 +269,6 @@ int ED_mesh_color_add(bContext *C, Scene *scene, Object *ob, Mesh *me, const cha
 			CustomData_set_layer_active(&me->fdata, CD_MCOL, layernum);
 
 		mesh_update_customdata_pointers(me);
-
-		if(!mcol)
-			shadeMeshMCol(scene, ob, me);
 	}
 
 	DAG_id_tag_update(&me->id, 0);
@@ -367,7 +361,7 @@ static int drop_named_image_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	}
 	
 	if(!ima) {
-		BKE_report(op->reports, RPT_ERROR, "Not an Image.");
+		BKE_report(op->reports, RPT_ERROR, "Not an Image");
 		return OPERATOR_CANCELLED;
 	}
 	
@@ -416,7 +410,7 @@ void MESH_OT_drop_named_image(wmOperatorType *ot)
 	ot->flag= OPTYPE_UNDO;
 	
 	/* properties */
-	RNA_def_string(ot->srna, "name", "Image", 24, "Name", "Image name to assign.");
+	RNA_def_string(ot->srna, "name", "Image", 24, "Name", "Image name to assign");
 	RNA_def_string(ot->srna, "filepath", "Path", FILE_MAX, "Filepath", "Path to image file");
 }
 
@@ -686,7 +680,7 @@ static void mesh_add_faces(Mesh *mesh, int len)
 void ED_mesh_geometry_add(Mesh *mesh, ReportList *reports, int verts, int edges, int faces)
 {
 	if(mesh->edit_mesh) {
-		BKE_report(reports, RPT_ERROR, "Can't add geometry in edit mode.");
+		BKE_report(reports, RPT_ERROR, "Can't add geometry in edit mode");
 		return;
 	}
 
@@ -702,7 +696,7 @@ void ED_mesh_geometry_add(Mesh *mesh, ReportList *reports, int verts, int edges,
 void ED_mesh_faces_add(Mesh *mesh, ReportList *reports, int count)
 {
 	if(mesh->edit_mesh) {
-		BKE_report(reports, RPT_ERROR, "Can't add faces in edit mode.");
+		BKE_report(reports, RPT_ERROR, "Can't add faces in edit mode");
 		return;
 	}
 
@@ -712,7 +706,7 @@ void ED_mesh_faces_add(Mesh *mesh, ReportList *reports, int count)
 void ED_mesh_edges_add(Mesh *mesh, ReportList *reports, int count)
 {
 	if(mesh->edit_mesh) {
-		BKE_report(reports, RPT_ERROR, "Can't add edges in edit mode.");
+		BKE_report(reports, RPT_ERROR, "Can't add edges in edit mode");
 		return;
 	}
 
@@ -722,7 +716,7 @@ void ED_mesh_edges_add(Mesh *mesh, ReportList *reports, int count)
 void ED_mesh_vertices_add(Mesh *mesh, ReportList *reports, int count)
 {
 	if(mesh->edit_mesh) {
-		BKE_report(reports, RPT_ERROR, "Can't add vertices in edit mode.");
+		BKE_report(reports, RPT_ERROR, "Can't add vertices in edit mode");
 		return;
 	}
 

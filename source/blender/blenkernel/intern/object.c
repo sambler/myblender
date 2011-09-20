@@ -54,6 +54,7 @@
 #include "DNA_scene_types.h"
 #include "DNA_screen_types.h"
 #include "DNA_sequence_types.h"
+#include "DNA_sound_types.h"
 #include "DNA_space_types.h"
 #include "DNA_view3d_types.h"
 #include "DNA_world_types.h"
@@ -96,6 +97,7 @@
 #include "BKE_sca.h"
 #include "BKE_scene.h"
 #include "BKE_sequencer.h"
+#include "BKE_speaker.h"
 #include "BKE_softbody.h"
 #include "BKE_material.h"
 
@@ -233,6 +235,17 @@ void object_free_display(Object *ob)
 	freedisplist(&ob->disp);
 }
 
+void free_sculptsession_deformMats(SculptSession *ss)
+{
+	if(ss->orig_cos) MEM_freeN(ss->orig_cos);
+	if(ss->deform_cos) MEM_freeN(ss->deform_cos);
+	if(ss->deform_imats) MEM_freeN(ss->deform_imats);
+
+	ss->orig_cos = NULL;
+	ss->deform_cos = NULL;
+	ss->deform_imats = NULL;
+}
+
 void free_sculptsession(Object *ob)
 {
 	if(ob && ob->sculpt) {
@@ -262,6 +275,7 @@ void free_sculptsession(Object *ob)
 		ob->sculpt = NULL;
 	}
 }
+
 
 /* do not free object itself */
 void free_object(Object *ob)
@@ -404,7 +418,7 @@ void unlink_object(Object *ob)
 						for (ct= targets.first; ct; ct= ct->next) {
 							if (ct->tar == ob) {
 								ct->tar = NULL;
-								strcpy(ct->subtarget, "");
+								ct->subtarget[0]= '\0';
 								obt->recalc |= OB_RECALC_DATA;
 							}
 						}
@@ -434,7 +448,7 @@ void unlink_object(Object *ob)
 				for (ct= targets.first; ct; ct= ct->next) {
 					if (ct->tar == ob) {
 						ct->tar = NULL;
-						strcpy(ct->subtarget, "");
+						ct->subtarget[0]= '\0';
 						obt->recalc |= OB_RECALC_DATA;
 					}
 				}
@@ -867,11 +881,32 @@ Lamp *copy_lamp(Lamp *la)
 	
 	lan->curfalloff = curvemapping_copy(la->curfalloff);
 	
-#if 0 // XXX old animation system
-	id_us_plus((ID *)lan->ipo);
-#endif // XXX old animation system
+	if(la->preview)
+		lan->preview = BKE_previewimg_copy(la->preview);
+	
+	return lan;
+}
 
-	if (la->preview) lan->preview = BKE_previewimg_copy(la->preview);
+Lamp *localize_lamp(Lamp *la)
+{
+	Lamp *lan;
+	int a;
+	
+	lan= copy_libblock(la);
+	BLI_remlink(&G.main->lamp, lan);
+
+	for(a=0; a<MAX_MTEX; a++) {
+		if(lan->mtex[a]) {
+			lan->mtex[a]= MEM_mallocN(sizeof(MTex), "localize_lamp");
+			memcpy(lan->mtex[a], la->mtex[a], sizeof(MTex));
+			/* free lamp decrements */
+			id_us_plus((ID *)lan->mtex[a]->tex);
+		}
+	}
+	
+	lan->curfalloff = curvemapping_copy(la->curfalloff);
+
+	lan->preview= NULL;
 	
 	return lan;
 }
@@ -968,6 +1003,7 @@ static void *add_obdata_from_type(int type)
 	case OB_LAMP: return add_lamp("Lamp");
 	case OB_LATTICE: return add_lattice("Lattice");
 	case OB_ARMATURE: return add_armature("Armature");
+	case OB_SPEAKER: return add_speaker("Speaker");
 	case OB_EMPTY: return NULL;
 	default:
 		printf("add_obdata_from_type: Internal error, bad type: %d\n", type);
@@ -987,6 +1023,7 @@ static const char *get_obdata_defname(int type)
 	case OB_LAMP: return "Lamp";
 	case OB_LATTICE: return "Lattice";
 	case OB_ARMATURE: return "Armature";
+	case OB_SPEAKER: return "Speaker";
 	case OB_EMPTY: return "Empty";
 	default:
 		printf("get_obdata_defname: Internal error, bad type: %d\n", type);
@@ -1030,7 +1067,7 @@ Object *add_only_object(int type, const char *name)
 	ob->empty_drawtype= OB_PLAINAXES;
 	ob->empty_drawsize= 1.0;
 
-	if(type==OB_CAMERA || type==OB_LAMP) {
+	if(type==OB_CAMERA || type==OB_LAMP || type==OB_SPEAKER) {
 		ob->trackflag= OB_NEGZ;
 		ob->upflag= OB_POSY;
 	}
@@ -1057,6 +1094,7 @@ Object *add_only_object(int type, const char *name)
 	ob->state=1;
 	/* ob->pad3 == Contact Processing Threshold */
 	ob->m_contactProcessingThreshold = 1.;
+	ob->obstacleRad = 1.;
 	
 	/* NT fluid sim defaults */
 	ob->fluidsimFlag = 0;
@@ -1270,6 +1308,37 @@ static void copy_object_pose(Object *obn, Object *ob)
 			}
 		}
 	}
+}
+
+static int object_pose_context(Object *ob)
+{
+	if(	(ob) &&
+		(ob->type == OB_ARMATURE) &&
+		(ob->pose) &&
+		(ob->mode & OB_MODE_POSE)
+	) {
+		return 1;
+	}
+	else {
+		return 0;
+	}
+}
+
+//Object *object_pose_armature_get(Object *ob)
+Object *object_pose_armature_get(struct Object *ob)
+{
+	if(ob==NULL)
+		return NULL;
+
+	if(object_pose_context(ob))
+		return ob;
+
+	ob= modifiers_isDeformedByArmature(ob);
+
+	if(object_pose_context(ob))
+		return ob;
+
+	return NULL;
 }
 
 static void copy_object_transform(Object *ob_tar, Object *ob_src)
@@ -1627,12 +1696,6 @@ void object_make_proxy(Object *ob, Object *target, Object *gob)
 
 /* there is also a timing calculation in drawobject() */
 
-static int no_speed_curve= 0;
-
-void disable_speed_curve(int val)
-{
-	no_speed_curve= val;
-}
 
 // XXX THIS CRUFT NEEDS SERIOUS RECODING ASAP!
 /* ob can be NULL */
@@ -1670,21 +1733,20 @@ void object_rot_to_mat3(Object *ob, float mat[][3])
 {
 	float rmat[3][3], dmat[3][3];
 	
-	/* initialise the delta-rotation matrix, which will get (pre)multiplied 
+	/* 'dmat' is the delta-rotation matrix, which will get (pre)multiplied
 	 * with the rotation matrix to yield the appropriate rotation
 	 */
-	unit_m3(dmat);
-	
+
 	/* rotations may either be quats, eulers (with various rotation orders), or axis-angle */
 	if (ob->rotmode > 0) {
 		/* euler rotations (will cause gimble lock, but this can be alleviated a bit with rotation orders) */
-		eulO_to_mat3( rmat,ob->rot, ob->rotmode);
-		eulO_to_mat3( dmat,ob->drot, ob->rotmode);
+		eulO_to_mat3(rmat, ob->rot, ob->rotmode);
+		eulO_to_mat3(dmat, ob->drot, ob->rotmode);
 	}
 	else if (ob->rotmode == ROT_MODE_AXISANGLE) {
 		/* axis-angle -  not really that great for 3D-changing orientations */
-		axis_angle_to_mat3( rmat,ob->rotAxis, ob->rotAngle);
-		axis_angle_to_mat3( dmat,ob->drotAxis, ob->drotAngle);
+		axis_angle_to_mat3(rmat, ob->rotAxis, ob->rotAngle);
+		axis_angle_to_mat3(dmat, ob->drotAxis, ob->drotAngle);
 	}
 	else {
 		/* quats are normalised before use to eliminate scaling issues */
@@ -1719,9 +1781,22 @@ void object_mat3_to_rot(Object *ob, float mat[][3], short use_compat)
 		ob->rotAngle -= ob->drotAngle;
 		break;
 	default: /* euler */
-		if(use_compat)	mat3_to_compatible_eulO(ob->rot, ob->rot, ob->rotmode, mat);
-		else			mat3_to_eulO(ob->rot, ob->rotmode, mat);
-		sub_v3_v3(ob->rot, ob->drot);
+		{
+			float quat[4];
+			float dquat[4];
+			float tmat[3][3];
+
+			/* without drot we could apply 'mat' directly */
+			mat3_to_quat(quat, mat);
+			eulO_to_quat(dquat, ob->drot, ob->rotmode);
+			invert_qt(dquat);
+			mul_qt_qtqt(quat, dquat, quat);
+			quat_to_mat3(tmat, quat);
+			/* end drot correction */
+
+			if(use_compat)	mat3_to_compatible_eulO(ob->rot, ob->rot, ob->rotmode, tmat);
+			else			mat3_to_eulO(ob->rot, ob->rotmode, tmat);
+		}
 	}
 }
 
@@ -1737,7 +1812,7 @@ void object_apply_mat4(Object *ob, float mat[][4], const short use_compat, const
 		mul_m4_m4m4(rmat, mat, imat); /* get the parent relative matrix */
 		object_apply_mat4(ob, rmat, use_compat, FALSE);
 		
-		/* same as below, use rmat rather then mat */
+		/* same as below, use rmat rather than mat */
 		mat4_to_loc_rot_size(ob->loc, rot, ob->size, rmat);
 		object_mat3_to_rot(ob, rot, use_compat);
 	}
@@ -2057,7 +2132,7 @@ void where_is_object_time(Scene *scene, Object *ob, float ctime)
 	if(ob==NULL) return;
 	
 	/* execute drivers only, as animation has already been done */
-	BKE_animsys_evaluate_animdata(&ob->id, ob->adt, ctime, ADT_RECALC_DRIVERS);
+	BKE_animsys_evaluate_animdata(scene, &ob->id, ob->adt, ctime, ADT_RECALC_DRIVERS);
 	
 	if(ob->parent) {
 		Object *par= ob->parent;
@@ -2360,24 +2435,42 @@ void object_set_dimensions(Object *ob, const float *value)
 void minmax_object(Object *ob, float *min, float *max)
 {
 	BoundBox bb;
-	Mesh *me;
-	Curve *cu;
 	float vec[3];
 	int a;
+	short change= FALSE;
 	
 	switch(ob->type) {
-		
 	case OB_CURVE:
 	case OB_FONT:
 	case OB_SURF:
-		cu= ob->data;
-		
-		if(cu->bb==NULL) tex_space_curve(cu);
-		bb= *(cu->bb);
-		
-		for(a=0; a<8; a++) {
-			mul_m4_v3(ob->obmat, bb.vec[a]);
-			DO_MINMAX(bb.vec[a], min, max);
+		{
+			Curve *cu= ob->data;
+
+			if(cu->bb==NULL) tex_space_curve(cu);
+			bb= *(cu->bb);
+
+			for(a=0; a<8; a++) {
+				mul_m4_v3(ob->obmat, bb.vec[a]);
+				DO_MINMAX(bb.vec[a], min, max);
+			}
+			change= TRUE;
+		}
+		break;
+	case OB_LATTICE:
+		{
+			Lattice *lt= ob->data;
+			BPoint *bp= lt->def;
+			int u, v, w;
+
+			for(w=0; w<lt->pntsw; w++) {
+				for(v=0; v<lt->pntsv; v++) {
+					for(u=0; u<lt->pntsu; u++, bp++) {
+						mul_v3_m4v3(vec, ob->obmat, bp->vec);
+						DO_MINMAX(vec, min, max);
+					}
+				}
+			}
+			change= TRUE;
 		}
 		break;
 	case OB_ARMATURE:
@@ -2389,25 +2482,27 @@ void minmax_object(Object *ob, float *min, float *max)
 				mul_v3_m4v3(vec, ob->obmat, pchan->pose_tail);
 				DO_MINMAX(vec, min, max);
 			}
-			break;
+			change= TRUE;
 		}
-		/* no break, get_mesh will give NULL and it passes on to default */
+		break;
 	case OB_MESH:
-		me= get_mesh(ob);
-		
-		if(me) {
-			bb = *mesh_get_bb(ob);
-			
-			for(a=0; a<8; a++) {
-				mul_m4_v3(ob->obmat, bb.vec[a]);
-				DO_MINMAX(bb.vec[a], min, max);
+		{
+			Mesh *me= get_mesh(ob);
+
+			if(me) {
+				bb = *mesh_get_bb(ob);
+
+				for(a=0; a<8; a++) {
+					mul_m4_v3(ob->obmat, bb.vec[a]);
+					DO_MINMAX(bb.vec[a], min, max);
+				}
+				change= TRUE;
 			}
 		}
-		if(min[0] < max[0] ) break;
-		
-		/* else here no break!!!, mesh can be zero sized */
-		
-	default:
+		break;
+	}
+
+	if(change == FALSE) {
 		DO_MINMAX(ob->obmat[3], min, max);
 
 		copy_v3_v3(vec, ob->obmat[3]);
@@ -2417,7 +2512,6 @@ void minmax_object(Object *ob, float *min, float *max)
 		copy_v3_v3(vec, ob->obmat[3]);
 		sub_v3_v3(vec, ob->size);
 		DO_MINMAX(vec, min, max);
-		break;
 	}
 }
 
@@ -2577,7 +2671,7 @@ void object_handle_update(Scene *scene, Object *ob)
 			if(adt) {
 				/* evaluate drivers */
 				// XXX: for mesh types, should we push this to derivedmesh instead?
-				BKE_animsys_evaluate_animdata(data_id, adt, ctime, ADT_RECALC_DRIVERS);
+				BKE_animsys_evaluate_animdata(scene, data_id, adt, ctime, ADT_RECALC_DRIVERS);
 			}
 
 			/* includes all keys and modifiers */
@@ -2595,11 +2689,12 @@ void object_handle_update(Scene *scene, Object *ob)
 
 #else				/* ensure CD_MASK_BAREMESH for now */
 					EditMesh *em = (ob == scene->obedit)? BKE_mesh_get_editmesh(ob->data): NULL;
+					unsigned int data_mask= scene->customdata_mask | ob->customdata_mask | CD_MASK_BAREMESH;
 					if(em) {
-						makeDerivedMesh(scene, ob, em,  scene->customdata_mask | CD_MASK_BAREMESH); /* was CD_MASK_BAREMESH */
+						makeDerivedMesh(scene, ob, em,  data_mask); /* was CD_MASK_BAREMESH */
 						BKE_mesh_end_editmesh(ob->data, em);
 					} else
-						makeDerivedMesh(scene, ob, NULL, scene->customdata_mask | CD_MASK_BAREMESH);
+						makeDerivedMesh(scene, ob, NULL, data_mask);
 #endif
 
 				}
@@ -2704,6 +2799,33 @@ void object_handle_update(Scene *scene, Object *ob)
 	if(ob->proxy) {
 		ob->proxy->proxy_from= ob;
 		// printf("set proxy pointer for later group stuff %s\n", ob->id.name);
+	}
+}
+
+void object_sculpt_modifiers_changed(Object *ob)
+{
+	SculptSession *ss= ob->sculpt;
+
+	if(!ss->cache) {
+		/* we free pbvh on changes, except during sculpt since it can't deal with
+		   changing PVBH node organization, we hope topology does not change in
+		   the meantime .. weak */
+		if(ss->pbvh) {
+				BLI_pbvh_free(ss->pbvh);
+				ss->pbvh= NULL;
+		}
+
+		free_sculptsession_deformMats(ob->sculpt);
+	} else {
+		PBVHNode **nodes;
+		int n, totnode;
+
+		BLI_pbvh_search_gather(ss->pbvh, NULL, NULL, &nodes, &totnode);
+
+		for(n = 0; n < totnode; n++)
+			BLI_pbvh_node_mark_update(nodes[n]);
+
+		MEM_freeN(nodes);
 	}
 }
 
@@ -3010,9 +3132,14 @@ static KeyBlock *insert_lattkey(Scene *scene, Object *ob, const char *name, int 
 
 	if(newkey || from_mix==FALSE) {
 		kb= add_keyblock(key, name);
-
-		/* create from lattice */
-		latt_to_key(lt, kb);
+		if (!newkey) {
+			KeyBlock *basekb= (KeyBlock *)key->block.first;
+			kb->data= MEM_dupallocN(basekb->data);
+			kb->totelem= basekb->totelem;
+		}
+		else {
+			latt_to_key(lt, kb);
+		}
 	}
 	else {
 		/* copy from current values */
@@ -3048,7 +3175,10 @@ static KeyBlock *insert_curvekey(Scene *scene, Object *ob, const char *name, int
 			KeyBlock *basekb= (KeyBlock *)key->block.first;
 			kb->data= MEM_dupallocN(basekb->data);
 			kb->totelem= basekb->totelem;
-		} else curve_to_key(cu, kb, lb);
+		}
+		else {
+			curve_to_key(cu, kb, lb);
+		}
 	}
 	else {
 		/* copy from current values */
@@ -3079,7 +3209,7 @@ int object_is_modified(Scene *scene, Object *ob)
 	int flag= 0;
 
 	if(ob_get_key(ob)) {
-		flag |= eModifierMode_Render | eModifierMode_Render;
+		flag |= eModifierMode_Render;
 	}
 	else {
 		ModifierData *md;

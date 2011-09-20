@@ -19,9 +19,11 @@
 # <pep8 compliant>
 
 import bpy
+from bpy.types import Header, Menu
+from blf import gettext as _
 
 
-class GRAPH_HT_header(bpy.types.Header):
+class GRAPH_HT_header(Header):
     bl_space_type = 'GRAPH_EDITOR'
 
     def draw(self, context):
@@ -35,13 +37,11 @@ class GRAPH_HT_header(bpy.types.Header):
         row.template_header()
 
         if context.area.show_menus:
-            sub = row.row(align=True)
-
-            sub.menu("GRAPH_MT_view")
-            sub.menu("GRAPH_MT_select")
-            sub.menu("GRAPH_MT_marker")
-            sub.menu("GRAPH_MT_channel")
-            sub.menu("GRAPH_MT_key")
+            row.menu("GRAPH_MT_view")
+            row.menu("GRAPH_MT_select")
+            row.menu("GRAPH_MT_marker")
+            row.menu("GRAPH_MT_channel")
+            row.menu("GRAPH_MT_key")
 
         layout.prop(st, "mode", text="")
 
@@ -61,15 +61,13 @@ class GRAPH_HT_header(bpy.types.Header):
             row.operator("graph.ghost_curves_create", text="", icon='GHOST_ENABLED')
 
 
-class GRAPH_MT_view(bpy.types.Menu):
+class GRAPH_MT_view(Menu):
     bl_label = "View"
 
     def draw(self, context):
         layout = self.layout
 
         st = context.space_data
-
-        layout.column()
 
         layout.operator("graph.properties", icon='MENU_PANEL')
         layout.separator()
@@ -81,13 +79,13 @@ class GRAPH_MT_view(bpy.types.Menu):
         layout.prop(st, "use_auto_merge_keyframes")
 
         layout.separator()
-        layout.prop(st, "use_fancy_drawing")
+        layout.prop(st, "use_beauty_drawing")
 
         layout.separator()
         if st.show_handles:
-            layout.operator("graph.handles_view_toggle", icon='CHECKBOX_HLT', text="Show All Handles")
+            layout.operator("graph.handles_view_toggle", icon='CHECKBOX_HLT', text=_("Show All Handles"))
         else:
-            layout.operator("graph.handles_view_toggle", icon='CHECKBOX_DEHLT', text="Show All Handles")
+            layout.operator("graph.handles_view_toggle", icon='CHECKBOX_DEHLT', text=_("Show All Handles"))
         layout.prop(st, "use_only_selected_curves_handles")
         layout.prop(st, "use_only_selected_keyframe_handles")
         layout.operator("anim.time_toggle")
@@ -107,32 +105,31 @@ class GRAPH_MT_view(bpy.types.Menu):
         layout.operator("screen.screen_full_area")
 
 
-class GRAPH_MT_select(bpy.types.Menu):
+class GRAPH_MT_select(Menu):
     bl_label = "Select"
 
     def draw(self, context):
         layout = self.layout
 
-        layout.column()
         # This is a bit misleading as the operator's default text is "Select All" while it actually *toggles* All/None
         layout.operator("graph.select_all_toggle")
-        layout.operator("graph.select_all_toggle", text="Invert Selection").invert = True
+        layout.operator("graph.select_all_toggle", text=_("Invert Selection")).invert = True
 
         layout.separator()
         layout.operator("graph.select_border")
-        layout.operator("graph.select_border", text="Border Axis Range").axis_range = True
-        layout.operator("graph.select_border", text="Border (Include Handles)").include_handles = True
+        layout.operator("graph.select_border", text=_("Border Axis Range")).axis_range = True
+        layout.operator("graph.select_border", text=_("Border (Include Handles)")).include_handles = True
 
         layout.separator()
-        layout.operator("graph.select_column", text="Columns on Selected Keys").mode = 'KEYS'
-        layout.operator("graph.select_column", text="Column on Current Frame").mode = 'CFRA'
+        layout.operator("graph.select_column", text=_("Columns on Selected Keys")).mode = 'KEYS'
+        layout.operator("graph.select_column", text=_("Column on Current Frame")).mode = 'CFRA'
 
-        layout.operator("graph.select_column", text="Columns on Selected Markers").mode = 'MARKERS_COLUMN'
-        layout.operator("graph.select_column", text="Between Selected Markers").mode = 'MARKERS_BETWEEN'
+        layout.operator("graph.select_column", text=_("Columns on Selected Markers")).mode = 'MARKERS_COLUMN'
+        layout.operator("graph.select_column", text=_("Between Selected Markers")).mode = 'MARKERS_BETWEEN'
 
         layout.separator()
-        layout.operator("graph.select_leftright", text="Before Current Frame").mode = 'LEFT'
-        layout.operator("graph.select_leftright", text="After Current Frame").mode = 'RIGHT'
+        layout.operator("graph.select_leftright", text=_("Before Current Frame")).mode = 'LEFT'
+        layout.operator("graph.select_leftright", text=_("After Current Frame")).mode = 'RIGHT'
 
         layout.separator()
         layout.operator("graph.select_more")
@@ -142,7 +139,7 @@ class GRAPH_MT_select(bpy.types.Menu):
         layout.operator("graph.select_linked")
 
 
-class GRAPH_MT_marker(bpy.types.Menu):
+class GRAPH_MT_marker(Menu):
     bl_label = "Marker"
 
     def draw(self, context):
@@ -150,20 +147,19 @@ class GRAPH_MT_marker(bpy.types.Menu):
 
         #layout.operator_context = 'EXEC_REGION_WIN'
 
-        layout.column()
-        layout.operator("marker.add", "Add Marker")
-        layout.operator("marker.duplicate", text="Duplicate Marker")
-        layout.operator("marker.delete", text="Delete Marker")
+        layout.operator("marker.add", _("Add Marker"))
+        layout.operator("marker.duplicate", text=_("Duplicate Marker"))
+        layout.operator("marker.delete", text=_("Delete Marker"))
 
         layout.separator()
 
-        layout.operator("marker.rename", text="Rename Marker")
-        layout.operator("marker.move", text="Grab/Move Marker")
+        layout.operator("marker.rename", text=_("Rename Marker"))
+        layout.operator("marker.move", text=_("Grab/Move Marker"))
 
         # TODO: pose markers for action edit mode only?
 
 
-class GRAPH_MT_channel(bpy.types.Menu):
+class GRAPH_MT_channel(Menu):
     bl_label = "Channel"
 
     def draw(self, context):
@@ -171,7 +167,6 @@ class GRAPH_MT_channel(bpy.types.Menu):
 
         layout.operator_context = 'INVOKE_REGION_CHANNELS'
 
-        layout.column()
         layout.operator("anim.channels_delete")
 
         layout.separator()
@@ -182,30 +177,29 @@ class GRAPH_MT_channel(bpy.types.Menu):
         layout.separator()
         layout.operator("anim.channels_editable_toggle")
         layout.operator("anim.channels_visibility_set")
-        layout.operator_menu_enum("graph.extrapolation_type", "type", text="Extrapolation Mode")
+        layout.operator_menu_enum("graph.extrapolation_type", "type", text=_("Extrapolation Mode"))
 
         layout.separator()
         layout.operator("anim.channels_expand")
         layout.operator("anim.channels_collapse")
 
         layout.separator()
-        layout.operator_menu_enum("anim.channels_move", "direction", text="Move...")
+        layout.operator_menu_enum("anim.channels_move", "direction", text=_("Move..."))
 
         layout.separator()
         layout.operator("anim.channels_fcurves_enable")
 
 
-class GRAPH_MT_key(bpy.types.Menu):
+class GRAPH_MT_key(Menu):
     bl_label = "Key"
 
     def draw(self, context):
         layout = self.layout
 
-        layout.column()
-        layout.menu("GRAPH_MT_key_transform", text="Transform")
+        layout.menu("GRAPH_MT_key_transform", text=_("Transform"))
 
-        layout.operator_menu_enum("graph.snap", "type", text="Snap")
-        layout.operator_menu_enum("graph.mirror", "type", text="Mirror")
+        layout.operator_menu_enum("graph.snap", "type", text=_("Snap"))
+        layout.operator_menu_enum("graph.mirror", "type", text=_("Mirror"))
 
         layout.separator()
         layout.operator("graph.keyframe_insert")
@@ -213,12 +207,12 @@ class GRAPH_MT_key(bpy.types.Menu):
         layout.operator("graph.sound_bake")
 
         layout.separator()
-        layout.operator("graph.duplicate")
+        layout.operator("graph.duplicate_move")
         layout.operator("graph.delete")
 
         layout.separator()
-        layout.operator_menu_enum("graph.handle_type", "type", text="Handle Type")
-        layout.operator_menu_enum("graph.interpolation_type", "type", text="Interpolation Mode")
+        layout.operator_menu_enum("graph.handle_type", "type", text=_("Handle Type"))
+        layout.operator_menu_enum("graph.interpolation_type", "type", text=_("Interpolation Mode"))
 
         layout.separator()
         layout.operator("graph.clean")
@@ -231,20 +225,19 @@ class GRAPH_MT_key(bpy.types.Menu):
         layout.operator("graph.paste")
 
         layout.separator()
-        layout.operator("graph.euler_filter", text="Discontinuity (Euler) Filter")
+        layout.operator("graph.euler_filter", text=_("Discontinuity (Euler) Filter"))
 
 
-class GRAPH_MT_key_transform(bpy.types.Menu):
+class GRAPH_MT_key_transform(Menu):
     bl_label = "Transform"
 
     def draw(self, context):
         layout = self.layout
 
-        layout.column()
-        layout.operator("transform.translate", text="Grab/Move")
-        layout.operator("transform.transform", text="Extend").mode = 'TIME_EXTEND'
-        layout.operator("transform.rotate", text="Rotate")
-        layout.operator("transform.resize", text="Scale")
+        layout.operator("transform.translate", text=_("Grab/Move"))
+        layout.operator("transform.transform", text=_("Extend")).mode = 'TIME_EXTEND'
+        layout.operator("transform.rotate", text=_("Rotate"))
+        layout.operator("transform.resize", text=_("Scale"))
 
 if __name__ == "__main__":  # only for live edit.
     bpy.utils.register_module(__name__)

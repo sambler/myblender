@@ -18,9 +18,11 @@
 
 # <pep8 compliant>
 import bpy
+from bpy.types import Header, Menu, Panel
+from blf import gettext as _
 
 
-class LOGIC_PT_properties(bpy.types.Panel):
+class LOGIC_PT_properties(Panel):
     bl_space_type = 'LOGIC_EDITOR'
     bl_region_type = 'UI'
     bl_label = "Properties"
@@ -36,7 +38,7 @@ class LOGIC_PT_properties(bpy.types.Panel):
         ob = context.active_object
         game = ob.game
 
-        layout.operator("object.game_property_new", text="Add Game Property", icon='ZOOMIN')
+        layout.operator("object.game_property_new", text=_("Add Game Property"), icon='ZOOMIN')
 
         for i, prop in enumerate(game.properties):
 
@@ -49,40 +51,34 @@ class LOGIC_PT_properties(bpy.types.Panel):
             row.operator("object.game_property_remove", text="", icon='X', emboss=False).index = i
 
 
-class LOGIC_MT_logicbricks_add(bpy.types.Menu):
+class LOGIC_MT_logicbricks_add(Menu):
     bl_label = "Add"
 
     def draw(self, context):
         layout = self.layout
 
-        layout.operator_menu_enum("logic.sensor_add", "type", text="Sensor")
-        layout.operator_menu_enum("logic.controller_add", "type", text="Controller")
-        layout.operator_menu_enum("logic.actuator_add", "type", text="Actuator")
+        layout.operator_menu_enum("logic.sensor_add", "type", text=_("Sensor"))
+        layout.operator_menu_enum("logic.controller_add", "type", text=_("Controller"))
+        layout.operator_menu_enum("logic.actuator_add", "type", text=_("Actuator"))
 
 
-class LOGIC_HT_header(bpy.types.Header):
+class LOGIC_HT_header(Header):
     bl_space_type = 'LOGIC_EDITOR'
 
     def draw(self, context):
-        layout = self.layout
+        layout = self.layout.row(align=True)
 
-        row = layout.row(align=True)
-        row.template_header()
+        layout.template_header()
 
         if context.area.show_menus:
-            sub = row.row(align=True)
-            sub.menu("LOGIC_MT_view")
-            #sub.menu("LOGIC_MT_select")
-            #sub.menu("LOGIC_MT_add")
+            layout.menu("LOGIC_MT_view")
 
 
-class LOGIC_MT_view(bpy.types.Menu):
+class LOGIC_MT_view(Menu):
     bl_label = "View"
 
     def draw(self, context):
         layout = self.layout
-
-        layout.column()
 
         layout.operator("logic.properties", icon='MENU_PANEL')
 

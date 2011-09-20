@@ -18,7 +18,8 @@
 
 # <pep8 compliant>
 import bpy
-
+from bpy.types import Panel
+from blf import gettext as _
 
 class DataButtonsPanel():
     bl_space_type = 'PROPERTIES'
@@ -30,7 +31,7 @@ class DataButtonsPanel():
         return (context.object and context.object.type == 'EMPTY')
 
 
-class DATA_PT_empty(DataButtonsPanel, bpy.types.Panel):
+class DATA_PT_empty(DataButtonsPanel, Panel):
     bl_label = "Empty"
 
     def draw(self, context):
@@ -38,19 +39,17 @@ class DATA_PT_empty(DataButtonsPanel, bpy.types.Panel):
 
         ob = context.object
 
-        layout.prop(ob, "empty_draw_type", text="Display")
+        layout.prop(ob, "empty_draw_type", text=_("Display"))
 
         if ob.empty_draw_type == 'IMAGE':
-            # layout.template_image(ob, "data", None)
             layout.template_ID(ob, "data", open="image.open", unlink="image.unlink")
 
-            row = layout.row(align = True)
-            row.prop(ob, "color", text="Transparency", index=3, slider=True)
-            row = layout.row(align = True)
-            row.prop(ob, "empty_image_offset", text="Offset X", index=0)
-            row.prop(ob, "empty_image_offset", text="Offset Y", index=1)
+            layout.prop(ob, "color", text=_("Transparency"), index=3, slider=True)
+            row = layout.row(align=True)
+            row.prop(ob, "empty_image_offset", text=_("Offset X"), index=0)
+            row.prop(ob, "empty_image_offset", text=_("Offset Y"), index=1)
 
-        layout.prop(ob, "empty_draw_size", text="Size")
+        layout.prop(ob, "empty_draw_size", text=_("Size"))
 
 if __name__ == "__main__":  # only for live edit.
     bpy.utils.register_module(__name__)

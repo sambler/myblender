@@ -370,6 +370,12 @@ void ED_operatortypes_paint(void)
 	WM_operatortype_append(PAINT_OT_weight_paint);
 	WM_operatortype_append(PAINT_OT_weight_set);
 	WM_operatortype_append(PAINT_OT_weight_from_bones);
+	WM_operatortype_append(PAINT_OT_weight_sample);
+	WM_operatortype_append(PAINT_OT_weight_sample_group);
+
+	/* vertex selection */
+	WM_operatortype_append(PAINT_OT_vert_select_all);
+	WM_operatortype_append(PAINT_OT_vert_select_inverse);
 
 	/* vertex */
 	WM_operatortype_append(PAINT_OT_vertex_paint_toggle);
@@ -589,6 +595,10 @@ void ED_keymap_paint(wmKeyConfig *keyconf)
 
 	WM_keymap_verify_item(keymap, "PAINT_OT_weight_paint", LEFTMOUSE, KM_PRESS, 0, 0);
 
+	/* these keys are from 2.4x but could be changed */
+	WM_keymap_verify_item(keymap, "PAINT_OT_weight_sample", LEFTMOUSE, KM_PRESS, KM_CTRL, 0);
+	WM_keymap_verify_item(keymap, "PAINT_OT_weight_sample_group", LEFTMOUSE, KM_PRESS, KM_SHIFT, 0);
+
 	WM_keymap_add_item(keymap,
 			"PAINT_OT_weight_set", KKEY, KM_PRESS, KM_SHIFT, 0);
 
@@ -600,6 +610,17 @@ void ED_keymap_paint(wmKeyConfig *keyconf)
 	RNA_string_set(kmi->ptr, "data_path", "weight_paint_object.data.use_paint_mask");
 
 	WM_keymap_verify_item(keymap, "PAINT_OT_weight_from_bones", WKEY, KM_PRESS, 0, 0);
+
+	
+	/*Weight paint's Vertex Selection Mode */
+	keymap= WM_keymap_find(keyconf, "Weight Paint Vertex Selection", 0, 0);
+	keymap->poll= vert_paint_poll;
+	WM_keymap_add_item(keymap, "PAINT_OT_vert_select_all", AKEY, KM_PRESS, 0, 0);
+	WM_keymap_add_item(keymap, "PAINT_OT_vert_select_inverse", IKEY, KM_PRESS, KM_CTRL, 0);
+	WM_keymap_add_item(keymap, "VIEW3D_OT_select_border", BKEY, KM_PRESS, 0, 0);
+	WM_keymap_add_item(keymap, "VIEW3D_OT_select_lasso", EVT_TWEAK_A, KM_ANY, KM_CTRL, 0);
+	RNA_boolean_set(WM_keymap_add_item(keymap, "VIEW3D_OT_select_lasso", EVT_TWEAK_A, KM_ANY, KM_SHIFT|KM_CTRL, 0)->ptr, "deselect", 1);
+	WM_keymap_add_item(keymap, "VIEW3D_OT_select_circle", CKEY, KM_PRESS, 0, 0);
 
 	/* Image/Texture Paint mode */
 	keymap= WM_keymap_find(keyconf, "Image Paint", 0, 0);

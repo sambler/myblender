@@ -36,7 +36,75 @@
 #include "BLI_path_util.h"
 #endif
 
-#define PYC_INTERPRETER_ACTIVE (((PyThreadState*)_Py_atomic_load_relaxed(&_PyThreadState_Current)) != NULL)
+/* array utility function */
+int PyC_AsArray(void *array, PyObject *value, const int length, const PyTypeObject *type, const short is_double, const char *error_prefix)
+{
+	PyObject *value_fast;
+	int value_len;
+	int i;
+
+	if(!(value_fast=PySequence_Fast(value, error_prefix))) {
+		return -1;
+	}
+
+	value_len= PySequence_Fast_GET_SIZE(value_fast);
+
+	if(value_len != length) {
+		Py_DECREF(value);
+		PyErr_Format(PyExc_TypeError,
+		             "%.200s: invalid sequence length. expected %d, got %d",
+		             error_prefix, length, value_len);
+		return -1;
+	}
+
+	/* for each type */
+	if(type == &PyFloat_Type) {
+		if(is_double) {
+			double *array_double= array;
+			for(i=0; i<length; i++) {
+				array_double[i]= PyFloat_AsDouble(PySequence_Fast_GET_ITEM(value_fast, i));
+			}
+		}
+		else {
+			float *array_float= array;
+			for(i=0; i<length; i++) {
+				array_float[i]= PyFloat_AsDouble(PySequence_Fast_GET_ITEM(value_fast, i));
+			}
+		}
+	}
+	else if(type == &PyLong_Type) {
+		/* could use is_double for 'long int' but no use now */
+		int *array_int= array;
+		for(i=0; i<length; i++) {
+			array_int[i]= PyLong_AsSsize_t(PySequence_Fast_GET_ITEM(value_fast, i));
+		}
+	}
+	else if(type == &PyBool_Type) {
+		int *array_bool= array;
+		for(i=0; i<length; i++) {
+			array_bool[i]= (PyLong_AsSsize_t(PySequence_Fast_GET_ITEM(value_fast, i)) != 0);
+		}
+	}
+	else {
+		Py_DECREF(value_fast);
+		PyErr_Format(PyExc_TypeError,
+		             "%s: internal error %s is invalid",
+		             error_prefix, type->tp_name);
+		return -1;
+	}
+
+	Py_DECREF(value_fast);
+
+	if(PyErr_Occurred()) {
+		PyErr_Format(PyExc_TypeError,
+		             "%s: one or more items could not be used as a %s",
+		             error_prefix, type->tp_name);
+		return -1;
+	}
+
+	return 0;
+}
+
 
 /* for debugging */
 void PyC_ObSpit(const char *name, PyObject *var) {
@@ -140,7 +208,77 @@ PyObject *PyC_Object_GetAttrStringArgs(PyObject *o, Py_ssize_t n, ...)
 	return item;
 }
 
-/* returns the exception string as a new PyUnicode object, depends on external StringIO module */
+/* similar to PyErr_Format(),
+ *
+ * implimentation - we cant actually preprend the existing exception,
+ * because it could have _any_ argiments given to it, so instead we get its
+ * __str__ output and raise our own exception including it.
+ */
+PyObject *PyC_Err_Format_Prefix(PyObject *exception_type_prefix, const char *format, ...)
+{
+	PyObject *error_value_prefix;
+	va_list args;
+
+	va_start(args, format);
+	error_value_prefix= PyUnicode_FromFormatV(format, args); /* can fail and be NULL */
+	va_end(args);
+
+	if(PyErr_Occurred()) {
+		PyObject *error_type, *error_value, *error_traceback;
+		PyErr_Fetch(&error_type, &error_value, &error_traceback);
+		PyErr_Format(exception_type_prefix,
+		             "%S, %.200s(%S)",
+		             error_value_prefix,
+		             Py_TYPE(error_value)->tp_name,
+		             error_value
+		             );
+	}
+	else {
+		PyErr_SetObject(exception_type_prefix,
+		                error_value_prefix
+		                );
+	}
+
+	Py_XDECREF(error_value_prefix);
+
+	/* dumb to always return NULL but matches PyErr_Format */
+	return NULL;
+}
+
+
+/* returns the exception string as a new PyUnicode object, depends on external traceback module */
+#if 0
+
+/* this version uses traceback module but somehow fails on UI errors */
+
+PyObject *PyC_ExceptionBuffer(void)
+{
+	PyObject *traceback_mod= NULL;
+	PyObject *format_tb_func= NULL;
+	PyObject *ret= NULL;
+
+	if(! (traceback_mod= PyImport_ImportModule("traceback")) ) {
+		goto error_cleanup;
+	}
+	else if (! (format_tb_func= PyObject_GetAttrString(traceback_mod, "format_exc"))) {
+		goto error_cleanup;
+	}
+
+	ret= PyObject_CallObject(format_tb_func, NULL);
+
+	if(ret == Py_None) {
+		Py_DECREF(ret);
+		ret= NULL;
+	}
+
+error_cleanup:
+	/* could not import the module so print the error and close */
+	Py_XDECREF(traceback_mod);
+	Py_XDECREF(format_tb_func);
+
+	return ret;
+}
+#else /* verbose, non-threadsafe version */
 PyObject *PyC_ExceptionBuffer(void)
 {
 	PyObject *stdout_backup = PySys_GetObject("stdout"); /* borrowed */
@@ -149,20 +287,20 @@ PyObject *PyC_ExceptionBuffer(void)
 	PyObject *string_io_buf = NULL;
 	PyObject *string_io_mod= NULL;
 	PyObject *string_io_getvalue= NULL;
-	
+
 	PyObject *error_type, *error_value, *error_traceback;
-	
+
 	if (!PyErr_Occurred())
 		return NULL;
-	
+
 	PyErr_Fetch(&error_type, &error_value, &error_traceback);
-	
+
 	PyErr_Clear();
-	
+
 	/* import io
 	 * string_io = io.StringIO()
 	 */
-	
+
 	if(! (string_io_mod= PyImport_ImportModule("io")) ) {
 		goto error_cleanup;
 	}
@@ -172,44 +310,45 @@ PyObject *PyC_ExceptionBuffer(void)
 	else if (! (string_io_getvalue= PyObject_GetAttrString(string_io, "getvalue"))) {
 		goto error_cleanup;
 	}
-	
+
 	Py_INCREF(stdout_backup); // since these were borrowed we dont want them freed when replaced.
 	Py_INCREF(stderr_backup);
-	
+
 	PySys_SetObject("stdout", string_io); // both of these are free'd when restoring
 	PySys_SetObject("stderr", string_io);
-	
+
 	PyErr_Restore(error_type, error_value, error_traceback);
 	PyErr_Print(); /* print the error */
 	PyErr_Clear();
-	
+
 	string_io_buf = PyObject_CallObject(string_io_getvalue, NULL);
-	
+
 	PySys_SetObject("stdout", stdout_backup);
 	PySys_SetObject("stderr", stderr_backup);
-	
+
 	Py_DECREF(stdout_backup); /* now sys owns the ref again */
 	Py_DECREF(stderr_backup);
-	
+
 	Py_DECREF(string_io_mod);
 	Py_DECREF(string_io_getvalue);
 	Py_DECREF(string_io); /* free the original reference */
-	
+
 	PyErr_Clear();
 	return string_io_buf;
-	
-	
+
+
 error_cleanup:
 	/* could not import the module so print the error and close */
 	Py_XDECREF(string_io_mod);
 	Py_XDECREF(string_io);
-	
+
 	PyErr_Restore(error_type, error_value, error_traceback);
 	PyErr_Print(); /* print the error */
 	PyErr_Clear();
-	
+
 	return NULL;
 }
+#endif
 
 
 /* string conversion, escape non-unicode chars, coerce must be set to NULL */

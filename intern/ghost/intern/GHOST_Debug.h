@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -26,8 +26,8 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
-/**
- * @file	GHOST_Debug.h
+/** \file ghost/intern/GHOST_Debug.h
+ *  \ingroup GHOST
  * Macro's used in GHOST debug target.
  */
 
@@ -41,9 +41,9 @@
 	#endif // DEBUG
 #endif // WIN32
 
-#ifdef BF_GHOST_DEBUG 
+#ifdef WITH_GHOST_DEBUG 
 	#define GHOST_DEBUG // spit ghost events to stdout
-#endif // BF_GHOST_DEBUG 
+#endif // WITH_GHOST_DEBUG 
 
 #ifdef GHOST_DEBUG
 	#include <iostream>
@@ -53,10 +53,10 @@
 
 #ifdef GHOST_DEBUG
 	#define GHOST_PRINT(x) { std::cout << x; }
-	//#define GHOST_PRINTF(x) { printf(x); }
+	#define GHOST_PRINTF(x, ...) { printf(x, __VA_ARGS__); }
 #else  // GHOST_DEBUG
 	#define GHOST_PRINT(x)
-	//#define GHOST_PRINTF(x)
+	#define GHOST_PRINTF(x, ...)
 #endif // GHOST_DEBUG
 
 

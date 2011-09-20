@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -22,23 +22,27 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/space_console/console_draw.c
+ *  \ingroup spconsole
+ */
+
+
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <limits.h>
 
-
 #include "BLF_api.h"
 
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 
 #include "DNA_space_types.h"
 #include "DNA_screen_types.h"
 
-// #include "BKE_suggestions.h"
 #include "BKE_report.h"
-#include "BKE_utildefines.h"
+
 
 #include "MEM_guardedalloc.h"
 
@@ -59,16 +63,16 @@ static void console_line_color(unsigned char fg[3], int type)
 {
 	switch(type) {
 	case CONSOLE_LINE_OUTPUT:
-		UI_GetThemeColor3ubv(TH_CONSOLE_OUTPUT, (char *)fg);
+		UI_GetThemeColor3ubv(TH_CONSOLE_OUTPUT, fg);
 		break;
 	case CONSOLE_LINE_INPUT:
-		UI_GetThemeColor3ubv(TH_CONSOLE_INPUT, (char *)fg);
+		UI_GetThemeColor3ubv(TH_CONSOLE_INPUT, fg);
 		break;
 	case CONSOLE_LINE_INFO:
-		UI_GetThemeColor3ubv(TH_CONSOLE_INFO, (char *)fg);
+		UI_GetThemeColor3ubv(TH_CONSOLE_INFO, fg);
 		break;
 	case CONSOLE_LINE_ERROR:
-		UI_GetThemeColor3ubv(TH_CONSOLE_ERROR, (char *)fg);
+		UI_GetThemeColor3ubv(TH_CONSOLE_ERROR, fg);
 		break;
 	}
 }
@@ -79,11 +83,13 @@ typedef struct ConsoleDrawContext {
 	int console_width;
 	int winx;
 	int ymin, ymax;
+#if 0 /* used by textview, may use later */
 	int *xy; // [2]
 	int *sel; // [2]
 	int *pos_pick; // bottom of view == 0, top of file == combine chars, end of line is lower then start. 
 	int *mval; // [2]
 	int draw;
+#endif
 } ConsoleDrawContext;
 
 void console_scrollback_prompt_begin(struct SpaceConsole *sc, ConsoleLine *cl_dummy)
@@ -171,7 +177,7 @@ static int console_textview_line_color(struct TextViewContext *tvc, unsigned cha
 		}
 
 		/* cursor */
-		UI_GetThemeColor3ubv(TH_CONSOLE_CURSOR, (char *)fg);
+		UI_GetThemeColor3ubv(TH_CONSOLE_CURSOR, fg);
 		glColor3ubv(fg);
 
 		glRecti(	(xy[0] + pen[0]) - 1,
@@ -189,7 +195,7 @@ static int console_textview_line_color(struct TextViewContext *tvc, unsigned cha
 
 static int console_textview_main__internal(struct SpaceConsole *sc, struct ARegion *ar, int draw, int mval[2], void **mouse_pick, int *pos_pick)
 {
-	ConsoleLine cl_dummy= {0};
+	ConsoleLine cl_dummy= {NULL};
 	int ret= 0;
 	
 	View2D *v2d= &ar->v2d;
@@ -232,18 +238,6 @@ int console_textview_height(struct SpaceConsole *sc, struct ARegion *ar)
 {
 	int mval[2] = {INT_MAX, INT_MAX};
 	return console_textview_main__internal(sc, ar, 0,  mval, NULL, NULL);
-}
-
-void *console_text_pick(struct SpaceConsole *sc, struct ARegion *ar, int mouse_y)
-{
-	void *mouse_pick= NULL;
-	int mval[2];
-
-	mval[0]= 0;
-	mval[1]= mouse_y;
-
-	console_textview_main__internal(sc, ar, 0, mval, &mouse_pick, NULL);
-	return (void *)mouse_pick;
 }
 
 int console_char_pick(struct SpaceConsole *sc, struct ARegion *ar, int mval[2])

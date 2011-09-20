@@ -1,4 +1,4 @@
-/**
+/*
 * global game stuff
 *
 * $Id$
@@ -28,6 +28,13 @@
  *
  * ***** END GPL LICENSE BLOCK *****
 */
+
+/** \file gameengine/Ketsji/KX_GameActuator.cpp
+ *  \ingroup ketsji
+ */
+
+
+#include <stddef.h>
 
 #include "SCA_IActuator.h"
 #include "KX_GameActuator.h"

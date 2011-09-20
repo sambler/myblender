@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/mesh/editmesh_lib.c
+ *  \ingroup edmesh
+ */
+
+
 /*
 
 editmesh_lib: generic (no UI, no menus) operations/evaluators for editmesh data
@@ -48,12 +53,13 @@ editmesh_lib: generic (no UI, no menus) operations/evaluators for editmesh data
 #include "BLI_math.h"
 #include "BLI_editVert.h"
 #include "BLI_edgehash.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_customdata.h"
 #include "BKE_context.h"
 #include "BKE_global.h"
 #include "BKE_mesh.h"
-#include "BKE_utildefines.h"
+
 
 #include "ED_mesh.h"
 #include "ED_screen.h"
@@ -347,8 +353,8 @@ void EM_editselection_plane(float *plane, EditSelection *ese)
 			we cant make a crossvec from a vec thats the same as the vec
 			unlikely but possible, so make sure if the normal is (0,0,1)
 			that vec isnt the same or in the same direction even.*/
-			if (eve->no[0]<0.5)			vec[0]=1;
-			else if (eve->no[1]<0.5)	vec[1]=1;
+			if (eve->no[0]<0.5f)		vec[0]=1;
+			else if (eve->no[1]<0.5f)	vec[1]=1;
 			else						vec[2]=1;
 			cross_v3_v3v3(plane, eve->no, vec);
 		}
@@ -359,7 +365,7 @@ void EM_editselection_plane(float *plane, EditSelection *ese)
 		however selecting different edges can swap the direction of the y axis.
 		this makes it less likely for the y axis of the manipulator
 		(running along the edge).. to flip less often.
-		at least its more pradictable */
+		at least its more predictable */
 		if (eed->v2->co[1] > eed->v1->co[1]) /*check which to do first */
 			sub_v3_v3v3(plane, eed->v2->co, eed->v1->co);
 		else
@@ -698,7 +704,7 @@ static void check_fgons_selection(EditMesh *em)
 			if(sel) efa->f |= SELECT;
 			else efa->f &= ~SELECT;
 		}
-		addlisttolist(&em->faces, &lbar[index]);
+		BLI_movelisttolist(&em->faces, &lbar[index]);
 	}
 	
 	MEM_freeN(lbar);
@@ -996,7 +1002,7 @@ void EM_free_data_layer(EditMesh *em, CustomData *data, int type)
 
 static void add_normal_aligned(float *nor, float *add)
 {
-	if( INPR(nor, add) < -0.9999f)
+	if(dot_v3v3(nor, add) < -0.9999f)
 		sub_v3_v3(nor, add);
 	else
 		add_v3_v3(nor, add);
@@ -1090,13 +1096,13 @@ short extrudeflag_face_indiv(EditMesh *em, short UNUSED(flag), float *UNUSED(nor
 			v3= addvertlist(em, efa->v3->co, efa->v3);
 			
 			v1->f1= v2->f1= v3->f1= 1;
-			VECCOPY(v1->no, efa->n);
-			VECCOPY(v2->no, efa->n);
-			VECCOPY(v3->no, efa->n);
+			copy_v3_v3(v1->no, efa->n);
+			copy_v3_v3(v2->no, efa->n);
+			copy_v3_v3(v3->no, efa->n);
 			if(efa->v4) {
 				v4= addvertlist(em, efa->v4->co, efa->v4); 
 				v4->f1= 1;
-				VECCOPY(v4->no, efa->n);
+				copy_v3_v3(v4->no, efa->n);
 			}
 			else v4= NULL;
 			
@@ -1135,6 +1141,9 @@ short extrudeflag_face_indiv(EditMesh *em, short UNUSED(flag), float *UNUSED(nor
 	
 	EM_select_flush(em);
 	
+	/* step 5; update normals after extrude */
+	recalc_editnormals(em);
+
 	return 'n';
 }
 
@@ -1200,7 +1209,10 @@ short extrudeflag_edges_indiv(EditMesh *em, short flag, float *nor)
 		if(eed->v1->f & eed->v2->f & flag) eed->f |= flag;
 	}
 	
-	if(nor[0]==0.0 && nor[1]==0.0 && nor[2]==0.0) return 'g'; // g is grab
+	/* update normals after extrude */
+	recalc_editnormals(em);
+
+	if(is_zero_v3(nor)) return 'g'; // g is grab
 	return 'n';  // n is for normal constraint
 }
 
@@ -1298,7 +1310,7 @@ static short extrudeflag_edge(Object *obedit, EditMesh *em, short UNUSED(flag), 
 	 * of the cases above to handle edges on the line of symmetry.
 	 */
 	for (; md; md=md->next) {
-		if (md->type==eModifierType_Mirror) {
+		if ((md->type==eModifierType_Mirror) && (md->mode & eModifierMode_Realtime)) {
 			MirrorModifierData *mmd = (MirrorModifierData*) md;	
 		
 			if(mmd->flag & MOD_MIR_CLIPPING) {
@@ -1322,18 +1334,18 @@ static short extrudeflag_edge(Object *obedit, EditMesh *em, short UNUSED(flag), 
 						}
 
 						if (mmd->flag & MOD_MIR_AXIS_X)
-							if ( (fabs(co1[0]) < mmd->tolerance) &&
-								 (fabs(co2[0]) < mmd->tolerance) )
+							if ( (fabsf(co1[0]) < mmd->tolerance) &&
+								 (fabsf(co2[0]) < mmd->tolerance) )
 								++eed->f2;
 
 						if (mmd->flag & MOD_MIR_AXIS_Y)
-							if ( (fabs(co1[1]) < mmd->tolerance) &&
-								 (fabs(co2[1]) < mmd->tolerance) )
+							if ( (fabsf(co1[1]) < mmd->tolerance) &&
+								 (fabsf(co2[1]) < mmd->tolerance) )
 								++eed->f2;
 
 						if (mmd->flag & MOD_MIR_AXIS_Z)
-							if ( (fabs(co1[2]) < mmd->tolerance) &&
-								 (fabs(co2[2]) < mmd->tolerance) )
+							if ( (fabsf(co1[2]) < mmd->tolerance) &&
+								 (fabsf(co2[2]) < mmd->tolerance) )
 								++eed->f2;
 					}
 				}
@@ -1391,27 +1403,22 @@ static short extrudeflag_edge(Object *obedit, EditMesh *em, short UNUSED(flag), 
 			if (efa->v4 && (efa->v4->tmp.v == NULL))
 				efa->v4->tmp.v = addvertlist(em, efa->v4->co, efa->v4);
 			
-			if(del_old==0) {	// keep old faces means flipping normal
-				if(efa->v4)
-					efan = addfacelist(em, efa->v4->tmp.v, efa->v3->tmp.v, 
-								efa->v2->tmp.v, efa->v1->tmp.v, efa, efa);
-				else
-					efan = addfacelist(em, efa->v3->tmp.v, efa->v2->tmp.v, 
-								efa->v1->tmp.v, NULL, efa, efa);
+			if(efa->v4)
+				efan = addfacelist(em, efa->v1->tmp.v, efa->v2->tmp.v,
+							efa->v3->tmp.v, efa->v4->tmp.v, efa, efa);
+			else
+				efan = addfacelist(em, efa->v1->tmp.v, efa->v2->tmp.v,
+							efa->v3->tmp.v, NULL, efa, efa);
+
+			/* keep old faces means flipping normal, reverse vertex order gives bad UV's & VCols etc - [#25260] */
+			if(del_old==0) {
+				flipface(em, efan);
 			}
-			else {
-				if(efa->v4)
-					efan = addfacelist(em, efa->v1->tmp.v, efa->v2->tmp.v, 
-								efa->v3->tmp.v, efa->v4->tmp.v, efa, efa);
-				else
-					efan = addfacelist(em, efa->v1->tmp.v, efa->v2->tmp.v, 
-								efa->v3->tmp.v, NULL, efa, efa);
-			}
-			
+
 			if (em->act_face == efa) {
 				em->act_face = efan; 
 			}
-			
+
 			/* for transform */
 			add_normal_aligned(nor, efa->n);
 		}
@@ -1484,7 +1491,10 @@ static short extrudeflag_edge(Object *obedit, EditMesh *em, short UNUSED(flag), 
 
 	EM_select_flush(em);
 
-	if(nor[0]==0.0 && nor[1]==0.0 && nor[2]==0.0) return 'g'; // grab
+	/* step 8; update normals after extrude */
+	recalc_editnormals(em);
+
+	if(is_zero_v3(nor)) return 'g'; // grab
 	return 'n'; // normal constraint 
 }
 
@@ -1587,7 +1597,7 @@ short extrudeflag_vert(Object *obedit, EditMesh *em, short flag, float *nor, int
 	 * of the cases above to handle edges on the line of symmetry.
 	 */
 	for (; md; md=md->next) {
-		if (md->type==eModifierType_Mirror) {
+		if ((md->type==eModifierType_Mirror) && (md->mode & eModifierMode_Realtime)) {
 			MirrorModifierData *mmd = (MirrorModifierData*) md;	
 		
 			if(mmd->flag & MOD_MIR_CLIPPING) {
@@ -1611,17 +1621,17 @@ short extrudeflag_vert(Object *obedit, EditMesh *em, short flag, float *nor, int
 						}
 
 						if (mmd->flag & MOD_MIR_AXIS_X)
-							if ( (fabs(co1[0]) < mmd->tolerance) &&
-								 (fabs(co2[0]) < mmd->tolerance) )
+							if ( (fabsf(co1[0]) < mmd->tolerance) &&
+								 (fabsf(co2[0]) < mmd->tolerance) )
 								++eed->f2;
 
 						if (mmd->flag & MOD_MIR_AXIS_Y)
-							if ( (fabs(co1[1]) < mmd->tolerance) &&
-								 (fabs(co2[1]) < mmd->tolerance) )
+							if ( (fabsf(co1[1]) < mmd->tolerance) &&
+								 (fabsf(co2[1]) < mmd->tolerance) )
 								++eed->f2;
 						if (mmd->flag & MOD_MIR_AXIS_Z)
-							if ( (fabs(co1[2]) < mmd->tolerance) &&
-								 (fabs(co2[2]) < mmd->tolerance) )
+							if ( (fabsf(co1[2]) < mmd->tolerance) &&
+								 (fabsf(co2[2]) < mmd->tolerance) )
 								++eed->f2;
 					}
 				}
@@ -1638,13 +1648,13 @@ short extrudeflag_vert(Object *obedit, EditMesh *em, short flag, float *nor, int
 			sel= 1;
 			v1= addvertlist(em, 0, NULL);
 			
-			VECCOPY(v1->co, eve->co);
-			VECCOPY(v1->no, eve->no);
+			copy_v3_v3(v1->co, eve->co);
+			copy_v3_v3(v1->no, eve->no);
 			v1->f= eve->f;
-			eve->f-= flag;
+			eve->f &= ~flag;
 			eve->tmp.v = v1;
 		}
-		else eve->tmp.v = 0;
+		else eve->tmp.v = NULL;
 		eve= eve->prev;
 	}
 
@@ -1702,17 +1712,7 @@ short extrudeflag_vert(Object *obedit, EditMesh *em, short flag, float *nor, int
 
 		eed= nexted;
 	}
-	if(del_old) {
-		eed= em->edges.first;
-		while(eed) {
-			nexted= eed->next;
-			if(eed->f2==3 && eed->f1==1) {
-				remedge(em, eed);
-				free_editedge(em, eed);
-			}
-			eed= nexted;
-		}
-	}
+	
 	/* duplicate faces, if necessary remove old ones  */
 	efa= em->faces.first;
 	while(efa) {
@@ -1725,7 +1725,7 @@ short extrudeflag_vert(Object *obedit, EditMesh *em, short flag, float *nor, int
 			if(efa->v4) 
 				v4 = efa->v4->tmp.v; 
 			else
-				v4= 0;
+				v4= NULL;
 
 			/* hmm .. not sure about edges here */
 			if(del_old==0)	// if we keep old, we flip normal
@@ -1742,6 +1742,18 @@ short extrudeflag_vert(Object *obedit, EditMesh *em, short flag, float *nor, int
 			}
 		}
 		efa= nextvl;
+	}
+	/* delete edges after copying edges above! */
+	if(del_old) {
+		eed= em->edges.first;
+		while(eed) {
+			nexted= eed->next;
+			if(eed->f2==3 && eed->f1==1) {
+				remedge(em, eed);
+				free_editedge(em, eed);
+			}
+			eed= nexted;
+		}
 	}
 	
 	normalize_v3(nor);	// for grab
@@ -1771,7 +1783,7 @@ short extrudeflag_vert(Object *obedit, EditMesh *em, short flag, float *nor, int
 	// since its vertex select mode now, it also deselects higher order
 	EM_selectmode_flush(em);
 
-	if(nor[0]==0.0 && nor[1]==0.0 && nor[2]==0.0) return 'g'; // g is grab, for correct undo print
+	if(is_zero_v3(nor)) return 'g'; // g is grab, for correct undo print
 	return 'n';
 }
 
@@ -1828,7 +1840,7 @@ static EditVert *adduplicate_vertex(EditMesh *em, EditVert *eve, int flag)
 	EditVert *v1= addvertlist(em, eve->co, eve);
 	
 	v1->f= eve->f;
-	eve->f-= flag;
+	eve->f &= ~flag;
 	eve->f|= 128;
 	
 	eve->tmp.v = v1;
@@ -1867,7 +1879,7 @@ void adduplicateflag(EditMesh *em, int flag)
 			newed= addedgelist(em, v1, v2, eed);
 			
 			newed->f= eed->f;
-			eed->f -= flag;
+			eed->f &= ~flag;
 			eed->f |= 128;
 		}
 	}
@@ -1894,7 +1906,7 @@ void adduplicateflag(EditMesh *em, int flag)
 			}
 			
 			newfa->f= efa->f;
-			efa->f -= flag;
+			efa->f &= ~flag;
 			efa->f |= 128;
 		}
 	}
@@ -1999,29 +2011,30 @@ void recalc_editnormals(EditMesh *em)
 	EditFace *efa;
 	EditVert *eve;
 
-	for(eve= em->verts.first; eve; eve=eve->next) {
-		eve->no[0] = eve->no[1] = eve->no[2] = 0.0;
-	}
+	for(eve= em->verts.first; eve; eve=eve->next)
+		zero_v3(eve->no);
 
 	for(efa= em->faces.first; efa; efa=efa->next) {
+		float *n4= (efa->v4)? efa->v4->no: NULL;
+		float *c4= (efa->v4)? efa->v4->co: NULL;
+
 		if(efa->v4) {
-			normal_quad_v3( efa->n,efa->v1->co, efa->v2->co, efa->v3->co, efa->v4->co);
+			normal_quad_v3(efa->n, efa->v1->co, efa->v2->co, efa->v3->co, efa->v4->co);
 			cent_quad_v3(efa->cent, efa->v1->co, efa->v2->co, efa->v3->co, efa->v4->co);
-			add_v3_v3(efa->v4->no, efa->n);
 		}
 		else {
-			normal_tri_v3( efa->n,efa->v1->co, efa->v2->co, efa->v3->co);
+			normal_tri_v3(efa->n, efa->v1->co, efa->v2->co, efa->v3->co);
 			cent_tri_v3(efa->cent, efa->v1->co, efa->v2->co, efa->v3->co);
 		}
-		add_v3_v3(efa->v1->no, efa->n);
-		add_v3_v3(efa->v2->no, efa->n);
-		add_v3_v3(efa->v3->no, efa->n);
+
+		accumulate_vertex_normals(efa->v1->no, efa->v2->no, efa->v3->no, n4,
+			efa->n, efa->v1->co, efa->v2->co, efa->v3->co, c4);
 	}
 
 	/* following Mesh convention; we use vertex coordinate itself for normal in this case */
 	for(eve= em->verts.first; eve; eve=eve->next) {
-		if (normalize_v3(eve->no)==0.0) {
-			VECCOPY(eve->no, eve->co);
+		if(normalize_v3(eve->no) == 0.0f) {
+			copy_v3_v3(eve->no, eve->co);
 			normalize_v3(eve->no);
 		}
 	}
@@ -2334,7 +2347,7 @@ UvVertMap *EM_make_uv_vert_map(EditMesh *em, int selected, int do_face_idx_array
 				
 				sub_v2_v2v2(uvdiff, uv2, uv);
 
-				if(fabs(uv[0]-uv2[0]) < limit[0] && fabs(uv[1]-uv2[1]) < limit[1]) {
+				if(fabsf(uv[0]-uv2[0]) < limit[0] && fabsf(uv[1]-uv2[1]) < limit[1]) {
 					if(lastv) lastv->next= next;
 					else vlist= next;
 					iterv->next= newvlist;
@@ -2444,7 +2457,7 @@ void EM_make_hq_normals(EditMesh *em)
 
 
 	for(edge_iter = BLI_edgehashIterator_new(edge_hash); !BLI_edgehashIterator_isDone(edge_iter); BLI_edgehashIterator_step(edge_iter)) {
-		/* Get the edge vert indicies, and edge value (the face indicies that use it)*/
+		/* Get the edge vert indices, and edge value (the face indices that use it)*/
 		BLI_edgehashIterator_getKey(edge_iter, (int*)&ed_v1, (int*)&ed_v2);
 		edge_ref = BLI_edgehashIterator_getValue(edge_iter);
 
@@ -2469,7 +2482,7 @@ void EM_make_hq_normals(EditMesh *em)
 			/* only one face attached to that edge */
 			/* an edge without another attached- the weight on this is
 			 * undefined, M_PI/2 is 90d in radians and that seems good enough */
-			VECCOPY(edge_normal, EM_get_face_for_index(edge_ref->f1)->n)
+			copy_v3_v3(edge_normal, EM_get_face_for_index(edge_ref->f1)->n);
 			mul_v3_fl(edge_normal, M_PI/2);
 		}
 		add_v3_v3(EM_get_vert_for_index(ed_v1)->no, edge_normal );
@@ -2486,7 +2499,7 @@ void EM_make_hq_normals(EditMesh *em)
 		if(normalize_v3(eve->no) == 0.0f && eve->tmp.l < 0) {
 			/* exceptional case, totally flat */
 			efa= EM_get_face_for_index(-(eve->tmp.l) - 1);
-			VECCOPY(eve->no, efa->n);
+			copy_v3_v3(eve->no, efa->n);
 		}	
 	}
 
@@ -2553,7 +2566,7 @@ static int tag_face_edges_test(EditFace *efa)
 		return (efa->e1->tmp.l || efa->e2->tmp.l || efa->e3->tmp.l) ? 1:0;
 }
 
-void em_deselect_nth_face(EditMesh *em, int nth, EditFace *efa_act)
+static void em_deselect_nth_face(EditMesh *em, int nth, EditFace *efa_act)
 {
 	EditFace *efa;
 	EditEdge *eed;
@@ -2625,7 +2638,7 @@ static int tag_edge_verts_test(EditEdge *eed)
 	return (eed->v1->tmp.l || eed->v2->tmp.l) ? 1:0;
 }
 
-void em_deselect_nth_edge(EditMesh *em, int nth, EditEdge *eed_act)
+static void em_deselect_nth_edge(EditMesh *em, int nth, EditEdge *eed_act)
 {
 	EditEdge *eed;
 	EditVert *eve;
@@ -2701,7 +2714,7 @@ void em_deselect_nth_edge(EditMesh *em, int nth, EditEdge *eed_act)
 	EM_nfaces_selected(em);
 }
 
-void em_deselect_nth_vert(EditMesh *em, int nth, EditVert *eve_act)
+static void em_deselect_nth_vert(EditMesh *em, int nth, EditVert *eve_act)
 {
 	EditVert *eve;
 	EditEdge *eed;

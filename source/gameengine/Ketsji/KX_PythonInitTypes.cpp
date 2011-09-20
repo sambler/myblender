@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file gameengine/Ketsji/KX_PythonInitTypes.cpp
+ *  \ingroup ketsji
+ */
+
+
 
 
 #ifndef _adr_py_init_types_h_				// only process once,
@@ -47,6 +52,7 @@
 #include "KX_ConstraintWrapper.h"
 #include "KX_GameActuator.h"
 #include "KX_Light.h"
+#include "KX_FontObject.h"
 #include "KX_MeshProxy.h"
 #include "KX_MouseFocusSensor.h"
 #include "KX_NetworkMessageActuator.h"
@@ -62,6 +68,7 @@
 #include "KX_SCA_ReplaceMeshActuator.h"
 #include "KX_SceneActuator.h"
 #include "KX_StateActuator.h"
+#include "KX_SteeringActuator.h"
 #include "KX_TrackToActuator.h"
 #include "KX_VehicleWrapper.h"
 #include "KX_VertexProxy.h"
@@ -93,6 +100,7 @@
 #include "SCA_PythonController.h"
 #include "SCA_RandomActuator.h"
 #include "SCA_IController.h"
+#include "KX_NavMeshObject.h"
 
 static void PyType_Attr_Set(PyGetSetDef *attr_getset, PyAttributeDef *attr)
 {
@@ -193,6 +201,7 @@ void initPyTypes(void)
 		PyType_Ready_Attr(dict, KX_GameObject, init_getset);
 		PyType_Ready_Attr(dict, KX_IpoActuator, init_getset);
 		PyType_Ready_Attr(dict, KX_LightObject, init_getset);
+		PyType_Ready_Attr(dict, KX_FontObject, init_getset);
 		PyType_Ready_Attr(dict, KX_MeshProxy, init_getset);
 		PyType_Ready_Attr(dict, KX_MouseFocusSensor, init_getset);
 		PyType_Ready_Attr(dict, KX_NearSensor, init_getset);
@@ -210,9 +219,11 @@ void initPyTypes(void)
 		PyType_Ready_Attr(dict, KX_SCA_EndObjectActuator, init_getset);
 		PyType_Ready_Attr(dict, KX_SCA_ReplaceMeshActuator, init_getset);
 		PyType_Ready_Attr(dict, KX_Scene, init_getset);
+		PyType_Ready_Attr(dict, KX_NavMeshObject, init_getset);
 		PyType_Ready_Attr(dict, KX_SceneActuator, init_getset);
 		PyType_Ready_Attr(dict, KX_SoundActuator, init_getset);
 		PyType_Ready_Attr(dict, KX_StateActuator, init_getset);
+		PyType_Ready_Attr(dict, KX_SteeringActuator, init_getset);
 		PyType_Ready_Attr(dict, KX_TouchSensor, init_getset);
 		PyType_Ready_Attr(dict, KX_TrackToActuator, init_getset);
 		PyType_Ready_Attr(dict, KX_VehicleWrapper, init_getset);

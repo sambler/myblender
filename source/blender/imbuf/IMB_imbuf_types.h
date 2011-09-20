@@ -1,4 +1,4 @@
-/**
+/*
  * IMB_imbuf_types.h (mar-2001 nzc)
  *
  * Types needed for using the image buffer.
@@ -54,7 +54,6 @@ struct ImMetaData;
 #define IB_FILENAME_SIZE	1023
 
 /**
- * \brief The basic imbuf type
  * \ingroup imbuf
  * This is the abstraction of an image.  ImBuf is the basic type used for all
  * imbuf operations.
@@ -85,11 +84,13 @@ typedef struct ImBuf {
 
 	/* pixels */
 	unsigned int *rect;		/* pixel values stored here */
-	unsigned int *crect;	/* color corrected pixel values stored here */
 	float *rect_float;		/* floating point Rect equivalent
 							Linear RGB color space - may need gamma correction to 
 							sRGB when generating 8bit representations */
-	
+
+	/* resolution - pixels per meter */
+	double ppm[2];
+
 	/* tiled pixel storage */
 	int tilex, tiley;
 	int xtiles, ytiles;
@@ -102,7 +103,6 @@ typedef struct ImBuf {
 	/* parameters used by conversion between byte and float */
 	float dither;				/* random dither value, for conversion from float -> byte rect */
 	short profile;				/* color space/profile preset that the byte rect buffer represents */
-	char profile_filename[256];	/* to be implemented properly, specific filename for custom profiles */
 
 	/* mipmapping */
 	struct ImBuf *mipmap[IB_MIPMAP_LEVELS]; /* MipMap levels, a series of halved images */
@@ -137,12 +137,7 @@ typedef struct ImBuf {
 #define IB_BITMAPFONT		(1 << 0)	/* this image is a font */
 #define IB_BITMAPDIRTY		(1 << 1)	/* image needs to be saved is not the same as filename */
 #define IB_MIPMAP_INVALID	(1 << 2)	/* image mipmaps are invalid, need recreate */
-
-/* From iff.h. This was once moved away by Frank, now Nzc moves it
- * back. Such is the way it is... It is a long list of defines, and
- * there are a few external defines in the back. Most of the stuff is
- * probably imbuf_intern only. This will need to be merged later
- * on. */
+#define IB_RECT_INVALID		(1 << 3)    /* float buffer changed, needs recreation of byte rect */
 
 /**
  * \name Imbuf Component flags

@@ -30,13 +30,20 @@
 *
 */
 
+/** \file blender/modifiers/intern/MOD_cloth.c
+ *  \ingroup modifiers
+ */
+
+
 #include "DNA_cloth_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_object_types.h"
 
 #include "MEM_guardedalloc.h"
 
-#include "BKE_utildefines.h"
+#include "BLI_utildefines.h"
+
+
 #include "BKE_cloth.h"
 #include "BKE_cdderivedmesh.h"
 #include "BKE_global.h"
@@ -45,6 +52,7 @@
 
 #include "depsgraph_private.h"
 
+#include "MOD_util.h"
 
 static void initData(ModifierData *md) 
 {
@@ -182,6 +190,19 @@ static void freeData(ModifierData *md)
 	}
 }
 
+static void foreachIDLink(ModifierData *md, Object *ob,
+					   IDWalkFunc walk, void *userData)
+{
+	ClothModifierData *clmd = (ClothModifierData*) md;
+
+	if(clmd->coll_parms) {
+		walk(userData, ob, (ID **)&clmd->coll_parms->group);
+	}
+
+	if(clmd->sim_parms && clmd->sim_parms->effector_weights) {
+		walk(userData, ob, (ID **)&clmd->sim_parms->effector_weights->group);
+	}
+}
 
 ModifierTypeInfo modifierType_Cloth = {
 	/* name */              "Cloth",
@@ -193,18 +214,20 @@ ModifierTypeInfo modifierType_Cloth = {
 							| eModifierTypeFlag_Single,
 
 	/* copyData */          copyData,
-	/* deformVerts */       0,
-	/* deformVertsEM */     0,
-	/* deformMatricesEM */  0,
+	/* deformVerts */       NULL,
+	/* deformMatrices */    NULL,
+	/* deformVertsEM */     NULL,
+	/* deformMatricesEM */  NULL,
 	/* applyModifier */     applyModifier,
-	/* applyModifierEM */   0,
+	/* applyModifierEM */   NULL,
 	/* initData */          initData,
 	/* requiredDataMask */  requiredDataMask,
 	/* freeData */          freeData,
-	/* isDisabled */        0,
+	/* isDisabled */        NULL,
 	/* updateDepgraph */    updateDepgraph,
 	/* dependsOnTime */     dependsOnTime,
-	/* dependsOnNormals */	0,
-	/* foreachObjectLink */ 0,
-	/* foreachIDLink */     0,
+	/* dependsOnNormals */	NULL,
+	/* foreachObjectLink */ NULL,
+	/* foreachIDLink */     foreachIDLink,
+	/* foreachTexLink */    NULL,
 };

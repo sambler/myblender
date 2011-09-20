@@ -1,6 +1,4 @@
-/**
- * blenlib/BLI_listBase.h    mar 2001 Nzc
- *
+/*
  * $Id$ 
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,8 +25,12 @@
  * Contributor(s): none yet.
  *
  * ***** END GPL LICENSE BLOCK *****
- *
- * More low-level fileops from Daniel Dunbar. Two functions were also
+ */
+
+/** \file BLI_fileops.h
+ *  \ingroup bli
+ *  \author Daniel Dunbar
+ *  \brief More low-level fileops from Daniel Dunbar. Two functions were also
  * defined in storage.c. These are the old fop_ prefixes. There is
  * definitely some redundancy here!
  * */
@@ -51,6 +53,7 @@ int   BLI_exists(const char *file);
 int   BLI_copy_fileops(const char *file, const char *to);
 int   BLI_rename(const char *from, const char *to);
 int   BLI_gzip(const char *from, const char *to);
+char *BLI_ungzip_to_mem(const char *from_file, int *size_r);
 int   BLI_delete(const char *file, int dir, int recursive);
 int   BLI_move(const char *file, const char *to);
 int   BLI_touch(const char *file);

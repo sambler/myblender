@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -22,6 +22,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/space_info/textview.c
+ *  \ingroup spinfo
+ */
+
+
 #include <math.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -30,7 +35,9 @@
 
 #include "BLF_api.h"
 
-#include "BKE_utildefines.h"
+#include "BLI_utildefines.h"
+
+
 
 #include "BIF_gl.h"
 #include "BIF_glutil.h"

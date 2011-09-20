@@ -1,8 +1,4 @@
-/**
- * blenlib/DNA_ID.h (mar-2001 nzc)
- *
- * ID and Library types, which are fundamental for sdna,
- *
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -32,6 +28,11 @@
  */
 #ifndef DNA_ID_H
 #define DNA_ID_H
+
+/** \file DNA_ID.h
+ *  \ingroup DNA
+ *  \brief ID and Library types, which are fundamental for sdna.
+ */
 
 #include "DNA_listBase.h"
 
@@ -122,13 +123,16 @@ typedef struct Library {
 	struct Library *parent;	/* set for indirectly linked libs, used in the outliner and while reading */
 } Library;
 
-#define PREVIEW_MIPMAPS 2
-#define PREVIEW_MIPMAP_ZERO 0
-#define PREVIEW_MIPMAP_LARGE 1
+enum eIconSizes {
+	ICON_SIZE_ICON,
+	ICON_SIZE_PREVIEW,
+};
+#define NUM_ICON_SIZES (ICON_SIZE_PREVIEW + 1)
 
 typedef struct PreviewImage {
+	/* All values of 2 are really NUM_ICON_SIZES */
 	unsigned int w[2];
-	unsigned int h[2];	
+	unsigned int h[2];
 	short changed[2];
 	short changed_timestamp[2];
 	unsigned int * rect[2];
@@ -142,16 +146,16 @@ typedef struct PreviewImage {
  *
  **/
 
-#if defined(__sgi) || defined(__sparc) || defined(__sparc__) || defined (__PPC__) || defined (__ppc__)  || defined (__hppa__) || defined (__BIG_ENDIAN__)
-/* big endian */
-#define MAKE_ID2(c, d)		( (c)<<8 | (d) )
-#define MOST_SIG_BYTE				0
-#define BBIG_ENDIAN
+#ifdef __BIG_ENDIAN__
+   /* big endian */
+#  define MAKE_ID2(c, d)		( (c)<<8 | (d) )
+#  define MOST_SIG_BYTE			0
+#  define BBIG_ENDIAN
 #else
-/* little endian  */
-#define MAKE_ID2(c, d)		( (d)<<8 | (c) )
-#define MOST_SIG_BYTE				1
-#define BLITTLE_ENDIAN
+   /* little endian  */
+#  define MAKE_ID2(c, d)		( (d)<<8 | (c) )
+#  define MOST_SIG_BYTE			1
+#  define BLITTLE_ENDIAN
 #endif
 
 /* ID from database */
@@ -174,6 +178,7 @@ typedef struct PreviewImage {
 #define ID_SCRN		MAKE_ID2('S', 'N') /* (depreciated?) */
 #define ID_VF		MAKE_ID2('V', 'F') /* VectorFont */
 #define ID_TXT		MAKE_ID2('T', 'X') /* Text */
+#define ID_SPK		MAKE_ID2('S', 'K') /* Speaker */
 #define ID_SO		MAKE_ID2('S', 'O') /* Sound */
 #define ID_GR		MAKE_ID2('G', 'R') /* Group */
 #define ID_ID		MAKE_ID2('I', 'D') /* (internal use only) */
@@ -198,6 +203,11 @@ typedef struct PreviewImage {
 #define ID_FLUIDSIM	MAKE_ID2('F', 'S')
 
 #define ID_REAL_USERS(id) (((ID *)id)->us - ((((ID *)id)->flag & LIB_FAKEUSER) ? 1:0))
+
+#ifdef GS
+#undef GS
+#endif
+#define GS(a)	(*((short *)(a)))
 
 /* id->flag: set frist 8 bits always at zero while reading */
 #define LIB_LOCAL		0

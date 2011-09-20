@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -25,8 +25,9 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
-/**
- * @file	GHOST_EventPrinter.h
+
+/** \file ghost/intern/GHOST_EventPrinter.h
+ *  \ingroup GHOST
  * Declaration of GHOST_EventPrinter class.
  */
 
@@ -57,7 +58,7 @@ protected:
 	 * @param key The GHOST key code to convert.
 	 * @param str The GHOST key code converted to a readable string.
 	 */
-	void	getKeyString(GHOST_TKey key, STR_String& str) const;
+	void	getKeyString(GHOST_TKey key, char str[32]) const;
 };
 
 #endif // _GHOST_EVENT_PRINTER_H_

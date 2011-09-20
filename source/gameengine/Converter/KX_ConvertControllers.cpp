@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file gameengine/Converter/KX_ConvertControllers.cpp
+ *  \ingroup bgeconv
+ */
+
 
 #include "MEM_guardedalloc.h"
 
@@ -205,7 +210,11 @@ void BL_ConvertControllers(
 			CIntValue* uniqueval = new CIntValue(uniqueint);
 			uniquename += uniqueval->GetText();
 			uniqueval->Release();
-			gamecontroller->SetName(uniquename);
+			//unique name was never implemented for sensors and actuators, only for controllers
+			//and it's producing difference in the keys for the lists: obj.controllers/sensors/actuators
+			//at some point it should either be implemented globally (and saved as a separate var) or removed.
+			//gamecontroller->SetName(uniquename);
+			gamecontroller->SetName(bcontr->name);
 			gameobj->AddController(gamecontroller);
 			
 			converter->RegisterGameController(gamecontroller, bcontr);
@@ -214,7 +223,7 @@ void BL_ConvertControllers(
 			if (bcontr->type==CONT_PYTHON) {
 				SCA_PythonController *pyctrl= static_cast<SCA_PythonController*>(gamecontroller);
 				/* not strictly needed but gives syntax errors early on and
-				 * gives more pradictable performance for larger scripts */
+				 * gives more predictable performance for larger scripts */
 				if(pyctrl->m_mode==SCA_PythonController::SCA_PYEXEC_SCRIPT)
 					pyctrl->Compile();
 				else {

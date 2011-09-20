@@ -28,9 +28,14 @@ set(INC
 	.
 	..
 	../blenlib
+	../blenloader
 	../imbuf
 	../makesdna
 	../../../intern/guardedalloc
+)
+
+set(INC_SYS
+
 )
 
 set(SRC
@@ -45,8 +50,10 @@ set(SRC
 )
 
 if(WITH_CODEC_QUICKTIME)
-	list(APPEND INC ${QUICKTIME_INC})
+	list(APPEND INC_SYS
+		${QUICKTIME_INCLUDE_DIRS}
+	)
 	add_definitions(-DWITH_QUICKTIME)
 endif()
 
-blenderlib(bf_blenpluginapi "${SRC}" "${INC}")
+blender_add_lib(bf_blenpluginapi "${SRC}" "${INC}" "${INC_SYS}")

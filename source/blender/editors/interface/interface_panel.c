@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/interface/interface_panel.c
+ *  \ingroup edinterface
+ */
+
+
 /* a full doc with API notes can be found in bf-blender/trunk/blender/doc/guides/interface_API.txt */
  
 #include <math.h>
@@ -38,6 +43,7 @@
 
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
 #include "DNA_userdef_types.h"
 
@@ -167,7 +173,7 @@ static void ui_panel_copy_offset(Panel *pa, Panel *papar)
 
 Panel *uiBeginPanel(ScrArea *sa, ARegion *ar, uiBlock *block, PanelType *pt, int *open)
 {
-	uiStyle *style= U.uistyles.first;
+	uiStyle *style= UI_GetStyle();
 	Panel *pa, *patab, *palast, *panext;
 	char *drawname= pt->label;
 	char *idname= pt->idname;
@@ -286,7 +292,7 @@ void uiEndPanel(uiBlock *block, int width, int height)
 
 static void ui_offset_panel_block(uiBlock *block)
 {
-	uiStyle *style= U.uistyles.first;
+	uiStyle *style= UI_GetStyle();
 	uiBut *but;
 	int ofsy;
 
@@ -308,7 +314,8 @@ static void ui_offset_panel_block(uiBlock *block)
 /**************************** drawing *******************************/
 
 /* extern used by previewrender */
-void uiPanelPush(uiBlock *block)
+#if 0 /*UNUSED 2.5*/
+static void uiPanelPush(uiBlock *block)
 {
 	glPushMatrix(); 
 
@@ -316,24 +323,29 @@ void uiPanelPush(uiBlock *block)
 		glTranslatef((float)block->panel->ofsx, (float)block->panel->ofsy, 0.0);
 }
 
-void uiPanelPop(uiBlock *UNUSED(block))
+static void uiPanelPop(uiBlock *UNUSED(block))
 {
 	glPopMatrix();
 }
+#endif
 
 /* triangle 'icon' for panel header */
-void ui_draw_tria_icon(float x, float y, char dir)
+/* NOTE - this seems to be only used for hiding nodes now */
+void UI_DrawTriIcon(float x, float y, char dir)
 {
 	if(dir=='h') {
-		ui_draw_anti_tria(x-1, y, x-1, y+11.0, x+9, y+6.25);
+		ui_draw_anti_tria( x-3, y-5, x-3, y+5, x+7,y );
 	}
-	else {
-		ui_draw_anti_tria(x-3, y+10,  x+8-1, y+10, x+4.25-2, y);	
+	else if(dir=='t') {
+		ui_draw_anti_tria( x-5, y-7, x+5, y-7, x, y+3);	
+	}
+	else { /* 'v' = vertical, down */
+		ui_draw_anti_tria( x-5, y+3, x+5, y+3, x, y-7);	
 	}
 }
 
 /* triangle 'icon' inside rect */
-void ui_draw_tria_rect(rctf *rect, char dir)
+static void ui_draw_tria_rect(rctf *rect, char dir)
 {
 	if(dir=='h') {
 		float half= 0.5f*(rect->ymax - rect->ymin);
@@ -345,7 +357,7 @@ void ui_draw_tria_rect(rctf *rect, char dir)
 	}
 }
 
-void ui_draw_anti_x(float x1, float y1, float x2, float y2)
+static void ui_draw_anti_x(float x1, float y1, float x2, float y2)
 {
 
 	/* set antialias line */
@@ -368,11 +380,11 @@ void ui_draw_anti_x(float x1, float y1, float x2, float y2)
 static void ui_draw_x_icon(float x, float y)
 {
 
-	ui_draw_anti_x(x, y, x+9.375, y+9.375);
+	ui_draw_anti_x(x, y, x+9.375f, y+9.375f);
 
 }
 
-#define PNL_ICON 	20
+#define PNL_ICON 	UI_UNIT_X  /* could be UI_UNIT_Y too */
 
 static void ui_draw_panel_scalewidget(rcti *rect)
 {
@@ -430,8 +442,12 @@ static void ui_draw_aligned_panel_header(uiStyle *style, uiBlock *block, rcti *r
 	Panel *panel= block->panel;
 	rcti hrect;
 	int  pnl_icons;
-	char *activename= panel->drawname[0]?panel->drawname:panel->panelname;
-	
+	const char *activename= panel->drawname[0]?panel->drawname:panel->panelname;
+
+#ifdef INTERNATIONAL
+	activename= UI_translate_do_iface(activename);
+#endif
+
 	/* + 0.001f to avoid flirting with float inaccuracy */
 	if(panel->control & UI_PNL_CLOSE) pnl_icons=(panel->labelofs+2*PNL_ICON+5)/block->aspect + 0.001f;
 	else pnl_icons= (panel->labelofs+PNL_ICON+5)/block->aspect + 0.001f;
@@ -525,8 +541,8 @@ void ui_draw_aligned_panel(uiStyle *style, uiBlock *block, rcti *rect)
 		
 		/* in some occasions, draw a border */
 		if(panel->flag & PNL_SELECT) {
-			if(panel->control & UI_PNL_SOLID) uiSetRoundBox(15);
-			else uiSetRoundBox(3);
+			if(panel->control & UI_PNL_SOLID) uiSetRoundBox(UI_CNR_ALL);
+			else uiSetRoundBox(UI_CNR_TOP_LEFT | UI_CNR_TOP_RIGHT);
 			
 			UI_ThemeColorShade(TH_BACK, -120);
 			uiRoundRect(0.5f + rect->xmin, 0.5f + rect->ymin, 0.5f + rect->xmax, 0.5f + headrect.ymax+1, 8);
@@ -563,8 +579,8 @@ void ui_draw_aligned_panel(uiStyle *style, uiBlock *block, rcti *rect)
 		ui_draw_tria_rect(&itemrect, 'h');
 	else
 		ui_draw_tria_rect(&itemrect, 'v');
-	
-	
+
+	(void)ofsx;
 }
 
 /************************** panel alignment *************************/
@@ -653,9 +669,9 @@ static int compare_panel(const void *a1, const void *a2)
 
 /* this doesnt draw */
 /* returns 1 when it did something */
-int uiAlignPanelStep(ScrArea *sa, ARegion *ar, float fac, int drag)
+static int uiAlignPanelStep(ScrArea *sa, ARegion *ar, float fac, int drag)
 {
-	uiStyle *style= U.uistyles.first;
+	uiStyle *style= UI_GetStyle();
 	Panel *pa;
 	PanelSort *ps, *panelsort, *psnext;
 	int a, tot=0, done;
@@ -728,8 +744,8 @@ int uiAlignPanelStep(ScrArea *sa, ARegion *ar, float fac, int drag)
 	for(a=0; a<tot; a++, ps++) {
 		if((ps->pa->flag & PNL_SELECT)==0) {
 			if((ps->orig->ofsx != ps->pa->ofsx) || (ps->orig->ofsy != ps->pa->ofsy)) {
-				ps->orig->ofsx= floor(0.5 + fac*ps->pa->ofsx + (1.0-fac)*ps->orig->ofsx);
-				ps->orig->ofsy= floor(0.5 + fac*ps->pa->ofsy + (1.0-fac)*ps->orig->ofsy);
+				ps->orig->ofsx= floorf(0.5f + fac*(float)ps->pa->ofsx + (1.0f-fac)*(float)ps->orig->ofsx);
+				ps->orig->ofsy= floorf(0.5f + fac*(float)ps->pa->ofsy + (1.0f-fac)*(float)ps->orig->ofsy);
 				done= 1;
 			}
 		}
@@ -798,7 +814,7 @@ void uiEndPanels(const bContext *C, ARegion *ar)
 		if(block->active && block->panel)
 			ui_offset_panel_block(block);
 
-	/* consistancy; are panels not made, whilst they have tabs */
+	/* consistency; are panels not made, whilst they have tabs */
 	for(panot= ar->panels.first; panot; panot= panot->next) {
 		if((panot->runtime_flag & PNL_ACTIVE)==0) { // not made
 
@@ -877,9 +893,9 @@ static void check_panel_overlap(ARegion *ar, Panel *panel)
 				else if(panel->flag & PNL_CLOSEDY) safey= 0.05;
 				
 				if(pa->ofsx > panel->ofsx- safex*panel->sizex)
-				if(pa->ofsx+pa->sizex < panel->ofsx+ (1.0+safex)*panel->sizex)
+				if(pa->ofsx+pa->sizex < panel->ofsx+ (1.0f+safex)*panel->sizex)
 				if(pa->ofsy > panel->ofsy- safey*panel->sizey)
-				if(pa->ofsy+pa->sizey < panel->ofsy+ (1.0+safey)*panel->sizey)
+				if(pa->ofsy+pa->sizey < panel->ofsy+ (1.0f+safey)*panel->sizey)
 					pa->flag |= PNL_OVERLAP;
 			}
 		}
@@ -953,10 +969,11 @@ static void ui_handle_panel_header(const bContext *C, uiBlock *block, int mx, in
 		if(my >= block->maxy) button= 1;
 	}
 	else if(block->panel->control & UI_PNL_CLOSE) {
-		if(mx <= block->minx+10+PNL_ICON-2) button= 2;
-		else if(mx <= block->minx+10+2*PNL_ICON+2) button= 1;
+		/* whole of header can be used to collapse panel (except top-right corner) */
+		if(mx <= block->maxx-8-PNL_ICON) button= 2;
+		//else if(mx <= block->minx+10+2*PNL_ICON+2) button= 1;
 	}
-	else if(mx <= block->minx+10+PNL_ICON+2) {
+	else if(mx <= block->maxx-PNL_ICON-12) {
 		button= 1;
 	}
 	
@@ -994,10 +1011,7 @@ static void ui_handle_panel_header(const bContext *C, uiBlock *block, int mx, in
 		else
 			ED_region_tag_redraw(ar);
 	}
-	else if(block->panel->flag & PNL_CLOSED) {
-		panel_activate_state(C, block->panel, PANEL_STATE_DRAG);
-	}
-	else {
+	else if(mx <= (block->maxx-PNL_ICON-12)+PNL_ICON+2) {
 		panel_activate_state(C, block->panel, PANEL_STATE_DRAG);
 	}
 }
@@ -1090,6 +1104,7 @@ int ui_handler_panel_region(bContext *C, wmEvent *event)
 					}*/
 				}
 				else if(event->type==PADPLUSKEY || event->type==PADMINUS) {
+#if 0 // XXX make float panel exception?
 					int zoom=0;
 				
 					/* if panel is closed, only zoom if mouse is over the header */
@@ -1100,7 +1115,6 @@ int ui_handler_panel_region(bContext *C, wmEvent *event)
 					else
 						zoom=1;
 
-#if 0 // XXX make float panel exception?
 					if(zoom) {
 						ScrArea *sa= CTX_wm_area(C);
 						SpaceLink *sl= sa->spacedata.first;
@@ -1204,7 +1218,7 @@ static void panel_activate_state(const bContext *C, Panel *pa, uiHandlePanelStat
 		MEM_freeN(data);
 		pa->activedata= NULL;
 
-		WM_event_remove_ui_handler(&win->modalhandlers, ui_handler_panel, ui_handler_remove_panel, pa);
+		WM_event_remove_ui_handler(&win->modalhandlers, ui_handler_panel, ui_handler_remove_panel, pa, 0);
 	}
 	else {
 		if(!data) {

@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/blenkernel/intern/group.c
+ *  \ingroup bke
+ */
+
+
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -41,8 +46,9 @@
 #include "DNA_particle_types.h"
 
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 
-#include "BKE_utildefines.h"
+
 #include "BKE_global.h"
 #include "BKE_group.h"
 #include "BKE_library.h"

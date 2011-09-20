@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$ 
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -28,6 +28,10 @@
  */
 #ifndef DNA_LATTICE_TYPES_H
 #define DNA_LATTICE_TYPES_H
+
+/** \file DNA_lattice_types.h
+ *  \ingroup DNA
+ */
 
 #include "DNA_ID.h"
 
@@ -76,6 +80,10 @@ typedef struct Lattice {
 /* flag */
 #define LT_GRID		1
 #define LT_OUTSIDE	2
+
+#define LT_DS_EXPAND	4
+
+#define LT_INDEX(lt, u, v, w) ((w) * ((lt)->pntsu * (lt)->pntsv) + ((v) * (lt)->pntsu) + (u))
 
 #endif
 

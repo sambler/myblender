@@ -1,4 +1,4 @@
-/**
+/*
  * BME_tools.c    jan 2007
  *
  *	Functions for changing the topology of a mesh.
@@ -31,6 +31,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/blenkernel/intern/BME_tools.c
+ *  \ingroup bke
+ */
+
+
 #include <math.h>
 
 #include "MEM_guardedalloc.h"
@@ -38,8 +43,10 @@
 #include "DNA_meshdata_types.h"
 #include "DNA_object_types.h"
 
-#include "BKE_bmesh.h"
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
+
+#include "BKE_bmesh.h"
 
 /*split this all into a seperate bevel.c file in src*/
 
@@ -995,7 +1002,7 @@ static BME_Mesh *BME_bevel_initialize(BME_Mesh *bm, int options, int UNUSED(defg
 	}
 
 	/* edge pass */
-	threshold = (float)cos((angle + 0.00001) * M_PI / 180.0);
+	threshold = (float)cos((angle + 0.001) * M_PI / 180.0);
 	for (e=bm->edges.first; e; e=e->next) {
 		e->tflag1 = BME_BEVEL_ORIG;
 		weight = 0.0;

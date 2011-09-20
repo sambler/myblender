@@ -1,29 +1,34 @@
-/*  cloth.c
-*
-*
-* ***** BEGIN GPL LICENSE BLOCK *****
-*
-* This program is free software; you can redistribute it and/or
-* modify it under the terms of the GNU General Public License
-* as published by the Free Software Foundation; either version 2
-* of the License, or (at your option) any later version.
-*
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU General Public License for more details.
-*
-* You should have received a copy of the GNU General Public License
-* along with this program; if not, write to the Free Software Foundation,
-* Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-*
-* The Original Code is Copyright (C) Blender Foundation
-* All rights reserved.
-*
-* Contributor(s): Daniel Genrich
-*
-* ***** END GPL LICENSE BLOCK *****
-*/
+/*
+ * $Id$
+ *
+ * ***** BEGIN GPL LICENSE BLOCK *****
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ *
+ * The Original Code is Copyright (C) Blender Foundation
+ * All rights reserved.
+ *
+ * Contributor(s): Daniel Genrich
+ *
+ * ***** END GPL LICENSE BLOCK *****
+ */
+
+/** \file blender/blenkernel/intern/cloth.c
+ *  \ingroup bke
+ */
+
 
 #include "MEM_guardedalloc.h"
 
@@ -34,6 +39,7 @@
 
 #include "BLI_math.h"
 #include "BLI_edgehash.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_cdderivedmesh.h"
 #include "BKE_cloth.h"
@@ -41,7 +47,7 @@
 #include "BKE_global.h"
 #include "BKE_modifier.h"
 #include "BKE_pointcache.h"
-#include "BKE_utildefines.h"
+
 
 #ifdef _WIN32
 void tstart ( void )
@@ -163,7 +169,6 @@ static BVHTree *bvhselftree_build_from_cloth (ClothModifierData *clmd, float eps
 	BVHTree *bvhtree;
 	Cloth *cloth;
 	ClothVertex *verts;
-	MFace *mfaces;
 	float co[12];
 
 	if(!clmd)
@@ -175,7 +180,6 @@ static BVHTree *bvhselftree_build_from_cloth (ClothModifierData *clmd, float eps
 		return NULL;
 	
 	verts = cloth->verts;
-	mfaces = cloth->mfaces;
 	
 	// in the moment, return zero if no faces there
 	if(!cloth->numverts)
@@ -430,7 +434,7 @@ DerivedMesh *clothModifier_do(ClothModifierData *clmd, Scene *scene, Object *ob,
 	PointCache *cache;
 	PTCacheID pid;
 	float timescale;
-	int framedelta, framenr, startframe, endframe;
+	int framenr, startframe, endframe;
 	int cache_result;
 
 	clmd->scene= scene;	/* nice to pass on later :) */
@@ -486,11 +490,6 @@ DerivedMesh *clothModifier_do(ClothModifierData *clmd, Scene *scene, Object *ob,
 		framenr= endframe;
 	}
 
-	if(cache->flag & PTCACHE_SIMULATION_VALID)
-		framedelta= framenr - cache->simframe;
-	else
-		framedelta= -1;
-
 	/* initialize simulation data if it didn't exist already */
 	if(!do_init_cloth(ob, clmd, dm, framenr))
 		return result;
@@ -504,7 +503,7 @@ DerivedMesh *clothModifier_do(ClothModifierData *clmd, Scene *scene, Object *ob,
 	}
 
 	/* try to read from cache */
-	cache_result = BKE_ptcache_read_cache(&pid, (float)framenr+scene->r.subframe, scene->r.frs_sec);
+	cache_result = BKE_ptcache_read(&pid, (float)framenr+scene->r.subframe);
 
 	if(cache_result == PTCACHE_READ_EXACT || cache_result == PTCACHE_READ_INTERPOLATED) {
 		implicit_set_positions(clmd);
@@ -513,7 +512,7 @@ DerivedMesh *clothModifier_do(ClothModifierData *clmd, Scene *scene, Object *ob,
 		BKE_ptcache_validate(cache, framenr);
 
 		if(cache_result == PTCACHE_READ_INTERPOLATED && cache->flag & PTCACHE_REDO_NEEDED)
-			BKE_ptcache_write_cache(&pid, framenr);
+			BKE_ptcache_write(&pid, framenr);
 
 		return result;
 	}
@@ -528,7 +527,7 @@ DerivedMesh *clothModifier_do(ClothModifierData *clmd, Scene *scene, Object *ob,
 
 	/* if on second frame, write cache for first frame */
 	if(cache->simframe == startframe && (cache->flag & PTCACHE_OUTDATED || cache->last_exact==0))
-		BKE_ptcache_write_cache(&pid, startframe);
+		BKE_ptcache_write(&pid, startframe);
 
 	clmd->sim_parms->timescale *= framenr - cache->simframe;
 
@@ -539,7 +538,7 @@ DerivedMesh *clothModifier_do(ClothModifierData *clmd, Scene *scene, Object *ob,
 		BKE_ptcache_invalidate(cache);
 	}
 	else
-		BKE_ptcache_write_cache(&pid, framenr);
+		BKE_ptcache_write(&pid, framenr);
 
 	cloth_to_object (ob, clmd, result);
 
@@ -920,11 +919,11 @@ static int cloth_from_object(Object *ob, ClothModifierData *clmd, DerivedMesh *d
 	if(!first)
 		implicit_set_positions(clmd);
 
-	clmd->clothObject->bvhtree = bvhtree_build_from_cloth ( clmd, clmd->coll_parms->epsilon );
+	clmd->clothObject->bvhtree = bvhtree_build_from_cloth ( clmd, MAX2(clmd->coll_parms->epsilon, clmd->coll_parms->distance_repel) );
 	
 	for(i = 0; i < dm->getNumVerts(dm); i++)
 	{
-		maxdist = MAX2(maxdist, clmd->coll_parms->selfepsilon* ( cloth->verts[i].avg_spring_len*2.0));
+		maxdist = MAX2(maxdist, clmd->coll_parms->selfepsilon* ( cloth->verts[i].avg_spring_len*2.0f));
 	}
 	
 	clmd->clothObject->bvhselftree = bvhselftree_build_from_cloth ( clmd, maxdist );

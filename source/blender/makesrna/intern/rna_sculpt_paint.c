@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -21,6 +21,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/makesrna/intern/rna_sculpt_paint.c
+ *  \ingroup RNA
+ */
+
 
 #include <stdlib.h>
 
@@ -90,7 +95,7 @@ static PointerRNA rna_ParticleBrush_curve_get(PointerRNA *ptr)
 	return rna_pointer_inherit_refine(ptr, &RNA_CurveMapping, NULL);
 }
 
-static void rna_ParticleEdit_redo(Main *bmain, Scene *scene, PointerRNA *ptr)
+static void rna_ParticleEdit_redo(Main *UNUSED(bmain), Scene *scene, PointerRNA *UNUSED(ptr))
 {
 	Object *ob= (scene->basact)? scene->basact->object: NULL;
 	PTCacheEdit *edit = PE_get_current(scene, ob);
@@ -101,7 +106,7 @@ static void rna_ParticleEdit_redo(Main *bmain, Scene *scene, PointerRNA *ptr)
 	psys_free_path_cache(edit->psys, edit);
 }
 
-static void rna_ParticleEdit_update(Main *bmain, Scene *scene, PointerRNA *ptr)
+static void rna_ParticleEdit_update(Main *UNUSED(bmain), Scene *scene, PointerRNA *UNUSED(ptr))
 {
 	Object *ob= (scene->basact)? scene->basact->object: NULL;
 
@@ -122,7 +127,7 @@ static void rna_ParticleEdit_tool_set(PointerRNA *ptr, int value)
 
 	pset->brushtype = value;
 }
-static EnumPropertyItem *rna_ParticleEdit_tool_itemf(bContext *C, PointerRNA *ptr, int *free)
+static EnumPropertyItem *rna_ParticleEdit_tool_itemf(bContext *C, PointerRNA *UNUSED(ptr), PropertyRNA *UNUSED(prop), int *UNUSED(free))
 {
 	Scene *scene= CTX_data_scene(C);
 	Object *ob= (scene->basact)? scene->basact->object: NULL;
@@ -160,18 +165,32 @@ static int rna_ParticleEdit_hair_get(PointerRNA *ptr)
 static int rna_Brush_mode_poll(PointerRNA *ptr, PointerRNA value)
 {
 	Scene *scene= (Scene *)ptr->id.data;
-	Object *ob = OBACT;
+	ToolSettings *ts = scene->toolsettings;
 	Brush *brush= value.id.data;
-	
-	/* weak, for object painting we need to check against the object mode
-	 * but for 2D view image painting we always want texture brushes 
-	 * this is not quite correct since you could be in object weightpaint
-	 * mode at the same time as the 2D image view, but for now its *good enough* */
-	if(ob && ob->mode & OB_MODE_ALL_PAINT) {
-		return ob->mode & brush->ob_mode;
-	}
-	else {
-		return OB_MODE_TEXTURE_PAINT & brush->ob_mode;
+	int mode = 0;
+
+	/* check the origin of the Paint struct to see which paint
+	   mode to select from */
+
+	if(ptr->data == &ts->imapaint)
+		mode = OB_MODE_TEXTURE_PAINT;
+	else if(ptr->data == ts->sculpt)
+		mode = OB_MODE_SCULPT;
+	else if(ptr->data == ts->vpaint)
+		mode = OB_MODE_VERTEX_PAINT;
+	else if(ptr->data == ts->wpaint)
+		mode = OB_MODE_WEIGHT_PAINT;
+
+	return brush->ob_mode & mode;
+}
+
+static void rna_Sculpt_update(Main *UNUSED(bmain), Scene *scene, PointerRNA *UNUSED(ptr))
+{
+	Object *ob= (scene->basact)? scene->basact->object: NULL;
+
+	if(ob) {
+		DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
+		WM_main_add_notifier(NC_OBJECT|ND_MODIFIER, ob);
 	}
 }
 
@@ -251,6 +270,11 @@ static void rna_def_sculpt(BlenderRNA  *brna)
 	prop= RNA_def_property(srna, "use_threaded", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flags", SCULPT_USE_OPENMP);
 	RNA_def_property_ui_text(prop, "Use OpenMP", "Take advantage of multiple CPU cores to improve sculpting performance");
+
+	prop= RNA_def_property(srna, "use_deform_only", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flags", SCULPT_ONLY_DEFORM);
+	RNA_def_property_ui_text(prop, "Use Deform Only", "Use only deformation modifiers (temporary disable all constructive modifiers except multi-resolution)");
+	RNA_def_property_update(prop, NC_OBJECT|ND_DRAW, "rna_Sculpt_update");
 }
 
 static void rna_def_vertex_paint(BlenderRNA *brna)
@@ -457,12 +481,12 @@ static void rna_def_particle_edit(BlenderRNA *brna)
 	RNA_def_struct_sdna(srna, "ParticleBrushData");
 	RNA_def_struct_ui_text(srna, "Particle Brush", "Particle editing brush");
 
-	prop= RNA_def_property(srna, "size", PROP_INT, PROP_NONE);
+	prop= RNA_def_property(srna, "size", PROP_INT, PROP_DISTANCE);
 	RNA_def_property_range(prop, 1, SHRT_MAX);
 	RNA_def_property_ui_range(prop, 1, 100, 10, 3);
-	RNA_def_property_ui_text(prop, "Size", "Brush size");
+	RNA_def_property_ui_text(prop, "Radius", "Radius of the brush in pixels");
 
-	prop= RNA_def_property(srna, "strength", PROP_FLOAT, PROP_NONE);
+	prop= RNA_def_property(srna, "strength", PROP_FLOAT, PROP_FACTOR);
 	RNA_def_property_range(prop, 0.001, 1.0);
 	RNA_def_property_ui_text(prop, "Strength", "Brush strength");
 

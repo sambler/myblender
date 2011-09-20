@@ -1,3 +1,4 @@
+# -*- mode: cmake; indent-tabs-mode: t; -*-
 # $Id: CMakeLists.txt 17433 2008-11-12 21:16:53Z blendix $
 # ***** BEGIN GPL LICENSE BLOCK *****
 #
@@ -27,16 +28,100 @@
 # Generated code has some unused vars we can ignore.
 remove_strict_flags()
 
-message(STATUS "Configuring makesrna")
+# message(STATUS "Configuring makesrna")
 
-file(GLOB DEFSRC RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "*.c")
-file(GLOB APISRC RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "*_api.c")
-list(REMOVE_ITEM DEFSRC rna_access.c rna_define.c makesrna.c)
-list(REMOVE_ITEM DEFSRC ${APISRC})
- 
+# files rna_access.c rna_define.c makesrna.c intentionally excluded.
+set(DEFSRC
+	rna_ID.c
+	rna_action.c
+	rna_actuator.c
+	rna_animation.c
+	rna_animviz.c
+	rna_armature.c
+	rna_boid.c
+	rna_brush.c
+	rna_camera.c
+	rna_cloth.c
+	rna_color.c
+	rna_constraint.c
+	rna_context.c
+	rna_controller.c
+	rna_curve.c
+	rna_fcurve.c
+	rna_fluidsim.c
+	rna_gpencil.c
+	rna_group.c
+	rna_image.c
+	rna_key.c
+	rna_lamp.c
+	rna_lattice.c
+	rna_main.c
+	rna_material.c
+	rna_mesh.c
+	rna_meta.c
+	rna_modifier.c
+	rna_nla.c
+	rna_nodetree.c
+	rna_object.c
+	rna_object_force.c
+	rna_packedfile.c
+	rna_particle.c
+	rna_pose.c
+	rna_property.c
+	rna_render.c
+	rna_rna.c
+	rna_scene.c
+	rna_screen.c
+	rna_sculpt_paint.c
+	rna_sensor.c
+	rna_sequencer.c
+	rna_smoke.c
+	rna_sound.c
+	rna_space.c
+	rna_speaker.c
+	rna_test.c
+	rna_text.c
+	rna_texture.c
+	rna_timeline.c
+	rna_ui.c
+	rna_userdef.c
+	rna_vfont.c
+	rna_wm.c
+	rna_world.c
+)
+
+set(APISRC
+	rna_action_api.c
+	rna_actuator_api.c
+	rna_animation_api.c
+	rna_armature_api.c
+	rna_controller_api.c
+	rna_fcurve_api.c
+	rna_image_api.c
+	rna_main_api.c
+	rna_material_api.c
+	rna_mesh_api.c
+	rna_texture_api.c
+	rna_object_api.c
+	rna_pose_api.c
+	rna_scene_api.c
+	rna_sensor_api.c
+	rna_sequencer_api.c
+	rna_text_api.c
+	rna_ui_api.c
+	rna_wm_api.c
+)
+
 string(REGEX REPLACE "rna_([a-zA-Z0-9_-]*).c" "${CMAKE_CURRENT_BINARY_DIR}/rna_\\1_gen.c" GENSRC "${DEFSRC}")
 set_source_files_properties(GENSRC PROPERTIES GENERATED true)
 
+set(SRC_RNA_INC
+	../RNA_access.h
+	../RNA_define.h
+	../RNA_documentation.h
+	../RNA_enum_types.h
+	../RNA_types.h
+)
 
 set(SRC
 	makesrna.c
@@ -47,26 +132,14 @@ set(SRC
 	../../../../intern/guardedalloc/intern/mmap_win.c
 )
 
-include_directories(
-	../../../../intern/audaspace/intern
-	../../../../intern/guardedalloc
-	../../../../intern/memutil
-	..
-	../../makesdna
-	../../blenkernel
-	../../blenlib
-	../../blenfont
-	../../ikplugin
-	../../windowmanager
-	../../editors/include
-	../../gpu
-	../../imbuf
-	../../render/extern/include
-	../../../../extern/glew/include
-	.
+set(INC
+
 )
 
-file(GLOB INC_FILES ../*.h ../../makesdna/*.h)
+set(INC_SYS
+
+)
+
 
 if(WITH_PYTHON)
 	add_definitions(-DWITH_PYTHON)
@@ -100,19 +173,26 @@ if(WITH_IMAGE_HDR)
 	add_definitions(-DWITH_HDR)
 endif()
 
+if(WITH_IMAGE_FRAMESERVER)
+	add_definitions(-DWITH_FRAMESERVER)
+endif()
+
+if(WITH_AUDASPACE)
+	add_definitions(-DWITH_AUDASPACE)
+endif()
+
 if(WITH_CODEC_QUICKTIME)
-	list(APPEND INC ../../quicktime)
+	list(APPEND INC
+		../../quicktime
+	)
 	add_definitions(-DWITH_QUICKTIME)
 endif()
 
 if(WITH_CODEC_FFMPEG)
-	list(APPEND INC ${FFMPEG_INC})
+	list(APPEND INC_SYS
+		${FFMPEG_INCLUDE_DIRS}
+	)
 	add_definitions(-DWITH_FFMPEG)
-endif()
-
-if(WITH_LCMS)
-	list(APPEND INC ${LCMS_INCLUDE_DIR})
-	add_definitions(-DWITH_LCMS)
 endif()
 
 if(NOT WITH_MOD_FLUID)
@@ -120,7 +200,7 @@ if(NOT WITH_MOD_FLUID)
 endif()
 
 if(WITH_FFTW3)
-	add_definitions(-DFFTW3=1)
+	add_definitions(-DWITH_FFTW3)
 endif()
 
 if(WITH_SDL)
@@ -139,9 +219,37 @@ if(WITH_OPENCOLLADA)
 	add_definitions(-DWITH_COLLADA)
 endif()
 
+if(WITH_INTERNATIONAL)
+	add_definitions(-DINTERNATIONAL)
+endif()
+
 # Build makesrna executable
-add_executable(makesrna ${SRC} ${INC_FILES})
+blender_include_dirs(
+	.
+	..
+	../../blenkernel
+	../../blenloader
+	../../blenlib
+	../../blenfont
+	../../gpu
+	../../imbuf
+	../../ikplugin
+	../../makesdna
+	../../windowmanager
+	../../editors/include
+	../../render/extern/include
+	../../../../intern/audaspace/intern
+	../../../../intern/guardedalloc
+	../../../../intern/memutil
+)
+
+blender_include_dirs_sys(
+	${GLEW_INCLUDE_PATH}
+)
+
+add_executable(makesrna ${SRC} ${SRC_RNA_INC} ${SRC_DNA_INC})
 target_link_libraries(makesrna bf_dna)
+target_link_libraries(makesrna bf_dna_blenlib)
 
 # Output rna_*_gen.c
 # note (linux only): with crashes try add this after COMMAND: valgrind --leak-check=full --track-origins=yes
@@ -156,14 +264,10 @@ set(SRC
 	rna_access.c
 	${GENSRC}
 
-	../RNA_access.h
-	../RNA_define.h
-	../RNA_enum_types.h
-	../RNA_types.h
-
+	${SRC_RNA_INC}
 	rna_internal.h
 	rna_internal_types.h
 	rna_nodetree_types.h
 )
 
-blenderlib(bf_rna "${SRC}" "${INC}")
+blender_add_lib(bf_rna "${SRC}" "${INC}" "${INC_SYS}")

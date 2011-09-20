@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file ghost/GHOST_Path-api.h
+ *  \ingroup GHOST
+ */
+
+
 #ifndef	GHOST_PATH_API_H
 #define GHOST_PATH_API_H
 
@@ -35,6 +40,20 @@
 #ifdef __cplusplus
 extern "C" { 
 #endif
+
+GHOST_DECLARE_HANDLE(GHOST_SystemPathsHandle);
+
+/**
+ * Creates the one and only instance of the system path access.
+ * @return An indication of success.
+ */
+extern GHOST_TSuccess GHOST_CreateSystemPaths(void);
+
+/**
+ * Disposes the one and only system.
+ * @return An indication of success.
+ */
+extern GHOST_TSuccess GHOST_DisposeSystemPaths(void);
 
 /**
  * Determine the base dir in which shared resources are located. It will first try to use
@@ -55,6 +74,11 @@ extern const GHOST_TUns8* GHOST_getUserDir(void);
  * @return Unsigned char string pointing to binary dir (eg ~/usr/local/bin/).
  */
 extern const GHOST_TUns8* GHOST_getBinaryDir(void);
+
+/**
+* Add the file to the operating system most recently used files
+*/
+extern void GHOST_addToSystemRecentFiles(const char* filename);
 
 #ifdef __cplusplus
 } 

@@ -23,6 +23,7 @@ set(INC
 	../include
 	../../blenkernel
 	../../blenlib
+	../../blenloader
 	../../makesdna
 	../../makesrna
 	../../windowmanager
@@ -30,7 +31,12 @@ set(INC
 	../../../../intern/opennl/extern
 )
 
+set(INC_SYS
+	${GLEW_INCLUDE_PATH}
+)
+
 set(SRC
+	uvedit_buttons.c
 	uvedit_draw.c
 	uvedit_ops.c
 	uvedit_parametrizer.c
@@ -40,4 +46,4 @@ set(SRC
 	uvedit_parametrizer.h
 )
 
-blenderlib(bf_editor_uvedit "${SRC}" "${INC}")
+blender_add_lib(bf_editor_uvedit "${SRC}" "${INC}" "${INC_SYS}")

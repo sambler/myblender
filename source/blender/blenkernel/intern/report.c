@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,24 +25,24 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/blenkernel/intern/report.c
+ *  \ingroup bke
+ */
+
+
 #include "MEM_guardedalloc.h"
 
 #include "BLI_blenlib.h"
 #include "BLI_dynstr.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_report.h"
 #include "BKE_global.h" /* G.background only */
-#include "BKE_utildefines.h"
+
 
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
-
-#ifdef _WIN32
-#ifndef vsnprintf
-#define vsnprintf _vsnprintf
-#endif
-#endif
 
 static const char *report_type_str(int type)
 {
@@ -95,11 +95,9 @@ void BKE_report(ReportList *reports, ReportType type, const char *message)
 	Report *report;
 	int len;
 
-    /* exception, print and return in background, no reason to store a list */
-    if(G.background)
-        reports= NULL;
-
-	if(!reports || ((reports->flag & RPT_PRINT) && (type >= reports->printlevel))) {
+	/* in background mode always print otherwise there are cases the errors wont be displayed,
+	 * but still add to the report list since this is used for python exception handling */
+	if(G.background || !reports || ((reports->flag & RPT_PRINT) && (type >= reports->printlevel))) {
 		printf("%s: %s\n", report_type_str(type), message);
 		fflush(stdout); /* this ensures the message is printed before a crash */
 	}
@@ -125,7 +123,7 @@ void BKE_reportf(ReportList *reports, ReportType type, const char *format, ...)
 	Report *report;
 	va_list args;
 
-	if(!reports || ((reports->flag & RPT_PRINT) && (type >= reports->printlevel))) {
+	if(G.background || !reports || ((reports->flag & RPT_PRINT) && (type >= reports->printlevel))) {
 		va_start(args, format);
 		vprintf(format, args);
 		va_end(args);

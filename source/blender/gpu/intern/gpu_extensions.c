@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -30,6 +30,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/gpu/intern/gpu_extensions.c
+ *  \ingroup gpu
+ */
+
+
 #include "GL/glew.h"
 
 #include "DNA_image_types.h"
@@ -37,10 +42,10 @@
 #include "MEM_guardedalloc.h"
 
 #include "BKE_global.h"
-#include "BKE_utildefines.h"
 
 
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 
 #include "GPU_draw.h"
 #include "GPU_extensions.h"
@@ -48,6 +53,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+
+#include "BLI_winstuff.h"
 
 /* Extensions support */
 
@@ -82,12 +89,12 @@ int GPU_type_matches(GPUDeviceType device, GPUOSType os, GPUDriverType driver)
 
 /* GPU Extensions */
 
-void GPU_extensions_disable()
+void GPU_extensions_disable(void)
 {
 	GG.extdisabled = 1;
 }
 
-void GPU_extensions_init()
+void GPU_extensions_init(void)
 {
 	GLint r, g, b;
 	const char *vendor, *renderer;
@@ -112,8 +119,8 @@ void GPU_extensions_init()
 	glGetIntegerv(GL_RED_BITS, &r);
 	glGetIntegerv(GL_GREEN_BITS, &g);
 	glGetIntegerv(GL_BLUE_BITS, &b);
-    GG.colordepth = r+g+b; /* assumes same depth for RGB */
-    
+	GG.colordepth = r+g+b; /* assumes same depth for RGB */
+
 	vendor = (const char*)glGetString(GL_VENDOR);
 	renderer = (const char*)glGetString(GL_RENDERER);
 
@@ -134,7 +141,7 @@ void GPU_extensions_init()
 	else if(strstr(vendor, "Intel") ||
 	        /* src/mesa/drivers/dri/intel/intel_context.c */
 	        strstr(renderer, "Mesa DRI Intel") ||
-	        strstr(renderer, "Mesa DRI Mobile Intel")) {
+		strstr(renderer, "Mesa DRI Mobile Intel")) {
 		GG.device = GPU_DEVICE_INTEL;
 		GG.driver = GPU_DRIVER_OFFICIAL;
 	}
@@ -183,12 +190,12 @@ void GPU_extensions_init()
 #endif
 }
 
-int GPU_glsl_support()
+int GPU_glsl_support(void)
 {
 	return !GG.extdisabled && GG.glslsupport;
 }
 
-int GPU_non_power_of_two_support()
+int GPU_non_power_of_two_support(void)
 {
 	/* Exception for buggy ATI/Apple driver in Mac OS X 10.5/10.6,
 	 * they claim to support this but can cause system freeze */
@@ -201,9 +208,9 @@ int GPU_non_power_of_two_support()
 	return GLEW_ARB_texture_non_power_of_two;
 }
 
-int GPU_color_depth()
+int GPU_color_depth(void)
 {
-    return GG.colordepth;
+	return GG.colordepth;
 }
 
 int GPU_print_error(const char *str)
@@ -220,38 +227,43 @@ int GPU_print_error(const char *str)
 	return 0;
 }
 
-static void GPU_print_framebuffer_error(GLenum status)
+static void GPU_print_framebuffer_error(GLenum status, char err_out[256])
 {
-	fprintf(stderr, "GPUFrameBuffer: framebuffer incomplete error %d\n",
-		(int)status);
+	const char *err= "unknown";
 
 	switch(status) {
 		case GL_FRAMEBUFFER_COMPLETE_EXT:
 			break;
 		case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT_EXT:
-			fprintf(stderr, "Incomplete attachment.\n");
+			err= "Incomplete attachment";
 			break;
 		case GL_FRAMEBUFFER_UNSUPPORTED_EXT:
-			fprintf(stderr, "Unsupported framebuffer format.\n");
+			err= "Unsupported framebuffer format";
 			break;
 		case GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT_EXT:
-			fprintf(stderr, "Missing attachment.\n");
+			err= "Missing attachment";
 			break;
 		case GL_FRAMEBUFFER_INCOMPLETE_DIMENSIONS_EXT:
-			fprintf(stderr, "Attached images must have same dimensions.\n");
+			err= "Attached images must have same dimensions";
 			break;
 		case GL_FRAMEBUFFER_INCOMPLETE_FORMATS_EXT:
-			 fprintf(stderr, "Attached images must have same format.\n");
+			err= "Attached images must have same format";
 			break;
 		case GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER_EXT:
-			fprintf(stderr, "Missing draw buffer.\n");
+			err= "Missing draw buffer";
 			break;
 		case GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER_EXT:
-			fprintf(stderr, "Missing read buffer.\n");
+			err= "Missing read buffer";
 			break;
-		default:
-			fprintf(stderr, "Unknown.\n");
-			break;
+	}
+
+	if(err_out) {
+		BLI_snprintf(err_out, 256, "GPUFrameBuffer: framebuffer incomplete error %d '%s'",
+			(int)status, err);
+	}
+	else {
+		fprintf(stderr, "GPUFrameBuffer: framebuffer incomplete error %d '%s'\n",
+			(int)status, err);
 	}
 }
 
@@ -313,7 +325,7 @@ static void GPU_glTexSubImageEmpty(GLenum target, GLenum format, int x, int y, i
 	MEM_freeN(pixels);
 }
 
-static GPUTexture *GPU_texture_create_nD(int w, int h, int n, float *fpixels, int depth)
+static GPUTexture *GPU_texture_create_nD(int w, int h, int n, float *fpixels, int depth, char err_out[256])
 {
 	GPUTexture *tex;
 	GLenum type, format, internalformat;
@@ -333,8 +345,14 @@ static GPUTexture *GPU_texture_create_nD(int w, int h, int n, float *fpixels, in
 	glGenTextures(1, &tex->bindcode);
 
 	if (!tex->bindcode) {
-		fprintf(stderr, "GPUTexture: texture create failed: %d\n",
-			(int)glGetError());
+		if(err_out) {
+			BLI_snprintf(err_out, 256, "GPUTexture: texture create failed: %d",
+				(int)glGetError());
+		}
+		else {
+			fprintf(stderr, "GPUTexture: texture create failed: %d\n",
+				(int)glGetError());
+		}
 		GPU_texture_free(tex);
 		return NULL;
 	}
@@ -362,7 +380,7 @@ static GPUTexture *GPU_texture_create_nD(int w, int h, int n, float *fpixels, in
 	}
 
 	if (tex->target == GL_TEXTURE_1D) {
-		glTexImage1D(tex->target, 0, internalformat, tex->w, 0, format, type, 0);
+		glTexImage1D(tex->target, 0, internalformat, tex->w, 0, format, type, NULL);
 
 		if (fpixels) {
 			glTexSubImage1D(tex->target, 0, 0, w, format, type,
@@ -375,7 +393,7 @@ static GPUTexture *GPU_texture_create_nD(int w, int h, int n, float *fpixels, in
 	}
 	else {
 		glTexImage2D(tex->target, 0, internalformat, tex->w, tex->h, 0,
-			format, type, 0);
+			format, type, NULL);
 
 		if (fpixels) {
 			glTexSubImage2D(tex->target, 0, 0, 0, w, h,
@@ -405,7 +423,7 @@ static GPUTexture *GPU_texture_create_nD(int w, int h, int n, float *fpixels, in
 
 	if (tex->target != GL_TEXTURE_1D) {
 		/* CLAMP_TO_BORDER is an OpenGL 1.3 core feature */
-		GLenum wrapmode = (depth)? GL_CLAMP_TO_EDGE: GL_CLAMP_TO_BORDER;
+		GLenum wrapmode = (depth || tex->h == 1)? GL_CLAMP_TO_EDGE: GL_CLAMP_TO_BORDER;
 		glTexParameteri(tex->target, GL_TEXTURE_WRAP_S, wrapmode);
 		glTexParameteri(tex->target, GL_TEXTURE_WRAP_T, wrapmode);
 
@@ -466,7 +484,7 @@ GPUTexture *GPU_texture_create_3D(int w, int h, int depth, float *fpixels)
 	//if (fpixels)
 	//	pixels = GPU_texture_convert_pixels(w*h*depth, fpixels);
 
-	glTexImage3D(tex->target, 0, internalformat, tex->w, tex->h, tex->depth, 0, format, type, 0);
+	glTexImage3D(tex->target, 0, internalformat, tex->w, tex->h, tex->depth, 0, format, type, NULL);
 
 	GPU_print_error("3D glTexImage3D");
 
@@ -496,8 +514,7 @@ GPUTexture *GPU_texture_create_3D(int w, int h, int depth, float *fpixels)
 	if (pixels)
 		MEM_freeN(pixels);
 
-	if (tex)
-		GPU_texture_unbind(tex);
+	GPU_texture_unbind(tex);
 
 	return tex;
 }
@@ -550,9 +567,9 @@ GPUTexture *GPU_texture_from_blender(Image *ima, ImageUser *iuser, double time, 
 	return tex;
 }
 
-GPUTexture *GPU_texture_create_1D(int w, float *fpixels)
+GPUTexture *GPU_texture_create_1D(int w, float *fpixels, char err_out[256])
 {
-	GPUTexture *tex = GPU_texture_create_nD(w, 1, 1, fpixels, 0);
+	GPUTexture *tex = GPU_texture_create_nD(w, 1, 1, fpixels, 0, err_out);
 
 	if (tex)
 		GPU_texture_unbind(tex);
@@ -560,9 +577,9 @@ GPUTexture *GPU_texture_create_1D(int w, float *fpixels)
 	return tex;
 }
 
-GPUTexture *GPU_texture_create_2D(int w, int h, float *fpixels)
+GPUTexture *GPU_texture_create_2D(int w, int h, float *fpixels, char err_out[256])
 {
-	GPUTexture *tex = GPU_texture_create_nD(w, h, 2, fpixels, 0);
+	GPUTexture *tex = GPU_texture_create_nD(w, h, 2, fpixels, 0, err_out);
 
 	if (tex)
 		GPU_texture_unbind(tex);
@@ -570,9 +587,9 @@ GPUTexture *GPU_texture_create_2D(int w, int h, float *fpixels)
 	return tex;
 }
 
-GPUTexture *GPU_texture_create_depth(int w, int h)
+GPUTexture *GPU_texture_create_depth(int w, int h, char err_out[256])
 {
-	GPUTexture *tex = GPU_texture_create_nD(w, h, 2, NULL, 1);
+	GPUTexture *tex = GPU_texture_create_nD(w, h, 2, NULL, 1, err_out);
 
 	if (tex)
 		GPU_texture_unbind(tex);
@@ -667,6 +684,11 @@ int GPU_texture_opengl_height(GPUTexture *tex)
 	return tex->h;
 }
 
+int GPU_texture_opengl_bindcode(GPUTexture *tex)
+{
+	return tex->bindcode;
+}
+
 GPUFrameBuffer *GPU_texture_framebuffer(GPUTexture *tex)
 {
 	return tex->fb;
@@ -680,7 +702,7 @@ struct GPUFrameBuffer {
 	GPUTexture *depthtex;
 };
 
-GPUFrameBuffer *GPU_framebuffer_create()
+GPUFrameBuffer *GPU_framebuffer_create(void)
 {
 	GPUFrameBuffer *fb;
 
@@ -700,7 +722,7 @@ GPUFrameBuffer *GPU_framebuffer_create()
 	return fb;
 }
 
-int GPU_framebuffer_texture_attach(GPUFrameBuffer *fb, GPUTexture *tex)
+int GPU_framebuffer_texture_attach(GPUFrameBuffer *fb, GPUTexture *tex, char err_out[256])
 {
 	GLenum status;
 	GLenum attachment;
@@ -729,7 +751,7 @@ int GPU_framebuffer_texture_attach(GPUFrameBuffer *fb, GPUTexture *tex)
 
 	if (status != GL_FRAMEBUFFER_COMPLETE_EXT) {
 		GPU_framebuffer_restore();
-		GPU_print_framebuffer_error(status);
+		GPU_print_framebuffer_error(status, err_out);
 		return 0;
 	}
 
@@ -825,7 +847,7 @@ void GPU_framebuffer_free(GPUFrameBuffer *fb)
 	MEM_freeN(fb);
 }
 
-void GPU_framebuffer_restore()
+void GPU_framebuffer_restore(void)
 {
 	if (GG.currentfb != 0) {
 		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
@@ -841,7 +863,7 @@ struct GPUOffScreen {
 	GPUTexture *depth;
 };
 
-GPUOffScreen *GPU_offscreen_create(int *width, int *height)
+GPUOffScreen *GPU_offscreen_create(int *width, int *height, char err_out[256])
 {
 	GPUOffScreen *ofs;
 
@@ -853,7 +875,7 @@ GPUOffScreen *GPU_offscreen_create(int *width, int *height)
 		return NULL;
 	}
 
-	ofs->depth = GPU_texture_create_depth(*width, *height);
+	ofs->depth = GPU_texture_create_depth(*width, *height, err_out);
 	if(!ofs->depth) {
 		GPU_offscreen_free(ofs);
 		return NULL;
@@ -865,18 +887,18 @@ GPUOffScreen *GPU_offscreen_create(int *width, int *height)
 		printf("Offscreen size differs from given size!\n");
 	}
 	
-	if(!GPU_framebuffer_texture_attach(ofs->fb, ofs->depth)) {
+	if(!GPU_framebuffer_texture_attach(ofs->fb, ofs->depth, err_out)) {
 		GPU_offscreen_free(ofs);
 		return NULL;
 	}
 
-	ofs->color = GPU_texture_create_2D(*width, *height, NULL);
+	ofs->color = GPU_texture_create_2D(*width, *height, NULL, err_out);
 	if(!ofs->color) {
 		GPU_offscreen_free(ofs);
 		return NULL;
 	}
 
-	if(!GPU_framebuffer_texture_attach(ofs->fb, ofs->color)) {
+	if(!GPU_framebuffer_texture_attach(ofs->fb, ofs->color, err_out)) {
 		GPU_offscreen_free(ofs);
 		return NULL;
 	}
@@ -1200,15 +1222,15 @@ void GPU_pixelbuffer_texture(GPUTexture *tex, GPUPixelBuffer *pb)
 	int i;
 
 	glBindTexture(GL_TEXTURE_RECTANGLE_EXT, tex->bindcode);
- 
-	 for (i = 0; i < pb->numbuffers; i++) {
+
+	for (i = 0; i < pb->numbuffers; i++) {
 		glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_EXT, pb->bindcode[pb->current]);
 		glBufferDataARB(GL_PIXEL_UNPACK_BUFFER_EXT, pb->datasize, NULL,
-			GL_STREAM_DRAW_ARB);
-    
+		GL_STREAM_DRAW_ARB);
+
 		pixels = glMapBufferARB(GL_PIXEL_UNPACK_BUFFER_EXT, GL_WRITE_ONLY);
 		/*memcpy(pixels, _oImage.data(), pb->datasize);*/
-    
+
 		if (!glUnmapBufferARB(GL_PIXEL_UNPACK_BUFFER_EXT)) {
 			fprintf(stderr, "Could not unmap opengl PBO\n");
 			break;

@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,10 +25,14 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/interface/interface_ops.c
+ *  \ingroup edinterface
+ */
+
+
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
-
 
 #include "MEM_guardedalloc.h"
 
@@ -38,6 +42,7 @@
 
 #include "BLI_blenlib.h"
 #include "BLI_math_color.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_context.h"
 #include "BKE_global.h"
@@ -92,7 +97,7 @@ static int eyedropper_cancel(bContext *C, wmOperator *op)
 	return OPERATOR_CANCELLED;
 }
 
-static void eyedropper_sample(bContext *C, Eyedropper *eye, short mx, short my)
+static void eyedropper_sample(bContext *C, Eyedropper *eye, int mx, int my)
 {
 	if(RNA_property_type(eye->prop) == PROP_FLOAT) {
 		const int color_manage = CTX_data_scene(C)->r.color_mgt_flag & R_COLOR_MANAGEMENT;
@@ -177,7 +182,7 @@ static int eyedropper_poll(bContext *C)
 	else return 1;
 }
 
-void UI_OT_eyedropper(wmOperatorType *ot)
+static void UI_OT_eyedropper(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Eyedropper";
@@ -207,7 +212,7 @@ static int reset_default_theme_exec(bContext *C, wmOperator *UNUSED(op))
 	return OPERATOR_FINISHED;
 }
 
-void UI_OT_reset_default_theme(wmOperatorType *ot)
+static void UI_OT_reset_default_theme(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Reset to Default Theme";
@@ -247,7 +252,7 @@ static int copy_data_path_button_exec(bContext *C, wmOperator *UNUSED(op))
 	return (success)? OPERATOR_FINISHED: OPERATOR_CANCELLED;
 }
 
-void UI_OT_copy_data_path_button(wmOperatorType *ot)
+static void UI_OT_copy_data_path_button(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Copy Data Path";
@@ -297,7 +302,7 @@ static int reset_default_button_exec(bContext *C, wmOperator *op)
 	return (success)? OPERATOR_FINISHED: OPERATOR_CANCELLED;
 }
 
-void UI_OT_reset_default_button(wmOperatorType *ot)
+static void UI_OT_reset_default_button(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Reset to Default Value";
@@ -312,7 +317,7 @@ void UI_OT_reset_default_button(wmOperatorType *ot)
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 	
 	/* properties */
-	RNA_def_boolean(ot->srna, "all", 1, "All", "Reset to default values all elements of the array.");
+	RNA_def_boolean(ot->srna, "all", 1, "All", "Reset to default values all elements of the array");
 }
 
 /* Copy To Selected Operator ------------------------ */
@@ -389,7 +394,7 @@ static int copy_to_selected_button_exec(bContext *C, wmOperator *op)
 	return (success)? OPERATOR_FINISHED: OPERATOR_CANCELLED;
 }
 
-void UI_OT_copy_to_selected_button(wmOperatorType *ot)
+static void UI_OT_copy_to_selected_button(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Copy To Selected";
@@ -404,7 +409,7 @@ void UI_OT_copy_to_selected_button(wmOperatorType *ot)
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 
 	/* properties */
-	RNA_def_boolean(ot->srna, "all", 1, "All", "Reset to default values all elements of the array.");
+	RNA_def_boolean(ot->srna, "all", 1, "All", "Reset to default values all elements of the array");
 }
 
 /* Reports to Textblock Operator ------------------------ */
@@ -439,7 +444,7 @@ static int reports_to_text_exec(bContext *C, wmOperator *UNUSED(op))
 	return OPERATOR_FINISHED;
 }
 
-void UI_OT_reports_to_textblock(wmOperatorType *ot)
+static void UI_OT_reports_to_textblock(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Reports to Text Block";

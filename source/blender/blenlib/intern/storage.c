@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -28,6 +28,11 @@
  * Reorganised mar-01 nzc
  * Some really low-level file thingies.
  */
+
+/** \file blender/blenlib/intern/storage.c
+ *  \ingroup bli
+ */
+
 
 #include <sys/types.h>
 #include <stdio.h>
@@ -71,10 +76,6 @@
 #include <pwd.h>
 #endif
 
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
-#include <malloc.h>
-#endif
-
 #ifdef WIN32
 #include <io.h>
 #include <direct.h>
@@ -89,33 +90,29 @@
 
 #include "BLI_listbase.h"
 #include "BLI_linklist.h"
+#include "BLI_storage.h"
 #include "BLI_storage_types.h"
 #include "BLI_string.h"
+
 #include "BKE_utildefines.h"
 
 /* vars: */
 static int totnum,actnum;
 static struct direntry *files;
 
-static struct ListBase dirbase_={
-	0,0};
+static struct ListBase dirbase_={NULL, NULL};
 static struct ListBase *dirbase = &dirbase_;
 
-
-char *BLI_getwdN(char *dir)
+/* can return NULL when the size is not big enough */
+char *BLI_getwdN(char *dir, const int maxncpy)
 {
-	char *pwd;
-
-	if (dir) {
-		pwd = getenv("PWD");
-		if (pwd){
-			strcpy(dir, pwd);
-			return(dir);
-		}
-		/* 160 is FILE_MAXDIR in filesel.c */
-		return( getcwd(dir, 160) );
+	const char *pwd= getenv("PWD");
+	if (pwd){
+		BLI_strncpy(dir, pwd, maxncpy);
+		return dir;
 	}
-	return(0);
+
+	return getcwd(dir, maxncpy);
 }
 
 
@@ -205,7 +202,7 @@ void BLI_builddir(const char *dirname, const char *relname)
 {
 	struct dirent *fname;
 	struct dirlink *dlink;
-	int rellen, newnum = 0, len;
+	int rellen, newnum = 0;
 	char buf[256];
 	DIR *dir;
 
@@ -224,8 +221,6 @@ void BLI_builddir(const char *dirname, const char *relname)
 
 	if ( (dir = (DIR *)opendir(".")) ){
 		while ((fname = (struct dirent*) readdir(dir)) != NULL) {
-			len= strlen(fname->d_name);
-			
 			dlink = (struct dirlink *)malloc(sizeof(struct dirlink));
 			if (dlink){
 				strcpy(buf+rellen,fname->d_name);
@@ -343,7 +338,7 @@ void BLI_adddirstrings(void)
 			if ( pwuser ) {
 				BLI_strncpy(file->owner, pwuser->pw_name, sizeof(file->owner));
 			} else {
-				snprintf(file->owner, sizeof(file->owner), "%d", file->s.st_uid);
+				BLI_snprintf(file->owner, sizeof(file->owner), "%d", file->s.st_uid);
 			}
 		}
 #endif
@@ -404,7 +399,7 @@ unsigned int BLI_getdir(const char *dirname,  struct direntry **filelist)
 	// filesel.c:freefilelist()
 
 	actnum = totnum = 0;
-	files = 0;
+	files = NULL;
 
 	BLI_builddir(dirname,"");
 	BLI_adddirstrings();
@@ -478,12 +473,12 @@ int BLI_is_dir(const char *file) {
 	return S_ISDIR(BLI_exist(file));
 }
 
-LinkNode *BLI_read_file_as_lines(char *name)
+LinkNode *BLI_read_file_as_lines(const char *name)
 {
 	FILE *fp= fopen(name, "r");
 	LinkNode *lines= NULL;
 	char *buf;
-	int size;
+	int64_t size;
 
 	if (!fp) return NULL;
 		

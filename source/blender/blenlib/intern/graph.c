@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -23,6 +23,11 @@
  * graph.c: Common graph interface and methods
  */
 
+/** \file blender/blenlib/intern/graph.c
+ *  \ingroup bli
+ */
+
+
 #include <float.h> 
 #include <math.h>
 
@@ -31,8 +36,9 @@
 #include "BLI_graph.h"
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
-#include "BKE_utildefines.h"
+
 
 static void testRadialSymmetry(BGraph *graph, BNode* root_node, RadialArc* ring, int total, float axis[3], float limit, int group);
 
@@ -295,7 +301,7 @@ BNode * BLI_FindNodeByPosition(BGraph *graph, float *p, float limit)
 }
 /************************************* SUBGRAPH DETECTION **********************************************/
 
-void flagSubgraph(BNode *node, int subgraph)
+static void flagSubgraph(BNode *node, int subgraph)
 {
 	if (node->subgraph_index == 0)
 	{
@@ -409,7 +415,7 @@ int	BLI_isGraphCyclic(BGraph *graph)
 
 BArc * BLI_findConnectedArc(BGraph *graph, BArc *arc, BNode *v)
 {
-	BArc *nextArc = arc->next;
+	BArc *nextArc;
 	
 	for(nextArc = graph->arcs.first; nextArc; nextArc = nextArc->next)
 	{
@@ -424,7 +430,7 @@ BArc * BLI_findConnectedArc(BGraph *graph, BArc *arc, BNode *v)
 
 /*********************************** GRAPH AS TREE FUNCTIONS *******************************************/
 
-int subtreeShape(BNode *node, BArc *rootArc, int include_root)
+static int subtreeShape(BNode *node, BArc *rootArc, int include_root)
 {
 	int depth = 0;
 	
@@ -585,7 +591,7 @@ static void testRadialSymmetry(BGraph *graph, BNode* root_node, RadialArc* ring,
 		node1 = BLI_otherNode(ring[i].arc, root_node);
 		node2 = BLI_otherNode(ring[j].arc, root_node);
 
-		VECCOPY(p, node2->p);
+		copy_v3_v3(p, node2->p);
 		BLI_mirrorAlongAxis(p, root_node->p, normal);
 		
 		/* check if it's within limit before continuing */
@@ -599,7 +605,7 @@ static void testRadialSymmetry(BGraph *graph, BNode* root_node, RadialArc* ring,
 	if (symmetric)
 	{
 		/* mark node as symmetric physically */
-		VECCOPY(root_node->symmetry_axis, axis);
+		copy_v3_v3(root_node->symmetry_axis, axis);
 		root_node->symmetry_flag |= SYM_PHYSICAL;
 		root_node->symmetry_flag |= SYM_RADIAL;
 		
@@ -708,7 +714,7 @@ static void handleRadialSymmetry(BGraph *graph, BNode *root_node, int depth, flo
 		int dispatch = 0;
 		int last = i - 1;
 		
-		if (fabs(ring[first].arc->length - ring[i].arc->length) > limit)
+		if (fabsf(ring[first].arc->length - ring[i].arc->length) > limit)
 		{
 			dispatch = 1;
 		}

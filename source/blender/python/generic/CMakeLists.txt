@@ -20,12 +20,16 @@
 
 set(INC 
 	.
-	../../blenlib
-	../../makesdna
 	../../blenkernel
+	../../blenlib
+	../../blenloader
+	../../makesdna
 	../../../../intern/guardedalloc
-	../../../../extern/glew/include
-	${PYTHON_INC}
+)
+
+set(INC_SYS
+	${GLEW_INCLUDE_PATH}
+	${PYTHON_INCLUDE_DIRS}
 )
 
 set(SRC
@@ -33,28 +37,19 @@ set(SRC
 	bgl.c
 	blf_py_api.c
 	bpy_internal_import.c
-	mathutils.c
-	mathutils_color.c
-	mathutils_euler.c
-	mathutils_geometry.c
-	mathutils_matrix.c
-	mathutils_quat.c
-	mathutils_vector.c
-	noise.c
+	noise_py_api.c
 	py_capi_utils.c
 
 	IDProp.h
 	bgl.h
 	blf_py_api.h
 	bpy_internal_import.h
-	mathutils.h
-	mathutils_color.h
-	mathutils_euler.h
-	mathutils_geometry.h
-	mathutils_matrix.h
-	mathutils_quat.h
-	mathutils_vector.h
+	noise_py_api.h
 	py_capi_utils.h
 )
 
-blenderlib(bf_python_ext "${SRC}" "${INC}")
+if(WITH_INTERNATIONAL)
+        add_definitions(-DINTERNATIONAL)
+endif()
+
+blender_add_lib(bf_python_ext "${SRC}" "${INC}" "${INC_SYS}")

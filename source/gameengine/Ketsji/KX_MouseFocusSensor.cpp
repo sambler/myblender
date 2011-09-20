@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
  * KX_MouseFocusSensor determines mouse in/out/over events.
  */
+
+/** \file gameengine/Ketsji/KX_MouseFocusSensor.cpp
+ *  \ingroup ketsji
+ */
+
 
 #if defined(WIN32) && !defined(FREE_WINDOWS)
 // This warning tells us about truncation of __long__ stl-generated names.
@@ -116,14 +121,14 @@ bool KX_MouseFocusSensor::Evaluate()
 			}
 		} 
 		if (reset) {
-			// force an event 
+			// force an event
 			result = true;
 		}
 	} else {
 		/* No focus behaviour required: revert to the basic mode. This
-         * mode is never used, because the converter never makes this
-         * sensor for a mouse-key event. It is here for
-         * completeness. */
+		 * mode is never used, because the converter never makes this
+		 * sensor for a mouse-key event. It is here for
+		 * completeness. */
 		result = SCA_MouseSensor::Evaluate();
 		m_positive_event = (m_val!=0);
 	}

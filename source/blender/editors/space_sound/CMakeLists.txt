@@ -23,10 +23,15 @@ set(INC
 	../include
 	../../blenkernel
 	../../blenlib
+	../../blenloader
 	../../makesdna
 	../../makesrna
 	../../windowmanager
 	../../../../intern/guardedalloc
+)
+
+set(INC_SYS
+	${GLEW_INCLUDE_PATH}
 )
 
 set(SRC
@@ -36,4 +41,4 @@ set(SRC
 	sound_intern.h
 )
 
-blenderlib(bf_editor_space_sound "${SRC}" "${INC}")
+blender_add_lib(bf_editor_space_sound "${SRC}" "${INC}" "${INC_SYS}")

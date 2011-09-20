@@ -1,4 +1,4 @@
-/**
+/*
  * smoke.c
  *
  * $Id$
@@ -29,6 +29,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/blenkernel/intern/smoke.c
+ *  \ingroup bke
+ */
+
+
 /* Part of the code copied from elbeem fluid library, copyright by Nils Thuerey */
 
 #include <GL/glew.h>
@@ -48,6 +53,7 @@
 #include "BLI_edgehash.h"
 #include "BLI_kdtree.h"
 #include "BLI_kdopbvh.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_bvhutils.h"
 #include "BKE_cdderivedmesh.h"
@@ -58,7 +64,7 @@
 #include "BKE_particle.h"
 #include "BKE_pointcache.h"
 #include "BKE_smoke.h"
-#include "BKE_utildefines.h"
+
 
 #include "DNA_customdata_types.h"
 #include "DNA_group_types.h"
@@ -134,7 +140,20 @@ static void fill_scs_points(Object *ob, DerivedMesh *dm, SmokeCollSettings *scs)
 
 #define TRI_UVOFFSET (1./4.)
 
-int smokeModifier_init (SmokeModifierData *smd, Object *ob, Scene *scene, DerivedMesh *dm)
+/* Stubs to use when smoke is disabled */
+#ifndef WITH_SMOKE
+struct WTURBULENCE *smoke_turbulence_init(int *UNUSED(res), int UNUSED(amplify), int UNUSED(noisetype)) { return NULL; }
+struct FLUID_3D *smoke_init(int *UNUSED(res), float *UNUSED(p0)) { return NULL; }
+void smoke_free(struct FLUID_3D *UNUSED(fluid)) {}
+void smoke_turbulence_free(struct WTURBULENCE *UNUSED(wt)) {}
+void smoke_initWaveletBlenderRNA(struct WTURBULENCE *UNUSED(wt), float *UNUSED(strength)) {}
+void smoke_initBlenderRNA(struct FLUID_3D *UNUSED(fluid), float *UNUSED(alpha), float *UNUSED(beta), float *UNUSED(dt_factor), float *UNUSED(vorticity), int *UNUSED(border_colli)) {}
+long long smoke_get_mem_req(int UNUSED(xres), int UNUSED(yres), int UNUSED(zres), int UNUSED(amplify)) { return 0; }
+void smokeModifier_do(SmokeModifierData *UNUSED(smd), Scene *UNUSED(scene), Object *UNUSED(ob), DerivedMesh *UNUSED(dm)) {}
+#endif // WITH_SMOKE
+
+
+static int smokeModifier_init (SmokeModifierData *smd, Object *ob, Scene *scene, DerivedMesh *dm)
 {
 	if((smd->type & MOD_SMOKE_TYPE_DOMAIN) && smd->domain && !smd->domain->fluid)
 	{
@@ -799,6 +818,9 @@ void smokeModifier_copy(struct SmokeModifierData *smd, struct SmokeModifierData 
 // forward decleration
 static void smoke_calc_transparency(float *result, float *input, float *p0, float *p1, int res[3], float dx, float *light, bresenham_callback cb, float correct);
 static float calc_voxel_transp(float *result, float *input, int res[3], int *pixel, float *tRay, float correct);
+
+#ifdef WITH_SMOKE
+
 static int get_lamp(Scene *scene, float *light)
 {	
 	Base *base_tmp = NULL;	
@@ -973,9 +995,8 @@ static void smoke_calc_domain(Scene *scene, Object *ob, SmokeModifierData *smd)
 					
 					if(sfs && sfs->psys && sfs->psys->part && sfs->psys->part->type==PART_EMITTER) // is particle system selected
 					{
+						ParticleSimulationData sim;
 						ParticleSystem *psys = sfs->psys;
-						ParticleSettings *part=psys->part;
-						ParticleData *pa = NULL;							
 						int p = 0;								
 						float *density = smoke_get_density(sds->fluid);								
 						float *bigdensity = smoke_turbulence_get_density(sds->wt);								
@@ -995,6 +1016,10 @@ static void smoke_calc_domain(Scene *scene, Object *ob, SmokeModifierData *smd)
 						*/
 						float *temp_emission_map = NULL;
 
+						sim.scene = scene;
+						sim.ob = otherobj;
+						sim.psys = psys;
+
 						// initialize temp emission map
 						if(!(sfs->type & MOD_SMOKE_FLOW_TYPE_OUTFLOW))
 						{
@@ -1007,19 +1032,26 @@ static void smoke_calc_domain(Scene *scene, Object *ob, SmokeModifierData *smd)
 						}
 														
 						// mostly copied from particle code								
-						for(p=0, pa=psys->particles; p<psys->totpart; p++, pa++)								
-						{									
-							int cell[3];									
-							size_t i = 0;									
-							size_t index = 0;									
-							int badcell = 0;																		
-							if(pa->alive == PARS_UNBORN && (part->flag & PART_UNBORN)==0) continue;									
-							else if(pa->alive == PARS_DEAD && (part->flag & PART_DIED)==0) continue;									
-							else if(pa->flag & (PARS_UNEXIST+PARS_NO_DISP)) continue;																		
+						for(p=0; p<psys->totpart; p++)								
+						{
+							int cell[3];
+							size_t i = 0;
+							size_t index = 0;
+							int badcell = 0;
+							ParticleKey state;
+
+							if(psys->particles[p].flag & (PARS_NO_DISP|PARS_UNEXIST))
+								continue;
+
+							state.time = smd->time;
+
+							if(psys_get_particle_state(&sim, p, &state, 0) == 0)
+								continue;
+							
 							// VECCOPY(pos, pa->state.co);									
 							// mul_m4_v3(ob->imat, pos);																		
 							// 1. get corresponding cell	
-							get_cell(smd->domain->p0, smd->domain->res, smd->domain->dx, pa->state.co, cell, 0);																	
+							get_cell(smd->domain->p0, smd->domain->res, smd->domain->dx, state.co, cell, 0);																	
 							// check if cell is valid (in the domain boundary)									
 							for(i = 0; i < 3; i++)									
 							{										
@@ -1045,9 +1077,9 @@ static void smoke_calc_domain(Scene *scene, Object *ob, SmokeModifierData *smd)
 								// Uses particle velocity as initial velocity for smoke
 								if(sfs->flags & MOD_SMOKE_FLOW_INITVELOCITY && (psys->part->phystype != PART_PHYS_NO))
 								{
-									velocity_x[index] = pa->state.vel[0]*sfs->vel_multi;
-									velocity_y[index] = pa->state.vel[1]*sfs->vel_multi;
-									velocity_z[index] = pa->state.vel[2]*sfs->vel_multi;
+									velocity_x[index] = state.vel[0]*sfs->vel_multi;
+									velocity_y[index] = state.vel[1]*sfs->vel_multi;
+									velocity_z[index] = state.vel[2]*sfs->vel_multi;
 								}										
 							}									
 							else if(sfs->type & MOD_SMOKE_FLOW_TYPE_OUTFLOW) // outflow									
@@ -1366,7 +1398,7 @@ void smokeModifier_do(SmokeModifierData *smd, Scene *scene, Object *ob, DerivedM
 		}
 
 		/* try to read from cache */
-		if(BKE_ptcache_read_cache(&pid, (float)framenr, scene->r.frs_sec) == PTCACHE_READ_EXACT) {
+		if(BKE_ptcache_read(&pid, (float)framenr) == PTCACHE_READ_EXACT) {
 			BKE_ptcache_validate(cache, framenr);
 			smd->time = framenr;
 			return;
@@ -1397,7 +1429,7 @@ void smokeModifier_do(SmokeModifierData *smd, Scene *scene, Object *ob, DerivedM
 				smoke_turbulence_step(sds->wt, sds->fluid);
 			}
 
-			BKE_ptcache_write_cache(&pid, startframe);
+			BKE_ptcache_write(&pid, startframe);
 		}
 		
 		// set new time
@@ -1429,7 +1461,7 @@ void smokeModifier_do(SmokeModifierData *smd, Scene *scene, Object *ob, DerivedM
 	
 		BKE_ptcache_validate(cache, framenr);
 		if(framenr != startframe)
-			BKE_ptcache_write_cache(&pid, framenr);
+			BKE_ptcache_write(&pid, framenr);
 
 		tend();
 		//printf ( "Frame: %d, Time: %f\n", (int)smd->time, ( float ) tval() );
@@ -1454,20 +1486,20 @@ static float calc_voxel_transp(float *result, float *input, int res[3], int *pix
 
 long long smoke_get_mem_req(int xres, int yres, int zres, int amplify)
 {
-	  int totalCells = xres * yres * zres;
-	  int amplifiedCells = totalCells * amplify * amplify * amplify;
+	int totalCells = xres * yres * zres;
+	int amplifiedCells = totalCells * amplify * amplify * amplify;
 
-	  // print out memory requirements
-	  long long int coarseSize = sizeof(float) * totalCells * 22 +
-					   sizeof(unsigned char) * totalCells;
+	// print out memory requirements
+	long long int coarseSize = sizeof(float) * totalCells * 22 +
+	sizeof(unsigned char) * totalCells;
 
-	  long long int fineSize = sizeof(float) * amplifiedCells * 7 + // big grids
-					 sizeof(float) * totalCells * 8 +     // small grids
-					 sizeof(float) * 128 * 128 * 128;     // noise tile
+	long long int fineSize = sizeof(float) * amplifiedCells * 7 + // big grids
+	sizeof(float) * totalCells * 8 +     // small grids
+	sizeof(float) * 128 * 128 * 128;     // noise tile
 
-	  long long int totalMB = (coarseSize + fineSize) / (1024 * 1024);
+	long long int totalMB = (coarseSize + fineSize) / (1024 * 1024);
 
-	  return totalMB;
+	return totalMB;
 }
 
 static void bresenham_linie_3D(int x1, int y1, int z1, int x2, int y2, int z2, float *tRay, bresenham_callback cb, float *result, float *input, int res[3], float correct)
@@ -1630,3 +1662,4 @@ static void smoke_calc_transparency(float *result, float *input, float *p0, floa
 	}
 }
 
+#endif // WITH_SMOKE

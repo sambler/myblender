@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -23,6 +23,10 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file GeometryExporter.h
+ *  \ingroup collada
+ */
+
 #ifndef __GEOMETRYEXPORTER_H__
 #define __GEOMETRYEXPORTER_H__
 
@@ -37,6 +41,8 @@
 #include "DNA_mesh_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
+
+#include "ExportSettings.h"
 
 // TODO: optimize UV sets by making indexed list with duplicates removed
 class GeometryExporter : COLLADASW::LibraryGeometries
@@ -54,14 +60,14 @@ class GeometryExporter : COLLADASW::LibraryGeometries
 	Scene *mScene;
 
 public:
-	GeometryExporter(COLLADASW::StreamWriter *sw);
+	GeometryExporter(COLLADASW::StreamWriter *sw, const ExportSettings *export_settings);
 
 	void exportGeom(Scene *sce);
 
 	void operator()(Object *ob);
 
 	// powerful because it handles both cases when there is material and when there's not
-	void createPolylist(int material_index,
+	void createPolylist(short material_index,
 						bool has_uvs,
 						bool has_color,
 						Object *ob,
@@ -83,29 +89,33 @@ public:
 
 	void create_normals(std::vector<Normal> &nor, std::vector<Face> &ind, Mesh *me);
 	
-	std::string getIdBySemantics(std::string geom_id, COLLADASW::Semantics type, std::string other_suffix = "");
+	std::string getIdBySemantics(std::string geom_id, COLLADASW::InputSemantic::Semantics type, std::string other_suffix = "");
 	
-	COLLADASW::URI getUrlBySemantics(std::string geom_id, COLLADASW::Semantics type, std::string other_suffix = "");
+	COLLADASW::URI getUrlBySemantics(std::string geom_id, COLLADASW::InputSemantic::Semantics type, std::string other_suffix = "");
 
 	COLLADASW::URI makeUrl(std::string id);
 	
 	/* int getTriCount(MFace *faces, int totface);*/
 private:
 	std::set<std::string> exportedGeometry;
+	
+	const ExportSettings *export_settings;
 };
 
 struct GeometryFunctor {
 	// f should have
 	// void operator()(Object* ob)
 	template<class Functor>
-	void forEachMeshObjectInScene(Scene *sce, Functor &f)
+	void forEachMeshObjectInScene(Scene *sce, Functor &f, bool export_selected)
 	{
 		
 		Base *base= (Base*) sce->base.first;
 		while(base) {
 			Object *ob = base->object;
 			
-			if (ob->type == OB_MESH && ob->data) {
+			if (ob->type == OB_MESH && ob->data
+				&& !(export_selected && !(ob->flag && SELECT))
+				&& ((sce->lay & ob->lay)!=0)) {
 				f(ob);
 			}
 			base= base->next;

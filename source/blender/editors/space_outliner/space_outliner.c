@@ -1,6 +1,4 @@
-/**
- * $Id$
- *
+/*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -26,19 +24,25 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/space_outliner/space_outliner.c
+ *  \ingroup spoutliner
+ */
+
+
 #include <string.h>
 #include <stdio.h>
-
 
 #include "MEM_guardedalloc.h"
 
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
 #include "BLI_rand.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_context.h"
 #include "BKE_screen.h"
 
+#include "ED_space_api.h"
 #include "ED_screen.h"
 
 #include "WM_api.h"
@@ -117,6 +121,7 @@ static void outliner_main_area_listener(ARegion *ar, wmNotifier *wmn)
 					break;
 				case ND_BONE_ACTIVE:
 				case ND_BONE_SELECT:
+				case ND_DRAW:
 				case ND_PARENT:
 				case ND_OB_SHADING:
 					ED_region_tag_redraw(ar);
@@ -168,6 +173,13 @@ static void outliner_main_area_listener(ARegion *ar, wmNotifier *wmn)
 			switch(wmn->data) {
 				case ND_DATA:
 					/* needed for vertex groups only, no special notifier atm so use NC_GEOM|ND_DATA */
+					ED_region_tag_redraw(ar);
+					break;
+			}
+			break;
+		case NC_ANIMATION:
+			switch(wmn->data) {
+				case ND_NLA_ACTCHANGE:
 					ED_region_tag_redraw(ar);
 					break;
 			}

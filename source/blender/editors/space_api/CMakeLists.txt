@@ -23,10 +23,15 @@ set(INC
 	../include
 	../../blenkernel
 	../../blenlib
+	../../blenloader
 	../../makesdna
 	../../makesrna
 	../../windowmanager
 	../../../../intern/guardedalloc
+)
+
+set(INC_SYS
+
 )
 
 set(SRC
@@ -34,4 +39,4 @@ set(SRC
 	spacetypes.c
 )
 
-blenderlib(bf_editor_space_api "${SRC}" "${INC}")
+blender_add_lib(bf_editor_space_api "${SRC}" "${INC}" "${INC_SYS}")

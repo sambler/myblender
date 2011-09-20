@@ -1,6 +1,4 @@
-/**
- * Compatibility-like things for windows.
- *
+/*
  * $Id$ 
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -31,6 +29,11 @@
  
 #ifndef __WINSTUFF_H__
 #define __WINSTUFF_H__
+
+/** \file BLI_winstuff.h
+ *  \ingroup bli
+ *  \brief Compatibility-like things for windows.
+ */
 
 #ifdef _WIN32
 
@@ -72,7 +75,7 @@
 
 #undef small
 
-// These definitions are also in arithb for simplicity
+// These definitions are also in BLI_math for simplicity
 
 #ifdef __cplusplus
 extern "C" {
@@ -93,6 +96,15 @@ extern "C" {
 
 #ifndef FREE_WINDOWS
 typedef unsigned int mode_t;
+#endif
+
+/* use functions that take a 64 bit offset for files larger than 4GB */
+#ifndef FREE_WINDOWS
+#include <stdio.h>
+#define fseek(stream, offset, origin) _fseeki64(stream, offset, origin)
+#define ftell(stream) _ftelli64(stream)
+#define lseek(fd, offset, origin) _lseeki64(fd, offset, origin)
+#define tell(fd) _telli64(fd)
 #endif
 
 /* mingw using _SSIZE_T_ to declare ssize_t type */
@@ -124,7 +136,7 @@ typedef struct _DIR {
 	struct dirent direntry;
 } DIR;
 
-void RegisterBlendExtension(char * str);
+void RegisterBlendExtension(void);
 DIR *opendir (const char *path);
 struct dirent *readdir(DIR *dp);
 int closedir (DIR *dp);

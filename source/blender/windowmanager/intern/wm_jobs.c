@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/windowmanager/intern/wm_jobs.c
+ *  \ingroup wm
+ */
+
 
 #include <string.h>
 
@@ -197,6 +202,20 @@ char *WM_jobs_name(wmWindowManager *wm, void *owner)
 	return NULL;
 }
 
+int WM_jobs_is_running(wmJob *steve)
+{
+	return steve->running;
+}
+
+void* WM_jobs_get_customdata(wmJob * steve)
+{
+	if (!steve->customdata) {
+		return steve->run_customdata;
+	} else {
+		return steve->customdata;
+	}
+}
+
 void WM_jobs_customdata(wmJob *steve, void *customdata, void (*free)(void *))
 {
 	/* pending job? just free */
@@ -247,33 +266,40 @@ static void wm_jobs_test_suspend_stop(wmWindowManager *wm, wmJob *test)
 	wmJob *steve;
 	int suspend= 0;
 	
-	for(steve= wm->jobs.first; steve; steve= steve->next) {
-		/* obvious case, no test needed */
-		if(steve==test || !steve->running) continue;
-		
-		/* if new job is not render, then check for same startjob */
-		if(0==(test->flag & WM_JOB_EXCL_RENDER)) 
-			if(steve->startjob!=test->startjob)
-				continue;
-		
-		/* if new job is render, any render job should be stopped */
-		if(test->flag & WM_JOB_EXCL_RENDER)
-		   if(0==(steve->flag & WM_JOB_EXCL_RENDER)) 
-			   continue;
-
+	/* job added with suspend flag, we wait 1 timer step before activating it */
+	if(test->flag & WM_JOB_SUSPEND) {
 		suspend= 1;
+		test->flag &= ~WM_JOB_SUSPEND;
+	}
+	else {
+		/* check other jobs */
+		for(steve= wm->jobs.first; steve; steve= steve->next) {
+			/* obvious case, no test needed */
+			if(steve==test || !steve->running) continue;
+			
+			/* if new job is not render, then check for same startjob */
+			if(0==(test->flag & WM_JOB_EXCL_RENDER)) 
+				if(steve->startjob!=test->startjob)
+					continue;
+			
+			/* if new job is render, any render job should be stopped */
+			if(test->flag & WM_JOB_EXCL_RENDER)
+				if(0==(steve->flag & WM_JOB_EXCL_RENDER))
+					continue;
 
-		/* if this job has higher priority, stop others */
-		if(test->flag & WM_JOB_PRIORITY) {
-			steve->stop= 1;
-			// printf("job stopped: %s\n", steve->name);
+			suspend= 1;
+
+			/* if this job has higher priority, stop others */
+			if(test->flag & WM_JOB_PRIORITY) {
+				steve->stop= 1;
+				// printf("job stopped: %s\n", steve->name);
+			}
 		}
 	}
-
+	
 	/* possible suspend ourselfs, waiting for other jobs, or de-suspend */
 	test->suspended= suspend;
 	// if(suspend) printf("job suspended: %s\n", test->name);
-
 }
 
 /* if job running, the same owner gave it a new job */
@@ -283,8 +309,10 @@ void WM_jobs_start(wmWindowManager *wm, wmJob *steve)
 	if(steve->running) {
 		/* signal job to end and restart */
 		steve->stop= 1;
+		// printf("job started a running job, ending... %s\n", steve->name);
 	}
 	else {
+		
 		if(steve->customdata && steve->startjob) {
 			
 			wm_jobs_test_suspend_stop(wm, steve);
@@ -304,10 +332,10 @@ void WM_jobs_start(wmWindowManager *wm, wmJob *steve)
 				steve->ready= 0;
 				steve->progress= 0.0;
 
+				// printf("job started: %s\n", steve->name);
+				
 				BLI_init_threads(&steve->threads, do_job_thread, 1);
 				BLI_insert_thread(&steve->threads, steve);
-
-				// printf("job started: %s\n", steve->name);
 			}
 			
 			/* restarted job has timer already */
@@ -431,8 +459,8 @@ void wm_jobs_timer(const bContext *C, wmWindowManager *wm, wmTimer *wt)
 					steve->run_customdata= NULL;
 					steve->run_free= NULL;
 					
-					//	if(steve->stop) printf("job stopped\n");
-					//	else printf("job finished\n");
+					// if(steve->stop) printf("job ready but stopped %s\n", steve->name);
+					// else printf("job finished %s\n", steve->name);
 
 					steve->running= 0;
 					BLI_end_threads(&steve->threads);
@@ -444,6 +472,7 @@ void wm_jobs_timer(const bContext *C, wmWindowManager *wm, wmTimer *wt)
 					
 					/* new job added for steve? */
 					if(steve->customdata) {
+						// printf("job restarted with new data %s\n", steve->name);
 						WM_jobs_start(wm, steve);
 					}
 					else {

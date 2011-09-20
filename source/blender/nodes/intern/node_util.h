@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,16 +27,39 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/nodes/intern/node_util.h
+ *  \ingroup nodes
+ */
+
+
 #ifndef NODE_UTIL_H_
 #define NODE_UTIL_H_
 
+#include "DNA_listBase.h"
+
+#include "BKE_node.h"
+
 #include "MEM_guardedalloc.h"
+
+#include "NOD_socket.h"
+
+struct bNodeTree;
+struct bNode;
+
+/**** Storage Data ****/
 
 extern void node_free_curves(struct bNode *node);
 extern void node_free_standard_storage(struct bNode *node);
 
 extern void node_copy_curves(struct bNode *orig_node, struct bNode *new_node);
 extern void node_copy_standard_storage(struct bNode *orig_node, struct bNode *new_node);
+
+/**** Labels ****/
+
+const char *node_blend_label(struct bNode *node);
+const char *node_math_label(struct bNode *node);
+const char *node_vect_math_label(struct bNode *node);
+const char *node_filter_label(struct bNode *node);
 
 #endif
 

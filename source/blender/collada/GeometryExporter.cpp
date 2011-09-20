@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -23,6 +23,13 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/collada/GeometryExporter.cpp
+ *  \ingroup collada
+ */
+
+
+#include <sstream>
+
 #include "COLLADASWPrimitves.h"
 #include "COLLADASWSource.h"
 #include "COLLADASWVertices.h"
@@ -37,7 +44,7 @@
 #include "collada_internal.h"
 
 // TODO: optimize UV sets by making indexed list with duplicates removed
-GeometryExporter::GeometryExporter(COLLADASW::StreamWriter *sw) : COLLADASW::LibraryGeometries(sw) {}
+GeometryExporter::GeometryExporter(COLLADASW::StreamWriter *sw, const ExportSettings *export_settings) : COLLADASW::LibraryGeometries(sw), export_settings(export_settings) {}
 
 
 void GeometryExporter::exportGeom(Scene *sce)
@@ -46,7 +53,7 @@ void GeometryExporter::exportGeom(Scene *sce)
 
 	mScene = sce;
 	GeometryFunctor gf;
-	gf.forEachMeshObjectInScene<GeometryExporter>(sce, *this);
+	gf.forEachMeshObjectInScene<GeometryExporter>(sce, *this, this->export_settings->selected);
 
 	closeLibrary();
 }
@@ -92,9 +99,9 @@ void GeometryExporter::operator()(Object *ob)
 
 	// <vertices>
 	COLLADASW::Vertices verts(mSW);
-	verts.setId(getIdBySemantics(geom_id, COLLADASW::VERTEX));
+	verts.setId(getIdBySemantics(geom_id, COLLADASW::InputSemantic::VERTEX));
 	COLLADASW::InputList &input_list = verts.getInputList();
-	COLLADASW::Input input(COLLADASW::POSITION, getUrlBySemantics(geom_id, COLLADASW::POSITION));
+	COLLADASW::Input input(COLLADASW::InputSemantic::POSITION, getUrlBySemantics(geom_id, COLLADASW::InputSemantic::POSITION));
 	input_list.push_back(input);
 	verts.add();
 
@@ -109,6 +116,11 @@ void GeometryExporter::operator()(Object *ob)
 	}
 	
 	closeMesh();
+	
+	if (me->flag & ME_TWOSIDED) {
+		mSW->appendTextBlock("<extra><technique profile=\"MAYA\"><double_sided>1</double_sided></technique></extra>");
+	}
+	
 	closeGeometry();
 	
 #if 0
@@ -117,7 +129,7 @@ void GeometryExporter::operator()(Object *ob)
 }
 
 // powerful because it handles both cases when there is material and when there's not
-void GeometryExporter::createPolylist(int material_index,
+void GeometryExporter::createPolylist(short material_index,
 					bool has_uvs,
 					bool has_color,
 					Object *ob,
@@ -162,16 +174,18 @@ void GeometryExporter::createPolylist(int material_index,
 		
 	// sets material name
 	if (ma) {
-		polylist.setMaterial(translate_id(id_name(ma)));
+		std::ostringstream ostr;
+		ostr << translate_id(id_name(ma)) << material_index+1;
+		polylist.setMaterial(ostr.str());
 	}
 			
 	COLLADASW::InputList &til = polylist.getInputList();
 		
 	// creates <input> in <polylist> for vertices 
-	COLLADASW::Input input1(COLLADASW::VERTEX, getUrlBySemantics(geom_id, COLLADASW::VERTEX), 0);
+	COLLADASW::Input input1(COLLADASW::InputSemantic::VERTEX, getUrlBySemantics(geom_id, COLLADASW::InputSemantic::VERTEX), 0);
 		
 	// creates <input> in <polylist> for normals
-	COLLADASW::Input input2(COLLADASW::NORMAL, getUrlBySemantics(geom_id, COLLADASW::NORMAL), 1);
+	COLLADASW::Input input2(COLLADASW::InputSemantic::NORMAL, getUrlBySemantics(geom_id, COLLADASW::InputSemantic::NORMAL), 1);
 		
 	til.push_back(input1);
 	til.push_back(input2);
@@ -181,7 +195,7 @@ void GeometryExporter::createPolylist(int material_index,
 
 	for (i = 0; i < num_layers; i++) {
 		// char *name = CustomData_get_layer_name(&me->fdata, CD_MTFACE, i);
-		COLLADASW::Input input3(COLLADASW::TEXCOORD,
+		COLLADASW::Input input3(COLLADASW::InputSemantic::TEXCOORD,
 								makeUrl(makeTexcoordSourceId(geom_id, i)),
 								2, // offset always 2, this is only until we have optimized UV sets
 								i  // set number equals UV layer index
@@ -190,7 +204,7 @@ void GeometryExporter::createPolylist(int material_index,
 	}
 
 	if (has_color) {
-		COLLADASW::Input input4(COLLADASW::COLOR, getUrlBySemantics(geom_id, COLLADASW::COLOR), has_uvs ? 3 : 2);
+		COLLADASW::Input input4(COLLADASW::InputSemantic::COLOR, getUrlBySemantics(geom_id, COLLADASW::InputSemantic::COLOR), has_uvs ? 3 : 2);
 		til.push_back(input4);
 	}
 		
@@ -240,8 +254,8 @@ void GeometryExporter::createVertsSource(std::string geom_id, Mesh *me)
 	MVert *verts = me->mvert;
 	
 	COLLADASW::FloatSourceF source(mSW);
-	source.setId(getIdBySemantics(geom_id, COLLADASW::POSITION));
-	source.setArrayId(getIdBySemantics(geom_id, COLLADASW::POSITION) +
+	source.setId(getIdBySemantics(geom_id, COLLADASW::InputSemantic::POSITION));
+	source.setArrayId(getIdBySemantics(geom_id, COLLADASW::InputSemantic::POSITION) +
 					  ARRAY_ID_SUFFIX);
 	source.setAccessorCount(totverts);
 	source.setAccessorStride(3);
@@ -274,8 +288,8 @@ void GeometryExporter::createVertexColorSource(std::string geom_id, Mesh *me)
 		totcolor += f->v4 ? 4 : 3;
 
 	COLLADASW::FloatSourceF source(mSW);
-	source.setId(getIdBySemantics(geom_id, COLLADASW::COLOR));
-	source.setArrayId(getIdBySemantics(geom_id, COLLADASW::COLOR) + ARRAY_ID_SUFFIX);
+	source.setId(getIdBySemantics(geom_id, COLLADASW::InputSemantic::COLOR));
+	source.setArrayId(getIdBySemantics(geom_id, COLLADASW::InputSemantic::COLOR) + ARRAY_ID_SUFFIX);
 	source.setAccessorCount(totcolor);
 	source.setAccessorStride(3);
 
@@ -302,7 +316,7 @@ std::string GeometryExporter::makeTexcoordSourceId(std::string& geom_id, int lay
 {
 	char suffix[20];
 	sprintf(suffix, "-%d", layer_index);
-	return getIdBySemantics(geom_id, COLLADASW::TEXCOORD) + suffix;
+	return getIdBySemantics(geom_id, COLLADASW::InputSemantic::TEXCOORD) + suffix;
 }
 
 //creates <source> for texcoords
@@ -373,8 +387,8 @@ void GeometryExporter::createNormalsSource(std::string geom_id, Mesh *me, std::v
 #endif
 
 	COLLADASW::FloatSourceF source(mSW);
-	source.setId(getIdBySemantics(geom_id, COLLADASW::NORMAL));
-	source.setArrayId(getIdBySemantics(geom_id, COLLADASW::NORMAL) +
+	source.setId(getIdBySemantics(geom_id, COLLADASW::InputSemantic::NORMAL));
+	source.setArrayId(getIdBySemantics(geom_id, COLLADASW::InputSemantic::NORMAL) +
 					  ARRAY_ID_SUFFIX);
 	source.setAccessorCount((unsigned long)nor.size());
 	source.setAccessorStride(3);
@@ -444,12 +458,12 @@ void GeometryExporter::create_normals(std::vector<Normal> &nor, std::vector<Face
 	}
 }
 
-std::string GeometryExporter::getIdBySemantics(std::string geom_id, COLLADASW::Semantics type, std::string other_suffix) {
+std::string GeometryExporter::getIdBySemantics(std::string geom_id, COLLADASW::InputSemantic::Semantics type, std::string other_suffix) {
 	return geom_id + getSuffixBySemantic(type) + other_suffix;
 }
 
 
-COLLADASW::URI GeometryExporter::getUrlBySemantics(std::string geom_id, COLLADASW::Semantics type, std::string other_suffix) {
+COLLADASW::URI GeometryExporter::getUrlBySemantics(std::string geom_id, COLLADASW::InputSemantic::Semantics type, std::string other_suffix) {
 	
 	std::string id(getIdBySemantics(geom_id, type, other_suffix));
 	return COLLADASW::URI(COLLADABU::Utils::EMPTY_STRING, id);

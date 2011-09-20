@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -28,6 +28,11 @@
  * editarmature.c: Interface for creating and posing armature objects
  */
 
+/** \file blender/editors/armature/editarmature_generate.c
+ *  \ingroup edarmature
+ */
+
+
 #include <string.h>
 #include <math.h>
 #include <float.h>
@@ -39,8 +44,9 @@
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
 #include "BLI_graph.h"
+#include "BLI_utildefines.h"
  
-#include "BKE_utildefines.h"
+
 
 #include "ED_armature.h"
 #include "armature_intern.h"

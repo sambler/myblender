@@ -29,6 +29,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/render/intern/include/rendercore.h
+ *  \ingroup render
+ */
+
+
 #ifndef RENDERCORE_H
 #define RENDERCORE_H 
 
@@ -48,6 +53,7 @@ struct RenderPart;
 struct RenderLayer;
 struct ObjectRen;
 struct ListBase;
+struct RayObject;
 
 /* ------------------------------------------------------------------------- */
 
@@ -75,8 +81,8 @@ float   mistfactor(float zcor, float *co);	/* dist and height, return alpha */
 void	renderspothalo(struct ShadeInput *shi, float *col, float alpha);
 void	add_halo_flare(Render *re);
 
-void calc_renderco_zbuf(float *co, float *view, int z);
-void calc_renderco_ortho(float *co, float x, float y, int z);
+void calc_renderco_zbuf(float co[3], float *view, int z);
+void calc_renderco_ortho(float co[3], float x, float y, int z);
 
 int count_mask(unsigned short mask);
 
@@ -95,7 +101,7 @@ int get_sample_layers(struct RenderPart *pa, struct RenderLayer *rl, struct Rend
 
 extern void freeraytree(Render *re);
 extern void makeraytree(Render *re);
-RayObject* makeraytree_object(Render *re, ObjectInstanceRen *obi);
+struct RayObject* makeraytree_object(Render *re, ObjectInstanceRen *obi);
 
 extern void ray_shadow(ShadeInput *, LampRen *, float *);
 extern void ray_trace(ShadeInput *, ShadeResult *);

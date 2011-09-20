@@ -1,4 +1,4 @@
-/**
+/*
  * Sensor for mouse input
  *
  *
@@ -30,6 +30,13 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file gameengine/GameLogic/SCA_MouseSensor.cpp
+ *  \ingroup gamelogic
+ */
+
+
+#include <stddef.h>
+
 #include "SCA_MouseSensor.h"
 #include "SCA_EventManager.h"
 #include "SCA_MouseManager.h"
@@ -43,12 +50,12 @@
 /* ------------------------------------------------------------------------- */
 
 SCA_MouseSensor::SCA_MouseSensor(SCA_MouseManager* eventmgr, 
-								 int startx,int starty,
-								 short int mousemode,
-								 SCA_IObject* gameobj)
+                                 int startx,int starty,
+                                 short int mousemode,
+                                 SCA_IObject* gameobj)
     : SCA_ISensor(gameobj,eventmgr),
-	m_x(startx),
-	m_y(starty)
+      m_x(startx),
+      m_y(starty)
 {
 	m_mousemode   = mousemode;
 	m_triggermode = true;
@@ -65,7 +72,7 @@ void SCA_MouseSensor::Init()
 
 SCA_MouseSensor::~SCA_MouseSensor() 
 {
-    /* Nothing to be done here. */
+	/* Nothing to be done here. */
 }
 
 void SCA_MouseSensor::UpdateHotkey(void *self)

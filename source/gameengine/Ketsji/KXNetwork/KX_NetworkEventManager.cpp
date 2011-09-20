@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
  * Ketsji Logic Extenstion: Network Event Manager generic implementation
  */
+
+/** \file gameengine/Ketsji/KXNetwork/KX_NetworkEventManager.cpp
+ *  \ingroup ketsjinet
+ */
+
 
 // Ketsji specific sensor part
 #include "SCA_ISensor.h"
@@ -61,8 +66,8 @@ void KX_NetworkEventManager::NextFrame()
 	for (it.begin();!it.end();++it)
 	{
 //	    printf("KX_NetworkEventManager::proceed sensor %.2f\n", curtime);
-	    // process queue
-	    (*it)->Activate(m_logicmgr);
+		// process queue
+		(*it)->Activate(m_logicmgr);
 	}
 
 	// now a list of triggerer sensors has been built

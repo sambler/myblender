@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/render/intern/source/occlusion.c
+ *  \ingroup render
+ */
+
+
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -40,10 +45,11 @@
 #include "BLI_blenlib.h"
 #include "BLI_memarena.h"
 #include "BLI_threads.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_global.h"
 #include "BKE_scene.h"
-#include "BKE_utildefines.h"
+
 
 #include "RE_shader_ext.h"
 
@@ -188,6 +194,7 @@ static void occ_shade(ShadeSample *ssamp, ObjectInstanceRen *obi, VlakRen *vlr, 
 	if(shi->obr->ob && shi->obr->ob->transflag & OB_NEG_SCALE) {
 		negate_v3(shi->vn);
 		negate_v3(shi->vno);
+		negate_v3(shi->nmapnorm);
 	}
 
 	/* init material vars */
@@ -304,7 +311,7 @@ static float sh_eval(float *sh, float *v)
 
 /* ------------------------------ Building --------------------------------- */
 
-static void occ_face(const OccFace *face, float *co, float *normal, float *area)
+static void occ_face(const OccFace *face, float co[3], float normal[3], float *area)
 {
 	ObjectInstanceRen *obi;
 	VlakRen *vlr;
@@ -421,20 +428,22 @@ static void occ_node_from_face(OccFace *face, OccNode *node)
 	sh_from_disc(n, node->area, node->sh);
 }
 
-static void occ_build_dco(OcclusionTree *tree, OccNode *node, float *co, float *dco)
+static void occ_build_dco(OcclusionTree *tree, OccNode *node, const float co[3], float *dco)
 {
-	OccNode *child;
-	float dist, d[3], nco[3];
 	int b;
-
 	for(b=0; b<TOTCHILD; b++) {
+		float dist, d[3], nco[3];
+
 		if(node->childflag & (1<<b)) {
-			occ_face(tree->face+node->child[b].face, nco, 0, 0);
+			occ_face(tree->face+node->child[b].face, nco, NULL, NULL);
 		}
 		else if(node->child[b].node) {
-			child= node->child[b].node;
+			OccNode *child= node->child[b].node;
 			occ_build_dco(tree, child, co, dco);
 			VECCOPY(nco, child->co);
+		}
+		else {
+			continue;
 		}
 
 		VECSUB(d, nco, co);
@@ -521,7 +530,7 @@ static void occ_build_recursive(OcclusionTree *tree, OccNode *node, int begin, i
 	ListBase threads;
 	OcclusionBuildThread othreads[BLENDER_MAX_THREADS];
 	OccNode *child, tmpnode;
-	OccFace *face;
+	/* OccFace *face; */
 	int a, b, totthread=0, offset[TOTCHILD], count[TOTCHILD];
 
 	/* add a new node */
@@ -530,7 +539,7 @@ static void occ_build_recursive(OcclusionTree *tree, OccNode *node, int begin, i
 	/* leaf node with only children */
 	if(end - begin <= TOTCHILD) {
 		for(a=begin, b=0; a<end; a++, b++) {
-			face= &tree->face[a];
+			/* face= &tree->face[a]; */
 			node->child[b].face= a;
 			node->childflag |= (1<<b);
 		}
@@ -547,7 +556,7 @@ static void occ_build_recursive(OcclusionTree *tree, OccNode *node, int begin, i
 				node->child[b].node= NULL;
 			}
 			else if(count[b] == 1) {
-				face= &tree->face[offset[b]];
+				/* face= &tree->face[offset[b]]; */
 				node->child[b].face= offset[b];
 				node->childflag |= (1<<b);
 			}
@@ -605,7 +614,8 @@ static void occ_build_recursive(OcclusionTree *tree, OccNode *node, int begin, i
 
 	/* compute maximum distance from center */
 	node->dco= 0.0f;
-	occ_build_dco(tree, node, node->co, &node->dco);
+	if(node->area > 0.0f)
+		occ_build_dco(tree, node, node->co, &node->dco);
 }
 
 static void occ_build_sh_normalize(OccNode *node)
@@ -1404,7 +1414,7 @@ static void sample_occ_tree(Render *re, OcclusionTree *tree, OccFace *exclude, f
 	if(env) {
 		/* sky shading using bent normal */
 		if(ELEM(envcolor, WO_AOSKYCOL, WO_AOSKYTEX)) {
-			fac= 0.5*(1.0f+bn[0]*re->grvec[0]+ bn[1]*re->grvec[1]+ bn[2]*re->grvec[2]);
+			fac= 0.5f*(1.0f+bn[0]*re->grvec[0]+ bn[1]*re->grvec[1]+ bn[2]*re->grvec[2]);
 			env[0]= (1.0f-fac)*re->wrld.horr + fac*re->wrld.zenr;
 			env[1]= (1.0f-fac)*re->wrld.horg + fac*re->wrld.zeng;
 			env[2]= (1.0f-fac)*re->wrld.horb + fac*re->wrld.zenb;
@@ -1526,7 +1536,7 @@ static int sample_occ_cache(OcclusionTree *tree, float *co, float *n, int x, int
 
 	for(i=0; i<4; i++) {
 		VECSUB(d, samples[i]->co, co);
-		dist2= INPR(d, d);
+		//dist2= INPR(d, d);
 
 		wz[i]= 1.0f; //(samples[i]->dist2/(1e-4f + dist2));
 		wn[i]= pow(INPR(samples[i]->n, n), 32.0f);
@@ -1767,11 +1777,11 @@ void sample_occ(Render *re, ShadeInput *shi)
 
 				if(cache->sample && cache->step) {
 					sample= &cache->sample[(shi->ys-cache->y)*cache->w + (shi->xs-cache->x)];
-					VECCOPY(sample->co, shi->co);
-					VECCOPY(sample->n, shi->vno);
-					VECCOPY(sample->ao, shi->ao);
-					VECCOPY(sample->env, shi->env);
-					VECCOPY(sample->indirect, shi->indirect);
+					copy_v3_v3(sample->co, shi->co);
+					copy_v3_v3(sample->n, shi->vno);
+					copy_v3_v3(sample->ao, shi->ao);
+					copy_v3_v3(sample->env, shi->env);
+					copy_v3_v3(sample->indirect, shi->indirect);
 					sample->intensity= MAX3(sample->ao[0], sample->ao[1], sample->ao[2]);
 					sample->intensity= MAX2(sample->intensity, MAX3(sample->env[0], sample->env[1], sample->env[2]));
 					sample->intensity= MAX2(sample->intensity, MAX3(sample->indirect[0], sample->indirect[1], sample->indirect[2]));
@@ -1862,11 +1872,11 @@ void cache_occ_samples(Render *re, RenderPart *pa, ShadeSample *ssamp)
 				exclude.facenr= shi->vlr->index;
 				sample_occ_tree(re, tree, &exclude, shi->co, shi->vno, shi->thread, onlyshadow, shi->ao, shi->env, shi->indirect);
 
-				VECCOPY(sample->co, shi->co);
-				VECCOPY(sample->n, shi->vno);
-				VECCOPY(sample->ao, shi->ao);
-				VECCOPY(sample->env, shi->env);
-				VECCOPY(sample->indirect, shi->indirect);
+				copy_v3_v3(sample->co, shi->co);
+				copy_v3_v3(sample->n, shi->vno);
+				copy_v3_v3(sample->ao, shi->ao);
+				copy_v3_v3(sample->env, shi->env);
+				copy_v3_v3(sample->indirect, shi->indirect);
 				sample->intensity= MAX3(sample->ao[0], sample->ao[1], sample->ao[2]);
 				sample->intensity= MAX2(sample->intensity, MAX3(sample->env[0], sample->env[1], sample->env[2]));
 				sample->intensity= MAX2(sample->intensity, MAX3(sample->indirect[0], sample->indirect[1], sample->indirect[2]));

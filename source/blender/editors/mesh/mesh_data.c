@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/mesh/mesh_data.c
+ *  \ingroup edmesh
+ */
+
+
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -38,6 +43,11 @@
 #include "DNA_scene_types.h"
 #include "DNA_view3d_types.h"
 
+#include "BLI_math.h"
+#include "BLI_editVert.h"
+#include "BLI_edgehash.h"
+#include "BLI_utildefines.h"
+
 #include "BKE_context.h"
 #include "BKE_depsgraph.h"
 #include "BKE_displist.h"
@@ -46,10 +56,6 @@
 #include "BKE_material.h"
 #include "BKE_mesh.h"
 #include "BKE_report.h"
-
-#include "BLI_math.h"
-#include "BLI_editVert.h"
-#include "BLI_edgehash.h"
 
 #include "RNA_access.h"
 #include "RNA_define.h"
@@ -157,6 +163,17 @@ static void delete_customdata_layer(bContext *C, Object *ob, CustomDataLayer *la
 	}
 }
 
+static void copy_editface_active_customdata(EditMesh *em, int type, int index)
+{
+	EditFace *efa;
+	int n= CustomData_get_active_layer(&em->fdata, type);
+
+	for(efa= em->faces.first; efa; efa= efa->next) {
+		void *data= CustomData_em_get_n(&em->fdata, efa->data, type, n);
+		CustomData_em_set_n(&em->fdata, efa->data, type, index, data);
+	}
+}
+
 int ED_mesh_uv_texture_add(bContext *C, Mesh *me, const char *name, int active_set)
 {
 	EditMesh *em;
@@ -170,6 +187,10 @@ int ED_mesh_uv_texture_add(bContext *C, Mesh *me, const char *name, int active_s
 			return 0;
 
 		EM_add_data_layer(em, &em->fdata, CD_MTFACE, name);
+
+		if(layernum) /* copy data from active UV */
+			copy_editface_active_customdata(em, CD_MTFACE, layernum);
+
 		if(active_set || layernum==0)
 			CustomData_set_layer_active(&em->fdata, CD_MTFACE, layernum);
 	}
@@ -189,7 +210,7 @@ int ED_mesh_uv_texture_add(bContext *C, Mesh *me, const char *name, int active_s
 		mesh_update_customdata_pointers(me);
 	}
 
-	DAG_id_tag_update(&me->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&me->id, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, me);
 
 	return 1;
@@ -208,16 +229,15 @@ int ED_mesh_uv_texture_remove(bContext *C, Object *ob, Mesh *me)
 		return 0;
 
 	delete_customdata_layer(C, ob, cdl);
-	DAG_id_tag_update(&me->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&me->id, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, me);
 
 	return 1;
 }
 
-int ED_mesh_color_add(bContext *C, Scene *scene, Object *ob, Mesh *me, const char *name, int active_set)
+int ED_mesh_color_add(bContext *C, Scene *UNUSED(scene), Object *UNUSED(ob), Mesh *me, const char *name, int active_set)
 {
 	EditMesh *em;
-	MCol *mcol;
 	int layernum;
 
 	if(me->edit_mesh) {
@@ -228,6 +248,10 @@ int ED_mesh_color_add(bContext *C, Scene *scene, Object *ob, Mesh *me, const cha
 			return 0;
 
 		EM_add_data_layer(em, &em->fdata, CD_MCOL, name);
+
+		if(layernum) /* copy data from active vertex color layer */
+			copy_editface_active_customdata(em, CD_MCOL, layernum);
+
 		if(active_set || layernum==0)
 			CustomData_set_layer_active(&em->fdata, CD_MCOL, layernum);
 	}
@@ -235,8 +259,6 @@ int ED_mesh_color_add(bContext *C, Scene *scene, Object *ob, Mesh *me, const cha
 		layernum= CustomData_number_of_layers(&me->fdata, CD_MCOL);
 		if(layernum >= MAX_MCOL)
 			return 0;
-
-		mcol= me->mcol;
 
 		if(me->mcol)
 			CustomData_add_layer_named(&me->fdata, CD_MCOL, CD_DUPLICATE, me->mcol, me->totface, name);
@@ -247,12 +269,9 @@ int ED_mesh_color_add(bContext *C, Scene *scene, Object *ob, Mesh *me, const cha
 			CustomData_set_layer_active(&me->fdata, CD_MCOL, layernum);
 
 		mesh_update_customdata_pointers(me);
-
-		if(!mcol)
-			shadeMeshMCol(scene, ob, me);
 	}
 
-	DAG_id_tag_update(&me->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&me->id, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, me);
 
 	return 1;
@@ -271,7 +290,7 @@ int ED_mesh_color_remove(bContext *C, Object *ob, Mesh *me)
 		return 0;
 
 	delete_customdata_layer(C, ob, cdl);
-	DAG_id_tag_update(&me->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&me->id, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, me);
 
 	return 1;
@@ -315,6 +334,7 @@ void MESH_OT_uv_texture_add(wmOperatorType *ot)
 static int drop_named_image_invoke(bContext *C, wmOperator *op, wmEvent *event)
 {
 	Scene *scene= CTX_data_scene(C);
+	View3D *v3d= CTX_wm_view3d(C);
 	Base *base= ED_view3d_give_base_under_cursor(C, event->mval);
 	Image *ima= NULL;
 	Mesh *me;
@@ -341,7 +361,7 @@ static int drop_named_image_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	}
 	
 	if(!ima) {
-		BKE_report(op->reports, RPT_ERROR, "Not an Image.");
+		BKE_report(op->reports, RPT_ERROR, "Not an Image");
 		return OPERATOR_CANCELLED;
 	}
 	
@@ -366,6 +386,10 @@ static int drop_named_image_invoke(bContext *C, wmOperator *op, wmEvent *event)
 		me->edit_mesh= NULL;
 	}
 
+	/* dummie drop support; ensure view shows a result :) */
+	if(v3d)
+		v3d->flag2 |= V3D_SOLID_TEX;
+	
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
 	
 	return OPERATOR_FINISHED;
@@ -386,7 +410,7 @@ void MESH_OT_drop_named_image(wmOperatorType *ot)
 	ot->flag= OPTYPE_UNDO;
 	
 	/* properties */
-	RNA_def_string(ot->srna, "name", "Image", 24, "Name", "Image name to assign.");
+	RNA_def_string(ot->srna, "name", "Image", 24, "Name", "Image name to assign");
 	RNA_def_string(ot->srna, "filepath", "Path", FILE_MAX, "Filepath", "Path to image file");
 }
 
@@ -485,7 +509,7 @@ static int sticky_add_exec(bContext *C, wmOperator *UNUSED(op))
 
 	RE_make_sticky(scene, v3d);
 
-	DAG_id_tag_update(&me->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&me->id, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, me);
 
 	return OPERATOR_FINISHED;
@@ -517,7 +541,7 @@ static int sticky_remove_exec(bContext *C, wmOperator *UNUSED(op))
 	CustomData_free_layer_active(&me->vdata, CD_MSTICKY, me->totvert);
 	me->msticky= NULL;
 
-	DAG_id_tag_update(&me->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&me->id, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, me);
 
 	return OPERATOR_FINISHED;
@@ -540,81 +564,14 @@ void MESH_OT_sticky_remove(wmOperatorType *ot)
 
 /************************** Add Geometry Layers *************************/
 
-static void mesh_calc_edges(Mesh *mesh, int update)
-{
-	CustomData edata;
-	EdgeHashIterator *ehi;
-	MFace *mf = mesh->mface;
-	MEdge *med, *med_orig;
-	EdgeHash *eh = BLI_edgehash_new();
-	int i, totedge, totface = mesh->totface;
-
-	if(mesh->totedge==0)
-		update= 0;
-
-	if(update) {
-		/* assume existing edges are valid
-		 * useful when adding more faces and generating edges from them */
-		med= mesh->medge;
-		for(i= 0; i<mesh->totedge; i++, med++)
-			BLI_edgehash_insert(eh, med->v1, med->v2, med);
-	}
-
-	for (i = 0; i < totface; i++, mf++) {
-		if (!BLI_edgehash_haskey(eh, mf->v1, mf->v2))
-			BLI_edgehash_insert(eh, mf->v1, mf->v2, NULL);
-		if (!BLI_edgehash_haskey(eh, mf->v2, mf->v3))
-			BLI_edgehash_insert(eh, mf->v2, mf->v3, NULL);
-		
-		if (mf->v4) {
-			if (!BLI_edgehash_haskey(eh, mf->v3, mf->v4))
-				BLI_edgehash_insert(eh, mf->v3, mf->v4, NULL);
-			if (!BLI_edgehash_haskey(eh, mf->v4, mf->v1))
-				BLI_edgehash_insert(eh, mf->v4, mf->v1, NULL);
-		} else {
-			if (!BLI_edgehash_haskey(eh, mf->v3, mf->v1))
-				BLI_edgehash_insert(eh, mf->v3, mf->v1, NULL);
-		}
-	}
-
-	totedge = BLI_edgehash_size(eh);
-
-	/* write new edges into a temporary CustomData */
-	memset(&edata, 0, sizeof(edata));
-	CustomData_add_layer(&edata, CD_MEDGE, CD_CALLOC, NULL, totedge);
-
-	ehi = BLI_edgehashIterator_new(eh);
-	med = CustomData_get_layer(&edata, CD_MEDGE);
-	for(i = 0; !BLI_edgehashIterator_isDone(ehi);
-		BLI_edgehashIterator_step(ehi), ++i, ++med) {
-
-		if(update && (med_orig=BLI_edgehashIterator_getValue(ehi))) {
-			*med= *med_orig; /* copy from the original */
-		} else {
-			BLI_edgehashIterator_getKey(ehi, (int*)&med->v1, (int*)&med->v2);
-			med->flag = ME_EDGEDRAW|ME_EDGERENDER;
-		}
-	}
-	BLI_edgehashIterator_free(ehi);
-
-	/* free old CustomData and assign new one */
-	CustomData_free(&mesh->edata, mesh->totedge);
-	mesh->edata = edata;
-	mesh->totedge = totedge;
-
-	mesh->medge = CustomData_get_layer(&mesh->edata, CD_MEDGE);
-
-	BLI_edgehash_free(eh, NULL);
-}
-
 void ED_mesh_update(Mesh *mesh, bContext *C, int calc_edges)
 {
 	if(calc_edges || (mesh->totface && mesh->totedge == 0))
-		mesh_calc_edges(mesh, calc_edges);
+		BKE_mesh_calc_edges(mesh, calc_edges);
 
 	mesh_calc_normals(mesh->mvert, mesh->totvert, mesh->mface, mesh->totface, NULL);
 
-	DAG_id_tag_update(&mesh->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&mesh->id, 0);
 	WM_event_add_notifier(C, NC_GEOM|ND_DATA, mesh);
 }
 
@@ -723,7 +680,7 @@ static void mesh_add_faces(Mesh *mesh, int len)
 void ED_mesh_geometry_add(Mesh *mesh, ReportList *reports, int verts, int edges, int faces)
 {
 	if(mesh->edit_mesh) {
-		BKE_report(reports, RPT_ERROR, "Can't add geometry in edit mode.");
+		BKE_report(reports, RPT_ERROR, "Can't add geometry in edit mode");
 		return;
 	}
 
@@ -739,7 +696,7 @@ void ED_mesh_geometry_add(Mesh *mesh, ReportList *reports, int verts, int edges,
 void ED_mesh_faces_add(Mesh *mesh, ReportList *reports, int count)
 {
 	if(mesh->edit_mesh) {
-		BKE_report(reports, RPT_ERROR, "Can't add faces in edit mode.");
+		BKE_report(reports, RPT_ERROR, "Can't add faces in edit mode");
 		return;
 	}
 
@@ -749,7 +706,7 @@ void ED_mesh_faces_add(Mesh *mesh, ReportList *reports, int count)
 void ED_mesh_edges_add(Mesh *mesh, ReportList *reports, int count)
 {
 	if(mesh->edit_mesh) {
-		BKE_report(reports, RPT_ERROR, "Can't add edges in edit mode.");
+		BKE_report(reports, RPT_ERROR, "Can't add edges in edit mode");
 		return;
 	}
 
@@ -759,7 +716,7 @@ void ED_mesh_edges_add(Mesh *mesh, ReportList *reports, int count)
 void ED_mesh_vertices_add(Mesh *mesh, ReportList *reports, int count)
 {
 	if(mesh->edit_mesh) {
-		BKE_report(reports, RPT_ERROR, "Can't add vertices in edit mode.");
+		BKE_report(reports, RPT_ERROR, "Can't add vertices in edit mode");
 		return;
 	}
 

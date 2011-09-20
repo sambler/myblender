@@ -1,6 +1,4 @@
-/**
- * $Id$
- *
+/*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -25,6 +23,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/blenkernel/intern/armature.c
+ *  \ingroup bke
+ */
+
+
 #include <ctype.h>
 #include <stdlib.h>
 #include <math.h>
@@ -36,6 +39,7 @@
 
 #include "BLI_math.h"
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 
 #include "DNA_anim_types.h"
 #include "DNA_armature_types.h"
@@ -63,7 +67,7 @@
 #include "BKE_lattice.h"
 #include "BKE_main.h"
 #include "BKE_object.h"
-#include "BKE_utildefines.h"
+
 #include "BIK_api.h"
 #include "BKE_sketch.h"
 
@@ -131,39 +135,42 @@ void free_armature(bArmature *arm)
 
 void make_local_armature(bArmature *arm)
 {
+	Main *bmain= G.main;
 	int local=0, lib=0;
 	Object *ob;
-	bArmature *newArm;
-	
-	if (arm->id.lib==0)
-		return;
+
+	if (arm->id.lib==NULL) return;
 	if (arm->id.us==1) {
-		arm->id.lib= 0;
+		arm->id.lib= NULL;
 		arm->id.flag= LIB_LOCAL;
-		new_id(0, (ID*)arm, 0);
+		new_id(&bmain->armature, (ID*)arm, NULL);
 		return;
 	}
-	
+
+	for(ob= bmain->object.first; ob && ELEM(0, lib, local); ob= ob->id.next) {
+		if(ob->data == arm) {
+			if(ob->id.lib) lib= 1;
+			else local= 1;
+		}
+	}
+
 	if(local && lib==0) {
-		arm->id.lib= 0;
+		arm->id.lib= NULL;
 		arm->id.flag= LIB_LOCAL;
-		new_id(0, (ID *)arm, 0);
+		new_id(&bmain->armature, (ID *)arm, NULL);
 	}
 	else if(local && lib) {
-		newArm= copy_armature(arm);
-		newArm->id.us= 0;
+		bArmature *armn= copy_armature(arm);
+		armn->id.us= 0;
 		
-		ob= G.main->object.first;
-		while(ob) {
-			if(ob->data==arm) {
-				
-				if(ob->id.lib==0) {
-					ob->data= newArm;
-					newArm->id.us++;
+		for(ob= bmain->object.first; ob; ob= ob->id.next) {
+			if(ob->data == arm) {
+				if(ob->id.lib==NULL) {
+					ob->data= armn;
+					armn->id.us++;
 					arm->id.us--;
 				}
 			}
-			ob= ob->id.next;
 		}
 	}
 }
@@ -208,6 +215,11 @@ bArmature *copy_armature(bArmature *arm)
 	};
 	
 	newArm->act_bone= newActBone;
+
+	newArm->edbo= NULL;
+	newArm->act_edbone= NULL;
+	newArm->sketch= NULL;
+
 	return newArm;
 }
 
@@ -247,16 +259,15 @@ Bone *get_named_bone (bArmature *arm, const char *name)
 }
 
 /* Finds the best possible extension to the name on a particular axis. (For renaming, check for unique names afterwards)
- * This assumes that bone names are at most 32 chars long!
  * 	strip_number: removes number extensions  (TODO: not used)
  *	axis: the axis to name on
  *	head/tail: the head/tail co-ordinate of the bone on the specified axis
  */
-int bone_autoside_name (char *name, int UNUSED(strip_number), short axis, float head, float tail)
+int bone_autoside_name (char name[MAXBONENAME], int UNUSED(strip_number), short axis, float head, float tail)
 {
 	unsigned int len;
-	char	basename[32]={""};
-	char 	extension[5]={""};
+	char	basename[MAXBONENAME]= "";
+	char 	extension[5]= "";
 
 	len= strlen(name);
 	if (len == 0) return 0;
@@ -349,13 +360,13 @@ int bone_autoside_name (char *name, int UNUSED(strip_number), short axis, float 
 				}
 			}
 		}
-		
-		if ((32 - len) < strlen(extension) + 1) { /* add 1 for the '.' */
+
+		if ((MAXBONENAME - len) < strlen(extension) + 1) { /* add 1 for the '.' */
 			strncpy(name, basename, len-strlen(extension));
 		}
-		
-		sprintf(name, "%s.%s", basename, extension);
-		
+
+		BLI_snprintf(name, MAXBONENAME, "%s.%s", basename, extension);
+
 		return 1;
 	}
 
@@ -433,7 +444,7 @@ Mat4 *b_bone_spline_setup(bPoseChannel *pchan, int rest)
 		scale[1]= len_v3(pchan->pose_mat[1]);
 		scale[2]= len_v3(pchan->pose_mat[2]);
 
-		if(fabs(scale[0] - scale[1]) > 1e-6f || fabs(scale[1] - scale[2]) > 1e-6f) {
+		if(fabsf(scale[0] - scale[1]) > 1e-6f || fabsf(scale[1] - scale[2]) > 1e-6f) {
 			unit_m4(scalemat);
 			scalemat[0][0]= scale[0];
 			scalemat[1][1]= scale[1];
@@ -729,11 +740,11 @@ static float dist_bone_deform(bPoseChannel *pchan, bPoseChanDeform *pdef_info, f
 
 	fac= distfactor_to_bone(cop, bone->arm_head, bone->arm_tail, bone->rad_head, bone->rad_tail, bone->dist);
 	
-	if (fac>0.0) {
+	if (fac > 0.0f) {
 		
 		fac*=bone->weight;
 		contrib= fac;
-		if(contrib>0.0) {
+		if(contrib > 0.0f) {
 			if(vec) {
 				if(bone->segments>1)
 					// applies on cop and bbonemat
@@ -936,19 +947,15 @@ void armature_deform_verts(Object *armOb, Object *target, DerivedMesh *dm,
 			dvert = NULL;
 
 		if(armature_def_nr >= 0 && dvert) {
-			armature_weight = 0.0f; /* a def group was given, so default to 0 */
-			for(j = 0; j < dvert->totweight; j++) {
-				if(dvert->dw[j].def_nr == armature_def_nr) {
-					armature_weight = dvert->dw[j].weight;
-					break;
-				}
+			armature_weight= defvert_find_weight(dvert, armature_def_nr);
+
+			if(invert_vgroup) {
+				armature_weight= 1.0f-armature_weight;
 			}
+
 			/* hackish: the blending factor can be used for blending with prevCos too */
 			if(prevCos) {
-				if(invert_vgroup)
-					prevco_weight= 1.0f-armature_weight;
-				else
-					prevco_weight= armature_weight;
+				prevco_weight= armature_weight;
 				armature_weight= 1.0f;
 			}
 		}
@@ -1225,10 +1232,10 @@ void pchan_apply_mat4(bPoseChannel *pchan, float mat[][4], short use_compat)
  */
 void armature_mat_pose_to_delta(float delta_mat[][4], float pose_mat[][4], float arm_mat[][4])
 {
-	 float imat[4][4];
- 
-	 invert_m4_m4(imat, arm_mat);
-	 mul_m4_m4m4(delta_mat, pose_mat, imat);
+	float imat[4][4];
+	
+	invert_m4_m4(imat, arm_mat);
+	mul_m4_m4m4(delta_mat, pose_mat, imat);
 }
 
 /* **************** Rotation Mode Conversions ****************************** */
@@ -1276,7 +1283,7 @@ void BKE_rotMode_change_values (float quat[4], float eul[3], float axis[3], floa
 		}
 		
 		/* when converting to axis-angle, we need a special exception for the case when there is no axis */
-		if (IS_EQ(axis[0], axis[1]) && IS_EQ(axis[1], axis[2])) {
+		if (IS_EQF(axis[0], axis[1]) && IS_EQF(axis[1], axis[2])) {
 			/* for now, rotate around y-axis then (so that it simply becomes the roll) */
 			axis[1]= 1.0f;
 		}
@@ -1334,8 +1341,12 @@ void vec_roll_to_mat3(float *vec, float roll, float mat[][3])
 	cross_v3_v3v3(axis,target,nor);
 
 	/* was 0.0000000000001, caused bug [#23954], smaller values give unstable
-	 * roll when toggling editmode */
-	if (dot_v3v3(axis,axis) > 0.00001) {
+	 * roll when toggling editmode.
+	 *
+	 * was 0.00001, causes bug [#27675], with 0.00000495,
+	 * so a value inbetween these is needed.
+	 */
+	if (dot_v3v3(axis,axis) > 0.000001f) {
 		/* if nor is *not* a multiple of target ... */
 		normalize_v3(axis);
 		
@@ -1378,7 +1389,7 @@ void where_is_armature_bone(Bone *bone, Bone *prevbone)
 	bone->length= len_v3v3(bone->head, bone->tail);
 	
 	/* this is called on old file reading too... */
-	if(bone->xwidth==0.0) {
+	if(bone->xwidth==0.0f) {
 		bone->xwidth= 0.1f;
 		bone->zwidth= 0.1f;
 		bone->segments= 1;
@@ -1403,13 +1414,6 @@ void where_is_armature_bone(Bone *bone, Bone *prevbone)
 		copy_m4_m3(bone->arm_mat, bone->bone_mat);
 		VECCOPY(bone->arm_mat[3], bone->head);
 	}
-	
-	/* head */
-	VECCOPY(bone->arm_head, bone->arm_mat[3]);
-	/* tail is in current local coord system */
-	VECCOPY(vec, bone->arm_mat[1]);
-	mul_v3_fl(vec, bone->length);
-	add_v3_v3v3(bone->arm_tail, bone->arm_head, vec);
 	
 	/* and the kiddies */
 	prevbone= bone;
@@ -1479,7 +1483,6 @@ static void pose_proxy_synchronize(Object *ob, Object *from, int layer_protected
 			pchanw.next= pchan->next;
 			pchanw.parent= pchan->parent;
 			pchanw.child= pchan->child;
-			pchanw.path= NULL;
 			
 			/* this is freed so copy a copy, else undo crashes */
 			if(pchanw.prop) {
@@ -1500,7 +1503,7 @@ static void pose_proxy_synchronize(Object *ob, Object *from, int layer_protected
 			 */
 			extract_proxylocal_constraints(&proxylocal_constraints, &pchan->constraints);
 			copy_constraints(&pchanw.constraints, &pchanp->constraints, FALSE);
-			addlisttolist(&pchanw.constraints, &proxylocal_constraints);
+			BLI_movelisttolist(&pchanw.constraints, &proxylocal_constraints);
 			
 			/* constraints - set target ob pointer to own object */
 			for (con= pchanw.constraints.first; con; con= con->next) {
@@ -1976,12 +1979,12 @@ static void splineik_evaluate_bone(tSplineIK_Tree *tree, Scene *scene, Object *o
 				/* calculate volume preservation factor which is 
 				 * basically the inverse of the y-scaling factor 
 				 */
-				if (fabs(scaleFac) != 0.0f) {
-					scale= 1.0 / fabs(scaleFac);
+				if (fabsf(scaleFac) != 0.0f) {
+					scale= 1.0f / fabsf(scaleFac);
 					
 					/* we need to clamp this within sensible values */
 					// NOTE: these should be fine for now, but should get sanitised in future
-					scale= MIN2(MAX2(scale, 0.0001) , 100000);
+					CLAMP(scale, 0.0001f, 100000.0f);
 				}
 				else
 					scale= 1.0f;
@@ -2111,7 +2114,7 @@ void pchan_to_mat4(bPoseChannel *pchan, float chan_mat[4][4])
 
 /* loc/rot/size to mat4 */
 /* used in constraint.c too */
-void chan_calc_mat(bPoseChannel *pchan)
+void pchan_calc_mat(bPoseChannel *pchan)
 {
 	/* this is just a wrapper around the copy of this function which calculates the matrix 
 	 * and stores the result in any given channel
@@ -2267,7 +2270,7 @@ void where_is_pose_bone(Scene *scene, Object *ob, bPoseChannel *pchan, float cti
 	parchan= pchan->parent;
 	
 	/* this gives a chan_mat with actions (ipos) results */
-	if(do_extra)	chan_calc_mat(pchan);
+	if(do_extra)	pchan_calc_mat(pchan);
 	else			unit_m4(pchan->chan_mat);
 
 	/* construct the posemat based on PoseChannels, that we do before applying constraints */
@@ -2460,4 +2463,34 @@ void where_is_pose (Scene *scene, Object *ob)
 			mul_m4_m4m4(pchan->chan_mat, imat, pchan->pose_mat);
 		}
 	}
+}
+
+
+/* Returns total selected vgroups,
+ * wpi.defbase_sel is assumed malloc'd, all values are set */
+int get_selected_defgroups(Object *ob, char *dg_selection, int defbase_len)
+{
+	bDeformGroup *defgroup;
+	unsigned int i;
+	Object *armob= object_pose_armature_get(ob);
+	int dg_flags_sel_tot= 0;
+
+	if(armob) {
+		bPose *pose= armob->pose;
+		for (i= 0, defgroup= ob->defbase.first; i < defbase_len && defgroup; defgroup = defgroup->next, i++) {
+			bPoseChannel *pchan= get_pose_channel(pose, defgroup->name);
+			if(pchan && (pchan->bone->flag & BONE_SELECTED)) {
+				dg_selection[i]= TRUE;
+				dg_flags_sel_tot++;
+			}
+			else {
+				dg_selection[i]= FALSE;
+			}
+		}
+	}
+	else {
+		memset(dg_selection, FALSE, sizeof(char) * defbase_len);
+	}
+
+	return dg_flags_sel_tot;
 }

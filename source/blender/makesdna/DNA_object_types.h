@@ -1,8 +1,4 @@
-/**
- * blenlib/DNA_object_types.h (mar-2001 nzc)
- *	
- * Object is a sort of wrapper for general info.
- *
+/*
  * $Id$ 
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -33,6 +29,11 @@
 #ifndef DNA_OBJECT_TYPES_H
 #define DNA_OBJECT_TYPES_H
 
+/** \file DNA_object_types.h
+ *  \ingroup DNA
+ *  \brief Object is a sort of wrapper for general info.
+ */
+
 #include "DNA_listBase.h"
 #include "DNA_ID.h"
 #include "DNA_action_types.h" /* bAnimVizSettings */
@@ -61,8 +62,13 @@ struct bGPdata;
 typedef struct bDeformGroup {
 	struct bDeformGroup *next, *prev;
 	char name[32];
+	/* need this flag for locking weights */
+	char flag, pad[7];
 } bDeformGroup;
 #define MAX_VGROUP_NAME 32
+
+/* bDeformGroup->flag */
+#define DG_LOCK_WEIGHT 1
 
 /**
  * The following illustrates the orientation of the 
@@ -144,7 +150,13 @@ typedef struct Object {
 	float obmat[4][4];		/* final worldspace matrix with constraints & animsys applied */
 	float parentinv[4][4]; /* inverse result of parent, so that object doesn't 'stick' to parent */
 	float constinv[4][4]; /* inverse result of constraints. doesn't include effect of parent or object local transform */
-	float imat[4][4];	/* inverse matrix of 'obmat' for during render, old game engine, temporally: ipokeys of transform  */
+	float imat[4][4];	/* inverse matrix of 'obmat' for any other use than rendering! */
+	
+	/* Previously 'imat' was used at render time, but as other places use it too
+	 * the interactive ui of 2.5 creates problems. So now only 'imat_ren' should
+	 * be used when ever the inverse of ob->obmat * re->viewmat is needed! - jahka
+	 */
+	float imat_ren[4][4];
 	
 	unsigned int lay;				/* copy of Base */
 	
@@ -182,6 +194,8 @@ typedef struct Object {
 	float max_vel; /* clamp the maximum velocity 0.0 is disabled */
 	float min_vel; /* clamp the maximum velocity 0.0 is disabled */
 	float m_contactProcessingThreshold;
+	float obstacleRad;
+	char pad0[4];
 	
 	short rotmode;		/* rotation mode - uses defines set out in DNA_action_types.h for PoseChannel rotations... */
 	
@@ -198,7 +212,7 @@ typedef struct Object {
 	float bbsize[3];
 	short index;			/* custom index, for renderpasses */
 	unsigned short actdef;	/* current deformation group, note: index starts at 1 */
-	float col[4];			/* object color, adjusted via IPO's only */
+	float col[4];			/* object color */
 	/**
 	 * Settings for game objects
 	 * bit 0: Object has dynamic behaviour
@@ -243,15 +257,17 @@ typedef struct Object {
 	struct FluidsimSettings *fluidsimSettings; /* if fluidsim enabled, store additional settings */
 
 	struct DerivedMesh *derivedDeform, *derivedFinal;
-	int lastDataMask;			/* the custom data layer mask that was last used to calculate derivedDeform and derivedFinal */
+	unsigned int lastDataMask;   /* the custom data layer mask that was last used to calculate derivedDeform and derivedFinal */
+	unsigned int customdata_mask; /* (extra) custom data layer mask to use for creating derivedmesh, set by depsgraph */
 	unsigned int state;			/* bit masks of game controllers that are active */
 	unsigned int init_state;	/* bit masks of initial state as recorded by the users */
-
-	int pad2;
 
 	ListBase gpulamp;		/* runtime, for lamps only */
 	ListBase pc_ids;
 	ListBase *duplilist;	/* for temporary dupli list storage, only for use by RNA API */
+
+	float ima_ofs[2];		/* offset for image empties */
+	char pad3[8];
 } Object;
 
 /* Warning, this is not used anymore because hooks are now modifiers */
@@ -281,10 +297,6 @@ typedef struct DupliObject {
 	float orco[3], uv[2];
 } DupliObject;
 
-/* this work object is defined in object.c */
-extern Object workob;
-
-
 /* **************** OBJECT ********************* */
 
 /* used many places... should be specialized  */
@@ -300,6 +312,8 @@ extern Object workob;
 
 #define OB_LAMP			10
 #define OB_CAMERA		11
+
+#define OB_SPEAKER		12
 
 // #define OB_WAVE			21
 #define OB_LATTICE		22
@@ -320,16 +334,15 @@ extern Object workob;
 #define PARSLOW			16
 
 /* (short) transflag */
-#define OB_OFFS_LOCAL		1
-	// XXX OB_QUAT was never used, but is now depreceated in favour of standard rotation handling...
-#define OB_QUAT				2
+/*#define OB_OFFS_LOCAL		1*/ /*UNUSED*/
+/* #define OB_QUAT				2 */ /* never used, free flag */
 #define OB_NEG_SCALE		4
 #define OB_DUPLI			(8+16+256+512+2048)
 #define OB_DUPLIFRAMES		8
 #define OB_DUPLIVERTS		16
 #define OB_DUPLIROT			32
 #define OB_DUPLINOSPEED		64
-#define OB_POWERTRACK		128
+/*#define OB_POWERTRACK		128*/ /*UNUSED*/
 #define OB_DUPLIGROUP		256
 #define OB_DUPLIFACES		512
 #define OB_DUPLIFACES_SCALE	1024
@@ -342,9 +355,9 @@ extern Object workob;
 #define OB_DRAWKEY			1
 #define OB_DRAWKEYSEL		2
 #define OB_OFFS_OB			4
-#define OB_OFFS_MAT			8
-#define OB_OFFS_VKEY		16
-#define OB_OFFS_PATH		32
+/* #define OB_OFFS_MAT		8 */ /*UNUSED*/
+/* #define OB_OFFS_VKEY		16 */ /*UNUSED*/
+/* #define OB_OFFS_PATH		32 */ /*UNUSED*/
 #define OB_OFFS_PARENT		64
 #define OB_OFFS_PARTICLE	128
 	/* get ipo from from action or not? */
@@ -393,6 +406,7 @@ extern Object workob;
 #define OB_CUBE			5
 #define OB_EMPTY_SPHERE	6
 #define OB_EMPTY_CONE	7
+#define OB_EMPTY_IMAGE	8
 
 /* boundtype */
 #define OB_BOUND_BOX		0
@@ -401,7 +415,7 @@ extern Object workob;
 #define OB_BOUND_CONE		3
 #define OB_BOUND_POLYH		4
 #define OB_BOUND_POLYT		5
-#define OB_BOUND_DYN_MESH   6
+/* #define OB_BOUND_DYN_MESH   6 */ /*UNUSED*/
 #define OB_BOUND_CAPSULE	7
 
 
@@ -416,7 +430,7 @@ extern Object workob;
 	/* NOTE: this was used as a proper setting in past, so nullify before using */
 #define BA_TEMP_TAG			32
 
-#define BA_FROMSET			128
+/* #define BA_FROMSET			128 */ /*UNUSED*/
 
 #define BA_TRANSFORM_CHILD	256 /* child of a transformed object */
 #define BA_TRANSFORM_PARENT	8192 /* parent of a transformed object */
@@ -437,7 +451,8 @@ extern Object workob;
 #define OB_RECALC_DATA		2
 		/* time flag is set when time changes need recalc, so baked systems can ignore it */
 #define OB_RECALC_TIME		4
-#define OB_RECALC_ALL		7
+		/* only use for matching any flag, NOT as an argument since more flags may be added. */
+#define OB_RECALC_ALL		(OB_RECALC_OB|OB_RECALC_DATA|OB_RECALC_TIME)
 
 /* controller state */
 #define OB_MAX_STATES		30
@@ -465,6 +480,8 @@ extern Object workob;
 #define OB_SOFT_BODY	0x20000
 #define OB_OCCLUDER		0x40000
 #define OB_SENSOR		0x80000
+#define OB_NAVMESH		0x100000
+#define OB_HASOBSTACLE	0x200000
 
 /* ob->gameflag2 */
 #define OB_NEVER_DO_ACTIVITY_CULLING	1
@@ -475,7 +492,7 @@ extern Object workob;
 #define OB_LOCK_RIGID_BODY_Y_ROT_AXIS	64
 #define OB_LOCK_RIGID_BODY_Z_ROT_AXIS	128
 
-#define OB_LIFE			(OB_PROP|OB_DYNAMIC|OB_ACTOR|OB_MAINACTOR|OB_CHILD)
+/* #define OB_LIFE			(OB_PROP|OB_DYNAMIC|OB_ACTOR|OB_MAINACTOR|OB_CHILD) */
 
 /* ob->body_type */
 #define OB_BODY_TYPE_NO_COLLISION	0
@@ -485,6 +502,7 @@ extern Object workob;
 #define OB_BODY_TYPE_SOFT			4
 #define OB_BODY_TYPE_OCCLUDER		5
 #define OB_BODY_TYPE_SENSOR			6
+#define OB_BODY_TYPE_NAVMESH		7
 
 /* ob->scavisflag */
 #define OB_VIS_SENS		1

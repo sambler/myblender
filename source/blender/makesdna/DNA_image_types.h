@@ -1,6 +1,4 @@
-/**
- * blenlib/DNA_image_types.h (mar-2001 nzc)
- *
+/*
  * $Id$ 
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -30,6 +28,10 @@
  */
 #ifndef DNA_IMAGE_TYPES_H
 #define DNA_IMAGE_TYPES_H
+
+/** \file DNA_image_types.h
+ *  \ingroup DNA
+ */
 
 #include "DNA_ID.h"
 
@@ -100,7 +102,8 @@ typedef struct Image {
 	short animspeed;
 	
 	/* for generated images */
-	short gen_x, gen_y, gen_type;
+	short gen_x, gen_y;
+	char gen_type, gen_flag;
 	
 	/* display aspect - for UV editing images resized for faster openGL display */
 	float aspx, aspy;
@@ -133,6 +136,9 @@ typedef struct Image {
 /* render */
 #define IMA_MAX_RENDER_TEXT		512
 #define IMA_MAX_RENDER_SLOT		10 /* shouldn't this be above the image struct and used in renders[]? */
+
+/* gen_flag */
+#define IMA_GEN_FLOAT		1
 
 #endif
 

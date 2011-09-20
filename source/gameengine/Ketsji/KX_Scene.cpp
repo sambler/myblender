@@ -28,6 +28,11 @@
  * Ketsji scene. Holds references to all scene data.
  */
 
+/** \file gameengine/Ketsji/KX_Scene.cpp
+ *  \ingroup ketsji
+ */
+
+
 #if defined(WIN32) && !defined(FREE_WINDOWS)
 #pragma warning (disable : 4786)
 #endif //WIN32
@@ -62,7 +67,7 @@
 #include "SCA_IController.h"
 #include "SCA_IActuator.h"
 #include "SG_Node.h"
-#include "SYS_System.h"
+#include "BL_System.h"
 #include "SG_Controller.h"
 #include "SG_IObject.h"
 #include "SG_Tree.h"
@@ -82,6 +87,7 @@
 #include "BL_ModifierDeformer.h"
 #include "BL_ShapeDeformer.h"
 #include "BL_DeformableGameObject.h"
+#include "KX_ObstacleSimulation.h"
 
 #ifdef USE_BULLET
 #include "KX_SoftBodyDeformer.h"
@@ -163,6 +169,7 @@ KX_Scene::KX_Scene(class SCA_IInputDevice* keyboarddevice,
 	m_lightlist= new CListValue();
 	m_inactivelist = new CListValue();
 	m_euthanasyobjects = new CListValue();
+	m_animatedlist = new CListValue();
 
 	m_logicmgr = new SCA_LogicManager();
 	
@@ -208,6 +215,19 @@ KX_Scene::KX_Scene(class SCA_IInputDevice* keyboarddevice,
 
 	m_bucketmanager=new RAS_BucketManager();
 	
+	bool showObstacleSimulation = scene->gm.flag & GAME_SHOW_OBSTACLE_SIMULATION;
+	switch (scene->gm.obstacleSimulation)
+	{
+	case OBSTSIMULATION_TOI_rays:
+		m_obstacleSimulation = new KX_ObstacleSimulationTOI_rays((MT_Scalar)scene->gm.levelHeight, showObstacleSimulation);
+		break;
+	case OBSTSIMULATION_TOI_cells:
+		m_obstacleSimulation = new KX_ObstacleSimulationTOI_cells((MT_Scalar)scene->gm.levelHeight, showObstacleSimulation);
+		break;
+	default:
+		m_obstacleSimulation = NULL;
+	}
+	
 #ifdef WITH_PYTHON
 	m_attr_dict = PyDict_New(); /* new ref */
 	m_draw_call_pre = NULL;
@@ -230,6 +250,9 @@ KX_Scene::~KX_Scene()
 		this->RemoveObject(parentobj);
 	}
 
+	if (m_obstacleSimulation)
+		delete m_obstacleSimulation;
+
 	if(m_objectlist)
 		m_objectlist->Release();
 
@@ -248,6 +271,9 @@ KX_Scene::~KX_Scene()
 	if (m_euthanasyobjects)
 		m_euthanasyobjects->Release();
 
+	if (m_animatedlist)
+		m_animatedlist->Release();
+
 	if (m_logicmgr)
 		delete m_logicmgr;
 
@@ -264,10 +290,12 @@ KX_Scene::~KX_Scene()
 
 #ifdef WITH_PYTHON
 	PyDict_Clear(m_attr_dict);
-	Py_DECREF(m_attr_dict);
+	/* Py_CLEAR: Py_DECREF's and NULL's */
+	Py_CLEAR(m_attr_dict);
 
-	Py_XDECREF(m_draw_call_pre);
-	Py_XDECREF(m_draw_call_post);
+	/* these may be NULL but the macro checks */
+	Py_CLEAR(m_draw_call_pre);
+	Py_CLEAR(m_draw_call_post);
 #endif
 }
 
@@ -323,7 +351,10 @@ list<class KX_Camera*>* KX_Scene::GetCameras()
 	return &m_cameras;
 }
 
-
+list<class KX_FontObject*>* KX_Scene::GetFonts()
+{
+	return &m_fonts;
+}
 
 void KX_Scene::SetFramingType(RAS_FrameSettings & frame_settings)
 {
@@ -1003,6 +1034,8 @@ int KX_Scene::NewRemoveObject(class CValue* gameobj)
 		ret = newobj->Release();
 	if (m_euthanasyobjects->RemoveValue(newobj))
 		ret = newobj->Release();
+	if (m_animatedlist->RemoveValue(newobj))
+		ret = newobj->Release();
 		
 	if (newobj == m_active_camera)
 	{
@@ -1013,6 +1046,9 @@ int KX_Scene::NewRemoveObject(class CValue* gameobj)
 
 	// in case this is a camera
 	m_cameras.remove((KX_Camera*)newobj);
+
+	// in case this is a font
+	m_fonts.remove((KX_FontObject*)newobj);
 
 	/* currently does nothing, keep incase we need to Unregister something */
 #if 0
@@ -1188,6 +1224,27 @@ void KX_Scene::ReplaceMesh(class CValue* obj,void* meshobj, bool use_gfx, bool u
 #endif
 }
 
+/* Font Object routines */
+void KX_Scene::AddFont(KX_FontObject* font)
+{
+	if (!FindFont(font))
+		m_fonts.push_back(font);
+}
+
+KX_FontObject* KX_Scene::FindFont(KX_FontObject* font)
+{
+	list<KX_FontObject*>::iterator it = m_fonts.begin();
+
+	while ( (it != m_fonts.end()) 
+			&& ((*it) != font) ) {
+	  ++it;
+	}
+
+	return ((it == m_fonts.end()) ? NULL : (*it));
+}
+
+
+/* Camera Object routines */
 KX_Camera* KX_Scene::FindCamera(KX_Camera* cam)
 {
 	list<KX_Camera*>::iterator it = m_cameras.begin();
@@ -1468,7 +1525,23 @@ void KX_Scene::LogicBeginFrame(double curtime)
 	m_logicmgr->BeginFrame(curtime, 1.0/KX_KetsjiEngine::GetTicRate());
 }
 
+void KX_Scene::AddAnimatedObject(CValue* gameobj)
+{
+	gameobj->AddRef();
+	m_animatedlist->Add(gameobj);
+}
 
+void KX_Scene::RemoveAnimatedObject(CValue* gameobj)
+{
+	m_animatedlist->RemoveValue(gameobj);
+}
+
+void KX_Scene::UpdateAnimations(double curtime)
+{
+	// Update any animations
+	for (int i=0; i<m_animatedlist->GetCount(); ++i)
+		((KX_GameObject*)m_animatedlist->GetValue(i))->UpdateActionManager(curtime);
+}
 
 void KX_Scene::LogicUpdateFrame(double curtime, bool frame)
 {
@@ -1480,7 +1553,7 @@ void KX_Scene::LogicUpdateFrame(double curtime, bool frame)
 void KX_Scene::LogicEndFrame()
 {
 	m_logicmgr->EndFrame();
-	int numobj = m_euthanasyobjects->GetCount();
+	int numobj;
 
 	KX_GameObject* obj;
 
@@ -1492,6 +1565,10 @@ void KX_Scene::LogicEndFrame()
 		obj->Release();
 		RemoveObject(obj);
 	}
+
+	//prepare obstacle simulation for new frame
+	if (m_obstacleSimulation)
+		m_obstacleSimulation->UpdateObstacles();
 }
 
 
@@ -1632,6 +1709,11 @@ void KX_Scene::setSuspendedDelta(double suspendeddelta)
 double KX_Scene::getSuspendedDelta()
 {
 	return m_suspendeddelta;
+}
+
+short KX_Scene::GetAnimationFPS()
+{
+	return m_blenderScene->r.frs_sec;
 }
 
 #ifdef USE_BULLET
@@ -1830,6 +1912,16 @@ bool KX_Scene::MergeScene(KX_Scene *other)
 
 			/* when merging objects sensors are moved across into the new manager, dont need to do this here */
 		}
+
+		/* grab any timer properties from the other scene */
+		SCA_TimeEventManager *timemgr=		GetTimeEventManager();
+		SCA_TimeEventManager *timemgr_other=	other->GetTimeEventManager();
+		vector<CValue*> times = timemgr_other->GetTimeValues();
+
+		for(unsigned int i= 0; i < times.size(); i++) {
+			timemgr->AddTimeProperty(times[i]);
+		}
+		
 	}
 	return true;
 }
@@ -1848,7 +1940,7 @@ void KX_Scene::Render2DFilters(RAS_ICanvas* canvas)
 
 void KX_Scene::RunDrawingCallbacks(PyObject* cb_list)
 {
-	int len;
+	Py_ssize_t len;
 
 	if (cb_list && (len=PyList_GET_SIZE(cb_list)))
 	{
@@ -1857,7 +1949,7 @@ void KX_Scene::RunDrawingCallbacks(PyObject* cb_list)
 		PyObject* ret;
 
 		// Iterate the list and run the callbacks
-		for (int pos=0; pos < len; pos++)
+		for (Py_ssize_t pos=0; pos < len; pos++)
 		{
 			func= PyList_GET_ITEM(cb_list, pos);
 			ret= PyObject_Call(func, args, NULL);
@@ -1909,6 +2001,8 @@ PyMethodDef KX_Scene::Methods[] = {
 	KX_PYMETHODTABLE(KX_Scene, replace),
 	KX_PYMETHODTABLE(KX_Scene, suspend),
 	KX_PYMETHODTABLE(KX_Scene, resume),
+	KX_PYMETHODTABLE(KX_Scene, drawObstacleSimulation),
+
 	
 	/* dict style access */
 	KX_PYMETHODTABLE(KX_Scene, get),
@@ -2092,8 +2186,7 @@ PyObject* KX_Scene::pyattr_get_drawing_callback_pre(void *self_v, const KX_PYATT
 
 	if(self->m_draw_call_pre==NULL)
 		self->m_draw_call_pre= PyList_New(0);
-	else
-		Py_INCREF(self->m_draw_call_pre);
+	Py_INCREF(self->m_draw_call_pre);
 	return self->m_draw_call_pre;
 }
 
@@ -2103,8 +2196,7 @@ PyObject* KX_Scene::pyattr_get_drawing_callback_post(void *self_v, const KX_PYAT
 
 	if(self->m_draw_call_post==NULL)
 		self->m_draw_call_post= PyList_New(0);
-	else
-		Py_INCREF(self->m_draw_call_post);
+	Py_INCREF(self->m_draw_call_post);
 	return self->m_draw_call_post;
 }
 
@@ -2232,6 +2324,16 @@ KX_PYMETHODDEF_DOC(KX_Scene, resume,
 {
 	Resume();
 	
+	Py_RETURN_NONE;
+}
+
+KX_PYMETHODDEF_DOC(KX_Scene, drawObstacleSimulation,
+				   "drawObstacleSimulation()\n"
+				   "Draw debug visualization of obstacle simulation.\n")
+{
+	if (GetObstacleSimulation())
+		GetObstacleSimulation()->DrawObstacles();
+
 	Py_RETURN_NONE;
 }
 

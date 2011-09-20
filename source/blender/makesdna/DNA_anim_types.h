@@ -1,6 +1,4 @@
-/**
- * $Id$
- *
+/*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -27,6 +25,10 @@
 
 #ifndef DNA_ANIM_TYPES_H
 #define DNA_ANIM_TYPES_H
+
+/** \file DNA_anim_types.h
+ *  \ingroup DNA
+ */
 
 #ifdef __cplusplus
 extern "C" {
@@ -58,6 +60,11 @@ typedef struct FModifier {
 	short flag;			/* settings for the modifier */
 	
 	float influence;	/* the amount that the modifier should influence the value */
+	
+	float sfra;			/* start frame of restricted frame-range */
+	float efra;			/* end frame of restricted frame-range */
+	float blendin;		/* number of frames from sfra before modifier takes full influence */
+	float blendout;		/* number of frames from efra before modifier fades out */
 } FModifier;
 
 /* Types of F-Curve modifier 
@@ -82,13 +89,17 @@ typedef enum eFModifier_Types {
 /* F-Curve Modifier Settings */
 typedef enum eFModifier_Flags {
 		/* modifier is not able to be evaluated for some reason, and should be skipped (internal) */
-	FMODIFIER_FLAG_DISABLED		= (1<<0),
+	FMODIFIER_FLAG_DISABLED		 = (1<<0),
 		/* modifier's data is expanded (in UI) */
-	FMODIFIER_FLAG_EXPANDED		= (1<<1),
+	FMODIFIER_FLAG_EXPANDED		 = (1<<1),
 		/* modifier is active one (in UI) for editing purposes */
-	FMODIFIER_FLAG_ACTIVE		= (1<<2),
+	FMODIFIER_FLAG_ACTIVE		 = (1<<2),
 		/* user wants modifier to be skipped */
-	FMODIFIER_FLAG_MUTED		= (1<<3)
+	FMODIFIER_FLAG_MUTED		 = (1<<3),
+		/* restrict range that F-Modifier can be considered over */
+	FMODIFIER_FLAG_RANGERESTRICT = (1<<4),
+		/* use influence control */
+	FMODIFIER_FLAG_USEINFLUENCE  = (1<<5)
 } eFModifier_Flags; 
 
 /* --- */
@@ -257,7 +268,7 @@ typedef enum eFMod_Stepped_Flags {
  * Defines how to access a dependency needed for a driver variable.
  */
 typedef struct DriverTarget {
-	ID 	*id;				/* ID-block which owns the target */
+	ID 	*id;				/* ID-block which owns the target, no user count */
 	
 	char *rna_path;			/* RNA path defining the setting to use (for DVAR_TYPE_SINGLE_PROP) */
 	
@@ -276,8 +287,12 @@ typedef enum eDriverTarget_Flag {
 	DTAR_FLAG_STRUCT_REF	= (1<<0),
 		/* idtype can only be 'Object' */
 	DTAR_FLAG_ID_OB_ONLY	= (1<<1),
-		/* toggles localspace (where transforms are manually obtained) */
+	
+	/* "localspace" flags */
+		/* base flag - basically "pre parent+constraints" */
 	DTAR_FLAG_LOCALSPACE	= (1<<2),
+		/* include constraints transformed to space including parents */
+	DTAR_FLAG_LOCAL_CONSTS	= (1<<3),
 } eDriverTarget_Flag;
 
 /* Transform Channels for Driver Targets */
@@ -456,7 +471,9 @@ typedef enum eFCurve_Flags {
 	FCURVE_PROTECTED	= (1<<3),
 		/* fcurve will not be evaluated for the next round */
 	FCURVE_MUTED		= (1<<4),
+	
 		/* fcurve uses 'auto-handles', which stay horizontal... */
+		// DEPRECATED
 	FCURVE_AUTO_HANDLES	= (1<<5),
 	
 		/* skip evaluation, as RNA-path cannot be resolved (similar to muting, but cannot be set by user) */
@@ -566,6 +583,8 @@ typedef struct NlaStrip {
 	
 	short type;					/* type of NLA strip */
 	
+	void *speaker_handle;		/* handle for speaker objects */
+	
 	int flag;					/* settings */
 	int pad2;
 } NlaStrip;
@@ -632,7 +651,10 @@ typedef enum eNlaStrip_Type {
 		/* 'transition' - blends between the adjacent strips */
 	NLASTRIP_TYPE_TRANSITION,
 		/* 'meta' - a strip which acts as a container for a few others */
-	NLASTRIP_TYPE_META
+	NLASTRIP_TYPE_META,	
+	
+		/* 'emit sound' - a strip which is used for timing when speaker emits sounds */
+	NLASTRIP_TYPE_SOUND
 } eNlaStrip_Type;
 
 /* NLA Tracks ------------------------------------- */
@@ -721,23 +743,6 @@ typedef enum eKSP_Grouping {
 		 */
 	KSP_GROUP_TEMPLATE_ITEM
 } eKSP_Grouping;
-
-/* KS_Path->templates  (Template Flags)
- *
- * Templates in paths are used to substitute information from the 
- * active context into relavent places in the path strings. This
- * enum here defines the flags which define which templates are
- * required by a path before it can be used
- */
-typedef enum eKSP_TemplateTypes {
-	KSP_TEMPLATE_OBJECT			= (1<<0),	/* #obj - selected object */
-	KSP_TEMPLATE_PCHAN 			= (1<<1),	/* #pch - selected posechannel */
-	KSP_TEMPLATE_CONSTRAINT 	= (1<<2),	/* #con - active only */
-	KSP_TEMPLATE_NODE		 	= (1<<3),	/* #nod - selected node */
-	KSP_TEMPLATE_MODIFIER		= (1<<4),	/* #mod - active only */
-	
-	KSP_TEMPLATE_ROT			= (1<<16)	/* modify rotation paths based on rotation mode of Object or Pose Channel */
-} eKSP_TemplateTypes;
 
 /* ---------------- */
  

@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -24,6 +24,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/blenkernel/depsgraph_private.h
+ *  \ingroup bke
+ */
+
 #ifndef DEPSGRAPH_PRIVATE
 #define DEPSGRAPH_PRIVATE
 
@@ -64,8 +69,9 @@ typedef struct DagNode
 	void * ob;
 	void * first_ancestor;
 	int ancestor_count;
-	unsigned int lay;			// accumulated layers of its relations + itself
+	unsigned int lay;				// accumulated layers of its relations + itself
 	unsigned int scelay;			// layers due to being in scene
+	unsigned int customdata_mask;	// customdata mask
 	int lasttime;		// if lasttime != DagForest->time, this node was not evaluated yet for flushing
 	int BFS_dist;		// BFS distance
 	int DFS_dist;		// DFS distance

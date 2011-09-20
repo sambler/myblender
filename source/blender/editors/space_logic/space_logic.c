@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/space_logic/space_logic.c
+ *  \ingroup splogic
+ */
+
+
 #include <string.h>
 #include <stdio.h>
 
@@ -34,10 +39,12 @@
 
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_context.h"
 #include "BKE_screen.h"
 
+#include "ED_space_api.h"
 #include "ED_screen.h"
 
 #include "BIF_gl.h"
@@ -56,16 +63,13 @@
 ARegion *logic_has_buttons_region(ScrArea *sa)
 {
 	ARegion *ar, *arnew;
-	
-	for(ar= sa->regionbase.first; ar; ar= ar->next)
-		if(ar->regiontype==RGN_TYPE_UI)
-			return ar;
+
+	ar= BKE_area_find_region_type(sa, RGN_TYPE_UI);
+	if(ar) return ar;
 	
 	/* add subdiv level; after header */
-	for(ar= sa->regionbase.first; ar; ar= ar->next)
-		if(ar->regiontype==RGN_TYPE_HEADER)
-			break;
-	
+	ar= BKE_area_find_region_type(sa, RGN_TYPE_HEADER);
+
 	/* is error! */
 	if(ar==NULL) return NULL;
 	
@@ -168,13 +172,13 @@ static SpaceLink *logic_duplicate(SpaceLink *sl)
 	return (SpaceLink *)slogicn;
 }
 
-void logic_operatortypes(void)
+static void logic_operatortypes(void)
 {
 	WM_operatortype_append(LOGIC_OT_properties);
 	WM_operatortype_append(LOGIC_OT_links_cut);
 }
 
-void logic_keymap(struct wmKeyConfig *keyconf)
+static void logic_keymap(struct wmKeyConfig *keyconf)
 {
 	wmKeyMap *keymap= WM_keymap_find(keyconf, "Logic Editor", SPACE_LOGIC, 0);
 	

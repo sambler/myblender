@@ -23,11 +23,16 @@ set(INC
 	../include
 	../../blenkernel
 	../../blenlib
+	../../blenloader
 	../../makesdna
 	../../makesrna
 	../../render/extern/include
 	../../windowmanager
 	../../../../intern/guardedalloc
+)
+
+set(INC_SYS
+
 )
 
 set(SRC
@@ -37,4 +42,4 @@ set(SRC
 	mball_intern.h
 )
 
-blenderlib(bf_editor_metaball "${SRC}" "${INC}")
+blender_add_lib(bf_editor_metaball "${SRC}" "${INC}" "${INC_SYS}")

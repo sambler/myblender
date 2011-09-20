@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,8 +25,12 @@
  * ***** END GPL LICENSE BLOCK *****
  * */
 
-#ifndef BLI_MATH_MATRIX
-#define BLI_MATH_MATRIX
+#ifndef BLI_MATH_MATRIX_H
+#define BLI_MATH_MATRIX_H
+
+/** \file BLI_math_matrix.h
+ *  \ingroup bli
+ */
 
 #ifdef __cplusplus
 extern "C" {
@@ -62,6 +66,9 @@ void swap_m4m4(float A[4][4], float B[4][4]);
 void add_m3_m3m3(float R[3][3], float A[3][3], float B[3][3]);
 void add_m4_m4m4(float R[4][4], float A[4][4], float B[4][4]);
 
+void sub_m3_m3m3(float R[3][3], float A[3][3], float B[3][3]);
+void sub_m4_m4m4(float R[4][4], float A[4][4], float B[4][4]);
+
 void mul_m3_m3m3(float R[3][3], float A[3][3], float B[3][3]);
 void mul_m4_m4m4(float R[4][4], float A[4][4], float B[4][4]);
 void mul_m4_m3m4(float R[4][4], float A[3][3], float B[4][4]);
@@ -76,11 +83,11 @@ void mul_serie_m4(float R[4][4],
 	float M5[4][4], float M6[4][4], float M7[4][4], float M8[4][4]);
 
 void mul_m4_v3(float M[4][4], float r[3]);
-void mul_v3_m4v3(float r[3], float M[4][4], float v[3]);
+void mul_v3_m4v3(float r[3], float M[4][4], const float v[3]);
 void mul_mat3_m4_v3(float M[4][4], float r[3]);
 void mul_m4_v4(float M[4][4], float r[4]);
 void mul_v4_m4v4(float r[4], float M[4][4], float v[4]);
-void mul_project_m4_v4(float M[4][4], float r[3]);
+void mul_project_m4_v3(float M[4][4], float vec[3]);
 
 void mul_m3_v3(float M[3][3], float r[3]);
 void mul_v3_m3v3(float r[3], float M[3][3], float a[3]);
@@ -165,12 +172,12 @@ int is_negative_m4(float mat[4][4]);
 
 /*********************************** Other ***********************************/
 
-void print_m3(char *str, float M[3][3]);
-void print_m4(char *str, float M[3][4]);
+void print_m3(const char *str, float M[3][3]);
+void print_m4(const char *str, float M[3][4]);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* BLI_MATH_MATRIX */
+#endif /* BLI_MATH_MATRIX_H */
 

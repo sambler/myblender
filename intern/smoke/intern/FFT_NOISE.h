@@ -1,3 +1,6 @@
+/** \file smoke/intern/FFT_NOISE.h
+ *  \ingroup smoke
+ */
 //////////////////////////////////////////////////////////////////////
 // This file is part of Wavelet Turbulence.
 // 
@@ -22,7 +25,7 @@
 #ifndef FFT_NOISE_H_
 #define FFT_NOISE_H_
 
-#if FFTW3==1
+#ifdef WITH_FFTW3
 #include <iostream>
 #include <fftw3.h>
 #include <MERSENNETWISTER.h>

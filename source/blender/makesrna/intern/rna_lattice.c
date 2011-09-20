@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -21,6 +21,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/makesrna/intern/rna_lattice.c
+ *  \ingroup RNA
+ */
+
 
 #include <stdlib.h>
 
@@ -87,11 +92,11 @@ static void rna_Lattice_points_begin(CollectionPropertyIterator *iter, PointerRN
 		rna_iterator_array_begin(iter, NULL, 0, 0, 0, NULL);
 }
 
-static void rna_Lattice_update_data(Main *bmain, Scene *scene, PointerRNA *ptr)
+static void rna_Lattice_update_data(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
 {
 	ID *id= ptr->id.data;
 
-	DAG_id_tag_update(id, OB_RECALC_DATA);
+	DAG_id_tag_update(id, 0);
 	WM_main_add_notifier(NC_GEOM|ND_DATA, id);
 }
 

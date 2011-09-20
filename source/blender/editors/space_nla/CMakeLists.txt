@@ -21,12 +21,18 @@
 
 set(INC
 	../include
+	../../blenfont
 	../../blenkernel
 	../../blenlib
+	../../blenloader
 	../../makesdna
 	../../makesrna
 	../../windowmanager
 	../../../../intern/guardedalloc
+)
+
+set(INC_SYS
+	${GLEW_INCLUDE_PATH}
 )
 
 set(SRC
@@ -41,4 +47,4 @@ set(SRC
 	nla_intern.h
 )
 
-blenderlib(bf_editor_space_nla "${SRC}" "${INC}")
+blender_add_lib(bf_editor_space_nla "${SRC}" "${INC}" "${INC_SYS}")

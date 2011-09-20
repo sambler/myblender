@@ -29,7 +29,9 @@
  * ***** END GPL LICENSE BLOCK *****
 */
 
-#ifdef WITH_HDR
+/** \file blender/imbuf/intern/radiance_hdr.c
+ *  \ingroup imbuf
+ */
 
 /* ----------------------------------------------------------------------
   Radiance High Dynamic Range image file IO
@@ -40,7 +42,7 @@
 */
 
 #ifdef WIN32
-#include <io.h>
+#  include <io.h>
 #endif
 
 #include "MEM_guardedalloc.h"
@@ -364,5 +366,3 @@ int imb_savehdr(struct ImBuf *ibuf, const char *name, int flags)
 	fclose(file);
 	return 1;
 }
-
-#endif /* WITH_HDR */

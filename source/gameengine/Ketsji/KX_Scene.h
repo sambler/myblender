@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file KX_Scene.h
+ *  \ingroup ketsji
+ */
+
 #ifndef __KX_SCENE_H
 #define __KX_SCENE_H
 
@@ -36,8 +41,8 @@
 #include <set>
 #include <list>
 
-#include "GEN_Map.h"
-#include "GEN_HashedPtr.h"
+#include "CTR_Map.h"
+#include "CTR_HashedPtr.h"
 #include "SG_IObject.h"
 #include "SCA_IScene.h"
 #include "MT_Transform.h"
@@ -56,7 +61,7 @@ struct SM_MaterialProps;
 struct SM_ShapeProps;
 struct Scene;
 
-class GEN_HashedPtr;
+class CTR_HashedPtr;
 class CListValue;
 class CValue;
 class SCA_LogicManager;
@@ -83,6 +88,7 @@ class SCA_JoystickManager;
 class btCollisionShape;
 class KX_BlenderSceneConverter;
 struct KX_ClientObjectInfo;
+class KX_ObstacleSimulation;
 
 #ifdef WITH_CXX_GUARDEDALLOC
 #include "MEM_guardedalloc.h"
@@ -125,6 +131,7 @@ protected:
 	CListValue*			m_parentlist; // all 'root' parents
 	CListValue*			m_lightlist;
 	CListValue*			m_inactivelist;	// all objects that are not in the active layer
+	CListValue*			m_animatedlist; // all animated objects
 	
 	SG_QList			m_sghead;		// list of nodes that needs scenegraph update
 										// the Dlist is not object that must be updated
@@ -136,6 +143,13 @@ protected:
 	 * The set of cameras for this scene
 	 */
 	list<class KX_Camera*>       m_cameras;
+
+	/**
+	 * The set of fonts for this scene
+	 */
+	list<class KX_FontObject*>       m_fonts;
+
+
 	/**
 	 * Various SCA managers used by the scene
 	 */
@@ -195,7 +209,7 @@ protected:
 	 * used in AddReplicaObject to map game objects to their
 	 * replicas so pointers can be updated.
 	 */
-	GEN_Map	<GEN_HashedPtr, void*> m_map_gameobject_to_replica;
+	CTR_Map	<CTR_HashedPtr, void*> m_map_gameobject_to_replica;
 
 	/**
 	 * Another temporary variable outstaying its welcome
@@ -280,6 +294,9 @@ protected:
 	struct Scene* m_blenderScene;
 
 	RAS_2DFilterManager m_filtermanager;
+
+	KX_ObstacleSimulation* m_obstacleSimulation;
+
 public:	
 	KX_Scene(class SCA_IInputDevice* keyboarddevice,
 		class SCA_IInputDevice* mousedevice,
@@ -322,12 +339,17 @@ public:
 	int NewRemoveObject(CValue* gameobj);
 	void ReplaceMesh(CValue* gameobj,
 					 void* meshob, bool use_gfx, bool use_phys);
+
+	void AddAnimatedObject(CValue* gameobj);
+	void RemoveAnimatedObject(CValue* gameobj);
+
 	/**
 	 * @section Logic stuff
 	 * Initiate an update of the logic system.
 	 */
 	void LogicBeginFrame(double curtime);
 	void LogicUpdateFrame(double curtime, bool frame);
+	void UpdateAnimations(double curtime);
 
 		void						
 	LogicEndFrame(
@@ -360,6 +382,27 @@ public:
 		SCA_TimeEventManager*	
 	GetTimeEventManager(
 	);
+
+	/** Font Routines */
+		
+		list<class KX_FontObject*>*
+	GetFonts(
+	);
+
+	/** Find a font in the scene by pointer. */
+		KX_FontObject*              
+	FindFont(
+		KX_FontObject*
+	);
+
+	/** Add a camera to this scene. */
+		void                    
+	AddFont(
+		KX_FontObject*
+	);
+
+
+	/** Camera Routines */
 
 		list<class KX_Camera*>*
 	GetCameras(
@@ -532,6 +575,8 @@ public:
 	void SetPhysicsEnvironment(class PHY_IPhysicsEnvironment*	physEnv);
 
 	void	SetGravity(const MT_Vector3& gravity);
+
+	short GetAnimationFPS();
 	
 	/**
 	 * Sets the node tree for this scene.
@@ -543,6 +588,8 @@ public:
 	*/
 	void Update2DFilter(vector<STR_String>& propNames, void* gameObj, RAS_2DFilterManager::RAS_2DFILTER_MODE filtermode, int pass, STR_String& text);
 	void Render2DFilters(RAS_ICanvas* canvas);
+
+	KX_ObstacleSimulation* GetObstacleSimulation() {return m_obstacleSimulation;};
 
 #ifdef WITH_PYTHON
 	/* --------------------------------------------------------------------- */
@@ -556,6 +603,8 @@ public:
 	KX_PYMETHOD_DOC(KX_Scene, suspend);
 	KX_PYMETHOD_DOC(KX_Scene, resume);
 	KX_PYMETHOD_DOC(KX_Scene, get);
+	KX_PYMETHOD_DOC(KX_Scene, drawObstacleSimulation);
+
 
 	/* attributes */
 	static PyObject*	pyattr_get_name(void* self_v, const KX_PYATTRIBUTE_DEF *attrdef);

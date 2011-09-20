@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/blenlib/intern/fileops.c
+ *  \ingroup bli
+ */
+
+
 #include <string.h>
 #include <stdio.h>
 
@@ -47,6 +52,8 @@
 #include <sys/param.h>
 #endif
 
+#include "MEM_guardedalloc.h"
+
 #include "BLI_blenlib.h"
 
 #include "BKE_utildefines.h"
@@ -64,8 +71,10 @@ int BLI_gzip(const char *from, const char *to) {
 	int readsize = 0;
 	int rval= 0, err;
 	gzFile gzfile;
-	
-	gzfile = gzopen(to, "wb"); 
+
+	/* level 1 is very close to 3 (the default) in terms of file size,
+	 * but about twice as fast, best use for speedy saving - campbell */
+	gzfile = gzopen(to, "wb1");
 	if(gzfile == NULL)
 		return -1;
 	
@@ -96,6 +105,49 @@ int BLI_gzip(const char *from, const char *to) {
 
 	return rval;
 }
+
+/* gzip the file in from_file and write it to memery to_mem, at most size bytes.
+   return the unziped size
+  */
+char *BLI_ungzip_to_mem(const char *from_file, int *size_r)
+{
+	gzFile gzfile;
+	int readsize, size, alloc_size=0;
+	char *mem= NULL;
+	const int chunk_size= 512*1024;
+
+	size= 0;
+
+	gzfile = gzopen( from_file, "rb" );
+
+	for(;;) {
+		if(mem==NULL) {
+			mem= MEM_callocN(chunk_size, "BLI_ungzip_to_mem");
+			alloc_size= chunk_size;
+		} else {
+			mem= MEM_reallocN(mem, size+chunk_size);
+			alloc_size+= chunk_size;
+		}
+
+		readsize= gzread(gzfile, mem+size, chunk_size);
+		if(readsize>0) {
+			size+= readsize;
+		}
+		else break;
+	}
+
+	if(size==0) {
+		MEM_freeN(mem);
+		mem= NULL;
+	}
+	else if(alloc_size!=size)
+		mem= MEM_reallocN(mem, size);
+
+	*size_r= size;
+
+	return mem;
+}
+
 
 /* return 1 when file can be written */
 int BLI_is_writable(const char *filename)
@@ -128,13 +180,13 @@ int BLI_is_writable(const char *filename)
 
 int BLI_touch(const char *file)
 {
-   FILE *f = fopen(file,"r+b");
-   if (f != NULL) {
+	FILE *f = fopen(file,"r+b");
+	if (f != NULL) {
 		char c = getc(f);
 		rewind(f);
 		putc(c,f);
 	} else {
-	   f = fopen(file,"wb");
+		f = fopen(file,"wb");
 	}
 	if (f) {
 		fclose(f);
@@ -218,9 +270,10 @@ int BLI_copy_fileops(const char *file, const char *to) {
 	return err;
 }
 
-int BLI_link(const char *UNUSED(file), const char *UNUSED(to)) {
+int BLI_link(const char *file, const char *to) {
 	callLocalErrorCallBack("Linking files is unsupported on Windows");
-	
+	(void)file;
+	(void)to;
 	return 1;
 }
 
@@ -264,14 +317,14 @@ int BLI_rename(const char *from, const char *to) {
 	return rename(from, to);
 }
 
-#else /* The weirdo UNIX world */
+#else /* The UNIX world */
 
 /*
  * but the UNIX world is tied to the interface, and the system
  * timer, and... We implement a callback mechanism. The system will
  * have to initialise the callback before the functions will work!
  * */
-static char str[MAXPATHLEN+12];
+static char str[12 + (MAXPATHLEN * 2)];
 
 int BLI_delete(const char *file, int dir, int recursive) 
 {
@@ -280,34 +333,34 @@ int BLI_delete(const char *file, int dir, int recursive)
 	}
 	else {
 		if (recursive) {
-			sprintf(str, "/bin/rm -rf \"%s\"", file);
+			BLI_snprintf(str, sizeof(str), "/bin/rm -rf \"%s\"", file);
 			return system(str);
 		}
 		else if (dir) {
-			sprintf(str, "/bin/rmdir \"%s\"", file);
+			BLI_snprintf(str, sizeof(str), "/bin/rmdir \"%s\"", file);
 			return system(str);
 		}
 		else {
-			return remove(file); //sprintf(str, "/bin/rm -f \"%s\"", file);
+			return remove(file); //BLI_snprintf(str, sizeof(str), "/bin/rm -f \"%s\"", file);
 		}
 	}
 	return -1;
 }
 
 int BLI_move(const char *file, const char *to) {
-	sprintf(str, "/bin/mv -f \"%s\" \"%s\"", file, to);
+	BLI_snprintf(str, sizeof(str), "/bin/mv -f \"%s\" \"%s\"", file, to);
 
 	return system(str);
 }
 
 int BLI_copy_fileops(const char *file, const char *to) {
-	sprintf(str, "/bin/cp -rf \"%s\" \"%s\"", file, to);
+	BLI_snprintf(str, sizeof(str), "/bin/cp -rf \"%s\" \"%s\"", file, to);
 
 	return system(str);
 }
 
 int BLI_link(const char *file, const char *to) {
-	sprintf(str, "/bin/ln -f \"%s\" \"%s\"", file, to);
+	BLI_snprintf(str, sizeof(str), "/bin/ln -f \"%s\" \"%s\"", file, to);
 	
 	return system(str);
 }

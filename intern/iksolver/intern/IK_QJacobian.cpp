@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file iksolver/intern/IK_QJacobian.cpp
+ *  \ingroup iksolver
+ */
+
+
 #include "IK_QJacobian.h"
 #include "TNT/svd.h"
 
@@ -54,6 +59,7 @@ void IK_QJacobian::ArmMatrices(int dof, int task_size)
 
 	m_d_theta.newsize(dof);
 	m_d_theta_tmp.newsize(dof);
+	m_d_norm_weight.newsize(dof);
 
 	m_norm.newsize(dof);
 	m_norm = 0.0;
@@ -106,11 +112,13 @@ void IK_QJacobian::SetBetas(int id, int, const MT_Vector3& v)
 	m_beta[id+2] = v.z();
 }
 
-void IK_QJacobian::SetDerivatives(int id, int dof_id, const MT_Vector3& v)
+void IK_QJacobian::SetDerivatives(int id, int dof_id, const MT_Vector3& v, MT_Scalar norm_weight)
 {
 	m_jacobian[id][dof_id] = v.x()*m_weight_sqrt[dof_id];
 	m_jacobian[id+1][dof_id] = v.y()*m_weight_sqrt[dof_id];
 	m_jacobian[id+2][dof_id] = v.z()*m_weight_sqrt[dof_id];
+
+	m_d_norm_weight[dof_id] = norm_weight;
 }
 
 void IK_QJacobian::Invert()
@@ -424,7 +432,7 @@ MT_Scalar IK_QJacobian::AngleUpdateNorm() const
 	MT_Scalar mx = 0.0, dtheta_abs;
 
 	for (i = 0; i < m_d_theta.size(); i++) {
-		dtheta_abs = MT_abs(m_d_theta[i]);
+		dtheta_abs = MT_abs(m_d_theta[i]*m_d_norm_weight[i]);
 		if (dtheta_abs > mx)
 			mx = dtheta_abs;
 	}

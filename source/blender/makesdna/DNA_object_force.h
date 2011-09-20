@@ -1,4 +1,4 @@
-/**
+/*
  *
  * $Id$
  *
@@ -29,6 +29,10 @@
  */
 #ifndef DNA_OBJECT_FORCE_H
 #define DNA_OBJECT_FORCE_H
+
+/** \file DNA_object_force.h
+ *  \ingroup DNA
+ */
 
 #ifdef __cplusplus
 extern "C" {
@@ -141,14 +145,23 @@ typedef struct EffectorWeights {
 
 #define BPHYS_TOT_DATA			8
 
+#define BPHYS_EXTRA_FLUID_SPRINGS	1
+
+typedef struct PTCacheExtra {
+	struct PTCacheExtra *next, *prev;
+	unsigned int type, totdata;
+	void *data;
+} PTCacheExtra;
+
 typedef struct PTCacheMem {
 	struct PTCacheMem *next, *prev;
-	int frame, totpoint;
+	unsigned int frame, totpoint;
 	unsigned int data_types, flag;
-	int *index_array; /* quick access to stored points with index */
 
 	void *data[8]; /* BPHYS_TOT_DATA */
 	void *cur[8]; /* BPHYS_TOT_DATA */
+
+	struct ListBase extradata;
 } PTCacheMem;
 
 typedef struct PointCache {
@@ -175,7 +188,8 @@ typedef struct PointCache {
 
 	/* for external cache files */
 	int totpoint;   /* number of cached points */
-	int index, rt;	/* modifier stack index */
+	int index;	/* modifier stack index */
+	short compression, rt;
 	
 	char name[64];
 	char prev_name[64];
@@ -329,7 +343,7 @@ typedef struct SoftBody {
 
 /* pd->flag: various settings */
 #define PFIELD_USEMAX			1
-#define PDEFLE_DEFORM			2
+/*#define PDEFLE_DEFORM			2*/			/*UNUSED*/
 #define PFIELD_GUIDE_PATH_ADD	4			/* TODO: do_versions for below */
 #define PFIELD_PLANAR			8			/* used for do_versions */
 #define PDEFLE_KILL_PART		16
@@ -383,9 +397,15 @@ typedef struct SoftBody {
 #define PTCACHE_READ_INFO			1024
 /* dont use the filename of the blendfile the data is linked from (write a local cache) */
 #define PTCACHE_IGNORE_LIBPATH		2048
+/* high resolution cache is saved for smoke for backwards compatibility, so set this flag to know it's a "fake" cache */
+#define PTCACHE_FAKE_SMOKE			(1<<12)
 
 /* PTCACHE_OUTDATED + PTCACHE_FRAMES_SKIPPED */
 #define PTCACHE_REDO_NEEDED			258
+
+#define PTCACHE_COMPRESS_NO			0
+#define PTCACHE_COMPRESS_LZO		1
+#define PTCACHE_COMPRESS_LZMA		2
 
 /* ob->softflag */
 #define OB_SB_ENABLE	1		/* deprecated, use modifier */
@@ -400,7 +420,7 @@ typedef struct SoftBody {
 #define OB_SB_SELF		512
 #define OB_SB_FACECOLL  1024
 #define OB_SB_EDGECOLL  2048
-#define OB_SB_COLLFINAL 4096
+#define OB_SB_COLLFINAL 4096	/* deprecated */
 #define OB_SB_BIG_UI	8192
 #define OB_SB_AERO_ANGLE	16384
 

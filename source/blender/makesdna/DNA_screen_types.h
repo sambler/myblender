@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$ 
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,6 +27,10 @@
 #ifndef DNA_SCREEN_TYPES_H
 #define DNA_SCREEN_TYPES_H
 
+/** \file DNA_screen_types.h
+ *  \ingroup DNA
+ */
+
 #include "DNA_listBase.h"
 #include "DNA_view2d_types.h"
 #include "DNA_vec_types.h"
@@ -53,6 +57,9 @@ typedef struct bScreen {
 	
 	struct Scene *scene;
 	struct Scene *newscene;				/* temporary when switching */
+	
+	int redraws_flag;					/* user-setting for which editors get redrawn during anim playback (used to be time->redraws) */
+	int pad1;
 	
 	short full;							/* temp screen for image render display or fileselect */
 	short temp;							/* temp screen in a temp window, don't save (like user prefs) */
@@ -177,8 +184,9 @@ typedef struct ARegion {
 #define AREA_FLAG_DRAWJOINTO	2
 #define AREA_FLAG_DRAWJOINFROM	4
 #define AREA_TEMP_INFO			8
+#define AREA_FLAG_DRAWSPLIT_H	16
+#define AREA_FLAG_DRAWSPLIT_V	32
 
-/* If you change EDGEWIDTH, also do the global arrat edcol[]  */
 #define EDGEWIDTH	1
 #define AREAGRID	4
 #define AREAMINX	32
@@ -189,18 +197,19 @@ typedef struct ARegion {
 #define HEADERTOP	2
 
 /* screen->full */
-#define SCREENNORMAL    0
-#define SCREENFULL      1
+#define SCREENNORMAL	0
+#define SCREENFULL		1
+#define SCREENFULLTEMP	2
 
 
 /* Panel->snap - for snapping to screen edges */
 #define PNL_SNAP_NONE		0
-#define PNL_SNAP_TOP		1
-#define PNL_SNAP_RIGHT		2
-#define PNL_SNAP_BOTTOM	4
-#define PNL_SNAP_LEFT		8
+/* #define PNL_SNAP_TOP		1 */
+/* #define PNL_SNAP_RIGHT		2 */
+#define PNL_SNAP_BOTTOM		4
+/* #define PNL_SNAP_LEFT		8 */
 
-#define PNL_SNAP_DIST		9.0
+/* #define PNL_SNAP_DIST		9.0 */
 
 /* paneltype flag */
 #define PNL_DEFAULT_CLOSED		1

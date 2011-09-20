@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -21,7 +21,17 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
- 
+
+/** \file blender/makesrna/intern/rna_nodetree_types.h
+ *  \ingroup RNA
+ */
+
+
+/* Empty definitions for undefined macros to avoid warnings */
+#ifndef DefNode
+#define DefNode(Category, ID, DefFunc, EnumName, StructName, UIName, UIDesc)
+#endif
+
 /*       Tree type       Node ID                  RNA def function        Enum name         Struct name       UI Name              UI Description */
 DefNode( ShaderNode,     SH_NODE_OUTPUT,          0,                      "OUTPUT",         Output,           "Output",            ""              )
 DefNode( ShaderNode,     SH_NODE_MATERIAL,        def_sh_material,        "MATERIAL",       Material,         "Material",          ""              )
@@ -133,3 +143,6 @@ DefNode( TextureNode,    TEX_NODE_DECOMPOSE,      0,                      "DECOM
 DefNode( TextureNode,    TEX_NODE_VALTONOR,       0,                      "VALTONOR",       ValToNor,         "Val to Nor",        ""              )
 DefNode( TextureNode,    TEX_NODE_SCALE,          0,                      "SCALE",          Scale,            "Scale",             ""              )
 
+
+/* undefine macros */
+#undef DefNode

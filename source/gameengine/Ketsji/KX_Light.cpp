@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file gameengine/Ketsji/KX_Light.cpp
+ *  \ingroup ketsji
+ */
+
 
 #if defined(WIN32) && !defined(FREE_WINDOWS)
 #pragma warning (disable : 4786)
@@ -249,8 +254,12 @@ void KX_LightObject::BindShadowBuffer(RAS_IRasterizer *ras, KX_Camera *cam, MT_T
 	cam->NodeUpdateGS(0);
 
 	/* setup rasterizer transformations */
+	/* SetViewMatrix may use stereomode which we temporarily disable here */
+	RAS_IRasterizer::StereoMode stereomode = ras->GetStereoMode();
+	ras->SetStereoMode(RAS_IRasterizer::RAS_STEREO_NOSTEREO);
 	ras->SetProjectionMatrix(projectionmat);
 	ras->SetViewMatrix(modelviewmat, cam->NodeGetWorldOrientation(), cam->NodeGetWorldPosition(), cam->GetCameraData()->m_perspective);
+	ras->SetStereoMode(stereomode);
 }
 
 void KX_LightObject::UnbindShadowBuffer(RAS_IRasterizer *ras)
@@ -346,11 +355,11 @@ PyObject* KX_LightObject::pyattr_get_typeconst(void *self_v, const KX_PYATTRIBUT
 	} else if (!strcmp(type, "NORMAL")) {
 		retvalue = PyLong_FromSsize_t(RAS_LightObject::LIGHT_NORMAL);
 	}
-    else {
-        /* should never happen */
-        PyErr_SetString(PyExc_TypeError, "light.type: internal error, invalid light type");
-        retvalue = NULL;
-    }
+	else {
+		/* should never happen */
+		PyErr_SetString(PyExc_TypeError, "light.type: internal error, invalid light type");
+		retvalue = NULL;
+	}
 
 	return retvalue;
 }

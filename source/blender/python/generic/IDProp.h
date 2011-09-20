@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -22,7 +22,13 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
-#include <Python.h>
+/** \file blender/python/generic/IDProp.h
+ *  \ingroup pygen
+ */
+
+
+#ifndef IDPROP_H
+#define IDPROP_H
 
 struct ID;
 struct IDProperty;
@@ -31,14 +37,15 @@ struct BPy_IDGroup_Iter;
 typedef struct BPy_IDProperty {
 	PyObject_VAR_HEAD
 	struct ID *id;
-	struct IDProperty *prop, *parent;
+	struct IDProperty *prop; /* must be second member */
+	struct IDProperty *parent;
 	PyObject *data_wrap;
 } BPy_IDProperty;
 
 typedef struct BPy_IDArray {
 	PyObject_VAR_HEAD
 	struct ID *id;
-	struct IDProperty *prop;
+	struct IDProperty *prop;  /* must be second member */
 } BPy_IDArray;
 
 typedef struct BPy_IDGroup_Iter {
@@ -62,3 +69,5 @@ void IDProp_Init_Types(void);
 
 #define IDPROP_ITER_KEYS	0
 #define IDPROP_ITER_ITEMS	1
+
+#endif /* IDPROP_H */

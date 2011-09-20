@@ -25,6 +25,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/blenlib/intern/math_matrix.c
+ *  \ingroup bli
+ */
+
+
 #include <assert.h>
 #include "BLI_math.h"
 
@@ -107,6 +112,20 @@ void copy_m4_m3(float m1[][4], float m2[][3])	/* no clear */
 	m1[3][2]=0.0F;	
 	m1[3][3]=1.0F;
 
+}
+
+void swap_m3m3(float m1[][3], float m2[][3])
+{
+	float t;
+	int i, j;
+
+	for(i = 0; i < 3; i++) {
+		for (j = 0; j < 3; j++) {
+			t        = m1[i][j];
+			m1[i][j] = m2[i][j];
+			m2[i][j] = t;
+		}
+	}
 }
 
 void swap_m4m4(float m1[][4], float m2[][4])
@@ -228,7 +247,7 @@ void mul_serie_m3(float answ[][3],
 {
 	float temp[3][3];
 	
-	if(m1==0 || m2==0) return;
+	if(m1==NULL || m2==NULL) return;
 	
 	mul_m3_m3m3(answ, m2, m1);
 	if(m3) {
@@ -261,7 +280,7 @@ void mul_serie_m4(float answ[][4], float m1[][4],
 {
 	float temp[4][4];
 	
-	if(m1==0 || m2==0) return;
+	if(m1==NULL || m2==NULL) return;
 	
 	mul_m4_m4m4(answ, m2, m1);
 	if(m3) {
@@ -287,7 +306,7 @@ void mul_serie_m4(float answ[][4], float m1[][4],
 	}
 }
 
-void mul_m4_v3(float mat[][4], float *vec)
+void mul_m4_v3(float mat[][4], float vec[3])
 {
 	float x,y;
 
@@ -298,7 +317,7 @@ void mul_m4_v3(float mat[][4], float *vec)
 	vec[2]=x*mat[0][2] + y*mat[1][2] + mat[2][2]*vec[2] + mat[3][2];
 }
 
-void mul_v3_m4v3(float *in, float mat[][4], float *vec)
+void mul_v3_m4v3(float in[3], float mat[][4], const float vec[3])
 {
 	float x,y;
 
@@ -310,7 +329,7 @@ void mul_v3_m4v3(float *in, float mat[][4], float *vec)
 }
 
 /* same as mul_m4_v3() but doesnt apply translation component */
-void mul_mat3_m4_v3(float mat[][4], float *vec)
+void mul_mat3_m4_v3(float mat[][4], float vec[3])
 {
 	float x,y;
 
@@ -321,11 +340,9 @@ void mul_mat3_m4_v3(float mat[][4], float *vec)
 	vec[2]= x*mat[0][2] + y*mat[1][2] + mat[2][2]*vec[2];
 }
 
-void mul_project_m4_v4(float mat[][4], float *vec)
+void mul_project_m4_v3(float mat[][4], float vec[3])
 {
-	float w;
-
-	w = vec[0]*mat[0][3] + vec[1]*mat[1][3] + vec[2]*mat[2][3] + mat[3][3];
+	const float w= vec[0]*mat[0][3] + vec[1]*mat[1][3] + vec[2]*mat[2][3] + mat[3][3];
 	mul_m4_v3(mat, vec);
 
 	vec[0] /= w;
@@ -367,7 +384,7 @@ void mul_m3_v3(float M[3][3], float r[3])
 	copy_v3_v3(r, tmp);
 }
 
-void mul_transposed_m3_v3(float mat[][3], float *vec)
+void mul_transposed_m3_v3(float mat[][3], float vec[3])
 {
 	float x,y;
 
@@ -405,7 +422,7 @@ void mul_mat3_m4_fl(float m[4][4], float f)
 			m[i][j] *= f;
 }
 
-void mul_m3_v3_double(float mat[][3], double *vec)
+void mul_m3_v3_double(float mat[][3], double vec[3])
 {
 	double x,y;
 
@@ -432,6 +449,24 @@ void add_m4_m4m4(float m1[][4], float m2[][4], float m3[][4])
 	for(i=0;i<4;i++)
 		for(j=0;j<4;j++)
 			m1[i][j]= m2[i][j] + m3[i][j];
+}
+
+void sub_m3_m3m3(float m1[][3], float m2[][3], float m3[][3])
+{
+	int i, j;
+
+	for(i=0;i<3;i++)
+		for(j=0;j<3;j++)
+			m1[i][j]= m2[i][j] - m3[i][j];
+}
+
+void sub_m4_m4m4(float m1[][4], float m2[][4], float m3[][4])
+{
+	int i, j;
+
+	for(i=0;i<4;i++)
+		for(j=0;j<4;j++)
+			m1[i][j]= m2[i][j] - m3[i][j];
 }
 
 int invert_m3(float m[3][3])
@@ -516,7 +551,7 @@ int invert_m4_m4(float inverse[4][4], float mat[4][4])
 		max = fabs(tempmat[i][i]);
 		maxj = i;
 		for(j = i + 1; j < 4; j++) {
-			if(fabs(tempmat[j][i]) > max) {
+			if(fabsf(tempmat[j][i]) > max) {
 				max = fabs(tempmat[j][i]);
 				maxj = j;
 			}
@@ -741,13 +776,13 @@ void orthogonalize_m4(float mat[][4], int axis)
 
 int is_orthogonal_m3(float mat[][3])
 {
-	if (fabs(dot_v3v3(mat[0], mat[1])) > 1.5 * FLT_EPSILON)
+	if (fabsf(dot_v3v3(mat[0], mat[1])) > 1.5f * FLT_EPSILON)
 		return 0;
 
-	if (fabs(dot_v3v3(mat[1], mat[2])) > 1.5 * FLT_EPSILON)
+	if (fabsf(dot_v3v3(mat[1], mat[2])) > 1.5f * FLT_EPSILON)
 		return 0;
 
-	if (fabs(dot_v3v3(mat[0], mat[2])) > 1.5 * FLT_EPSILON)
+	if (fabsf(dot_v3v3(mat[0], mat[2])) > 1.5f * FLT_EPSILON)
 		return 0;
 	
 	return 1;
@@ -755,13 +790,13 @@ int is_orthogonal_m3(float mat[][3])
 
 int is_orthogonal_m4(float mat[][4])
 {
-	if (fabs(dot_v3v3(mat[0], mat[1])) > 1.5 * FLT_EPSILON)
+	if (fabsf(dot_v3v3(mat[0], mat[1])) > 1.5f * FLT_EPSILON)
 		return 0;
 
-	if (fabs(dot_v3v3(mat[1], mat[2])) > 1.5 * FLT_EPSILON)
+	if (fabsf(dot_v3v3(mat[1], mat[2])) > 1.5f * FLT_EPSILON)
 		return 0;
 
-	if (fabs(dot_v3v3(mat[0], mat[2])) > 1.5 * FLT_EPSILON)
+	if (fabsf(dot_v3v3(mat[0], mat[2])) > 1.5f * FLT_EPSILON)
 		return 0;
 	
 	return 1;
@@ -787,11 +822,11 @@ void normalize_m4(float mat[][4])
 	float len;
 	
 	len= normalize_v3(mat[0]);
-	if(len!=0.0) mat[0][3]/= len;
+	if(len!=0.0f) mat[0][3]/= len;
 	len= normalize_v3(mat[1]);
-	if(len!=0.0) mat[1][3]/= len;
+	if(len!=0.0f) mat[1][3]/= len;
 	len= normalize_v3(mat[2]);
-	if(len!=0.0) mat[2][3]/= len;
+	if(len!=0.0f) mat[2][3]/= len;
 }
 
 void normalize_m4_m4(float rmat[][4], float mat[][4])
@@ -799,11 +834,11 @@ void normalize_m4_m4(float rmat[][4], float mat[][4])
 	float len;
 	
 	len= normalize_v3_v3(rmat[0], mat[0]);
-	if(len!=0.0) rmat[0][3]= mat[0][3] / len;
+	if(len!=0.0f) rmat[0][3]= mat[0][3] / len;
 	len= normalize_v3_v3(rmat[1], mat[1]);
-	if(len!=0.0) rmat[1][3]= mat[1][3] / len;
+	if(len!=0.0f) rmat[1][3]= mat[1][3] / len;
 	len= normalize_v3_v3(rmat[2], mat[2]);
-	if(len!=0.0) rmat[2][3]= mat[2][3] / len;;
+	if(len!=0.0f) rmat[2][3]= mat[2][3] / len;
 }
 
 void adjoint_m3_m3(float m1[][3], float m[][3])
@@ -944,14 +979,14 @@ void size_to_mat4(float mat[][4], const float size[3])
 	copy_m4_m3(mat, tmat);
 }
 
-void mat3_to_size(float *size, float mat[][3])
+void mat3_to_size(float size[3], float mat[][3])
 {
 	size[0]= len_v3(mat[0]);
 	size[1]= len_v3(mat[1]);
 	size[2]= len_v3(mat[2]);
 }
 
-void mat4_to_size(float *size, float mat[][4])
+void mat4_to_size(float size[3], float mat[][4])
 {
 	size[0]= len_v3(mat[0]);
 	size[1]= len_v3(mat[1]);
@@ -1224,7 +1259,7 @@ void loc_axisangle_size_to_mat4(float mat[4][4], const float loc[3], const float
 
 /*********************************** Other ***********************************/
 
-void print_m3(char *str, float m[][3])
+void print_m3(const char *str, float m[][3])
 {
 	printf("%s\n", str);
 	printf("%f %f %f\n",m[0][0],m[1][0],m[2][0]);
@@ -1233,7 +1268,7 @@ void print_m3(char *str, float m[][3])
 	printf("\n");
 }
 
-void print_m4(char *str, float m[][4])
+void print_m4(const char *str, float m[][4])
 {
 	printf("%s\n", str);
 	printf("%f %f %f %f\n",m[0][0],m[1][0],m[2][0],m[3][0]);
@@ -1457,7 +1492,6 @@ void svd_m4(float U[4][4], float s[4], float V[4][4], float A_[4][4])
 	eps = powf(2.0f,-52.0f);
 	while (p > 0) {
 		int kase=0;
-		k=0;
 
 		// Test for maximum iterations to avoid infinite loop
 		if(maxiter == 0)
@@ -1695,5 +1729,5 @@ void pseudoinverse_m4_m4(float Ainv[4][4], float A[4][4], float epsilon)
 
 	transpose_m4(V);
 
-	mul_serie_m4(Ainv, U, Wm, V, 0, 0, 0, 0, 0);
+	mul_serie_m4(Ainv, U, Wm, V, NULL, NULL, NULL, NULL, NULL);
 }

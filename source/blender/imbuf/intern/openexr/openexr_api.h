@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$ 
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,15 +27,17 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/imbuf/intern/openexr/openexr_api.h
+ *  \ingroup openexr
+ */
+
+
 #ifndef _OPENEXR_API_H
 #define _OPENEXR_API_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#define OPENEXR_FLOATRGB	0x1
-#define OPENEXR_ZBUF		0x2
   
 #include <stdio.h>
   

@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file KX_BlenderGL.h
+ *  \ingroup blroutines
+ */
+
 #ifndef __BLENDERGL
 #define __BLENDERGL
 
@@ -47,6 +52,7 @@ void	BL_HideMouse(struct wmWindow *win);
 void	BL_NormalMouse(struct wmWindow *win);
 void	BL_WaitMouse(struct wmWindow *win);
 
+void BL_print_game_line(int fontid, const char* text, int size, int dpi, float* color, double* mat, float aspect);
 void BL_print_gamedebug_line(const char* text, int xco, int yco, int width, int height);
 void BL_print_gamedebug_line_padded(const char* text, int xco, int yco, int width, int height);
 

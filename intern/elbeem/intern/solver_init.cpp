@@ -1,3 +1,6 @@
+/** \file elbeem/intern/solver_init.cpp
+ *  \ingroup elbeem
+ */
 /******************************************************************************
  *
  * El'Beem - Free Surface Fluid Simulation with the Lattice Boltzmann Method
@@ -532,6 +535,15 @@ void LbmFsgrSolver::parseAttrList()
 	debMsgStd("LbmFsgrSolver", DM_WARNING, "LES model switched off!",2);
 	mInitialCsmago = 0.0;
 #endif // USE_LES==1
+}
+
+
+/******************************************************************************
+ * (part of enabling chapter 6 of "Free Surface Flows with Moving and Deforming Objects for LBM")
+ *****************************************************************************/
+void LbmFsgrSolver::setSurfGenSettings(short value)
+{
+	mFsSurfGenSetting = value;
 }
 
 

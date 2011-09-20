@@ -1,6 +1,4 @@
-/**
- * $Id$
- *
+/*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -25,6 +23,10 @@
  * Contributor(s): Joshua Leung (full recode)
  *
  * ***** END GPL LICENSE BLOCK *****
+ */
+
+/** \file ED_keyframes_draw.h
+ *  \ingroup editors
  */
 
 #ifndef ED_KEYFRAMES_DRAW_H
@@ -100,7 +102,7 @@ typedef enum eKeyframeShapeDrawOpts {
 } eKeyframeShapeDrawOpts;
 
 /* draw simple diamond-shape keyframe (with OpenGL) */
-void draw_keyframe_shape(float x, float y, float xscale, float hsize, short sel, short key_type, short mode);
+void draw_keyframe_shape(float x, float y, float xscale, float hsize, short sel, short key_type, short mode, float alpha);
 
 /* ******************************* Methods ****************************** */
 
@@ -141,6 +143,12 @@ void gpl_to_keylist(struct bDopeSheet *ads, struct bGPDlayer *gpl, struct DLRBT_
 /* ActKeyColumn API ---------------- */
 /* Comparator callback used for ActKeyColumns and cframe float-value pointer */
 short compare_ak_cfraPtr(void *node, void *data);
+
+/* Comparator callback used for ActKeyBlocks and cframe float-value pointer */
+short compare_ab_cfraPtr(void *node, void *data);
+
+/* Checks if ActKeyBlock can be used (i.e. drawn/used to detect "holds") */
+short actkeyblock_is_valid(ActKeyBlock *ab, struct DLRBT_Tree *keys);
 
 #endif  /*  ED_KEYFRAMES_DRAW_H */
 

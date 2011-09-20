@@ -25,13 +25,18 @@
 # ***** END GPL LICENSE BLOCK *****
 
 set(INC 
-		.
-		..
-		../../
-		../../../blenkernel
-		../../../blenlib
-		../../../makesdna
-		../../../../../intern/guardedalloc
+	.
+	..
+	../..
+	../../../blenkernel
+	../../../blenlib
+	../../../blenloader
+	../../../makesdna
+	../../../../../intern/guardedalloc
+)
+
+set(INC_SYS
+
 )
 
 set(SRC
@@ -43,4 +48,4 @@ set(SRC
 	logmemfile.c
 )
 
-blenderlib(bf_imbuf_cineon "${SRC}" "${INC}")
+blender_add_lib(bf_imbuf_cineon "${SRC}" "${INC}" "${INC_SYS}")

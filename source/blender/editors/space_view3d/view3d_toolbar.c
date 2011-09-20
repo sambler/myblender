@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/space_view3d/view3d_toolbar.c
+ *  \ingroup spview3d
+ */
+
+
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
@@ -40,6 +45,10 @@
 #include "BLI_blenlib.h"
 #include "BLI_editVert.h"
 #include "BLI_rand.h"
+#include "BLI_utildefines.h"
+#include "BLI_ghash.h"
+
+#include "BLF_translation.h"
 
 #include "BKE_context.h"
 #include "BKE_idprop.h"
@@ -63,59 +72,24 @@
 
 /* ******************* view3d space & buttons ************** */
 
-static wmOperator *view3d_last_operator(const bContext *C)
-{
-	wmWindowManager *wm= CTX_wm_manager(C);
-	wmOperator *op;
-
-	/* only for operators that are registered and did an undo push */
-	for(op= wm->operators.last; op; op= op->prev)
-		if((op->type->flag & OPTYPE_REGISTER) && (op->type->flag & OPTYPE_UNDO))
-			break;
-
-	return op;
-}
-
 static void view3d_panel_operator_redo_buts(const bContext *C, Panel *pa, wmOperator *op)
 {
-	wmWindowManager *wm= CTX_wm_manager(C);
-	PointerRNA ptr;
-	
-	if(!op->properties) {
-		IDPropertyTemplate val = {0};
-		op->properties= IDP_New(IDP_GROUP, val, "wmOperatorProperties");
-	}
-	
-	/* poll() on this operator may still fail, at the moment there is no nice feedback when this happens
-	 * just fails silently */
-	if(!WM_operator_repeat_check(C, op)) {
-		uiBlockSetButLock(uiLayoutGetBlock(pa->layout), TRUE, "Operator cannot redo");
-		uiItemL(pa->layout, "* Redo Unsupported *", 0); // XXX, could give some nicer feedback or not show redo panel at all?
-	}
-
-	RNA_pointer_create(&wm->id, op->type->srna, op->properties, &ptr);
-	if(op->type->ui) {
-		op->layout= pa->layout;
-		op->type->ui((bContext*)C, op);
-		op->layout= NULL;
-	}
-	else
-		uiDefAutoButsRNA(pa->layout, &ptr, 1);
+	uiLayoutOperatorButs(C, pa->layout, op, NULL, 'V', 0);
 }
 
 static void view3d_panel_operator_redo_header(const bContext *C, Panel *pa)
 {
-	wmOperator *op= view3d_last_operator(C);
+	wmOperator *op= WM_operator_last_redo(C);
 
 	if(op) BLI_strncpy(pa->drawname, op->type->name, sizeof(pa->drawname));
-	else BLI_strncpy(pa->drawname, "Operator", sizeof(pa->drawname));
+	else BLI_strncpy(pa->drawname, N_("Operator"), sizeof(pa->drawname));
 }
 
 static void view3d_panel_operator_redo_operator(const bContext *C, Panel *pa, wmOperator *op)
 {
 	if(op->type->flag & OPTYPE_MACRO) {
 		for(op= op->macro.first; op; op= op->next) {
-			uiItemL(pa->layout, op->type->name, 0);
+			uiItemL(pa->layout, op->type->name, ICON_NONE);
 			view3d_panel_operator_redo_operator(C, pa, op);
 		}
 	}
@@ -126,7 +100,7 @@ static void view3d_panel_operator_redo_operator(const bContext *C, Panel *pa, wm
 
 static void view3d_panel_operator_redo(const bContext *C, Panel *pa)
 {
-	wmOperator *op= view3d_last_operator(C);
+	wmOperator *op= WM_operator_last_redo(C);
 	uiBlock *block;
 	
 	if(op==NULL)
@@ -135,8 +109,12 @@ static void view3d_panel_operator_redo(const bContext *C, Panel *pa)
 		return;
 	
 	block= uiLayoutGetBlock(pa->layout);
+	
+	if(ED_undo_valid(C, op->type->name)==0)
+		uiLayoutSetEnabled(pa->layout, 0);
 
-	uiBlockSetFunc(block, ED_undo_operator_repeat_cb, op, NULL);
+	/* note, blockfunc is a default but->func, use Handle func to allow button callbacks too */
+	uiBlockSetHandleFunc(block, ED_undo_operator_repeat_cb_evt, op);
 	
 	view3d_panel_operator_redo_operator(C, pa, op);
 }
@@ -165,10 +143,11 @@ static void operator_call_cb(struct bContext *C, void *arg_listbase, void *arg2)
 
 static void operator_search_cb(const struct bContext *C, void *UNUSED(arg), const char *str, uiSearchItems *items)
 {
-	wmOperatorType *ot = WM_operatortype_first();
-	
-	for(; ot; ot= ot->next) {
-		
+	GHashIterator *iter= WM_operatortype_iter();
+
+	for( ; !BLI_ghashIterator_isDone(iter); BLI_ghashIterator_step(iter)) {
+		wmOperatorType *ot= BLI_ghashIterator_getValue(iter);
+
 		if(BLI_strcasestr(ot->name, str)) {
 			if(WM_operator_poll((bContext*)C, ot)) {
 				
@@ -177,6 +156,7 @@ static void operator_search_cb(const struct bContext *C, void *UNUSED(arg), cons
 			}
 		}
 	}
+	BLI_ghashIterator_free(iter);
 }
 
 
@@ -232,7 +212,7 @@ static void view3d_panel_tool_shelf(const bContext *C, Panel *pa)
 		for(ct= st->toolshelf.first; ct; ct= ct->next) {
 			if(0==strncmp(context, ct->context, OP_MAX_TYPENAME)) {
 				col= uiLayoutColumn(pa->layout, 1);
-				uiItemFullO(col, ct->opname, NULL, 0, NULL, WM_OP_INVOKE_REGION_WIN, 0);
+				uiItemFullO(col, ct->opname, NULL, ICON_NONE, NULL, WM_OP_INVOKE_REGION_WIN, 0);
 			}
 		}
 	}

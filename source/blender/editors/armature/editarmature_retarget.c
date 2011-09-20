@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -23,6 +23,11 @@
  * autoarmature.c: Interface for automagically manipulating armature (retarget, created, ...)
  */
 
+/** \file blender/editors/armature/editarmature_retarget.c
+ *  \ingroup edarmature
+ */
+
+
 #include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
@@ -41,6 +46,7 @@
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
 #include "BLI_editVert.h"
+#include "BLI_utildefines.h"
 #include "BLI_ghash.h"
 #include "BLI_graph.h"
 #include "BLI_rand.h"
@@ -97,7 +103,7 @@ typedef enum
 	ARC_USED = 2
 } ArcUsageFlags;
 
-RigGraph *GLOBAL_RIGG = NULL;
+static RigGraph *GLOBAL_RIGG = NULL;
 
 /*******************************************************************************************************/
 
@@ -111,7 +117,7 @@ float rollBoneByQuat(EditBone *bone, float old_up_axis[3], float qrot[4]);
 
 /*********************************** EDITBONE UTILS ****************************************************/
 
-int countEditBoneChildren(ListBase *list, EditBone *parent)
+static int countEditBoneChildren(ListBase *list, EditBone *parent)
 {
 	EditBone *ebone;
 	int count = 0;
@@ -127,7 +133,7 @@ int countEditBoneChildren(ListBase *list, EditBone *parent)
 	return count;
 }
 
-EditBone* nextEditBoneChild(ListBase *list, EditBone *parent, int n)
+static EditBone* nextEditBoneChild(ListBase *list, EditBone *parent, int n)
 {
 	EditBone *ebone;
 	
@@ -146,7 +152,7 @@ EditBone* nextEditBoneChild(ListBase *list, EditBone *parent, int n)
 	return NULL;
 }
 
-void getEditBoneRollUpAxis(EditBone *bone, float roll, float up_axis[3])
+static void getEditBoneRollUpAxis(EditBone *bone, float roll, float up_axis[3])
 {
 	float mat[3][3], nor[3];
 
@@ -156,7 +162,7 @@ void getEditBoneRollUpAxis(EditBone *bone, float roll, float up_axis[3])
 	VECCOPY(up_axis, mat[2]);
 }
 
-float rollBoneByQuatAligned(EditBone *bone, float old_up_axis[3], float qrot[4], float qroll[4], float aligned_axis[3])
+static float rollBoneByQuatAligned(EditBone *bone, float old_up_axis[3], float qrot[4], float qroll[4], float aligned_axis[3])
 {
 	float nor[3], new_up_axis[3], x_axis[3], z_axis[3];
 	
@@ -194,7 +200,7 @@ float rollBoneByQuatAligned(EditBone *bone, float old_up_axis[3], float qrot[4],
 	}
 }
 
-float rollBoneByQuatJoint(RigEdge *edge, RigEdge *previous, float qrot[4], float qroll[4], float up_axis[3])
+static float rollBoneByQuatJoint(RigEdge *edge, RigEdge *previous, float qrot[4], float qroll[4], float up_axis[3])
 {
 	if (previous == NULL)
 	{
@@ -256,7 +262,7 @@ float rollBoneByQuat(EditBone *bone, float old_up_axis[3], float qrot[4])
 
 /************************************ DESTRUCTORS ******************************************************/
 
-void RIG_freeRigArc(BArc *arc)
+static void RIG_freeRigArc(BArc *arc)
 {
 	BLI_freelistN(&((RigArc*)arc)->edges);
 }
@@ -1413,7 +1419,7 @@ static void RIG_findHead(RigGraph *rg)
 
 /*******************************************************************************************************/
 
-void RIG_printNode(RigNode *node, const char name[])
+static void RIG_printNode(RigNode *node, const char name[])
 {
 	printf("%s %p %i <%0.3f, %0.3f, %0.3f>\n", name, (void *)node, node->degree, node->p[0], node->p[1], node->p[2]);
 	
@@ -1442,7 +1448,7 @@ void RIG_printArcBones(RigArc *arc)
 	printf("\n");
 }
 
-void RIG_printCtrl(RigControl *ctrl, char *indent)
+static void RIG_printCtrl(RigControl *ctrl, char *indent)
 {
 	char text[128];
 	
@@ -1455,7 +1461,7 @@ void RIG_printCtrl(RigControl *ctrl, char *indent)
 	printf("%sFlag: %i\n", indent, ctrl->flag);
 }
 
-void RIG_printLinkedCtrl(RigGraph *rg, EditBone *bone, int tabs)
+static void RIG_printLinkedCtrl(RigGraph *rg, EditBone *bone, int tabs)
 {
 	RigControl *ctrl;
 	char indent[64];
@@ -1530,7 +1536,7 @@ RigGraph *RIG_graphFromArmature(const bContext *C, Object *ob, bArmature *arm)
 	Scene *scene = CTX_data_scene(C);
 	EditBone *ebone;
 	RigGraph *rg;
- 	
+
 	rg = newRigGraph();
 	
 	if (obedit == ob)
@@ -1576,13 +1582,13 @@ RigGraph *RIG_graphFromArmature(const bContext *C, Object *ob, bArmature *arm)
 	return rg;
 }
 
-RigGraph *armatureSelectedToGraph(bContext *C, Object *ob, bArmature *arm)
+static RigGraph *armatureSelectedToGraph(bContext *C, Object *ob, bArmature *arm)
 {
 	Object *obedit = CTX_data_edit_object(C);
 	Scene *scene = CTX_data_scene(C);
 	EditBone *ebone;
 	RigGraph *rg;
- 	
+
 	rg = newRigGraph();
 	
 	if (obedit == ob)
@@ -1655,7 +1661,8 @@ static EditBone *add_editbonetolist(char *name, ListBase *list)
 }
 #endif
 
-void generateMissingArcsFromNode(RigGraph *rigg, ReebNode *node, int multi_level_limit)
+#if 0 /* UNUSED */
+static void generateMissingArcsFromNode(RigGraph *rigg, ReebNode *node, int multi_level_limit)
 {
 	while (node->multi_level > multi_level_limit && node->link_up)
 	{
@@ -1688,9 +1695,9 @@ void generateMissingArcsFromNode(RigGraph *rigg, ReebNode *node, int multi_level
 	}
 }
 
-void generateMissingArcs(RigGraph *rigg)
+static void generateMissingArcs(RigGraph *rigg)
 {
-	ReebGraph *reebg = rigg->link_mesh;
+	ReebGraph *reebg;
 	int multi_level_limit = 5;
 	
 	for (reebg = rigg->link_mesh; reebg; reebg = reebg->link_up)
@@ -1707,6 +1714,7 @@ void generateMissingArcs(RigGraph *rigg)
 		}
 	}
 }
+#endif
 
 /************************************ RETARGETTING *****************************************************/
 
@@ -2729,8 +2737,6 @@ static void retargetGraphs(bContext *C, RigGraph *rigg)
 	BIF_flagMultiArcs(reebg, ARC_FREE);
 	
 	/* return to first level */
-	reebg = rigg->link_mesh;
-	
 	inode = rigg->head;
 	
 	matchMultiResolutionStartingNode(rigg, reebg, inode);
@@ -2791,7 +2797,7 @@ int RIG_nbJoints(RigGraph *rg)
 	return total;
 }
 
-void BIF_freeRetarget(void)
+static void BIF_freeRetarget(void)
 {
 	if (GLOBAL_RIGG)
 	{
@@ -2823,7 +2829,7 @@ void BIF_retargetArmature(bContext *C)
 		{
 			RigGraph *rigg;
 			bArmature *arm;
-		 	
+
 			arm = ob->data;
 		
 			/* Put the armature into editmode */
@@ -2886,7 +2892,6 @@ void BIF_retargetArc(bContext *C, ReebArc *earc, RigGraph *template_rigg)
 	Object *ob;
 	RigGraph *rigg;
 	RigArc *iarc;
-	bArmature *arm;
 	char *side_string = scene->toolsettings->skgen_side_string;
 	char *num_string = scene->toolsettings->skgen_num_string;
 	int free_template = 0;
@@ -2894,14 +2899,12 @@ void BIF_retargetArc(bContext *C, ReebArc *earc, RigGraph *template_rigg)
 	if (template_rigg)
 	{
 		ob = template_rigg->ob; 	
-		arm = ob->data;
 	}
 	else
 	{
 		free_template = 1;
-		ob = obedit; 	
-		arm = ob->data;
-		template_rigg = armatureSelectedToGraph(C, ob, arm);
+		ob = obedit;
+		template_rigg = armatureSelectedToGraph(C, ob, ob->data);
 	}
 	
 	if (template_rigg->arcs.first == NULL)

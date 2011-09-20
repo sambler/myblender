@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -22,15 +22,20 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/space_info/info_report.c
+ *  \ingroup spinfo
+ */
+
+
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
 
 #include "MEM_guardedalloc.h"
 
-
 #include "BLI_blenlib.h"
 #include "BLI_dynstr.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_context.h"
 
@@ -128,6 +133,9 @@ static int select_report_pick_invoke(bContext *C, wmOperator *op, wmEvent *event
 	ReportList *reports= CTX_wm_reports(C);
 	Report *report;
 
+	/* uses opengl */
+	wmSubWindowSet(CTX_wm_window(C), ar->swinid);
+	
 	report= info_text_pick(sinfo, ar, reports, event->mval[1]);
 
 	RNA_int_set(op->ptr, "report_index", BLI_findindex(&reports->list, report));
@@ -152,7 +160,7 @@ void INFO_OT_select_pick(wmOperatorType *ot)
 	/* ot->flag= OPTYPE_REGISTER; */
 
 	/* properties */
-	RNA_def_int(ot->srna, "report_index", 0, 0, INT_MAX, "Report", "The index of the report.", 0, INT_MAX);
+	RNA_def_int(ot->srna, "report_index", 0, 0, INT_MAX, "Report", "The index of the report", 0, INT_MAX);
 }
 
 
@@ -222,7 +230,7 @@ static int borderselect_exec(bContext *C, wmOperator *op)
 	rcti rect;
 	//rctf rectf, rq;
 	short selecting= (RNA_int_get(op->ptr, "gesture_mode")==GESTURE_MODAL_SELECT);
-	//short mval[2];
+	//int mval[2];
 
 	rect.xmin= RNA_int_get(op->ptr, "xmin");
 	rect.ymin= RNA_int_get(op->ptr, "ymin");
@@ -294,6 +302,7 @@ void INFO_OT_select_border(wmOperatorType *ot)
 	ot->invoke= WM_border_select_invoke;
 	ot->exec= borderselect_exec;
 	ot->modal= WM_border_select_modal;
+	ot->cancel= WM_border_select_cancel;
 
 	ot->poll= ED_operator_info_active;
 

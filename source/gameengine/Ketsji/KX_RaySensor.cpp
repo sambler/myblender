@@ -1,4 +1,4 @@
-/**
+/*
  * Cast a ray and feel for objects
  *
  * $Id$
@@ -28,6 +28,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file gameengine/Ketsji/KX_RaySensor.cpp
+ *  \ingroup ketsji
+ */
+
 
 #include "KX_RaySensor.h"
 #include "SCA_EventManager.h"
@@ -78,7 +83,7 @@ void KX_RaySensor::Init()
 
 KX_RaySensor::~KX_RaySensor() 
 {
-    /* Nothing to be done here. */
+	/* Nothing to be done here. */
 }
 
 
@@ -274,7 +279,7 @@ bool KX_RaySensor::Evaluate()
 
 	/* now pass this result to some controller */
 
-    if (m_rayHit)
+	if (m_rayHit)
 	{
 		if (!m_bTriggered)
 		{
@@ -283,14 +288,14 @@ bool KX_RaySensor::Evaluate()
 			m_bTriggered = true;
 		}
 		else
-		  {
+		{
 			// notify logicsystem that ray is STILL hitting ...
 			result = false;
-		    
-		  }
+
+		}
 	}
-    else
-      {
+	else
+	{
 		if (m_bTriggered)
 		{
 			m_bTriggered = false;
@@ -301,9 +306,9 @@ bool KX_RaySensor::Evaluate()
 		{
 			result = false;
 		}
-	
-      }
-    if (reset)
+
+	}
+	if (reset)
 		// force an event
 		result = true;
 

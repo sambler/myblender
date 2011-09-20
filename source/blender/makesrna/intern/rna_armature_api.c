@@ -1,4 +1,4 @@
-/**
+/*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -23,6 +23,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/makesrna/intern/rna_armature_api.c
+ *  \ingroup RNA
+ */
+
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -57,7 +62,8 @@ void RNA_api_armature_edit_bone(StructRNA *srna)
 	PropertyRNA *parm;
 
 	func= RNA_def_function(srna, "align_roll", "rna_EditBone_align_roll");
-	RNA_def_function_ui_description(func, "Align the bone to a localspace roll so the Z axis points in the direction of the vector given.");
+	RNA_def_function_ui_description(func, "Align the bone to a localspace roll so the Z axis "
+	                                "points in the direction of the vector given");
 	parm= RNA_def_float_vector(func, "vector", 3, NULL, -FLT_MAX, FLT_MAX, "Vector", "", -FLT_MAX, FLT_MAX);
 	RNA_def_property_flag(parm, PROP_REQUIRED);
 }
@@ -68,8 +74,9 @@ void RNA_api_bone(StructRNA *srna)
 	FunctionRNA *func;
 
 	func= RNA_def_function(srna, "evaluate_envelope", "rna_Bone_do_envelope");
-	RNA_def_function_ui_description(func, "Calculate bone envelope at given point.");
-	parm= RNA_def_float_vector_xyz(func, "point", 3, NULL, -FLT_MAX, FLT_MAX, "Point", "Position in 3d space to evaluate", -FLT_MAX, FLT_MAX);
+	RNA_def_function_ui_description(func, "Calculate bone envelope at given point");
+	parm= RNA_def_float_vector_xyz(func, "point", 3, NULL, -FLT_MAX, FLT_MAX, "Point",
+	                               "Position in 3d space to evaluate", -FLT_MAX, FLT_MAX);
 	RNA_def_property_flag(parm, PROP_REQUIRED);
 	/* return value */
 	parm= RNA_def_float(func, "factor", 0, -FLT_MAX, FLT_MAX, "Factor", "Envelope factor", -FLT_MAX, FLT_MAX);

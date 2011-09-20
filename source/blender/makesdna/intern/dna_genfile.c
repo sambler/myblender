@@ -31,11 +31,20 @@
  * DNA handling
  */
 
+/** \file blender/makesdna/intern/dna_genfile.c
+ *  \ingroup DNA
+ */
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "MEM_guardedalloc.h" // for MEM_freeN MEM_mallocN MEM_callocN
+
+#ifdef WITH_DNA_GHASH
+#  include "BLI_ghash.h"
+#endif
 
 #include "DNA_genfile.h"
 #include "DNA_sdna_types.h" // for SDNA ;-)
@@ -43,7 +52,7 @@
 
 /* gcc 4.1 on mingw was complaining that __int64 was already defined
 actually is saw the line below as typedef long long long long... 
-Anyhow, since its already defined, its safe to do an ifndef here- Cambpell*/
+Anyhow, since its already defined, its safe to do an ifndef here- Campbell */
 #ifdef FREE_WINDOWS
 #ifndef __int64
 typedef long long __int64;
@@ -165,7 +174,7 @@ static int le_int(int temp)
 int DNA_elem_array_size(const char *astr, int len)
 {
 	int a, mul=1;
-	char str[100], *cp=0;
+	char str[100], *cp= NULL;
 
 	memcpy(str, astr, len+1);
 
@@ -189,10 +198,14 @@ int DNA_elem_array_size(const char *astr, int len)
 void DNA_sdna_free(SDNA *sdna)
 {
 	MEM_freeN(sdna->data);
-	MEM_freeN(sdna->names);
+	MEM_freeN((void *)sdna->names);
 	MEM_freeN(sdna->types);
 	MEM_freeN(sdna->structs);
-	
+
+#ifdef WITH_DNA_GHASH
+	BLI_ghash_free(sdna->structs_map, NULL, NULL);
+#endif
+
 	MEM_freeN(sdna);
 }
 
@@ -254,7 +267,7 @@ static void printstruct(SDNA *sdna, short strnr)
 static short *findstruct_name(SDNA *sdna, const char *str)
 {
 	int a;
-	short *sp=0;
+	short *sp= NULL;
 
 
 	for(a=0; a<sdna->nr_structs; a++) {
@@ -264,30 +277,36 @@ static short *findstruct_name(SDNA *sdna, const char *str)
 		if(strcmp( sdna->types[ sp[0] ], str )==0) return sp;
 	}
 	
-	return 0;
+	return NULL;
 }
 
 int DNA_struct_find_nr(SDNA *sdna, const char *str)
 {
-	short *sp=0;
-	int a;
+	short *sp= NULL;
 
 	if(sdna->lastfind<sdna->nr_structs) {
 		sp= sdna->structs[sdna->lastfind];
 		if(strcmp( sdna->types[ sp[0] ], str )==0) return sdna->lastfind;
 	}
 
-	for(a=0; a<sdna->nr_structs; a++) {
+#ifdef WITH_DNA_GHASH
+	return (intptr_t)BLI_ghash_lookup(sdna->structs_map, str) - 1;
+#else
+	{
+		int a;
 
-		sp= sdna->structs[a];
-		
-		if(strcmp( sdna->types[ sp[0] ], str )==0) {
-			sdna->lastfind= a;
-			return a;
+		for(a=0; a<sdna->nr_structs; a++) {
+
+			sp= sdna->structs[a];
+
+			if(strcmp( sdna->types[ sp[0] ], str )==0) {
+				sdna->lastfind= a;
+				return a;
+			}
 		}
 	}
-	
 	return -1;
+#endif
 }
 
 /* ************************* END DIV ********************** */
@@ -476,6 +495,16 @@ static void init_structDNA(SDNA *sdna, int do_endian_swap)
 					sp[10]= 9;
 			}
 		}
+
+#ifdef WITH_DNA_GHASH
+		/* create a ghash lookup to speed up */
+		sdna->structs_map= BLI_ghash_new(BLI_ghashutil_strhash, BLI_ghashutil_strcmp, "init_structDNA gh");
+
+		for(nr = 0; nr < sdna->nr_structs; nr++) {
+			sp= sdna->structs[nr];
+			BLI_ghash_insert(sdna->structs_map, (void *)sdna->types[sp[0]], (void *)(nr + 1));
+		}
+#endif
 	}
 }
 
@@ -571,33 +600,33 @@ char *DNA_struct_get_compareflags(SDNA *sdna, SDNA *newsdna)
 			
 			/* compare length and amount of elems */
 			if( spcur[1] == spold[1]) {
-				 if( newsdna->typelens[spcur[0]] == sdna->typelens[spold[0]] ) {
-					 
-					 /* same length, same amount of elems, now per type and name */
-					 b= spold[1];
-					 spold+= 2;
-					 spcur+= 2;
-					 while(b > 0) {
-						 str1= newsdna->types[spcur[0]];
-						 str2= sdna->types[spold[0]];
-						 if(strcmp(str1, str2)!=0) break;
+				if( newsdna->typelens[spcur[0]] == sdna->typelens[spold[0]] ) {
 
-						 str1= newsdna->names[spcur[1]];
-						 str2= sdna->names[spold[1]];
-						 if(strcmp(str1, str2)!=0) break;
-						 
-						 /* same type and same name, now pointersize */
-						 if(ispointer(str1)) {
-							 if(sdna->pointerlen!=newsdna->pointerlen) break;
-						 }
-						 
-						 b--;
-						 spold+= 2;
-						 spcur+= 2;
-					 }
-					 if(b==0) compflags[a]= 1;
+					/* same length, same amount of elems, now per type and name */
+					b= spold[1];
+					spold+= 2;
+					spcur+= 2;
+					while(b > 0) {
+						str1= newsdna->types[spcur[0]];
+						str2= sdna->types[spold[0]];
+						if(strcmp(str1, str2)!=0) break;
 
-				 }
+						str1= newsdna->names[spcur[1]];
+						str2= sdna->names[spold[1]];
+						if(strcmp(str1, str2)!=0) break;
+
+						/* same type and same name, now pointersize */
+						if(ispointer(str1)) {
+							if(sdna->pointerlen!=newsdna->pointerlen) break;
+						}
+
+						b--;
+						spold+= 2;
+						spcur+= 2;
+					}
+					if(b==0) compflags[a]= 1;
+
+				}
 			}
 			
 		}
@@ -803,12 +832,12 @@ static char *find_elem(SDNA *sdna, const char *type, const char *name, short *ol
 				return olddata;
 			}
 			
-			return 0;
+			return NULL;
 		}
 		
 		olddata+= len;
 	}
-	return 0;
+	return NULL;
 }
 
 static void reconstruct_elem(SDNA *newsdna, SDNA *oldsdna, char *type, const char *name, char *curdata, short *old, char *olddata)
@@ -869,6 +898,10 @@ static void reconstruct_elem(SDNA *newsdna, SDNA *oldsdna, char *type, const cha
 					mul= len/oldsize;
 					mul*= (cursize < oldsize)? cursize: oldsize;
 					memcpy(curdata, olddata, mul);
+					
+					/* terminate strings */
+					if(oldsize > cursize && strcmp(type, "char")==0)
+						curdata[mul-1]= 0;
 				}
 				else {
 					if(cursize>oldsize) cast_elem(type, otype, oname, curdata, olddata);
@@ -990,7 +1023,7 @@ void DNA_struct_switch_endian(SDNA *oldsdna, int oldSDNAnr, char *data)
 		/* test: is type a struct? */
 		if(spc[0]>=firststructtypenr  &&  !ispointer(name)) {
 			/* where does the old data start (is there one?) */
-			cpo= find_elem(oldsdna, type, name, spo, data, 0);
+			cpo= find_elem(oldsdna, type, name, spo, data, NULL);
 			if(cpo) {
 				oldSDNAnr= DNA_struct_find_nr(oldsdna, type);
 				

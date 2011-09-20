@@ -28,39 +28,33 @@ remove_strict_flags()
 
 set(INC
 	.
-	../blenlib
 	../blenkernel
-	../windowmanager
+	../blenlib
+	../blenloader
+	../editors/include
 	../makesdna
 	../makesrna
-	../editors/include
+	../windowmanager
 	../../../intern/guardedalloc
 )
 
-if(APPLE)
-	list(APPEND INC
-		${OPENCOLLADA_INC}/COLLADAStreamWriter
-		${OPENCOLLADA_INC}/COLLADABaseUtils
-		${OPENCOLLADA_INC}/COLLADAFramework
-		${OPENCOLLADA_INC}/COLLADASaxFrameworkLoader 
-	)
-else()
-	list(APPEND INC
-		${OPENCOLLADA_INC}/COLLADAStreamWriter/include
-		${OPENCOLLADA_INC}/COLLADABaseUtils/include
-		${OPENCOLLADA_INC}/COLLADAFramework/include
-		${OPENCOLLADA_INC}/COLLADASaxFrameworkLoader/include 
-	)
-endif()
+set(INC_SYS
+	${OPENCOLLADA_INCLUDE_DIRS}
+)
 
 set(SRC
 	AnimationImporter.cpp
+	AnimationExporter.cpp
 	ArmatureExporter.cpp
 	ArmatureImporter.cpp
 	CameraExporter.cpp
 	DocumentExporter.cpp
 	DocumentImporter.cpp
 	EffectExporter.cpp
+	ErrorHandler.cpp
+	ExportSettings.cpp
+	ExtraHandler.cpp
+	ExtraTags.cpp
 	GeometryExporter.cpp
 	ImageExporter.cpp
 	InstanceWriter.cpp
@@ -68,6 +62,7 @@ set(SRC
 	MaterialExporter.cpp
 	MeshImporter.cpp
 	SkinInfo.cpp
+	SceneExporter.cpp
 	TransformReader.cpp
 	TransformWriter.cpp
 	collada.cpp
@@ -75,12 +70,17 @@ set(SRC
 	collada_utils.cpp
 
 	AnimationImporter.h
+	AnimationExporter.h	
 	ArmatureExporter.h
 	ArmatureImporter.h
 	CameraExporter.h
 	DocumentExporter.h
 	DocumentImporter.h
 	EffectExporter.h
+	ErrorHandler.h
+	ExportSettings.h
+	ExtraHandler.h
+	ExtraTags.h
 	GeometryExporter.h
 	ImageExporter.h
 	InstanceWriter.h
@@ -88,6 +88,7 @@ set(SRC
 	MaterialExporter.h
 	MeshImporter.h
 	SkinInfo.h
+	SceneExporter.h
 	TransformReader.h
 	TransformWriter.h
 	collada.h
@@ -96,7 +97,12 @@ set(SRC
 )
 
 if(WITH_BUILDINFO)
-	add_definitions(-DNAN_BUILDINFO)
+	add_definitions(-DWITH_BUILDINFO)
 endif()
 
-blenderlib(bf_collada "${SRC}" "${INC}")
+if(CMAKE_COMPILER_IS_GNUCXX)
+	# COLLADAFWArray.h gives error with gcc 4.5
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fpermissive")
+endif()
+
+blender_add_lib(bf_collada "${SRC}" "${INC}" "${INC_SYS}")

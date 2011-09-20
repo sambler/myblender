@@ -27,7 +27,11 @@
 * ***** END GPL LICENSE BLOCK *****
 */ 
 
-/* CustomData interface, see also DNA_customdata_types.h. */
+/** \file BKE_customdata.h
+ *  \ingroup bke
+ *  \author Ben Batt
+ *  \brief CustomData interface, see also DNA_customdata_types.h.
+ */
 
 #ifndef BKE_CUSTOMDATA_H
 #define BKE_CUSTOMDATA_H
@@ -144,6 +148,7 @@ void CustomData_em_copy_data(const struct CustomData *source,
 void CustomData_bmesh_copy_data(const struct CustomData *source, 
 							struct CustomData *dest,void *src_block, 
 							void **dest_block);
+void CustomData_em_validate_data(struct CustomData *data, void *block, int sub_elements);
 
 /* frees data in a CustomData object
  * return 1 on success, 0 on failure

@@ -1,8 +1,4 @@
-/**
- * blenlib/DNA_curve_types.h (mar-2001 nzc)
- *
- * Curve stuff.
- *
+/*
  * $Id$ 
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -32,6 +28,10 @@
  */
 #ifndef DNA_CURVE_TYPES_H
 #define DNA_CURVE_TYPES_H
+
+/** \file DNA_curve_types.h
+ *  \ingroup DNA
+ */
 
 #include "DNA_listBase.h"
 #include "DNA_vec_types.h"
@@ -155,10 +155,6 @@ typedef struct EditNurb {
 	/* base of nurbs' list (old Curve->editnurb) */
 	ListBase nurbs;
 
-	/* copy of animation curves to keep them in consistent state */
-	/* when changing curve topology */
-	ListBase fcurves;
-
 	/* index data for shape keys */
 	struct GHash *keyindex;
 
@@ -175,7 +171,7 @@ typedef struct Curve {
 	struct BoundBox *bb;
 	
 	ListBase nurb;		/* actual data, called splines in rna */
-	ListBase disp;
+	ListBase disp;		/* undeformed display list, used mostly for texture space calculation */
 	
 	EditNurb *editnurb;	/* edited data, not in file, use pointer so we can check for it */
 	
@@ -318,7 +314,7 @@ typedef enum eBezTriple_Handle {
 	HD_AUTO,
 	HD_VECT,
 	HD_ALIGN,
-	HD_AUTO_ANIM	/* not real handle type, but is just used as dummy item for anim code */
+	HD_AUTO_ANIM 	/* auto-clamped handles for animation */
 } eBezTriple_Handle;
 
 /* interpolation modes (used only for BezTriple->ipo) */
@@ -332,7 +328,8 @@ typedef enum eBezTriple_Interpolation {
 typedef enum eBezTriple_KeyframeType {
 	BEZT_KEYTYPE_KEYFRAME = 0,	/* default - 'proper' Keyframe */
 	BEZT_KEYTYPE_EXTREME,		/* 'extreme' keyframe */
-	BEZT_KEYTYPE_BREAKDOWN		/* 'breakdown' keyframe */
+	BEZT_KEYTYPE_BREAKDOWN,		/* 'breakdown' keyframe */
+	BEZT_KEYTYPE_JITTER,		/* 'jitter' keyframe (for adding 'filler' secondary motion) */
 } eBezTriple_KeyframeType;
 
 /* checks if the given BezTriple is selected */

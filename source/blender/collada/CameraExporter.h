@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -23,6 +23,10 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file CameraExporter.h
+ *  \ingroup collada
+ */
+
 #ifndef __CAMERAEXPORTER_H__
 #define __CAMERAEXPORTER_H__
 
@@ -32,12 +36,16 @@
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 
+#include "ExportSettings.h"
+
 class CamerasExporter: COLLADASW::LibraryCameras
 {
 public:
-	CamerasExporter(COLLADASW::StreamWriter *sw);
+	CamerasExporter(COLLADASW::StreamWriter *sw, const ExportSettings *export_settings);
 	void exportCameras(Scene *sce);
 	void operator()(Object *ob, Scene *sce);
+private:
+	const ExportSettings *export_settings;
 };
 
 #endif

@@ -1,4 +1,4 @@
-/**
+/*
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -29,15 +29,21 @@
  * $Id$
  */
 
+/** \file blender/imbuf/intern/divers.c
+ *  \ingroup imbuf
+ */
+
+
 #include "BLI_blenlib.h"
 #include "BLI_rand.h"
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
 #include "imbuf.h"
 #include "IMB_imbuf_types.h"
 #include "IMB_imbuf.h"
 #include "IMB_allocimbuf.h"
-#include "BKE_utildefines.h"
+
 #include "BKE_colortools.h"
 
 #include "MEM_guardedalloc.h"
@@ -46,7 +52,7 @@ void IMB_de_interlace(struct ImBuf *ibuf)
 {
 	struct ImBuf * tbuf1, * tbuf2;
 	
-	if (ibuf == 0) return;
+	if (ibuf == NULL) return;
 	if (ibuf->flags & IB_fields) return;
 	ibuf->flags |= IB_fields;
 	
@@ -73,7 +79,7 @@ void IMB_interlace(struct ImBuf *ibuf)
 {
 	struct ImBuf * tbuf1, * tbuf2;
 
-	if (ibuf == 0) return;
+	if (ibuf == NULL) return;
 	ibuf->flags &= ~IB_fields;
 
 	ibuf->y *= 2;
@@ -103,7 +109,7 @@ void IMB_rect_from_float(struct ImBuf *ibuf)
 	/* quick method to convert floatbuf to byte */
 	float *tof = (float *)ibuf->rect_float;
 //	int do_dither = ibuf->dither != 0.f;
-	float dither= ibuf->dither / 255.0;
+	float dither= ibuf->dither / 255.0f;
 	float srgb[4];
 	int i, channels= ibuf->channels;
 	short profile= ibuf->profile;
@@ -135,7 +141,7 @@ void IMB_rect_from_float(struct ImBuf *ibuf)
 		else if (channels == 4) {
 			if (dither != 0.f) {
 				for (i = ibuf->x * ibuf->y; i > 0; i--, to+=4, tof+=4) {
-					const float d = (BLI_frand()-0.5)*dither;
+					const float d = (BLI_frand()-0.5f)*dither;
 					
 					srgb[0]= d + linearrgb_to_srgb(tof[0]);
 					srgb[1]= d + linearrgb_to_srgb(tof[1]);
@@ -164,7 +170,7 @@ void IMB_rect_from_float(struct ImBuf *ibuf)
 		else {
 			if (dither != 0.f) {
 				for (i = ibuf->x * ibuf->y; i > 0; i--, to+=4, tof+=4) {
-					const float d = (BLI_frand()-0.5)*dither;
+					const float d = (BLI_frand()-0.5f)*dither;
 					float col[4];
 
 					col[0]= d + tof[0];
@@ -187,6 +193,137 @@ void IMB_rect_from_float(struct ImBuf *ibuf)
 			}
 		}
 	}
+	/* ensure user flag is reset */
+	ibuf->userflags &= ~IB_RECT_INVALID;
+}
+
+ 
+
+/* converts from linear float to sRGB byte for part of the texture, buffer will hold the changed part */
+void IMB_partial_rect_from_float(struct ImBuf *ibuf,float *buffer, int x, int y, int w, int h)
+{
+	/* indices to source and destination image pixels */
+	float *srcFloatPxl;
+	unsigned char *dstBytePxl;
+	/* buffer index will fill buffer */
+	float *bufferIndex;
+
+	/* convenience pointers to start of image buffers */
+	float *init_srcFloatPxl = (float *)ibuf->rect_float;
+	unsigned char *init_dstBytePxl = (unsigned char *) ibuf->rect;
+
+	/* Dithering factor */
+	float dither= ibuf->dither / 255.0f;
+	/* respective attributes of image */
+	short profile= ibuf->profile;
+	int channels= ibuf->channels;
+	
+	int i, j;
+	
+	/*
+		if called -only- from GPU_paint_update_image this test will never fail
+		but leaving it here for better or worse
+	*/
+	if(init_srcFloatPxl==NULL || (buffer == NULL)){
+		return;
+	}
+	if(init_dstBytePxl==NULL) {
+		imb_addrectImBuf(ibuf);
+		init_dstBytePxl = (unsigned char *) ibuf->rect;
+	}
+	if(channels==1) {
+			for (j = 0; j < h; j++){
+				bufferIndex = buffer + w*j*4;
+				dstBytePxl = init_dstBytePxl + (ibuf->x*(y + j) + x)*4;
+				srcFloatPxl = init_srcFloatPxl + (ibuf->x*(y + j) + x);
+				for(i = 0;  i < w; i++, dstBytePxl+=4, srcFloatPxl++, bufferIndex+=4) {
+					dstBytePxl[1]= dstBytePxl[2]= dstBytePxl[3]= dstBytePxl[0] = FTOCHAR(srcFloatPxl[0]);
+					bufferIndex[0] = bufferIndex[1] = bufferIndex[2] = bufferIndex[3] = srcFloatPxl[0];
+				}
+			}
+	}
+	else if (profile == IB_PROFILE_LINEAR_RGB) {
+		if(channels == 3) {
+			for (j = 0; j < h; j++){
+				bufferIndex = buffer + w*j*4;
+				dstBytePxl = init_dstBytePxl + (ibuf->x*(y + j) + x)*4;
+				srcFloatPxl = init_srcFloatPxl + (ibuf->x*(y + j) + x)*3;
+				for(i = 0;  i < w; i++, dstBytePxl+=4, srcFloatPxl+=3, bufferIndex += 4) {
+					linearrgb_to_srgb_v3_v3(bufferIndex, srcFloatPxl);
+					F3TOCHAR4(bufferIndex, dstBytePxl);
+					bufferIndex[3]= 1.0;
+				}
+			}
+		}
+		else if (channels == 4) {
+			if (dither != 0.f) {
+				for (j = 0; j < h; j++){
+					bufferIndex = buffer + w*j*4;
+					dstBytePxl = init_dstBytePxl + (ibuf->x*(y + j) + x)*4;
+					srcFloatPxl = init_srcFloatPxl + (ibuf->x*(y + j) + x)*4;
+					for(i = 0;  i < w; i++, dstBytePxl+=4, srcFloatPxl+=4, bufferIndex+=4) {
+						const float d = (BLI_frand()-0.5f)*dither;
+						linearrgb_to_srgb_v3_v3(bufferIndex, srcFloatPxl);
+						bufferIndex[3] = srcFloatPxl[3];
+						add_v4_fl(bufferIndex, d);
+						F4TOCHAR4(bufferIndex, dstBytePxl);
+					}
+				}
+			} else {
+				for (j = 0; j < h; j++){
+					bufferIndex = buffer + w*j*4;
+					dstBytePxl = init_dstBytePxl + (ibuf->x*(y + j) + x)*4;
+					srcFloatPxl = init_srcFloatPxl + (ibuf->x*(y + j) + x)*4;
+					for(i = 0;  i < w; i++, dstBytePxl+=4, srcFloatPxl+=4, bufferIndex+=4) {
+						linearrgb_to_srgb_v3_v3(bufferIndex, srcFloatPxl);
+						bufferIndex[3]= srcFloatPxl[3];
+						F4TOCHAR4(bufferIndex, dstBytePxl);
+					}
+				}
+			}
+		}
+	}
+	else if(ELEM(profile, IB_PROFILE_NONE, IB_PROFILE_SRGB)) {
+		if(channels==3) {
+			for (j = 0; j < h; j++){
+				bufferIndex = buffer + w*j*4;
+				dstBytePxl = init_dstBytePxl + (ibuf->x*(y + j) + x)*4;
+				srcFloatPxl = init_srcFloatPxl + (ibuf->x*(y + j) + x)*3;
+				for(i = 0;  i < w; i++, dstBytePxl+=4, srcFloatPxl+=3, bufferIndex+=4) {
+					copy_v3_v3(bufferIndex, srcFloatPxl);
+					F3TOCHAR4(bufferIndex, dstBytePxl);
+					bufferIndex[3] = 1.0;
+				}
+			}
+		}
+		else {
+			if (dither != 0.f) {
+				for (j = 0; j < h; j++){
+					bufferIndex = buffer + w*j*4;
+					dstBytePxl = init_dstBytePxl + (ibuf->x*(y + j) + x)*4;
+					srcFloatPxl = init_srcFloatPxl + (ibuf->x*(y + j) + x)*4;
+					for(i = 0;  i < w; i++, dstBytePxl+=4, srcFloatPxl+=4, bufferIndex+=4) {
+						const float d = (BLI_frand()-0.5f)*dither;
+						copy_v4_v4(bufferIndex, srcFloatPxl);
+						add_v4_fl(bufferIndex,d);
+						F4TOCHAR4(bufferIndex, dstBytePxl);
+					}
+				}
+			} else {
+				for (j = 0; j < h; j++){
+					bufferIndex = buffer + w*j*4;
+					dstBytePxl = init_dstBytePxl + (ibuf->x*(y + j) + x)*4;
+					srcFloatPxl = init_srcFloatPxl + (ibuf->x*(y + j) + x)*4;
+					for(i = 0;  i < w; i++, dstBytePxl+=4, srcFloatPxl+=4, bufferIndex+=4) {
+						copy_v4_v4(bufferIndex, srcFloatPxl);
+						F4TOCHAR4(bufferIndex, dstBytePxl);
+					}
+				}
+			}
+		}
+	}
+	/* ensure user flag is reset */
+	ibuf->userflags &= ~IB_RECT_INVALID;
 }
 
 static void imb_float_from_rect_nonlinear(struct ImBuf *ibuf, float *fbuf)
@@ -227,13 +364,9 @@ static void imb_float_from_rect_linear(struct ImBuf *ibuf, float *fbuf)
 void IMB_float_from_rect(struct ImBuf *ibuf)
 {
 	/* quick method to convert byte to floatbuf */
-	float *tof = ibuf->rect_float;
-
-	unsigned char *to = (unsigned char *) ibuf->rect;
-	if(to==NULL) return;
-	if(tof==NULL) {
+	if(ibuf->rect==NULL) return;
+	if(ibuf->rect_float==NULL) {
 		if (imb_addrectfloatImBuf(ibuf) == 0) return;
-		tof = ibuf->rect_float;
 	}
 	
 	/* Float bufs should be stored linear */
@@ -277,9 +410,9 @@ void IMB_convert_profile(struct ImBuf *ibuf, int profile)
 			}
 			if(ibuf->rect) {
 				for (i = ibuf->x * ibuf->y; i > 0; i--, rct+=4) {
-					rctf[0]= (unsigned char)((srgb_to_linearrgb((float)rctf[0]/255.0f) * 255.0f) + 0.5f);
-					rctf[1]= (unsigned char)((srgb_to_linearrgb((float)rctf[1]/255.0f) * 255.0f) + 0.5f);
-					rctf[2]= (unsigned char)((srgb_to_linearrgb((float)rctf[2]/255.0f) * 255.0f) + 0.5f);
+					rct[0]= (unsigned char)((srgb_to_linearrgb((float)rct[0]/255.0f) * 255.0f) + 0.5f);
+					rct[1]= (unsigned char)((srgb_to_linearrgb((float)rct[1]/255.0f) * 255.0f) + 0.5f);
+					rct[2]= (unsigned char)((srgb_to_linearrgb((float)rct[2]/255.0f) * 255.0f) + 0.5f);
 				}
 			}
 			ok= TRUE;
@@ -296,9 +429,9 @@ void IMB_convert_profile(struct ImBuf *ibuf, int profile)
 			}
 			if(ibuf->rect) {
 				for (i = ibuf->x * ibuf->y; i > 0; i--, rct+=4) {
-					rctf[0]= (unsigned char)((linearrgb_to_srgb((float)rctf[0]/255.0f) * 255.0f) + 0.5f);
-					rctf[1]= (unsigned char)((linearrgb_to_srgb((float)rctf[1]/255.0f) * 255.0f) + 0.5f);
-					rctf[2]= (unsigned char)((linearrgb_to_srgb((float)rctf[2]/255.0f) * 255.0f) + 0.5f);
+					rct[0]= (unsigned char)((linearrgb_to_srgb((float)rct[0]/255.0f) * 255.0f) + 0.5f);
+					rct[1]= (unsigned char)((linearrgb_to_srgb((float)rct[1]/255.0f) * 255.0f) + 0.5f);
+					rct[2]= (unsigned char)((linearrgb_to_srgb((float)rct[2]/255.0f) * 255.0f) + 0.5f);
 				}
 			}
 			ok= TRUE;
@@ -355,5 +488,25 @@ float *IMB_float_profile_ensure(struct ImBuf *ibuf, int profile, int *alloc)
 		}
 
 		return fbuf;
+	}
+}
+
+
+/* no profile conversion */
+void IMB_color_to_bw(struct ImBuf *ibuf)
+{
+	float *rctf= ibuf->rect_float;
+	unsigned char *rct= (unsigned char *)ibuf->rect;
+	int i;
+	if(rctf) {
+		for (i = ibuf->x * ibuf->y; i > 0; i--, rctf+=4) {
+			rctf[0]= rctf[1]= rctf[2]= rgb_to_grayscale(rctf);
+		}
+	}
+
+	if(rct) {
+		for (i = ibuf->x * ibuf->y; i > 0; i--, rct+=4) {
+			rct[0]= rct[1]= rct[2]= rgb_to_grayscale_byte(rct);
+		}
 	}
 }

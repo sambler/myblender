@@ -1,3 +1,6 @@
+/** \file blender/blenkernel/intern/writeframeserver.c
+ *  \ingroup bke
+ */
 /*
  * $Id$
  *
@@ -19,6 +22,7 @@
  *
  */
 
+#ifdef WITH_FRAMESERVER
 
 #include <string.h>
 #include <stdio.h>
@@ -47,10 +51,11 @@
 
 #include "DNA_userdef_types.h"
 
-#include "BKE_utildefines.h"
+#include "BLI_utildefines.h"
+
+#include "BKE_writeframeserver.h"
 #include "BKE_global.h"
 #include "BKE_report.h"
-
 
 #include "DNA_scene_types.h"
 
@@ -377,3 +382,4 @@ void end_frameserver(void)
 	shutdown_socket_system();
 }
 
+#endif /* WITH_FRAMESERVER */

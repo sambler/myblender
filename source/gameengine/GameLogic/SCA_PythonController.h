@@ -1,6 +1,4 @@
-/**
- * Execute Python scripts
- *
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -29,9 +27,14 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file SCA_PythonController.h
+ *  \ingroup gamelogic
+ *  \brief Execute Python scripts
+ */
+
 #ifndef KX_PYTHONCONTROLLER_H
 #define KX_PYTHONCONTROLLER_H
-	      
+
 #include "SCA_IController.h"
 #include "SCA_LogicManager.h"
 #include "BoolValue.h"

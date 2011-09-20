@@ -1,8 +1,4 @@
-/**
- * blenlib/BKE_library.h (mar-2001 nzc)
- *	
- * Library
- *
+/*
  * $Id$ 
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -33,6 +29,11 @@
 #ifndef BKE_LIBRARY_TYPES_H
 #define BKE_LIBRARY_TYPES_H
 
+/** \file BKE_library.h
+ *  \ingroup bke
+ *  \since March 2001
+ *  \author nzc
+ */
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -43,6 +44,8 @@ struct Main;
 struct Library;
 struct wmWindowManager;
 struct bContext;
+struct PointerRNA;
+struct PropertyRNA;
 
 void *alloc_libblock(struct ListBase *lb, short type, const char *name);
 void *copy_libblock(void *rt);
@@ -52,6 +55,7 @@ void id_lib_extern(struct ID *id);
 void id_us_plus(struct ID *id);
 void id_us_min(struct ID *id);
 int id_make_local(struct ID *id, int test);
+int id_single_user(struct bContext *C, struct ID *id, struct PointerRNA *ptr, struct PropertyRNA *prop);
 int id_copy(struct ID *id, struct ID **newid, int test);
 int id_unlink(struct ID *id, int test);
 
@@ -65,7 +69,10 @@ int set_listbasepointers(struct Main *main, struct ListBase **lb);
 void free_libblock(struct ListBase *lb, void *idv);
 void free_libblock_us(struct ListBase *lb, void *idv);
 void free_main(struct Main *mainvar);
-void tag_main(struct Main *mainvar, int tag);
+
+void tag_main_idcode(struct Main *mainvar, const short type, const short tag);
+void tag_main_lb(struct ListBase *lb, const short tag);
+void tag_main(struct Main *mainvar, const short tag);
 
 void rename_id(struct ID *id, const char *name);
 void name_uiprefix_id(char *name, struct ID *id);
@@ -87,6 +94,8 @@ void set_free_windowmanager_cb(void (*func)(struct bContext *, struct wmWindowMa
 
 /* use when "" is given to new_id() */
 #define ID_FALLBACK_NAME "Untitled"
+
+#define IS_TAGGED(_id) ((_id) && (((ID *)_id)->flag & LIB_DOIT))
 
 #ifdef __cplusplus
 }

@@ -1,6 +1,4 @@
-/**
- * $Id$
- *
+/*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -30,6 +28,10 @@
 
 #ifndef DNA_CONSTRAINT_TYPES_H
 #define DNA_CONSTRAINT_TYPES_H
+
+/** \file DNA_constraint_types.h
+ *  \ingroup DNA
+ */
 
 #include "DNA_ID.h"
 #include "DNA_listBase.h"
@@ -541,7 +543,7 @@ typedef enum eUpAxis_Modes {
 	UP_Z
 } eUpAxis_Modes;
 
-/* Tracking axis (TrackTo, Locked Track, Damped Track) */
+/* Tracking axis (TrackTo, Locked Track, Damped Track) and minmax (floor) constraint */
 typedef enum eTrackToAxis_Modes {
 	TRACK_X		= 0,
 	TRACK_Y,
@@ -673,7 +675,10 @@ typedef enum eRotLimit_Flags {
 /* distance limit constraint */
 	/* bDistLimitConstraint->flag */
 typedef enum eDistLimit_Flag {
-	LIMITDIST_USESOFT	= (1<<0)
+	/* "soft" cushion effect when reaching the limit sphere */ // NOT IMPLEMENTED!
+	LIMITDIST_USESOFT	= (1<<0),
+	/* as for all Limit constraints - allow to be used during transform? */
+	LIMITDIST_TRANSFORM = (1<<1)
 } eDistLimit_Flag;
 
 	/* bDistLimitConstraint->mode */
@@ -699,7 +704,8 @@ typedef enum eChildOf_Flags {
 	CHILDOF_ROTZ	= (1<<5),
 	CHILDOF_SIZEX	= (1<<6),
 	CHILDOF_SIZEY	= (1<<7),
-	CHILDOF_SIZEZ	= (1<<8)
+	CHILDOF_SIZEZ	= (1<<8),
+	CHILDOF_ALL		= 511
 } eChildOf_Flags;
 
 /* Pivot Constraint */

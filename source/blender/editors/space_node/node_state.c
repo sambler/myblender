@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,15 +26,21 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/space_node/node_state.c
+ *  \ingroup spnode
+ */
+
+
 #include <stdio.h>
 
 #include "DNA_node_types.h"
 #include "DNA_scene_types.h"
 
+#include "BLI_rect.h"
+#include "BLI_utildefines.h"
+
 #include "BKE_context.h"
 #include "BKE_node.h"
-
-#include "BLI_rect.h"
 
 #include "ED_screen.h"
 
@@ -63,30 +69,14 @@ void node_set_hidden_sockets(SpaceNode *snode, bNode *node, int set)
 			sock->flag &= ~SOCK_HIDDEN;
 	}
 	else {
-		bNode *gnode= node_tree_get_editgroup(snode->nodetree);
-
-		/* hiding inside group should not break links in other group users */
-		if(gnode) {
-			nodeGroupSocketUseFlags((bNodeTree *)gnode->id);
-			for(sock= node->inputs.first; sock; sock= sock->next)
-				if(!(sock->flag & SOCK_IN_USE))
-					if(sock->link==NULL)
-						sock->flag |= SOCK_HIDDEN;
-			for(sock= node->outputs.first; sock; sock= sock->next)
-				if(!(sock->flag & SOCK_IN_USE))
-					if(nodeCountSocketLinks(snode->edittree, sock)==0)
-						sock->flag |= SOCK_HIDDEN;
+		/* hide unused sockets */
+		for(sock= node->inputs.first; sock; sock= sock->next) {
+			if(sock->link==NULL)
+				sock->flag |= SOCK_HIDDEN;
 		}
-		else {
-			/* hide unused sockets */
-			for(sock= node->inputs.first; sock; sock= sock->next) {
-				if(sock->link==NULL)
-					sock->flag |= SOCK_HIDDEN;
-			}
-			for(sock= node->outputs.first; sock; sock= sock->next) {
-				if(nodeCountSocketLinks(snode->edittree, sock)==0)
-					sock->flag |= SOCK_HIDDEN;
-			}
+		for(sock= node->outputs.first; sock; sock= sock->next) {
+			if(nodeCountSocketLinks(snode->edittree, sock)==0)
+				sock->flag |= SOCK_HIDDEN;
 		}
 	}
 }
@@ -94,7 +84,7 @@ void node_set_hidden_sockets(SpaceNode *snode, bNode *node, int set)
 static void node_hide_unhide_sockets(SpaceNode *snode, bNode *node)
 {
 	node_set_hidden_sockets(snode, node, !node_has_hidden_sockets(node));
-	node_tree_verify_groups(snode->nodetree);
+	ntreeUpdateTree(snode->edittree);
 }
 
 static int do_header_node(SpaceNode *snode, bNode *node, float mx, float my)
@@ -116,21 +106,21 @@ static int do_header_node(SpaceNode *snode, bNode *node, float mx, float my)
 			node->flag ^= NODE_PREVIEW;
 			return 1;
 		}
-		totr.xmin-=18.0f;
+		totr.xmin-=15.0f;
 	}
 	if(node->type == NODE_GROUP) {
 		if(BLI_in_rctf(&totr, mx, my)) {
 			snode_make_group_editable(snode, node);
 			return 1;
 		}
-		totr.xmin-=18.0f;
+		totr.xmin-=15.0f;
 	}
 	if(node->typeinfo->flag & NODE_OPTIONS) {
 		if(BLI_in_rctf(&totr, mx, my)) {
 			node->flag ^= NODE_OPTIONS;
 			return 1;
 		}
-		totr.xmin-=18.0f;
+		totr.xmin-=15.0f;
 	}
 	/* hide unused sockets */
 	if(BLI_in_rctf(&totr, mx, my)) {
@@ -152,7 +142,7 @@ static int do_header_hidden_node(bNode *node, float mx, float my)
 	return 0;
 }
 
-static int node_toggle_visibility(SpaceNode *snode, ARegion *ar, short *mval)
+static int node_toggle_visibility(SpaceNode *snode, ARegion *ar, const int mval[2])
 {
 	bNode *node;
 	float mx, my;
@@ -162,7 +152,7 @@ static int node_toggle_visibility(SpaceNode *snode, ARegion *ar, short *mval)
 	
 	UI_view2d_region_to_view(&ar->v2d, mval[0], mval[1], &mx, &my);
 	
-	for(next_node(snode->edittree); (node=next_node(NULL));) {
+	for(node=snode->edittree->nodes.last; node; node=node->prev) {
 		if(node->flag & NODE_HIDDEN) {
 			if(do_header_hidden_node(node, mx, my)) {
 				ED_region_tag_redraw(ar);
@@ -183,7 +173,7 @@ static int node_toggle_visibility_exec(bContext *C, wmOperator *op)
 {
 	SpaceNode *snode= CTX_wm_space_node(C);
 	ARegion *ar= CTX_wm_region(C);
-	short mval[2];
+	int mval[2];
 
 	mval[0] = RNA_int_get(op->ptr, "mouse_x");
 	mval[1] = RNA_int_get(op->ptr, "mouse_y");
@@ -195,14 +185,8 @@ static int node_toggle_visibility_exec(bContext *C, wmOperator *op)
 
 static int node_toggle_visibility_invoke(bContext *C, wmOperator *op, wmEvent *event)
 {
-	ARegion *ar= CTX_wm_region(C);
-	short mval[2];	
-	
-	mval[0]= event->x - ar->winrct.xmin;
-	mval[1]= event->y - ar->winrct.ymin;
-	
-	RNA_int_set(op->ptr, "mouse_x", mval[0]);
-	RNA_int_set(op->ptr, "mouse_y", mval[1]);
+	RNA_int_set(op->ptr, "mouse_x", event->mval[0]);
+	RNA_int_set(op->ptr, "mouse_y", event->mval[1]);
 
 	return node_toggle_visibility_exec(C,op);
 }
@@ -230,12 +214,11 @@ void NODE_OT_visibility_toggle(wmOperatorType *ot)
 static void snode_home(ScrArea *UNUSED(sa), ARegion *ar, SpaceNode* snode)
 {
 	bNode *node;
-	rctf *cur, *tot;
+	rctf *cur;
 	float oldwidth, oldheight, width, height;
 	int first= 1;
 	
 	cur= &ar->v2d.cur;
-	tot= &ar->v2d.tot;
 	
 	oldwidth= cur->xmax - cur->xmin;
 	oldheight= cur->ymax - cur->ymin;

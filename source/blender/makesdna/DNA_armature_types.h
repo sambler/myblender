@@ -1,6 +1,4 @@
-/**
- * $Id$
- *
+/*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -27,6 +25,10 @@
 
 #ifndef DNA_ARMATURE_TYPES_H
 #define DNA_ARMATURE_TYPES_H
+
+/** \file DNA_armature_types.h
+ *  \ingroup DNA
+ */
 
 #include "DNA_listBase.h"
 #include "DNA_ID.h"
@@ -57,8 +59,9 @@ typedef struct Bone {
 	int				flag;
 	
 	float			arm_head[3];		
-	float			arm_tail[3];	/*	head/tail and roll in Armature Space (rest pos) */
+	float			arm_tail[3];	/*	head/tail in Armature Space (rest pos) */
 	float			arm_mat[4][4];  /*  matrix: (bonemat(b)+head(b))*arm_mat(b-1), rest pos*/
+	float           arm_roll;        /* roll in Armature Space (rest pos) */
 	
 	float			dist, weight;			/*  dist, weight: for non-deformgroup deforms */
 	float			xwidth, length, zwidth;	/*  width: for block bones. keep in this order, transform! */
@@ -68,7 +71,7 @@ typedef struct Bone {
 	float			size[3];		/*  patch for upward compat, UNUSED! */
 	int				layer;			/* layers that bone appears on */
 	short			segments;		/*  for B-bones */
-	short 			pad[3];
+	short 			pad[1];
 } Bone;
 
 typedef struct bArmature {
@@ -91,7 +94,9 @@ typedef struct bArmature {
 	void		*sketch;				/* sketch struct for etch-a-ton */
 	
 	int			flag;
-	int			drawtype;			
+	int			drawtype;
+	int			gevertdeformer;			/* how vertex deformation is handled in the ge */
+	int			pad;
 	short		deformflag; 
 	short		pathflag;
 	
@@ -131,8 +136,15 @@ typedef enum eArmature_Drawtype {
 	ARM_OCTA = 0,
 	ARM_LINE,
 	ARM_B_BONE,
-	ARM_ENVELOPE
+	ARM_ENVELOPE,
+	ARM_WIRE
 } eArmature_Drawtype;
+
+/* armature->gevertdeformer */
+typedef enum eArmature_VertDeformer {
+	ARM_VDEF_BLENDER,
+	ARM_VDEF_BGE_CPU
+} eArmature_VertDeformer;
 
 /* armature->deformflag */
 typedef enum eArmature_DeformFlag {
@@ -187,5 +199,7 @@ typedef enum eBone_Flag {
 	BONE_UNSELECTABLE			= (1<<21),	/* bone cannot be selected */
 	BONE_NO_LOCAL_LOCATION		= (1<<22)	/* bone location is in armature space */
 } eBone_Flag;
+
+#define MAXBONENAME 32
 
 #endif

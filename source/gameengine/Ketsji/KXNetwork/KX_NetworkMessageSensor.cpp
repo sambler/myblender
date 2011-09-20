@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -28,6 +28,13 @@
  * Ketsji Logic Extenstion: Network Message Sensor generic implementation
  */
 
+/** \file gameengine/Ketsji/KXNetwork/KX_NetworkMessageSensor.cpp
+ *  \ingroup ketsjinet
+ */
+
+
+#include <stddef.h>
+
 #include "KX_NetworkMessageSensor.h"
 #include "KX_NetworkEventManager.h"
 #include "NG_NetworkMessage.h"
@@ -43,11 +50,11 @@
 #endif
 
 KX_NetworkMessageSensor::KX_NetworkMessageSensor(
-	class KX_NetworkEventManager* eventmgr,	// our eventmanager
-	class NG_NetworkScene *NetworkScene,	// our scene
-	SCA_IObject* gameobj,					// the sensor controlling object
-	const STR_String &subject
-) :
+        class KX_NetworkEventManager* eventmgr,	// our eventmanager
+        class NG_NetworkScene *NetworkScene,	// our scene
+        SCA_IObject* gameobj,					// the sensor controlling object
+        const STR_String &subject
+        ) :
     SCA_ISensor(gameobj,eventmgr),
     m_NetworkScene(NetworkScene),
     m_subject(subject),
@@ -60,7 +67,7 @@ KX_NetworkMessageSensor::KX_NetworkMessageSensor(
 
 void KX_NetworkMessageSensor::Init()
 {
-    m_IsUp = false;
+	m_IsUp = false;
 }
 
 KX_NetworkMessageSensor::~KX_NetworkMessageSensor()

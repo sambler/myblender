@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/makesrna/intern/rna_actuator_api.c
+ *  \ingroup RNA
+ */
+
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -56,14 +61,14 @@ void RNA_api_actuator(StructRNA *srna)
 	PropertyRNA *parm;
 
 	func= RNA_def_function(srna, "link", "rna_Actuator_link");
-	RNA_def_function_ui_description(func, "Link the actuator to a controller.");
-	parm= RNA_def_pointer(func, "controller", "Controller", "", "Controller to link to."); 
+	RNA_def_function_ui_description(func, "Link the actuator to a controller");
+	parm= RNA_def_pointer(func, "controller", "Controller", "", "Controller to link to"); 
 	RNA_def_property_flag(parm, PROP_REQUIRED);
 	RNA_def_property_update(parm, NC_LOGIC, NULL);
 
 	func= RNA_def_function(srna, "unlink", "rna_Actuator_unlink");
-	RNA_def_function_ui_description(func, "Unlink the actuator from a controller.");
-	parm= RNA_def_pointer(func, "controller", "Controller", "", "Controller to unlink from."); 
+	RNA_def_function_ui_description(func, "Unlink the actuator from a controller");
+	parm= RNA_def_pointer(func, "controller", "Controller", "", "Controller to unlink from"); 
 	RNA_def_property_flag(parm, PROP_REQUIRED);
 	RNA_def_property_update(parm, NC_LOGIC, NULL);
 }

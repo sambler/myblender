@@ -1,4 +1,4 @@
-/**
+/*
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -29,6 +29,11 @@
  * I hearby donate this code and all rights to the Blender Foundation.
  * $Id$
  */
+
+/** \file blender/imbuf/intern/cineon/cineon_dpx.c
+ *  \ingroup imbcineon
+ */
+
  
 #include <stdio.h>
 #include <string.h> /*for memcpy*/
@@ -39,6 +44,7 @@
 
 #include "IMB_imbuf_types.h"
 #include "IMB_imbuf.h"
+#include "IMB_filetype.h"
 
 #include "BKE_global.h"
 
@@ -126,7 +132,6 @@ static int imb_save_dpx_cineon(ImBuf *ibuf, const char *filename, int use_cineon
 	LogImageFile* logImage;
 	unsigned short* line, *pixel;
 	int i, j;
-	int index;
 	float *fline;
 	float *fbuf;
 	int is_alloc= 0;
@@ -155,7 +160,6 @@ static int imb_save_dpx_cineon(ImBuf *ibuf, const char *filename, int use_cineon
 		printf("error setting args\n");
 	}
 
-	index = 0;
 	line = MEM_mallocN(sizeof(unsigned short)*depth*width, "line");
 	
 	/*note that image is flipped when sent to logImageSetRowBytes (see last passed parameter).*/
@@ -189,7 +193,7 @@ static int imb_save_dpx_cineon(ImBuf *ibuf, const char *filename, int use_cineon
 	return 1;
 }
 
-short imb_savecineon(struct ImBuf *buf, const char *myfile, int flags)
+int imb_savecineon(struct ImBuf *buf, const char *myfile, int flags)
 {
 	return imb_save_dpx_cineon(buf, myfile, 1, flags);
 }
@@ -200,14 +204,14 @@ int imb_is_cineon(unsigned char *buf)
 	return cineonIsMemFileCineon(buf);
 }
 
-ImBuf *imb_loadcineon(unsigned char *mem, int size, int flags)
+ImBuf *imb_loadcineon(unsigned char *mem, size_t size, int flags)
 {
 	if(imb_is_cineon(mem))
 		return imb_load_dpx_cineon(mem, 1, size, flags);
 	return NULL;
 }
 
-short imb_save_dpx(struct ImBuf *buf, const char *myfile, int flags)
+int imb_save_dpx(struct ImBuf *buf, const char *myfile, int flags)
 {
 	return imb_save_dpx_cineon(buf, myfile, 0, flags);
 }
@@ -217,7 +221,7 @@ int imb_is_dpx(unsigned char *buf)
 	return dpxIsMemFileCineon(buf);
 }
 
-ImBuf *imb_loaddpx(unsigned char *mem, int size, int flags)
+ImBuf *imb_loaddpx(unsigned char *mem, size_t size, int flags)
 {
 	if(imb_is_dpx(mem))
 		return imb_load_dpx_cineon(mem, 0, size, flags);

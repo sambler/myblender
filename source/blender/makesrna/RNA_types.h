@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -22,10 +22,15 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/makesrna/RNA_types.h
+ *  \ingroup RNA
+ */
+
+
 #include "BLO_sys_types.h"
 
-#ifndef RNA_TYPES
-#define RNA_TYPES
+#ifndef RNA_TYPES_H
+#define RNA_TYPES_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -34,13 +39,15 @@ extern "C" {
 struct ParameterList;
 struct FunctionRNA;
 struct PropertyRNA;
+struct EnumPropertyRNA;
 struct StructRNA;
 struct BlenderRNA;
 struct IDProperty;
 struct bContext;
+struct Main;
 struct ReportList;
 
-/* Pointer
+/** Pointer
  *
  * RNA pointers are not a single C pointer but include the type,
  * and a pointer to the ID struct that owns the struct, since
@@ -92,7 +99,10 @@ typedef enum PropertyUnit {
 
 #define RNA_ENUM_BITFLAG_SIZE 32
 
-/* also update enums in bpy_props.c when adding items here */
+/* also update enums in bpy_props.c when adding items here
+ * watch it: these values are written to files as part of
+ * node socket button subtypes!
+ */
 typedef enum PropertySubType {
 	PROP_NONE = 0,
 
@@ -122,6 +132,7 @@ typedef enum PropertySubType {
 	PROP_XYZ = 29,
 	PROP_XYZ_LENGTH = 29|PROP_UNIT_LENGTH,
 	PROP_COLOR_GAMMA = 30,
+	PROP_COORDS = 31, /* generic array, no units applied, only that x/y/z/w are used (python vec) */
 
 	/* booleans */
 	PROP_LAYER = 40,
@@ -151,6 +162,8 @@ typedef enum PropertyFlag {
 
 	/* hidden in  the user interface */
 	PROP_HIDDEN = 1<<19,
+	/* do not write in presets */
+	PROP_SKIP_SAVE = 1<<28,
 
 	/* function paramater flags */
 	PROP_REQUIRED = 1<<2,
@@ -167,6 +180,10 @@ typedef enum PropertyFlag {
 	 * only apply this to types that are derived from an ID ()*/
 	PROP_ID_SELF_CHECK = 1<<20,
 	PROP_NEVER_NULL = 1<<18,
+	/* currently only used for UI, this is similar to PROP_NEVER_NULL
+	 * except that the value may be NULL at times, used for ObData, where an Empty's will be NULL
+	 * but setting NULL on a mesh object is not possible. So, if its not NULL, setting NULL cant be done! */
+	PROP_NEVER_UNLINK = 1<<25,
 
 	/* flag contains multiple enums.
 	 * note: not to be confused with prop->enumbitflags
@@ -178,10 +195,17 @@ typedef enum PropertyFlag {
 
 	/* need context for update function */
 	PROP_CONTEXT_UPDATE = 1<<22,
+	PROP_CONTEXT_PROPERTY_UPDATE = (1<<22)|(1<<27),
 
 	/* Use for arrays or for any data that should not have a referene kept
 	 * most common case is functions that return arrays where the array */
 	PROP_THICK_WRAP = 1<<23,
+
+	/* Reject values outside limits, use for python api only so far
+	 * this is for use when silently clamping string length will give
+	 * bad behavior later. Could also enforce this for INT's and other types.
+	 * note: currently no support for function arguments or non utf8 paths (filepaths) */
+	PROP_NEVER_CLAMP = 1<<26,
 
 	/* internal flags */
 	PROP_BUILTIN = 1<<7,
@@ -238,7 +262,8 @@ typedef struct EnumPropertyItem {
 	const char *description;
 } EnumPropertyItem;
 
-typedef EnumPropertyItem *(*EnumPropertyItemFunc)(struct bContext *C, PointerRNA *ptr, int *free);
+/* this is a copy of 'PropEnumItemFunc' defined in rna_internal_types.h */
+typedef EnumPropertyItem *(*EnumPropertyItemFunc)(struct bContext *C, PointerRNA *ptr, struct PropertyRNA *prop, int *free);
 
 typedef struct PropertyRNA PropertyRNA;
 
@@ -259,7 +284,7 @@ typedef struct ParameterList {
 
 typedef struct ParameterIterator {
 	struct ParameterList *parms;
-	PointerRNA funcptr;
+	/* PointerRNA funcptr; */ /*UNUSED*/
 	void *data;
 	int size, offset;
 
@@ -313,9 +338,10 @@ typedef enum StructFlag {
 typedef int (*StructValidateFunc)(struct PointerRNA *ptr, void *data, int *have_function);
 typedef int (*StructCallbackFunc)(struct bContext *C, struct PointerRNA *ptr, struct FunctionRNA *func, ParameterList *list);
 typedef void (*StructFreeFunc)(void *data);
-typedef struct StructRNA *(*StructRegisterFunc)(struct bContext *C, struct ReportList *reports, void *data,
+typedef struct StructRNA *(*StructRegisterFunc)(struct Main *bmain, struct ReportList *reports, void *data,
 	const char *identifier, StructValidateFunc validate, StructCallbackFunc call, StructFreeFunc free);
-typedef void (*StructUnregisterFunc)(const struct bContext *C, struct StructRNA *type);
+typedef void (*StructUnregisterFunc)(struct Main *bmain, struct StructRNA *type);
+typedef void **(*StructInstanceFunc)(PointerRNA *ptr);
 
 typedef struct StructRNA StructRNA;
 
@@ -338,38 +364,8 @@ typedef struct ExtensionRNA {
 	
 } ExtensionRNA;
 
-/* fake struct definitions, needed otherwise collections end up owning the C
- * structs like 'Object' when defined first */
-#define MainActions		Main
-#define MainArmatures		Main
-#define MainBrushes		Main
-#define MainCameras		Main
-#define MainCurves		Main
-#define MainFonts		Main
-#define MainGreasePencils	Main
-#define MainGroups		Main
-#define MainImages		Main
-#define MainLamps		Main
-#define MainLattices		Main
-#define MainLibraries		Main
-#define MainMaterials		Main
-#define MainMeshes		Main
-#define MainMetaBalls		Main
-#define MainNodeTrees		Main
-#define MainObjects		Main
-#define MainParticles		Main
-#define MainScenes		Main
-#define MainScreens		Main
-#define MainSounds		Main
-#define MainTexts		Main
-#define MainTextures		Main
-#define MainWindowManagers	Main
-#define MainWorlds		Main
-
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* RNA_TYPES */
-
-
+#endif /* RNA_TYPES_H */

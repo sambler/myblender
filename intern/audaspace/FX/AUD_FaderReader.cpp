@@ -1,94 +1,71 @@
 /*
  * $Id$
  *
- * ***** BEGIN LGPL LICENSE BLOCK *****
+ * ***** BEGIN GPL LICENSE BLOCK *****
  *
- * Copyright 2009 Jörg Hermann Müller
+ * Copyright 2009-2011 Jörg Hermann Müller
  *
  * This file is part of AudaSpace.
  *
- * AudaSpace is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
+ * Audaspace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
  * AudaSpace is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU Lesser General Public License
- * along with AudaSpace.  If not, see <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU General Public License
+ * along with Audaspace; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * ***** END LGPL LICENSE BLOCK *****
+ * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file audaspace/FX/AUD_FaderReader.cpp
+ *  \ingroup audfx
+ */
+
 
 #include "AUD_FaderReader.h"
 
 #include <cstring>
 
-AUD_FaderReader::AUD_FaderReader(AUD_IReader* reader, AUD_FadeType type,
+AUD_FaderReader::AUD_FaderReader(AUD_Reference<AUD_IReader> reader, AUD_FadeType type,
 								 float start,float length) :
 		AUD_EffectReader(reader),
 		m_type(type),
 		m_start(start),
-		m_length(length),
-		m_empty(true)
+		m_length(length)
 {
 }
 
-void AUD_FaderReader::read(int & length, sample_t* & buffer)
+void AUD_FaderReader::read(int& length, bool& eos, sample_t* buffer)
 {
 	int position = m_reader->getPosition();
 	AUD_Specs specs = m_reader->getSpecs();
 	int samplesize = AUD_SAMPLE_SIZE(specs);
 
-	m_reader->read(length, buffer);
+	m_reader->read(length, eos, buffer);
 
 	if((position + length) / (float)specs.rate <= m_start)
 	{
 		if(m_type != AUD_FADE_OUT)
 		{
-			if(m_buffer.getSize() < length * samplesize)
-			{
-				m_buffer.resize(length * samplesize);
-				m_empty = false;
-			}
-
-			buffer = m_buffer.getBuffer();
-
-			if(!m_empty)
-			{
-				memset(buffer, 0, length * samplesize);
-				m_empty = true;
-			}
+			memset(buffer, 0, length * samplesize);
 		}
 	}
 	else if(position / (float)specs.rate >= m_start+m_length)
 	{
 		if(m_type == AUD_FADE_OUT)
 		{
-			if(m_buffer.getSize() < length * samplesize)
-			{
-				m_buffer.resize(length * samplesize);
-				m_empty = false;
-			}
-
-			buffer = m_buffer.getBuffer();
-
-			if(!m_empty)
-			{
-				memset(buffer, 0, length * samplesize);
-				m_empty = true;
-			}
+			memset(buffer, 0, length * samplesize);
 		}
 	}
 	else
 	{
-		if(m_buffer.getSize() < length * samplesize)
-			m_buffer.resize(length * samplesize);
-
-		sample_t* buf = m_buffer.getBuffer();
 		float volume = 1.0f;
 
 		for(int i = 0; i < length * specs.channels; i++)
@@ -105,10 +82,7 @@ void AUD_FaderReader::read(int & length, sample_t* & buffer)
 					volume = 1.0f - volume;
 			}
 
-			buf[i] = buffer[i] * volume;
+			buffer[i] = buffer[i] * volume;
 		}
-
-		buffer = buf;
-		m_empty = false;
 	}
 }

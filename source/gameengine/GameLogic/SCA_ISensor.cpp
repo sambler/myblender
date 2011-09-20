@@ -1,4 +1,4 @@
-/**
+/*
  * Abstract class for sensor logic bricks
  *
  * $Id$
@@ -28,6 +28,13 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file gameengine/GameLogic/SCA_ISensor.cpp
+ *  \ingroup gamelogic
+ */
+
+
+#include <stddef.h>
 
 #include "SCA_ISensor.h"
 #include "SCA_EventManager.h"
@@ -209,8 +216,8 @@ void SCA_ISensor::UnregisterToManager()
 
 void SCA_ISensor::ActivateControllers(class SCA_LogicManager* logicmgr)
 {
-    for(vector<SCA_IController*>::const_iterator c= m_linkedcontrollers.begin();
-		c!=m_linkedcontrollers.end();++c)
+	for(vector<SCA_IController*>::const_iterator c= m_linkedcontrollers.begin();
+	    c!=m_linkedcontrollers.end();++c)
 	{
 		SCA_IController* contr = *c;
 		if (contr->IsActive())

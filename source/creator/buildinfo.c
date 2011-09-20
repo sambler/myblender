@@ -27,20 +27,30 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
-#ifdef BUILD_DATE
-#include "BKE_utildefines.h"
+/** \file creator/buildinfo.c
+ *  \ingroup creator
+ */
 
-char build_date[]= STRINGIFY(BUILD_DATE);
-char build_time[]= STRINGIFY(BUILD_TIME);
-char build_rev[]= STRINGIFY(BUILD_REV);
-char build_platform[]= STRINGIFY(BUILD_PLATFORM);
-char build_type[]= STRINGIFY(BUILD_TYPE);
+
+#ifdef WITH_BUILDINFO_HEADER
+#  include "buildinfo.h"
+#endif
+
+#ifdef BUILD_DATE
+
+/* currently only these are defined in the header */
+char build_date[]= BUILD_DATE;
+char build_time[]= BUILD_TIME;
+char build_rev[]= BUILD_REV;
+
+char build_platform[]= BUILD_PLATFORM;
+char build_type[]= BUILD_TYPE;
 
 #ifdef BUILD_CFLAGS
-char build_cflags[]= STRINGIFY(BUILD_CFLAGS);
-char build_cxxflags[]= STRINGIFY(BUILD_CXXFLAGS);
-char build_linkflags[]= STRINGIFY(BUILD_LINKFLAGS);
-char build_system[]= STRINGIFY(BUILD_SYSTEM);
+char build_cflags[]= BUILD_CFLAGS;
+char build_cxxflags[]= BUILD_CXXFLAGS;
+char build_linkflags[]= BUILD_LINKFLAGS;
+char build_system[]= BUILD_SYSTEM;
 #else
 char build_cflags[]= "unmaintained buildsystem alert!";
 char build_cxxflags[]= "unmaintained buildsystem alert!";

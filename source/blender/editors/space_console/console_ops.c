@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -22,6 +22,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/space_console/console_ops.c
+ *  \ingroup spconsole
+ */
+
+
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h> /* ispunct */
@@ -33,6 +38,7 @@
 
 #include "BLI_blenlib.h"
 #include "BLI_dynstr.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_context.h"
 #include "BKE_text.h" /* only for character utility funcs */
@@ -47,6 +53,14 @@
 #include "RNA_define.h"
 
 #include "console_intern.h"
+
+/* so when we type - the view scrolls to the bottom */
+static void console_scroll_bottom(ARegion *ar)
+{
+	View2D *v2d= &ar->v2d;
+	v2d->cur.ymin = 0.0;
+	v2d->cur.ymax =(float)v2d->winy;
+}
 
 static void console_textview_update_rect(SpaceConsole *sc, ARegion *ar)
 {
@@ -74,11 +88,11 @@ void console_scrollback_free(SpaceConsole *sc, ConsoleLine *cl)
 	MEM_freeN(cl);
 }
 
-void console_scrollback_limit(SpaceConsole *sc)
+static void console_scrollback_limit(SpaceConsole *sc)
 {
 	int tot;
 	
-	if (U.scrollback < 32) U.scrollback= 128; // XXX - save in user defaults
+	if (U.scrollback < 32) U.scrollback= 256; // XXX - save in user defaults
 	
 	for(tot= BLI_countlist(&sc->scrollback); tot > U.scrollback; tot--)
 		console_scrollback_free(sc, sc->scrollback.first);
@@ -333,9 +347,14 @@ static int move_exec(bContext *C, wmOperator *op)
 	}
 	
 	if(done) {
-		ED_area_tag_redraw(CTX_wm_area(C));
+		ScrArea *sa= CTX_wm_area(C);
+		ARegion *ar= CTX_wm_region(C);
+
+		ED_area_tag_redraw(sa);
+		console_scroll_bottom(ar);
 	}
-	
+
+
 	return OPERATOR_FINISHED;
 }
 
@@ -351,7 +370,7 @@ void CONSOLE_OT_move(wmOperatorType *ot)
 	ot->poll= ED_operator_console_active;
 
 	/* properties */
-	RNA_def_enum(ot->srna, "type", move_type_items, LINE_BEGIN, "Type", "Where to move cursor to.");
+	RNA_def_enum(ot->srna, "type", move_type_items, LINE_BEGIN, "Type", "Where to move cursor to");
 }
 
 #define TAB_LENGTH 4
@@ -385,7 +404,9 @@ static int insert_exec(bContext *C, wmOperator *op)
 
 	console_textview_update_rect(sc, ar);
 	ED_area_tag_redraw(CTX_wm_area(C));
-	
+
+	console_scroll_bottom(ar);
+
 	return OPERATOR_FINISHED;
 }
 
@@ -421,7 +442,7 @@ void CONSOLE_OT_insert(wmOperatorType *ot)
 	ot->poll= ED_operator_console_active;
 
 	/* properties */
-	RNA_def_string(ot->srna, "text", "", 0, "Text", "Text to insert at the cursor position.");
+	RNA_def_string(ot->srna, "text", "", 0, "Text", "Text to insert at the cursor position");
 }
 
 
@@ -472,6 +493,8 @@ static int delete_exec(bContext *C, wmOperator *op)
 
 	console_textview_update_rect(sc, ar);
 	ED_area_tag_redraw(CTX_wm_area(C));
+
+	console_scroll_bottom(ar);
 	
 	return OPERATOR_FINISHED;
 }
@@ -489,7 +512,7 @@ void CONSOLE_OT_delete(wmOperatorType *ot)
 	ot->poll= ED_operator_console_active;
 
 	/* properties */
-	RNA_def_enum(ot->srna, "type", delete_type_items, DEL_NEXT_CHAR, "Type", "Which part of the text to delete.");
+	RNA_def_enum(ot->srna, "type", delete_type_items, DEL_NEXT_CHAR, "Type", "Which part of the text to delete");
 }
 
 
@@ -583,6 +606,8 @@ static int history_cycle_exec(bContext *C, wmOperator *op)
 	console_textview_update_rect(sc, ar);
 	ED_area_tag_redraw(CTX_wm_area(C));
 
+	console_scroll_bottom(ar);
+
 	return OPERATOR_FINISHED;
 }
 
@@ -598,7 +623,7 @@ void CONSOLE_OT_history_cycle(wmOperatorType *ot)
 	ot->poll= ED_operator_console_active;
 	
 	/* properties */
-	RNA_def_boolean(ot->srna, "reverse", 0, "Reverse", "reverse cycle history");
+	RNA_def_boolean(ot->srna, "reverse", 0, "Reverse", "Reverse cycle history");
 }
 
 
@@ -606,6 +631,7 @@ void CONSOLE_OT_history_cycle(wmOperatorType *ot)
 static int history_append_exec(bContext *C, wmOperator *op)
 {
 	SpaceConsole *sc= CTX_wm_space_console(C);
+	ARegion *ar= CTX_wm_region(C);
 	ScrArea *sa= CTX_wm_area(C);
 	ConsoleLine *ci= console_history_verify(C);
 	char *str= RNA_string_get_alloc(op->ptr, "text", NULL, 0); /* own this text in the new line, dont free */
@@ -631,6 +657,8 @@ static int history_append_exec(bContext *C, wmOperator *op)
 
 	ED_area_tag_redraw(sa);
 
+	console_scroll_bottom(ar);
+
 	return OPERATOR_FINISHED;
 }
 
@@ -646,8 +674,8 @@ void CONSOLE_OT_history_append(wmOperatorType *ot)
 	ot->poll= ED_operator_console_active;
 	
 	/* properties */
-	RNA_def_string(ot->srna, "text", "", 0, "Text", "Text to insert at the cursor position.");	
-	RNA_def_int(ot->srna, "current_character", 0, 0, INT_MAX, "Cursor", "The index of the cursor.", 0, 10000);
+	RNA_def_string(ot->srna, "text", "", 0, "Text", "Text to insert at the cursor position");	
+	RNA_def_int(ot->srna, "current_character", 0, 0, INT_MAX, "Cursor", "The index of the cursor", 0, 10000);
 	RNA_def_boolean(ot->srna, "remove_duplicates", 0, "Remove Duplicates", "Remove duplicate items in the history");
 }
 
@@ -657,18 +685,24 @@ static int scrollback_append_exec(bContext *C, wmOperator *op)
 {
 	SpaceConsole *sc= CTX_wm_space_console(C);
 	ARegion *ar= CTX_wm_region(C);
-
-	ConsoleLine *ci= console_history_verify(C);
+	ConsoleLine *ci;
 	
 	char *str= RNA_string_get_alloc(op->ptr, "text", NULL, 0); /* own this text in the new line, dont free */
 	int type= RNA_enum_get(op->ptr, "type");
+
+	console_history_verify(C);
 	
 	ci= console_scrollback_add_str(sc, str, 1); /* own the string */
 	ci->type= type;
 	
 	console_scrollback_limit(sc);
 
-	console_textview_update_rect(sc, ar);
+	/* 'ar' can be null depending on the operator that runs
+	 * rendering with invoke default for eg causes this */
+	if(ar) {
+		console_textview_update_rect(sc, ar);
+	}
+
 	ED_area_tag_redraw(CTX_wm_area(C));
 	
 	return OPERATOR_FINISHED;
@@ -694,15 +728,14 @@ void CONSOLE_OT_scrollback_append(wmOperatorType *ot)
 	ot->poll= ED_operator_console_active;
 	
 	/* properties */
-	RNA_def_string(ot->srna, "text", "", 0, "Text", "Text to insert at the cursor position.");	
-	RNA_def_enum(ot->srna, "type", console_line_type_items, CONSOLE_LINE_OUTPUT, "Type", "Console output type.");
+	RNA_def_string(ot->srna, "text", "", 0, "Text", "Text to insert at the cursor position");
+	RNA_def_enum(ot->srna, "type", console_line_type_items, CONSOLE_LINE_OUTPUT, "Type", "Console output type");
 }
 
 
 static int copy_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	SpaceConsole *sc= CTX_wm_space_console(C);
-	int buf_len;
 
 	DynStr *buf_dyn= BLI_dynstr_new();
 	char *buf_str;
@@ -711,7 +744,7 @@ static int copy_exec(bContext *C, wmOperator *UNUSED(op))
 	int sel[2];
 	int offset= 0;
 
-	ConsoleLine cl_dummy= {0};
+	ConsoleLine cl_dummy= {NULL};
 
 #if 0
 	/* copy whole file */
@@ -755,7 +788,7 @@ static int copy_exec(bContext *C, wmOperator *UNUSED(op))
 	}
 
 	buf_str= BLI_dynstr_get_cstring(buf_dyn);
-	buf_len= BLI_dynstr_get_len(buf_dyn);
+
 	BLI_dynstr_free(buf_dyn);
 	WM_clipboard_text_set(buf_str, 0);
 
@@ -792,7 +825,6 @@ static int paste_exec(bContext *C, wmOperator *UNUSED(op))
 	if(buf_str==NULL)
 		return OPERATOR_CANCELLED;
 
-	buf_next= buf_str;
 	buf_step= buf_str;
 
 	while((buf_next=buf_step) && buf_next[0] != '\0') {
@@ -814,6 +846,8 @@ static int paste_exec(bContext *C, wmOperator *UNUSED(op))
 
 	console_textview_update_rect(sc, ar);
 	ED_area_tag_redraw(CTX_wm_area(C));
+
+	console_scroll_bottom(ar);
 
 	return OPERATOR_FINISHED;
 }

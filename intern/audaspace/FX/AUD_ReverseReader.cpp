@@ -1,27 +1,33 @@
 /*
  * $Id$
  *
- * ***** BEGIN LGPL LICENSE BLOCK *****
+ * ***** BEGIN GPL LICENSE BLOCK *****
  *
- * Copyright 2009 Jörg Hermann Müller
+ * Copyright 2009-2011 Jörg Hermann Müller
  *
  * This file is part of AudaSpace.
  *
- * AudaSpace is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
+ * Audaspace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
  * AudaSpace is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU Lesser General Public License
- * along with AudaSpace.  If not, see <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU General Public License
+ * along with Audaspace; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * ***** END LGPL LICENSE BLOCK *****
+ * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file audaspace/FX/AUD_ReverseReader.cpp
+ *  \ingroup audfx
+ */
+
 
 #include "AUD_ReverseReader.h"
 
@@ -30,7 +36,7 @@
 static const char* props_error = "AUD_ReverseReader: The reader has to be "
 								 "seekable and a finite length.";
 
-AUD_ReverseReader::AUD_ReverseReader(AUD_IReader* reader) :
+AUD_ReverseReader::AUD_ReverseReader(AUD_Reference<AUD_IReader> reader) :
 		AUD_EffectReader(reader),
 		m_length(reader->getLength()),
 		m_position(0)
@@ -54,7 +60,7 @@ int AUD_ReverseReader::getPosition() const
 	return m_position;
 }
 
-void AUD_ReverseReader::read(int & length, sample_t* & buffer)
+void AUD_ReverseReader::read(int& length, bool& eos, sample_t* buffer)
 {
 	// first correct the length
 	if(m_position + length > m_length)
@@ -63,39 +69,39 @@ void AUD_ReverseReader::read(int & length, sample_t* & buffer)
 	if(length <= 0)
 	{
 		length = 0;
+		eos = true;
 		return;
 	}
 
-	AUD_Specs specs = getSpecs();
-	int samplesize = AUD_SAMPLE_SIZE(specs);
+	const AUD_Specs specs = getSpecs();
+	const int samplesize = AUD_SAMPLE_SIZE(specs);
 
-	// resize buffer if needed
-	if(m_buffer.getSize() < length * samplesize)
-		m_buffer.resize(length * samplesize);
+	sample_t temp[AUD_CHANNEL_MAX];
 
-	buffer = m_buffer.getBuffer();
-
-	sample_t* buf;
 	int len = length;
 
 	// read from reader
 	m_reader->seek(m_length - m_position - len);
-	m_reader->read(len, buf);
+	m_reader->read(len, eos, buffer);
 
 	// set null if reader didn't give enough data
 	if(len < length)
-	{
 		memset(buffer, 0, (length - len) * samplesize);
-		buffer += (length - len) * specs.channels;
-	}
 
 	// copy the samples reverted
-	for(int i = 0; i < len; i++)
-		memcpy(buffer + i * specs.channels,
-			   buf + (len - 1 - i) * specs.channels,
+	for(int i = 0; i < length / 2; i++)
+	{
+		memcpy(temp,
+			   buffer + (len - 1 - i) * specs.channels,
 			   samplesize);
+		memcpy(buffer + (len - 1 - i) * specs.channels,
+			   buffer + i * specs.channels,
+			   samplesize);
+		memcpy(buffer + i * specs.channels,
+			   temp,
+			   samplesize);
+	}
 
 	m_position += length;
-
-	buffer = m_buffer.getBuffer();
+	eos = false;
 }

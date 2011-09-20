@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file gameengine/Ketsji/KX_MeshProxy.cpp
+ *  \ingroup ketsji
+ */
+
 
 #ifdef WITH_PYTHON
 
@@ -114,7 +119,7 @@ CValue*		KX_MeshProxy::GetReplica() { return NULL;}
 
 PyObject* KX_MeshProxy::PyGetMaterialName(PyObject* args, PyObject* kwds)
 {
-    int matid= 1;
+	int matid= 1;
 	STR_String matname;
 
 	if (PyArg_ParseTuple(args,"i:getMaterialName",&matid))
@@ -126,13 +131,13 @@ PyObject* KX_MeshProxy::PyGetMaterialName(PyObject* args, PyObject* kwds)
 	}
 
 	return PyUnicode_FromString(matname.Ptr());
-		
+
 }
-	
+
 
 PyObject* KX_MeshProxy::PyGetTextureName(PyObject* args, PyObject* kwds)
 {
-    int matid= 1;
+	int matid= 1;
 	STR_String matname;
 
 	if (PyArg_ParseTuple(args,"i:getTextureName",&matid))
@@ -149,7 +154,7 @@ PyObject* KX_MeshProxy::PyGetTextureName(PyObject* args, PyObject* kwds)
 
 PyObject* KX_MeshProxy::PyGetVertexArrayLength(PyObject* args, PyObject* kwds)
 {
-    int matid= 0;
+	int matid= 0;
 	int length = 0;
 
 	
@@ -172,7 +177,7 @@ PyObject* KX_MeshProxy::PyGetVertexArrayLength(PyObject* args, PyObject* kwds)
 
 PyObject* KX_MeshProxy::PyGetVertex(PyObject* args, PyObject* kwds)
 {
-    int vertexindex;
+	int vertexindex;
 	int matindex;
 
 	if (!PyArg_ParseTuple(args,"ii:getVertex",&matindex,&vertexindex))
@@ -181,7 +186,7 @@ PyObject* KX_MeshProxy::PyGetVertex(PyObject* args, PyObject* kwds)
 	RAS_TexVert* vertex = m_meshobj->GetVertex(matindex,vertexindex);
 	
 	if(vertex==NULL) {
-		PyErr_SetString(PyExc_ValueError, "mesh.getVertex(mat_idx, vert_idx): KX_MeshProxy, could not get a vertex at the given indicies");
+		PyErr_SetString(PyExc_ValueError, "mesh.getVertex(mat_idx, vert_idx): KX_MeshProxy, could not get a vertex at the given indices");
 		return NULL;
 	}
 	
@@ -190,7 +195,7 @@ PyObject* KX_MeshProxy::PyGetVertex(PyObject* args, PyObject* kwds)
 
 PyObject* KX_MeshProxy::PyGetPolygon(PyObject* args, PyObject* kwds)
 {
-    int polyindex= 1;
+	int polyindex= 1;
 	PyObject* polyob = NULL;
 
 	if (!PyArg_ParseTuple(args,"i:getPolygon",&polyindex))

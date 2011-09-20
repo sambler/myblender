@@ -29,6 +29,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/blenkernel/intern/scene.c
+ *  \ingroup bke
+ */
+
+
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
@@ -39,6 +44,8 @@
 #include <io.h>
 #endif
 
+#include "MEM_guardedalloc.h"
+
 #include "DNA_anim_types.h"
 #include "DNA_group_types.h"
 #include "DNA_object_types.h"
@@ -46,7 +53,9 @@
 #include "DNA_screen_types.h"
 #include "DNA_sequence_types.h"
 
-#include "MEM_guardedalloc.h"
+#include "BLI_math.h"
+#include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_anim.h"
 #include "BKE_animsys.h"
@@ -63,14 +72,11 @@
 #include "BKE_scene.h"
 #include "BKE_sequencer.h"
 #include "BKE_world.h"
-#include "BKE_utildefines.h"
+
 #include "BKE_sound.h"
 
 //XXX #include "BIF_previewrender.h"
 //XXX #include "BIF_editseq.h"
-
-#include "BLI_math.h"
-#include "BLI_blenlib.h"
 
 //XXX #include "nla.h"
 
@@ -170,7 +176,7 @@ Scene *copy_scene(Scene *sce, int type)
 		BKE_keyingsets_copy(&(scen->keyingsets), &(sce->keyingsets));
 
 		if(sce->nodetree) {
-			scen->nodetree= ntreeCopyTree(sce->nodetree, 0); /* copies actions */
+			scen->nodetree= ntreeCopyTree(sce->nodetree); /* copies actions */
 			ntreeSwitchID(scen->nodetree, &sce->id, &scen->id);
 		}
 
@@ -373,6 +379,7 @@ Scene *add_scene(const char *name)
 	sce->r.fg_stamp[3]= 1.0f;
 	sce->r.bg_stamp[0]= sce->r.bg_stamp[1]= sce->r.bg_stamp[2]= 0.0f;
 	sce->r.bg_stamp[3]= 0.25f;
+	sce->r.raytrace_options = R_RAYTRACE_USE_INSTANCES;
 
 	sce->r.seq_prev_type= OB_SOLID;
 	sce->r.seq_rend_type= OB_SOLID;
@@ -461,15 +468,17 @@ Scene *add_scene(const char *name)
 
 	sce->r.ffcodecdata.audio_mixrate = 44100;
 	sce->r.ffcodecdata.audio_volume = 1.0f;
+	sce->r.ffcodecdata.audio_bitrate = 192;
+	sce->r.ffcodecdata.audio_channels = 2;
 
 	BLI_strncpy(sce->r.engine, "BLENDER_RENDER", sizeof(sce->r.engine));
 
-	sce->audio.distance_model = 2.0;
-	sce->audio.doppler_factor = 1.0;
-	sce->audio.speed_of_sound = 343.3;
+	sce->audio.distance_model = 2.0f;
+	sce->audio.doppler_factor = 1.0f;
+	sce->audio.speed_of_sound = 343.3f;
+	sce->audio.volume = 1.0f;
 
-	strcpy(sce->r.backbuf, "//backbuf");
-	strcpy(sce->r.pic, U.renderdir);
+	BLI_strncpy(sce->r.pic, U.renderdir, sizeof(sce->r.pic));
 
 	BLI_init_rctf(&sce->r.safety, 0.1f, 0.9f, 0.1f, 0.9f);
 	sce->r.osa= 8;
@@ -504,6 +513,23 @@ Scene *add_scene(const char *name)
 
 	sce->gm.flag = GAME_DISPLAY_LISTS;
 	sce->gm.matmode = GAME_MAT_MULTITEX;
+
+	sce->gm.obstacleSimulation= OBSTSIMULATION_NONE;
+	sce->gm.levelHeight = 2.f;
+
+	sce->gm.recastData.cellsize = 0.3f;
+	sce->gm.recastData.cellheight = 0.2f;
+	sce->gm.recastData.agentmaxslope = M_PI/2;
+	sce->gm.recastData.agentmaxclimb = 0.9f;
+	sce->gm.recastData.agentheight = 2.0f;
+	sce->gm.recastData.agentradius = 0.6f;
+	sce->gm.recastData.edgemaxlen = 12.0f;
+	sce->gm.recastData.edgemaxerror = 1.3f;
+	sce->gm.recastData.regionminsize = 50.f;
+	sce->gm.recastData.regionmergesize = 20.f;
+	sce->gm.recastData.vertsperpoly = 6;
+	sce->gm.recastData.detailsampledist = 6.0f;
+	sce->gm.recastData.detailsamplemaxerror = 1.0f;
 
 	sound_create_scene(sce);
 
@@ -579,7 +605,7 @@ void set_scene_bg(Main *bmain, Scene *scene)
 }
 
 /* called from creator.c */
-Scene *set_scene_name(Main *bmain, char *name)
+Scene *set_scene_name(Main *bmain, const char *name)
 {
 	Scene *sce= (Scene *)find_id("SC", name);
 	if(sce) {
@@ -825,54 +851,6 @@ char *scene_find_last_marker_name(Scene *scene, int frame)
 	return best_marker ? best_marker->name : NULL;
 }
 
-/* markers need transforming from different parts of the code so have
- * a generic function to do this */
-int scene_marker_tfm_translate(Scene *scene, int delta, int flag)
-{
-	TimeMarker *marker;
-	int tot= 0;
-
-	for (marker= scene->markers.first; marker; marker= marker->next) {
-		if ((marker->flag & flag) == flag) {
-			marker->frame += delta;
-			tot++;
-		}
-	}
-
-	return tot;
-}
-
-int scene_marker_tfm_extend(Scene *scene, int delta, int flag, int frame, char side)
-{
-	TimeMarker *marker;
-	int tot= 0;
-
-	for (marker= scene->markers.first; marker; marker= marker->next) {
-		if ((marker->flag & flag) == flag) {
-			if((side=='L' && marker->frame < frame) || (side=='R' && marker->frame >= frame)) {
-				marker->frame += delta;
-				tot++;
-			}
-		}
-	}
-
-	return tot;
-}
-
-int scene_marker_tfm_scale(struct Scene *scene, float value, int flag)
-{
-	TimeMarker *marker;
-	int tot= 0;
-
-	for (marker= scene->markers.first; marker; marker= marker->next) {
-		if ((marker->flag & flag) == flag) {
-			marker->frame= CFRA + (int)floorf(((float)(marker->frame - CFRA) * value) + 0.5f);
-			tot++;
-		}
-	}
-
-	return tot;
-}
 
 Base *scene_add_base(Scene *sce, Object *ob)
 {
@@ -943,26 +921,71 @@ float BKE_curframe(Scene *scene)
 	return ctime;
 }
 
+/* drivers support/hacks 
+ * 	- this method is called from scene_update_tagged_recursive(), so gets included in viewport + render
+ *	- these are always run since the depsgraph can't handle non-object data
+ *	- these happen after objects are all done so that we can read in their final transform values,
+ *	  though this means that objects can't refer to scene info for guidance...
+ */
+static void scene_update_drivers(Main *UNUSED(bmain), Scene *scene)
+{
+	float ctime = BKE_curframe(scene);
+	
+	/* scene itself */
+	if (scene->adt && scene->adt->drivers.first) {
+		BKE_animsys_evaluate_animdata(scene, &scene->id, scene->adt, ctime, ADT_RECALC_DRIVERS);
+	}
+	
+	/* world */
+	// TODO: what about world textures? but then those have nodes too...
+	if (scene->world) {
+		ID *wid = (ID *)scene->world;
+		AnimData *adt= BKE_animdata_from_id(wid);
+		
+		if (adt && adt->drivers.first)
+			BKE_animsys_evaluate_animdata(scene, wid, adt, ctime, ADT_RECALC_DRIVERS);
+	}
+	
+	/* nodes */
+	if (scene->nodetree) {
+		ID *nid = (ID *)scene->nodetree;
+		AnimData *adt= BKE_animdata_from_id(nid);
+		
+		if (adt && adt->drivers.first)
+			BKE_animsys_evaluate_animdata(scene, nid, adt, ctime, ADT_RECALC_DRIVERS);
+	}
+}
+
 static void scene_update_tagged_recursive(Main *bmain, Scene *scene, Scene *scene_parent)
 {
 	Base *base;
+	
+	
+	scene->customdata_mask= scene_parent->customdata_mask;
 
 	/* sets first, we allow per definition current scene to have
 	   dependencies on sets, but not the other way around. */
-	if(scene->set)
+	if (scene->set)
 		scene_update_tagged_recursive(bmain, scene->set, scene_parent);
-
-	for(base= scene->base.first; base; base= base->next) {
+	
+	/* scene objects */
+	for (base= scene->base.first; base; base= base->next) {
 		Object *ob= base->object;
-
+		
 		object_handle_update(scene_parent, ob);
-
+		
 		if(ob->dup_group && (ob->transflag & OB_DUPLIGROUP))
 			group_handle_recalc_and_update(scene_parent, ob, ob->dup_group);
 			
 		/* always update layer, so that animating layers works */
 		base->lay= ob->lay;
 	}
+	
+	/* scene drivers... */
+	scene_update_drivers(bmain, scene);
+
+	/* update sound system animation */
+	sound_update_scene(scene);
 }
 
 /* this is called in main loop, doing tagged updates before redraw */
@@ -979,14 +1002,14 @@ void scene_update_tagged(Main *bmain, Scene *scene)
 
 	/* recalc scene animation data here (for sequencer) */
 	{
-		float ctime = BKE_curframe(scene); 
 		AnimData *adt= BKE_animdata_from_id(&scene->id);
-
-		if(adt && (adt->recalc & ADT_RECALC_ANIM))
-			BKE_animsys_evaluate_animdata(&scene->id, adt, ctime, 0);
+		float ctime = BKE_curframe(scene);
+		
+		if (adt && (adt->recalc & ADT_RECALC_ANIM))
+			BKE_animsys_evaluate_animdata(scene, &scene->id, adt, ctime, 0);
 	}
-
-	if(scene->physics_settings.quick_cache_step)
+	
+	if (scene->physics_settings.quick_cache_step)
 		BKE_ptcache_quick_cache_all(bmain, scene);
 
 	/* in the future this should handle updates for all datablocks, not
@@ -998,6 +1021,8 @@ void scene_update_for_newframe(Main *bmain, Scene *sce, unsigned int lay)
 {
 	float ctime = BKE_curframe(sce);
 	Scene *sce_iter;
+
+	sound_set_cfra(sce->r.cfra);
 	
 	/* clear animation overrides */
 	// XXX TODO...
@@ -1010,7 +1035,7 @@ void scene_update_for_newframe(Main *bmain, Scene *sce, unsigned int lay)
 
 	/* Following 2 functions are recursive
 	 * so dont call within 'scene_update_tagged_recursive' */
-	DAG_scene_update_flags(bmain, sce, lay);   // only stuff that moves or needs display still
+	DAG_scene_update_flags(bmain, sce, lay, TRUE);   // only stuff that moves or needs display still
 
 	/* All 'standard' (i.e. without any dependencies) animation is handled here,
 	 * with an 'local' to 'macro' order of evaluation. This should ensure that
@@ -1018,7 +1043,7 @@ void scene_update_for_newframe(Main *bmain, Scene *sce, unsigned int lay)
 	 * can be overridden by settings from Scene, which owns the Texture through a hierarchy
 	 * such as Scene->World->MTex/Texture) can still get correctly overridden.
 	 */
-	BKE_animsys_evaluate_all_animation(bmain, ctime);
+	BKE_animsys_evaluate_all_animation(bmain, sce, ctime);
 	/*...done with recusrive funcs */
 
 	/* object_handle_update() on all objects, groups and sets */
@@ -1077,25 +1102,25 @@ float get_render_aosss_error(RenderData *r, float error)
 }
 
 /* helper function for the SETLOOPER macro */
-Base *_setlooper_base_step(Scene **sce, Base *base)
+Base *_setlooper_base_step(Scene **sce_iter, Base *base)
 {
-    if(base && base->next) {
-        /* common case, step to the next */
-        return base->next;
-    }
-    else if(base==NULL && (*sce)->base.first) {
-        /* first time looping, return the scenes first base */
-        return (Base *)(*sce)->base.first;
-    }
-    else {
-        /* reached the end, get the next base in the set */
-        while((*sce= (*sce)->set)) {
-            base= (Base *)(*sce)->base.first;
-            if(base) {
-                return base;
-            }
-        }
-    }
+	if(base && base->next) {
+		/* common case, step to the next */
+		return base->next;
+	}
+	else if(base==NULL && (*sce_iter)->base.first) {
+		/* first time looping, return the scenes first base */
+		return (Base *)(*sce_iter)->base.first;
+	}
+	else {
+		/* reached the end, get the next base in the set */
+		while((*sce_iter= (*sce_iter)->set)) {
+			base= (Base *)(*sce_iter)->base.first;
+			if(base) {
+				return base;
+			}
+		}
+	}
 
-    return NULL;
+	return NULL;
 }

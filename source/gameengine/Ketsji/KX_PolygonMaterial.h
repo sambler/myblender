@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file KX_PolygonMaterial.h
+ *  \ingroup ketsji
+ */
+
 #ifndef __KX_POLYGONMATERIAL_H__
 #define __KX_POLYGONMATERIAL_H__
 
@@ -42,6 +47,7 @@
 struct MTFace;
 struct Material;
 struct MTex;
+struct Image;
 
 /**
  *  Material class.
@@ -72,10 +78,10 @@ public:
 		int tile,
 		int tilexrep,
 		int tileyrep,
-		int mode,
-		int transp,
+		int alphablend,
 		bool alpha,
 		bool zsort,
+		bool light,
 		int lightlayer,
 		struct MTFace* tface,
 		unsigned int* mcol);
@@ -106,6 +112,8 @@ public:
 	{
 		return m_material;
 	}
+
+	Image *GetBlenderImage() const;
 
 	/**
 	 * Returns the Blender texture face structure that is used for this material.

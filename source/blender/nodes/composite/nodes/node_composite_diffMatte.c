@@ -88,10 +88,10 @@ static void do_diff_matte(bNode *node, float *outColor, float *inColor1, float *
 
 static void node_composit_exec_diff_matte(void *data, bNode *node, bNodeStack **in, bNodeStack **out)
 {
-	CompBuf *outbuf=0;
-	CompBuf *imbuf1=0;
-	CompBuf *imbuf2=0;
-	NodeChroma *c;
+	CompBuf *outbuf= NULL;
+	CompBuf *imbuf1= NULL;
+	CompBuf *imbuf2= NULL;
+	/* NodeChroma *c; */ /* UNUSED */
 
 	/*is anything connected?*/
 	if(out[0]->hasoutput==0 && out[1]->hasoutput==0) return;
@@ -107,7 +107,7 @@ static void node_composit_exec_diff_matte(void *data, bNode *node, bNodeStack **
 		imbuf2=typecheck_compbuf(in[1]->data, CB_RGBA);
 	}
 
-	c=node->storage;
+	/* c=node->storage; */ /* UNUSED */
 	outbuf=dupalloc_compbuf(imbuf1);
 
 	/* note, processor gets a keyvals array passed on as buffer constant */

@@ -342,7 +342,7 @@ static void singleuser_action_cb(bContext *C, Scene *UNUSED(scene), TreeElement 
 	
 	if (id) {
 		IdAdtTemplate *iat = (IdAdtTemplate *)tsep->id;
-		PointerRNA ptr = {{0}};
+		PointerRNA ptr = {{NULL}};
 		PropertyRNA *prop;
 		
 		RNA_pointer_create(&iat->id, &RNA_AnimData, iat->adt, &ptr);
@@ -899,7 +899,7 @@ static int outliner_action_set_exec(bContext *C, wmOperator *op)
 	act= BLI_findlink(&CTX_data_main(C)->action, RNA_enum_get(op->ptr, "action"));
 	
 	if (act == NULL) {
-		BKE_report(op->reports, RPT_ERROR, "No valid Action to add.");
+		BKE_report(op->reports, RPT_ERROR, "No valid Action to add");
 		return OPERATOR_CANCELLED;
 	}
 	else if (act->idroot == 0) {

@@ -52,6 +52,7 @@
 #include "BKE_global.h"
 #include "BKE_main.h"
 #include "BKE_mesh.h"
+#include "BKE_object.h"
 #include "BKE_report.h"
 #include "BKE_scene.h"
 #include "BKE_screen.h"
@@ -346,7 +347,7 @@ int ED_operator_posemode(bContext *C)
 
 	if (obact && !(obact->mode & OB_MODE_EDIT)) {
 		Object *obpose;
-		if((obpose= ED_object_pose_armature(obact))) {
+		if((obpose= object_pose_armature_get(obact))) {
 			if((obact == obpose) || (obact->mode & OB_MODE_WEIGHT_PAINT)) {
 				return 1;
 			}
@@ -1810,7 +1811,7 @@ static void SCREEN_OT_frame_jump(wmOperatorType *ot)
 	ot->flag= OPTYPE_UNDO;
 	
 	/* rna */
-	RNA_def_boolean(ot->srna, "end", 0, "Last Frame", "Jump to the last frame of the frame range.");
+	RNA_def_boolean(ot->srna, "end", 0, "Last Frame", "Jump to the last frame of the frame range");
 }
 
 
@@ -3022,7 +3023,7 @@ static void SCREEN_OT_animation_cancel(wmOperatorType *ot)
 	
 	ot->poll= ED_operator_screenactive;
 
-	RNA_def_boolean(ot->srna, "restore_frame", TRUE, "Restore Frame", "Restore the frame when animation was initialized.");
+	RNA_def_boolean(ot->srna, "restore_frame", TRUE, "Restore Frame", "Restore the frame when animation was initialized");
 }
 
 /* ************** border select operator (template) ***************************** */
@@ -3097,7 +3098,7 @@ static int fullscreen_back_exec(bContext *C, wmOperator *op)
 		if (sa->full) break;
 	}
 	if (!sa) {
-		BKE_report(op->reports, RPT_ERROR, "No fullscreen areas were found.");
+		BKE_report(op->reports, RPT_ERROR, "No fullscreen areas were found");
 		return OPERATOR_CANCELLED;
 	}
 	

@@ -97,7 +97,7 @@ static void node_sync_cb(bContext *UNUSED(C), void *snode_v, void *node_v)
 	}
 }
 
-void node_socket_button_default(const bContext *C, uiBlock *block,
+static void node_socket_button_default(const bContext *C, uiBlock *block,
 								bNodeTree *ntree, bNode *node, bNodeSocket *sock,
 								const char *name, int x, int y, int width)
 {
@@ -135,7 +135,7 @@ static uiBlock *socket_component_menu(bContext *C, ARegion *ar, void *args_v)
 	
 	return block;
 }
-void node_socket_button_components(const bContext *C, uiBlock *block,
+static void node_socket_button_components(const bContext *C, uiBlock *block,
 								   bNodeTree *ntree, bNode *node, bNodeSocket *sock,
 								   const char *name, int x, int y, int width)
 {
@@ -157,7 +157,7 @@ void node_socket_button_components(const bContext *C, uiBlock *block,
 	uiDefBlockButN(block, socket_component_menu, args, name, x, y+1, width, NODE_DY-2, "");
 }
 
-void node_socket_button_color(const bContext *C, uiBlock *block,
+static void node_socket_button_color(const bContext *C, uiBlock *block,
 							  bNodeTree *ntree, bNode *node, bNodeSocket *sock,
 							  const char *name, int x, int y, int width)
 {
@@ -179,7 +179,8 @@ void node_socket_button_color(const bContext *C, uiBlock *block,
 
 /* ****************** BASE DRAW FUNCTIONS FOR NEW OPERATOR NODES ***************** */
 
-void node_draw_socket_new(bNodeSocket *sock, float size)
+#if 0 /* UNUSED */
+static void node_draw_socket_new(bNodeSocket *sock, float size)
 {
 	float x=sock->locx, y=sock->locy;
 	
@@ -216,6 +217,7 @@ void node_draw_socket_new(bNodeSocket *sock, float size)
 	glDisable( GL_LINE_SMOOTH );
 	glDisable(GL_BLEND);
 }
+#endif
 
 /* ****************** BUTTON CALLBACKS FOR ALL TREES ***************** */
 
@@ -305,7 +307,7 @@ static void node_buts_curvecol(uiLayout *layout, bContext *UNUSED(C), PointerRNA
 
 	if(_sample_col) {
 		cumap->flag |= CUMA_DRAW_SAMPLE;
-		VECCOPY(cumap->sample, _sample_col);
+		copy_v3_v3(cumap->sample, _sample_col);
 	}
 	else 
 		cumap->flag &= ~CUMA_DRAW_SAMPLE;
@@ -741,23 +743,23 @@ static void node_draw_group(const bContext *C, ARegion *ar, SpaceNode *snode, bN
 		
 		/* backdrop header */
 		glEnable(GL_BLEND);
-		uiSetRoundBox(3);
+		uiSetRoundBox(UI_CNR_TOP_LEFT | UI_CNR_TOP_RIGHT);
 		UI_ThemeColorShadeAlpha(TH_NODE_GROUP, 0, -70);
 		uiDrawBox(GL_POLYGON, rect.xmin-node_group_frame, rect.ymax, rect.xmax+node_group_frame, rect.ymax+group_header, BASIS_RAD);
 		
 		/* backdrop body */
 		UI_ThemeColorShadeAlpha(TH_BACK, -8, -70);
-		uiSetRoundBox(0);
+		uiSetRoundBox(UI_CNR_NONE);
 		uiDrawBox(GL_POLYGON, rect.xmin, rect.ymin, rect.xmax, rect.ymax, BASIS_RAD);
 	
 		/* input column */
 		UI_ThemeColorShadeAlpha(TH_BACK, 10, -50);
-		uiSetRoundBox(8);
+		uiSetRoundBox(UI_CNR_BOTTOM_LEFT);
 		uiDrawBox(GL_POLYGON, rect.xmin-node_group_frame, rect.ymin, rect.xmin, rect.ymax, BASIS_RAD);
 	
 		/* output column */
 		UI_ThemeColorShadeAlpha(TH_BACK, 10, -50);
-		uiSetRoundBox(4);
+		uiSetRoundBox(UI_CNR_BOTTOM_RIGHT);
 		uiDrawBox(GL_POLYGON, rect.xmax, rect.ymin, rect.xmax+node_group_frame, rect.ymax, BASIS_RAD);
 	
 		/* input column separator */
@@ -775,7 +777,7 @@ static void node_draw_group(const bContext *C, ARegion *ar, SpaceNode *snode, bN
 		glEnd();
 	
 		/* group node outline */
-		uiSetRoundBox(15);
+		uiSetRoundBox(UI_CNR_ALL);
 		glColor4ub(200, 200, 200, 140);
 		glEnable( GL_LINE_SMOOTH );
 		uiDrawBox(GL_LINE_LOOP, rect.xmin-node_group_frame, rect.ymin, rect.xmax+node_group_frame, rect.ymax+group_header, BASIS_RAD);
@@ -894,14 +896,14 @@ static void node_browse_text_cb(bContext *C, void *ntree_v, void *node_v)
 	Main *bmain= CTX_data_main(C);
 	bNodeTree *ntree= ntree_v;
 	bNode *node= node_v;
-	ID *oldid;
+	/* ID *oldid; */ /* UNUSED */
 	
 	if(node->menunr<1) return;
 	
 	if(node->id) {
 		node->id->us--;
 	}
-	oldid= node->id;
+	/* oldid= node->id; */ /* UNUSED */
 	node->id= BLI_findlink(&bmain->text, node->menunr-1);
 	id_us_plus(node->id);
 	BLI_strncpy(node->name, node->id->name+2, sizeof(node->name));

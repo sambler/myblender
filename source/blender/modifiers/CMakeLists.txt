@@ -34,11 +34,8 @@ set(INC
 	../makesdna
 	../makesrna
 	../render/extern/include
-	../editors/include
-	../gpu
 	../../../intern/elbeem/extern
 	../../../intern/guardedalloc
-	../../../extern/recastnavigation/Recast/Include
 )
 
 set(INC_SYS
@@ -68,7 +65,7 @@ set(SRC
 	intern/MOD_meshdeform.c
 	intern/MOD_mirror.c
 	intern/MOD_multires.c
-	intern/MOD_navmesh.cpp
+	intern/MOD_navmesh.c
 	intern/MOD_none.c
 	intern/MOD_particleinstance.c
 	intern/MOD_particlesystem.c
@@ -120,7 +117,12 @@ if(NOT WITH_MOD_FLUID)
 endif()
 
 if(WITH_GAMEENGINE)
+	# for MOD_navmesh.c
 	add_definitions(-DWITH_GAMEENGINE)
+	list(APPEND INC
+		../gpu
+		../../../extern/recastnavigation
+	)
 endif()
 
 blender_add_lib(bf_modifiers "${SRC}" "${INC}" "${INC_SYS}")

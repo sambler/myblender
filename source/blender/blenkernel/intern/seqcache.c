@@ -1,4 +1,4 @@
-/**
+/*
 * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -22,6 +22,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/blenkernel/intern/seqcache.c
+ *  \ingroup bke
+ */
+
+
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -32,6 +37,7 @@
 
 #include "DNA_sequence_types.h"
 #include "BKE_sequencer.h"
+#include "BLI_utildefines.h"
 #include "BLI_ghash.h"
 #include "BLI_mempool.h"
 #include <pthread.h>
@@ -42,8 +48,7 @@
 typedef struct seqCacheKey 
 {
 	struct Sequence * seq;
-	int rectx;
-	int recty;
+	SeqRenderData context;
 	float cfra;
 	seq_stripelem_ibuf_t type;
 } seqCacheKey;
@@ -54,17 +59,17 @@ typedef struct seqCacheEntry
 	MEM_CacheLimiterHandleC * c_handle;
 } seqCacheEntry;
 
-static GHash * hash = 0;
-static MEM_CacheLimiterC * limitor = 0;
-static struct BLI_mempool * entrypool = 0;
-static struct BLI_mempool * keypool = 0;
+static GHash * hash = NULL;
+static MEM_CacheLimiterC * limitor = NULL;
+static struct BLI_mempool * entrypool = NULL;
+static struct BLI_mempool * keypool = NULL;
 static int ibufs_in  = 0;
 static int ibufs_rem = 0;
 
-static unsigned int HashHash(void *key_)
+static unsigned int HashHash(const void *key_)
 {
-	seqCacheKey * key = (seqCacheKey*) key_;
-	unsigned int rval = key->rectx + key->recty;
+	const seqCacheKey *key = (seqCacheKey*) key_;
+	unsigned int rval = seq_hash_render_data(&key->context);
 
 	rval ^= *(unsigned int*) &key->cfra;
 	rval += key->type;
@@ -73,10 +78,10 @@ static unsigned int HashHash(void *key_)
 	return rval;
 }
 
-static int HashCmp(void *a_, void *b_)
+static int HashCmp(const void *a_, const void *b_)
 {
-	seqCacheKey * a = (seqCacheKey*) a_;
-	seqCacheKey * b = (seqCacheKey*) b_;
+	const seqCacheKey * a = (seqCacheKey*) a_;
+	const seqCacheKey * b = (seqCacheKey*) b_;
 
 	if (a->seq < b->seq) {
 		return -1;		
@@ -99,21 +104,7 @@ static int HashCmp(void *a_, void *b_)
 		return 1;
 	}
 
-	if (a->rectx < b->rectx) {
-		return -1;
-	}
-	if (a->rectx > b->rectx) {
-		return 1;
-	}
-
-	if (a->recty < b->recty) {
-		return -1;
-	}
-	if (a->recty > b->recty) {
-		return 1;
-	}
-
-	return 0;
+	return seq_cmp_render_data(&a->context, &b->context);
 }
 
 static void HashKeyFree(void *key)
@@ -133,8 +124,8 @@ static void HashValFree(void *val)
 		ibufs_rem++;
 	}
 
-	e->ibuf = 0;
-	e->c_handle = 0;
+	e->ibuf = NULL;
+	e->c_handle = NULL;
 
 	BLI_mempool_free(entrypool, e);
 }
@@ -149,12 +140,12 @@ static void IMB_seq_cache_destructor(void * p)
 		IMB_freeImBuf(e->ibuf);
 		ibufs_rem++;
 
-		e->ibuf = 0;
-		e->c_handle = 0;
+		e->ibuf = NULL;
+		e->c_handle = NULL;
 	}
 }
 
-void seq_stripelem_cache_init()
+void seq_stripelem_cache_init(void)
 {
 	hash = BLI_ghash_new(HashHash, HashCmp, "seq stripelem cache hash");
 	limitor = new_MEM_CacheLimiter( IMB_seq_cache_destructor );
@@ -163,7 +154,7 @@ void seq_stripelem_cache_init()
 	keypool = BLI_mempool_create(sizeof(seqCacheKey), 64, 64, 0);
 }
 
-void seq_stripelem_cache_destruct()
+void seq_stripelem_cache_destruct(void)
 {
 	if (!entrypool) {
 		return;
@@ -174,7 +165,7 @@ void seq_stripelem_cache_destruct()
 	BLI_mempool_destroy(keypool);
 }
 
-void seq_stripelem_cache_cleanup()
+void seq_stripelem_cache_cleanup(void)
 {
 	if (!entrypool) {
 		seq_stripelem_cache_init();
@@ -192,14 +183,14 @@ void seq_stripelem_cache_cleanup()
 }
 
 struct ImBuf * seq_stripelem_cache_get(
-	struct Sequence * seq, int rectx, int recty, 
+	SeqRenderData context, struct Sequence * seq, 
 	float cfra, seq_stripelem_ibuf_t type)
 {
 	seqCacheKey key;
 	seqCacheEntry * e;
 
 	if (!seq) {
-		return 0;
+		return NULL;
 	}
 
 	if (!entrypool) {
@@ -207,8 +198,7 @@ struct ImBuf * seq_stripelem_cache_get(
 	}
 
 	key.seq = seq;
-	key.rectx = rectx;
-	key.recty = recty;
+	key.context = context;
 	key.cfra = cfra - seq->start;
 	key.type = type;
 	
@@ -220,11 +210,11 @@ struct ImBuf * seq_stripelem_cache_get(
 		MEM_CacheLimiter_touch(e->c_handle);
 		return e->ibuf;
 	}
-	return 0;
+	return NULL;
 }
 
 void seq_stripelem_cache_put(
-	struct Sequence * seq, int rectx, int recty, 
+	SeqRenderData context, struct Sequence * seq, 
 	float cfra, seq_stripelem_ibuf_t type, struct ImBuf * i)
 {
 	seqCacheKey * key;
@@ -243,18 +233,16 @@ void seq_stripelem_cache_put(
 	key = (seqCacheKey*) BLI_mempool_alloc(keypool);
 
 	key->seq = seq;
-	key->rectx = rectx;
-	key->recty = recty;
+	key->context = context;
 	key->cfra = cfra - seq->start;
 	key->type = type;
 
-	/* we want our own version */
 	IMB_refImBuf(i);
 
 	e = (seqCacheEntry*) BLI_mempool_alloc(entrypool);
 
 	e->ibuf = i;
-	e->c_handle = 0;
+	e->c_handle = NULL;
 
 	BLI_ghash_remove(hash, key, HashKeyFree, HashValFree);
 	BLI_ghash_insert(hash, key, e);

@@ -1,4 +1,4 @@
-/**
+/*
  * Cast a ray and feel for objects
  *
  * $Id$
@@ -29,6 +29,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file gameengine/Ketsji/KX_RaySensor.cpp
+ *  \ingroup ketsji
+ */
+
+
 #include "KX_RaySensor.h"
 #include "SCA_EventManager.h"
 #include "SCA_RandomEventManager.h"
@@ -42,6 +47,7 @@
 #include "PHY_IPhysicsEnvironment.h"
 #include "KX_IPhysicsController.h"
 #include "PHY_IPhysicsController.h"
+#include "DNA_sensor_types.h"
 
 #include <stdio.h>
 
@@ -77,7 +83,7 @@ void KX_RaySensor::Init()
 
 KX_RaySensor::~KX_RaySensor() 
 {
-    /* Nothing to be done here. */
+	/* Nothing to be done here. */
 }
 
 
@@ -198,42 +204,42 @@ bool KX_RaySensor::Evaluate()
 	m_reset = false;
 	switch (m_axis)
 	{
-	case 1: // X
+	case SENS_RAY_X_AXIS: // X
 		{
 			todir[0] = invmat[0][0];
 			todir[1] = invmat[0][1];
 			todir[2] = invmat[0][2];
 			break;
 		}
-	case 0: // Y
+	case SENS_RAY_Y_AXIS: // Y
 		{
 			todir[0] = invmat[1][0];
 			todir[1] = invmat[1][1];
 			todir[2] = invmat[1][2];
 			break;
 		}
-	case 2: // Z
+	case SENS_RAY_Z_AXIS: // Z
 		{
 			todir[0] = invmat[2][0];
 			todir[1] = invmat[2][1];
 			todir[2] = invmat[2][2];
 			break;
 		}
-	case 3: // -X
+	case SENS_RAY_NEG_X_AXIS: // -X
 		{
 			todir[0] = -invmat[0][0];
 			todir[1] = -invmat[0][1];
 			todir[2] = -invmat[0][2];
 			break;
 		}
-	case 4: // -Y
+	case SENS_RAY_NEG_Y_AXIS: // -Y
 		{
 			todir[0] = -invmat[1][0];
 			todir[1] = -invmat[1][1];
 			todir[2] = -invmat[1][2];
 			break;
 		}
-	case 5: // -Z
+	case SENS_RAY_NEG_Z_AXIS: // -Z
 		{
 			todir[0] = -invmat[2][0];
 			todir[1] = -invmat[2][1];
@@ -273,7 +279,7 @@ bool KX_RaySensor::Evaluate()
 
 	/* now pass this result to some controller */
 
-    if (m_rayHit)
+	if (m_rayHit)
 	{
 		if (!m_bTriggered)
 		{
@@ -282,14 +288,14 @@ bool KX_RaySensor::Evaluate()
 			m_bTriggered = true;
 		}
 		else
-		  {
+		{
 			// notify logicsystem that ray is STILL hitting ...
 			result = false;
-		    
-		  }
+
+		}
 	}
-    else
-      {
+	else
+	{
 		if (m_bTriggered)
 		{
 			m_bTriggered = false;
@@ -300,16 +306,16 @@ bool KX_RaySensor::Evaluate()
 		{
 			result = false;
 		}
-	
-      }
-    if (reset)
+
+	}
+	if (reset)
 		// force an event
 		result = true;
 
 	return result;
 }
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 
 /* ------------------------------------------------------------------------- */
 /* Python functions                                                          */
@@ -365,4 +371,4 @@ PyObject* KX_RaySensor::pyattr_get_hitobject(void *self_v, const KX_PYATTRIBUTE_
 	Py_RETURN_NONE;
 }
 
-#endif // DISABLE_PYTHON
+#endif // WITH_PYTHON

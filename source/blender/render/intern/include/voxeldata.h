@@ -1,4 +1,4 @@
-/**
+/*
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -26,6 +26,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/render/intern/include/voxeldata.h
+ *  \ingroup render
+ */
+
+
 #ifndef VOXELDATA_H
 #define VOXELDATA_H 
 
@@ -40,6 +45,6 @@ typedef struct VoxelDataHeader
 
 void make_voxeldata(struct Render *re);
 void free_voxeldata(struct Render *re);
-int voxeldatatex(struct Tex *tex, float *texvec, struct TexResult *texres);
+int voxeldatatex(struct Tex *tex, const float texvec[3], struct TexResult *texres);
 
 #endif /* VOXELDATA_H */

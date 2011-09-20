@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/space_sequencer/space_sequencer.c
+ *  \ingroup spseq
+ */
+
+
 #include <string.h>
 #include <stdio.h>
 
@@ -36,12 +41,15 @@
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
 #include "BLI_path_util.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_context.h"
 #include "BKE_screen.h"
 #include "BKE_sequencer.h"
 #include "BKE_global.h"
 
+#include "ED_space_api.h"
+#include "ED_sequencer.h"
 #include "ED_screen.h"
 #include "ED_view3d.h" /* only for sequencer view3d drawing callback */
 
@@ -58,16 +66,13 @@
 ARegion *sequencer_has_buttons_region(ScrArea *sa)
 {
 	ARegion *ar, *arnew;
-	
-	for(ar= sa->regionbase.first; ar; ar= ar->next)
-		if(ar->regiontype==RGN_TYPE_UI)
-			return ar;
+
+	ar= BKE_area_find_region_type(sa, RGN_TYPE_UI);
+	if(ar) return ar;
 	
 	/* add subdiv level; after header */
-	for(ar= sa->regionbase.first; ar; ar= ar->next)
-		if(ar->regiontype==RGN_TYPE_HEADER)
-			break;
-	
+	ar= BKE_area_find_region_type(sa, RGN_TYPE_HEADER);
+
 	/* is error! */
 	if(ar==NULL) return NULL;
 	
@@ -82,7 +87,7 @@ ARegion *sequencer_has_buttons_region(ScrArea *sa)
 	return arnew;
 }
 
-ARegion *sequencer_find_region(ScrArea *sa, short type)
+static ARegion *sequencer_find_region(ScrArea *sa, short type)
 {
 	ARegion *ar=NULL;
 	
@@ -92,61 +97,6 @@ ARegion *sequencer_find_region(ScrArea *sa, short type)
 
 	return ar;
 }
-
-void ED_sequencer_update_view(bContext *C, int view)
-{
-	ScrArea *sa= CTX_wm_area(C);
-	
-	ARegion *ar_main= sequencer_find_region(sa, RGN_TYPE_WINDOW);
-	ARegion *ar_preview= sequencer_find_region(sa, RGN_TYPE_PREVIEW);
-
-	switch (view) {
-		case SEQ_VIEW_SEQUENCE:
-			if (ar_main && (ar_main->flag & RGN_FLAG_HIDDEN)) {
-				ar_main->flag &= ~RGN_FLAG_HIDDEN;
-				ar_main->v2d.flag &= ~V2D_IS_INITIALISED;
-			}
-			if (ar_preview && !(ar_preview->flag & RGN_FLAG_HIDDEN)) {
-				ar_preview->flag |= RGN_FLAG_HIDDEN;
-				ar_preview->v2d.flag &= ~V2D_IS_INITIALISED;
-				WM_event_remove_handlers(C, &ar_preview->handlers);
-			}
-			if (ar_main) ar_main->alignment= RGN_ALIGN_NONE;
-			if (ar_preview) ar_preview->alignment= RGN_ALIGN_NONE;
-			break;
-		case SEQ_VIEW_PREVIEW:
-			if (ar_main && !(ar_main->flag & RGN_FLAG_HIDDEN)) {
-				ar_main->flag |= RGN_FLAG_HIDDEN;
-				ar_main->v2d.flag &= ~V2D_IS_INITIALISED;
-				WM_event_remove_handlers(C, &ar_main->handlers);
-			}
-			if (ar_preview && (ar_preview->flag & RGN_FLAG_HIDDEN)) {
-				ar_preview->flag &= ~RGN_FLAG_HIDDEN;
-				ar_preview->v2d.flag &= ~V2D_IS_INITIALISED;
-				ar_preview->v2d.cur = ar_preview->v2d.tot;
-			}
-			if (ar_main) ar_main->alignment= RGN_ALIGN_NONE;
-			if (ar_preview) ar_preview->alignment= RGN_ALIGN_NONE;
-			break;
-		case SEQ_VIEW_SEQUENCE_PREVIEW:
-			if (ar_main && (ar_main->flag & RGN_FLAG_HIDDEN)) {
-				ar_main->flag &= ~RGN_FLAG_HIDDEN;
-				ar_main->v2d.flag &= ~V2D_IS_INITIALISED;
-			}
-			if (ar_preview && (ar_preview->flag & RGN_FLAG_HIDDEN)) {
-				ar_preview->flag &= ~RGN_FLAG_HIDDEN;
-				ar_preview->v2d.flag &= ~V2D_IS_INITIALISED;
-				ar_preview->v2d.cur = ar_preview->v2d.tot;
-			}
-			if (ar_main) ar_main->alignment= RGN_ALIGN_NONE;
-			if (ar_preview) ar_preview->alignment= RGN_ALIGN_TOP;
-			break;
-	}
-
-	ED_area_initialize(CTX_wm_manager(C), CTX_wm_window(C), sa);
-	ED_area_tag_redraw(sa);
-}
-
 
 /* ******************** default callbacks for sequencer space ***************** */
 
@@ -218,7 +168,7 @@ static SpaceLink *sequencer_new(const bContext *C)
 	ar->v2d.cur= ar->v2d.tot;
 	
 	ar->v2d.min[0]= 10.0f;
-	ar->v2d.min[1]= 4.0f;
+	ar->v2d.min[1]= 0.5f;
 	
 	ar->v2d.max[0]= MAXFRAMEF;
 	ar->v2d.max[1]= MAXSEQ;
@@ -236,7 +186,7 @@ static SpaceLink *sequencer_new(const bContext *C)
 }
 
 /* not spacelink itself */
-static void sequencer_free(SpaceLink *sl)
+static void sequencer_free(SpaceLink *UNUSED(sl))
 {	
 //	SpaceSeq *sseq= (SpaceSequencer*) sl;
 	
@@ -246,9 +196,91 @@ static void sequencer_free(SpaceLink *sl)
 
 
 /* spacetype; init callback */
-static void sequencer_init(struct wmWindowManager *wm, ScrArea *sa)
+static void sequencer_init(struct wmWindowManager *UNUSED(wm), ScrArea *UNUSED(sa))
 {
 	
+}
+
+static void sequencer_refresh(const bContext *C, ScrArea *sa)
+{
+	wmWindowManager *wm= CTX_wm_manager(C);
+	wmWindow *window= CTX_wm_window(C);
+	SpaceSeq *sseq= (SpaceSeq *)sa->spacedata.first;
+	ARegion *ar_main= sequencer_find_region(sa, RGN_TYPE_WINDOW);
+	ARegion *ar_preview= sequencer_find_region(sa, RGN_TYPE_PREVIEW);
+	int view_changed= 0;
+
+	switch (sseq->view) {
+		case SEQ_VIEW_SEQUENCE:
+			if (ar_main && (ar_main->flag & RGN_FLAG_HIDDEN)) {
+				ar_main->flag &= ~RGN_FLAG_HIDDEN;
+				ar_main->v2d.flag &= ~V2D_IS_INITIALISED;
+				view_changed= 1;
+			}
+			if (ar_preview && !(ar_preview->flag & RGN_FLAG_HIDDEN)) {
+				ar_preview->flag |= RGN_FLAG_HIDDEN;
+				ar_preview->v2d.flag &= ~V2D_IS_INITIALISED;
+				WM_event_remove_handlers((bContext*)C, &ar_preview->handlers);
+				view_changed= 1;
+			}
+			if (ar_main && ar_main->alignment != RGN_ALIGN_NONE) {
+				ar_main->alignment= RGN_ALIGN_NONE;
+				view_changed= 1;
+			}
+			if (ar_preview && ar_preview->alignment != RGN_ALIGN_NONE) {
+				ar_preview->alignment= RGN_ALIGN_NONE;
+				view_changed= 1;
+			}
+			break;
+		case SEQ_VIEW_PREVIEW:
+			if (ar_main && !(ar_main->flag & RGN_FLAG_HIDDEN)) {
+				ar_main->flag |= RGN_FLAG_HIDDEN;
+				ar_main->v2d.flag &= ~V2D_IS_INITIALISED;
+				WM_event_remove_handlers((bContext*)C, &ar_main->handlers);
+				view_changed= 1;
+			}
+			if (ar_preview && (ar_preview->flag & RGN_FLAG_HIDDEN)) {
+				ar_preview->flag &= ~RGN_FLAG_HIDDEN;
+				ar_preview->v2d.flag &= ~V2D_IS_INITIALISED;
+				ar_preview->v2d.cur = ar_preview->v2d.tot;
+				view_changed= 1;
+			}
+			if (ar_main && ar_main->alignment != RGN_ALIGN_NONE) {
+				ar_main->alignment= RGN_ALIGN_NONE;
+				view_changed= 1;
+			}
+			if (ar_preview && ar_preview->alignment != RGN_ALIGN_NONE) {
+				ar_preview->alignment= RGN_ALIGN_NONE;
+				view_changed= 1;
+			}
+			break;
+		case SEQ_VIEW_SEQUENCE_PREVIEW:
+			if (ar_main && (ar_main->flag & RGN_FLAG_HIDDEN)) {
+				ar_main->flag &= ~RGN_FLAG_HIDDEN;
+				ar_main->v2d.flag &= ~V2D_IS_INITIALISED;
+				view_changed= 1;
+			}
+			if (ar_preview && (ar_preview->flag & RGN_FLAG_HIDDEN)) {
+				ar_preview->flag &= ~RGN_FLAG_HIDDEN;
+				ar_preview->v2d.flag &= ~V2D_IS_INITIALISED;
+				ar_preview->v2d.cur = ar_preview->v2d.tot;
+				view_changed= 1;
+			}
+			if (ar_main && ar_main->alignment != RGN_ALIGN_NONE) {
+				ar_main->alignment= RGN_ALIGN_NONE;
+				view_changed= 1;
+			}
+			if (ar_preview && ar_preview->alignment != RGN_ALIGN_TOP) {
+				ar_preview->alignment= RGN_ALIGN_TOP;
+				view_changed= 1;
+			}
+			break;
+	}
+
+	if(view_changed) {
+		ED_area_initialize(wm, window, sa);
+		ED_area_tag_redraw(sa);
+	}
 }
 
 static SpaceLink *sequencer_duplicate(SpaceLink *sl)
@@ -296,7 +328,7 @@ static void sequencer_main_area_draw(const bContext *C, ARegion *ar)
 
 /* ************* dropboxes ************* */
 
-static int image_drop_poll(bContext *C, wmDrag *drag, wmEvent *event)
+static int image_drop_poll(bContext *UNUSED(C), wmDrag *drag, wmEvent *UNUSED(event))
 {
 	if(drag->type==WM_DRAG_PATH)
 		if(ELEM(drag->icon, ICON_FILE_IMAGE, ICON_FILE_BLANK))	/* rule might not work? */
@@ -304,7 +336,7 @@ static int image_drop_poll(bContext *C, wmDrag *drag, wmEvent *event)
 	return 0;
 }
 
-static int movie_drop_poll(bContext *C, wmDrag *drag, wmEvent *event)
+static int movie_drop_poll(bContext *UNUSED(C), wmDrag *drag, wmEvent *UNUSED(event))
 {
 	if(drag->type==WM_DRAG_PATH)
 		if(ELEM3(drag->icon, 0, ICON_FILE_MOVIE, ICON_FILE_BLANK))	/* rule might not work? */
@@ -312,7 +344,7 @@ static int movie_drop_poll(bContext *C, wmDrag *drag, wmEvent *event)
 	return 0;
 }
 
-static int sound_drop_poll(bContext *C, wmDrag *drag, wmEvent *event)
+static int sound_drop_poll(bContext *UNUSED(C), wmDrag *drag, wmEvent *UNUSED(event))
 {
 	if(drag->type==WM_DRAG_PATH)
 		if(ELEM(drag->icon, ICON_FILE_SOUND, ICON_FILE_BLANK))	/* rule might not work? */
@@ -334,6 +366,7 @@ static void sequencer_drop_copy(wmDrag *drag, wmDropBox *drop)
 		
 		RNA_string_set(drop->ptr, "directory", dir);
 
+		RNA_collection_clear(drop->ptr, "files");
 		RNA_collection_add(drop->ptr, "files", &itemptr);
 		RNA_string_set(&itemptr, "name", file);
 	}
@@ -352,7 +385,7 @@ static void sequencer_dropboxes(void)
 /* ************* end drop *********** */
 
 /* add handlers, stuff you only do once or on area/region changes */
-static void sequencer_header_area_init(wmWindowManager *wm, ARegion *ar)
+static void sequencer_header_area_init(wmWindowManager *UNUSED(wm), ARegion *ar)
 {
 	ED_region_header_init(ar);
 }
@@ -510,6 +543,7 @@ void ED_spacetype_sequencer(void)
 	st->operatortypes= sequencer_operatortypes;
 	st->keymap= sequencer_keymap;
 	st->dropboxes= sequencer_dropboxes;
+	st->refresh= sequencer_refresh;
 
 	/* regions: main window */
 	art= MEM_callocN(sizeof(ARegionType), "spacetype sequencer region");
@@ -517,7 +551,7 @@ void ED_spacetype_sequencer(void)
 	art->init= sequencer_main_area_init;
 	art->draw= sequencer_main_area_draw;
 	art->listener= sequencer_main_area_listener;
-	art->keymapflag= ED_KEYMAP_VIEW2D|ED_KEYMAP_FRAMES|ED_KEYMAP_ANIMATION;
+	art->keymapflag= ED_KEYMAP_VIEW2D|ED_KEYMAP_MARKERS|ED_KEYMAP_FRAMES|ED_KEYMAP_ANIMATION;
 
 	BLI_addhead(&st->regiontypes, art);
 

@@ -1,3 +1,8 @@
+
+/** \file KX_BlenderMaterial.h
+ *  \ingroup ketsji
+ */
+
 #ifndef __KX_BLENDER_MATERIAL_H__
 #define __KX_BLENDER_MATERIAL_H__
 
@@ -33,7 +38,8 @@ public:
 	KX_BlenderMaterial();
 	void Initialize(
 		class KX_Scene*	scene,
-		BL_Material*	mat
+		BL_Material*	mat,
+		GameSettings*	game
 	);
 
 	virtual ~KX_BlenderMaterial();
@@ -91,14 +97,14 @@ public:
 	
 	virtual void Replace_IScene(SCA_IScene *val)
 	{
+		mScene= static_cast<KX_Scene *>(val);
 		if (mBlenderShader)
 		{
-			mScene= static_cast<KX_Scene *>(val);
 			mBlenderShader->SetScene(mScene);
 		}
 	};
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 	// --------------------------------
 	virtual PyObject* py_repr(void) { return PyUnicode_FromString(mMaterial->matname.ReadPtr()); }
 
@@ -113,7 +119,7 @@ public:
 	KX_PYMETHOD_DOC( KX_BlenderMaterial, setTexture );
 
 	KX_PYMETHOD_DOC( KX_BlenderMaterial, setBlending );
-#endif // DISABLE_PYTHON
+#endif // WITH_PYTHON
 
 	// --------------------------------
 	// pre calculate to avoid pops/lag at startup

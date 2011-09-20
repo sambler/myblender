@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -26,6 +26,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file gameengine/Converter/BL_ArmatureConstraint.cpp
+ *  \ingroup bgeconv
+ */
+
+
 #include "DNA_constraint_types.h"
 #include "DNA_action_types.h"
 #include "BL_ArmatureConstraint.h"
@@ -33,7 +38,7 @@
 #include "BLI_math.h"
 #include "BLI_string.h"
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 
 PyTypeObject BL_ArmatureConstraint::Type = {
 	PyVarObject_HEAD_INIT(NULL, 0)
@@ -62,7 +67,7 @@ PyObject* BL_ArmatureConstraint::py_repr(void)
 	return PyUnicode_FromString(m_name);
 }
 
-#endif // DISABLE_PYTHON
+#endif // WITH_PYTHON
 
 BL_ArmatureConstraint::BL_ArmatureConstraint(
 	BL_ArmatureObject *armature, 
@@ -142,7 +147,7 @@ void BL_ArmatureConstraint::ReParent(BL_ArmatureObject* armature)
 	}
 }
 
-void BL_ArmatureConstraint::Relink(GEN_Map<GEN_HashedPtr, void*> *obj_map)
+void BL_ArmatureConstraint::Relink(CTR_Map<CTR_HashedPtr, void*> *obj_map)
 {
 	void **h_obj = (*obj_map)[m_target];
 	if (h_obj) {
@@ -237,7 +242,7 @@ void BL_ArmatureConstraint::SetSubtarget(KX_GameObject* subtarget)
 
 }
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 
 // PYTHON
 
@@ -447,4 +452,4 @@ int BL_ArmatureConstraint::py_attr_setattr(void *self_v, const struct KX_PYATTRI
 	return PY_SET_ATTR_FAIL;
 }
 
-#endif // DISABLE_PYTHON
+#endif // WITH_PYTHON

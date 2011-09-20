@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -25,9 +25,10 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
-/**
- * @file	GHOST_ISystem.h
- * Main interface file for C++ Api with declaration of GHOST_ISystem interface
+
+/** \file ghost/GHOST_ISystem.h
+ *  \ingroup GHOST
+ * %Main interface file for C++ Api with declaration of GHOST_ISystem interface
  * class.
  * Contains the doxygen documentation main page.
  */
@@ -42,7 +43,7 @@
 class GHOST_IEventConsumer;
 
 /**
- *! \mainpage GHOST Main Page
+ * \page GHOSTPage GHOST
  *
  * \section intro Introduction
  *
@@ -88,8 +89,6 @@ class GHOST_IEventConsumer;
  * <ul>
  * <li>GHOST_IEvent.h</li>
  * <li>GHOST_IEventConsumer.h</li>
- * <li>GHOST_IMenu.h (in progress)</li>
- * <li>GHOST_IMenuBar.h (in progress)</li>
  * <li>GHOST_ISystem.h</li>
  * <li>GHOST_ITimerTask.h</li>
  * <li>GHOST_IWindow.h</li>
@@ -108,14 +107,10 @@ class GHOST_IEventConsumer;
  * in the ?/ghost/test/gears/ directory.
  *
  * \section work Work in progress
- *
- * \subsection menus Menu functionality
- * Menu bars with pull-down menu's for windows are in development in the 
- * current version of GHOST. The file GHOST_MenuDependKludge.h contains a 
- * setting to turn menu functionality on or off.
+ * \todo write WIP section
  */
  
-/**
+/** \interface GHOST_ISystem
  * Interface for classes that provide access to the operating system.
  * There should be only one system class in an application.
  * Therefore, the routines to create and dispose the system are static.
@@ -295,22 +290,13 @@ public:
 	 * @return Indication of success.
 	 */
 	virtual GHOST_TSuccess addEventConsumer(GHOST_IEventConsumer* consumer) = 0;
-	
-	 /***************************************************************************************
-	 ** N-degree of freedom device management functionality
-	 ***************************************************************************************/
 
-   /**
-    * Starts the N-degree of freedom device manager
-    */
-   virtual int openNDOF(GHOST_IWindow*,
-       GHOST_NDOFLibraryInit_fp setNdofLibraryInit, 
-       GHOST_NDOFLibraryShutdown_fp setNdofLibraryShutdown,
-       GHOST_NDOFDeviceOpen_fp setNdofDeviceOpen
-       // original patch only
-      // GHOST_NDOFEventHandler_fp setNdofEventHandler
-       ) = 0;
-
+	/**
+	 * Removes the given event consumer to our list.
+	 * @param consumer The event consumer to remove.
+	 * @return Indication of success.
+	 */
+	virtual GHOST_TSuccess removeEventConsumer(GHOST_IEventConsumer* consumer) = 0;
 
 	/***************************************************************************************
 	 ** Cursor management functionality
@@ -353,6 +339,16 @@ public:
 	 */
 	virtual GHOST_TSuccess getButtonState(GHOST_TButtonMask mask, bool& isDown) const = 0;
 
+	/**
+	 * Toggles console
+	 * @action	0 - Hides
+	 *			1 - Shows
+	 *			2 - Toggles
+	 *			3 - Hides if it runs not from  command line
+	 *			* - Does nothing
+	 * @return current status (1 -visible, 0 - hidden)
+	 */
+	virtual int toggleConsole(int action) = 0;
 	
 	/***************************************************************************************
 	 ** Access to clipboard.
@@ -370,25 +366,7 @@ public:
 	 */
 	virtual void putClipboard(GHOST_TInt8 *buffer, bool selection) const = 0;
 
-		  	/**
-	 * Determine the base dir in which shared resources are located. It will first try to use
-	 * "unpack and run" path, then look for properly installed path, not including versioning.
-	 * @return Unsigned char string pointing to system dir (eg /usr/share/blender/).
-	 */
-	virtual const GHOST_TUns8* getSystemDir() const = 0;
-
-	/**
-	 * Determine the base dir in which user configuration is stored, not including versioning.
-	 * If needed, it will create the base directory.
-	 * @return Unsigned char string pointing to user dir (eg ~/.blender/).
-	 */
-	virtual const GHOST_TUns8* getUserDir() const = 0;
-
-	/**
-	  * Determine the directory of the current binary
-	  * @return Unsigned char string pointing to the binary dir
-	  */
-	 virtual const GHOST_TUns8* getBinaryDir() const = 0;
+	
 protected:
 	/**
 	 * Initialize the system.
@@ -404,6 +382,12 @@ protected:
 
 	/** The one and only system */
 	static GHOST_ISystem* m_system;
+
+#ifdef WITH_CXX_GUARDEDALLOC
+public:
+	void *operator new(size_t num_bytes) { return MEM_mallocN(num_bytes, "GHOST:GHOST_ISystem"); }
+	void operator delete( void *mem ) { MEM_freeN(mem); }
+#endif
 };
 
 #endif // _GHOST_ISYSTEM_H_

@@ -1,31 +1,39 @@
 /*
  * $Id$
  *
- * ***** BEGIN LGPL LICENSE BLOCK *****
+ * ***** BEGIN GPL LICENSE BLOCK *****
  *
- * Copyright 2009 Jörg Hermann Müller
+ * Copyright 2009-2011 Jörg Hermann Müller
  *
  * This file is part of AudaSpace.
  *
- * AudaSpace is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
+ * Audaspace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
  * AudaSpace is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU Lesser General Public License
- * along with AudaSpace.  If not, see <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU General Public License
+ * along with Audaspace; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * ***** END LGPL LICENSE BLOCK *****
+ * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file audaspace/intern/AUD_BufferReader.cpp
+ *  \ingroup audaspaceintern
+ */
+
 
 #include "AUD_BufferReader.h"
 #include "AUD_Buffer.h"
 #include "AUD_Space.h"
+
+#include <cstring>
 
 AUD_BufferReader::AUD_BufferReader(AUD_Reference<AUD_Buffer> buffer,
 								   AUD_Specs specs) :
@@ -45,7 +53,7 @@ void AUD_BufferReader::seek(int position)
 
 int AUD_BufferReader::getLength() const
 {
-	return m_buffer.get()->getSize() / AUD_SAMPLE_SIZE(m_specs);
+	return m_buffer->getSize() / AUD_SAMPLE_SIZE(m_specs);
 }
 
 int AUD_BufferReader::getPosition() const
@@ -58,17 +66,27 @@ AUD_Specs AUD_BufferReader::getSpecs() const
 	return m_specs;
 }
 
-void AUD_BufferReader::read(int & length, sample_t* & buffer)
+void AUD_BufferReader::read(int& length, bool& eos, sample_t* buffer)
 {
+	eos = false;
+
 	int sample_size = AUD_SAMPLE_SIZE(m_specs);
 
-	buffer = m_buffer.get()->getBuffer() + m_position * m_specs.channels;
+	sample_t* buf = m_buffer->getBuffer() + m_position * m_specs.channels;
 
 	// in case the end of the buffer is reached
-	if(m_buffer.get()->getSize() < (m_position + length) * sample_size)
-		length = m_buffer.get()->getSize() / sample_size - m_position;
+	if(m_buffer->getSize() < (m_position + length) * sample_size)
+	{
+		length = m_buffer->getSize() / sample_size - m_position;
+		eos = true;
+	}
 
 	if(length < 0)
+	{
 		length = 0;
+		return;
+	}
+
 	m_position += length;
+	memcpy(buffer, buf, length * sample_size);
 }

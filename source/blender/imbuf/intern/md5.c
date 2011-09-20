@@ -1,3 +1,6 @@
+/** \file blender/imbuf/intern/md5.c
+ *  \ingroup imbuf
+ */
 /* md5.c - Functions to compute MD5 message digest of files or memory blocks
    according to the definition of MD5 in RFC 1321 from April 1992.
    Copyright (C) 1995 Software Foundation, Inc.
@@ -25,11 +28,11 @@
 
 #include "md5.h"
 
-#ifdef WORDS_BIGENDIAN
-# define SWAP(n)							\
+#ifdef __BIG_ENDIAN__
+#  define SWAP(n)							\
 	(((n) << 24) | (((n) & 0xff00) << 8) | (((n) >> 8) & 0xff00) | ((n) >> 24))
 #else
-# define SWAP(n) (n)
+#  define SWAP(n) (n)
 #endif
 
 

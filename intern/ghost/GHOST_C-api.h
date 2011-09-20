@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -25,10 +25,10 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
-/**
- * @file	GHOST_C-api.h
- * GHOST C-API function and type declarations.
- * The C-API wraps the C++ objects with the 
+/** \ingroup GHOST
+ *
+ * \file	GHOST_C-api.h
+ * \brief GHOST C-API function and type declarations.
  */
 
 #ifndef	GHOST_C_API_H
@@ -44,9 +44,8 @@ extern "C" {
  * Creates a &quot;handle&quot; for a C++ GHOST object.
  * A handle is just an opaque pointer to an empty struct.
  * In the API the pointer is casted to the actual C++ class.
- * @param	name	Name of the handle to create.
+ * \param	name	Name of the handle to create.
  */
-#define GHOST_DECLARE_HANDLE(name) typedef struct name##__ { int unused; } *name
 
 GHOST_DECLARE_HANDLE(GHOST_SystemHandle);
 GHOST_DECLARE_HANDLE(GHOST_TimerTaskHandle);
@@ -167,7 +166,7 @@ extern void GHOST_GetMainDisplayDimensions(GHOST_SystemHandle systemhandle,
  * @return	A handle to the new window ( == NULL if creation failed).
  */
 extern GHOST_WindowHandle GHOST_CreateWindow(GHOST_SystemHandle systemhandle,
-	char* title,
+	const char* title,
 	GHOST_TInt32 left,
 	GHOST_TInt32 top,
 	GHOST_TUns32 width,
@@ -263,7 +262,16 @@ extern int GHOST_DispatchEvents(GHOST_SystemHandle systemhandle);
  */
 extern GHOST_TSuccess GHOST_AddEventConsumer(GHOST_SystemHandle systemhandle,
 											  GHOST_EventConsumerHandle consumerhandle);
-	
+
+/**
+ * Remove the given event consumer to our list.
+ * @param systemhandle The handle to the system
+ * @param consumerhandle The event consumer to remove.
+ * @return Indication of success.
+ */
+extern GHOST_TSuccess GHOST_RemoveEventConsumer(GHOST_SystemHandle systemhandle,
+											  GHOST_EventConsumerHandle consumerhandle);
+
 /***************************************************************************************
  ** Progress bar functionality
  ***************************************************************************************/
@@ -280,21 +288,6 @@ extern GHOST_TSuccess GHOST_SetProgressBar(GHOST_WindowHandle windowhandle, floa
  * @param windowhandle The handle to the window
  */
 extern GHOST_TSuccess GHOST_EndProgressBar(GHOST_WindowHandle windowhandle);
-	
-	
-/***************************************************************************************
- ** N-degree of freedom device management functionality
- ***************************************************************************************/
- 
-/**
-* Open N-degree of freedom devices
- */
-extern int GHOST_OpenNDOF(GHOST_SystemHandle systemhandle, 
-                           GHOST_WindowHandle windowhandle,
-                          GHOST_NDOFLibraryInit_fp setNdofLibraryInit, 
-                          GHOST_NDOFLibraryShutdown_fp setNdofLibraryShutdown,
-                          GHOST_NDOFDeviceOpen_fp setNdofDeviceOpen
-                          );
 
 /***************************************************************************************
  ** Cursor management functionality
@@ -525,7 +518,7 @@ extern GHOST_TSuccess GHOST_SetDrawingContextType(GHOST_WindowHandle windowhandl
  * @param title	The title to display in the title bar.
  */
 extern void GHOST_SetTitle(GHOST_WindowHandle windowhandle,
-						   char* title);
+						   const char* title);
 
 /**
  * Returns the title displayed in the title bar. The title
@@ -836,6 +829,18 @@ extern GHOST_TUns8* GHOST_getClipboard(int selection);
  */
 extern void GHOST_putClipboard(GHOST_TInt8 *buffer, int selection);
 
+
+
+/**
+ * Toggles console
+ * @action	0 - Hides
+ *			1 - Shows
+ *			2 - Toggles
+ *			3 - Hides if it runs not from  command line
+ *			* - Does nothing
+ * @return current status (1 -visible, 0 - hidden)
+ */
+extern int GHOST_toggleConsole(int action);
 
 #ifdef __cplusplus
 }

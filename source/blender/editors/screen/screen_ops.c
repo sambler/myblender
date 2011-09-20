@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -24,6 +24,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/screen/screen_ops.c
+ *  \ingroup edscr
+ */
+
+
 #include <math.h>
 #include <string.h>
 
@@ -33,6 +38,7 @@
 #include "BLI_blenlib.h"
 #include "BLI_editVert.h"
 #include "BLI_dlrbTree.h"
+#include "BLI_utildefines.h"
 
 #include "DNA_armature_types.h"
 #include "DNA_lattice_types.h"
@@ -43,8 +49,10 @@
 
 #include "BKE_context.h"
 #include "BKE_customdata.h"
+#include "BKE_global.h"
 #include "BKE_main.h"
 #include "BKE_mesh.h"
+#include "BKE_object.h"
 #include "BKE_report.h"
 #include "BKE_scene.h"
 #include "BKE_screen.h"
@@ -54,15 +62,19 @@
 #include "WM_types.h"
 
 #include "ED_util.h"
+#include "ED_image.h"
 #include "ED_screen.h"
 #include "ED_object.h"
+#include "ED_armature.h"
 #include "ED_screen_types.h"
 #include "ED_keyframes_draw.h"
+#include "ED_view3d.h"
 
 #include "RNA_access.h"
 #include "RNA_define.h"
 
 #include "UI_interface.h"
+#include "UI_resources.h"
 
 #include "wm_window.h"
 
@@ -98,6 +110,27 @@ int ED_operator_screenactive(bContext *C)
 	return 1;
 }
 
+/* XXX added this to prevent anim state to change during renders */
+static int ED_operator_screenactive_norender(bContext *C)
+{
+	if(G.rendering) return 0;
+	if(CTX_wm_window(C)==NULL) return 0;
+	if(CTX_wm_screen(C)==NULL) return 0;
+	return 1;
+}
+
+
+static int screen_active_editable(bContext *C)
+{
+	if(ED_operator_screenactive(C)) {
+		/* no full window splitting allowed */
+		if(CTX_wm_screen(C)->full != SCREENNORMAL)
+			return 0;
+		return 1;
+	}
+	return 0;
+}
+
 /* when mouse is over area-edge */
 int ED_operator_screen_mainwinactive(bContext *C)
 {
@@ -114,6 +147,24 @@ int ED_operator_scene_editable(bContext *C)
 		return 1;
 	return 0;
 }
+
+int ED_operator_objectmode(bContext *C)
+{
+	Scene *scene= CTX_data_scene(C);
+	Object *obact= CTX_data_active_object(C);
+
+	if(scene==NULL || scene->id.lib)
+		return 0;
+	if( CTX_data_edit_object(C) )
+		return 0;
+	
+	/* add a check for ob->mode too? */
+	if(obact && obact->mode)
+		return 0;
+	
+	return 1;
+}
+
 
 static int ed_spacetype_test(bContext *C, int type)
 {
@@ -133,9 +184,22 @@ int ED_operator_region_view3d_active(bContext *C)
 {
 	if(CTX_wm_region_view3d(C))
 		return TRUE;
-	
+
 	CTX_wm_operator_poll_msg_set(C, "expected a view3d region");
 	return FALSE;	
+}
+
+/* generic for any view2d which uses anim_ops */
+int ED_operator_animview_active(bContext *C)
+{
+	if(ED_operator_areaactive(C)) {
+		SpaceLink *sl= (SpaceLink *)CTX_wm_space_data(C);
+		if (sl && (ELEM6(sl->spacetype, SPACE_SEQ, SPACE_SOUND, SPACE_ACTION, SPACE_NLA, SPACE_IPO, SPACE_TIME)))
+			return TRUE;
+	}
+
+	CTX_wm_operator_poll_msg_set(C, "expected an timeline/animation area to be active");
+	return 0;
 }
 
 int ED_operator_timeline_active(bContext *C)
@@ -187,7 +251,7 @@ int ED_operator_node_active(bContext *C)
 }
 
 // XXX rename
-int ED_operator_ipo_active(bContext *C)
+int ED_operator_graphedit_active(bContext *C)
 {
 	return ed_spacetype_test(C, SPACE_IPO);
 }
@@ -212,6 +276,17 @@ int ED_operator_logic_active(bContext *C)
 	return ed_spacetype_test(C, SPACE_LOGIC);
 }
 
+int ED_operator_info_active(bContext *C)
+{
+	return ed_spacetype_test(C, SPACE_INFO);
+}
+
+
+int ED_operator_console_active(bContext *C)
+{
+	return ed_spacetype_test(C, SPACE_CONSOLE);
+}
+
 int ED_operator_object_active(bContext *C)
 {
 	Object *ob = ED_object_active_context(C);
@@ -222,6 +297,18 @@ int ED_operator_object_active_editable(bContext *C)
 {
 	Object *ob = ED_object_active_context(C);
 	return ((ob != NULL) && !(ob->id.lib) && !(ob->restrictflag & OB_RESTRICT_VIEW));
+}
+
+int ED_operator_object_active_editable_mesh(bContext *C)
+{
+	Object *ob = ED_object_active_context(C);
+	return ((ob != NULL) && !(ob->id.lib) && !(ob->restrictflag & OB_RESTRICT_VIEW) && ob->type == OB_MESH && !(((ID *)ob->data)->lib));
+}
+
+int ED_operator_object_active_editable_font(bContext *C)
+{
+	Object *ob = ED_object_active_context(C);
+	return ((ob != NULL) && !(ob->id.lib) && !(ob->restrictflag & OB_RESTRICT_VIEW) && ob->type == OB_FONT);
 }
 
 int ED_operator_editmesh(bContext *C)
@@ -239,7 +326,11 @@ int ED_operator_editmesh_view3d(bContext *C)
 
 int ED_operator_editmesh_region_view3d(bContext *C)
 {
-	return ED_operator_editmesh(C) && CTX_wm_region_view3d(C);
+	if(ED_operator_editmesh(C) && CTX_wm_region_view3d(C))
+		return 1;
+
+	CTX_wm_operator_poll_msg_set(C, "expected a view3d region & editmesh");
+	return 0;
 }
 
 int ED_operator_editarmature(bContext *C)
@@ -253,31 +344,25 @@ int ED_operator_editarmature(bContext *C)
 int ED_operator_posemode(bContext *C)
 {
 	Object *obact= CTX_data_active_object(C);
-	Object *obedit= CTX_data_edit_object(C);
-	
-	if ((obact != obedit) && (obact) && (obact->type==OB_ARMATURE))
-		return (obact->mode & OB_MODE_POSE)!=0;
-	
+
+	if (obact && !(obact->mode & OB_MODE_EDIT)) {
+		Object *obpose;
+		if((obpose= object_pose_armature_get(obact))) {
+			if((obact == obpose) || (obact->mode & OB_MODE_WEIGHT_PAINT)) {
+				return 1;
+			}
+		}
+	}
+
 	return 0;
 }
 
-
+/* wrapper for ED_space_image_show_uvedit */
 int ED_operator_uvedit(bContext *C)
 {
+	SpaceImage *sima= CTX_wm_space_image(C);
 	Object *obedit= CTX_data_edit_object(C);
-	EditMesh *em= NULL;
-	
-	if(obedit && obedit->type==OB_MESH)
-		em= BKE_mesh_get_editmesh((Mesh *)obedit->data);
-	
-	if(em && (em->faces.first) && (CustomData_has_layer(&em->fdata, CD_MTFACE))) {
-		BKE_mesh_end_editmesh(obedit->data, em);
-		return 1;
-	}
-	
-	if(obedit)
-		BKE_mesh_end_editmesh(obedit->data, em);
-	return 0;
+	return ED_space_image_show_uvedit(sima, obedit);
 }
 
 int ED_operator_uvmap(bContext *C)
@@ -306,6 +391,14 @@ int ED_operator_editsurfcurve(bContext *C)
 	return 0;
 }
 
+int ED_operator_editsurfcurve_region_view3d(bContext *C)
+{
+	if(ED_operator_editsurfcurve(C) && CTX_wm_region_view3d(C))
+		return 1;
+
+	CTX_wm_operator_poll_msg_set(C, "expected a view3d region & editcurve");
+	return 0;
+}
 
 int ED_operator_editcurve(bContext *C)
 {
@@ -416,7 +509,10 @@ AZone *is_in_area_actionzone(ScrArea *sa, int x, int y)
 	for(az= sa->actionzones.first; az; az= az->next) {
 		if(BLI_in_rcti(&az->rect, x, y)) {
 			if(az->type == AZONE_AREA) {
-				if(isect_point_tri_v2_int(az->x1, az->y1, az->x2, az->y2, x, y)) 
+				/* no triangle intersect but a hotspot circle based on corner */
+				int radius= (x-az->x1)*(x-az->x1) + (y-az->y1)*(y-az->y1);
+				
+				if(radius <= AZONESPOT*AZONESPOT)
 					break;
 			}
 			else if(az->type == AZONE_REGION) {
@@ -429,7 +525,7 @@ AZone *is_in_area_actionzone(ScrArea *sa, int x, int y)
 }
 
 
-static void actionzone_exit(bContext *C, wmOperator *op)
+static void actionzone_exit(wmOperator *op)
 {
 	if(op->customdata)
 		MEM_freeN(op->customdata);
@@ -475,7 +571,7 @@ static int actionzone_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	/* region azone directly reacts on mouse clicks */
 	if(sad->az->type==AZONE_REGION) {
 		actionzone_apply(C, op, AZONE_REGION);
-		actionzone_exit(C, op);
+		actionzone_exit(op);
 		return OPERATOR_FINISHED;
 	}
 	else {
@@ -515,21 +611,28 @@ static int actionzone_modal(bContext *C, wmOperator *op, wmEvent *event)
 				sad->sa2= screen_areahascursor(CTX_wm_screen(C), event->x, event->y);
 				/* apply sends event */
 				actionzone_apply(C, op, sad->az->type);
-				actionzone_exit(C, op);
+				actionzone_exit(op);
 				
 				return OPERATOR_FINISHED;
 			}
 			break;
 		case ESCKEY:
-			actionzone_exit(C, op);
+			actionzone_exit(op);
 			return OPERATOR_CANCELLED;
 		case LEFTMOUSE:				
-			actionzone_exit(C, op);
+			actionzone_exit(op);
 			return OPERATOR_CANCELLED;
 			
 	}
 	
 	return OPERATOR_RUNNING_MODAL;
+}
+
+static int actionzone_cancel(bContext *UNUSED(C), wmOperator *op)
+{
+	actionzone_exit(op);
+
+	return OPERATOR_CANCELLED;
 }
 
 static void SCREEN_OT_actionzone(wmOperatorType *ot)
@@ -542,6 +645,7 @@ static void SCREEN_OT_actionzone(wmOperatorType *ot)
 	ot->invoke= actionzone_invoke;
 	ot->modal= actionzone_modal;
 	ot->poll= actionzone_area_poll;
+	ot->cancel= actionzone_cancel;
 	
 	ot->flag= OPTYPE_BLOCKING;
 	
@@ -575,7 +679,7 @@ typedef struct sAreaSwapData {
 	ScrArea *sa1, *sa2;
 } sAreaSwapData;
 
-static int area_swap_init(bContext *C, wmOperator *op, wmEvent *event)
+static int area_swap_init(wmOperator *op, wmEvent *event)
 {
 	sAreaSwapData *sd= NULL;
 	sActionzoneData *sad= event->customdata;
@@ -609,7 +713,7 @@ static int area_swap_cancel(bContext *C, wmOperator *op)
 static int area_swap_invoke(bContext *C, wmOperator *op, wmEvent *event)
 {
 	
-	if(!area_swap_init(C, op, event))
+	if(!area_swap_init(op, event))
 		return OPERATOR_PASS_THROUGH;
 	
 	/* add modal handler */
@@ -664,6 +768,7 @@ static void SCREEN_OT_area_swap(wmOperatorType *ot)
 	ot->invoke= area_swap_invoke;
 	ot->modal= area_swap_modal;
 	ot->poll= ED_operator_areaactive;
+	ot->cancel= area_swap_cancel;
 	
 	ot->flag= OPTYPE_BLOCKING;
 }
@@ -695,7 +800,7 @@ static int area_dupli_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	/*  poll() checks area context, but we don't accept full-area windows */
 	if(sc->full != SCREENNORMAL) {
 		if(event->type==EVT_ACTIONZONE_AREA)
-			actionzone_exit(C, op);
+			actionzone_exit(op);
 		return OPERATOR_CANCELLED;
 	}
 	
@@ -717,7 +822,7 @@ static int area_dupli_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	WM_event_add_notifier(C, NC_SCREEN|NA_EDITED, NULL);
 	
 	if(event->type==EVT_ACTIONZONE_AREA)
-		actionzone_exit(C, op);
+		actionzone_exit(op);
 	
 	return OPERATOR_FINISHED;
 }
@@ -773,13 +878,14 @@ typedef struct sAreaMoveData {
 static void area_move_set_limits(bScreen *sc, int dir, int *bigger, int *smaller)
 {
 	ScrArea *sa;
+	int areaminy= ED_area_headersize()+1;
 	
 	/* we check all areas and test for free space with MINSIZE */
 	*bigger= *smaller= 100000;
 	
 	for(sa= sc->areabase.first; sa; sa= sa->next) {
 		if(dir=='h') {
-			int y1= sa->v2->vec.y - sa->v1->vec.y-AREAMINY;
+			int y1= sa->v2->vec.y - sa->v1->vec.y-areaminy;
 			
 			/* if top or down edge selected, test height */
 			if(sa->v1->flag && sa->v4->flag)
@@ -838,6 +944,7 @@ static void area_move_apply_do(bContext *C, int origval, int delta, int dir, int
 	bScreen *sc= CTX_wm_screen(C);
 	ScrVert *v1;
 	ScrArea *sa;
+	int areaminy= ED_area_headersize()+1;
 	
 	delta= CLAMPIS(delta, -smaller, bigger);
 	
@@ -855,8 +962,8 @@ static void area_move_apply_do(bContext *C, int origval, int delta, int dir, int
 				v1->vec.y-= (v1->vec.y % AREAGRID);
 				
 				/* prevent too small top header */
-				if(v1->vec.y > win->sizey-AREAMINY)
-					v1->vec.y= win->sizey-AREAMINY;
+				if(v1->vec.y > win->sizey-areaminy)
+					v1->vec.y= win->sizey-areaminy;
 			}
 		}
 	}
@@ -1028,25 +1135,49 @@ static void SCREEN_OT_area_move(wmOperatorType *ot)
 #define SPLIT_STARTED	1
 #define SPLIT_PROGRESS	2
 
-typedef struct sAreaSplitData
-	{
-		int x, y;	/* last used mouse position */
-		
-		int origval;			/* for move areas */
-		int bigger, smaller;	/* constraints for moving new edge */
-		int delta;				/* delta move edge */
-		int origmin, origsize;	/* to calculate fac, for property storage */
-		
-		ScrEdge *nedge;			/* new edge */
-		ScrArea *sarea;			/* start area */
-		ScrArea *narea;			/* new area */
-	} sAreaSplitData;
+typedef struct sAreaSplitData {
+	int x, y;	/* last used mouse position */
+	
+	int origval;			/* for move areas */
+	int bigger, smaller;	/* constraints for moving new edge */
+	int delta;				/* delta move edge */
+	int origmin, origsize;	/* to calculate fac, for property storage */
+	int previewmode;		/* draw previewline, then split */
+	
+	ScrEdge *nedge;			/* new edge */
+	ScrArea *sarea;			/* start area */
+	ScrArea *narea;			/* new area */
+	
+} sAreaSplitData;
 
-/* generic init, no UI stuff here */
+/* generic init, menu case, doesn't need active area */
+static int area_split_menu_init(bContext *C, wmOperator *op)
+{
+	sAreaSplitData *sd;
+	
+	/* custom data */
+	sd= (sAreaSplitData*)MEM_callocN(sizeof (sAreaSplitData), "op_area_split");
+	op->customdata= sd;
+	
+	sd->sarea= CTX_wm_area(C);
+	
+	if(sd->sarea) {
+		int dir= RNA_enum_get(op->ptr, "direction");
+
+		if(dir=='h')
+			sd->sarea->flag |= AREA_FLAG_DRAWSPLIT_H;
+		else
+			sd->sarea->flag |= AREA_FLAG_DRAWSPLIT_V;
+	}
+	return 1;
+}
+
+/* generic init, no UI stuff here, assumes active area */
 static int area_split_init(bContext *C, wmOperator *op)
 {
 	ScrArea *sa= CTX_wm_area(C);
 	sAreaSplitData *sd;
+	int areaminy= ED_area_headersize()+1;
 	int dir;
 	
 	/* required context */
@@ -1057,7 +1188,7 @@ static int area_split_init(bContext *C, wmOperator *op)
 	
 	/* minimal size */
 	if(dir=='v' && sa->winx < 2*AREAMINX) return 0;
-	if(dir=='h' && sa->winy < 2*AREAMINY) return 0;
+	if(dir=='h' && sa->winy < 2*areaminy) return 0;
 	
 	/* custom data */
 	sd= (sAreaSplitData*)MEM_callocN(sizeof (sAreaSplitData), "op_area_split");
@@ -1111,7 +1242,7 @@ static int area_split_apply(bContext *C, wmOperator *op)
 	fac= RNA_float_get(op->ptr, "factor");
 	dir= RNA_enum_get(op->ptr, "direction");
 	
-	sd->narea= area_split(CTX_wm_window(C), sc, sd->sarea, dir, fac);
+	sd->narea= area_split(sc, sd->sarea, dir, fac, 0); /* 0 = no merge */
 	
 	if(sd->narea) {
 		ScrVert *sv;
@@ -1146,6 +1277,9 @@ static void area_split_exit(bContext *C, wmOperator *op)
 		if(sd->sarea) ED_area_tag_redraw(sd->sarea);
 		if(sd->narea) ED_area_tag_redraw(sd->narea);
 
+		if(sd->sarea)
+			sd->sarea->flag &= ~(AREA_FLAG_DRAWSPLIT_H|AREA_FLAG_DRAWSPLIT_V);
+		
 		MEM_freeN(op->customdata);
 		op->customdata = NULL;
 	}
@@ -1162,18 +1296,18 @@ static void area_split_exit(bContext *C, wmOperator *op)
 static int area_split_invoke(bContext *C, wmOperator *op, wmEvent *event)
 {
 	sAreaSplitData *sd;
+	int dir;
+	
+	/* no full window splitting allowed */
+	if(CTX_wm_screen(C)->full != SCREENNORMAL)
+		return OPERATOR_CANCELLED;
 	
 	if(event->type==EVT_ACTIONZONE_AREA) {
 		sActionzoneData *sad= event->customdata;
-		int dir;
 		
 		if(sad->modifier>0) {
 			return OPERATOR_PASS_THROUGH;
 		}
-		
-		/* no full window splitting allowed */
-		if(CTX_wm_area(C)->full)
-			return OPERATOR_PASS_THROUGH;
 		
 		/* verify *sad itself */
 		if(sad==NULL || sad->sa1==NULL || sad->az==NULL)
@@ -1198,10 +1332,42 @@ static int area_split_invoke(bContext *C, wmOperator *op, wmEvent *event)
 		if(!area_split_init(C, op))
 			return OPERATOR_PASS_THROUGH;
 		
-		sd= (sAreaSplitData *)op->customdata;
+	}
+	else {
+		ScrEdge *actedge;
+		int x, y;
 		
-		sd->x= event->x;
-		sd->y= event->y;
+		/* retrieve initial mouse coord, so we can find the active edge */
+		if(RNA_property_is_set(op->ptr, "mouse_x"))
+			x= RNA_int_get(op->ptr, "mouse_x");
+		else
+			x= event->x;
+		
+		if(RNA_property_is_set(op->ptr, "mouse_y"))
+			y= RNA_int_get(op->ptr, "mouse_y");
+		else
+			y= event->x;
+		
+		actedge= screen_find_active_scredge(CTX_wm_screen(C), x, y);
+		if(actedge==NULL) 
+			return OPERATOR_CANCELLED;
+		
+		dir= scredge_is_horizontal(actedge)?'v':'h';
+		
+		RNA_enum_set(op->ptr, "direction", dir);
+		
+		/* special case, adds customdata, sets defaults */
+		if(!area_split_menu_init(C, op))
+			return OPERATOR_CANCELLED;
+		
+	}
+	
+	sd= (sAreaSplitData *)op->customdata;
+	
+	sd->x= event->x;
+	sd->y= event->y;
+	
+	if(event->type==EVT_ACTIONZONE_AREA) {
 		
 		/* do the split */
 		if(area_split_apply(C, op)) {
@@ -1212,11 +1378,14 @@ static int area_split_invoke(bContext *C, wmOperator *op, wmEvent *event)
 			
 			return OPERATOR_RUNNING_MODAL;
 		}
-		
 	}
 	else {
-		/* nonmodal for now */
-		return op->type->exec(C, op);
+		sd->previewmode= 1;
+		/* add temp handler for edge move or cancel */
+		WM_event_add_modal_handler(C, op);
+		
+		return OPERATOR_RUNNING_MODAL;
+		
 	}
 	
 	return OPERATOR_PASS_THROUGH;
@@ -1240,12 +1409,16 @@ static int area_split_cancel(bContext *C, wmOperator *op)
 {
 	sAreaSplitData *sd= (sAreaSplitData *)op->customdata;
 	
-	if (screen_area_join(C, CTX_wm_screen(C), sd->sarea, sd->narea)) {
-		if (CTX_wm_area(C) == sd->narea) {
-			CTX_wm_area_set(C, NULL);
-			CTX_wm_region_set(C, NULL);
+	if(sd->previewmode) {
+	}
+	else {
+		if (screen_area_join(C, CTX_wm_screen(C), sd->sarea, sd->narea)) {
+			if (CTX_wm_area(C) == sd->narea) {
+				CTX_wm_area_set(C, NULL);
+				CTX_wm_region_set(C, NULL);
+			}
+			sd->narea = NULL;
 		}
-		sd->narea = NULL;
 	}
 	area_split_exit(C, op);
 	
@@ -1264,16 +1437,49 @@ static int area_split_modal(bContext *C, wmOperator *op, wmEvent *event)
 			dir= RNA_enum_get(op->ptr, "direction");
 			
 			sd->delta= (dir == 'v')? event->x - sd->origval: event->y - sd->origval;
-			area_move_apply_do(C, sd->origval, sd->delta, dir, sd->bigger, sd->smaller);
+			if(sd->previewmode==0) 
+				area_move_apply_do(C, sd->origval, sd->delta, dir, sd->bigger, sd->smaller);
+			else {
+				if(sd->sarea) {
+					sd->sarea->flag &= ~(AREA_FLAG_DRAWSPLIT_H|AREA_FLAG_DRAWSPLIT_V);
+					ED_area_tag_redraw(sd->sarea);
+				}
+				sd->sarea= screen_areahascursor(CTX_wm_screen(C), event->x, event->y);	/* area context not set */
+				
+				if(sd->sarea) {
+					ED_area_tag_redraw(sd->sarea);
+					if (dir=='v') {
+						sd->origsize= sd->sarea->winx;
+						sd->origmin= sd->sarea->totrct.xmin;
+						sd->sarea->flag |= AREA_FLAG_DRAWSPLIT_V;
+					}
+					else {
+						sd->origsize= sd->sarea->winy;
+						sd->origmin= sd->sarea->totrct.ymin;
+						sd->sarea->flag |= AREA_FLAG_DRAWSPLIT_H;
+					}
+				}
+				
+				CTX_wm_window(C)->screen->do_draw= 1;
+
+			}
 			
 			fac= (dir == 'v') ? event->x-sd->origmin : event->y-sd->origmin;
 			RNA_float_set(op->ptr, "factor", fac / (float)sd->origsize);
+			
 			break;
 			
 		case LEFTMOUSE:
-			if(event->val==KM_RELEASE) { /* mouse up */
+			if(sd->previewmode) {
+				area_split_apply(C, op);
 				area_split_exit(C, op);
 				return OPERATOR_FINISHED;
+			}
+			else {
+				if(event->val==KM_RELEASE) { /* mouse up */
+					area_split_exit(C, op);
+					return OPERATOR_FINISHED;
+				}
 			}
 			break;
 		case RIGHTMOUSE: /* cancel operation */
@@ -1298,13 +1504,16 @@ static void SCREEN_OT_area_split(wmOperatorType *ot)
 	ot->exec= area_split_exec;
 	ot->invoke= area_split_invoke;
 	ot->modal= area_split_modal;
+	ot->cancel= area_split_cancel;
 	
-	ot->poll= ED_operator_areaactive;
+	ot->poll= screen_active_editable;
 	ot->flag= OPTYPE_BLOCKING;
 	
 	/* rna */
 	RNA_def_enum(ot->srna, "direction", prop_direction_items, 'h', "Direction", "");
 	RNA_def_float(ot->srna, "factor", 0.5f, 0.0, 1.0, "Factor", "", 0.0, 1.0);
+	RNA_def_int(ot->srna, "mouse_x", -100, INT_MIN, INT_MAX, "Mouse X", "", INT_MIN, INT_MAX);
+	RNA_def_int(ot->srna, "mouse_y", -100, INT_MIN, INT_MAX, "Mouse Y", "", INT_MIN, INT_MAX);
 }
 
 
@@ -1336,8 +1545,7 @@ static int area_max_regionsize(ScrArea *sa, ARegion *scalear, AZEdge edge)
 	
 	/* subtractwidth of regions on opposite side 
 	 * prevents dragging regions into other opposite regions */
-	for (ar=sa->regionbase.first; ar; ar=ar->next)
-	{
+	for (ar=sa->regionbase.first; ar; ar=ar->next) {
 		if (ar == scalear)
 			continue;
 		
@@ -1433,7 +1641,7 @@ static int region_scale_modal(bContext *C, wmOperator *op, wmEvent *event)
 				rmd->ar->sizex= rmd->origval + delta;
 				CLAMP(rmd->ar->sizex, 0, rmd->maxsize);
 				
-				if(rmd->ar->sizex < 24) {
+				if(rmd->ar->sizex < UI_UNIT_X) {
 					rmd->ar->sizex= rmd->origval;
 					if(!(rmd->ar->flag & RGN_FLAG_HIDDEN))
 						ED_region_toggle_hidden(C, rmd->ar);
@@ -1448,11 +1656,17 @@ static int region_scale_modal(bContext *C, wmOperator *op, wmEvent *event)
 				
 				rmd->ar->sizey= rmd->origval + delta;
 				CLAMP(rmd->ar->sizey, 0, rmd->maxsize);
-				
-				if(rmd->ar->regiontype == RGN_TYPE_TOOL_PROPS)
-					maxsize = rmd->maxsize - ((rmd->sa->headertype==2)?48:24) - 10;
 
-				if(rmd->ar->sizey < 24 || (maxsize > 0 && (rmd->ar->sizey > maxsize)) ) {
+				if(rmd->ar->regiontype == RGN_TYPE_TOOL_PROPS) {
+					/* this calculation seems overly verbose
+					 * can someone explain why this method is necessary? - campbell */
+					maxsize = rmd->maxsize - ((rmd->sa->headertype==HEADERTOP)?UI_UNIT_Y*2:UI_UNIT_Y) - (UI_UNIT_Y/4);
+				}
+
+				/* note, 'UI_UNIT_Y/4' means you need to drag the header almost
+				 * all the way down for it to become hidden, this is done
+				 * otherwise its too easy to do this by accident */
+				if(rmd->ar->sizey < UI_UNIT_Y/4 || (maxsize > 0 && (rmd->ar->sizey > maxsize)) ) {
 					rmd->ar->sizey= rmd->origval;
 					if(!(rmd->ar->flag & RGN_FLAG_HIDDEN))
 						ED_region_toggle_hidden(C, rmd->ar);
@@ -1489,6 +1703,13 @@ static int region_scale_modal(bContext *C, wmOperator *op, wmEvent *event)
 	return OPERATOR_RUNNING_MODAL;
 }
 
+static int region_scale_cancel(bContext *UNUSED(C), wmOperator *op)
+{
+	MEM_freeN(op->customdata);
+	op->customdata = NULL;
+
+	return OPERATOR_CANCELLED;
+}
 
 static void SCREEN_OT_region_scale(wmOperatorType *ot)
 {
@@ -1499,6 +1720,7 @@ static void SCREEN_OT_region_scale(wmOperatorType *ot)
 	
 	ot->invoke= region_scale_invoke;
 	ot->modal= region_scale_modal;
+	ot->cancel= region_scale_cancel;
 	
 	ot->poll= ED_operator_areaactive;
 	
@@ -1511,14 +1733,16 @@ static void SCREEN_OT_region_scale(wmOperatorType *ot)
 /* function to be called outside UI context, or for redo */
 static int frame_offset_exec(bContext *C, wmOperator *op)
 {
+	Main *bmain= CTX_data_main(C);
+	Scene *scene= CTX_data_scene(C);
 	int delta;
 	
 	delta = RNA_int_get(op->ptr, "delta");
 
-	CTX_data_scene(C)->r.cfra += delta;
-	CTX_data_scene(C)->r.subframe = 0.f;
+	scene->r.cfra += delta;
+	scene->r.subframe = 0.f;
 	
-	sound_seek_scene(C);
+	sound_seek_scene(bmain, scene);
 
 	WM_event_add_notifier(C, NC_SCENE|ND_FRAME, CTX_data_scene(C));
 	
@@ -1532,7 +1756,7 @@ static void SCREEN_OT_frame_offset(wmOperatorType *ot)
 	
 	ot->exec= frame_offset_exec;
 	
-	ot->poll= ED_operator_screenactive;
+	ot->poll= ED_operator_screenactive_norender;
 	ot->flag= 0;
 	
 	/* rna */
@@ -1543,16 +1767,34 @@ static void SCREEN_OT_frame_offset(wmOperatorType *ot)
 /* function to be called outside UI context, or for redo */
 static int frame_jump_exec(bContext *C, wmOperator *op)
 {
+	Main *bmain= CTX_data_main(C);
 	Scene *scene= CTX_data_scene(C);
-	
-	if (RNA_boolean_get(op->ptr, "end"))
-		CFRA= PEFRA;
-	else
-		CFRA= PSFRA;
-	
-	sound_seek_scene(C);
+	wmTimer *animtimer= CTX_wm_screen(C)->animtimer;
 
-	WM_event_add_notifier(C, NC_SCENE|ND_FRAME, scene);
+	/* Don't change CFRA directly if animtimer is running as this can cause
+	 * first/last frame not to be actually shown (bad since for example physics
+	 * simulations aren't reset properly).
+	 */
+	if(animtimer) {
+		ScreenAnimData *sad = animtimer->customdata;
+		
+		sad->flag |= ANIMPLAY_FLAG_USE_NEXT_FRAME;
+		
+		if (RNA_boolean_get(op->ptr, "end"))
+			sad->nextfra= PEFRA;
+		else
+			sad->nextfra= PSFRA;
+	}
+	else {
+		if (RNA_boolean_get(op->ptr, "end"))
+			CFRA= PEFRA;
+		else
+			CFRA= PSFRA;
+		
+		sound_seek_scene(bmain, scene);
+
+		WM_event_add_notifier(C, NC_SCENE|ND_FRAME, scene);
+	}
 	
 	return OPERATOR_FINISHED;
 }
@@ -1565,11 +1807,11 @@ static void SCREEN_OT_frame_jump(wmOperatorType *ot)
 	
 	ot->exec= frame_jump_exec;
 	
-	ot->poll= ED_operator_screenactive;
+	ot->poll= ED_operator_screenactive_norender;
 	ot->flag= OPTYPE_UNDO;
 	
 	/* rna */
-	RNA_def_boolean(ot->srna, "end", 0, "Last Frame", "Jump to the last frame of the frame range.");
+	RNA_def_boolean(ot->srna, "end", 0, "Last Frame", "Jump to the last frame of the frame range");
 }
 
 
@@ -1578,26 +1820,30 @@ static void SCREEN_OT_frame_jump(wmOperatorType *ot)
 /* function to be called outside UI context, or for redo */
 static int keyframe_jump_exec(bContext *C, wmOperator *op)
 {
+	Main *bmain= CTX_data_main(C);
 	Scene *scene= CTX_data_scene(C);
 	Object *ob= CTX_data_active_object(C);
+	bDopeSheet ads= {NULL};
 	DLRBT_Tree keys;
 	ActKeyColumn *ak;
-	float cfra= (scene)? (float)(CFRA) : 0.0f;
+	float cfra;
 	short next= RNA_boolean_get(op->ptr, "next");
 	short done = 0;
 	
 	/* sanity checks */
 	if (scene == NULL)
 		return OPERATOR_CANCELLED;
-	
+
+	cfra= (float)(CFRA);
+
 	/* init binarytree-list for getting keyframes */
 	BLI_dlrbTree_init(&keys);
 	
 	/* populate tree with keyframe nodes */
-	if (scene && scene->adt)
-		scene_to_keylist(NULL, scene, &keys, NULL);
-	if (ob && ob->adt)
-		ob_to_keylist(NULL, ob, &keys, NULL);
+	scene_to_keylist(&ads, scene, &keys, NULL);
+
+	if (ob)
+		ob_to_keylist(&ads, ob, &keys, NULL);
 	
 	/* build linked-list for searching */
 	BLI_dlrbTree_linkedlist_sync(&keys);
@@ -1629,9 +1875,9 @@ static int keyframe_jump_exec(bContext *C, wmOperator *op)
 	/* free temp stuff */
 	BLI_dlrbTree_free(&keys);
 	
-	sound_seek_scene(C);
+	sound_seek_scene(bmain, scene);
 
-	WM_event_add_notifier(C, NC_SCENE|ND_FRAME, CTX_data_scene(C));
+	WM_event_add_notifier(C, NC_SCENE|ND_FRAME, scene);
 	
 	return OPERATOR_FINISHED;
 }
@@ -1644,7 +1890,7 @@ static void SCREEN_OT_keyframe_jump(wmOperatorType *ot)
 	
 	ot->exec= keyframe_jump_exec;
 	
-	ot->poll= ED_operator_screenactive;
+	ot->poll= ED_operator_screenactive_norender;
 	ot->flag= OPTYPE_UNDO;
 	
 	/* rna */
@@ -1658,19 +1904,21 @@ static void SCREEN_OT_keyframe_jump(wmOperatorType *ot)
 static int screen_set_exec(bContext *C, wmOperator *op)
 {
 	bScreen *screen= CTX_wm_screen(C);
+	bScreen *screen_prev= screen;
+	
 	ScrArea *sa= CTX_wm_area(C);
 	int tot= BLI_countlist(&CTX_data_main(C)->screen);
 	int delta= RNA_int_get(op->ptr, "delta");
 	
-	/* return to previous state before switching screens */
-	if(sa && sa->full)
-		ED_screen_full_restore(C, sa);
+	/* temp screens are for userpref or render display */
+	if(screen->temp)
+		return OPERATOR_CANCELLED;
 	
 	if(delta==1) {
 		while(tot--) {
 			screen= screen->id.next;
 			if(screen==NULL) screen= CTX_data_main(C)->screen.first;
-			if(screen->winid==0 && screen->full==0)
+			if(screen->winid==0 && screen->full==0 && screen != screen_prev)
 				break;
 		}
 	}
@@ -1678,7 +1926,7 @@ static int screen_set_exec(bContext *C, wmOperator *op)
 		while(tot--) {
 			screen= screen->id.prev;
 			if(screen==NULL) screen= CTX_data_main(C)->screen.last;
-			if(screen->winid==0 && screen->full==0)
+			if(screen->winid==0 && screen->full==0 && screen != screen_prev)
 				break;
 		}
 	}
@@ -1686,7 +1934,12 @@ static int screen_set_exec(bContext *C, wmOperator *op)
 		screen= NULL;
 	}
 	
-	if(screen) {
+	if(screen && screen_prev != screen) {
+		/* return to previous state before switching screens */
+		if(sa && sa->full) {
+			ED_screen_full_restore(C, sa); /* may free 'screen_prev' */
+		}
+		
 		ED_screen_set(C, screen);
 		return OPERATOR_FINISHED;
 	}
@@ -1710,9 +1963,20 @@ static void SCREEN_OT_screen_set(wmOperatorType *ot)
 
 
 /* function to be called outside UI context, or for redo */
-static int screen_full_area_exec(bContext *C, wmOperator *op)
+static int screen_full_area_exec(bContext *C, wmOperator *UNUSED(op))
 {
-	ED_screen_full_toggle(C, CTX_wm_window(C), CTX_wm_area(C));
+	bScreen *screen = CTX_wm_screen(C);
+	ScrArea *sa=NULL;
+	
+	/* search current screen for 'fullscreen' areas */
+	/* prevents restoring info header, when mouse is over it */
+	for (sa=screen->areabase.first; sa; sa=sa->next) {
+		if (sa->full) break;
+	}
+	
+	if(sa==NULL) sa= CTX_wm_area(C);
+	
+	ED_screen_full_toggle(C, CTX_wm_window(C), sa);
 	return OPERATOR_FINISHED;
 }
 
@@ -1761,12 +2025,12 @@ static void SCREEN_OT_screen_full_area(wmOperatorType *ot)
  */
 
 typedef struct sAreaJoinData
-	{
-		ScrArea *sa1;	/* first area to be considered */
-		ScrArea *sa2;	/* second area to be considered */
-		ScrArea *scr;	/* designed for removal */
-		
-	} sAreaJoinData;
+{
+	ScrArea *sa1;	/* first area to be considered */
+	ScrArea *sa2;	/* second area to be considered */
+	ScrArea *scr;	/* designed for removal */
+
+} sAreaJoinData;
 
 
 /* validate selection inside screen, set variables OK */
@@ -1778,6 +2042,7 @@ static int area_join_init(bContext *C, wmOperator *op)
 	sAreaJoinData* jd= NULL;
 	int x1, y1;
 	int x2, y2;
+	int shared= 0;
 	
 	/* required properties, make negative to get return 0 if not set by caller */
 	x1= RNA_int_get(op->ptr, "min_x");
@@ -1789,6 +2054,16 @@ static int area_join_init(bContext *C, wmOperator *op)
 	sa2 = screen_areahascursor(CTX_wm_screen(C), x2, y2);
 	if(sa1==NULL || sa2==NULL || sa1==sa2)
 		return 0;
+	
+	/* do areas share an edge? */
+	if(sa1->v1==sa2->v1 || sa1->v1==sa2->v2 || sa1->v1==sa2->v3 || sa1->v1==sa2->v4) shared++; 
+	if(sa1->v2==sa2->v1 || sa1->v2==sa2->v2 || sa1->v2==sa2->v3 || sa1->v2==sa2->v4) shared++; 
+	if(sa1->v3==sa2->v1 || sa1->v3==sa2->v2 || sa1->v3==sa2->v3 || sa1->v3==sa2->v4) shared++; 
+	if(sa1->v4==sa2->v1 || sa1->v4==sa2->v2 || sa1->v4==sa2->v3 || sa1->v4==sa2->v4) shared++; 
+	if(shared!=2) {
+		printf("areas don't share edge\n");
+		return 0;
+	}
 	
 	jd = (sAreaJoinData*)MEM_callocN(sizeof (sAreaJoinData), "op_area_join");
 	
@@ -1868,17 +2143,16 @@ static int area_join_invoke(bContext *C, wmOperator *op, wmEvent *event)
 		RNA_int_set(op->ptr, "min_y", sad->y);
 		RNA_int_set(op->ptr, "max_x", event->x);
 		RNA_int_set(op->ptr, "max_y", event->y);
-		
-		if(!area_join_init(C, op)) 
-			return OPERATOR_PASS_THROUGH;
-		
-		/* add temp handler */
-		WM_event_add_modal_handler(C, op);
-		
-		return OPERATOR_RUNNING_MODAL;
 	}
 	
-	return OPERATOR_PASS_THROUGH;
+	
+	if(!area_join_init(C, op)) 
+		return OPERATOR_PASS_THROUGH;
+	
+	/* add temp handler */
+	WM_event_add_modal_handler(C, op);
+	
+	return OPERATOR_RUNNING_MODAL;
 }
 
 static int area_join_cancel(bContext *C, wmOperator *op)
@@ -1917,7 +2191,7 @@ static int area_join_modal(bContext *C, wmOperator *op, wmEvent *event)
 			
 			if (sa) {					
 				if (jd->sa1 != sa) {
-					dir = area_getorientation(sc, jd->sa1, sa);
+					dir = area_getorientation(jd->sa1, sa);
 					if (dir >= 0) {
 						if (jd->sa2) jd->sa2->flag &= ~AREA_FLAG_DRAWJOINTO;
 						jd->sa2 = sa;
@@ -1928,7 +2202,7 @@ static int area_join_modal(bContext *C, wmOperator *op, wmEvent *event)
 						 we check if area has common border with the one marked for removal
 						 in this case we can swap areas.
 						 */
-						dir = area_getorientation(sc, sa, jd->sa2);
+						dir = area_getorientation(sa, jd->sa2);
 						if (dir >= 0) {
 							if (jd->sa1) jd->sa1->flag &= ~AREA_FLAG_DRAWJOINFROM;
 							if (jd->sa2) jd->sa2->flag &= ~AREA_FLAG_DRAWJOINTO;
@@ -1954,13 +2228,13 @@ static int area_join_modal(bContext *C, wmOperator *op, wmEvent *event)
 						jd->sa2 = sa;
 						if (jd->sa1) jd->sa1->flag |= AREA_FLAG_DRAWJOINFROM;
 						if (jd->sa2) jd->sa2->flag |= AREA_FLAG_DRAWJOINTO;
-						dir = area_getorientation(sc, jd->sa1, jd->sa2);
+						dir = area_getorientation(jd->sa1, jd->sa2);
 						if (dir < 0) {
 							printf("oops, didn't expect that!\n");
 						}
 					} 
 					else {
-						dir = area_getorientation(sc, jd->sa1, sa);
+						dir = area_getorientation(jd->sa1, sa);
 						if (dir >= 0) {
 							if (jd->sa2) jd->sa2->flag &= ~AREA_FLAG_DRAWJOINTO;
 							jd->sa2 = sa;
@@ -2004,9 +2278,10 @@ static void SCREEN_OT_area_join(wmOperatorType *ot)
 	ot->exec= area_join_exec;
 	ot->invoke= area_join_invoke;
 	ot->modal= area_join_modal;
-	ot->poll= ED_operator_areaactive;
+	ot->poll= screen_active_editable;
+	ot->cancel= area_join_cancel;
 	
-	ot->flag= OPTYPE_BLOCKING;
+	ot->flag= OPTYPE_BLOCKING|OPTYPE_INTERNAL;
 	
 	/* rna */
 	RNA_def_int(ot->srna, "min_x", -100, INT_MIN, INT_MAX, "X 1", "", INT_MIN, INT_MAX);
@@ -2015,9 +2290,99 @@ static void SCREEN_OT_area_join(wmOperatorType *ot)
 	RNA_def_int(ot->srna, "max_y", -100, INT_MIN, INT_MAX, "Y 2", "", INT_MIN, INT_MAX);
 }
 
+/* ******************************* */
+
+static int screen_area_options_invoke(bContext *C, wmOperator *op, wmEvent *event)
+{
+	uiPopupMenu *pup;
+	uiLayout *layout;
+	PointerRNA ptr1, ptr2;
+	ScrEdge *actedge= screen_find_active_scredge(CTX_wm_screen(C), event->x, event->y);
+	
+	if(actedge==NULL) return OPERATOR_CANCELLED;
+	
+	pup= uiPupMenuBegin(C, op->type->name, ICON_NONE);
+	layout= uiPupMenuLayout(pup);
+	
+	WM_operator_properties_create(&ptr1, "SCREEN_OT_area_join");
+	
+	/* mouse cursor on edge, '4' can fail on wide edges... */
+	RNA_int_set(&ptr1, "min_x", event->x+4);
+	RNA_int_set(&ptr1, "min_y", event->y+4);
+	RNA_int_set(&ptr1, "max_x", event->x-4);
+	RNA_int_set(&ptr1, "max_y", event->y-4);
+	
+	WM_operator_properties_create(&ptr2, "SCREEN_OT_area_split");
+	
+	/* store initial mouse cursor position */
+	RNA_int_set(&ptr2, "mouse_x", event->x);
+	RNA_int_set(&ptr2, "mouse_y", event->y);
+	
+	uiItemFullO(layout, "SCREEN_OT_area_split", "Split Area", ICON_NONE, ptr2.data, WM_OP_INVOKE_DEFAULT, 0);
+	uiItemFullO(layout, "SCREEN_OT_area_join", "Join Area", ICON_NONE, ptr1.data, WM_OP_INVOKE_DEFAULT, 0);
+	
+	uiPupMenuEnd(C, pup);
+	
+	return OPERATOR_CANCELLED;
+}
+
+static void SCREEN_OT_area_options(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name= "Area Options";
+	ot->description= "Operations for splitting and merging";
+	ot->idname= "SCREEN_OT_area_options";
+	
+	/* api callbacks */
+	ot->invoke= screen_area_options_invoke;
+	
+	ot->poll= ED_operator_screen_mainwinactive;
+}
+
+
+/* ******************************* */
+
+
+static int spacedata_cleanup(bContext *C, wmOperator *op)
+{
+	Main *bmain= CTX_data_main(C);
+	bScreen *screen;
+	ScrArea *sa;
+	int tot= 0;
+	
+	for(screen= bmain->screen.first; screen; screen= screen->id.next) {
+		for(sa= screen->areabase.first; sa; sa= sa->next) {
+			if(sa->spacedata.first != sa->spacedata.last) {
+				SpaceLink *sl= sa->spacedata.first;
+
+				BLI_remlink(&sa->spacedata, sl);
+				tot+= BLI_countlist(&sa->spacedata);
+				BKE_spacedata_freelist(&sa->spacedata);
+				BLI_addtail(&sa->spacedata, sl);
+			}
+		}
+	}
+	BKE_reportf(op->reports, RPT_INFO, "Removed amount of editors: %d", tot);
+	
+	return OPERATOR_FINISHED;
+}
+
+static void SCREEN_OT_spacedata_cleanup(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name= "Clean-up space-data";
+	ot->description= "Remove unused settings for invisible editors";
+	ot->idname= "SCREEN_OT_spacedata_cleanup";
+	
+	/* api callbacks */
+	ot->exec= spacedata_cleanup;
+	ot->poll= WM_operator_winactive;
+	
+}
+
 /* ************** repeat last operator ***************************** */
 
-static int repeat_last_exec(bContext *C, wmOperator *op)
+static int repeat_last_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	wmOperator *lastop= CTX_wm_manager(C)->operators.last;
 	
@@ -2041,7 +2406,7 @@ static void SCREEN_OT_repeat_last(wmOperatorType *ot)
 	
 }
 
-static int repeat_history_invoke(bContext *C, wmOperator *op, wmEvent *event)
+static int repeat_history_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 {
 	wmWindowManager *wm= CTX_wm_manager(C);
 	wmOperator *lastop;
@@ -2053,11 +2418,11 @@ static int repeat_history_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	if(items==0)
 		return OPERATOR_CANCELLED;
 	
-	pup= uiPupMenuBegin(C, op->type->name, 0);
+	pup= uiPupMenuBegin(C, op->type->name, ICON_NONE);
 	layout= uiPupMenuLayout(pup);
 	
 	for (i=items-1, lastop= wm->operators.last; lastop; lastop= lastop->prev, i--)
-		uiItemIntO(layout, lastop->type->name, 0, op->type->idname, "index", i);
+		uiItemIntO(layout, lastop->type->name, ICON_NONE, op->type->idname, "index", i);
 	
 	uiPupMenuEnd(C, pup);
 	
@@ -2098,15 +2463,9 @@ static void SCREEN_OT_repeat_history(wmOperatorType *ot)
 
 /* ********************** redo operator ***************************** */
 
-static int redo_last_invoke(bContext *C, wmOperator *op, wmEvent *event)
+static int redo_last_invoke(bContext *C, wmOperator *UNUSED(op), wmEvent *UNUSED(event))
 {
-	wmWindowManager *wm= CTX_wm_manager(C);
-	wmOperator *lastop;
-	
-	/* only for operators that are registered and did an undo push */
-	for(lastop= wm->operators.last; lastop; lastop= lastop->prev)
-		if((lastop->type->flag & OPTYPE_REGISTER) && (lastop->type->flag & OPTYPE_UNDO))
-			break;
+	wmOperator *lastop= WM_operator_last_redo(C);
 	
 	if(lastop)
 		WM_operator_redo_popup(C, lastop);
@@ -2178,26 +2537,36 @@ static int region_quadview_exec(bContext *C, wmOperator *op)
 		
 		/* lock views and set them */
 		if(sa->spacetype==SPACE_VIEW3D) {
+			/* run ED_view3d_lock() so the correct 'rv3d->viewquat' is set,
+			 * otherwise when restoring rv3d->localvd the 'viewquat' won't
+			 * match the 'view', set on entering localview See: [#26315],
+			 *
+			 * We could avoid manipulating rv3d->localvd here if exiting
+			 * localview with a 4-split would assign these view locks */
 			RegionView3D *rv3d;
 			
 			rv3d= ar->regiondata;
 			rv3d->viewlock= RV3D_LOCKED; rv3d->view= RV3D_VIEW_FRONT; rv3d->persp= RV3D_ORTHO;
-			if (rv3d->localvd) { rv3d->localvd->view = rv3d->view; rv3d->localvd->persp = rv3d->persp; }
+			ED_view3d_lock(rv3d);
+			if (rv3d->localvd) { rv3d->localvd->view = rv3d->view; rv3d->localvd->persp = rv3d->persp; copy_qt_qt(rv3d->localvd->viewquat, rv3d->viewquat);}
 			
 			ar= ar->next;
 			rv3d= ar->regiondata;
 			rv3d->viewlock= RV3D_LOCKED; rv3d->view= RV3D_VIEW_TOP; rv3d->persp= RV3D_ORTHO;
-			if (rv3d->localvd) { rv3d->localvd->view = rv3d->view; rv3d->localvd->persp = rv3d->persp; }
+			ED_view3d_lock(rv3d);
+			if (rv3d->localvd) { rv3d->localvd->view = rv3d->view; rv3d->localvd->persp = rv3d->persp; copy_qt_qt(rv3d->localvd->viewquat, rv3d->viewquat);}
 			
 			ar= ar->next;
 			rv3d= ar->regiondata;
 			rv3d->viewlock= RV3D_LOCKED; rv3d->view= RV3D_VIEW_RIGHT; rv3d->persp= RV3D_ORTHO;
-			if (rv3d->localvd) { rv3d->localvd->view = rv3d->view; rv3d->localvd->persp = rv3d->persp; }
+			ED_view3d_lock(rv3d);
+			if (rv3d->localvd) { rv3d->localvd->view = rv3d->view; rv3d->localvd->persp = rv3d->persp; copy_qt_qt(rv3d->localvd->viewquat, rv3d->viewquat);}
 			
 			ar= ar->next;
 			rv3d= ar->regiondata;
 			rv3d->view= RV3D_VIEW_CAMERA; rv3d->persp= RV3D_CAMOB;
-			if (rv3d->localvd) {rv3d->localvd->view = rv3d->view; rv3d->localvd->persp = rv3d->persp; }
+			ED_view3d_lock(rv3d);
+			if (rv3d->localvd) {rv3d->localvd->view = rv3d->view; rv3d->localvd->persp = rv3d->persp; copy_qt_qt(rv3d->localvd->viewquat, rv3d->viewquat);}
 		}
 		ED_area_tag_redraw(sa);
 		WM_event_add_notifier(C, NC_SCREEN|NA_EDITED, NULL);
@@ -2217,7 +2586,7 @@ static void SCREEN_OT_region_quadview(wmOperatorType *ot)
 	/* api callbacks */
 	//	ot->invoke= WM_operator_confirm;
 	ot->exec= region_quadview_exec;
-	ot->poll= ED_operator_areaactive;
+	ot->poll= ED_operator_region_view3d_active;
 	ot->flag= 0;
 }
 
@@ -2226,7 +2595,7 @@ static void SCREEN_OT_region_quadview(wmOperatorType *ot)
 /* ************** region flip operator ***************************** */
 
 /* flip a region alignment */
-static int region_flip_exec(bContext *C, wmOperator *op)
+static int region_flip_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	ARegion *ar= CTX_wm_region(C);
 	
@@ -2264,7 +2633,7 @@ static void SCREEN_OT_region_flip(wmOperatorType *ot)
 /* ************** header flip operator ***************************** */
 
 /* flip a header region alignment */
-static int header_flip_exec(bContext *C, wmOperator *op)
+static int header_flip_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	ARegion *ar= CTX_wm_region(C);
 	
@@ -2273,13 +2642,8 @@ static int header_flip_exec(bContext *C, wmOperator *op)
 	 */
 	if((ar == NULL) || (ar->regiontype != RGN_TYPE_HEADER)) {
 		ScrArea *sa= CTX_wm_area(C);
-		
-		/* loop over all regions until a matching one is found */
-		for (ar= sa->regionbase.first; ar; ar= ar->next) {
-			if(ar->regiontype == RGN_TYPE_HEADER)
-				break;
-		}
-		
+		ar= BKE_area_find_region_type(sa, RGN_TYPE_HEADER);
+
 		/* don't do anything if no region */
 		if(ar == NULL)
 			return OPERATOR_CANCELLED;
@@ -2318,30 +2682,30 @@ static void SCREEN_OT_header_flip(wmOperatorType *ot)
 
 /* ************** header tools operator ***************************** */
 
-static int header_toolbox_invoke(bContext *C, wmOperator *op, wmEvent *event)
+static int header_toolbox_invoke(bContext *C, wmOperator *UNUSED(op), wmEvent *UNUSED(event))
 {
 	ScrArea *sa= CTX_wm_area(C);
 	ARegion *ar= CTX_wm_region(C);
 	uiPopupMenu *pup;
 	uiLayout *layout;
 	
-	pup= uiPupMenuBegin(C, "Header", 0);
+	pup= uiPupMenuBegin(C, "Header", ICON_NONE);
 	layout= uiPupMenuLayout(pup);
 	
 	// XXX SCREEN_OT_region_flip doesn't work - gets wrong context for active region, so added custom operator
 	if (ar->alignment == RGN_ALIGN_TOP)
-		uiItemO(layout, "Flip to Bottom", 0, "SCREEN_OT_header_flip");	
+		uiItemO(layout, "Flip to Bottom", ICON_NONE, "SCREEN_OT_header_flip");
 	else
-		uiItemO(layout, "Flip to Top", 0, "SCREEN_OT_header_flip");
+		uiItemO(layout, "Flip to Top", ICON_NONE, "SCREEN_OT_header_flip");
 	
 	uiItemS(layout);
 	
 	/* file browser should be fullscreen all the time, but other regions can be maximised/restored... */
 	if (sa->spacetype != SPACE_FILE) {
 		if (sa->full) 
-			uiItemO(layout, "Tile Area", 0, "SCREEN_OT_screen_full_area");
+			uiItemO(layout, "Tile Area", ICON_NONE, "SCREEN_OT_screen_full_area");
 		else
-			uiItemO(layout, "Maximize Area", 0, "SCREEN_OT_screen_full_area");
+			uiItemO(layout, "Maximize Area", ICON_NONE, "SCREEN_OT_screen_full_area");
 	}
 	
 	uiPupMenuEnd(C, pup);
@@ -2349,7 +2713,7 @@ static int header_toolbox_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	return OPERATOR_CANCELLED;
 }
 
-void SCREEN_OT_header_toolbox(wmOperatorType *ot)
+static void SCREEN_OT_header_toolbox(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Header Toolbox";
@@ -2432,11 +2796,12 @@ static int match_region_with_redraws(int spacetype, int regiontype, int redraws)
 	return 0;
 }
 
-static int screen_animation_step(bContext *C, wmOperator *op, wmEvent *event)
+static int screen_animation_step(bContext *C, wmOperator *UNUSED(op), wmEvent *event)
 {
 	bScreen *screen= CTX_wm_screen(C);
 
 	if(screen->animtimer && screen->animtimer==event->customdata) {
+		Main *bmain= CTX_data_main(C);
 		Scene *scene= CTX_data_scene(C);
 		wmTimer *wt= screen->animtimer;
 		ScreenAnimData *sad= wt->customdata;
@@ -2450,7 +2815,7 @@ static int screen_animation_step(bContext *C, wmOperator *op, wmEvent *event)
 		else sync= (scene->flag & SCE_FRAME_DROP);
 		
 		if((scene->audio.flag & AUDIO_SYNC) && !(sad->flag & ANIMPLAY_FLAG_REVERSE) && finite(time = sound_sync_scene(scene)))
-			scene->r.cfra = time * FPS + 0.5;
+			scene->r.cfra = (double)time * FPS + 0.5;
 		else
 		{
 			if (sync) {
@@ -2460,7 +2825,7 @@ static int screen_animation_step(bContext *C, wmOperator *op, wmEvent *event)
 					scene->r.cfra -= step;
 				else
 					scene->r.cfra += step;
-				wt->duration -= ((float)step)/FPS;
+				wt->duration -= ((double)step)/FPS;
 			}
 			else {
 				/* one frame +/- */
@@ -2504,12 +2869,19 @@ static int screen_animation_step(bContext *C, wmOperator *op, wmEvent *event)
 				}
 			}
 		}
+
+		/* next frame overriden by user action (pressed jump to first/last frame) */
+		if(sad->flag & ANIMPLAY_FLAG_USE_NEXT_FRAME) {
+			scene->r.cfra = sad->nextfra;
+			sad->flag &= ~ANIMPLAY_FLAG_USE_NEXT_FRAME;
+			sad->flag |= ANIMPLAY_FLAG_JUMPED;
+		}
 		
 		if (sad->flag & ANIMPLAY_FLAG_JUMPED)
-			sound_seek_scene(C);
+			sound_seek_scene(bmain, scene);
 		
 		/* since we follow drawflags, we can't send notifier but tag regions ourselves */
-		ED_update_for_newframe(C, 1);
+		ED_update_for_newframe(CTX_data_main(C), scene, screen, 1);
 		
 		for (sa= screen->areabase.first; sa; sa= sa->next) {
 			ARegion *ar;
@@ -2552,7 +2924,7 @@ static void SCREEN_OT_animation_step(wmOperatorType *ot)
 	/* api callbacks */
 	ot->invoke= screen_animation_step;
 	
-	ot->poll= ED_operator_screenactive;
+	ot->poll= ED_operator_screenactive_norender;
 	
 }
 
@@ -2570,37 +2942,18 @@ int ED_screen_animation_play(bContext *C, int sync, int mode)
 		sound_stop_scene(scene);
 	}
 	else {
-		ScrArea *sa= CTX_wm_area(C);
-		int refresh= SPACE_TIME;
+		int refresh= SPACE_TIME; /* these settings are currently only available from a menu in the TimeLine */
 		
 		if (mode == 1) // XXX only play audio forwards!?
 			sound_play_scene(scene);
 		
-		/* timeline gets special treatment since it has it's own menu for determining redraws */
-		if ((sa) && (sa->spacetype == SPACE_TIME)) {
-			SpaceTime *stime= (SpaceTime *)sa->spacedata.first;
+		ED_screen_animation_timer(C, screen->redraws_flag, refresh, sync, mode);
+		
+		if (screen->animtimer) {
+			wmTimer *wt= screen->animtimer;
+			ScreenAnimData *sad= wt->customdata;
 			
-			ED_screen_animation_timer(C, stime->redraws, refresh, sync, mode);
-			
-			/* update region if TIME_REGION was set, to leftmost 3d window */
-			ED_screen_animation_timer_update(screen, stime->redraws, refresh);
-		}
-		else {
-			int redraws = TIME_REGION|TIME_ALL_3D_WIN;
-			
-			/* XXX - would like a better way to deal with this situation - Campbell */
-			if ((!sa) || (sa->spacetype == SPACE_SEQ)) {
-				redraws |= TIME_SEQ;
-			}
-			
-			ED_screen_animation_timer(C, redraws, refresh, sync, mode);
-			
-			if(screen->animtimer) {
-				wmTimer *wt= screen->animtimer;
-				ScreenAnimData *sad= wt->customdata;
-				
-				sad->ar= CTX_wm_region(C);
-			}
+			sad->ar= CTX_wm_region(C);
 		}
 	}
 
@@ -2628,7 +2981,7 @@ static void SCREEN_OT_animation_play(wmOperatorType *ot)
 	/* api callbacks */
 	ot->exec= screen_animation_play_exec;
 	
-	ot->poll= ED_operator_screenactive;
+	ot->poll= ED_operator_screenactive_norender;
 	
 	RNA_def_boolean(ot->srna, "reverse", 0, "Play in Reverse", "Animation is played backwards");
 	RNA_def_boolean(ot->srna, "sync", 0, "Sync", "Drop frames to maintain framerate");
@@ -2637,17 +2990,20 @@ static void SCREEN_OT_animation_play(wmOperatorType *ot)
 static int screen_animation_cancel_exec(bContext *C, wmOperator *op)
 {
 	bScreen *screen= CTX_wm_screen(C);
-	
-	if(screen->animtimer) {
-		ScreenAnimData *sad= screen->animtimer->customdata;
-		Scene *scene= CTX_data_scene(C);
-		
-		/* reset current frame before stopping, and just send a notifier to deal with the rest 
-		 * (since playback still needs to be stopped)
-		 */
-		scene->r.cfra= sad->sfra;
-		WM_event_add_notifier(C, NC_SCENE|ND_FRAME, scene);
-		
+
+	if (screen->animtimer) {
+		if(RNA_boolean_get(op->ptr, "restore_frame")) {
+			ScreenAnimData *sad= screen->animtimer->customdata;
+			Scene *scene= CTX_data_scene(C);
+
+			/* reset current frame before stopping, and just send a notifier to deal with the rest
+			 * (since playback still needs to be stopped)
+			 */
+			scene->r.cfra= sad->sfra;
+
+			WM_event_add_notifier(C, NC_SCENE|ND_FRAME, scene);
+		}
+
 		/* call the other "toggling" operator to clean up now */
 		ED_screen_animation_play(C, 0, 0);
 	}
@@ -2666,6 +3022,8 @@ static void SCREEN_OT_animation_cancel(wmOperatorType *ot)
 	ot->exec= screen_animation_cancel_exec;
 	
 	ot->poll= ED_operator_screenactive;
+
+	RNA_def_boolean(ot->srna, "restore_frame", TRUE, "Restore Frame", "Restore the frame when animation was initialized");
 }
 
 /* ************** border select operator (template) ***************************** */
@@ -2713,6 +3071,7 @@ static void SCREEN_OT_border_select(wmOperatorType *ot)
 	ot->exec= border_select_do;
 	ot->invoke= WM_border_select_invoke;
 	ot->modal= WM_border_select_modal;
+	ot->cancel= WM_border_select_cancel;
 	
 	ot->poll= ED_operator_areaactive;
 	
@@ -2739,7 +3098,7 @@ static int fullscreen_back_exec(bContext *C, wmOperator *op)
 		if (sa->full) break;
 	}
 	if (!sa) {
-		BKE_report(op->reports, RPT_ERROR, "No fullscreen areas were found.");
+		BKE_report(op->reports, RPT_ERROR, "No fullscreen areas were found");
 		return OPERATOR_CANCELLED;
 	}
 	
@@ -2762,9 +3121,8 @@ static void SCREEN_OT_back_to_previous(struct wmOperatorType *ot)
 
 /* *********** show user pref window ****** */
 
-static int userpref_show_invoke(bContext *C, wmOperator *unused, wmEvent *event)
+static int userpref_show_invoke(bContext *C, wmOperator *UNUSED(op), wmEvent *event)
 {
-	ScrArea *sa;
 	rcti rect;
 	int sizex, sizey;
 	
@@ -2779,9 +3137,6 @@ static int userpref_show_invoke(bContext *C, wmOperator *unused, wmEvent *event)
 	
 	/* changes context! */
 	WM_window_open_temp(C, &rect, WM_WINDOW_USERPREFS);
-	
-	sa= CTX_wm_area(C);
-	
 	
 	return OPERATOR_FINISHED;
 }
@@ -2801,7 +3156,7 @@ static void SCREEN_OT_userpref_show(struct wmOperatorType *ot)
 
 /********************* new screen operator *********************/
 
-static int screen_new_exec(bContext *C, wmOperator *op)
+static int screen_new_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	wmWindow *win= CTX_wm_window(C);
 	bScreen *sc= CTX_wm_screen(C);
@@ -2812,7 +3167,7 @@ static int screen_new_exec(bContext *C, wmOperator *op)
 	return OPERATOR_FINISHED;
 }
 
-void SCREEN_OT_new(wmOperatorType *ot)
+static void SCREEN_OT_new(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "New Screen";
@@ -2821,6 +3176,7 @@ void SCREEN_OT_new(wmOperatorType *ot)
 	
 	/* api callbacks */
 	ot->exec= screen_new_exec;
+	ot->poll= WM_operator_winactive;
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
@@ -2828,7 +3184,7 @@ void SCREEN_OT_new(wmOperatorType *ot)
 
 /********************* delete screen operator *********************/
 
-static int screen_delete_exec(bContext *C, wmOperator *op)
+static int screen_delete_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	bScreen *sc= CTX_wm_screen(C);
 	
@@ -2837,7 +3193,7 @@ static int screen_delete_exec(bContext *C, wmOperator *op)
 	return OPERATOR_FINISHED;
 }
 
-void SCREEN_OT_delete(wmOperatorType *ot)
+static void SCREEN_OT_delete(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Delete Screen"; //was scene
@@ -2856,26 +3212,39 @@ void SCREEN_OT_delete(wmOperatorType *ot)
 static int scene_new_exec(bContext *C, wmOperator *op)
 {
 	Scene *newscene, *scene= CTX_data_scene(C);
+	bScreen *screen= CTX_wm_screen(C);
 	Main *bmain= CTX_data_main(C);
 	int type= RNA_enum_get(op->ptr, "type");
+
+	if(type == SCE_COPY_NEW) {
+		newscene= add_scene("Scene");
+	}
+	else { /* different kinds of copying */
+		newscene= copy_scene(scene, type);
+
+		/* these can't be handled in blenkernel curently, so do them here */
+		if(type == SCE_COPY_LINK_DATA) {
+			ED_object_single_users(bmain, newscene, 0);
+		}
+		else if(type == SCE_COPY_FULL) {
+			ED_object_single_users(bmain, newscene, 1);
+		}
+	}
 	
-	newscene= copy_scene(bmain, scene, type);
-	
-	/* these can't be handled in blenkernel curently, so do them here */
-	if(type == SCE_COPY_LINK_DATA)
-		ED_object_single_users(bmain, newscene, 0);
-	else if(type == SCE_COPY_FULL)
-		ED_object_single_users(bmain, newscene, 1);
-	
+	/* this notifier calls ED_screen_set_scene, doing a lot of UI stuff, not for inside event loops */
 	WM_event_add_notifier(C, NC_SCENE|ND_SCENEBROWSE, newscene);
+	
+	if(screen)
+		screen->scene= newscene;
 	
 	return OPERATOR_FINISHED;
 }
 
-void SCENE_OT_new(wmOperatorType *ot)
+static void SCENE_OT_new(wmOperatorType *ot)
 {
 	static EnumPropertyItem type_items[]= {
-		{SCE_COPY_EMPTY, "EMPTY", 0, "Empty", "Add empty scene"},
+		{SCE_COPY_NEW, "NEW", 0, "New", "Add new scene"},
+		{SCE_COPY_EMPTY, "EMPTY", 0, "Copy Settings", "Make a copy without any objects"},
 		{SCE_COPY_LINK_OB, "LINK_OBJECTS", 0, "Link Objects", "Link to the objects from the current scene"},
 		{SCE_COPY_LINK_DATA, "LINK_OBJECT_DATA", 0, "Link Object Data", "Copy objects linked to data from the current scene"},
 		{SCE_COPY_FULL, "FULL_COPY", 0, "Full Copy", "Make a full copy of the current scene"},
@@ -2899,7 +3268,7 @@ void SCENE_OT_new(wmOperatorType *ot)
 
 /********************* delete scene operator *********************/
 
-static int scene_delete_exec(bContext *C, wmOperator *op)
+static int scene_delete_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	Scene *scene= CTX_data_scene(C);
 	
@@ -2908,7 +3277,7 @@ static int scene_delete_exec(bContext *C, wmOperator *op)
 	return OPERATOR_FINISHED;
 }
 
-void SCENE_OT_delete(wmOperatorType *ot)
+static void SCENE_OT_delete(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Delete Scene";
@@ -2924,6 +3293,7 @@ void SCENE_OT_delete(wmOperatorType *ot)
 
 /* ****************  Assigning operatortypes to global list, adding handlers **************** */
 
+
 /* called in spacetypes.c */
 void ED_operatortypes_screen(void)
 {
@@ -2937,6 +3307,7 @@ void ED_operatortypes_screen(void)
 	WM_operatortype_append(SCREEN_OT_area_move);
 	WM_operatortype_append(SCREEN_OT_area_split);
 	WM_operatortype_append(SCREEN_OT_area_join);
+	WM_operatortype_append(SCREEN_OT_area_options);
 	WM_operatortype_append(SCREEN_OT_area_dupli);
 	WM_operatortype_append(SCREEN_OT_area_swap);
 	WM_operatortype_append(SCREEN_OT_region_quadview);
@@ -2947,6 +3318,7 @@ void ED_operatortypes_screen(void)
 	WM_operatortype_append(SCREEN_OT_screen_set);
 	WM_operatortype_append(SCREEN_OT_screen_full_area);
 	WM_operatortype_append(SCREEN_OT_back_to_previous);
+	WM_operatortype_append(SCREEN_OT_spacedata_cleanup);
 	WM_operatortype_append(SCREEN_OT_screenshot);
 	WM_operatortype_append(SCREEN_OT_screencast);
 	WM_operatortype_append(SCREEN_OT_userpref_show);
@@ -2968,7 +3340,9 @@ void ED_operatortypes_screen(void)
 	
 	/* tools shared by more space types */
 	WM_operatortype_append(ED_OT_undo);
+	WM_operatortype_append(ED_OT_undo_push);
 	WM_operatortype_append(ED_OT_redo);	
+	WM_operatortype_append(ED_OT_undo_history);
 	
 }
 
@@ -2997,9 +3371,27 @@ static void keymap_modal_set(wmKeyConfig *keyconf)
 	
 }
 
+static int open_file_drop_poll(bContext *UNUSED(C), wmDrag *drag, wmEvent *UNUSED(event))
+{
+	if(drag->type==WM_DRAG_PATH) {
+		if(drag->icon==ICON_FILE_BLEND)
+			return 1;
+	}
+	return 0;
+}
+
+static void open_file_drop_copy(wmDrag *drag, wmDropBox *drop)
+{
+	/* copy drag path to properties */
+	RNA_string_set(drop->ptr, "filepath", drag->path);
+	drop->opcontext= WM_OP_EXEC_DEFAULT;
+}
+
+
 /* called in spacetypes.c */
 void ED_keymap_screen(wmKeyConfig *keyconf)
 {
+	ListBase *lb;
 	wmKeyMap *keymap;
 	//wmKeyMapItem *kmi;
 	
@@ -3018,6 +3410,9 @@ void ED_keymap_screen(wmKeyConfig *keyconf)
 	WM_keymap_verify_item(keymap, "SCREEN_OT_region_scale", EVT_ACTIONZONE_REGION, 0, 0, 0);
 	/* area move after action zones */
 	WM_keymap_verify_item(keymap, "SCREEN_OT_area_move", LEFTMOUSE, KM_PRESS, 0, 0);
+	
+	WM_keymap_verify_item(keymap, "SCREEN_OT_area_options", RIGHTMOUSE, KM_PRESS, 0, 0);
+	
 	
 	/* Header Editing ------------------------------------------------ */
 	keymap= WM_keymap_find(keyconf, "Header", 0, 0);
@@ -3056,9 +3451,11 @@ void ED_keymap_screen(wmKeyConfig *keyconf)
 #ifdef __APPLE__
 	WM_keymap_add_item(keymap, "ED_OT_undo", ZKEY, KM_PRESS, KM_OSKEY, 0);
 	WM_keymap_add_item(keymap, "ED_OT_redo", ZKEY, KM_PRESS, KM_SHIFT|KM_OSKEY, 0);
+	WM_keymap_add_item(keymap, "ED_OT_undo_history", ZKEY, KM_PRESS, KM_ALT|KM_OSKEY, 0);
 #endif
 	WM_keymap_add_item(keymap, "ED_OT_undo", ZKEY, KM_PRESS, KM_CTRL, 0);
 	WM_keymap_add_item(keymap, "ED_OT_redo", ZKEY, KM_PRESS, KM_SHIFT|KM_CTRL, 0);
+	WM_keymap_add_item(keymap, "ED_OT_undo_history", ZKEY, KM_PRESS, KM_ALT|KM_CTRL, 0);
 	
 	
 	/* render */
@@ -3079,26 +3476,32 @@ void ED_keymap_screen(wmKeyConfig *keyconf)
 	keymap= WM_keymap_find(keyconf, "Frames", 0, 0);
 	
 	/* frame offsets */
-	RNA_int_set(WM_keymap_add_item(keymap, "SCREEN_OT_frame_offset", UPARROWKEY, KM_PRESS, 0, 0)->ptr, "delta", 10);
-	RNA_int_set(WM_keymap_add_item(keymap, "SCREEN_OT_frame_offset", DOWNARROWKEY, KM_PRESS, 0, 0)->ptr, "delta", -10);
+	RNA_int_set(WM_keymap_add_item(keymap, "SCREEN_OT_frame_offset", UPARROWKEY, KM_PRESS, KM_SHIFT, 0)->ptr, "delta", 10);
+	RNA_int_set(WM_keymap_add_item(keymap, "SCREEN_OT_frame_offset", DOWNARROWKEY, KM_PRESS, KM_SHIFT, 0)->ptr, "delta", -10);
 	RNA_int_set(WM_keymap_add_item(keymap, "SCREEN_OT_frame_offset", LEFTARROWKEY, KM_PRESS, 0, 0)->ptr, "delta", -1);
 	RNA_int_set(WM_keymap_add_item(keymap, "SCREEN_OT_frame_offset", RIGHTARROWKEY, KM_PRESS, 0, 0)->ptr, "delta", 1);
 	
 	RNA_int_set(WM_keymap_add_item(keymap, "SCREEN_OT_frame_offset", WHEELDOWNMOUSE, KM_PRESS, KM_ALT, 0)->ptr, "delta", 1);
 	RNA_int_set(WM_keymap_add_item(keymap, "SCREEN_OT_frame_offset", WHEELUPMOUSE, KM_PRESS, KM_ALT, 0)->ptr, "delta", -1);
 	
-	RNA_boolean_set(WM_keymap_add_item(keymap, "SCREEN_OT_frame_jump", UPARROWKEY, KM_PRESS, KM_SHIFT, 0)->ptr, "end", 1);
-	RNA_boolean_set(WM_keymap_add_item(keymap, "SCREEN_OT_frame_jump", DOWNARROWKEY, KM_PRESS, KM_SHIFT, 0)->ptr, "end", 0);
+	RNA_boolean_set(WM_keymap_add_item(keymap, "SCREEN_OT_frame_jump", UPARROWKEY, KM_PRESS, KM_CTRL|KM_SHIFT, 0)->ptr, "end", 1);
+	RNA_boolean_set(WM_keymap_add_item(keymap, "SCREEN_OT_frame_jump", DOWNARROWKEY, KM_PRESS, KM_CTRL|KM_SHIFT, 0)->ptr, "end", 0);
 	RNA_boolean_set(WM_keymap_add_item(keymap, "SCREEN_OT_frame_jump", RIGHTARROWKEY, KM_PRESS, KM_SHIFT, 0)->ptr, "end", 1);
 	RNA_boolean_set(WM_keymap_add_item(keymap, "SCREEN_OT_frame_jump", LEFTARROWKEY, KM_PRESS, KM_SHIFT, 0)->ptr, "end", 0);
 	
-	WM_keymap_add_item(keymap, "SCREEN_OT_keyframe_jump", PAGEUPKEY, KM_PRESS, KM_CTRL, 0);
-	RNA_boolean_set(WM_keymap_add_item(keymap, "SCREEN_OT_keyframe_jump", PAGEDOWNKEY, KM_PRESS, KM_CTRL, 0)->ptr, "next", 0);
+	WM_keymap_add_item(keymap, "SCREEN_OT_keyframe_jump", UPARROWKEY, KM_PRESS, 0, 0);
+	RNA_boolean_set(WM_keymap_add_item(keymap, "SCREEN_OT_keyframe_jump", DOWNARROWKEY, KM_PRESS, 0, 0)->ptr, "next", 0);
+	
+	WM_keymap_add_item(keymap, "SCREEN_OT_keyframe_jump", MEDIALAST, KM_PRESS, 0, 0);
+	RNA_boolean_set(WM_keymap_add_item(keymap, "SCREEN_OT_keyframe_jump", MEDIAFIRST, KM_PRESS, 0, 0)->ptr, "next", 0);
 	
 	/* play (forward and backwards) */
 	WM_keymap_add_item(keymap, "SCREEN_OT_animation_play", AKEY, KM_PRESS, KM_ALT, 0);
 	RNA_boolean_set(WM_keymap_add_item(keymap, "SCREEN_OT_animation_play", AKEY, KM_PRESS, KM_ALT|KM_SHIFT, 0)->ptr, "reverse", 1);
 	WM_keymap_add_item(keymap, "SCREEN_OT_animation_cancel", ESCKEY, KM_PRESS, 0, 0);
+	
+	WM_keymap_add_item(keymap, "SCREEN_OT_animation_play", MEDIAPLAY, KM_PRESS, 0, 0);
+	WM_keymap_add_item(keymap, "SCREEN_OT_animation_cancel", MEDIASTOP, KM_PRESS, 0, 0);
 	
 	/* Alternative keys for animation and sequencer playing */
 #if 0 // XXX: disabled for restoring later... bad implementation
@@ -3113,6 +3516,10 @@ void ED_keymap_screen(wmKeyConfig *keyconf)
 	WM_keymap_add_item(keymap, "SCREEN_OT_animation_play", DOWNARROWKEY, KM_PRESS, KM_ALT, 0);
 #endif
 
+	/* dropbox for entire window */
+	lb= WM_dropboxmap_find("Window", 0, 0);
+	WM_dropbox_add(lb, "WM_OT_open_mainfile", open_file_drop_poll, open_file_drop_copy);
+	
 	keymap_modal_set(keyconf);
 }
 

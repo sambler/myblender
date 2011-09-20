@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,6 +27,13 @@
  * ***** END GPL LICENSE BLOCK *****
  * Ketsji Logic Extenstion: Network Message Actuator generic implementation
  */
+
+/** \file gameengine/Ketsji/KXNetwork/KX_NetworkMessageActuator.cpp
+ *  \ingroup ketsjinet
+ */
+
+
+#include <stddef.h>
 
 #include "NG_NetworkScene.h"
 #include "KX_NetworkMessageActuator.h"
@@ -84,14 +91,13 @@ bool KX_NetworkMessageActuator::Update()
 
 CValue* KX_NetworkMessageActuator::GetReplica()
 {
-	KX_NetworkMessageActuator* replica =
-	    new KX_NetworkMessageActuator(*this);
+	KX_NetworkMessageActuator* replica = new KX_NetworkMessageActuator(*this);
 	replica->ProcessReplica();
 
 	return replica;
 }
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 
 /* -------------------------------------------------------------------- */
 /* Python interface --------------------------------------------------- */
@@ -132,4 +138,4 @@ PyAttributeDef KX_NetworkMessageActuator::Attributes[] = {
 	{ NULL }	//Sentinel
 };
 
-#endif // DISABLE_PYTHON
+#endif // WITH_PYTHON

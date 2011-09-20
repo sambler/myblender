@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,15 +26,16 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file RAS_IPolygonMaterial.h
+ *  \ingroup bgerast
+ */
+
 #ifndef __RAS_IPOLYGONMATERIAL
 #define __RAS_IPOLYGONMATERIAL
 
 #include "STR_HashedString.h"
 
-/**
- * Polygon Material on which the material buckets are sorted
- *
- */
 #include "MT_Vector3.h"
 #include "STR_HashedString.h"
 
@@ -45,8 +46,10 @@
 class RAS_IRasterizer;
 struct MTFace;
 struct Material;
+struct Image;
 struct Scene;
 class SCA_IScene;
+struct GameSettings;
 
 enum MaterialProps
 {
@@ -60,11 +63,13 @@ enum MaterialProps
 	RAS_AUTOGEN		=128,
 	RAS_NORMAL		=256,
 	RAS_DEFMULTI	=512,
-	RAS_BLENDERGLSL =1024
+	RAS_BLENDERGLSL =1024,
+	RAS_CASTSHADOW	=2048
 };
 
 /**
- * Material properties.
+ * Polygon Material on which the material buckets are sorted
+ *
  */
 class RAS_IPolyMaterial
 {
@@ -74,10 +79,11 @@ protected:
 	STR_HashedString		m_materialname; //also needed for touchsensor  
 	int						m_tile;
 	int						m_tilexrep,m_tileyrep;
-	int						m_drawingmode;	// tface->mode
-	int						m_transp;
+	int						m_drawingmode;
+	int						m_alphablend;
 	bool					m_alpha;
 	bool					m_zsort;
+	bool					m_light;
 	int						m_materialindex;
 	
 	unsigned int			m_polymatid;
@@ -98,9 +104,9 @@ public:
 	// care! these are taken from blender polygonflags, see file DNA_mesh_types.h for #define TF_BILLBOARD etc.
 	enum MaterialFlags
 	{
-		BILLBOARD_SCREENALIGNED = 256,
-		BILLBOARD_AXISALIGNED = 4096,
-		SHADOW				  =8192
+		BILLBOARD_SCREENALIGNED	= 512,  /* GEMAT_HALO */
+		BILLBOARD_AXISALIGNED	= 1024, /* GEMAT_BILLBOARD */
+		SHADOW			=2048   /* GEMAT_SHADOW */
 	};
 
 	RAS_IPolyMaterial();
@@ -110,7 +116,6 @@ public:
 					  int tile,
 					  int tilexrep,
 					  int tileyrep,
-					  int mode,
 					  int transp,
 					  bool alpha,
 					  bool zsort);
@@ -120,10 +125,13 @@ public:
 					int tile,
 					int tilexrep,
 					int tileyrep,
-					int mode,
 					int transp,
 					bool alpha,
-					bool zsort);
+					bool zsort,
+					bool light,
+					bool image,
+					struct GameSettings* game);
+
 	virtual ~RAS_IPolyMaterial() {};
  
 	/**
@@ -160,13 +168,20 @@ public:
 	int					GetMaterialIndex() const;
 
 	virtual Material*   GetBlenderMaterial() const;
+	virtual Image*      GetBlenderImage() const;
 	virtual Scene*		GetBlenderScene() const;
 	virtual void		ReleaseMaterial();
 	virtual void		GetMaterialRGBAColor(unsigned char *rgba) const;
 	virtual bool		UsesLighting(RAS_IRasterizer *rasty) const;
 	virtual bool		UsesObjectColor() const;
+	virtual bool		CastsShadows() const;
 
 	virtual void		Replace_IScene(SCA_IScene *val) {}; /* overridden by KX_BlenderMaterial */
+
+	/**
+	* @return the equivalent drawing mode for the material settings (equivalent to old TexFace tface->mode).
+	*/
+	int					ConvertFaceMode(struct GameSettings *game, bool image) const;
 
 	/*
 	 * PreCalculate texture gen

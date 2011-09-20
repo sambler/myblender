@@ -1,33 +1,39 @@
 /*
  * $Id$
  *
- * ***** BEGIN LGPL LICENSE BLOCK *****
+ * ***** BEGIN GPL LICENSE BLOCK *****
  *
- * Copyright 2009 Jörg Hermann Müller
+ * Copyright 2009-2011 Jörg Hermann Müller
  *
  * This file is part of AudaSpace.
  *
- * AudaSpace is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
+ * Audaspace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
  * AudaSpace is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU Lesser General Public License
- * along with AudaSpace.  If not, see <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU General Public License
+ * along with Audaspace; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * ***** END LGPL LICENSE BLOCK *****
+ * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file audaspace/FX/AUD_IIRFilterReader.cpp
+ *  \ingroup audfx
+ */
+
 
 #include "AUD_IIRFilterReader.h"
 
-AUD_IIRFilterReader::AUD_IIRFilterReader(AUD_IReader* reader,
-										 std::vector<float> b,
-										 std::vector<float> a) :
+AUD_IIRFilterReader::AUD_IIRFilterReader(AUD_Reference<AUD_IReader> reader,
+										 const std::vector<float>& b,
+										 const std::vector<float>& a) :
 	AUD_BaseIIRFilterReader(reader, b.size(), a.size()), m_a(a), m_b(b)
 {
 	for(int i = 1; i < m_a.size(); i++)
@@ -47,4 +53,12 @@ sample_t AUD_IIRFilterReader::filter()
 		out += x(-i) * m_b[i];
 
 	return out;
+}
+
+void AUD_IIRFilterReader::setCoefficients(const std::vector<float>& b,
+										  const std::vector<float>& a)
+{
+	setLengths(m_b.size(), m_a.size());
+	m_a = a;
+	m_b = b;
 }

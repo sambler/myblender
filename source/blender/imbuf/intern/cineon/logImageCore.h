@@ -1,3 +1,6 @@
+/** \file blender/imbuf/intern/cineon/logImageCore.h
+ *  \ingroup imbcineon
+ */
 /*
  *	 Cineon image file format library definitions.
  *	 Cineon and DPX common structures.
@@ -35,8 +38,12 @@ extern "C" {
 #endif
 
 #include "BLO_sys_types.h" // for intptr_t support
+
+#ifdef _MSC_VER
 #undef ntohl
 #undef htonl
+#endif
+
 typedef int (GetRowFn)(LogImageFile* logImage, unsigned short* row, int lineNum);
 typedef int (SetRowFn)(LogImageFile* logImage, const unsigned short* row, int lineNum);
 typedef void (CloseFn)(LogImageFile* logImage);
@@ -103,7 +110,7 @@ typedef char ASCII;
 
 R32 htonf(R32 f);
 R32 ntohf(R32 f);
-R32 undefined();
+R32 undefined(void);
 U16 reverseU16(U16 value);
 U32 reverseU32(U32 value);
 R32 reverseR32(R32 value);

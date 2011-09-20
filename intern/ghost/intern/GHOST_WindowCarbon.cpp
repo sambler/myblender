@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file ghost/intern/GHOST_WindowCarbon.cpp
+ *  \ingroup GHOST
+ */
+
 
 /**
 
@@ -97,7 +102,7 @@ GHOST_WindowCarbon::GHOST_WindowCarbon(
 	const bool stereoVisual,
 	const GHOST_TUns16 numOfAASamples
 ) :
-	GHOST_Window(title, left, top, width, height, state, GHOST_kDrawingContextTypeNone),
+	GHOST_Window(width, height, state, GHOST_kDrawingContextTypeNone),
 	m_windowRef(0),
 	m_grafPtr(0),
 	m_aglCtx(0),

@@ -1,6 +1,4 @@
-/**
- * blenlib/DNA_sdna.h (mar-2001 nzc)
- *	
+/*
  * $Id$ 
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -30,6 +28,10 @@
  */
 #ifndef DNA_SDNA_H
 #define DNA_SDNA_H
+/**
+ * \file DNA_sdna_types.h
+ * \ingroup DNA
+ */
 
 #
 #
@@ -38,7 +40,7 @@ typedef struct SDNA {
 	int datalen;		/* length of data */
 
 	int nr_names;		/* total number of struct members */
-	char **names;		/* struct member names */
+	const char **names;		/* struct member names */
 
 	int pointerlen;		/* size of a pointer in bytes */
 
@@ -52,7 +54,10 @@ typedef struct SDNA {
 
 						   (sp[2], sp[3]), (sp[4], sp[5]), .. are the member
 						   type and name numbers respectively */
-	
+
+	struct GHash *structs_map; /* ghash for faster lookups,
+								  requires WITH_DNA_GHASH to be used for now */
+
 		/* wrong place for this really, its a simple
 		 * cache for findstruct_nr.
 		 */

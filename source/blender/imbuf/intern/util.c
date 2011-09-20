@@ -1,4 +1,4 @@
-/**
+/*
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -29,6 +29,11 @@
  * $Id$
  */
 
+/** \file blender/imbuf/intern/util.c
+ *  \ingroup imbuf
+ */
+
+
 #ifdef _WIN32
 #include <io.h>
 #define open _open
@@ -58,11 +63,7 @@
 #include <libavdevice/avdevice.h>
 #include <libavutil/log.h>
 
-#if LIBAVFORMAT_VERSION_INT < (49 << 16)
-#define FFMPEG_OLD_FRAME_RATE 1
-#else
-#define FFMPEG_CODEC_IS_POINTER 1
-#endif
+#include "ffmpeg_compat.h"
 
 #endif
 
@@ -112,6 +113,7 @@ const char *imb_ext_movie[] = {
 	".m4v",
 	".m2v",
 	".m2t",
+	".m2ts",
 	".mts",
 	".mv",
 	".avs",
@@ -126,6 +128,7 @@ const char *imb_ext_movie[] = {
 	".flv",
 	".divx",
 	".xvid",
+	".mxf",
 	NULL};
 
 /* sort of wrong being here... */
@@ -140,9 +143,12 @@ const char *imb_ext_audio[] = {
 	".flac",
 	".wma",
 	".eac3",
+	".aif",
+	".aiff",
+	".m4a",
 	NULL};
 
-static int IMB_ispic_name(char *name)
+static int IMB_ispic_name(const char *name)
 {
 	ImFileType *type;
 	struct stat st;
@@ -176,7 +182,7 @@ static int IMB_ispic_name(char *name)
 	return FALSE;
 }
 
-int IMB_ispic(char *filename)
+int IMB_ispic(const char *filename)
 {
 	if(U.uiflag & USER_FILTERFILEEXTS) {
 		if(	(BLI_testextensie_array(filename, imb_ext_image)) ||
@@ -195,12 +201,12 @@ int IMB_ispic(char *filename)
 
 
 
-static int isavi (char *name) {
+static int isavi (const char *name) {
 	return AVI_is_avi (name);
 }
 
 #ifdef WITH_QUICKTIME
-static int isqtime (char *name) {
+static int isqtime (const char *name) {
 	return anim_is_quicktime (name);
 }
 #endif
@@ -215,12 +221,12 @@ void silence_log_ffmpeg(int quiet)
 	}
 	else
 	{
-		av_log_set_level(AV_LOG_INFO);
+		av_log_set_level(AV_LOG_DEBUG);
 	}
 }
 
-extern void do_init_ffmpeg();
-void do_init_ffmpeg()
+extern void do_init_ffmpeg(void);
+void do_init_ffmpeg(void)
 {
 	static int ffmpeg_init = 0;
 	if (!ffmpeg_init) {
@@ -228,27 +234,15 @@ void do_init_ffmpeg()
 		av_register_all();
 		avdevice_register_all();
 		
-		if ((G.f & G_DEBUG) == 0)
-		{
+		if ((G.f & G_DEBUG) == 0) {
 			silence_log_ffmpeg(1);
+		} else {
+			silence_log_ffmpeg(0);
 		}
 	}
 }
 
-#ifdef FFMPEG_CODEC_IS_POINTER
-static AVCodecContext* get_codec_from_stream(AVStream* stream)
-{
-	return stream->codec;
-}
-#else
-static AVCodecContext* get_codec_from_stream(AVStream* stream)
-{
-	return &stream->codec;
-}
-#endif
-
-
-static int isffmpeg (char *filename) {
+static int isffmpeg (const char *filename) {
 	AVFormatContext *pFormatCtx;
 	unsigned int i;
 	int videoStream;
@@ -278,15 +272,15 @@ static int isffmpeg (char *filename) {
 		return 0;
 	}
 
-	if(UTIL_DEBUG) dump_format(pFormatCtx, 0, filename, 0);
+	if(UTIL_DEBUG) av_dump_format(pFormatCtx, 0, filename, 0);
 
 
 		/* Find the first video stream */
 	videoStream=-1;
 	for(i=0; i<pFormatCtx->nb_streams; i++)
 		if(pFormatCtx->streams[i] &&
-		   get_codec_from_stream(pFormatCtx->streams[i]) && 
-		  (get_codec_from_stream(pFormatCtx->streams[i])->codec_type==CODEC_TYPE_VIDEO))
+		   pFormatCtx->streams[i]->codec && 
+		  (pFormatCtx->streams[i]->codec->codec_type==AVMEDIA_TYPE_VIDEO))
 		{
 			videoStream=i;
 			break;
@@ -297,7 +291,7 @@ static int isffmpeg (char *filename) {
 		return 0;
 	}
 
-	pCodecCtx = get_codec_from_stream(pFormatCtx->streams[videoStream]);
+	pCodecCtx = pFormatCtx->streams[videoStream]->codec;
 
 		/* Find the decoder for the video stream */
 	pCodec=avcodec_find_decoder(pCodecCtx->codec_id);
@@ -319,7 +313,7 @@ static int isffmpeg (char *filename) {
 #endif
 
 #ifdef WITH_REDCODE
-static int isredcode(char * filename)
+static int isredcode(const char * filename)
 {
 	struct redcode_handle * h = redcode_open(filename);
 	if (!h) {
@@ -331,7 +325,7 @@ static int isredcode(char * filename)
 
 #endif
 
-int imb_get_anim_type(char * name) {
+int imb_get_anim_type(const char * name) {
 	int type;
 	struct stat st;
 
@@ -372,7 +366,7 @@ int imb_get_anim_type(char * name) {
 	return(0);
 }
  
-int IMB_isanim(char *filename) {
+int IMB_isanim(const char *filename) {
 	int type;
 	
 	if(U.uiflag & USER_FILTERFILEEXTS) {

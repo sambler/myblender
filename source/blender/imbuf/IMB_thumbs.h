@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$ 
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/imbuf/IMB_thumbs.h
+ *  \ingroup imbuf
+ */
+
+
 #ifndef _IMB_THUMBS_H
 #define _IMB_THUMBS_H
 
@@ -54,6 +59,9 @@ typedef enum ThumbSource {
 	THB_SOURCE_BLEND
 } ThumbSource;
 
+/* dont generate thumbs for images bigger then this (100mb) */
+#define THUMB_SIZE_MAX (100 * 1024*1024)
+
 // IB_metadata
 
 /* create thumbnail for file and returns new imbuf for thumbnail */
@@ -69,12 +77,15 @@ void IMB_thumb_delete(const char* path, ThumbSize size);
 ImBuf* IMB_thumb_manage(const char* path, ThumbSize size, ThumbSource source);
 
 /* create the necessary dirs to store the thumbnails */
-void IMB_thumb_makedirs();
+void IMB_thumb_makedirs(void);
 
 /* special function for loading a thumbnail embedded into a blend file */
 ImBuf *IMB_loadblend_thumb(const char *path);
 void IMB_overlayblend_thumb(unsigned int *thumb, int width, int height, float aspect);
 
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* _IMB_THUMBS_H */
 

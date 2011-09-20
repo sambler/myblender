@@ -1,29 +1,34 @@
 /*
  * $Id$
  *
- * ***** BEGIN LGPL LICENSE BLOCK *****
+ * ***** BEGIN GPL LICENSE BLOCK *****
  *
- * Copyright 2009 Jörg Hermann Müller
+ * Copyright 2009-2011 Jörg Hermann Müller
  *
  * This file is part of AudaSpace.
  *
- * AudaSpace is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
+ * Audaspace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
  * AudaSpace is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU Lesser General Public License
- * along with AudaSpace.  If not, see <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU General Public License
+ * along with Audaspace; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * ***** END LGPL LICENSE BLOCK *****
+ * ***** END GPL LICENSE BLOCK *****
  */
 
-#include "AUD_DefaultMixer.h"
+/** \file audaspace/intern/AUD_ReadDevice.cpp
+ *  \ingroup audaspaceintern
+ */
+
+
 #include "AUD_ReadDevice.h"
 #include "AUD_IReader.h"
 
@@ -33,6 +38,15 @@ AUD_ReadDevice::AUD_ReadDevice(AUD_DeviceSpecs specs) :
 	m_playing(false)
 {
 	m_specs = specs;
+
+	create();
+}
+
+AUD_ReadDevice::AUD_ReadDevice(AUD_Specs specs) :
+	m_playing(false)
+{
+	m_specs.specs = specs;
+	m_specs.format = AUD_FORMAT_FLOAT32;
 
 	create();
 }
@@ -52,6 +66,12 @@ bool AUD_ReadDevice::read(data_t* buffer, int length)
 		else
 			memset(buffer, 0, length * AUD_DEVICE_SAMPLE_SIZE(m_specs));
 	return m_playing;
+}
+
+void AUD_ReadDevice::changeSpecs(AUD_Specs specs)
+{
+	if(!AUD_COMPARE_SPECS(specs, m_specs.specs))
+		setSpecs(specs);
 }
 
 void AUD_ReadDevice::playing(bool playing)

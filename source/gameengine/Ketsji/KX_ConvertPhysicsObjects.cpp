@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file gameengine/Ketsji/KX_ConvertPhysicsObjects.cpp
+ *  \ingroup ketsji
+ */
+
 #if defined(WIN32) && !defined(FREE_WINDOWS)
 #pragma warning (disable : 4786)
 #endif
@@ -37,14 +42,13 @@
 #include "BL_DeformableGameObject.h"
 #include "RAS_MeshObject.h"
 #include "KX_Scene.h"
-#include "SYS_System.h"
-#include "BulletSoftBody/btSoftBody.h"
+#include "BL_System.h"
 
 #include "PHY_Pro.h" //todo cleanup
 #include "KX_ClientObjectInfo.h"
 
-#include "GEN_Map.h"
-#include "GEN_HashedPtr.h"
+#include "CTR_Map.h"
+#include "CTR_HashedPtr.h"
 
 #include "KX_PhysicsEngineEnums.h"
 #include "PHY_Pro.h"
@@ -56,6 +60,7 @@ extern "C"{
 }
 
 #ifdef USE_BULLET
+#include "BulletSoftBody/btSoftBody.h"
 
 #include "CcdPhysicsEnvironment.h"
 #include "CcdPhysicsController.h"
@@ -218,6 +223,9 @@ void	KX_ConvertBulletObject(	class	KX_GameObject* gameobj,
 
 			break;
 		}
+	case KX_BOUND_DYN_MESH:
+		/* do nothing */
+		break;
 	}
 
 
@@ -561,4 +569,4 @@ bool KX_ReInstanceBulletShapeFromMesh(KX_GameObject *gameobj, KX_GameObject *fro
 	spc->ReplaceControllerShape(bm);
 	return true;
 }
-#endif
+#endif // USE_BULLET

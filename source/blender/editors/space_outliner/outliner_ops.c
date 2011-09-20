@@ -1,6 +1,4 @@
-/**
- * $Id$
- *
+/*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -25,6 +23,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/space_outliner/outliner_ops.c
+ *  \ingroup spoutliner
+ */
+
 
 #include <stdlib.h>
 
@@ -52,10 +55,13 @@ void outliner_operatortypes(void)
 	WM_operatortype_append(OUTLINER_OT_group_operation);
 	WM_operatortype_append(OUTLINER_OT_id_operation);
 	WM_operatortype_append(OUTLINER_OT_data_operation);
+	WM_operatortype_append(OUTLINER_OT_animdata_operation);
+	WM_operatortype_append(OUTLINER_OT_action_set);
 
 	WM_operatortype_append(OUTLINER_OT_show_one_level);
 	WM_operatortype_append(OUTLINER_OT_show_active);
 	WM_operatortype_append(OUTLINER_OT_show_hierarchy);
+	WM_operatortype_append(OUTLINER_OT_scroll_page);
 	
 	WM_operatortype_append(OUTLINER_OT_selected_toggle);
 	WM_operatortype_append(OUTLINER_OT_expanded_toggle);
@@ -77,8 +83,8 @@ void outliner_keymap(wmKeyConfig *keyconf)
 	
 	WM_keymap_add_item(keymap, "OUTLINER_OT_item_rename", LEFTMOUSE, KM_DBL_CLICK, 0, 0);
 	
-	RNA_boolean_set(WM_keymap_add_item(keymap, "OUTLINER_OT_item_activate", LEFTMOUSE, KM_PRESS, 0, 0)->ptr, "extend", 0);
-	RNA_boolean_set(WM_keymap_add_item(keymap, "OUTLINER_OT_item_activate", LEFTMOUSE, KM_PRESS, KM_SHIFT, 0)->ptr, "extend", 1);
+	RNA_boolean_set(WM_keymap_add_item(keymap, "OUTLINER_OT_item_activate", LEFTMOUSE, KM_CLICK, 0, 0)->ptr, "extend", 0);
+	RNA_boolean_set(WM_keymap_add_item(keymap, "OUTLINER_OT_item_activate", LEFTMOUSE, KM_CLICK, KM_SHIFT, 0)->ptr, "extend", 1);
 	
 	RNA_boolean_set(WM_keymap_add_item(keymap, "OUTLINER_OT_item_openclose", RETKEY, KM_PRESS, 0, 0)->ptr, "all", 0);
 	RNA_boolean_set(WM_keymap_add_item(keymap, "OUTLINER_OT_item_openclose", RETKEY, KM_PRESS, KM_SHIFT, 0)->ptr, "all", 1);
@@ -90,6 +96,9 @@ void outliner_keymap(wmKeyConfig *keyconf)
 	
 	WM_keymap_add_item(keymap, "OUTLINER_OT_show_active", PERIODKEY, KM_PRESS, 0, 0);
 	WM_keymap_add_item(keymap, "OUTLINER_OT_show_active", PADPERIOD, KM_PRESS, 0, 0);
+	
+	WM_keymap_add_item(keymap, "OUTLINER_OT_scroll_page", PAGEDOWNKEY, KM_PRESS, 0, 0);
+	RNA_boolean_set(WM_keymap_add_item(keymap, "OUTLINER_OT_scroll_page", PAGEUPKEY, KM_PRESS, 0, 0)->ptr, "up", 1);
 	
 	WM_keymap_add_item(keymap, "OUTLINER_OT_show_one_level", PADPLUSKEY, KM_PRESS, 0, 0); /* open */
 	RNA_boolean_set(WM_keymap_add_item(keymap, "OUTLINER_OT_show_one_level", PADMINUS, KM_PRESS, 0, 0)->ptr, "open", 0); /* close */

@@ -19,16 +19,24 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-FILE(GLOB SRC *.c)
-
-SET(INC
+set(INC
 	../include
 	../../blenkernel
 	../../blenlib
+	../../blenloader
 	../../makesdna
 	../../makesrna
 	../../windowmanager
 	../../../../intern/guardedalloc
 )
 
-BLENDERLIB(bf_editor_space_api "${SRC}" "${INC}")
+set(INC_SYS
+
+)
+
+set(SRC
+	space.c
+	spacetypes.c
+)
+
+blender_add_lib(bf_editor_space_api "${SRC}" "${INC}" "${INC_SYS}")

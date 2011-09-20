@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/blenkernel/intern/context.c
+ *  \ingroup bke
+ */
+
+
 #include <string.h>
 #include <stddef.h>
 
@@ -46,7 +51,7 @@
 #include "BKE_main.h"
 #include "BKE_screen.h"
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 #include "BPY_extern.h"
 #endif
 
@@ -85,7 +90,7 @@ struct bContext {
 
 /* context */
 
-bContext *CTX_create()
+bContext *CTX_create(void)
 {
 	bContext *C;
 	
@@ -108,7 +113,7 @@ void CTX_free(bContext *C)
 
 /* store */
 
-bContextStore *CTX_store_add(ListBase *contexts, char *name, PointerRNA *ptr)
+bContextStore *CTX_store_add(ListBase *contexts, const char *name, PointerRNA *ptr)
 {
 	bContextStoreEntry *entry;
 	bContextStore *ctx, *lastctx;
@@ -179,7 +184,7 @@ void CTX_py_init_set(bContext *C, int value)
 	C->data.py_init= value;
 }
 
-void *CTX_py_dict_get(bContext *C)
+void *CTX_py_dict_get(const bContext *C)
 {
 	return C->data.py_context;
 }
@@ -425,10 +430,10 @@ static int ctx_data_get(bContext *C, const char *member, bContextDataResult *res
 	int ret= 0;
 
 	memset(result, 0, sizeof(bContextDataResult));
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 	if(CTX_py_dict_get(C)) {
-		return BPY_context_get(C, member, result);
-//		if (BPY_context_get(C, member, result))
+		return BPY_context_member_get(C, member, result);
+//		if (BPY_context_member_get(C, member, result))
 //			return 1;
 	}
 #endif
@@ -446,11 +451,10 @@ static int ctx_data_get(bContext *C, const char *member, bContextDataResult *res
 
 		C->data.recursion= 1;
 
-		for(entry=C->wm.store->entries.first; entry; entry=entry->next) {
-			if(strcmp(entry->name, member) == 0) {
-				result->ptr= entry->ptr;
-				done= 1;
-			}
+		entry= BLI_rfindstring(&C->wm.store->entries, member, offsetof(bContextStoreEntry, name));
+		if(entry) {
+			result->ptr= entry->ptr;
+			done= 1;
 		}
 	}
 	if(done!=1 && recursion < 2 && C->wm.region) {
@@ -554,8 +558,7 @@ ListBase CTX_data_collection_get(const bContext *C, const char *member)
 		return result.list;
 	}
 	else {
-		ListBase list;
-		memset(&list, 0, sizeof(list));
+		ListBase list= {NULL, NULL};
 		return list;
 	}
 }
@@ -645,7 +648,7 @@ int CTX_data_equals(const char *member, const char *str)
 
 int CTX_data_dir(const char *member)
 {
-	return (strcmp(member, "") == 0);
+	return member[0] == '\0';
 }
 
 void CTX_data_id_pointer_set(bContextDataResult *result, ID *id)
@@ -774,7 +777,7 @@ int CTX_data_mode_enum(const bContext *C)
 
 /* would prefer if we can use the enum version below over this one - Campbell */
 /* must be aligned with above enum  */
-static char *data_mode_strings[] = {
+static const char *data_mode_strings[] = {
 	"mesh_edit",
 	"curve_edit",
 	"surface_edit",
@@ -786,12 +789,12 @@ static char *data_mode_strings[] = {
 	"sculpt_mode",
 	"weightpaint",
 	"vertexpaint",
-	"texturepaint",
+	"imagepaint",
 	"particlemode",
 	"objectmode",
-	0
+	NULL
 };
-char *CTX_data_mode_string(const bContext *C)
+const char *CTX_data_mode_string(const bContext *C)
 {
 	return data_mode_strings[CTX_data_mode_enum(C)];
 }

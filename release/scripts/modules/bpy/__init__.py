@@ -16,39 +16,45 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
-# <pep8 compliant>
+# <pep8-80 compliant>
+
+"""
+Give access to blender data and utility functions.
+"""
+
+__all__ = (
+    "app",
+    "context",
+    "data",
+    "ops",
+    "path",
+    "props",
+    "types",
+    "utils",
+    )
+
 
 # internal blender C module
-import _bpy
-from _bpy import types, props, app
-
-data = _bpy.data
-context = _bpy.context
+from _bpy import types, props, app, data, context
 
 # python modules
-from bpy import utils, path
-
-from bpy import ops as _ops_module
+from . import utils, path, ops
 
 # fake operator module
-ops = _ops_module.ops_fake_module
-
-import sys as _sys
+ops = ops.ops_fake_module
 
 
-def _main():
+def main():
+    import sys
 
-    ## security issue, dont allow the $CWD in the path.
-    ## note: this removes "" but not "." which are the same, security
-    ## people need to explain how this is even a fix.
-    # _sys.path[:] = filter(None, _sys.path)
+    # Possibly temp. addons path
+    from os.path import join, dirname, normpath
+    sys.path.append(normpath(join(dirname(__file__),
+                                   "..", "..", "addons", "modules")))
 
-    # because of how the console works. we need our own help() pager func.
-    # replace the bold function because it adds crazy chars
-    import pydoc
-    pydoc.getpager = lambda: pydoc.plainpager
-    pydoc.Helper.getline = lambda self, prompt: None
-    pydoc.TextDoc.use_bold = lambda self, text: text
+    # fake module to allow:
+    #   from bpy.types import Panel
+    sys.modules["bpy.types"] = types
 
     # if "-d" in sys.argv: # Enable this to measure startup speed
     if 0:
@@ -63,4 +69,6 @@ def _main():
         utils.load_scripts()
 
 
-_main()
+main()
+
+del main

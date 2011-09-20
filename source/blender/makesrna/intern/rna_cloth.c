@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -22,6 +22,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/makesrna/intern/rna_cloth.c
+ *  \ingroup RNA
+ */
+
+
 #include <stdlib.h>
 #include <limits.h>
 
@@ -44,22 +49,34 @@
 #include "BKE_context.h"
 #include "BKE_depsgraph.h"
 
-static void rna_cloth_update(Main *bmain, Scene *scene, PointerRNA *ptr)
+static void rna_cloth_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
 {
 	Object *ob= (Object*)ptr->id.data;
 
-	DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	WM_main_add_notifier(NC_OBJECT|ND_MODIFIER, ob);
 }
 
-static void rna_cloth_reset(Main *bmain, Scene *scene, PointerRNA *ptr)
+static void rna_cloth_pinning_changed(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
+{
+	Object *ob= (Object*)ptr->id.data;
+//	ClothSimSettings *settings = (ClothSimSettings*)ptr->data;
+	ClothModifierData *clmd = (ClothModifierData*)modifiers_findByType(ob, eModifierType_Cloth);
+
+	cloth_free_modifier(clmd);
+
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
+	WM_main_add_notifier(NC_OBJECT|ND_MODIFIER, ob);
+}
+
+static void rna_cloth_reset(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
 {
 	Object *ob= (Object*)ptr->id.data;
 	ClothSimSettings *settings = (ClothSimSettings*)ptr->data;
 
 	settings->reset = 1;
 
-	DAG_id_flush_update(&ob->id, OB_RECALC_DATA);
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	WM_main_add_notifier(NC_OBJECT|ND_MODIFIER, ob);
 }
 
@@ -256,7 +273,7 @@ static void rna_def_cloth_sim_settings(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "vertex_group_mass", PROP_STRING, PROP_NONE);
 	RNA_def_property_string_funcs(prop, "rna_ClothSettings_mass_vgroup_get", "rna_ClothSettings_mass_vgroup_length", "rna_ClothSettings_mass_vgroup_set");
 	RNA_def_property_ui_text(prop, "Mass Vertex Group", "Vertex Group for pinning of vertices");
-	RNA_def_property_update(prop, 0, "rna_cloth_update");
+	RNA_def_property_update(prop, 0, "rna_cloth_pinning_changed");
 	
 	prop= RNA_def_property(srna, "gravity", PROP_FLOAT, PROP_ACCELERATION);
 	RNA_def_property_array(prop, 3);
@@ -276,7 +293,8 @@ static void rna_def_cloth_sim_settings(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "use_pin_cloth", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flags", CLOTH_SIMSETTINGS_FLAG_GOAL);
 	RNA_def_property_ui_text(prop, "Pin Cloth", "Enable pinning of cloth vertices to other objects/positions");
-	RNA_def_property_update(prop, 0, "rna_cloth_update");
+	RNA_def_property_update(prop, 0, "rna_cloth_pinning_changed");
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 
 	prop= RNA_def_property(srna, "pin_stiffness", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "goalspring");
@@ -296,6 +314,7 @@ static void rna_def_cloth_sim_settings(BlenderRNA *brna)
 	RNA_def_property_boolean_sdna(prop, NULL, "flags", CLOTH_SIMSETTINGS_FLAG_SCALING);
 	RNA_def_property_ui_text(prop, "Stiffness Scaling", "If enabled, stiffness can be scaled along a weight painted vertex group");
 	RNA_def_property_update(prop, 0, "rna_cloth_update");
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 	
 	prop= RNA_def_property(srna, "spring_damping", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "Cdis");
@@ -410,6 +429,20 @@ static void rna_def_cloth_collision_settings(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "use_collision", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flags", CLOTH_COLLSETTINGS_FLAG_ENABLED);
 	RNA_def_property_ui_text(prop, "Enable Collision", "Enable collisions with other objects");
+	RNA_def_property_update(prop, 0, "rna_cloth_update");
+
+	prop= RNA_def_property(srna, "repel_force", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "repel_force");
+	RNA_def_property_range(prop, 0.0f, 20.0f);
+	RNA_def_property_float_default(prop, 1.0f);
+	RNA_def_property_ui_text(prop, "Repulsion Force", "Repulsion force to apply on cloth when close to colliding");
+	RNA_def_property_update(prop, 0, "rna_cloth_update");
+
+	prop= RNA_def_property(srna, "distance_repel", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "distance_repel");
+	RNA_def_property_range(prop, 0.001f, 10.0f);
+	RNA_def_property_float_default(prop, 0.005f);
+	RNA_def_property_ui_text(prop, "Repulsion Distance", "Maximum distance to apply repulsion force, must be greater then minimum distance");
 	RNA_def_property_update(prop, 0, "rna_cloth_update");
 	
 	prop= RNA_def_property(srna, "distance_min", PROP_FLOAT, PROP_NONE);

@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -27,15 +27,21 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/ikplugin/intern/iksolver_plugin.c
+ *  \ingroup ikplugin
+ */
+
+
 #include "MEM_guardedalloc.h"
 
 #include "BIK_api.h"
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_armature.h"
 #include "BKE_constraint.h"
-#include "BKE_utildefines.h"
+
 #include "DNA_object_types.h"
 #include "DNA_action_types.h"
 #include "DNA_constraint_types.h"
@@ -50,7 +56,7 @@
 
 /* allocates PoseTree, and links that to root bone/channel */
 /* Note: detecting the IK chain is duplicate code... in drawarmature.c and in transform_conversions.c */
-static void initialize_posetree(struct Object *ob, bPoseChannel *pchan_tip)
+static void initialize_posetree(struct Object *UNUSED(ob), bPoseChannel *pchan_tip)
 {
 	bPoseChannel *curchan, *pchan_root=NULL, *chanlist[256], **oldchan;
 	PoseTree *tree;
@@ -394,7 +400,7 @@ static void execute_posetree(struct Scene *scene, Object *ob, PoseTree *tree)
 			/* end effector in world space */
 			copy_m4_m4(end_pose, pchan->pose_mat);
 			VECCOPY(end_pose[3], pchan->pose_tail);
-			mul_serie_m4(world_pose, goalinv, ob->obmat, end_pose, 0, 0, 0, 0, 0);
+			mul_serie_m4(world_pose, goalinv, ob->obmat, end_pose, NULL, NULL, NULL, NULL, NULL);
 			
 			/* blend position */
 			goalpos[0]= fac*goalpos[0] + mfac*world_pose[3][0];
@@ -488,7 +494,7 @@ static void free_posetree(PoseTree *tree)
 ///----------------------------------------
 /// Plugin API for legacy iksolver
 
-void iksolver_initialize_tree(struct Scene *scene, struct Object *ob, float ctime)
+void iksolver_initialize_tree(struct Scene *UNUSED(scene), struct Object *ob, float UNUSED(ctime))
 {
 	bPoseChannel *pchan;
 	

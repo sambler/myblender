@@ -4,7 +4,7 @@ LCGDIR = os.getcwd()+"/../lib/irix-6.5-mips"
 LIBDIR = LCGDIR
 
 BF_PYTHON = LCGDIR+'/python'
-BF_PYTHON_VERSION = '3.1'
+BF_PYTHON_VERSION = '3.2'
 WITH_BF_STATICPYTHON = 'true'
 BF_PYTHON_INC = '${BF_PYTHON}/include/python${BF_PYTHON_VERSION}'
 BF_PYTHON_BINARY = '${BF_PYTHON}/bin/python${BF_PYTHON_VERSION}'
@@ -163,17 +163,17 @@ CCFLAGS = ['-pipe','-fPIC', '-n32']
 
 CPPFLAGS = []
 CXXFLAGS = ['-pipe','-fPIC', '-n32']
-REL_CFLAGS = ['-O2']
-REL_CCFLAGS = ['-O2']
+REL_CFLAGS = ['-DNDEBUG', '-O2']
+REL_CCFLAGS = ['-DNDEBUG', '-O2']
 ##BF_DEPEND = 'true'
 ##
 ##AR = ar
 ##ARFLAGS = ruv
 ##ARFLAGSQUIET = ru
 ##
-C_WARN = '-no_prelink -ptused'
+C_WARN = ['-no_prelink', '-ptused']
 
-CC_WARN = '-no_prelink -ptused'
+CC_WARN = ['-no_prelink', '-ptused']
 
 ##FIX_STUBS_WARNINGS = -Wno-unused
 
@@ -185,7 +185,7 @@ BF_PROFILE_FLAGS = ['-pg','-g']
 BF_PROFILE = 'false'
 
 BF_DEBUG = 'false'
-BF_DEBUG_FLAGS = '-g'
+BF_DEBUG_CCFLAGS = ['-g']
 
 BF_BUILDDIR = '../build/irix6'
 BF_INSTALLDIR='../install/irix6'

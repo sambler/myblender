@@ -1,24 +1,4 @@
-/**
- * @mainpage AVI - AVI module external interface
- *
- * @section about About the AVI module
- *
- * This is external code. It provides avi file import/export and
- * conversions. It has been adapted to make use of Blender memory
- * management functions, and because of this it needs module
- * blenlib. You need to provide this lib when linking with libavi.a .
- *
- * @section issues Known issues with AVI
- *
- * - avi uses mallocN, freeN from blenlib. 
- * - Not all functions that are used externally are properly
- *   prototyped.
- *
- * This header has not been split, since it interleaves type defines
- * and functions. You would need the types to be able to include the
- * function headers anyway. And, after all, it is someone else's
- * code. So we keep it like this.
- *
+/*
  * $Id$ 
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -48,9 +28,34 @@
  *
  */
 
+/** \file AVI_avi.h
+ *  \ingroup avi
+ * \section aviabout AVI module external interface
+ *
+ * \subsection about About the AVI module
+ *
+ * This is external code. It provides avi file import/export and
+ * conversions. It has been adapted to make use of Blender memory
+ * management functions, and because of this it needs module
+ * blenlib. You need to provide this lib when linking with libavi.a .
+ *
+ * \subsection issues Known issues with AVI
+ *
+ * - avi uses mallocN, freeN from blenlib. 
+ * - Not all functions that are used externally are properly
+ *   prototyped.
+ *
+ * This header has not been split, since it interleaves type defines
+ * and functions. You would need the types to be able to include the
+ * function headers anyway. And, after all, it is someone else's
+ * code. So we keep it like this.
+ *
+ */
+
 #ifndef __AVI_H__
 #define __AVI_H__
 
+#include "MEM_sys_types.h"
 #include <stdio.h> /* for FILE */
 
 typedef struct _AviChunk {
@@ -181,16 +186,16 @@ typedef struct _AviMovie {
 #define AVI_MOVIE_READ  0
 #define AVI_MOVIE_WRITE 1
 	
-	unsigned long size;
+	int64_t size;
 
 	AviMainHeader *header;
 	AviStreamRec *streams;
 	AviIndexEntry *entries;
 	int index_entries;
 	
-	int movi_offset;
-	int read_offset;
-	long *offset_table;
+	int64_t movi_offset;
+	int64_t read_offset;
+	int64_t *offset_table;
 	
 	/* Local data goes here */
 	int interlace;
@@ -232,7 +237,7 @@ typedef enum {
 /**
  * Test whether this is an avi-format.
  */
-int AVI_is_avi (char *name);
+int AVI_is_avi (const char *name);
 
 
 /**
@@ -277,7 +282,7 @@ int AVI_get_stream (AviMovie *movie, int avist_type, int stream_num);
 /**
  * Open a movie stream from file.
  */
-AviError AVI_open_movie (char *name, AviMovie *movie);
+AviError AVI_open_movie (const char *name, AviMovie *movie);
 
 /**
  * Read a frame from a movie stream.

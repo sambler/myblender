@@ -1,3 +1,6 @@
+/** \file elbeem/intern/solver_class.h
+ *  \ingroup elbeem
+ */
 /******************************************************************************
  *
  * El'Beem - the visual lattice boltzmann freesurface simulator
@@ -304,6 +307,9 @@ class LbmFsgrSolver :
 
 		//! for raytracing, preprocess
 		void prepareVisualization( void );
+
+		/* surface generation settings */
+		virtual void setSurfGenSettings(short value);
 
 	protected:
 

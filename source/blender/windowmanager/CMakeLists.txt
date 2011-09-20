@@ -24,68 +24,113 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-FILE(GLOB SRC intern/*.c)
-
-SET(INC
+set(INC
 	.
-	../nodes
-	../gpu
 	../blenfont
-	../blenlib
-	../makesdna
-	../makesrna
 	../blenkernel
-	../include
-	../imbuf
+	../blenlib
 	../blenloader
 	../editors/include
+	../gpu
+	../imbuf
+	../makesdna
+	../makesrna
+	../nodes
 	../render/extern/include
-	../../kernel/gen_system
-	../../../intern/guardedalloc
-	../../../intern/memutil
+	../../gameengine/BlenderRoutines
 	../../../intern/elbeem/extern
 	../../../intern/ghost
+	../../../intern/guardedalloc
+	../../../intern/memutil
 	../../../intern/opennl/extern
-	../../../extern/glew/include
-	${OPENGL_INCLUDE_DIR}
 )
 
-ADD_DEFINITIONS(-DGLEW_STATIC)
+set(INC_SYS
+	${ZLIB_INCLUDE_DIRS}
+	${OPENGL_INCLUDE_DIR}
+	${GLEW_INCLUDE_PATH}
+)
 
-IF(WITH_INTERNATIONAL)
-	ADD_DEFINITIONS(-DINTERNATIONAL)
-ENDIF(WITH_INTERNATIONAL)
+set(SRC
+	intern/wm.c
+	intern/wm_cursors.c
+	intern/wm_dragdrop.c
+	intern/wm_draw.c
+	intern/wm_event_system.c
+	intern/wm_files.c
+	intern/wm_gesture.c
+	intern/wm_init_exit.c
+	intern/wm_jobs.c
+	intern/wm_keymap.c
+	intern/wm_operators.c
+	intern/wm_subwindow.c
+	intern/wm_window.c
 
-IF(WITH_OPENCOLLADA)
-	ADD_DEFINITIONS(-DWITH_COLLADA)
-ENDIF(WITH_OPENCOLLADA)
+	WM_api.h
+	WM_keymap.h
+	WM_types.h
+	wm.h
+	wm_cursors.h
+	wm_draw.h
+	wm_event_system.h
+	wm_event_types.h
+	wm_files.h
+	wm_subwindow.h
+	wm_window.h
+)
 
-IF(WITH_QUICKTIME)
-	LIST(APPEND INC ../quicktime ${QUICKTIME_INC})
-	ADD_DEFINITIONS(-DWITH_QUICKTIME)
-ENDIF(WITH_QUICKTIME)
+add_definitions(-DGLEW_STATIC)
 
-IF(WITH_FFMPEG)
-	LIST(APPEND INC ${FFMPEG_INC})
-	ADD_DEFINITIONS(-DWITH_FFMPEG)
-ENDIF(WITH_FFMPEG)
+if(WITH_INTERNATIONAL)
+	add_definitions(-DINTERNATIONAL)
+endif()
 
-IF(WITH_PYTHON)
-	LIST(APPEND INC ../python ${PYTHON_INC})
-ELSE(WITH_PYTHON)
-	ADD_DEFINITIONS(-DDISABLE_PYTHON)
-ENDIF(WITH_PYTHON)
+if(WITH_OPENCOLLADA)
+	add_definitions(-DWITH_COLLADA)
+endif()
 
-IF(WIN32)
-	LIST(APPEND INC ${PTHREADS_INC})
-ENDIF(WIN32)
+if(WITH_CODEC_QUICKTIME)
+	list(APPEND INC
+		../quicktime
+	)
+	list(APPEND INC_SYS
+		${QUICKTIME_INCLUDE_DIRS}
+	)
+	add_definitions(-DWITH_QUICKTIME)
+endif()
 
-IF(WITH_COCOA)
-	LIST(REMOVE_ITEM SRC "${CMAKE_CURRENT_SOURCE_DIR}/intern/wm_apple.c")
-ENDIF(WITH_COCOA)
+if(WITH_CODEC_FFMPEG)
+	list(APPEND INC_SYS
+		${FFMPEG_INCLUDE_DIRS}
+	)
+	add_definitions(-DWITH_FFMPEG)
+endif()
 
-IF(WITH_BUILDINFO)
-	ADD_DEFINITIONS(-DNAN_BUILDINFO)
-ENDIF(WITH_BUILDINFO)
+if(WITH_PYTHON)
+	list(APPEND INC
+		../python
+	)
+	add_definitions(-DWITH_PYTHON)
 
-BLENDERLIB_NOLIST(bf_windowmanager "${SRC}" "${INC}")
+	if(WITH_PYTHON_SECURITY)
+		add_definitions(-DWITH_PYTHON_SECURITY)
+	endif()
+endif()
+
+if(WITH_GAMEENGINE)
+	add_definitions(-DWITH_GAMEENGINE)
+endif()
+
+if(APPLE)
+	if(NOT WITH_COCOA)
+		list(APPEND SRC
+			intern/wm_apple.c
+		)
+	endif()
+endif()
+
+if(WITH_BUILDINFO)
+	add_definitions(-DWITH_BUILDINFO)
+endif()
+
+blender_add_lib_nolist(bf_windowmanager "${SRC}" "${INC}" "${INC_SYS}")

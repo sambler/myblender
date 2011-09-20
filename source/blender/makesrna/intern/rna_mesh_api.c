@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/makesrna/intern/rna_mesh_api.c
+ *  \ingroup RNA
+ */
+
+
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -33,6 +38,7 @@
 
 #include "BLO_sys_types.h"
 
+#include "BKE_mesh.h"
 #include "ED_mesh.h"
 
 #ifdef RNA_RUNTIME
@@ -46,16 +52,23 @@ void RNA_api_mesh(StructRNA *srna)
 	PropertyRNA *parm;
 
 	func= RNA_def_function(srna, "transform", "ED_mesh_transform");
-	RNA_def_function_ui_description(func, "Transform mesh vertices by a matrix.");
-	parm= RNA_def_float_matrix(func, "matrix", 4, 4, NULL, 0.0f, 0.0f, "", "Matrix.", 0.0f, 0.0f);
+	RNA_def_function_ui_description(func, "Transform mesh vertices by a matrix");
+	parm= RNA_def_float_matrix(func, "matrix", 4, 4, NULL, 0.0f, 0.0f, "", "Matrix", 0.0f, 0.0f);
 	RNA_def_property_flag(parm, PROP_REQUIRED);
 
 	func= RNA_def_function(srna, "calc_normals", "ED_mesh_calc_normals");
-	RNA_def_function_ui_description(func, "Calculate vertex normals.");
+	RNA_def_function_ui_description(func, "Calculate vertex normals");
 
 	func= RNA_def_function(srna, "update", "ED_mesh_update");
-	RNA_def_boolean(func, "calc_edges", 0, "Calculate Edges", "Force recalculation of edges.");
+	RNA_def_boolean(func, "calc_edges", 0, "Calculate Edges", "Force recalculation of edges");
 	RNA_def_function_flag(func, FUNC_USE_CONTEXT);
+
+	func= RNA_def_function(srna, "validate", "BKE_mesh_validate");
+	RNA_def_function_ui_description(func, "validate geometry, return True when the mesh has had "
+	                                      "invalid geometry corrected/removed");
+	RNA_def_boolean(func, "verbose", 0, "Verbose", "Output information about the errors found");
+	parm= RNA_def_boolean(func, "result", 0, "Result", "");
+	RNA_def_function_return(func, parm);
 }
 
 #endif

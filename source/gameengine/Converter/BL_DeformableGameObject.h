@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,6 +27,10 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file BL_DeformableGameObject.h
+ *  \ingroup bgeconv
+ */
+
 #ifndef BL_DEFORMABLEGAMEOBJECT
 #define BL_DEFORMABLEGAMEOBJECT
 
@@ -37,6 +41,7 @@
 #include "DNA_mesh_types.h"
 #include "KX_GameObject.h"
 #include "BL_MeshDeformer.h"
+#include "KX_SoftBodyDeformer.h"
 #include <vector>
 
 class BL_ShapeActionActuator;
@@ -55,7 +60,7 @@ public:
 	{
 		return m_blendobj;
 	}
-	virtual void Relink(GEN_Map<GEN_HashedPtr, void*>*map)
+	virtual void Relink(CTR_Map<CTR_HashedPtr, void*>*map)
 	{
 		if (m_pDeformer)
 			m_pDeformer->Relink (map);
@@ -77,10 +82,6 @@ public:
 	bool SetActiveAction(class BL_ShapeActionActuator *act, short priority, double curtime);
 
 	bool GetShape(vector<float> &shape);
-	Key* GetKey()
-	{
-		return (m_pDeformer) ? ((BL_MeshDeformer*)m_pDeformer)->GetMesh()->key : NULL;
-	}
 	
 	virtual void	SetDeformer(class RAS_Deformer* deformer);
 	virtual class RAS_Deformer* GetDeformer()

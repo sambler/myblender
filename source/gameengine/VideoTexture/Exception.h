@@ -21,6 +21,10 @@ http://www.gnu.org/copyleft/lesser.txt.
 */
 
 
+/** \file Exception.h
+ *  \ingroup bgevideotex
+ */
+ 
 #if !defined EXCEPTION_H
 #define EXCEPTION_H
 
@@ -118,11 +122,11 @@ public:
 		desc = m_description;
 	}
 
-    void registerDesc(void)
-    {
-        if (std::find(m_expDescs.begin(), m_expDescs.end(), this) == m_expDescs.end())
-            m_expDescs.push_back(this);
-    }
+	void registerDesc(void)
+	{
+		if (std::find(m_expDescs.begin(), m_expDescs.end(), this) == m_expDescs.end())
+			m_expDescs.push_back(this);
+	}
 	// list of exception descriptions
 	static std::vector<ExpDesc*> m_expDescs;
 

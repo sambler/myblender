@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -28,20 +28,29 @@
 #ifndef BLI_MATH_INLINE_H
 #define BLI_MATH_INLINE_H
 
+/** \file BLI_math_inline.h
+ *  \ingroup bli
+ */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /* add platform/compiler checks here if it is not supported */
-#define BLI_MATH_INLINE
+#define BLI_MATH_INLINE_H
 
-#ifdef BLI_MATH_INLINE
+#ifdef BLI_MATH_INLINE_H
 #ifdef _MSC_VER
 #define MINLINE static __forceinline
 #define MALWAYS_INLINE MINLINE
 #else
 #define MINLINE static inline
+#if (defined(__APPLE__) && defined(__ppc__))
+/* static inline __attribute__ here breaks osx ppc gcc42 build */
 #define MALWAYS_INLINE static __attribute__((always_inline))
+#else
+#define MALWAYS_INLINE static inline __attribute__((always_inline))
+#endif
 #endif
 #else
 #define MINLINE

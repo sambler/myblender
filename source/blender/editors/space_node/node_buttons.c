@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,24 +26,29 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/space_node/node_buttons.c
+ *  \ingroup spnode
+ */
+
+
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
 #include <float.h>
 
+#include "MEM_guardedalloc.h"
+
 #include "DNA_node_types.h"
 #include "DNA_scene_types.h"
-
-#include "MEM_guardedalloc.h"
 
 #include "BLI_math.h"
 #include "BLI_blenlib.h"
 #include "BLI_rand.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_context.h"
 #include "BKE_node.h"
 #include "BKE_screen.h"
-
 
 #include "WM_api.h"
 #include "WM_types.h"
@@ -63,7 +68,7 @@
 #define B_NOP		1
 #define B_REDR		2
 
-static void do_node_region_buttons(bContext *C, void *arg, int event)
+static void do_node_region_buttons(bContext *C, void *UNUSED(arg), int event)
 {
 	//SpaceNode *snode= CTX_wm_space_node(C);
 	
@@ -75,7 +80,7 @@ static void do_node_region_buttons(bContext *C, void *arg, int event)
 }
 
 /* poll callback for active node */
-static int active_node_poll(const bContext *C, PanelType *pt)
+static int active_node_poll(const bContext *C, PanelType *UNUSED(pt))
 {
 	SpaceNode *snode= CTX_wm_space_node(C);
 	
@@ -107,11 +112,15 @@ static void active_node_panel(const bContext *C, Panel *pa)
 	uiBlockSetHandleFunc(block, do_node_region_buttons, NULL);
 	
 	/* draw this node's name, etc. */
+	uiItemR(layout, &ptr, "label", 0, NULL, ICON_NODE);
+	uiItemS(layout);
 	uiItemR(layout, &ptr, "name", 0, NULL, ICON_NODE);
-	// TODO: a separator would be nice...
-	
+	uiItemS(layout);
+
 	/* draw this node's settings */
-	if (node->typeinfo && node->typeinfo->uifunc)
+	if (node->typeinfo && node->typeinfo->uifuncbut)
+		node->typeinfo->uifuncbut(layout, (bContext *)C, &ptr);
+	else if (node->typeinfo && node->typeinfo->uifunc)
 		node->typeinfo->uifunc(layout, (bContext *)C, &ptr);
 }
 
@@ -135,7 +144,7 @@ void node_buttons_register(ARegionType *art)
 	BLI_addtail(&art->paneltypes, pt);
 }
 
-static int node_properties(bContext *C, wmOperator *op)
+static int node_properties(bContext *C, wmOperator *UNUSED(op))
 {
 	ScrArea *sa= CTX_wm_area(C);
 	ARegion *ar= node_has_buttons_region(sa);

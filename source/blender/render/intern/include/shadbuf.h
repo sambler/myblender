@@ -29,6 +29,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/render/intern/include/shadbuf.h
+ *  \ingroup render
+ */
+
+
 #ifndef SHADBUF_EXT_H
 #define SHADBUF_EXT_H
 
@@ -54,13 +59,13 @@ void threaded_makeshadowbufs(struct Render *re);
  * @param inp The inproduct between viewvector and ?
  *
  */
-float testshadowbuf(struct Render *re, struct ShadBuf *shb, float *rco, float *dxco, float *dyco, float inp, float mat_bias);	
+float testshadowbuf(struct Render *re, struct ShadBuf *shb, const float rco[3], const float dxco[3], const float dyco[3], float inp, float mat_bias);
 
 /**
  * Determines the shadow factor for lamp <lar>, between <p1>
  * and <p2>. (Which CS?)
  */
-float shadow_halo(LampRen *lar, float *p1, float *p2);
+float shadow_halo(LampRen *lar, const float p1[3], const float p2[3]);
 
 /**
  * Irregular shadowbuffer

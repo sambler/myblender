@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,39 +25,76 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/blenfont/intern/blf_lang.c
+ *  \ingroup blf
+ */
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "BLF_api.h"
+
 #ifdef INTERNATIONAL
 
 #include <locale.h>
+
+#if defined (_WIN32)
+#include <windows.h>
+#endif
+
 #include "libintl.h"
 
+#include "DNA_userdef_types.h"
 
 #include "DNA_listBase.h"
 #include "DNA_vec_types.h"
 
-#include "BKE_utildefines.h"
+#include "MEM_guardedalloc.h"
 
-#include "BLI_blenlib.h"
 #include "BLI_linklist.h"	/* linknode */
 #include "BLI_string.h"
-
-
-#ifdef __APPLE__
-#include "BKE_utildefines.h"
-#endif
+#include "BLI_path_util.h"
 
 #define DOMAIN_NAME "blender"
 #define SYSTEM_ENCODING_DEFAULT "UTF-8"
 #define FONT_SIZE_DEFAULT 12
 
 /* locale options. */
-char global_messagepath[1024];
-char global_language[32];
-char global_encoding_name[32];
+static char global_messagepath[1024];
+static char global_language[32];
+static char global_encoding_name[32];
 
+/* map from the rna_userdef.c:rna_def_userdef_system(BlenderRNA *brna):language_items */
+static const char *locales[] = {
+	"", "",
+	"english", "en_US",
+	"japanese", "ja_JP",
+	"dutch", "nl_NL",
+	"italian", "it_IT",
+	"german", "de_DE",
+	"finnish", "fi_FI",
+	"swedish", "sv_SE",
+	"french", "fr_FR",
+	"spanish", "es_ES",
+	"catalan", "ca_AD",
+	"czech", "cs_CZ",
+	"ptb", "pt_BR",
+	"chs", "zh_CN",
+	"cht", "zh_TW",
+	"russian", "ru_RU",
+	"croatian", "hr_HR",
+	"serbian", "sr_RS",
+	"ukrainian", "uk_UA",
+	"polish", "pl_PL",
+	"romanian", "ro_RO",
+	"arabic", "ar_EG",
+	"bulgarian", "bg_BG",
+	"greek", "el_GR",
+	"korean", "ko_KR",
+	"nepali", "ne_NP",
+};
 
 void BLF_lang_init(void)
 {
@@ -69,43 +106,106 @@ void BLF_lang_init(void)
 		BLI_strncpy(global_messagepath, messagepath, sizeof(global_messagepath));
 	else
 		global_messagepath[0]= '\0';
+	
 }
 
-
+/* XXX WARNING!!! IN osx somehow the previous function call jumps in this one??? (ton, ppc) */
 void BLF_lang_set(const char *str)
 {
-#if defined (_WIN32) || defined(__APPLE__)
-	BLI_setenv("LANG", str);
-#else
-	char *locreturn= setlocale(LC_ALL, str);
+	char *locreturn;
+	const char *short_locale;
+	int ok= 1;
+#if defined (_WIN32)
+	char *long_locale = locales[ 2 * U.language];
+#endif
+
+	if((U.transopts&USER_DOTRANSLATE)==0)
+		return;
+
+	if(str)
+		short_locale = str;
+	else
+		short_locale = locales[ 2 * U.language + 1];
+
+#if defined (_WIN32)
+	if(short_locale) {
+		char *envStr;
+
+		if( U.language==0 )/* use system setting */
+			envStr = BLI_sprintfN( "LANG=%s", getenv("LANG") );
+		else
+			envStr = BLI_sprintfN( "LANG=%s", short_locale );
+
+		gettext_putenv(envStr);
+		MEM_freeN(envStr);
+	}
+
+	locreturn= setlocale(LC_ALL, long_locale);
+
 	if (locreturn == NULL) {
-		char *lang;
+		printf("Could not change locale to %s\n", long_locale);
+		ok= 0;
+	}
+#else
+	{
+		const char *locale;
+		static char default_locale[64]="\0";
 
-		lang= (char*)malloc(sizeof(char)*(strlen(str)+7));
+		if(default_locale[0]==0) {
+			char *env_language= getenv("LANGUAGE");
 
-		lang[0]= '\0';
-		strcat(lang, str);
-		strcat(lang, ".UTF-8");
+			if(env_language) {
+				char *s;
 
-		locreturn= setlocale(LC_ALL, lang);
-		if (locreturn == NULL) {
-			printf("could not change language to %s nor %s\n", str, lang);
+				/* store defaul locale */
+				strncpy(default_locale, env_language, sizeof(default_locale));
+
+				/* use first language as default */
+				s= strchr(default_locale, ':');
+				if(s) s[0]= 0;
+			}
 		}
 
-		free(lang);
+		if(short_locale[0])
+			locale= short_locale;
+		else
+			locale= default_locale;
+
+		BLI_setenv("LANG", locale);
+		BLI_setenv("LANGUAGE", locale);
+
+		locreturn= setlocale(LC_ALL, locale);
+
+		if (locreturn == NULL) {
+			char *short_locale_utf8= BLI_sprintfN("%s.UTF-8", short_locale);
+
+			locreturn= setlocale(LC_ALL, short_locale_utf8);
+
+			if (locreturn == NULL) {
+				printf("Could not change locale to %s nor %s\n", short_locale, short_locale_utf8);
+				ok= 0;
+			}
+
+			MEM_freeN(short_locale_utf8);
+		}
+	}
+#endif
+
+	if(ok) {
+		//printf("Change locale to %s\n", locreturn );
+		BLI_strncpy(global_language, locreturn, sizeof(global_language));
 	}
 
 	setlocale(LC_NUMERIC, "C");
-#endif
+
 	textdomain(DOMAIN_NAME);
 	bindtextdomain(DOMAIN_NAME, global_messagepath);
-	/* bind_textdomain_codeset(DOMAIN_NAME, global_encoding_name); */
-	strcpy(global_language, str);
+	bind_textdomain_codeset(DOMAIN_NAME, global_encoding_name);
 }
 
 void BLF_lang_encoding(const char *str)
 {
-	strcpy(global_encoding_name, str);
+	BLI_strncpy(global_encoding_name, str, sizeof(global_encoding_name));
 	/* bind_textdomain_codeset(DOMAIN_NAME, encoding_name); */
 }
 
@@ -116,13 +216,15 @@ void BLF_lang_init(void)
 	return;
 }
 
-void BLF_lang_encoding(char *str)
+void BLF_lang_encoding(const char *str)
 {
+	(void)str;
 	return;
 }
 
-void BLF_lang_set(char *str)
+void BLF_lang_set(const char *str)
 {
+	(void)str;
 	return;
 }
 

@@ -1,5 +1,6 @@
 import bpy
-from bpy.props import *
+from bpy.props import IntProperty, FloatProperty
+
 
 class ModalOperator(bpy.types.Operator):
     '''Move an object with the mouse, example.'''
@@ -17,7 +18,7 @@ class ModalOperator(bpy.types.Operator):
         elif event.type == 'LEFTMOUSE':
             return {'FINISHED'}
 
-        elif event.type in ('RIGHTMOUSE', 'ESC'):
+        elif event.type in {'RIGHTMOUSE', 'ESC'}:
             context.object.location.x = self.first_value
             return {'CANCELLED'}
 
@@ -25,7 +26,7 @@ class ModalOperator(bpy.types.Operator):
 
     def invoke(self, context, event):
         if context.object:
-            context.window_manager.add_modal_handler(self)
+            context.window_manager.modal_handler_add(self)
             self.first_mouse_x = event.mouse_x
             self.first_value = context.object.location.x
             return {'RUNNING_MODAL'}
@@ -34,5 +35,16 @@ class ModalOperator(bpy.types.Operator):
             return {'CANCELLED'}
 
 
+def register():
+    bpy.utils.register_class(ModalOperator)
+
+
+def unregister():
+    bpy.utils.unregister_class(ModalOperator)
+
+
 if __name__ == "__main__":
-    bpy.ops.object.modal_operator()
+    register()
+
+    # test call
+    bpy.ops.object.modal_operator('INVOKE_DEFAULT')

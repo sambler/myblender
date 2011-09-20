@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -31,12 +31,16 @@
 #ifndef BKE_BRUSH_H
 #define BKE_BRUSH_H
 
+/** \file BKE_brush.h
+ *  \ingroup bke
+ */
+
 struct ID;
 struct Brush;
 struct ImBuf;
 struct Scene;
 struct wmOperator;
-enum CurveMappingPreset;
+// enum CurveMappingPreset;
 
 /* datablock functions */
 struct Brush *add_brush(const char *name);
@@ -56,6 +60,9 @@ int brush_texture_delete(struct Brush *brush);
 int brush_clone_image_set_nr(struct Brush *brush, int nr);
 int brush_clone_image_delete(struct Brush *brush);
 
+/* jitter */
+void brush_jitter_pos(struct Brush *brush, float *pos, float *jitterpos);
+
 /* brush curve */
 void brush_curve_preset(struct Brush *b, /*enum CurveMappingPreset*/int preset);
 float brush_curve_strength_clamp(struct Brush *br, float p, const float len);
@@ -64,7 +71,7 @@ float brush_curve_strength(struct Brush *br, float p, const float len); /* used 
 /* sampling */
 void brush_sample_tex(struct Brush *brush, float *xy, float *rgba, const int thread);
 void brush_imbuf_new(struct Brush *brush, short flt, short texfalloff, int size,
-	struct ImBuf **imbuf);
+	struct ImBuf **imbuf, int use_color_correction);
 
 /* painting */
 struct BrushPainter;
@@ -75,7 +82,7 @@ BrushPainter *brush_painter_new(struct Brush *brush);
 void brush_painter_require_imbuf(BrushPainter *painter, short flt,
 	short texonly, int size);
 int brush_painter_paint(BrushPainter *painter, BrushFunc func, float *pos,
-	double time, float pressure, void *user);
+	double time, float pressure, void *user, int use_color_correction);
 void brush_painter_break_stroke(BrushPainter *painter);
 void brush_painter_free(BrushPainter *painter);
 
@@ -83,8 +90,7 @@ void brush_painter_free(BrushPainter *painter);
 unsigned int *brush_gen_texture_cache(struct Brush *br, int half_side);
 
 /* radial control */
-void brush_radial_control_invoke(struct wmOperator *op, struct Brush *br, float size_weight);
-int brush_radial_control_exec(struct wmOperator *op, struct Brush *br, float size_weight);
+struct ImBuf *brush_gen_radial_control_imbuf(struct Brush *br);
 
 /* unified strength and size */
 
@@ -105,6 +111,9 @@ void  brush_set_unprojected_radius(struct Brush *brush, float value);
 
 float brush_alpha(struct Brush *brush);
 void  brush_set_alpha(struct Brush *brush, float value);
+
+/* debugging only */
+void brush_debug_print_state(struct Brush *br);
 
 #endif
 

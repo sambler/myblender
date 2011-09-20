@@ -1,6 +1,4 @@
-/**
- * blenlib/BKE_image.h (mar-2001 nzc)
- *	
+/*
  * $Id$ 
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -31,6 +29,12 @@
 #ifndef BKE_IMAGE_H
 #define BKE_IMAGE_H
 
+/** \file BKE_image.h
+ *  \ingroup bke
+ *  \since March 2001
+ *  \author nzc
+ */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -40,20 +44,23 @@ struct ImBuf;
 struct Tex;
 struct anim;
 struct Scene;
+struct Object;
 
 /* call from library */
 void	free_image(struct Image *me);
 
-void	BKE_stamp_info(struct Scene *scene, struct ImBuf *ibuf);
-void	BKE_stamp_buf(struct Scene *scene, unsigned char *rect, float *rectf, int width, int height, int channels);
-int		BKE_write_ibuf(struct Scene *scene, struct ImBuf *ibuf, char *name, int imtype, int subimtype, int quality);
-void	BKE_makepicstring(char *string, char *base, int frame, int imtype, int use_ext);
+void	BKE_stamp_info(struct Scene *scene, struct Object *camera, struct ImBuf *ibuf);
+void	BKE_stamp_buf(struct Scene *scene, struct Object *camera, unsigned char *rect, float *rectf, int width, int height, int channels);
+int		BKE_alphatest_ibuf(struct ImBuf *ibuf);
+int		BKE_write_ibuf_stamp(struct Scene *scene, struct Object *camera, struct ImBuf *ibuf, const char *name, int imtype, int subimtype, int quality);
+int		BKE_write_ibuf(struct ImBuf *ibuf, const char *name, int imtype, int subimtype, int quality);
+void	BKE_makepicstring(char *string, const char *base, int frame, int imtype, const short use_ext, const short use_frames);
 int		BKE_add_image_extension(char *string, int imtype);
 int		BKE_ftype_to_imtype(int ftype);
 int		BKE_imtype_to_ftype(int imtype);
 int		BKE_imtype_is_movie(int imtype);
 
-struct anim *openanim(char * name, int flags);
+struct anim *openanim(char * name, int flags, int streamindex);
 
 void	image_de_interlace(struct Image *ima, int odd);
 	
@@ -93,10 +100,6 @@ struct RenderResult;
 	/* reload only frees, doesn't read until image_get_ibuf() called */
 #define IMA_SIGNAL_RELOAD			0
 #define IMA_SIGNAL_FREE				1
-	/* pack signals are executed */
-#define IMA_SIGNAL_PACK				2
-#define IMA_SIGNAL_REPACK			3
-#define IMA_SIGNAL_UNPACK			4
 	/* source changes, from image to sequence or movie, etc */
 #define IMA_SIGNAL_SRC_CHANGE		5
 	/* image-user gets a new image, check settings */
@@ -112,10 +115,10 @@ struct ImBuf *BKE_image_acquire_ibuf(struct Image *ima, struct ImageUser *iuser,
 void BKE_image_release_ibuf(struct Image *ima, void *lock);
 
 /* returns existing Image when filename/type is same (frame optional) */
-struct Image *BKE_add_image_file(const char *name, int frame);
+struct Image *BKE_add_image_file(const char *name);
 
 /* adds image, adds ibuf, generates color or pattern */
-struct Image *BKE_add_image_size(unsigned int width, unsigned int height, char *name, int depth, int floatbuf, short uvtestgrid, float color[4]);
+struct Image *BKE_add_image_size(unsigned int width, unsigned int height, const char *name, int depth, int floatbuf, short uvtestgrid, float color[4]);
 /* adds image from imbuf, owns imbuf */
 struct Image *BKE_add_image_imbuf(struct ImBuf *ibuf);
 
@@ -130,6 +133,7 @@ void BKE_image_assign_ibuf(struct Image *ima, struct ImBuf *ibuf);
 
 /* called on frame change or before render */
 void BKE_image_user_calc_frame(struct ImageUser *iuser, int cfra, int fieldnr);
+int BKE_image_user_get_frame(const struct ImageUser *iuser, int cfra, int fieldnr);
 
 /* fix things in ImageUser when new image gets assigned */
 void BKE_image_user_new_image(struct Image *ima, struct ImageUser *iuser);
@@ -163,6 +167,9 @@ struct Image *copy_image(struct Image *ima);
 
 /* merge source into dest, and free source */
 void BKE_image_merge(struct Image *dest, struct Image *source);
+
+/* check if texture has alpha (depth=32) */
+int BKE_image_has_alpha(struct Image *image);
 
 /* image_gen.c */
 void BKE_image_buf_fill_color(unsigned char *rect, float *rect_float, int width, int height, float color[4]);

@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/space_userpref/space_userpref.c
+ *  \ingroup spuserpref
+ */
+
+
 #include <string.h>
 #include <stdio.h>
 
@@ -33,21 +38,24 @@
 #include "MEM_guardedalloc.h"
 
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_context.h"
 #include "BKE_screen.h"
 
 #include "ED_screen.h"
-
+#include "ED_space_api.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
+
+#include "UI_view2d.h"
 
 #include "userpref_intern.h"	// own include
 
 /* ******************** default callbacks for userpref space ***************** */
 
-static SpaceLink *userpref_new(const bContext *C)
+static SpaceLink *userpref_new(const bContext *UNUSED(C))
 {
 	ARegion *ar;
 	SpaceUserPref *spref;
@@ -72,7 +80,7 @@ static SpaceLink *userpref_new(const bContext *C)
 }
 
 /* not spacelink itself */
-static void userpref_free(SpaceLink *sl)
+static void userpref_free(SpaceLink *UNUSED(sl))
 {	
 //	SpaceUserPref *spref= (SpaceUserPref*) sl;
 	
@@ -80,7 +88,7 @@ static void userpref_free(SpaceLink *sl)
 
 
 /* spacetype; init callback */
-static void userpref_init(struct wmWindowManager *wm, ScrArea *sa)
+static void userpref_init(struct wmWindowManager *UNUSED(wm), ScrArea *UNUSED(sa))
 {
 
 }
@@ -104,20 +112,23 @@ static void userpref_main_area_init(wmWindowManager *wm, ARegion *ar)
 
 static void userpref_main_area_draw(const bContext *C, ARegion *ar)
 {
+	/* this solves "vibrating UI" bug #25422 */
+	UI_view2d_region_reinit(&ar->v2d, V2D_COMMONVIEW_PANELS_UI, ar->winx, ar->winy);
+	
 	ED_region_panels(C, ar, 1, NULL, -1);
 }
 
-void userpref_operatortypes(void)
+static void userpref_operatortypes(void)
 {
 }
 
-void userpref_keymap(struct wmKeyConfig *keyconf)
+static void userpref_keymap(struct wmKeyConfig *UNUSED(keyconf))
 {
 	
 }
 
 /* add handlers, stuff you only do once or on area/region changes */
-static void userpref_header_area_init(wmWindowManager *wm, ARegion *ar)
+static void userpref_header_area_init(wmWindowManager *UNUSED(wm), ARegion *ar)
 {
 	ED_region_header_init(ar);
 }
@@ -127,19 +138,20 @@ static void userpref_header_area_draw(const bContext *C, ARegion *ar)
 	ED_region_header(C, ar);
 }
 
-static void userpref_main_area_listener(ARegion *ar, wmNotifier *wmn)
+static void userpref_main_area_listener(ARegion *UNUSED(ar), wmNotifier *UNUSED(wmn))
 {
 	/* context changes */
 }
 
-static void userpref_header_listener(ARegion *ar, wmNotifier *wmn)
+static void userpref_header_listener(ARegion *UNUSED(ar), wmNotifier *UNUSED(wmn))
 {
 	/* context changes */
+#if 0
 	switch(wmn->category) {
 		default:
 			break;
 	}
-	
+#endif	
 }
 
 /* only called once, from space/spacetypes.c */

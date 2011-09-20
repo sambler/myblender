@@ -1,4 +1,4 @@
-/**
+/*
  * Generate random pulses
  *
  * $Id$
@@ -29,6 +29,13 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file gameengine/GameLogic/SCA_RandomSensor.cpp
+ *  \ingroup gamelogic
+ */
+
+
+#include <stddef.h>
+
 #include "SCA_RandomSensor.h"
 #include "SCA_EventManager.h"
 #include "SCA_RandomEventManager.h"
@@ -41,8 +48,8 @@
 /* ------------------------------------------------------------------------- */
 
 SCA_RandomSensor::SCA_RandomSensor(SCA_EventManager* eventmgr, 
-				 SCA_IObject* gameobj, 
-				 int startseed)
+                                   SCA_IObject* gameobj,
+                                   int startseed)
     : SCA_ISensor(gameobj,eventmgr)
 {
 	m_basegenerator = new SCA_RandomNumberGenerator(startseed);
@@ -58,10 +65,10 @@ SCA_RandomSensor::~SCA_RandomSensor()
 
 void SCA_RandomSensor::Init()
 {
-    m_iteration  = 0;
+	m_iteration  = 0;
 	m_interval = 0;
 	m_lastdraw   = false;
-    m_currentDraw = m_basegenerator->Draw();
+	m_currentDraw = m_basegenerator->Draw();
 }
 
 
@@ -90,19 +97,19 @@ bool SCA_RandomSensor::IsPositiveTrigger()
 
 bool SCA_RandomSensor::Evaluate()
 {
-    /* Random generator is the generator from Line 25 of Table 1 in          */
-    /* [KNUTH 1981, The Art of Computer Programming Vol. 2                   */
-    /* (2nd Ed.), pp102]                                                     */
-    /* It's a very simple max. length sequence generator. We can             */
-    /* draw 32 bool values before having to generate the next                */
-    /* sequence value. There are some theorems that will tell you            */
-    /* this is a reasonable way of generating bools. Check Knuth.            */
-    /* Furthermore, we only draw each <delay>-eth frame.                     */
+	/* Random generator is the generator from Line 25 of Table 1 in          */
+	/* [KNUTH 1981, The Art of Computer Programming Vol. 2                   */
+	/* (2nd Ed.), pp102]                                                     */
+	/* It's a very simple max. length sequence generator. We can             */
+	/* draw 32 bool values before having to generate the next                */
+	/* sequence value. There are some theorems that will tell you            */
+	/* this is a reasonable way of generating bools. Check Knuth.            */
+	/* Furthermore, we only draw each <delay>-eth frame.                     */
 
 	bool evaluateResult = false;
 
 	if (++m_interval > m_pulse_frequency) {
-	    bool drawResult = false;
+		bool drawResult = false;
 		m_interval = 0;
 		if (m_iteration > 31) {
 			m_currentDraw = m_basegenerator->Draw();
@@ -115,12 +122,12 @@ bool SCA_RandomSensor::Evaluate()
 		evaluateResult = drawResult != m_lastdraw;
 		m_lastdraw = drawResult;
 	}
-    
-    /* now pass this result to some controller */
+
+	/* now pass this result to some controller */
 	return evaluateResult;
 }
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 
 /* ------------------------------------------------------------------------- */
 /* Python functions                                                          */
@@ -176,6 +183,6 @@ int SCA_RandomSensor::pyattr_set_seed(void *self_v, const KX_PYATTRIBUTE_DEF *at
 	return PY_SET_ATTR_SUCCESS;
 }
 
-#endif // DISABLE_PYTHON
+#endif // WITH_PYTHON
 
 /* eof */

@@ -1,6 +1,4 @@
-/**
- * $Id$
- *
+/*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -27,6 +25,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/space_action/action_draw.c
+ *  \ingroup spaction
+ */
+
+
 /* System includes ----------------------------------------------------- */
 
 #include <math.h>
@@ -34,9 +37,9 @@
 #include <string.h>
 #include <float.h>
 
-
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
 /* Types --------------------------------------------------------------- */
 
@@ -45,7 +48,7 @@
 
 #include "BKE_action.h"
 #include "BKE_context.h"
-#include "BKE_utildefines.h"
+
 
 /* Everything from source (BIF, BDR, BSE) ------------------------------ */ 
 
@@ -58,12 +61,13 @@
 #include "ED_anim_api.h"
 #include "ED_keyframes_draw.h"
 
+#include "action_intern.h"
 
 /* ************************************************************************* */
 /* Channel List */
 
 /* left hand part */
-void draw_channel_names(bContext *C, bAnimContext *ac, SpaceAction *saction, ARegion *ar) 
+void draw_channel_names(bContext *C, bAnimContext *ac, ARegion *ar) 
 {
 	ListBase anim_data = {NULL, NULL};
 	bAnimListElem *ale;
@@ -71,10 +75,11 @@ void draw_channel_names(bContext *C, bAnimContext *ac, SpaceAction *saction, ARe
 	
 	View2D *v2d= &ar->v2d;
 	float y= 0.0f;
-	int items, height;
+	size_t items;
+	int height;
 	
 	/* build list of channels to draw */
-	filter= (ANIMFILTER_VISIBLE|ANIMFILTER_CHANNELS);
+	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_LIST_VISIBLE | ANIMFILTER_LIST_CHANNELS);
 	items= ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 	
 	/* Update max-extent of channels here (taking into account scrollers):
@@ -90,8 +95,8 @@ void draw_channel_names(bContext *C, bAnimContext *ac, SpaceAction *saction, ARe
 		 */
 		v2d->tot.ymin= (float)(-height);
 	}
-	/* need to do a view-sync here, so that the keys area doesn't jump around */
-	UI_view2d_sync(NULL, ac->sa, v2d, V2D_VIEWSYNC_AREA_VERTICAL);
+	/* need to do a view-sync here, so that the keys area doesn't jump around (it must copy this) */
+	UI_view2d_sync(NULL, ac->sa, v2d, V2D_LOCK_COPY);
 	
 	/* loop through channels, and set up drawing depending on their type  */	
 	{ 	/* first pass: just the standard GL-drawing for backdrop + text */
@@ -115,6 +120,7 @@ void draw_channel_names(bContext *C, bAnimContext *ac, SpaceAction *saction, ARe
 	}
 	{	/* second pass: widgets */
 		uiBlock *block= uiBeginBlock(C, ar, "dopesheet channel buttons", UI_EMBOSS);
+		size_t channel_index = 0;
 		
 		y= (float)ACHANNEL_FIRST;
 		
@@ -127,11 +133,12 @@ void draw_channel_names(bContext *C, bAnimContext *ac, SpaceAction *saction, ARe
 				 IN_RANGE(ymaxc, v2d->cur.ymin, v2d->cur.ymax) ) 
 			{
 				/* draw all channels using standard channel-drawing API */
-				ANIM_channel_draw_widgets(ac, ale, block, yminc, ymaxc);
+				ANIM_channel_draw_widgets(C, ac, ale, block, yminc, ymaxc, channel_index);
 			}
 			
 			/* adjust y-position for next one */
 			y -= ACHANNEL_STEP;
+			channel_index++;
 		}
 		
 		uiEndBlock(C, block);
@@ -160,11 +167,12 @@ void draw_channel_strips(bAnimContext *ac, SpaceAction *saction, ARegion *ar)
 	AnimData *adt= NULL;
 	
 	float act_start, act_end, y;
-	int height, items;
+	size_t items;
+	int height;
 	
-	char col1[3], col2[3];
-	char col1a[3], col2a[3];
-	char col1b[3], col2b[3];
+	unsigned char col1[3], col2[3];
+	unsigned char col1a[3], col2a[3];
+	unsigned char col1b[3], col2b[3];
 	
 	
 	/* get theme colors */
@@ -188,7 +196,7 @@ void draw_channel_strips(bAnimContext *ac, SpaceAction *saction, ARegion *ar)
 	}
 	
 	/* build list of channels to draw */
-	filter= (ANIMFILTER_VISIBLE|ANIMFILTER_CHANNELS);
+	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_LIST_VISIBLE | ANIMFILTER_LIST_CHANNELS);
 	items= ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 	
 	/* Update max-extent of channels here (taking into account scrollers):
@@ -228,7 +236,7 @@ void draw_channel_strips(bAnimContext *ac, SpaceAction *saction, ARegion *ar)
 					switch (ale->type) {
 						case ANIMTYPE_SUMMARY:
 						{
-							// FIXME: hardcoded colours - reddish color from NLA
+							// FIXME: hardcoded colors - reddish color from NLA
 							glColor4f(0.8f, 0.2f, 0.0f, 0.4f);
 						}
 							break;
@@ -242,8 +250,6 @@ void draw_channel_strips(bAnimContext *ac, SpaceAction *saction, ARegion *ar)
 							break;
 						
 						case ANIMTYPE_FILLACTD:
-						case ANIMTYPE_FILLMATD:
-						case ANIMTYPE_FILLPARTD:
 						case ANIMTYPE_DSSKEY:
 						case ANIMTYPE_DSWOR:
 						{

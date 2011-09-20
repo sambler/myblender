@@ -19,9 +19,7 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-FILE(GLOB SRC *.c)
-
-SET(INC
+set(INC
 	../include
 	../../blenfont
 	../../blenkernel
@@ -34,20 +32,40 @@ SET(INC
 	../../render/extern/include
 	../../windowmanager
 	../../../../intern/guardedalloc
-	../../../../extern/glew/include
 )
 
-IF(WITH_QUICKTIME)
-	LIST(APPEND INC ../../quicktime ${QUICKTIME_INC})
-	ADD_DEFINITIONS(-DWITH_QUICKTIME)
-ENDIF(WITH_QUICKTIME)
+set(INC_SYS
+	${GLEW_INCLUDE_PATH}
+)
 
-IF(WITH_OPENMP)
-	ADD_DEFINITIONS(-DPARALLEL=1)
-ENDIF(WITH_OPENMP)
+set(SRC
+	render_internal.c
+	render_opengl.c
+	render_ops.c
+	render_preview.c
+	render_shading.c
+	render_update.c
+	render_view.c
 
-IF(WIN32)
-	LIST(APPEND INC ${PTHREADS_INC})
-ENDIF(WIN32)
+	render_intern.h
+)
 
-BLENDERLIB(bf_editor_render "${SRC}" "${INC}")
+if(WITH_CODEC_QUICKTIME)
+	list(APPEND INC
+		../../quicktime
+	)
+	list(APPEND INC_SYS
+		${QUICKTIME_INCLUDE_DIRS}
+	)
+	add_definitions(-DWITH_QUICKTIME)
+endif()
+
+if(WITH_OPENMP)
+	add_definitions(-DPARALLEL=1)
+endif()
+
+if(WITH_HEADLESS)
+	add_definitions(-DWITH_HEADLESS)
+endif()
+
+blender_add_lib(bf_editor_render "${SRC}" "${INC}" "${INC_SYS}")

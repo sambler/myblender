@@ -25,7 +25,11 @@
  * Contributor(s): none yet.
  *
  * ***** END GPL LICENSE BLOCK *****
- * LoopbackNetworkDeviceInterface derived from NG_NetworkDeviceInterface
+ */
+
+/** \file NG_LoopBackNetworkDeviceInterface.h
+ *  \ingroup bgenetlb
+ *  \brief LoopbackNetworkDeviceInterface derived from NG_NetworkDeviceInterface
  */
 #ifndef NG_LOOPBACKNETWORKDEVICEINTERFACE_H
 #define NG_LOOPBACKNETWORKDEVICEINTERFACE_H
@@ -48,8 +52,8 @@ public:
 	virtual void NextFrame();
 
 	bool Connect(char *address, unsigned int port, char *password,
-		     unsigned int localport, unsigned int timeout) {
-	    return true;}
+	             unsigned int localport, unsigned int timeout) {
+		return true;}
 	bool Disconnect(void) {return true;}
 
 	virtual void SendNetworkMessage(class NG_NetworkMessage* msg);

@@ -1,6 +1,4 @@
-/**
- * blenlib/DNA_sound_types.h (mar-2001 nzc)
- *	
+/*
  * $Id$ 
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -30,6 +28,11 @@
  */
 #ifndef DNA_SOUND_TYPES_H
 #define DNA_SOUND_TYPES_H
+/** \file DNA_sound_types.h
+ *  \ingroup DNA
+ *  \since mar-2001
+ *  \author nzc
+ */
 
 #include "DNA_listBase.h"
 #include "DNA_ID.h"
@@ -82,6 +85,11 @@ typedef struct bSound {
 	void *cache;
 
 	/**
+	 * Waveform display data.
+	 */
+	void *waveform;
+
+	/**
 	 * The audaspace handle that should actually be played back.
 	 * Should be cache if cache != NULL; otherwise it's handle
 	 */
@@ -103,7 +111,9 @@ typedef enum eSound_Type {
 #define SND_DRAWFRAMES	1
 #define SND_CFRA_NUM	2
 
-#define SOUND_FLAGS_3D					(1 << 3)
+#define SOUND_FLAGS_3D					(1 << 3) /* deprecated! used for sound actuator loading */
+#define SOUND_FLAGS_CACHING				(1 << 4)
+#define SOUND_FLAGS_MONO				(1 << 5)
 
 /* to DNA_sound_types.h*/
 

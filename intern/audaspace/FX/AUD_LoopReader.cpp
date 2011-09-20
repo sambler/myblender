@@ -1,34 +1,40 @@
 /*
  * $Id$
  *
- * ***** BEGIN LGPL LICENSE BLOCK *****
+ * ***** BEGIN GPL LICENSE BLOCK *****
  *
- * Copyright 2009 Jörg Hermann Müller
+ * Copyright 2009-2011 Jörg Hermann Müller
  *
  * This file is part of AudaSpace.
  *
- * AudaSpace is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
+ * Audaspace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
  * AudaSpace is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU Lesser General Public License
- * along with AudaSpace.  If not, see <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU General Public License
+ * along with Audaspace; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * ***** END LGPL LICENSE BLOCK *****
+ * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file audaspace/FX/AUD_LoopReader.cpp
+ *  \ingroup audfx
+ */
+
 
 #include "AUD_LoopReader.h"
 #include "AUD_Buffer.h"
 
 #include <cstring>
 
-AUD_LoopReader::AUD_LoopReader(AUD_IReader* reader, int loop) :
+AUD_LoopReader::AUD_LoopReader(AUD_Reference<AUD_IReader> reader, int loop) :
 		AUD_EffectReader(reader), m_count(loop), m_left(loop)
 {
 }
@@ -62,29 +68,20 @@ int AUD_LoopReader::getPosition() const
 	return m_reader->getPosition() * (m_count < 0 ? 1 : m_count);
 }
 
-void AUD_LoopReader::read(int & length, sample_t* & buffer)
+void AUD_LoopReader::read(int& length, bool& eos, sample_t* buffer)
 {
-	AUD_Specs specs = m_reader->getSpecs();
-	int samplesize = AUD_SAMPLE_SIZE(specs);
+	const AUD_Specs specs = m_reader->getSpecs();
 
 	int len = length;
 
-	m_reader->read(len, buffer);
+	m_reader->read(length, eos, buffer);
 
-	if(len < length && m_left)
+	if(length < len && eos && m_left)
 	{
-		int pos = 0;
+		int pos = length;
+		length = len;
 
-		if(m_buffer.getSize() < length * samplesize)
-			m_buffer.resize(length * samplesize);
-
-		sample_t* buf = m_buffer.getBuffer();
-
-		memcpy(buf + pos * specs.channels, buffer, len * samplesize);
-
-		pos += len;
-
-		while(pos < length && m_left)
+		while(pos < length && eos && m_left)
 		{
 			if(m_left > 0)
 				m_left--;
@@ -92,20 +89,15 @@ void AUD_LoopReader::read(int & length, sample_t* & buffer)
 			m_reader->seek(0);
 
 			len = length - pos;
-			m_reader->read(len, buffer);
+			m_reader->read(len, eos, buffer + pos * specs.channels);
 
 			// prevent endless loop
 			if(!len)
 				break;
 
-			memcpy(buf + pos * specs.channels, buffer, len * samplesize);
-
 			pos += len;
 		}
 
 		length = pos;
-		buffer = buf;
 	}
-	else
-		length = len;
 }

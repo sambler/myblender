@@ -24,24 +24,41 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-IF(WITH_BULLET)
-	ADD_SUBDIRECTORY(bullet2)
-ENDIF(WITH_BULLET)
+# Otherwise we get warnings here that we cant fix in external projects
+remove_strict_flags()
 
-IF(CMAKE_SYSTEM_NAME MATCHES "Linux")
-	ADD_SUBDIRECTORY(binreloc)
-ENDIF(CMAKE_SYSTEM_NAME MATCHES "Linux")
+if(WITH_BULLET)
+	add_subdirectory(bullet2)
+endif()
 
-ADD_SUBDIRECTORY(glew)
+if(WITH_MOD_CLOTH_ELTOPO)
+	add_subdirectory(eltopo)
+endif()
 
-IF(WITH_IMAGE_OPENJPEG)
-	ADD_SUBDIRECTORY(libopenjpeg)
-ENDIF(WITH_IMAGE_OPENJPEG)
+if(WITH_BINRELOC)
+	add_subdirectory(binreloc)
+endif()
 
-IF(WITH_LZO)
-	ADD_SUBDIRECTORY(lzo)
-ENDIF(WITH_LZO)
+if(WITH_BUILTIN_GLEW)
+	add_subdirectory(glew)
+endif()
 
-IF(WITH_LZMA)
-	ADD_SUBDIRECTORY(lzma)
-ENDIF(WITH_LZMA)
+if(WITH_GAMEENGINE)
+   add_subdirectory(recastnavigation)
+endif()
+
+if(WITH_IMAGE_OPENJPEG AND (NOT UNIX OR APPLE))
+	add_subdirectory(libopenjpeg)
+endif()
+
+if(WITH_IMAGE_REDCODE)
+	add_subdirectory(libredcode)
+endif()
+
+if(WITH_LZO)
+	add_subdirectory(lzo)
+endif()
+
+if(WITH_LZMA)
+	add_subdirectory(lzma)
+endif()

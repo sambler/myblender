@@ -27,33 +27,35 @@
  * ***** END GPL/BL DUAL LICENSE BLOCK *****
  */
 
+/** \file blender/blenkernel/intern/colortools.c
+ *  \ingroup bke
+ */
+
+
 #include <string.h>
 #include <math.h>
 #include <stdlib.h>
 #include <float.h>
-
-#ifdef WITH_LCMS
-#include <lcms.h>
-#endif
 
 #include "MEM_guardedalloc.h"
 
 #include "DNA_color_types.h"
 #include "DNA_curve_types.h"
 
-#include "BKE_colortools.h"
-#include "BKE_curve.h"
-#include "BKE_ipo.h"
-#include "BKE_utildefines.h"
-
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
+
+#include "BKE_colortools.h"
+#include "BKE_curve.h"
+#include "BKE_fcurve.h"
+
 
 #include "IMB_imbuf.h"
 #include "IMB_imbuf_types.h"
 
 
-void floatbuf_to_srgb_byte(float *rectf, unsigned char *rectc, int x1, int x2, int y1, int y2, int w)
+void floatbuf_to_srgb_byte(float *rectf, unsigned char *rectc, int x1, int x2, int y1, int y2, int UNUSED(w))
 {
 	int x, y;
 	float *rf= rectf;
@@ -74,7 +76,7 @@ void floatbuf_to_srgb_byte(float *rectf, unsigned char *rectc, int x1, int x2, i
 	}
 }
 
-void floatbuf_to_byte(float *rectf, unsigned char *rectc, int x1, int x2, int y1, int y2, int w)
+void floatbuf_to_byte(float *rectf, unsigned char *rectc, int x1, int x2, int y1, int y2, int UNUSED(w))
 {
 	int x, y;
 	float *rf= rectf;
@@ -165,14 +167,14 @@ CurveMapping *curvemapping_copy(CurveMapping *cumap)
 	return NULL;
 }
 
-void curvemapping_set_black_white(CurveMapping *cumap, float *black, float *white)
+void curvemapping_set_black_white(CurveMapping *cumap, const float black[3], const float white[3])
 {
 	int a;
 	
 	if(white)
-		VECCOPY(cumap->white, white);
+		copy_v3_v3(cumap->white, white);
 	if(black)
-		VECCOPY(cumap->black, black);
+		copy_v3_v3(cumap->black, black);
 	
 	for(a=0; a<3; a++) {
 		if(cumap->white[a]==cumap->black[a])
@@ -356,7 +358,7 @@ void curvemap_sethandle(CurveMap *cuma, int type)
 /* *********************** Making the tables and display ************** */
 
 /* reduced copy of garbled calchandleNurb() code in curve.c */
-static void calchandle_curvemap(BezTriple *bezt, BezTriple *prev, BezTriple *next, int mode)
+static void calchandle_curvemap(BezTriple *bezt, BezTriple *prev, BezTriple *next, int UNUSED(mode))
 {
 	float *p1,*p2,*p3,pt[3];
 	float dx1,dy1, dx,dy, vx,vy, len,len1,len2;
@@ -415,14 +417,14 @@ static void calchandle_curvemap(BezTriple *bezt, BezTriple *prev, BezTriple *nex
 	}
 
 	if(bezt->h1==HD_VECT) {	/* vector */
-		dx/=3.0; 
-		dy/=3.0; 
+		dx/=3.0f;
+		dy/=3.0f;
 		*(p2-3)= *p2-dx;
 		*(p2-2)= *(p2+1)-dy;
 	}
 	if(bezt->h2==HD_VECT) {
-		dx1/=3.0; 
-		dy1/=3.0; 
+		dx1/=3.0f;
+		dy1/=3.0f;
 		*(p2+3)= *p2+dx1;
 		*(p2+4)= *(p2+1)+dy1;
 	}
@@ -430,7 +432,7 @@ static void calchandle_curvemap(BezTriple *bezt, BezTriple *prev, BezTriple *nex
 
 /* in X, out Y. 
    X is presumed to be outside first or last */
-static float curvemap_calc_extend(CurveMap *cuma, float x, float *first, float *last)
+static float curvemap_calc_extend(CurveMap *cuma, float x, const float first[2], const float last[2])
 {
 	if(x <= first[0]) {
 		if((cuma->flag & CUMA_EXTEND_EXTRAPOLATE)==0) {
@@ -694,7 +696,7 @@ void curvemapping_changed(CurveMapping *cumap, int rem_doubles)
 		for(a=0; a<cuma->totpoint-1; a++) {
 			dx= cmp[a].x - cmp[a+1].x;
 			dy= cmp[a].y - cmp[a+1].y;
-			if( sqrt(dx*dx + dy*dy) < thresh ) {
+			if( sqrtf(dx*dx + dy*dy) < thresh ) {
 				if(a==0) {
 					cmp[a+1].flag|= 2;
 					if(cmp[a+1].flag & CUMA_SELECT)
@@ -751,7 +753,7 @@ float curvemapping_evaluateF(CurveMapping *cumap, int cur, float value)
 }
 
 /* vector case */
-void curvemapping_evaluate3F(CurveMapping *cumap, float *vecout, const float *vecin)
+void curvemapping_evaluate3F(CurveMapping *cumap, float vecout[3], const float vecin[3])
 {
 	vecout[0]= curvemapping_evaluateF(cumap, 0, vecin[0]);
 	vecout[1]= curvemapping_evaluateF(cumap, 1, vecin[1]);
@@ -759,7 +761,7 @@ void curvemapping_evaluate3F(CurveMapping *cumap, float *vecout, const float *ve
 }
 
 /* RGB case, no black/white points, no premult */
-void curvemapping_evaluateRGBF(CurveMapping *cumap, float *vecout, const float *vecin)
+void curvemapping_evaluateRGBF(CurveMapping *cumap, float vecout[3], const float vecin[3])
 {
 	vecout[0]= curvemapping_evaluateF(cumap, 0, curvemapping_evaluateF(cumap, 3, vecin[0]));
 	vecout[1]= curvemapping_evaluateF(cumap, 1, curvemapping_evaluateF(cumap, 3, vecin[1]));
@@ -768,7 +770,7 @@ void curvemapping_evaluateRGBF(CurveMapping *cumap, float *vecout, const float *
 
 
 /* RGB with black/white points and premult. tables are checked */
-void curvemapping_evaluate_premulRGBF(CurveMapping *cumap, float *vecout, const float *vecin)
+void curvemapping_evaluate_premulRGBF(CurveMapping *cumap, float vecout[3], const float vecin[3])
 {
 	float fac;
 	
@@ -782,56 +784,6 @@ void curvemapping_evaluate_premulRGBF(CurveMapping *cumap, float *vecout, const 
 	vecout[2]= curvemap_evaluateF(cumap->cm+2, fac);
 }
 
-
-#ifdef WITH_LCMS
-/* basic error handler, if we dont do this blender will exit */
-static int ErrorReportingFunction(int ErrorCode, const char *ErrorText)
-{
-    fprintf(stderr, "%s:%d\n", ErrorText, ErrorCode);
-	return 1;
-}
-#endif
-
-void colorcorrection_do_ibuf(ImBuf *ibuf, const char *profile)
-{
-#ifdef WITH_LCMS
-	if (ibuf->crect == NULL)
-	{
-		cmsHPROFILE proofingProfile;
-		
-		/* TODO, move to initialization area of code */
-		//cmsSetLogErrorHandler(ErrorReportingFunction);
-		cmsSetErrorHandler(ErrorReportingFunction);
-		
-		/* will return NULL if the file isn't fount */
-		proofingProfile = cmsOpenProfileFromFile(profile, "r");
-
-		cmsErrorAction(LCMS_ERROR_SHOW);
-
-		if(proofingProfile) {
-			cmsHPROFILE imageProfile;
-			cmsHTRANSFORM hTransform;
-
-			ibuf->crect = MEM_mallocN(ibuf->x*ibuf->y*sizeof(int), "imbuf crect");
-
-			imageProfile  = cmsCreate_sRGBProfile();
-
-
-			hTransform = cmsCreateProofingTransform(imageProfile, TYPE_RGBA_8, imageProfile, TYPE_RGBA_8, 
-												  proofingProfile,
-												  INTENT_ABSOLUTE_COLORIMETRIC,
-												  INTENT_ABSOLUTE_COLORIMETRIC,
-												  cmsFLAGS_SOFTPROOFING);
-		
-			cmsDoTransform(hTransform, ibuf->rect, ibuf->crect, ibuf->x * ibuf->y);
-
-			cmsDeleteTransform(hTransform);
-			cmsCloseProfile(imageProfile);
-			cmsCloseProfile(proofingProfile);
-		}
-	}
-#endif
-}
 
 /* only used for image editor curves */
 void curvemapping_do_ibuf(CurveMapping *cumap, ImBuf *ibuf)
@@ -865,7 +817,7 @@ void curvemapping_do_ibuf(CurveMapping *cumap, ImBuf *ibuf)
 	if(ibuf->channels)
 		stride= ibuf->channels;
 	
-	for(pixel= ibuf->x*ibuf->y; pixel>0; pixel--, pix_in+=stride, pix_out+=4) {
+	for(pixel= ibuf->x*ibuf->y; pixel>0; pixel--, pix_in+=stride, pix_out+=stride) {
 		if(stride<3) {
 			col[0]= curvemap_evaluateF(cumap->cm, *pix_in);
 			
@@ -952,13 +904,11 @@ void curvemapping_table_RGBA(CurveMapping *cumap, float **array, int *size)
 
 DO_INLINE int get_bin_float(float f)
 {
-	int bin= (int)(f*255);
+	int bin= (int)((f*255.0f) + 0.5f);	/* 0.5 to prevent quantisation differences */
 
 	/* note: clamp integer instead of float to avoid problems with NaN */
 	CLAMP(bin, 0, 255);
-	
-	//return (int) (((f + 0.25) / 1.5) * 255);
-	
+
 	return bin;
 }
 
@@ -1000,7 +950,8 @@ DO_INLINE void save_sample_line(Scopes *scopes, const int idx, const float fx, f
 
 void scopes_update(Scopes *scopes, ImBuf *ibuf, int use_color_management)
 {
-	int x, y, c, n, nl;
+	int x, y, c;
+	unsigned int n, nl;
 	double div, divl;
 	float *rf=NULL;
 	unsigned char *rc=NULL;
@@ -1008,6 +959,9 @@ void scopes_update(Scopes *scopes, ImBuf *ibuf, int use_color_management)
 	int savedlines, saveline;
 	float rgb[3], ycc[3], luma;
 	int ycc_mode=-1;
+	const short is_float = (ibuf->rect_float != NULL);
+
+	if (ibuf->rect==NULL && ibuf->rect_float==NULL) return;
 
 	if (scopes->ok == 1 ) return;
 
@@ -1015,6 +969,7 @@ void scopes_update(Scopes *scopes, ImBuf *ibuf, int use_color_management)
 
 	/* hmmmm */
 	if (!(ELEM(ibuf->channels, 3, 4))) return;
+
 	scopes->hist.channels = 3;
 	scopes->hist.x_resolution = 256;
 
@@ -1041,7 +996,7 @@ void scopes_update(Scopes *scopes, ImBuf *ibuf, int use_color_management)
 	bin_lum = MEM_callocN(256 * sizeof(unsigned int), "temp historgram bins");
 
 	/* convert to number of lines with logarithmic scale */
-	scopes->sample_lines = (scopes->accuracy*0.01) * (scopes->accuracy*0.01) * ibuf->y;
+	scopes->sample_lines = (scopes->accuracy*0.01f) * (scopes->accuracy*0.01f) * ibuf->y;
 	
 	if (scopes->sample_full)
 		scopes->sample_lines = ibuf->y;
@@ -1069,9 +1024,9 @@ void scopes_update(Scopes *scopes, ImBuf *ibuf, int use_color_management)
 	scopes->waveform_3= MEM_callocN(scopes->waveform_tot * 2 * sizeof(float), "waveform point channel 3");
 	scopes->vecscope= MEM_callocN(scopes->waveform_tot * 2 * sizeof(float), "vectorscope point channel");
 	
-	if (ibuf->rect_float)
+	if (is_float)
 		rf = ibuf->rect_float;
-	else if (ibuf->rect)
+	else
 		rc = (unsigned char *)ibuf->rect;
 
 	for (y = 0; y < ibuf->y; y++) {
@@ -1080,19 +1035,19 @@ void scopes_update(Scopes *scopes, ImBuf *ibuf, int use_color_management)
 		} else saveline=0;
 		for (x = 0; x < ibuf->x; x++) {
 
-			if (ibuf->rect_float) {
+			if (is_float) {
 				if (use_color_management)
 					linearrgb_to_srgb_v3_v3(rgb, rf);
 				else
 					copy_v3_v3(rgb, rf);
 			}
-			else if (ibuf->rect) {
+			else {
 				for (c=0; c<3; c++)
 					rgb[c] = rc[c] * INV_255;
 			}
 
 			/* we still need luma for histogram */
-			luma = 0.299*rgb[0] + 0.587*rgb[1] + 0.114 * rgb[2];
+			luma = 0.299f * rgb[0] + 0.587f * rgb[1] + 0.114f * rgb[2];
 
 			/* check for min max */
 			if(ycc_mode == -1 ) {
@@ -1142,8 +1097,8 @@ void scopes_update(Scopes *scopes, ImBuf *ibuf, int use_color_management)
 		if (bin_lum[x] > nl)
 			nl = bin_lum[x];
 	}
-	div = 1.f/(double)n;
-	divl = 1.f/(double)nl;
+	div = 1.0/(double)n;
+	divl = 1.0/(double)nl;
 	for (x=0; x<256; x++) {
 		scopes->hist.data_r[x] = bin_r[x] * div;
 		scopes->hist.data_g[x] = bin_g[x] * div;

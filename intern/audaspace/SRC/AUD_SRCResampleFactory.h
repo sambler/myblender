@@ -1,38 +1,44 @@
 /*
  * $Id$
  *
- * ***** BEGIN LGPL LICENSE BLOCK *****
+ * ***** BEGIN GPL LICENSE BLOCK *****
  *
- * Copyright 2009 Jörg Hermann Müller
+ * Copyright 2009-2011 Jörg Hermann Müller
  *
  * This file is part of AudaSpace.
  *
- * AudaSpace is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
+ * Audaspace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
  * AudaSpace is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU Lesser General Public License
- * along with AudaSpace.  If not, see <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU General Public License
+ * along with Audaspace; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * ***** END LGPL LICENSE BLOCK *****
+ * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file audaspace/SRC/AUD_SRCResampleFactory.h
+ *  \ingroup audsrc
+ */
+
 
 #ifndef AUD_SRCRESAMPLEFACTORY
 #define AUD_SRCRESAMPLEFACTORY
 
-#include "AUD_ResampleFactory.h"
+#include "AUD_MixerFactory.h"
 
 /**
  * This factory creates a resampling reader that uses libsamplerate for
  * resampling.
  */
-class AUD_SRCResampleFactory : public AUD_ResampleFactory
+class AUD_SRCResampleFactory : public AUD_MixerFactory
 {
 private:
 	// hide copy constructor and operator=
@@ -40,9 +46,14 @@ private:
 	AUD_SRCResampleFactory& operator=(const AUD_SRCResampleFactory&);
 
 public:
-	AUD_SRCResampleFactory(AUD_IFactory* factory, AUD_DeviceSpecs specs);
+	/**
+	 * Creates a new factory.
+	 * \param factory The input factory.
+	 * \param specs The target specifications.
+	 */
+	AUD_SRCResampleFactory(AUD_Reference<AUD_IFactory> factory, AUD_DeviceSpecs specs);
 
-	virtual AUD_IReader* createReader() const;
+	virtual AUD_Reference<AUD_IReader> createReader();
 };
 
 #endif //AUD_SRCRESAMPLEFACTORY

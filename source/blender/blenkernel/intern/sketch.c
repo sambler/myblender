@@ -1,4 +1,4 @@
-/**
+/*
  *
  * $Id$
  *
@@ -23,6 +23,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/blenkernel/intern/sketch.c
+ *  \ingroup bke
+ */
+
+
 #include <string.h>
 #include <math.h>
 #include <float.h>
@@ -31,9 +36,10 @@
 
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_sketch.h"
-#include "BKE_utildefines.h"
+
 
 #include "DNA_userdef_types.h"
 
@@ -53,7 +59,7 @@ void freeSketch(SK_Sketch *sketch)
 	MEM_freeN(sketch);
 }
 
-SK_Sketch* createSketch()
+SK_Sketch* createSketch(void)
 {
 	SK_Sketch *sketch;
 
@@ -101,7 +107,7 @@ void sk_freeStroke(SK_Stroke *stk)
 	MEM_freeN(stk);
 }
 
-SK_Stroke* sk_createStroke()
+SK_Stroke* sk_createStroke(void)
 {
 	SK_Stroke *stk;
 
@@ -239,13 +245,13 @@ void sk_straightenStroke(SK_Stroke *stk, int start, int end, float p_start[3], f
 	prev = stk->points + start;
 	next = stk->points + end;
 
-	VECCOPY(pt1.p, p_start);
-	VECCOPY(pt1.no, prev->no);
+	copy_v3_v3(pt1.p, p_start);
+	copy_v3_v3(pt1.no, prev->no);
 	pt1.mode = prev->mode;
 	pt1.type = prev->type;
 
-	VECCOPY(pt2.p, p_end);
-	VECCOPY(pt2.no, next->no);
+	copy_v3_v3(pt2.p, p_end);
+	copy_v3_v3(pt2.no, next->no);
 	pt2.mode = next->mode;
 	pt2.type = next->type;
 
@@ -317,7 +323,7 @@ void sk_flattenStroke(SK_Stroke *stk, int start, int end)
 
 	total = end - start + 1;
 
-	VECCOPY(normal, stk->points[start].no);
+	copy_v3_v3(normal, stk->points[start].no);
 
 	sub_v3_v3v3(distance, stk->points[end].p, stk->points[start].p);
 	project_v3_v3v3(normal, distance, normal);
@@ -537,7 +543,7 @@ int sk_stroke_filtermval(SK_DrawData *dd)
 	return retval;
 }
 
-void sk_initDrawData(SK_DrawData *dd, short mval[2])
+void sk_initDrawData(SK_DrawData *dd, const int mval[2])
 {
 	dd->mval[0] = mval[0];
 	dd->mval[1] = mval[1];

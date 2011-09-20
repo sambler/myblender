@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,10 +27,14 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file BL_ShapeActionActuator.h
+ *  \ingroup bgeconv
+ */
+
 #ifndef BL_SHAPEACTIONACTUATOR
 #define BL_SHAPEACTIONACTUATOR
 
-#include "GEN_HashedPtr.h"
+#include "CTR_HashedPtr.h"
 #include "SCA_IActuator.h"
 #include "BL_ActionActuator.h"
 #include "MT_Point3.h"
@@ -50,27 +54,7 @@ public:
 						short	playtype,
 						short	blendin,
 						short	priority,
-						float	stride) 
-		: SCA_IActuator(gameobj, KX_ACT_SHAPEACTION),
-		
-		m_lastpos(0, 0, 0),
-		m_blendframe(0),
-		m_flag(0),
-		m_startframe (starttime),
-		m_endframe(endtime) ,
-		m_starttime(0),
-		m_localtime(starttime),
-		m_lastUpdate(-1),
-		m_blendin(blendin),
-		m_blendstart(0),
-		m_stridelength(stride),
-		m_playtype(playtype),
-		m_priority(priority),
-		m_action(action),
-		m_framepropname(framepropname),	
-		m_propname(propname)
-	{
-	};
+						float	stride);
 	virtual ~BL_ShapeActionActuator();
 	virtual	bool Update(double curtime, bool frame);
 	virtual CValue* GetReplica();
@@ -82,7 +66,7 @@ public:
 	bAction*	GetAction() { return m_action; }
 	void		SetAction(bAction* act) { m_action= act; }
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 
 	static PyObject*	pyattr_get_action(void *self_v, const KX_PYATTRIBUTE_DEF *attrdef);
 	static int			pyattr_set_action(void *self_v, const KX_PYATTRIBUTE_DEF *attrdef, PyObject *value);
@@ -113,6 +97,7 @@ public:
 
 		switch (act->m_playtype) {
 			case ACT_ACTION_PLAY:
+			case ACT_ACTION_PINGPONG:
 			case ACT_ACTION_FLIPPER:
 			case ACT_ACTION_LOOP_STOP:
 			case ACT_ACTION_LOOP_END:
@@ -125,7 +110,7 @@ public:
 
 	}
 
-#endif // DISABLE_PYTHON
+#endif // WITH_PYTHON
 
 protected:
 
@@ -155,6 +140,7 @@ protected:
 	STR_String	m_framepropname;
 	STR_String	m_propname;
 	vector<float> m_blendshape;
+	struct PointerRNA *m_idptr;
 };
 
 #endif

@@ -1,27 +1,33 @@
 /*
  * $Id$
  *
- * ***** BEGIN LGPL LICENSE BLOCK *****
+ * ***** BEGIN GPL LICENSE BLOCK *****
  *
- * Copyright 2009 Jörg Hermann Müller
+ * Copyright 2009-2011 Jörg Hermann Müller
  *
  * This file is part of AudaSpace.
  *
- * AudaSpace is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
+ * Audaspace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
  * AudaSpace is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU Lesser General Public License
- * along with AudaSpace.  If not, see <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU General Public License
+ * along with Audaspace; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * ***** END LGPL LICENSE BLOCK *****
+ * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file audaspace/SRC/AUD_SRCResampleReader.cpp
+ *  \ingroup audsrc
+ */
+
 
 #include "AUD_SRCResampleReader.h"
 
@@ -37,20 +43,16 @@ static long src_callback(void *cb_data, float **data)
 static const char* state_error = "AUD_SRCResampleReader: SRC State couldn't be "
 								 "created.";
 
-AUD_SRCResampleReader::AUD_SRCResampleReader(AUD_IReader* reader,
+AUD_SRCResampleReader::AUD_SRCResampleReader(AUD_Reference<AUD_IReader> reader,
 											 AUD_Specs specs) :
-		AUD_EffectReader(reader),
-		m_sspecs(reader->getSpecs()),
-		m_factor(double(specs.rate) / double(m_sspecs.rate)),
-		m_tspecs(specs),
+		AUD_ResampleReader(reader, specs.rate),
+		m_channels(reader->getSpecs().channels),
 		m_position(0)
 {
-	m_tspecs.channels = m_sspecs.channels;
-
 	int error;
 	m_src = src_callback_new(src_callback,
 							 SRC_SINC_MEDIUM_QUALITY,
-							 m_sspecs.channels,
+							 m_channels,
 							 &error,
 							 this);
 
@@ -68,25 +70,32 @@ AUD_SRCResampleReader::~AUD_SRCResampleReader()
 
 long AUD_SRCResampleReader::doCallback(float** data)
 {
-	int length = m_buffer.getSize() / AUD_SAMPLE_SIZE(m_tspecs);
-	sample_t* buffer;
+	AUD_Specs specs;
+	specs.channels = m_channels;
+	specs.rate = m_rate;
 
-	m_reader->read(length, buffer);
+	int length = m_buffer.getSize() / AUD_SAMPLE_SIZE(specs);
 
-	*data = buffer;
+	*data = m_buffer.getBuffer();
+	m_reader->read(length, m_eos, *data);
+
 	return length;
 }
 
 void AUD_SRCResampleReader::seek(int position)
 {
-	m_reader->seek(position / m_factor);
+	AUD_Specs specs = m_reader->getSpecs();
+	double factor = double(m_rate) / double(specs.rate);
+	m_reader->seek(position / factor);
 	src_reset(m_src);
 	m_position = position;
 }
 
 int AUD_SRCResampleReader::getLength() const
 {
-	return m_reader->getLength() * m_factor;
+	AUD_Specs specs = m_reader->getSpecs();
+	double factor = double(m_rate) / double(specs.rate);
+	return m_reader->getLength() * factor;
 }
 
 int AUD_SRCResampleReader::getPosition() const
@@ -96,19 +105,48 @@ int AUD_SRCResampleReader::getPosition() const
 
 AUD_Specs AUD_SRCResampleReader::getSpecs() const
 {
-	return m_tspecs;
+	AUD_Specs specs = m_reader->getSpecs();
+	specs.rate = m_rate;
+	return specs;
 }
 
-void AUD_SRCResampleReader::read(int & length, sample_t* & buffer)
+void AUD_SRCResampleReader::read(int& length, bool& eos, sample_t* buffer)
 {
-	int size = length * AUD_SAMPLE_SIZE(m_tspecs);
+	AUD_Specs specs = m_reader->getSpecs();
 
-	if(m_buffer.getSize() < size)
-		m_buffer.resize(size);
+	double factor = double(m_rate) / double(specs.rate);
 
-	buffer = m_buffer.getBuffer();
+	specs.rate = m_rate;
 
-	length = src_callback_read(m_src, m_factor, length, buffer);
+	int size = length;
+
+	m_buffer.assureSize(length * AUD_SAMPLE_SIZE(specs));
+
+	if(specs.channels != m_channels)
+	{
+		src_delete(m_src);
+
+		m_channels = specs.channels;
+
+		int error;
+		m_src = src_callback_new(src_callback,
+								 SRC_SINC_MEDIUM_QUALITY,
+								 m_channels,
+								 &error,
+								 this);
+
+		if(!m_src)
+		{
+			// XXX printf("%s\n", src_strerror(error));
+			AUD_THROW(AUD_ERROR_SRC, state_error);
+		}
+	}
+
+	m_eos = false;
+
+	length = src_callback_read(m_src, factor, length, buffer);
 
 	m_position += length;
+
+	eos = m_eos && (length < size);
 }

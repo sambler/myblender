@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/makesrna/intern/rna_boid.c
+ *  \ingroup RNA
+ */
+
+
 #include <float.h>
 #include <limits.h>
 #include <stdlib.h>
@@ -46,7 +51,7 @@
 EnumPropertyItem boidrule_type_items[] ={
 	{eBoidRuleType_Goal, "GOAL", 0, "Goal", "Go to assigned object or loudest assigned signal source"},
 	{eBoidRuleType_Avoid, "AVOID", 0, "Avoid", "Get away from assigned object or loudest assigned signal source"},
-	{eBoidRuleType_AvoidCollision, "AVOID_COLLISION", 0, "Avoid Collision", "Maneuver to avoid collisions with other boids and deflector objects in near future"},
+	{eBoidRuleType_AvoidCollision, "AVOID_COLLISION", 0, "Avoid Collision", "Manoeuvre to avoid collisions with other boids and deflector objects in near future"},
 	{eBoidRuleType_Separate, "SEPARATE", 0, "Separate", "Keep from going through other boids"},
 	{eBoidRuleType_Flock, "FLOCK", 0, "Flock", "Move to center of neighbors and match their velocity"},
 	{eBoidRuleType_FollowLeader, "FOLLOW_LEADER", 0, "Follow Leader", "Follow a boid or assigned object"},
@@ -78,10 +83,10 @@ static void rna_Boids_reset(Main *bmain, Scene *scene, PointerRNA *ptr)
 		
 		psys->recalc = PSYS_RECALC_RESET;
 
-		DAG_id_flush_update(ptr->id.data, OB_RECALC_DATA);
+		DAG_id_tag_update(ptr->id.data, OB_RECALC_DATA);
 	}
 	else
-		DAG_id_flush_update(ptr->id.data, OB_RECALC_DATA|PSYS_RECALC_RESET);
+		DAG_id_tag_update(ptr->id.data, OB_RECALC_DATA|PSYS_RECALC_RESET);
 
 	WM_main_add_notifier(NC_OBJECT|ND_PARTICLE|NA_EDITED, NULL);
 }
@@ -92,10 +97,10 @@ static void rna_Boids_reset_deps(Main *bmain, Scene *scene, PointerRNA *ptr)
 		
 		psys->recalc = PSYS_RECALC_RESET;
 
-		DAG_id_flush_update(ptr->id.data, OB_RECALC_DATA);
+		DAG_id_tag_update(ptr->id.data, OB_RECALC_DATA);
 	}
 	else
-		DAG_id_flush_update(ptr->id.data, OB_RECALC_DATA|PSYS_RECALC_RESET);
+		DAG_id_tag_update(ptr->id.data, OB_RECALC_DATA|PSYS_RECALC_RESET);
 
 	DAG_scene_sort(bmain, scene);
 
@@ -173,6 +178,26 @@ static void rna_BoidState_active_boid_rule_index_set(struct PointerRNA *ptr, int
 		else
 			rule->flag &= ~BOIDRULE_CURRENT;
 	}
+}
+
+static int particle_id_check(PointerRNA *ptr)
+{
+	ID *id= ptr->id.data;
+
+	return (GS(id->name) == ID_PA);
+}
+
+static char *rna_BoidSettings_path(PointerRNA *ptr)
+{
+	BoidSettings *boids = (BoidSettings *)ptr->data;
+	
+	if(particle_id_check(ptr)) {
+		ParticleSettings *part = (ParticleSettings*)ptr->id.data;
+		
+		if (part->boids == boids)
+			return BLI_sprintfN("boids");
+	}
+	return NULL;
 }
 
 static PointerRNA rna_BoidSettings_active_boid_state_get(PointerRNA *ptr)
@@ -466,6 +491,7 @@ static void rna_def_boid_settings(BlenderRNA *brna)
 	PropertyRNA *prop;
 
 	srna = RNA_def_struct(brna, "BoidSettings", NULL);
+	RNA_def_struct_path_func(srna, "rna_BoidSettings_path");
 	RNA_def_struct_ui_text(srna, "Boid Settings", "Settings for boid physics");
 
 	prop= RNA_def_property(srna, "land_smooth", PROP_FLOAT, PROP_NONE);

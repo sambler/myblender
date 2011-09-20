@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  * 
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,12 +26,20 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/makesrna/intern/rna_image_api.c
+ *  \ingroup RNA
+ */
+
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
 
 #include "RNA_define.h"
+#include "RNA_enum_types.h"
+
+#include "DNA_packedFile_types.h"
 
 #include "BIF_gl.h"
 
@@ -40,8 +48,8 @@
 #include "BKE_image.h"
 #include "BKE_packedFile.h"
 #include "BKE_main.h"
-#include "BKE_utildefines.h"
-#include "BKE_global.h" /* grr: G.sce */
+
+#include "BKE_global.h" /* grr: G.main->name */
 
 #include "IMB_imbuf.h"
 
@@ -53,7 +61,7 @@
 
 #include "MEM_guardedalloc.h"
 
-static void rna_Image_save_render(Image *image, bContext *C, ReportList *reports, char *path, Scene *scene)
+static void rna_Image_save_render(Image *image, bContext *C, ReportList *reports, const char *path, Scene *scene)
 {
 	ImBuf *ibuf;
 
@@ -73,9 +81,17 @@ static void rna_Image_save_render(Image *image, bContext *C, ReportList *reports
 		if (ibuf == NULL) {
 			BKE_reportf(reports, RPT_ERROR, "Couldn't acquire buffer from image");
 		}
-
-		if (!BKE_write_ibuf(NULL, ibuf, path, scene->r.imtype, scene->r.subimtype, scene->r.quality)) {
-			BKE_reportf(reports, RPT_ERROR, "Couldn't write image: %s", path);
+		else {
+			/* temp swap out the color */
+			const unsigned char imb_depth_back= ibuf->depth;
+			const float dither_back= ibuf->dither; 
+			ibuf->depth= scene->r.planes;
+			ibuf->dither= scene->r.dither_intensity;
+			if (!BKE_write_ibuf(ibuf, path, scene->r.imtype, scene->r.subimtype, scene->r.quality)) {
+				BKE_reportf(reports, RPT_ERROR, "Couldn't write image: %s", path);
+			}
+			ibuf->depth= imb_depth_back;
+			ibuf->dither= dither_back;
 		}
 
 		BKE_image_release_ibuf(image, lock);
@@ -90,7 +106,7 @@ static void rna_Image_save(Image *image, ReportList *reports)
 	if(ibuf) {
 		char filename[FILE_MAXDIR + FILE_MAXFILE];
 		BLI_strncpy(filename, image->name, sizeof(filename));
-		BLI_path_abs(filename, G.sce);
+		BLI_path_abs(filename, G.main->name);
 
 		if(image->packedfile) {
 			if (writePackedFile(reports, image->name, image->packedfile, 0) != RET_OK) {
@@ -111,6 +127,38 @@ static void rna_Image_save(Image *image, ReportList *reports)
 	}
 	else {
 		BKE_reportf(reports, RPT_ERROR, "Image \"%s\" does not have any image data", image->id.name+2);
+	}
+}
+
+static void rna_Image_pack(Image *image, ReportList *reports, int as_png)
+{
+	ImBuf *ibuf = BKE_image_get_ibuf(image, NULL);
+
+	if (!as_png && (ibuf && (ibuf->userflags & IB_BITMAPDIRTY))) {
+		BKE_reportf(reports, RPT_ERROR, "Can't pack edited image from disk, only as internal PNG");
+	}
+	else {
+		if(as_png) {
+			BKE_image_memorypack(image);
+		}
+		else {
+			image->packedfile= newPackedFile(reports, image->name);
+		}
+	}
+}
+
+static void rna_Image_unpack(Image *image, ReportList *reports, int method)
+{
+	if (!image->packedfile) {
+		BKE_report(reports, RPT_ERROR, "Image not packed");
+	}
+	else if (image->source==IMA_SRC_SEQUENCE || image->source==IMA_SRC_MOVIE) {
+		BKE_report(reports, RPT_ERROR, "Unpacking movies or image sequences not supported");
+		return;
+	}
+	else {
+		/* reports its own error on failier */
+		unpackImage (reports, image, method);
 	}
 }
 
@@ -142,7 +190,7 @@ static int rna_Image_gl_load(Image *image, ReportList *reports, int filter, int 
 
 	ibuf= BKE_image_get_ibuf(image, NULL);
 
- 	if(ibuf == NULL || ibuf->rect == NULL ) {
+	if(ibuf == NULL || ibuf->rect == NULL ) {
 		BKE_reportf(reports, RPT_ERROR, "Image \"%s\" does not have any image data", image->id.name+2);
 		return (int)GL_INVALID_OPERATION;
 	}
@@ -190,13 +238,23 @@ void RNA_api_image(StructRNA *srna)
 	func= RNA_def_function(srna, "save_render", "rna_Image_save_render");
 	RNA_def_function_ui_description(func, "Save image to a specific path using a scenes render settings");
 	RNA_def_function_flag(func, FUNC_USE_CONTEXT|FUNC_USE_REPORTS);
-	parm= RNA_def_string(func, "filepath", "", 0, "", "Save path.");
+	parm= RNA_def_string_file_path(func, "filepath", "", 0, "", "Save path");
 	RNA_def_property_flag(parm, PROP_REQUIRED);
-	parm= RNA_def_pointer(func, "scene", "Scene", "", "Scene to take image parameters from");
+	RNA_def_pointer(func, "scene", "Scene", "", "Scene to take image parameters from");
 
 	func= RNA_def_function(srna, "save", "rna_Image_save");
 	RNA_def_function_ui_description(func, "Save image to its source path");
 	RNA_def_function_flag(func, FUNC_USE_REPORTS);
+
+	func= RNA_def_function(srna, "pack", "rna_Image_pack");
+	RNA_def_function_ui_description(func, "Pack an image as embedded data into the .blend file");
+	RNA_def_function_flag(func, FUNC_USE_REPORTS);
+	RNA_def_boolean(func, "as_png", 0, "as_png", "Pack the image as PNG (needed for generated/dirty images)");
+
+	func= RNA_def_function(srna, "unpack", "rna_Image_unpack");
+	RNA_def_function_ui_description(func, "Save an image packed in the .blend file to disk");
+	RNA_def_function_flag(func, FUNC_USE_REPORTS);
+	RNA_def_enum(func, "method", unpack_method_items, PF_USE_LOCAL, "method", "How to unpack");
 
 	func= RNA_def_function(srna, "reload", "rna_Image_reload");
 	RNA_def_function_ui_description(func, "Reload the image from its source path");
@@ -208,8 +266,10 @@ void RNA_api_image(StructRNA *srna)
 	func= RNA_def_function(srna, "gl_load", "rna_Image_gl_load");
 	RNA_def_function_ui_description(func, "Load the image into OpenGL graphics memory");
 	RNA_def_function_flag(func, FUNC_USE_REPORTS);
-	parm= RNA_def_int(func, "filter", GL_LINEAR_MIPMAP_NEAREST, -INT_MAX, INT_MAX, "Filter", "The texture minifying function", -INT_MAX, INT_MAX);
-	parm= RNA_def_int(func, "mag", GL_LINEAR, -INT_MAX, INT_MAX, "Magnification", "The texture magnification function", -INT_MAX, INT_MAX);
+	RNA_def_int(func, "filter", GL_LINEAR_MIPMAP_NEAREST, -INT_MAX, INT_MAX, "Filter",
+	            "The texture minifying function", -INT_MAX, INT_MAX);
+	RNA_def_int(func, "mag", GL_LINEAR, -INT_MAX, INT_MAX, "Magnification",
+	            "The texture magnification function", -INT_MAX, INT_MAX);
 	/* return value */
 	parm= RNA_def_int(func, "error", 0, -INT_MAX, INT_MAX, "Error", "OpenGL error value", -INT_MAX, INT_MAX);
 	RNA_def_function_return(func, parm);

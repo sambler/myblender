@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/blenfont/intern/blf_internal_types.h
+ *  \ingroup blf
+ */
+
+
 #ifndef BLF_INTERNAL_TYPES_H
 #define BLF_INTERNAL_TYPES_H
 
@@ -40,6 +45,9 @@ typedef struct GlyphCacheBLF {
 
 	/* and the glyphs. */
 	ListBase bucket[257];
+
+	/* fast ascii lookup */
+	struct GlyphBLF *glyph_ascii_table[256];
 
 	/* texture array, to draw the glyphs. */
 	GLuint *textures;
@@ -133,7 +141,7 @@ typedef struct FontBLF {
 	char *filename;
 
 	/* aspect ratio or scale. */
-	float aspect;
+	float aspect[3];
 
 	/* initial position for draw the text. */
 	float pos[3];
@@ -153,9 +161,14 @@ typedef struct FontBLF {
 
 	/* shadow color. */
 	float shadow_col[4];
-	
-	/* this is the matrix that we load before rotate/scale/translate. */
-	float mat[4][4];
+
+	/* store color here when drawing shadow or blur. */
+	float orig_col[4];
+
+	/* Multiplied this matrix with the current one before
+	 * draw the text! see blf_draw__start.
+	 */
+	double m[16];
 
 	/* clipping rectangle. */
 	rctf clip_rec;
@@ -169,6 +182,9 @@ typedef struct FontBLF {
 	/* max texture size. */
 	int max_tex_size;
 
+	/* current opengl texture  bind, avoids calling glGet */
+	int tex_bind_state;
+
 	/* font options. */
 	int flags;
 
@@ -177,6 +193,9 @@ typedef struct FontBLF {
 
 	/* current glyph cache, size and dpi. */
 	GlyphCacheBLF *glyph_cache;
+
+	/* freetype2 lib handle. */
+	FT_Library ft_lib;
 
 	/* freetype2 face. */
 	FT_Face face;
@@ -187,9 +206,9 @@ typedef struct FontBLF {
 	/* the same but unsigned char */
 	unsigned char *b_cbuf;
 
-	/* buffer size. */
-	unsigned int bw;
-	unsigned int bh;
+	/* buffer size, keep signed so comparisons with negative values work */
+	int bw;
+	int bh;
 
 	/* number of channels. */
 	int bch;

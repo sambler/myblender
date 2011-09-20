@@ -1,6 +1,4 @@
-/**
- * blenlib/DNA_image_types.h (mar-2001 nzc)
- *
+/*
  * $Id$ 
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -31,6 +29,10 @@
 #ifndef DNA_IMAGE_TYPES_H
 #define DNA_IMAGE_TYPES_H
 
+/** \file DNA_image_types.h
+ *  \ingroup DNA
+ */
+
 #include "DNA_ID.h"
 
 struct PackedFile;
@@ -44,16 +46,20 @@ struct GPUTexture;
 /* ImageUser is in Texture, in Nodes, Background Image, Image Window, .... */
 /* should be used in conjunction with an ID * to Image. */
 typedef struct ImageUser {
+	struct Scene *scene;		/* to retrieve render result */
+
 	int framenr;				/* movies, sequences: current to display */
 	int frames;					/* total amount of frames to use */
 	int offset, sfra;			/* offset within movie, start frame in global time */
-	short fie_ima, cycl;		/* fields/image in movie, cyclic flag */
-	short flag, ok;
-	
+	char fie_ima, cycl;		/* fields/image in movie, cyclic flag */
+	char ok, pad;
+
 	short multi_index, layer, pass;	 /* listbase indices, for menu browsing or retrieve buffer */
-	short menunr;					/* localized menu entry, for handling browse event */
+
+	short flag;
 	
-	struct Scene *scene;		/* to retrieve render result */
+	int pad2;
+
 } ImageUser;
 
 /* iuser->flag */
@@ -96,7 +102,8 @@ typedef struct Image {
 	short animspeed;
 	
 	/* for generated images */
-	short gen_x, gen_y, gen_type;
+	short gen_x, gen_y;
+	char gen_type, gen_flag;
 	
 	/* display aspect - for UV editing images resized for faster openGL display */
 	float aspx, aspy;
@@ -129,6 +136,9 @@ typedef struct Image {
 /* render */
 #define IMA_MAX_RENDER_TEXT		512
 #define IMA_MAX_RENDER_SLOT		8
+
+/* gen_flag */
+#define IMA_GEN_FLOAT		1
 
 #endif
 

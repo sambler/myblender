@@ -1,3 +1,6 @@
+/** \file blender/imbuf/intern/cineon/cineonlib.c
+ *  \ingroup imbcineon
+ */
 /*
  *	 Cineon image file format library routines.
  *
@@ -33,6 +36,9 @@
 #include <netinet/in.h>	 /* htonl() */
 #endif
 #include <string.h>			 /* memset */
+
+#include "BLI_utildefines.h"
+
 #include "cin_debug_stuff.h"
 #include "logmemfile.h"
 
@@ -185,6 +191,8 @@ dumpCineonImageInfo(CineonImageInformation* imageInfo) {
 static void
 fillCineonFormatInfo(CineonFile* cineon, CineonFormatInformation* formatInfo) {
 
+	(void)cineon; /* unused */
+	
 	formatInfo->interleave = 0;
 	formatInfo->packing = 5;
 	formatInfo->signage = 0;
@@ -238,6 +246,8 @@ dumpCineonFormatInfo(CineonFormatInformation* formatInfo) {
 static void
 fillCineonOriginationInfo(CineonFile* cineon,
 	CineonOriginationInformation* originInfo, CineonFileInformation* fileInfo) {
+	
+	(void)cineon; /* unused */
 
 	originInfo->x_offset = htonl(0);
 	originInfo->y_offset = htonl(0);
@@ -269,7 +279,7 @@ dumpCineonOriginationInfo(CineonOriginationInformation* originInfo) {
 	d_printf("Input device gamma %f\n", ntohf(originInfo->input_device_gamma));
 }
 
-int
+static int
 initCineonGenericHeader(CineonFile* cineon, CineonGenericHeader* header, const char* imagename) {
 
 	fillCineonFileInfo(cineon, &header->fileInfo, imagename);
@@ -280,8 +290,8 @@ initCineonGenericHeader(CineonFile* cineon, CineonGenericHeader* header, const c
 	return 0;
 }
 
-void
-dumpCineonGenericHeader(CineonGenericHeader* header) {
+static void
+UNUSED_FUNCTION(dumpCineonGenericHeader)(CineonGenericHeader* header) {
 	dumpCineonFileInfo(&header->fileInfo);
 	dumpCineonImageInfo(&header->imageInfo);
 	dumpCineonFormatInfo(&header->formatInfo);
@@ -599,7 +609,6 @@ CineonFile*
 cineonOpenFromMem(unsigned char *mem, unsigned int size) {
 
 	CineonGenericHeader header;
-	int i;
 	
 	CineonFile* cineon = (CineonFile* )malloc(sizeof(CineonFile));
 	if (cineon == 0) {
@@ -663,8 +672,6 @@ cineonOpenFromMem(unsigned char *mem, unsigned int size) {
 		return 0;
 	}
 	cineon->pixelBufferUsed = 0;
-
-	i = cineon->imageOffset;
 	
 	if (logimage_fseek(cineon, cineon->imageOffset, SEEK_SET) != 0) {
 		if (verbose) d_printf("Couldn't seek to image data at %d\n", cineon->imageOffset);

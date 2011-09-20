@@ -30,10 +30,17 @@
 *
 */
 
+/** \file blender/modifiers/intern/MOD_meshdeform.c
+ *  \ingroup modifiers
+ */
+
+
 #include "DNA_meshdata_types.h"
 #include "DNA_object_types.h"
 
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
+
 
 #include "BKE_cdderivedmesh.h"
 #include "BKE_global.h"
@@ -65,6 +72,8 @@ static void freeData(ModifierData *md)
 	if(mmd->dyngrid) MEM_freeN(mmd->dyngrid);
 	if(mmd->dyninfluences) MEM_freeN(mmd->dyninfluences);
 	if(mmd->dynverts) MEM_freeN(mmd->dynverts);
+	if(mmd->bindweights) MEM_freeN(mmd->bindweights); /* deprecated */
+	if(mmd->bindcos) MEM_freeN(mmd->bindcos); /* deprecated */
 }
 
 static void copyData(ModifierData *md, ModifierData *target)
@@ -76,18 +85,18 @@ static void copyData(ModifierData *md, ModifierData *target)
 	tmmd->object = mmd->object;
 }
 
-static CustomDataMask requiredDataMask(Object *ob, ModifierData *md)
+static CustomDataMask requiredDataMask(Object *UNUSED(ob), ModifierData *md)
 {	
 	MeshDeformModifierData *mmd = (MeshDeformModifierData *)md;
 	CustomDataMask dataMask = 0;
 
 	/* ask for vertexgroups if we need them */
-	if(mmd->defgrp_name[0]) dataMask |= (1 << CD_MDEFORMVERT);
+	if(mmd->defgrp_name[0]) dataMask |= CD_MASK_MDEFORMVERT;
 
 	return dataMask;
 }
 
-static int isDisabled(ModifierData *md, int useRenderParams)
+static int isDisabled(ModifierData *md, int UNUSED(useRenderParams))
 {
 	MeshDeformModifierData *mmd = (MeshDeformModifierData*) md;
 
@@ -104,9 +113,10 @@ static void foreachObjectLink(
 	walk(userData, ob, &mmd->object);
 }
 
-static void updateDepgraph(
-						  ModifierData *md, DagForest *forest, struct Scene *scene, Object *ob,
-	   DagNode *obNode)
+static void updateDepgraph(ModifierData *md, DagForest *forest,
+						struct Scene *UNUSED(scene),
+						Object *UNUSED(ob),
+						DagNode *obNode)
 {
 	MeshDeformModifierData *mmd = (MeshDeformModifierData*) md;
 
@@ -204,7 +214,7 @@ static void meshdeformModifier_do(
 	/* if we don't have one computed, use derivedmesh from data
 	 * without any modifiers */
 	if(!cagedm) {
-		cagedm= get_dm(md->scene, mmd->object, NULL, NULL, NULL, 0);
+		cagedm= get_dm(mmd->object, NULL, NULL, NULL, 0);
 		if(cagedm)
 			cagedm->needsFree= 1;
 	}
@@ -274,10 +284,7 @@ static void meshdeformModifier_do(
 			copy_v3_v3(dco[a], co);
 	}
 
-	defgrp_index = defgroup_name_index(ob, mmd->defgrp_name);
-
-	if(dm && defgrp_index >= 0)
-		dvert= dm->getVertDataArray(dm, CD_MDEFORMVERT);
+	modifier_get_vgroup(ob, dm, mmd->defgrp_name, &dvert, &defgrp_index);
 
 	/* do deformation */
 	fac= 1.0f;
@@ -338,11 +345,14 @@ static void meshdeformModifier_do(
 	cagedm->release(cagedm);
 }
 
-static void deformVerts(
-					   ModifierData *md, Object *ob, DerivedMesh *derivedData,
-	float (*vertexCos)[3], int numVerts, int useRenderParams, int isFinalCalc)
+static void deformVerts(ModifierData *md, Object *ob,
+						DerivedMesh *derivedData,
+						float (*vertexCos)[3],
+						int numVerts,
+						int UNUSED(useRenderParams),
+						int UNUSED(isFinalCalc))
 {
-	DerivedMesh *dm= get_dm(md->scene, ob, NULL, derivedData, NULL, 0);;
+	DerivedMesh *dm= get_dm(ob, NULL, derivedData, NULL, 0);
 
 	modifier_vgroup_cache(md, vertexCos); /* if next modifier needs original vertices */
 	
@@ -352,11 +362,13 @@ static void deformVerts(
 		dm->release(dm);
 }
 
-static void deformVertsEM(
-						 ModifierData *md, Object *ob, struct EditMesh *editData,
-	  DerivedMesh *derivedData, float (*vertexCos)[3], int numVerts)
+static void deformVertsEM(ModifierData *md, Object *ob,
+						struct EditMesh *UNUSED(editData),
+						DerivedMesh *derivedData,
+						float (*vertexCos)[3],
+						int numVerts)
 {
-	DerivedMesh *dm= get_dm(md->scene, ob, NULL, derivedData, NULL, 0);;
+	DerivedMesh *dm= get_dm(ob, NULL, derivedData, NULL, 0);
 
 	meshdeformModifier_do(md, ob, dm, vertexCos, numVerts);
 
@@ -364,7 +376,7 @@ static void deformVertsEM(
 		dm->release(dm);
 }
 
-#define MESHDEFORM_MIN_INFLUENCE 0.00001
+#define MESHDEFORM_MIN_INFLUENCE 0.00001f
 
 void modifier_mdef_compact_influences(ModifierData *md)
 {
@@ -437,16 +449,19 @@ ModifierTypeInfo modifierType_MeshDeform = {
 
 	/* copyData */          copyData,
 	/* deformVerts */       deformVerts,
+	/* deformMatrices */    NULL,
 	/* deformVertsEM */     deformVertsEM,
-	/* deformMatricesEM */  0,
-	/* applyModifier */     0,
-	/* applyModifierEM */   0,
+	/* deformMatricesEM */  NULL,
+	/* applyModifier */     NULL,
+	/* applyModifierEM */   NULL,
 	/* initData */          initData,
 	/* requiredDataMask */  requiredDataMask,
 	/* freeData */          freeData,
 	/* isDisabled */        isDisabled,
 	/* updateDepgraph */    updateDepgraph,
-	/* dependsOnTime */     0,
+	/* dependsOnTime */     NULL,
+	/* dependsOnNormals */	NULL,
 	/* foreachObjectLink */ foreachObjectLink,
-	/* foreachIDLink */     0,
+	/* foreachIDLink */     NULL,
+	/* foreachTexLink */    NULL,
 };

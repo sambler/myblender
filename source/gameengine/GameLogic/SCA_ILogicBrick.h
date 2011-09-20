@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,14 +26,19 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file SCA_ILogicBrick.h
+ *  \ingroup gamelogic
+ */
+
 #ifndef __KX_ILOGICBRICK
 #define __KX_ILOGICBRICK
 
 #include "Value.h"
 #include "SCA_IObject.h"
 #include "BoolValue.h"
-#include "GEN_Map.h"
-#include "GEN_HashedPtr.h"
+#include "CTR_Map.h"
+#include "CTR_HashedPtr.h"
 
 class NG_NetworkScene;
 class SCA_IScene;
@@ -65,7 +70,7 @@ public:
 	SCA_IObject*	GetParent() { return m_gameobj; }
 
 	virtual void	ReParent(SCA_IObject* parent);
-	virtual void	Relink(GEN_Map<GEN_HashedPtr, void*> *obj_map);
+	virtual void	Relink(CTR_Map<CTR_HashedPtr, void*> *obj_map);
 	virtual void Delete() { Release(); }
 
 	// act as a BoolValue (with value IsPositiveTrigger)
@@ -133,7 +138,7 @@ public:
 	virtual void		Replace_IScene(SCA_IScene *val) {};
 	virtual void		Replace_NetworkScene(NG_NetworkScene *val) {};
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 	// python methods
 	
 	static PyObject*	pyattr_get_owner(void *self_v, const KX_PYATTRIBUTE_DEF *attrdef);
@@ -157,7 +162,7 @@ protected:
 	/** Convert a a c++ value to KX_TRUE, KX_FALSE in Python. */
 	PyObject* BoolToPyArg(bool);
 	
-#endif // DISABLE_PYTHON
+#endif // WITH_PYTHON
 
 };
 

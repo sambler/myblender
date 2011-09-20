@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,13 +26,26 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file KX_IpoConvert.h
+ *  \ingroup bgeconv
+ */
+
 #ifndef __KX_IPOCONVERT_H
 #define __KX_IPOCONVERT_H
 
 struct Object;
 
+class SG_Controller *BL_CreateIPO(struct bAction *action,
+	class KX_GameObject* gameobj,
+	class KX_BlenderSceneConverter *converter);
+
 void BL_ConvertIpos(struct Object* blenderobject,
 	class KX_GameObject* gameobj, 
+	class KX_BlenderSceneConverter *converter);
+
+class SG_Controller *BL_CreateLampIPO(struct bAction *action,
+	class KX_GameObject* lightobj,
 	class KX_BlenderSceneConverter *converter);
 
 void BL_ConvertLampIpos(struct Lamp* blenderlight,
@@ -40,6 +53,10 @@ void BL_ConvertLampIpos(struct Lamp* blenderlight,
 	class KX_BlenderSceneConverter *converter);
 
 void BL_ConvertWorldIpos(struct World* blenderworld, 
+	class KX_BlenderSceneConverter *converter);
+
+class SG_Controller *BL_CreateCameraIPO(struct bAction *action,
+	class KX_GameObject* cameraobj,
 	class KX_BlenderSceneConverter *converter);
 
 void BL_ConvertCameraIpos(struct Camera* blendercamera,

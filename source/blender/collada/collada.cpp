@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -21,28 +21,55 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
-#include "BKE_main.h"
-#include "BKE_scene.h"
-#include "BKE_context.h"
 
+/** \file blender/collada/collada.cpp
+ *  \ingroup collada
+ */
+
+
+/* COLLADABU_ASSERT, may be able to remove later */
+#include "COLLADABUPlatform.h"
+
+#include "ExportSettings.h"
 #include "DocumentExporter.h"
 #include "DocumentImporter.h"
 
 extern "C"
 {
+#include "BKE_scene.h"
+#include "BKE_context.h"
+
+/* make dummy file */
+#include "BLI_storage.h"
+#include "BLI_path_util.h"
+#include "BLI_fileops.h"
+
 	int collada_import(bContext *C, const char *filepath)
 	{
-		DocumentImporter imp;
-		imp.import(C, filepath);
+		DocumentImporter imp (C, filepath);
+		if(imp.import()) return 1;
 
-		return 1;
+		return 0;
 	}
 
-	int collada_export(Scene *sce, const char *filepath)
+	int collada_export(Scene *sce, const char *filepath, int selected)
 	{
+		ExportSettings export_settings;
+		
+		export_settings.selected = selected != 0;
+		export_settings.filepath = (char *)filepath;
 
-		DocumentExporter exp;
-		exp.exportCurrentScene(sce, filepath);
+		/* annoying, collada crashes if file cant be created! [#27162] */
+		if(!BLI_exist(filepath)) {
+			BLI_make_existing_file(filepath); /* makes the dir if its not there */
+			if(BLI_touch(filepath) == 0) {
+				return 0;
+			}
+		}
+		/* end! */
+
+		DocumentExporter exporter(&export_settings);
+		exporter.exportCurrentScene(sce);
 
 		return 1;
 	}

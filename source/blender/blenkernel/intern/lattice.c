@@ -1,4 +1,4 @@
-/**
+/*
  * lattice.c
  *
  *
@@ -30,6 +30,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/blenkernel/intern/lattice.c
+ *  \ingroup bke
+ */
+
+
 
 #include <stdio.h>
 #include <string.h>
@@ -40,6 +45,7 @@
 
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
+#include "BLI_utildefines.h"
 
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
@@ -49,6 +55,7 @@
 #include "DNA_curve_types.h"
 #include "DNA_key_types.h"
 
+#include "BKE_animsys.h"
 #include "BKE_anim.h"
 #include "BKE_cdderivedmesh.h"
 #include "BKE_displist.h"
@@ -59,7 +66,7 @@
 #include "BKE_main.h"
 #include "BKE_mesh.h"
 #include "BKE_modifier.h"
-#include "BKE_utildefines.h"
+
 #include "BKE_deform.h"
 
 //XXX #include "BIF_editdeform.h"
@@ -181,7 +188,7 @@ void resizelattice(Lattice *lt, int uNew, int vNew, int wNew, Object *ltOb)
 	MEM_freeN(vertexCos);
 }
 
-Lattice *add_lattice(char *name)
+Lattice *add_lattice(const char *name)
 {
 	Lattice *lt;
 	
@@ -203,10 +210,6 @@ Lattice *copy_lattice(Lattice *lt)
 
 	ltn= copy_libblock(lt);
 	ltn->def= MEM_dupallocN(lt->def);
-		
-#if 0 // XXX old animation system
-	id_us_plus((ID *)ltn->ipo);
-#endif // XXX old animation system
 
 	ltn->key= copy_key(ltn->key);
 	if(ltn->key) ltn->key->from= (ID *)ltn;
@@ -216,7 +219,9 @@ Lattice *copy_lattice(Lattice *lt)
 		ltn->dvert = MEM_mallocN (sizeof (MDeformVert)*tot, "Lattice MDeformVert");
 		copy_dverts(ltn->dvert, lt->dvert, tot);
 	}
-	
+
+	ltn->editlatt= NULL;
+
 	return ltn;
 }
 
@@ -233,13 +238,19 @@ void free_lattice(Lattice *lt)
 		MEM_freeN(editlt);
 		MEM_freeN(lt->editlatt);
 	}
+	
+	/* free animation data */
+	if (lt->adt) {
+		BKE_free_animdata(&lt->id);
+		lt->adt= NULL;
+	}
 }
 
 
 void make_local_lattice(Lattice *lt)
 {
+	Main *bmain= G.main;
 	Object *ob;
-	Lattice *ltn;
 	int local=0, lib=0;
 
 	/* - only lib users: do nothing
@@ -247,43 +258,38 @@ void make_local_lattice(Lattice *lt)
 	 * - mixed: make copy
 	 */
 	
-	if(lt->id.lib==0) return;
+	if(lt->id.lib==NULL) return;
 	if(lt->id.us==1) {
-		lt->id.lib= 0;
+		lt->id.lib= NULL;
 		lt->id.flag= LIB_LOCAL;
-		new_id(0, (ID *)lt, 0);
+		new_id(&bmain->latt, (ID *)lt, NULL);
 		return;
 	}
 	
-	ob= G.main->object.first;
-	while(ob) {
+	for(ob= bmain->object.first; ob && ELEM(0, lib, local); ob= ob->id.next) {
 		if(ob->data==lt) {
 			if(ob->id.lib) lib= 1;
 			else local= 1;
 		}
-		ob= ob->id.next;
 	}
 	
 	if(local && lib==0) {
-		lt->id.lib= 0;
+		lt->id.lib= NULL;
 		lt->id.flag= LIB_LOCAL;
-		new_id(0, (ID *)lt, 0);
+		new_id(&bmain->latt, (ID *)lt, NULL);
 	}
 	else if(local && lib) {
-		ltn= copy_lattice(lt);
+		Lattice *ltn= copy_lattice(lt);
 		ltn->id.us= 0;
-		
-		ob= G.main->object.first;
-		while(ob) {
+
+		for(ob= bmain->object.first; ob; ob= ob->id.next) {
 			if(ob->data==lt) {
-				
-				if(ob->id.lib==0) {
+				if(ob->id.lib==NULL) {
 					ob->data= ltn;
 					ltn->id.us++;
 					lt->id.us--;
 				}
 			}
-			ob= ob->id.next;
 		}
 	}
 }
@@ -403,7 +409,7 @@ void calc_latt_deform(Object *ob, float *co, float weight)
 	for(ww= wi-1; ww<=wi+2; ww++) {
 		w= tw[ww-wi+1];
 
-		if(w!=0.0) {
+		if(w != 0.0f) {
 			if(ww>0) {
 				if(ww<lt->pntsw) idx_w= ww*lt->pntsu*lt->pntsv;
 				else idx_w= (lt->pntsw-1)*lt->pntsu*lt->pntsv;
@@ -413,7 +419,7 @@ void calc_latt_deform(Object *ob, float *co, float weight)
 			for(vv= vi-1; vv<=vi+2; vv++) {
 				v= w*tv[vv-vi+1];
 
-				if(v!=0.0) {
+				if(v != 0.0f) {
 					if(vv>0) {
 						if(vv<lt->pntsv) idx_v= idx_w + vv*lt->pntsu;
 						else idx_v= idx_w + (lt->pntsv-1)*lt->pntsu;
@@ -423,7 +429,7 @@ void calc_latt_deform(Object *ob, float *co, float weight)
 					for(uu= ui-1; uu<=ui+2; uu++) {
 						u= weight*v*tu[uu-ui+1];
 
-						if(u!=0.0) {
+						if(u != 0.0f) {
 							if(uu>0) {
 								if(uu<lt->pntsu) idx_u= idx_v + uu;
 								else idx_u= idx_v + (lt->pntsu-1);
@@ -499,7 +505,7 @@ static int where_on_path_deform(Object *ob, float ctime, float *vec, float *dir,
 	if(bl && bl->poly> -1) cycl= 1;
 
 	if(cycl==0) {
-		ctime1= CLAMPIS(ctime, 0.0, 1.0);
+		ctime1= CLAMPIS(ctime, 0.0f, 1.0f);
 	}
 	else ctime1= ctime;
 	
@@ -510,16 +516,16 @@ static int where_on_path_deform(Object *ob, float ctime, float *vec, float *dir,
 			Path *path= cu->path;
 			float dvec[3];
 			
-			if(ctime < 0.0) {
+			if(ctime < 0.0f) {
 				sub_v3_v3v3(dvec, path->data[1].vec, path->data[0].vec);
 				mul_v3_fl(dvec, ctime*(float)path->len);
 				add_v3_v3(vec, dvec);
 				if(quat) copy_qt_qt(quat, path->data[0].quat);
 				if(radius) *radius= path->data[0].radius;
 			}
-			else if(ctime > 1.0) {
+			else if(ctime > 1.0f) {
 				sub_v3_v3v3(dvec, path->data[path->len-1].vec, path->data[path->len-2].vec);
-				mul_v3_fl(dvec, (ctime-1.0)*(float)path->len);
+				mul_v3_fl(dvec, (ctime-1.0f)*(float)path->len);
 				add_v3_v3(vec, dvec);
 				if(quat) copy_qt_qt(quat, path->data[path->len-1].quat);
 				if(radius) *radius= path->data[path->len-1].radius;
@@ -599,19 +605,9 @@ static int calc_curve_deform(Scene *scene, Object *par, float *co, short axis, C
 		}
 #endif
 
-
-		static float q_x90d[4] = {0.70710676908493, 0.70710676908493, 0.0, 0.0};	// float rot_axis[3]= {1,0,0}; axis_angle_to_quat(q, rot_axis, 90 * (M_PI / 180));
-		static float q_y90d[4] = {0.70710676908493, 0.0, 0.70710676908493, 0.0};	// float rot_axis[3]= {0,1,0}; axis_angle_to_quat(q, rot_axis, 90 * (M_PI / 180));
-		static float q_z90d[4] = {0.70710676908493, 0.0, 0.0, 0.70710676908493};	// float rot_axis[3]= {0,0,2}; axis_angle_to_quat(q, rot_axis, 90 * (M_PI / 180));
-
-		static float q_nx90d[4] = {0.70710676908493, -0.70710676908493, 0.0, 0.0};	// float rot_axis[3]= {1,0,0}; axis_angle_to_quat(q, rot_axis, -90 * (M_PI / 180));
-		static float q_ny90d[4] = {0.70710676908493, 0.0, -0.70710676908493, 0.0};	// float rot_axis[3]= {0,1,0}; axis_angle_to_quat(q, rot_axis, -90 * (M_PI / 180));
-		static float q_nz90d[4] = {0.70710676908493, 0.0, 0.0, -0.70710676908493};	// float rot_axis[3]= {0,0,2}; axis_angle_to_quat(q, rot_axis, -90 * (M_PI / 180));
-
-
 		if(cd->no_rot_axis) {	/* set by caller */
 
-			/* this is not exactly the same as 2.4x, since the axis is having rotation removed rather then
+			/* this is not exactly the same as 2.4x, since the axis is having rotation removed rather than
 			 * changing the axis before calculating the tilt but serves much the same purpose */
 			float dir_flat[3]={0,0,0}, q[4];
 			copy_v3_v3(dir_flat, dir);
@@ -635,53 +631,18 @@ static int calc_curve_deform(Scene *scene, Object *par, float *co, short axis, C
 		 * Notice X,Y,Z Up all have light colors and each ordered CCW.
 		 *
 		 * Now for Neg Up XYZ, the colors are all dark, and ordered clockwise - Campbell
+		 *
+		 * note: moved functions into quat_apply_track/vec_apply_track
 		 * */
+		copy_qt_qt(quat, new_quat);
+		copy_v3_v3(cent, co);
 
-		switch(axis) {
-		case MOD_CURVE_POSX:
-			mul_qt_qtqt(quat, new_quat, q_y90d);
+		/* zero the axis which is not used,
+		 * the big block of text above now applies to these 3 lines */
+		quat_apply_track(quat, axis-1, (axis==1 || axis==3) ? 1:0); /* up flag is a dummy, set so no rotation is done */
+		vec_apply_track(cent, axis-1);
+		cent[axis < 4 ? axis-1 : axis-4]= 0.0f;
 
-			cent[0]=  0.0;
-			cent[1]=  co[2];
-			cent[2]=  co[1];
-			break;
-		case MOD_CURVE_NEGX:
-			mul_qt_qtqt(quat, new_quat, q_ny90d);
-
-			cent[0]=  0.0;
-			cent[1]= -co[1];
-			cent[2]=  co[2];
-
-			break;
-		case MOD_CURVE_POSY:
-			mul_qt_qtqt(quat, new_quat, q_x90d);
-
-			cent[0]=  co[2];
-			cent[1]=  0.0;
-			cent[2]= -co[0];
-			break;
-		case MOD_CURVE_NEGY:
-			mul_qt_qtqt(quat, new_quat, q_nx90d);
-
-			cent[0]= -co[0];
-			cent[1]=  0.0;
-			cent[2]= -co[2];
-			break;
-		case MOD_CURVE_POSZ:
-			mul_qt_qtqt(quat, new_quat, q_z90d);
-
-			cent[0]=  co[1];
-			cent[1]= -co[0];
-			cent[2]=  0.0;
-			break;
-		case MOD_CURVE_NEGZ:
-			mul_qt_qtqt(quat, new_quat, q_nz90d);
-
-			cent[0]=  co[0];
-			cent[1]= -co[1];
-			cent[2]=  0.0;
-			break;
-		}
 
 		/* scale if enabled */
 		if(cu->flag & CU_PATH_RADIUS)
@@ -1067,13 +1028,8 @@ void lattice_calc_modifiers(Scene *scene, Object *ob)
 
 struct MDeformVert* lattice_get_deform_verts(struct Object *oblatt)
 {
-	if(oblatt->type == OB_LATTICE)
-	{
-		Lattice *lt = (Lattice*)oblatt->data;
-		if(lt->editlatt) lt= lt->editlatt->latt;
-		return lt->dvert;
-	}
-
-	return NULL;	
+	Lattice *lt = (Lattice*)oblatt->data;
+	BLI_assert(oblatt->type == OB_LATTICE);
+	if(lt->editlatt) lt= lt->editlatt->latt;
+	return lt->dvert;
 }
-

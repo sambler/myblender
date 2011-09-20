@@ -1,54 +1,49 @@
 /*
  * $Id$
  *
- * ***** BEGIN LGPL LICENSE BLOCK *****
+ * ***** BEGIN GPL LICENSE BLOCK *****
  *
- * Copyright 2009 Jörg Hermann Müller
+ * Copyright 2009-2011 Jörg Hermann Müller
  *
  * This file is part of AudaSpace.
  *
- * AudaSpace is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
+ * Audaspace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
  * AudaSpace is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU Lesser General Public License
- * along with AudaSpace.  If not, see <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU General Public License
+ * along with Audaspace; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * ***** END LGPL LICENSE BLOCK *****
+ * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file audaspace/FX/AUD_DoubleReader.cpp
+ *  \ingroup audfx
+ */
+
 
 #include "AUD_DoubleReader.h"
 
 #include <cstring>
 
-static const char* specs_error = "AUD_DoubleReader: Both readers have to have "
-								 "the same specs.";
-
-AUD_DoubleReader::AUD_DoubleReader(AUD_IReader* reader1,
-								   AUD_IReader* reader2) :
+AUD_DoubleReader::AUD_DoubleReader(AUD_Reference<AUD_IReader> reader1,
+								   AUD_Reference<AUD_IReader> reader2) :
 		m_reader1(reader1), m_reader2(reader2), m_finished1(false)
 {
 	AUD_Specs s1, s2;
 	s1 = reader1->getSpecs();
 	s2 = reader2->getSpecs();
-	if(memcmp(&s1, &s2, sizeof(AUD_Specs)) != 0)
-	{
-		delete reader1;
-		delete reader2;
-		AUD_THROW(AUD_ERROR_SPECS, specs_error);
-	}
 }
 
 AUD_DoubleReader::~AUD_DoubleReader()
 {
-	delete m_reader1;
-	delete m_reader2;
 }
 
 bool AUD_DoubleReader::isSeekable() const
@@ -84,43 +79,36 @@ int AUD_DoubleReader::getPosition() const
 
 AUD_Specs AUD_DoubleReader::getSpecs() const
 {
-	return m_reader1->getSpecs();
+	return m_finished1 ? m_reader1->getSpecs() : m_reader2->getSpecs();
 }
 
-void AUD_DoubleReader::read(int & length, sample_t* & buffer)
+void AUD_DoubleReader::read(int& length, bool& eos, sample_t* buffer)
 {
+	eos = false;
+
 	if(!m_finished1)
 	{
 		int len = length;
-		m_reader1->read(len, buffer);
+
+		m_reader1->read(len, m_finished1, buffer);
 
 		if(len < length)
 		{
-			AUD_Specs specs = m_reader1->getSpecs();
-			int samplesize = AUD_SAMPLE_SIZE(specs);
-
-			if(m_buffer.getSize() < length * samplesize)
-				m_buffer.resize(length * samplesize);
-
-			sample_t* buf = buffer;
-			buffer = m_buffer.getBuffer();
-
-			memcpy(buffer, buf, len * samplesize);
-
-			len = length - len;
-			length -= len;
-			m_reader2->read(len, buf);
-
-			memcpy(buffer + length * specs.channels, buf,
-				   len * samplesize);
-
-			length += len;
-
-			m_finished1 = true;
+			AUD_Specs specs1, specs2;
+			specs1 = m_reader1->getSpecs();
+			specs2 = m_reader2->getSpecs();
+			if(AUD_COMPARE_SPECS(specs1, specs2))
+			{
+				int len2 = length - len;
+				m_reader2->read(len2, eos, buffer + specs1.channels * len);
+				length = len + len2;
+			}
+			else
+				length = len;
 		}
 	}
 	else
 	{
-		m_reader2->read(length, buffer);
+		m_reader2->read(length, eos, buffer);
 	}
 }

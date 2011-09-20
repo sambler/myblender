@@ -1,32 +1,40 @@
 /*
  * $Id$
  *
- * ***** BEGIN LGPL LICENSE BLOCK *****
+ * ***** BEGIN GPL LICENSE BLOCK *****
  *
- * Copyright 2009 Jörg Hermann Müller
+ * Copyright 2009-2011 Jörg Hermann Müller
  *
  * This file is part of AudaSpace.
  *
- * AudaSpace is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
+ * Audaspace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
  * AudaSpace is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
+ * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU Lesser General Public License
- * along with AudaSpace.  If not, see <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU General Public License
+ * along with Audaspace; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * ***** END LGPL LICENSE BLOCK *****
+ * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file audaspace/FX/AUD_EnvelopeFactory.h
+ *  \ingroup audfx
+ */
+
 
 #ifndef AUD_ENVELOPEFACTORY
 #define AUD_ENVELOPEFACTORY
 
 #include "AUD_EffectFactory.h"
+class AUD_CallbackIIRFilterReader;
+struct EnvelopeParameters;
 
 /**
  * This factory creates an envelope follower reader.
@@ -67,10 +75,13 @@ public:
 	 * \param threshold The threshold value.
 	 * \param arthreshold The attack/release threshold value.
 	 */
-	AUD_EnvelopeFactory(AUD_IFactory* factory, float attack, float release,
+	AUD_EnvelopeFactory(AUD_Reference<AUD_IFactory> factory, float attack, float release,
 						float threshold, float arthreshold);
 
-	virtual AUD_IReader* createReader() const;
+	virtual AUD_Reference<AUD_IReader> createReader();
+
+	static sample_t envelopeFilter(AUD_CallbackIIRFilterReader* reader, EnvelopeParameters* param);
+	static void endEnvelopeFilter(EnvelopeParameters* param);
 };
 
 #endif //AUD_ENVELOPEFACTORY

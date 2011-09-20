@@ -25,10 +25,14 @@
  * Contributor(s): none yet.
  *
  * ***** END GPL LICENSE BLOCK *****
- * NetworkGameengine_NetworkDeviceInterface
- * Functions like (de)initialize network, get library version
+ */
+
+/** \file NG_NetworkDeviceInterface.h
+ *  \ingroup bgenet
+ *  \brief Functions like (de)initialize network, get library version
  * To be derived by loopback and network libraries
  */
+
 #ifndef NG_NETWORKDEVICEINTERFACE_H
 #define NG_NETWORKDEVICEINTERFACE_H
 
@@ -60,7 +64,7 @@ public:
 	bool IsOnline(void) { return m_online; }
 
 	virtual bool Connect(char *address, unsigned int port, char *password,
-		     unsigned int localport, unsigned int timeout)=0;
+	                     unsigned int localport, unsigned int timeout)=0;
 	virtual bool Disconnect(void)=0;
 
 	virtual void SendNetworkMessage(NG_NetworkMessage* msg)=0;

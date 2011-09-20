@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -25,6 +25,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/object/object_intern.h
+ *  \ingroup edobj
+ */
+
 #ifndef ED_OBJECT_INTERN_H
 #define ED_OBJECT_INTERN_H
 
@@ -50,9 +55,7 @@ void OBJECT_OT_rotation_clear(struct wmOperatorType *ot);
 void OBJECT_OT_scale_clear(struct wmOperatorType *ot);
 void OBJECT_OT_origin_clear(struct wmOperatorType *ot);
 void OBJECT_OT_visual_transform_apply(struct wmOperatorType *ot);
-void OBJECT_OT_location_apply(struct wmOperatorType *ot);
-void OBJECT_OT_scale_apply(struct wmOperatorType *ot);
-void OBJECT_OT_rotation_apply(struct wmOperatorType *ot);
+void OBJECT_OT_transform_apply(struct wmOperatorType *ot);
 void OBJECT_OT_origin_set(struct wmOperatorType *ot);
 
 /* object_relations.c */
@@ -84,6 +87,7 @@ void OBJECT_OT_shade_smooth(struct wmOperatorType *ot);
 void OBJECT_OT_shade_flat(struct wmOperatorType *ot);
 void OBJECT_OT_paths_calculate(struct wmOperatorType *ot);
 void OBJECT_OT_paths_clear(struct wmOperatorType *ot);
+void OBJECT_OT_forcefield_toggle(struct wmOperatorType *ot);
 
 void OBJECT_OT_game_property_new(struct wmOperatorType *ot);
 void OBJECT_OT_game_property_remove(struct wmOperatorType *ot);
@@ -112,6 +116,7 @@ void OBJECT_OT_armature_add(struct wmOperatorType *ot);
 void OBJECT_OT_lamp_add(struct wmOperatorType *ot);
 void OBJECT_OT_effector_add(struct wmOperatorType *ot);
 void OBJECT_OT_camera_add(struct wmOperatorType *ot);
+void OBJECT_OT_speaker_add(struct wmOperatorType *ot);
 void OBJECT_OT_group_instance_add(struct wmOperatorType *ot);
 
 void OBJECT_OT_duplicates_make_real(struct wmOperatorType *ot);
@@ -151,6 +156,7 @@ void OBJECT_OT_modifier_copy(struct wmOperatorType *ot);
 void OBJECT_OT_multires_subdivide(struct wmOperatorType *ot);
 void OBJECT_OT_multires_reshape(struct wmOperatorType *ot);
 void OBJECT_OT_multires_higher_levels_delete(struct wmOperatorType *ot);
+void OBJECT_OT_multires_base_apply(struct wmOperatorType *ot);
 void OBJECT_OT_multires_external_save(struct wmOperatorType *ot);
 void OBJECT_OT_multires_external_pack(struct wmOperatorType *ot);
 void OBJECT_OT_meshdeform_bind(struct wmOperatorType *ot);
@@ -194,6 +200,8 @@ void OBJECT_OT_vertex_group_copy(struct wmOperatorType *ot);
 void OBJECT_OT_vertex_group_normalize(struct wmOperatorType *ot);
 void OBJECT_OT_vertex_group_normalize_all(struct wmOperatorType *ot);
 void OBJECT_OT_vertex_group_levels(struct wmOperatorType *ot);
+void OBJECT_OT_vertex_group_lock(struct wmOperatorType *ot);
+void OBJECT_OT_vertex_group_fix(struct wmOperatorType *ot);
 void OBJECT_OT_vertex_group_invert(struct wmOperatorType *ot);
 void OBJECT_OT_vertex_group_blend(struct wmOperatorType *ot);
 void OBJECT_OT_vertex_group_clean(struct wmOperatorType *ot);
@@ -216,6 +224,11 @@ void OBJECT_OT_group_remove(struct wmOperatorType *ot);
 
 /* object_bake.c */
 void OBJECT_OT_bake_image(wmOperatorType *ot);
+
+/* object_navmesh.cpp */
+void OBJECT_OT_create_navmesh(struct wmOperatorType *ot);
+void OBJECT_OT_assign_navpolygon(struct wmOperatorType *ot);
+void OBJECT_OT_assign_new_navpolygon(struct wmOperatorType *ot);
 
 #endif /* ED_OBJECT_INTERN_H */
 

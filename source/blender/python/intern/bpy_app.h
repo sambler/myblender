@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -21,11 +21,14 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
-#ifndef BPY_APP_H__
-#define BPY_APP_H__
 
-#include <Python.h>
+/** \file blender/python/intern/bpy_app.h
+ *  \ingroup pythonintern
+ */
 
-PyObject *BPY_app_struct( void );
+#ifndef BPY_APP_H
+#define BPY_APP_H
 
-#endif
+PyObject *BPY_app_struct(void);
+
+#endif // BPY_APP_H

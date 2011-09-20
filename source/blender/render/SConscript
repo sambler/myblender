@@ -6,13 +6,15 @@ raysources = env.Glob('intern/raytrace/*.cpp')
 
 incs = 'intern/include #/intern/guardedalloc ../blenlib ../makesdna ../makesrna'
 incs += ' extern/include ../blenkernel ../radiosity/extern/include ../imbuf'
-incs += ' ../include ../blenloader ../../../intern/smoke/extern'
+incs += ' ../include ../blenloader ../../../intern/smoke/extern ../../../intern/mikktspace'
 
 cflags_raytrace = env['CCFLAGS']
 cxxflags_raytrace = env['CXXFLAGS']
 
 defs = []
 defs_raytrace = []
+
+defs.append('WITH_SMOKE')  # TODO, make optional
 
 if env['OURPLATFORM'] in ('win32-vc', 'win64-vc'):
     if env['WITH_BF_RAYOPTIMIZATION']:
@@ -29,7 +31,7 @@ if env['OURPLATFORM'] == 'darwin':
         cflags_raytrace = env['CFLAGS'] + env['BF_RAYOPTIMIZATION_SSE_FLAGS']
         cxxflags_raytrace = env['CXXFLAGS'] + env['BF_RAYOPTIMIZATION_SSE_FLAGS']
         
-if env['OURPLATFORM'] == 'linux2':
+if env['OURPLATFORM'] == 'linux':
     if env['WITH_BF_RAYOPTIMIZATION']:
         cflags_raytrace = env['CCFLAGS'] +  env['BF_RAYOPTIMIZATION_SSE_FLAGS']
         cxxflags_raytrace = env['CXXFLAGS'] +  env['BF_RAYOPTIMIZATION_SSE_FLAGS']

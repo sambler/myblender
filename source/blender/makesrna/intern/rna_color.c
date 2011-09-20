@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -21,6 +21,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/makesrna/intern/rna_color.c
+ *  \ingroup RNA
+ */
+
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -232,7 +237,7 @@ MEM_freeN(texture_path); \
 	return path;
 }
 
-static void rna_ColorRamp_update(Main *bmain, Scene *scene, PointerRNA *ptr)
+static void rna_ColorRamp_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *ptr)
 {
 	if (ptr->id.data) {
 		ID *id= ptr->id.data;
@@ -242,7 +247,7 @@ static void rna_ColorRamp_update(Main *bmain, Scene *scene, PointerRNA *ptr)
 			{
 				Material *ma= ptr->id.data;
 				
-				DAG_id_flush_update(&ma->id, 0);
+				DAG_id_tag_update(&ma->id, 0);
 				WM_main_add_notifier(NC_MATERIAL|ND_SHADING_DRAW, ma);
 			}
 				break;
@@ -253,7 +258,7 @@ static void rna_ColorRamp_update(Main *bmain, Scene *scene, PointerRNA *ptr)
 
 				for(node=ntree->nodes.first; node; node=node->next) {
 					if (ELEM3(node->type, SH_NODE_VALTORGB, CMP_NODE_VALTORGB, TEX_NODE_VALTORGB)) {
-						ED_node_generic_update(bmain, scene, ntree, node);
+						ED_node_generic_update(bmain, ntree, node);
 					}
 				}
 			}
@@ -262,7 +267,7 @@ static void rna_ColorRamp_update(Main *bmain, Scene *scene, PointerRNA *ptr)
 			{
 				Tex *tex= ptr->id.data;
 
-				DAG_id_flush_update(&tex->id, 0);
+				DAG_id_tag_update(&tex->id, 0);
 				WM_main_add_notifier(NC_TEXTURE, tex);
 			}
 				break;
@@ -295,7 +300,7 @@ static void rna_ColorRampElement_remove(struct ColorBand *coba, ReportList *repo
 
 }
 
-static void rna_Scopes_update(Main *bmain, Scene *scene, PointerRNA *ptr)
+static void rna_Scopes_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
 {
 	Scopes *s= (Scopes*)ptr->data;
 	s->ok = 0;
@@ -328,7 +333,7 @@ static void rna_def_curvemappoint(BlenderRNA *brna)
 	RNA_def_property_enum_bitflag_sdna(prop, NULL, "flag");
 	RNA_def_property_enum_items(prop, prop_handle_type_items);
 	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
-	RNA_def_property_ui_text(prop, "Handle Type", "Curve interpolation at this point: bezier or vector");
+	RNA_def_property_ui_text(prop, "Handle Type", "Curve interpolation at this point: Bezier or vector");
 
 	prop= RNA_def_property(srna, "select", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", CUMA_SELECT);
@@ -430,13 +435,13 @@ static void rna_def_color_ramp_element(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "color", PROP_FLOAT, PROP_COLOR);
 	RNA_def_property_float_sdna(prop, NULL, "r");
 	RNA_def_property_array(prop, 4);
-	RNA_def_property_ui_text(prop, "Color", "");
+	RNA_def_property_ui_text(prop, "Color", "Set color of selected color stop");
 	RNA_def_property_update(prop, 0, "rna_ColorRamp_update");
 	
 	prop= RNA_def_property(srna, "position", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "pos");
 	RNA_def_property_range(prop, 0, 1);
-	RNA_def_property_ui_text(prop, "Position", "");
+	RNA_def_property_ui_text(prop, "Position", "Set position of selected color stop");
 	RNA_def_property_update(prop, 0, "rna_ColorRamp_update");
 }
 
@@ -459,13 +464,13 @@ static void rna_def_color_ramp_element_api(BlenderRNA *brna, PropertyRNA *cprop)
 	parm= RNA_def_float(func, "position", 0.0f, 0.0f, 1.0f, "Position", "Position to add element", 0.0f, 1.0f);
 	RNA_def_property_flag(parm, PROP_REQUIRED);
 	/* return type */
-	parm= RNA_def_pointer(func, "element", "ColorRampElement", "", "New element.");
+	parm= RNA_def_pointer(func, "element", "ColorRampElement", "", "New element");
 	RNA_def_function_return(func, parm);
 
 	func = RNA_def_function(srna, "remove", "rna_ColorRampElement_remove");
 	RNA_def_function_ui_description(func, "Delete element from ColorRamp");
 	RNA_def_function_flag(func, FUNC_USE_REPORTS);
-	parm= RNA_def_pointer(func, "element", "ColorRampElement", "", "Element to remove.");
+	parm= RNA_def_pointer(func, "element", "ColorRampElement", "", "Element to remove");
 	RNA_def_property_flag(parm, PROP_REQUIRED|PROP_NEVER_NULL);
 }
 

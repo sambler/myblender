@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -26,6 +26,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file gameengine/Ketsji/KX_OrientationInterpolator.cpp
+ *  \ingroup ketsji
+ */
+
+
 #include "KX_OrientationInterpolator.h"
 #include "MT_Matrix3x3.h"
 #include "KX_IScalarInterpolator.h"
@@ -46,6 +51,6 @@ void KX_OrientationInterpolator::Execute(float currentTime) const {
 	MT_Scalar ss = si*sh;
 
 	m_target.setValue(cj*ch, sj*sc-cs, sj*cc+ss,
-					  cj*sh, sj*ss+cc, sj*cs-sc, 
-					    -sj,    cj*si,    cj*ci);
+	                  cj*sh, sj*ss+cc, sj*cs-sc,
+	                  -sj,    cj*si,    cj*ci);
 }

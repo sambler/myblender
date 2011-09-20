@@ -1,4 +1,4 @@
-/**
+/*
 * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -23,6 +23,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/render/intern/include/shading.h
+ *  \ingroup render
+ */
+
+
 struct ShadeInput;
 struct ShadeResult;
 struct RenderPart;
@@ -32,7 +37,7 @@ struct LampRen;
 struct VlakRen;
 struct StrandSegment;
 struct StrandPoint;
-struct ObjectInstanceRen obi;
+struct ObjectInstanceRen;
 struct Isect;
 
 /* shadeinput.c */
@@ -58,10 +63,11 @@ void shade_volume_loop(struct ShadeInput *shi, struct ShadeResult *shr);
 void shade_input_set_triangle_i(struct ShadeInput *shi, struct ObjectInstanceRen *obi, struct VlakRen *vlr, short i1, short i2, short i3);
 void shade_input_set_triangle(struct ShadeInput *shi, volatile int obi, volatile int facenr, int normal_flip);
 void shade_input_copy_triangle(struct ShadeInput *shi, struct ShadeInput *from);
-void shade_input_calc_viewco(struct ShadeInput *shi, float x, float y, float z, float *view, float *dxyview, float *co, float *dxco, float *dyco);
+void shade_input_calc_viewco(struct ShadeInput *shi, float x, float y, float z, float view[3], float *dxyview, float *co, float *dxco, float *dyco);
 void shade_input_set_viewco(struct ShadeInput *shi, float x, float y, float sx, float sy, float z);
 void shade_input_set_uv(struct ShadeInput *shi);
 void shade_input_set_normals(struct ShadeInput *shi);
+void shade_input_set_vertex_normals(struct ShadeInput *shi);
 void shade_input_flip_normals(struct ShadeInput *shi);
 void shade_input_set_shade_texco(struct ShadeInput *shi);
 void shade_input_set_strand(struct ShadeInput *shi, struct StrandRen *strand, struct StrandPoint *spoint);
@@ -90,7 +96,7 @@ void ambient_occlusion(struct ShadeInput *shi);
 void environment_lighting_apply(struct ShadeInput *shi, struct ShadeResult *shr);
 
 ListBase *get_lights(struct ShadeInput *shi);
-float lamp_get_visibility(struct LampRen *lar, float *co, float *lv, float *dist);
+float lamp_get_visibility(struct LampRen *lar, const float co[3], float *lv, float *dist);
 void lamp_get_shadow(struct LampRen *lar, ShadeInput *shi, float inp, float *shadfac, int do_real);
 
 float	fresnel_fac(float *view, float *vn, float fresnel, float fac);

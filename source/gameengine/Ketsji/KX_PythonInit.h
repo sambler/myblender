@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file KX_PythonInit.h
+ *  \ingroup ketsji
+ */
+
 #ifndef __KX_PYTHON_INIT
 #define __KX_PYTHON_INIT
 
@@ -39,15 +44,11 @@ typedef enum {
 
 extern bool gUseVisibilityTemp;
 
-#ifndef DISABLE_PYTHON
+#ifdef WITH_PYTHON
 PyObject*	initGameLogic(class KX_KetsjiEngine *engine, class KX_Scene* ketsjiscene);
 PyObject*	initGameKeys();
 PyObject*	initRasterizer(class RAS_IRasterizer* rasty,class RAS_ICanvas* canvas);
 PyObject*	initGamePlayerPythonScripting(const STR_String& progname, TPythonSecurityLevel level, struct Main *maggie, int argc, char** argv);
-PyObject*	initMathutils();
-PyObject*	initGeometry();
-PyObject*	initBGL();
-PyObject*	initBLF();
 PyObject*	initVideoTexture(void); 
 void		exitGamePlayerPythonScripting();
 PyObject*	initGamePythonScripting(const STR_String& progname, TPythonSecurityLevel level, struct Main *maggie);
@@ -71,6 +72,9 @@ class KX_KetsjiEngine* KX_GetActiveEngine();
 #include "MT_Vector3.h"
 
 void		KX_RasterizerDrawDebugLine(const MT_Vector3& from,const MT_Vector3& to,const MT_Vector3& color);
+void		KX_RasterizerDrawDebugCircle(const MT_Vector3& center, const MT_Scalar radius, const MT_Vector3& color,
+										 const MT_Vector3& normal, int nsector);
+
 
 #endif //__KX_PYTHON_INIT
 

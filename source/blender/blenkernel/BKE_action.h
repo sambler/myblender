@@ -1,11 +1,4 @@
-/*  BKE_action.h   May 2001
- *  
- *  Blender kernel action and pose functionality
- *
- *	Reevan McKay
- *
- * $Id$
- *
+/*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -33,6 +26,14 @@
 
 #ifndef BKE_ACTION_H
 #define BKE_ACTION_H
+/** \file BKE_action.h
+ *  \ingroup bke
+ *  \brief Blender kernel action and pose functionality.
+ *  \author Reevan McKay
+ *  \author Ton Roosendaal (full recode 2005)
+ *  \author Joshua Leung (full recode 2009)
+ *  \since may 2001
+ */
 
 #include "DNA_listBase.h"
 
@@ -79,9 +80,15 @@ typedef enum eAction_TransformFlags {
 	ACT_TRANS_ROT	= (1<<1),
 		/* scaling */
 	ACT_TRANS_SCALE	= (1<<2),
+	
+		/* strictly not a transform, but custom properties are also
+		 * quite often used in modern rigs
+		 */
+	ACT_TRANS_PROP 	= (1<<3),
 		
 		/* all flags */
-	ACT_TRANS_ALL	= (ACT_TRANS_LOC|ACT_TRANS_ROT|ACT_TRANS_SCALE),
+	ACT_TRANS_ONLY 	= (ACT_TRANS_LOC|ACT_TRANS_ROT|ACT_TRANS_SCALE),
+	ACT_TRANS_ALL	= (ACT_TRANS_ONLY|ACT_TRANS_PROP)
 } eAction_TransformFlags;
 
 /* Return flags indicating which transforms the given object/posechannel has 
@@ -117,6 +124,8 @@ void action_groups_remove_channel(struct bAction *act, struct FCurve *fcu);
 /* Find a group with the given name */
 struct bActionGroup *action_groups_find_named(struct bAction *act, const char name[]);
 
+/* Clear all 'temp' flags on all groups */
+void action_groups_clear_tempflags(struct bAction *act);
 
 /* Pose API ----------------- */	
 	
@@ -205,7 +214,7 @@ void pose_remove_group(struct Object *ob);
 /* Assorted Evaluation ----------------- */	
 
 /* Used for the Action Constraint */
-void what_does_obaction(struct Scene *scene, struct Object *ob, struct Object *workob, struct bPose *pose, struct bAction *act, char groupname[], float cframe);
+void what_does_obaction(struct Object *ob, struct Object *workob, struct bPose *pose, struct bAction *act, char groupname[], float cframe);
 
 /* for proxy */
 void copy_pose_result(struct bPose *to, struct bPose *from);

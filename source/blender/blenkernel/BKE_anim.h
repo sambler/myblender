@@ -1,8 +1,4 @@
-/**
- * blenlib/BKE_anim.h (mar-2001 nzc);
- *	
- * $Id$ 
- *
+/*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -31,6 +27,11 @@
 #ifndef BKE_ANIM_H
 #define BKE_ANIM_H
 
+/** \file BKE_anim.h
+ *  \ingroup bke
+ *  \author nzc
+ *  \since March 2001
+ */
 struct Path;
 struct Object;
 struct PartEff;

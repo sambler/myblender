@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
  * BIF_meshlaplacian.h: Algorithms using the mesh laplacian.
  */
+
+/** \file blender/editors/armature/meshlaplacian.h
+ *  \ingroup edarmature
+ */
+
 
 #ifndef BIF_MESHLAPLACIAN_H
 #define BIF_MESHLAPLACIAN_H
@@ -66,7 +71,7 @@ float laplacian_system_get_solution(int v);
 void heat_bone_weighting(struct Object *ob, struct Mesh *me, float (*verts)[3],
 	int numbones, struct bDeformGroup **dgrouplist,
 	struct bDeformGroup **dgroupflip, float (*root)[3], float (*tip)[3],
-	int *selected);
+	int *selected, const char **error);
 
 #ifdef RIGID_DEFORM
 /* As-Rigid-As-Possible Deformation */
@@ -78,9 +83,7 @@ void rigid_deform_end(int cancel);
 
 /* Harmonic Coordinates */
 
-void mesh_deform_bind(struct Scene *scene,
-	struct MeshDeformModifierData *mmd,
-	float *vertexcos, int totvert, float cagemat[][4]);
+/* mesh_deform_bind(...) defined in ED_armature.h */
 
 #endif
 

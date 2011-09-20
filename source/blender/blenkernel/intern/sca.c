@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -28,6 +28,11 @@
  * these all are linked to objects (listbase)
  * all data is 'direct data', not Blender lib data.
  */
+
+/** \file blender/blenkernel/intern/sca.c
+ *  \ingroup bke
+ */
+
 
 #include <stdio.h>
 #include <string.h>
@@ -86,7 +91,7 @@ void copy_sensors(ListBase *lbn, ListBase *lbo)
 {
 	bSensor *sens, *sensn;
 	
-	lbn->first= lbn->last= 0;
+	lbn->first= lbn->last= NULL;
 	sens= lbo->first;
 	while(sens) {
 		sensn= copy_sensor(sens);
@@ -253,7 +258,7 @@ void copy_controllers(ListBase *lbn, ListBase *lbo)
 {
 	bController *cont, *contn;
 	
-	lbn->first= lbn->last= 0;
+	lbn->first= lbn->last= NULL;
 	cont= lbo->first;
 	while(cont) {
 		contn= copy_controller(cont);
@@ -267,7 +272,7 @@ void init_controller(bController *cont)
 	/* also use when controller changes type, leave actuators... */
 	
 	if(cont->data) MEM_freeN(cont->data);
-	cont->data= 0;
+	cont->data= NULL;
 	
 	switch(cont->type) {
 	case CONT_EXPRESSION:
@@ -328,12 +333,12 @@ void free_actuator(bActuator *act)
 
 	if(act->data) {
 		switch (act->type) {
-			case ACT_SOUND:
-				sa = (bSoundActuator *) act->data;
-                        	if(sa->sound)
-                                	id_us_min((ID *) sa->sound);
-                	        break;
-        	}
+		case ACT_SOUND:
+			sa = (bSoundActuator *) act->data;
+			if(sa->sound)
+				id_us_min((ID *) sa->sound);
+			break;
+		}
 
 		MEM_freeN(act->data);
 	}
@@ -375,7 +380,7 @@ void copy_actuators(ListBase *lbn, ListBase *lbo)
 {
 	bActuator *act, *actn;
 	
-	lbn->first= lbn->last= 0;
+	lbn->first= lbn->last= NULL;
 	act= lbo->first;
 	while(act) {
 		actn= copy_actuator(act);
@@ -391,9 +396,10 @@ void init_actuator(bActuator *act)
 	bObjectActuator *oa;
 	bRandomActuator *ra;
 	bSoundActuator *sa;
+	bSteeringActuator *sta;
 	
 	if(act->data) MEM_freeN(act->data);
-	act->data= 0;
+	act->data= NULL;
 	
 	switch(act->type) {
 	case ACT_ACTION:
@@ -425,6 +431,7 @@ void init_actuator(bActuator *act)
 		act->data= MEM_callocN(sizeof(bCameraActuator), "camact");
 		ca = act->data;
 		ca->axis = ACT_CAMERA_X;
+		ca->damping = 1.0/32.0;
 		break;
 	case ACT_EDIT_OBJECT:
 		act->data= MEM_callocN(sizeof(bEditObjectActuator), "editobact");
@@ -463,6 +470,16 @@ void init_actuator(bActuator *act)
 		break;
 	case ACT_ARMATURE:
 		act->data = MEM_callocN(sizeof( bArmatureActuator ), "armature act");
+		break;
+	case ACT_STEERING:
+		act->data = MEM_callocN(sizeof( bSteeringActuator), "steering act");
+		sta = act->data;
+		sta->acceleration = 3.f;
+		sta->turnspeed = 120.f;
+		sta->dist = 1.f;
+		sta->velocity= 3.f;
+		sta->flag = ACT_STEERING_AUTOMATICFACING;
+		sta->facingaxis = 1;
 		break;
 	default:
 		; /* this is very severe... I cannot make any memory for this        */
@@ -512,7 +529,7 @@ void clear_sca_new_poins_ob(Object *ob)
 	}
 }
 
-void clear_sca_new_poins()
+void clear_sca_new_poins(void)
 {
 	Object *ob;
 	
@@ -589,13 +606,18 @@ void set_sca_new_poins_ob(Object *ob)
 				bPropertyActuator *pa= act->data;
 				ID_NEW(pa->ob);
 			}
+			else if(act->type==ACT_STEERING) {
+				bSteeringActuator *sta = act->data;
+				ID_NEW(sta->navmesh);
+				ID_NEW(sta->target);
+			}
 		}
 		act= act->next;
 	}
 }
 
 
-void set_sca_new_poins()
+void set_sca_new_poins(void)
 {
 	Object *ob;
 	

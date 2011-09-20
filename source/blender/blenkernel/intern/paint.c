@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -23,13 +25,21 @@
  * Contributor(s): none yet.
  *
  * ***** END GPL LICENSE BLOCK *****
- */ 
+ */
+
+/** \file blender/blenkernel/intern/paint.c
+ *  \ingroup bke
+ */
+
 
 
 #include "DNA_object_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_brush_types.h"
+
+#include "BLI_utildefines.h"
+
 
 #include "BKE_brush.h"
 #include "BKE_library.h"
@@ -75,8 +85,11 @@ Brush *paint_brush(Paint *p)
 
 void paint_brush_set(Paint *p, Brush *br)
 {
-	if(p)
+	if(p) {
+		id_us_min((ID *)p->brush);
+		id_us_plus((ID *)br);
 		p->brush= br;
+	}
 }
 
 int paint_facesel_test(Object *ob)
@@ -84,6 +97,10 @@ int paint_facesel_test(Object *ob)
 	return (ob && ob->type==OB_MESH && ob->data && (((Mesh *)ob->data)->editflag & ME_EDIT_PAINT_MASK) && (ob->mode & (OB_MODE_VERTEX_PAINT|OB_MODE_WEIGHT_PAINT|OB_MODE_TEXTURE_PAINT)));
 }
 
+int paint_vertsel_test(Object *ob)
+{
+	return (ob && ob->type==OB_MESH && ob->data && (((Mesh *)ob->data)->editflag & ME_EDIT_VERT_SEL) && (ob->mode & OB_MODE_WEIGHT_PAINT));
+}
 void paint_init(Paint *p, const char col[3])
 {
 	Brush *brush;
@@ -102,10 +119,15 @@ void paint_init(Paint *p, const char col[3])
 
 void free_paint(Paint *paint)
 {
-	/* nothing */
+	id_us_min((ID *)paint->brush);
 }
 
+/* called when copying scene settings, so even if 'src' and 'tar' are the same
+ * still do a id_us_plus(), rather then if we were copying betweem 2 existing
+ * scenes where a matching value should decrease the existing user count as
+ * with paint_brush_set() */
 void copy_paint(Paint *src, Paint *tar)
 {
 	tar->brush= src->brush;
+	id_us_plus((ID *)tar->brush);
 }

@@ -1,4 +1,4 @@
-/**
+/*
  * BME_customdata.c    jan 2007
  *
  *	Custom Data functions for Bmesh
@@ -34,6 +34,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/blenkernel/intern/BME_Customdata.c
+ *  \ingroup bke
+ */
+
+
 #include <string.h>
 
 #include "MEM_guardedalloc.h"
@@ -43,7 +48,7 @@
 /********************* Layer type information **********************/
 typedef struct BME_LayerTypeInfo {
 	int size;
-	char *defaultname;
+	const char *defaultname;
 	void (*copy)(const void *source, void *dest, int count);
 	void (*free)(void *data, int count, int size);
 	void (*interp)(void **sources, float *weights, float *sub_weights, int count, void *dest);

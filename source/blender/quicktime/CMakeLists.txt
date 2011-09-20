@@ -24,31 +24,50 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-IF(USE_QTKIT)
-	SET(SRC apple/qtkit_import.m apple/qtkit_export.m)
-ELSE(USE_QTKIT)
-	SET(SRC apple/quicktime_import.c apple/quicktime_export.c)
-ENDIF(USE_QTKIT)
-
-SET(INC 
+set(INC 
 	.
-	../quicktime
-	../makesdna
-	../makesrna
-	../blenlib
-	../blenkernel
 	../avi
+	../blenkernel
+	../blenlib
+	../blenloader
 	../imbuf
 	../imbuf/intern
-	../blenloader
+	../makesdna
+	../makesrna
 	../render/extern/include
-	../include
 	../windowmanager
-	../../../intern/audaspace/intern
 	../../../intern/guardedalloc
-	${QUICKTIME_INC}
 )
 
-ADD_DEFINITIONS(-DWITH_QUICKTIME)
+set(INC_SYS
+	${QUICKTIME_INCLUDE_DIRS}
+)
 
-BLENDERLIB(bf_quicktime "${SRC}" "${INC}")
+if(USE_QTKIT)
+	set(SRC
+		apple/qtkit_import.m
+		apple/qtkit_export.m
+
+		quicktime_export.h
+		quicktime_import.h
+	)
+else()
+	set(SRC
+		apple/quicktime_import.c
+		apple/quicktime_export.c
+
+		quicktime_export.h
+		quicktime_import.h
+	)
+endif()
+
+add_definitions(-DWITH_QUICKTIME)
+
+if(WITH_AUDASPACE)
+	list(APPEND INC
+		../../../intern/audaspace/intern
+	)
+	add_definitions(-DWITH_AUDASPACE)
+endif()
+
+blender_add_lib(bf_quicktime "${SRC}" "${INC}" "${INC_SYS}")

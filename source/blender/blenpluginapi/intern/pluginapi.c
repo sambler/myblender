@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
  * Wrappers for the plugin api. This api is up for removal.
  */
+
+/** \file blender/blenpluginapi/intern/pluginapi.c
+ *  \ingroup blenpluginapi
+ */
+
 
 /* There are four headers making up the plugin api:
  * - floatpatch.h : Wraps math functions for mips platforms, no code
@@ -101,10 +106,9 @@ LIBEXPORT void freeT(void *vmemh)
 LIBEXPORT struct ImBuf *allocImBuf(short x,
 						 short y,
 						 uchar d,
-						 uint flags,
-						 uchar bitmap)
+						 uint flags)
 {
-	return IMB_allocImBuf(x, y, d, flags, bitmap);
+	return IMB_allocImBuf(x, y, d, flags);
 }
 
 

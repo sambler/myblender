@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -27,13 +27,18 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/ikplugin/intern/ikplugin_api.c
+ *  \ingroup ikplugin
+ */
+
+
 
 #include "BIK_api.h"
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
 
 #include "BKE_armature.h"
-#include "BKE_utildefines.h"
+
 #include "DNA_object_types.h"
 #include "DNA_action_types.h"
 #include "DNA_scene_types.h"

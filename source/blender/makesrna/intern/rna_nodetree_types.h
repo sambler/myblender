@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -21,7 +21,17 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
- 
+
+/** \file blender/makesrna/intern/rna_nodetree_types.h
+ *  \ingroup RNA
+ */
+
+
+/* Empty definitions for undefined macros to avoid warnings */
+#ifndef DefNode
+#define DefNode(Category, ID, DefFunc, EnumName, StructName, UIName, UIDesc)
+#endif
+
 /*       Tree type       Node ID                  RNA def function        Enum name         Struct name       UI Name              UI Description */
 DefNode( ShaderNode,     SH_NODE_OUTPUT,          0,                      "OUTPUT",         Output,           "Output",            ""              )
 DefNode( ShaderNode,     SH_NODE_MATERIAL,        def_sh_material,        "MATERIAL",       Material,         "Material",          ""              )
@@ -71,13 +81,13 @@ DefNode( CompositorNode, CMP_NODE_COMPOSITE,      0,                      "COMPO
 DefNode( CompositorNode, CMP_NODE_OUTPUT_FILE,    def_cmp_output_file,    "OUTPUT_FILE",    OutputFile,       "Output File",       ""              )
 DefNode( CompositorNode, CMP_NODE_TEXTURE,        def_texture,            "TEXTURE",        Texture,          "Texture",           ""              )
 DefNode( CompositorNode, CMP_NODE_TRANSLATE,      0,                      "TRANSLATE",      Translate,        "Translate",         ""              )
-DefNode( CompositorNode, CMP_NODE_ZCOMBINE,       0,                      "ZCOMBINE",       Zcombine,         "Z Combine",         ""              )
+DefNode( CompositorNode, CMP_NODE_ZCOMBINE,       def_cmp_zcombine,		  "ZCOMBINE",       Zcombine,         "Z Combine",         ""              )
 DefNode( CompositorNode, CMP_NODE_COMBRGBA,       0,                      "COMBRGBA",       CombRGBA,         "Combine RGBA",      ""              )
 DefNode( CompositorNode, CMP_NODE_DILATEERODE,    def_cmp_dilate_erode,   "DILATEERODE",    DilateErode,      "Dilate/Erode",      ""              )
 DefNode( CompositorNode, CMP_NODE_ROTATE,         def_cmp_rotate,         "ROTATE",         Rotate,           "Rotate",            ""              )
 DefNode( CompositorNode, CMP_NODE_SCALE,          def_cmp_scale,          "SCALE",          Scale,            "Scale",             ""              )
-DefNode( CompositorNode, CMP_NODE_SEPYCCA,        0,                      "SEPYCCA",        SepYCCA,          "Separate YCCA",     ""              )
-DefNode( CompositorNode, CMP_NODE_COMBYCCA,       0,                      "COMBYCCA",       CombYCCA,         "Combine YCCA",      ""              )
+DefNode( CompositorNode, CMP_NODE_SEPYCCA,        def_cmp_ycc,            "SEPYCCA",        SepYCCA,          "Separate YCCA",     ""              )
+DefNode( CompositorNode, CMP_NODE_COMBYCCA,       def_cmp_ycc,            "COMBYCCA",       CombYCCA,         "Combine YCCA",      ""              )
 DefNode( CompositorNode, CMP_NODE_SEPYUVA,        0,                      "SEPYUVA",        SepYUVA,          "Separate YUVA",     ""              )
 DefNode( CompositorNode, CMP_NODE_COMBYUVA,       0,                      "COMBYUVA",       CombYUVA,         "Combine YUVA",      ""              )
 DefNode( CompositorNode, CMP_NODE_DIFF_MATTE,     def_cmp_diff_matte,     "DIFF_MATTE",     DiffMatte,        "Difference Key",    ""              )
@@ -133,3 +143,6 @@ DefNode( TextureNode,    TEX_NODE_DECOMPOSE,      0,                      "DECOM
 DefNode( TextureNode,    TEX_NODE_VALTONOR,       0,                      "VALTONOR",       ValToNor,         "Val to Nor",        ""              )
 DefNode( TextureNode,    TEX_NODE_SCALE,          0,                      "SCALE",          Scale,            "Scale",             ""              )
 
+
+/* undefine macros */
+#undef DefNode

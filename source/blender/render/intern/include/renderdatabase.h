@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/render/intern/include/renderdatabase.h
+ *  \ingroup render
+ */
+
 
 #ifndef RENDERDATABASE_H
 #define RENDERDATABASE_H
@@ -86,7 +91,7 @@ void free_renderdata_vertnodes(struct VertTableNode *vertnodes);
 void free_renderdata_vlaknodes(struct VlakTableNode *vlaknodes);
 
 void set_normalflags(struct Render *re, struct ObjectRen *obr);
-void project_renderdata(struct Render *re, void (*projectfunc)(float *, float mat[][4], float *),  int do_pano, float xoffs, int do_buckets);
+void project_renderdata(struct Render *re, void (*projectfunc)(const float *, float mat[][4], float *),  int do_pano, float xoffs, int do_buckets);
 int clip_render_object(float boundbox[][3], float *bounds, float mat[][4]);
 
 /* functions are not exported... so wrong names */
@@ -96,7 +101,7 @@ struct VertRen *RE_findOrAddVert(struct ObjectRen *obr, int nr);
 struct StrandRen *RE_findOrAddStrand(struct ObjectRen *obr, int nr);
 struct HaloRen *RE_findOrAddHalo(struct ObjectRen *obr, int nr);
 struct HaloRen *RE_inithalo(struct Render *re, struct ObjectRen *obr, struct Material *ma, float *vec, float *vec1, float *orco, float hasize,  float vectsize, int seed);
-struct HaloRen *RE_inithalo_particle(struct Render *re, struct ObjectRen *obr, struct DerivedMesh *dm, struct Material *ma,   float *vec,   float *vec1, float *orco, float *uvco, float hasize, float vectsize, int seed);
+struct HaloRen *RE_inithalo_particle(struct Render *re, struct ObjectRen *obr, struct DerivedMesh *dm, struct Material *ma,   float *vec,   float *vec1, float *orco, float *uvco, float hasize, float vectsize, int seed, float *pa_co);
 struct StrandBuffer *RE_addStrandBuffer(struct ObjectRen *obr, int totvert);
 
 struct ObjectRen *RE_addRenderObject(struct Render *re, struct Object *ob, struct Object *par, int index, int psysindex, int lay);

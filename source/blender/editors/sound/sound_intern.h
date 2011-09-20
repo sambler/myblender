@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,12 +26,15 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/sound/sound_intern.h
+ *  \ingroup edsnd
+ */
+
+
 #ifndef ED_SOUND_INTERN_H
 #define ED_SOUND_INTERN_H
 
 struct wmOperatorType;
-
-void SOUND_OT_open(wmOperatorType *ot);
 
 #endif /* ED_SOUND_INTERN_H */
 

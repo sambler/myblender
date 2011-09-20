@@ -1,6 +1,4 @@
-/**
- * $Id$
- *
+/*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -25,6 +23,11 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file blender/editors/gpencil/gpencil_intern.h
+ *  \ingroup edgpencil
+ */
+
 #ifndef ED_GPENCIL_INTERN_H
 #define ED_GPENCIL_INTERN_H
 
@@ -34,6 +37,7 @@
 /* ***************************************************** */
 /* Operator Defines */
 
+struct bGPdata;
 struct wmOperatorType;
 
 /* drawing ---------- */
@@ -45,6 +49,7 @@ typedef enum eGPencil_PaintModes {
 	GP_PAINTMODE_DRAW = 0,
 	GP_PAINTMODE_ERASER,
 	GP_PAINTMODE_DRAW_STRAIGHT,
+	GP_PAINTMODE_DRAW_POLY
 } eGPencil_PaintModes;
 
 /* buttons editing --- */
@@ -58,6 +63,11 @@ void GPENCIL_OT_active_frame_delete(struct wmOperatorType *ot);
 
 void GPENCIL_OT_convert(struct wmOperatorType *ot);
 
+/* undo stack ---------- */
+
+void gpencil_undo_init(struct bGPdata *gpd);
+void gpencil_undo_push(struct bGPdata *gpd);
+void gpencil_undo_finish(void);
 
 /******************************************************* */
 /* FILTERED ACTION DATA - TYPES  ---> XXX DEPRECEATED OLD ANIM SYSTEM CODE! */

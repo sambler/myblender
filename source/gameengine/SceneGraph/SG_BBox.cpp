@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
  * Bounding Box
  */
+
+/** \file gameengine/SceneGraph/SG_BBox.cpp
+ *  \ingroup bgesg
+ */
+
 
 #include <math.h>
  
@@ -137,8 +142,8 @@ SG_BBox SG_BBox::transform(const MT_Transform &world) const
 bool SG_BBox::inside(const MT_Point3 &point) const
 {
 	return point[0] >= m_min[0] && point[0] <= m_max[0] &&
-	    point[1] >= m_min[1] && point[1] <= m_max[1] &&
-	    point[2] >= m_min[2] && point[2] <= m_max[2];
+	        point[1] >= m_min[1] && point[1] <= m_max[1] &&
+	        point[2] >= m_min[2] && point[2] <= m_max[2];
 }
 
 bool SG_BBox::inside(const SG_BBox& other) const

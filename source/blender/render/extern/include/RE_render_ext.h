@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,6 +26,10 @@
  *
  * ***** END GPL/BL DUAL LICENSE BLOCK *****
  */
+/** \file RE_render_ext.h
+ *  \ingroup render
+ */
+
 
 #ifndef RE_RENDER_EXT_H
 #define RE_RENDER_EXT_H
@@ -51,10 +55,10 @@ struct ImBuf;
 //void    RE_zbufferall_radio(struct RadView *vw, struct RNode **rg_elem, int rg_totelem, struct Render *re);
 
 /* particle.c, effect.c, editmesh_modes.c and brush.c, returns 1 if rgb, 0 otherwise */
-int	externtex(struct MTex *mtex, float *vec, float *tin, float *tr, float *tg, float *tb, float *ta);
+int	externtex(struct MTex *mtex, const float vec[3], float *tin, float *tr, float *tg, float *tb, float *ta, const int thread);
 
 /* particle.c */
-void texture_rgb_blend(float *in, float *tex, float *out, float fact, float facg, int blendtype);
+void texture_rgb_blend(float in[3], const float tex[3], const float out[3], float fact, float facg, int blendtype);
 float texture_value_blend(float tex, float out, float fact, float facg, int blendtype);
 
 /* node_composite.c */

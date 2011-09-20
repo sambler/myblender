@@ -1,6 +1,4 @@
-/**
- * $Id$
- *
+/*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -25,6 +23,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/gpencil/gpencil_ops.c
+ *  \ingroup edgpencil
+ */
+
+
 #include <stdlib.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -37,6 +40,8 @@
 #include "WM_types.h"
 
 #include "RNA_access.h"
+
+#include "ED_gpencil.h"
 
 #include "gpencil_intern.h"
 
@@ -54,6 +59,9 @@ void ED_keymap_gpencil(wmKeyConfig *keyconf)
 		/* draw - straight lines */
 	kmi=WM_keymap_add_item(keymap, "GPENCIL_OT_draw", LEFTMOUSE, KM_PRESS, KM_CTRL, DKEY);
 		RNA_enum_set(kmi->ptr, "mode", GP_PAINTMODE_DRAW_STRAIGHT);
+		/* draw - poly lines */
+	kmi=WM_keymap_add_item(keymap, "GPENCIL_OT_draw", RIGHTMOUSE, KM_PRESS, KM_CTRL, DKEY);
+		RNA_enum_set(kmi->ptr, "mode", GP_PAINTMODE_DRAW_POLY);
 		/* erase */
 	kmi=WM_keymap_add_item(keymap, "GPENCIL_OT_draw", RIGHTMOUSE, KM_PRESS, 0, DKEY);
 		RNA_enum_set(kmi->ptr, "mode", GP_PAINTMODE_ERASER);

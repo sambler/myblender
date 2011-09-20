@@ -24,8 +24,28 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-SET(INC . )
+set(INC
+	.
+)
 
-FILE(GLOB SRC ./*.c)
+set(INC_SYS
 
-BLENDERLIB(extern_lzma "${SRC}" "${INC}")
+)
+
+set(SRC
+	Alloc.c
+	LzFind.c
+	LzmaDec.c
+	LzmaEnc.c
+	LzmaLib.c
+
+	Alloc.h
+	LzFind.h
+	LzHash.h
+	LzmaDec.h
+	LzmaEnc.h
+	LzmaLib.h
+	Types.h
+)
+
+blender_add_lib(extern_lzma "${SRC}" "${INC}" "${INC_SYS}")

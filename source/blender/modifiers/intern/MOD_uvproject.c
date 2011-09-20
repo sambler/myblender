@@ -30,6 +30,11 @@
 *
 */
 
+/** \file blender/modifiers/intern/MOD_uvproject.c
+ *  \ingroup modifiers
+ */
+
+
 /* UV Project modifier: Generates UVs projected from an object */
 
 #include "DNA_meshdata_types.h"
@@ -37,7 +42,10 @@
 #include "DNA_object_types.h"
 
 #include "BLI_math.h"
+#include "BLI_string.h"
 #include "BLI_uvproject.h"
+#include "BLI_utildefines.h"
+
 
 #include "BKE_DerivedMesh.h"
 
@@ -76,14 +84,15 @@ static void copyData(ModifierData *md, ModifierData *target)
 	tumd->aspecty = umd->aspecty;
 	tumd->scalex = umd->scalex;
 	tumd->scaley = umd->scaley;
+	BLI_strncpy(tumd->uvlayer_name, umd->uvlayer_name, sizeof(umd->uvlayer_name));
 }
 
-static CustomDataMask requiredDataMask(Object *ob, ModifierData *md)
+static CustomDataMask requiredDataMask(Object *UNUSED(ob), ModifierData *UNUSED(md))
 {
 	CustomDataMask dataMask = 0;
 
 	/* ask for UV coordinates */
-	dataMask |= (1 << CD_MTFACE);
+	dataMask |= CD_MASK_MTFACE;
 
 	return dataMask;
 }
@@ -109,8 +118,10 @@ static void foreachIDLink(ModifierData *md, Object *ob,
 						userData);
 }
 
-static void updateDepgraph(ModifierData *md,
-						 DagForest *forest, struct Scene *scene, Object *ob, DagNode *obNode)
+static void updateDepgraph(ModifierData *md, DagForest *forest,
+						struct Scene *UNUSED(scene),
+						Object *UNUSED(ob),
+						DagNode *obNode)
 {
 	UVProjectModifierData *umd = (UVProjectModifierData*) md;
 	int i;
@@ -185,7 +196,7 @@ static DerivedMesh *uvprojectModifier_do(UVProjectModifierData *umd,
 				free_uci= 1;
 			}
 			else {
-				float scale= (cam->type == CAM_PERSP) ? cam->clipsta * 32.0 / cam->lens : cam->ortho_scale;
+				float scale= (cam->type == CAM_PERSP) ? cam->clipsta * 32.0f / cam->lens : cam->ortho_scale;
 				float xmax, xmin, ymax, ymin;
 
 				if(aspect > 1.0f) {
@@ -262,7 +273,7 @@ static DerivedMesh *uvprojectModifier_do(UVProjectModifierData *umd,
 	/* if only one projector, project coords to UVs */
 	if(num_projectors == 1 && projectors[0].uci==NULL)
 		for(i = 0, co = coords; i < numVerts; ++i, ++co)
-			mul_project_m4_v4(projectors[0].projmat, *co);
+			mul_project_m4_v3(projectors[0].projmat, *co);
 
 	mface = dm->getFaceArray(dm);
 	numFaces = dm->getNumFaces(dm);
@@ -336,11 +347,11 @@ static DerivedMesh *uvprojectModifier_do(UVProjectModifierData *umd,
 						project_from_camera(tface->uv[3], coords[mf->v4], best_projector->uci);
 				}
 				else {
-					mul_project_m4_v4(best_projector->projmat, co1);
-					mul_project_m4_v4(best_projector->projmat, co2);
-					mul_project_m4_v4(best_projector->projmat, co3);
+					mul_project_m4_v3(best_projector->projmat, co1);
+					mul_project_m4_v3(best_projector->projmat, co2);
+					mul_project_m4_v3(best_projector->projmat, co3);
 					if(mf->v4)
-						mul_project_m4_v4(best_projector->projmat, co4);
+						mul_project_m4_v3(best_projector->projmat, co4);
 
 					/* apply transformed coords as UVs */
 					tface->uv[0][0] = co1[0];
@@ -358,7 +369,6 @@ static DerivedMesh *uvprojectModifier_do(UVProjectModifierData *umd,
 		}
 
 		if(override_image) {
-			tface->mode = TF_TEX;
 			tface->tpage = image;
 		}
 	}
@@ -376,9 +386,10 @@ static DerivedMesh *uvprojectModifier_do(UVProjectModifierData *umd,
 	return dm;
 }
 
-static DerivedMesh *applyModifier(
-		ModifierData *md, Object *ob, DerivedMesh *derivedData,
-  int useRenderParams, int isFinalCalc)
+static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
+						DerivedMesh *derivedData,
+						int UNUSED(useRenderParams),
+						int UNUSED(isFinalCalc))
 {
 	DerivedMesh *result;
 	UVProjectModifierData *umd = (UVProjectModifierData*) md;
@@ -388,9 +399,9 @@ static DerivedMesh *applyModifier(
 	return result;
 }
 
-static DerivedMesh *applyModifierEM(
-		ModifierData *md, Object *ob, struct EditMesh *editData,
-  DerivedMesh *derivedData)
+static DerivedMesh *applyModifierEM(ModifierData *md, Object *ob,
+						struct EditMesh *UNUSED(editData),
+						DerivedMesh *derivedData)
 {
 	return applyModifier(md, ob, derivedData, 0, 1);
 }
@@ -407,17 +418,20 @@ ModifierTypeInfo modifierType_UVProject = {
 							| eModifierTypeFlag_EnableInEditmode,
 
 	/* copyData */          copyData,
-	/* deformVerts */       0,
-	/* deformVertsEM */     0,
-	/* deformMatricesEM */  0,
+	/* deformVerts */       NULL,
+	/* deformMatrices */    NULL,
+	/* deformVertsEM */     NULL,
+	/* deformMatricesEM */  NULL,
 	/* applyModifier */     applyModifier,
 	/* applyModifierEM */   applyModifierEM,
 	/* initData */          initData,
 	/* requiredDataMask */  requiredDataMask,
-	/* freeData */          0,
-	/* isDisabled */        0,
+	/* freeData */          NULL,
+	/* isDisabled */        NULL,
 	/* updateDepgraph */    updateDepgraph,
-	/* dependsOnTime */     0,
+	/* dependsOnTime */     NULL,
+	/* dependsOnNormals */	NULL,
 	/* foreachObjectLink */ foreachObjectLink,
 	/* foreachIDLink */     foreachIDLink,
+	/* foreachTexLink */    NULL,
 };

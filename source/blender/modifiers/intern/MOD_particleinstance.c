@@ -30,6 +30,11 @@
 *
 */
 
+/** \file blender/modifiers/intern/MOD_particleinstance.c
+ *  \ingroup modifiers
+ */
+
+
 #include "DNA_meshdata_types.h"
 
 #include "MEM_guardedalloc.h"
@@ -37,13 +42,15 @@
 #include "BLI_math.h"
 #include "BLI_listbase.h"
 #include "BLI_rand.h"
+#include "BLI_utildefines.h"
 
 #include "BKE_cdderivedmesh.h"
 #include "BKE_lattice.h"
 #include "BKE_modifier.h"
 #include "BKE_particle.h"
 #include "BKE_pointcache.h"
-#include "BKE_utildefines.h"
+
+#include "MOD_util.h"
 
 #include "depsgraph_private.h"
 
@@ -72,12 +79,14 @@ static void copyData(ModifierData *md, ModifierData *target)
 	tpimd->random_position = pimd->random_position;
 }
 
-static int dependsOnTime(ModifierData *md)
+static int dependsOnTime(ModifierData *UNUSED(md))
 {
 	return 0;
 }
 static void updateDepgraph(ModifierData *md, DagForest *forest,
-		 struct Scene *scene,Object *ob, DagNode *obNode)
+						struct Scene *UNUSED(scene),
+						Object *UNUSED(ob),
+						DagNode *obNode)
 {
 	ParticleInstanceModifierData *pimd = (ParticleInstanceModifierData*) md;
 
@@ -98,15 +107,16 @@ static void foreachObjectLink(ModifierData *md, Object *ob,
 	walk(userData, ob, &pimd->ob);
 }
 
-static DerivedMesh * applyModifier(
-		ModifierData *md, Object *ob, DerivedMesh *derivedData,
-  int useRenderParams, int isFinalCalc)
+static DerivedMesh * applyModifier(ModifierData *md, Object *ob,
+						DerivedMesh *derivedData,
+						int UNUSED(useRenderParams),
+						int UNUSED(isFinalCalc))
 {
 	DerivedMesh *dm = derivedData, *result;
 	ParticleInstanceModifierData *pimd= (ParticleInstanceModifierData*) md;
 	ParticleSimulationData sim;
-	ParticleSystem * psys=0;
-	ParticleData *pa=0, *pars=0;
+	ParticleSystem *psys= NULL;
+	ParticleData *pa= NULL, *pars= NULL;
 	MFace *mface, *orig_mface;
 	MVert *mvert, *orig_mvert;
 	int i,totvert, totpart=0, totface, maxvert, maxface, first_particle=0;
@@ -117,13 +127,13 @@ static DerivedMesh * applyModifier(
 	trackneg=((ob->trackflag>2)?1:0);
 
 	if(pimd->ob==ob){
-		pimd->ob=0;
+		pimd->ob= NULL;
 		return derivedData;
 	}
 
 	if(pimd->ob){
 		psys = BLI_findlink(&pimd->ob->particlesystem,pimd->psys-1);
-		if(psys==0 || psys->totpart==0)
+		if(psys==NULL || psys->totpart==0)
 			return derivedData;
 	}
 	else return derivedData;
@@ -226,7 +236,7 @@ static DerivedMesh * applyModifier(
 			normalize_v3(state.vel);
 
 			/* TODO: incremental rotations somehow */
-			if(state.vel[axis] < -0.9999 || state.vel[axis] > 0.9999) {
+			if(state.vel[axis] < -0.9999f || state.vel[axis] > 0.9999f) {
 				state.rot[0] = 1;
 				state.rot[1] = state.rot[2] = state.rot[3] = 0.0f;
 			}
@@ -264,7 +274,7 @@ static DerivedMesh * applyModifier(
 				if(psys->part->childtype==PART_CHILD_PARTICLES)
 					pa=psys->particles+(psys->child+i/totface-psys->totpart)->parent;
 				else
-					pa=0;
+					pa= NULL;
 			}
 			else
 				pa=pars+i/totface;
@@ -273,7 +283,7 @@ static DerivedMesh * applyModifier(
 			if(psys->part->childtype==PART_CHILD_PARTICLES)
 				pa=psys->particles+(psys->child+i/totface)->parent;
 			else
-				pa=0;
+				pa= NULL;
 		}
 
 		if(pa){
@@ -306,9 +316,9 @@ static DerivedMesh * applyModifier(
 
 	return result;
 }
-static DerivedMesh *applyModifierEM(
-		ModifierData *md, Object *ob, struct EditMesh *editData,
-  DerivedMesh *derivedData)
+static DerivedMesh *applyModifierEM(ModifierData *md, Object *ob,
+						struct EditMesh *UNUSED(editData),
+						DerivedMesh *derivedData)
 {
 	return applyModifier(md, ob, derivedData, 0, 1);
 }
@@ -325,17 +335,20 @@ ModifierTypeInfo modifierType_ParticleInstance = {
 							| eModifierTypeFlag_EnableInEditmode,
 
 	/* copyData */          copyData,
-	/* deformVerts */       0,
-	/* deformVertsEM */     0,
-	/* deformMatricesEM */  0,
+	/* deformVerts */       NULL,
+	/* deformMatrices */    NULL,
+	/* deformVertsEM */     NULL,
+	/* deformMatricesEM */  NULL,
 	/* applyModifier */     applyModifier,
 	/* applyModifierEM */   applyModifierEM,
 	/* initData */          initData,
-	/* requiredDataMask */  0,
-	/* freeData */          0,
-	/* isDisabled */        0,
+	/* requiredDataMask */  NULL,
+	/* freeData */          NULL,
+	/* isDisabled */        NULL,
 	/* updateDepgraph */    updateDepgraph,
 	/* dependsOnTime */     dependsOnTime,
+	/* dependsOnNormals */	NULL,
 	/* foreachObjectLink */ foreachObjectLink,
-	/* foreachIDLink */     0,
+	/* foreachIDLink */     NULL,
+	/* foreachTexLink */    NULL,
 };

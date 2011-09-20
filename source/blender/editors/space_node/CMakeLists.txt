@@ -19,24 +19,38 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-FILE(GLOB SRC *.c)
-
-SET(INC
+set(INC
 	../include
+	../../blenfont
 	../../blenkernel
 	../../blenlib
+	../../blenloader
 	../../imbuf
 	../../makesdna
 	../../makesrna
 	../../nodes
-	../../windowmanager
 	../../render/extern/include
+	../../windowmanager
 	../../../../intern/guardedalloc
 	../../../../intern/opennl/extern
 )
 
-IF(WIN32)
-	LIST(APPEND INC ${PTHREADS_INC})
-ENDIF(WIN32)
+set(INC_SYS
+	${GLEW_INCLUDE_PATH}
+)
 
-BLENDERLIB(bf_editor_space_node "${SRC}" "${INC}")
+set(SRC
+	drawnode.c
+	node_buttons.c
+	node_draw.c
+	node_edit.c
+	node_header.c
+	node_ops.c
+	node_select.c
+	node_state.c
+	space_node.c
+
+	node_intern.h
+)
+
+blender_add_lib(bf_editor_space_node "${SRC}" "${INC}" "${INC_SYS}")

@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -22,6 +22,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/transform/transform_orientations.c
+ *  \ingroup edtransform
+ */
+
+
 #include <string.h>
 #include <ctype.h>
 
@@ -34,14 +39,18 @@
 #include "DNA_screen_types.h"
 #include "DNA_view3d_types.h"
 
-#include "BKE_utildefines.h"
+
 #include "BKE_armature.h"
+#include "BKE_curve.h"
 #include "BKE_context.h"
 #include "BKE_report.h"
 
 #include "BLI_math.h"
 #include "BLI_blenlib.h"
 #include "BLI_editVert.h"
+#include "BLI_utildefines.h"
+
+#include "BLF_translation.h"
 
 //#include "BIF_editmesh.h"
 //#include "BIF_interface.h"
@@ -50,10 +59,10 @@
 
 #include "ED_armature.h"
 #include "ED_mesh.h"
-#include "ED_curve.h" /* for ED_curve_editnurbs */
-
 
 #include "RNA_define.h"
+
+#include "UI_interface.h"
 
 #include "transform.h"
 
@@ -72,13 +81,12 @@ void BIF_clearTransformOrientation(bContext *C)
 	}
 }
 
-TransformOrientation* findOrientationName(bContext *C, char *name)
+static TransformOrientation* findOrientationName(ListBase *lb, const char *name)
 {
-	ListBase *transform_spaces = &CTX_data_scene(C)->transform_spaces;
 	TransformOrientation *ts= NULL;
 
-	for (ts = transform_spaces->first; ts; ts = ts->next) {
-		if (strncmp(ts->name, name, 35) == 0) {
+	for (ts= lb->first; ts; ts = ts->next) {
+		if (strncmp(ts->name, name, sizeof(ts->name)-1) == 0) {
 			return ts;
 		}
 	}
@@ -86,34 +94,14 @@ TransformOrientation* findOrientationName(bContext *C, char *name)
 	return NULL;
 }
 
-void uniqueOrientationName(bContext *C, char *name)
+static int uniqueOrientationNameCheck(void *arg, const char *name)
 {
-	if (findOrientationName(C, name) != NULL)
-	{
-		char		tempname[64];
-		int			number;
-		char		*dot;
+	return findOrientationName((ListBase *)arg, name) != NULL;
+}
 
-		
-		number = strlen(name);
-
-		if (number && isdigit(name[number-1]))
-		{
-			dot = strrchr(name, '.');	// last occurrence
-			if (dot)
-				*dot=0;
-		}
-
-		for (number = 1; number <= 999; number++)
-		{
-			sprintf(tempname, "%s.%03d", name, number);
-			if (findOrientationName(C, tempname) == NULL)
-			{
-				BLI_strncpy(name, tempname, 32);
-				break;
-			}
-		}
-	}
+static void uniqueOrientationName(ListBase *lb, char *name)
+{
+	BLI_uniquename_cb(uniqueOrientationNameCheck, lb, "Space", '.', name, sizeof(((TransformOrientation *)NULL)->name));
 }
 
 void BIF_createTransformOrientation(bContext *C, ReportList *reports, char *name, int use, int overwrite)
@@ -141,7 +129,7 @@ void BIF_createTransformOrientation(bContext *C, ReportList *reports, char *name
 	}
 }
 
-TransformOrientation *createObjectSpace(bContext *C, ReportList *reports, char *name, int overwrite) {
+TransformOrientation *createObjectSpace(bContext *C, ReportList *UNUSED(reports), char *name, int overwrite) {
 	Base *base = CTX_data_active_base(C);
 	Object *ob;
 	float mat[3][3];
@@ -237,7 +225,7 @@ int createSpaceNormal(float mat[3][3], float normal[3])
 {
 	float tangent[3] = {0.0f, 0.0f, 1.0f};
 	
-	VECCOPY(mat[2], normal);
+	copy_v3_v3(mat[2], normal);
 	if (normalize_v3(mat[2]) == 0.0f) {
 		return 0; /* error return */
 	}
@@ -258,7 +246,7 @@ int createSpaceNormal(float mat[3][3], float normal[3])
 
 int createSpaceNormalTangent(float mat[3][3], float normal[3], float tangent[3])
 {
-	VECCOPY(mat[2], normal);
+	copy_v3_v3(mat[2], normal);
 	if (normalize_v3(mat[2]) == 0.0f) {
 		return 0; /* error return */
 	}
@@ -287,11 +275,11 @@ TransformOrientation* addMatrixSpace(bContext *C, float mat[3][3], char name[], 
 
 	if (overwrite)
 	{
-		ts = findOrientationName(C, name);
+		ts = findOrientationName(transform_spaces, name);
 	}
 	else
 	{
-		uniqueOrientationName(C, name);
+		uniqueOrientationName(transform_spaces, name);
 	}
 
 	/* if not, create a new one */
@@ -310,7 +298,7 @@ TransformOrientation* addMatrixSpace(bContext *C, float mat[3][3], char name[], 
 
 void BIF_removeTransformOrientation(bContext *C, TransformOrientation *target) {
 	ListBase *transform_spaces = &CTX_data_scene(C)->transform_spaces;
-	TransformOrientation *ts = transform_spaces->first;
+	TransformOrientation *ts;
 	int i;
 	
 	for (i = 0, ts = transform_spaces->first; ts; ts = ts->next, i++) {
@@ -337,35 +325,31 @@ void BIF_removeTransformOrientation(bContext *C, TransformOrientation *target) {
 
 void BIF_removeTransformOrientationIndex(bContext *C, int index) {
 	ListBase *transform_spaces = &CTX_data_scene(C)->transform_spaces;
-	TransformOrientation *ts = transform_spaces->first;
-	int i;
-	
-	for (i = 0, ts = transform_spaces->first; ts; ts = ts->next, i++) {
-		if (i == index) {
-			View3D *v3d = CTX_wm_view3d(C);
-			if(v3d) {
-				int selected_index = (v3d->twmode - V3D_MANIP_CUSTOM);
-				
-				// Transform_fix_me NEED TO DO THIS FOR ALL VIEW3D
-				if (selected_index == i) {
-					v3d->twmode = V3D_MANIP_GLOBAL;	/* fallback to global	*/
-				}
-				else if (selected_index > i) {
-					v3d->twmode--;
-				}
-				
-			}
+	TransformOrientation *ts= BLI_findlink(transform_spaces, index);
 
-			BLI_freelinkN(transform_spaces, ts);
-			break;
+	if (ts) {
+		View3D *v3d = CTX_wm_view3d(C);
+		if(v3d) {
+			int selected_index = (v3d->twmode - V3D_MANIP_CUSTOM);
+			
+			// Transform_fix_me NEED TO DO THIS FOR ALL VIEW3D
+			if (selected_index == index) {
+				v3d->twmode = V3D_MANIP_GLOBAL;	/* fallback to global	*/
+			}
+			else if (selected_index > index) {
+				v3d->twmode--;
+			}
+			
 		}
+
+		BLI_freelinkN(transform_spaces, ts);
 	}
 }
 
 void BIF_selectTransformOrientation(bContext *C, TransformOrientation *target) {
 	ListBase *transform_spaces = &CTX_data_scene(C)->transform_spaces;
 	View3D *v3d = CTX_wm_view3d(C);
-	TransformOrientation *ts = transform_spaces->first;
+	TransformOrientation *ts;
 	int i;
 	
 	for (i = 0, ts = transform_spaces->first; ts; ts = ts->next, i++) {
@@ -425,15 +409,19 @@ EnumPropertyItem *BIF_enumTransformOrientation(bContext *C)
 	return item;
 }
 
-char * BIF_menustringTransformOrientation(const bContext *C, char *title) {
-	char menu[] = "%t|Global%x0|Local%x1|Gimbal%x4|Normal%x2|View%x3";
+const char * BIF_menustringTransformOrientation(const bContext *C, const char *title) {
+	const char* menu = N_("%t|Global%x0|Local%x1|Gimbal%x4|Normal%x2|View%x3");
 	ListBase *transform_spaces = &CTX_data_scene(C)->transform_spaces;
 	TransformOrientation *ts;
 	int i = V3D_MANIP_CUSTOM;
 	char *str_menu, *p;
+
+	if(UI_translate_iface()) {
+		title= BLF_gettext(title);
+		menu= BLF_gettext(menu);
+	}
 	
-	
-	str_menu = MEM_callocN(strlen(menu) + strlen(title) + 1 + 40 * BIF_countTransformOrientation(C), "UserTransSpace from matrix");
+	str_menu = MEM_callocN(strlen(menu) + strlen(title) + 1 + 40 * BIF_countTransformOrientation(C), UI_translate_do_tooltip(N_("UserTransSpace from matrix")));
 	p = str_menu;
 	
 	p += sprintf(str_menu, "%s", title);
@@ -678,7 +666,7 @@ int getTransformOrientation(const bContext *C, float normal[3], float plane[3], 
 					for(eed= em->edges.first; eed; eed= eed->next) {
 						if(eed->f & SELECT) {
 							/* use average vert normals as plane and edge vector as normal */
-							VECCOPY(plane, eed->v1->no);
+							copy_v3_v3(plane, eed->v1->no);
 							VECADD(plane, plane, eed->v2->no);
 							sub_v3_v3v3(normal, eed->v2->co, eed->v1->co);
 							break;
@@ -699,7 +687,7 @@ int getTransformOrientation(const bContext *C, float normal[3], float plane[3], 
 							else {
 								v2 = eve;
 								
-								VECCOPY(plane, v1->no);
+								copy_v3_v3(plane, v1->no);
 								VECADD(plane, plane, v2->no);
 								sub_v3_v3v3(normal, v2->co, v1->co);
 								break; 
@@ -713,7 +701,7 @@ int getTransformOrientation(const bContext *C, float normal[3], float plane[3], 
 					for (eve = em->verts.first; eve; eve = eve->next)
 					{
 						if ( eve->f & SELECT ) {
-							VECCOPY(normal, eve->no);
+							copy_v3_v3(normal, eve->no);
 							break;
 						}
 					}
@@ -740,7 +728,7 @@ int getTransformOrientation(const bContext *C, float normal[3], float plane[3], 
 			Nurb *nu;
 			BezTriple *bezt;
 			int a;
-			ListBase *nurbs= ED_curve_editnurbs(cu);
+			ListBase *nurbs= curve_editnurbs(cu);
 
 			for (nu = nurbs->first; nu; nu = nu->next)
 			{
@@ -811,7 +799,7 @@ int getTransformOrientation(const bContext *C, float normal[3], float plane[3], 
 				/* Rotation of MetaElem is stored in quat */
 				 quat_to_mat4( mat,ml_sel->quat);
 
-				VECCOPY(normal, mat[2]);
+				copy_v3_v3(normal, mat[2]);
 
 				negate_v3_v3(plane, mat[1]);
 				
@@ -830,14 +818,14 @@ int getTransformOrientation(const bContext *C, float normal[3], float plane[3], 
 				{
 					if (ebone->flag & BONE_SELECTED)
 					{
-						float mat[3][3];
+						float tmat[3][3];
 						float vec[3];
 						sub_v3_v3v3(vec, ebone->tail, ebone->head);
 						normalize_v3(vec);
 						add_v3_v3(normal, vec);
 						
-						vec_roll_to_mat3(vec, ebone->roll, mat);
-						add_v3_v3(plane, mat[2]);
+						vec_roll_to_mat3(vec, ebone->roll, tmat);
+						add_v3_v3(plane, tmat[2]);
 					}
 				}
 			}
@@ -894,7 +882,7 @@ int getTransformOrientation(const bContext *C, float normal[3], float plane[3], 
 			result = ORIENTATION_EDGE;
 		}
 	}
-	else if(ob && (ob->mode & (OB_MODE_SCULPT|OB_MODE_VERTEX_PAINT|OB_MODE_WEIGHT_PAINT|OB_MODE_TEXTURE_PAINT|OB_MODE_PARTICLE_EDIT)))
+	else if(ob && (ob->mode & (OB_MODE_ALL_PAINT|OB_MODE_PARTICLE_EDIT)))
 	{
 	}
 	else {
@@ -912,8 +900,8 @@ int getTransformOrientation(const bContext *C, float normal[3], float plane[3], 
 		}
 		
 		if (ob) {
-			VECCOPY(normal, ob->obmat[2]);
-			VECCOPY(plane, ob->obmat[1]);
+			copy_v3_v3(normal, ob->obmat[2]);
+			copy_v3_v3(plane, ob->obmat[1]);
 		}
 		result = ORIENTATION_NORMAL;
 	}

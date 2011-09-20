@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,6 +27,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/interface/interface_intern.h
+ *  \ingroup edinterface
+ */
+
+
 #ifndef INTERFACE_H
 #define INTERFACE_H
 
@@ -40,6 +45,7 @@ struct uiHandleButtonData;
 struct wmEvent;
 struct wmOperatorType;
 struct wmWindow;
+struct wmTimer;
 struct uiStyle;
 struct uiWidgetColors;
 struct uiLayout;
@@ -96,15 +102,14 @@ typedef enum {
 
 #define UI_MAX_DRAW_STR	400
 #define UI_MAX_NAME_STR	128
-#define UI_ARRAY	29
 
 /* panel limits */
 #define UI_PANEL_MINX	100
 #define UI_PANEL_MINY	70
 
 /* uiBut->flag */
-#define UI_SELECT		1
-#define UI_MOUSE_OVER	2
+#define UI_SELECT		1	/* use when the button is pressed */
+#define UI_SCROLLED		2	/* temp hidden, scrolled away */
 #define UI_ACTIVE		4
 #define UI_HAS_ICON		8
 #define UI_TEXTINPUT	16
@@ -112,15 +117,15 @@ typedef enum {
 /* warn: rest of uiBut->flag in UI_interface.h */
 
 /* internal panel drawing defines */
-#define PNL_GRID	4
-#define PNL_HEADER  20
+#define PNL_GRID	(UI_UNIT_Y / 5)	/* 4 default */
+#define PNL_HEADER  UI_UNIT_Y		/* 20 default */
 
 /* panel->flag */
 #define PNL_SELECT	1
 #define PNL_CLOSEDX	2
 #define PNL_CLOSEDY	4
 #define PNL_CLOSED	6
-#define PNL_TABBED	8
+/*#define PNL_TABBED	8*/ /*UNUSED*/
 #define PNL_OVERLAP	16
 
 /* Button text selection:
@@ -171,8 +176,9 @@ struct uiBut {
 
 	char *poin;
 	float hardmin, hardmax, softmin, softmax;
-	float a1, a2, hsv[3];	// hsv is temp memory for hsv buttons
+	float a1, a2;
 	float aspect;
+	char col[4];
 
 	uiButHandleFunc func;
 	void *func_arg1;
@@ -203,13 +209,15 @@ struct uiBut {
 	uiLink *link;
 	short linkto[2];
 	
-	char *tip, *lockstr;
+	const char *tip, *lockstr;
 
 	BIFIconID icon;
-	short but_align;	/* aligning buttons, horiz/vertical */
-	short lock;
+	char lock;
+	char dt; /* drawtype: UI_EMBOSS, UI_EMBOSSN ... etc, copied from the block */
+	char changed; /* could be made into a single flag */
+	unsigned char unit_type; /* so buttons can support unit systems which are not RNA */
 	short modifier_key;
-	short iconadd, dt;
+	short iconadd;
 
 	/* IDPOIN data */
 	uiIDPoinFuncFP idpoin_func;
@@ -234,9 +242,10 @@ struct uiBut {
 	struct IDProperty *opproperties;
 	struct PointerRNA *opptr;
 	short opcontext;
-	
+	unsigned char menu_key; /* 'a'-'z', always lower case */
+
 	/* Draggable data, type is WM_DRAG_... */
-	short dragtype;
+	char dragtype;
 	void *dragpoin;
 	struct ImBuf *imb;
 	float imb_scale;
@@ -296,32 +305,36 @@ struct uiBlock {
 	void *drawextra_arg1;
 	void *drawextra_arg2;
 
-	int afterval, flag;
-	
-	short direction, dt;
-	short auto_open, in_use;
+	int flag;
+	char direction;
+	char dt; /* drawtype: UI_EMBOSS, UI_EMBOSSN ... etc, copied to buttons */
+	short auto_open;
 	double auto_open_last;
 
-	int lock;
-	char *lockstr;
+	const char *lockstr;
+
+	char lock;
+	char active;					// to keep blocks while drawing and free them afterwards
+	char tooltipdisabled;			// to avoid tooltip after click
+	char endblock;					// uiEndBlock done?
 	
 	float xofs, yofs;				// offset to parent button
 	int dobounds, mx, my;			// for doing delayed
 	int bounds, minbounds;			// for doing delayed
-	int endblock;					// uiEndBlock done?
 
 	rctf safety;				// pulldowns, to detect outside, can differ per case how it is created
 	ListBase saferct;			// uiSafetyRct list
 
 	uiPopupBlockHandle *handle;	// handle
-	int tooltipdisabled;		// to avoid tooltip after click
 
-	int active;					// to keep blocks while drawing and free them afterwards
 	int puphash;				// popup menu hash for memory
 	
-	int color_profile;				// color profile for correcting linear colors for display
-
 	void *evil_C;				// XXX hack for dynamic operator enums
+
+	float _hsv[3];				// XXX, only access via ui_block_hsv_get()
+	char color_profile;			// color profile for correcting linear colors for display
+	struct UnitSettings *unit;	// unit system, used a lot for numeric buttons so include here rather then fetching through the scene every time.
+
 };
 
 typedef struct uiSafetyRct {
@@ -333,10 +346,6 @@ typedef struct uiSafetyRct {
 /* interface.c */
 
 extern void ui_delete_linkline(uiLinkLine *line, uiBut *but);
-
-extern int ui_translate_buttons(void);
-extern int ui_translate_menus(void);
-extern int ui_translate_tooltips(void);
 
 void ui_fontscale(short *points, float aspect);
 
@@ -360,13 +369,14 @@ extern void ui_convert_to_unit_alt_name(uiBut *but, char *str, int maxlen);
 extern int ui_set_but_string(struct bContext *C, uiBut *but, const char *str);
 extern int ui_get_but_string_max_length(uiBut *but);
 
-extern void ui_set_but_default(struct bContext *C, uiBut *but);
+extern void ui_set_but_default(struct bContext *C, short all);
 
 extern void ui_set_but_soft_range(uiBut *but, double value);
 
 extern void ui_check_but(uiBut *but);
 extern int  ui_is_but_float(uiBut *but);
 extern int  ui_is_but_unit(uiBut *but);
+extern int  ui_is_but_rna_valid(uiBut *but);
 
 extern void ui_bounds_block(uiBlock *block);
 extern void ui_block_translate(uiBlock *block, int x, int y);
@@ -385,6 +395,8 @@ struct uiPopupBlockHandle {
 	void (*popup_func)(struct bContext *C, void *arg, int event);
 	void (*cancel_func)(void *arg);
 	void *popup_arg;
+	
+	struct wmTimer *scrolltimer;
 
 	/* for operator popups */
 	struct wmOperatorType *optype;
@@ -406,7 +418,11 @@ void ui_block_func_ICONTEXTROW(struct bContext *C, uiLayout *layout, void *arg_b
 struct ARegion *ui_tooltip_create(struct bContext *C, struct ARegion *butregion, uiBut *but);
 void ui_tooltip_free(struct bContext *C, struct ARegion *ar);
 
-uiBut *ui_popup_menu_memory(uiBlock *block, uiBut *but);
+uiBut *ui_popup_menu_memory(struct uiBlock *block, struct uiBut *but);
+
+float *ui_block_hsv_get(struct uiBlock *block);
+void ui_popup_block_scrolltest(struct uiBlock *block);
+
 
 /* searchbox for string button */
 ARegion *ui_searchbox_create(struct bContext *C, struct ARegion *butregion, uiBut *but);
@@ -416,6 +432,7 @@ void ui_searchbox_autocomplete(struct bContext *C, struct ARegion *ar, uiBut *bu
 void ui_searchbox_event(struct bContext *C, struct ARegion *ar, uiBut *but, struct wmEvent *event);
 void ui_searchbox_apply(uiBut *but, struct ARegion *ar);
 void ui_searchbox_free(struct bContext *C, struct ARegion *ar);
+void ui_but_search_test(uiBut *but);
 
 typedef uiBlock* (*uiBlockHandleCreateFunc)(struct bContext *C, struct uiPopupBlockHandle *handle, void *arg1);
 
@@ -430,18 +447,15 @@ void ui_set_name_menu(uiBut *but, int value);
 int ui_step_name_menu(uiBut *but, int step);
 
 struct AutoComplete;
-struct AutoComplete *autocomplete_begin(char *startname, int maxlen);
-void autocomplete_do_name(struct AutoComplete *autocpl, const char *name);
-void autocomplete_end(struct AutoComplete *autocpl, char *autoname);
 
 /* interface_panel.c */
 extern int ui_handler_panel_region(struct bContext *C, struct wmEvent *event);
-extern void ui_draw_aligned_panel(struct ARegion *ar, struct uiStyle *style, uiBlock *block, rcti *rect);
+extern void ui_draw_aligned_panel(struct uiStyle *style, uiBlock *block, rcti *rect);
 
 /* interface_draw.c */
 extern void ui_dropshadow(rctf *rct, float radius, float aspect, int select);
 
-void ui_draw_gradient(rcti *rect, float *rgb, int type, float alpha);
+void ui_draw_gradient(rcti *rect, float *hsv, int type, float alpha);
 
 void ui_draw_but_HISTOGRAM(ARegion *ar, uiBut *but, struct uiWidgetColors *wcol, rcti *rect);
 void ui_draw_but_WAVEFORM(ARegion *ar, uiBut *but, struct uiWidgetColors *wcol, rcti *rect);
@@ -468,14 +482,18 @@ extern void ui_draw_but(const struct bContext *C, ARegion *ar, struct uiStyle *s
 struct ThemeUI;
 void ui_widget_color_init(struct ThemeUI *tui);
 
-void ui_draw_menu_item(struct uiFontStyle *fstyle, rcti *rect, char *name, int iconid, int state);
-void ui_draw_preview_item(struct uiFontStyle *fstyle, rcti *rect, char *name, int iconid, int state);
+void ui_draw_menu_item(struct uiFontStyle *fstyle, rcti *rect, const char *name, int iconid, int state);
+void ui_draw_preview_item(struct uiFontStyle *fstyle, rcti *rect, const char *name, int iconid, int state);
+
+extern unsigned char checker_stipple_sml[];
+/* used for transp checkers */
+#define UI_TRANSP_DARK 100
+#define UI_TRANSP_LIGHT 160
 
 /* interface_style.c */
 void uiStyleInit(void);
 
 /* interface_icons.c */
-void ui_id_icon_render(struct bContext *C, struct ID *id, int preview);
 int ui_id_icon_get(struct bContext *C, struct ID *id, int preview);
 
 /* resources.c */
@@ -501,6 +519,7 @@ void ui_but_anim_add_keyingset(struct bContext *C);
 void ui_but_anim_remove_keyingset(struct bContext *C);
 int ui_but_anim_expression_get(uiBut *but, char *str, int maxlen);
 int ui_but_anim_expression_set(uiBut *but, const char *str);
+int ui_but_anim_expression_create(uiBut *but, const char *str);
 void ui_but_anim_autokey(struct bContext *C, uiBut *but, struct Scene *scene, float cfra);
 
 #endif

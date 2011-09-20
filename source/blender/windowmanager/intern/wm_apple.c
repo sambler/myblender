@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,7 +26,11 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
-#ifdef __APPLE__
+/** \file blender/windowmanager/intern/wm_apple.c
+ *  \ingroup wm
+ */
+
+/* note, this file builds on apple-carbon only! */
 
 #include "BKE_context.h"
 #include "BKE_global.h"
@@ -132,8 +136,3 @@ void wm_set_apple_prefsize(int scr_x, int scr_y)
 		G.windowstate= 0;
 	}
 }
-
-
-#endif /* __APPLE__ */
-
-

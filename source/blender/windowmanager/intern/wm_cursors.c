@@ -1,4 +1,4 @@
-/**
+/*
 * $Id$
 *
 * ***** BEGIN GPL LICENSE BLOCK *****
@@ -27,6 +27,11 @@
 * ***** END GPL/BL DUAL LICENSE BLOCK *****
 */
 
+/** \file blender/windowmanager/intern/wm_cursors.c
+ *  \ingroup wm
+ */
+
+
 #include <stdio.h>
 #include <string.h>
 
@@ -42,6 +47,7 @@
 #include "BKE_main.h"
 
 #include "WM_api.h"
+#include "WM_types.h"
 #include "wm_cursors.h"
 
 /* XXX this still is mess from old code */
@@ -70,7 +76,7 @@ static GHOST_TStandardCursor convert_cursor(int curs)
 	}
 }
 
-void window_set_custom_cursor(wmWindow *win, unsigned char mask[16][2], 
+static void window_set_custom_cursor(wmWindow *win, unsigned char mask[16][2], 
 							  unsigned char bitmap[16][2], int hotx, int hoty) 
 {
 	GHOST_SetCustomCursorShape(win->ghostwin, bitmap, mask, hotx, hoty);
@@ -116,6 +122,9 @@ void WM_cursor_set(wmWindow *win, int curs)
 
 	GHOST_SetCursorVisibility(win->ghostwin, 1);
 	
+	if(curs == CURSOR_STD && win->modalcursor)
+		curs= win->modalcursor;
+	
 	win->cursor= curs;
 	
 	/* detect if we use system cursor or Blender cursor */
@@ -139,14 +148,15 @@ void WM_cursor_set(wmWindow *win, int curs)
 
 void WM_cursor_modal(wmWindow *win, int val)
 {
-	if(win->lastcursor == 0) {
+	if(win->lastcursor == 0)
 		win->lastcursor = win->cursor;
-		WM_cursor_set(win, val);
-	}
+	win->modalcursor = val;
+	WM_cursor_set(win, val);
 }
 
 void WM_cursor_restore(wmWindow *win)
 {
+	win->modalcursor = 0;
 	if(win->lastcursor)
 		WM_cursor_set(win, win->lastcursor);
 	win->lastcursor = 0;
@@ -155,14 +165,16 @@ void WM_cursor_restore(wmWindow *win)
 /* to allow usage all over, we do entire WM */
 void WM_cursor_wait(int val)
 {
-	wmWindowManager *wm= G.main->wm.first;
-	wmWindow *win= wm->windows.first; 
-	
-	for(; win; win= win->next) {
-		if(val) {
-			WM_cursor_modal(win, CURSOR_WAIT);
-		} else {
-			WM_cursor_restore(win);
+	if(!G.background) {
+		wmWindowManager *wm= G.main->wm.first;
+		wmWindow *win= wm?wm->windows.first:NULL; 
+		
+		for(; win; win= win->next) {
+			if(val) {
+				WM_cursor_modal(win, BC_WAITCURSOR);
+			} else {
+				WM_cursor_restore(win);
+			}
 		}
 	}
 }
@@ -200,6 +212,29 @@ void WM_cursor_ungrab(wmWindow *win)
 	}
 }
 
+/* give it a modal keymap one day? */
+int wm_cursor_arrow_move(wmWindow *win, wmEvent *event)
+{
+	if(win && event->val==KM_PRESS) {
+		
+		if(event->type==UPARROWKEY) {
+			WM_cursor_warp(win, event->x, event->y+1);
+			return 1;
+		} else if(event->type==DOWNARROWKEY) {
+			WM_cursor_warp(win, event->x, event->y-1);
+			return 1;
+		} else if(event->type==LEFTARROWKEY) {
+			WM_cursor_warp(win, event->x-1, event->y);
+			return 1;
+		} else if(event->type==RIGHTARROWKEY) {
+			WM_cursor_warp(win, event->x+1, event->y);
+			return 1;
+		}
+	}
+	return 0;
+}
+
+
 /* afer this you can call restore too */
 void WM_timecursor(wmWindow *win, int nr)
 {
@@ -217,13 +252,12 @@ void WM_timecursor(wmWindow *win, int nr)
 	{0,  56,  68,  68, 120,  64,  68,  56} 
 	};
 	unsigned char mask[16][2];
-	unsigned char bitmap[16][2];
+	unsigned char bitmap[16][2]= {{0}};
 	int i, idx;
 	
 	if(win->lastcursor == 0)
 		win->lastcursor= win->cursor; 
 	
-	memset(&bitmap, 0x00, sizeof(bitmap));
 	memset(&mask, 0xFF, sizeof(mask));
 	
 	/* print number bottom right justified */

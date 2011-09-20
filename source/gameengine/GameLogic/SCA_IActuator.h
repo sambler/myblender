@@ -1,4 +1,4 @@
-/**
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -26,13 +26,18 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
+
+/** \file SCA_IActuator.h
+ *  \ingroup gamelogic
+ */
+
 #ifndef __KX_IACTUATOR
 #define __KX_IACTUATOR
 
 #include "SCA_IController.h"
 #include <vector>
 
-/*
+/**
  * Use of SG_DList : None
  * Use of SG_QList : element of activated actuator list of their owner
  *                   Head: SCA_IObject::m_activeActuators
@@ -85,6 +90,7 @@ public:
 		KX_ACT_SHAPEACTION,
 		KX_ACT_STATE,
 		KX_ACT_ARMATURE,
+		KX_ACT_STEERING,
 	};
 
 	SCA_IActuator(SCA_IObject* gameobj, KX_ACTUATOR_TYPE type); 

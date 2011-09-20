@@ -23,9 +23,7 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-FILE(GLOB SRC intern/*.c intern/CMP_nodes/*.c intern/SHD_nodes/*.c intern/TEX_nodes/*.c)
-
-SET(INC 
+set(INC 
 	.
 	../blenkernel
 	../blenlib
@@ -36,18 +34,151 @@ SET(INC
 	../makesrna
 	../render/extern/include
 	../../../intern/guardedalloc
-	../../../extern/glew/include
 )
 
-IF(WIN32)
-	LIST(APPEND INC ${PTHREADS_INC})
-ENDIF(WIN32)
+set(INC_SYS
+	${GLEW_INCLUDE_PATH}
+	intern
+	composite
+	shader
+	texture
+)
 
-IF(WITH_PYTHON)
-	SET(INC ${INC} ../python ${PYTHON_INC})
-ELSE(WITH_PYTHON)
-	ADD_DEFINITIONS(-DDISABLE_PYTHON)
-ENDIF(WITH_PYTHON)
+set(SRC
+	composite/nodes/node_composite_alphaOver.c
+	composite/nodes/node_composite_bilateralblur.c
+	composite/nodes/node_composite_blur.c
+	composite/nodes/node_composite_brightness.c
+	composite/nodes/node_composite_channelMatte.c
+	composite/nodes/node_composite_chromaMatte.c
+	composite/nodes/node_composite_colorMatte.c
+	composite/nodes/node_composite_colorSpill.c
+	composite/nodes/node_composite_colorbalance.c
+	composite/nodes/node_composite_common.c
+	composite/nodes/node_composite_composite.c
+	composite/nodes/node_composite_crop.c
+	composite/nodes/node_composite_curves.c
+	composite/nodes/node_composite_defocus.c
+	composite/nodes/node_composite_diffMatte.c
+	composite/nodes/node_composite_dilate.c
+	composite/nodes/node_composite_directionalblur.c
+	composite/nodes/node_composite_displace.c
+	composite/nodes/node_composite_distanceMatte.c
+	composite/nodes/node_composite_filter.c
+	composite/nodes/node_composite_flip.c
+	composite/nodes/node_composite_gamma.c
+	composite/nodes/node_composite_glare.c
+	composite/nodes/node_composite_hueSatVal.c
+	composite/nodes/node_composite_huecorrect.c
+	composite/nodes/node_composite_idMask.c
+	composite/nodes/node_composite_image.c
+	composite/nodes/node_composite_invert.c
+	composite/nodes/node_composite_lensdist.c
+	composite/nodes/node_composite_levels.c
+	composite/nodes/node_composite_lummaMatte.c
+	composite/nodes/node_composite_mapUV.c
+	composite/nodes/node_composite_mapValue.c
+	composite/nodes/node_composite_math.c
+	composite/nodes/node_composite_mixrgb.c
+	composite/nodes/node_composite_normal.c
+	composite/nodes/node_composite_normalize.c
+	composite/nodes/node_composite_outputFile.c
+	composite/nodes/node_composite_premulkey.c
+	composite/nodes/node_composite_rgb.c
+	composite/nodes/node_composite_rotate.c
+	composite/nodes/node_composite_scale.c
+	composite/nodes/node_composite_sepcombHSVA.c
+	composite/nodes/node_composite_sepcombRGBA.c
+	composite/nodes/node_composite_sepcombYCCA.c
+	composite/nodes/node_composite_sepcombYUVA.c
+	composite/nodes/node_composite_setalpha.c
+	composite/nodes/node_composite_splitViewer.c
+	composite/nodes/node_composite_texture.c
+	composite/nodes/node_composite_tonemap.c
+	composite/nodes/node_composite_translate.c
+	composite/nodes/node_composite_valToRgb.c
+	composite/nodes/node_composite_value.c
+	composite/nodes/node_composite_vecBlur.c
+	composite/nodes/node_composite_viewer.c
+	composite/nodes/node_composite_zcombine.c
+	composite/node_composite_tree.c
+	composite/node_composite_util.c
 
-BLENDERLIB(bf_nodes "${SRC}" "${INC}")
+	shader/nodes/node_shader_camera.c
+	shader/nodes/node_shader_common.c
+	shader/nodes/node_shader_curves.c
+	shader/nodes/node_shader_dynamic.c
+	shader/nodes/node_shader_geom.c
+	shader/nodes/node_shader_hueSatVal.c
+	shader/nodes/node_shader_invert.c
+	shader/nodes/node_shader_mapping.c
+	shader/nodes/node_shader_material.c
+	shader/nodes/node_shader_math.c
+	shader/nodes/node_shader_mixRgb.c
+	shader/nodes/node_shader_normal.c
+	shader/nodes/node_shader_output.c
+	shader/nodes/node_shader_rgb.c
+	shader/nodes/node_shader_sepcombRGB.c
+	shader/nodes/node_shader_squeeze.c
+	shader/nodes/node_shader_texture.c
+	shader/nodes/node_shader_valToRgb.c
+	shader/nodes/node_shader_value.c
+	shader/nodes/node_shader_vectMath.c
+	shader/node_shader_tree.c
+	shader/node_shader_util.c
 
+	texture/nodes/node_texture_at.c
+	texture/nodes/node_texture_bricks.c
+	texture/nodes/node_texture_checker.c
+	texture/nodes/node_texture_common.c
+	texture/nodes/node_texture_compose.c
+	texture/nodes/node_texture_coord.c
+	texture/nodes/node_texture_curves.c
+	texture/nodes/node_texture_decompose.c
+	texture/nodes/node_texture_distance.c
+	texture/nodes/node_texture_hueSatVal.c
+	texture/nodes/node_texture_image.c
+	texture/nodes/node_texture_invert.c
+	texture/nodes/node_texture_math.c
+	texture/nodes/node_texture_mixRgb.c
+	texture/nodes/node_texture_output.c
+	texture/nodes/node_texture_proc.c
+	texture/nodes/node_texture_rotate.c
+	texture/nodes/node_texture_scale.c
+	texture/nodes/node_texture_texture.c
+	texture/nodes/node_texture_translate.c
+	texture/nodes/node_texture_valToNor.c
+	texture/nodes/node_texture_valToRgb.c
+	texture/nodes/node_texture_viewer.c
+	texture/node_texture_tree.c
+	texture/node_texture_util.c
+
+	intern/node_util.c
+	intern/node_exec.c
+	intern/node_common.c
+	intern/node_socket.c
+
+	composite/node_composite_util.h
+	shader/node_shader_util.h
+	texture/node_texture_util.h
+
+	NOD_composite.h
+	NOD_shader.h
+	NOD_texture.h
+	NOD_socket.h
+	intern/node_util.h
+	intern/node_exec.h
+	intern/node_common.h
+)
+
+if(WITH_PYTHON)
+	list(APPEND INC
+		../python
+	)
+	list(APPEND INC_SYS
+		${PYTHON_INCLUDE_DIRS}
+	)
+	add_definitions(-DWITH_PYTHON)
+endif()
+
+blender_add_lib(bf_nodes "${SRC}" "${INC}" "${INC_SYS}")

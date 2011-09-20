@@ -1,3 +1,6 @@
+/** \file gameengine/Ketsji/BL_Texture.cpp
+ *  \ingroup ketsji
+ */
 // ------------------------------------
 
 #include "GL/glew.h"
@@ -25,6 +28,7 @@
 #define spit(x) std::cout << x << std::endl;
 
 #include "MEM_guardedalloc.h"
+#include "GPU_draw.h"
 
 extern "C" {
 	// envmaps
@@ -172,6 +176,8 @@ void BL_Texture::InitGLTex(unsigned int *pix,int x,int y,bool mipmap)
 		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, x, y, 0, GL_RGBA, GL_UNSIGNED_BYTE, pix );
 	}
 
+	if (GLEW_EXT_texture_filter_anisotropic)
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, GPU_get_anisotropic());
 	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 }
 
@@ -196,6 +202,9 @@ void BL_Texture::InitNonPow2Tex(unsigned int *pix,int x,int y,bool mipmap)
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, nx, ny, 0, GL_RGBA, GL_UNSIGNED_BYTE, newPixels );
 	}
+
+	if (GLEW_EXT_texture_filter_anisotropic)
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, GPU_get_anisotropic());
 	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 	free(newPixels);
 }
@@ -634,7 +643,7 @@ void my_envmap_split_ima(EnvMap *env, ImBuf *ibuf)
 	}
 	else {
 		for(part=0; part<6; part++) {
-			env->cube[part]= IMB_allocImBuf(dx, dx, 24, IB_rect, 0);
+			env->cube[part]= IMB_allocImBuf(dx, dx, 24, IB_rect);
 		}
 		IMB_rectcpy(env->cube[0], ibuf, 
 			0, 0, 0, 0, dx, dx);

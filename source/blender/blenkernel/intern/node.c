@@ -295,12 +295,12 @@ int nodeFindNode(bNodeTree *ntree, bNodeSocket *sock, bNode **nodep, int *sockin
 static void node_add_sockets_from_type(bNodeTree *ntree, bNode *node, bNodeType *ntype)
 {
 	bNodeSocketTemplate *sockdef;
-	bNodeSocket *sock;
+	/* bNodeSocket *sock; */ /* UNUSED */
 
 	if(ntype->inputs) {
 		sockdef= ntype->inputs;
 		while(sockdef->type != -1) {
-			sock = node_add_input_from_template(ntree, node, sockdef);
+			/* sock = */ node_add_input_from_template(ntree, node, sockdef);
 			
 			sockdef++;
 		}
@@ -308,7 +308,7 @@ static void node_add_sockets_from_type(bNodeTree *ntree, bNode *node, bNodeType 
 	if(ntype->outputs) {
 		sockdef= ntype->outputs;
 		while(sockdef->type != -1) {
-			sock = node_add_output_from_template(ntree, node, sockdef);
+			/* sock = */ node_add_output_from_template(ntree, node, sockdef);
 			
 			sockdef++;
 		}
@@ -398,6 +398,11 @@ bNode *nodeCopyNode(struct bNodeTree *ntree, struct bNode *node)
 		sock->stack_index= 0;
 		
 		sock->default_value = (oldsock->default_value ? MEM_dupallocN(oldsock->default_value) : NULL);
+		
+		/* XXX some compositor node (e.g. image, render layers) still store
+		 * some persistent buffer data here, need to clear this to avoid dangling pointers.
+		 */
+		sock->cache = NULL;
 	}
 	
 	BLI_duplicatelist(&nnode->outputs, &node->outputs);
@@ -407,6 +412,11 @@ bNode *nodeCopyNode(struct bNodeTree *ntree, struct bNode *node)
 		sock->stack_index= 0;
 		
 		sock->default_value = (oldsock->default_value ? MEM_dupallocN(oldsock->default_value) : NULL);
+		
+		/* XXX some compositor node (e.g. image, render layers) still store
+		 * some persistent buffer data here, need to clear this to avoid dangling pointers.
+		 */
+		sock->cache = NULL;
 	}
 	
 	/* don't increase node->id users, freenode doesn't decrement either */
@@ -610,7 +620,7 @@ bNodeTree *ntreeAddTree(const char *name, int type, int nodetype)
 bNodeTree *ntreeCopyTree(bNodeTree *ntree)
 {
 	bNodeTree *newtree;
-	bNode *node, *nnode, *last;
+	bNode *node /*, *nnode */ /* UNUSED */, *last;
 	bNodeLink *link;
 	bNodeSocket *gsock, *oldgsock;
 	
@@ -637,7 +647,7 @@ bNodeTree *ntreeCopyTree(bNodeTree *ntree)
 	last = ntree->nodes.last;
 	for(node= ntree->nodes.first; node; node= node->next) {
 		node->new_node= NULL;
-		nnode= nodeCopyNode(newtree, node);	/* sets node->new */
+		/* nnode= */ nodeCopyNode(newtree, node);	/* sets node->new */
 		
 		/* make sure we don't copy new nodes again! */
 		if (node==last)
@@ -897,13 +907,13 @@ void ntreeFreeTree(bNodeTree *ntree)
 	if (ntree->execdata) {
 		switch (ntree->type) {
 		case NTREE_COMPOSIT:
-			ntreeCompositEndExecTree(ntree->execdata);
+			ntreeCompositEndExecTree(ntree->execdata, 1);
 			break;
 		case NTREE_SHADER:
-			ntreeShaderEndExecTree(ntree->execdata);
+			ntreeShaderEndExecTree(ntree->execdata, 1);
 			break;
 		case NTREE_TEXTURE:
-			ntreeTexEndExecTree(ntree->execdata);
+			ntreeTexEndExecTree(ntree->execdata, 1);
 			break;
 		}
 	}
@@ -1041,9 +1051,9 @@ void ntreeMakeLocal(bNodeTree *ntree)
 	
 	if(ntree->id.lib==NULL) return;
 	if(ntree->id.us==1) {
-		ntree->id.lib= 0;
+		ntree->id.lib= NULL;
 		ntree->id.flag= LIB_LOCAL;
-		new_id(0, (ID *)ntree, 0);
+		new_id(NULL, (ID *)ntree, NULL);
 		return;
 	}
 	
@@ -1059,7 +1069,7 @@ void ntreeMakeLocal(bNodeTree *ntree)
 	if(cd.local && cd.lib==0) {
 		ntree->id.lib= NULL;
 		ntree->id.flag= LIB_LOCAL;
-		new_id(0, (ID *)ntree, 0);
+		new_id(NULL, (ID *)ntree, NULL);
 	}
 	else if(cd.local && cd.lib) {
 		/* this is the mixed case, we copy the tree and assign it to local users */
@@ -1428,7 +1438,7 @@ static void ntree_update_link_pointers(bNodeTree *ntree)
 	}
 }
 
-void ntree_validate_links(bNodeTree *ntree)
+static void ntree_validate_links(bNodeTree *ntree)
 {
 	bNodeTreeType *ntreetype = ntreeGetType(ntree->type);
 	bNodeLink *link;
@@ -1524,20 +1534,24 @@ void NodeTagChanged(bNodeTree *ntree, bNode *node)
 {
 	bNodeTreeType *ntreetype = ntreeGetType(ntree->type);
 	
-	if (ntreetype->update_node)
+	/* extra null pointer checks here because this is called when unlinking
+	   unknown nodes on file load, so typeinfo pointers may not be set */
+	if (ntreetype && ntreetype->update_node)
 		ntreetype->update_node(ntree, node);
-	else if (node->typeinfo->updatefunc)
+	else if (node->typeinfo && node->typeinfo->updatefunc)
 		node->typeinfo->updatefunc(ntree, node);
 }
 
 int NodeTagIDChanged(bNodeTree *ntree, ID *id)
 {
-	bNodeTreeType *ntreetype = ntreeGetType(ntree->type);
+	bNodeTreeType *ntreetype;
 	bNode *node;
 	int change = FALSE;
 
 	if(ELEM(NULL, id, ntree))
 		return change;
+	
+	ntreetype = ntreeGetType(ntree->type);
 	
 	if (ntreetype->update_node) {
 		for(node= ntree->nodes.first; node; node= node->next) {

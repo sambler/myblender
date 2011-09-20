@@ -200,17 +200,22 @@ bNodeTreeType ntreeType_Composite = {
 };
 
 
-struct bNodeTreeExec *ntreeCompositBeginExecTree(bNodeTree *ntree)
+/* XXX Group nodes must set use_tree_data to false, since their trees can be shared by multiple nodes.
+ * If use_tree_data is true, the ntree->execdata pointer is checked to avoid multiple execution of top-level trees.
+ */
+struct bNodeTreeExec *ntreeCompositBeginExecTree(bNodeTree *ntree, int use_tree_data)
 {
 	bNodeTreeExec *exec;
 	bNode *node;
 	bNodeSocket *sock;
 	
-	/* XXX hack: prevent exec data from being generated twice.
-	 * this should be handled by the renderer!
-	 */
-	if (ntree->execdata)
-		return ntree->execdata;
+	if (use_tree_data) {
+		/* XXX hack: prevent exec data from being generated twice.
+		 * this should be handled by the renderer!
+		 */
+		if (ntree->execdata)
+			return ntree->execdata;
+	}
 	
 	/* ensures only a single output node is enabled */
 	ntreeSetOutput(ntree);
@@ -236,15 +241,20 @@ struct bNodeTreeExec *ntreeCompositBeginExecTree(bNodeTree *ntree)
 		}
 	}
 	
-	/* XXX this should not be necessary, but is still used for cmp/sha/tex nodes,
+	if (use_tree_data) {
+		/* XXX this should not be necessary, but is still used for cmp/sha/tex nodes,
 		 * which only store the ntree pointer. Should be fixed at some point!
 		 */
-	ntree->execdata = exec;
+		ntree->execdata = exec;
+	}
 	
 	return exec;
 }
 
-void ntreeCompositEndExecTree(bNodeTreeExec *exec)
+/* XXX Group nodes must set use_tree_data to false, since their trees can be shared by multiple nodes.
+ * If use_tree_data is true, the ntree->execdata pointer is checked to avoid multiple execution of top-level trees.
+ */
+void ntreeCompositEndExecTree(bNodeTreeExec *exec, int use_tree_data)
 {
 	if(exec) {
 		bNodeTree *ntree= exec->nodetree;
@@ -269,8 +279,10 @@ void ntreeCompositEndExecTree(bNodeTreeExec *exec)
 	
 		ntree_exec_end(exec);
 		
-		/* XXX clear nodetree backpointer to exec data, same problem as noted in ntreeBeginExecTree */
-		ntree->execdata = NULL;
+		if (use_tree_data) {
+			/* XXX clear nodetree backpointer to exec data, same problem as noted in ntreeBeginExecTree */
+			ntree->execdata = NULL;
+		}
 	}
 }
 
@@ -325,19 +337,19 @@ static void *exec_composite_node(void *nodeexec_v)
 		node->typeinfo->newexecfunc(thd->rd, 0, node, nodeexec->data, nsin, nsout);
 	
 	node->exec |= NODE_READY;
-	return 0;
+	return NULL;
 }
 
 /* return total of executable nodes, for timecursor */
-static int setExecutableNodes(bNodeTree *ntree, ThreadData *thd)
+static int setExecutableNodes(bNodeTreeExec *exec, ThreadData *thd)
 {
+	bNodeTree *ntree = exec->nodetree;
 	bNodeStack *nsin[MAX_SOCKET];	/* arbitrary... watch this */
 	bNodeStack *nsout[MAX_SOCKET];	/* arbitrary... watch this */
+	bNodeExec *nodeexec;
 	bNode *node;
 	bNodeSocket *sock;
-	int totnode= 0, group_edit= 0;
-	
-	/* note; do not add a dependency sort here, the stack was created already */
+	int n, totnode= 0, group_edit= 0;
 	
 	/* if we are in group edit, viewer nodes get skipped when group has viewer */
 	for(node= ntree->nodes.first; node; node= node->next)
@@ -345,10 +357,12 @@ static int setExecutableNodes(bNodeTree *ntree, ThreadData *thd)
 			if(ntreeHasType((bNodeTree *)node->id, CMP_NODE_VIEWER))
 				group_edit= 1;
 	
-	for(node= ntree->nodes.first; node; node= node->next) {
+	/* NB: using the exec data list here to have valid dependency sort */
+	for(n=0, nodeexec=exec->nodeexec; n < exec->totnodes; ++n, ++nodeexec) {
 		int a;
+		node = nodeexec->node;
 		
-		node_get_stack(node, thd->stack, nsin, nsout);
+		node_get_stack(node, exec->stack, nsin, nsout);
 		
 		/* test the outputs */
 		/* skip value-only nodes (should be in type!) */
@@ -410,10 +424,11 @@ static int setExecutableNodes(bNodeTree *ntree, ThreadData *thd)
 	/* last step: set the stack values for only-value nodes */
 	/* just does all now, compared to a full buffer exec this is nothing */
 	if(totnode) {
-		for(node= ntree->nodes.first; node; node= node->next) {
+		for(n=0, nodeexec=exec->nodeexec; n < exec->totnodes; ++n, ++nodeexec) {
+			node = nodeexec->node;
 			if(node->need_exec==0 && node_only_value(node)) {
 				if(node->typeinfo->execfunc) {
-					node_get_stack(node, thd->stack, nsin, nsout);
+					node_get_stack(node, exec->stack, nsin, nsout);
 					node->typeinfo->execfunc(thd->rd, node, nsin, nsout);
 				}
 			}
@@ -424,14 +439,17 @@ static int setExecutableNodes(bNodeTree *ntree, ThreadData *thd)
 }
 
 /* while executing tree, free buffers from nodes that are not needed anymore */
-static void freeExecutableNode(bNodeTree *ntree, bNodeTreeExec *exec)
+static void freeExecutableNode(bNodeTreeExec *exec)
 {
 	/* node outputs can be freed when:
 	- not a render result or image node
 	- when node outputs go to nodes all being set NODE_FINISHED
 	*/
+	bNodeTree *ntree = exec->nodetree;
+	bNodeExec *nodeexec;
 	bNode *node;
 	bNodeSocket *sock;
+	int n;
 	
 	/* set exec flag for finished nodes that might need freed */
 	for(node= ntree->nodes.first; node; node= node->next) {
@@ -439,8 +457,11 @@ static void freeExecutableNode(bNodeTree *ntree, bNodeTreeExec *exec)
 			if(node->exec & NODE_FINISHED)
 				node->exec |= NODE_FREEBUFS;
 	}
-	/* clear this flag for input links that are not done yet */
-	for(node= ntree->nodes.first; node; node= node->next) {
+	/* clear this flag for input links that are not done yet.
+	 * Using the exec data for valid dependency sort.
+	 */
+	for(n=0, nodeexec=exec->nodeexec; n < exec->totnodes; ++n, ++nodeexec) {
+		node = nodeexec->node;
 		if((node->exec & NODE_FINISHED)==0) {
 			for(sock= node->inputs.first; sock; sock= sock->next)
 				if(sock->link)
@@ -495,10 +516,10 @@ static  void ntree_composite_texnode(bNodeTree *ntree, int init)
 				/* has internal flag to detect it only does it once */
 				if(init) {
 					if (!tex->nodetree->execdata)
-						tex->nodetree->execdata = ntreeTexBeginExecTree(tex->nodetree); 
+						tex->nodetree->execdata = ntreeTexBeginExecTree(tex->nodetree, 1); 
 				}
 				else
-					ntreeTexEndExecTree(tex->nodetree->execdata);
+					ntreeTexEndExecTree(tex->nodetree->execdata, 1);
 					tex->nodetree->execdata = NULL;
 			}
 		}
@@ -514,15 +535,17 @@ void ntreeCompositExecTree(bNodeTree *ntree, RenderData *rd, int do_preview)
 	ListBase threads;
 	ThreadData thdata;
 	int totnode, curnode, rendering= 1, n;
-	bNodeTreeExec *exec= NULL;
+	bNodeTreeExec *exec= ntree->execdata;
 	
 	if(ntree==NULL) return;
 	
 	if(do_preview)
 		ntreeInitPreview(ntree, 0, 0);
 	
-	if (!ntree->execdata)
-		exec = ntreeCompositBeginExecTree(ntree);
+	if (!ntree->execdata) {
+		/* XXX this is the top-level tree, so we use the ntree->execdata pointer. */
+		exec = ntreeCompositBeginExecTree(ntree, 1);
+	}
 	ntree_composite_texnode(ntree, 1);
 	
 	/* prevent unlucky accidents */
@@ -537,7 +560,7 @@ void ntreeCompositExecTree(bNodeTree *ntree, RenderData *rd, int do_preview)
 	BLI_srandom(rd->cfra);
 
 	/* sets need_exec tags in nodes */
-	curnode = totnode= setExecutableNodes(ntree, &thdata);
+	curnode = totnode= setExecutableNodes(exec, &thdata);
 
 	BLI_init_threads(&threads, exec_composite_node, rd->threads);
 	
@@ -583,7 +606,7 @@ void ntreeCompositExecTree(bNodeTree *ntree, RenderData *rd, int do_preview)
 					
 					/* freeing unused buffers */
 					if(rd->scemode & R_COMP_FREE)
-						freeExecutableNode(ntree, exec);
+						freeExecutableNode(exec);
 				}
 			}
 			else rendering= 1;
@@ -592,7 +615,8 @@ void ntreeCompositExecTree(bNodeTree *ntree, RenderData *rd, int do_preview)
 	
 	BLI_end_threads(&threads);
 	
-	ntreeCompositEndExecTree(exec);
+	/* XXX top-level tree uses the ntree->execdata pointer */
+	ntreeCompositEndExecTree(exec, 1);
 }
 
 /* *********************************************** */

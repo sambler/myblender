@@ -826,11 +826,11 @@ bNodeTemplate node_forloop_template(bNode *node)
 
 void node_forloop_init(bNodeTree *ntree, bNode *node, bNodeTemplate *ntemp)
 {
-	bNodeSocket *sock;
+	/* bNodeSocket *sock; */ /* UNUSED */
 	
 	node->id = (ID*)ntemp->ngroup;
 	
-	sock = nodeAddInputFloat(ntree, node, "Iterations", PROP_UNSIGNED, 1, 0, 10000);
+	/* sock = */ nodeAddInputFloat(ntree, node, "Iterations", PROP_UNSIGNED, 1, 0, 10000);
 	
 	/* NB: group socket input/output roles are inverted internally!
 	 * Group "inputs" work as outputs in links and vice versa.
@@ -878,7 +878,7 @@ static void loop_sync(bNodeTree *ntree, int sync_in_out)
 		while (sync && ((sync->flag & SOCK_INTERNAL) || !(sync->flag & SOCK_DYNAMIC)))
 			sync = sync->next;
 		
-		if (!(sync->flag & SOCK_INTERNAL) && (sync->flag & SOCK_DYNAMIC)) {
+		if (sync && !(sync->flag & SOCK_INTERNAL) && (sync->flag & SOCK_DYNAMIC)) {
 			if (sock->storage==NULL) {
 				/* if mirror index is 0, the sockets is newly added and a new mirror must be created. */
 				mirror = node_group_expose_socket(ntree, sock, sync_in_out);
@@ -932,11 +932,11 @@ void node_loop_update_tree(bNodeTree *ngroup)
 
 void node_whileloop_init(bNodeTree *ntree, bNode *node, bNodeTemplate *ntemp)
 {
-	bNodeSocket *sock;
+	/* bNodeSocket *sock; */ /* UNUSED */
 	
 	node->id = (ID*)ntemp->ngroup;
 	
-	sock = nodeAddInputFloat(ntree, node, "Condition", PROP_NONE, 1, 0, 1);
+	/* sock = */ nodeAddInputFloat(ntree, node, "Condition", PROP_NONE, 1, 0, 1);
 	
 	/* max iterations */
 	node->custom1 = 10000;

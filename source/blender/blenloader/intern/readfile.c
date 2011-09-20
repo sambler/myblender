@@ -238,6 +238,7 @@ typedef struct OldNewMap {
 /* local prototypes */
 static void *read_struct(FileData *fd, BHead *bh, const char *blockname);
 static void direct_link_modifiers(FileData *fd, ListBase *lb);
+static void convert_tface_mt(FileData *fd, Main *main);
 
 static OldNewMap *oldnewmap_new(void) 
 {
@@ -2142,7 +2143,7 @@ static void lib_verify_nodetree(Main *main, int UNUSED(open))
 			ntreetype->foreach_nodetree(main, NULL, lib_nodetree_init_types_cb);
 	}
 	for(ntree= main->nodetree.first; ntree; ntree= ntree->id.next)
-		ntreeInitTypes(ntree);
+		lib_nodetree_init_types_cb(NULL, NULL, ntree);
 	
 	{
 		int has_old_groups=0;
@@ -2217,8 +2218,9 @@ static void direct_link_nodetree(FileData *fd, bNodeTree *ntree)
 		if(node->type == NODE_DYNAMIC) {
 			node->custom1= 0;
 			node->custom1= BSET(node->custom1, NODE_DYNAMIC_LOADED);
-			node->typeinfo= NULL;
 		}
+
+		node->typeinfo= NULL;
 		
 		link_list(fd, &node->inputs);
 		link_list(fd, &node->outputs);
@@ -3477,6 +3479,9 @@ static void lib_link_mesh(FileData *fd, Main *main)
 		}
 		me= me->id.next;
 	}
+
+	/* convert texface options to material */
+	convert_tface_mt(fd, main);
 }
 
 static void direct_link_dverts(FileData *fd, int count, MDeformVert *mdverts)
@@ -3895,6 +3900,11 @@ static void lib_link_object(FileData *fd, Main *main)
 					arma->target= newlibadr(fd, ob->id.lib, arma->target);
 					arma->subtarget= newlibadr(fd, ob->id.lib, arma->subtarget);
 				}
+				else if(act->type==ACT_STEERING) {
+					bSteeringActuator *steeringa = act->data; 
+					steeringa->target = newlibadr(fd, ob->id.lib, steeringa->target);
+					steeringa->navmesh = newlibadr(fd, ob->id.lib, steeringa->navmesh);
+				}
 				act= act->next;
 			}
 			
@@ -3961,7 +3971,6 @@ static void direct_link_pose(FileData *fd, bPose *pose)
 			direct_link_motionpath(fd, pchan->mpath);
 		
 		pchan->iktree.first= pchan->iktree.last= NULL;
-		pchan->path= NULL;
 		
 		/* incase this value changes in future, clamp else we get undefined behavior */
 		CLAMP(pchan->rotmode, ROT_MODE_MIN, ROT_MODE_MAX);
@@ -4023,8 +4032,10 @@ static void direct_link_modifiers(FileData *fd, ListBase *lb)
 			FluidsimModifierData *fluidmd = (FluidsimModifierData*) md;
 			
 			fluidmd->fss= newdataadr(fd, fluidmd->fss);
-			fluidmd->fss->fmd= fluidmd;
-			fluidmd->fss->meshVelocities = NULL;
+			if(fluidmd->fss) {
+				fluidmd->fss->fmd= fluidmd;
+				fluidmd->fss->meshVelocities = NULL;
+			}
 		}
 		else if (md->type==eModifierType_Smoke) {
 			SmokeModifierData *smd = (SmokeModifierData*) md;
@@ -4184,6 +4195,13 @@ static void direct_link_modifiers(FileData *fd, ListBase *lb)
 			tmd->curfalloff= newdataadr(fd, tmd->curfalloff);
 			if(tmd->curfalloff)
 				direct_link_curvemapping(fd, tmd->curfalloff);
+		}
+		else if (md->type==eModifierType_WeightVGEdit) {
+			WeightVGEditModifierData *wmd = (WeightVGEditModifierData*) md;
+
+			wmd->cmap_curve = newdataadr(fd, wmd->cmap_curve);
+			if(wmd->cmap_curve)
+				direct_link_curvemapping(fd, wmd->cmap_curve);
 		}
 	}
 }
@@ -6344,7 +6362,7 @@ static void alphasort_version_246(FileData *fd, Library *lib, Mesh *me)
 	/* if we do, set alpha sort if the game engine did it before */
 	for(a=0, mf=me->mface; a<me->totface; a++, mf++) {
 		if(mf->mat_nr < me->totcol) {
-			ma= newlibadr(fd, lib, me->mat[(int)mf->mat_nr]);
+			ma= newlibadr(fd, lib, me->mat[mf->mat_nr]);
 			texalpha = 0;
 
 			/* we can't read from this if it comes from a library,
@@ -7013,6 +7031,36 @@ static void do_versions_nodetree_default_value(bNodeTree *ntree)
 		do_versions_socket_default_value(sock);
 	for (sock=ntree->outputs.first; sock; sock=sock->next)
 		do_versions_socket_default_value(sock);
+}
+
+static void do_versions_nodetree_dynamic_sockets(bNodeTree *ntree)
+{
+	bNodeSocket *sock;
+	for (sock=ntree->inputs.first; sock; sock=sock->next)
+		sock->flag |= SOCK_DYNAMIC;
+	for (sock=ntree->outputs.first; sock; sock=sock->next)
+		sock->flag |= SOCK_DYNAMIC;
+}
+
+void convert_tface_mt(FileData *fd, Main *main)
+{
+	Main *gmain;
+
+	/* this is a delayed do_version (so it can create new materials) */
+	if (main->versionfile < 259 || (main->versionfile == 259 && main->subversionfile < 3)) {
+
+		//XXX hack, material.c uses G.main all over the place, instead of main
+		// temporarily set G.main to the current main
+		gmain = G.main;
+		G.main = main;
+
+		if(!(do_version_tface(main, 1))) {
+			BKE_report(fd->reports, RPT_ERROR, "Texface conversion problem. Error in console");
+		}
+
+		//XXX hack, material.c uses G.main allover the place, instead of main
+		G.main = gmain;
+	}
 }
 
 static void do_versions(FileData *fd, Library *lib, Main *main)
@@ -9210,7 +9258,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 							simasel->prv_w = 96;
 							simasel->flag = 7; /* ??? elubie */
 							strcpy (simasel->dir,  U.textudir);	/* TON */
-							strcpy (simasel->file, "");
+							simasel->file[0]= '\0';
 							
 							simasel->returnfunc     =  NULL;
 							simasel->title[0]       =  0;
@@ -9440,7 +9488,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 								
 								/* clear old targets to avoid problems */
 								data->tar = NULL;
-								strcpy(data->subtarget, "");
+								data->subtarget[0]= '\0';
 							}
 						}
 						else if (con->type == CONSTRAINT_TYPE_LOCLIKE) {
@@ -9470,7 +9518,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 						
 						/* clear old targets to avoid problems */
 						data->tar = NULL;
-						strcpy(data->subtarget, "");
+						data->subtarget[0]= '\0';
 					}
 				}
 				else if (con->type == CONSTRAINT_TYPE_LOCLIKE) {
@@ -11598,6 +11646,23 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 		}
 	}
 	
+	// init facing axis property of steering actuators
+	{					
+		Object *ob;
+		for(ob = main->object.first; ob; ob = ob->id.next) {
+			bActuator *act;
+			for(act= ob->actuators.first; act; act= act->next) {
+				if(act->type==ACT_STEERING) {
+					bSteeringActuator* stact = act->data;
+					if (stact->facingaxis==0)
+					{
+						stact->facingaxis=1;
+					}						
+				}
+			}
+		}
+	}
+	
 	if (main->versionfile < 256) {
 		bScreen *sc;
 		ScrArea *sa;
@@ -11972,6 +12037,27 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 				tex->nodetree->update |= NTREE_UPDATE;
 			}
 		}
+
+		/* add SOCK_DYNAMIC flag to existing group sockets */
+		{
+			bNodeTree *ntree;
+			/* only need to do this for trees in main, local trees are not used as groups */
+			for (ntree=main->nodetree.first; ntree; ntree=ntree->id.next) {
+				do_versions_nodetree_dynamic_sockets(ntree);
+				ntree->update |= NTREE_UPDATE;
+			}
+		}
+
+		{
+			/* Initialize group tree nodetypes.
+			 * These are used to distinguish tree types and
+			 * associate them with specific node types for polling.
+			 */
+			bNodeTree *ntree;
+			/* all node trees in main->nodetree are considered groups */
+			for (ntree=main->nodetree.first; ntree; ntree=ntree->id.next)
+				ntree->nodetype = NODE_GROUP;
+		}
 	}
 
 	/* put compatibility code here until next subversion bump */
@@ -11980,6 +12066,43 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 
 	}
 
+	//set defaults for obstacle avoidance, recast data
+	{
+		Scene *sce;
+		for(sce = main->scene.first; sce; sce = sce->id.next)
+		{
+			if (sce->gm.levelHeight == 0.f)
+				sce->gm.levelHeight = 2.f;
+
+			if(sce->gm.recastData.cellsize == 0.0f)
+				sce->gm.recastData.cellsize = 0.3f;
+			if(sce->gm.recastData.cellheight == 0.0f)
+				sce->gm.recastData.cellheight = 0.2f;
+			if(sce->gm.recastData.agentmaxslope == 0.0f)
+				sce->gm.recastData.agentmaxslope = M_PI/4;
+			if(sce->gm.recastData.agentmaxclimb == 0.0f)
+				sce->gm.recastData.agentmaxclimb = 0.9f;
+			if(sce->gm.recastData.agentheight == 0.0f)
+				sce->gm.recastData.agentheight = 2.0f;
+			if(sce->gm.recastData.agentradius == 0.0f)
+				sce->gm.recastData.agentradius = 0.6f;
+			if(sce->gm.recastData.edgemaxlen == 0.0f)
+				sce->gm.recastData.edgemaxlen = 12.0f;
+			if(sce->gm.recastData.edgemaxerror == 0.0f)
+				sce->gm.recastData.edgemaxerror = 1.3f;
+			if(sce->gm.recastData.regionminsize == 0.0f)
+				sce->gm.recastData.regionminsize = 50.f;
+			if(sce->gm.recastData.regionmergesize == 0.0f)
+				sce->gm.recastData.regionmergesize = 20.f;
+			if(sce->gm.recastData.vertsperpoly<3)
+				sce->gm.recastData.vertsperpoly = 6;
+			if(sce->gm.recastData.detailsampledist == 0.0f)
+				sce->gm.recastData.detailsampledist = 6.0f;
+			if(sce->gm.recastData.detailsamplemaxerror == 0.0f)
+				sce->gm.recastData.detailsamplemaxerror = 1.0f;
+		}			
+	}
+	
 	/* WATCH IT!!!: pointers from libdata have not been converted yet here! */
 	/* WATCH IT 2!: Userdef struct init has to be in editors/interface/resources.c! */
 
@@ -12883,6 +13006,11 @@ static void expand_object(FileData *fd, Main *mainvar, Object *ob)
 		else if(act->type==ACT_ARMATURE) {
 			bArmatureActuator *arma= act->data;
 			expand_doit(fd, mainvar, arma->target);
+		}
+		else if(act->type==ACT_STEERING) {
+			bSteeringActuator *sta= act->data;
+			expand_doit(fd, mainvar, sta->target);
+			expand_doit(fd, mainvar, sta->navmesh);
 		}
 		act= act->next;
 	}

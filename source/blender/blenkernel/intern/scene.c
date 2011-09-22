@@ -1124,3 +1124,183 @@ Base *_setlooper_base_step(Scene **sce_iter, Base *base)
 
 	return NULL;
 }
+
+/* *********************************** */
+/* WirecolourSet API */
+
+/* Finding Tools --------------------------- */
+
+/* Find the first path that matches the given criteria */
+// TODO: do we want some method to perform partial matches too?
+KS_Path *BKE_wirecolourset_find_path (WirecolourSet *wcs, ID *id, const char group_name[], const char rna_path[], int array_index, int UNUSED(group_mode))
+{
+//	KS_Path *ksp;
+//
+//	/* sanity checks */
+//	if ELEM3(NULL, wcs, rna_path, id)
+//		return NULL;
+//
+//	/* loop over paths in the current KeyingSet, finding the first one where all settings match
+//	 * (i.e. the first one where none of the checks fail and equal 0)
+//	 */
+//	for (ksp= wcs->paths.first; ksp; ksp= ksp->next) {
+//		short eq_id=1, eq_path=1, eq_index=1, eq_group=1;
+//
+//		/* id */
+//		if (id != ksp->id)
+//			eq_id= 0;
+//
+//		/* path */
+//		if ((ksp->rna_path==NULL) || strcmp(rna_path, ksp->rna_path))
+//			eq_path= 0;
+//
+//		/* index - need to compare whole-array setting too... */
+//		if (ksp->array_index != array_index)
+//			eq_index= 0;
+//
+//		/* group */
+//		if (group_name) {
+//			// FIXME: these checks need to be coded... for now, it's not too important though
+//		}
+//
+//		/* if all aspects are ok, return */
+//		if (eq_id && eq_path && eq_index && eq_group)
+//			return ksp;
+//	}
+//
+	/* none found */
+	return NULL;
+}
+
+/* Defining Tools --------------------------- */
+
+/* Used to create a new 'custom' WirecolourSet for the user, that will be automatically added to the stack */
+WirecolourSet *BKE_wirecolourset_add (ListBase *list, const char name[])
+{
+	WirecolourSet *wcs;
+
+	/* allocate new WirecolourSet */
+	wcs= MEM_callocN(sizeof(WirecolourSet), "WirecolourSet");
+
+	BLI_strncpy(wcs->name, name ? name : "WirecolourSet", sizeof(wcs->name));
+
+
+	/* add WirecolourSet to list */
+	BLI_addtail(list, wcs);
+
+	/* make sure WirecolourSet has a unique name (this helps with identification) */
+	BLI_uniquename(list, wcs, "WirecolourSet", '.', offsetof(WirecolourSet, name), sizeof(wcs->name));
+
+	/* return new WirecolourSet for further editing */
+	return wcs;
+}
+
+/* Add a path to a WirecolourSet. Nothing is returned for now...
+ * Checks are performed to ensure that destination is appropriate for the WirecolourSet in question
+ */
+KS_Path *BKE_wirecolourset_add_path (WirecolourSet *ks, ID *id, const char group_name[], const char rna_path[], int array_index, short flag, short groupmode)
+{
+//	KS_Path *ksp;
+//
+//	/* sanity checks */
+//	if ELEM(NULL, ks, rna_path) {
+//		printf("ERROR: no Keying Set and/or RNA Path to add path with \n");
+//		return NULL;
+//	}
+//
+//	/* ID is required for all types of KeyingSets */
+//	if (id == NULL) {
+//		printf("ERROR: No ID provided for Keying Set Path. \n");
+//		return NULL;
+//	}
+//
+//	/* don't add if there is already a matching KS_Path in the KeyingSet */
+//	if (BKE_keyingset_find_path(ks, id, group_name, rna_path, array_index, groupmode)) {
+//		if (G.f & G_DEBUG)
+//			printf("ERROR: destination already exists in Keying Set \n");
+//		return NULL;
+//	}
+//
+//	/* allocate a new KeyingSet Path */
+//	ksp= MEM_callocN(sizeof(KS_Path), "KeyingSet Path");
+//
+//	/* just store absolute info */
+//	ksp->id= id;
+//	if (group_name)
+//		BLI_strncpy(ksp->group, group_name, sizeof(ksp->group));
+//	else
+//		ksp->group[0]= '\0';
+//
+//	/* store additional info for relative paths (just in case user makes the set relative) */
+//	if (id)
+//		ksp->idtype= GS(id->name);
+//
+//	/* just copy path info */
+//	// TODO: should array index be checked too?
+//	ksp->rna_path= BLI_strdupn(rna_path, strlen(rna_path));
+//	ksp->array_index= array_index;
+//
+//	/* store flags */
+//	ksp->flag= flag;
+//	ksp->groupmode= groupmode;
+//
+//	/* add KeyingSet path to KeyingSet */
+//	BLI_addtail(&ks->paths, ksp);
+//
+//	/* return this path */
+//	return ksp;
+	return NULL;
+}
+
+///* Free the given Wirecolour Set path */
+//void BKE_keyingset_free_path (KeyingSet *ks, KS_Path *ksp)
+//{
+//	/* sanity check */
+//	if ELEM(NULL, ks, ksp)
+//		return;
+//
+//	/* free RNA-path info */
+//	if(ksp->rna_path)
+//		MEM_freeN(ksp->rna_path);
+//
+//	/* free path itself */
+//	BLI_freelinkN(&ks->paths, ksp);
+//}
+
+/* Copy all WirecolourSets in the given list */
+void BKE_wirecoloursets_copy (ListBase *newlist, ListBase *list)
+{
+	BLI_duplicatelist(newlist, list);
+}
+
+/* Freeing Tools --------------------------- */
+
+/* Free data for KeyingSet removing it from the list */
+void BKE_wirecolourset_free (WirecolourSet *wcs)
+{
+	/* sanity check */
+	if (wcs == NULL)
+		return;
+
+	wcs->prev->next= wcs->next;
+	wcs->next->prev= wcs->prev;
+
+	MEM_freeN(wcs);
+}
+
+/* Free all the KeyingSets in the given list */
+void BKE_wirecoloursets_free (ListBase *list)
+{
+	WirecolourSet *wcs, *wcsn;
+
+	/* sanity check */
+	if (list == NULL)
+		return;
+
+	/* loop over WirecolourSets freeing them */
+	for (wcs= list->first; wcs; wcs= wcsn) {
+		wcsn= wcs->next;
+		BKE_wirecolourset_free(wcs);
+	}
+}
+

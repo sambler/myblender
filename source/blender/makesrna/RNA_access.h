@@ -577,6 +577,8 @@ extern StructRNA RNA_WeightVGProximityModifier;
 extern StructRNA RNA_Window;
 extern StructRNA RNA_WindowManager;
 extern StructRNA RNA_WipeSequence;
+extern StructRNA RNA_WirecolourSet;
+extern StructRNA RNA_WirecolourSetsAll;
 extern StructRNA RNA_WoodTexture;
 extern StructRNA RNA_World;
 extern StructRNA RNA_WorldAmbientOcclusion;

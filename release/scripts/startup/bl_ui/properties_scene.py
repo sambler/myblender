@@ -172,6 +172,38 @@ class SCENE_PT_keying_set_paths(SceneButtonsPanel, Panel):
 
             col.prop(ksp, "bl_options")
 
+class SCENE_PT_wirecolour_sets(SceneButtonsPanel, Panel):
+    bl_label = "Wirecolour Sets"
+
+    def draw(self, context):
+        layout = self.layout
+
+        scene = context.scene
+        ob = scene.objects.active
+        row = layout.row()
+
+        col = row.column()
+        col.template_list(scene, "keying_sets", scene.keying_sets, "active_index", rows=2)
+
+        col = row.column(align=True)
+        col.operator("anim.keying_set_add", icon='ZOOMIN', text="")
+        col.operator("anim.keying_set_remove", icon='ZOOMOUT', text="")
+
+ #       ks = scene.active_wirecolour_set
+ #       if ks and ks.is_path_absolute:
+        ks = scene.keying_sets.active
+        row = layout.row()
+
+        col = row.column()
+        col.prop(ks, "name")
+
+        row = col.row(align=False)
+        row.prop(ob, "color", text="Draw")
+        row = col.row(align=False)
+        row.prop(ob, "wire_colour", text="Selected")
+        row = col.row(align=False)
+        row.prop(ob, "color", text="Active")
+
 
 class SCENE_PT_physics(SceneButtonsPanel, Panel):
     bl_label = "Gravity"

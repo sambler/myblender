@@ -213,7 +213,7 @@ class OBJECT_PT_display(ObjectButtonsPanel, Panel):
         col.prop(ob, "show_axis", text="Axis")
         col.prop(ob, "show_wire", text="Wire")
 
-		col.prop(ob, "show_wire_custom", text="Wire Colour")
+        col.prop(ob, "show_wire_custom", text="Wire Colour")
         sub = col.row()
         sub.active = ob.show_wire_custom
         col.prop(ob, "wire_colour", text="")

@@ -76,6 +76,7 @@ typedef enum ModifierType {
 	eModifierType_WeightVGMix,
 	eModifierType_WeightVGProximity,
 	eModifierType_NavMesh,
+	eModifierType_DynamicPaint, /* reserve slot */
 	NUM_MODIFIER_TYPES
 } ModifierType;
 

@@ -37,16 +37,17 @@
 #include "BKE_navmesh_conversion.h"
 #include "BKE_cdderivedmesh.h"
 
+#include "BLI_utildefines.h"
 #include "BLI_math.h"
 
 #include "recast-capi.h"
 
-inline float area2(const float* a, const float* b, const float* c)
+BM_INLINE float area2(const float* a, const float* b, const float* c)
 {
 	return (b[0] - a[0]) * (c[2] - a[2]) - (c[0] - a[0]) * (b[2] - a[2]);
 }
 
-inline int left(const float* a, const float* b, const float* c)
+BM_INLINE int left(const float* a, const float* b, const float* c)
 {
 	return area2(a, b, c) < 0;
 }
@@ -83,10 +84,14 @@ int polyIsConvex(const unsigned short* p, const int vertsPerPoly, const float* v
 float distPointToSegmentSq(const float* point, const float* a, const float* b)
 {
 	float abx[3], dx[3];
+	float d, t;
+
 	sub_v3_v3v3(abx, b,a);
 	sub_v3_v3v3(dx, point,a);
-	float d = abx[0]*abx[0]+abx[2]*abx[2];
-	float t = abx[0]*dx[0]+abx[2]*dx[2];
+
+	d = abx[0]*abx[0]+abx[2]*abx[2];
+	t = abx[0]*dx[0]+abx[2]*dx[2];
+
 	if (d > 0)
 		t /= d;
 	if (t < 0)
@@ -95,6 +100,7 @@ float distPointToSegmentSq(const float* point, const float* a, const float* b)
 		t = 1;
 	dx[0] = a[0] + t*abx[0] - point[0];
 	dx[2] = a[2] + t*abx[2] - point[2];
+
 	return dx[0]*dx[0] + dx[2]*dx[2];
 }
 
@@ -107,6 +113,8 @@ int buildRawVertIndicesData(DerivedMesh* dm, int *nverts_r, float **verts_r,
 	int *trisToFacesMap;
 	float *verts;
 	unsigned short *tris, *tri;
+	int nfaces;
+	MFace *faces;
 
 	nverts = dm->getNumVerts(dm);
 	if (nverts>=0xffff)
@@ -124,8 +132,8 @@ int buildRawVertIndicesData(DerivedMesh* dm, int *nverts_r, float **verts_r,
 	}
 
 	//calculate number of tris
-	int nfaces = dm->getNumFaces(dm);
-	MFace *faces = dm->getFaceArray(dm);
+	nfaces = dm->getNumFaces(dm);
+	faces = dm->getFaceArray(dm);
 	ntris = nfaces;
 	for (fi=0; fi<nfaces; fi++)
 	{
@@ -226,8 +234,9 @@ int buildPolygonsByDetailedMeshes(const int vertsPerPoly, const int npolys,
 			{
 				if (nv==capacity)
 				{
+					unsigned short* newPolyBig;
 					capacity += vertsPerPoly;
-					unsigned short* newPolyBig = MEM_callocN(sizeof(unsigned short)*capacity, "buildPolygonsByDetailedMeshes newPolyBig");
+					newPolyBig = MEM_callocN(sizeof(unsigned short)*capacity, "buildPolygonsByDetailedMeshes newPolyBig");
 					memset(newPolyBig, 0xff, sizeof(unsigned short)*capacity);
 					memcpy(newPolyBig, newPoly, sizeof(unsigned short)*nv);
 					MEM_freeN(newPoly);

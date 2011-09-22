@@ -210,14 +210,14 @@ class OBJECT_PT_display(ObjectButtonsPanel, Panel):
 
         col = split.column()
 
-        col.prop(ob, "show_name", text=_("Name"))
-        col.prop(ob, "show_axis", text=_("Axis"))
-        col.prop(ob, "show_wire", text=_("Wire"))
-		col.prop(ob, "show_wire_custom", text=_("Wire Colour"))
+        col.prop(ob, "show_name", text="Name")
+        col.prop(ob, "show_axis", text="Axis")
+        col.prop(ob, "show_wire", text="Wire")
+        col.prop(ob, "show_wire_custom", text="Wire Colour")
         sub = col.row()
         sub.active = ob.show_wire_custom
         col.prop(ob, "wire_colour", text="")
-        col.prop(ob, "color", text=_("Object Color"))
+        col.prop(ob, "color", text="Object Color")
 
         col = split.column()
         col.prop(ob, "show_texture_space", text="Texture Space")

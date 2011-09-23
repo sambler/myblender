@@ -801,7 +801,6 @@ typedef struct WirecolourSet {
 	struct WirecolourSet *next, *prev;
 
 	char name[64];			/* user-viewable name for WirecolourSet (for menus, etc.) */
-	char typeinfo[64];		/* name of the typeinfo data used for the relative paths */
 
 	float draw[4];			/* standard drawing colour */
 	float selected[4];		/* selected colour */

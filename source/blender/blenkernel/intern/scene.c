@@ -1132,8 +1132,8 @@ Base *_setlooper_base_step(Scene **sce_iter, Base *base)
 
 /* Find the first path that matches the given criteria */
 // TODO: do we want some method to perform partial matches too?
-KS_Path *BKE_wirecolourset_find_path (WirecolourSet *wcs, ID *id, const char group_name[], const char rna_path[], int array_index, int UNUSED(group_mode))
-{
+//KS_Path *BKE_wirecolourset_find_path (WirecolourSet *wcs, ID *id, const char group_name[], const char rna_path[], int array_index, int UNUSED(group_mode))
+//{
 //	KS_Path *ksp;
 //
 //	/* sanity checks */
@@ -1168,9 +1168,9 @@ KS_Path *BKE_wirecolourset_find_path (WirecolourSet *wcs, ID *id, const char gro
 //			return ksp;
 //	}
 //
-	/* none found */
-	return NULL;
-}
+//	/* none found */
+//	return NULL;
+//}
 
 /* Defining Tools --------------------------- */
 
@@ -1198,8 +1198,8 @@ WirecolourSet *BKE_wirecolourset_add (ListBase *list, const char name[])
 /* Add a path to a WirecolourSet. Nothing is returned for now...
  * Checks are performed to ensure that destination is appropriate for the WirecolourSet in question
  */
-KS_Path *BKE_wirecolourset_add_path (WirecolourSet *ks, ID *id, const char group_name[], const char rna_path[], int array_index, short flag, short groupmode)
-{
+//KS_Path *BKE_wirecolourset_add_path (WirecolourSet *ks, ID *id, const char group_name[], const char rna_path[], int array_index, short flag, short groupmode)
+//{
 //	KS_Path *ksp;
 //
 //	/* sanity checks */
@@ -1249,8 +1249,8 @@ KS_Path *BKE_wirecolourset_add_path (WirecolourSet *ks, ID *id, const char group
 //
 //	/* return this path */
 //	return ksp;
-	return NULL;
-}
+//	return NULL;
+//}
 
 ///* Free the given Wirecolour Set path */
 //void BKE_keyingset_free_path (KeyingSet *ks, KS_Path *ksp)

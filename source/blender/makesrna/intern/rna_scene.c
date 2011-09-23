@@ -3454,20 +3454,20 @@ static void rna_def_scene_wirecolour_sets(BlenderRNA *brna, PropertyRNA *cprop)
 	FunctionRNA *func;
 	PropertyRNA *parm;
 
-	RNA_def_property_srna(cprop, "WirecolourSets");
-	srna= RNA_def_struct(brna, "WirecolourSets", NULL);
+	RNA_def_property_srna(cprop, "WirecolourSet");
+	srna= RNA_def_struct(brna, "WirecolourSet", NULL);
 	RNA_def_struct_sdna(srna, "Scene");
 	RNA_def_struct_ui_text(srna, "Wirecolour Sets", "Scene wirecolour sets");
 
 	/* Add wirecolour Set */
 	func= RNA_def_function(srna, "new", "rna_Scene_wirecolour_set_new");
-	RNA_def_function_ui_description(func, "Add a new Wirecolour Set to Scene.");
+	RNA_def_function_ui_description(func, "Add a new Wirecolour Set to Scene");
 	RNA_def_function_flag(func, FUNC_USE_REPORTS);
 	/* name */
 	RNA_def_string(func, "name", "WirecolourSet", 64, "Name", "Name of Wirecolour Set");
 
 	/* returns the new WirecolourSet */
-	parm= RNA_def_pointer(func, "wirecolourset", "WirecolourSet", "", "Newly created Wirecolour Set.");
+	parm= RNA_def_pointer(func, "wirecol", "WirecolourSet", "", "Newly created Wirecolour Set");
 	RNA_def_function_return(func, parm);
 
 	prop= RNA_def_property(srna, "active", PROP_POINTER, PROP_NONE);

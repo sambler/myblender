@@ -250,7 +250,8 @@ enum {
 
 	TH_NODE_CURVING,
 
-	TH_MATCH	/* highlight colour for search matches */
+	TH_MATCH,	/* highlight colour for search matches */
+	TH_SELECT_HIGHLIGHT	/* highlight colour for selected outliner item */
 };
 /* XXX WARNING: previous is saved in file, so do not change order! */
 

@@ -1506,7 +1506,7 @@ static void outliner_draw_tree(bContext *C, uiBlock *block, Scene *scene, ARegio
 	
 	/* always draw selection fill before hierarchy */
 	UI_GetThemeColor3fv(TH_SELECT_HIGHLIGHT, col);
-	glColor4fv(col);
+	glColor3fv(col);
 	starty= (int)ar->v2d.tot.ymax-UI_UNIT_Y-OL_Y_OFFSET;
 	outliner_draw_selection(ar, soops, &soops->tree, &starty);
 	

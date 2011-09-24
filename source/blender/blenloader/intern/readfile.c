@@ -3009,6 +3009,9 @@ static void direct_link_texture(FileData *fd, Tex *tex)
 	if(tex->vd) {
 		tex->vd->dataset = NULL;
 		tex->vd->ok = 0;
+	} else {
+		if(tex->type == TEX_VOXELDATA)
+			tex->vd= MEM_callocN(sizeof(VoxelData), "direct_link_texture VoxelData");
 	}
 	
 	tex->nodetree= newdataadr(fd, tex->nodetree);
@@ -12224,7 +12227,7 @@ BlendFileData *blo_read_file_internal(FileData *fd, const char *filepath)
 	BlendFileData *bfd;
 
 	bfd= MEM_callocN(sizeof(BlendFileData), "blendfiledata");
-	bfd->main= MEM_callocN(sizeof(Main), "main");
+	bfd->main= MEM_callocN(sizeof(Main), "readfile_Main");
 	BLI_addtail(&fd->mainlist, bfd->main);
 
 	bfd->main->versionfile= fd->fileversion;

@@ -25,6 +25,12 @@
 * ***** END GPL LICENSE BLOCK *****
 *
 */
+
+/** \file blender/modifiers/intern/MOD_navmesh.c
+ *  \ingroup modifiers
+ */
+
+
 #include <math.h>
 
 #include "DNA_mesh_types.h"
@@ -48,12 +54,12 @@
 #include "BKE_customdata.h"
 #include "MEM_guardedalloc.h"
 
-static inline int bit(int a, int b)
+BM_INLINE int bit(int a, int b)
 {
 	return (a & (1 << b)) >> b;
 }
 
-static inline void intToCol(int i, float* col)
+BM_INLINE void intToCol(int i, float* col)
 {
 	int	r = bit(i, 0) + bit(i, 3) * 2 + 1;
 	int	g = bit(i, 1) + bit(i, 4) * 2 + 1;
@@ -133,7 +139,7 @@ static void drawNavMeshColored(DerivedMesh *dm)
 	glEnable(GL_LIGHTING);
 }
 
-static void navDM_drawFacesTex(DerivedMesh *dm, int (*setDrawOptions)(MTFace *tface, MCol *mcol, int matnr))
+static void navDM_drawFacesTex(DerivedMesh *dm, int (*setDrawOptions)(MTFace *tface, int has_mcol, int matnr))
 {
 	(void) setDrawOptions;
 

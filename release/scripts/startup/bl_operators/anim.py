@@ -18,8 +18,18 @@
 
 # <pep8-80 compliant>
 
+if "bpy" in locals():
+    import imp
+    if "anim_utils" in locals():
+        imp.reload(anim_utils)
+
 import bpy
 from bpy.types import Operator
+from bpy.props import (IntProperty,
+                       BoolProperty,
+                       EnumProperty,
+                       StringProperty,
+                       )
 
 
 class ANIM_OT_keying_set_export(Operator):
@@ -27,10 +37,24 @@ class ANIM_OT_keying_set_export(Operator):
     bl_idname = "anim.keying_set_export"
     bl_label = "Export Keying Set..."
 
-    filepath = bpy.props.StringProperty(name="File Path", description="Filepath to write file to")
-    filter_folder = bpy.props.BoolProperty(name="Filter folders", description="", default=True, options={'HIDDEN'})
-    filter_text = bpy.props.BoolProperty(name="Filter text", description="", default=True, options={'HIDDEN'})
-    filter_python = bpy.props.BoolProperty(name="Filter python", description="", default=True, options={'HIDDEN'})
+    filepath = StringProperty(
+            name="File Path",
+            )
+    filter_folder = BoolProperty(
+            name="Filter folders",
+            default=True,
+            options={'HIDDEN'},
+            )
+    filter_text = BoolProperty(
+            name="Filter text",
+            default=True,
+            options={'HIDDEN'},
+            )
+    filter_python = BoolProperty(
+            name="Filter python",
+            default=True,
+            options={'HIDDEN'},
+            )
 
     def execute(self, context):
         if not self.filepath:
@@ -46,7 +70,8 @@ class ANIM_OT_keying_set_export(Operator):
         f.write("# Keying Set: %s\n" % ks.name)
 
         f.write("import bpy\n\n")
-        f.write("scene= bpy.data.scenes[0]\n\n")  # XXX, why not use the current scene?
+        # XXX, why not current scene?
+        f.write("scene= bpy.data.scenes[0]\n\n")
 
         # Add KeyingSet and set general settings
         f.write("# Keying Set Level declarations\n")
@@ -59,8 +84,11 @@ class ANIM_OT_keying_set_export(Operator):
         f.write("ks.bl_options = %r\n" % ks.bl_options)
         f.write("\n")
 
+        # --------------------------------------------------------
         # generate and write set of lookups for id's used in paths
-        id_to_paths_cache = {}  # cache for syncing ID-blocks to bpy paths + shorthands
+
+        # cache for syncing ID-blocks to bpy paths + shorthands
+        id_to_paths_cache = {}
 
         for ksp in ks.paths:
             if ksp.id is None:
@@ -68,11 +96,14 @@ class ANIM_OT_keying_set_export(Operator):
             if ksp.id in id_to_paths_cache:
                 continue
 
-            # - idtype_list is used to get the list of id-datablocks from bpy.data.*
-            #   since this info isn't available elsewhere
-            # - id.bl_rna.name gives a name suitable for UI,
-            #   with a capitalised first letter, but we need
-            #   the plural form that's all lower case
+            """
+            - idtype_list is used to get the list of id-datablocks from
+              bpy.data.* since this info isn't available elsewhere
+            - id.bl_rna.name gives a name suitable for UI,
+              with a capitalised first letter, but we need
+              the plural form that's all lower case
+            """
+
             idtype_list = ksp.id.bl_rna.name.lower() + "s"
             id_bpy_path = "bpy.data.%s[\"%s\"]" % (idtype_list, ksp.id.name)
 
@@ -107,9 +138,11 @@ class ANIM_OT_keying_set_export(Operator):
                 f.write(", index=%d" % ksp.array_index)
 
             # grouping settings (if applicable)
-            # NOTE: the current default is KEYINGSET, but if this changes, change this code too
+            # NOTE: the current default is KEYINGSET, but if this changes,
+            # change this code too
             if ksp.group_method == 'NAMED':
-                f.write(", group_method='%s', group_name=\"%s\"" % (ksp.group_method, ksp.group))
+                f.write(", group_method='%s', group_name=\"%s\"" %
+                        (ksp.group_method, ksp.group))
             elif ksp.group_method != 'KEYINGSET':
                 f.write(", group_method='%s'" % ksp.group_method)
 
@@ -125,3 +158,117 @@ class ANIM_OT_keying_set_export(Operator):
         wm = context.window_manager
         wm.fileselect_add(self)
         return {'RUNNING_MODAL'}
+
+
+class BakeAction(Operator):
+    """Bake animation to an Action"""
+    bl_idname = "nla.bake"
+    bl_label = "Bake Action"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    frame_start = IntProperty(
+            name="Start Frame",
+            description="Start frame for baking",
+            min=0, max=300000,
+            default=1,
+            )
+    frame_end = IntProperty(
+            name="End Frame",
+            description="End frame for baking",
+            min=1, max=300000,
+            default=250,
+            )
+    step = IntProperty(
+            name="Frame Step",
+            description="Frame Step",
+            min=1, max=120,
+            default=1,
+            )
+    only_selected = BoolProperty(
+            name="Only Selected",
+            default=True,
+            )
+    clear_consraints = BoolProperty(
+            name="Clear Constraints",
+            default=False,
+            )
+    bake_types = EnumProperty(
+            name="Bake Data",
+            options={'ENUM_FLAG'},
+            items=(('POSE', "Pose", ""),
+                   ('OBJECT', "Object", ""),
+                   ),
+            default={'POSE'},
+            )
+
+    def execute(self, context):
+
+        from bpy_extras import anim_utils
+
+        action = anim_utils.bake_action(self.frame_start,
+                                        self.frame_end,
+                                        self.step,
+                                        self.only_selected,
+                                        'POSE' in self.bake_types,
+                                        'OBJECT' in self.bake_types,
+                                        self.clear_consraints,
+                                        True,
+                                 )
+
+        if action is None:
+            self.report({'INFO'}, "Nothing to bake")
+            return {'CANCELLED'}
+
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        wm = context.window_manager
+        return wm.invoke_props_dialog(self)
+
+
+class ClearUselessActions(Operator):
+    """Mark actions with no F-Curves for deletion after save+reload of """ \
+    """file preserving "action libraries"""
+    bl_idname = "anim.clear_useless_actions"
+    bl_label = "Clear Useless Actions"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    only_unused = BoolProperty(name="Only Unused",
+            description="Only unused (Fake User only) actions get considered",
+            default=True)
+
+    @classmethod
+    def poll(cls, context):
+        return len(bpy.data.actions) != 0
+
+    def execute(self, context):
+        removed = 0
+
+        for action in bpy.data.actions:
+            # if only user is "fake" user...
+            if ((self.only_unused is False) or
+                (action.use_fake_user and action.users == 1)):
+
+                # if it has F-Curves, then it's a "action library"
+                # (i.e. walk, wave, jump, etc.)
+                # and should be left alone as that's what fake users are for!
+                if not action.fcurves:
+                    # mark action for deletion
+                    action.user_clear()
+                    removed += 1
+
+        self.report({'INFO'}, "Removed %d empty and/or fake-user only Actions"
+                              % removed)
+        return {'FINISHED'}
+
+
+class UpdateAnimData(Operator):
+    """Update data paths from 2.56 and previous versions, """ \
+    """modifying data paths of drivers and fcurves"""
+    bl_idname = "anim.update_data_paths"
+    bl_label = "Update Animation Data"
+
+    def execute(self, context):
+        import animsys_refactor
+        animsys_refactor.update_data_paths(animsys_refactor.data_2_56_to_2_59)
+        return {'FINISHED'}

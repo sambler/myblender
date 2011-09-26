@@ -179,30 +179,28 @@ class SCENE_PT_wirecolour_sets(SceneButtonsPanel, Panel):
         layout = self.layout
 
         scene = context.scene
-        ob = scene.objects.active
         row = layout.row()
 
         col = row.column()
-        col.template_list(scene, "keying_sets", scene.keying_sets, "active_index", rows=2)
+        col.template_list(scene, "wirecolour_sets", scene.wirecolour_sets, "active_index", rows=2)
 
         col = row.column(align=True)
-        col.operator("anim.keying_set_add", icon='ZOOMIN', text="")
-        col.operator("anim.keying_set_remove", icon='ZOOMOUT', text="")
+        col.operator("scene.wirecolour_set_add", icon='ZOOMIN', text="")
+        col.operator("scene.wirecolour_set_remove", icon='ZOOMOUT', text="")
 
- #       ks = scene.active_wirecolour_set
- #       if ks and ks.is_path_absolute:
-        ks = scene.keying_sets.active
-        row = layout.row()
+        wcs = scene.wirecolour_sets.active
+        if wcs:
+            row = layout.row()
 
-        col = row.column()
-        col.prop(ks, "name")
+            col = row.column()
+            col.prop(wcs, "name")
 
-        row = col.row(align=False)
-        row.prop(ob, "color", text="Draw")
-        row = col.row(align=False)
-        row.prop(ob, "wire_colour", text="Selected")
-        row = col.row(align=False)
-        row.prop(ob, "color", text="Active")
+            row = col.row(align=False)
+            row.prop(wcs, "draw_colour", text="Draw")
+            row = col.row(align=False)
+            row.prop(wcs, "selected_colour", text="Selected")
+            row = col.row(align=False)
+            row.prop(wcs, "active_colour", text="Active")
 
 
 class SCENE_PT_physics(SceneButtonsPanel, Panel):

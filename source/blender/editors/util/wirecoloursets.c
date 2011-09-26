@@ -66,18 +66,6 @@
 #include "RNA_define.h"
 #include "RNA_enum_types.h"
 
-/* external prototypes - needed??? */
-/* wirecoloursets.c */
-/*
-extern void SCN_OT_wirecolour_set_add (wmOperatorType *ot);
-extern void SCN_OT_wirecolour_set_remove (wmOperatorType *ot);
-extern void SCN_OT_wirecolour_set_active_set (wmOperatorType *ot);
-extern WirecolourSet *SCN_get_active_wirecolourset (Scene *scene);
-extern int SCN_get_wirecolourset_index (Scene *scene, WirecolourSet *wcs);
-extern EnumPropertyItem *SCN_wirecolour_sets_enum_itemf (bContext *C, PointerRNA *ptr, PropertyRNA *prop, int *free);
-extern void SCN_wirecolour_sets_menu_setup (bContext *C, const char title[], const char op_name[]);
-*/
-
 /* ************************************************** */
 /* WIRECOLOUR SETS - OPERATORS (for use in UI panels) */
 /* These operators are really duplication of existing functionality, but just for completeness,
@@ -121,11 +109,11 @@ static int add_default_wirecolourset_exec (bContext *C, wmOperator *UNUSED(op))
 	return OPERATOR_FINISHED;
 }
 
-void SCN_OT_wirecolour_set_add (wmOperatorType *ot)
+void SCENE_OT_wirecolour_set_add (wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Add Empty Wirecolour Set";
-	ot->idname= "SCN_OT_wirecolour_set_add";
+	ot->idname= "SCENE_OT_wirecolour_set_add";
 	ot->description= "Add a new (empty) Wirecolour Set to the active Scene";
 	
 	/* callbacks */
@@ -164,11 +152,11 @@ static int remove_active_wirecolourset_exec (bContext *C, wmOperator *op)
 	return OPERATOR_FINISHED;
 }
 
-void SCN_OT_wirecolour_set_remove (wmOperatorType *ot)
+void SCENE_OT_wirecolour_set_remove (wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Removed Active Wirecolour Set";
-	ot->idname= "SCN_OT_wirecolour_set_remove";
+	ot->idname= "SCENE_OT_wirecolour_set_remove";
 	ot->description= "Remove the active Wirecolour Set";
 	
 	/* callbacks */
@@ -184,7 +172,7 @@ void SCN_OT_wirecolour_set_remove (wmOperatorType *ot)
 static int wirecolourset_active_menu_invoke (bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 {
 	/* call the menu, which will call this operator again, hence the cancelled */
-	SCN_wirecolour_sets_menu_setup(C, op->type->name, "SCN_OT_wirecolour_set_active_set");
+	SCENE_wirecolour_sets_menu_setup(C, op->type->name, "SCENE_OT_wirecolour_set_active_set");
 	return OPERATOR_CANCELLED;
 }
 
@@ -205,11 +193,11 @@ static int wirecolourset_active_menu_exec (bContext *C, wmOperator *op)
 	return OPERATOR_FINISHED;
 }
  
-void SCN_OT_wirecolour_set_active_set (wmOperatorType *ot)
+void SCENE_OT_wirecolour_set_active_set (wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name= "Set Active Wirecolour Set";
-	ot->idname= "SCN_OT_wirecolour_set_active_set";
+	ot->idname= "SCENE_OT_wirecolour_set_active_set";
 	
 	/* callbacks */
 	ot->invoke= wirecolourset_active_menu_invoke;
@@ -231,7 +219,7 @@ void SCN_OT_wirecolour_set_active_set (wmOperatorType *ot)
 /* Getters for Active/Indices ----------------------------- */
 
 /* Get the active Wirecolour Set for the Scene provided */
-WirecolourSet *SCN_get_active_wirecolourset (Scene *scene)
+WirecolourSet *SCENE_get_active_wirecolourset (Scene *scene)
 {
 	/* if no scene, we've got no hope of finding the Wirecolour Set */
 	if (scene == NULL)
@@ -248,7 +236,7 @@ WirecolourSet *SCN_get_active_wirecolourset (Scene *scene)
 }
 
 /* Get the index of the Wirecolour Set provided, for the given Scene */
-int SCN_get_wirecolourset_index (Scene *scene, WirecolourSet *wcs)
+int SCENE_get_wirecolourset_index (Scene *scene, WirecolourSet *wcs)
 {
 	int index;
 	
@@ -269,11 +257,21 @@ int SCN_get_wirecolourset_index (Scene *scene, WirecolourSet *wcs)
 	return 0;
 }
 
+/* Check if WirecolourSet can be used in the current context */
+/* XXX - remove this? not needed */
+short SCENE_wirecolourset_context_ok_poll (bContext *C, WirecolourSet *wcs)
+{
+	if ((wcs->flags & WCS_OVERRIDE_GROUP) == 0) {
+		return 0;
+	}
+
+	return 1;
+}
 
 /* Menu of All Wirecolour Sets ----------------------------- */
 
 /* Dynamically populate an enum of Wirecolour Sets */
-EnumPropertyItem *SCN_wirecolour_sets_enum_itemf (bContext *C, PointerRNA *UNUSED(ptr), PropertyRNA *UNUSED(prop), int *free)
+EnumPropertyItem *SCENE_wirecolour_sets_enum_itemf (bContext *C, PointerRNA *UNUSED(ptr), PropertyRNA *UNUSED(prop), int *free)
 {
 	Scene *scene = CTX_data_scene(C);
 	WirecolourSet *wcs;
@@ -305,7 +303,7 @@ EnumPropertyItem *SCN_wirecolour_sets_enum_itemf (bContext *C, PointerRNA *UNUSE
 	 */
 	if (scene->wirecoloursets.first) {
 		for (wcs= scene->wirecoloursets.first; wcs; wcs= wcs->next) {
-			if (SCN_wirecolourset_context_ok_poll(C, wcs)) {
+			if (SCENE_wirecolourset_context_ok_poll(C, wcs)) {
 				item_tmp.identifier= item_tmp.name= wcs->name;
 				item_tmp.value= i++;
 				RNA_enum_item_add(&item, &totitem, &item_tmp);
@@ -323,7 +321,7 @@ EnumPropertyItem *SCN_wirecolour_sets_enum_itemf (bContext *C, PointerRNA *UNUSE
 }
 
 /* Create (and show) a menu containing all the Wirecolour Sets which can be used in the current context */
-void SCN_wirecolour_sets_menu_setup (bContext *C, const char title[], const char op_name[])
+void SCENE_wirecolour_sets_menu_setup (bContext *C, const char title[], const char op_name[])
 {
 	Scene *scene= CTX_data_scene(C);
 	WirecolourSet *wcs;
@@ -349,7 +347,7 @@ void SCN_wirecolour_sets_menu_setup (bContext *C, const char title[], const char
 	 */
 	if (scene->wirecoloursets.first) {
 		for (wcs= scene->wirecoloursets.first; wcs; wcs=wcs->next, i++) {
-			if (SCN_wirecolourset_context_ok_poll(C, wcs))
+			if (SCENE_wirecolourset_context_ok_poll(C, wcs))
 				uiItemIntO(layout, wcs->name, ICON_NONE, op_name, "type", i);
 		}
 		uiItemS(layout);
@@ -357,3 +355,4 @@ void SCN_wirecolour_sets_menu_setup (bContext *C, const char title[], const char
 	
 	uiPupMenuEnd(C, pup);
 } 
+

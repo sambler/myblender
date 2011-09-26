@@ -41,14 +41,21 @@ extern "C" {
 
 struct AviCodecData;
 struct Base;
+struct bContext;
 struct bglMats;
+struct EnumPropertyItem;
+struct ListBase;
 struct Main;
 struct Object;
+struct PointerRNA;
+struct PropertyRNA;
 struct QuicktimeCodecData;
 struct RenderData;
 struct Scene;
 struct Text;
 struct Text;
+struct wmOperatorType;
+struct WirecolourSet;
 
 #define SCE_COPY_NEW		0
 #define SCE_COPY_EMPTY		1
@@ -100,9 +107,23 @@ int get_render_child_particle_number(struct RenderData *r, int num);
 int get_render_shadow_samples(struct RenderData *r, int samples);
 float get_render_aosss_error(struct RenderData *r, float error);
 
+/* wirecoloursets.c */
+void SCENE_OT_wirecolour_set_add (struct wmOperatorType *ot);
+void SCENE_OT_wirecolour_set_remove (struct wmOperatorType *ot);
+void SCENE_OT_wirecolour_set_active_set (struct wmOperatorType *ot);
+struct WirecolourSet *SCENE_get_active_wirecolourset (struct Scene *scene);
+int SCENE_get_wirecolourset_index (struct Scene *scene, struct WirecolourSet *wcs);
+struct EnumPropertyItem *SCENE_wirecolour_sets_enum_itemf (struct bContext *C, struct PointerRNA *ptr, struct PropertyRNA *prop, int *free);
+void SCENE_wirecolour_sets_menu_setup (struct bContext *C, const char title[], const char op_name[]);
+
+/* scene.c */
+struct WirecolourSet *BKE_wirecolourset_add (struct ListBase *list, const char name[]);
+void BKE_wirecoloursets_copy (struct ListBase *newlist, struct ListBase *list);
+void BKE_wirecolourset_free (struct WirecolourSet *wcs);
+void BKE_wirecoloursets_free (struct ListBase *list);
+
 #ifdef __cplusplus
 }
 #endif
 
 #endif
-

@@ -3343,7 +3343,11 @@ void ED_operatortypes_screen(void)
 	WM_operatortype_append(ED_OT_undo_push);
 	WM_operatortype_append(ED_OT_redo);	
 	WM_operatortype_append(ED_OT_undo_history);
-	
+
+	/* scene operators - for wirecolour sets - wirecoloursets.c */
+	WM_operatortype_append(SCENE_OT_wirecolour_set_add);
+	WM_operatortype_append(SCENE_OT_wirecolour_set_remove);
+
 }
 
 static void keymap_modal_set(wmKeyConfig *keyconf)

@@ -806,10 +806,15 @@ typedef struct WirecolourSet {
 	float selected[4];		/* selected colour */
 	float active[4];		/* active selected colour */
 
-	int override_group;		/* use custom colours instead of group colour? */
+	int flags;
 
 	char pad[4];
 } WirecolourSet;
+
+typedef enum WirecolourSet_Flags {
+	WCS_OVERRIDE_GROUP	= (1<<0)	/* use custom colours instead of group colour? */
+
+}WirecolourSet_Flags;
 
 typedef struct Scene {
 	ID id;

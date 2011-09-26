@@ -9985,7 +9985,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 			sce->toolsettings->skgen_resolution = 250;
 			sce->toolsettings->skgen_threshold_internal 	= 0.1f;
 			sce->toolsettings->skgen_threshold_external 	= 0.1f;
-			sce->toolsettings->skgen_angle_limit	 		= 30.0f;
+			sce->toolsettings->skgen_angle_limit			= 30.0f;
 			sce->toolsettings->skgen_length_ratio			= 1.3f;
 			sce->toolsettings->skgen_length_limit			= 1.5f;
 			sce->toolsettings->skgen_correlation_limit		= 0.98f;
@@ -12066,7 +12066,14 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 	/* put compatibility code here until next subversion bump */
 
 	{
-
+		{
+			/* Adaptive time step for particle systems */
+			ParticleSettings *part;
+			for (part = main->particle.first; part; part = part->id.next) {
+				part->courant_target = 0.2f;
+				part->time_flag &= ~PART_TIME_AUTOSF;
+			}
+		}
 	}
 
 	//set defaults for obstacle avoidance, recast data
@@ -12082,7 +12089,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 			if(sce->gm.recastData.cellheight == 0.0f)
 				sce->gm.recastData.cellheight = 0.2f;
 			if(sce->gm.recastData.agentmaxslope == 0.0f)
-				sce->gm.recastData.agentmaxslope = M_PI/4;
+				sce->gm.recastData.agentmaxslope = (float)M_PI/4;
 			if(sce->gm.recastData.agentmaxclimb == 0.0f)
 				sce->gm.recastData.agentmaxclimb = 0.9f;
 			if(sce->gm.recastData.agentheight == 0.0f)

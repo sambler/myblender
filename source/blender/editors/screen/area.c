@@ -1370,9 +1370,9 @@ static const char *editortype_pup(void)
 		   "|Outliner %x3"
 		   "|User Preferences %x19"
 		   "|Info%x7"
-		    		   
+
 		   "|%l"
-		   
+
 		   "|File Browser %x5"
 		   
 		   "|%l"

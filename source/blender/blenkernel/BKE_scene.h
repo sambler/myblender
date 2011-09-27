@@ -55,7 +55,7 @@ struct Scene;
 struct Text;
 struct Text;
 struct wmOperatorType;
-struct WirecolourSet;
+struct WirecolorSet;
 
 #define SCE_COPY_NEW		0
 #define SCE_COPY_EMPTY		1
@@ -107,20 +107,20 @@ int get_render_child_particle_number(struct RenderData *r, int num);
 int get_render_shadow_samples(struct RenderData *r, int samples);
 float get_render_aosss_error(struct RenderData *r, float error);
 
-/* wirecoloursets.c */
-void SCENE_OT_wirecolour_set_add (struct wmOperatorType *ot);
-void SCENE_OT_wirecolour_set_remove (struct wmOperatorType *ot);
-void SCENE_OT_wirecolour_set_active_set (struct wmOperatorType *ot);
-struct WirecolourSet *SCENE_get_active_wirecolourset (struct Scene *scene);
-int SCENE_get_wirecolourset_index (struct Scene *scene, struct WirecolourSet *wcs);
-struct EnumPropertyItem *SCENE_wirecolour_sets_enum_itemf (struct bContext *C, struct PointerRNA *ptr, struct PropertyRNA *prop, int *free);
-void SCENE_wirecolour_sets_menu_setup (struct bContext *C, const char title[], const char op_name[]);
+/* wirecolorsets.c */
+void SCENE_OT_wirecolor_set_add (struct wmOperatorType *ot);
+void SCENE_OT_wirecolor_set_remove (struct wmOperatorType *ot);
+void SCENE_OT_wirecolor_set_active_set (struct wmOperatorType *ot);
+struct WirecolorSet *SCENE_get_active_wirecolorset (struct Scene *scene);
+int SCENE_get_wirecolorset_index (struct Scene *scene, struct WirecolorSet *wcs);
+struct EnumPropertyItem *SCENE_wirecolor_sets_enum_itemf (struct bContext *C, struct PointerRNA *ptr, struct PropertyRNA *prop, int *free);
+void SCENE_wirecolor_sets_menu_setup (struct bContext *C, const char title[], const char op_name[]);
 
 /* scene.c */
-struct WirecolourSet *BKE_wirecolourset_add (struct ListBase *list, const char name[]);
-void BKE_wirecoloursets_copy (struct ListBase *newlist, struct ListBase *list);
-void BKE_wirecolourset_free (struct WirecolourSet *wcs);
-void BKE_wirecoloursets_free (struct ListBase *list);
+struct WirecolorSet *BKE_wirecolorset_add (struct ListBase *list, const char name[]);
+void BKE_wirecolorsets_copy (struct ListBase *newlist, struct ListBase *list);
+void BKE_wirecolorset_free (struct WirecolorSet *wcs);
+void BKE_wirecolorsets_free (struct ListBase *list);
 
 #ifdef __cplusplus
 }

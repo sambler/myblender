@@ -147,9 +147,9 @@ void ED_operatortypes_object(void)
 	
     WM_operatortype_append(OBJECT_OT_wiredraw_toggle);
     WM_operatortype_append(OBJECT_OT_wiredraw_copy_selected);
-    WM_operatortype_append(OBJECT_OT_use_cust_wire_colour_toggle);
-    WM_operatortype_append(OBJECT_OT_use_cust_wire_colour_copy_selected);
-    WM_operatortype_append(OBJECT_OT_cust_wire_colour_copy_selected);
+    WM_operatortype_append(OBJECT_OT_use_cust_wire_color_toggle);
+    WM_operatortype_append(OBJECT_OT_use_cust_wire_color_copy_selected);
+    WM_operatortype_append(OBJECT_OT_cust_wire_color_copy_selected);
     
 	WM_operatortype_append(OBJECT_OT_constraint_add);
 	WM_operatortype_append(OBJECT_OT_constraint_add_with_targets);

@@ -3344,9 +3344,9 @@ void ED_operatortypes_screen(void)
 	WM_operatortype_append(ED_OT_redo);	
 	WM_operatortype_append(ED_OT_undo_history);
 
-	/* scene operators - for wirecolour sets - wirecoloursets.c */
-	WM_operatortype_append(SCENE_OT_wirecolour_set_add);
-	WM_operatortype_append(SCENE_OT_wirecolour_set_remove);
+	/* scene operators - for wirecolor sets - wirecolorsets.c */
+	WM_operatortype_append(SCENE_OT_wirecolor_set_add);
+	WM_operatortype_append(SCENE_OT_wirecolor_set_remove);
 
 }
 

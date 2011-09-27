@@ -266,8 +266,8 @@ typedef struct Object {
 	ListBase pc_ids;
 	ListBase *duplilist;	/* for temporary dupli list storage, only for use by RNA API */
 
-    int use_cust_wire_colour;       /* Use Custom Wire Colour - use int for alignment */
-    float cust_wire_colour[3];      /* custom wireframe colour */
+    int use_cust_wire_color;       /* Use Custom Wire Colour - use int for alignment */
+    float cust_wire_color[3];      /* custom wireframe colour */
 
 	float ima_ofs[2];		/* offset for image empties */
 } Object;

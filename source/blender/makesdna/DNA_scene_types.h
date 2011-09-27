@@ -791,16 +791,16 @@ typedef struct PhysicsSettings {
 	int flag, quick_cache_step, rt;
 } PhysicsSettings;
 
-/* WirecolourSet definition (wcs)
+/* WirecolorSet definition (wcs)
  *
- * A WirecolourSet defines a group of colours that define
+ * A WirecolorSet defines a group of colors that define
  * how an object's wireframe is drawn.
  *
  */
-typedef struct WirecolourSet {
-	struct WirecolourSet *next, *prev;
+typedef struct WirecolorSet {
+	struct WirecolorSet *next, *prev;
 
-	char name[64];			/* user-viewable name for WirecolourSet (for menus, etc.) */
+	char name[64];			/* user-viewable name for WirecolorSet (for menus, etc.) */
 
 	float draw[4];			/* standard drawing colour */
 	float selected[4];		/* selected colour */
@@ -809,12 +809,12 @@ typedef struct WirecolourSet {
 	int flags;
 
 	char pad[4];
-} WirecolourSet;
+} WirecolorSet;
 
-typedef enum WirecolourSet_Flags {
-	WCS_OVERRIDE_GROUP	= (1<<0)	/* use custom colours instead of group colour? */
+typedef enum WirecolorSet_Flags {
+	WCS_OVERRIDE_GROUP	= (1<<0)	/* use custom colors instead of group color? */
 
-}WirecolourSet_Flags;
+}WirecolorSet_Flags;
 
 typedef struct Scene {
 	ID id;
@@ -890,9 +890,9 @@ typedef struct Scene {
 	/* Physics simulation settings */
 	struct PhysicsSettings physics_settings;
 
-	/* user defined wirecolour sets */
-	int active_wirecolourset;
-	ListBase wirecoloursets;
+	/* user defined wirecolor sets */
+	int active_wirecolorset;
+	ListBase wirecolorsets;
 
 	char pad7[4];
 } Scene;

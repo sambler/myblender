@@ -1126,13 +1126,13 @@ Base *_setlooper_base_step(Scene **sce_iter, Base *base)
 }
 
 /* *********************************** */
-/* WirecolourSet API */
+/* WirecolorSet API */
 
 /* Finding Tools --------------------------- */
 
 /* Find the first path that matches the given criteria */
 // TODO: do we want some method to perform partial matches too?
-//KS_Path *BKE_wirecolourset_find_path (WirecolourSet *wcs, ID *id, const char group_name[], const char rna_path[], int array_index, int UNUSED(group_mode))
+//KS_Path *BKE_wirecolorset_find_path (WirecolorSet *wcs, ID *id, const char group_name[], const char rna_path[], int array_index, int UNUSED(group_mode))
 //{
 //	KS_Path *ksp;
 //
@@ -1174,31 +1174,31 @@ Base *_setlooper_base_step(Scene **sce_iter, Base *base)
 
 /* Defining Tools --------------------------- */
 
-/* Used to create a new 'custom' WirecolourSet for the user, that will be automatically added to the stack */
-WirecolourSet *BKE_wirecolourset_add (ListBase *list, const char name[])
+/* Used to create a new 'custom' WirecolorSet for the user, that will be automatically added to the stack */
+WirecolorSet *BKE_wirecolorset_add (ListBase *list, const char name[])
 {
-	WirecolourSet *wcs;
+	WirecolorSet *wcs;
 
-	/* allocate new WirecolourSet */
-	wcs= MEM_callocN(sizeof(WirecolourSet), "WirecolourSet");
+	/* allocate new WirecolorSet */
+	wcs= MEM_callocN(sizeof(WirecolorSet), "WirecolorSet");
 
-	BLI_strncpy(wcs->name, name ? name : "WirecolourSet", sizeof(wcs->name));
+	BLI_strncpy(wcs->name, name ? name : "WirecolorSet", sizeof(wcs->name));
 
 
-	/* add WirecolourSet to list */
+	/* add WirecolorSet to list */
 	BLI_addtail(list, wcs);
 
-	/* make sure WirecolourSet has a unique name (this helps with identification) */
-	BLI_uniquename(list, wcs, "WirecolourSet", '.', offsetof(WirecolourSet, name), sizeof(wcs->name));
+	/* make sure WirecolorSet has a unique name (this helps with identification) */
+	BLI_uniquename(list, wcs, "WirecolorSet", '.', offsetof(WirecolorSet, name), sizeof(wcs->name));
 
-	/* return new WirecolourSet for further editing */
+	/* return new WirecolorSet for further editing */
 	return wcs;
 }
 
-/* Add a path to a WirecolourSet. Nothing is returned for now...
- * Checks are performed to ensure that destination is appropriate for the WirecolourSet in question
+/* Add a path to a WirecolorSet. Nothing is returned for now...
+ * Checks are performed to ensure that destination is appropriate for the WirecolorSet in question
  */
-//KS_Path *BKE_wirecolourset_add_path (WirecolourSet *ks, ID *id, const char group_name[], const char rna_path[], int array_index, short flag, short groupmode)
+//KS_Path *BKE_wirecolorset_add_path (WirecolorSet *ks, ID *id, const char group_name[], const char rna_path[], int array_index, short flag, short groupmode)
 //{
 //	KS_Path *ksp;
 //
@@ -1252,7 +1252,7 @@ WirecolourSet *BKE_wirecolourset_add (ListBase *list, const char name[])
 //	return NULL;
 //}
 
-///* Free the given Wirecolour Set path */
+///* Free the given Wirecolor Set path */
 //void BKE_keyingset_free_path (KeyingSet *ks, KS_Path *ksp)
 //{
 //	/* sanity check */
@@ -1267,8 +1267,8 @@ WirecolourSet *BKE_wirecolourset_add (ListBase *list, const char name[])
 //	BLI_freelinkN(&ks->paths, ksp);
 //}
 
-/* Copy all WirecolourSets in the given list */
-void BKE_wirecoloursets_copy (ListBase *newlist, ListBase *list)
+/* Copy all WirecolorSets in the given list */
+void BKE_wirecolorsets_copy (ListBase *newlist, ListBase *list)
 {
 	BLI_duplicatelist(newlist, list);
 }
@@ -1276,7 +1276,7 @@ void BKE_wirecoloursets_copy (ListBase *newlist, ListBase *list)
 /* Freeing Tools --------------------------- */
 
 /* Free data for KeyingSet removing it from the list */
-void BKE_wirecolourset_free (WirecolourSet *wcs)
+void BKE_wirecolorset_free (WirecolorSet *wcs)
 {
 	/* sanity check */
 	if (wcs == NULL)
@@ -1289,18 +1289,18 @@ void BKE_wirecolourset_free (WirecolourSet *wcs)
 }
 
 /* Free all the KeyingSets in the given list */
-void BKE_wirecoloursets_free (ListBase *list)
+void BKE_wirecolorsets_free (ListBase *list)
 {
-	WirecolourSet *wcs, *wcsn;
+	WirecolorSet *wcs, *wcsn;
 
 	/* sanity check */
 	if (list == NULL)
 		return;
 
-	/* loop over WirecolourSets freeing them */
+	/* loop over WirecolorSets freeing them */
 	for (wcs= list->first; wcs; wcs= wcsn) {
 		wcsn= wcs->next;
-		BKE_wirecolourset_free(wcs);
+		BKE_wirecolorset_free(wcs);
 	}
 }
 

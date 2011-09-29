@@ -746,7 +746,7 @@ static int ui_but_is_rna_undo(uiBut *but)
 		 * unforseen conciquences, so best check for ID's we _know_ are not
 		 * handled by undo - campbell */
 		ID *id= but->rnapoin.id.data;
-		if(ELEM(GS(id->name), ID_SCR, ID_WM)) {
+		if(ID_CHECK_UNDO(id) == FALSE) {
 			return FALSE;
 		}
 		else {
@@ -2804,7 +2804,8 @@ uiBut *uiDefBut(uiBlock *block, int type, int retval, const char *str, int x1, i
 	 * otherwise return -1. 
 	 * (1<<findBitIndex(x))==x for powers of two.
 	 */
-static int findBitIndex(unsigned int x) {
+static int findBitIndex(unsigned int x)
+{
 	if (!x || (x&(x-1))!=0) {	/* x&(x-1) strips lowest bit */
 		return -1;
 	} else {

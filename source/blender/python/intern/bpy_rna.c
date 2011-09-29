@@ -4140,8 +4140,8 @@ static PyObject *pyrna_struct_new(PyTypeObject *type, PyObject *args, PyObject *
 
 /* only needed for subtyping, so a new class gets a valid BPy_StructRNA
  * todo - also accept useful args */
-static PyObject *pyrna_prop_new(PyTypeObject *type, PyObject *args, PyObject *UNUSED(kwds)) {
-
+static PyObject *pyrna_prop_new(PyTypeObject *type, PyObject *args, PyObject *UNUSED(kwds))
+{
 	BPy_PropertyRNA *base;
 
 	if (!PyArg_ParseTuple(args, "O!:bpy_prop.__new__", &pyrna_prop_Type, &base))
@@ -6238,7 +6238,11 @@ static int bpy_class_call(bContext *C, PointerRNA *ptr, FunctionRNA *func, Param
 	ParameterIterator iter;
 	PointerRNA funcptr;
 	int err= 0, i, flag, ret_len=0;
-	int is_static= RNA_function_flag(func) & FUNC_NO_SELF;
+	const char is_static= (RNA_function_flag(func) & FUNC_NO_SELF) != 0;
+
+	/* annoying!, need to check if the screen gets set to NULL which is a
+	 * hint that the file was actually re-loaded. */
+	const char is_valid_screen= (CTX_wm_screen(C) != NULL);
 
 	PropertyRNA *pret_single= NULL;
 	void *retdata_single= NULL;
@@ -6498,7 +6502,11 @@ static int bpy_class_call(bContext *C, PointerRNA *ptr, FunctionRNA *func, Param
 	if(err != 0) {
 		ReportList *reports;
 		/* alert the user, else they wont know unless they see the console. */
-		if (!is_static && ptr->data && RNA_struct_is_a(ptr->type, &RNA_Operator)) {
+		if (    (!is_static) &&
+		        (ptr->data) &&
+		        (RNA_struct_is_a(ptr->type, &RNA_Operator)) &&
+		        is_valid_screen == (CTX_wm_screen(C) != NULL))
+		{
 			wmOperator *op= ptr->data;
 			reports= op->reports;
 		}

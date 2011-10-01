@@ -213,6 +213,7 @@ macro(setup_liblinks
 			${JPEG_LIBRARIES}
 			${PNG_LIBRARIES}
 			${ZLIB_LIBRARIES}
+			${FREETYPE_LIBRARY}
 			${PLATFORM_LINKLIBS})
 
 	# since we are using the local libs for python when compiling msvc projects, we need to add _d when compiling debug versions
@@ -232,13 +233,6 @@ macro(setup_liblinks
 	if(NOT WITH_BUILTIN_GLEW)
 		target_link_libraries(${target} ${GLEW_LIBRARY})
 	endif()
-
-	target_link_libraries(${target}
-			${OPENGL_glu_LIBRARY}
-			${JPEG_LIBRARIES}
-			${PNG_LIBRARIES}
-			${ZLIB_LIBRARIES}
-			${FREETYPE_LIBRARY})
 
 	if(WITH_INTERNATIONAL)
 		target_link_libraries(${target} ${GETTEXT_LIB})
@@ -286,6 +280,11 @@ macro(setup_liblinks
 		target_link_libraries(${target} ${OPENJPEG_LIBRARIES})
 	endif()
 	if(WITH_CODEC_FFMPEG)
+
+		# Strange!, without this ffmpeg gives linking errors (on linux)
+		# even though its linked above
+		target_link_libraries(${target} ${OPENGL_glu_LIBRARY})
+
 		target_link_libraries(${target} ${FFMPEG_LIBRARIES})
 	endif()
 	if(WITH_OPENCOLLADA)
@@ -334,6 +333,10 @@ macro(TEST_SSE_SUPPORT)
 		set(CMAKE_REQUIRED_FLAGS "-msse -msse2")
 	elseif(MSVC)
 		set(CMAKE_REQUIRED_FLAGS "/arch:SSE2") # TODO, SSE 1 ?
+	elseif(CMAKE_C_COMPILER_ID MATCHES "Intel")
+		set(CMAKE_REQUIRED_FLAGS "-xSSE2")
+	else()
+		message(STATUS "Compiler: '${CMAKE_C_COMPILER_ID}' has no SSE flags defiend for it!")
 	endif()
 
 	if(NOT DEFINED ${SUPPORT_SSE_BUILD})
@@ -341,14 +344,14 @@ macro(TEST_SSE_SUPPORT)
 			#include <xmmintrin.h>
 			int main() { __m128 v = _mm_setzero_ps(); return 0; }"
 		SUPPORT_SSE_BUILD)
-		
+
 		if(SUPPORT_SSE_BUILD)
 			message(STATUS "SSE Support: detected.")
 		else()
 			message(STATUS "SSE Support: missing.")
 		endif()
 		set(${SUPPORT_SSE_BUILD} ${SUPPORT_SSE_BUILD} CACHE INTERNAL "SSE Test")
-	endif()	
+	endif()
 
 	if(NOT DEFINED ${SUPPORT_SSE2_BUILD})
 		check_c_source_runs("
@@ -360,7 +363,7 @@ macro(TEST_SSE_SUPPORT)
 			message(STATUS "SSE2 Support: detected.")
 		else()
 			message(STATUS "SSE2 Support: missing.")
-		endif()	
+		endif()
 		set(${SUPPORT_SSE2_BUILD} ${SUPPORT_SSE2_BUILD} CACHE INTERNAL "SSE2 Test")
 	endif()
 
@@ -499,7 +502,7 @@ endmacro()
 
 
 # hacks to override initial project settings
-# these macros must be called directly before/after project(Blender) 
+# these macros must be called directly before/after project(Blender)
 macro(blender_project_hack_pre)
 	# ----------------
 	# MINGW HACK START
@@ -541,8 +544,10 @@ macro(blender_project_hack_post)
 		# have libs we define and that cmake & scons builds match.
 		set(CMAKE_C_STANDARD_LIBRARIES "" CACHE STRING "" FORCE)
 		set(CMAKE_CXX_STANDARD_LIBRARIES "" CACHE STRING "" FORCE)
-		mark_as_advanced(CMAKE_C_STANDARD_LIBRARIES)
-		mark_as_advanced(CMAKE_CXX_STANDARD_LIBRARIES)
+		mark_as_advanced(
+			CMAKE_C_STANDARD_LIBRARIES
+			CMAKE_CXX_STANDARD_LIBRARIES
+		)
 	endif()
 	unset(_reset_standard_libraries)
 

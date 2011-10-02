@@ -3813,7 +3813,7 @@ void RNA_def_scene(BlenderRNA *brna)
 	rna_def_scene_wirecolor_sets(brna, prop);
 
 	prop= RNA_def_property(srna, "wirecolor_sets_all", PROP_COLLECTION, PROP_NONE);
-	RNA_def_property_collection_funcs(prop, "rna_Scene_all_wirecolorsets_begin", "rna_Scene_all_wirecolorsets_next", "rna_iterator_listbase_end", "rna_iterator_listbase_get", 0, 0, 0);
+	RNA_def_property_collection_funcs(prop, "rna_Scene_all_wirecolorsets_begin", "rna_Scene_all_wirecolorsets_next", "rna_iterator_listbase_end", "rna_iterator_listbase_get", NULL, NULL, NULL, NULL);
 	RNA_def_property_struct_type(prop, "WirecolorSet");
 	RNA_def_property_ui_text(prop, "All Wirecolor Sets", "All Wirecolor Sets available for this Scene");
 	RNA_def_property_update(prop, NC_SCENE|ND_WIRECOLORSET, NULL);

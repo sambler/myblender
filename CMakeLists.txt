@@ -273,7 +273,7 @@ if(WITH_PYTHON_MODULE)
 	set(WITH_HEADLESS ON)
 endif()
 
-TEST_SSE_SUPPORT()
+TEST_SSE_SUPPORT(COMPILER_SSE_FLAG COMPILER_SSE2_FLAG)
 
 # don't store paths to libs for portable distrobution
 if(WITH_INSTALL_PORTABLE)
@@ -287,7 +287,7 @@ endif()
 set(WITH_BINRELOC OFF)
 
 # MAXOSX only, set to avoid uninitialized
-set(EXETYPE)
+set(EXETYPE "")
 
 # C/C++ flags
 set(PLATFORM_CFLAGS)
@@ -298,13 +298,13 @@ set(CXX_WARNINGS)
 
 # libraries to link the binary with passed to target_link_libraries()
 # known as LLIBS to scons
-set(PLATFORM_LINKLIBS)
+set(PLATFORM_LINKLIBS "")
 
 # Added to linker flags in setup_liblinks
 # - CMAKE_EXE_LINKER_FLAGS
 # - CMAKE_EXE_LINKER_FLAGS_DEBUG
-set(PLATFORM_LINKFLAGS)
-set(PLATFORM_LINKFLAGS_DEBUG)
+set(PLATFORM_LINKFLAGS "")
+set(PLATFORM_LINKFLAGS_DEBUG "")
 
 
 # disabled for now, not supported
@@ -436,7 +436,7 @@ if(UNIX AND NOT APPLE)
 		)
 
 		if(INTL_LIBRARY AND ICONV_LIBRARY)
-			set(GETTEXT_LIB ${INTL_LIBRARY} ${ICONV_LIBRARY})
+			set(GETTEXT_LIBRARIES ${INTL_LIBRARY} ${ICONV_LIBRARY})
 		endif()
 	endif()
 
@@ -645,9 +645,9 @@ elseif(WIN32)
 
 		if(WITH_INTERNATIONAL)
 			set(GETTEXT ${LIBDIR}/gettext)
-			set(GETTEXT_INC ${GETTEXT}/include)
+			set(GETTEXT_INCLUDE_DIRS ${GETTEXT}/include)
 			set(GETTEXT_LIBPATH ${GETTEXT}/lib)
-			set(GETTEXT_LIB gnu_gettext)
+			set(GETTEXT_LIBRARIES gnu_gettext)
 		endif()
 
 		if(CMAKE_CL_64)
@@ -745,7 +745,7 @@ elseif(WIN32)
 			set(OPENEXR_INCUDE ${OPENEXR}/include${MSVC_INC})
 			set(OPENEXR_INCLUDE_DIRS
 				${OPENEXR_INCUDE}
-			        ${OPENEXR_INCUDE}/IlmImf
+				${OPENEXR_INCUDE}/IlmImf
 				${OPENEXR_INCUDE}/Iex
 				${OPENEXR_INCUDE}/Imath
 			)
@@ -804,9 +804,9 @@ elseif(WIN32)
 
 		if(WITH_INTERNATIONAL)
 			set(GETTEXT ${LIBDIR}/gcc/gettext)
-			set(GETTEXT_INC ${GETTEXT}/include)
+			set(GETTEXT_INCLUDE_DIRS ${GETTEXT}/include)
 			set(GETTEXT_LIBPATH ${GETTEXT}/lib)
-			set(GETTEXT_LIB intl)
+			set(GETTEXT_LIBRARIES intl)
 		endif()
 
 		set(JPEG_LIBRARIES libjpeg)
@@ -972,8 +972,8 @@ elseif(APPLE)
 
 	if(WITH_INTERNATIONAL)
 		set(GETTEXT ${LIBDIR}/gettext)
-		set(GETTEXT_INC "${GETTEXT}/include")
-		set(GETTEXT_LIB intl iconv)
+		set(GETTEXT_INCLUDE_DIRS "${GETTEXT}/include")
+		set(GETTEXT_LIBRARIES intl iconv)
 		set(GETTEXT_LIBPATH ${GETTEXT}/lib)
 	endif()
 
@@ -1144,34 +1144,17 @@ endif()
 # See TEST_SSE_SUPPORT() for how this is defined.
 
 if(WITH_RAYOPTIMIZATION)
-	if(CMAKE_COMPILER_IS_GNUCC)
-		set(_sse "-msse")
-		set(_sse2 "-msse2")
-	elseif(MSVC)
-		set(_sse "/arch:SSE")
-		set(_sse2 "/arch:SSE2")
-	elseif(CMAKE_C_COMPILER_ID MATCHES "Intel")
-		set(_sse)  # icc only has sse2
-		set(_sse2 "-xSSE2")		
-	else()
-		message(WARNING "SSE flags for this compiler: '${CMAKE_C_COMPILER_ID}' not known")
-		set(_sse)
-		set(_sse2)
-	endif()
-
 	if(SUPPORT_SSE_BUILD)
-		set(PLATFORM_CFLAGS " ${_sse} ${PLATFORM_CFLAGS}")
+		set(PLATFORM_CFLAGS " ${COMPILER_SSE_FLAG} ${PLATFORM_CFLAGS}")
 		add_definitions(-D__SSE__ -D__MMX__)
 	endif()
 	if(SUPPORT_SSE2_BUILD)
-		set(PLATFORM_CFLAGS " ${_sse2} ${PLATFORM_CFLAGS}")
+		set(PLATFORM_CFLAGS " ${COMPILER_SSE2_FLAG} ${PLATFORM_CFLAGS}")
 		add_definitions(-D__SSE2__)
 		if(NOT SUPPORT_SSE_BUILD) # dont double up
 			add_definitions(-D__MMX__)
 		endif()
 	endif()
-	unset(_sse)
-	unset(_sse2)
 endif()
 
 
@@ -1325,6 +1308,10 @@ elseif(CMAKE_C_COMPILER_ID MATCHES "Intel")
 	ADD_CHECK_CXX_COMPILER_FLAG(CXX_WARNINGS CXX_WARN_ALL -Wall)
 	ADD_CHECK_CXX_COMPILER_FLAG(CXX_WARNINGS CXX_WARN_NO_INVALID_OFFSETOF -Wno-invalid-offsetof)
 	ADD_CHECK_CXX_COMPILER_FLAG(CXX_WARNINGS CXX_WARN_NO_SIGN_COMPARE -Wno-sign-compare)
+
+	# disable numbered, false positives
+	set(C_WARNINGS "${C_WARNINGS} -wd188,186,144,913,556")
+	set(CXX_WARNINGS "${CXX_WARNINGS} -wd188,186,144,913,556")
 
 endif()
 

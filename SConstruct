@@ -524,7 +524,7 @@ if env['OURPLATFORM']!='darwin':
             
             for f in df:
                 # This files aren't used anymore
-                if f in ['.Blanguages', '.bfont.ttf']:
+                if f in (".bfont.ttf", ):
                     continue
 
                 if not env['WITH_BF_INTERNATIONAL']:

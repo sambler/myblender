@@ -343,7 +343,7 @@ def buildinfo(lenv, build_type):
     build_time = time.strftime ("%H:%M:%S")
     build_rev = os.popen('svnversion').read()[:-1] # remove \n
     if build_rev == '': 
-        build_rev = '40769'
+        build_rev = '40799'
     if lenv['BF_DEBUG']:
         build_type = "Debug"
         build_cflags = ' '.join(lenv['CFLAGS'] + lenv['CCFLAGS'] + lenv['BF_DEBUG_CCFLAGS'] + lenv['CPPFLAGS'])
@@ -625,7 +625,11 @@ def UnixPyBundle(target=None, source=None, env=None):
     run("rm -rf '%s/distutils'" % py_target)
     run("rm -rf '%s/lib2to3'" % py_target)
     run("rm -rf '%s/config'" % py_target)
-    run("rm -rf '%s/config-*'" % py_target)
+
+    for f in os.listdir(py_target):
+        if f.startswith("config-"):
+            run("rm -rf '%s/%s'" % (py_target, f))
+
     run("rm -rf '%s/site-packages'" % py_target)
     run("mkdir '%s/site-packages'" % py_target)    # python needs it.'
     run("rm -rf '%s/idlelib'" % py_target)

@@ -14,7 +14,7 @@ if(EXISTS ${SOURCE_DIR}/.svn/)
 	endif()
 endif()
 
-set(MY_WC_REVISION "40824")
+set(MY_WC_REVISION "40841")
 
 # BUILD_PLATFORM and BUILD_PLATFORM are taken from CMake
 # but BUILD_DATE and BUILD_TIME are plataform dependant

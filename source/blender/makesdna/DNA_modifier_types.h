@@ -795,7 +795,6 @@ typedef struct OceanModifierData {
 	
 } OceanModifierData;
  
-
 #define MOD_OCEAN_GEOM_GENERATE	0
 #define MOD_OCEAN_GEOM_DISPLACE	1
 #define MOD_OCEAN_GEOM_SIM_ONLY	2
@@ -808,10 +807,6 @@ typedef struct OceanModifierData {
 
 #define MOD_OCEAN_GENERATE_FOAM	1
 #define MOD_OCEAN_GENERATE_NORMALS	2
-
-typedef struct NavMeshModifierData {
-	ModifierData modifier;
-} NavMeshModifierData;
 
 typedef struct WarpModifierData {
 	ModifierData modifier;

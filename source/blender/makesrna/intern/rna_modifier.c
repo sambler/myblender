@@ -91,7 +91,6 @@ EnumPropertyItem modifier_type_items[] ={
 	{eModifierType_Collision, "COLLISION", ICON_MOD_PHYSICS, "Collision", ""},
 	{eModifierType_Explode, "EXPLODE", ICON_MOD_EXPLODE, "Explode", ""},
 	{eModifierType_Fluidsim, "FLUID_SIMULATION", ICON_MOD_FLUIDSIM, "Fluid Simulation", ""},
-	{eModifierType_NavMesh, "NAVMESH", ICON_MOD_PHYSICS, "Navigation mesh", ""},
 	{eModifierType_ParticleInstance, "PARTICLE_INSTANCE", ICON_MOD_PARTICLES, "Particle Instance", ""},
 	{eModifierType_ParticleSystem, "PARTICLE_SYSTEM", ICON_MOD_PARTICLES, "Particle System", ""},
 	{eModifierType_Smoke, "SMOKE", ICON_MOD_SMOKE, "Smoke", ""},
@@ -192,8 +191,6 @@ static StructRNA* rna_Modifier_refine(struct PointerRNA *ptr)
 			return &RNA_WarpModifier;
 		case eModifierType_Ocean:
 			return &RNA_OceanModifier;
-		case eModifierType_NavMesh:
-			return &RNA_NavMeshModifier;
 		case eModifierType_WeightVGEdit:
 			return &RNA_VertexWeightEditModifier;
 		case eModifierType_WeightVGMix:
@@ -278,7 +275,7 @@ static void rna_Smoke_set_type(Main *bmain, Scene *scene, PointerRNA *ptr)
 					part->end = 250.0f;
 					part->ren_as = PART_DRAW_NOT;
 					part->draw_as = PART_DRAW_DOT;
-					sprintf(psys->name, "SmokeParticles");
+					BLI_strncpy(psys->name, "SmokeParticles", sizeof(psys->name));
 					psys->recalc |= (PSYS_RECALC_RESET|PSYS_RECALC_PHYS);
 					DAG_id_tag_update(ptr->id.data, OB_RECALC_DATA);
 				}
@@ -3107,7 +3104,6 @@ void RNA_def_modifier(BlenderRNA *brna)
 	rna_def_modifier_solidify(brna);
 	rna_def_modifier_screw(brna);
 	rna_def_modifier_ocean(brna);
-	rna_def_modifier_navmesh(brna);
 	rna_def_modifier_weightvgedit(brna);
 	rna_def_modifier_weightvgmix(brna);
 	rna_def_modifier_weightvgproximity(brna);

@@ -75,7 +75,7 @@ typedef enum ModifierType {
 	eModifierType_WeightVGEdit,
 	eModifierType_WeightVGMix,
 	eModifierType_WeightVGProximity,
-	eModifierType_NavMesh,
+	eModifierType_DynamicPaint, /* reserve slot */
 	NUM_MODIFIER_TYPES
 } ModifierType;
 
@@ -808,10 +808,6 @@ typedef struct OceanModifierData {
 #define MOD_OCEAN_GENERATE_FOAM	1
 #define MOD_OCEAN_GENERATE_NORMALS	2
 
-typedef struct NavMeshModifierData {
-	ModifierData modifier;
-} NavMeshModifierData;
-
 typedef struct WarpModifierData {
 	ModifierData modifier;
 
@@ -865,7 +861,7 @@ typedef struct WeightVGEditModifierData {
 	/* Mapping stuff. */
 	struct CurveMapping *cmap_curve;  /* The custom mapping curve! */
 
- 	/* The add/remove vertices weight thresholds. */
+	/* The add/remove vertices weight thresholds. */
 	float	add_threshold, rem_threshold;
 
 	/* Masking options. */

@@ -831,26 +831,6 @@ static char *blender_version_decimal(const int ver)
 	return version_str;
 }
 
-static char *blender_prev_version_decimal(void)
-{
-	/* future version needs to compensate for previous vers not being a simple +1 minor bump */
-
-	static char prev_version_str[5];
-
-	switch (BLENDER_VERSION) {
-		case 240:
-			/* example only - only needed for > +1 minor bump after 2.56 */
-			sprintf(prev_version_str, "%d.%02d", 2, 37);
-			break;
-
-		default:
-			sprintf(prev_version_str, "%d.%02d", BLENDER_VERSION/100, (BLENDER_VERSION%100)-1);
-			break;
-	}
-
-	return prev_version_str;
-}
-
 static int test_path(char *targetpath, const char *path_base, const char *path_sep, const char *folder_name)
 {
 	char tmppath[FILE_MAX];
@@ -893,13 +873,13 @@ static int test_env_path(char *path, const char *envvar)
 	}
 }
 
-static int config_from_local = 0;
 
-static int get_path_local(char *targetpath, const char *folder_name, const char *subfolder_name, const int ver, int inc_prev)
+static int get_path_local(char *targetpath, const char *folder_name, const char *subfolder_name, const int ver)
 {
 	char bprogdir[FILE_MAX];
 	char relfolder[FILE_MAX];
-#if __APPLE__
+//#if __APPLE__
+#if 1
 	char osxprogfolder[FILE_MAX]; /* prevent osx extra test from messing with current tests */
 #endif
 	
@@ -920,47 +900,22 @@ static int get_path_local(char *targetpath, const char *folder_name, const char 
 	
 	/* use argv[0] (bprogname) to get the path to the executable */
 	BLI_split_dirfile(bprogname, bprogdir, NULL, sizeof(bprogdir), 0);
-#if __APPLE__
+//#if __APPLE__
+#if 1
 	/* on osx EXECUTABLE_DIR is buried inside the .app bundle which is partially hidden by the finder
 		let's back up and allow the config to be in the same dir as the .app bundle.
 		blender exe is in blender.app/Contents/MacOS so up three gives us the app bundle's parent folder */
 	BLI_join_dirfile(osxprogfolder, sizeof(osxprogfolder), bprogdir, "../../../");
-	if(folder_name && test_path(targetpath, osxprogfolder, blender_version_decimal(ver), relfolder)) {
-		/* vers folder in same location as blender only counts as local config if we are looking for the config dir */
-		if(BLI_strcasecmp(folder_name, "config")==0)
-			config_from_local = 1;
-		return 1;
-	}
-	else if( inc_prev && folder_name && BLI_strcasecmp(folder_name, "config")==0 /* we only go back for config */
-			&& test_path(targetpath, osxprogfolder, blender_prev_version_decimal(), relfolder) ) {
-			config_from_local = 1;
-		return 1;
-	}
-	else if (config_from_local && folder_name && BLI_strcasecmp(folder_name, "config")==0) {
-		/* we started with a prev local config but we aren't looking for it now - give a non-existing current config path to save the config file into */
-		test_path(targetpath, osxprogfolder, blender_version_decimal(ver), relfolder);
+	if( folder_name && BLI_strcasecmp(folder_name, "config")==0 /* we only go up for config */
+			&& test_path(targetpath, osxprogfolder, blender_version_decimal(ver), relfolder) ) {
 		return 1;
 	}
 	/* if not there check normally */
 #endif /* __APPLE__ */
 	
 	/* try EXECUTABLE_DIR/2.5x/folder_name - new default directory for local blender installed files */
-	if(folder_name && test_path(targetpath, bprogdir, blender_version_decimal(ver), relfolder)) {
-		/* vers folder in same location as blender only counts as local config if we are looking for the config dir */
-		if(folder_name && BLI_strcasecmp(folder_name, "config")==0)
-			config_from_local = 1;
+	if( test_path(targetpath, bprogdir, blender_version_decimal(ver), relfolder))
 		return 1;
-	}
-	else if( inc_prev && folder_name && BLI_strcasecmp(folder_name, "config")==0 /* we only go back for config */
-			&& test_path(targetpath, bprogdir, blender_prev_version_decimal(), relfolder)) {
-		config_from_local = 1;
-		return 1;
-	}
-	else if (config_from_local && folder_name && BLI_strcasecmp(folder_name, "config")==0) {
-		/* we started with a prev local config but we aren't looking for it now - give a non-existing current config path to save the config file into */
-		test_path(targetpath, bprogdir, blender_version_decimal(ver), relfolder);
-		return 1;
-	}
 
 	return 0;
 }
@@ -971,22 +926,19 @@ static int is_portable_install(void)
 	const int ver= BLENDER_VERSION;
 	char path[FILE_MAX];
 
-	return get_path_local(path, "config", NULL, ver, 0);
+	return get_path_local(path, "config", NULL, ver);
 }
 
-static int get_path_user(char *targetpath, const char *folder_name, const char *subfolder_name, const char *envvar, const int ver, int inc_prev)
+static int get_path_user(char *targetpath, const char *folder_name, const char *subfolder_name, const char *envvar, const int ver)
 {
 	char user_path[FILE_MAX];
-	char user_path_prev[FILE_MAX];
 	const char *user_base_path;
-	int path_exists;
 
 	/* for portable install, user path is always local */
 	if (is_portable_install())
-		return get_path_local(targetpath, folder_name, subfolder_name, ver, 0);
+		return get_path_local(targetpath, folder_name, subfolder_name, ver);
 	
 	user_path[0] = '\0';
-	user_path_prev[0] = '\0';
 
 	if (test_env_path(user_path, envvar)) {
 		if (subfolder_name) {
@@ -1000,32 +952,21 @@ static int get_path_user(char *targetpath, const char *folder_name, const char *
 	user_base_path = (const char *)GHOST_getUserDir();
 	if (user_base_path) {
 		BLI_snprintf(user_path, FILE_MAX, BLENDER_USER_FORMAT, user_base_path, blender_version_decimal(ver));
-		if(inc_prev)
-			BLI_snprintf(user_path_prev, FILE_MAX, BLENDER_USER_FORMAT, user_base_path, blender_prev_version_decimal());
 	}
 
-	if(!user_path[0] && !user_path_prev)
+	if(!user_path[0])
 		return 0;
 	
 #ifdef PATH_DEBUG2
 	printf("get_path_user: %s\n", user_path);
-	printf("get_path_user_prev: %s\n", user_path_prev);
 #endif
 	
 	if (subfolder_name) {
 		/* try $HOME/folder_name/subfolder_name */
-		path_exists = test_path(targetpath, user_path, folder_name, subfolder_name);
-		if(path_exists || !inc_prev)
-			return path_exists;
-		else
-			return test_path(targetpath, user_path_prev, folder_name, subfolder_name);
+		return test_path(targetpath, user_path, folder_name, subfolder_name);
 	} else {
 		/* try $HOME/folder_name */
-		path_exists = test_path(targetpath, user_path, NULL, folder_name);
-		if(path_exists || !inc_prev)
-		   return path_exists;
-		else
-			return test_path(targetpath, user_path_prev, NULL, folder_name);
+		return test_path(targetpath, user_path, NULL, folder_name);
 	}
 }
 
@@ -1110,43 +1051,39 @@ char *BLI_get_folder(int folder_id, const char *subfolder)
 	
 	switch (folder_id) {
 		case BLENDER_DATAFILES:		/* general case */
-			if (get_path_user(path, "datafiles", subfolder, "BLENDER_USER_DATAFILES", ver, 0))	break;
-			if (get_path_local(path, "datafiles", subfolder, ver, 0)) break;
+			if (get_path_user(path, "datafiles", subfolder, "BLENDER_USER_DATAFILES", ver))	break;
+			if (get_path_local(path, "datafiles", subfolder, ver)) break;
 			if (get_path_system(path, "datafiles", subfolder, "BLENDER_SYSTEM_DATAFILES", ver)) break;
 			return NULL;
 			
 		case BLENDER_USER_DATAFILES:
-			if (get_path_user(path, "datafiles", subfolder, "BLENDER_USER_DATAFILES", ver, 0))	break;
-			if (get_path_local(path, "datafiles", subfolder, ver, 0)) break;
+			if (get_path_user(path, "datafiles", subfolder, "BLENDER_USER_DATAFILES", ver))	break;
 			return NULL;
 			
 		case BLENDER_SYSTEM_DATAFILES:
-			if (get_path_local(path, "datafiles", subfolder, ver, 0)) break;
+			if (get_path_local(path, "datafiles", subfolder, ver)) break;
 			if (get_path_system(path, "datafiles", subfolder, "BLENDER_SYSTEM_DATAFILES", ver))	break;
 			return NULL;
 			
 		case BLENDER_USER_AUTOSAVE:
-			if (get_path_local(path, "autosave", subfolder, ver, 0)) break;
-			if (get_path_user(path, "autosave", subfolder, "BLENDER_USER_DATAFILES", ver, 0))	break;
+			if (get_path_user(path, "autosave", subfolder, "BLENDER_USER_DATAFILES", ver))	break;
 			return NULL;
-
+			
 		case BLENDER_USER_CONFIG:
-//			if (get_path_local(path, "config", subfolder, ver, 1)) break;
-			if (get_path_user(path, "config", subfolder, "BLENDER_USER_CONFIG", ver, 1)) break;
+			if (get_path_user(path, "config", subfolder, "BLENDER_USER_CONFIG", ver)) break;
 			return NULL;
 			
 		case BLENDER_USER_SCRIPTS:
-            if (get_path_local(path, "scripts", subfolder, ver, 0)) break;
-			if (get_path_user(path, "scripts", subfolder, "BLENDER_USER_SCRIPTS", ver, 0)) break;
+			if (get_path_user(path, "scripts", subfolder, "BLENDER_USER_SCRIPTS", ver)) break;
 			return NULL;
 			
 		case BLENDER_SYSTEM_SCRIPTS:
-			if (get_path_local(path, "scripts", subfolder, ver, 0)) break;
+			if (get_path_local(path, "scripts", subfolder, ver)) break;
 			if (get_path_system(path, "scripts", subfolder, "BLENDER_SYSTEM_SCRIPTS", ver)) break;
 			return NULL;
-						
+			
 		case BLENDER_SYSTEM_PYTHON:
-			if (get_path_local(path, "python", subfolder, ver, 0)) break;
+			if (get_path_local(path, "python", subfolder, ver)) break;
 			if (get_path_system(path, "python", subfolder, "BLENDER_SYSTEM_PYTHON", ver)) break;
 			return NULL;
 	}
@@ -1161,19 +1098,16 @@ char *BLI_get_user_folder_notest(int folder_id, const char *subfolder)
 
 	switch (folder_id) {
 		case BLENDER_USER_DATAFILES:
-			get_path_user(path, "datafiles", subfolder, "BLENDER_USER_DATAFILES", ver, 0);
+			get_path_user(path, "datafiles", subfolder, "BLENDER_USER_DATAFILES", ver);
 			break;
 		case BLENDER_USER_CONFIG:
-			if( config_from_local )
-				get_path_local(path, "config", subfolder, ver, 0);
-			else
-				get_path_user(path, "config", subfolder, "BLENDER_USER_CONFIG", ver, 0);
+			get_path_user(path, "config", subfolder, "BLENDER_USER_CONFIG", ver);
 			break;
 		case BLENDER_USER_AUTOSAVE:
-			get_path_user(path, "autosave", subfolder, "BLENDER_USER_AUTOSAVE", ver, 0);
+			get_path_user(path, "autosave", subfolder, "BLENDER_USER_AUTOSAVE", ver);
 			break;
 		case BLENDER_USER_SCRIPTS:
-			get_path_user(path, "scripts", subfolder, "BLENDER_USER_SCRIPTS", ver, 0);
+			get_path_user(path, "scripts", subfolder, "BLENDER_USER_SCRIPTS", ver);
 			break;
 	}
 	if ('\0' == path[0]) {
@@ -1185,17 +1119,14 @@ char *BLI_get_user_folder_notest(int folder_id, const char *subfolder)
 char *BLI_get_folder_create(int folder_id, const char *subfolder)
 {
 	char *path;
-	char *path_no_test;
 
 	/* only for user folders */
 	if (!ELEM4(folder_id, BLENDER_USER_DATAFILES, BLENDER_USER_CONFIG, BLENDER_USER_SCRIPTS, BLENDER_USER_AUTOSAVE))
 		return NULL;
 	
 	path = BLI_get_folder(folder_id, subfolder);
-	path_no_test = BLI_get_user_folder_notest(folder_id, subfolder);
 	
-	if (!path || BLI_strcasecmp(path, path_no_test)!=0) {
-		/* if path and path_no_test differ then we started with a prev vers config but now we want to save a new version keeping a local saved config */
+	if (!path) {
 		path = BLI_get_user_folder_notest(folder_id, subfolder);
 		if (path) BLI_recurdir_fileops(path);
 	}
@@ -1209,10 +1140,10 @@ char *BLI_get_folder_version(const int id, const int ver, const int do_check)
 	int ok;
 	switch(id) {
 	case BLENDER_RESOURCE_PATH_USER:
-		ok= get_path_user(path, NULL, NULL, NULL, ver, 0);
+		ok= get_path_user(path, NULL, NULL, NULL, ver);
 		break;
 	case BLENDER_RESOURCE_PATH_LOCAL:
-		ok= get_path_local(path, NULL, NULL, ver, 0);
+		ok= get_path_local(path, NULL, NULL, ver);
 		break;
 	case BLENDER_RESOURCE_PATH_SYSTEM:
 		ok= get_path_system(path, NULL, NULL, NULL, ver);

@@ -642,7 +642,7 @@ bool ConvertMaterial(
 	if(validmat && (mat->mode & MA_TRANSP) && (mat->mode & MA_ZTRANSP) && (material->alphablend == GEMAT_SOLID))
 		material->alphablend = GEMAT_ALPHA;
 
-  	// always zsort alpha + add
+	// always zsort alpha + add
 	if((ELEM3(material->alphablend, GEMAT_ALPHA, GEMAT_ALPHA_SORT, GEMAT_ADD) || texalpha) && (material->alphablend != GEMAT_CLIP )) {
 		material->ras_mode |= ALPHA;
 		material->ras_mode |= (mat && (mat->game.alpha_blend & GEMAT_ALPHA_SORT))? ZSORT: 0;
@@ -1590,15 +1590,15 @@ void BL_CreatePhysicsObjectNew(KX_GameObject* gameobj,
 				objprop.m_boundobject.box.m_extends[1]=2.f*bb.m_extends[1];
 				objprop.m_boundobject.box.m_extends[2]=2.f*bb.m_extends[2];
 				break;
-			case OB_BOUND_POLYT:
+			case OB_BOUND_CONVEX_HULL:
 				if (blenderobject->type == OB_MESH)
 				{
 					objprop.m_boundclass = KX_BOUNDPOLYTOPE;
 					break;
 				}
-				// Object is not a mesh... fall through OB_BOUND_POLYH to 
+				// Object is not a mesh... fall through OB_BOUND_TRIANGLE_MESH to
 				// OB_BOUND_SPHERE
-			case OB_BOUND_POLYH:
+			case OB_BOUND_TRIANGLE_MESH:
 				if (blenderobject->type == OB_MESH)
 				{
 					objprop.m_boundclass = KX_BOUNDMESH;

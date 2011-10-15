@@ -1,4 +1,6 @@
-/* 
+/*
+ * $Id$
+ *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -317,7 +319,7 @@ static const char *constraint_adrcodes_to_paths (int adrcode, int *array_index)
 
 /* ShapeKey types 
  * NOTE: as we don't have access to the keyblock where the data comes from (for now), 
- *	 	we'll just use numerical indices for now... 
+ *       we'll just use numerical indices for now...
  */
 static char *shapekey_adrcodes_to_paths (int adrcode, int *UNUSED(array_index))
 {
@@ -1032,12 +1034,14 @@ static ChannelDriver *idriver_to_cdriver (IpoDriver *idriver)
 					/* first bone target */
 				dtar= &dvar->targets[0];
 				dtar->id= (ID *)idriver->ob;
+				dtar->idtype= ID_OB;
 				if (idriver->name[0])
 					BLI_strncpy(dtar->pchan_name, idriver->name, sizeof(dtar->pchan_name));
 				
 					/* second bone target (name was stored in same var as the first one) */
 				dtar= &dvar->targets[1];
 				dtar->id= (ID *)idriver->ob;
+				dtar->idtype= ID_OB;
 				if (idriver->name[0]) // xxx... for safety
 					BLI_strncpy(dtar->pchan_name, idriver->name+DRIVER_NAME_OFFS, sizeof(dtar->pchan_name));
 			}
@@ -1049,6 +1053,7 @@ static ChannelDriver *idriver_to_cdriver (IpoDriver *idriver)
 				/* only requires a single target */
 				dtar= &dvar->targets[0];
 				dtar->id= (ID *)idriver->ob;
+				dtar->idtype= ID_OB;
 				if (idriver->name[0])
 					BLI_strncpy(dtar->pchan_name, idriver->name, sizeof(dtar->pchan_name));
 				dtar->transChan= adrcode_to_dtar_transchan(idriver->adrcode);
@@ -1063,6 +1068,7 @@ static ChannelDriver *idriver_to_cdriver (IpoDriver *idriver)
 				/* only requires single target */
 			dtar= &dvar->targets[0];
 			dtar->id= (ID *)idriver->ob;
+			dtar->idtype= ID_OB;
 			dtar->transChan= adrcode_to_dtar_transchan(idriver->adrcode);
 		}
 	}
@@ -1103,7 +1109,7 @@ static void fcurve_add_to_list (ListBase *groups, ListBase *list, FCurve *fcu, c
 				agrp->flag = AGRP_SELECTED;
 				if (muteipo) agrp->flag |= AGRP_MUTED;
 				
-				strncpy(agrp->name, grpname, sizeof(agrp->name));
+				BLI_strncpy(agrp->name, grpname, sizeof(agrp->name));
 				
 				BLI_addtail(&tmp_act.groups, agrp);
 				BLI_uniquename(&tmp_act.groups, agrp, "Group", '.', offsetof(bActionGroup, name), sizeof(agrp->name));

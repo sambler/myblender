@@ -1787,7 +1787,7 @@ static void write_textures(WriteData *wd, ListBase *idbase)
 				if(tex->pd->coba) writestruct(wd, DATA, "ColorBand", 1, tex->pd->coba);
 				if(tex->pd->falloff_curve) write_curvemapping(wd, tex->pd->falloff_curve);
 			}
-			if(tex->type == TEX_VOXELDATA && tex->vd) writestruct(wd, DATA, "VoxelData", 1, tex->vd);
+			if(tex->type == TEX_VOXELDATA) writestruct(wd, DATA, "VoxelData", 1, tex->vd);
 			
 			/* nodetree is integral part of texture, no libdata */
 			if(tex->nodetree) {
@@ -2678,8 +2678,8 @@ int BLO_write_file(Main *mainvar, const char *filepath, int write_flags, ReportL
 	if(write_flags & G_FILE_RELATIVE_REMAP) {
 		char dir1[FILE_MAXDIR+FILE_MAXFILE];
 		char dir2[FILE_MAXDIR+FILE_MAXFILE];
-		BLI_split_dirfile(filepath, dir1, NULL);
-		BLI_split_dirfile(mainvar->name, dir2, NULL);
+		BLI_split_dirfile(filepath, dir1, NULL, sizeof(dir1), 0);
+		BLI_split_dirfile(mainvar->name, dir2, NULL, sizeof(dir2), 0);
 
 		/* just incase there is some subtle difference */
 		BLI_cleanup_dir(mainvar->name, dir1);

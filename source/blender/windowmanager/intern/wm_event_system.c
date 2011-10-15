@@ -33,7 +33,6 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
 
 #include "DNA_listBase.h"
 #include "DNA_screen_types.h"
@@ -47,6 +46,7 @@
 
 #include "BLI_blenlib.h"
 #include "BLI_utildefines.h"
+#include "BLI_math.h"
 
 #include "BKE_blender.h"
 #include "BKE_context.h"
@@ -85,7 +85,7 @@ static int wm_operator_call_internal(bContext *C, wmOperatorType *ot, PointerRNA
 
 void wm_event_add(wmWindow *win, wmEvent *event_to_add)
 {
-	wmEvent *event= MEM_callocN(sizeof(wmEvent), "event");
+	wmEvent *event= MEM_callocN(sizeof(wmEvent), "wmEvent");
 	
 	*event= *event_to_add;
 	BLI_addtail(&win->queue, event);
@@ -1223,41 +1223,47 @@ static int wm_handler_operator_call(bContext *C, ListBase *handlers, wmEventHand
 			retval= ot->modal(C, op, event);
 			OPERATOR_RETVAL_CHECK(retval);
 
-			if(ot->flag & OPTYPE_UNDO && CTX_wm_manager(C) == wm)
-				wm->op_undo_depth--;
+			/* when this is _not_ the case the modal modifier may have loaded
+			 * a new blend file (demo mode does this), so we have to assume
+			 * the event, operator etc have all been freed. - campbell */
+			if(CTX_wm_manager(C) == wm) {
 
-			/* putting back screen context, reval can pass trough after modal failures! */
-			if((retval & OPERATOR_PASS_THROUGH) || wm_event_always_pass(event)) {
-				CTX_wm_area_set(C, area);
-				CTX_wm_region_set(C, region);
-			}
-			else {
-				/* this special cases is for areas and regions that get removed */
-				CTX_wm_area_set(C, NULL);
-				CTX_wm_region_set(C, NULL);
-			}		
+				if(ot->flag & OPTYPE_UNDO)
+					wm->op_undo_depth--;
 
-			if(retval & (OPERATOR_CANCELLED|OPERATOR_FINISHED))
-				wm_operator_reports(C, op, retval, 0);
-			
-			if(retval & OPERATOR_FINISHED) {
-				wm_operator_finished(C, op, 0);
-				handler->op= NULL;
-			}
-			else if(retval & (OPERATOR_CANCELLED|OPERATOR_FINISHED)) {
-				WM_operator_free(op);
-				handler->op= NULL;
-			}
-			
-			/* remove modal handler, operator itself should have been cancelled and freed */
-			if(retval & (OPERATOR_CANCELLED|OPERATOR_FINISHED)) {
-				WM_cursor_ungrab(CTX_wm_window(C));
+				/* putting back screen context, reval can pass trough after modal failures! */
+				if((retval & OPERATOR_PASS_THROUGH) || wm_event_always_pass(event)) {
+					CTX_wm_area_set(C, area);
+					CTX_wm_region_set(C, region);
+				}
+				else {
+					/* this special cases is for areas and regions that get removed */
+					CTX_wm_area_set(C, NULL);
+					CTX_wm_region_set(C, NULL);
+				}
 
-				BLI_remlink(handlers, handler);
-				wm_event_free_handler(handler);
-				
-				/* prevent silly errors from operator users */
-				//retval &= ~OPERATOR_PASS_THROUGH;
+				if(retval & (OPERATOR_CANCELLED|OPERATOR_FINISHED))
+					wm_operator_reports(C, op, retval, 0);
+
+				if(retval & OPERATOR_FINISHED) {
+					wm_operator_finished(C, op, 0);
+					handler->op= NULL;
+				}
+				else if(retval & (OPERATOR_CANCELLED|OPERATOR_FINISHED)) {
+					WM_operator_free(op);
+					handler->op= NULL;
+				}
+
+				/* remove modal handler, operator itself should have been cancelled and freed */
+				if(retval & (OPERATOR_CANCELLED|OPERATOR_FINISHED)) {
+					WM_cursor_ungrab(CTX_wm_window(C));
+
+					BLI_remlink(handlers, handler);
+					wm_event_free_handler(handler);
+
+					/* prevent silly errors from operator users */
+					//retval &= ~OPERATOR_PASS_THROUGH;
+				}
 			}
 			
 		}
@@ -1270,6 +1276,7 @@ static int wm_handler_operator_call(bContext *C, ListBase *handlers, wmEventHand
 		if(ot)
 			retval= wm_operator_invoke(C, ot, event, properties, NULL, FALSE);
 	}
+	/* Finished and pass through flag as handled */
 
 	/* Finished and pass through flag as handled */
 	if(retval == (OPERATOR_FINISHED|OPERATOR_PASS_THROUGH))
@@ -1783,11 +1790,14 @@ void wm_event_do_handlers(bContext *C)
 					}
 					
 					if(playing == 0) {
-						int ncfra = sound_sync_scene(scene) * (float)FPS + 0.5f;
-						if(ncfra != scene->r.cfra)	{
-							scene->r.cfra = ncfra;
-							ED_update_for_newframe(CTX_data_main(C), scene, win->screen, 1);
-							WM_event_add_notifier(C, NC_WINDOW, NULL);
+						float time = sound_sync_scene(scene);
+						if(finite(time)) {
+							int ncfra = sound_sync_scene(scene) * (float)FPS + 0.5f;
+							if(ncfra != scene->r.cfra)	{
+								scene->r.cfra = ncfra;
+								ED_update_for_newframe(CTX_data_main(C), scene, win->screen, 1);
+								WM_event_add_notifier(C, NC_WINDOW, NULL);
+							}
 						}
 					}
 					
@@ -1917,7 +1927,7 @@ void wm_event_do_handlers(bContext *C)
 			
 			/* store last event for this window */
 			/* mousemove and timer events don't overwrite last type */
-			if (event->type != MOUSEMOVE && !ISTIMER(event->type)) {
+			if (!ELEM(event->type, MOUSEMOVE, INBETWEEN_MOUSEMOVE) && !ISTIMER(event->type)) {
 				if (wm_action_not_handled(action)) {
 					if (win->eventstate->prevtype == event->type) {
 						/* set click time on first click (press -> release) */

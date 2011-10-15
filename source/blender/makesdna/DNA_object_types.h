@@ -321,6 +321,9 @@ typedef struct DupliObject {
 /* 23 and 24 are for life and sector (old file compat.) */
 #define	OB_ARMATURE		25
 
+/* check if the object type supports materials */
+#define OB_TYPE_SUPPORT_MATERIAL(_type) ((_type)  >= OB_MESH && (_type) <= OB_MBALL)
+
 /* partype: first 4 bits: type */
 #define PARTYPE			15
 #define PAROBJECT		0
@@ -409,14 +412,14 @@ typedef struct DupliObject {
 #define OB_EMPTY_IMAGE	8
 
 /* boundtype */
-#define OB_BOUND_BOX		0
-#define OB_BOUND_SPHERE		1
-#define OB_BOUND_CYLINDER	2
-#define OB_BOUND_CONE		3
-#define OB_BOUND_POLYH		4
-#define OB_BOUND_POLYT		5
+#define OB_BOUND_BOX           0
+#define OB_BOUND_SPHERE        1
+#define OB_BOUND_CYLINDER      2
+#define OB_BOUND_CONE          3
+#define OB_BOUND_TRIANGLE_MESH 4
+#define OB_BOUND_CONVEX_HULL   5
 /* #define OB_BOUND_DYN_MESH   6 */ /*UNUSED*/
-#define OB_BOUND_CAPSULE	7
+#define OB_BOUND_CAPSULE       7
 
 
 /* **************** BASE ********************* */

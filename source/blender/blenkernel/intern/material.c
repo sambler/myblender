@@ -1,7 +1,4 @@
-
-/*  material.c
- *
- * 
+/*
  * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
@@ -193,7 +190,7 @@ void init_material(Material *ma)
 	ma->vol.ms_diff = 1.f;
 	ma->vol.ms_intensity = 1.f;
 	
-	ma->game.flag=0;
+	ma->game.flag = GEMAT_BACKCULL;
 	ma->game.alpha_blend=0;
 	ma->game.face_orientation=0;
 	
@@ -723,6 +720,48 @@ void test_object_materials(ID *id)
 	}
 }
 
+void assign_material_id(ID *id, Material *ma, short act)
+{
+	Material *mao, **matar, ***matarar;
+	short *totcolp;
+
+	if(act>MAXMAT) return;
+	if(act<1) act= 1;
+
+	/* prevent crashing when using accidentally */
+	BLI_assert(id->lib == NULL);
+	if(id->lib) return;
+
+	/* test arraylens */
+
+	totcolp= give_totcolp_id(id);
+	matarar= give_matarar_id(id);
+
+	if(totcolp==NULL || matarar==NULL) return;
+
+	if(act > *totcolp) {
+		matar= MEM_callocN(sizeof(void *)*act, "matarray1");
+
+		if(*totcolp) {
+			memcpy(matar, *matarar, sizeof(void *)*(*totcolp));
+			MEM_freeN(*matarar);
+		}
+
+		*matarar= matar;
+		*totcolp= act;
+	}
+
+	/* in data */
+	mao= (*matarar)[act-1];
+	if(mao) mao->id.us--;
+	(*matarar)[act-1]= ma;
+
+	if(ma)
+		id_us_plus((ID *)ma);
+
+	test_object_materials(id);
+}
+
 void assign_material(Object *ob, Material *ma, short act)
 {
 	Material *mao, **matar, ***matarar;
@@ -1066,8 +1105,17 @@ int object_remove_material_slot(Object *ob)
 	short *totcolp;
 	short a, actcol;
 	
-	if(ob==NULL || ob->totcol==0) return FALSE;
-	
+	if (ob==NULL || ob->totcol==0) {
+		return FALSE;
+	}
+
+	/* this should never happen and used to crash */
+	if (ob->actcol <= 0) {
+		printf("%s: invalid material index %d, report a bug!\n", __func__, ob->actcol);
+		BLI_assert(0);
+		return FALSE;
+	}
+
 	/* take a mesh/curve/mball as starting point, remove 1 index,
 	 * AND with all objects that share the ob->data
 	 * 
@@ -1080,10 +1128,8 @@ int object_remove_material_slot(Object *ob)
 	if(*matarar==NULL) return FALSE;
 
 	/* we delete the actcol */
-	if(ob->totcol) {
-		mao= (*matarar)[ob->actcol-1];
-		if(mao) mao->id.us--;
-	}
+	mao= (*matarar)[ob->actcol-1];
+	if(mao) mao->id.us--;
 	
 	for(a=ob->actcol; a<ob->totcol; a++)
 		(*matarar)[a-1]= (*matarar)[a];
@@ -1283,7 +1329,7 @@ void ramp_blend(int type, float *r, float *g, float *b, float fac, const float c
 					*g=1.0f;
 				else
 					*g = tmp;
-			        	
+
 					tmp = facm + fac*col[2];
 					if(tmp <= 0.0f)
 					*b = 0.0f;
@@ -1772,7 +1818,7 @@ int do_version_tface(Main *main, int fileload)
 	int flag;
 	int index;
 
- 	/* sometimes mesh has no materials but will need a new one. In those
+	/* sometimes mesh has no materials but will need a new one. In those
 	 * cases we need to ignore the mf->mat_nr and only look at the face
 	 * mode because it can be zero as uninitialized or the 1st created material
 	 */
@@ -1953,6 +1999,11 @@ int do_version_tface(Main *main, int fileload)
 				}
 			}
 		}
+		/* material is not used by faces with texface
+		 * set the default flag - do it only once */
+		else
+			 if (fileload)
+					ma->game.flag = GEMAT_BACKCULL;
 	}
 
 	return nowarning;

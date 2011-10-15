@@ -19,7 +19,6 @@
 # <pep8 compliant>
 import bpy
 from bpy.types import Menu, Panel
-from blf import gettext as _
 
 
 class View3DPanel():
@@ -32,33 +31,33 @@ class View3DPanel():
 # History/Repeat tools
 def draw_repeat_tools(context, layout):
     col = layout.column(align=True)
-    col.label(text=_("Repeat:"))
+    col.label(text="Repeat:")
     col.operator("screen.repeat_last")
-    col.operator("screen.repeat_history", text=_("History..."))
+    col.operator("screen.repeat_history", text="History...")
 
 
 # Keyframing tools
 def draw_keyframing_tools(context, layout):
     col = layout.column(align=True)
-    col.label(text=_("Keyframes:"))
+    col.label(text="Keyframes:")
     row = col.row()
-    row.operator("anim.keyframe_insert_menu", text=_("Insert"))
-    row.operator("anim.keyframe_delete_v3d", text=_("Remove"))
+    row.operator("anim.keyframe_insert_menu", text="Insert")
+    row.operator("anim.keyframe_delete_v3d", text="Remove")
 
 
 # Grease Pencil tools
 def draw_gpencil_tools(context, layout):
     col = layout.column(align=True)
 
-    col.label(text=_("Grease Pencil:"))
+    col.label(text="Grease Pencil:")
 
     row = col.row()
-    row.operator("gpencil.draw", text=_("Draw")).mode = 'DRAW'
-    row.operator("gpencil.draw", text=_("Line")).mode = 'DRAW_STRAIGHT'
+    row.operator("gpencil.draw", text="Draw").mode = 'DRAW'
+    row.operator("gpencil.draw", text="Line").mode = 'DRAW_STRAIGHT'
 
     row = col.row()
-    row.operator("gpencil.draw", text=_("Poly")).mode = 'DRAW_POLY'
-    row.operator("gpencil.draw", text=_("Erase")).mode = 'ERASER'
+    row.operator("gpencil.draw", text="Poly").mode = 'DRAW_POLY'
+    row.operator("gpencil.draw", text="Erase").mode = 'ERASER'
 
     row = col.row()
     row.prop(context.tool_settings, "use_grease_pencil_sessions")
@@ -74,16 +73,16 @@ class VIEW3D_PT_tools_objectmode(View3DPanel, Panel):
         layout = self.layout
 
         col = layout.column(align=True)
-        col.label(text=_("Transform:"))
+        col.label(text="Transform:")
         col.operator("transform.translate")
         col.operator("transform.rotate")
-        col.operator("transform.resize", text=_("Scale"))
+        col.operator("transform.resize", text="Scale")
 
         col = layout.column(align=True)
-        col.operator("object.origin_set", text=_("Origin"))
+        col.operator("object.origin_set", text="Origin")
 
         col = layout.column(align=True)
-        col.label(text=_("Object:"))
+        col.label(text="Object:")
         col.operator("object.duplicate_move")
         col.operator("object.delete")
         col.operator("object.join")
@@ -92,17 +91,17 @@ class VIEW3D_PT_tools_objectmode(View3DPanel, Panel):
         if active_object and active_object.type == 'MESH':
 
             col = layout.column(align=True)
-            col.label(text=_("Shading:"))
+            col.label(text="Shading:")
             row = col.row(align=True)
-            row.operator("object.shade_smooth", text=_("Smooth"))
-            row.operator("object.shade_flat", text=_("Flat"))
+            row.operator("object.shade_smooth", text="Smooth")
+            row.operator("object.shade_flat", text="Flat")
 
         draw_keyframing_tools(context, layout)
 
         col = layout.column(align=True)
-        col.label(text=_("Motion Paths:"))
-        col.operator("object.paths_calculate", text=_("Calculate Paths"))
-        col.operator("object.paths_clear", text=_("Clear Paths"))
+        col.label(text="Motion Paths:")
+        col.operator("object.paths_calculate", text="Calculate Paths")
+        col.operator("object.paths_clear", text="Clear Paths")
 
         draw_repeat_tools(context, layout)
 
@@ -123,8 +122,8 @@ class VIEW3D_PT_tools_meshedit(View3DPanel, Panel):
         col.operator("transform.translate")
         col.operator("transform.rotate")
         col.operator("transform.resize", text="Scale")
-        col.operator("transform.shrink_fatten", text=_("Shrink/Fatten"))
-        col.operator("transform.push_pull", text=_("Push/Pull"))
+        col.operator("transform.shrink_fatten", text="Shrink/Fatten")
+        col.operator("transform.push_pull", text="Push/Pull")
 
         col = layout.column(align=True)
         col.label(text="Deform:")
@@ -485,16 +484,18 @@ class VIEW3D_PT_tools_brush(PaintPanel, Panel):
 
         # XXX This needs a check if psys is editable.
         if context.particle_edit_object:
+            tool = settings.tool
+
             # XXX Select Particle System
             layout.column().prop(settings, "tool", expand=True)
 
-            if settings.tool != 'NONE':
+            if tool != 'NONE':
                 col = layout.column()
                 col.prop(brush, "size", slider=True)
-                if settings.tool != 'ADD':
+                if tool != 'ADD':
                     col.prop(brush, "strength", slider=True)
 
-            if settings.tool == 'ADD':
+            if tool == 'ADD':
                 col.prop(brush, "count")
                 col = layout.column()
                 col.prop(settings, "use_default_interpolate")
@@ -502,15 +503,16 @@ class VIEW3D_PT_tools_brush(PaintPanel, Panel):
                 sub.active = settings.use_default_interpolate
                 sub.prop(brush, "steps", slider=True)
                 sub.prop(settings, "default_key_count", slider=True)
-            elif settings.tool == 'LENGTH':
+            elif tool == 'LENGTH':
                 layout.prop(brush, "length_mode", expand=True)
-            elif settings.tool == 'PUFF':
+            elif tool == 'PUFF':
                 layout.prop(brush, "puff_mode", expand=True)
                 layout.prop(brush, "use_puff_volume")
 
         # Sculpt Mode #
 
         elif context.sculpt_object and brush:
+            tool = brush.sculpt_tool
 
             col = layout.column()
 
@@ -527,12 +529,12 @@ class VIEW3D_PT_tools_brush(PaintPanel, Panel):
 
             row.prop(brush, "use_pressure_size", toggle=True, text="")
 
-            if brush.sculpt_tool not in {'SNAKE_HOOK', 'GRAB', 'ROTATE'}:
+            if tool not in {'SNAKE_HOOK', 'GRAB', 'ROTATE'}:
                 col.separator()
 
                 row = col.row(align=True)
 
-                if brush.use_space and brush.sculpt_tool not in {'SMOOTH'}:
+                if brush.use_space and tool != 'SMOOTH':
                     if brush.use_space_atten:
                         row.prop(brush, "use_space_atten", toggle=True, text="", icon='LOCKED')
                     else:
@@ -541,26 +543,26 @@ class VIEW3D_PT_tools_brush(PaintPanel, Panel):
                 row.prop(brush, "strength", text="Strength", slider=True)
                 row.prop(brush, "use_pressure_strength", text="")
 
-            if brush.sculpt_tool not in {'SMOOTH'}:
+            if tool != 'SMOOTH':
                 col.separator()
 
                 row = col.row(align=True)
                 row.prop(brush, "auto_smooth_factor", slider=True)
                 row.prop(brush, "use_inverse_smooth_pressure", toggle=True, text="")
 
-            if brush.sculpt_tool in {'GRAB', 'SNAKE_HOOK'}:
+            if tool in {'GRAB', 'SNAKE_HOOK'}:
                 col.separator()
 
                 row = col.row(align=True)
                 row.prop(brush, "normal_weight", slider=True)
 
-            if brush.sculpt_tool in {'CREASE', 'BLOB'}:
+            if tool in {'CREASE', 'BLOB'}:
                 col.separator()
 
                 row = col.row(align=True)
                 row.prop(brush, "crease_pinch_factor", slider=True, text="Pinch")
 
-            if brush.sculpt_tool not in {'PINCH', 'INFLATE', 'SMOOTH'}:
+            if tool not in {'PINCH', 'INFLATE', 'SMOOTH'}:
                 row = col.row(align=True)
 
                 col.separator()
@@ -572,8 +574,8 @@ class VIEW3D_PT_tools_brush(PaintPanel, Panel):
 
                 row.prop(brush, "sculpt_plane", text="")
 
-            #if brush.sculpt_tool in {'CLAY', 'CLAY_TUBES', 'FLATTEN', 'FILL', 'SCRAPE'}:
-            if brush.sculpt_tool in {'CLAY', 'FLATTEN', 'FILL', 'SCRAPE'}:
+            #if tool in {'CLAY', 'CLAY_TUBES', 'FLATTEN', 'FILL', 'SCRAPE'}:
+            if tool in {'CLAY', 'FLATTEN', 'FILL', 'SCRAPE'}:
                 row = col.row(align=True)
                 row.prop(brush, "plane_offset", slider=True)
                 row.prop(brush, "use_offset_pressure", text="")
@@ -586,7 +588,7 @@ class VIEW3D_PT_tools_brush(PaintPanel, Panel):
                 row.active = brush.use_plane_trim
                 row.prop(brush, "plane_trim", slider=True, text="Distance")
 
-            if brush.sculpt_tool == 'LAYER':
+            if tool == 'LAYER':
                 row = col.row()
                 row.prop(brush, "height", slider=True, text="Height")
 
@@ -598,12 +600,12 @@ class VIEW3D_PT_tools_brush(PaintPanel, Panel):
             col.separator()
             col.row().prop(brush, "direction", expand=True)
 
-            if brush.sculpt_tool in {'DRAW', 'CREASE', 'BLOB', 'INFLATE', 'LAYER', 'CLAY'}:
+            if tool in {'DRAW', 'CREASE', 'BLOB', 'INFLATE', 'LAYER', 'CLAY'}:
                 col.separator()
 
                 col.prop(brush, "use_accumulate")
 
-            if brush.sculpt_tool == 'LAYER':
+            if tool == 'LAYER':
                 col.separator()
 
                 ob = context.sculpt_object
@@ -1017,7 +1019,7 @@ class VIEW3D_PT_tools_brush_appearance(PaintPanel, Panel):
         brush = settings.brush
 
         if brush is None:  # unlikely but can happen
-            layout.label(text=_("Brush Unset"))
+            layout.label(text="Brush Unset")
             return
 
         col = layout.column()

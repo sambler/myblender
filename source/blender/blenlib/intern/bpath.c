@@ -400,7 +400,7 @@ static void seq_setpath(struct BPathIterator *bpi, const char *path)
 
 	if (SEQ_HAS_PATH(seq)) {
 		if (ELEM3(seq->type, SEQ_IMAGE, SEQ_MOVIE, SEQ_SOUND)) {
-			BLI_split_dirfile(path, seq->strip->dir, seq->strip->stripdata->name);
+			BLI_split_dirfile(path, seq->strip->dir, seq->strip->stripdata->name, sizeof(seq->strip->dir), sizeof(seq->strip->stripdata->name));
 		}
 		else {
 			/* simple case */
@@ -644,7 +644,8 @@ void BLI_bpathIterator_step(struct BPathIterator *bpi)
 	}
 }
 
-int BLI_bpathIterator_isDone( struct BPathIterator *bpi) {
+int BLI_bpathIterator_isDone( struct BPathIterator *bpi)
+{
 	return bpi->type==BPATH_DONE;
 }
 
@@ -699,7 +700,8 @@ static void bpath_as_report(struct BPathIterator *bpi, const char *message, Repo
 }
 
 /* high level function */
-void checkMissingFiles(Main *bmain, ReportList *reports) {
+void checkMissingFiles(Main *bmain, ReportList *reports)
+{
 	struct BPathIterator *bpi;
 
 	/* be sure there is low chance of the path being too short */
@@ -718,7 +720,8 @@ void checkMissingFiles(Main *bmain, ReportList *reports) {
 }
 
 /* dont log any errors at the moment, should probably do this */
-void makeFilesRelative(Main *bmain, const char *basedir, ReportList *reports) {
+void makeFilesRelative(Main *bmain, const char *basedir, ReportList *reports)
+{
 	int tot= 0, changed= 0, failed= 0, linked= 0;
 	struct BPathIterator *bpi;
 	char filepath[FILE_MAX];
@@ -886,7 +889,8 @@ static int findFileRecursive(char *filename_new, const char *dirname, const char
 }
 
 /* high level function - call from fileselector */
-void findMissingFiles(Main *bmain, const char *str) {
+void findMissingFiles(Main *bmain, const char *str)
+{
 	struct BPathIterator *bpi;
 
 	/* be sure there is low chance of the path being too short */
@@ -899,7 +903,7 @@ void findMissingFiles(Main *bmain, const char *str) {
 
 	//XXX waitcursor( 1 );
 
-	BLI_split_dirfile(str, dirname, NULL);
+	BLI_split_dirfile(str, dirname, NULL, sizeof(dirname), 0);
 
 	BLI_bpathIterator_init(&bpi, bmain, bmain->name, 0);
 

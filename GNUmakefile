@@ -130,6 +130,10 @@ help:
 	@echo "  * package_pacman  - build an arch linux pacmanpackage"
 	@echo "  * package_archive - build an archive package"
 	@echo ""
+	@echo "Other Targets"
+	@echo "  * translations  - update blenders translation files in po/"
+	# TODO, doxygen and sphinx docs
+	@echo ""
 	@echo "Testing Targets (not assosiated with building blender)"
 	@echo "  * test            - run ctest, currently tests import/export, operator execution and that python modules load"
 	@echo "  * test_cmake      - runs our own cmake file checker which detects errors in the cmake file list definitions"
@@ -140,6 +144,9 @@ help:
 	@echo "  * check_cppcheck  - run blender source through cppcheck (C & C++)"
 	@echo "  * check_splint    - run blenders source through splint (C only)"
 	@echo "  * check_sparse    - run blenders source through sparse (C only)"
+	@echo ""
+	@echo "Documentation Targets"
+	@echo "  * doc_py   - generate sphinx python api docs"
 	@echo ""
 
 # -----------------------------------------------------------------------------
@@ -154,6 +161,16 @@ package_pacman:
 package_archive:
 	make -C $(BUILD_DIR) -s package_archive
 	@echo archive in "$(BUILD_DIR)/release"
+
+
+# -----------------------------------------------------------------------------
+# Other Targets
+#
+translations:
+	$(BUILD_DIR)/bin/blender --background --factory-startup --python po/update_msg.py
+	python3 po/update_pot.py
+	python3 po/update_po.py
+	python3 po/update_mo.py
 
 
 # -----------------------------------------------------------------------------
@@ -206,6 +223,17 @@ check_splint:
 check_sparse:
 	$(CMAKE_CONFIG)
 	cd $(BUILD_DIR) ; python3 $(BLENDER_DIR)/build_files/cmake/cmake_static_check_sparse.py
+
+
+# -----------------------------------------------------------------------------
+# Documentation
+#
+
+# Simple version of ./doc/python_api/sphinx_doc_gen.sh with no PDF generation.
+doc_py:
+	$(BUILD_DIR)/bin/blender --background --factory-startup --python doc/python_api/sphinx_doc_gen.py
+	cd doc/python_api ; sphinx-build -n -b html sphinx-in sphinx-out
+	@echo "docs written into: '$(BLENDER_DIR)/doc/python_api/sphinx-out/contents.html'"
 
 
 clean:

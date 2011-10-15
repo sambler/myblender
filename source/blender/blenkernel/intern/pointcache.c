@@ -910,7 +910,7 @@ static int ptcache_path(PTCacheID *pid, char *filename)
 	else if (G.relbase_valid || lib) {
 		char file[MAX_PTCACHE_PATH]; /* we dont want the dir, only the file */
 
-		BLI_split_dirfile(blendfilename, NULL, file);
+		BLI_split_dirfile(blendfilename, NULL, file, 0, sizeof(file));
 		i = strlen(file);
 		
 		/* remove .blend */
@@ -2544,7 +2544,8 @@ static void ptcache_dt_to_str(char *str, double dtime)
 		sprintf(str, "%is", ((int)dtime) % 60);
 }
 
-static void *ptcache_bake_thread(void *ptr) {
+static void *ptcache_bake_thread(void *ptr)
+{
 	int usetimer = 0, sfra, efra;
 	double stime, ptime, ctime, fetd;
 	char run[32], cur[32], etd[32];

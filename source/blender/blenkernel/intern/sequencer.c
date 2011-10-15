@@ -1,5 +1,5 @@
 /*
-* $Id$
+ * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -2852,7 +2852,8 @@ void update_changed_seq_and_deps(Scene *scene, Sequence *changed_seq, int len_ch
  left and right are the bounds at which the sequence is rendered,
 start and end are from the start and fixed length of the sequence.
 */
-int seq_tx_get_start(Sequence *seq) {
+int seq_tx_get_start(Sequence *seq)
+{
 	return seq->start;
 }
 int seq_tx_get_end(Sequence *seq)
@@ -3646,14 +3647,14 @@ Sequence *sequencer_add_sound_strip(bContext *C, ListBase *seqbasep, SeqLoadInfo
 	/* we only need 1 element to store the filename */
 	strip->stripdata= se= MEM_callocN(sizeof(StripElem), "stripelem");
 
-	BLI_split_dirfile(seq_load->path, strip->dir, se->name);
+	BLI_split_dirfile(seq_load->path, strip->dir, se->name, sizeof(strip->dir), sizeof(se->name));
 
 	seq->scene_sound = sound_add_scene_sound(scene, seq, seq_load->start_frame, seq_load->start_frame + strip->len, 0);
 
 	calc_sequence_disp(scene, seq);
 
 	/* last active name */
-	strncpy(ed->act_sounddir, strip->dir, FILE_MAXDIR-1);
+	BLI_strncpy(ed->act_sounddir, strip->dir, FILE_MAXDIR);
 
 	seq_load_apply(scene, seq, seq_load);
 
@@ -3705,7 +3706,7 @@ Sequence *sequencer_add_movie_strip(bContext *C, ListBase *seqbasep, SeqLoadInfo
 	/* we only need 1 element for MOVIE strips */
 	strip->stripdata= se= MEM_callocN(sizeof(StripElem), "stripelem");
 
-	BLI_split_dirfile(seq_load->path, strip->dir, se->name);
+	BLI_split_dirfile(seq_load->path, strip->dir, se->name, sizeof(strip->dir), sizeof(se->name));
 
 	calc_sequence_disp(scene, seq);
 

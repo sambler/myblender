@@ -343,7 +343,7 @@ def buildinfo(lenv, build_type):
     build_time = time.strftime ("%H:%M:%S")
     build_rev = os.popen('svnversion').read()[:-1] # remove \n
     if build_rev == '': 
-        build_rev = '41023'
+        build_rev = '41060'
     if lenv['BF_DEBUG']:
         build_type = "Debug"
         build_cflags = ' '.join(lenv['CFLAGS'] + lenv['CCFLAGS'] + lenv['BF_DEBUG_CCFLAGS'] + lenv['CPPFLAGS'])
@@ -592,7 +592,9 @@ def AppIt(target=None, source=None, env=None):
         commands.getoutput(cmd)
         cmd = 'install_name_tool -change %s/lib/libgcc_s.1.dylib  @executable_path/lib/libgcc_s.1.dylib %s/%s.app/Contents/MacOS/%s'%(instname, installdir, binary, binary)
         commands.getoutput(cmd)
-        cmd = 'cp -R %s/source/darwin/set_simulation_threads.app %s/'%(bldroot, installdir) # the omp_num_threads applescript
+        cmd = 'rm -rf  %s/set_simulation_threads.app'%(installdir) # first clear omp_num_threads applescript
+        commands.getoutput(cmd)
+        cmd = 'cp -R %s/source/darwin/set_simulation_threads.app %s/'%(bldroot, installdir) # copy the omp_num_threads applescript
         commands.getoutput(cmd)
 
 # extract copy system python, be sure to update other build systems

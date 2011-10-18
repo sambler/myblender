@@ -40,6 +40,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 void  BLI_recurdir_fileops(const char *dirname);

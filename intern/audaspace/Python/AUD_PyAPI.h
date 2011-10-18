@@ -36,6 +36,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #else
 typedef void AUD_IFactory;
 typedef void AUD_IDevice;

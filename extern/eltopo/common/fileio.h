@@ -4,6 +4,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 extern const unsigned int NUM_RAYTRACER_BOOLEAN_PARAMETERS;
@@ -129,7 +130,3 @@ void free_marker_particle_data( float* x );
 #endif
 
 #endif
-
-
-
-

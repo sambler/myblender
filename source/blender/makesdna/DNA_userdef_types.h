@@ -41,6 +41,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 /* themes; defines in BIF_resource.h */

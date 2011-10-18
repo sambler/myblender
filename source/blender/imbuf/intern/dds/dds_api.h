@@ -32,6 +32,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 int  	      imb_save_dds(struct ImBuf *ibuf, const char *name, int flags);

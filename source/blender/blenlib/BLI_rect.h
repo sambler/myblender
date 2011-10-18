@@ -40,6 +40,7 @@ struct rcti;
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 /* BLI_rct.c */

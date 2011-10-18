@@ -34,6 +34,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 #include "DNA_windowmanager_types.h"

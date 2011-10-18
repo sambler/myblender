@@ -35,10 +35,11 @@
 #ifndef RE_RAYCOUNTER_H
 #define RE_RAYCOUNTER_H
 
-//#define RE_RAYCOUNTER			/* enable counters per ray, usefull for measuring raytrace structures performance */
+//#define RE_RAYCOUNTER			/* enable counters per ray, useful for measuring raytrace structures performance */
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 #ifdef RE_RAYCOUNTER

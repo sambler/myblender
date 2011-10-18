@@ -31,6 +31,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 	
 struct MEM_CacheLimiter_s;

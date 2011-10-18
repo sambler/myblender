@@ -37,7 +37,8 @@
 #include "GHOST_Types.h"
 
 #ifdef __cplusplus
-extern "C" { 
+extern "C" {
+//} for code folding
 #endif
 
 /**

@@ -57,6 +57,7 @@ struct ReportList;
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 void BPY_pyconstraint_exec(struct bPythonConstraint *con, struct bConstraintOb *cob, struct ListBase *targets);

@@ -39,7 +39,8 @@
 #define PIL_TIME_H
 
 #ifdef __cplusplus
-extern "C" { 
+extern "C" {
+//} for code folding
 #endif
 
 extern 

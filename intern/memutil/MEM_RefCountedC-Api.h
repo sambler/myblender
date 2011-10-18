@@ -46,6 +46,7 @@ typedef MEM_TObjectPtr MEM_TRefCountedObjectPtr;
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 

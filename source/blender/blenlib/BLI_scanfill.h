@@ -48,6 +48,7 @@ struct EditVert;
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 /* scanfill.c: used in displist only... */

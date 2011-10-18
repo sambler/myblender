@@ -39,6 +39,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 #ifdef RE_RAYCOUNTER

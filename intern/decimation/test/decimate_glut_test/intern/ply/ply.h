@@ -63,6 +63,7 @@ WARRANTY OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 #include <stdio.h>

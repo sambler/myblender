@@ -38,6 +38,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 /* these lines are grep'd, watch out for our not-so-awesome regex

@@ -54,6 +54,7 @@ struct Scene;
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 struct EditMesh *BKE_mesh_get_editmesh(struct Mesh *me);

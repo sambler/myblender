@@ -47,6 +47,7 @@ struct Mesh;
 /* Kernel prototypes */
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 void free_key(struct Key *sc); 

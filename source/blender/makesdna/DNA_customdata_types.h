@@ -36,6 +36,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 /** descriptor and storage for a custom data layer */

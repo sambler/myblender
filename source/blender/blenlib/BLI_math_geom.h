@@ -34,6 +34,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 #include "BLI_math_inline.h"

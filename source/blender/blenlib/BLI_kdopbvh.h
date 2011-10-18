@@ -38,7 +38,8 @@
  */
 
 #ifdef __cplusplus
-extern "C" { 
+extern "C" {
+//} for code folding
 #endif
 
 #include <float.h>

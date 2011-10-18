@@ -40,6 +40,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 void BLI_insertlink(struct ListBase *listbase, void *vprevlink, void *vnewlink);

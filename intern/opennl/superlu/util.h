@@ -224,6 +224,7 @@ typedef struct {
  ***********************************************************************/
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 extern void    Destroy_SuperMatrix_Store(SuperMatrix *);

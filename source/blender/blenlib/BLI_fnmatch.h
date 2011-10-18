@@ -26,6 +26,7 @@ Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.  */
 
 #ifdef	__cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 #if defined (__cplusplus) || (defined (__STDC__) && __STDC__)

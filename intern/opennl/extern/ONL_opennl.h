@@ -51,6 +51,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 #define NL_VERSION_0_0 1

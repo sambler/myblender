@@ -34,6 +34,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 /* add platform/compiler checks here if it is not supported */

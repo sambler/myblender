@@ -51,6 +51,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+//} for codefolding
 #endif
 
 	struct netscape_plugin_Plugin;

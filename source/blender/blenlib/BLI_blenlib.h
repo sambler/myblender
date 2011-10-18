@@ -68,6 +68,7 @@ extern char btempdir[]; /* creator.c temp dir used instead of U.tempdir, set wit
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 #include "BLI_listbase.h"

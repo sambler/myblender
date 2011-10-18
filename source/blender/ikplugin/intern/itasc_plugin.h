@@ -39,6 +39,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 void itasc_initialize_tree(struct Scene *scene, struct Object *ob, float ctime);

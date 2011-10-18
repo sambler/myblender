@@ -34,6 +34,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 #define RAD2DEG(_rad) ((_rad)*(180.0/M_PI))

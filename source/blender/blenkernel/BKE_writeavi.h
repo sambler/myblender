@@ -36,6 +36,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 /* generic blender movie support, could move to own module */

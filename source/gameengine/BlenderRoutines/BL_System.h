@@ -38,6 +38,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 /* Game Engine command line parameters */

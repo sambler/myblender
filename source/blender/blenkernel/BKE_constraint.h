@@ -44,6 +44,7 @@ struct bPoseChannel;
 /* ---------------------------------------------------------------------------- */
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 /* special struct for use in constraint evaluation */

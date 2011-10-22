@@ -79,6 +79,10 @@
 #include "wm_event_types.h"
 #include "wm_draw.h"
 
+#ifndef NDEBUG
+#  include "RNA_enum_types.h"
+#endif
+
 static int wm_operator_call_internal(bContext *C, wmOperatorType *ot, PointerRNA *properties, ReportList *reports, short context, short poll_only);
 
 /* ************ event management ************** */
@@ -434,6 +438,35 @@ static void wm_operator_print(bContext *C, wmOperator *op)
 	printf("%s\n", buf);
 	MEM_freeN(buf);
 }
+
+/* for debugging only, getting inspecting events manually is tedious */
+#ifndef NDEBUG
+
+void WM_event_print(wmEvent *event)
+{
+	if(event) {
+		const char *unknown= "UNKNOWN";
+		const char *type_id= unknown;
+		const char *val_id= unknown;
+
+		RNA_enum_identifier(event_type_items, event->type, &type_id);
+		RNA_enum_identifier(event_value_items, event->val, &val_id);
+
+		printf("wmEvent - type:%d/%s, val:%d/%s, "
+			   "shift:%d, ctrl:%d, alt:%d, oskey:%d, keymodifier:%d, "
+			   "mouse:(%d,%d), ascii:'%c', utf8:'%.6s', "
+			   "keymap_idname:%s, pointer:%p\n",
+			   event->type, type_id, event->val, val_id,
+			   event->shift, event->ctrl, event->alt, event->oskey, event->keymodifier,
+			   event->x, event->y, event->ascii, event->utf8_buf,
+			   event->keymap_idname, (void *)event);
+	}
+	else {
+		printf("wmEvent - NULL\n");
+	}
+}
+
+#endif /* NDEBUG */
 
 static void wm_operator_reports(bContext *C, wmOperator *op, int retval, int popup)
 {
@@ -1146,7 +1179,7 @@ static int wm_eventmatch(wmEvent *winevent, wmKeyMapItem *kmi)
 
 	/* the matching rules */
 	if(kmitype==KM_TEXTINPUT)
-		if(ISTEXTINPUT(winevent->type) && winevent->ascii) return 1;
+		if(ISTEXTINPUT(winevent->type) && (winevent->ascii || winevent->utf8_buf[0])) return 1;
 	if(kmitype!=KM_ANY)
 		if(winevent->type!=kmitype) return 0;
 	
@@ -2578,7 +2611,7 @@ void wm_event_add_ghostevent(wmWindowManager *wm, wmWindow *win, int type, int U
 			GHOST_TEventKeyData *kd= customdata;
 			event.type= convert_key(kd->key);
 			event.ascii= kd->ascii;
-			strcpy(event.utf8_buf, kd->utf8_buf);
+			memcpy(event.utf8_buf, kd->utf8_buf,sizeof(event.utf8_buf));/* might be not null terminated*/
 			event.val= (type==GHOST_kEventKeyDown)?KM_PRESS:KM_RELEASE;
 			
 			/* exclude arrow keys, esc, etc from text input */
@@ -2696,4 +2729,8 @@ void wm_event_add_ghostevent(wmWindowManager *wm, wmWindow *win, int type, int U
 		}
 
 	}
+
+	/* Handy when debugging checking events */
+	/* WM_event_print(&event); */
+
 }

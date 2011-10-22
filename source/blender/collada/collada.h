@@ -34,6 +34,7 @@ struct Scene;
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 	/*
 	 * both return 1 on success, 0 on error

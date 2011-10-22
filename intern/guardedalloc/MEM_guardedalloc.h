@@ -74,6 +74,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 	/** Returns the length of the allocated memory segment pointed at

@@ -41,6 +41,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 	/* A reasonable standard buffer size, big

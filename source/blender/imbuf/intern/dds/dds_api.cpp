@@ -35,6 +35,7 @@
 #include <fstream>
 
 extern "C" {
+//} for code folding
 
 #include "imbuf.h"
 #include "IMB_imbuf_types.h"

@@ -3112,7 +3112,7 @@ static void direct_link_pointcache(FileData *fd, PointCache *cache)
 				pm->data[i] = newdataadr(fd, pm->data[i]);
 				
 				/* the cache saves non-struct data without DNA */
-				if(pm->data[i] && strcmp(ptcache_data_struct[i], "")==0 && (fd->flags & FD_FLAGS_SWITCH_ENDIAN)) {
+				if(pm->data[i] && ptcache_data_struct[i][0]=='\0' && (fd->flags & FD_FLAGS_SWITCH_ENDIAN)) {
 					int j, tot= (BKE_ptcache_data_size (i) * pm->totpoint)/4; /* data_size returns bytes */
 					int *poin= pm->data[i];
 					
@@ -8661,7 +8661,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 		
 		for (wo = main->world.first; wo; wo= wo->id.next) {
 			/* Migrate to Bullet for games, except for the NaN versions */
-			/* People can still explicitely choose for Sumo (after 2.42 is out) */
+			/* People can still explicitly choose for Sumo (after 2.42 is out) */
 			if(main->versionfile > 225)
 				wo->physicsEngine = WOPHY_BULLET;
 			if(WO_AODIST == wo->aomode)
@@ -9275,7 +9275,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 							simasel->prv_h = 96;
 							simasel->prv_w = 96;
 							simasel->flag = 7; /* ??? elubie */
-							strcpy (simasel->dir,  U.textudir);	/* TON */
+							BLI_strncpy (simasel->dir,  U.textudir, sizeof(simasel->dir)); /* TON */
 							simasel->file[0]= '\0';
 							
 							simasel->returnfunc     =  NULL;
@@ -9498,7 +9498,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 								ct= MEM_callocN(sizeof(bConstraintTarget), "PyConTarget");
 								
 								ct->tar = data->tar;
-								strcpy(ct->subtarget, data->subtarget);
+								BLI_strncpy(ct->subtarget, data->subtarget, sizeof(ct->subtarget));
 								ct->space = con->tarspace;
 								
 								BLI_addtail(&data->targets, ct);
@@ -9528,7 +9528,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 						ct= MEM_callocN(sizeof(bConstraintTarget), "PyConTarget");
 						
 						ct->tar = data->tar;
-						strcpy(ct->subtarget, data->subtarget);
+						BLI_strncpy(ct->subtarget, data->subtarget, sizeof(ct->subtarget));
 						ct->space = con->tarspace;
 						
 						BLI_addtail(&data->targets, ct);
@@ -10215,8 +10215,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 		{
 			if(scene->ed && scene->ed->seqbasep)
 			{
-				for(seq = scene->ed->seqbasep->first; seq; seq = seq->next)
-				{
+				SEQ_BEGIN(scene->ed, seq) {
 					if(seq->type == SEQ_HD_SOUND)
 					{
 						char str[FILE_MAX];
@@ -10236,6 +10235,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 							 seq->strip->dir);
 					}
 				}
+				SEQ_END
 			}
 		}
 
@@ -12008,8 +12008,8 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 						aa->flag = ia->flag;
 						aa->sta = ia->sta;
 						aa->end = ia->end;
-						strcpy(aa->name, ia->name);
-						strcpy(aa->frameProp, ia->frameProp);
+						BLI_strncpy(aa->name, ia->name, sizeof(aa->name));
+						BLI_strncpy(aa->frameProp, ia->frameProp, sizeof(aa->frameProp));
 						if (ob->adt)
 							aa->act = ob->adt->action;
 
@@ -12175,6 +12175,20 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 
 			for (ntree=main->nodetree.first; ntree; ntree=ntree->id.next)
 				do_versions_nodetree_image_default_alpha_output(ntree);
+		}
+
+		{
+			/* support old particle dupliobject rotation settings */
+			ParticleSettings *part;
+
+			for (part=main->particle.first; part; part=part->id.next) {
+				if(ELEM(part->ren_as, PART_DRAW_OB, PART_DRAW_GR)) {
+					part->draw |= PART_DRAW_ROTATE_OB;
+
+					if(part->rotmode == 0)
+						part->rotmode = PART_ROT_VEL;
+				}
+			}
 		}
 	}
 
@@ -13289,7 +13303,7 @@ static void give_base_to_objects(Main *mainvar, Scene *sce, Library *lib, const 
 		if( ob->id.flag & LIB_INDIRECT ) {
 			
 				/* IF below is quite confusing!
-				if we are appending, but this object wasnt just added allong with a group,
+				if we are appending, but this object wasnt just added along with a group,
 				then this is already used indirectly in the scene somewhere else and we didnt just append it.
 				
 				(ob->id.flag & LIB_PRE_EXISTING)==0 means that this is a newly appended object - Campbell */
@@ -13637,8 +13651,8 @@ static void read_libraries(FileData *basefd, ListBase *mainlist)
 							printf("  enter a new path:\n");
 
 							if(scanf("%s", newlib_path) > 0) {
-								strcpy(mainptr->curlib->name, newlib_path);
-								strcpy(mainptr->curlib->filepath, newlib_path);
+								BLI_strncpy(mainptr->curlib->name, newlib_path, sizeof(mainptr->curlib->name));
+								BLI_strncpy(mainptr->curlib->filepath, newlib_path, sizeof(mainptr->curlib->filepath));
 								cleanup_path(G.main->name, mainptr->curlib->filepath);
 								
 								fd= blo_openblenderfile(mainptr->curlib->filepath, basefd->reports);
@@ -13754,7 +13768,7 @@ static void read_libraries(FileData *basefd, ListBase *mainlist)
 
 /* reading runtime */
 
-BlendFileData *blo_read_blendafterruntime(int file, char *name, int actualsize, ReportList *reports)
+BlendFileData *blo_read_blendafterruntime(int file, const char *name, int actualsize, ReportList *reports)
 {
 	BlendFileData *bfd = NULL;
 	FileData *fd = filedata_new();

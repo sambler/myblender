@@ -79,6 +79,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 #define _USE_MATH_DEFINES

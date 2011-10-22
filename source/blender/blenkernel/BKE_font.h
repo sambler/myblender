@@ -35,6 +35,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 #include <wchar.h>
@@ -84,11 +85,6 @@ struct TmpFont *vfont_find_tmpfont(struct VFont *vfont);
 struct chartrans *BKE_text_to_curve(struct Main *bmain, struct Scene *scene, struct Object *ob, int mode);
 
 int BKE_font_getselection(struct Object *ob, int *start, int *end);
-
-size_t chtoutf8(const unsigned long c, char o[4]);
-void wcs2utf8s(char *dst, const wchar_t *src);
-size_t wcsleninu8(wchar_t *src);
-size_t utf8towchar(wchar_t *w, const char *c);
 
 #ifdef __cplusplus
 }

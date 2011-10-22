@@ -35,6 +35,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 struct bContext;
@@ -341,8 +342,8 @@ typedef struct wmEvent {
 	short val;			/* press, release, scrollvalue */
 	int x, y;			/* mouse pointer position, screen coord */
 	int mval[2];		/* region mouse position, name convention pre 2.5 :) */
-	short unicode;		/* future, ghost? */
-	char ascii;			/* from ghost */
+	char utf8_buf[6];	/* from, ghost if utf8 is enabled for the platform */
+	char ascii;			/* from ghost, fallback if utf8 isnt set */
 	char pad;
 
 	/* previous state */

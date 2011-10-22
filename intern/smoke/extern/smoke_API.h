@@ -35,6 +35,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 struct FLUID_3D;

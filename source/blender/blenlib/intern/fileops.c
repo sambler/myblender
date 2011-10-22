@@ -195,10 +195,6 @@ int BLI_touch(const char *file)
 	return 0;
 }
 
-int BLI_exists(const char *file) {
-	return BLI_exist(file);
-}
-
 #ifdef WIN32
 
 static char str[MAXPATHLEN+12];
@@ -227,7 +223,7 @@ int BLI_move(const char *file, const char *to) {
 	// it has to be 'mv filename filename' and not
 	// 'mv filename destdir'
 
-	strcpy(str, to);
+	BLI_strncpy(str, to, sizeof(str));
 	// points 'to' to a directory ?
 	if (BLI_last_slash(str) == (str + strlen(str) - 1)) {
 		if (BLI_last_slash(file) != NULL) {
@@ -252,7 +248,7 @@ int BLI_copy_fileops(const char *file, const char *to) {
 	// it has to be 'cp filename filename' and not
 	// 'cp filename destdir'
 
-	strcpy(str, to);
+	BLI_strncpy(str, to, sizeof(str));
 	// points 'to' to a directory ?
 	if (BLI_last_slash(str) == (str + strlen(str) - 1)) {
 		if (BLI_last_slash(file) != NULL) {
@@ -286,7 +282,7 @@ void BLI_recurdir_fileops(const char *dirname) {
 	// blah1/blah2/ (with slash) after creating
 	// blah1/blah2 (without slash)
 
-	strcpy(tmp, dirname);
+	BLI_strncpy(tmp, dirname, sizeof(tmp));
 	lslash= BLI_last_slash(tmp);
 
 	if (lslash == tmp + strlen(tmp) - 1) {
@@ -371,7 +367,7 @@ void BLI_recurdir_fileops(const char *dirname) {
 		
 	if (BLI_exists(dirname)) return;
 
-	strcpy(tmp, dirname);
+	BLI_strncpy(tmp, dirname, sizeof(tmp));
 		
 	lslash= BLI_last_slash(tmp);
 	if (lslash) {

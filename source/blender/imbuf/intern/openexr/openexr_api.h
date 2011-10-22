@@ -37,6 +37,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
   
 #include <stdio.h>

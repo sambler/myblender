@@ -42,7 +42,6 @@
 #include "MEM_guardedalloc.h"
 
 #include "DNA_listBase.h"
-//#include "DNA_userdef_types.h"
 
 #include "BLI_fileops.h"
 #include "BLI_path_util.h"
@@ -891,8 +890,7 @@ static int test_env_path(char *path, const char *envvar)
 static int get_path_local(char *targetpath, const char *folder_name, const char *subfolder_name, const int ver)
 {
 	char relfolder[FILE_MAX];
-//#if __APPLE__
-#if 1
+#if __APPLE__
 	char osxprogfolder[FILE_MAX]; /* prevent osx extra test from messing with current tests */
 #endif
 	
@@ -910,9 +908,8 @@ static int get_path_local(char *targetpath, const char *folder_name, const char 
 	else {
 		relfolder[0]= '\0';
 	}
-	
-//#if __APPLE__
-#if 1
+
+#if __APPLE__
 	/* on osx EXECUTABLE_DIR is buried inside the .app bundle which is partially hidden by the finder
 		let's back up and allow the config to be in the same dir as the .app bundle.
 		blender exe is in blender.app/Contents/MacOS so up three gives us the app bundle's parent folder */
@@ -923,7 +920,7 @@ static int get_path_local(char *targetpath, const char *folder_name, const char 
 	}
 	/* if not there check normally */
 #endif /* __APPLE__ */
-	
+
 	/* try EXECUTABLE_DIR/2.5x/folder_name - new default directory for local blender installed files */
 	if( test_path(targetpath, bprogdir, blender_version_decimal(ver), relfolder))
 		return 1;

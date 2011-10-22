@@ -2253,81 +2253,21 @@ void OBJECT_OT_wiredraw_copy_selected(wmOperatorType *ot)
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 }
 
-static int use_cust_wire_color_exec(bContext *C, wmOperator *op)
-{
-    Object *ob = ED_object_active_context(C);
-    
-    if(ob->use_cust_wire_color & OB_CUSTOM_WIRE) ob->use_cust_wire_color &= ~OB_CUSTOM_WIRE;
-    else ob->use_cust_wire_color |= OB_CUSTOM_WIRE;
-    
-    WM_event_add_notifier(C, NC_SPACE|ND_SPACE_VIEW3D|ND_SPACE_PROPERTIES, NULL);
-    return OPERATOR_FINISHED;
-}
-
-void OBJECT_OT_use_cust_wire_color_toggle(wmOperatorType *ot)
-{
-	/* identifiers */
-	ot->name= "Use Wireframe Custom Color";
-	ot->description = "Turn use wireframe custom color on/off.";
-	ot->idname= "OBJECT_OT_use_cust_wire_color_toggle";
-    
-	/* api callbacks */
-	ot->exec= use_cust_wire_color_exec;
-	ot->poll= wiredraw_poll;
-    
-	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
-}
-
-static int use_cust_wire_color_copy_exec(bContext *C, wmOperator *op)
-{
-    Object *cur = ED_object_active_context(C);
-    int allon = (cur->use_cust_wire_color & OB_CUSTOM_WIRE);
-    
-    CTX_DATA_BEGIN(C, Object*, ob, selected_editable_objects) {
-        if(allon)
-            ob->use_cust_wire_color |= OB_CUSTOM_WIRE;
-        else
-            ob->use_cust_wire_color &= ~OB_CUSTOM_WIRE;
-	}
-	CTX_DATA_END;
-    
-    WM_event_add_notifier(C, NC_SPACE|ND_SPACE_VIEW3D|ND_SPACE_PROPERTIES, NULL);
-    return OPERATOR_FINISHED;
-}
-
-void OBJECT_OT_use_cust_wire_color_copy_selected(wmOperatorType *ot)
-{
-	/* identifiers */
-	ot->name= "Copy Use Wireframe Custom Color";
-	ot->description = "Copy use wireframe custom color to other selected objects.";
-	ot->idname= "OBJECT_OT_use_cust_wire_color_copy_selected";
-    
-	/* api callbacks */
-	ot->exec= use_cust_wire_color_copy_exec;
-	ot->poll= wiredraw_poll;
-    
-	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
-}
-
 static int use_cust_wire_color_copy_selected_exec(bContext *C, wmOperator *op)
 {
-    Object *cur = ED_object_active_context(C);
-    int x;
-    float newcol[3];
-    
-    for(x=0;x<3;x++)
-        newcol[x] = cur->cust_wire_color[x];
-    
-    CTX_DATA_BEGIN(C, Object*, ob, selected_editable_objects) {
-        for(x=0;x<3;x++)
-            ob->cust_wire_color[x] = newcol[x];
+	Object *cur = ED_object_active_context(C);
+	int x;
+	WirecolorSet *newcolset;
+
+	newcolset = cur->wire_colorset;
+
+	CTX_DATA_BEGIN(C, Object*, ob, selected_editable_objects) {
+		ob->wire_colorset = newcolset;
 	}
 	CTX_DATA_END;
-    
-    WM_event_add_notifier(C, NC_SPACE|ND_SPACE_VIEW3D|ND_SPACE_PROPERTIES, NULL);
-    return OPERATOR_FINISHED;
+
+	WM_event_add_notifier(C, NC_SPACE|ND_SPACE_VIEW3D|ND_SPACE_PROPERTIES, NULL);
+	return OPERATOR_FINISHED;
 }
 
 void OBJECT_OT_cust_wire_color_copy_selected(wmOperatorType *ot)
@@ -2336,11 +2276,11 @@ void OBJECT_OT_cust_wire_color_copy_selected(wmOperatorType *ot)
 	ot->name= "Copy Wireframe Color to Selected";
 	ot->description = "Copy wireframe draw color to other selected objects.";
 	ot->idname= "OBJECT_OT_cust_wire_color_copy_selected";
-    
+
 	/* api callbacks */
 	ot->exec= use_cust_wire_color_copy_selected_exec;
 	ot->poll= wiredraw_poll;
-    
+
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 }

@@ -235,6 +235,20 @@ WirecolorSet *SCENE_get_active_wirecolorset (Scene *scene)
 		return NULL;
 }
 
+/* Get the specified Wirecolor Set from the Scene provided */
+WirecolorSet *SCENE_get_wirecolorset (Scene *scene, int idx)
+{
+	/* if no scene or zero index, we've got no hope of finding the Wirecolor Set */
+	if (scene == NULL || idx == 0)
+		return NULL;
+
+	/* currently, there are two possibilities here:
+	 *	-   0: no active Wirecolor set
+	 *	- > 0: one of the user-defined Wirecolor Sets, but indices start from 0 (hence the -1)
+	 */
+	return BLI_findlink(&scene->wirecolorsets, idx-1);
+}
+
 /* Get the index of the Wirecolor Set provided, for the given Scene */
 int SCENE_get_wirecolorset_index (Scene *scene, WirecolorSet *wcs)
 {

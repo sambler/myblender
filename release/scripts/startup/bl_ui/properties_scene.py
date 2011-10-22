@@ -182,13 +182,13 @@ class SCENE_PT_wirecolour_sets(SceneButtonsPanel, Panel):
         row = layout.row()
 
         col = row.column()
-        col.template_list(scene, "wirecolour_sets", scene.wirecolour_sets, "active_index", rows=2)
+        col.template_list(scene, "wirecolor_sets", scene.wirecolor_sets, "active_index", rows=2)
 
         col = row.column(align=True)
-        col.operator("scene.wirecolour_set_add", icon='ZOOMIN', text="")
-        col.operator("scene.wirecolour_set_remove", icon='ZOOMOUT', text="")
+        col.operator("scene.wirecolor_set_add", icon='ZOOMIN', text="")
+        col.operator("scene.wirecolor_set_remove", icon='ZOOMOUT', text="")
 
-        wcs = scene.wirecolour_sets.active
+        wcs = scene.wirecolor_sets.active
         if wcs:
             row = layout.row()
 
@@ -196,11 +196,11 @@ class SCENE_PT_wirecolour_sets(SceneButtonsPanel, Panel):
             col.prop(wcs, "name")
 
             row = col.row(align=False)
-            row.prop(wcs, "draw_colour", text="Draw")
+            row.prop(wcs, "draw_color", text="Draw")
             row = col.row(align=False)
-            row.prop(wcs, "selected_colour", text="Selected")
+            row.prop(wcs, "selected_color", text="Selected")
             row = col.row(align=False)
-            row.prop(wcs, "active_colour", text="Active")
+            row.prop(wcs, "active_color", text="Active")
 
 
 class SCENE_PT_physics(SceneButtonsPanel, Panel):

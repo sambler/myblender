@@ -1344,41 +1344,56 @@ static void draw_bone(int dt, int armflag, int boneflag, short constflag, unsign
 
 static void draw_custom_bone(Scene *scene, View3D *v3d, RegionView3D *rv3d, Object *ob, int dt, int armflag, int boneflag, unsigned int id, float length)
 {
-    float curColor[4];
-    
+	float curColor[4];
+	WirecolorSet *wcs;
+
 	if(ob==NULL) return;
 	
-    glGetFloatv(GL_CURRENT_COLOR, curColor); /* store the current draw color to prevent messing up other bones and ghosts */
-    
+	glGetFloatv(GL_CURRENT_COLOR, curColor); /* store the current draw color to prevent messing up other bones and ghosts */
+
+	//wcs = SCENE_get_wirecolorset (scene, ob->wire_colorset_index);
+	wcs = ob->wire_colorset;
+
 	glScalef(length, length, length);
 	
 	/* colors for posemode */
 	if (armflag & ARM_POSEMODE) {
-        if( (ob->use_cust_wire_color == OB_CUSTOM_WIRE) && !(armflag & ARM_DRAWGHOST)
-                        && !(boneflag & BONE_DRAW_ACTIVE) && !(boneflag & BONE_SELECTED) )
-            glColor3fv(ob->cust_wire_color);
-        else
-            set_pchan_glColor(PCHAN_COLOR_NORMAL, boneflag, 0);
+		//if( (ob->wire_colorset_index > 0) && wcs && !(armflag & ARM_DRAWGHOST) ) {
+		if( wcs && !(armflag & ARM_DRAWGHOST) ) {
+			if(boneflag & BONE_DRAW_ACTIVE)
+				glColor4fv(wcs->active);
+			else if(boneflag & BONE_SELECTED)
+				glColor4fv(wcs->selected);
+			else
+				glColor4fv(wcs->draw);
+		}
+		else
+			set_pchan_glColor(PCHAN_COLOR_NORMAL, boneflag, 0);
 	}else{ /* object mode?? or ghost drawing - edit mode doesn't draw custom bones */
-        if( ((ob->use_cust_wire_color == OB_CUSTOM_WIRE) && (!(boneflag & BONE_DRAW_ACTIVE) || (armflag & ARM_COL_CUSTOM)) 
-                        && !(armflag & ARM_DRAWGHOST)) )
-            glColor3fv(ob->cust_wire_color);
-        else{
-            if( !(armflag & ARM_DRAWGHOST) )
-                if (dt <= OB_WIRE) set_pchan_glColor(PCHAN_COLOR_NORMAL, boneflag, 0);
-                else set_pchan_glColor(PCHAN_COLOR_SOLID, boneflag, 0);
+		//if((ob->wire_colorset_index > 0) && wcs && !(armflag & ARM_DRAWGHOST)) {
+		if(wcs && !(armflag & ARM_DRAWGHOST)) {
+			if(boneflag & BONE_DRAW_ACTIVE)
+				glColor4fv(wcs->active);
+			else if(boneflag & BONE_SELECTED)
+				glColor4fv(wcs->selected);
+			else
+				glColor4fv(wcs->draw);
+		}
+		else{
+			if( !(armflag & ARM_DRAWGHOST) )
+				if (dt <= OB_WIRE) set_pchan_glColor(PCHAN_COLOR_NORMAL, boneflag, 0);
+				else set_pchan_glColor(PCHAN_COLOR_SOLID, boneflag, 0);
+		}
 	}
-    }
 	
 	if (id != -1) {
 		glLoadName((GLuint) id|BONESEL_BONE);
 	}
 	
 	draw_object_instance(scene, v3d, rv3d, ob, dt, armflag & ARM_POSEMODE);
-    
-    glColor4fv(curColor); /* restore the previous draw colour */
-}
 
+	glColor4fv(curColor); /* restore the previous draw colour */
+}
 
 static void pchan_draw_IK_root_lines(bPoseChannel *pchan, short only_temp)
 {

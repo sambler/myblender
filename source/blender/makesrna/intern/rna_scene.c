@@ -1169,26 +1169,27 @@ static void rna_def_wirecolorset(BlenderRNA *brna)
 	/* Name */
 	prop= RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
 	RNA_def_property_ui_text(prop, "Name", "");
-	RNA_def_struct_ui_icon(srna, ICON_WIRECOLORSET);
+	//RNA_def_struct_ui_icon(srna, ICON_WIRECOLORSET);
+	RNA_def_struct_ui_icon(srna, ICON_GROUP_VCOL); // show vert colour group icon till we make our own
 	RNA_def_struct_name_property(srna, prop);
 	RNA_def_property_update(prop, NC_SCENE|NA_RENAME, NULL);
 
 	/* Colours */
 	prop= RNA_def_property(srna, "draw_color", PROP_FLOAT, PROP_COLOR);
 	RNA_def_property_float_sdna(prop, NULL, "draw");
-//	RNA_def_property_array(prop, 4);
+	RNA_def_property_array(prop, 4);
 	RNA_def_property_ui_text(prop, "Draw Color", "Standard wireframe Draw color");
 	RNA_def_property_update(prop, NC_OBJECT|ND_DRAW, NULL);
 
 	prop= RNA_def_property(srna, "selected_color", PROP_FLOAT, PROP_COLOR);
 	RNA_def_property_float_sdna(prop, NULL, "selected");
-//	RNA_def_property_array(prop, 4);
+	RNA_def_property_array(prop, 4);
 	RNA_def_property_ui_text(prop, "Selected Color", "Selected Item wireframe Draw color");
 	RNA_def_property_update(prop, NC_OBJECT|ND_DRAW, NULL);
 
 	prop= RNA_def_property(srna, "active_color", PROP_FLOAT, PROP_COLOR);
 	RNA_def_property_float_sdna(prop, NULL, "active");
-//	RNA_def_property_array(prop, 4);
+	RNA_def_property_array(prop, 4);
 	RNA_def_property_ui_text(prop, "Active Color", "Active Selected Item wireframe Draw color");
 	RNA_def_property_update(prop, NC_OBJECT|ND_DRAW, NULL);
 

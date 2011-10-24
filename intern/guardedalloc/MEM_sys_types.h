@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -54,6 +52,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
  
 #if defined(_WIN32) && !defined(FREE_WINDOWS)
@@ -129,7 +128,7 @@ unsigned long __attribute__((__stdcall__)) htonl(unsigned long);
 #include <netinet/in.h>
 #endif /* ifdef platform for htonl/ntohl */
 
-#ifdef __cplusplus 
+#ifdef __cplusplus
 }
 #endif
 

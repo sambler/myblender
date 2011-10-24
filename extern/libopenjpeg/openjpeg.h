@@ -701,6 +701,7 @@ typedef struct opj_codestream_info {
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 

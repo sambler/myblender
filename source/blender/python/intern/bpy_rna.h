@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -44,9 +42,6 @@
 /* support for inter references, currently only needed for corner case */
 #define USE_PYRNA_STRUCT_REFERENCE
 
-/* use real collection iterators rather than faking with a list */
-#define USE_PYRNA_ITER
-
 #else /* WITH_PYTHON_SAFETY */
 
  /* default, no defines! */
@@ -66,6 +61,11 @@
 /* only used by operator introspection get_rna(), this is only used for doc gen
  * so prefer the leak to the memory bloat for now. */
 // #define PYRNA_FREE_SUPPORT
+
+/* use real collection iterators rather than faking with a list
+ * this is needed so enums can be iterated over without crashing,
+ * since finishing the iteration frees temp allocated enums */
+#define USE_PYRNA_ITER
 
 /* --- end bpy build options --- */
 
@@ -147,7 +147,7 @@ typedef struct {
 	PyObject *in_weakreflist;
 #endif
 
-	/* collection iterator spesific parts */
+	/* collection iterator specific parts */
 	CollectionPropertyIterator iter;
 } BPy_PropertyCollectionIterRNA;
 

@@ -1,8 +1,4 @@
-/** \file blender/blenkernel/intern/writeffmpeg.c
- *  \ingroup bke
- */
 /*
- * $Id$
  *
  * ffmpeg-write support
  *
@@ -18,6 +14,10 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ */
+
+/** \file blender/blenkernel/intern/writeffmpeg.c
+ *  \ingroup bke
  */
 
 #ifdef WITH_FFMPEG
@@ -406,8 +406,7 @@ static void set_ffmpeg_properties(RenderData *rd, AVCodecContext *c, const char 
 		return;
 	}
 	
-	prop = IDP_GetPropertyFromGroup(
-		rd->ffcodecdata.properties, (char*) prop_name);
+	prop = IDP_GetPropertyFromGroup(rd->ffcodecdata.properties, prop_name);
 	if (!prop) {
 		return;
 	}
@@ -489,6 +488,12 @@ static AVStream* alloc_video_stream(RenderData *rd, int codec_id, AVFormatContex
 		c->qmax=51;
 	}
 	
+	// Keep lossless encodes in the RGB domain.
+	if (codec_id == CODEC_ID_HUFFYUV || codec_id == CODEC_ID_FFV1) {
+		/* HUFFYUV was PIX_FMT_YUV422P before */
+		c->pix_fmt = PIX_FMT_RGB32;
+	}
+
 	if ((of->oformat->flags & AVFMT_GLOBALHEADER)
 //		|| !strcmp(of->oformat->name, "mp4")
 //	    || !strcmp(of->oformat->name, "mov")
@@ -518,8 +523,8 @@ static AVStream* alloc_video_stream(RenderData *rd, int codec_id, AVFormatContex
 		return NULL;
 	}
 
-	video_buffersize = 2000000;
-	video_buffer = (uint8_t*)MEM_mallocN(video_buffersize, 
+	video_buffersize = avpicture_get_size(c->pix_fmt, c->width, c->height);
+	video_buffer = (uint8_t*)MEM_mallocN(video_buffersize*sizeof(uint8_t),
 						 "FFMPEG video buffer");
 	
 	current_frame = alloc_picture(c->pix_fmt, c->width, c->height);
@@ -564,6 +569,11 @@ static AVStream* alloc_audio_stream(RenderData *rd, int codec_id, AVFormatContex
 		//XXX error("Couldn't initialize audio codec");
 		return NULL;
 	}
+
+	/* need to prevent floating point exception when using vorbis audio codec,
+	   initialize this value in the same way as it's done in FFmpeg iteslf (sergey) */
+	st->codec->time_base.num= 1;
+	st->codec->time_base.den= st->codec->sample_rate;
 
 	audio_outbuf_size = FF_MIN_BUFFER_SIZE;
 
@@ -737,7 +747,11 @@ static int start_ffmpeg_impl(struct RenderData *rd, int rectx, int recty, Report
 		}
 	}
 
-	av_write_header(of);
+	if (av_write_header(of) < 0) {
+		BKE_report(reports, RPT_ERROR, "Could not initialize streams. Probably unsupported codec combination.");
+		return 0;
+	}
+
 	outfile = of;
 	av_dump_format(of, 0, name, 1);
 
@@ -808,7 +822,8 @@ void flush_ffmpeg(void)
    ********************************************************************** */
 
 /* Get the output filename-- similar to the other output formats */
-void filepath_ffmpeg(char* string, RenderData* rd) {
+void filepath_ffmpeg(char* string, RenderData* rd)
+{
 	char autosplit[20];
 
 	const char ** exts = get_file_extensions(rd->ffcodecdata.type);
@@ -1008,8 +1023,7 @@ void ffmpeg_property_del(RenderData *rd, void *type, void *prop_)
 		return;
 	}
 
-	group = IDP_GetPropertyFromGroup(
-		rd->ffcodecdata.properties, (char*) type);
+	group = IDP_GetPropertyFromGroup(rd->ffcodecdata.properties, type);
 	if (group && prop) {
 		IDP_RemFromGroup(group, prop);
 		IDP_FreeProperty(prop);
@@ -1040,11 +1054,10 @@ IDProperty *ffmpeg_property_add(RenderData *rd, char * type, int opt_index, int 
 			= IDP_New(IDP_GROUP, val, "ffmpeg"); 
 	}
 
-	group = IDP_GetPropertyFromGroup(
-		rd->ffcodecdata.properties, (char*) type);
+	group = IDP_GetPropertyFromGroup(rd->ffcodecdata.properties, type);
 	
 	if (!group) {
-		group = IDP_New(IDP_GROUP, val, (char*) type); 
+		group = IDP_New(IDP_GROUP, val, type);
 		IDP_AddToGroup(rd->ffcodecdata.properties, group);
 	}
 

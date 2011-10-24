@@ -1,7 +1,6 @@
 /*
  * allocimbuf.h
  *
- * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -66,9 +65,6 @@
 #else
 #  include <dirent.h>
 #endif
-
-#include "BLI_blenlib.h" /* BLI_remlink BLI_filesize BLI_addtail
-							BLI_countlist BLI_stringdec */
 
 #include "imbuf.h"
 

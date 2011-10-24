@@ -59,7 +59,7 @@ def bake_action(frame_start,
     :arg action: An action to bake the data into, or None for a new action
        to be created.
     :type action: :class:`bpy.types.Action` or None
-    
+
     :return: an action or None
     :rtype: :class:`bpy.types.Action`
     """
@@ -115,7 +115,6 @@ def bake_action(frame_start,
 
         return info
 
-
     def obj_frame_info(obj):
         info = {}
         # parent = obj.parent
@@ -159,7 +158,7 @@ def bake_action(frame_start,
     # -------------------------------------------------------------------------
     # Create action
 
-    # incase animation data hassnt been created
+    # in case animation data hassnt been created
     atd = obj.animation_data_create()
     if action is None:
         action = bpy.data.actions.new("Action")
@@ -183,7 +182,8 @@ def bake_action(frame_start,
                 pbone.constraints.remove(pbone.constraints[0])
 
         for f in frame_range:
-            matrix = pose_info[(f - frame_start) // frame_step][name]["matrix_key"]
+            f_step = (f - frame_start) // frame_step
+            matrix = pose_info[f_step][name]["matrix_key"]
 
             # pbone.location = matrix.to_translation()
             # pbone.rotation_quaternion = matrix.to_quaternion()

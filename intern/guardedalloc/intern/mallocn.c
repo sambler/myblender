@@ -1,5 +1,4 @@
 /*
- * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -33,7 +32,6 @@
 
 /**
 
- * $Id$
  * Copyright (C) 2001 NaN Technologies B.V.
  * Guarded memory allocation, and boundary-write detection.
  */
@@ -711,6 +709,10 @@ static void rem_memblock(MemHead *memh)
 static void MemorY_ErroR(const char *block, const char *error)
 {
 	print_error("Memoryblock %s: %s\n",block, error);
+
+#ifdef WITH_ASSERT_ABORT
+	abort();
+#endif
 }
 
 static const char *check_memlist(MemHead *memh)

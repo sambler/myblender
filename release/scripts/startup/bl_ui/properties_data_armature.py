@@ -72,7 +72,7 @@ class DATA_PT_skeleton(ArmatureButtonsPanel, Panel):
         flow.prop(arm, "use_deform_preserve_volume", text="Quaternion")
 
         if context.scene.render.engine == "BLENDER_GAME":
-            layout.row().prop(arm, "vert_deformer", expand=True)
+            layout.row().prop(arm, "deform_method", expand=True)
 
 
 class DATA_PT_display(ArmatureButtonsPanel, Panel):
@@ -214,7 +214,7 @@ class DATA_PT_pose_library(ArmatureButtonsPanel, Panel):
                 layout.prop(pose_marker_active, "name")
 
 
-# TODO: this panel will soon be depreceated too
+# TODO: this panel will soon be deprecated deprecated too
 class DATA_PT_ghost(ArmatureButtonsPanel, Panel):
     bl_label = "Ghost"
 
@@ -301,7 +301,7 @@ class DATA_PT_motion_paths(MotionPathButtonsPanel, Panel):
 
     @classmethod
     def poll(cls, context):
-        # XXX: include posemode check?
+        # XXX: include pose-mode check?
         return (context.object) and (context.armature)
 
     def draw(self, context):
@@ -324,7 +324,7 @@ class DATA_PT_onion_skinning(OnionSkinButtonsPanel):  # , Panel): # inherit from
 
     @classmethod
     def poll(cls, context):
-        # XXX: include posemode check?
+        # XXX: include pose-mode check?
         return (context.object) and (context.armature)
 
     def draw(self, context):

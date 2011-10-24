@@ -1,4 +1,3 @@
-# $Id $
 # ***** BEGIN GPL LICENSE BLOCK *****
 #
 # This program is free software; you can redistribute it and/or
@@ -53,9 +52,9 @@ set(SRC
 
 if(WITH_INTERNATIONAL)
 	list(APPEND INC_SYS
-		${GETTEXT_INC}
+		${GETTEXT_INCLUDE_DIRS}
 	)
-	add_definitions(-DINTERNATIONAL)
+	add_definitions(-DWITH_INTERNATIONAL)
 endif()
 
 blender_add_lib(bf_blenfont "${SRC}" "${INC}" "${INC_SYS}")

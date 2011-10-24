@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -38,6 +36,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 struct Library;
@@ -118,14 +117,20 @@ typedef struct Library {
 	ID *idblock;
 	struct FileData *filedata;
 	char name[240];			/* path name used for reading, can be relative and edited in the outliner */
-	char filepath[240];		/* temp. absolute filepath, only used while reading */
+	char filepath[240];		/* absolute filepath, this is only for convenience,
+							 * 'name' is the real path used on file read but in
+							 * some cases its useful to access the absolute one,
+							 * This is set on file read.
+							 * Use BKE_library_filepath_set() rather than
+							 * setting 'name' directly and it will be kepk in
+							 * sync - campbell */
 	int tot, pad;			/* tot, idblock and filedata are only fo read and write */
 	struct Library *parent;	/* set for indirectly linked libs, used in the outliner and while reading */
 } Library;
 
 enum eIconSizes {
 	ICON_SIZE_ICON,
-	ICON_SIZE_PREVIEW,
+	ICON_SIZE_PREVIEW
 };
 #define NUM_ICON_SIZES (ICON_SIZE_PREVIEW + 1)
 
@@ -203,6 +208,10 @@ typedef struct PreviewImage {
 #define ID_FLUIDSIM	MAKE_ID2('F', 'S')
 
 #define ID_REAL_USERS(id) (((ID *)id)->us - ((((ID *)id)->flag & LIB_FAKEUSER) ? 1:0))
+
+#define ID_CHECK_UNDO(id) ((GS((id)->name) != ID_SCR) && (GS((id)->name) != ID_WM))
+
+#define ID_BLEND_PATH(_bmain, _id) ((_id)->lib ? (_id)->lib->filepath : (_bmain)->name)
 
 #ifdef GS
 #undef GS

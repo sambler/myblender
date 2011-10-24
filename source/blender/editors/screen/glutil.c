@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -364,7 +362,8 @@ void fdrawXORcirc(float xofs, float yofs, float rad)
 	set_inverted_drawing(0);
 }
 
-void glutil_draw_filled_arc(float start, float angle, float radius, int nsegments) {
+void glutil_draw_filled_arc(float start, float angle, float radius, int nsegments)
+{
 	int i;
 	
 	glBegin(GL_TRIANGLE_FAN);
@@ -378,7 +377,8 @@ void glutil_draw_filled_arc(float start, float angle, float radius, int nsegment
 	glEnd();
 }
 
-void glutil_draw_lined_arc(float start, float angle, float radius, int nsegments) {
+void glutil_draw_lined_arc(float start, float angle, float radius, int nsegments)
+{
 	int i;
 	
 	glBegin(GL_LINE_STRIP);
@@ -797,7 +797,8 @@ void bglBegin(int mode)
 	}
 }
 
-int bglPointHack(void) {
+int bglPointHack(void)
+{
 	float value[4];
 	int pointhack_px;
 	glGetFloatv(GL_POINT_SIZE_RANGE, value);

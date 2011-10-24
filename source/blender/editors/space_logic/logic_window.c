@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -1747,6 +1745,7 @@ static int get_col_actuator(int type)
 	case ACT_CONSTRAINT:		return TH_PANEL;
 	case ACT_STATE:			return TH_PANEL;
 	case ACT_ARMATURE:			return TH_PANEL;
+	case ACT_STEERING:		return TH_PANEL;
 	default:				return TH_PANEL;
 	}
 }

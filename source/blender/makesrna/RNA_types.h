@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -34,6 +32,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 struct ParameterList;
@@ -230,8 +229,8 @@ typedef struct CollectionPropertyIterator {
 	int level;
 
 	/* external */
-	int valid;
 	PointerRNA ptr;
+	int valid;
 } CollectionPropertyIterator;
 
 typedef struct CollectionPointerLink {
@@ -274,13 +273,13 @@ typedef struct ParameterList {
 	/* storage for parameters */
 	void *data;
 
+	/* function passed at creation time */
+	struct FunctionRNA *func;
+
 	/* store the parameter size */
 	int alloc_size;
 
 	int arg_count, ret_count;
-
-	/* function passed at creation time */
-	struct FunctionRNA *func;
 } ParameterList;
 
 typedef struct ParameterIterator {

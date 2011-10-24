@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -36,7 +34,7 @@
 
 #include "BLF_api.h"
 
-#ifdef INTERNATIONAL
+#ifdef WITH_INTERNATIONAL
 
 #include <locale.h>
 
@@ -55,6 +53,7 @@
 
 #include "BLI_linklist.h"	/* linknode */
 #include "BLI_string.h"
+#include "BLI_utildefines.h"
 #include "BLI_path_util.h"
 
 #define DOMAIN_NAME "blender"
@@ -94,6 +93,7 @@ static const char *locales[] = {
 	"greek", "el_GR",
 	"korean", "ko_KR",
 	"nepali", "ne_NP",
+	"persian", "fa_PE",
 };
 
 void BLF_lang_init(void)
@@ -102,10 +102,13 @@ void BLF_lang_init(void)
 	
 	BLI_strncpy(global_encoding_name, SYSTEM_ENCODING_DEFAULT, sizeof(global_encoding_name));
 	
-	if (messagepath)
+	if (messagepath) {
 		BLI_strncpy(global_messagepath, messagepath, sizeof(global_messagepath));
-	else
+	}
+	else {
+		printf("%s: 'locale' data path for translations not found, continuing\n", __func__);
 		global_messagepath[0]= '\0';
+	}
 	
 }
 
@@ -158,7 +161,7 @@ void BLF_lang_set(const char *str)
 				char *s;
 
 				/* store defaul locale */
-				strncpy(default_locale, env_language, sizeof(default_locale));
+				BLI_strncpy(default_locale, env_language, sizeof(default_locale));
 
 				/* use first language as default */
 				s= strchr(default_locale, ':');
@@ -209,7 +212,7 @@ void BLF_lang_encoding(const char *str)
 	/* bind_textdomain_codeset(DOMAIN_NAME, encoding_name); */
 }
 
-#else /* ! INTERNATIONAL */
+#else /* ! WITH_INTERNATIONAL */
 
 void BLF_lang_init(void)
 {
@@ -228,4 +231,4 @@ void BLF_lang_set(const char *str)
 	return;
 }
 
-#endif /* INTERNATIONAL */
+#endif /* WITH_INTERNATIONAL */

@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -51,6 +49,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+//} for codefolding
 #endif
 
 	struct netscape_plugin_Plugin;

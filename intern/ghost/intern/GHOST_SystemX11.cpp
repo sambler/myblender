@@ -1,5 +1,4 @@
 /*
- * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -89,6 +88,11 @@ GHOST_SystemX11(
 		abort(); //was return before, but this would just mean it will crash later
 	}
 
+	/* Open a connection to the X input manager */
+#if defined(WITH_X11_XINPUT) && defined(X_HAVE_UTF8_STRING)
+	m_xim = XOpenIM(m_display, NULL, (char *)GHOST_X11_RES_NAME, (char *)GHOST_X11_RES_CLASS);
+#endif
+
 	m_delete_window_atom 
 	  = XInternAtom(m_display, "WM_DELETE_WINDOW", True);
 
@@ -141,6 +145,10 @@ GHOST_SystemX11(
 GHOST_SystemX11::
 ~GHOST_SystemX11()
 {
+#if defined(WITH_X11_XINPUT) && defined(X_HAVE_UTF8_STRING)
+	XCloseIM(m_xim);
+#endif
+
 	XCloseDisplay(m_display);
 }
 
@@ -500,9 +508,9 @@ GHOST_SystemX11::processEvent(XEvent *xe)
 		case KeyRelease:
 		{
 			XKeyEvent *xke = &(xe->xkey);
-		
 			KeySym key_sym = XLookupKeysym(xke,0);
 			char ascii;
+			char utf8_buf[6]; /* 6 is enough for a utf8 char */
 			
 			GHOST_TKey gkey = convertXKey(key_sym);
 			GHOST_TEventType type = (xke->type == KeyPress) ? 
@@ -512,13 +520,55 @@ GHOST_SystemX11::processEvent(XEvent *xe)
 				ascii = '\0';
 			}
 			
+#if defined(WITH_X11_XINPUT) && defined(X_HAVE_UTF8_STRING)
+			/* getting unicode on key-up events gives XLookupNone status */
+			if (xke->type == KeyPress) {
+				Status status;
+				int len;
+
+				/* use utf8 because its not locale depentant, from xorg docs */
+				if (!(len= Xutf8LookupString(window->getX11_XIC(), xke, utf8_buf, sizeof(utf8_buf), &key_sym, &status))) {
+					utf8_buf[0]= '\0';
+				}
+
+				if ((status == XLookupChars || status == XLookupBoth)) {
+					if ((unsigned char)utf8_buf[0] >= 32) { /* not an ascii control character */
+						/* do nothing for now, this is valid utf8 */
+					}
+					else {
+						utf8_buf[0]= '\0';
+					}
+				}
+				else if (status == XLookupKeySym) {
+					/* this key doesn't have a text representation, it is a command
+					   key of some sort */;
+				}
+				else {
+					printf("Bad keycode lookup. Keysym 0x%x Status: %s\n",
+							  (unsigned int) key_sym,
+							  (status == XBufferOverflow ? "BufferOverflow" :
+							   status == XLookupNone ? "XLookupNone" :
+							   status == XLookupKeySym ? "XLookupKeySym" :
+							   "Unknown status"));
+
+					printf("'%.*s' %p %p\n", len, utf8_buf, window->getX11_XIC(), m_xim);
+				}
+			}
+			else {
+				utf8_buf[0]= '\0';
+			}
+#else
+			utf8_buf[0]= '\0';
+#endif
+
 			g_event = new
 			GHOST_EventKey(
 				getMilliSeconds(),
 				type,
 				window,
 				gkey,
-				ascii
+				ascii,
+			    utf8_buf
 			);
 			
 		break;
@@ -1018,18 +1068,18 @@ convertXKey(KeySym key)
 			GXMAP(type,XK_bracketright,	GHOST_kKeyRightBracket);
 			GXMAP(type,XK_Pause,		GHOST_kKeyPause);
 			
-			GXMAP(type,XK_Shift_L,  	GHOST_kKeyLeftShift);
-			GXMAP(type,XK_Shift_R,  	GHOST_kKeyRightShift);
+			GXMAP(type,XK_Shift_L,		GHOST_kKeyLeftShift);
+			GXMAP(type,XK_Shift_R,		GHOST_kKeyRightShift);
 			GXMAP(type,XK_Control_L,	GHOST_kKeyLeftControl);
 			GXMAP(type,XK_Control_R,	GHOST_kKeyRightControl);
-			GXMAP(type,XK_Alt_L,	 	GHOST_kKeyLeftAlt);
-			GXMAP(type,XK_Alt_R,	 	GHOST_kKeyRightAlt);
+			GXMAP(type,XK_Alt_L,		GHOST_kKeyLeftAlt);
+			GXMAP(type,XK_Alt_R,		GHOST_kKeyRightAlt);
 			GXMAP(type,XK_Super_L,		GHOST_kKeyOS);
 			GXMAP(type,XK_Super_R,		GHOST_kKeyOS);
 
-			GXMAP(type,XK_Insert,	 	GHOST_kKeyInsert);
-			GXMAP(type,XK_Delete,	 	GHOST_kKeyDelete);
-			GXMAP(type,XK_Home,	 		GHOST_kKeyHome);
+			GXMAP(type,XK_Insert,		GHOST_kKeyInsert);
+			GXMAP(type,XK_Delete,		GHOST_kKeyDelete);
+			GXMAP(type,XK_Home,			GHOST_kKeyHome);
 			GXMAP(type,XK_End,			GHOST_kKeyEnd);
 			GXMAP(type,XK_Page_Up,		GHOST_kKeyUpPage);
 			GXMAP(type,XK_Page_Down, 	GHOST_kKeyDownPage);
@@ -1045,27 +1095,27 @@ convertXKey(KeySym key)
 			
 				/* keypad events */
 				
-			GXMAP(type,XK_KP_0,	 		GHOST_kKeyNumpad0);
-			GXMAP(type,XK_KP_1,	 		GHOST_kKeyNumpad1);
-			GXMAP(type,XK_KP_2,	 		GHOST_kKeyNumpad2);
-			GXMAP(type,XK_KP_3,	 		GHOST_kKeyNumpad3);
-			GXMAP(type,XK_KP_4,	 		GHOST_kKeyNumpad4);
-			GXMAP(type,XK_KP_5,	 		GHOST_kKeyNumpad5);
-			GXMAP(type,XK_KP_6,	 		GHOST_kKeyNumpad6);
-			GXMAP(type,XK_KP_7,	 		GHOST_kKeyNumpad7);
-			GXMAP(type,XK_KP_8,	 		GHOST_kKeyNumpad8);
-			GXMAP(type,XK_KP_9,	 		GHOST_kKeyNumpad9);
+			GXMAP(type,XK_KP_0,			GHOST_kKeyNumpad0);
+			GXMAP(type,XK_KP_1,			GHOST_kKeyNumpad1);
+			GXMAP(type,XK_KP_2,			GHOST_kKeyNumpad2);
+			GXMAP(type,XK_KP_3,			GHOST_kKeyNumpad3);
+			GXMAP(type,XK_KP_4,			GHOST_kKeyNumpad4);
+			GXMAP(type,XK_KP_5,			GHOST_kKeyNumpad5);
+			GXMAP(type,XK_KP_6,			GHOST_kKeyNumpad6);
+			GXMAP(type,XK_KP_7,			GHOST_kKeyNumpad7);
+			GXMAP(type,XK_KP_8,			GHOST_kKeyNumpad8);
+			GXMAP(type,XK_KP_9,			GHOST_kKeyNumpad9);
 			GXMAP(type,XK_KP_Decimal,	GHOST_kKeyNumpadPeriod);
 
 			GXMAP(type,XK_KP_Insert, 	GHOST_kKeyNumpad0);
-			GXMAP(type,XK_KP_End,	 	GHOST_kKeyNumpad1);
-			GXMAP(type,XK_KP_Down,	 	GHOST_kKeyNumpad2);
+			GXMAP(type,XK_KP_End,		GHOST_kKeyNumpad1);
+			GXMAP(type,XK_KP_Down,		GHOST_kKeyNumpad2);
 			GXMAP(type,XK_KP_Page_Down,	GHOST_kKeyNumpad3);
-			GXMAP(type,XK_KP_Left,	 	GHOST_kKeyNumpad4);
-			GXMAP(type,XK_KP_Begin, 	GHOST_kKeyNumpad5);
+			GXMAP(type,XK_KP_Left,		GHOST_kKeyNumpad4);
+			GXMAP(type,XK_KP_Begin,		GHOST_kKeyNumpad5);
 			GXMAP(type,XK_KP_Right,		GHOST_kKeyNumpad6);
-			GXMAP(type,XK_KP_Home,	 	GHOST_kKeyNumpad7);
-			GXMAP(type,XK_KP_Up,	 	GHOST_kKeyNumpad8);
+			GXMAP(type,XK_KP_Home,		GHOST_kKeyNumpad7);
+			GXMAP(type,XK_KP_Up,		GHOST_kKeyNumpad8);
 			GXMAP(type,XK_KP_Page_Up,	GHOST_kKeyNumpad9);
 			GXMAP(type,XK_KP_Delete,	GHOST_kKeyNumpadPeriod);
 

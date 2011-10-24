@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -450,7 +448,7 @@ EnumPropertyItem *rna_Actuator_type_itemf(bContext *C, PointerRNA *ptr, Property
 	return item;
 }
 
-static void rna_Actuator_Armature_update(Main *bmain, Scene *scene, PointerRNA *ptr)
+static void rna_Actuator_Armature_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
 {
 	bActuator *act= (bActuator *)ptr->data;
 	bArmatureActuator *aa = act->data;

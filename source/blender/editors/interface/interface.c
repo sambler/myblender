@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -96,7 +94,7 @@ static void ui_free_but(const bContext *C, uiBut *but);
 
 int UI_translate_iface(void)
 {
-#ifdef INTERNATIONAL
+#ifdef WITH_INTERNATIONAL
 	return (U.transopts & USER_DOTRANSLATE) && (U.transopts & USER_TR_IFACE);
 #else
 	return 0;
@@ -105,7 +103,7 @@ int UI_translate_iface(void)
 
 int UI_translate_tooltips(void)
 {
-#ifdef INTERNATIONAL
+#ifdef WITH_INTERNATIONAL
 	return (U.transopts & USER_DOTRANSLATE) && (U.transopts & USER_TR_TOOLTIPS);
 #else
 	return 0;
@@ -114,7 +112,7 @@ int UI_translate_tooltips(void)
 
 const char *UI_translate_do_iface(const char *msgid)
 {
-#ifdef INTERNATIONAL
+#ifdef WITH_INTERNATIONAL
 	if(UI_translate_iface())
 		return BLF_gettext(msgid);
 	else
@@ -126,7 +124,7 @@ const char *UI_translate_do_iface(const char *msgid)
 
 const char *UI_translate_do_tooltip(const char *msgid)
 {
-#ifdef INTERNATIONAL
+#ifdef WITH_INTERNATIONAL
 	if(UI_translate_tooltips())
 		return BLF_gettext(msgid);
 	else
@@ -575,7 +573,7 @@ static void ui_draw_links(uiBlock *block)
 /* NOTE: if but->poin is allocated memory for every defbut, things fail... */
 static int ui_but_equals_old(uiBut *but, uiBut *oldbut)
 {
-	/* various properties are being compared here, hopfully sufficient
+	/* various properties are being compared here, hopefully sufficient
 	 * to catch all cases, but it is simple to add more checks later */
 	if(but->retval != oldbut->retval) return 0;
 	if(but->rnapoin.data != oldbut->rnapoin.data) return 0;
@@ -640,7 +638,7 @@ static int ui_but_update_from_old_block(const bContext *C, uiBlock *block, uiBut
 //				but->flag= oldbut->flag;
 #else
 				/* exception! redalert flag can't be update from old button. 
-				 * perhaps it should only copy spesific flags rather than all. */
+				 * perhaps it should only copy specific flags rather than all. */
 //				but->flag= (oldbut->flag & ~UI_BUT_REDALERT) | (but->flag & UI_BUT_REDALERT);
 #endif
 //				but->active= oldbut->active;
@@ -677,6 +675,11 @@ static int ui_but_update_from_old_block(const bContext *C, uiBlock *block, uiBut
 					SWAP(char *, oldbut->poin, but->poin)
 					SWAP(void *, oldbut->func_argN, but->func_argN)
 				}
+				
+				/* copy hardmin for list rows to prevent 'sticking' highlight to mouse position
+				   when scrolling without moving mouse (see [#28432]) */
+				if(ELEM(oldbut->type, ROW, LISTROW))
+					oldbut->hardmax= but->hardmax;
 				
 				ui_but_update_linklines(block, oldbut, but);
 				
@@ -743,10 +746,10 @@ static int ui_but_is_rna_undo(uiBut *but)
 	if(but->rnapoin.id.data) {
 		/* avoid undo push for buttons who's ID are screen or wm level
 		 * we could disable undo for buttons with no ID too but may have
-		 * unforseen conciquences, so best check for ID's we _know_ are not
+		 * unforeseen consequences, so best check for ID's we _know_ are not
 		 * handled by undo - campbell */
 		ID *id= but->rnapoin.id.data;
-		if(ELEM(GS(id->name), ID_SCR, ID_WM)) {
+		if(ID_CHECK_UNDO(id) == FALSE) {
 			return FALSE;
 		}
 		else {
@@ -860,7 +863,7 @@ void uiEndBlock(const bContext *C, uiBlock *block)
 
 	/* inherit flags from 'old' buttons that was drawn here previous, based
 	 * on matching buttons, we need this to make button event handling non
-	 * blocking, while still alowing buttons to be remade each redraw as it
+	 * blocking, while still allowing buttons to be remade each redraw as it
 	 * is expected by blender code */
 	for(but=block->buttons.first; but; but=but->next) {
 		if(ui_but_update_from_old_block(C, block, &but))
@@ -1206,7 +1209,7 @@ void ui_delete_linkline(uiLinkLine *line, uiBut *but)
  * an edit override pointer while dragging for example */
 
 /* for buttons pointing to color for example */
-void ui_get_but_vectorf(uiBut *but, float *vec)
+void ui_get_but_vectorf(uiBut *but, float vec[3])
 {
 	PropertyRNA *prop;
 	int a, tot;
@@ -1244,27 +1247,34 @@ void ui_get_but_vectorf(uiBut *but, float *vec)
 			vec[0]= vec[1]= vec[2]= 0.0f;
 		}
 	}
+
+	if (but->type == BUT_NORMAL) {
+		normalize_v3(vec);
+	}
 }
 
 /* for buttons pointing to color for example */
-void ui_set_but_vectorf(uiBut *but, float *vec)
+void ui_set_but_vectorf(uiBut *but, const float vec[3])
 {
 	PropertyRNA *prop;
-	int a, tot;
 
 	if(but->editvec) {
-		VECCOPY(but->editvec, vec);
+		copy_v3_v3(but->editvec, vec);
 	}
 
 	if(but->rnaprop) {
 		prop= but->rnaprop;
 
 		if(RNA_property_type(prop) == PROP_FLOAT) {
+			int tot;
+			int a;
+
 			tot= RNA_property_array_length(&but->rnapoin, prop);
 			tot= MIN2(tot, 3);
 
-			for(a=0; a<tot; a++)
+			for (a=0; a<tot; a++) {
 				RNA_property_float_set_index(&but->rnapoin, prop, a, vec[a]);
+			}
 		}
 	}
 	else if(but->pointype == CHA) {
@@ -1275,7 +1285,7 @@ void ui_set_but_vectorf(uiBut *but, float *vec)
 	}
 	else if(but->pointype == FLO) {
 		float *fp= (float *)but->poin;
-		VECCOPY(fp, vec);
+		copy_v3_v3(fp, vec);
 	}
 }
 
@@ -1528,7 +1538,7 @@ static double ui_get_but_scale_unit(uiBut *but, double value)
 }
 
 /* str will be overwritten */
-void ui_convert_to_unit_alt_name(uiBut *but, char *str, int maxlen)
+void ui_convert_to_unit_alt_name(uiBut *but, char *str, size_t maxlen)
 {
 	if(ui_is_but_unit(but)) {
 		UnitSettings *unit= but->block->unit;
@@ -1576,22 +1586,23 @@ static float ui_get_but_step_unit(uiBut *but, float step_default)
 }
 
 
-void ui_get_but_string(uiBut *but, char *str, int maxlen)
+void ui_get_but_string(uiBut *but, char *str, size_t maxlen)
 {
 	if(but->rnaprop && ELEM3(but->type, TEX, IDPOIN, SEARCH_MENU)) {
 		PropertyType type;
 		char *buf= NULL;
+		int buf_len;
 
 		type= RNA_property_type(but->rnaprop);
 
 		if(type == PROP_STRING) {
 			/* RNA string */
-			buf= RNA_property_string_get_alloc(&but->rnapoin, but->rnaprop, str, maxlen);
+			buf= RNA_property_string_get_alloc(&but->rnapoin, but->rnaprop, str, maxlen, &buf_len);
 		}
 		else if(type == PROP_POINTER) {
 			/* RNA pointer */
 			PointerRNA ptr= RNA_property_pointer_get(&but->rnapoin, but->rnaprop);
-			buf= RNA_struct_name_get_alloc(&ptr, str, maxlen);
+			buf= RNA_struct_name_get_alloc(&ptr, str, maxlen, &buf_len);
 		}
 
 		if(!buf) {
@@ -1599,7 +1610,7 @@ void ui_get_but_string(uiBut *but, char *str, int maxlen)
 		}
 		else if(buf && buf != str) {
 			/* string was too long, we have to truncate */
-			BLI_strncpy(str, buf, maxlen);
+			memcpy(str, buf, MIN2(maxlen, buf_len+1));
 			MEM_freeN(buf);
 		}
 	}
@@ -1735,7 +1746,9 @@ int ui_set_but_string(bContext *C, uiBut *but, const char *str)
 	}
 	else if(but->type == TEX) {
 		/* string */
-		BLI_strncpy(but->poin, str, but->hardmax);
+		if(ui_is_but_utf8(but)) BLI_strncpy_utf8(but->poin, str, but->hardmax);
+		else                    BLI_strncpy(but->poin, str, but->hardmax);
+
 		return 1;
 	}
 	else if(but->type == SEARCH_MENU) {
@@ -2044,7 +2057,7 @@ uiBlock *uiBeginBlock(const bContext *C, ARegion *region, const char *name, shor
 		wm_subwindow_getsize(window, window->screen->mainwin, &getsizex, &getsizey);
 
 		block->aspect= 2.0/fabs(getsizex*block->winmat[0][0]);
-		block->auto_open= 2;
+		block->auto_open= TRUE;
 		block->flag |= UI_BLOCK_LOOP; /* tag as menu */
 	}
 
@@ -2143,8 +2156,8 @@ void ui_check_but(uiBut *but)
 		UI_GET_BUT_VALUE_INIT(but, value)
 
 		if(ui_is_but_float(but)) {
-			if(value == (double) FLT_MAX) sprintf(but->drawstr, "%sinf", but->str);
-			else if(value == (double) -FLT_MAX) sprintf(but->drawstr, "%s-inf", but->str);
+			if(value == (double) FLT_MAX) BLI_snprintf(but->drawstr, sizeof(but->drawstr), "%sinf", but->str);
+			else if(value == (double) -FLT_MAX) BLI_snprintf(but->drawstr, sizeof(but->drawstr), "%s-inf", but->str);
 			/* support length type buttons */
 			else if(ui_is_but_unit(but)) {
 				char new_str[sizeof(but->drawstr)];
@@ -2157,7 +2170,7 @@ void ui_check_but(uiBut *but)
 			}
 		}
 		else {
-			sprintf(but->drawstr, "%s%d", but->str, (int)value);
+			BLI_snprintf(but->drawstr, sizeof(but->drawstr), "%s%d", but->str, (int)value);
 		}
 			
 		if(but->rnaprop) {
@@ -2176,7 +2189,7 @@ void ui_check_but(uiBut *but)
 			BLI_snprintf(but->drawstr, sizeof(but->drawstr), "%s%.*f", but->str, prec, value);
 		}
 		else {
-			strncpy(but->drawstr, but->str, UI_MAX_DRAW_STR);
+			BLI_strncpy(but->drawstr, but->str, UI_MAX_DRAW_STR);
 		}
 		
 		break;
@@ -2194,7 +2207,7 @@ void ui_check_but(uiBut *but)
 		break;
 	
 	case KEYEVT:
-		strncpy(but->drawstr, but->str, UI_MAX_DRAW_STR);
+		BLI_strncpy(but->drawstr, but->str, UI_MAX_DRAW_STR);
 		if (but->flag & UI_SELECT) {
 			strcat(but->drawstr, "Press a key");
 		}
@@ -2226,15 +2239,15 @@ void ui_check_but(uiBut *but)
 				strcat(but->drawstr, "Press a key  ");
 		}
 		else
-			strncpy(but->drawstr, but->str, UI_MAX_DRAW_STR);
+			BLI_strncpy(but->drawstr, but->str, UI_MAX_DRAW_STR);
 
 		break;
 		
 	case BUT_TOGDUAL:
 		/* trying to get the dual-icon to left of text... not very nice */
 		if(but->str[0]) {
-			strncpy(but->drawstr, "  ", UI_MAX_DRAW_STR);
-			strncpy(but->drawstr+2, but->str, UI_MAX_DRAW_STR-2);
+			BLI_strncpy(but->drawstr, "  ", UI_MAX_DRAW_STR);
+			BLI_strncpy(but->drawstr+2, but->str, UI_MAX_DRAW_STR-2);
 		}
 		break;
 
@@ -2242,13 +2255,13 @@ void ui_check_but(uiBut *but)
 	case HSVCIRCLE:
 		break;
 	default:
-		strncpy(but->drawstr, but->str, UI_MAX_DRAW_STR);
+		BLI_strncpy(but->drawstr, but->str, UI_MAX_DRAW_STR);
 		
 	}
 
 	/* if we are doing text editing, this will override the drawstr */
 	if(but->editstr)
-		strncpy(but->drawstr, but->editstr, UI_MAX_DRAW_STR);
+		BLI_strncpy(but->drawstr, but->editstr, UI_MAX_DRAW_STR);
 	
 	/* text clipping moved to widget drawing code itself */
 }
@@ -2286,7 +2299,7 @@ int ui_but_can_align(uiBut *but)
 	return !ELEM3(but->type, LABEL, OPTION, OPTIONN);
 }
 
-static void ui_block_do_align_but(uiBut *first, int nr)
+static void ui_block_do_align_but(uiBut *first, short nr)
 {
 	uiBut *prev, *but=NULL, *next;
 	int flag= 0, cols=0, rows=0;
@@ -2423,7 +2436,7 @@ static void ui_block_do_align_but(uiBut *first, int nr)
 void ui_block_do_align(uiBlock *block)
 {
 	uiBut *but;
-	int nr;
+	short nr;
 
 	/* align buttons with same align nr */
 	for(but=block->buttons.first; but;) {
@@ -2467,7 +2480,7 @@ static uiBut *ui_def_but(uiBlock *block, int type, int retval, const char *str, 
 	but->pointype= type & BUTPOIN;
 	but->bit= type & BIT;
 	but->bitnr= type & 31;
-	but->icon = 0;
+	but->icon = ICON_NONE;
 	but->iconadd=0;
 
 	but->retval= retval;
@@ -2514,7 +2527,7 @@ static uiBut *ui_def_but(uiBlock *block, int type, int retval, const char *str, 
 	but->pos= -1;	/* cursor invisible */
 
 	if(ELEM4(but->type, NUM, NUMABS, NUMSLI, HSVSLI)) {	/* add a space to name */
-		slen= strlen(but->str);
+		/* slen remains unchanged from previous assignment, ensure this stays true */
 		if(slen>0 && slen<UI_MAX_NAME_STR-2) {
 			if(but->str[slen-1]!=' ') {
 				but->str[slen]= ' ';
@@ -2546,6 +2559,11 @@ static uiBut *ui_def_but(uiBlock *block, int type, int retval, const char *str, 
 	
 	if(block->curlayout)
 		ui_layout_add_but(block->curlayout, but);
+
+	/* if the 'UI_OT_editsource' is running, extract the source info from the button  */
+	if (UI_editsource_enable_check()) {
+		UI_editsource_active_but_test(but);
+	}
 
 	return but;
 }
@@ -2741,10 +2759,7 @@ static uiBut *ui_def_but_operator(uiBlock *block, int type, const char *opname, 
 	if ((!tip || tip[0]=='\0') && ot && ot->description) {
 		tip= ot->description;
 
-#ifdef INTERNATIONAL
-		if(UI_translate_tooltips())
-			tip= BLF_gettext(tip);
-#endif
+		tip = TIP_(tip);
 	}
 
 	but= ui_def_but(block, type, -1, str, x1, y1, x2, y2, NULL, 0, 0, 0, 0, tip);
@@ -2804,7 +2819,8 @@ uiBut *uiDefBut(uiBlock *block, int type, int retval, const char *str, int x1, i
 	 * otherwise return -1. 
 	 * (1<<findBitIndex(x))==x for powers of two.
 	 */
-static int findBitIndex(unsigned int x) {
+static int findBitIndex(unsigned int x)
+{
 	if (!x || (x&(x-1))!=0) {	/* x&(x-1) strips lowest bit */
 		return -1;
 	} else {
@@ -2822,12 +2838,12 @@ static int findBitIndex(unsigned int x) {
 
 /* autocomplete helper functions */
 struct AutoComplete {
-	int maxlen;
+	size_t maxlen;
 	char *truncate;
 	const char *startname;
 };
 
-AutoComplete *autocomplete_begin(const char *startname, int maxlen)
+AutoComplete *autocomplete_begin(const char *startname, size_t maxlen)
 {
 	AutoComplete *autocpl;
 	

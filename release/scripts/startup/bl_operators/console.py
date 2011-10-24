@@ -37,12 +37,14 @@ class ConsoleExec(Operator):
         if execute:
             return execute(context)
         else:
-            print("Error: bpy.ops.console.execute_" + sc.language + " - not found")
+            print("Error: bpy.ops.console.execute_%s - not found" %
+                  sc.language)
             return {'FINISHED'}
 
 
 class ConsoleAutocomplete(Operator):
-    '''Evaluate the namespace up until the cursor and give a list of options or complete the name if there is only one'''
+    """Evaluate the namespace up until the cursor and give a list of """ \
+    """options or complete the name if there is only one"""
     bl_idname = "console.autocomplete"
     bl_label = "Console Autocomplete"
 
@@ -54,12 +56,13 @@ class ConsoleAutocomplete(Operator):
         if autocomplete:
             return autocomplete(context)
         else:
-            print("Error: bpy.ops.console.autocomplete_" + sc.language + " - not found")
+            print("Error: bpy.ops.console.autocomplete_%s - not found" %
+                  sc.language)
             return {'FINISHED'}
 
 
 class ConsoleBanner(Operator):
-    '''Print a message whem the terminal initializes'''
+    '''Print a message when the terminal initializes'''
     bl_idname = "console.banner"
     bl_label = "Console Banner"
 
@@ -76,7 +79,8 @@ class ConsoleBanner(Operator):
         if banner:
             return banner(context)
         else:
-            print("Error: bpy.ops.console.banner_" + sc.language + " - not found")
+            print("Error: bpy.ops.console.banner_%s - not found" %
+                  sc.language)
             return {'FINISHED'}
 
 
@@ -93,7 +97,7 @@ class ConsoleLanguage(Operator):
     def execute(self, context):
         sc = context.space_data
 
-        # defailt to python
+        # default to python
         sc.language = self.language
 
         bpy.ops.console.banner()
@@ -103,4 +107,3 @@ class ConsoleLanguage(Operator):
             remove_duplicates=True)
 
         return {'FINISHED'}
-        

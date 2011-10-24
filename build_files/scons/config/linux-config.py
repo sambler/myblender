@@ -23,13 +23,6 @@ BF_CXX = '/usr'
 WITH_BF_STATICCXX = False
 BF_CXX_LIB_STATIC = '${BF_CXX}/lib/libstdc++.a'
 
-BF_LIBSAMPLERATE = '/usr'
-WITH_BF_STATICLIBSAMPLERATE = False
-BF_LIBSAMPLERATE_INC = '${BF_LIBSAMPLERATE}/include'
-BF_LIBSAMPLERATE_LIB = 'samplerate'
-BF_LIBSAMPLERATE_LIBPATH = '${BF_LIBSAMPLERATE}/lib'
-BF_LIBSAMPLERATE_LIB_STATIC = '${BF_LIBSAMPLERATE}/lib/libsamplerate.a'
-
 WITH_BF_JACK = False
 BF_JACK = '/usr'
 BF_JACK_INC = '${BF_JACK}/include/jack'
@@ -104,7 +97,6 @@ BF_BULLET_LIB = 'extern_bullet'
 BF_FREETYPE = '/usr'
 BF_FREETYPE_INC = '${BF_FREETYPE}/include ${BF_FREETYPE}/include/freetype2'
 BF_FREETYPE_LIB = 'freetype'
-#WITH_BF_FREETYPE_STATIC = True
 #BF_FREETYPE_LIB_STATIC = '${BF_FREETYPE}/lib/libfreetype.a'
 
 WITH_BF_QUICKTIME = False # -DWITH_QUICKTIME
@@ -207,15 +199,16 @@ CXX = 'g++'
 ##   CFLAGS += -pipe -fPIC -funsigned-char -fno-strict-aliasing -mieee
 
 CCFLAGS = ['-pipe','-fPIC','-funsigned-char','-fno-strict-aliasing','-D_LARGEFILE_SOURCE', '-D_FILE_OFFSET_BITS=64','-D_LARGEFILE64_SOURCE']
+CXXFLAGS = []
 
 CPPFLAGS = []
-CXXFLAGS = ['-pipe','-fPIC','-funsigned-char','-fno-strict-aliasing','-D_LARGEFILE_SOURCE', '-D_FILE_OFFSET_BITS=64','-D_LARGEFILE64_SOURCE']
 # g++ 4.6, only needed for bullet
 CXXFLAGS += ['-fpermissive']
 if WITH_BF_FFMPEG:
   # libavutil needs UINT64_C()
   CXXFLAGS += ['-D__STDC_CONSTANT_MACROS', ]
-REL_CFLAGS = ['-DNDEBUG', '-O2']
+REL_CFLAGS = []
+REL_CXXFLAGS = []
 REL_CCFLAGS = ['-DNDEBUG', '-O2']
 ##BF_DEPEND = True
 ##

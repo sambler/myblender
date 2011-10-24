@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -62,6 +60,7 @@
 
 #include "DNA_ID.h"
 #include "DNA_scene_types.h"
+#include "DNA_userdef_types.h"
 
 #include "BLI_blenlib.h"
 
@@ -85,6 +84,7 @@
 #include "BPY_extern.h"
 #endif
 
+#include "RE_engine.h"
 #include "RE_pipeline.h"
 
 //XXX #include "playanim_ext.h"
@@ -140,9 +140,6 @@ static int print_version(int argc, const char **argv, void *data);
 /* for the callbacks: */
 
 extern int pluginapi_force_ref(void);  /* from blenpluginapi:pluginapi.c */
-
-char bprogname[FILE_MAX]; /* from blenpluginapi:pluginapi.c */
-char btempdir[FILE_MAX];
 
 #define BLEND_VERSION_STRING_FMT "Blender %d.%02d (sub %d)\n", BLENDER_VERSION/100, BLENDER_VERSION%100, BLENDER_SUBVERSION
 
@@ -305,7 +302,7 @@ static int print_help(int UNUSED(argc), const char **UNUSED(argv), void *data)
 #else
 	printf ("  $TMP or $TMPDIR           Store temporary files here.\n");
 #endif
-#ifndef DISABLE_SDL
+#ifdef WITH_SDL
 	printf ("  $SDL_AUDIODRIVER          LibSDL audio driver - alsa, esd, dma.\n");
 #endif
 	printf ("  $PYTHONHOME               Path to the python directory, eg. /usr/lib/python.\n\n");
@@ -483,7 +480,7 @@ static int no_joystick(int UNUSED(argc), const char **UNUSED(argv), void *data)
 	SYS_SystemHandle *syshandle = data;
 
 	/**
-	 	don't initialize joysticks if user doesn't want to use joysticks
+		don't initialize joysticks if user doesn't want to use joysticks
 		failed joystick initialization delays over 5 seconds, before game engine start
 	*/
 	SYS_WriteCommandLineInt(*syshandle, "nojoystick",1);
@@ -520,8 +517,8 @@ static int set_output(int argc, const char **argv, void *data)
 {
 	bContext *C = data;
 	if (argc >= 1){
-		if (CTX_data_scene(C)) {
-			Scene *scene= CTX_data_scene(C);
+		Scene *scene= CTX_data_scene(C);
+		if (scene) {
 			BLI_strncpy(scene->r.pic, argv[1], sizeof(scene->r.pic));
 		} else {
 			printf("\nError: no blend loaded. cannot use '-o / --render-output'.\n");
@@ -546,16 +543,16 @@ static int set_engine(int argc, const char **argv, void *data)
 			exit(0);
 		}
 		else {
-			if (CTX_data_scene(C)==NULL) {
-				printf("\nError: no blend loaded. order the arguments so '-E  / --engine ' is after a blend is loaded.\n");
-			}
-			else {
-				Scene *scene= CTX_data_scene(C);
+			Scene *scene= CTX_data_scene(C);
+			if (scene) {
 				RenderData *rd = &scene->r;
 
 				if(BLI_findstring(&R_engines, argv[1], offsetof(RenderEngineType, idname))) {
 					BLI_strncpy_utf8(rd->engine, argv[1], sizeof(rd->engine));
 				}
+			}
+			else {
+				printf("\nError: no blend loaded. order the arguments so '-E  / --engine ' is after a blend is loaded.\n");
 			}
 		}
 
@@ -573,10 +570,8 @@ static int set_image_type(int argc, const char **argv, void *data)
 	bContext *C = data;
 	if (argc >= 1){
 		const char *imtype = argv[1];
-		if (CTX_data_scene(C)==NULL) {
-			printf("\nError: no blend loaded. order the arguments so '-F  / --render-format' is after the blend is loaded.\n");
-		} else {
-			Scene *scene= CTX_data_scene(C);
+		Scene *scene= CTX_data_scene(C);
+		if (scene) {
 			if      (!strcmp(imtype,"TGA")) scene->r.imtype = R_TARGA;
 			else if (!strcmp(imtype,"IRIS")) scene->r.imtype = R_IRIS;
 #ifdef WITH_DDS
@@ -612,6 +607,9 @@ static int set_image_type(int argc, const char **argv, void *data)
 #endif
 			else printf("\nError: Format from '-F / --render-format' not known or not compiled in this release.\n");
 		}
+		else {
+			printf("\nError: no blend loaded. order the arguments so '-F  / --render-format' is after the blend is loaded.\n");
+		}
 		return 1;
 	} else {
 		printf("\nError: you must specify a format after '-F  / --render-foramt'.\n");
@@ -638,8 +636,8 @@ static int set_extension(int argc, const char **argv, void *data)
 {
 	bContext *C = data;
 	if (argc >= 1) {
-		if (CTX_data_scene(C)) {
-			Scene *scene= CTX_data_scene(C);
+		Scene *scene= CTX_data_scene(C);
+		if (scene) {
 			if (argv[1][0] == '0') {
 				scene->r.scemode &= ~R_EXTENSION;
 			} else if (argv[1][0] == '1') {
@@ -721,9 +719,9 @@ example:
 static int render_frame(int argc, const char **argv, void *data)
 {
 	bContext *C = data;
-	if (CTX_data_scene(C)) {
+	Scene *scene= CTX_data_scene(C);
+	if (scene) {
 		Main *bmain= CTX_data_main(C);
-		Scene *scene= CTX_data_scene(C);
 
 		if (argc > 1) {
 			Render *re = RE_NewRender(scene->id.name);
@@ -763,9 +761,9 @@ static int render_frame(int argc, const char **argv, void *data)
 static int render_animation(int UNUSED(argc), const char **UNUSED(argv), void *data)
 {
 	bContext *C = data;
-	if (CTX_data_scene(C)) {
+	Scene *scene= CTX_data_scene(C);
+	if (scene) {
 		Main *bmain= CTX_data_main(C);
-		Scene *scene= CTX_data_scene(C);
 		Render *re= RE_NewRender(scene->id.name);
 		ReportList reports;
 		BKE_reports_init(&reports, RPT_PRINT);
@@ -782,9 +780,9 @@ static int set_scene(int argc, const char **argv, void *data)
 {
 	if(argc > 1) {
 		bContext *C= data;
-		Scene *sce= set_scene_name(CTX_data_main(C), argv[1]);
-		if(sce) {
-			CTX_data_scene_set(C, sce);
+		Scene *scene= set_scene_name(CTX_data_main(C), argv[1]);
+		if(scene) {
+			CTX_data_scene_set(C, scene);
 		}
 		return 1;
 	} else {
@@ -796,8 +794,8 @@ static int set_scene(int argc, const char **argv, void *data)
 static int set_start_frame(int argc, const char **argv, void *data)
 {
 	bContext *C = data;
-	if (CTX_data_scene(C)) {
-		Scene *scene= CTX_data_scene(C);
+	Scene *scene= CTX_data_scene(C);
+	if (scene) {
 		if (argc > 1) {
 			int frame = atoi(argv[1]);
 			(scene->r.sfra) = CLAMPIS(frame, MINFRAME, MAXFRAME);
@@ -815,8 +813,8 @@ static int set_start_frame(int argc, const char **argv, void *data)
 static int set_end_frame(int argc, const char **argv, void *data)
 {
 	bContext *C = data;
-	if (CTX_data_scene(C)) {
-		Scene *scene= CTX_data_scene(C);
+	Scene *scene= CTX_data_scene(C);
+	if (scene) {
 		if (argc > 1) {
 			int frame = atoi(argv[1]);
 			(scene->r.efra) = CLAMPIS(frame, MINFRAME, MAXFRAME);
@@ -834,8 +832,8 @@ static int set_end_frame(int argc, const char **argv, void *data)
 static int set_skip_frame(int argc, const char **argv, void *data)
 {
 	bContext *C = data;
-	if (CTX_data_scene(C)) {
-		Scene *scene= CTX_data_scene(C);
+	Scene *scene= CTX_data_scene(C);
+	if (scene) {
 		if (argc > 1) {
 			int frame = atoi(argv[1]);
 			(scene->r.frame_step) = CLAMPIS(frame, 1, MAXFRAME);
@@ -1152,10 +1150,8 @@ int main(int argc, const char **argv)
 	fpsetmask(0);
 #endif
 
-	// copy path to executable in bprogname. playanim and creting runtimes
-	// need this.
-
-	BLI_where_am_i(bprogname, sizeof(bprogname), argv[0]);
+	// initialize path to executable
+	BLI_init_program_path(argv[0]);
 
 	BLI_threadapi_init();
 
@@ -1210,9 +1206,10 @@ int main(int argc, const char **argv)
 		WM_init(C, argc, argv);
 
 		/* this is properly initialized with user defs, but this is default */
-		BLI_where_is_temp(btempdir, FILE_MAX, 1); /* call after loading the startup.blend so we can read U.tempdir */
+		/* call after loading the startup.blend so we can read U.tempdir */
+		BLI_init_temporary_dir(U.tempdir);
 
-#ifndef DISABLE_SDL
+#ifdef WITH_SDL
 	BLI_setenv("SDL_VIDEODRIVER", "dummy");
 #endif
 	}
@@ -1221,7 +1218,8 @@ int main(int argc, const char **argv)
 
 		WM_init(C, argc, argv);
 
-		BLI_where_is_temp(btempdir, FILE_MAX, 0); /* call after loading the startup.blend so we can read U.tempdir */
+		/* don't use user preferences temp dir */
+		BLI_init_temporary_dir(NULL);
 	}
 #ifdef WITH_PYTHON
 	/**

@@ -1,7 +1,6 @@
 /*
  * A general argument parsing module
  *
- * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -35,12 +34,13 @@
 
 
 #include <ctype.h> /* for tolower */
+#include <string.h>
 
 #include "MEM_guardedalloc.h"
 
+#include "BLI_utildefines.h"
 #include "BLI_listbase.h"
 #include "BLI_string.h"
-#include "BLI_utildefines.h"
 #include "BLI_args.h"
 #include "BLI_ghash.h"
 
@@ -76,7 +76,8 @@ struct bArgs {
 	int	  *passes;
 };
 
-static unsigned int case_strhash(const void *ptr) {
+static unsigned int case_strhash(const void *ptr)
+{
 	const char *s= ptr;
 	unsigned int i= 0;
 	unsigned char c;

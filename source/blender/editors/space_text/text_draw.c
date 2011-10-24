@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -1421,8 +1419,7 @@ static void draw_suggestion_list(SpaceText *st, ARegion *ar)
 
 		y -= st->lheight;
 
-		strncpy(str, item->name, SUGG_LIST_WIDTH);
-		str[SUGG_LIST_WIDTH] = '\0';
+		BLI_strncpy(str, item->name, SUGG_LIST_WIDTH);
 
 		w = text_font_width(st, str);
 		

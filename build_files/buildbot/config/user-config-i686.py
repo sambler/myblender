@@ -58,8 +58,6 @@ WITH_BF_PNG = True
 BF_PNG_LIB = 'libpng'
 BF_PNG_LIBPATH = '/home/sources/staticlibs/lib32'
 
-WITH_BF_STATICLIBSAMPLERATE = True
-
 WITH_BF_ZLIB = True
 WITH_BF_STATICZLIB = True
 BF_ZLIB_LIB_STATIC = '${BF_ZLIB}/lib/libz.a'
@@ -91,8 +89,12 @@ BF_3DMOUSE_LIBPATH = '${BF_3DMOUSE}/lib32'
 WITH_BF_FFTW3 = True
 WITH_BF_STATICFFTW3 = True
 
+# JACK
+WITH_BF_JACK = True
+
 # Compilation and optimization
 BF_DEBUG = False
-REL_CFLAGS = ['-O2']
-REL_CCFLAGS = ['-O2']
+REL_CFLAGS = []
+REL_CXXFLAGS = []
+REL_CCFLAGS = ['-O2']  # C & C++
 PLATFORM_LINKFLAGS = ['-L/home/sources/staticlibs/lib32']

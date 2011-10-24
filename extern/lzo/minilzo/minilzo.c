@@ -906,6 +906,7 @@
 #endif
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 #if (LZO_CC_BORLANDC && (__BORLANDC__ >= 0x0200))
    extern void __near __cdecl _AHSHIFT(void);
@@ -2088,6 +2089,7 @@ LZO_EXTERN(const lzo_bytep) lzo_copyright(void);
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 #if !defined(lzo_uintptr_t)
@@ -2596,6 +2598,7 @@ int __far __pascal LibMain ( int a, short b, short c, long d )
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 #if !defined(D_BITS) && defined(DBITS)

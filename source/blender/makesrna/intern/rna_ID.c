@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -314,6 +312,26 @@ static int rna_IDPArray_length(PointerRNA *ptr)
 	return prop->len;
 }
 
+int rna_IDMaterials_assign_int(PointerRNA *ptr, int key, const PointerRNA *assign_ptr)
+{
+	ID *id=           ptr->id.data;
+	short *totcol= give_totcolp_id(id);
+	Material *mat_id= assign_ptr->id.data;
+	if(totcol && (key >= 0 && key < *totcol)) {
+		assign_material_id(id, mat_id, key + 1);
+		return 1;
+	}
+	else {
+		return 0;
+	}
+}
+
+void rna_Library_filepath_set(PointerRNA *ptr, const char *value)
+{
+	Library *lib= (Library*)ptr->data;
+	BKE_library_filepath_set(lib, value);
+}
+
 #else
 
 static void rna_def_ID_properties(BlenderRNA *brna)
@@ -367,7 +385,7 @@ static void rna_def_ID_properties(BlenderRNA *brna)
 
 	prop= RNA_def_property(srna, "idp_array", PROP_COLLECTION, PROP_NONE);
 	RNA_def_property_struct_type(prop, "PropertyGroup");
-	RNA_def_property_collection_funcs(prop, "rna_IDPArray_begin", "rna_iterator_array_next", "rna_iterator_array_end", "rna_iterator_array_get", "rna_IDPArray_length", NULL, NULL);
+	RNA_def_property_collection_funcs(prop, "rna_IDPArray_begin", "rna_iterator_array_next", "rna_iterator_array_end", "rna_iterator_array_get", "rna_IDPArray_length", NULL, NULL, NULL);
 	RNA_def_property_flag(prop, PROP_EXPORT|PROP_IDPROPERTY);
 
 	// never tested, maybe its useful to have this?
@@ -509,7 +527,7 @@ static void rna_def_library(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "filepath", PROP_STRING, PROP_FILEPATH);
 	RNA_def_property_string_sdna(prop, NULL, "name");
 	RNA_def_property_ui_text(prop, "File Path", "Path to the library .blend file");
-	/* TODO - lib->filename isnt updated, however the outliner also skips this, probably only needed on read. */
+	RNA_def_property_string_funcs(prop, NULL, NULL, "rna_Library_filepath_set");
 	
 	prop= RNA_def_property(srna, "parent", PROP_POINTER, PROP_NONE);
 	RNA_def_property_struct_type(prop, "Library");

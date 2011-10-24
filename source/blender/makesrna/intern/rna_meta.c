@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -330,7 +328,8 @@ static void rna_def_metaball(BlenderRNA *brna)
 	RNA_def_property_collection_sdna(prop, NULL, "mat", "totcol");
 	RNA_def_property_struct_type(prop, "Material");
 	RNA_def_property_ui_text(prop, "Materials", "");
-	RNA_def_property_srna(prop, "IDMaterials"); /* see rna_ID.c */	
+	RNA_def_property_srna(prop, "IDMaterials"); /* see rna_ID.c */
+	RNA_def_property_collection_funcs(prop, 0, NULL, NULL, NULL, NULL, NULL, NULL, "rna_IDMaterials_assign_int");
 	
 	/* anim */
 	rna_def_animdata_common(srna);

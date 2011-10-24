@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -149,7 +147,7 @@ public:
 	virtual void	SetRenderArea();
 
 	virtual void	SetStereoMode(const StereoMode stereomode);
-    virtual RAS_IRasterizer::StereoMode GetStereoMode();
+	virtual RAS_IRasterizer::StereoMode GetStereoMode();
 	virtual bool	Stereo();
 	virtual bool	InterlacedStereo();
 	virtual void	SetEye(const StereoEye eye);

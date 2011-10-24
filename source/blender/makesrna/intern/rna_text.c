@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -69,7 +67,7 @@ static void rna_Text_filename_set(PointerRNA *ptr, const char *value)
 	if(text->name)
 		MEM_freeN(text->name);
 
-	if(strlen(value))
+	if(value[0])
 		text->name= BLI_strdup(value);
 	else
 		text->name= NULL;

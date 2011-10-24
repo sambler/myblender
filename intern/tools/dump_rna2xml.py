@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-# $Id$
 # ***** BEGIN GPL LICENSE BLOCK *****
 #
 # This program is free software; you can redistribute it and/or
@@ -27,7 +26,7 @@
 # useful for finding bugs in RNA api.
 
 # Example usage
-# blender some.blend -b -P intern/tools/dump_rna2xml.py
+# blender some.blend --background -noaudio --python intern/tools/dump_rna2xml.py
 
 import bpy
 

@@ -145,7 +145,7 @@ class PARTICLE_PT_context_particles(ParticleButtonsPanel, Panel):
             #row.label(text="Render")
 
             if part.is_fluid:
-                layout.label(text=str(part.count) + " fluid particles for this frame")
+                layout.label(text="{} fluid particles for this frame".format(str(part.count)))
                 return
 
             row = col.row()
@@ -405,9 +405,12 @@ class PARTICLE_PT_rotation(ParticleButtonsPanel, Panel):
 
         layout.enabled = particle_panel_enabled(context, psys)
 
-        row = layout.row()
-        row.label(text="Initial Rotation:")
-        row.prop(part, "use_dynamic_rotation")
+        layout.prop(part, "use_dynamic_rotation")
+
+        if part.use_dynamic_rotation:
+            layout.label(text="Initial Rotation Axis:")
+        else:
+            layout.label(text="Rotation Axis:")
 
         split = layout.split()
 
@@ -419,12 +422,17 @@ class PARTICLE_PT_rotation(ParticleButtonsPanel, Panel):
         col.prop(part, "phase_factor", slider=True)
         col.prop(part, "phase_factor_random", text="Random", slider=True)
 
-        col = layout.column()
-        col.label(text="Angular Velocity:")
-        col.row().prop(part, "angular_velocity_mode", expand=True)
-
-        if part.angular_velocity_mode != 'NONE':
-            col.prop(part, "angular_velocity_factor", text="")
+        if part.type != 'HAIR':
+            col = layout.column()
+            if part.use_dynamic_rotation:
+                col.label(text="Initial Angular Velocity:")
+            else:
+                col.label(text="Angular Velocity:")
+            sub = col.row(align=True)
+            sub.prop(part, "angular_velocity_mode", text="")
+            subsub = sub.column()
+            subsub.active = part.angular_velocity_mode != 'NONE'
+            subsub.prop(part, "angular_velocity_factor", text="")
 
 
 class PARTICLE_PT_physics(ParticleButtonsPanel, Panel):
@@ -476,7 +484,12 @@ class PARTICLE_PT_physics(ParticleButtonsPanel, Panel):
             col.label(text="Integration:")
             col.prop(part, "integrator", text="")
             col.prop(part, "timestep")
-            col.prop(part, "subframes")
+            sub = col.row()
+            if part.adaptive_subframes:
+                sub.prop(part, "courant_target", text="Threshold")
+            else:
+                sub.prop(part, "subframes")
+            sub.prop(part, "adaptive_subframes", text="")
 
             row = layout.row()
             row.prop(part, "use_size_deflect")
@@ -491,7 +504,7 @@ class PARTICLE_PT_physics(ParticleButtonsPanel, Panel):
                 col.label(text="Fluid properties:")
                 col.prop(fluid, "stiffness", text="Stiffness")
                 col.prop(fluid, "linear_viscosity", text="Viscosity")
-                col.prop(fluid, "buoyancy", text="Buoancy", slider=True)
+                col.prop(fluid, "buoyancy", text="Buoyancy", slider=True)
 
                 col = split.column()
                 col.label(text="Advanced:")
@@ -827,7 +840,9 @@ class PARTICLE_PT_render(ParticleButtonsPanel, Panel):
 
         elif part.render_type == 'OBJECT':
             col.prop(part, "dupli_object")
-            col.prop(part, "use_global_dupli")
+            sub = col.row()
+            sub.prop(part, "use_global_dupli")
+            sub.prop(part, "use_rotation_dupli")
         elif part.render_type == 'GROUP':
             col.prop(part, "dupli_group")
             split = layout.split()
@@ -836,13 +851,14 @@ class PARTICLE_PT_render(ParticleButtonsPanel, Panel):
             col.prop(part, "use_whole_group")
             sub = col.column()
             sub.active = (part.use_whole_group is False)
+            sub.prop(part, "use_group_pick_random")
             sub.prop(part, "use_group_count")
 
             col = split.column()
             sub = col.column()
             sub.active = (part.use_whole_group is False)
             sub.prop(part, "use_global_dupli")
-            sub.prop(part, "use_group_pick_random")
+            sub.prop(part, "use_rotation_dupli")
 
             if part.use_group_count and not part.use_whole_group:
                 row = layout.row()
@@ -983,7 +999,7 @@ class PARTICLE_PT_draw(ParticleButtonsPanel, Panel):
         col.label(text="Color:")
         col.prop(part, "draw_color", text="")
         sub = col.row()
-        sub.active = part.draw_color in ('VELOCITY', 'ACCELERATION')
+        sub.active = (part.draw_color in {'VELOCITY', 'ACCELERATION'})
         sub.prop(part, "color_maximum", text="Max")
 
         if (path):
@@ -1146,7 +1162,7 @@ class PARTICLE_PT_force_fields(ParticleButtonsPanel, Panel):
 
 
 class PARTICLE_PT_vertexgroups(ParticleButtonsPanel, Panel):
-    bl_label = "Vertexgroups"
+    bl_label = "Vertex Groups"
     bl_options = {'DEFAULT_CLOSED'}
     COMPAT_ENGINES = {'BLENDER_RENDER'}
 

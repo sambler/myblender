@@ -228,7 +228,7 @@ typedef struct bMinMaxConstraint {
 	int			minmaxflag;
 	float		offset;
 	int			flag;
-	short		sticky, stuck, pad1, pad2; /* for backward compatability */
+	short		sticky, stuck, pad1, pad2; /* for backward compatibility */
 	float		cache[3];
 	char		subtarget[32];
 } bMinMaxConstraint;
@@ -344,7 +344,7 @@ typedef struct bPivotConstraint {
 	 *	Either target object + offset, or just offset is used
 	 */
 	struct Object 		*tar;			/* target object (optional) */
-	char	 	subtarget[32];		/* subtarget name (optional) */
+	char		subtarget[32];		/* subtarget name (optional) */
 	float 		offset[3];		/* offset from the target to use, regardless of whether it exists */
 	
 	/* Rotation-driven activation:

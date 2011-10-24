@@ -1,4 +1,3 @@
-# $Id$
 # ***** BEGIN GPL LICENSE BLOCK *****
 #
 # This program is free software; you can redistribute it and/or
@@ -248,9 +247,10 @@ elseif(UNIX)
 	endif()
 
 elseif(WIN32)
-	if(MSVC)
-		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /WX")
-	endif()
+	## Warnings as errors, this is too strict!
+	#if(MSVC)
+	#	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /WX")
+	#endif()
 
 	list(APPEND INC_SYS
 		${WINTAB_INC}

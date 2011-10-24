@@ -90,9 +90,10 @@ LIBDIR = '${LCGDIR}'
 ###################          Dependency settings           ##################
 #############################################################################
 
-#Defaults openMP to true if compiler handles it
-if CC == 'gcc-4.2' or CC == 'llvm-gcc-4.2':
-    WITH_BF_OPENMP = True  # multithreading for fluids, cloth and smoke
+#Defaults openMP to true if compiler handles it ( only gcc 4.6.1 and newer )
+# if your compiler does not have accurate suffix you may have to enable it by hand !
+if CC.endswith('4.6.1'):
+    WITH_BF_OPENMP = True  # multithreading for fluids, cloth, sculpt and smoke
 else:
     WITH_BF_OPENMP = False
 
@@ -146,11 +147,6 @@ BF_OPENAL_INC = '${BF_OPENAL}/include' # only headers from libdir needed for pro
 BF_CXX = '/usr'
 WITH_BF_STATICCXX = False
 BF_CXX_LIB_STATIC = '${BF_CXX}/lib/libstdc++.a'
-
-BF_LIBSAMPLERATE = LIBDIR + '/samplerate'
-BF_LIBSAMPLERATE_INC = '${BF_LIBSAMPLERATE}/include'
-BF_LIBSAMPLERATE_LIB = 'samplerate'
-BF_LIBSAMPLERATE_LIBPATH = '${BF_LIBSAMPLERATE}/lib'
 
 # TODO - set proper paths here (add precompiled to lib/ ? )
 WITH_BF_JACK = False
@@ -310,11 +306,11 @@ if MACOSX_ARCHITECTURE == 'x86_64' or MACOSX_ARCHITECTURE == 'ppc64':
 else:
 	ARCH_FLAGS = ['-m32']
 
-CFLAGS = ['-pipe','-funsigned-char']+ARCH_FLAGS
+CFLAGS = []
+CXXFLAGS = []
+CCFLAGS = ['-pipe','-funsigned-char']
 
-CPPFLAGS = []+ARCH_FLAGS
-CCFLAGS = ['-pipe','-funsigned-char']+ARCH_FLAGS
-CXXFLAGS = ['-pipe','-funsigned-char']+ARCH_FLAGS
+CPPFLAGS = list(ARCH_FLAGS)
 
 if WITH_GHOST_COCOA:
 	PLATFORM_LINKFLAGS = ['-fexceptions','-framework','CoreServices','-framework','Foundation','-framework','IOKit','-framework','AppKit','-framework','Cocoa','-framework','Carbon','-framework','AudioUnit','-framework','AudioToolbox','-framework','CoreAudio','-framework','OpenAL']+ARCH_FLAGS
@@ -340,9 +336,8 @@ else:
 
 # some flags shuffling for different OS versions
 if MAC_MIN_VERS == '10.3':
-	CFLAGS = ['-fuse-cxa-atexit']+CFLAGS
-	CXXFLAGS = ['-fuse-cxa-atexit']+CXXFLAGS
-	PLATFORM_LINKFLAGS = ['-fuse-cxa-atexit']+PLATFORM_LINKFLAGS
+	CCFLAGS = ['-fuse-cxa-atexit'] + CFLAGS
+	PLATFORM_LINKFLAGS = ['-fuse-cxa-atexit'] + PLATFORM_LINKFLAGS
 	LLIBS.append('crt3.o')
 	
 if USE_SDK:
@@ -353,19 +348,18 @@ if USE_SDK:
 
 #Intel Macs are CoreDuo and Up	
 if MACOSX_ARCHITECTURE == 'i386' or MACOSX_ARCHITECTURE == 'x86_64':
-	REL_CFLAGS = ['-DNDEBUG', '-O2','-ftree-vectorize','-msse','-msse2','-msse3','-mfpmath=sse']
+	REL_CFLAGS = []
+	REL_CXXFLAGS = []
 	REL_CCFLAGS = ['-DNDEBUG', '-O2','-ftree-vectorize','-msse','-msse2','-msse3','-mfpmath=sse']
 else:
-	CFLAGS = CFLAGS+['-fno-strict-aliasing']
-	CCFLAGS =  CCFLAGS+['-fno-strict-aliasing']
-	CXXFLAGS = CXXFLAGS+['-fno-strict-aliasing']
-	REL_CFLAGS = ['-DNDEBUG', '-O2']
+	CCFLAGS += ['-fno-strict-aliasing']
+	REL_CFLAGS = []
+	REL_CXXFLAGS = []
 	REL_CCFLAGS = ['-DNDEBUG', '-O2']
 
 # Intel 64bit Macs are Core2Duo and up
 if MACOSX_ARCHITECTURE == 'x86_64':
-	REL_CFLAGS = REL_CFLAGS+['-march=core2','-mssse3','-with-tune=core2','-enable-threads']
-	REL_CCFLAGS = REL_CCFLAGS+['-march=core2','-mssse3','-with-tune=core2','-enable-threads']
+	REL_CCFLAGS += ['-march=core2','-mssse3','-with-tune=core2','-enable-threads']
 
 CC_WARN = ['-Wall']
 C_WARN = ['-Wno-char-subscripts', '-Wpointer-arith', '-Wcast-align', '-Wdeclaration-after-statement', '-Wno-unknown-pragmas', '-Wstrict-prototypes']

@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -164,9 +162,6 @@ static int open_exec(bContext *UNUSED(C), wmOperator *op)
 
 static int open_invoke(bContext *C, wmOperator *op, wmEvent *event)
 {
-	if(!RNA_property_is_set(op->ptr, "relative_path"))
-		RNA_boolean_set(op->ptr, "relative_path", U.flag & USER_RELPATHS);
-
 	if(RNA_property_is_set(op->ptr, "filepath"))
 		return open_exec(C, op);
 
@@ -264,9 +259,6 @@ static int mixdown_exec(bContext *C, wmOperator *op)
 
 static int mixdown_invoke(bContext *C, wmOperator *op, wmEvent *event)
 {
-	if(!RNA_property_is_set(op->ptr, "relative_path"))
-		RNA_boolean_set(op->ptr, "relative_path", U.flag & USER_RELPATHS);
-
 	if(RNA_property_is_set(op->ptr, "filepath"))
 		return mixdown_exec(C, op);
 
@@ -519,6 +511,7 @@ static int sound_poll(bContext *C)
 
 static int pack_exec(bContext *C, wmOperator *op)
 {
+	Main *bmain= CTX_data_main(C);
 	Editing* ed = CTX_data_scene(C)->ed;
 	bSound* sound;
 
@@ -530,7 +523,7 @@ static int pack_exec(bContext *C, wmOperator *op)
 	if(!sound || sound->packedfile)
 		return OPERATOR_CANCELLED;
 
-	sound->packedfile= newPackedFile(op->reports, sound->name);
+	sound->packedfile= newPackedFile(op->reports, sound->name, ID_BLEND_PATH(bmain, &sound->id));
 	sound_load(CTX_data_main(C), sound);
 
 	return OPERATOR_FINISHED;

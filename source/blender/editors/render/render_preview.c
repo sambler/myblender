@@ -1,5 +1,4 @@
 /* 
- * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -121,8 +120,6 @@ ImBuf* get_brush_icon(Brush *brush)
 				// otherwise lets try to find it in other directories
 				if (!(brush->icon_imbuf)) {
 					folder= BLI_get_folder(BLENDER_DATAFILES, "brushicons");
-
-					path[0]= 0;
 
 					BLI_make_file_string(G.main->name, path, folder, brush->icon_filepath);
 
@@ -261,7 +258,7 @@ static Scene *preview_prepare_scene(Scene *scene, ID *id, int id_type, ShaderPre
 			sce->r.alphamode= R_ADDSKY;
 
 		sce->r.cfra= scene->r.cfra;
-		strcpy(sce->r.engine, scene->r.engine);
+		BLI_strncpy(sce->r.engine, scene->r.engine, sizeof(sce->r.engine));
 		
 		if(id_type==ID_MA) {
 			Material *mat= NULL, *origmat= (Material *)id;
@@ -344,7 +341,7 @@ static Scene *preview_prepare_scene(Scene *scene, ID *id, int id_type, ShaderPre
 					/* copy over object color, in case material uses it */
 					copy_v4_v4(base->object->col, sp->col);
 					
-					if(ELEM4(base->object->type, OB_MESH, OB_CURVE, OB_SURF, OB_MBALL)) {
+					if(OB_TYPE_SUPPORT_MATERIAL(base->object->type)) {
 						/* don't use assign_material, it changed mat->id.us, which shows in the UI */
 						Material ***matar= give_matarar(base->object);
 						int actcol= MAX2(base->object->actcol > 0, 1) - 1;

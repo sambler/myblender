@@ -1,6 +1,6 @@
 #ifdef _cplusplus
 extern "C" {
-
+//} for code folding
 #endif
 	
 // x0 is the point, x1-x2-x3 is the triangle. Take care to specify x1,x2,x3 in sorted order of index!

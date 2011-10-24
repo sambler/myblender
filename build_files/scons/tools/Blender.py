@@ -131,7 +131,6 @@ def setup_staticlibs(lenv):
         lenv['BF_JPEG_LIBPATH'],
         lenv['BF_ZLIB_LIBPATH'],
         lenv['BF_PNG_LIBPATH'],
-        lenv['BF_LIBSAMPLERATE_LIBPATH'],
         lenv['BF_ICONV_LIBPATH']
         ])
 
@@ -193,9 +192,6 @@ def setup_staticlibs(lenv):
     if lenv['WITH_BF_OPENMP']:
         if lenv['OURPLATFORM'] == 'linuxcross':
             libincs += Split(lenv['BF_OPENMP_LIBPATH'])
-
-    if lenv['WITH_BF_STATICLIBSAMPLERATE']:
-        statlibs += Split(lenv['BF_LIBSAMPLERATE_LIB_STATIC'])
 
     # setting this last so any overriding of manually libs could be handled
     if lenv['OURPLATFORM'] not in ('win32-vc', 'win32-mingw', 'win64-vc', 'linuxcross'):
@@ -270,9 +266,6 @@ def setup_syslibs(lenv):
             syslibs += Split(lenv['BF_OPENCOLLADA_LIB'])
         syslibs.append(lenv['BF_EXPAT_LIB'])
 
-    if not lenv['WITH_BF_STATICLIBSAMPLERATE']:
-        syslibs += Split(lenv['BF_LIBSAMPLERATE_LIB'])
-
     if lenv['WITH_BF_JEMALLOC']:
         if not lenv['WITH_BF_STATICJEMALLOC']:
             syslibs += Split(lenv['BF_JEMALLOC_LIB'])
@@ -323,8 +316,8 @@ def creator(env):
     if env['WITH_BF_TIFF']:
         defs.append('WITH_TIFF')
 
-    if not env['WITH_BF_SDL']:
-        defs.append('DISABLE_SDL')
+    if env['WITH_BF_SDL']:
+        defs.append('WITH_SDL')
 
     if env['WITH_BF_PYTHON']:
         incs.append('#/source/blender/python')
@@ -350,7 +343,7 @@ def buildinfo(lenv, build_type):
     build_time = time.strftime ("%H:%M:%S")
     build_rev = os.popen('svnversion').read()[:-1] # remove \n
     if build_rev == '': 
-        build_rev = '40404'
+        build_rev = '41189'
     if lenv['BF_DEBUG']:
         build_type = "Debug"
         build_cflags = ' '.join(lenv['CFLAGS'] + lenv['CCFLAGS'] + lenv['BF_DEBUG_CCFLAGS'] + lenv['CPPFLAGS'])
@@ -561,25 +554,24 @@ def AppIt(target=None, source=None, env=None):
     cmd = 'cp %s/%s %s/%s.app/Contents/MacOS/%s'%(builddir, binary,installdir, binary, binary)
     commands.getoutput(cmd)
     cmd = 'mkdir %s/%s.app/Contents/MacOS/%s/'%(installdir, binary, VERSION)
-#    print cmd
     commands.getoutput(cmd)
     cmd = installdir + '/%s.app/Contents/MacOS/%s'%(binary,VERSION)
-    cmd = 'mkdir %s/%s.app/Contents/MacOS/%s/datafiles'%(installdir, binary, VERSION)
-    commands.getoutput(cmd)
-    cmd = 'cp -R %s/release/bin/.blender/locale %s/%s.app/Contents/MacOS/%s/datafiles/'%(bldroot,installdir,binary,VERSION)
-    commands.getoutput(cmd)
-    cmd = 'cp -R %s/release/bin/.blender/fonts %s/%s.app/Contents/MacOS/%s/datafiles/'%(bldroot,installdir,binary,VERSION)
-    commands.getoutput(cmd)
-    cmd = 'cp %s/release/bin/%s/.Blanguages %s/%s.app/Contents/Resources/'%(bldroot,VERSION,installdir,binary)
-    commands.getoutput(cmd)
+
+    # blenderplayer doesn't need all the files
+    if binary == 'blender':
+        cmd = 'mkdir %s/%s.app/Contents/MacOS/%s/datafiles'%(installdir, binary, VERSION)
+        commands.getoutput(cmd)
+        cmd = 'cp -R %s/release/datafiles/locale %s/%s.app/Contents/MacOS/%s/datafiles/'%(bldroot,installdir,binary,VERSION)
+        commands.getoutput(cmd)
+        cmd = 'cp -R %s/release/datafiles/fonts %s/%s.app/Contents/MacOS/%s/datafiles/'%(bldroot,installdir,binary,VERSION)
+        commands.getoutput(cmd)
+        cmd = 'cp -R %s/release/scripts %s/%s.app/Contents/MacOS/%s/'%(bldroot,installdir,binary,VERSION)
+        commands.getoutput(cmd)
+
     if env['WITH_OSX_STATICPYTHON']:
         cmd = 'mkdir %s/%s.app/Contents/MacOS/%s/python/'%(installdir,binary, VERSION)
         commands.getoutput(cmd)
         cmd = 'unzip -q %s/release/%s -d %s/%s.app/Contents/MacOS/%s/python/'%(libdir,python_zip,installdir,binary,VERSION)
-        commands.getoutput(cmd) 
-
-    if binary == 'blender':#not copy everything for blenderplayer
-        cmd = 'cp -R %s/release/scripts %s/%s.app/Contents/MacOS/%s/'%(bldroot,installdir,binary,VERSION)
         commands.getoutput(cmd)
 
     cmd = 'chmod +x  %s/%s.app/Contents/MacOS/%s'%(installdir,binary, binary)
@@ -590,6 +582,20 @@ def AppIt(target=None, source=None, env=None):
     commands.getoutput(cmd)
     cmd = 'find %s/%s.app -name __MACOSX -exec rm -rf {} \;'%(installdir, binary)
     commands.getoutput(cmd)
+    if env['CC'].endswith('4.6.1'): # for correct errorhandling with gcc 4.6.1 we need the gcc.dylib to link, thus distribute in app-bundle
+        cmd = 'mkdir %s/%s.app/Contents/MacOS/lib'%(installdir, binary)
+        commands.getoutput(cmd)
+        instname = env['BF_CXX']
+        cmd = 'cp %s/lib/libgcc_s.1.dylib %s/%s.app/Contents/MacOS/lib/'%(instname, installdir, binary)
+        commands.getoutput(cmd)
+        cmd = 'install_name_tool -id @executable_path/lib/libgcc_s.1.dylib %s/%s.app/Contents/MacOS/lib/libgcc_s.1.dylib'%(installdir, binary)
+        commands.getoutput(cmd)
+        cmd = 'install_name_tool -change %s/lib/libgcc_s.1.dylib  @executable_path/lib/libgcc_s.1.dylib %s/%s.app/Contents/MacOS/%s'%(instname, installdir, binary, binary)
+        commands.getoutput(cmd)
+        cmd = 'rm -rf  %s/set_simulation_threads.app'%(installdir) # first clear omp_num_threads applescript
+        commands.getoutput(cmd)
+        cmd = 'cp -R %s/source/darwin/set_simulation_threads.app %s/'%(bldroot, installdir) # copy the omp_num_threads applescript
+        commands.getoutput(cmd)
 
 # extract copy system python, be sure to update other build systems
 # when making changes to the files that are copied.
@@ -633,7 +639,11 @@ def UnixPyBundle(target=None, source=None, env=None):
     run("rm -rf '%s/distutils'" % py_target)
     run("rm -rf '%s/lib2to3'" % py_target)
     run("rm -rf '%s/config'" % py_target)
-    run("rm -rf '%s/config-*'" % py_target)
+
+    for f in os.listdir(py_target):
+        if f.startswith("config-"):
+            run("rm -rf '%s/%s'" % (py_target, f))
+
     run("rm -rf '%s/site-packages'" % py_target)
     run("mkdir '%s/site-packages'" % py_target)    # python needs it.'
     run("rm -rf '%s/idlelib'" % py_target)
@@ -695,7 +705,7 @@ class BlenderEnvironment(SConsEnvironment):
         SConsEnvironment.Default(self, res)
         resources.append(res)
 
-    def BlenderLib(self=None, libname=None, sources=None, includes=[], defines=[], libtype='common', priority = 100, compileflags=None, cc_compileflags=None, cxx_compileflags=None):
+    def BlenderLib(self=None, libname=None, sources=None, includes=[], defines=[], libtype='common', priority = 100, compileflags=None, cc_compileflags=None, cxx_compileflags=None, cc_compilerchange=None, cxx_compilerchange=None):
         global vcp
         if not self or not libname or not sources:
             print bc.FAIL+'Cannot continue. Missing argument for BuildBlenderLib '+libname+bc.ENDC
@@ -733,6 +743,10 @@ class BlenderEnvironment(SConsEnvironment):
                 lenv.Replace(CCFLAGS = cc_compileflags)
             if cxx_compileflags:
                 lenv.Replace(CXXFLAGS = cxx_compileflags)
+            if cc_compilerchange:
+                lenv.Replace(CC = cc_compilerchange)
+            if cxx_compilerchange:
+                lenv.Replace(CXX = cxx_compilerchange)
             lenv.Append(CFLAGS = lenv['C_WARN'])
             lenv.Append(CCFLAGS = lenv['CC_WARN'])
             lenv.Append(CXXFLAGS = lenv['CXX_WARN'])

@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -54,22 +52,22 @@ public:
 	~BlenderWorldInfo();
 
 	bool	hasWorld();
-    bool	hasMist();
-    float	getBackColorRed();
-    float	getBackColorGreen();
-    float	getBackColorBlue();
+	bool	hasMist();
+	float	getBackColorRed();
+	float	getBackColorGreen();
+	float	getBackColorBlue();
 	
 	float	getAmbientColorRed();
 	float	getAmbientColorGreen();
 	float	getAmbientColorBlue();
 
-    float	getMistStart();
-    float	getMistDistance();
-    float	getMistColorRed();
-    float	getMistColorGreen();
-    float	getMistColorBlue();     
+	float	getMistStart();
+	float	getMistDistance();
+	float	getMistColorRed();
+	float	getMistColorGreen();
+	float	getMistColorBlue();
 
-		void
+	void
 	setBackColor(
 		float r,
 		float g,

@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -34,6 +32,7 @@
 #ifndef UI_INTERFACE_H
 #define UI_INTERFACE_H
 
+#include "BLO_sys_types.h" /* size_t */
 #include "RNA_types.h"
 #include "DNA_userdef_types.h"
 
@@ -576,7 +575,7 @@ void uiButSetFocusOnEnter	(struct wmWindow *win, uiBut *but);
 
 typedef struct AutoComplete AutoComplete;
 
-AutoComplete *autocomplete_begin(const char *startname, int maxlen);
+AutoComplete *autocomplete_begin(const char *startname, size_t maxlen);
 void autocomplete_do_name(AutoComplete *autocpl, const char *name);
 void autocomplete_end(AutoComplete *autocpl, char *autoname);
 
@@ -610,6 +609,7 @@ void UI_remove_popup_handlers(struct ListBase *handlers, uiPopupBlockHandle *pop
 
 void UI_init(void);
 void UI_init_userdef(void);
+void UI_reinit_font(void);
 void UI_exit(void);
 
 /* Layout
@@ -747,6 +747,7 @@ void uiTemplateHeader3D(uiLayout *layout, struct bContext *C);
 void uiTemplateEditModeSelection(uiLayout *layout, struct bContext *C);
 void uiTemplateTextureImage(uiLayout *layout, struct bContext *C, struct Tex *tex);
 void uiTemplateReportsBanner(uiLayout *layout, struct bContext *C);
+void uiTemplateKeymapItemProperties(uiLayout *layout, struct PointerRNA *ptr);
 
 void uiTemplateList(uiLayout *layout, struct bContext *C, struct PointerRNA *ptr, const char *propname, struct PointerRNA *activeptr, const char *activeprop, int rows, int maxrows, int type);
 
@@ -784,7 +785,9 @@ void uiItemMenuEnumR(uiLayout *layout, struct PointerRNA *ptr, const char *propn
 void UI_buttons_operatortypes(void);
 
 /* Helpers for Operators */
+uiBut *uiContextActiveButton(const struct bContext *C);
 void uiContextActiveProperty(const struct bContext *C, struct PointerRNA *ptr, struct PropertyRNA **prop, int *index);
+void uiContextActivePropertyHandle(struct bContext *C);
 void uiContextAnimUpdate(const struct bContext *C);
 void uiFileBrowseContextProperty(const struct bContext *C, struct PointerRNA *ptr, struct PropertyRNA **prop);
 void uiIDContextProperty(struct bContext *C, struct PointerRNA *ptr, struct PropertyRNA **prop);
@@ -808,6 +811,14 @@ int UI_translate_iface(void);
 int UI_translate_tooltips(void);
 const char *UI_translate_do_iface(const char *msgid);
 const char *UI_translate_do_tooltip(const char *msgid);
+
+/* Those macros should be used everywhere in UI code. */
+#define IFACE_(msgid) UI_translate_do_iface(msgid)
+#define TIP_(msgid) UI_translate_do_tooltip(msgid)
+
+/* UI_OT_editsource helpers */
+int  UI_editsource_enable_check(void);
+void UI_editsource_active_but_test(uiBut *but);
 
 #endif /*  UI_INTERFACE_H */
 

@@ -1,5 +1,4 @@
 /*
- * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -33,7 +32,6 @@
 
 /**
 
- * $Id$
  * Copyright (C) 2001 NaN Technologies B.V.
  * This file was formerly known as: GEN_StdString.h.
  * @date	April, 25, 2001
@@ -95,11 +93,11 @@ public:
 	STR_String&			Format(const char *fmt, ...);				// Set formatted text to string
 	STR_String&			FormatAdd(const char *fmt, ...);			// Add formatted text to string
 	inline void			Clear()										{ Len = pData[0] = 0; }
-	inline const STR_String	& Reverse()									
-        { 
-            for (int i1=0, i2=Len-1; i1<i2; i1++, i2--) 
-                swap(pData[i1], pData[i2]); return *this; 
-        }
+	inline const STR_String	& Reverse()
+	{
+		for (int i1=0, i2=Len-1; i1<i2; i1++, i2--)
+			swap(pData[i1], pData[i2]); return *this;
+	}
 
 	// Properties
 	bool				IsUpper() const;

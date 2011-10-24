@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -295,6 +293,7 @@ typedef struct wmKeyConfig {
 
 /* wmKeyConfig.flag */
 #define KEYCONF_USER			(1 << 1)
+#define KEYCONF_INIT_DEFAULT	(1 << 2)
 
 /* this one is the operator itself, stored in files for macros etc */
 /* operator + operatortype should be able to redo entirely, but for different contextes */

@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -35,6 +33,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 struct bContext;
@@ -351,7 +350,7 @@ extern StructRNA RNA_OperatorFileListElement;
 extern StructRNA RNA_OperatorMousePath;
 extern StructRNA RNA_OperatorProperties;
 extern StructRNA RNA_OperatorStrokeElement;
-extern StructRNA RNA_OperatorTypeMacro;
+extern StructRNA RNA_OperatorMacro;
 extern StructRNA RNA_OrController;
 extern StructRNA RNA_OutflowFluidSettings;
 extern StructRNA RNA_PackedFile;
@@ -649,7 +648,7 @@ PropertyRNA *RNA_struct_type_find_property(StructRNA *srna, const char *identifi
 FunctionRNA *RNA_struct_find_function(PointerRNA *ptr, const char *identifier);
 const struct ListBase *RNA_struct_type_functions(StructRNA *srna);
 
-char *RNA_struct_name_get_alloc(PointerRNA *ptr, char *fixedbuf, int fixedlen);
+char *RNA_struct_name_get_alloc(PointerRNA *ptr, char *fixedbuf, int fixedlen, int *r_len);
 
 /* Properties
  *
@@ -756,7 +755,7 @@ void RNA_property_float_get_default_array(PointerRNA *ptr, PropertyRNA *prop, fl
 float RNA_property_float_get_default_index(PointerRNA *ptr, PropertyRNA *prop, int index);
 
 void RNA_property_string_get(PointerRNA *ptr, PropertyRNA *prop, char *value);
-char *RNA_property_string_get_alloc(PointerRNA *ptr, PropertyRNA *prop, char *fixedbuf, int fixedlen);
+char *RNA_property_string_get_alloc(PointerRNA *ptr, PropertyRNA *prop, char *fixedbuf, int fixedlen, int *r_len);
 void RNA_property_string_set(PointerRNA *ptr, PropertyRNA *prop, const char *value);
 int RNA_property_string_length(PointerRNA *ptr, PropertyRNA *prop);
 void RNA_property_string_get_default(PointerRNA *ptr, PropertyRNA *prop, char *value);
@@ -779,6 +778,7 @@ int RNA_property_collection_length(PointerRNA *ptr, PropertyRNA *prop);
 int RNA_property_collection_lookup_index(PointerRNA *ptr, PropertyRNA *prop, PointerRNA *t_ptr);
 int RNA_property_collection_lookup_int(PointerRNA *ptr, PropertyRNA *prop, int key, PointerRNA *r_ptr);
 int RNA_property_collection_lookup_string(PointerRNA *ptr, PropertyRNA *prop, const char *key, PointerRNA *r_ptr);
+int RNA_property_collection_assign_int(PointerRNA *ptr, PropertyRNA *prop, const int key, const PointerRNA *assign_ptr);
 int RNA_property_collection_type_get(PointerRNA *ptr, PropertyRNA *prop, PointerRNA *r_ptr);
 
 /* efficient functions to set properties for arrays */
@@ -822,20 +822,6 @@ int RNA_path_resolve_full(PointerRNA *ptr, const char *path,
 
 char *RNA_path_from_ID_to_struct(PointerRNA *ptr);
 char *RNA_path_from_ID_to_property(PointerRNA *ptr, PropertyRNA *prop);
-
-#if 0
-/* Dependency
- *
- * Experimental code that will generate callbacks for each dependency
- * between ID types. This may end up being useful for UI
- * and evaluation code that needs to know such dependencies for correct
- * redraws and re-evaluations. */
-
-typedef void (*PropDependencyCallback)(void *udata, PointerRNA *from, PointerRNA *to);
-void RNA_test_dependencies_cb(void *udata, PointerRNA *from, PointerRNA *to);
-
-void RNA_generate_dependencies(PointerRNA *mainptr, void *udata, PropDependencyCallback cb);
-#endif
 
 /* Quick name based property access
  *

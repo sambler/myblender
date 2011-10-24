@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -41,6 +39,7 @@
 
 #include "BLI_math.h" /* windows needs for M_PI */
 #include "BLI_utildefines.h"
+#include "BLI_string.h"
 
 #include "DNA_scene_types.h"
 #include "DNA_sequence_types.h"
@@ -177,7 +176,7 @@ static void open_plugin_seq(PluginSeq *pis, const char *seqname)
 				MEM_freeN(info);
 
 				cp= BLI_dynlib_find_symbol(pis->handle, "seqname");
-				if(cp) strncpy(cp, seqname, 21);
+				if(cp) BLI_strncpy(cp, seqname, 21);
 			} else {
 				printf ("Plugin returned unrecognized version number\n");
 				return;
@@ -203,7 +202,7 @@ static PluginSeq *add_plugin_seq(const char *str, const char *seqname)
 
 	pis= MEM_callocN(sizeof(PluginSeq), "PluginSeq");
 
-	strncpy(pis->name, str, FILE_MAXDIR+FILE_MAXFILE);
+	BLI_strncpy(pis->name, str, FILE_MAX);
 	open_plugin_seq(pis, seqname);
 
 	if(pis->doit==NULL) {
@@ -826,7 +825,7 @@ static void do_cross_effect_float(float facf0, float facf1, int x, int y,
 	}
 }
 
-/* carefull: also used by speed effect! */
+/* careful: also used by speed effect! */
 
 static struct ImBuf* do_cross_effect(
 	SeqRenderData context, Sequence *UNUSED(seq), float UNUSED(cfra),
@@ -1638,8 +1637,6 @@ float hyp3,hyp4,b4,b5
 	if(wipezone->flip) x = xo - x;
 	angle = wipezone->angle;
 
-	posy = facf0 * yo;
-
 	if(wipe->forward){
 		posx = facf0 * xo;
 		posy = facf0 * yo;
@@ -2319,7 +2316,7 @@ static void RVBlurBitmap2_byte ( unsigned char* map, int width,int height,
 
 
 	/*	Swap buffers */
-	swap=temp;temp=map;map=swap;
+	swap=temp;temp=map; /* map=swap; */ /* UNUSED */
 
 	/*	Tidy up	 */
 	MEM_freeN (filter);
@@ -2489,7 +2486,7 @@ static void RVBlurBitmap2_float ( float* map, int width,int height,
 
 
 	/*	Swap buffers */
-	swap=temp;temp=map;map=swap;
+	swap=temp;temp=map; /* map=swap; */ /* UNUSED */
 
 	/*	Tidy up	 */
 	MEM_freeN (filter);

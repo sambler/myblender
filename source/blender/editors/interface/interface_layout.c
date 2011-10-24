@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -637,11 +635,7 @@ PointerRNA uiItemFullO(uiLayout *layout, const char *opname, const char *name, i
 	}
 
 	if(!name) {
-		name= ot->name;
-
-#ifdef INTERNATIONAL
-		name= UI_translate_do_iface(name);
-#endif
+		name= IFACE_(ot->name);
 	}
 
 	if(layout->root->type == UI_LAYOUT_MENU && !icon)
@@ -768,7 +762,7 @@ void uiItemsFullEnumO(uiLayout *layout, const char *opname, const char *propname
 				if(properties) {
 					PointerRNA tptr;
 
-					WM_operator_properties_create(&tptr, opname);
+					WM_operator_properties_create_ptr(&tptr, ot);
 					if(tptr.data) {
 						IDP_FreeProperty(tptr.data);
 						MEM_freeN(tptr.data);
@@ -1219,13 +1213,13 @@ static void rna_search_cb(const struct bContext *C, void *arg_but, const char *s
 #if 0		/* this name is used for a string comparison and can't be modified, TODO */
 			name_uiprefix_id(name_ui, id);
 #else
-			strcpy(name_ui, id->name+2);
+			BLI_strncpy(name_ui, id->name+2, sizeof(name_ui));
 #endif
 			name= BLI_strdup(name_ui);
 			iconid= ui_id_icon_get((bContext*)C, id, 1);
 		}
 		else {
-			name= RNA_struct_name_get_alloc(&itemptr, NULL, 0);
+			name= RNA_struct_name_get_alloc(&itemptr, NULL, 0, NULL); /* could use the string length here */
 			iconid = 0;
 		}
 
@@ -1430,11 +1424,7 @@ void uiItemM(uiLayout *layout, bContext *UNUSED(C), const char *menuname, const 
 	}
 
 	if(!name) {
-		name= mt->label;
-
-#ifdef INTERNATIONAL
-		name= UI_translate_do_iface(name);
-#endif
+		name= IFACE_(mt->label);
 	}
 
 	if(layout->root->type == UI_LAYOUT_MENU && !icon)
@@ -2432,7 +2422,7 @@ static void ui_item_estimate(uiItem *item)
 	}
 }
 
-static void ui_item_align(uiLayout *litem, int nr)
+static void ui_item_align(uiLayout *litem, short nr)
 {
 	uiItem *item;
 	uiButtonItem *bitem;
@@ -2808,7 +2798,7 @@ void uiLayoutOperatorButs(const bContext *C, uiLayout *layout, wmOperator *op,in
 		empty= uiDefAutoButsRNA(layout, &ptr, check_prop, label_align) == 0;
 
 		if(empty && (flag & UI_LAYOUT_OP_SHOW_EMPTY)) {
-			uiItemL(layout, UI_translate_do_iface(N_("No Properties")), ICON_NONE);
+			uiItemL(layout, IFACE_("No Properties"), ICON_NONE);
 		}
 	}
 	

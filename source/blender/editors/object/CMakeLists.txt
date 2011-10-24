@@ -1,4 +1,3 @@
-# $Id: CMakeLists.txt 12931 2007-12-17 18:20:48Z theeth $
 # ***** BEGIN GPL LICENSE BLOCK *****
 #
 # This program is free software; you can redistribute it and/or
@@ -57,16 +56,6 @@ set(SRC
 
 	object_intern.h
 )
-
-if(WITH_GAMEENGINE)
-	list(APPEND INC
-		../../../../extern/recastnavigation/Recast/Include
-	)
-
-	list(APPEND SRC
-		object_navmesh.cpp
-	)
-endif()
 
 if(WITH_PYTHON)
 	add_definitions(-DWITH_PYTHON)

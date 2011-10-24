@@ -627,6 +627,7 @@ void BL_Texture::SplitEnvMap(EnvMap *map)
 unsigned int BL_Texture::mDisableState = 0;
 
 extern "C" {
+//} for codefolding
 
 void my_envmap_split_ima(EnvMap *env, ImBuf *ibuf)
 {

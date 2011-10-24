@@ -1,7 +1,4 @@
-/** \file gameengine/Ketsji/KX_Dome.cpp
- *  \ingroup ketsji
- */
-/* $Id$
+/*
 -----------------------------------------------------------------------------
 
 This program is free software; you can redistribute it and/or modify it under
@@ -24,6 +21,10 @@ This code is originally inspired on some of the ideas and codes from Paul Bourke
 Developed as part of a Research and Development project for SAT - La Société des arts technologiques.
 -----------------------------------------------------------------------------
 */
+
+/** \file gameengine/Ketsji/KX_Dome.cpp
+ *  \ingroup ketsji
+ */
 
 #include "KX_Dome.h"
 
@@ -231,26 +232,12 @@ void KX_Dome::CalculateImageSize(void)
 - reduce the buffer for better performace
 - create a power of 2 texture bigger than the buffer
 */
-/*
-Blender handles Canvas size differently when in fullscreen mode.
-We are manually checking for that. Although it's a hack, it works.
-
-Bug reported here: #18655 - Inconsistency of pixels in canvas dimensions when in maximized mode (affecting BGE Dome)
-http://projects.blender.org/tracker/?func=detail&aid=18655&group_id=9&atid=125
-*/
-
 	canvaswidth = m_canvas->GetWidth();
 	canvasheight = m_canvas->GetHeight();
-
-	bool fullscreen(false); //XXX HACK
-	fullscreen = (canvaswidth != m_viewport.GetWidth());
 
 	m_buffersize = (canvaswidth > canvasheight?canvasheight:canvaswidth);
 	m_buffersize = (int)(m_buffersize*m_resbuffer); //reduce buffer size for better performance
 	
-	if (fullscreen) //XXX HACK
-		m_buffersize --;
-
 	int i = 0;
 	while ((1 << i) <= m_buffersize)
 		i++;
@@ -266,10 +253,6 @@ http://projects.blender.org/tracker/?func=detail&aid=18655&group_id=9&atid=125
 		warp.bufferwidth  = canvaswidth;
 		warp.bufferheight = canvasheight;
 	}
-
-	//XXX HACK
-	canvaswidth  = m_viewport.GetWidth();
-	canvasheight = m_viewport.GetHeight();
 }
 
 bool KX_Dome::CreateDL(){

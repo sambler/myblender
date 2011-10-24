@@ -1,8 +1,5 @@
-/*
- * @file PIL_time.h
- * 
- * Platform independant time functions.
- * $Id$
+/* 
+ * Platform independent time functions.
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -39,7 +36,8 @@
 #define PIL_TIME_H
 
 #ifdef __cplusplus
-extern "C" { 
+extern "C" {
+//} for code folding
 #endif
 
 extern 
@@ -51,7 +49,7 @@ extern
 double	PIL_check_seconds_timer		(void);
 
 	/**
-	 * Platform-independant sleep function.
+	 * Platform-independent sleep function.
 	 * @param ms Number of milliseconds to sleep
 	 */
 void	PIL_sleep_ms				(int ms);

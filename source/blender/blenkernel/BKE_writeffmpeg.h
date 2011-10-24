@@ -36,6 +36,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 #define FFMPEG_MPEG1 	0

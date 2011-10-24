@@ -1,31 +1,33 @@
-/**
-* $Id$ 
-*
-* ***** BEGIN GPL LICENSE BLOCK *****
-*
-* This program is free software; you can redistribute it and/or
-* modify it under the terms of the GNU General Public License
-* as published by the Free Software Foundation; either version 2
-* of the License, or (at your option) any later version.
-*
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU General Public License for more details.
-*
-* You should have received a copy of the GNU General Public License
-* along with this program; if not, write to the Free Software Foundation,
-* Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-*
-* The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
-* All rights reserved.
-*
-* The Original Code is: all of this file.
-*
-* Contributor(s): none yet.
-*
-* ***** END GPL LICENSE BLOCK *****
-*/
+/*
+ * ***** BEGIN GPL LICENSE BLOCK *****
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ *
+ * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
+ * All rights reserved.
+ *
+ * The Original Code is: all of this file.
+ *
+ * Contributor(s): none yet.
+ *
+ * ***** END GPL LICENSE BLOCK *****
+ */
+
+/** \file blender/blenkernel/intern/navmesh_conversion.c
+ *  \ingroup bke
+ */
 
 #include <math.h>
 #include <stdlib.h>
@@ -37,16 +39,17 @@
 #include "BKE_navmesh_conversion.h"
 #include "BKE_cdderivedmesh.h"
 
+#include "BLI_utildefines.h"
 #include "BLI_math.h"
 
 #include "recast-capi.h"
 
-inline float area2(const float* a, const float* b, const float* c)
+BM_INLINE float area2(const float* a, const float* b, const float* c)
 {
 	return (b[0] - a[0]) * (c[2] - a[2]) - (c[0] - a[0]) * (b[2] - a[2]);
 }
 
-inline int left(const float* a, const float* b, const float* c)
+BM_INLINE int left(const float* a, const float* b, const float* c)
 {
 	return area2(a, b, c) < 0;
 }
@@ -83,10 +86,14 @@ int polyIsConvex(const unsigned short* p, const int vertsPerPoly, const float* v
 float distPointToSegmentSq(const float* point, const float* a, const float* b)
 {
 	float abx[3], dx[3];
+	float d, t;
+
 	sub_v3_v3v3(abx, b,a);
 	sub_v3_v3v3(dx, point,a);
-	float d = abx[0]*abx[0]+abx[2]*abx[2];
-	float t = abx[0]*dx[0]+abx[2]*dx[2];
+
+	d = abx[0]*abx[0]+abx[2]*abx[2];
+	t = abx[0]*dx[0]+abx[2]*dx[2];
+
 	if (d > 0)
 		t /= d;
 	if (t < 0)
@@ -95,6 +102,7 @@ float distPointToSegmentSq(const float* point, const float* a, const float* b)
 		t = 1;
 	dx[0] = a[0] + t*abx[0] - point[0];
 	dx[2] = a[2] + t*abx[2] - point[2];
+
 	return dx[0]*dx[0] + dx[2]*dx[2];
 }
 
@@ -107,6 +115,8 @@ int buildRawVertIndicesData(DerivedMesh* dm, int *nverts_r, float **verts_r,
 	int *trisToFacesMap;
 	float *verts;
 	unsigned short *tris, *tri;
+	int nfaces;
+	MFace *faces;
 
 	nverts = dm->getNumVerts(dm);
 	if (nverts>=0xffff)
@@ -124,8 +134,8 @@ int buildRawVertIndicesData(DerivedMesh* dm, int *nverts_r, float **verts_r,
 	}
 
 	//calculate number of tris
-	int nfaces = dm->getNumFaces(dm);
-	MFace *faces = dm->getFaceArray(dm);
+	nfaces = dm->getNumFaces(dm);
+	faces = dm->getFaceArray(dm);
 	ntris = nfaces;
 	for (fi=0; fi<nfaces; fi++)
 	{
@@ -226,8 +236,9 @@ int buildPolygonsByDetailedMeshes(const int vertsPerPoly, const int npolys,
 			{
 				if (nv==capacity)
 				{
+					unsigned short* newPolyBig;
 					capacity += vertsPerPoly;
-					unsigned short* newPolyBig = MEM_callocN(sizeof(unsigned short)*capacity, "buildPolygonsByDetailedMeshes newPolyBig");
+					newPolyBig = MEM_callocN(sizeof(unsigned short)*capacity, "buildPolygonsByDetailedMeshes newPolyBig");
 					memset(newPolyBig, 0xff, sizeof(unsigned short)*capacity);
 					memcpy(newPolyBig, newPoly, sizeof(unsigned short)*nv);
 					MEM_freeN(newPoly);
@@ -319,14 +330,10 @@ struct SortContext
 	const int* trisToFacesMap;
 };
 
-/* XXX: not thread-safe, but it's called only from modifiers stack
-        which isn't threaded. Anyway, better to avoid this in the future */
-static struct SortContext *_qsort_context;
-
-static int compareByData(const void * a, const void * b)
+static int compareByData(void *ctx, const void * a, const void * b)
 {
-	return ( _qsort_context->recastData[_qsort_context->trisToFacesMap[*(int*)a]] -
-			_qsort_context->recastData[_qsort_context->trisToFacesMap[*(int*)b]] );
+	return (((struct SortContext *)ctx)->recastData[((struct SortContext *)ctx)->trisToFacesMap[*(int*)a]] -
+			((struct SortContext *)ctx)->recastData[((struct SortContext *)ctx)->trisToFacesMap[*(int*)b]] );
 }
 
 int buildNavMeshData(const int nverts, const float* verts, 
@@ -358,8 +365,7 @@ int buildNavMeshData(const int nverts, const float* verts,
 		trisMapping[i]=i;
 	context.recastData = recastData;
 	context.trisToFacesMap = trisToFacesMap;
-	_qsort_context = &context;
-	qsort(trisMapping, ntris, sizeof(int), compareByData);
+	recast_qsort(trisMapping, ntris, sizeof(int), &context, compareByData);
 
 	//search first valid triangle - triangle of convex polygon
 	validTriStart = -1;

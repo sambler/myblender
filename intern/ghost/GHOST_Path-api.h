@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -38,7 +36,8 @@
 #include "GHOST_Types.h"
 
 #ifdef __cplusplus
-extern "C" { 
+extern "C" {
+//} for code folding
 #endif
 
 GHOST_DECLARE_HANDLE(GHOST_SystemPathsHandle);
@@ -81,7 +80,7 @@ extern const GHOST_TUns8* GHOST_getBinaryDir(void);
 extern void GHOST_addToSystemRecentFiles(const char* filename);
 
 #ifdef __cplusplus
-} 
+}
 #endif
 
 #endif

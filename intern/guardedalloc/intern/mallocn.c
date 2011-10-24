@@ -1,5 +1,4 @@
 /*
- * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -33,7 +32,6 @@
 
 /**
 
- * $Id$
  * Copyright (C) 2001 NaN Technologies B.V.
  * Guarded memory allocation, and boundary-write detection.
  */
@@ -364,22 +362,9 @@ void *MEM_mapallocN(size_t len, const char *str)
 	mem_lock_thread();
 	
 	len = (len + 3 ) & ~3; 	/* allocate in units of 4 */
-	
-#ifdef __sgi
-	{
-#include <fcntl.h>
 
-		int fd;
-		fd = open("/dev/zero", O_RDWR);
-
-		memh= mmap(0, len+sizeof(MemHead)+sizeof(MemTail),
-				PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
-		close(fd);
-	}
-#else
 	memh= mmap(NULL, len+sizeof(MemHead)+sizeof(MemTail),
 			PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANON, -1, 0);
-#endif
 
 	if(memh!=(MemHead *)-1) {
 		make_memhead_header(memh, len, str);
@@ -724,6 +709,10 @@ static void rem_memblock(MemHead *memh)
 static void MemorY_ErroR(const char *block, const char *error)
 {
 	print_error("Memoryblock %s: %s\n",block, error);
+
+#ifdef WITH_ASSERT_ABORT
+	abort();
+#endif
 }
 
 static const char *check_memlist(MemHead *memh)

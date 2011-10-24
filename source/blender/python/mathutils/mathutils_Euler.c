@@ -1,5 +1,4 @@
 /*
- * $Id: mathutils_Euler.c 34851 2011-02-14 17:55:27Z campbellbarton $
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *

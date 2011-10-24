@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -40,8 +38,9 @@ void			PyC_FileAndNum_Safe(const char **filename, int *lineno); /* checks python
 int				PyC_AsArray(void *array, PyObject *value, const int length, const PyTypeObject *type, const short is_double, const char *error_prefix);
 
 /* follow http://www.python.org/dev/peps/pep-0383/ */
-PyObject *		PyC_UnicodeFromByte(const char *str);
-const char *	PyC_UnicodeAsByte(PyObject *py_str, PyObject **coerce); /* coerce must be NULL */
+PyObject *      PyC_UnicodeFromByte(const char *str);
+PyObject *      PyC_UnicodeFromByteAndSize(const char *str, Py_ssize_t size);
+const char *    PyC_UnicodeAsByte(PyObject *py_str, PyObject **coerce); /* coerce must be NULL */
 
 /* name namespace function for bpy & bge */
 PyObject *		PyC_DefaultNameSpace(const char *filename);

@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -39,7 +37,6 @@
 
 #include "BLI_fileops.h"
 #include "BLI_path_util.h"
-#include "BLI_storage.h"
 #include "BLI_string.h"
 #include "BLI_utildefines.h"
 
@@ -169,7 +166,7 @@ static int file_browse_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	if(!prop)
 		return OPERATOR_CANCELLED;
 
-	str= RNA_property_string_get_alloc(&ptr, prop, NULL, 0);
+	str= RNA_property_string_get_alloc(&ptr, prop, NULL, 0, NULL);
 
 	/* useful yet irritating feature, Shift+Click to open the file
 	 * Alt+Click to browse a folder in the OS's browser */

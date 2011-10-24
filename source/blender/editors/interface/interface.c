@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -1593,17 +1591,18 @@ void ui_get_but_string(uiBut *but, char *str, size_t maxlen)
 	if(but->rnaprop && ELEM3(but->type, TEX, IDPOIN, SEARCH_MENU)) {
 		PropertyType type;
 		char *buf= NULL;
+		int buf_len;
 
 		type= RNA_property_type(but->rnaprop);
 
 		if(type == PROP_STRING) {
 			/* RNA string */
-			buf= RNA_property_string_get_alloc(&but->rnapoin, but->rnaprop, str, maxlen);
+			buf= RNA_property_string_get_alloc(&but->rnapoin, but->rnaprop, str, maxlen, &buf_len);
 		}
 		else if(type == PROP_POINTER) {
 			/* RNA pointer */
 			PointerRNA ptr= RNA_property_pointer_get(&but->rnapoin, but->rnaprop);
-			buf= RNA_struct_name_get_alloc(&ptr, str, maxlen);
+			buf= RNA_struct_name_get_alloc(&ptr, str, maxlen, &buf_len);
 		}
 
 		if(!buf) {
@@ -1611,7 +1610,7 @@ void ui_get_but_string(uiBut *but, char *str, size_t maxlen)
 		}
 		else if(buf && buf != str) {
 			/* string was too long, we have to truncate */
-			BLI_strncpy(str, buf, maxlen);
+			memcpy(str, buf, MIN2(maxlen, buf_len+1));
 			MEM_freeN(buf);
 		}
 	}
@@ -2561,23 +2560,10 @@ static uiBut *ui_def_but(uiBlock *block, int type, int retval, const char *str, 
 	if(block->curlayout)
 		ui_layout_add_but(block->curlayout, but);
 
-#ifdef WITH_PYTHON_UI_INFO
-	{
-		extern void PyC_FileAndNum_Safe(const char **filename, int *lineno);
-
-		const char *fn;
-		int lineno= -1;
-		PyC_FileAndNum_Safe(&fn, &lineno);
-		if (lineno != -1) {
-			BLI_strncpy(but->py_dbg_fn, fn, sizeof(but->py_dbg_fn));
-			but->py_dbg_ln= lineno;
-		}
-		else {
-			but->py_dbg_fn[0]= '\0';
-			but->py_dbg_ln= -1;
-		}
+	/* if the 'UI_OT_editsource' is running, extract the source info from the button  */
+	if (UI_editsource_enable_check()) {
+		UI_editsource_active_but_test(but);
 	}
-#endif /* WITH_PYTHON_UI_INFO */
 
 	return but;
 }

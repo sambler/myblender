@@ -96,7 +96,7 @@ def register():
 
         items_unique = set()
 
-        for mod in addon_utils.modules(space_userpref.USERPREF_PT_addons._addons_fake_modules):
+        for mod in addon_utils.modules(addon_utils.addons_fake_modules):
             info = addon_utils.module_bl_info(mod)
             items_unique.add(info["category"])
 
@@ -110,7 +110,7 @@ def register():
     WindowManager.addon_filter = EnumProperty(
             items=addon_filter_items,
             name="Category",
-            description="Filter add-ons by category",
+            description="Filter addons by category",
             )
 
     WindowManager.addon_support = EnumProperty(

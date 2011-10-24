@@ -1,6 +1,4 @@
 /*
-* $Id$
-*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -25,18 +23,14 @@
  * Contributor(s): none yet.
  *
  * ***** END GPL LICENSE BLOCK *****
-*/
+ */
 
 /** \file gameengine/Converter/BL_ShapeActionActuator.cpp
  *  \ingroup bgeconv
  */
 
 
-#if defined (__sgi)
-#include <math.h>
-#else
 #include <cmath>
-#endif
 
 #include "SCA_LogicManager.h"
 #include "BL_ShapeActionActuator.h"

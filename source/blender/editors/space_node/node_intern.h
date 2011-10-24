@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -33,6 +31,7 @@
 #ifndef ED_NODE_INTERN_H
 #define ED_NODE_INTERN_H
 
+#include <stddef.h> /* for size_t */
 #include "UI_interface.h"
 
 /* internal exports only */

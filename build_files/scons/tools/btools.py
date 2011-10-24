@@ -99,7 +99,6 @@ def validate_arguments(args, bc):
             'WITH_BF_PYTHON', 'WITH_BF_PYTHON_SAFETY', 'BF_PYTHON', 'BF_PYTHON_VERSION', 'BF_PYTHON_INC', 'BF_PYTHON_BINARY', 'BF_PYTHON_LIB', 'BF_PYTHON_LIBPATH', 'WITH_BF_STATICPYTHON', 'WITH_OSX_STATICPYTHON', 'BF_PYTHON_LIB_STATIC', 'BF_PYTHON_DLL', 'BF_PYTHON_ABI_FLAGS', 
             'WITH_BF_OPENAL', 'BF_OPENAL', 'BF_OPENAL_INC', 'BF_OPENAL_LIB', 'BF_OPENAL_LIBPATH', 'WITH_BF_STATICOPENAL', 'BF_OPENAL_LIB_STATIC',
             'WITH_BF_SDL', 'BF_SDL', 'BF_SDL_INC', 'BF_SDL_LIB', 'BF_SDL_LIBPATH',
-            'BF_LIBSAMPLERATE', 'BF_LIBSAMPLERATE_INC', 'BF_LIBSAMPLERATE_LIB', 'BF_LIBSAMPLERATE_LIBPATH', 'WITH_BF_STATICLIBSAMPLERATE', 'BF_LIBSAMPLERATE_LIB_STATIC',
             'WITH_BF_JACK', 'BF_JACK', 'BF_JACK_INC', 'BF_JACK_LIB', 'BF_JACK_LIBPATH',
             'WITH_BF_SNDFILE', 'BF_SNDFILE', 'BF_SNDFILE_INC', 'BF_SNDFILE_LIB', 'BF_SNDFILE_LIBPATH', 'WITH_BF_STATICSNDFILE', 'BF_SNDFILE_LIB_STATIC',
             'BF_PTHREADS', 'BF_PTHREADS_INC', 'BF_PTHREADS_LIB', 'BF_PTHREADS_LIBPATH',
@@ -119,7 +118,7 @@ def validate_arguments(args, bc):
             'WITH_BF_ICONV', 'BF_ICONV', 'BF_ICONV_INC', 'BF_ICONV_LIB', 'BF_ICONV_LIBPATH',
             'WITH_BF_GAMEENGINE', 'WITH_BF_BULLET', 'WITH_BF_ELTOPO', 'BF_BULLET', 'BF_BULLET_INC', 'BF_BULLET_LIB',
             'BF_WINTAB', 'BF_WINTAB_INC',
-            'WITH_BF_FREETYPE', 'BF_FREETYPE', 'BF_FREETYPE_INC', 'BF_FREETYPE_LIB', 'BF_FREETYPE_LIBPATH', 'BF_FREETYPE_LIB_STATIC', 'WITH_BF_FREETYPE_STATIC',
+            'BF_FREETYPE', 'BF_FREETYPE_INC', 'BF_FREETYPE_LIB', 'BF_FREETYPE_LIBPATH', 'BF_FREETYPE_LIB_STATIC', 'WITH_BF_FREETYPE_STATIC',
             'WITH_BF_QUICKTIME', 'BF_QUICKTIME', 'BF_QUICKTIME_INC', 'BF_QUICKTIME_LIB', 'BF_QUICKTIME_LIBPATH',
             'WITH_BF_FFTW3', 'BF_FFTW3', 'BF_FFTW3_INC', 'BF_FFTW3_LIB', 'BF_FFTW3_LIBPATH', 'WITH_BF_STATICFFTW3', 'BF_FFTW3_LIB_STATIC',
             'WITH_BF_STATICOPENGL', 'BF_OPENGL', 'BF_OPENGL_INC', 'BF_OPENGL_LIB', 'BF_OPENGL_LIBPATH', 'BF_OPENGL_LIB_STATIC',
@@ -267,13 +266,6 @@ def read_opts(env, cfg, args):
         ('BF_SDL_LIB', 'SDL library', ''),
         ('BF_SDL_LIBPATH', 'SDL library path', ''),
 
-        ('BF_LIBSAMPLERATE', 'libsamplerate aka SRC base path', ''),
-        ('BF_LIBSAMPLERATE_INC', 'libsamplerate aka SRC include path', ''),
-        ('BF_LIBSAMPLERATE_LIB', 'libsamplerate aka SRC library', ''),
-        ('BF_LIBSAMPLERATE_LIBPATH', 'libsamplerate aka SRC library path', ''),
-        ('BF_LIBSAMPLERATE_LIB_STATIC', 'Path to libsamplerate static library', ''),
-        (BoolVariable('WITH_BF_STATICLIBSAMPLERATE', 'Staticly link to libsamplerate', False)),
-
         (BoolVariable('WITH_BF_JACK', 'Enable jack support if true', True)),
         ('BF_JACK', 'jack base path', ''),
         ('BF_JACK_INC', 'jack include path', ''),
@@ -393,7 +385,6 @@ def read_opts(env, cfg, args):
         (BoolVariable('WITH_BF_STATICCXX', 'static link to stdc++', False)),
         ('BF_CXX_LIB_STATIC', 'static library path for stdc++', ''),
 
-        (BoolVariable('WITH_BF_FREETYPE', 'Use FreeType2 if true', True)),
         ('BF_FREETYPE', 'Freetype base path', ''),
         ('BF_FREETYPE_INC', 'Freetype include path', ''),
         ('BF_FREETYPE_LIB', 'Freetype library', ''),

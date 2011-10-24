@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -334,11 +332,9 @@ static int make_proxy_exec (bContext *C, wmOperator *op)
 		
 		/* Add new object for the proxy */
 		newob= add_object(scene, OB_EMPTY);
-		if (gob)
-			strcpy(name, gob->id.name+2);
-		else
-			strcpy(name, ob->id.name+2);
-		strcat(name, "_proxy");
+
+		BLI_snprintf(name, sizeof(name), "%s_proxy", ((ID *)(gob ? gob : ob))->name);
+
 		rename_id(&newob->id, name);
 		
 		/* set layers OK */
@@ -605,7 +601,7 @@ static int parent_set_exec(bContext *C, wmOperator *op)
 				
 				/* handle types */
 				if (pchan)
-					strcpy(ob->parsubstr, pchan->name);
+					BLI_strncpy(ob->parsubstr, pchan->name, sizeof(ob->parsubstr));
 				else
 					ob->parsubstr[0]= 0;
 					
@@ -1243,9 +1239,11 @@ static int allow_make_links_data(int ev, Object *ob, Object *obt)
 				return 1;
 			break;
 		case MAKE_LINKS_MATERIALS:
-			if (ELEM5(ob->type, OB_MESH, OB_CURVE, OB_FONT, OB_SURF, OB_MBALL) &&
-				ELEM5(obt->type, OB_MESH, OB_CURVE, OB_FONT, OB_SURF, OB_MBALL))
+			if (OB_TYPE_SUPPORT_MATERIAL(ob->type) &&
+				OB_TYPE_SUPPORT_MATERIAL(obt->type))
+			{
 				return 1;
+			}
 			break;
 		case MAKE_LINKS_ANIMDATA:
 		case MAKE_LINKS_DUPLIGROUP:

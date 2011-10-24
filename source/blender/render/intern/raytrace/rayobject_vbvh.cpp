@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -154,8 +152,8 @@ void bvh_hint_bb(Tree *tree, LCTSHint *hint, float *min, float *max)
 {
 	//TODO renable hint support
 	{
-	 	hint->size = 0;
-	 	hint->stack[hint->size++] = (RayObject*)tree->root;
+		hint->size = 0;
+		hint->stack[hint->size++] = (RayObject*)tree->root;
 	}
 }
 

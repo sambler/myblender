@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -398,13 +396,13 @@ static void render_endjob(void *rjv)
 		ED_update_for_newframe(G.main, rj->scene, rj->win->screen, 1);
 	
 	/* XXX above function sets all tags in nodes */
-	ntreeClearTags(rj->scene->nodetree);
+	ntreeCompositClearTags(rj->scene->nodetree);
 	
 	/* potentially set by caller */
 	rj->scene->r.scemode &= ~R_NO_FRAME_UPDATE;
 	
 	if(rj->srl) {
-		NodeTagIDChanged(rj->scene->nodetree, &rj->scene->id);
+		nodeUpdateID(rj->scene->nodetree, &rj->scene->id);
 		WM_main_add_notifier(NC_NODE|NA_EDITED, rj->scene);
 	}
 	

@@ -1,6 +1,5 @@
 /*
  *
- * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -38,6 +37,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 	
 struct Mesh;

@@ -2,8 +2,6 @@
  *  \ingroup opennlextern
  */
 /*
- *  $Id$
- *
  *  OpenNL: Numerical Library
  *  Copyright (C) 2004 Bruno Levy
  *
@@ -51,6 +49,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 #define NL_VERSION_0_0 1

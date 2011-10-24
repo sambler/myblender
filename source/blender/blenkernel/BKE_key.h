@@ -1,6 +1,4 @@
 /*
- * $Id$ 
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -47,6 +45,7 @@ struct Mesh;
 /* Kernel prototypes */
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 void free_key(struct Key *sc); 

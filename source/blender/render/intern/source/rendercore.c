@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -142,7 +140,7 @@ void calc_renderco_ortho(float co[3], float x, float y, int z)
 	co[2]= R.winmat[3][2]/( R.winmat[2][3]*zco - R.winmat[2][2] );
 }
 
-void calc_renderco_zbuf(float co[3], float *view, int z)
+void calc_renderco_zbuf(float co[3], const float view[3], int z)
 {
 	float fac, zco;
 	

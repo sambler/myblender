@@ -1,5 +1,4 @@
 /*
- * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -46,6 +45,7 @@ typedef MEM_TObjectPtr MEM_TRefCountedObjectPtr;
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 

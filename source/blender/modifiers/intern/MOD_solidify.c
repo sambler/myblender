@@ -1,34 +1,32 @@
 /*
-* $Id$
-*
-* ***** BEGIN GPL LICENSE BLOCK *****
-*
-* This program is free software; you can redistribute it and/or
-* modify it under the terms of the GNU General Public License
-* as published by the Free Software Foundation; either version 2
-* of the License, or (at your option) any later version.
-*
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU General Public License for more details.
-*
-* You should have received a copy of the GNU General Public License
-* along with this program; if not, write to the Free Software  Foundation,
-* Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-*
-* The Original Code is Copyright (C) 2005 by the Blender Foundation.
-* All rights reserved.
-*
-* Contributor(s): Daniel Dunbar
-*                 Ton Roosendaal,
-*                 Ben Batt,
-*                 Brecht Van Lommel,
-*                 Campbell Barton
-*
-* ***** END GPL LICENSE BLOCK *****
-*
-*/
+ * ***** BEGIN GPL LICENSE BLOCK *****
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software  Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ *
+ * The Original Code is Copyright (C) 2005 by the Blender Foundation.
+ * All rights reserved.
+ *
+ * Contributor(s): Daniel Dunbar
+ *                 Ton Roosendaal,
+ *                 Ben Batt,
+ *                 Brecht Van Lommel,
+ *                 Campbell Barton
+ *
+ * ***** END GPL LICENSE BLOCK *****
+ *
+ */
 
 /** \file blender/modifiers/intern/MOD_solidify.c
  *  \ingroup modifiers
@@ -40,6 +38,7 @@
 #include "BLI_math.h"
 #include "BLI_edgehash.h"
 #include "BLI_utildefines.h"
+#include "BLI_string.h"
 
 #include "BKE_cdderivedmesh.h"
 #include "BKE_mesh.h"
@@ -183,7 +182,7 @@ static void copyData(ModifierData *md, ModifierData *target)
 	tsmd->crease_outer = smd->crease_outer;
 	tsmd->crease_rim = smd->crease_rim;
 	tsmd->flag = smd->flag;
-	strcpy(tsmd->defgrp_name, smd->defgrp_name);
+	BLI_strncpy(tsmd->defgrp_name, smd->defgrp_name, sizeof(tsmd->defgrp_name));
 }
 
 static CustomDataMask requiredDataMask(Object *UNUSED(ob), ModifierData *md)
@@ -524,7 +523,7 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 	}
 
 	if(smd->flag & MOD_SOLIDIFY_RIM) {
-
+		int *origindex;
 		
 		/* bugger, need to re-calculate the normals for the new edge faces.
 		 * This could be done in many ways, but probably the quickest way is to calculate the average normals for side faces only.
@@ -551,11 +550,14 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 				{0, 3, 3, 0}};
 
 		/* add faces & edges */
+		origindex= result->getEdgeDataArray(result, CD_ORIGINDEX);
 		ed= medge + (numEdges * 2);
 		for(i=0; i<newEdges; i++, ed++) {
 			ed->v1= new_vert_arr[i];
 			ed->v2= new_vert_arr[i] + numVerts;
 			ed->flag |= ME_EDGEDRAW;
+
+			origindex[numEdges * 2 + i]= ORIGINDEX_NONE;
 
 			if(crease_rim)
 				ed->crease= crease_rim;
@@ -563,6 +565,7 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 
 		/* faces */
 		mf= mface + (numFaces * 2);
+		origindex= result->getFaceDataArray(result, CD_ORIGINDEX);
 		for(i=0; i<newFaces; i++, mf++) {
 			int eidx= new_edge_arr[i];
 			int fidx= edge_users[eidx];
@@ -623,6 +626,7 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 			add_v3_v3(edge_vert_nos[ed->v1], nor);
 			add_v3_v3(edge_vert_nos[ed->v2], nor);
 #endif
+			origindex[numFaces * 2 + i]= ORIGINDEX_NONE;
 		}
 		
 #ifdef SOLIDIFY_SIDE_NORMALS

@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -35,6 +33,7 @@
 #include <fstream>
 
 extern "C" {
+//} for code folding
 
 #include "imbuf.h"
 #include "IMB_imbuf_types.h"

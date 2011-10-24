@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -179,10 +177,12 @@ typedef struct ParticleSettings {
 	float simplify_rate, simplify_transition;
 	float simplify_viewport;
 
-	/* general values */
+	/* time and emission */
 	float sta, end, lifetime, randlife;
-	float timetweak, jitfac, eff_hair, grid_rand;
+	float timetweak, courant_target;
+	float jitfac, eff_hair, grid_rand, ps_offset[1];
 	int totpart, userjit, grid_res, effector_amount;
+	short time_flag, time_pad[3];
 
 	/* initial velocity factors */
 	float normfac, obfac, randfac, partfac, tanfac, tanphase, reactfac;
@@ -288,6 +288,9 @@ typedef struct ParticleSystem{				/* note, make sure all (runtime) are NULL's in
 	struct ParticleDrawData *pdd;
 
 	float *frand;							/* array of 1024 random floats for fast lookups */
+
+	float dt_frac;							/* current time step, as a fraction of a frame */
+	float _pad;								/* spare capacity */
 }ParticleSystem;
 
 /* part->type */
@@ -381,7 +384,8 @@ typedef struct ParticleSystem{				/* note, make sure all (runtime) are NULL's in
 #define PART_DRAW_HEALTH	16
 #define PART_ABS_PATH_TIME  32
 #define PART_DRAW_COUNT_GR	64
-#define PART_DRAW_BB_LOCK	128
+#define PART_DRAW_BB_LOCK	128	/* used with billboards */
+#define PART_DRAW_ROTATE_OB 128 /* used with dupliobjects/groups */
 #define PART_DRAW_PARENT	256
 #define PART_DRAW_NUM		512
 #define PART_DRAW_RAND_GR	1024
@@ -401,6 +405,9 @@ typedef struct ParticleSystem{				/* note, make sure all (runtime) are NULL's in
 /* part->simplify_flag */
 #define PART_SIMPLIFY_ENABLE	1
 #define PART_SIMPLIFY_VIEWPORT	2
+
+/* part->time_flag */
+#define PART_TIME_AUTOSF	1 /* Automatic subframes */
 
 /* part->bb_align */
 #define PART_BB_X		0

@@ -1,5 +1,4 @@
 /*
- * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -37,18 +36,18 @@
 
 class CTR_Link {
 public:
-    CTR_Link(
+	CTR_Link(
 	) ;
 
-    CTR_Link(
+	CTR_Link(
 		CTR_Link *next,
 		CTR_Link *prev
 	) ;
-    
+
 		CTR_Link *
 	getNext(
 	) const ;
-  
+
 		CTR_Link *
 	getPrev(
 	) const ;
@@ -76,14 +75,14 @@ public:
 	) ;
 
 private:  
-    CTR_Link  *m_next;
-    CTR_Link  *m_prev;
+	CTR_Link  *m_next;
+	CTR_Link  *m_prev;
 };
 
 class CTR_List {
 public:
 
-    CTR_List(
+	CTR_List(
 	) ;
 
 		CTR_Link *
@@ -103,10 +102,10 @@ public:
 	addTail(
 		CTR_Link *link
 	) ;
-    
+
 private:
-    CTR_Link m_head;
-    CTR_Link m_tail;
+	CTR_Link m_head;
+	CTR_Link m_tail;
 };
 
 #endif

@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -1187,6 +1185,12 @@ int initTransInfo (bContext *C, TransInfo *t, wmOperator *op, wmEvent *event)
 		t->options |= CTX_NO_PET;
 	}
 	
+	// Mirror is not supported with PET, turn it off.
+	if (t->flag & T_PROP_EDIT)
+	{
+		t->flag &= ~T_MIRROR;
+	}
+
 	setTransformViewMatrices(t);
 	initNumInput(&t->num);
 	
@@ -1270,7 +1274,8 @@ void applyTransObjects(TransInfo *t)
 	recalcData(t);
 }
 
-static void restoreElement(TransData *td) {
+static void restoreElement(TransData *td)
+{
 	/* TransData for crease has no loc */
 	if (td->loc) {
 		copy_v3_v3(td->loc, td->iloc);

@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -179,10 +177,11 @@ static void rna_Lattice_points_w_set(PointerRNA *ptr, int value)
 static void rna_Lattice_vg_name_set(PointerRNA *ptr, const char *value)
 {
 	Lattice *lt= ptr->data;
-	strcpy(lt->vgroup, value);
+	BLI_strncpy(lt->vgroup, value, sizeof(lt->vgroup));
 
-	if(lt->editlatt)
-		strcpy(lt->editlatt->latt->vgroup, value);
+	if(lt->editlatt) {
+		BLI_strncpy(lt->editlatt->latt->vgroup, value, sizeof(lt->editlatt->latt->vgroup));
+	}
 }
 
 /* annoying, but is a consequence of RNA structures... */
@@ -237,7 +236,7 @@ static void rna_def_latticepoint(BlenderRNA *brna)
 	RNA_def_property_update(prop, 0, "rna_Lattice_update_data");
 
 	prop= RNA_def_property(srna, "groups", PROP_COLLECTION, PROP_NONE);
-	RNA_def_property_collection_funcs(prop, "rna_LatticePoint_groups_begin", "rna_iterator_array_next", "rna_iterator_array_end", "rna_iterator_array_get", 0, 0, 0);
+	RNA_def_property_collection_funcs(prop, "rna_LatticePoint_groups_begin", "rna_iterator_array_next", "rna_iterator_array_end", "rna_iterator_array_get", NULL, NULL, NULL, NULL);
 	RNA_def_property_struct_type(prop, "VertexGroupElement");
 	RNA_def_property_ui_text(prop, "Groups", "Weights for the vertex groups this point is member of");
 }
@@ -317,7 +316,7 @@ static void rna_def_lattice(BlenderRNA *brna)
 
 	prop= RNA_def_property(srna, "points", PROP_COLLECTION, PROP_NONE);
 	RNA_def_property_struct_type(prop, "LatticePoint");
-	RNA_def_property_collection_funcs(prop, "rna_Lattice_points_begin", "rna_iterator_array_next", "rna_iterator_array_end", "rna_iterator_array_get", 0, 0, 0);
+	RNA_def_property_collection_funcs(prop, "rna_Lattice_points_begin", "rna_iterator_array_next", "rna_iterator_array_end", "rna_iterator_array_get", NULL, NULL, NULL, NULL);
 	RNA_def_property_ui_text(prop, "Points", "Points of the lattice");
 	
 	/* pointers */

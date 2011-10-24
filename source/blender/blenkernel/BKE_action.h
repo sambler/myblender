@@ -51,6 +51,7 @@ struct ID;
 /* Kernel prototypes */
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 /* Action Lib Stuff ----------------- */

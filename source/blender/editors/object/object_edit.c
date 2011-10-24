@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -585,7 +583,7 @@ void OBJECT_OT_posemode_toggle(wmOperatorType *ot)
 	/* identifiers */
 	ot->name= "Toggle Pose Mode";
 	ot->idname= "OBJECT_OT_posemode_toggle";
-	ot->description= "Enables or disables posing/selecting bones";
+	ot->description= "Enable or disable posing/selecting bones";
 	
 	/* api callbacks */
 	ot->exec= posemode_exec;
@@ -798,7 +796,7 @@ static void UNUSED_FUNCTION(special_editmenu)(Scene *scene, View3D *v3d)
 			Object *par= modifiers_isDeformedByArmature(ob);
 
 			if(par && (par->mode & OB_MODE_POSE)) {
-				nr= pupmenu("Specials%t|Apply Bone Envelopes to Vertex Groups %x1|Apply Bone Heat Weights to Vertex Groups %x2");
+// XXX				nr= pupmenu("Specials%t|Apply Bone Envelopes to Vertex Groups %x1|Apply Bone Heat Weights to Vertex Groups %x2");
 
 // XXX				if(nr==1 || nr==2)
 // XXX					pose_adds_vgroups(ob, (nr == 2));
@@ -1221,7 +1219,7 @@ static void copy_attr(Main *bmain, Scene *scene, View3D *v3d, short event)
 						cu1->vfontbi= cu->vfontbi;
 						id_us_plus((ID *)cu1->vfontbi);						
 
-						BKE_text_to_curve(scene, base->object, 0);		/* needed? */
+						BKE_text_to_curve(bmain, scene, base->object, 0); /* needed? */
 
 						
 						BLI_strncpy(cu1->family, cu->family, sizeof(cu1->family));
@@ -1368,7 +1366,7 @@ static void UNUSED_FUNCTION(copy_attr_menu)(Main *bmain, Scene *scene, View3D *v
 	strcat (str, "|Object Constraints%x22");
 	strcat (str, "|NLA Strips%x26");
 	
-// XXX	if (OB_SUPPORT_MATERIAL(ob)) {
+// XXX	if (OB_TYPE_SUPPORT_MATERIAL(ob->type)) {
 //		strcat(str, "|Texture Space%x17");
 //	}	
 	

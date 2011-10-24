@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -40,6 +38,8 @@ struct Main;
 struct ID;
 
 typedef enum {
+	BLI_CB_EVT_FRAME_CHANGE_PRE,
+	BLI_CB_EVT_FRAME_CHANGE_POST,
 	BLI_CB_EVT_RENDER_PRE,
 	BLI_CB_EVT_RENDER_POST,
 	BLI_CB_EVT_RENDER_STATS,

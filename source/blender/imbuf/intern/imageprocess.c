@@ -1,5 +1,4 @@
 /*
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -39,7 +38,6 @@
  * 
  *  april 95
  * 
- * $Id$
  */
 
 #include <stdlib.h>
@@ -111,7 +109,8 @@ static void pixel_from_buffer(struct ImBuf *ibuf, unsigned char **outI, float **
 */
 /* function assumes out to be zero'ed, only does RGBA */
 
-static float P(float k){
+static float P(float k)
+{
 	float p1, p2, p3, p4;
 	p1 = MAX2(k+2.0f,0);
 	p2 = MAX2(k+1.0f,0);
@@ -123,7 +122,8 @@ static float P(float k){
 
 #if 0
 /* older, slower function, works the same as above */
-static float P(float k){
+static float P(float k)
+{
 	return (float)(1.0f/6.0f)*( pow( MAX2(k+2.0f,0) , 3.0f ) - 4.0f * pow( MAX2(k+1.0f,0) , 3.0f ) + 6.0f * pow( MAX2(k,0) , 3.0f ) - 4.0f * pow( MAX2(k-1.0f,0) , 3.0f));
 }
 #endif

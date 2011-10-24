@@ -2199,13 +2199,13 @@ static int wiredraw_poll(bContext *C)
 
 static int wiredraw_toggle_exec(bContext *C, wmOperator *op)
 {
-    Object *ob = ED_object_active_context(C);
-    
-    if(ob->dtx & OB_DRAWWIRE) ob->dtx &= ~OB_DRAWWIRE;
-    else ob->dtx |= OB_DRAWWIRE;
-    
-    WM_event_add_notifier(C, NC_SPACE|ND_SPACE_VIEW3D|ND_SPACE_PROPERTIES, NULL);
-    return OPERATOR_FINISHED;
+	Object *ob = ED_object_active_context(C);
+
+	if(ob->dtx & OB_DRAWWIRE) ob->dtx &= ~OB_DRAWWIRE;
+	else ob->dtx |= OB_DRAWWIRE;
+
+	WM_event_add_notifier(C, NC_SPACE|ND_SPACE_VIEW3D|ND_SPACE_PROPERTIES, NULL);
+	return OPERATOR_FINISHED;
 }
 
 void OBJECT_OT_wiredraw_toggle(wmOperatorType *ot)
@@ -2214,28 +2214,28 @@ void OBJECT_OT_wiredraw_toggle(wmOperatorType *ot)
 	ot->name= "Display Wireframe";
 	ot->description = "Turn wireframe display on/off.";
 	ot->idname= "OBJECT_OT_wiredraw_toggle";
-    
+
 	/* api callbacks */
 	ot->exec= wiredraw_toggle_exec;
 	ot->poll= wiredraw_poll;
-    
+
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 }
 
 static int wiredraw_copy_exec(bContext *C, wmOperator *op)
 {
-    Object *cur = ED_object_active_context(C);
-    int allon = (cur->dtx & OB_DRAWWIRE);
-    
-    CTX_DATA_BEGIN(C, Object*, ob, selected_editable_objects) {
+	Object *cur = ED_object_active_context(C);
+	int allon = (cur->dtx & OB_DRAWWIRE);
+
+	CTX_DATA_BEGIN(C, Object*, ob, selected_editable_objects) {
 		if(allon) ob->dtx |= OB_DRAWWIRE;
-        else ob->dtx &= ~OB_DRAWWIRE;
+		else ob->dtx &= ~OB_DRAWWIRE;
 	}
 	CTX_DATA_END;
-    
-    WM_event_add_notifier(C, NC_SPACE|ND_SPACE_VIEW3D|ND_SPACE_PROPERTIES, NULL);
-    return OPERATOR_FINISHED;
+
+	WM_event_add_notifier(C, NC_SPACE|ND_SPACE_VIEW3D|ND_SPACE_PROPERTIES, NULL);
+	return OPERATOR_FINISHED;
 }
 
 void OBJECT_OT_wiredraw_copy_selected(wmOperatorType *ot)
@@ -2244,11 +2244,11 @@ void OBJECT_OT_wiredraw_copy_selected(wmOperatorType *ot)
 	ot->name= "Copy Wireframe Draw to Selected";
 	ot->description = "Copy active wireframe draw to other selected objects.";
 	ot->idname= "OBJECT_OT_wiredraw_copy_selected";
-    
+
 	/* api callbacks */
 	ot->exec= wiredraw_copy_exec;
 	ot->poll= wiredraw_poll;
-    
+
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 }

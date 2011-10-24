@@ -1,5 +1,4 @@
 /*
- * $Id: mathutils_Matrix.c 35236 2011-02-27 20:10:08Z jesterking $
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *

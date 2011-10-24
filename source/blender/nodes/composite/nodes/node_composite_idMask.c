@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -99,7 +97,7 @@ static void node_composit_exec_idmask(void *data, bNode *node, bNodeStack **in, 
 		
 		stackbuf= alloc_compbuf(cbuf->x, cbuf->y, CB_VAL, 1); /* allocs */;
 		
-		if(rd->scemode & R_FULL_SAMPLE)
+		if((rd->scemode & R_FULL_SAMPLE) || node->custom2 == 0)
 			do_idmask_fsa(stackbuf, cbuf, (float)node->custom1);
 		else
 			do_idmask(stackbuf, cbuf, (float)node->custom1);

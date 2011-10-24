@@ -885,6 +885,7 @@
 #endif
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 #if (LZO_CC_BORLANDC && (__BORLANDC__ >= 0x0200))
    extern void __near __cdecl _AHSHIFT(void);

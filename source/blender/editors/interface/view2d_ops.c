@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -785,7 +783,7 @@ static void VIEW2D_OT_zoom_out(wmOperatorType *ot)
 }
 
 /* ********************************************************* */
-/* DRAG-ZOOM OPERATOR					 				 */
+/* DRAG-ZOOM OPERATOR									 */
 
 /* 	MMB Drag - allows non-uniform scaling by dragging mouse
  *

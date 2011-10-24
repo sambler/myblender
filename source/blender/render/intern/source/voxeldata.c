@@ -1,5 +1,4 @@
 /*
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -389,7 +388,7 @@ int voxeldatatex(struct Tex *tex, const float texvec[3], struct TexResult *texre
 	VoxelData *vd = tex->vd;	
 	float co[3], offset[3] = {0.5, 0.5, 0.5};
 
-	if ((!vd) || (vd->dataset==NULL)) {
+	if (vd->dataset==NULL) {
 		texres->tin = 0.0f;
 		return 0;
 	}

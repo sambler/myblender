@@ -1,6 +1,4 @@
 /*
-* $Id$
-*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -25,7 +23,7 @@
  * Contributor(s): none yet.
  *
  * ***** END GPL LICENSE BLOCK *****
-*/
+ */
 
 /** \file gameengine/Converter/BL_ActionActuator.cpp
  *  \ingroup bgeconv
@@ -160,6 +158,8 @@ void BL_ActionActuator::SetLocalTime(float curtime)
 
 			m_starttime = curtime;
 
+			m_flag ^= ACT_FLAG_REVERSE;
+
 			break;
 		}
 	}
@@ -208,9 +208,8 @@ bool BL_ActionActuator::Update(double curtime, bool frame)
 		
 			if (m_flag & ACT_FLAG_REVERSE)
 			{
-				m_localtime = start;
-				start = end;
-				end = m_localtime;
+				start = m_endframe;
+				end = m_startframe;
 			}
 
 			break;
@@ -226,10 +225,7 @@ bool BL_ActionActuator::Update(double curtime, bool frame)
 			break;
 	}
 
-	// Continue only really makes sense for play stop and flipper. All other modes go until they are complete.
-	if (m_flag & ACT_FLAG_CONTINUE &&
-		(m_playtype == ACT_ACTION_LOOP_STOP ||
-		m_playtype == ACT_ACTION_FLIPPER))
+	if (m_flag & ACT_FLAG_CONTINUE)
 		bUseContinue = true;
 	
 	
@@ -241,14 +237,14 @@ bool BL_ActionActuator::Update(double curtime, bool frame)
 		RemoveAllEvents();
 	}
 
-	if (m_flag & ACT_FLAG_ATTEMPT_PLAY)
-		SetLocalTime(curtime);
-
 	if (bUseContinue && (m_flag & ACT_FLAG_ACTIVE))
 	{
 		m_localtime = obj->GetActionFrame(m_layer);
 		ResetStartTime(curtime);
 	}
+
+	if (m_flag & ACT_FLAG_ATTEMPT_PLAY)
+		SetLocalTime(curtime);
 
 	// Handle a frame property if it's defined
 	if ((m_flag & ACT_FLAG_ACTIVE) && m_framepropname[0] != 0)
@@ -264,22 +260,28 @@ bool BL_ActionActuator::Update(double curtime, bool frame)
 	}
 
 	// Handle a finished animation
-	if ((m_flag & ACT_FLAG_PLAY_END) && obj->IsActionDone(m_layer))
+	if ((m_flag & ACT_FLAG_PLAY_END) && (m_flag & ACT_FLAG_ACTIVE) && obj->IsActionDone(m_layer))
 	{
 		m_flag &= ~ACT_FLAG_ACTIVE;
 		m_flag &= ~ACT_FLAG_ATTEMPT_PLAY;
-		obj->StopAction(m_layer);
+
+		if (m_playtype == ACT_ACTION_PINGPONG)
+			m_flag ^= ACT_FLAG_REVERSE;
 		return false;
 	}
 	
 	// If a different action is playing, we've been overruled and are no longer active
-	if (obj->GetCurrentAction(m_layer) != m_action)
+	if (obj->GetCurrentAction(m_layer) != m_action && !obj->IsActionDone(m_layer))
 		m_flag &= ~ACT_FLAG_ACTIVE;
 
 	if (bPositiveEvent || (m_flag & ACT_FLAG_ATTEMPT_PLAY && !(m_flag & ACT_FLAG_ACTIVE)))
 	{
-		if (bPositiveEvent)
+		if (bPositiveEvent && m_playtype == ACT_ACTION_PLAY)
+		{
+			if (obj->IsActionDone(m_layer))
+				m_localtime = start;
 			ResetStartTime(curtime);
+		}
 
 		if (obj->PlayAction(m_action->id.name+2, start, end, m_layer, m_priority, m_blendin, playtype, m_layer_weight, m_ipo_flags))
 		{
@@ -287,7 +289,7 @@ bool BL_ActionActuator::Update(double curtime, bool frame)
 			if (bUseContinue)
 				obj->SetActionFrame(m_layer, m_localtime);
 
-			if (m_playtype == ACT_ACTION_PLAY)
+			if (m_playtype == ACT_ACTION_PLAY || m_playtype == ACT_ACTION_PINGPONG)
 				m_flag |= ACT_FLAG_PLAY_END;
 			else
 				m_flag &= ~ACT_FLAG_PLAY_END;
@@ -307,11 +309,6 @@ bool BL_ActionActuator::Update(double curtime, bool frame)
 			return false;
 		}
 
-		
-		m_localtime = obj->GetActionFrame(m_layer);
-		if (m_localtime < min(m_startframe, m_endframe) || m_localtime > max(m_startframe, m_endframe))
-			m_localtime = m_startframe;
-
 		switch(m_playtype)
 		{
 			case ACT_ACTION_LOOP_STOP:
@@ -320,9 +317,6 @@ bool BL_ActionActuator::Update(double curtime, bool frame)
 				// We're done
 				m_flag &= ~ACT_FLAG_ACTIVE;
 				return false;
-			case ACT_ACTION_PINGPONG:
-				m_flag ^= ACT_FLAG_REVERSE;
-				// Now fallthrough to LOOP_END code
 			case ACT_ACTION_LOOP_END:
 				// Convert into a play and let it finish
 				obj->SetPlayMode(m_layer, BL_Action::ACT_MODE_PLAY);

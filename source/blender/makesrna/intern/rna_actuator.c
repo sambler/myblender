@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -450,7 +448,7 @@ EnumPropertyItem *rna_Actuator_type_itemf(bContext *C, PointerRNA *ptr, Property
 	return item;
 }
 
-static void rna_Actuator_Armature_update(Main *bmain, Scene *scene, PointerRNA *ptr)
+static void rna_Actuator_Armature_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
 {
 	bActuator *act= (bActuator *)ptr->data;
 	bArmatureActuator *aa = act->data;
@@ -861,7 +859,7 @@ static void rna_def_camera_actuator(BlenderRNA *brna)
 		{0, NULL, 0, NULL, NULL}};
 	
 	srna= RNA_def_struct(brna, "CameraActuator", "Actuator");
-	RNA_def_struct_ui_text(srna, "Camera Actuator", "Actuator to...");
+	RNA_def_struct_ui_text(srna, "Camera Actuator", "");
 	RNA_def_struct_sdna_from(srna, "bCameraActuator", "data");
 
 	prop= RNA_def_property(srna, "object", PROP_POINTER, PROP_NONE);
@@ -1387,7 +1385,7 @@ static void rna_def_scene_actuator(BlenderRNA *brna)
 		{0, NULL, 0, NULL, NULL}};	
 		
 	srna= RNA_def_struct(brna, "SceneActuator", "Actuator");
-	RNA_def_struct_ui_text(srna, "Scene Actuator", "Actuator to...");
+	RNA_def_struct_ui_text(srna, "Scene Actuator", "");
 	RNA_def_struct_sdna_from(srna, "bSceneActuator", "data");
 
 	prop= RNA_def_property(srna, "mode", PROP_ENUM, PROP_NONE);
@@ -1445,7 +1443,7 @@ static void rna_def_random_actuator(BlenderRNA *brna)
 		{0, NULL, 0, NULL, NULL}};	
 
 	srna= RNA_def_struct(brna, "RandomActuator", "Actuator");
-	RNA_def_struct_ui_text(srna, "Random Actuator", "Actuator to...");
+	RNA_def_struct_ui_text(srna, "Random Actuator", "");
 	RNA_def_struct_sdna_from(srna, "bRandomActuator", "data");
 
 	prop= RNA_def_property(srna, "seed", PROP_INT, PROP_NONE);
@@ -1562,7 +1560,7 @@ static void rna_def_message_actuator(BlenderRNA *brna)
 		{0, NULL, 0, NULL, NULL}};
 
 	srna= RNA_def_struct(brna, "MessageActuator", "Actuator");
-	RNA_def_struct_ui_text(srna, "Message Actuator", "Actuator to...");
+	RNA_def_struct_ui_text(srna, "Message Actuator", "");
 	RNA_def_struct_sdna_from(srna, "bMessageActuator", "data");
 
 	prop= RNA_def_property(srna, "to_property", PROP_STRING, PROP_NONE);
@@ -1877,7 +1875,7 @@ static void rna_def_armature_actuator(BlenderRNA *brna)
 		{0, NULL, 0, NULL, NULL}};
 
 	srna= RNA_def_struct(brna, "ArmatureActuator", "Actuator");
-	RNA_def_struct_ui_text(srna, "Armature Actuator", "Actuator to...");
+	RNA_def_struct_ui_text(srna, "Armature Actuator", "");
 	RNA_def_struct_sdna_from(srna, "bArmatureActuator", "data");
 
 	prop= RNA_def_property(srna, "mode", PROP_ENUM, PROP_NONE);

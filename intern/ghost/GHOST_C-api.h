@@ -1,5 +1,4 @@
 /*
- * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -37,7 +36,8 @@
 #include "GHOST_Types.h"
 
 #ifdef __cplusplus
-extern "C" { 
+extern "C" {
+//} for code folding
 #endif
 
 /**

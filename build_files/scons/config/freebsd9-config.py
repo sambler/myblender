@@ -25,11 +25,6 @@ BF_CXX = '/usr/local'
 WITH_BF_STATICCXX = False
 BF_CXX_LIB_STATIC = '${BF_CXX}/lib/libstdc++.a'
 
-BF_LIBSAMPLERATE = '/usr/local'
-BF_LIBSAMPLERATE_INC = '${BF_LIBSAMPLERATE}/include'
-BF_LIBSAMPLERATE_LIB = 'samplerate'
-BF_LIBSAMPLERATE_LIBPATH = '${BF_LIBSAMPLERATE}/lib'
-
 WITH_BF_JACK = True
 BF_JACK = '/usr/local'
 BF_JACK_INC = '${BF_JACK}/include/jack'
@@ -175,13 +170,14 @@ WITH_BF_RAYOPTIMIZATION = True
 BF_RAYOPTIMIZATION_SSE_FLAGS = ['-msse','-pthread']
 
 CCFLAGS = ['-pipe','-fPIC','-funsigned-char','-fno-strict-aliasing','-D_LARGEFILE_SOURCE','-D_FILE_OFFSET_BITS=64','-D_LARGEFILE64_SOURCE']
+CXXFLAGS = []
 
 CPPFLAGS = []
-CXXFLAGS = ['-pipe','-fPIC','-funsigned-char','-fno-strict-aliasing','-D_LARGEFILE_SOURCE','-D_FILE_OFFSET_BITS=64','-D_LARGEFILE64_SOURCE']
 if WITH_BF_FFMPEG:
   # libavutil needs UINT64_C()
   CXXFLAGS += ['-D__STDC_CONSTANT_MACROS', ]
-REL_CFLAGS = ['-DNDEBUG', '-O2']
+REL_CFLAGS = []
+REL_CXXFLAGS = []
 REL_CCFLAGS = ['-DNDEBUG', '-O2']
 ##BF_DEPEND = True
 ##

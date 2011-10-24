@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -36,6 +34,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 struct FCurve;
@@ -76,6 +75,7 @@ void bezt_add_to_cfra_elem(ListBase *lb, struct BezTriple *bezt);
 		int tarIndex= 0; \
 		for (; tarIndex < MAX_DRIVER_TARGETS; tarIndex++, dtar++)
 		 
+//} for code folding
 /* convenience looper over USED driver targets only */
 #define DRIVER_TARGETS_USED_LOOPER(dvar) \
 	{ \
@@ -83,6 +83,7 @@ void bezt_add_to_cfra_elem(ListBase *lb, struct BezTriple *bezt);
 		int tarIndex= 0; \
 		for (; tarIndex < dvar->num_targets; tarIndex++, dtar++)
 		
+//} for code folding
 /* tidy up for driver targets loopers */
 #define DRIVER_TARGETS_LOOPER_END \
 	}
@@ -231,7 +232,7 @@ short fcurve_is_keyframable(struct FCurve *fcu);
 /* -------- Curve Sanity --------  */
 
 void calchandles_fcurve(struct FCurve *fcu);
-void testhandles_fcurve(struct FCurve *fcu);
+void testhandles_fcurve(struct FCurve *fcu, const short use_handle);
 void sort_time_fcurve(struct FCurve *fcu);
 short test_time_fcurve(struct FCurve *fcu);
 

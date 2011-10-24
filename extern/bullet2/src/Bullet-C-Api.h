@@ -35,7 +35,8 @@ typedef plReal	plVector3[3];
 typedef plReal	plQuaternion[4];
 
 #ifdef __cplusplus
-extern "C" { 
+extern "C" {
+//} for code folding
 #endif
 
 /**	Particular physics SDK (C-API) */

@@ -1,5 +1,4 @@
 /*
- * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -70,7 +69,7 @@ public:
 
 	~GHOST_WindowSDL();
 
-	/* SDL spesific */
+	/* SDL specific */
 	SDL_Window *
 	getSDLWindow()
 	{

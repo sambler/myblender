@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -95,6 +93,8 @@ static ARegionType *region_type_find(ReportList *reports, int space_type, int re
 
 static int panel_poll(const bContext *C, PanelType *pt)
 {
+	extern FunctionRNA rna_Panel_poll_func;
+
 	PointerRNA ptr;
 	ParameterList list;
 	FunctionRNA *func;
@@ -102,7 +102,7 @@ static int panel_poll(const bContext *C, PanelType *pt)
 	int visible;
 
 	RNA_pointer_create(NULL, pt->ext.srna, NULL, &ptr); /* dummy */
-	func= RNA_struct_find_function(&ptr, "poll");
+	func= &rna_Panel_poll_func; /* RNA_struct_find_function(&ptr, "poll"); */
 
 	RNA_parameter_list_create(&list, &ptr, func);
 	RNA_parameter_set_lookup(&list, "context", &C);
@@ -118,12 +118,14 @@ static int panel_poll(const bContext *C, PanelType *pt)
 
 static void panel_draw(const bContext *C, Panel *pnl)
 {
+	extern FunctionRNA rna_Panel_draw_func;
+
 	PointerRNA ptr;
 	ParameterList list;
 	FunctionRNA *func;
 
 	RNA_pointer_create(&CTX_wm_screen(C)->id, pnl->type->ext.srna, pnl, &ptr);
-	func= RNA_struct_find_function(&ptr, "draw");
+	func= &rna_Panel_draw_func;/* RNA_struct_find_function(&ptr, "draw"); */
 
 	RNA_parameter_list_create(&list, &ptr, func);
 	RNA_parameter_set_lookup(&list, "context", &C);
@@ -134,12 +136,14 @@ static void panel_draw(const bContext *C, Panel *pnl)
 
 static void panel_draw_header(const bContext *C, Panel *pnl)
 {
+	extern FunctionRNA rna_Panel_draw_header_func;
+
 	PointerRNA ptr;
 	ParameterList list;
 	FunctionRNA *func;
 
 	RNA_pointer_create(&CTX_wm_screen(C)->id, pnl->type->ext.srna, pnl, &ptr);
-	func= RNA_struct_find_function(&ptr, "draw_header");
+	func= &rna_Panel_draw_header_func; /* RNA_struct_find_function(&ptr, "draw_header"); */
 
 	RNA_parameter_list_create(&list, &ptr, func);
 	RNA_parameter_set_lookup(&list, "context", &C);
@@ -249,12 +253,14 @@ static StructRNA* rna_Panel_refine(PointerRNA *ptr)
 
 static void header_draw(const bContext *C, Header *hdr)
 {
+	extern FunctionRNA rna_Header_draw_func;
+
 	PointerRNA htr;
 	ParameterList list;
 	FunctionRNA *func;
 
 	RNA_pointer_create(&CTX_wm_screen(C)->id, hdr->type->ext.srna, hdr, &htr);
-	func= RNA_struct_find_function(&htr, "draw");
+	func= &rna_Header_draw_func; /* RNA_struct_find_function(&htr, "draw"); */
 
 	RNA_parameter_list_create(&list, &htr, func);
 	RNA_parameter_set_lookup(&list, "context", &C);
@@ -347,6 +353,8 @@ static StructRNA* rna_Header_refine(PointerRNA *htr)
 
 static int menu_poll(const bContext *C, MenuType *pt)
 {
+	extern FunctionRNA rna_Menu_poll_func;
+
 	PointerRNA ptr;
 	ParameterList list;
 	FunctionRNA *func;
@@ -354,7 +362,7 @@ static int menu_poll(const bContext *C, MenuType *pt)
 	int visible;
 
 	RNA_pointer_create(NULL, pt->ext.srna, NULL, &ptr); /* dummy */
-	func= RNA_struct_find_function(&ptr, "poll");
+	func= &rna_Menu_poll_func; /* RNA_struct_find_function(&ptr, "poll"); */
 
 	RNA_parameter_list_create(&list, &ptr, func);
 	RNA_parameter_set_lookup(&list, "context", &C);
@@ -370,12 +378,14 @@ static int menu_poll(const bContext *C, MenuType *pt)
 
 static void menu_draw(const bContext *C, Menu *hdr)
 {
+	extern FunctionRNA rna_Menu_draw_func;
+
 	PointerRNA mtr;
 	ParameterList list;
 	FunctionRNA *func;
 
 	RNA_pointer_create(&CTX_wm_screen(C)->id, hdr->type->ext.srna, hdr, &mtr);
-	func= RNA_struct_find_function(&mtr, "draw");
+	func= &rna_Menu_draw_func; /* RNA_struct_find_function(&mtr, "draw"); */
 
 	RNA_parameter_list_create(&list, &mtr, func);
 	RNA_parameter_set_lookup(&list, "context", &C);
@@ -719,7 +729,7 @@ static void rna_def_header(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "layout", PROP_POINTER, PROP_NONE);
 	RNA_def_property_pointer_sdna(prop, NULL, "layout");
 	RNA_def_property_struct_type(prop, "UILayout");
-	RNA_def_property_ui_text(prop, "Layout", "Defines the structure of the header in the UI");
+	RNA_def_property_ui_text(prop, "Layout", "Structure of the header in the UI");
 
 	/* registration */
 	prop= RNA_def_property(srna, "bl_idname", PROP_STRING, PROP_NONE);
@@ -727,7 +737,7 @@ static void rna_def_header(BlenderRNA *brna)
 	RNA_def_property_flag(prop, PROP_REGISTER|PROP_NEVER_CLAMP);
 	RNA_def_property_ui_text(prop, "ID Name",
 	                         "If this is set, the header gets a custom ID, otherwise it takes the "
-	                         "name of the class used to define the panel. For example, if the "
+	                         "name of the class used to define the panel; for example, if the "
 	                         "class name is \"OBJECT_HT_hello\", and bl_idname is not set by the "
 	                         "script, then bl_idname = \"OBJECT_HT_hello\"");
 
@@ -781,9 +791,9 @@ static void rna_def_menu(BlenderRNA *brna)
 	RNA_def_property_flag(prop, PROP_REGISTER|PROP_NEVER_CLAMP);
 	RNA_def_property_ui_text(prop, "ID Name",
 	                         "If this is set, the menu gets a custom ID, otherwise it takes the "
-	                         "name of the class used to define the panel. For example, if the "
+	                         "name of the class used to define the menu (for example, if the "
 	                         "class name is \"OBJECT_MT_hello\", and bl_idname is not set by the "
-	                         "script, then bl_idname = \"OBJECT_MT_hello\"");
+	                         "script, then bl_idname = \"OBJECT_MT_hello\")");
 
 	prop= RNA_def_property(srna, "bl_label", PROP_STRING, PROP_NONE);
 	RNA_def_property_string_sdna(prop, NULL, "type->label");

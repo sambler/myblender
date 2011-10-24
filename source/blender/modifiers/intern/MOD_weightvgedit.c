@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -26,11 +24,8 @@
  *
  */
 
-/*
- * XXX I'd like to make modified weights visible in WeightPaint mode,
- *     but couldn't figure a way to do this...
- *     Maybe this will need changes in mesh_calc_modifiers (DerivedMesh.c)?
- *     Or the WeightPaint mode code itself?
+/** \file blender/modifiers/intern/MOD_weightvgedit.c
+ *  \ingroup modifiers
  */
 
 #include "BLI_utildefines.h"

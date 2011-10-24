@@ -1,5 +1,4 @@
 # -*- mode: cmake; indent-tabs-mode: t; -*-
-# $Id: CMakeLists.txt 17433 2008-11-12 21:16:53Z blendix $
 # ***** BEGIN GPL LICENSE BLOCK *****
 #
 # This program is free software; you can redistribute it and/or
@@ -95,6 +94,7 @@ set(APISRC
 	rna_actuator_api.c
 	rna_animation_api.c
 	rna_armature_api.c
+	rna_camera_api.c
 	rna_controller_api.c
 	rna_fcurve_api.c
 	rna_image_api.c
@@ -220,7 +220,7 @@ if(WITH_OPENCOLLADA)
 endif()
 
 if(WITH_INTERNATIONAL)
-	add_definitions(-DINTERNATIONAL)
+	add_definitions(-DWITH_INTERNATIONAL)
 endif()
 
 # Build makesrna executable

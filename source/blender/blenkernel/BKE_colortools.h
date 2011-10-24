@@ -1,6 +1,4 @@
 /*
- * $Id$ 
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -41,8 +39,6 @@ struct rctf;
 
 #if defined _WIN32
 #   define DO_INLINE __inline
-#elif defined (__sgi)
-#   define DO_INLINE
 #elif defined (__sun) || defined (__sun__)
 #   define DO_INLINE
 #else

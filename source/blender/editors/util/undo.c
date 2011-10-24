@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -471,7 +469,7 @@ static int undo_history_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(even
 		if(totitem > 0) {
 			uiPopupMenu *pup= uiPupMenuBegin(C, op->type->name, ICON_NONE);
 			uiLayout *layout= uiPupMenuLayout(pup);
-			uiLayout *split= uiLayoutSplit(layout, 0, 0), *column;
+			uiLayout *split= uiLayoutSplit(layout, 0, 0), *column = NULL;
 			int i, c;
 			
 			for(c=0, i=totitem-1; i >= 0; i--, c++) {

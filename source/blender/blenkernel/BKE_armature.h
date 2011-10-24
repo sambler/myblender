@@ -73,6 +73,7 @@ typedef struct PoseTree
 /*	Core armature functionality */
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 struct bArmature *add_armature(const char *name);

@@ -1,11 +1,4 @@
-/*  deform.c   June 2001
- *  
- *  support for deformation groups
- * 
- *	Reevan McKay
- *
- * $Id$
- *
+/*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -27,7 +20,7 @@
  *
  * The Original Code is: all of this file.
  *
- * Contributor(s): none yet.
+ * Contributor(s): Reevan McKay
  *
  * ***** END GPL LICENSE BLOCK *****
  */

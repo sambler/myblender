@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -76,7 +74,7 @@ EnumPropertyItem boidruleset_type_items[] ={
 #include "BKE_depsgraph.h"
 #include "BKE_particle.h"
 
-static void rna_Boids_reset(Main *bmain, Scene *scene, PointerRNA *ptr)
+static void rna_Boids_reset(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
 {
 	if(ptr->type==&RNA_ParticleSystem) {
 		ParticleSystem *psys = (ParticleSystem*)ptr->data;
@@ -554,7 +552,7 @@ static void rna_def_boid_settings(BlenderRNA *brna)
 
 	prop= RNA_def_property(srna, "range", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_range(prop, 0.0, 100.0);
-	RNA_def_property_ui_text(prop, "Range", "The maximum distance from which a boid can attack");
+	RNA_def_property_ui_text(prop, "Range", "Maximum distance from which a boid can attack");
 	RNA_def_property_update(prop, 0, "rna_Boids_reset");
 
 	/* physical properties */

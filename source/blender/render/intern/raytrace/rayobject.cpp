@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -441,7 +439,7 @@ int RE_rayobject_intersect(RayObject *r, Isect *i)
 	}
 	else {
 		assert(0);
-    	return 0;
+		return 0;
 	}
 }
 

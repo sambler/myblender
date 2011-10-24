@@ -1,5 +1,4 @@
 /**
- * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -63,6 +62,7 @@ WARRANTY OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 #include <stdio.h>

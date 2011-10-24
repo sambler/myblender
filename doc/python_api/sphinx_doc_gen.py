@@ -27,7 +27,7 @@ For HTML generation
 -------------------
 - Run this script from blenders root path once you have compiled blender
 
-    ./blender.bin --background --python doc/python_api/sphinx_doc_gen.py
+    ./blender.bin --background -noaudio --python doc/python_api/sphinx_doc_gen.py
 
   This will generate python files in doc/python_api/sphinx-in/
   providing ./blender.bin is or links to the blender executable
@@ -83,6 +83,7 @@ else:
         "aud",
         "bgl",
         "blf",
+        "gpu",
         "mathutils",
         "mathutils.geometry",
     )
@@ -93,7 +94,7 @@ else:
     # for quick rebuilds
     """
 rm -rf /b/doc/python_api/sphinx-* && \
-./blender.bin --background --factory-startup --python  doc/python_api/sphinx_doc_gen.py && \
+./blender.bin --background -noaudio --factory-startup --python  doc/python_api/sphinx_doc_gen.py && \
 sphinx-build doc/python_api/sphinx-in doc/python_api/sphinx-out
 
     """
@@ -161,7 +162,7 @@ def range_str(val):
 
 
 def example_extract_docstring(filepath):
-    file = open(filepath, 'r')
+    file = open(filepath, "r", encoding="utf-8")
     line = file.readline()
     line_no = 0
     text = []
@@ -360,7 +361,7 @@ def pymodule2sphinx(BASEPATH, module_name, module, title):
     if module_all:
         module_dir = module_all
 
-    file = open(filepath, "w")
+    file = open(filepath, "w", encoding="utf-8")
 
     fw = file.write
 
@@ -510,7 +511,7 @@ def pycontext2sphinx(BASEPATH):
     # Only use once. very irregular
 
     filepath = os.path.join(BASEPATH, "bpy.context.rst")
-    file = open(filepath, "w")
+    file = open(filepath, "w", encoding="utf-8")
     fw = file.write
     fw("Context Access (bpy.context)\n")
     fw("============================\n\n")
@@ -698,7 +699,7 @@ def pyrna2sphinx(BASEPATH):
         #    return
 
         filepath = os.path.join(BASEPATH, "bpy.types.%s.rst" % struct.identifier)
-        file = open(filepath, "w")
+        file = open(filepath, "w", encoding="utf-8")
         fw = file.write
 
         base_id = getattr(struct.base, "identifier", "")
@@ -765,7 +766,7 @@ def pyrna2sphinx(BASEPATH):
                 fw("   .. attribute:: %s\n\n" % prop.identifier)
             if prop.description:
                 fw("      %s\n\n" % prop.description)
-            
+
             # special exception, cant use genric code here for enums
             if prop.type == "enum":
                 enum_text = pyrna_enum2sphinx(prop)
@@ -912,7 +913,7 @@ def pyrna2sphinx(BASEPATH):
 
         def fake_bpy_type(class_value, class_name, descr_str, use_subclasses=True):
             filepath = os.path.join(BASEPATH, "bpy.types.%s.rst" % class_name)
-            file = open(filepath, "w")
+            file = open(filepath, "w", encoding="utf-8")
             fw = file.write
 
             write_title(fw, class_name, "=")
@@ -963,7 +964,7 @@ def pyrna2sphinx(BASEPATH):
 
         for op_module_name, ops_mod in op_modules.items():
             filepath = os.path.join(BASEPATH, "bpy.ops.%s.rst" % op_module_name)
-            file = open(filepath, "w")
+            file = open(filepath, "w", encoding="utf-8")
             fw = file.write
 
             title = "%s Operators" % op_module_name.replace("_", " ").title()
@@ -1017,7 +1018,7 @@ def rna2sphinx(BASEPATH):
 
     # conf.py - empty for now
     filepath = os.path.join(BASEPATH, "conf.py")
-    file = open(filepath, "w")
+    file = open(filepath, "w", encoding="utf-8")
     fw = file.write
 
     version_string = ".".join(str(v) for v in bpy.app.version)
@@ -1042,7 +1043,9 @@ def rna2sphinx(BASEPATH):
         fw("html_theme = 'blender-org'\n")
         fw("html_theme_path = ['../']\n")
 
-    fw("html_favicon = 'favicon.ico'\n")
+        # copied with the theme, exclude else we get an error [#28873]
+        fw("html_favicon = 'favicon.ico'\n")
+
     # not helpful since the source us generated, adds to upload size.
     fw("html_copy_source = False\n")
     fw("\n")
@@ -1053,7 +1056,7 @@ def rna2sphinx(BASEPATH):
 
     # main page needed for sphinx (index.html)
     filepath = os.path.join(BASEPATH, "contents.rst")
-    file = open(filepath, "w")
+    file = open(filepath, "w", encoding="utf-8")
     fw = file.write
 
     fw("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n")
@@ -1120,6 +1123,8 @@ def rna2sphinx(BASEPATH):
         fw("   bgl.rst\n\n")
     if "blf" not in EXCLUDE_MODULES:
         fw("   blf.rst\n\n")
+    if "gpu" not in EXCLUDE_MODULES:
+        fw("   gpu.rst\n\n")
     if "aud" not in EXCLUDE_MODULES:
         fw("   aud.rst\n\n")
     if "bpy_extras" not in EXCLUDE_MODULES:
@@ -1169,7 +1174,7 @@ def rna2sphinx(BASEPATH):
     # internal modules
     if "bpy.ops" not in EXCLUDE_MODULES:
         filepath = os.path.join(BASEPATH, "bpy.ops.rst")
-        file = open(filepath, "w")
+        file = open(filepath, "w", encoding="utf-8")
         fw = file.write
         fw("Operators (bpy.ops)\n")
         fw("===================\n\n")
@@ -1181,7 +1186,7 @@ def rna2sphinx(BASEPATH):
 
     if "bpy.types" not in EXCLUDE_MODULES:
         filepath = os.path.join(BASEPATH, "bpy.types.rst")
-        file = open(filepath, "w")
+        file = open(filepath, "w", encoding="utf-8")
         fw = file.write
         fw("Types (bpy.types)\n")
         fw("=================\n\n")
@@ -1194,7 +1199,7 @@ def rna2sphinx(BASEPATH):
         # not actually a module, only write this file so we
         # can reference in the TOC
         filepath = os.path.join(BASEPATH, "bpy.data.rst")
-        file = open(filepath, "w")
+        file = open(filepath, "w", encoding="utf-8")
         fw = file.write
         fw("Data Access (bpy.data)\n")
         fw("======================\n\n")
@@ -1260,6 +1265,13 @@ def rna2sphinx(BASEPATH):
         import shutil
         shutil.copy2(os.path.join(BASEPATH, "..", "rst", "bgl.rst"), BASEPATH)
 
+    if "gpu" not in EXCLUDE_MODULES:
+        #import gpu as module
+        #pymodule2sphinx(BASEPATH, "gpu", module, "GPU Shader Module")
+        #del module
+        import shutil
+        shutil.copy2(os.path.join(BASEPATH, "..", "rst", "gpu.rst"), BASEPATH)
+
     if "aud" not in EXCLUDE_MODULES:
         import aud as module
         pymodule2sphinx(BASEPATH, "aud", module, "Audio System")
@@ -1284,7 +1296,7 @@ def rna2sphinx(BASEPATH):
 
     if 0:
         filepath = os.path.join(BASEPATH, "bpy.rst")
-        file = open(filepath, "w")
+        file = open(filepath, "w", encoding="utf-8")
         fw = file.write
 
         fw("\n")

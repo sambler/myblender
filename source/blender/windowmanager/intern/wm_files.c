@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -226,13 +224,16 @@ static void wm_window_match_do(bContext *C, ListBase *oldwmlist)
 			oldwm= oldwmlist->first;
 			wm= G.main->wm.first;
 
-			/* move addon key configuration to new wm, to preserve their keymaps */
-			if(oldwm->addonconf) {
-				wm->addonconf= oldwm->addonconf;
-				BLI_remlink(&oldwm->keyconfigs, oldwm->addonconf);
-				oldwm->addonconf= NULL;
-				BLI_addtail(&wm->keyconfigs, wm->addonconf);
-			}
+			/* preserve key configurations in new wm, to preserve their keymaps */
+			wm->keyconfigs= oldwm->keyconfigs;
+			wm->addonconf= oldwm->addonconf;
+			wm->defaultconf= oldwm->defaultconf;
+			wm->userconf= oldwm->userconf;
+
+			oldwm->keyconfigs.first= oldwm->keyconfigs.last= NULL;
+			oldwm->addonconf= NULL;
+			oldwm->defaultconf= NULL;
+			oldwm->userconf= NULL;
 
 			/* ensure making new keymaps and set space types */
 			wm->initialized= 0;
@@ -286,7 +287,9 @@ static void wm_init_userdef(bContext *C)
 		if ((U.flag & USER_SCRIPT_AUTOEXEC_DISABLE) == 0) G.f |=  G_SCRIPT_AUTOEXEC;
 		else											  G.f &= ~G_SCRIPT_AUTOEXEC;
 	}
-	if(U.tempdir[0]) BLI_where_is_temp(btempdir, FILE_MAX, 1);
+
+	/* update tempdir from user preferences */
+	BLI_init_temporary_dir(U.tempdir);
 }
 
 
@@ -408,6 +411,10 @@ void WM_read_file(bContext *C, const char *filepath, ReportList *reports)
 		BPY_app_handlers_reset();
 		BPY_modules_load_user(C);
 #endif
+
+		/* important to do before NULL'ing the context */
+		BLI_exec_cb(CTX_data_main(C), NULL, BLI_CB_EVT_LOAD_POST);
+
 		CTX_wm_window_set(C, NULL); /* exits queues */
 
 #if 0	/* gives popups on windows but not linux, bug in report API but disable for now to stop users getting annoyed  */
@@ -425,23 +432,21 @@ void WM_read_file(bContext *C, const char *filepath, ReportList *reports)
 		// XXX		undo_editmode_clear();
 		BKE_reset_undo();
 		BKE_write_undo(C, "original");	/* save current state */
-
-		BLI_exec_cb(CTX_data_main(C), NULL, BLI_CB_EVT_LOAD_POST);
 	}
 	else if(retval == BKE_READ_EXOTIC_OK_OTHER)
 		BKE_write_undo(C, "Import file");
 	else if(retval == BKE_READ_EXOTIC_FAIL_OPEN) {
-		BKE_reportf(reports, RPT_ERROR, UI_translate_do_iface(N_("Can't read file: \"%s\", %s.")), filepath,
-				errno ? strerror(errno) : UI_translate_do_iface(N_("Unable to open the file")));
+		BKE_reportf(reports, RPT_ERROR, IFACE_("Can't read file: \"%s\", %s."), filepath,
+				errno ? strerror(errno) : IFACE_("Unable to open the file"));
 	}
 	else if(retval == BKE_READ_EXOTIC_FAIL_FORMAT) {
-		BKE_reportf(reports, RPT_ERROR, UI_translate_do_iface(N_("File format is not supported in file: \"%s\".")), filepath);
+		BKE_reportf(reports, RPT_ERROR, IFACE_("File format is not supported in file: \"%s\"."), filepath);
 	}
 	else if(retval == BKE_READ_EXOTIC_FAIL_PATH) {
-		BKE_reportf(reports, RPT_ERROR, UI_translate_do_iface(N_("File path invalid: \"%s\".")), filepath);
+		BKE_reportf(reports, RPT_ERROR, IFACE_("File path invalid: \"%s\"."), filepath);
 	}
 	else {
-		BKE_reportf(reports, RPT_ERROR, UI_translate_do_iface(N_("Unknown error loading: \"%s\".")), filepath);
+		BKE_reportf(reports, RPT_ERROR, IFACE_("Unknown error loading: \"%s\"."), filepath);
 		BLI_assert(!"invalid 'retval'");
 	}
 
@@ -567,7 +572,7 @@ void WM_read_history(void)
 
 	BLI_make_file_string("/", name, cfgdir, BLENDER_HISTORY_FILE);
 
-	lines= BLI_read_file_as_lines(name);
+	lines= BLI_file_read_as_lines(name);
 
 	G.recent_files.first = G.recent_files.last = NULL;
 
@@ -582,7 +587,7 @@ void WM_read_history(void)
 		}
 	}
 	
-	BLI_free_file_lines(lines);
+	BLI_file_free_lines(lines);
 
 }
 
@@ -850,14 +855,14 @@ void wm_autosave_location(char *filepath)
 	 * BLI_make_file_string will create string that has it most likely on C:\
 	 * through get_default_root().
 	 * If there is no C:\tmp autosave fails. */
-	if (!BLI_exists(U.tempdir)) {
+	if (!BLI_exists(BLI_temporary_dir())) {
 		savedir = BLI_get_folder_create(BLENDER_USER_AUTOSAVE, NULL);
 		BLI_make_file_string("/", filepath, savedir, pidstr);
 		return;
 	}
 #endif
-	
-	BLI_make_file_string("/", filepath, U.tempdir, pidstr);
+
+	BLI_make_file_string("/", filepath, BLI_temporary_dir(), pidstr);
 }
 
 void WM_autosave_init(wmWindowManager *wm)
@@ -915,7 +920,7 @@ void wm_autosave_delete(void)
 
 	if(BLI_exists(filename)) {
 		char str[FILE_MAXDIR+FILE_MAXFILE];
-		BLI_make_file_string("/", str, U.tempdir, "quit.blend");
+		BLI_make_file_string("/", str, BLI_temporary_dir(), "quit.blend");
 
 		/* if global undo; remove tempsave, otherwise rename */
 		if(U.uiflag & USER_GLOBALUNDO) BLI_delete(filename, 0, 0);

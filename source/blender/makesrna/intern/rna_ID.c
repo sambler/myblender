@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -314,6 +312,26 @@ static int rna_IDPArray_length(PointerRNA *ptr)
 	return prop->len;
 }
 
+int rna_IDMaterials_assign_int(PointerRNA *ptr, int key, const PointerRNA *assign_ptr)
+{
+	ID *id=           ptr->id.data;
+	short *totcol= give_totcolp_id(id);
+	Material *mat_id= assign_ptr->id.data;
+	if(totcol && (key >= 0 && key < *totcol)) {
+		assign_material_id(id, mat_id, key + 1);
+		return 1;
+	}
+	else {
+		return 0;
+	}
+}
+
+void rna_Library_filepath_set(PointerRNA *ptr, const char *value)
+{
+	Library *lib= (Library*)ptr->data;
+	BKE_library_filepath_set(lib, value);
+}
+
 #else
 
 static void rna_def_ID_properties(BlenderRNA *brna)
@@ -367,7 +385,7 @@ static void rna_def_ID_properties(BlenderRNA *brna)
 
 	prop= RNA_def_property(srna, "idp_array", PROP_COLLECTION, PROP_NONE);
 	RNA_def_property_struct_type(prop, "PropertyGroup");
-	RNA_def_property_collection_funcs(prop, "rna_IDPArray_begin", "rna_iterator_array_next", "rna_iterator_array_end", "rna_iterator_array_get", "rna_IDPArray_length", NULL, NULL);
+	RNA_def_property_collection_funcs(prop, "rna_IDPArray_begin", "rna_iterator_array_next", "rna_iterator_array_end", "rna_iterator_array_get", "rna_IDPArray_length", NULL, NULL, NULL);
 	RNA_def_property_flag(prop, PROP_EXPORT|PROP_IDPROPERTY);
 
 	// never tested, maybe its useful to have this?
@@ -460,13 +478,13 @@ static void rna_def_ID(BlenderRNA *brna)
 
 	prop= RNA_def_property(srna, "use_fake_user", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", LIB_FAKEUSER);
-	RNA_def_property_ui_text(prop, "Fake User", "Saves this datablock even if it has no users");
+	RNA_def_property_ui_text(prop, "Fake User", "Save this datablock even if it has no users");
 	RNA_def_property_boolean_funcs(prop, NULL, "rna_ID_fake_user_set");
 
 	prop= RNA_def_property(srna, "tag", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", LIB_DOIT);
 	RNA_def_property_flag(prop, PROP_LIB_EXCEPTION);
-	RNA_def_property_ui_text(prop, "Tag", "Tools can use this to tag data, (initial state is undefined)");
+	RNA_def_property_ui_text(prop, "Tag", "Tools can use this to tag data (initial state is undefined)");
 
 	prop= RNA_def_property(srna, "library", PROP_POINTER, PROP_NONE);
 	RNA_def_property_pointer_sdna(prop, NULL, "lib");
@@ -480,8 +498,8 @@ static void rna_def_ID(BlenderRNA *brna)
 	RNA_def_function_return(func, parm);
 
 	func= RNA_def_function(srna, "user_clear", "rna_ID_user_clear");
-	RNA_def_function_ui_description(func, "Clears the user count of a datablock so its not saved, "
-	                                "on reload the data will be removed");
+	RNA_def_function_ui_description(func, "Clear the user count of a datablock so its not saved, "
+	                                      "on reload the data will be removed");
 
 	func= RNA_def_function(srna, "animation_data_create", "BKE_id_add_animdata");
 	RNA_def_function_ui_description(func, "Create animation data to this ID, note that not all ID types support this");
@@ -493,7 +511,7 @@ static void rna_def_ID(BlenderRNA *brna)
 
 	func= RNA_def_function(srna, "update_tag", "rna_ID_update_tag");
 	RNA_def_function_flag(func, FUNC_USE_REPORTS);
-	RNA_def_function_ui_description(func, "Tag the id to update its display data");
+	RNA_def_function_ui_description(func, "Tag the ID to update its display data");
 	RNA_def_enum_flag(func, "refresh", update_flag_items, 0, "", "Type of updates to perform");
 }
 
@@ -509,7 +527,7 @@ static void rna_def_library(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "filepath", PROP_STRING, PROP_FILEPATH);
 	RNA_def_property_string_sdna(prop, NULL, "name");
 	RNA_def_property_ui_text(prop, "File Path", "Path to the library .blend file");
-	/* TODO - lib->filename isnt updated, however the outliner also skips this, probably only needed on read. */
+	RNA_def_property_string_funcs(prop, NULL, NULL, "rna_Library_filepath_set");
 	
 	prop= RNA_def_property(srna, "parent", PROP_POINTER, PROP_NONE);
 	RNA_def_property_struct_type(prop, "Library");

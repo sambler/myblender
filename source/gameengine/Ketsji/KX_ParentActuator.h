@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -56,8 +54,8 @@ class KX_ParentActuator : public SCA_IActuator
 	
 	
 
- public:
- 	enum KX_PARENTACT_MODE
+public:
+	enum KX_PARENTACT_MODE
 	{
 		KX_PARENT_NODEF = 0,
 		KX_PARENT_SET,
@@ -65,7 +63,7 @@ class KX_ParentActuator : public SCA_IActuator
 		KX_PARENT_MAX
 
 	};
- 
+
 	KX_ParentActuator(class SCA_IObject* gameobj,
 						int mode,
 						bool addToCompound,

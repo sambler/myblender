@@ -1,4 +1,3 @@
-# $Id: CMakeLists.txt 12931 2007-12-17 18:20:48Z theeth $
 # ***** BEGIN GPL LICENSE BLOCK *****
 #
 # This program is free software; you can redistribute it and/or
@@ -51,5 +50,17 @@ set(SRC
 
 	mesh_intern.h
 )
+
+if(WITH_GAMEENGINE)
+	add_definitions(-DWITH_GAMEENGINE)
+
+	list(APPEND INC
+		../../../../extern/recastnavigation
+	)
+
+	list(APPEND SRC
+		mesh_navmesh.c
+	)
+endif()
 
 blender_add_lib(bf_editor_mesh "${SRC}" "${INC}" "${INC_SYS}")

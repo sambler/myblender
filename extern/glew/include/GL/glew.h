@@ -239,6 +239,7 @@ typedef _W64 int ptrdiff_t;
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 /* ----------------------------- GL_VERSION_1_1 ---------------------------- */

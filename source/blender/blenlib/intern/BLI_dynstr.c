@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -70,7 +68,8 @@ struct DynStr {
 
 /***/
 
-DynStr *BLI_dynstr_new(void) {
+DynStr *BLI_dynstr_new(void)
+{
 	DynStr *ds= MEM_mallocN(sizeof(*ds), "DynStr");
 	ds->elems= ds->last= NULL;
 	ds->curlen= 0;
@@ -78,7 +77,8 @@ DynStr *BLI_dynstr_new(void) {
 	return ds;
 }
 
-void BLI_dynstr_append(DynStr *ds, const char *cstr) {
+void BLI_dynstr_append(DynStr *ds, const char *cstr)
+{
 	DynStrElem *dse= malloc(sizeof(*dse));
 	int cstrlen= strlen(cstr);
 	
@@ -220,7 +220,8 @@ void BLI_dynstr_appendf(DynStr *ds, const char *format, ...)
 	}
 }
 
-int BLI_dynstr_get_len(DynStr *ds) {
+int BLI_dynstr_get_len(DynStr *ds)
+{
 	return ds->curlen;
 }
 

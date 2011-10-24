@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -37,7 +35,7 @@
 
 /* blf_translation.c  */
 
-#ifdef INTERNATIONAL
+#ifdef WITH_INTERNATIONAL
 unsigned char *BLF_get_unifont(int *unifont_size);
 void BLF_free_unifont(void);
 #endif
@@ -60,7 +58,8 @@ void BLF_lang_encoding_name(const char *str);
 
 void BLF_lang_encoding(const char *str);
 
-#define _(msgid) BLF_gettext(msgid)
+/*#define _(msgid) BLF_gettext(msgid)*/
+/* The "translation-marker" macro. */
 #define N_(msgid) msgid
 
 #endif /* BLF_TRANSLATION_H */

@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -883,7 +881,8 @@ static void multiresbake_start(MultiresBakeRender *bkr)
 	finish_images(bkr);
 }
 
-static int multiresbake_check(bContext *C, wmOperator *op) {
+static int multiresbake_check(bContext *C, wmOperator *op)
+{
 	Scene *scene= CTX_data_scene(C);
 	Object *ob;
 	Mesh *me;

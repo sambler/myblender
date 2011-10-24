@@ -1,5 +1,4 @@
 /*
- * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -102,7 +101,7 @@ SG_Controller *BL_CreateIPO(struct bAction *action, KX_GameObject* gameobj, KX_B
 		rotmode = "rotation_axis_angle";
 		drotmode = "delta_rotation_axis_angle";
 		break;
-	case ROT_MODE_QUAT:
+	case ROT_MODE_QUAT: /* XXX, this isnt working, currently only eulers are supported [#28853] */
 		rotmode = "rotation_quaternion";
 		drotmode = "delta_rotation_quaternion";
 		break;

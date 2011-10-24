@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -118,7 +116,8 @@ static void InputTrackBall(TransInfo *UNUSED(t), MouseInput *mi, const int mval[
 	output[1] *= mi->factor;
 }
 
-static void InputHorizontalRatio(TransInfo *t, MouseInput *mi, const int mval[2], float output[3]) {
+static void InputHorizontalRatio(TransInfo *t, MouseInput *mi, const int mval[2], float output[3])
+{
 	float x, pad;
 
 	pad = t->ar->winx / 10;
@@ -135,7 +134,8 @@ static void InputHorizontalRatio(TransInfo *t, MouseInput *mi, const int mval[2]
 	output[0] = (x - pad) / (t->ar->winx - 2 * pad);
 }
 
-static void InputHorizontalAbsolute(TransInfo *t, MouseInput *mi, const int mval[2], float output[3]) {
+static void InputHorizontalAbsolute(TransInfo *t, MouseInput *mi, const int mval[2], float output[3])
+{
 	float vec[3];
 
 	InputVector(t, mi, mval, vec);
@@ -144,7 +144,8 @@ static void InputHorizontalAbsolute(TransInfo *t, MouseInput *mi, const int mval
 	output[0] = dot_v3v3(t->viewinv[0], vec) * 2.0f;
 }
 
-static void InputVerticalRatio(TransInfo *t, MouseInput *mi, const int mval[2], float output[3]) {
+static void InputVerticalRatio(TransInfo *t, MouseInput *mi, const int mval[2], float output[3])
+{
 	float y, pad;
 
 	pad = t->ar->winy / 10;
@@ -160,7 +161,8 @@ static void InputVerticalRatio(TransInfo *t, MouseInput *mi, const int mval[2], 
 	output[0] = (y - pad) / (t->ar->winy - 2 * pad);
 }
 
-static void InputVerticalAbsolute(TransInfo *t, MouseInput *mi, const int mval[2], float output[3]) {
+static void InputVerticalAbsolute(TransInfo *t, MouseInput *mi, const int mval[2], float output[3])
+{
 	float vec[3];
 
 	InputVector(t, mi, mval, vec);
@@ -308,6 +310,15 @@ static void calcSpringFactor(MouseInput *mi)
 
 void initMouseInputMode(TransInfo *t, MouseInput *mi, MouseInputMode mode)
 {
+	/* may have been allocated previously */
+	/* TODO, holding R-key can cause mem leak, but this causes [#28903]
+	 * disable for now. */
+#if 0
+	if(mi->data) {
+		MEM_freeN(mi->data);
+		mi->data= NULL;
+	}
+#endif
 
 	switch(mode)
 	{

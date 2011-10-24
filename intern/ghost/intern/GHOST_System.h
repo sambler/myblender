@@ -1,5 +1,4 @@
 /*
- * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -250,7 +249,7 @@ public:
 	virtual inline GHOST_WindowManager* getWindowManager() const;
 
 #ifdef WITH_INPUT_NDOF
- 	/**
+	/**
 	 * Returns a pointer to our n-degree of freedeom manager.
 	 * @return A pointer to our n-degree of freedeom manager.
 	 */

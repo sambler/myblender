@@ -86,6 +86,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 /* -------------------------- WGL_3DFX_multisample ------------------------- */

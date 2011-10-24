@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -765,12 +763,12 @@ else
 				m_logger->StartLog(tc_scenegraph, m_kxsystem->GetTimeInSeconds(), true);
 				SG_SetActiveStage(SG_STAGE_ACTUATOR);
 				scene->UpdateParents(m_clockTime);
-				 
- 				scene->setSuspendedTime(0.0);
+
+				scene->setSuspendedTime(0.0);
 			} // suspended
- 			else
- 				if(scene->getSuspendedTime()==0.0)
- 					scene->setSuspendedTime(m_clockTime);
+			else
+				if(scene->getSuspendedTime()==0.0)
+					scene->setSuspendedTime(m_clockTime);
 
 			m_logger->StartLog(tc_services, m_kxsystem->GetTimeInSeconds(), true);
 		}
@@ -1400,8 +1398,14 @@ void KX_KetsjiEngine::PostProcessScene(KX_Scene* scene)
 		KX_Camera* activecam = NULL;
 
 		RAS_CameraData camdata = RAS_CameraData();
-		if (override_camera) camdata.m_lens = m_overrideCamLens;
-
+		if (override_camera)
+		{
+			camdata.m_lens = m_overrideCamLens;
+			camdata.m_clipstart = m_overrideCamNear;
+			camdata.m_clipend = m_overrideCamFar;
+			
+			camdata.m_perspective= !m_overrideCamUseOrtho;
+		}
 		activecam = new KX_Camera(scene,KX_Scene::m_callbacks,camdata);
 		activecam->SetName("__default__cam__");
 	

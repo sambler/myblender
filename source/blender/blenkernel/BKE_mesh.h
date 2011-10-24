@@ -1,8 +1,4 @@
 /*
- * blenlib/BKE_mesh.h (mar-2001 nzc)
- *	
- * $Id$ 
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -24,7 +20,7 @@
  *
  * The Original Code is: all of this file.
  *
- * Contributor(s): none yet.
+ * Contributor(s): (mar-2001 nzc)
  *
  * ***** END GPL LICENSE BLOCK *****
  */
@@ -56,6 +52,7 @@ struct Scene;
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 struct EditMesh *BKE_mesh_get_editmesh(struct Mesh *me);

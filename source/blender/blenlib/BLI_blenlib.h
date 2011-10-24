@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -64,32 +62,24 @@ struct ListBase;
 
 #include <stdlib.h>
 
-extern char btempdir[]; /* creator.c temp dir used instead of U.tempdir, set with BLI_where_is_temp( btempdir, 1 ); */
-
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 #include "BLI_listbase.h"
 
 #include "BLI_string.h"
 
-#include "BLI_path_util.h"
+#include "BLI_string_utf8.h"
 
-#include "BLI_storage.h"
+#include "BLI_path_util.h"
 
 #include "BLI_fileops.h"
 
 #include "BLI_rect.h"
 
 #include "BLI_noise.h"
-
-/**
- * @param strct The structure of interest
- * @param member The name of a member field of @a strct
- * @retval The offset in bytes of @a member within @a strct
- */
-#define BLI_STRUCT_OFFSET(strct, member)	((int)(intptr_t) &((strct*) 0)->member)
 
 #ifdef __cplusplus
 }

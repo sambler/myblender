@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -50,6 +48,7 @@
 #include "BLI_memarena.h"
 #include "BLI_pbvh.h"
 #include "BLI_utildefines.h"
+#include "BLI_linklist.h"
 
 #include "BKE_cdderivedmesh.h"
 #include "BKE_displist.h"
@@ -64,6 +63,7 @@
 
 #ifdef WITH_GAMEENGINE
 #include "BKE_navmesh_conversion.h"
+static DerivedMesh *navmesh_dm_createNavMeshForVisualization(DerivedMesh *dm);
 #endif
 
 #include "BLO_sys_types.h" // for intptr_t support
@@ -76,8 +76,6 @@
 #include "GPU_material.h"
 
 extern GLubyte stipple_quarttone[128]; /* glutil.c, bad level data */
-
-static DerivedMesh *navmesh_dm_createNavMeshForVisualization(DerivedMesh *dm);
 
 ///////////////////////////////////
 ///////////////////////////////////
@@ -2970,7 +2968,7 @@ BM_INLINE int navmesh_bit(int a, int b)
 	return (a & (1 << b)) >> b;
 }
 
-static void navmesh_intToCol(int i, float* col)
+BM_INLINE void navmesh_intToCol(int i, float col[3])
 {
 	int	r = navmesh_bit(i, 0) + navmesh_bit(i, 3) * 2 + 1;
 	int	g = navmesh_bit(i, 1) + navmesh_bit(i, 4) * 2 + 1;
@@ -2985,8 +2983,7 @@ static void navmesh_drawColored(DerivedMesh *dm)
 	int a, glmode;
 	MVert *mvert = (MVert *)CustomData_get_layer(&dm->vertData, CD_MVERT);
 	MFace *mface = (MFace *)CustomData_get_layer(&dm->faceData, CD_MFACE);
-	int* polygonIdx = (int*)CustomData_get_layer(&dm->faceData, CD_RECAST);
-	const float BLACK_COLOR[3] = {0.f, 0.f, 0.f};
+	int *polygonIdx = (int *)CustomData_get_layer(&dm->faceData, CD_RECAST);
 	float col[3];
 
 	if (!polygonIdx)
@@ -3007,11 +3004,13 @@ static void navmesh_drawColored(DerivedMesh *dm)
 		glBegin(glmode = GL_QUADS);
 		for(a = 0; a < dm->numFaceData; a++, mface++) {
 			int new_glmode = mface->v4?GL_QUADS:GL_TRIANGLES;
-			int polygonIdx = *(int*)CustomData_get(&dm->faceData, a, CD_RECAST);
-			if (polygonIdx<=0)
-				memcpy(col, BLACK_COLOR, 3*sizeof(float));
-			else
-				navmesh_intToCol(polygonIdx, col);
+			int pi = polygonIdx[a];
+			if (pi <= 0) {
+				zero_v3(col);
+			}
+			else {
+				navmesh_intToCol(pi, col);
+			}
 
 			if(new_glmode != glmode) {
 				glEnd();

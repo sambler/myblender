@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -149,7 +147,7 @@ typedef struct {
 	PyObject *in_weakreflist;
 #endif
 
-	/* collection iterator spesific parts */
+	/* collection iterator specific parts */
 	CollectionPropertyIterator iter;
 } BPy_PropertyCollectionIterRNA;
 

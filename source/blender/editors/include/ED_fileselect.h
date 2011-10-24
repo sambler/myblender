@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -106,7 +104,7 @@ void ED_fileselect_clear(struct bContext *C, struct SpaceFile *sfile);
 
 void ED_fileselect_exit(struct bContext *C, struct SpaceFile *sfile);
 
-int ED_file_extension_icon(char *relname);
+int ED_file_extension_icon(const char *relname);
 
 #endif /* ED_FILES_H */
 

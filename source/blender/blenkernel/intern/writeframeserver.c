@@ -1,8 +1,4 @@
-/** \file blender/blenkernel/intern/writeframeserver.c
- *  \ingroup bke
- */
 /*
- * $Id$
  *
  * Frameserver
  * Makes Blender accessible from TMPGenc directly using VFAPI (you can
@@ -20,6 +16,10 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ */
+
+/** \file blender/blenkernel/intern/writeframeserver.c
+ *  \ingroup bke
  */
 
 #ifdef WITH_FRAMESERVER

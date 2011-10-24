@@ -1,7 +1,7 @@
+
 /** \file blender/blenkernel/intern/CCGSubSurf.h
  *  \ingroup bke
  */
-/* $Id$ */
 
 typedef void* CCGMeshHDL;
 typedef void* CCGVertHDL;

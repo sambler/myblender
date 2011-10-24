@@ -1,6 +1,4 @@
 /*
- * $Id$ 
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -75,6 +73,7 @@ typedef enum ModifierType {
 	eModifierType_WeightVGEdit,
 	eModifierType_WeightVGMix,
 	eModifierType_WeightVGProximity,
+	eModifierType_EmptySlot,    /* keep so DynamicPaint keep loading, can re-use later */
 	eModifierType_DynamicPaint, /* reserve slot */
 	NUM_MODIFIER_TYPES
 } ModifierType;

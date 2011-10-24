@@ -35,6 +35,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 #include "BLO_sys_types.h" // for intptr_t support

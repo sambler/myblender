@@ -80,6 +80,8 @@ static void rna_AnimData_action_set(PointerRNA *ptr, PointerRNA value)
 /* wrapper for poll callback */
 static int RKS_POLL_rna_internal(KeyingSetInfo *ksi, bContext *C)
 {
+	extern FunctionRNA rna_KeyingSetInfo_poll_func;
+
 	PointerRNA ptr;
 	ParameterList list;
 	FunctionRNA *func;
@@ -87,7 +89,7 @@ static int RKS_POLL_rna_internal(KeyingSetInfo *ksi, bContext *C)
 	int ok;
 
 	RNA_pointer_create(NULL, ksi->ext.srna, ksi, &ptr);
-	func= RNA_struct_find_function(&ptr, "poll");
+	func= &rna_KeyingSetInfo_poll_func; /* RNA_struct_find_function(&ptr, "poll"); */
 
 	RNA_parameter_list_create(&list, &ptr, func);
 		/* hook up arguments */
@@ -108,12 +110,14 @@ static int RKS_POLL_rna_internal(KeyingSetInfo *ksi, bContext *C)
 /* wrapper for iterator callback */
 static void RKS_ITER_rna_internal(KeyingSetInfo *ksi, bContext *C, KeyingSet *ks)
 {
+	extern FunctionRNA rna_KeyingSetInfo_iterator_func;
+
 	PointerRNA ptr;
 	ParameterList list;
 	FunctionRNA *func;
 
 	RNA_pointer_create(NULL, ksi->ext.srna, ksi, &ptr);
-	func= RNA_struct_find_function(&ptr, "iterator");
+	func= &rna_KeyingSetInfo_iterator_func; /* RNA_struct_find_function(&ptr, "poll"); */
 
 	RNA_parameter_list_create(&list, &ptr, func);
 		/* hook up arguments */
@@ -129,12 +133,14 @@ static void RKS_ITER_rna_internal(KeyingSetInfo *ksi, bContext *C, KeyingSet *ks
 /* wrapper for generator callback */
 static void RKS_GEN_rna_internal(KeyingSetInfo *ksi, bContext *C, KeyingSet *ks, PointerRNA *data)
 {
+	extern FunctionRNA rna_KeyingSetInfo_generate_func;
+
 	PointerRNA ptr;
 	ParameterList list;
 	FunctionRNA *func;
 
 	RNA_pointer_create(NULL, ksi->ext.srna, ksi, &ptr);
-	func= RNA_struct_find_function(&ptr, "generate");
+	func= &rna_KeyingSetInfo_generate_func; /* RNA_struct_find_generate(&ptr, "poll"); */
 
 	RNA_parameter_list_create(&list, &ptr, func);
 		/* hook up arguments */
@@ -272,7 +278,7 @@ static void rna_ksPath_RnaPath_set(PointerRNA *ptr, const char *value)
 	if (ksp->rna_path)
 		MEM_freeN(ksp->rna_path);
 	
-	if (strlen(value))
+	if (value[0])
 		ksp->rna_path= BLI_strdup(value);
 	else 
 		ksp->rna_path= NULL;
@@ -489,7 +495,7 @@ static void rna_def_keyingset_info(BlenderRNA *brna)
 	RNA_def_property_flag(prop, PROP_REGISTER|PROP_NEVER_CLAMP);
 		
 	/* Name */
-	prop= RNA_def_property(srna, "bl_label", PROP_STRING, PROP_NONE);
+	prop= RNA_def_property(srna, "bl_label", PROP_STRING, PROP_TRANSLATE);
 	RNA_def_property_string_sdna(prop, NULL, "name");
 	RNA_def_property_ui_text(prop, "Name", "");
 	RNA_def_struct_name_property(srna, prop);

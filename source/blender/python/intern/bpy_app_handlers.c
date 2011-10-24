@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -40,6 +38,8 @@ void bpy_app_generic_callback(struct Main *main, struct ID *id, void *arg);
 static PyTypeObject BlenderAppCbType;
 
 static PyStructSequence_Field app_cb_info_fields[]= {
+	{(char *)"frame_change_pre", NULL},
+	{(char *)"frame_change_post", NULL},
 	{(char *)"render_pre", NULL},
 	{(char *)"render_post", NULL},
 	{(char *)"render_stats", NULL},
@@ -75,13 +75,13 @@ static PyObject *make_app_cb_info(void)
 		return NULL;
 	}
 
-	for(pos= 0; pos < BLI_CB_EVT_TOT; pos++) {
-		if(app_cb_info_fields[pos].name == NULL) {
+	for (pos= 0; pos < BLI_CB_EVT_TOT; pos++) {
+		if (app_cb_info_fields[pos].name == NULL) {
 			Py_FatalError("invalid callback slots 1");
 		}
 		PyStructSequence_SET_ITEM(app_cb_info, pos, (py_cb_array[pos]= PyList_New(0)));
 	}
-	if(app_cb_info_fields[pos].name != NULL) {
+	if (app_cb_info_fields[pos].name != NULL) {
 		Py_FatalError("invalid callback slots 2");
 	}
 
@@ -101,12 +101,12 @@ PyObject *BPY_app_handlers_struct(void)
 	BlenderAppCbType.tp_new= NULL;
 
 	/* assign the C callbacks */
-	if(ret) {
+	if (ret) {
 		static bCallbackFuncStore funcstore_array[BLI_CB_EVT_TOT]= {{NULL}};
 		bCallbackFuncStore *funcstore;
 		int pos= 0;
 
-		for(pos= 0; pos < BLI_CB_EVT_TOT; pos++) {
+		for (pos= 0; pos < BLI_CB_EVT_TOT; pos++) {
 			funcstore= &funcstore_array[pos];
 			funcstore->func= bpy_app_generic_callback;
 			funcstore->alloc= 0;
@@ -122,7 +122,7 @@ void BPY_app_handlers_reset(void)
 {
 	int pos= 0;
 
-	for(pos= 0; pos < BLI_CB_EVT_TOT; pos++) {
+	for (pos= 0; pos < BLI_CB_EVT_TOT; pos++) {
 		PyList_SetSlice(py_cb_array[pos], 0, PY_SSIZE_T_MAX, NULL);
 	}
 }
@@ -132,7 +132,7 @@ void bpy_app_generic_callback(struct Main *UNUSED(main), struct ID *id, void *ar
 {
 	PyObject *cb_list= py_cb_array[GET_INT_FROM_POINTER(arg)];
 	Py_ssize_t cb_list_len;
-	if((cb_list_len= PyList_GET_SIZE(cb_list)) > 0) {
+	if ((cb_list_len= PyList_GET_SIZE(cb_list)) > 0) {
 		PyGILState_STATE gilstate= PyGILState_Ensure();
 
 		PyObject* args= PyTuple_New(1); // save python creating each call
@@ -141,7 +141,7 @@ void bpy_app_generic_callback(struct Main *UNUSED(main), struct ID *id, void *ar
 		Py_ssize_t pos;
 
 		/* setup arguments */
-		if(id) {
+		if (id) {
 			PointerRNA id_ptr;
 			RNA_id_pointer_create(id, &id_ptr);
 			PyTuple_SET_ITEM(args, 0, pyrna_struct_CreatePyObject(&id_ptr));

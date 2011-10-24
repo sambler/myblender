@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -140,7 +138,7 @@ class KX_MouseFocusSensor : public SCA_MouseSensor
 	 */
 	bool m_positive_event;
 
- 	/**
+	/**
 	 * Tests whether the object is in mouse focus for this camera
 	 */
 	bool ParentObjectHasFocusCamera(KX_Camera *cam);

@@ -1,5 +1,4 @@
 /* 
- * $Id: mathutils_Matrix.h 34837 2011-02-14 04:15:25Z campbellbarton $
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or

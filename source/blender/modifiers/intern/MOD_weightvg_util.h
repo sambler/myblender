@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -26,7 +24,7 @@
  *
  */
 
-/** \file blender/modifiers/intern/MOD_util.h
+/** \file blender/modifiers/intern/MOD_weightvg_util.h
  *  \ingroup modifiers
  */
 

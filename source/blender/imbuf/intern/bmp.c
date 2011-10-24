@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -101,8 +99,8 @@ static int checkbmp(unsigned char *mem)
 	return(ret_val);
 }
 
-int imb_is_a_bmp(unsigned char *buf) {
-	
+int imb_is_a_bmp(unsigned char *buf)
+{
 	return checkbmp(buf);
 }
 
@@ -200,8 +198,8 @@ static int putShortLSB(unsigned short us,FILE *ofile) {
 } 
 
 /* Found write info at http://users.ece.gatech.edu/~slabaugh/personal/c/bitmapUnix.c */
-int imb_savebmp(struct ImBuf *ibuf, const char *name, int flags) {
-
+int imb_savebmp(struct ImBuf *ibuf, const char *name, int flags)
+{
 	BMPINFOHEADER infoheader;
 	int bytesize, extrabytes, x, y, t, ptr;
 	uchar *data;

@@ -972,7 +972,7 @@ static TreeElement *outliner_add_element(SpaceOops *soops, ListBase *lb, void *i
 		}
 		else if(type == TSE_RNA_STRUCT) {
 			/* struct */
-			te->name= RNA_struct_name_get_alloc(ptr, NULL, 0);
+			te->name= RNA_struct_name_get_alloc(ptr, NULL, 0, NULL);
 
 			if(te->name)
 				te->flag |= TE_FREE_NAME;
@@ -1544,8 +1544,9 @@ void outliner_build_tree(Main *mainvar, Scene *scene, SpaceOops *soops)
 
 		while(seq) {
 			op= need_add_seq_dup(seq);
-			if(op==1)
-				ten= outliner_add_element(soops, &soops->tree, (void*)seq, NULL, TSE_SEQUENCE, 0);
+			if(op==1) {
+				/* ten= */ outliner_add_element(soops, &soops->tree, (void*)seq, NULL, TSE_SEQUENCE, 0);
+			}
 			else if(op==0) {
 				ten= outliner_add_element(soops, &soops->tree, (void*)seq, NULL, TSE_SEQUENCE_DUP, 0);
 				outliner_add_seq_dup(soops, seq, ten, 0);
@@ -1582,7 +1583,7 @@ void outliner_build_tree(Main *mainvar, Scene *scene, SpaceOops *soops)
 		wmKeyMap *km;
 		
 		for(km= wm->defaultconf->keymaps.first; km; km= km->next) {
-			ten= outliner_add_element(soops, &soops->tree, (void*)km, NULL, TSE_KEYMAP, 0);
+			/* ten= */ outliner_add_element(soops, &soops->tree, (void*)km, NULL, TSE_KEYMAP, 0);
 		}
 	}
 	else {

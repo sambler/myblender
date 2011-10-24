@@ -1,7 +1,4 @@
-/*  softbody.c
- *
- * $Id$
- *
+/*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -69,6 +66,7 @@ variables on the UI for now
 
 #include "BLI_math.h"
 #include "BLI_utildefines.h"
+#include "BLI_listbase.h"
 #include "BLI_ghash.h"
 #include "BLI_threads.h"
 
@@ -208,7 +206,7 @@ static float sb_time_scale(Object *ob)
 	}
 	return (1.0f);
 	/*
-	this would be frames/sec independant timing assuming 25 fps is default
+	this would be frames/sec independent timing assuming 25 fps is default
 	but does not work very well with NLA
 		return (25.0f/scene->r.frs_sec)
 	*/
@@ -1744,12 +1742,12 @@ static int sb_detect_vertex_collisionCached(float opco[3], float facenormal[3], 
 	GHash *hash;
 	GHashIterator *ihash;
 	float nv1[3], nv2[3], nv3[3], nv4[3], edge1[3], edge2[3],d_nvect[3], dv1[3],ve[3],avel[3]={0.0,0.0,0.0},
-	vv1[3], vv2[3], vv3[3], vv4[3], coledge[3]={0.0f, 0.0f, 0.0f}, mindistedge = 1000.0f,
-	outerforceaccu[3],innerforceaccu[3],
-		facedist,n_mag,force_mag_norm,minx,miny,minz,maxx,maxy,maxz,
-		innerfacethickness = -0.5f, outerfacethickness = 0.2f,
-		ee = 5.0f, ff = 0.1f, fa=1;
-	int a, deflected=0, cavel=0,ci=0;
+	      vv1[3], vv2[3], vv3[3], vv4[3], coledge[3]={0.0f, 0.0f, 0.0f}, mindistedge = 1000.0f,
+	      outerforceaccu[3], innerforceaccu[3],
+	      facedist, /* n_mag, */ /* UNUSED */ force_mag_norm, minx, miny, minz, maxx, maxy, maxz,
+	      innerfacethickness = -0.5f, outerfacethickness = 0.2f,
+	      ee = 5.0f, ff = 0.1f, fa=1;
+	int a, deflected=0, cavel=0, ci=0;
 /* init */
 	*intrusion = 0.0f;
 	hash  = vertexowner->soft->scratch->colliderhash;
@@ -1869,7 +1867,7 @@ static int sb_detect_vertex_collisionCached(float opco[3], float facenormal[3], 
 					VECSUB(dv1,opco,nv2); /* abuse dv1 to have vertex in question at *origin* of triangle */
 
 					cross_v3_v3v3(d_nvect, edge2, edge1);
-					n_mag = normalize_v3(d_nvect);
+					/* n_mag = */ /* UNUSED */ normalize_v3(d_nvect);
 					facedist = dot_v3v3(dv1,d_nvect);
 					// so rules are
 					//
@@ -1906,7 +1904,7 @@ static int sb_detect_vertex_collisionCached(float opco[3], float facenormal[3], 
 						VECSUB(dv1,opco,nv4); /* abuse dv1 to have vertex in question at *origin* of triangle */
 
 						cross_v3_v3v3(d_nvect, edge2, edge1);
-						n_mag = normalize_v3(d_nvect);
+						/* n_mag = */ /* UNUSED */ normalize_v3(d_nvect);
 						facedist = dot_v3v3(dv1,d_nvect);
 
 						if ((facedist > innerfacethickness) && (facedist < outerfacethickness)){
@@ -2819,7 +2817,7 @@ static void softbody_calc_forces(Scene *scene, Object *ob, float forcetime, floa
 		if (ob->softflag & OB_SB_FACECOLL) scan_for_ext_face_forces(ob,timenow);
 
 		/* finish matrix and solve */
-#if (0) // remove onl linking for now .. still i am not sure .. the jacobian can be usefull .. so keep that BM
+#if (0) // remove onl linking for now .. still i am not sure .. the jacobian can be useful .. so keep that BM
 		if(nl_flags & NLF_SOLVE){
 			//double sct,sst=PIL_check_seconds_timer();
 			for(a=sb->totpoint, bp= sb->bpoint; a>0; a--, bp++) {
@@ -3541,7 +3539,7 @@ static void lattice_to_softbody(Scene *scene, Object *ob)
 		}
 	}
 
-	/* create some helper edges to enable SB lattice to be usefull at all */
+	/* create some helper edges to enable SB lattice to be useful at all */
 	if (ob->softflag & OB_SB_EDGES){
 		makelatticesprings(lt,ob->soft->bspring,ob->softflag & OB_SB_QUADS,ob);
 		build_bps_springlist(ob); /* link bps to springs */

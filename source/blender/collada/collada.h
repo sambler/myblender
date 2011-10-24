@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -34,6 +32,7 @@ struct Scene;
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 	/*
 	 * both return 1 on success, 0 on error

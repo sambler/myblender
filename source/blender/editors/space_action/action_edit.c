@@ -233,7 +233,8 @@ static void get_keyframe_extents (bAnimContext *ac, float *min, float *max, cons
 	
 	/* get data to filter, from Action or Dopesheet */
 	// XXX: what is sel doing here?!
-	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_LIST_VISIBLE | ANIMFILTER_SEL /*| ANIMFILTER_CURVESONLY*/ | ANIMFILTER_NODUPLIS);
+	//      Commented it, was breaking things (eg. the "auto preview range" tool).
+	filter= (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_LIST_VISIBLE /*| ANIMFILTER_SEL *//*| ANIMFILTER_CURVESONLY*/ | ANIMFILTER_NODUPLIS);
 	ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 	
 	/* set large values to try to override */
@@ -245,20 +246,32 @@ static void get_keyframe_extents (bAnimContext *ac, float *min, float *max, cons
 		/* go through channels, finding max extents */
 		for (ale= anim_data.first; ale; ale= ale->next) {
 			AnimData *adt= ANIM_nla_mapping_get(ac, ale);
-			FCurve *fcu= (FCurve *)ale->key_data;
-			float tmin, tmax;
-			
-			/* get range and apply necessary scaling before processing */
-			calc_fcurve_range(fcu, &tmin, &tmax, onlySel);
-			
-			if (adt) {
-				tmin= BKE_nla_tweakedit_remap(adt, tmin, NLATIME_CONVERT_MAP);
-				tmax= BKE_nla_tweakedit_remap(adt, tmax, NLATIME_CONVERT_MAP);
+			if (ale->datatype == ALE_GPFRAME) {
+				bGPDlayer *gpl= ale->data;
+				bGPDframe *gpf;
+
+				/* find gp-frame which is less than or equal to cframe */
+				for (gpf= gpl->frames.first; gpf; gpf= gpf->next) {
+					*min= MIN2(*min, gpf->framenum);
+					*max= MAX2(*max, gpf->framenum);
+				}
 			}
-			
-			/* try to set cur using these values, if they're more extreme than previously set values */
-			*min= MIN2(*min, tmin);
-			*max= MAX2(*max, tmax);
+			else {
+				FCurve *fcu= (FCurve *)ale->key_data;
+				float tmin, tmax;
+
+				/* get range and apply necessary scaling before processing */
+				calc_fcurve_range(fcu, &tmin, &tmax, onlySel);
+
+				if (adt) {
+					tmin= BKE_nla_tweakedit_remap(adt, tmin, NLATIME_CONVERT_MAP);
+					tmax= BKE_nla_tweakedit_remap(adt, tmax, NLATIME_CONVERT_MAP);
+				}
+
+				/* try to set cur using these values, if they're more extreme than previously set values */
+				*min= MIN2(*min, tmin);
+				*max= MAX2(*max, tmax);
+			}
 		}
 		
 		/* free memory */
@@ -458,6 +471,8 @@ static int actkeys_copy_exec(bContext *C, wmOperator *op)
 	/* copy keyframes */
 	if (ac.datatype == ANIMCONT_GPENCIL) {
 		// FIXME...
+		BKE_report(op->reports, RPT_ERROR, "Keyframe pasting is not available for Grease Pencil mode");
+		return OPERATOR_CANCELLED;
 	}
 	else {
 		if (copy_action_keys(&ac)) {	
@@ -496,13 +511,15 @@ static int actkeys_paste_exec(bContext *C, wmOperator *op)
 	if (ANIM_animdata_get_context(C, &ac) == 0)
 		return OPERATOR_CANCELLED;
 	
-	if(ac.reports==NULL) {
+	if (ac.reports==NULL) {
 		ac.reports= op->reports;
 	}
 	
 	/* paste keyframes */
 	if (ac.datatype == ANIMCONT_GPENCIL) {
 		// FIXME...
+		BKE_report(op->reports, RPT_ERROR, "Keyframe pasting is not available for Grease Pencil mode");
+		return OPERATOR_CANCELLED;
 	}
 	else {
 		if (paste_action_keys(&ac, offset_mode, merge_mode)) {
@@ -679,12 +696,13 @@ static int actkeys_duplicate_exec(bContext *C, wmOperator *UNUSED(op))
 	duplicate_action_keys(&ac);
 	
 	/* validate keyframes after editing */
-	ANIM_editkeyframes_refresh(&ac);
+	if (ac.datatype != ANIMCONT_GPENCIL)
+		ANIM_editkeyframes_refresh(&ac);
 	
 	/* set notifier that keyframes have changed */
 	WM_event_add_notifier(C, NC_ANIMATION|ND_KEYFRAME|NA_EDITED, NULL);
 	
-	return OPERATOR_FINISHED; // xxx - start transform
+	return OPERATOR_FINISHED;
 }
 
 static int actkeys_duplicate_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
@@ -708,9 +726,6 @@ void ACTION_OT_duplicate (wmOperatorType *ot)
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
-	
-	/* to give to transform */
-	RNA_def_enum(ot->srna, "mode", transform_mode_types, TFM_TRANSLATION, "Mode", "");
 }
 
 /* ******************** Delete Keyframes Operator ************************* */
@@ -763,7 +778,8 @@ static int actkeys_delete_exec(bContext *C, wmOperator *UNUSED(op))
 	delete_action_keys(&ac);
 	
 	/* validate keyframes after editing */
-	ANIM_editkeyframes_refresh(&ac);
+	if (ac.datatype != ANIMCONT_GPENCIL)
+		ANIM_editkeyframes_refresh(&ac);
 	
 	/* set notifier that keyframes have changed */
 	WM_event_add_notifier(C, NC_ANIMATION|ND_KEYFRAME|NA_EDITED, NULL);
@@ -1380,6 +1396,10 @@ static int actkeys_snap_exec(bContext *C, wmOperator *op)
 	if (ANIM_animdata_get_context(C, &ac) == 0)
 		return OPERATOR_CANCELLED;
 		
+	// XXX...
+	if (ac.datatype == ANIMCONT_GPENCIL)
+		return OPERATOR_PASS_THROUGH;
+		
 	/* get snapping mode */
 	mode= RNA_enum_get(op->ptr, "type");
 	
@@ -1489,6 +1509,10 @@ static int actkeys_mirror_exec(bContext *C, wmOperator *op)
 	/* get editor data */
 	if (ANIM_animdata_get_context(C, &ac) == 0)
 		return OPERATOR_CANCELLED;
+		
+	// XXX...
+	if (ac.datatype == ANIMCONT_GPENCIL)
+		return OPERATOR_PASS_THROUGH;
 		
 	/* get mirroring mode */
 	mode= RNA_enum_get(op->ptr, "type");

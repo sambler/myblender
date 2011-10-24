@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -152,7 +150,7 @@ typedef struct TransData2D {
 	float loc[3];		/* Location of data used to transform (x,y,0) */
 	float *loc2d;		/* Pointer to real 2d location of data */
 
-	float *h1, *h2;     /* Pointer to handle locations, if handles aren't being moved independantly*/
+	float *h1, *h2;     /* Pointer to handle locations, if handles aren't being moved independently */
 	float ih1[2], ih2[2];
 } TransData2D;
 
@@ -425,8 +423,8 @@ typedef struct TransInfo {
 #define TD_BEZTRIPLE		(1 << 12)	/* if this is a bez triple, we need to restore the handles, if this is set transdata->misc.hdata needs freeing */
 #define TD_NO_LOC			(1 << 13)	/* when this is set, don't apply translation changes to this element */
 #define TD_NOTIMESNAP		(1 << 14)	/* for Graph Editor autosnap, indicates that point should not undergo autosnapping */
-#define TD_INTVALUES	 	(1 << 15) 	/* for Graph Editor - curves that can only have int-values need their keyframes tagged with this */
-#define TD_MIRROR_EDGE	 	(1 << 16) 	/* For editmode mirror, clamp to x = 0 */
+#define TD_INTVALUES		(1 << 15) 	/* for Graph Editor - curves that can only have int-values need their keyframes tagged with this */
+#define TD_MIRROR_EDGE		(1 << 16) 	/* For editmode mirror, clamp to x = 0 */
 #define TD_MOVEHANDLE1		(1 << 17)	/* For fcurve handles, move them along with their keyframes */
 #define TD_MOVEHANDLE2		(1 << 18)
 #define TD_PBONE_LOCAL_MTX_P (1 << 19)	/* exceptional case with pose bone rotating when a parent bone has 'Local Location' option enabled and rotating also transforms it. */

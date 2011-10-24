@@ -1,31 +1,29 @@
 /*
-* $Id$
-*
-* ***** BEGIN GPL LICENSE BLOCK *****
-*
-* This program is free software; you can redistribute it and/or
-* modify it under the terms of the GNU General Public License
-* as published by the Free Software Foundation; either version 2
-* of the License, or (at your option) any later version.
-*
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU General Public License for more details.
-*
-* You should have received a copy of the GNU General Public License
-* along with this program; if not, write to the Free Software Foundation,
-* Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-*
-* The Original Code is Copyright (C) 2006 by NaN Holding BV.
-* All rights reserved.
-*
-* The Original Code is: all of this file.
-*
-* Contributor(s): Daniel (Genscher)
-*
-* ***** END GPL LICENSE BLOCK *****
-*/
+ * ***** BEGIN GPL LICENSE BLOCK *****
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ *
+ * The Original Code is Copyright (C) 2006 by NaN Holding BV.
+ * All rights reserved.
+ *
+ * The Original Code is: all of this file.
+ *
+ * Contributor(s): Daniel (Genscher)
+ *
+ * ***** END GPL LICENSE BLOCK *****
+ */
 #ifndef DNA_CLOTH_TYPES_H
 #define DNA_CLOTH_TYPES_H
 
@@ -93,7 +91,7 @@ typedef struct ClothCollSettings
 {
 	struct	LinkNode *collision_list; /* e.g. pointer to temp memory for collisions */
 	float	epsilon;		/* min distance for collisions.		*/
-	float	self_friction;		/* Fiction/damping with self contact.		 	*/
+	float	self_friction;		/* Fiction/damping with self contact. */
 	float	friction;		/* Friction/damping applied on contact with other object.*/
 	float 	selfepsilon; 		/* for selfcollision */
 	float repel_force, distance_repel;

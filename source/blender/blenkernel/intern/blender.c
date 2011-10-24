@@ -1,9 +1,4 @@
-/*  blender.c   jan 94     MIXED MODEL
- * 
- * common help functions and data
- * 
- * $Id$
- *
+/*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -62,7 +57,6 @@
 #include "BLI_blenlib.h"
 #include "BLI_bpath.h"
 #include "BLI_dynstr.h"
-#include "BLI_path_util.h"
 #include "BLI_utildefines.h"
 #include "BLI_callbacks.h"
 
@@ -318,6 +312,8 @@ static void setup_app_data(bContext *C, BlendFileData *bfd, const char *filepath
 	set_scene_bg(G.main, CTX_data_scene(C));
 	
 	MEM_freeN(bfd);
+
+	(void)curscene; /* quiet warning */
 }
 
 static int handle_subversion_warning(Main *main, ReportList *reports)
@@ -516,7 +512,7 @@ void BKE_write_undo(bContext *C, const char *name)
 	
 	/* make new */
 	curundo= uel= MEM_callocN(sizeof(UndoElem), "undo file");
-	strncpy(uel->name, name, MAXUNDONAME-1);
+	BLI_strncpy(uel->name, name, sizeof(uel->name));
 	BLI_addtail(&undobase, uel);
 	
 	/* and limit amount to the maximum */
@@ -550,7 +546,7 @@ void BKE_write_undo(bContext *C, const char *name)
 		counter= counter % U.undosteps;	
 	
 		BLI_snprintf(numstr, sizeof(numstr), "%d.blend", counter);
-		BLI_make_file_string("/", filepath, btempdir, numstr);
+		BLI_make_file_string("/", filepath, BLI_temporary_dir(), numstr);
 	
 		/* success= */ /* UNUSED */ BLO_write_file(CTX_data_main(C), filepath, fileflags, NULL, NULL);
 		
@@ -720,7 +716,7 @@ void BKE_undo_save_quit(void)
 	/* no undo state to save */
 	if(undobase.first==undobase.last) return;
 		
-	BLI_make_file_string("/", str, btempdir, "quit.blend");
+	BLI_make_file_string("/", str, BLI_temporary_dir(), "quit.blend");
 
 	file = open(str,O_BINARY+O_WRONLY+O_CREAT+O_TRUNC, 0666);
 	if(file == -1) {

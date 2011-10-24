@@ -1,5 +1,4 @@
 /*
- * $Id$
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -33,7 +32,6 @@
 
 /**
 
- * $Id$
  * Copyright (C) 2001 NaN Technologies B.V.
  * This file was formerly known as: GEN_StdString.cpp.
  * @date	November, 14, 2001
@@ -79,7 +77,7 @@ static inline dword			STR_gHash(dword inDWord)
 	key ^=  (key >> 13);
 	key += ~(key <<  9);
 	key ^=  (key >> 17);
-  	return key;
+	return key;
 }
 
 enum { GOLDEN_RATIO = 0x9e3779b9 }; // arbitrary value to initialize hash funtion, well not so arbitrary

@@ -1,6 +1,4 @@
-/**
- * $Id$
- *
+/*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -37,7 +35,7 @@
 #include "IMB_anim.h"
 
 /*
-  seperate animation index files to solve the following problems:
+  separate animation index files to solve the following problems:
 
   a) different timecodes within one file (like DTS/PTS, Timecode-Track, 
      "implicit" timecodes within DV-files and HDV-files etc.)

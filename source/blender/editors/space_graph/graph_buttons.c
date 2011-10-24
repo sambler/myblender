@@ -245,13 +245,15 @@ static short get_active_fcurve_keyframe_edit(FCurve *fcu, BezTriple **bezt, BezT
 }
 
 /* update callback for active keyframe properties - base updates stuff */
-static void graphedit_activekey_update_cb(bContext *UNUSED(C), void *fcu_ptr, void *UNUSED(bezt_ptr))
+static void graphedit_activekey_update_cb(bContext *C, void *fcu_ptr, void *UNUSED(bezt_ptr))
 {
+	SpaceIpo *sipo= CTX_wm_space_graph(C);
+	const short use_handle = !(sipo->flag & SIPO_NOHANDLES);
 	FCurve *fcu = (FCurve *)fcu_ptr;
 	
 	/* make sure F-Curve and its handles are still valid after this editing */
 	sort_time_fcurve(fcu);
-	testhandles_fcurve(fcu);
+	testhandles_fcurve(fcu, use_handle);
 }
 
 /* update callback for active keyframe properties - handle-editing wrapper */
@@ -752,8 +754,8 @@ static void graph_panel_modifiers(const bContext *C, Panel *pa)
 		block= uiLayoutGetBlock(row);
 		
 		// XXX for now, this will be a operator button which calls a 'add modifier' operator
-		uiDefButO(block, BUT, "GRAPH_OT_fmodifier_add", WM_OP_INVOKE_REGION_WIN, UI_translate_do_iface(N_("Add Modifier")), 10, 0, 150, 20,
-				UI_translate_do_tooltip(N_("Adds a new F-Curve Modifier for the active F-Curve")));
+		uiDefButO(block, BUT, "GRAPH_OT_fmodifier_add", WM_OP_INVOKE_REGION_WIN, IFACE_("Add Modifier"), 10, 0, 150, 20,
+				TIP_("Adds a new F-Curve Modifier for the active F-Curve"));
 		
 		/* copy/paste (as sub-row)*/
 		row= uiLayoutRow(row, 1);

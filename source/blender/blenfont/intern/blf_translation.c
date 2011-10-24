@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -32,12 +30,13 @@
 
 #include <stdlib.h>
 
-#ifdef INTERNATIONAL
+#ifdef WITH_INTERNATIONAL
 #include <libintl.h>
 #endif
 
 #include "MEM_guardedalloc.h"
 
+#include "BLI_utildefines.h"
 #include "BLI_path_util.h"
 #include "BLI_string.h"
 #include "BLI_path_util.h"
@@ -45,7 +44,7 @@
 
 #include "BLF_translation.h"
 
-#ifdef INTERNATIONAL
+#ifdef WITH_INTERNATIONAL
 const char unifont_filename[]="droidsans.ttf.gz";
 static unsigned char *unifont_ttf= NULL;
 static int unifont_size= 0;
@@ -54,11 +53,16 @@ unsigned char *BLF_get_unifont(int *unifont_size_r)
 {
 	if(unifont_ttf==NULL) {
 		char *fontpath = BLI_get_folder(BLENDER_DATAFILES, "fonts");
-		char unifont_path[1024];
+		if (fontpath) {
+			char unifont_path[1024];
 
-		BLI_snprintf(unifont_path, sizeof(unifont_path), "%s/%s", fontpath, unifont_filename);
+			BLI_snprintf(unifont_path, sizeof(unifont_path), "%s/%s", fontpath, unifont_filename);
 
-		unifont_ttf= (unsigned char*)BLI_ungzip_to_mem(unifont_path, &unifont_size);
+			unifont_ttf= (unsigned char*)BLI_file_ungzip_to_mem(unifont_path, &unifont_size);
+		}
+		else {
+			printf("%s: 'fonts' data path not found for international font, continuing\n", __func__);
+		}
 	}
 
 	*unifont_size_r= unifont_size;
@@ -76,7 +80,7 @@ void BLF_free_unifont(void)
 
 const char* BLF_gettext(const char *msgid)
 {
-#ifdef INTERNATIONAL
+#ifdef WITH_INTERNATIONAL
 	if( msgid[0] )
 		return gettext( msgid );
 	return "";

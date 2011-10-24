@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -46,7 +44,6 @@
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
 #include "BLI_rand.h"
-#include "BLI_storage_types.h"
 #include "BLI_utildefines.h"
 
 #include "BKE_context.h"
@@ -154,7 +151,7 @@ static void file_init(struct wmWindowManager *UNUSED(wm), ScrArea *sa)
 	SpaceFile *sfile= (SpaceFile*)sa->spacedata.first;
 	//printf("file_init\n");
 
-	if(sfile->layout) sfile->layout->dirty= 1;
+	if(sfile->layout) sfile->layout->dirty= TRUE;
 }
 
 
@@ -242,7 +239,7 @@ static void file_refresh(const bContext *C, ScrArea *UNUSED(sa))
 		BLI_strncpy(sfile->params->renameedit, sfile->params->renamefile, sizeof(sfile->params->renameedit));
 		params->renamefile[0] = '\0';
 	}
-	if (sfile->layout) sfile->layout->dirty= 1;
+	if (sfile->layout) sfile->layout->dirty= TRUE;
 
 }
 
@@ -520,8 +517,13 @@ static void file_ui_area_draw(const bContext *C, ARegion *ar)
 	glClearColor(col[0], col[1], col[2], 0.0);
 	glClear(GL_COLOR_BUFFER_BIT);
 
+	/* scrolling here is just annoying, disable it */
+	ar->v2d.cur.ymax= ar->v2d.cur.ymax - ar->v2d.cur.ymin;
+	ar->v2d.cur.ymin= 0;
+
 	/* set view2d view matrix for scrolling (without scrollers) */
 	UI_view2d_view_ortho(&ar->v2d);
+
 
 	file_draw_buttons(C, ar);
 

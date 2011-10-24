@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -66,6 +64,7 @@
 #include "BLI_blenlib.h"
 #include "BLI_winstuff.h"
 
+#include "RE_engine.h"
 #include "RE_pipeline.h"		/* RE_ free stuff */
 
 #ifdef WITH_PYTHON
@@ -403,7 +402,7 @@ void WM_exit_ext(bContext *C, const short do_python)
 
 	BLF_exit();
 
-#ifdef INTERNATIONAL
+#ifdef WITH_INTERNATIONAL
 	BLF_free_unifont();
 #endif
 	
@@ -427,6 +426,8 @@ void WM_exit_ext(bContext *C, const short do_python)
 		 * the pyDriver bug can be fixed if it happens again we can deal with it then */
 		BPY_python_end();
 	}
+#else
+	(void)do_python;
 #endif
 
 	GPU_global_buffer_pool_free();

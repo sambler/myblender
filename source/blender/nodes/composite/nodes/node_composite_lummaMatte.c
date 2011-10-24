@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -51,8 +49,6 @@ static void do_luma_matte(bNode *node, float *out, float *in)
 {
 	NodeChroma *c=(NodeChroma *)node->storage;
 	float alpha;
-
-	alpha=0.0;
 
 	/* test range*/
 	if(in[0]>c->t1) {

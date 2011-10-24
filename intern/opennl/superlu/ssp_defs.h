@@ -108,6 +108,7 @@ typedef struct {
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 /* Driver routines */

@@ -1,6 +1,5 @@
 /*
  *
- * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -218,7 +217,8 @@ static void *tslot_thread_start(void *tslot_p)
 	return tslot->do_thread(tslot->callerdata);
 }
 
-int BLI_thread_is_main(void) {
+int BLI_thread_is_main(void)
+{
 	return pthread_equal(pthread_self(), mainid);
 }
 
@@ -318,8 +318,6 @@ int BLI_system_thread_count( void )
 	mib[1] = HW_NCPU;
 	len = sizeof(t);
 	sysctl(mib, 2, &t, &len, NULL, 0);
-#	elif defined(__sgi)
-	t = sysconf(_SC_NPROC_ONLN);
 #	else
 	t = (int)sysconf(_SC_NPROCESSORS_ONLN);
 #	endif

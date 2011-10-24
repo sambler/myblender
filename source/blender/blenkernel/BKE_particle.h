@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -80,6 +78,10 @@ typedef struct ParticleSimulationData {
 	struct ParticleSystem *psys;
 	struct ParticleSystemModifierData *psmd;
 	struct ListBase *colliders;
+	/* Courant number. This is used to implement an adaptive time step. Only the
+	   maximum value per time step is important. Only sph_integrate makes use of
+	   this at the moment. Other solvers could, too. */
+	float courant_num;
 } ParticleSimulationData;
 
 typedef struct ParticleTexture{

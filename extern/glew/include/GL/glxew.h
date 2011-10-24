@@ -101,6 +101,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 /* ---------------------------- GLX_VERSION_1_0 --------------------------- */

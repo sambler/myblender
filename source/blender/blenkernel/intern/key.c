@@ -1,9 +1,4 @@
-
-/*  key.c      
- *  
- * 
- * $Id$
- *
+/*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -807,7 +802,7 @@ static void do_key(const int start, int end, const int tot, char *poin, Key *key
 	int a, ofs[32], *ofsp;
 	int flagdo= 15, flagflo=0, elemsize, poinsize=0;
 	char *k1, *k2, *k3, *k4, *freek1, *freek2, *freek3, *freek4;
-	char *cp, elemstr[8];;
+	char *cp, elemstr[8];
 
 	/* currently always 0, in future key_pointer_size may assign */
 	ofs[1]= 0;
@@ -1283,9 +1278,9 @@ static void do_latt_key(Scene *scene, Object *ob, Key *key, char *out, const int
 			flag= setkeys(ctime, &key->block, k, t, 0);
 
 			if(flag==0)
-				do_key(a, a+1, tot, (char *)out, key, actkb, k, t, KEY_MODE_DUMMY);
+				do_key(a, a+1, tot, out, key, actkb, k, t, KEY_MODE_DUMMY);
 			else
-				cp_key(a, a+1, tot, (char *)out, key, actkb, k[2], NULL, KEY_MODE_DUMMY);
+				cp_key(a, a+1, tot, out, key, actkb, k[2], NULL, KEY_MODE_DUMMY);
 		}		
 	}
 	else {
@@ -1295,7 +1290,7 @@ static void do_latt_key(Scene *scene, Object *ob, Key *key, char *out, const int
 			for(kb= key->block.first; kb; kb= kb->next)
 				kb->weights= get_weights_array(ob, kb->vgroup);
 			
-			do_rel_key(0, tot, tot, (char *)out, key, actkb, KEY_MODE_DUMMY);
+			do_rel_key(0, tot, tot, out, key, actkb, KEY_MODE_DUMMY);
 			
 			for(kb= key->block.first; kb; kb= kb->next) {
 				if(kb->weights) MEM_freeN(kb->weights);
@@ -1389,7 +1384,7 @@ float *do_ob_key(Scene *scene, Object *ob)
 		if(ELEM(ob->type, OB_MESH, OB_LATTICE)) {
 			float *weights= get_weights_array(ob, kb->vgroup);
 
-			cp_key(0, tot, tot, (char*)out, key, actkb, kb, weights, 0);
+			cp_key(0, tot, tot, out, key, actkb, kb, weights, 0);
 
 			if(weights) MEM_freeN(weights);
 		}
@@ -1445,10 +1440,10 @@ KeyBlock *add_keyblock(Key *key, const char *name)
 	
 	tot= BLI_countlist(&key->block);
 	if(name) {
-		strncpy(kb->name, name, sizeof(kb->name));
+		BLI_strncpy(kb->name, name, sizeof(kb->name));
 	} else {
-		if(tot==1) strcpy(kb->name, "Basis");
-		else sprintf(kb->name, "Key %d", tot-1);
+		if(tot==1) BLI_strncpy(kb->name, "Basis", sizeof(kb->name));
+		else BLI_snprintf(kb->name, sizeof(kb->name), "Key %d", tot-1);
 	}
 
 	BLI_uniquename(&key->block, kb, "Key", '.', offsetof(KeyBlock, name), sizeof(kb->name));

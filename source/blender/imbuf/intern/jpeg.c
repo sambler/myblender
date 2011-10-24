@@ -1,5 +1,4 @@
 /*
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -24,9 +23,6 @@
  * Contributor(s): none yet.
  *
  * ***** END GPL LICENSE BLOCK *****
- * jpeg.c
- *
- * $Id$
  */
 
 /** \file blender/imbuf/intern/jpeg.c
@@ -84,8 +80,8 @@ type 3 is unsupported as of jul 05 2000 Frank.
 static int jpeg_default_quality;
 static int ibuf_ftype;
 
-int imb_is_a_jpeg(unsigned char *mem) {
-
+int imb_is_a_jpeg(unsigned char *mem)
+{
 	if ((mem[0]== 0xFF) && (mem[1] == 0xD8))return 1;
 	return 0;
 }
@@ -255,12 +251,12 @@ static void memory_source(j_decompress_ptr cinfo, unsigned char *buffer, size_t 
 static boolean
 handle_app1 (j_decompress_ptr cinfo)
 {
-	INT32 length, i;
+	INT32 length; /* initialized by the macro */
+	INT32 i;
 	char neogeo[128];
 	
 	INPUT_VARS(cinfo);
-	
-	length = 0;
+
 	INPUT_2BYTES(cinfo, length, return FALSE);
 	length -= 2;
 	

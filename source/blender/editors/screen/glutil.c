@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -279,18 +277,7 @@ void setlinestyle(int nr)
 void set_inverted_drawing(int enable) 
 {
 	glLogicOp(enable?GL_INVERT:GL_COPY);
-
-	/* Use GL_BLEND_EQUATION_EXT on sgi (if we have it),
-	 * apparently GL_COLOR_LOGIC_OP doesn't work on O2?
-	 * Is this an sgi bug or our bug?
-	 */
-#if defined(__sgi) && defined(GL_BLEND_EQUATION_EXT)
-	glBlendEquationEXT(enable?GL_LOGIC_OP:GL_FUNC_ADD_EXT);
-	glToggle(GL_BLEND, enable);
-#else
 	glToggle(GL_COLOR_LOGIC_OP, enable);
-#endif
-
 	glToggle(GL_DITHER, !enable);
 }
 
@@ -375,7 +362,8 @@ void fdrawXORcirc(float xofs, float yofs, float rad)
 	set_inverted_drawing(0);
 }
 
-void glutil_draw_filled_arc(float start, float angle, float radius, int nsegments) {
+void glutil_draw_filled_arc(float start, float angle, float radius, int nsegments)
+{
 	int i;
 	
 	glBegin(GL_TRIANGLE_FAN);
@@ -389,7 +377,8 @@ void glutil_draw_filled_arc(float start, float angle, float radius, int nsegment
 	glEnd();
 }
 
-void glutil_draw_lined_arc(float start, float angle, float radius, int nsegments) {
+void glutil_draw_lined_arc(float start, float angle, float radius, int nsegments)
+{
 	int i;
 	
 	glBegin(GL_LINE_STRIP);
@@ -808,7 +797,8 @@ void bglBegin(int mode)
 	}
 }
 
-int bglPointHack(void) {
+int bglPointHack(void)
+{
 	float value[4];
 	int pointhack_px;
 	glGetFloatv(GL_POINT_SIZE_RANGE, value);

@@ -1,5 +1,4 @@
 /* 
- * $Id$
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -689,9 +688,9 @@ int envmaptex(Tex *tex, float *texvec, float *dxt, float *dyt, int osatex, TexRe
 		env->ima= tex->ima;
 		if(env->ima && env->ima->ok) {
 			if(env->cube[1]==NULL) {
-				ImBuf *ibuf= BKE_image_get_ibuf(env->ima, NULL);
-				if(ibuf)
-					envmap_split_ima(env, ibuf);
+				ImBuf *ibuf_ima= BKE_image_get_ibuf(env->ima, NULL);
+				if(ibuf_ima)
+					envmap_split_ima(env, ibuf_ima);
 				else
 					env->ok= 0;
 			}

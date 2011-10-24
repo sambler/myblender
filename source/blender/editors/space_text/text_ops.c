@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -2582,6 +2580,9 @@ static int set_selection_invoke(bContext *C, wmOperator *op, wmEvent *event)
 {
 	SpaceText *st= CTX_wm_space_text(C);
 	SetSelection *ssel;
+
+	if(event->mval[0]>=st->txtbar.xmin)
+		return OPERATOR_PASS_THROUGH;
 
 	op->customdata= MEM_callocN(sizeof(SetSelection), "SetCursor");
 	ssel= op->customdata;

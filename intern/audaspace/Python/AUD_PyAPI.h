@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * Copyright 2009-2011 Jörg Hermann Müller
@@ -36,6 +34,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #else
 typedef void AUD_IFactory;
 typedef void AUD_IDevice;

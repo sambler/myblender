@@ -1,6 +1,4 @@
 /*
- *	$Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -25,7 +23,7 @@
  * Contributor(s): none yet.
  *
  * ***** END GPL LICENSE BLOCK *****
-*/
+ */
 
 #ifndef DNA_USERDEF_TYPES_H
 #define DNA_USERDEF_TYPES_H
@@ -41,6 +39,7 @@
 
 #ifdef __cplusplus
 extern "C" {
+//} for code folding
 #endif
 
 /* themes; defines in BIF_resource.h */

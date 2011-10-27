@@ -414,7 +414,7 @@ macro(remove_strict_flags)
 
 		# negate flags implied by '-Wall'
 		add_cc_flag("-Wno-unused-parameter")
-		add_cc_flag("-Wno-unused-but-set-variable")
+#		add_cc_flag("-Wno-unused-but-set-variable")
 	endif()
 
 	if(MSVC)

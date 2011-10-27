@@ -42,6 +42,7 @@
 #include "BKE_deform.h"
 
 #include "BLI_blenlib.h"
+#include "BLI_utildefines.h"
 
 
 void defgroup_copy_list (ListBase *outbase, ListBase *inbase)

@@ -209,7 +209,7 @@ class VIEW3D_PT_tools_curveedit(View3DPanel, Panel):
         col.operator("transform.resize", text="Scale")
 
         col = layout.column(align=True)
-        col.operator("transform.transform", text="Tilt").mode = 'TILT'
+        col.operator("transform.tilt", text="Tilt")
         col.operator("transform.transform", text="Shrink/Fatten").mode = 'CURVE_SHRINKFATTEN'
 
         col = layout.column(align=True)
@@ -1036,6 +1036,7 @@ class VIEW3D_PT_tools_weightpaint(View3DPanel, Panel):
         col.active = ob.vertex_groups.active is not None
         col.operator("object.vertex_group_normalize_all", text="Normalize All")
         col.operator("object.vertex_group_normalize", text="Normalize")
+        col.operator("object.vertex_group_mirror", text="Mirror")
         col.operator("object.vertex_group_invert", text="Invert")
         col.operator("object.vertex_group_clean", text="Clean")
         col.operator("object.vertex_group_levels", text="Levels")

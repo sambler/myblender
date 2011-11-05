@@ -141,6 +141,8 @@
 #include "BLO_readfile.h"
 #include "BLO_undofile.h"
 
+#include "RE_engine.h"
+
 #include "readfile.h"
 
 #include "PIL_time.h"
@@ -2181,6 +2183,7 @@ static void lib_verify_nodetree(Main *main, int UNUSED(open))
 		for(ntree= main->nodetree.first; ntree; ntree= ntree->id.next)
 			if (ntree->update)
 				ntreeUpdateTree(ntree);
+
 		for (i=0; i < NUM_NTREE_TYPES; ++i) {
 			ntreetype= ntreeGetType(i);
 			if (ntreetype && ntreetype->foreach_nodetree)
@@ -2506,6 +2509,9 @@ static void lib_link_lamp(FileData *fd, Main *main)
 			}
 			
 			la->ipo= newlibadr_us(fd, la->id.lib, la->ipo); // XXX depreceated - old animation system
+
+			if(la->nodetree)
+				lib_link_ntree(fd, &la->id, la->nodetree);
 			
 			la->id.flag -= LIB_NEEDLINK;
 		}
@@ -2527,6 +2533,10 @@ static void direct_link_lamp(FileData *fd, Lamp *la)
 	la->curfalloff= newdataadr(fd, la->curfalloff);
 	if(la->curfalloff)
 		direct_link_curvemapping(fd, la->curfalloff);
+
+	la->nodetree= newdataadr(fd, la->nodetree);
+	if(la->nodetree)
+		direct_link_nodetree(fd, la->nodetree);
 	
 	la->preview = direct_link_preview_image(fd, la->preview);
 }
@@ -2669,6 +2679,9 @@ static void lib_link_world(FileData *fd, Main *main)
 					mtex->object= newlibadr(fd, wrld->id.lib, mtex->object);
 				}
 			}
+
+			if(wrld->nodetree)
+				lib_link_ntree(fd, &wrld->id, wrld->nodetree);
 			
 			wrld->id.flag -= LIB_NEEDLINK;
 		}
@@ -2686,6 +2699,11 @@ static void direct_link_world(FileData *fd, World *wrld)
 	for(a=0; a<MAX_MTEX; a++) {
 		wrld->mtex[a]= newdataadr(fd, wrld->mtex[a]);
 	}
+
+	wrld->nodetree= newdataadr(fd, wrld->nodetree);
+	if(wrld->nodetree)
+		direct_link_nodetree(fd, wrld->nodetree);
+
 	wrld->preview = direct_link_preview_image(fd, wrld->preview);
 }
 
@@ -5018,6 +5036,10 @@ static void lib_link_screen(FileData *fd, Main *main)
 							if(snode->id) {
 								if(GS(snode->id->name)==ID_MA)
 									snode->nodetree= ((Material *)snode->id)->nodetree;
+								else if(GS(snode->id->name)==ID_WO)
+									snode->nodetree= ((World *)snode->id)->nodetree;
+								else if(GS(snode->id->name)==ID_LA)
+									snode->nodetree= ((Lamp *)snode->id)->nodetree;
 								else if(GS(snode->id->name)==ID_SCE)
 									snode->nodetree= ((Scene *)snode->id)->nodetree;
 								else if(GS(snode->id->name)==ID_TE)
@@ -5105,6 +5127,7 @@ void lib_link_screen_restore(Main *newmain, bScreen *curscreen, Scene *curscene)
 				if(sl->spacetype==SPACE_VIEW3D) {
 					View3D *v3d= (View3D*) sl;
 					BGpic *bgpic;
+					ARegion *ar;
 					
 					if(v3d->scenelock)
 						v3d->camera= NULL; /* always get from scene */
@@ -5140,6 +5163,15 @@ void lib_link_screen_restore(Main *newmain, bScreen *curscreen, Scene *curscene)
 					/* not very nice, but could help */
 					if((v3d->layact & v3d->lay)==0) v3d->layact= v3d->lay;
 					
+					/* free render engines for now */
+					for(ar= sa->regionbase.first; ar; ar= ar->next) {
+						RegionView3D *rv3d= ar->regiondata;
+
+						if(rv3d && rv3d->render_engine) {
+							RE_engine_free(rv3d->render_engine);
+							rv3d->render_engine= NULL;
+						}
+					}
 				}
 				else if(sl->spacetype==SPACE_IPO) {
 					SpaceIpo *sipo= (SpaceIpo *)sl;
@@ -5278,6 +5310,7 @@ static void direct_link_region(FileData *fd, ARegion *ar, int spacetype)
 			
 			rv3d->depths= NULL;
 			rv3d->ri= NULL;
+			rv3d->render_engine= NULL;
 			rv3d->sms= NULL;
 			rv3d->smooth_timer= NULL;
 		}
@@ -5419,6 +5452,10 @@ static void direct_link_screen(FileData *fd, bScreen *sc)
 				v3d->afterdraw_xray.first= v3d->afterdraw_xray.last= NULL;
 				v3d->afterdraw_xraytransp.first= v3d->afterdraw_xraytransp.last= NULL;
 				v3d->properties_storage= NULL;
+
+				/* render can be quite heavy, set to wire on load */
+				if(v3d->drawtype == OB_RENDER)
+					v3d->drawtype = OB_WIRE;
 				
 				view3d_split_250(v3d, &sl->regionbase);
 			}
@@ -7408,9 +7445,9 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 	if(main->versionfile <= 200) {
 		Object *ob= main->object.first;
 		while(ob) {
-			ob->scaflag = ob->gameflag & (64+128+256+512+1024+2048);
+			ob->scaflag = ob->gameflag & (OB_DO_FH|OB_ROT_FH|OB_ANISOTROPIC_FRICTION|OB_GHOST|OB_RIGID_BODY|OB_BOUNDS);
 				/* 64 is do_fh */
-			ob->gameflag &= ~(128+256+512+1024+2048);
+			ob->gameflag &= ~(OB_ROT_FH|OB_ANISOTROPIC_FRICTION|OB_GHOST|OB_RIGID_BODY|OB_BOUNDS);
 			ob = ob->id.next;
 		}
 	}
@@ -8224,7 +8261,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 	if(main->versionfile <= 233) {
 		bScreen *sc;
 		Material *ma= main->mat.first;
-		Object *ob= main->object.first;
+		/* Object *ob= main->object.first; */
 		
 		while(ma) {
 			if(ma->rampfac_col==0.0f) ma->rampfac_col= 1.0;
@@ -8234,11 +8271,12 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 		}
 		
 		/* this should have been done loooong before! */
+#if 0   /* deprecated in 2.5+ */
 		while(ob) {
 			if(ob->ipowin==0) ob->ipowin= ID_OB;
 			ob= ob->id.next;
 		}
-		
+#endif
 		for (sc= main->screen.first; sc; sc= sc->id.next) {
 			ScrArea *sa;
 			for (sa= sc->areabase.first; sa; sa= sa->next) {
@@ -10712,7 +10750,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 			Object *ob=main->object.first;
 			while (ob) {
 				/* shaded mode disabled for now */
-				if (ob->dt == OB_SHADED) ob->dt = OB_TEXTURE;
+				if (ob->dt == OB_MATERIAL) ob->dt = OB_TEXTURE;
 				ob=ob->id.next;
 			}
 		}
@@ -10727,7 +10765,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 					for(sl= sa->spacedata.first; sl; sl= sl->next) {
 						if(sl->spacetype==SPACE_VIEW3D) {
 							View3D *v3d = (View3D *)sl;
-							if (v3d->drawtype == OB_SHADED) v3d->drawtype = OB_SOLID;
+							if (v3d->drawtype == OB_MATERIAL) v3d->drawtype = OB_SOLID;
 						}
 					}
 				}
@@ -12126,8 +12164,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 
 	}
 
-	/* put compatibility code here until next subversion bump */
-	{
+	if (main->versionfile < 260){
 		{
 			/* set default alpha value of Image outputs in image and render layer nodes to 0 */
 			Scene *sce;
@@ -12160,6 +12197,31 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 				}
 			}
 		}
+
+	}
+
+	if (main->versionfile < 260 || (main->versionfile == 260 && main->subversionfile < 1)){
+		Object *ob;
+
+		for (ob= main->object.first; ob; ob= ob->id.next) {
+			ob->collision_boundtype= ob->boundtype;
+		}
+
+		{
+			Camera *cam;
+			for(cam= main->camera.first; cam; cam= cam->id.next) {
+				if (cam->sensor_x < 0.01)
+					cam->sensor_x = DEFAULT_SENSOR_WIDTH;
+
+				if (cam->sensor_y < 0.01)
+					cam->sensor_y = DEFAULT_SENSOR_HEIGHT;
+			}
+		}
+	}
+
+	/* put compatibility code here until next subversion bump */
+	{
+		
 	}
 
 	/* WATCH IT!!!: pointers from libdata have not been converted yet here! */
@@ -12748,6 +12810,9 @@ static void expand_lamp(FileData *fd, Main *mainvar, Lamp *la)
 	
 	if (la->adt)
 		expand_animdata(fd, mainvar, la->adt);
+
+	if(la->nodetree)
+		expand_nodetree(fd, mainvar, la->nodetree);
 }
 
 static void expand_lattice(FileData *fd, Main *mainvar, Lattice *lt)
@@ -12775,6 +12840,9 @@ static void expand_world(FileData *fd, Main *mainvar, World *wrld)
 	
 	if (wrld->adt)
 		expand_animdata(fd, mainvar, wrld->adt);
+
+	if(wrld->nodetree)
+		expand_nodetree(fd, mainvar, wrld->nodetree);
 }
 
 

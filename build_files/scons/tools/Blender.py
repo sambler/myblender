@@ -192,6 +192,11 @@ def setup_staticlibs(lenv):
     if lenv['WITH_BF_OPENMP']:
         if lenv['OURPLATFORM'] == 'linuxcross':
             libincs += Split(lenv['BF_OPENMP_LIBPATH'])
+            
+    if lenv['WITH_BF_OIIO']:
+        libincs += Split(lenv['BF_OIIO_LIBPATH'])
+    if lenv['WITH_BF_BOOST']:
+        libincs += Split(lenv['BF_BOOST_LIBPATH'])
 
     # setting this last so any overriding of manually libs could be handled
     if lenv['OURPLATFORM'] not in ('win32-vc', 'win32-mingw', 'win64-vc', 'linuxcross'):
@@ -275,6 +280,11 @@ def setup_syslibs(lenv):
             if not lenv['WITH_BF_STATIC3DMOUSE']:
                 syslibs += Split(lenv['BF_3DMOUSE_LIB'])
 
+    if lenv['WITH_BF_OIIO']:
+        syslibs += Split(lenv['BF_OIIO_LIB'])
+    if lenv['WITH_BF_BOOST']:
+        syslibs += Split(lenv['BF_BOOST_LIB'])
+
     syslibs += lenv['LLIBS']
 
     return syslibs
@@ -343,7 +353,7 @@ def buildinfo(lenv, build_type):
     build_time = time.strftime ("%H:%M:%S")
     build_rev = os.popen('svnversion').read()[:-1] # remove \n
     if build_rev == '': 
-        build_rev = '41457'
+        build_rev = '41551'
     if lenv['BF_DEBUG']:
         build_type = "Debug"
         build_cflags = ' '.join(lenv['CFLAGS'] + lenv['CCFLAGS'] + lenv['BF_DEBUG_CCFLAGS'] + lenv['CPPFLAGS'])

@@ -23,11 +23,6 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
-if(WITH_CODEC_FFMPEG)
-	# FFMPEG gives warnings which are hard to avoid across multiple versions.
-	remove_strict_flags()
-endif()
-
 set(INC 
 	.
 	../avi
@@ -82,6 +77,7 @@ set(SRC
 	intern/brush.c
 	intern/bullet.c
 	intern/bvhutils.c
+	intern/camera.c
 	intern/cdderivedmesh.c
 	intern/cloth.c
 	intern/collision.c
@@ -109,6 +105,7 @@ set(SRC
 	intern/implicit.c
 	intern/ipo.c
 	intern/key.c
+	intern/lamp.c
 	intern/lattice.c
 	intern/library.c
 	intern/material.c
@@ -165,6 +162,7 @@ set(SRC
 	BKE_brush.h
 	BKE_bullet.h
 	BKE_bvhutils.h
+	BKE_camera.h
 	BKE_cdderivedmesh.h
 	BKE_cloth.h
 	BKE_collision.h
@@ -190,6 +188,7 @@ set(SRC
 	BKE_image.h
 	BKE_ipo.h
 	BKE_key.h
+	BKE_lamp.h
 	BKE_lattice.h
 	BKE_library.h
 	BKE_main.h
@@ -304,6 +303,10 @@ if(WITH_CODEC_FFMPEG)
 		${FFMPEG_INCLUDE_DIRS}
 	)
 	add_definitions(-DWITH_FFMPEG)
+
+	remove_strict_flags_file(
+		intern/writeffmpeg.c
+	)
 endif()
 
 if(WITH_PYTHON)
@@ -324,8 +327,8 @@ if(WITH_OPENMP)
 	add_definitions(-DPARALLEL=1)
 endif()
 
-if(NOT WITH_MOD_FLUID)
-	add_definitions(-DDISABLE_ELBEEM)
+if(WITH_MOD_FLUID)
+	add_definitions(-DWITH_MOD_FLUID)
 endif()
 
 if(WITH_MOD_SMOKE)

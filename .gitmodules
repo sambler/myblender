@@ -1,3 +1,6 @@
 [submodule "release/scripts/addons"]
 	path = release/scripts/addons
 	url = ../externals/addons
+[submodule "release/datafiles/locale"]
+	path = release/datafiles/locale
+	url = ../externals/locale

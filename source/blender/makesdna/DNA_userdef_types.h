@@ -268,13 +268,11 @@ typedef struct bTheme {
 	ThemeSpace tv3d;
 	ThemeSpace tfile;
 	ThemeSpace tipo;
-	ThemeSpace tinfo;	
-	ThemeSpace tsnd;
+	ThemeSpace tinfo;
 	ThemeSpace tact;
 	ThemeSpace tnla;
 	ThemeSpace tseq;
 	ThemeSpace tima;
-	ThemeSpace timasel;
 	ThemeSpace text;
 	ThemeSpace toops;
 	ThemeSpace ttime;
@@ -444,10 +442,10 @@ extern UserDef U; /* from blenkernel blender.c */
 #define USER_OPTION_TOOLTIPS	(1 << 27)		/* this shows tooltips when holding option/alt if USER_TOOLTIPS is off */
 
 /* helper macro for checking frame clamping */
-#define FRAMENUMBER_MIN_CLAMP(cfra) \
-	{ \
-		if ((U.flag & USER_NONEGFRAMES) && (cfra < 0)) \
-			cfra = 0; \
+#define FRAMENUMBER_MIN_CLAMP(cfra)                                           \
+	{                                                                         \
+		if ((U.flag & USER_NONEGFRAMES) && (cfra < 0))                        \
+			cfra = 0;                                                         \
 	}
 
 /* viewzom */

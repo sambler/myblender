@@ -227,7 +227,7 @@ void init_mapping(TexMapping *texmap)
 	mul_m3_m3m3(mat, rmat, smat);
 	
 	copy_m4_m3(texmap->mat, mat);
-	VECCOPY(texmap->mat[3], texmap->loc);
+	copy_v3_v3(texmap->mat[3], texmap->loc);
 
 }
 
@@ -897,13 +897,12 @@ void make_local_texture(Tex *tex)
 		extern_local_texture(tex);
 	}
 	else if(is_local && is_lib) {
-		char *bpath_user_data[2]= {bmain->name, tex->id.lib->filepath};
 		Tex *texn= copy_texture(tex);
 
 		texn->id.us= 0;
 
 		/* Remap paths of new ID using old library as base. */
-		bpath_traverse_id(bmain, &texn->id, bpath_relocate_visitor, 0, bpath_user_data);
+		BKE_id_lib_local_paths(bmain, &texn->id);
 		
 		ma= bmain->mat.first;
 		while(ma) {

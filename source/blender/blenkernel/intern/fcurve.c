@@ -184,7 +184,7 @@ FCurve *id_data_find_fcurve(ID *id, void *data, StructRNA *type, const char *pro
 	char *path;
 
 	if(driven)
-		*driven = 0;
+		*driven = FALSE;
 	
 	/* only use the current action ??? */
 	if (ELEM(NULL, adt, adt->action))
@@ -205,7 +205,7 @@ FCurve *id_data_find_fcurve(ID *id, void *data, StructRNA *type, const char *pro
 			if ((fcu == NULL) && (adt->drivers.first)) {
 				fcu= list_find_fcurve(&adt->drivers, path, index);
 				if(fcu && driven)
-					*driven = 1;
+					*driven = TRUE;
 				fcu = NULL;
 			}
 			
@@ -433,7 +433,8 @@ int binarysearch_bezt_index (BezTriple array[], float frame, int arraylen, short
 /* ...................................... */
 
 /* helper for calc_fcurve_* functions -> find first and last BezTriple to be used */
-static void get_fcurve_end_keyframes (FCurve *fcu, BezTriple **first, BezTriple **last, const short selOnly)
+static void get_fcurve_end_keyframes (FCurve *fcu, BezTriple **first, BezTriple **last,
+                                      const short do_sel_only)
 {
 	/* init outputs */
 	*first = NULL;
@@ -444,7 +445,7 @@ static void get_fcurve_end_keyframes (FCurve *fcu, BezTriple **first, BezTriple 
 		return;
 	
 	/* only include selected items? */
-	if (selOnly) {
+	if (do_sel_only) {
 		BezTriple *bezt;
 		unsigned int i;
 		
@@ -475,11 +476,12 @@ static void get_fcurve_end_keyframes (FCurve *fcu, BezTriple **first, BezTriple 
 
 
 /* Calculate the extents of F-Curve's data */
-void calc_fcurve_bounds (FCurve *fcu, float *xmin, float *xmax, float *ymin, float *ymax, const short selOnly)
+void calc_fcurve_bounds (FCurve *fcu, float *xmin, float *xmax, float *ymin, float *ymax,
+                         const short do_sel_only)
 {
 	float xminv=999999999.0f, xmaxv=-999999999.0f;
 	float yminv=999999999.0f, ymaxv=-999999999.0f;
-	short foundvert=0;
+	short foundvert= FALSE;
 	unsigned int i;
 	
 	if (fcu->totvert) {
@@ -488,7 +490,7 @@ void calc_fcurve_bounds (FCurve *fcu, float *xmin, float *xmax, float *ymin, flo
 			
 			if (xmin || xmax) {
 				/* get endpoint keyframes */
-				get_fcurve_end_keyframes(fcu, &bezt_first, &bezt_last, selOnly);
+				get_fcurve_end_keyframes(fcu, &bezt_first, &bezt_last, do_sel_only);
 				
 				if (bezt_first) {
 					BLI_assert(bezt_last != NULL);
@@ -503,11 +505,12 @@ void calc_fcurve_bounds (FCurve *fcu, float *xmin, float *xmax, float *ymin, flo
 				BezTriple *bezt;
 				
 				for (bezt=fcu->bezt, i=0; i < fcu->totvert; bezt++, i++) {
-					if ((selOnly == 0) || BEZSELECTED(bezt)) {
+					if ((do_sel_only == 0) || BEZSELECTED(bezt)) {
 						if (bezt->vec[1][1] < yminv)
 							yminv= bezt->vec[1][1];
 						if (bezt->vec[1][1] > ymaxv)
 							ymaxv= bezt->vec[1][1];
+						foundvert= TRUE;
 					}
 				}
 			}
@@ -528,11 +531,11 @@ void calc_fcurve_bounds (FCurve *fcu, float *xmin, float *xmax, float *ymin, flo
 						yminv= fpt->vec[1];
 					if (fpt->vec[1] > ymaxv)
 						ymaxv= fpt->vec[1];
+
+					foundvert= TRUE;
 				}
 			}
 		}
-		
-		foundvert=1;
 	}
 	
 	if (foundvert) {
@@ -555,43 +558,50 @@ void calc_fcurve_bounds (FCurve *fcu, float *xmin, float *xmax, float *ymin, flo
 }
 
 /* Calculate the extents of F-Curve's keyframes */
-void calc_fcurve_range (FCurve *fcu, float *start, float *end, const short selOnly)
+void calc_fcurve_range (FCurve *fcu, float *start, float *end,
+                        const short do_sel_only, const short do_min_length)
 {
 	float min=999999999.0f, max=-999999999.0f;
-	short foundvert=0;
+	short foundvert= FALSE;
 
 	if (fcu->totvert) {
 		if (fcu->bezt) {
 			BezTriple *bezt_first= NULL, *bezt_last= NULL;
 			
 			/* get endpoint keyframes */
-			get_fcurve_end_keyframes(fcu, &bezt_first, &bezt_last, selOnly);
-			
+			get_fcurve_end_keyframes(fcu, &bezt_first, &bezt_last, do_sel_only);
+
 			if (bezt_first) {
 				BLI_assert(bezt_last != NULL);
-				
+
 				min= MIN2(min, bezt_first->vec[1][0]);
 				max= MAX2(max, bezt_last->vec[1][0]);
+
+				foundvert= TRUE;
 			}
 		}
 		else if (fcu->fpt) {
 			min= MIN2(min, fcu->fpt[0].vec[0]);
 			max= MAX2(max, fcu->fpt[fcu->totvert-1].vec[0]);
+
+			foundvert= TRUE;
 		}
 		
-		foundvert=1;
 	}
 	
-	/* minimum length is 1 frame */
-	if (foundvert) {
-		if (min == max) max += 1.0f;
-		*start= min;
-		*end= max;
+	if (foundvert == FALSE) {
+		min= max= 0.0f;
 	}
-	else {
-		*start= 0.0f;
-		*end= 1.0f;
+
+	if (do_min_length) {
+		/* minimum length is 1 frame */
+		if (min == max) {
+			max += 1.0f;
+		}
 	}
+
+	*start= min;
+	*end= max;
 }
 
 /* ----------------- Status Checks -------------------------- */
@@ -1168,16 +1178,16 @@ static float dvar_eval_locDiff (ChannelDriver *driver, DriverVar *dvar)
 					constraint_mat_convertspace(ob, pchan, mat, CONSTRAINT_SPACE_POSE, CONSTRAINT_SPACE_LOCAL);
 					
 					/* ... and from that, we get our transform */
-					VECCOPY(tmp_loc, mat[3]);
+					copy_v3_v3(tmp_loc, mat[3]);
 				}
 				else {
 					/* transform space (use transform values directly) */
-					VECCOPY(tmp_loc, pchan->loc);
+					copy_v3_v3(tmp_loc, pchan->loc);
 				}
 			}
 			else {
 				/* convert to worldspace */
-				VECCOPY(tmp_loc, pchan->pose_head);
+				copy_v3_v3(tmp_loc, pchan->pose_head);
 				mul_m4_v3(ob->obmat, tmp_loc);
 			}
 		}
@@ -1193,25 +1203,25 @@ static float dvar_eval_locDiff (ChannelDriver *driver, DriverVar *dvar)
 					constraint_mat_convertspace(ob, NULL, mat, CONSTRAINT_SPACE_WORLD, CONSTRAINT_SPACE_LOCAL);
 					
 					/* ... and from that, we get our transform */
-					VECCOPY(tmp_loc, mat[3]);
+					copy_v3_v3(tmp_loc, mat[3]);
 				}
 				else {
 					/* transform space (use transform values directly) */
-					VECCOPY(tmp_loc, ob->loc);
+					copy_v3_v3(tmp_loc, ob->loc);
 				}
 			}
 			else {
 				/* worldspace */
-				VECCOPY(tmp_loc, ob->obmat[3]); 
+				copy_v3_v3(tmp_loc, ob->obmat[3]);
 			}
 		}
 		
 		/* copy the location to the right place */
 		if (tarIndex) {
-			VECCOPY(loc2, tmp_loc);
+			copy_v3_v3(loc2, tmp_loc);
 		}
 		else {
-			VECCOPY(loc1, tmp_loc);
+			copy_v3_v3(loc1, tmp_loc);
 		}
 	}
 	DRIVER_TARGETS_LOOPER_END
@@ -1252,7 +1262,7 @@ static float dvar_eval_transChan (ChannelDriver *driver, DriverVar *dvar)
 	if (pchan) {
 		/* bone */
 		if (pchan->rotmode > 0) {
-			VECCOPY(oldEul, pchan->eul);
+			copy_v3_v3(oldEul, pchan->eul);
 			rotOrder= pchan->rotmode;
 			useEulers = 1;
 		}
@@ -1279,7 +1289,7 @@ static float dvar_eval_transChan (ChannelDriver *driver, DriverVar *dvar)
 	else {
 		/* object */
 		if (ob->rotmode > 0) {
-			VECCOPY(oldEul, ob->rot);
+			copy_v3_v3(oldEul, ob->rot);
 			rotOrder= ob->rotmode;
 			useEulers = 1;
 		}

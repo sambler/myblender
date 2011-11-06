@@ -42,6 +42,7 @@
 #include "BLI_math.h"
 #include "BLI_kdopbvh.h"
 #include "BLI_utildefines.h"
+#include "BLI_bpath.h"
 
 #include "DNA_key_types.h"
 #include "DNA_object_types.h"
@@ -227,7 +228,7 @@ void init_mapping(TexMapping *texmap)
 	mul_m3_m3m3(mat, rmat, smat);
 	
 	copy_m4_m3(texmap->mat, mat);
-	VECCOPY(texmap->mat[3], texmap->loc);
+	copy_v3_v3(texmap->mat[3], texmap->loc);
 
 }
 
@@ -827,16 +828,20 @@ Tex *localize_texture(Tex *tex)
 
 /* ------------------------------------------------------------------------- */
 
+static void extern_local_texture(Tex *tex)
+{
+	id_lib_extern((ID *)tex->ima);
+}
+
 void make_local_texture(Tex *tex)
 {
 	Main *bmain= G.main;
-	Tex *texn;
 	Material *ma;
 	World *wrld;
 	Lamp *la;
 	Brush *br;
 	ParticleSettings *pa;
-	int a, local=0, lib=0;
+	int a, is_local= FALSE, is_lib= FALSE;
 
 	/* - only lib users: do nothing
 		* - only local users: set flag
@@ -845,18 +850,9 @@ void make_local_texture(Tex *tex)
 	
 	if(tex->id.lib==NULL) return;
 
-	/* special case: ima always local immediately */
-	if(tex->ima) {
-		tex->ima->id.lib= NULL;
-		tex->ima->id.flag= LIB_LOCAL;
-		new_id(&bmain->image, (ID *)tex->ima, NULL);
-	}
-
 	if(tex->id.us==1) {
-		tex->id.lib= NULL;
-		tex->id.flag= LIB_LOCAL;
-		new_id(&bmain->tex, (ID *)tex, NULL);
-
+		id_clear_lib_data(bmain, &tex->id);
+		extern_local_texture(tex);
 		return;
 	}
 	
@@ -864,8 +860,8 @@ void make_local_texture(Tex *tex)
 	while(ma) {
 		for(a=0; a<MAX_MTEX; a++) {
 			if(ma->mtex[a] && ma->mtex[a]->tex==tex) {
-				if(ma->id.lib) lib= 1;
-				else local= 1;
+				if(ma->id.lib) is_lib= TRUE;
+				else is_local= TRUE;
 			}
 		}
 		ma= ma->id.next;
@@ -874,8 +870,8 @@ void make_local_texture(Tex *tex)
 	while(la) {
 		for(a=0; a<MAX_MTEX; a++) {
 			if(la->mtex[a] && la->mtex[a]->tex==tex) {
-				if(la->id.lib) lib= 1;
-				else local= 1;
+				if(la->id.lib) is_lib= TRUE;
+				else is_local= TRUE;
 			}
 		}
 		la= la->id.next;
@@ -884,8 +880,8 @@ void make_local_texture(Tex *tex)
 	while(wrld) {
 		for(a=0; a<MAX_MTEX; a++) {
 			if(wrld->mtex[a] && wrld->mtex[a]->tex==tex) {
-				if(wrld->id.lib) lib= 1;
-				else local= 1;
+				if(wrld->id.lib) is_lib= TRUE;
+				else is_local= TRUE;
 			}
 		}
 		wrld= wrld->id.next;
@@ -893,8 +889,8 @@ void make_local_texture(Tex *tex)
 	br= bmain->brush.first;
 	while(br) {
 		if(br->mtex.tex==tex) {
-			if(br->id.lib) lib= 1;
-			else local= 1;
+			if(br->id.lib) is_lib= TRUE;
+			else is_local= TRUE;
 		}
 		br= br->id.next;
 	}
@@ -902,21 +898,24 @@ void make_local_texture(Tex *tex)
 	while(pa) {
 		for(a=0; a<MAX_MTEX; a++) {
 			if(pa->mtex[a] && pa->mtex[a]->tex==tex) {
-				if(pa->id.lib) lib= 1;
-				else local= 1;
+				if(pa->id.lib) is_lib= TRUE;
+				else is_local= TRUE;
 			}
 		}
 		pa= pa->id.next;
 	}
 	
-	if(local && lib==0) {
-		tex->id.lib= NULL;
-		tex->id.flag= LIB_LOCAL;
-		new_id(&bmain->tex, (ID *)tex, NULL);
+	if(is_local && is_lib == FALSE) {
+		id_clear_lib_data(bmain, &tex->id);
+		extern_local_texture(tex);
 	}
-	else if(local && lib) {
-		texn= copy_texture(tex);
+	else if(is_local && is_lib) {
+		Tex *texn= copy_texture(tex);
+
 		texn->id.us= 0;
+
+		/* Remap paths of new ID using old library as base. */
+		BKE_id_lib_local_paths(bmain, &texn->id);
 		
 		ma= bmain->mat.first;
 		while(ma) {

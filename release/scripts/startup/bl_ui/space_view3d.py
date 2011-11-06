@@ -976,10 +976,8 @@ class VIEW3D_MT_make_links(Menu):
         if(len(bpy.data.scenes) > 10):
             layout.operator_context = 'INVOKE_DEFAULT'
             layout.operator("object.make_links_scene", text="Objects to Scene...", icon='OUTLINER_OB_EMPTY')
-            layout.operator("object.make_links_scene", text="Markers to Scene...", icon='OUTLINER_OB_EMPTY')
         else:
             layout.operator_menu_enum("object.make_links_scene", "scene", text="Objects to Scene...")
-            layout.operator_menu_enum("marker.make_links_scene", "scene", text="Markers to Scene...")
 
         layout.operator_enum("object.make_links_data", "type")  # inline
 
@@ -1086,6 +1084,7 @@ class VIEW3D_MT_paint_weight(Menu):
 
         layout.operator("object.vertex_group_normalize_all", text="Normalize All")
         layout.operator("object.vertex_group_normalize", text="Normalize")
+        layout.operator("object.vertex_group_mirror", text="Mirror")
         layout.operator("object.vertex_group_invert", text="Invert")
         layout.operator("object.vertex_group_clean", text="Clean")
         layout.operator("object.vertex_group_levels", text="Levels")
@@ -2064,7 +2063,22 @@ class VIEW3D_PT_view3d_properties(Panel):
         subcol.label(text="Local Camera:")
         subcol.prop(view, "camera", text="")
 
-        layout.column().prop(view, "cursor_location")
+
+class VIEW3D_PT_view3d_cursor(Panel):
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_label = "3D Cursor"
+
+    @classmethod
+    def poll(cls, context):
+        view = context.space_data
+        return (view)
+
+    def draw(self, context):
+        layout = self.layout
+
+        view = context.space_data
+        layout.column().prop(view, "cursor_location", text="Location")
 
 
 class VIEW3D_PT_view3d_name(Panel):
@@ -2142,10 +2156,11 @@ class VIEW3D_PT_view3d_display(Panel):
         subsub.active = scene.unit_settings.system == 'NONE'
         subsub.prop(view, "grid_subdivisions", text="Subdivisions")
 
-        col = layout.column()
-        col.label(text="Shading:")
-        col.prop(gs, "material_mode", text="")
-        col.prop(view, "show_textured_solid")
+        if not scene.render.use_shading_nodes:
+            col = layout.column()
+            col.label(text="Shading:")
+            col.prop(gs, "material_mode", text="")
+            col.prop(view, "show_textured_solid")
 
         layout.separator()
 

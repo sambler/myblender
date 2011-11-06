@@ -555,7 +555,7 @@ static void add_pose_transdata(TransInfo *t, bPoseChannel *pchan, Object *ob, Tr
 		td->ext->rotAngle= NULL;
 		td->ext->quat= pchan->quat;
 		
-		QUATCOPY(td->ext->iquat, pchan->quat);
+		copy_qt_qt(td->ext->iquat, pchan->quat);
 	}
 	td->ext->rotOrder= pchan->rotmode;
 	
@@ -1305,7 +1305,7 @@ static void createTransMBallVerts(TransInfo *t)
 
 			/* quat is used for rotation of MetaElem */
 			tx->quat = ml->quat;
-			QUATCOPY(tx->iquat, ml->quat);
+			copy_qt_qt(tx->iquat, ml->quat);
 
 			tx->rot = NULL;
 
@@ -2960,8 +2960,8 @@ static TransData *ActionFCurveToTransData(TransData *td, TransData2D **td2dv, FC
 				td2d->h1 = bezt->vec[0];
 				td2d->h2 = bezt->vec[2];
 				
-				VECCOPY2D(td2d->ih1, td2d->h1);
-				VECCOPY2D(td2d->ih2, td2d->h2);
+				copy_v2_v2(td2d->ih1, td2d->h1);
+				copy_v2_v2(td2d->ih2, td2d->h2);
 				
 				td++;
 				td2d++;
@@ -3217,14 +3217,14 @@ static void bezt_to_transdata (TransData *td, TransData2D *td2d, AnimData *adt, 
 
 	if (td->flag & TD_MOVEHANDLE1) {
 		td2d->h1 = bezt->vec[0];
-		VECCOPY2D(td2d->ih1, td2d->h1);
+		copy_v2_v2(td2d->ih1, td2d->h1);
 	} 
 	else 	
 		td2d->h1 = NULL;
 
 	if (td->flag & TD_MOVEHANDLE2) {
 		td2d->h2 = bezt->vec[2];
-		VECCOPY2D(td2d->ih2, td2d->h2);
+		copy_v2_v2(td2d->ih2, td2d->h2);
 	} 
 	else 
 		td2d->h2 = NULL;
@@ -4299,8 +4299,8 @@ static void ObjectToTransData(TransInfo *t, TransData *td, Object *ob)
 		td->ext->rotAngle= NULL;
 		td->ext->quat= ob->quat;
 		
-		QUATCOPY(td->ext->iquat, ob->quat);
-		QUATCOPY(td->ext->dquat, ob->dquat);
+		copy_qt_qt(td->ext->iquat, ob->quat);
+		copy_qt_qt(td->ext->dquat, ob->dquat);
 	}
 	td->ext->rotOrder=ob->rotmode;
 

@@ -35,7 +35,7 @@
 
 /* **************** NORMALIZE single channel, useful for Z buffer ******************** */
 static bNodeSocketTemplate cmp_node_normalize_in[]= {
-	{   SOCK_FLOAT, 1, "Value",         1.0f, 0.8f, 0.8f, 1.0f, 0.0f, 1.0f, PROP_NONE},
+	{   SOCK_FLOAT, 1, "Value",         1.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f, PROP_NONE},
 	{   -1, 0, ""   }
 };
 static bNodeSocketTemplate cmp_node_normalize_out[]= {
@@ -69,7 +69,7 @@ static void node_composit_exec_normalize(void *UNUSED(data), bNode *node, bNodeS
 
 	/* Input has no image buffer? Then pass the value */
 	if(in[0]->data==NULL) {
-		QUATCOPY(out[0]->vec, in[0]->vec);
+		copy_v4_v4(out[0]->vec, in[0]->vec);
 	}
 	else {
 		float min = 1.0f+BLENDER_ZMAX;

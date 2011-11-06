@@ -296,7 +296,7 @@ void GPU_material_bind_uniforms(GPUMaterial *material, float obmat[][4], float v
 			GPU_shader_uniform_vector(shader, material->invobmatloc, 16, 1, (float*)invmat);
 		}
 		if(material->builtins & GPU_OBCOLOR) {
-			QUATCOPY(col, obcol);
+			copy_v4_v4(col, obcol);
 			CLAMP(col[3], 0.0f, 1.0f);
 			GPU_shader_uniform_vector(shader, material->obcolloc, 4, 1, col);
 		}
@@ -1661,7 +1661,8 @@ void GPU_lamp_shadow_buffer_bind(GPULamp *lamp, float viewmat[][4], int *winsize
 
 	/* opengl */
 	glDisable(GL_SCISSOR_TEST);
-	GPU_framebuffer_texture_bind(lamp->fb, lamp->tex);
+	GPU_framebuffer_texture_bind(lamp->fb, lamp->tex,
+		GPU_texture_opengl_width(lamp->tex), GPU_texture_opengl_height(lamp->tex));
 
 	/* set matrices */
 	copy_m4_m4(viewmat, lamp->viewmat);

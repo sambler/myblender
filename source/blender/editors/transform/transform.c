@@ -3882,7 +3882,7 @@ int Bevel(TransInfo *t, const int UNUSED(mval[2]))
 		else {
 			d = distance;
 		}
-		VECADDFAC(td->loc,td->center,td->axismtx[0],(*td->val)*d);
+		madd_v3_v3v3fl(td->loc, td->center, td->axismtx[0], (*td->val) * d);
 	}
 
 	recalcData(t);
@@ -4847,7 +4847,7 @@ int doEdgeSlide(TransInfo *t, float perc)
 						interp_v2_v2v2(uv_tmp, suv->origuv,  (perc>=0)?suv->uv_up:suv->uv_down, fabs(perc));
 						fuv_link = suv->fuv_list;
 						while (fuv_link) {
-							VECCOPY2D(((float *)fuv_link->link), uv_tmp);
+							copy_v2_v2(((float *)fuv_link->link), uv_tmp);
 							fuv_link = fuv_link->next;
 						}
 					}
@@ -4878,7 +4878,7 @@ int doEdgeSlide(TransInfo *t, float perc)
 							interp_v2_v2v2(uv_tmp, suv->uv_down, suv->uv_up, fabs(newlen));
 							fuv_link = suv->fuv_list;
 							while (fuv_link) {
-								VECCOPY2D(((float *)fuv_link->link), uv_tmp);
+								copy_v2_v2(((float *)fuv_link->link), uv_tmp);
 								fuv_link = fuv_link->next;
 							}
 						}
@@ -4895,7 +4895,7 @@ int doEdgeSlide(TransInfo *t, float perc)
 							interp_v2_v2v2(uv_tmp, suv->uv_up, suv->uv_down, fabs(newlen));
 							fuv_link = suv->fuv_list;
 							while (fuv_link) {
-								VECCOPY2D(((float *)fuv_link->link), uv_tmp);
+								copy_v2_v2(((float *)fuv_link->link), uv_tmp);
 								fuv_link = fuv_link->next;
 							}
 						}
@@ -5861,7 +5861,7 @@ int TimeScale(TransInfo *t, const int UNUSED(mval[2]))
 
 /* ************************************ */
 
-void BIF_TransformSetUndo(char *UNUSED(str))
+void BIF_TransformSetUndo(const char *UNUSED(str))
 {
 	// TRANSFORM_FIX_ME
 	//Trans.undostr= str;

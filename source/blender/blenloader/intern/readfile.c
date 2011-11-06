@@ -4412,7 +4412,7 @@ static void direct_link_object(FileData *fd, Object *ob)
 			 * a hook we need to make sure it gets converted
 			 * and free'd, regardless of version.
 			 */
-		VECCOPY(hmd->cent, hook->cent);
+		copy_v3_v3(hmd->cent, hook->cent);
 		hmd->falloff = hook->falloff;
 		hmd->force = hook->force;
 		hmd->indexar = hook->indexar;
@@ -4539,6 +4539,8 @@ static void lib_link_scene(FileData *fd, Main *main)
 					marker->camera= newlibadr(fd, sce->id.lib, marker->camera);
 				}
 			}
+#else
+			(void)marker;
 #endif
 
 			if(sce->ed)
@@ -7153,7 +7155,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 		while(ob) {
 			if(ob->transflag & 1) {
 				ob->transflag -= 1;
-				ob->ipoflag |= OB_OFFS_OB;
+				//ob->ipoflag |= OB_OFFS_OB;
 			}
 			ob= ob->id.next;
 		}
@@ -7184,7 +7186,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 		}
 		ob= main->object.first;
 		while(ob) {
-			ob->ipoflag |= OB_OFFS_PARENT;
+			//ob->ipoflag |= OB_OFFS_PARENT;
 			if(ob->dt==0) ob->dt= OB_SOLID;
 			ob= ob->id.next;
 		}
@@ -9605,7 +9607,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 				part->obfac = paf->obfac;
 				part->randfac = paf->randfac * 25.0f;
 				part->dampfac = paf->damp;
-				VECCOPY(part->acc, paf->force);
+				copy_v3_v3(part->acc, paf->force);
 
 				/* flags */
 				if(paf->stype & PAF_VECT) {
@@ -10656,7 +10658,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 				tot= MIN2(me->totvert, key->refkey->totelem);
 
 				for(a=0; a<tot; a++, data+=3)
-					VECCOPY(me->mvert[a].co, data)
+					copy_v3_v3(me->mvert[a].co, data);
 			}
 		}
 
@@ -10666,7 +10668,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 				tot= MIN2(lt->pntsu*lt->pntsv*lt->pntsw, key->refkey->totelem);
 
 				for(a=0; a<tot; a++, data+=3)
-					VECCOPY(lt->def[a].vec, data)
+					copy_v3_v3(lt->def[a].vec, data);
 			}
 		}
 
@@ -10679,9 +10681,9 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 						BezTriple *bezt = nu->bezt;
 
 						for(a=0; a<nu->pntsu; a++, bezt++) {
-							VECCOPY(bezt->vec[0], data); data+=3;
-							VECCOPY(bezt->vec[1], data); data+=3;
-							VECCOPY(bezt->vec[2], data); data+=3;
+							copy_v3_v3(bezt->vec[0], data); data+=3;
+							copy_v3_v3(bezt->vec[1], data); data+=3;
+							copy_v3_v3(bezt->vec[2], data); data+=3;
 							bezt->alfa= *data; data++;
 						}
 					}
@@ -10689,7 +10691,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 						BPoint *bp = nu->bp;
 
 						for(a=0; a<nu->pntsu*nu->pntsv; a++, bp++) {
-							VECCOPY(bp->vec, data); data+=3;
+							copy_v3_v3(bp->vec, data); data+=3;
 							bp->alfa= *data; data++;
 						}
 					}
@@ -13374,7 +13376,7 @@ static void give_base_to_groups(Main *mainvar, Scene *scene)
 			ob->dup_group= group;
 			ob->transflag |= OB_DUPLIGROUP;
 			rename_id(&ob->id, group->id.name+2);
-			VECCOPY(ob->loc, scene->cursor);
+			copy_v3_v3(ob->loc, scene->cursor);
 		}
 	}
 }

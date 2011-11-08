@@ -329,6 +329,10 @@ def creator(env):
     if env['WITH_BF_SDL']:
         defs.append('WITH_SDL')
 
+    if env['WITH_BF_LIBMV']:
+        incs.append('#/extern/libmv')
+        defs.append('WITH_LIBMV')
+
     if env['WITH_BF_PYTHON']:
         incs.append('#/source/blender/python')
         defs.append('WITH_PYTHON')
@@ -353,7 +357,7 @@ def buildinfo(lenv, build_type):
     build_time = time.strftime ("%H:%M:%S")
     build_rev = os.popen('svnversion').read()[:-1] # remove \n
     if build_rev == '': 
-        build_rev = '41596'
+        build_rev = '41649'
     if lenv['BF_DEBUG']:
         build_type = "Debug"
         build_cflags = ' '.join(lenv['CFLAGS'] + lenv['CCFLAGS'] + lenv['BF_DEBUG_CCFLAGS'] + lenv['CPPFLAGS'])

@@ -55,6 +55,7 @@ struct AnimData;
 struct Editing;
 struct SceneStats;
 struct bGPdata;
+struct MovieClip;
 
 typedef struct Base {
 	struct Base *next, *prev;
@@ -890,6 +891,9 @@ typedef struct Scene {
 	/* Physics simulation settings */
 	struct PhysicsSettings physics_settings;
 
+	/* Movie Tracking */
+	struct MovieClip *clip;			/* active movie clip */
+
 	/* user defined wirecolor sets */
 	int active_wirecolorset;
 	ListBase wirecolorsets;
@@ -1368,7 +1372,6 @@ typedef enum SculptFlags {
 /* UnitSettings->flag */
 #define	USER_UNIT_OPT_SPLIT		1
 #define USER_UNIT_ROT_RADIANS	2
-
 
 #ifdef __cplusplus
 }

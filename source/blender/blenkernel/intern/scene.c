@@ -126,7 +126,7 @@ Scene *copy_scene(Scene *sce, int type)
 		scen->r.layers= lb;
 	}
 	else {
-		scen= copy_libblock(sce);
+		scen= copy_libblock(&sce->id);
 		BLI_duplicatelist(&(scen->base), &(sce->base));
 		
 		clear_id_newpoins();
@@ -1343,4 +1343,6 @@ void BKE_wirecolorsets_free (ListBase *list)
 		wcsn= wcs->next;
 		BKE_wirecolorset_free(wcs);
 	}
+
+}
 

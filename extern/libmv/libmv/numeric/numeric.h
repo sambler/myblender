@@ -33,12 +33,12 @@
 #include <Eigen/QR>
 #include <Eigen/SVD>
 
-#if _WIN32 || __APPLE__
+#if _WIN32 || __APPLE__ || __FreeBSD__
   void static sincos (double x, double *sinx, double *cosx) {
     *sinx = sin(x);
     *cosx = cos(x);
   }
-#endif //_WIN32 || __APPLE__
+#endif //_WIN32 || __APPLE__ || __FreeBSD__
 
 #if (defined(WIN32) || defined(WIN64)) && !defined(__MINGW32__)
   inline long lround(double d) {

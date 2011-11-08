@@ -249,6 +249,17 @@ enum {
 
 	TH_NODE_CURVING,
 
+	TH_MARKER_OUTLINE,
+	TH_MARKER,
+	TH_ACT_MARKER,
+	TH_SEL_MARKER,
+	TH_BUNDLE_SOLID,
+	TH_DIS_MARKER,
+	TH_PATH_BEFORE,
+	TH_PATH_AFTER,
+	TH_CAMERA_PATH,
+	TH_LOCK_MARKER
+
 	TH_MATCH	/* highlight colour for search matches */
 };
 /* XXX WARNING: previous is saved in file, so do not change order! */

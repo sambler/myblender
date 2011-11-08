@@ -437,6 +437,10 @@ const unsigned char *UI_ThemeGetColorPtr(bTheme *btheme, int spacetype, int colo
 			case TH_MATCH:
 				cp= ts->match;
 				break;
+				
+			case TH_SELECT_HIGHLIGHT:
+				cp= ts->selected_highlight;
+				break;
 			}
 		}
 	}
@@ -772,6 +776,7 @@ void ui_theme_init_default(void)
 	btheme->toops= btheme->tv3d;
 	SETCOLF(btheme->toops.back, 	0.45, 0.45, 0.45, 1.0);
 	SETCOLF(btheme->toops.match, 	0.2, 0.5, 0.2, 0.3);	/* highlighting search match - soft green*/
+	SETCOLF(btheme->toops.selected_highlight, 0.51, 0.53, 0.55, 0.3);
 
 	/* space info */
 	btheme->tinfo= btheme->tv3d;
@@ -1638,8 +1643,9 @@ void init_userdef_do_versions(void)
 			btheme->tv3d.speaker[3] = 255;
 		}
 	}
-	
-    if (bmain->versionfile < 259 || (bmain->versionfile == 259 && bmain->subversionfile < 3)) {
+
+	if (bmain->versionfile < 259 || (bmain->versionfile == 259 && bmain->subversionfile < 3))
+	{
 		bTheme *btheme;
 		for(btheme= U.themes.first; btheme; btheme= btheme->next) {
 			if(btheme->tv3d.bundle_solid[3] == 0)
@@ -1667,14 +1673,15 @@ void init_userdef_do_versions(void)
 			}
 		}
 	}
-
-    if (bmain->versionfile < 259 || (bmain->versionfile == 259 && bmain->subversionfile < 3)) {
+	
+	if (bmain->versionfile < 260) {
 		bTheme *btheme;
 		for(btheme= U.themes.first; btheme; btheme= btheme->next) {
 			SETCOLF(btheme->toops.match, 0.2, 0.5, 0.2, 0.3);
+			SETCOLF(btheme->toops.selected_highlight, 0.51, 0.53, 0.55, 0.3);
 		}
 	}
-	
+
 	/* GL Texture Garbage Collection (variable abused above!) */
 	if (U.textimeout == 0) {
 		U.texcollectrate = 60;

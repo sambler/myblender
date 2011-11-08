@@ -245,6 +245,7 @@ typedef struct ThemeSpace {
 	char preview_back[4];
 
 	char match[4];	// outliner - filter match
+	char selected_highlight[4];	// outliner - selected item
 
 } ThemeSpace;
 

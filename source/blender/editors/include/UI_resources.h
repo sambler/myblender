@@ -260,7 +260,8 @@ enum {
 	TH_CAMERA_PATH,
 	TH_LOCK_MARKER,
 
-	TH_MATCH	/* highlight colour for search matches */
+	TH_MATCH,	/* highlight colour for search matches */
+	TH_SELECT_HIGHLIGHT	/* highlight colour for selected outliner item */
 };
 /* XXX WARNING: previous is saved in file, so do not change order! */
 

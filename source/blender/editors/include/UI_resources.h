@@ -258,7 +258,7 @@ enum {
 	TH_PATH_BEFORE,
 	TH_PATH_AFTER,
 	TH_CAMERA_PATH,
-	TH_LOCK_MARKER
+	TH_LOCK_MARKER,
 
 	TH_MATCH	/* highlight colour for search matches */
 };

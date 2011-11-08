@@ -153,6 +153,9 @@ const unsigned char *UI_ThemeGetColorPtr(bTheme *btheme, int spacetype, int colo
 			case SPACE_LOGIC:
 				ts= &btheme->tlogic;
 				break;
+			case SPACE_CLIP:
+				ts= &btheme->tclip;
+				break;
 			default:
 				ts= &btheme->tv3d;
 				break;
@@ -410,6 +413,27 @@ const unsigned char *UI_ThemeGetColorPtr(bTheme *btheme, int spacetype, int colo
 				cp= ts->preview_back;
 				break;
 
+			case TH_MARKER_OUTLINE:
+				cp= ts->marker_outline; break;
+			case TH_MARKER:
+				cp= ts->marker; break;
+			case TH_ACT_MARKER:
+				cp= ts->act_marker; break;
+			case TH_SEL_MARKER:
+				cp= ts->sel_marker; break;
+			case TH_BUNDLE_SOLID:
+				cp= ts->bundle_solid; break;
+			case TH_DIS_MARKER:
+				cp= ts->dis_marker; break;
+			case TH_PATH_BEFORE:
+				cp= ts->path_before; break;
+			case TH_PATH_AFTER:
+				cp= ts->path_after; break;
+			case TH_CAMERA_PATH:
+				cp= ts->camera_path; break;
+			case TH_LOCK_MARKER:
+				cp= ts->lock_marker; break;
+
 			case TH_MATCH:
 				cp= ts->match;
 				break;
@@ -541,6 +565,7 @@ static void ui_theme_init_new(bTheme *btheme)
 	ui_theme_init_new_do(&btheme->tlogic);
 	ui_theme_init_new_do(&btheme->tuserpref);
 	ui_theme_init_new_do(&btheme->tconsole);
+	ui_theme_init_new_do(&btheme->tclip);
 	
 }
 
@@ -647,7 +672,9 @@ void ui_theme_init_default(void)
 
 	SETCOL(btheme->tv3d.bone_solid, 200, 200, 200, 255);
 	SETCOL(btheme->tv3d.bone_pose, 80, 200, 255, 80);               // alpha 80 is not meant editable, used for wire+action draw
-	
+
+	SETCOL(btheme->tv3d.bundle_solid, 200, 200, 200, 255);
+	SETCOL(btheme->tv3d.camera_path, 0x00, 0x00, 0x00, 255);
 	
 	/* space buttons */
 	/* to have something initialized */
@@ -787,6 +814,23 @@ void ui_theme_init_default(void)
 	/* space logic */
 	btheme->tlogic= btheme->tv3d;
 	SETCOL(btheme->tlogic.back, 100, 100, 100, 255);
+	
+	/* space clip */
+	btheme->tclip= btheme->tv3d;
+
+	SETCOL(btheme->tclip.marker_outline, 0x00, 0x00, 0x00, 255);
+	SETCOL(btheme->tclip.marker, 0x7f, 0x7f, 0x00, 255);
+	SETCOL(btheme->tclip.act_marker, 0xff, 0xff, 0xff, 255);
+	SETCOL(btheme->tclip.sel_marker, 0xff, 0xff, 0x00, 255);
+	SETCOL(btheme->tclip.dis_marker, 0x7f, 0x00, 0x00, 255);
+	SETCOL(btheme->tclip.lock_marker, 0x7f, 0x7f, 0x7f, 255);
+	SETCOL(btheme->tclip.path_before, 0xff, 0x00, 0x00, 255);
+	SETCOL(btheme->tclip.path_after, 0x00, 0x00, 0xff, 255);
+	SETCOL(btheme->tclip.grid, 0x5e, 0x5e, 0x5e, 255);
+	SETCOL(btheme->tclip.cframe, 0x60, 0xc0, 0x40, 255);
+	SETCOL(btheme->tclip.handle_vertex, 0x00, 0x00, 0x00, 0xff);
+	SETCOL(btheme->tclip.handle_vertex_select, 0xff, 0xff, 0, 0xff);
+	btheme->tclip.handle_vertex_size= 4;
 }
 
 
@@ -1600,7 +1644,37 @@ void init_userdef_do_versions(void)
 		}
 	}
 
-	if (bmain->versionfile < 259 || (bmain->versionfile == 259 && bmain->subversionfile < 3)) {
+	if (bmain->versionfile < 259 || (bmain->versionfile == 259 && bmain->subversionfile < 3))
+	{
+		bTheme *btheme;
+		for(btheme= U.themes.first; btheme; btheme= btheme->next) {
+			if(btheme->tv3d.bundle_solid[3] == 0)
+				SETCOL(btheme->tv3d.bundle_solid, 200, 200, 200, 255);
+
+			if(btheme->tv3d.camera_path[3] == 0)
+				SETCOL(btheme->tv3d.camera_path, 0x00, 0x00, 0x00, 255);
+
+			if((btheme->tclip.back[3]) == 0) {
+				btheme->tclip= btheme->tv3d;
+
+				SETCOL(btheme->tclip.marker_outline, 0x00, 0x00, 0x00, 255);
+				SETCOL(btheme->tclip.marker, 0x7f, 0x7f, 0x00, 255);
+				SETCOL(btheme->tclip.act_marker, 0xff, 0xff, 0xff, 255);
+				SETCOL(btheme->tclip.sel_marker, 0xff, 0xff, 0x00, 255);
+				SETCOL(btheme->tclip.dis_marker, 0x7f, 0x00, 0x00, 255);
+				SETCOL(btheme->tclip.lock_marker, 0x7f, 0x7f, 0x7f, 255);
+				SETCOL(btheme->tclip.path_before, 0xff, 0x00, 0x00, 255);
+				SETCOL(btheme->tclip.path_after, 0x00, 0x00, 0xff, 255);
+				SETCOL(btheme->tclip.grid, 0x5e, 0x5e, 0x5e, 255);
+				SETCOL(btheme->tclip.cframe, 0x60, 0xc0, 0x40, 255);
+				SETCOL(btheme->tclip.handle_vertex, 0x00, 0x00, 0x00, 0xff);
+				SETCOL(btheme->tclip.handle_vertex_select, 0xff, 0xff, 0, 0xff);
+				btheme->tclip.handle_vertex_size= 4;
+			}
+		}
+	}
+	
+	if (bmain->versionfile < 260) {
 		bTheme *btheme;
 		for(btheme= U.themes.first; btheme; btheme= btheme->next) {
 			SETCOLF(btheme->toops.match, 0.2, 0.5, 0.2, 0.3);

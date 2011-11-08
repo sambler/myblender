@@ -70,7 +70,6 @@ extern ModifierTypeInfo modifierType_ShapeKey;
 extern ModifierTypeInfo modifierType_Solidify;
 extern ModifierTypeInfo modifierType_Screw;
 extern ModifierTypeInfo modifierType_Warp;
-extern ModifierTypeInfo modifierType_Ocean;
 extern ModifierTypeInfo modifierType_NavMesh;
 extern ModifierTypeInfo modifierType_WeightVGEdit;
 extern ModifierTypeInfo modifierType_WeightVGMix;

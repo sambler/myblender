@@ -1563,10 +1563,6 @@ static void rna_def_object_game_settings(BlenderRNA *brna)
 	RNA_def_property_float_sdna(prop, NULL, "obstacleRad");
 	RNA_def_property_range(prop, 0.0, 1000.0);
 	RNA_def_property_ui_text(prop, "Obstacle Radius", "Radius of object representation in obstacle simulation");
-	
-	prop= RNA_def_property(srna, "use_animation_recording", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_negative_sdna(prop, NULL, "gameflag2", OB_IGNORE_ANIM_RECORDING);
-	RNA_def_property_ui_text(prop, "Allow Animation Recording", "Allow saving animation keyframes for this object when 'Record Animation' is enabled");
 
 	/* state */
 

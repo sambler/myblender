@@ -116,7 +116,6 @@ set(SRC
 	intern/multires.c
 	intern/nla.c
 	intern/node.c
-	intern/ocean.c
 	intern/object.c
 	intern/packedFile.c
 	intern/paint.c

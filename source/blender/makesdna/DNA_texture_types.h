@@ -207,39 +207,6 @@ typedef struct VoxelData {
 	
 } VoxelData;
 
-typedef struct OceanTex {
-	
-	struct Ocean *ocean;
-	
-	int		resolution;
-	int		spatial_size;
-
-	float	wind_velocity;
-
-	float	damp;
-	float	smallest_wave;
-	float	depth;
-	
-	float	wave_alignment;
-	float	wave_direction;
-	float	wave_scale;
-	
-	float	chop_amount;
-	float	foam_coverage;
-	float	time;
-	
-	int		seed;
-	int		flag;
-	int		output;
-	
-	int		pad;
-	
-	
-	struct Object *object;
-	char oceanmod[64];
-	
-} OceanTex;
-	
 typedef struct Tex {
 	ID id;
 	struct AnimData *adt;	/* animation data (must be immediately after id for utilities to use it) */ 
@@ -295,7 +262,6 @@ typedef struct Tex {
 	struct PreviewImage * preview;
 	struct PointDensity *pd;
 	struct VoxelData *vd;
-	struct OceanTex *ot;
 	
 	char use_nodes;
 	char pad[7];
@@ -353,8 +319,7 @@ typedef struct ColorMapping {
 #define TEX_DISTNOISE	13
 #define TEX_POINTDENSITY	14
 #define TEX_VOXELDATA		15
-#define TEX_OCEAN		16
-#define TEX_PLANET		17
+#define TEX_PLANET		16
 
 /* musgrave stype */
 #define TEX_MFRACTAL		0
@@ -624,18 +589,6 @@ typedef struct ColorMapping {
 #define TEX_VD_SMOKEDENSITY		0
 #define TEX_VD_SMOKEHEAT		1
 #define TEX_VD_SMOKEVEL			2
-
-/******************** Ocean *****************************/
-/* output */
-#define TEX_OCN_DISPLACEMENT	1
-#define TEX_OCN_FOAM			2
-#define TEX_OCN_JPLUS			3
-#define TEX_OCN_EMINUS			4	
-#define TEX_OCN_EPLUS			5
-
-/* flag */
-#define TEX_OCN_GENERATE_NORMALS	1	
-#define TEX_OCN_XZ				2	
 	
 #ifdef __cplusplus
 }

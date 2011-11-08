@@ -66,7 +66,6 @@ set(SRC
 	intern/MOD_mirror.c
 	intern/MOD_multires.c
 	intern/MOD_none.c
-	intern/MOD_ocean.c
 	intern/MOD_particleinstance.c
 	intern/MOD_particlesystem.c
 	intern/MOD_screw.c
@@ -114,10 +113,6 @@ endif()
 
 if(WITH_MOD_FLUID)
 	add_definitions(-DWITH_MOD_FLUID)
-endif()
-
-if(WITH_OPENMP)
-	add_definitions(-DPARALLEL=1)
 endif()
 
 if(WITH_GAMEENGINE)

@@ -1638,14 +1638,8 @@ void init_userdef_do_versions(void)
 			btheme->tv3d.speaker[3] = 255;
 		}
 	}
-
-<<<<<<< HEAD
-	if (bmain->versionfile < 259 || (bmain->versionfile == 259 && bmain->subversionfile < 3)) {
-		bTheme *btheme;
-		for(btheme= U.themes.first; btheme; btheme= btheme->next) {
-			SETCOLF(btheme->toops.match, 0.2, 0.5, 0.2, 0.3);
-=======
-	{
+	
+    if (bmain->versionfile < 259 || (bmain->versionfile == 259 && bmain->subversionfile < 3)) {
 		bTheme *btheme;
 		for(btheme= U.themes.first; btheme; btheme= btheme->next) {
 			if(btheme->tv3d.bundle_solid[3] == 0)
@@ -1671,10 +1665,16 @@ void init_userdef_do_versions(void)
 				SETCOL(btheme->tclip.handle_vertex_select, 0xff, 0xff, 0, 0xff);
 				btheme->tclip.handle_vertex_size= 4;
 			}
->>>>>>> master
 		}
 	}
 
+    if (bmain->versionfile < 259 || (bmain->versionfile == 259 && bmain->subversionfile < 3)) {
+		bTheme *btheme;
+		for(btheme= U.themes.first; btheme; btheme= btheme->next) {
+			SETCOLF(btheme->toops.match, 0.2, 0.5, 0.2, 0.3);
+		}
+	}
+	
 	/* GL Texture Garbage Collection (variable abused above!) */
 	if (U.textimeout == 0) {
 		U.texcollectrate = 60;

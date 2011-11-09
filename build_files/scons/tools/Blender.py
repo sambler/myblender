@@ -279,6 +279,11 @@ def setup_syslibs(lenv):
         if lenv['WITH_BF_3DMOUSE']:
             if not lenv['WITH_BF_STATIC3DMOUSE']:
                 syslibs += Split(lenv['BF_3DMOUSE_LIB'])
+                
+    if lenv['WITH_BF_OIIO']:
+        syslibs += Split(lenv['BF_OIIO_LIB'])
+    if lenv['WITH_BF_BOOST']:
+        syslibs += Split(lenv['BF_BOOST_LIB'])
 
     if lenv['WITH_BF_OIIO']:
         syslibs += Split(lenv['BF_OIIO_LIB'])
@@ -357,7 +362,7 @@ def buildinfo(lenv, build_type):
     build_time = time.strftime ("%H:%M:%S")
     build_rev = os.popen('svnversion').read()[:-1] # remove \n
     if build_rev == '': 
-        build_rev = '41680'
+        build_rev = '41690'
     if lenv['BF_DEBUG']:
         build_type = "Debug"
         build_cflags = ' '.join(lenv['CFLAGS'] + lenv['CCFLAGS'] + lenv['BF_DEBUG_CCFLAGS'] + lenv['CPPFLAGS'])

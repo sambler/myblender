@@ -214,8 +214,10 @@ endif()
 option(WITH_PYTHON_INSTALL       "Copy system python into the blender install folder" ON)
 
 # Cycles
-option(WITH_CYCLES			"Enable Cycles Render Engine" ON)
-OPTION(WITH_CYCLES_TEST		"Build cycles test application" OFF)
+option(WITH_CYCLES					"Enable cycles Render Engine" ON)
+option(WITH_CYCLES_TEST				"Build cycles test application" OFF)
+option(WITH_CYCLES_CUDA_BINARIES	"Build cycles CUDA binaries" OFF)
+set(CYCLES_CUDA_BINARIES_ARCH		sm_13 sm_20 sm_21 CACHE STRING "CUDA architectures to build binaries for")
 
 # disable for now, but plan to support on all platforms eventually
 option(WITH_MEM_JEMALLOC   "Enable malloc replacement (http://www.canonware.com/jemalloc)" OFF)
@@ -507,6 +509,7 @@ if(UNIX AND NOT APPLE)
 		if(NOT BOOST_CUSTOM)
 			set(Boost_USE_MULTITHREADED ON)
 			find_package(Boost 1.34 COMPONENTS filesystem regex system thread)
+			mark_as_advanced(Boost_DIR)  # why doesnt boost do this?
 		endif()
 
 		set(BOOST_INCLUDE_DIR ${Boost_INCLUDE_DIRS})

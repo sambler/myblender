@@ -1,6 +1,6 @@
 
 set(CYCLES_INSTALL_PATH "scripts/addons/cycles")
-SET(WITH_CYCLES_BLENDER ON)
+set(WITH_CYCLES_BLENDER ON)
 
 # External Libraries
 
@@ -8,28 +8,32 @@ include(cmake/external_libs.cmake)
 
 # Build Flags
 
-set(GCC_WARNING_FLAGS "-Wall -Wextra -Wno-unused-parameter -Wno-long-long")
-set(GCC_OPTIM_FLAGS "-ffast-math -msse -msse2 -msse3 -mtune=native")
+if(WITH_RAYOPTIMIZATION AND SUPPORT_SSE_BUILD)
+	set(GCC_OPTIM_FLAGS "-ffast-math -msse -msse2 -msse3")
+endif()
 
 if(APPLE)
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${GCC_WARNING_FLAGS} ${GCC_OPTIM_FLAGS}")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${GCC_OPTIM_FLAGS}")
 	set(RTTI_DISABLE_FLAGS "-fno-rtti -DBOOST_NO_RTTI -DBOOST_NO_TYPEID")
-endif(APPLE)
+endif()
 
 if(WIN32)
 	if(MSVC)
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Ox /Ot /arch:SSE2 -D_CRT_SECURE_NO_WARNINGS /EHsc /fp:fast")
 		set(RTTI_DISABLE_FLAGS "/GR- -DBOOST_NO_RTTI -DBOOST_NO_TYPEID")
 	elseif(CMAKE_COMPILER_IS_GNUCC)
-		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${GCC_WARNING_FLAGS} ${GCC_OPTIM_FLAGS}")
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${GCC_OPTIM_FLAGS}")
 		set(RTTI_DISABLE_FLAGS "-fno-rtti -DBOOST_NO_RTTI -DBOOST_NO_TYPEID")
 	endif()
-endif(WIN32)
+endif()
 
 if(UNIX AND NOT APPLE)
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${GCC_WARNING_FLAGS} ${GCC_OPTIM_FLAGS}")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${GCC_OPTIM_FLAGS}")
 	set(RTTI_DISABLE_FLAGS "-fno-rtti -DBOOST_NO_RTTI -DBOOST_NO_TYPEID")
-endif(UNIX AND NOT APPLE)
+endif()
+
+# not needed yet, is for open shading language
+set(RTTI_DISABLE_FLAGS "")
 
 # Definitions and Includes
 
@@ -48,6 +52,10 @@ endif()
 
 if(WITH_CYCLES_PARTIO)
   add_definitions(-DWITH_PARTIO)
+endif()
+
+if(WITH_CYCLES_CUDA_BINARIES)
+  add_definitions(-DWITH_CUDA_BINARIES)
 endif()
 
 add_definitions(-DWITH_OPENCL)

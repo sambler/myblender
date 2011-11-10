@@ -1,5 +1,5 @@
 
-include_directories(
+set(INC
 	.
 	../device
 	../kernel
@@ -7,14 +7,16 @@ include_directories(
 	../kernel/osl
 	../bvh
 	../util
-	${GLEW_INCLUDE_PATH})
+	${GLEW_INCLUDE_PATH}
+)
 
-set(sources
+set(SRC
 	attribute.cpp
 	background.cpp
 	buffers.cpp
 	camera.cpp
 	film.cpp
+	# film_response.cpp  # XXX, why isnt this in?
 	filter.cpp
 	graph.cpp
 	image.cpp
@@ -30,14 +32,16 @@ set(sources
 	shader.cpp
 	sobol.cpp
 	svm.cpp
-	tile.cpp)
+	tile.cpp
+)
 
-set(headers
+set(SRC_HEADERS
 	attribute.h
 	background.h
 	buffers.h
 	camera.h
 	film.h
+	# film_response.h  # XXX, why isnt this in?
 	filter.h
 	graph.h
 	image.h
@@ -52,9 +56,12 @@ set(headers
 	shader.h
 	sobol.h
 	svm.h
-	tile.h)
+	tile.h
+)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${RTTI_DISABLE_FLAGS}")
 
-add_library(cycles_render ${sources} ${headers})
+include_directories(${INC})
+
+add_library(cycles_render ${SRC} ${SRC_HEADERS})
 

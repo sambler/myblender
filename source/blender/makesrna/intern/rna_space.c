@@ -514,7 +514,7 @@ static void rna_SpaceImageEditor_image_set(PointerRNA *ptr, PointerRNA value)
 	SpaceImage *sima= (SpaceImage*)(ptr->data);
 	bScreen *sc= (bScreen*)ptr->id.data;
 
-	ED_space_image_set(NULL, sima, sc->scene, sc->scene->obedit, (Image*)value.data);
+	ED_space_image_set(sima, sc->scene, sc->scene->obedit, (Image*)value.data);
 }
 
 static EnumPropertyItem *rna_SpaceImageEditor_draw_channels_itemf(bContext *UNUSED(C), PointerRNA *ptr,
@@ -2388,6 +2388,11 @@ static void rna_def_space_time(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "cache_smoke", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "cache_display", TIME_CACHE_SMOKE);
 	RNA_def_property_ui_text(prop, "Smoke", "Show the active object's smoke cache");	
+	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_TIME, NULL);
+		
+	prop= RNA_def_property(srna, "cache_dynamicpaint", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "cache_display", TIME_CACHE_DYNAMICPAINT);
+	RNA_def_property_ui_text(prop, "Dynamic Paint", "Show the active object's Dynamic Paint cache");	
 	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_TIME, NULL);
 }
 

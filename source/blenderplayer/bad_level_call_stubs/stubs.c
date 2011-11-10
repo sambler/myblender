@@ -47,6 +47,7 @@ struct CSG_VertexIteratorDescriptor;
 struct ColorBand;
 struct CurveMapping;
 struct Curve;
+struct DerivedMesh;
 struct EditBone;
 struct EditFace;
 struct EditMesh;
@@ -77,6 +78,7 @@ struct RenderEngine;
 struct RenderEngineType;
 struct RenderLayer;
 struct RenderResult;
+struct Scene;
 struct ScrArea;
 struct SculptSession;
 struct ShadeInput;
@@ -125,6 +127,11 @@ int multitex_thread(struct Tex *tex, float *texvec, float *dxt, float *dyt, int 
 int multitex_ext(struct Tex *tex, float *texvec, float *dxt, float *dyt, int osatex, struct TexResult *texres){return 0;}
 int multitex_ext_safe(struct Tex *tex, float *texvec, struct TexResult *texres){return 0;}
 int multitex_nodes(struct Tex *tex, float *texvec, float *dxt, float *dyt, int osatex, struct TexResult *texres, short thread, short which_output, struct ShadeInput *shi, struct MTex *mtex) {return 0;}
+
+struct Material *RE_init_sample_material(struct Material *orig_mat, struct Scene *scene) {return (struct Material *)NULL;}
+void RE_free_sample_material(struct Material *mat) {}
+void RE_sample_material_color(struct Material *mat, float color[3], float *alpha, const float volume_co[3], const float surface_co[3],
+						   int face_index, short hit_quad, struct DerivedMesh *orcoDm, struct Object *ob) {}
 
 /* nodes */
 struct RenderResult *RE_GetResult(struct Render *re){return (struct RenderResult *) NULL;}
@@ -193,7 +200,7 @@ int ED_space_image_show_uvedit(struct SpaceImage *sima, struct Object *obedit){r
 int ED_space_image_show_render(struct SpaceImage *sima){return 0;}
 int ED_space_image_show_paint(struct SpaceImage *sima){return 0;}
 void ED_space_image_paint_update(struct wmWindowManager *wm, struct ToolSettings *settings){}
-void ED_space_image_set(struct bContext *C, struct SpaceImage *sima, struct Scene *scene, struct Object *obedit, struct Image *ima){}
+void ED_space_image_set(struct SpaceImage *sima, struct Scene *scene, struct Object *obedit, struct Image *ima){}
 struct ImBuf *ED_space_image_buffer(struct SpaceImage *sima){return (struct ImBuf *) NULL;}
 void ED_screen_set_scene(struct bContext *C, struct Scene *scene){}
 void ED_space_clip_set(struct bContext *C, struct SpaceClip *sc, struct MovieClip *clip){}

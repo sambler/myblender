@@ -56,6 +56,7 @@
 #include "DNA_cloth_types.h"
 #include "DNA_controller_types.h"
 #include "DNA_constraint_types.h"
+#include "DNA_dynamicpaint_types.h"
 #include "DNA_effect_types.h"
 #include "DNA_fileglobal_types.h"
 #include "DNA_genfile.h"
@@ -2122,11 +2123,61 @@ static void lib_link_nodetree(FileData *fd, Main *main)
 	}
 }
 
+static void do_versions_socket_default_value(bNodeSocket *sock)
+{
+	bNodeSocketValueFloat *valfloat;
+	bNodeSocketValueVector *valvector;
+	bNodeSocketValueRGBA *valrgba;
+	
+	if (sock->default_value)
+		return;
+	
+	switch (sock->type) {
+	case SOCK_FLOAT:
+		valfloat = sock->default_value = MEM_callocN(sizeof(bNodeSocketValueFloat), "default socket value");
+		valfloat->value = sock->ns.vec[0];
+		valfloat->min = sock->ns.min;
+		valfloat->max = sock->ns.max;
+		valfloat->subtype = PROP_NONE;
+		break;
+	case SOCK_VECTOR:
+		valvector = sock->default_value = MEM_callocN(sizeof(bNodeSocketValueVector), "default socket value");
+		copy_v3_v3(valvector->value, sock->ns.vec);
+		valvector->min = sock->ns.min;
+		valvector->max = sock->ns.max;
+		valvector->subtype = PROP_NONE;
+		break;
+	case SOCK_RGBA:
+		valrgba = sock->default_value = MEM_callocN(sizeof(bNodeSocketValueRGBA), "default socket value");
+		copy_v4_v4(valrgba->value, sock->ns.vec);
+		break;
+	}
+}
+
+static void do_versions_nodetree_default_value(bNodeTree *ntree)
+{
+	bNode *node;
+	bNodeSocket *sock;
+	for (node=ntree->nodes.first; node; node=node->next) {
+		for (sock=node->inputs.first; sock; sock=sock->next)
+			do_versions_socket_default_value(sock);
+		for (sock=node->outputs.first; sock; sock=sock->next)
+			do_versions_socket_default_value(sock);
+	}
+	for (sock=ntree->inputs.first; sock; sock=sock->next)
+		do_versions_socket_default_value(sock);
+	for (sock=ntree->outputs.first; sock; sock=sock->next)
+		do_versions_socket_default_value(sock);
+}
+
 static void lib_nodetree_init_types_cb(void *UNUSED(data), ID *UNUSED(id), bNodeTree *ntree)
 {
 	bNode *node;
 	
 	ntreeInitTypes(ntree);
+
+	/* need to do this here instead of in do_versions, otherwise next function can crash */
+	do_versions_nodetree_default_value(ntree);
 	
 	/* XXX could be replaced by do_versions for new nodes */
 	for (node=ntree->nodes.first; node; node=node->next)
@@ -4190,6 +4241,40 @@ static void direct_link_modifiers(FileData *fd, ListBase *lb)
 				else
 					smd->type = 0;
 
+			}
+		}
+		else if (md->type==eModifierType_DynamicPaint) {
+			DynamicPaintModifierData *pmd = (DynamicPaintModifierData*) md;
+
+			if(pmd->canvas)
+			{
+				pmd->canvas = newdataadr(fd, pmd->canvas);
+				pmd->canvas->pmd = pmd;
+				pmd->canvas->dm = NULL;
+				pmd->canvas->flags &= ~MOD_DPAINT_BAKING; /* just in case */
+
+				if (pmd->canvas->surfaces.first) {
+					DynamicPaintSurface *surface;
+					link_list(fd, &pmd->canvas->surfaces);
+
+					for (surface=pmd->canvas->surfaces.first; surface; surface=surface->next) {
+						surface->canvas = pmd->canvas;
+						surface->data = NULL;
+						direct_link_pointcache_list(fd, &(surface->ptcaches), &(surface->pointcache), 1);
+
+						if(!(surface->effector_weights = newdataadr(fd, surface->effector_weights)))
+							surface->effector_weights = BKE_add_effector_weights(NULL);
+					}
+				}
+			}
+			if(pmd->brush)
+			{
+				pmd->brush = newdataadr(fd, pmd->brush);
+				pmd->brush->pmd = pmd;
+				pmd->brush->psys = newdataadr(fd, pmd->brush->psys);
+				pmd->brush->paint_ramp = newdataadr(fd, pmd->brush->paint_ramp);
+				pmd->brush->vel_ramp = newdataadr(fd, pmd->brush->vel_ramp);
+				pmd->brush->dm = NULL;
 			}
 		}
 		else if (md->type==eModifierType_Collision) {
@@ -7144,53 +7229,6 @@ static void do_version_bone_roll_256(Bone *bone)
 	
 	for(child = bone->childbase.first; child; child = child->next)
 		do_version_bone_roll_256(child);
-}
-
-static void do_versions_socket_default_value(bNodeSocket *sock)
-{
-	bNodeSocketValueFloat *valfloat;
-	bNodeSocketValueVector *valvector;
-	bNodeSocketValueRGBA *valrgba;
-	
-	if (sock->default_value)
-		return;
-	
-	switch (sock->type) {
-	case SOCK_FLOAT:
-		valfloat = sock->default_value = MEM_callocN(sizeof(bNodeSocketValueFloat), "default socket value");
-		valfloat->value = sock->ns.vec[0];
-		valfloat->min = sock->ns.min;
-		valfloat->max = sock->ns.max;
-		valfloat->subtype = PROP_NONE;
-		break;
-	case SOCK_VECTOR:
-		valvector = sock->default_value = MEM_callocN(sizeof(bNodeSocketValueVector), "default socket value");
-		copy_v3_v3(valvector->value, sock->ns.vec);
-		valvector->min = sock->ns.min;
-		valvector->max = sock->ns.max;
-		valvector->subtype = PROP_NONE;
-		break;
-	case SOCK_RGBA:
-		valrgba = sock->default_value = MEM_callocN(sizeof(bNodeSocketValueRGBA), "default socket value");
-		copy_v4_v4(valrgba->value, sock->ns.vec);
-		break;
-	}
-}
-
-static void do_versions_nodetree_default_value(bNodeTree *ntree)
-{
-	bNode *node;
-	bNodeSocket *sock;
-	for (node=ntree->nodes.first; node; node=node->next) {
-		for (sock=node->inputs.first; sock; sock=sock->next)
-			do_versions_socket_default_value(sock);
-		for (sock=node->outputs.first; sock; sock=sock->next)
-			do_versions_socket_default_value(sock);
-	}
-	for (sock=ntree->inputs.first; sock; sock=sock->next)
-		do_versions_socket_default_value(sock);
-	for (sock=ntree->outputs.first; sock; sock=sock->next)
-		do_versions_socket_default_value(sock);
 }
 
 static void do_versions_nodetree_dynamic_sockets(bNodeTree *ntree)
@@ -11513,7 +11551,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 						/* enable all cache display */
 						stime->cache_display |= TIME_CACHE_DISPLAY;
 						stime->cache_display |= (TIME_CACHE_SOFTBODY|TIME_CACHE_PARTICLES);
-						stime->cache_display |= (TIME_CACHE_CLOTH|TIME_CACHE_SMOKE);
+						stime->cache_display |= (TIME_CACHE_CLOTH|TIME_CACHE_SMOKE|TIME_CACHE_DYNAMICPAINT);
 					}
 				}
 			}

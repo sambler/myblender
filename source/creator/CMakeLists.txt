@@ -789,7 +789,6 @@ endif()
 		bf_editor_space_outliner
 		bf_editor_space_script
 		bf_editor_space_sequencer
-		bf_editor_space_sound
 		bf_editor_space_time
 		bf_editor_space_userpref
 		bf_editor_space_view3d
@@ -852,7 +851,6 @@ endif()
 		extern_minilzo
 		extern_lzma
 		extern_colamd
-		extern_libmv
 		ge_logic_ketsji
 		extern_recastnavigation
 		ge_phys_common

@@ -73,6 +73,7 @@ EnumPropertyItem texture_type_items[] = {
 	{TEX_VORONOI, "VORONOI", ICON_TEXTURE, "Voronoi", "Procedural - Create cell-like patterns based on Worley noise"},
 	{TEX_VOXELDATA, "VOXEL_DATA", ICON_TEXTURE, "Voxel Data", "Create a 3d texture based on volumetric data"},
 	{TEX_WOOD, "WOOD", ICON_TEXTURE, "Wood", "Procedural - Wave generated bands or rings, with optional noise"},
+	{TEX_OCEAN, "OCEAN", ICON_TEXTURE, "Ocean", ""},
 	{TEX_PLANET, "PLANET", ICON_TEXTURE, "Planet", ""},
 	{0, NULL, 0, NULL, NULL}};
 
@@ -146,6 +147,8 @@ static StructRNA *rna_Texture_refine(struct PointerRNA *ptr)
 			return &RNA_VoxelDataTexture;
 		case TEX_WOOD:
 			return &RNA_WoodTexture;
+		case TEX_OCEAN:
+			return &RNA_OceanTexture;
 		case TEX_PLANET:
 			return &RNA_PlanetTexture;
 		default:
@@ -438,6 +441,11 @@ static char *rna_VoxelData_path(PointerRNA *UNUSED(ptr))
 	return BLI_sprintfN("voxel_data");
 }
 
+static char *rna_OceanTex_path(PointerRNA *ptr)
+{
+	return BLI_sprintfN("ocean");
+}
+
 #else
 
 static void rna_def_texmapping(BlenderRNA *brna)
@@ -467,7 +475,7 @@ static void rna_def_texmapping(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Location", "");
 	RNA_def_property_update(prop, 0, "rna_Texture_mapping_update");
 	
-	prop= RNA_def_property(srna, "rotation", PROP_FLOAT, PROP_XYZ); /* Not PROP_EUL, this is already in degrees, not radians */
+	prop= RNA_def_property(srna, "rotation", PROP_FLOAT, PROP_EULER); /* Not PROP_XYZ, this is now in radians, no more degrees */
 	RNA_def_property_float_sdna(prop, NULL, "rot");
 	RNA_def_property_ui_text(prop, "Rotation", "");
 	RNA_def_property_update(prop, 0, "rna_Texture_mapping_update");
@@ -1917,6 +1925,49 @@ static void rna_def_texture_voxeldata(BlenderRNA *brna)
 	RNA_def_property_update(prop, 0, "rna_Texture_voxeldata_update");
 }
 
+static void rna_def_texture_ocean(BlenderRNA *brna)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+	
+	static EnumPropertyItem ocean_output_items[] = {
+		{TEX_OCN_DISPLACEMENT, "DISPLACEMENT", 0, "Displacement", "Outputs XYZ displacement in RGB channels"},
+		//{TEX_OCN_NORMALS, "NORMALS", 0, "Normals", "Outputs wave normals"},	// these are in nor channel now
+		{TEX_OCN_FOAM, "FOAM", 0, "Foam", "Outputs Foam (wave overlap) amount in single channel"},
+		{TEX_OCN_JPLUS, "JPLUS", 0, "Eigenvalues", "Positive Eigenvalues"},
+		{TEX_OCN_EMINUS, "EMINUS", 0, "Eigenvectors (-)", "Negative Eigenvectors"},
+		{TEX_OCN_EPLUS, "EPLUS", 0, "Eigenvectors (+)", "Positive Eigenvectors"},
+		{0, NULL, 0, NULL, NULL}};
+	
+	srna= RNA_def_struct(brna, "OceanTexData", NULL);
+	RNA_def_struct_sdna(srna, "OceanTex");
+	RNA_def_struct_ui_text(srna, "Ocean", "Ocean Texture settings");
+	RNA_def_struct_path_func(srna, "rna_OceanTex_path");
+	
+	prop= RNA_def_property(srna, "output", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "output");
+	RNA_def_property_enum_items(prop, ocean_output_items);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_ui_text(prop, "Output", "The data that is output by the texture");
+	RNA_def_property_update(prop, 0, "rna_Texture_update");
+
+	prop= RNA_def_property(srna, "ocean_object", PROP_POINTER, PROP_NONE);
+	RNA_def_property_pointer_sdna(prop, NULL, "object");
+	RNA_def_property_ui_text(prop, "Modifier Object", "Object containing the ocean modifier");
+	RNA_def_property_flag(prop, PROP_EDITABLE);
+	RNA_def_property_update(prop, 0, "rna_Texture_update");
+	
+	srna= RNA_def_struct(brna, "OceanTexture", "Texture");
+	RNA_def_struct_sdna(srna, "Tex");
+	RNA_def_struct_ui_text(srna, "Ocean", "Settings for the Ocean texture");
+	
+	prop= RNA_def_property(srna, "ocean", PROP_POINTER, PROP_NONE);
+	RNA_def_property_pointer_sdna(prop, NULL, "ot");
+	RNA_def_property_struct_type(prop, "OceanTexData");
+	RNA_def_property_ui_text(prop, "Ocean", "The ocean data associated with this texture");
+	RNA_def_property_update(prop, 0, "rna_Texture_update");
+}
+
 static void rna_def_texture(BlenderRNA *brna)
 {
 	StructRNA *srna;
@@ -2019,6 +2070,7 @@ static void rna_def_texture(BlenderRNA *brna)
 	rna_def_texture_distorted_noise(brna);
 	rna_def_texture_pointdensity(brna);
 	rna_def_texture_voxeldata(brna);
+	rna_def_texture_ocean(brna);
 	rna_def_texture_planet(brna);
 	/* XXX add more types here .. */
 

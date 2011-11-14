@@ -1289,8 +1289,27 @@ static int retrieve_libmv_reconstruct(MovieTracking *tracking, struct libmv_Reco
 		}
 
 		if(track->markersnr) {
-			if(track->markers[0].framenr<sfra) sfra= track->markers[0].framenr;
-			if(track->markers[track->markersnr-1].framenr>efra) efra= track->markers[track->markersnr-1].framenr;
+			int first= 0, last= track->markersnr;
+			MovieTrackingMarker *first_marker= &track->markers[0];
+			MovieTrackingMarker *last_marker= &track->markers[track->markersnr-1];
+
+			/* find first not-disabled marker */
+			while(first<track->markersnr-1 && first_marker->flag&MARKER_DISABLED) {
+				first++;
+				first_marker++;
+			}
+
+			/* find last not-disabled marker */
+			while(last>=0 && last_marker->flag&MARKER_DISABLED) {
+				last--;
+				last_marker--;
+			}
+
+			if(first<track->markersnr-1)
+				sfra= MIN2(sfra, first_marker->framenr);
+
+			if(last>=0)
+				efra= MAX2(efra, last_marker->framenr);
 		}
 
 		track= track->next;
@@ -1794,8 +1813,8 @@ static void calculate_stabdata(MovieTracking *tracking, int framenr, float width
 		*angle*= stab->rotinf;
 
 		/* convert to rotation around image center */
-		loc[0]-= (x0 + (x-x0)*cos(*angle)-(y-y0)*sin(*angle) - x)*(*scale);
-		loc[1]-= (y0 + (x-x0)*sin(*angle)+(y-y0)*cos(*angle) - y)*(*scale);
+		loc[0]-= (x0 + (x-x0)*cosf(*angle)-(y-y0)*sinf(*angle) - x)*(*scale);
+		loc[1]-= (y0 + (x-x0)*sinf(*angle)+(y-y0)*cosf(*angle) - y)*(*scale);
 	}
 }
 

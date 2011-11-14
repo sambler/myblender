@@ -36,7 +36,11 @@ namespace KDL {
     class Chain {
     private:
         // Eigen allocator is needed for alignment of Eigen data types
+#if __MAC_OS_VERSION_MIN_REQUIRED < 1060
+        std::vector<Segment> segments;
+#else
         std::vector<Segment, Eigen::aligned_allocator<Segment> > segments;
+#endif
         unsigned int nrOfJoints;
         unsigned int nrOfSegments;
     public:

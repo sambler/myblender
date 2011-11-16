@@ -182,6 +182,14 @@ bool system_cpu_support_optimized()
 	return caps.sse && caps.sse2 && caps.sse3;
 }
 
+#elif defined (__PPC__) || defined (__ppc__)
+
+bool system_cpu_support_optimized()
+{
+	// check for G4 or higher???
+	return true;
+}
+
 #else
 
 bool system_cpu_support_optimized()

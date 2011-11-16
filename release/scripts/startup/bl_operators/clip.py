@@ -24,27 +24,27 @@ from bpy.types import Operator
 from bpy_extras.io_utils import unpack_list
 
 
+def CLIP_track_view_selected(sc, track):
+    if track.select_anchor:
+        return True
+
+    if sc.show_marker_pattern and track.select_pattern:
+        return True
+
+    if sc.show_marker_search and track.select_search:
+        return True
+
+    return False
+
 class CLIP_OT_track_to_empty(Operator):
     """Create an Empty object which will be copying movement of active track"""
 
     bl_idname = "clip.track_to_empty"
-    bl_label = "2D Track to Empty"
+    bl_label = "Link Empty to Track"
     bl_options = {'UNDO', 'REGISTER'}
 
-    @classmethod
-    def poll(cls, context):
-        if context.space_data.type != 'CLIP_EDITOR':
-            return False
-
+    def _link_track(self, context, track):
         sc = context.space_data
-        clip = sc.clip
-
-        return clip and clip.tracking.tracks.active
-
-    def execute(self, context):
-        sc = context.space_data
-        clip = sc.clip
-        track = clip.tracking.tracks.active
         constraint = None
         ob = None
 
@@ -63,16 +63,24 @@ class CLIP_OT_track_to_empty(Operator):
 
         constraint.clip = sc.clip
         constraint.track = track.name
-        constraint.reference = 'TRACK'
+        constraint.use_3d_position = False
+
+    def execute(self, context):
+        sc = context.space_data
+        clip = sc.clip
+
+        for track in clip.tracking.tracks:
+            if CLIP_track_view_selected(sc, track):
+                self._link_track(context, track)
 
         return {'FINISHED'}
 
 
-class CLIP_OT_bundles_to_mesh(Operator):
-    """Create vertex cloud using coordinates of bundles"""
+class CLIP_OT_tracks_to_mesh(Operator):
+    """Create vertex cloud using coordinates of tracks"""
 
-    bl_idname = "clip.bundles_to_mesh"
-    bl_label = "Bundles to Mesh"
+    bl_idname = "clip.tracks_to_mesh"
+    bl_label = "Tracks to Mesh"
     bl_options = {'UNDO', 'REGISTER'}
 
     @classmethod
@@ -91,7 +99,7 @@ class CLIP_OT_bundles_to_mesh(Operator):
 
         new_verts = []
 
-        mesh = bpy.data.meshes.new(name="Bundles")
+        mesh = bpy.data.meshes.new(name="Tracks")
         for track in clip.tracking.tracks:
             if track.has_bundle:
                 new_verts.append(track.bundle)
@@ -100,7 +108,7 @@ class CLIP_OT_bundles_to_mesh(Operator):
             mesh.vertices.add(len(new_verts))
             mesh.vertices.foreach_set("co", unpack_list(new_verts))
 
-        ob = bpy.data.objects.new(name="Bundles", object_data=mesh)
+        ob = bpy.data.objects.new(name="Tracks", object_data=mesh)
 
         bpy.context.scene.objects.link(ob)
 
@@ -179,7 +187,7 @@ class CLIP_OT_delete_proxy(Operator):
 
 
 class CLIP_OT_set_viewport_background(Operator):
-    """Set current movie clip as a camera background in 3D viewport"""
+    """Set current movie clip as a camera background in 3D viewport (works only when a 3D viewport is visible)"""
 
     bl_idname = "clip.set_viewport_background"
     bl_label = "Set as Background"
@@ -252,7 +260,7 @@ class CLIP_OT_constraint_to_fcurve(Operator):
         if not con:
             return
 
-        if con.type == 'FOLLOW_TRACK' and con.reference == 'BUNDLE':
+        if con.type == 'FOLLOW_TRACK' and con.use_3d_position:
             mat = ob.matrix_world.copy()
             ob.constraints.remove(con)
             ob.matrix_world = mat

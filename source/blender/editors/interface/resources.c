@@ -1678,7 +1678,7 @@ void init_userdef_do_versions(void)
 		}
 	}
 	
-	if (bmain->versionfile < 260) {
+	if (bmain->versionfile < 261) {
 		bTheme *btheme;
 		for(btheme= U.themes.first; btheme; btheme= btheme->next) {
 			SETCOLF(btheme->toops.match, 0.2, 0.5, 0.2, 0.3);

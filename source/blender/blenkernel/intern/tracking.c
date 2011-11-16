@@ -1449,6 +1449,7 @@ int BKE_tracking_can_solve(MovieTracking *tracking, char *error_msg, int error_s
 	return 1;
 #else
 	BLI_strncpy(error_msg, "Blender is compiled without motion tracking library", error_size);
+	(void)tracking;
 
 	return 0;
 #endif
@@ -1873,7 +1874,7 @@ static void calculate_stabdata(MovieTracking *tracking, int framenr, float width
 
 	mul_v2_fl(loc, stab->locinf);
 
-	if(stab->rot_track && stab->rotinf) {
+	if((stab->flag&TRACKING_STABILIZE_ROTATION) && stab->rot_track && stab->rotinf) {
 		MovieTrackingMarker *marker;
 		float a[2], b[2];
 		float x0= (float)width/2.0f, y0= (float)height/2.0f;
@@ -1915,7 +1916,8 @@ static float stabilization_auto_scale_factor(MovieTracking *tracking, int width,
 
 		track= tracking->tracks.first;
 		while(track) {
-			if(track->flag&TRACK_USE_2D_STAB || track==stab->rot_track) {
+			if(track->flag&TRACK_USE_2D_STAB ||
+			   ((stab->flag&TRACKING_STABILIZE_ROTATION) && track==stab->rot_track)) {
 				if(track->markersnr) {
 					sfra= MIN2(sfra, track->markers[0].framenr);
 					efra= MAX2(efra, track->markers[track->markersnr-1].framenr);

@@ -53,9 +53,11 @@
 #include "WM_types.h"
 #include "WM_api.h"
 
+#include "physics_intern.h" /* own include */
+
 static int surface_slot_add_exec(bContext *C, wmOperator *UNUSED(op))
 {
-	DynamicPaintModifierData *pmd = 0;
+	DynamicPaintModifierData *pmd = NULL;
 	Object *cObject = CTX_data_pointer_get_type(C, "object", &RNA_Object).data;
 	DynamicPaintCanvasSettings *canvas;
 	DynamicPaintSurface *surface;
@@ -97,7 +99,7 @@ void DPAINT_OT_surface_slot_add(wmOperatorType *ot)
 
 static int surface_slot_remove_exec(bContext *C, wmOperator *UNUSED(op))
 {
-	DynamicPaintModifierData *pmd = 0;
+	DynamicPaintModifierData *pmd = NULL;
 	Object *cObject = CTX_data_pointer_get_type(C, "object", &RNA_Object).data;
 	DynamicPaintCanvasSettings *canvas;
 	DynamicPaintSurface *surface;
@@ -181,7 +183,7 @@ void DPAINT_OT_type_toggle(wmOperatorType *ot)
 	/* identifiers */
 	ot->name= "Toggle Type Active";
 	ot->idname= "DPAINT_OT_type_toggle";
-	ot->description = "Toggles whether given type is active or not";
+	ot->description = "Toggle whether given type is active or not";
 	
 	/* api callbacks */
 	ot->exec= type_toggle_exec;
@@ -249,7 +251,7 @@ void DPAINT_OT_output_toggle(wmOperatorType *ot)
 	/* identifiers */
 	ot->name= "Toggle Output Layer";
 	ot->idname= "DPAINT_OT_output_toggle";
-	ot->description = "Adds or removes Dynamic Paint output data layer";
+	ot->description = "Add or remove Dynamic Paint output data layer";
 	
 	/* api callbacks */
 	ot->exec= output_toggle_exec;
@@ -336,9 +338,9 @@ static int dynamicPaint_bakeImageSequence(bContext *C, DynamicPaintSurface *surf
 
 
 /*
-*	Bake Dynamic Paint image sequence surface
-*/
-int dynamicPaint_initBake(struct bContext *C, struct wmOperator *op)
+ * Bake Dynamic Paint image sequence surface
+ */
+static int dynamicPaint_initBake(struct bContext *C, struct wmOperator *op)
 {
 	DynamicPaintModifierData *pmd = NULL;
 	DynamicPaintCanvasSettings *canvas;

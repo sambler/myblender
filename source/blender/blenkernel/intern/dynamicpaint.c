@@ -317,7 +317,7 @@ static int surface_duplicateOutputExists(void *arg, const char *name)
 	return 0;
 }
 
-void surface_setUniqueOutputName(DynamicPaintSurface *surface, char *basename, int output)
+static void surface_setUniqueOutputName(DynamicPaintSurface *surface, char *basename, int output)
 {
 	char name[64];
 	BLI_strncpy(name, basename, sizeof(name)); /* in case basename is surface->name use a copy */
@@ -4139,13 +4139,13 @@ static void dynamicPaint_doEffectStep(DynamicPaintSurface *surface, float *force
 				totalAlpha += ePoint->e_alpha;
 
 				/* do color mixing */
-				if (color_mix) mixColors(pPoint->e_color, pPoint->e_alpha, ePoint->e_color, color_mix);
+				if (color_mix > MIN_WETNESS) mixColors(pPoint->e_color, pPoint->e_alpha, ePoint->e_color, color_mix);
 
 				/* Check if neighbouring point has higher wetness,
 				*  if so, add it's wetness to this point as well*/
 				if (ePoint->wetness <= pPoint->wetness) continue;
 				w_factor = ePoint->wetness/numOfNeighs * (ePoint->wetness - pPoint->wetness) * speed_scale;
-				if (w_factor <= 0.0f) continue;
+				if (w_factor <= MIN_WETNESS) continue;
 
 				if (ePoint->e_alpha > pPoint->e_alpha) {
 					alphaAdd = ePoint->e_alpha/numOfNeighs * (ePoint->wetness*ePoint->e_alpha - pPoint->wetness*pPoint->e_alpha) * speed_scale;

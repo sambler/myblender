@@ -1830,32 +1830,32 @@ class VIEW3D_MT_edit_text_chars(Menu):
     def draw(self, context):
         layout = self.layout
 
-        layout.operator("font.text_insert", text="Copyright|Alt C").text = b'\xC2\xA9'.decode()
-        layout.operator("font.text_insert", text="Registered Trademark|Alt R").text = b'\xC2\xAE'.decode()
+        layout.operator("font.text_insert", text="Copyright|Alt C").text = "\u00A9"
+        layout.operator("font.text_insert", text="Registered Trademark|Alt R").text = "\u00AE"
 
         layout.separator()
 
-        layout.operator("font.text_insert", text="Degree Sign|Alt G").text = b'\xC2\xB0'.decode()
-        layout.operator("font.text_insert", text="Multiplication Sign|Alt x").text = b'\xC3\x97'.decode()
-        layout.operator("font.text_insert", text="Circle|Alt .").text = b'\xC2\x8A'.decode()
-        layout.operator("font.text_insert", text="Superscript 1|Alt 1").text = b'\xC2\xB9'.decode()
-        layout.operator("font.text_insert", text="Superscript 2|Alt 2").text = b'\xC2\xB2'.decode()
-        layout.operator("font.text_insert", text="Superscript 3|Alt 3").text = b'\xC2\xB3'.decode()
-        layout.operator("font.text_insert", text="Double >>|Alt >").text = b'\xC2\xBB'.decode()
-        layout.operator("font.text_insert", text="Double <<|Alt <").text = b'\xC2\xAB'.decode()
-        layout.operator("font.text_insert", text="Promillage|Alt %").text = b'\xE2\x80\xB0'.decode()
+        layout.operator("font.text_insert", text="Degree Sign|Alt G").text = "\u00B0"
+        layout.operator("font.text_insert", text="Multiplication Sign|Alt x").text = "\u00D7"
+        layout.operator("font.text_insert", text="Circle|Alt .").text = "\u008A"
+        layout.operator("font.text_insert", text="Superscript 1|Alt 1").text = "\u00B9"
+        layout.operator("font.text_insert", text="Superscript 2|Alt 2").text = "\u00B2"
+        layout.operator("font.text_insert", text="Superscript 3|Alt 3").text = "\u00B3"
+        layout.operator("font.text_insert", text="Double >>|Alt >").text = "\u00BB"
+        layout.operator("font.text_insert", text="Double <<|Alt <").text = "\u00AB"
+        layout.operator("font.text_insert", text="Promillage|Alt %").text = "\u2030"
 
         layout.separator()
 
-        layout.operator("font.text_insert", text="Dutch Florin|Alt F").text = b'\xC2\xA4'.decode()
-        layout.operator("font.text_insert", text="British Pound|Alt L").text = b'\xC2\xA3'.decode()
-        layout.operator("font.text_insert", text="Japanese Yen|Alt Y").text = b'\xC2\xA5'.decode()
+        layout.operator("font.text_insert", text="Dutch Florin|Alt F").text = "\u00A4"
+        layout.operator("font.text_insert", text="British Pound|Alt L").text = "\u00A3"
+        layout.operator("font.text_insert", text="Japanese Yen|Alt Y").text = "\u00A5"
 
         layout.separator()
 
-        layout.operator("font.text_insert", text="German S|Alt S").text = b'\xC3\x9F'.decode()
-        layout.operator("font.text_insert", text="Spanish Question Mark|Alt ?").text = b'\xC2\xBF'.decode()
-        layout.operator("font.text_insert", text="Spanish Exclamation Mark|Alt !").text = b'\xC2\xA1'.decode()
+        layout.operator("font.text_insert", text="German S|Alt S").text = "\u00DF"
+        layout.operator("font.text_insert", text="Spanish Question Mark|Alt ?").text = "\u00BF"
+        layout.operator("font.text_insert", text="Spanish Exclamation Mark|Alt !").text = "\u00A1"
 
 
 class VIEW3D_MT_edit_meta(Menu):
@@ -2276,12 +2276,6 @@ class VIEW3D_PT_background_image(Panel):
     bl_label = "Background Images"
     bl_options = {'DEFAULT_CLOSED'}
 
-    @classmethod
-    def poll(cls, context):
-        view = context.space_data
-        #~ bg = context.space_data.background_image
-        return (view)
-
     def draw_header(self, context):
         layout = self.layout
         view = context.space_data
@@ -2315,16 +2309,15 @@ class VIEW3D_PT_background_image(Panel):
                 row = box.row()
                 row.prop(bg, "source", expand=True)
 
-                hasbg = False
+                has_bg = False
                 if bg.source == 'IMAGE':
                     row = box.row()
                     row.template_ID(bg, "image", open="image.open")
                     if (bg.image):
                         box.template_image(bg, "image", bg.image_user, compact=True)
-                        hasbg = True
+                        has_bg = True
 
                 elif bg.source == 'MOVIE':
-                    has_clip = False
                     box.prop(bg, 'use_camera_clip')
 
                     column = box.column()
@@ -2335,14 +2328,14 @@ class VIEW3D_PT_background_image(Panel):
                         column.template_movieclip(bg, "clip", compact=True)
 
                     if bg.use_camera_clip or bg.clip:
-                        hasbg = True
+                        has_bg = True
 
                     column = box.column()
-                    column.active = hasbg
+                    column.active = has_bg
                     column.prop(bg.clip_user, "proxy_render_size", text="")
                     column.prop(bg.clip_user, "use_render_undistorted")
 
-                if hasbg:
+                if has_bg:
                     box.prop(bg, "opacity", slider=True)
                     if bg.view_axis != 'CAMERA':
                         box.prop(bg, "size")

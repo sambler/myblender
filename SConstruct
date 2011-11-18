@@ -70,6 +70,7 @@ BlenderEnvironment = Blender.BlenderEnvironment
 B = Blender
 
 VERSION = btools.VERSION # This is used in creating the local config directories
+VERSION_RELEASE_CYCLE = btools.VERSION_RELEASE_CYCLE
 
 ### globals ###
 platform = sys.platform
@@ -333,6 +334,7 @@ if env['WITH_BF_FLUID'] == 1:
 
 # build with ocean sim?
 if env['WITH_BF_OCEANSIM'] == 1:
+    env['WITH_BF_FFTW3']  = 1  # ocean needs fftw3 so enable it 
     env['CPPFLAGS'].append('-DWITH_MOD_OCEANSIM')
 
 
@@ -523,6 +525,10 @@ if env['OURPLATFORM']!='darwin':
                     dn.remove('_svn')
                 if '__pycache__' in dn:  # py3.2 cache dir
                     dn.remove('__pycache__')
+
+                # only for testing builds
+                if VERSION_RELEASE_CYCLE == "release" and "addons_contrib" in dn:
+                    dn.remove('addons_contrib')
 
                 dir = os.path.join(env['BF_INSTALLDIR'], VERSION)
                 dir += os.sep + os.path.basename(scriptpath) + dp[len(scriptpath):]

@@ -4,3 +4,6 @@
 [submodule "release/datafiles/locale"]
 	path = release/datafiles/locale
 	url = ../externals/locale
+[submodule "release/scripts/addons_contrib"]
+	path = release/scripts/addons_contrib
+	url = ../externals/contrib

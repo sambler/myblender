@@ -34,10 +34,12 @@
 #include "DNA_scene_types.h"
 
 #include "BKE_cdderivedmesh.h"
+#include "BKE_global.h"
 #include "BKE_modifier.h"
 #include "BKE_ocean.h"
 #include "BKE_utildefines.h"
 
+#include "BLI_blenlib.h"
 #include "BLI_math.h"
 #include "BLI_math_inline.h"
 #include "BLI_utildefines.h"
@@ -95,6 +97,7 @@ static void initData(ModifierData *md)
 {
 #ifdef WITH_OCEANSIM
 	OceanModifierData *omd = (OceanModifierData*) md;
+	int cachepathmax = sizeof(omd->cachepath);
 
 	omd->resolution = 7;
 	omd->spatial_size = 50;
@@ -122,7 +125,22 @@ static void initData(ModifierData *md)
 	omd->repeat_x = 1;
 	omd->repeat_y = 1;
 
-	BLI_strncpy(omd->cachepath, "//ocean_cache", sizeof(omd->cachepath));
+	if (G.relbase_valid) {		/* is the .blend saved? */
+		/* subfolder next to saved file */
+		BLI_strncpy(omd->cachepath, "//ocean_cache", cachepathmax);
+		BLI_add_slash(omd->cachepath);
+	}
+	else {
+		/* subfolder in temp. directory */
+		BLI_strncpy(omd->cachepath, BLI_temporary_dir(), cachepathmax);
+		cachepathmax -= strlen(omd->cachepath);
+		if (cachepathmax > 1) {
+			BLI_strncpy(omd->cachepath+strlen(omd->cachepath), "ocean_cache", cachepathmax);
+			cachepathmax -= strlen("ocean_cache");
+			if (cachepathmax > 1)
+				BLI_add_slash(omd->cachepath);
+		}
+	}
 
 	omd->cached = 0;
 	omd->bakestart = 1;
@@ -178,7 +196,6 @@ static void copyData(ModifierData *md, ModifierData *target)
 
 	tomd->seed = omd->seed;
 	tomd->flag = omd->flag;
-	tomd->output = omd->output;
 
 	tomd->refresh = 0;
 
@@ -542,19 +559,19 @@ ModifierTypeInfo modifierType_Ocean = {
 							| eModifierTypeFlag_EnableInEditmode,
 
 	/* copyData */          copyData,
-	/* deformMatrices */    0,
-	/* deformVerts */       0,
-	/* deformVertsEM */     0,
-	/* deformMatricesEM */  0,
+	/* deformMatrices */    NULL,
+	/* deformVerts */       NULL,
+	/* deformVertsEM */     NULL,
+	/* deformMatricesEM */  NULL,
 	/* applyModifier */     applyModifier,
 	/* applyModifierEM */   applyModifierEM,
 	/* initData */          initData,
 	/* requiredDataMask */  requiredDataMask,
 	/* freeData */          freeData,
-	/* isDisabled */        0,
-	/* updateDepgraph */    0,
-	/* dependsOnTime */     0,
-	/* dependsOnNormals */	0,
-	/* foreachObjectLink */ 0,
-	/* foreachIDLink */     0,
+	/* isDisabled */        NULL,
+	/* updateDepgraph */    NULL,
+	/* dependsOnTime */     NULL,
+	/* dependsOnNormals */	NULL,
+	/* foreachObjectLink */ NULL,
+	/* foreachIDLink */     NULL,
 };

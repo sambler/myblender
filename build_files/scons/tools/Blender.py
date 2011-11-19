@@ -34,6 +34,7 @@ import bcolors
 bc = bcolors.bcolors()
 import btools
 VERSION = btools.VERSION
+VERSION_RELEASE_CYCLE = btools.VERSION_RELEASE_CYCLE
 
 Split = SCons.Util.Split
 Action = SCons.Action.Action
@@ -363,7 +364,7 @@ def buildinfo(lenv, build_type):
     build_time = time.strftime ("%H:%M:%S")
     build_rev = os.popen('svnversion').read()[:-1] # remove \n
     if build_rev == '': 
-        build_rev = '41952'
+        build_rev = '41984'
     if lenv['BF_DEBUG']:
         build_type = "Debug"
         build_cflags = ' '.join(lenv['CFLAGS'] + lenv['CCFLAGS'] + lenv['BF_DEBUG_CCFLAGS'] + lenv['CPPFLAGS'])
@@ -583,6 +584,10 @@ def AppIt(target=None, source=None, env=None):
         commands.getoutput(cmd)
         cmd = 'cp -R %s/release/scripts %s/%s.app/Contents/MacOS/%s/'%(bldroot,installdir,binary,VERSION)
         commands.getoutput(cmd)
+
+        if VERSION_RELEASE_CYCLE == "release":
+            cmd = 'rm -rf %s/%s.app/Contents/MacOS/%s/scripts/addons_contrib'%(installdir,binary,VERSION)
+            commands.getoutput(cmd)
 
         if env['WITH_BF_CYCLES']:
             croot = '%s/intern/cycles' % (bldroot)

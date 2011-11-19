@@ -1228,19 +1228,39 @@ static void drawviewborder(Scene *scene, ARegion *ar, View3D *v3d)
 			uiDrawBox(GL_LINE_LOOP, x1, y1, x2, y2, 12.0);
 		}
 		if (ca && (ca->flag & CAM_SHOWSENSOR)) {
-			/* assume fixed sensor width for now */
+			/* determine sensor fit, and get sensor x/y, for auto fit we
+			   assume and square sensor and only use sensor_x */
+			float sizex= scene->r.xsch*scene->r.xasp;
+			float sizey= scene->r.ysch*scene->r.yasp;
+			int sensor_fit = camera_sensor_fit(ca->sensor_fit, sizex, sizey);
+			float sensor_x= ca->sensor_x;
+			float sensor_y= (ca->sensor_fit == CAMERA_SENSOR_FIT_AUTO)? ca->sensor_x: ca->sensor_y;
 
-			/* float sensor_aspect = ca->sensor_x / ca->sensor_y; */ /* UNUSED */
-			float sensor_scale = (x2i-x1i) / ca->sensor_x;
-			float sensor_height = sensor_scale * ca->sensor_y;
+			/* determine sensor plane */
+			rctf rect;
 
-			float ymid = y1i + (y2i-y1i)/2.f;
-			float sy1= ymid - sensor_height/2.f;
-			float sy2= ymid + sensor_height/2.f;
+			if(sensor_fit == CAMERA_SENSOR_FIT_HOR) {
+				float sensor_scale = (x2i-x1i) / sensor_x;
+				float sensor_height = sensor_scale * sensor_y;
 
+				rect.xmin= x1i;
+				rect.xmax= x2i;
+				rect.ymin= (y1i + y2i)*0.5f - sensor_height*0.5f;
+				rect.ymax= rect.ymin + sensor_height;
+			}
+			else {
+				float sensor_scale = (y2i-y1i) / sensor_y;
+				float sensor_width = sensor_scale * sensor_x;
+
+				rect.xmin= (x1i + x2i)*0.5f - sensor_width*0.5f;
+				rect.xmax= rect.xmin + sensor_width;
+				rect.ymin= y1i;
+				rect.ymax= y2i;
+			}
+
+			/* draw */
 			UI_ThemeColorShade(TH_WIRE, 100);
-
-			uiDrawBox(GL_LINE_LOOP, x1i, sy1, x2i, sy2, 2.0f);
+			uiDrawBox(GL_LINE_LOOP, rect.xmin, rect.ymin, rect.xmax, rect.ymax, 2.0f);
 		}
 	}
 
@@ -2485,15 +2505,13 @@ ImBuf *ED_view3d_draw_offscreen_imbuf(Scene *scene, View3D *v3d, ARegion *ar, in
 
 	/* render 3d view */
 	if(rv3d->persp==RV3D_CAMOB && v3d->camera) {
-		float winmat[4][4];
-		float _clipsta, _clipend, _lens, _yco, _dx, _dy, _sensor_x= DEFAULT_SENSOR_WIDTH, _sensor_y= DEFAULT_SENSOR_HEIGHT;
-		short _sensor_fit= CAMERA_SENSOR_FIT_AUTO;
-		rctf _viewplane;
+		CameraParams params;
 
-		object_camera_matrix(&scene->r, v3d->camera, sizex, sizey, 0, winmat, &_viewplane, &_clipsta, &_clipend, &_lens,
-			&_sensor_x, &_sensor_y, &_sensor_fit, &_yco, &_dx, &_dy);
+		camera_params_init(&params);
+		camera_params_from_object(&params, v3d->camera);
+		camera_params_compute(&params, sizex, sizey, scene->r.xasp, scene->r.yasp);
 
-		ED_view3d_draw_offscreen(scene, v3d, ar, sizex, sizey, NULL, winmat);
+		ED_view3d_draw_offscreen(scene, v3d, ar, sizex, sizey, NULL, params.winmat);
 	}
 	else {
 		ED_view3d_draw_offscreen(scene, v3d, ar, sizex, sizey, NULL, NULL);
@@ -2546,10 +2564,16 @@ ImBuf *ED_view3d_draw_offscreen_imbuf_simple(Scene *scene, Object *camera, int w
 	invert_m4_m4(rv3d.viewmat, rv3d.viewinv);
 
 	{
-		float _yco, _dx, _dy, _sensor_x= DEFAULT_SENSOR_WIDTH, _sensor_y= DEFAULT_SENSOR_HEIGHT;
-		short _sensor_fit= CAMERA_SENSOR_FIT_AUTO;
-		rctf _viewplane;
-		object_camera_matrix(&scene->r, v3d.camera, width, height, 0, rv3d.winmat, &_viewplane, &v3d.near, &v3d.far, &v3d.lens, &_sensor_x, &_sensor_y, &_sensor_fit, &_yco, &_dx, &_dy);
+		CameraParams params;
+
+		camera_params_init(&params);
+		camera_params_from_object(&params, v3d.camera);
+		camera_params_compute(&params, width, height, scene->r.xasp, scene->r.yasp);
+
+		copy_m4_m4(rv3d.winmat, params.winmat);
+		v3d.near= params.clipsta;
+		v3d.far= params.clipend;
+		v3d.lens= params.lens;
 	}
 
 	mul_m4_m4m4(rv3d.persmat, rv3d.viewmat, rv3d.winmat);

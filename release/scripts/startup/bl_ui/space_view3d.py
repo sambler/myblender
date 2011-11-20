@@ -525,7 +525,7 @@ class VIEW3D_MT_select_edit_mesh(Menu):
         layout.operator("mesh.select_by_number_vertices", text="Triangles").type = 'TRIANGLES'
         layout.operator("mesh.select_by_number_vertices", text="Quads").type = 'QUADS'
         if context.scene.tool_settings.mesh_select_mode[2] == False:
-                layout.operator("mesh.select_non_manifold", text="Non Manifold")
+            layout.operator("mesh.select_non_manifold", text="Non Manifold")
         layout.operator("mesh.select_by_number_vertices", text="Loose Verts/Edges").type = 'OTHER'
         layout.operator("mesh.select_similar", text="Similar")
 
@@ -2206,10 +2206,9 @@ class VIEW3D_PT_view3d_motion_tracking(Panel):
         return (view)
 
     def draw_header(self, context):
-        layout = self.layout
         view = context.space_data
 
-        layout.prop(view, "show_reconstruction", text="")
+        self.layout.prop(view, "show_reconstruction", text="")
 
     def draw(self, context):
         layout = self.layout
@@ -2291,10 +2290,9 @@ class VIEW3D_PT_background_image(Panel):
     bl_options = {'DEFAULT_CLOSED'}
 
     def draw_header(self, context):
-        layout = self.layout
         view = context.space_data
 
-        layout.prop(view, "show_background_images", text="")
+        self.layout.prop(view, "show_background_images", text="")
 
     def draw(self, context):
         layout = self.layout
@@ -2311,7 +2309,7 @@ class VIEW3D_PT_background_image(Panel):
             row.prop(bg, "show_expanded", text="", emboss=False)
             if bg.source == 'IMAGE' and bg.image:
                 row.prop(bg.image, "name", text="", emboss=False)
-            if bg.source == 'MOVIE' and bg.clip:
+            elif bg.source == 'MOVIE' and bg.clip:
                 row.prop(bg.clip, "name", text="", emboss=False)
             else:
                 row.label(text="Not Set")
@@ -2373,13 +2371,11 @@ class VIEW3D_PT_transform_orientations(Panel):
         layout = self.layout
 
         view = context.space_data
+        orientation = view.current_orientation
 
         col = layout.column()
-
         col.prop(view, "transform_orientation")
         col.operator("transform.create_orientation", text="Create")
-
-        orientation = view.current_orientation
 
         if orientation:
             col.prop(orientation, "name")

@@ -849,6 +849,11 @@ void UI_SetTheme(int spacetype, int regionid)
 	}
 }
 
+bTheme *UI_GetTheme()
+{
+	return U.themes.first;
+}
+
 // for space windows only
 void UI_ThemeColor(int colorid)
 {
@@ -1683,6 +1688,15 @@ void init_userdef_do_versions(void)
 		for(btheme= U.themes.first; btheme; btheme= btheme->next) {
 			SETCOLF(btheme->toops.match, 0.2, 0.5, 0.2, 0.3);
 			SETCOLF(btheme->toops.selected_highlight, 0.51, 0.53, 0.55, 0.3);
+		}
+	}
+
+	if (bmain->versionfile < 260 || (bmain->versionfile == 260 && bmain->subversionfile < 5)) {
+		bTheme *btheme;
+
+		for(btheme= U.themes.first; btheme; btheme= btheme->next) {
+			SETCOL(btheme->tui.panel.header, 0, 0, 0, 25);
+			btheme->tui.icon_alpha= 1.0;
 		}
 	}
 

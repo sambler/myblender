@@ -278,7 +278,7 @@ if(WITH_PYTHON)
 	# install(CODE "message(\"copying blender scripts...\")")
 	
 	# exclude addons_contrib if release
-	if("${BLENDER_VERSION_CYCLE}" STREQUAL "release")
+	if("${BLENDER_VERSION_CYCLE}" STREQUAL "always-contrib")
 		set(ADDON_EXCLUDE_CONDITIONAL "addons_contrib/*")
 	else()
 		set(ADDON_EXCLUDE_CONDITIONAL "_addons_contrib/*")  # dummy, wont do anything
@@ -313,7 +313,7 @@ if("${CMAKE_GENERATOR}" MATCHES ".*Makefiles.*")
 	# message after building.
 	add_custom_command(
 		TARGET blender POST_BUILD MAIN_DEPENDENCY blender
-		COMMAND ${CMAKE_COMMAND} -E echo 'now run: \"make install\" to copy runtime files & scripts to ${TARGETDIR_VER}'
+		COMMAND ${CMAKE_COMMAND} -E echo 'now run: \"make install\" to copy runtime files and scripts to ${TARGETDIR_VER}'
 	)
 endif()
 

@@ -4726,6 +4726,9 @@ static void lib_link_scene(FileData *fd, Main *main)
 			/*Game Settings: Dome Warp Text*/
 			sce->gm.dome.warptext= newlibadr(fd, sce->id.lib, sce->gm.dome.warptext);
 
+			/* Motion Tracking */
+			sce->clip= newlibadr_us(fd, sce->id.lib, sce->clip);
+
 			sce->id.flag -= LIB_NEEDLINK;
 		}
 
@@ -4929,8 +4932,6 @@ static void direct_link_scene(FileData *fd, Scene *sce)
 	sce->nodetree= newdataadr(fd, sce->nodetree);
 	if(sce->nodetree)
 		direct_link_nodetree(fd, sce->nodetree);
-	
-	sce->clip= newlibadr_us(fd, sce->id.lib, sce->clip);
 }
 
 /* ************ READ WM ***************** */
@@ -8947,7 +8948,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 			if(sce->r.yparts<2) sce->r.yparts= 4;
 			/* adds default layer */
 			if(sce->r.layers.first==NULL)
-				scene_add_render_layer(sce);
+				scene_add_render_layer(sce, NULL);
 			else {
 				SceneRenderLayer *srl;
 				/* new layer flag for sky, was default for solid */

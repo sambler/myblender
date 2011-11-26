@@ -3189,7 +3189,7 @@ static void draw_mesh_fancy(Scene *scene, ARegion *ar, View3D *v3d, RegionView3D
 			}
 		}
 	}
-//	}
+	}
 	if (draw_wire != OBDRAW_WIRE_OFF) {
 
 		/* When using wireframe object traw in particle edit mode

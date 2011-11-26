@@ -12,9 +12,9 @@ if(WITH_RAYOPTIMIZATION AND SUPPORT_SSE_BUILD)
 	set(WITH_CYCLES_OPTIMIZED_KERNEL ON)
 
 	if(WIN32 AND MSVC)
-		set(CYCLES_OPTIMIZED_KERNEL_FLAGS "/Ox /Ot /arch:SSE2 -D_CRT_SECURE_NO_WARNINGS /EHsc /fp:fast")
+		set(CYCLES_OPTIMIZED_KERNEL_FLAGS "/arch:SSE2 -D_CRT_SECURE_NO_WARNINGS /fp:fast")
 	elseif(CMAKE_COMPILER_IS_GNUCC)
-		set(CYCLES_OPTIMIZED_KERNEL_FLAGS "-ffast-math -msse -msse2 -msse3 -DGOGOGO")
+		set(CYCLES_OPTIMIZED_KERNEL_FLAGS "-ffast-math -msse -msse2 -msse3")
 	endif()
 endif()
 
@@ -61,6 +61,7 @@ include_directories(
 # Subdirectories
 
 if(WITH_CYCLES_BLENDER)
+	add_definitions(-DBLENDER_PLUGIN)
 	add_subdirectory(blender)
 endif(WITH_CYCLES_BLENDER)
 

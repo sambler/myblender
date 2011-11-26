@@ -46,6 +46,7 @@
 #include "BLI_utildefines.h"
 
 
+#include "BKE_camera.h"
 #include "BKE_DerivedMesh.h"
 
 #include "MOD_modifiertypes.h"
@@ -169,7 +170,7 @@ static DerivedMesh *uvprojectModifier_do(UVProjectModifierData *umd,
 
 	if(num_projectors == 0) return dm;
 
-	/* make sure there are UV layers available */
+	/* make sure there are UV Maps available */
 
 	if(!CustomData_has_layer(&dm->faceData, CD_MTFACE)) return dm;
 
@@ -195,20 +196,12 @@ static DerivedMesh *uvprojectModifier_do(UVProjectModifierData *umd,
 				free_uci= 1;
 			}
 			else {
-				float sensor= (cam->sensor_fit == CAMERA_SENSOR_FIT_VERT) ? (cam->sensor_y) : cam->sensor_x;
+				float sensor= camera_sensor_size(cam->sensor_fit, cam->sensor_x, cam->sensor_y);
+				int sensor_fit= camera_sensor_fit(cam->sensor_fit, aspx, aspy);
 				float scale= (cam->type == CAM_PERSP) ? cam->clipsta * sensor / cam->lens : cam->ortho_scale;
 				float xmax, xmin, ymax, ymin;
 
-				if(cam->sensor_fit==CAMERA_SENSOR_FIT_AUTO) {
-					if(aspect > 1.0f) {
-						xmax = 0.5f * scale;
-						ymax = xmax / aspect;
-					} else {
-						ymax = 0.5f * scale;
-						xmax = ymax * aspect;
-					}
-				}
-				else if(cam->sensor_fit==CAMERA_SENSOR_FIT_HOR) {
+				if(sensor_fit==CAMERA_SENSOR_FIT_HOR) {
 					xmax = 0.5f * scale;
 					ymax = xmax / aspect;
 				}
@@ -266,7 +259,7 @@ static DerivedMesh *uvprojectModifier_do(UVProjectModifierData *umd,
 		mul_mat3_m4_v3(projectors[i].ob->obmat, projectors[i].normal);
 	}
 
-	/* make sure we are not modifying the original UV layer */
+	/* make sure we are not modifying the original UV map */
 	tface = CustomData_duplicate_referenced_layer_named(&dm->faceData,
 			CD_MTFACE, uvname);
 

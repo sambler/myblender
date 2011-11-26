@@ -455,11 +455,18 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
 
         layout.prop(md, "use_normals")
 
-        row = layout.row()
-        row.prop(md, "use_foam")
-        sub = row.row()
+        split = layout.split()
+
+        col = split.column()
+        col.prop(md, "use_foam")
+        sub = col.row()
         sub.active = md.use_foam
         sub.prop(md, "foam_coverage", text="Coverage")
+
+        col = split.column()
+        col.active = md.use_foam
+        col.label("Foam Data Layer Name:")
+        col.prop(md, "foam_layer_name", text="")
 
         layout.separator()
 
@@ -685,7 +692,7 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         col.prop(md, "image", text="")
 
         col = split.column()
-        col.label(text="UV Layer:")
+        col.label(text="UV Map:")
         col.prop_search(md, "uv_layer", ob.data, "uv_textures", text="")
 
         split = layout.split()

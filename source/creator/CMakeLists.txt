@@ -40,34 +40,6 @@ blender_include_dirs(
 	../blender/windowmanager
 )
 
-if(WITH_CODEC_QUICKTIME)
-	add_definitions(-DWITH_QUICKTIME)
-endif()
-
-if(WITH_IMAGE_OPENEXR)
-	add_definitions(-DWITH_OPENEXR)
-endif()
-
-if(WITH_IMAGE_OPENJPEG)
-	add_definitions(-DWITH_OPENJPEG)
-endif()
-
-if(WITH_IMAGE_TIFF)
-	add_definitions(-DWITH_TIFF)
-endif()
-
-if(WITH_IMAGE_DDS)
-	add_definitions(-DWITH_DDS)
-endif()
-
-if(WITH_IMAGE_CINEON)
-	add_definitions(-DWITH_CINEON)
-endif()
-
-if(WITH_IMAGE_HDR)
-	add_definitions(-DWITH_HDR)
-endif()
-
 if(WITH_LIBMV)
 	blender_include_dirs(../../extern/libmv)
 	add_definitions(-DWITH_LIBMV)
@@ -278,7 +250,7 @@ if(WITH_PYTHON)
 	# install(CODE "message(\"copying blender scripts...\")")
 	
 	# exclude addons_contrib if release
-	if("${BLENDER_VERSION_CYCLE}" STREQUAL "release")
+	if("${BLENDER_VERSION_CYCLE}" STREQUAL "always-contrib")
 		set(ADDON_EXCLUDE_CONDITIONAL "addons_contrib/*")
 	else()
 		set(ADDON_EXCLUDE_CONDITIONAL "_addons_contrib/*")  # dummy, wont do anything
@@ -313,7 +285,7 @@ if("${CMAKE_GENERATOR}" MATCHES ".*Makefiles.*")
 	# message after building.
 	add_custom_command(
 		TARGET blender POST_BUILD MAIN_DEPENDENCY blender
-		COMMAND ${CMAKE_COMMAND} -E echo 'now run: \"make install\" to copy runtime files & scripts to ${TARGETDIR_VER}'
+		COMMAND ${CMAKE_COMMAND} -E echo 'now run: \"make install\" to copy runtime files and scripts to ${TARGETDIR_VER}'
 	)
 endif()
 

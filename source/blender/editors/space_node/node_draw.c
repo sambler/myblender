@@ -73,6 +73,8 @@
 #include "NOD_composite.h"
 #include "NOD_shader.h"
 
+#include "intern/node_util.h"
+
 #include "node_intern.h"
 
 /* width of socket columns in group display */
@@ -195,28 +197,16 @@ static void node_uiblocks_init(const bContext *C, bNodeTree *ntree)
 	bNode *node;
 	char str[32];
 	
-	/* add node uiBlocks in reverse order - prevents events going to overlapping nodes */
+	/* add node uiBlocks in drawing order - prevents events going to overlapping nodes */
 	
-	/* process selected nodes first so they're at the start of the uiblocks list */
-	for(node= ntree->nodes.last; node; node= node->prev) {
-		
-		if (node->flag & NODE_SELECT) {
+	for(node= ntree->nodes.first; node; node=node->next) {
 			/* ui block */
 			sprintf(str, "node buttons %p", (void *)node);
 			node->block= uiBeginBlock(C, CTX_wm_region(C), str, UI_EMBOSS);
 			uiBlockSetHandleFunc(node->block, do_node_internal_buttons, node);
-		}
-	}
-	
-	/* then the rest */
-	for(node= ntree->nodes.last; node; node= node->prev) {
-		
-		if (!(node->flag & (NODE_GROUP_EDIT|NODE_SELECT))) {
-			/* ui block */
-			sprintf(str, "node buttons %p", (void *)node);
-			node->block= uiBeginBlock(C, CTX_wm_region(C), str, UI_EMBOSS);
-			uiBlockSetHandleFunc(node->block, do_node_internal_buttons, node);
-		}
+			
+			/* this cancels events for background nodes */
+			uiBlockSetFlag(node->block, UI_BLOCK_CLIP_EVENTS);
 	}
 }
 
@@ -337,6 +327,15 @@ static void node_update_basis(const bContext *C, bNodeTree *ntree, bNode *node)
 	node->totr.xmax= locx + node->width;
 	node->totr.ymax= locy;
 	node->totr.ymin= MIN2(dy, locy-2*NODE_DY);
+	
+	/* Set the block bounds to clip mouse events from underlying nodes.
+	 * Add a margin for sockets on each side.
+	 */
+	uiExplicitBoundsBlock(node->block,
+						  node->totr.xmin - NODE_SOCKSIZE,
+						  node->totr.ymin,
+						  node->totr.xmax + NODE_SOCKSIZE,
+						  node->totr.ymax);
 }
 
 /* based on settings in node, sets drawing rect info. each redraw! */
@@ -389,6 +388,15 @@ static void node_update_hidden(bNode *node)
 			rad+= drad;
 		}
 	}
+
+	/* Set the block bounds to clip mouse events from underlying nodes.
+	 * Add a margin for sockets on each side.
+	 */
+	uiExplicitBoundsBlock(node->block,
+						  node->totr.xmin - NODE_SOCKSIZE,
+						  node->totr.ymin,
+						  node->totr.xmax + NODE_SOCKSIZE,
+						  node->totr.ymax);
 }
 
 void node_update_default(const bContext *C, bNodeTree *ntree, bNode *node)
@@ -418,38 +426,41 @@ static int node_get_colorid(bNode *node)
 	return TH_NODE;
 }
 
-/* note: in cmp_util.c is similar code, for node_compo_pass_on() */
+/* note: in cmp_util.c is similar code, for node_compo_pass_on()
+ *       the same goes for shader and texture nodes. */
 /* note: in node_edit.c is similar code, for untangle node */
 static void node_draw_mute_line(View2D *v2d, SpaceNode *snode, bNode *node)
 {
-	static int types[]= { SOCK_FLOAT, SOCK_VECTOR, SOCK_RGBA };
+	ListBase links;
+	LinkInOutsMuteNode *lnk;
 	bNodeLink link= {NULL};
 	int i;
-	
-	/* connect the first input of each type with first output of the same type */
-	
+
+	if(node->typeinfo->mutelinksfunc == NULL)
+		return;
+
+	/* Get default muting links (as bNodeSocket pointers). */
+	links = node->typeinfo->mutelinksfunc(snode->edittree, node, NULL, NULL, NULL, NULL);
+
 	glEnable(GL_BLEND);
-	glEnable( GL_LINE_SMOOTH );
-	
+	glEnable(GL_LINE_SMOOTH);
+
 	link.fromnode = link.tonode = node;
-	for (i=0; i < 3; ++i) {
-		/* find input socket */
-		for (link.fromsock=node->inputs.first; link.fromsock; link.fromsock=link.fromsock->next)
-			if (link.fromsock->type==types[i] && nodeCountSocketLinks(snode->edittree, link.fromsock))
-				break;
-		if (link.fromsock) {
-			for (link.tosock=node->outputs.first; link.tosock; link.tosock=link.tosock->next)
-				if (link.tosock->type==types[i] && nodeCountSocketLinks(snode->edittree, link.tosock))
-					break;
-			
-			if (link.tosock) {
-				node_draw_link_bezier(v2d, snode, &link, TH_REDALERT, 0, TH_WIRE, 0, TH_WIRE);
-			}
+	for(lnk = links.first; lnk; lnk = lnk->next) {
+		for(i = 0; i < lnk->num_outs; i++) {
+			link.fromsock = (bNodeSocket*)(lnk->in);
+			link.tosock   = (bNodeSocket*)(lnk->outs)+i;
+			node_draw_link_bezier(v2d, snode, &link, TH_REDALERT, 0, TH_WIRE, 0, TH_WIRE);
 		}
+		/* If num_outs > 1, lnk->outs was an allocated table of pointers... */
+		if(i > 1)
+			MEM_freeN(lnk->outs);
 	}
-	
+
 	glDisable(GL_BLEND);
-	glDisable( GL_LINE_SMOOTH );
+	glDisable(GL_LINE_SMOOTH);
+
+	BLI_freelistN(&links);
 }
 
 /* this might have some more generic use */
@@ -922,14 +933,15 @@ void drawnodespace(const bContext *C, ARegion *ar, View2D *v2d)
 	if(snode->nodetree) {
 		bNode *node;
 		
-		/* init ui blocks for opened node group trees first 
-		 * so they're in the correct depth stack order */
+		node_uiblocks_init(C, snode->nodetree);
+		
+		/* uiBlocks must be initialized in drawing order for correct event clipping.
+		 * Node group internal blocks added after the main group block.
+		 */
 		for(node= snode->nodetree->nodes.first; node; node= node->next) {
 			if(node->flag & NODE_GROUP_EDIT)
 				node_uiblocks_init(C, (bNodeTree *)node->id);
 		}
-		
-		node_uiblocks_init(C, snode->nodetree);
 		
 		node_update_nodetree(C, snode->nodetree, 0.0f, 0.0f);
 		node_draw_nodetree(C, ar, snode, snode->nodetree);

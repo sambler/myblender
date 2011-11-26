@@ -500,7 +500,7 @@ static Main *blo_find_main(FileData *fd, ListBase *mainlist, const char *filepat
 {
 	Main *m;
 	Library *lib;
-	char name1[FILE_MAXDIR+FILE_MAXFILE];
+	char name1[FILE_MAX];
 	
 	BLI_strncpy(name1, filepath, sizeof(name1));
 	cleanup_path(relabase, name1);
@@ -4726,6 +4726,9 @@ static void lib_link_scene(FileData *fd, Main *main)
 			/*Game Settings: Dome Warp Text*/
 			sce->gm.dome.warptext= newlibadr(fd, sce->id.lib, sce->gm.dome.warptext);
 
+			/* Motion Tracking */
+			sce->clip= newlibadr_us(fd, sce->id.lib, sce->clip);
+
 			sce->id.flag -= LIB_NEEDLINK;
 		}
 
@@ -4929,8 +4932,6 @@ static void direct_link_scene(FileData *fd, Scene *sce)
 	sce->nodetree= newdataadr(fd, sce->nodetree);
 	if(sce->nodetree)
 		direct_link_nodetree(fd, sce->nodetree);
-	
-	sce->clip= newlibadr_us(fd, sce->id.lib, sce->clip);
 }
 
 /* ************ READ WM ***************** */
@@ -6478,8 +6479,8 @@ static void customdata_version_242(Mesh *me)
 
 		if (layer->type == CD_MTFACE) {
 			if (layer->name[0] == 0) {
-				if (mtfacen == 0) strcpy(layer->name, "UVTex");
-				else sprintf(layer->name, "UVTex.%.3d", mtfacen);
+				if (mtfacen == 0) strcpy(layer->name, "UVMap");
+				else sprintf(layer->name, "UVMap.%.3d", mtfacen);
 			}
 			mtfacen++;
 		}
@@ -7345,6 +7346,67 @@ static void do_versions_nodetree_convert_angle(bNodeTree *ntree)
 			tmap->rot[2] = DEG2RADF(tmap->rot[2]);
 		}
 	}
+}
+
+void do_versions_image_settings_2_60(Scene *sce)
+{
+	/* note: rd->subimtype is moved into indervidual settings now and no longer
+	 * exists */
+	RenderData *rd= &sce->r;
+	ImageFormatData *imf= &sce->r.im_format;
+
+	imf->imtype= rd->imtype;
+	imf->planes= rd->planes;
+	imf->compress= rd->quality;
+	imf->quality= rd->quality;
+
+	/* default, was stored in multiple places, may override later */
+	imf->depth= R_IMF_CHAN_DEPTH_8;
+
+	/* openexr */
+	imf->exr_codec = rd->quality & 7; /* strange but true! 0-4 are valid values, OPENEXR_COMPRESS */
+
+	switch (imf->imtype) {
+	case R_IMF_IMTYPE_OPENEXR:
+		imf->depth=  (rd->subimtype & R_OPENEXR_HALF) ? R_IMF_CHAN_DEPTH_16 : R_IMF_CHAN_DEPTH_32;
+		if (rd->subimtype & R_PREVIEW_JPG) {
+			imf->flag |= R_IMF_FLAG_PREVIEW_JPG;
+		}
+		if (rd->subimtype & R_OPENEXR_ZBUF) {
+			imf->flag |= R_IMF_FLAG_ZBUF;
+		}
+		break;
+	case R_IMF_IMTYPE_TIFF:
+		if (rd->subimtype & R_TIFF_16BIT) {
+			imf->depth= R_IMF_CHAN_DEPTH_16;
+		}
+		break;
+	case R_IMF_IMTYPE_JP2:
+		if (rd->subimtype & R_JPEG2K_16BIT) {
+			imf->depth= R_IMF_CHAN_DEPTH_16;
+		}
+		else if (rd->subimtype & R_JPEG2K_12BIT) {
+			imf->depth= R_IMF_CHAN_DEPTH_12;
+		}
+
+		if (rd->subimtype & R_JPEG2K_YCC) {
+			imf->jp2_flag |= R_IMF_JP2_FLAG_YCC;
+		}
+		if (rd->subimtype & R_JPEG2K_CINE_PRESET) {
+			imf->jp2_flag |= R_IMF_JP2_FLAG_CINE_PRESET;
+		}
+		if (rd->subimtype & R_JPEG2K_CINE_48FPS) {
+			imf->jp2_flag |= R_IMF_JP2_FLAG_CINE_48;
+		}
+		break;
+	case R_IMF_IMTYPE_CINEON:
+	case R_IMF_IMTYPE_DPX:
+		if (rd->subimtype & R_CINEON_LOG) {
+			imf->cineon_flag |= R_IMF_CINEON_FLAG_LOG;
+		}
+		break;
+	}
+
 }
 
 static void do_versions(FileData *fd, Library *lib, Main *main)
@@ -8947,7 +9009,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 			if(sce->r.yparts<2) sce->r.yparts= 4;
 			/* adds default layer */
 			if(sce->r.layers.first==NULL)
-				scene_add_render_layer(sce);
+				scene_add_render_layer(sce, NULL);
 			else {
 				SceneRenderLayer *srl;
 				/* new layer flag for sky, was default for solid */
@@ -12543,6 +12605,12 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 
 	/* put compatibility code here until next subversion bump */
 	{
+		Scene *sce;
+		for(sce = main->scene.first; sce; sce = sce->id.next) {
+			if (sce->r.im_format.depth == 0) {
+				do_versions_image_settings_2_60(sce);
+			}
+		}
 	}
 
 	/* WATCH IT!!!: pointers from libdata have not been converted yet here! */

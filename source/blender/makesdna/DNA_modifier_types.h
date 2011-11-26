@@ -777,6 +777,7 @@ typedef struct OceanModifierData {
 	int		bakeend;
 	
 	char	cachepath[240];	// FILE_MAX
+	char	foamlayername[32];
 	char	cached;
 	char	geometry_mode;
 
@@ -877,7 +878,7 @@ typedef struct WeightVGEditModifierData {
 	struct Object *mask_tex_map_obj;   /* Name of the map object. */
 	/* How to map the texture (using MOD_DISP_MAP_* constants). */
 	int		mask_tex_mapping;
-	char	mask_tex_uvlayer_name[32]; /* Name of the UV layer. */
+	char	mask_tex_uvlayer_name[32]; /* Name of the UV map. */
 
 	/* Padding... */
 	int pad_i1;
@@ -922,7 +923,7 @@ typedef struct WeightVGMixModifierData {
 	struct Tex *mask_texture;          /* The texture. */
 	struct Object *mask_tex_map_obj;   /* Name of the map object. */
 	int		mask_tex_mapping;          /* How to map the texture! */
-	char	mask_tex_uvlayer_name[32]; /* Name of the UV layer. */
+	char	mask_tex_uvlayer_name[32]; /* Name of the UV map. */
 
 	/* Padding... */
 	int pad_i1;
@@ -969,7 +970,7 @@ typedef struct WeightVGProximityModifierData {
 	struct Tex *mask_texture;          /* The texture. */
 	struct Object *mask_tex_map_obj;   /* Name of the map object. */
 	int		mask_tex_mapping;          /* How to map the texture! */
-	char	mask_tex_uvlayer_name[32]; /* Name of the UV layer. */
+	char	mask_tex_uvlayer_name[32]; /* Name of the UV Map. */
 
 	float	min_dist, max_dist;        /* Distances mapping to 0.0/1.0 weights. */
 

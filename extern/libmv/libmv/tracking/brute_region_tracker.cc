@@ -24,7 +24,7 @@
 #include <emmintrin.h>
 #endif
 
-#ifndef __APPLE__
+#if !defined(__APPLE__) && !defined(__FreeBSD__)
 // Needed for memalign on Linux and _aligned_alloc on Windows.
 #ifdef FREE_WINDOWS
 /* make sure _aligned_malloc is included */
@@ -59,6 +59,22 @@ void *aligned_malloc(int size, int alignment) {
   // they work natively with SSE types with no further work.
   CHECK_EQ(alignment, 16);
   return malloc(size);
+#elif __FreeBSD__
+  void *result;
+  // test that alignment is power of 2 and > sizeof(void*)
+  if ( ((alignment - 1) & alignment) != 0 || alignment < sizeof(void *)) {
+    int talign, x;
+    talign= alignment-1;
+    for(x=1;x<sizeof(alignment)*CHAR_BIT;x<<=1)
+        talign= talign | talign >> x;
+    alignment= talign+1;
+  }
+  if(posix_memalign(&result, alignment, size)) {
+    // non-zero mean allocation error
+    // either allocation error or bad alignment value
+    return NULL;
+  }
+  return result;
 #else // This is for Linux.
   return memalign(alignment, size);
 #endif

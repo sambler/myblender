@@ -70,8 +70,8 @@ void *aligned_malloc(int size, int alignment) {
     alignment= talign+1;
   }
   if(posix_memalign(&result, alignment, size)) {
-    // non-zero mean allocation error
-    // either allocation error or bad alignment value
+    // non-zero means allocation error
+    // either no allocation or bad alignment value
     return NULL;
   }
   return result;

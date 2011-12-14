@@ -802,7 +802,7 @@ int WM_operator_confirm(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 int WM_operator_filesel(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 {
 	if (RNA_property_is_set(op->ptr, "filepath")) {
-		return WM_operator_call(C, op);
+		return WM_operator_call_notest(C, op); /* call exec direct */
 	} 
 	else {
 		WM_event_add_fileselect(C, op);
@@ -1634,10 +1634,26 @@ static void WM_OT_open_mainfile(wmOperatorType *ot)
 
 /* **************** link/append *************** */
 
+int wm_link_append_poll(bContext *C)
+{
+	if(WM_operator_winactive(C)) {
+		/* linking changes active object which is pretty useful in general,
+		   but which totally confuses edit mode (i.e. it becoming not so obvious
+		   to leave from edit mode and inwalid tools in toolbar might be displayed)
+		   so disable link/append when in edit mode (sergey) */
+		if(CTX_data_edit_object(C))
+			return 0;
+
+		return 1;
+	}
+
+	return 0;
+}
+
 static int wm_link_append_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 {
 	if(RNA_property_is_set(op->ptr, "filepath")) {
-		return WM_operator_call(C, op);
+		return WM_operator_call_notest(C, op);
 	} 
 	else {
 		/* XXX TODO solve where to get last linked library from */
@@ -1796,7 +1812,7 @@ static void WM_OT_link_append(wmOperatorType *ot)
 	
 	ot->invoke= wm_link_append_invoke;
 	ot->exec= wm_link_append_exec;
-	ot->poll= WM_operator_winactive;
+	ot->poll= wm_link_append_poll;
 	
 	ot->flag |= OPTYPE_UNDO;
 
@@ -2003,6 +2019,7 @@ static int wm_save_mainfile_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(
 {
 	char name[FILE_MAX];
 	int check_existing=1;
+	int ret;
 	
 	/* cancel if no active window */
 	if (CTX_wm_window(C) == NULL)
@@ -2027,16 +2044,20 @@ static int wm_save_mainfile_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(
 			check_existing = 0;
 	
 	if (G.save_over) {
-		if (check_existing)
+		if (check_existing && BLI_exists(name)) {
 			uiPupMenuSaveOver(C, op, name);
-		else {
-			wm_save_as_mainfile_exec(C, op);
+			ret= OPERATOR_RUNNING_MODAL;
 		}
-	} else {
+		else {
+			ret= wm_save_as_mainfile_exec(C, op);
+		}
+	}
+	else {
 		WM_event_add_fileselect(C, op);
+		ret= OPERATOR_RUNNING_MODAL;
 	}
 	
-	return OPERATOR_RUNNING_MODAL;
+	return ret;
 }
 
 static void WM_OT_save_mainfile(wmOperatorType *ot)

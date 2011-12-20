@@ -2153,7 +2153,7 @@ static int ntap_bump_compute(NTapBump *ntap_bump, ShadeInput *shi, MTex *mtex, T
 		if( mtex->texflag & MTEX_BUMP_OBJECTSPACE ) {
 			// TODO: these calculations happen for every pixel!
 			//	-> move to shi->obi
-			mul_m4_m4m4(tmp, shi->obr->ob->obmat, R.viewmat);
+			mult_m4_m4m4(tmp, R.viewmat, shi->obr->ob->obmat);
 			copy_m3_m4(obj2view, tmp); // use only upper left 3x3 matrix
 			invert_m3_m3(view2obj, obj2view);
 		
@@ -3148,6 +3148,12 @@ void do_sky_tex(const float rco[3], float lo[3], const float dxyview[2], float h
 					/* potentially dangerous... check with multitex! */
 					continue;
 				}
+				break;
+			case TEXCO_EQUIRECTMAP:
+				tempvec[0]= atan2f(lo[0], lo[2]) / (float)M_PI;
+				tempvec[1]= 1.0f - 2.0f*saacos(lo[1]) / (float)M_PI;
+				tempvec[2]= 0.0f;
+				co= tempvec;
 				break;
 			case TEXCO_OBJECT:
 				if(mtex->object) {

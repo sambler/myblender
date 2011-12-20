@@ -497,7 +497,6 @@ elseif(WIN32)
 	else()
 		install(
 			FILES
-				${LIBDIR}/png/lib/libpng.dll
 				${LIBDIR}/zlib/lib/zlib.dll
 			DESTINATION ${TARGETDIR}
 		)

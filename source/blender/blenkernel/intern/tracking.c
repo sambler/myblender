@@ -1154,7 +1154,7 @@ int BKE_tracking_next(MovieTrackingContext *context)
 
 	#pragma omp parallel for private(a) shared(ibuf_new, ok) if(map_size>1)
 	for(a= 0; a<map_size; a++) {
-		TrackContext *track_context;
+		TrackContext *track_context = NULL;
 		MovieTrackingTrack *track;
 		MovieTrackingMarker *marker;
 
@@ -1484,7 +1484,7 @@ static int retrieve_libmv_reconstruct_tracks(MovieReconstructContext *context, M
 			}
 
 			if(origin_set)
-				mul_m4_m4m4(mat, mat, imat);
+				mult_m4_m4m4(mat, imat, mat);
 
 			copy_m4_m4(reconstructed[reconstruction->camnr].mat, mat);
 			reconstructed[reconstruction->camnr].framenr= a;
@@ -1914,7 +1914,7 @@ void BKE_tracking_projection_matrix(MovieTracking *tracking, int framenr, int wi
 		float imat[4][4];
 
 		invert_m4_m4(imat, camera->mat);
-		mul_m4_m4m4(mat, imat, winmat);
+		mult_m4_m4m4(mat, winmat, imat);
 	} else copy_m4_m4(mat, winmat);
 }
 

@@ -36,6 +36,7 @@
 
 #include "BLI_math.h"
 #include "BLI_utildefines.h"
+#include "BLI_dynstr.h"
 
 #define EULER_SIZE 3
 
@@ -59,7 +60,7 @@ static PyObject *Euler_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	if (!PyArg_ParseTuple(args, "|Os:mathutils.Euler", &seq, &order_str))
 		return NULL;
 
-	switch(PyTuple_GET_SIZE(args)) {
+	switch (PyTuple_GET_SIZE(args)) {
 	case 0:
 		break;
 	case 2:
@@ -84,7 +85,7 @@ static const char *euler_order_str(EulerObject *self)
 short euler_order_from_string(const char *str, const char *error_prefix)
 {
 	if ((str[0] && str[1] && str[2] && str[3]=='\0')) {
-		switch(*((PY_INT32_T *)str)) {
+		switch (*((PY_INT32_T *)str)) {
 			case 'X'|'Y'<<8|'Z'<<16:	return EULER_ORDER_XYZ;
 			case 'X'|'Z'<<8|'Y'<<16:	return EULER_ORDER_XZY;
 			case 'Y'|'X'<<8|'Z'<<16:	return EULER_ORDER_YXZ;
@@ -315,6 +316,21 @@ static PyObject *Euler_repr(EulerObject * self)
 
 	Py_DECREF(tuple);
 	return ret;
+}
+
+static PyObject *Euler_str(EulerObject * self)
+{
+	DynStr *ds;
+
+	if (BaseMath_ReadCallback(self) == -1)
+		return NULL;
+
+	ds= BLI_dynstr_new();
+
+	BLI_dynstr_appendf(ds, "<Euler (x=%.4f, y=%.4f, z=%.4f), order='%s'>",
+	                   self->eul[0], self->eul[1], self->eul[2], euler_order_str(self));
+
+	return mathutils_dynstr_to_py(ds); /* frees ds */
 }
 
 static PyObject* Euler_richcmpr(PyObject *a, PyObject *b, int op)
@@ -635,7 +651,7 @@ PyTypeObject euler_Type = {
 	&Euler_AsMapping,				//tp_as_mapping
 	NULL,							//tp_hash
 	NULL,							//tp_call
-	NULL,							//tp_str
+	(reprfunc) Euler_str,			//tp_str
 	NULL,							//tp_getattro
 	NULL,							//tp_setattro
 	NULL,							//tp_as_buffer

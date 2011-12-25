@@ -92,6 +92,7 @@ void OBJECT_OT_game_property_remove(struct wmOperatorType *ot);
 void OBJECT_OT_game_property_copy(struct wmOperatorType *ot);
 void OBJECT_OT_game_property_clear(struct wmOperatorType *ot);
 void OBJECT_OT_logic_bricks_copy(struct wmOperatorType *ot);
+void OBJECT_OT_game_physics_copy(struct wmOperatorType *ot);
 
 void OBJECT_OT_wiredraw_toggle(wmOperatorType *ot);
 void OBJECT_OT_wiredraw_copy_selected(wmOperatorType *ot);

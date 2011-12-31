@@ -443,15 +443,15 @@ elseif(WIN32)
 	# )
 
 	if(WITH_PYTHON)
-
+		set_lib_path(PYLIB "python/lib")
 		install(
-			FILES ${LIBDIR}/python/lib/python32.dll
+			FILES ${PYLIB}/python32.dll
 			DESTINATION ${TARGETDIR}
 			CONFIGURATIONS Release;RelWithDebInfo;MinSizeRel
 		)
 
 		install(
-			FILES ${LIBDIR}/python/lib/python32_d.dll
+			FILES ${PYLIB}/python32_d.dll
 			DESTINATION ${TARGETDIR}
 			CONFIGURATIONS Debug
 		)
@@ -564,9 +564,10 @@ elseif(WIN32)
 	)	
 
 	if(WITH_OPENIMAGEIO)
+		set_lib_path(OIIOBIN "openimageio/bin")
 		install(
 			FILES
-				${LIBDIR}/openimageio/bin/OpenImageIO.dll
+				${OIIOBIN}/OpenImageIO.dll
 			DESTINATION ${TARGETDIR}
 		)
 	endif()
@@ -828,6 +829,7 @@ endif()
 		bf_blenfont
 		bf_intern_audaspace
 		bf_intern_mikktspace
+		bf_intern_dualcon
 		bf_intern_cycles
 		cycles_render
 		cycles_bvh

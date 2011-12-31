@@ -26,6 +26,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "BLO_sys_types.h"
+
 #define CONTAINS_INDEX
 #define GRID_DIMENSION 20
 

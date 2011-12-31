@@ -20,6 +20,7 @@ set(INC
 	.
 	intern
 	../../extern/Eigen3
+	../../source/blender/blenloader
 )
 
 set(SRC

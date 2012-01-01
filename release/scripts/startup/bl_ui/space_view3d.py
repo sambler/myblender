@@ -255,7 +255,7 @@ class VIEW3D_MT_uv_map(Menu):
 
         layout.separator()
 
-        layout.operator_context = 'EXEC_DEFAULT'
+        layout.operator_context = 'EXEC_REGION_WIN'
         layout.operator("uv.cube_project")
         layout.operator("uv.cylinder_project")
         layout.operator("uv.sphere_project")
@@ -1010,6 +1010,7 @@ class VIEW3D_MT_object_game(Menu):
         layout = self.layout
 
         layout.operator("object.logic_bricks_copy", text="Copy Logic Bricks")
+        layout.operator("object.game_physics_copy", text="Copy Physics Properties")
 
         layout.separator()
 
@@ -2263,6 +2264,8 @@ class VIEW3D_PT_view3d_meshdisplay(Panel):
         col.prop(mesh, "show_extra_edge_length")
         col.prop(mesh, "show_extra_face_angle")
         col.prop(mesh, "show_extra_face_area")
+        if bpy.app.debug:
+          col.prop(mesh, "show_extra_indices")
 
 
 class VIEW3D_PT_view3d_curvedisplay(Panel):
@@ -2313,10 +2316,16 @@ class VIEW3D_PT_background_image(Panel):
             row.prop(bg, "show_expanded", text="", emboss=False)
             if bg.source == 'IMAGE' and bg.image:
                 row.prop(bg.image, "name", text="", emboss=False)
-            elif bg.source == 'MOVIE' and bg.clip:
+            elif bg.source == 'MOVIE_CLIP' and bg.clip:
                 row.prop(bg.clip, "name", text="", emboss=False)
             else:
                 row.label(text="Not Set")
+
+            if bg.show_background_image:
+                row.prop(bg, "show_background_image", text="", emboss=False, icon='RESTRICT_VIEW_OFF')
+            else:
+                row.prop(bg, "show_background_image", text="", emboss=False, icon='RESTRICT_VIEW_ON')
+
             row.operator("view3d.background_image_remove", text="", emboss=False, icon='X').index = i
 
             box.prop(bg, "view_axis", text="Axis")
@@ -2333,7 +2342,7 @@ class VIEW3D_PT_background_image(Panel):
                         box.template_image(bg, "image", bg.image_user, compact=True)
                         has_bg = True
 
-                elif bg.source == 'MOVIE':
+                elif bg.source == 'MOVIE_CLIP':
                     box.prop(bg, 'use_camera_clip')
 
                     column = box.column()

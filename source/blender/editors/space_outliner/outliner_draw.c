@@ -893,9 +893,11 @@ struct DrawIconArg {
 static void tselem_draw_icon_uibut(struct DrawIconArg *arg, int icon)
 {
 	/* restrict collumn clip... it has been coded by simply overdrawing, doesnt work for buttons */
-	if(arg->x >= arg->xmax) 
-		UI_icon_draw(arg->x, arg->y, icon);
-	else {
+	if(arg->x >= arg->xmax) {
+		glEnable(GL_BLEND);
+		UI_icon_draw_aspect(arg->x, arg->y, icon, 1.0f, arg->alpha);
+		glDisable(GL_BLEND);
+	} else {
 		/* XXX investigate: button placement of icons is way different than UI_icon_draw? */
 		float ufac= UI_UNIT_X/20.0f;
 		uiBut *but= uiDefIconBut(arg->block, LABEL, 0, icon, arg->x-3.0f*ufac, arg->y, UI_UNIT_X-4.0f*ufac, UI_UNIT_Y-4.0f*ufac, NULL, 0.0, 0.0, 1.0, arg->alpha, (arg->id && arg->id->lib) ? arg->id->lib->name : "");
@@ -1012,6 +1014,8 @@ static void tselem_draw_icon(uiBlock *block, int xmax, float x, float y, TreeSto
 						UI_icon_draw(x, y, ICON_MOD_SOLIDIFY); break;
 					case eModifierType_Screw:
 						UI_icon_draw(x, y, ICON_MOD_SCREW); break;
+					case eModifierType_Remesh:
+						UI_icon_draw(x, y, ICON_MOD_REMESH); break;
 					case eModifierType_WeightVGEdit:
 					case eModifierType_WeightVGMix:
 					case eModifierType_WeightVGProximity:

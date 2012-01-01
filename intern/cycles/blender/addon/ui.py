@@ -22,8 +22,7 @@ import bpy
 
 from bpy.types import Panel, Menu
 
-from cycles import enums
-from cycles import engine
+from . import enums, engine
 
 
 class CYCLES_MT_integrator_presets(Menu):
@@ -161,18 +160,17 @@ class CyclesRender_PT_layers(CyclesButtonsPanel, Panel):
         scene = context.scene
         rd = scene.render
 
-        # row = layout.row()
-        # row.template_list(rd, "layers", rd.layers, "active_index", rows=2)
+        row = layout.row()
+        row.template_list(rd, "layers", rd.layers, "active_index", rows=2)
 
-        # col = row.column(align=True)
-        # col.operator("scene.render_layer_add", icon='ZOOMIN', text="")
-        # col.operator("scene.render_layer_remove", icon='ZOOMOUT', text="")
+        col = row.column(align=True)
+        col.operator("scene.render_layer_add", icon='ZOOMIN', text="")
+        col.operator("scene.render_layer_remove", icon='ZOOMOUT', text="")
 
         row = layout.row()
-        # rl = rd.layers.active
-        rl = rd.layers[0]
+        rl = rd.layers.active
         row.prop(rl, "name")
-        #row.prop(rd, "use_single_layer", text="", icon_only=True)
+        row.prop(rd, "use_single_layer", text="", icon_only=True)
 
         split = layout.split()
 
@@ -184,6 +182,7 @@ class CyclesRender_PT_layers(CyclesButtonsPanel, Panel):
 
         layout.separator()
 
+        rl = rd.layers[0]
         layout.prop(rl, "material_override", text="Material")
 
 
@@ -295,7 +294,12 @@ class Cycles_PT_mesh_displacement(CyclesButtonsPanel, Panel):
 
     @classmethod
     def poll(cls, context):
-        return CyclesButtonsPanel.poll(context) and (context.mesh or context.curve or context.meta_ball)
+        if CyclesButtonsPanel.poll(context):
+            if context.mesh or context.curve or context.meta_ball:
+                if context.scene.cycles.feature_set == 'EXPERIMENTAL':
+                    return True
+
+        return False
 
     def draw(self, context):
         layout = self.layout
@@ -324,7 +328,7 @@ class CyclesObject_PT_ray_visibility(CyclesButtonsPanel, Panel):
     @classmethod
     def poll(cls, context):
         ob = context.object
-        return CyclesButtonsPanel.poll(context) and ob and ob.type in ('MESH', 'CURVE', 'CURVE', 'SURFACE', 'FONT', 'META')  # todo: 'LAMP'
+        return CyclesButtonsPanel.poll(context) and ob and ob.type in {'MESH', 'CURVE', 'CURVE', 'SURFACE', 'FONT', 'META'}  # todo: 'LAMP'
 
     def draw(self, context):
         layout = self.layout
@@ -399,7 +403,7 @@ class CyclesLamp_PT_lamp(CyclesButtonsPanel, Panel):
         split = layout.split()
         col = split.column(align=True)
 
-        if lamp.type in ('POINT', 'SUN', 'SPOT'):
+        if lamp.type in {'POINT', 'SUN', 'SPOT'}:
             col.prop(lamp, "shadow_soft_size", text="Size")
         elif lamp.type == 'AREA':
             col.prop(lamp, "shape", text="")
@@ -460,7 +464,8 @@ class CyclesWorld_PT_volume(CyclesButtonsPanel, Panel):
     @classmethod
     def poll(cls, context):
         # world = context.world
-        return False  # world and world.node_tree and CyclesButtonsPanel.poll(context)
+        # world and world.node_tree and CyclesButtonsPanel.poll(context)
+        return False
 
     def draw(self, context):
         layout = self.layout
@@ -494,7 +499,8 @@ class CyclesMaterial_PT_volume(CyclesButtonsPanel, Panel):
     @classmethod
     def poll(cls, context):
         # mat = context.material
-        return False  # mat and mat.node_tree and CyclesButtonsPanel.poll(context)
+        # mat and mat.node_tree and CyclesButtonsPanel.poll(context)
+        return False
 
     def draw(self, context):
         layout = self.layout
@@ -705,15 +711,18 @@ def draw_device(self, context):
     if scene.render.engine == "CYCLES":
         cscene = scene.cycles
 
+        layout.prop(cscene, "feature_set")
+        experimental = cscene.feature_set == 'EXPERIMENTAL'
+
         available_devices = engine.available_devices()
         available_cuda = 'cuda' in available_devices
-        available_opencl = 'opencl' in available_devices
+        available_opencl = experimental and 'opencl' in available_devices
 
         if available_cuda or available_opencl:
             layout.prop(cscene, "device")
             if cscene.device == 'GPU' and available_cuda and available_opencl:
                 layout.prop(cscene, "gpu_type")
-        if cscene.device == 'CPU' and engine.with_osl():
+        if experimental and cscene.device == 'CPU' and engine.with_osl():
             layout.prop(cscene, "shading_system")
 
 
@@ -730,12 +739,18 @@ def draw_pause(self, context):
 
 
 def get_panels():
-    return [
+    return (
         bpy.types.RENDER_PT_render,
         bpy.types.RENDER_PT_output,
         bpy.types.RENDER_PT_encoding,
         bpy.types.RENDER_PT_dimensions,
         bpy.types.RENDER_PT_stamp,
+        bpy.types.SCENE_PT_scene,
+        bpy.types.SCENE_PT_audio,
+        bpy.types.SCENE_PT_unit,
+        bpy.types.SCENE_PT_keying_sets,
+        bpy.types.SCENE_PT_keying_set_paths,
+        bpy.types.SCENE_PT_physics,
         bpy.types.WORLD_PT_context_world,
         bpy.types.DATA_PT_context_mesh,
         bpy.types.DATA_PT_context_camera,
@@ -782,7 +797,8 @@ def get_panels():
         bpy.types.PARTICLE_PT_field_weights,
         bpy.types.PARTICLE_PT_force_fields,
         bpy.types.PARTICLE_PT_vertexgroups,
-        bpy.types.PARTICLE_PT_custom_props]
+        bpy.types.PARTICLE_PT_custom_props,
+        )
 
 
 def register():

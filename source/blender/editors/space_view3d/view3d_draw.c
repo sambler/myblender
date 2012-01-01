@@ -1506,6 +1506,10 @@ static void draw_bgpic(Scene *scene, ARegion *ar, View3D *v3d)
 			(bgpic->view & (1<<rv3d->view)) || /* check agaist flags */
 			(rv3d->persp==RV3D_CAMOB && bgpic->view == (1<<RV3D_VIEW_CAMERA))
 		) {
+			/* disable individual images */
+			if((bgpic->flag&V3D_BGPIC_DISABLED))
+				continue;
+
 			freeibuf= NULL;
 			if(bgpic->source==V3D_BGPIC_IMAGE) {
 				ima= bgpic->ima;
@@ -1517,9 +1521,6 @@ static void draw_bgpic(Scene *scene, ARegion *ar, View3D *v3d)
 				clip= NULL;
 
 				if(bgpic->flag&V3D_BGPIC_CAMERACLIP) {
-					if(!scene->camera)
-						scene->camera= scene_find_camera(scene);
-
 					if(scene->camera)
 						clip= object_get_movieclip(scene, scene->camera, 1);
 				} else clip= bgpic->clip;
@@ -1989,7 +1990,7 @@ void draw_depth_gpencil(Scene *scene, ARegion *ar, View3D *v3d)
 	setwinmatrixview3d(ar, v3d, NULL);	/* 0= no pick rect */
 	setviewmatrixview3d(scene, v3d, rv3d);	/* note: calls where_is_object for camera... */
 
-	mul_m4_m4m4(rv3d->persmat, rv3d->viewmat, rv3d->winmat);
+	mult_m4_m4m4(rv3d->persmat, rv3d->winmat, rv3d->viewmat);
 	invert_m4_m4(rv3d->persinv, rv3d->persmat);
 	invert_m4_m4(rv3d->viewinv, rv3d->viewmat);
 
@@ -2024,7 +2025,7 @@ void draw_depth(Scene *scene, ARegion *ar, View3D *v3d, int (* func)(void *))
 	setwinmatrixview3d(ar, v3d, NULL);	/* 0= no pick rect */
 	setviewmatrixview3d(scene, v3d, rv3d);	/* note: calls where_is_object for camera... */
 	
-	mul_m4_m4m4(rv3d->persmat, rv3d->viewmat, rv3d->winmat);
+	mult_m4_m4m4(rv3d->persmat, rv3d->winmat, rv3d->viewmat);
 	invert_m4_m4(rv3d->persinv, rv3d->persmat);
 	invert_m4_m4(rv3d->viewinv, rv3d->viewmat);
 	
@@ -2215,7 +2216,7 @@ static void gpu_update_lamps_shadows(Scene *scene, View3D *v3d)
 		copy_m4_m4(rv3d.winmat, winmat);
 		copy_m4_m4(rv3d.viewmat, viewmat);
 		invert_m4_m4(rv3d.viewinv, rv3d.viewmat);
-		mul_m4_m4m4(rv3d.persmat, rv3d.viewmat, rv3d.winmat);
+		mult_m4_m4m4(rv3d.persmat, rv3d.winmat, rv3d.viewmat);
 		invert_m4_m4(rv3d.persinv, rv3d.viewinv);
 
 		ED_view3d_draw_offscreen(scene, v3d, &ar, winsize, winsize, viewmat, winmat);
@@ -2297,7 +2298,7 @@ static void view3d_main_area_setup_view(Scene *scene, View3D *v3d, ARegion *ar, 
 		setviewmatrixview3d(scene, v3d, rv3d);	/* note: calls where_is_object for camera... */
 	
 	/* update utilitity matrices */
-	mul_m4_m4m4(rv3d->persmat, rv3d->viewmat, rv3d->winmat);
+	mult_m4_m4m4(rv3d->persmat, rv3d->winmat, rv3d->viewmat);
 	invert_m4_m4(rv3d->persinv, rv3d->persmat);
 	invert_m4_m4(rv3d->viewinv, rv3d->viewmat);
 
@@ -2551,7 +2552,7 @@ ImBuf *ED_view3d_draw_offscreen_imbuf_simple(Scene *scene, Object *camera, int w
 		v3d.lens= params.lens;
 	}
 
-	mul_m4_m4m4(rv3d.persmat, rv3d.viewmat, rv3d.winmat);
+	mult_m4_m4m4(rv3d.persmat, rv3d.winmat, rv3d.viewmat);
 	invert_m4_m4(rv3d.persinv, rv3d.viewinv);
 
 	return ED_view3d_draw_offscreen_imbuf(scene, &v3d, &ar, width, height, flag, err_out);
@@ -2643,28 +2644,10 @@ static int view3d_main_area_draw_engine(const bContext *C, ARegion *ar)
 
 static void view3d_main_area_draw_engine_info(RegionView3D *rv3d, ARegion *ar)
 {
-	rcti rect;
-	const int header_height = 18;
-
 	if(!rv3d->render_engine || !rv3d->render_engine->text)
 		return;
-	
-	/* background box */
-	rect= ar->winrct;
-	rect.xmin= 0;
-	rect.ymin= ar->winrct.ymax - ar->winrct.ymin - header_height;
-	rect.xmax= ar->winrct.xmax - ar->winrct.xmin;
-	rect.ymax= ar->winrct.ymax - ar->winrct.ymin;
 
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-	glColor4f(0.0f, 0.0f, 0.0f, 0.25f);
-	glRecti(rect.xmin, rect.ymin, rect.xmax+1, rect.ymax+1);
-	glDisable(GL_BLEND);
-	
-	/* text */
-	UI_ThemeColor(TH_TEXT_HI);
-	UI_DrawString(12, rect.ymin + 5, rv3d->render_engine->text);
+	ED_region_info_draw(ar, rv3d->render_engine->text, 1, 0.25);
 }
 
 /* warning: this function has duplicate drawing in ED_view3d_draw_offscreen() */

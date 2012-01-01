@@ -717,10 +717,10 @@ static void rna_ImageFormatSettings_file_format_set(PointerRNA *ptr, int value)
 		Scene *scene= ptr->id.data;
 		RenderData *rd= &scene->r;
 #ifdef WITH_FFMPEG
-		ffmpeg_verify_image_type(rd);
+		ffmpeg_verify_image_type(rd, imf);
 #endif
 #ifdef WITH_QUICKTIME
-		quicktime_verify_image_type(rd);
+		quicktime_verify_image_type(rd, imf);
 #endif
 		(void)rd;
 	}
@@ -1271,6 +1271,13 @@ static void rna_GameSettings_auto_start_set(PointerRNA *UNUSED(ptr), int value)
 		G.fileflags &= ~G_FILE_AUTOPLAY;
 }
 
+static void rna_GameSettings_exit_key_set(PointerRNA *ptr, int value)
+{
+	GameData *gm = (GameData*)ptr->data;
+
+	if(ISKEYBOARD(value))
+		gm->exitkey=value;
+}
 
 static TimeMarker *rna_TimeLine_add(Scene *scene, const char name[])
 {
@@ -2218,6 +2225,13 @@ static void rna_def_scene_game_data(BlenderRNA *brna)
 	RNA_def_property_range(prop, 8, 32);
 	RNA_def_property_ui_text(prop, "Bits", "Display bit depth of full screen display");
 	RNA_def_property_update(prop, NC_SCENE, NULL);
+
+	prop= RNA_def_property(srna, "exit_key", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "exitkey");
+	RNA_def_property_enum_items(prop, event_type_items);
+	RNA_def_property_enum_funcs(prop, NULL, "rna_GameSettings_exit_key_set", NULL);
+	RNA_def_property_ui_text(prop, "Exit Key",  "The key that exits the Game Engine");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
 	
 	// Do we need it here ? (since we already have it in World
 	prop= RNA_def_property(srna, "frequency", PROP_INT, PROP_NONE);
@@ -2613,7 +2627,7 @@ static void rna_def_scene_image_format_data(BlenderRNA *brna)
 	/* flag */
 	prop= RNA_def_property(srna, "use_zbuffer", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", R_IMF_FLAG_ZBUF);
-	RNA_def_property_ui_text(prop, "Z Buffer", "Save the z-depth per pixel (32 bit unsigned int z-buffer)Save the z-depth per pixel (32 bit unsigned int z-buffer)");
+	RNA_def_property_ui_text(prop, "Z Buffer", "Save the z-depth per pixel (32 bit unsigned int z-buffer)");
 	RNA_def_property_update(prop, NC_SCENE|ND_RENDER_OPTIONS, NULL);
 
 	prop= RNA_def_property(srna, "use_preview", PROP_BOOLEAN, PROP_NONE);
@@ -3329,7 +3343,11 @@ static void rna_def_scene_render_data(BlenderRNA *brna)
 	RNA_def_property_boolean_sdna(prop, NULL, "color_mgt_flag", R_COLOR_MANAGEMENT);
 	RNA_def_property_ui_text(prop, "Color Management", "Use linear workflow - gamma corrected imaging pipeline");
 	RNA_def_property_update(prop, NC_SCENE|ND_RENDER_OPTIONS, "rna_RenderSettings_color_management_update");
-
+	
+	prop= RNA_def_property(srna, "use_color_unpremultiply", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "color_mgt_flag", R_COLOR_MANAGEMENT_PREDIVIDE);
+	RNA_def_property_ui_text(prop, "Color Unpremultipy", "For premultiplied alpha render output, do color space conversion on colors without alpha, to avoid fringing on light backgrounds");
+	RNA_def_property_update(prop, NC_SCENE|ND_RENDER_OPTIONS, NULL);
 	
 	prop= RNA_def_property(srna, "use_file_extension", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "scemode", R_EXTENSION);

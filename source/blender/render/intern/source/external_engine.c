@@ -113,6 +113,12 @@ RenderEngineType *RE_engines_find(const char *idname)
 	return type;
 }
 
+int RE_engine_is_external(Render *re)
+{
+	RenderEngineType *type= RE_engines_find(re->r.engine);
+	return (type && type->render);
+}
+
 /* Create, Free */
 
 RenderEngine *RE_engine_create(RenderEngineType *type)
@@ -184,6 +190,11 @@ void RE_engine_end_result(RenderEngine *engine, RenderResult *result)
 
 	if(!result)
 		return;
+	
+	result->tilerect.xmin += re->disprect.xmin;
+	result->tilerect.xmax += re->disprect.xmin;
+	result->tilerect.ymin += re->disprect.ymin;
+	result->tilerect.ymax += re->disprect.ymin;
 
 	/* merge. on break, don't merge in result for preview renders, looks nicer */
 	if(!(re->test_break(re->tbh) && (re->r.scemode & R_PREVIEWBUTS)))

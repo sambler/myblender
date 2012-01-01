@@ -580,7 +580,7 @@ void RNA_free(BlenderRNA *brna)
 static size_t rna_property_type_sizeof(PropertyType type)
 {
 	switch(type) {
-		case PROP_BOOLEAN: return sizeof(BooleanPropertyRNA);
+		case PROP_BOOLEAN: return sizeof(BoolPropertyRNA);
 		case PROP_INT: return sizeof(IntPropertyRNA);
 		case PROP_FLOAT: return sizeof(FloatPropertyRNA);
 		case PROP_STRING: return sizeof(StringPropertyRNA);
@@ -1308,7 +1308,7 @@ void RNA_def_property_boolean_default(PropertyRNA *prop, int value)
 
 	switch(prop->type) {
 		case PROP_BOOLEAN: {
-			BooleanPropertyRNA *bprop= (BooleanPropertyRNA*)prop;
+			BoolPropertyRNA *bprop= (BoolPropertyRNA*)prop;
 			bprop->defaultvalue= value;
 			break;
 		}
@@ -1325,7 +1325,7 @@ void RNA_def_property_boolean_array_default(PropertyRNA *prop, const int *array)
 
 	switch(prop->type) {
 		case PROP_BOOLEAN: {
-			BooleanPropertyRNA *bprop= (BooleanPropertyRNA*)prop;
+			BoolPropertyRNA *bprop= (BoolPropertyRNA*)prop;
 			bprop->defaultarray= array;
 			break;
 		}
@@ -1824,6 +1824,11 @@ void RNA_def_property_collection_sdna(PropertyRNA *prop, const char *structname,
 	}
 }
 
+void RNA_def_property_translation_context(PropertyRNA *prop, const char *context)
+{
+	prop->translation_context= context;
+}
+
 /* Functions */
 
 void RNA_def_property_editable_func(PropertyRNA *prop, const char *editable)
@@ -1889,7 +1894,7 @@ void RNA_def_property_boolean_funcs(PropertyRNA *prop, const char *get, const ch
 
 	switch(prop->type) {
 		case PROP_BOOLEAN: {
-			BooleanPropertyRNA *bprop= (BooleanPropertyRNA*)prop;
+			BoolPropertyRNA *bprop= (BoolPropertyRNA*)prop;
 
 			if(prop->arraydimension) {
 				if(get) bprop->getarray= (PropBooleanArrayGetFunc)get;
@@ -2806,7 +2811,7 @@ void RNA_def_property_duplicate_pointers(StructOrFunctionRNA *cont_, PropertyRNA
 
 	switch(prop->type) {
 		case PROP_BOOLEAN: {
-			BooleanPropertyRNA *bprop= (BooleanPropertyRNA*)prop;
+			BoolPropertyRNA *bprop= (BoolPropertyRNA*)prop;
 
 			if(bprop->defaultarray) {
 				iarray= MEM_callocN(sizeof(int)*prop->totarraylength, "RNA_def_property_store");
@@ -2875,7 +2880,7 @@ void RNA_def_property_free_pointers(PropertyRNA *prop)
 
 		switch(prop->type) {
 			case PROP_BOOLEAN: {
-				BooleanPropertyRNA *bprop= (BooleanPropertyRNA*)prop;
+				BoolPropertyRNA *bprop= (BoolPropertyRNA*)prop;
 				if(bprop->defaultarray) MEM_freeN((void*)bprop->defaultarray);
 				break;
 			}

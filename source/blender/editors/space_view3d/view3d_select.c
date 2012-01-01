@@ -135,13 +135,13 @@ int view3d_get_view_aligned_coordinate(ViewContext *vc, float fp[3], const int m
 /*
  * ob == NULL if you want global matrices
  * */
-void view3d_get_transformation(ARegion *ar, RegionView3D *rv3d, Object *ob, bglMats *mats)
+void view3d_get_transformation(const ARegion *ar, RegionView3D *rv3d, Object *ob, bglMats *mats)
 {
 	float cpy[4][4];
 	int i, j;
 
 	if (ob) {
-		mul_m4_m4m4(cpy, ob->obmat, rv3d->viewmat);
+		mult_m4_m4m4(cpy, rv3d->viewmat, ob->obmat);
 	} else {
 		copy_m4_m4(cpy, rv3d->viewmat);
 	}
@@ -521,17 +521,17 @@ static void do_lasso_select_mesh(ViewContext *vc, int mcords[][2], short moves, 
 			EM_backbuf_checkAndSelectVerts(vc->em, select);
 		}
 		else {
-			mesh_foreachScreenVert(vc, do_lasso_select_mesh__doSelectVert, &data, 1);
+			mesh_foreachScreenVert(vc, do_lasso_select_mesh__doSelectVert, &data, V3D_CLIP_TEST_RV3D_CLIPPING);
 		}
 	}
 	if(ts->selectmode & SCE_SELECT_EDGE) {
 		/* Does both bbsel and non-bbsel versions (need screen cos for both) */
 		data.pass = 0;
-		mesh_foreachScreenEdge(vc, do_lasso_select_mesh__doSelectEdge, &data, 0);
+		mesh_foreachScreenEdge(vc, do_lasso_select_mesh__doSelectEdge, &data, V3D_CLIP_TEST_OFF);
 
 		if (data.done==0) {
 			data.pass = 1;
-			mesh_foreachScreenEdge(vc, do_lasso_select_mesh__doSelectEdge, &data, 0);
+			mesh_foreachScreenEdge(vc, do_lasso_select_mesh__doSelectEdge, &data, V3D_CLIP_TEST_OFF);
 		}
 	}
 	
@@ -1320,6 +1320,25 @@ Base *ED_view3d_give_base_under_cursor(bContext *C, const int mval[2])
 	return basact;
 }
 
+static void deselect_all_tracks(MovieTracking *tracking)
+{
+	MovieTrackingObject *object;
+
+	object= tracking->objects.first;
+	while(object) {
+		ListBase *tracksbase= BKE_tracking_object_tracks(tracking, object);
+		MovieTrackingTrack *track= tracksbase->first;
+
+		while(track) {
+			BKE_tracking_deselect_track(track, TRACK_AREA_ALL);
+
+			track= track->next;
+		}
+
+		object= object->next;
+	}
+}
+
 /* mval is region coords */
 static int mouse_select(bContext *C, const int mval[2], short extend, short obcenter, short enumerate)
 {
@@ -1391,27 +1410,41 @@ static int mouse_select(bContext *C, const int mval[2], short extend, short obce
 				if(basact->object->type==OB_CAMERA) {
 					if(BASACT==basact) {
 						int i, hitresult;
-						MovieTrackingTrack *track;
+						int changed= 0;
 
 						for (i=0; i< hits; i++) {
 							hitresult= buffer[3+(i*4)];
 
 							/* if there's bundles in buffer select bundles first,
 							   so non-camera elements should be ignored in buffer */
-							if(basact->selcol != (hitresult & 0xFFFF))
+							if(basact->selcol != (hitresult & 0xFFFF)) {
 								continue;
+							}
 
 							/* index of bundle is 1<<16-based. if there's no "bone" index
 							   in hight word, this buffer value belongs to camera,. not to bundle */
 							if(buffer[4*i+3] & 0xFFFF0000) {
 								MovieClip *clip= object_get_movieclip(scene, basact->object, 0);
-								int selected;
-								track= BKE_tracking_indexed_track(&clip->tracking, hitresult >> 16);
+								MovieTracking *tracking= &clip->tracking;
+								ListBase *tracksbase;
+								MovieTrackingTrack *track;
 
-								selected= (track->flag&SELECT) || (track->pat_flag&SELECT) || (track->search_flag&SELECT);
+								track= BKE_tracking_indexed_track(&clip->tracking, hitresult >> 16, &tracksbase);
 
-								if(selected && extend)  BKE_tracking_deselect_track(track, TRACK_AREA_ALL);
-								else BKE_tracking_select_track(&clip->tracking, track, TRACK_AREA_ALL, extend);
+								if(TRACK_SELECTED(track) && extend) {
+									changed= 0;
+									BKE_tracking_deselect_track(track, TRACK_AREA_ALL);
+								}
+								else {
+									int oldsel= TRACK_SELECTED(track) ? 1 : 0;
+									if(!extend)
+										deselect_all_tracks(tracking);
+
+									BKE_tracking_select_track(tracksbase, track, TRACK_AREA_ALL, extend);
+
+									if(oldsel!=(TRACK_SELECTED(track) ? 1 : 0))
+										changed= 1;
+								}
 
 								basact->flag|= SELECT;
 								basact->object->flag= basact->flag;
@@ -1423,6 +1456,12 @@ static int mouse_select(bContext *C, const int mval[2], short extend, short obce
 
 								break;
 							}
+						}
+
+						if(!changed) {
+							/* fallback to regular object selection if no new bundles were selected,
+							   allows to select object parented to reconstruction object */
+							basact= mouse_select_eval_buffer(&vc, buffer, hits, mval, startbase, 0);
 						}
 					}
 				}
@@ -1644,18 +1683,18 @@ static int do_mesh_box_select(ViewContext *vc, rcti *rect, int select, int exten
 		if (bbsel) {
 			EM_backbuf_checkAndSelectVerts(vc->em, select);
 		} else {
-			mesh_foreachScreenVert(vc, do_mesh_box_select__doSelectVert, &data, 1);
+			mesh_foreachScreenVert(vc, do_mesh_box_select__doSelectVert, &data, V3D_CLIP_TEST_RV3D_CLIPPING);
 		}
 	}
 	if(ts->selectmode & SCE_SELECT_EDGE) {
 			/* Does both bbsel and non-bbsel versions (need screen cos for both) */
 
 		data.pass = 0;
-		mesh_foreachScreenEdge(vc, do_mesh_box_select__doSelectEdge, &data, 0);
+		mesh_foreachScreenEdge(vc, do_mesh_box_select__doSelectEdge, &data, V3D_CLIP_TEST_OFF);
 
 		if (data.done==0) {
 			data.pass = 1;
-			mesh_foreachScreenEdge(vc, do_mesh_box_select__doSelectEdge, &data, 0);
+			mesh_foreachScreenEdge(vc, do_mesh_box_select__doSelectEdge, &data, V3D_CLIP_TEST_OFF);
 		}
 	}
 	
@@ -2170,7 +2209,7 @@ static void mesh_circle_select(ViewContext *vc, int select, const int mval[2], f
 		if(bbsel) {
 			EM_backbuf_checkAndSelectVerts(vc->em, select==LEFTMOUSE);
 		} else {
-			mesh_foreachScreenVert(vc, mesh_circle_doSelectVert, &data, 1);
+			mesh_foreachScreenVert(vc, mesh_circle_doSelectVert, &data, V3D_CLIP_TEST_RV3D_CLIPPING);
 		}
 	}
 
@@ -2178,7 +2217,7 @@ static void mesh_circle_select(ViewContext *vc, int select, const int mval[2], f
 		if (bbsel) {
 			EM_backbuf_checkAndSelectEdges(vc->em, select==LEFTMOUSE);
 		} else {
-			mesh_foreachScreenEdge(vc, mesh_circle_doSelectEdge, &data, 0);
+			mesh_foreachScreenEdge(vc, mesh_circle_doSelectEdge, &data, V3D_CLIP_TEST_OFF);
 		}
 	}
 	

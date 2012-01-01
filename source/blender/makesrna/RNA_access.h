@@ -88,7 +88,7 @@ extern StructRNA RNA_BoidState;
 extern StructRNA RNA_Bone;
 extern StructRNA RNA_BoneGroup;
 extern StructRNA RNA_BooleanModifier;
-extern StructRNA RNA_BooleanProperty;
+extern StructRNA RNA_BoolProperty;
 extern StructRNA RNA_Brush;
 extern StructRNA RNA_BrushTextureSlot;
 extern StructRNA RNA_BuildModifier;
@@ -330,6 +330,7 @@ extern StructRNA RNA_MotionPath;
 extern StructRNA RNA_MotionPathVert;
 extern StructRNA RNA_MouseSensor;
 extern StructRNA RNA_MovieSequence;
+extern StructRNA RNA_MovieTrackingObject;
 extern StructRNA RNA_MulticamSequence;
 extern StructRNA RNA_MultiresModifier;
 extern StructRNA RNA_MusgraveTexture;
@@ -1000,7 +1001,7 @@ StructRNA *ID_code_to_RNA_type(short idcode);
 #ifdef __GNUC__
 #  define RNA_warning(format, args...) _RNA_warning("%s: " format "\n", __func__, ##args)
 #else
-#  define RNA_warning(format, args, ...) _RNA_warning("%s: " format "\n", __FUNCTION__, __VA_ARGS__)
+#  define RNA_warning(format, ...) _RNA_warning("%s: " format "\n", __FUNCTION__, __VA_ARGS__)
 #endif
 
 void _RNA_warning(const char *format, ...)

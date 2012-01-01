@@ -161,7 +161,7 @@ void ED_armature_edit_bone_remove(bArmature *arm, EditBone *exBone)
 EditBone *ED_armature_bone_get_mirrored(ListBase *edbo, EditBone *ebo)
 {
 	EditBone *eboflip= NULL;
-	char name[32];
+	char name[MAXBONENAME];
 	
 	if (ebo == NULL)
 		return NULL;
@@ -936,7 +936,7 @@ int join_armature_exec(bContext *C, wmOperator *UNUSED(op))
 			
 			/* Find the difference matrix */
 			invert_m4_m4(oimat, ob->obmat);
-			mul_m4_m4m4(mat, base->object->obmat, oimat);
+			mult_m4_m4m4(mat, oimat, base->object->obmat);
 			
 			/* Copy bones and posechannels from the object to the edit armature */
 			for (pchan=opose->chanbase.first; pchan; pchan=pchann) {
@@ -972,7 +972,7 @@ int join_armature_exec(bContext *C, wmOperator *UNUSED(op))
 					
 					/* Find the roll */
 					invert_m4_m4(imat, premat);
-					mul_m4_m4m4(difmat, postmat, imat);
+					mult_m4_m4m4(difmat, imat, postmat);
 					
 					curbone->roll -= (float)atan2(difmat[2][0], difmat[2][2]);
 				}
@@ -4663,7 +4663,7 @@ static void add_verts_to_dgroups(ReportList *reports, Scene *scene, Object *ob, 
 		
 		/* find flipped group */
 		if (dgroup && mirror) {
-			char name[32];
+			char name[MAXBONENAME];
 
 			// 0 = don't strip off number extensions
 			flip_side_name(name, dgroup->name, FALSE);
@@ -5456,7 +5456,7 @@ static int armature_flip_names_exec (bContext *C, wmOperator *UNUSED(op))
 {
 	Object *ob= CTX_data_edit_object(C);
 	bArmature *arm;
-	char newname[32];
+	char newname[MAXBONENAME];
 	
 	/* paranoia checks */
 	if (ELEM(NULL, ob, ob->pose)) 

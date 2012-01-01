@@ -214,6 +214,21 @@ public:
 		return string("CUDA ") + deviceName;
 	}
 
+	bool support_device(bool experimental)
+	{
+		if(!experimental) {
+			int major, minor;
+			cuDeviceComputeCapability(&major, &minor, cuDevId);
+
+			if(major <= 1 && minor <= 2) {
+				cuda_error(string_printf("CUDA device supported only with compute capability 1.3 or up, found %d.%d.", major, minor));
+				return false;
+			}
+		}
+
+		return true;
+	}
+
 	string compile_kernel()
 	{
 		/* compute cubin name */
@@ -236,8 +251,11 @@ public:
 		if(path_exists(cubin))
 			return cubin;
 
-#ifdef WITH_CUDA_BINARIES
-		cuda_error("CUDA binary kernel for this graphics card not found.");
+#if defined(WITH_CUDA_BINARIES) && defined(_WIN32)
+		if(major <= 1 && minor <= 2)
+			cuda_error(string_printf("CUDA device supported only compute capability 1.3 or up, found %d.%d.", major, minor));
+		else
+			cuda_error(string_printf("CUDA binary kernel for this graphics card compute capability (%d.%d) not found.", major, minor));
 		return "";
 #else
 		/* if not, find CUDA compiler */
@@ -280,10 +298,13 @@ public:
 #endif
 	}
 
-	bool load_kernels()
+	bool load_kernels(bool experimental)
 	{
 		/* check if cuda init succeeded */
 		if(cuContext == 0)
+			return false;
+
+		if(!support_device(experimental))
 			return false;
 
 		/* get kernel */
@@ -499,6 +520,12 @@ public:
 		cuda_assert(cuParamSeti(cuPathTrace, offset, task.h))
 		offset += sizeof(task.h);
 
+		cuda_assert(cuParamSeti(cuPathTrace, offset, task.offset))
+		offset += sizeof(task.offset);
+
+		cuda_assert(cuParamSeti(cuPathTrace, offset, task.stride))
+		offset += sizeof(task.stride);
+
 		cuda_assert(cuParamSetSize(cuPathTrace, offset))
 
 		/* launch kernel: todo find optimal size, cache config for fermi */
@@ -559,6 +586,12 @@ public:
 
 		cuda_assert(cuParamSeti(cuFilmConvert, offset, task.h))
 		offset += sizeof(task.h);
+
+		cuda_assert(cuParamSeti(cuFilmConvert, offset, task.offset))
+		offset += sizeof(task.offset);
+
+		cuda_assert(cuParamSeti(cuFilmConvert, offset, task.stride))
+		offset += sizeof(task.stride);
 
 		cuda_assert(cuParamSetSize(cuFilmConvert, offset))
 

@@ -3795,6 +3795,8 @@ static int ui_do_but_CURVE(bContext *C, uiBlock *block, uiBut *but, uiHandleButt
 			}
 
 			if (sel == -1) {
+				int i;
+
 				/* if the click didn't select anything, check if it's clicked on the 
 				 * curve itself, and if so, add a point */
 				fx= ((float)mx - but->x1)/zoomx + offsx;
@@ -3804,8 +3806,10 @@ static int ui_do_but_CURVE(bContext *C, uiBlock *block, uiBut *but, uiHandleButt
 
 				/* loop through the curve segment table and find what's near the mouse.
 				 * 0.05 is kinda arbitrary, but seems to be what works nicely. */
-				for(a=0; a<=CM_TABLE; a++) {			
-					if ( ( fabs(fx - cmp[a].x) < (0.05) ) && ( fabs(fy - cmp[a].y) < (0.05) ) ) {
+				for(i=0; i<=CM_TABLE; i++) {
+					if ( (fabsf(fx - cmp[i].x) < 0.05f) &&
+					     (fabsf(fy - cmp[i].y) < 0.05f))
+					{
 					
 						curvemap_insert(cuma, fx, fy);
 						curvemapping_changed(cumap, 0);
@@ -5238,9 +5242,13 @@ static void button_activate_state(bContext *C, uiBut *but, uiHandleButtonState s
 	data->state= state;
 
 	if(state != BUTTON_STATE_EXIT) {
-		/* When objects for eg. are removed, running ui_check_but()
-		 * can access the removed data - so disable update on exit */
-		ui_check_but(but);
+		/* When objects for eg. are removed, running ui_check_but() can access
+		   the removed data - so disable update on exit. Also in case of
+		   highlight when not in a popup menu, we remove because data used in
+		   button below popup might have been removed by action of popup. Needs
+		   a more reliable solution... */
+		if(state != BUTTON_STATE_HIGHLIGHT || (but->block->flag & UI_BLOCK_LOOP))
+			ui_check_but(but);
 	}
 
 	/* redraw */
@@ -5483,6 +5491,11 @@ wmOperator *uiContextActiveOperator(const struct bContext *C)
 {
 	ARegion *ar_ctx= CTX_wm_region(C);
 	uiBlock *block;
+
+	/* background mode */
+	if (ar_ctx == NULL) {
+		return NULL;
+	}
 
 	/* scan active regions ui */
 	for(block=ar_ctx->uiblocks.first; block; block=block->next) {

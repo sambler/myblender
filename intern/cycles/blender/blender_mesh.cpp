@@ -232,10 +232,12 @@ Mesh *BlenderSync::sync_mesh(BL::Object b_ob, bool object_updated)
 
 	BL::Object::material_slots_iterator slot;
 	for(b_ob.material_slots.begin(slot); slot != b_ob.material_slots.end(); ++slot) {
-		if(render_layer.material_override)
-			find_shader(render_layer.material_override, used_shaders);
+		BL::Material material_override = render_layers.front().material_override;
+
+		if(material_override)
+			find_shader(material_override, used_shaders, scene->default_surface);
 		else
-			find_shader(slot->material(), used_shaders);
+			find_shader(slot->material(), used_shaders, scene->default_surface);
 	}
 
 	if(used_shaders.size() == 0)
@@ -281,7 +283,7 @@ Mesh *BlenderSync::sync_mesh(BL::Object b_ob, bool object_updated)
 	mesh->name = ustring(b_ob_data.name().c_str());
 
 	if(b_mesh) {
-		if(cmesh.data && RNA_boolean_get(&cmesh, "use_subdivision"))
+		if(cmesh.data && experimental && RNA_boolean_get(&cmesh, "use_subdivision"))
 			create_subd_mesh(mesh, b_mesh, &cmesh, used_shaders);
 		else
 			create_mesh(scene, mesh, b_mesh, used_shaders);
@@ -294,7 +296,7 @@ Mesh *BlenderSync::sync_mesh(BL::Object b_ob, bool object_updated)
 	if(cmesh.data) {
 		int method = RNA_enum_get(&cmesh, "displacement_method");
 
-		if(method == 0)
+		if(method == 0 || !experimental)
 			mesh->displacement_method = Mesh::DISPLACE_BUMP;
 		else if(method == 1)
 			mesh->displacement_method = Mesh::DISPLACE_TRUE;

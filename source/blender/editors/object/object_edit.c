@@ -111,6 +111,10 @@ static int pupmenu(const char *UNUSED(msg)) {return 0;}
 static bContext *evil_C;
 static void error_libdata(void) {}
 
+Object *ED_object_context(bContext *C)
+{
+	return CTX_data_pointer_get_type(C, "object", &RNA_Object).data;
+}
 
 /* find the correct active object per context
  * note: context can be NULL when called from a enum with PROP_ENUM_NO_CONTEXT */
@@ -118,7 +122,7 @@ Object *ED_object_active_context(bContext *C)
 {
 	Object *ob= NULL;
 	if(C) {
-		ob= CTX_data_pointer_get_type(C, "object", &RNA_Object).data;
+		ob= ED_object_context(C);
 		if (!ob) ob= CTX_data_active_object(C);
 	}
 	return ob;
@@ -1932,16 +1936,21 @@ void ED_object_toggle_modes(bContext *C, int mode)
 
 /************************ Game Properties ***********************/
 
-static int game_property_new(bContext *C, wmOperator *UNUSED(op))
+static int game_property_new(bContext *C, wmOperator *op)
 {
 	Object *ob= CTX_data_active_object(C);
 	bProperty *prop;
+	char name[32];
+	int type= RNA_enum_get(op->ptr, "type");
 
-	if(!ob)
-		return OPERATOR_CANCELLED;
-
-	prop= new_property(PROP_FLOAT);
+	prop= new_property(type);
 	BLI_addtail(&ob->prop, prop);
+
+	RNA_string_get(op->ptr, "name", name);
+	if (name[0] != '\0') {
+		BLI_strncpy(prop->name, name, sizeof(prop->name));
+	}
+
 	unique_property(NULL, prop, 0); // make_unique_prop_names(prop->name);
 
 	WM_event_add_notifier(C, NC_LOGIC, NULL);
@@ -1962,6 +1971,9 @@ void OBJECT_OT_game_property_new(wmOperatorType *ot)
 
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+
+	RNA_def_enum(ot->srna, "type", gameproperty_type_items, 2, "Type", "Type of game property to add");
+	RNA_def_string(ot->srna, "name", "", 32, "Name", "Name of the game property to add");
 }
 
 static int game_property_remove(bContext *C, wmOperator *op)

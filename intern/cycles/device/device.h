@@ -33,6 +33,8 @@ CCL_NAMESPACE_BEGIN
 
 class Progress;
 
+/* Device Types */
+
 enum DeviceType {
 	DEVICE_NONE,
 	DEVICE_CPU,
@@ -42,17 +44,29 @@ enum DeviceType {
 	DEVICE_MULTI
 };
 
-enum MemoryType {
-	MEM_READ_ONLY,
-	MEM_WRITE_ONLY,
-	MEM_READ_WRITE
+class DeviceInfo {
+public:
+	DeviceType type;
+	string description;
+	string id;
+	int num;
+	bool display_device;
+	vector<DeviceInfo> multi_devices;
+
+	DeviceInfo()
+	{
+		type = DEVICE_CPU;
+		id = "CPU";
+		num = 0;
+		display_device = false;
+	}
 };
 
 /* Device Task */
 
 class DeviceTask {
 public:
-	typedef enum { PATH_TRACE, TONEMAP, DISPLACE } Type;
+	typedef enum { PATH_TRACE, TONEMAP, SHADER } Type;
 	Type type;
 
 	int x, y, w, h;
@@ -63,9 +77,10 @@ public:
 	int resolution;
 	int offset, stride;
 
-	device_ptr displace_input;
-	device_ptr displace_offset;
-	int displace_x, displace_w;
+	device_ptr shader_input;
+	device_ptr shader_output;
+	int shader_eval_type;
+	int shader_x, shader_w;
 
 	DeviceTask(Type type = PATH_TRACE);
 
@@ -90,7 +105,7 @@ public:
 
 	/* info */
 	virtual string description() = 0;
-	const string& error_message() { return error_msg; }
+	virtual const string& error_message() { return error_msg; }
 
 	/* regular memory */
 	virtual void mem_alloc(device_memory& mem, MemoryType type) = 0;
@@ -126,7 +141,7 @@ public:
 	
 	/* opengl drawing */
 	virtual void draw_pixels(device_memory& mem, int y, int w, int h,
-		int width, int height, bool transparent);
+		int dy, int width, int height, bool transparent);
 
 #ifdef WITH_NETWORK
 	/* networking */
@@ -134,11 +149,12 @@ public:
 #endif
 
 	/* static */
-	static Device *create(DeviceType type, bool background = true, int threads = 0);
+	static Device *create(DeviceInfo& info, bool background = true, int threads = 0);
 
 	static DeviceType type_from_string(const char *name);
 	static string string_from_type(DeviceType type);
-	static vector<DeviceType> available_types();
+	static vector<DeviceType>& available_types();
+	static vector<DeviceInfo>& available_devices();
 };
 
 CCL_NAMESPACE_END

@@ -177,6 +177,7 @@ class SCENE_PT_keying_set_paths(SceneButtonsPanel, Panel):
 
 class SCENE_PT_wirecolour_sets(SceneButtonsPanel, Panel):
     bl_label = "Wirecolour Sets"
+    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
 
     def draw(self, context):
         layout = self.layout

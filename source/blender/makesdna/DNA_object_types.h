@@ -263,9 +263,9 @@ typedef struct Object {
 
 	float ima_ofs[2];		/* offset for image empties */
 
-	WirecolorSet *wire_colorset;	/* Index of Custom WireColorSet - index into scene.wirecolorsets
+	int wire_colorset;	/* Index of Custom WireColorSet - index into scene.wirecolorsets
 									- 0 == no colourset - index by 1 adjustment done in colourset get/set functions only */
-	char pad2[8];
+	char pad2[4];
 } Object;
 
 /* Warning, this is not used anymore because hooks are now modifiers */

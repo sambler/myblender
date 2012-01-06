@@ -1008,9 +1008,10 @@ typedef struct Scene {
 
 	/* user defined wirecolor sets */
 	int active_wirecolorset;
+	char pad7[4];
 	ListBase wirecolorsets;
 
-	char pad7[4];
+	char pad8[8];
 } Scene;
 
 

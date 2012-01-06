@@ -619,8 +619,8 @@ static void rna_Scene_all_wirecolorsets_begin(CollectionPropertyIterator *iter, 
 	 */
 	if (scene->wirecolorsets.first)
 		rna_iterator_listbase_begin(iter, &scene->wirecolorsets, NULL);
-	else
-		rna_iterator_listbase_end(iter);
+//	else
+//		rna_iterator_listbase_end(iter);
 }
 
 static void rna_Scene_all_wirecolorsets_next(CollectionPropertyIterator *iter)

@@ -318,7 +318,7 @@ class CLIP_PT_tools_object(Panel):
 
     def draw(self, context):
         layout = self.layout
-        
+
         sc = context.space_data
         clip = sc.clip
         tracking_object = clip.tracking.objects.active
@@ -854,6 +854,10 @@ class CLIP_MT_track(Menu):
 
         layout.separator()
         layout.operator("clip.clean_tracks")
+
+        layout.separator()
+        layout.operator("clip.copy_tracks")
+        layout.operator("clip.paste_tracks")
 
         layout.separator()
         props = layout.operator("clip.track_markers",

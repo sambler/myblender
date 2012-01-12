@@ -103,7 +103,6 @@ void ED_operatortypes_object(void)
 	WM_operatortype_append(OBJECT_OT_select_linked);
 	WM_operatortype_append(OBJECT_OT_select_grouped);
 	WM_operatortype_append(OBJECT_OT_select_mirror);
-	WM_operatortype_append(OBJECT_OT_select_name); /* XXX - weak, not compat with linked objects */
 
 	WM_operatortype_append(GROUP_OT_create);
 	WM_operatortype_append(GROUP_OT_objects_remove);
@@ -246,7 +245,7 @@ void ED_operatormacros_object(void)
 	ot= WM_operatortype_append_macro("OBJECT_OT_add_named_cursor", "Add named object at cursor", OPTYPE_UNDO|OPTYPE_REGISTER);
 	if(ot) {
 		ot->description = "Add named object at cursor";
-		RNA_def_string(ot->srna, "name", "Cube", 24, "Name", "Object name to add");
+		RNA_def_string(ot->srna, "name", "Cube", MAX_ID_NAME-2, "Name", "Object name to add");
 
 		WM_operatortype_macro_define(ot, "VIEW3D_OT_cursor3d");
 		WM_operatortype_macro_define(ot, "OBJECT_OT_add_named");

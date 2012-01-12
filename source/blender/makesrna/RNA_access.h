@@ -137,6 +137,7 @@ extern StructRNA RNA_CompositorNodeGamma;
 extern StructRNA RNA_CompositorNodeGlare;
 extern StructRNA RNA_CompositorNodeHueSat;
 extern StructRNA RNA_CompositorNodeIDMask;
+extern StructRNA RNA_CompositorNodeDoubleEdgeMask;
 extern StructRNA RNA_CompositorNodeImage;
 extern StructRNA RNA_CompositorNodeInvert;
 extern StructRNA RNA_CompositorNodeLensdist;
@@ -933,7 +934,8 @@ void RNA_collection_clear(PointerRNA *ptr, const char *name);
 	}
 
 /* check if the idproperty exists, for operators */
-int RNA_property_is_set(PointerRNA *ptr, const char *name);
+int RNA_property_is_set(PointerRNA *ptr, PropertyRNA *prop);
+int RNA_struct_property_is_set(PointerRNA *ptr, const char *identifier);
 int RNA_property_is_idprop(PropertyRNA *prop);
 
 /* python compatible string representation of this property, (must be freed!) */

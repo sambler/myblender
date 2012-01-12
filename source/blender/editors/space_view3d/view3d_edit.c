@@ -1585,8 +1585,8 @@ static int viewzoom_exec(bContext *C, wmOperator *op)
 	v3d= sa->spacedata.first;
 	rv3d= ar->regiondata;
 
-	mx= RNA_property_is_set(op->ptr, "mx") ? RNA_int_get(op->ptr, "mx") : ar->winx / 2;
-	my= RNA_property_is_set(op->ptr, "my") ? RNA_int_get(op->ptr, "my") : ar->winy / 2;
+	mx= RNA_struct_property_is_set(op->ptr, "mx") ? RNA_int_get(op->ptr, "mx") : ar->winx / 2;
+	my= RNA_struct_property_is_set(op->ptr, "my") ? RNA_int_get(op->ptr, "my") : ar->winy / 2;
 
 	use_cam_zoom= (rv3d->persp==RV3D_CAMOB) && !(rv3d->is_persp && ED_view3d_camera_lock_check(v3d, rv3d));
 
@@ -1667,12 +1667,12 @@ static int viewzoom_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	vod= op->customdata;
 
 	/* if one or the other zoom position aren't set, set from event */
-	if (!RNA_property_is_set(op->ptr, "mx") || !RNA_property_is_set(op->ptr, "my")) {
+	if (!RNA_struct_property_is_set(op->ptr, "mx") || !RNA_struct_property_is_set(op->ptr, "my")) {
 		RNA_int_set(op->ptr, "mx", event->x);
 		RNA_int_set(op->ptr, "my", event->y);
 	}
 
-	if(RNA_property_is_set(op->ptr, "delta")) {
+	if(RNA_struct_property_is_set(op->ptr, "delta")) {
 		viewzoom_exec(C, op);
 	}
 	else {
@@ -1880,12 +1880,12 @@ static int viewdolly_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	vod= op->customdata;
 
 	/* if one or the other zoom position aren't set, set from event */
-	if (!RNA_property_is_set(op->ptr, "mx") || !RNA_property_is_set(op->ptr, "my")) {
+	if (!RNA_struct_property_is_set(op->ptr, "mx") || !RNA_struct_property_is_set(op->ptr, "my")) {
 		RNA_int_set(op->ptr, "mx", event->x);
 		RNA_int_set(op->ptr, "my", event->y);
 	}
 
-	if(RNA_property_is_set(op->ptr, "delta")) {
+	if(RNA_struct_property_is_set(op->ptr, "delta")) {
 		viewdolly_exec(C, op);
 	}
 	else {
@@ -2960,16 +2960,16 @@ static int background_image_add_invoke(bContext *C, wmOperator *op, wmEvent *UNU
 	View3D *v3d= CTX_wm_view3d(C);
 	Image *ima= NULL;
 	BGpic *bgpic;
-	char name[32];
+	char name[MAX_ID_NAME-2];
 	
 	/* check input variables */
-	if(RNA_property_is_set(op->ptr, "filepath")) {
+	if(RNA_struct_property_is_set(op->ptr, "filepath")) {
 		char path[FILE_MAX];
 		
 		RNA_string_get(op->ptr, "filepath", path);
 		ima= BKE_add_image_file(path);
 	}
-	else if(RNA_property_is_set(op->ptr, "name")) {
+	else if(RNA_struct_property_is_set(op->ptr, "name")) {
 		RNA_string_get(op->ptr, "name", name);
 		ima= (Image *)find_id("IM", name);
 	}
@@ -3007,7 +3007,7 @@ void VIEW3D_OT_background_image_add(wmOperatorType *ot)
 	ot->flag   = 0;
 	
 	/* properties */
-	RNA_def_string(ot->srna, "name", "Image", 24, "Name", "Image name to assign");
+	RNA_def_string(ot->srna, "name", "Image", MAX_ID_NAME-2, "Name", "Image name to assign");
 	RNA_def_string(ot->srna, "filepath", "Path", FILE_MAX, "Filepath", "Path to image file");
 }
 

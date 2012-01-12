@@ -60,6 +60,10 @@ struct SceneStats;
 struct bGPdata;
 struct MovieClip;
 
+/* ************************************************************* */
+/* Scene Data */
+
+/* Base - Wrapper for referencing Objects in a Scene */
 typedef struct Base {
 	struct Base *next, *prev;
 	unsigned int lay, selcol;
@@ -67,6 +71,9 @@ typedef struct Base {
 	short sx, sy;
 	struct Object *object;
 } Base;
+
+/* ************************************************************* */
+/* Output Format Data */
 
 typedef struct AviCodecData {
 	void			*lpFormat;  /* save format */
@@ -143,6 +150,8 @@ typedef struct FFMpegCodecData {
 	IDProperty *properties;
 } FFMpegCodecData;
 
+/* ************************************************************* */
+/* Audio */
 
 typedef struct AudioData {
 	int mixrate; // 2.5: now in FFMpegCodecData: audio_mixrate
@@ -156,10 +165,14 @@ typedef struct AudioData {
 	float pad2;
 } AudioData;
 
+/* *************************************************************** */
+/* Render Layers */
+
+/* Render Layer */
 typedef struct SceneRenderLayer {
 	struct SceneRenderLayer *next, *prev;
 	
-	char name[32];
+	char name[64];	/* MAX_NAME */
 	
 	struct Material *mat_override;
 	struct Group *light_override;
@@ -212,6 +225,7 @@ typedef struct SceneRenderLayer {
 
 /* note, srl->passflag is treestore element 'nr' in outliner, short still... */
 
+/* *************************************************************** */
 
 /* Generic image format settings,
  * this is used for NodeImageFile and IMAGE_OT_save_as operator too.
@@ -314,6 +328,9 @@ typedef struct ImageFormatData {
 
 /* ImageFormatData.cineon_flag */
 #define R_IMF_CINEON_FLAG_LOG (1<<0)  /* was R_CINEON_LOG */
+
+/* *************************************************************** */
+/* Render Data */
 
 typedef struct RenderData {
 	struct ImageFormatData im_format;
@@ -500,6 +517,9 @@ typedef struct RenderData {
 	char engine[32];
 } RenderData;
 
+/* *************************************************************** */
+/* Render Conversion/Simplfication Settings */
+
 /* control render convert and shading engine */
 typedef struct RenderProfile {
 	struct RenderProfile *next, *prev;
@@ -514,6 +534,9 @@ typedef struct RenderProfile {
 	
 } RenderProfile;
 
+/* *************************************************************** */
+/* Game Engine - Dome */
+
 typedef struct GameDome {
 	short res, mode;
 	short angle, tilt;
@@ -527,6 +550,9 @@ typedef struct GameDome {
 #define DOME_ENVMAP				4
 #define DOME_PANORAM_SPH		5
 #define DOME_NUM_MODES			6
+
+/* *************************************************************** */
+/* Game Engine */
 
 typedef struct GameFraming {
 	float col[3];
@@ -558,8 +584,9 @@ typedef struct GameData {
 
 	/*  standalone player */
 	struct GameFraming framing;
-	short fullscreen, xplay, yplay, freqplay;
+	short playerflag, xplay, yplay, freqplay;
 	short depth, attrib, rt1, rt2;
+	short aasamples, pad4[3];
 
 	/* stereo/dome mode */
 	struct GameDome dome;
@@ -636,10 +663,17 @@ typedef struct GameData {
 #define GAME_SHOW_OBSTACLE_SIMULATION		(1 << 16)
 /* Note: GameData.flag is now an int (max 32 flags). A short could only take 16 flags */
 
+/* GameData.playerflag */
+#define GAME_PLAYER_FULLSCREEN				(1 << 0)
+#define GAME_PLAYER_DESKTOP_RESOLUTION		(1 << 1)
+
 /* GameData.matmode */
 #define GAME_MAT_TEXFACE	0
 #define GAME_MAT_MULTITEX	1
 #define GAME_MAT_GLSL		2
+
+/* *************************************************************** */
+/* Markers */
 
 typedef struct TimeMarker {
 	struct TimeMarker *next, *prev;
@@ -649,6 +683,10 @@ typedef struct TimeMarker {
 	struct Object *camera;
 } TimeMarker;
 
+/* *************************************************************** */
+/* Paint Mode/Tool Data */
+
+/* Paint Tool Base */
 typedef struct Paint {
 	struct Brush *brush;
 	
@@ -659,6 +697,10 @@ typedef struct Paint {
 	int flags;
 } Paint;
 
+/* ------------------------------------------- */
+/* Image Paint */
+
+/* Texture/Image Editor */
 typedef struct ImagePaintSettings {
 	Paint paint;
 
@@ -673,6 +715,10 @@ typedef struct ImagePaintSettings {
 	void *paintcursor;			/* wm handle */
 } ImagePaintSettings;
 
+/* ------------------------------------------- */
+/* Particle Edit */
+
+/* Settings for a Particle Editing Brush */
 typedef struct ParticleBrushData {
 	short size;						/* common setting */
 	short step, invert, count;		/* for specific brushes only */
@@ -680,6 +726,7 @@ typedef struct ParticleBrushData {
 	float strength;
 } ParticleBrushData;
 
+/* Particle Edit Mode Settings */
 typedef struct ParticleEditSettings {
 	short flag;
 	short totrekey;
@@ -700,12 +747,10 @@ typedef struct ParticleEditSettings {
 	struct Object *object;
 } ParticleEditSettings;
 
-typedef struct TransformOrientation {
-	struct TransformOrientation *next, *prev;
-	char name[36];
-	float mat[3][3];
-} TransformOrientation;
+/* ------------------------------------------- */
+/* Sculpt */
 
+/* Sculpt */
 typedef struct Sculpt {
 	Paint paint;
 
@@ -736,6 +781,10 @@ typedef struct Sculpt {
 	int pad;
 } Sculpt;
 
+/* ------------------------------------------- */
+/* Vertex Paint */
+
+/* Vertex Paint */
 typedef struct VPaint {
 	Paint paint;
 
@@ -756,6 +805,18 @@ typedef struct VPaint {
 // #define VP_MIRROR_X	32 // deprecated in 2.5x use (me->editflag & ME_EDIT_MIRROR_X)
 #define VP_ONLYVGROUP	128
 
+/* *************************************************************** */
+/* Transform Orientations */
+
+typedef struct TransformOrientation {
+	struct TransformOrientation *next, *prev;
+	char name[64];	/* MAX_NAME */
+	float mat[3][3];
+	int pad;
+} TransformOrientation;
+
+/* *************************************************************** */
+/* Tool Settings */
 
 typedef struct ToolSettings {
 	VPaint *vpaint;		/* vertex paint */
@@ -883,11 +944,20 @@ typedef struct ToolSettings {
 	float sculpt_paint_unified_alpha; /* unified strength of brush */
 } ToolSettings;
 
+/* *************************************************************** */
+/* Assorted Scene Data */
+
+/* ------------------------------------------- */
+/* Stats (show in Info header) */
+
 typedef struct bStats {
 	/* scene totals for visible layers */
 	int totobj, totlamp, totobjsel, totcurve, totmesh, totarmature;
 	int totvert, totface;
 } bStats;
+
+/* ------------------------------------------- */
+/* Unit Settings */
 
 typedef struct UnitSettings {
 	/* Display/Editing unit options for each scene */
@@ -895,13 +965,18 @@ typedef struct UnitSettings {
 	char system; /* imperial, metric etc */
 	char system_rotation; /* not implimented as a propper unit system yet */
 	short flag;
-	
 } UnitSettings;
+
+/* ------------------------------------------- */
+/* Global/Common Physics Settings */
 
 typedef struct PhysicsSettings {
 	float gravity[3];
 	int flag, quick_cache_step, rt;
 } PhysicsSettings;
+
+/* *************************************************************** */
+/* Scene ID-Block */
 
 typedef struct Scene {
 	ID id;
@@ -960,7 +1035,7 @@ typedef struct Scene {
 
 	/* User-Defined KeyingSets */
 	int active_keyingset;			/* index of the active KeyingSet. first KeyingSet has index 1, 'none' active is 0, 'add new' is -1 */
-	ListBase keyingsets;			/* KeyingSets for the given frame */
+	ListBase keyingsets;			/* KeyingSets for this scene */
 	
 	/* Game Settings */
 	struct GameFraming framing  DNA_DEPRECATED; // XXX  deprecated since 2.5

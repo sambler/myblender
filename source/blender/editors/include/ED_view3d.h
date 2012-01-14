@@ -75,6 +75,12 @@ typedef struct ViewDepths {
 	char damaged;
 } ViewDepths;
 
+/* enum for passing to foreach functions to test RV3D_CLIPPING */
+typedef enum eV3DClipTest {
+	V3D_CLIP_TEST_OFF =            0, /* clipping is off */
+	V3D_CLIP_TEST_RV3D_CLIPPING =  1, /* clip single points */
+	V3D_CLIP_TEST_REGION =         2  /* use for edges to check if both verts are in the view, but not RV3D_CLIPPING */
+} eV3DClipTest;
 
 float *give_cursor(struct Scene *scene, struct View3D *v3d);
 
@@ -195,7 +201,7 @@ void ED_view3d_depth_tag_update(struct RegionView3D *rv3d);
 /* Projection */
 #define IS_CLIPPED        12000
 
-void ED_view3d_calc_clipping(struct BoundBox *bb, float planes[4][4], struct bglMats *mats, struct rcti *rect);
+void ED_view3d_calc_clipping(struct BoundBox *bb, float planes[4][4], struct bglMats *mats, const struct rcti *rect);
 
 void project_short(struct ARegion *ar, const float vec[3], short adr[2]);
 void project_short_noclip(struct ARegion *ar, const float vec[3], short adr[2]);
@@ -206,16 +212,16 @@ void project_int_noclip(struct ARegion *ar, const float vec[3], int adr[2]);
 void project_float(struct ARegion *ar, const float vec[3], float adr[2]);
 void project_float_noclip(struct ARegion *ar, const float vec[3], float adr[2]);
 
-void ED_view3d_ob_clip_range_get(struct Object *ob, float *lens, float *clipsta, float *clipend);
 int ED_view3d_clip_range_get(struct View3D *v3d, struct RegionView3D *rv3d, float *clipsta, float *clipend);
-int ED_view3d_viewplane_get(struct View3D *v3d, struct RegionView3D *rv3d, int winxi, int winyi, struct rctf *viewplane, float *clipsta, float *clipend, float *pixsize);
+int ED_view3d_viewplane_get(struct View3D *v3d, struct RegionView3D *rv3d, int winxi, int winyi, struct rctf *viewplane, float *clipsta, float *clipend);
 void ED_view3d_ob_project_mat_get(struct RegionView3D *v3d, struct Object *ob, float pmat[4][4]);
-void ED_view3d_project_float(struct ARegion *a, const float vec[3], float adr[2], float mat[4][4]);
-void ED_view3d_calc_camera_border(struct Scene *scene, struct ARegion *ar, struct View3D *v3d, struct RegionView3D *rv3d, struct rctf *viewborder_r, short do_shift);
+void ED_view3d_project_float(const struct ARegion *a, const float vec[3], float adr[2], float mat[4][4]);
+void ED_view3d_calc_camera_border(struct Scene *scene, struct ARegion *ar, struct View3D *v3d, struct RegionView3D *rv3d, struct rctf *viewborder_r, short no_shift);
+void ED_view3d_calc_camera_border_size(struct Scene *scene, struct ARegion *ar, struct View3D *v3d, struct RegionView3D *rv3d, float size_r[2]);
 
 /* drawobject.c iterators */
-void mesh_foreachScreenVert(struct ViewContext *vc, void (*func)(void *userData, struct EditVert *eve, int x, int y, int index), void *userData, int clipVerts);
-void mesh_foreachScreenEdge(struct ViewContext *vc, void (*func)(void *userData, struct EditEdge *eed, int x0, int y0, int x1, int y1, int index), void *userData, int clipVerts);
+void mesh_foreachScreenVert(struct ViewContext *vc, void (*func)(void *userData, struct EditVert *eve, int x, int y, int index), void *userData, eV3DClipTest clipVerts);
+void mesh_foreachScreenEdge(struct ViewContext *vc, void (*func)(void *userData, struct EditEdge *eed, int x0, int y0, int x1, int y1, int index), void *userData, eV3DClipTest clipVerts);
 void mesh_foreachScreenFace(struct ViewContext *vc, void (*func)(void *userData, struct EditFace *efa, int x, int y, int index), void *userData);
 void nurbs_foreachScreenVert(struct ViewContext *vc, void (*func)(void *userData, struct Nurb *nu, struct BPoint *bp, struct BezTriple *bezt, int beztindex, int x, int y), void *userData);
 void lattice_foreachScreenVert(struct ViewContext *vc, void (*func)(void *userData, struct BPoint *bp, int x, int y), void *userData);
@@ -251,7 +257,7 @@ void view3d_set_viewcontext(struct bContext *C, struct ViewContext *vc);
 void view3d_operator_needs_opengl(const struct bContext *C);
 void view3d_region_operator_needs_opengl(struct wmWindow *win, struct ARegion *ar);
 int view3d_get_view_aligned_coordinate(struct ViewContext *vc, float fp[3], const int mval[2], const short do_fallback);
-void view3d_get_transformation(struct ARegion *ar, struct RegionView3D *rv3d, struct Object *ob, struct bglMats *mats);
+void view3d_get_transformation(const struct ARegion *ar, struct RegionView3D *rv3d, struct Object *ob, struct bglMats *mats);
 
 /* XXX should move to BLI_math */
 int edge_inside_circle(short centx, short centy, short rad, short x1, short y1, short x2, short y2);
@@ -280,8 +286,9 @@ Base *ED_view3d_give_base_under_cursor(struct bContext *C, const int mval[2]);
 void ED_view3d_quadview_update(struct ScrArea *sa, struct ARegion *ar, short do_clip);
 int ED_view3d_lock(struct RegionView3D *rv3d);
 
-unsigned int ED_view3d_datamask(struct Scene *scene, struct View3D *v3d);
-unsigned int ED_viewedit_datamask(struct bScreen *screen);
+uint64_t ED_view3d_datamask(struct Scene *scene, struct View3D *v3d);
+uint64_t ED_view3d_screen_datamask(struct bScreen *screen);
+uint64_t ED_view3d_object_datamask(struct Scene *scene);
 
 /* camera lock functions */
 int ED_view3d_camera_lock_check(struct View3D *v3d, struct RegionView3D *rv3d);
@@ -290,6 +297,8 @@ void ED_view3d_camera_lock_init(struct View3D *v3d, struct RegionView3D *rv3d);
 /* copy the view to the camera, return TRUE if */
 int ED_view3d_camera_lock_sync(struct View3D *v3d, struct RegionView3D *rv3d);
 
-struct BGpic *ED_view3D_background_image_add(struct View3D *v3d);
+struct BGpic *ED_view3D_background_image_new(struct View3D *v3d);
+void ED_view3D_background_image_remove(struct View3D *v3d, struct BGpic *bgpic);
+void ED_view3D_background_image_clear(struct View3D *v3d);
 
 #endif /* ED_VIEW3D_H */

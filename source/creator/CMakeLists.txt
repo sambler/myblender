@@ -40,34 +40,6 @@ blender_include_dirs(
 	../blender/windowmanager
 )
 
-if(WITH_CODEC_QUICKTIME)
-	add_definitions(-DWITH_QUICKTIME)
-endif()
-
-if(WITH_IMAGE_OPENEXR)
-	add_definitions(-DWITH_OPENEXR)
-endif()
-
-if(WITH_IMAGE_OPENJPEG)
-	add_definitions(-DWITH_OPENJPEG)
-endif()
-
-if(WITH_IMAGE_TIFF)
-	add_definitions(-DWITH_TIFF)
-endif()
-
-if(WITH_IMAGE_DDS)
-	add_definitions(-DWITH_DDS)
-endif()
-
-if(WITH_IMAGE_CINEON)
-	add_definitions(-DWITH_CINEON)
-endif()
-
-if(WITH_IMAGE_HDR)
-	add_definitions(-DWITH_HDR)
-endif()
-
 if(WITH_LIBMV)
 	blender_include_dirs(../../extern/libmv)
 	add_definitions(-DWITH_LIBMV)
@@ -193,7 +165,10 @@ if(WITH_PYTHON_MODULE)
 	add_definitions(-DWITH_PYTHON_MODULE)
 
 	# creates ./bin/bpy.so which can be imported as a python module.
-	add_library(blender SHARED ${SRC})
+	#
+	# note that 'SHARED' works on Linux and Windows,
+	# but not OSX which _must_ be 'MODULE'
+	add_library(blender MODULE ${SRC})
 	set_target_properties(
 		blender
 		PROPERTIES
@@ -278,7 +253,7 @@ if(WITH_PYTHON)
 	# install(CODE "message(\"copying blender scripts...\")")
 	
 	# exclude addons_contrib if release
-	if("${BLENDER_VERSION_CYCLE}" STREQUAL "release")
+	if("${BLENDER_VERSION_CYCLE}" STREQUAL "always-contrib")
 		set(ADDON_EXCLUDE_CONDITIONAL "addons_contrib/*")
 	else()
 		set(ADDON_EXCLUDE_CONDITIONAL "_addons_contrib/*")  # dummy, wont do anything
@@ -313,7 +288,7 @@ if("${CMAKE_GENERATOR}" MATCHES ".*Makefiles.*")
 	# message after building.
 	add_custom_command(
 		TARGET blender POST_BUILD MAIN_DEPENDENCY blender
-		COMMAND ${CMAKE_COMMAND} -E echo 'now run: \"make install\" to copy runtime files & scripts to ${TARGETDIR_VER}'
+		COMMAND ${CMAKE_COMMAND} -E echo 'now run: \"make install\" to copy runtime files and scripts to ${TARGETDIR_VER}'
 	)
 endif()
 
@@ -471,15 +446,15 @@ elseif(WIN32)
 	# )
 
 	if(WITH_PYTHON)
-
+		set_lib_path(PYLIB "python/lib")
 		install(
-			FILES ${LIBDIR}/python/lib/python32.dll
+			FILES ${PYLIB}/python32.dll
 			DESTINATION ${TARGETDIR}
 			CONFIGURATIONS Release;RelWithDebInfo;MinSizeRel
 		)
 
 		install(
-			FILES ${LIBDIR}/python/lib/python32_d.dll
+			FILES ${PYLIB}/python32_d.dll
 			DESTINATION ${TARGETDIR}
 			CONFIGURATIONS Debug
 		)
@@ -525,7 +500,6 @@ elseif(WIN32)
 	else()
 		install(
 			FILES
-				${LIBDIR}/png/lib/libpng.dll
 				${LIBDIR}/zlib/lib/zlib.dll
 			DESTINATION ${TARGETDIR}
 		)
@@ -567,7 +541,6 @@ elseif(WIN32)
 		install(
 			FILES
 				${LIBDIR}/openal/lib/OpenAL32.dll
-				${LIBDIR}/openal/lib/wrap_oal.dll
 			DESTINATION ${TARGETDIR}
 		)
 	endif()
@@ -594,9 +567,10 @@ elseif(WIN32)
 	)	
 
 	if(WITH_OPENIMAGEIO)
+		set_lib_path(OIIOBIN "openimageio/bin")
 		install(
 			FILES
-				${LIBDIR}/openimageio/bin/OpenImageIO.dll
+				${OIIOBIN}/OpenImageIO.dll
 			DESTINATION ${TARGETDIR}
 		)
 	endif()
@@ -811,11 +785,11 @@ endif()
 		bf_nodes
 		bf_gpu
 		bf_blenloader
+		bf_imbuf
 		bf_blenlib
 		bf_intern_ghost
 		bf_intern_string
 		bf_blenpluginapi
-		bf_imbuf
 		bf_avi
 		bf_imbuf_cineon
 		bf_imbuf_openexr
@@ -858,6 +832,7 @@ endif()
 		bf_blenfont
 		bf_intern_audaspace
 		bf_intern_mikktspace
+		bf_intern_dualcon
 		bf_intern_cycles
 		cycles_render
 		cycles_bvh

@@ -46,6 +46,7 @@
 #include "DNA_scene_types.h"
 #include "DNA_userdef_types.h"
 #include "DNA_windowmanager_types.h"
+#include "DNA_mesh_types.h" /* only for USE_BMESH_SAVE_AS_COMPAT */
 
 #include "BLF_translation.h"
 
@@ -637,6 +638,25 @@ void WM_operator_properties_sanitize(PointerRNA *ptr, const short no_context)
 	RNA_STRUCT_END;
 }
 
+/* remove all props without PROP_SKIP_SAVE */
+void WM_operator_properties_reset(wmOperator *op)
+{
+	if (op->ptr->data) {
+		PropertyRNA *iterprop;
+		iterprop= RNA_struct_iterator_property(op->type->srna);
+
+		RNA_PROP_BEGIN(op->ptr, itemptr, iterprop) {
+			PropertyRNA *prop= itemptr.data;
+
+			if((RNA_property_flag(prop) & PROP_SKIP_SAVE) == 0) {
+				const char *identifier = RNA_property_identifier(prop);
+				RNA_struct_idprops_unset(op->ptr, identifier);
+			}
+		}
+		RNA_PROP_END;
+	}
+}
+
 void WM_operator_properties_free(PointerRNA *ptr)
 {
 	IDProperty *properties= ptr->data;
@@ -664,7 +684,7 @@ int WM_menu_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 		printf("%s: %s \"%s\" is not an enum property\n",
 		       __func__, op->type->idname, RNA_property_identifier(prop));
 	}
-	else if (RNA_property_is_set(op->ptr, RNA_property_identifier(prop))) {
+	else if (RNA_property_is_set(op->ptr, prop)) {
 		const int retval= op->type->exec(C, op);
 		OPERATOR_RETVAL_CHECK(retval);
 		return retval;
@@ -746,7 +766,7 @@ static uiBlock *wm_enum_search_menu(bContext *C, ARegion *ar, void *arg_op)
 	uiBlockSetFlag(block, UI_BLOCK_LOOP|UI_BLOCK_RET_1|UI_BLOCK_MOVEMOUSE_QUIT);
 
 	//uiDefBut(block, LABEL, 0, op->type->name, 10, 10, 180, UI_UNIT_Y, NULL, 0.0, 0.0, 0, 0, ""); // ok, this isnt so easy...
-	but= uiDefSearchBut(block, search, 0, ICON_VIEWZOOM, 256, 10, 10, 9*UI_UNIT_X, UI_UNIT_Y, 0, 0, "");
+	but= uiDefSearchBut(block, search, 0, ICON_VIEWZOOM, sizeof(search), 10, 10, 9*UI_UNIT_X, UI_UNIT_Y, 0, 0, "");
 	uiButSetSearchFunc(but, operator_enum_search_cb, op->type, operator_enum_call_cb, NULL);
 
 	/* fake button, it holds space for search items */
@@ -801,8 +821,8 @@ int WM_operator_confirm(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 /* op->invoke, opens fileselect if path property not set, otherwise executes */
 int WM_operator_filesel(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 {
-	if (RNA_property_is_set(op->ptr, "filepath")) {
-		return WM_operator_call(C, op);
+	if (RNA_struct_property_is_set(op->ptr, "filepath")) {
+		return WM_operator_call_notest(C, op); /* call exec direct */
 	} 
 	else {
 		WM_event_add_fileselect(C, op);
@@ -907,6 +927,15 @@ int WM_operator_winactive(bContext *C)
 	return 1;
 }
 
+/* return FALSE, if the UI should be disabled */
+int WM_operator_check_ui_enabled(const bContext *C, const char *idname)
+{
+	wmWindowManager *wm= CTX_wm_manager(C);
+	Scene *scene= CTX_data_scene(C);
+
+	return !(ED_undo_valid(C, idname)==0 || WM_jobs_test(wm, scene));
+}
+
 wmOperator *WM_operator_last_redo(const bContext *C)
 {
 	wmWindowManager *wm= CTX_wm_manager(C);
@@ -929,7 +958,7 @@ static uiBlock *wm_block_create_redo(bContext *C, ARegion *ar, void *arg_op)
 	int width= 300;
 	
 
-	block= uiBeginBlock(C, ar, "redo_popup", UI_EMBOSS);
+	block= uiBeginBlock(C, ar, __func__, UI_EMBOSS);
 	uiBlockClearFlag(block, UI_BLOCK_LOOP);
 	uiBlockSetFlag(block, UI_BLOCK_KEEP_OPEN|UI_BLOCK_RET_1|UI_BLOCK_MOVEMOUSE_QUIT);
 
@@ -940,7 +969,7 @@ static uiBlock *wm_block_create_redo(bContext *C, ARegion *ar, void *arg_op)
 	uiBlockSetHandleFunc(block, ED_undo_operator_repeat_cb_evt, arg_op);
 	layout= uiBlockLayout(block, UI_LAYOUT_VERTICAL, UI_LAYOUT_PANEL, 0, 0, width, UI_UNIT_Y, style);
 
-	if(ED_undo_valid(C, op->type->name)==0)
+	if (!WM_operator_check_ui_enabled(C, op->type->name))
 		uiLayoutSetEnabled(layout, 0);
 
 	if(op->type->flag & OPTYPE_MACRO) {
@@ -1005,7 +1034,7 @@ static uiBlock *wm_block_dialog_create(bContext *C, ARegion *ar, void *userData)
 	uiLayout *layout;
 	uiStyle *style= UI_GetStyle();
 
-	block = uiBeginBlock(C, ar, "operator dialog", UI_EMBOSS);
+	block = uiBeginBlock(C, ar, __func__, UI_EMBOSS);
 	uiBlockClearFlag(block, UI_BLOCK_LOOP);
 	uiBlockSetFlag(block, UI_BLOCK_KEEP_OPEN|UI_BLOCK_RET_1|UI_BLOCK_MOVEMOUSE_QUIT);
 
@@ -1046,7 +1075,7 @@ static uiBlock *wm_operator_ui_create(bContext *C, ARegion *ar, void *userData)
 	uiLayout *layout;
 	uiStyle *style= UI_GetStyle();
 
-	block= uiBeginBlock(C, ar, "opui_popup", UI_EMBOSS);
+	block= uiBeginBlock(C, ar, __func__, UI_EMBOSS);
 	uiBlockClearFlag(block, UI_BLOCK_LOOP);
 	uiBlockSetFlag(block, UI_BLOCK_KEEP_OPEN|UI_BLOCK_RET_1|UI_BLOCK_MOVEMOUSE_QUIT);
 
@@ -1072,6 +1101,15 @@ static void wm_operator_ui_popup_cancel(void *userData)
 	MEM_freeN(data);
 }
 
+static void wm_operator_ui_popup_ok(struct bContext *C, void *arg, int retval)
+{
+	wmOpPopUp *data= arg;
+	wmOperator *op= data->op;
+
+	if(op && retval > 0)
+		WM_operator_call(C, op);
+}
+
 int WM_operator_ui_popup(bContext *C, wmOperator *op, int width, int height)
 {
 	wmOpPopUp *data= MEM_callocN(sizeof(wmOpPopUp), "WM_operator_ui_popup");
@@ -1079,7 +1117,7 @@ int WM_operator_ui_popup(bContext *C, wmOperator *op, int width, int height)
 	data->width= width;
 	data->height= height;
 	data->free_op= TRUE; /* if this runs and gets registered we may want not to free it */
-	uiPupBlockEx(C, wm_operator_ui_create, wm_operator_ui_popup_cancel, data);
+	uiPupBlockEx(C, wm_operator_ui_create, NULL, wm_operator_ui_popup_cancel, data);
 	return OPERATOR_RUNNING_MODAL;
 }
 
@@ -1110,7 +1148,7 @@ int WM_operator_props_dialog_popup(bContext *C, wmOperator *op, int width, int h
 	data->free_op= TRUE; /* if this runs and gets registered we may want not to free it */
 
 	/* op is not executed until popup OK but is clicked */
-	uiPupBlockEx(C, wm_block_dialog_create, wm_operator_ui_popup_cancel, data);
+	uiPupBlockEx(C, wm_block_dialog_create, wm_operator_ui_popup_ok, wm_operator_ui_popup_cancel, data);
 
 	return OPERATOR_RUNNING_MODAL;
 }
@@ -1238,8 +1276,9 @@ static uiBlock *wm_block_create_splash(bContext *C, ARegion *ar, void *UNUSED(ar
 	version_str = &version_buf[0];
 	revision_str = &revision_buf[0];
 	
-	sprintf(version_str, "%d.%02d.%d", BLENDER_VERSION/100, BLENDER_VERSION%100, BLENDER_SUBVERSION);
-	sprintf(revision_str, "r%s", build_rev);
+	BLI_snprintf(version_str, sizeof(version_str),
+	             "%d.%02d.%d", BLENDER_VERSION/100, BLENDER_VERSION%100, BLENDER_SUBVERSION);
+	BLI_snprintf(revision_str, sizeof(revision_str), "r%s", build_rev);
 	
 	BLF_size(style->widgetlabel.uifont_id, style->widgetlabel.points, U.dpi);
 	ver_width = (int)BLF_width(style->widgetlabel.uifont_id, version_str) + 5;
@@ -1280,7 +1319,7 @@ static uiBlock *wm_block_create_splash(bContext *C, ARegion *ar, void *UNUSED(ar
 	uiItemL(col, "Links", ICON_NONE);
 	uiItemStringO(col, IFACE_("Donations"), ICON_URL, "WM_OT_url_open", "url", "http://www.blender.org/blenderorg/blender-foundation/donation-payment");
 	uiItemStringO(col, IFACE_("Credits"), ICON_URL, "WM_OT_url_open", "url", "http://www.blender.org/development/credits");
-	uiItemStringO(col, IFACE_("Release Log"), ICON_URL, "WM_OT_url_open", "url", "http://www.blender.org/development/release-logs/blender-260");
+	uiItemStringO(col, IFACE_("Release Log"), ICON_URL, "WM_OT_url_open", "url", "http://www.blender.org/development/release-logs/blender-261");
 	uiItemStringO(col, IFACE_("Manual"), ICON_URL, "WM_OT_url_open", "url", "http://wiki.blender.org/index.php/Doc:2.5/Manual");
 	uiItemStringO(col, IFACE_("Blender Website"), ICON_URL, "WM_OT_url_open", "url", "http://www.blender.org");
 	uiItemStringO(col, IFACE_("User Community"), ICON_URL, "WM_OT_url_open", "url", "http://www.blender.org/community/user-community");
@@ -1358,12 +1397,15 @@ static void operator_search_cb(const struct bContext *C, void *UNUSED(arg), cons
 				int len= strlen(ot->name);
 				
 				/* display name for menu, can hold hotkey */
-				BLI_strncpy(name, ot->name, 256);
+				BLI_strncpy(name, ot->name, sizeof(name));
 				
 				/* check for hotkey */
-				if(len < 256-6) {
-					if(WM_key_event_operator_string(C, ot->idname, WM_OP_EXEC_DEFAULT, NULL, TRUE, &name[len+1], 256-len-1))
+				if (len < sizeof(name) - 6) {
+					if (WM_key_event_operator_string(C, ot->idname, WM_OP_EXEC_DEFAULT, NULL, TRUE,
+					                                &name[len+1], sizeof(name)-len-1))
+					{
 						name[len]= '|';
+					}
 				}
 				
 				if(0==uiSearchItemAdd(items, name, ot, 0))
@@ -1385,7 +1427,7 @@ static uiBlock *wm_block_search_menu(bContext *C, ARegion *ar, void *UNUSED(arg_
 	block= uiBeginBlock(C, ar, "_popup", UI_EMBOSS);
 	uiBlockSetFlag(block, UI_BLOCK_LOOP|UI_BLOCK_RET_1|UI_BLOCK_MOVEMOUSE_QUIT);
 	
-	but= uiDefSearchBut(block, search, 0, ICON_VIEWZOOM, 256, 10, 10, 9*UI_UNIT_X, UI_UNIT_Y, 0, 0, "");
+	but= uiDefSearchBut(block, search, 0, ICON_VIEWZOOM, sizeof(search), 10, 10, 9*UI_UNIT_X, UI_UNIT_Y, 0, 0, "");
 	uiButSetSearchFunc(but, operator_search_cb, NULL, operator_call_cb, NULL);
 	
 	/* fake button, it holds space for search items */
@@ -1530,13 +1572,13 @@ static void WM_OT_read_factory_settings(wmOperatorType *ot)
 
 static void open_set_load_ui(wmOperator *op)
 {
-	if(!RNA_property_is_set(op->ptr, "load_ui"))
+	if(!RNA_struct_property_is_set(op->ptr, "load_ui"))
 		RNA_boolean_set(op->ptr, "load_ui", !(U.flag & USER_FILENOUI));
 }
 
 static void open_set_use_scripts(wmOperator *op)
 {
-	if(!RNA_property_is_set(op->ptr, "use_scripts")) {
+	if(!RNA_struct_property_is_set(op->ptr, "use_scripts")) {
 		/* use G_SCRIPT_AUTOEXEC rather than the userpref because this means if
 		 * the flag has been disabled from the command line, then opening
 		 * from the menu wont enable this setting. */
@@ -1616,10 +1658,26 @@ static void WM_OT_open_mainfile(wmOperatorType *ot)
 
 /* **************** link/append *************** */
 
+int wm_link_append_poll(bContext *C)
+{
+	if(WM_operator_winactive(C)) {
+		/* linking changes active object which is pretty useful in general,
+		   but which totally confuses edit mode (i.e. it becoming not so obvious
+		   to leave from edit mode and inwalid tools in toolbar might be displayed)
+		   so disable link/append when in edit mode (sergey) */
+		if(CTX_data_edit_object(C))
+			return 0;
+
+		return 1;
+	}
+
+	return 0;
+}
+
 static int wm_link_append_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 {
-	if(RNA_property_is_set(op->ptr, "filepath")) {
-		return WM_operator_call(C, op);
+	if(RNA_struct_property_is_set(op->ptr, "filepath")) {
+		return WM_operator_call_notest(C, op);
 	} 
 	else {
 		/* XXX TODO solve where to get last linked library from */
@@ -1778,7 +1836,7 @@ static void WM_OT_link_append(wmOperatorType *ot)
 	
 	ot->invoke= wm_link_append_invoke;
 	ot->exec= wm_link_append_exec;
-	ot->poll= WM_operator_winactive;
+	ot->poll= wm_link_append_poll;
 	
 	ot->flag |= OPTYPE_UNDO;
 
@@ -1882,7 +1940,7 @@ static void untitled(char *name)
 
 static void save_set_compress(wmOperator *op)
 {
-	if(!RNA_property_is_set(op->ptr, "compress")) {
+	if(!RNA_struct_property_is_set(op->ptr, "compress")) {
 		if(G.save_over) /* keep flag for existing file */
 			RNA_boolean_set(op->ptr, "compress", G.fileflags & G_FILE_COMPRESS);
 		else /* use userdef for new file */
@@ -1921,14 +1979,14 @@ static int wm_save_as_mainfile_exec(bContext *C, wmOperator *op)
 
 	save_set_compress(op);
 	
-	if(RNA_property_is_set(op->ptr, "filepath"))
+	if(RNA_struct_property_is_set(op->ptr, "filepath"))
 		RNA_string_get(op->ptr, "filepath", path);
 	else {
 		BLI_strncpy(path, G.main->name, FILE_MAX);
 		untitled(path);
 	}
 
-	if(RNA_property_is_set(op->ptr, "copy"))
+	if(RNA_struct_property_is_set(op->ptr, "copy"))
 		copy = RNA_boolean_get(op->ptr, "copy");
 	
 	fileflags= G.fileflags;
@@ -1938,6 +1996,10 @@ static int wm_save_as_mainfile_exec(bContext *C, wmOperator *op)
 	else											fileflags &= ~G_FILE_COMPRESS;
 	if(RNA_boolean_get(op->ptr, "relative_remap"))	fileflags |=  G_FILE_RELATIVE_REMAP;
 	else											fileflags &= ~G_FILE_RELATIVE_REMAP;
+#ifdef USE_BMESH_SAVE_AS_COMPAT
+	if(RNA_boolean_get(op->ptr, "use_mesh_compat"))	fileflags |=  G_FILE_MESH_COMPAT;
+	else											fileflags &= ~G_FILE_MESH_COMPAT;
+#endif
 
 	if ( WM_write_file(C, path, fileflags, op->reports, copy) != 0)
 		return OPERATOR_CANCELLED;
@@ -1977,6 +2039,9 @@ static void WM_OT_save_as_mainfile(wmOperatorType *ot)
 	RNA_def_boolean(ot->srna, "compress", 0, "Compress", "Write compressed .blend file");
 	RNA_def_boolean(ot->srna, "relative_remap", 1, "Remap Relative", "Remap relative paths when saving in a different directory");
 	RNA_def_boolean(ot->srna, "copy", 0, "Save Copy", "Save a copy of the actual working state but does not make saved file active");
+#ifdef USE_BMESH_SAVE_AS_COMPAT
+	RNA_def_boolean(ot->srna, "use_mesh_compat", 0, "Legacy Mesh Format", "Save using legacy mesh format (no ngons)");
+#endif
 }
 
 /* *************** save file directly ******** */
@@ -1985,6 +2050,7 @@ static int wm_save_mainfile_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(
 {
 	char name[FILE_MAX];
 	int check_existing=1;
+	int ret;
 	
 	/* cancel if no active window */
 	if (CTX_wm_window(C) == NULL)
@@ -2009,16 +2075,20 @@ static int wm_save_mainfile_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(
 			check_existing = 0;
 	
 	if (G.save_over) {
-		if (check_existing)
+		if (check_existing && BLI_exists(name)) {
 			uiPupMenuSaveOver(C, op, name);
-		else {
-			wm_save_as_mainfile_exec(C, op);
+			ret= OPERATOR_RUNNING_MODAL;
 		}
-	} else {
+		else {
+			ret= wm_save_as_mainfile_exec(C, op);
+		}
+	}
+	else {
 		WM_event_add_fileselect(C, op);
+		ret= OPERATOR_RUNNING_MODAL;
 	}
 	
-	return OPERATOR_RUNNING_MODAL;
+	return ret;
 }
 
 static void WM_OT_save_mainfile(wmOperatorType *ot)
@@ -2044,7 +2114,7 @@ static void WM_OT_save_mainfile(wmOperatorType *ot)
 
 static int wm_collada_export_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 {	
-	if(!RNA_property_is_set(op->ptr, "filepath")) {
+	if(!RNA_struct_property_is_set(op->ptr, "filepath")) {
 		char filepath[FILE_MAX];
 		BLI_strncpy(filepath, G.main->name, sizeof(filepath));
 		BLI_replace_extension(filepath, sizeof(filepath), ".dae");
@@ -2062,7 +2132,7 @@ static int wm_collada_export_exec(bContext *C, wmOperator *op)
 	char filename[FILE_MAX];
 	int selected;
 	
-	if(!RNA_property_is_set(op->ptr, "filepath")) {
+	if(!RNA_struct_property_is_set(op->ptr, "filepath")) {
 		BKE_report(op->reports, RPT_ERROR, "No filename given");
 		return OPERATOR_CANCELLED;
 	}
@@ -2096,7 +2166,7 @@ static int wm_collada_import_exec(bContext *C, wmOperator *op)
 {
 	char filename[FILE_MAX];
 	
-	if(!RNA_property_is_set(op->ptr, "filepath")) {
+	if(!RNA_struct_property_is_set(op->ptr, "filepath")) {
 		BKE_report(op->reports, RPT_ERROR, "No filename given");
 		return OPERATOR_CANCELLED;
 	}

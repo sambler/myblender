@@ -609,7 +609,7 @@ void node_group_expose_all_sockets(bNodeTree *ngroup)
 	
 	for (node=ngroup->nodes.first; node; node=node->next) {
 		for (sock=node->inputs.first; sock; sock=sock->next) {
-			if (!sock->link && !(sock->flag & SOCK_HIDDEN)) {
+			if (!sock->link && !nodeSocketIsHidden(sock)) {
 				gsock = node_group_add_socket(ngroup, sock->name, sock->type, SOCK_IN);
 				
 				/* initialize the default value. */
@@ -619,7 +619,7 @@ void node_group_expose_all_sockets(bNodeTree *ngroup)
 			}
 		}
 		for (sock=node->outputs.first; sock; sock=sock->next) {
-			if (nodeCountSocketLinks(ngroup, sock)==0 && !(sock->flag & SOCK_HIDDEN)) {
+			if (nodeCountSocketLinks(ngroup, sock)==0 && !nodeSocketIsHidden(sock)) {
 				gsock = node_group_add_socket(ngroup, sock->name, sock->type, SOCK_OUT);
 				
 				/* initialize the default value. */
@@ -973,15 +973,15 @@ bNodeTemplate node_whileloop_template(bNode *node)
 
 /**** FRAME ****/
 
-void register_node_type_frame(ListBase *lb)
+void register_node_type_frame(bNodeTreeType *ttype)
 {
 	/* frame type is used for all tree types, needs dynamic allocation */
 	bNodeType *ntype= MEM_callocN(sizeof(bNodeType), "frame node type");
 
-	node_type_base(ntype, NODE_FRAME, "Frame", NODE_CLASS_LAYOUT, NODE_BACKGROUND);
+	node_type_base(ttype, ntype, NODE_FRAME, "Frame", NODE_CLASS_LAYOUT, NODE_BACKGROUND);
 	node_type_size(ntype, 150, 100, 0);
 	node_type_compatibility(ntype, NODE_OLD_SHADING|NODE_NEW_SHADING);
 	
 	ntype->needs_free = 1;
-	nodeRegisterType(lb, ntype);
+	nodeRegisterType(ttype, ntype);
 }

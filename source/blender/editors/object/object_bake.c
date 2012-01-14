@@ -636,6 +636,13 @@ static void *init_normal_data(MultiresBakeRender *bkr, Image *UNUSED(ima))
 	return (void*)normal_data;
 }
 
+static void free_normal_data(void *bake_data)
+{
+	MNormalBakeData *normal_data= (MNormalBakeData*)bake_data;
+
+	MEM_freeN(normal_data);
+}
+
 static void apply_heights_data(void *bake_data)
 {
 	MHeightBakeData *height_data= (MHeightBakeData*)bake_data;
@@ -849,7 +856,7 @@ static void bake_images(MultiresBakeRender *bkr)
 
 			switch(bkr->mode) {
 				case RE_BAKE_NORMALS:
-					do_multires_bake(bkr, ima, apply_tangmat_callback, init_normal_data, NULL, NULL);
+					do_multires_bake(bkr, ima, apply_tangmat_callback, init_normal_data, NULL, free_normal_data);
 					break;
 				case RE_BAKE_DISPLACEMENT:
 					do_multires_bake(bkr, ima, apply_heights_callback, init_heights_data,
@@ -990,9 +997,7 @@ static DerivedMesh *multiresbake_create_loresdm(Scene *scene, Object *ob, int *l
 	*lvl= mmd->lvl;
 
 	if(*lvl==0) {
-		DerivedMesh *tmp_dm= CDDM_from_mesh(me, ob);
-		dm= CDDM_copy(tmp_dm);
-		tmp_dm->release(tmp_dm);
+		return NULL;
 	} else {
 		MultiresModifierData tmp_mmd= *mmd;
 		DerivedMesh *cddm= CDDM_from_mesh(me, ob);
@@ -1039,7 +1044,7 @@ static void clear_images(MTFace *mtface, int totface)
 		if((ima->id.flag&LIB_DOIT)==0) {
 			ImBuf *ibuf= BKE_image_get_ibuf(ima, NULL);
 
-			IMB_rectfill(ibuf, (ibuf->depth == 32) ? vec_alpha : vec_solid);
+			IMB_rectfill(ibuf, (ibuf->planes == R_IMF_PLANES_RGBA) ? vec_alpha : vec_solid);
 			ima->id.flag|= LIB_DOIT;
 		}
 	}
@@ -1052,6 +1057,7 @@ static int multiresbake_image_exec_locked(bContext *C, wmOperator *op)
 {
 	Object *ob;
 	Scene *scene= CTX_data_scene(C);
+	int objects_baked= 0;
 
 	if(!multiresbake_check(C, op))
 		return OPERATOR_CANCELLED;
@@ -1073,6 +1079,8 @@ static int multiresbake_image_exec_locked(bContext *C, wmOperator *op)
 
 		ob= base->object;
 
+		multires_force_update(ob);
+
 		/* copy data stored in job descriptor */
 		bkr.bake_filter= scene->r.bake_filter;
 		bkr.mode= scene->r.bake_mode;
@@ -1080,6 +1088,10 @@ static int multiresbake_image_exec_locked(bContext *C, wmOperator *op)
 
 		/* create low-resolution DM (to bake to) and hi-resolution DM (to bake from) */
 		bkr.lores_dm= multiresbake_create_loresdm(scene, ob, &bkr.lvl);
+
+		if(!bkr.lores_dm)
+			continue;
+
 		bkr.hires_dm= multiresbake_create_hiresdm(scene, ob, &bkr.tot_lvl, &bkr.simple);
 
 		multiresbake_start(&bkr);
@@ -1088,8 +1100,13 @@ static int multiresbake_image_exec_locked(bContext *C, wmOperator *op)
 
 		bkr.lores_dm->release(bkr.lores_dm);
 		bkr.hires_dm->release(bkr.hires_dm);
+
+		objects_baked++;
 	}
 	CTX_DATA_END;
+
+	if(!objects_baked)
+		BKE_report(op->reports, RPT_ERROR, "No objects found to bake from");
 
 	return OPERATOR_FINISHED;
 }
@@ -1108,11 +1125,21 @@ static void init_multiresbake_job(bContext *C, MultiresBakeJob *bkj)
 
 	CTX_DATA_BEGIN(C, Base*, base, selected_editable_bases) {
 		MultiresBakerJobData *data;
+		DerivedMesh *lores_dm;
+		int lvl;
 		ob= base->object;
 
+		multires_force_update(ob);
+
+		lores_dm = multiresbake_create_loresdm(scene, ob, &lvl);
+		if(!lores_dm)
+			continue;
+
 		data= MEM_callocN(sizeof(MultiresBakerJobData), "multiresBaker derivedMesh_data");
-		data->lores_dm = multiresbake_create_loresdm(scene, ob, &data->lvl);
+		data->lores_dm = lores_dm;
+		data->lvl = lvl;
 		data->hires_dm = multiresbake_create_hiresdm(scene, ob, &data->tot_lvl, &data->simple);
+
 		BLI_addtail(&bkj->data, data);
 	}
 	CTX_DATA_END;
@@ -1195,6 +1222,11 @@ static int multiresbake_image_exec(bContext *C, wmOperator *op)
 	bkr= MEM_callocN(sizeof(MultiresBakeJob), "MultiresBakeJob data");
 	init_multiresbake_job(C, bkr);
 
+	if(!bkr->data.first) {
+		BKE_report(op->reports, RPT_ERROR, "No objects found to bake from");
+		return OPERATOR_CANCELLED;
+	}
+
 	/* setup job */
 	steve= WM_jobs_get(CTX_wm_manager(C), CTX_wm_window(C), scene, "Multires Bake", WM_JOB_EXCL_RENDER|WM_JOB_PRIORITY|WM_JOB_PROGRESS);
 	WM_jobs_customdata(steve, bkr, multiresbake_freejob);
@@ -1248,9 +1280,7 @@ static int test_bake_internal(bContext *C, ReportList *reports)
 {
 	Scene *scene= CTX_data_scene(C);
 
-	if(scene->r.renderer!=R_INTERN) {
-		BKE_report(reports, RPT_ERROR, "Bake only supported for Internal Renderer");
-	} else if((scene->r.bake_flag & R_BAKE_TO_ACTIVE) && CTX_data_active_object(C)==NULL) {
+	if((scene->r.bake_flag & R_BAKE_TO_ACTIVE) && CTX_data_active_object(C)==NULL) {
 		BKE_report(reports, RPT_ERROR, "No active object");
 	}
 	else if(scene->r.bake_mode==RE_BAKE_AO && scene->world==NULL) {

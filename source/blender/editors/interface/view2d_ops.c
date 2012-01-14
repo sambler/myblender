@@ -248,20 +248,19 @@ static int view_pan_modal(bContext *C, wmOperator *op, wmEvent *event)
 			view_pan_apply(op);
 		}
 			break;
-			
+		/* XXX - Mode switching isn't implemented. See comments in 36818.
+		 * switch to zoom *
 		case LEFTMOUSE:
-			/* switch to zoom */
 			if (event->val==KM_PRESS) {
-				/* calculate overall delta mouse-movement for redo */
+				* calculate overall delta mouse-movement for redo *
 				RNA_int_set(op->ptr, "deltax", (vpd->startx - vpd->lastx));
 				RNA_int_set(op->ptr, "deltay", (vpd->starty - vpd->lasty));
 				
 				view_pan_exit(op);
 				WM_cursor_restore(CTX_wm_window(C));
-				
 				WM_operator_name_call(C, "VIEW2D_OT_zoom", WM_OP_INVOKE_DEFAULT, NULL);
 				return OPERATOR_FINISHED;
-			}
+			}*/
 			
 		default:
 			if (event->type == vpd->invoke_event || event->type==ESCKEY) {
@@ -985,12 +984,12 @@ static int view_zoomdrag_modal(bContext *C, wmOperator *op, wmEvent *event)
 			
 			/* x-axis transform */
 			dist = (v2d->mask.xmax - v2d->mask.xmin) / 2.0f;
-			dx= 1.0f - ((float)fabs(vzd->lastx - dist) + 2.0f) / ((float)fabs(event->x - dist) + 2.0f);
+			dx= 1.0f - (fabsf(vzd->lastx - dist) + 2.0f) / (fabsf(event->x - dist) + 2.0f);
 			dx*= 0.5f * (v2d->cur.xmax - v2d->cur.xmin);
 			
 			/* y-axis transform */
 			dist = (v2d->mask.ymax - v2d->mask.ymin) / 2.0f;
-			dy= 1.0f - ((float)fabs(vzd->lasty - dist) + 2.0f) / ((float)fabs(event->y - dist) + 2.0f);
+			dy= 1.0f - (fabsf(vzd->lasty - dist) + 2.0f) / (fabsf(event->y - dist) + 2.0f);
 			dy*= 0.5f * (v2d->cur.ymax - v2d->cur.ymin);
 		}
 		else {

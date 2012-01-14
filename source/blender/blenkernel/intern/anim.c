@@ -726,10 +726,10 @@ static void group_duplilist(ListBase *lb, Scene *scene, Object *ob, int level, i
 			if(!is_zero_v3(group->dupli_ofs)) {
 				copy_m4_m4(tmat, go->ob->obmat);
 				sub_v3_v3v3(tmat[3], tmat[3], group->dupli_ofs);
-				mul_m4_m4m4(mat, tmat, ob->obmat);
+				mult_m4_m4m4(mat, ob->obmat, tmat);
 			}
 			else {
-				mul_m4_m4m4(mat, go->ob->obmat, ob->obmat);
+				mult_m4_m4m4(mat, ob->obmat, go->ob->obmat);
 			}
 			
 			dob= new_dupli_object(lb, go->ob, mat, ob->lay, 0, OB_DUPLIGROUP, animated);
@@ -757,7 +757,7 @@ static void group_duplilist(ListBase *lb, Scene *scene, Object *ob, int level, i
 static void frames_duplilist(ListBase *lb, Scene *scene, Object *ob, int level, int animated)
 {
 	extern int enable_cu_speed;	/* object.c */
-	Object copyob = {{NULL}};
+	Object copyob;
 	int cfrao = scene->r.cfra;
 	int dupend = ob->dupend;
 	
@@ -955,7 +955,7 @@ static void vertex_duplilist(ListBase *lb, ID *id, Scene *scene, Object *par, fl
 					   when par_space_mat is NULL ob->obmat can be used instead of ob__obmat
 					*/
 					if(par_space_mat)
-						mul_m4_m4m4(vdd.obmat, ob->obmat, par_space_mat);
+						mult_m4_m4m4(vdd.obmat, par_space_mat, ob->obmat);
 					else
 						copy_m4_m4(vdd.obmat, ob->obmat);
 
@@ -1030,26 +1030,16 @@ static void face_duplilist(ListBase *lb, ID *id, Scene *scene, Object *par, floa
 	
 	em = BKE_mesh_get_editmesh(me);
 	if(em) {
-		int totvert;
-		
 		dm= editmesh_get_derived_cage(scene, par, em, CD_MASK_BAREMESH);
-		
-		totface= dm->getNumFaces(dm);
-		mface= MEM_mallocN(sizeof(MFace)*totface, "mface temp");
-		dm->copyFaceArray(dm, mface);
-		totvert= dm->getNumVerts(dm);
-		mvert= MEM_mallocN(sizeof(MVert)*totvert, "mvert temp");
-		dm->copyVertArray(dm, mvert);
-
 		BKE_mesh_end_editmesh(me, em);
 	}
 	else {
 		dm = mesh_get_derived_deform(scene, par, CD_MASK_BAREMESH);
-		
-		totface= dm->getNumFaces(dm);
-		mface= dm->getFaceArray(dm);
-		mvert= dm->getVertArray(dm);
 	}
+
+	totface= dm->getNumFaces(dm);
+	mface= dm->getFaceArray(dm);
+	mvert= dm->getVertArray(dm);
 
 	if(G.rendering) {
 
@@ -1094,7 +1084,7 @@ static void face_duplilist(ListBase *lb, ID *id, Scene *scene, Object *par, floa
 					   when par_space_mat is NULL ob->obmat can be used instead of ob__obmat
 					*/
 					if(par_space_mat)
-						mul_m4_m4m4(ob__obmat, ob->obmat, par_space_mat);
+						mult_m4_m4m4(ob__obmat, par_space_mat, ob->obmat);
 					else
 						copy_m4_m4(ob__obmat, ob->obmat);
 					
@@ -1153,21 +1143,17 @@ static void face_duplilist(ListBase *lb, ID *id, Scene *scene, Object *par, floa
 								madd_v3_v3v3fl(dob->orco, dob->orco, orco[mv1], w);
 								madd_v3_v3v3fl(dob->orco, dob->orco, orco[mv2], w);
 								madd_v3_v3v3fl(dob->orco, dob->orco, orco[mv3], w);
-								if(mv4)
+								if (mv4) {
 									madd_v3_v3v3fl(dob->orco, dob->orco, orco[mv4], w);
+								}
 							}
 
 							if(mtface) {
-								dob->uv[0] += w*mtface[a].uv[0][0];
-								dob->uv[1] += w*mtface[a].uv[0][1];
-								dob->uv[0] += w*mtface[a].uv[1][0];
-								dob->uv[1] += w*mtface[a].uv[1][1];
-								dob->uv[0] += w*mtface[a].uv[2][0];
-								dob->uv[1] += w*mtface[a].uv[2][1];
-
-								if(mv4) {
-									dob->uv[0] += w*mtface[a].uv[3][0];
-									dob->uv[1] += w*mtface[a].uv[3][1];
+								madd_v2_v2v2fl(dob->uv, dob->uv, mtface[a].uv[0], w);
+								madd_v2_v2v2fl(dob->uv, dob->uv, mtface[a].uv[1], w);
+								madd_v2_v2v2fl(dob->uv, dob->uv, mtface[a].uv[2], w);
+								if (mv4) {
+									madd_v2_v2v2fl(dob->uv, dob->uv, mtface[a].uv[3], w);
 								}
 							}
 						}
@@ -1188,11 +1174,6 @@ static void face_duplilist(ListBase *lb, ID *id, Scene *scene, Object *par, floa
 		}
 		if (sce)	base= base->next;	/* scene loop */
 		else		go= go->next;		/* group loop */
-	}
-	
-	if(em) {
-		MEM_freeN(mface);
-		MEM_freeN(mvert);
 	}
 
 	if(orco)
@@ -1411,15 +1392,15 @@ static void new_particle_duplilist(ListBase *lb, ID *id, Scene *scene, Object *p
 					if(!is_zero_v3(part->dup_group->dupli_ofs)) {
 						copy_m4_m4(tmat, oblist[b]->obmat);
 						sub_v3_v3v3(tmat[3], tmat[3], part->dup_group->dupli_ofs);
-						mul_m4_m4m4(tmat, tmat, pamat);
+						mult_m4_m4m4(tmat, pamat, tmat);
 					}
 					else {
-						mul_m4_m4m4(tmat, oblist[b]->obmat, pamat);
+						mult_m4_m4m4(tmat, pamat, oblist[b]->obmat);
 					}
 
 					mul_mat3_m4_fl(tmat, size*scale);
 					if(par_space_mat)
-						mul_m4_m4m4(mat, tmat, par_space_mat);
+						mult_m4_m4m4(mat, par_space_mat, tmat);
 					else
 						copy_m4_m4(mat, tmat);
 
@@ -1450,15 +1431,15 @@ static void new_particle_duplilist(ListBase *lb, ID *id, Scene *scene, Object *p
 				 * remove the real emitter's transformation before 2nd order duplication.
 				 */
 				if(par_space_mat && GS(id->name) != ID_GR)
-					mul_m4_m4m4(mat, pamat, psys->imat);
+					mult_m4_m4m4(mat, psys->imat, pamat);
 				else
 					copy_m4_m4(mat, pamat);
 
-				mul_m4_m4m4(tmat, obmat, mat);
+				mult_m4_m4m4(tmat, mat, obmat);
 				mul_mat3_m4_fl(tmat, size*scale);
 
 				if(par_space_mat)
-					mul_m4_m4m4(mat, tmat, par_space_mat);
+					mult_m4_m4m4(mat, par_space_mat, tmat);
 				else
 					copy_m4_m4(mat, tmat);
 

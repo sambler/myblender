@@ -24,8 +24,6 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
-#ifndef DNA_TEXTURE_TYPES_H
-#define DNA_TEXTURE_TYPES_H
 
 /** \file DNA_texture_types.h
  *  \ingroup DNA
@@ -33,6 +31,10 @@
  *  \author nzc
  */
 
+#ifndef DNA_TEXTURE_TYPES_H
+#define DNA_TEXTURE_TYPES_H
+
+#include "DNA_defs.h"
 #include "DNA_ID.h"
 #include "DNA_image_types.h" /* ImageUser */
 
@@ -59,7 +61,7 @@ typedef struct MTex {
 	short texco, mapto, maptoneg, blendtype;
 	struct Object *object;
 	struct Tex *tex;
-	char uvname[32];
+	char uvname[64];	/* MAX_CUSTOMDATA_LAYER_NAME */
 	
 	char projx, projy, projz, mapping;
 	float ofs[3], size[3], rot;
@@ -264,7 +266,7 @@ typedef struct Tex {
 	struct ImageUser iuser;
 	
 	struct bNodeTree *nodetree;
-	struct Ipo *ipo;				// XXX depreceated... old animation system
+	struct Ipo *ipo  DNA_DEPRECATED;  /* old animation system, deprecated for 2.5 */
 	struct Image *ima;
 	struct PluginTex *plugin;
 	struct ColorBand *coba;
@@ -493,7 +495,8 @@ typedef struct ColorMapping {
 #define MTEX_5TAP_BUMP		512
 #define MTEX_BUMP_OBJECTSPACE	1024
 #define MTEX_BUMP_TEXTURESPACE	2048
-#define MTEX_BUMP_FLIPPED		4096 /* temp flag for 2.59/2.60 */
+/* #define MTEX_BUMP_FLIPPED 	4096 */ /* UNUSED */
+#define MTEX_BICUBIC_BUMP		8192
 
 /* blendtype */
 #define MTEX_BLEND		0
@@ -510,7 +513,7 @@ typedef struct ColorMapping {
 #define MTEX_BLEND_SAT		11
 #define MTEX_BLEND_VAL		12
 #define MTEX_BLEND_COLOR	13
-#define MTEX_NUM_BLENDTYPES	14
+/* free for use */
 #define MTEX_SOFT_LIGHT     15 
 #define MTEX_LIN_LIGHT      16
 

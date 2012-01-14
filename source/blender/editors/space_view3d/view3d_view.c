@@ -104,31 +104,6 @@ float *give_cursor(Scene *scene, View3D *v3d)
 }
 
 
-/* Gets the lens and clipping values from a camera of lamp type object */
-void ED_view3d_ob_clip_range_get(Object *ob, float *lens, float *clipsta, float *clipend)
-{
-	if(ob->type==OB_LAMP ) {
-		Lamp *la = ob->data;
-		if (lens) {
-			float x1, fac;
-			fac= cosf((float)M_PI*la->spotsize/360.0f);
-			x1= saacos(fac);
-			*lens= 16.0f*fac/sinf(x1);
-		}
-		if (clipsta)	*clipsta= la->clipsta;
-		if (clipend)	*clipend= la->clipend;
-	}
-	else if(ob->type==OB_CAMERA) {
-		Camera *cam= ob->data;
-		if (lens)		*lens= cam->lens;
-		if (clipsta)	*clipsta= cam->clipsta;
-		if (clipend)	*clipend= cam->clipend;
-	}
-	else {
-		if (lens)		*lens= 35.0f;
-	}
-}
-
 /* ****************** smooth view operator ****************** */
 /* This operator is one of the 'timer refresh' ones like animation playback */
 
@@ -367,7 +342,7 @@ void VIEW3D_OT_smoothview(wmOperatorType *ot)
 
 /* ****************** change view operators ****************** */
 
-static int view3d_setcameratoview_exec(bContext *C, wmOperator *UNUSED(op))
+static int view3d_camera_to_view_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	View3D *v3d = CTX_wm_view3d(C);
 	RegionView3D *rv3d= CTX_wm_region_view3d(C);
@@ -394,7 +369,7 @@ static int view3d_setcameratoview_exec(bContext *C, wmOperator *UNUSED(op))
 
 }
 
-static int view3d_setcameratoview_poll(bContext *C)
+static int view3d_camera_to_view_poll(bContext *C)
 {
 	View3D *v3d= CTX_wm_view3d(C);
 	if(v3d && v3d->camera && v3d->camera->id.lib==NULL) {
@@ -415,8 +390,8 @@ void VIEW3D_OT_camera_to_view(wmOperatorType *ot)
 	ot->idname= "VIEW3D_OT_camera_to_view";
 	
 	/* api callbacks */
-	ot->exec= view3d_setcameratoview_exec;	
-	ot->poll= view3d_setcameratoview_poll;
+	ot->exec= view3d_camera_to_view_exec;
+	ot->poll= view3d_camera_to_view_poll;
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
@@ -456,6 +431,24 @@ static int view3d_camera_to_view_selected_exec(bContext *C, wmOperator *UNUSED(o
 	}
 }
 
+static int view3d_camera_to_view_selected_poll(bContext *C)
+{
+	View3D *v3d= CTX_wm_view3d(C);
+	if(v3d && v3d->camera && v3d->camera->id.lib==NULL) {
+		RegionView3D *rv3d= CTX_wm_region_view3d(C);
+		if(rv3d) {
+			if (rv3d->is_persp == FALSE) {
+				CTX_wm_operator_poll_msg_set(C, "Only valid for a perspective camera view");
+			}
+			else if (!rv3d->viewlock) {
+				return 1;
+			}
+		}
+	}
+
+	return 0;
+}
+
 void VIEW3D_OT_camera_to_view_selected(wmOperatorType *ot)
 {
 	/* identifiers */
@@ -465,7 +458,7 @@ void VIEW3D_OT_camera_to_view_selected(wmOperatorType *ot)
 
 	/* api callbacks */
 	ot->exec= view3d_camera_to_view_selected_exec;
-	// ot->poll= view3d_setcameratoview_poll;
+	ot->poll= view3d_camera_to_view_selected_poll;
 
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
@@ -519,7 +512,7 @@ void VIEW3D_OT_object_as_camera(wmOperatorType *ot)
 
 /* ********************************** */
 
-void ED_view3d_calc_clipping(BoundBox *bb, float planes[4][4], bglMats *mats, rcti *rect)
+void ED_view3d_calc_clipping(BoundBox *bb, float planes[4][4], bglMats *mats, const rcti *rect)
 {
 	float modelview[4][4];
 	double xs, ys, p[3];
@@ -747,8 +740,8 @@ void ED_view3d_ob_project_mat_get(RegionView3D *rv3d, Object *ob, float pmat[4][
 {
 	float vmat[4][4];
 	
-	mul_m4_m4m4(vmat, ob->obmat, rv3d->viewmat);
-	mul_m4_m4m4(pmat, vmat, rv3d->winmat);
+	mult_m4_m4m4(vmat, rv3d->viewmat, ob->obmat);
+	mult_m4_m4m4(pmat, rv3d->winmat, vmat);
 }
 
 #if 0
@@ -767,7 +760,7 @@ void view3d_unproject(bglMats *mats, float out[3], const short x, const short y,
 #endif
 
 /* use view3d_get_object_project_mat to get projecting mat */
-void ED_view3d_project_float(ARegion *ar, const float vec[3], float adr[2], float mat[4][4])
+void ED_view3d_project_float(const ARegion *ar, const float vec[3], float adr[2], float mat[4][4])
 {
 	float vec4[4];
 	
@@ -816,7 +809,7 @@ int ED_view3d_boundbox_clip(RegionView3D *rv3d, float obmat[][4], BoundBox *bb)
 	if(bb==NULL) return 1;
 	if(bb->flag & OB_BB_DISABLED) return 1;
 	
-	mul_m4_m4m4(mat, obmat, rv3d->persmat);
+	mult_m4_m4m4(mat, rv3d->persmat, obmat);
 	
 	for(a=0; a<8; a++) {
 		copy_v3_v3(vec, bb->vec[a]);
@@ -985,202 +978,31 @@ void project_float_noclip(ARegion *ar, const float vec[3], float adr[2])
 /* copies logic of get_view3d_viewplane(), keep in sync */
 int ED_view3d_clip_range_get(View3D *v3d, RegionView3D *rv3d, float *clipsta, float *clipend)
 {
-	int orth= 0;
+	CameraParams params;
 
-	*clipsta= v3d->near;
-	*clipend= v3d->far;
+	camera_params_init(&params);
+	camera_params_from_view3d(&params, v3d, rv3d);
 
-	if(rv3d->persp==RV3D_CAMOB) {
-		if(v3d->camera) {
-			if(v3d->camera->type==OB_LAMP ) {
-				Lamp *la= v3d->camera->data;
-				*clipsta= la->clipsta;
-				*clipend= la->clipend;
-			}
-			else if(v3d->camera->type==OB_CAMERA) {
-				Camera *cam= v3d->camera->data;
-				*clipsta= cam->clipsta;
-				*clipend= cam->clipend;
+	if(clipsta) *clipsta= params.clipsta;
+	if(clipend) *clipend= params.clipend;
 
-				if(cam->type==CAM_ORTHO)
-					orth= 1;
-			}
-		}
-	}
-
-	if(rv3d->persp==RV3D_ORTHO) {
-		*clipend *= 0.5f;	// otherwise too extreme low zbuffer quality
-		*clipsta= - *clipend;
-		orth= 1;
-	}
-
-	return orth;
+	return params.is_ortho;
 }
 
 /* also exposed in previewrender.c */
-int ED_view3d_viewplane_get(View3D *v3d, RegionView3D *rv3d, int winxi, int winyi, rctf *viewplane, float *clipsta, float *clipend, float *pixsize)
+int ED_view3d_viewplane_get(View3D *v3d, RegionView3D *rv3d, int winx, int winy, rctf *viewplane, float *clipsta, float *clipend)
 {
-	Camera *cam=NULL;
-	float lens, sensor_x =DEFAULT_SENSOR_WIDTH, sensor_y= DEFAULT_SENSOR_HEIGHT, fac, x1, y1, x2, y2;
-	float winx= (float)winxi, winy= (float)winyi;
-	int orth= 0;
-	short sensor_fit= CAMERA_SENSOR_FIT_AUTO;
+	CameraParams params;
 
-	/* currnetly using sensor size (depends on fov calculating method) */
-	float sensor= DEFAULT_SENSOR_WIDTH;
+	camera_params_init(&params);
+	camera_params_from_view3d(&params, v3d, rv3d);
+	camera_params_compute_viewplane(&params, winx, winy, 1.0f, 1.0f);
 
-	lens= v3d->lens;	
+	if(viewplane) *viewplane= params.viewplane;
+	if(clipsta) *clipsta= params.clipsta;
+	if(clipend) *clipend= params.clipend;
 	
-	*clipsta= v3d->near;
-	*clipend= v3d->far;
-	
-	if(rv3d->persp==RV3D_CAMOB) {
-		if(v3d->camera) {
-			if(v3d->camera->type==OB_LAMP ) {
-				Lamp *la;
-				
-				la= v3d->camera->data;
-				fac= cosf(((float)M_PI)*la->spotsize/360.0f);
-				
-				x1= saacos(fac);
-				lens= 16.0f*fac/sinf(x1);
-				
-				*clipsta= la->clipsta;
-				*clipend= la->clipend;
-			}
-			else if(v3d->camera->type==OB_CAMERA) {
-				cam= v3d->camera->data;
-				lens= cam->lens;
-				sensor_x= cam->sensor_x;
-				sensor_y= cam->sensor_y;
-				*clipsta= cam->clipsta;
-				*clipend= cam->clipend;
-				sensor_fit= cam->sensor_fit;
-
-				sensor= (cam->sensor_fit==CAMERA_SENSOR_FIT_VERT) ? (cam->sensor_y) : (cam->sensor_x);
-			}
-		}
-	}
-	
-	if(rv3d->persp==RV3D_ORTHO) {
-		if(winx>winy) x1= -rv3d->dist;
-		else x1= -winx*rv3d->dist/winy;
-		x2= -x1;
-		
-		if(winx>winy) y1= -winy*rv3d->dist/winx;
-		else y1= -rv3d->dist;
-		y2= -y1;
-		
-		*clipend *= 0.5f;	// otherwise too extreme low zbuffer quality
-		*clipsta= - *clipend;
-		orth= 1;
-	}
-	else {
-		/* fac for zoom, also used for camdx */
-		if(rv3d->persp==RV3D_CAMOB) {
-			fac= BKE_screen_view3d_zoom_to_fac((float)rv3d->camzoom) * 4.0f;
-		}
-		else {
-			fac= 2.0;
-		}
-		
-		/* viewplane size depends... */
-		if(cam && cam->type==CAM_ORTHO) {
-			/* ortho_scale == 1 means exact 1 to 1 mapping */
-			float dfac= 2.0f*cam->ortho_scale/fac;
-
-			if(sensor_fit==CAMERA_SENSOR_FIT_AUTO) {
-				if(winx>winy) {
-					x1= -dfac;
-					y1= -winy*dfac/winx;
-				}
-				else {
-					x1= -winx*dfac/winy;
-					y1= -dfac;
-				}
-			}
-			else if(sensor_fit==CAMERA_SENSOR_FIT_HOR) {
-				x1= -dfac;
-				y1= -winy*dfac/winx;
-			}
-			else {
-				x1= -winx*dfac/winy;
-				y1= -dfac;
-			}
-
-			x2= -x1;
-			y2= -y1;
-
-			orth= 1;
-		}
-		else {
-			float dfac;
-			
-			if(sensor_fit==CAMERA_SENSOR_FIT_AUTO) {
-				if(winx>winy) dfac= (sensor_x * 2.0f) / (fac*winx*lens);
-				else dfac= (sensor_x * 2.0f) / (fac*winy*lens);
-			}
-			else if(sensor_fit==CAMERA_SENSOR_FIT_HOR) {
-				dfac= (sensor_x * 2.0f) / (fac*winx*lens);
-			}
-			else {
-				dfac= (sensor_y * 2.0f) / (fac*winy*lens);
-			}
-			
-			x1= - *clipsta * winx*dfac;
-			x2= -x1;
-			y1= - *clipsta * winy*dfac;
-			y2= -y1;
-			orth= 0;
-		}
-		/* cam view offset */
-		if(cam) {
-			float dx= 0.5f*fac*rv3d->camdx*(x2-x1);
-			float dy= 0.5f*fac*rv3d->camdy*(y2-y1);
-
-			/* shift offset */		
-			if(cam->type==CAM_ORTHO) {
-				dx += cam->shiftx * cam->ortho_scale;
-				dy += cam->shifty * cam->ortho_scale;
-			}
-			else {
-				dx += cam->shiftx * (cam->clipsta / cam->lens) * sensor;
-				dy += cam->shifty * (cam->clipsta / cam->lens) * sensor;
-			}
-
-			x1+= dx;
-			x2+= dx;
-			y1+= dy;
-			y2+= dy;
-		}
-	}
-	
-	if(pixsize) {
-		float viewfac;
-		
-		if(orth) {
-			viewfac= (winx >= winy)? winx: winy;
-			*pixsize= 1.0f/viewfac;
-		}
-		else {
-			float size= ((winx >= winy)? winx: winy);
-
-			if(sensor_fit==CAMERA_SENSOR_FIT_HOR)
-				size= winx;
-			else if(sensor_fit==CAMERA_SENSOR_FIT_VERT)
-				size= winy;
-
-			viewfac= (size*lens)/sensor;
-			*pixsize= *clipsta/viewfac;
-		}
-	}
-	
-	viewplane->xmin= x1;
-	viewplane->ymin= y1;
-	viewplane->xmax= x2;
-	viewplane->ymax= y2;
-	
-	return orth;
+	return params.is_ortho;
 }
 
 void setwinmatrixview3d(ARegion *ar, View3D *v3d, rctf *rect)		/* rect: for picking */
@@ -1190,7 +1012,7 @@ void setwinmatrixview3d(ARegion *ar, View3D *v3d, rctf *rect)		/* rect: for pick
 	float clipsta, clipend, x1, y1, x2, y2;
 	int orth;
 	
-	orth= ED_view3d_viewplane_get(v3d, rv3d, ar->winx, ar->winy, &viewplane, &clipsta, &clipend, NULL);
+	orth= ED_view3d_viewplane_get(v3d, rv3d, ar->winx, ar->winy, &viewplane, &clipsta, &clipend);
 	rv3d->is_persp= !orth;
 
 	//	printf("%d %d %f %f %f %f %f %f\n", winx, winy, viewplane.xmin, viewplane.ymin, viewplane.xmax, viewplane.ymax, clipsta, clipend);
@@ -1374,7 +1196,7 @@ short view3d_opengl_select(ViewContext *vc, unsigned int *buffer, unsigned int b
 	}
 	
 	setwinmatrixview3d(ar, v3d, &rect);
-	mul_m4_m4m4(vc->rv3d->persmat, vc->rv3d->viewmat, vc->rv3d->winmat);
+	mult_m4_m4m4(vc->rv3d->persmat, vc->rv3d->winmat, vc->rv3d->viewmat);
 	
 	if(v3d->drawtype > OB_WIRE) {
 		v3d->zbuf= TRUE;
@@ -1452,7 +1274,7 @@ short view3d_opengl_select(ViewContext *vc, unsigned int *buffer, unsigned int b
 	
 	G.f &= ~G_PICKSEL;
 	setwinmatrixview3d(ar, v3d, NULL);
-	mul_m4_m4m4(vc->rv3d->persmat, vc->rv3d->viewmat, vc->rv3d->winmat);
+	mult_m4_m4m4(vc->rv3d->persmat, vc->rv3d->winmat, vc->rv3d->viewmat);
 	
 	if(v3d->drawtype > OB_WIRE) {
 		v3d->zbuf= 0;
@@ -1893,6 +1715,10 @@ static int game_engine_exec(bContext *C, wmOperator *op)
 	if(!ED_view3d_context_activate(C))
 		return OPERATOR_CANCELLED;
 	
+	/* redraw to hide any menus/popups, we don't go back to
+	   the window manager until after this operator exits */
+	WM_redraw_windows(C);
+
 	rv3d= CTX_wm_region_view3d(C);
 	/* sa= CTX_wm_area(C); */ /* UNUSED */
 	ar= CTX_wm_region(C);
@@ -1901,7 +1727,11 @@ static int game_engine_exec(bContext *C, wmOperator *op)
 	
 	game_set_commmandline_options(&startscene->gm);
 
-	if(rv3d->persp==RV3D_CAMOB && startscene->gm.framing.type == SCE_GAMEFRAMING_BARS && startscene->gm.stereoflag != STEREO_DOME) { /* Letterbox */
+	if((rv3d->persp == RV3D_CAMOB) &&
+	   (startscene->gm.framing.type == SCE_GAMEFRAMING_BARS) &&
+	   (startscene->gm.stereoflag != STEREO_DOME))
+	{
+		/* Letterbox */
 		rctf cam_framef;
 		ED_view3d_calc_camera_border(startscene, ar, CTX_wm_view3d(C), rv3d, &cam_framef, FALSE);
 		cam_frame.xmin = cam_framef.xmin + ar->winrct.xmin;
@@ -1928,6 +1758,8 @@ static int game_engine_exec(bContext *C, wmOperator *op)
 		CTX_wm_window_set(C, NULL);
 	}
 	
+	ED_area_tag_redraw(CTX_wm_area(C));
+
 	if(prevwin) {
 		/* restore context, in case it changed in the meantime, for
 		   example by working in another window or closing it */
@@ -1941,8 +1773,6 @@ static int game_engine_exec(bContext *C, wmOperator *op)
 	//XXX restore_all_scene_cfra(scene_cfra_store);
 	set_scene_bg(CTX_data_main(C), startscene);
 	//XXX scene_update_for_newframe(bmain, scene, scene->lay);
-	
-	ED_area_tag_redraw(CTX_wm_area(C));
 
 	return OPERATOR_FINISHED;
 #else

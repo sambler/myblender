@@ -228,7 +228,11 @@ bNodeTreeType ntreeType_Composite = {
 	/* local_sync */		local_sync,
 	/* local_merge */		local_merge,
 	/* update */			update,
-	/* update_node */		update_node
+	/* update_node */		update_node,
+	/* validate_link */		NULL,
+	/* mutefunc */			node_compo_pass_on,
+	/* mutelinksfunc */		node_mute_get_links,
+	/* gpumutefunc */		NULL
 };
 
 
@@ -356,13 +360,8 @@ static void *exec_composite_node(void *nodeexec_v)
 	
 	node_get_stack(node, thd->stack, nsin, nsout);
 	
-	if((node->flag & NODE_MUTED) && (!node_only_value(node))) {
-		/* viewers we execute, for feedback to user */
-		if(ELEM(node->type, CMP_NODE_VIEWER, CMP_NODE_SPLITVIEWER)) 
-			node->typeinfo->execfunc(thd->rd, node, nsin, nsout);
-		else
-			node_compo_pass_on(node, nsin, nsout);
-	}
+	if((node->flag & NODE_MUTED) && node->typeinfo->mutefunc)
+		node->typeinfo->mutefunc(thd->rd, 0, node, nodeexec->data, nsin, nsout);
 	else if(node->typeinfo->execfunc)
 		node->typeinfo->execfunc(thd->rd, node, nsin, nsout);
 	else if (node->typeinfo->newexecfunc)
@@ -605,8 +604,8 @@ void ntreeCompositExecTree(bNodeTree *ntree, RenderData *rd, int do_preview)
 				if(ntree->progress && totnode)
 					ntree->progress(ntree->prh, (1.0f - curnode/(float)totnode));
 				if(ntree->stats_draw) {
-					char str[64];
-					sprintf(str, "Compositing %d %s", curnode, node->name);
+					char str[128];
+					BLI_snprintf(str, sizeof(str), "Compositing %d %s", curnode, node->name);
 					ntree->stats_draw(ntree->sdh, str);
 				}
 				curnode--;

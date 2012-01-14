@@ -652,7 +652,7 @@ void calc_sequence(Scene *scene, Sequence *seq)
 /* note: caller should run calc_sequence(scene, seq) after */
 void reload_sequence_new_file(Scene *scene, Sequence * seq, int lock_range)
 {
-	char str[FILE_MAXDIR+FILE_MAXFILE];
+	char str[FILE_MAX];
 	int prev_startdisp=0, prev_enddisp=0;
 	/* note: dont rename the strip, will break animation curves */
 
@@ -833,8 +833,8 @@ void clear_scene_in_allseqs(Main *bmain, Scene *scene)
 
 typedef struct SeqUniqueInfo {
 	Sequence *seq;
-	char name_src[32];
-	char name_dest[32];
+	char name_src[SEQ_NAME_MAXSTR];
+	char name_dest[SEQ_NAME_MAXSTR];
 	int count;
 	int match;
 } SeqUniqueInfo;
@@ -850,7 +850,8 @@ static void seqbase_unique_name(ListBase *seqbasep, SeqUniqueInfo *sui)
 	Sequence *seq;
 	for(seq=seqbasep->first; seq; seq= seq->next) {
 		if (sui->seq != seq && strcmp(sui->name_dest, seq->name+2)==0) {
-			sprintf(sui->name_dest, "%.17s.%03d",  sui->name_src, sui->count++); /*24 - 2 for prefix, -1 for \0 */
+			/* SEQ_NAME_MAXSTR - 2 for prefix, -1 for \0, -4 for the number */
+			BLI_snprintf(sui->name_dest, sizeof(sui->name_dest), "%.59s.%03d",  sui->name_src, sui->count++);
 			sui->match= 1; /* be sure to re-scan */
 		}
 	}
@@ -1156,7 +1157,7 @@ static IMB_Proxy_Size seq_rendersize_to_proxysize(int size)
 
 static void seq_open_anim_file(Sequence * seq)
 {
-	char name[FILE_MAXDIR+FILE_MAXFILE];
+	char name[FILE_MAX];
 	StripProxy * proxy;
 
 	if(seq->anim != NULL) {
@@ -1327,8 +1328,8 @@ static void seq_proxy_build_frame(SeqRenderData context,
 	ibuf->ftype= JPG | quality;
 
 	/* unsupported feature only confuses other s/w */
-	if(ibuf->depth==32)
-		ibuf->depth= 24;
+	if(ibuf->planes==32)
+		ibuf->planes= 24;
 
 	BLI_make_existing_file(name);
 	
@@ -1729,7 +1730,7 @@ static ImBuf * input_preprocess(
 	}
 
 	if(seq->flag & SEQ_MAKE_PREMUL) {
-		if(ibuf->depth == 32 && ibuf->zbuf == NULL) {
+		if(ibuf->planes == 32 && ibuf->zbuf == NULL) {
 			IMB_premultiply_alpha(ibuf);
 		}
 	}
@@ -2025,7 +2026,10 @@ static ImBuf * seq_render_scene_strip_impl(
 			}
 
 			/* float buffers in the sequencer are not linear */
-			ibuf->profile= IB_PROFILE_LINEAR_RGB;
+			if(scene->r.color_mgt_flag & R_COLOR_MANAGEMENT)
+				ibuf->profile= IB_PROFILE_LINEAR_RGB;
+			else
+				ibuf->profile= IB_PROFILE_NONE;
 			IMB_convert_profile(ibuf, IB_PROFILE_SRGB);			
 		}
 		else if (rres.rect32) {
@@ -2057,7 +2061,7 @@ static ImBuf * seq_render_scene_strip_impl(
 static ImBuf * seq_render_strip(SeqRenderData context, Sequence * seq, float cfra)
 {
 	ImBuf * ibuf = NULL;
-	char name[FILE_MAXDIR+FILE_MAXFILE];
+	char name[FILE_MAX];
 	int use_preprocess = input_have_to_preprocess(context, seq, cfra);
 	float nr = give_stripelem_index(seq, cfra);
 	/* all effects are handled similarly with the exception of speed effect */
@@ -3067,10 +3071,10 @@ void seq_sound_init(Scene *scene, Sequence *seq)
 	}
 	else {
 		if(seq->sound) {
-			seq->scene_sound = sound_add_scene_sound(scene, seq, seq->startdisp, seq->enddisp, seq->startofs + seq->anim_startofs);
+			seq->scene_sound = sound_add_scene_sound_defaults(scene, seq);
 		}
 		if(seq->scene) {
-			sound_scene_add_scene_sound(scene, seq, seq->startdisp, seq->enddisp, seq->startofs + seq->anim_startofs);
+			sound_scene_add_scene_sound_defaults(scene, seq);
 		}
 	}
 }
@@ -3224,10 +3228,8 @@ void seq_update_sound_bounds_all(Scene *scene)
 
 void seq_update_sound_bounds(Scene* scene, Sequence *seq)
 {
-	if(seq->scene_sound) {
-		sound_move_scene_sound(scene, seq->scene_sound, seq->startdisp, seq->enddisp, seq->startofs + seq->anim_startofs);
-		/* mute is set in seq_update_muting_recursive */
-	}
+	sound_move_scene_sound_defaults(scene, seq);
+	/* mute is set in seq_update_muting_recursive */
 }
 
 static void seq_update_muting_recursive(ListBase *seqbasep, Sequence *metaseq, int mute)
@@ -3387,13 +3389,13 @@ int seq_swap(Sequence *seq_a, Sequence *seq_b, const char **error_str)
 /* XXX - hackish function needed for transforming strips! TODO - have some better solution */
 void seq_offset_animdata(Scene *scene, Sequence *seq, int ofs)
 {
-	char str[32];
+	char str[SEQ_NAME_MAXSTR+3];
 	FCurve *fcu;
 
 	if(scene->adt==NULL || ofs==0 || scene->adt->action==NULL)
 		return;
 
-	sprintf(str, "[\"%s\"]", seq->name+2);
+	BLI_snprintf(str, sizeof(str), "[\"%s\"]", seq->name+2);
 
 	for (fcu= scene->adt->action->curves.first; fcu; fcu= fcu->next) {
 		if(strstr(fcu->rna_path, "sequence_editor.sequences_all[") && strstr(fcu->rna_path, str)) {
@@ -3410,7 +3412,7 @@ void seq_offset_animdata(Scene *scene, Sequence *seq, int ofs)
 
 void seq_dupe_animdata(Scene *scene, const char *name_src, const char *name_dst)
 {
-	char str_from[32];
+	char str_from[SEQ_NAME_MAXSTR+3];
 	FCurve *fcu;
 	FCurve *fcu_last;
 	FCurve *fcu_cpy;
@@ -3419,7 +3421,7 @@ void seq_dupe_animdata(Scene *scene, const char *name_src, const char *name_dst)
 	if(scene->adt==NULL || scene->adt->action==NULL)
 		return;
 
-	sprintf(str_from, "[\"%s\"]", name_src);
+	BLI_snprintf(str_from, sizeof(str_from), "[\"%s\"]", name_src);
 
 	fcu_last= scene->adt->action->curves.last;
 
@@ -3440,13 +3442,13 @@ void seq_dupe_animdata(Scene *scene, const char *name_src, const char *name_dst)
 /* XXX - hackish function needed to remove all fcurves belonging to a sequencer strip */
 static void seq_free_animdata(Scene *scene, Sequence *seq)
 {
-	char str[32];
+	char str[SEQ_NAME_MAXSTR+3];
 	FCurve *fcu;
 
 	if(scene->adt==NULL || scene->adt->action==NULL)
 		return;
 
-	sprintf(str, "[\"%s\"]", seq->name+2);
+	BLI_snprintf(str, sizeof(str), "[\"%s\"]", seq->name+2);
 
 	fcu= scene->adt->action->curves.first; 
 
@@ -3769,7 +3771,7 @@ static Sequence *seq_dupli(struct Scene *scene, struct Scene *scene_to, Sequence
 	} else if(seq->type == SEQ_SCENE) {
 		seqn->strip->stripdata = NULL;
 		if(seq->scene_sound)
-			seqn->scene_sound = sound_scene_add_scene_sound(sce_audio, seqn, seq->startdisp, seq->enddisp, seq->startofs + seq->anim_startofs);
+			seqn->scene_sound = sound_scene_add_scene_sound_defaults(sce_audio, seqn);
 	} else if(seq->type == SEQ_MOVIE) {
 		seqn->strip->stripdata =
 				MEM_dupallocN(seq->strip->stripdata);
@@ -3778,7 +3780,7 @@ static Sequence *seq_dupli(struct Scene *scene, struct Scene *scene_to, Sequence
 		seqn->strip->stripdata =
 				MEM_dupallocN(seq->strip->stripdata);
 		if(seq->scene_sound)
-			seqn->scene_sound = sound_add_scene_sound(sce_audio, seqn, seq->startdisp, seq->enddisp, seq->startofs + seq->anim_startofs);
+			seqn->scene_sound = sound_add_scene_sound_defaults(sce_audio, seqn);
 
 		seqn->sound->id.us++;
 	} else if(seq->type == SEQ_IMAGE) {

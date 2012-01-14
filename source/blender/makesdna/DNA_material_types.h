@@ -24,13 +24,15 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
-#ifndef DNA_MATERIAL_TYPES_H
-#define DNA_MATERIAL_TYPES_H
 
 /** \file DNA_material_types.h
  *  \ingroup DNA
  */
 
+#ifndef DNA_MATERIAL_TYPES_H
+#define DNA_MATERIAL_TYPES_H
+
+#include "DNA_defs.h"
 #include "DNA_ID.h"
 #include "DNA_listBase.h"
 
@@ -119,7 +121,7 @@ typedef struct Material {
 	float hasize, flaresize, subsize, flareboost;
 	float strand_sta, strand_end, strand_ease, strand_surfnor;
 	float strand_min, strand_widthfade;
-	char strand_uvname[32];
+	char strand_uvname[64];	/* MAX_CUSTOMDATA_LAYER_NAME */
 	
 	float sbias;			/* shadow bias to prevent terminator prob */
 	float lbias;			/* factor to multiply lampbias with (0.0 = no mult) */
@@ -150,7 +152,7 @@ typedef struct Material {
 
 	struct MTex *mtex[18];		/* MAX_MTEX */
 	struct bNodeTree *nodetree;	
-	struct Ipo *ipo;		// XXX depreceated... old animation system
+	struct Ipo *ipo  DNA_DEPRECATED;  /* old animation system, deprecated for 2.5 */
 	struct Group *group;	/* light group */
 	struct PreviewImage * preview;
 
@@ -167,8 +169,8 @@ typedef struct Material {
 	short sss_flag, sss_preset;
 
 	int mapto_textured;	/* render-time cache to optimise texture lookups */
-	short shadowonly_flag;		/* "shadowsonly" type */
-        short index;    /* custom index for render passes */
+	short shadowonly_flag;  /* "shadowsonly" type */
+	short index;            /* custom index for render passes */
 
 	ListBase gpumaterial;		/* runtime */
 } Material;

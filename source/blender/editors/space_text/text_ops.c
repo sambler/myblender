@@ -195,7 +195,6 @@ void TEXT_OT_new(wmOperatorType *ot)
 	ot->description= "Create a new text data block";
 	
 	/* api callbacks */
-	ot->invoke= WM_operator_confirm;
 	ot->exec= text_new_exec;
 	ot->poll= text_new_poll;
 	
@@ -277,7 +276,7 @@ static int text_open_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 	Text *text= CTX_data_edit_text(C);
 	char *path= (text && text->name)? text->name: G.main->name;
 
-	if(RNA_property_is_set(op->ptr, "filepath"))
+	if(RNA_struct_property_is_set(op->ptr, "filepath"))
 		return text_open_exec(C, op);
 	
 	text_open_init(C, op);
@@ -449,9 +448,9 @@ static void txt_write_file(Text *text, ReportList *reports)
 	FILE *fp;
 	TextLine *tmp;
 	struct stat st;
-	char filepath[FILE_MAXDIR+FILE_MAXFILE];
+	char filepath[FILE_MAX];
 	
-	BLI_strncpy(filepath, text->name, FILE_MAXDIR+FILE_MAXFILE);
+	BLI_strncpy(filepath, text->name, FILE_MAX);
 	BLI_path_abs(filepath, G.main->name);
 	
 	fp= fopen(filepath, "w");
@@ -535,7 +534,7 @@ static int text_save_as_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(even
 	Text *text= CTX_data_edit_text(C);
 	char *str;
 
-	if(RNA_property_is_set(op->ptr, "filepath"))
+	if(RNA_struct_property_is_set(op->ptr, "filepath"))
 		return text_save_as_exec(C, op);
 
 	if(text->name)
@@ -2210,7 +2209,7 @@ static int text_scroll_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	SpaceText *st= CTX_wm_space_text(C);
 	TextScroll *tsc;
 	
-	if(RNA_property_is_set(op->ptr, "lines"))
+	if(RNA_struct_property_is_set(op->ptr, "lines"))
 		return text_scroll_exec(C, op);
 	
 	tsc= MEM_callocN(sizeof(TextScroll), "TextScroll");
@@ -2290,7 +2289,7 @@ static int text_scroll_bar_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	const int *mval= event->mval;
 	int zone= -1;
 
-	if(RNA_property_is_set(op->ptr, "lines"))
+	if(RNA_struct_property_is_set(op->ptr, "lines"))
 		return text_scroll_exec(C, op);
 	
 	/* verify we are in the right zone */
@@ -2785,7 +2784,7 @@ static int text_insert_invoke(bContext *C, wmOperator *op, wmEvent *event)
 {
 	int ret;
 
-	// if(!RNA_property_is_set(op->ptr, "text")) { /* always set from keymap XXX */
+	// if(!RNA_struct_property_is_set(op->ptr, "text")) { /* always set from keymap XXX */
 	if(!RNA_string_length(op->ptr, "text")) {
 		/* if alt/ctrl/super are pressed pass through */
 		if(event->ctrl || event->oskey) {
@@ -3053,12 +3052,12 @@ int text_file_modified(Text *text)
 {
 	struct stat st;
 	int result;
-	char file[FILE_MAXDIR+FILE_MAXFILE];
+	char file[FILE_MAX];
 
 	if(!text || !text->name)
 		return 0;
 
-	BLI_strncpy(file, text->name, FILE_MAXDIR+FILE_MAXFILE);
+	BLI_strncpy(file, text->name, FILE_MAX);
 	BLI_path_abs(file, G.main->name);
 
 	if(!BLI_exists(file))
@@ -3082,11 +3081,11 @@ static void text_ignore_modified(Text *text)
 {
 	struct stat st;
 	int result;
-	char file[FILE_MAXDIR+FILE_MAXFILE];
+	char file[FILE_MAX];
 
 	if(!text || !text->name) return;
 
-	BLI_strncpy(file, text->name, FILE_MAXDIR+FILE_MAXFILE);
+	BLI_strncpy(file, text->name, FILE_MAX);
 	BLI_path_abs(file, G.main->name);
 
 	if(!BLI_exists(file)) return;

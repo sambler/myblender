@@ -88,8 +88,8 @@ struct rcti;
 
 /* meshtools.c */
 
-intptr_t	mesh_octree_table(struct Object *ob, struct EditMesh *em, float *co, char mode);
-long		mesh_mirrtopo_table(struct Object *ob, char mode);
+intptr_t   mesh_octree_table(struct Object *ob, struct EditMesh *em, float *co, char mode);
+int        mesh_mirrtopo_table(struct Object *ob, char mode);
 
 struct EditVert   *editmesh_get_x_mirror_vert(struct Object *ob, struct EditMesh *em, struct EditVert *eve, float *co, int index);
 int			mesh_get_x_mirror_vert(struct Object *ob, int index);
@@ -206,6 +206,7 @@ void paintface_reveal(struct Object *ob);
 struct bDeformGroup		*ED_vgroup_add(struct Object *ob);
 struct bDeformGroup		*ED_vgroup_add_name(struct Object *ob, const char *name);
 void 					ED_vgroup_delete(struct Object *ob, struct bDeformGroup *defgroup);
+void					ED_vgroup_clear(struct Object *ob);
 void					ED_vgroup_select_by_name(struct Object *ob, const char *name);
 int						ED_vgroup_data_create(struct ID *id);
 int						ED_vgroup_give_array(struct ID *id, struct MDeformVert **dvert_arr, int *dvert_tot);
@@ -242,6 +243,20 @@ int ED_mesh_uv_texture_remove(struct bContext *C, struct Object *ob, struct Mesh
 int ED_mesh_color_add(struct bContext *C, struct Scene *scene, struct Object *ob, struct Mesh *me, const char *name, int active_set);
 int ED_mesh_color_remove(struct bContext *C, struct Object *ob, struct Mesh *me);
 int ED_mesh_color_remove_named(struct bContext *C, struct Object *ob, struct Mesh *me, const char *name);
+
+
+/* mirrtopo */
+typedef struct MirrTopoStore_t {
+	intptr_t *index_lookup;
+	int       prev_vert_tot;
+	int       prev_edge_tot;
+	int       prev_ob_mode;
+} MirrTopoStore_t;
+
+int  ED_mesh_mirrtopo_recalc_check(struct Mesh *me, const int ob_mode, MirrTopoStore_t *mesh_topo_store);
+void ED_mesh_mirrtopo_init(struct Mesh *me, const int ob_mode, MirrTopoStore_t *mesh_topo_store,
+                           const short skip_em_vert_array_init);
+void ED_mesh_mirrtopo_free(MirrTopoStore_t *mesh_topo_store);
 
 #ifdef __cplusplus
 }

@@ -156,6 +156,7 @@ endif()
 
 if(UNIX AND NOT APPLE)
 	option(WITH_X11_XINPUT "Enable X11 Xinput (tablet support and unicode input)"	ON)
+	option(WITH_X11_XF86VMODE "Enable X11 video mode switching"	ON)
 	option(WITH_BUILTIN_GLEW "Use GLEW OpenGL wrapper library bundled with blender" ON)
 	option(WITH_XDG_USER_DIRS    "Build with XDG Base Directory Specification (only config and documents for now)" OFF)
 	mark_as_advanced(WITH_XDG_USER_DIRS)
@@ -169,6 +170,7 @@ option(WITH_MOD_FLUID        	"Enable Elbeem Modifier (Fluid Simulation)" ON)
 option(WITH_MOD_SMOKE        	"Enable Smoke Modifier (Smoke Simulation)" ON)
 option(WITH_MOD_DECIMATE       	"Enable Decimate Modifier" ON)
 option(WITH_MOD_BOOLEAN        	"Enable Boolean Modifier" ON)
+option(WITH_MOD_REMESH        	"Enable Remesh Modifier" ON)
 option(WITH_MOD_CLOTH_ELTOPO   	"Enable Experemental cloth solver" OFF)
 mark_as_advanced(WITH_MOD_CLOTH_ELTOPO)
 option(WITH_MOD_OCEANSIM        "Enable Ocean Modifier" OFF)
@@ -268,8 +270,8 @@ if(NOT WITH_SDL AND WITH_GHOST_SDL)
 	message(FATAL_ERROR "WITH_GHOST_SDL requires WITH_SDL to be ON")
 endif()
 
-if(NOT WITH_IMAGE_OPENJPEG AND WITH_IMAGE_REDCODE)
-	message(FATAL_ERROR "WITH_IMAGE_REDCODE requires WITH_IMAGE_OPENJPEG")
+if(WITH_IMAGE_REDCODE AND ((NOT WITH_IMAGE_OPENJPEG) OR (NOT WITH_CODEC_FFMPEG)))
+	message(FATAL_ERROR "WITH_IMAGE_REDCODE requires WITH_IMAGE_OPENJPEG and WITH_CODEC_FFMPEG")
 endif()
 
 # python module, needs some different options
@@ -281,10 +283,12 @@ if(WITH_PYTHON_MODULE AND WITH_PYTHON_INSTALL)
 	message(FATAL_ERROR "WITH_PYTHON_MODULE requires WITH_PYTHON_INSTALL to be OFF")
 endif()
 
-if(WITH_CODEC_QUICKTIME AND MINGW)
-	message(FATAL_ERROR "MINGW requires WITH_CODEC_QUICKTIME to be OFF "
-						"because it is currently unsupported, remove this "
-						"line if youre a developer who wants to add support.")
+if(MINGW)
+	if(WITH_CODEC_QUICKTIME)
+		message(FATAL_ERROR "MINGW requires WITH_CODEC_QUICKTIME to be OFF "
+							"because it is currently unsupported, remove this "
+							"line if youre a developer who wants to add support.")
+	endif()
 endif()
 
 if(NOT WITH_FFTW3 AND WITH_MOD_OCEANSIM)
@@ -457,7 +461,8 @@ if(UNIX AND NOT APPLE)
 		# use lib dir if available and nothing else specified
 		if(LIBDIR AND NOT FFMPEG)
 			set(FFMPEG ${LIBDIR}/ffmpeg CACHE PATH "FFMPEG Directory")
-			set(FFMPEG_LIBRARIES avformat avcodec avutil avdevice swscale dirac_encoder mp3lame ogg orc-0.4 schroedinger-1.0 theora theoraenc theoradec vorbis vorbisenc vpx x264 xvidcore faad asound CACHE STRING "FFMPEG Libraries")
+			# XXX, some distros might need 'theoraenc theoradec' too
+			set(FFMPEG_LIBRARIES avformat avcodec avutil avdevice swscale dirac_encoder mp3lame ogg orc-0.4 schroedinger-1.0 theora vorbis vorbisenc vpx x264 xvidcore faad asound CACHE STRING "FFMPEG Libraries")
 		else()
 			set(FFMPEG /usr CACHE PATH "FFMPEG Directory")
 			set(FFMPEG_LIBRARIES avformat avcodec avutil avdevice swscale CACHE STRING "FFMPEG Libraries")
@@ -581,6 +586,17 @@ if(UNIX AND NOT APPLE)
 		if(WITH_X11_XINPUT)
 			set(PLATFORM_LINKLIBS "${PLATFORM_LINKLIBS} ${X11_Xinput_LIB}")
 		endif()
+
+		if(WITH_X11_XF86VMODE)
+			# XXX, why dont cmake make this available?
+			FIND_LIBRARY(X11_Xxf86vmode_LIB Xxf86vm   ${X11_LIB_SEARCH_PATH})
+			mark_as_advanced(X11_Xxf86vmode_LIB)
+			if(X11_Xxf86vmode_LIB)
+				set(PLATFORM_LINKLIBS "${PLATFORM_LINKLIBS} ${X11_Xxf86vmode_LIB}")
+			else()
+				set(WITH_X11_XF86VMODE OFF)
+			endif()
+		endif()
 	endif()
 
 	if(CMAKE_SYSTEM_NAME MATCHES "Linux")
@@ -604,6 +620,10 @@ if(UNIX AND NOT APPLE)
 	# CLang is the same as GCC for now.
 	elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 		set(PLATFORM_CFLAGS "-pipe -fPIC -funsigned-char -fno-strict-aliasing")
+	# Solaris CC
+	elseif(CMAKE_CXX_COMPILER_ID MATCHES "SunPro") 
+		set(PLATFORM_CFLAGS "-pipe -features=extensions -fPIC -D__FUNCTION__=__func__")
+		
 	# Intel C++ Compiler
 	elseif(CMAKE_C_COMPILER_ID MATCHES "Intel")
 		# think these next two are broken
@@ -649,10 +669,6 @@ elseif(WIN32)
 		set(ICONV_LIBPATH ${ICONV}/lib)
 	endif()
 
-	set(PNG "${LIBDIR}/png")
-	set(PNG_INCLUDE_DIR "${PNG}/include")
-	set(PNG_LIBPATH ${PNG}/lib) # not cmake defined
-
 	set(JPEG "${LIBDIR}/jpeg")
 	set(JPEG_INCLUDE_DIR "${JPEG}/include")
 	set(JPEG_LIBPATH ${JPEG}/lib) # not cmake defined
@@ -662,7 +678,7 @@ elseif(WIN32)
 	if(WITH_OPENAL)
 		set(OPENAL ${LIBDIR}/openal)
 		set(OPENAL_INCLUDE_DIR ${OPENAL}/include)
-		set(OPENAL_LIBRARY wrap_oal)
+		set(OPENAL_LIBRARY OpenAL32)
 		set(OPENAL_LIBPATH ${OPENAL}/lib)
 	endif()
 
@@ -700,8 +716,8 @@ elseif(WIN32)
 
 		add_definitions(/D_CRT_NONSTDC_NO_DEPRECATE /D_CRT_SECURE_NO_DEPRECATE /D_SCL_SECURE_NO_DEPRECATE /D_CONSOLE /D_LIB)
 
-		set(CMAKE_CXX_FLAGS "/nologo /J /W0 /Gd /wd4018 /wd4244 /wd4305 /wd4800 /wd4065 /wd4267 /we4013" CACHE STRING "MSVC MT C++ flags " FORCE)
-		set(CMAKE_C_FLAGS   "/nologo /J /W0 /Gd /wd4018 /wd4244 /wd4305 /wd4800 /wd4065 /wd4267 /we4013 /EHsc" CACHE STRING "MSVC MT C++ flags " FORCE)
+		set(CMAKE_CXX_FLAGS "/nologo /J /W1 /Gd /wd4018 /wd4244 /wd4305 /wd4800 /wd4065 /wd4267 /we4013" CACHE STRING "MSVC MT C++ flags " FORCE)
+		set(CMAKE_C_FLAGS   "/nologo /J /W1 /Gd /wd4018 /wd4244 /wd4305 /wd4800 /wd4065 /wd4267 /we4013 /EHsc" CACHE STRING "MSVC MT C++ flags " FORCE)
 
 		if(CMAKE_CL_64)
 			set(CMAKE_CXX_FLAGS_DEBUG "/Od /Gm /EHsc /RTC1 /MTd /W3 /nologo /Zi /J" CACHE STRING "MSVC MT flags " FORCE)
@@ -727,12 +743,12 @@ elseif(WIN32)
 			set(GETTEXT_LIBRARIES gnu_gettext)
 		endif()
 
-		if(CMAKE_CL_64)
-			set(PNG_LIBRARIES libpng)
-		else()
-			set(PNG_LIBRARIES libpng_st)
-		endif()
+		set(PNG_LIBRARIES libpng)
 		set(JPEG_LIBRARIES libjpeg)
+		
+		set(PNG "${LIBDIR}/png")
+		set(PNG_INCLUDE_DIR "${PNG}/include")
+		set(PNG_LIBPATH ${PNG}/lib) # not cmake defined
 
 		set(ZLIB_INCLUDE_DIRS ${LIBDIR}/zlib/include)
 		if(CMAKE_CL_64)
@@ -767,22 +783,27 @@ elseif(WIN32)
 				${LIBDIR}/opencollada/include/COLLADASaxFrameworkLoader/include
 				${LIBDIR}/opencollada/include/GeneratedSaxParser/include
 			)
+			
+			set_lib_path(OPENCOLLADA_LIBPATH "opencollada/lib")
 
 			set(OPENCOLLADA_LIBRARIES
-				${LIBDIR}/opencollada/lib/OpenCOLLADASaxFrameworkLoader.lib
-				${LIBDIR}/opencollada/lib/OpenCOLLADAFramework.lib
-				${LIBDIR}/opencollada/lib/OpenCOLLADABaseUtils.lib
-				${LIBDIR}/opencollada/lib/OpenCOLLADAStreamWriter.lib
-				${LIBDIR}/opencollada/lib/MathMLSolver.lib
-				${LIBDIR}/opencollada/lib/GeneratedSaxParser.lib
-				${LIBDIR}/opencollada/lib/xml2.lib
-				${LIBDIR}/opencollada/lib/buffer.lib
-				${LIBDIR}/opencollada/lib/ftoa.lib
-				${LIBDIR}/opencollada/lib/UTF.lib
+				${OPENCOLLADA_LIBPATH}/OpenCOLLADASaxFrameworkLoader.lib
+				${OPENCOLLADA_LIBPATH}/OpenCOLLADAFramework.lib
+				${OPENCOLLADA_LIBPATH}/OpenCOLLADABaseUtils.lib
+				${OPENCOLLADA_LIBPATH}/OpenCOLLADAStreamWriter.lib
+				${OPENCOLLADA_LIBPATH}/MathMLSolver.lib
+				${OPENCOLLADA_LIBPATH}/GeneratedSaxParser.lib
+				${OPENCOLLADA_LIBPATH}/xml2.lib
+				${OPENCOLLADA_LIBPATH}/buffer.lib
+				${OPENCOLLADA_LIBPATH}/ftoa.lib
+				${OPENCOLLADA_LIBPATH}/UTF.lib
 			)
 			set(PCRE_LIBRARIES
-				${LIBDIR}/opencollada/lib/pcre.lib
+				${OPENCOLLADA_LIBPATH}/pcre.lib
 			)
+			
+			unset(OPENCOLLADA_LIBPATH)
+			
 		endif()
 
 		if(WITH_CODEC_FFMPEG)
@@ -800,18 +821,8 @@ elseif(WIN32)
 		endif()
 
 		if(WITH_IMAGE_OPENEXR)
-			if(MSVC90)
-				set(MSVC_LIB _vs2008)
-				set(MSVC_INC)
-			elseif(MSVC10)
-				set(MSVC_LIB _vs2010)
-				set(MSVC_INC _vs2010)
-			else()
-				set(MSVC_LIB msvc)
-				set(MSVC_INC)
-			endif()
-			set(OPENEXR ${LIBDIR}/openexr)
-			set(OPENEXR_LIBPATH ${OPENEXR}/lib${MSVC_LIB})
+			set_lib_path(OPENEXR "openexr")
+			set_lib_path(OPENEXR_LIBPATH "openexr/lib")
 			set(OPENEXR_LIBRARIES
 				${OPENEXR_LIBPATH}/Iex.lib
 				${OPENEXR_LIBPATH}/Half.lib
@@ -819,7 +830,7 @@ elseif(WIN32)
 				${OPENEXR_LIBPATH}/Imath.lib
 				${OPENEXR_LIBPATH}/IlmThread.lib
 			)
-			set(OPENEXR_INCUDE ${OPENEXR}/include${MSVC_INC})
+			set_lib_path(OPENEXR_INCUDE "openexr/include")
 			set(OPENEXR_INCLUDE_DIRS
 				${OPENEXR_INCUDE}
 				${OPENEXR_INCUDE}/IlmImf
@@ -846,9 +857,9 @@ elseif(WIN32)
 		if(WITH_PYTHON)
 			# normally cached but not since we include them with blender
 			set(PYTHON_VERSION 3.2) # CACHE STRING)
-			set(PYTHON_INCLUDE_DIR "${LIBDIR}/python/include/python${PYTHON_VERSION}") # CACHE PATH)
-			set(PYTHON_LIBRARY "${LIBDIR}/python/lib/python32.lib") #CACHE FILEPATH)
-
+			set_lib_path(PYTHON_INCLUDE_DIR "python/include/python${PYTHON_VERSION}")
+			set_lib_path(PYTHON_LIBRARY "python/lib/python32.lib") #CACHE FILEPATH)
+			
 			# uncached vars
 			set(PYTHON_INCLUDE_DIRS "${PYTHON_INCLUDE_DIR}")
 			set(PYTHON_LIBRARIES  "${PYTHON_LIBRARY}")
@@ -857,14 +868,23 @@ elseif(WIN32)
 		if(WITH_BOOST)
 			set(BOOST ${LIBDIR}/boost)
 			set(BOOST_INCLUDE_DIR ${BOOST}/include)
-			set(BOOST_POSTFIX "vc90-mt-s-1_47.lib")
-			set(BOOST_DEBUG_POSTFIX "vc90-mt-sgd-1_47.lib")
+			if(MSVC10)
+				set(BOOST_POSTFIX "vc100-mt-s-1_47.lib")
+				set(BOOST_DEBUG_POSTFIX "vc100-mt-sgd-1_47.lib")
+			else()
+				set(BOOST_POSTFIX "vc90-mt-s-1_47.lib")
+				set(BOOST_DEBUG_POSTFIX "vc90-mt-sgd-1_47.lib")					
+			endif()
 			set(BOOST_LIBRARIES
-				optimized libboost_date_time-${BOOST_POSTFIX} libboost_filesystem-${BOOST_POSTFIX}
-				libboost_regex-${BOOST_POSTFIX} libboost_system-${BOOST_POSTFIX} libboost_thread-${BOOST_POSTFIX}
-				debug libboost_date_time-${BOOST_DEBUG_POSTFIX} libboost_filesystem-${BOOST_DEBUG_POSTFIX}
-				libboost_regex-${BOOST_DEBUG_POSTFIX} libboost_system-${BOOST_DEBUG_POSTFIX} libboost_thread-${BOOST_DEBUG_POSTFIX})
-			set(BOOST_LIBPATH ${BOOST}/lib)
+				optimized libboost_date_time-${BOOST_POSTFIX} optimized libboost_filesystem-${BOOST_POSTFIX}
+				optimized libboost_regex-${BOOST_POSTFIX} optimized libboost_system-${BOOST_POSTFIX} optimized libboost_thread-${BOOST_POSTFIX}
+				debug libboost_date_time-${BOOST_DEBUG_POSTFIX} debug libboost_filesystem-${BOOST_DEBUG_POSTFIX}
+				debug libboost_regex-${BOOST_DEBUG_POSTFIX} debug libboost_system-${BOOST_DEBUG_POSTFIX} debug libboost_thread-${BOOST_DEBUG_POSTFIX})
+			if(MSVC10)
+				set(BOOST_LIBPATH ${BOOST}/lib/vc_10)
+			else()
+				set(BOOST_LIBPATH ${BOOST}/lib)
+			endif()
 			set(BOOST_DEFINITIONS "-DBOOST_ALL_NO_LIB")
 		endif()
 			
@@ -872,7 +892,7 @@ elseif(WIN32)
 			set(OPENIMAGEIO ${LIBDIR}/openimageio)
 			set(OPENIMAGEIO_INCLUDE_DIRS ${OPENIMAGEIO}/include)
 			set(OPENIMAGEIO_LIBRARIES OpenImageIO)
-			set(OPENIMAGEIO_LIBPATH ${OPENIMAGEIO}/lib)
+			set_lib_path(OPENIMAGEIO_LIBPATH "openimageio/lib")
 			set(OPENIMAGEIO_DEFINITIONS)
 		endif()
 
@@ -904,6 +924,10 @@ elseif(WIN32)
 			set(GETTEXT_LIBPATH ${GETTEXT}/lib)
 			set(GETTEXT_LIBRARIES intl)
 		endif()
+		
+		set(PNG "${LIBDIR}/gcc/png")
+		set(PNG_INCLUDE_DIR "${PNG}/include")
+		set(PNG_LIBPATH ${PNG}/lib) # not cmake defined
 
 		set(JPEG_LIBRARIES libjpeg)
 		set(PNG_LIBRARIES png)
@@ -1007,8 +1031,12 @@ elseif(WIN32)
 			set(OPENIMAGEIO_LIBPATH ${OPENIMAGEIO}/lib)
 			set(OPENIMAGEIO_DEFINITIONS)
 		endif()
-
+		
 		set(PLATFORM_LINKFLAGS "-Xlinker --stack=2097152")
+
+		## DISABLE - causes linking errors 
+		## for re-distrobution, so users dont need mingw installed
+		# set(PLATFORM_LINKFLAGS "${PLATFORM_LINKFLAGS} -static-libgcc -static-libstdc++")
 
 	endif()
 
@@ -1402,7 +1430,10 @@ if(CMAKE_COMPILER_IS_GNUCC)
 
 	# disable because it gives warnings for printf() & friends.
 	# ADD_CHECK_C_COMPILER_FLAG(C_WARNINGS C_WARN_DOUBLE_PROMOTION -Wdouble-promotion -Wno-error=double-promotion)
-	ADD_CHECK_C_COMPILER_FLAG(C_WARNINGS C_WARN_NO_ERROR_UNUSED_BUT_SET_VARIABLE -Wno-error=unused-but-set-variable)
+
+	if(NOT APPLE)
+		ADD_CHECK_C_COMPILER_FLAG(C_WARNINGS C_WARN_NO_ERROR_UNUSED_BUT_SET_VARIABLE -Wno-error=unused-but-set-variable)
+	endif()
 
 	ADD_CHECK_CXX_COMPILER_FLAG(CXX_WARNINGS CXX_WARN_ALL -Wall)
 	ADD_CHECK_CXX_COMPILER_FLAG(CXX_WARNINGS CXX_WARN_NO_INVALID_OFFSETOF -Wno-invalid-offsetof)
@@ -1414,7 +1445,10 @@ if(CMAKE_COMPILER_IS_GNUCC)
 	# flags to undo strict flags
 	ADD_CHECK_C_COMPILER_FLAG(CC_REMOVE_STRICT_FLAGS C_WARN_NO_DEPRECATED_DECLARATIONS -Wno-deprecated-declarations)
 	ADD_CHECK_C_COMPILER_FLAG(CC_REMOVE_STRICT_FLAGS C_WARN_NO_UNUSED_PARAMETER        -Wno-unused-parameter)
-	ADD_CHECK_C_COMPILER_FLAG(CC_REMOVE_STRICT_FLAGS C_WARN_NO_UNUSED_BUT_SET_VARIABLE -Wno-unused-but-set-variable)
+
+	if(NOT APPLE)
+		ADD_CHECK_C_COMPILER_FLAG(CC_REMOVE_STRICT_FLAGS C_WARN_NO_ERROR_UNUSED_BUT_SET_VARIABLE -Wno-error=unused-but-set-variable)
+	endif()
 
 elseif(CMAKE_C_COMPILER_ID MATCHES "Intel")
 
@@ -1436,11 +1470,9 @@ endif()
 if(MSVC10)
 	if(WITH_IMAGE_OPENEXR)
 		message(WARNING "MSVC 2010 does not support OpenEXR, disabling WITH_IMAGE_OPENEXR. To enable support use Use MSVC 2008")
-		set(WITH_IMAGE_OPENEXR OFF)
 	endif()
 	if(WITH_OPENCOLLADA)
 		message(WARNING "MSVC 2010 does not support OpenCollada, disabling WITH_OPENCOLLADA. To enable support use Use MSVC 2008")
-		set(WITH_OPENCOLLADA OFF)
 	endif()
 endif()
 
@@ -1552,6 +1584,7 @@ if(FIRST_RUN)
 
 	info_cfg_text("System Options:")
 	info_cfg_option(WITH_INSTALL_PORTABLE)
+	info_cfg_option(WITH_X11_XF86VMODE)
 	info_cfg_option(WITH_X11_XINPUT)
 	info_cfg_option(WITH_BUILTIN_GLEW)
 
@@ -1582,6 +1615,7 @@ if(FIRST_RUN)
 
 	info_cfg_text("Modifiers:")
 	info_cfg_option(WITH_MOD_BOOLEAN)
+	info_cfg_option(WITH_MOD_REMESH)
 	info_cfg_option(WITH_MOD_DECIMATE)
 	info_cfg_option(WITH_MOD_FLUID)
 	info_cfg_option(WITH_MOD_OCEANSIM)

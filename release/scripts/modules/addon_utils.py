@@ -146,7 +146,10 @@ def modules(module_cache):
     for path in path_list:
 
         # force all contrib addons to be 'TESTING'
-        force_support = 'TESTING' if path.endswith("addons_contrib") else None
+        if path.endswith("addons_contrib") or path.endswith("addons_extern"):
+            force_support = 'TESTING'
+        else:
+            force_support = None
 
         for mod_name, mod_path in _bpy.path.module_names(path):
             modules_stale -= {mod_name}
@@ -168,7 +171,9 @@ def modules(module_cache):
                     mod = None
 
             if mod is None:
-                mod = fake_module(mod_name, mod_path, force_support=force_support)
+                mod = fake_module(mod_name,
+                                  mod_path,
+                                  force_support=force_support)
                 if mod:
                     module_cache[mod_name] = mod
 
@@ -230,7 +235,8 @@ def enable(module_name, default_set=True):
 
     # reload if the mtime changes
     mod = sys.modules.get(module_name)
-    if mod:
+    # chances of the file _not_ existing are low, but it could be removed
+    if mod and os.path.exists(mod.__file__):
         mod.__addon_enabled__ = False
         mtime_orig = getattr(mod, "__time__", 0)
         mtime_new = os.path.getmtime(mod.__file__)
@@ -247,6 +253,7 @@ def enable(module_name, default_set=True):
 
     # Split registering up into 3 steps so we can undo
     # if it fails par way through.
+
     # 1) try import
     try:
         mod = __import__(module_name)

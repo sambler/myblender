@@ -285,7 +285,7 @@ class SEQUENCER_MT_strip(Menu):
         layout.separator()
         layout.operator("sequencer.lock")
         layout.operator("sequencer.unlock")
-        layout.operator("sequencer.mute")
+        layout.operator("sequencer.mute").unselected = False
         layout.operator("sequencer.unmute")
 
         layout.operator("sequencer.mute", text="Mute Deselected Strips").unselected = True
@@ -473,9 +473,9 @@ class SEQUENCER_PT_effect(SequencerButtonsPanel, Panel):
         if strip.type == 'SPEED':
             col.prop(strip, "multiply_speed")
         elif strip.type in {'CROSS', 'GAMMA_CROSS', 'PLUGIN', 'WIPE'}:
-                col.prop(strip, "use_default_fade", "Default fade")
-                if not strip.use_default_fade:
-                    col.prop(strip, "effect_fader", text="Effect fader")
+            col.prop(strip, "use_default_fade", "Default fade")
+            if not strip.use_default_fade:
+                col.prop(strip, "effect_fader", text="Effect fader")
 
         layout.prop(strip, "use_translation", text="Image Offset:")
         if strip.use_translation:
@@ -625,6 +625,7 @@ class SEQUENCER_PT_sound(SequencerButtonsPanel, Panel):
         layout = self.layout
 
         strip = act_strip(context)
+        sound = strip.sound
 
         layout.template_ID(strip, "sound", open="sound.open")
 
@@ -632,12 +633,12 @@ class SEQUENCER_PT_sound(SequencerButtonsPanel, Panel):
         layout.prop(strip, "filepath", text="")
 
         row = layout.row()
-        if strip.sound.packed_file:
+        if sound.packed_file:
             row.operator("sound.unpack", icon='PACKAGE', text="Unpack")
         else:
             row.operator("sound.pack", icon='UGLYPACKAGE', text="Pack")
 
-        row.prop(strip.sound, "use_memory_cache")
+        row.prop(sound, "use_memory_cache")
 
         layout.prop(strip, "waveform")
         layout.prop(strip, "volume")

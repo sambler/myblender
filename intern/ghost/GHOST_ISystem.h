@@ -181,7 +181,10 @@ public:
 	 * @param userData	Placeholder for user data.
 	 * @return A timer task (0 if timer task installation failed).
 	 */
-	virtual GHOST_ITimerTask* installTimer(GHOST_TUns64 delay, GHOST_TUns64 interval, GHOST_TimerProcPtr timerProc, GHOST_TUserDataPtr userData = 0) = 0;
+	virtual GHOST_ITimerTask* installTimer(GHOST_TUns64 delay,
+	                                       GHOST_TUns64 interval,
+	                                       GHOST_TimerProcPtr timerProc,
+	                                       GHOST_TUserDataPtr userData = 0) = 0;
 
 	/**
 	 * Removes a timer.
@@ -252,7 +255,7 @@ public:
 	 * @return	Indication of success.
 	 */
 	virtual GHOST_TSuccess beginFullScreen(const GHOST_DisplaySetting& setting, GHOST_IWindow** window,
-		const bool stereoVisual) = 0;
+		const bool stereoVisual, const GHOST_TUns16 numOfAASamples=0) = 0;
 
 	/**
 	 * Ends full screen mode.

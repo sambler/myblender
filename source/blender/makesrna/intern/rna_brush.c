@@ -185,42 +185,6 @@ static int rna_Brush_get_size(PointerRNA *ptr)
 	return brush_size(me);
 }
 
-static void rna_Brush_set_use_locked_size(PointerRNA *ptr, int value)
-{
-	Brush* me = (Brush*)(ptr->data);
-	brush_set_use_locked_size(me, value);
-}
-
-static int rna_Brush_get_use_locked_size(PointerRNA *ptr)
-{
-	Brush* me = (Brush*)(ptr->data);
-	return brush_use_locked_size(me);
-}
-
-static void rna_Brush_set_use_size_pressure(PointerRNA *ptr, int value)
-{
-	Brush* me = (Brush*)(ptr->data);
-	brush_set_use_size_pressure(me, value);
-}
-
-static int rna_Brush_get_use_size_pressure(PointerRNA *ptr)
-{
-	Brush* me = (Brush*)(ptr->data);
-	return brush_use_size_pressure(me);
-}
-
-static void rna_Brush_set_use_alpha_pressure(PointerRNA *ptr, int value)
-{
-	Brush* me = (Brush*)(ptr->data);
-	brush_set_use_alpha_pressure(me, value);
-}
-
-static int rna_Brush_get_use_alpha_pressure(PointerRNA *ptr)
-{
-	Brush* me = (Brush*)(ptr->data);
-	return brush_use_alpha_pressure(me);
-}
-
 static void rna_Brush_set_unprojected_radius(PointerRNA *ptr, float value)
 {
 	Brush* me = (Brush*)(ptr->data);
@@ -336,7 +300,7 @@ static void rna_def_brush_texture_slot(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "angle", PROP_FLOAT, PROP_ANGLE);
 	RNA_def_property_float_sdna(prop, NULL, "rot");
 	RNA_def_property_range(prop, 0, M_PI*2);
-	RNA_def_property_ui_text(prop, "Angle", "Defines brush texture rotation");
+	RNA_def_property_ui_text(prop, "Angle", "Brush texture rotation");
 	RNA_def_property_update(prop, 0, "rna_TextureSlot_update");
 
 	prop= RNA_def_property(srna, "map_mode", PROP_ENUM, PROP_NONE);
@@ -511,14 +475,14 @@ static void rna_def_brush(BlenderRNA *brna)
 	RNA_def_property_float_default(prop, 0);
 	RNA_def_property_range(prop, -2.0f, 2.0f);
 	RNA_def_property_ui_range(prop, -0.5f, 0.5f, 0.001, 0.001);
-	RNA_def_property_ui_text(prop, "Plane Offset", "Adjusts plane on which the brush acts towards or away from the object surface");
+	RNA_def_property_ui_text(prop, "Plane Offset", "Adjust plane on which the brush acts towards or away from the object surface");
 	RNA_def_property_update(prop, 0, "rna_Brush_update");
 
 	prop= RNA_def_property(srna, "plane_trim", PROP_FLOAT, PROP_DISTANCE);
 	RNA_def_property_float_sdna(prop, NULL, "plane_trim");
 	RNA_def_property_float_default(prop, 0.5f);
 	RNA_def_property_range(prop, 0, 1.0f);
-	RNA_def_property_ui_text(prop, "Plane Trim", "If a vertex is further from offset plane than this then it is not affected");
+	RNA_def_property_ui_text(prop, "Plane Trim", "If a vertex is further away from offset plane than this, then it is not affected");
 	RNA_def_property_update(prop, 0, "rna_Brush_update");
 
 	prop= RNA_def_property(srna, "height", PROP_FLOAT, PROP_DISTANCE);
@@ -575,7 +539,6 @@ static void rna_def_brush(BlenderRNA *brna)
 	
 	prop= RNA_def_property(srna, "use_pressure_strength", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", BRUSH_ALPHA_PRESSURE);
-	RNA_def_property_boolean_funcs(prop, "rna_Brush_get_use_alpha_pressure", "rna_Brush_set_use_alpha_pressure");
 	RNA_def_property_ui_icon(prop, ICON_STYLUS_PRESSURE, 0);
 	RNA_def_property_ui_text(prop, "Strength Pressure", "Enable tablet pressure sensitivity for strength");
 	RNA_def_property_update(prop, 0, "rna_Brush_update");
@@ -588,7 +551,6 @@ static void rna_def_brush(BlenderRNA *brna)
 
 	prop= RNA_def_property(srna, "use_pressure_size", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", BRUSH_SIZE_PRESSURE);
-	RNA_def_property_boolean_funcs(prop, "rna_Brush_get_use_size_pressure", "rna_Brush_set_use_size_pressure");
 	RNA_def_property_ui_icon(prop, ICON_STYLUS_PRESSURE, 0);
 	RNA_def_property_ui_text(prop, "Size Pressure", "Enable tablet pressure sensitivity for size");
 	RNA_def_property_update(prop, 0, "rna_Brush_update");
@@ -648,17 +610,17 @@ static void rna_def_brush(BlenderRNA *brna)
 
 	prop= RNA_def_property(srna, "use_persistent", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", BRUSH_PERSISTENT);
-	RNA_def_property_ui_text(prop, "Persistent", "Sculpts on a persistent layer of the mesh");
+	RNA_def_property_ui_text(prop, "Persistent", "Sculpt on a persistent layer of the mesh");
 	RNA_def_property_update(prop, 0, "rna_Brush_update");
 
 	prop= RNA_def_property(srna, "use_accumulate", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", BRUSH_ACCUMULATE);
-	RNA_def_property_ui_text(prop, "Accumulate", "Accumulate stroke dabs on top of each other");
+	RNA_def_property_ui_text(prop, "Accumulate", "Accumulate stroke daubs on top of each other");
 	RNA_def_property_update(prop, 0, "rna_Brush_update");
 	
 	prop= RNA_def_property(srna, "use_space_atten", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", BRUSH_SPACE_ATTEN);
-	RNA_def_property_ui_text(prop, "Use Automatic Strength Adjustment", "Automatically adjusts strength to give consistent results for different spacings");
+	RNA_def_property_ui_text(prop, "Use Automatic Strength Adjustment", "Automatically adjust strength to give consistent results for different spacings");
 	RNA_def_property_update(prop, 0, "rna_Brush_update");
 
 	/* adaptive space is not implemented yet */
@@ -668,7 +630,6 @@ static void rna_def_brush(BlenderRNA *brna)
 	RNA_def_property_update(prop, 0, "rna_Brush_update");
 
 	prop= RNA_def_property(srna, "use_locked_size", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_funcs(prop, "rna_Brush_get_use_locked_size", "rna_Brush_set_use_locked_size");
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", BRUSH_LOCK_SIZE);
 	RNA_def_property_ui_text(prop, "Use Blender Units", "When locked brush stays same size relative to object; when unlocked brush size is given in pixels");
 	RNA_def_property_update(prop, 0, "rna_Brush_update");
@@ -685,7 +646,7 @@ static void rna_def_brush(BlenderRNA *brna)
 
 	prop= RNA_def_property(srna, "use_restore_mesh", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", BRUSH_RESTORE_MESH);
-	RNA_def_property_ui_text(prop, "Restore Mesh", "Allows a single dot to be carefully positioned");
+	RNA_def_property_ui_text(prop, "Restore Mesh", "Allow a single dot to be carefully positioned");
 	RNA_def_property_update(prop, 0, "rna_Brush_update");
 
 	prop= RNA_def_property(srna, "use_fixed_texture", PROP_BOOLEAN, PROP_NONE);

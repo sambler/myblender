@@ -88,7 +88,7 @@ class VIEW3D_PT_tools_objectmode(View3DPanel, Panel):
         col.operator("object.join")
 
         active_object = context.active_object
-        if active_object and active_object.type == 'MESH':
+        if active_object and active_object.type in {'MESH', 'CURVE', 'SURFACE'}:
 
             col = layout.column(align=True)
             col.label(text="Shading:")
@@ -155,7 +155,7 @@ class VIEW3D_PT_tools_meshedit(View3DPanel, Panel):
         col = layout.column(align=True)
         col.label(text="UV Mapping:")
         col.operator("wm.call_menu", text="Unwrap").name = "VIEW3D_MT_uv_map"
-        col.operator("mesh.mark_seam")
+        col.operator("mesh.mark_seam").clear = False
         col.operator("mesh.mark_seam", text="Clear Seam").clear = True
 
         col = layout.column(align=True)
@@ -468,6 +468,24 @@ class PaintPanel():
 
         return None
 
+    @staticmethod
+    def unified_paint_settings(parent, context):
+        ups = context.tool_settings.unified_paint_settings
+        parent.label(text="Unified Settings:")
+        parent.prop(ups, "use_unified_size", text="Size")
+        parent.prop(ups, "use_unified_strength", text="Strength")
+
+    @staticmethod
+    def prop_unified_size(parent, context, brush, prop_name, icon='NONE', text=""):
+        ups = context.tool_settings.unified_paint_settings
+        ptr = ups if ups.use_unified_size else brush
+        parent.prop(ptr, prop_name, icon=icon, text=text)
+
+    @staticmethod
+    def prop_unified_strength(parent, context, brush, prop_name, icon='NONE', text=""):
+        ups = context.tool_settings.unified_paint_settings
+        ptr = ups if ups.use_unified_strength else brush
+        parent.prop(ptr, prop_name, icon=icon, text=text)
 
 class VIEW3D_PT_tools_brush(PaintPanel, Panel):
     bl_label = "Brush"
@@ -523,14 +541,16 @@ class VIEW3D_PT_tools_brush(PaintPanel, Panel):
 
             row = col.row(align=True)
 
-            if brush.use_locked_size:
-                row.prop(brush, "use_locked_size", toggle=True, text="", icon='LOCKED')
+            ups = context.tool_settings.unified_paint_settings
+            if ((ups.use_unified_size and ups.use_locked_size) or
+                ((not ups.use_unified_size) and brush.use_locked_size)):
+                self.prop_unified_size(row, context, brush, "use_locked_size", icon='LOCKED')
                 row.prop(brush, "unprojected_radius", text="Radius", slider=True)
             else:
-                row.prop(brush, "use_locked_size", toggle=True, text="", icon='UNLOCKED')
+                self.prop_unified_size(row, context, brush, "use_locked_size", icon='UNLOCKED')
                 row.prop(brush, "size", slider=True)
 
-            row.prop(brush, "use_pressure_size", toggle=True, text="")
+            self.prop_unified_size(row, context, brush, "use_pressure_size")
 
             if tool not in {'SNAKE_HOOK', 'GRAB', 'ROTATE'}:
                 col.separator()
@@ -544,7 +564,12 @@ class VIEW3D_PT_tools_brush(PaintPanel, Panel):
                         row.prop(brush, "use_space_atten", toggle=True, text="", icon='UNLOCKED')
 
                 row.prop(brush, "strength", text="Strength", slider=True)
-                row.prop(brush, "use_pressure_strength", text="")
+                self.prop_unified_strength(row, context, brush, "use_pressure_strength")
+
+            if tool == 'ROTATE':
+                row = col.row(align=True)
+                row.prop(brush, "strength", text="Strength", slider=True)
+                self.prop_unified_strength(row, context, brush, "use_pressure_strength")
 
             if tool != 'SMOOTH':
                 col.separator()
@@ -632,11 +657,11 @@ class VIEW3D_PT_tools_brush(PaintPanel, Panel):
 
             row = col.row(align=True)
             row.prop(brush, "size", slider=True)
-            row.prop(brush, "use_pressure_size", toggle=True, text="")
+            self.prop_unified_size(row, context, brush, "use_pressure_size")
 
             row = col.row(align=True)
             row.prop(brush, "strength", text="Strength", slider=True)
-            row.prop(brush, "use_pressure_strength", toggle=True, text="")
+            self.prop_unified_strength(row, context, brush, "use_pressure_strength")
 
             row = col.row(align=True)
             row.prop(brush, "jitter", slider=True)
@@ -658,11 +683,11 @@ class VIEW3D_PT_tools_brush(PaintPanel, Panel):
 
             row = col.row(align=True)
             row.prop(brush, "size", slider=True)
-            row.prop(brush, "use_pressure_size", toggle=True, text="")
+            self.prop_unified_size(row, context, brush, "use_pressure_size")
 
             row = col.row(align=True)
             row.prop(brush, "strength", text="Strength", slider=True)
-            row.prop(brush, "use_pressure_strength", toggle=True, text="")
+            self.prop_unified_strength(row, context, brush, "use_pressure_strength")
 
             row = col.row(align=True)
             row.prop(brush, "jitter", slider=True)
@@ -676,11 +701,11 @@ class VIEW3D_PT_tools_brush(PaintPanel, Panel):
 
             row = col.row(align=True)
             row.prop(brush, "size", slider=True)
-            row.prop(brush, "use_pressure_size", toggle=True, text="")
+            self.prop_unified_size(row, context, brush, "use_pressure_size")
 
             row = col.row(align=True)
             row.prop(brush, "strength", text="Strength", slider=True)
-            row.prop(brush, "use_pressure_strength", toggle=True, text="")
+            self.prop_unified_strength(row, context, brush, "use_pressure_strength")
 
             # XXX - TODO
             #row = col.row(align=True)
@@ -945,9 +970,7 @@ class VIEW3D_PT_sculpt_options(PaintPanel, Panel):
         layout.prop(sculpt, "show_brush")
         layout.prop(sculpt, "use_deform_only")
 
-        layout.label(text="Unified Settings:")
-        layout.prop(tool_settings, "sculpt_paint_use_unified_size", text="Size")
-        layout.prop(tool_settings, "sculpt_paint_use_unified_strength", text="Strength")
+        self.unified_paint_settings(layout, context)
 
 
 class VIEW3D_PT_sculpt_symmetry(PaintPanel, Panel):
@@ -1036,7 +1059,7 @@ class VIEW3D_PT_tools_weightpaint(View3DPanel, Panel):
         col.operator("object.vertex_group_fix", text="Fix Deforms")
 
 
-class VIEW3D_PT_tools_weightpaint_options(View3DPanel, Panel):
+class VIEW3D_PT_tools_weightpaint_options(PaintPanel, Panel):
     bl_context = "weightpaint"
     bl_label = "Options"
 
@@ -1057,9 +1080,7 @@ class VIEW3D_PT_tools_weightpaint_options(View3DPanel, Panel):
             col.prop(mesh, "use_mirror_x")
             col.prop(mesh, "use_mirror_topology")
 
-        col.label(text="Unified Settings:")
-        col.prop(tool_settings, "sculpt_paint_use_unified_size", text="Size")
-        col.prop(tool_settings, "sculpt_paint_use_unified_strength", text="Strength")
+        self.unified_paint_settings(col, context)
 
 # Commented out because the Apply button isn't an operator yet, making these settings useless
 #		col.label(text="Gamma:")
@@ -1073,7 +1094,7 @@ class VIEW3D_PT_tools_weightpaint_options(View3DPanel, Panel):
 # ********** default tools for vertex-paint ****************
 
 
-class VIEW3D_PT_tools_vertexpaint(View3DPanel, Panel):
+class VIEW3D_PT_tools_vertexpaint(PaintPanel, Panel):
     bl_context = "vertexpaint"
     bl_label = "Options"
 
@@ -1089,9 +1110,7 @@ class VIEW3D_PT_tools_vertexpaint(View3DPanel, Panel):
         col.prop(vpaint, "use_normal")
         col.prop(vpaint, "use_spray")
 
-        col.label(text="Unified Settings:")
-        col.prop(tool_settings, "sculpt_paint_use_unified_size", text="Size")
-        col.prop(tool_settings, "sculpt_paint_use_unified_strength", text="Strength")
+        self.unified_paint_settings(col, context)
 
 # Commented out because the Apply button isn't an operator yet, making these settings useless
 #		col.label(text="Gamma:")
@@ -1182,9 +1201,7 @@ class VIEW3D_PT_imagepaint_options(PaintPanel):
         tool_settings = context.tool_settings
 
         col = layout.column()
-        col.label(text="Unified Settings:")
-        col.prop(tool_settings, "sculpt_paint_use_unified_size", text="Size")
-        col.prop(tool_settings, "sculpt_paint_use_unified_strength", text="Strength")
+        self.unified_paint_settings(col, context)
 
 
 class VIEW3D_MT_tools_projectpaint_clone(Menu):
@@ -1193,9 +1210,9 @@ class VIEW3D_MT_tools_projectpaint_clone(Menu):
     def draw(self, context):
         layout = self.layout
         for i, tex in enumerate(context.active_object.data.uv_textures):
-            prop = layout.operator("wm.context_set_int", text=tex.name)
-            prop.data_path = "active_object.data.uv_texture_clone_index"
-            prop.value = i
+            props = layout.operator("wm.context_set_int", text=tex.name)
+            props.data_path = "active_object.data.uv_texture_clone_index"
+            props.value = i
 
 
 class VIEW3D_MT_tools_projectpaint_stencil(Menu):
@@ -1204,9 +1221,9 @@ class VIEW3D_MT_tools_projectpaint_stencil(Menu):
     def draw(self, context):
         layout = self.layout
         for i, tex in enumerate(context.active_object.data.uv_textures):
-            prop = layout.operator("wm.context_set_int", text=tex.name)
-            prop.data_path = "active_object.data.uv_texture_stencil_index"
-            prop.value = i
+            props = layout.operator("wm.context_set_int", text=tex.name)
+            props.data_path = "active_object.data.uv_texture_stencil_index"
+            props.value = i
 
 
 class VIEW3D_PT_tools_particlemode(View3DPanel, Panel):

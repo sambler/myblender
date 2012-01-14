@@ -96,6 +96,7 @@ static void view3d_panel_operator_redo_operator(const bContext *C, Panel *pa, wm
 	}
 }
 
+/* TODO de-duplicate redo panel functions - campbell */
 static void view3d_panel_operator_redo(const bContext *C, Panel *pa)
 {
 	wmOperator *op= WM_operator_last_redo(C);
@@ -108,7 +109,7 @@ static void view3d_panel_operator_redo(const bContext *C, Panel *pa)
 	
 	block= uiLayoutGetBlock(pa->layout);
 	
-	if(ED_undo_valid(C, op->type->name)==0)
+	if (!WM_operator_check_ui_enabled(C, op->type->name))
 		uiLayoutSetEnabled(pa->layout, 0);
 
 	/* note, blockfunc is a default but->func, use Handle func to allow button callbacks too */
@@ -176,7 +177,7 @@ static uiBlock *tool_search_menu(bContext *C, ARegion *ar, void *arg_listbase)
 	/* fake button, it holds space for search items */
 	uiDefBut(block, LABEL, 0, "", 10, 15, 150, uiSearchBoxhHeight(), NULL, 0, 0, 0, 0, NULL);
 	
-	but= uiDefSearchBut(block, search, 0, ICON_VIEWZOOM, OP_MAX_TYPENAME, 10, 0, 150, 19, 0, 0, "");
+	but= uiDefSearchBut(block, search, 0, ICON_VIEWZOOM, sizeof(search), 10, 0, 150, 19, 0, 0, "");
 	uiButSetSearchFunc(but, operator_search_cb, arg_listbase, operator_call_cb, NULL);
 	
 	uiBoundsBlock(block, 6);

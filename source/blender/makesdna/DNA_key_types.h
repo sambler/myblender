@@ -31,6 +31,7 @@
  *  \ingroup DNA
  */
 
+#include "DNA_defs.h"
 #include "DNA_listBase.h"
 #include "DNA_ID.h"
 
@@ -47,8 +48,8 @@ typedef struct KeyBlock {
 	
 	void *data;
 	float *weights;
-	char  name[32];
-	char vgroup[32];
+	char  name[64];	/* MAX_NAME */
+	char vgroup[64];	/* MAX_VGROUP_NAME */
 
 	float slidermin;
 	float slidermax;
@@ -60,12 +61,12 @@ typedef struct Key {
 	struct AnimData *adt;	/* animation data (must be immediately after id for utilities to use it) */ 
 	
 	KeyBlock *refkey;
-	char elemstr[32];
+	char elemstr[64];	/* MAX_NAME */
 	int elemsize;
-	float curval;
+	float curval  DNA_DEPRECATED;
 	
 	ListBase block;
-	struct Ipo *ipo;		// XXX depreceated... old animation system
+	struct Ipo *ipo  DNA_DEPRECATED;  /* old animation system, deprecated for 2.5 */
 	
 	ID *from;
 
@@ -93,4 +94,3 @@ typedef struct Key {
 #define KEYBLOCK_LOCKED			(1<<2)
 
 #endif
-

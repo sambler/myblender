@@ -269,14 +269,12 @@ static void spothalo(struct LampRen *lar, ShadeInput *shi, float *intens)
 				if(p1[2]<-ladist) t1= t3;
 			}
 			else {
-				ok1= 1;
 				t1= t3;
 			}
 			if(ok2) {
 				if(p2[2]<-ladist) t2= t3;
 			}
 			else {
-				ok2= 1;
 				t2= t3;
 			}
 		}
@@ -908,7 +906,7 @@ static void ramp_diffuse_result(float *diff, ShadeInput *shi)
 			/* blending method */
 			fac= col[3]*ma->rampfac_col;
 			
-			ramp_blend(ma->rampblend_col, diff, diff+1, diff+2, fac, col);
+			ramp_blend(ma->rampblend_col, diff, fac, col);
 		}
 	}
 }
@@ -955,7 +953,7 @@ static void add_to_diffuse(float *diff, ShadeInput *shi, float is, float r, floa
 			colt[1]= shi->g;
 			colt[2]= shi->b;
 
-			ramp_blend(ma->rampblend_col, colt, colt+1, colt+2, fac, col);
+			ramp_blend(ma->rampblend_col, colt, fac, col);
 
 			/* output to */
 			diff[0] += r * colt[0];
@@ -970,20 +968,20 @@ static void add_to_diffuse(float *diff, ShadeInput *shi, float is, float r, floa
 	}
 }
 
-static void ramp_spec_result(float *specr, float *specg, float *specb, ShadeInput *shi)
+static void ramp_spec_result(float spec_col[3], ShadeInput *shi)
 {
 	Material *ma= shi->mat;
 
 	if(ma->ramp_spec && (ma->rampin_spec==MA_RAMP_IN_RESULT)) {
 		float col[4];
-		float fac= 0.3f*(*specr) + 0.58f*(*specg) + 0.12f*(*specb);
+		float fac= 0.3f*spec_col[0] + 0.58f*spec_col[1] + 0.12f*spec_col[2];
 
 		do_colorband(ma->ramp_spec, fac, col);
 		
 		/* blending method */
 		fac= col[3]*ma->rampfac_spec;
 		
-		ramp_blend(ma->rampblend_spec, specr, specg, specb, fac, col);
+		ramp_blend(ma->rampblend_spec, spec_col, fac, col);
 		
 	}
 }
@@ -1023,7 +1021,7 @@ static void do_specular_ramp(ShadeInput *shi, float is, float t, float spec[3])
 		/* blending method */
 		fac= col[3]*ma->rampfac_spec;
 		
-		ramp_blend(ma->rampblend_spec, spec, spec+1, spec+2, fac, col);
+		ramp_blend(ma->rampblend_spec, spec, fac, col);
 	}
 }
 
@@ -1714,9 +1712,9 @@ void shade_lamp_loop(ShadeInput *shi, ShadeResult *shr)
 	}
 
 	if( (ma->mode & (MA_VERTEXCOL|MA_VERTEXCOLP))== MA_VERTEXCOL ) {	// vertexcolor light
-		shr->emit[0]= shi->r*(shi->emit+shi->vcol[0]);
-		shr->emit[1]= shi->g*(shi->emit+shi->vcol[1]);
-		shr->emit[2]= shi->b*(shi->emit+shi->vcol[2]);
+		shr->emit[0]= shi->r*(shi->emit+shi->vcol[0]*shi->vcol[3]);
+		shr->emit[1]= shi->g*(shi->emit+shi->vcol[1]*shi->vcol[3]);
+		shr->emit[2]= shi->b*(shi->emit+shi->vcol[2]*shi->vcol[3]);
 	}
 	else {
 		shr->emit[0]= shi->r*shi->emit;
@@ -1873,7 +1871,7 @@ void shade_lamp_loop(ShadeInput *shi, ShadeResult *shr)
 		if(ma->mode & MA_RAMP_COL) ramp_diffuse_result(shr->combined, shi);
 	}
 
-	if(ma->mode & MA_RAMP_SPEC) ramp_spec_result(shr->spec, shr->spec+1, shr->spec+2, shi);
+	if(ma->mode & MA_RAMP_SPEC) ramp_spec_result(shr->spec, shi);
 	
 	/* refcol is for envmap only */
 	if(shi->refcol[0]!=0.0f) {

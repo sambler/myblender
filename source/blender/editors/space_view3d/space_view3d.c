@@ -204,8 +204,8 @@ ARegion *ED_view3d_context_region_unlock(bContext *C)
 void ED_view3d_init_mats_rv3d(struct Object *ob, struct RegionView3D *rv3d)
 {
 	/* local viewmat and persmat, to calculate projections */
-	mul_m4_m4m4(rv3d->viewmatob, ob->obmat, rv3d->viewmat);
-	mul_m4_m4m4(rv3d->persmatob, ob->obmat, rv3d->persmat);
+	mult_m4_m4m4(rv3d->viewmatob, rv3d->viewmat, ob->obmat);
+	mult_m4_m4m4(rv3d->persmatob, rv3d->persmat, ob->obmat);
 
 	/* initializes object space clipping, speeds up clip tests */
 	ED_view3d_local_clipping(rv3d, ob->obmat);
@@ -553,7 +553,6 @@ static void view3d_main_area_free(ARegion *ar)
 		if(rv3d->localvd) MEM_freeN(rv3d->localvd);
 		if(rv3d->clipbb) MEM_freeN(rv3d->clipbb);
 
-		// XXX	retopo_free_view_data(rv3d);
 		if(rv3d->ri) { 
 			// XXX		BIF_view3d_previewrender_free(rv3d);
 		}

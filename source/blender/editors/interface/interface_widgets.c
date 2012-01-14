@@ -130,9 +130,12 @@ typedef struct uiWidgetType {
 static float cornervec[WIDGET_CURVE_RESOLU][2]= {{0.0, 0.0}, {0.195, 0.02}, {0.383, 0.067}, {0.55, 0.169},
 {0.707, 0.293}, {0.831, 0.45}, {0.924, 0.617}, {0.98, 0.805}, {1.0, 1.0}};
 
-static float jit[8][2]= {{0.468813 , -0.481430}, {-0.155755 , -0.352820}, 
-{0.219306 , -0.238501},  {-0.393286 , -0.110949}, {-0.024699 , 0.013908}, 
-{0.343805 , 0.147431}, {-0.272855 , 0.269918}, {0.095909 , 0.388710}};
+#define WIDGET_AA_JITTER 8
+static float jit[WIDGET_AA_JITTER][2]= {
+    { 0.468813 , -0.481430}, {-0.155755 , -0.352820},
+    { 0.219306 , -0.238501}, {-0.393286 , -0.110949},
+    {-0.024699 ,  0.013908}, { 0.343805 ,  0.147431},
+    {-0.272855 ,  0.269918}, { 0.095909 ,  0.388710}};
 
 static float num_tria_vert[3][2]= { 
 {-0.352077, 0.532607}, {-0.352077, -0.549313}, {0.330000, -0.008353}};
@@ -165,14 +168,14 @@ static unsigned int check_tria_face[4][3]= {
 
 GLubyte checker_stipple_sml[32*32/8] =
 {
-	255,0,255,0,255,0,255,0,255,0,255,0,255,0,255,0, \
-	255,0,255,0,255,0,255,0,255,0,255,0,255,0,255,0, \
-	0,255,0,255,0,255,0,255,0,255,0,255,0,255,0,255, \
-	0,255,0,255,0,255,0,255,0,255,0,255,0,255,0,255, \
-	255,0,255,0,255,0,255,0,255,0,255,0,255,0,255,0, \
-	255,0,255,0,255,0,255,0,255,0,255,0,255,0,255,0, \
-	0,255,0,255,0,255,0,255,0,255,0,255,0,255,0,255, \
-	0,255,0,255,0,255,0,255,0,255,0,255,0,255,0,255, \
+	255,0,255,0,255,0,255,0,255,0,255,0,255,0,255,0,
+	255,0,255,0,255,0,255,0,255,0,255,0,255,0,255,0,
+	0,255,0,255,0,255,0,255,0,255,0,255,0,255,0,255,
+	0,255,0,255,0,255,0,255,0,255,0,255,0,255,0,255,
+	255,0,255,0,255,0,255,0,255,0,255,0,255,0,255,0,
+	255,0,255,0,255,0,255,0,255,0,255,0,255,0,255,0,
+	0,255,0,255,0,255,0,255,0,255,0,255,0,255,0,255,
+	0,255,0,255,0,255,0,255,0,255,0,255,0,255,0,255,
 };
 
 /* ************************************************* */
@@ -192,7 +195,7 @@ void ui_draw_anti_tria(float x1, float y1, float x2, float y2, float x3, float y
 	glVertexPointer(2, GL_FLOAT, 0, tri_arr);
 
 	/* for each AA step */
-	for(j=0; j<8; j++) {
+	for (j = 0; j < WIDGET_AA_JITTER; j++) {
 		glTranslatef(1.0f * jit[j][0], 1.0f * jit[j][1], 0.0f);
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 		glTranslatef(-1.0f * jit[j][0], -1.0f * jit[j][1], 0.0f);
@@ -200,7 +203,25 @@ void ui_draw_anti_tria(float x1, float y1, float x2, float y2, float x3, float y
 
 	glDisableClientState(GL_VERTEX_ARRAY);
 	glDisable(GL_BLEND);
+}
+
+void ui_draw_anti_roundbox(int mode, float minx, float miny, float maxx, float maxy, float rad)
+{
+	float color[4];
+	int j;
 	
+	glEnable(GL_BLEND);
+	glGetFloatv(GL_CURRENT_COLOR, color);
+	color[3] *= 0.125f;
+	glColor4fv(color);
+	
+	for (j = 0;  j < WIDGET_AA_JITTER; j++) {
+		glTranslatef(1.0f * jit[j][0], 1.0f * jit[j][1], 0.0f);
+		uiDrawBox(mode, minx, miny, maxx, maxy, rad);
+		glTranslatef(-1.0f * jit[j][0], -1.0f * jit[j][1], 0.0f);
+	}
+
+	glDisable(GL_BLEND);
 }
 
 static void widget_init(uiWidgetBase *wtb)
@@ -731,6 +752,11 @@ static void widgetbase_draw(uiWidgetBase *wtb, uiWidgetColors *wcol)
 		float quad_strip[WIDGET_SIZE_MAX*2+2][2]; /* + 2 because the last pair is wrapped */
 		float quad_strip_emboss[WIDGET_SIZE_MAX*2][2]; /* only for emboss */
 
+		const GLubyte tcol[4] = {wcol->outline[0],
+		                         wcol->outline[1],
+		                         wcol->outline[2],
+		                         wcol->outline[3] / (WIDGET_AA_JITTER / 2)};
+
 		widget_verts_to_quad_strip(wtb, wtb->totvert, quad_strip);
 
 		if(wtb->emboss) {
@@ -739,11 +765,11 @@ static void widgetbase_draw(uiWidgetBase *wtb, uiWidgetColors *wcol)
 
 		glEnableClientState(GL_VERTEX_ARRAY);
 
-		for(j=0; j<8; j++) {
+		for (j = 0; j < WIDGET_AA_JITTER; j++) {
 			glTranslatef(1.0f * jit[j][0], 1.0f * jit[j][1], 0.0f);
 			
 			/* outline */
-			glColor4ub(wcol->outline[0], wcol->outline[1], wcol->outline[2], 32);
+			glColor4ubv(tcol);
 
 			glVertexPointer(2, GL_FLOAT, 0, quad_strip);
 			glDrawArrays(GL_QUAD_STRIP, 0, wtb->totvert*2 + 2);
@@ -764,16 +790,20 @@ static void widgetbase_draw(uiWidgetBase *wtb, uiWidgetColors *wcol)
 	
 	/* decoration */
 	if(wtb->tria1.tot || wtb->tria2.tot) {
+		const GLubyte tcol[4] = {wcol->item[0],
+		                         wcol->item[1],
+		                         wcol->item[2],
+		                         wcol->item[3] / (WIDGET_AA_JITTER / 2)};
 		/* for each AA step */
-		for(j=0; j<8; j++) {
+		for (j = 0; j < WIDGET_AA_JITTER; j++) {
 			glTranslatef(1.0f * jit[j][0], 1.0f * jit[j][1], 0.0f);
 
 			if(wtb->tria1.tot) {
-				glColor4ub(wcol->item[0], wcol->item[1], wcol->item[2], 32);
+				glColor4ubv(tcol);
 				widget_trias_draw(&wtb->tria1);
 			}
 			if(wtb->tria2.tot) {
-				glColor4ub(wcol->item[0], wcol->item[1], wcol->item[2], 32);
+				glColor4ubv(tcol);
 				widget_trias_draw(&wtb->tria2);
 			}
 		
@@ -1617,7 +1647,7 @@ static void widget_state_option_menu(uiWidgetType *wt, int state)
 	if(state & UI_SELECT)
 		UI_GetThemeColor4ubv(TH_TEXT_HI, (unsigned char *)wt->wcol.text);
 	else {
-		bTheme *btheme= U.themes.first; /* XXX */
+		bTheme *btheme= UI_GetTheme(); /* XXX */
 
 		copy_v3_v3_char(wt->wcol.text, btheme->tui.wcol_menu_back.text);
 	}
@@ -1777,7 +1807,7 @@ static void ui_draw_but_HSVCIRCLE(uiBut *but, uiWidgetColors *wcol, rcti *rect)
 {
 	/* gouraud triangle fan */
 	float radstep, ang= 0.0f;
-	float centx, centy, radius;
+	float centx, centy, radius, cursor_radius;
 	float rgb[3], hsvo[3], hsv[3], col[3], colcent[3];
 	int a, tot= 32;
 	int color_profile = but->block->color_profile;
@@ -1846,12 +1876,12 @@ static void ui_draw_but_HSVCIRCLE(uiBut *but, uiWidgetColors *wcol, rcti *rect)
 	ang= 2.0f*(float)M_PI*hsvo[0] + 0.5f*(float)M_PI;
 
 	if(but->flag & UI_BUT_COLOR_CUBIC)
-		radius= (1.0f - powf(1.0f - hsvo[1], 3.0f)) *radius;
+		cursor_radius = (1.0f - powf(1.0f - hsvo[1], 3.0f));
 	else
-		radius= hsvo[1] * radius;
+		cursor_radius = hsvo[1];
 
+	radius= CLAMPIS(cursor_radius, 0.0f, 1.0f) * radius;
 	ui_hsv_cursor(centx + cosf(-ang)*radius, centy + sinf(-ang)*radius);
-	
 }
 
 /* ************ custom buttons, old stuff ************** */
@@ -2760,7 +2790,7 @@ static void widget_disabled(rcti *rect)
 
 static uiWidgetType *widget_type(uiWidgetTypeEnum type)
 {
-	bTheme *btheme= U.themes.first;
+	bTheme *btheme= UI_GetTheme();
 	static uiWidgetType wt;
 	
 	/* defaults */
@@ -2945,7 +2975,7 @@ static int widget_roundbox_set(uiBut *but, rcti *rect)
 /* conversion from old to new buttons, so still messy */
 void ui_draw_but(const bContext *C, ARegion *ar, uiStyle *style, uiBut *but, rcti *rect)
 {
-	bTheme *btheme= U.themes.first;
+	bTheme *btheme= UI_GetTheme();
 	ThemeUI *tui= &btheme->tui;
 	uiFontStyle *fstyle= &style->widget;
 	uiWidgetType *wt= NULL;
@@ -3246,7 +3276,7 @@ void ui_draw_menu_item(uiFontStyle *fstyle, rcti *rect, const char *name, int ic
 void ui_draw_preview_item(uiFontStyle *fstyle, rcti *rect, const char *name, int iconid, int state)
 {
 	rcti trect = *rect;
-	
+	float font_dims[2] = {0.0f, 0.0f};
 	uiWidgetType *wt= widget_type(UI_WTYPE_MENU_ITEM);
 	
 	wt->state(wt, state);
@@ -3258,10 +3288,12 @@ void ui_draw_preview_item(uiFontStyle *fstyle, rcti *rect, const char *name, int
 		glColor3ubv((unsigned char*)wt->wcol.text);
 	else
 		glColor3ubv((unsigned char*)wt->wcol.text_sel);
-	
+
+	BLF_width_and_height(fstyle->uifont_id, name, &font_dims[0], &font_dims[1]);
+
 	trect.xmin += 0;
-	trect.xmax = trect.xmin + BLF_width(fstyle->uifont_id, name) + 10;
+	trect.xmax = trect.xmin + font_dims[0] + 10;
 	trect.ymin += 10;
-	trect.ymax = trect.ymin + BLF_height(fstyle->uifont_id, name);
+	trect.ymax = trect.ymin + font_dims[1];
 	uiStyleFontDraw(fstyle, &trect, name);
 }

@@ -75,7 +75,7 @@ static void text_font_end(SpaceText *UNUSED(st))
 static int text_font_draw(SpaceText *UNUSED(st), int x, int y, char *str)
 {
 	BLF_position(mono, x, y, 0);
-	BLF_draw(mono, str, 65535); /* XXX, use real length */
+	BLF_draw(mono, str, BLF_DRAW_STR_DUMMY_MAX);
 
 	return BLF_width(mono, str);
 }
@@ -1179,7 +1179,7 @@ static void calc_text_rcts(SpaceText *st, ARegion *ar, rcti *scroll, rcti *back)
 
 static void draw_textscroll(SpaceText *st, rcti *scroll, rcti *back)
 {
-	bTheme *btheme= U.themes.first;
+	bTheme *btheme= UI_GetTheme();
 	uiWidgetColors wcol= btheme->tui.wcol_scroll;
 	unsigned char col[4];
 	float rad;
@@ -1689,6 +1689,9 @@ void draw_text_main(SpaceText *st, ARegion *ar)
 	int i, x, y, winx, linecount= 0, lineno= 0;
 	int wraplinecount= 0, wrap_skip= 0;
 
+	if(st->lheight) st->viewlines= (int)ar->winy/st->lheight;
+	else st->viewlines= 0;
+
 	/* if no text, nothing to do */
 	if(!text)
 		return;
@@ -1698,9 +1701,6 @@ void draw_text_main(SpaceText *st, ARegion *ar)
 	/* make sure all the positional pointers exist */
 	if(!text->curl || !text->sell || !text->lines.first || !text->lines.last)
 		txt_clean_text(text);
-	
-	if(st->lheight) st->viewlines= (int)ar->winy/st->lheight;
-	else st->viewlines= 0;
 	
 	/* update rects for scroll */
 	calc_text_rcts(st, ar, &scroll, &back);	/* scroll will hold the entire bar size */
@@ -1766,7 +1766,7 @@ void draw_text_main(SpaceText *st, ARegion *ar)
 			else
 				UI_ThemeColor(TH_TEXT);
 
-			sprintf(linenr, "%*d", st->linenrs_tot, i + linecount + 1);
+			BLI_snprintf(linenr, sizeof(linenr), "%*d", st->linenrs_tot, i + linecount + 1);
 			/* itoa(i + linecount + 1, linenr, 10); */ /* not ansi-c :/ */
 			text_font_draw(st, TXT_OFFSET - 7, y, linenr);
 

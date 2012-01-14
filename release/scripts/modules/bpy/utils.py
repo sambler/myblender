@@ -263,7 +263,7 @@ def user_script_path():
         return None
 
 
-def script_paths(subdir=None, user_pref=True, all=False):
+def script_paths(subdir=None, user_pref=True, check_all=False):
     """
     Returns a list of valid script paths.
 
@@ -271,9 +271,9 @@ def script_paths(subdir=None, user_pref=True, all=False):
     :type subdir: string
     :arg user_pref: Include the user preference script path.
     :type user_pref: bool
-    :arg all: Include local, user and system paths rather just the paths
+    :arg check_all: Include local, user and system paths rather just the paths
        blender uses.
-    :type all: bool
+    :type check_all: bool
     :return: script paths.
     :rtype: list
     """
@@ -286,7 +286,7 @@ def script_paths(subdir=None, user_pref=True, all=False):
     else:
         user_script_path = None
 
-    if all:
+    if check_all:
         # all possible paths
         base_paths = tuple(_os.path.join(resource_path(res), "scripts")
                            for res in ('LOCAL', 'USER', 'SYSTEM'))
@@ -343,12 +343,20 @@ def preset_paths(subdir):
     :rtype: list
     """
     dirs = []
-    for path in script_paths("presets", all=True):
+    for path in script_paths("presets", check_all=True):
         directory = _os.path.join(path, subdir)
         if not directory.startswith(path):
             raise Exception("invalid subdir given %r" % subdir)
         elif _os.path.isdir(directory):
             dirs.append(directory)
+
+    # Find addons preset paths
+    import addon_utils
+    for path in addon_utils.paths():
+        directory = _os.path.join(path, "presets", subdir)
+        if _os.path.isdir(directory):
+            dirs.append(directory)
+
     return dirs
 
 
@@ -400,7 +408,7 @@ def smpte_from_frame(frame, fps=None, fps_base=None):
     return smpte_from_seconds((frame * fps_base) / fps, fps)
 
 
-def preset_find(name, preset_path, display_name=False):
+def preset_find(name, preset_path, display_name=False, ext=".py"):
     if not name:
         return None
 
@@ -409,11 +417,11 @@ def preset_find(name, preset_path, display_name=False):
         if display_name:
             filename = ""
             for fn in _os.listdir(directory):
-                if fn.endswith(".py") and name == _bpy.path.display_name(fn):
+                if fn.endswith(ext) and name == _bpy.path.display_name(fn):
                     filename = fn
                     break
         else:
-            filename = name + ".py"
+            filename = name + ext
 
         if filename:
             filepath = _os.path.join(directory, filename)
@@ -432,9 +440,9 @@ def keyconfig_set(filepath):
     keyconfigs_old = keyconfigs[:]
 
     try:
-        file = open(filepath)
-        exec(compile(file.read(), filepath, 'exec'), {"__file__": filepath})
-        file.close()
+        keyfile = open(filepath)
+        exec(compile(keyfile.read(), filepath, 'exec'), {"__file__": filepath})
+        keyfile.close()
     except:
         import traceback
         traceback.print_exc()

@@ -63,6 +63,7 @@ CCL_NAMESPACE_BEGIN
 #if(!defined(FREE_WINDOWS))
 #define copysignf(x, y) ((float)_copysign(x, y))
 #define hypotf(x, y) _hypotf(x, y)
+#define isnan(x) _isnan(x)
 #endif
 
 #endif
@@ -115,12 +116,12 @@ __device_inline double min(double a, double b)
 
 __device_inline float min4(float a, float b, float c, float d)
 {
-	return min(min(min(a, b), c), d);
+	return min(min(a, b), min(c, d));
 }
 
 __device_inline float max4(float a, float b, float c, float d)
 {
-	return max(max(max(a, b), c), d);
+	return max(max(a, b), max(c, d));
 }
 
 #ifndef __KERNEL_OPENCL__
@@ -533,6 +534,11 @@ __device_inline float3 fabs(float3 a)
 __device_inline float3 float4_to_float3(const float4 a)
 {
 	return make_float3(a.x, a.y, a.z);
+}
+
+__device_inline float4 float3_to_float4(const float3 a)
+{
+	return make_float4(a.x, a.y, a.z, 1.0f);
 }
 
 #ifndef __KERNEL_GPU__

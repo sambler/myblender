@@ -270,12 +270,12 @@ static void get_filename(int argc, char **argv, char *filename)
 
 	if (argc > 1) {
 		if (BLI_exists(argv[argc-1])) {
-			BLI_strncpy(filename, argv[argc-1], FILE_MAXDIR + FILE_MAXFILE);
+			BLI_strncpy(filename, argv[argc-1], FILE_MAX);
 		}
 		if (::strncmp(argv[argc-1], "-psn_", 5)==0) {
 			static char firstfilebuf[512];
 			if (GHOST_HACK_getFirstFile(firstfilebuf)) {
-				BLI_strncpy(filename, firstfilebuf, FILE_MAXDIR + FILE_MAXFILE);
+				BLI_strncpy(filename, firstfilebuf, FILE_MAX);
 			}
 		}                        
 	}
@@ -289,7 +289,7 @@ static void get_filename(int argc, char **argv, char *filename)
 		//::printf("looking for file: %s\n", filename);
 		
 		if (BLI_exists(gamefile))
-			BLI_strncpy(filename, gamefile, FILE_MAXDIR + FILE_MAXFILE);
+			BLI_strncpy(filename, gamefile, FILE_MAX);
 
 		delete [] gamefile;
 	}
@@ -298,7 +298,7 @@ static void get_filename(int argc, char **argv, char *filename)
 	filename[0] = '\0';
 
 	if(argc > 1)
-		BLI_strncpy(filename, argv[argc-1], FILE_MAXDIR + FILE_MAXFILE);
+		BLI_strncpy(filename, argv[argc-1], FILE_MAX);
 #endif // !_APPLE
 }
 
@@ -365,6 +365,7 @@ int main(int argc, char** argv)
 	GHOST_TEmbedderWindowID parentWindow = 0;
 	bool isBlenderPlayer = false;
 	int validArguments=0;
+	bool samplesParFound = false;
 	GHOST_TUns16 aasamples = 0;
 	
 #ifdef __linux__
@@ -406,6 +407,7 @@ int main(int argc, char** argv)
 	
 	initglobals();
 
+	U.gameflags |= USER_DISABLE_VBO;
 	// We load our own G.main, so free the one that initglobals() gives us
 	free_main(G.main);
 	G.main = NULL;
@@ -581,8 +583,14 @@ int main(int argc, char** argv)
 				break;
 			case 'm':
 				i++;
+				samplesParFound = true;
 				if ((i+1) <= validArguments )
-				aasamples = atoi(argv[i++]);
+					aasamples = atoi(argv[i++]);
+				else
+				{
+					error = true;
+					printf("error: No argument supplied for -m");
+				}
 				break;
 			case 'c':
 				i++;
@@ -736,8 +744,8 @@ int main(int argc, char** argv)
 				STR_String exitstring = "";
 				GPG_Application app(system);
 				bool firstTimeRunning = true;
-				char filename[FILE_MAXDIR + FILE_MAXFILE];
-				char pathname[FILE_MAXDIR + FILE_MAXFILE];
+				char filename[FILE_MAX];
+				char pathname[FILE_MAX];
 				char *titlename;
 
 				get_filename(argc_py_clamped, argv, filename);
@@ -818,7 +826,7 @@ int main(int argc, char** argv)
 						if ((!fullScreenParFound) && (!windowParFound))
 						{
 							// Only use file settings when command line did not override
-							if (scene->gm.fullscreen) {
+							if ((scene->gm.playerflag & GAME_PLAYER_FULLSCREEN)) {
 								//printf("fullscreen option found in Blender file\n");
 								fullScreen = true;
 								fullScreenWidth= scene->gm.xplay;
@@ -846,6 +854,9 @@ int main(int argc, char** argv)
 						}
 						else
 							scene->gm.stereoflag = STEREO_ENABLED;
+
+						if (!samplesParFound)
+							aasamples = scene->gm.aasamples;
 
 						if (stereoFlag == STEREO_DOME){
 							stereomode = RAS_IRasterizer::RAS_STEREO_DOME;
@@ -892,7 +903,7 @@ int main(int argc, char** argv)
 #endif
 								{
 									app.startFullScreen(fullScreenWidth, fullScreenHeight, fullScreenBpp, fullScreenFrequency,
-										stereoWindow, stereomode, aasamples);
+										stereoWindow, stereomode, aasamples, (scene->gm.playerflag & GAME_PLAYER_DESKTOP_RESOLUTION));
 								}
 							}
 							else

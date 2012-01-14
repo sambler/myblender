@@ -29,7 +29,7 @@
  *  \ingroup cmpnodes
  */
 #include "node_composite_util.h"
-/* **************** DblEdgMatte  ******************** */
+/* **************** Double Edge Mask ******************** */
 
 
 static bNodeSocketTemplate cmp_node_doubleedgemask_in[]= {
@@ -716,10 +716,11 @@ static void do_allEdgeDetection(unsigned int t, unsigned int rw, unsigned int *l
                       is also empty. If both conditions are true for any one of the 4 adjacent pixels
                       then the current pixel is counted as being a true outer edge pixel.
                      */
-                    if((!lomask[pix_nextCol] && !limask[pix_nextCol]) || \
-                       (!lomask[pix_prevCol] && !limask[pix_prevCol]) || \
-                       (!lomask[pix_nextRow] && !limask[pix_nextRow]) || \
-                       (!lomask[pix_prevRow] && !limask[pix_prevRow])) {
+                    if((!lomask[pix_nextCol] && !limask[pix_nextCol]) ||
+                       (!lomask[pix_prevCol] && !limask[pix_prevCol]) ||
+                       (!lomask[pix_nextRow] && !limask[pix_nextRow]) ||
+                       (!lomask[pix_prevRow] && !limask[pix_prevRow]))
+					{
                         in_osz++;           // increment the outer boundary pixel count
                         lres[a]=3;       // flag pixel as part of outer edge
                     } else {             // it's not a boundary pixel, but it is a gradient pixel
@@ -773,10 +774,11 @@ static void do_adjacentEdgeDetection(unsigned int t, unsigned int rw, unsigned i
                       is also empty. If both conditions are true for any one of the 4 adjacent pixels
                       then the current pixel is counted as being a true outer edge pixel.
                      */
-                    if((!lomask[pix_nextCol] && !limask[pix_nextCol]) || \
-                       (!lomask[pix_prevCol] && !limask[pix_prevCol]) || \
-                       (!lomask[pix_nextRow] && !limask[pix_nextRow]) || \
-                       (!lomask[pix_prevRow] && !limask[pix_prevRow])) {
+                    if((!lomask[pix_nextCol] && !limask[pix_nextCol]) ||
+                       (!lomask[pix_prevCol] && !limask[pix_prevCol]) ||
+                       (!lomask[pix_nextRow] && !limask[pix_nextRow]) ||
+                       (!lomask[pix_prevRow] && !limask[pix_prevRow]))
+					{
                         in_osz++;           // increment the outer boundary pixel count
                         lres[a]=3;       // flag pixel as part of outer edge
                     } else {             // it's not a boundary pixel, but it is a gradient pixel
@@ -786,10 +788,11 @@ static void do_adjacentEdgeDetection(unsigned int t, unsigned int rw, unsigned i
                 }
 
             } else {
-                if((!limask[pix_nextCol] && lomask[pix_nextCol]) || \
-                   (!limask[pix_prevCol] && lomask[pix_prevCol]) || \
-                   (!limask[pix_nextRow] && lomask[pix_nextRow]) || \
-                   (!limask[pix_prevRow] && lomask[pix_prevRow])) {
+                if((!limask[pix_nextCol] && lomask[pix_nextCol]) ||
+                   (!limask[pix_prevCol] && lomask[pix_prevCol]) ||
+                   (!limask[pix_nextRow] && lomask[pix_nextRow]) ||
+                   (!limask[pix_prevRow] && lomask[pix_prevRow]))
+				{
                     in_isz++;               // increment the inner boundary pixel count
                     lres[a]=4;           // flag pixel as part of inner edge
                 } else {
@@ -1146,7 +1149,7 @@ static void node_composit_exec_doubleedgemask(void *UNUSED(data), bNode *node, b
         }
 
         isz=rsize[0];                  // set edge and gradient buffer sizes once again...
-        osz=rsize[1];                  // the sizes in rsize[] have been modified (always increased)
+        osz=rsize[1];                  // the sizes in rsize[] may have been modified
         gsz=rsize[2];                  // by the do_*EdgeDetection() function.
 
         // quick check for existance of edges in the buffer...

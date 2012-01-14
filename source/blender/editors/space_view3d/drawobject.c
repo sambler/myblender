@@ -3003,8 +3003,6 @@ static void draw_em_fancy(Scene *scene, View3D *v3d, RegionView3D *rv3d,
 		draw_em_fancy_edges(scene, v3d, me, cageDM, 0, eed_act);
 	}
 	if(em) {
-// XXX		retopo_matrix_update(v3d);
-
 		draw_em_fancy_verts(scene, v3d, ob, cageDM, eve_act);
 
 		if(me->drawflag & ME_DRAWNORMALS) {
@@ -3185,6 +3183,7 @@ static void draw_mesh_fancy(Scene *scene, ARegion *ar, View3D *v3d, RegionView3D
 			bglPolygonOffset(rv3d->dist, 0.0);
 			glDepthMask(1);
 			glDisable(GL_LINE_STIPPLE);
+			glDisable(GL_BLEND);
 
 			GPU_disable_material();
 			
@@ -5338,8 +5337,6 @@ static void drawnurb(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *base, 
 	BevList *bl;
 	short hide_handles = (cu->drawflag & CU_HIDE_HANDLES);
 	int index;
-
-// XXX	retopo_matrix_update(v3d);
 
 	/* DispList */
 	if( (ob->use_cust_wire_colour == OB_CUSTOM_WIRE) && !(ob->mode & OB_MODE_EDIT) )

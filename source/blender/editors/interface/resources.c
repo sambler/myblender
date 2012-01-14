@@ -1679,14 +1679,6 @@ void init_userdef_do_versions(void)
 			BLI_addtail(&U.addons, baddon);
 		}
 	}
-	
-	if (bmain->versionfile < 261) {
-		bTheme *btheme;
-		for(btheme= U.themes.first; btheme; btheme= btheme->next) {
-			SETCOLF(btheme->toops.match, 0.2, 0.5, 0.2, 0.3);
-			SETCOLF(btheme->toops.selected_highlight, 0.51, 0.53, 0.55, 0.3);
-		}
-	}
 
 	if (bmain->versionfile < 260 || (bmain->versionfile == 260 && bmain->subversionfile < 5)) {
 		bTheme *btheme;
@@ -1694,6 +1686,14 @@ void init_userdef_do_versions(void)
 		for(btheme= U.themes.first; btheme; btheme= btheme->next) {
 			SETCOL(btheme->tui.panel.header, 0, 0, 0, 25);
 			btheme->tui.icon_alpha= 1.0;
+		}
+	}
+
+	if (bmain->versionfile < 261 || (bmain->versionfile == 261 && bmain->subversionfile < 2)) {
+		bTheme *btheme;
+		for(btheme= U.themes.first; btheme; btheme= btheme->next) {
+			SETCOLF(btheme->toops.match, 0.2, 0.5, 0.2, 0.3);
+			SETCOLF(btheme->toops.selected_highlight, 0.51, 0.53, 0.55, 0.3);
 		}
 	}
 

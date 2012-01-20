@@ -51,7 +51,7 @@ struct Library;
 
 typedef struct Main {
 	struct Main *next, *prev;
-	char name[240];
+	char name[240]; /* 240 = FILE_MAX */
 	short versionfile, subversionfile;
 	short minversionfile, minsubversionfile;
 	int revision;	/* svn revision of binary that saved file */

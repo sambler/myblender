@@ -165,8 +165,6 @@ endif()
 		list(APPEND BLENDER_SORTED_LIBS extern_lzma)
 	endif()
 
-	list(APPEND BLENDER_SORTED_LIBS extern_colamd)
-
 	if(WITH_LIBMV)
 		list(APPEND BLENDER_SORTED_LIBS extern_libmv)
 	endif()
@@ -181,6 +179,10 @@ endif()
 		list(APPEND BLENDER_SORTED_LIBS bf_intern_bsp)
 		list(APPEND BLENDER_SORTED_LIBS bf_intern_bop)
 		list(APPEND BLENDER_SORTED_LIBS bf_intern_moto)
+	endif()
+
+	if(WITH_CARVE)
+		list(APPEND BLENDER_SORTED_LIBS extern_carve)
 	endif()
 
 	if(WITH_CODEC_QUICKTIME)

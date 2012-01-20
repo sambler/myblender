@@ -448,11 +448,11 @@ EditVert *findnearestvert(ViewContext *vc, int *dist, short sel, short strict)
 
 		ED_view3d_init_mats_rv3d(vc->obedit, vc->rv3d);
 
-		mesh_foreachScreenVert(vc, findnearestvert__doClosest, &data, 1);
+		mesh_foreachScreenVert(vc, findnearestvert__doClosest, &data, V3D_CLIP_TEST_RV3D_CLIPPING);
 
 		if (data.dist>3) {
 			data.pass = 1;
-			mesh_foreachScreenVert(vc, findnearestvert__doClosest, &data, 1);
+			mesh_foreachScreenVert(vc, findnearestvert__doClosest, &data, V3D_CLIP_TEST_RV3D_CLIPPING);
 		}
 
 		*dist = data.dist;
@@ -540,7 +540,7 @@ EditEdge *findnearestedge(ViewContext *vc, int *dist)
 		data.closest = NULL;
 
 		ED_view3d_init_mats_rv3d(vc->obedit, vc->rv3d);
-		mesh_foreachScreenEdge(vc, findnearestedge__doClosest, &data, 2);
+		mesh_foreachScreenEdge(vc, findnearestedge__doClosest, &data, V3D_CLIP_TEST_REGION);
 
 		*dist = data.dist;
 		return data.closest;
@@ -873,12 +873,10 @@ static int similar_face_select_exec(bContext *C, wmOperator *op)
 		/* here was an edge-mode only select flush case, has to be generalized */
 		EM_selectmode_flush(em);
 		WM_event_add_notifier(C, NC_GEOM|ND_SELECT, obedit->data);
-		BKE_mesh_end_editmesh(me, em);
-		return OPERATOR_FINISHED;
 	}
 	
 	BKE_mesh_end_editmesh(me, em);
-	return OPERATOR_CANCELLED;
+	return OPERATOR_FINISHED;
 }	
 
 /* ***************************************************** */
@@ -1092,12 +1090,10 @@ static int similar_edge_select_exec(bContext *C, wmOperator *op)
 		/* here was an edge-mode only select flush case, has to be generalized */
 		EM_selectmode_flush(em);
 		WM_event_add_notifier(C, NC_GEOM|ND_SELECT, obedit->data);
-		BKE_mesh_end_editmesh(me, em);
-		return OPERATOR_FINISHED;
 	}
-	
+
 	BKE_mesh_end_editmesh(me, em);
-	return OPERATOR_CANCELLED;
+	return OPERATOR_FINISHED;
 }
 
 /* ********************************* */
@@ -1135,7 +1131,7 @@ static int similar_vert_select_exec(bContext *C, wmOperator *op)
 	
 	if (!ok || !deselcount) { /* no data selected OR no more data to select*/
 		BKE_mesh_end_editmesh(me, em);
-		return 0;
+		return OPERATOR_CANCELLED;
 	}
 	
 	if(mode == SIMVERT_FACE) {
@@ -1166,7 +1162,7 @@ static int similar_vert_select_exec(bContext *C, wmOperator *op)
 							deselcount--;
 							if (!deselcount) {/*have we selected all posible faces?, if so return*/
 								BKE_mesh_end_editmesh(me, em);
-								return selcount;
+								return OPERATOR_FINISHED;
 							}
 						}
 					}
@@ -1184,7 +1180,7 @@ static int similar_vert_select_exec(bContext *C, wmOperator *op)
 						deselcount--;
 						if (!deselcount) {/*have we selected all posible faces?, if so return*/
 							BKE_mesh_end_editmesh(me, em);
-							return selcount;
+							return OPERATOR_FINISHED;
 						}
 					}
 				}
@@ -1198,7 +1194,7 @@ static int similar_vert_select_exec(bContext *C, wmOperator *op)
 
 				if (!base_dvert || base_dvert->totweight == 0) {
 					BKE_mesh_end_editmesh(me, em);
-					return selcount;
+					return OPERATOR_FINISHED;
 				}
 				
 				for(eve= em->verts.first; eve; eve= eve->next) {
@@ -1216,7 +1212,7 @@ static int similar_vert_select_exec(bContext *C, wmOperator *op)
 									deselcount--;
 									if (!deselcount) { /*have we selected all posible faces?, if so return*/
 										BKE_mesh_end_editmesh(me, em);
-										return selcount;
+										return OPERATOR_FINISHED;
 									}
 									break;
 								}
@@ -1230,12 +1226,10 @@ static int similar_vert_select_exec(bContext *C, wmOperator *op)
 
 	if(selcount) {
 		WM_event_add_notifier(C, NC_GEOM|ND_SELECT, obedit->data);
-		BKE_mesh_end_editmesh(me, em);
-		return OPERATOR_FINISHED;
 	}
 
 	BKE_mesh_end_editmesh(me, em);
-	return OPERATOR_CANCELLED;
+	return OPERATOR_FINISHED;
 }
 
 static int select_similar_exec(bContext *C, wmOperator *op)
@@ -1342,7 +1336,8 @@ void mesh_layers_menu_concat(CustomData *data, int type, char *str)
 	}
 }
 
-int mesh_layers_menu(CustomData *data, int type) {
+int mesh_layers_menu(CustomData *data, int type)
+{
 	int ret;
 	char *str_pt, *str;
 	
@@ -2461,8 +2456,9 @@ static int select_linked_limited_invoke(ViewContext *vc, short all, short sel)
 #undef is_face_tag
 #undef face_tag
 
-static void linked_limit_default(bContext *C, wmOperator *op) {
-	if(!RNA_property_is_set(op->ptr, "limit")) {
+static void linked_limit_default(bContext *C, wmOperator *op)
+{
+	if(!RNA_struct_property_is_set(op->ptr, "limit")) {
 		Object *obedit= CTX_data_edit_object(C);
 		EditMesh *em= BKE_mesh_get_editmesh(obedit->data);
 		if(em->selectmode == SCE_SELECT_FACE)
@@ -3386,34 +3382,6 @@ void EM_select_swap(EditMesh *em) /* exported for UV */
 //	if (EM_texFaceCheck())
 
 }
-
-static int select_inverse_mesh_exec(bContext *C, wmOperator *UNUSED(op))
-{
-	Object *obedit= CTX_data_edit_object(C);
-	EditMesh *em= BKE_mesh_get_editmesh(((Mesh *)obedit->data));
-	
-	EM_select_swap(em);
-	
-	WM_event_add_notifier(C, NC_GEOM|ND_SELECT, obedit->data);
-
-	BKE_mesh_end_editmesh(obedit->data, em);
-	return OPERATOR_FINISHED;	
-}
-
-void MESH_OT_select_inverse(wmOperatorType *ot)
-{
-	/* identifiers */
-	ot->name= "Select Inverse";
-	ot->description= "Select inverse of (un)selected vertices, edges or faces";
-	ot->idname= "MESH_OT_select_inverse";
-	
-	/* api callbacks */
-	ot->exec= select_inverse_mesh_exec;
-	ot->poll= ED_operator_editmesh;
-	
-	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
-}
 	
 /* ******************** (de)select all operator **************** */
 
@@ -4151,20 +4119,10 @@ static int smooth_vertex(bContext *C, wmOperator *op)
 				for (eve= em->verts.first; eve; eve= eve->next) {
 					if(eve->f & SELECT) {
 
-						switch(mmd->axis){
-							case 0:
-								if (fabsf(eve->co[0]) < mmd->tolerance)
-									eve->f2 |= 1;
-								break;
-							case 1:
-								if (fabsf(eve->co[1]) < mmd->tolerance)
-									eve->f2 |= 2;
-								break;
-							case 2:
-								if (fabsf(eve->co[2]) < mmd->tolerance)
-									eve->f2 |= 4;
-								break;
-						}
+						if (mmd->flag & MOD_MIR_AXIS_X && fabsf(eve->co[0]) < mmd->tolerance) eve->f2 |= 1;
+						if (mmd->flag & MOD_MIR_AXIS_Y && fabsf(eve->co[1]) < mmd->tolerance) eve->f2 |= 2;
+						if (mmd->flag & MOD_MIR_AXIS_Z && fabsf(eve->co[2]) < mmd->tolerance) eve->f2 |= 4;
+
 					}
 				}
 			}

@@ -131,44 +131,29 @@ void compbuf_set_node(CompBuf *cbuf, bNode *node)
 }
 
 /* used for disabling node  (similar code in node_draw.c for disable line and node_edit for untangling nodes) */
-void node_compo_pass_on(bNode *node, bNodeStack **nsin, bNodeStack **nsout)
+void node_compo_pass_on(void *UNUSED(data), int UNUSED(thread), struct bNode *node, void *UNUSED(nodedata),
+                        struct bNodeStack **in, struct bNodeStack **out)
 {
-	CompBuf *valbuf= NULL, *colbuf= NULL, *vecbuf= NULL;
-	bNodeSocket *sock;
-	int a;
-	
-	/* connect the first value buffer in with first value out */
-	/* connect the first RGBA buffer in with first RGBA out */
-	
-	/* test the inputs */
-	for(a=0, sock= node->inputs.first; sock; sock= sock->next, a++) {
-		if(nsin[a]->data) {
-			CompBuf *cbuf= nsin[a]->data;
-			if(cbuf->type==1 && valbuf==NULL) valbuf= cbuf;
-			if(cbuf->type==3 && vecbuf==NULL) vecbuf= cbuf;
-			if(cbuf->type==4 && colbuf==NULL) colbuf= cbuf;
+	ListBase links;
+	LinkInOutsMuteNode *lnk;
+	int i;
+
+	if(node->typeinfo->mutelinksfunc == NULL)
+		return;
+
+	/* Get default muting links (as bNodeStack pointers). */
+	links = node->typeinfo->mutelinksfunc(NULL, node, in, out, NULL, NULL);
+
+	for(lnk = links.first; lnk; lnk = lnk->next) {
+		for(i = 0; i < lnk->num_outs; i++) {
+			if(((bNodeStack*)(lnk->in))->data)
+				(((bNodeStack*)(lnk->outs))+i)->data = pass_on_compbuf((CompBuf*)((bNodeStack*)(lnk->in))->data);
 		}
+		/* If num_outs > 1, lnk->outs was an allocated table of pointers... */
+		if(i > 1)
+			MEM_freeN(lnk->outs);
 	}
-	
-	/* outputs */
-	if(valbuf || colbuf || vecbuf) {
-		for(a=0, sock= node->outputs.first; sock; sock= sock->next, a++) {
-			if(nsout[a]->hasoutput) {
-				if(sock->type==SOCK_FLOAT && valbuf) {
-					nsout[a]->data= pass_on_compbuf(valbuf);
-					valbuf= NULL;
-				}
-				if(sock->type==SOCK_VECTOR && vecbuf) {
-					nsout[a]->data= pass_on_compbuf(vecbuf);
-					vecbuf= NULL;
-				}
-				if(sock->type==SOCK_RGBA && colbuf) {
-					nsout[a]->data= pass_on_compbuf(colbuf);
-					colbuf= NULL;
-				}
-			}
-		}
-	}
+	BLI_freelistN(&links);
 }
 
 
@@ -417,7 +402,7 @@ CompBuf *typecheck_compbuf(CompBuf *inbuf, int type)
 	return inbuf;
 }
 
-static float *compbuf_get_pixel(CompBuf *cbuf, float *defcol, float *use, int x, int y, int xrad, int yrad)
+float *compbuf_get_pixel(CompBuf *cbuf, float *defcol, float *use, int x, int y, int xrad, int yrad)
 {
 	if(cbuf) {
 		if(cbuf->rect_procedural) {
@@ -442,6 +427,18 @@ static float *compbuf_get_pixel(CompBuf *cbuf, float *defcol, float *use, int x,
 
 /* **************************************************** */
 
+static CompBuf *composit_check_compbuf(CompBuf *cbuf, int type, CompBuf *outbuf)
+{
+	/* check type */
+	CompBuf *dbuf= typecheck_compbuf(cbuf, type);
+
+	/* if same as output and translated, duplicate so pixels don't interfere */
+	if(dbuf == outbuf && !dbuf->rect_procedural && (dbuf->xof || dbuf->yof))
+		dbuf= dupalloc_compbuf(dbuf);
+	
+	return dbuf;
+}
+
 /* Pixel-to-Pixel operation, 1 Image in, 1 out */
 void composit1_pixel_processor(bNode *node, CompBuf *out, CompBuf *src_buf, float *src_col,
 									  void (*func)(bNode *, float *, float *), 
@@ -452,7 +449,7 @@ void composit1_pixel_processor(bNode *node, CompBuf *out, CompBuf *src_buf, floa
 	float color[4];	/* local color if compbuf is procedural */
 	int xrad, yrad, x, y;
 	
-	src_use= typecheck_compbuf(src_buf, src_type);
+	src_use= composit_check_compbuf(src_buf, src_type, out);
 	
 	xrad= out->xrad;
 	yrad= out->yrad;
@@ -478,8 +475,8 @@ void composit2_pixel_processor(bNode *node, CompBuf *out, CompBuf *src_buf, floa
 	float color[4];	/* local color if compbuf is procedural */
 	int xrad, yrad, x, y;
 	
-	src_use= typecheck_compbuf(src_buf, src_type);
-	fac_use= typecheck_compbuf(fac_buf, fac_type);
+	src_use= composit_check_compbuf(src_buf, src_type, out);
+	fac_use= composit_check_compbuf(fac_buf, fac_type, out);
 
 	xrad= out->xrad;
 	yrad= out->yrad;
@@ -508,9 +505,9 @@ void composit3_pixel_processor(bNode *node, CompBuf *out, CompBuf *src1_buf, flo
 	float color[4];	/* local color if compbuf is procedural */
 	int xrad, yrad, x, y;
 	
-	src1_use= typecheck_compbuf(src1_buf, src1_type);
-	src2_use= typecheck_compbuf(src2_buf, src2_type);
-	fac_use= typecheck_compbuf(fac_buf, fac_type);
+	src1_use= composit_check_compbuf(src1_buf, src1_type, out);
+	src2_use= composit_check_compbuf(src2_buf, src2_type, out);
+	fac_use= composit_check_compbuf(fac_buf, fac_type, out);
 	
 	xrad= out->xrad;
 	yrad= out->yrad;
@@ -544,10 +541,10 @@ void composit4_pixel_processor(bNode *node, CompBuf *out, CompBuf *src1_buf, flo
 	float color[4];	/* local color if compbuf is procedural */
 	int xrad, yrad, x, y;
 	
-	src1_use= typecheck_compbuf(src1_buf, src1_type);
-	src2_use= typecheck_compbuf(src2_buf, src2_type);
-	fac1_use= typecheck_compbuf(fac1_buf, fac1_type);
-	fac2_use= typecheck_compbuf(fac2_buf, fac2_type);
+	src1_use= composit_check_compbuf(src1_buf, src1_type, out);
+	src2_use= composit_check_compbuf(src2_buf, src2_type, out);
+	fac1_use= composit_check_compbuf(fac1_buf, fac1_type, out);
+	fac2_use= composit_check_compbuf(fac2_buf, fac2_type, out);
 	
 	xrad= out->xrad;
 	yrad= out->yrad;
@@ -621,7 +618,9 @@ void generate_preview(void *data, bNode *node, CompBuf *stackbuf)
 	RenderData *rd= data;
 	bNodePreview *preview= node->preview;
 	int xsize, ysize;
-	int color_manage= rd->color_mgt_flag & R_COLOR_MANAGEMENT;
+	int profile_from= (rd->color_mgt_flag & R_COLOR_MANAGEMENT)? IB_PROFILE_LINEAR_RGB: IB_PROFILE_SRGB;
+	int predivide= (rd->color_mgt_flag & R_COLOR_MANAGEMENT_PREDIVIDE);
+	int dither= 0;
 	unsigned char *rect;
 	
 	if(preview && stackbuf) {
@@ -648,10 +647,9 @@ void generate_preview(void *data, bNode *node, CompBuf *stackbuf)
 		/* convert to byte for preview */
 		rect= MEM_callocN(sizeof(unsigned char)*4*xsize*ysize, "bNodePreview.rect");
 
-		if(color_manage)
-			floatbuf_to_srgb_byte(cbuf->rect, rect, 0, xsize, 0, ysize, xsize);
-		else
-			floatbuf_to_byte(cbuf->rect, rect, 0, xsize, 0, ysize, xsize);
+		IMB_buffer_byte_from_float(rect, cbuf->rect,
+			4, dither, IB_PROFILE_SRGB, profile_from, predivide, 
+			xsize, ysize, xsize, xsize);
 		
 		free_compbuf(cbuf);
 		if(stackbuf_use!=stackbuf)

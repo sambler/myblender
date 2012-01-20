@@ -48,6 +48,8 @@ WITH_BF_JPEG = True
 BF_JPEG_LIB = 'libjpeg'
 BF_JPEG_LIBPATH = '/home/sources/staticlibs/lib64'
 
+WITH_BF_STATICLIBSAMPLERATE = True
+
 WITH_BF_PNG = True
 BF_PNG_LIB = 'libpng'
 BF_PNG_LIBPATH = '/home/sources/staticlibs/lib64'

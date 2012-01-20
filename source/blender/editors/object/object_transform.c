@@ -188,15 +188,15 @@ static void object_clear_scale(Object *ob)
 {
 	/* clear scale factors which are not locked */
 	if ((ob->protectflag & OB_LOCK_SCALEX)==0) {
-		ob->dsize[0]= 0.0f;
+		ob->dscale[0]= 1.0f;
 		ob->size[0]= 1.0f;
 	}
 	if ((ob->protectflag & OB_LOCK_SCALEY)==0) {
-		ob->dsize[1]= 0.0f;
+		ob->dscale[1]= 1.0f;
 		ob->size[1]= 1.0f;
 	}
 	if ((ob->protectflag & OB_LOCK_SCALEZ)==0) {
-		ob->dsize[2]= 0.0f;
+		ob->dscale[2]= 1.0f;
 		ob->size[2]= 1.0f;
 	}
 }
@@ -645,7 +645,7 @@ static int object_origin_set_exec(bContext *C, wmOperator *op)
 		/* get the view settings if 'around' isnt set and the view is available */
 		View3D *v3d= CTX_wm_view3d(C);
 		copy_v3_v3(cursor, give_cursor(scene, v3d));
-		if(v3d && !RNA_property_is_set(op->ptr, "center"))
+		if(v3d && !RNA_struct_property_is_set(op->ptr, "center"))
 			around= v3d->around;
 	}
 

@@ -1316,7 +1316,7 @@ static short extrudeflag_edge(Object *obedit, EditMesh *em, short UNUSED(flag), 
 				if (mmd->mirror_ob) {
 					float imtx[4][4];
 					invert_m4_m4(imtx, mmd->mirror_ob->obmat);
-					mul_m4_m4m4(mtx, obedit->obmat, imtx);
+					mult_m4_m4m4(mtx, imtx, obedit->obmat);
 				}
 
 				for (eed= em->edges.first; eed; eed= eed->next) {
@@ -1603,7 +1603,7 @@ short extrudeflag_vert(Object *obedit, EditMesh *em, short flag, float *nor, int
 				if (mmd->mirror_ob) {
 					float imtx[4][4];
 					invert_m4_m4(imtx, mmd->mirror_ob->obmat);
-					mul_m4_m4m4(mtx, obedit->obmat, imtx);
+					mult_m4_m4m4(mtx, imtx, obedit->obmat);
 				}
 
 				for (eed= em->edges.first; eed; eed= eed->next) {
@@ -2322,7 +2322,7 @@ UvVertMap *EM_make_uv_vert_map(EditMesh *em, int selected, int do_face_idx_array
 	for(a=0, ev=em->verts.first; ev; a++, ev= ev->next) {
 		UvMapVert *newvlist= NULL, *vlist=vmap->vert[a];
 		UvMapVert *iterv, *v, *lastv, *next;
-		float *uv, *uv2, uvdiff[2];
+		float *uv, *uv2;
 
 		while(vlist) {
 			v= vlist;
@@ -2332,8 +2332,8 @@ UvVertMap *EM_make_uv_vert_map(EditMesh *em, int selected, int do_face_idx_array
 
 			efa = EM_get_face_for_index(v->f);
 			tf = CustomData_em_get(&em->fdata, efa->data, CD_MTFACE);
-			uv = tf->uv[v->tfindex]; 
-			
+			uv = tf->uv[v->tfindex];
+
 			lastv= NULL;
 			iterv= vlist;
 
@@ -2342,8 +2342,6 @@ UvVertMap *EM_make_uv_vert_map(EditMesh *em, int selected, int do_face_idx_array
 				efa = EM_get_face_for_index(iterv->f);
 				tf = CustomData_em_get(&em->fdata, efa->data, CD_MTFACE);
 				uv2 = tf->uv[iterv->tfindex];
-				
-				sub_v2_v2v2(uvdiff, uv2, uv);
 
 				if(fabsf(uv[0]-uv2[0]) < limit[0] && fabsf(uv[1]-uv2[1]) < limit[1]) {
 					if(lastv) lastv->next= next;
@@ -2353,21 +2351,223 @@ UvVertMap *EM_make_uv_vert_map(EditMesh *em, int selected, int do_face_idx_array
 				}
 				else
 					lastv=iterv;
-
 				iterv= next;
+			}
+			newvlist->separate = 1;
+		}
+		vmap->vert[a]= newvlist;
+	}
+
+
+	if (do_face_idx_array)
+		EM_free_index_arrays();
+
+	return vmap;
+}
+
+/* A specialized vert map used by stitch operator */
+UvElementMap *EM_make_uv_element_map(EditMesh *em, int selected, int do_islands)
+{
+	EditVert *ev;
+	EditFace *efa;
+
+	/* vars from original func */
+	UvElementMap *vmap;
+	UvElement *buf;
+	UvElement *islandbuf;
+	MTFace *tf;
+	unsigned int a;
+	int	i,j, totuv, nverts, nislands = 0, islandbufsize = 0;
+	unsigned int *map;
+	/* for uv island creation */
+	EditFace **stack;
+	int stacksize = 0;
+
+	/* we need the vert */
+	for(ev = em->verts.first, i = 0; ev; ev = ev->next, i++)
+		ev->tmp.l = i;
+
+	totuv = 0;
+
+	for(efa = em->faces.first; efa; efa = efa->next)
+		if(!selected || ((!efa->h) && (efa->f & SELECT)))
+			totuv += (efa->v4)? 4: 3;
+
+	if(totuv == 0)
+		return NULL;
+
+	vmap = (UvElementMap *)MEM_callocN(sizeof(*vmap), "UvVertElementMap");
+	if(!vmap)
+		return NULL;
+
+	vmap->vert = (UvElement**)MEM_callocN(sizeof(*vmap->vert)*em->totvert, "UvElementVerts");
+	buf = vmap->buf = (UvElement*)MEM_callocN(sizeof(*vmap->buf)*totuv, "UvElement");
+
+	if(!vmap->vert || !vmap->buf) {
+		EM_free_uv_element_map(vmap);
+		return NULL;
+	}
+
+	vmap->totalUVs = totuv;
+
+	for(efa = em->faces.first; efa; a++, efa = efa->next) {
+		if(!selected || ((!efa->h) && (efa->f & SELECT))) {
+			nverts = (efa->v4)? 4: 3;
+
+			for(i = 0; i<nverts; i++) {
+				buf->tfindex = i;
+				buf->face = efa;
+				buf->separate = 0;
+				buf->island = INVALID_ISLAND;
+
+				buf->next = vmap->vert[(*(&efa->v1 + i))->tmp.l];
+				vmap->vert[(*(&efa->v1 + i))->tmp.l] = buf;
+
+				buf++;
+			}
+		}
+
+		efa->tmp.l = INVALID_ISLAND;
+	}
+
+	/* sort individual uvs for each vert */
+	for(a = 0, ev = em->verts.first; ev; a++, ev = ev->next) {
+		UvElement *newvlist = NULL, *vlist = vmap->vert[a];
+		UvElement *iterv, *v, *lastv, *next;
+		float *uv, *uv2;
+
+		while(vlist) {
+			v= vlist;
+			vlist= vlist->next;
+			v->next= newvlist;
+			newvlist= v;
+
+			efa = v->face;
+			tf = CustomData_em_get(&em->fdata, efa->data, CD_MTFACE);
+			uv = tf->uv[v->tfindex];
+
+			lastv= NULL;
+			iterv= vlist;
+
+			while(iterv) {
+				next= iterv->next;
+				efa = iterv->face;
+				tf = CustomData_em_get(&em->fdata, efa->data, CD_MTFACE);
+				uv2 = tf->uv[iterv->tfindex];
+
+				if(fabsf(uv[0]-uv2[0]) < STD_UV_CONNECT_LIMIT && fabsf(uv[1]-uv2[1]) < STD_UV_CONNECT_LIMIT) {
+					if(lastv) lastv->next = next;
+					else vlist = next;
+					iterv->next = newvlist;
+					newvlist = iterv;
+				}
+				else
+					lastv = iterv;
+
+				iterv = next;
 			}
 
 			newvlist->separate = 1;
 		}
 
-		vmap->vert[a]= newvlist;
+		vmap->vert[a] = newvlist;
 	}
-	
-	if (do_face_idx_array)
-		EM_free_index_arrays();
-	
+
+	if(do_islands) {
+		/* at this point, every UvElement in vert points to a UvElement sharing the same vertex. Now we should sort uv's in islands. */
+
+		/* map holds the map from current vmap->buf to the new, sorted map*/
+		map = MEM_mallocN(sizeof(*map)*totuv, "uvelement_remap");
+		stack = MEM_mallocN(sizeof(*stack)*em->totface, "uv_island_face_stack");
+		islandbuf = MEM_callocN(sizeof(*islandbuf)*totuv, "uvelement_island_buffer");
+
+		for(i = 0; i < totuv; i++) {
+			if(vmap->buf[i].island == INVALID_ISLAND) {
+				vmap->buf[i].island = nislands;
+				stack[0] = vmap->buf[i].face;
+				stack[0]->tmp.l = nislands;
+				stacksize=1;
+
+				while(stacksize > 0) {
+					efa = stack[--stacksize];
+					nverts = efa->v4? 4 : 3;
+
+					for(j = 0; j < nverts; j++) {
+						UvElement *element, *initelement = vmap->vert[(*(&efa->v1 + j))->tmp.l];
+
+						for(element = initelement; element; element = element->next) {
+							if(element->separate)
+								initelement = element;
+
+							if(element->face == efa) {
+								/* found the uv corresponding to our face and vertex. Now fill it to the buffer */
+								element->island = nislands;
+								map[element - vmap->buf] = islandbufsize;
+								islandbuf[islandbufsize].tfindex = element->tfindex;
+								islandbuf[islandbufsize].face = element->face;
+								islandbuf[islandbufsize].separate = element->separate;
+								islandbuf[islandbufsize].island =  nislands;
+								islandbufsize++;
+
+								for(element = initelement; element; element = element->next) {
+									if(element->separate && element != initelement)
+										break;
+
+									if(element->face->tmp.l == INVALID_ISLAND) {
+										stack[stacksize++] = element->face;
+										element->face->tmp.l = nislands;
+									}
+								}
+								break;
+							}
+						}
+					}
+				}
+
+				nislands++;
+			}
+		}
+
+		/* remap */
+		for(i = 0; i < em->totvert; i++) {
+			/* important since we may do selection only. Some of these may be NULL */
+			if(vmap->vert[i])
+				vmap->vert[i] = &islandbuf[map[vmap->vert[i] - vmap->buf]];
+		}
+
+		vmap->islandIndices = MEM_callocN(sizeof(*vmap->islandIndices)*nislands,"UvVertMap2_island_indices");
+		if(!vmap->islandIndices) {
+			MEM_freeN(islandbuf);
+			MEM_freeN(stack);
+			MEM_freeN(map);
+			EM_free_uv_element_map(vmap);
+		}
+
+		j = 0;
+		for(i = 0; i < totuv; i++) {
+			UvElement *element = vmap->buf[i].next;
+			if(element == NULL)
+				islandbuf[map[i]].next = NULL;
+			else
+				islandbuf[map[i]].next = &islandbuf[map[element - vmap->buf]];
+
+			if(islandbuf[i].island != j) {
+				j++;
+				vmap->islandIndices[j] = i;
+			}
+		}
+
+		MEM_freeN(vmap->buf);
+
+		vmap->buf = islandbuf;
+		vmap->totalIslands = nislands;
+		MEM_freeN(stack);
+		MEM_freeN(map);
+	}
+
 	return vmap;
 }
+
 
 UvMapVert *EM_get_uv_map_vert(UvVertMap *vmap, unsigned int v)
 {
@@ -2379,6 +2579,16 @@ void EM_free_uv_vert_map(UvVertMap *vmap)
 	if (vmap) {
 		if (vmap->vert) MEM_freeN(vmap->vert);
 		if (vmap->buf) MEM_freeN(vmap->buf);
+		MEM_freeN(vmap);
+	}
+}
+
+void EM_free_uv_element_map(UvElementMap *vmap)
+{
+	if (vmap) {
+		if (vmap->vert) MEM_freeN(vmap->vert);
+		if (vmap->buf) MEM_freeN(vmap->buf);
+		if (vmap->islandIndices) MEM_freeN(vmap->islandIndices);
 		MEM_freeN(vmap);
 	}
 }
@@ -2412,7 +2622,7 @@ void EM_make_hq_normals(EditMesh *em)
 	EdgeHash *edge_hash = BLI_edgehash_new();
 	EdgeHashIterator *edge_iter;
 	int edge_ref_count = 0;
-	int ed_v1, ed_v2; /* use when getting the key */
+	unsigned int ed_v1, ed_v2; /* use when getting the key */
 	EdgeFaceRef *edge_ref_array = MEM_callocN(em->totedge * sizeof(EdgeFaceRef), "Edge Connectivity");
 	EdgeFaceRef *edge_ref;
 	float edge_normal[3];
@@ -2426,15 +2636,20 @@ void EM_make_hq_normals(EditMesh *em)
 
 	/* This function adds an edge hash if its not there, and adds the face index */
 #define NOCALC_EDGEWEIGHT_ADD_EDGEREF_FACE(EDV1, EDV2); \
-			edge_ref = (EdgeFaceRef *)BLI_edgehash_lookup(edge_hash, EDV1, EDV2); \
+		{ \
+			const unsigned int mf_v1 = EDV1; \
+			const unsigned int mf_v2 = EDV2; \
+			edge_ref = (EdgeFaceRef *)BLI_edgehash_lookup(edge_hash, mf_v1, mf_v2); \
 			if (!edge_ref) { \
 				edge_ref = &edge_ref_array[edge_ref_count]; edge_ref_count++; \
-				edge_ref->f1=i; \
-				edge_ref->f2=-1; \
-				BLI_edgehash_insert(edge_hash, EDV1, EDV2, edge_ref); \
-			} else { \
-				edge_ref->f2=i; \
-			}
+				edge_ref->f1 = i; \
+				edge_ref->f2 = -1; \
+				BLI_edgehash_insert(edge_hash, mf_v1, mf_v2, edge_ref); \
+			} \
+			else { \
+				edge_ref->f2 = i; \
+			} \
+		}
 
 
 	efa= em->faces.first;
@@ -2456,7 +2671,7 @@ void EM_make_hq_normals(EditMesh *em)
 
 	for(edge_iter = BLI_edgehashIterator_new(edge_hash); !BLI_edgehashIterator_isDone(edge_iter); BLI_edgehashIterator_step(edge_iter)) {
 		/* Get the edge vert indices, and edge value (the face indices that use it)*/
-		BLI_edgehashIterator_getKey(edge_iter, (int*)&ed_v1, (int*)&ed_v2);
+		BLI_edgehashIterator_getKey(edge_iter, &ed_v1, &ed_v2);
 		edge_ref = BLI_edgehashIterator_getValue(edge_iter);
 
 		if (edge_ref->f2 != -1) {

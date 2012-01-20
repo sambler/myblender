@@ -626,7 +626,7 @@ static void rna_def_action_actuator(BlenderRNA *brna)
 
 	prop= RNA_def_property(srna, "priority", PROP_INT, PROP_NONE);
 	RNA_def_property_range(prop, 0, 100);
-	RNA_def_property_ui_text(prop, "Priority", "Execution priority - lower numbers will override actions with higher numbers. With 2 or more actions at once, the overriding channels must be lower in the stack");
+	RNA_def_property_ui_text(prop, "Priority", "Execution priority - lower numbers will override actions with higher numbers (with 2 or more actions at once, the overriding channels must be lower in the stack)");
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 
 	prop= RNA_def_property(srna, "layer", PROP_INT, PROP_NONE);
@@ -867,8 +867,10 @@ static void rna_def_camera_actuator(BlenderRNA *brna)
 	PropertyRNA *prop;
 
 	static EnumPropertyItem prop_axis_items[] ={
-		{ACT_CAMERA_X, "X", 0, "X", "Camera tries to get behind the X axis"},
-		{ACT_CAMERA_Y, "Y", 0, "Y", "Camera tries to get behind the Y axis"},
+		{OB_POSX, "POS_X", 0, "+X", "Camera tries to get behind the X axis"},
+		{OB_POSY, "POS_Y", 0, "+Y", "Camera tries to get behind the Y axis"},
+		{OB_NEGX, "NEG_X", 0, "-X", "Camera tries to get behind the -X axis"},
+		{OB_NEGY, "NEG_Y", 0, "-Y", "Camera tries to get behind the -Y axis"},
 		{0, NULL, 0, NULL, NULL}};
 	
 	srna= RNA_def_struct(brna, "CameraActuator", "Actuator");
@@ -905,7 +907,7 @@ static void rna_def_camera_actuator(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Damping", "Strength of the constraint that drives the camera behind the target");
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 
-	/* x/y */
+	/* +x/+y/-x/-y */
 	prop= RNA_def_property(srna, "axis", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "axis");
 	RNA_def_property_enum_items(prop, prop_axis_items);
@@ -1404,7 +1406,7 @@ static void rna_def_scene_actuator(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "mode", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "type");
 	RNA_def_property_enum_items(prop, prop_type_items);
-	RNA_def_property_ui_text(prop, "Scene", "");
+	RNA_def_property_ui_text(prop, "Mode", "");
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 	
 	//XXX filter only camera objects

@@ -201,7 +201,7 @@ static void borderselect_graphkeys (bAnimContext *ac, rcti rect, short mode, sho
 {
 	ListBase anim_data = {NULL, NULL};
 	bAnimListElem *ale;
-	int filter;
+	int filter, mapping_flag;
 	
 	SpaceIpo *sipo= (SpaceIpo *)ac->sl;
 	KeyframeEditData ked;
@@ -226,8 +226,12 @@ static void borderselect_graphkeys (bAnimContext *ac, rcti rect, short mode, sho
 	ked.data= &rectf;
 	
 	/* treat handles separately? */
-	if (incl_handles)
+	if (incl_handles) {
 		ked.iterflags |= KEYFRAME_ITER_INCL_HANDLES;
+		mapping_flag= 0;
+	}
+	else
+		mapping_flag= ANIM_UNITCONV_ONLYKEYS;
 	
 	/* loop over data, doing border select */
 	for (ale= anim_data.first; ale; ale= ale->next) {
@@ -235,7 +239,7 @@ static void borderselect_graphkeys (bAnimContext *ac, rcti rect, short mode, sho
 		FCurve *fcu= (FCurve *)ale->key_data;
 		
 		/* apply unit corrections */
-		ANIM_unit_mapping_apply_fcurve(ac->scene, ale->id, ale->key_data, ANIM_UNITCONV_ONLYKEYS);
+		ANIM_unit_mapping_apply_fcurve(ac->scene, ale->id, ale->key_data, mapping_flag);
 		
 		/* apply NLA mapping to all the keyframes, since it's easier than trying to
 		 * guess when a callback might use something different
@@ -274,7 +278,7 @@ static void borderselect_graphkeys (bAnimContext *ac, rcti rect, short mode, sho
 			ANIM_nla_mapping_apply_fcurve(adt, ale->key_data, 1, incl_handles==0);
 			
 		/* unapply unit corrections */
-		ANIM_unit_mapping_apply_fcurve(ac->scene, ale->id, ale->key_data, ANIM_UNITCONV_RESTORE|ANIM_UNITCONV_ONLYKEYS);
+		ANIM_unit_mapping_apply_fcurve(ac->scene, ale->id, ale->key_data, ANIM_UNITCONV_RESTORE|mapping_flag);
 	}
 	
 	/* cleanup */
@@ -386,6 +390,8 @@ static EnumPropertyItem prop_column_select_types[] = {
 /* ------------------- */ 
 
 /* Selects all visible keyframes between the specified markers */
+/* TODO, this is almost an _exact_ duplicate of a function of the same name in action_select.c
+ * should de-duplicate - campbell */
 static void markers_selectkeys_between (bAnimContext *ac)
 {
 	ListBase anim_data = {NULL, NULL};
@@ -393,7 +399,7 @@ static void markers_selectkeys_between (bAnimContext *ac)
 	int filter;
 	
 	KeyframeEditFunc ok_cb, select_cb;
-	KeyframeEditData ked;
+	KeyframeEditData ked= {{NULL}};
 	float min, max;
 	
 	/* get extreme markers */
@@ -404,9 +410,8 @@ static void markers_selectkeys_between (bAnimContext *ac)
 	/* get editing funcs + data */
 	ok_cb= ANIM_editkeyframes_ok(BEZT_OK_FRAMERANGE);
 	select_cb= ANIM_editkeyframes_select(SELECT_ADD);
-	
-	memset(&ked, 0, sizeof(KeyframeEditData));
-	ked.f1= min; 
+
+	ked.f1= min;
 	ked.f2= max;
 	
 	/* filter data */
@@ -416,8 +421,8 @@ static void markers_selectkeys_between (bAnimContext *ac)
 	/* select keys in-between */
 	for (ale= anim_data.first; ale; ale= ale->next) {
 		AnimData *adt= ANIM_nla_mapping_get(ac, ale);
-		
-		if (adt) {	
+
+		if (adt) {
 			ANIM_nla_mapping_apply_fcurve(adt, ale->key_data, 0, 1);
 			ANIM_fcurve_keyframes_loop(&ked, ale->key_data, ok_cb, select_cb, NULL);
 			ANIM_nla_mapping_apply_fcurve(adt, ale->key_data, 1, 1);

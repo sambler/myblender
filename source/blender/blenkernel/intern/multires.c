@@ -32,6 +32,9 @@
 
 #include "MEM_guardedalloc.h"
 
+/* for reading old multires */
+#define DNA_DEPRECATED_ALLOW
+
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
 #include "DNA_object_types.h"
@@ -1613,7 +1616,7 @@ static void multires_apply_smat(Scene *scene, Object *ob, float smat[3][3])
 	CustomData_external_read(&me->fdata, &me->id, CD_MASK_MDISPS, me->totface);
 	mdisps= CustomData_get_layer(&me->fdata, CD_MDISPS);
 
-	if(!mdisps || !mmd) return;
+	if(!mdisps || !mmd || !mmd->totlvl) return;
 
 	/* we need derived mesh created from highest resolution */
 	high_mmd= *mmd;

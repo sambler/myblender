@@ -289,6 +289,17 @@ static void rna_def_sculpt(BlenderRNA  *brna)
 	RNA_def_property_update(prop, NC_OBJECT|ND_DRAW, "rna_Sculpt_update");
 }
 
+
+static void rna_def_uv_sculpt(BlenderRNA  *brna)
+{
+	StructRNA *srna;
+
+	srna= RNA_def_struct(brna, "UvSculpt", "Paint");
+	RNA_def_struct_ui_text(srna, "UV Sculpting", "");
+}
+
+
+/* use for weight paint too */
 static void rna_def_vertex_paint(BlenderRNA *brna)
 {
 	StructRNA *srna;
@@ -297,18 +308,24 @@ static void rna_def_vertex_paint(BlenderRNA *brna)
 	srna= RNA_def_struct(brna, "VertexPaint", "Paint");
 	RNA_def_struct_sdna(srna, "VPaint");
 	RNA_def_struct_ui_text(srna, "Vertex Paint", "Properties of vertex and weight paint mode");
-	
+
+	/* vertex paint only */
 	prop= RNA_def_property(srna, "use_all_faces", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", VP_AREA);
 	RNA_def_property_ui_text(prop, "All Faces", "Paint on all faces inside brush");
 
 	prop= RNA_def_property(srna, "use_normal", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", VP_NORMALS);
-	RNA_def_property_ui_text(prop, "Normals", "Applies the vertex normal before painting");
+	RNA_def_property_ui_text(prop, "Normals", "Apply the vertex normal before painting");
 	
 	prop= RNA_def_property(srna, "use_spray", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", VP_SPRAY);
 	RNA_def_property_ui_text(prop, "Spray", "Keep applying paint effect while holding mouse");
+
+	/* weight paint only */
+	prop= RNA_def_property(srna, "use_group_restrict", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", VP_ONLYVGROUP);
+	RNA_def_property_ui_text(prop, "Restrict", "Restrict painting to verts already apart of the vertex group");
 }
 
 static void rna_def_image_paint(BlenderRNA *brna)
@@ -339,7 +356,7 @@ static void rna_def_image_paint(BlenderRNA *brna)
 	
 	prop= RNA_def_property(srna, "use_stencil_layer", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", IMAGEPAINT_PROJECT_LAYER_STENCIL);
-	RNA_def_property_ui_text(prop, "Stencil Layer", "Set the mask layer from the UV layer buttons");
+	RNA_def_property_ui_text(prop, "Stencil Layer", "Set the mask layer from the UV map buttons");
 	
 	prop= RNA_def_property(srna, "invert_stencil", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", IMAGEPAINT_PROJECT_LAYER_STENCIL_INV);
@@ -347,8 +364,8 @@ static void rna_def_image_paint(BlenderRNA *brna)
 	
 	prop= RNA_def_property(srna, "use_clone_layer", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", IMAGEPAINT_PROJECT_LAYER_CLONE);
-	RNA_def_property_ui_text(prop, "Clone Layer",
-	                         "Use another UV layer as clone source, otherwise use 3D the cursor as the source");
+	RNA_def_property_ui_text(prop, "Clone Map",
+	                         "Use another UV map as clone source, otherwise use the 3D cursor as the source");
 	
 	/* integers */
 	
@@ -459,12 +476,12 @@ static void rna_def_particle_edit(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Brush", "");
 
 	prop= RNA_def_property(srna, "draw_step", PROP_INT, PROP_NONE);
-	RNA_def_property_range(prop, 2, 10);
+	RNA_def_property_range(prop, 1, 10);
 	RNA_def_property_ui_text(prop, "Steps", "How many steps to draw the path with");
 	RNA_def_property_update(prop, NC_OBJECT|ND_DRAW, "rna_ParticleEdit_redo");
 
 	prop= RNA_def_property(srna, "fade_frames", PROP_INT, PROP_NONE);
-	RNA_def_property_range(prop, 2, 100);
+	RNA_def_property_range(prop, 1, 100);
 	RNA_def_property_ui_text(prop, "Frames", "How many frames to fade");
 	RNA_def_property_update(prop, NC_OBJECT|ND_DRAW, "rna_ParticleEdit_update");
 
@@ -541,6 +558,7 @@ void RNA_def_sculpt_paint(BlenderRNA *brna)
 {
 	rna_def_paint(brna);
 	rna_def_sculpt(brna);
+	rna_def_uv_sculpt(brna);
 	rna_def_vertex_paint(brna);
 	rna_def_image_paint(brna);
 	rna_def_particle_edit(brna);

@@ -127,7 +127,8 @@ void BIF_createTransformOrientation(bContext *C, ReportList *reports, char *name
 	}
 }
 
-TransformOrientation *createObjectSpace(bContext *C, ReportList *UNUSED(reports), char *name, int overwrite) {
+TransformOrientation *createObjectSpace(bContext *C, ReportList *UNUSED(reports), char *name, int overwrite)
+{
 	Base *base = CTX_data_active_base(C);
 	Object *ob;
 	float mat[3][3];
@@ -144,13 +145,14 @@ TransformOrientation *createObjectSpace(bContext *C, ReportList *UNUSED(reports)
 	/* use object name if no name is given */
 	if (name[0] == 0)
 	{
-		strncpy(name, ob->id.name+2, 35);
+		strncpy(name, ob->id.name+2, MAX_ID_NAME-2);
 	}
 
 	return addMatrixSpace(C, mat, name, overwrite);	
 }
 
-TransformOrientation *createBoneSpace(bContext *C, ReportList *reports, char *name, int overwrite) {
+TransformOrientation *createBoneSpace(bContext *C, ReportList *reports, char *name, int overwrite)
+{
 	float mat[3][3];
 	float normal[3], plane[3];
 
@@ -169,7 +171,8 @@ TransformOrientation *createBoneSpace(bContext *C, ReportList *reports, char *na
 	return addMatrixSpace(C, mat, name, overwrite);
 }
 
-TransformOrientation *createMeshSpace(bContext *C, ReportList *reports, char *name, int overwrite) {
+TransformOrientation *createMeshSpace(bContext *C, ReportList *reports, char *name, int overwrite)
+{
 	float mat[3][3];
 	float normal[3], plane[3];
 	int type;
@@ -267,7 +270,8 @@ int createSpaceNormalTangent(float mat[3][3], float normal[3], float tangent[3])
 	return 1;
 }
 
-TransformOrientation* addMatrixSpace(bContext *C, float mat[3][3], char name[], int overwrite) {
+TransformOrientation* addMatrixSpace(bContext *C, float mat[3][3], char name[], int overwrite)
+{
 	ListBase *transform_spaces = &CTX_data_scene(C)->transform_spaces;
 	TransformOrientation *ts = NULL;
 
@@ -285,7 +289,7 @@ TransformOrientation* addMatrixSpace(bContext *C, float mat[3][3], char name[], 
 	{
 		ts = MEM_callocN(sizeof(TransformOrientation), "UserTransSpace from matrix");
 		BLI_addtail(transform_spaces, ts);
-		strncpy(ts->name, name, 35);
+		strncpy(ts->name, name, sizeof(ts->name));
 	}
 
 	/* copy matrix into transform space */
@@ -294,7 +298,8 @@ TransformOrientation* addMatrixSpace(bContext *C, float mat[3][3], char name[], 
 	return ts;
 }
 
-void BIF_removeTransformOrientation(bContext *C, TransformOrientation *target) {
+void BIF_removeTransformOrientation(bContext *C, TransformOrientation *target)
+{
 	ListBase *transform_spaces = &CTX_data_scene(C)->transform_spaces;
 	TransformOrientation *ts;
 	int i;
@@ -321,7 +326,8 @@ void BIF_removeTransformOrientation(bContext *C, TransformOrientation *target) {
 	}
 }
 
-void BIF_removeTransformOrientationIndex(bContext *C, int index) {
+void BIF_removeTransformOrientationIndex(bContext *C, int index)
+{
 	ListBase *transform_spaces = &CTX_data_scene(C)->transform_spaces;
 	TransformOrientation *ts= BLI_findlink(transform_spaces, index);
 
@@ -344,7 +350,8 @@ void BIF_removeTransformOrientationIndex(bContext *C, int index) {
 	}
 }
 
-void BIF_selectTransformOrientation(bContext *C, TransformOrientation *target) {
+void BIF_selectTransformOrientation(bContext *C, TransformOrientation *target)
+{
 	ListBase *transform_spaces = &CTX_data_scene(C)->transform_spaces;
 	View3D *v3d = CTX_wm_view3d(C);
 	TransformOrientation *ts;
@@ -358,7 +365,8 @@ void BIF_selectTransformOrientation(bContext *C, TransformOrientation *target) {
 	}
 }
 
-void BIF_selectTransformOrientationValue(bContext *C, int orientation) {
+void BIF_selectTransformOrientationValue(bContext *C, int orientation)
+{
 	View3D *v3d = CTX_wm_view3d(C);
 	if(v3d) /* currently using generic poll */
 		v3d->twmode = orientation;
@@ -407,16 +415,18 @@ EnumPropertyItem *BIF_enumTransformOrientation(bContext *C)
 	return item;
 }
 
-const char * BIF_menustringTransformOrientation(const bContext *C, const char *title) {
+const char * BIF_menustringTransformOrientation(const bContext *C, const char *title)
+{
 	const char* menu = IFACE_("%t|Global%x0|Local%x1|Gimbal%x4|Normal%x2|View%x3");
 	ListBase *transform_spaces = &CTX_data_scene(C)->transform_spaces;
 	TransformOrientation *ts;
 	int i = V3D_MANIP_CUSTOM;
 	char *str_menu, *p;
+	const int elem_size = MAX_NAME + 4;
 
 	title = IFACE_(title);
 
-	str_menu = MEM_callocN(strlen(menu) + strlen(title) + 1 + 40 * BIF_countTransformOrientation(C), TIP_("UserTransSpace from matrix"));
+	str_menu = MEM_callocN(strlen(menu) + strlen(title) + 1 + elem_size * BIF_countTransformOrientation(C), TIP_("UserTransSpace from matrix"));
 	p = str_menu;
 	
 	p += sprintf(str_menu, "%s", title);
@@ -429,7 +439,8 @@ const char * BIF_menustringTransformOrientation(const bContext *C, const char *t
 	return str_menu;
 }
 
-int BIF_countTransformOrientation(const bContext *C) {
+int BIF_countTransformOrientation(const bContext *C)
+{
 	ListBase *transform_spaces = &CTX_data_scene(C)->transform_spaces;
 	TransformOrientation *ts;
 	int count = 0;
@@ -441,7 +452,8 @@ int BIF_countTransformOrientation(const bContext *C) {
 	return count;
 }
 
-void applyTransformOrientation(const bContext *C, float mat[3][3], char *name) {
+void applyTransformOrientation(const bContext *C, float mat[3][3], char *name)
+{
 	TransformOrientation *ts;
 	View3D *v3d = CTX_wm_view3d(C);
 	int selected_index = (v3d->twmode - V3D_MANIP_CUSTOM);

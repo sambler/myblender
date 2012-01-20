@@ -76,7 +76,7 @@ class ParticleButtonsPanel():
 class PARTICLE_PT_context_particles(ParticleButtonsPanel, Panel):
     bl_label = ""
     bl_options = {'HIDE_HEADER'}
-    COMPAT_ENGINES = {'BLENDER_RENDER'}
+    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
 
     @classmethod
     def poll(cls, context):
@@ -85,6 +85,10 @@ class PARTICLE_PT_context_particles(ParticleButtonsPanel, Panel):
 
     def draw(self, context):
         layout = self.layout
+
+        if context.scene.render.engine == "BLENDER_GAME":
+            layout.label("Not available in the Game Engine")
+            return
 
         ob = context.object
         psys = context.particle_system
@@ -262,10 +266,6 @@ class PARTICLE_PT_hair_dynamics(ParticleButtonsPanel, Panel):
         return psys.settings.type == 'HAIR' and (engine in cls.COMPAT_ENGINES)
 
     def draw_header(self, context):
-        #cloth = context.cloth.collision_settings
-
-        #self.layout.active = cloth_panel_enabled(context.cloth)
-        #self.layout.prop(cloth, "use_collision", text="")
         psys = context.particle_system
         self.layout.prop(psys, "use_hair_dynamics", text="")
 

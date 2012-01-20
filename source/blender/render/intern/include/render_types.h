@@ -36,6 +36,7 @@
 /* ------------------------------------------------------------------------- */
 
 #include "DNA_color_types.h"
+#include "DNA_customdata_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_world_types.h"
 #include "DNA_object_types.h"
@@ -152,10 +153,7 @@ struct Render
 	int partx, party;
 	
 	/* values for viewing */
-	float lens;
-	float sensor_x, sensor_y; /* image sensor size, same variable in camera */
 	float ycor; /* (scene->xasp / scene->yasp), multiplied with 'winy' */
-	short sensor_fit;
 	
 	float panophi, panosi, panoco, panodxp, panodxv;
 	
@@ -309,8 +307,8 @@ typedef struct ObjectRen {
 	struct HaloRen **bloha;
 	struct StrandBuffer *strandbuf;
 
-	char (*mtface)[32];
-	char (*mcol)[32];
+	char (*mtface)[MAX_CUSTOMDATA_LAYER_NAME];
+	char (*mcol)[MAX_CUSTOMDATA_LAYER_NAME];
 	int  actmtface, actmcol, bakemtface;
 
 	float obmat[4][4];	/* only used in convertblender.c, for instancing */
@@ -629,7 +627,6 @@ typedef struct LampRen {
 #define R_DUPLI_TRANSFORMED	1
 #define R_ENV_TRANSFORMED	2
 #define R_TRANSFORMED		(1|2)
-#define R_NEED_VECTORS		4
 
 #endif /* RENDER_TYPES_H */
 

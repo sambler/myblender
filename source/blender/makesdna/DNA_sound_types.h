@@ -24,13 +24,14 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
-#ifndef DNA_SOUND_TYPES_H
-#define DNA_SOUND_TYPES_H
 /** \file DNA_sound_types.h
  *  \ingroup DNA
  *  \since mar-2001
  *  \author nzc
  */
+
+#ifndef DNA_SOUND_TYPES_H
+#define DNA_SOUND_TYPES_H
 
 #include "DNA_listBase.h"
 #include "DNA_ID.h"
@@ -48,7 +49,7 @@ typedef struct bSound {
 	/**
 	 * The path to the sound file.
 	 */
-	char name[240];
+	char name[240];  /* 240 = FILE_MAX */
 
 	/**
 	 * The packed file.

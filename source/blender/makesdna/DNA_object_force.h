@@ -26,12 +26,13 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
-#ifndef DNA_OBJECT_FORCE_H
-#define DNA_OBJECT_FORCE_H
 
 /** \file DNA_object_force.h
  *  \ingroup DNA
  */
+
+#ifndef DNA_OBJECT_FORCE_H
+#define DNA_OBJECT_FORCE_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -195,7 +196,7 @@ typedef struct PointCache {
 	char name[64];
 	char prev_name[64];
 	char info[64];
-	char path[240]; /* file path */
+	char path[240]; /* file path, 240 = FILE_MAX */
 	char *cached_frames;	/* array of length endframe-startframe+1 with flags to indicate cached frames */
 							/* can be later used for other per frame flags too if needed */
 	struct ListBase mem_cache;
@@ -274,7 +275,7 @@ typedef struct SoftBody {
 	
 	/* general options */
 	float nodemass;		/* softbody mass of *vertex* */
-	char  namedVG_Mass[32]; /* along with it introduce mass painting
+	char  namedVG_Mass[64]; /* MAX_VGROUP_NAME */ /* along with it introduce mass painting
 							starting to fix old bug .. nastyness that VG are indexes 
 								rather find them by name tag to find it -> jow20090613 */
 	float grav;			/* softbody amount of gravitaion to apply */
@@ -289,7 +290,7 @@ typedef struct SoftBody {
 	float maxgoal;
 	float defgoal;		/* default goal for vertices without vgroup */
 	short vertgroup;	/* index starting at 1 */
-	char  namedVG_Softgoal[32]; /* starting to fix old bug .. nastyness that VG are indexes 
+	char  namedVG_Softgoal[64]; /* MAX_VGROUP_NAME */ /* starting to fix old bug .. nastyness that VG are indexes 
 								rather find them by name tag to find it -> jow20090613 */
   
 	short fuzzyness;      /* */
@@ -297,7 +298,7 @@ typedef struct SoftBody {
 	/* springs */
 	float inspring;		/* softbody inner springs */
 	float infrict;		/* softbody inner springs friction */
-	char  namedVG_Spring_K[32]; /* along with it introduce Spring_K painting
+	char  namedVG_Spring_K[64]; /* MAX_VGROUP_NAME */ /* along with it introduce Spring_K painting
 	                               starting to fix old bug .. nastyness that VG are indexes
 	                               rather find them by name tag to find it -> jow20090613 */
 	
@@ -337,8 +338,8 @@ typedef struct SoftBody {
 	float lcom[3];
 	float lrot[3][3];
 	float lscale[3][3];
-	char  pad4[4];
 
+	int last_frame;
 } SoftBody;
 
 
@@ -422,8 +423,8 @@ typedef struct SoftBody {
 #define OB_SB_SELF		512
 #define OB_SB_FACECOLL  1024
 #define OB_SB_EDGECOLL  2048
-#define OB_SB_COLLFINAL 4096	/* deprecated */
-#define OB_SB_BIG_UI	8192
+/* #define OB_SB_COLLFINAL 4096	*/ /* deprecated */
+/* #define OB_SB_BIG_UI	8192 */    /* deprecated */
 #define OB_SB_AERO_ANGLE	16384
 
 /* sb->solverflags */

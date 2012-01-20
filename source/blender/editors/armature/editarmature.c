@@ -161,7 +161,7 @@ void ED_armature_edit_bone_remove(bArmature *arm, EditBone *exBone)
 EditBone *ED_armature_bone_get_mirrored(ListBase *edbo, EditBone *ebo)
 {
 	EditBone *eboflip= NULL;
-	char name[32];
+	char name[MAXBONENAME];
 	
 	if (ebo == NULL)
 		return NULL;
@@ -936,7 +936,7 @@ int join_armature_exec(bContext *C, wmOperator *UNUSED(op))
 			
 			/* Find the difference matrix */
 			invert_m4_m4(oimat, ob->obmat);
-			mul_m4_m4m4(mat, base->object->obmat, oimat);
+			mult_m4_m4m4(mat, oimat, base->object->obmat);
 			
 			/* Copy bones and posechannels from the object to the edit armature */
 			for (pchan=opose->chanbase.first; pchan; pchan=pchann) {
@@ -972,7 +972,7 @@ int join_armature_exec(bContext *C, wmOperator *UNUSED(op))
 					
 					/* Find the roll */
 					invert_m4_m4(imat, premat);
-					mul_m4_m4m4(difmat, postmat, imat);
+					mult_m4_m4m4(difmat, imat, postmat);
 					
 					curbone->roll -= (float)atan2(difmat[2][0], difmat[2][2]);
 				}
@@ -3457,7 +3457,7 @@ static int armature_bone_primitive_add_exec(bContext *C, wmOperator *op)
 	Object *obedit = CTX_data_edit_object(C);
 	EditBone *bone;
 	float obmat[3][3], curs[3], viewmat[3][3], totmat[3][3], imat[3][3];
-	char name[32];
+	char name[MAXBONENAME];
 	
 	RNA_string_get(op->ptr, "name", name);
 	
@@ -3507,7 +3507,7 @@ void ARMATURE_OT_bone_primitive_add(wmOperatorType *ot)
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 	
-	RNA_def_string(ot->srna, "name", "Bone", 32, "Name", "Name of the newly created bone");
+	RNA_def_string(ot->srna, "name", "Bone", MAXBONENAME, "Name", "Name of the newly created bone");
 	
 }
 
@@ -4663,7 +4663,7 @@ static void add_verts_to_dgroups(ReportList *reports, Scene *scene, Object *ob, 
 		
 		/* find flipped group */
 		if (dgroup && mirror) {
-			char name[32];
+			char name[MAXBONENAME];
 
 			// 0 = don't strip off number extensions
 			flip_side_name(name, dgroup->name, FALSE);
@@ -5031,43 +5031,10 @@ void POSE_OT_transforms_clear(wmOperatorType *ot)
 
 /* ***************** selections ********************** */
 
-static int pose_select_inverse_exec(bContext *C, wmOperator *UNUSED(op))
-{
-	
-	/*	Set the flags */
-	CTX_DATA_BEGIN(C, bPoseChannel *, pchan, visible_pose_bones) 
-	{
-		if ((pchan->bone->flag & BONE_UNSELECTABLE) == 0) {
-			pchan->bone->flag ^= (BONE_SELECTED|BONE_TIPSEL|BONE_ROOTSEL);
-		}
-	}	
-	CTX_DATA_END;
-	
-	WM_event_add_notifier(C, NC_OBJECT|ND_BONE_SELECT, NULL);
-	
-	return OPERATOR_FINISHED;
-}
-
-void POSE_OT_select_inverse(wmOperatorType *ot)
-{
-	/* identifiers */
-	ot->name= "Select Inverse";
-	ot->idname= "POSE_OT_select_inverse";
-	ot->description= "Flip the selection status of bones (selected -> unselected, unselected -> selected)";
-	
-	/* api callbacks */
-	ot->exec= pose_select_inverse_exec;
-	ot->poll= ED_operator_posemode;
-	
-	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
-	
-}
 static int pose_de_select_all_exec(bContext *C, wmOperator *op)
 {
 	int action = RNA_enum_get(op->ptr, "action");
 	
-	Object *ob = NULL;
 	Scene *scene= CTX_data_scene(C);
 	int multipaint = scene->toolsettings->multipaint;
 
@@ -5100,8 +5067,8 @@ static int pose_de_select_all_exec(bContext *C, wmOperator *op)
 
 	WM_event_add_notifier(C, NC_OBJECT|ND_BONE_SELECT, NULL);
 	
-	if(multipaint) {
-		ob= CTX_data_pointer_get_type(C, "object", &RNA_Object).data;
+	if (multipaint) {
+		Object *ob = ED_object_context(C);
 		DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	}
 
@@ -5456,7 +5423,7 @@ static int armature_flip_names_exec (bContext *C, wmOperator *UNUSED(op))
 {
 	Object *ob= CTX_data_edit_object(C);
 	bArmature *arm;
-	char newname[32];
+	char newname[MAXBONENAME];
 	
 	/* paranoia checks */
 	if (ELEM(NULL, ob, ob->pose)) 
@@ -5500,7 +5467,7 @@ static int armature_autoside_names_exec (bContext *C, wmOperator *op)
 {
 	Object *ob= CTX_data_edit_object(C);
 	bArmature *arm;
-	char newname[32];
+	char newname[MAXBONENAME];
 	short axis= RNA_enum_get(op->ptr, "type");
 	
 	/* paranoia checks */

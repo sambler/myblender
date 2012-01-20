@@ -57,7 +57,6 @@ void FONT_OT_text_copy(struct wmOperatorType *ot);
 void FONT_OT_text_cut(struct wmOperatorType *ot);
 void FONT_OT_text_paste(struct wmOperatorType *ot);
 void FONT_OT_file_paste(struct wmOperatorType *ot);
-void FONT_OT_buffer_paste(struct wmOperatorType *ot);
 
 void FONT_OT_move(struct wmOperatorType *ot);
 void FONT_OT_move_select(struct wmOperatorType *ot);
@@ -107,7 +106,6 @@ void SURFACE_OT_primitive_nurbs_surface_torus_add(struct wmOperatorType *ot);
 void CURVE_OT_de_select_first(struct wmOperatorType *ot);
 void CURVE_OT_de_select_last(struct wmOperatorType *ot);
 void CURVE_OT_select_all(struct wmOperatorType *ot);
-void CURVE_OT_select_inverse(struct wmOperatorType *ot);
 void CURVE_OT_select_linked(struct wmOperatorType *ot);
 void CURVE_OT_select_linked_pick(struct wmOperatorType *ot);
 void CURVE_OT_select_row(struct wmOperatorType *ot);

@@ -5,10 +5,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version. The Blender
- * Foundation also sells licenses for use in proprietary software under
- * the Blender License.  See http://www.blender.org/BL/ for information
- * about this.
+ * of the License, or (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -48,78 +45,9 @@ typedef enum {
 } BIFIconID;
 
 #define BIFICONID_FIRST		(ICON_NONE)
-#define BIFNICONIDS			(BIFICONID_LAST-BIFICONID_FIRST + 1)
 
 #undef DEF_ICON
 #undef DEF_VICO
-
-
-typedef enum {
-#define BIFCOLORSHADE_FIRST     (COLORSHADE_DARK)
-		COLORSHADE_DARK,
-		COLORSHADE_GREY,
-		COLORSHADE_MEDIUM,
-		COLORSHADE_HILITE,
-		COLORSHADE_LIGHT,
-		COLORSHADE_WHITE
-#define BIFCOLORSHADE_LAST      (COLORSHADE_WHITE)
-#define BIFNCOLORSHADES         (BIFCOLORSHADE_LAST-BIFCOLORSHADE_FIRST + 1)
-} BIFColorShade;
-
-typedef enum {
-#define BIFCOLORID_FIRST	(BUTGREY)
-	BUTGREY = 0,
-	BUTGREEN,
-	BUTBLUE,
-	BUTSALMON,
-	MIDGREY,
-	BUTPURPLE,
-	BUTYELLOW,
-	REDALERT,
-	BUTRUST,
-	BUTWHITE,
-	BUTDBLUE,
-	BUTPINK,
-	BUTDPINK,
-	BUTMACTIVE,
-
-	BUTIPO,
-	BUTAUDIO,
-	BUTCAMERA,
-	BUTRANDOM,
-	BUTEDITOBJECT,
-	BUTPROPERTY,
-	BUTSCENE,
-	BUTMOTION,
-	BUTMESSAGE,
-	BUTACTION,
-	BUTCD,
-	BUTGAME,
-	BUTVISIBILITY,
-	BUTYUCK,
-	BUTSEASICK,
-	BUTCHOKE,
-	BUTIMPERIAL,
-
-	BUTTEXTCOLOR,
-	BUTTEXTPRESSED,
-	BUTSBACKGROUND,
-	
-	VIEWPORTBACKCOLOR,
-	VIEWPORTGRIDCOLOR,
-	VIEWPORTACTIVECOLOR,
-	VIEWPORTSELECTEDCOLOR,
-	VIEWPORTUNSELCOLOR,
-	
-	EDITVERTSEL, 
-	EDITVERTUNSEL, 
-	EDITEDGESEL, 
-	EDITEDGEUNSEL
-	
-#define BIFCOLORID_LAST		(EDITEDGEUNSEL)
-#define BIFNCOLORIDS		(BIFCOLORID_LAST-BIFCOLORID_FIRST + 1)
-
-} BIFColorID;
 
 enum {
 	TH_REDALERT,
@@ -258,7 +186,15 @@ enum {
 	TH_PATH_BEFORE,
 	TH_PATH_AFTER,
 	TH_CAMERA_PATH,
-	TH_LOCK_MARKER
+	TH_LOCK_MARKER,
+
+	TH_STITCH_PREVIEW_FACE,
+	TH_STITCH_PREVIEW_EDGE,
+	TH_STITCH_PREVIEW_VERT,
+	TH_STITCH_PREVIEW_STITCHABLE,
+	TH_STITCH_PREVIEW_UNSTITCHABLE,
+	TH_STITCH_PREVIEW_ACTIVE
+
 };
 /* XXX WARNING: previous is saved in file, so do not change order! */
 
@@ -317,6 +253,9 @@ void	UI_ThemeClearColor(int colorid);
 
 // internal (blender) usage only, for init and set active
 void 	UI_SetTheme(int spacetype, int regionid);
+
+// get current theme
+struct bTheme *UI_GetTheme(void);
 
 /* only for buttons in theme editor! */
 const unsigned char 	*UI_ThemeGetColorPtr(struct bTheme *btheme, int spacetype, int colorid);

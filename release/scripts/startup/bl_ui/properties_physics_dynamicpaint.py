@@ -137,11 +137,14 @@ class PHYSICS_PT_dp_advanced_canvas(PhysicButtonsPanel, Panel):
         # dissolve
         if surface_type == 'PAINT':
             split = layout.split(percentage=0.35)
-            split.label(text="Wetmap drying:")
+            split.prop(surface, "use_drying", text="Dry:")
 
             col = split.column()
+            col.active = surface.use_drying
             split = col.split(percentage=0.7)
-            split.prop(surface, "dry_speed", text="Time")
+            col = split.column(align=True)
+            col.prop(surface, "dry_speed", text="Time")
+            col.prop(surface, "color_dry_threshold")
             split.prop(surface, "use_dry_log", text="Slow")
 
         if surface_type != 'WAVE':
@@ -179,7 +182,10 @@ class PHYSICS_PT_dp_advanced_canvas(PhysicButtonsPanel, Panel):
             col.prop(surface, "wave_spring")
 
         layout.separator()
-        layout.prop(surface, "brush_group", text="Brush Group")
+        layout.prop(surface, "brush_group")
+        row = layout.row()
+        row.prop(surface, "brush_influence_scale")
+        row.prop(surface, "brush_radius_scale")
 
 
 class PHYSICS_PT_dp_canvas_output(PhysicButtonsPanel, Panel):
@@ -242,7 +248,7 @@ class PHYSICS_PT_dp_canvas_output(PhysicButtonsPanel, Panel):
         # image format outputs
         if surface.surface_format == 'IMAGE':
             layout.operator("dpaint.bake", text="Bake Image Sequence", icon='MOD_DYNAMICPAINT')
-            layout.prop_search(surface, "uv_layer", ob.data, "uv_textures", text="UV layer:")
+            layout.prop_search(surface, "uv_layer", ob.data, "uv_textures", text="UV Map:")
             layout.separator()
 
             layout.prop(surface, "image_output_path", text="")
@@ -300,7 +306,7 @@ class PHYSICS_PT_dp_canvas_initial_color(PhysicButtonsPanel, Panel):
 
         elif surface.init_color_type == 'TEXTURE':
             layout.prop(surface, "init_texture")
-            layout.prop_search(surface, "init_layername", ob.data, "uv_textures", text="UV Layer:")
+            layout.prop_search(surface, "init_layername", ob.data, "uv_textures", text="UV Map:")
 
         elif surface.init_color_type == 'VERTEX_COLOR':
             layout.prop_search(surface, "init_layername", ob.data, "vertex_colors", text="Color Layer: ")
@@ -406,14 +412,14 @@ class PHYSICS_PT_dp_brush_source(PhysicButtonsPanel, Panel):
             col.prop(brush, "paint_distance", text="Paint Distance")
             split = layout.row().split(percentage=0.4)
             sub = split.column()
-            if brush.paint_source == 'DISTANCE':
+            if brush.paint_source in {'DISTANCE', 'VOLUME_DISTANCE'}:
                 sub.prop(brush, "use_proximity_project")
-            elif brush.paint_source == 'VOLUME_DISTANCE':
+            if brush.paint_source == 'VOLUME_DISTANCE':
                 sub.prop(brush, "invert_proximity")
                 sub.prop(brush, "use_negative_volume")
 
             sub = split.column()
-            if brush.paint_source == 'DISTANCE':
+            if brush.paint_source in {'DISTANCE', 'VOLUME_DISTANCE'}:
                 column = sub.column()
                 column.active = brush.use_proximity_project
                 column.prop(brush, "ray_direction")

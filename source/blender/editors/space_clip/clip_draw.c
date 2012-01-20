@@ -75,20 +75,20 @@ void clip_draw_curfra_label(SpaceClip *sc, float x, float y)
 {
 	uiStyle *style= UI_GetStyle();
 	int fontid= style->widget.uifont_id;
-	char str[32];
-	float fontsize, fontwidth;
+	char numstr[32];
+	float font_dims[2] = {0.0f, 0.0f};
 
 	/* frame number */
 	BLF_size(fontid, 11.0f, U.dpi);
-	BLI_snprintf(str, sizeof(str), "%d", sc->user.framenr);
-	fontsize= BLF_height(fontid, str);
-	fontwidth= BLF_width(fontid, str);
+	BLI_snprintf(numstr, sizeof(numstr), "%d", sc->user.framenr);
 
-	glRecti(x, y, x+fontwidth+6, y+fontsize+4);
+	BLF_width_and_height(fontid, numstr, &font_dims[0], &font_dims[1]);
+
+	glRecti(x, y, x + font_dims[0] + 6.0f, y + font_dims[1] + 4.0f);
 
 	UI_ThemeColor(TH_TEXT);
 	BLF_position(fontid, x+2.0f, y+2.0f, 0.0f);
-	BLF_draw(fontid, str, strlen(str));
+	BLF_draw(fontid, numstr, sizeof(numstr));
 }
 
 static void draw_movieclip_cache(SpaceClip *sc, ARegion *ar, MovieClip *clip, Scene *scene)
@@ -96,6 +96,8 @@ static void draw_movieclip_cache(SpaceClip *sc, ARegion *ar, MovieClip *clip, Sc
 	float x;
 	int *points, totseg, i, a;
 	float sfra= SFRA, efra= EFRA, framelen= ar->winx/(efra-sfra+1);
+	MovieTrackingTrack *act_track= BKE_tracking_active_track(&clip->tracking);
+	MovieTrackingReconstruction *reconstruction= BKE_tracking_get_reconstruction(&clip->tracking);
 
 	glEnable(GL_BLEND);
 
@@ -119,8 +121,8 @@ static void draw_movieclip_cache(SpaceClip *sc, ARegion *ar, MovieClip *clip, Sc
 	}
 
 	/* track */
-	if(clip->tracking.act_track) {
-		MovieTrackingTrack *track= clip->tracking.act_track;
+	if(act_track) {
+		MovieTrackingTrack *track= act_track;
 
 		for(i= sfra, a= 0; i <= efra; i++) {
 			int framenr;
@@ -152,9 +154,9 @@ static void draw_movieclip_cache(SpaceClip *sc, ARegion *ar, MovieClip *clip, Sc
 	}
 
 	/* failed frames */
-	if(clip->tracking.reconstruction.flag&TRACKING_RECONSTRUCTED) {
-		int n= clip->tracking.reconstruction.camnr;
-		MovieReconstructedCamera *cameras= clip->tracking.reconstruction.cameras;
+	if(reconstruction->flag&TRACKING_RECONSTRUCTED) {
+		int n= reconstruction->camnr;
+		MovieReconstructedCamera *cameras= reconstruction->cameras;
 
 		glColor4ub(255, 0, 0, 96);
 
@@ -191,31 +193,21 @@ static void draw_movieclip_cache(SpaceClip *sc, ARegion *ar, MovieClip *clip, Sc
 
 static void draw_movieclip_notes(SpaceClip *sc, ARegion *ar)
 {
+	MovieClip *clip= ED_space_clip(sc);
+	MovieTracking *tracking= &clip->tracking;
 	char str[256]= {0};
+	int block= 0;
 
-	if(sc->flag&SC_LOCK_SELECTION)
-		strcpy(str, "Locked");
-
-	if(str[0]) {
-		uiStyle *style= UI_GetStyle();
-		int fontsize, fontwidth;
-		int fontid= style->widget.uifont_id;
-
-		BLF_size(fontid, 11.0f, U.dpi);
-		fontsize= BLF_height(fontid, str);
-		fontwidth= BLF_width(fontid, str);
-
-		glEnable(GL_BLEND);
-
-		glColor4f(0.0f, 0.0f, 0.0f, 0.6f);
-		glRecti(0, ar->winy-fontsize-9, fontwidth+12, ar->winy);
-
-		glColor3f(1.0f, 1.0f, 1.0f);
-		BLF_position(fontid, 6.0f, ar->winy-fontsize-5.0f, 0.0f);
-		BLF_draw(fontid, str, strlen(str));
-
-		glDisable(GL_BLEND);
+	if(tracking->stats) {
+		BLI_strncpy(str, tracking->stats->message, sizeof(str));
+		block= 1;
+	} else {
+		if(sc->flag&SC_LOCK_SELECTION)
+			strcpy(str, "Locked");
 	}
+
+	if(str[0])
+		ED_region_info_draw(ar, str, block, 0.6f);
 }
 
 static void draw_movieclip_buffer(SpaceClip *sc, ARegion *ar, ImBuf *ibuf,
@@ -258,9 +250,9 @@ static void draw_movieclip_buffer(SpaceClip *sc, ARegion *ar, ImBuf *ibuf,
 
 		glBegin(GL_LINE_LOOP);
 			glVertex2f(0.0f, 0.0f);
-			glVertex2f(ibuf->x, 0.0f);
-			glVertex2f(ibuf->x, ibuf->y);
-			glVertex2f(0.0f, ibuf->y);
+			glVertex2f(width, 0.0f);
+			glVertex2f(width, height);
+			glVertex2f(0.0f, height);
 		glEnd();
 
 		glPopMatrix();
@@ -813,13 +805,13 @@ static void draw_marker_texts(SpaceClip *sc, MovieTrackingTrack *track, MovieTra
 		BLI_snprintf(str, sizeof(str), "%s", track->name);
 
 	BLF_position(fontid, pos[0], pos[1], 0.0f);
-	BLF_draw(fontid, str, strlen(str));
+	BLF_draw(fontid, str, sizeof(str));
 	pos[1]-= fontsize;
 
 	if(track->flag&TRACK_HAS_BUNDLE) {
 		BLI_snprintf(str, sizeof(str), "Average error: %.3f", track->error);
 		BLF_position(fontid, pos[0], pos[1], 0.0f);
-		BLF_draw(fontid, str, strlen(str));
+		BLF_draw(fontid, str, sizeof(str));
 		pos[1]-= fontsize;
 	}
 
@@ -845,8 +837,9 @@ static void draw_tracking_tracks(SpaceClip *sc, ARegion *ar, MovieClip *clip,
 {
 	float x, y;
 	MovieTracking* tracking= &clip->tracking;
-	MovieTrackingMarker *marker;
+	ListBase *tracksbase= BKE_tracking_get_tracks(tracking);
 	MovieTrackingTrack *track, *act_track;
+	MovieTrackingMarker *marker;
 	int framenr= sc->user.framenr;
 	int undistort= sc->user.render_flag&MCLIP_PROXY_RENDER_UNDISTORT;
 	float *marker_pos= NULL, *fp, *active_pos= NULL, cur_pos[2];
@@ -868,13 +861,13 @@ static void draw_tracking_tracks(SpaceClip *sc, ARegion *ar, MovieClip *clip,
 	glMultMatrixf(sc->stabmat);
 	glScalef(width, height, 0);
 
-	act_track= clip->tracking.act_track;
+	act_track= BKE_tracking_active_track(tracking);
 
 	if(sc->user.render_flag&MCLIP_PROXY_RENDER_UNDISTORT) {
 		int count= 0;
 
 		/* count */
-		track= tracking->tracks.first;
+		track= tracksbase->first;
 		while(track) {
 			if((track->flag&TRACK_HIDDEN)==0) {
 				marker= BKE_tracking_get_marker(track, framenr);
@@ -890,7 +883,7 @@ static void draw_tracking_tracks(SpaceClip *sc, ARegion *ar, MovieClip *clip,
 		if(count) {
 			marker_pos= MEM_callocN(2*sizeof(float)*count, "draw_tracking_tracks marker_pos");
 
-			track= tracking->tracks.first;
+			track= tracksbase->first;
 			fp= marker_pos;
 			while(track) {
 				if((track->flag&TRACK_HIDDEN)==0) {
@@ -912,7 +905,7 @@ static void draw_tracking_tracks(SpaceClip *sc, ARegion *ar, MovieClip *clip,
 	}
 
 	if(sc->flag&SC_SHOW_TRACK_PATH) {
-		track= tracking->tracks.first;
+		track= tracksbase->first;
 		while(track) {
 			if((track->flag&TRACK_HIDDEN)==0)
 				draw_track_path(sc, clip, track);
@@ -922,7 +915,7 @@ static void draw_tracking_tracks(SpaceClip *sc, ARegion *ar, MovieClip *clip,
 	}
 
 	/* markers outline and non-selected areas */
-	track= tracking->tracks.first;
+	track= tracksbase->first;
 	fp= marker_pos;
 	while(track) {
 		if((track->flag&TRACK_HIDDEN)==0) {
@@ -946,7 +939,7 @@ static void draw_tracking_tracks(SpaceClip *sc, ARegion *ar, MovieClip *clip,
 
 	/* selected areas only, so selection wouldn't be overlapped by
 	   non-selected areas */
-	track= tracking->tracks.first;
+	track= tracksbase->first;
 	fp= marker_pos;
 	while(track) {
 		if((track->flag&TRACK_HIDDEN)==0) {
@@ -984,15 +977,16 @@ static void draw_tracking_tracks(SpaceClip *sc, ARegion *ar, MovieClip *clip,
 	}
 
 	if(sc->flag&SC_SHOW_BUNDLES) {
+		MovieTrackingObject *object= BKE_tracking_active_object(tracking);
 		float pos[4], vec[4], mat[4][4], aspy;
 
 		glEnable(GL_POINT_SMOOTH);
 		glPointSize(3.0f);
 
 		aspy= 1.0f/clip->tracking.camera.pixel_aspect;
-		BKE_tracking_projection_matrix(tracking, framenr, width, height, mat);
+		BKE_tracking_projection_matrix(tracking, object, framenr, width, height, mat);
 
-		track= tracking->tracks.first;
+		track= tracksbase->first;
 		while(track) {
 			if((track->flag&TRACK_HIDDEN)==0 && track->flag&TRACK_HAS_BUNDLE) {
 				marker= BKE_tracking_get_marker(track, framenr);
@@ -1037,7 +1031,7 @@ static void draw_tracking_tracks(SpaceClip *sc, ARegion *ar, MovieClip *clip,
 
 	if(sc->flag&SC_SHOW_NAMES) {
 		/* scaling should be cleared before drawing texts, otherwise font would also be scaled */
-		track= tracking->tracks.first;
+		track= tracksbase->first;
 		fp= marker_pos;
 		while(track) {
 			if((track->flag&TRACK_HIDDEN)==0) {
@@ -1265,14 +1259,24 @@ void clip_draw_main(SpaceClip *sc, ARegion *ar, Scene *scene)
 		float smat[4][4], ismat[4][4];
 
 		ibuf= ED_space_clip_get_stable_buffer(sc, sc->loc, &sc->scale, &sc->angle);
-		BKE_tracking_stabdata_to_mat4(width, height, sc->loc, sc->scale, sc->angle, sc->stabmat);
 
-		unit_m4(smat);
-		smat[0][0]= 1.0f/width;
-		smat[1][1]= 1.0f/height;
-		invert_m4_m4(ismat, smat);
+		if(ibuf) {
+			float loc[2];
 
-		mul_serie_m4(sc->unistabmat, smat, sc->stabmat, ismat, NULL, NULL, NULL, NULL, NULL);
+			if(width != ibuf->x)
+				mul_v2_v2fl(loc, sc->loc, (float)width / ibuf->x);
+			else
+				copy_v2_v2(loc, sc->loc);
+
+			BKE_tracking_stabdata_to_mat4(width, height, loc, sc->scale, sc->angle, sc->stabmat);
+
+			unit_m4(smat);
+			smat[0][0]= 1.0f/width;
+			smat[1][1]= 1.0f/height;
+			invert_m4_m4(ismat, smat);
+
+			mul_serie_m4(sc->unistabmat, smat, sc->stabmat, ismat, NULL, NULL, NULL, NULL, NULL);
+		}
 	} else {
 		ibuf= ED_space_clip_get_buffer(sc);
 

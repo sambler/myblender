@@ -263,7 +263,7 @@ def user_script_path():
         return None
 
 
-def script_paths(subdir=None, user_pref=True, all=False):
+def script_paths(subdir=None, user_pref=True, check_all=False):
     """
     Returns a list of valid script paths.
 
@@ -271,9 +271,9 @@ def script_paths(subdir=None, user_pref=True, all=False):
     :type subdir: string
     :arg user_pref: Include the user preference script path.
     :type user_pref: bool
-    :arg all: Include local, user and system paths rather just the paths
+    :arg check_all: Include local, user and system paths rather just the paths
        blender uses.
-    :type all: bool
+    :type check_all: bool
     :return: script paths.
     :rtype: list
     """
@@ -281,12 +281,9 @@ def script_paths(subdir=None, user_pref=True, all=False):
     prefs = _bpy.context.user_preferences
 
     # add user scripts dir
-    if user_pref:
-        user_script_path = prefs.filepaths.script_directory
-    else:
-        user_script_path = None
+    user_script = prefs.filepaths.script_directory if user_pref else None
 
-    if all:
+    if check_all:
         # all possible paths
         base_paths = tuple(_os.path.join(resource_path(res), "scripts")
                            for res in ('LOCAL', 'USER', 'SYSTEM'))
@@ -294,7 +291,7 @@ def script_paths(subdir=None, user_pref=True, all=False):
         # only paths blender uses
         base_paths = _bpy_script_paths()
 
-    for path in base_paths + (user_script_path, ):
+    for path in base_paths + (user_script, ):
         if path:
             path = _os.path.normpath(path)
             if path not in scripts and _os.path.isdir(path):
@@ -303,13 +300,13 @@ def script_paths(subdir=None, user_pref=True, all=False):
     if subdir is None:
         return scripts
 
-    script_paths = []
+    scripts_subdir = []
     for path in scripts:
         path_subdir = _os.path.join(path, subdir)
         if _os.path.isdir(path_subdir):
-            script_paths.append(path_subdir)
+            scripts_subdir.append(path_subdir)
 
-    return script_paths
+    return scripts_subdir
 
 
 def refresh_script_paths():
@@ -343,12 +340,20 @@ def preset_paths(subdir):
     :rtype: list
     """
     dirs = []
-    for path in script_paths("presets", all=True):
+    for path in script_paths("presets", check_all=True):
         directory = _os.path.join(path, subdir)
         if not directory.startswith(path):
             raise Exception("invalid subdir given %r" % subdir)
         elif _os.path.isdir(directory):
             dirs.append(directory)
+
+    # Find addons preset paths
+    import addon_utils
+    for path in addon_utils.paths():
+        directory = _os.path.join(path, "presets", subdir)
+        if _os.path.isdir(directory):
+            dirs.append(directory)
+
     return dirs
 
 
@@ -400,7 +405,7 @@ def smpte_from_frame(frame, fps=None, fps_base=None):
     return smpte_from_seconds((frame * fps_base) / fps, fps)
 
 
-def preset_find(name, preset_path, display_name=False):
+def preset_find(name, preset_path, display_name=False, ext=".py"):
     if not name:
         return None
 
@@ -409,11 +414,11 @@ def preset_find(name, preset_path, display_name=False):
         if display_name:
             filename = ""
             for fn in _os.listdir(directory):
-                if fn.endswith(".py") and name == _bpy.path.display_name(fn):
+                if fn.endswith(ext) and name == _bpy.path.display_name(fn):
                     filename = fn
                     break
         else:
-            filename = name + ".py"
+            filename = name + ext
 
         if filename:
             filepath = _os.path.join(directory, filename)
@@ -432,9 +437,9 @@ def keyconfig_set(filepath):
     keyconfigs_old = keyconfigs[:]
 
     try:
-        file = open(filepath)
-        exec(compile(file.read(), filepath, 'exec'), {"__file__": filepath})
-        file.close()
+        keyfile = open(filepath)
+        exec(compile(keyfile.read(), filepath, 'exec'), {"__file__": filepath})
+        keyfile.close()
     except:
         import traceback
         traceback.print_exc()
@@ -456,7 +461,7 @@ def keyconfig_set(filepath):
     keyconfigs.active = kc_new
 
 
-def user_resource(type, path="", create=False):
+def user_resource(resource_type, path="", create=False):
     """
     Return a user resource path (normally from the users home directory).
 
@@ -471,7 +476,7 @@ def user_resource(type, path="", create=False):
     :rtype: string
     """
 
-    target_path = _user_resource(type, path)
+    target_path = _user_resource(resource_type, path)
 
     if create:
         # should always be true.

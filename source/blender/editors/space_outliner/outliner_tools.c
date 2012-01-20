@@ -297,8 +297,6 @@ static void object_delete_cb(bContext *C, Scene *scene, TreeElement *te, TreeSto
 	if(base==NULL) 
 		base= object_in_scene((Object *)tselem->id, scene);
 	if(base) {
-		SpaceOops *soops= CTX_wm_space_outliner(C);
-
 		// check also library later
 		if(scene->obedit==base->object) 
 			ED_object_exit_editmode(C, EM_FREEDATA|EM_FREEUNDO|EM_WAITCURSOR|EM_DO_UNDO);
@@ -306,21 +304,18 @@ static void object_delete_cb(bContext *C, Scene *scene, TreeElement *te, TreeSto
 		ED_base_object_free_and_unlink(CTX_data_main(C), scene, base);
 		te->directdata= NULL;
 		tselem->id= NULL;
-
-		/* XXX: tree management normally happens from draw_outliner(), but when
-		        you're clicking to fast on Delete object from context menu in
-		        outliner several mouse events can be handled in one cycle without
-		        handling notifiers/redraw which leads to deleting the same object twice.
-		        cleanup tree here to prevent such cases. */
-		outliner_cleanup_tree(soops);
 	}
-
 }
 
-static void id_local_cb(bContext *UNUSED(C), Scene *UNUSED(scene), TreeElement *UNUSED(te), TreeStoreElem *UNUSED(tsep), TreeStoreElem *tselem)
+static void id_local_cb(bContext *C, Scene *UNUSED(scene), TreeElement *UNUSED(te), TreeStoreElem *UNUSED(tsep), TreeStoreElem *tselem)
 {
 	if (tselem->id->lib && (tselem->id->flag & LIB_EXTERN)) {
-		id_clear_lib_data(NULL, tselem->id);
+		/* if the ID type has no special local function,
+		 * just clear the lib */
+		if (id_make_local(tselem->id, FALSE) == FALSE) {
+			Main *bmain= CTX_data_main(C);
+			id_clear_lib_data(bmain, tselem->id);
+		}
 	}
 }
 
@@ -579,6 +574,14 @@ static int outliner_object_operation_exec(bContext *C, wmOperator *op)
 	}
 	else if(event==4) {
 		outliner_do_object_operation(C, scene, soops, &soops->tree, object_delete_cb);
+
+		/* XXX: tree management normally happens from draw_outliner(), but when
+		        you're clicking to fast on Delete object from context menu in
+		        outliner several mouse events can be handled in one cycle without
+		        handling notifiers/redraw which leads to deleting the same object twice.
+		        cleanup tree here to prevent such cases. */
+		outliner_cleanup_tree(soops);
+
 		DAG_scene_sort(bmain, scene);
 		str= "Delete Objects";
 		WM_event_add_notifier(C, NC_SCENE|ND_OB_ACTIVE, scene);

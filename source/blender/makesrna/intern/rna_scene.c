@@ -63,6 +63,18 @@
 
 #include "BLI_threads.h"
 
+EnumPropertyItem uv_sculpt_relaxation_items[] = {
+	{UV_SCULPT_TOOL_RELAX_LAPLACIAN, "LAPLACIAN", 0, "Laplacian", "Use Laplacian method for relaxation"},
+	{UV_SCULPT_TOOL_RELAX_HC, "HC", 0, "HC", "Use HC method for relaxation"},
+	{0, NULL, 0, NULL, NULL}};
+
+EnumPropertyItem uv_sculpt_tool_items[] = {
+	{UV_SCULPT_TOOL_PINCH, "PINCH", 0, "Pinch", "Pinch UVs"},
+	{UV_SCULPT_TOOL_RELAX, "RELAX", 0, "Relax", "Relax UVs"},
+	{UV_SCULPT_TOOL_GRAB, "GRAB", 0, "Grab", "Grab UVs"},
+	{0, NULL, 0, NULL, NULL}};
+
+
 EnumPropertyItem snap_target_items[] = {
 	{SCE_SNAP_TARGET_CLOSEST, "CLOSEST", 0, "Closest", "Snap closest point onto target"},
 	{SCE_SNAP_TARGET_CENTER, "CENTER", 0, "Center", "Snap center onto target"},
@@ -244,6 +256,7 @@ EnumPropertyItem image_color_depth_items[] = {
 #include "BLI_threads.h"
 #include "BLI_editVert.h"
 
+#include "BKE_brush.h"
 #include "BKE_context.h"
 #include "BKE_global.h"
 #include "BKE_image.h"
@@ -266,8 +279,14 @@ EnumPropertyItem image_color_depth_items[] = {
 #include "ED_view3d.h"
 #include "ED_mesh.h"
 #include "ED_keyframing.h"
+#include "ED_image.h"
 
 #include "RE_engine.h"
+
+static void rna_SpaceImageEditor_uv_sculpt_update(Main *bmain, Scene *scene, PointerRNA *UNUSED(ptr))
+{
+	ED_space_image_uv_sculpt_update(bmain->wm.first, scene->toolsettings);
+}
 
 static int rna_Scene_object_bases_lookup_string(PointerRNA *ptr, const char *key, PointerRNA *r_ptr)
 {
@@ -868,6 +887,7 @@ static EnumPropertyItem *rna_RenderSettings_qtcodecsettings_audiocodecType_itemf
 #endif
 #endif
 
+#ifdef WITH_FFMPEG
 static void rna_FFmpegSettings_lossless_output_set(PointerRNA *ptr, int value)
 {
 	Scene *scene = (Scene *) ptr->id.data;
@@ -877,10 +897,9 @@ static void rna_FFmpegSettings_lossless_output_set(PointerRNA *ptr, int value)
 		rd->ffcodecdata.flags |= FFMPEG_LOSSLESS_OUTPUT;
 	else
 		rd->ffcodecdata.flags &= ~FFMPEG_LOSSLESS_OUTPUT;
-#ifdef WITH_FFMPEG
 	ffmpeg_verify_lossless_format(rd, &rd->im_format);
-#endif
 }
+#endif
 
 static int rna_RenderSettings_active_layer_index_get(PointerRNA *ptr)
 {
@@ -1288,6 +1307,25 @@ static KeyingSet *rna_Scene_keying_set_new(Scene *sce, ReportList *reports, cons
 	}
 }
 
+static void rna_UnifiedPaintSettings_size_set(PointerRNA *ptr, int value)
+{
+	UnifiedPaintSettings* ups = ptr->data;
+
+	/* scale unprojected radius so it stays consistent with brush size */
+	brush_scale_unprojected_radius(&ups->unprojected_radius,
+								   value, ups->size);
+	ups->size= value;
+}
+
+static void rna_UnifiedPaintSettings_unprojected_radius_set(PointerRNA *ptr, float value)
+{
+	UnifiedPaintSettings* ups = ptr->data;
+
+	/* scale brush size so it stays consistent with unprojected_radius */
+	brush_scale_size(&ups->size, value, ups->unprojected_radius);
+	ups->unprojected_radius= value;
+}
+
 /* note: without this, when Multi-Paint is activated/deactivated, the colors
  * will not change right away when multiple bones are selected, this function
  * is not for general use and only for the few cases where changing scene
@@ -1409,9 +1447,37 @@ static void rna_def_tool_settings(BlenderRNA  *brna)
 	RNA_def_property_pointer_sdna(prop, NULL, "imapaint");
 	RNA_def_property_ui_text(prop, "Image Paint", "");
 
+	prop= RNA_def_property(srna, "uv_sculpt", PROP_POINTER, PROP_NONE);
+	RNA_def_property_pointer_sdna(prop, NULL, "uvsculpt");
+	RNA_def_property_ui_text(prop, "UV Sculpt", "");
+
 	prop= RNA_def_property(srna, "particle_edit", PROP_POINTER, PROP_NONE);
 	RNA_def_property_pointer_sdna(prop, NULL, "particle");
 	RNA_def_property_ui_text(prop, "Particle Edit", "");
+
+	prop= RNA_def_property(srna, "use_uv_sculpt", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "use_uv_sculpt", 1);
+	RNA_def_property_ui_text(prop, "UV Sculpt", "Enable brush for uv sculpting");
+	RNA_def_property_ui_icon(prop, ICON_TPAINT_HLT, 0);
+	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_IMAGE, "rna_SpaceImageEditor_uv_sculpt_update");
+
+	prop= RNA_def_property(srna, "uv_sculpt_lock_borders", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "uv_sculpt_settings", UV_SCULPT_LOCK_BORDERS);
+	RNA_def_property_ui_text(prop, "Lock Borders", "Disables editing of boundary edges");
+
+	prop= RNA_def_property(srna, "uv_sculpt_all_islands", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "uv_sculpt_settings", UV_SCULPT_ALL_ISLANDS);
+	RNA_def_property_ui_text(prop, "Sculpt All Islands", "Brush operates on all islands");
+
+	prop= RNA_def_property(srna, "uv_sculpt_tool", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "uv_sculpt_tool");
+	RNA_def_property_enum_items(prop, uv_sculpt_tool_items);
+	RNA_def_property_ui_text(prop, "UV Sculpt Tools", "Select Tools for the UV sculpt brushes");
+
+	prop= RNA_def_property(srna, "uv_relax_method", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "uv_relax_method");
+	RNA_def_property_enum_items(prop, uv_sculpt_relaxation_items);
+	RNA_def_property_ui_text(prop, "Relaxation Method", "Algorithm used for UV relaxation");
 
 	/* Transform */
 	prop= RNA_def_property(srna, "proportional_edit", PROP_ENUM, PROP_NONE);
@@ -1654,11 +1720,13 @@ static void rna_def_unified_paint_settings(BlenderRNA  *brna)
 	/* unified paint settings that override the equivalent settings
 	   from the active brush */
 	prop= RNA_def_property(srna, "size", PROP_INT, PROP_DISTANCE);
+	RNA_def_property_int_funcs(prop, NULL, "rna_UnifiedPaintSettings_size_set", NULL);
 	RNA_def_property_range(prop, 1, MAX_BRUSH_PIXEL_RADIUS*10);
 	RNA_def_property_ui_range(prop, 1, MAX_BRUSH_PIXEL_RADIUS, 1, 0);
 	RNA_def_property_ui_text(prop, "Radius", "Radius of the brush in pixels");
 
 	prop= RNA_def_property(srna, "unprojected_radius", PROP_FLOAT, PROP_DISTANCE);
+	RNA_def_property_float_funcs(prop, NULL, "rna_UnifiedPaintSettings_unprojected_radius_set", NULL);
 	RNA_def_property_range(prop, 0.001, FLT_MAX);
 	RNA_def_property_ui_range(prop, 0.001, 1, 0, 0);
 	RNA_def_property_ui_text(prop, "Unprojected Radius", "Radius of brush in Blender units");
@@ -2776,7 +2844,7 @@ static void rna_def_scene_ffmpeg_settings(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "use_lossless_output", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flags", FFMPEG_LOSSLESS_OUTPUT);
 	RNA_def_property_boolean_funcs(prop, NULL, "rna_FFmpegSettings_lossless_output_set");
-	RNA_def_property_ui_text(prop, "Lossless Output", "Use losslecc output for video streams");
+	RNA_def_property_ui_text(prop, "Lossless Output", "Use lossless output for video streams");
 	RNA_def_property_update(prop, NC_SCENE|ND_RENDER_OPTIONS, NULL);
 
 	/* FFMPEG Audio*/
@@ -3820,6 +3888,28 @@ static void rna_def_scene_keying_sets_all(BlenderRNA *brna, PropertyRNA *cprop)
 	RNA_def_property_update(prop, NC_SCENE|ND_KEYINGSET, NULL);
 }
 
+/* Runtime property, used to remember uv indices, used only in UV stitch for now.
+ */
+static void rna_def_selected_uv_element(BlenderRNA *brna)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+
+	srna= RNA_def_struct(brna, "SelectedUvElement", "PropertyGroup");
+	RNA_def_struct_ui_text(srna, "Selected Uv Element", "");
+
+	/* store the index to the UV element selected */
+	prop= RNA_def_property(srna, "element_index", PROP_INT, PROP_UNSIGNED);
+	RNA_def_property_flag(prop, PROP_IDPROPERTY);
+	RNA_def_property_ui_text(prop, "Element Index", "");
+
+	prop= RNA_def_property(srna, "face_index", PROP_INT, PROP_UNSIGNED);
+	RNA_def_property_flag(prop, PROP_IDPROPERTY);
+	RNA_def_property_ui_text(prop, "Face Index", "");
+}
+
+
+
 void RNA_def_scene(BlenderRNA *brna)
 {
 	StructRNA *srna;
@@ -4153,6 +4243,7 @@ void RNA_def_scene(BlenderRNA *brna)
 	rna_def_scene_game_data(brna);
 	rna_def_scene_render_layer(brna);
 	rna_def_transform_orientation(brna);
+	rna_def_selected_uv_element(brna);
 	
 	/* Scene API */
 	RNA_api_scene(srna);

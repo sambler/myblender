@@ -29,12 +29,13 @@ class SceneButtonsPanel():
 
     @classmethod
     def poll(cls, context):
-        return context.scene
+        rd = context.scene.render
+        return context.scene and (rd.engine in cls.COMPAT_ENGINES)
 
 
 class SCENE_PT_scene(SceneButtonsPanel, Panel):
     bl_label = "Scene"
-    COMPAT_ENGINES = {'BLENDER_RENDER'}
+    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
 
     def draw(self, context):
         layout = self.layout
@@ -53,6 +54,7 @@ class SCENE_PT_audio(SceneButtonsPanel, Panel):
         layout = self.layout
         scene = context.scene
         rd = context.scene.render
+        ffmpeg = rd.ffmpeg
 
         layout.prop(scene, "audio_volume")
         layout.operator("sound.bake_animation")
@@ -67,15 +69,15 @@ class SCENE_PT_audio(SceneButtonsPanel, Panel):
 
         col = split.column()
         col.label("Format:")
-        col.prop(rd, "ffmpeg_audio_channels", text="")
-        col.prop(rd, "ffmpeg_audio_mixrate", text="Rate")
+        col.prop(ffmpeg, "audio_channels", text="")
+        col.prop(ffmpeg, "audio_mixrate", text="Rate")
 
         layout.operator("sound.mixdown")
 
 
 class SCENE_PT_unit(SceneButtonsPanel, Panel):
     bl_label = "Units"
-    COMPAT_ENGINES = {'BLENDER_RENDER'}
+    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
 
     def draw(self, context):
         layout = self.layout
@@ -93,6 +95,7 @@ class SCENE_PT_unit(SceneButtonsPanel, Panel):
 
 class SCENE_PT_keying_sets(SceneButtonsPanel, Panel):
     bl_label = "Keying Sets"
+    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
 
     def draw(self, context):
         layout = self.layout
@@ -125,6 +128,7 @@ class SCENE_PT_keying_sets(SceneButtonsPanel, Panel):
 
 class SCENE_PT_keying_set_paths(SceneButtonsPanel, Panel):
     bl_label = "Active Keying Set"
+    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
 
     @classmethod
     def poll(cls, context):
@@ -195,14 +199,13 @@ class SCENE_PT_simplify(SceneButtonsPanel, Panel):
     COMPAT_ENGINES = {'BLENDER_RENDER'}
 
     def draw_header(self, context):
-        scene = context.scene
-        rd = scene.render
+        rd = context.scene.render
         self.layout.prop(rd, "use_simplify", text="")
 
     def draw(self, context):
         layout = self.layout
-        scene = context.scene
-        rd = scene.render
+
+        rd = context.scene.render
 
         layout.active = rd.use_simplify
 

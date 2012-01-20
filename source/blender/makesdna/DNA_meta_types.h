@@ -24,12 +24,13 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
-#ifndef DNA_META_TYPES_H
-#define DNA_META_TYPES_H
 
 /** \file DNA_meta_types.h
  *  \ingroup DNA
  */
+
+#ifndef DNA_META_TYPES_H
+#define DNA_META_TYPES_H
 
 #include "DNA_listBase.h"
 #include "DNA_ID.h"
@@ -44,7 +45,6 @@ typedef struct MetaElem {
 	struct MetaElem *next, *prev;
 
 	struct BoundBox *bb;        /* Bound Box of MetaElem */
-	int i1,j1,k1, i2,j2,k2;     /* corners of Bounding Box in lattice */
 
 	short type, flag, selcol1, selcol2;
 	float x, y, z;          /* Position of center of MetaElem */
@@ -70,7 +70,7 @@ typedef struct MetaBall {
 	ListBase elems;
 	ListBase disp;
 	ListBase *editelems;		/* not saved in files, note we use pointer for editmode check */
-	struct Ipo *ipo;			// XXX... depreceated (old animation system)
+	struct Ipo *ipo  DNA_DEPRECATED;  /* old animation system, deprecated for 2.5 */
 
 	/* material of the mother ball will define the material used of all others */
 	struct Material **mat; 

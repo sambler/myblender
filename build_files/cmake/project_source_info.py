@@ -25,6 +25,14 @@ __all__ = (
     "SOURCE_DIR",
     )
 
+
+import sys
+if not sys.version.startswith("3"):
+    print("\nPython3.x needed, found %s.\nAborting!\n" %
+          sys.version.partition(" ")[0])
+    sys.exit(1)
+
+
 import os
 from os.path import join, dirname, normpath, abspath
 
@@ -152,7 +160,6 @@ def build_info(use_c=True, use_cxx=True, ignore_prefix_list=None):
 def queue_processes(process_funcs, job_total=-1):
     """ Takes a list of function arg pairs, each function must return a process
     """
-    import sys
 
     if job_total == -1:
         import multiprocessing

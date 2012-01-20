@@ -55,6 +55,7 @@
 #include "BKE_texture.h"
 #include "BKE_report.h"
 #include "BKE_displist.h"
+#include "BKE_scene.h"
 
 #include "ED_screen.h"
 #include "ED_object.h"
@@ -139,7 +140,7 @@ static void id_search_cb(const bContext *C, void *arg_template, const char *str,
 					continue;
 
 			if(BLI_strcasestr(id->name+2, str)) {
-				char name_ui[32];
+				char name_ui[MAX_ID_NAME];
 				name_uiprefix_id(name_ui, id);
 
 				iconid= ui_id_icon_get((bContext*)C, id, 1);
@@ -180,7 +181,7 @@ static uiBlock *id_search_menu(bContext *C, ARegion *ar, void *arg_litem)
 		/* fake button, it holds space for search items */
 		uiDefBut(block, LABEL, 0, "", 10, 15, w, h, NULL, 0, 0, 0, 0, NULL);
 		
-		but= uiDefSearchBut(block, search, 0, ICON_VIEWZOOM, 256, 10, 0, w, 19, template.prv_rows, template.prv_cols, "");
+		but= uiDefSearchBut(block, search, 0, ICON_VIEWZOOM, sizeof(search), 10, 0, w, 19, template.prv_rows, template.prv_cols, "");
 		uiButSetSearchFunc(but, id_search_cb, &template, id_search_call_cb, idptr.data);
 	}
 	/* list view */
@@ -188,7 +189,7 @@ static uiBlock *id_search_menu(bContext *C, ARegion *ar, void *arg_litem)
 		/* fake button, it holds space for search items */
 		uiDefBut(block, LABEL, 0, "", 10, 15, 150, uiSearchBoxhHeight(), NULL, 0, 0, 0, 0, NULL);
 		
-		but= uiDefSearchBut(block, search, 0, ICON_VIEWZOOM, 256, 10, 0, 150, 19, 0, 0, "");
+		but= uiDefSearchBut(block, search, 0, ICON_VIEWZOOM, sizeof(search), 10, 0, 150, 19, 0, 0, "");
 		uiButSetSearchFunc(but, id_search_cb, &template, id_search_call_cb, idptr.data);
 	}
 		
@@ -412,11 +413,11 @@ static void template_ID(bContext *C, uiLayout *layout, TemplateID *template, Str
 		}
 
 		if(id->us > 1) {
-			char str[32];
+			char numstr[32];
 
-			BLI_snprintf(str, sizeof(str), "%d", id->us);
+			BLI_snprintf(numstr, sizeof(numstr), "%d", id->us);
 
-			but= uiDefBut(block, BUT, 0, str, 0,0,UI_UNIT_X + ((id->us < 10) ? 0:10), UI_UNIT_Y, NULL, 0, 0, 0, 0,
+			but= uiDefBut(block, BUT, 0, numstr, 0,0,UI_UNIT_X + ((id->us < 10) ? 0:10), UI_UNIT_Y, NULL, 0, 0, 0, 0,
 			              TIP_("Display number of users of this data (click to make a single-user copy)"));
 
 			uiButSetNFunc(but, template_id_cb, MEM_dupallocN(template), SET_INT_IN_POINTER(UI_ID_ALONE));
@@ -681,7 +682,7 @@ static void modifiers_convertToReal(bContext *C, void *ob_v, void *md_v)
 
 static int modifier_can_delete(ModifierData *md)
 {
-	// fluid particle modifier can't be deleted here
+	/* fluid particle modifier can't be deleted here */
 	if(md->type == eModifierType_ParticleSystem)
 		if(((ParticleSystemModifierData *)md)->psys->part->type == PART_FLUID)
 			return 0;
@@ -689,14 +690,16 @@ static int modifier_can_delete(ModifierData *md)
 	return 1;
 }
 
-// Check wheter Modifier is a simulation or not, this is used for switching to the physics/particles context tab
+/* Check wheter Modifier is a simulation or not, this is used for switching to the physics/particles context tab */
 static int modifier_is_simulation(ModifierData *md)
 {
-	// Physic Tab
-	if(ELEM7(md->type, eModifierType_Cloth, eModifierType_Collision, eModifierType_Fluidsim, eModifierType_Smoke, eModifierType_Softbody, eModifierType_Surface, eModifierType_DynamicPaint)) {
+	/* Physic Tab */
+	if (ELEM7(md->type, eModifierType_Cloth, eModifierType_Collision, eModifierType_Fluidsim, eModifierType_Smoke,
+	                    eModifierType_Softbody, eModifierType_Surface, eModifierType_DynamicPaint))
+	{
 		return 1;
 	}
-	// Particle Tab
+	/* Particle Tab */
 	else if (md->type == eModifierType_ParticleSystem) {
 		return 2;
 	}
@@ -705,7 +708,8 @@ static int modifier_is_simulation(ModifierData *md)
 	}
 }
 
-static uiLayout *draw_modifier(uiLayout *layout, Scene *scene, Object *ob, ModifierData *md, int index, int cageIndex, int lastCageIndex)
+static uiLayout *draw_modifier(uiLayout *layout, Scene *scene, Object *ob,
+                               ModifierData *md, int index, int cageIndex, int lastCageIndex)
 {
 	ModifierTypeInfo *mti = modifierType_getInfo(md->type);
 	PointerRNA ptr;
@@ -845,7 +849,7 @@ static uiLayout *draw_modifier(uiLayout *layout, Scene *scene, Object *ob, Modif
 				uiLayoutSetOperatorContext(row, WM_OP_INVOKE_DEFAULT);
 				uiItemEnumO(row, "OBJECT_OT_modifier_apply", IFACE_("Apply"), 0, "apply_as", MODIFIER_APPLY_DATA);
 				
-				if (modifier_sameTopology(md))
+				if (modifier_sameTopology(md) && !modifier_nonGeometrical(md))
 					uiItemEnumO(row, "OBJECT_OT_modifier_apply", IFACE_("Apply as Shape"), 0, "apply_as", MODIFIER_APPLY_SHAPE);
 			}
 			
@@ -853,7 +857,7 @@ static uiLayout *draw_modifier(uiLayout *layout, Scene *scene, Object *ob, Modif
 			uiBlockSetButLock(block, ob && ob->id.lib, ERROR_LIBDATA_MESSAGE);
 			
 			if (!ELEM5(md->type, eModifierType_Fluidsim, eModifierType_Softbody, eModifierType_ParticleSystem, eModifierType_Cloth, eModifierType_Smoke))
-				uiItemO(row, TIP_("Copy"), ICON_NONE, "OBJECT_OT_modifier_copy");
+				uiItemO(row, IFACE_("Copy"), ICON_NONE, "OBJECT_OT_modifier_copy");
 		}
 		
 		/* result is the layout block inside the box, that we return so that modifier settings can be drawn */
@@ -1223,7 +1227,7 @@ void uiTemplatePreview(uiLayout *layout, ID *id, int show_buttons, ID *parent, M
 				uiDefButS(block, ROW, B_MATPRV, IFACE_("World"),  0, 0,UI_UNIT_X*10,UI_UNIT_Y, pr_texture, 10, TEX_PR_OTHER, 0, 0, "");
 			uiDefButS(block, ROW, B_MATPRV, IFACE_("Both"),  0, 0,UI_UNIT_X*10,UI_UNIT_Y, pr_texture, 10, TEX_PR_BOTH, 0, 0, "");
 			
-			/* Alpha buton for texture preview */
+			/* Alpha button for texture preview */
 			if(*pr_texture!=TEX_PR_OTHER) {
 				row = uiLayoutRow(layout, 0);
 				uiItemR(row, &texture_ptr, "use_preview_alpha", 0, NULL, ICON_NONE);
@@ -1617,7 +1621,7 @@ static uiBlock *curvemap_clipping_func(bContext *C, struct ARegion *ar, void *cu
 	uiBut *bt;
 	float width= 8*UI_UNIT_X;
 
-	block= uiBeginBlock(C, ar, "curvemap_clipping_func", UI_EMBOSS);
+	block = uiBeginBlock(C, ar, __func__, UI_EMBOSS);
 
 	/* use this for a fake extra empy space around the buttons */
 	uiDefBut(block, LABEL, 0, "",			-4, 16, width+8, 6*UI_UNIT_Y, NULL, 0, 0, 0, 0, "");
@@ -1676,7 +1680,7 @@ static uiBlock *curvemap_tools_func(bContext *C, struct ARegion *ar, void *cumap
 	uiBlock *block;
 	short yco= 0, menuwidth=10*UI_UNIT_X;
 
-	block= uiBeginBlock(C, ar, "curvemap_tools_func", UI_EMBOSS);
+	block= uiBeginBlock(C, ar, __func__, UI_EMBOSS);
 	uiBlockSetButmFunc(block, curvemap_tools_dofunc, cumap_v);
 
 	uiDefIconTextBut(block, BUTM, 1, ICON_BLANK1, IFACE_("Reset View"),			0, yco-=UI_UNIT_Y, menuwidth, UI_UNIT_Y, NULL, 0.0, 0.0, 0, 1, "");
@@ -1698,7 +1702,7 @@ static uiBlock *curvemap_brush_tools_func(bContext *C, struct ARegion *ar, void 
 	uiBlock *block;
 	short yco= 0, menuwidth=10*UI_UNIT_X;
 
-	block= uiBeginBlock(C, ar, "curvemap_tools_func", UI_EMBOSS);
+	block= uiBeginBlock(C, ar, __func__, UI_EMBOSS);
 	uiBlockSetButmFunc(block, curvemap_tools_dofunc, cumap_v);
 
 	uiDefIconTextBut(block, BUTM, 1, ICON_BLANK1, IFACE_("Reset View"),		0, yco-=UI_UNIT_Y, menuwidth, UI_UNIT_Y, NULL, 0.0, 0.0, 0, 1, "");
@@ -1953,10 +1957,10 @@ static void handle_layer_buttons(bContext *C, void *arg1, void *arg2)
 		tot= RNA_property_array_length(&but->rnapoin, but->rnaprop);
 		
 		/* Normally clicking only selects one layer */
-		RNA_property_boolean_set_index(&but->rnapoin, but->rnaprop, cur, 1);
+		RNA_property_boolean_set_index(&but->rnapoin, but->rnaprop, cur, TRUE);
 		for(i = 0; i < tot; ++i) {
 			if(i != cur)
-				RNA_property_boolean_set_index(&but->rnapoin, but->rnaprop, i, 0);
+				RNA_property_boolean_set_index(&but->rnapoin, but->rnaprop, i, FALSE);
 		}
 	}
 	
@@ -2122,6 +2126,7 @@ static void list_item_row(bContext *C, uiLayout *layout, PointerRNA *ptr, Pointe
 	else if(RNA_struct_is_a(itemptr->type, &RNA_MaterialSlot)) {
 		/* provision to draw active node name */
 		Material *ma, *manode;
+		Scene *scene= CTX_data_scene(C);
 		Object *ob= (Object*)ptr->id.data;
 		int index= (Material**)itemptr->data - ob->mat;
 		
@@ -2129,7 +2134,7 @@ static void list_item_row(bContext *C, uiLayout *layout, PointerRNA *ptr, Pointe
 		uiItemL(sub, name, icon);
 		
 		ma= give_current_material(ob, index+1);
-		if(ma) {
+		if (ma && !scene_use_new_shading_nodes(scene)){
 			manode= give_node_material(ma);
 			if(manode) {
 				char str[MAX_ID_NAME + 12];
@@ -2198,6 +2203,17 @@ static void list_item_row(bContext *C, uiLayout *layout, PointerRNA *ptr, Pointe
 		}
 		uiDefButR(block, OPTION, 0, "", 0, 0, UI_UNIT_X, UI_UNIT_Y, itemptr, "is_active", i, 0, 0, 0, 0,  NULL);
 	}
+	else if(itemptr->type == &RNA_MovieTrackingObject) {
+		MovieTrackingObject *tracking_object= (MovieTrackingObject*)itemptr->data;
+
+		split= uiLayoutSplit(sub, 0.75f, 0);
+		if(tracking_object->flag&TRACKING_OBJECT_CAMERA) {
+			uiItemL(split, name, ICON_CAMERA_DATA);
+		}
+		else {
+			uiItemL(split, name, ICON_OBJECT_DATA);
+		}
+	}
 
 	/* There is a last chance to display custom controls (in addition to the name/label):
 	 * If the given item property group features a string property named as prop_list,
@@ -2265,7 +2281,8 @@ void uiTemplateList(uiLayout *layout, bContext *C, PointerRNA *ptr, const char *
 	uiBlock *block;
 	uiBut *but;
 	Panel *pa;
-	char *name, str[32];
+	const char *name;
+	char numstr[32];
 	int rnaicon=0, icon=0, i= 0, activei= 0, len= 0, items, found, min, max;
 
 	/* validate arguments */
@@ -2356,7 +2373,7 @@ void uiTemplateList(uiLayout *layout, bContext *C, PointerRNA *ptr, const char *
 					uiItemL(row, (name)? name: "", icon);
 
 					if(name)
-						MEM_freeN(name);
+						MEM_freeN((void *)name);
 				}
 
 				i++;
@@ -2369,8 +2386,8 @@ void uiTemplateList(uiLayout *layout, bContext *C, PointerRNA *ptr, const char *
 			uiItemL(row, "", ICON_NONE);
 
 		/* next/prev button */
-		BLI_snprintf(str, sizeof(str), "%d :", i);
-		but= uiDefIconTextButR_prop(block, NUM, 0, 0, str, 0,0,UI_UNIT_X*5,UI_UNIT_Y, activeptr, activeprop, 0, 0, 0, 0, 0, "");
+		BLI_snprintf(numstr, sizeof(numstr), "%d :", i);
+		but= uiDefIconTextButR_prop(block, NUM, 0, 0, numstr, 0,0,UI_UNIT_X*5,UI_UNIT_Y, activeptr, activeprop, 0, 0, 0, 0, 0, "");
 		if(i == 0)
 			uiButSetFlag(but, UI_BUT_DISABLED);
 	}
@@ -2454,12 +2471,15 @@ static void operator_search_cb(const bContext *C, void *UNUSED(arg), const char 
 				int len= strlen(ot->name);
 				
 				/* display name for menu, can hold hotkey */
-				BLI_strncpy(name, ot->name, 256);
+				BLI_strncpy(name, ot->name, sizeof(name));
 				
 				/* check for hotkey */
-				if(len < 256-6) {
-					if(WM_key_event_operator_string(C, ot->idname, WM_OP_EXEC_DEFAULT, NULL, TRUE, &name[len+1], 256-len-1))
+				if(len < sizeof(name)-6) {
+					if (WM_key_event_operator_string(C, ot->idname, WM_OP_EXEC_DEFAULT, NULL, TRUE,
+					                                 &name[len+1], sizeof(name)-len-1))
+					{
 						name[len]= '|';
+					}
 				}
 				
 				if(0==uiSearchItemAdd(items, name, ot, 0))
@@ -2606,9 +2626,7 @@ void uiTemplateReportsBanner(uiLayout *layout, bContext *C)
 	uiBlockBeginAlign(block);
 	but= uiDefBut(block, ROUNDBOX, 0, "", 0, 0, UI_UNIT_X+10, UI_UNIT_Y, NULL, 0.0f, 0.0f, 0, 0, "");
 	/* set the report's bg color in but->col - ROUNDBOX feature */
-	but->col[0]= FTOCHAR(rti->col[0]);
-	but->col[1]= FTOCHAR(rti->col[1]);
-	but->col[2]= FTOCHAR(rti->col[2]);
+	rgb_float_to_uchar(but->col, rti->col);
 	but->col[3]= 255; 
 
 	but= uiDefBut(block, ROUNDBOX, 0, "", UI_UNIT_X+10, 0, UI_UNIT_X+width, UI_UNIT_Y, NULL, 0.0f, 0.0f, 0, 0, "");

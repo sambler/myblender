@@ -186,7 +186,7 @@ void wm_event_do_notifiers(bContext *C)
 	wmWindowManager *wm= CTX_wm_manager(C);
 	wmNotifier *note, *next;
 	wmWindow *win;
-	unsigned int win_combine_v3d_datamask= 0;
+	uint64_t win_combine_v3d_datamask= 0;
 	
 	if(wm==NULL)
 		return;
@@ -225,20 +225,8 @@ void wm_event_do_notifiers(bContext *C)
 
 			if(note->window==win || (note->window == NULL && (note->reference == NULL || note->reference == CTX_data_scene(C)))) {
 				if(note->category==NC_SCENE) {
-					if(note->data==ND_SCENEBROWSE) {
-						ED_screen_set_scene(C, note->reference);	// XXX hrms, think this over!
-						if(G.f & G_DEBUG)
-							printf("scene set %p\n", note->reference);
-					}
-					else if(note->data==ND_FRAME)
+					if(note->data==ND_FRAME)
 						do_anim= 1;
-					
-					if(note->action == NA_REMOVED) {
-						ED_screen_delete_scene(C, note->reference);	// XXX hrms, think this over!
-						if(G.f & G_DEBUG)
-							printf("scene delete %p\n", note->reference);
-					}
-						
 				}
 			}
 			if(ELEM5(note->category, NC_SCENE, NC_OBJECT, NC_GEOM, NC_SCENE, NC_WM)) {
@@ -294,7 +282,7 @@ void wm_event_do_notifiers(bContext *C)
 	
 	/* combine datamasks so 1 win doesn't disable UV's in another [#26448] */
 	for(win= wm->windows.first; win; win= win->next) {
-		win_combine_v3d_datamask |= ED_viewedit_datamask(win->screen);
+		win_combine_v3d_datamask |= ED_view3d_screen_datamask(win->screen);
 	}
 
 	/* cached: editor refresh callbacks now, they get context */
@@ -321,10 +309,6 @@ void wm_event_do_notifiers(bContext *C)
 			win->screen->scene->customdata_mask |= win->screen->scene->customdata_mask_modal;
 
 			scene_update_tagged(bmain, win->screen->scene);
-
-			ED_render_engine_update_tagged(C, bmain);
-
-			scene_clear_tagged(bmain, win->screen->scene);
 		}
 	}
 
@@ -601,10 +585,34 @@ static int wm_operator_exec(bContext *C, wmOperator *op, int repeat)
 	
 }
 
-/* for running operators with frozen context (modal handlers, menus) */
+/* simply calls exec with basic checks */
+static int wm_operator_exec_notest(bContext *C, wmOperator *op)
+{
+	int retval= OPERATOR_CANCELLED;
+
+	if(op==NULL || op->type==NULL || op->type->exec==NULL)
+		return retval;
+
+	retval= op->type->exec(C, op);
+	OPERATOR_RETVAL_CHECK(retval);
+
+	return retval;
+}
+
+/* for running operators with frozen context (modal handlers, menus)
+ *
+ * warning: do not use this within an operator to call its self! [#29537] */
 int WM_operator_call(bContext *C, wmOperator *op)
 {
 	return wm_operator_exec(C, op, 0);
+}
+
+/* this is intended to be used when an invoke operator wants to call exec on its self
+ * and is basically like running op->type->exec() directly, no poll checks no freeing,
+ * since we assume whoever called invokle will take care of that */
+int WM_operator_call_notest(bContext *C, wmOperator *op)
+{
+	return wm_operator_exec_notest(C, op);
 }
 
 /* do this operator again, put here so it can share above code */
@@ -721,6 +729,47 @@ static void wm_region_mouse_co(bContext *C, wmEvent *event)
 	}
 }
 
+static int wm_operator_init_from_last(wmWindowManager *wm, wmOperator *op)
+{
+	int change= FALSE;
+	wmOperator *lastop;
+
+	for(lastop= wm->operators.last; lastop; lastop= lastop->prev) {
+		/* equality check is a bit paranoid but just incase */
+		if((op != lastop) && (op->type == (lastop->type))) {
+			break;
+		}
+	}
+
+	if (lastop && op != lastop) {
+		PropertyRNA *iterprop;
+		iterprop= RNA_struct_iterator_property(op->type->srna);
+
+		RNA_PROP_BEGIN(op->ptr, itemptr, iterprop) {
+			PropertyRNA *prop= itemptr.data;
+			if((RNA_property_flag(prop) & PROP_SKIP_SAVE) == 0) {
+				if (!RNA_property_is_set(op->ptr, prop)) { /* don't override a setting already set */
+					const char *identifier= RNA_property_identifier(prop);
+					IDProperty *idp_src= IDP_GetPropertyFromGroup(lastop->properties, identifier);
+					if(idp_src) {
+						IDProperty *idp_dst = IDP_CopyProperty(idp_src);
+
+						/* note - in the future this may need to be done recursively,
+						 * but for now RNA doesn't access nested operators */
+						idp_dst->flag |= IDP_FLAG_GHOST;
+
+						IDP_ReplaceInGroup(op->properties, idp_dst);
+						change= TRUE;
+					}
+				}
+			}
+		}
+		RNA_PROP_END;
+	}
+
+	return change;
+}
+
 static int wm_operator_invoke(bContext *C, wmOperatorType *ot, wmEvent *event, PointerRNA *properties, ReportList *reports, short poll_only)
 {
 	wmWindowManager *wm= CTX_wm_manager(C);
@@ -733,6 +782,11 @@ static int wm_operator_invoke(bContext *C, wmOperatorType *ot, wmEvent *event, P
 	if(WM_operator_poll(C, ot)) {
 		wmOperator *op= wm_operator_create(wm, ot, properties, reports); /* if reports==NULL, theyll be initialized */
 		
+		/* initialize setting from previous run */
+		if(wm->op_undo_depth == 0 && (ot->flag & OPTYPE_REGISTER)) { /* not called by py script */
+			wm_operator_init_from_last(wm, op);
+		}
+
 		if((G.f & G_DEBUG) && event && event->type!=MOUSEMOVE)
 			printf("handle evt %d win %d op %s\n", event?event->type:0, CTX_wm_screen(C)->subwinactive, ot->idname); 
 		
@@ -2670,6 +2724,11 @@ void wm_event_add_ghostevent(wmWindowManager *wm, wmWindow *win, int type, int U
 			   modifier in win->eventstate, but for the press event of the same
 			   key we don't want the key modifier */
 			if(event.keymodifier == event.type)
+				event.keymodifier= 0;
+			/* this case happened with an external numpad, it's not really clear
+			   why, but it's also impossible to map a key modifier to an unknwon
+			   key, so it shouldn't harm */
+			if(event.keymodifier == UNKNOWNKEY)
 				event.keymodifier= 0;
 			
 			/* if test_break set, it catches this. XXX Keep global for now? */

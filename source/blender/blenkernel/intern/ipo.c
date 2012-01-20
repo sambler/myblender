@@ -43,7 +43,8 @@
 #include <string.h>
 #include <stddef.h>
 
-#include "MEM_guardedalloc.h"
+/* since we have versioning code here */
+#define DNA_DEPRECATED_ALLOW
 
 #include "DNA_anim_types.h"
 #include "DNA_constraint_types.h"
@@ -73,6 +74,7 @@
 #include "BKE_nla.h"
 #include "BKE_sequencer.h"
 
+#include "MEM_guardedalloc.h"
 
 /* *************************************************** */
 /* Old-Data Freeing Tools */
@@ -326,9 +328,9 @@ static char *shapekey_adrcodes_to_paths (int adrcode, int *UNUSED(array_index))
 	/* block will be attached to ID_KE block, and setting that we alter is the 'value' (which sets keyblock.curval) */
 	// XXX adrcode 0 was dummy 'speed' curve 
 	if (adrcode == 0) 
-		sprintf(buf, "speed");
+		strcpy(buf, "speed");
 	else
-		sprintf(buf, "key_blocks[%d].value", adrcode);
+		BLI_snprintf(buf, sizeof(buf), "key_blocks[%d].value", adrcode);
 	return buf;
 }
 
@@ -907,15 +909,18 @@ static char *get_rna_access (int blocktype, int adrcode, char actname[], char co
 		if (array_index)
 			*array_index= dummy_index;
 	}
-	
+
+	/* 'buf' _must_ be initialized in this block */
 	/* append preceding bits to path */
+	/* note, strings are not escapted and they should be! */
 	if ((actname && actname[0]) && (constname && constname[0])) {
 		/* Constraint in Pose-Channel */
-		sprintf(buf, "pose.bones[\"%s\"].constraints[\"%s\"]", actname, constname);
+		BLI_snprintf(buf, sizeof(buf), "pose.bones[\"%s\"].constraints[\"%s\"]", actname, constname);
 	}
 	else if (actname && actname[0]) {
 		if ((blocktype == ID_OB) && strcmp(actname, "Object")==0) {
 			/* Actionified "Object" IPO's... no extra path stuff needed */
+			buf[0]= '\0'; /* empty string */
 		}
 		else if ((blocktype == ID_KE) && strcmp(actname, "Shape")==0) {
 			/* Actionified "Shape" IPO's - these are forced onto object level via the action container there... */
@@ -923,19 +928,21 @@ static char *get_rna_access (int blocktype, int adrcode, char actname[], char co
 		}
 		else {
 			/* Pose-Channel */
-			sprintf(buf, "pose.bones[\"%s\"]", actname);
+			BLI_snprintf(buf, sizeof(buf), "pose.bones[\"%s\"]", actname);
 		}
 	}
 	else if (constname && constname[0]) {
 		/* Constraint in Object */
-		sprintf(buf, "constraints[\"%s\"]", constname);
+		BLI_snprintf(buf, sizeof(buf), "constraints[\"%s\"]", constname);
 	}
 	else if (seq) {
 		/* Sequence names in Scene */
-		sprintf(buf, "sequence_editor.sequences_all[\"%s\"]", seq->name+2);
+		BLI_snprintf(buf, sizeof(buf), "sequence_editor.sequences_all[\"%s\"]", seq->name+2);
 	}
-	else
+	else {
 		buf[0]= '\0'; /* empty string */
+	}
+
 	BLI_dynstr_append(path, buf);
 	
 	/* need to add dot before property if there was anything precceding this */
@@ -947,7 +954,7 @@ static char *get_rna_access (int blocktype, int adrcode, char actname[], char co
 	
 	/* if there was no array index pointer provided, add it to the path */
 	if (array_index == NULL) {
-		sprintf(buf, "[\"%d\"]", dummy_index);
+		BLI_snprintf(buf, sizeof(buf), "[\"%d\"]", dummy_index);
 		BLI_dynstr_append(path, buf);
 	}
 	

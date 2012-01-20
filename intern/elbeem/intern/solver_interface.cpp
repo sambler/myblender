@@ -203,10 +203,10 @@ void calculateMemreqEstimate( int resx,int resy,int resz,
 	std::ostringstream ret;
 	if(memCnt< 1024.0*1024.0) {
 		// show full MBs
-		ret << (ceil(memd));
+		ret << (ceill(memd));
 	} else {
 		// two digits for anything larger than MB
-		ret << (ceil(memd*100.0)/100.0);
+		ret << (ceill(memd*100.0)/100.0);
 	}
 	ret	<< " "<< sizeStr;
 	*reqret = memCnt;

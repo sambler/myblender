@@ -74,8 +74,8 @@ __device void camera_sample_perspective(KernelGlobals *kg, float raster_x, float
 	ray->dP.dx = make_float3(0.0f, 0.0f, 0.0f);
 	ray->dP.dy = make_float3(0.0f, 0.0f, 0.0f);
 
-	ray->dD.dx = normalize(Ddiff + kernel_data.cam.dx) - normalize(Ddiff);
-	ray->dD.dy = normalize(Ddiff + kernel_data.cam.dy) - normalize(Ddiff);
+	ray->dD.dx = normalize(Ddiff + float4_to_float3(kernel_data.cam.dx)) - normalize(Ddiff);
+	ray->dD.dy = normalize(Ddiff + float4_to_float3(kernel_data.cam.dy)) - normalize(Ddiff);
 #endif
 
 #ifdef __CAMERA_CLIPPING__
@@ -107,8 +107,8 @@ __device void camera_sample_orthographic(KernelGlobals *kg, float raster_x, floa
 
 #ifdef __RAY_DIFFERENTIALS__
 	/* ray differential */
-	ray->dP.dx = kernel_data.cam.dx;
-	ray->dP.dy = kernel_data.cam.dy;
+	ray->dP.dx = float4_to_float3(kernel_data.cam.dx);
+	ray->dP.dy = float4_to_float3(kernel_data.cam.dy);
 
 	ray->dD.dx = make_float3(0.0f, 0.0f, 0.0f);
 	ray->dD.dy = make_float3(0.0f, 0.0f, 0.0f);
@@ -127,8 +127,8 @@ __device void camera_sample_orthographic(KernelGlobals *kg, float raster_x, floa
 __device void camera_sample(KernelGlobals *kg, int x, int y, float filter_u, float filter_v, float lens_u, float lens_v, Ray *ray)
 {
 	/* pixel filter */
-	float raster_x = x + kernel_tex_interp(__filter_table, filter_u);
-	float raster_y = y + kernel_tex_interp(__filter_table, filter_v);
+	float raster_x = x + kernel_tex_interp(__filter_table, filter_u, FILTER_TABLE_SIZE);
+	float raster_y = y + kernel_tex_interp(__filter_table, filter_v, FILTER_TABLE_SIZE);
 
 	/* motion blur */
 	//ray->time = lerp(time_t, kernel_data.cam.shutter_open, kernel_data.cam.shutter_close);

@@ -58,6 +58,8 @@ WITH_BF_PNG = True
 BF_PNG_LIB = 'libpng'
 BF_PNG_LIBPATH = '/home/sources/staticlibs/lib64'
 
+WITH_BF_STATICLIBSAMPLERATE = True
+
 WITH_BF_ZLIB = True
 WITH_BF_STATICZLIB = True
 BF_ZLIB_LIB_STATIC = '${BF_ZLIB}/lib/libz.a'
@@ -94,6 +96,7 @@ WITH_BF_JACK = True
 
 # Cycles
 WITH_BF_CYCLES = True
+WITH_BF_CYCLES_CUDA_BINARIES = True
 
 WITH_BF_OIIO = True
 WITH_BF_STATICOIIO = True

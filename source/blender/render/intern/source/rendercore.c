@@ -67,6 +67,7 @@
 #include "rayintersection.h"
 #include "rayobject.h"
 #include "renderpipeline.h"
+#include "render_result.h"
 #include "render_types.h"
 #include "renderdatabase.h"
 #include "occlusion.h"
@@ -2165,21 +2166,13 @@ static void bake_shade(void *handle, Object *ob, ShadeInput *shi, int UNUSED(qua
 		}
 	}
 	else {
-		char *col= (char *)(bs->rect + bs->rectx*y + x);
+		unsigned char *col= (unsigned char *)(bs->rect + bs->rectx*y + x);
 
 		if (ELEM(bs->type, RE_BAKE_ALL, RE_BAKE_TEXTURE) &&	(R.r.color_mgt_flag & R_COLOR_MANAGEMENT)) {
-			float srgb[3];
-			srgb[0]= linearrgb_to_srgb(shr.combined[0]);
-			srgb[1]= linearrgb_to_srgb(shr.combined[1]);
-			srgb[2]= linearrgb_to_srgb(shr.combined[2]);
-			
-			col[0]= FTOCHAR(srgb[0]);
-			col[1]= FTOCHAR(srgb[1]);
-			col[2]= FTOCHAR(srgb[2]);
-		} else {
-			col[0]= FTOCHAR(shr.combined[0]);
-			col[1]= FTOCHAR(shr.combined[1]);
-			col[2]= FTOCHAR(shr.combined[2]);
+			linearrgb_to_srgb_uchar3(col, shr.combined);
+		}
+		else {
+			rgb_float_to_uchar(col, shr.combined);
 		}
 		
 		if (ELEM(bs->type, RE_BAKE_ALL, RE_BAKE_TEXTURE)) {
@@ -2211,9 +2204,7 @@ static void bake_displacement(void *handle, ShadeInput *UNUSED(shi), float dist,
 		col[3]= 1.0f;
 	} else {	
 		char *col= (char *)(bs->rect + bs->rectx*y + x);
-		col[0]= FTOCHAR(disp);
-		col[1]= FTOCHAR(disp);
-		col[2]= FTOCHAR(disp);
+		col[0] = col[1] = col[2] = FTOCHAR(disp);
 		col[3]= 255;
 	}
 	if (bs->rect_mask) {
@@ -2371,7 +2362,7 @@ static void do_bake_shade(void *handle, int x, int y, float u, float v)
 			isec.skip = RE_SKIP_VLR_NEIGHBOUR;
 			
 			if(bake_intersect_tree(R.raytree, &isec, shi->co, shi->vn, sign, co, &dist)) {
-				if(!hit || len_v3v3(shi->co, co) < len_v3v3(shi->co, minco)) {
+				if(!hit || len_squared_v3v3(shi->co, co) < len_squared_v3v3(shi->co, minco)) {
 					minisec= isec;
 					mindist= dist;
 					copy_v3_v3(minco, co);
@@ -2458,7 +2449,7 @@ static int get_next_bake_face(BakeShade *bs)
 							imb_freerectImBuf(ibuf);
 						/* clear image */
 						if(R.r.bake_flag & R_BAKE_CLEAR)
-							IMB_rectfill(ibuf, (ibuf->depth == 32) ? vec_alpha : vec_solid);
+							IMB_rectfill(ibuf, (ibuf->planes == R_IMF_PLANES_RGBA) ? vec_alpha : vec_solid);
 					
 						/* might be read by UI to set active image for display */
 						R.bakebuf= ima;
@@ -2566,7 +2557,7 @@ static void *do_bake_thread(void *bs_v)
 void RE_bake_ibuf_filter(ImBuf *ibuf, char *mask, const int filter)
 {
 	/* must check before filtering */
-	const short is_new_alpha= (ibuf->depth != 32) && BKE_alphatest_ibuf(ibuf);
+	const short is_new_alpha= (ibuf->planes != R_IMF_PLANES_RGBA) && BKE_alphatest_ibuf(ibuf);
 
 	/* Margin */
 	if(filter) {
@@ -2575,10 +2566,10 @@ void RE_bake_ibuf_filter(ImBuf *ibuf, char *mask, const int filter)
 
 	/* if the bake results in new alpha then change the image setting */
 	if(is_new_alpha) {
-		ibuf->depth= 32;
+		ibuf->planes= R_IMF_PLANES_RGBA;
 	}
 	else {
-		if(filter && ibuf->depth != 32) {
+		if(filter && ibuf->planes != R_IMF_PLANES_RGBA) {
 			/* clear alpha added by filtering */
 			IMB_rectfill_alpha(ibuf, 1.0f);
 		}

@@ -174,17 +174,17 @@ void make_local_mball(MetaBall *mb)
 		extern_local_mball(mb);
 	}
 	else if(is_local && is_lib) {
-		MetaBall *mbn= copy_mball(mb);
-		mbn->id.us= 0;
+		MetaBall *mb_new= copy_mball(mb);
+		mb_new->id.us= 0;
 
 		/* Remap paths of new ID using old library as base. */
-		BKE_id_lib_local_paths(bmain, &mbn->id);
+		BKE_id_lib_local_paths(bmain, mb->id.lib, &mb_new->id);
 
 		for(ob= G.main->object.first; ob; ob= ob->id.next) {
 			if(ob->data == mb) {
 				if(ob->id.lib==NULL) {
-					ob->data= mbn;
-					mbn->id.us++;
+					ob->data= mb_new;
+					mb_new->id.us++;
 					mb->id.us--;
 				}
 			}
@@ -356,7 +356,7 @@ int is_basis_mball(Object *ob)
 int is_mball_basis_for(Object *ob1, Object *ob2)
 {
 	int basis1nr, basis2nr;
-	char basis1name[32], basis2name[32];
+	char basis1name[MAX_ID_NAME], basis2name[MAX_ID_NAME];
 
 	BLI_split_name_num(basis1name, &basis1nr, ob1->id.name+2, '.');
 	BLI_split_name_num(basis2name, &basis2nr, ob2->id.name+2, '.');
@@ -378,7 +378,7 @@ void copy_mball_properties(Scene *scene, Object *active_object)
 	Object *ob;
 	MetaBall *active_mball = (MetaBall*)active_object->data;
 	int basisnr, obnr;
-	char basisname[32], obname[32];
+	char basisname[MAX_ID_NAME], obname[MAX_ID_NAME];
 	
 	BLI_split_name_num(basisname, &basisnr, active_object->id.name+2, '.');
 
@@ -423,7 +423,7 @@ Object *find_basis_mball(Scene *scene, Object *basis)
 	Object *ob,*bob= basis;
 	MetaElem *ml=NULL;
 	int basisnr, obnr;
-	char basisname[32], obname[32];
+	char basisname[MAX_ID_NAME], obname[MAX_ID_NAME];
 
 	BLI_split_name_num(basisname, &basisnr, basis->id.name+2, '.');
 	totelem= 0;
@@ -1596,7 +1596,7 @@ float init_meta(Scene *scene, Object *ob)	/* return totsize */
 	float size, totsize, obinv[4][4], obmat[4][4], vec[3];
 	//float max=0.0;
 	int a, obnr, zero_size=0;
-	char obname[32];
+	char obname[MAX_ID_NAME];
 	
 	copy_m4_m4(obmat, ob->obmat);	/* to cope with duplicators from next_object */
 	invert_m4_m4(obinv, ob->obmat);
@@ -1619,7 +1619,7 @@ float init_meta(Scene *scene, Object *ob)	/* return totsize */
 				else ml= mb->elems.first;
 			}
 			else {
-				char name[32];
+				char name[MAX_ID_NAME];
 				int nr;
 				
 				BLI_split_name_num(name, &nr, bob->id.name+2, '.');
@@ -1679,7 +1679,7 @@ float init_meta(Scene *scene, Object *ob)	/* return totsize */
 					temp2[3][1]= ml->y;
 					temp2[3][2]= ml->z;
 
-					mul_m4_m4m4(temp1, temp3, temp2);
+					mult_m4_m4m4(temp1, temp2, temp3);
 				
 					/* make a copy because of duplicates */
 					mainb[a]= new_pgn_element(sizeof(MetaElem));
@@ -1691,9 +1691,9 @@ float init_meta(Scene *scene, Object *ob)	/* return totsize */
 					
 					/* mat is the matrix to transform from mball into the basis-mball */
 					invert_m4_m4(obinv, obmat);
-					mul_m4_m4m4(temp2, bob->obmat, obinv);
+					mult_m4_m4m4(temp2, obinv, bob->obmat);
 					/* MetaBall transformation */
-					mul_m4_m4m4(mat, temp1, temp2);
+					mult_m4_m4m4(mat, temp2, temp1);
 
 					invert_m4_m4(imat,mat);				
 
@@ -1781,11 +1781,11 @@ float init_meta(Scene *scene, Object *ob)	/* return totsize */
 
 		calc_mballco(mainb[a], vec);
 	
-		size= (float)fabs( vec[0] );
+		size= fabsf( vec[0] );
 		if( size > totsize ) totsize= size;
-		size= (float)fabs( vec[1] );
+		size= fabsf( vec[1] );
 		if( size > totsize ) totsize= size;
-		size= (float)fabs( vec[2] );
+		size= fabsf( vec[2] );
 		if( size > totsize ) totsize= size;
 
 		vec[0]= mainb[a]->x - mainb[a]->rad;
@@ -1794,11 +1794,11 @@ float init_meta(Scene *scene, Object *ob)	/* return totsize */
 				
 		calc_mballco(mainb[a], vec);
 	
-		size= (float)fabs( vec[0] );
+		size= fabsf( vec[0] );
 		if( size > totsize ) totsize= size;
-		size= (float)fabs( vec[1] );
+		size= fabsf( vec[1] );
 		if( size > totsize ) totsize= size;
-		size= (float)fabs( vec[2] );
+		size= fabsf( vec[2] );
 		if( size > totsize ) totsize= size;
 	}
 

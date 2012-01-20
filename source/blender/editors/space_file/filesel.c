@@ -130,7 +130,7 @@ short ED_fileselect_set_params(SpaceFile *sfile)
 		else
 			params->type = FILE_SPECIAL;
 
-		if (is_filepath && RNA_property_is_set(op->ptr, "filepath")) {
+		if (is_filepath && RNA_struct_property_is_set(op->ptr, "filepath")) {
 			char name[FILE_MAX];
 			RNA_string_get(op->ptr, "filepath", name);
 			if (params->type == FILE_LOADLIB) {
@@ -142,12 +142,12 @@ short ED_fileselect_set_params(SpaceFile *sfile)
 			}
 		}
 		else {
-			if (is_directory && RNA_property_is_set(op->ptr, "directory")) {
+			if (is_directory && RNA_struct_property_is_set(op->ptr, "directory")) {
 				RNA_string_get(op->ptr, "directory", params->dir);
 				sfile->params->file[0]= '\0';
 			}
 
-			if (is_filename && RNA_property_is_set(op->ptr, "filename")) {
+			if (is_filename && RNA_struct_property_is_set(op->ptr, "filename")) {
 				RNA_string_get(op->ptr, "filename", params->file);
 			}
 		}
@@ -226,7 +226,7 @@ short ED_fileselect_set_params(SpaceFile *sfile)
 		}
 
 		if (is_relative_path) {
-			if (!RNA_property_is_set(op->ptr, "relative_path")) {
+			if (!RNA_struct_property_is_set(op->ptr, "relative_path")) {
 				RNA_boolean_set(op->ptr, "relative_path", U.flag & USER_RELPATHS);
 			}
 		}
@@ -667,9 +667,13 @@ void autocomplete_file(struct bContext *C, char *str, void *UNUSED(arg_v))
 
 void ED_fileselect_clear(struct bContext *C, struct SpaceFile *sfile)
 {
-	thumbnails_stop(sfile->files, C);
-	filelist_freelib(sfile->files);
-	filelist_free(sfile->files);
+	/* only NULL in rare cases - [#29734] */
+	if (sfile->files) {
+		thumbnails_stop(sfile->files, C);
+		filelist_freelib(sfile->files);
+		filelist_free(sfile->files);
+	}
+
 	sfile->params->active_file = -1;
 	WM_event_add_notifier(C, NC_SPACE|ND_SPACE_FILE_LIST, NULL);
 }

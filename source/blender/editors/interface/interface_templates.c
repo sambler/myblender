@@ -1957,10 +1957,10 @@ static void handle_layer_buttons(bContext *C, void *arg1, void *arg2)
 		tot= RNA_property_array_length(&but->rnapoin, but->rnaprop);
 		
 		/* Normally clicking only selects one layer */
-		RNA_property_boolean_set_index(&but->rnapoin, but->rnaprop, cur, 1);
+		RNA_property_boolean_set_index(&but->rnapoin, but->rnaprop, cur, TRUE);
 		for(i = 0; i < tot; ++i) {
 			if(i != cur)
-				RNA_property_boolean_set_index(&but->rnapoin, but->rnaprop, i, 0);
+				RNA_property_boolean_set_index(&but->rnapoin, but->rnaprop, i, FALSE);
 		}
 	}
 	
@@ -2626,9 +2626,7 @@ void uiTemplateReportsBanner(uiLayout *layout, bContext *C)
 	uiBlockBeginAlign(block);
 	but= uiDefBut(block, ROUNDBOX, 0, "", 0, 0, UI_UNIT_X+10, UI_UNIT_Y, NULL, 0.0f, 0.0f, 0, 0, "");
 	/* set the report's bg color in but->col - ROUNDBOX feature */
-	but->col[0]= FTOCHAR(rti->col[0]);
-	but->col[1]= FTOCHAR(rti->col[1]);
-	but->col[2]= FTOCHAR(rti->col[2]);
+	rgb_float_to_uchar(but->col, rti->col);
 	but->col[3]= 255; 
 
 	but= uiDefBut(block, ROUNDBOX, 0, "", UI_UNIT_X+10, 0, UI_UNIT_X+width, UI_UNIT_Y, NULL, 0.0f, 0.0f, 0, 0, "");

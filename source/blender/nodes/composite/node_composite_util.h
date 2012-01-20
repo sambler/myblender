@@ -124,7 +124,7 @@ CompBuf *pass_on_compbuf(CompBuf *cbuf);
 void free_compbuf(CompBuf *cbuf);
 void print_compbuf(char *str, CompBuf *cbuf);
 void compbuf_set_node(struct CompBuf *cbuf, struct bNode *node);
-void node_compo_pass_on(struct bNode *node, struct bNodeStack **nsin, struct bNodeStack **nsout);
+void node_compo_pass_on(void *data, int thread, struct bNode *node, void *nodedata, struct bNodeStack **in, struct bNodeStack **out);
 
 CompBuf *get_cropped_compbuf(rcti *drect, float *rectf, int rectx, int recty, int type);
 CompBuf *scalefast_compbuf(CompBuf *inbuf, int newx, int newy);
@@ -132,6 +132,8 @@ CompBuf *typecheck_compbuf(CompBuf *inbuf, int type);
 void typecheck_compbuf_color(float *out, float *in, int outtype, int intype);
 
 /* **************************************************** */
+
+float *compbuf_get_pixel(CompBuf *cbuf, float *defcol, float *use, int x, int y, int xrad, int yrad);
 
 /* Pixel-to-Pixel operation, 1 Image in, 1 out */
 void composit1_pixel_processor(bNode *node, CompBuf *out, CompBuf *src_buf, float *src_col,

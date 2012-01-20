@@ -1,11 +1,4 @@
 
-set(BLENDER_INCLUDE_DIRS
-	${CMAKE_SOURCE_DIR}/intern/guardedalloc
-	${CMAKE_SOURCE_DIR}/source/blender/makesdna
-	${CMAKE_SOURCE_DIR}/source/blender/makesrna
-	${CMAKE_SOURCE_DIR}/source/blender/blenloader
-	${CMAKE_BINARY_DIR}/source/blender/makesrna/intern)
-
 set(INC
 	../render
 	../device
@@ -13,14 +6,17 @@ set(INC
 	../kernel/svm
 	../util
 	../subd
+	../../guardedalloc
+	../../../source/blender/makesdna
+	../../../source/blender/makesrna
+	../../../source/blender/blenloader
+	${CMAKE_BINARY_DIR}/source/blender/makesrna/intern
 )
 
 set(INC_SYS
-	${BLENDER_INCLUDE_DIRS}
 	${PYTHON_INCLUDE_DIRS}
 	${GLEW_INCLUDE_PATH}
 )
-
 
 set(SRC
 	blender_camera.cpp
@@ -31,6 +27,7 @@ set(SRC
 	blender_shader.cpp
 	blender_sync.cpp
 
+	CCL_api.h
 	blender_sync.h
 	blender_session.h
 	blender_util.h
@@ -43,7 +40,6 @@ set(ADDON_FILES
 	addon/presets.py
 	addon/properties.py
 	addon/ui.py
-	addon/xml.py
 )
 
 blender_add_lib(bf_intern_cycles "${SRC}" "${INC}" "${INC_SYS}")

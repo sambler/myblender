@@ -30,9 +30,10 @@
 
 #include "BKE_image.h"
 #include "BLI_math_color.h"
+#include "BLI_math_base.h"
 #include "BLF_api.h"
 
-void BKE_image_buf_fill_color(unsigned char *rect, float *rect_float, int width, int height, float color[4])
+void BKE_image_buf_fill_color(unsigned char *rect, float *rect_float, int width, int height, const float color[4])
 {
 	int x, y;
 
@@ -40,22 +41,17 @@ void BKE_image_buf_fill_color(unsigned char *rect, float *rect_float, int width,
 	if(rect_float) {
 		for(y= 0; y<height; y++) {
 			for(x= 0; x<width; x++) {
-				rect_float[0]= color[0];
-				rect_float[1]= color[1];
-				rect_float[2]= color[2];
-				rect_float[3]= color[3];
+				copy_v4_v4(rect_float, color);
 				rect_float+= 4;
 			}
 		}
 	}
 	
 	if(rect) {
-		char ccol[4];
+		unsigned char ccol[4];
 
-		ccol[0]= (char)(color[0]*255.0f);
-		ccol[1]= (char)(color[1]*255.0f);
-		ccol[2]= (char)(color[2]*255.0f);
-		ccol[3]= (char)(color[3]*255.0f);
+		rgba_float_to_uchar(ccol, color);
+
 		for(y= 0; y<height; y++) {
 			for(x= 0; x<width; x++) {
 				
@@ -161,21 +157,6 @@ void BKE_image_buf_fill_checker(unsigned char *rect, float *rect_float, int widt
 #define BLEND_FLOAT(real, add)  (real+add <= 1.0f) ? (real+add) : 1.0f
 #define BLEND_CHAR(real, add) ((real + (char)(add * 255.0f)) <= 255) ? (real + (char)(add * 255.0f)) : 255
 
-static int is_pow2(int n)
-{
-	return ((n)&(n-1))==0;
-}
-static int larger_pow2(int n)
-{
-	if (is_pow2(n))
-		return n;
-
-	while(!is_pow2(n))
-		n= n&(n-1);
-
-	return n*2;
-}
-
 static void checker_board_color_fill(unsigned char *rect, float *rect_float, int width, int height)
 {
 	int hue_step, y, x;
@@ -183,7 +164,7 @@ static void checker_board_color_fill(unsigned char *rect, float *rect_float, int
 
 	sat= 1.0;
 
-	hue_step= larger_pow2(width / 8);
+	hue_step= power_of_2_max_i(width / 8);
 	if(hue_step < 8) hue_step= 8;
 
 	for(y= 0; y < height; y++)

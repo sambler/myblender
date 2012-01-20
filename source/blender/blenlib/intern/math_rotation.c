@@ -1322,8 +1322,8 @@ void mat3_to_compatible_eulO(float eul[3], float oldrot[3], short order,float ma
 	compatible_eul(eul1, oldrot);
 	compatible_eul(eul2, oldrot);
 	
-	d1= (float)fabs(eul1[0]-oldrot[0]) + (float)fabs(eul1[1]-oldrot[1]) + (float)fabs(eul1[2]-oldrot[2]);
-	d2= (float)fabs(eul2[0]-oldrot[0]) + (float)fabs(eul2[1]-oldrot[1]) + (float)fabs(eul2[2]-oldrot[2]);
+	d1= fabsf(eul1[0]-oldrot[0]) + fabsf(eul1[1]-oldrot[1]) + fabsf(eul1[2]-oldrot[2]);
+	d2= fabsf(eul2[0]-oldrot[0]) + fabsf(eul2[1]-oldrot[1]) + fabsf(eul2[2]-oldrot[2]);
 	
 	/* return best, which is just the one with lowest difference */
 	if (d1 > d2)
@@ -1433,7 +1433,7 @@ void mat4_to_dquat(DualQuat *dq,float basemat[][4], float mat[][4])
 
 	/* split scaling and rotation, there is probably a faster way to do
 	   this, it's done like this now to correctly get negative scaling */
-	mul_m4_m4m4(baseRS, basemat, mat);
+	mult_m4_m4m4(baseRS, mat, basemat);
 	mat4_to_size(scale,baseRS);
 
 	copy_v3_v3(dscale, scale);
@@ -1452,10 +1452,10 @@ void mat4_to_dquat(DualQuat *dq,float basemat[][4], float mat[][4])
 		copy_v3_v3(baseR[3], baseRS[3]);
 
 		invert_m4_m4(baseinv, basemat);
-		mul_m4_m4m4(R, baseinv, baseR);
+		mult_m4_m4m4(R, baseR, baseinv);
 
 		invert_m4_m4(baseRinv, baseR);
-		mul_m4_m4m4(S, baseRS, baseRinv);
+		mult_m4_m4m4(S, baseRinv, baseRS);
 
 		/* set scaling part */
 		mul_serie_m4(dq->scale, basemat, S, baseinv, NULL, NULL, NULL, NULL, NULL);

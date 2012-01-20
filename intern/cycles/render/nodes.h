@@ -143,6 +143,11 @@ public:
 	int depth;
 };
 
+class CheckerTextureNode : public TextureNode {
+public:
+	SHADER_NODE_CLASS(CheckerTextureNode)
+};
+
 class MappingNode : public ShaderNode {
 public:
 	SHADER_NODE_CLASS(MappingNode)
@@ -154,6 +159,14 @@ class ConvertNode : public ShaderNode {
 public:
 	ConvertNode(ShaderSocketType from, ShaderSocketType to);
 	SHADER_NODE_BASE_CLASS(ConvertNode)
+
+	ShaderSocketType from, to;
+};
+
+class ProxyNode : public ShaderNode {
+public:
+	ProxyNode(ShaderSocketType from, ShaderSocketType to);
+	SHADER_NODE_BASE_CLASS(ProxyNode)
 
 	ShaderSocketType from, to;
 };
@@ -284,6 +297,11 @@ public:
 	SHADER_NODE_CLASS(MixClosureNode)
 };
 
+class InvertNode : public ShaderNode {
+public:
+	SHADER_NODE_CLASS(InvertNode)
+};
+
 class MixNode : public ShaderNode {
 public:
 	SHADER_NODE_CLASS(MixNode)
@@ -292,12 +310,37 @@ public:
 	static ShaderEnum type_enum;
 };
 
+class CombineRGBNode : public ShaderNode {
+public:
+	SHADER_NODE_CLASS(CombineRGBNode)
+};
+
+class GammaNode : public ShaderNode {
+public:
+	SHADER_NODE_CLASS(GammaNode)
+};
+
+class SeparateRGBNode : public ShaderNode {
+public:
+	SHADER_NODE_CLASS(SeparateRGBNode)
+};
+
+class HSVNode : public ShaderNode {
+public:
+	SHADER_NODE_CLASS(HSVNode)
+};
+
 class AttributeNode : public ShaderNode {
 public:
 	SHADER_NODE_CLASS(AttributeNode)
 	void attributes(AttributeRequestSet *attributes);
 
 	ustring attribute;
+};
+
+class CameraNode : public ShaderNode {
+public:
+	SHADER_NODE_CLASS(CameraNode)
 };
 
 class FresnelNode : public ShaderNode {
@@ -316,6 +359,13 @@ public:
 
 	ustring type;
 	static ShaderEnum type_enum;
+};
+
+class NormalNode : public ShaderNode {
+public:
+	SHADER_NODE_CLASS(NormalNode)
+
+	float3 direction;
 };
 
 class VectorMathNode : public ShaderNode {

@@ -580,7 +580,7 @@ void RNA_free(BlenderRNA *brna)
 static size_t rna_property_type_sizeof(PropertyType type)
 {
 	switch(type) {
-		case PROP_BOOLEAN: return sizeof(BooleanPropertyRNA);
+		case PROP_BOOLEAN: return sizeof(BoolPropertyRNA);
 		case PROP_INT: return sizeof(IntPropertyRNA);
 		case PROP_FLOAT: return sizeof(FloatPropertyRNA);
 		case PROP_STRING: return sizeof(StringPropertyRNA);
@@ -1308,7 +1308,7 @@ void RNA_def_property_boolean_default(PropertyRNA *prop, int value)
 
 	switch(prop->type) {
 		case PROP_BOOLEAN: {
-			BooleanPropertyRNA *bprop= (BooleanPropertyRNA*)prop;
+			BoolPropertyRNA *bprop= (BoolPropertyRNA*)prop;
 			bprop->defaultvalue= value;
 			break;
 		}
@@ -1325,7 +1325,7 @@ void RNA_def_property_boolean_array_default(PropertyRNA *prop, const int *array)
 
 	switch(prop->type) {
 		case PROP_BOOLEAN: {
-			BooleanPropertyRNA *bprop= (BooleanPropertyRNA*)prop;
+			BoolPropertyRNA *bprop= (BoolPropertyRNA*)prop;
 			bprop->defaultarray= array;
 			break;
 		}
@@ -1504,7 +1504,8 @@ static PropertyDefRNA *rna_def_property_sdna(PropertyRNA *prop, const char *stru
 			return dp;
 		}
 		else {
-			fprintf(stderr, "%s: \"%s.%s\" not found.\n", __func__, structname, propname);
+			fprintf(stderr, "%s: \"%s.%s\" (identifier \"%s\") not found.\n",
+			        __func__, structname, propname, prop->identifier);
 			DefRNA.error= 1;
 			return NULL;
 		}
@@ -1627,6 +1628,7 @@ void RNA_def_property_int_sdna(PropertyRNA *prop, const char *structname, const 
 void RNA_def_property_float_sdna(PropertyRNA *prop, const char *structname, const char *propname)
 {
 	PropertyDefRNA *dp;
+	FloatPropertyRNA *fprop= (FloatPropertyRNA*)prop;
 	StructRNA *srna= DefRNA.laststruct;
 
 	if(!DefRNA.preprocess) {
@@ -1650,6 +1652,11 @@ void RNA_def_property_float_sdna(PropertyRNA *prop, const char *structname, cons
 					return;
 				}
 			}
+		}
+
+		if(dp->dnatype && strcmp(dp->dnatype, "char") == 0) {
+			fprop->hardmin= fprop->softmin= 0.0f;
+			fprop->hardmax= fprop->softmax= 1.0f;
 		}
 	}
 
@@ -1823,6 +1830,11 @@ void RNA_def_property_collection_sdna(PropertyRNA *prop, const char *structname,
 	}
 }
 
+void RNA_def_property_translation_context(PropertyRNA *prop, const char *context)
+{
+	prop->translation_context= context;
+}
+
 /* Functions */
 
 void RNA_def_property_editable_func(PropertyRNA *prop, const char *editable)
@@ -1888,7 +1900,7 @@ void RNA_def_property_boolean_funcs(PropertyRNA *prop, const char *get, const ch
 
 	switch(prop->type) {
 		case PROP_BOOLEAN: {
-			BooleanPropertyRNA *bprop= (BooleanPropertyRNA*)prop;
+			BoolPropertyRNA *bprop= (BoolPropertyRNA*)prop;
 
 			if(prop->arraydimension) {
 				if(get) bprop->getarray= (PropBooleanArrayGetFunc)get;
@@ -2409,9 +2421,15 @@ PropertyRNA *RNA_def_float_rotation(StructOrFunctionRNA *cont_, const char *iden
 	ContainerRNA *cont= cont_;
 	PropertyRNA *prop;
 	
-	prop= RNA_def_property(cont, identifier, PROP_FLOAT, PROP_EULER); // XXX
-	if(len != 0) RNA_def_property_array(prop, len);
-	if(default_value) RNA_def_property_float_array_default(prop, default_value);
+	prop= RNA_def_property(cont, identifier, PROP_FLOAT, (len != 0) ? PROP_EULER : PROP_ANGLE);
+	if(len != 0) {
+		RNA_def_property_array(prop, len);
+		if(default_value) RNA_def_property_float_array_default(prop, default_value);
+	}
+	else {
+		/* RNA_def_property_float_default must be called outside */
+		BLI_assert(default_value == NULL);
+	}
 	if(hardmin != hardmax) RNA_def_property_range(prop, hardmin, hardmax);
 	RNA_def_property_ui_text(prop, ui_name, ui_description);
 	RNA_def_property_ui_range(prop, softmin, softmax, 1, 3);
@@ -2689,7 +2707,7 @@ int rna_parameter_size_alloc(PropertyRNA *parm)
 
 /* Dynamic Enums */
 
-void RNA_enum_item_add(EnumPropertyItem **items, int *totitem, EnumPropertyItem *item)
+void RNA_enum_item_add(EnumPropertyItem **items, int *totitem, const EnumPropertyItem *item)
 {
 	EnumPropertyItem *newitems;
 	int tot= *totitem;
@@ -2799,7 +2817,7 @@ void RNA_def_property_duplicate_pointers(StructOrFunctionRNA *cont_, PropertyRNA
 
 	switch(prop->type) {
 		case PROP_BOOLEAN: {
-			BooleanPropertyRNA *bprop= (BooleanPropertyRNA*)prop;
+			BoolPropertyRNA *bprop= (BoolPropertyRNA*)prop;
 
 			if(bprop->defaultarray) {
 				iarray= MEM_callocN(sizeof(int)*prop->totarraylength, "RNA_def_property_store");
@@ -2868,7 +2886,7 @@ void RNA_def_property_free_pointers(PropertyRNA *prop)
 
 		switch(prop->type) {
 			case PROP_BOOLEAN: {
-				BooleanPropertyRNA *bprop= (BooleanPropertyRNA*)prop;
+				BoolPropertyRNA *bprop= (BoolPropertyRNA*)prop;
 				if(bprop->defaultarray) MEM_freeN((void*)bprop->defaultarray);
 				break;
 			}

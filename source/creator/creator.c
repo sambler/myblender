@@ -77,6 +77,7 @@
 #include "BKE_node.h"
 #include "BKE_report.h"
 #include "BKE_sound.h"
+#include "BKE_image.h"
 
 #include "IMB_imbuf.h"	// for IMB_init
 
@@ -582,40 +583,14 @@ static int set_image_type(int argc, const char **argv, void *data)
 		const char *imtype = argv[1];
 		Scene *scene= CTX_data_scene(C);
 		if (scene) {
-			if      (!strcmp(imtype,"TGA")) scene->r.imtype = R_TARGA;
-			else if (!strcmp(imtype,"IRIS")) scene->r.imtype = R_IRIS;
-#ifdef WITH_DDS
-			else if (!strcmp(imtype,"DDS")) scene->r.imtype = R_DDS;
-#endif
-			else if (!strcmp(imtype,"JPEG")) scene->r.imtype = R_JPEG90;
-			else if (!strcmp(imtype,"IRIZ")) scene->r.imtype = R_IRIZ;
-			else if (!strcmp(imtype,"RAWTGA")) scene->r.imtype = R_RAWTGA;
-			else if (!strcmp(imtype,"AVIRAW")) scene->r.imtype = R_AVIRAW;
-			else if (!strcmp(imtype,"AVIJPEG")) scene->r.imtype = R_AVIJPEG;
-			else if (!strcmp(imtype,"PNG")) scene->r.imtype = R_PNG;
-			else if (!strcmp(imtype,"AVICODEC")) scene->r.imtype = R_AVICODEC;
-			else if (!strcmp(imtype,"QUICKTIME")) scene->r.imtype = R_QUICKTIME;
-			else if (!strcmp(imtype,"BMP")) scene->r.imtype = R_BMP;
-#ifdef WITH_HDR
-			else if (!strcmp(imtype,"HDR")) scene->r.imtype = R_RADHDR;
-#endif
-#ifdef WITH_TIFF
-			else if (!strcmp(imtype,"TIFF")) scene->r.imtype = R_TIFF;
-#endif
-#ifdef WITH_OPENEXR
-			else if (!strcmp(imtype,"EXR")) scene->r.imtype = R_OPENEXR;
-			else if (!strcmp(imtype,"MULTILAYER")) scene->r.imtype = R_MULTILAYER;
-#endif
-			else if (!strcmp(imtype,"MPEG")) scene->r.imtype = R_FFMPEG;
-			else if (!strcmp(imtype,"FRAMESERVER")) scene->r.imtype = R_FRAMESERVER;
-#ifdef WITH_CINEON
-			else if (!strcmp(imtype,"CINEON")) scene->r.imtype = R_CINEON;
-			else if (!strcmp(imtype,"DPX")) scene->r.imtype = R_DPX;
-#endif
-#ifdef WITH_OPENJPEG
-			else if (!strcmp(imtype,"JP2")) scene->r.imtype = R_JP2;
-#endif
-			else printf("\nError: Format from '-F / --render-format' not known or not compiled in this release.\n");
+			const char imtype_new= BKE_imtype_from_arg(imtype);
+
+			if (imtype_new == R_IMF_IMTYPE_INVALID) {
+				printf("\nError: Format from '-F / --render-format' not known or not compiled in this release.\n");
+			}
+			else {
+				scene->r.im_format.imtype= imtype_new;
+			}
 		}
 		else {
 			printf("\nError: no blend loaded. order the arguments so '-F  / --render-format' is after the blend is loaded.\n");
@@ -888,7 +863,7 @@ static int run_python(int argc, const char **argv, void *data)
 	/* workaround for scripts not getting a bpy.context.scene, causes internal errors elsewhere */
 	if (argc > 1) {
 		/* Make the path absolute because its needed for relative linked blends to be found */
-		char filename[FILE_MAXDIR + FILE_MAXFILE];
+		char filename[FILE_MAX];
 		BLI_strncpy(filename, argv[1], sizeof(filename));
 		BLI_path_cwd(filename);
 
@@ -949,7 +924,13 @@ static int load_file(int UNUSED(argc), const char **argv, void *data)
 	bContext *C = data;
 
 	/* Make the path absolute because its needed for relative linked blends to be found */
-	char filename[FILE_MAXDIR + FILE_MAXFILE];
+	char filename[FILE_MAX];
+
+	/* note, we could skip these, but so far we always tried to load these files */
+	if (argv[0][0] == '-') {
+		fprintf(stderr, "unknown argument, loading as file: %s\n", argv[0]);
+	}
+
 	BLI_strncpy(filename, argv[0], sizeof(filename));
 	BLI_path_cwd(filename);
 
@@ -1127,6 +1108,13 @@ static void setupArguments(bContext *C, bArgs *ba, SYS_SystemHandle *syshandle)
 /* allow python module to call main */
 #define main main_python_enter
 static void *evil_C= NULL;
+
+#ifdef __APPLE__
+/* environ is not available in mac shared libraries */
+#include <crt_externs.h>
+char **environ = NULL;
+#endif
+
 #endif
 
 int main(int argc, const char **argv)
@@ -1136,6 +1124,10 @@ int main(int argc, const char **argv)
 	bArgs *ba;
 
 #ifdef WITH_PYTHON_MODULE
+#ifdef __APPLE__
+	environ = *_NSGetEnviron();
+#endif
+
 #undef main
 	evil_C= C;
 #endif
@@ -1149,7 +1141,7 @@ int main(int argc, const char **argv)
 #endif
 
 	setCallbacks();
-#ifdef __APPLE__
+#if defined(__APPLE__) && !defined(WITH_PYTHON_MODULE)
 		/* patch to ignore argument finder gives us (pid?) */
 	if (argc==2 && strncmp(argv[1], "-psn_", 5)==0) {
 		extern int GHOST_HACK_getFirstFile(char buf[]);

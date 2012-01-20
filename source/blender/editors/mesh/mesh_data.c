@@ -318,14 +318,14 @@ int ED_mesh_color_remove_named(bContext *C, Object *ob, Mesh *me, const char *na
 
 static int layers_poll(bContext *C)
 {
-	Object *ob= CTX_data_pointer_get_type(C, "object", &RNA_Object).data;
+	Object *ob= ED_object_context(C);
 	ID *data= (ob)? ob->data: NULL;
 	return (ob && !ob->id.lib && ob->type==OB_MESH && data && !data->lib);
 }
 
 static int uv_texture_add_exec(bContext *C, wmOperator *UNUSED(op))
 {
-	Object *ob= CTX_data_pointer_get_type(C, "object", &RNA_Object).data;
+	Object *ob= ED_object_context(C);
 	Mesh *me= ob->data;
 
 	if(!ED_mesh_uv_texture_add(C, me, NULL, TRUE))
@@ -337,8 +337,8 @@ static int uv_texture_add_exec(bContext *C, wmOperator *UNUSED(op))
 void MESH_OT_uv_texture_add(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Add UV Texture";
-	ot->description= "Add UV texture layer";
+	ot->name= "Add UV Map";
+	ot->description= "Add UV Map";
 	ot->idname= "MESH_OT_uv_texture_add";
 	
 	/* api callbacks */
@@ -359,7 +359,7 @@ static int drop_named_image_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	Mesh *me;
 	Object *obedit;
 	int exitmode= 0;
-	char name[32];
+	char name[MAX_ID_NAME-2];
 	
 	/* Check context */
 	if(base==NULL || base->object->type!=OB_MESH) {
@@ -368,7 +368,7 @@ static int drop_named_image_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	}
 	
 	/* check input variables */
-	if(RNA_property_is_set(op->ptr, "filepath")) {
+	if(RNA_struct_property_is_set(op->ptr, "filepath")) {
 		char path[FILE_MAX];
 		
 		RNA_string_get(op->ptr, "filepath", path);
@@ -417,8 +417,8 @@ static int drop_named_image_invoke(bContext *C, wmOperator *op, wmEvent *event)
 void MESH_OT_drop_named_image(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Assign Image to UV Texture";
-	ot->description= "Assigns Image to active UV layer, or creates a UV layer";
+	ot->name= "Assign Image to UV Map";
+	ot->description= "Assign Image to active UV Map, or create an UV Map";
 	ot->idname= "MESH_OT_drop_named_image";
 	
 	/* api callbacks */
@@ -429,13 +429,13 @@ void MESH_OT_drop_named_image(wmOperatorType *ot)
 	ot->flag= OPTYPE_UNDO;
 	
 	/* properties */
-	RNA_def_string(ot->srna, "name", "Image", 24, "Name", "Image name to assign");
+	RNA_def_string(ot->srna, "name", "Image", MAX_ID_NAME-2, "Name", "Image name to assign");
 	RNA_def_string(ot->srna, "filepath", "Path", FILE_MAX, "Filepath", "Path to image file");
 }
 
 static int uv_texture_remove_exec(bContext *C, wmOperator *UNUSED(op))
 {
-	Object *ob= CTX_data_pointer_get_type(C, "object", &RNA_Object).data;
+	Object *ob= ED_object_context(C);
 	Mesh *me= ob->data;
 
 	if(!ED_mesh_uv_texture_remove(C, ob, me))
@@ -447,8 +447,8 @@ static int uv_texture_remove_exec(bContext *C, wmOperator *UNUSED(op))
 void MESH_OT_uv_texture_remove(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Remove UV Texture";
-	ot->description= "Remove UV texture layer";
+	ot->name= "Remove UV Map";
+	ot->description= "Remove UV Map";
 	ot->idname= "MESH_OT_uv_texture_remove";
 	
 	/* api callbacks */
@@ -464,7 +464,7 @@ void MESH_OT_uv_texture_remove(wmOperatorType *ot)
 static int vertex_color_add_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	Scene *scene= CTX_data_scene(C);
-	Object *ob= CTX_data_pointer_get_type(C, "object", &RNA_Object).data;
+	Object *ob= ED_object_context(C);
 	Mesh *me= ob->data;
 
 	if(!ED_mesh_color_add(C, scene, ob, me, NULL, TRUE))
@@ -490,7 +490,7 @@ void MESH_OT_vertex_color_add(wmOperatorType *ot)
 
 static int vertex_color_remove_exec(bContext *C, wmOperator *UNUSED(op))
 {
-	Object *ob= CTX_data_pointer_get_type(C, "object", &RNA_Object).data;
+	Object *ob= ED_object_context(C);
 	Mesh *me= ob->data;
 
 	if(!ED_mesh_color_remove(C, ob, me))
@@ -520,7 +520,7 @@ static int sticky_add_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	Scene *scene= CTX_data_scene(C);
 	View3D *v3d= CTX_wm_view3d(C);
-	Object *ob= CTX_data_pointer_get_type(C, "object", &RNA_Object).data;
+	Object *ob= ED_object_context(C);
 	Mesh *me= ob->data;
 
 	/*if(me->msticky)
@@ -551,7 +551,7 @@ void MESH_OT_sticky_add(wmOperatorType *ot)
 
 static int sticky_remove_exec(bContext *C, wmOperator *UNUSED(op))
 {
-	Object *ob= CTX_data_pointer_get_type(C, "object", &RNA_Object).data;
+	Object *ob= ED_object_context(C);
 	Mesh *me= ob->data;
 
 	if(!me->msticky)
@@ -695,6 +695,46 @@ static void mesh_add_faces(Mesh *mesh, int len)
 	mesh->totface= totface;
 }
 
+static void mesh_remove_verts(Mesh *mesh, int len)
+{
+	int totvert;
+
+	if(len == 0)
+		return;
+
+	totvert= mesh->totvert - len;
+	CustomData_free_elem(&mesh->vdata, totvert, len);
+
+	/* set final vertex list size */
+	mesh->totvert= totvert;
+}
+
+static void mesh_remove_edges(Mesh *mesh, int len)
+{
+	int totedge;
+
+	if(len == 0)
+		return;
+
+	totedge= mesh->totedge - len;
+	CustomData_free_elem(&mesh->edata, totedge, len);
+
+	mesh->totedge= totedge;
+}
+
+static void mesh_remove_faces(Mesh *mesh, int len)
+{
+	int totface;
+
+	if(len == 0)
+		return;
+
+	totface= mesh->totface - len;	/* new face count */
+	CustomData_free_elem(&mesh->fdata, totface, len);
+
+	mesh->totface= totface;
+}
+
 /*
 void ED_mesh_geometry_add(Mesh *mesh, ReportList *reports, int verts, int edges, int faces)
 {
@@ -740,6 +780,48 @@ void ED_mesh_vertices_add(Mesh *mesh, ReportList *reports, int count)
 	}
 
 	mesh_add_verts(mesh, count);
+}
+
+void ED_mesh_faces_remove(Mesh *mesh, ReportList *reports, int count)
+{
+	if(mesh->edit_mesh) {
+		BKE_report(reports, RPT_ERROR, "Can't remove faces in edit mode");
+		return;
+	}
+	else if(count > mesh->totface) {
+		BKE_report(reports, RPT_ERROR, "Can't remove more faces than the mesh contains");
+		return;
+	}
+
+	mesh_remove_faces(mesh, count);
+}
+
+void ED_mesh_edges_remove(Mesh *mesh, ReportList *reports, int count)
+{
+	if(mesh->edit_mesh) {
+		BKE_report(reports, RPT_ERROR, "Can't remove edges in edit mode");
+		return;
+	}
+	else if(count > mesh->totedge) {
+		BKE_report(reports, RPT_ERROR, "Can't remove more edges than the mesh contains");
+		return;
+	}
+
+	mesh_remove_edges(mesh, count);
+}
+
+void ED_mesh_vertices_remove(Mesh *mesh, ReportList *reports, int count)
+{
+	if(mesh->edit_mesh) {
+		BKE_report(reports, RPT_ERROR, "Can't remove vertices in edit mode");
+		return;
+	}
+	else if(count > mesh->totvert) {
+		BKE_report(reports, RPT_ERROR, "Can't remove more vertices than the mesh contains");
+		return;
+	}
+
+	mesh_remove_verts(mesh, count);
 }
 
 void ED_mesh_calc_normals(Mesh *me)

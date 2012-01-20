@@ -177,7 +177,8 @@ void UI_view2d_region_reinit(View2D *v2d, short type, int winx, int winy)
 		
 		/* see eView2D_CommonViewTypes in UI_view2d.h for available view presets */
 		switch (type) {
-			/* 'standard view' - optimum setup for 'standard' view behaviour, that should be used new views as basis for their
+			/* 'standard view' - optimum setup for 'standard' view behaviour,
+			 *  that should be used new views as basis for their
 			 * 	own unique View2D settings, which should be used instead of this in most cases...
 			 */
 			case V2D_COMMONVIEW_STANDARD:
@@ -1506,7 +1507,7 @@ View2DScrollers *UI_view2d_scrollers_calc(const bContext *C, View2D *v2d, short 
 static void scroll_printstr(Scene *scene, float x, float y, float val, int power, short unit, char dir)
 {
 	int len;
-	char str[32];
+	char timecode_str[32];
 	
 	/* adjust the scale unit to work ok */
 	if (dir == 'v') {
@@ -1521,10 +1522,10 @@ static void scroll_printstr(Scene *scene, float x, float y, float val, int power
 	}
 	
 	/* get string to print */
-	ANIM_timecode_string_from_frame(str, scene, power, (unit == V2D_UNIT_SECONDS), val);
+	ANIM_timecode_string_from_frame(timecode_str, scene, power, (unit == V2D_UNIT_SECONDS), val);
 	
 	/* get length of string, and adjust printing location to fit it into the horizontal scrollbar */
-	len= strlen(str);
+	len= strlen(timecode_str);
 	if (dir == 'h') {
 		/* seconds/timecode display has slightly longer strings... */
 		if (unit == V2D_UNIT_SECONDS)
@@ -1535,12 +1536,12 @@ static void scroll_printstr(Scene *scene, float x, float y, float val, int power
 	
 	/* Add degree sympbol to end of string for vertical scrollbar? */
 	if ((dir == 'v') && (unit == V2D_UNIT_DEGREES)) {
-		str[len]= 186;
-		str[len+1]= 0;
+		timecode_str[len]= 186;
+		timecode_str[len+1]= 0;
 	}
 	
 	/* draw it */
-	BLF_draw_default_ascii(x, y, 0.0f, str, sizeof(str)-1);
+	BLF_draw_default_ascii(x, y, 0.0f, timecode_str, sizeof(timecode_str));
 }
 
 /* Draw scrollbars in the given 2d-region */
@@ -1558,7 +1559,7 @@ void UI_view2d_scrollers_draw(const bContext *C, View2D *v2d, View2DScrollers *v
 	if (scroll & V2D_SCROLL_HORIZONTAL) {
 		/* only draw scrollbar when it doesn't fill the entire space */
 		if(vs->horfull==0) {
-			bTheme *btheme= U.themes.first;
+			bTheme *btheme= UI_GetTheme();
 			uiWidgetColors wcol= btheme->tui.wcol_scroll;
 			rcti slider;
 			int state;
@@ -1669,7 +1670,7 @@ void UI_view2d_scrollers_draw(const bContext *C, View2D *v2d, View2DScrollers *v
 	if (scroll & V2D_SCROLL_VERTICAL) {
 		/* only draw scrollbar when it doesn't fill the entire space */
 		if(vs->vertfull==0) {
-			bTheme *btheme= U.themes.first;
+			bTheme *btheme= UI_GetTheme();
 			uiWidgetColors wcol= btheme->tui.wcol_scroll;
 			rcti slider;
 			int state;
@@ -2092,11 +2093,11 @@ void UI_view2d_text_cache_draw(ARegion *ar)
 		}
 
 		if(v2s->rect.xmin >= v2s->rect.xmax)
-			BLF_draw_default((float)v2s->mval[0]+xofs, (float)v2s->mval[1]+yofs, 0.0, str, 65535);
+			BLF_draw_default((float)v2s->mval[0]+xofs, (float)v2s->mval[1]+yofs, 0.0, str, BLF_DRAW_STR_DUMMY_MAX);
 		else {
 			BLF_clipping_default(v2s->rect.xmin-4, v2s->rect.ymin-4, v2s->rect.xmax+4, v2s->rect.ymax+4);
 			BLF_enable_default(BLF_CLIPPING);
-			BLF_draw_default(v2s->rect.xmin+xofs, v2s->rect.ymin+yofs, 0.0f, str, 65535);
+			BLF_draw_default(v2s->rect.xmin+xofs, v2s->rect.ymin+yofs, 0.0f, str, BLF_DRAW_STR_DUMMY_MAX);
 			BLF_disable_default(BLF_CLIPPING);
 		}
 	}

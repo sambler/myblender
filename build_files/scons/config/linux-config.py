@@ -140,7 +140,7 @@ BF_FFMPEG_LIBPATH='${BF_FFMPEG}/lib'
 #BF_FFMPEG_LIB_STATIC = '${BF_FFMPEG_LIBPATH}/libavformat.a ${BF_FFMPEG_LIBPATH/libavcodec.a ${BF_FFMPEG_LIBPATH}/libswscale.a ${BF_FFMPEG_LIBPATH}/libavutil.a ${BF_FFMPEG_LIBPATH}/libavdevice.a'
 
 # enable ogg, vorbis and theora in ffmpeg
-WITH_BF_OGG = False  # -DWITH_OGG 
+WITH_BF_OGG = False
 BF_OGG = '/usr'
 BF_OGG_INC = '${BF_OGG}/include'
 BF_OGG_LIB = 'ogg vorbis vorbisenc theoraenc theoradec'
@@ -219,6 +219,10 @@ BF_BOOST_LIBPATH = BF_BOOST + '/lib'
 
 WITH_BF_CYCLES = WITH_BF_OIIO and WITH_BF_BOOST
 
+WITH_BF_CYCLES_CUDA_BINARIES = False
+BF_CYCLES_CUDA_NVCC = '/usr/local/cuda/bin/nvcc'
+BF_CYCLES_CUDA_BINARIES_ARCH = ['sm_13', 'sm_20', 'sm_21']
+
 WITH_BF_OPENMP = True
 
 #Ray trace optimization
@@ -247,8 +251,8 @@ CPPFLAGS = []
 # g++ 4.6, only needed for bullet
 CXXFLAGS += ['-fpermissive']
 if WITH_BF_FFMPEG:
-  # libavutil needs UINT64_C()
-  CXXFLAGS += ['-D__STDC_CONSTANT_MACROS', ]
+    # libavutil needs UINT64_C()
+    CXXFLAGS += ['-D__STDC_CONSTANT_MACROS', ]
 REL_CFLAGS = []
 REL_CXXFLAGS = []
 REL_CCFLAGS = ['-DNDEBUG', '-O2']

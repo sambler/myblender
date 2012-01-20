@@ -59,6 +59,7 @@
 
 #include "BLI_math.h"
 #include "BLI_utildefines.h"
+#include "BLI_string.h"
 
 //#include "blendef.h"
 //
@@ -138,7 +139,8 @@ void constraintNumInput(TransInfo *t, float vec[3])
 	}
 }
 
-static void postConstraintChecks(TransInfo *t, float vec[3], float pvec[3]) {
+static void postConstraintChecks(TransInfo *t, float vec[3], float pvec[3])
+{
 	int i = 0;
 
 	mul_m3_v3(t->con.imtx, vec);
@@ -209,7 +211,8 @@ static void viewAxisCorrectCenter(TransInfo *t, float t_con_center[3])
 	}
 }
 
-static void axisProjection(TransInfo *t, float axis[3], float in[3], float out[3]) {
+static void axisProjection(TransInfo *t, float axis[3], float in[3], float out[3])
+{
 	float norm[3], vec[3], factor, angle;
 	float t_con_center[3];
 
@@ -284,7 +287,8 @@ static void axisProjection(TransInfo *t, float axis[3], float in[3], float out[3
 	}
 }
 
-static void planeProjection(TransInfo *t, float in[3], float out[3]) {
+static void planeProjection(TransInfo *t, float in[3], float out[3])
+{
 	float vec[3], factor, norm[3];
 
 	add_v3_v3v3(vec, in, t->con.center);
@@ -547,8 +551,9 @@ static void applyObjectConstraintRot(TransInfo *t, TransData *td, float vec[3], 
 
 /*--------------------- INTERNAL SETUP CALLS ------------------*/
 
-void setConstraint(TransInfo *t, float space[3][3], int mode, const char text[]) {
-	strncpy(t->con.text + 1, text, 48);
+void setConstraint(TransInfo *t, float space[3][3], int mode, const char text[])
+{
+	BLI_strncpy(t->con.text + 1, text, sizeof(t->con.text) - 1);
 	copy_m3_m3(t->con.mtx, space);
 	t->con.mode = mode;
 	getConstraintMatrix(t);
@@ -562,7 +567,8 @@ void setConstraint(TransInfo *t, float space[3][3], int mode, const char text[])
 	t->redraw = 1;
 }
 
-void setLocalConstraint(TransInfo *t, int mode, const char text[]) {
+void setLocalConstraint(TransInfo *t, int mode, const char text[])
+{
 	if (t->flag & T_EDIT) {
 		float obmat[3][3];
 		copy_m3_m4(obmat, t->scene->obedit->obmat);
@@ -574,7 +580,7 @@ void setLocalConstraint(TransInfo *t, int mode, const char text[]) {
 			setConstraint(t, t->data->axismtx, mode, text);
 		}
 		else {
-			strncpy(t->con.text + 1, text, 48);
+			BLI_strncpy(t->con.text + 1, text, sizeof(t->con.text) - 1);
 			copy_m3_m3(t->con.mtx, t->data->axismtx);
 			t->con.mode = mode;
 			getConstraintMatrix(t);
@@ -593,38 +599,39 @@ void setLocalConstraint(TransInfo *t, int mode, const char text[]) {
 /*
 	Set the constraint according to the user defined orientation
 
-	ftext is a format string passed to sprintf. It will add the name of
+	ftext is a format string passed to BLI_snprintf. It will add the name of
 	the orientation where %s is (logically).
 */
-void setUserConstraint(TransInfo *t, short orientation, int mode, const char ftext[]) {
+void setUserConstraint(TransInfo *t, short orientation, int mode, const char ftext[])
+{
 	char text[40];
 
 	switch(orientation) {
 	case V3D_MANIP_GLOBAL:
 		{
 			float mtx[3][3]= MAT3_UNITY;
-			sprintf(text, ftext, "global");
+			BLI_snprintf(text, sizeof(text), ftext, "global");
 			setConstraint(t, mtx, mode, text);
 		}
 		break;
 	case V3D_MANIP_LOCAL:
-		sprintf(text, ftext, "local");
+		BLI_snprintf(text, sizeof(text), ftext, "local");
 		setLocalConstraint(t, mode, text);
 		break;
 	case V3D_MANIP_NORMAL:
-		sprintf(text, ftext, "normal");
+		BLI_snprintf(text, sizeof(text), ftext, "normal");
 		setConstraint(t, t->spacemtx, mode, text);
 		break;
 	case V3D_MANIP_VIEW:
-		sprintf(text, ftext, "view");
+		BLI_snprintf(text, sizeof(text), ftext, "view");
 		setConstraint(t, t->spacemtx, mode, text);
 		break;
 	case V3D_MANIP_GIMBAL:
-		sprintf(text, ftext, "gimbal");
+		BLI_snprintf(text, sizeof(text), ftext, "gimbal");
 		setConstraint(t, t->spacemtx, mode, text);
 		break;
 	default: /* V3D_MANIP_CUSTOM */
-		sprintf(text, ftext, t->spacename);
+		BLI_snprintf(text, sizeof(text), ftext, t->spacename);
 		setConstraint(t, t->spacemtx, mode, text);
 		break;
 	}
@@ -744,7 +751,8 @@ void drawPropCircle(const struct bContext *C, TransInfo *t)
 	}
 }
 
-static void drawObjectConstraint(TransInfo *t) {
+static void drawObjectConstraint(TransInfo *t)
+{
 	int i;
 	TransData * td = t->data;
 
@@ -781,13 +789,15 @@ static void drawObjectConstraint(TransInfo *t) {
 
 /*--------------------- START / STOP CONSTRAINTS ---------------------- */
 
-void startConstraint(TransInfo *t) {
+void startConstraint(TransInfo *t)
+{
 	t->con.mode |= CON_APPLY;
 	*t->con.text = ' ';
 	t->num.idx_max = MIN2(getConstraintSpaceDimension(t) - 1, t->idx_max);
 }
 
-void stopConstraint(TransInfo *t) {
+void stopConstraint(TransInfo *t)
+{
 	t->con.mode &= ~(CON_APPLY|CON_SELECT);
 	*t->con.text = '\0';
 	t->num.idx_max = t->idx_max;
@@ -836,7 +846,8 @@ void initSelectConstraint(TransInfo *t, float mtx[3][3])
 	t->con.applyRot = applyAxisConstraintRot;
 }
 
-void selectConstraint(TransInfo *t) {
+void selectConstraint(TransInfo *t)
+{
 	if (t->con.mode & CON_SELECT) {
 		setNearestAxis(t);
 		startConstraint(t);
@@ -864,11 +875,11 @@ static void setNearestAxis2d(TransInfo *t)
 	/* no correction needed... just use whichever one is lower */
 	if ( abs(t->mval[0]-t->con.imval[0]) < abs(t->mval[1]-t->con.imval[1]) ) {
 		t->con.mode |= CON_AXIS1;
-		sprintf(t->con.text, " along Y axis");
+		BLI_snprintf(t->con.text, sizeof(t->con.text), " along Y axis");
 	}
 	else {
 		t->con.mode |= CON_AXIS0;
-		sprintf(t->con.text, " along X axis");
+		BLI_snprintf(t->con.text, sizeof(t->con.text), " along X axis");
 	}
 }
 
@@ -919,31 +930,31 @@ static void setNearestAxis3d(TransInfo *t)
 	if (len[0] <= len[1] && len[0] <= len[2]) {
 		if (t->modifiers & MOD_CONSTRAINT_PLANE) {
 			t->con.mode |= (CON_AXIS1|CON_AXIS2);
-			sprintf(t->con.text, " locking %s X axis", t->spacename);
+			BLI_snprintf(t->con.text, sizeof(t->con.text), " locking %s X axis", t->spacename);
 		}
 		else {
 			t->con.mode |= CON_AXIS0;
-			sprintf(t->con.text, " along %s X axis", t->spacename);
+			BLI_snprintf(t->con.text, sizeof(t->con.text), " along %s X axis", t->spacename);
 		}
 	}
 	else if (len[1] <= len[0] && len[1] <= len[2]) {
 		if (t->modifiers & MOD_CONSTRAINT_PLANE) {
 			t->con.mode |= (CON_AXIS0|CON_AXIS2);
-			sprintf(t->con.text, " locking %s Y axis", t->spacename);
+			BLI_snprintf(t->con.text, sizeof(t->con.text), " locking %s Y axis", t->spacename);
 		}
 		else {
 			t->con.mode |= CON_AXIS1;
-			sprintf(t->con.text, " along %s Y axis", t->spacename);
+			BLI_snprintf(t->con.text, sizeof(t->con.text), " along %s Y axis", t->spacename);
 		}
 	}
 	else if (len[2] <= len[1] && len[2] <= len[0]) {
 		if (t->modifiers & MOD_CONSTRAINT_PLANE) {
 			t->con.mode |= (CON_AXIS0|CON_AXIS1);
-			sprintf(t->con.text, " locking %s Z axis", t->spacename);
+			BLI_snprintf(t->con.text, sizeof(t->con.text), " locking %s Z axis", t->spacename);
 		}
 		else {
 			t->con.mode |= CON_AXIS2;
-			sprintf(t->con.text, " along %s Z axis", t->spacename);
+			BLI_snprintf(t->con.text, sizeof(t->con.text), " along %s Z axis", t->spacename);
 		}
 	}
 }
@@ -970,7 +981,8 @@ void setNearestAxis(TransInfo *t)
 
 /*-------------- HELPER FUNCTIONS ----------------*/
 
-char constraintModeToChar(TransInfo *t) {
+char constraintModeToChar(TransInfo *t)
+{
 	if ((t->con.mode & CON_APPLY)==0) {
 		return '\0';
 	}
@@ -990,7 +1002,8 @@ char constraintModeToChar(TransInfo *t) {
 }
 
 
-int isLockConstraint(TransInfo *t) {
+int isLockConstraint(TransInfo *t)
+{
 	int mode = t->con.mode;
 
 	if ( (mode & (CON_AXIS0|CON_AXIS1)) == (CON_AXIS0|CON_AXIS1))

@@ -40,6 +40,7 @@
 #include "BLI_rand.h"
 #include "BLI_utildefines.h"
 
+#include "DNA_defs.h"
 #include "DNA_meta_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
@@ -178,45 +179,6 @@ void MBALL_OT_select_all(wmOperatorType *ot)
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 
 	WM_operator_properties_select_all(ot);
-}
-
-/***************************** Select inverse operator *****************************/
-
-/* Invert metaball selection */
-static int select_inverse_metaelems_exec(bContext *C, wmOperator *UNUSED(op))
-{
-	Object *obedit= CTX_data_edit_object(C);
-	MetaBall *mb = (MetaBall*)obedit->data;
-	MetaElem *ml;
-	
-	ml= mb->editelems->first;
-	if(ml) {
-		while(ml) {
-			if(ml->flag & SELECT)
-				ml->flag &= ~SELECT;
-			else
-				ml->flag |= SELECT;
-			ml= ml->next;
-		}
-		WM_event_add_notifier(C, NC_GEOM|ND_SELECT, mb);
-	}
-	
-	return OPERATOR_FINISHED;
-}
-
-void MBALL_OT_select_inverse_metaelems(wmOperatorType *ot)
-{
-	/* identifiers */
-	ot->name= "Inverse";
-	ot->description= "Select inverse of (un)selected metaelements";
-	ot->idname= "MBALL_OT_select_inverse_metaelems";
-
-	/* callback functions */
-	ot->exec= select_inverse_metaelems_exec;
-	ot->poll= ED_operator_editmball;
-
-	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;	
 }
 
 /***************************** Select random operator *****************************/

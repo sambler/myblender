@@ -852,7 +852,7 @@ static void filelist_read_library(struct FileList* filelist)
 		file = filelist->filelist;
 		for(num=0; num<filelist->numfiles; num++, file++) {
 			if(BLO_has_bfile_extension(file->relname)) {
-				char name[FILE_MAXDIR+FILE_MAXFILE];
+				char name[FILE_MAX];
 			
 				BLI_strncpy(name, filelist->dir, sizeof(name));
 				strcat(name, file->relname);
@@ -970,7 +970,7 @@ int filelist_islibrary(struct FileList* filelist, char* dir, char* group)
 	return BLO_is_a_library(filelist->dir, dir, group);
 }
 
-static int groupname_to_code(char *group)
+static int groupname_to_code(const char *group)
 {
 	char buf[32];
 	char *lslash;
@@ -988,7 +988,7 @@ void filelist_from_library(struct FileList* filelist)
 	LinkNode *l, *names, *previews;
 	struct ImBuf* ima;
 	int ok, i, nprevs, nnames, idcode;
-	char filename[FILE_MAXDIR+FILE_MAXFILE];
+	char filename[FILE_MAX];
 	char dir[FILE_MAX], group[GROUP_MAX];	
 	
 	/* name test */
@@ -1179,7 +1179,7 @@ void filelist_from_main(struct FileList *filelist)
 					if(id->lib==NULL)
 						files->relname= BLI_strdup(id->name+2);
 					else {
-						files->relname= MEM_mallocN(FILE_MAXDIR+FILE_MAXFILE+32, "filename for lib");
+						files->relname= MEM_mallocN(FILE_MAX+32, "filename for lib");
 						sprintf(files->relname, "%s | %s", id->lib->name, id->name+2);
 					}
 					files->type |= S_IFREG;
@@ -1199,10 +1199,10 @@ void filelist_from_main(struct FileList *filelist)
 					if(idcode == ID_MA || idcode == ID_TE || idcode == ID_LA || idcode == ID_WO || idcode == ID_IM) {
 						files->flags |= IMAGEFILE;
 					}
-					if(id->lib && fake) sprintf(files->extra, "LF %d", id->us);
-					else if(id->lib) sprintf(files->extra, "L    %d", id->us);
-					else if(fake) sprintf(files->extra, "F    %d", id->us);
-					else sprintf(files->extra, "      %d", id->us);
+					if(id->lib && fake) BLI_snprintf(files->extra, sizeof(files->extra), "LF %d", id->us);
+					else if(id->lib) BLI_snprintf(files->extra, sizeof(files->extra), "L    %d", id->us);
+					else if(fake) BLI_snprintf(files->extra, sizeof(files->extra), "F    %d", id->us);
+					else BLI_snprintf(files->extra, sizeof(files->extra), "      %d", id->us);
 					
 					if(id->lib) {
 						if(totlib==0) firstlib= files;

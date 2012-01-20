@@ -564,8 +564,6 @@ void free_editMesh(EditMesh *em)
 
 	em->totvert= em->totedge= em->totface= 0;
 
-// XXX	if(em->retopo_paint_data) retopo_free_paint_data(em->retopo_paint_data);
-	em->retopo_paint_data= NULL;
 	em->act_face = NULL;
 }
 
@@ -743,7 +741,8 @@ void make_editMesh(Scene *scene, Object *ob)
 	EditSelection *ese;
 	float *co, (*keyco)[3]= NULL;
 	int tot, a, eekadoodle= 0;
-	const short is_paint_sel= paint_facesel_test(ob);
+	const short is_paint_face_sel=                             paint_facesel_test(ob);
+	const short is_paint_vert_sel= is_paint_face_sel ? FALSE : paint_vertsel_test(ob);
 
 	if(me->edit_mesh==NULL)
 		me->edit_mesh= MEM_callocN(sizeof(EditMesh), "editmesh");
@@ -794,8 +793,8 @@ void make_editMesh(Scene *scene, Object *ob)
 		evlist[a]= eve;
 		
 		/* face select sets selection in next loop */
-		if(!is_paint_sel)
-			eve->f |= (mvert->flag & 1);
+		if(!is_paint_face_sel)
+			eve->f |= (mvert->flag & SELECT);
 		
 		if (mvert->flag & ME_HIDE) eve->h= 1;
 		normal_short_to_float_v3(eve->no, mvert->no);
@@ -821,15 +820,25 @@ void make_editMesh(Scene *scene, Object *ob)
 			eed= addedgelist(em, evlist[medge->v1], evlist[medge->v2], NULL);
 			/* eed can be zero when v1 and v2 are identical, dxf import does this... */
 			if(eed) {
+				int is_sel;
+				if (is_paint_vert_sel) {
+					/* when from vertex select, flush flags to edges,
+					 * allow selection, code below handles editmode selection conversion */
+					is_sel= (eed->v1->f & SELECT) && (eed->v2->f & SELECT);
+				}
+				else {
+					is_sel= (medge->flag & SELECT);
+				}
+
 				eed->crease= ((float)medge->crease)/255.0f;
 				eed->bweight= ((float)medge->bweight)/255.0f;
 				
 				if(medge->flag & ME_SEAM) eed->seam= 1;
 				if(medge->flag & ME_SHARP) eed->sharp = 1;
-				if(medge->flag & SELECT) eed->f |= SELECT;
 				if(medge->flag & ME_FGON) eed->h= EM_FGON;	// 2 different defines!
 				if(medge->flag & ME_HIDE) eed->h |= 1;
-				if(em->selectmode==SCE_SELECT_EDGE) 
+				if(is_sel) eed->f |= SELECT;
+				if(em->selectmode==SCE_SELECT_EDGE)
 					EM_select_edge(eed, eed->f & SELECT);		// force edge selection to vertices, seems to be needed ...
 				CustomData_to_em_block(&me->edata,&em->edata, a, &eed->data);
 			}
@@ -859,15 +868,30 @@ void make_editMesh(Scene *scene, Object *ob)
 				if(mface->flag & ME_HIDE) {
 					efa->h= 1;
 				} else {
+					int is_sel;
+
+					if (!is_paint_vert_sel) {
+						is_sel= (mface->flag & ME_FACE_SEL);
+					}
+					else {
+						/* when from vertex select, flush flags to edges,
+						 * allow selection, code below handles editmode selection conversion */
+						is_sel= ( (efa->v1->f & SELECT) &&
+						          (efa->v2->f & SELECT) &&
+						          (efa->v3->f & SELECT) &&
+						          (efa->v4 == NULL || efa->v4->f & SELECT)
+						          );
+					}
+
 					if (a==me->act_face) {
 						EM_set_actFace(em, efa);
 					}
 					
 					/* dont allow hidden and selected */
-					if(mface->flag & ME_FACE_SEL) {
+					if(is_sel) {
 						efa->f |= SELECT;
 						
-						if(is_paint_sel) {
+						if(is_paint_face_sel) {
 							EM_select_face(efa, 1); /* flush down */
 						}
 
@@ -896,7 +920,10 @@ void make_editMesh(Scene *scene, Object *ob)
 		
 		for(a=0; a<me->totselect; a++, mselect++){
 			/*check if recorded selection is still valid, if so copy into editmesh*/
-			if( (mselect->type == EDITVERT && me->mvert[mselect->index].flag & SELECT) || (mselect->type == EDITEDGE && me->medge[mselect->index].flag & SELECT) || (mselect->type == EDITFACE && me->mface[mselect->index].flag & ME_FACE_SEL) ){
+			if ( (mselect->type == EDITVERT && me->mvert[mselect->index].flag & SELECT) ||
+			     (mselect->type == EDITEDGE && me->medge[mselect->index].flag & SELECT) ||
+			     (mselect->type == EDITFACE && me->mface[mselect->index].flag & ME_FACE_SEL) )
+			{
 				ese = MEM_callocN(sizeof(EditSelection), "Edit Selection");
 				ese->type = mselect->type;	
 				if(ese->type == EDITVERT) ese->data = EM_get_vert_for_index(mselect->index); else
@@ -1549,7 +1576,7 @@ void MESH_OT_separate(wmOperatorType *ot)
 	ot->poll= ED_operator_editmesh;
 	
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag= OPTYPE_UNDO;
 	
 	ot->prop= RNA_def_enum(ot->srna, "type", prop_separate_types, 0, "Type", "");
 }
@@ -1600,7 +1627,6 @@ typedef struct UndoMesh {
 	EditSelectionC *selected;
 	int totvert, totedge, totface, totsel;
 	int selectmode, shapenr;
-	char retopo_mode;
 	CustomData vdata, edata, fdata;
 } UndoMesh;
 
@@ -1614,7 +1640,6 @@ static void free_undoMesh(void *umv)
 	if(um->edges) MEM_freeN(um->edges);
 	if(um->faces) MEM_freeN(um->faces);
 	if(um->selected) MEM_freeN(um->selected);
-// XXX	if(um->retopo_paint_data) retopo_free_paint_data(um->retopo_paint_data);
 	CustomData_free(&um->vdata, um->totvert);
 	CustomData_free(&um->edata, um->totedge);
 	CustomData_free(&um->fdata, um->totface);
@@ -1715,9 +1740,6 @@ static void *editMesh_to_undoMesh(void *emv)
 		else if(ese->type == EDITFACE) a = esec->index = ((EditFace*)ese->data)->tmp.l;
 	}
 
-// XXX	um->retopo_paint_data= retopo_paint_data_copy(em->retopo_paint_data);
-//	um->retopo_mode= scene->toolsettings->retopo_mode;
-	
 	return um;
 }
 
@@ -1823,16 +1845,6 @@ static void undoMesh_to_editMesh(void *umv, void *emv)
 	EM_nvertices_selected(em);
 	EM_nedges_selected(em);
 	EM_nfaces_selected(em);
-
-// XXX	retopo_free_paint();
-//	em->retopo_paint_data= retopo_paint_data_copy(um->retopo_paint_data);
-//	scene->toolsettings->retopo_mode= um->retopo_mode;
-//	if(scene->toolsettings->retopo_mode) {
-// XXX		if(G.vd->depths) G.vd->depths->damaged= 1;
-//		retopo_queue_updates(G.vd);
-//		retopo_paint_view_update(G.vd);
-//	}
-	
 }
 
 static void *getEditMesh(bContext *C)

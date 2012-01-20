@@ -451,7 +451,8 @@ static bool g_hasFirstFile = false;
 static char g_firstFileBuf[512];
 
 //TODO:Need to investigate this. Function called too early in creator.c to have g_hasFirstFile == true
-extern "C" int GHOST_HACK_getFirstFile(char buf[FIRSTFILEBUFLG]) { 
+extern "C" int GHOST_HACK_getFirstFile(char buf[FIRSTFILEBUFLG])
+{
 	if (g_hasFirstFile) {
 		strncpy(buf, g_firstFileBuf, FIRSTFILEBUFLG - 1);
 		buf[FIRSTFILEBUFLG - 1] = '\0';
@@ -1765,7 +1766,7 @@ GHOST_TUns8* GHOST_SystemCocoa::getClipboard(bool selection) const
 		return NULL;
 	}
 	
-	pastedTextSize = [textPasted lengthOfBytesUsingEncoding:NSISOLatin1StringEncoding];
+	pastedTextSize = [textPasted lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
 	
 	temp_buff = (GHOST_TUns8*) malloc(pastedTextSize+1); 
 
@@ -1774,7 +1775,7 @@ GHOST_TUns8* GHOST_SystemCocoa::getClipboard(bool selection) const
 		return NULL;
 	}
 	
-	strncpy((char*)temp_buff, [textPasted cStringUsingEncoding:NSISOLatin1StringEncoding], pastedTextSize);
+	strncpy((char*)temp_buff, [textPasted cStringUsingEncoding:NSUTF8StringEncoding], pastedTextSize);
 	
 	temp_buff[pastedTextSize] = '\0';
 	
@@ -1806,7 +1807,7 @@ void GHOST_SystemCocoa::putClipboard(GHOST_TInt8 *buffer, bool selection) const
 	
 	[pasteBoard declareTypes:supportedTypes owner:nil];
 	
-	textToCopy = [NSString stringWithCString:buffer encoding:NSISOLatin1StringEncoding];
+	textToCopy = [NSString stringWithCString:buffer encoding:NSUTF8StringEncoding];
 	
 	[pasteBoard setString:textToCopy forType:NSStringPboardType];
 	

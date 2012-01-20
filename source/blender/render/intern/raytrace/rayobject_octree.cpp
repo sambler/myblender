@@ -96,12 +96,13 @@ static void RE_rayobject_octree_bb(RayObject *o, float *min, float *max);
 /*
  * This function is not expected to be called by current code state.
  */
-static float RE_rayobject_octree_cost(RayObject *o)
+static float RE_rayobject_octree_cost(RayObject *UNUSED(o))
 {
 	return 1.0;
 }
 
-static void RE_rayobject_octree_hint_bb(RayObject *o, RayHint *hint, float *min, float *max)
+static void RE_rayobject_octree_hint_bb(RayObject *UNUSED(o), RayHint *UNUSED(hint),
+                                        float *UNUSED(min), float *UNUSED(max))
 {
 	return;
 }
@@ -671,7 +672,7 @@ static void RE_rayobject_octree_bb(RayObject *tree, float *min, float *max)
 }
 
 /* check all faces in this node */
-static int testnode(Octree *oc, Isect *is, Node *no, OcVal ocval)
+static int testnode(Octree *UNUSED(oc), Isect *is, Node *no, OcVal ocval)
 {
 	short nr=0;
 
@@ -978,7 +979,7 @@ static int RE_rayobject_octree_intersect(RayObject *tree, Isect *is)
 		}
 		
 		xo=ocx1; yo=ocy1; zo=ocz1;
-		labdao= ddalabda= MIN3(labdax,labday,labdaz);
+		ddalabda= MIN3(labdax,labday,labdaz);
 		
 		vec2[0]= ox1;
 		vec2[1]= oy1;

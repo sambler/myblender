@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -370,6 +368,7 @@ static void ui_node_menu_column(NodeLinkArg *arg, int nclass, const char *cname)
 					NULL, 0.0, 0.0, 0.0, 0.0, "Add node to input");
 
 				argN = MEM_dupallocN(arg);
+				argN->type = NODE_GROUP;
 				argN->ngroup = ngroup;
 				argN->output = i;
 				uiButSetNFunc(but, ui_node_link, argN, NULL);

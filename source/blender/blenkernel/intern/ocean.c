@@ -313,8 +313,8 @@ void BKE_ocean_eval_uv(struct Ocean *oc, struct OceanResult *ocr, float u,float 
 	float uu,vv;
 
 	// first wrap the texture so 0 <= (u,v) < 1
-	u = fmod(u,1.0f);
-	v = fmod(v,1.0f);
+	u = fmodf(u,1.0f);
+	v = fmodf(v,1.0f);
 
 	if (u < 0) u += 1.0f;
 	if (v < 0) v += 1.0f;
@@ -998,7 +998,7 @@ void BKE_free_ocean(struct Ocean *oc)
 #define CACHE_TYPE_FOAM		2
 #define CACHE_TYPE_NORMAL	3
 
-static void cache_filename(char *string, const char *path, int frame, int type)
+static void cache_filename(char *string, const char *path, const char *relbase, int frame, int type)
 {
 	char cachepath[FILE_MAX];
 	const char *fname;
@@ -1018,7 +1018,23 @@ static void cache_filename(char *string, const char *path, int frame, int type)
 
 	BLI_join_dirfile(cachepath, sizeof(cachepath), path, fname);
 
-	BKE_makepicstring(string, cachepath, frame, R_OPENEXR, 1, TRUE);
+	BKE_makepicstring(string, cachepath, relbase, frame, R_IMF_IMTYPE_OPENEXR, 1, TRUE);
+}
+
+/* silly functions but useful to inline when the args do a lot of indirections */
+MINLINE void rgb_to_rgba_unit_alpha(float r_rgba[4], const float rgb[3])
+{
+	r_rgba[0]= rgb[0];
+	r_rgba[1]= rgb[1];
+	r_rgba[2]= rgb[2];
+	r_rgba[3]= 1.0f;
+}
+MINLINE void value_to_rgba_unit_alpha(float r_rgba[4], const float value)
+{
+	r_rgba[0]= value;
+	r_rgba[1]= value;
+	r_rgba[2]= value;
+	r_rgba[3]= 1.0f;
 }
 
 void BKE_free_ocean_cache(struct OceanCache *och)
@@ -1076,9 +1092,7 @@ void BKE_ocean_cache_eval_uv(struct OceanCache *och, struct OceanResult *ocr, in
 
 	if (och->ibufs_disp[f]) {
 		ibuf_sample(och->ibufs_disp[f], u, v, (1.0f/(float)res_x), (1.0f/(float)res_y), result);
-		ocr->disp[0] = result[0];
-		ocr->disp[1] = result[1];
-		ocr->disp[2] = result[2];
+		copy_v3_v3(ocr->disp, result);
 	}
 
 	if (och->ibufs_foam[f]) {
@@ -1088,43 +1102,43 @@ void BKE_ocean_cache_eval_uv(struct OceanCache *och, struct OceanResult *ocr, in
 
 	if (och->ibufs_norm[f]) {
 		ibuf_sample(och->ibufs_norm[f], u, v, (1.0f/(float)res_x), (1.0f/(float)res_y), result);
-		ocr->normal[0] = result[0];
-		ocr->normal[1] = result[1];
-		ocr->normal[2] = result[2];
+		copy_v3_v3(ocr->normal, result);
 	}
 }
 
 void BKE_ocean_cache_eval_ij(struct OceanCache *och, struct OceanResult *ocr, int f, int i, int j)
 {
-	int res_x = och->resolution_x;
-	int res_y = och->resolution_y;
+	const int res_x = och->resolution_x;
+	const int res_y = och->resolution_y;
 
-	i = abs(i) % res_x;
-	j = abs(j) % res_y;
+	if (i < 0) i= -i;
+	if (j < 0) j= -j;
+
+	i = i % res_x;
+	j = j % res_y;
 
 	if (och->ibufs_disp[f]) {
-		ocr->disp[0] = och->ibufs_disp[f]->rect_float[4*(res_x*j + i) + 0];
-		ocr->disp[1] = och->ibufs_disp[f]->rect_float[4*(res_x*j + i) + 1];
-		ocr->disp[2] = och->ibufs_disp[f]->rect_float[4*(res_x*j + i) + 2];
+		copy_v3_v3(ocr->disp, &och->ibufs_disp[f]->rect_float[4*(res_x*j + i)]);
 	}
 
 	if (och->ibufs_foam[f]) {
-		ocr->foam = och->ibufs_foam[f]->rect_float[4*(res_x*j + i) + 0];
+		ocr->foam = och->ibufs_foam[f]->rect_float[4*(res_x*j + i)];
 	}
 
 	if (och->ibufs_norm[f]) {
-		ocr->normal[0] = och->ibufs_norm[f]->rect_float[4*(res_x*j + i) + 0];
-		ocr->normal[1] = och->ibufs_norm[f]->rect_float[4*(res_x*j + i) + 1];
-		ocr->normal[2] = och->ibufs_norm[f]->rect_float[4*(res_x*j + i) + 2];
+		copy_v3_v3(ocr->normal, &och->ibufs_norm[f]->rect_float[4*(res_x*j + i)]);
 	}
 }
 
-struct OceanCache *BKE_init_ocean_cache(char *bakepath, int start, int end, float wave_scale,
-						  float chop_amount, float foam_coverage, float foam_fade, int resolution)
+struct OceanCache *BKE_init_ocean_cache(const char *bakepath, const char *relbase,
+                                        int start, int end, float wave_scale,
+                                        float chop_amount, float foam_coverage, float foam_fade, int resolution)
 {
 	OceanCache *och = MEM_callocN(sizeof(OceanCache), "ocean cache data");
 
 	och->bakepath = bakepath;
+	och->relbase = relbase;
+
 	och->start = start;
 	och->end = end;
 	och->duration = (end - start) + 1;
@@ -1158,17 +1172,17 @@ void BKE_simulate_ocean_cache(struct OceanCache *och, int frame)
 	if (och->ibufs_disp[f] != NULL ) return;
 
 
-	cache_filename(string, och->bakepath, frame, CACHE_TYPE_DISPLACE);
+	cache_filename(string, och->bakepath, och->relbase, frame, CACHE_TYPE_DISPLACE);
 	och->ibufs_disp[f] = IMB_loadiffname(string, 0);
 	//if (och->ibufs_disp[f] == NULL) printf("error loading %s \n", string);
 	//else printf("loaded cache %s \n", string);
 
-	cache_filename(string, och->bakepath, frame, CACHE_TYPE_FOAM);
+	cache_filename(string, och->bakepath, och->relbase, frame, CACHE_TYPE_FOAM);
 	och->ibufs_foam[f] = IMB_loadiffname(string, 0);
 	//if (och->ibufs_foam[f] == NULL) printf("error loading %s \n", string);
 	//else printf("loaded cache %s \n", string);
 
-	cache_filename(string, och->bakepath, frame, CACHE_TYPE_NORMAL);
+	cache_filename(string, och->bakepath, och->relbase, frame, CACHE_TYPE_NORMAL);
 	och->ibufs_norm[f] = IMB_loadiffname(string, 0);
 	//if (och->ibufs_norm[f] == NULL) printf("error loading %s \n", string);
 	//else printf("loaded cache %s \n", string);
@@ -1181,6 +1195,8 @@ void BKE_bake_ocean(struct Ocean *o, struct OceanCache *och, void (*update_cb)(v
 	 * are enabled, take care that BKE_ocean_eval_ij() initializes a member
 	 * before use - campbell */
 	OceanResult ocr;
+
+	ImageFormatData imf= {0};
 
 	int f, i=0, x, y, cancel=0;
 	float progress;
@@ -1197,6 +1213,11 @@ void BKE_bake_ocean(struct Ocean *o, struct OceanCache *och, void (*update_cb)(v
 	else                 prev_foam = NULL;
 
 	BLI_srand(0);
+
+	/* setup image format */
+	imf.imtype= R_IMF_IMTYPE_OPENEXR;
+	imf.depth=  R_IMF_CHAN_DEPTH_16;
+	imf.exr_codec= R_IMF_EXR_CODEC_ZIP;
 
 	for (f=och->start, i=0; f<=och->end; f++, i++) {
 
@@ -1216,10 +1237,7 @@ void BKE_bake_ocean(struct Ocean *o, struct OceanCache *och, void (*update_cb)(v
 				BKE_ocean_eval_ij(o, &ocr, x, y);
 
 				/* add to the image */
-				ibuf_disp->rect_float[4*(res_x*y + x) + 0] = ocr.disp[0];
-				ibuf_disp->rect_float[4*(res_x*y + x) + 1] = ocr.disp[1];
-				ibuf_disp->rect_float[4*(res_x*y + x) + 2] = ocr.disp[2];
-				ibuf_disp->rect_float[4*(res_x*y + x) + 3] = 1.0f;
+				rgb_to_rgba_unit_alpha(&ibuf_disp->rect_float[4*(res_x*y + x)], ocr.disp);
 
 				if (o->_do_jacobian) {
 					/* TODO, cleanup unused code - campbell */
@@ -1272,35 +1290,29 @@ void BKE_bake_ocean(struct Ocean *o, struct OceanCache *och, void (*update_cb)(v
 
 					prev_foam[res_x*y + x] = foam_result;
 
-					ibuf_foam->rect_float[4*(res_x*y + x) + 0] = foam_result;
-					ibuf_foam->rect_float[4*(res_x*y + x) + 1] = foam_result;
-					ibuf_foam->rect_float[4*(res_x*y + x) + 2] = foam_result;
-					ibuf_foam->rect_float[4*(res_x*y + x) + 3] = 1.0;
+					value_to_rgba_unit_alpha(&ibuf_foam->rect_float[4*(res_x*y + x)], foam_result);
 				}
 
 				if (o->_do_normals) {
-					ibuf_normal->rect_float[4*(res_x*y + x) + 0] = ocr.normal[0];
-					ibuf_normal->rect_float[4*(res_x*y + x) + 1] = ocr.normal[1];
-					ibuf_normal->rect_float[4*(res_x*y + x) + 2] = ocr.normal[2];
-					ibuf_normal->rect_float[4*(res_x*y + x) + 3] = 1.0;
+					rgb_to_rgba_unit_alpha(&ibuf_normal->rect_float[4*(res_x*y + x)], ocr.normal);
 				}
 			}
 		}
 
 		/* write the images */
-		cache_filename(string, och->bakepath, f, CACHE_TYPE_DISPLACE);
-		if(0 == BKE_write_ibuf(ibuf_disp, string, R_OPENEXR, R_OPENEXR_HALF, 2))  // 2 == ZIP exr codec
+		cache_filename(string, och->bakepath, och->relbase, f, CACHE_TYPE_DISPLACE);
+		if(0 == BKE_write_ibuf(ibuf_disp, string, &imf))
 			printf("Cannot save Displacement File Output to %s\n", string);
 
 		if (o->_do_jacobian) {
-			cache_filename(string, och->bakepath, f, CACHE_TYPE_FOAM);
-			if(0 == BKE_write_ibuf(ibuf_foam, string, R_OPENEXR, R_OPENEXR_HALF, 2))  // 2 == ZIP exr codec
+			cache_filename(string, och->bakepath, och->relbase,  f, CACHE_TYPE_FOAM);
+			if(0 == BKE_write_ibuf(ibuf_foam, string, &imf))
 				printf("Cannot save Foam File Output to %s\n", string);
 		}
 
 		if (o->_do_normals) {
-			cache_filename(string, och->bakepath, f, CACHE_TYPE_NORMAL);
-			if(0 == BKE_write_ibuf(ibuf_normal, string, R_OPENEXR, R_OPENEXR_HALF, 2))  // 2 == ZIP exr codec
+			cache_filename(string, och->bakepath,  och->relbase, f, CACHE_TYPE_NORMAL);
+			if(0 == BKE_write_ibuf(ibuf_normal, string, &imf))
 				printf("Cannot save Normal File Output to %s\n", string);
 		}
 
@@ -1331,7 +1343,8 @@ typedef struct Ocean {
 } Ocean;
 
 
-float BKE_ocean_jminus_to_foam(float UNUSED(jminus), float UNUSED(coverage)) {
+float BKE_ocean_jminus_to_foam(float UNUSED(jminus), float UNUSED(coverage))
+{
 	return 0.0f;
 }
 
@@ -1401,8 +1414,9 @@ void BKE_ocean_cache_eval_ij(struct OceanCache *UNUSED(och), struct OceanResult 
 {
 }
 
-struct OceanCache *BKE_init_ocean_cache(char *UNUSED(bakepath), int UNUSED(start), int UNUSED(end), float UNUSED(wave_scale),
-						  float UNUSED(chop_amount), float UNUSED(foam_coverage), float UNUSED(foam_fade), int UNUSED(resolution))
+struct OceanCache *BKE_init_ocean_cache(const char *UNUSED(bakepath), const char *UNUSED(relbase),
+                                        int UNUSED(start), int UNUSED(end), float UNUSED(wave_scale),
+                                        float UNUSED(chop_amount), float UNUSED(foam_coverage), float UNUSED(foam_fade), int UNUSED(resolution))
 {
 	OceanCache *och = MEM_callocN(sizeof(OceanCache), "ocean cache data");
 

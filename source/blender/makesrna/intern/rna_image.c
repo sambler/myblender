@@ -40,6 +40,7 @@
 #include "BKE_image.h"
 
 #include "WM_types.h"
+#include "WM_api.h"
 
 static EnumPropertyItem image_source_items[]= {
 	{IMA_SRC_FILE, "FILE", 0, "Single Image", "Single image file"},
@@ -106,10 +107,20 @@ static void rna_Image_fields_update(Main *UNUSED(bmain), Scene *UNUSED(scene), P
 	BKE_image_release_ibuf(ima, lock);
 }
 
+static void rna_Image_free_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
+{
+	Image *ima= ptr->id.data;
+	BKE_image_signal(ima, NULL, IMA_SIGNAL_FREE);
+	WM_main_add_notifier(NC_IMAGE|NA_EDITED, &ima->id);
+	DAG_id_tag_update(&ima->id, 0);
+}
+
+
 static void rna_Image_reload_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
 {
 	Image *ima= ptr->id.data;
 	BKE_image_signal(ima, NULL, IMA_SIGNAL_RELOAD);
+	WM_main_add_notifier(NC_IMAGE|NA_EDITED, &ima->id);
 	DAG_id_tag_update(&ima->id, 0);
 }
 
@@ -258,20 +269,20 @@ static int rna_Image_depth_get(PointerRNA *ptr)
 	Image *im= (Image*)ptr->data;
 	ImBuf *ibuf;
 	void *lock;
-	int depth;
+	int planes;
 	
 	ibuf= BKE_image_acquire_ibuf(im, NULL, &lock);
 
 	if(!ibuf)
-		depth= 0;
+		planes= 0;
 	else if(ibuf->rect_float)
-		depth= ibuf->depth * 4;
+		planes= ibuf->planes * 4;
 	else
-		depth= ibuf->depth;
+		planes= ibuf->planes;
 
 	BKE_image_release_ibuf(im, lock);
 
-	return depth;
+	return planes;
 }
 
 static int rna_Image_pixels_get_length(PointerRNA *ptr, int length[RNA_MAX_ARRAY_DIMENSION])
@@ -462,7 +473,7 @@ static void rna_def_image(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "field_order", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_bitflag_sdna(prop, NULL, "flag");
 	RNA_def_property_enum_items(prop, prop_field_order_items);
-	RNA_def_property_ui_text(prop, "Field Order", "Order of video fields. Select which lines are displayed first");
+	RNA_def_property_ui_text(prop, "Field Order", "Order of video fields (select which lines are displayed first)");
 	RNA_def_property_update(prop, NC_IMAGE|ND_DISPLAY, NULL);
 	
 	/* booleans */
@@ -474,7 +485,12 @@ static void rna_def_image(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "use_premultiply", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", IMA_DO_PREMUL);
 	RNA_def_property_ui_text(prop, "Premultiply", "Convert RGB from key alpha to premultiplied alpha");
-	RNA_def_property_update(prop, NC_IMAGE|ND_DISPLAY, "rna_Image_reload_update");
+	RNA_def_property_update(prop, NC_IMAGE|ND_DISPLAY, "rna_Image_free_update");
+	
+	prop= RNA_def_property(srna, "use_color_unpremultiply", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", IMA_CM_PREDIVIDE);
+	RNA_def_property_ui_text(prop, "Color Unpremultiply", "For premultiplied alpha images, do color space conversion on colors without alpha, to avoid fringing for images with light backgrounds");
+	RNA_def_property_update(prop, NC_IMAGE|ND_DISPLAY, "rna_Image_free_update");
 
 	prop= RNA_def_property(srna, "is_dirty", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_funcs(prop, "rna_Image_dirty_get", NULL);

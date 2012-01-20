@@ -458,11 +458,16 @@ static int reports_to_text_exec(bContext *C, wmOperator *UNUSED(op))
 	 *	- otherwise, up to info (which is what users normally see)
 	 */
 	str = BKE_reports_string(reports, (G.f & G_DEBUG)? RPT_DEBUG : RPT_INFO);
-	
-	write_text(txt, str);
-	MEM_freeN(str);
-	
-	return OPERATOR_FINISHED;
+
+	if (str) {
+		write_text(txt, str);
+		MEM_freeN(str);
+
+		return OPERATOR_FINISHED;
+	}
+	else {
+		return OPERATOR_CANCELLED;
+	}
 }
 
 static void UI_OT_reports_to_textblock(wmOperatorType *ot)
@@ -489,7 +494,7 @@ struct uiEditSourceStore {
 } uiEditSourceStore;
 
 struct uiEditSourceButStore {
-	char py_dbg_fn[240];
+	char py_dbg_fn[FILE_MAX];
 	int py_dbg_ln;
 } uiEditSourceButStore;
 
@@ -579,7 +584,7 @@ void UI_editsource_active_but_test(uiBut *but)
 /* editsource operator component */
 
 static int editsource_text_edit(bContext *C, wmOperator *op,
-                                char filepath[240], int line)
+                                char filepath[FILE_MAX], int line)
 {
 	struct Main *bmain= CTX_data_main(C);
 	Text *text;

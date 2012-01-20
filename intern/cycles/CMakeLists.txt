@@ -10,21 +10,20 @@ include(cmake/external_libs.cmake)
 
 if(WITH_RAYOPTIMIZATION AND SUPPORT_SSE_BUILD)
 	set(WITH_CYCLES_OPTIMIZED_KERNEL ON)
+endif()
 
-	if(WIN32 AND MSVC)
-		set(CYCLES_OPTIMIZED_KERNEL_FLAGS "/Ox /Ot /arch:SSE2 -D_CRT_SECURE_NO_WARNINGS /EHsc /fp:fast")
-	elseif(CMAKE_COMPILER_IS_GNUCC)
-		set(CYCLES_OPTIMIZED_KERNEL_FLAGS "-ffast-math -msse -msse2 -msse3 -DGOGOGO")
-	endif()
-
-elseif(WITH_RAYOPTIMIZATION)
+if(WIN32 AND MSVC)
+	set(CYCLES_OPTIMIZED_KERNEL_FLAGS "/arch:SSE2 -D_CRT_SECURE_NO_WARNINGS /fp:fast /EHsc")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /fp:fast -D_CRT_SECURE_NO_WARNINGS /EHsc")
+elseif(CMAKE_OSX_ARCHITECTURES MATCHES "ppc")
 	set(WITH_CYCLES_OPTIMIZED_KERNEL ON)
-
-	if(CMAKE_OSX_ARCHITECTURES MATCHES ppc)
-		set(CYCLES_OPTIMIZED_KERNEL_FLAGS "-mcpu=G4 -maltivec")
-	elseif(CMAKE_OSX_ARCHITECTURES MATCHES ppc64)
-		set(CYCLES_OPTIMIZED_KERNEL_FLAGS "-mcpu=G5 -maltivec")
-
+	set(CYCLES_OPTIMIZED_KERNEL_FLAGS "-mcpu=G4 -maltivec -mabi=altivec")
+elseif(CMAKE_OSX_ARCHITECTURES MATCHES "ppc64")
+	set(WITH_CYCLES_OPTIMIZED_KERNEL ON)
+	set(CYCLES_OPTIMIZED_KERNEL_FLAGS "-mcpu=G5 -maltivec -mabi=altivec")
+elseif(CMAKE_COMPILER_IS_GNUCC)
+	set(CYCLES_OPTIMIZED_KERNEL_FLAGS "-ffast-math -msse -msse2 -msse3 -mfpmath=sse")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ffast-math")
 endif()
 
 # for OSL, not needed yet
@@ -43,19 +42,19 @@ if(WITH_CYCLES_OPTIMIZED_KERNEL)
 endif()
 
 if(WITH_CYCLES_NETWORK)
-  add_definitions(-DWITH_NETWORK)
+	add_definitions(-DWITH_NETWORK)
 endif()
 
 if(WITH_CYCLES_OSL)
-  add_definitions(-DWITH_OSL)
+	add_definitions(-DWITH_OSL)
 endif()
 
 if(WITH_CYCLES_PARTIO)
-  add_definitions(-DWITH_PARTIO)
+	add_definitions(-DWITH_PARTIO)
 endif()
 
 if(WITH_CYCLES_CUDA_BINARIES)
-  add_definitions(-DWITH_CUDA_BINARIES)
+	add_definitions(-DWITH_CUDA_BINARIES)
 endif()
 
 add_definitions(-DWITH_OPENCL)
@@ -70,6 +69,7 @@ include_directories(
 # Subdirectories
 
 if(WITH_CYCLES_BLENDER)
+	add_definitions(-DBLENDER_PLUGIN)
 	add_subdirectory(blender)
 endif(WITH_CYCLES_BLENDER)
 

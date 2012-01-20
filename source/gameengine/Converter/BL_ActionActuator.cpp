@@ -123,7 +123,8 @@ void BL_ActionActuator::ProcessReplica()
 	
 }
 
-void BL_ActionActuator::SetBlendTime (float newtime){
+void BL_ActionActuator::SetBlendTime (float newtime)
+{
 	m_blendframe = newtime;
 }
 
@@ -144,6 +145,7 @@ void BL_ActionActuator::SetLocalTime(float curtime)
 		case ACT_ACTION_PLAY:
 			// Clamp
 			m_localtime = m_endframe;
+			((KX_GameObject*)GetParent())->StopAction(m_layer);
 			break;
 		case ACT_ACTION_LOOP_END:
 			// Put the time back to the beginning
@@ -237,14 +239,14 @@ bool BL_ActionActuator::Update(double curtime, bool frame)
 		RemoveAllEvents();
 	}
 
+	// "Active" actions need to keep updating their current frame
 	if (bUseContinue && (m_flag & ACT_FLAG_ACTIVE))
-	{
 		m_localtime = obj->GetActionFrame(m_layer);
-		ResetStartTime(curtime);
-	}
 
 	if (m_flag & ACT_FLAG_ATTEMPT_PLAY)
 		SetLocalTime(curtime);
+	else
+		ResetStartTime(curtime);
 
 	// Handle a frame property if it's defined
 	if ((m_flag & ACT_FLAG_ACTIVE) && m_framepropname[0] != 0)
@@ -299,6 +301,7 @@ bool BL_ActionActuator::Update(double curtime, bool frame)
 	else if ((m_flag & ACT_FLAG_ACTIVE) && bNegativeEvent)
 	{	
 		m_flag &= ~ACT_FLAG_ATTEMPT_PLAY;
+		m_localtime = obj->GetActionFrame(m_layer);
 		bAction *curr_action = obj->GetCurrentAction(m_layer);
 		if (curr_action && curr_action != m_action)
 		{
@@ -523,8 +526,8 @@ PyAttributeDef BL_ActionActuator::Attributes[] = {
 	KX_PYATTRIBUTE_RO_FUNCTION("channelNames", BL_ActionActuator, pyattr_get_channel_names),
 	KX_PYATTRIBUTE_SHORT_RW("priority", 0, 100, false, BL_ActionActuator, m_priority),
 	KX_PYATTRIBUTE_RW_FUNCTION("frame", BL_ActionActuator, pyattr_get_frame, pyattr_set_frame),
-	KX_PYATTRIBUTE_STRING_RW("propName", 0, 31, false, BL_ActionActuator, m_propname),
-	KX_PYATTRIBUTE_STRING_RW("framePropName", 0, 31, false, BL_ActionActuator, m_framepropname),
+	KX_PYATTRIBUTE_STRING_RW("propName", 0, MAX_PROP_NAME, false, BL_ActionActuator, m_propname),
+	KX_PYATTRIBUTE_STRING_RW("framePropName", 0, MAX_PROP_NAME, false, BL_ActionActuator, m_framepropname),
 	KX_PYATTRIBUTE_RW_FUNCTION("useContinue", BL_ActionActuator, pyattr_get_use_continue, pyattr_set_use_continue),
 	KX_PYATTRIBUTE_FLOAT_RW_CHECK("blendTime", 0, MAXFRAMEF, BL_ActionActuator, m_blendframe, CheckBlendTime),
 	KX_PYATTRIBUTE_SHORT_RW_CHECK("mode",0,100,false,BL_ActionActuator,m_playtype,CheckType),

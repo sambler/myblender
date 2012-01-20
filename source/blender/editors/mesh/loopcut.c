@@ -45,6 +45,7 @@
 
 #include "PIL_time.h"
 
+#include "BLI_array.h"
 #include "BLI_blenlib.h"
 #include "BLI_dynstr.h" /*for WM_operator_pystring */
 #include "BLI_editVert.h"
@@ -58,7 +59,6 @@
 #include "BKE_modifier.h"
 #include "BKE_report.h"
 #include "BKE_scene.h"
-#include "BKE_array_mallocn.h"
 
 #include "BIF_gl.h"
 #include "BIF_glutil.h" /* for paint cursor */
@@ -69,6 +69,7 @@
 #include "ED_space_api.h"
 #include "ED_view3d.h"
 #include "ED_mesh.h"
+#include "ED_numinput.h"
 
 #include "RNA_access.h"
 #include "RNA_define.h"
@@ -95,6 +96,7 @@ typedef struct tringselOpData {
 	Object *ob;
 	EditMesh *em;
 	EditEdge *eed;
+	NumInput num;
 
 	int extend;
 	int do_cut;
@@ -136,7 +138,7 @@ static void edgering_sel(tringselOpData *lcd, int previewlines, int select)
 	EditFace *efa;
 	EditVert *v[2][2];
 	float (*edges)[2][3] = NULL;
-	V_DYNDECLARE(edges);
+	BLI_array_declare(edges);
 	float co[2][3];
 	int looking=1, i, tot=0;
 	
@@ -238,9 +240,9 @@ static void edgering_sel(tringselOpData *lcd, int previewlines, int select)
 						co[1][1] = (v[1][1]->co[1] - v[1][0]->co[1])*(i/((float)previewlines+1))+v[1][0]->co[1];
 						co[1][2] = (v[1][1]->co[2] - v[1][0]->co[2])*(i/((float)previewlines+1))+v[1][0]->co[2];					
 						
-						V_GROW(edges);
-						VECCOPY(edges[tot][0], co[0]);
-						VECCOPY(edges[tot][1], co[1]);
+						BLI_array_growone(edges);
+						copy_v3_v3(edges[tot][0], co[0]);
+						copy_v3_v3(edges[tot][1], co[1]);
 						tot++;
 					}
 				}
@@ -345,6 +347,11 @@ static int ringsel_init (bContext *C, wmOperator *op, int do_cut)
 	lcd->em= BKE_mesh_get_editmesh((Mesh *)lcd->ob->data);
 	lcd->extend = do_cut ? 0 : RNA_boolean_get(op->ptr, "extend");
 	lcd->do_cut = do_cut;
+	
+	initNumInput(&lcd->num);
+	lcd->num.idx_max = 0;
+	lcd->num.flag |= NUM_NO_NEGATIVE | NUM_NO_FRACTION;
+	
 	em_setup_viewcontext(C, &lcd->vc);
 
 	ED_region_tag_redraw(lcd->ar);
@@ -464,6 +471,7 @@ static int ringcut_modal (bContext *C, wmOperator *op, wmEvent *event)
 			ED_region_tag_redraw(lcd->ar);
 			break;
 		case WHEELUPMOUSE:  /* change number of cuts */
+		case PADPLUSKEY:
 		case PAGEUPKEY:
 			if (event->val == KM_PRESS) {
 				cuts++;
@@ -474,6 +482,7 @@ static int ringcut_modal (bContext *C, wmOperator *op, wmEvent *event)
 			}
 			break;
 		case WHEELDOWNMOUSE:  /* change number of cuts */
+		case PADMINUS:
 		case PAGEDOWNKEY:
 			if (event->val == KM_PRESS) {
 				cuts=MAX2(cuts-1,1);
@@ -499,6 +508,23 @@ static int ringcut_modal (bContext *C, wmOperator *op, wmEvent *event)
 			ED_region_tag_redraw(lcd->ar);
 			break;
 		}			
+	}
+	
+	/* using the keyboard to input the number of cuts */
+	if (event->val==KM_PRESS) {
+		float value;
+		
+		if (handleNumInput(&lcd->num, event))
+		{
+			applyNumInput(&lcd->num, &value);
+			
+			cuts= CLAMPIS(value, 1, 32);
+			
+			RNA_int_set(op->ptr,"number_cuts",cuts);
+			ringsel_find_edge(lcd, cuts);
+			
+			ED_region_tag_redraw(lcd->ar);
+		}
 	}
 	
 	/* keep going until the user confirms */

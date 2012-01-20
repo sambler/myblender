@@ -455,14 +455,19 @@ static void blur_with_reference(bNode *node, CompBuf *new, CompBuf *img, CompBuf
 	int x, y, pix= img->type;
 	int i, j;
 	float *src, *dest, *refd, *blurd;
+	float defcol[4] = {1.0f, 1.0f, 1.0f, 1.0f};	/* default color for compbuf_get_pixel */
+	float proccol[4];	/* local color if compbuf is procedural */
+	int refradx, refrady;
 
-	if(ref->x!=img->x && ref->y!=img->y)
+	if(ref->x!=img->x || ref->y!=img->y)
 		return;
 	
 	ref_use= typecheck_compbuf(ref, CB_VAL);
 	
 	/* trick is; we blur the reference image... but only works with clipped values*/
 	blurbuf= alloc_compbuf(imgx, imgy, CB_VAL, 1);
+	blurbuf->xof= ref_use->xof;
+	blurbuf->yof= ref_use->yof;
 	blurd= blurbuf->rect;
 	refd= ref_use->rect;
 	for(x= imgx*imgy; x>0; x--, refd++, blurd++) {
@@ -492,15 +497,15 @@ static void blur_with_reference(bNode *node, CompBuf *new, CompBuf *img, CompBuf
 	for(i= 0; i<x; i++)
 		maintabs[i]= make_gausstab(nbd->filtertype, i+1);
 	
-	refd= blurbuf->rect;
 	dest= new->rect;
 	radxf= (float)radx;
 	radyf= (float)rady;
 	
 	for (y = 0; y < imgy; y++) {
-		for (x = 0; x < imgx ; x++, dest+=pix, refd++) {
-			int refradx= (int)(refd[0]*radxf);
-			int refrady= (int)(refd[0]*radyf);
+		for (x = 0; x < imgx ; x++, dest+=pix) {
+			refd= compbuf_get_pixel(blurbuf, defcol, proccol, x-blurbuf->xrad, y-blurbuf->yrad, blurbuf->xrad, blurbuf->yrad);
+			refradx= (int)(refd[0]*radxf);
+			refrady= (int)(refd[0]*radyf);
 			
 			if(refradx>radx) refradx= radx;
 			else if(refradx<1) refradx= 1;
@@ -716,19 +721,16 @@ static void node_composit_init_blur(bNodeTree *UNUSED(ntree), bNode* node, bNode
 	node->storage= MEM_callocN(sizeof(NodeBlurData), "node blur data");
 }
 
-void register_node_type_cmp_blur(ListBase *lb)
+void register_node_type_cmp_blur(bNodeTreeType *ttype)
 {
 	static bNodeType ntype;
 
-	node_type_base(&ntype, CMP_NODE_BLUR, "Blur", NODE_CLASS_OP_FILTER, NODE_PREVIEW|NODE_OPTIONS);
+	node_type_base(ttype, &ntype, CMP_NODE_BLUR, "Blur", NODE_CLASS_OP_FILTER, NODE_PREVIEW|NODE_OPTIONS);
 	node_type_socket_templates(&ntype, cmp_node_blur_in, cmp_node_blur_out);
 	node_type_size(&ntype, 120, 80, 200);
 	node_type_init(&ntype, node_composit_init_blur);
 	node_type_storage(&ntype, "NodeBlurData", node_free_standard_storage, node_copy_standard_storage);
 	node_type_exec(&ntype, node_composit_exec_blur);
 
-	nodeRegisterType(lb, &ntype);
+	nodeRegisterType(ttype, &ntype);
 }
-
-
-

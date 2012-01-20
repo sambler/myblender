@@ -54,7 +54,10 @@ extern "C" {
 }
 #endif
 
-static inline void Py_Fatal(const char *M) {
+#define MAX_PROP_NAME 64
+
+static inline void Py_Fatal(const char *M)
+{
 	fprintf(stderr, "%s\n", M);
 	exit(-1);
 };

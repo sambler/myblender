@@ -176,6 +176,8 @@ void RNA_def_property_collection_funcs(PropertyRNA *prop, const char *begin, con
 void RNA_def_property_srna(PropertyRNA *prop, const char *type);
 void RNA_def_py_data(PropertyRNA *prop, void *py_data);
 
+void RNA_def_property_translation_context(PropertyRNA *prop, const char *context);
+
 /* Function */
 
 FunctionRNA *RNA_def_function(StructRNA *srna, const char *identifier, const char *call);
@@ -188,7 +190,7 @@ void RNA_def_function_ui_description(FunctionRNA *func, const char *description)
 /* Dynamic Enums
  * strings are not freed, assumed pointing to static location. */
 
-void RNA_enum_item_add(EnumPropertyItem **items, int *totitem, EnumPropertyItem *item);
+void RNA_enum_item_add(EnumPropertyItem **items, int *totitem, const EnumPropertyItem *item);
 void RNA_enum_item_add_separator(EnumPropertyItem **items, int *totitem);
 void RNA_enum_items_add(EnumPropertyItem **items, int *totitem, EnumPropertyItem *item);
 void RNA_enum_items_add_value(EnumPropertyItem **items, int *totitem, EnumPropertyItem *item, int value);

@@ -174,7 +174,7 @@ static void rna_Object_matrix_local_get(PointerRNA *ptr, float values[16])
 	if(ob->parent) {
 		float invmat[4][4]; /* for inverse of parent's matrix */
 		invert_m4_m4(invmat, ob->parent->obmat);
-		mul_m4_m4m4((float(*)[4])values, ob->obmat, invmat);
+		mult_m4_m4m4((float(*)[4])values, invmat, ob->obmat);
 	}
 	else {
 		copy_m4_m4((float(*)[4])values, ob->obmat);
@@ -191,7 +191,7 @@ static void rna_Object_matrix_local_set(PointerRNA *ptr, const float values[16])
 	if(ob->parent) {
 		float invmat[4][4];
 		invert_m4_m4(invmat, ob->parentinv);
-		mul_m4_m4m4(ob->obmat, (float(*)[4])values, invmat);
+		mult_m4_m4m4(ob->obmat, invmat, (float(*)[4])values);
 	}
 	else {
 		copy_m4_m4(ob->obmat, (float(*)[4])values);
@@ -809,11 +809,11 @@ static void rna_MaterialSlot_link_set(PointerRNA *ptr, int value)
 	
 	if(value) {
 		ob->matbits[index]= 1;
-		ob->colbits |= (1<<index);
+		/* ob->colbits |= (1<<index); */ /* DEPRECATED */
 	}
 	else {
 		ob->matbits[index]= 0;
-		ob->colbits &= ~(1<<index);
+		/* ob->colbits &= ~(1<<index); */ /* DEPRECATED */
 	}
 }
 
@@ -1156,6 +1156,16 @@ static void rna_Object_constraints_remove(Object *object, ReportList *reports, b
 	WM_main_add_notifier(NC_OBJECT|ND_CONSTRAINT|NA_REMOVED, object);
 }
 
+static void rna_Object_constraints_clear(Object *object)
+{
+	free_constraints(&object->constraints);
+
+	ED_object_constraint_update(object);
+	ED_object_constraint_set_active(object, NULL);
+
+	WM_main_add_notifier(NC_OBJECT|ND_CONSTRAINT|NA_REMOVED, object);
+}
+
 static ModifierData *rna_Object_modifier_new(Object *object, bContext *C, ReportList *reports, const char *name, int type)
 {
 	return ED_object_modifier_add(reports, CTX_data_main(C), CTX_data_scene(C), object, name, type);
@@ -1164,6 +1174,15 @@ static ModifierData *rna_Object_modifier_new(Object *object, bContext *C, Report
 static void rna_Object_modifier_remove(Object *object, bContext *C, ReportList *reports, ModifierData *md)
 {
 	ED_object_modifier_remove(reports, CTX_data_main(C), CTX_data_scene(C), object, md);
+
+	WM_main_add_notifier(NC_OBJECT|ND_MODIFIER|NA_REMOVED, object);
+}
+
+static void rna_Object_modifier_clear(Object *object, bContext *C)
+{
+	ED_object_modifier_clear(CTX_data_main(C), CTX_data_scene(C), object);
+
+	WM_main_add_notifier(NC_OBJECT|ND_MODIFIER|NA_REMOVED, object);
 }
 
 static void rna_Object_boundbox_get(PointerRNA *ptr, float *values)
@@ -1174,7 +1193,7 @@ static void rna_Object_boundbox_get(PointerRNA *ptr, float *values)
 		memcpy(values, bb->vec, sizeof(bb->vec));
 	}
 	else {
-		fill_vn(values, sizeof(bb->vec)/sizeof(float), 0.0f);
+		fill_vn_fl(values, sizeof(bb->vec)/sizeof(float), 0.0f);
 	}
 
 }
@@ -1191,6 +1210,13 @@ static bDeformGroup *rna_Object_vgroup_new(Object *ob, const char *name)
 static void rna_Object_vgroup_remove(Object *ob, bDeformGroup *defgroup)
 {
 	ED_vgroup_delete(ob, defgroup);
+
+	WM_main_add_notifier(NC_OBJECT|ND_DRAW, ob);
+}
+
+static void rna_Object_vgroup_clear(Object *ob)
+{
+	ED_vgroup_clear(ob);
 
 	WM_main_add_notifier(NC_OBJECT|ND_DRAW, ob);
 }
@@ -1636,6 +1662,9 @@ static void rna_def_object_constraints(BlenderRNA *brna, PropertyRNA *cprop)
 	/* constraint to remove */
 	parm= RNA_def_pointer(func, "constraint", "Constraint", "", "Removed constraint");
 	RNA_def_property_flag(parm, PROP_REQUIRED|PROP_NEVER_NULL);
+
+	func= RNA_def_function(srna, "clear", "rna_Object_constraints_clear");
+	RNA_def_function_ui_description(func, "Remove all constraint from this object");
 }
 
 /* object.modifiers */
@@ -1684,6 +1713,11 @@ static void rna_def_object_modifiers(BlenderRNA *brna, PropertyRNA *cprop)
 	/* target to remove*/
 	parm= RNA_def_pointer(func, "modifier", "Modifier", "", "Modifier to remove");
 	RNA_def_property_flag(parm, PROP_REQUIRED|PROP_NEVER_NULL);
+
+	/* clear all modifiers */
+	func= RNA_def_function(srna, "clear", "rna_Object_modifier_clear");
+	RNA_def_function_flag(func, FUNC_USE_CONTEXT);
+	RNA_def_function_ui_description(func, "Remove all modifiers from the object");
 }
 
 /* object.particle_systems */
@@ -1758,6 +1792,9 @@ static void rna_def_object_vertex_groups(BlenderRNA *brna, PropertyRNA *cprop)
 	RNA_def_function_ui_description(func, "Delete vertex group from object");
 	parm= RNA_def_pointer(func, "group", "VertexGroup", "", "Vertex group to remove");
 	RNA_def_property_flag(parm, PROP_REQUIRED|PROP_NEVER_NULL);
+
+	func= RNA_def_function(srna, "clear", "rna_Object_vgroup_clear");
+	RNA_def_function_ui_description(func, "Delete all vertex groups from object");
 }
 
 
@@ -2034,7 +2071,9 @@ static void rna_def_object(BlenderRNA *brna)
 #endif
 	
 	prop= RNA_def_property(srna, "delta_scale", PROP_FLOAT, PROP_XYZ);
-	RNA_def_property_float_sdna(prop, NULL, "dsize");
+	RNA_def_property_float_sdna(prop, NULL, "dscale");
+	RNA_def_property_ui_range(prop, -FLT_MAX, FLT_MAX, 1, 3);
+	RNA_def_property_float_array_default(prop, default_scale);
 	RNA_def_property_ui_text(prop, "Delta Scale", "Extra scaling added to the scale of the object");
 	RNA_def_property_update(prop, NC_OBJECT|ND_TRANSFORM, "rna_Object_internal_update");
 	
@@ -2153,7 +2192,7 @@ static void rna_def_object(BlenderRNA *brna)
 	/* render */
 	prop= RNA_def_property(srna, "pass_index", PROP_INT, PROP_UNSIGNED);
 	RNA_def_property_int_sdna(prop, NULL, "index");
-	RNA_def_property_ui_text(prop, "Pass Index", "Index # for the IndexOB render pass");
+	RNA_def_property_ui_text(prop, "Pass Index", "Index number for the IndexOB render pass");
 	RNA_def_property_update(prop, NC_OBJECT, NULL);
 	
 	prop= RNA_def_property(srna, "color", PROP_FLOAT, PROP_COLOR);
@@ -2214,13 +2253,13 @@ static void rna_def_object(BlenderRNA *brna)
 	// XXX: evil old crap
 	prop= RNA_def_property(srna, "use_slow_parent", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "partype", PARSLOW);
-	RNA_def_property_ui_text(prop, "Slow Parent", "Create a delay in the parent relationship (Beware: this isn't renderfarm safe and may be invalid after jumping around the timeline)");
+	RNA_def_property_ui_text(prop, "Slow Parent", "Create a delay in the parent relationship (beware: this isn't renderfarm safe and may be invalid after jumping around the timeline)");
 	RNA_def_property_update(prop, NC_OBJECT|ND_DRAW, "rna_Object_internal_update");
 	
 	prop= RNA_def_property(srna, "slow_parent_offset", PROP_FLOAT, PROP_NONE|PROP_UNIT_TIME);
 	RNA_def_property_float_sdna(prop, NULL, "sf");
 	RNA_def_property_range(prop, MINAFRAMEF, MAXFRAMEF);
-	RNA_def_property_ui_text(prop, "Slow Parent Offset", "Amount of delay in the parent relationship");
+	RNA_def_property_ui_text(prop, "Slow Parent Offset", "Delay in the parent relationship");
 	RNA_def_property_update(prop, NC_OBJECT|ND_TRANSFORM, "rna_Object_internal_update");
 	
 	/* duplicates */
@@ -2408,14 +2447,19 @@ static void rna_def_dupli_object(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "matrix_original", PROP_FLOAT, PROP_MATRIX);
 	RNA_def_property_float_sdna(prop, NULL, "omat");
 	RNA_def_property_multi_array(prop, 2, rna_matrix_dimsize_4x4);
-	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE|PROP_EDITABLE);
 	RNA_def_property_ui_text(prop, "Object Matrix", "The original matrix of this object before it was duplicated");
 
 	prop= RNA_def_property(srna, "matrix", PROP_FLOAT, PROP_MATRIX);
 	RNA_def_property_float_sdna(prop, NULL, "mat");
 	RNA_def_property_multi_array(prop, 2, rna_matrix_dimsize_4x4);
-	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE|PROP_EDITABLE);
 	RNA_def_property_ui_text(prop, "Object Duplicate Matrix", "Object duplicate transformation matrix");
+
+	prop= RNA_def_property(srna, "hide", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "no_draw", 0);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE|PROP_EDITABLE);
+	RNA_def_property_ui_text(prop, "Hide", "Don't show dupli object in viewport or render");
 
 	/* TODO: DupliObject has more properties that can be wrapped */
 }

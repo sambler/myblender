@@ -22,8 +22,7 @@ import bpy
 
 from bpy.types import Panel, Menu
 
-from cycles import enums
-from cycles import engine
+from . import enums, engine
 
 
 class CYCLES_MT_integrator_presets(Menu):
@@ -148,6 +147,7 @@ class CyclesRender_PT_performance(CyclesButtonsPanel, Panel):
         sub.label(text="Acceleration structure:")
         sub.prop(cscene, "debug_bvh_type", text="")
         sub.prop(cscene, "debug_use_spatial_splits")
+        sub.prop(cscene, "use_cache")
 
 
 class CyclesRender_PT_layers(CyclesButtonsPanel, Panel):
@@ -161,18 +161,17 @@ class CyclesRender_PT_layers(CyclesButtonsPanel, Panel):
         scene = context.scene
         rd = scene.render
 
-        # row = layout.row()
-        # row.template_list(rd, "layers", rd.layers, "active_index", rows=2)
+        row = layout.row()
+        row.template_list(rd, "layers", rd.layers, "active_index", rows=2)
 
-        # col = row.column(align=True)
-        # col.operator("scene.render_layer_add", icon='ZOOMIN', text="")
-        # col.operator("scene.render_layer_remove", icon='ZOOMOUT', text="")
+        col = row.column(align=True)
+        col.operator("scene.render_layer_add", icon='ZOOMIN', text="")
+        col.operator("scene.render_layer_remove", icon='ZOOMOUT', text="")
 
         row = layout.row()
-        # rl = rd.layers.active
-        rl = rd.layers[0]
+        rl = rd.layers.active
         row.prop(rl, "name")
-        #row.prop(rd, "use_single_layer", text="", icon_only=True)
+        row.prop(rd, "use_single_layer", text="", icon_only=True)
 
         split = layout.split()
 
@@ -184,6 +183,7 @@ class CyclesRender_PT_layers(CyclesButtonsPanel, Panel):
 
         layout.separator()
 
+        rl = rd.layers[0]
         layout.prop(rl, "material_override", text="Material")
 
 
@@ -295,7 +295,12 @@ class Cycles_PT_mesh_displacement(CyclesButtonsPanel, Panel):
 
     @classmethod
     def poll(cls, context):
-        return CyclesButtonsPanel.poll(context) and context.mesh or context.curve or context.meta_ball
+        if CyclesButtonsPanel.poll(context):
+            if context.mesh or context.curve or context.meta_ball:
+                if context.scene.cycles.feature_set == 'EXPERIMENTAL':
+                    return True
+
+        return False
 
     def draw(self, context):
         layout = self.layout
@@ -324,7 +329,7 @@ class CyclesObject_PT_ray_visibility(CyclesButtonsPanel, Panel):
     @classmethod
     def poll(cls, context):
         ob = context.object
-        return CyclesButtonsPanel.poll(context) and ob and ob.type in ('MESH', 'CURVE', 'CURVE', 'SURFACE', 'FONT', 'META')  # todo: 'LAMP'
+        return CyclesButtonsPanel.poll(context) and ob and ob.type in {'MESH', 'CURVE', 'CURVE', 'SURFACE', 'FONT', 'META'}  # todo: 'LAMP'
 
     def draw(self, context):
         layout = self.layout
@@ -349,7 +354,7 @@ def find_node(material, nodetype):
         ntree = material.node_tree
 
         for node in ntree.nodes:
-            if hasattr(node, 'type') and node.type == nodetype:
+            if getattr(node, "type", None) == nodetype:
                 return node
 
     return None
@@ -363,14 +368,14 @@ def find_node_input(node, name):
     return None
 
 
-def panel_node_draw(layout, id, output_type, input_name):
-    if not id.node_tree:
-        layout.prop(id, "use_nodes", icon='NODETREE')
+def panel_node_draw(layout, id_data, output_type, input_name):
+    if not id_data.node_tree:
+        layout.prop(id_data, "use_nodes", icon='NODETREE')
         return False
 
-    ntree = id.node_tree
+    ntree = id_data.node_tree
 
-    node = find_node(id, output_type)
+    node = find_node(id_data, output_type)
     if not node:
         layout.label(text="No output node.")
     else:
@@ -399,7 +404,7 @@ class CyclesLamp_PT_lamp(CyclesButtonsPanel, Panel):
         split = layout.split()
         col = split.column(align=True)
 
-        if lamp.type in ('POINT', 'SUN', 'SPOT'):
+        if lamp.type in {'POINT', 'SUN', 'SPOT'}:
             col.prop(lamp, "shadow_soft_size", text="Size")
         elif lamp.type == 'AREA':
             col.prop(lamp, "shape", text="")
@@ -460,7 +465,8 @@ class CyclesWorld_PT_volume(CyclesButtonsPanel, Panel):
     @classmethod
     def poll(cls, context):
         # world = context.world
-        return False  # world and world.node_tree and CyclesButtonsPanel.poll(context)
+        # world and world.node_tree and CyclesButtonsPanel.poll(context)
+        return False
 
     def draw(self, context):
         layout = self.layout
@@ -494,7 +500,8 @@ class CyclesMaterial_PT_volume(CyclesButtonsPanel, Panel):
     @classmethod
     def poll(cls, context):
         # mat = context.material
-        return False  # mat and mat.node_tree and CyclesButtonsPanel.poll(context)
+        # mat and mat.node_tree and CyclesButtonsPanel.poll(context)
+        return False
 
     def draw(self, context):
         layout = self.layout
@@ -702,19 +709,16 @@ def draw_device(self, context):
     scene = context.scene
     layout = self.layout
 
-    if scene.render.engine == "CYCLES":
+    if scene.render.engine == 'CYCLES':
         cscene = scene.cycles
 
-        available_devices = engine.available_devices()
-        available_cuda = 'cuda' in available_devices
-        available_opencl = 'opencl' in available_devices
+        layout.prop(cscene, "feature_set")
 
-        if available_cuda or available_opencl:
+        device_type = context.user_preferences.system.compute_device_type
+        if device_type == 'CUDA':
             layout.prop(cscene, "device")
-            if cscene.device == 'GPU' and available_cuda and available_opencl:
-                layout.prop(cscene, "gpu_type")
-        if cscene.device == 'CPU' and engine.with_osl():
-            layout.prop(cscene, "shading_system")
+        elif device_type == 'OPENCL' and cscene.feature_set == 'EXPERIMENTAL':
+            layout.prop(cscene, "device")
 
 
 def draw_pause(self, context):
@@ -724,18 +728,24 @@ def draw_pause(self, context):
     if scene.render.engine == "CYCLES":
         view = context.space_data
 
-        if view.viewport_shade == "RENDERED":
+        if view.viewport_shade == 'RENDERED':
             cscene = scene.cycles
             layout.prop(cscene, "preview_pause", icon="PAUSE", text="")
 
 
 def get_panels():
-    return [
+    return (
         bpy.types.RENDER_PT_render,
         bpy.types.RENDER_PT_output,
         bpy.types.RENDER_PT_encoding,
         bpy.types.RENDER_PT_dimensions,
         bpy.types.RENDER_PT_stamp,
+        bpy.types.SCENE_PT_scene,
+        bpy.types.SCENE_PT_audio,
+        bpy.types.SCENE_PT_unit,
+        bpy.types.SCENE_PT_keying_sets,
+        bpy.types.SCENE_PT_keying_set_paths,
+        bpy.types.SCENE_PT_physics,
         bpy.types.WORLD_PT_context_world,
         bpy.types.DATA_PT_context_mesh,
         bpy.types.DATA_PT_context_camera,
@@ -782,7 +792,8 @@ def get_panels():
         bpy.types.PARTICLE_PT_field_weights,
         bpy.types.PARTICLE_PT_force_fields,
         bpy.types.PARTICLE_PT_vertexgroups,
-        bpy.types.PARTICLE_PT_custom_props]
+        bpy.types.PARTICLE_PT_custom_props,
+        )
 
 
 def register():

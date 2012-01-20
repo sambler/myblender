@@ -178,6 +178,30 @@ int space_image_main_area_poll(bContext *C)
 	return 0;
 }
 
+/* For IMAGE_OT_curves_point_set to avoid sampling when in uv smooth mode */
+int space_image_main_area_not_uv_brush_poll(bContext *C)
+{
+	SpaceImage *sima= CTX_wm_space_image(C);
+
+	ToolSettings *toolsettings = CTX_data_scene(C)->toolsettings;
+	if(sima && !toolsettings->uvsculpt)
+		return 1;
+
+	return 0;
+}
+
+static int space_image_image_sample_poll(bContext *C)
+{
+	SpaceImage *sima= CTX_wm_space_image(C);
+	Object *obedit= CTX_data_edit_object(C);
+	ToolSettings *toolsettings = CTX_data_scene(C)->toolsettings;
+
+	if(obedit){
+		if(ED_space_image_show_uvedit(sima, obedit) && (toolsettings->use_uv_sculpt))
+			return 0;
+	}
+	return space_image_main_area_poll(C);
+}
 /********************** view pan operator *********************/
 
 typedef struct ViewPanData {
@@ -858,7 +882,9 @@ static int image_replace_exec(bContext *C, wmOperator *op)
 		return OPERATOR_CANCELLED;
 	
 	RNA_string_get(op->ptr, "filepath", str);
-	BLI_strncpy(sima->image->name, str, sizeof(sima->image->name)); /* we cant do much if the str is longer then 240 :/ */
+
+	/* we cant do much if the str is longer then FILE_MAX :/ */
+	BLI_strncpy(sima->image->name, str, sizeof(sima->image->name));
 
 	/* XXX unpackImage frees image buffers */
 	ED_preview_kill_jobs(C);
@@ -1947,7 +1973,7 @@ void IMAGE_OT_sample(wmOperatorType *ot)
 	ot->invoke= image_sample_invoke;
 	ot->modal= image_sample_modal;
 	ot->cancel= image_sample_cancel;
-	ot->poll= space_image_main_area_poll;
+	ot->poll= space_image_image_sample_poll;
 
 	/* flags */
 	ot->flag= OPTYPE_BLOCKING;
@@ -2016,14 +2042,14 @@ static int image_sample_line_exec(bContext *C, wmOperator *op)
 				hist->data_r[i] = rgb[0];
 				hist->data_g[i] = rgb[1];
 				hist->data_b[i] = rgb[2];
-				hist->data_luma[i] = (0.299f*rgb[0] + 0.587f*rgb[1] + 0.114f*rgb[2]);
+				hist->data_luma[i] = rgb_to_luma(rgb);
 			}
 			else if (ibuf->rect) {
 				cp= (unsigned char *)(ibuf->rect + y*ibuf->x + x);
 				hist->data_r[i] = (float)cp[0]/255.0f;
 				hist->data_g[i] = (float)cp[1]/255.0f;
 				hist->data_b[i] = (float)cp[2]/255.0f;
-				hist->data_luma[i] = (0.299f*cp[0] + 0.587f*cp[1] + 0.114f*cp[2])/255;
+				hist->data_luma[i] = (float)rgb_to_luma_byte(cp)/255.0f;
 			}
 		}
 	}
@@ -2084,7 +2110,7 @@ void IMAGE_OT_curves_point_set(wmOperatorType *ot)
 	ot->invoke= image_sample_invoke;
 	ot->modal= image_sample_modal;
 	ot->cancel= image_sample_cancel;
-	ot->poll= space_image_main_area_poll;
+	ot->poll= space_image_main_area_not_uv_brush_poll;
 
 	/* properties */
 	RNA_def_enum(ot->srna, "point", point_items, 0, "Point", "Set black point or white point for curves");

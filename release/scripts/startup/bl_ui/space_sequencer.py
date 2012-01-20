@@ -114,10 +114,7 @@ class SEQUENCER_MT_view(Menu):
 
         layout.operator("sequencer.view_selected")
 
-        if st.show_frames:
-            layout.operator("anim.time_toggle", text="Show Seconds")
-        else:
-            layout.operator("anim.time_toggle", text="Show Frames")
+        layout.prop(st, "show_seconds")
 
         layout.prop(st, "show_frame_indicator")
         if st.display_mode == 'IMAGE':
@@ -148,8 +145,8 @@ class SEQUENCER_MT_select(Menu):
         layout.separator()
         layout.operator_menu_enum("object.select_grouped", "type", text="Grouped")
         layout.operator("sequencer.select_linked")
-        layout.operator("sequencer.select_all_toggle")
-        layout.operator("sequencer.select_inverse")
+        layout.operator("sequencer.select_all").action = 'TOGGLE'
+        layout.operator("sequencer.select_all").action = 'INVERT'
 
 
 class SEQUENCER_MT_marker(Menu):

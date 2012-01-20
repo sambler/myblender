@@ -743,14 +743,28 @@ int pyrna_enum_value_from_id(EnumPropertyItem *item, const char *identifier, int
 	return 0;
 }
 
+/* note on __cmp__:
+ * checking the 'ptr->data' matches works in almost all cases,
+ * however there are a few RNA properties that are fake sub-structs and
+ * share the pointer with the parent, in those cases this happens 'a.b == a'
+ * see: r43352 for example.
+ *
+ * So compare the 'ptr->type' as well to avoid this problem.
+ * It's highly unlikely this would happen that 'ptr->data' and 'ptr->prop' would match,
+ * but _not_ 'ptr->type' but include this check for completeness.
+ * - campbell */
+
 static int pyrna_struct_compare(BPy_StructRNA *a, BPy_StructRNA *b)
 {
-	return (a->ptr.data == b->ptr.data && a->ptr.type == b->ptr.type) ? 0 : -1;
+	return ( (a->ptr.data == b->ptr.data) &&
+	         (a->ptr.type == b->ptr.type)) ? 0 : -1;
 }
 
 static int pyrna_prop_compare(BPy_PropertyRNA *a, BPy_PropertyRNA *b)
 {
-	return (a->prop == b->prop && a->ptr.data == b->ptr.data) ? 0 : -1;
+	return ( (a->prop == b->prop) &&
+	         (a->ptr.data == b->ptr.data) &&
+	         (a->ptr.type == b->ptr.type) ) ? 0 : -1;
 }
 
 static PyObject *pyrna_struct_richcmp(PyObject *a, PyObject *b, int op)
@@ -7144,8 +7158,25 @@ static PyObject *pyrna_register_class(PyObject *UNUSED(self), PyObject *py_class
 	const char *identifier;
 	PyObject *py_cls_meth;
 
+	if (!PyType_Check(py_class)) {
+		PyErr_Format(PyExc_ValueError,
+		             "register_class(...): "
+		             "expected a class argument, not '%.200s'", Py_TYPE(py_class)->tp_name);
+		return NULL;
+	}
+
 	if (PyDict_GetItem(((PyTypeObject *)py_class)->tp_dict, bpy_intern_str_bl_rna)) {
-		PyErr_SetString(PyExc_AttributeError, "register_class(...): already registered as a subclass");
+		PyErr_SetString(PyExc_ValueError,
+		                "register_class(...): "
+		                "already registered as a subclass");
+		return NULL;
+	}
+
+	if (!pyrna_write_check()) {
+		PyErr_Format(PyExc_RuntimeError,
+		             "register_class(...): "
+		             "can't run in readonly state '%.200s'",
+		             ((PyTypeObject *)py_class)->tp_name);
 		return NULL;
 	}
 
@@ -7270,11 +7301,26 @@ static PyObject *pyrna_unregister_class(PyObject *UNUSED(self), PyObject *py_cla
 	StructRNA *srna;
 	PyObject *py_cls_meth;
 
+	if (!PyType_Check(py_class)) {
+		PyErr_Format(PyExc_ValueError,
+		             "register_class(...): "
+		             "expected a class argument, not '%.200s'", Py_TYPE(py_class)->tp_name);
+		return NULL;
+	}
+
 	/*if (PyDict_GetItem(((PyTypeObject *)py_class)->tp_dict, bpy_intern_str_bl_rna) == NULL) {
 		PWM_cursor_wait(0);
 		PyErr_SetString(PyExc_ValueError, "unregister_class(): not a registered as a subclass");
 		return NULL;
 	}*/
+
+	if (!pyrna_write_check()) {
+		PyErr_Format(PyExc_RuntimeError,
+		             "unregister_class(...): "
+		             "can't run in readonly state '%.200s'",
+		             ((PyTypeObject *)py_class)->tp_name);
+		return NULL;
+	}
 
 	srna = pyrna_struct_as_srna(py_class, 0, "unregister_class(...):");
 	if (srna == NULL)

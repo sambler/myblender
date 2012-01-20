@@ -1716,14 +1716,6 @@ void init_userdef_do_versions(void)
 		}
 	}
 
-	if (bmain->versionfile < 261 || (bmain->versionfile == 261 && bmain->subversionfile < 2)) {
-		bTheme *btheme;
-		for(btheme= U.themes.first; btheme; btheme= btheme->next) {
-			SETCOLF(btheme->toops.match, 0.2, 0.5, 0.2, 0.3);
-			SETCOLF(btheme->toops.selected_highlight, 0.51, 0.53, 0.55, 0.3);
-		}
-	}
-
 	if (bmain->versionfile < 262){
 		bTheme *btheme;
 		for(btheme= U.themes.first; btheme; btheme= btheme->next) {
@@ -1733,6 +1725,8 @@ void init_userdef_do_versions(void)
 			SETCOLF(btheme->tima.preview_stitch_stitchable, 0.0, 1.0, 0.0, 1.0);
 			SETCOLF(btheme->tima.preview_stitch_unstitchable, 1.0, 0.0, 0.0, 1.0);
 			SETCOLF(btheme->tima.preview_stitch_active, 0.886, 0.824, 0.765, 0.140);
+			SETCOLF(btheme->toops.match, 0.2, 0.5, 0.2, 0.3);
+			SETCOLF(btheme->toops.selected_highlight, 0.51, 0.53, 0.55, 0.3);
 		}
 		U.use_16bit_textures = 0;
 	}

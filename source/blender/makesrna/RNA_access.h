@@ -137,6 +137,7 @@ extern StructRNA RNA_CompositorNodeGamma;
 extern StructRNA RNA_CompositorNodeGlare;
 extern StructRNA RNA_CompositorNodeHueSat;
 extern StructRNA RNA_CompositorNodeIDMask;
+extern StructRNA RNA_CompositorNodeDoubleEdgeMask;
 extern StructRNA RNA_CompositorNodeImage;
 extern StructRNA RNA_CompositorNodeInvert;
 extern StructRNA RNA_CompositorNodeLensdist;
@@ -215,6 +216,7 @@ extern StructRNA RNA_ExplodeModifier;
 extern StructRNA RNA_ExpressionController;
 extern StructRNA RNA_FCurve;
 extern StructRNA RNA_FCurveSample;
+extern StructRNA RNA_FFmpegSettings;
 extern StructRNA RNA_FModifier;
 extern StructRNA RNA_FModifierCycles;
 extern StructRNA RNA_FModifierEnvelope;
@@ -394,6 +396,7 @@ extern StructRNA RNA_PropertyGroupItem;
 extern StructRNA RNA_PropertySensor;
 extern StructRNA RNA_PythonConstraint;
 extern StructRNA RNA_PythonController;
+extern StructRNA RNA_QuickTimeSettings;
 extern StructRNA RNA_RadarSensor;
 extern StructRNA RNA_RandomSensor;
 extern StructRNA RNA_RaySensor;
@@ -414,6 +417,7 @@ extern StructRNA RNA_Scopes;
 extern StructRNA RNA_Screen;
 extern StructRNA RNA_ScrewModifier;
 extern StructRNA RNA_Sculpt;
+extern StructRNA RNA_SelectedUvElement;
 extern StructRNA RNA_Sensor;
 extern StructRNA RNA_Sequence;
 extern StructRNA RNA_SequenceColorBalance;
@@ -544,6 +548,8 @@ extern StructRNA RNA_ThemeNodeEditor;
 extern StructRNA RNA_ThemeOutliner;
 extern StructRNA RNA_ThemeProperties;
 extern StructRNA RNA_ThemeSequenceEditor;
+extern StructRNA RNA_ThemeSpaceGeneric;
+extern StructRNA RNA_ThemeSpaceListGeneric;
 extern StructRNA RNA_ThemeStyle;
 extern StructRNA RNA_ThemeTextEditor;
 extern StructRNA RNA_ThemeTimeline;
@@ -936,7 +942,8 @@ void RNA_collection_clear(PointerRNA *ptr, const char *name);
 	}
 
 /* check if the idproperty exists, for operators */
-int RNA_property_is_set(PointerRNA *ptr, const char *name);
+int RNA_property_is_set(PointerRNA *ptr, PropertyRNA *prop);
+int RNA_struct_property_is_set(PointerRNA *ptr, const char *identifier);
 int RNA_property_is_idprop(PropertyRNA *prop);
 
 /* python compatible string representation of this property, (must be freed!) */
@@ -998,7 +1005,7 @@ StructRNA *ID_code_to_RNA_type(short idcode);
 
 
 /* macro which inserts the function name */
-#ifdef __GNUC__
+#if defined __GNUC__ || defined __sun
 #  define RNA_warning(format, args...) _RNA_warning("%s: " format "\n", __func__, ##args)
 #else
 #  define RNA_warning(format, ...) _RNA_warning("%s: " format "\n", __FUNCTION__, __VA_ARGS__)

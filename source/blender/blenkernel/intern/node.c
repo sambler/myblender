@@ -790,16 +790,11 @@ void nodeAddToPreview(bNode *node, float *col, int x, int y, int do_manage)
 				unsigned char *tar= preview->rect+ 4*((preview->xsize*y) + x);
 				
 				if(do_manage) {
-					tar[0]= FTOCHAR(linearrgb_to_srgb(col[0]));
-					tar[1]= FTOCHAR(linearrgb_to_srgb(col[1]));
-					tar[2]= FTOCHAR(linearrgb_to_srgb(col[2]));
+					linearrgb_to_srgb_uchar4(tar, col);
 				}
 				else {
-					tar[0]= FTOCHAR(col[0]);
-					tar[1]= FTOCHAR(col[1]);
-					tar[2]= FTOCHAR(col[2]);
+					rgba_float_to_uchar(tar, col);
 				}
-				tar[3]= FTOCHAR(col[3]);
 			}
 			//else printf("prv out bound x y %d %d\n", x, y);
 		}
@@ -1862,7 +1857,8 @@ static void registerCompositNodes(bNodeTreeType *ttype)
 	register_node_type_cmp_channel_matte(ttype);
 	register_node_type_cmp_color_spill(ttype);
 	register_node_type_cmp_luma_matte(ttype);
-	
+    register_node_type_cmp_doubleedgemask(ttype);
+
 	register_node_type_cmp_translate(ttype);
 	register_node_type_cmp_rotate(ttype);
 	register_node_type_cmp_scale(ttype);

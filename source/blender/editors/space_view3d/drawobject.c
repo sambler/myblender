@@ -2663,7 +2663,7 @@ static void draw_em_measure_stats(View3D *v3d, Object *ob, EditMesh *em, UnitSet
 	EditFace *efa;
 	float v1[3], v2[3], v3[3], v4[3], vmid[3];
 	float fvec[3];
-	char val[32]; /* Stores the measurement display text here */
+	char numstr[32]; /* Stores the measurement display text here */
 	const char *conv_float; /* Use a float conversion matching the grid size */
 	unsigned char col[4]= {0, 0, 0, 255}; /* color of the text to draw */
 	float area; /* area of the face */
@@ -2695,18 +2695,22 @@ static void draw_em_measure_stats(View3D *v3d, Object *ob, EditMesh *em, UnitSet
 					mul_mat3_m4_v3(ob->obmat, v1);
 					mul_mat3_m4_v3(ob->obmat, v2);
 				}
-				if(unit->system)
-					bUnit_AsString(val, sizeof(val), len_v3v3(v1, v2)*unit->scale_length, 3, unit->system, B_UNIT_LENGTH, do_split, FALSE);
-				else
-					sprintf(val, conv_float, len_v3v3(v1, v2));
 
-				view3d_cached_text_draw_add(vmid, val, 0, V3D_CACHE_TEXT_ASCII, col);
+				if(unit->system) {
+					bUnit_AsString(numstr, sizeof(numstr), len_v3v3(v1, v2) * unit->scale_length, 3,
+					               unit->system, B_UNIT_LENGTH, do_split, FALSE);
+				}
+				else {
+					sprintf(numstr, conv_float, len_v3v3(v1, v2));
+				}
+
+				view3d_cached_text_draw_add(vmid, numstr, 0, V3D_CACHE_TEXT_ASCII, col);
 			}
 		}
 	}
 
 	if(me->drawflag & ME_DRAWEXTRA_FACEAREA) {
-// XXX		extern int faceselectedOR(EditFace *efa, int flag);		// editmesh.h shouldn't be in this file... ok for now?
+// XXX		extern int faceselectedOR(EditFace *efa, int flag); // editmesh.h shouldn't be in this file... ok for now?
 		UI_GetThemeColor3ubv(TH_DRAWEXTRA_FACEAREA, col);
 		
 		for(efa= em->faces.first; efa; efa= efa->next) {
@@ -2729,12 +2733,16 @@ static void draw_em_measure_stats(View3D *v3d, Object *ob, EditMesh *em, UnitSet
 				else
 					area = area_tri_v3(v1, v2, v3);
 
-				if(unit->system)
-					bUnit_AsString(val, sizeof(val), area*unit->scale_length, 3, unit->system, B_UNIT_LENGTH, do_split, FALSE); // XXX should be B_UNIT_AREA
-				else
-					sprintf(val, conv_float, area);
+				if(unit->system) {
+					// XXX should be B_UNIT_AREA
+					bUnit_AsString(numstr, sizeof(numstr), area * unit->scale_length, 3,
+					               unit->system, B_UNIT_LENGTH, do_split, FALSE);
+				}
+				else {
+					sprintf(numstr, conv_float, area);
+				}
 
-				view3d_cached_text_draw_add(efa->cent, val, 0, V3D_CACHE_TEXT_ASCII, col);
+				view3d_cached_text_draw_add(efa->cent, numstr, 0, V3D_CACHE_TEXT_ASCII, col);
 			}
 		}
 	}
@@ -2768,31 +2776,31 @@ static void draw_em_measure_stats(View3D *v3d, Object *ob, EditMesh *em, UnitSet
 				
 			if( (e4->f & e1->f & SELECT) || (do_moving && (efa->v1->f & SELECT)) ) {
 				/* Vec 1 */
-				sprintf(val,"%.3g", RAD2DEGF(angle_v3v3v3(v4, v1, v2)));
+				sprintf(numstr,"%.3g", RAD2DEGF(angle_v3v3v3(v4, v1, v2)));
 				interp_v3_v3v3(fvec, efa->cent, efa->v1->co, 0.8f);
-				view3d_cached_text_draw_add(fvec, val, 0, V3D_CACHE_TEXT_ASCII, col);
+				view3d_cached_text_draw_add(fvec, numstr, 0, V3D_CACHE_TEXT_ASCII, col);
 			}
 			if( (e1->f & e2->f & SELECT) || (do_moving && (efa->v2->f & SELECT)) ) {
 				/* Vec 2 */
-				sprintf(val,"%.3g", RAD2DEGF(angle_v3v3v3(v1, v2, v3)));
+				sprintf(numstr,"%.3g", RAD2DEGF(angle_v3v3v3(v1, v2, v3)));
 				interp_v3_v3v3(fvec, efa->cent, efa->v2->co, 0.8f);
-				view3d_cached_text_draw_add(fvec, val, 0, V3D_CACHE_TEXT_ASCII, col);
+				view3d_cached_text_draw_add(fvec, numstr, 0, V3D_CACHE_TEXT_ASCII, col);
 			}
 			if( (e2->f & e3->f & SELECT) || (do_moving && (efa->v3->f & SELECT)) ) {
 				/* Vec 3 */
 				if(efa->v4) 
-					sprintf(val,"%.3g", RAD2DEGF(angle_v3v3v3(v2, v3, v4)));
+					sprintf(numstr,"%.3g", RAD2DEGF(angle_v3v3v3(v2, v3, v4)));
 				else
-					sprintf(val,"%.3g", RAD2DEGF(angle_v3v3v3(v2, v3, v1)));
+					sprintf(numstr,"%.3g", RAD2DEGF(angle_v3v3v3(v2, v3, v1)));
 				interp_v3_v3v3(fvec, efa->cent, efa->v3->co, 0.8f);
-				view3d_cached_text_draw_add(fvec, val, 0, V3D_CACHE_TEXT_ASCII, col);
+				view3d_cached_text_draw_add(fvec, numstr, 0, V3D_CACHE_TEXT_ASCII, col);
 			}
 				/* Vec 4 */
 			if(efa->v4) {
 				if( (e3->f & e4->f & SELECT) || (do_moving && (efa->v4->f & SELECT)) ) {
-					sprintf(val,"%.3g", RAD2DEGF(angle_v3v3v3(v3, v4, v1)));
+					sprintf(numstr,"%.3g", RAD2DEGF(angle_v3v3v3(v3, v4, v1)));
 					interp_v3_v3v3(fvec, efa->cent, efa->v4->co, 0.8f);
-					view3d_cached_text_draw_add(fvec, val, 0, V3D_CACHE_TEXT_ASCII, col);
+					view3d_cached_text_draw_add(fvec, numstr, 0, V3D_CACHE_TEXT_ASCII, col);
 				}
 			}
 		}
@@ -2805,7 +2813,7 @@ static void draw_em_indices(EditMesh *em)
 	EditFace *f;
 	EditVert *v;
 	int i;
-	char val[32];
+	char numstr[32];
 	float pos[3];
 	unsigned char col[4];
 
@@ -2815,8 +2823,8 @@ static void draw_em_indices(EditMesh *em)
 		UI_GetThemeColor3ubv(TH_DRAWEXTRA_FACEANG, col);
 		for (v = em->verts.first, i = 0; v; v = v->next, i++) {
 			if (v->f & SELECT) {
-				sprintf(val, "%d", i);
-				view3d_cached_text_draw_add(v->co, val, 0, V3D_CACHE_TEXT_ASCII, col);
+				sprintf(numstr, "%d", i);
+				view3d_cached_text_draw_add(v->co, numstr, 0, V3D_CACHE_TEXT_ASCII, col);
 			}
 		}
 	}
@@ -2825,9 +2833,9 @@ static void draw_em_indices(EditMesh *em)
 		UI_GetThemeColor3ubv(TH_DRAWEXTRA_EDGELEN, col);
 		for (e = em->edges.first, i = 0; e; e = e->next, i++) {
 			if (e->f & SELECT) {
-				sprintf(val, "%d", i);
+				sprintf(numstr, "%d", i);
 				mid_v3_v3v3(pos, e->v1->co, e->v2->co);
-				view3d_cached_text_draw_add(pos, val, 0, V3D_CACHE_TEXT_ASCII, col);
+				view3d_cached_text_draw_add(pos, numstr, 0, V3D_CACHE_TEXT_ASCII, col);
 			}
 		}
 	}
@@ -2836,8 +2844,8 @@ static void draw_em_indices(EditMesh *em)
 		UI_GetThemeColor3ubv(TH_DRAWEXTRA_FACEAREA, col);
 		for (f = em->faces.first, i = 0; f; f = f->next, i++) {
 			if (f->f & SELECT) {
-				sprintf(val, "%d", i);
-				view3d_cached_text_draw_add(f->cent, val, 0, V3D_CACHE_TEXT_ASCII, col);
+				sprintf(numstr, "%d", i);
+				view3d_cached_text_draw_add(f->cent, numstr, 0, V3D_CACHE_TEXT_ASCII, col);
 			}
 		}
 	}
@@ -3006,8 +3014,6 @@ static void draw_em_fancy(Scene *scene, View3D *v3d, RegionView3D *rv3d,
 		draw_em_fancy_edges(scene, v3d, me, cageDM, 0, eed_act);
 	}
 	if(em) {
-// XXX		retopo_matrix_update(v3d);
-
 		draw_em_fancy_verts(scene, v3d, ob, cageDM, eve_act);
 
 		if(me->drawflag & ME_DRAWNORMALS) {
@@ -3201,6 +3207,7 @@ static void draw_mesh_fancy(Scene *scene, ARegion *ar, View3D *v3d, RegionView3D
 			bglPolygonOffset(rv3d->dist, 0.0);
 			glDepthMask(1);
 			glDisable(GL_LINE_STIPPLE);
+			glDisable(GL_BLEND);
 
 			GPU_disable_material();
 			
@@ -4090,7 +4097,7 @@ static void draw_new_particle_system(Scene *scene, View3D *v3d, RegionView3D *rv
 	int a, totpart, totpoint=0, totve=0, drawn, draw_as, totchild=0;
 	int select=ob->flag&SELECT, create_cdata=0, need_v=0;
 	GLint polygonmode[2];
-	char val[32];
+	char numstr[32];
 	unsigned char tcol[4]= {0, 0, 0, 255};
 
 /* 1. */
@@ -4149,7 +4156,7 @@ static void draw_new_particle_system(Scene *scene, View3D *v3d, RegionView3D *rv
 	if(v3d->zbuf) glDepthMask(1);
 
 	if((ma) && (part->draw_col == PART_DRAW_COL_MAT)) {
-		rgb_float_to_byte(&(ma->r), tcol);
+		rgb_float_to_uchar(tcol, &(ma->r));
 		copy_v3_v3(ma_col, &ma->r);
 	}
 
@@ -4478,8 +4485,8 @@ static void draw_new_particle_system(Scene *scene, View3D *v3d, RegionView3D *rv
 
 				if((part->draw & PART_DRAW_NUM || part->draw & PART_DRAW_HEALTH) && (v3d->flag2 & V3D_RENDER_OVERRIDE)==0){
 					float vec_txt[3];
-					char *val_pos= val;
-					val[0]= '\0';
+					char *val_pos= numstr;
+					numstr[0]= '\0';
 
 					if(part->draw&PART_DRAW_NUM) {
 						if(a < totpart && (part->draw & PART_DRAW_HEALTH) && (part->phystype==PART_PHYS_BOIDS)) {
@@ -4498,7 +4505,7 @@ static void draw_new_particle_system(Scene *scene, View3D *v3d, RegionView3D *rv
 					/* in path drawing state.co is the end point */
 					/* use worldspace beause object matrix is already applied */
 					mul_v3_m4v3(vec_txt, ob->imat, state.co);
-					view3d_cached_text_draw_add(vec_txt, val, 10, V3D_CACHE_TEXT_WORLDSPACE|V3D_CACHE_TEXT_ASCII, tcol);
+					view3d_cached_text_draw_add(vec_txt, numstr, 10, V3D_CACHE_TEXT_WORLDSPACE|V3D_CACHE_TEXT_ASCII, tcol);
 				}
 			}
 		}
@@ -4587,10 +4594,10 @@ static void draw_new_particle_system(Scene *scene, View3D *v3d, RegionView3D *rv
 
 			for(a=0, pa=psys->particles; a<totpart; a++, pa++){
 				float vec_txt[3];
-				sprintf(val, "%i", a);
+				BLI_snprintf(numstr, sizeof(numstr), "%i", a);
 				/* use worldspace beause object matrix is already applied */
 				mul_v3_m4v3(vec_txt, ob->imat, cache[a]->co);
-				view3d_cached_text_draw_add(vec_txt, val, 10, V3D_CACHE_TEXT_WORLDSPACE|V3D_CACHE_TEXT_ASCII, tcol);
+				view3d_cached_text_draw_add(vec_txt, numstr, 10, V3D_CACHE_TEXT_WORLDSPACE|V3D_CACHE_TEXT_ASCII, tcol);
 			}
 		}
 	}
@@ -5376,8 +5383,6 @@ static void drawnurb(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *base, 
 	BevList *bl;
 	short hide_handles = (cu->drawflag & CU_HIDE_HANDLES);
 	int index;
-
-// XXX	retopo_matrix_update(v3d);
 
 	/* DispList */
 	if( wcs && !(ob->mode & OB_MODE_EDIT) ) {
@@ -6268,7 +6273,7 @@ static void drawRBpivot(bRigidBodyJointConstraint *data)
 	float curcol[4];
 	unsigned char tcol[4];
 	glGetFloatv(GL_CURRENT_COLOR, curcol);
-	rgb_float_to_byte(curcol, tcol);
+	rgb_float_to_uchar(tcol, curcol);
 	tcol[3]= 255;
 
 	eul_to_mat4(mat,&data->axX);
@@ -6931,7 +6936,7 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, int flag)
 					float curcol[4];
 					unsigned char tcol[4];
 					glGetFloatv(GL_CURRENT_COLOR, curcol);
-					rgb_float_to_byte(curcol, tcol);
+					rgb_float_to_uchar(tcol, curcol);
 					tcol[3]= 255;
 					view3d_cached_text_draw_add(zero, ob->id.name+2, 10, 0, tcol);
 				}

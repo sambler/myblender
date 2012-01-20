@@ -184,10 +184,10 @@ static int open_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 	if(clip)
 		path= clip->name;
 
-	if(!RNA_property_is_set(op->ptr, "relative_path"))
+	if(!RNA_struct_property_is_set(op->ptr, "relative_path"))
 		RNA_boolean_set(op->ptr, "relative_path", U.flag & USER_RELPATHS);
 
-	if(RNA_property_is_set(op->ptr, "filepath"))
+	if(RNA_struct_property_is_set(op->ptr, "filepath"))
 		return open_exec(C, op);
 
 	open_init(C, op);
@@ -999,5 +999,5 @@ void ED_operatormacros_clip(void)
 	ot->description = "Add new marker and slide it with mouse until mouse button release";
 	WM_operatortype_macro_define(ot, "CLIP_OT_add_marker");
 	otmacro= WM_operatortype_macro_define(ot, "TRANSFORM_OT_translate");
-	RNA_boolean_set(otmacro->ptr, "release_confirm", 1);
+	RNA_boolean_set(otmacro->ptr, "release_confirm", TRUE);
 }

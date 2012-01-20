@@ -42,6 +42,7 @@
 
 #include "ED_mesh.h"
 #include "ED_screen.h"
+#include "ED_object.h"
 
 #include "RNA_access.h"
 #include "RNA_define.h"
@@ -58,7 +59,7 @@
 static int surface_slot_add_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	DynamicPaintModifierData *pmd = NULL;
-	Object *cObject = CTX_data_pointer_get_type(C, "object", &RNA_Object).data;
+	Object *cObject = ED_object_context(C);
 	DynamicPaintCanvasSettings *canvas;
 	DynamicPaintSurface *surface;
 
@@ -100,7 +101,7 @@ void DPAINT_OT_surface_slot_add(wmOperatorType *ot)
 static int surface_slot_remove_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	DynamicPaintModifierData *pmd = NULL;
-	Object *cObject = CTX_data_pointer_get_type(C, "object", &RNA_Object).data;
+	Object *cObject = ED_object_context(C);
 	DynamicPaintCanvasSettings *canvas;
 	DynamicPaintSurface *surface;
 	int id=0;
@@ -148,7 +149,7 @@ void DPAINT_OT_surface_slot_remove(wmOperatorType *ot)
 static int type_toggle_exec(bContext *C, wmOperator *op)
 {
 
-	Object *cObject = CTX_data_pointer_get_type(C, "object", &RNA_Object).data;
+	Object *cObject = ED_object_context(C);
 	Scene *scene = CTX_data_scene(C);
 	DynamicPaintModifierData *pmd = (DynamicPaintModifierData *)modifiers_findByType(cObject, eModifierType_DynamicPaint);
 	int type= RNA_enum_get(op->ptr, "type");
@@ -199,7 +200,7 @@ void DPAINT_OT_type_toggle(wmOperatorType *ot)
 
 static int output_toggle_exec(bContext *C, wmOperator *op)
 {
-	Object *ob = CTX_data_pointer_get_type(C, "object", &RNA_Object).data;
+	Object *ob = ED_object_context(C);
 	Scene *scene = CTX_data_scene(C);
 	DynamicPaintSurface *surface;
 	DynamicPaintModifierData *pmd = (DynamicPaintModifierData *)modifiers_findByType(ob, eModifierType_DynamicPaint);
@@ -312,22 +313,22 @@ static int dynamicPaint_bakeImageSequence(bContext *C, DynamicPaintSurface *surf
 		*/
 		{
 			char filename[FILE_MAX];
-			/* make sure output path has ending slash */
-			BLI_add_slash(surface->image_output_path);
 
 			/* primary output layer */
 			if (surface->flags & MOD_DPAINT_OUT1) {
 				/* set filepath */
-				BLI_snprintf(filename, sizeof(filename), "%s%s", surface->image_output_path, surface->output_name);
+				BLI_join_dirfile(filename, sizeof(filename), surface->image_output_path, surface->output_name);
 				BLI_path_frame(filename, frame, 4);
+
 				/* save image */
 				dynamicPaint_outputSurfaceImage(surface, filename, 0);
 			}
 			/* secondary output */
 			if (surface->flags & MOD_DPAINT_OUT2 && surface->type == MOD_DPAINT_SURFACE_T_PAINT) {
 				/* set filepath */
-				BLI_snprintf(filename, sizeof(filename), "%s%s", surface->image_output_path, surface->output_name2);
+				BLI_join_dirfile(filename, sizeof(filename), surface->image_output_path, surface->output_name2);
 				BLI_path_frame(filename, frame, 4);
+
 				/* save image */
 				dynamicPaint_outputSurfaceImage(surface, filename, 1);
 			}
@@ -344,7 +345,7 @@ static int dynamicPaint_initBake(struct bContext *C, struct wmOperator *op)
 {
 	DynamicPaintModifierData *pmd = NULL;
 	DynamicPaintCanvasSettings *canvas;
-	Object *ob = CTX_data_pointer_get_type(C, "object", &RNA_Object).data;
+	Object *ob = ED_object_context(C);
 	int status = 0;
 	double timer = PIL_check_seconds_timer();
 	char result_str[80];

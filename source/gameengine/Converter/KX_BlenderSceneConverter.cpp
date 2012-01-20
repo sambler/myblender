@@ -703,8 +703,8 @@ void	KX_BlenderSceneConverter::ResetPhysicsObjectsAnimationIpo(bool clearIpo)
 
 }
 
-void	KX_BlenderSceneConverter::resetNoneDynamicObjectToIpo(){
-	
+void	KX_BlenderSceneConverter::resetNoneDynamicObjectToIpo()
+{
 	if (addInitFromFrame){		
 		KX_SceneList* scenes = m_ketsjiEngine->CurrentScenes();
 		int numScenes = scenes->size();
@@ -765,7 +765,7 @@ void	KX_BlenderSceneConverter::WritePhysicsObjectToAnimationIpo(int frameNumber)
 		{
 			KX_GameObject* gameObj = (KX_GameObject*)parentList->GetValue(g);
 			Object* blenderObject = gameObj->GetBlenderObject();
-			if (blenderObject && blenderObject->parent==NULL && gameObj->GetPhysicsController() != NULL)
+			if (blenderObject && blenderObject->parent==NULL && gameObj->IsDynamic())
 			{
 				//KX_IPhysicsController* physCtrl = gameObj->GetPhysicsController();
 
@@ -888,11 +888,11 @@ void	KX_BlenderSceneConverter::TestHandlesPhysicsObjectToAnimationIpo()
 			{
 				//KX_IPhysicsController* physCtrl = gameObj->GetPhysicsController();
 				
+#if 0
 				Object* blenderObject = gameObj->GetBlenderObject();
 				if (blenderObject && blenderObject->ipo)
 				{
 					// XXX animato
-#if 0
 					Ipo* ipo = blenderObject->ipo;
 					
 					//create the curves, if not existing
@@ -903,17 +903,11 @@ void	KX_BlenderSceneConverter::TestHandlesPhysicsObjectToAnimationIpo()
 					testhandles_ipocurve(findIpoCurve((IpoCurve *)ipo->curve.first,"RotX"));
 					testhandles_ipocurve(findIpoCurve((IpoCurve *)ipo->curve.first,"RotY"));
 					testhandles_ipocurve(findIpoCurve((IpoCurve *)ipo->curve.first,"RotZ"));
-#endif
 				}
+#endif
 			}
-
 		}
-		
-	
 	}
-
-
-
 }
 
 #ifdef WITH_PYTHON

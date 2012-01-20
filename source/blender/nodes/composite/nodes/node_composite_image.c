@@ -62,6 +62,7 @@ static bNodeSocketTemplate cmp_node_rlayers_out[]= {
 float *node_composit_get_float_buffer(RenderData *rd, ImBuf *ibuf, int *alloc)
 {
 	float *rect;
+	int predivide= (ibuf->flags & IB_cm_predivide);
 
 	*alloc= FALSE;
 
@@ -71,7 +72,11 @@ float *node_composit_get_float_buffer(RenderData *rd, ImBuf *ibuf, int *alloc)
 		}
 		else {
 			rect= MEM_mapallocN(sizeof(float) * 4 * ibuf->x * ibuf->y, "node_composit_get_image");
-			srgb_to_linearrgb_rgba_rgba_buf(rect, ibuf->rect_float, ibuf->x * ibuf->y);
+
+			IMB_buffer_float_from_float(rect, ibuf->rect_float,
+				4, IB_PROFILE_LINEAR_RGB, IB_PROFILE_SRGB, predivide,
+				ibuf->x, ibuf->y, ibuf->x, ibuf->x);
+
 			*alloc= TRUE;
 		}
 	}
@@ -81,7 +86,11 @@ float *node_composit_get_float_buffer(RenderData *rd, ImBuf *ibuf, int *alloc)
 		}
 		else {
 			rect= MEM_mapallocN(sizeof(float) * 4 * ibuf->x * ibuf->y, "node_composit_get_image");
-			linearrgb_to_srgb_rgba_rgba_buf(rect, ibuf->rect_float, ibuf->x * ibuf->y);
+
+			IMB_buffer_float_from_float(rect, ibuf->rect_float,
+				4, IB_PROFILE_SRGB, IB_PROFILE_LINEAR_RGB, predivide,
+				ibuf->x, ibuf->y, ibuf->x, ibuf->x);
+
 			*alloc= TRUE;
 		}
 	}
@@ -314,18 +323,18 @@ static void node_composit_init_image(bNodeTree *UNUSED(ntree), bNode* node, bNod
 	iuser->ok= 1;
 }
 
-void register_node_type_cmp_image(ListBase *lb)
+void register_node_type_cmp_image(bNodeTreeType *ttype)
 {
 	static bNodeType ntype;
 
-	node_type_base(&ntype, CMP_NODE_IMAGE, "Image", NODE_CLASS_INPUT, NODE_PREVIEW|NODE_OPTIONS);
+	node_type_base(ttype, &ntype, CMP_NODE_IMAGE, "Image", NODE_CLASS_INPUT, NODE_PREVIEW|NODE_OPTIONS);
 	node_type_socket_templates(&ntype, NULL, cmp_node_rlayers_out);
 	node_type_size(&ntype, 120, 80, 300);
 	node_type_init(&ntype, node_composit_init_image);
 	node_type_storage(&ntype, "ImageUser", node_free_standard_storage, node_copy_standard_storage);
 	node_type_exec(&ntype, node_composit_exec_image);
 
-	nodeRegisterType(lb, &ntype);
+	nodeRegisterType(ttype, &ntype);
 }
 
 
@@ -445,17 +454,14 @@ static void node_composit_exec_rlayers(void *data, bNode *node, bNodeStack **UNU
 }
 
 
-void register_node_type_cmp_rlayers(ListBase *lb)
+void register_node_type_cmp_rlayers(bNodeTreeType *ttype)
 {
 	static bNodeType ntype;
 
-	node_type_base(&ntype, CMP_NODE_R_LAYERS, "Render Layers", NODE_CLASS_INPUT, NODE_PREVIEW|NODE_OPTIONS);
+	node_type_base(ttype, &ntype, CMP_NODE_R_LAYERS, "Render Layers", NODE_CLASS_INPUT, NODE_PREVIEW|NODE_OPTIONS);
 	node_type_socket_templates(&ntype, NULL, cmp_node_rlayers_out);
 	node_type_size(&ntype, 150, 100, 300);
 	node_type_exec(&ntype, node_composit_exec_rlayers);
 
-	nodeRegisterType(lb, &ntype);
+	nodeRegisterType(ttype, &ntype);
 }
-
-
-

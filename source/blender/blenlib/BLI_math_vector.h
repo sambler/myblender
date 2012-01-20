@@ -117,9 +117,10 @@ MINLINE void star_m3_v3(float rmat[3][3],float a[3]);
 
 /*********************************** Length **********************************/
 
+MINLINE float len_squared_v2(const float v[2]);
 MINLINE float len_v2(const float a[2]);
 MINLINE float len_v2v2(const float a[2], const float b[2]);
-MINLINE float len_squared_v2v2(const float a[3], const float b[3]);
+MINLINE float len_squared_v2v2(const float a[2], const float b[2]);
 MINLINE float len_v3(const float a[3]);
 MINLINE float len_v3v3(const float a[3], const float b[3]);
 MINLINE float len_squared_v3v3(const float a[3], const float b[3]);
@@ -171,6 +172,7 @@ float angle_v3v3v3(const float a[3], const float b[3], const float c[3]);
 float angle_normalized_v3v3(const float v1[3], const float v2[3]);
 void angle_tri_v3(float angles[3], const float v1[3], const float v2[3], const float v3[3]);
 void angle_quad_v3(float angles[4], const float v1[3], const float v2[3], const float v3[3], const float v4[3]);
+void angle_poly_v3(float* angles, const float* verts[3], int len);
 
 /********************************* Geometry **********************************/
 
@@ -195,17 +197,21 @@ void minmax_v3v3_v3(float min[3], float max[3], const float vec[3]);
 
 /***************************** Array Functions *******************************/
 /* attempted to follow fixed length vertex functions. names could be improved*/
-void range_vni(int *array, const int size, const int start);
+double dot_vn_vn(const float *array_src_a, const float *array_src_b, const int size);
+float normalize_vn_vn(float *array_tar, const float *array_src, const int size);
+float normalize_vn(float *array_tar, const int size);
+void range_vn_i(int *array_tar, const int size, const int start);
+void range_vn_fl(float *array_tar, const int size, const float start, const float step);
 void negate_vn(float *array_tar, const int size);
 void negate_vn_vn(float *array_tar, const float *array_src, const int size);
-void mul_vn_fl(float *array, const int size, const float f);
+void mul_vn_fl(float *array_tar, const int size, const float f);
 void mul_vn_vn_fl(float *array_tar, const float *array_src, const int size, const float f);
 void add_vn_vn(float *array_tar, const float *array_src, const int size);
 void add_vn_vnvn(float *array_tar, const float *array_src_a, const float *array_src_b, const int size);
 void sub_vn_vn(float *array_tar, const float *array_src, const int size);
 void sub_vn_vnvn(float *array_tar, const float *array_src_a, const float *array_src_b, const int size);
-void fill_vni(int *array_tar, const int size, const int val);
-void fill_vn(float *array_tar, const int size, const float val);
+void fill_vn_i(int *array_tar, const int size, const int val);
+void fill_vn_fl(float *array_tar, const int size, const float val);
 
 #ifdef __cplusplus
 }

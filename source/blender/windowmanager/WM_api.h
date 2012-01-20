@@ -192,6 +192,7 @@ struct wmOperatorTypeMacro *WM_operatortype_macro_define(struct wmOperatorType *
 int			WM_operator_poll		(struct bContext *C, struct wmOperatorType *ot);
 int			WM_operator_poll_context(struct bContext *C, struct wmOperatorType *ot, int context);
 int			WM_operator_call		(struct bContext *C, struct wmOperator *op);
+int			WM_operator_call_notest(struct bContext *C, struct wmOperator *op);
 int			WM_operator_repeat		(struct bContext *C, struct wmOperator *op);
 int			WM_operator_repeat_check(const struct bContext *C, struct wmOperator *op);
 int			WM_operator_name_call	(struct bContext *C, const char *opstring, int context, struct PointerRNA *properties);
@@ -199,6 +200,7 @@ int			WM_operator_call_py(struct bContext *C, struct wmOperatorType *ot, int con
 
 void		WM_operator_properties_alloc(struct PointerRNA **ptr, struct IDProperty **properties, const char *opstring); /* used for keymap and macro items */
 void		WM_operator_properties_sanitize(struct PointerRNA *ptr, const short no_context); /* make props context sensitive or not */
+void        WM_operator_properties_reset(struct wmOperator *op);
 void		WM_operator_properties_create(struct PointerRNA *ptr, const char *opstring);
 void		WM_operator_properties_create_ptr(struct PointerRNA *ptr, struct wmOperatorType *ot);
 void		WM_operator_properties_free(struct PointerRNA *ptr);
@@ -207,6 +209,7 @@ void		WM_operator_properties_gesture_border(struct wmOperatorType *ot, int exten
 void		WM_operator_properties_gesture_straightline(struct wmOperatorType *ot, int cursor);
 void		WM_operator_properties_select_all(struct wmOperatorType *ot);
 
+int         WM_operator_check_ui_enabled(const struct bContext *C, const char *idname);
 wmOperator *WM_operator_last_redo(const struct bContext *C);
 
 /* MOVE THIS SOMEWHERE ELSE */
@@ -317,6 +320,8 @@ void		WM_jobs_stop(struct wmWindowManager *wm, void *owner, void *startjob);
 void		WM_jobs_kill(struct wmWindowManager *wm, void *owner, void (*)(void *, short int *, short int *, float *));
 void		WM_jobs_stop_all(struct wmWindowManager *wm);
 
+int			WM_jobs_has_running(struct wmWindowManager *wm);
+
 			/* clipboard */
 char		*WM_clipboard_text_get(int selection);
 void		WM_clipboard_text_set(char *buf, int selection);
@@ -329,6 +334,9 @@ void		WM_progress_clear(struct wmWindow *win);
 			/* Windows System Console */
 void		WM_console_toggle(struct bContext *C, short show);
 #endif
+
+			/* Draw (for screenshot) */
+void		WM_redraw_windows(struct bContext *C);
 
 /* debugging only, convenience function to write on crash */
 int write_crash_blend(void);

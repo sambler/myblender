@@ -428,7 +428,7 @@ static void add_hook_object(Main *bmain, Scene *scene, Object *obedit, Object *o
 	HookModifierData *hmd = NULL;
 	float cent[3];
 	int tot, ok, *indexar;
-	char name[32];
+	char name[MAX_NAME];
 	
 	ok = object_hook_index_array(scene, obedit, &tot, &indexar, name, cent);
 	
@@ -608,7 +608,9 @@ void OBJECT_OT_hook_remove(wmOperatorType *ot)
 	ot->poll= hook_op_edit_poll;
 	
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	/* this operator removes modifier which isn't stored in local undo stack,
+	   so redoing it from redo panel gives totally weird results  */
+	ot->flag= /*OPTYPE_REGISTER|*/OPTYPE_UNDO;
 	
 	/* properties */
 	prop= RNA_def_enum(ot->srna, "modifier", DummyRNA_NULL_items, 0, "Modifier", "Modifier number to remove");
@@ -644,7 +646,7 @@ static int object_hook_reset_exec(bContext *C, wmOperator *op)
 			float imat[4][4], mat[4][4];
 			
 			/* calculate the world-space matrix for the pose-channel target first, then carry on as usual */
-			mul_m4_m4m4(mat, pchan->pose_mat, hmd->object->obmat);
+			mult_m4_m4m4(mat, hmd->object->obmat, pchan->pose_mat);
 			
 			invert_m4_m4(imat, mat);
 			mul_serie_m4(hmd->parentinv, imat, ob->obmat, NULL, NULL, NULL, NULL, NULL, NULL);
@@ -745,7 +747,7 @@ static int object_hook_assign_exec(bContext *C, wmOperator *op)
 	Object *ob=NULL;
 	HookModifierData *hmd=NULL;
 	float cent[3];
-	char name[32];
+	char name[MAX_NAME];
 	int *indexar, tot;
 	
 	if (ptr.data) {		/* if modifier context is available, use that */
@@ -794,7 +796,9 @@ void OBJECT_OT_hook_assign(wmOperatorType *ot)
 	ot->poll= hook_op_edit_poll;
 	
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	/* this operator changes data stored in modifier which doesn't get pushed to undo stack,
+	   so redoing it from redo panel gives totally weird results  */
+	ot->flag= /*OPTYPE_REGISTER|*/OPTYPE_UNDO;
 	
 	/* properties */
 	prop= RNA_def_enum(ot->srna, "modifier", DummyRNA_NULL_items, 0, "Modifier", "Modifier number to assign to");

@@ -176,7 +176,6 @@ static void render_lighting_halo(HaloRen *har, float col_r[3])
 			if(inpr<t) continue;
 			else {
 				t= inpr-t;
-				i= 1.0;
 				soft= 1.0;
 				if(t<lar->spotbl && lar->spotbl!=0.0f) {
 					/* soft area */
@@ -587,7 +586,7 @@ void shadeSunView(float col_r[3], const float view[3])
 			xyz_to_rgb(colorxyz[0], colorxyz[1], colorxyz[2], &sun_collector[0], &sun_collector[1], &sun_collector[2], 
 					   lar->sunsky->sky_colorspace);
 			
-			ramp_blend(lar->sunsky->skyblendtype, col_r, col_r+1, col_r+2, lar->sunsky->skyblendfac, sun_collector);
+			ramp_blend(lar->sunsky->skyblendtype, col_r, lar->sunsky->skyblendfac, sun_collector);
 		}
 	}
 }

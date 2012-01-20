@@ -25,12 +25,12 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
-#ifndef DNA_BRUSH_TYPES_H
-#define DNA_BRUSH_TYPES_H
-
 /** \file DNA_brush_types.h
  *  \ingroup DNA
  */
+
+#ifndef DNA_BRUSH_TYPES_H
+#define DNA_BRUSH_TYPES_H
 
 
 #include "DNA_ID.h"
@@ -59,7 +59,7 @@ typedef struct Brush {
 
 	struct ImBuf *icon_imbuf;
 	PreviewImage *preview;
-	char icon_filepath[240];
+	char icon_filepath[240]; /* 240 = FILE_MAX */
 
 	float normal_weight;
 
@@ -81,7 +81,7 @@ typedef struct Brush {
 	float plane_offset;		/* offset for plane brushes (clay, flatten, fill, scrape) */
 
 	char sculpt_tool;		/* active sculpt tool */
-	char vertexpaint_tool;		/* active vertex/weight paint tool/blend mode */
+	char vertexpaint_tool;		/* active vertex/weight paint blend mode (poorly named) */
 	char imagepaint_tool;		/* active image paint tool */
 	char pad3[5];
 
@@ -132,7 +132,7 @@ typedef struct Brush {
 #define BRUSH_CUSTOM_ICON (1<<28)
 
 /* temporary flag which sets up autmatically for correct
-   brush drawing when inverted modal operator is running */
+ * brush drawing when inverted modal operator is running */
 #define BRUSH_INVERTED (1<<29)
 
 /* Brush.sculpt_tool */
@@ -167,8 +167,19 @@ enum {
 	SCULPT_DISP_DIR_VIEW,
 	SCULPT_DISP_DIR_X,
 	SCULPT_DISP_DIR_Y,
-	SCULPT_DISP_DIR_Z,
+	SCULPT_DISP_DIR_Z
 };
+
+enum {
+	PAINT_BLEND_MIX,
+	PAINT_BLEND_ADD,
+	PAINT_BLEND_SUB,
+	PAINT_BLEND_MUL,
+	PAINT_BLEND_BLUR,
+	PAINT_BLEND_LIGHTEN,
+	PAINT_BLEND_DARKEN
+};
+
 
 #define MAX_BRUSH_PIXEL_RADIUS 200
 

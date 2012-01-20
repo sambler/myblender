@@ -25,17 +25,18 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
-#ifndef DNA_NODE_TYPES_H
-#define DNA_NODE_TYPES_H
-
 /** \file DNA_node_types.h
  *  \ingroup DNA
  */
+
+#ifndef DNA_NODE_TYPES_H
+#define DNA_NODE_TYPES_H
 
 #include "DNA_ID.h"
 #include "DNA_vec_types.h"
 #include "DNA_listBase.h"
 #include "DNA_texture_types.h"
+#include "DNA_scene_types.h"
 
 struct ID;
 struct ListBase;
@@ -48,7 +49,7 @@ struct bGPdata;
 struct uiBlock;
 struct Image;
 
-#define NODE_MAXSTR 32
+#define NODE_MAXSTR 64
 
 typedef struct bNodeStack {
 	float vec[4];
@@ -70,7 +71,7 @@ typedef struct bNodeStack {
 typedef struct bNodeSocket {
 	struct bNodeSocket *next, *prev, *new_sock;
 	
-	char name[32];
+	char name[64];	/* MAX_NAME */
 	
 	void *storage;				/* custom storage */
 	
@@ -90,7 +91,7 @@ typedef struct bNodeSocket {
 	
 	/* internal data to retrieve relations and groups */
 	int own_index;				/* group socket identifiers, to find matching pairs after reading files */
-	int to_index;				/* XXX deprecated, only used for restoring old group node links */
+	int to_index  DNA_DEPRECATED;  /* XXX deprecated, only used for restoring old group node links */
 	struct bNodeSocket *groupsock;
 	
 	struct bNodeLink *link;		/* a link pointer, set in ntreeUpdateTree */
@@ -128,6 +129,8 @@ typedef struct bNodeSocket {
 #define SOCK_COLLAPSED			64
 	/* hide socket value, if it gets auto default */
 #define SOCK_HIDE_VALUE			128
+	/* socket hidden automatically, to distinguish from manually hidden */
+#define SOCK_AUTO_HIDDEN		256
 
 typedef struct bNodePreview {
 	unsigned char *rect;
@@ -139,7 +142,7 @@ typedef struct bNodePreview {
 typedef struct bNode {
 	struct bNode *next, *prev, *new_node;
 	
-	char name[32];
+	char name[64];	/* MAX_NAME */
 	short type, flag;
 	short done, level;		/* both for dependency and sorting */
 	short lasty, menunr;	/* lasty: check preview render status, menunr: browse ID blocks */
@@ -157,7 +160,7 @@ typedef struct bNode {
 	
 	int update;				/* update flags */
 	
-	char label[32];			/* custom user-defined label */
+	char label[64];			/* custom user-defined label, MAX_NAME */
 	short custom1, custom2;	/* to be abused for buttons */
 	float custom3, custom4;
 	
@@ -345,7 +348,7 @@ typedef struct NodeHueSat {
 
 typedef struct NodeImageFile {
 	char name[256];
-	short imtype, subimtype, quality, codec;
+	struct ImageFormatData im_format;
 	int sfra, efra;
 } NodeImageFile;
 
@@ -353,12 +356,12 @@ typedef struct NodeChroma {
 	float t1,t2,t3;
 	float fsize,fstrength,falpha;
 	float key[4];
-   short algorithm, channel;
+	short algorithm, channel;
 } NodeChroma;
 
 typedef struct NodeTwoXYs {
 	short x1, x2, y1, y2;
-   float fac_x1, fac_x2, fac_y1, fac_y2;
+	float fac_x1, fac_x2, fac_y1, fac_y2;
 } NodeTwoXYs;
 
 typedef struct NodeTwoFloats {
@@ -366,12 +369,12 @@ typedef struct NodeTwoFloats {
 } NodeTwoFloats;
 
 typedef struct NodeGeometry {
-	char uvname[32];
-	char colname[32];
+	char uvname[64];	/* MAX_CUSTOMDATA_LAYER_NAME */
+	char colname[64];
 } NodeGeometry;
 
 typedef struct NodeVertexCol {
-	char name[32];
+	char name[64];
 } NodeVertexCol;
 
 /* qdn: Defocus blur node */
@@ -427,7 +430,7 @@ typedef struct NodeColorspill {
 	short limchan, unspill;
 	float limscale;
 	float uspillr, uspillg, uspillb;
-}NodeColorspill;
+} NodeColorspill;
 
 typedef struct NodeTexBase {
 	TexMapping tex_mapping;
@@ -444,6 +447,10 @@ typedef struct NodeTexImage {
 	NodeTexBase base;
 	int color_space, pad;
 } NodeTexImage;
+
+typedef struct NodeTexChecker {
+	NodeTexBase base;
+} NodeTexChecker;
 
 typedef struct NodeTexEnvironment {
 	NodeTexBase base;
@@ -490,7 +497,7 @@ typedef struct NodeShaderAttribute {
 
 /* TEX_output */
 typedef struct TexNodeOutput {
-	char name[32];
+	char name[64];
 } TexNodeOutput;
 
 /* comp channel matte */

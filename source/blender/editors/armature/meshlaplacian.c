@@ -45,6 +45,7 @@
 #include "BLI_edgehash.h"
 #include "BLI_memarena.h"
 #include "BLI_utildefines.h"
+#include "BLI_string.h"
 
 #include "BKE_DerivedMesh.h"
 #include "BKE_modifier.h"
@@ -1608,12 +1609,12 @@ static void meshdeform_matrix_add_exterior_phi(MeshDeformBind *mdb, int x, int y
 		mdb->phi[acenter]= phi/totweight;
 }
 
-static void meshdeform_matrix_solve(MeshDeformBind *mdb)
+static void meshdeform_matrix_solve(MeshDeformModifierData *mmd, MeshDeformBind *mdb)
 {
 	NLContext *context;
 	float vec[3], gridvec[3];
 	int a, b, x, y, z, totvar;
-	char message[1024];
+	char message[256];
 
 	/* setup variable indices */
 	mdb->varidx= MEM_callocN(sizeof(int)*mdb->size3, "MeshDeformDSvaridx");
@@ -1710,11 +1711,12 @@ static void meshdeform_matrix_solve(MeshDeformBind *mdb)
 			}
 		}
 		else {
-			error("Mesh Deform: failed to find solution");
+			modifier_setError(&mmd->modifier, "Failed to find bind solution (increase precision?).");
+			error("Mesh Deform: failed to find bind solution.");
 			break;
 		}
 
-		sprintf(message, "Mesh deform solve %d / %d       |||", a+1, mdb->totcagevert);
+		BLI_snprintf(message, sizeof(message), "Mesh deform solve %d / %d       |||", a+1, mdb->totcagevert);
 		progress_bar((float)(a+1)/(float)(mdb->totcagevert), message);
 	}
 
@@ -1819,7 +1821,7 @@ static void harmonic_coordinates_bind(Scene *UNUSED(scene), MeshDeformModifierDa
 				meshdeform_check_semibound(mdb, x, y, z);
 
 	/* solve */
-	meshdeform_matrix_solve(mdb);
+	meshdeform_matrix_solve(mmd, mdb);
 
 	/* assign results */
 	if(mmd->flag & MOD_MDEF_DYNAMIC_BIND) {

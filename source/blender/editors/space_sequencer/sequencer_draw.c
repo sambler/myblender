@@ -143,7 +143,7 @@ static void get_seq_color3ubv(Scene *curscene, Sequence *seq, unsigned char col[
 		
 	case SEQ_COLOR:
 		if (colvars->col) {
-			rgb_float_to_byte(colvars->col, col);
+			rgb_float_to_uchar(col, colvars->col);
 		} else {
 			col[0] = col[1] = col[2] = 128;
 		}
@@ -328,7 +328,7 @@ static void draw_seq_handle(View2D *v2d, Sequence *seq, float pixelx, short dire
 	float x1, x2, y1, y2;
 	float handsize;
 	float minhandle, maxhandle;
-	char str[32];
+	char numstr[32];
 	unsigned int whichsel=0;
 	
 	x1= seq->startdisp;
@@ -392,15 +392,15 @@ static void draw_seq_handle(View2D *v2d, Sequence *seq, float pixelx, short dire
 	if(G.moving || (seq->flag & whichsel)) {
 		const char col[4]= {255, 255, 255, 255};
 		if (direction == SEQ_LEFTHANDLE) {
-			sprintf(str, "%d", seq->startdisp);
+			BLI_snprintf(numstr, sizeof(numstr),"%d", seq->startdisp);
 			x1= rx1;
 			y1 -= 0.45f;
 		} else {
-			sprintf(str, "%d", seq->enddisp - 1);
+			BLI_snprintf(numstr, sizeof(numstr), "%d", seq->enddisp - 1);
 			x1= x2 - handsize*0.75f;
 			y1= y2 + 0.05f;
 		}
-		UI_view2d_text_cache_add(v2d, x1, y1, str, col);
+		UI_view2d_text_cache_add(v2d, x1, y1, numstr, col);
 	}	
 }
 
@@ -512,7 +512,7 @@ static void draw_seq_extensions(Scene *scene, ARegion *ar, Sequence *seq)
 static void draw_seq_text(View2D *v2d, Sequence *seq, float x1, float x2, float y1, float y2, const unsigned char background_col[3])
 {
 	rctf rect;
-	char str[32 + FILE_MAXDIR+FILE_MAXFILE];
+	char str[32 + FILE_MAX];
 	const char *name= seq->name+2;
 	char col[4];
 

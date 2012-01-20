@@ -269,7 +269,8 @@ DagNode * pop_queue(DagNodeQueue *queue)
 	}
 }
 
-void	*pop_ob_queue(struct DagNodeQueue *queue) {
+void	*pop_ob_queue(struct DagNodeQueue *queue)
+{
 	return(pop_queue(queue)->ob);
 }
 
@@ -278,7 +279,8 @@ DagNode * get_top_node_queue(DagNodeQueue *queue)
 	return queue->first->node;
 }
 
-int		queue_count(struct DagNodeQueue *queue){
+int		queue_count(struct DagNodeQueue *queue)
+{
 	return queue->count;
 }
 
@@ -647,16 +649,26 @@ static void build_dag_object(DagForest *dag, DagNode *scenenode, Scene *scene, O
 			continue;
 
 		/* special case for camera tracking -- it doesn't use targets to define relations */
-		if(ELEM(cti->type, CONSTRAINT_TYPE_FOLLOWTRACK, CONSTRAINT_TYPE_CAMERASOLVER)) {
+		if(ELEM3(cti->type, CONSTRAINT_TYPE_FOLLOWTRACK, CONSTRAINT_TYPE_CAMERASOLVER, CONSTRAINT_TYPE_OBJECTSOLVER)) {
+			int depends_on_camera= 0;
+
 			if(cti->type==CONSTRAINT_TYPE_FOLLOWTRACK) {
 				bFollowTrackConstraint *data= (bFollowTrackConstraint *)con->data;
 
-				if((data->clip || data->flag&FOLLOWTRACK_ACTIVECLIP) && data->track[0]) {
-					if(scene->camera) {
-						node2 = dag_get_node(dag, scene->camera);
-						dag_add_relation(dag, node2, node, DAG_RL_DATA_OB|DAG_RL_OB_OB, cti->name);
-					}
+				if((data->clip || data->flag&FOLLOWTRACK_ACTIVECLIP) && data->track[0])
+					depends_on_camera= 1;
+
+				if(data->depth_ob) {
+					node2 = dag_get_node(dag, data->depth_ob);
+					dag_add_relation(dag, node2, node, DAG_RL_DATA_OB|DAG_RL_OB_OB, cti->name);
 				}
+			}
+			else if(cti->type==CONSTRAINT_TYPE_OBJECTSOLVER)
+				depends_on_camera= 1;
+
+			if(depends_on_camera && scene->camera) {
+				node2 = dag_get_node(dag, scene->camera);
+				dag_add_relation(dag, node2, node, DAG_RL_DATA_OB|DAG_RL_OB_OB, cti->name);
 			}
 
 			dag_add_relation(dag,scenenode,node,DAG_RL_SCENE, "Scene Relation");
@@ -1155,7 +1167,8 @@ void graph_bfs(void)
 	queue_delete(nqueue);
 }
 
-int pre_and_post_BFS(DagForest *dag, short mask, graph_action_func pre_func, graph_action_func post_func, void **data) {
+int pre_and_post_BFS(DagForest *dag, short mask, graph_action_func pre_func, graph_action_func post_func, void **data)
+{
 	DagNode *node;
 	
 	node = dag->DagNode.first;
@@ -1341,7 +1354,8 @@ DagNodeQueue * graph_dfs(void)
 }
 
 /* unused */
-int pre_and_post_DFS(DagForest *dag, short mask, graph_action_func pre_func, graph_action_func post_func, void **data) {
+int pre_and_post_DFS(DagForest *dag, short mask, graph_action_func pre_func, graph_action_func post_func, void **data)
+{
 	DagNode *node;
 
 	node = dag->DagNode.first;
@@ -1552,7 +1566,8 @@ struct DagNodeQueue *get_all_childs(struct DagForest	*dag, void *ob)
 }
 
 /* unused */
-short	are_obs_related(struct DagForest	*dag, void *ob1, void *ob2) {
+short	are_obs_related(struct DagForest	*dag, void *ob1, void *ob2)
+{
 	DagNode * node;
 	DagAdjList *itA;
 	
@@ -1568,7 +1583,8 @@ short	are_obs_related(struct DagForest	*dag, void *ob1, void *ob2) {
 	return DAG_NO_RELATION;
 }
 
-int	is_acyclic( DagForest	*dag) {
+int	is_acyclic( DagForest	*dag)
+{
 	return dag->is_acyclic;
 }
 
@@ -1636,17 +1652,25 @@ void graph_print_adj_list(void)
 
 /* mechanism to allow editors to be informed of depsgraph updates,
    to do their own updates based on changes... */
-static void (*EditorsUpdateCb)(Main *bmain, ID *id)= NULL;
+static void (*EditorsUpdateIDCb)(Main *bmain, ID *id)= NULL;
+static void (*EditorsUpdateSceneCb)(Main *bmain, Scene *scene, int updated)= NULL;
 
-void DAG_editors_update_cb(void (*func)(Main *bmain, ID *id))
+void DAG_editors_update_cb(void (*id_func)(Main *bmain, ID *id), void (*scene_func)(Main *bmain, Scene *scene, int updated))
 {
-	EditorsUpdateCb= func;
+	EditorsUpdateIDCb= id_func;
+	EditorsUpdateSceneCb= scene_func;
 }
 
-static void dag_editors_update(Main *bmain, ID *id)
+static void dag_editors_id_update(Main *bmain, ID *id)
 {
-	if(EditorsUpdateCb)
-		EditorsUpdateCb(bmain, id);
+	if(EditorsUpdateIDCb)
+		EditorsUpdateIDCb(bmain, id);
+}
+
+static void dag_editors_scene_update(Main *bmain, Scene *scene, int updated)
+{
+	if(EditorsUpdateSceneCb)
+		EditorsUpdateSceneCb(bmain, scene, updated);
 }
 
 /* groups with objects in this scene need to be put in the right order as well */
@@ -1696,7 +1720,7 @@ static void scene_sort_groups(Main *bmain, Scene *sce)
 /* sort the base list on dependency order */
 void DAG_scene_sort(Main *bmain, Scene *sce)
 {
-	DagNode *node;
+	DagNode *node, *rootnode;
 	DagNodeQueue *nqueue;
 	DagAdjList *itA;
 	int time;
@@ -1718,11 +1742,10 @@ void DAG_scene_sort(Main *bmain, Scene *sce)
 	
 	time = 1;
 	
-	node = sce->theDag->DagNode.first;
-	
-	node->color = DAG_GRAY;
+	rootnode = sce->theDag->DagNode.first;
+	rootnode->color = DAG_GRAY;
 	time++;
-	push_stack(nqueue,node);  
+	push_stack(nqueue,rootnode);  
 	
 	while(nqueue->count) {
 		
@@ -2152,7 +2175,7 @@ static void dag_object_time_update_flags(Object *ob)
 			
 			if (cti) {
 				/* special case for camera tracking -- it doesn't use targets to define relations */
-				if(ELEM(cti->type, CONSTRAINT_TYPE_FOLLOWTRACK, CONSTRAINT_TYPE_CAMERASOLVER)) {
+				if(ELEM3(cti->type, CONSTRAINT_TYPE_FOLLOWTRACK, CONSTRAINT_TYPE_CAMERASOLVER, CONSTRAINT_TYPE_OBJECTSOLVER)) {
 					ob->recalc |= OB_RECALC_OB;
 				}
 				else if (cti->get_constraint_targets) {
@@ -2460,7 +2483,7 @@ static void dag_id_flush_update(Scene *sce, ID *id)
 
 			/* no point in trying in this cases */
 			if(id && id->us <= 1) {
-				dag_editors_update(bmain, id);
+				dag_editors_id_update(bmain, id);
 				id= NULL;
 			}
 		}
@@ -2546,7 +2569,9 @@ static void dag_id_flush_update(Scene *sce, ID *id)
 				bConstraint *con;
 				for (con = obt->constraints.first; con; con=con->next) {
 					bConstraintTypeInfo *cti= constraint_get_typeinfo(con);
-					if(ELEM(cti->type, CONSTRAINT_TYPE_FOLLOWTRACK, CONSTRAINT_TYPE_CAMERASOLVER)) {
+					if(ELEM3(cti->type, CONSTRAINT_TYPE_FOLLOWTRACK, CONSTRAINT_TYPE_CAMERASOLVER,
+					         CONSTRAINT_TYPE_OBJECTSOLVER))
+					{
 						obt->recalc |= OB_RECALC_OB;
 						break;
 					}
@@ -2572,7 +2597,7 @@ static void dag_id_flush_update(Scene *sce, ID *id)
 		}
 
 		/* update editors */
-		dag_editors_update(bmain, id);
+		dag_editors_id_update(bmain, id);
 	}
 }
 
@@ -2612,10 +2637,10 @@ void DAG_ids_flush_tagged(Main *bmain)
 		DAG_scene_flush_update(bmain, sce, lay, 0);
 }
 
-void DAG_ids_check_recalc(Main *bmain)
+void DAG_ids_check_recalc(Main *bmain, Scene *scene, int time)
 {
 	ListBase *lbarray[MAX_LIBARRAY];
-	int a;
+	int a, updated = 0;
 
 	/* loop over all ID types */
 	a  = set_listbasepointers(bmain, lbarray);
@@ -2627,13 +2652,13 @@ void DAG_ids_check_recalc(Main *bmain)
 		/* we tag based on first ID type character to avoid 
 		   looping over all ID's in case there are no tags */
 		if(id && bmain->id_tag_update[id->name[0]]) {
-			/* do editors update */
-			dag_editors_update(bmain, NULL);
-			return;
+			updated= 1;
+			break;
 		}
 	}
-}
 
+	dag_editors_scene_update(bmain, scene, (updated || time));
+}
 
 void DAG_ids_clear_recalc(Main *bmain)
 {
@@ -2840,10 +2865,8 @@ void DAG_pose_sort(Object *ob)
 	for(node = dag->DagNode.first; node; node= node->next) 
 		node->color = DAG_WHITE;
 	
-	node = dag->DagNode.first;
-	
-	node->color = DAG_GRAY;
-	push_stack(nqueue, node);  
+	rootnode->color = DAG_GRAY;
+	push_stack(nqueue, rootnode);  
 	
 	while(nqueue->count) {
 		

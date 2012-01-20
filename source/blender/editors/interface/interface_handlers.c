@@ -114,6 +114,17 @@ typedef enum uiButtonJumpType {
 	BUTTON_EDIT_JUMP_ALL
 } uiButtonJumpType;
 
+typedef enum uiButtonDelimType {
+	BUTTON_DELIM_NONE,
+	BUTTON_DELIM_ALPHA,
+	BUTTON_DELIM_PUNCT,
+	BUTTON_DELIM_BRACE,
+	BUTTON_DELIM_OPERATOR,
+	BUTTON_DELIM_QUOTE,
+	BUTTON_DELIM_WHITESPACE,
+	BUTTON_DELIM_OTHER
+} uiButtonDelimType;
+
 typedef struct uiHandleButtonData {
 	wmWindowManager *wm;
 	wmWindow *window;
@@ -1230,46 +1241,60 @@ static void ui_but_copy_paste(bContext *C, uiBut *but, uiHandleButtonData *data,
 /* ************* in-button text selection/editing ************* */
 
 /* return 1 if char ch is special character, otherwise return 0 */
-static short test_special_char(char ch)
+static uiButtonDelimType test_special_char(const char ch)
 {
+	if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')) {
+		return BUTTON_DELIM_ALPHA;
+	}
+
 	switch(ch) {
-		case '\\':
-		case '/':
-		case '~':
-		case '!':
-		case '@':
-		case '#':
-		case '$':
-		case '%':
-		case '^':
-		case '&':
-		case '*':
-		case '(':
-		case ')':
-		case '+':
-		case '=':
+		case ',':
+		case '.':
+			return BUTTON_DELIM_PUNCT;
+
 		case '{':
 		case '}':
 		case '[':
 		case ']':
-		case ':':
-		case ';':
-		case '\'':
-		case '\"': // " - an extra closing one for Aligorith's text editor
+		case '(':
+		case ')':
+			return BUTTON_DELIM_BRACE;
+
+		case '+':
+		case '-':
+		case '=':
+		case '~':
+		case '%':
+		case '/':
 		case '<':
 		case '>':
-		case ',':
-		case '.':
+		case '^':
+		case '*':
+		case '&':
+			return BUTTON_DELIM_OPERATOR;
+
+		case '\'':
+		case '\"': // " - an extra closing one for Aligorith's text editor
+			return BUTTON_DELIM_QUOTE;
+
+		case ' ':
+			return BUTTON_DELIM_WHITESPACE;
+
+		case '\\':
+		case '!':
+		case '@':
+		case '#':
+		case '$':
+		case ':':
+		case ';':
 		case '?':
 		case '_':
-		case '-':
-		case ' ':
-			return 1;
-			break;
+			return BUTTON_DELIM_OTHER;
+
 		default:
 			break;
 	}
-	return 0;
+	return BUTTON_DELIM_NONE;
 }
 
 static int ui_textedit_step_next_utf8(const char *str, size_t maxlen, short *pos)
@@ -1308,12 +1333,13 @@ static void ui_textedit_step_utf8(const char *str, size_t maxlen,
 
 	if(direction) { /* right*/
 		if(jump != BUTTON_EDIT_JUMP_NONE) {
+			const uiButtonDelimType is_special= (*pos) < maxlen ? test_special_char(str[(*pos)]) : BUTTON_DELIM_NONE;
 			/* jump between special characters (/,\,_,-, etc.),
 			 * look at function test_special_char() for complete
 			 * list of special character, ctr -> */
 			while((*pos) < maxlen) {
 				if (ui_textedit_step_next_utf8(str, maxlen, pos)) {
-					if((jump != BUTTON_EDIT_JUMP_ALL) && test_special_char(str[(*pos)])) break;
+					if((jump != BUTTON_EDIT_JUMP_ALL) && (is_special != test_special_char(str[(*pos)]))) break;
 				}
 				else {
 					break; /* unlikely but just incase */
@@ -1326,6 +1352,7 @@ static void ui_textedit_step_utf8(const char *str, size_t maxlen,
 	}
 	else { /* left */
 		if(jump != BUTTON_EDIT_JUMP_NONE) {
+			const uiButtonDelimType is_special= (*pos) > 1 ? test_special_char(str[(*pos) - 1]) : BUTTON_DELIM_NONE;
 			/* left only: compensate for index/change in direction */
 			ui_textedit_step_prev_utf8(str, maxlen, pos);
 
@@ -1334,7 +1361,7 @@ static void ui_textedit_step_utf8(const char *str, size_t maxlen,
 			 * list of special character, ctr -> */
 			while ((*pos) > 0) {
 				if (ui_textedit_step_prev_utf8(str, maxlen, pos)) {
-					if((jump != BUTTON_EDIT_JUMP_ALL) && test_special_char(str[(*pos)])) break;
+					if((jump != BUTTON_EDIT_JUMP_ALL) && (is_special != test_special_char(str[(*pos)]))) break;
 				}
 				else {
 					break;
@@ -3795,6 +3822,8 @@ static int ui_do_but_CURVE(bContext *C, uiBlock *block, uiBut *but, uiHandleButt
 			}
 
 			if (sel == -1) {
+				int i;
+
 				/* if the click didn't select anything, check if it's clicked on the 
 				 * curve itself, and if so, add a point */
 				fx= ((float)mx - but->x1)/zoomx + offsx;
@@ -3804,8 +3833,10 @@ static int ui_do_but_CURVE(bContext *C, uiBlock *block, uiBut *but, uiHandleButt
 
 				/* loop through the curve segment table and find what's near the mouse.
 				 * 0.05 is kinda arbitrary, but seems to be what works nicely. */
-				for(a=0; a<=CM_TABLE; a++) {			
-					if ( ( fabs(fx - cmp[a].x) < (0.05) ) && ( fabs(fy - cmp[a].y) < (0.05) ) ) {
+				for(i=0; i<=CM_TABLE; i++) {
+					if ( (fabsf(fx - cmp[i].x) < 0.05f) &&
+					     (fabsf(fy - cmp[i].y) < 0.05f))
+					{
 					
 						curvemap_insert(cuma, fx, fy);
 						curvemapping_changed(cumap, 0);
@@ -4357,7 +4388,9 @@ static void but_shortcut_name_func(bContext *C, void *arg1, int UNUSED(event))
 		IDProperty *prop= (but->opptr)? but->opptr->data: NULL;
 		
 		/* complex code to change name of button */
-		if(WM_key_event_operator_string(C, but->optype->idname, but->opcontext, prop, TRUE, buf, sizeof(buf))) {
+		if(WM_key_event_operator_string(C, but->optype->idname, but->opcontext, prop, TRUE,
+		                                buf, sizeof(buf)))
+		{
 			char *butstr_orig;
 
 			// XXX but->str changed... should not, remove the hotkey from it
@@ -5077,6 +5110,14 @@ static uiBut *ui_but_find_mouse_over(ARegion *ar, int x, int y)
 			if(ui_but_contains_pt(but, mx, my))
 				butover= but;
 		}
+
+		/* CLIP_EVENTS prevents the event from reaching other blocks */
+		if (block->flag & UI_BLOCK_CLIP_EVENTS) {
+			/* check if mouse is inside block */
+			if(block->minx <= mx && block->maxx >= mx &&
+			   block->miny <= my && block->maxy >= my)
+				break;
+		}
 	}
 
 	return butover;
@@ -5244,9 +5285,13 @@ static void button_activate_state(bContext *C, uiBut *but, uiHandleButtonState s
 	data->state= state;
 
 	if(state != BUTTON_STATE_EXIT) {
-		/* When objects for eg. are removed, running ui_check_but()
-		 * can access the removed data - so disable update on exit */
-		ui_check_but(but);
+		/* When objects for eg. are removed, running ui_check_but() can access
+		   the removed data - so disable update on exit. Also in case of
+		   highlight when not in a popup menu, we remove because data used in
+		   button below popup might have been removed by action of popup. Needs
+		   a more reliable solution... */
+		if(state != BUTTON_STATE_HIGHLIGHT || (but->block->flag & UI_BLOCK_LOOP))
+			ui_check_but(but);
 	}
 
 	/* redraw */
@@ -5489,6 +5534,11 @@ wmOperator *uiContextActiveOperator(const struct bContext *C)
 {
 	ARegion *ar_ctx= CTX_wm_region(C);
 	uiBlock *block;
+
+	/* background mode */
+	if (ar_ctx == NULL) {
+		return NULL;
+	}
 
 	/* scan active regions ui */
 	for(block=ar_ctx->uiblocks.first; block; block=block->next) {
@@ -5867,14 +5917,14 @@ static void ui_handle_button_return_submenu(bContext *C, wmEvent *event, uiBut *
 	menu= data->menu;
 
 	/* copy over return values from the closing menu */
-	if(menu->menuretval == UI_RETURN_OK || menu->menuretval == UI_RETURN_UPDATE) {
+	if((menu->menuretval & UI_RETURN_OK) || (menu->menuretval & UI_RETURN_UPDATE)) {
 		if(but->type == COL)
 			copy_v3_v3(data->vec, menu->retvec);
 		else if(ELEM3(but->type, MENU, ICONROW, ICONTEXTROW))
 			data->value= menu->retvalue;
 	}
 
-	if(menu->menuretval == UI_RETURN_UPDATE) {
+	if(menu->menuretval & UI_RETURN_UPDATE) {
 		if(data->interactive) ui_apply_button(C, but->block, but, data, 1);
 		else ui_check_but(but);
 
@@ -5882,13 +5932,13 @@ static void ui_handle_button_return_submenu(bContext *C, wmEvent *event, uiBut *
 	}
 	
 	/* now change button state or exit, which will close the submenu */
-	if(ELEM(menu->menuretval, UI_RETURN_OK, UI_RETURN_CANCEL)) {
+	if((menu->menuretval & UI_RETURN_OK) || (menu->menuretval & UI_RETURN_CANCEL)) {
 		if(menu->menuretval != UI_RETURN_OK)
 			data->cancel= 1;
 
 		button_activate_exit(C, data, but, 1, 0);
 	}
-	else if(menu->menuretval == UI_RETURN_OUT) {
+	else if(menu->menuretval & UI_RETURN_OUT) {
 		if(event->type==MOUSEMOVE && ui_mouse_inside_button(data->region, but, event->x, event->y)) {
 			button_activate_state(C, but, BUTTON_STATE_HIGHLIGHT);
 		}
@@ -6103,7 +6153,7 @@ static int ui_handle_menu_event(bContext *C, wmEvent *event, uiPopupBlockHandle 
 				/* closing sublevels of pulldowns */
 				case LEFTARROWKEY:
 					if(event->val==KM_PRESS && (block->flag & UI_BLOCK_LOOP))
-						if(BLI_countlist(&block->saferct) > 0)
+						if(block->saferct.first)
 							menu->menuretval= UI_RETURN_OUT;
 
 					retval= WM_UI_HANDLER_BREAK;
@@ -6336,7 +6386,7 @@ static int ui_handle_menu_event(bContext *C, wmEvent *event, uiPopupBlockHandle 
 				/* enter will always close this block, we let the event
 				 * get handled by the button if it is activated, otherwise we cancel */
 				if(!ui_but_find_activated(ar))
-					menu->menuretval= UI_RETURN_CANCEL;
+					menu->menuretval= UI_RETURN_CANCEL | UI_RETURN_POPUP_OK;
 			}
 			else {
 				ui_mouse_motion_towards_check(block, menu, mx, my);
@@ -6376,7 +6426,7 @@ static int ui_handle_menu_event(bContext *C, wmEvent *event, uiPopupBlockHandle 
 	 * buttons inside this region. disabled inside check .. not sure
 	 * anymore why it was there? but it meant enter didn't work
 	 * for example when mouse was not over submenu */
-	if((/*inside &&*/ (!menu->menuretval || menu->menuretval == UI_RETURN_UPDATE) && retval == WM_UI_HANDLER_CONTINUE) || event->type == TIMER) {
+	if((/*inside &&*/ (!menu->menuretval || (menu->menuretval & UI_RETURN_UPDATE)) && retval == WM_UI_HANDLER_CONTINUE) || event->type == TIMER) {
 		but= ui_but_find_activated(ar);
 
 		if(but) {
@@ -6425,14 +6475,14 @@ static int ui_handle_menu_return_submenu(bContext *C, wmEvent *event, uiPopupBlo
 	if(submenu->menuretval) {
 		/* first decide if we want to close our own menu cascading, if
 		 * so pass on the sub menu return value to our own menu handle */
-		if(ELEM(submenu->menuretval, UI_RETURN_OK, UI_RETURN_CANCEL)) {
+		if((submenu->menuretval & UI_RETURN_OK) || (submenu->menuretval & UI_RETURN_CANCEL)) {
 			if(!(block->flag & UI_BLOCK_KEEP_OPEN)) {
 				menu->menuretval= submenu->menuretval;
 				menu->butretval= data->retval;
 			}
 		}
 
-		update= (submenu->menuretval == UI_RETURN_UPDATE);
+		update= (submenu->menuretval & UI_RETURN_UPDATE);
 
 		/* now let activated button in this menu exit, which
 		 * will actually close the submenu too */
@@ -6605,7 +6655,7 @@ static int ui_handler_popup(bContext *C, wmEvent *event, void *userdata)
 		ui_popup_block_free(C, menu);
 		UI_remove_popup_handlers(&CTX_wm_window(C)->modalhandlers, menu);
 
-		if(temp.menuretval == UI_RETURN_OK) {
+		if((temp.menuretval & UI_RETURN_OK) || (temp.menuretval & UI_RETURN_POPUP_OK)) {
 			if(temp.popup_func)
 				temp.popup_func(C, temp.popup_arg, temp.retvalue);
 			if(temp.optype)

@@ -1,4 +1,4 @@
-/* 
+/*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -28,7 +28,6 @@
 /** \file DNA_action_types.h
  *  \ingroup DNA
  */
-
 
 #ifndef DNA_ACTION_TYPES_H
 #define DNA_ACTION_TYPES_H
@@ -185,7 +184,7 @@ typedef struct bPoseChannel {
 	IDProperty 			*prop;		/* User-Defined Properties on this PoseChannel */			
 	
 	ListBase			constraints;/* Constraints that act on this PoseChannel */
-	char				name[32];	/* Channels need longer names than normal blender objects */
+	char				name[64];	/* need to match bone name length: MAXBONENAME */
 	
 	short				flag;		/* dynamic, for detecting transform changes */
 	short				ikflag;		/* settings for IK bones */
@@ -204,7 +203,9 @@ typedef struct bPoseChannel {
 	
 	bMotionPath *mpath;				/* motion path cache for this bone */
 	struct Object *custom;			/* draws custom object instead of default bone shape */
-	struct bPoseChannel *custom_tx;	/* odd feature, display with another bones transform. needed in rare cases for advanced rigs, since the alternative is highly complicated - campbell */
+	struct bPoseChannel *custom_tx;	/* odd feature, display with another bones transform.
+	                                 * needed in rare cases for advanced rigs,
+	                                 * since the alternative is highly complicated - campbell */
 
 		/* transforms - written in by actions or transform */
 	float		loc[3];				
@@ -219,7 +220,8 @@ typedef struct bPoseChannel {
 	
 	float		chan_mat[4][4];		/* matrix result of loc/quat/size , and where we put deform in, see next line */
 	float		pose_mat[4][4];		/* constraints accumulate here. in the end, pose_mat = bone->arm_mat * chan_mat */
-	float		constinv[4][4];		/* inverse result of constraints. doesn't include effect of restposition, parent, and local transform*/
+	float		constinv[4][4];		/* inverse result of constraints.
+	                                 * doesn't include effect of restposition, parent, and local transform*/
 	
 	float		pose_head[3];		/* actually pose_mat[3] */
 	float		pose_tail[3];		/* also used for drawing help lines... */
@@ -343,7 +345,7 @@ typedef struct bPose {
 	void *ikparam;				/* IK solver parameters, structure depends on iksolver */ 
 	
 	bAnimVizSettings avs;		/* settings for visualization of bone animation */
-	char proxy_act_bone[32];    /* proxy active bone name*/
+	char proxy_act_bone[64];    /* proxy active bone name, MAXBONENAME */
 } bPose;
 
 
@@ -582,7 +584,7 @@ typedef struct SpaceAction {
 
 	short blockhandler[8];
 
-	View2D v2d;					/* depricated, copied to region */
+	View2D v2d  DNA_DEPRECATED; /* copied to region */
 	
 	bAction		*action;		/* the currently active action */
 	bDopeSheet 	ads;			/* the currently active context (when not showing action) */
@@ -667,7 +669,7 @@ typedef struct bActionChannel {
 	ListBase				constraintChannels;		/* Constraint Channels (when Action Channel represents an Object or Bone) */
 	
 	int		flag;			/* settings accessed via bitmapping */
-	char	name[32];		/* channel name */
+	char	name[64];		/* channel name, MAX_NAME */
 	int		temp;			/* temporary setting - may be used to indicate group that channel belongs to during syncing  */
 } bActionChannel;
 

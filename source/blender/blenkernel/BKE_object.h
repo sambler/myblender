@@ -95,7 +95,6 @@ void object_to_mat3(struct Object *ob, float mat[][3]);
 void object_to_mat4(struct Object *ob, float mat[][4]);
 void object_apply_mat4(struct Object *ob, float mat[][4], const short use_compat, const short use_parent);
 
-void set_no_parent_ipo(int val);
 struct Object *object_pose_armature_get(struct Object *ob);
 
 void where_is_object_time(struct Scene *scene, struct Object *ob, float ctime);
@@ -122,6 +121,8 @@ void BKE_scene_foreach_display_point(
         const short flag,
         void (*func_cb)(const float[3], void *), void *user_data);
 
+int BKE_object_parent_loop_check(const struct Object *parent, const struct Object *ob);
+
 void solve_tracking (struct Object *ob, float targetmat[][4]);
 int ray_hit_boundbox(struct BoundBox *bb, float ray_start[3], float ray_normal[3]);
 
@@ -130,7 +131,7 @@ void object_tfm_restore(struct Object *ob, void *obtfm_pt);
 
 typedef struct ObjectTfmProtectedChannels {
 	float loc[3],     dloc[3];
-	float size[3],    dsize[3];
+	float size[3],    dscale[3];
 	float rot[3],     drot[3];
 	float quat[4],    dquat[4];
 	float rotAxis[3], drotAxis[3];

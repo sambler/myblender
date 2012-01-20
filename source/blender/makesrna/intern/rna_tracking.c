@@ -31,6 +31,7 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "BLI_math.h"
 #include "BKE_movieclip.h"
 #include "BKE_tracking.h"
 
@@ -53,46 +54,124 @@
 
 #include "WM_api.h"
 
-static void rna_tracking_tracks_begin(CollectionPropertyIterator *iter, PointerRNA *ptr)
+static void rna_tracking_defaultSettings_levelsUpdate(Main *UNUSED(bmain), Scene *scene, PointerRNA *ptr)
 {
 	MovieClip *clip= (MovieClip*)ptr->id.data;
+	MovieTracking *tracking= &clip->tracking;
+	MovieTrackingSettings *settings= &tracking->settings;
+
+	if(settings->default_tracker==TRACKER_KLT) {
+		int max_pyramid_level_factor= 1 << (settings->default_pyramid_levels - 1);
+		float search_ratio= 2.3f * max_pyramid_level_factor;
+
+		settings->default_search_size= settings->default_pattern_size*search_ratio;
+	}
+}
+
+static void rna_tracking_defaultSettings_patternUpdate(Main *UNUSED(bmain), Scene *scene, PointerRNA *ptr)
+{
+	MovieClip *clip= (MovieClip*)ptr->id.data;
+	MovieTracking *tracking= &clip->tracking;
+	MovieTrackingSettings *settings= &tracking->settings;
+
+	if(settings->default_search_size<settings->default_pattern_size)
+		settings->default_search_size= settings->default_pattern_size;
+}
+
+static void rna_tracking_defaultSettings_searchUpdate(Main *UNUSED(bmain), Scene *scene, PointerRNA *ptr)
+{
+	MovieClip *clip= (MovieClip*)ptr->id.data;
+	MovieTracking *tracking= &clip->tracking;
+	MovieTrackingSettings *settings= &tracking->settings;
+
+	if(settings->default_pattern_size>settings->default_search_size)
+		settings->default_pattern_size= settings->default_search_size;
+}
+
+static void rna_trackingTracks_begin(CollectionPropertyIterator *iter, PointerRNA *ptr)
+{
+	MovieClip *clip= (MovieClip*)ptr->id.data;
+
 	rna_iterator_listbase_begin(iter, &clip->tracking.tracks, NULL);
 }
 
-static void rna_tracking_tracks_add(MovieTracking *tracking, int frame, int number)
+static void rna_trackingObjects_begin(CollectionPropertyIterator *iter, PointerRNA *ptr)
 {
-	int a;
+	MovieClip *clip= (MovieClip*)ptr->id.data;
 
-	for(a= 0; a<number; a++)
-		BKE_tracking_add_track(tracking, 0, 0, frame, 1, 1);
+	rna_iterator_listbase_begin(iter, &clip->tracking.objects, NULL);
+}
 
-	WM_main_add_notifier(NC_MOVIECLIP|NA_EDITED, NULL);
+static int rna_tracking_active_object_index_get(PointerRNA *ptr)
+{
+	MovieClip *clip= (MovieClip*)ptr->id.data;
+
+	return clip->tracking.objectnr;
+}
+
+static void rna_tracking_active_object_index_set(PointerRNA *ptr, int value)
+{
+	MovieClip *clip= (MovieClip*)ptr->id.data;
+
+	clip->tracking.objectnr= value;
+}
+
+static void rna_tracking_active_object_index_range(PointerRNA *ptr, int *min, int *max)
+{
+	MovieClip *clip= (MovieClip*)ptr->id.data;
+
+	*min= 0;
+	*max= clip->tracking.tot_object-1;
+	*max= MAX2(0, *max);
 }
 
 static PointerRNA rna_tracking_active_track_get(PointerRNA *ptr)
 {
 	MovieClip *clip= (MovieClip*)ptr->id.data;
+	MovieTrackingTrack *act_track= BKE_tracking_active_track(&clip->tracking);
 
-	return rna_pointer_inherit_refine(ptr, &RNA_MovieTrackingTrack, clip->tracking.act_track);
+	return rna_pointer_inherit_refine(ptr, &RNA_MovieTrackingTrack, act_track);
 }
 
 static void rna_tracking_active_track_set(PointerRNA *ptr, PointerRNA value)
 {
 	MovieClip *clip= (MovieClip*)ptr->id.data;
 	MovieTrackingTrack *track= (MovieTrackingTrack *)value.data;
-	int index= BLI_findindex(&clip->tracking.tracks, track);
+	ListBase *tracksbase= BKE_tracking_get_tracks(&clip->tracking);
+	int index= BLI_findindex(tracksbase, track);
 
-	if(index>=0) clip->tracking.act_track= track;
-	else clip->tracking.act_track= NULL;
+	if(index>=0)
+		clip->tracking.act_track= track;
+	else
+		clip->tracking.act_track= NULL;
 }
 
 void rna_trackingTrack_name_set(PointerRNA *ptr, const char *value)
 {
 	MovieClip *clip= (MovieClip *)ptr->id.data;
+	MovieTracking *tracking= &clip->tracking;
 	MovieTrackingTrack *track= (MovieTrackingTrack *)ptr->data;
+	ListBase *tracksbase= &tracking->tracks;
+
 	BLI_strncpy(track->name, value, sizeof(track->name));
 
-	BKE_track_unique_name(&clip->tracking, track);
+	/* TODO: it's a bit difficult to find list track came from knowing just
+	         movie clip ID and MovieTracking structure, so keep this naive
+			 search for a while */
+	if(BLI_findindex(tracksbase, track) < 0) {
+		MovieTrackingObject *object= tracking->objects.first;
+
+		while(object) {
+			if(BLI_findindex(&object->tracks, track)) {
+				tracksbase= &object->tracks;
+				break;
+			}
+
+			object= object->next;
+		}
+	}
+
+	BKE_track_unique_name(tracksbase, track);
 }
 
 static int rna_trackingTrack_select_get(PointerRNA *ptr)
@@ -223,14 +302,176 @@ static void rna_tracking_flushUpdate(Main *UNUSED(bmain), Scene *scene, PointerR
 	DAG_id_tag_update(&clip->id, 0);
 }
 
+static void rna_trackingObject_tracks_begin(CollectionPropertyIterator *iter, PointerRNA *ptr)
+{
+	MovieTrackingObject *object= (MovieTrackingObject* )ptr->data;
+
+	if(object->flag&TRACKING_OBJECT_CAMERA) {
+		MovieClip *clip= (MovieClip*)ptr->id.data;
+
+		rna_iterator_listbase_begin(iter, &clip->tracking.tracks, NULL);
+	}
+	else {
+		rna_iterator_listbase_begin(iter, &object->tracks, NULL);
+	}
+}
+
+static PointerRNA rna_tracking_active_object_get(PointerRNA *ptr)
+{
+	MovieClip *clip= (MovieClip*)ptr->id.data;
+	MovieTrackingObject *object= BLI_findlink(&clip->tracking.objects, clip->tracking.objectnr);
+
+	return rna_pointer_inherit_refine(ptr, &RNA_MovieTrackingObject, object);
+}
+
+static void rna_tracking_active_object_set(PointerRNA *ptr, PointerRNA value)
+{
+	MovieClip *clip= (MovieClip*)ptr->id.data;
+	MovieTrackingObject *object= (MovieTrackingObject *)value.data;
+	int index= BLI_findindex(&clip->tracking.objects, object);
+
+	if(index>=0) clip->tracking.objectnr= index;
+	else clip->tracking.objectnr= 0;
+}
+
+void rna_trackingObject_name_set(PointerRNA *ptr, const char *value)
+{
+	MovieClip *clip= (MovieClip *)ptr->id.data;
+	MovieTrackingObject *object= (MovieTrackingObject *)ptr->data;
+
+	BLI_strncpy(object->name, value, sizeof(object->name));
+
+	BKE_tracking_object_unique_name(&clip->tracking, object);
+}
+
+static void rna_trackingObject_flushUpdate(Main *UNUSED(bmain), Scene *scene, PointerRNA *ptr)
+{
+	MovieClip *clip= (MovieClip*)ptr->id.data;
+
+	WM_main_add_notifier(NC_OBJECT|ND_TRANSFORM, NULL);
+	DAG_id_tag_update(&clip->id, 0);
+}
+
+static void rna_trackingMarker_frame_set(PointerRNA *ptr, int value)
+{
+	MovieClip *clip = (MovieClip *) ptr->id.data;
+	MovieTracking *tracking = &clip->tracking;
+	MovieTrackingTrack *track;
+	MovieTrackingMarker *marker = (MovieTrackingMarker *) ptr->data;
+
+	track = tracking->tracks.first;
+	while (track) {
+		if (marker >= track->markers && marker < track->markers+track->markersnr) {
+			break;
+		}
+
+		track = track->next;
+	}
+
+	if (track) {
+		MovieTrackingMarker new_marker = *marker;
+		new_marker.framenr = value;
+
+		BKE_tracking_delete_marker(track, marker->framenr);
+		BKE_tracking_insert_marker(track, &new_marker);
+	}
+}
+
 /* API */
 
-static MovieTrackingMarker *rna_trackingTrack_marker_find_frame(MovieTrackingTrack *track, int framenr)
+static void add_tracks_to_base(MovieClip *clip, MovieTracking *tracking, ListBase *tracksbase, int frame, int number)
 {
-	return BKE_tracking_get_marker(track, framenr);
+	int a, width, height;
+	MovieClipUser user= {0};
+
+	user.framenr= 1;
+
+	BKE_movieclip_get_size(clip, &user, &width, &height);
+
+	for(a= 0; a<number; a++)
+		BKE_tracking_add_track(tracking, tracksbase, 0, 0, frame, width, height);
+}
+
+static void rna_trackingTracks_add(ID *id, MovieTracking *tracking, int frame, int number)
+{
+	MovieClip *clip= (MovieClip *) id;
+
+	add_tracks_to_base(clip, tracking, &tracking->tracks, frame, number);
+
+	WM_main_add_notifier(NC_MOVIECLIP|NA_EDITED, clip);
+}
+
+static void rna_trackingObject_tracks_add(ID *id, MovieTrackingObject *object, int frame, int number)
+{
+	MovieClip *clip= (MovieClip *) id;
+	ListBase *tracksbase= &object->tracks;
+
+	if(object->flag&TRACKING_OBJECT_CAMERA)
+		tracksbase= &clip->tracking.tracks;
+
+	add_tracks_to_base(clip, &clip->tracking, tracksbase, frame, number);
+
+	WM_main_add_notifier(NC_MOVIECLIP|NA_EDITED, NULL);
+}
+
+static MovieTrackingObject *rna_trackingObject_new(MovieTracking *tracking, const char *name)
+{
+	MovieTrackingObject *object= BKE_tracking_new_object(tracking, name);
+
+	WM_main_add_notifier(NC_MOVIECLIP|NA_EDITED, NULL);
+
+	return object;
+}
+
+void rna_trackingObject_remove(MovieTracking *tracking, MovieTrackingObject *object)
+{
+	BKE_tracking_remove_object(tracking, object);
+
+	WM_main_add_notifier(NC_MOVIECLIP|NA_EDITED, NULL);
+}
+
+static MovieTrackingMarker *rna_trackingMarkers_find_frame(MovieTrackingTrack *track, int framenr)
+{
+	return BKE_tracking_exact_marker(track, framenr);
+}
+
+static MovieTrackingMarker* rna_trackingMarkers_insert_frame(MovieTrackingTrack *track, int framenr, float *co)
+{
+	MovieTrackingMarker marker, *new_marker;
+
+	memset(&marker, 0, sizeof(marker));
+	marker.framenr = framenr;
+	copy_v2_v2(marker.pos, co);
+
+	new_marker = BKE_tracking_insert_marker(track, &marker);
+
+	WM_main_add_notifier(NC_MOVIECLIP|NA_EDITED, NULL);
+
+	return new_marker;
+}
+
+void rna_trackingMarkers_delete_frame(MovieTrackingTrack *track, int framenr)
+{
+	if(track->markersnr==1)
+		return;
+
+	BKE_tracking_delete_marker(track, framenr);
+
+	WM_main_add_notifier(NC_MOVIECLIP|NA_EDITED, NULL);
 }
 
 #else
+
+static EnumPropertyItem tracker_items[] = {
+	{TRACKER_KLT, "KLT", 0, "KLT", "Kanade–Lucas–Tomasi tracker which works with most of video clips, a bit slower than SAD"},
+	{TRACKER_SAD, "SAD", 0, "SAD", "Sum of Absolute Differences tracker which can be used when KLT tracker fails"},
+	{TRACKER_HYBRID, "Hybrid", 0, "Hybrid", "A hybrid tracker that uses SAD for rough tracking, KLT for refinement."},
+	{0, NULL, 0, NULL, NULL}};
+
+static EnumPropertyItem pattern_match_items[] = {
+	{TRACK_MATCH_KEYFRAME, "KEYFRAME", 0, "Keyframe", "Track pattern from keyframe to next frame"},
+	{TRACK_MATCH_PREVFRAME, "PREV_FRAME", 0, "Previous frame", "Track pattern from current frame to next frame"},
+	{0, NULL, 0, NULL, NULL}};
 
 static int rna_matrix_dimsize_4x4[]= {4, 4};
 
@@ -257,17 +498,17 @@ static void rna_def_trackingSettings(BlenderRNA *brna)
 	static EnumPropertyItem refine_items[] = {
 		{0, "NONE", 0, "Nothing", "Do not refine camera intrinsics"},
 		{REFINE_FOCAL_LENGTH, "FOCAL_LENGTH", 0, "Focal Length", "Refine focal length"},
+		{REFINE_FOCAL_LENGTH|REFINE_RADIAL_DISTORTION_K1, "FOCAL_LENGTH_RADIAL_K1", 0, "Focal length, K1", "Refine focal length and radial distortion K1"},
 		{REFINE_FOCAL_LENGTH|
-		 REFINE_PRINCIPAL_POINT, "FOCAL_LENGTH_PRINCIPAL_POINT", 0, "Focal Length, Optical Center", "Refine focal length and optical center"},
+		 REFINE_RADIAL_DISTORTION_K1|
+		 REFINE_RADIAL_DISTORTION_K2, "FOCAL_LENGTH_RADIAL_K1_K2", 0, "Focal length, K1, K2", "Refine focal length and radial distortion K1 and K2"},
 		{REFINE_FOCAL_LENGTH|
 		 REFINE_PRINCIPAL_POINT|
 		 REFINE_RADIAL_DISTORTION_K1|
 		 REFINE_RADIAL_DISTORTION_K2,
 		 "FOCAL_LENGTH_PRINCIPAL_POINT_RADIAL_K1_K2", 0, "Focal Length, Optical Center, K1, K2", "Refine focal length, optical center and radial distortion K1 and K2"},
 		{REFINE_FOCAL_LENGTH|
-		 REFINE_RADIAL_DISTORTION_K1|
-		 REFINE_RADIAL_DISTORTION_K2, "FOCAL_LENGTH_RADIAL_K1_K2", 0, "Focal length, K1. K2", "Refine focal length and radial distortion K1 and K2"},
-		{REFINE_FOCAL_LENGTH|REFINE_RADIAL_DISTORTION_K1, "FOCAL_LENGTH_RADIAL_K1", 0, "Focal length, K1", "Refine focal length and radial distortion K1"},
+		 REFINE_PRINCIPAL_POINT, "FOCAL_LENGTH_PRINCIPAL_POINT", 0, "Focal Length, Optical Center", "Refine focal length and optical center"},
 		{0, NULL, 0, NULL, NULL}
 	};
 
@@ -279,27 +520,6 @@ static void rna_def_trackingSettings(BlenderRNA *brna)
 	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 	RNA_def_property_enum_items(prop, speed_items);
 	RNA_def_property_ui_text(prop, "Speed", "Limit speed of tracking to make visual feedback easier (this does not affect the tracking quality)");
-
-	/* limit frames */
-	prop= RNA_def_property(srna, "frames_limit", PROP_INT, PROP_NONE);
-	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
-	RNA_def_property_int_sdna(prop, NULL, "frames_limit");
-	RNA_def_property_range(prop, 0, SHRT_MAX);
-	RNA_def_property_ui_text(prop, "Frames Limit", "Every tracking cycle, this amount of frames are tracked");
-
-	/* adjust frames */
-	prop= RNA_def_property(srna, "frames_adjust", PROP_INT, PROP_NONE);
-	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
-	RNA_def_property_int_sdna(prop, NULL, "adjframes");
-	RNA_def_property_range(prop, 0, INT_MAX);
-	RNA_def_property_ui_text(prop, "Adjust Frames", "Automatically re-adjust marker position using position on each N frames. 0 means only keyframed position is used");
-
-	/* margin */
-	prop= RNA_def_property(srna, "margin", PROP_INT, PROP_NONE);
-	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
-	RNA_def_property_int_sdna(prop, NULL, "margin");
-	RNA_def_property_range(prop, 0, 300);
-	RNA_def_property_ui_text(prop, "Margin", "Distance from image boudary at which marker stops tracking");
 
 	/* keyframe_a */
 	prop= RNA_def_property(srna, "keyframe_a", PROP_INT, PROP_NONE);
@@ -348,6 +568,84 @@ static void rna_def_trackingSettings(BlenderRNA *brna)
 	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 	RNA_def_property_enum_items(prop, cleanup_items);
 	RNA_def_property_ui_text(prop, "Action", "Cleanup action to execute");
+
+	/* ** default tracker settings ** */
+	prop= RNA_def_property(srna, "show_default_expanded", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", TRACKING_SETTINGS_SHOW_DEFAULT_EXPANDED);
+	RNA_def_property_ui_text(prop, "Show Expanded", "Show the expanded in the user interface");
+	RNA_def_property_ui_icon(prop, ICON_TRIA_RIGHT, 1);
+
+	/* limit frames */
+	prop= RNA_def_property(srna, "default_frames_limit", PROP_INT, PROP_NONE);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_int_sdna(prop, NULL, "default_frames_limit");
+	RNA_def_property_range(prop, 0, SHRT_MAX);
+	RNA_def_property_ui_text(prop, "Frames Limit", "Every tracking cycle, this number of frames are tracked");
+
+	/* pattern match */
+	prop= RNA_def_property(srna, "default_pattern_match", PROP_ENUM, PROP_NONE);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_enum_sdna(prop, NULL, "default_pattern_match");
+	RNA_def_property_enum_items(prop, pattern_match_items);
+	RNA_def_property_ui_text(prop, "Pattern Match", "Track pattern from given frame when tracking marker to next frame");
+
+	/* margin */
+	prop= RNA_def_property(srna, "default_margin", PROP_INT, PROP_NONE);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_int_sdna(prop, NULL, "default_margin");
+	RNA_def_property_range(prop, 0, 300);
+	RNA_def_property_ui_text(prop, "Margin", "Default distance from image boudary at which marker stops tracking");
+
+	/* tracking algorithm */
+	prop= RNA_def_property(srna, "default_tracker", PROP_ENUM, PROP_NONE);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_enum_items(prop, tracker_items);
+	RNA_def_property_update(prop, 0, "rna_tracking_defaultSettings_levelsUpdate");
+	RNA_def_property_ui_text(prop, "Tracker", "Default tracking algorithm to use");
+
+	/* pyramid level for pyramid klt tracking */
+	prop= RNA_def_property(srna, "default_pyramid_levels", PROP_INT, PROP_NONE);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_int_sdna(prop, NULL, "default_pyramid_levels");
+	RNA_def_property_range(prop, 1, 16);
+	RNA_def_property_update(prop, 0, "rna_tracking_defaultSettings_levelsUpdate");
+	RNA_def_property_ui_text(prop, "Pyramid levels", "Default number of pyramid levels (increase on blurry footage)");
+
+	/* minmal correlation - only used for SAD tracker */
+	prop= RNA_def_property(srna, "default_correlation_min", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_float_sdna(prop, NULL, "default_minimum_correlation");
+	RNA_def_property_range(prop, -1.0f, 1.0f);
+	RNA_def_property_ui_range(prop, -1.0f, 1.0f, 0.1, 3);
+	RNA_def_property_ui_text(prop, "Correlation", "Default minimal value of correlation between matched pattern and reference which is still treated as successful tracking");
+
+	/* default pattern size */
+	prop= RNA_def_property(srna, "default_pattern_size", PROP_INT, PROP_NONE);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_int_sdna(prop, NULL, "default_pattern_size");
+	RNA_def_property_range(prop, 5, 1000);
+	RNA_def_property_update(prop, 0, "rna_tracking_defaultSettings_patternUpdate");
+	RNA_def_property_ui_text(prop, "Pattern Size", "Size of pattern area for newly created tracks");
+
+	/* default search size */
+	prop= RNA_def_property(srna, "default_search_size", PROP_INT, PROP_NONE);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_int_sdna(prop, NULL, "default_search_size");
+	RNA_def_property_range(prop, 5, 1000);
+	RNA_def_property_update(prop, 0, "rna_tracking_defaultSettings_searchUpdate");
+	RNA_def_property_ui_text(prop, "Search Size", "Size of search area for newly created tracks");
+
+	/* object distance */
+	prop= RNA_def_property(srna, "object_distance", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_float_sdna(prop, NULL, "object_distance");
+	RNA_def_property_ui_text(prop, "Distance", "Distance between two bundles used for object scaling");
+	RNA_def_property_range(prop, 0.001, 10000);
+	RNA_def_property_ui_range(prop, 0.001, 10000.0, 1, 3);
 }
 
 static void rna_def_trackingCamera(BlenderRNA *brna)
@@ -445,30 +743,59 @@ static void rna_def_trackingMarker(BlenderRNA *brna)
 
 	/* frame */
 	prop= RNA_def_property(srna, "frame", PROP_INT, PROP_NONE);
-	RNA_def_property_clear_flag(prop, PROP_EDITABLE);	/* can't be safty edited for now, need to re-sort markers array after change */
 	RNA_def_property_int_sdna(prop, NULL, "framenr");
 	RNA_def_property_ui_text(prop, "Frame", "Frame number marker is keyframed on");
-	RNA_def_property_update(prop, NC_MOVIECLIP|NA_EDITED, NULL);
+	RNA_def_property_int_funcs(prop, NULL, "rna_trackingMarker_frame_set", NULL);
+	RNA_def_property_update(prop, NC_MOVIECLIP|NA_EDITED, 0);
 
 	/* enable */
-	prop= RNA_def_property(srna, "enable", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_negative_sdna(prop, NULL, "flag", MARKER_DISABLED);
-	RNA_def_property_ui_text(prop, "Enable", "Is marker enabled for current frame");
+	prop= RNA_def_property(srna, "mute", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", MARKER_DISABLED);
+	RNA_def_property_ui_text(prop, "Mode", "Is marker muted for current frame");
 	RNA_def_property_update(prop, NC_MOVIECLIP|NA_EDITED, NULL);
+}
+
+static void rna_def_trackingMarkers(BlenderRNA *brna, PropertyRNA *cprop)
+{
+	StructRNA *srna;
+	FunctionRNA *func;
+	PropertyRNA *parm;
+
+	RNA_def_property_srna(cprop, "MovieTrackingMarkers");
+	srna= RNA_def_struct(brna, "MovieTrackingMarkers", NULL);
+	RNA_def_struct_sdna(srna, "MovieTrackingTrack");
+	RNA_def_struct_ui_text(srna, "Movie Tracking Markers", "Collection of markers for movie tracking track");
+
+	func= RNA_def_function(srna, "find_frame", "rna_trackingMarkers_find_frame");
+	RNA_def_function_ui_description(func, "Get marker for specified frame");
+	parm= RNA_def_int(func, "frame", 1, MINFRAME, MAXFRAME, "Frame",
+			 "Frame number to find marker for", MINFRAME, MAXFRAME);
+	RNA_def_property_flag(parm, PROP_REQUIRED);
+	parm= RNA_def_pointer(func, "marker", "MovieTrackingMarker", "", "Marker for specified frame");
+	RNA_def_function_return(func, parm);
+
+	func= RNA_def_function(srna, "insert_frame", "rna_trackingMarkers_insert_frame");
+	RNA_def_function_ui_description(func, "Add a number of tracks to this movie clip");
+	parm= RNA_def_int(func, "frame", 1, MINFRAME, MAXFRAME, "Frame",
+			"Frame number to insert marker to", MINFRAME, MAXFRAME);
+	RNA_def_property_flag(parm, PROP_REQUIRED);
+	RNA_def_float_vector(func, "co", 2, 0, -1.0, 1.0, "Coordinate",
+			"Place new marker at the given frame using specified in normalized space coordinates", -1.0, 1.0);
+	RNA_def_property_flag(parm, PROP_REQUIRED);
+	parm= RNA_def_pointer(func, "marker", "MovieTrackingMarker", "", "Newly created marker");
+	RNA_def_function_return(func, parm);
+
+	func= RNA_def_function(srna, "delete_frame", "rna_trackingMarkers_delete_frame");
+	RNA_def_function_ui_description(func, "Delete marker at specified frame");
+	parm= RNA_def_int(func, "frame", 1, MINFRAME, MAXFRAME, "Frame",
+			"Frame number to delete marker from", MINFRAME, MAXFRAME);
+	RNA_def_property_flag(parm, PROP_REQUIRED);
 }
 
 static void rna_def_trackingTrack(BlenderRNA *brna)
 {
 	StructRNA *srna;
 	PropertyRNA *prop;
-
-	FunctionRNA *func;
-	PropertyRNA *parm;
-
-	static EnumPropertyItem tracker_items[] = {
-		{TRACKER_KLT, "KLT", 0, "KLT", "Kanade–Lucas–Tomasi tracker which works with most of video clips, a bit slower than SAD"},
-		{TRACKER_SAD, "SAD", 0, "SAD", "Sum of Absolute Differences tracker which can be used when MLT tracker fails"},
-		{0, NULL, 0, NULL, NULL}};
 
 	rna_def_trackingMarker(brna);
 
@@ -480,7 +807,7 @@ static void rna_def_trackingTrack(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
 	RNA_def_property_ui_text(prop, "Name", "Unique name of track");
 	RNA_def_property_string_funcs(prop, NULL, NULL, "rna_trackingTrack_name_set");
-	RNA_def_property_string_maxlength(prop, MAX_ID_NAME);
+	RNA_def_property_string_maxlength(prop, MAX_ID_NAME-2);
 	RNA_def_property_update(prop, NC_MOVIECLIP|NA_EDITED, NULL);
 	RNA_def_struct_name_property(srna, prop);
 
@@ -514,6 +841,27 @@ static void rna_def_trackingTrack(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Search Max", "Right-bottom corner of search area in normalized coordinates relative to marker position");
 	RNA_def_property_update(prop, NC_MOVIECLIP|NA_EDITED, "rna_tracking_trackerSearch_update");
 
+	/* limit frames */
+	prop= RNA_def_property(srna, "frames_limit", PROP_INT, PROP_NONE);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_int_sdna(prop, NULL, "frames_limit");
+	RNA_def_property_range(prop, 0, SHRT_MAX);
+	RNA_def_property_ui_text(prop, "Frames Limit", "Every tracking cycle, this number of frames are tracked");
+
+	/* pattern match */
+	prop= RNA_def_property(srna, "pattern_match", PROP_ENUM, PROP_NONE);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_enum_sdna(prop, NULL, "pattern_match");
+	RNA_def_property_enum_items(prop, pattern_match_items);
+	RNA_def_property_ui_text(prop, "Pattern Match", "Track pattern from given frame when tracking marker to next frame");
+
+	/* margin */
+	prop= RNA_def_property(srna, "margin", PROP_INT, PROP_NONE);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_int_sdna(prop, NULL, "margin");
+	RNA_def_property_range(prop, 0, 300);
+	RNA_def_property_ui_text(prop, "Margin", "Distance from image boudary at which marker stops tracking");
+
 	/* tracking algorithm */
 	prop= RNA_def_property(srna, "tracker", PROP_ENUM, PROP_NONE);
 	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
@@ -535,13 +883,14 @@ static void rna_def_trackingTrack(BlenderRNA *brna)
 	RNA_def_property_float_sdna(prop, NULL, "minimum_correlation");
 	RNA_def_property_range(prop, -1.0f, 1.0f);
 	RNA_def_property_ui_range(prop, -1.0f, 1.0f, 0.1, 3);
-	RNA_def_property_ui_text(prop, "Correlation", "Minimal value of correlation between mathed pattern and reference which is still treated as successful tracking");
+	RNA_def_property_ui_text(prop, "Correlation", "Minimal value of correlation between matched pattern and reference which is still treated as successful tracking");
 
 	/* markers */
 	prop= RNA_def_property(srna, "markers", PROP_COLLECTION, PROP_NONE);
 	RNA_def_property_struct_type(prop, "MovieTrackingMarker");
 	RNA_def_property_collection_sdna(prop, NULL, "markers", "markersnr");
 	RNA_def_property_ui_text(prop, "Markers", "Collection of markers in track");
+	rna_def_trackingMarkers(brna, prop);
 
 	/* ** channels ** */
 
@@ -561,6 +910,12 @@ static void rna_def_trackingTrack(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "use_blue_channel", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_negative_sdna(prop, NULL, "flag", TRACK_DISABLE_BLUE);
 	RNA_def_property_ui_text(prop, "Use Blue Channel", "Use blue channel from footage for tracking");
+	RNA_def_property_update(prop, NC_MOVIECLIP|ND_DISPLAY, NULL);
+
+	/* preview_grayscale */
+	prop= RNA_def_property(srna, "use_grayscale_preview", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", TRACK_PREVIEW_GRAYSCALE);
+	RNA_def_property_ui_text(prop, "Grayscale", "Display what the tracking algorithm sees in the preview");
 	RNA_def_property_update(prop, NC_MOVIECLIP|ND_DISPLAY, NULL);
 
 	/* has bundle */
@@ -630,15 +985,6 @@ static void rna_def_trackingTrack(BlenderRNA *brna)
 	RNA_def_property_float_sdna(prop, NULL, "error");
 	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
 	RNA_def_property_ui_text(prop, "Average Error", "Average error of re-projection");
-
-	/* ** api ** */
-
-	func= RNA_def_function(srna, "marker_find_frame", "rna_trackingTrack_marker_find_frame");
-	RNA_def_function_ui_description(func, "Get marker for specified frame");
-	parm= RNA_def_int(func, "frame", 1, MINFRAME, MAXFRAME, "Frame", "type for the new spline", MINFRAME, MAXFRAME);
-	RNA_def_property_flag(parm, PROP_REQUIRED);
-	parm= RNA_def_pointer(func, "marker", "MovieTrackingMarker", "", "Marker for specified frame");
-	RNA_def_function_return(func, parm);
 }
 
 static void rna_def_trackingStabilization(BlenderRNA *brna)
@@ -685,7 +1031,7 @@ static void rna_def_trackingStabilization(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "scale_max", PROP_FLOAT, PROP_FACTOR);
 	RNA_def_property_float_sdna(prop, NULL, "maxscale");
 	RNA_def_property_range(prop, 0.0f, 10.0f);
-	RNA_def_property_ui_text(prop, "Maximal Scale", "Limits the amount of automatic scaling");
+	RNA_def_property_ui_text(prop, "Maximal Scale", "Limit the amount of automatic scaling");
 	RNA_def_property_update(prop, NC_MOVIECLIP|ND_DISPLAY, "rna_tracking_flushUpdate");
 
 	/* influence_location */
@@ -702,7 +1048,7 @@ static void rna_def_trackingStabilization(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Scale Influence", "Influence of stabilization algorithm on footage scale");
 	RNA_def_property_update(prop, NC_MOVIECLIP|ND_DISPLAY, "rna_tracking_flushUpdate");
 
- 	/* use_stabilize_rotation */
+	/* use_stabilize_rotation */
 	prop= RNA_def_property(srna, "use_stabilize_rotation", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", TRACKING_STABILIZE_ROTATION);
 	RNA_def_property_ui_text(prop, "Stabilize Rotation", "Stabilize horizon line on the shot");
@@ -773,18 +1119,18 @@ static void rna_def_trackingReconstruction(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Cameras", "Collection of solved cameras");
 }
 
-static void rna_def_trackingTracks(BlenderRNA *brna, PropertyRNA *cprop)
+static void rna_def_trackingTracks(BlenderRNA *brna)
 {
 	StructRNA *srna;
 	FunctionRNA *func;
 	PropertyRNA *prop;
 
-	RNA_def_property_srna(cprop, "MovieTrackingTracks");
 	srna= RNA_def_struct(brna, "MovieTrackingTracks", NULL);
 	RNA_def_struct_sdna(srna, "MovieTracking");
 	RNA_def_struct_ui_text(srna, "Movie Tracks", "Collection of movie tracking tracks");
 
-	func= RNA_def_function(srna, "add", "rna_tracking_tracks_add");
+	func= RNA_def_function(srna, "add", "rna_trackingTracks_add");
+	RNA_def_function_flag(func, FUNC_USE_SELF_ID);
 	RNA_def_function_ui_description(func, "Add a number of tracks to this movie clip");
 	RNA_def_int(func, "frame", 1, MINFRAME, MAXFRAME, "Frame", "Frame number to add tracks on", MINFRAME, MAXFRAME);
 	RNA_def_int(func, "count", 1, 0, INT_MAX, "Number", "Number of tracks to add to the movie clip", 0, INT_MAX);
@@ -797,6 +1143,105 @@ static void rna_def_trackingTracks(BlenderRNA *brna, PropertyRNA *cprop)
 	RNA_def_property_ui_text(prop, "Active Track", "Active track in this tracking data object");
 }
 
+static void rna_def_trackingObjectTracks(BlenderRNA *brna)
+{
+	StructRNA *srna;
+	FunctionRNA *func;
+	PropertyRNA *prop;
+
+	srna= RNA_def_struct(brna, "MovieTrackingObjectTracks", NULL);
+	RNA_def_struct_sdna(srna, "MovieTrackingObject");
+	RNA_def_struct_ui_text(srna, "Movie Tracks", "Collection of movie tracking tracks");
+
+	func= RNA_def_function(srna, "add", "rna_trackingObject_tracks_add");
+	RNA_def_function_flag(func, FUNC_USE_SELF_ID);
+	RNA_def_function_ui_description(func, "Add a number of tracks to this movie clip");
+	RNA_def_int(func, "frame", 1, MINFRAME, MAXFRAME, "Frame", "Frame number to add tracks on", MINFRAME, MAXFRAME);
+	RNA_def_int(func, "count", 1, 0, INT_MAX, "Number", "Number of tracks to add to the movie clip", 0, INT_MAX);
+
+	/* active track */
+	prop= RNA_def_property(srna, "active", PROP_POINTER, PROP_NONE);
+	RNA_def_property_struct_type(prop, "MovieTrackingTrack");
+	RNA_def_property_pointer_funcs(prop, "rna_tracking_active_track_get", "rna_tracking_active_track_set", NULL, NULL);
+	RNA_def_property_flag(prop, PROP_EDITABLE|PROP_NEVER_UNLINK);
+	RNA_def_property_ui_text(prop, "Active Track", "Active track in this tracking data object");
+}
+
+static void rna_def_trackingObject(BlenderRNA *brna)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+
+	srna= RNA_def_struct(brna, "MovieTrackingObject", NULL);
+	RNA_def_struct_ui_text(srna, "Movie tracking object data", "Match-moving object tracking and reconstruction data");
+
+	/* name */
+	prop= RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
+	RNA_def_property_ui_text(prop, "Name", "Unique name of object");
+	RNA_def_property_string_funcs(prop, NULL, NULL, "rna_trackingObject_name_set");
+	RNA_def_property_string_maxlength(prop, MAX_ID_NAME-2);
+	RNA_def_property_update(prop, NC_MOVIECLIP|NA_EDITED, NULL);
+	RNA_def_struct_name_property(srna, prop);
+
+	/* is_camera */
+	prop= RNA_def_property(srna, "is_camera", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", TRACKING_OBJECT_CAMERA);
+	RNA_def_property_ui_text(prop, "Camera", "Object is used for camera tracking");
+	RNA_def_property_update(prop, NC_MOVIECLIP|ND_DISPLAY, NULL);
+
+	/* tracks */
+	prop= RNA_def_property(srna, "tracks", PROP_COLLECTION, PROP_NONE);
+	RNA_def_property_collection_funcs(prop, "rna_trackingObject_tracks_begin", "rna_iterator_listbase_next", "rna_iterator_listbase_end", "rna_iterator_listbase_get", 0, 0, 0, 0);
+	RNA_def_property_struct_type(prop, "MovieTrackingTrack");
+	RNA_def_property_ui_text(prop, "Tracks", "Collection of tracks in this tracking data object");
+	RNA_def_property_srna(prop, "MovieTrackingObjectTracks");
+
+	/* reconstruction */
+	prop= RNA_def_property(srna, "reconstruction", PROP_POINTER, PROP_NONE);
+	RNA_def_property_struct_type(prop, "MovieTrackingReconstruction");
+
+	/* scale */
+	prop= RNA_def_property(srna, "scale", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_float_sdna(prop, NULL, "scale");
+	RNA_def_property_range(prop, 0.0001f, 10000.0f);
+	RNA_def_property_ui_range(prop, 0.0001f, 10000.0, 1, 4);
+	RNA_def_property_ui_text(prop, "Scale", "Scale of object solution in camera space");
+	RNA_def_property_update(prop, NC_MOVIECLIP|NA_EDITED, "rna_trackingObject_flushUpdate");
+}
+
+static void rna_def_trackingObjects(BlenderRNA *brna, PropertyRNA *cprop)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+
+	FunctionRNA *func;
+	PropertyRNA *parm;
+
+	RNA_def_property_srna(cprop, "MovieTrackingObjects");
+	srna= RNA_def_struct(brna, "MovieTrackingObjects", NULL);
+	RNA_def_struct_sdna(srna, "MovieTracking");
+	RNA_def_struct_ui_text(srna, "Movie Objects", "Collection of movie trackingobjects");
+
+	func= RNA_def_function(srna, "new", "rna_trackingObject_new");
+	RNA_def_function_ui_description(func, "Add tracking object to this movie clip");
+	RNA_def_string(func, "name", "", 0, "", "Name of new object");
+	parm= RNA_def_pointer(func, "object", "MovieTrackingObject", "", "New motion tracking object");
+	RNA_def_function_return(func, parm);
+
+	func= RNA_def_function(srna, "remove", "rna_trackingObject_remove");
+	RNA_def_function_ui_description(func, "Remove tracking object from this movie clip");
+	parm= RNA_def_pointer(func, "object", "MovieTrackingObject", "", "Motion tracking object to be removed");
+
+	/* active object */
+	prop= RNA_def_property(srna, "active", PROP_POINTER, PROP_NONE);
+	RNA_def_property_struct_type(prop, "MovieTrackingObject");
+	RNA_def_property_pointer_funcs(prop, "rna_tracking_active_object_get", "rna_tracking_active_object_set", NULL, NULL);
+	RNA_def_property_flag(prop, PROP_EDITABLE|PROP_NEVER_UNLINK);
+	RNA_def_property_ui_text(prop, "Active Object", "Active object in this tracking data object");
+}
+
 static void rna_def_tracking(BlenderRNA *brna)
 {
 	StructRNA *srna;
@@ -805,8 +1250,11 @@ static void rna_def_tracking(BlenderRNA *brna)
 	rna_def_trackingSettings(brna);
 	rna_def_trackingCamera(brna);
 	rna_def_trackingTrack(brna);
+	rna_def_trackingTracks(brna);
+	rna_def_trackingObjectTracks(brna);
 	rna_def_trackingStabilization(brna);
 	rna_def_trackingReconstruction(brna);
+	rna_def_trackingObject(brna);
 
 	srna= RNA_def_struct(brna, "MovieTracking", NULL);
 	RNA_def_struct_ui_text(srna, "Movie tracking data", "Match-moving data for tracking");
@@ -821,10 +1269,10 @@ static void rna_def_tracking(BlenderRNA *brna)
 
 	/* tracks */
 	prop= RNA_def_property(srna, "tracks", PROP_COLLECTION, PROP_NONE);
-	RNA_def_property_collection_funcs(prop, "rna_tracking_tracks_begin", "rna_iterator_listbase_next", "rna_iterator_listbase_end", "rna_iterator_listbase_get", 0, 0, 0, 0);
+	RNA_def_property_collection_funcs(prop, "rna_trackingTracks_begin", "rna_iterator_listbase_next", "rna_iterator_listbase_end", "rna_iterator_listbase_get", 0, 0, 0, 0);
 	RNA_def_property_struct_type(prop, "MovieTrackingTrack");
 	RNA_def_property_ui_text(prop, "Tracks", "Collection of tracks in this tracking data object");
-	rna_def_trackingTracks(brna, prop);
+	RNA_def_property_srna(prop, "MovieTrackingTracks");
 
 	/* stabilization */
 	prop= RNA_def_property(srna, "stabilization", PROP_POINTER, PROP_NONE);
@@ -833,6 +1281,20 @@ static void rna_def_tracking(BlenderRNA *brna)
 	/* reconstruction */
 	prop= RNA_def_property(srna, "reconstruction", PROP_POINTER, PROP_NONE);
 	RNA_def_property_struct_type(prop, "MovieTrackingReconstruction");
+
+	/* objects */
+	prop= RNA_def_property(srna, "objects", PROP_COLLECTION, PROP_NONE);
+	RNA_def_property_collection_funcs(prop, "rna_trackingObjects_begin", "rna_iterator_listbase_next", "rna_iterator_listbase_end", "rna_iterator_listbase_get", 0, 0, 0, 0);
+	RNA_def_property_struct_type(prop, "MovieTrackingObject");
+	RNA_def_property_ui_text(prop, "Objects", "Collection of objects in this tracking data object");
+	rna_def_trackingObjects(brna, prop);
+
+	/* active object index */
+	prop= RNA_def_property(srna, "active_object_index", PROP_INT, PROP_NONE);
+	RNA_def_property_int_sdna(prop, NULL, "objectnr");
+	RNA_def_property_int_funcs(prop, "rna_tracking_active_object_index_get", "rna_tracking_active_object_index_set", "rna_tracking_active_object_index_range");
+	RNA_def_property_ui_text(prop, "Active Object Index", "Index of active object");
+	RNA_def_property_update(prop, NC_MOVIECLIP|ND_DISPLAY, NULL);
 }
 
 void RNA_def_tracking(BlenderRNA *brna)

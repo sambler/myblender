@@ -124,6 +124,7 @@ static uiStyle *ui_style_new(ListBase *styles, const char *name, short uifont_id
 	style->buttonspacex= 8;
 	style->buttonspacey= 2;
 	style->panelspace= 8;
+	style->panelouter= 4;
 	
 	return style;
 }
@@ -179,7 +180,7 @@ void uiStyleFontDrawExt(uiFontStyle *fs, rcti *rect, const char *str,
 	if (fs->kerning == 1)
 		BLF_enable(fs->uifont_id, BLF_KERNING_DEFAULT);
 
-	BLF_draw(fs->uifont_id, str, 65535); /* XXX, use real length */
+	BLF_draw(fs->uifont_id, str, BLF_DRAW_STR_DUMMY_MAX);
 	BLF_disable(fs->uifont_id, BLF_CLIPPING);
 	if (fs->shadow)
 		BLF_disable(fs->uifont_id, BLF_SHADOW);
@@ -242,7 +243,7 @@ void uiStyleFontDrawRotated(uiFontStyle *fs, rcti *rect, const char *str)
 	if (fs->kerning == 1)
 		BLF_enable(fs->uifont_id, BLF_KERNING_DEFAULT);
 
-	BLF_draw(fs->uifont_id, str, 65535); /* XXX, use real length */
+	BLF_draw(fs->uifont_id, str, BLF_DRAW_STR_DUMMY_MAX);
 	BLF_disable(fs->uifont_id, BLF_ROTATION);
 	BLF_disable(fs->uifont_id, BLF_CLIPPING);
 	if (fs->shadow)
@@ -290,7 +291,7 @@ void UI_DrawString(float x, float y, const char *str)
 
 	uiStyleFontSet(&style->widget);
 	BLF_position(style->widget.uifont_id, x, y, 0.0f);
-	BLF_draw(style->widget.uifont_id, str, 65535); /* XXX, use real length */
+	BLF_draw(style->widget.uifont_id, str, BLF_DRAW_STR_DUMMY_MAX);
 
 	if (style->widget.kerning == 1)
 		BLF_disable(style->widget.uifont_id, BLF_KERNING_DEFAULT);

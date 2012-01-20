@@ -86,7 +86,7 @@ ImBuf *ED_space_clip_get_buffer(SpaceClip *sc)
 	if(sc->clip) {
 		ImBuf *ibuf;
 
-		ibuf= BKE_movieclip_get_ibuf(sc->clip, &sc->user);
+		ibuf= BKE_movieclip_get_postprocessed_ibuf(sc->clip, &sc->user, sc->postproc_flag);
 
 		if(ibuf && (ibuf->rect || ibuf->rect_float))
 			return ibuf;
@@ -103,7 +103,7 @@ ImBuf *ED_space_clip_get_stable_buffer(SpaceClip *sc, float loc[2], float *scale
 	if(sc->clip) {
 		ImBuf *ibuf;
 
-		ibuf= BKE_movieclip_get_stable_ibuf(sc->clip, &sc->user, loc, scale, angle);
+		ibuf= BKE_movieclip_get_stable_ibuf(sc->clip, &sc->user, loc, scale, angle, sc->postproc_flag);
 
 		if(ibuf && (ibuf->rect || ibuf->rect_float))
 			return ibuf;
@@ -171,12 +171,13 @@ static int selected_boundbox(SpaceClip *sc, float min[2], float max[2])
 	MovieClip *clip= ED_space_clip(sc);
 	MovieTrackingTrack *track;
 	int width, height, ok= 0;
+	ListBase *tracksbase= BKE_tracking_get_tracks(&clip->tracking);
 
 	INIT_MINMAX2(min, max);
 
 	ED_space_clip_size(sc, &width, &height);
 
-	track= clip->tracking.tracks.first;
+	track= tracksbase->first;
 	while(track) {
 		if(TRACK_VIEW_SELECTED(sc, track)) {
 			MovieTrackingMarker *marker= BKE_tracking_get_marker(track, sc->user.framenr);

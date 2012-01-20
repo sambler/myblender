@@ -71,6 +71,7 @@
 #include "IMB_imbuf_types.h"
 
 #include "ED_node.h"
+#include "ED_image.h"
 #include "ED_screen.h"
 #include "ED_space_api.h"
 #include "ED_render.h"
@@ -483,6 +484,7 @@ void node_tree_from_ID(ID *id, bNodeTree **ntree, bNodeTree **edittree, int *tre
 	}
 	else {
 		*ntree= NULL;
+		*edittree= NULL;
 		if(treetype) *treetype= 0;
 	}
 }
@@ -689,108 +691,6 @@ void ED_node_set_active(Main *bmain, bNodeTree *ntree, bNode *node)
 	}
 }
 
-static int compare_nodes(bNode *a, bNode *b)
-{
-	bNode *parent;
-	/* These tell if either the node or any of the parent nodes is selected.
-	 * A selected parent means an unselected node is also in foreground!
-	 */
-	int a_select=(a->flag & NODE_SELECT), b_select=(b->flag & NODE_SELECT);
-	int a_active=(a->flag & NODE_ACTIVE), b_active=(b->flag & NODE_ACTIVE);
-	
-	/* if one is an ancestor of the other */
-	/* XXX there might be a better sorting algorithm for stable topological sort, this is O(n^2) worst case */
-	for (parent = a->parent; parent; parent=parent->parent) {
-		/* if b is an ancestor, it is always behind a */
-		if (parent==b)
-			return 1;
-		/* any selected ancestor moves the node forward */
-		if (parent->flag & NODE_ACTIVE)
-			a_active = 1;
-		if (parent->flag & NODE_SELECT)
-			a_select = 1;
-	}
-	for (parent = b->parent; parent; parent=parent->parent) {
-		/* if a is an ancestor, it is always behind b */
-		if (parent==a)
-			return 0;
-		/* any selected ancestor moves the node forward */
-		if (parent->flag & NODE_ACTIVE)
-			b_active = 1;
-		if (parent->flag & NODE_SELECT)
-			b_select = 1;
-	}
-
-	/* if one of the nodes is in the background and the other not */
-	if ((a->flag & NODE_BACKGROUND) && !(b->flag & NODE_BACKGROUND))
-		return 0;
-	else if (!(a->flag & NODE_BACKGROUND) && (b->flag & NODE_BACKGROUND))
-		return 1;
-	
-	/* if one has a higher selection state (active > selected > nothing) */
-	if (!b_active && a_active)
-		return 1;
-	else if (!b_select && (a_active || a_select))
-		return 1;
-	
-	return 0;
-}
-/* Sorts nodes by selection: unselected nodes first, then selected,
- * then the active node at the very end. Relative order is kept intact!
- */
-void node_sort(bNodeTree *ntree)
-{
-	/* merge sort is the algorithm of choice here */
-	bNode *first_a, *first_b, *node_a, *node_b, *tmp;
-	int totnodes= BLI_countlist(&ntree->nodes);
-	int k, a, b;
-	
-	k = 1;
-	while (k < totnodes) {
-		first_a = first_b = ntree->nodes.first;
-		
-		do {
-			/* setup first_b pointer */
-			for (b=0; b < k && first_b; ++b) {
-				first_b = first_b->next;
-			}
-			/* all batches merged? */
-			if (first_b==NULL)
-				break;
-			
-			/* merge batches */
-			node_a = first_a;
-			node_b = first_b;
-			a = b = 0;
-			while (a < k && b < k && node_b) {
-				if (compare_nodes(node_a, node_b)==0) {
-					node_a = node_a->next;
-					++a;
-				}
-				else {
-					tmp = node_b;
-					node_b = node_b->next;
-					++b;
-					BLI_remlink(&ntree->nodes, tmp);
-					BLI_insertlinkbefore(&ntree->nodes, node_a, tmp);
-				}
-			}
-
-			/* setup first pointers for next batch */
-			first_b = node_b;
-			for (; b < k; ++b) {
-				/* all nodes sorted? */
-				if (first_b==NULL)
-					break;
-				first_b = first_b->next;
-			}
-			first_a = first_b;
-		} while (first_b);
-		
-		k = k << 1;
-	}
-}
-
 static int inside_rctf(rctf *bounds, rctf *rect)
 {
 	return (bounds->xmin <= rect->xmin && bounds->xmax >= rect->xmax
@@ -852,14 +752,14 @@ static int edit_node_poll(bContext *C)
 static void edit_node_properties(wmOperatorType *ot)
 {
 	/* XXX could node be a context pointer? */
-	RNA_def_string(ot->srna, "node", "", 32, "Node", "");
+	RNA_def_string(ot->srna, "node", "", MAX_NAME, "Node", "");
 	RNA_def_int(ot->srna, "socket", 0, 0, MAX_SOCKET, "Socket", "", 0, MAX_SOCKET);
 	RNA_def_enum(ot->srna, "in_out", socket_in_out_items, SOCK_IN, "Socket Side", "");
 }
 
 static int edit_node_invoke_properties(bContext *C, wmOperator *op)
 {
-	if (!RNA_property_is_set(op->ptr, "node")) {
+	if (!RNA_struct_property_is_set(op->ptr, "node")) {
 		bNode *node= CTX_data_pointer_get_type(C, "node", &RNA_Node).data;
 		if (!node)
 			return 0;
@@ -867,10 +767,10 @@ static int edit_node_invoke_properties(bContext *C, wmOperator *op)
 			RNA_string_set(op->ptr, "node", node->name);
 	}
 	
-	if (!RNA_property_is_set(op->ptr, "in_out"))
+	if (!RNA_struct_property_is_set(op->ptr, "in_out"))
 		RNA_enum_set(op->ptr, "in_out", SOCK_IN);
 	
-	if (!RNA_property_is_set(op->ptr, "socket"))
+	if (!RNA_struct_property_is_set(op->ptr, "socket"))
 		RNA_int_set(op->ptr, "socket", 0);
 	
 	return 1;
@@ -880,7 +780,7 @@ static void edit_node_properties_get(wmOperator *op, bNodeTree *ntree, bNode **r
 {
 	bNode *node;
 	bNodeSocket *sock=NULL;
-	char nodename[32];
+	char nodename[MAX_NAME];
 	int sockindex;
 	int in_out;
 	
@@ -939,7 +839,7 @@ static int node_group_edit_exec(bContext *C, wmOperator *UNUSED(op))
 	ED_preview_kill_jobs(C);
 
 	if (snode->nodetree==snode->edittree) {
-		bNode *gnode= nodeGetActive(snode->nodetree);
+		bNode *gnode = nodeGetActive(snode->edittree);
 		snode_make_group_editable(snode, gnode);
 	}
 	else
@@ -954,8 +854,11 @@ static int node_group_edit_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(e
 {
 	SpaceNode *snode = CTX_wm_space_node(C);
 	bNode *gnode;
-
-	gnode= nodeGetActive(snode->edittree);
+	
+	gnode = nodeGetActive(snode->edittree);
+	if (!gnode)
+		return OPERATOR_CANCELLED;
+	
 	/* XXX callback? */
 	if(gnode && gnode->id && GS(gnode->id->name)==ID_NT && gnode->id->lib) {
 		uiPupMenuOkee(C, op->type->idname, "Make group local?");
@@ -987,20 +890,20 @@ static int node_group_socket_add_exec(bContext *C, wmOperator *op)
 {
 	SpaceNode *snode = CTX_wm_space_node(C);
 	int in_out= -1;
-	char name[32]= "";
+	char name[MAX_NAME]= "";
 	int type= SOCK_FLOAT;
 	bNodeTree *ngroup= snode->edittree;
 	/* bNodeSocket *sock; */ /* UNUSED */
 	
 	ED_preview_kill_jobs(C);
 	
-	if (RNA_property_is_set(op->ptr, "name"))
+	if (RNA_struct_property_is_set(op->ptr, "name"))
 		RNA_string_get(op->ptr, "name", name);
 	
-	if (RNA_property_is_set(op->ptr, "type"))
+	if (RNA_struct_property_is_set(op->ptr, "type"))
 		type = RNA_enum_get(op->ptr, "type");
 	
-	if (RNA_property_is_set(op->ptr, "in_out"))
+	if (RNA_struct_property_is_set(op->ptr, "in_out"))
 		in_out = RNA_enum_get(op->ptr, "in_out");
 	else
 		return OPERATOR_CANCELLED;
@@ -1030,7 +933,7 @@ void NODE_OT_group_socket_add(wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 	
 	RNA_def_enum(ot->srna, "in_out", socket_in_out_items, SOCK_IN, "Socket Type", "Input or Output");
-	RNA_def_string(ot->srna, "name", "", 32, "Name", "Group socket name");
+	RNA_def_string(ot->srna, "name", "", MAX_NAME, "Name", "Group socket name");
 	RNA_def_enum(ot->srna, "type", node_socket_type_items, SOCK_FLOAT, "Type", "Type of the group socket");
 }
 
@@ -1046,12 +949,12 @@ static int node_group_socket_remove_exec(bContext *C, wmOperator *op)
 	
 	ED_preview_kill_jobs(C);
 	
-	if (RNA_property_is_set(op->ptr, "index"))
+	if (RNA_struct_property_is_set(op->ptr, "index"))
 		index = RNA_int_get(op->ptr, "index");
 	else
 		return OPERATOR_CANCELLED;
 	
-	if (RNA_property_is_set(op->ptr, "in_out"))
+	if (RNA_struct_property_is_set(op->ptr, "in_out"))
 		in_out = RNA_enum_get(op->ptr, "in_out");
 	else
 		return OPERATOR_CANCELLED;
@@ -1097,12 +1000,12 @@ static int node_group_socket_move_up_exec(bContext *C, wmOperator *op)
 	
 	ED_preview_kill_jobs(C);
 	
-	if (RNA_property_is_set(op->ptr, "index"))
+	if (RNA_struct_property_is_set(op->ptr, "index"))
 		index = RNA_int_get(op->ptr, "index");
 	else
 		return OPERATOR_CANCELLED;
 	
-	if (RNA_property_is_set(op->ptr, "in_out"))
+	if (RNA_struct_property_is_set(op->ptr, "in_out"))
 		in_out = RNA_enum_get(op->ptr, "in_out");
 	else
 		return OPERATOR_CANCELLED;
@@ -1167,12 +1070,12 @@ static int node_group_socket_move_down_exec(bContext *C, wmOperator *op)
 	
 	ED_preview_kill_jobs(C);
 	
-	if (RNA_property_is_set(op->ptr, "index"))
+	if (RNA_struct_property_is_set(op->ptr, "index"))
 		index = RNA_int_get(op->ptr, "index");
 	else
 		return OPERATOR_CANCELLED;
 	
-	if (RNA_property_is_set(op->ptr, "in_out"))
+	if (RNA_struct_property_is_set(op->ptr, "in_out"))
 		in_out = RNA_enum_get(op->ptr, "in_out");
 	else
 		return OPERATOR_CANCELLED;
@@ -1441,8 +1344,10 @@ static void sample_draw(const bContext *C, ARegion *ar, void *arg_info)
 {
 	ImageSampleInfo *info= arg_info;
 
-	draw_nodespace_color_info(ar, (CTX_data_scene(C)->r.color_mgt_flag & R_COLOR_MANAGEMENT), info->channels,
-							  info->x, info->y, info->col, info->colf);
+	ED_image_draw_info(ar, (CTX_data_scene(C)->r.color_mgt_flag & R_COLOR_MANAGEMENT), info->channels,
+	                   info->x, info->y, info->col, info->colf,
+	                   NULL, NULL /* zbuf - unused for nodes */
+	                   );
 }
 
 static void sample_apply(bContext *C, wmOperator *op, wmEvent *event)
@@ -1695,102 +1600,43 @@ void NODE_OT_resize(wmOperatorType *ot)
 	ot->flag= OPTYPE_BLOCKING;
 }
 
-/* ********************** select ******************** */
 
+/* ********************** hidden sockets ******************** */
 
-/* no undo here! */
-void node_deselectall(SpaceNode *snode)
-{
-	bNode *node;
-	
-	for(node= snode->edittree->nodes.first; node; node= node->next)
-		node->flag &= ~SELECT;
-}
-
-/* return 1 if we need redraw otherwise zero. */
-int node_select_same_type(SpaceNode *snode)
-{
-	bNode *nac, *p;
-	int redraw;
-
-	/* search for the active node. */
-	for (nac= snode->edittree->nodes.first; nac; nac= nac->next) {
-		if (nac->flag & SELECT)
-			break;
-	}
-
-	/* no active node, return. */
-	if (!nac)
-		return(0);
-
-	redraw= 0;
-	for (p= snode->edittree->nodes.first; p; p= p->next) {
-		if (p->type != nac->type && p->flag & SELECT) {
-			/* if it's selected but different type, unselect */
-			redraw= 1;
-			p->flag &= ~SELECT;
-		}
-		else if (p->type == nac->type && (!(p->flag & SELECT))) {
-			/* if it's the same type and is not selected, select! */
-			redraw= 1;
-			p->flag |= SELECT;
-		}
-	}
-	return(redraw);
-}
-
-/* return 1 if we need redraw, otherwise zero.
- * dir can be 0 == next or 0 != prev.
- */
-int node_select_same_type_np(SpaceNode *snode, int dir)
-{
-	bNode *nac, *p;
-
-	/* search the active one. */
-	for (nac= snode->edittree->nodes.first; nac; nac= nac->next) {
-		if (nac->flag & SELECT)
-			break;
-	}
-
-	/* no active node, return. */
-	if (!nac)
-		return(0);
-
-	if (dir == 0)
-		p= nac->next;
-	else
-		p= nac->prev;
-
-	while (p) {
-		/* Now search the next with the same type. */
-		if (p->type == nac->type)
-			break;
-
-		if (dir == 0)
-			p= p->next;
-		else
-			p= p->prev;
-	}
-
-	if (p) {
-		node_deselectall(snode);
-		p->flag |= SELECT;
-		return(1);
-	}
-	return(0);
-}
-
-int node_has_hidden_sockets(bNode *node)
+int node_has_hidden_sockets(bNode *node, short flag)
 {
 	bNodeSocket *sock;
 	
 	for(sock= node->inputs.first; sock; sock= sock->next)
-		if(sock->flag & SOCK_HIDDEN)
+		if(sock->flag & flag)
 			return 1;
 	for(sock= node->outputs.first; sock; sock= sock->next)
-		if(sock->flag & SOCK_HIDDEN)
+		if(sock->flag & flag)
 			return 1;
 	return 0;
+}
+
+void node_set_hidden_sockets(SpaceNode *snode, bNode *node, short flag, int set)
+{	
+	bNodeSocket *sock;
+
+	if(set==0) {
+		for(sock= node->inputs.first; sock; sock= sock->next)
+			sock->flag &= ~flag;
+		for(sock= node->outputs.first; sock; sock= sock->next)
+			sock->flag &= ~flag;
+	}
+	else {
+		/* hide unused sockets */
+		for(sock= node->inputs.first; sock; sock= sock->next) {
+			if(sock->link==NULL)
+				sock->flag |= flag;
+		}
+		for(sock= node->outputs.first; sock; sock= sock->next) {
+			if(nodeCountSocketLinks(snode->edittree, sock)==0)
+				sock->flag |= flag;
+		}
+	}
 }
 
 static void node_link_viewer(SpaceNode *snode, bNode *tonode)
@@ -1835,14 +1681,14 @@ static void node_link_viewer(SpaceNode *snode, bNode *tonode)
 
 			/* find a socket after the previously connected socket */
 			for(sock=sock->next; sock; sock= sock->next)
-				if(!(sock->flag & (SOCK_HIDDEN|SOCK_UNAVAIL)))
+				if(!nodeSocketIsHidden(sock))
 					break;
 		}
 
 		/* find a socket starting from the first socket */
 		if(!sock) {
 			for(sock= tonode->outputs.first; sock; sock= sock->next)
-				if(!(sock->flag & (SOCK_HIDDEN|SOCK_UNAVAIL)))
+				if(!nodeSocketIsHidden(sock))
 					break;
 		}
 		
@@ -1960,7 +1806,7 @@ static int find_indicated_socket(SpaceNode *snode, bNode **nodep, bNodeSocket **
 		
 		if(in_out & SOCK_IN) {
 			for(sock= node->inputs.first; sock; sock= sock->next) {
-				if(!(sock->flag & (SOCK_HIDDEN|SOCK_UNAVAIL))) {
+				if(!nodeSocketIsHidden(sock)) {
 					if(BLI_in_rctf(&rect, sock->locx, sock->locy)) {
 						if(node == visible_node(snode, &rect)) {
 							*nodep= node;
@@ -1973,7 +1819,7 @@ static int find_indicated_socket(SpaceNode *snode, bNode **nodep, bNodeSocket **
 		}
 		if(in_out & SOCK_OUT) {
 			for(sock= node->outputs.first; sock; sock= sock->next) {
-				if(!(sock->flag & (SOCK_HIDDEN|SOCK_UNAVAIL))) {
+				if(!nodeSocketIsHidden(sock)) {
 					if(BLI_in_rctf(&rect, sock->locx, sock->locy)) {
 						if(node == visible_node(snode, &rect)) {
 							*nodep= node;
@@ -1991,7 +1837,7 @@ static int find_indicated_socket(SpaceNode *snode, bNode **nodep, bNodeSocket **
 	 */
 	if(in_out & SOCK_IN) {
 		for(sock= snode->edittree->outputs.first; sock; sock= sock->next) {
-			if(!(sock->flag & (SOCK_HIDDEN|SOCK_UNAVAIL))) {
+			if(!nodeSocketIsHidden(sock)) {
 				if(BLI_in_rctf(&rect, sock->locx, sock->locy)) {
 					*nodep= NULL;	/* NULL node pointer indicates group socket */
 					*sockp= sock;
@@ -2002,7 +1848,7 @@ static int find_indicated_socket(SpaceNode *snode, bNode **nodep, bNodeSocket **
 	}
 	if(in_out & SOCK_OUT) {
 		for(sock= snode->edittree->inputs.first; sock; sock= sock->next) {
-			if(!(sock->flag & (SOCK_HIDDEN|SOCK_UNAVAIL))) {
+			if(!nodeSocketIsHidden(sock)) {
 				if(BLI_in_rctf(&rect, sock->locx, sock->locy)) {
 					*nodep= NULL;	/* NULL node pointer indicates group socket */
 					*sockp= sock;
@@ -2083,15 +1929,14 @@ static int sort_nodes_locx(void *a, void *b)
 		return 0;
 }
 
-static int socket_is_available(bNodeTree *ntree, bNodeSocket *sock, int allow_used)
+static int socket_is_available(bNodeTree *UNUSED(ntree), bNodeSocket *sock, int allow_used)
 {
-	if (sock->flag & (SOCK_HIDDEN|SOCK_UNAVAIL))
+	if (nodeSocketIsHidden(sock))
 		return 0;
 	
-	if (!allow_used) {
-		if (nodeCountSocketLinks(ntree, sock) > 0)
-			return 0;
-	}
+	if (!allow_used && (sock->flag & SOCK_IN_USE))
+		return 0;
+	
 	return 1;
 }
 
@@ -2231,7 +2076,7 @@ bNode *node_add_node(SpaceNode *snode, Main *bmain, Scene *scene, bNodeTemplate 
 {
 	bNode *node= NULL, *gnode;
 	
-	node_deselectall(snode);
+	node_deselect_all(snode);
 	
 	node = nodeAddNode(snode->edittree, ntemp);
 	
@@ -2401,7 +2246,7 @@ static void node_remove_extra_links(SpaceNode *snode, bNodeSocket *tsock, bNodeL
 				}
 				if(sock) {
 					tlink->tosock= sock;
-					sock->flag &= ~SOCK_HIDDEN;
+					sock->flag &= ~(SOCK_HIDDEN|SOCK_AUTO_HIDDEN);
 				}
 				else {
 					nodeRemLink(snode->edittree, tlink);
@@ -2799,26 +2644,26 @@ static bNodeSocket *socket_best_match(ListBase *sockets, int type)
 	
 	/* first, match type */
 	for(sock= sockets->first; sock; sock= sock->next)
-		if(!(sock->flag & SOCK_HIDDEN))
+		if(!nodeSocketIsHidden(sock))
 			if(type == sock->type)
 				return sock;
 	
 	/* then just use first unhidden socket */
 	for(sock= sockets->first; sock; sock= sock->next)
-		if(!(sock->flag & SOCK_HIDDEN))
+		if(!nodeSocketIsHidden(sock))
 			return sock;
 
 	/* OK, let's unhide proper one */
 	for(sock= sockets->first; sock; sock= sock->next) {
 		if(type == sock->type) {
-			sock->flag &= ~SOCK_HIDDEN;
+			sock->flag &= ~(SOCK_HIDDEN|SOCK_AUTO_HIDDEN);
 			return sock;
 		}
 	}
 	
 	/* just the first */
 	sock= sockets->first;
-	sock->flag &= ~SOCK_HIDDEN;
+	sock->flag &= ~(SOCK_HIDDEN|SOCK_AUTO_HIDDEN);
 	
 	return sockets->first;
 }
@@ -3129,15 +2974,21 @@ void NODE_OT_group_make(wmOperatorType *ot)
 
 static void node_flag_toggle_exec(SpaceNode *snode, int toggle_flag)
 {
-	int tot_eq= 0, tot_neq= 0;
 	bNode *node;
+	int tot_eq= 0, tot_neq= 0;
 
+	/* Toggles the flag on all selected nodes.
+	 * If the flag is set on all nodes it is unset.
+	 * If the flag is not set on all nodes, it is set.
+	 */
 	for(node= snode->edittree->nodes.first; node; node= node->next) {
 		if(node->flag & SELECT) {
-
+			
 			if(toggle_flag== NODE_PREVIEW && (node->typeinfo->flag & NODE_PREVIEW)==0)
 				continue;
-
+			if(toggle_flag== NODE_OPTIONS && (node->typeinfo->flag & NODE_OPTIONS)==0)
+				continue;
+			
 			if(node->flag & toggle_flag)
 				tot_eq++;
 			else
@@ -3146,19 +2997,31 @@ static void node_flag_toggle_exec(SpaceNode *snode, int toggle_flag)
 	}
 	for(node= snode->edittree->nodes.first; node; node= node->next) {
 		if(node->flag & SELECT) {
-
+			
 			if(toggle_flag== NODE_PREVIEW && (node->typeinfo->flag & NODE_PREVIEW)==0)
 				continue;
-
-			if( (tot_eq && tot_neq) || tot_eq==0)
+			if(toggle_flag== NODE_OPTIONS && (node->typeinfo->flag & NODE_OPTIONS)==0)
+				continue;
+			
+			if( (tot_eq && tot_neq) || tot_eq==0) {
 				node->flag |= toggle_flag;
-			else
+				
+				/* hide/unhide node also toggles unlinked socket display */
+				if (toggle_flag== NODE_HIDDEN)
+					node_set_hidden_sockets(snode, node, SOCK_AUTO_HIDDEN, 1);
+			}
+			else {
 				node->flag &= ~toggle_flag;
+				
+				/* hide/unhide node also toggles unlinked socket display */
+				if (toggle_flag== NODE_HIDDEN)
+					node_set_hidden_sockets(snode, node, SOCK_AUTO_HIDDEN, 0);
+			}
 		}
 	}
 }
 
-static int node_hide_exec(bContext *C, wmOperator *UNUSED(op))
+static int node_hide_toggle_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	SpaceNode *snode= CTX_wm_space_node(C);
 	
@@ -3181,14 +3044,14 @@ void NODE_OT_hide_toggle(wmOperatorType *ot)
 	ot->idname= "NODE_OT_hide_toggle";
 	
 	/* callbacks */
-	ot->exec= node_hide_exec;
+	ot->exec= node_hide_toggle_exec;
 	ot->poll= ED_operator_node_active;
 
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 }
 
-static int node_preview_exec(bContext *C, wmOperator *UNUSED(op))
+static int node_preview_toggle_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	SpaceNode *snode= CTX_wm_space_node(C);
 
@@ -3213,7 +3076,37 @@ void NODE_OT_preview_toggle(wmOperatorType *ot)
 	ot->idname= "NODE_OT_preview_toggle";
 
 	/* callbacks */
-	ot->exec= node_preview_exec;
+	ot->exec= node_preview_toggle_exec;
+	ot->poll= ED_operator_node_active;
+
+	/* flags */
+	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+}
+
+static int node_options_toggle_exec(bContext *C, wmOperator *UNUSED(op))
+{
+	SpaceNode *snode= CTX_wm_space_node(C);
+
+	/* sanity checking (poll callback checks this already) */
+	if((snode == NULL) || (snode->edittree == NULL))
+		return OPERATOR_CANCELLED;
+
+	node_flag_toggle_exec(snode, NODE_OPTIONS);
+
+	snode_notify(C, snode);
+
+	return OPERATOR_FINISHED;
+}
+
+void NODE_OT_options_toggle(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name= "Toggle Node Options";
+	ot->description= "Toggle option buttons display for selected nodes";
+	ot->idname= "NODE_OT_options_toggle";
+
+	/* callbacks */
+	ot->exec= node_options_toggle_exec;
 	ot->poll= ED_operator_node_active;
 
 	/* flags */
@@ -3224,7 +3117,7 @@ static int node_socket_toggle_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	SpaceNode *snode= CTX_wm_space_node(C);
 	bNode *node;
-	int hidden= 0;
+	int hidden;
 
 	/* sanity checking (poll callback checks this already) */
 	if((snode == NULL) || (snode->edittree == NULL))
@@ -3232,18 +3125,20 @@ static int node_socket_toggle_exec(bContext *C, wmOperator *UNUSED(op))
 
 	ED_preview_kill_jobs(C);
 
+	/* Toggle for all selected nodes */
+	hidden = 0;
 	for(node= snode->edittree->nodes.first; node; node= node->next) {
 		if(node->flag & SELECT) {
-			if(node_has_hidden_sockets(node)) {
+			if(node_has_hidden_sockets(node, SOCK_HIDDEN)) {
 				hidden= 1;
 				break;
 			}
 		}
 	}
-
+	
 	for(node= snode->edittree->nodes.first; node; node= node->next) {
 		if(node->flag & SELECT) {
-			node_set_hidden_sockets(snode, node, !hidden);
+			node_set_hidden_sockets(snode, node, SOCK_HIDDEN, !hidden);
 		}
 	}
 
@@ -3276,10 +3171,6 @@ static int node_mute_exec(bContext *C, wmOperator *UNUSED(op))
 	SpaceNode *snode= CTX_wm_space_node(C);
 	bNode *node;
 
-	/* no disabling inside of groups */
-	if(node_tree_get_editgroup(snode->nodetree))
-		return OPERATOR_CANCELLED;
-	
 	ED_preview_kill_jobs(C);
 
 	for(node= snode->edittree->nodes.first; node; node= node->next) {
@@ -3547,7 +3438,7 @@ static int node_add_file_exec(bContext *C, wmOperator *op)
 	ntemp.type = -1;
 
 	/* check input variables */
-	if (RNA_property_is_set(op->ptr, "filepath"))
+	if (RNA_struct_property_is_set(op->ptr, "filepath"))
 	{
 		char path[FILE_MAX];
 		RNA_string_get(op->ptr, "filepath", path);
@@ -3561,9 +3452,9 @@ static int node_add_file_exec(bContext *C, wmOperator *op)
 			return OPERATOR_CANCELLED;
 		}
 	}
-	else if(RNA_property_is_set(op->ptr, "name"))
+	else if(RNA_struct_property_is_set(op->ptr, "name"))
 	{
-		char name[32];
+		char name[MAX_ID_NAME-2];
 		RNA_string_get(op->ptr, "name", name);
 		ima= (Image *)find_id("IM", name);
 
@@ -3573,7 +3464,7 @@ static int node_add_file_exec(bContext *C, wmOperator *op)
 		}
 	}
 	
-	node_deselectall(snode);
+	node_deselect_all(snode);
 	
 	if (snode->nodetree->type==NTREE_COMPOSIT)
 		ntemp.type = CMP_NODE_IMAGE;
@@ -3607,7 +3498,7 @@ static int node_add_file_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	UI_view2d_region_to_view(&ar->v2d, event->mval[0], event->mval[1],
 							 &snode->mx, &snode->my);
 	
-	if (RNA_property_is_set(op->ptr, "filepath") || RNA_property_is_set(op->ptr, "name"))
+	if (RNA_struct_property_is_set(op->ptr, "filepath") || RNA_struct_property_is_set(op->ptr, "name"))
 		return node_add_file_exec(C, op);
 	else
 		return WM_operator_filesel(C, op, event);
@@ -3629,7 +3520,7 @@ void NODE_OT_add_file(wmOperatorType *ot)
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 	
 	WM_operator_properties_filesel(ot, FOLDERFILE|IMAGEFILE, FILE_SPECIAL, FILE_OPENFILE, WM_FILESEL_FILEPATH);  //XXX TODO, relative_path
-	RNA_def_string(ot->srna, "name", "Image", 24, "Name", "Datablock name to assign");
+	RNA_def_string(ot->srna, "name", "Image", MAX_ID_NAME-2, "Name", "Datablock name to assign");
 }
 
 /********************** New node tree operator *********************/
@@ -3646,12 +3537,12 @@ static int new_node_tree_exec(bContext *C, wmOperator *op)
 	/* retrieve state */
 	snode= CTX_wm_space_node(C);
 	
-	if (RNA_property_is_set(op->ptr, "type"))
+	if (RNA_struct_property_is_set(op->ptr, "type"))
 		treetype = RNA_enum_get(op->ptr, "type");
 	else
 		treetype = snode->treetype;
 	
-	if (RNA_property_is_set(op->ptr, "name"))
+	if (RNA_struct_property_is_set(op->ptr, "name"))
 		RNA_string_get(op->ptr, "name", treename);
 	
 	ntree = ntreeAddTree(treename, treetype, 0);

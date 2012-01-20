@@ -55,6 +55,8 @@ float area_tri_v3(const float a[3], const float b[3], const float c[3]);
 float area_quad_v3(const float a[3], const float b[3], const float c[3], const float d[3]);
 float area_poly_v3(int nr, float verts[][3], const float normal[3]);
 
+int is_quad_convex_v3(const float *v1, const float *v2, const float *v3, const float *v4);
+
 /********************************* Distance **********************************/
 
 float dist_to_line_v2(const float p[2], const float l1[2], const float l2[2]);
@@ -66,7 +68,9 @@ float dist_to_plane_v3(const float p[3], const float plane_co[3], const float pl
 float dist_to_line_segment_v3(const float p[3], const float l1[3], const float l2[3]);
 float closest_to_line_v3(float r[3], const float p[3], const float l1[3], const float l2[3]);
 float closest_to_line_v2(float r[2], const float p[2], const float l1[2], const float l2[2]);
-void closest_to_line_segment_v3(float r[3], const float p[3], const float l1[3], const float l2[3]);
+void  closest_to_line_segment_v3(float r[3], const float p[3], const float l1[3], const float l2[3]);
+void  closest_to_plane_v3(float r[3], const float plane_co[3], const float plane_no_unit[3], const float pt[3]);
+
 
 float line_point_factor_v3(const float p[3], const float l1[3], const float l2[3]);
 float line_point_factor_v2(const float p[2], const float l1[2], const float l2[2]);
@@ -220,6 +224,9 @@ void accumulate_vertex_normals(float n1[3], float n2[3], float n3[3],
 	float n4[3], const float f_no[3], const float co1[3], const float co2[3],
 	const float co3[3], const float co4[3]);
 
+void accumulate_vertex_normals_poly(float **vertnos, float polyno[3],
+	float **vertcos, float vdiffs[][3], int nverts);
+
 /********************************* Tangents **********************************/
 
 typedef struct VertexTangent {
@@ -260,6 +267,8 @@ MINLINE void madd_sh_shfl(float r[9], const float sh[3], const float f);
 
 float form_factor_hemi_poly(float p[3], float n[3],
 	float v1[3], float v2[3], float v3[3], float v4[3]);
+
+void axis_dominant_v3(int *axis_a, int *axis_b, const float axis[3]);
 
 #ifdef __cplusplus
 }

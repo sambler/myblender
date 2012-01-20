@@ -454,15 +454,15 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         layout.separator()
 
         layout.prop(md, "use_normals")
-        
+
         split = layout.split()
-        
+
         col = split.column()
         col.prop(md, "use_foam")
         sub = col.row()
         sub.active = md.use_foam
         sub.prop(md, "foam_coverage", text="Coverage")
-        
+
         col = split.column()
         col.active = md.use_foam
         col.label("Foam Data Layer Name:")
@@ -587,11 +587,10 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
             layout.prop(md, "use_keep_above_surface")
 
     def SIMPLE_DEFORM(self, layout, ob, md):
-        split = layout.split()
 
-        col = split.column()
-        col.label(text="Mode:")
-        col.prop(md, "deform_method", text="")
+        layout.row().prop(md, "deform_method", expand=True)
+
+        split = layout.split()
 
         col = split.column()
         col.label(text="Vertex Group:")
@@ -610,7 +609,7 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         col.label(text="Deform:")
         col.prop(md, "factor")
         col.prop(md, "limits", slider=True)
-        if md.deform_method in {'TAPER', 'STRETCH'}:
+        if md.deform_method in {'TAPER', 'STRETCH', 'TWIST'}:
             col.prop(md, "lock_x")
             col.prop(md, "lock_y")
 
@@ -692,7 +691,7 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         col.prop(md, "image", text="")
 
         col = split.column()
-        col.label(text="UV Layer:")
+        col.label(text="UV Map:")
         col.prop_search(md, "uv_layer", ob.data, "uv_textures", text="")
 
         split = layout.split()
@@ -812,6 +811,21 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         col = split.column()
         col.prop(md, "width", slider=True)
         col.prop(md, "narrowness", slider=True)
+
+    def REMESH(self, layout, ob, md):
+        layout.prop(md, "mode")
+        
+        row = layout.row()
+        row.prop(md, "octree_depth")
+        row.prop(md, "scale")
+
+        if md.mode == "SHARP":
+            layout.prop(md, "sharpness")
+
+        layout.prop(md, "remove_disconnected_pieces")
+        row = layout.row()
+        row.active = md.remove_disconnected_pieces
+        row.prop(md, "threshold")
 
     @staticmethod
     def vertex_weight_mask(layout, ob, md):

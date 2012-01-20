@@ -57,7 +57,7 @@
 #include "BLI_utildefines.h"
 #include "BLI_math_base.h"
 
-#if defined WIN32 && !defined _LIBC
+#if defined WIN32 && !defined _LIBC  || defined __sun
 # include "BLI_fnmatch.h" /* use fnmatch included in blenlib */
 #else
 #  ifndef _GNU_SOURCE
@@ -977,7 +977,7 @@ static TreeElement *outliner_add_element(SpaceOops *soops, ListBase *lb, void *i
 			if(te->name)
 				te->flag |= TE_FREE_NAME;
 			else
-				te->name= (char*)RNA_struct_ui_name(ptr->type);
+				te->name= RNA_struct_ui_name(ptr->type);
 
 			/* If searching don't expand RNA entries */
 			if(SEARCHING_OUTLINER(soops) && BLI_strcasecmp("RNA",te->name)==0) tselem->flag &= ~TSE_CHILDSEARCH;
@@ -1007,7 +1007,7 @@ static TreeElement *outliner_add_element(SpaceOops *soops, ListBase *lb, void *i
 			prop= propptr.data;
 			proptype= RNA_property_type(prop);
 
-			te->name= (char*)RNA_property_ui_name(prop);
+			te->name= RNA_property_ui_name(prop);
 			te->directdata= prop;
 			te->rnaptr= *ptr;
 
@@ -1342,7 +1342,7 @@ static int outliner_filter_has_name(TreeElement *te, const char *name, int flags
 	}
 	else {
 		char fn_name[sizeof(((struct SpaceOops *)NULL)->search_string) + 2];
-		sprintf(fn_name, "*%s*", name);
+		BLI_snprintf(fn_name, sizeof(fn_name), "*%s*", name);
 		found= fnmatch(fn_name, te->name, fn_flag)==0;
 	}
 	return found;

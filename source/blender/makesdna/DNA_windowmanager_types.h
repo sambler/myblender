@@ -23,12 +23,13 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
-#ifndef DNA_WINDOWMANAGER_TYPES_H
-#define DNA_WINDOWMANAGER_TYPES_H
 
 /** \file DNA_windowmanager_types.h
  *  \ingroup DNA
  */
+
+#ifndef DNA_WINDOWMANAGER_TYPES_H
+#define DNA_WINDOWMANAGER_TYPES_H
 
 #include "DNA_listBase.h"
 #include "DNA_vec_types.h"
@@ -167,7 +168,7 @@ typedef struct wmWindow {
 	
 	struct bScreen *screen;		/* active screen */
 	struct bScreen *newscreen;	/* temporary when switching */
-	char screenname[32];	/* MAX_ID_NAME for matching window with active screen after file read */
+	char screenname[64];	/* MAX_ID_NAME for matching window with active screen after file read */
 	
 	short posx, posy, sizex, sizey;	/* window coords */
 	short windowstate;	/* borderless, full */

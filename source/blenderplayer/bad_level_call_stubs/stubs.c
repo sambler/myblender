@@ -154,7 +154,7 @@ double elbeemEstimateMemreq(int res, float sx, float sy, float sz, int refine, c
 struct Render *RE_NewRender(const char *name){return (struct Render*) NULL;}
 void RE_SwapResult(struct Render *re, struct RenderResult **rr){}
 void RE_BlenderFrame(struct Render *re, struct Scene *scene, int frame){}
-int RE_WriteEnvmapResult(struct ReportList *reports, struct Scene *scene, struct EnvMap *env, const char *relpath, int imtype, float layout[12]) { return 0; }
+int RE_WriteEnvmapResult(struct ReportList *reports, struct Scene *scene, struct EnvMap *env, const char *relpath, const char imtype, float layout[12]) { return 0; }
 
 /* rna */
 float *give_cursor(struct Scene *scene, struct View3D *v3d){return (float *) NULL;}
@@ -202,6 +202,8 @@ int ED_space_image_show_paint(struct SpaceImage *sima){return 0;}
 void ED_space_image_paint_update(struct wmWindowManager *wm, struct ToolSettings *settings){}
 void ED_space_image_set(struct SpaceImage *sima, struct Scene *scene, struct Object *obedit, struct Image *ima){}
 struct ImBuf *ED_space_image_buffer(struct SpaceImage *sima){return (struct ImBuf *) NULL;}
+void ED_space_image_uv_sculpt_update(struct wmWindowManager *wm, struct ToolSettings *settings){}
+
 void ED_screen_set_scene(struct bContext *C, struct Scene *scene){}
 void ED_space_clip_set(struct bContext *C, struct SpaceClip *sc, struct MovieClip *clip){}
 
@@ -263,6 +265,7 @@ void ED_view3d_quadview_update(struct ScrArea *sa, struct ARegion *ar){}
 void ED_view3d_from_m4(float mat[][4], float ofs[3], float quat[4], float *dist){}
 struct BGpic *ED_view3D_background_image_new(struct View3D *v3d){return (struct BGpic *) NULL;}
 void ED_view3D_background_image_remove(struct View3D *v3d, struct BGpic *bgpic){}
+void ED_view3D_background_image_clear(struct View3D *v3d){}
 void view3d_apply_mat4(float mat[][4], float *ofs, float *quat, float *dist){}
 int text_file_modified(struct Text *text){return 0;}
 void ED_node_shader_default(struct Material *ma){}
@@ -270,6 +273,7 @@ void ED_screen_animation_timer_update(struct bContext *C, int redraws){}
 void ED_base_object_select(struct Base *base, short mode){}
 int ED_object_modifier_remove(struct ReportList *reports, struct Scene *scene, struct Object *ob, struct ModifierData *md){return 0;}
 int ED_object_modifier_add(struct ReportList *reports, struct Scene *scene, struct Object *ob, char *name, int type){return 0;}
+void ED_object_modifier_clear(struct Scene *scene, struct Object *ob){}
 void ED_object_enter_editmode(struct bContext *C, int flag){}
 void ED_object_exit_editmode(struct bContext *C, int flag){}
 int uiLayoutGetActive(struct uiLayout *layout){return 0;}
@@ -293,6 +297,9 @@ void ED_mesh_update(struct Mesh *mesh, struct bContext *C){}
 void ED_mesh_vertices_add(struct Mesh *mesh, struct ReportList *reports, int count){}
 void ED_mesh_edges_add(struct Mesh *mesh, struct ReportList *reports, int count){}
 void ED_mesh_faces_add(struct Mesh *mesh, struct ReportList *reports, int count){}
+void ED_mesh_vertices_remove(struct Mesh *mesh, struct ReportList *reports, int count){}
+void ED_mesh_edges_remove(struct Mesh *mesh, struct ReportList *reports, int count){}
+void ED_mesh_faces_remove(struct Mesh *mesh, struct ReportList *reports, int count){}
 void ED_mesh_material_link(struct Mesh *mesh, struct Material *ma){}
 int ED_mesh_color_add(struct bContext *C, struct Scene *scene, struct Object *ob, struct Mesh *me){return 0;}
 int ED_mesh_uv_texture_add(struct bContext *C, struct Mesh *me){return 0;}
@@ -303,6 +310,7 @@ void ED_vgroup_vert_add(struct Object *ob, struct bDeformGroup *dg, int vertnum,
 void ED_vgroup_vert_remove(struct Object *ob, struct bDeformGroup *dg, int vertnum){}
 void ED_vgroup_vert_weight(struct Object *ob, struct bDeformGroup *dg, int vertnum){}
 void ED_vgroup_delete(struct Object *ob, struct bDeformGroup *defgroup){}
+void ED_vgroup_clear(struct Object *ob){}
 void ED_vgroup_object_is_edit_mode(struct Object *ob){}
 
 void ED_sequencer_update_view(struct bContext *C, int view){}
@@ -346,7 +354,7 @@ void uiItemBooleanO(struct uiLayout *layout, char *name, int icon, char *opname,
 void uiItemIntO(struct uiLayout *layout, char *name, int icon, char *opname, char *propname, int value){}
 void uiItemFloatO(struct uiLayout *layout, char *name, int icon, char *opname, char *propname, float value){}
 void uiItemStringO(struct uiLayout *layout, char *name, int icon, char *opname, char *propname, char *value){}
-void uiItemL(struct uiLayout *layout, char *name, int icon){}
+void uiItemL(struct uiLayout *layout, const char *name, int icon){}
 void uiItemM(struct uiLayout *layout, struct bContext *C, char *menuname, char *name, int icon){}
 void uiItemS(struct uiLayout *layout){}
 void uiItemFullR(struct uiLayout *layout, struct PointerRNA *ptr, struct PropertyRNA *prop, int index, int value, int flag, char *name, int icon){}
@@ -388,6 +396,7 @@ void uiTemplateKeymapItemProperties(struct uiLayout *layout, struct PointerRNA *
 void uiTemplateMovieClip(struct uiLayout *layout, struct bContext *C, struct PointerRNA *ptr, const char *propname, int compact){}
 void uiTemplateTrack(struct uiLayout *layout, struct PointerRNA *ptr, const char *propname){}
 void uiTemplateMarker(struct uiLayout *layout, struct PointerRNA *ptr, const char *propname, PointerRNA *userptr, PointerRNA *trackptr, int compact){}
+void uiTemplateImageSettings(struct uiLayout *layout, struct PointerRNA *imfptr){}
 
 /* rna render */
 struct RenderResult *RE_engine_begin_result(struct RenderEngine *engine, int x, int y, int w, int h){return (struct RenderResult *) NULL;}
@@ -460,6 +469,20 @@ void BPY_DECREF(void *pyob_ptr) {}
 void BPY_pyconstraint_exec(struct bPythonConstraint *con, struct bConstraintOb *cob, struct ListBase *targets) {}
 void macro_wrapper(struct wmOperatorType *ot, void *userdata) {} ;
 
+/* intern/dualcon */
+struct DualConMesh;
+struct DualConMesh *dualcon(const struct DualConMesh *input_mesh,
+			    void *create_mesh,
+			    int flags,
+			    int mode,
+			    float threshold,
+			    float hermite_num,
+			    float scale,
+			    int depth) {return 0;}
+
+/* intern/cycles */
+struct CCLDeviceInfo;
+struct CCLDeviceInfo *CCL_compute_device_list(int opencl) { return NULL; }
 
 char blender_path[] = "";
 

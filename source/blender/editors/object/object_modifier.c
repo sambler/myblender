@@ -157,10 +157,9 @@ ModifierData *ED_object_modifier_add(ReportList *reports, Main *bmain, Scene *sc
 	return new_md;
 }
 
-int ED_object_modifier_remove(ReportList *reports, Main *bmain, Scene *scene, Object *ob, ModifierData *md)
+static int object_modifier_remove(Object *ob, ModifierData *md, int *sort_depsgraph)
 {
 	ModifierData *obmd;
-	int sort_depsgraph = 0;
 
 	/* It seems on rapid delete it is possible to
 	 * get called twice on same modifier, so make
@@ -168,11 +167,9 @@ int ED_object_modifier_remove(ReportList *reports, Main *bmain, Scene *scene, Ob
 	for(obmd=ob->modifiers.first; obmd; obmd=obmd->next)
 		if(obmd==md)
 			break;
-	
-	if(!obmd) {
-		BKE_reportf(reports, RPT_ERROR, "Modifier '%s' not in object '%s'", ob->id.name, md->name);
+
+	if(!obmd)
 		return 0;
-	}
 
 	/* special cases */
 	if(md->type == eModifierType_ParticleSystem) {
@@ -193,13 +190,13 @@ int ED_object_modifier_remove(ReportList *reports, Main *bmain, Scene *scene, Ob
 		if(ob->pd)
 			ob->pd->deflect= 0;
 
-		sort_depsgraph = 1;
+		*sort_depsgraph = 1;
 	}
 	else if(md->type == eModifierType_Surface) {
 		if(ob->pd && ob->pd->shape == PFIELD_SHAPE_SURFACE)
 			ob->pd->shape = PFIELD_SHAPE_PLANE;
 
-		sort_depsgraph = 1;
+		*sort_depsgraph = 1;
 	}
 	else if(md->type == eModifierType_Smoke) {
 		ob->dt = OB_TEXTURE;
@@ -238,6 +235,21 @@ int ED_object_modifier_remove(ReportList *reports, Main *bmain, Scene *scene, Ob
 	BLI_remlink(&ob->modifiers, md);
 	modifier_free(md);
 
+	return 1;
+}
+
+int ED_object_modifier_remove(ReportList *reports, Main *bmain, Scene *scene, Object *ob, ModifierData *md)
+{
+	int sort_depsgraph = 0;
+	int ok;
+
+	ok= object_modifier_remove(ob, md, &sort_depsgraph);
+
+	if(!ok) {
+		BKE_reportf(reports, RPT_ERROR, "Modifier '%s' not in object '%s'", ob->id.name, md->name);
+		return 0;
+	}
+
 	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 
 	/* sorting has to be done after the update so that dynamic systems can react properly */
@@ -245,6 +257,31 @@ int ED_object_modifier_remove(ReportList *reports, Main *bmain, Scene *scene, Ob
 		DAG_scene_sort(bmain, scene);
 
 	return 1;
+}
+
+void ED_object_modifier_clear(Main *bmain, Scene *scene, Object *ob)
+{
+	ModifierData *md =ob->modifiers.first;
+	int sort_depsgraph = 0;
+
+	if(!md)
+		return;
+
+	while(md) {
+		ModifierData *next_md;
+
+		next_md= md->next;
+
+		object_modifier_remove(ob, md, &sort_depsgraph);
+
+		md= next_md;
+	}
+
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
+
+	/* sorting has to be done after the update so that dynamic systems can react properly */
+	if(sort_depsgraph)
+		DAG_scene_sort(bmain, scene);
 }
 
 int ED_object_modifier_move_up(ReportList *reports, Object *ob, ModifierData *md)
@@ -415,11 +452,10 @@ static int modifier_apply_shape(ReportList *reports, Scene *scene, Object *ob, M
 		Key *key=me->key;
 		KeyBlock *kb;
 		
-		if(!modifier_sameTopology(md)) {
+		if(!modifier_sameTopology(md) || mti->type == eModifierTypeType_NonGeometrical) {
 			BKE_report(reports, RPT_ERROR, "Only deforming modifiers can be applied to Shapes");
 			return 0;
 		}
-		mesh_pmv_off(me);
 		
 		dm = mesh_create_derived_for_modifier(scene, ob, md);
 		if (!dm) {
@@ -464,12 +500,10 @@ static int modifier_apply_obdata(ReportList *reports, Scene *scene, Object *ob, 
 		Mesh *me = ob->data;
 		MultiresModifierData *mmd= find_multires_modifier_before(scene, md);
 
-		if( me->key) {
+		if(me->key && mti->type != eModifierTypeType_NonGeometrical) {
 			BKE_report(reports, RPT_ERROR, "Modifier cannot be applied to Mesh with Shape Keys");
 			return 0;
 		}
-
-		mesh_pmv_off(me);
 
 		/* Multires: ensure that recent sculpting is applied */
 		if(md->type == eModifierType_Multires)
@@ -609,7 +643,7 @@ static int modifier_add_exec(bContext *C, wmOperator *op)
 static EnumPropertyItem *modifier_add_itemf(bContext *C, PointerRNA *UNUSED(ptr), PropertyRNA *UNUSED(prop), int *free)
 {	
 	Object *ob= ED_object_active_context(C);
-	EnumPropertyItem *item= NULL, *md_item;
+	EnumPropertyItem *item= NULL, *md_item, *group_item= NULL;
 	ModifierTypeInfo *mti;
 	int totitem= 0, a;
 	
@@ -628,6 +662,17 @@ static EnumPropertyItem *modifier_add_itemf(bContext *C, PointerRNA *UNUSED(ptr)
 			if(!((mti->flags & eModifierTypeFlag_AcceptsCVs) ||
 			   (ob->type==OB_MESH && (mti->flags & eModifierTypeFlag_AcceptsMesh))))
 				continue;
+		}
+		else {
+			group_item= md_item;
+			md_item= NULL;
+
+			continue;
+		}
+
+		if(group_item) {
+			RNA_enum_item_add(&item, &totitem, group_item);
+			group_item= NULL;
 		}
 
 		RNA_enum_item_add(&item, &totitem, md_item);
@@ -683,7 +728,7 @@ static int edit_modifier_poll(bContext *C)
 
 static void edit_modifier_properties(wmOperatorType *ot)
 {
-	RNA_def_string(ot->srna, "modifier", "", 32, "Modifier", "Name of the modifier to edit");
+	RNA_def_string(ot->srna, "modifier", "", MAX_NAME, "Modifier", "Name of the modifier to edit");
 }
 
 static int edit_modifier_invoke_properties(bContext *C, wmOperator *op)
@@ -691,7 +736,7 @@ static int edit_modifier_invoke_properties(bContext *C, wmOperator *op)
 	PointerRNA ptr= CTX_data_pointer_get_type(C, "modifier", &RNA_Modifier);
 	ModifierData *md;
 	
-	if (RNA_property_is_set(op->ptr, "modifier"))
+	if (RNA_struct_property_is_set(op->ptr, "modifier"))
 		return 1;
 	
 	if (ptr.data) {
@@ -705,7 +750,7 @@ static int edit_modifier_invoke_properties(bContext *C, wmOperator *op)
 
 static ModifierData *edit_modifier_property_get(wmOperator *op, Object *ob, int type)
 {
-	char modifier_name[32];
+	char modifier_name[MAX_NAME];
 	ModifierData *md;
 	RNA_string_get(op->ptr, "modifier", modifier_name);
 	
@@ -1164,7 +1209,7 @@ static int multires_external_save_invoke(bContext *C, wmOperator *op, wmEvent *U
 	if(CustomData_external_test(&me->fdata, CD_MDISPS))
 		return OPERATOR_CANCELLED;
 
-	if(RNA_property_is_set(op->ptr, "filepath"))
+	if(RNA_struct_property_is_set(op->ptr, "filepath"))
 		return multires_external_save_exec(C, op);
 	
 	op->customdata= me;

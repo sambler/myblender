@@ -134,8 +134,6 @@ void ntreeShaderGetTexcoMode(bNodeTree *ntree, int r_mode, short *texco, int *mo
 	bNodeSocket *sock;
 	int a;
 	
-	ntreeSocketUseFlags(ntree);
-
 	for(node= ntree->nodes.first; node; node= node->next) {
 		if(node->type==SH_NODE_TEXTURE) {
 			if((r_mode & R_OSA) && node->id) {
@@ -186,7 +184,7 @@ void nodeShaderSynchronizeID(bNode *node, int copyto)
 		
 		/* hrmf, case in loop isnt super fast, but we dont edit 100s of material at same time either! */
 		for(a=0, sock= node->inputs.first; sock; sock= sock->next, a++) {
-			if(!(sock->flag & SOCK_HIDDEN)) {
+			if(!nodeSocketIsHidden(sock)) {
 				if(copyto) {
 					switch(a) {
 						case MAT_IN_COLOR:

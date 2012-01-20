@@ -102,7 +102,7 @@ void fluidsim_init(FluidsimModifierData *fluidmd)
 		// fluid/inflow settings
 		// fss->iniVel --> automatically set to 0
 
-		modifier_path_init(fss->surfdataPath, sizeof(fss->surfdataPath), "fluid_cache");
+		modifier_path_init(fss->surfdataPath, sizeof(fss->surfdataPath), "cache_fluid");
 
 		// first init of bounding box
 		// no bounding box needed
@@ -447,7 +447,7 @@ static DerivedMesh *fluidsim_read_cache(Object *ob, DerivedMesh *orgdm, Fluidsim
 {
 	int displaymode = 0;
 	int curFrame = framenr - 1 /*scene->r.sfra*/; /* start with 0 at start frame */
-	char targetFile[FILE_MAXFILE+FILE_MAXDIR];
+	char targetFile[FILE_MAX];
 	FluidsimSettings *fss = fluidmd->fss;
 	DerivedMesh *dm = NULL;
 	MFace *mface;
@@ -499,16 +499,20 @@ static DerivedMesh *fluidsim_read_cache(Object *ob, DerivedMesh *orgdm, Fluidsim
 	}
 
 	// assign material + flags to new dm
+	// if there's no faces in original dm, keep materials and flags unchanged
 	mface = orgdm->getFaceArray(orgdm);
-	mat_nr = mface[0].mat_nr;
-	flag = mface[0].flag;
 
-	mface = dm->getFaceArray(dm);
-	numfaces = dm->getNumFaces(dm);
-	for(i=0; i<numfaces; i++)
-	{
-		mface[i].mat_nr = mat_nr;
-		mface[i].flag = flag;
+	if(mface) {
+		mat_nr = mface[0].mat_nr;
+		flag = mface[0].flag;
+
+		mface = dm->getFaceArray(dm);
+		numfaces = dm->getNumFaces(dm);
+		for(i=0; i<numfaces; i++)
+			{
+				mface[i].mat_nr = mat_nr;
+				mface[i].flag = flag;
+			}
 	}
 
 	// load vertex velocities, if they exist...
@@ -572,6 +576,7 @@ DerivedMesh *fluidsimModifier_do(FluidsimModifierData *fluidmd, Scene *scene,
 	/* unused */
 	(void)fluidmd;
 	(void)scene;
+	(void)ob;
 	(void)dm;
 	(void)useRenderParams;
 	return NULL;

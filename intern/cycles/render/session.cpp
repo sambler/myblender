@@ -35,9 +35,9 @@ Session::Session(const SessionParams& params_)
 : params(params_),
   tile_manager(params.progressive, params.samples, params.tile_size, params.min_size)
 {
-	device_use_gl = ((params.device_type != DEVICE_CPU) && !params.background);
+	device_use_gl = ((params.device.type != DEVICE_CPU) && !params.background);
 
-	device = Device::create(params.device_type, params.background, params.threads);
+	device = Device::create(params.device, params.background, params.threads);
 	buffers = new RenderBuffers(device);
 	display = new DisplayBuffer(device);
 
@@ -51,8 +51,6 @@ Session::Session(const SessionParams& params_)
 	sample = 0;
 
 	delayed_reset.do_reset = false;
-	delayed_reset.w = 0;
-	delayed_reset.h = 0;
 	delayed_reset.samples = 0;
 
 	display_outdated = false;
@@ -108,7 +106,7 @@ bool Session::ready_to_reset()
 
 /* GPU Session */
 
-void Session::reset_gpu(int w, int h, int samples)
+void Session::reset_gpu(BufferParams& buffer_params, int samples)
 {
 	/* block for buffer acces and reset immediately. we can't do this
 	   in the thread, because we need to allocate an OpenGL buffer, and
@@ -119,7 +117,7 @@ void Session::reset_gpu(int w, int h, int samples)
 	display_outdated = true;
 	reset_time = time_dt();
 
-	reset_(w, h, samples);
+	reset_(buffer_params, samples);
 
 	gpu_need_tonemap = false;
 	gpu_need_tonemap_cond.notify_all();
@@ -127,7 +125,7 @@ void Session::reset_gpu(int w, int h, int samples)
 	pause_cond.notify_all();
 }
 
-bool Session::draw_gpu(int w, int h)
+bool Session::draw_gpu(BufferParams& buffer_params)
 {
 	/* block for buffer access */
 	thread_scoped_lock display_lock(display->mutex);
@@ -136,7 +134,7 @@ bool Session::draw_gpu(int w, int h)
 	if(gpu_draw_ready) {
 		/* then verify the buffers have the expected size, so we don't
 		   draw previous results in a resized window */
-		if(w == display->width && h == display->height) {
+		if(!buffer_params.modified(display->params)) {
 			/* for CUDA we need to do tonemapping still, since we can
 			   only access GL buffers from the main thread */
 			if(gpu_need_tonemap) {
@@ -164,6 +162,9 @@ void Session::run_gpu()
 	reset_time = time_dt();
 	paused_time = 0.0;
 
+	if(!params.background)
+		progress.set_start_time(start_time - paused_time);
+
 	while(!progress.get_cancel()) {
 		/* advance to next tile */
 		bool no_tiles = !tile_manager.next();
@@ -188,6 +189,9 @@ void Session::run_gpu()
 					pause_cond.wait(pause_lock);
 					paused_time += time_dt() - pause_start;
 
+					if(!params.background)
+						progress.set_start_time(start_time - paused_time);
+
 					update_status_time(pause, no_tiles);
 					progress.set_update();
 
@@ -203,6 +207,10 @@ void Session::run_gpu()
 		if(!no_tiles) {
 			/* update scene */
 			update_scene();
+
+			if(device->error_message() != "")
+				progress.set_cancel(device->error_message());
+
 			if(progress.get_cancel())
 				break;
 		}
@@ -221,6 +229,9 @@ void Session::run_gpu()
 				path_trace(tile);
 
 				device->task_wait();
+
+				if(device->error_message() != "")
+					progress.set_cancel(device->error_message());
 
 				if(progress.get_cancel())
 					break;
@@ -243,6 +254,9 @@ void Session::run_gpu()
 				}
 			}
 
+			if(device->error_message() != "")
+				progress.set_cancel(device->error_message());
+
 			if(progress.get_cancel())
 				break;
 		}
@@ -251,15 +265,14 @@ void Session::run_gpu()
 
 /* CPU Session */
 
-void Session::reset_cpu(int w, int h, int samples)
+void Session::reset_cpu(BufferParams& buffer_params, int samples)
 {
 	thread_scoped_lock reset_lock(delayed_reset.mutex);
 
 	display_outdated = true;
 	reset_time = time_dt();
 
-	delayed_reset.w = w;
-	delayed_reset.h = h;
+	delayed_reset.params = buffer_params;
 	delayed_reset.samples = samples;
 	delayed_reset.do_reset = true;
 	device->task_cancel();
@@ -267,7 +280,7 @@ void Session::reset_cpu(int w, int h, int samples)
 	pause_cond.notify_all();
 }
 
-bool Session::draw_cpu(int w, int h)
+bool Session::draw_cpu(BufferParams& buffer_params)
 {
 	thread_scoped_lock display_lock(display->mutex);
 
@@ -275,7 +288,7 @@ bool Session::draw_cpu(int w, int h)
 	if(display->draw_ready()) {
 		/* then verify the buffers have the expected size, so we don't
 		   draw previous results in a resized window */
-		if(w == display->width && h == display->height) {
+		if(!buffer_params.modified(display->params)) {
 			display->draw(device);
 
 			if(display_outdated && (time_dt() - reset_time) > params.text_timeout)
@@ -296,7 +309,7 @@ void Session::run_cpu()
 		thread_scoped_lock buffers_lock(buffers->mutex);
 		thread_scoped_lock display_lock(display->mutex);
 
-		reset_(delayed_reset.w, delayed_reset.h, delayed_reset.samples);
+		reset_(delayed_reset.params, delayed_reset.samples);
 		delayed_reset.do_reset = false;
 	}
 
@@ -325,6 +338,9 @@ void Session::run_cpu()
 					pause_cond.wait(pause_lock);
 					paused_time += time_dt() - pause_start;
 
+					if(!params.background)
+						progress.set_start_time(start_time - paused_time);
+
 					update_status_time(pause, no_tiles);
 					progress.set_update();
 
@@ -345,6 +361,10 @@ void Session::run_cpu()
 
 			/* update scene */
 			update_scene();
+
+			if(device->error_message() != "")
+				progress.set_cancel(device->error_message());
+
 			if(progress.get_cancel())
 				break;
 
@@ -360,6 +380,9 @@ void Session::run_cpu()
 
 			if(!params.background)
 				need_tonemap = true;
+
+			if(device->error_message() != "")
+				progress.set_cancel(device->error_message());
 		}
 
 		device->task_wait();
@@ -372,13 +395,16 @@ void Session::run_cpu()
 			if(delayed_reset.do_reset) {
 				/* reset rendering if request from main thread */
 				delayed_reset.do_reset = false;
-				reset_(delayed_reset.w, delayed_reset.h, delayed_reset.samples);
+				reset_(delayed_reset.params, delayed_reset.samples);
 			}
 			else if(need_tonemap) {
 				/* tonemap only if we do not reset, we don't we don't
 				   want to show the result of an incomplete sample*/
 				tonemap();
 			}
+
+			if(device->error_message() != "")
+				progress.set_cancel(device->error_message());
 		}
 
 		progress.set_update();
@@ -390,8 +416,12 @@ void Session::run()
 	/* load kernels */
 	progress.set_status("Loading render kernels (may take a few minutes the first time)");
 
-	if(!device->load_kernels()) {
-		progress.set_status("Failed loading render kernel, see console for errors");
+	if(!device->load_kernels(params.experimental)) {
+		string message = device->error_message();
+		if(message == "")
+			message = "Failed loading render kernel, see console for errors";
+
+		progress.set_status("Error", message);
 		progress.set_update();
 		return;
 	}
@@ -409,41 +439,44 @@ void Session::run()
 
 	/* progress update */
 	if(progress.get_cancel())
-		progress.set_status(progress.get_cancel_message());
+		progress.set_status("Cancel", progress.get_cancel_message());
 	else
 		progress.set_update();
 }
 
-bool Session::draw(int w, int h)
+bool Session::draw(BufferParams& buffer_params)
 {
 	if(device_use_gl)
-		return draw_gpu(w, h);
+		return draw_gpu(buffer_params);
 	else
-		return draw_cpu(w, h);
+		return draw_cpu(buffer_params);
 }
 
-void Session::reset_(int w, int h, int samples)
+void Session::reset_(BufferParams& buffer_params, int samples)
 {
-	if(w != buffers->width || h != buffers->height) {
+	if(buffer_params.modified(buffers->params)) {
 		gpu_draw_ready = false;
-		buffers->reset(device, w, h);
-		display->reset(device, w, h);
+		buffers->reset(device, buffer_params);
+		display->reset(device, buffer_params);
 	}
 
-	tile_manager.reset(w, h, samples);
+	tile_manager.reset(buffer_params, samples);
 
 	start_time = time_dt();
 	preview_time = 0.0;
 	paused_time = 0.0;
 	sample = 0;
+
+	if(!params.background)
+		progress.set_start_time(start_time - paused_time);
 }
 
-void Session::reset(int w, int h, int samples)
+void Session::reset(BufferParams& buffer_params, int samples)
 {
 	if(device_use_gl)
-		reset_gpu(w, h, samples);
+		reset_gpu(buffer_params, samples);
 	else
-		reset_cpu(w, h, samples);
+		reset_cpu(buffer_params, samples);
 }
 
 void Session::set_samples(int samples)
@@ -490,14 +523,16 @@ void Session::update_scene()
 
 	progress.set_status("Updating Scene");
 
-	/* update camera if dimensions changed for progressive render */
+	/* update camera if dimensions changed for progressive render. the camera
+	   knows nothing about progressive or cropped rendering, it just gets the
+	   image dimensions passed in */
 	Camera *cam = scene->camera;
-	int w = tile_manager.state.width;
-	int h = tile_manager.state.height;
+	int width = tile_manager.state.buffer.full_width;
+	int height = tile_manager.state.buffer.full_height;
 
-	if(cam->width != w || cam->height != h) {
-		cam->width = w;
-		cam->height = h;
+	if(width != cam->width || height != cam->height) {
+		cam->width = width;
+		cam->height = height;
 		cam->tag_update();
 	}
 
@@ -533,15 +568,13 @@ void Session::update_status_time(bool show_pause, bool show_done)
 	/* update timing */
 	if(preview_time == 0.0 && resolution == 1)
 		preview_time = time_dt();
-
-	double total_time = time_dt() - start_time - paused_time;
+	
 	double sample_time = (sample == 0)? 0.0: (time_dt() - preview_time - paused_time)/(sample);
 
 	/* negative can happen when we pause a bit before rendering, can discard that */
-	if(total_time < 0.0) total_time = 0.0;
 	if(preview_time < 0.0) preview_time = 0.0;
 
-	progress.set_sample(sample + 1, total_time, sample_time);
+	progress.set_sample(sample + 1, sample_time);
 }
 
 void Session::path_trace(Tile& tile)
@@ -549,14 +582,15 @@ void Session::path_trace(Tile& tile)
 	/* add path trace task */
 	DeviceTask task(DeviceTask::PATH_TRACE);
 
-	task.x = tile.x;
-	task.y = tile.y;
+	task.x = tile_manager.state.buffer.full_x + tile.x;
+	task.y = tile_manager.state.buffer.full_y + tile.y;
 	task.w = tile.w;
 	task.h = tile.h;
 	task.buffer = buffers->buffer.device_pointer;
 	task.rng_state = buffers->rng_state.device_pointer;
 	task.sample = tile_manager.state.sample;
 	task.resolution = tile_manager.state.resolution;
+	tile_manager.state.buffer.get_offset_stride(task.offset, task.stride);
 
 	device->task_add(task);
 }
@@ -566,14 +600,15 @@ void Session::tonemap()
 	/* add tonemap task */
 	DeviceTask task(DeviceTask::TONEMAP);
 
-	task.x = 0;
-	task.y = 0;
-	task.w = tile_manager.state.width;
-	task.h = tile_manager.state.height;
+	task.x = tile_manager.state.buffer.full_x;
+	task.y = tile_manager.state.buffer.full_y;
+	task.w = tile_manager.state.buffer.width;
+	task.h = tile_manager.state.buffer.height;
 	task.rgba = display->rgba.device_pointer;
 	task.buffer = buffers->buffer.device_pointer;
 	task.sample = tile_manager.state.sample;
 	task.resolution = tile_manager.state.resolution;
+	tile_manager.state.buffer.get_offset_stride(task.offset, task.stride);
 
 	if(task.w > 0 && task.h > 0) {
 		device->task_add(task);

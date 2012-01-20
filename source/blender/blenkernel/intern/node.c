@@ -790,16 +790,11 @@ void nodeAddToPreview(bNode *node, float *col, int x, int y, int do_manage)
 				unsigned char *tar= preview->rect+ 4*((preview->xsize*y) + x);
 				
 				if(do_manage) {
-					tar[0]= FTOCHAR(linearrgb_to_srgb(col[0]));
-					tar[1]= FTOCHAR(linearrgb_to_srgb(col[1]));
-					tar[2]= FTOCHAR(linearrgb_to_srgb(col[2]));
+					linearrgb_to_srgb_uchar4(tar, col);
 				}
 				else {
-					tar[0]= FTOCHAR(col[0]);
-					tar[1]= FTOCHAR(col[1]);
-					tar[2]= FTOCHAR(col[2]);
+					rgba_float_to_uchar(tar, col);
 				}
-				tar[3]= FTOCHAR(col[3]);
 			}
 			//else printf("prv out bound x y %d %d\n", x, y);
 		}
@@ -1325,30 +1320,9 @@ void nodeSetActive(bNodeTree *ntree, bNode *node)
 		node->flag |= NODE_ACTIVE_TEXTURE;
 }
 
-/* use flags are not persistent yet, groups might need different tagging, so we do it each time
-   when we need to get this info */
-void ntreeSocketUseFlags(bNodeTree *ntree)
+int nodeSocketIsHidden(bNodeSocket *sock)
 {
-	bNode *node;
-	bNodeSocket *sock;
-	bNodeLink *link;
-	
-	/* clear flags */
-	for(node= ntree->nodes.first; node; node= node->next) {
-		for(sock= node->inputs.first; sock; sock= sock->next)
-			sock->flag &= ~SOCK_IN_USE;
-		for(sock= node->outputs.first; sock; sock= sock->next)
-			sock->flag &= ~SOCK_IN_USE;
-	}
-	
-	/* tag all thats in use */
-	for(link= ntree->links.first; link; link= link->next) {
-	
-		if(link->fromsock) // FIXME, see below
-			link->fromsock->flag |= SOCK_IN_USE;
-		if(link->tosock) // FIXME This can be NULL, when dragging a new link in the UI, should probably copy the node tree for preview render - campbell
-			link->tosock->flag |= SOCK_IN_USE;
-	}
+	return ((sock->flag & (SOCK_HIDDEN | SOCK_AUTO_HIDDEN | SOCK_UNAVAIL)) != 0);
 }
 
 /* ************** dependency stuff *********** */
@@ -1425,16 +1399,27 @@ static void ntree_update_link_pointers(bNodeTree *ntree)
 	
 	/* first clear data */
 	for(node= ntree->nodes.first; node; node= node->next) {
-		for(sock= node->inputs.first; sock; sock= sock->next)
+		for(sock= node->inputs.first; sock; sock= sock->next) {
 			sock->link= NULL;
+			sock->flag &= ~SOCK_IN_USE;
+		}
+		for(sock= node->outputs.first; sock; sock= sock->next) {
+			sock->flag &= ~SOCK_IN_USE;
+		}
 	}
-	/* clear socket links */
-	for(sock= ntree->outputs.first; sock; sock= sock->next)
+	for(sock= ntree->inputs.first; sock; sock= sock->next) {
+		sock->flag &= ~SOCK_IN_USE;
+	}
+	for(sock= ntree->outputs.first; sock; sock= sock->next) {
 		sock->link= NULL;
+		sock->flag &= ~SOCK_IN_USE;
+	}
 
 	for(link= ntree->links.first; link; link= link->next) {
-		if (link->tosock)
-			link->tosock->link= link;
+		link->tosock->link= link;
+		
+		link->fromsock->flag |= SOCK_IN_USE;
+		link->tosock->flag |= SOCK_IN_USE;
 	}
 }
 
@@ -1872,7 +1857,8 @@ static void registerCompositNodes(bNodeTreeType *ttype)
 	register_node_type_cmp_channel_matte(ttype);
 	register_node_type_cmp_color_spill(ttype);
 	register_node_type_cmp_luma_matte(ttype);
-	
+    register_node_type_cmp_doubleedgemask(ttype);
+
 	register_node_type_cmp_translate(ttype);
 	register_node_type_cmp_rotate(ttype);
 	register_node_type_cmp_scale(ttype);
@@ -1899,6 +1885,7 @@ static void registerShaderNodes(bNodeTreeType *ttype)
 	register_node_type_sh_output(ttype);
 	register_node_type_sh_material(ttype);
 	register_node_type_sh_camera(ttype);
+	register_node_type_sh_gamma(ttype);
 	register_node_type_sh_value(ttype);
 	register_node_type_sh_rgb(ttype);
 	register_node_type_sh_mix_rgb(ttype);
@@ -1954,6 +1941,7 @@ static void registerShaderNodes(bNodeTreeType *ttype)
 	register_node_type_sh_tex_musgrave(ttype);
 	register_node_type_sh_tex_gradient(ttype);
 	register_node_type_sh_tex_magic(ttype);
+	register_node_type_sh_tex_checker(ttype);
 }
 
 static void registerTextureNodes(bNodeTreeType *ttype)

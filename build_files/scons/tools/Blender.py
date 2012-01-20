@@ -50,6 +50,7 @@ program_list = [] # A list holding Nodes to final binaries, used to create insta
 arguments = None
 targets = None
 resources = []
+bitness = 0
 
 #some internals
 blenderdeps = [] # don't manipulate this one outside this module!
@@ -291,7 +292,7 @@ def setup_syslibs(lenv):
 
     syslibs += Split(lenv['BF_JPEG_LIB'])
     syslibs += Split(lenv['BF_PNG_LIB'])
-	
+
     syslibs += lenv['LLIBS']
 
     return syslibs
@@ -319,19 +320,10 @@ def creator(env):
     incs = ['#/intern/guardedalloc', '#/source/blender/blenlib', '#/source/blender/blenkernel', '#/source/blender/editors/include', '#/source/blender/blenloader', '#/source/blender/imbuf', '#/source/blender/renderconverter', '#/source/blender/render/extern/include', '#/source/blender/windowmanager', '#/source/blender/makesdna', '#/source/blender/makesrna', '#/source/gameengine/BlenderRoutines', '#/extern/glew/include', '#/source/blender/gpu', env['BF_OPENGL_INC']]
 
     defs = []
-    if env['WITH_BF_QUICKTIME']:
-        incs.append(env['BF_QUICKTIME_INC'])
-        defs.append('WITH_QUICKTIME')
 
     if env['WITH_BF_BINRELOC']:
         incs.append('#/extern/binreloc/include')
         defs.append('WITH_BINRELOC')
-
-    if env['WITH_BF_OPENEXR']:
-        defs.append('WITH_OPENEXR')
-
-    if env['WITH_BF_TIFF']:
-        defs.append('WITH_TIFF')
 
     if env['WITH_BF_SDL']:
         defs.append('WITH_SDL')
@@ -364,7 +356,7 @@ def buildinfo(lenv, build_type):
     build_time = time.strftime ("%H:%M:%S")
     build_rev = os.popen('svnversion').read()[:-1] # remove \n
     if build_rev == '': 
-        build_rev = '42021'
+        build_rev = '43553'
     if lenv['BF_DEBUG']:
         build_type = "Debug"
         build_cflags = ' '.join(lenv['CFLAGS'] + lenv['CCFLAGS'] + lenv['BF_DEBUG_CCFLAGS'] + lenv['CPPFLAGS'])
@@ -597,6 +589,8 @@ def AppIt(target=None, source=None, env=None):
             commands.getoutput(cmd)
             cmd = 'mkdir %s/kernel' % (cinstalldir)
             commands.getoutput(cmd)
+            cmd = 'mkdir %s/lib' % (cinstalldir)
+            commands.getoutput(cmd)
             cmd = 'cp -R %s/blender/addon/*.py %s/' % (croot, cinstalldir)
             commands.getoutput(cmd)
             cmd = 'cp -R %s/doc/license %s/license' % (croot, cinstalldir)
@@ -604,6 +598,8 @@ def AppIt(target=None, source=None, env=None):
             cmd = 'cp -R %s/kernel/*.h %s/kernel/*.cl %s/kernel/*.cu %s/kernel/' % (croot, croot, croot, cinstalldir)
             commands.getoutput(cmd)
             cmd = 'cp -R %s/kernel/svm %s/util/util_color.h %s/util/util_math.h %s/util/util_transform.h %s/util/util_types.h %s/kernel/' % (croot, croot, croot, croot, croot, cinstalldir)
+            commands.getoutput(cmd)
+            cmd = 'cp -R %s/../intern/cycles/kernel/*.cubin %s/lib/' % (builddir, cinstalldir)
             commands.getoutput(cmd)
 
     if env['WITH_OSX_STATICPYTHON']:

@@ -76,10 +76,10 @@
 /* called inside thread! */
 void image_buffer_rect_update(Scene *scene, RenderResult *rr, ImBuf *ibuf, volatile rcti *renrect)
 {
-	float x1, y1, *rectf= NULL;
+	float *rectf= NULL;
 	int ymin, ymax, xmin, xmax;
-	int rymin, rxmin, do_color_management;
-	char *rectc;
+	int rymin, rxmin, predivide, profile_from;
+	unsigned char *rectc;
 
 	/* if renrect argument, we only refresh scanlines */
 	if(renrect) {
@@ -136,50 +136,20 @@ void image_buffer_rect_update(Scene *scene, RenderResult *rr, ImBuf *ibuf, volat
 		imb_addrectImBuf(ibuf);
 	
 	rectf+= 4*(rr->rectx*ymin + xmin);
-	rectc= (char *)(ibuf->rect + ibuf->x*rymin + rxmin);
+	rectc= (unsigned char*)(ibuf->rect + ibuf->x*rymin + rxmin);
 
-	do_color_management = (scene && (scene->r.color_mgt_flag & R_COLOR_MANAGEMENT));
-	
-	/* XXX make nice consistent functions for this */
-	for(y1= 0; y1<ymax; y1++) {
-		float *rf= rectf;
-		float srgb[3];
-		char *rc= rectc;
-		const float dither = ibuf->dither / 255.0f;
-
-		/* XXX temp. because crop offset */
-		if(rectc >= (char *)(ibuf->rect)) {
-			for(x1= 0; x1<xmax; x1++, rf += 4, rc+=4) {
-				/* color management */
-				if(do_color_management) {
-					srgb[0]= linearrgb_to_srgb(rf[0]);
-					srgb[1]= linearrgb_to_srgb(rf[1]);
-					srgb[2]= linearrgb_to_srgb(rf[2]);
-				}
-				else {
-					copy_v3_v3(srgb, rf);
-				}
-
-				/* dither */
-				if(dither != 0.0f) {
-					const float d = (BLI_frand()-0.5f)*dither;
-
-					srgb[0] += d;
-					srgb[1] += d;
-					srgb[2] += d;
-				}
-
-				/* write */
-				rc[0]= FTOCHAR(srgb[0]);
-				rc[1]= FTOCHAR(srgb[1]);
-				rc[2]= FTOCHAR(srgb[2]);
-				rc[3]= FTOCHAR(rf[3]);
-			}
-		}
-
-		rectf += 4*rr->rectx;
-		rectc += 4*ibuf->x;
+	if(scene && (scene->r.color_mgt_flag & R_COLOR_MANAGEMENT)) {
+		profile_from= IB_PROFILE_LINEAR_RGB;
+		predivide= (scene->r.color_mgt_flag & R_COLOR_MANAGEMENT_PREDIVIDE);
 	}
+	else {
+		profile_from= IB_PROFILE_SRGB;
+		predivide= 0;
+	}
+
+	IMB_buffer_byte_from_float(rectc, rectf,
+		4, ibuf->dither, IB_PROFILE_SRGB, profile_from, predivide,
+		xmax, ymax, ibuf->x, rr->rectx);
 }
 
 /* ****************************** render invoking ***************** */
@@ -190,7 +160,7 @@ void image_buffer_rect_update(Scene *scene, RenderResult *rr, ImBuf *ibuf, volat
 static void screen_render_scene_layer_set(wmOperator *op, Main *mainp, Scene **scene, SceneRenderLayer **srl)
 {
 	/* single layer re-render */
-	if(RNA_property_is_set(op->ptr, "scene")) {
+	if(RNA_struct_property_is_set(op->ptr, "scene")) {
 		Scene *scn;
 		char scene_name[MAX_ID_NAME-2];
 
@@ -206,7 +176,7 @@ static void screen_render_scene_layer_set(wmOperator *op, Main *mainp, Scene **s
 		}
 	}
 
-	if(RNA_property_is_set(op->ptr, "layer")) {
+	if(RNA_struct_property_is_set(op->ptr, "layer")) {
 		SceneRenderLayer *rl;
 		char rl_name[RE_MAXNAME];
 
@@ -235,7 +205,7 @@ static int screen_render_exec(bContext *C, wmOperator *op)
 	/* custom scene and single layer re-render */
 	screen_render_scene_layer_set(op, mainp, &scene, &srl);
 
-	if(!is_animation && is_write_still && BKE_imtype_is_movie(scene->r.imtype)) {
+	if(!is_animation && is_write_still && BKE_imtype_is_movie(scene->r.im_format.imtype)) {
 		BKE_report(op->reports, RPT_ERROR, "Can't write a single file with an animation format selected");
 		return OPERATOR_CANCELLED;
 	}
@@ -378,8 +348,12 @@ static void render_progress_update(void *rjv, float progress)
 {
 	RenderJob *rj= rjv;
 	
-	if(rj->progress)
+	if(rj->progress && *rj->progress != progress) {
 		*rj->progress = progress;
+
+		/* make jobs timer to send notifier */
+		*(rj->do_update)= 1;
+	}
 }
 
 static void image_rect_update(void *rjv, RenderResult *rr, volatile rcti *renrect)
@@ -516,7 +490,7 @@ static int screen_render_invoke(bContext *C, wmOperator *op, wmEvent *event)
 		return OPERATOR_CANCELLED;
 	}
 
-	if(!is_animation && is_write_still && BKE_imtype_is_movie(scene->r.imtype)) {
+	if(!is_animation && is_write_still && BKE_imtype_is_movie(scene->r.im_format.imtype)) {
 		BKE_report(op->reports, RPT_ERROR, "Can't write a single file with an animation format selected");
 		return OPERATOR_CANCELLED;
 	}	
@@ -563,7 +537,7 @@ static int screen_render_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	/* custom scene and single layer re-render */
 	screen_render_scene_layer_set(op, mainp, &scene, &srl);
 
-	if(RNA_property_is_set(op->ptr, "layer"))
+	if(RNA_struct_property_is_set(op->ptr, "layer"))
 		jobflag |= WM_JOB_SUSPEND;
 
 	/* job custom data */

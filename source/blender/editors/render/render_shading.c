@@ -73,6 +73,7 @@
 #include "WM_api.h"
 #include "WM_types.h"
 
+#include "ED_object.h"
 #include "ED_curve.h"
 #include "ED_mesh.h"
 #include "ED_node.h"
@@ -91,7 +92,7 @@
 
 static int material_slot_add_exec(bContext *C, wmOperator *UNUSED(op))
 {
-	Object *ob= CTX_data_pointer_get_type(C, "object", &RNA_Object).data;
+	Object *ob= ED_object_context(C);
 
 	if(!ob)
 		return OPERATOR_CANCELLED;
@@ -120,7 +121,7 @@ void OBJECT_OT_material_slot_add(wmOperatorType *ot)
 
 static int material_slot_remove_exec(bContext *C, wmOperator *op)
 {
-	Object *ob= CTX_data_pointer_get_type(C, "object", &RNA_Object).data;
+	Object *ob= ED_object_context(C);
 
 	if(!ob)
 		return OPERATOR_CANCELLED;
@@ -156,7 +157,7 @@ void OBJECT_OT_material_slot_remove(wmOperatorType *ot)
 
 static int material_slot_assign_exec(bContext *C, wmOperator *UNUSED(op))
 {
-	Object *ob= CTX_data_pointer_get_type(C, "object", &RNA_Object).data;
+	Object *ob= ED_object_context(C);
 
 	if(!ob)
 		return OPERATOR_CANCELLED;
@@ -216,7 +217,7 @@ void OBJECT_OT_material_slot_assign(wmOperatorType *ot)
 
 static int material_slot_de_select(bContext *C, int select)
 {
-	Object *ob= CTX_data_pointer_get_type(C, "object", &RNA_Object).data;
+	Object *ob= ED_object_context(C);
 
 	if(!ob)
 		return OPERATOR_CANCELLED;
@@ -322,7 +323,7 @@ void OBJECT_OT_material_slot_deselect(wmOperatorType *ot)
 
 static int material_slot_copy_exec(bContext *C, wmOperator *UNUSED(op))
 {
-	Object *ob= CTX_data_pointer_get_type(C, "object", &RNA_Object).data;
+	Object *ob= ED_object_context(C);
 	Material ***matar;
 
 	if(!ob || !(matar= give_matarar(ob)))
@@ -658,7 +659,7 @@ void TEXTURE_OT_slot_move(wmOperatorType *ot)
 
 /********************** environment map operators *********************/
 
-static int save_envmap(wmOperator *op, Scene *scene, EnvMap *env, char *path, int imtype)
+static int save_envmap(wmOperator *op, Scene *scene, EnvMap *env, char *path, const char imtype)
 {
 	float layout[12];
 	if ( RNA_struct_find_property(op->ptr, "layout") )
@@ -680,7 +681,7 @@ static int envmap_save_exec(bContext *C, wmOperator *op)
 	Tex *tex= CTX_data_pointer_get_type(C, "texture", &RNA_Texture).data;
 	Scene *scene = CTX_data_scene(C);
 	//int imtype = RNA_enum_get(op->ptr, "file_type");
-	int imtype = scene->r.imtype;
+	char imtype = scene->r.im_format.imtype;
 	char path[FILE_MAX];
 	
 	RNA_string_get(op->ptr, "filepath", path);
@@ -704,10 +705,10 @@ static int envmap_save_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event
 {
 	//Scene *scene= CTX_data_scene(C);
 	
-	if(RNA_property_is_set(op->ptr, "filepath"))
+	if(RNA_struct_property_is_set(op->ptr, "filepath"))
 		return envmap_save_exec(C, op);
 
-	//RNA_enum_set(op->ptr, "file_type", scene->r.imtype);
+	//RNA_enum_set(op->ptr, "file_type", scene->r.im_format.imtype);
 	RNA_string_set(op->ptr, "filepath", G.main->name);
 	WM_event_add_fileselect(C, op);
 	

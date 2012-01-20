@@ -25,6 +25,7 @@
 #include "device.h"
 #include "device_intern.h"
 
+#include "util_foreach.h"
 #include "util_map.h"
 #include "util_math.h"
 #include "util_md5.h"
@@ -52,6 +53,7 @@ public:
 	map<string, device_memory*> mem_map;
 	device_ptr null_mem;
 	bool device_initialized;
+	string platform_name;
 
 	const char *opencl_error_string(cl_int err)
 	{
@@ -109,24 +111,37 @@ public:
 	bool opencl_error(cl_int err)
 	{
 		if(err != CL_SUCCESS) {
-			fprintf(stderr, "OpenCL error (%d): %s\n", err, opencl_error_string(err));
+			string message = string_printf("OpenCL error (%d): %s", err, opencl_error_string(err));
+			if(error_msg == "")
+				error_msg = message;
+			fprintf(stderr, "%s\n", message.c_str());
 			return true;
 		}
 
 		return false;
 	}
 
+	void opencl_error(const string& message)
+	{
+		if(error_msg == "")
+			error_msg = message;
+		fprintf(stderr, "%s\n", message.c_str());
+	}
+
 	void opencl_assert(cl_int err)
 	{
 		if(err != CL_SUCCESS) {
-			fprintf(stderr, "OpenCL error (%d): %s\n", err, opencl_error_string(err));
+			string message = string_printf("OpenCL error (%d): %s", err, opencl_error_string(err));
+			if(error_msg == "")
+				error_msg = message;
+			fprintf(stderr, "%s\n", message.c_str());
 #ifndef NDEBUG
 			abort();
 #endif
 		}
 	}
 
-	OpenCLDevice(bool background_)
+	OpenCLDevice(DeviceInfo& info, bool background_)
 	{
 		background = background_;
 		cpPlatform = NULL;
@@ -138,30 +153,49 @@ public:
 		null_mem = 0;
 		device_initialized = false;
 
-		vector<cl_platform_id> platform_ids;
+		/* setup platform */
 		cl_uint num_platforms;
 
-		/* setup device */
 		ciErr = clGetPlatformIDs(0, NULL, &num_platforms);
 		if(opencl_error(ciErr))
 			return;
 
 		if(num_platforms == 0) {
-			fprintf(stderr, "OpenCL: no platforms found.\n");
+			opencl_error("OpenCL: no platforms found.");
 			return;
 		}
 
-		platform_ids.resize(num_platforms);
-		ciErr = clGetPlatformIDs(num_platforms, &platform_ids[0], NULL);
+		ciErr = clGetPlatformIDs(num_platforms, &cpPlatform, NULL);
 		if(opencl_error(ciErr))
 			return;
 
-		cpPlatform = platform_ids[0]; /* todo: pick specified platform && device */
+		char name[256];
+		clGetPlatformInfo(cpPlatform, CL_PLATFORM_NAME, sizeof(name), &name, NULL);
+		platform_name = name;
 
-		ciErr = clGetDeviceIDs(cpPlatform, CL_DEVICE_TYPE_GPU|CL_DEVICE_TYPE_ACCELERATOR, 1, &cdDevice, NULL);
-		if(opencl_error(ciErr))
+		/* get devices */
+		vector<cl_device_id> device_ids;
+		cl_uint num_devices;
+
+		if(opencl_error(clGetDeviceIDs(cpPlatform, CL_DEVICE_TYPE_GPU|CL_DEVICE_TYPE_ACCELERATOR, 0, NULL, &num_devices)))
 			return;
 
+		if(info.num > num_devices) {
+			if(num_devices == 0)
+				opencl_error("OpenCL: no devices found.");
+			else
+				opencl_error("OpenCL: specified device not found.");
+			return;
+		}
+
+		device_ids.resize(num_devices);
+		
+		if(opencl_error(clGetDeviceIDs(cpPlatform, CL_DEVICE_TYPE_GPU|CL_DEVICE_TYPE_ACCELERATOR, num_devices, &device_ids[0], NULL)))
+			return;
+
+		cdDevice = device_ids[info.num];
+
+		/* create context */
 		cxContext = clCreateContext(0, 1, &cdDevice, NULL, NULL, &ciErr);
 		if(opencl_error(ciErr))
 			return;
@@ -183,24 +217,24 @@ public:
 		clGetPlatformInfo(cpPlatform, CL_PLATFORM_VERSION, sizeof(version), &version, NULL);
 
 		if(sscanf(version, "OpenCL %d.%d", &major, &minor) < 2) {
-			fprintf(stderr, "OpenCL: failed to parse platform version string (%s).", version);
+			opencl_error(string_printf("OpenCL: failed to parse platform version string (%s).", version));
 			return false;
 		}
 
 		if(!((major == req_major && minor >= req_minor) || (major > req_major))) {
-			fprintf(stderr, "OpenCL: platform version 1.1 or later required, found %d.%d\n", major, minor);
+			opencl_error(string_printf("OpenCL: platform version 1.1 or later required, found %d.%d", major, minor));
 			return false;
 		}
 
 		clGetDeviceInfo(cdDevice, CL_DEVICE_OPENCL_C_VERSION, sizeof(version), &version, NULL);
 
 		if(sscanf(version, "OpenCL C %d.%d", &major, &minor) < 2) {
-			fprintf(stderr, "OpenCL: failed to parse OpenCL C version string (%s).", version);
+			opencl_error(string_printf("OpenCL: failed to parse OpenCL C version string (%s).", version));
 			return false;
 		}
 
 		if(!((major == req_major && minor >= req_minor) || (major > req_major))) {
-			fprintf(stderr, "OpenCL: C version 1.1 or later required, found %d.%d\n", major, minor);
+			opencl_error(string_printf("OpenCL: C version 1.1 or later required, found %d.%d", major, minor));
 			return false;
 		}
 
@@ -216,7 +250,7 @@ public:
 		vector<uint8_t> binary;
 
 		if(!path_read_binary(clbin, binary)) {
-			fprintf(stderr, "OpenCL failed to read cached binary %s.\n", clbin.c_str());
+			opencl_error(string_printf("OpenCL failed to read cached binary %s.", clbin.c_str()));
 			return false;
 		}
 
@@ -229,7 +263,7 @@ public:
 			&size, &bytes, &status, &ciErr);
 
 		if(opencl_error(status) || opencl_error(ciErr)) {
-			fprintf(stderr, "OpenCL failed create program from cached binary %s.\n", clbin.c_str());
+			opencl_error(string_printf("OpenCL failed create program from cached binary %s.", clbin.c_str()));
 			return false;
 		}
 
@@ -253,34 +287,30 @@ public:
 		clGetProgramInfo(cpProgram, CL_PROGRAM_BINARIES, sizeof(uint8_t*), &bytes, NULL);
 
 		if(!path_write_binary(clbin, binary)) {
-			fprintf(stderr, "OpenCL failed to write cached binary %s.\n", clbin.c_str());
+			opencl_error(string_printf("OpenCL failed to write cached binary %s.", clbin.c_str()));
 			return false;
 		}
 
 		return true;
 	}
 
+	string kernel_build_options()
+	{
+		string build_options = " -cl-fast-relaxed-math ";
+		
+		/* full shading only on NVIDIA cards at the moment */
+		if(platform_name == "NVIDIA CUDA")
+			build_options += "-D__KERNEL_SHADING__ -D__MULTI_CLOSURE__ -cl-nv-maxrregcount=24 -cl-nv-verbose ";
+		if(platform_name == "Apple")
+			build_options += " -D__CL_NO_FLOAT3__ ";
+
+		return build_options;
+	}
+
 	bool build_kernel(const string& kernel_path)
 	{
-		string build_options = "";
-
-		build_options += "-I " + kernel_path + ""; /* todo: escape path */
-		build_options += " -cl-fast-relaxed-math ";
-		
-		/* Full Shading only on NVIDIA cards at the moment */
-		char vendor[256];
-
-		clGetPlatformInfo(cpPlatform, CL_PLATFORM_NAME, sizeof(vendor), &vendor, NULL);
-		string name = vendor;
-		
-		if (name == "NVIDIA CUDA") {
-			build_options += "-D __SVM__ ";
-			build_options += "-D __EMISSION__ ";
-			build_options += "-D __TEXTURES__ ";
-			build_options += "-D __HOLDOUT__ ";
-			build_options += "-D __MULTI_CLOSURE__ ";
-		}
-
+		string build_options = kernel_build_options();
+	
 		ciErr = clBuildProgram(cpProgram, 0, NULL, build_options.c_str(), NULL, NULL);
 
 		if(ciErr != CL_SUCCESS) {
@@ -294,7 +324,8 @@ public:
 			clGetProgramBuildInfo(cpProgram, cdDevice, CL_PROGRAM_BUILD_LOG, ret_val_size, build_log, NULL);
 
 			build_log[ret_val_size] = '\0';
-			fprintf(stderr, "OpenCL build failed:\n %s\n", build_log);
+			opencl_error("OpenCL build failed: errors in console");
+			fprintf(stderr, "%s\n", build_log);
 
 			delete[] build_log;
 
@@ -310,6 +341,8 @@ public:
 		   kernel caches do not seem to recognize changes in included files.
 		   so we force recompile on changes by adding the md5 hash of all files */
 		string source = "#include \"kernel.cl\" // " + kernel_md5 + "\n";
+		source = path_source_replace_includes(source, kernel_path);
+
 		size_t source_len = source.size();
 		const char *source_str = source.c_str();
 
@@ -344,10 +377,13 @@ public:
 		md5.append((uint8_t*)name, strlen(name));
 		md5.append((uint8_t*)driver, strlen(driver));
 
+		string options = kernel_build_options();
+		md5.append((uint8_t*)options.c_str(), options.size());
+
 		return md5.get_hex();
 	}
 
-	bool load_kernels()
+	bool load_kernels(bool experimental)
 	{
 		/* verify if device was initialized */
 		if(!device_initialized) {
@@ -453,8 +489,11 @@ public:
 		opencl_assert(ciErr);
 	}
 
-	void mem_copy_from(device_memory& mem, size_t offset, size_t size)
+	void mem_copy_from(device_memory& mem, int y, int w, int h, int elem)
 	{
+		size_t offset = elem*y*w;
+		size_t size = elem*w*h;
+
 		ciErr = clEnqueueReadBuffer(cqCommandQueue, CL_MEM_PTR(mem.device_pointer), CL_TRUE, offset, size, (uchar*)mem.data_pointer + offset, 0, NULL, NULL);
 		opencl_assert(ciErr);
 	}
@@ -523,6 +562,8 @@ public:
 		cl_int d_w = task.w;
 		cl_int d_h = task.h;
 		cl_int d_sample = task.sample;
+		cl_int d_offset = task.offset;
+		cl_int d_stride = task.stride;
 
 		/* sample arguments */
 		int narg = 0;
@@ -541,6 +582,8 @@ public:
 		ciErr |= clSetKernelArg(ckPathTraceKernel, narg++, sizeof(d_y), (void*)&d_y);
 		ciErr |= clSetKernelArg(ckPathTraceKernel, narg++, sizeof(d_w), (void*)&d_w);
 		ciErr |= clSetKernelArg(ckPathTraceKernel, narg++, sizeof(d_h), (void*)&d_h);
+		ciErr |= clSetKernelArg(ckPathTraceKernel, narg++, sizeof(d_offset), (void*)&d_offset);
+		ciErr |= clSetKernelArg(ckPathTraceKernel, narg++, sizeof(d_stride), (void*)&d_stride);
 
 		opencl_assert(ciErr);
 
@@ -563,23 +606,19 @@ public:
 	cl_int set_kernel_arg_mem(cl_kernel kernel, int *narg, const char *name)
 	{
 		cl_mem ptr;
-		cl_int size, err = 0;
+		cl_int err = 0;
 
 		if(mem_map.find(name) != mem_map.end()) {
 			device_memory *mem = mem_map[name];
 		
 			ptr = CL_MEM_PTR(mem->device_pointer);
-			size = mem->data_width;
 		}
 		else {
 			/* work around NULL not working, even though the spec says otherwise */
 			ptr = CL_MEM_PTR(null_mem);
-			size = 1;
 		}
 		
 		err |= clSetKernelArg(kernel, (*narg)++, sizeof(ptr), (void*)&ptr);
-		opencl_assert(err);
-		err |= clSetKernelArg(kernel, (*narg)++, sizeof(size), (void*)&size);
 		opencl_assert(err);
 
 		return err;
@@ -597,6 +636,8 @@ public:
 		cl_int d_h = task.h;
 		cl_int d_sample = task.sample;
 		cl_int d_resolution = task.resolution;
+		cl_int d_offset = task.offset;
+		cl_int d_stride = task.stride;
 
 		/* sample arguments */
 		int narg = 0;
@@ -616,6 +657,8 @@ public:
 		ciErr |= clSetKernelArg(ckFilmConvertKernel, narg++, sizeof(d_y), (void*)&d_y);
 		ciErr |= clSetKernelArg(ckFilmConvertKernel, narg++, sizeof(d_w), (void*)&d_w);
 		ciErr |= clSetKernelArg(ckFilmConvertKernel, narg++, sizeof(d_h), (void*)&d_h);
+		ciErr |= clSetKernelArg(ckFilmConvertKernel, narg++, sizeof(d_offset), (void*)&d_offset);
+		ciErr |= clSetKernelArg(ckFilmConvertKernel, narg++, sizeof(d_stride), (void*)&d_stride);
 
 		opencl_assert(ciErr);
 
@@ -635,12 +678,24 @@ public:
 		opencl_assert(clFinish(cqCommandQueue));
 	}
 
-	void task_add(DeviceTask& task)
+	void task_add(DeviceTask& maintask)
 	{
-		if(task.type == DeviceTask::TONEMAP)
-			tonemap(task);
-		else if(task.type == DeviceTask::PATH_TRACE)
-			path_trace(task);
+		list<DeviceTask> tasks;
+
+		/* arbitrary limit to work around apple ATI opencl issue */
+		if(platform_name == "Apple")
+			maintask.split_max_size(tasks, 76800);
+		else
+			tasks.push_back(maintask);
+
+		DeviceTask task;
+
+		foreach(DeviceTask& task, tasks) {
+			if(task.type == DeviceTask::TONEMAP)
+				tonemap(task);
+			else if(task.type == DeviceTask::PATH_TRACE)
+				path_trace(task);
+		}
 	}
 
 	void task_wait()
@@ -652,9 +707,52 @@ public:
 	}
 };
 
-Device *device_opencl_create(bool background)
+Device *device_opencl_create(DeviceInfo& info, bool background)
 {
-	return new OpenCLDevice(background);
+	return new OpenCLDevice(info, background);
+}
+
+void device_opencl_info(vector<DeviceInfo>& devices)
+{
+	vector<cl_device_id> device_ids;
+	cl_uint num_devices;
+	cl_platform_id platform_id;
+	cl_uint num_platforms;
+
+	/* get devices */
+	if(clGetPlatformIDs(0, NULL, &num_platforms) != CL_SUCCESS || num_platforms == 0)
+		return;
+
+	if(clGetPlatformIDs(num_platforms, &platform_id, NULL) != CL_SUCCESS)
+		return;
+
+	if(clGetDeviceIDs(platform_id, CL_DEVICE_TYPE_GPU|CL_DEVICE_TYPE_ACCELERATOR, 0, NULL, &num_devices) != CL_SUCCESS)
+		return;
+	
+	device_ids.resize(num_devices);
+
+	if(clGetDeviceIDs(platform_id, CL_DEVICE_TYPE_GPU|CL_DEVICE_TYPE_ACCELERATOR, num_devices, &device_ids[0], NULL) != CL_SUCCESS)
+		return;
+	
+	/* add devices */
+	for(int num = 0; num < num_devices; num++) {
+		cl_device_id device_id = device_ids[num];
+		char name[1024];
+
+		if(clGetDeviceInfo(device_id, CL_DEVICE_NAME, sizeof(name), &name, NULL) != CL_SUCCESS)
+			continue;
+
+		DeviceInfo info;
+
+		info.type = DEVICE_OPENCL;
+		info.description = string(name);
+		info.id = string_printf("OPENCL_%d", num);
+		info.num = num;
+		/* we don't know if it's used for display, but assume it is */
+		info.display_device = true;
+
+		devices.push_back(info);
+	}
 }
 
 CCL_NAMESPACE_END

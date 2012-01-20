@@ -628,7 +628,7 @@ static uiBlock *operator_search_menu(bContext *C, ARegion *ar, void *arg_kmi)
 	/* fake button, it holds space for search items */
 	uiDefBut(block, LABEL, 0, "", 10, 15, 150, uiSearchBoxhHeight(), NULL, 0, 0, 0, 0, NULL);
 	
-	but= uiDefSearchBut(block, search, 0, ICON_VIEWZOOM, 256, 10, 0, 150, UI_UNIT_Y, 0, 0, "");
+	but= uiDefSearchBut(block, search, 0, ICON_VIEWZOOM, sizeof(search), 10, 0, 150, UI_UNIT_Y, 0, 0, "");
 	uiButSetSearchFunc(but, operator_search_cb, arg_kmi, operator_call_cb, ot);
 	
 	uiBoundsBlock(block, 6);
@@ -893,9 +893,11 @@ struct DrawIconArg {
 static void tselem_draw_icon_uibut(struct DrawIconArg *arg, int icon)
 {
 	/* restrict collumn clip... it has been coded by simply overdrawing, doesnt work for buttons */
-	if(arg->x >= arg->xmax) 
-		UI_icon_draw(arg->x, arg->y, icon);
-	else {
+	if(arg->x >= arg->xmax) {
+		glEnable(GL_BLEND);
+		UI_icon_draw_aspect(arg->x, arg->y, icon, 1.0f, arg->alpha);
+		glDisable(GL_BLEND);
+	} else {
 		/* XXX investigate: button placement of icons is way different than UI_icon_draw? */
 		float ufac= UI_UNIT_X/20.0f;
 		uiBut *but= uiDefIconBut(arg->block, LABEL, 0, icon, arg->x-3.0f*ufac, arg->y, UI_UNIT_X-4.0f*ufac, UI_UNIT_Y-4.0f*ufac, NULL, 0.0, 0.0, 1.0, arg->alpha, (arg->id && arg->id->lib) ? arg->id->lib->name : "");
@@ -1012,6 +1014,8 @@ static void tselem_draw_icon(uiBlock *block, int xmax, float x, float y, TreeSto
 						UI_icon_draw(x, y, ICON_MOD_SOLIDIFY); break;
 					case eModifierType_Screw:
 						UI_icon_draw(x, y, ICON_MOD_SCREW); break;
+					case eModifierType_Remesh:
+						UI_icon_draw(x, y, ICON_MOD_REMESH); break;
 					case eModifierType_WeightVGEdit:
 					case eModifierType_WeightVGMix:
 					case eModifierType_WeightVGProximity:
@@ -1645,7 +1649,7 @@ void draw_outliner(const bContext *C)
 
 	/* draw outliner stuff (background, hierachy lines and names) */
 	outliner_back(ar);
-	block= uiBeginBlock(C, ar, "outliner buttons", UI_EMBOSS);
+	block= uiBeginBlock(C, ar, __func__, UI_EMBOSS);
 	outliner_draw_tree((bContext *)C, block, scene, ar, soops);
 	
 	if(ELEM(soops->outlinevis, SO_DATABLOCKS, SO_USERDEF)) {

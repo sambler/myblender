@@ -53,6 +53,7 @@
 
 #include "PIL_time.h"
 
+#include "render_result.h"
 #include "render_types.h"
 #include "renderpipeline.h"
 #include "rendercore.h"
@@ -485,18 +486,12 @@ void makeraytree(Render *re)
 /* 	if(shi->osatex)  */
 static void shade_ray_set_derivative(ShadeInput *shi)
 {
-	float detsh, t00, t10, t01, t11, xn, yn, zn;
+	float detsh, t00, t10, t01, t11;
 	int axis1, axis2;
 
 	/* find most stable axis to project */
-	xn= fabs(shi->facenor[0]);
-	yn= fabs(shi->facenor[1]);
-	zn= fabs(shi->facenor[2]);
-	
-	if(zn>=xn && zn>=yn) { axis1= 0; axis2= 1; }
-	else if(yn>=xn && yn>=zn) { axis1= 0; axis2= 2; }
-	else { axis1= 1; axis2= 2; }
-	
+	axis_dominant_v3(&axis1, &axis2, shi->facenor);
+
 	/* compute u,v and derivatives */
 	if(shi->obi->flag & R_TRANSFORMED) {
 		float v1[3], v2[3], v3[3];
@@ -785,7 +780,10 @@ static void traceray(ShadeInput *origshi, ShadeResult *origshr, short depth, con
 				tracol[3]= col[3];	// we pass on and accumulate alpha
 				
 				if((shi.mat->mode & MA_TRANSP) && (shi.mat->mode & MA_RAYTRANSP)) {
-					if(traflag & RAY_INSIDE) {
+					/* don't overwrite traflag, it's value is used in mirror reflection */
+					int new_traflag = traflag;
+					
+					if(new_traflag & RAY_INSIDE) {
 						/* inside the material, so use inverse normal */
 						float norm[3];
 						norm[0]= - shi.vn[0];
@@ -794,7 +792,7 @@ static void traceray(ShadeInput *origshi, ShadeResult *origshr, short depth, con
 
 						if (refraction(refract, norm, shi.view, shi.ang)) {
 							/* ray comes out from the material into air */
-							traflag &= ~RAY_INSIDE;
+							new_traflag &= ~RAY_INSIDE;
 						}
 						else {
 							/* total internal reflection (ray stays inside the material) */
@@ -804,14 +802,14 @@ static void traceray(ShadeInput *origshi, ShadeResult *origshr, short depth, con
 					else {
 						if (refraction(refract, shi.vn, shi.view, shi.ang)) {
 							/* ray goes in to the material from air */
-							traflag |= RAY_INSIDE;
+							new_traflag |= RAY_INSIDE;
 						}
 						else {
 							/* total external reflection (ray doesn't enter the material) */
 							reflection(refract, shi.vn, shi.view, shi.vn);
 						}
 					}
-					traceray(origshi, origshr, depth-1, shi.co, refract, tracol, shi.obi, shi.vlr, traflag);
+					traceray(origshi, origshr, depth-1, shi.co, refract, tracol, shi.obi, shi.vlr, new_traflag);
 				}
 				else
 					traceray(origshi, origshr, depth-1, shi.co, shi.view, tracol, shi.obi, shi.vlr, 0);
@@ -845,7 +843,7 @@ static void traceray(ShadeInput *origshi, ShadeResult *origshr, short depth, con
 				float ref[3];
 				
 				reflection_simple(ref, shi.vn, shi.view);
-				traceray(origshi, origshr, depth-1, shi.co, ref, mircol, shi.obi, shi.vlr, 0);
+				traceray(origshi, origshr, depth-1, shi.co, ref, mircol, shi.obi, shi.vlr, traflag);
 			
 				f1= 1.0f-f;
 
@@ -2016,7 +2014,7 @@ static void ray_ao_qmc(ShadeInput *shi, float ao[3], float env[3])
 		
 		samples++;
 		
-		if (qsa->type == SAMP_TYPE_HALTON) {
+		if (qsa && qsa->type == SAMP_TYPE_HALTON) {
 			/* adaptive sampling - consider samples below threshold as in shadow (or vice versa) and exit early */		
 			if (adapt_thresh > 0.0f && (samples > max_samples/2) ) {
 				

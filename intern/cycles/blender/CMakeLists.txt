@@ -6,7 +6,7 @@ set(INC
 	../kernel/svm
 	../util
 	../subd
-	../../../intern/guardedalloc
+	../../guardedalloc
 	../../../source/blender/makesdna
 	../../../source/blender/makesrna
 	../../../source/blender/blenloader
@@ -27,6 +27,7 @@ set(SRC
 	blender_shader.cpp
 	blender_sync.cpp
 
+	CCL_api.h
 	blender_sync.h
 	blender_session.h
 	blender_util.h
@@ -39,7 +40,6 @@ set(ADDON_FILES
 	addon/presets.py
 	addon/properties.py
 	addon/ui.py
-	addon/xml.py
 )
 
 blender_add_lib(bf_intern_cycles "${SRC}" "${INC}" "${INC_SYS}")

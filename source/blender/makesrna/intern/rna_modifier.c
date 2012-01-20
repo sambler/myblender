@@ -69,6 +69,7 @@ EnumPropertyItem modifier_type_items[] ={
 	{eModifierType_Mask, "MASK", ICON_MOD_MASK, "Mask", ""},
 	{eModifierType_Mirror, "MIRROR", ICON_MOD_MIRROR, "Mirror", ""},
 	{eModifierType_Multires, "MULTIRES", ICON_MOD_MULTIRES, "Multiresolution", ""},
+	{eModifierType_Remesh, "REMESH", ICON_MOD_REMESH, "Remesh", ""},
 	{eModifierType_Screw, "SCREW", ICON_MOD_SCREW, "Screw", ""},
 	{eModifierType_Solidify, "SOLIDIFY", ICON_MOD_SOLIDIFY, "Solidify", ""},
 	{eModifierType_Subsurf, "SUBSURF", ICON_MOD_SUBSURF, "Subdivision Surface", ""},
@@ -199,6 +200,8 @@ static StructRNA* rna_Modifier_refine(struct PointerRNA *ptr)
 			return &RNA_VertexWeightProximityModifier;
 		case eModifierType_DynamicPaint:
 			return &RNA_DynamicPaintModifier;
+		case eModifierType_Remesh:
+			return &RNA_RemeshModifier;
 		default:
 			return &RNA_Modifier;
 	}
@@ -447,12 +450,6 @@ static void RNA_WarpModifier_vgroup_set(PointerRNA *ptr, const char *value)
 {
 	WarpModifierData *tmd= (WarpModifierData*)ptr->data;
 	rna_object_vgroup_name_set(ptr, value, tmd->defgrp_name, sizeof(tmd->defgrp_name));
-}
-
-static void rna_WaveModifier_uvlayer_set(PointerRNA *ptr, const char *value)
-{
-	WaveModifierData *wmd= (WaveModifierData*)ptr->data;
-	rna_object_uvlayer_name_set(ptr, value, wmd->uvlayer_name, sizeof(wmd->uvlayer_name));
 }
 
 static void rna_WeightVGModifier_mask_uvlayer_set(PointerRNA *ptr, const char *value)
@@ -743,7 +740,7 @@ static void rna_def_property_subdivision_common(StructRNA *srna, const char type
 	PropertyRNA *prop= RNA_def_property(srna, "subdivision_type", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, type);
 	RNA_def_property_enum_items(prop, prop_subdivision_type_items);
-	RNA_def_property_ui_text(prop, "Subdivision Type", "Selects type of subdivision algorithm");
+	RNA_def_property_ui_text(prop, "Subdivision Type", "Select type of subdivision algorithm");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 }
 
@@ -784,10 +781,10 @@ static void rna_def_modifier_subsurf(BlenderRNA *brna)
 static void rna_def_modifier_generic_map_info(StructRNA *srna)
 {
 	static EnumPropertyItem prop_texture_coordinates_items[] = {
-		{MOD_DISP_MAP_LOCAL, "LOCAL", 0, "Map", "Uses the local coordinate system for the texture coordinates"},
-		{MOD_DISP_MAP_GLOBAL, "GLOBAL", 0, "Global", "Uses the global coordinate system for the texture coordinates"},
-		{MOD_DISP_MAP_OBJECT, "OBJECT", 0, "Object", "Uses the linked object's local coordinate system for the texture coordinates"},
-		{MOD_DISP_MAP_UV, "UV", 0, "UV", "Uses UV coordinates for the texture coordinates"},
+		{MOD_DISP_MAP_LOCAL, "LOCAL", 0, "Local", "Use the local coordinate system for the texture coordinates"},
+		{MOD_DISP_MAP_GLOBAL, "GLOBAL", 0, "Global", "Use the global coordinate system for the texture coordinates"},
+		{MOD_DISP_MAP_OBJECT, "OBJECT", 0, "Object", "Use the linked object's local coordinate system for the texture coordinates"},
+		{MOD_DISP_MAP_UV, "UV", 0, "UV", "Use UV coordinates for the texture coordinates"},
 		{0, NULL, 0, NULL, NULL}};
 
 	PropertyRNA *prop;
@@ -805,7 +802,7 @@ static void rna_def_modifier_generic_map_info(StructRNA *srna)
 
 	prop= RNA_def_property(srna, "uv_layer", PROP_STRING, PROP_NONE);
 	RNA_def_property_string_sdna(prop, NULL, "uvlayer_name");
-	RNA_def_property_ui_text(prop, "UV Layer", "UV layer name");
+	RNA_def_property_ui_text(prop, "UV Map", "UV map name");
 	RNA_def_property_string_funcs(prop, NULL, NULL, "rna_MappingInfo_uvlayer_set");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
@@ -1010,13 +1007,13 @@ static void rna_def_modifier_build(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "frame_start", PROP_FLOAT, PROP_TIME);
 	RNA_def_property_float_sdna(prop, NULL, "start");
 	RNA_def_property_range(prop, MINAFRAMEF, MAXFRAMEF);
-	RNA_def_property_ui_text(prop, "Start", "Specify the start frame of the effect");
+	RNA_def_property_ui_text(prop, "Start", "Start frame of the effect");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
 	prop= RNA_def_property(srna, "frame_duration", PROP_FLOAT, PROP_TIME);
 	RNA_def_property_float_sdna(prop, NULL, "length");
 	RNA_def_property_range(prop, 1, MAXFRAMEF);
-	RNA_def_property_ui_text(prop, "Length", "Specify the total time the build effect requires");
+	RNA_def_property_ui_text(prop, "Length", "Total time the build effect requires");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
 	prop= RNA_def_property(srna, "use_random_order", PROP_BOOLEAN, PROP_NONE);
@@ -1026,7 +1023,7 @@ static void rna_def_modifier_build(BlenderRNA *brna)
 
 	prop= RNA_def_property(srna, "seed", PROP_INT, PROP_NONE);
 	RNA_def_property_range(prop, 1, MAXFRAMEF);
-	RNA_def_property_ui_text(prop, "Seed", "Specify the seed for random if used");
+	RNA_def_property_ui_text(prop, "Seed", "Seed for random if used");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 }
 
@@ -1057,7 +1054,7 @@ static void rna_def_modifier_mirror(BlenderRNA *brna)
 
 	prop= RNA_def_property(srna, "use_clip", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", MOD_MIR_CLIPPING);
-	RNA_def_property_ui_text(prop, "Clip", "Prevents vertices from going through the mirror during transform");
+	RNA_def_property_ui_text(prop, "Clip", "Prevent vertices from going through the mirror during transform");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
 	prop= RNA_def_property(srna, "use_mirror_vertex_groups", PROP_BOOLEAN, PROP_NONE);
@@ -1108,7 +1105,7 @@ static void rna_def_modifier_decimate(BlenderRNA *brna)
 	RNA_def_property_float_sdna(prop, NULL, "percent");
 	RNA_def_property_range(prop, 0, 1);
 	RNA_def_property_ui_range(prop, 0, 1, 1, 2);
-	RNA_def_property_ui_text(prop, "Ratio", "Defines the ratio of triangles to reduce to");
+	RNA_def_property_ui_text(prop, "Ratio", "Ratio of triangles to reduce to");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
 	prop= RNA_def_property(srna, "face_count", PROP_INT, PROP_NONE);
@@ -1121,13 +1118,6 @@ static void rna_def_modifier_wave(BlenderRNA *brna)
 {
 	StructRNA *srna;
 	PropertyRNA *prop;
-
-	static EnumPropertyItem prop_texture_coordinates_items[] = {
-		{MOD_WAV_MAP_LOCAL, "LOCAL", 0, "Local", ""},
-		{MOD_WAV_MAP_GLOBAL, "GLOBAL", 0, "Global", ""},
-		{MOD_WAV_MAP_OBJECT, "OBJECT", 0, "Object", ""},
-		{MOD_WAV_MAP_UV, "MAP_UV", 0, "UV", ""},
-		{0, NULL, 0, NULL, NULL}};
 
 	srna= RNA_def_struct(brna, "WaveModifier", "Modifier");
 	RNA_def_struct_ui_text(srna, "Wave Modifier", "Wave effect modifier");
@@ -1184,7 +1174,7 @@ static void rna_def_modifier_wave(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "damping_time", PROP_FLOAT, PROP_TIME);
 	RNA_def_property_float_sdna(prop, NULL, "damp");
 	RNA_def_property_range(prop, MINAFRAMEF, MAXFRAMEF);
-	RNA_def_property_ui_text(prop, "Damping Time",  "Number of frames in which the waves damps out after it dies");
+	RNA_def_property_ui_text(prop, "Damping Time",  "Number of frames in which the wave damps out after it dies");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
 	prop= RNA_def_property(srna, "falloff_radius", PROP_FLOAT, PROP_DISTANCE);
@@ -1205,7 +1195,7 @@ static void rna_def_modifier_wave(BlenderRNA *brna)
 	RNA_def_property_float_sdna(prop, NULL, "starty");
 	RNA_def_property_range(prop, -FLT_MAX, FLT_MAX);
 	RNA_def_property_ui_range(prop, -100, 100, 100, 2);
-	RNA_def_property_ui_text(prop, "Start Position Y",  "Z coordinate of the start position");
+	RNA_def_property_ui_text(prop, "Start Position Y",  "Y coordinate of the start position");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
 	prop= RNA_def_property(srna, "start_position_object", PROP_POINTER, PROP_NONE);
@@ -1219,29 +1209,6 @@ static void rna_def_modifier_wave(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Vertex Group", "Vertex group name for modulating the wave");
 	RNA_def_property_string_funcs(prop, NULL, NULL, "rna_WaveModifier_vgroup_set");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop= RNA_def_property(srna, "texture", PROP_POINTER, PROP_NONE);
-	RNA_def_property_ui_text(prop, "Texture", "Texture for modulating the wave");
-	RNA_def_property_flag(prop, PROP_EDITABLE);
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop= RNA_def_property(srna, "texture_coords", PROP_ENUM, PROP_NONE);
-	RNA_def_property_enum_sdna(prop, NULL, "texmapping");
-	RNA_def_property_enum_items(prop, prop_texture_coordinates_items);
-	RNA_def_property_ui_text(prop, "Texture Coordinates", "Texture coordinates used for modulating input");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop= RNA_def_property(srna, "uv_layer", PROP_STRING, PROP_NONE);
-	RNA_def_property_string_sdna(prop, NULL, "uvlayer_name");
-	RNA_def_property_ui_text(prop, "UV Layer", "UV layer name");
-	RNA_def_property_string_funcs(prop, NULL, NULL, "rna_WaveModifier_uvlayer_set");
-	RNA_def_property_update(prop, 0, "rna_Modifier_update");
-
-	prop= RNA_def_property(srna, "texture_coords_object", PROP_POINTER, PROP_NONE);
-	RNA_def_property_pointer_sdna(prop, NULL, "map_object");
-	RNA_def_property_ui_text(prop, "Texture Coordinates Object", "");
-	RNA_def_property_flag(prop, PROP_EDITABLE|PROP_ID_SELF_CHECK);
-	RNA_def_property_update(prop, 0, "rna_Modifier_dependency_update");
 
 	prop= RNA_def_property(srna, "speed", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_range(prop, -FLT_MAX, FLT_MAX);
@@ -1267,6 +1234,8 @@ static void rna_def_modifier_wave(BlenderRNA *brna)
 	RNA_def_property_ui_range(prop, 0, 10, 10, 2);
 	RNA_def_property_ui_text(prop, "Narrowness", "Distance between the top and the base of a wave, the higher the value, the more narrow the wave");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
+	rna_def_modifier_generic_map_info(srna);
 }
 
 static void rna_def_modifier_armature(BlenderRNA *brna)
@@ -1287,12 +1256,12 @@ static void rna_def_modifier_armature(BlenderRNA *brna)
 
 	prop= RNA_def_property(srna, "use_bone_envelopes", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "deformflag", ARM_DEF_ENVELOPE);
-	RNA_def_property_ui_text(prop, "Use Bone Envelopes", "Binds Bone envelope  to armature modifier");
+	RNA_def_property_ui_text(prop, "Use Bone Envelopes", "Bind Bone envelopes to armature modifier");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
 	prop= RNA_def_property(srna, "use_vertex_groups", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "deformflag", ARM_DEF_VGROUP);
-	RNA_def_property_ui_text(prop, "Use Vertex Groups", "Binds vertex group to armature modifier");
+	RNA_def_property_ui_text(prop, "Use Vertex Groups", "Bind vertex groups to armature modifier");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 	
 	prop= RNA_def_property(srna, "use_deform_preserve_volume", PROP_BOOLEAN, PROP_NONE);
@@ -1384,9 +1353,9 @@ static void rna_def_modifier_boolean(BlenderRNA *brna)
 	PropertyRNA *prop;
 
 	static EnumPropertyItem prop_operation_items[] = {
-		{eBooleanModifierOp_Intersect, "INTERSECT", 0, "Intersect", "Keeps the part of the mesh that intersects with the other selected object"},
-		{eBooleanModifierOp_Union, "UNION", 0, "Union", "Combines two meshes in an additive way"},
-		{eBooleanModifierOp_Difference, "DIFFERENCE", 0, "Difference", "Combines two meshes in a subtractive way"},
+		{eBooleanModifierOp_Intersect, "INTERSECT", 0, "Intersect", "Keep the part of the mesh that intersects with the other selected object"},
+		{eBooleanModifierOp_Union, "UNION", 0, "Union", "Combine two meshes in an additive way"},
+		{eBooleanModifierOp_Difference, "DIFFERENCE", 0, "Difference", "Combine two meshes in a subtractive way"},
 		{0, NULL, 0, NULL, NULL}};
 
 	srna= RNA_def_struct(brna, "BooleanModifier", "Modifier");
@@ -1495,7 +1464,7 @@ static void rna_def_modifier_array(BlenderRNA *brna)
 
 	prop= RNA_def_property(srna, "offset_object", PROP_POINTER, PROP_NONE);
 	RNA_def_property_pointer_sdna(prop, NULL, "offset_ob");
-	RNA_def_property_ui_text(prop, "Object Offset", "Uses the location and rotation of another object to determine the distance and rotational change between arrayed items");
+	RNA_def_property_ui_text(prop, "Object Offset", "Use the location and rotation of another object to determine the distance and rotational change between arrayed items");
 	RNA_def_property_flag(prop, PROP_EDITABLE|PROP_ID_SELF_CHECK);
 	RNA_def_property_update(prop, 0, "rna_Modifier_dependency_update");
 	
@@ -1553,11 +1522,11 @@ static void rna_def_modifier_displace(BlenderRNA *brna)
 	PropertyRNA *prop;
 
 	static EnumPropertyItem prop_direction_items[] = {
-		{MOD_DISP_DIR_X, "X", 0, "X", "Uses the texture's intensity value to displace in the X direction"},
-		{MOD_DISP_DIR_Y, "Y", 0, "Y", "Uses the texture's intensity value to displace in the Y direction"},
-		{MOD_DISP_DIR_Z, "Z", 0, "Z", "Uses the texture's intensity value to displace in the Z direction"},
-		{MOD_DISP_DIR_NOR, "NORMAL", 0, "Normal", "Uses the texture's intensity value to displace in the normal direction"},
-		{MOD_DISP_DIR_RGB_XYZ, "RGB_TO_XYZ", 0, "RGB to XYZ", "Uses the texture's RGB values to displace the mesh in the XYZ direction"},
+		{MOD_DISP_DIR_X, "X", 0, "X", "Use the texture's intensity value to displace in the X direction"},
+		{MOD_DISP_DIR_Y, "Y", 0, "Y", "Use the texture's intensity value to displace in the Y direction"},
+		{MOD_DISP_DIR_Z, "Z", 0, "Z", "Use the texture's intensity value to displace in the Z direction"},
+		{MOD_DISP_DIR_NOR, "NORMAL", 0, "Normal", "Use the texture's intensity value to displace in the normal direction"},
+		{MOD_DISP_DIR_RGB_XYZ, "RGB_TO_XYZ", 0, "RGB to XYZ", "Use the texture's RGB values to displace the mesh in the XYZ direction"},
 		{0, NULL, 0, NULL, NULL}};
 
 	srna= RNA_def_struct(brna, "DisplaceModifier", "Modifier");
@@ -1598,13 +1567,13 @@ static void rna_def_modifier_uvproject(BlenderRNA *brna)
 	PropertyRNA *prop;
 
 	srna= RNA_def_struct(brna, "UVProjectModifier", "Modifier");
-	RNA_def_struct_ui_text(srna, "UV Project Modifier", "UV projection modifier to sets UVs from a projector");
+	RNA_def_struct_ui_text(srna, "UV Project Modifier", "UV projection modifier to set UVs from a projector");
 	RNA_def_struct_sdna(srna, "UVProjectModifierData");
 	RNA_def_struct_ui_icon(srna, ICON_MOD_UVPROJECT);
 
 	prop= RNA_def_property(srna, "uv_layer", PROP_STRING, PROP_NONE);
 	RNA_def_property_string_sdna(prop, NULL, "uvlayer_name");
-	RNA_def_property_ui_text(prop, "UV Layer", "UV layer name");
+	RNA_def_property_ui_text(prop, "UV Map", "UV map name");
 	RNA_def_property_string_funcs(prop, NULL, NULL, "rna_UVProjectModifier_uvlayer_set");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
@@ -1726,7 +1695,7 @@ static void rna_def_modifier_cast(BlenderRNA *brna)
 		{0, NULL, 0, NULL, NULL}};
 
 	srna= RNA_def_struct(brna, "CastModifier", "Modifier");
-	RNA_def_struct_ui_text(srna, "Cast Modifier", "Cast modifier to cast to other shapes");
+	RNA_def_struct_ui_text(srna, "Cast Modifier", "Modifier to cast to other shapes");
 	RNA_def_struct_sdna(srna, "CastModifierData");
 	RNA_def_struct_ui_icon(srna, ICON_MOD_CAST);
 
@@ -1783,7 +1752,7 @@ static void rna_def_modifier_cast(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "size", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_range(prop, 0, FLT_MAX);
 	RNA_def_property_ui_range(prop, 0, 100, 5, 2);
-	RNA_def_property_ui_text(prop, "Size", "Size of projection shape (leave as 0 for auto.)");
+	RNA_def_property_ui_text(prop, "Size", "Size of projection shape (leave as 0 for auto)");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
 	prop= RNA_def_property(srna, "vertex_group", PROP_STRING, PROP_NONE);
@@ -1839,7 +1808,7 @@ static void rna_def_modifier_meshdeform(BlenderRNA *brna)
 
 	prop= RNA_def_property(srna, "use_dynamic_bind", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", MOD_MDEF_DYNAMIC_BIND);
-	RNA_def_property_ui_text(prop, "Dynamic", "Recompute binding dynamically on top of other deformers (slower and more memory consuming.)");
+	RNA_def_property_ui_text(prop, "Dynamic", "Recompute binding dynamically on top of other deformers (slower and more memory consuming)");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
 #if 0
@@ -2000,8 +1969,8 @@ static void rna_def_modifier_explode(BlenderRNA *brna)
 
 	prop= RNA_def_property(srna, "particle_uv", PROP_STRING, PROP_NONE);
 	RNA_def_property_string_sdna(prop, NULL, "uvname");
-	RNA_def_property_string_maxlength(prop, 32);
-	RNA_def_property_ui_text(prop, "Particle UV", "UV Layer to change with particle age");
+	RNA_def_property_string_maxlength(prop, MAX_CUSTOMDATA_LAYER_NAME);
+	RNA_def_property_ui_text(prop, "Particle UV", "UV map to change with particle age");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 }
 
@@ -2175,15 +2144,15 @@ static void rna_def_modifier_shrinkwrap(BlenderRNA *brna)
 	PropertyRNA *prop;
 
 	static EnumPropertyItem shrink_type_items[] = {
-		{MOD_SHRINKWRAP_NEAREST_SURFACE, "NEAREST_SURFACEPOINT", 0, "Nearest Surface Point", "Shrinks the mesh to the nearest target surface"},
-		{MOD_SHRINKWRAP_PROJECT, "PROJECT", 0, "Project", "Shrinks the mesh to the nearest target surface along a given axis"},
-		{MOD_SHRINKWRAP_NEAREST_VERTEX, "NEAREST_VERTEX", 0, "Nearest Vertex", "Shrinks the mesh to the nearest target vertex"},
+		{MOD_SHRINKWRAP_NEAREST_SURFACE, "NEAREST_SURFACEPOINT", 0, "Nearest Surface Point", "Shrink the mesh to the nearest target surface"},
+		{MOD_SHRINKWRAP_PROJECT, "PROJECT", 0, "Project", "Shrink the mesh to the nearest target surface along a given axis"},
+		{MOD_SHRINKWRAP_NEAREST_VERTEX, "NEAREST_VERTEX", 0, "Nearest Vertex", "Shrink the mesh to the nearest target vertex"},
 		{0, NULL, 0, NULL, NULL}};
 	
 	static EnumPropertyItem shrink_face_cull_items[] = {
-		{0, "OFF", 0, "Off", ""},
-		{MOD_SHRINKWRAP_CULL_TARGET_FRONTFACE, "FRONT", 0, "Front", ""},
-		{MOD_SHRINKWRAP_CULL_TARGET_BACKFACE, "BACK", 0, "Back", ""},
+		{0, "OFF", 0, "Off", "No culling"},
+		{MOD_SHRINKWRAP_CULL_TARGET_FRONTFACE, "FRONT", 0, "Front", "No projection when in front of the face"},
+		{MOD_SHRINKWRAP_CULL_TARGET_BACKFACE, "BACK", 0, "Back", "No projection when behind the face"},
 		{0, NULL, 0, NULL, NULL}};
 
 	srna= RNA_def_struct(brna, "ShrinkwrapModifier", "Modifier");
@@ -2201,7 +2170,7 @@ static void rna_def_modifier_shrinkwrap(BlenderRNA *brna)
 	RNA_def_property_enum_sdna(prop, NULL, "shrinkOpts");
 	RNA_def_property_enum_items(prop, shrink_face_cull_items);
 	RNA_def_property_enum_funcs(prop, "rna_ShrinkwrapModifier_face_cull_get", "rna_ShrinkwrapModifier_face_cull_set", NULL);
-	RNA_def_property_ui_text(prop, "Face Cull", "Stop vertices from projecting to a the face on the target when facing towards/away");
+	RNA_def_property_ui_text(prop, "Face Cull", "Stop vertices from projecting to a face on the target when facing towards/away");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
 	prop= RNA_def_property(srna, "target", PROP_POINTER, PROP_NONE);
@@ -2329,10 +2298,10 @@ static void rna_def_modifier_simpledeform(BlenderRNA *brna)
 	PropertyRNA *prop;
 
 	static EnumPropertyItem simple_deform_mode_items[] = {
-		{MOD_SIMPLEDEFORM_MODE_TWIST, "TWIST", 0, "Twist", "Rotates around the Z axis of the modifier space"},
-		{MOD_SIMPLEDEFORM_MODE_BEND, "BEND", 0, "Bend", "Bends the mesh over the Z axis of the modifier space"},
-		{MOD_SIMPLEDEFORM_MODE_TAPER, "TAPER", 0, "Taper", "Linearly scales along Z axis of the modifier space"},
-		{MOD_SIMPLEDEFORM_MODE_STRETCH, "STRETCH", 0, "Stretch", "Stretches the object along the Z axis of the modifier space"},
+		{MOD_SIMPLEDEFORM_MODE_TWIST, "TWIST", 0, "Twist", "Rotate around the Z axis of the modifier space"},
+		{MOD_SIMPLEDEFORM_MODE_BEND, "BEND", 0, "Bend", "Bend the mesh over the Z axis of the modifier space"},
+		{MOD_SIMPLEDEFORM_MODE_TAPER, "TAPER", 0, "Taper", "Linearly scale along Z axis of the modifier space"},
+		{MOD_SIMPLEDEFORM_MODE_STRETCH, "STRETCH", 0, "Stretch", "Stretch the object along the Z axis of the modifier space"},
 		{0, NULL, 0, NULL, NULL}};
 
 	srna= RNA_def_struct(brna, "SimpleDeformModifier", "Modifier");
@@ -2359,7 +2328,7 @@ static void rna_def_modifier_simpledeform(BlenderRNA *brna)
 
 	prop= RNA_def_property(srna, "use_relative", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "originOpts", MOD_SIMPLEDEFORM_ORIGIN_LOCAL);
-	RNA_def_property_ui_text(prop, "Relative", "Sets the origin of deform space to be relative to the object");
+	RNA_def_property_ui_text(prop, "Relative", "Set the origin of deform space to be relative to the object");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
 	prop= RNA_def_property(srna, "factor", PROP_FLOAT, PROP_NONE);
@@ -2571,10 +2540,10 @@ static void rna_def_modifier_screw(BlenderRNA *brna)
 static void rna_def_modifier_weightvg_mask(BlenderRNA *brna, StructRNA *srna)
 {
 	static EnumPropertyItem weightvg_mask_tex_map_items[] = {
-		{MOD_DISP_MAP_LOCAL, "LOCAL", 0, "Local", ""},
-		{MOD_DISP_MAP_GLOBAL, "GLOBAL", 0, "Global", ""},
-		{MOD_DISP_MAP_OBJECT, "OBJECT", 0, "Object", ""},
-		{MOD_DISP_MAP_UV, "UV", 0, "UV", ""},
+		{MOD_DISP_MAP_LOCAL, "LOCAL", 0, "Local", "Use local generated coordinates"},
+		{MOD_DISP_MAP_GLOBAL, "GLOBAL", 0, "Global", "Use global coordinates"},
+		{MOD_DISP_MAP_OBJECT, "OBJECT", 0, "Object", "Use local generated coordinates of another object"},
+		{MOD_DISP_MAP_UV, "UV", 0, "UV", "Use coordinates from an UV layer"},
 		{0, NULL, 0, NULL, NULL}};
 
 	static EnumPropertyItem weightvg_mask_tex_used_items[] = {
@@ -2592,7 +2561,7 @@ static void rna_def_modifier_weightvg_mask(BlenderRNA *brna, StructRNA *srna)
 
 	prop= RNA_def_property(srna, "mask_constant", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_range(prop, -FLT_MAX, FLT_MAX);
-	RNA_def_property_ui_range(prop, 0.0, 1.0, 10, 0);
+	RNA_def_property_ui_range(prop, 0.0, 1.0, 1, 0);
 	RNA_def_property_ui_text(prop, "Influence", "Global influence of current modifications on vgroup");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
@@ -2620,7 +2589,7 @@ static void rna_def_modifier_weightvg_mask(BlenderRNA *brna, StructRNA *srna)
 
 	prop= RNA_def_property(srna, "mask_tex_uv_layer", PROP_STRING, PROP_NONE);
 	RNA_def_property_string_sdna(prop, NULL, "mask_tex_uvlayer_name");
-	RNA_def_property_ui_text(prop, "UV Layer", "UV layer name");
+	RNA_def_property_ui_text(prop, "UV Map", "UV map name");
 	RNA_def_property_string_funcs(prop, NULL, NULL, "rna_WeightVGModifier_mask_uvlayer_set");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
@@ -2635,14 +2604,15 @@ static void rna_def_modifier_weightvg_mask(BlenderRNA *brna, StructRNA *srna)
 static void rna_def_modifier_weightvgedit(BlenderRNA *brna)
 {
 	static EnumPropertyItem weightvg_edit_falloff_type_items[] = {
-		{MOD_WVG_MAPPING_NONE, "LINEAR", ICON_LINCURVE, "Linear", ""},
+		{MOD_WVG_MAPPING_NONE, "LINEAR", ICON_LINCURVE, "Linear", "Null action"},
 		{MOD_WVG_MAPPING_CURVE, "CURVE", ICON_RNDCURVE, "Custom Curve", ""},
 		{MOD_WVG_MAPPING_SHARP, "SHARP", ICON_SHARPCURVE, "Sharp", ""},
 		{MOD_WVG_MAPPING_SMOOTH, "SMOOTH", ICON_SMOOTHCURVE, "Smooth", ""},
 		{MOD_WVG_MAPPING_ROOT, "ROOT", ICON_ROOTCURVE, "Root", ""},
 		{MOD_WVG_MAPPING_SPHERE, "ICON_SPHERECURVE", ICON_SPHERECURVE, "Sphere", ""},
 		{MOD_WVG_MAPPING_RANDOM, "RANDOM", ICON_RNDCURVE, "Random", ""},
-		{MOD_WVG_MAPPING_STEP, "STEP", ICON_NOCURVE, "Median Step", ""}, /* Would need a better icon... */
+		{MOD_WVG_MAPPING_STEP, "STEP", ICON_NOCURVE /* Would need a better icon... */, "Median Step",
+		                       "Map all values below 0.5 to 0.0, and all others to 1.0"},
 		{0, NULL, 0, NULL, NULL}};
 
 	StructRNA *srna;
@@ -2674,12 +2644,12 @@ static void rna_def_modifier_weightvgedit(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "use_remove", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "edit_flags", MOD_WVG_EDIT_REMFVG);
 	RNA_def_property_ui_text(prop, "Group Remove", "Remove vertices with weight below threshold "
-	                                              "from vgroup");
+	                                               "from vgroup");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
 	prop= RNA_def_property(srna, "default_weight", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_range(prop, 0.0, 1.0f);
-	RNA_def_property_ui_range(prop, 0.0, 1.0, 10, 0);
+	RNA_def_property_ui_range(prop, 0.0, 1.0, 1, 0);
 	RNA_def_property_ui_text(prop, "Default Weight", "Default weight a vertex will have if "
 	                                                 "it is not in the vgroup");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
@@ -2692,7 +2662,7 @@ static void rna_def_modifier_weightvgedit(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "add_threshold", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "add_threshold");
 	RNA_def_property_range(prop, 0.0, 1.0);
-	RNA_def_property_ui_range(prop, 0.0, 1.0, 10, 0);
+	RNA_def_property_ui_range(prop, 0.0, 1.0, 1, 0);
 	RNA_def_property_ui_text(prop, "Add Threshold", "Lower bound for a vertex's weight "
 	                                                "to be added to the vgroup");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
@@ -2700,7 +2670,7 @@ static void rna_def_modifier_weightvgedit(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "remove_threshold", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "rem_threshold");
 	RNA_def_property_range(prop, 0.0, 1.0);
-	RNA_def_property_ui_range(prop, 0.0, 1.0, 10, 0);
+	RNA_def_property_ui_range(prop, 0.0, 1.0, 1, 0);
 	RNA_def_property_ui_text(prop, "Rem Threshold", "Upper bound for a vertex's weight "
 	                                                "to be removed from the vgroup");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
@@ -2712,21 +2682,21 @@ static void rna_def_modifier_weightvgedit(BlenderRNA *brna)
 static void rna_def_modifier_weightvgmix(BlenderRNA *brna)
 {
 	static EnumPropertyItem weightvg_mix_modes_items[] = {
-		{MOD_WVG_MIX_SET, "SET", 0, "Replace weights", ""},
-		{MOD_WVG_MIX_ADD, "ADD", 0, "Add to weights", ""},
-		{MOD_WVG_MIX_SUB, "SUB", 0, "Subtract from weights", ""},
-		{MOD_WVG_MIX_MUL, "MUL", 0, "Multiply weights", ""},
-		{MOD_WVG_MIX_DIV, "DIV", 0, "Divide weights", ""},
-		{MOD_WVG_MIX_DIF, "DIF", 0, "Difference", ""},
-		{MOD_WVG_MIX_AVG, "AVG", 0, "Average", ""},
+		{MOD_WVG_MIX_SET, "SET", 0, "Replace", "Replace VGroup A's weights by VGroup B's ones"},
+		{MOD_WVG_MIX_ADD, "ADD", 0, "Add", "Add VGroup B's weights to VGroup A's ones"},
+		{MOD_WVG_MIX_SUB, "SUB", 0, "Subtract", "Subtract VGroup B's weights from VGroup A's ones"},
+		{MOD_WVG_MIX_MUL, "MUL", 0, "Multiply", "Multiply VGroup A's weights by VGroup B's ones"},
+		{MOD_WVG_MIX_DIV, "DIV", 0, "Divide", "Divide VGroup A's weights by VGroup B's ones"},
+		{MOD_WVG_MIX_DIF, "DIF", 0, "Difference", "Difference between VGroup A's and VGroup B's weigths"},
+		{MOD_WVG_MIX_AVG, "AVG", 0, "Average", "Average value of VGroup A's and VGroup B's weigths"},
 		{0, NULL, 0, NULL, NULL}};
 
 	static EnumPropertyItem weightvg_mix_set_items[] = {
-		{MOD_WVG_SET_ALL,   "ALL",   0, "All vertices", ""},
-		{MOD_WVG_SET_A,     "A",   0, "Vertices from group A", ""},
-		{MOD_WVG_SET_B,     "B",   0, "Vertices from group B", ""},
-		{MOD_WVG_SET_OR,    "OR", 0, "Vertices from one group", ""},
-		{MOD_WVG_SET_AND,   "AND", 0, "Vertices from both groups", ""},
+		{MOD_WVG_SET_ALL,   "ALL",   0, "All", "Affect all vertices (might add some to VGroup A)"},
+		{MOD_WVG_SET_A,     "A",   0, "VGroup A", "Affect vertices in VGroup A"},
+		{MOD_WVG_SET_B,     "B",   0, "VGroup B", "Affect vertices in VGroup B (might add some to VGroup A)"},
+		{MOD_WVG_SET_OR,    "OR", 0, "VGroup A or B", "Affect vertices in at least one of both VGroups (might add some to VGroup A)"},
+		{MOD_WVG_SET_AND,   "AND", 0, "VGroup A and B", "Affect vertices in both groups"},
 		{0, NULL, 0, NULL, NULL}};
 
 	StructRNA *srna;
@@ -2752,22 +2722,22 @@ static void rna_def_modifier_weightvgmix(BlenderRNA *brna)
 
 	prop= RNA_def_property(srna, "default_weight_a", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_range(prop, 0.0, 1.0f);
-	RNA_def_property_ui_range(prop, 0.0, 1.0, 10, 0);
+	RNA_def_property_ui_range(prop, 0.0, 1.0, 1, 0);
 	RNA_def_property_ui_text(prop, "Default Weight A", "Default weight a vertex will have if "
-	                                                 "it is not in the first vgroup");
+	                                                   "it is not in the first A vgroup");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
 	prop= RNA_def_property(srna, "default_weight_b", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_range(prop, 0.0, 1.0f);
-	RNA_def_property_ui_range(prop, 0.0, 1.0, 10, 0);
+	RNA_def_property_ui_range(prop, 0.0, 1.0, 1, 0);
 	RNA_def_property_ui_text(prop, "Default Weight B", "Default weight a vertex will have if "
-	                                                   "it is not in the second vgroup");
+	                                                   "it is not in the second B vgroup");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
 	prop= RNA_def_property(srna, "mix_mode", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_items(prop, weightvg_mix_modes_items);
-	RNA_def_property_ui_text(prop, "Mix Mode", "How weights from vgroup 2 affect weights "
-	                                           "of vgroup 1");
+	RNA_def_property_ui_text(prop, "Mix Mode", "How weights from vgroup B affect weights "
+	                                           "of vgroup A");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
 	prop= RNA_def_property(srna, "mix_set", PROP_ENUM, PROP_NONE);
@@ -2796,14 +2766,15 @@ static void rna_def_modifier_weightvgproximity(BlenderRNA *brna)
 		{0, NULL, 0, NULL, NULL}};
 
 	static EnumPropertyItem weightvg_proximity_falloff_type_items[] = {
-		{MOD_WVG_MAPPING_NONE, "LINEAR", ICON_LINCURVE, "Linear", ""},
+		{MOD_WVG_MAPPING_NONE, "LINEAR", ICON_LINCURVE, "Linear", "Null action"},
 		/* No curve mapping here! */
 		{MOD_WVG_MAPPING_SHARP, "SHARP", ICON_SHARPCURVE, "Sharp", ""},
 		{MOD_WVG_MAPPING_SMOOTH, "SMOOTH", ICON_SMOOTHCURVE, "Smooth", ""},
 		{MOD_WVG_MAPPING_ROOT, "ROOT", ICON_ROOTCURVE, "Root", ""},
 		{MOD_WVG_MAPPING_SPHERE, "ICON_SPHERECURVE", ICON_SPHERECURVE, "Sphere", ""},
 		{MOD_WVG_MAPPING_RANDOM, "RANDOM", ICON_RNDCURVE, "Random", ""},
-		{MOD_WVG_MAPPING_STEP, "STEP", ICON_NOCURVE, "Median Step", ""}, /* Would need a better icon... */
+		{MOD_WVG_MAPPING_STEP, "STEP", ICON_NOCURVE /* Would need a better icon... */, "Median Step",
+		                       "Map all values below 0.5 to 0.0, and all others to 1.0"},
 		{0, NULL, 0, NULL, NULL}};
 
 	StructRNA *srna;
@@ -2824,6 +2795,7 @@ static void rna_def_modifier_weightvgproximity(BlenderRNA *brna)
 
 	prop= RNA_def_property(srna, "proximity_mode", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_items(prop, weightvg_proximity_modes_items);
+	RNA_def_property_enum_default(prop, MOD_WVG_PROXIMITY_GEOMETRY);
 	RNA_def_property_ui_text(prop, "Proximity Mode", "Which distances to target object to use");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
@@ -2831,6 +2803,7 @@ static void rna_def_modifier_weightvgproximity(BlenderRNA *brna)
 	RNA_def_property_enum_sdna(prop, NULL, "proximity_flags");
 	RNA_def_property_enum_items(prop, proximity_geometry_items);
 	RNA_def_property_flag(prop, PROP_ENUM_FLAG); /* important to run before default set */
+	RNA_def_property_enum_default(prop, MOD_WVG_PROXIMITY_GEOM_FACES);
 	RNA_def_property_ui_text(prop, "Proximity Geometry",
 	                         "Use the shortest computed distance to target object's geometry "
 	                         "as weight");
@@ -2845,13 +2818,13 @@ static void rna_def_modifier_weightvgproximity(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "min_dist", PROP_FLOAT, PROP_DISTANCE);
 	RNA_def_property_range(prop, 0.0, FLT_MAX);
 	RNA_def_property_ui_range(prop, 0.0, 1000.0, 10, 0);
-	RNA_def_property_ui_text(prop, "Lowest Dist", "Distance mapping to weight 0.0 (or weight 1.0 if above Highest Dist)");
+	RNA_def_property_ui_text(prop, "Lowest Dist", "Distance mapping to weight 0.0");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
 	prop= RNA_def_property(srna, "max_dist", PROP_FLOAT, PROP_DISTANCE);
 	RNA_def_property_range(prop, 0.0, FLT_MAX);
 	RNA_def_property_ui_range(prop, 0.0, 1000.0, 10, 0);
-	RNA_def_property_ui_text(prop, "Highest Dist", "Distance mapping to weight 1.0 (or weight 0.0 if below Lowest Dist)");
+	RNA_def_property_ui_text(prop, "Highest Dist", "Distance mapping to weight 1.0");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
 	prop= RNA_def_property(srna, "falloff_type", PROP_ENUM, PROP_NONE);
@@ -2863,14 +2836,65 @@ static void rna_def_modifier_weightvgproximity(BlenderRNA *brna)
 	rna_def_modifier_weightvg_mask(brna, srna);
 }
 
+static void rna_def_modifier_remesh(BlenderRNA *brna)
+{
+	static EnumPropertyItem mode_items[]= {
+		{MOD_REMESH_CENTROID, "BLOCKS", 0, "Blocks", "Output a blocky surface with no smoothing"},
+		{MOD_REMESH_MASS_POINT, "SMOOTH", 0, "Smooth", "Output a smooth surface with no sharp-features detection"},
+		{MOD_REMESH_SHARP_FEATURES, "SHARP", 0, "Sharp", "Output a surface that reproduces sharp edges and corners from the input mesh"},
+		{0, NULL, 0, NULL, NULL}};
+
+	StructRNA *srna;
+	PropertyRNA *prop;
+
+	srna= RNA_def_struct(brna, "RemeshModifier", "Modifier");
+	RNA_def_struct_ui_text(srna, "Remesh Modifier", "Generate a new surface with regular topology that follows the shape of the input mesh");
+	RNA_def_struct_sdna(srna, "RemeshModifierData");
+	RNA_def_struct_ui_icon(srna, ICON_MOD_REMESH);
+
+	prop= RNA_def_property(srna, "mode", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_items(prop, mode_items);
+	RNA_def_property_ui_text(prop, "Mode", "");
+	RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
+	prop= RNA_def_property(srna, "scale", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_ui_range(prop, 0, 0.99, 0.01, 3);
+	RNA_def_property_range(prop, 0, 0.99);
+	RNA_def_property_ui_text(prop, "Scale", "The ratio of the largest dimension of the model over the size of the grid");
+	RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
+	prop= RNA_def_property(srna, "threshold", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_ui_range(prop, 0, 1, 0.1, 3);
+	RNA_def_property_range(prop, 0, 1);
+	RNA_def_property_ui_text(prop, "Threshold", "If removing disconnected pieces, minimum size of components to preserve as a ratio of the number of polygons in the largest component");
+	RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
+	prop= RNA_def_property(srna, "octree_depth", PROP_INT, PROP_NONE);
+	RNA_def_property_int_sdna(prop, NULL, "depth");
+	RNA_def_property_range(prop, 1, 10);
+	RNA_def_property_ui_text(prop, "Octree Depth", "Resolution of the octree; higher values give finer details");
+	RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
+	prop= RNA_def_property(srna, "sharpness", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "hermite_num");
+	RNA_def_property_ui_range(prop, 0, 2, 0.1, 3);
+	RNA_def_property_ui_text(prop, "Sharpness", "Tolerance for outliers; lower values filter noise while higher values will reproduce edges closer to the input");
+	RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
+	prop= RNA_def_property(srna, "remove_disconnected_pieces", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", MOD_REMESH_FLOOD_FILL);
+	RNA_def_property_ui_text(prop, "Remove Disconnected Pieces", "");
+	RNA_def_property_update(prop, 0, "rna_Modifier_update");
+}
+
 static void rna_def_modifier_ocean(BlenderRNA *brna)
 {
 	StructRNA *srna;
 	PropertyRNA *prop;
 	
 	static EnumPropertyItem geometry_items[]= {
-		{MOD_OCEAN_GEOM_GENERATE, "GENERATE", 0, "Generate", "Generates ocean surface geometry at the specified resolution"},
-		{MOD_OCEAN_GEOM_DISPLACE, "DISPLACE", 0, "Displace", "Displaces existing geometry according to simulation"},
+		{MOD_OCEAN_GEOM_GENERATE, "GENERATE", 0, "Generate", "Generate ocean surface geometry at the specified resolution"},
+		{MOD_OCEAN_GEOM_DISPLACE, "DISPLACE", 0, "Displace", "Displace existing geometry according to simulation"},
 		//{MOD_OCEAN_GEOM_SIM_ONLY, "SIM_ONLY", 0, "Sim Only", "Leaves geometry unchanged, but still runs simulation (to be used from texture)"},
 		{0, NULL, 0, NULL, NULL}};
 	
@@ -2916,13 +2940,13 @@ static void rna_def_modifier_ocean(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "use_normals", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", MOD_OCEAN_GENERATE_NORMALS);
 	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
-	RNA_def_property_ui_text(prop, "Generate Normals", "Outputs normals for bump mapping - disabling can speed up performance if its not needed");
+	RNA_def_property_ui_text(prop, "Generate Normals", "Output normals for bump mapping - disabling can speed up performance if its not needed");
 	RNA_def_property_update(prop, 0, "rna_OceanModifier_init_update");
 	
 	prop= RNA_def_property(srna, "use_foam", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", MOD_OCEAN_GENERATE_FOAM);
 	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
-	RNA_def_property_ui_text(prop, "Generate Foam", "Generates foam mask as a vertex color channel");
+	RNA_def_property_ui_text(prop, "Generate Foam", "Generate foam mask as a vertex color channel");
 	RNA_def_property_update(prop, 0, "rna_OceanModifier_init_update");
 	
 	prop= RNA_def_property(srna, "resolution", PROP_INT, PROP_UNSIGNED);
@@ -3032,7 +3056,7 @@ static void rna_def_modifier_ocean(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "is_cached", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "cached", 1);
 	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
-	RNA_def_property_ui_text(prop, "Ocean is Cached", "Whether the ocean is useing cached data or simulating");
+	RNA_def_property_ui_text(prop, "Ocean is Cached", "Whether the ocean is using cached data or simulating");
 
 	prop= RNA_def_property(srna, "filepath", PROP_STRING, PROP_DIRPATH);
 	RNA_def_property_string_sdna(prop, NULL, "cachepath");
@@ -3144,6 +3168,7 @@ void RNA_def_modifier(BlenderRNA *brna)
 	rna_def_modifier_weightvgproximity(brna);
 	rna_def_modifier_dynamic_paint(brna);
 	rna_def_modifier_ocean(brna);
+	rna_def_modifier_remesh(brna);
 }
 
 #endif

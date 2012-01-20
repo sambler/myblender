@@ -35,6 +35,7 @@
 #include "rna_internal.h"
 
 #include "BKE_key.h"
+#include "BKE_movieclip.h"
 
 #include "DNA_action_types.h"
 #include "DNA_key_types.h"
@@ -911,6 +912,12 @@ static void rna_BackgroundImage_remove(View3D *v3d, ReportList *reports, BGpic *
 	}
 }
 
+static void rna_BackgroundImage_clear(View3D *v3d)
+{
+	ED_view3D_background_image_clear(v3d);
+	WM_main_add_notifier(NC_SPACE|ND_SPACE_VIEW3D, v3d);
+}
+
 /* Space Node Editor */
 
 static int rna_SpaceNodeEditor_node_tree_poll(PointerRNA *ptr, PointerRNA value)
@@ -1228,7 +1235,7 @@ static void rna_def_background_image(BlenderRNA *brna)
 
 	static EnumPropertyItem bgpic_source_items[] = {
 		{V3D_BGPIC_IMAGE, "IMAGE", 0, "Image", ""},
-		{V3D_BGPIC_MOVIE, "MOVIE", 0, "Movie", ""},
+		{V3D_BGPIC_MOVIE, "MOVIE_CLIP", 0, "Movie Clip", ""},
 	    {0, NULL, 0, NULL, NULL}
 	};
 
@@ -1305,6 +1312,11 @@ static void rna_def_background_image(BlenderRNA *brna)
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", V3D_BGPIC_CAMERACLIP);
 	RNA_def_property_ui_text(prop, "Camera Clip", "Use movie clip from active scene camera");
 	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_VIEW3D, NULL);
+
+	prop= RNA_def_property(srna, "show_background_image", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_negative_sdna(prop, NULL, "flag", V3D_BGPIC_DISABLED);
+	RNA_def_property_ui_text(prop, "Show Background Image", "Show this image as background");
+	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_VIEW3D, NULL);
 }
 
 static void rna_def_backgroundImages(BlenderRNA *brna, PropertyRNA *cprop)
@@ -1328,6 +1340,9 @@ static void rna_def_backgroundImages(BlenderRNA *brna, PropertyRNA *cprop)
 	RNA_def_function_flag(func, FUNC_USE_REPORTS);
 	parm= RNA_def_pointer(func, "image", "BackgroundImage", "", "Image displayed as viewport background");
 	RNA_def_property_flag(parm, PROP_REQUIRED|PROP_NEVER_NULL);
+
+	func= RNA_def_function(srna, "clear", "rna_BackgroundImage_clear");
+	RNA_def_function_ui_description(func, "Remove all background images");
 }
 
 static void rna_def_space_view3d(BlenderRNA *brna)
@@ -1612,9 +1627,9 @@ static void rna_def_space_view3d(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Show Camera Path", "Show reconstructed camera path");
 	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_VIEW3D, NULL);
 
-	prop= RNA_def_property(srna, "show_tracks_name", PROP_BOOLEAN, PROP_NONE);
+	prop= RNA_def_property(srna, "show_bundle_names", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag2", V3D_SHOW_BUNDLENAME);
-	RNA_def_property_ui_text(prop, "Show Track Names", "Show names for tracks objects");
+	RNA_def_property_ui_text(prop, "Show 3D Marker Names", "Show names for reconstructed tracks objects");
 	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_VIEW3D, NULL);
 
 	/* region */
@@ -1986,23 +2001,6 @@ static void rna_def_space_sequencer(BlenderRNA *brna)
 	RNA_def_property_enum_items(prop, proxy_render_size_items);
 	RNA_def_property_ui_text(prop, "Proxy render size", "Draw preview using full resolution or different proxy resolutions");
 	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_SEQUENCER, NULL);
-	
-	
-	/* not sure we need rna access to these but adding anyway */
-	prop= RNA_def_property(srna, "offset_x", PROP_FLOAT, PROP_NONE);
-	RNA_def_property_float_sdna(prop, NULL, "xof");
-	RNA_def_property_ui_text(prop, "X Offset", "Offset image horizontally from the view center");
-	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_SEQUENCER, NULL);
-
-	prop= RNA_def_property(srna, "offset_y", PROP_FLOAT, PROP_NONE);
-	RNA_def_property_float_sdna(prop, NULL, "yof");
-	RNA_def_property_ui_text(prop, "Y Offset", "Offset image vertically from the view center");
-	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_SEQUENCER, NULL);
-	
-	prop= RNA_def_property(srna, "zoom", PROP_FLOAT, PROP_NONE);
-	RNA_def_property_float_sdna(prop, NULL, "zoom");
-	RNA_def_property_ui_text(prop, "Zoom", "Display zoom level");	
-	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_SEQUENCER, NULL);
 }
 
 static void rna_def_space_text(BlenderRNA *brna)
@@ -2142,7 +2140,6 @@ static void rna_def_space_dopesheet(BlenderRNA *brna)
 	/* display */
 	prop= RNA_def_property(srna, "show_seconds", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", SACTION_DRAWTIME);
-	RNA_def_property_clear_flag(prop, PROP_EDITABLE); // XXX for now, only set with operator
 	RNA_def_property_ui_text(prop, "Show Seconds", "Show timing in seconds not frames");
 	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_DOPESHEET, NULL);
 	
@@ -2227,7 +2224,6 @@ static void rna_def_space_graph(BlenderRNA *brna)
 	/* display */
 	prop= RNA_def_property(srna, "show_seconds", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", SIPO_DRAWTIME);
-	RNA_def_property_clear_flag(prop, PROP_EDITABLE); // XXX for now, only set with operator
 	RNA_def_property_ui_text(prop, "Show Seconds", "Show timing in seconds not frames");
 	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_GRAPH, NULL);
 	
@@ -2325,7 +2321,6 @@ static void rna_def_space_nla(BlenderRNA *brna)
 	/* display */
 	prop= RNA_def_property(srna, "show_seconds", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", SNLA_DRAWTIME);
-	RNA_def_property_clear_flag(prop, PROP_EDITABLE); // XXX for now, only set with operator
 	RNA_def_property_ui_text(prop, "Show Seconds", "Show timing in seconds not frames");
 	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_NLA, NULL);
 	
@@ -2601,6 +2596,12 @@ static void rna_def_space_filebrowser(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Filebrowser Parameter", "Parameters and Settings for the Filebrowser");
 	
 	prop= RNA_def_property(srna, "active_operator", PROP_POINTER, PROP_NONE);
+	RNA_def_property_pointer_sdna(prop, NULL, "op");
+	RNA_def_property_ui_text(prop, "Active Operator", "");
+
+	/* keep this for compatibility with existing presets,
+	   not exposed in c++ api because of keyword conflict */
+	prop= RNA_def_property(srna, "operator", PROP_POINTER, PROP_NONE);
 	RNA_def_property_pointer_sdna(prop, NULL, "op");
 	RNA_def_property_ui_text(prop, "Active Operator", "");
 }
@@ -2915,7 +2916,7 @@ static void rna_def_space_clip(BlenderRNA *brna)
 
 	/* show bundles */
 	prop= RNA_def_property(srna, "show_bundles", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_ui_text(prop, "Show Bundles", "Show projection of bundles into footage");
+	RNA_def_property_ui_text(prop, "Show Bundles", "Show projection of 3D markers into footage");
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", SC_SHOW_BUNDLES);
 	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_CLIP, NULL);
 
@@ -2984,6 +2985,32 @@ static void rna_def_space_clip(BlenderRNA *brna)
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", SC_SHOW_GRAPH_TRACKS);
 	RNA_def_property_ui_text(prop, "Show Tracks", "Display the speed curves (in \"x\" direction red, in \"y\" direction green) for the selected tracks");
 	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_CLIP, NULL);
+
+	/* ** channels ** */
+
+	/* show_red_channel */
+	prop= RNA_def_property(srna, "show_red_channel", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_negative_sdna(prop, NULL, "postproc_flag", MOVIECLIP_DISABLE_RED);
+	RNA_def_property_ui_text(prop, "Show Red Channel", "Show red channel in the frame");
+	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_CLIP, NULL);
+
+	/* show_green_channel */
+	prop= RNA_def_property(srna, "show_green_channel", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_negative_sdna(prop, NULL, "postproc_flag", MOVIECLIP_DISABLE_GREEN);
+	RNA_def_property_ui_text(prop, "Show Green Channel", "Show green channel in the frame");
+	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_CLIP, NULL);
+
+	/* show_blue_channel */
+	prop= RNA_def_property(srna, "show_blue_channel", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_negative_sdna(prop, NULL, "postproc_flag", MOVIECLIP_DISABLE_BLUE);
+	RNA_def_property_ui_text(prop, "Show Blue Channel", "Show blue channel in the frame");
+	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_CLIP, NULL);
+
+	/* preview_grayscale */
+	prop= RNA_def_property(srna, "use_grayscale_preview", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "postproc_flag", MOVIECLIP_PREVIEW_GRAYSCALE);
+	RNA_def_property_ui_text(prop, "Grayscale", "Display frame in grayscale mode");
+	RNA_def_property_update(prop, NC_MOVIECLIP|ND_DISPLAY, NULL);
 }
 
 

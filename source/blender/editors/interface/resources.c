@@ -799,6 +799,7 @@ void ui_theme_init_default(void)
 	/* space oops */
 	btheme->toops= btheme->tv3d;
 	SETCOLF(btheme->toops.back, 	0.45, 0.45, 0.45, 1.0);
+
 	SETCOLF(btheme->toops.match, 	0.2, 0.5, 0.2, 0.3);	/* highlighting search match - soft green*/
 	SETCOLF(btheme->toops.selected_highlight, 0.51, 0.53, 0.55, 0.3);
 
@@ -1706,17 +1707,17 @@ void init_userdef_do_versions(void)
 			BLI_addtail(&U.addons, baddon);
 		}
 	}
-
+	
 	if (bmain->versionfile < 260 || (bmain->versionfile == 260 && bmain->subversionfile < 5)) {
 		bTheme *btheme;
-
+		
 		for(btheme= U.themes.first; btheme; btheme= btheme->next) {
 			SETCOL(btheme->tui.panel.header, 0, 0, 0, 25);
 			btheme->tui.icon_alpha= 1.0;
 		}
 	}
-
-	if (bmain->versionfile < 262){
+	
+	if (bmain->versionfile < 261 || (bmain->versionfile == 261 && bmain->subversionfile < 4)) {
 		bTheme *btheme;
 		for(btheme= U.themes.first; btheme; btheme= btheme->next) {
 			SETCOLF(btheme->tima.preview_stitch_face, 0.071, 0.259, 0.694, 0.150);
@@ -1725,12 +1726,14 @@ void init_userdef_do_versions(void)
 			SETCOLF(btheme->tima.preview_stitch_stitchable, 0.0, 1.0, 0.0, 1.0);
 			SETCOLF(btheme->tima.preview_stitch_unstitchable, 1.0, 0.0, 0.0, 1.0);
 			SETCOLF(btheme->tima.preview_stitch_active, 0.886, 0.824, 0.765, 0.140);
+
 			SETCOLF(btheme->toops.match, 0.2, 0.5, 0.2, 0.3);
 			SETCOLF(btheme->toops.selected_highlight, 0.51, 0.53, 0.55, 0.3);
 		}
+		
 		U.use_16bit_textures = 0;
 	}
-	
+
 	/* GL Texture Garbage Collection (variable abused above!) */
 	if (U.textimeout == 0) {
 		U.texcollectrate = 60;

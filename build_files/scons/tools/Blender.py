@@ -272,7 +272,7 @@ def setup_syslibs(lenv):
         syslibs += Split(lenv['BF_PTHREADS_LIB'])
     if lenv['WITH_BF_COLLADA']:
         syslibs.append(lenv['BF_PCRE_LIB'])
-        if lenv['BF_DEBUG']:
+        if lenv['BF_DEBUG'] and (lenv['OURPLATFORM'] != 'linux'):
             syslibs += [colladalib+'_d' for colladalib in Split(lenv['BF_OPENCOLLADA_LIB'])]
         else:
             syslibs += Split(lenv['BF_OPENCOLLADA_LIB'])
@@ -356,7 +356,7 @@ def buildinfo(lenv, build_type):
     build_time = time.strftime ("%H:%M:%S")
     build_rev = os.popen('svnversion').read()[:-1] # remove \n
     if build_rev == '': 
-        build_rev = '43553'
+        build_rev = '43629'
     if lenv['BF_DEBUG']:
         build_type = "Debug"
         build_cflags = ' '.join(lenv['CFLAGS'] + lenv['CCFLAGS'] + lenv['BF_DEBUG_CCFLAGS'] + lenv['CPPFLAGS'])

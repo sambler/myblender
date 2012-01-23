@@ -850,7 +850,7 @@ static uiLayout *draw_modifier(uiLayout *layout, Scene *scene, Object *ob,
 				uiItemEnumO(row, "OBJECT_OT_modifier_apply", IFACE_("Apply"), 0, "apply_as", MODIFIER_APPLY_DATA);
 				
 				if (modifier_sameTopology(md) && !modifier_nonGeometrical(md))
-					uiItemEnumO(row, "OBJECT_OT_modifier_apply", IFACE_("Apply as Shape"), 0, "apply_as", MODIFIER_APPLY_SHAPE);
+					uiItemEnumO(row, "OBJECT_OT_modifier_apply", IFACE_("Apply as Shape Key"), 0, "apply_as", MODIFIER_APPLY_SHAPE);
 			}
 			
 			uiBlockClearButLock(block);
@@ -2267,8 +2267,9 @@ static void list_item_row(bContext *C, uiLayout *layout, PointerRNA *ptr, Pointe
 		uiItemL(sub, name, icon); /* fails, backdrop LISTROW... */
 
 	/* free name */
-	if(namebuf)
+	if (namebuf) {
 		MEM_freeN(namebuf);
+	}
 }
 
 void uiTemplateList(uiLayout *layout, bContext *C, PointerRNA *ptr, const char *propname, PointerRNA *activeptr, const char *activepropname, const char *prop_list, int rows, int maxrows, int listtype)
@@ -2372,8 +2373,9 @@ void uiTemplateList(uiLayout *layout, bContext *C, PointerRNA *ptr, const char *
 					icon= list_item_icon_get(C, &itemptr, rnaicon, 0);
 					uiItemL(row, (name)? name: "", icon);
 
-					if(name)
+					if (name) {
 						MEM_freeN((void *)name);
+					}
 				}
 
 				i++;

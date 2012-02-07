@@ -2571,7 +2571,8 @@ static PyObject *pyrna_prop_array_subscript(BPy_PropertyArrayRNA *self, PyObject
 			return NULL;
 		}
 		else if (key_slice->start == Py_None && key_slice->stop == Py_None) {
-			/* note, no significant advantage with optimizing [:] slice as with collections but include here for consistency with collection slice func */
+			/* note, no significant advantage with optimizing [:] slice as with collections
+			 * but include here for consistency with collection slice func */
 			Py_ssize_t len = (Py_ssize_t)pyrna_prop_array_length(self);
 			return pyrna_prop_array_subscript_slice(self, &self->ptr, self->prop, 0, len, len);
 		}
@@ -2834,7 +2835,8 @@ static int pyrna_prop_collection_contains(BPy_PropertyRNA *self, PyObject *key)
 		const char *keyname = _PyUnicode_AsString(key);
 
 		if (keyname == NULL) {
-			PyErr_SetString(PyExc_TypeError, "bpy_prop_collection.__contains__: expected a string or a typle of strings");
+			PyErr_SetString(PyExc_TypeError,
+			                "bpy_prop_collection.__contains__: expected a string or a typle of strings");
 			return -1;
 		}
 
@@ -5102,7 +5104,14 @@ static PyObject *pyrna_func_call(BPy_FunctionRNA *self, PyObject *args, PyObject
 
 
 #ifdef DEBUG_STRING_FREE
-	// if (PyList_GET_SIZE(string_free_ls)) printf("%.200s.%.200s():  has %d strings\n", RNA_struct_identifier(self_ptr->type), RNA_function_identifier(self_func), (int)PyList_GET_SIZE(string_free_ls));
+	/*
+	if (PyList_GET_SIZE(string_free_ls)) {
+		printf("%.200s.%.200s():  has %d strings\n",
+		       RNA_struct_identifier(self_ptr->type),
+		       RNA_function_identifier(self_func),
+		       (int)PyList_GET_SIZE(string_free_ls));
+	}
+	 */
 	Py_DECREF(string_free_ls);
 #undef DEBUG_STRING_FREE
 #endif
@@ -5126,7 +5135,10 @@ static PyObject *pyrna_func_call(BPy_FunctionRNA *self, PyObject *args, PyObject
 PyTypeObject pyrna_struct_meta_idprop_Type = {
 	PyVarObject_HEAD_INIT(NULL, 0)
 	"bpy_struct_meta_idprop",   /* tp_name */
-	sizeof(PyHeapTypeObject),   /* tp_basicsize */ // XXX, would be PyTypeObject, but subtypes of Type must be PyHeapTypeObject's
+
+	/* NOTE! would be PyTypeObject, but subtypes of Type must be PyHeapTypeObject's */
+	sizeof(PyHeapTypeObject),   /* tp_basicsize */
+
 	0,                          /* tp_itemsize */
 	/* methods */
 	NULL,                       /* tp_dealloc */
@@ -5380,16 +5392,16 @@ PyTypeObject pyrna_prop_Type = {
 
 PyTypeObject pyrna_prop_array_Type = {
 	PyVarObject_HEAD_INIT(NULL, 0)
-	"bpy_prop_array",		/* tp_name */
+	"bpy_prop_array",           /* tp_name */
 	sizeof(BPy_PropertyArrayRNA),			/* tp_basicsize */
-	0,							/* tp_itemsize */
+	0,                          /* tp_itemsize */
 	/* methods */
 	(destructor)pyrna_prop_array_dealloc, /* tp_dealloc */
 	NULL,                       /* printfunc tp_print; */
 	NULL,                       /* getattrfunc tp_getattr; */
 	NULL,                       /* setattrfunc tp_setattr; */
 	NULL,                       /* tp_compare */ /* DEPRECATED in python 3.0! */
-	NULL,/* subclassed */		/* tp_repr */
+	NULL,/* subclassed */       /* tp_repr */
 
 	/* Method suites for standard classes */
 
@@ -6298,6 +6310,8 @@ static struct PyMethodDef pyrna_basetype_methods[] = {
 	{NULL, NULL, 0, NULL}
 };
 
+/* used to call ..._keys() direct, but we need to filter out operator subclasses */
+#if 0
 static PyObject *pyrna_basetype_dir(BPy_BaseTypeRNA *self)
 {
 	PyObject *list;
@@ -6317,6 +6331,34 @@ static PyObject *pyrna_basetype_dir(BPy_BaseTypeRNA *self)
 #endif
 	return list;
 }
+
+#else
+
+static PyObject *pyrna_basetype_dir(BPy_BaseTypeRNA *self)
+{
+	PyObject *ret = PyList_New(0);
+	PyObject *item;
+
+	RNA_PROP_BEGIN(&self->ptr, itemptr, self->prop) {
+		StructRNA *srna = itemptr.data;
+		StructRNA *srna_base = RNA_struct_base(itemptr.data);
+		/* skip own operators, these double up [#29666] */
+		if (srna_base == &RNA_Operator) {
+			/* do nothing */
+		}
+		else {
+			/* add to python list */
+			item = PyUnicode_FromString(RNA_struct_identifier(srna));
+			PyList_Append(ret, item);
+			Py_DECREF(item);
+		}
+	}
+	RNA_PROP_END;
+
+	return ret;
+}
+
+#endif
 
 static PyTypeObject pyrna_basetype_Type = BLANK_PYTHON_TYPE;
 

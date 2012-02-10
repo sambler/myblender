@@ -849,7 +849,6 @@ class TEXTURE_PT_mapping(TextureSlotPanel, Panel):
         idblock = context_tex_datablock(context)
 
         tex = context.texture_slot
-        # textype = context.texture
 
         if not isinstance(idblock, Brush):
             split = layout.split(percentage=0.3)
@@ -937,7 +936,6 @@ class TEXTURE_PT_influence(TextureSlotPanel, Panel):
 
         idblock = context_tex_datablock(context)
 
-        # textype = context.texture
         tex = context.texture_slot
 
         def factor_but(layout, toggle, factor, name):

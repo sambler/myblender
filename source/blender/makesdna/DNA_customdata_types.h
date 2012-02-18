@@ -29,8 +29,8 @@
  *  \ingroup DNA
  */
 
-#ifndef DNA_CUSTOMDATA_TYPES_H
-#define DNA_CUSTOMDATA_TYPES_H
+#ifndef __DNA_CUSTOMDATA_TYPES_H__
+#define __DNA_CUSTOMDATA_TYPES_H__
 
 #ifdef __cplusplus
 extern "C" {
@@ -56,7 +56,7 @@ typedef struct CustomDataLayer {
 #define MAX_CUSTOMDATA_LAYER_NAME 64
 
 typedef struct CustomDataExternal {
-	char filename[240]; /* FILE_MAX */
+	char filename[1024]; /* FILE_MAX */
 } CustomDataExternal;
 
 /** structure which stores custom element data associated with mesh elements

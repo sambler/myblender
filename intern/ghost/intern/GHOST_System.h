@@ -30,8 +30,8 @@
  * Declaration of GHOST_System class.
  */
 
-#ifndef _GHOST_SYSTEM_H_
-#define _GHOST_SYSTEM_H_
+#ifndef __GHOST_SYSTEM_H__
+#define __GHOST_SYSTEM_H__
 
 #include "GHOST_ISystem.h"
 
@@ -145,6 +145,15 @@ public:
 	 */
 	virtual GHOST_TSuccess beginFullScreen(const GHOST_DisplaySetting& setting, GHOST_IWindow** window,
 		const bool stereoVisual, const GHOST_TUns16 numOfAASamples=0);
+		
+	/**
+	 * Updates the resolution while in fullscreen mode.
+	 * @param setting	The new setting of the display.
+	 * @param window	Window displayed in full screen.
+	 *
+	 * @return	Indication of success.
+	 */
+	virtual GHOST_TSuccess updateFullScreen(const GHOST_DisplaySetting& setting, GHOST_IWindow** window);
 
 	/**
 	 * Ends full screen mode.
@@ -358,5 +367,5 @@ inline GHOST_NDOFManager* GHOST_System::getNDOFManager() const
 }
 #endif
 
-#endif // _GHOST_SYSTEM_H_
+#endif // __GHOST_SYSTEM_H__
 

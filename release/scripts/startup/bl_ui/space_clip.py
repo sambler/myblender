@@ -127,6 +127,16 @@ class CLIP_PT_tools_marker(Panel):
 
             col.separator()
 
+            row = col.row(align=True)
+            row.prop(settings, "use_default_red_channel",
+                     text="R", toggle=True)
+            row.prop(settings, "use_default_green_channel",
+                     text="G", toggle=True)
+            row.prop(settings, "use_default_blue_channel",
+                     text="B", toggle=True)
+
+            col.separator()
+
             sub = col.column(align=True)
             sub.prop(settings, "default_pattern_size")
             sub.prop(settings, "default_search_size")
@@ -146,6 +156,10 @@ class CLIP_PT_tools_marker(Panel):
 
             col.label(text="Match:")
             col.prop(settings, "default_pattern_match", text="")
+
+            col.separator()
+            col.operator('clip.track_settings_as_default',
+                         text="Copy From Active Track")
 
 
 class CLIP_PT_tools_tracking(Panel):
@@ -172,6 +186,7 @@ class CLIP_PT_tools_tracking(Panel):
         props.backwards = True
         props.sequence = True
         props = row.operator("clip.track_markers", text="", icon='PLAY')
+        props.backwards = False
         props.sequence = True
         row.operator("clip.track_markers", text="", icon='FRAME_NEXT')
 
@@ -532,23 +547,15 @@ class CLIP_PT_display(Panel):
 
         col = layout.column(align=True)
 
-        col.prop(sc, "show_marker_pattern", text="Pattern")
-        col.prop(sc, "show_marker_search", text="Search")
-        col.prop(sc, "show_pyramid_levels", text="Pyramid")
-
-        col.prop(sc, "show_track_path", text="Path")
-        row = col.row()
-        row.active = sc.show_track_path
-        row.prop(sc, "path_length", text="Length")
-
         col.prop(sc, "show_disabled", "Disabled Tracks")
+        col.prop(sc, "show_names", text="Names and Status")
         col.prop(sc, "show_bundles", text="3D Markers")
 
-        col.prop(sc, "show_names", text="Names and Status")
-        col.prop(sc, "show_tiny_markers", text="Compact Markers")
+        col.prop(sc, "use_mute_footage", text="Mute Footage")
+        col.prop(sc, "lock_selection")
 
-        col.prop(sc, "show_grease_pencil", text="Grease Pencil")
-        col.prop(sc, "use_mute_footage", text="Mute")
+        if sc.view == 'GRAPH':
+            col.prop(sc, "lock_time_cursor")
 
         if sc.mode == 'DISTORTION':
             col.prop(sc, "show_grid", text="Grid")
@@ -556,12 +563,34 @@ class CLIP_PT_display(Panel):
         elif sc.mode == 'RECONSTRUCTION':
             col.prop(sc, "show_stable", text="Stable")
 
-        col.prop(sc, "lock_selection")
-
         clip = sc.clip
         if clip:
             col.label(text="Display Aspect Ratio:")
-            col.prop(clip, "display_aspect", text="")
+            row = col.row()
+            row.prop(clip, "display_aspect", text="")
+
+
+class CLIP_PT_marker_display(Panel):
+    bl_space_type = 'CLIP_EDITOR'
+    bl_region_type = 'UI'
+    bl_label = "Marker Display"
+
+    def draw(self, context):
+        layout = self.layout
+        sc = context.space_data
+
+        col = layout.column(align=True)
+
+        row = col.row()
+        row.prop(sc, "show_marker_pattern", text="Pattern")
+        row.prop(sc, "show_marker_search", text="Search")
+
+        col.prop(sc, "show_tiny_markers", text="Thin Markers")
+        col.prop(sc, "show_track_path", text="Path")
+
+        row = col.row()
+        row.active = sc.show_track_path
+        row.prop(sc, "path_length", text="Length")
 
 
 class CLIP_PT_track_settings(Panel):
@@ -655,6 +684,8 @@ class CLIP_PT_stabilization(Panel):
         row.active = stab.rotation_track is not None
         row.prop(stab, "influence_rotation")
 
+        layout.prop(stab, "filter_type")
+
 
 class CLIP_PT_marker(Panel):
     bl_space_type = 'CLIP_EDITOR'
@@ -706,17 +737,21 @@ class CLIP_PT_proxy(Panel):
 
         layout.active = clip.use_proxy
 
-        layout.label(text="Build Sizes:")
+        layout.label(text="Build Original:")
 
-        row = layout.row()
-        row.prop(clip.proxy, "build_25")
-        row.prop(clip.proxy, "build_50")
+        row = layout.row(align=True)
+        row.prop(clip.proxy, "build_25", toggle=True)
+        row.prop(clip.proxy, "build_50", toggle=True)
+        row.prop(clip.proxy, "build_75", toggle=True)
+        row.prop(clip.proxy, "build_100", toggle=True)
 
-        row = layout.row()
-        row.prop(clip.proxy, "build_75")
-        row.prop(clip.proxy, "build_100")
+        layout.label(text="Build Undistorted:")
 
-        layout.prop(clip.proxy, "build_undistorted")
+        row = layout.row(align=True)
+        row.prop(clip.proxy, "build_undistorted_25", toggle=True)
+        row.prop(clip.proxy, "build_undistorted_50", toggle=True)
+        row.prop(clip.proxy, "build_undistorted_75", toggle=True)
+        row.prop(clip.proxy, "build_undistorted_100", toggle=True)
 
         layout.prop(clip.proxy, "quality")
 
@@ -724,7 +759,7 @@ class CLIP_PT_proxy(Panel):
         if clip.use_proxy_custom_directory:
             layout.prop(clip.proxy, "directory")
 
-        layout.operator("clip.rebuild_proxy", text="Rebuild Proxy")
+        layout.operator("clip.rebuild_proxy", text="Build Proxy")
 
         if clip.source == 'MOVIE':
             col = layout.column()

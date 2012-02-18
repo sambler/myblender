@@ -377,10 +377,18 @@ static EnumPropertyItem *rna_userdef_compute_device_itemf(bContext *UNUSED(C), P
 		CCLDeviceInfo *devices = CCL_compute_device_list(opencl);
 		int a;
 
-		for(a = 0; devices[a].name; a++) {
-			tmp.value = devices[a].value;
-			tmp.identifier = devices[a].identifier;
-			tmp.name = devices[a].name;
+		if(devices) {
+			for(a = 0; devices[a].name; a++) {
+				tmp.value = devices[a].value;
+				tmp.identifier = devices[a].identifier;
+				tmp.name = devices[a].name;
+				RNA_enum_item_add(&item, &totitem, &tmp);
+			}
+		}
+		else {
+			tmp.value = 0;
+			tmp.name = "CPU";
+			tmp.identifier = "CPU";
 			RNA_enum_item_add(&item, &totitem, &tmp);
 		}
 	}
@@ -1312,6 +1320,7 @@ static void rna_def_userdef_theme_space_file(BlenderRNA *brna)
 static void rna_def_userdef_theme_space_outliner(BlenderRNA *brna)
 {
 	StructRNA *srna;
+	PropertyRNA *prop;
 
 	/* space_outliner */
 
@@ -1321,6 +1330,16 @@ static void rna_def_userdef_theme_space_outliner(BlenderRNA *brna)
 	RNA_def_struct_ui_text(srna, "Theme Outliner", "Theme settings for the Outliner");
 
 	rna_def_userdef_theme_spaces_main(srna);
+
+	prop= RNA_def_property(srna, "match", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_array(prop, 3);
+	RNA_def_property_ui_text(prop, "Filter Match", "");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+
+	prop= RNA_def_property(srna, "selected_highlight", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_array(prop, 3);
+	RNA_def_property_ui_text(prop, "Selected Highlight", "");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
 }
 
 static void rna_def_userdef_theme_space_userpref(BlenderRNA *brna)
@@ -2061,6 +2080,7 @@ static void rna_def_userdef_themes(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
 	RNA_def_property_ui_text(prop, "Name", "Name of the theme");
 	RNA_def_struct_name_property(srna, prop);
+	RNA_def_property_flag(prop, PROP_SKIP_SAVE); /* XXX: for now putting this in presets is silly - its just Default */
 
 	prop= RNA_def_property(srna, "theme_area", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "active_theme_area");
@@ -2807,7 +2827,7 @@ static void rna_def_userdef_system(BlenderRNA *brna)
 		{24, "KOREAN", 0, "Korean (한국 언어)", "ko_KR"},
 		{25, "NEPALI", 0, "Nepali (नेपाली)", "ne_NP"},
 		/* using the utf8 flipped form of Persian (فارسی) */
-		{26, "PERSIAN", 0, "Persian (ﯽﺳﺭﺎﻓ)", "fa_PE"},
+		{26, "PERSIAN", 0, "Persian (ﯽﺳﺭﺎﻓ)", "fa_IR"},
 		{19, "POLISH", 0, "Polish (Polski)", "pl_PL"},
 		{20, "ROMANIAN", 0, "Romanian (Român)", "ro_RO"},
 		{17, "SERBIAN", 0, "Serbian (Српски)", "sr_RS"},

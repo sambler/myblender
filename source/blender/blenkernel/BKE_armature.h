@@ -24,8 +24,8 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
-#ifndef BKE_ARMATURE_H
-#define BKE_ARMATURE_H
+#ifndef __BKE_ARMATURE_H__
+#define __BKE_ARMATURE_H__
 
 /** \file BKE_armature.h
  *  \ingroup bke
@@ -87,7 +87,7 @@ int bone_autoside_name (char name[64], int strip_number, short axis, float head,
 
 struct Bone *get_named_bone (struct bArmature *arm, const char *name);
 
-float distfactor_to_bone (float vec[3], float b1[3], float b2[3], float rad1, float rad2, float rdist);
+float distfactor_to_bone(const float vec[3], const float b1[3], const float b2[3], float rad1, float rad2, float rdist);
 
 void where_is_armature (struct bArmature *arm);
 void where_is_armature_bone(struct Bone *bone, struct Bone *prevbone);
@@ -109,6 +109,8 @@ void armature_loc_world_to_pose(struct Object *ob, float *inloc, float *outloc);
 void armature_mat_pose_to_bone(struct bPoseChannel *pchan, float inmat[][4], float outmat[][4]);
 void armature_loc_pose_to_bone(struct bPoseChannel *pchan, float *inloc, float *outloc);
 void armature_mat_pose_to_delta(float delta_mat[][4], float pose_mat[][4], float arm_mat[][4]);
+
+void armature_mat_pose_to_bone_ex(struct Object *ob, struct bPoseChannel *pchan, float inmat[][4], float outmat[][4]);
 
 void pchan_mat3_to_rot(struct bPoseChannel *pchan, float mat[][3], short use_compat);
 void pchan_apply_mat4(struct bPoseChannel *pchan, float mat[][4], short use_comat);

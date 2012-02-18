@@ -1745,7 +1745,7 @@ static int check_valid_camera(Scene *scene, Object *camera_override)
 			check_comp= 0;
 
 			while(seq) {
-				if(seq->type == SEQ_SCENE) {
+				if(seq->type == SEQ_SCENE && seq->scene) {
 					if(!seq->scene_camera) {
 						if(!seq->scene->camera && !scene_find_camera(seq->scene)) {
 							if(seq->scene == scene) {
@@ -1894,6 +1894,7 @@ static void validate_render_settings(Render *re)
 	if(RE_engine_is_external(re)) {
 		/* not supported yet */
 		re->r.scemode &= ~(R_EXR_TILE_FILE|R_FULL_SAMPLE);
+		re->r.mode &= ~R_FIELDS;
 	}
 }
 

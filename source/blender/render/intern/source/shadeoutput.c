@@ -206,7 +206,7 @@ static void spothalo(struct LampRen *lar, ShadeInput *shi, float *intens)
 		maxz*= lar->sh_zfac;
 		maxy= lar->imat[0][1]*p1[0]+lar->imat[1][1]*p1[1]+lar->imat[2][1]*p1[2];
 
-		if( fabsf(nray[2]) < FLT_EPSILON ) use_yco= 1;
+		if( fabs(nray[2]) < FLT_EPSILON ) use_yco= 1;
 	}
 	
 	/* scale z to make sure volume is normalized */	
@@ -1030,12 +1030,17 @@ static void do_specular_ramp(ShadeInput *shi, float is, float t, float spec[3])
 /* preprocess, textures were not done, don't use shi->amb for that reason */
 void ambient_occlusion(ShadeInput *shi)
 {
-	if((R.wrld.ao_gather_method == WO_AOGATHER_APPROX) && shi->mat->amb!=0.0f)
+	if((R.wrld.ao_gather_method == WO_AOGATHER_APPROX) && shi->mat->amb!=0.0f) {
 		sample_occ(&R, shi);
-	else if((R.r.mode & R_RAYTRACE) && shi->mat->amb!=0.0f)
+	}
+	else if((R.r.mode & R_RAYTRACE) && shi->mat->amb!=0.0f) {
 		ray_ao(shi, shi->ao, shi->env);
-	else
+	}
+	else {
 		shi->ao[0]= shi->ao[1]= shi->ao[2]= 1.0f;
+		zero_v3(shi->env);
+		zero_v3(shi->indirect);
+	}
 }
 
 

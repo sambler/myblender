@@ -24,8 +24,8 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
-#ifndef BKE_BLENDER_H
-#define BKE_BLENDER_H
+#ifndef __BKE_BLENDER_H__
+#define __BKE_BLENDER_H__
 
 /** \file BKE_blender.h
  *  \ingroup bke
@@ -42,8 +42,8 @@ extern "C" {
 /* these lines are grep'd, watch out for our not-so-awesome regex
  * and keep comment above the defines.
  * Use STRINGIFY() rather than defining with quotes */
-#define BLENDER_VERSION			261
-#define BLENDER_SUBVERSION		3
+#define BLENDER_VERSION			262
+#define BLENDER_SUBVERSION		0
 
 #define BLENDER_MINVERSION		250
 #define BLENDER_MINSUBVERSION	0

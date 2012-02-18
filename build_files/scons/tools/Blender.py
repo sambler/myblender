@@ -272,7 +272,7 @@ def setup_syslibs(lenv):
         syslibs += Split(lenv['BF_PTHREADS_LIB'])
     if lenv['WITH_BF_COLLADA']:
         syslibs.append(lenv['BF_PCRE_LIB'])
-        if lenv['BF_DEBUG']:
+        if lenv['BF_DEBUG'] and (lenv['OURPLATFORM'] != 'linux'):
             syslibs += [colladalib+'_d' for colladalib in Split(lenv['BF_OPENCOLLADA_LIB'])]
         else:
             syslibs += Split(lenv['BF_OPENCOLLADA_LIB'])
@@ -356,7 +356,7 @@ def buildinfo(lenv, build_type):
     build_time = time.strftime ("%H:%M:%S")
     build_rev = os.popen('svnversion').read()[:-1] # remove \n
     if build_rev == '': 
-        build_rev = '43553'
+        build_rev = '44221'
     if lenv['BF_DEBUG']:
         build_type = "Debug"
         build_cflags = ' '.join(lenv['CFLAGS'] + lenv['CCFLAGS'] + lenv['BF_DEBUG_CCFLAGS'] + lenv['CPPFLAGS'])
@@ -437,8 +437,9 @@ def set_quiet_output(env):
     static_ob, shared_ob = SCons.Tool.createObjBuilders(env)
     static_ob.add_action('.c', mycaction)
     static_ob.add_action('.cpp', mycppaction)
+    static_ob.add_action('.cc', mycppaction)
     shared_ob.add_action('.c', myshcaction)
-    shared_ob.add_action('.cpp', myshcppaction)
+    shared_ob.add_action('.cc', myshcppaction)
 
     static_lib = SCons.Builder.Builder(action = mylibaction,
                                        emitter = '$LIBEMITTER',
@@ -648,8 +649,11 @@ def UnixPyBundle(target=None, source=None, env=None):
 
     dir = os.path.join(env['BF_INSTALLDIR'], VERSION)
 
+    lib = env['BF_PYTHON_LIBPATH'].split(os.sep)[-1]
+    target_lib = "lib64" if lib == "lib64" else "lib"
+
     py_src =    env.subst( env['BF_PYTHON_LIBPATH'] + '/python'+env['BF_PYTHON_VERSION'] )
-    py_target =    env.subst( dir + '/python/lib/python'+env['BF_PYTHON_VERSION'] )
+    py_target =    env.subst( dir + '/python/' + target_lib + '/python'+env['BF_PYTHON_VERSION'] )
     
     # This is a bit weak, but dont install if its been installed before, makes rebuilds quite slow.
     if os.path.exists(py_target):

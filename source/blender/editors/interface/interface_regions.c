@@ -138,8 +138,9 @@ static void menudata_add_item(MenuData *md, const char *str, int retval, int ico
 static void menudata_free(MenuData *md)
 {
 	MEM_freeN((void *)md->instr);
-	if (md->items)
+	if (md->items) {
 		MEM_freeN(md->items);
+	}
 	MEM_freeN(md);
 }
 
@@ -394,8 +395,9 @@ ARegion *ui_tooltip_create(bContext *C, ARegion *butregion, uiBut *but)
 				}
 			}
 
-			if(free)
+			if (free) {
 				MEM_freeN(item);
+			}
 		}
 	}
 	
@@ -982,8 +984,9 @@ static void ui_searchbox_region_free_cb(ARegion *ar)
 	int a;
 
 	/* free search data */
-	for(a=0; a<data->items.maxitem; a++)
+	for (a = 0; a < data->items.maxitem; a++) {
 		MEM_freeN(data->items.names[a]);
+	}
 	MEM_freeN(data->items.names);
 	MEM_freeN(data->items.pointers);
 	MEM_freeN(data->items.icons);
@@ -1182,8 +1185,9 @@ void ui_but_search_test(uiBut *but)
 			uiButSetFlag(but, UI_BUT_REDALERT);
 	}
 	
-	for(x1=0; x1<items->maxitem; x1++)
+	for (x1 = 0; x1 < items->maxitem; x1++) {
 		MEM_freeN(items->names[x1]);
+	}
 	MEM_freeN(items->names);
 	MEM_freeN(items);
 }
@@ -1536,6 +1540,8 @@ uiPopupBlockHandle *ui_popup_block_create(bContext *C, ARegion *butregion, uiBut
 	if(but) {
 		if(ELEM(but->type, BLOCK, PULLDOWN))
 			block->xofs = -2;	/* for proper alignment */
+
+		block->aspect = but->block->aspect;
 
 		ui_block_position(window, butregion, but, block);
 	}
@@ -2474,7 +2480,7 @@ static void confirm_operator(bContext *C, wmOperator *op, const char *title, con
 	char *s, buf[512];
 	
 	s= buf;
-	if (title) s+= sprintf(s, "%s%%t|%s", title, item);
+	if (title) s+= BLI_snprintf(s, sizeof(buf), "%s%%t|%s", title, item);
 	(void)s;
 	
 	handle= ui_popup_menu_create(C, NULL, NULL, NULL, NULL, buf);
@@ -2651,8 +2657,13 @@ void uiPupBlockOperator(bContext *C, uiBlockCreateFunc func, wmOperator *op, int
 void uiPupBlockClose(bContext *C, uiBlock *block)
 {
 	if(block->handle) {
-		UI_remove_popup_handlers(&CTX_wm_window(C)->modalhandlers, block->handle);
-		ui_popup_block_free(C, block->handle);
+		wmWindow *win = CTX_wm_window(C);
+
+		/* if loading new .blend while popup is open, window will be NULL */
+		if(win) {
+			UI_remove_popup_handlers(&win->modalhandlers, block->handle);
+			ui_popup_block_free(C, block->handle);
+		}
 	}
 }
 

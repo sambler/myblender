@@ -30,8 +30,8 @@
  *  \brief ID and Library types, which are fundamental for sdna.
  */
 
-#ifndef DNA_ID_H
-#define DNA_ID_H
+#ifndef __DNA_ID_H__
+#define __DNA_ID_H__
 
 #include "DNA_listBase.h"
 
@@ -129,8 +129,8 @@ typedef struct Library {
 	ID id;
 	ID *idblock;
 	struct FileData *filedata;
-	char name[240];			/* path name used for reading, can be relative and edited in the outliner */
-	char filepath[240];		/* absolute filepath, this is only for convenience,
+	char name[1024];		/* path name used for reading, can be relative and edited in the outliner */
+	char filepath[1024];	/* absolute filepath, this is only for convenience,
 							 * 'name' is the real path used on file read but in
 							 * some cases its useful to access the absolute one,
 							 * This is set on file read.

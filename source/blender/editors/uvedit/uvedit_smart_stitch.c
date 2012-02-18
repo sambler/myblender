@@ -290,7 +290,8 @@ static int stitch_check_uvs_stitchable(UvElement *element, UvElement *element_it
 
 
 static int stitch_check_uvs_state_stitchable(UvElement *element, UvElement *element_iter, StitchState *state){
-	if(state->snap_islands && element->island == element_iter->island)
+	if((state->snap_islands && element->island == element_iter->island) ||
+			(!state->midpoints && element->island == element_iter->island))
 		return 0;
 
 	return stitch_check_uvs_stitchable(element, element_iter, state);
@@ -543,9 +544,8 @@ static void stitch_validate_stichability(UvElement *element, StitchState *state,
 		if(element_iter->separate){
 			if(element_iter == element)
 				continue;
-			if(stitch_check_uvs_stitchable(element, element_iter, state)){
-				if(((element_iter->island == state->static_island) || (element->island == state->static_island)) &&
-						!((element_iter->island == element->island) && state->snap_islands)){
+			if(stitch_check_uvs_state_stitchable(element, element_iter, state)){
+				if((element_iter->island == state->static_island) || (element->island == state->static_island)){
 					element->flag |= STITCH_STITCHABLE;
 					preview->num_stitchable++;
 					stitch_setup_face_preview_for_uv_group(element, state, island_stitch_data);
@@ -565,7 +565,7 @@ static void stitch_validate_stichability(UvElement *element, StitchState *state,
 static int stitch_process_data(StitchState *state, Scene *scene, int final)
 {
 	int i;
-	StitchPreviewer *preview = uv_get_stitch_previewer();
+	StitchPreviewer *preview;
 	IslandStitchData *island_stitch_data = NULL;
 	int previous_island = state->static_island;
 	EditFace *efa;
@@ -912,12 +912,13 @@ static void stitch_select_uv(UvElement *element, StitchState *stitch_state, int 
 	}
 }
 
-static void stitch_calculate_edge_normal(EditMesh *em, UvEdge *edge, float *normal){
+static void stitch_calculate_edge_normal(EditMesh *em, UvEdge *edge, float *normal)
+{
 	UvElement *element = edge->element;
 	EditFace *efa = element->face;
 	MTFace *mt = CustomData_em_get(&em->fdata, efa->data, CD_MTFACE);
 	int nverts = efa->v4?4 : 3;
-	int index = index = (element->tfindex + 2)%nverts;
+	int index = (element->tfindex + 2)%nverts;
 	float tangent[2], internal[2];
 
 	sub_v2_v2v2(tangent, mt->uv[(element->tfindex + 1)%nverts],  mt->uv[element->tfindex]);
@@ -1067,7 +1068,7 @@ static int stitch_init(bContext *C, wmOperator *op)
 	ghi = BLI_ghashIterator_new(edgeHash);
 	total_edges = 0;
 	/* fill the edges with data */
-	for(i = 0; !BLI_ghashIterator_isDone(ghi); BLI_ghashIterator_step(ghi)){
+	for(; !BLI_ghashIterator_isDone(ghi); BLI_ghashIterator_step(ghi)){
 		UvEdge *edge = ((UvEdge *)BLI_ghashIterator_getKey(ghi));
 		if(edge->flag & STITCH_BOUNDARY){
 			total_edges++;
@@ -1453,11 +1454,15 @@ void UV_OT_stitch(wmOperatorType *ot)
 
 	/* properties */
 	RNA_def_boolean(ot->srna, "use_limit", 0, "Use Limit", "Stitch UVs within a specified limit distance");
-	RNA_def_boolean(ot->srna, "snap_islands", 1, "Snap Islands", "Snap islands together. On edge stitch mode, rotates the islands too");
+	RNA_def_boolean(ot->srna, "snap_islands", 1, "Snap Islands",
+	                          "Snap islands together (on edge stitch mode, rotates the islands too)");
 
-	RNA_def_float(ot->srna, "limit", 0.01f, 0.0f, FLT_MAX, "Limit", "Limit distance in normalized coordinates", 0.0, FLT_MAX);
-	RNA_def_int(ot->srna, "static_island", 0, 0, INT_MAX, "Static Island",  "Island that stays in place when stitching islands", 0, INT_MAX);
-	RNA_def_boolean(ot->srna, "midpoint_snap", 0, "Snap At Midpoint", "Uv's are stitched at midpoint instead of at static island");
+	RNA_def_float(ot->srna, "limit", 0.01f, 0.0f, FLT_MAX, "Limit",
+	                        "Limit distance in normalized coordinates", 0.0, FLT_MAX);
+	RNA_def_int(ot->srna, "static_island", 0, 0, INT_MAX, "Static Island",
+	                      "Island that stays in place when stitching islands", 0, INT_MAX);
+	RNA_def_boolean(ot->srna, "midpoint_snap", 0, "Snap At Midpoint",
+	                          "UVs are stitched at midpoint instead of at static island");
 	prop = RNA_def_collection_runtime(ot->srna, "selection", &RNA_SelectedUvElement, "Selection", "");
 	/* Selection should not be editable or viewed in toolbar */
 	RNA_def_property_flag(prop, PROP_HIDDEN);

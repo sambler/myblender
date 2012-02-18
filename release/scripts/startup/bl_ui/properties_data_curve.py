@@ -111,7 +111,7 @@ class DATA_PT_shape_curve(CurveButtonsPanel, Panel):
             sub = col.column()
             sub.active = (curve.dimensions == '2D' or (curve.bevel_object is None and curve.dimensions == '3D'))
             sub.prop(curve, "fill_mode", text="")
-            col.prop(curve, "use_fill_deform", text="Fill Deformed")
+            col.prop(curve, "use_fill_deform")
 
 
 class DATA_PT_curve_texture_space(CurveButtonsPanel, Panel):
@@ -165,6 +165,10 @@ class DATA_PT_geometry_curve(CurveButtonsPanel, Panel):
         col.label(text="Bevel Object:")
         col.prop(curve, "bevel_object", text="")
 
+        row = col.row()
+        row.active = (curve.bevel_object is not None)
+        row.prop(curve, "use_fill_caps")
+
 
 class DATA_PT_pathanim(CurveButtonsPanelCurve, Panel):
     bl_label = "Path Animation"
@@ -213,7 +217,7 @@ class DATA_PT_active_spline(CurveButtonsPanelActive, Panel):
 
         if is_poly:
             # These settings are below but its easier to have
-            # poly's set aside since they use so few settings
+            # polys set aside since they use so few settings
             row = layout.row()
             row.label(text="Cyclic:")
             row.prop(act_spline, "use_cyclic_u", text="U")
@@ -246,7 +250,7 @@ class DATA_PT_active_spline(CurveButtonsPanelActive, Panel):
                 col = split.column()
                 col.prop(act_spline, "use_cyclic_v", text="V")
 
-                # its a surface, assume its a nurb.
+                # its a surface, assume its a nurbs
                 sub = col.column()
                 sub.active = (not act_spline.use_cyclic_v)
                 sub.prop(act_spline, "use_bezier_v", text="V")

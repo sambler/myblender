@@ -29,8 +29,8 @@
  *  \ingroup DNA
  */
 
-#ifndef DNA_BRUSH_TYPES_H
-#define DNA_BRUSH_TYPES_H
+#ifndef __DNA_BRUSH_TYPES_H__
+#define __DNA_BRUSH_TYPES_H__
 
 
 #include "DNA_ID.h"
@@ -59,7 +59,7 @@ typedef struct Brush {
 
 	struct ImBuf *icon_imbuf;
 	PreviewImage *preview;
-	char icon_filepath[240]; /* 240 = FILE_MAX */
+	char icon_filepath[1024]; /* 1024 = FILE_MAX */
 
 	float normal_weight;
 

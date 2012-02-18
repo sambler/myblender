@@ -586,7 +586,7 @@ static void draw_marker_areas(SpaceClip *sc, MovieTrackingTrack *track, MovieTra
 	}
 
 	/* pyramid */
-	if(sel && TRACK_SELECTED(track) && (sc->flag&SC_SHOW_PYRAMID_LEVELS) && (track->tracker==TRACKER_KLT) && (marker->flag&MARKER_DISABLED)==0) {
+	if(sel && TRACK_SELECTED(track) && (track->tracker==TRACKER_KLT) && (marker->flag&MARKER_DISABLED)==0) {
 		if(track->flag&TRACK_LOCKED) {
 			if(act) UI_ThemeColor(TH_ACT_MARKER);
 			else if(track->pat_flag&SELECT) UI_ThemeColorShade(TH_LOCK_MARKER, 64);
@@ -777,7 +777,9 @@ static void draw_marker_texts(SpaceClip *sc, MovieTrackingTrack *track, MovieTra
 		else UI_ThemeColor(TH_SEL_MARKER);
 	}
 
-	if(sc->flag&SC_SHOW_MARKER_SEARCH) {
+	if((sc->flag&SC_SHOW_MARKER_SEARCH) &&
+	   ((marker->flag&MARKER_DISABLED)==0 || (sc->flag&SC_SHOW_MARKER_PATTERN)==0))
+	{
 		dx= track->search_min[0];
 		dy= track->search_min[1];
 	} else if(sc->flag&SC_SHOW_MARKER_PATTERN) {
@@ -1176,6 +1178,11 @@ static void draw_distortion(SpaceClip *sc, ARegion *ar, MovieClip *clip, int wid
 		while(layer) {
 			bGPDframe *frame= layer->frames.first;
 
+			if(layer->flag & GP_LAYER_HIDE) {
+				layer= layer->next;
+				continue;
+			}
+
 			glColor4fv(layer->color);
 			glLineWidth(layer->thickness);
 			glPointSize((float)(layer->thickness + 2));
@@ -1262,13 +1269,14 @@ void clip_draw_main(SpaceClip *sc, ARegion *ar, Scene *scene)
 
 		if(ibuf) {
 			float loc[2];
+			float aspect= clip->tracking.camera.pixel_aspect;
 
 			if(width != ibuf->x)
 				mul_v2_v2fl(loc, sc->loc, (float)width / ibuf->x);
 			else
 				copy_v2_v2(loc, sc->loc);
 
-			BKE_tracking_stabdata_to_mat4(width, height, loc, sc->scale, sc->angle, sc->stabmat);
+			BKE_tracking_stabdata_to_mat4(width, height, aspect, loc, sc->scale, sc->angle, sc->stabmat);
 
 			unit_m4(smat);
 			smat[0][0]= 1.0f/width;
@@ -1305,7 +1313,7 @@ void clip_draw_grease_pencil(bContext *C, int onlyv2d)
 	MovieClip *clip= ED_space_clip(sc);
 	ImBuf *ibuf;
 
-	if((sc->flag&SC_SHOW_GPENCIL)==0 || !clip)
+	if(!clip)
 		return;
 
 	if(onlyv2d) {

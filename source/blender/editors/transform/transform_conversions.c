@@ -2303,12 +2303,17 @@ void flushTransSeq(TransInfo *t)
 
 	if (ELEM(t->mode, TFM_SEQ_SLIDE, TFM_TIME_TRANSLATE)) { /* originally TFM_TIME_EXTEND, transform changes */
 		/* Special annoying case here, need to calc metas with TFM_TIME_EXTEND only */
-		seq= seqbasep->first;
 
-		while(seq) {
-			if (seq->type == SEQ_META && seq->flag & SELECT)
+		/* calc all meta's then effects [#27953] */
+		for (seq = seqbasep->first; seq; seq = seq->next) {
+			if (seq->type == SEQ_META && seq->flag & SELECT) {
 				calc_sequence(t->scene, seq);
-			seq= seq->next;
+			}
+		}
+		for (seq = seqbasep->first; seq; seq = seq->next) {
+			if (seq->seq1 || seq->seq2 || seq->seq3) {
+				calc_sequence(t->scene, seq);
+			}
 		}
 	}
 
@@ -3800,8 +3805,8 @@ static void SeqTransInfo(TransInfo *t, Sequence *seq, int *recursive, int *count
 
 		Scene * scene= t->scene;
 		int cfra= CFRA;
-		int left= seq_tx_get_final_left(seq, 0);
-		int right= seq_tx_get_final_right(seq, 0);
+		int left= seq_tx_get_final_left(seq, 1);
+		int right= seq_tx_get_final_right(seq, 1);
 
 		if (seq->depth == 0 && ((seq->flag & SELECT) == 0 || (seq->flag & SEQ_LOCK))) {
 			*recursive= 0;
@@ -3901,7 +3906,7 @@ static void SeqTransInfo(TransInfo *t, Sequence *seq, int *recursive, int *count
 
 
 
-static int SeqTransCount(TransInfo *t, ListBase *seqbase, int depth)
+static int SeqTransCount(TransInfo *t, Sequence *parent, ListBase *seqbase, int depth)
 {
 	Sequence *seq;
 	int tot= 0, recursive, count, flag;
@@ -3909,11 +3914,15 @@ static int SeqTransCount(TransInfo *t, ListBase *seqbase, int depth)
 	for (seq= seqbase->first; seq; seq= seq->next) {
 		seq->depth= depth;
 
+		/* seq->tmp is used by seq_tx_get_final_{left,right} to check sequence's range and clamp to it if needed.
+		 * it's first place where digging into sequences tree, so store link to parent here */
+		seq->tmp = parent;
+
 		SeqTransInfo(t, seq, &recursive, &count, &flag); /* ignore the flag */
 		tot += count;
 
 		if (recursive) {
-			tot += SeqTransCount(t, &seq->seqbase, depth+1);
+			tot += SeqTransCount(t, seq, &seq->seqbase, depth+1);
 		}
 	}
 
@@ -4211,7 +4220,7 @@ static void createTransSeqData(bContext *C, TransInfo *t)
 	}
 #endif
 
-	count = SeqTransCount(t, ed->seqbasep, 0);
+	count = SeqTransCount(t, NULL, ed->seqbasep, 0);
 
 	/* allocate memory for data */
 	t->total= count;
@@ -5640,10 +5649,13 @@ static void createTransTrackingData(bContext *C, TransInfo *t)
 	SpaceClip *sc = CTX_wm_space_clip(C);
 	MovieClip *clip = ED_space_clip(sc);
 
-	if(!clip || !BKE_movieclip_has_frame(clip, &sc->user)) {
-		t->total = 0;
+	t->total = 0;
+
+	if(!clip || !BKE_movieclip_has_frame(clip, &sc->user))
 		return;
-	}
+
+	if(!ELEM(t->mode, TFM_RESIZE, TFM_TRANSLATION))
+		return;
 
 	if(ar->regiontype == RGN_TYPE_PREVIEW) {
 		/* transformation was called from graph editor */

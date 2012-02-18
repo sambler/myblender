@@ -1126,6 +1126,9 @@ static int distribute_threads_init_data(ParticleThread *threads, Scene *scene, D
 			fprintf(stderr,"Particle distribution error: Nothing to emit from!\n");
 
 		if(dm != finaldm) dm->release(dm);
+
+		BLI_kdtree_free(tree);
+
 		return 0;
 	}
 
@@ -3404,6 +3407,7 @@ static void psys_update_path_cache(ParticleSimulationData *sim, float cfra)
 	ParticleSystem *psys = sim->psys;
 	ParticleSettings *part = psys->part;
 	ParticleEditSettings *pset = &sim->scene->toolsettings->particle;
+	Base *base;
 	int distr=0, alloc=0, skip=0;
 
 	if((psys->part->childtype && psys->totchild != get_psys_tot_child(sim->scene, psys)) || psys->recalc&PSYS_RECALC_RESET)
@@ -3446,6 +3450,19 @@ static void psys_update_path_cache(ParticleSimulationData *sim, float cfra)
 		}
 	}
 
+
+	/* particle instance modifier with "path" option need cached paths even if particle system doesn't */
+	for (base = sim->scene->base.first; base; base= base->next) {
+		ModifierData *md = modifiers_findByType(base->object, eModifierType_ParticleInstance);
+		if(md) {
+			ParticleInstanceModifierData *pimd = (ParticleInstanceModifierData *)md;
+			if(pimd->flag & eParticleInstanceFlag_Path && pimd->ob == sim->ob && pimd->psys == (psys - (ParticleSystem*)sim->ob->particlesystem.first)) {
+				skip = 0;
+				break;
+			}
+		}
+	}
+
 	if(!skip) {
 		psys_cache_paths(sim, cfra);
 
@@ -3477,6 +3494,7 @@ static void do_hair_dynamics(ParticleSimulationData *sim)
 	int totedge;
 	int k;
 	float hairmat[4][4];
+	float (*deformedVerts)[3];
 
 	if(!psys->clmd) {
 		psys->clmd = (ClothModifierData*)modifier_new(eModifierType_Cloth);
@@ -3570,7 +3588,15 @@ static void do_hair_dynamics(ParticleSimulationData *sim)
 	psys->clmd->point_cache = psys->pointcache;
 	psys->clmd->sim_parms->effector_weights = psys->part->effector_weights;
 
-	psys->hair_out_dm = clothModifier_do(psys->clmd, sim->scene, sim->ob, dm);
+	deformedVerts = MEM_callocN(sizeof(*deformedVerts)*dm->getNumVerts(dm), "do_hair_dynamics vertexCos");
+	psys->hair_out_dm = CDDM_copy(dm);
+	psys->hair_out_dm->getVertCos(psys->hair_out_dm, deformedVerts);
+
+	clothModifier_do(psys->clmd, sim->scene, sim->ob, dm, deformedVerts);
+
+	CDDM_apply_vert_coords(psys->hair_out_dm, deformedVerts);
+
+	MEM_freeN(deformedVerts);
 
 	psys->clmd->sim_parms->effector_weights = NULL;
 }
@@ -4402,6 +4428,7 @@ void particle_system_update(Scene *scene, Object *ob, ParticleSystem *psys)
 			if(psys->totpart == 0 && part->totpart == 0) {
 				psys_free_path_cache(psys, NULL);
 				free_hair(ob, psys, 0);
+				psys->flag |= PSYS_HAIR_DONE;
 			}
 			/* (re-)create hair */
 			else if(hair_needs_recalc(psys)) {

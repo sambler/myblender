@@ -29,8 +29,8 @@
  *  \ingroup DNA
  */
 
-#ifndef DNA_SMOKE_TYPES_H
-#define DNA_SMOKE_TYPES_H
+#ifndef __DNA_SMOKE_TYPES_H__
+#define __DNA_SMOKE_TYPES_H__
 
 /* flags */
 #define MOD_SMOKE_HIGHRES (1<<1) /* enable high resolution */
@@ -138,7 +138,8 @@ typedef struct SmokeFlowSettings {
 typedef struct SmokeCollSettings {
 	struct SmokeModifierData *smd; /* for fast RNA access */
 	struct BVHTree *bvhtree; /* bounding volume hierarchy for this cloth object */
-	struct DerivedMesh *dm;
+
+//	struct DerivedMesh *dm; // UNUSED, ifdef'd in code for now.
 	float *points;
 	float *points_old;
 	float *vel;

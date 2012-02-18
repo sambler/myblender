@@ -536,7 +536,7 @@ static int modifier_apply_obdata(ReportList *reports, Scene *scene, Object *ob, 
 		int numVerts;
 		float (*vertexCos)[3];
 
-		if (mti->type==eModifierTypeType_Constructive) {
+		if (ELEM(mti->type, eModifierTypeType_Constructive, eModifierTypeType_Nonconstructive)) {
 			BKE_report(reports, RPT_ERROR, "Cannot apply constructive modifiers on curve");
 			return 0;
 		}
@@ -1236,7 +1236,7 @@ void OBJECT_OT_multires_external_save(wmOperatorType *ot)
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 
-	WM_operator_properties_filesel(ot, FOLDERFILE|BTXFILE, FILE_SPECIAL, FILE_SAVE, WM_FILESEL_FILEPATH|WM_FILESEL_RELPATH);
+	WM_operator_properties_filesel(ot, FOLDERFILE|BTXFILE, FILE_SPECIAL, FILE_SAVE, WM_FILESEL_FILEPATH|WM_FILESEL_RELPATH, FILE_DEFAULTDISPLAY);
 	edit_modifier_properties(ot);
 }
 

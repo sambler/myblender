@@ -22,8 +22,8 @@
  *  \ingroup DNA
  */
 
-#ifndef DNA_MODIFIER_TYPES_H
-#define DNA_MODIFIER_TYPES_H
+#ifndef __DNA_MODIFIER_TYPES_H__
+#define __DNA_MODIFIER_TYPES_H__
 
 #include "DNA_defs.h"
 #include "DNA_listBase.h"
@@ -773,7 +773,7 @@ typedef struct OceanModifierData {
 	int		bakestart;
 	int		bakeend;
 	
-	char	cachepath[240];	// FILE_MAX
+	char	cachepath[1024];	// FILE_MAX
 	char	foamlayername[64];	/* MAX_CUSTOMDATA_LAYER_NAME */
 	char	cached;
 	char	geometry_mode;

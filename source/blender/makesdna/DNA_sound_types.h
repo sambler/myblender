@@ -30,8 +30,8 @@
  *  \author nzc
  */
 
-#ifndef DNA_SOUND_TYPES_H
-#define DNA_SOUND_TYPES_H
+#ifndef __DNA_SOUND_TYPES_H__
+#define __DNA_SOUND_TYPES_H__
 
 #include "DNA_listBase.h"
 #include "DNA_ID.h"
@@ -49,7 +49,7 @@ typedef struct bSound {
 	/**
 	 * The path to the sound file.
 	 */
-	char name[240];  /* 240 = FILE_MAX */
+	char name[1024];  /* 1024 = FILE_MAX */
 
 	/**
 	 * The packed file.

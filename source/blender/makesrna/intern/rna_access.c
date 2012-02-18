@@ -475,7 +475,7 @@ static const char *rna_ensure_property_description(PropertyRNA *prop)
 	}
 
 #ifdef WITH_INTERNATIONAL
-	if(description && (U.transopts&USER_DOTRANSLATE) && (U.transopts&USER_TR_TOOLTIPS))
+	if(description && BLF_translate_tooltips())
 		description= BLF_gettext(description);
 #endif
 
@@ -492,7 +492,7 @@ static const char *rna_ensure_property_name(PropertyRNA *prop)
 		name= ((IDProperty*)prop)->name;
 
 #ifdef WITH_INTERNATIONAL
-	if((U.transopts&USER_DOTRANSLATE) && (U.transopts&USER_TR_IFACE)) {
+	if(BLF_translate_iface()) {
 		if(prop->translation_context)
 			name = BLF_pgettext(prop->translation_context, name);
 		else
@@ -1182,7 +1182,7 @@ void RNA_property_enum_items_gettexted(bContext *C, PointerRNA *ptr, PropertyRNA
 	RNA_property_enum_items(C, ptr, prop, item, totitem, free);
 
 #ifdef WITH_INTERNATIONAL
-	if((U.transopts&USER_DOTRANSLATE) && (U.transopts&USER_TR_IFACE)) {
+	if(BLF_translate_iface()) {
 		int i;
 		EnumPropertyItem *nitem;
 
@@ -3979,6 +3979,8 @@ static char *rna_idp_path(PointerRNA *ptr, IDProperty *haystack, IDProperty *nee
 								}
 							}
 						}
+						if(path)
+							break;
 					}
 				}
 			}
@@ -4745,8 +4747,15 @@ ParameterList *RNA_parameter_list_create(ParameterList *parms, PointerRNA *UNUSE
 					break;
 				case PROP_STRING: {
 					const char *defvalue= ((StringPropertyRNA*)parm)->defaultvalue;
-					if(defvalue && defvalue[0])
+					if(defvalue && defvalue[0]) {
+						/* causes bug [#29988], possibly this is only correct for thick wrapped
+						 * need to look further into it - campbell */
+#if 0
+						BLI_strncpy(data, defvalue, size);
+#else
 						memcpy(data, &defvalue, size);
+#endif
+					}
 					break;
 				}
 				case PROP_POINTER:

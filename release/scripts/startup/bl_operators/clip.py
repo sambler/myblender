@@ -69,7 +69,7 @@ def CLIP_camera_for_clip(context, clip):
         if ob.type == 'CAMERA':
             for con in ob.constraints:
                 if con.type == 'CAMERA_SOLVER':
-                    cur_clip = scene.clip if con.use_active_clip else con.clip
+                    cur_clip = scene.active_clip if con.use_active_clip else con.clip
 
                     if cur_clip == clip:
                         return ob
@@ -88,6 +88,34 @@ def CLIP_track_view_selected(sc, track):
         return True
 
     return False
+
+
+def CLIP_default_settings_from_track(clip, track):
+    settings = clip.tracking.settings
+
+    width = clip.size[0]
+    height = clip.size[1]
+
+    pattern = track.pattern_max - track.pattern_min
+    search = track.search_max - track.search_min
+
+    pattern[0] = pattern[0] * clip.size[0]
+    pattern[1] = pattern[1] * clip.size[1]
+
+    search[0] = search[0] * clip.size[0]
+    search[1] = search[1] * clip.size[1]
+
+    settings.default_tracker = track.tracker
+    settings.default_pyramid_levels = track.pyramid_levels
+    settings.default_correlation_min = track.correlation_min
+    settings.default_pattern_size = max(pattern[0], pattern[1])
+    settings.default_search_size = max(search[0], search[1])
+    settings.default_frames_limit = track.frames_limit
+    settings.default_pattern_match = track.pattern_match
+    settings.default_margin = track.margin
+    settings.use_default_red_channel = track.use_red_channel
+    settings.use_default_green_channel = track.use_green_channel
+    settings.use_default_blue_channel = track.use_blue_channel
 
 
 class CLIP_OT_track_to_empty(Operator):
@@ -115,6 +143,7 @@ class CLIP_OT_track_to_empty(Operator):
         if constraint is None:
             constraint = ob.constraints.new(type='FOLLOW_TRACK')
 
+        constraint.use_active_clip = False
         constraint.clip = sc.clip
         constraint.track = track.name
         constraint.use_3d_position = False
@@ -247,8 +276,8 @@ class CLIP_OT_delete_proxy(Operator):
 
 
 class CLIP_OT_set_viewport_background(Operator):
-    """Set current movie clip as a camera background in 3D viewport \
-(works only when a 3D viewport is visible)"""
+    """Set current movie clip as a camera background in 3D view-port """ \
+    """(works only when a 3D view-port is visible)"""
 
     bl_idname = "clip.set_viewport_background"
     bl_label = "Set as Background"
@@ -286,9 +315,9 @@ object's movement caused by this constraint"""
         frame_current = scene.frame_current
         matrices = []
 
-        # Find constraint which would eb converting
+        # Find constraint which would be converting
         # TODO: several camera solvers and track followers would fail,
-        #       but can't think about eal workflow where it'll be useful
+        #       but can't think about real work-flow where it'll be useful
         for x in ob.constraints:
             if x.type in {'CAMERA_SOLVER', 'FOLLOW_TRACK', 'OBJECT_SOLVER'}:
                 con = x
@@ -340,7 +369,7 @@ object's movement caused by this constraint"""
 
         ob.animation_data_create()
 
-        # Apply matrices on object and insert keyframes
+        # Apply matrices on object and insert key-frames
         i = 0
         for x in range(sfra, efra + 1):
             scene.frame_set(x)
@@ -763,7 +792,7 @@ class CLIP_OT_setup_tracking_scene(Operator):
 
         all_layers = self._mergeLayers(fg.layers, bg.layers)
 
-        # enshure all lamps are active on foreground and background
+        # ensure all lamps are active on foreground and background
         has_lamp = False
         has_mesh = False
         for ob in scene.objects:
@@ -803,5 +832,32 @@ class CLIP_OT_setup_tracking_scene(Operator):
         self._setupRenderLayers(context)
         self._setupNodes(context)
         self._setupObjects(context)
+
+        return {'FINISHED'}
+
+
+class CLIP_OT_track_settings_as_default(Operator):
+    """Copy tracking settings from active track to default settings"""
+
+    bl_idname = "clip.track_settings_as_default"
+    bl_label = "Track Settings As Default"
+    bl_options = {'UNDO', 'REGISTER'}
+
+    @classmethod
+    def poll(cls, context):
+        sc = context.space_data
+
+        if sc.type != 'CLIP_EDITOR':
+            return False
+
+        clip = sc.clip
+
+        return clip and clip.tracking.tracks.active
+
+    def execute(self, context):
+        sc = context.space_data
+        clip = sc.clip
+
+        CLIP_default_settings_from_track(clip, clip.tracking.tracks.active)
 
         return {'FINISHED'}

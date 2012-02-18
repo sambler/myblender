@@ -29,8 +29,8 @@
  *  \ingroup editorui
  */
 
-#ifndef UI_INTERFACE_ICONS_H
-#define UI_INTERFACE_ICONS_H
+#ifndef __UI_INTERFACE_ICONS_H__
+#define __UI_INTERFACE_ICONS_H__
 
 struct Image;
 struct ImBuf;
@@ -41,7 +41,7 @@ struct Material;
 
 typedef struct IconFile {
 	struct IconFile *next, *prev;
-	char filename[80];	// FILE_MAXFILE size
+	char filename[256];	// FILE_MAXFILE size
 	int index;
 } IconFile;
 
@@ -75,4 +75,4 @@ struct ListBase *UI_iconfile_list(void);
 int UI_iconfile_get_index(const char *filename);
 
 
-#endif /*  UI_INTERFACE_ICONS_H */
+#endif /*  __UI_INTERFACE_ICONS_H__ */

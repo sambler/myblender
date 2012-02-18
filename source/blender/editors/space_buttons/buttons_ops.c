@@ -43,6 +43,7 @@
 #include "BKE_context.h"
 #include "BKE_global.h"
 #include "BKE_main.h"
+#include "BKE_report.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
@@ -160,6 +161,11 @@ static int file_browse_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	FileBrowseOp *fbo;
 	char *str;
 
+	if (CTX_wm_space_file(C)) {
+		BKE_report(op->reports, RPT_ERROR, "Can't activate a file selector, one already open");
+		return OPERATOR_CANCELLED;
+	}
+
 	uiFileBrowseContextProperty(C, &ptr, &prop);
 
 	if(!prop)
@@ -224,7 +230,7 @@ void BUTTONS_OT_file_browse(wmOperatorType *ot)
 	ot->cancel= file_browse_cancel;
 
 	/* properties */
-	WM_operator_properties_filesel(ot, 0, FILE_SPECIAL, FILE_OPENFILE, WM_FILESEL_FILEPATH|WM_FILESEL_RELPATH);
+	WM_operator_properties_filesel(ot, 0, FILE_SPECIAL, FILE_OPENFILE, WM_FILESEL_FILEPATH|WM_FILESEL_RELPATH, FILE_DEFAULTDISPLAY);
 }
 
 /* second operator, only difference from BUTTONS_OT_file_browse is WM_FILESEL_DIRECTORY */
@@ -241,5 +247,5 @@ void BUTTONS_OT_directory_browse(wmOperatorType *ot)
 	ot->cancel= file_browse_cancel;
 
 	/* properties */
-	WM_operator_properties_filesel(ot, 0, FILE_SPECIAL, FILE_OPENFILE, WM_FILESEL_DIRECTORY|WM_FILESEL_RELPATH);
+	WM_operator_properties_filesel(ot, 0, FILE_SPECIAL, FILE_OPENFILE, WM_FILESEL_DIRECTORY|WM_FILESEL_RELPATH, FILE_DEFAULTDISPLAY);
 }

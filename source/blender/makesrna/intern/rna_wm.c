@@ -67,6 +67,14 @@ EnumPropertyItem event_value_items[] = {
 	{KM_RELEASE, "RELEASE", 0, "Release", ""},
 	{KM_CLICK, "CLICK", 0, "Click", ""},
 	{KM_DBL_CLICK, "DOUBLE_CLICK", 0, "Double Click", ""},
+	{EVT_GESTURE_N, "NORTH", 0, "North", ""},
+	{EVT_GESTURE_NE, "NORTH_EAST", 0, "North-East", ""},
+	{EVT_GESTURE_E, "EAST", 0, "East", ""},
+	{EVT_GESTURE_SE, "SOUTH_EAST", 0, "South-East", ""},
+	{EVT_GESTURE_S, "SOUTH", 0, "South", ""},
+	{EVT_GESTURE_SW, "SOUTH_WEST", 0, "South-West", ""},
+	{EVT_GESTURE_W, "WEST", 0, "West", ""},
+	{EVT_GESTURE_NW, "NORTH_WEST", 0, "North-West", ""},
 	{0, NULL, 0, NULL, NULL}};
 
 EnumPropertyItem event_tweak_type_items[]= {
@@ -295,43 +303,44 @@ EnumPropertyItem event_type_items[] = {
 	{TIMER1, "TIMER1", 0, "Timer 1", ""},
 	{TIMER2, "TIMER2", 0, "Timer 2", ""},
 	{0, "", 0, NULL, NULL},
+	{NDOF_MOTION, "NDOF_MOTION", 0, "NDOF Motion", ""},
 	/* buttons on all 3dconnexion devices */
-	{NDOF_BUTTON_MENU, "NDOF_BUTTON_MENU", 0, "Menu", ""},
-	{NDOF_BUTTON_FIT, "NDOF_BUTTON_FIT", 0, "Fit", ""},
+	{NDOF_BUTTON_MENU, "NDOF_BUTTON_MENU", 0, "NDOF Menu", ""},
+	{NDOF_BUTTON_FIT, "NDOF_BUTTON_FIT", 0, "NDOF Fit", ""},
 	/* view buttons */
-	{NDOF_BUTTON_TOP, "NDOF_BUTTON_TOP", 0, "Top", ""},
-	{NDOF_BUTTON_BOTTOM, "NDOF_BUTTON_BOTTOM", 0, "Bottom", ""},
-	{NDOF_BUTTON_LEFT, "NDOF_BUTTON_LEFT", 0, "Left", ""},
-	{NDOF_BUTTON_RIGHT, "NDOF_BUTTON_RIGHT", 0, "Right", ""},
-	{NDOF_BUTTON_FRONT, "NDOF_BUTTON_FRONT", 0, "Front", ""},
-	{NDOF_BUTTON_BACK, "NDOF_BUTTON_BACK", 0, "Back", ""},
+	{NDOF_BUTTON_TOP, "NDOF_BUTTON_TOP", 0, "NDOF Top", ""},
+	{NDOF_BUTTON_BOTTOM, "NDOF_BUTTON_BOTTOM", 0, "NDOF Bottom", ""},
+	{NDOF_BUTTON_LEFT, "NDOF_BUTTON_LEFT", 0, "NDOF Left", ""},
+	{NDOF_BUTTON_RIGHT, "NDOF_BUTTON_RIGHT", 0, "NDOF Right", ""},
+	{NDOF_BUTTON_FRONT, "NDOF_BUTTON_FRONT", 0, "NDOF Front", ""},
+	{NDOF_BUTTON_BACK, "NDOF_BUTTON_BACK", 0, "NDOF Back", ""},
 	/* more views */
-	{NDOF_BUTTON_ISO1, "NDOF_BUTTON_ISO1", 0, "ISO 1", ""},
-	{NDOF_BUTTON_ISO2, "NDOF_BUTTON_ISO2", 0, "ISO 2", ""},
+	{NDOF_BUTTON_ISO1, "NDOF_BUTTON_ISO1", 0, "NDOF ISO 1", ""},
+	{NDOF_BUTTON_ISO2, "NDOF_BUTTON_ISO2", 0, "NDOF ISO 2", ""},
 	/* 90 degree rotations */
-	{NDOF_BUTTON_ROLL_CW, "NDOF_BUTTON_ROLL_CW", 0, "Roll CW", ""},
-	{NDOF_BUTTON_ROLL_CCW, "NDOF_BUTTON_ROLL_CCW", 0, "Roll CCW", ""},
-	{NDOF_BUTTON_SPIN_CW, "NDOF_BUTTON_SPIN_CW", 0, "Spin CW", ""},
-	{NDOF_BUTTON_SPIN_CCW, "NDOF_BUTTON_SPIN_CCW", 0, "Spin CCW", ""},
-	{NDOF_BUTTON_TILT_CW, "NDOF_BUTTON_TILT_CW", 0, "Tilt CW", ""},
-	{NDOF_BUTTON_TILT_CCW, "NDOF_BUTTON_TILT_CCW", 0, "Tilt CCW", ""},
+	{NDOF_BUTTON_ROLL_CW, "NDOF_BUTTON_ROLL_CW", 0, "NDOF Roll CW", ""},
+	{NDOF_BUTTON_ROLL_CCW, "NDOF_BUTTON_ROLL_CCW", 0, "NDOF Roll CCW", ""},
+	{NDOF_BUTTON_SPIN_CW, "NDOF_BUTTON_SPIN_CW", 0, "NDOF Spin CW", ""},
+	{NDOF_BUTTON_SPIN_CCW, "NDOF_BUTTON_SPIN_CCW", 0, "NDOF Spin CCW", ""},
+	{NDOF_BUTTON_TILT_CW, "NDOF_BUTTON_TILT_CW", 0, "NDOF Tilt CW", ""},
+	{NDOF_BUTTON_TILT_CCW, "NDOF_BUTTON_TILT_CCW", 0, "NDOF Tilt CCW", ""},
 	/* device control */
-	{NDOF_BUTTON_ROTATE, "NDOF_BUTTON_ROTATE", 0, "Rotate", ""},
-	{NDOF_BUTTON_PANZOOM, "NDOF_BUTTON_PANZOOM", 0, "Pan/Zoom", ""},
-	{NDOF_BUTTON_DOMINANT, "NDOF_BUTTON_DOMINANT", 0, "Dominant", ""},
-	{NDOF_BUTTON_PLUS, "NDOF_BUTTON_PLUS", 0, "Plus", ""},
-	{NDOF_BUTTON_MINUS, "NDOF_BUTTON_MINUS", 0, "Minus", ""},
+	{NDOF_BUTTON_ROTATE, "NDOF_BUTTON_ROTATE", 0, "NDOF Rotate", ""},
+	{NDOF_BUTTON_PANZOOM, "NDOF_BUTTON_PANZOOM", 0, "NDOF Pan/Zoom", ""},
+	{NDOF_BUTTON_DOMINANT, "NDOF_BUTTON_DOMINANT", 0, "NDOF Dominant", ""},
+	{NDOF_BUTTON_PLUS, "NDOF_BUTTON_PLUS", 0, "NDOF Plus", ""},
+	{NDOF_BUTTON_MINUS, "NDOF_BUTTON_MINUS", 0, "NDOF Minus", ""},
 	/* general-purpose buttons */
-	{NDOF_BUTTON_1, "NDOF_BUTTON_1", 0, "Button 1", ""},
-	{NDOF_BUTTON_2, "NDOF_BUTTON_2", 0, "Button 2", ""},
-	{NDOF_BUTTON_3, "NDOF_BUTTON_3", 0, "Button 3", ""},
-	{NDOF_BUTTON_4, "NDOF_BUTTON_4", 0, "Button 4", ""},
-	{NDOF_BUTTON_5, "NDOF_BUTTON_5", 0, "Button 5", ""},
-	{NDOF_BUTTON_6, "NDOF_BUTTON_6", 0, "Button 6", ""},
-	{NDOF_BUTTON_7, "NDOF_BUTTON_7", 0, "Button 7", ""},
-	{NDOF_BUTTON_8, "NDOF_BUTTON_8", 0, "Button 8", ""},
-	{NDOF_BUTTON_9, "NDOF_BUTTON_9", 0, "Button 9", ""},
-	{NDOF_BUTTON_10, "NDOF_BUTTON_10", 0, "Button 10", ""},
+	{NDOF_BUTTON_1, "NDOF_BUTTON_1", 0, "NDOF Button 1", ""},
+	{NDOF_BUTTON_2, "NDOF_BUTTON_2", 0, "NDOF Button 2", ""},
+	{NDOF_BUTTON_3, "NDOF_BUTTON_3", 0, "NDOF Button 3", ""},
+	{NDOF_BUTTON_4, "NDOF_BUTTON_4", 0, "NDOF Button 4", ""},
+	{NDOF_BUTTON_5, "NDOF_BUTTON_5", 0, "NDOF Button 5", ""},
+	{NDOF_BUTTON_6, "NDOF_BUTTON_6", 0, "NDOF Button 6", ""},
+	{NDOF_BUTTON_7, "NDOF_BUTTON_7", 0, "NDOF Button 7", ""},
+	{NDOF_BUTTON_8, "NDOF_BUTTON_8", 0, "NDOF Button 8", ""},
+	{NDOF_BUTTON_9, "NDOF_BUTTON_9", 0, "NDOF Button 9", ""},
+	{NDOF_BUTTON_10, "NDOF_BUTTON_10", 0, "NDOF Button 10", ""},
 	{0, NULL, 0, NULL, NULL}};	
 
 EnumPropertyItem keymap_propvalue_items[] = {
@@ -1050,6 +1059,9 @@ static StructRNA *rna_Operator_register(Main *bmain, ReportList *reports, void *
 			rna_Operator_unregister(bmain, ot->ext.srna);
 	}
 
+	/* XXX, this doubles up with the operator name [#29666]
+	 * for now just remove from dir(bpy.types) */
+
 	/* create a new operator type */
 	dummyot.ext.srna= RNA_def_struct(&BLENDER_RNA, dummyot.idname, "Operator");
 	RNA_def_struct_flag(dummyot.ext.srna, STRUCT_NO_IDPROPERTIES); /* operator properties are registered separately */
@@ -1126,7 +1138,10 @@ static StructRNA *rna_MacroOperator_register(Main *bmain, ReportList *reports, v
 			rna_Operator_unregister(bmain, ot->ext.srna);
 	}
 
-	/* create a new menu type */
+	/* XXX, this doubles up with the operator name [#29666]
+	 * for now just remove from dir(bpy.types) */
+
+	/* create a new operator type */
 	dummyot.ext.srna= RNA_def_struct(&BLENDER_RNA, dummyot.idname, "Operator");
 	dummyot.ext.data= data;
 	dummyot.ext.call= call;
@@ -1230,6 +1245,9 @@ static void rna_def_operator(BlenderRNA *brna)
 	RNA_def_property_flag(prop, PROP_REGISTER|PROP_NEVER_CLAMP);
 	RNA_def_struct_name_property(srna, prop);
 
+	/* operator's label indeed doesn't need PROP_TRANSLATE flag: translation of label happens in runtime
+	 * when drawing panel and having this flag set will make runtime switching of language much more tricky
+	 * because label will be stored translated */
 	prop= RNA_def_property(srna, "bl_label", PROP_STRING, PROP_NONE);
 	RNA_def_property_string_sdna(prop, NULL, "type->name");
 	RNA_def_property_string_maxlength(prop, RNA_DYN_DESCR_MAX); /* else it uses the pointer size! */
@@ -1291,7 +1309,10 @@ static void rna_def_macro_operator(BlenderRNA *brna)
 	RNA_def_property_flag(prop, PROP_REGISTER|PROP_NEVER_CLAMP);
 	RNA_def_struct_name_property(srna, prop);
 
-	prop= RNA_def_property(srna, "bl_label", PROP_STRING, PROP_TRANSLATE);
+	/* menu's label indeed doesn't need PROP_TRANSLATE flag: translation of label happens in runtime
+	 * when drawing panel and having this flag set will make runtime switching of language much more tricky
+	 * because label will be stored translated */
+	prop= RNA_def_property(srna, "bl_label", PROP_STRING, PROP_NONE);
 	RNA_def_property_string_sdna(prop, NULL, "type->name");
 	RNA_def_property_string_maxlength(prop, RNA_DYN_DESCR_MAX); /* else it uses the pointer size! */
 	RNA_def_property_string_funcs(prop, NULL, NULL, "rna_Operator_bl_label_set");

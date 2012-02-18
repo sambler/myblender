@@ -24,8 +24,8 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
-#ifndef BKE_TRACKING_H
-#define BKE_TRACKING_H
+#ifndef __BKE_TRACKING_H__
+#define __BKE_TRACKING_H__
 
 /** \file BKE_trackingp.h
  *  \ingroup bke
@@ -61,6 +61,7 @@ struct MovieTrackingMarker *BKE_tracking_get_marker(struct MovieTrackingTrack *t
 struct MovieTrackingMarker *BKE_tracking_ensure_marker(struct MovieTrackingTrack *track, int framenr);
 struct MovieTrackingMarker *BKE_tracking_exact_marker(struct MovieTrackingTrack *track, int framenr);
 int BKE_tracking_has_marker(struct MovieTrackingTrack *track, int framenr);
+int BKE_tracking_has_enabled_marker(struct MovieTrackingTrack *track, int framenr);
 
 void BKE_tracking_free_track(struct MovieTrackingTrack *track);
 
@@ -137,7 +138,7 @@ void BKE_tracking_detect_fast(struct MovieTracking *tracking, struct ListBase *t
 /* 2D stabilization */
 void BKE_tracking_stabilization_data(struct MovieTracking *tracking, int framenr, int width, int height, float loc[2], float *scale, float *angle);
 struct ImBuf *BKE_tracking_stabilize(struct MovieTracking *tracking, int framenr, struct ImBuf *ibuf, float loc[2], float *scale, float *angle);
-void BKE_tracking_stabdata_to_mat4(int width, int height, float loc[2], float scale, float angle, float mat[4][4]);
+void BKE_tracking_stabdata_to_mat4(int width, int height, float aspect, float loc[2], float scale, float angle, float mat[4][4]);
 
 /* Distortion/Undistortion */
 void BKE_tracking_apply_intrinsics(struct MovieTracking *tracking, float co[2], float nco[2]);

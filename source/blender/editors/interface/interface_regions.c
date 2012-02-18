@@ -1541,6 +1541,8 @@ uiPopupBlockHandle *ui_popup_block_create(bContext *C, ARegion *butregion, uiBut
 		if(ELEM(but->type, BLOCK, PULLDOWN))
 			block->xofs = -2;	/* for proper alignment */
 
+		block->aspect = but->block->aspect;
+
 		ui_block_position(window, butregion, but, block);
 	}
 	else {
@@ -2655,8 +2657,13 @@ void uiPupBlockOperator(bContext *C, uiBlockCreateFunc func, wmOperator *op, int
 void uiPupBlockClose(bContext *C, uiBlock *block)
 {
 	if(block->handle) {
-		UI_remove_popup_handlers(&CTX_wm_window(C)->modalhandlers, block->handle);
-		ui_popup_block_free(C, block->handle);
+		wmWindow *win = CTX_wm_window(C);
+
+		/* if loading new .blend while popup is open, window will be NULL */
+		if(win) {
+			UI_remove_popup_handlers(&win->modalhandlers, block->handle);
+			ui_popup_block_free(C, block->handle);
+		}
 	}
 }
 

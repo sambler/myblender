@@ -64,6 +64,7 @@
 #include "BLI_mempool.h"
 #include "BLI_threads.h"
 
+#include "BKE_animsys.h"
 #include "BKE_constraint.h"
 #include "BKE_library.h"
 #include "BKE_global.h"
@@ -276,9 +277,10 @@ typedef struct MovieClipCache {
 	struct {
 		ImBuf *ibuf;
 		int framenr;
+		int postprocess_flag;
 
-		float loc[2], scale, angle;
-		int proxy;
+		float loc[2], scale, angle, aspect;
+		int proxy, filter;
 		short render_flag;
 	} stabilized;
 } MovieClipCache;
@@ -631,7 +633,8 @@ static ImBuf *put_postprocessed_frame_to_cache(MovieClip *clip, MovieClipUser *u
 	return postproc_ibuf;
 }
 
-static ImBuf *movieclip_get_postprocessed_ibuf(MovieClip *clip, MovieClipUser *user, int flag, int postprocess_flag)
+static ImBuf *movieclip_get_postprocessed_ibuf(MovieClip *clip, MovieClipUser *user, int flag,
+                                               int postprocess_flag, int cache_flag)
 {
 	ImBuf *ibuf= NULL;
 	int framenr= user->framenr, need_postprocess= 0;
@@ -664,7 +667,7 @@ static ImBuf *movieclip_get_postprocessed_ibuf(MovieClip *clip, MovieClipUser *u
 			ibuf= movieclip_load_movie_file(clip, user, framenr, flag);
 		}
 
-		if(ibuf)
+		if(ibuf && (cache_flag & MOVIECLIP_CACHE_SKIP) == 0)
 			put_imbuf_cache(clip, user, ibuf, flag);
 	}
 
@@ -687,22 +690,23 @@ static ImBuf *movieclip_get_postprocessed_ibuf(MovieClip *clip, MovieClipUser *u
 
 ImBuf *BKE_movieclip_get_ibuf(MovieClip *clip, MovieClipUser *user)
 {
-	return BKE_movieclip_get_ibuf_flag(clip, user, clip->flag);
+	return BKE_movieclip_get_ibuf_flag(clip, user, clip->flag, 0);
 }
 
-ImBuf *BKE_movieclip_get_ibuf_flag(MovieClip *clip, MovieClipUser *user, int flag)
+ImBuf *BKE_movieclip_get_ibuf_flag(MovieClip *clip, MovieClipUser *user, int flag, int cache_flag)
 {
-	return movieclip_get_postprocessed_ibuf(clip, user, flag, 0);
+	return movieclip_get_postprocessed_ibuf(clip, user, flag, 0, cache_flag);
 }
 
 ImBuf *BKE_movieclip_get_postprocessed_ibuf(MovieClip *clip, MovieClipUser *user, int postprocess_flag)
 {
-	return movieclip_get_postprocessed_ibuf(clip, user, clip->flag, postprocess_flag);
+	return movieclip_get_postprocessed_ibuf(clip, user, clip->flag, postprocess_flag, 0);
 }
 
-static ImBuf *get_stable_cached_frame(MovieClip *clip, MovieClipUser *user, int framenr)
+static ImBuf *get_stable_cached_frame(MovieClip *clip, MovieClipUser *user, int framenr, int postprocess_flag)
 {
 	MovieClipCache *cache = clip->cache;
+	MovieTracking *tracking = &clip->tracking;
 	ImBuf *stableibuf;
 	float tloc[2], tscale, tangle;
 	short proxy = IMB_PROXY_NONE;
@@ -719,6 +723,16 @@ static ImBuf *get_stable_cached_frame(MovieClip *clip, MovieClipUser *user, int 
 
 	/* cached ibuf used different proxy settings */
 	if(cache->stabilized.render_flag!=render_flag || cache->stabilized.proxy!=proxy)
+		return NULL;
+
+	if(cache->stabilized.postprocess_flag != postprocess_flag)
+		return NULL;
+
+	/* stabilization also depends on pixel aspect ratio */
+	if(cache->stabilized.aspect != tracking->camera.pixel_aspect)
+		return NULL;
+
+	if(cache->stabilized.filter != tracking->stabilization.filter)
 		return NULL;
 
 	stableibuf = cache->stabilized.ibuf;
@@ -738,9 +752,11 @@ static ImBuf *get_stable_cached_frame(MovieClip *clip, MovieClipUser *user, int 
 	return stableibuf;
 }
 
-static ImBuf *put_stabilized_frame_to_cache(MovieClip *clip, MovieClipUser *user, ImBuf *ibuf, int framenr)
+static ImBuf *put_stabilized_frame_to_cache(MovieClip *clip, MovieClipUser *user, ImBuf *ibuf,
+                                            int framenr, int postprocess_flag)
 {
 	MovieClipCache *cache = clip->cache;
+	MovieTracking *tracking = &clip->tracking;
 	ImBuf *stableibuf;
 	float tloc[2], tscale, tangle;
 
@@ -756,6 +772,8 @@ static ImBuf *put_stabilized_frame_to_cache(MovieClip *clip, MovieClipUser *user
 	cache->stabilized.scale = tscale;
 	cache->stabilized.angle = tangle;
 	cache->stabilized.framenr = framenr;
+	cache->stabilized.aspect = tracking->camera.pixel_aspect;
+	cache->stabilized.filter = tracking->stabilization.filter;
 
 	if(clip->flag&MCLIP_USE_PROXY) {
 		cache->stabilized.proxy= rendersize_to_proxy(user, clip->flag);
@@ -765,6 +783,8 @@ static ImBuf *put_stabilized_frame_to_cache(MovieClip *clip, MovieClipUser *user
 		cache->stabilized.proxy = IMB_PROXY_NONE;
 		cache->stabilized.render_flag = 0;
 	}
+
+	cache->stabilized.postprocess_flag = postprocess_flag;
 
 	IMB_refImBuf(stableibuf);
 
@@ -784,10 +804,10 @@ ImBuf *BKE_movieclip_get_stable_ibuf(MovieClip *clip, MovieClipUser *user, float
 	if(clip->tracking.stabilization.flag&TRACKING_2D_STABILIZATION) {
 		MovieClipCache *cache= clip->cache;
 
-		stableibuf= get_stable_cached_frame(clip, user, framenr);
+		stableibuf= get_stable_cached_frame(clip, user, framenr, postprocess_flag);
 
 		if(!stableibuf)
-			stableibuf= put_stabilized_frame_to_cache(clip, user, ibuf, framenr);
+			stableibuf= put_stabilized_frame_to_cache(clip, user, ibuf, framenr, postprocess_flag);
 
 		if(loc)		copy_v2_v2(loc, cache->stabilized.loc);
 		if(scale)	*scale= cache->stabilized.scale;
@@ -888,6 +908,8 @@ static void free_buffers(MovieClip *clip)
 		IMB_free_anim(clip->anim);
 		clip->anim= FALSE;
 	}
+
+	BKE_free_animdata((ID *) clip);
 }
 
 void BKE_movieclip_reload(MovieClip *clip)
@@ -1021,7 +1043,7 @@ void BKE_movieclip_build_proxy_frame(MovieClip *clip, int clip_flag, struct Movi
 	user.render_flag= 0;
 	user.render_size= MCLIP_PROXY_RENDER_SIZE_FULL;
 
-	ibuf= BKE_movieclip_get_ibuf_flag(clip, &user, clip_flag);
+	ibuf= BKE_movieclip_get_ibuf_flag(clip, &user, clip_flag, MOVIECLIP_CACHE_SKIP);
 
 	if(ibuf) {
 		ImBuf *tmpibuf= ibuf;

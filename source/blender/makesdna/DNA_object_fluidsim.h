@@ -31,8 +31,8 @@
  *  \ingroup DNA
  */
 
-#ifndef DNA_OBJECT_FLUIDSIM_H
-#define DNA_OBJECT_FLUIDSIM_H
+#ifndef __DNA_OBJECT_FLUIDSIM_H__
+#define __DNA_OBJECT_FLUIDSIM_H__
 
 #include "DNA_ID.h"
 
@@ -75,6 +75,9 @@ typedef struct FluidsimSettings {
 	float animStart, animEnd;
 	/* bake start end time (in blender frames) */
 	int bakeStart, bakeEnd;
+	/* offset for baked frames */
+	int frameOffset;
+	int pad;
 	/* g star param (LBM compressibility) */
 	float gstar;
 	/* activate refinement? */

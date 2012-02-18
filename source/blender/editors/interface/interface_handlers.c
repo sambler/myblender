@@ -1527,6 +1527,8 @@ static void ui_textedit_move(uiBut *but, uiHandleButtonData *data, int direction
 	const int pos_prev= but->pos;
 	const int has_sel= (but->selend - but->selsta) > 0;
 
+	ui_check_but(but);
+
 	/* special case, quit selection and set cursor */
 	if (has_sel && !select) {
 		if (jump == BUTTON_EDIT_JUMP_ALL) {
@@ -3030,12 +3032,28 @@ static int ui_do_but_BLOCK(bContext *C, uiBut *but, uiHandleButtonData *data, wm
 				data->value= ui_step_name_menu(but, -1);
 				button_activate_state(C, but, BUTTON_STATE_EXIT);
 				ui_apply_button(C, but->block, but, data, 1);
+
+				/* button's state need to be changed to EXIT so moving mouse away from this mouse wouldn't lead
+				 * to cancel changes made to this button, but shanging state to EXIT also makes no button active for
+				 * a while which leads to triggering operator when doing fast scrolling mouse wheel.
+				 * using post activate stuff from button allows to make button be active again after checking for all
+				 * all that mouse leave and cancel stuff, so wuick scrool wouldnt't be an issue anumore.
+				 * same goes for scrolling wheel in another direction below (sergey)
+				 */
+				data->postbut= but;
+				data->posttype= BUTTON_ACTIVATE_OVER;
+
 				return WM_UI_HANDLER_BREAK;
 			}
 			else if(event->type == WHEELUPMOUSE && event->alt) {
 				data->value= ui_step_name_menu(but, 1);
 				button_activate_state(C, but, BUTTON_STATE_EXIT);
 				ui_apply_button(C, but->block, but, data, 1);
+
+				/* why this is needed described above */
+				data->postbut= but;
+				data->posttype= BUTTON_ACTIVATE_OVER;
+
 				return WM_UI_HANDLER_BREAK;
 			}
 		}
@@ -3589,31 +3607,6 @@ static int ui_do_but_HSVCIRCLE(bContext *C, uiBlock *block, uiBut *but, uiHandle
 }
 
 
-static int verg_colorband(const void *a1, const void *a2)
-{
-	const CBData *x1=a1, *x2=a2;
-	
-	if( x1->pos > x2->pos ) return 1;
-	else if( x1->pos < x2->pos) return -1;
-	return WM_UI_HANDLER_CONTINUE;
-}
-
-static void ui_colorband_update(ColorBand *coba)
-{
-	int a;
-	
-	if(coba->tot<2) return;
-	
-	for(a=0; a<coba->tot; a++) coba->data[a].cur= a;
-		qsort(coba->data, coba->tot, sizeof(CBData), verg_colorband);
-	for(a=0; a<coba->tot; a++) {
-		if(coba->data[a].cur==coba->cur) {
-			coba->cur= a;
-			break;
-		}
-	}
-}
-
 static int ui_numedit_but_COLORBAND(uiBut *but, uiHandleButtonData *data, int mx)
 {
 	float dx;
@@ -3626,7 +3619,7 @@ static int ui_numedit_but_COLORBAND(uiBut *but, uiHandleButtonData *data, int mx
 	data->dragcbd->pos += dx;
 	CLAMP(data->dragcbd->pos, 0.0f, 1.0f);
 	
-	ui_colorband_update(data->coba);
+	colorband_update_sort(data->coba);
 	data->dragcbd= data->coba->data + data->coba->cur;	/* because qsort */
 	
 	data->draglastx= mx;
@@ -5866,15 +5859,17 @@ static int ui_handle_list_event(bContext *C, wmEvent *event, ARegion *ar)
 			retval= WM_UI_HANDLER_BREAK;
 		}
 		else if(ELEM(event->type, WHEELUPMOUSE, WHEELDOWNMOUSE)) {
-			/* list template will clamp */
-			if(event->type == WHEELUPMOUSE)
-				pa->list_scroll--;
-			else
-				pa->list_scroll++;
+			if(pa->list_last_len > pa->list_size) {
+				/* list template will clamp */
+				if(event->type == WHEELUPMOUSE)
+					pa->list_scroll--;
+				else
+					pa->list_scroll++;
 
-			ED_region_tag_redraw(ar);
+				ED_region_tag_redraw(ar);
 
-			retval= WM_UI_HANDLER_BREAK;
+				retval= WM_UI_HANDLER_BREAK;
+			}
 		}
 	}
 

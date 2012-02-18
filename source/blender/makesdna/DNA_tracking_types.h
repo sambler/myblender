@@ -32,8 +32,8 @@
  *  \author Sergey Sharybin
  */
 
-#ifndef DNA_TRACKING_TYPES_H
-#define DNA_TRACKING_TYPES_H
+#ifndef __DNA_TRACKING_TYPES_H__
+#define __DNA_TRACKING_TYPES_H__
 
 #include "DNA_listBase.h"
 
@@ -121,6 +121,9 @@ typedef struct MovieTrackingSettings {
 	short default_frames_limit;			/* number of frames to be tarcked during single tracking session (if TRACKING_FRAMES_LIMIT is set) */
 	short default_margin;				/* margin from frame boundaries */
 	short default_pattern_match;		/* re-adjust every N frames */
+	short default_flag;					/* default flags like color channels used by default */
+
+	short pod;
 
 	/* ** common tracker settings ** */
 	short speed;			/* speed of tracking */
@@ -129,7 +132,7 @@ typedef struct MovieTrackingSettings {
 	int keyframe1, keyframe2;	/* two keyframes for reconstrution initialization */
 
 	/* ** which camera intrinsics to refine. uses on the REFINE_* flags */
-	short refine_camera_intrinsics, pad2;
+	short refine_camera_intrinsics, pad23;
 
 	/* ** tool settings ** */
 
@@ -142,6 +145,8 @@ typedef struct MovieTrackingSettings {
 
 	/* set object scale */
 	float object_distance;		/* distance between two bundles used for object scaling */
+
+	int pad3;
 } MovieTrackingSettings;
 
 typedef struct MovieTrackingStabilization {
@@ -154,8 +159,10 @@ typedef struct MovieTrackingStabilization {
 
 	float locinf, scaleinf, rotinf;	/* influence on location, scale and rotation */
 
+	int filter;		/* filter used for pixel interpolation */
+
 	/* some pre-computing run-time variables */
-	int ok, pad;				/* are precomputed values and scaled buf relevant? */
+	int ok;						/* are precomputed values and scaled buf relevant? */
 	float scale;				/* autoscale factor */
 
 	struct ImBuf *scaleibuf;	/* currently scaled ibuf */
@@ -252,6 +259,11 @@ enum {
 #define TRACKING_2D_STABILIZATION	(1<<0)
 #define TRACKING_AUTOSCALE			(1<<1)
 #define TRACKING_STABILIZE_ROTATION	(1<<2)
+
+/* MovieTrackingStrabilization->filter */
+#define TRACKING_FILTER_NEAREAST	0
+#define TRACKING_FILTER_BILINEAR	1
+#define TRACKING_FILTER_BICUBIC		2
 
 /* MovieTrackingReconstruction->flag */
 #define TRACKING_RECONSTRUCTED	(1<<0)

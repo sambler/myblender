@@ -183,6 +183,38 @@ class CyclesRender_PT_layers(CyclesButtonsPanel, Panel):
 
         layout.separator()
 
+        split = layout.split()
+
+        col = split.column()
+        col.label(text="Passes:")
+        col.prop(rl, "use_pass_combined")
+        col.prop(rl, "use_pass_z")
+        col.prop(rl, "use_pass_normal")
+        col.prop(rl, "use_pass_object_index")
+        col.prop(rl, "use_pass_material_index")
+        col.prop(rl, "use_pass_emit")
+        col.prop(rl, "use_pass_environment")
+
+        col = split.column()
+        col.label()
+        col.label(text="Diffuse:")
+        row = col.row(align=True)
+        row.prop(rl, "use_pass_diffuse_direct", text="Direct", toggle=True)
+        row.prop(rl, "use_pass_diffuse_indirect", text="Indirect", toggle=True)
+        row.prop(rl, "use_pass_diffuse_color", text="Color", toggle=True)
+        col.label(text="Glossy:")
+        row = col.row(align=True)
+        row.prop(rl, "use_pass_glossy_direct", text="Direct", toggle=True)
+        row.prop(rl, "use_pass_glossy_indirect", text="Indirect", toggle=True)
+        row.prop(rl, "use_pass_glossy_color", text="Color", toggle=True)
+        col.label(text="Transmission:")
+        row = col.row(align=True)
+        row.prop(rl, "use_pass_transmission_direct", text="Direct", toggle=True)
+        row.prop(rl, "use_pass_transmission_indirect", text="Indirect", toggle=True)
+        row.prop(rl, "use_pass_transmission_color", text="Color", toggle=True)
+
+        layout.separator()
+
         rl = rd.layers[0]
         layout.prop(rl, "material_override", text="Material")
 
@@ -241,7 +273,7 @@ class CyclesCamera_PT_dof(CyclesButtonsPanel, Panel):
 
 
 class Cycles_PT_context_material(CyclesButtonsPanel, Panel):
-    bl_label = "Surface"
+    bl_label = ""
     bl_context = "material"
     bl_options = {'HIDE_HEADER'}
 
@@ -338,7 +370,7 @@ class CyclesObject_PT_ray_visibility(CyclesButtonsPanel, Panel):
         visibility = ob.cycles_visibility
 
         flow = layout.column_flow()
-        
+
         flow.prop(visibility, "camera")
         flow.prop(visibility, "diffuse")
         flow.prop(visibility, "glossy")
@@ -574,6 +606,7 @@ class CyclesMaterial_PT_settings(CyclesButtonsPanel, Panel):
 
         col = split.column()
         col.prop(cmat, "sample_as_light")
+        col.prop(mat, "pass_index")
 
 
 class CyclesTexture_PT_context(CyclesButtonsPanel, Panel):

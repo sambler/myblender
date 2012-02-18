@@ -581,7 +581,7 @@ static void image_refresh(const bContext *C, ScrArea *UNUSED(sa))
 	ima= ED_space_image(sima);
 
 	if(sima->iuser.flag & IMA_ANIM_ALWAYS)
-		BKE_image_user_calc_frame(&sima->iuser, CTX_data_scene(C)->r.cfra, 0);
+		BKE_image_user_calc_frame(&sima->iuser, scene->r.cfra, 0);
 	
 	/* check if we have to set the image from the editmesh */
 	if(ima && (ima->source==IMA_SRC_VIEWER || sima->pin));
@@ -872,6 +872,12 @@ static void image_buttons_area_listener(ARegion *ar, wmNotifier *wmn)
 		case NC_BRUSH:
 			if(wmn->action==NA_EDITED)
 				ED_region_tag_redraw(ar);
+			break;
+		case NC_TEXTURE:
+		case NC_MATERIAL:
+			/* sending by texture render job and needed to properly update displaying
+			 * brush texture icon */
+			ED_region_tag_redraw(ar);
 			break;
 	}
 }

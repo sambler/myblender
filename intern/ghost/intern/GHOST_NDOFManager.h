@@ -21,8 +21,8 @@
  * ***** END GPL LICENSE BLOCK *****
  */
  
-#ifndef _GHOST_NDOFMANAGER_H_
-#define _GHOST_NDOFMANAGER_H_
+#ifndef __GHOST_NDOFMANAGER_H__
+#define __GHOST_NDOFMANAGER_H__
 
 #include "GHOST_System.h"
 
@@ -40,7 +40,8 @@ typedef enum {
 	NDOF_SpaceMousePro,
 
 	// older devices
-	NDOF_SpacePilot
+	NDOF_SpacePilot,
+	NDOF_Spaceball5000
 
 	} NDOF_DeviceT;
 
@@ -87,7 +88,12 @@ typedef enum {
 	NDOF_BUTTON_8,
 	NDOF_BUTTON_9,
 	NDOF_BUTTON_10,
-
+	// more general-purpose buttons
+	NDOF_BUTTON_A,
+	NDOF_BUTTON_B,
+	NDOF_BUTTON_C,
+	// the end
+	NDOF_BUTTON_LAST
 	} NDOF_ButtonT;
 
 class GHOST_NDOFManager

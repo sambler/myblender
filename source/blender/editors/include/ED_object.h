@@ -28,8 +28,8 @@
  *  \ingroup editors
  */
 
-#ifndef ED_OBJECT_H
-#define ED_OBJECT_H
+#ifndef __ED_OBJECT_H__
+#define __ED_OBJECT_H__
 
 #ifdef __cplusplus
 extern "C" {
@@ -179,5 +179,5 @@ int ED_object_modifier_copy(struct ReportList *reports, struct Object *ob, struc
 }
 #endif
 
-#endif /* ED_OBJECT_H */
+#endif /* __ED_OBJECT_H__ */
 

@@ -594,7 +594,7 @@ static int image_view_selected_exec(bContext *C, wmOperator *UNUSED(op))
 	/* retrieve state */
 	sima= CTX_wm_space_image(C);
 	ar= CTX_wm_region(C);
-	scene= (Scene*)CTX_data_scene(C);
+	scene= CTX_data_scene(C);
 	obedit= CTX_data_edit_object(C);
 
 	ima= ED_space_image(sima);
@@ -868,7 +868,7 @@ void IMAGE_OT_open(wmOperatorType *ot)
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 
 	/* properties */
-	WM_operator_properties_filesel(ot, FOLDERFILE|IMAGEFILE|MOVIEFILE, FILE_SPECIAL, FILE_OPENFILE, WM_FILESEL_FILEPATH|WM_FILESEL_RELPATH);
+	WM_operator_properties_filesel(ot, FOLDERFILE|IMAGEFILE|MOVIEFILE, FILE_SPECIAL, FILE_OPENFILE, WM_FILESEL_FILEPATH|WM_FILESEL_RELPATH, FILE_DEFAULTDISPLAY);
 }
 
 /******************** replace image operator ********************/
@@ -885,6 +885,11 @@ static int image_replace_exec(bContext *C, wmOperator *op)
 
 	/* we cant do much if the str is longer then FILE_MAX :/ */
 	BLI_strncpy(sima->image->name, str, sizeof(sima->image->name));
+
+	if (BLI_testextensie_array(str, imb_ext_movie))
+		sima->image->source= IMA_SRC_MOVIE;
+	else
+		sima->image->source= IMA_SRC_FILE;
 
 	/* XXX unpackImage frees image buffers */
 	ED_preview_kill_jobs(C);
@@ -928,7 +933,7 @@ void IMAGE_OT_replace(wmOperatorType *ot)
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 
 	/* properties */
-	WM_operator_properties_filesel(ot, FOLDERFILE|IMAGEFILE|MOVIEFILE, FILE_SPECIAL, FILE_OPENFILE, WM_FILESEL_FILEPATH|WM_FILESEL_RELPATH);
+	WM_operator_properties_filesel(ot, FOLDERFILE|IMAGEFILE|MOVIEFILE, FILE_SPECIAL, FILE_OPENFILE, WM_FILESEL_FILEPATH|WM_FILESEL_RELPATH, FILE_DEFAULTDISPLAY);
 }
 
 /******************** save image as operator ********************/
@@ -1278,7 +1283,7 @@ void IMAGE_OT_save_as(wmOperatorType *ot)
 	/* properties */
 	RNA_def_boolean(ot->srna, "copy", 0, "Copy", "Create a new image file without modifying the current image in blender");
 
-	WM_operator_properties_filesel(ot, FOLDERFILE|IMAGEFILE|MOVIEFILE, FILE_SPECIAL, FILE_SAVE, WM_FILESEL_FILEPATH|WM_FILESEL_RELPATH);
+	WM_operator_properties_filesel(ot, FOLDERFILE|IMAGEFILE|MOVIEFILE, FILE_SPECIAL, FILE_SAVE, WM_FILESEL_FILEPATH|WM_FILESEL_RELPATH, FILE_DEFAULTDISPLAY);
 }
 
 /******************** save image operator ********************/
@@ -1445,7 +1450,7 @@ static int image_new_exec(bContext *C, wmOperator *op)
 
 	/* retrieve state */
 	sima= CTX_wm_space_image(C);
-	scene= (Scene*)CTX_data_scene(C);
+	scene= CTX_data_scene(C);
 	obedit= CTX_data_edit_object(C);
 
 	RNA_string_get(op->ptr, "name", name);

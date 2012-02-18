@@ -28,8 +28,8 @@
  *  \ingroup wm
  */
 
-#ifndef WM_TYPES_H
-#define WM_TYPES_H
+#ifndef __WM_TYPES_H__
+#define __WM_TYPES_H__
 
 #ifdef __cplusplus
 extern "C" {
@@ -527,14 +527,14 @@ typedef struct wmDrag {
 	
 	int icon, type;					/* type, see WM_DRAG defines above */
 	void *poin;
-	char path[240]; /* FILE_MAX */
+	char path[1024]; /* FILE_MAX */
 	double value;
 	
 	struct ImBuf *imb;						/* if no icon but imbuf should be drawn around cursor */
 	float scale;
 	int sx, sy;
 	
-	char opname[240]; /* FILE_MAX */			/* if set, draws operator name*/
+	char opname[200]; /* if set, draws operator name*/
 } wmDrag;
 
 /* dropboxes are like keymaps, part of the screen/area/region definition */
@@ -570,5 +570,5 @@ typedef struct RecentFile {
 }
 #endif
 
-#endif /* WM_TYPES_H */
+#endif /* __WM_TYPES_H__ */
 

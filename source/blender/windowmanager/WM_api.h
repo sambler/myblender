@@ -23,8 +23,8 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
-#ifndef WM_API_H
-#define WM_API_H
+#ifndef __WM_API_H__
+#define __WM_API_H__
 
 /** \file WM_api.h
  *  \ingroup wm
@@ -204,7 +204,7 @@ void        WM_operator_properties_reset(struct wmOperator *op);
 void		WM_operator_properties_create(struct PointerRNA *ptr, const char *opstring);
 void		WM_operator_properties_create_ptr(struct PointerRNA *ptr, struct wmOperatorType *ot);
 void		WM_operator_properties_free(struct PointerRNA *ptr);
-void		WM_operator_properties_filesel(struct wmOperatorType *ot, int filter, short type, short action, short flag);
+void		WM_operator_properties_filesel(struct wmOperatorType *ot, int filter, short type, short action, short flag, short display);
 void		WM_operator_properties_gesture_border(struct wmOperatorType *ot, int extend);
 void		WM_operator_properties_gesture_straightline(struct wmOperatorType *ot, int cursor);
 void		WM_operator_properties_select_all(struct wmOperatorType *ot);
@@ -345,5 +345,5 @@ int write_crash_blend(void);
 }
 #endif
 
-#endif /* WM_API_H */
+#endif /* __WM_API_H__ */
 

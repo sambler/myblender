@@ -29,8 +29,8 @@
  *  \ingroup spclip
  */
 
-#ifndef ED_CLIP_INTERN_H
-#define ED_CLIP_INTERN_H
+#ifndef __CLIP_INTERN_H__
+#define __CLIP_INTERN_H__
 
 struct bContext;
 struct ARegion;
@@ -55,9 +55,13 @@ void clip_draw_curfra_label(struct SpaceClip *sc, float x, float y);
 void clip_draw_graph(struct SpaceClip *sc, struct ARegion *ar, struct Scene *scene);
 
 /* clip_graph_ops.c */
+void ED_clip_graph_center_current_frame(struct Scene *scene, struct ARegion *ar);
+
 void CLIP_OT_graph_select(struct wmOperatorType *ot);
 void CLIP_OT_graph_delete_curve(struct wmOperatorType *ot);
 void CLIP_OT_graph_delete_knot(struct wmOperatorType *ot);
+void CLIP_OT_graph_view_all(struct wmOperatorType *ot);
+void CLIP_OT_graph_center_current_frame(struct wmOperatorType *ot);
 
 /* clip_ops.c */
 void CLIP_OT_open(struct wmOperatorType *ot);
@@ -148,4 +152,4 @@ void CLIP_OT_tracking_object_remove(struct wmOperatorType *ot);
 void CLIP_OT_copy_tracks(struct wmOperatorType *ot);
 void CLIP_OT_paste_tracks(struct wmOperatorType *ot);
 
-#endif /* ED_CLIP_INTERN_H */
+#endif /* __CLIP_INTERN_H__ */

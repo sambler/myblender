@@ -1976,6 +1976,11 @@ static void rna_def_space_sequencer(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Use Grease Pencil", "Display and edit the grease pencil freehand annotations overlay");
 	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_SEQUENCER, NULL);
 	
+	prop= RNA_def_property(srna, "show_seconds", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_negative_sdna(prop, NULL, "flag", SEQ_DRAWFRAMES);
+	RNA_def_property_ui_text(prop, "Show Seconds", "Show timing in seconds not frames");
+	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_SEQUENCER, NULL);
+
 	/* grease pencil */
 	prop= RNA_def_property(srna, "grease_pencil", PROP_POINTER, PROP_NONE);
 	RNA_def_property_pointer_sdna(prop, NULL, "gpd");
@@ -2373,6 +2378,11 @@ static void rna_def_space_time(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "show_frame_indicator", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", TIME_CFRA_NUM);
 	RNA_def_property_ui_text(prop, "Show Frame Number Indicator", "Show frame number beside the current frame indicator line");
+	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_TIME, NULL);
+	
+	prop= RNA_def_property(srna, "show_seconds", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_negative_sdna(prop, NULL, "flag", TIME_DRAWFRAMES);
+	RNA_def_property_ui_text(prop, "Show Seconds", "Show timing in seconds not frames");
 	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_TIME, NULL);
 	
 	/* displaying cache status */
@@ -2883,17 +2893,17 @@ static void rna_def_space_clip(BlenderRNA *brna)
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", SC_SHOW_MARKER_SEARCH);
 	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_CLIP, NULL);
 
-	/* show pyramid */
-	prop= RNA_def_property(srna, "show_pyramid_levels", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_ui_text(prop, "Show Pyramid ", "Show patterns for each pyramid level for markers (KLT only)");
-	RNA_def_property_boolean_sdna(prop, NULL, "flag", SC_SHOW_PYRAMID_LEVELS);
-	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_CLIP, NULL);
-
 	/* lock to selection */
 	prop= RNA_def_property(srna, "lock_selection", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_ui_text(prop, "Lock to Selection", "Lock viewport to selected markers during playback");
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", SC_LOCK_SELECTION);
 	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_CLIP, "rna_SpaceClipEditor_lock_selection_update");
+
+	/* lock to time cursor */
+	prop= RNA_def_property(srna, "lock_time_cursor", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_ui_text(prop, "Lock to Time Cursor", "Lock curves view to time cursor during playback and tracking");
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", SC_LOCK_TIMECURSOR);
+	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_CLIP, NULL);
 
 	/* show markers pathes */
 	prop= RNA_def_property(srna, "show_track_path", PROP_BOOLEAN, PROP_NONE);
@@ -2960,12 +2970,6 @@ static void rna_def_space_clip(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "use_manual_calibration", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", SC_MANUAL_CALIBRATION);
 	RNA_def_property_ui_text(prop, "Manual Calibration", "Use manual calibration helpers");
-	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_CLIP, NULL);
-
-	/* show stable */
-	prop= RNA_def_property(srna, "show_grease_pencil", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "flag", SC_SHOW_GPENCIL);
-	RNA_def_property_ui_text(prop, "Show Grease Pencil", "Show grease pencil strokes over the footage");
 	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_CLIP, NULL);
 
 	/* show filters */

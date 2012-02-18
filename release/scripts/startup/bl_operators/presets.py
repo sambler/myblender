@@ -35,10 +35,11 @@ class AddPresetBase():
             name="Name",
             description="Name of the preset, used to make the path name",
             maxlen=64,
+            options={'SKIP_SAVE'},
             )
     remove_active = bpy.props.BoolProperty(
             default=False,
-            options={'HIDDEN'},
+            options={'HIDDEN', 'SKIP_SAVE'},
             )
 
     @staticmethod
@@ -195,7 +196,7 @@ class ExecutePreset(Operator):
                                  preset_class.preset_xml_map)
         else:
             self.report({'ERROR'}, "unknown filetype: %r" % ext)
-            return {'CANCELLED '}
+            return {'CANCELLED'}
 
         return {'FINISHED'}
 
@@ -409,7 +410,10 @@ class AddPresetTrackingSettings(AddPresetBase, Operator):
         "settings.default_search_size",
         "settings.default_frames_limit",
         "settings.default_pattern_match",
-        "settings.default_margin"
+        "settings.default_margin",
+        "settings.use_default_red_channel",
+        "settings.use_default_green_channel",
+        "settings.use_default_blue_channel"
     ]
 
     preset_subdir = "tracking_settings"
@@ -424,7 +428,7 @@ class AddPresetInterfaceTheme(AddPresetBase, Operator):
 
 
 class AddPresetKeyconfig(AddPresetBase, Operator):
-    '''Add a Keyconfig Preset'''
+    '''Add a Key-config Preset'''
     bl_idname = "wm.keyconfig_preset_add"
     bl_label = "Add Keyconfig Preset"
     preset_menu = "USERPREF_MT_keyconfigs"

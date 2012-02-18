@@ -29,8 +29,8 @@
  */
 
 
-#ifndef ED_OUTLINER_INTERN_H
-#define ED_OUTLINER_INTERN_H
+#ifndef __OUTLINER_INTERN_H__
+#define __OUTLINER_INTERN_H__
 
 #include "RNA_types.h"
 
@@ -188,6 +188,9 @@ void group_toggle_renderability_cb(struct bContext *C, struct Scene *scene, Tree
 
 void item_rename_cb(struct bContext *C, struct Scene *scene, TreeElement *te, struct TreeStoreElem *tsep, struct TreeStoreElem *tselem);
 
+TreeElement *outliner_dropzone_parent(struct bContext *C, struct wmEvent *event, struct TreeElement *te, float *fmval);
+int outliner_dropzone_parent_clear(struct bContext *C, struct wmEvent *event, struct TreeElement *te, float *fmval);
+
 /* ...................................................... */
 
 void OUTLINER_OT_item_activate(struct wmOperatorType *ot);
@@ -215,6 +218,9 @@ void OUTLINER_OT_keyingset_remove_selected(struct wmOperatorType *ot);
 void OUTLINER_OT_drivers_add_selected(struct wmOperatorType *ot);
 void OUTLINER_OT_drivers_delete_selected(struct wmOperatorType *ot);
 
+void OUTLINER_OT_parent_drop(struct wmOperatorType *ot);
+void OUTLINER_OT_parent_clear(struct wmOperatorType *ot);
+
 /* outliner_tools.c ---------------------------------------------- */
 
 void OUTLINER_OT_operation(struct wmOperatorType *ot);
@@ -231,4 +237,4 @@ void OUTLINER_OT_action_set(struct wmOperatorType *ot);
 void outliner_operatortypes(void);
 void outliner_keymap(struct wmKeyConfig *keyconf);
 
-#endif /* ED_OUTLINER_INTERN_H */
+#endif /* __OUTLINER_INTERN_H__ */

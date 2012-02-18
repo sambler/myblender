@@ -242,6 +242,7 @@ MovieTrackingTrack *BKE_tracking_add_track(MovieTracking *tracking, ListBase *tr
 	track->margin= settings->default_margin;
 	track->pattern_match= settings->default_pattern_match;
 	track->frames_limit= settings->default_frames_limit;
+	track->flag= settings->default_flag;
 
 	memset(&marker, 0, sizeof(marker));
 	marker.pos[0]= x;
@@ -393,6 +394,13 @@ MovieTrackingMarker *BKE_tracking_exact_marker(MovieTrackingTrack *track, int fr
 int BKE_tracking_has_marker(MovieTrackingTrack *track, int framenr)
 {
 	return BKE_tracking_exact_marker(track, framenr) != 0;
+}
+
+int BKE_tracking_has_enabled_marker(MovieTrackingTrack *track, int framenr)
+{
+	MovieTrackingMarker *marker = BKE_tracking_exact_marker(track, framenr);
+
+	return marker && (marker->flag & MARKER_DISABLED) == 0;
 }
 
 void BKE_tracking_free_track(MovieTrackingTrack *track)
@@ -718,6 +726,7 @@ static void tracks_map_merge(TracksMap *map, MovieTracking *tracking)
 {
 	MovieTrackingTrack *track;
 	MovieTrackingTrack *act_track= BKE_tracking_active_track(tracking);
+	MovieTrackingTrack *rot_track= tracking->stabilization.rot_track;
 	ListBase tracks= {NULL, NULL}, new_tracks= {NULL, NULL};
 	ListBase *old_tracks;
 	int a;
@@ -739,7 +748,7 @@ static void tracks_map_merge(TracksMap *map, MovieTracking *tracking)
 	   this is needed to keep names in unique state and it's faster to change names
 	   of currently operating tracks (if needed) */
 	for(a= 0; a<map->num_tracks; a++) {
-		int replace_sel= 0;
+		int replace_sel= 0, replace_rot= 0;
 		MovieTrackingTrack *new_track, *old;
 
 		track= &map->tracks[a];
@@ -758,8 +767,10 @@ static void tracks_map_merge(TracksMap *map, MovieTracking *tracking)
 
 			/* original track was found, re-use flags and remove this track */
 			if(cur) {
-				if(act_track)
+				if(cur==act_track)
 					replace_sel= 1;
+				if(cur==rot_track)
+					replace_rot= 1;
 
 				track->flag= cur->flag;
 				track->pat_flag= cur->pat_flag;
@@ -777,6 +788,9 @@ static void tracks_map_merge(TracksMap *map, MovieTracking *tracking)
 
 		if(replace_sel)		/* update current selection in clip */
 			tracking->act_track= new_track;
+
+		if(replace_rot)		/* update track used for rotation stabilization */
+			tracking->stabilization.rot_track= new_track;
 
 		BLI_addtail(&tracks, new_track);
 	}
@@ -967,8 +981,8 @@ MovieTrackingContext *BKE_tracking_context_new(MovieClip *clip, MovieClipUser *u
 	context->clip_flag= clip->flag&MCLIP_TIMECODE_FLAGS;
 
 	context->user= *user;
-	context->user.render_size= 0;
-	context->user.render_flag= MCLIP_PROXY_RENDER_SIZE_FULL;
+	context->user.render_size= MCLIP_PROXY_RENDER_SIZE_FULL;
+	context->user.render_flag= 0;
 
 	if(!sequence)
 		BLI_begin_threaded_malloc();
@@ -1062,7 +1076,7 @@ void BKE_tracking_disable_imbuf_channels(ImBuf *ibuf, int disable_red, int disab
 static void disable_imbuf_channels(ImBuf *ibuf, MovieTrackingTrack *track, int grayscale)
 {
 	BKE_tracking_disable_imbuf_channels(ibuf, track->flag&TRACK_DISABLE_RED,
-			track->flag&TRACK_DISABLE_GREEN, track->flag&TRACK_DISABLE_RED, grayscale);
+			track->flag&TRACK_DISABLE_GREEN, track->flag&TRACK_DISABLE_BLUE, grayscale);
 }
 
 static ImBuf *get_area_imbuf(ImBuf *ibuf, MovieTrackingTrack *track, MovieTrackingMarker *marker,
@@ -1218,7 +1232,7 @@ static ImBuf *get_frame_ibuf(MovieTrackingContext *context, int framenr)
 
 	user.framenr= framenr;
 
-	ibuf= BKE_movieclip_get_ibuf_flag(context->clip, &user, context->clip_flag);
+	ibuf= BKE_movieclip_get_ibuf_flag(context->clip, &user, context->clip_flag, MOVIECLIP_CACHE_SKIP);
 
 	return ibuf;
 }
@@ -1322,7 +1336,7 @@ int BKE_tracking_next(MovieTrackingContext *context)
 	if(context->backwards) context->user.framenr--;
 	else context->user.framenr++;
 
-	ibuf_new= BKE_movieclip_get_ibuf_flag(context->clip, &context->user, context->clip_flag);
+	ibuf_new= BKE_movieclip_get_ibuf_flag(context->clip, &context->user, context->clip_flag, MOVIECLIP_CACHE_SKIP);
 	if(!ibuf_new)
 		return 0;
 
@@ -1741,8 +1755,8 @@ static int count_tracks_on_both_keyframes(MovieTracking *tracking, ListBase *tra
 
 	track= tracksbase->first;
 	while(track) {
-		if(BKE_tracking_has_marker(track, frame1))
-			if(BKE_tracking_has_marker(track, frame2))
+		if(BKE_tracking_has_enabled_marker(track, frame1))
+			if(BKE_tracking_has_enabled_marker(track, frame2))
 				tot++;
 
 		track= track->next;
@@ -1758,7 +1772,7 @@ int BKE_tracking_can_reconstruct(MovieTracking *tracking, MovieTrackingObject *o
 	ListBase *tracksbase= BKE_tracking_object_tracks(tracking, object);
 
 	if(count_tracks_on_both_keyframes(tracking, tracksbase)<8) {
-		BLI_strncpy(error_msg, "At least 8 tracks on both of keyframes are needed for reconstruction", error_size);
+		BLI_strncpy(error_msg, "At least 8 common tracks on both of keyframes are needed for reconstruction", error_size);
 		return 0;
 	}
 
@@ -1838,7 +1852,7 @@ MovieReconstructContext* BKE_tracking_reconstruction_context_new(MovieTracking *
 
 	context->k1= camera->k1;
 	context->k2= camera->k2;
-	context->k2= camera->k2;
+	context->k3= camera->k3;
 
 	return context;
 }
@@ -2437,8 +2451,8 @@ static void calculate_stabdata(MovieTracking *tracking, int framenr, float width
 	*scale= (stab->scale-1.0f)*stab->scaleinf+1.0f;
 	*angle= 0.0f;
 
-	loc[0]= (firstmedian[0]-median[0])*width*(*scale);
-	loc[1]= (firstmedian[1]-median[1])*height*(*scale);
+	loc[0]= (firstmedian[0]-median[0])*width;
+	loc[1]= (firstmedian[1]-median[1])*height;
 
 	mul_v2_fl(loc, stab->locinf);
 
@@ -2471,6 +2485,7 @@ static float stabilization_auto_scale_factor(MovieTracking *tracking, int width,
 {
 	float firstmedian[2];
 	MovieTrackingStabilization *stab= &tracking->stabilization;
+	float aspect= tracking->camera.pixel_aspect;
 
 	if(stab->ok)
 		return stab->scale;
@@ -2521,7 +2536,7 @@ static float stabilization_auto_scale_factor(MovieTracking *tracking, int width,
 				float mat[4][4];
 				float points[4][2]={{0.0f, 0.0f}, {0.0f, height}, {width, height}, {width, 0.0f}};
 
-				BKE_tracking_stabdata_to_mat4(width, height, loc, scale, angle, mat);
+				BKE_tracking_stabdata_to_mat4(width, height, aspect, loc, scale, angle, mat);
 
 				for(i= 0; i<4; i++) {
 					int j;
@@ -2636,6 +2651,7 @@ ImBuf *BKE_tracking_stabilize(MovieTracking *tracking, int framenr, ImBuf *ibuf,
 	MovieTrackingStabilization *stab= &tracking->stabilization;
 	ImBuf *tmpibuf;
 	float width= ibuf->x, height= ibuf->y;
+	float aspect= tracking->camera.pixel_aspect;
 
 	if(loc)		copy_v2_v2(tloc, loc);
 	if(scale)	tscale= *scale;
@@ -2672,10 +2688,18 @@ ImBuf *BKE_tracking_stabilize(MovieTracking *tracking, int framenr, ImBuf *ibuf,
 		IMB_rectcpy(tmpibuf, ibuf, tloc[0]-(tscale-1.0f)*width/2.0f, tloc[1]-(tscale-1.0f)*height/2.0f, 0, 0, ibuf->x, ibuf->y);
 	} else {
 		float mat[4][4];
-		int i, j;
+		int i, j, filter= tracking->stabilization.filter;
+		void (*interpolation) (struct ImBuf*, struct ImBuf*, float, float, int, int) = NULL;
 
-		BKE_tracking_stabdata_to_mat4(ibuf->x, ibuf->y, tloc, tscale, tangle, mat);
+		BKE_tracking_stabdata_to_mat4(ibuf->x, ibuf->y, aspect, tloc, tscale, tangle, mat);
 		invert_m4(mat);
+
+		if(filter == TRACKING_FILTER_NEAREAST)
+			interpolation = neareast_interpolation;
+		else if(filter == TRACKING_FILTER_BILINEAR)
+			interpolation = bilinear_interpolation;
+		else if(filter == TRACKING_FILTER_BICUBIC)
+			interpolation = bicubic_interpolation;
 
 		for(j=0; j<tmpibuf->y; j++) {
 			for(i=0; i<tmpibuf->x;i++) {
@@ -2683,8 +2707,7 @@ ImBuf *BKE_tracking_stabilize(MovieTracking *tracking, int framenr, ImBuf *ibuf,
 
 				mul_v3_m4v3(vec, mat, vec);
 
-				/* TODO: add selector for interpolation method */
-				neareast_interpolation(ibuf, tmpibuf, vec[0], vec[1], i, j);
+				interpolation(ibuf, tmpibuf, vec[0], vec[1], i, j);
 			}
 		}
 	}
@@ -2701,15 +2724,20 @@ ImBuf *BKE_tracking_stabilize(MovieTracking *tracking, int framenr, ImBuf *ibuf,
 	return tmpibuf;
 }
 
-void BKE_tracking_stabdata_to_mat4(int width, int height, float loc[2], float scale, float angle, float mat[4][4])
+void BKE_tracking_stabdata_to_mat4(int width, int height, float aspect, float loc[2], float scale, float angle, float mat[4][4])
 {
-	float lmat[4][4], rmat[4][4], smat[4][4], cmat[4][4], icmat[4][4];
+	float lmat[4][4], rmat[4][4], smat[4][4], cmat[4][4], icmat[4][4], amat[4][4], iamat[4][4];
 	float svec[3]= {scale, scale, scale};
 
 	unit_m4(rmat);
 	unit_m4(lmat);
 	unit_m4(smat);
 	unit_m4(cmat);
+	unit_m4(amat);
+
+	/* aspect ratio correction matrix */
+	amat[0][0] = 1.0f / aspect;
+	invert_m4_m4(iamat, amat);
 
 	/* image center as rotation center */
 	cmat[3][0]= (float)width/2.0f;
@@ -2717,11 +2745,11 @@ void BKE_tracking_stabdata_to_mat4(int width, int height, float loc[2], float sc
 	invert_m4_m4(icmat, cmat);
 
 	size_to_mat4(smat, svec);		/* scale matrix */
-	add_v2_v2(lmat[3], loc);		/* tranlation matrix */
+	add_v2_v2(lmat[3], loc);		/* translation matrix */
 	rotate_m4(rmat, 'Z', angle);	/* rotation matrix */
 
 	/* compose transformation matrix */
-	mul_serie_m4(mat, lmat, cmat, rmat, smat, icmat, NULL, NULL, NULL);
+	mul_serie_m4(mat, amat, lmat, cmat, rmat, smat, icmat, iamat, NULL);
 }
 
 MovieDistortion *BKE_tracking_distortion_create(void)

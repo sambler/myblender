@@ -36,7 +36,6 @@
 #include "DNA_camera_types.h"
 #include "DNA_curve_types.h"
 #include "DNA_constraint_types.h" // for drawing constraint
-#include "DNA_dynamicpaint_types.h"
 #include "DNA_lamp_types.h"
 #include "DNA_lattice_types.h"
 #include "DNA_material_types.h"
@@ -154,6 +153,10 @@ typedef struct drawDMFacesSel_userData {
 	EditFace *efa_act;
 	int *orig_index;
 } drawDMFacesSel_userData;
+
+typedef struct drawDMNormal_userData {
+	float normalsize;
+} drawDMNormal_userData;
 
 typedef struct bbsObmodeMeshVerts_userData {
 	void *offset;
@@ -2213,20 +2216,24 @@ void nurbs_foreachScreenVert(
 
 static void draw_dm_face_normals__mapFunc(void *userData, int index, float *cent, float *no)
 {
-	ToolSettings *ts= ((Scene *)userData)->toolsettings;
+	drawDMNormal_userData *data = userData;
 	EditFace *efa = EM_get_face_for_index(index);
 
 	if (efa->h==0 && efa->fgonf!=EM_FGON) {
 		glVertex3fv(cent);
-		glVertex3f(	cent[0] + no[0]*ts->normalsize,
-					cent[1] + no[1]*ts->normalsize,
-					cent[2] + no[2]*ts->normalsize);
+		glVertex3f(cent[0] + no[0] * data->normalsize,
+		           cent[1] + no[1] * data->normalsize,
+		           cent[2] + no[2] * data->normalsize);
 	}
 }
 static void draw_dm_face_normals(Scene *scene, DerivedMesh *dm) 
 {
+	drawDMNormal_userData data;
+
+	data.normalsize = scene->toolsettings->normalsize;
+
 	glBegin(GL_LINES);
-	dm->foreachMappedFaceCenter(dm, draw_dm_face_normals__mapFunc, scene);
+	dm->foreachMappedFaceCenter(dm, draw_dm_face_normals__mapFunc, &data);
 	glEnd();
 }
 
@@ -2248,28 +2255,32 @@ static void draw_dm_face_centers(DerivedMesh *dm, int sel)
 
 static void draw_dm_vert_normals__mapFunc(void *userData, int index, float *co, float *no_f, short *no_s)
 {
-	Scene *scene= (Scene *)userData;
-	ToolSettings *ts= scene->toolsettings;
+	drawDMNormal_userData *data = userData;
 	EditVert *eve = EM_get_vert_for_index(index);
 
 	if (eve->h==0) {
 		glVertex3fv(co);
 
 		if (no_f) {
-			glVertex3f(	co[0] + no_f[0]*ts->normalsize,
-						co[1] + no_f[1]*ts->normalsize,
-						co[2] + no_f[2]*ts->normalsize);
-		} else {
-			glVertex3f(	co[0] + no_s[0]*ts->normalsize/32767.0f,
-						co[1] + no_s[1]*ts->normalsize/32767.0f,
-						co[2] + no_s[2]*ts->normalsize/32767.0f);
+			glVertex3f(co[0] + no_f[0] * data->normalsize,
+			           co[1] + no_f[1] * data->normalsize,
+			           co[2] + no_f[2] * data->normalsize);
+		}
+		else {
+			glVertex3f(co[0] + no_s[0] * (data->normalsize / 32767.0f),
+			           co[1] + no_s[1] * (data->normalsize / 32767.0f),
+			           co[2] + no_s[2] * (data->normalsize / 32767.0f));
 		}
 	}
 }
 static void draw_dm_vert_normals(Scene *scene, DerivedMesh *dm) 
 {
+	drawDMNormal_userData data;
+
+	data.normalsize = scene->toolsettings->normalsize;
+
 	glBegin(GL_LINES);
-	dm->foreachMappedVert(dm, draw_dm_vert_normals__mapFunc, scene);
+	dm->foreachMappedVert(dm, draw_dm_vert_normals__mapFunc, &data);
 	glEnd();
 }
 
@@ -3081,27 +3092,16 @@ static void draw_mesh_fancy(Scene *scene, ARegion *ar, View3D *v3d, RegionView3D
 	eWireDrawMode draw_wire= OBDRAW_WIRE_OFF;
 	int /* totvert,*/ totedge, totface;
 	DerivedMesh *dm= mesh_get_derived_final(scene, ob, scene->customdata_mask);
-	ModifierData *md = NULL;
 	const short is_obact= (ob == OBACT);
 	int draw_flags = (is_obact && paint_facesel_test(ob)) ? DRAW_FACE_SELECT : 0;
 
 	if(!dm)
 		return;
 
-	/* check to draw dynamic paint colors */
-	if ((md = modifiers_findByType(ob, eModifierType_DynamicPaint)))
-	{
-		/* check if target has an active dpaint modifier	*/
-		if(md && (md->mode & eModifierMode_Realtime))					
-		{
-			DynamicPaintModifierData *pmd = (DynamicPaintModifierData *)md;
-			/* if canvas is ready to preview vertex colors */
-			if (pmd->canvas && pmd->canvas->flags & MOD_DPAINT_PREVIEW_READY &&
-				DM_get_face_data_layer(dm, CD_WEIGHT_MCOL)) {
-				draw_flags |= DRAW_DYNAMIC_PAINT_PREVIEW;
-			}
-		}
-	}
+	/* Check to draw dynamic paint colors (or weights from WeightVG modifiers).
+	 * Note: Last "preview-active" modifier in stack will win! */
+	if(DM_get_face_data_layer(dm, CD_WEIGHT_MCOL) && modifiers_isPreview(ob))
+		draw_flags |= DRAW_MODIFIERS_PREVIEW;
 
 	/* Unwanted combination */
 	if (draw_flags & DRAW_FACE_SELECT) {
@@ -3142,7 +3142,7 @@ static void draw_mesh_fancy(Scene *scene, ARegion *ar, View3D *v3d, RegionView3D
 			draw_mesh_object_outline(v3d, ob, dm);
 		}
 
-		if(draw_glsl_material(scene, ob, v3d, dt) && !(draw_flags & DRAW_DYNAMIC_PAINT_PREVIEW)) {
+		if(draw_glsl_material(scene, ob, v3d, dt) && !(draw_flags & DRAW_MODIFIERS_PREVIEW)) {
 			glFrontFace((ob->transflag&OB_NEG_SCALE)?GL_CW:GL_CCW);
 
 			dm->drawFacesGLSL(dm, GPU_enable_material);
@@ -3193,7 +3193,7 @@ static void draw_mesh_fancy(Scene *scene, ARegion *ar, View3D *v3d, RegionView3D
 			/* since we already draw wire as wp guide, dont draw over the top */
 			draw_wire= OBDRAW_WIRE_OFF;
 		}
-		else if (draw_flags & DRAW_DYNAMIC_PAINT_PREVIEW) {
+		else if (draw_flags & DRAW_MODIFIERS_PREVIEW) {
 			/* for object selection draws no shade */
 			if (flag & (DRAW_PICKING|DRAW_CONSTCOLOR)) {
 				dm->drawFacesSolid(dm, NULL, 0, GPU_enable_material);
@@ -4042,7 +4042,7 @@ static void draw_new_particle_system(Scene *scene, View3D *v3d, RegionView3D *rv
 	ParticleDrawData *pdd = psys->pdd;
 	Material *ma;
 	float vel[3], imat[4][4];
-	float timestep, pixsize=1.0, pa_size, r_tilt, r_length;
+	float timestep, pixsize_scale, pa_size, r_tilt, r_length;
 	float pa_time, pa_birthtime, pa_dietime, pa_health, intensity;
 	float cfra;
 	float ma_col[3]= {0.0f, 0.0f, 0.0f};
@@ -4149,12 +4149,11 @@ static void draw_new_particle_system(Scene *scene, View3D *v3d, RegionView3D *rv
 		case PART_DRAW_CROSS:
 		case PART_DRAW_AXIS:
 			/* lets calculate the scale: */
-			pixsize= ED_view3d_pixel_size(rv3d, ob->obmat[3]);
 			
-			if(part->draw_size==0.0)
-				pixsize *= 2.0f;
+			if (part->draw_size == 0.0)
+				pixsize_scale = 2.0f;
 			else
-				pixsize*=part->draw_size;
+				pixsize_scale = part->draw_size;
 
 			if(draw_as==PART_DRAW_AXIS)
 				create_cdata = 1;
@@ -4342,6 +4341,8 @@ static void draw_new_particle_system(Scene *scene, View3D *v3d, RegionView3D *rv
 
 				ct+=dt;
 				for(i=0; i < trail_count; i++, ct += dt) {
+					float pixsize;
+
 					if(part->draw & PART_ABS_PATH_TIME) {
 						if(ct < pa_birthtime || ct > pa_dietime)
 							continue;
@@ -4375,6 +4376,8 @@ static void draw_new_particle_system(Scene *scene, View3D *v3d, RegionView3D *rv
 						bb.time = ct;
 					}
 
+					pixsize = ED_view3d_pixel_size(rv3d, state.co) * pixsize_scale;
+
 					draw_particle(&state, draw_as, part->draw, pixsize, imat, part->draw_line, &bb, psys->pdd);
 
 					totpoint++;
@@ -4385,6 +4388,8 @@ static void draw_new_particle_system(Scene *scene, View3D *v3d, RegionView3D *rv
 			{
 				state.time=cfra;
 				if(psys_get_particle_state(&sim,a,&state,0)){
+					float pixsize;
+
 					if(psys->parent)
 						mul_m4_v3(psys->parent->obmat, state.co);
 
@@ -4407,6 +4412,8 @@ static void draw_new_particle_system(Scene *scene, View3D *v3d, RegionView3D *rv
 						bb.tilt = part->bb_tilt * (1.0f - part->bb_rand_tilt * r_tilt);
 						bb.time = pa_time;
 					}
+
+					pixsize = ED_view3d_pixel_size(rv3d, state.co) * pixsize_scale;
 
 					draw_particle(&state, draw_as, part->draw, pixsize, imat, part->draw_line, &bb, pdd);
 

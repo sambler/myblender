@@ -645,15 +645,19 @@ void IMB_convert_profile(ImBuf *ibuf, int profile)
 		profile_from = IB_PROFILE_LINEAR_RGB;
 	else if(ELEM(ibuf->profile, IB_PROFILE_SRGB, IB_PROFILE_NONE))
 		profile_from = IB_PROFILE_SRGB;
-	else
+	else {
 		BLI_assert(0);
+		profile_from = IB_PROFILE_SRGB; /* dummy, should never happen */
+	}
 
 	if(profile == IB_PROFILE_LINEAR_RGB)
 		profile_to = IB_PROFILE_LINEAR_RGB;
 	else if(ELEM(profile, IB_PROFILE_SRGB, IB_PROFILE_NONE))
 		profile_to = IB_PROFILE_SRGB;
-	else
+	else {
 		BLI_assert(0);
+		profile_to = IB_PROFILE_SRGB; /* dummy, should never happen */
+	}
 	
 	/* do conversion */
 	if(ibuf->rect_float) {
@@ -736,5 +740,12 @@ void IMB_color_to_bw(ImBuf *ibuf)
 	if(rct) {
 		for(i = ibuf->x * ibuf->y; i > 0; i--, rct+=4)
 			rct[0]= rct[1]= rct[2]= rgb_to_grayscale_byte(rct);
+	}
+}
+
+void IMB_buffer_float_clamp(float *buf, int width, int height){
+	int i, total = width*height*4;
+	for(i = 0; i < total; i++){
+		buf[i] = MIN2(1.0, buf[i]);
 	}
 }

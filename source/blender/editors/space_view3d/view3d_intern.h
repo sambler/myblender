@@ -28,8 +28,8 @@
  *  \ingroup spview3d
  */
 
-#ifndef ED_VIEW3D_INTERN_H
-#define ED_VIEW3D_INTERN_H
+#ifndef __VIEW3D_INTERN_H__
+#define __VIEW3D_INTERN_H__
 
 #include "ED_view3d.h"
 
@@ -59,7 +59,7 @@ struct wmNDOFMotionData;
 #define DRAW_SCENESET	4
 
 /* draw_mesh_fancy/draw_mesh_textured draw_flags */
-#define DRAW_DYNAMIC_PAINT_PREVIEW 1
+#define DRAW_MODIFIERS_PREVIEW 1
 #define DRAW_FACE_SELECT 2
 
 /* view3d_header.c */
@@ -215,5 +215,5 @@ extern float view3d_camera_border_hack_col[4];
 extern short view3d_camera_border_hack_test;
 #endif
 
-#endif /* ED_VIEW3D_INTERN_H */
+#endif /* __VIEW3D_INTERN_H__ */
 

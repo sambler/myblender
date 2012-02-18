@@ -1292,11 +1292,11 @@ float (*mesh_getVertexCos(Mesh *me, int *numVerts_r))[3]
 {
 	int i, numVerts = me->totvert;
 	float (*cos)[3] = MEM_mallocN(sizeof(*cos)*numVerts, "vertexcos1");
-	
+
 	if (numVerts_r) *numVerts_r = numVerts;
 	for (i=0; i<numVerts; i++)
 		copy_v3_v3(cos[i], me->mvert[i].co);
-	
+
 	return cos;
 }
 
@@ -1315,7 +1315,7 @@ UvVertMap *make_uv_vert_map(struct MFace *mface, struct MTFace *tface, unsigned 
 	for(a=0; a<totface; a++, mf++)
 		if(!selected || (!(mf->flag & ME_HIDE) && (mf->flag & ME_FACE_SEL)))
 			totuv += (mf->v4)? 4: 3;
-		
+
 	if(totuv==0)
 		return NULL;
 	

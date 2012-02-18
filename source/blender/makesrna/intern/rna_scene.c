@@ -710,7 +710,21 @@ static EnumPropertyItem *rna_ImageFormatSettings_color_mode_itemf(bContext *C, P
 	 * where 'BW' will force greyscale even if the output format writes
 	 * as RGBA, this is age old blender convention and not sure how useful
 	 * it really is but keep it for now - campbell */
-	const char chan_flag= BKE_imtype_valid_channels(imf->imtype) | (is_render ? IMA_CHAN_FLAG_BW : 0);
+	char chan_flag= BKE_imtype_valid_channels(imf->imtype) | (is_render ? IMA_CHAN_FLAG_BW : 0);
+
+#ifdef WITH_FFMPEG
+	/* a WAY more crappy case than B&W flag: depending on codec, file format MIGHT support
+	 * alpha channel. for example MPEG format with h264 codec can't do alpha channel, but
+	 * the same MPEG format with QTRLE codec can easily handle alpga channel.
+	 * not sure how to deal with such cases in a nicer way (sergey) */
+	if(is_render) {
+		Scene *scene = ptr->id.data;
+		RenderData *rd = &scene->r;
+
+		if (rd->ffcodecdata.codec == CODEC_ID_QTRLE)
+			chan_flag |= IMA_CHAN_FLAG_ALPHA;
+	}
+#endif
 
 	if (chan_flag == (IMA_CHAN_FLAG_BW|IMA_CHAN_FLAG_RGB|IMA_CHAN_FLAG_ALPHA)) {
 		return image_color_mode_items;
@@ -807,16 +821,16 @@ static void rna_SceneRender_file_ext_get(PointerRNA *ptr, char *str)
 #ifdef WITH_QUICKTIME
 static int rna_RenderSettings_qtcodecsettings_codecType_get(PointerRNA *ptr)
 {
-	RenderData *rd= (RenderData*)ptr->data;
+	QuicktimeCodecSettings *settings = (QuicktimeCodecSettings*)ptr->data;
 	
-	return quicktime_rnatmpvalue_from_videocodectype(rd->qtcodecsettings.codecType);
+	return quicktime_rnatmpvalue_from_videocodectype(settings->codecType);
 }
 
 static void rna_RenderSettings_qtcodecsettings_codecType_set(PointerRNA *ptr, int value)
 {
-	RenderData *rd= (RenderData*)ptr->data;
+	QuicktimeCodecSettings *settings = (QuicktimeCodecSettings*)ptr->data;
 
-	rd->qtcodecsettings.codecType = quicktime_videocodecType_from_rnatmpvalue(value);
+	settings->codecType = quicktime_videocodecType_from_rnatmpvalue(value);
 }
 
 static EnumPropertyItem *rna_RenderSettings_qtcodecsettings_codecType_itemf(bContext *C, PointerRNA *ptr,
@@ -849,16 +863,16 @@ static EnumPropertyItem *rna_RenderSettings_qtcodecsettings_codecType_itemf(bCon
 #ifdef USE_QTKIT
 static int rna_RenderSettings_qtcodecsettings_audiocodecType_get(PointerRNA *ptr)
 {
-	RenderData *rd= (RenderData*)ptr->data;
+	QuicktimeCodecSettings *settings = (QuicktimeCodecSettings*)ptr->data;
 	
-	return quicktime_rnatmpvalue_from_audiocodectype(rd->qtcodecsettings.audiocodecType);
+	return quicktime_rnatmpvalue_from_audiocodectype(settings->audiocodecType);
 }
 
 static void rna_RenderSettings_qtcodecsettings_audiocodecType_set(PointerRNA *ptr, int value)
 {
-	RenderData *rd= (RenderData*)ptr->data;
+	QuicktimeCodecSettings *settings = (QuicktimeCodecSettings*)ptr->data;
 	
-	rd->qtcodecsettings.audiocodecType = quicktime_audiocodecType_from_rnatmpvalue(value);
+	settings->audiocodecType = quicktime_audiocodecType_from_rnatmpvalue(value);
 }
 
 static EnumPropertyItem *rna_RenderSettings_qtcodecsettings_audiocodecType_itemf(bContext *C, PointerRNA *ptr,
@@ -897,7 +911,16 @@ static void rna_FFmpegSettings_lossless_output_set(PointerRNA *ptr, int value)
 		rd->ffcodecdata.flags |= FFMPEG_LOSSLESS_OUTPUT;
 	else
 		rd->ffcodecdata.flags &= ~FFMPEG_LOSSLESS_OUTPUT;
-	ffmpeg_verify_lossless_format(rd, &rd->im_format);
+
+	ffmpeg_verify_codec_settings(rd);
+}
+
+static void rna_FFmpegSettings_codec_settings_update(Main *UNUSED(bmain), Scene *UNUSED(scene_unused), PointerRNA *ptr)
+{
+	Scene *scene = (Scene *) ptr->id.data;
+	RenderData *rd = &scene->r;
+
+	ffmpeg_verify_codec_settings(rd);
 }
 #endif
 
@@ -1457,13 +1480,13 @@ static void rna_def_tool_settings(BlenderRNA  *brna)
 
 	prop= RNA_def_property(srna, "use_uv_sculpt", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "use_uv_sculpt", 1);
-	RNA_def_property_ui_text(prop, "UV Sculpt", "Enable brush for uv sculpting");
+	RNA_def_property_ui_text(prop, "UV Sculpt", "Enable brush for UV sculpting");
 	RNA_def_property_ui_icon(prop, ICON_TPAINT_HLT, 0);
 	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_IMAGE, "rna_SpaceImageEditor_uv_sculpt_update");
 
 	prop= RNA_def_property(srna, "uv_sculpt_lock_borders", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "uv_sculpt_settings", UV_SCULPT_LOCK_BORDERS);
-	RNA_def_property_ui_text(prop, "Lock Borders", "Disables editing of boundary edges");
+	RNA_def_property_ui_text(prop, "Lock Borders", "Disable editing of boundary edges");
 
 	prop= RNA_def_property(srna, "uv_sculpt_all_islands", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "uv_sculpt_settings", UV_SCULPT_ALL_ISLANDS);
@@ -2063,6 +2086,60 @@ void rna_def_render_layer_common(StructRNA *srna, int scene)
 	RNA_def_property_boolean_sdna(prop, NULL, "pass_xor", SCE_PASS_INDIRECT);
 	RNA_def_property_ui_text(prop, "Indirect Exclude", "Exclude indirect pass from combined");
 	RNA_def_property_ui_icon(prop, ICON_RESTRICT_RENDER_OFF, 1);
+	if(scene) RNA_def_property_update(prop, NC_SCENE|ND_RENDER_OPTIONS, "rna_SceneRenderLayer_pass_update");
+	else RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+
+	prop= RNA_def_property(srna, "use_pass_diffuse_direct", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "passflag", SCE_PASS_DIFFUSE_DIRECT);
+	RNA_def_property_ui_text(prop, "Diffuse Direct", "Deliver diffuse direct pass");
+	if(scene) RNA_def_property_update(prop, NC_SCENE|ND_RENDER_OPTIONS, "rna_SceneRenderLayer_pass_update");
+	else RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+
+	prop= RNA_def_property(srna, "use_pass_diffuse_indirect", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "passflag", SCE_PASS_DIFFUSE_INDIRECT);
+	RNA_def_property_ui_text(prop, "Diffuse Indirect", "Deliver diffuse indirect pass");
+	if(scene) RNA_def_property_update(prop, NC_SCENE|ND_RENDER_OPTIONS, "rna_SceneRenderLayer_pass_update");
+	else RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+
+	prop= RNA_def_property(srna, "use_pass_diffuse_color", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "passflag", SCE_PASS_DIFFUSE_COLOR);
+	RNA_def_property_ui_text(prop, "Diffuse Color", "Deliver diffuse color pass");
+	if(scene) RNA_def_property_update(prop, NC_SCENE|ND_RENDER_OPTIONS, "rna_SceneRenderLayer_pass_update");
+	else RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+
+	prop= RNA_def_property(srna, "use_pass_glossy_direct", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "passflag", SCE_PASS_GLOSSY_DIRECT);
+	RNA_def_property_ui_text(prop, "Glossy Direct", "Deliver glossy direct pass");
+	if(scene) RNA_def_property_update(prop, NC_SCENE|ND_RENDER_OPTIONS, "rna_SceneRenderLayer_pass_update");
+	else RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+
+	prop= RNA_def_property(srna, "use_pass_glossy_indirect", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "passflag", SCE_PASS_GLOSSY_INDIRECT);
+	RNA_def_property_ui_text(prop, "Glossy Indirect", "Deliver glossy indirect pass");
+	if(scene) RNA_def_property_update(prop, NC_SCENE|ND_RENDER_OPTIONS, "rna_SceneRenderLayer_pass_update");
+	else RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+
+	prop= RNA_def_property(srna, "use_pass_glossy_color", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "passflag", SCE_PASS_GLOSSY_COLOR);
+	RNA_def_property_ui_text(prop, "Glossy Color", "Deliver glossy color pass");
+	if(scene) RNA_def_property_update(prop, NC_SCENE|ND_RENDER_OPTIONS, "rna_SceneRenderLayer_pass_update");
+	else RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+
+	prop= RNA_def_property(srna, "use_pass_transmission_direct", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "passflag", SCE_PASS_TRANSM_DIRECT);
+	RNA_def_property_ui_text(prop, "Transmission Direct", "Deliver transmission direct pass");
+	if(scene) RNA_def_property_update(prop, NC_SCENE|ND_RENDER_OPTIONS, "rna_SceneRenderLayer_pass_update");
+	else RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+
+	prop= RNA_def_property(srna, "use_pass_transmission_indirect", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "passflag", SCE_PASS_TRANSM_INDIRECT);
+	RNA_def_property_ui_text(prop, "Transmission Indirect", "Deliver transmission indirect pass");
+	if(scene) RNA_def_property_update(prop, NC_SCENE|ND_RENDER_OPTIONS, "rna_SceneRenderLayer_pass_update");
+	else RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+
+	prop= RNA_def_property(srna, "use_pass_transmission_color", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "passflag", SCE_PASS_TRANSM_COLOR);
+	RNA_def_property_ui_text(prop, "Transmission Color", "Deliver transmission color pass");
 	if(scene) RNA_def_property_update(prop, NC_SCENE|ND_RENDER_OPTIONS, "rna_SceneRenderLayer_pass_update");
 	else RNA_def_property_clear_flag(prop, PROP_EDITABLE);
 }
@@ -2755,6 +2832,8 @@ static void rna_def_scene_ffmpeg_settings(BlenderRNA *brna)
 		{CODEC_ID_THEORA, "THEORA", 0, "Theora", ""},
 		{CODEC_ID_FLV1, "FLASH", 0, "Flash Video", ""},
 		{CODEC_ID_FFV1, "FFV1", 0, "FFmpeg video codec #1", ""},
+		{CODEC_ID_QTRLE, "QTRLE", 0, "QTRLE", ""},
+		/* {CODEC_ID_DNXHD, "DNXHD", 0, "DNxHD", ""},*/ /* disabled for after release */
 		{0, NULL, 0, NULL, NULL}};
 
 	static EnumPropertyItem ffmpeg_audio_codec_items[] = {
@@ -2784,65 +2863,76 @@ static void rna_def_scene_ffmpeg_settings(BlenderRNA *brna)
 #ifdef WITH_FFMPEG
 	prop = RNA_def_property(srna, "format", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_bitflag_sdna(prop, NULL, "type");
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 	RNA_def_property_enum_items(prop, ffmpeg_format_items);
 	RNA_def_property_ui_text(prop, "Format", "Output file format");
-	RNA_def_property_update(prop, NC_SCENE|ND_RENDER_OPTIONS, NULL);
+	RNA_def_property_update(prop, NC_SCENE|ND_RENDER_OPTIONS, "rna_FFmpegSettings_codec_settings_update");
 
 	prop = RNA_def_property(srna, "codec", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_bitflag_sdna(prop, NULL, "codec");
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 	RNA_def_property_enum_items(prop, ffmpeg_codec_items);
 	RNA_def_property_ui_text(prop, "Codec", "FFmpeg codec to use");
-	RNA_def_property_update(prop, NC_SCENE|ND_RENDER_OPTIONS, NULL);
+	RNA_def_property_update(prop, NC_SCENE|ND_RENDER_OPTIONS, "rna_FFmpegSettings_codec_settings_update");
 
 	prop = RNA_def_property(srna, "video_bitrate", PROP_INT, PROP_NONE);
 	RNA_def_property_int_sdna(prop, NULL, "video_bitrate");
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 	RNA_def_property_range(prop, 1, 14000);
 	RNA_def_property_ui_text(prop, "Bitrate", "Video bitrate (kb/s)");
 	RNA_def_property_update(prop, NC_SCENE|ND_RENDER_OPTIONS, NULL);
 
 	prop = RNA_def_property(srna, "minrate", PROP_INT, PROP_NONE);
 	RNA_def_property_int_sdna(prop, NULL, "rc_min_rate");
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 	RNA_def_property_range(prop, 0, 9000);
 	RNA_def_property_ui_text(prop, "Min Rate", "Rate control: min rate (kb/s)");
 	RNA_def_property_update(prop, NC_SCENE|ND_RENDER_OPTIONS, NULL);
 
 	prop = RNA_def_property(srna, "maxrate", PROP_INT, PROP_NONE);
 	RNA_def_property_int_sdna(prop, NULL, "rc_max_rate");
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 	RNA_def_property_range(prop, 1, 14000);
 	RNA_def_property_ui_text(prop, "Max Rate", "Rate control: max rate (kb/s)");
 	RNA_def_property_update(prop, NC_SCENE|ND_RENDER_OPTIONS, NULL);
 
 	prop= RNA_def_property(srna, "muxrate", PROP_INT, PROP_NONE);
 	RNA_def_property_int_sdna(prop, NULL, "mux_rate");
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 	RNA_def_property_range(prop, 0, 100000000);
 	RNA_def_property_ui_text(prop, "Mux Rate", "Mux rate (bits/s(!))");
 	RNA_def_property_update(prop, NC_SCENE|ND_RENDER_OPTIONS, NULL);
 
 	prop = RNA_def_property(srna, "gopsize", PROP_INT, PROP_NONE);
 	RNA_def_property_int_sdna(prop, NULL, "gop_size");
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 	RNA_def_property_range(prop, 0, 100);
 	RNA_def_property_ui_text(prop, "GOP Size", "Distance between key frames");
 	RNA_def_property_update(prop, NC_SCENE|ND_RENDER_OPTIONS, NULL);
 
 	prop = RNA_def_property(srna, "buffersize", PROP_INT, PROP_NONE);
 	RNA_def_property_int_sdna(prop, NULL, "rc_buffer_size");
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 	RNA_def_property_range(prop, 0, 2000);
 	RNA_def_property_ui_text(prop, "Buffersize", "Rate control: buffer size (kb)");
 	RNA_def_property_update(prop, NC_SCENE|ND_RENDER_OPTIONS, NULL);
 
 	prop = RNA_def_property(srna, "packetsize", PROP_INT, PROP_NONE);
 	RNA_def_property_int_sdna(prop, NULL, "mux_packet_size");
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 	RNA_def_property_range(prop, 0, 16384);
 	RNA_def_property_ui_text(prop, "Mux Packet Size", "Mux packet size (byte)");
 	RNA_def_property_update(prop, NC_SCENE|ND_RENDER_OPTIONS, NULL);
 
 	prop= RNA_def_property(srna, "use_autosplit", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flags", FFMPEG_AUTOSPLIT_OUTPUT);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 	RNA_def_property_ui_text(prop, "Autosplit Output", "Autosplit output at 2GB boundary");
 	RNA_def_property_update(prop, NC_SCENE|ND_RENDER_OPTIONS, NULL);
 
 	prop = RNA_def_property(srna, "use_lossless_output", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flags", FFMPEG_LOSSLESS_OUTPUT);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 	RNA_def_property_boolean_funcs(prop, NULL, "rna_FFmpegSettings_lossless_output_set");
 	RNA_def_property_ui_text(prop, "Lossless Output", "Use lossless output for video streams");
 	RNA_def_property_update(prop, NC_SCENE|ND_RENDER_OPTIONS, NULL);
@@ -3100,18 +3190,21 @@ static void rna_def_scene_render_data(BlenderRNA *brna)
 
 	prop= RNA_def_property(srna, "resolution_x", PROP_INT, PROP_NONE);
 	RNA_def_property_int_sdna(prop, NULL, "xsch");
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 	RNA_def_property_range(prop, 4, 10000);
 	RNA_def_property_ui_text(prop, "Resolution X", "Number of horizontal pixels in the rendered image");
 	RNA_def_property_update(prop, NC_SCENE|ND_RENDER_OPTIONS, "rna_SceneCamera_update");
 	
 	prop= RNA_def_property(srna, "resolution_y", PROP_INT, PROP_NONE);
 	RNA_def_property_int_sdna(prop, NULL, "ysch");
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 	RNA_def_property_range(prop, 4, 10000);
 	RNA_def_property_ui_text(prop, "Resolution Y", "Number of vertical pixels in the rendered image");
 	RNA_def_property_update(prop, NC_SCENE|ND_RENDER_OPTIONS, "rna_SceneCamera_update");
 	
 	prop= RNA_def_property(srna, "resolution_percentage", PROP_INT, PROP_PERCENTAGE);
 	RNA_def_property_int_sdna(prop, NULL, "size");
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 	RNA_def_property_range(prop, 1, SHRT_MAX);
 	RNA_def_property_ui_range(prop, 1, 100, 10, 1);
 	RNA_def_property_ui_text(prop, "Resolution %", "Percentage scale for render resolution");
@@ -3131,12 +3224,14 @@ static void rna_def_scene_render_data(BlenderRNA *brna)
 	
 	prop= RNA_def_property(srna, "pixel_aspect_x", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "xasp");
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 	RNA_def_property_range(prop, 1.0f, 200.0f);
 	RNA_def_property_ui_text(prop, "Pixel Aspect X", "Horizontal aspect ratio - for anamorphic or non-square pixel output");
 	RNA_def_property_update(prop, NC_SCENE|ND_RENDER_OPTIONS, "rna_SceneCamera_update");
 	
 	prop= RNA_def_property(srna, "pixel_aspect_y", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "yasp");
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 	RNA_def_property_range(prop, 1.0f, 200.0f);
 	RNA_def_property_ui_text(prop, "Pixel Aspect Y", "Vertical aspect ratio - for anamorphic or non-square pixel output");
 	RNA_def_property_update(prop, NC_SCENE|ND_RENDER_OPTIONS, "rna_SceneCamera_update");
@@ -3332,12 +3427,14 @@ static void rna_def_scene_render_data(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "use_motion_blur", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "mode", R_MBLUR);
 	RNA_def_property_ui_text(prop, "Motion Blur", "Use multi-sampled 3D scene motion blur");
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 	RNA_def_property_update(prop, NC_SCENE|ND_RENDER_OPTIONS, NULL);
 	
 	prop= RNA_def_property(srna, "motion_blur_samples", PROP_INT, PROP_NONE);
 	RNA_def_property_int_sdna(prop, NULL, "mblur_samples");
 	RNA_def_property_range(prop, 1, 32);
 	RNA_def_property_ui_text(prop, "Motion Samples", "Number of scene samples to take with motion blur");
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 	RNA_def_property_update(prop, NC_SCENE|ND_RENDER_OPTIONS, NULL);
 	
 	prop= RNA_def_property(srna, "motion_blur_shutter", PROP_FLOAT, PROP_NONE);
@@ -3350,6 +3447,7 @@ static void rna_def_scene_render_data(BlenderRNA *brna)
 	/* border */
 	prop= RNA_def_property(srna, "use_border", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "mode", R_BORDER);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 	RNA_def_property_ui_text(prop, "Border",
 	                         "Render a user-defined border region, within the frame size "
 	                         "(note that this disables save_buffers and full_sample)");
@@ -3381,6 +3479,7 @@ static void rna_def_scene_render_data(BlenderRNA *brna)
 	
 	prop= RNA_def_property(srna, "use_crop_to_border", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "mode", R_CROP);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 	RNA_def_property_ui_text(prop, "Crop to Border", "Crop the rendered frame to the defined border size");
 	RNA_def_property_update(prop, NC_SCENE|ND_RENDER_OPTIONS, NULL);
 	
@@ -3722,7 +3821,7 @@ static void rna_def_scene_render_data(BlenderRNA *brna)
 
 	prop= RNA_def_property(srna, "use_simplify_triangulate", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "simplify_flag", R_SIMPLE_NO_TRIANGULATE);
-	RNA_def_property_ui_text(prop, "Skip Quad to Triangles", "Disables non-planer quads being triangulated");
+	RNA_def_property_ui_text(prop, "Skip Quad to Triangles", "Disable non-planar quads being triangulated");
 
 	/* Scene API */
 	RNA_api_scene_render(srna);
@@ -3896,7 +3995,7 @@ static void rna_def_selected_uv_element(BlenderRNA *brna)
 	PropertyRNA *prop;
 
 	srna= RNA_def_struct(brna, "SelectedUvElement", "PropertyGroup");
-	RNA_def_struct_ui_text(srna, "Selected Uv Element", "");
+	RNA_def_struct_ui_text(srna, "Selected UV Element", "");
 
 	/* store the index to the UV element selected */
 	prop= RNA_def_property(srna, "element_index", PROP_INT, PROP_UNSIGNED);
@@ -3957,7 +4056,7 @@ void RNA_def_scene(BlenderRNA *brna)
 	prop= RNA_def_property(srna, "world", PROP_POINTER, PROP_NONE);
 	RNA_def_property_flag(prop, PROP_EDITABLE);
 	RNA_def_property_ui_text(prop, "World", "World used for rendering the scene");
-	RNA_def_property_update(prop, NC_SCENE|ND_WORLD, NULL);
+	RNA_def_property_update(prop, NC_SCENE|ND_WORLD, "rna_Scene_glsl_update");
 
 	prop= RNA_def_property(srna, "cursor_location", PROP_FLOAT, PROP_XYZ_LENGTH);
 	RNA_def_property_float_sdna(prop, NULL, "cursor");

@@ -24,8 +24,8 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
-#ifndef BKE_GLOBAL_H
-#define BKE_GLOBAL_H
+#ifndef __BKE_GLOBAL_H__
+#define __BKE_GLOBAL_H__
 
 /** \file BKE_global.h
  *  \ingroup bke
@@ -54,7 +54,7 @@ typedef struct Global {
 	struct Main *main;
 	
 	/* strings: lastsaved */
-	char ima[256], lib[256];
+	char ima[1024], lib[1024]; /* 1024 = FILE_MAX */
 
 	/* flag: if != 0 G.main->name contains valid relative base path */
 	int relbase_valid;

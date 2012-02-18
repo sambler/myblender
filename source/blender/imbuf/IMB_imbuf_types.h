@@ -44,13 +44,13 @@
  * \todo Clean up includes.
  */
 
-#ifndef IMB_IMBUF_TYPES_H
-#define IMB_IMBUF_TYPES_H
+#ifndef __IMB_IMBUF_TYPES_H__
+#define __IMB_IMBUF_TYPES_H__
 
 struct ImMetaData;
 
 #define IB_MIPMAP_LEVELS	20
-#define IB_FILENAME_SIZE	1023
+#define IB_FILENAME_SIZE	1024
 
 /**
  * \ingroup imbuf

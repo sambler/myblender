@@ -24,8 +24,8 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
-#ifndef BLO_READFILE_H
-#define BLO_READFILE_H
+#ifndef __BLO_READFILE_H__
+#define __BLO_READFILE_H__
 
 /** \file BLO_readfile.h
  *  \ingroup blenloader
@@ -66,7 +66,7 @@ typedef struct BlendFileData {
 	int fileflags;
 	int displaymode;
 	int globalf;
-	char filename[240];	/* 240 = FILE_MAX */
+	char filename[1024];	/* 1024 = FILE_MAX */
 	
 	struct bScreen*	curscreen;
 	struct Scene*	curscene;

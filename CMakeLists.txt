@@ -160,6 +160,11 @@ if(UNIX AND NOT APPLE)
 	option(WITH_BUILTIN_GLEW "Use GLEW OpenGL wrapper library bundled with blender" ON)
 	option(WITH_XDG_USER_DIRS    "Build with XDG Base Directory Specification (only config and documents for now)" OFF)
 	mark_as_advanced(WITH_XDG_USER_DIRS)
+
+	# freebsd doesn't seems to support XDND
+	if(NOT ${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD")
+		option(WITH_GHOST_XDND   "Enable drag'n'drop support on Linux using XDND protocol" ON)
+	endif()
 else()
 	# not an option for other OS's
 	set(WITH_BUILTIN_GLEW ON)
@@ -248,6 +253,12 @@ if(APPLE)
 		set(CMAKE_OSX_DEPLOYMENT_TARGET 10.5 CACHE STRING
 		"Choose the minimum OSX version required: 10.4 or 10.5"
 		FORCE)
+	endif()
+	if(${CMAKE_GENERATOR} MATCHES "Xcode" AND (${XCODE_VERSION} VERSION_EQUAL 4 OR ${XCODE_VERSION} VERSION_GREATER 4))
+		# Xcode 4 defaults to the Apple LLVM Compiler.
+		# Override the default compiler selection because Blender only compiles with gcc
+		set(CMAKE_XCODE_ATTRIBUTE_GCC_VERSION "com.apple.compilers.llvmgcc42")
+		message(STATUS "Setting compiler to: " ${CMAKE_XCODE_ATTRIBUTE_GCC_VERSION})
 	endif()
 	option(WITH_COCOA	  "Use Cocoa framework instead of deprecated Carbon" ON)
 	option(USE_QTKIT	  "Use QtKit instead of Carbon quicktime (needed for having partial quicktime for 64bit)" OFF)
@@ -685,7 +696,7 @@ elseif(WIN32)
 	if(WITH_OPENAL)
 		set(OPENAL ${LIBDIR}/openal)
 		set(OPENAL_INCLUDE_DIR ${OPENAL}/include)
-		set(OPENAL_LIBRARY OpenAL32)
+		set(OPENAL_LIBRARY wrap_oal)
 		set(OPENAL_LIBPATH ${OPENAL}/lib)
 	endif()
 
@@ -1500,10 +1511,9 @@ if(MSVC10)
 endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-	if(WITH_IK_ITASC OR WITH_MOD_FLUID)
+	if(WITH_IK_ITASC)
 		message(WARNING "Using Clang as CXX compiler: disabling WITH_IK_ITASC and WITH_MOD_FLUID, these features will be missing.")
 		set(WITH_IK_ITASC OFF)
-		set(WITH_MOD_FLUID OFF)
 	endif()
 endif()
 

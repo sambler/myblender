@@ -33,8 +33,8 @@
  */
 
 
-#ifndef IMB_ANIM_H
-#define IMB_ANIM_H
+#ifndef __IMB_ANIM_H__
+#define __IMB_ANIM_H__
 
 #ifdef _WIN32
 #  define INC_OLE2
@@ -136,9 +136,9 @@ struct anim {
 	int x, y;
 	
 		/* voor op nummer */
-	char name[256];
+	char name[1024];
 		/* voor sequence */
-	char first[256];
+	char first[1024];
 
 		/* movie */
 	void *movie;
@@ -189,7 +189,7 @@ struct anim {
 	struct redcode_handle * redcodeCtx;
 #endif
 
-	char index_dir[256];
+	char index_dir[768];
 
 	int proxies_tried;
 	int indices_tried;

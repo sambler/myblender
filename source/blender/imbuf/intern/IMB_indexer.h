@@ -22,8 +22,8 @@
  */
 
 
-#ifndef IMB_INDEXER_H
-#define IMB_INDEXER_H
+#ifndef __IMB_INDEXER_H__
+#define __IMB_INDEXER_H__
 
 #ifdef WIN32
 #  include <io.h>
@@ -62,7 +62,7 @@ typedef struct anim_index_entry {
 } anim_index_entry;
 
 struct anim_index {
-	char name[256];
+	char name[1024];
 
 	int num_entries;
 	struct anim_index_entry * entries;

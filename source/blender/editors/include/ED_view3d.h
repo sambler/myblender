@@ -28,8 +28,8 @@
  *  \ingroup editors
  */
 
-#ifndef ED_VIEW3D_H
-#define ED_VIEW3D_H
+#ifndef __ED_VIEW3D_H__
+#define __ED_VIEW3D_H__
 
 /* ********* exports for space_view3d/ module ********** */
 struct ARegion;
@@ -52,7 +52,8 @@ struct View3D;
 struct ViewContext;
 struct wmWindow;
 struct MVert;
-
+struct wmOperatorType;
+struct wmOperator;
 
 /* for derivedmesh drawing callbacks, for view3d_select, .... */
 typedef struct ViewContext {
@@ -209,6 +210,7 @@ void project_short_noclip(struct ARegion *ar, const float vec[3], short adr[2]);
 void project_int(struct ARegion *ar, const float vec[3], int adr[2]);
 void project_int_noclip(struct ARegion *ar, const float vec[3], int adr[2]);
 
+void apply_project_float(float persmat[4][4], int winx, int winy, const float vec[], float adr[2]);
 void project_float(struct ARegion *ar, const float vec[3], float adr[2]);
 void project_float_noclip(struct ARegion *ar, const float vec[3], float adr[2]);
 
@@ -301,4 +303,9 @@ struct BGpic *ED_view3D_background_image_new(struct View3D *v3d);
 void ED_view3D_background_image_remove(struct View3D *v3d, struct BGpic *bgpic);
 void ED_view3D_background_image_clear(struct View3D *v3d);
 
-#endif /* ED_VIEW3D_H */
+/* view matrix properties utilities */
+void ED_view3d_operator_properties_viewmat(struct wmOperatorType *ot);
+void ED_view3d_operator_properties_viewmat_set(struct bContext *C, struct wmOperator *op);
+void ED_view3d_operator_properties_viewmat_get(struct wmOperator *op, int *winx, int *winy, float persmat[4][4]);
+
+#endif /* __ED_VIEW3D_H__ */

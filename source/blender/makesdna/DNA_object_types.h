@@ -37,13 +37,12 @@
 #include "DNA_listBase.h"
 #include "DNA_ID.h"
 #include "DNA_action_types.h" /* bAnimVizSettings */
-#include "DNA_scene_types.h"
 
 #ifdef __cplusplus
 extern "C" {
 //} for code folding
 #endif
-
+	
 struct Object;
 struct AnimData;
 struct Ipo;
@@ -58,6 +57,7 @@ struct ParticleSystem;
 struct DerivedMesh;
 struct SculptSession;
 struct bGPdata;
+
 
 /* Vertex Groups - Name Info */
 typedef struct bDeformGroup {
@@ -262,10 +262,6 @@ typedef struct Object {
 	ListBase *duplilist;	/* for temporary dupli list storage, only for use by RNA API */
 
 	float ima_ofs[2];		/* offset for image empties */
-
-	int wire_colorset;	/* Index of Custom WireColorSet - index into scene.wirecolorsets
-									- 0 == no colourset - index by 1 adjustment done in colourset get/set functions only */
-	char pad2[4];
 } Object;
 
 /* Warning, this is not used anymore because hooks are now modifiers */
@@ -415,6 +411,7 @@ typedef struct DupliObject {
 #define OB_BOUND_CONVEX_HULL   5
 /* #define OB_BOUND_DYN_MESH   6 */ /*UNUSED*/
 #define OB_BOUND_CAPSULE       7
+
 
 /* **************** BASE ********************* */
 

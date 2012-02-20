@@ -194,7 +194,6 @@ class OBJECT_PT_display(ObjectButtonsPanel, Panel):
         layout = self.layout
 
         ob = context.object
-        scn = context.scene
 
         split = layout.split()
         col = split.column()
@@ -213,14 +212,6 @@ class OBJECT_PT_display(ObjectButtonsPanel, Panel):
         col.prop(ob, "show_name", text="Name")
         col.prop(ob, "show_axis", text="Axis")
         col.prop(ob, "show_wire", text="Wire")
-
-
-        if ob and scn:
-            col.label(text="Wirecolour Sets:")
-            #  prop_search(data, property, search_data, search_property, text="", icon='NONE')
-            col.prop_search(scn.wirecolor_sets_all, "active", scn, "wirecolor_sets_all", text="")
-            #col.prop_search(ob, "wire_colorset", scn.wirecolor_sets_all, "active", text="")
-
         col.prop(ob, "color", text="Object Color")
 
         col = split.column()

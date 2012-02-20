@@ -1104,7 +1104,7 @@ static short animsys_remap_path (AnimMapper *UNUSED(remap), char *path, char **d
 	//if (remap) {
 		/* find a matching entry... to use to remap */
 		// ...TODO...
-	// }
+	//}
 	
 	/* nothing suitable found, so just set dst to look at path (i.e. no alloc/free needed) */
 	*dst= path;

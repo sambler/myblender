@@ -2930,16 +2930,10 @@ static void draw_em_fancy(Scene *scene, View3D *v3d, RegionView3D *rv3d,
 			glFrontFace(GL_CCW);
 			glDisable(GL_LIGHTING);
 		}
-
+			
 		// Setup for drawing wire over, disable zbuffer
 		// write to show selected edge wires better
-		//WirecolorSet *wcs = SCENE_get_wirecolorset (scene, ob->wire_colorset_index);
-		WirecolorSet *wcs = ob->wire_colorset;
-
-		if(wcs)
-			glColor4fv(wcs->draw); /* draw edit mesh - we only use standard wire colour */
-		else
-			UI_ThemeColor(TH_WIRE);
+		UI_ThemeColor(TH_WIRE);
 
 		bglPolygonOffset(rv3d->dist, 1.0);
 		glDepthMask(0);
@@ -3098,10 +3092,6 @@ static void draw_mesh_fancy(Scene *scene, ARegion *ar, View3D *v3d, RegionView3D
 	eWireDrawMode draw_wire= OBDRAW_WIRE_OFF;
 	int /* totvert,*/ totedge, totface;
 	DerivedMesh *dm= mesh_get_derived_final(scene, ob, scene->customdata_mask);
-//	WirecolorSet *wcs = SCENE_get_wirecolorset (scene, ob->wire_colorset_index);
-	WirecolorSet *wcs = ob->wire_colorset;
-
-	ModifierData *md = NULL;
 	const short is_obact= (ob == OBACT);
 	int draw_flags = (is_obact && paint_facesel_test(ob)) ? DRAW_FACE_SELECT : 0;
 
@@ -3166,18 +3156,6 @@ static void draw_mesh_fancy(Scene *scene, ARegion *ar, View3D *v3d, RegionView3D
 			draw_mesh_textured(scene, v3d, rv3d, ob, dm, draw_flags);
 		}
 
-/* HEAD from merge master --
-		if(!is_paint_sel) {
-			if(wcs) {
-				if(ob==OBACT)
-					glColor4fv(wcs->active);
-				else if(base->flag & SELECT)
-					glColor4fv(wcs->selected);
-				else
-					glColor4fv(wcs->draw);
-			}
-			else if(base->flag & SELECT)
-*/
 		if(!(draw_flags & DRAW_FACE_SELECT)) {
 			if(base->flag & SELECT)
 				UI_ThemeColor(is_obact ? TH_ACTIVE : TH_SELECT);
@@ -3293,18 +3271,10 @@ static void draw_mesh_fancy(Scene *scene, ARegion *ar, View3D *v3d, RegionView3D
 			glFrontFace(GL_CCW);
 			glDisable(GL_LIGHTING);
 
-			if(wcs) {
-				if(is_obact)
-					glColor4fv(wcs->active);
-				else if(base->flag & SELECT)
-					glColor4fv(wcs->selected);
-				else
-					glColor4fv(wcs->draw);
-			}
-			else if(base->flag & SELECT) {
+			if(base->flag & SELECT) {
 				UI_ThemeColor(is_obact ? TH_ACTIVE : TH_SELECT);
 			} else {
-					UI_ThemeColor(TH_WIRE);
+				UI_ThemeColor(TH_WIRE);
 			}
 			if(!ob->sculpt && (v3d->flag2 & V3D_RENDER_OVERRIDE)==0)
 				dm->drawLooseEdges(dm);
@@ -3345,38 +3315,19 @@ static void draw_mesh_fancy(Scene *scene, ARegion *ar, View3D *v3d, RegionView3D
 	
 	/* set default draw color back for wire or for draw-extra later on */
 	if (dt!=OB_WIRE) {
-		if(wcs) { /* colourset used */
-			if((ob->flag & OB_FROMGROUP) && !(wcs->flags & WCS_OVERRIDE_GROUP)) {
-				/* still standard group colours */
-				if(ob==OBACT && ob->flag & OB_FROMGROUP)
-					UI_ThemeColor(TH_GROUP_ACTIVE);
-				else if(ob->flag & OB_FROMGROUP)
-					UI_ThemeColorShade(TH_GROUP_ACTIVE, -16);
-				else if(flag!=DRAW_CONSTCOLOR)
-					UI_ThemeColor((ob==OBACT)?TH_ACTIVE:TH_SELECT);
-				else
-					glColor3ub(80,80,80);
-			} else {
-				if(ob==OBACT)
-					glColor4fv(wcs->active);
-				else if(base->flag & SELECT)
-					glColor4fv(wcs->selected);
-				else
-					glColor4fv(wcs->draw);
-			}
-		} else if(base->flag & SELECT) { /* standard wire selected colours */
-			if(is_obact && ob->flag & OB_FROMGROUP)
+		if(base->flag & SELECT) {
+			if (is_obact && ob->flag & OB_FROMGROUP)
 				UI_ThemeColor(TH_GROUP_ACTIVE);
-			else if(ob->flag & OB_FROMGROUP)
+			else if(ob->flag & OB_FROMGROUP) 
 				UI_ThemeColorShade(TH_GROUP_ACTIVE, -16);
 			else if(flag!=DRAW_CONSTCOLOR)
 				UI_ThemeColor(is_obact ? TH_ACTIVE : TH_SELECT);
 			else
 				glColor3ub(80,80,80);
-		} else { /* standard wire colour */
-			if (ob->flag & OB_FROMGROUP) {
+		} else {
+			if (ob->flag & OB_FROMGROUP) 
 				UI_ThemeColor(TH_GROUP);
-			} else {
+			else {
 				if(ob->dtx & OB_DRAWWIRE && flag==DRAW_CONSTCOLOR)
 					glColor3ub(80,80,80);
 				else
@@ -5384,8 +5335,6 @@ static void drawnurb(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *base, 
 {
 	ToolSettings *ts= scene->toolsettings;
 	Object *ob= base->object;
-	//WirecolorSet *wcs = SCENE_get_wirecolorset (scene, ob->wire_colorset_index);
-	WirecolorSet *wcs = ob->wire_colorset;
 	Curve *cu = ob->data;
 	Nurb *nu;
 	BevList *bl;
@@ -5393,16 +5342,7 @@ static void drawnurb(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *base, 
 	int index;
 
 	/* DispList */
-	if( wcs && !(ob->mode & OB_MODE_EDIT) ) {
-		if(ob==OBACT)
-			glColor4fv(wcs->active);
-		else if(base->flag & SELECT)
-			glColor4fv(wcs->selected);
-		else
-			glColor4fv(wcs->draw);
-	}
-	else
-		UI_ThemeColor(TH_WIRE);
+	UI_ThemeColor(TH_WIRE);
 	drawDispList(scene, v3d, rv3d, base, dt);
 
 	if(v3d->zbuf) glDisable(GL_DEPTH_TEST);
@@ -5432,15 +5372,7 @@ static void drawnurb(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *base, 
 		when at its lowest, dont render normals */
 	if(cu->flag & CU_3D && ts->normalsize > 0.0015f && (cu->drawflag & CU_HIDE_NORMALS)==0) {
 
-		if( wcs && !(ob->mode & OB_MODE_EDIT) )
-			if(ob==OBACT)
-				glColor4fv(wcs->active);
-			else if(base->flag & SELECT)
-				glColor4fv(wcs->selected);
-			else
-				glColor4fv(wcs->draw);
-		else
-			UI_ThemeColor(TH_WIRE);
+		UI_ThemeColor(TH_WIRE);
 		for (bl=cu->bev.first,nu=nurb; nu && bl; bl=bl->next,nu=nu->next) {
 			BevPoint *bevp= (BevPoint *)(bl+1);		
 			int nr= bl->nr;
@@ -5726,8 +5658,6 @@ static void drawcone(const float vec[3], float radius, float height, float tmat[
 static int drawmball(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *base, int dt)
 {
 	Object *ob= base->object;
-	//WirecolorSet *wcs = SCENE_get_wirecolorset (scene, ob->wire_colorset_index);
-	WirecolorSet *wcs = ob->wire_colorset;
 	MetaBall *mb;
 	MetaElem *ml;
 	float imat[4][4];
@@ -5736,15 +5666,7 @@ static int drawmball(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *base, 
 	mb= ob->data;
 
 	if(mb->editelems) {
-		if(wcs)
-			if(ob==OBACT)
-				glColor4fv(wcs->active);
-			else if(base->flag & SELECT)
-				glColor4fv(wcs->selected);
-			else
-				glColor4fv(wcs->draw);
-		else
-			UI_ThemeColor(TH_WIRE);
+		UI_ThemeColor(TH_WIRE);
 		if((G.f & G_PICKSEL)==0 ) drawDispList(scene, v3d, rv3d, base, dt);
 		ml= mb->editelems->first;
 	}
@@ -5759,20 +5681,11 @@ static int drawmball(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *base, 
 	if(v3d->flag2 & V3D_RENDER_OVERRIDE) return 0;
 	
 	/* in case solid draw, reset wire colors */
-	if(wcs) {
-		if(ob==OBACT)
-			glColor4fv(wcs->active);
-		else if(base->flag & SELECT)
-			glColor4fv(wcs->selected);
-		else
-			glColor4fv(wcs->draw);
-	} else if(ob->flag & SELECT) {
+	if(ob->flag & SELECT) {
 		if(ob==OBACT) UI_ThemeColor(TH_ACTIVE);
 		else UI_ThemeColor(TH_SELECT);
 	}
-
-	else
-		UI_ThemeColor(TH_WIRE);
+	else UI_ThemeColor(TH_WIRE);
 
 	invert_m4_m4(imat, rv3d->viewmatob);
 	normalize_v3(imat[0]);
@@ -6165,9 +6078,6 @@ static void drawObjectSelect(Scene *scene, View3D *v3d, ARegion *ar, Base *base)
 
 static void drawWireExtra(Scene *scene, RegionView3D *rv3d, Object *ob) 
 {
-	//WirecolorSet *wcs = SCENE_get_wirecolorset (scene, ob->wire_colorset_index);
-	WirecolorSet *wcs = ob->wire_colorset;
-
 	if(ob!=scene->obedit && (ob->flag & SELECT)) {
 		if(ob==OBACT) {
 			if(ob->flag & OB_FROMGROUP) UI_ThemeColor(TH_GROUP_ACTIVE);
@@ -6180,36 +6090,12 @@ static void drawWireExtra(Scene *scene, RegionView3D *rv3d, Object *ob)
 	}
 	else {
 		if(ob->flag & OB_FROMGROUP)
-			if(wcs && (wcs->flags & WCS_OVERRIDE_GROUP) ) {
-				if(ob==OBACT)
-					glColor4fv(wcs->active);
-				else if(ob->flag & SELECT)
-					glColor4fv(wcs->selected);
-				else
-					glColor4fv(wcs->draw);
-			} else
-				UI_ThemeColor(TH_GROUP);
+			UI_ThemeColor(TH_GROUP);
 		else {
 			if(ob->dtx & OB_DRAWWIRE) {
-				if(wcs) {
-					if(ob==OBACT)
-						glColor4fv(wcs->active);
-					else if(ob->flag & SELECT)
-						glColor4fv(wcs->selected);
-					else
-						glColor4fv(wcs->draw);
-				}else
-					glColor3ub(80,80,80);
+				glColor3ub(80,80,80);
 			} else {
-				if(wcs) {
-					if(ob==OBACT)
-						glColor4fv(wcs->active);
-					else if(ob->flag & SELECT)
-						glColor4fv(wcs->selected);
-					else
-						glColor4fv(wcs->draw);
-				}else
-					UI_ThemeColor(TH_WIRE);
+				UI_ThemeColor(TH_WIRE);
 			}
 		}
 	}
@@ -6395,26 +6281,6 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, int flag)
 			theme_id= TH_TRANSFORM;
 		}
 		else {
-/* merge this below
-
-			if(ob->type==OB_LAMP)
-				UI_ThemeColor(TH_LAMP);
-			else if(ob->type==OB_SPEAKER)
-				UI_ThemeColor(TH_SPEAKER);
-			else if(ob->use_cust_wire_color == OB_CUSTOM_WIRE)
-                glColor3fv(ob->cust_wire_color);
-			else
-				UI_ThemeColor(TH_WIRE);
-
-			if((scene->basact)==base) {
-				if(base->flag & (SELECT+BA_WAS_SEL)) UI_ThemeColor(TH_ACTIVE);
-			}
-			else {
-				if(base->flag & (SELECT+BA_WAS_SEL)) UI_ThemeColor(TH_SELECT);
-			}
-
-			// no theme yet
-*/
 			/* Sets the 'colindex' */
 			if(ob->id.lib) {
 				colindex= (base->flag & (SELECT+BA_WAS_SEL)) ? 4 : 3;
@@ -6535,9 +6401,6 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, int flag)
 		case OB_FONT:
 			cu= ob->data;
 			if(cu->editfont) {
-				//WirecolorSet *wcs = SCENE_get_wirecolorset (scene, ob->wire_colorset_index);
-				WirecolorSet *wcs = ob->wire_colorset;
-
 				draw_textcurs(cu->editfont->textcurs);
 
 				if (cu->flag & CU_FAST) {
@@ -6550,17 +6413,7 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, int flag)
 				}
 
 				if (cu->linewidth != 0.0f) {
-					cpack(0xff44ff);
-					if(wcs) {
-						if(ob==OBACT)
-							glColor4fv(wcs->active);
-						else if(base->flag & SELECT)
-							glColor4fv(wcs->selected);
-						else
-							glColor4fv(wcs->draw);
-					}
-					else
-						UI_ThemeColor(TH_WIRE);
+					UI_ThemeColor(TH_WIRE);
 					copy_v3_v3(vec1, ob->orig);
 					copy_v3_v3(vec2, ob->orig);
 					vec1[0] += cu->linewidth;
@@ -6578,14 +6431,7 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, int flag)
 				setlinestyle(3);
 				for (i=0; i<cu->totbox; i++) {
 					if (cu->tb[i].w != 0.0f) {
-						if (i == (cu->actbox-1))
-							UI_ThemeColor(TH_ACTIVE);
-						else {
-							if(wcs) {
-								glColor4fv(wcs->draw);
-							} else
-								UI_ThemeColor(TH_WIRE);
-						}
+						UI_ThemeColor(i == (cu->actbox-1) ? TH_ACTIVE : TH_WIRE);
 						vec1[0] = (cu->xof * cu->fsize) + cu->tb[i].x;
 						vec1[1] = (cu->yof * cu->fsize) + cu->tb[i].y + cu->fsize;
 						vec1[2] = 0.001;

@@ -39,7 +39,6 @@ set(SRC
 	numinput.c
 	undo.c
 	crazyspace.c
-	wirecolorsets.c
 
 	util_intern.h
 	# general includes

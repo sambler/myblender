@@ -176,37 +176,6 @@ class SCENE_PT_keying_set_paths(SceneButtonsPanel, Panel):
 
             col.prop(ksp, "bl_options")
 
-class SCENE_PT_wirecolour_sets(SceneButtonsPanel, Panel):
-    bl_label = "Wirecolour Sets"
-    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
-
-    def draw(self, context):
-        layout = self.layout
-
-        scene = context.scene
-        row = layout.row()
-
-        col = row.column()
-        col.template_list(scene, "wirecolor_sets", scene.wirecolor_sets, "active_index", rows=2)
-
-        col = row.column(align=True)
-        col.operator("scene.wirecolor_set_add", icon='ZOOMIN', text="")
-        col.operator("scene.wirecolor_set_remove", icon='ZOOMOUT', text="")
-
-        wcs = scene.wirecolor_sets.active
-        if wcs:
-            row = layout.row()
-
-            col = row.column()
-            col.prop(wcs, "name")
-
-            row = col.row(align=False)
-            row.prop(wcs, "draw_color", text="Draw")
-            row = col.row(align=False)
-            row.prop(wcs, "selected_color", text="Selected")
-            row = col.row(align=False)
-            row.prop(wcs, "active_color", text="Active")
-
 
 class SCENE_PT_physics(SceneButtonsPanel, Panel):
     bl_label = "Gravity"

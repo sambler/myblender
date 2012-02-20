@@ -596,64 +596,6 @@ static void rna_Scene_all_keyingsets_next(CollectionPropertyIterator *iter)
 	iter->valid= (internal->link != NULL);
 }
 
-static PointerRNA rna_Scene_active_wirecolor_set_get(PointerRNA *ptr)
-{
-	Scene *scene= (Scene *)ptr->data;
-	return rna_pointer_inherit_refine(ptr, &RNA_WirecolorSet, SCENE_get_active_wirecolorset(scene));
-}
-
-static void rna_Scene_active_wirecolor_set_set(PointerRNA *ptr, PointerRNA value)
-{
-	Scene *scene= (Scene *)ptr->data;
-	WirecolorSet *wcs= (WirecolorSet*)value.data;
-
-	scene->active_wirecolorset= SCENE_get_wirecolorset_index(scene, wcs);
-}
-
-/* get WirecolorSet index stuff for list of wirecolor Sets editing UI
- *	- active_wirecolorset-1 since 0 is reserved for 'none'
- *	- don't clamp, otherwise can never set builtins types as active...
- */
-static int rna_Scene_active_wirecolor_set_index_get(PointerRNA *ptr)
-{
-	Scene *scene= (Scene *)ptr->data;
-	return scene->active_wirecolorset-1;
-}
-
-/* get WirecolorSet index stuff for list of Wirecolor Sets editing UI
- *	- value+1 since 0 is reserved for 'none'
- */
-static void rna_Scene_active_wirecolor_set_index_set(PointerRNA *ptr, int value)
-{
-	Scene *scene= (Scene *)ptr->data;
-	scene->active_wirecolorset= value+1;
-}
-
-static void rna_Scene_all_wirecolorsets_begin(CollectionPropertyIterator *iter, PointerRNA *ptr)
-{
-	Scene *scene= (Scene*)ptr->data;
-
-	/* start going over the scene WirecolorSets first, while we still have pointer to it
-	 * but only if we have any Wirecolor Sets to use...
-	 */
-	if (scene->wirecolorsets.first)
-		rna_iterator_listbase_begin(iter, &scene->wirecolorsets, NULL);
-//	else
-//		rna_iterator_listbase_end(iter);
-}
-
-static void rna_Scene_all_wirecolorsets_next(CollectionPropertyIterator *iter)
-{
-	ListBaseIterator *internal= iter->internal;
-	WirecolorSet *wcs= (WirecolorSet*)internal->link;
-
-	if (wcs->next == NULL)
-		internal->link= (Link*)wcs->prev;
-	else
-		internal->link= (Link*)wcs->next;
-
-	iter->valid= (internal->link != NULL);
-}
 
 static char *rna_RenderSettings_path(PointerRNA *UNUSED(ptr))
 {
@@ -1430,23 +1372,6 @@ static void rna_SceneCamera_update(Main *UNUSED(bmain), Scene *UNUSED(scene), Po
 		DAG_id_tag_update(&camera->id, 0);
 }
 
-static WirecolorSet *rna_Scene_wirecolor_set_new(Scene *sce, ReportList *reports, const char name[])
-{
-	WirecolorSet *wcs= NULL;
-
-	/* call the API func, and set the active wirecolorset index */
-	wcs= BKE_wirecolorset_add(&sce->wirecolorsets, name);
-
-	if (wcs) {
-		sce->active_wirecolorset= BLI_countlist(&sce->wirecolorsets);
-		return wcs;
-	}
-	else {
-		BKE_report(reports, RPT_ERROR, "Wirecolor Set could not be added.");
-		return NULL;
-	}
-}
-
 #else
 
 static void rna_def_transform_orientation(BlenderRNA *brna)
@@ -1467,48 +1392,6 @@ static void rna_def_transform_orientation(BlenderRNA *brna)
 	RNA_def_struct_name_property(srna, prop);
 	RNA_def_property_ui_text(prop, "Name", "Name of the custom transform orientation");
 	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_VIEW3D, NULL);
-}
-
-static void rna_def_wirecolorset(BlenderRNA *brna)
-{
-	StructRNA *srna;
-	PropertyRNA *prop;
-
-	srna= RNA_def_struct(brna, "WirecolorSet", NULL);
-	RNA_def_struct_ui_text(srna, "Wirecolor Set", "Color set defining how an objects wireframe is drawn");
-
-	/* Name */
-	prop= RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
-	RNA_def_property_ui_text(prop, "Name", "");
-	//RNA_def_struct_ui_icon(srna, ICON_WIRECOLORSET);
-	RNA_def_struct_ui_icon(srna, ICON_GROUP_VCOL); // show vert colour group icon till we make our own
-	RNA_def_struct_name_property(srna, prop);
-	RNA_def_property_update(prop, NC_SCENE|NA_RENAME, NULL);
-
-	/* Colours */
-	prop= RNA_def_property(srna, "draw_color", PROP_FLOAT, PROP_COLOR);
-	RNA_def_property_float_sdna(prop, NULL, "draw");
-	RNA_def_property_array(prop, 4);
-	RNA_def_property_ui_text(prop, "Draw Color", "Standard wireframe Draw color");
-	RNA_def_property_update(prop, NC_OBJECT|ND_DRAW, NULL);
-
-	prop= RNA_def_property(srna, "selected_color", PROP_FLOAT, PROP_COLOR);
-	RNA_def_property_float_sdna(prop, NULL, "selected");
-	RNA_def_property_array(prop, 4);
-	RNA_def_property_ui_text(prop, "Selected Color", "Selected Item wireframe Draw color");
-	RNA_def_property_update(prop, NC_OBJECT|ND_DRAW, NULL);
-
-	prop= RNA_def_property(srna, "active_color", PROP_FLOAT, PROP_COLOR);
-	RNA_def_property_float_sdna(prop, NULL, "active");
-	RNA_def_property_array(prop, 4);
-	RNA_def_property_ui_text(prop, "Active Color", "Active Selected Item wireframe Draw color");
-	RNA_def_property_update(prop, NC_OBJECT|ND_DRAW, NULL);
-
-	/* Flags */
-	prop= RNA_def_property(srna, "override_group", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
-	RNA_def_property_boolean_sdna(prop, NULL, "flags", WCS_OVERRIDE_GROUP);
-	RNA_def_property_ui_text(prop, "Override Group", "Use Wirecolor set colors instead of standard group colors");
 }
 
 static void rna_def_tool_settings(BlenderRNA  *brna)
@@ -2397,10 +2280,10 @@ static void rna_def_scene_game_data(BlenderRNA *brna)
 
 	static EnumPropertyItem physics_engine_items[] = {
 		{WOPHY_NONE, "NONE", 0, "None", "Don't use a physics engine"},
-		// {WOPHY_ENJI, "ENJI", 0, "Enji", ""},
-		// {WOPHY_SUMO, "SUMO", 0, "Sumo (Deprecated)", ""},
-		// {WOPHY_DYNAMO, "DYNAMO", 0, "Dynamo", ""},
-		// {WOPHY_ODE, "ODE", 0, "ODE", ""},
+		//{WOPHY_ENJI, "ENJI", 0, "Enji", ""},
+		//{WOPHY_SUMO, "SUMO", 0, "Sumo (Deprecated)", ""},
+		//{WOPHY_DYNAMO, "DYNAMO", 0, "Dynamo", ""},
+		//{WOPHY_ODE, "ODE", 0, "ODE", ""},
 		{WOPHY_BULLET, "BULLET", 0, "Bullet", "Use the Bullet physics engine"},
 		{0, NULL, 0, NULL, NULL}};
 
@@ -4068,7 +3951,7 @@ static void rna_def_scene_keying_sets(BlenderRNA *brna, PropertyRNA *cprop)
 	RNA_def_property_pointer_funcs(prop, "rna_Scene_active_keying_set_get", "rna_Scene_active_keying_set_set", NULL, NULL);
 	RNA_def_property_ui_text(prop, "Active Keying Set", "Active Keying Set used to insert/delete keyframes");
 	RNA_def_property_update(prop, NC_SCENE|ND_KEYINGSET, NULL);
-
+	
 	prop= RNA_def_property(srna, "active_index", PROP_INT, PROP_NONE);
 	RNA_def_property_int_sdna(prop, NULL, "active_keyingset");
 	RNA_def_property_int_funcs(prop, "rna_Scene_active_keying_set_index_get", "rna_Scene_active_keying_set_index_set", NULL);
@@ -4104,77 +3987,13 @@ static void rna_def_scene_keying_sets_all(BlenderRNA *brna, PropertyRNA *cprop)
 	RNA_def_property_update(prop, NC_SCENE|ND_KEYINGSET, NULL);
 }
 
-/* scene.wirecolor_sets */
-static void rna_def_scene_wirecolor_sets(BlenderRNA *brna, PropertyRNA *cprop)
-{
-	StructRNA *srna;
-	PropertyRNA *prop;
-
-	FunctionRNA *func;
-	PropertyRNA *parm;
-
-	RNA_def_property_srna(cprop, "WirecolorSets");
-	srna= RNA_def_struct(brna, "WirecolorSets", NULL);
-	RNA_def_struct_sdna(srna, "Scene");
-	RNA_def_struct_ui_text(srna, "Wirecolor Sets", "Scene wirecolor sets");
-
-	/* Add wirecolor Set */
-	func= RNA_def_function(srna, "new", "rna_Scene_wirecolor_set_new");
-	RNA_def_function_ui_description(func, "Add a new Wirecolor Set to Scene");
-	RNA_def_function_flag(func, FUNC_USE_REPORTS);
-	/* name */
-	RNA_def_string(func, "name", "WirecolorSet", 64, "Name", "Name of Wirecolor Set");
-
-	/* returns the new WirecolorSet */
-	parm= RNA_def_pointer(func, "wirecolorset", "WirecolorSet", "", "Newly created Wirecolor Set");
-	RNA_def_function_return(func, parm);
-
-	prop= RNA_def_property(srna, "active", PROP_POINTER, PROP_NONE);
-	RNA_def_property_struct_type(prop, "WirecolorSet");
-	RNA_def_property_flag(prop, PROP_EDITABLE);
-	RNA_def_property_pointer_funcs(prop, "rna_Scene_active_wirecolor_set_get", "rna_Scene_active_wirecolor_set_set", NULL, NULL);
-	RNA_def_property_ui_text(prop, "Active Wirecolor Set", "Active Wirecolor Set");
-	RNA_def_property_update(prop, NC_SCENE|ND_WIRECOLORSET, NULL);
-
-	prop= RNA_def_property(srna, "active_index", PROP_INT, PROP_NONE);
-	RNA_def_property_int_sdna(prop, NULL, "active_wirecolorset");
-	RNA_def_property_int_funcs(prop, "rna_Scene_active_wirecolor_set_index_get", "rna_Scene_active_wirecolor_set_index_set", NULL);
-	RNA_def_property_ui_text(prop, "Active Wirecolor Set Index", "Current Wirecolor Set index");
-	RNA_def_property_update(prop, NC_SCENE|ND_WIRECOLORSET, NULL);
-}
-
-static void rna_def_scene_wirecolor_sets_all(BlenderRNA *brna, PropertyRNA *cprop)
-{
-	StructRNA *srna;
-	PropertyRNA *prop;
-
-	RNA_def_property_srna(cprop, "WirecolorSetsAll");
-	srna= RNA_def_struct(brna, "WirecolorSetsAll", NULL);
-	RNA_def_struct_sdna(srna, "Scene");
-	RNA_def_struct_ui_text(srna, "Wirecolor Sets All", "All available wirecolor sets");
-
-	/* NOTE: no add/remove available here, without screwing up this amalgamated list... */
-
-	prop= RNA_def_property(srna, "active", PROP_POINTER, PROP_NONE);
-	RNA_def_property_struct_type(prop, "WirecolorSet");
-	RNA_def_property_flag(prop, PROP_EDITABLE);
-	RNA_def_property_pointer_funcs(prop, "rna_Scene_active_wirecolor_set_get", "rna_Scene_active_wirecolor_set_set", NULL, NULL);
-	RNA_def_property_ui_text(prop, "Active Wirecolor Set", "Active Wirecolor Set");
-	RNA_def_property_update(prop, NC_SCENE|ND_WIRECOLORSET, NULL);
-
-	prop= RNA_def_property(srna, "active_index", PROP_INT, PROP_NONE);
-	RNA_def_property_int_sdna(prop, NULL, "active_wirecolorset");
-	RNA_def_property_int_funcs(prop, "rna_Scene_active_wirecolor_set_index_get", "rna_Scene_active_wirecolor_set_index_set", NULL);
-	RNA_def_property_ui_text(prop, "Active Wirecolor Set Index", "Current Wirecolor Set index");
-	RNA_def_property_update(prop, NC_SCENE|ND_WIRECOLORSET, NULL);
-}
-
 /* Runtime property, used to remember uv indices, used only in UV stitch for now.
  */
 static void rna_def_selected_uv_element(BlenderRNA *brna)
 {
 	StructRNA *srna;
 	PropertyRNA *prop;
+
 	srna= RNA_def_struct(brna, "SelectedUvElement", "PropertyGroup");
 	RNA_def_struct_ui_text(srna, "Selected UV Element", "");
 
@@ -4187,6 +4006,7 @@ static void rna_def_selected_uv_element(BlenderRNA *brna)
 	RNA_def_property_flag(prop, PROP_IDPROPERTY);
 	RNA_def_property_ui_text(prop, "Face Index", "");
 }
+
 
 
 void RNA_def_scene(BlenderRNA *brna)
@@ -4217,7 +4037,7 @@ void RNA_def_scene(BlenderRNA *brna)
 	                       "Scene data block, consisting in objects and defining time and render related settings");
 	RNA_def_struct_ui_icon(srna, ICON_SCENE_DATA);
 	RNA_def_struct_clear_flag(srna, STRUCT_ID_REFCOUNT);
-
+	
 	/* Global Settings */
 	prop= RNA_def_property(srna, "camera", PROP_POINTER, PROP_NONE);
 	RNA_def_property_flag(prop, PROP_EDITABLE);
@@ -4376,7 +4196,7 @@ void RNA_def_scene(BlenderRNA *brna)
 	RNA_def_property_pointer_sdna(prop, NULL, "ed");
 	RNA_def_property_struct_type(prop, "SequenceEditor");
 	RNA_def_property_ui_text(prop, "Sequence Editor", "");
-
+	
 	/* Keying Sets */
 	prop= RNA_def_property(srna, "keying_sets", PROP_COLLECTION, PROP_NONE);
 	RNA_def_property_collection_sdna(prop, NULL, "keyingsets", NULL);
@@ -4392,23 +4212,7 @@ void RNA_def_scene(BlenderRNA *brna)
 	                         "All Keying Sets available for use (Builtins and Absolute Keying Sets for this Scene)");
 	RNA_def_property_update(prop, NC_SCENE|ND_KEYINGSET, NULL);
 	rna_def_scene_keying_sets_all(brna, prop);
-
-	/* Wirecolor Sets */
-	rna_def_wirecolorset(brna);
-	prop= RNA_def_property(srna, "wirecolor_sets", PROP_COLLECTION, PROP_NONE);
-	RNA_def_property_collection_sdna(prop, NULL, "wirecolorsets", NULL);
-	RNA_def_property_struct_type(prop, "WirecolorSet");
-	RNA_def_property_ui_text(prop, "Wirecolor Sets", "Wirecolor Sets for this Scene");
-	RNA_def_property_update(prop, NC_SCENE|ND_WIRECOLORSET, NULL);
-	rna_def_scene_wirecolor_sets(brna, prop);
-
-	prop= RNA_def_property(srna, "wirecolor_sets_all", PROP_COLLECTION, PROP_NONE);
-	RNA_def_property_collection_funcs(prop, "rna_Scene_all_wirecolorsets_begin", "rna_Scene_all_wirecolorsets_next", "rna_iterator_listbase_end", "rna_iterator_listbase_get", NULL, NULL, NULL, NULL);
-	RNA_def_property_struct_type(prop, "WirecolorSet");
-	RNA_def_property_ui_text(prop, "All Wirecolor Sets", "All Wirecolor Sets available for this Scene");
-	RNA_def_property_update(prop, NC_SCENE|ND_WIRECOLORSET, NULL);
-	rna_def_scene_wirecolor_sets_all(brna, prop);
-
+	
 	/* Tool Settings */
 	prop= RNA_def_property(srna, "tool_settings", PROP_POINTER, PROP_NONE);
 	RNA_def_property_flag(prop, PROP_NEVER_NULL);

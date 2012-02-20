@@ -282,4 +282,3 @@ set(SRC
 )
 
 blender_add_lib(bf_rna "${SRC}" "${INC}" "${INC_SYS}")
-target_link_libraries(bf_rna bf_editor_util)

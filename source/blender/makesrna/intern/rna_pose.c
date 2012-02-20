@@ -735,7 +735,7 @@ static void rna_def_pose_channel_constraints(BlenderRNA *brna, PropertyRNA *cpro
 }
 
 static void rna_def_pose_channel(BlenderRNA *brna)
-{
+{	
 	static float default_quat[4] = {1,0,0,0};	/* default quaternion values */
 	static float default_axisAngle[4] = {0,0,1,0};	/* default axis-angle rotation values */
 	static float default_scale[3] = {1,1,1}; /* default scale values */

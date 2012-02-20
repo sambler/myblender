@@ -84,7 +84,7 @@ static EnumPropertyItem collision_bounds_items[] = {
 	{OB_BOUND_CONVEX_HULL, "CONVEX_HULL", 0, "Convex Hull", ""},
 	{OB_BOUND_TRIANGLE_MESH, "TRIANGLE_MESH", 0, "Triangle Mesh", ""},
 	{OB_BOUND_CAPSULE, "CAPSULE", 0, "Capsule", ""},
-	// {OB_DYN_MESH, "DYNAMIC_MESH", 0, "Dynamic Mesh", ""},
+	//{OB_DYN_MESH, "DYNAMIC_MESH", 0, "Dynamic Mesh", ""},
 	{0, NULL, 0, NULL, NULL}};
 
 EnumPropertyItem metaelem_type_items[] = {
@@ -2380,13 +2380,7 @@ static void rna_def_object(BlenderRNA *brna)
 	RNA_def_property_boolean_sdna(prop, NULL, "dtx", OB_DRAWXRAY);
 	RNA_def_property_ui_text(prop, "X-Ray", "Make the object draw in front of others (unsupported for duplicator drawing)");
 	RNA_def_property_update(prop, NC_OBJECT|ND_DRAW, NULL);
-
-	prop= RNA_def_property(srna, "wire_colorset", PROP_POINTER, PROP_NONE );
-	RNA_def_property_struct_type(prop, "WirecolorSet");
-	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
-	RNA_def_property_ui_text(prop, "Wire Colorset", "Use a custom colorset for the object's wireframe drawing");
-	RNA_def_property_update(prop, NC_OBJECT|ND_DRAW, NULL);
-
+	
 	/* Grease Pencil */
 	prop= RNA_def_property(srna, "grease_pencil", PROP_POINTER, PROP_NONE);
 	RNA_def_property_pointer_sdna(prop, NULL, "gpd");

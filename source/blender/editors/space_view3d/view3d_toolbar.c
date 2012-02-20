@@ -41,7 +41,6 @@
 
 #include "BLI_math.h"
 #include "BLI_blenlib.h"
-#include "BLI_editVert.h"
 #include "BLI_rand.h"
 #include "BLI_utildefines.h"
 #include "BLI_ghash.h"
@@ -268,3 +267,4 @@ void VIEW3D_OT_toolshelf(wmOperatorType *ot)
 	/* flags */
 	ot->flag= 0;
 }
+

@@ -261,9 +261,6 @@ typedef struct Object {
 	ListBase pc_ids;
 	ListBase *duplilist;	/* for temporary dupli list storage, only for use by RNA API */
 
-    int use_cust_wire_colour;       /* Use Custom Wire Colour - use int for alignment */
-    float cust_wire_colour[3];      /* custom wireframe colour */
-
 	float ima_ofs[2];		/* offset for image empties */
 } Object;
 
@@ -415,8 +412,6 @@ typedef struct DupliObject {
 /* #define OB_BOUND_DYN_MESH   6 */ /*UNUSED*/
 #define OB_BOUND_CAPSULE       7
 
-/* custom wire frame colour drawing */
-#define OB_CUSTOM_WIRE      1
 
 /* **************** BASE ********************* */
 

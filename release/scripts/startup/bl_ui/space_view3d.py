@@ -740,7 +740,6 @@ class VIEW3D_MT_object(Menu):
         layout.separator()
 
         layout.operator("object.move_to_layer", text="Move to Layer...")
-        layout.menu("VIEW3D_MT_display_options")
         layout.menu("VIEW3D_MT_object_showhide")
 
         layout.operator_menu_enum("object.convert", "target")
@@ -959,19 +958,6 @@ class VIEW3D_MT_object_showhide(Menu):
         layout.operator("object.hide_view_set", text="Hide Selected").unselected = False
         layout.operator("object.hide_view_set", text="Hide Unselected").unselected = True
 
-class VIEW3D_MT_display_options(bpy.types.Menu):
-    bl_label = "Display Options"
-        
-    def draw(self, context):
-        layout = self.layout
-        
-        layout.operator("object.wiredraw_toggle")
-        layout.operator("object.wiredraw_copy_selected")
-        layout.separator()
-        
-        layout.operator("object.use_cust_wire_colour_toggle")
-        layout.operator("object.use_cust_wire_colour_copy_selected")
-        layout.operator("object.cust_wire_colour_copy_selected")
 
 class VIEW3D_MT_make_single_user(Menu):
     bl_label = "Make Single User"

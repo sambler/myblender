@@ -1350,30 +1350,13 @@ static void draw_bone(int dt, int armflag, int boneflag, short constflag, unsign
 static void draw_custom_bone(Scene *scene, View3D *v3d, RegionView3D *rv3d, Object *ob,
                              int dt, int armflag, int boneflag, unsigned int id, float length)
 {
-    float curColour[4];
-    
 	if(ob==NULL) return;
 	
-    glGetFloatv(GL_CURRENT_COLOR, curColour); /* store the current draw colour to prevent messing up other bones and ghosts */
-    
 	glScalef(length, length, length);
 	
 	/* colors for posemode */
 	if (armflag & ARM_POSEMODE) {
-        if( (ob->use_cust_wire_colour == OB_CUSTOM_WIRE) && !(armflag & ARM_DRAWGHOST)
-                        && !(boneflag & BONE_DRAW_ACTIVE) && !(boneflag & BONE_SELECTED) )
-            glColor3fv(ob->cust_wire_colour);
-        else
-            set_pchan_glColor(PCHAN_COLOR_NORMAL, boneflag, 0);
-	}else{ /* object mode?? or ghost drawing - edit mode doesn't draw custom bones */
-        if( ((ob->use_cust_wire_colour == OB_CUSTOM_WIRE) && (!(boneflag & BONE_DRAW_ACTIVE) || (armflag & ARM_COL_CUSTOM)) 
-                        && !(armflag & ARM_DRAWGHOST)) )
-            glColor3fv(ob->cust_wire_colour);
-        else{
-            if( !(armflag & ARM_DRAWGHOST) )
-                if (dt <= OB_WIRE) set_pchan_glColor(PCHAN_COLOR_NORMAL, boneflag, 0);
-                else set_pchan_glColor(PCHAN_COLOR_SOLID, boneflag, 0);
-	}
+		set_pchan_glColor(PCHAN_COLOR_NORMAL, boneflag, 0);
     }
 	
 	if (id != -1) {
@@ -1381,8 +1364,6 @@ static void draw_custom_bone(Scene *scene, View3D *v3d, RegionView3D *rv3d, Obje
 	}
 	
 	draw_object_instance(scene, v3d, rv3d, ob, dt, armflag & ARM_POSEMODE);
-    
-    glColor4fv(curColour); /* restore the previous draw colour */
 }
 
 
@@ -2330,7 +2311,6 @@ static void draw_ghost_poses_range(Scene *scene, View3D *v3d, ARegion *ar, Base 
 	cfrao= CFRA;
 	flago= arm->flag;
 	arm->flag &= ~(ARM_DRAWNAMES|ARM_DRAWAXES);
-    arm->flag |= ARM_DRAWGHOST;
 	ipoflago= ob->ipoflag; 
 	ob->ipoflag |= OB_DISABLE_PATH;
 	
@@ -2409,7 +2389,6 @@ static void draw_ghost_poses_keys(Scene *scene, View3D *v3d, ARegion *ar, Base *
 	cfrao= CFRA;
 	flago= arm->flag;
 	arm->flag &= ~(ARM_DRAWNAMES|ARM_DRAWAXES);
-    arm->flag |= ARM_DRAWGHOST;
 	ob->ipoflag |= OB_DISABLE_PATH;
 	
 	/* copy the pose */
@@ -2477,7 +2456,6 @@ static void draw_ghost_poses(Scene *scene, View3D *v3d, ARegion *ar, Base *base)
 	actframe= BKE_nla_tweakedit_remap(adt, (float)CFRA, 0);
 	flago= arm->flag;
 	arm->flag &= ~(ARM_DRAWNAMES|ARM_DRAWAXES);
-	arm->flag |= ARM_DRAWGHOST;
 	
 	/* copy the pose */
 	poseo= ob->pose;

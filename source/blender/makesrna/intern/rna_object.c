@@ -2381,16 +2381,6 @@ static void rna_def_object(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "X-Ray", "Make the object draw in front of others (unsupported for duplicator drawing)");
 	RNA_def_property_update(prop, NC_OBJECT|ND_DRAW, NULL);
 
-    prop= RNA_def_property(srna, "show_wire_custom", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "use_cust_wire_colour", OB_CUSTOM_WIRE);
-	RNA_def_property_ui_text(prop, "Custom Wire", "Use a custom colour for the object's wireframe drawing");
-	RNA_def_property_update(prop, NC_OBJECT|ND_DRAW, NULL);
-    
-    prop= RNA_def_property(srna, "wire_colour", PROP_FLOAT, PROP_COLOR);
-	RNA_def_property_float_sdna(prop, NULL, "cust_wire_colour");
-	RNA_def_property_ui_text(prop, "Wire Colour", "Custom wire colour, used when Wire Colour is enabled");
-	RNA_def_property_update(prop, NC_OBJECT|ND_DRAW, NULL);
-    
 	/* Grease Pencil */
 	prop= RNA_def_property(srna, "grease_pencil", PROP_POINTER, PROP_NONE);
 	RNA_def_property_pointer_sdna(prop, NULL, "gpd");

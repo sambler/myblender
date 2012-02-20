@@ -39,6 +39,8 @@
 #include "DNA_userdef_types.h"
 #include "BLI_math.h"
 
+#include "BKE_tessmesh.h"
+
 /* Include for Bake Options */
 #include "RE_engine.h"
 #include "RE_pipeline.h"
@@ -254,7 +256,6 @@ EnumPropertyItem image_color_depth_items[] = {
 #include "MEM_guardedalloc.h"
 
 #include "BLI_threads.h"
-#include "BLI_editVert.h"
 
 #include "BKE_brush.h"
 #include "BKE_context.h"
@@ -1149,9 +1150,9 @@ static void rna_Scene_editmesh_select_mode_set(PointerRNA *ptr, const int *value
 
 		if(scene->basact) {
 			Mesh *me= get_mesh(scene->basact->object);
-			if(me && me->edit_mesh && me->edit_mesh->selectmode != flag) {
-				me->edit_mesh->selectmode= flag;
-				EM_selectmode_set(me->edit_mesh);
+			if(me && me->edit_btmesh && me->edit_btmesh->selectmode != flag) {
+				me->edit_btmesh->selectmode= flag;
+				EDBM_selectmode_set(me->edit_btmesh);
 			}
 		}
 	}
@@ -1163,7 +1164,7 @@ static void rna_Scene_editmesh_select_mode_update(Main *UNUSED(bmain), Scene *sc
 
 	if(scene->basact) {
 		me= get_mesh(scene->basact->object);
-		if(me && me->edit_mesh==NULL)
+		if(me && me->edit_btmesh==NULL)
 			me= NULL;
 	}
 

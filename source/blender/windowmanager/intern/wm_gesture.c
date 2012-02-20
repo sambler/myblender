@@ -37,7 +37,6 @@
 #include "MEM_guardedalloc.h"
 
 #include "BLI_blenlib.h"
-#include "BLI_editVert.h"	/* lasso tessellation */
 #include "BLI_math.h"
 #include "BLI_scanfill.h"	/* lasso tessellation */
 #include "BLI_utildefines.h"
@@ -74,7 +73,9 @@ wmGesture *WM_gesture_new(bContext *C, wmEvent *event, int type)
 	
 	wm_subwindow_getorigin(window, gesture->swinid, &sx, &sy);
 	
-	if( ELEM5(type, WM_GESTURE_RECT, WM_GESTURE_CROSS_RECT, WM_GESTURE_TWEAK, WM_GESTURE_CIRCLE, WM_GESTURE_STRAIGHTLINE)) {
+	if (ELEM5(type, WM_GESTURE_RECT, WM_GESTURE_CROSS_RECT, WM_GESTURE_TWEAK,
+	                WM_GESTURE_CIRCLE, WM_GESTURE_STRAIGHTLINE))
+	{
 		rcti *rect= MEM_callocN(sizeof(rcti), "gesture rect new");
 		
 		gesture->customdata= rect;
@@ -228,12 +229,13 @@ static void wm_gesture_draw_circle(wmGesture *gt)
 
 static void draw_filled_lasso(wmGesture *gt)
 {
-	EditVert *v=NULL, *lastv=NULL, *firstv=NULL;
+	ScanFillVert *v=NULL, *lastv=NULL, *firstv=NULL;
 	/* EditEdge *e; */ /* UNUSED */
-	EditFace *efa;
+	ScanFillFace *efa;
 	short *lasso= (short *)gt->customdata;
 	int i;
 	
+	BLI_begin_edgefill();
 	for (i=0; i<gt->points; i++, lasso+=2) {
 		float co[3];
 

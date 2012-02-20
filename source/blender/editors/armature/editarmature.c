@@ -38,6 +38,7 @@
 
 
 #include "DNA_anim_types.h"
+#include "DNA_mesh_types.h"
 #include "DNA_armature_types.h"
 #include "DNA_constraint_types.h"
 #include "DNA_meshdata_types.h"
@@ -48,7 +49,6 @@
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
 #include "BLI_utildefines.h"
-#include "BLI_editVert.h"
 #include "BLI_ghash.h"
 
 #include "BKE_animsys.h"
@@ -2126,7 +2126,7 @@ typedef struct UndoArmature {
 	ListBase lb;
 } UndoArmature;
 
-static void undoBones_to_editBones(void *uarmv, void *armv)
+static void undoBones_to_editBones(void *uarmv, void *armv, void *UNUSED(data))
 {
 	UndoArmature *uarm= uarmv;
 	bArmature *arm= armv;
@@ -2159,7 +2159,7 @@ static void undoBones_to_editBones(void *uarmv, void *armv)
 	}
 }
 
-static void *editBones_to_undoBones(void *armv)
+static void *editBones_to_undoBones(void *armv, void *UNUSED(obdata))
 {
 	bArmature *arm= armv;
 	UndoArmature *uarm;

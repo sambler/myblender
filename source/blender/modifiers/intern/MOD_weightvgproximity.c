@@ -30,7 +30,6 @@
 
 #define DO_PROFILE 0
 
-#include "BLI_editVert.h"
 #include "BLI_math.h"
 #include "BLI_string.h"
 #include "BLI_utildefines.h"
@@ -460,8 +459,8 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob, DerivedMesh *der
 					target_dm = CDDM_from_curve(obr);
 				else if (obr->type == OB_MESH) {
 					Mesh *me = (Mesh*)obr->data;
-					if (me->edit_mesh)
-						target_dm = CDDM_from_editmesh((EditMesh*)me->edit_mesh, me);
+					if (me->edit_btmesh)
+						target_dm = CDDM_from_BMEditMesh(me->edit_btmesh, me, FALSE, FALSE);
 					else
 						target_dm = CDDM_from_mesh(me, obr);
 				}
@@ -534,7 +533,7 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob, DerivedMesh *der
 }
 
 static DerivedMesh *applyModifierEM(ModifierData *md, Object *ob,
-                                    struct EditMesh *UNUSED(editData),
+                                    struct BMEditMesh *UNUSED(editData),
                                     DerivedMesh *derivedData)
 {
 	return applyModifier(md, ob, derivedData, 0, 1);

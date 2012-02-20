@@ -44,6 +44,7 @@
 #include "DNA_space_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_object_types.h"
+#include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
 #include "DNA_view3d_types.h"
 #include "DNA_modifier_types.h"
@@ -71,6 +72,7 @@
 #include "BKE_mesh.h"
 #include "BKE_nla.h"
 #include "BKE_context.h"
+#include "BKE_tessmesh.h"
 #include "BKE_tracking.h"
 
 #include "ED_anim_api.h"
@@ -91,7 +93,6 @@
 
 #include "BLI_math.h"
 #include "BLI_blenlib.h"
-#include "BLI_editVert.h"
 #include "BLI_rand.h"
 #include "BLI_utildefines.h"
 
@@ -236,10 +237,10 @@ static void clipMirrorModifier(TransInfo *t, Object *ob)
 }
 
 /* assumes obedit set to mesh object */
-static void editmesh_apply_to_mirror(TransInfo *t)
+static void editbmesh_apply_to_mirror(TransInfo *t)
 {
 	TransData *td = t->data;
-	EditVert *eve;
+	BMVert *eve;
 	int i;
 	
 	for(i = 0 ; i < t->total; i++, td++) {
@@ -374,7 +375,6 @@ static void recalcData_actedit(TransInfo *t)
 		BLI_freelistN(&anim_data);
 	}
 }
-
 /* helper for recalcData() - for Graph Editor transforms */
 static void recalcData_graphedit(TransInfo *t)
 {
@@ -714,7 +714,7 @@ static void recalcData_view3d(TransInfo *t)
 			if(la->editlatt->latt->flag & LT_OUTSIDE) outside_lattice(la->editlatt->latt);
 		}
 		else if (t->obedit->type == OB_MESH) {
-			EditMesh *em = ((Mesh*)t->obedit->data)->edit_mesh;
+			BMEditMesh *em = ((Mesh*)t->obedit->data)->edit_btmesh;
 			/* mirror modifier clipping? */
 			if(t->state != TRANS_CANCEL) {
 				/* apply clipping after so we never project past the clip plane [#25423] */
@@ -722,11 +722,12 @@ static void recalcData_view3d(TransInfo *t)
 				clipMirrorModifier(t, t->obedit);
 			}
 			if((t->options & CTX_NO_MIRROR) == 0 && (t->flag & T_MIRROR))
-				editmesh_apply_to_mirror(t);
+				editbmesh_apply_to_mirror(t);
 				
 			DAG_id_tag_update(t->obedit->data, 0);  /* sets recalc flags */
 			
-			recalc_editnormals(em);
+			EDBM_RecalcNormals(em);
+			BMEdit_RecalcTesselation(em);
 		}
 		else if(t->obedit->type==OB_ARMATURE) { /* no recalc flag, does pose */
 			bArmature *arm= t->obedit->data;
@@ -1537,12 +1538,12 @@ void calculateCenter(TransInfo *t)
 		/* EDIT MODE ACTIVE EDITMODE ELEMENT */
 
 		if (t->obedit) {
-			if(t->obedit->type == OB_MESH) {
-				EditSelection ese;
-				EditMesh *em = BKE_mesh_get_editmesh(t->obedit->data);
+			if (t->obedit && t->obedit->type == OB_MESH) {
+				BMEditSelection ese;
+				BMEditMesh *em = ((Mesh*)t->obedit->data)->edit_btmesh;
 
-				if (EM_get_actSelection(em, &ese)) {
-					EM_editselection_center(t->center, &ese);
+				if (EDBM_get_actSelection(em, &ese)) {
+					EDBM_editselection_center(em, t->center, &ese);
 					calculateCenter2D(t);
 					break;
 				}

@@ -42,16 +42,51 @@ extern struct ListBase fillvertbase;
 extern struct ListBase filledgebase;
 extern struct ListBase fillfacebase;
 
-struct EditVert;
+struct ScanFillVert;
 
 #ifdef __cplusplus
 extern "C" {
 //} for code folding
 #endif
 
+/* note; changing this also might affect the undo copy in editmesh.c */
+typedef struct ScanFillVert
+{
+	struct ScanFillVert *next, *prev;
+	union {
+		struct ScanFillVert *v;
+		void            *p;
+		intptr_t         l;
+	} tmp;
+	float co[3]; /*vertex location */
+	int keyindex; /* original index #, for restoring  key information */
+	short poly_nr;
+	unsigned char f, h;
+} ScanFillVert;
+
+typedef struct ScanFillEdge
+{
+	struct ScanFillEdge *next, *prev;
+	struct ScanFillVert *v1, *v2;
+	short poly_nr;
+	unsigned char f;
+} ScanFillEdge;
+
+typedef struct ScanFillFace
+{
+	struct ScanFillFace *next, *prev;
+	struct ScanFillVert *v1, *v2, *v3;
+} ScanFillFace;
+
 /* scanfill.c: used in displist only... */
-struct EditVert *BLI_addfillvert(float *vec);
-struct EditEdge *BLI_addfilledge(struct EditVert *v1, struct EditVert *v2);
+struct ScanFillVert *BLI_addfillvert(const float vec[3]);
+struct ScanFillEdge *BLI_addfilledge(struct ScanFillVert *v1, struct ScanFillVert *v2);
+
+/* Optionally set ScanFillEdge f to this to mark original boundary edges.
+  Only needed if there are internal diagonal edges pased to BLI_edgefill. */
+#define FILLBOUNDARY 1
+
+int BLI_begin_edgefill(void);
 int BLI_edgefill(short mat_nr);
 void BLI_end_edgefill(void);
 
@@ -74,6 +109,8 @@ void BLI_setErrorCallBack(void (*f)(const char*));
  * @attention used in creator.c
  */
 void BLI_setInterruptCallBack(int (*f)(void));
+
+void BLI_scanfill_free(void);
 
 #ifdef __cplusplus
 }

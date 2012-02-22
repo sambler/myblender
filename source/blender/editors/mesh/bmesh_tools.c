@@ -919,11 +919,11 @@ static int delete_mesh(bContext *C, Object *obedit, wmOperator *op, int event, S
 		int use_verts = RNA_boolean_get(op->ptr, "use_verts");
 		//"Dissolve"
 		if (bem->selectmode & SCE_SELECT_FACE) {
-			if (!EDBM_CallOpf(bem, op, "dissolvefaces faces=%hf use_verts=%i", BM_ELEM_SELECT, use_verts))
+			if (!EDBM_CallOpf(bem, op, "dissolvefaces faces=%hf use_verts=%b", BM_ELEM_SELECT, use_verts))
 				return OPERATOR_CANCELLED;
 		}
 		else if (bem->selectmode & SCE_SELECT_EDGE) {
-			if (!EDBM_CallOpf(bem, op, "dissolveedges edges=%he use_verts=%i", BM_ELEM_SELECT, use_verts))
+			if (!EDBM_CallOpf(bem, op, "dissolveedges edges=%he use_verts=%b", BM_ELEM_SELECT, use_verts))
 				return OPERATOR_CANCELLED;
 		}
 		else if (bem->selectmode & SCE_SELECT_VERTEX) {
@@ -948,7 +948,7 @@ static int delete_mesh(bContext *C, Object *obedit, wmOperator *op, int event, S
 	}
 	else if (event == 5) {
 		//"Erase Only Faces";
-		if (!EDBM_CallOpf(bem, op, "del geom=%hf context=%d",
+		if (!EDBM_CallOpf(bem, op, "del geom=%hf context=%i",
 		                  BM_ELEM_SELECT, DEL_ONLYFACES))
 			return OPERATOR_CANCELLED;
 	}
@@ -1565,7 +1565,7 @@ static int normals_make_consistent_exec(bContext *C, wmOperator *op)
 	
 	/* doflip has to do with bmesh_rationalize_normals, it's an internal
 	 * thing */
-	if (!EDBM_CallOpf(em, op, "righthandfaces faces=%hf do_flip=%d", BM_ELEM_SELECT, TRUE))
+	if (!EDBM_CallOpf(em, op, "righthandfaces faces=%hf do_flip=%b", BM_ELEM_SELECT, TRUE))
 		return OPERATOR_CANCELLED;
 
 	if (RNA_boolean_get(op->ptr, "inside"))

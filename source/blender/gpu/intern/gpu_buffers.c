@@ -1294,10 +1294,11 @@ struct GPU_Buffers {
 	int gridsize;
 
 	unsigned int tot_tri, tot_quad;
+	int smooth;
 };
 
 void GPU_update_mesh_buffers(GPU_Buffers *buffers, MVert *mvert,
-			int *vert_indices, int totvert)
+			int *vert_indices, int totvert, int smooth)
 {
 	VertexBufferFormat *vert_data;
 	int i;
@@ -1330,12 +1331,12 @@ void GPU_update_mesh_buffers(GPU_Buffers *buffers, MVert *mvert,
 	}
 
 	buffers->mvert = mvert;
+	buffers->smooth = smooth;
 }
 
-GPU_Buffers *GPU_build_mesh_buffers(GHash *map, MVert *mvert, MFace *mface,
-			int *face_indices, int totface,
-			int *vert_indices, int tot_uniq_verts,
-			int totvert)
+GPU_Buffers *GPU_build_mesh_buffers(GHash *map, MFace *mface,
+									int *face_indices, int totface,
+									int tot_uniq_verts)
 {
 	GPU_Buffers *buffers;
 	unsigned short *tri_data;
@@ -1401,7 +1402,6 @@ GPU_Buffers *GPU_build_mesh_buffers(GHash *map, MVert *mvert, MFace *mface,
 
 	if(buffers->index_buf)
 		glGenBuffersARB(1, &buffers->vert_buf);
-	GPU_update_mesh_buffers(buffers, mvert, vert_indices, totvert);
 
 	buffers->tot_tri = tottri;
 
@@ -1462,6 +1462,7 @@ void GPU_update_grid_buffers(GPU_Buffers *buffers, DMGridData **grids,
 	buffers->grid_indices = grid_indices;
 	buffers->totgrid = totgrid;
 	buffers->gridsize = gridsize;
+	buffers->smooth = smooth;
 
 	//printf("node updated %p\n", buffers);
 }
@@ -1556,6 +1557,94 @@ GPU_Buffers *GPU_build_grid_buffers(DMGridData **UNUSED(grids), int *UNUSED(grid
 	return buffers;
 }
 
+static void gpu_draw_buffers_legacy_mesh(GPU_Buffers *buffers)
+{
+	const MVert *mvert = buffers->mvert;
+	int i, j;
+
+	for(i = 0; i < buffers->totface; ++i) {
+		MFace *f = buffers->mface + buffers->face_indices[i];
+		int S = f->v4 ? 4 : 3;
+		unsigned int *fv = &f->v1;
+
+		glBegin((f->v4)? GL_QUADS: GL_TRIANGLES);
+
+		if(buffers->smooth) {
+			for(j = 0; j < S; j++) {
+				glNormal3sv(mvert[fv[j]].no);
+				glVertex3fv(mvert[fv[j]].co);
+			}
+		}
+		else {
+			float fno[3];
+
+			/* calculate face normal */
+			if(f->v4) {
+				normal_quad_v3(fno, mvert[fv[0]].co, mvert[fv[1]].co,
+							   mvert[fv[2]].co, mvert[fv[3]].co);
+			}
+			else
+				normal_tri_v3(fno, mvert[fv[0]].co, mvert[fv[1]].co, mvert[fv[2]].co);
+			glNormal3fv(fno);
+			
+			for(j = 0; j < S; j++)
+				glVertex3fv(mvert[fv[j]].co);
+		}
+		
+		glEnd();
+	}
+}
+
+static void gpu_draw_buffers_legacy_grids(GPU_Buffers *buffers)
+{
+	int i, x, y, gridsize = buffers->gridsize;
+
+	if(buffers->smooth) {
+		for(i = 0; i < buffers->totgrid; ++i) {
+			DMGridData *grid = buffers->grids[buffers->grid_indices[i]];
+
+			for(y = 0; y < gridsize-1; y++) {
+				glBegin(GL_QUAD_STRIP);
+				for(x = 0; x < gridsize; x++) {
+					DMGridData *a = &grid[y*gridsize + x];
+					DMGridData *b = &grid[(y+1)*gridsize + x];
+
+					glNormal3fv(a->no);
+					glVertex3fv(a->co);
+					glNormal3fv(b->no);
+					glVertex3fv(b->co);
+				}
+				glEnd();
+			}
+		}
+	}
+	else {
+		for(i = 0; i < buffers->totgrid; ++i) {
+			DMGridData *grid = buffers->grids[buffers->grid_indices[i]];
+
+			for(y = 0; y < gridsize-1; y++) {
+				glBegin(GL_QUAD_STRIP);
+				for(x = 0; x < gridsize; x++) {
+					DMGridData *a = &grid[y*gridsize + x];
+					DMGridData *b = &grid[(y+1)*gridsize + x];
+
+					if(x > 0) {
+						DMGridData *c = &grid[y*gridsize + x-1];
+						DMGridData *d = &grid[(y+1)*gridsize + x-1];
+						float fno[3];
+						normal_quad_v3(fno, d->co, b->co, a->co, c->co);
+						glNormal3fv(fno);
+					}
+
+					glVertex3fv(a->co);
+					glVertex3fv(b->co);
+				}
+				glEnd();
+			}
+		}
+	}
+}
+
 void GPU_draw_buffers(GPU_Buffers *buffers)
 {
 	if(buffers->vert_buf && buffers->index_buf) {
@@ -1584,47 +1673,12 @@ void GPU_draw_buffers(GPU_Buffers *buffers)
 		glDisableClientState(GL_VERTEX_ARRAY);
 		glDisableClientState(GL_NORMAL_ARRAY);
 	}
+	/* fallbacks if we are out of memory or VBO is disabled */
 	else if(buffers->totface) {
-		/* fallback if we are out of memory */
-		int i;
-
-		for(i = 0; i < buffers->totface; ++i) {
-			MFace *f = buffers->mface + buffers->face_indices[i];
-
-			glBegin((f->v4)? GL_QUADS: GL_TRIANGLES);
-			glNormal3sv(buffers->mvert[f->v1].no);
-			glVertex3fv(buffers->mvert[f->v1].co);
-			glNormal3sv(buffers->mvert[f->v2].no);
-			glVertex3fv(buffers->mvert[f->v2].co);
-			glNormal3sv(buffers->mvert[f->v3].no);
-			glVertex3fv(buffers->mvert[f->v3].co);
-			if(f->v4) {
-				glNormal3sv(buffers->mvert[f->v4].no);
-				glVertex3fv(buffers->mvert[f->v4].co);
-			}
-			glEnd();
-		}
+		gpu_draw_buffers_legacy_mesh(buffers);
 	}
 	else if(buffers->totgrid) {
-		int i, x, y, gridsize = buffers->gridsize;
-
-		for(i = 0; i < buffers->totgrid; ++i) {
-			DMGridData *grid = buffers->grids[buffers->grid_indices[i]];
-
-			for(y = 0; y < gridsize-1; y++) {
-				glBegin(GL_QUAD_STRIP);
-				for(x = 0; x < gridsize; x++) {
-					DMGridData *a = &grid[y*gridsize + x];
-					DMGridData *b = &grid[(y+1)*gridsize + x];
-
-					glNormal3fv(a->no);
-					glVertex3fv(a->co);
-					glNormal3fv(b->no);
-					glVertex3fv(b->co);
-				}
-				glEnd();
-			}
-		}
+		gpu_draw_buffers_legacy_grids(buffers);
 	}
 }
 

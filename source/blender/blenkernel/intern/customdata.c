@@ -159,6 +159,33 @@ static void layerFree_mdeformvert(void *data, int count, int size)
 	}
 }
 
+/* copy just zeros in this case */
+static void layerCopy_bmesh_elem_py_ptr(const void *UNUSED(source), void *dest,
+                                        int count)
+{
+	int i, size = sizeof(void *);
+
+	for(i = 0; i < count; ++i) {
+		void **ptr = (void  **)((char *)dest + i * size);
+		*ptr = NULL;
+	}
+}
+
+static void layerFree_bmesh_elem_py_ptr(void *data, int count, int size)
+{
+	extern void bpy_bm_generic_invalidate(void *self);
+
+	int i;
+
+	for(i = 0; i < count; ++i) {
+		void **ptr = (void *)((char *)data + i * size);
+		if (*ptr) {
+			bpy_bm_generic_invalidate(*ptr);
+		}
+	}
+}
+
+
 static void linklist_free_simple(void *link)
 {
 	MEM_freeN(link);
@@ -617,16 +644,17 @@ static void layerInterp_mloopcol(void **sources, float *weights,
 	col.a = col.r = col.g = col.b = 0;
 
 	sub_weight = sub_weights;
-	for(i = 0; i < count; ++i){
+	for (i = 0; i < count; ++i) {
 		float weight = weights ? weights[i] : 1;
 		MLoopCol *src = sources[i];
-		if(sub_weights){
+		if (sub_weights) {
 			col.a += src->a * (*sub_weight) * weight;
 			col.r += src->r * (*sub_weight) * weight;
 			col.g += src->g * (*sub_weight) * weight;
 			col.b += src->b * (*sub_weight) * weight;
 			sub_weight++;
-		} else {
+		}
+		else {
 			col.a += src->a * weight;
 			col.r += src->r * weight;
 			col.g += src->g * weight;
@@ -1003,6 +1031,10 @@ static const LayerTypeInfo LAYERTYPEINFO[CD_NUMTYPES] = {
 	{sizeof(MLoopCol), "MLoopCol", 1, "WeightLoopCol", NULL, NULL, layerInterp_mloopcol, NULL,
 	 layerDefault_mloopcol, layerEqual_mloopcol, layerMultiply_mloopcol, layerInitMinMax_mloopcol,
 	 layerAdd_mloopcol, layerDoMinMax_mloopcol, layerCopyValue_mloopcol},
+	/* 33: CD_BM_ELEM_PYPTR */
+	{sizeof(void *), "", 1, NULL, layerCopy_bmesh_elem_py_ptr,
+	 layerFree_bmesh_elem_py_ptr, NULL, NULL, NULL},
+
 /* END BMESH ONLY */
 
 

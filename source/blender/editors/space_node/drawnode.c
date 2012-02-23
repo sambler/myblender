@@ -1533,19 +1533,19 @@ static void node_composit_buts_map_value(uiLayout *layout, bContext *UNUSED(C), 
 {
 	uiLayout *sub, *col;
 	
-	col =uiLayoutColumn(layout, 1);
+	col = uiLayoutColumn(layout, 1);
 	uiItemR(col, ptr, "offset", 0, NULL, ICON_NONE);
 	uiItemR(col, ptr, "size", 0, NULL, ICON_NONE);
 	
-	col =uiLayoutColumn(layout, 1);
+	col = uiLayoutColumn(layout, 1);
 	uiItemR(col, ptr, "use_min", 0, NULL, ICON_NONE);
-	sub =uiLayoutColumn(col, 0);
+	sub = uiLayoutColumn(col, 0);
 	uiLayoutSetActive(sub, RNA_boolean_get(ptr, "use_min"));
 	uiItemR(sub, ptr, "min", 0, "", ICON_NONE);
 	
-	col =uiLayoutColumn(layout, 1);
+	col = uiLayoutColumn(layout, 1);
 	uiItemR(col, ptr, "use_max", 0, NULL, ICON_NONE);
-	sub =uiLayoutColumn(col, 0);
+	sub = uiLayoutColumn(col, 0);
 	uiLayoutSetActive(sub, RNA_boolean_get(ptr, "use_max"));
 	uiItemR(sub, ptr, "max", 0, "", ICON_NONE);
 }
@@ -1554,7 +1554,7 @@ static void node_composit_buts_alphaover(uiLayout *layout, bContext *UNUSED(C), 
 {	
 	uiLayout *col;
 	
-	col =uiLayoutColumn(layout, 1);
+	col = uiLayoutColumn(layout, 1);
 	uiItemR(col, ptr, "use_premultiply", 0, NULL, ICON_NONE);
 	uiItemR(col, ptr, "premul", 0, NULL, ICON_NONE);
 }
@@ -1563,7 +1563,7 @@ static void node_composit_buts_zcombine(uiLayout *layout, bContext *UNUSED(C), P
 {	
 	uiLayout *col;
 	
-	col =uiLayoutColumn(layout, 1);
+	col = uiLayoutColumn(layout, 1);
 	uiItemR(col, ptr, "use_alpha", 0, NULL, ICON_NONE);
 }
 
@@ -1572,7 +1572,7 @@ static void node_composit_buts_hue_sat(uiLayout *layout, bContext *UNUSED(C), Po
 {
 	uiLayout *col;
 	
-	col =uiLayoutColumn(layout, 0);
+	col = uiLayoutColumn(layout, 0);
 	uiItemR(col, ptr, "color_hue", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
 	uiItemR(col, ptr, "color_saturation", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
 	uiItemR(col, ptr, "color_value", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
@@ -1587,7 +1587,7 @@ static void node_composit_buts_diff_matte(uiLayout *layout, bContext *UNUSED(C),
 {
 	uiLayout *col;
 	
-	col =uiLayoutColumn(layout, 1);
+	col = uiLayoutColumn(layout, 1);
 	uiItemR(col, ptr, "tolerance", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
 	uiItemR(col, ptr, "falloff", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
 }
@@ -1596,7 +1596,7 @@ static void node_composit_buts_distance_matte(uiLayout *layout, bContext *UNUSED
 {
 	uiLayout *col;
 	
-	col =uiLayoutColumn(layout, 1);
+	col = uiLayoutColumn(layout, 1);
 	uiItemR(col, ptr, "tolerance", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
 	uiItemR(col, ptr, "falloff", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
 }
@@ -1606,7 +1606,7 @@ static void node_composit_buts_color_spill(uiLayout *layout, bContext *UNUSED(C)
 	uiLayout *row, *col;
 	
 	uiItemL(layout, "Despill Channel:", ICON_NONE);
-	row =uiLayoutRow(layout,0);
+	row = uiLayoutRow(layout,0);
 	uiItemR(row, ptr, "channel", UI_ITEM_R_EXPAND, NULL, ICON_NONE);
 
 	col= uiLayoutColumn(layout, 0);
@@ -1664,7 +1664,7 @@ static void node_composit_buts_channel_matte(uiLayout *layout, bContext *UNUSED(
 	row= uiLayoutRow(col, 0);
 	uiItemR(row, ptr, "matte_channel", UI_ITEM_R_EXPAND, NULL, ICON_NONE);
 
-	col =uiLayoutColumn(layout, 0);
+	col = uiLayoutColumn(layout, 0);
 
 	uiItemR(col, ptr, "limit_method", 0, NULL, ICON_NONE);
 	if(RNA_enum_get(ptr, "limit_method")==0) {
@@ -1731,9 +1731,8 @@ static void node_composit_buts_multi_file_output_details(uiLayout *layout, bCont
 	uiTemplateList(layout, C, ptr, "inputs", ptr, "active_input_index", NULL, 0, 0, 0);
 	
 	if (active_input_ptr.data) {
+		PointerRNA imfptr = RNA_pointer_get(&active_input_ptr, "format");
 		uiLayout *row, *col;
-		
-		uiItemS(layout);
 		
 		col = uiLayoutColumn(layout, 1);
 		uiItemL(col, "File Path:", 0);
@@ -1742,12 +1741,14 @@ static void node_composit_buts_multi_file_output_details(uiLayout *layout, bCont
 		uiItemFullO(row, "NODE_OT_output_multi_file_remove_active_socket", "", ICON_X, NULL, WM_OP_EXEC_DEFAULT, UI_ITEM_R_ICON_ONLY);
 		
 		uiItemS(layout);
-		uiItemL(layout, "Format:", 0);
-		uiItemR(layout, &active_input_ptr, "use_render_format", 0, NULL, 0);
-		if (!RNA_boolean_get(&active_input_ptr, "use_render_format")) {
-			PointerRNA imfptr = RNA_pointer_get(&active_input_ptr, "format");
-			uiTemplateImageSettings(layout, &imfptr);
-		}
+		
+		col = uiLayoutColumn(layout, 1);
+		uiItemL(col, "Format:", 0);
+		uiItemR(col, &active_input_ptr, "use_render_format", 0, NULL, 0);
+		
+		col= uiLayoutColumn(layout, 0);
+		uiLayoutSetActive(col, RNA_boolean_get(&active_input_ptr, "use_render_format")==0);
+		uiTemplateImageSettings(col, &imfptr);
 	}
 }
 

@@ -15,32 +15,21 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
+ * The Original Code is Copyright (C) 2012 Blender Foundation.
  * All rights reserved.
  *
- * The Original Code is: all of this file.
- *
- * Contributor(s): none yet.
+ * Contributor(s): Campbell Barton
  *
  * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file KX_ConvertSensors.h
- *  \ingroup bgeconv
+/** \file blender/python/bmesh/bmesh_py_utils.h
+ *  \ingroup pybmesh
  */
 
-#ifndef __KX_CONVERTSENSORS_H__
-#define __KX_CONVERTSENSORS_H__
+#ifndef __BMESH_PY_UTILS_H__
+#define __BMESH_PY_UTILS_H__
 
-void BL_ConvertSensors(struct Object* blenderobject,
-	   class KX_GameObject* gameobj,
-	   class SCA_LogicManager* logicmgr,
-	   class KX_Scene* kxscene,
-	   class KX_KetsjiEngine* kxengine,
-	   int activeLayerBitInfo,
-	   bool isInActiveLayer,
-	   class RAS_ICanvas* canvas, 
-	   class KX_BlenderSceneConverter* converter);
+PyObject *BPyInit_bmesh_utils(void);
 
-#endif //__KX_CONVERTSENSORS_H__
-
+#endif /* __BMESH_PY_UTILS_H__ */

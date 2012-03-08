@@ -186,7 +186,7 @@ static int has_poselib_pose_data_poll (bContext *C)
 
 /* ----------------------------------- */
 
-/* Initialise a new poselib (whether it is needed or not) */
+/* Initialize a new poselib (whether it is needed or not) */
 static bAction *poselib_init_new (Object *ob)
 {
 	/* sanity checks - only for armatures */
@@ -201,7 +201,7 @@ static bAction *poselib_init_new (Object *ob)
 	return ob->poselib;
 }
 
-/* Initialise a new poselib (checks if that needs to happen) */
+/* Initialize a new poselib (checks if that needs to happen) */
 static bAction *poselib_validate (Object *ob)
 {
 	if (ELEM(NULL, ob, ob->pose))
@@ -297,7 +297,7 @@ static int poselib_sanitise_exec (bContext *C, wmOperator *op)
 	TimeMarker *marker, *markern;
 	
 	/* validate action */
-	if (act == NULL)  {
+	if (act == NULL) {
 		BKE_report(op->reports, RPT_WARNING, "No Action to validate");
 		return OPERATOR_CANCELLED;
 	}
@@ -1473,7 +1473,7 @@ static void poselib_preview_cleanup (bContext *C, wmOperator *op)
 	/* this signal does one recalc on pose, then unlocks, so ESC or edit will work */
 	pose->flag |= POSE_DO_UNLOCK;
 	
-	/* clear pose if cancelled */
+	/* clear pose if canceled */
 	if (pld->state == PL_PREVIEW_CANCEL) {
 		poselib_backup_restore(pld);
 		

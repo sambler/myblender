@@ -142,7 +142,7 @@ static void Kx_Crossf(float *c, float *a, float *b)
 }
 
 
-static void Kx_VecUpMat3(float *vec, float mat[][3], short axis)
+static void Kx_VecUpMat3(float vec[3], float mat[][3], short axis)
 {
 
 	// Construct a camera matrix s.t. the specified axis
@@ -155,8 +155,8 @@ static void Kx_VecUpMat3(float *vec, float mat[][3], short axis)
 	float inp;
 	short cox = 0, coy = 0, coz = 0;
 	
-	/* up varieeren heeft geen zin, is eigenlijk helemaal geen up!
-	 * zie VecUpMat3old
+	/* up range has no meaning, is not really up!
+	 * see: VecUpMat3old
 	 */
 
 	if(axis==0) {
@@ -210,7 +210,7 @@ static void Kx_VecUpMat3(float *vec, float mat[][3], short axis)
 
 bool KX_CameraActuator::Update(double curtime, bool frame)
 {
-	/* wondering... is it really neccesary/desirable to suppress negative    */
+	/* wondering... is it really necessary/desirable to suppress negative    */
 	/* events here?                                                          */
 	bool bNegativeEvent = IsNegativeEvent();
 	RemoveAllEvents();

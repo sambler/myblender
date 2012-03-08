@@ -43,7 +43,7 @@ extern "C" {
  * and keep comment above the defines.
  * Use STRINGIFY() rather than defining with quotes */
 #define BLENDER_VERSION			262
-#define BLENDER_SUBVERSION		0
+#define BLENDER_SUBVERSION		1
 
 #define BLENDER_MINVERSION		250
 #define BLENDER_MINSUBVERSION	0
@@ -91,7 +91,6 @@ extern void BKE_reset_undo(void);
 extern char *BKE_undo_menu_string(void);
 extern void BKE_undo_number(struct bContext *C, int nr);
 extern const char *BKE_undo_get_name(int nr, int *active);
-void BKE_undo_save(char *fname);
 extern void BKE_undo_save_quit(void);
 extern struct Main *BKE_undo_get_main(struct Scene **scene);
 

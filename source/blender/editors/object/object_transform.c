@@ -36,6 +36,7 @@
 #include "DNA_key_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
+#include "DNA_meta_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_group_types.h"
@@ -48,6 +49,7 @@
 #include "BKE_curve.h"
 #include "BKE_depsgraph.h"
 #include "BKE_main.h"
+#include "BKE_mball.h"
 #include "BKE_mesh.h"
 #include "BKE_object.h"
 #include "BKE_report.h"
@@ -116,7 +118,7 @@ static void object_clear_rot(Object *ob)
 				if ((ob->protectflag & OB_LOCK_ROTZ) == 0)
 					ob->quat[3]= ob->dquat[3]= 0.0f;
 					
-				// TODO: does this quat need normalising now?
+				// TODO: does this quat need normalizing now?
 			}
 			else {
 				/* the flag may have been set for the other modes, so just ignore the extra flag... */
@@ -813,8 +815,10 @@ static int object_origin_set_exec(bContext *C, wmOperator *op)
 				bArmature *arm = ob->data;
 
 				if(ID_REAL_USERS(arm) > 1) {
-					/*BKE_report(op->reports, RPT_ERROR, "Can't apply to a multi user armature");
-					return;*/
+#if 0
+					BKE_report(op->reports, RPT_ERROR, "Can't apply to a multi user armature");
+					return;
+#endif
 					tot_multiuser_arm_error++;
 				}
 				else {
@@ -834,6 +838,27 @@ static int object_origin_set_exec(bContext *C, wmOperator *op)
 
 					if(obedit)
 						break;
+				}
+			}
+			else if (ob->type == OB_MBALL) {
+				MetaBall *mb = ob->data;
+
+				if(centermode == ORIGIN_TO_CURSOR) { /* done */ }
+				else if(around==V3D_CENTROID) { BKE_metaball_center_median(mb, cent); }
+				else { BKE_metaball_center_bounds(mb, cent);	}
+
+				negate_v3_v3(cent_neg, cent);
+				BKE_metaball_translate(mb, cent_neg);
+
+				tot_change++;
+				mb->id.flag |= LIB_DOIT;
+				do_inverse_offset= TRUE;
+
+				if(obedit) {
+					if (centermode == GEOMETRY_TO_ORIGIN) {
+						DAG_id_tag_update(&obedit->id, OB_RECALC_DATA);
+					}
+					break;
 				}
 			}
 

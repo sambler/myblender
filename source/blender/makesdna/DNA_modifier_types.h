@@ -77,7 +77,6 @@ typedef enum ModifierType {
 	eModifierType_Ocean,
 	eModifierType_DynamicPaint,
 	eModifierType_Remesh,
-	eModifierType_NgonInterp,
 	NUM_MODIFIER_TYPES
 } ModifierType;
 
@@ -809,12 +808,6 @@ typedef struct OceanModifierData {
 #define MOD_OCEAN_GENERATE_FOAM	1
 #define MOD_OCEAN_GENERATE_NORMALS	2
 
-
-/* BMESH_ONLY */
-typedef struct NgonInterpModifierData {
-	ModifierData modifier;
-	int		resolution, pad0;
-} NgonInterpModifierData;
 
 typedef struct WarpModifierData {
 	ModifierData modifier;

@@ -30,7 +30,7 @@
 #include "BKE_tessmesh.h"
 
 
-/* these wrap equivilent bmesh functions.  I'm in two minds of it we should
+/* these wrap equivalent bmesh functions.  I'm in two minds of it we should
  * just use the bm functions directly; on the one hand, there's no real
  * need (at the moment) to wrap them, but on the other hand having these
  * wrapped avoids a confusing mess of mixing BM_ and EDBM_ namespaces. */
@@ -46,21 +46,21 @@ void EDBM_editselection_normal(float *normal, BMEditSelection *ese)
 }
 
 /* Calculate a plane that is rightangles to the edge/vert/faces normal
-also make the plane run along an axis that is related to the geometry,
-because this is used for the manipulators Y axis.*/
+ * also make the plane run along an axis that is related to the geometry,
+ * because this is used for the manipulators Y axis. */
 void EDBM_editselection_plane(BMEditMesh *em, float *plane, BMEditSelection *ese)
 {
 	BM_editselection_plane(em->bm, plane, ese);
 }
 
-void EDBM_remove_selection(BMEditMesh *em, void *data)
+void EDBM_remove_selection(BMEditMesh *em, BMElem *ele)
 {
-	BM_select_history_remove(em->bm, data);
+	BM_select_history_remove(em->bm, ele);
 }
 
-void EDBM_store_selection(BMEditMesh *em, void *data)
+void EDBM_store_selection(BMEditMesh *em, BMElem *ele)
 {
-	BM_select_history_store(em->bm, data);
+	BM_select_history_store(em->bm, ele);
 }
 
 void EDBM_validate_selections(BMEditMesh *em)

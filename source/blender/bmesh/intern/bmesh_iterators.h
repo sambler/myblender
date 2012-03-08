@@ -23,12 +23,12 @@
 #ifndef __BMESH_ITERATORS_H__
 #define __BMESH_ITERATORS_H__
 
-/** \file blender/bmesh/bmesh_iterators.h
+/** \file blender/bmesh/intern/bmesh_iterators.h
  *  \ingroup bmesh
  */
 
-/*
- * BMESH ITERATORS
+/**
+ * \brief BMesh Iterators
  *
  * The functions and structures in this file
  * provide a unified method for iterating over
@@ -37,7 +37,7 @@
  * the iterators provided in this file instead
  * of inspecting the structure directly.
  *
-*/
+ */
 
 #include "BLI_mempool.h"
 
@@ -49,47 +49,57 @@
  */
 
 /* these iterator over all elements of a specific
- * type in the mesh.*/
-#define BM_VERTS_OF_MESH 			1
-#define BM_EDGES_OF_MESH 			2
-#define BM_FACES_OF_MESH 			3
+ * type in the mesh.
+ *
+ * be sure to keep 'bm_iter_itype_htype_map' in sync with any changes
+ */
+typedef enum BMIterType {
+	BM_VERTS_OF_MESH = 1,
+	BM_EDGES_OF_MESH = 2,
+	BM_FACES_OF_MESH = 3,
+	/* these are topological iterators. */
+	BM_EDGES_OF_VERT = 4,
+	BM_FACES_OF_VERT = 5,
+	BM_LOOPS_OF_VERT = 6,
+	BM_VERTS_OF_EDGE = 7, /* just v1, v2: added so py can use generalized sequencer wrapper */
+	BM_FACES_OF_EDGE = 8,
+	BM_VERTS_OF_FACE = 9,
+	BM_EDGES_OF_FACE = 10,
+	BM_LOOPS_OF_FACE = 11,
+	/* returns elements from all boundaries, and returns
+	 * the first element at the end to flag that we're entering
+	 * a different face hole boundary*/
+	BM_ALL_LOOPS_OF_FACE = 12,
+	/* iterate through loops around this loop, which are fetched
+	 * from the other faces in the radial cycle surrounding the
+	 * input loop's edge.*/
+	BM_LOOPS_OF_LOOP = 13,
+	BM_LOOPS_OF_EDGE = 14
+} BMIterType;
 
-/*these are topological iterators.*/
-#define BM_EDGES_OF_VERT 			4
-#define BM_FACES_OF_VERT 			5
-#define BM_LOOPS_OF_VERT			6
-#define BM_FACES_OF_EDGE 			7
-#define BM_VERTS_OF_FACE 			8
-#define BM_EDGES_OF_FACE 			9
-#define BM_LOOPS_OF_FACE 			10
-/* returns elements from all boundaries, and returns
- * the first element at the end to flag that we're entering
- * a different face hole boundary*/
-#define BM_ALL_LOOPS_OF_FACE		11
+#define BM_ITYPE_MAX 15
 
-/* iterate through loops around this loop, which are fetched
- * from the other faces in the radial cycle surrounding the
- * input loop's edge.*/
-#define BM_LOOPS_OF_LOOP		12
-#define BM_LOOPS_OF_EDGE		13
+/* the iterator htype for each iterator */
+extern const char bm_iter_itype_htype_map[BM_ITYPE_MAX];
+
 
 #define BM_ITER(ele, iter, bm, itype, data)                                   \
 	ele = BM_iter_new(iter, bm, itype, data);                                 \
-	for ( ; ele; ele=BM_iter_step(iter))
+	for ( ; ele; ele = BM_iter_step(iter))
 
 #define BM_ITER_INDEX(ele, iter, bm, itype, data, indexvar)                   \
 	ele = BM_iter_new(iter, bm, itype, data);                                 \
-	for (indexvar=0; ele; indexvar++, ele=BM_iter_step(iter))
+	for (indexvar = 0; ele; indexvar++, ele = BM_iter_step(iter))
 
-/*Iterator Structure*/
+/* Iterator Structure */
 typedef struct BMIter {
 	BLI_mempool_iter pooliter;
 
-	struct BMVert *firstvert, *nextvert, *vdata;
-	struct BMEdge *firstedge, *nextedge, *edata;
-	struct BMLoop *firstloop, *nextloop, *ldata, *l;
-	struct BMFace *firstpoly, *nextpoly, *pdata;
-	struct BMesh *bm;
+	BMVert *firstvert, *nextvert, *vdata;
+	BMEdge *firstedge, *nextedge, *edata;
+	BMLoop *firstloop, *nextloop, *ldata, *l;
+	BMFace *firstpoly, *nextpoly, *pdata;
+	BMesh *bm;
 	void (*begin)(struct BMIter *iter);
 	void *(*step)(struct BMIter *iter);
 	union {
@@ -102,8 +112,8 @@ typedef struct BMIter {
 	char itype;
 } BMIter;
 
-void *BM_iter_at_index(struct BMesh *bm, const char htype, void *data, int index);
-int   BM_iter_as_array(struct BMesh *bm, const char htype, void *data, void **array, const int len);
+void *BM_iter_at_index(BMesh *bm, const char itype, void *data, int index);
+int   BM_iter_as_array(BMesh *bm, const char itype, void *data, void **array, const int len);
 
 /* private for bmesh_iterators_inline.c */
 void  bmiter__vert_of_mesh_begin(struct BMIter *iter);
@@ -124,6 +134,8 @@ void  bmiter__loops_of_loop_begin(struct BMIter *iter);
 void *bmiter__loops_of_loop_step(struct BMIter *iter);
 void  bmiter__face_of_edge_begin(struct BMIter *iter);
 void *bmiter__face_of_edge_step(struct BMIter *iter);
+void  bmiter__vert_of_edge_begin(struct BMIter *iter);
+void *bmiter__vert_of_edge_step(struct BMIter *iter);
 void  bmiter__vert_of_face_begin(struct BMIter *iter);
 void *bmiter__vert_of_face_step(struct BMIter *iter);
 void  bmiter__edge_of_face_begin(struct BMIter *iter);

@@ -48,6 +48,7 @@
 #include "BLI_math.h"
 #include "BLI_blenlib.h"
 #include "BLI_utildefines.h"
+#include "BLI_string_cursor_utf8.h"
 
 #include "PIL_time.h"
 
@@ -107,23 +108,6 @@ typedef enum uiHandleButtonState {
 	BUTTON_STATE_WAIT_DRAG,
 	BUTTON_STATE_EXIT
 } uiHandleButtonState;
-
-typedef enum uiButtonJumpType {
-	BUTTON_EDIT_JUMP_NONE,
-	BUTTON_EDIT_JUMP_DELIM,
-	BUTTON_EDIT_JUMP_ALL
-} uiButtonJumpType;
-
-typedef enum uiButtonDelimType {
-	BUTTON_DELIM_NONE,
-	BUTTON_DELIM_ALPHA,
-	BUTTON_DELIM_PUNCT,
-	BUTTON_DELIM_BRACE,
-	BUTTON_DELIM_OPERATOR,
-	BUTTON_DELIM_QUOTE,
-	BUTTON_DELIM_WHITESPACE,
-	BUTTON_DELIM_OTHER
-} uiButtonDelimType;
 
 typedef struct uiHandleButtonData {
 	wmWindowManager *wm;
@@ -1238,144 +1222,6 @@ static void ui_but_copy_paste(bContext *C, uiBut *but, uiHandleButtonData *data,
 
 /* ************* in-button text selection/editing ************* */
 
-/* return 1 if char ch is special character, otherwise return 0 */
-static uiButtonDelimType test_special_char(const char ch)
-{
-	if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')) {
-		return BUTTON_DELIM_ALPHA;
-	}
-
-	switch(ch) {
-		case ',':
-		case '.':
-			return BUTTON_DELIM_PUNCT;
-
-		case '{':
-		case '}':
-		case '[':
-		case ']':
-		case '(':
-		case ')':
-			return BUTTON_DELIM_BRACE;
-
-		case '+':
-		case '-':
-		case '=':
-		case '~':
-		case '%':
-		case '/':
-		case '<':
-		case '>':
-		case '^':
-		case '*':
-		case '&':
-			return BUTTON_DELIM_OPERATOR;
-
-		case '\'':
-		case '\"': // " - an extra closing one for Aligorith's text editor
-			return BUTTON_DELIM_QUOTE;
-
-		case ' ':
-			return BUTTON_DELIM_WHITESPACE;
-
-		case '\\':
-		case '!':
-		case '@':
-		case '#':
-		case '$':
-		case ':':
-		case ';':
-		case '?':
-		case '_':
-			return BUTTON_DELIM_OTHER;
-
-		default:
-			break;
-	}
-	return BUTTON_DELIM_NONE;
-}
-
-static int ui_textedit_step_next_utf8(const char *str, size_t maxlen, short *pos)
-{
-	const char *str_end= str + (maxlen + 1);
-	const char *str_pos= str + (*pos);
-	const char *str_next= BLI_str_find_next_char_utf8(str_pos, str_end);
-	if (str_next) {
-		(*pos) += (str_next - str_pos);
-		if((*pos) > maxlen) (*pos)= maxlen;
-		return TRUE;
-	}
-
-	return FALSE;
-}
-
-static int ui_textedit_step_prev_utf8(const char *str, size_t UNUSED(maxlen), short *pos)
-{
-	if((*pos) > 0) {
-		const char *str_pos= str + (*pos);
-		const char *str_prev= BLI_str_find_prev_char_utf8(str, str_pos);
-		if (str_prev) {
-			(*pos) -= (str_pos - str_prev);
-			return TRUE;
-		}
-	}
-
-	return FALSE;
-}
-
-static void ui_textedit_step_utf8(const char *str, size_t maxlen,
-                                  short *pos, const char direction,
-                                  uiButtonJumpType jump)
-{
-	const short pos_prev= *pos;
-
-	if(direction) { /* right*/
-		if(jump != BUTTON_EDIT_JUMP_NONE) {
-			const uiButtonDelimType is_special= (*pos) < maxlen ? test_special_char(str[(*pos)]) : BUTTON_DELIM_NONE;
-			/* jump between special characters (/,\,_,-, etc.),
-			 * look at function test_special_char() for complete
-			 * list of special character, ctr -> */
-			while((*pos) < maxlen) {
-				if (ui_textedit_step_next_utf8(str, maxlen, pos)) {
-					if((jump != BUTTON_EDIT_JUMP_ALL) && (is_special != test_special_char(str[(*pos)]))) break;
-				}
-				else {
-					break; /* unlikely but just incase */
-				}
-			}
-		}
-		else {
-			ui_textedit_step_next_utf8(str, maxlen, pos);
-		}
-	}
-	else { /* left */
-		if(jump != BUTTON_EDIT_JUMP_NONE) {
-			const uiButtonDelimType is_special= (*pos) > 1 ? test_special_char(str[(*pos) - 1]) : BUTTON_DELIM_NONE;
-			/* left only: compensate for index/change in direction */
-			ui_textedit_step_prev_utf8(str, maxlen, pos);
-
-			/* jump between special characters (/,\,_,-, etc.),
-			 * look at function test_special_char() for complete
-			 * list of special character, ctr -> */
-			while ((*pos) > 0) {
-				if (ui_textedit_step_prev_utf8(str, maxlen, pos)) {
-					if((jump != BUTTON_EDIT_JUMP_ALL) && (is_special != test_special_char(str[(*pos)]))) break;
-				}
-				else {
-					break;
-				}
-			}
-
-			/* left only: compensate for index/change in direction */
-			if(((*pos) != 0) && ABS(pos_prev - (*pos)) > 1) {
-				ui_textedit_step_next_utf8(str, maxlen, pos);
-			}
-		}
-		else {
-			ui_textedit_step_prev_utf8(str, maxlen, pos);
-		}
-	}
-}
 
 static int ui_textedit_delete_selection(uiBut *but, uiHandleButtonData *data)
 {
@@ -1419,12 +1265,12 @@ static void ui_textedit_set_cursor_pos(uiBut *but, uiHandleButtonData *data, sho
 	
 	/* mouse dragged outside the widget to the left */
 	if (x < startx && but->ofs > 0) {	
-		short i= but->ofs;
+		int i = but->ofs;
 
 		origstr[but->ofs] = 0;
 		
 		while (i > 0) {
-			if (ui_textedit_step_prev_utf8(origstr, but->ofs, &i)) {
+			if (BLI_str_cursor_step_prev_utf8(origstr, but->ofs, &i)) {
 				if (BLF_width(fstyle->uifont_id, origstr+i) > (startx - x)*0.25f) break;	// 0.25 == scale factor for less sensitivity
 			}
 			else {
@@ -1442,9 +1288,11 @@ static void ui_textedit_set_cursor_pos(uiBut *but, uiHandleButtonData *data, sho
 		
 		/* XXX does not take zoom level into account */
 		while (startx + aspect_sqrt * BLF_width(fstyle->uifont_id, origstr+but->ofs) > x) {
+			int pos_i = but->pos;
 			if (but->pos <= 0) break;
-			if (ui_textedit_step_prev_utf8(origstr, but->ofs, &but->pos)) {
-				origstr[but->pos+but->ofs] = 0;
+			if (BLI_str_cursor_step_prev_utf8(origstr, but->ofs, &pos_i)) {
+				but->pos = pos_i;
+				origstr[but->pos + but->ofs] = 0;
 			}
 			else {
 				break; /* unlikely but possible */
@@ -1474,7 +1322,7 @@ static void ui_textedit_set_cursor_select(uiBut *but, uiHandleButtonData *data, 
 }
 
 /* this is used for both utf8 and ascii, its meant to be used for single keys,
- * notie the buffer is either copied or not, so its not suitable for pasting in
+ * notice the buffer is either copied or not, so its not suitable for pasting in
  * - campbell */
 static int ui_textedit_type_buf(uiBut *but, uiHandleButtonData *data,
                                 const char *utf8_buf, int utf8_buf_len)
@@ -1520,7 +1368,7 @@ static int ui_textedit_type_ascii(uiBut *but, uiHandleButtonData *data, char asc
 	return ui_textedit_type_buf(but, data, buf, 1);
 }
 
-static void ui_textedit_move(uiBut *but, uiHandleButtonData *data, int direction, int select, uiButtonJumpType jump)
+static void ui_textedit_move(uiBut *but, uiHandleButtonData *data, strCursorJumpDirection direction, int select, strCursorJumpType jump)
 {
 	const char *str= data->str;
 	const int len= strlen(str);
@@ -1531,7 +1379,7 @@ static void ui_textedit_move(uiBut *but, uiHandleButtonData *data, int direction
 
 	/* special case, quit selection and set cursor */
 	if (has_sel && !select) {
-		if (jump == BUTTON_EDIT_JUMP_ALL) {
+		if (jump == STRCUR_JUMP_ALL) {
 			but->selsta = but->selend= but->pos = direction ? len : 0;
 		}
 		else {
@@ -1545,7 +1393,9 @@ static void ui_textedit_move(uiBut *but, uiHandleButtonData *data, int direction
 		data->selextend = 0;
 	}
 	else {
-		ui_textedit_step_utf8(str, len, &but->pos, direction, jump);
+		int pos_i = but->pos;
+		BLI_str_cursor_step_utf8(str, len, &pos_i, direction, jump);
+		but->pos = pos_i;
 
 		if(select) {
 			/* existing selection */
@@ -1594,14 +1444,14 @@ static void ui_textedit_move(uiBut *but, uiHandleButtonData *data, int direction
 	}
 }
 
-static int ui_textedit_delete(uiBut *but, uiHandleButtonData *data, int direction, uiButtonJumpType jump)
+static int ui_textedit_delete(uiBut *but, uiHandleButtonData *data, int direction, strCursorJumpType jump)
 {
 	char *str= data->str;
 	const int len= strlen(str);
 
 	int changed= 0;
 
-	if(jump == BUTTON_EDIT_JUMP_ALL) {
+	if (jump == STRCUR_JUMP_ALL) {
 		if(len) changed=1;
 		str[0]= '\0';
 		but->pos= 0;
@@ -1611,10 +1461,10 @@ static int ui_textedit_delete(uiBut *but, uiHandleButtonData *data, int directio
 			changed= ui_textedit_delete_selection(but, data);
 		}
 		else if (but->pos>=0 && but->pos<len) {
-			short pos= but->pos;
+			int pos = but->pos;
 			int step;
-			ui_textedit_step_utf8(str, len, &pos, direction, jump);
-			step= pos - but->pos;
+			BLI_str_cursor_step_utf8(str, len, &pos, direction, jump);
+			step = pos - but->pos;
 			memmove(&str[but->pos], &str[but->pos + step], (len + 1) - but->pos);
 			changed= 1;
 		}
@@ -1625,10 +1475,10 @@ static int ui_textedit_delete(uiBut *but, uiHandleButtonData *data, int directio
 				changed= ui_textedit_delete_selection(but, data);
 			}
 			else if(but->pos>0) {
-				short pos= but->pos;
+				int pos = but->pos;
 				int step;
 
-				ui_textedit_step_utf8(str, len, &pos, direction, jump);
+				BLI_str_cursor_step_utf8(str, len, &pos, direction, jump);
 				step= but->pos - pos;
 				memmove(&str[but->pos - step], &str[but->pos], (len + 1) - but->pos);
 				but->pos -= step;
@@ -1920,11 +1770,11 @@ static void ui_do_but_textedit(bContext *C, uiBlock *block, uiBut *but, uiHandle
 				}
 				break;
 			case RIGHTARROWKEY:
-				ui_textedit_move(but, data, 1, event->shift, event->ctrl ? BUTTON_EDIT_JUMP_DELIM : BUTTON_EDIT_JUMP_NONE);
+				ui_textedit_move(but, data, STRCUR_DIR_NEXT, event->shift, event->ctrl ? STRCUR_JUMP_DELIM : STRCUR_JUMP_NONE);
 				retval= WM_UI_HANDLER_BREAK;
 				break;
 			case LEFTARROWKEY:
-				ui_textedit_move(but, data, 0, event->shift, event->ctrl ? BUTTON_EDIT_JUMP_DELIM : BUTTON_EDIT_JUMP_NONE);
+				ui_textedit_move(but, data, STRCUR_DIR_PREV, event->shift, event->ctrl ? STRCUR_JUMP_DELIM : STRCUR_JUMP_NONE);
 				retval= WM_UI_HANDLER_BREAK;
 				break;
 			case DOWNARROWKEY:
@@ -1934,7 +1784,7 @@ static void ui_do_but_textedit(bContext *C, uiBlock *block, uiBut *but, uiHandle
 				}
 				/* pass on purposedly */
 			case ENDKEY:
-				ui_textedit_move(but, data, 1, event->shift, BUTTON_EDIT_JUMP_ALL);
+				ui_textedit_move(but, data, STRCUR_DIR_NEXT, event->shift, STRCUR_JUMP_ALL);
 				retval= WM_UI_HANDLER_BREAK;
 				break;
 			case UPARROWKEY:
@@ -1944,7 +1794,7 @@ static void ui_do_but_textedit(bContext *C, uiBlock *block, uiBut *but, uiHandle
 				}
 				/* pass on purposedly */
 			case HOMEKEY:
-				ui_textedit_move(but, data, 0, event->shift, BUTTON_EDIT_JUMP_ALL);
+				ui_textedit_move(but, data, STRCUR_DIR_PREV, event->shift, STRCUR_JUMP_ALL);
 				retval= WM_UI_HANDLER_BREAK;
 				break;
 			case PADENTER:
@@ -1953,12 +1803,12 @@ static void ui_do_but_textedit(bContext *C, uiBlock *block, uiBut *but, uiHandle
 				retval= WM_UI_HANDLER_BREAK;
 				break;
 			case DELKEY:
-				changed= ui_textedit_delete(but, data, 1, event->ctrl ? BUTTON_EDIT_JUMP_DELIM : BUTTON_EDIT_JUMP_NONE);
+				changed= ui_textedit_delete(but, data, 1, event->ctrl ? STRCUR_JUMP_DELIM : STRCUR_JUMP_NONE);
 				retval= WM_UI_HANDLER_BREAK;
 				break;
 
 			case BACKSPACEKEY:
-				changed= ui_textedit_delete(but, data, 0, event->shift ? BUTTON_EDIT_JUMP_ALL :  (event->ctrl ? BUTTON_EDIT_JUMP_DELIM : BUTTON_EDIT_JUMP_NONE));
+				changed= ui_textedit_delete(but, data, 0, event->shift ? STRCUR_JUMP_ALL :  (event->ctrl ? STRCUR_JUMP_DELIM : STRCUR_JUMP_NONE));
 				retval= WM_UI_HANDLER_BREAK;
 				break;
 				
@@ -1986,7 +1836,7 @@ static void ui_do_but_textedit(bContext *C, uiBlock *block, uiBut *but, uiHandle
 			const char *utf8_buf= event->utf8_buf;
 
 			/* exception that's useful for number buttons, some keyboard
-			   numpads have a comma instead of a period */
+			 * numpads have a comma instead of a period */
 			if(ELEM3(but->type, NUM, NUMABS, NUMSLI)) { /* could use data->min*/
 				if(event->type == PADPERIOD && ascii == ',') {
 					ascii = '.';
@@ -2564,7 +2414,7 @@ static int ui_numedit_but_NUM(uiBut *but, uiHandleButtonData *data, float fac, i
 			data->dragf+= (((float)(mx-data->draglastx))/deler) * (fabsf(data->dragstartx-mx)*0.004f);
 		} else {
 			/*no scaling */
-			data->dragf+= ((float)(mx-data->draglastx))/deler ;
+			data->dragf += ((float)(mx - data->draglastx)) / deler;
 		}
 	
 		CLAMP(data->dragf, 0.0f, 1.0f);
@@ -2980,9 +2830,10 @@ static int ui_do_but_SCROLL(bContext *C, uiBlock *block, uiBut *but, uiHandleBut
 				retval= WM_UI_HANDLER_BREAK;
 			}
 			/* UNUSED - otherwise code is ok, add back if needed */
-			/* else if(ELEM(event->type, PADENTER, RETKEY) && event->val==KM_PRESS)
+#if 0
+			else if(ELEM(event->type, PADENTER, RETKEY) && event->val==KM_PRESS)
 				click= 1;
-			*/
+#endif
 		}
 	}
 	else if(data->state == BUTTON_STATE_NUM_EDITING) {
@@ -3034,10 +2885,10 @@ static int ui_do_but_BLOCK(bContext *C, uiBut *but, uiHandleButtonData *data, wm
 				ui_apply_button(C, but->block, but, data, 1);
 
 				/* button's state need to be changed to EXIT so moving mouse away from this mouse wouldn't lead
-				 * to cancel changes made to this button, but shanging state to EXIT also makes no button active for
+				 * to cancel changes made to this button, but changing state to EXIT also makes no button active for
 				 * a while which leads to triggering operator when doing fast scrolling mouse wheel.
 				 * using post activate stuff from button allows to make button be active again after checking for all
-				 * all that mouse leave and cancel stuff, so wuick scrool wouldnt't be an issue anumore.
+				 * all that mouse leave and cancel stuff, so quick scroll wouldn't be an issue anymore.
 				 * same goes for scrolling wheel in another direction below (sergey)
 				 */
 				data->postbut= but;
@@ -3112,7 +2963,7 @@ static int ui_numedit_but_NORMAL(uiBut *but, uiHandleButtonData *data, int mx, i
 	/* if mouse moves outside of sphere, it does negative normal */
 
 	/* note that both data->vec and data->origvec should be normalized
-	 * else we'll get a hamrless but annoying jump when first clicking */
+	 * else we'll get a harmless but annoying jump when first clicking */
 
 	fp= data->origvec;
 	rad= (but->x2 - but->x1);
@@ -4192,8 +4043,7 @@ static int ui_do_but_CHARTAB(bContext *UNUSED(C), uiBlock *UNUSED(block), uiBut 
 			if(che > G.charmax)
 				che = 0;
 
-			if(G.obedit)
-			{
+			if(G.obedit) {
 				do_textedit(0,0,che);
 			}
 
@@ -4226,10 +4076,8 @@ static int ui_do_but_CHARTAB(bContext *UNUSED(C), uiBlock *UNUSED(block), uiBut 
 			return WM_UI_HANDLER_BREAK;
 		}
 		else if(ELEM(event->type, WHEELDOWNMOUSE, PAGEDOWNKEY)) {
-			for(but= block->buttons.first; but; but= but->next)
-			{
-				if(but->type == CHARTAB)
-				{
+			for(but= block->buttons.first; but; but= but->next) {
+				if(but->type == CHARTAB) {
 					G.charstart = G.charstart + (12*6);
 					if(G.charstart > (0xffff - 12*6))
 						G.charstart = 0xffff - (12*6);
@@ -4688,12 +4536,13 @@ static int ui_but_menu(bContext *C, uiBut *but)
 			uiItemFullO(layout, "WM_OT_doc_view", "View Docs", ICON_NONE, ptr_props.data, WM_OP_EXEC_DEFAULT, 0);
 
 			/* XXX inactive option, not for public! */
-/*			WM_operator_properties_create(&ptr_props, "WM_OT_doc_edit");
+#if 0
+			WM_operator_properties_create(&ptr_props, "WM_OT_doc_edit");
 			RNA_string_set(&ptr_props, "doc_id", buf);
 			RNA_string_set(&ptr_props, "doc_new", RNA_property_description(but->rnaprop));
 
 			uiItemFullO(layout, "WM_OT_doc_edit", "Submit Description", ICON_NONE, ptr_props.data, WM_OP_INVOKE_DEFAULT, 0);
- */
+ #endif
 		}
 		else if (but->optype) {
 			WM_operator_py_idname(buf, but->optype->idname);
@@ -4781,8 +4630,8 @@ static int ui_do_button(bContext *C, uiBlock *block, uiBut *but, wmEvent *event)
 		}
 		/* reset to default */
 		/* XXX hardcoded keymap check.... */
-		else if(ELEM(event->type, DELKEY, PADPERIOD) && event->val == KM_PRESS) {
-			/* ctrl+del - reset active button; del - reset a whole array*/
+		else if(event->type == BACKSPACEKEY && event->val == KM_PRESS) {
+			/* ctrl+backspace = reset active button; backspace = reset a whole array*/
 			if (!(ELEM3(but->type, HSVCIRCLE, HSVCUBE, HISTOGRAM)))
 				ui_set_but_default(C, !event->ctrl);
 		}
@@ -5266,10 +5115,10 @@ static void button_activate_state(bContext *C, uiBut *but, uiHandleButtonState s
 
 	if(state != BUTTON_STATE_EXIT) {
 		/* When objects for eg. are removed, running ui_check_but() can access
-		   the removed data - so disable update on exit. Also in case of
-		   highlight when not in a popup menu, we remove because data used in
-		   button below popup might have been removed by action of popup. Needs
-		   a more reliable solution... */
+		 * the removed data - so disable update on exit. Also in case of
+		 * highlight when not in a popup menu, we remove because data used in
+		 * button below popup might have been removed by action of popup. Needs
+		 * a more reliable solution... */
 		if(state != BUTTON_STATE_HIGHLIGHT || (but->block->flag & UI_BLOCK_LOOP))
 			ui_check_but(but);
 	}

@@ -276,7 +276,7 @@ int ED_space_image_show_uvedit(SpaceImage *sima, Object *obedit)
 		return 0;
 
 	if(obedit && obedit->type == OB_MESH) {
-		struct BMEditMesh *em = ((Mesh*)obedit->data)->edit_btmesh;
+		struct BMEditMesh *em = BMEdit_FromObject(obedit);
 		int ret;
 		
 		ret = EDBM_texFaceCheck(em);
@@ -294,7 +294,7 @@ int ED_space_image_show_uvshadow(SpaceImage *sima, Object *obedit)
 	
 	if(ED_space_image_show_paint(sima))
 		if(obedit && obedit->type == OB_MESH) {
-			struct BMEditMesh *em = ((Mesh*)obedit->data)->edit_btmesh;
+			struct BMEditMesh *em = BMEdit_FromObject(obedit);
 			int ret;
 			
 			ret = EDBM_texFaceCheck(em);
@@ -824,9 +824,11 @@ static void image_main_area_draw(const bContext *C, ARegion *ar)
 	draw_image_grease_pencil((bContext *)C, 0);
 	
 	/* scrollers? */
-	/*scrollers= UI_view2d_scrollers_calc(C, v2d, V2D_UNIT_VALUES, V2D_GRID_CLAMP, V2D_ARG_DUMMY, V2D_ARG_DUMMY);
+#if 0
+	scrollers= UI_view2d_scrollers_calc(C, v2d, V2D_UNIT_VALUES, V2D_GRID_CLAMP, V2D_ARG_DUMMY, V2D_ARG_DUMMY);
 	UI_view2d_scrollers_draw(C, v2d, scrollers);
-	UI_view2d_scrollers_free(scrollers);*/
+	UI_view2d_scrollers_free(scrollers);
+#endif
 }
 
 static void image_main_area_listener(ARegion *ar, wmNotifier *wmn)

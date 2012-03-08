@@ -26,13 +26,14 @@
  *  \brief A BVH for high poly meshes.
  */
 
-struct MFace;
-struct MVert;
+struct DMFlagMat;
 struct DMGridAdjacency;
 struct DMGridData;
+struct ListBase;
+struct MFace;
+struct MVert;
 struct PBVH;
 struct PBVHNode;
-struct ListBase;
 
 typedef struct PBVH PBVH;
 typedef struct PBVHNode PBVHNode;
@@ -56,12 +57,12 @@ void BLI_pbvh_build_mesh(PBVH *bvh, struct MFace *faces, struct MVert *verts,
 			int totface, int totvert);
 void BLI_pbvh_build_grids(PBVH *bvh, struct DMGridData **grids,
 	struct DMGridAdjacency *gridadj, int totgrid,
-	int gridsize, void **gridfaces);
+	int gridsize, void **gridfaces, struct DMFlagMat *flagmats);
 void BLI_pbvh_free(PBVH *bvh);
 
 /* Hierarchical Search in the BVH, two methods:
-   * for each hit calling a callback
-   * gather nodes in an array (easy to multithread) */
+ * - for each hit calling a callback
+ * - gather nodes in an array (easy to multithread) */
 
 void BLI_pbvh_search_callback(PBVH *bvh,
 	BLI_pbvh_SearchCallback scb, void *search_data,
@@ -72,9 +73,9 @@ void BLI_pbvh_search_gather(PBVH *bvh,
 	PBVHNode ***array, int *tot);
 
 /* Raycast
-   the hit callback is called for all leaf nodes intersecting the ray;
-   it's up to the callback to find the primitive within the leaves that is
-   hit first */
+ * the hit callback is called for all leaf nodes intersecting the ray;
+ * it's up to the callback to find the primitive within the leaves that is
+ * hit first */
 
 void BLI_pbvh_raycast(PBVH *bvh, BLI_pbvh_HitOccludedCallback cb, void *data,
                       float ray_start[3], float ray_normal[3], int original);
@@ -85,7 +86,8 @@ int BLI_pbvh_node_raycast(PBVH *bvh, PBVHNode *node, float (*origco)[3],
 
 void BLI_pbvh_node_draw(PBVHNode *node, void *data);
 int BLI_pbvh_node_planes_contain_AABB(PBVHNode *node, void *data);
-void BLI_pbvh_draw(PBVH *bvh, float (*planes)[4], float (*face_nors)[3], int smooth);
+void BLI_pbvh_draw(PBVH *bvh, float (*planes)[4], float (*face_nors)[3],
+				   int (*setMaterial)(int, void *attribs));
 
 /* Node Access */
 
@@ -131,8 +133,8 @@ int BLI_pbvh_isDeformed(struct PBVH *pbvh);
 /* Vertex Iterator */
 
 /* this iterator has quite a lot of code, but it's designed to:
-   - allow the compiler to eliminate dead code and variables
-   - spend most of the time in the relatively simple inner loop */
+ * - allow the compiler to eliminate dead code and variables
+ * - spend most of the time in the relatively simple inner loop */
 
 #define PBVH_ITER_ALL		0
 #define PBVH_ITER_UNIQUE	1
@@ -142,7 +144,6 @@ typedef struct PBVHVertexIter {
 	int g;
 	int width;
 	int height;
-	int skip;
 	int gx;
 	int gy;
 	int i;
@@ -160,7 +161,7 @@ typedef struct PBVHVertexIter {
 	int *vert_indices;
 
 	/* result: these are all computed in the macro, but we assume
-	   that compiler optimizations will skip the ones we don't use */
+	 * that compiler optimization's will skip the ones we don't use */
 	struct MVert *mvert;
 	float *co;
 	short *no;
@@ -171,47 +172,17 @@ typedef struct PBVHVertexIter {
 #pragma warning (disable:4127) // conditional expression is constant
 #endif
 
+void pbvh_vertex_iter_init(PBVH *bvh, PBVHNode *node,
+						   PBVHVertexIter *vi, int mode);
+
 #define BLI_pbvh_vertex_iter_begin(bvh, node, vi, mode) \
-	{ \
-		struct DMGridData **grids; \
-		struct MVert *verts; \
-		int *grid_indices, totgrid, gridsize, *vert_indices, uniq_verts, totvert; \
-		\
-		vi.grid= 0; \
-		vi.no= 0; \
-		vi.fno= 0; \
-		vi.mvert= 0; \
-		vi.skip= 0; \
-		\
-		BLI_pbvh_node_get_grids(bvh, node, &grid_indices, &totgrid, NULL, &gridsize, &grids, NULL); \
-		BLI_pbvh_node_num_verts(bvh, node, &uniq_verts, &totvert); \
-		BLI_pbvh_node_get_verts(bvh, node, &vert_indices, &verts); \
-		\
-		vi.grids= grids; \
-		vi.grid_indices= grid_indices; \
-		vi.totgrid= (grids)? totgrid: 1; \
-		vi.gridsize= gridsize; \
-		\
-		if(mode == PBVH_ITER_ALL) \
-			vi.totvert = totvert; \
-		else \
-			vi.totvert= uniq_verts; \
-		vi.vert_indices= vert_indices; \
-		vi.mverts= verts; \
-	}\
+	pbvh_vertex_iter_init(bvh, node, &vi, mode); \
 	\
 	for(vi.i=0, vi.g=0; vi.g<vi.totgrid; vi.g++) { \
 		if(vi.grids) { \
 			vi.width= vi.gridsize; \
 			vi.height= vi.gridsize; \
 			vi.grid= vi.grids[vi.grid_indices[vi.g]]; \
-			vi.skip= 0; \
-			 \
-			/*if(mode == PVBH_ITER_UNIQUE) { \
-				vi.grid += subm->grid.offset; \
-				vi.skip= subm->grid.skip; \
-				vi.grid -= skip; \
-			}*/ \
 		} \
 		else { \
 			vi.width= vi.totvert; \
@@ -219,8 +190,6 @@ typedef struct PBVHVertexIter {
 		} \
 		 \
 		for(vi.gy=0; vi.gy<vi.height; vi.gy++) { \
-			if(vi.grid) vi.grid += vi.skip; \
-			\
 			for(vi.gx=0; vi.gx<vi.width; vi.gx++, vi.i++) { \
 				if(vi.grid) { \
 					vi.co= vi.grid->co; \

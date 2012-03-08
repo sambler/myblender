@@ -32,7 +32,7 @@
 
 #include "bmesh.h"
 
-#include "bmesh_operators_private.h" /* own include */
+#include "intern/bmesh_operators_private.h" /* own include */
 
 /*
  * UTILS.C
@@ -42,17 +42,17 @@
  *
  */
 
-void bmesh_makevert_exec(BMesh *bm, BMOperator *op)
+void bmo_makevert_exec(BMesh *bm, BMOperator *op)
 {
 	float vec[3];
 
 	BMO_slot_vec_get(op, "co", vec);
 
 	BMO_elem_flag_enable(bm, BM_vert_create(bm, vec, NULL), 1);
-	BMO_slot_from_flag(bm, op, "newvertout", 1, BM_VERT);
+	BMO_slot_buffer_from_flag(bm, op, "newvertout", 1, BM_VERT);
 }
 
-void bmesh_transform_exec(BMesh *bm, BMOperator *op)
+void bmo_transform_exec(BMesh *bm, BMOperator *op)
 {
 	BMOIter iter;
 	BMVert *v;
@@ -65,7 +65,7 @@ void bmesh_transform_exec(BMesh *bm, BMOperator *op)
 	}
 }
 
-void bmesh_translate_exec(BMesh *bm, BMOperator *op)
+void bmo_translate_exec(BMesh *bm, BMOperator *op)
 {
 	float mat[4][4], vec[3];
 	
@@ -77,7 +77,7 @@ void bmesh_translate_exec(BMesh *bm, BMOperator *op)
 	BMO_op_callf(bm, "transform mat=%m4 verts=%s", mat, op, "verts");
 }
 
-void bmesh_scale_exec(BMesh *bm, BMOperator *op)
+void bmo_scale_exec(BMesh *bm, BMOperator *op)
 {
 	float mat[3][3], vec[3];
 	
@@ -91,7 +91,7 @@ void bmesh_scale_exec(BMesh *bm, BMOperator *op)
 	BMO_op_callf(bm, "transform mat=%m3 verts=%s", mat, op, "verts");
 }
 
-void bmesh_rotate_exec(BMesh *bm, BMOperator *op)
+void bmo_rotate_exec(BMesh *bm, BMOperator *op)
 {
 	float vec[3];
 	
@@ -109,7 +109,7 @@ void bmesh_rotate_exec(BMesh *bm, BMOperator *op)
 	BMO_op_callf(bm, "translate verts=%s vec=%v", op, "verts", vec);
 }
 
-void bmesh_reversefaces_exec(BMesh *bm, BMOperator *op)
+void bmo_reversefaces_exec(BMesh *bm, BMOperator *op)
 {
 	BMOIter siter;
 	BMFace *f;
@@ -119,28 +119,61 @@ void bmesh_reversefaces_exec(BMesh *bm, BMOperator *op)
 	}
 }
 
-void bmesh_edgerotate_exec(BMesh *bm, BMOperator *op)
+void bmo_edgerotate_exec(BMesh *bm, BMOperator *op)
 {
 	BMOIter siter;
 	BMEdge *e, *e2;
 	int ccw = BMO_slot_bool_get(op, "ccw");
+	int is_single = BMO_slot_buffer_count(bm, op, "edges") == 1;
+	short check_flag = is_single ?
+	            BM_EDGEROT_CHECK_EXISTS :
+	            BM_EDGEROT_CHECK_EXISTS | BM_EDGEROT_CHECK_DEGENERATE;
+
+#define EDGE_OUT   1
+#define FACE_TAINT 1
 
 	BMO_ITER(e, &siter, bm, op, "edges", BM_EDGE) {
-		if (!(e2 = BM_edge_rotate(bm, e, ccw))) {
-			BMO_error_raise(bm, op, BMERR_INVALID_SELECTION, "Could not rotate edge");
-			return;
-		}
+		/**
+		 * this ends up being called twice, could add option to not to call check in
+		 * #BM_edge_rotate to get some extra speed */
+		if (BM_edge_rotate_check(bm, e)) {
+			BMFace *fa, *fb;
+			if (BM_edge_face_pair(e, &fa, &fb)) {
 
-		BMO_elem_flag_enable(bm, e2, 1);
+				/* check we're untouched */
+				if (BMO_elem_flag_test(bm, fa, FACE_TAINT) == FALSE &&
+				    BMO_elem_flag_test(bm, fb, FACE_TAINT) == FALSE)
+				{
+
+					if (!(e2 = BM_edge_rotate(bm, e, ccw, check_flag))) {
+#if 0
+						BMO_error_raise(bm, op, BMERR_INVALID_SELECTION, "Could not rotate edge");
+						return;
+#endif
+						continue;
+					}
+
+					BMO_elem_flag_enable(bm, e2, EDGE_OUT);
+
+					/* dont touch again */
+					BMO_elem_flag_enable(bm, fa, FACE_TAINT);
+					BMO_elem_flag_enable(bm, fb, FACE_TAINT);
+				}
+			}
+		}
 	}
 
-	BMO_slot_from_flag(bm, op, "edgeout", 1, BM_EDGE);
+	BMO_slot_buffer_from_flag(bm, op, "edgeout", EDGE_OUT, BM_EDGE);
+
+#undef EDGE_OUT
+#undef FACE_TAINT
+
 }
 
 #define SEL_FLAG	1
 #define SEL_ORIG	2
 
-static void bmesh_regionextend_extend(BMesh *bm, BMOperator *op, int usefaces)
+static void bmo_regionextend_extend(BMesh *bm, BMOperator *op, int usefaces)
 {
 	BMVert *v;
 	BMEdge *e;
@@ -170,15 +203,16 @@ static void bmesh_regionextend_extend(BMesh *bm, BMOperator *op, int usefaces)
 		BMO_ITER(f, &siter, bm, op, "geom", BM_FACE) {
 			BM_ITER(l, &liter, bm, BM_LOOPS_OF_FACE, f) {
 				BM_ITER(f2, &fiter, bm, BM_FACES_OF_EDGE, l->e) {
-					if (!BMO_elem_flag_test(bm, f2, SEL_ORIG))
+					if (!BMO_elem_flag_test(bm, f2, SEL_ORIG)) {
 						BMO_elem_flag_enable(bm, f2, SEL_FLAG);
+					}
 				}
 			}
 		}
 	}
 }
 
-static void bmesh_regionextend_constrict(BMesh *bm, BMOperator *op, int usefaces)
+static void bmo_regionextend_constrict(BMesh *bm, BMOperator *op, int usefaces)
 {
 	BMVert *v;
 	BMEdge *e;
@@ -198,6 +232,7 @@ static void bmesh_regionextend_constrict(BMesh *bm, BMOperator *op, int usefaces
 				BM_ITER(e, &eiter, bm, BM_EDGES_OF_VERT, v) {
 					BMO_elem_flag_enable(bm, e, SEL_FLAG);
 				}
+
 			}
 		}
 	}
@@ -219,7 +254,7 @@ static void bmesh_regionextend_constrict(BMesh *bm, BMOperator *op, int usefaces
 	}
 }
 
-void bmesh_regionextend_exec(BMesh *bm, BMOperator *op)
+void bmo_regionextend_exec(BMesh *bm, BMOperator *op)
 {
 	int use_faces = BMO_slot_bool_get(op, "use_faces");
 	int constrict = BMO_slot_bool_get(op, "constrict");
@@ -227,11 +262,11 @@ void bmesh_regionextend_exec(BMesh *bm, BMOperator *op)
 	BMO_slot_buffer_flag_enable(bm, op, "geom", SEL_ORIG, BM_ALL);
 
 	if (constrict)
-		bmesh_regionextend_constrict(bm, op, use_faces);
+		bmo_regionextend_constrict(bm, op, use_faces);
 	else
-		bmesh_regionextend_extend(bm, op, use_faces);
+		bmo_regionextend_extend(bm, op, use_faces);
 
-	BMO_slot_from_flag(bm, op, "geomout", SEL_FLAG, BM_ALL);
+	BMO_slot_buffer_from_flag(bm, op, "geomout", SEL_FLAG, BM_ALL);
 }
 
 /********* righthand faces implementation ****** */
@@ -262,14 +297,14 @@ void bmesh_regionextend_exec(BMesh *bm, BMOperator *op)
 
 /* NOTE: BM_ELEM_TAG is used on faces to tell if they are flipped. */
 
-void bmesh_righthandfaces_exec(BMesh *bm, BMOperator *op)
+void bmo_righthandfaces_exec(BMesh *bm, BMOperator *op)
 {
 	BMIter liter, liter2;
 	BMOIter siter;
 	BMFace *f, *startf, **fstack = NULL;
 	BLI_array_declare(fstack);
 	BMLoop *l, *l2;
-	float maxx, cent[3];
+	float maxx, maxx_test, cent[3];
 	int i, maxi, flagflip = BMO_slot_bool_get(op, "do_flip");
 
 	startf = NULL;
@@ -290,9 +325,8 @@ void bmesh_righthandfaces_exec(BMesh *bm, BMOperator *op)
 
 		BM_face_center_bounds_calc(bm, f, cent);
 
-		cent[0] = cent[0]*cent[0] + cent[1]*cent[1] + cent[2]*cent[2];
-		if (cent[0] > maxx) {
-			maxx = cent[0];
+		if ((maxx_test = dot_v3v3(cent, cent)) > maxx) {
+			maxx = maxx_test;
 			startf = f;
 		}
 	}
@@ -364,13 +398,13 @@ void bmesh_righthandfaces_exec(BMesh *bm, BMOperator *op)
 	/* check if we have faces yet to do.  if so, recurse */
 	BMO_ITER(f, &siter, bm, op, "faces", BM_FACE) {
 		if (!BMO_elem_flag_test(bm, f, FACE_VIS)) {
-			bmesh_righthandfaces_exec(bm, op);
+			bmo_righthandfaces_exec(bm, op);
 			break;
 		}
 	}
 }
 
-void bmesh_vertexsmooth_exec(BMesh *bm, BMOperator *op)
+void bmo_vertexsmooth_exec(BMesh *bm, BMOperator *op)
 {
 	BMOIter siter;
 	BMIter iter;
@@ -493,7 +527,7 @@ static float ngon_fake_area(BMesh *bm, BMFace *f)
 /*
  * extra face data (computed data)
  */
-typedef struct tmp_face_ext {
+typedef struct SimSel_FaceExt {
 	BMFace		*f;			/* the face */
 	float	c[3];			/* center */
 	union {
@@ -502,20 +536,20 @@ typedef struct tmp_face_ext {
 		float	d;			/* 4th component of plane (the first three being the normal) */
 		struct Image	*t;	/* image pointer */
 	};
-} tmp_face_ext;
+} SimSel_FaceExt;
 
 /*
  * Select similar faces, the choices are in the enum in source/blender/bmesh/bmesh_operators.h
  * We select either similar faces based on material, image, area, perimeter, normal, or the coplanar faces
  */
-void bmesh_similarfaces_exec(BMesh *bm, BMOperator *op)
+void bmo_similarfaces_exec(BMesh *bm, BMOperator *op)
 {
 	BMIter fm_iter;
 	BMFace *fs, *fm;
 	BMOIter fs_iter;
 	int num_sels = 0, num_total = 0, i = 0, idx = 0;
 	float angle = 0.0f;
-	tmp_face_ext *f_ext = NULL;
+	SimSel_FaceExt *f_ext = NULL;
 	int *indices = NULL;
 	float t_no[3];	/* temporary normal */
 	int type = BMO_slot_int_get(op, "type");
@@ -524,12 +558,12 @@ void bmesh_similarfaces_exec(BMesh *bm, BMOperator *op)
 	num_total = BM_mesh_elem_count(bm, BM_FACE);
 
 	/*
-	** The first thing to do is to iterate through all the the selected items and mark them since
-	** they will be in the selection anyway.
-	** This will increase performance, (especially when the number of originaly selected faces is high)
-	** so the overall complexity will be less than $O(mn)$ where is the total number of selected faces,
-	** and n is the total number of faces
-	*/
+	 * The first thing to do is to iterate through all the the selected items and mark them since
+	 * they will be in the selection anyway.
+	 * This will increase performance, (especially when the number of originaly selected faces is high)
+	 * so the overall complexity will be less than $O(mn)$ where is the total number of selected faces,
+	 * and n is the total number of faces
+	 */
 	BMO_ITER(fs, &fs_iter, bm, op, "faces", BM_FACE) {
 		if (!BMO_elem_flag_test(bm, fs, FACE_MARK)) {	/* is this really needed ? */
 			BMO_elem_flag_enable(bm, fs, FACE_MARK);
@@ -539,7 +573,7 @@ void bmesh_similarfaces_exec(BMesh *bm, BMOperator *op)
 
 	/* allocate memory for the selected faces indices and for all temporary faces */
 	indices	= (int *)MEM_callocN(sizeof(int) * num_sels, "face indices util.c");
-	f_ext = (tmp_face_ext *)MEM_callocN(sizeof(tmp_face_ext) * num_total, "f_ext util.c");
+	f_ext = (SimSel_FaceExt *)MEM_callocN(sizeof(SimSel_FaceExt) * num_total, "f_ext util.c");
 
 	/* loop through all the faces and fill the faces/indices structure */
 	BM_ITER(fm, &fm_iter, bm, BM_FACES_OF_MESH, NULL) {
@@ -552,9 +586,9 @@ void bmesh_similarfaces_exec(BMesh *bm, BMOperator *op)
 	}
 
 	/*
-	** Save us some computation burden: In case of perimeter/area/coplanar selection we compute
-	** only once.
-	*/
+	 * Save us some computation burden: In case of perimeter/area/coplanar selection we compute
+	 * only once.
+	 */
 	if (type == SIMFACE_PERIMETER || type == SIMFACE_AREA || type == SIMFACE_COPLANAR || type == SIMFACE_IMAGE) {
 		for (i = 0; i < num_total; i++) {
 			switch (type) {
@@ -594,21 +628,21 @@ void bmesh_similarfaces_exec(BMesh *bm, BMOperator *op)
 	for (i = 0; i < num_total; i++) {
 		fm = f_ext[i].f;
 		if (!BMO_elem_flag_test(bm, fm, FACE_MARK)  && !BM_elem_flag_test(fm, BM_ELEM_HIDDEN)) {
-			int cont = 1;
-			for (idx = 0; idx < num_sels && cont == 1; idx++) {
+			int cont = TRUE;
+			for (idx = 0; idx < num_sels && cont == TRUE; idx++) {
 				fs = f_ext[indices[idx]].f;
 				switch (type) {
 					case SIMFACE_MATERIAL:
 						if (fm->mat_nr == fs->mat_nr) {
 							BMO_elem_flag_enable(bm, fm, FACE_MARK);
-							cont = 0;
+							cont = FALSE;
 						}
 						break;
 
 					case SIMFACE_IMAGE:
 						if (f_ext[i].t == f_ext[indices[idx]].t) {
 							BMO_elem_flag_enable(bm, fm, FACE_MARK);
-							cont = 0;
+							cont = FALSE;
 						}
 						break;
 
@@ -616,7 +650,7 @@ void bmesh_similarfaces_exec(BMesh *bm, BMOperator *op)
 						angle = RAD2DEGF(angle_v3v3(fs->no, fm->no));	/* if the angle between the normals -> 0 */
 						if (angle / 180.0f <= thresh) {
 							BMO_elem_flag_enable(bm, fm, FACE_MARK);
-							cont = 0;
+							cont = FALSE;
 						}
 						break;
 
@@ -625,7 +659,7 @@ void bmesh_similarfaces_exec(BMesh *bm, BMOperator *op)
 						if (angle / 180.0f <= thresh) { /* and dot product difference -> 0 */
 							if (fabsf(f_ext[i].d - f_ext[indices[idx]].d) <= thresh) {
 								BMO_elem_flag_enable(bm, fm, FACE_MARK);
-								cont = 0;
+								cont = FALSE;
 							}
 						}
 						break;
@@ -633,14 +667,14 @@ void bmesh_similarfaces_exec(BMesh *bm, BMOperator *op)
 					case SIMFACE_AREA:
 						if (fabsf(f_ext[i].area - f_ext[indices[idx]].area) <= thresh) {
 							BMO_elem_flag_enable(bm, fm, FACE_MARK);
-							cont = 0;
+							cont = FALSE;
 						}
 						break;
 
 					case SIMFACE_PERIMETER:
 						if (fabsf(f_ext[i].perim - f_ext[indices[idx]].perim) <= thresh) {
 							BMO_elem_flag_enable(bm, fm, FACE_MARK);
-							cont = 0;
+							cont = FALSE;
 						}
 						break;
 				}
@@ -652,12 +686,12 @@ void bmesh_similarfaces_exec(BMesh *bm, BMOperator *op)
 	MEM_freeN(indices);
 
 	/* transfer all marked faces to the output slot */
-	BMO_slot_from_flag(bm, op, "faceout", FACE_MARK, BM_FACE);
+	BMO_slot_buffer_from_flag(bm, op, "faceout", FACE_MARK, BM_FACE);
 }
 
-/******************************************************************************
-** Similar Edges
-**************************************************************************** */
+/**************************************************************************** *
+ * Similar Edges
+ **************************************************************************** */
 #define EDGE_MARK	1
 
 /*
@@ -684,7 +718,7 @@ static float edge_angle(BMesh *bm, BMEdge *e)
 /*
  * extra edge information
  */
-typedef struct tmp_edge_ext {
+typedef struct SimSel_EdgeExt {
 	BMEdge		*e;
 	union {
 		float		dir[3];
@@ -695,13 +729,13 @@ typedef struct tmp_edge_ext {
 		float		length;			/* edge length */
 		int			faces;			/* faces count */
 	};
-} tmp_edge_ext;
+} SimSel_EdgeExt;
 
 /*
  * select similar edges: the choices are in the enum in source/blender/bmesh/bmesh_operators.h
  * choices are length, direction, face, ...
  */
-void bmesh_similaredges_exec(BMesh *bm, BMOperator *op)
+void bmo_similaredges_exec(BMesh *bm, BMOperator *op)
 {
 	BMOIter es_iter;	/* selected edges iterator */
 	BMIter	e_iter;		/* mesh edges iterator */
@@ -709,7 +743,7 @@ void bmesh_similaredges_exec(BMesh *bm, BMOperator *op)
 	BMEdge	*e;		/* mesh edge */
 	int idx = 0, i = 0 /* , f = 0 */;
 	int *indices = NULL;
-	tmp_edge_ext *e_ext = NULL;
+	SimSel_EdgeExt *e_ext = NULL;
 	// float *angles = NULL;
 	float angle;
 
@@ -727,7 +761,7 @@ void bmesh_similaredges_exec(BMesh *bm, BMOperator *op)
 
 	/* allocate memory for the selected edges indices and for all temporary edges */
 	indices	= (int *)MEM_callocN(sizeof(int) * num_sels, "indices util.c");
-	e_ext = (tmp_edge_ext *)MEM_callocN(sizeof(tmp_edge_ext) * num_total, "e_ext util.c");
+	e_ext = (SimSel_EdgeExt *)MEM_callocN(sizeof(SimSel_EdgeExt) * num_total, "e_ext util.c");
 
 	/* loop through all the edges and fill the edges/indices structure */
 	BM_ITER(e, &e_iter, bm, BM_EDGES_OF_MESH, NULL) {
@@ -768,14 +802,14 @@ void bmesh_similaredges_exec(BMesh *bm, BMOperator *op)
 	for (i = 0; i < num_total; i++) {
 		e = e_ext[i].e;
 		if (!BMO_elem_flag_test(bm, e, EDGE_MARK) && !BM_elem_flag_test(e, BM_ELEM_HIDDEN)) {
-			int cont = 1;
-			for (idx = 0; idx < num_sels && cont == 1; idx++) {
+			int cont = TRUE;
+			for (idx = 0; idx < num_sels && cont == TRUE; idx++) {
 				es = e_ext[indices[idx]].e;
 				switch (type) {
 					case SIMEDGE_LENGTH:
 						if (fabsf(e_ext[i].length - e_ext[indices[idx]].length) <= thresh) {
 							BMO_elem_flag_enable(bm, e, EDGE_MARK);
-							cont = 0;
+							cont = FALSE;
 						}
 						break;
 
@@ -788,14 +822,14 @@ void bmesh_similaredges_exec(BMesh *bm, BMOperator *op)
 
 						if (angle / 90.0f <= thresh) {
 							BMO_elem_flag_enable(bm, e, EDGE_MARK);
-							cont = 0;
+							cont = FALSE;
 						}
 						break;
 
 					case SIMEDGE_FACE:
 						if (e_ext[i].faces == e_ext[indices[idx]].faces) {
 							BMO_elem_flag_enable(bm, e, EDGE_MARK);
-							cont = 0;
+							cont = FALSE;
 						}
 						break;
 
@@ -804,12 +838,12 @@ void bmesh_similaredges_exec(BMesh *bm, BMOperator *op)
 							if (e_ext[indices[idx]].faces == 2) {
 								if (fabsf(e_ext[i].angle - e_ext[indices[idx]].angle) <= thresh) {
 									BMO_elem_flag_enable(bm, e, EDGE_MARK);
-									cont = 0;
+									cont = FALSE;
 								}
 							}
 						}
 						else {
-							cont = 0;
+							cont = FALSE;
 						}
 						break;
 
@@ -822,7 +856,7 @@ void bmesh_similaredges_exec(BMesh *bm, BMOperator *op)
 
 							if (c1 && c2 && fabsf(*c1 - *c2) <= thresh) {
 								BMO_elem_flag_enable(bm, e, EDGE_MARK);
-								cont = 0;
+								cont = FALSE;
 							}
 						}
 						break;
@@ -830,14 +864,14 @@ void bmesh_similaredges_exec(BMesh *bm, BMOperator *op)
 					case SIMEDGE_SEAM:
 						if (BM_elem_flag_test(e, BM_ELEM_SEAM) == BM_elem_flag_test(es, BM_ELEM_SEAM)) {
 							BMO_elem_flag_enable(bm, e, EDGE_MARK);
-							cont = 0;
+							cont = FALSE;
 						}
 						break;
 
 					case SIMEDGE_SHARP:
 						if (BM_elem_flag_test(e, BM_ELEM_SMOOTH) == BM_elem_flag_test(es, BM_ELEM_SMOOTH)) {
 							BMO_elem_flag_enable(bm, e, EDGE_MARK);
-							cont = 0;
+							cont = FALSE;
 						}
 						break;
 				}
@@ -849,33 +883,33 @@ void bmesh_similaredges_exec(BMesh *bm, BMOperator *op)
 	MEM_freeN(indices);
 
 	/* transfer all marked edges to the output slot */
-	BMO_slot_from_flag(bm, op, "edgeout", EDGE_MARK, BM_EDGE);
+	BMO_slot_buffer_from_flag(bm, op, "edgeout", EDGE_MARK, BM_EDGE);
 }
 
-/******************************************************************************
-** Similar Vertices
-**************************************************************************** */
+/**************************************************************************** *
+ * Similar Vertices
+ **************************************************************************** */
 #define VERT_MARK	1
 
-typedef struct tmp_vert_ext {
+typedef struct SimSel_VertExt {
 	BMVert *v;
 	union {
 		int num_faces; /* adjacent faces */
 		MDeformVert *dvert; /* deform vertex */
 	};
-} tmp_vert_ext;
+} SimSel_VertExt;
 
 /*
  * select similar vertices: the choices are in the enum in source/blender/bmesh/bmesh_operators.h
  * choices are normal, face, vertex group...
  */
-void bmesh_similarverts_exec(BMesh *bm, BMOperator *op)
+void bmo_similarverts_exec(BMesh *bm, BMOperator *op)
 {
 	BMOIter vs_iter;	/* selected verts iterator */
 	BMIter v_iter;		/* mesh verts iterator */
 	BMVert *vs;		/* selected vertex */
 	BMVert *v;			/* mesh vertex */
-	tmp_vert_ext *v_ext = NULL;
+	SimSel_VertExt *v_ext = NULL;
 	int *indices = NULL;
 	int num_total = 0, num_sels = 0, i = 0, idx = 0;
 	int type = BMO_slot_int_get(op, "type");
@@ -891,7 +925,7 @@ void bmesh_similarverts_exec(BMesh *bm, BMOperator *op)
 
 	/* allocate memory for the selected vertices indices and for all temporary vertices */
 	indices	= (int *)MEM_mallocN(sizeof(int) * num_sels, "vertex indices");
-	v_ext = (tmp_vert_ext *)MEM_mallocN(sizeof(tmp_vert_ext) * num_total, "vertex extra");
+	v_ext = (SimSel_VertExt *)MEM_mallocN(sizeof(SimSel_VertExt) * num_total, "vertex extra");
 
 	/* loop through all the vertices and fill the vertices/indices structure */
 	BM_ITER(v, &v_iter, bm, BM_VERTS_OF_MESH, NULL) {
@@ -924,22 +958,22 @@ void bmesh_similarverts_exec(BMesh *bm, BMOperator *op)
 	for (i = 0; i < num_total; i++) {
 		v = v_ext[i].v;
 		if (!BMO_elem_flag_test(bm, v, VERT_MARK) && !BM_elem_flag_test(v, BM_ELEM_HIDDEN)) {
-			int cont = 1;
-			for (idx = 0; idx < num_sels && cont == 1; idx++) {
+			int cont = TRUE;
+			for (idx = 0; idx < num_sels && cont == TRUE; idx++) {
 				vs = v_ext[indices[idx]].v;
 				switch (type) {
 					case SIMVERT_NORMAL:
 						/* compare the angle between the normals */
 						if (RAD2DEGF(angle_v3v3(v->no, vs->no)) / 180.0f <= thresh) {
 							BMO_elem_flag_enable(bm, v, VERT_MARK);
-							cont = 0;
+							cont = FALSE;
 						}
 						break;
 					case SIMVERT_FACE:
 						/* number of adjacent faces */
 						if (v_ext[i].num_faces == v_ext[indices[idx]].num_faces) {
 							BMO_elem_flag_enable(bm, v, VERT_MARK);
-							cont = 0;
+							cont = FALSE;
 						}
 						break;
 
@@ -950,7 +984,7 @@ void bmesh_similarverts_exec(BMesh *bm, BMOperator *op)
 								for (v2 = 0; v2 < v_ext[indices[idx]].dvert->totweight; v2++) {
 									if (v_ext[i].dvert->dw[v1].def_nr == v_ext[indices[idx]].dvert->dw[v2].def_nr) {
 										BMO_elem_flag_enable(bm, v, VERT_MARK);
-										cont = 0;
+										cont = FALSE;
 										break;
 									}
 								}
@@ -965,14 +999,14 @@ void bmesh_similarverts_exec(BMesh *bm, BMOperator *op)
 	MEM_freeN(indices);
 	MEM_freeN(v_ext);
 
-	BMO_slot_from_flag(bm, op, "vertout", VERT_MARK, BM_VERT);
+	BMO_slot_buffer_from_flag(bm, op, "vertout", VERT_MARK, BM_VERT);
 }
 
-/******************************************************************************
-** Cycle UVs for a face
-**************************************************************************** */
+/**************************************************************************** *
+ * Cycle UVs for a face
+ **************************************************************************** */
 
-void bmesh_rotateuvs_exec(BMesh *bm, BMOperator *op)
+void bmo_face_rotateuvs_exec(BMesh *bm, BMOperator *op)
 {
 	BMOIter fs_iter;	/* selected faces iterator */
 	BMFace *fs;	/* current face */
@@ -1035,11 +1069,11 @@ void bmesh_rotateuvs_exec(BMesh *bm, BMOperator *op)
 
 }
 
-/******************************************************************************
-** Reverse UVs for a face
-**************************************************************************** */
+/**************************************************************************** *
+ * Reverse UVs for a face
+ **************************************************************************** */
 
-void bmesh_reverseuvs_exec(BMesh *bm, BMOperator *op)
+void bmo_face_reverseuvs_exec(BMesh *bm, BMOperator *op)
 {
 	BMOIter fs_iter;	/* selected faces iterator */
 	BMFace *fs;		/* current face */
@@ -1078,11 +1112,11 @@ void bmesh_reverseuvs_exec(BMesh *bm, BMOperator *op)
 	BLI_array_free(uvs);
 }
 
-/******************************************************************************
-** Cycle colors for a face
-**************************************************************************** */
+/**************************************************************************** *
+ * Cycle colors for a face
+ **************************************************************************** */
 
-void bmesh_rotatecolors_exec(BMesh *bm, BMOperator *op)
+void bmo_rotatecolors_exec(BMesh *bm, BMOperator *op)
 {
 	BMOIter fs_iter;	/* selected faces iterator */
 	BMFace *fs;	/* current face */
@@ -1144,11 +1178,11 @@ void bmesh_rotatecolors_exec(BMesh *bm, BMOperator *op)
 	}
 }
 
-/******************************************************************************
-** Reverse colors for a face
-**************************************************************************** */
+/*************************************************************************** *
+ * Reverse colors for a face
+ *************************************************************************** */
 
-void bmesh_reversecolors_exec(BMesh *bm, BMOperator *op)
+void bmo_face_reversecolors_exec(BMesh *bm, BMOperator *op)
 {
 	BMOIter fs_iter;	/* selected faces iterator */
 	BMFace *fs;		/* current face */
@@ -1186,18 +1220,18 @@ void bmesh_reversecolors_exec(BMesh *bm, BMOperator *op)
 }
 
 
-/******************************************************************************
-** shortest vertex path select
-**************************************************************************** */
+/*************************************************************************** *
+ * shortest vertex path select
+ *************************************************************************** */
 
-typedef struct element_node {
+typedef struct ElemNode {
 	BMVert *v;	/* vertex */
 	BMVert *parent;	/* node parent id */
 	float weight;	/* node weight */
 	HeapNode *hn;	/* heap node */
-} element_node;
+} ElemNode;
 
-void bmesh_vertexshortestpath_exec(BMesh *bm, BMOperator *op)
+void bmo_vertexshortestpath_exec(BMesh *bm, BMOperator *op)
 {
 	BMOIter vs_iter /* , vs2_iter */;	/* selected verts iterator */
 	BMIter v_iter;		/* mesh verts iterator */
@@ -1205,7 +1239,7 @@ void bmesh_vertexshortestpath_exec(BMesh *bm, BMOperator *op)
 	BMVert *v;		/* mesh vertex */
 	Heap *h = NULL;
 
-	element_node *vert_list = NULL;
+	ElemNode *vert_list = NULL;
 
 	int num_total = 0 /*, num_sels = 0 */, i = 0;
 	int type = BMO_slot_int_get(op, "type");
@@ -1220,7 +1254,7 @@ void bmesh_vertexshortestpath_exec(BMesh *bm, BMOperator *op)
 	num_total = BM_mesh_elem_count(bm, BM_VERT);
 
 	/* allocate memory for the nodes */
-	vert_list = (element_node *)MEM_mallocN(sizeof(element_node) * num_total, "vertex nodes");
+	vert_list = (ElemNode *)MEM_mallocN(sizeof(ElemNode) * num_total, "vertex nodes");
 
 	/* iterate through all the mesh vertices */
 	/* loop through all the vertices and fill the vertices/indices structure */
@@ -1235,8 +1269,8 @@ void bmesh_vertexshortestpath_exec(BMesh *bm, BMOperator *op)
 	bm->elem_index_dirty &= ~BM_VERT;
 
 	/*
-	** we now have everything we need, start Dijkstra path finding algorithm
-	*/
+	 * we now have everything we need, start Dijkstra path finding algorithm
+	 */
 
 	/* set the distance/weight of the start vertex to 0 */
 	vert_list[BM_elem_index_get(sv)].weight = 0.0f;
@@ -1293,5 +1327,5 @@ void bmesh_vertexshortestpath_exec(BMesh *bm, BMOperator *op)
 	BLI_heap_free(h, NULL);
 	MEM_freeN(vert_list);
 
-	BMO_slot_from_flag(bm, op, "vertout", VERT_MARK, BM_VERT);
+	BMO_slot_buffer_from_flag(bm, op, "vertout", VERT_MARK, BM_VERT);
 }

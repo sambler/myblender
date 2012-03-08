@@ -50,11 +50,11 @@ int PyC_AsArray(void *array, PyObject *value, const Py_ssize_t length,
 	Py_ssize_t value_len;
 	Py_ssize_t i;
 
-	if (!(value_fast=PySequence_Fast(value, error_prefix))) {
+	if (!(value_fast = PySequence_Fast(value, error_prefix))) {
 		return -1;
 	}
 
-	value_len= PySequence_Fast_GET_SIZE(value_fast);
+	value_len = PySequence_Fast_GET_SIZE(value_fast);
 
 	if (value_len != length) {
 		Py_DECREF(value);
@@ -69,13 +69,13 @@ int PyC_AsArray(void *array, PyObject *value, const Py_ssize_t length,
 		if (is_double) {
 			double *array_double= array;
 			for (i=0; i<length; i++) {
-				array_double[i]= PyFloat_AsDouble(PySequence_Fast_GET_ITEM(value_fast, i));
+				array_double[i] = PyFloat_AsDouble(PySequence_Fast_GET_ITEM(value_fast, i));
 			}
 		}
 		else {
 			float *array_float= array;
 			for (i=0; i<length; i++) {
-				array_float[i]= PyFloat_AsDouble(PySequence_Fast_GET_ITEM(value_fast, i));
+				array_float[i] = PyFloat_AsDouble(PySequence_Fast_GET_ITEM(value_fast, i));
 			}
 		}
 	}
@@ -83,13 +83,13 @@ int PyC_AsArray(void *array, PyObject *value, const Py_ssize_t length,
 		/* could use is_double for 'long int' but no use now */
 		int *array_int= array;
 		for (i=0; i<length; i++) {
-			array_int[i]= PyLong_AsSsize_t(PySequence_Fast_GET_ITEM(value_fast, i));
+			array_int[i] = PyLong_AsSsize_t(PySequence_Fast_GET_ITEM(value_fast, i));
 		}
 	}
 	else if (type == &PyBool_Type) {
 		int *array_bool= array;
 		for (i=0; i<length; i++) {
-			array_bool[i]= (PyLong_AsSsize_t(PySequence_Fast_GET_ITEM(value_fast, i)) != 0);
+			array_bool[i] = (PyLong_AsSsize_t(PySequence_Fast_GET_ITEM(value_fast, i)) != 0);
 		}
 	}
 	else {
@@ -228,7 +228,7 @@ PyObject *PyC_Object_GetAttrStringArgs(PyObject *o, Py_ssize_t n, ...)
 
 /* similar to PyErr_Format(),
  *
- * implimentation - we cant actually preprend the existing exception,
+ * implementation - we cant actually preprend the existing exception,
  * because it could have _any_ argiments given to it, so instead we get its
  * __str__ output and raise our own exception including it.
  */
@@ -419,16 +419,16 @@ PyObject *PyC_UnicodeFromByte(const char *str)
 }
 
 /*****************************************************************************
-* Description: This function creates a new Python dictionary object.
-* note: dict is owned by sys.modules["__main__"] module, reference is borrowed
-* note: important we use the dict from __main__, this is what python expects
-  for 'pickle' to work as well as strings like this...
- >> foo = 10
- >> print(__import__("__main__").foo)
-*
-* note: this overwrites __main__ which gives problems with nested calles.
-* be sure to run PyC_MainModule_Backup & PyC_MainModule_Restore if there is
-* any chance that python is in the call stack.
+ * Description: This function creates a new Python dictionary object.
+ * note: dict is owned by sys.modules["__main__"] module, reference is borrowed
+ * note: important we use the dict from __main__, this is what python expects
+ *  for 'pickle' to work as well as strings like this...
+ * >> foo = 10
+ * >> print(__import__("__main__").foo)
+ *
+ * note: this overwrites __main__ which gives problems with nested calles.
+ * be sure to run PyC_MainModule_Backup & PyC_MainModule_Restore if there is
+ * any chance that python is in the call stack.
 *****************************************************************************/
 PyObject *PyC_DefaultNameSpace(const char *filename)
 {
@@ -475,7 +475,7 @@ void PyC_SetHomePath(const char *py_path_bundle)
 
 #ifdef __APPLE__
 	/* OSX allow file/directory names to contain : character (represented as / in the Finder)
-	 but current Python lib (release 3.1.1) doesn't handle these correctly */
+	 * but current Python lib (release 3.1.1) doesn't handle these correctly */
 	if (strchr(py_path_bundle, ':'))
 		printf("Warning : Blender application is located in a path containing : or / chars\
 			   \nThis may make python import function fail\n");
@@ -483,7 +483,7 @@ void PyC_SetHomePath(const char *py_path_bundle)
 
 #ifdef _WIN32
 	/* cmake/MSVC debug build crashes without this, why only
-	   in this case is unknown.. */
+	 * in this case is unknown.. */
 	{
 		BLI_setenv("PYTHONPATH", py_path_bundle);
 	}
@@ -645,4 +645,136 @@ void PyC_RunQuicky(const char *filepath, int n, ...)
 
 		PyGILState_Release(gilstate);
 	}
+}
+
+/* generic function to avoid depending on RNA */
+void *PyC_RNA_AsPointer(PyObject *value, const char *type_name)
+{
+	PyObject* as_pointer;
+	PyObject* pointer;
+
+	if (!strcmp(Py_TYPE(value)->tp_name, type_name) &&
+	    (as_pointer = PyObject_GetAttrString(value, "as_pointer")) != NULL &&
+	    PyCallable_Check(as_pointer))
+	{
+		void *result = NULL;
+
+		/* must be a 'type_name' object */
+		pointer = PyObject_CallObject(as_pointer, NULL);
+		Py_DECREF(as_pointer);
+
+		if (!pointer) {
+			PyErr_SetString(PyExc_SystemError, "value.as_pointer() failed");
+			return NULL;
+		}
+		result = PyLong_AsVoidPtr(pointer);
+		Py_DECREF(pointer);
+		if (!result) {
+			PyErr_SetString(PyExc_SystemError, "value.as_pointer() failed");
+		}
+
+		return result;
+	}
+	else {
+		PyErr_Format(PyExc_TypeError,
+		             "expected '%.200s' type found '%.200s' instead",
+		             type_name, Py_TYPE(value)->tp_name);
+		return NULL;
+	}
+}
+
+
+/* PyC_FlagSet_* functions - so flags/sets can be interchanged in a generic way */
+#include "BLI_dynstr.h"
+#include "MEM_guardedalloc.h"
+
+char *PyC_FlagSet_AsString(PyC_FlagSet *item)
+{
+	DynStr *dynstr = BLI_dynstr_new();
+	PyC_FlagSet *e;
+	char *cstring;
+
+	for (e = item; item->identifier; item++) {
+		BLI_dynstr_appendf(dynstr, (e == item) ? "'%s'" : ", '%s'", item->identifier);
+	}
+
+	cstring = BLI_dynstr_get_cstring(dynstr);
+	BLI_dynstr_free(dynstr);
+	return cstring;
+}
+
+int PyC_FlagSet_ValueFromID_int(PyC_FlagSet *item, const char *identifier, int *value)
+{
+	for( ; item->identifier; item++) {
+		if(strcmp(item->identifier, identifier) == 0) {
+			*value = item->value;
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+int PyC_FlagSet_ValueFromID(PyC_FlagSet *item, const char *identifier, int *value, const char *error_prefix)
+{
+	if (PyC_FlagSet_ValueFromID_int(item, identifier, value) == 0) {
+		const char *enum_str = PyC_FlagSet_AsString(item);
+		PyErr_Format(PyExc_ValueError,
+		             "%s: '%.200s' not found in (%s)",
+		             error_prefix, identifier, enum_str);
+		MEM_freeN((void *)enum_str);
+		return -1;
+	}
+
+	return 0;
+}
+
+/* 'value' _must_ be a set type, error check before calling */
+int PyC_FlagSet_ToBitfield(PyC_FlagSet *items, PyObject *value, int *r_value, const char *error_prefix)
+{
+	/* set of enum items, concatenate all values with OR */
+	int ret, flag = 0;
+
+	/* set looping */
+	Py_ssize_t pos = 0;
+	Py_ssize_t hash = 0;
+	PyObject *key;
+
+	*r_value = 0;
+
+	while (_PySet_NextEntry(value, &pos, &key, &hash)) {
+		const char *param = _PyUnicode_AsString(key);
+
+		if (param == NULL) {
+			PyErr_Format(PyExc_TypeError,
+			             "%.200s expected a string, not %.200s",
+			             error_prefix, Py_TYPE(key)->tp_name);
+			return -1;
+		}
+
+		if (PyC_FlagSet_ValueFromID(items, param, &ret, error_prefix) < 0) {
+			return -1;
+		}
+
+		flag |= ret;
+	}
+
+	*r_value = flag;
+	return 0;
+}
+
+PyObject *PyC_FlagSet_FromBitfield(PyC_FlagSet *items, int flag)
+{
+	PyObject *ret = PySet_New(NULL);
+	PyObject *pystr;
+
+	for ( ; items->identifier; items++) {
+		if (items->value & flag) {
+			pystr = PyUnicode_FromString(items->identifier);
+			PySet_Add(ret, pystr);
+			Py_DECREF(pystr);
+		}
+	}
+
+	return ret;
 }

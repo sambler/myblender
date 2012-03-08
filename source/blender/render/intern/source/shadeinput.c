@@ -91,7 +91,7 @@ extern struct Render R;
 
 	*/
 
-/* initialise material variables in shadeinput, 
+/* initialize material variables in shadeinput, 
  * doing inverse gamma correction where applicable */
 void shade_input_init_material(ShadeInput *shi)
 {
@@ -185,7 +185,7 @@ void shade_input_do_shade(ShadeInput *shi, ShadeResult *shr)
 	}
 	
 	/* MIST */
-	if((shi->passflag & SCE_PASS_MIST) || ((R.wrld.mode & WO_MIST) && (shi->mat->mode & MA_NOMIST)==0))  {
+	if((shi->passflag & SCE_PASS_MIST) || ((R.wrld.mode & WO_MIST) && (shi->mat->mode & MA_NOMIST)==0)) {
 		if(R.r.mode & R_ORTHO)
 			shr->mist= mistfactor(-shi->co[2], shi->co);
 		else
@@ -213,15 +213,15 @@ void shade_input_do_shade(ShadeInput *shi, ShadeResult *shr)
 	shr->z= -shi->co[2];
 	
 	/* RAYHITS */
-/*
-	if(1 || shi->passflag & SCE_PASS_RAYHITS)
-	{
+#if 0
+	if(1 || shi->passflag & SCE_PASS_RAYHITS) {
 		shr->rayhits[0] = (float)shi->raycounter.faces.test;
 		shr->rayhits[1] = (float)shi->raycounter.bb.hit;
 		shr->rayhits[2] = 0.0;
 		shr->rayhits[3] = 1.0;
 	}
- */
+#endif
+
 	RE_RC_MERGE(&re_rc_counter[shi->thread], &shi->raycounter);
 }
 
@@ -294,7 +294,7 @@ void shade_input_set_triangle_i(ShadeInput *shi, ObjectInstanceRen *obi, VlakRen
 	}
 }
 
-/* note, facenr declared volatile due to over-eager -O2 optimizations
+/* note, facenr declared volatile due to over-eager -O2 optimization's
  * on cygwin (particularly -frerun-cse-after-loop)
  */
 
@@ -447,7 +447,7 @@ void shade_input_set_strand_texco(ShadeInput *shi, StrandRen *strand, StrandVert
 			}
 		}
 
-		if((texco & TEXCO_UV) || (mode & (MA_VERTEXCOL|MA_VERTEXCOLP|MA_FACETEXTURE)))  {
+		if((texco & TEXCO_UV) || (mode & (MA_VERTEXCOL|MA_VERTEXCOLP|MA_FACETEXTURE))) {
 			MCol *mcol;
 			float *uv;
 			char *name;
@@ -821,8 +821,7 @@ void shade_input_set_normals(ShadeInput *shi)
 		
 		normalize_v3(shi->vn);
 	}
-	else
-	{
+	else {
 		copy_v3_v3(shi->vn, shi->facenor);
 		copy_v3_v3(shi->nmapnorm, shi->vn);
 	}
@@ -855,8 +854,7 @@ void shade_input_set_vertex_normals(ShadeInput *shi)
 		
 		normalize_v3(shi->vn);
 	}
-	else
-	{
+	else {
 		copy_v3_v3(shi->vn, shi->facenor);
 		copy_v3_v3(shi->nmapnorm, shi->vn);
 	}
@@ -970,8 +968,7 @@ void shade_input_set_shade_texco(ShadeInput *shi)
 
 				// keeping tangents normalized at vertex level
 				// corresponds better to how it's done in game engines
-				if(obi->flag & R_TRANSFORMED)
-				{
+				if (obi->flag & R_TRANSFORMED) {
 					mul_mat3_m4_v3(obi->mat, c0); normalize_v3(c0);
 					mul_mat3_m4_v3(obi->mat, c1); normalize_v3(c1);
 					mul_mat3_m4_v3(obi->mat, c2); normalize_v3(c2);
@@ -1076,7 +1073,7 @@ void shade_input_set_shade_texco(ShadeInput *shi)
 			}
 		}
 				
-		if((texco & TEXCO_UV) || (mode & (MA_VERTEXCOL|MA_VERTEXCOLP|MA_FACETEXTURE)))  {
+		if((texco & TEXCO_UV) || (mode & (MA_VERTEXCOL|MA_VERTEXCOLP|MA_FACETEXTURE))) {
 			VlakRen *vlr= shi->vlr;
 			MTFace *tface;
 			MCol *mcol;

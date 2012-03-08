@@ -31,8 +31,8 @@
 #include "BLI_math_color.h"
 #include "BLI_utildefines.h"
 
-#ifndef BLI_MATH_COLOR_INLINE_H
-#define BLI_MATH_COLOR_INLINE_H
+#ifndef __MATH_COLOR_INLINE_C__
+#define __MATH_COLOR_INLINE_C__
 
 /******************************** Color Space ********************************/
 
@@ -79,9 +79,9 @@ MINLINE void linearrgb_to_srgb_uchar4(unsigned char srgb[4], const float linear[
 }
 
 /* predivide versions to work on associated/premultipled alpha. if this should
-   be done or not depends on the background the image will be composited over,
-   ideally you would never do color space conversion on an image with alpha
-   because it is ill defined */
+ * be done or not depends on the background the image will be composited over,
+ * ideally you would never do color space conversion on an image with alpha
+ * because it is ill defined */
 
 MINLINE void srgb_to_linearrgb_predivide_v4(float linear[4], const float srgb[4])
 {
@@ -179,7 +179,7 @@ MINLINE void srgb_to_linearrgb_uchar4(float linear[4], const unsigned char srgb[
 
 MINLINE void srgb_to_linearrgb_uchar4_predivide(float linear[4], const unsigned char srgb[4])
 {
-	float alpha, inv_alpha;
+	float fsrgb[4];
 	int i;
 
 	if(srgb[3] == 255 || srgb[3] == 0) {
@@ -187,14 +187,10 @@ MINLINE void srgb_to_linearrgb_uchar4_predivide(float linear[4], const unsigned 
 		return;
 	}
 
-	alpha = srgb[3] * (1.0f/255.0f);
-	inv_alpha = 1.0f/alpha;
+	for (i=0; i<4; i++)
+		fsrgb[i] = srgb[i] * (1.0f/255.0f);
 
-	for(i=0; i<3; ++i)
-		linear[i] = linearrgb_to_srgb(srgb[i] * inv_alpha) * alpha;
-
-	linear[3] = alpha;
+	srgb_to_linearrgb_predivide_v4(linear, fsrgb);
 }
 
-#endif /* BLI_MATH_COLOR_INLINE_H */
-
+#endif /* __MATH_COLOR_INLINE_C__ */

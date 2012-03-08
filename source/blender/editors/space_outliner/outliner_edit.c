@@ -248,7 +248,7 @@ void item_rename_cb(bContext *C, Scene *UNUSED(scene), TreeElement *te, TreeStor
 {
 	ARegion *ar= CTX_wm_region(C);
 	ReportList *reports= CTX_wm_reports(C); // XXX
-	do_item_rename(ar, te, tselem, reports) ;
+	do_item_rename(ar, te, tselem, reports);
 }
 
 static int do_outliner_item_rename(bContext *C, ARegion *ar, SpaceOops *soops, TreeElement *te, const float mval[2])
@@ -261,7 +261,7 @@ static int do_outliner_item_rename(bContext *C, ARegion *ar, SpaceOops *soops, T
 		/* name and first icon */
 		if(mval[0]>te->xs+UI_UNIT_X && mval[0]<te->xend) {
 			
-			do_item_rename(ar, te, tselem, reports) ;
+			do_item_rename(ar, te, tselem, reports);
 		}
 		return 1;
 	}
@@ -978,7 +978,7 @@ static void tree_element_to_path(SpaceOops *soops, TreeElement *te, TreeStoreEle
 	PropertyRNA *prop;
 	char *newpath=NULL;
 	
-	/* optimise tricks:
+	/* optimize tricks:
 	 *	- Don't do anything if the selected item is a 'struct', but arrays are allowed
 	 */
 	if (tselem->type == TSE_RNA_STRUCT)
@@ -1128,7 +1128,7 @@ static void do_outliner_drivers_editop(SpaceOops *soops, ListBase *tree, ReportL
 			short flag= 0;
 			short groupmode= KSP_GROUP_KSNAME;
 			
-			/* check if RNA-property described by this selected element is an animateable prop */
+			/* check if RNA-property described by this selected element is an animatable prop */
 			if (ELEM(tselem->type, TSE_RNA_PROPERTY, TSE_RNA_ARRAY_ELEM) && RNA_property_animateable(&te->rnaptr, te->directdata)) {
 				/* get id + path + index info from the selected element */
 				tree_element_to_path(soops, te, tselem, 
@@ -1307,7 +1307,7 @@ static void do_outliner_keyingset_editop(SpaceOops *soops, KeyingSet *ks, ListBa
 			short flag= 0;
 			short groupmode= KSP_GROUP_KSNAME;
 			
-			/* check if RNA-property described by this selected element is an animateable prop */
+			/* check if RNA-property described by this selected element is an animatable prop */
 			if (ELEM(tselem->type, TSE_RNA_PROPERTY, TSE_RNA_ARRAY_ELEM) && RNA_property_animateable(&te->rnaptr, te->directdata)) {
 				/* get id + path + index info from the selected element */
 				tree_element_to_path(soops, te, tselem, 
@@ -1433,15 +1433,24 @@ void OUTLINER_OT_keyingset_remove_selected(wmOperatorType *ot)
 
 static int parent_drop_exec(bContext *C, wmOperator *op)
 {
-	Object *par = NULL;
+	Object *par = NULL, *ob = NULL;
+	Main *bmain= CTX_data_main(C);
+	Scene *scene= CTX_data_scene(C);
 	int partype = -1;
-	char parname[32];
+	char parname[MAX_ID_NAME], childname[MAX_ID_NAME];
 
 	partype= RNA_enum_get(op->ptr, "type");
 	RNA_string_get(op->ptr, "parent", parname);
 	par= (Object *)find_id("OB", parname);
+	RNA_string_get(op->ptr, "child", childname);
+	ob= (Object *)find_id("OB", childname);
 
-	ED_object_parent_set(C, op, par, partype);
+	ED_object_parent_set(op->reports, bmain, scene, ob, par, partype);
+
+	DAG_scene_sort(bmain, scene);
+	DAG_ids_flush_update(bmain, 0);
+	WM_event_add_notifier(C, NC_OBJECT|ND_TRANSFORM, NULL);
+	WM_event_add_notifier(C, NC_OBJECT|ND_PARENT, NULL);
 
 	return OPERATOR_FINISHED;
 }
@@ -1482,6 +1491,7 @@ static int parent_drop_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	Object *ob= NULL;
 	SpaceOops *soops= CTX_wm_space_outliner(C);
 	ARegion *ar= CTX_wm_region(C);
+	Main *bmain= CTX_data_main(C);
 	Scene *scene= CTX_data_scene(C);
 	TreeElement *te= NULL;
 	TreeElement *te_found= NULL;
@@ -1519,7 +1529,12 @@ static int parent_drop_invoke(bContext *C, wmOperator *op, wmEvent *event)
 			ED_base_object_select(object_in_scene(ob, scene), BA_SELECT);
 		
 		if ((par->type != OB_ARMATURE) && (par->type != OB_CURVE) && (par->type != OB_LATTICE)) {
-			ED_object_parent_set(C, op, par, partype);
+			if (ED_object_parent_set(op->reports, bmain, scene, ob, par, partype)) {
+				DAG_scene_sort(bmain, scene);
+				DAG_ids_flush_update(bmain, 0);
+				WM_event_add_notifier(C, NC_OBJECT|ND_TRANSFORM, NULL);
+				WM_event_add_notifier(C, NC_OBJECT|ND_PARENT, NULL);
+			}
 		}
 		else {
 			/* Menu creation */

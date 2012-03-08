@@ -423,7 +423,7 @@ static void fluid_init_all_channels(bContext *C, Object *UNUSED(fsDomain), Fluid
 		
 		eval_time = domainSettings->bakeStart + i;
 		
-		/* XXX: This can't be used due to an anim sys optimisation that ignores recalc object animation,
+		/* XXX: This can't be used due to an anim sys optimization that ignores recalc object animation,
 		 * leaving it for the depgraph (this ignores object animation such as modifier properties though... :/ )
 		 * --> BKE_animsys_evaluate_all_animation(G.main, eval_time);
 		 * This doesn't work with drivers:
@@ -804,7 +804,7 @@ int runSimulationCallback(void *data, int status, int frame)
 		//printf("elbeem blender cb s%d, f%d, domainid:%d noOfFrames: %d \n", status,frame, settings->domainId, settings->noOfFrames ); // DEBUG
 	}
 	
-	if (fluidbake_breakjob(fb))  {
+	if (fluidbake_breakjob(fb)) {
 		return FLUIDSIM_CBRET_ABORT;
 	}
 	
@@ -860,8 +860,7 @@ static void fluidsim_delete_until_lastframe(FluidsimSettings *fss, const char *r
 
 		curFrame++;
 
-		if((exists = BLI_exists(targetFile)))
-		{
+		if ((exists = BLI_exists(targetFile))) {
 			BLI_delete(targetFile, 0, 0);
 			BLI_delete(targetFileVel, 0, 0);
 			BLI_delete(previewFile, 0, 0);
@@ -975,7 +974,7 @@ static int fluidsimBake(bContext *C, ReportList *reports, Object *fsDomain, shor
 	channels->length = scene->r.efra;
 	channels->aniFrameTime = (domainSettings->animEnd - domainSettings->animStart)/(double)noFrames;
 	
-	/* ******** initialise and allocate animation channels ******** */
+	/* ******** initialize and allocate animation channels ******** */
 	fluid_init_all_channels(C, fsDomain, domainSettings, channels, fobjects);
 
 	/* reset to original current frame */

@@ -254,11 +254,13 @@ if(APPLE)
 		"Choose the minimum OSX version required: 10.4 or 10.5"
 		FORCE)
 	endif()
-	if(${CMAKE_GENERATOR} MATCHES "Xcode" AND (${XCODE_VERSION} VERSION_EQUAL 4 OR ${XCODE_VERSION} VERSION_GREATER 4))
-		# Xcode 4 defaults to the Apple LLVM Compiler.
-		# Override the default compiler selection because Blender only compiles with gcc
-		set(CMAKE_XCODE_ATTRIBUTE_GCC_VERSION "com.apple.compilers.llvmgcc42")
-		message(STATUS "Setting compiler to: " ${CMAKE_XCODE_ATTRIBUTE_GCC_VERSION})
+	if(${CMAKE_GENERATOR} MATCHES "Xcode")
+		if(${XCODE_VERSION} VERSION_EQUAL 4 OR ${XCODE_VERSION} VERSION_GREATER 4)
+			# Xcode 4 defaults to the Apple LLVM Compiler.
+			# Override the default compiler selection because Blender only compiles with gcc
+			set(CMAKE_XCODE_ATTRIBUTE_GCC_VERSION "com.apple.compilers.llvmgcc42")
+			message(STATUS "Setting compiler to: " ${CMAKE_XCODE_ATTRIBUTE_GCC_VERSION})
+		endif()
 	endif()
 	option(WITH_COCOA	  "Use Cocoa framework instead of deprecated Carbon" ON)
 	option(USE_QTKIT	  "Use QtKit instead of Carbon quicktime (needed for having partial quicktime for 64bit)" OFF)
@@ -1031,8 +1033,8 @@ elseif(WIN32)
 		if(WITH_BOOST)
 			set(BOOST ${LIBDIR}/boost)
 			set(BOOST_INCLUDE_DIR ${BOOST}/include)
-			set(BOOST_POSTFIX "mgw45-mt-s-1_47")
-			set(BOOST_DEBUG_POSTFIX "mgw45-mt-sd-1_47")
+			set(BOOST_POSTFIX "mgw46-mt-s-1_47")
+			set(BOOST_DEBUG_POSTFIX "mgw46-mt-sd-1_47")
 			set(BOOST_LIBRARIES
 				optimized boost_date_time-${BOOST_POSTFIX} boost_filesystem-${BOOST_POSTFIX}
 				boost_regex-${BOOST_POSTFIX} boost_system-${BOOST_POSTFIX} boost_thread-${BOOST_POSTFIX}
@@ -1511,9 +1513,9 @@ if(MSVC10)
 endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-	if(WITH_IK_ITASC)
-		message(WARNING "Using Clang as CXX compiler: disabling WITH_IK_ITASC and WITH_MOD_FLUID, these features will be missing.")
-		set(WITH_IK_ITASC OFF)
+	if(WITH_LIBMV)
+		message(WARNING "Using Clang as CXX compiler: disabling WITH_LIBMV, this feature will be missing.")
+		set(WITH_LIBMV OFF)
 	endif()
 endif()
 

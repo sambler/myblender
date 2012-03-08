@@ -257,7 +257,7 @@ int EXPP_FloatsAreEqual(float af, float bf, int maxDiff)
 }
 
 /*---------------------- EXPP_VectorsAreEqual -------------------------
-  Builds on EXPP_FloatsAreEqual to test vectors */
+ * Builds on EXPP_FloatsAreEqual to test vectors */
 int EXPP_VectorsAreEqual(float *vecA, float *vecB, int size, int floatSteps)
 {
 	int x;
@@ -304,8 +304,9 @@ int Mathutils_RegisterCallback(Mathutils_Callback *cb)
 int _BaseMathObject_ReadCallback(BaseMathObject *self)
 {
 	Mathutils_Callback *cb = mathutils_callbacks[self->cb_type];
-	if (cb->get(self, self->cb_subtype) != -1)
+	if (LIKELY(cb->get(self, self->cb_subtype) != -1)) {
 		return 0;
+	}
 
 	if (!PyErr_Occurred()) {
 		PyErr_Format(PyExc_RuntimeError,
@@ -318,8 +319,9 @@ int _BaseMathObject_ReadCallback(BaseMathObject *self)
 int _BaseMathObject_WriteCallback(BaseMathObject *self)
 {
 	Mathutils_Callback *cb = mathutils_callbacks[self->cb_type];
-	if (cb->set(self, self->cb_subtype) != -1)
+	if (LIKELY(cb->set(self, self->cb_subtype) != -1)) {
 		return 0;
+	}
 
 	if (!PyErr_Occurred()) {
 		PyErr_Format(PyExc_RuntimeError,
@@ -332,8 +334,9 @@ int _BaseMathObject_WriteCallback(BaseMathObject *self)
 int _BaseMathObject_ReadIndexCallback(BaseMathObject *self, int index)
 {
 	Mathutils_Callback *cb = mathutils_callbacks[self->cb_type];
-	if (cb->get_index(self, self->cb_subtype, index) != -1)
+	if (LIKELY(cb->get_index(self, self->cb_subtype, index) != -1)) {
 		return 0;
+	}
 
 	if (!PyErr_Occurred()) {
 		PyErr_Format(PyExc_RuntimeError,
@@ -346,8 +349,9 @@ int _BaseMathObject_ReadIndexCallback(BaseMathObject *self, int index)
 int _BaseMathObject_WriteIndexCallback(BaseMathObject *self, int index)
 {
 	Mathutils_Callback *cb = mathutils_callbacks[self->cb_type];
-	if (cb->set_index(self, self->cb_subtype, index) != -1)
+	if (LIKELY(cb->set_index(self, self->cb_subtype, index) != -1)) {
 		return 0;
+	}
 
 	if (!PyErr_Occurred()) {
 		PyErr_Format(PyExc_RuntimeError,
@@ -358,7 +362,7 @@ int _BaseMathObject_WriteIndexCallback(BaseMathObject *self, int index)
 }
 
 /* BaseMathObject generic functions for all mathutils types */
-char BaseMathObject_owner_doc[] = "The item this is wrapping or None  (readonly).";
+char BaseMathObject_owner_doc[] = "The item this is wrapping or None  (read-only).";
 PyObject *BaseMathObject_owner_get(BaseMathObject *self, void *UNUSED(closure))
 {
 	PyObject *ret = self->cb_user ? self->cb_user : Py_None;
@@ -366,7 +370,7 @@ PyObject *BaseMathObject_owner_get(BaseMathObject *self, void *UNUSED(closure))
 	return ret;
 }
 
-char BaseMathObject_is_wrapped_doc[] = "True when this object wraps external data (readonly).\n\n:type: boolean";
+char BaseMathObject_is_wrapped_doc[] = "True when this object wraps external data (read-only).\n\n:type: boolean";
 PyObject *BaseMathObject_is_wrapped_get(BaseMathObject *self, void *UNUSED(closure))
 {
 	return PyBool_FromLong((self->wrapped == Py_WRAP) ? 1:0);

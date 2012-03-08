@@ -114,7 +114,7 @@ class SCA_Joystick
 	void DestroyJoystickDevice(void);
 
 	/**
-	 * fills the axis mnember values 
+	 * fills the axis member values
 	 */
 	void pFillButtons(void);
 
@@ -193,9 +193,6 @@ public:
 	 */
 	int Connected(void);
 };
-#ifdef WITH_SDL
-void Joystick_HandleEvents( void );
-#endif
 
 #endif
 

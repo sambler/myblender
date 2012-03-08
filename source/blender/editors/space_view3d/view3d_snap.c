@@ -102,7 +102,7 @@ static void special_transvert_update(Object *obedit)
 		
 		if (obedit->type==OB_MESH) {
 			Mesh *me= obedit->data;
-			BM_mesh_normals_update(me->edit_btmesh->bm);	// does face centers too
+			BM_mesh_normals_update(me->edit_btmesh->bm, TRUE);	// does face centers too
 		}
 		else if (ELEM(obedit->type, OB_CURVE, OB_SURF)) {
 			Curve *cu= obedit->data;
@@ -285,7 +285,7 @@ static void make_trans_verts(Object *obedit, float *min, float *max, int mode)
 			BM_ITER(eve, &iter, bm, BM_VERTS_OF_MESH, NULL)
 				if (BM_elem_index_get(eve)) tottrans++;
 		}
-		/* for any of the 3 loops above which all dirty the indicies */
+		/* for any of the 3 loops above which all dirty the indices */
 		bm->elem_index_dirty |= BM_VERT;
 		
 		/* and now make transverts */
@@ -982,7 +982,7 @@ static int snap_curs_to_active(bContext *C, wmOperator *UNUSED(op))
 	
 	curs = give_cursor(scene, v3d);
 
-	if (obedit)  {
+	if (obedit) {
 		if (obedit->type == OB_MESH) {
 			/* check active */
 			Mesh *me= obedit->data;

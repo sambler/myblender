@@ -248,7 +248,7 @@ void item_rename_cb(bContext *C, Scene *UNUSED(scene), TreeElement *te, TreeStor
 {
 	ARegion *ar= CTX_wm_region(C);
 	ReportList *reports= CTX_wm_reports(C); // XXX
-	do_item_rename(ar, te, tselem, reports) ;
+	do_item_rename(ar, te, tselem, reports);
 }
 
 static int do_outliner_item_rename(bContext *C, ARegion *ar, SpaceOops *soops, TreeElement *te, const float mval[2])
@@ -261,7 +261,7 @@ static int do_outliner_item_rename(bContext *C, ARegion *ar, SpaceOops *soops, T
 		/* name and first icon */
 		if(mval[0]>te->xs+UI_UNIT_X && mval[0]<te->xend) {
 			
-			do_item_rename(ar, te, tselem, reports) ;
+			do_item_rename(ar, te, tselem, reports);
 		}
 		return 1;
 	}
@@ -978,7 +978,7 @@ static void tree_element_to_path(SpaceOops *soops, TreeElement *te, TreeStoreEle
 	PropertyRNA *prop;
 	char *newpath=NULL;
 	
-	/* optimise tricks:
+	/* optimize tricks:
 	 *	- Don't do anything if the selected item is a 'struct', but arrays are allowed
 	 */
 	if (tselem->type == TSE_RNA_STRUCT)
@@ -1128,7 +1128,7 @@ static void do_outliner_drivers_editop(SpaceOops *soops, ListBase *tree, ReportL
 			short flag= 0;
 			short groupmode= KSP_GROUP_KSNAME;
 			
-			/* check if RNA-property described by this selected element is an animateable prop */
+			/* check if RNA-property described by this selected element is an animatable prop */
 			if (ELEM(tselem->type, TSE_RNA_PROPERTY, TSE_RNA_ARRAY_ELEM) && RNA_property_animateable(&te->rnaptr, te->directdata)) {
 				/* get id + path + index info from the selected element */
 				tree_element_to_path(soops, te, tselem, 
@@ -1307,7 +1307,7 @@ static void do_outliner_keyingset_editop(SpaceOops *soops, KeyingSet *ks, ListBa
 			short flag= 0;
 			short groupmode= KSP_GROUP_KSNAME;
 			
-			/* check if RNA-property described by this selected element is an animateable prop */
+			/* check if RNA-property described by this selected element is an animatable prop */
 			if (ELEM(tselem->type, TSE_RNA_PROPERTY, TSE_RNA_ARRAY_ELEM) && RNA_property_animateable(&te->rnaptr, te->directdata)) {
 				/* get id + path + index info from the selected element */
 				tree_element_to_path(soops, te, tselem, 

@@ -71,17 +71,15 @@ SK_Sketch* createSketch(void)
 	return sketch;
 }
 
-void sk_initPoint(SK_Point *pt, SK_DrawData *dd, float *no)
+void sk_initPoint(SK_Point *pt, SK_DrawData *dd, const float no[3])
 {
-	if (no)
-	{
+	if (no) {
 		normalize_v3_v3(pt->no, no);
 	}
-	else
-	{
-		pt->no[0] = 0;
-		pt->no[1] = 0;
-		pt->no[2] = 1;
+	else {
+		pt->no[0] = 0.0f;
+		pt->no[1] = 0.0f;
+		pt->no[2] = 1.0f;
 	}
 	pt->p2d[0] = dd->mval[0];
 	pt->p2d[1] = dd->mval[1];
@@ -576,15 +574,13 @@ void sk_selectAllSketch(SK_Sketch *sketch, int mode)
 			stk->selected = 0;
 		}
 	}
-	else if (mode == 0)
-	{
+	else if (mode == 0) {
 		for (stk = sketch->strokes.first; stk; stk = stk->next)
 		{
 			stk->selected = 1;
 		}
 	}
-	else if (mode == 1)
-	{
+	else if (mode == 1) {
 		int selected = 1;
 
 		for (stk = sketch->strokes.first; stk; stk = stk->next)

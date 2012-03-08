@@ -286,7 +286,7 @@ NlaStrip *add_nlastrip (bAction *act)
 	 *	- selected flag to highlight this to the user
 	 *	- auto-blends to ensure that blend in/out values are automatically 
 	 *	  determined by overlaps of strips
-	 *	- (XXX) synchronisation of strip-length in accordance with changes to action-length
+	 *	- (XXX) synchronization of strip-length in accordance with changes to action-length
 	 *	  is not done though, since this should only really happens in editmode for strips now
 	 *	  though this decision is still subject to further review...
 	 */
@@ -352,8 +352,7 @@ NlaStrip *add_nla_soundstrip (Scene *scene, Speaker *speaker)
 	 * otherwise default to length of 10 frames
 	 */
 #ifdef WITH_AUDASPACE
-	if (speaker->sound) 
-	{
+	if (speaker->sound) {
 		AUD_SoundInfo info = AUD_getInfo(speaker->sound->playback_handle);
 		
 		strip->end = (float)ceil((double)info.length * FPS);
@@ -778,7 +777,7 @@ short BKE_nlameta_add_strip (NlaStrip *mstrip, NlaStrip *strip)
 		return 0;
 		
 	/* check if this would need to be added to the ends of the meta,
-	 * and subsequently, if the neighbouring strips allow us enough room
+	 * and subsequently, if the neighboring strips allow us enough room
 	 */
 	if (strip->start < mstrip->start) {
 		/* check if strip to the left (if it exists) ends before the 
@@ -841,7 +840,7 @@ void BKE_nlameta_flush_transforms (NlaStrip *mstrip)
 	oEnd= ((NlaStrip *)mstrip->strips.last)->end;
 	offset= mstrip->start - oStart;
 	
-	/* optimisation:
+	/* optimization:
 	 * don't flush if nothing changed yet
 	 *	TODO: maybe we need a flag to say always flush?
 	 */
@@ -1018,7 +1017,7 @@ short BKE_nlatrack_get_bounds (NlaTrack *nlt, float bounds[2])
 {
 	NlaStrip *strip;
 	
-	/* initialise bounds */
+	/* initialize bounds */
 	if (bounds)
 		bounds[0] = bounds[1] = 0.0f;
 	else
@@ -1073,7 +1072,7 @@ void BKE_nlastrip_set_active (AnimData *adt, NlaStrip *strip)
 	
 	/* loop over tracks, deactivating*/
 	for (nlt= adt->nla_tracks.first; nlt; nlt= nlt->next) {
-		for (nls= nlt->strips.first; nls; nls= nls->next)  {
+		for (nls= nlt->strips.first; nls; nls= nls->next) {
 			if (nls != strip)
 				nls->flag &= ~NLASTRIP_FLAG_ACTIVE;
 			else
@@ -1235,7 +1234,7 @@ void BKE_nlastrip_validate_fcurves (NlaStrip *strip)
 			/* store path - make copy, and store that */
 			fcu->rna_path= BLI_strdupn("influence", 9);
 			
-			// TODO: insert a few keyframes to ensure default behaviour?
+			// TODO: insert a few keyframes to ensure default behavior?
 		}
 	}
 	
@@ -1256,7 +1255,7 @@ void BKE_nlastrip_validate_fcurves (NlaStrip *strip)
 			/* store path - make copy, and store that */
 			fcu->rna_path= BLI_strdupn("strip_time", 10);
 			
-			// TODO: insert a few keyframes to ensure default behaviour?
+			// TODO: insert a few keyframes to ensure default behavior?
 		}
 	}
 }
@@ -1395,8 +1394,7 @@ static void BKE_nlastrip_validate_autoblends (NlaTrack *nlt, NlaStrip *nls)
 	 *	  is directly followed/preceeded by another strip, forming an 
 	 *	  'island' of continuous strips
 	 */
-	if ( (ps || ns) && ((nls->prev == NULL) || IS_EQF(nls->prev->end, nls->start)==0) )
-	{
+	if ((ps || ns) && ((nls->prev == NULL) || IS_EQF(nls->prev->end, nls->start)==0)) {
 		/* start overlaps - pick the largest overlap */
 		if ( ((ps && ns) && (*ps > *ns)) || (ps) )
 			nls->blendin= *ps - nls->start;
@@ -1406,8 +1404,7 @@ static void BKE_nlastrip_validate_autoblends (NlaTrack *nlt, NlaStrip *nls)
 	else /* no overlap allowed/needed */
 		nls->blendin= 0.0f;
 		
-	if ( (pe || ne) && ((nls->next == NULL) || IS_EQF(nls->next->start, nls->end)==0) )
-	{
+	if ((pe || ne) && ((nls->next == NULL) || IS_EQF(nls->next->start, nls->end)==0)) {
 		/* end overlaps - pick the largest overlap */
 		if ( ((pe && ne) && (*pe > *ne)) || (pe) )
 			nls->blendout= nls->end - *pe;

@@ -40,6 +40,7 @@
 #endif
 
 struct DerivedMesh;
+struct DMFlagMat;
 struct DMGridData;
 struct GHash;
 struct DMGridData;
@@ -132,7 +133,6 @@ void GPU_uv_setup( struct DerivedMesh *dm );
 void GPU_color_setup( struct DerivedMesh *dm );
 void GPU_edge_setup( struct DerivedMesh *dm );	/* does not mix with other data */
 void GPU_uvedge_setup( struct DerivedMesh *dm );
-void GPU_interleaved_setup( GPUBuffer *buffer, int data[] );
 int GPU_attrib_element_size( GPUAttrib data[], int numdata );
 void GPU_interleaved_attrib_setup( GPUBuffer *buffer, GPUAttrib data[], int numdata );
 
@@ -143,8 +143,6 @@ void GPU_buffer_unlock( GPUBuffer *buffer );
 
 /* upload three unsigned chars, representing RGB colors, for each vertex. Resets dm->drawObject->colType to -1 */
 void GPU_color3_upload( struct DerivedMesh *dm, unsigned char *data );
-/* upload four unsigned chars, representing RGBA colors, for each vertex. Resets dm->drawObject->colType to -1 */
-void GPU_color4_upload( struct DerivedMesh *dm, unsigned char *data );
 /* switch color rendering on=1/off=0 */
 void GPU_color_switch( int mode );
 
@@ -164,14 +162,15 @@ GPU_Buffers *GPU_build_mesh_buffers(int (*face_vert_indices)[4],
 			struct MFace *mface, int *face_indices, int totface);
 
 void GPU_update_mesh_buffers(GPU_Buffers *buffers, struct MVert *mvert,
-			int *vert_indices, int totvert, int smooth);
+			int *vert_indices, int totvert);
 
 GPU_Buffers *GPU_build_grid_buffers(int totgrid, int gridsize);
 
 void GPU_update_grid_buffers(GPU_Buffers *buffers, struct DMGridData **grids,
-	int *grid_indices, int totgrid, int gridsize, int smooth);
+							 const struct DMFlagMat *grid_flag_mats,
+							 int *grid_indices, int totgrid, int gridsize);
 
-void GPU_draw_buffers(GPU_Buffers *buffers);
+void GPU_draw_buffers(GPU_Buffers *buffers, DMSetMaterial setMaterial);
 
 void GPU_free_buffers(GPU_Buffers *buffers);
 

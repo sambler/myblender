@@ -194,7 +194,7 @@ static void copy_bonechildren(Bone* newBone, Bone* oldBone, Bone* actBone, Bone 
 
 	/* For each child in the list, update it's children */
 	newChildBone = newBone->childbase.first;
-	for (curBone = oldBone->childbase.first; curBone; curBone = curBone->next){
+	for (curBone = oldBone->childbase.first; curBone; curBone = curBone->next) {
 		newChildBone->parent = newBone;
 		copy_bonechildren(newChildBone, curBone, actBone, newActBone);
 		newChildBone = newChildBone->next;
@@ -642,7 +642,7 @@ static void pchan_b_bone_defmats(bPoseChannel *pchan, bPoseChanDeform *pdef_info
 	}
 }
 
-static void b_bone_deform(bPoseChanDeform *pdef_info, Bone *bone, float *co, DualQuat *dq, float defmat[][3])
+static void b_bone_deform(bPoseChanDeform *pdef_info, Bone *bone, float co[3], DualQuat *dq, float defmat[][3])
 {
 	Mat4 *b_bone = pdef_info->b_bone_mats;
 	float (*mat)[4] = b_bone[0].mat;
@@ -666,8 +666,9 @@ static void b_bone_deform(bPoseChanDeform *pdef_info, Bone *bone, float *co, Dua
 	else {
 		mul_m4_v3(b_bone[a+1].mat, co);
 
-		if (defmat)
+		if (defmat) {
 			copy_m3_m4(defmat, b_bone[a+1].mat);
+		}
 	}
 }
 
@@ -736,7 +737,7 @@ static void pchan_deform_mat_add(bPoseChannel *pchan, float weight, float bbonem
 	add_m3_m3m3(mat, mat, wmat);
 }
 
-static float dist_bone_deform(bPoseChannel *pchan, bPoseChanDeform *pdef_info, float *vec, DualQuat *dq,
+static float dist_bone_deform(bPoseChannel *pchan, bPoseChanDeform *pdef_info, float vec[3], DualQuat *dq,
                               float mat[][3], float *co)
 {
 	Bone *bone = pchan->bone;
@@ -783,7 +784,7 @@ static float dist_bone_deform(bPoseChannel *pchan, bPoseChanDeform *pdef_info, f
 	return contrib;
 }
 
-static void pchan_bone_deform(bPoseChannel *pchan, bPoseChanDeform *pdef_info, float weight, float *vec, DualQuat *dq,
+static void pchan_bone_deform(bPoseChannel *pchan, bPoseChanDeform *pdef_info, float weight, float vec[3], DualQuat *dq,
                               float mat[][3], float *co, float *contrib)
 {
 	float cop[3], bbonemat[3][3];
@@ -1113,10 +1114,10 @@ void armature_mat_world_to_pose(Object *ob, float inmat[][4], float outmat[][4])
 	mult_m4_m4m4(outmat, inmat, obmat);
 }
 
-/* Convert Wolrd-Space Location to Pose-Space Location
+/* Convert World-Space Location to Pose-Space Location
  * NOTE: this cannot be used to convert to pose-space location of the supplied
  *       pose-channel into its local space (i.e. 'visual'-keyframing) */
-void armature_loc_world_to_pose(Object *ob, float *inloc, float *outloc)
+void armature_loc_world_to_pose(Object *ob, const float inloc[3], float outloc[3])
 {
 	float xLocMat[4][4] = MAT4_UNITY;
 	float nLocMat[4][4];
@@ -1338,7 +1339,7 @@ void armature_mat_bone_to_pose(bPoseChannel *pchan, float inmat[][4], float outm
 /* Convert Pose-Space Location to Bone-Space Location
  * NOTE: this cannot be used to convert to pose-space location of the supplied
  *       pose-channel into its local space (i.e. 'visual'-keyframing) */
-void armature_loc_pose_to_bone(bPoseChannel *pchan, float *inloc, float *outloc)
+void armature_loc_pose_to_bone(bPoseChannel *pchan, const float inloc[3], float outloc[3])
 {
 	float xLocMat[4][4] = MAT4_UNITY;
 	float nLocMat[4][4];
@@ -1478,7 +1479,7 @@ void BKE_rotMode_change_values (float quat[4], float eul[3], float axis[3], floa
  * *************************************************************************** */
 /* Computes vector and roll based on a rotation.
  * "mat" must contain only a rotation, and no scaling. */
-void mat3_to_vec_roll(float mat[][3], float *vec, float *roll)
+void mat3_to_vec_roll(float mat[][3], float vec[3], float *roll)
 {
 	if (vec)
 		copy_v3_v3(vec, mat[1]);
@@ -1496,7 +1497,7 @@ void mat3_to_vec_roll(float mat[][3], float *vec, float *roll)
 
 /* Calculates the rest matrix of a bone based
  * On its vector and a roll around that vector */
-void vec_roll_to_mat3(float *vec, float roll, float mat[][3])
+void vec_roll_to_mat3(const float vec[3], const float roll, float mat[][3])
 {
 	float nor[3], axis[3], target[3] = {0, 1, 0};
 	float theta;
@@ -1583,7 +1584,7 @@ void where_is_armature_bone(Bone *bone, Bone *prevbone)
 }
 
 /* updates vectors and matrices on rest-position level, only needed
-   after editing armature itself, now only on reading file */
+ * after editing armature itself, now only on reading file */
 void where_is_armature(bArmature *arm)
 {
 	Bone *bone;
@@ -1900,7 +1901,7 @@ static void splineik_init_tree_from_pchan(Scene *scene, Object *UNUSED(ob), bPos
 		 * proportion of the total length that each bone occupies
 		 */
 		for (i = 0; i < segcount; i++) {
-			/* 'head' joints, travelling towards the root of the chain
+			/* 'head' joints, traveling towards the root of the chain
 			 *  - 2 methods; the one chosen depends on whether we've got usable lengths
 			 */
 			if ((ikData->flag & CONSTRAINT_SPLINEIK_EVENSPLITS) || (totLength == 0.0f)) {
@@ -2077,14 +2078,14 @@ static void splineik_evaluate_bone(tSplineIK_Tree *tree, Scene *scene, Object *o
 		float raxis[3], rangle;
 
 		/* compute the raw rotation matrix from the bone's current matrix by extracting only the
-		 * orientation-relevant axes, and normalising them
+		 * orientation-relevant axes, and normalizing them
 		 */
 		copy_v3_v3(rmat[0], pchan->pose_mat[0]);
 		copy_v3_v3(rmat[1], pchan->pose_mat[1]);
 		copy_v3_v3(rmat[2], pchan->pose_mat[2]);
 		normalize_m3(rmat);
 
-		/* also, normalise the orientation imposed by the bone, now that we've extracted the scale factor */
+		/* also, normalize the orientation imposed by the bone, now that we've extracted the scale factor */
 		normalize_v3(splineVec);
 
 		/* calculate smallest axis-angle rotation necessary for getting from the
@@ -2254,7 +2255,7 @@ void pchan_to_mat4(bPoseChannel *pchan, float chan_mat[4][4])
 		/* quats are normalised before use to eliminate scaling issues */
 		float quat[4];
 
-		/* NOTE: we now don't normalise the stored values anymore, since this was kindof evil in some cases
+		/* NOTE: we now don't normalize the stored values anymore, since this was kindof evil in some cases
 		 * but if this proves to be too problematic, switch back to the old system of operating directly on
 		 * the stored copy
 		 */

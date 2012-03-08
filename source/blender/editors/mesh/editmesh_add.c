@@ -379,7 +379,7 @@ static int add_primitive_cone_exec(bContext *C, wmOperator *op)
 	
 	make_prim_finish(C, &state, enter_editmode);
 
-	return OPERATOR_FINISHED;	
+	return OPERATOR_FINISHED;
 }
 
 void MESH_OT_primitive_cone_add(wmOperatorType *ot)
@@ -388,7 +388,7 @@ void MESH_OT_primitive_cone_add(wmOperatorType *ot)
 
 	/* identifiers */
 	ot->name= "Add Cone";
-	ot->description= "Construct a conic mesh (ends filled)";
+	ot->description= "Construct a conic mesh";
 	ot->idname= "MESH_OT_primitive_cone_add";
 	
 	/* api callbacks */
@@ -533,7 +533,7 @@ static int add_primitive_uvsphere_exec(bContext *C, wmOperator *op)
 
 	if (!EDBM_CallAndSelectOpf(em, op, "vertout",
 	                           "create_uvsphere segments=%i revolutions=%i diameter=%f mat=%m4",
-	                           RNA_int_get(op->ptr, "ring_count"), RNA_int_get(op->ptr, "segments"),
+	                           RNA_int_get(op->ptr, "segments"), RNA_int_get(op->ptr, "ring_count"),
 	                           RNA_float_get(op->ptr,"size"), mat))
 	{
 		return OPERATOR_CANCELLED;

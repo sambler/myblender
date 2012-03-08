@@ -278,7 +278,7 @@ void tex_space_mball(Object *ob)
 		min[0] = min[1] = min[2] = -1.0f;
 		max[0] = max[1] = max[2] = 1.0f;
 	}
-	/*
+#if 0
 	loc[0]= (min[0]+max[0])/2.0f;
 	loc[1]= (min[1]+max[1])/2.0f;
 	loc[2]= (min[2]+max[2])/2.0f;
@@ -286,7 +286,7 @@ void tex_space_mball(Object *ob)
 	size[0]= (max[0]-min[0])/2.0f;
 	size[1]= (max[1]-min[1])/2.0f;
 	size[2]= (max[2]-min[2])/2.0f;
-	*/
+#endif
 	boundbox_set_from_min_max(bb, min, max);
 }
 
@@ -485,7 +485,7 @@ Object *find_basis_mball(Scene *scene, Object *basis)
  * "An Implicit Surface Polygonizer"
  * by Jules Bloomenthal, jbloom@beauty.gmu.edu
  * in "Graphics Gems IV", Academic Press, 1994
-
+ *
  * Authored by Jules Bloomenthal, Xerox PARC.
  * Copyright (c) Xerox Corporation, 1991.  All rights reserved.
  * Permission is granted to reproduce, use and distribute this code for
@@ -522,7 +522,7 @@ Object *find_basis_mball(Scene *scene, Object *basis)
 
 /* **************** POLYGONIZATION ************************ */
 
-void calc_mballco(MetaElem *ml, float *vec)
+void calc_mballco(MetaElem *ml, float vec[3])
 {
 	if (ml->mat) {
 		mul_m4_v3((float ( * )[4])ml->mat, vec);
@@ -949,7 +949,7 @@ void testface(int i, int j, int k, CUBE* old, int bit, int c1, int c2, int c3, i
 }
 
 /* setcorner: return corner with the given lattice location
-   set (and cache) its function value */
+ * set (and cache) its function value */
 
 CORNER *setcorner (PROCESS* p, int i, int j, int k)
 {
@@ -1753,7 +1753,7 @@ float init_meta(Scene *scene, Object *ob)	/* return totsize */
 					}
 
 					/* create "new" bb, only point 0 and 6, which are
-					 * neccesary for octal tree filling */
+					 * necessary for octal tree filling */
 					mainb[a]->bb->vec[0][0] = min_x - ml->rad;
 					mainb[a]->bb->vec[0][1] = min_y - ml->rad;
 					mainb[a]->bb->vec[0][2] = min_z - ml->rad;
@@ -2282,3 +2282,54 @@ void metaball_polygonize(Scene *scene, Object *ob, ListBase *dispbase)
 	freepolygonize(&mbproc);
 }
 
+/* basic vertex data functions */
+int BKE_metaball_minmax(MetaBall *mb, float min[3], float max[3])
+{
+	MetaElem *ml;
+
+	INIT_MINMAX(min, max);
+
+	for (ml = mb->elems.first; ml; ml = ml->next) {
+		DO_MINMAX(&ml->x, min, max);
+	}
+
+	return (mb->elems.first != NULL);
+}
+
+int BKE_metaball_center_median(MetaBall *mb, float cent[3])
+{
+	MetaElem *ml;
+	int total= 0;
+
+	zero_v3(cent);
+
+	for (ml = mb->elems.first; ml; ml = ml->next) {
+		add_v3_v3(cent, &ml->x);
+	}
+
+	if (total)
+		mul_v3_fl(cent, 1.0f/(float)total);
+
+	return (total != 0);
+}
+
+int BKE_metaball_center_bounds(MetaBall *mb, float cent[3])
+{
+	float min[3], max[3];
+
+	if (BKE_metaball_minmax(mb, min, max)) {
+		mid_v3_v3v3(cent, min, max);
+		return 1;
+	}
+
+	return 0;
+}
+
+void BKE_metaball_translate(MetaBall *mb, float offset[3])
+{
+	MetaElem *ml;
+
+	for (ml = mb->elems.first; ml; ml = ml->next) {
+		add_v3_v3(&ml->x, offset);
+	}
+}

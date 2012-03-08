@@ -120,10 +120,10 @@ static struct bUnitDef buMetricLenDef[] = {
 
 	/* These get displayed because of float precision problems in the transform header,
 	 * could work around, but for now probably people wont use these */
-	/*
+#if 0
 	{"nanometer", "Nanometers",		"nm", NULL,	0.000000001, 0.0,	B_UNIT_DEF_NONE},
 	{"picometer", "Picometers",		"pm", NULL,	0.000000000001, 0.0,B_UNIT_DEF_NONE},
-	*/
+#endif
 	{NULL, NULL, NULL,	NULL, NULL, 0.0, 0.0}
 };
 static struct bUnitCollection buMetricLenCollecton = {buMetricLenDef, 3, 0, sizeof(buMetricLenDef)/sizeof(bUnitDef)};
@@ -689,8 +689,7 @@ void bUnit_ToUnitAltName(char *str, int len_max, const char *orig_str, int syste
 
 	/* find and substitute all units */
 	for (unit= usys->units; unit->name; unit++) {
-		if (len_max > 0 && (unit->name_alt || unit == unit_def))
-		{
+		if (len_max > 0 && (unit->name_alt || unit == unit_def)) {
 			const char *found= unit_find_str(orig_str, unit->name_short);
 			if (found) {
 				int offset= (int)(found - orig_str);

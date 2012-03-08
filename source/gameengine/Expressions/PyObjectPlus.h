@@ -56,13 +56,6 @@ extern "C" {
 
 #define MAX_PROP_NAME 64
 
-static inline void Py_Fatal(const char *M)
-{
-	fprintf(stderr, "%s\n", M);
-	exit(-1);
-};
-
-
 /* Use with ShowDeprecationWarning macro */
 typedef struct {
 	bool warn_done;
@@ -193,7 +186,7 @@ public:                                                                       \
 #define PY_SET_ATTR_SUCCESS		 0
 
 /**
- * These macros are helpfull when embedding Python routines. The second
+ * These macros are helpful when embedding Python routines. The second
  * macro is one that also requires a documentation string
  */
 #define KX_PYMETHOD(class_name, method_name)                                   \
@@ -647,8 +640,6 @@ public:
 };
 
 #ifdef WITH_PYTHON
-PyObject *py_getattr_dict(PyObject *pydict, PyObject *tp_dict);
-
 PyObject *PyUnicode_From_STR_String(const STR_String& str);
 #endif
 

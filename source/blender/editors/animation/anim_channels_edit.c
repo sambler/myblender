@@ -367,7 +367,7 @@ void ANIM_deselect_anim_channels (bAnimContext *ac, void *data, short datatype, 
  *	- anim_data: list of the all the anim channels that can be chosen
  *		-> filtered using ANIMFILTER_CHANNELS only, since if we took VISIBLE too,
  *		  then the channels under closed expanders get ignored...
- *	- ale_setting: the anim channel (not in the anim_data list directly, though occuring there)
+ *	- ale_setting: the anim channel (not in the anim_data list directly, though occurring there)
  *		with the new state of the setting that we want flushed up/down the hierarchy 
  *	- setting: type of setting to set
  *	- on: whether the visibility setting has been enabled or disabled 
@@ -541,8 +541,7 @@ void ANIM_fcurve_delete_from_animdata (bAnimContext *ac, AnimData *adt, FCurve *
 			/* XXX: there's a problem where many actions could build up in the file if multiple
 			 * full add/delete cycles are performed on the same objects, but assume that this is rare
 			 */
-		if ((adt->action->curves.first == NULL) && (adt->flag & ADT_NLA_EDIT_ON)==0)
-		{
+		if ((adt->action->curves.first == NULL) && (adt->flag & ADT_NLA_EDIT_ON)==0) {
 			id_us_min(&adt->action->id);
 			adt->action = NULL;
 		}
@@ -951,7 +950,7 @@ static void split_groups_action_temp (bAction *act, bActionGroup *tgrp)
 		}
 	}
 	
-	/* Initialise memory for temp-group */
+	/* Initialize memory for temp-group */
 	memset(tgrp, 0, sizeof(bActionGroup));
 	tgrp->flag |= (AGRP_EXPANDED|AGRP_TEMP);
 	BLI_strncpy(tgrp->name, "#TempGroup", sizeof(tgrp->name));
@@ -1784,7 +1783,7 @@ static int animchannels_deselectall_exec (bContext *C, wmOperator *op)
 	if (ANIM_animdata_get_context(C, &ac) == 0)
 		return OPERATOR_CANCELLED;
 		
-	/* 'standard' behaviour - check if selected, then apply relevant selection */
+	/* 'standard' behavior - check if selected, then apply relevant selection */
 	if (RNA_boolean_get(op->ptr, "invert"))
 		ANIM_deselect_anim_channels(&ac, ac.data, ac.datatype, 0, ACHANNEL_SETFLAG_TOGGLE);
 	else
@@ -1985,7 +1984,7 @@ static void rename_anim_channels (bAnimContext *ac, int channel_index)
 		if (acf->name_prop(ale, &ptr, &prop)) {
 			/* actually showing the rename textfield is done on redraw,
 			 * so here we just store the index of this channel in the 
-			 * dopesheet data, which will get utilised when drawing the
+			 * dopesheet data, which will get utilized when drawing the
 			 * channel...
 			 *
 			 * +1 factor is for backwards compat issues

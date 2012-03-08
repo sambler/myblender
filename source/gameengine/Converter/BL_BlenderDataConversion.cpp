@@ -536,8 +536,8 @@ bool ConvertMaterial(
 		int valid_index = 0;
 		
 		/* In Multitexture use the face texture if and only if
-		*  it is set in the buttons
-		*  In GLSL is not working yet :/ 3.2011 */
+		 * it is set in the buttons
+		 * In GLSL is not working yet :/ 3.2011 */
 		bool facetex = false;
 		if(validface && mat->mode &MA_FACETEXTURE) 
 			facetex = true;
@@ -784,8 +784,8 @@ bool ConvertMaterial(
 	
 	uv2[0]= uv2[1]= uv2[2]= uv2[3]= MT_Point2(0.0f, 0.0f);
 
-	/*  No material, what to do? let's see what is in the UV and set the material accordingly
-		light and visible is always on */
+	/* No material, what to do? let's see what is in the UV and set the material accordingly
+	 * light and visible is always on */
 	if( validface ) {
 		material->tile	= tface->tile;
 			
@@ -907,6 +907,7 @@ RAS_MeshObject* BL_ConvertMesh(Mesh* mesh, Object* blenderobj, KX_Scene* scene, 
 		return meshobj;
 	// Get DerivedMesh data
 	DerivedMesh *dm = CDDM_from_mesh(mesh, blenderobj);
+	DM_ensure_tessface(dm);
 
 	MVert *mvert = dm->getVertArray(dm);
 	int totvert = dm->getNumVerts(dm);
@@ -2139,7 +2140,8 @@ KX_IPhysicsController* getPhId(CListValue* sumolist,STR_String busc){//not used
 
 }
 
-KX_GameObject* getGameOb(STR_String busc,CListValue* sumolist){
+KX_GameObject* getGameOb(STR_String busc,CListValue* sumolist)
+{
 
 	for (int j=0;j<sumolist->GetCount();j++)
 	{

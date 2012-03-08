@@ -26,9 +26,9 @@
 #include "BLI_math.h"
 
 #include "bmesh.h"
-#include "bmesh_private.h"
+#include "intern/bmesh_private.h"
 
-#include "bmesh_operators_private.h" /* own include */
+#include "intern/bmesh_operators_private.h" /* own include */
 
 #define FACE_MARK	1
 #define FACE_ORIG	2
@@ -53,7 +53,7 @@ static int UNUSED_FUNCTION(check_hole_in_region)(BMesh *bm, BMFace *f)
 	for ( ; f2; f2 = BMW_step(&regwalker)) {
 		l2 = BM_iter_new(&liter2, bm, BM_LOOPS_OF_FACE, f2);
 		for ( ; l2; l2 = BM_iter_step(&liter2)) {
-			l3 = bmesh_radial_nextloop(l2);
+			l3 = l2->radial_next;
 			if ( BMO_elem_flag_test(bm, l3->f, FACE_MARK) !=
 			     BMO_elem_flag_test(bm, l2->f, FACE_MARK))
 			{
@@ -68,7 +68,7 @@ static int UNUSED_FUNCTION(check_hole_in_region)(BMesh *bm, BMFace *f)
 	return TRUE;
 }
 
-void dissolvefaces_exec(BMesh *bm, BMOperator *op)
+void bmo_dissolve_faces_exec(BMesh *bm, BMOperator *op)
 {
 	BMOIter oiter;
 	BMFace *f, *f2 /* , *nf = NULL */;
@@ -88,12 +88,7 @@ void dissolvefaces_exec(BMesh *bm, BMOperator *op)
 		BMVert *v;
 
 		BM_ITER(v, &viter, bm, BM_VERTS_OF_MESH, NULL) {
-			if (BM_vert_edge_count(v) == 2) {
-				BMO_elem_flag_disable(bm, v, VERT_MARK);
-			}
-			else {
-				BMO_elem_flag_enable(bm, v, VERT_MARK);
-			}
+			BMO_elem_flag_set(bm, v, VERT_MARK, (BM_vert_edge_count(v) != 2));
 		}
 	}
 
@@ -101,7 +96,10 @@ void dissolvefaces_exec(BMesh *bm, BMOperator *op)
 	
 	/* collect region */
 	BMO_ITER(f, &oiter, bm, op, "faces", BM_FACE) {
-		if (!BMO_elem_flag_test(bm, f, FACE_MARK)) continue;
+
+		if (!BMO_elem_flag_test(bm, f, FACE_MARK)) {
+			continue;
+		}
 
 		BLI_array_empty(faces);
 		faces = NULL; /* forces different allocatio */
@@ -170,18 +168,20 @@ void dissolvefaces_exec(BMesh *bm, BMOperator *op)
 		BM_ITER(v, &viter, bm, BM_VERTS_OF_MESH, NULL) {
 			if (BMO_elem_flag_test(bm, v, VERT_MARK)) {
 				if (BM_vert_edge_count(v) == 2) {
-					BM_vert_collapse_edge(bm, v->e, v);
+					BM_vert_collapse_edge(bm, v->e, v, TRUE);
 				}
 			}
 		}
 	}
 
-	if (BMO_error_occurred(bm)) goto cleanup;
+	if (BMO_error_occurred(bm)) {
+		goto cleanup;
+	}
 
-	BMO_slot_from_flag(bm, op, "regionout", FACE_NEW, BM_FACE);
+	BMO_slot_buffer_from_flag(bm, op, "regionout", FACE_NEW, BM_FACE);
 
 cleanup:
-	/* free/cleanu */
+	/* free/cleanup */
 	for (i = 0; i < BLI_array_count(regions); i++) {
 		if (regions[i]) MEM_freeN(regions[i]);
 	}
@@ -190,7 +190,7 @@ cleanup:
 }
 
 /* almost identical to dissolve edge, except it cleans up vertice */
-void dissolve_edgeloop_exec(BMesh *bm, BMOperator *op)
+void bmo_dissolve_edgeloop_exec(BMesh *bm, BMOperator *op)
 {
 	/* BMOperator fop; */
 	BMOIter oiter;
@@ -198,17 +198,16 @@ void dissolve_edgeloop_exec(BMesh *bm, BMOperator *op)
 	BMVert *v, **verts = NULL;
 	BLI_array_declare(verts);
 	BMEdge *e;
-	/* BMFace *f; */
+	BMFace *fa, *fb;
 	int i;
 
+
 	BMO_ITER(e, &oiter, bm, op, "edges", BM_EDGE) {
-		if (BM_edge_face_count(e) == 2) {
+		if (BM_edge_face_pair(e, &fa, &fb)) {
 			BMO_elem_flag_enable(bm, e->v1, VERT_MARK);
 			BMO_elem_flag_enable(bm, e->v2, VERT_MARK);
 
-			BM_faces_join_pair(bm, e->l->f,
-			                   e->l->radial_next->f,
-			                   e);
+			BM_faces_join_pair(bm, fa, fb, e);
 		}
 	}
 
@@ -221,13 +220,13 @@ void dissolve_edgeloop_exec(BMesh *bm, BMOperator *op)
 	/* clean up extreneous 2-valence vertice */
 	for (i = 0; i < BLI_array_count(verts); i++) {
 		if (verts[i]->e) {
-			BM_vert_collapse_edge(bm, verts[i]->e, verts[i]);
+			BM_vert_collapse_edge(bm, verts[i]->e, verts[i], TRUE);
 		}
 	}
 	
 	BLI_array_free(verts);
 
-	//BMO_op_initf(bm, &fop, "dissolvefaces faces=%ff", FACE_MARK);
+	//BMO_op_initf(bm, &fop, "dissolve_faces faces=%ff", FACE_MARK);
 	//BMO_op_exec(bm, &fop);
 
 	//BMO_slot_copy(op, &fop, "regionout", "regionout");
@@ -236,7 +235,7 @@ void dissolve_edgeloop_exec(BMesh *bm, BMOperator *op)
 }
 
 
-void dissolveedges_exec(BMesh *bm, BMOperator *op)
+void bmo_dissolve_edges_exec(BMesh *bm, BMOperator *op)
 {
 	/* might want to make this an option or mode - campbell */
 
@@ -251,23 +250,17 @@ void dissolveedges_exec(BMesh *bm, BMOperator *op)
 
 	if (use_verts) {
 		BM_ITER(v, &viter, bm, BM_VERTS_OF_MESH, NULL) {
-			if (BM_vert_edge_count(v) == 2) {
-				BMO_elem_flag_disable(bm, v, VERT_MARK);
-			}
-			else {
-				BMO_elem_flag_enable(bm, v, VERT_MARK);
-			}
+			BMO_elem_flag_set(bm, v, VERT_MARK, (BM_vert_edge_count(v) != 2));
 		}
 	}
 
 	BMO_ITER(e, &eiter, bm, op, "edges", BM_EDGE) {
-		const int edge_face_count = BM_edge_face_count(e);
-		if (edge_face_count == 2) {
+		BMFace *fa, *fb;
+
+		if (BM_edge_face_pair(e, &fa, &fb)) {
 
 			/* join faces */
-			BM_faces_join_pair(bm, e->l->f,
-			                   e->l->radial_next->f,
-			                   e);
+			BM_faces_join_pair(bm, fa, fb, e);
 		}
 	}
 
@@ -275,7 +268,7 @@ void dissolveedges_exec(BMesh *bm, BMOperator *op)
 		BM_ITER(v, &viter, bm, BM_VERTS_OF_MESH, NULL) {
 			if (BMO_elem_flag_test(bm, v, VERT_MARK)) {
 				if (BM_vert_edge_count(v) == 2) {
-					BM_vert_collapse_edge(bm, v->e, v);
+					BM_vert_collapse_edge(bm, v->e, v, TRUE);
 				}
 			}
 		}
@@ -327,15 +320,13 @@ static int test_extra_verts(BMesh *bm, BMVert *v)
 
 	return TRUE;
 }
-void dissolveverts_exec(BMesh *bm, BMOperator *op)
+void bmo_dissolve_verts_exec(BMesh *bm, BMOperator *op)
 {
-	BMOpSlot *vinput;
 	BMIter iter, fiter;
 	BMVert *v;
 	BMFace *f;
 	/* int i; */
-	
-	vinput = BMO_slot_get(op, "verts");
+
 	BMO_slot_buffer_flag_enable(bm, op, "verts", VERT_MARK, BM_VERT);
 	
 	for (v = BM_iter_new(&iter, bm, BM_VERTS_OF_MESH, NULL); v; v = BM_iter_step(&iter)) {
@@ -344,7 +335,14 @@ void dissolveverts_exec(BMesh *bm, BMOperator *op)
 			if (BM_vert_edge_count(v) == 2) {
 
 				/* collapse the ver */
-				BM_vert_collapse_faces(bm, v->e, v, 1.0f, TRUE);
+				/* previously the faces were joined, but collapsing between 2 edges
+				 * gives some advantage/difference in using vertex-dissolve over edge-dissolve */
+#if 0
+				BM_vert_collapse_faces(bm, v->e, v, 1.0f, TRUE, TRUE);
+#else
+				BM_vert_collapse_edge(bm, v->e, v, TRUE);
+#endif
+
 				continue;
 			}
 
@@ -374,7 +372,7 @@ void dissolveverts_exec(BMesh *bm, BMOperator *op)
 		}
 	}
 
-	BMO_op_callf(bm, "dissolvefaces faces=%ff", FACE_MARK);
+	BMO_op_callf(bm, "dissolve_faces faces=%ff", FACE_MARK);
 	if (BMO_error_occurred(bm)) {
 		const char *msg;
 
@@ -436,8 +434,8 @@ void dummy_exec(BMesh *bm, BMOperator *op)
 					}
 
 					if (!found2) {
-						bmesh_kf(bm, f);
-						bmesh_ke(bm, fe);
+						BM_face_kill(bm, f);
+						BM_edge_kill(bm, fe);
 					}
 				} /* else if (f->len == 3) {
 					BMEdge *ed[3];
@@ -466,28 +464,28 @@ void dummy_exec(BMesh *bm, BMOperator *op)
 #endif
 
 /**/
-typedef struct DissolveElemWeight_t {
+typedef struct DissolveElemWeight {
 	BMHeader *ele;
 	float weight;
-} DissolveElemWeight_t;
+} DissolveElemWeight;
 
 static int dissolve_elem_cmp(const void *a1, const void *a2)
 {
-	const struct DissolveElemWeight_t *d1 = a1, *d2 = a2;
+	const struct DissolveElemWeight *d1 = a1, *d2 = a2;
 
 	if      (d1->weight > d2->weight) return  1;
 	else if (d1->weight < d2->weight) return -1;
 	return 0;
 }
 
-void dissolvelimit_exec(BMesh *bm, BMOperator *op)
+void bmo_dissolve_limit_exec(BMesh *bm, BMOperator *op)
 {
 	BMOpSlot *einput = BMO_slot_get(op, "edges");
 	BMOpSlot *vinput = BMO_slot_get(op, "verts");
 	const float angle_max = (float)M_PI / 2.0f;
 	const float angle_limit = minf(angle_max, BMO_slot_float_get(op, "angle_limit"));
-	DissolveElemWeight_t *weight_elems = MEM_mallocN(MAX2(einput->len, vinput->len) *
-	                                                 sizeof(DissolveElemWeight_t), __func__);
+	DissolveElemWeight *weight_elems = MEM_mallocN(MAX2(einput->len, vinput->len) *
+	                                                 sizeof(DissolveElemWeight), __func__);
 	int i, tot_found;
 
 	/* --- first edges --- */
@@ -509,7 +507,7 @@ void dissolvelimit_exec(BMesh *bm, BMOperator *op)
 	}
 
 	if (tot_found != 0) {
-		qsort(weight_elems, einput->len, sizeof(DissolveElemWeight_t), dissolve_elem_cmp);
+		qsort(weight_elems, einput->len, sizeof(DissolveElemWeight), dissolve_elem_cmp);
 
 		for (i = 0; i < tot_found; i++) {
 			BMEdge *e = (BMEdge *)weight_elems[i].ele;
@@ -544,13 +542,13 @@ void dissolvelimit_exec(BMesh *bm, BMOperator *op)
 	}
 
 	if (tot_found != 0) {
-		qsort(weight_elems, vinput->len, sizeof(DissolveElemWeight_t), dissolve_elem_cmp);
+		qsort(weight_elems, vinput->len, sizeof(DissolveElemWeight), dissolve_elem_cmp);
 
 		for (i = 0; i < tot_found; i++) {
 			BMVert *v = (BMVert *)weight_elems[i].ele;
 			/* check twice because cumulative effect could disolve over angle limit */
 			if (BM_vert_edge_angle(bm, v) < angle_limit) {
-				BM_vert_collapse_edge(bm, v->e, v); /* join edges */
+				BM_vert_collapse_edge(bm, v->e, v, TRUE); /* join edges */
 			}
 		}
 	}

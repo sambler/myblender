@@ -20,13 +20,6 @@
 #  define CCG_INLINE inline
 #endif
 
-/* copied from BKE_utildefines.h ugh */
-#ifdef __GNUC__
-#  define UNUSED(x) UNUSED_ ## x __attribute__((__unused__))
-#else
-#  define UNUSED(x) x
-#endif
-
 /* used for normalize_v3 in BLI_math_vector
  * float.h's FLT_EPSILON causes trouble with subsurf normals - campbell */
 #define EPSILON (1.0e-35f)
@@ -306,7 +299,7 @@ enum {
 	Face_eEffected =    (1 << 0)
 } /*FaceFlags*/;
 
-struct _CCGVert {
+struct CCGVert {
 	CCGVert		*next;	/* EHData.next */
 	CCGVertHDL	vHDL;	/* EHData.key */
 
@@ -317,9 +310,13 @@ struct _CCGVert {
 //	byte *levelData;
 //	byte *userData;
 };
-#define VERT_getLevelData(v)		((byte *) &(v)[1])
 
-struct _CCGEdge {
+static CCG_INLINE byte *VERT_getLevelData(CCGVert *v)
+{
+	return (byte*)(&(v)[1]);
+}
+
+struct CCGEdge {
 	CCGEdge		*next;	/* EHData.next */
 	CCGEdgeHDL	eHDL;	/* EHData.key */
 
@@ -332,9 +329,13 @@ struct _CCGEdge {
 //	byte *levelData;
 //	byte *userData;
 };
-#define EDGE_getLevelData(e)		((byte *) &(e)[1])
 
-struct _CCGFace {
+static CCG_INLINE byte *EDGE_getLevelData(CCGEdge *e)
+{
+	return (byte*)(&(e)[1]);
+}
+
+struct CCGFace {
 	CCGFace		*next;	/* EHData.next */
 	CCGFaceHDL	fHDL;	/* EHData.key */
 
@@ -346,9 +347,21 @@ struct _CCGFace {
 //	byte **gridData;
 //	byte *userData;
 };
-#define FACE_getVerts(f)		((CCGVert**) &(f)[1])
-#define FACE_getEdges(f)		((CCGEdge**) &(FACE_getVerts(f)[(f)->numVerts]))
-#define FACE_getCenterData(f)	((byte *) &(FACE_getEdges(f)[(f)->numVerts]))
+
+static CCG_INLINE CCGVert **FACE_getVerts(CCGFace *f)
+{
+	return (CCGVert**)(&f[1]);
+}
+
+static CCG_INLINE CCGEdge **FACE_getEdges(CCGFace *f)
+{
+	return (CCGEdge**)(&(FACE_getVerts(f)[f->numVerts]));
+}
+
+static CCG_INLINE byte *FACE_getCenterData(CCGFace *f)
+{
+	return (byte*)(&(FACE_getEdges(f)[(f)->numVerts]));
+}
 
 typedef enum {
 	eSyncState_None = 0,
@@ -358,7 +371,7 @@ typedef enum {
 	eSyncState_Partial
 } SyncState;
 
-struct _CCGSubSurf {
+struct CCGSubSurf {
 	EHash *vMap;	/* map of CCGVertHDL -> Vert */
 	EHash *eMap;	/* map of CCGEdgeHDL -> Edge */
 	EHash *fMap;	/* map of CCGFaceHDL -> Face */
@@ -2455,7 +2468,7 @@ CCGError ccgSubSurf_updateToFaces(CCGSubSurf *ss, int lvl, CCGFace **effectedF, 
 }
 
 /* stitch together face grids, averaging coordinates at edges
-   and vertices, for multires displacements */
+ * and vertices, for multires displacements */
 CCGError ccgSubSurf_stitchFaces(CCGSubSurf *ss, int lvl, CCGFace **effectedF, int numEffectedF)
 {
 	CCGVert **effectedV;
@@ -2621,8 +2634,8 @@ CCGError ccgSubSurf_updateNormals(CCGSubSurf *ss, CCGFace **effectedF, int numEf
 }
 
 /* compute subdivision levels from a given starting point, used by
-   multires subdivide/propagate, by filling in coordinates at a
-   certain level, and then subdividing that up to the highest level */
+ * multires subdivide/propagate, by filling in coordinates at a
+ * certain level, and then subdividing that up to the highest level */
 CCGError ccgSubSurf_updateLevels(CCGSubSurf *ss, int lvl, CCGFace **effectedF, int numEffectedF)
 {
 	CCGVert **effectedV;
@@ -2844,7 +2857,7 @@ float ccgSubSurf_getEdgeCrease(CCGEdge *e)
 
 /* Face accessors */
 
-CCGFaceHDL ccgSubSurf_getFaceFaceHandle(CCGSubSurf *UNUSED(ss), CCGFace *f)
+CCGFaceHDL ccgSubSurf_getFaceFaceHandle(CCGFace *f)
 {
 	return f->fHDL;
 }
@@ -2867,7 +2880,7 @@ int ccgSubSurf_getFaceNumVerts(CCGFace *f)
 {
 	return f->numVerts;
 }
-CCGVert *ccgSubSurf_getFaceVert(CCGSubSurf *UNUSED(ss), CCGFace *f, int index)
+CCGVert *ccgSubSurf_getFaceVert(CCGFace *f, int index)
 {
 	if (index<0 || index>=f->numVerts) {
 		return NULL;
@@ -2876,7 +2889,7 @@ CCGVert *ccgSubSurf_getFaceVert(CCGSubSurf *UNUSED(ss), CCGFace *f, int index)
 		return FACE_getVerts(f)[index];
 	}
 }
-CCGEdge *ccgSubSurf_getFaceEdge(CCGSubSurf *UNUSED(ss), CCGFace *f, int index)
+CCGEdge *ccgSubSurf_getFaceEdge(CCGFace *f, int index)
 {
 	if (index<0 || index>=f->numVerts) {
 		return NULL;

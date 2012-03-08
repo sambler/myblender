@@ -194,6 +194,8 @@ static struct _inittab bpy_internal_modules[] = {
 	{(char *)"bgl", BPyInit_bgl},
 	{(char *)"blf", BPyInit_blf},
 	{(char *)"bmesh", BPyInit_bmesh},
+    // {(char *)"bmesh.types", BPyInit_bmesh_types},
+    // {(char *)"bmesh.utils", BPyInit_bmesh_utils},
 #ifdef WITH_AUDASPACE
 	{(char *)"aud", AUD_initPython},
 #endif
@@ -669,11 +671,11 @@ int BPY_context_member_get(bContext *C, const char *member, bContextDataResult *
 				PyObject *list_item = PySequence_Fast_GET_ITEM(seq_fast, i);
 
 				if (BPy_StructRNA_Check(list_item)) {
-					/*
+#if 0
 					CollectionPointerLink *link = MEM_callocN(sizeof(CollectionPointerLink), "bpy_context_get");
 					link->ptr = ((BPy_StructRNA *)item)->ptr;
 					BLI_addtail(&result->list, link);
-					*/
+#endif
 					ptr = &(((BPy_StructRNA *)list_item)->ptr);
 					CTX_data_list_add(result, ptr->id.data, ptr->type, ptr->data);
 				}

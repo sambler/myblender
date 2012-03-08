@@ -130,8 +130,8 @@ static void handle_view3d_lock(bContext *C)
 			scene->layact= v3d->layact;
 			scene->camera= v3d->camera;
 
-			/* not through notifiery, listener don't have context
-			   and non-open screens or spaces need to be updated too */
+			/* not through notifier, listener don't have context
+			 * and non-open screens or spaces need to be updated too */
 			BKE_screen_view3d_main_sync(&bmain->screen, scene);
 			
 			/* notifiers for scene update */
@@ -140,10 +140,11 @@ static void handle_view3d_lock(bContext *C)
 	}
 }
 
-/* layer code is on three levels actually:
-- here for operator
-- uiTemplateLayers in interface/ code for buttons
-- ED_view3d_scene_layer_set for RNA
+/**
+ * layer code is on three levels actually:
+ * - here for operator
+ * - uiTemplateLayers in interface/ code for buttons
+ * - ED_view3d_scene_layer_set for RNA
  */
 static void view3d_layers_editmode_ensure(Scene *scene, View3D *v3d)
 {
@@ -333,17 +334,17 @@ static char *view3d_modeselect_pup(Scene *scene)
 
 static void do_view3d_header_buttons(bContext *C, void *UNUSED(arg), int event)
 {
-	wmWindow *win= CTX_wm_window(C);
-	ToolSettings *ts= CTX_data_tool_settings(C);
-	ScrArea *sa= CTX_wm_area(C);
-	View3D *v3d= sa->spacedata.first;
+	wmWindow *win = CTX_wm_window(C);
+	ToolSettings *ts = CTX_data_tool_settings(C);
+	ScrArea *sa = CTX_wm_area(C);
+	View3D *v3d = sa->spacedata.first;
 	Object *obedit = CTX_data_edit_object(C);
-	BMEditMesh *em= NULL;
-	int ctrl= win->eventstate->ctrl, shift= win->eventstate->shift;
+	BMEditMesh *em = NULL;
+	int ctrl = win->eventstate->ctrl, shift= win->eventstate->shift;
 	PointerRNA props_ptr;
 	
-	if (obedit && obedit->type==OB_MESH) {
-		em= ((Mesh *)obedit->data)->edit_btmesh;
+	if (obedit && obedit->type == OB_MESH) {
+		em = BMEdit_FromObject(obedit);
 	}
 	/* watch it: if sa->win does not exist, check that when calling direct drawing routines */
 
@@ -449,7 +450,7 @@ void uiTemplateEditModeSelection(uiLayout *layout, struct bContext *C)
 	uiBlockSetHandleFunc(block, do_view3d_header_buttons, NULL);
 
 	if (obedit && (obedit->type == OB_MESH)) {
-		BMEditMesh *em= ((Mesh *)obedit->data)->edit_btmesh;
+		BMEditMesh *em = BMEdit_FromObject(obedit);
 		uiLayout *row;
 
 		row= uiLayoutRow(layout, 1);

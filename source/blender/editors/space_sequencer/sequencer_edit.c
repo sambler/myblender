@@ -56,6 +56,8 @@
 #include "BKE_report.h"
 #include "BKE_sound.h"
 
+#include "IMB_imbuf.h"
+
 #include "WM_api.h"
 #include "WM_types.h"
 
@@ -131,20 +133,14 @@ typedef struct ProxyBuildJob {
 	Scene *scene; 
 	struct Main * main;
 	ListBase queue;
-	ThreadMutex queue_lock;
+	int stop;
 } ProxyJob;
 
 static void proxy_freejob(void *pjv)
 {
 	ProxyJob *pj= pjv;
-	Sequence * seq;
 
-	for (seq = pj->queue.first; seq; seq = seq->next) {
-		BLI_remlink(&pj->queue, seq);
-		seq_free_sequence_recurse(pj->scene, seq);
-	}
-
-	BLI_mutex_end(&pj->queue_lock);
+	BLI_freelistN(&pj->queue);
 
 	MEM_freeN(pj);
 }
@@ -153,30 +149,17 @@ static void proxy_freejob(void *pjv)
 static void proxy_startjob(void *pjv, short *stop, short *do_update, float *progress)
 {
 	ProxyJob *pj = pjv;
+	LinkData *link;
 
-	while (!*stop) {
-		Sequence * seq;
+	for (link = pj->queue.first; link; link = link->next) {
+		struct SeqIndexBuildContext *context = link->data;
 
-		BLI_mutex_lock(&pj->queue_lock);
-		
-		if (!pj->queue.first) {
-			BLI_mutex_unlock(&pj->queue_lock);
-			break;
-		}
-
-		seq = pj->queue.first;
-
-		BLI_remlink(&pj->queue, seq);
-		BLI_mutex_unlock(&pj->queue_lock);
-
-		seq_proxy_rebuild(pj->main, pj->scene, seq, 
-		                  stop, do_update, progress);
-		seq_free_sequence_recurse(pj->scene, seq);
+		seq_proxy_rebuild(context, stop, do_update, progress);
 	}
 
 	if (*stop) {
-		fprintf(stderr, 
-			"Canceling proxy rebuild on users request...\n");
+		pj->stop = 1;
+		fprintf(stderr,  "Canceling proxy rebuild on users request...\n");
 	}
 }
 
@@ -184,23 +167,29 @@ static void proxy_endjob(void *pjv)
 {
 	ProxyJob *pj = pjv;
 	Editing *ed = seq_give_editing(pj->scene, FALSE);
+	LinkData *link;
+
+	for (link = pj->queue.first; link; link = link->next) {
+		seq_proxy_rebuild_finish(link->data, pj->stop);
+	}
 
 	free_imbuf_seq(pj->scene, &ed->seqbase, FALSE, FALSE);
 
 	WM_main_add_notifier(NC_SCENE|ND_SEQUENCER, pj->scene);
 }
 
-static void seq_proxy_build_job(const bContext *C, Sequence * seq)
+static void seq_proxy_build_job(const bContext *C)
 {
 	wmJob * steve;
 	ProxyJob *pj;
 	Scene *scene= CTX_data_scene(C);
+	Editing *ed = seq_give_editing(scene, FALSE);
 	ScrArea * sa= CTX_wm_area(C);
+	struct SeqIndexBuildContext *context;
+	LinkData *link;
+	Sequence * seq;
 
-	seq = seq_dupli_recursive(scene, scene, seq, 0);
-
-	steve = WM_jobs_get(CTX_wm_manager(C), CTX_wm_window(C), 
-	                    sa, "Building Proxies", WM_JOB_PROGRESS);
+	steve = WM_jobs_get(CTX_wm_manager(C), CTX_wm_window(C), sa, "Building Proxies", WM_JOB_PROGRESS);
 
 	pj = WM_jobs_get_customdata(steve);
 
@@ -210,18 +199,19 @@ static void seq_proxy_build_job(const bContext *C, Sequence * seq)
 		pj->scene= scene;
 		pj->main = CTX_data_main(C);
 
-		BLI_mutex_init(&pj->queue_lock);
-
 		WM_jobs_customdata(steve, pj, proxy_freejob);
-		WM_jobs_timer(steve, 0.1, NC_SCENE|ND_SEQUENCER,
-		              NC_SCENE|ND_SEQUENCER);
-		WM_jobs_callbacks(steve, proxy_startjob, NULL, NULL,
-		                  proxy_endjob);
+		WM_jobs_timer(steve, 0.1, NC_SCENE|ND_SEQUENCER, NC_SCENE|ND_SEQUENCER);
+		WM_jobs_callbacks(steve, proxy_startjob, NULL, NULL, proxy_endjob);
 	}
 
-	BLI_mutex_lock(&pj->queue_lock);
-	BLI_addtail(&pj->queue, seq);
-	BLI_mutex_unlock(&pj->queue_lock);
+	SEQP_BEGIN(ed, seq) {
+		if ((seq->flag & SELECT)) {
+			context = seq_proxy_rebuild_context(pj->main, pj->scene, seq);
+			link = BLI_genericNodeN(context);
+			BLI_addtail(&pj->queue, link);
+		}
+	}
+	SEQ_END
 
 	if (!WM_jobs_is_running(steve)) {
 		G.afbreek = 0;
@@ -424,7 +414,7 @@ Sequence *find_nearest_seq(Scene *scene, View2D *v2d, int *hand, const int mval[
 					
 					if (displen / pixelx > 16) { /* dont even try to grab the handles of small strips */
 						/* Set the max value to handle to 1/3 of the total len when its less then 28.
-						* This is important because otherwise selecting handles happens even when you click in the middle */
+						 * This is important because otherwise selecting handles happens even when you click in the middle */
 						
 						if ((displen/3) < 30*pixelx) {
 							handsize = displen/3;
@@ -525,7 +515,7 @@ int seq_effect_find_selected(Scene *scene, Sequence *activeseq, int type, Sequen
 	}
 
 	/* make sequence selection a little bit more intuitive
-	   for 3 strips: the last-strip should be sequence3 */
+	 * for 3 strips: the last-strip should be sequence3 */
 	if (seq3 != NULL && seq2 != NULL) {
 		Sequence *tmp = seq2;
 		seq2 = seq3;
@@ -538,7 +528,7 @@ int seq_effect_find_selected(Scene *scene, Sequence *activeseq, int type, Sequen
 		*selseq1 = *selseq2 = *selseq3 = NULL;
 		return 1; /* succsess */
 	case 1:
-		if(seq2==NULL)  {
+		if(seq2==NULL) {
 			*error_str= "Need at least one selected sequence strip";
 			return 0;
 		}
@@ -569,7 +559,7 @@ static Sequence *del_seq_find_replace_recurs(Scene *scene, Sequence *seq)
 	Sequence *seq1, *seq2, *seq3;
 
 	/* try to find a replacement input sequence, and flag for later deletion if
-	   no replacement can be found */
+	 * no replacement can be found */
 
 	if(!seq)
 		return NULL;
@@ -896,7 +886,7 @@ static void UNUSED_FUNCTION(touch_seq_files)(Scene *scene)
 	WM_cursor_wait(0);
 }
 
-/*
+#if 0
 static void set_filter_seq(Scene *scene)
 {
 	Sequence *seq;
@@ -919,7 +909,7 @@ static void set_filter_seq(Scene *scene)
 	}
 	SEQ_END
 }
-*/
+#endif
 
 static void UNUSED_FUNCTION(seq_remap_paths)(Scene *scene)
 {
@@ -990,7 +980,7 @@ static void UNUSED_FUNCTION(no_gaps)(Scene *scene)
 static int seq_get_snaplimit(View2D *v2d)
 {
 	/* fake mouse coords to get the snap value
-	a bit lazy but its only done once pre transform */
+	 * a bit lazy but its only done once pre transform */
 	float xmouse, ymouse, x;
 	int mval[2] = {24, 0}; /* 24 screen px snap */
 	
@@ -1743,7 +1733,7 @@ static int sequencer_separate_images_exec(bContext *C, wmOperator *op)
 	while (seq) {
 		if((seq->flag & SELECT) && (seq->type == SEQ_IMAGE) && (seq->len > 1)) {
 			/* remove seq so overlap tests dont conflict,
-			see seq_free_sequence below for the real free'ing */
+			 * see seq_free_sequence below for the real free'ing */
 			BLI_remlink(ed->seqbasep, seq);
 			/* if(seq->ipo) seq->ipo->id.us--; */
 			/* XXX, remove fcurve and assign to split image strips */
@@ -2316,8 +2306,8 @@ static int find_next_prev_edit(Scene *scene, int cfra, int side)
 	}
 
 	/* if no sequence to the right is found and the
-	   frame is on the start of the last sequence,
-	   move to the end of the last sequence */
+	 * frame is on the start of the last sequence,
+	 * move to the end of the last sequence */
 	if (frame_seq) cfra = frame_seq->enddisp;
 
 	return best_seq ? best_seq->startdisp : cfra;
@@ -2822,17 +2812,8 @@ void SEQUENCER_OT_view_ghost_border(wmOperatorType *ot)
 /* rebuild_proxy operator */
 static int sequencer_rebuild_proxy_exec(bContext *C, wmOperator *UNUSED(op))
 {
-	Scene *scene = CTX_data_scene(C);
-	Editing *ed = seq_give_editing(scene, FALSE);
-	Sequence * seq;
+	seq_proxy_build_job(C);
 
-	SEQP_BEGIN(ed, seq) {
-		if ((seq->flag & SELECT)) {
-			seq_proxy_build_job(C, seq);
-		}
-	}
-	SEQ_END
-		
 	return OPERATOR_FINISHED;
 }
 
@@ -2932,7 +2913,7 @@ static int sequencer_change_effect_type_exec(bContext *C, wmOperator *op)
 		return OPERATOR_CANCELLED;
 	}
 
-	/* can someone explain the logic behind only allowing to increse this,
+	/* can someone explain the logic behind only allowing to increase this,
 	 * copied from 2.4x - campbell */
 	if (get_sequence_effect_num_inputs(seq->type) <
 		get_sequence_effect_num_inputs(new_type)

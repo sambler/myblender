@@ -65,7 +65,7 @@ private:
 public:
 	/* Construct a new canvas.
 	 * 
-	 * @param area The Blender ARegion to run the game within.
+	 * \param area The Blender ARegion to run the game within.
 	 */
 	KX_BlenderCanvas(struct wmWindow* win, class RAS_Rect &rect, struct ARegion* ar);
 	~KX_BlenderCanvas();
@@ -106,11 +106,11 @@ public:
 
 		int 
 	GetWidth(
-	) const ;
+	) const;
 
 		int 
 	GetHeight(
-	) const ;
+	) const;
 
 		int
 	GetMouseX(int x

@@ -453,8 +453,7 @@ void RE_InitState(Render *re, Render *source, RenderData *rd, SceneRenderLayer *
 		re->r.scemode |= R_EXR_TILE_FILE;	/* enable automatic */
 
 	/* Until use_border is made compatible with save_buffers/full_sample, render without the later instead of not rendering at all.*/
-	if(re->r.mode & R_BORDER) 
-	{
+	if (re->r.mode & R_BORDER) {
 		re->r.scemode &= ~(R_EXR_TILE_FILE|R_FULL_SAMPLE);
 	}
 
@@ -1894,7 +1893,7 @@ static void validate_render_settings(Render *re)
 	if(RE_engine_is_external(re)) {
 		/* not supported yet */
 		re->r.scemode &= ~(R_EXR_TILE_FILE|R_FULL_SAMPLE);
-		re->r.mode &= ~R_FIELDS;
+		re->r.mode &= ~(R_FIELDS|R_MBLUR);
 	}
 }
 
@@ -2063,7 +2062,7 @@ static int do_write_image_or_movie(Render *re, Main *bmain, Scene *scene, bMovie
 		
 		if(re->r.im_format.imtype==R_IMF_IMTYPE_MULTILAYER) {
 			if(re->result) {
-				RE_WriteRenderResult(re->reports, re->result, name, scene->r.im_format.compress);
+				RE_WriteRenderResult(re->reports, re->result, name, scene->r.im_format.exr_codec);
 				printf("Saved: %s", name);
 			}
 		}
@@ -2098,7 +2097,11 @@ static int do_write_image_or_movie(Render *re, Main *bmain, Scene *scene, bMovie
 	RE_ReleaseResultImage(re);
 
 	BLI_timestr(re->i.lastframetime, name);
-	printf(" Time: %s\n", name);
+	printf(" Time: %s", name);
+
+	BLI_exec_cb(G.main, NULL, BLI_CB_EVT_RENDER_STATS);
+
+	fputc('\n', stdout);
 	fflush(stdout); /* needed for renderd !! (not anymore... (ton)) */
 
 	return ok;

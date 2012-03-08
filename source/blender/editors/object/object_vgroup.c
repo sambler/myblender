@@ -92,7 +92,7 @@ static Lattice *vgroup_edit_lattice(Object *ob)
 int ED_vgroup_object_is_edit_mode(Object *ob)
 {
 	if(ob->type == OB_MESH)
-		return (((Mesh*)ob->data)->edit_btmesh != NULL);
+		return (BMEdit_FromObject(ob) != NULL);
 	else if(ob->type == OB_LATTICE)
 		return (((Lattice*)ob->data)->editlatt != NULL);
 
@@ -702,8 +702,7 @@ static void vgroup_normalize(Object *ob)
 	int i, dvert_tot=0;
 	const int def_nr= ob->actdef-1;
 
-	Mesh *me = ob->data;
-	const int use_vert_sel= (me->editflag & ME_EDIT_VERT_SEL) != 0;
+	const int use_vert_sel = (ob->type == OB_MESH && ((Mesh *)ob->data)->editflag & ME_EDIT_VERT_SEL) != 0;
 
 	if (!BLI_findlink(&ob->defbase, def_nr)) {
 		return;
@@ -769,7 +768,7 @@ static int* getSurroundingVerts(Mesh *me, int vert, int *count)
 		MLoop *ml = &me->mloop[mp->loopstart];
 		while(j--) {
 			/* XXX This assume a vert can only be once in a poly, even though
-			 *     it seems logical to me, not totaly sure of that. */
+			 *     it seems logical to me, not totally sure of that. */
 			if (ml->v == vert) {
 				int a, b, k;
 				if(j == first_l) {
@@ -815,8 +814,8 @@ static int* getSurroundingVerts(Mesh *me, int vert, int *count)
 }
 
 /* get a single point in space by averaging a point cloud (vectors of size 3)
-coord is the place the average is stored, points is the point cloud, count is the number of points in the cloud
-*/
+ * coord is the place the average is stored, points is the point cloud, count is the number of points in the cloud
+ */
 static void getSingleCoordinate(MVert *points, int count, float coord[3])
 {
 	int i;
@@ -828,9 +827,9 @@ static void getSingleCoordinate(MVert *points, int count, float coord[3])
 }
 
 /* given a plane and a start and end position,
-compute the amount of vertical distance relative to the plane and store it in dists,
-then get the horizontal and vertical change and store them in changes
-*/
+ * compute the amount of vertical distance relative to the plane and store it in dists,
+ * then get the horizontal and vertical change and store them in changes
+ */
 static void getVerticalAndHorizontalChange(const float norm[3], float d, const float coord[3],
                                            const float start[3], float distToStart,
                                            float *end, float (*changes)[2], float *dists, int index)
@@ -865,21 +864,21 @@ static void dm_deform_clear(DerivedMesh *dm, Object *ob)
 	}
 }
 
-// recalculate the deformation
+/* recalculate the deformation */
 static DerivedMesh* dm_deform_recalc(Scene *scene, Object *ob)
 {
 	return mesh_get_derived_deform(scene, ob, CD_MASK_BAREMESH);
 }
 
 /* by changing nonzero weights, try to move a vertex in me->mverts with index 'index' to
-distToBe distance away from the provided plane strength can change distToBe so that it moves
-towards distToBe by that percentage cp changes how much the weights are adjusted
-to check the distance
-
-index is the index of the vertex being moved
-norm and d are the plane's properties for the equation: ax + by + cz + d = 0
-coord is a point on the plane
-*/
+ * distToBe distance away from the provided plane strength can change distToBe so that it moves
+ * towards distToBe by that percentage cp changes how much the weights are adjusted
+ * to check the distance
+ *
+ * index is the index of the vertex being moved
+ * norm and d are the plane's properties for the equation: ax + by + cz + d = 0
+ * coord is a point on the plane
+ */
 static void moveCloserToDistanceFromPlane(Scene *scene, Object *ob, Mesh *me, int index, float norm[3],
                                           float coord[3], float d, float distToBe, float strength, float cp)
 {
@@ -1049,7 +1048,7 @@ static void moveCloserToDistanceFromPlane(Scene *scene, Object *ob, Mesh *me, in
 }
 
 /* this is used to try to smooth a surface by only adjusting the nonzero weights of a vertex 
-but it could be used to raise or lower an existing 'bump.' */
+ * but it could be used to raise or lower an existing 'bump.' */
 static void vgroup_fix(Scene *scene, Object *ob, float distToBe, float strength, float cp)
 {
 	int i;
@@ -1103,8 +1102,7 @@ static void vgroup_levels(Object *ob, float offset, float gain)
 	int i, dvert_tot=0;
 	const int def_nr= ob->actdef-1;
 
-	Mesh *me = ob->data;
-	const int use_vert_sel= (me->editflag & ME_EDIT_VERT_SEL) != 0;
+	const int use_vert_sel = (ob->type == OB_MESH && ((Mesh *)ob->data)->editflag & ME_EDIT_VERT_SEL) != 0;
 
 	if (!BLI_findlink(&ob->defbase, def_nr)) {
 		return;
@@ -1139,8 +1137,7 @@ static void vgroup_normalize_all(Object *ob, int lock_active)
 	int i, dvert_tot=0;
 	const int def_nr= ob->actdef-1;
 
-	Mesh *me = ob->data;
-	const int use_vert_sel= (me->editflag & ME_EDIT_VERT_SEL) != 0;
+	const int use_vert_sel = (ob->type == OB_MESH && ((Mesh *)ob->data)->editflag & ME_EDIT_VERT_SEL) != 0;
 
 	if (lock_active && !BLI_findlink(&ob->defbase, def_nr)) {
 		return;
@@ -1212,9 +1209,7 @@ static void vgroup_invert(Object *ob, const short auto_assign, const short auto_
 	MDeformVert *dv, **dvert_array=NULL;
 	int i, dvert_tot=0;
 	const int def_nr= ob->actdef-1;
-	
-	Mesh *me = ob->data;
-	const int use_vert_sel= (me->editflag & ME_EDIT_VERT_SEL) != 0;
+	const int use_vert_sel = (ob->type == OB_MESH && ((Mesh *)ob->data)->editflag & ME_EDIT_VERT_SEL) != 0;
 
 	if (!BLI_findlink(&ob->defbase, def_nr)) {
 		return;
@@ -1257,11 +1252,11 @@ static void vgroup_blend(Object *ob)
 	int i, dvert_tot=0;
 	const int def_nr= ob->actdef-1;
 
-	BMEditMesh *em= ((Mesh *)ob->data)->edit_btmesh;
-	// ED_vgroup_give_array(ob->data, &dvert_array, &dvert_tot);
+	BMEditMesh *em;
 
-	if (em==NULL)
+	if (ob->type == OB_MESH && ((em = BMEdit_FromObject(ob)) != NULL)) {
 		return;
+	}
 
 	if (BLI_findlink(&ob->defbase, def_nr)) {
 		BMEdge *eed;
@@ -1301,10 +1296,17 @@ static void vgroup_blend(Object *ob)
 				vg_users[i1]++;
 
 				/* TODO, we may want object mode blending */
-				if(em)	dvert= CustomData_bmesh_get(&em->bm->vdata, eve->head.data, CD_MDEFORMVERT);
-				else	dvert= dvert_array+i2;
+#if 0
+				if (em) {
+					dvert = CustomData_bmesh_get(&em->bm->vdata, eve->head.data, CD_MDEFORMVERT);
+				}
+				else
+#endif
+				{
+					dvert= dvert_array+i2;
+				}
 
-				dw= defvert_find_index(dvert, def_nr);
+				dw = defvert_find_index(dvert, def_nr);
 
 				if(dw) {
 					vg_weights[i1] += dw->weight;
@@ -1339,9 +1341,7 @@ static void vgroup_clean(Object *ob, const float epsilon, int keep_single)
 	MDeformVert *dv, **dvert_array=NULL;
 	int i, dvert_tot=0;
 	const int def_nr= ob->actdef-1;
-	
-	Mesh *me = ob->data;
-	const int use_vert_sel= (me->editflag & ME_EDIT_VERT_SEL) != 0;
+	const int use_vert_sel = (ob->type == OB_MESH && ((Mesh *)ob->data)->editflag & ME_EDIT_VERT_SEL) != 0;
 
 	if (!BLI_findlink(&ob->defbase, def_nr)) {
 		return;
@@ -1376,10 +1376,8 @@ static void vgroup_clean(Object *ob, const float epsilon, int keep_single)
 static void vgroup_clean_all(Object *ob, const float epsilon, const int keep_single)
 {
 	MDeformVert **dvert_array=NULL;
-	int i, dvert_tot=0;
-	
-	Mesh *me = ob->data;
-	const int use_vert_sel= (me->editflag & ME_EDIT_VERT_SEL) != 0;
+	int i, dvert_tot = 0;
+	const int use_vert_sel = (ob->type == OB_MESH && ((Mesh *)ob->data)->editflag & ME_EDIT_VERT_SEL) != 0;
 
 	ED_vgroup_give_parray(ob->data, &dvert_array, &dvert_tot, use_vert_sel);
 
@@ -1552,7 +1550,7 @@ void ED_vgroup_mirror(Object *ob, const short mirror_weights, const short flip_v
 			/* object mode / weight paint */
 			MVert *mv, *mv_mirr;
 			int vidx, vidx_mirr;
-			const int use_vert_sel= (me->editflag & ME_EDIT_VERT_SEL) != 0;
+			const int use_vert_sel = (me->editflag & ME_EDIT_VERT_SEL) != 0;
 
 			if (me->dvert == NULL) {
 				goto cleanup;
@@ -1603,8 +1601,8 @@ void ED_vgroup_mirror(Object *ob, const short mirror_weights, const short flip_v
 			goto cleanup;
 		}
 
-		/* unlike editmesh we know that by only looping over the first hald of
-		 * the 'u' indicies it will cover all points except the middle which is
+		/* unlike editmesh we know that by only looping over the first half of
+		 * the 'u' indices it will cover all points except the middle which is
 		 * ok in this case */
 		pntsu_half= lt->pntsu / 2;
 
@@ -1880,7 +1878,7 @@ static void vgroup_delete_edit_mode(Object *ob, bDeformGroup *dg)
 static int vgroup_object_in_edit_mode(Object *ob)
 {
 	if(ob->type == OB_MESH)
-		return (((Mesh*)ob->data)->edit_btmesh != NULL);
+		return (BMEdit_FromObject(ob) != NULL);
 	else if(ob->type == OB_LATTICE)
 		return (((Lattice*)ob->data)->editlatt != NULL);
 	
@@ -2036,7 +2034,7 @@ static int vertex_group_poll(bContext *C)
 	return (ob && !ob->id.lib && OB_TYPE_SUPPORT_VGROUP(ob->type) && data && !data->lib);
 }
 
-static int UNUSED_FUNCTION(vertex_group_poll_edit)(bContext *C)
+static int vertex_group_poll_edit(bContext *C)
 {
 	Object *ob= ED_object_context(C);
 	ID *data= (ob)? ob->data: NULL;
@@ -2114,8 +2112,8 @@ void OBJECT_OT_vertex_group_remove(wmOperatorType *ot)
 
 	/* flags */
 	/* redo operator will fail in this case because vertex groups aren't stored
-	   in local edit mode stack and toggling "all" property will lead to
-	   all groups deleted without way to restore them (see [#29527], sergey) */
+	 * in local edit mode stack and toggling "all" property will lead to
+	 * all groups deleted without way to restore them (see [#29527], sergey) */
 	ot->flag= /*OPTYPE_REGISTER|*/OPTYPE_UNDO;
 
 	/* properties */
@@ -2149,8 +2147,8 @@ void OBJECT_OT_vertex_group_assign(wmOperatorType *ot)
 
 	/* flags */
 	/* redo operator will fail in this case because vertex group assignment
-	   isn't stored in local edit mode stack and toggling "new" property will
-	   lead to creating plenty of new veretx groups (see [#29527], sergey) */
+	 * isn't stored in local edit mode stack and toggling "new" property will
+	 * lead to creating plenty of new vertex groups (see [#29527], sergey) */
 	ot->flag= /*OPTYPE_REGISTER|*/OPTYPE_UNDO;
 
 	/* properties */
@@ -2190,9 +2188,9 @@ void OBJECT_OT_vertex_group_remove_from(wmOperatorType *ot)
 	ot->exec= vertex_group_remove_from_exec;
 
 	/* flags */
-	/* redo operator will fail in this case because vertex groups ssignment
-	   isn't stored in local edit mode stack and toggling "all" property will lead to
-	   removing vertices from all groups (see [#29527], sergey) */
+	/* redo operator will fail in this case because vertex groups assignment
+	 * isn't stored in local edit mode stack and toggling "all" property will lead to
+	 * removing vertices from all groups (see [#29527], sergey) */
 	ot->flag= /*OPTYPE_REGISTER|*/OPTYPE_UNDO;
 
 	/* properties */
@@ -2501,7 +2499,7 @@ void OBJECT_OT_vertex_group_blend(wmOperatorType *ot)
 	ot->description= "";
 
 	/* api callbacks */
-	ot->poll= vertex_group_poll;
+	ot->poll= vertex_group_poll_edit; /* TODO - add object mode support */
 	ot->exec= vertex_group_blend_exec;
 
 	/* flags */
@@ -2644,7 +2642,7 @@ static int vertex_group_copy_to_selected_exec(bContext *C, wmOperator *op)
 
 	if((change == 0 && fail == 0) || fail) {
 		BKE_reportf(op->reports, RPT_ERROR,
-		            "Copy to VGroups to Selected warning done %d, failed %d, object data must have matching indicies",
+		            "Copy to VGroups to Selected warning done %d, failed %d, object data must have matching indices",
 		            change, fail);
 	}
 
@@ -2732,8 +2730,8 @@ void OBJECT_OT_vertex_group_set_active(wmOperatorType *ot)
 	ot->prop= prop;
 }
 
-/*creates the name_array parameter for vgroup_do_remap, call this before fiddling
-  with the order of vgroups then call vgroup_do_remap after*/
+/* creates the name_array parameter for vgroup_do_remap, call this before fiddling
+ * with the order of vgroups then call vgroup_do_remap after*/
 static char *vgroup_init_remap(Object *ob)
 {
 	bDeformGroup *def;
@@ -2773,7 +2771,7 @@ static int vgroup_do_remap(Object *ob, char *name_array, wmOperator *op)
 
 	if(ob->mode == OB_MODE_EDIT) {
 		if(ob->type==OB_MESH) {
-			BMEditMesh *em = ((Mesh*)ob->data)->edit_btmesh;
+			BMEditMesh *em = BMEdit_FromObject(ob);
 			BMIter iter;
 			BMVert *eve;
 
@@ -2795,7 +2793,7 @@ static int vgroup_do_remap(Object *ob, char *name_array, wmOperator *op)
 
 		ED_vgroup_give_array(ob->data, &dvert, &dvert_tot);
 
-		/*create as necassary*/
+		/*create as necessary*/
 		while(dvert && dvert_tot--) {
 			if(dvert->totweight)
 				defvert_remap(dvert, sort_map, defbase_tot);

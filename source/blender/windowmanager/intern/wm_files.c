@@ -421,7 +421,12 @@ void WM_read_file(bContext *C, const char *filepath, ReportList *reports)
 		/* important to do before NULL'ing the context */
 		BLI_exec_cb(CTX_data_main(C), NULL, BLI_CB_EVT_LOAD_POST);
 
-		CTX_wm_window_set(C, NULL); /* exits queues */
+		if (!G.background) {
+			/* in background mode this makes it hard to load
+			 * a blend file and do anything since the screen
+			 * won't be set to a valid value again */
+			CTX_wm_window_set(C, NULL); /* exits queues */
+		}
 
 #if 0
 		/* gives popups on windows but not linux, bug in report API
@@ -671,7 +676,7 @@ static ImBuf *blend_file_thumb(Scene *scene, int **thumb_pt)
 	/* gets scaled to BLEN_THUMB_SIZE */
 	ibuf= ED_view3d_draw_offscreen_imbuf_simple(scene, scene->camera,
 	                                            BLEN_THUMB_SIZE * 2, BLEN_THUMB_SIZE * 2,
-	                                            IB_rect, OB_SOLID, err_out);
+	                                            IB_rect, OB_SOLID, FALSE, err_out);
 
 	if(ibuf) {		
 		float aspect= (scene->r.xsch*scene->r.xasp) / (scene->r.ysch*scene->r.yasp);

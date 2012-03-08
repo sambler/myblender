@@ -31,15 +31,11 @@
 extern "C" {
 #endif
 
-#include "BLI_memarena.h"
 #include "BLI_ghash.h"
 
-#include "BKE_utildefines.h"
-
 #include <stdarg.h>
-#include <string.h> /* for memcpy */
 
-/*
+/**
  * operators represent logical, executable mesh modules.  all topological
  * operations involving a bmesh has to go through them.
  *
@@ -59,47 +55,65 @@ extern "C" {
  * bmesh_opdefines.c and the BMOpDefine struct for how to define new operators.
  *
  * in general, operators are fed arrays of elements, created using either
- * BM_HeaderFlag_To_Slot or BM_Flag_To_Slot (or through one of the format
- * specifyers in BMO_op_callf or BMO_op_initf).  Note that multiple element
- * types (e.g. faces and edges) can be fed to the same slot array.  Operators
- * act on this data, and possibly spit out data into output slots.
+ * #BMO_slot_buffer_from_hflag or #BMO_slot_buffer_from_flag
+ * (or through one of the format specifiers in #BMO_op_callf or #BMO_op_initf).
  *
- * some notes:
- * - operators should never read from header flags (e.g. element->head.flag). for
- *   example, if you want an operator to only operate on selected faces, you
- *   should use BM_HeaderFlag_To_Slot to put the selected elements into a slot.
- * - when you read from an element slot array or mapping, you can either tool-flag
- *   all the elements in it, or read them using an iterator APi (which is
- *   semantically similar to the iterator api in bmesh_iterators.h).
+ * \note multiple element types (e.g. faces and edges)
+ * can be fed to the same slot array.  Operators act on this data,
+ * and possibly spit out data into output slots.
+ *
+ * \note operators should never read from header flags (e.g. element->head.flag).
+ * For example, if you want an operator to only operate on selected faces, you
+ * should use #BMO_slot_buffer_from_hflag to put the selected elements into a slot.
+ *
+ * \note when you read from an element slot array or mapping, you can either tool-flag
+ * all the elements in it, or read them using an iterator API (which is semantically
+ * similar to the iterator api in bmesh_iterators.h).
+ *
+ * \note only #BMLoop items can't be put into slots as with verts, edges & faces.
  */
 
 struct GHashIterator;
 
+#define BMO_elem_flag_test(   bm, ele, oflag)      _bmo_elem_flag_test    (bm, (ele)->oflags, oflag)
+#define BMO_elem_flag_enable( bm, ele, oflag)      _bmo_elem_flag_enable  (bm, (ele)->oflags, oflag)
+#define BMO_elem_flag_disable(bm, ele, oflag)      _bmo_elem_flag_disable (bm, (ele)->oflags, oflag)
+#define BMO_elem_flag_set(    bm, ele, oflag, val) _bmo_elem_flag_set     (bm, (ele)->oflags, oflag, val)
+#define BMO_elem_flag_toggle( bm, ele, oflag)      _bmo_elem_flag_toggle  (bm, (ele)->oflags, oflag)
+
+BM_INLINE short _bmo_elem_flag_test(BMesh *bm, BMFlagLayer *oflags, const short oflag);
+BM_INLINE void  _bmo_elem_flag_enable(BMesh *bm, BMFlagLayer *oflags, const short oflag);
+BM_INLINE void  _bmo_elem_flag_disable(BMesh *bm, BMFlagLayer *oflags, const short oflag);
+BM_INLINE void  _bmo_elem_flag_set(BMesh *bm, BMFlagLayer *oflags, const short oflag, int val);
+BM_INLINE void  _bmo_elem_flag_toggle(BMesh *bm, BMFlagLayer *oflags, const short oflag);
+
 /* slot type arrays are terminated by the last member
  * having a slot type of 0.*/
-#define BMO_OP_SLOT_SENTINEL	0
-#define BMO_OP_SLOT_BOOL		1
-#define BMO_OP_SLOT_INT			2
-#define BMO_OP_SLOT_FLT			3
-#define BMO_OP_SLOT_PNT			4
-#define BMO_OP_SLOT_MAT			5
-#define BMO_OP_SLOT_VEC			8
+enum {
+	BMO_OP_SLOT_SENTINEL = 0,
+	BMO_OP_SLOT_BOOL = 1,
+	BMO_OP_SLOT_INT = 2,
+	BMO_OP_SLOT_FLT = 3,
 
-/* after BMO_OP_SLOT_VEC, everything is
+	/* normally store pointers to object, scene,
+	 * _never_ store arrays corresponding to mesh elements with this */
+	BMO_OP_SLOT_PNT = 4,
+	BMO_OP_SLOT_MAT = 5,
+	BMO_OP_SLOT_VEC = 8,
 
- * dynamically allocated arrays.  we
- * leave a space in the identifiers
- * for future growth.
- */
-//it's very important this remain a power of two
-#define BMO_OP_SLOT_ELEMENT_BUF		9
-#define BMO_OP_SLOT_MAPPING			10
-#define BMO_OP_SLOT_TOTAL_TYPES		11
+	/* after BMO_OP_SLOT_VEC, everything is dynamically allocated arrays.
+	 * We leave a space in the identifiers for future growth.
+	 *
+	 * it's very important this remain a power of two */
+	BMO_OP_SLOT_ELEMENT_BUF = 9, /* list of verts/edges/faces */
+	BMO_OP_SLOT_MAPPING = 10 /* simple hash map */
+};
+#define BMO_OP_SLOT_TOTAL_TYPES 11
 
 /* please ignore all these structures, don't touch them in tool code, except
  * for when your defining an operator with BMOpDefine.*/
 
-typedef struct BMOpSlot{
+typedef struct BMOpSlot {
 	int slottype;
 	int len;
 	int flag;
@@ -125,9 +139,8 @@ typedef struct BMOperator {
 	int slottype;
 	int needflag;
 	int flag;
-	struct BMOpSlot slots[BMO_OP_MAX_SLOTS];
-	void (*exec)(struct BMesh *bm, struct BMOperator *op);
-	MemArena *arena;
+	struct BMOpSlot slots[BMO_OP_MAX_SLOTS]; void (*exec)(BMesh *bm, struct BMOperator *op);
+	struct MemArena *arena;
 } BMOperator;
 
 #define MAX_SLOTNAME	32
@@ -159,41 +172,19 @@ typedef struct BMOpDefine {
  * have it set directly.  and never use BMO_slot_ptr_set to
  * pass in a list of edges or any arrays, really.*/
 
-void BMO_op_init(struct BMesh *bm, struct BMOperator *op, const char *opname);
+void BMO_op_init(BMesh *bm, BMOperator *op, const char *opname);
 
 /* executes an operator, pushing and popping a new tool flag
  * layer as appropriate.*/
-void BMO_op_exec(struct BMesh *bm, struct BMOperator *op);
+void BMO_op_exec(BMesh *bm, BMOperator *op);
 
 /* finishes an operator (though note the operator's tool flag is removed
  * after it finishes executing in BMO_op_exec).*/
-void BMO_op_finish(struct BMesh *bm, struct BMOperator *op);
-
-
-/* tool flag API. never, ever ever should tool code put junk in
- * header flags (element->head.flag), nor should they use
- * element->head.eflag1/eflag2.  instead, use this api to set
- * flags.
- *
- * if you need to store a value per element, use a
- * ghash or a mapping slot to do it. */
-
-/* flags 15 and 16 (1<<14 and 1<<15) are reserved for bmesh api use */
-#define BMO_elem_flag_test(bm, element, oflag)    ((element)->oflags[bm->stackdepth-1].f &   (oflag))
-#define BMO_elem_flag_enable(bm, element, oflag)  ((element)->oflags[bm->stackdepth-1].f |=  (oflag))
-#define BMO_elem_flag_disable(bm, element, oflag) ((element)->oflags[bm->stackdepth-1].f &= ~(oflag))
-#define BMO_elem_flag_toggle(bm, element, oflag)  ((element)->oflags[bm->stackdepth-1].f ^=  (oflag))
-
-/* profiling showed a significant amount of time spent in BMO_elem_flag_test */
-#if 0
-void BMO_elem_flag_enable(struct BMesh *bm, void *element, const short oflag);
-void BMO_elem_flag_disable(struct BMesh *bm, void *element, const short oflag);
-int BMO_elem_flag_test(struct BMesh *bm, void *element, const short oflag);
-#endif
+void BMO_op_finish(BMesh *bm, BMOperator *op);
 
 /* count the number of elements with a specific flag.
  * type can be a bitmask of BM_FACE, BM_EDGE, or BM_FACE. */
-int BMO_mesh_flag_count(struct BMesh *bm, const short oflag, const char htype);
+int BMO_mesh_flag_count(BMesh *bm, const short oflag, const char htype);
 
 /*---------formatted operator initialization/execution-----------*/
 /*
@@ -225,7 +216,7 @@ int BMO_mesh_flag_count(struct BMesh *bm, const short oflag, const char htype);
  *    %e        - pass in a single element.
  *    %v - pointer to a float vector of length 3.
  *    %m[3/4] - matrix, 3/4 refers to the matrix size, 3 or 4.  the
- *              corrusponding argument must be a pointer to
+ *              corresponding argument must be a pointer to
  *          a float matrix.
  *    %s - copy a slot from another op, instead of mapping to one
  *         argument, it maps to two, a pointer to an operator and
@@ -247,23 +238,15 @@ int BMO_op_initf(BMesh *bm, BMOperator *op, const char *fmt, ...);
 int BMO_op_vinitf(BMesh *bm, BMOperator *op, const char *fmt, va_list vlist);
 
 /* test whether a named slot exists */
-int BMO_slot_exists(struct BMOperator *op, const char *slotname);
+int BMO_slot_exists(BMOperator *op, const char *slotname);
 
 /* get a pointer to a slot.  this may be removed layer on from the public API. */
-BMOpSlot *BMO_slot_get(struct BMOperator *op, const char *slotname);
+BMOpSlot *BMO_slot_get(BMOperator *op, const char *slotname);
 
 /* copies the data of a slot from one operator to another.  src and dst are the
  * source/destination slot codes, respectively. */
-void BMO_slot_copy(struct BMOperator *source_op, struct BMOperator *dest_op,
+void BMO_slot_copy(BMOperator *source_op, BMOperator *dest_op,
                    const char *src, const char *dst);
-
-/* remove tool flagged elements */
-void BMO_remove_tagged_faces(struct BMesh *bm, const short oflag);
-void BMO_remove_tagged_edges(struct BMesh *bm, const short oflag);
-void BMO_remove_tagged_verts(struct BMesh *bm, const short oflag);
-
-/* take care, uses operator flag DEL_WIREVERT */
-void BMO_remove_tagged_context(BMesh *bm, const short oflag, const int type);
 
 /* del "context" slot values, used for operator too */
 enum {
@@ -272,18 +255,18 @@ enum {
 	DEL_ONLYFACES,
 	DEL_EDGESFACES,
 	DEL_FACES,
-	DEL_ALL	,
+	DEL_ALL,
 	DEL_ONLYTAGGED
 };
 
-void BMO_op_flag_enable(struct BMesh *bm, struct BMOperator *op, const int op_flag);
-void BMO_op_flag_disable(struct BMesh *bm, struct BMOperator *op, const int op_flag);
+void BMO_op_flag_enable(BMesh *bm, BMOperator *op, const int op_flag);
+void BMO_op_flag_disable(BMesh *bm, BMOperator *op, const int op_flag);
 
-void  BMO_slot_float_set(struct BMOperator *op, const char *slotname, const float f);
+void  BMO_slot_float_set(BMOperator *op, const char *slotname, const float f);
 float BMO_slot_float_get(BMOperator *op, const char *slotname);
-void  BMO_slot_int_set(struct BMOperator *op, const char *slotname, const int i);
+void  BMO_slot_int_set(BMOperator *op, const char *slotname, const int i);
 int   BMO_slot_int_get(BMOperator *op, const char *slotname);
-void  BMO_slot_bool_set(struct BMOperator *op, const char *slotname, const int i);
+void  BMO_slot_bool_set(BMOperator *op, const char *slotname, const int i);
 int   BMO_slot_bool_get(BMOperator *op, const char *slotname);
 
 /* don't pass in arrays that are supposed to map to elements this way.
@@ -291,91 +274,61 @@ int   BMO_slot_bool_get(BMOperator *op, const char *slotname);
  * so, e.g. passing in list of floats per element in another slot is bad.
  * passing in, e.g. pointer to an editmesh for the conversion operator is fine
  * though. */
-void  BMO_slot_ptr_set(struct BMOperator *op, const char *slotname, void *p);
+void  BMO_slot_ptr_set(BMOperator *op, const char *slotname, void *p);
 void *BMO_slot_ptr_get(BMOperator *op, const char *slotname);
-void  BMO_slot_vec_set(struct BMOperator *op, const char *slotname, const float vec[3]);
+void  BMO_slot_vec_set(BMOperator *op, const char *slotname, const float vec[3]);
 void  BMO_slot_vec_get(BMOperator *op, const char *slotname, float r_vec[3]);
 
 /* only supports square mats */
 /* size must be 3 or 4; this api is meant only for transformation matrices.
  * note that internally the matrix is stored in 4x4 form, and it's safe to
  * call whichever BMO_Get_Mat* function you want. */
-void BMO_slot_mat_set(struct BMOperator *op, const char *slotname, const float *mat, int size);
-void BMO_slot_mat4_get(struct BMOperator *op, const char *slotname, float r_mat[4][4]);
-void BMO_slot_mat3_set(struct BMOperator *op, const char *slotname, float r_mat[3][3]);
+void BMO_slot_mat_set(BMOperator *op, const char *slotname, const float *mat, int size);
+void BMO_slot_mat4_get(BMOperator *op, const char *slotname, float r_mat[4][4]);
+void BMO_slot_mat3_set(BMOperator *op, const char *slotname, float r_mat[3][3]);
 
 void BMO_mesh_flag_disable_all(BMesh *bm, BMOperator *op, const char htype, const short oflag);
 
 /* puts every element of type type (which is a bitmask) with tool flag flag,
  * into a slot. */
-void BMO_slot_from_flag(struct BMesh *bm, struct BMOperator *op, const char *slotname,
-                        const short oflag, const char htype);
+void BMO_slot_buffer_from_flag(BMesh *bm, BMOperator *op, const char *slotname,
+                               const short oflag, const char htype);
 
 /* tool-flags all elements inside an element slot array with flag flag. */
-void BMO_slot_buffer_flag_enable(struct BMesh *bm, struct BMOperator *op, const char *slotname,
-                          const short oflag, const char htype);
+void BMO_slot_buffer_flag_enable(BMesh *bm, BMOperator *op, const char *slotname,
+                                 const short oflag, const char htype);
 /* clears tool-flag flag from all elements inside a slot array. */
-void BMO_slot_buffer_flag_disable(struct BMesh *bm, struct BMOperator *op, const char *slotname,
-                                const short oflag, const char htype);
+void BMO_slot_buffer_flag_disable(BMesh *bm, BMOperator *op, const char *slotname,
+                                  const short oflag, const char htype);
 
 /* tool-flags all elements inside an element slot array with flag flag. */
-void BMO_slot_buffer_hflag_enable(struct BMesh *bm, struct BMOperator *op, const char *slotname,
-                                  const char hflag, const char htype);
+void BMO_slot_buffer_hflag_enable(BMesh *bm, BMOperator *op, const char *slotname,
+                                  const char hflag, const char htype, char do_flush_select);
 /* clears tool-flag flag from all elements inside a slot array. */
-void BMO_slot_buffer_hflag_disable(struct BMesh *bm, struct BMOperator *op, const char *slotname,
-                                   const char hflag, const char htype);
+void BMO_slot_buffer_hflag_disable(BMesh *bm, BMOperator *op, const char *slotname,
+                                   const char hflag, const char htype, char do_flush_select);
 
 /* puts every element of type type (which is a bitmask) with header flag
  * flag, into a slot.  note: ignores hidden elements (e.g. elements with
  * header flag BM_ELEM_HIDDEN set).*/
-void BMO_slot_from_hflag(struct BMesh *bm, struct BMOperator *op, const char *slotname,
-                         const char hflag, const char htype);
+void BMO_slot_buffer_from_hflag(BMesh *bm, BMOperator *op, const char *slotname,
+                                const char hflag, const char htype);
 
 /* counts number of elements inside a slot array. */
-int BMO_slot_buf_count(struct BMesh *bm, struct BMOperator *op, const char *slotname);
-int BMO_slot_map_count(struct BMesh *bm, struct BMOperator *op, const char *slotname);
+int BMO_slot_buffer_count(BMesh *bm, BMOperator *op, const char *slotname);
+int BMO_slot_map_count(BMesh *bm, BMOperator *op, const char *slotname);
+
+void BMO_slot_map_insert(BMesh *UNUSED(bm), BMOperator *op, const char *slotname,
+                         void *element, void *data, int len);
 
 /* Counts the number of edges with tool flag toolflag around
  */
 int BMO_vert_edge_flags_count(BMesh *bm, BMVert *v, const short oflag);
 
-/* inserts a key/value mapping into a mapping slot.  note that it copies the
- * value, it doesn't store a reference to it. */
-
-#if 0
-
-BM_INLINE void BMO_slot_map_insert(BMesh *bm, BMOperator *op, const char *slotname,
-                                   void *element, void *data, int len);
-
-/* inserts a key/float mapping pair into a mapping slot. */
-BM_INLINE void BMO_slot_map_float_insert(BMesh *bm, BMOperator *op, const char *slotname,
-                                         void *element, float val);
-
-/* returns 1 if the specified pointer is in the map. */
-BM_INLINE int BMO_slot_map_contains(BMesh *bm, BMOperator *op, const char *slotname, void *element);
-
-/* returns a point to the value of a specific key. */
-BM_INLINE void *BMO_slot_map_data_get(BMesh *bm, BMOperator *op, const char *slotname, void *element);
-
-/* returns the float part of a key/float pair. */
-BM_INLINE float BMO_slot_map_float_get(BMesh *bm, BMOperator *op, const char *slotname, void *element);
-
-#endif
-
 /* flags all elements in a mapping.  note that the mapping must only have
  * bmesh elements in it.*/
-void BMO_slot_map_to_flag(struct BMesh *bm, struct BMOperator *op,
-                          const char *slotname, const short oflag);
-
-/* pointer versoins of BMO_slot_map_float_get and BMO_slot_map_float_insert.
- *
- * do NOT use these for non-operator-api-allocated memory! instead
- * use BMO_slot_map_data_get and BMO_slot_map_insert, which copies the data. */
-
-#if 0
-BM_INLINE void BMO_slot_map_ptr_insert(BMesh *bm, BMOperator *op, const char *slotname, void *key, void *val);
-BM_INLINE void *BMO_slot_map_ptr_get(BMesh *bm, BMOperator *op, const char *slotname, void *key);
-#endif
+void BMO_slot_map_to_flag(BMesh *bm, BMOperator *op, const char *slotname,
+                          const short oflag, const char hflag);
 
 /* this part of the API is used to iterate over element buffer or
  * mapping slots.
@@ -413,12 +366,12 @@ BM_INLINE void *BMO_slot_map_ptr_get(BMesh *bm, BMOperator *op, const char *slot
 typedef struct BMOIter {
 	BMOpSlot *slot;
 	int cur; //for arrays
-	struct GHashIterator giter;
+	GHashIterator giter;
 	void *val;
 	char restrictmask; /* bitwise '&' with BMHeader.htype */
 } BMOIter;
 
-void *BMO_slot_elem_first(BMOperator *op, const char *slotname);
+void *BMO_slot_buffer_elem_first(BMOperator *op, const char *slotname);
 
 /* restrictmask restricts the iteration to certain element types
  * (e.g. combination of BM_VERT, BM_EDGE, BM_FACE), if iterating
@@ -442,7 +395,7 @@ float BMO_iter_map_value_f(BMOIter *iter);
 	for ( ; ele; ele=BMO_iter_step(iter))
 
 /******************* Inlined Functions********************/
-typedef void (*opexec)(struct BMesh *bm, struct BMOperator *op);
+typedef void (*opexec)(BMesh *bm, BMOperator *op);
 
 /* mappings map elements to data, which
  * follows the mapping struct in memory. */
@@ -452,104 +405,6 @@ typedef struct BMOElemMapping {
 } BMOElemMapping;
 
 extern const int BMO_OPSLOT_TYPEINFO[BMO_OP_SLOT_TOTAL_TYPES];
-
-BM_INLINE void BMO_slot_map_insert(BMesh *UNUSED(bm), BMOperator *op, const char *slotname,
-                                   void *element, void *data, int len)
-{
-	BMOElemMapping *mapping;
-	BMOpSlot *slot = BMO_slot_get(op, slotname);
-
-	/*sanity check*/
-	if (slot->slottype != BMO_OP_SLOT_MAPPING) {
-		return;
-	}
-
-	mapping = (BMOElemMapping *) BLI_memarena_alloc(op->arena, sizeof(*mapping) + len);
-
-	mapping->element = (BMHeader*) element;
-	mapping->len = len;
-	memcpy(mapping + 1, data, len);
-
-	if (!slot->data.ghash) {
-		slot->data.ghash = BLI_ghash_new(BLI_ghashutil_ptrhash,
-		                                 BLI_ghashutil_ptrcmp, "bmesh op");
-	}
-
-	BLI_ghash_insert(slot->data.ghash, element, mapping);
-}
-
-BM_INLINE void BMO_slot_map_int_insert(BMesh *bm, BMOperator *op, const char *slotname,
-                                       void *element, int val)
-{
-	BMO_slot_map_insert(bm, op, slotname, element, &val, sizeof(int));
-}
-
-BM_INLINE void BMO_slot_map_float_insert(BMesh *bm, BMOperator *op, const char *slotname,
-                                         void *element, float val)
-{
-	BMO_slot_map_insert(bm, op, slotname, element, &val, sizeof(float));
-}
-
-BM_INLINE void BMO_slot_map_ptr_insert(BMesh *bm, BMOperator *op, const char *slotname,
-                                       void *element, void *val)
-{
-	BMO_slot_map_insert(bm, op, slotname, element, &val, sizeof(void*));
-}
-
-BM_INLINE int BMO_slot_map_contains(BMesh *UNUSED(bm), BMOperator *op, const char *slotname, void *element)
-{
-	BMOpSlot *slot = BMO_slot_get(op, slotname);
-
-	/*sanity check*/
-	if (slot->slottype != BMO_OP_SLOT_MAPPING) return 0;
-	if (!slot->data.ghash) return 0;
-
-	return BLI_ghash_haskey(slot->data.ghash, element);
-}
-
-BM_INLINE void *BMO_slot_map_data_get(BMesh *UNUSED(bm), BMOperator *op, const char *slotname,
-                                      void *element)
-{
-	BMOElemMapping *mapping;
-	BMOpSlot *slot = BMO_slot_get(op, slotname);
-
-	/*sanity check*/
-	if (slot->slottype != BMO_OP_SLOT_MAPPING) return NULL;
-	if (!slot->data.ghash) return NULL;
-
-	mapping = (BMOElemMapping *)BLI_ghash_lookup(slot->data.ghash, element);
-
-	if (!mapping) return NULL;
-
-	return mapping + 1;
-}
-
-BM_INLINE float BMO_slot_map_float_get(BMesh *bm, BMOperator *op, const char *slotname,
-                                       void *element)
-{
-	float *val = (float*) BMO_slot_map_data_get(bm, op, slotname, element);
-	if (val) return *val;
-
-	return 0.0f;
-}
-
-BM_INLINE int BMO_slot_map_int_get(BMesh *bm, BMOperator *op, const char *slotname,
-                                   void *element)
-{
-	int *val = (int*) BMO_slot_map_data_get(bm, op, slotname, element);
-	if (val) return *val;
-
-	return 0;
-}
-
-BM_INLINE void *BMO_slot_map_ptr_get(BMesh *bm, BMOperator *op, const char *slotname,
-                                     void *element)
-{
-	void **val = (void**) BMO_slot_map_data_get(bm, op, slotname, element);
-	if (val) return *val;
-
-	return NULL;
-}
 
 #ifdef __cplusplus
 }

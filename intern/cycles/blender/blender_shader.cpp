@@ -517,6 +517,9 @@ static void add_nodes(BL::BlendData b_data, ShaderGraph *graph, BL::ShaderNodeTr
 			/* add proxy converter nodes for inputs and outputs */
 			BL::NodeGroup b_gnode(*b_node);
 			BL::ShaderNodeTree b_group_ntree(b_gnode.node_tree());
+			if (!b_group_ntree)
+				continue;
+
 			BL::Node::inputs_iterator b_input;
 			BL::Node::outputs_iterator b_output;
 			
@@ -694,6 +697,18 @@ void BlenderSync::sync_world()
 			out = graph->output();
 
 			graph->connect(closure->output("Background"), out->input("Surface"));
+		}
+
+		/* AO */
+		if(b_world) {
+			BL::WorldLighting b_light = b_world.light_settings();
+
+			if(b_light.use_ambient_occlusion())
+				background->ao_factor = b_light.ao_factor();
+			else
+				background->ao_factor = 0.0f;
+
+			background->ao_distance = b_light.distance();
 		}
 
 		shader->set_graph(graph);

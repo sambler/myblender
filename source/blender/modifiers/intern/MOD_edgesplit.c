@@ -69,7 +69,7 @@ static DerivedMesh *doEdgeSplit(DerivedMesh *dm, EdgeSplitModifierData *emd, Obj
 	em = DM_to_editbmesh(ob, dm, NULL, FALSE);
 	bm = em->bm;
 
-	BM_mesh_normals_update(bm);	
+	BM_mesh_normals_update(bm, FALSE);
 	BMO_push(bm, NULL);
 	
 	if (emd->flags & MOD_EDGESPLIT_FROMANGLE) {
@@ -88,8 +88,13 @@ static DerivedMesh *doEdgeSplit(DerivedMesh *dm, EdgeSplitModifierData *emd, Obj
 	
 	if (emd->flags & MOD_EDGESPLIT_FROMFLAG) {
 		BM_ITER(e, &iter, bm, BM_EDGES_OF_MESH, NULL) {
-			if (!BM_elem_flag_test(e, BM_ELEM_SMOOTH)) {
-				BMO_elem_flag_enable(bm, e, EDGE_MARK);
+			/* check for 2 or more edge users */
+			if ((e->l) &&
+			    (e->l->next != e->l))
+			{
+				if (!BM_elem_flag_test(e, BM_ELEM_SMOOTH)) {
+					BMO_elem_flag_enable(bm, e, EDGE_MARK);
+				}
 			}
 		}
 	}

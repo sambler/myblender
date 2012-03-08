@@ -218,7 +218,7 @@ void draw_volume(ARegion *ar, GPUTexture *tex, float *min, float *max, int res[3
 	
 	float size[3];
 
-	if(!tex) {
+	if (!tex) {
 		printf("Could not allocate 3D texture for 3D View smoke drawing.\n");
 		return;
 	}
@@ -305,12 +305,12 @@ void draw_volume(ARegion *ar, GPUTexture *tex, float *min, float *max, int res[3
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-	/*
+#if 0
 	printf("Viewinv:\n");
 	printf("%f, %f, %f\n", rv3d->viewinv[0][0], rv3d->viewinv[0][1], rv3d->viewinv[0][2]);
 	printf("%f, %f, %f\n", rv3d->viewinv[1][0], rv3d->viewinv[1][1], rv3d->viewinv[1][2]);
 	printf("%f, %f, %f\n", rv3d->viewinv[2][0], rv3d->viewinv[2][1], rv3d->viewinv[2][2]);
-	*/
+#endif
 
 	// get view vector
 	copy_v3_v3(viewnormal, rv3d->viewinv[2]);
@@ -331,7 +331,7 @@ void draw_volume(ARegion *ar, GPUTexture *tex, float *min, float *max, int res[3
 		}
 	}
 
-	if(i >= 8) {
+	if (i >= 8) {
 		/* fallback, avoid using buffer over-run */
 		i= 0;
 	}
@@ -339,8 +339,7 @@ void draw_volume(ARegion *ar, GPUTexture *tex, float *min, float *max, int res[3
 	// printf("i: %d\n", i);
 	// printf("point %f, %f, %f\n", cv[i][0], cv[i][1], cv[i][2]);
 
-	if (GL_TRUE == glewIsSupported("GL_ARB_fragment_program"))
-	{
+	if (GL_TRUE == glewIsSupported("GL_ARB_fragment_program")) {
 		glEnable(GL_FRAGMENT_PROGRAM_ARB);
 		glGenProgramsARB(1, &prog);
 
@@ -356,7 +355,7 @@ void draw_volume(ARegion *ar, GPUTexture *tex, float *min, float *max, int res[3
 		printf("Your gfx card does not support 3D View smoke drawing.\n");
 
 	GPU_texture_bind(tex, 0);
-	if(tex_shadow)
+	if (tex_shadow)
 		GPU_texture_bind(tex_shadow, 1);
 	else
 		printf("No volume shadow\n");
@@ -382,11 +381,11 @@ void draw_volume(ARegion *ar, GPUTexture *tex, float *min, float *max, int res[3
 
 	points = MEM_callocN(sizeof(float)*12*3, "smoke_points_preview");
 
-	while(1) {
+	while (1) {
 		float p0[3];
 		float tmp_point[3], tmp_point2[3];
 
-		if(dd*(float)n > ds)
+		if (dd*(float)n > ds)
 			break;
 
 		copy_v3_v3(tmp_point, viewnormal);
@@ -406,12 +405,9 @@ void draw_volume(ARegion *ar, GPUTexture *tex, float *min, float *max, int res[3
 			copy_v3_v3(p0, points);
 
 			// sort points to get a convex polygon
-			for(i = 1; i < numpoints - 1; i++)
-			{
-				for(j = i + 1; j < numpoints; j++)
-				{
-					if(!convex(p0, viewnormal, &points[j * 3], &points[i * 3]))
-					{
+			for (i = 1; i < numpoints - 1; i++) {
+				for (j = i + 1; j < numpoints; j++) {
+					if (!convex(p0, viewnormal, &points[j * 3], &points[i * 3])) {
 						float tmp2[3];
 						copy_v3_v3(tmp2, &points[j * 3]);
 						copy_v3_v3(&points[j * 3], &points[i * 3]);
@@ -437,12 +433,11 @@ void draw_volume(ARegion *ar, GPUTexture *tex, float *min, float *max, int res[3
 	tend();
 	// printf ( "Draw Time: %f\n",( float ) tval() );
 
-	if(tex_shadow)
+	if (tex_shadow)
 		GPU_texture_unbind(tex_shadow);
 	GPU_texture_unbind(tex);
 
-	if(GLEW_ARB_fragment_program)
-	{
+	if (GLEW_ARB_fragment_program) {
 		glDisable(GL_FRAGMENT_PROGRAM_ARB);
 		glDeleteProgramsARB(1, &prog);
 	}
@@ -450,10 +445,11 @@ void draw_volume(ARegion *ar, GPUTexture *tex, float *min, float *max, int res[3
 
 	MEM_freeN(points);
 
-	if(!gl_blend)
+	if (!gl_blend) {
 		glDisable(GL_BLEND);
-	if(gl_depth)
-	{
+	}
+
+	if (gl_depth) {
 		glEnable(GL_DEPTH_TEST);
 		glDepthMask(GL_TRUE);	
 	}

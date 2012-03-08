@@ -506,12 +506,25 @@ static AVStream* alloc_video_stream(RenderData *rd, int codec_id, AVFormatContex
 	}
 	
 	// Keep lossless encodes in the RGB domain.
-	if (codec_id == CODEC_ID_HUFFYUV || codec_id == CODEC_ID_FFV1) {
+	if (codec_id == CODEC_ID_HUFFYUV) {
 		/* HUFFYUV was PIX_FMT_YUV422P before */
 		c->pix_fmt = PIX_FMT_RGB32;
 	}
 
-	if ( codec_id == CODEC_ID_QTRLE ) {
+	if (codec_id == CODEC_ID_FFV1) {
+#ifdef FFMPEG_FFV1_ALPHA_SUPPORTED
+		if (rd->im_format.planes ==  R_IMF_PLANES_RGBA) {
+			c->pix_fmt = PIX_FMT_RGB32;
+		}
+		else {
+			c->pix_fmt = PIX_FMT_BGR0;
+		}
+#else
+		c->pix_fmt = PIX_FMT_RGB32;
+#endif
+	}
+
+	if (codec_id == CODEC_ID_QTRLE ) {
 		if (rd->im_format.planes ==  R_IMF_PLANES_RGBA) {
 			c->pix_fmt = PIX_FMT_ARGB;
 		}
@@ -614,8 +627,7 @@ static AVStream* alloc_audio_stream(RenderData *rd, int codec_id, AVFormatContex
 
 	if((c->codec_id >= CODEC_ID_PCM_S16LE) && (c->codec_id <= CODEC_ID_PCM_DVD))
 		audio_input_samples = audio_outbuf_size * 8 / c->bits_per_coded_sample / c->channels;
-	else
-	{
+	else {
 		audio_input_samples = c->frame_size;
 		if(c->frame_size * c->channels * sizeof(int16_t) * 4 > audio_outbuf_size)
 			audio_outbuf_size = c->frame_size * c->channels * sizeof(int16_t) * 4;
@@ -981,8 +993,7 @@ void end_ffmpeg(void)
 	}*/
 
 #ifdef WITH_AUDASPACE
-	if(audio_mixdown_device)
-	{
+	if (audio_mixdown_device) {
 		AUD_closeReadDevice(audio_mixdown_device);
 		audio_mixdown_device = 0;
 	}
@@ -1141,12 +1152,13 @@ IDProperty *ffmpeg_property_add(RenderData *rd, const char *type, int opt_index,
 
 /* not all versions of ffmpeg include that, so here we go ... */
 
-static const AVOption *my_av_find_opt(void *v, const char *name, 
-					  const char *unit, int mask, int flags){
+static const AVOption *my_av_find_opt(void *v, const char *name,
+                                      const char *unit, int mask, int flags)
+{
 	AVClass *c= *(AVClass**)v; 
 	const AVOption *o= c->option;
 
-	for(;o && o->name; o++){
+	for(;o && o->name; o++) {
 		if(!strcmp(o->name, name) && 
 		   (!unit || (o->unit && !strcmp(o->unit, unit))) && 
 		   (o->flags & mask) == flags )
@@ -1420,6 +1432,21 @@ void ffmpeg_verify_image_type(RenderData *rd, ImageFormatData *imf)
 void ffmpeg_verify_codec_settings(RenderData *rd)
 {
 	ffmpeg_set_expert_options(rd);
+}
+
+int ffmpeg_alpha_channel_supported(RenderData *rd)
+{
+	int codec = rd->ffcodecdata.codec;
+
+	if (codec == CODEC_ID_QTRLE)
+		return TRUE;
+
+#ifdef FFMPEG_FFV1_ALPHA_SUPPORTED
+	if (codec == CODEC_ID_FFV1)
+		return TRUE;
+#endif
+
+	return FALSE;
 }
 
 #endif

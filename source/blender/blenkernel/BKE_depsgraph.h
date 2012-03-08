@@ -35,9 +35,7 @@ extern "C" {
 //} for code folding
 #endif
 
-/*
-#define DEPS_DEBUG
-*/
+// #define DEPS_DEBUG
 
 struct ID;
 struct Main;
@@ -97,9 +95,6 @@ struct DagNodeQueue *get_all_childs(struct DagForest	*dag, void *ob); //
 short		are_obs_related(struct DagForest	*dag, void *ob1, void *ob2);
 int					is_acyclic(struct DagForest	*dag); //
 //int					get_cycles(struct DagForest	*dag, struct DagNodeQueue **queues, int *count); //
-
-void	boundbox_deps(void);
-void	draw_all_deps(void);
 
 /* ********** API *************** */
 /* Note that the DAG never executes changes in Objects, only sets flags in Objects */

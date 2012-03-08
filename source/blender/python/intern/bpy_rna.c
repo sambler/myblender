@@ -733,7 +733,7 @@ int pyrna_enum_value_from_id(EnumPropertyItem *item, const char *identifier, int
 {
 	if (RNA_enum_value_from_id(item, identifier, value) == 0) {
 		const char *enum_str = BPy_enum_as_string(item);
-		PyErr_Format(PyExc_TypeError,
+		PyErr_Format(PyExc_ValueError,
 		             "%s: '%.200s' not found in (%s)",
 		             error_prefix, identifier, enum_str);
 		MEM_freeN((void *)enum_str);
@@ -912,7 +912,7 @@ static PyObject *pyrna_prop_str(BPy_PropertyRNA *self)
 		int len = -1;
 		char *c = type_fmt;
 
-		while ((*c++= tolower(*type_id++))) {} ;
+		while ((*c++= tolower(*type_id++))) {}
 
 		if (type == PROP_COLLECTION) {
 			len = pyrna_prop_collection_length(self);
@@ -999,7 +999,7 @@ static PyObject *pyrna_func_repr(BPy_FunctionRNA *self)
 }
 
 
-static long pyrna_struct_hash(BPy_StructRNA *self)
+static Py_hash_t pyrna_struct_hash(BPy_StructRNA *self)
 {
 	return _Py_HashPointer(self->ptr.data);
 }
@@ -1309,11 +1309,11 @@ static PyObject *pyrna_enum_to_py(PointerRNA *ptr, PropertyRNA *prop, int val)
 
 			if (free)
 				MEM_freeN(enum_item);
-			/*
+#if 0
 			PyErr_Format(PyExc_AttributeError,
 			             "RNA Error: Current value \"%d\" matches no enum", val);
 			ret = NULL;
-			*/
+#endif
 		}
 	}
 
@@ -2470,7 +2470,7 @@ static int pyrna_prop_collection_type_check(BPy_PropertyRNA *self, PyObject *val
 }
 
 /* note: currently this is a copy of 'pyrna_prop_collection_subscript' with
- * large blocks commented, we may support slice/key indicies later */
+ * large blocks commented, we may support slice/key indices later */
 static int pyrna_prop_collection_ass_subscript(BPy_PropertyRNA *self, PyObject *key, PyObject *value)
 {
 	PYRNA_PROP_CHECK_INT(self);
@@ -2549,10 +2549,12 @@ static PyObject *pyrna_prop_array_subscript(BPy_PropertyArrayRNA *self, PyObject
 {
 	PYRNA_PROP_CHECK_OBJ((BPy_PropertyRNA *)self);
 
-	/*if (PyUnicode_Check(key)) {
+#if 0
+	if (PyUnicode_Check(key)) {
 		return pyrna_prop_array_subscript_str(self, _PyUnicode_AsString(key));
 	}
-	else */
+	else
+#endif
 	if (PyIndex_Check(key)) {
 		Py_ssize_t i = PyNumber_AsSsize_t(key, PyExc_IndexError);
 		if (i == -1 && PyErr_Occurred())
@@ -2619,7 +2621,7 @@ static int prop_subscript_ass_array_slice(PointerRNA *ptr, PropertyRNA *prop,
 	if (PySequence_Fast_GET_SIZE(value) != stop-start) {
 		Py_DECREF(value);
 		PyErr_SetString(PyExc_TypeError,
-		                "bpy_prop_array[slice] = value: resizing bpy_struct arrays isn't supported");
+		                "bpy_prop_array[slice] = value: re-sizing bpy_struct arrays isn't supported");
 		return -1;
 	}
 
@@ -2836,7 +2838,7 @@ static int pyrna_prop_collection_contains(BPy_PropertyRNA *self, PyObject *key)
 
 		if (keyname == NULL) {
 			PyErr_SetString(PyExc_TypeError,
-			                "bpy_prop_collection.__contains__: expected a string or a typle of strings");
+			                "bpy_prop_collection.__contains__: expected a string or a tuple of strings");
 			return -1;
 		}
 
@@ -3576,14 +3578,14 @@ static int pyrna_struct_meta_idprop_setattro(PyObject *cls, PyObject *attr, PyOb
 
 	if (srna == NULL) {
 		/* allow setting on unregistered classes which can be registered later on */
-		/*
+#if 0
 		if (value && is_deferred_prop) {
 			PyErr_Format(PyExc_AttributeError,
 			             "pyrna_struct_meta_idprop_setattro() unable to get srna from class '%.200s'",
 			             ((PyTypeObject *)cls)->tp_name);
 			return -1;
 		}
-		*/
+#endif
 		/* srna_from_self may set an error */
 		PyErr_Clear();
 		return PyType_Type.tp_setattro(cls, attr, value);
@@ -4571,14 +4573,14 @@ static PyObject *pyrna_struct_new(PyTypeObject *type, PyObject *args, PyObject *
 		else if (PyType_IsSubtype(Py_TYPE(base), &pyrna_struct_Type)) {
 			/* this almost never runs, only when using user defined subclasses of built-in object.
 			 * this isn't common since its NOT related to registerable subclasses. eg:
-
-				>>> class MyObSubclass(bpy.types.Object):
-				...     def test_func(self):
-				...         print(100)
-				...
-				>>> myob = MyObSubclass(bpy.context.object)
-				>>> myob.test_func()
-				100
+			 *
+			 *  >>> class MyObSubclass(bpy.types.Object):
+			 *  ...     def test_func(self):
+			 *  ...         print(100)
+			 *  ...
+			 *  >>> myob = MyObSubclass(bpy.context.object)
+			 *  >>> myob.test_func()
+			 *  100
 			 *
 			 * Keep this since it could be useful.
 			 */
@@ -4866,7 +4868,7 @@ static PyObject *pyrna_func_call(BPy_FunctionRNA *self, PyObject *args, PyObject
 	}
 
 	/* for testing */
-	/*
+#if 0
 	{
 		const char *fn;
 		int lineno;
@@ -4874,7 +4876,7 @@ static PyObject *pyrna_func_call(BPy_FunctionRNA *self, PyObject *args, PyObject
 		printf("pyrna_func_call > %.200s.%.200s : %.200s:%d\n",
 		       RNA_struct_identifier(self_ptr->type), RNA_function_identifier(self_func), fn, lineno);
 	}
-	*/
+#endif
 
 	/* include the ID pointer for pyrna_param_to_py() so we can include the
 	 * ID pointer on return values, this only works when returned values have
@@ -5104,14 +5106,14 @@ static PyObject *pyrna_func_call(BPy_FunctionRNA *self, PyObject *args, PyObject
 
 
 #ifdef DEBUG_STRING_FREE
-	/*
+#if 0
 	if (PyList_GET_SIZE(string_free_ls)) {
 		printf("%.200s.%.200s():  has %d strings\n",
 		       RNA_struct_identifier(self_ptr->type),
 		       RNA_function_identifier(self_func),
 		       (int)PyList_GET_SIZE(string_free_ls));
 	}
-	 */
+#endif
 	Py_DECREF(string_free_ls);
 #undef DEBUG_STRING_FREE
 #endif
@@ -6018,10 +6020,10 @@ static PyObject* pyrna_srna_Subtype(StructRNA *srna)
 		 * mainly for the purposing of matching the C/rna type hierarchy */
 	else {
 		/* subclass equivalents
-		- class myClass(myBase):
-			some = 'value' # or ...
-		- myClass = type(name='myClass', bases=(myBase,), dict={'__module__':'bpy.types'})
-		*/
+		 * - class myClass(myBase):
+		 *     some = 'value' # or ...
+		 * - myClass = type(name='myClass', bases=(myBase,), dict={'__module__':'bpy.types'})
+		 */
 
 		/* Assume RNA_struct_py_type_get(srna) was already checked */
 		PyObject *py_base = pyrna_srna_PyBase(srna);
@@ -6500,14 +6502,16 @@ static int deferred_register_prop(StructRNA *srna, PyObject *key, PyObject *item
 
 			py_ret = PyObject_Call(py_func, args_fake, py_kw);
 
-			Py_DECREF(args_fake); /* free's py_srna_cobject too */
-
 			if (py_ret) {
 				Py_DECREF(py_ret);
+				Py_DECREF(args_fake); /* free's py_srna_cobject too */
 			}
 			else {
+				/* _must_ print before decreffing args_fake */
 				PyErr_Print();
 				PyErr_Clear();
+
+				Py_DECREF(args_fake); /* free's py_srna_cobject too */
 
 				// PyC_LineSpit();
 				PyErr_Format(PyExc_ValueError,
@@ -6521,8 +6525,10 @@ static int deferred_register_prop(StructRNA *srna, PyObject *key, PyObject *item
 			/* Since this is a class dict, ignore args that can't be passed */
 
 			/* for testing only */
-			/* PyC_ObSpit("Why doesn't this work??", item);
-			PyErr_Print(); */
+#if 0
+			PyC_ObSpit("Why doesn't this work??", item);
+			PyErr_Print();
+#endif
 			PyErr_Clear();
 		}
 	}
@@ -6857,7 +6863,7 @@ static int bpy_class_call(bContext *C, PointerRNA *ptr, FunctionRNA *func, Param
 #if 1
 			/* Skip the code below and call init directly on the allocated 'py_srna'
 			 * otherwise __init__() always needs to take a second self argument, see pyrna_struct_new().
-			 * Although this is annoying to have to impliment a part of pythons typeobject.c:type_call().
+			 * Although this is annoying to have to implement a part of pythons typeobject.c:type_call().
 			 */
 			if (py_class->tp_init) {
 #ifdef USE_PEDANTIC_WRITE
@@ -6884,9 +6890,12 @@ static int bpy_class_call(bContext *C, PointerRNA *ptr, FunctionRNA *func, Param
 			rna_disallow_writes = TRUE;
 
 			/* 'almost' all the time calling the class isn't needed.
-			 * We could just do...
+			 * We could just do... */
+#if 0
 			py_class_instance = py_srna;
 			Py_INCREF(py_class_instance);
+#endif
+			/*
 			 * This would work fine but means __init__ functions wouldnt run.
 			 * none of blenders default scripts use __init__ but its nice to call it
 			 * for general correctness. just to note why this is here when it could be safely removed.
@@ -7228,14 +7237,14 @@ static PyObject *pyrna_register_class(PyObject *UNUSED(self), PyObject *py_class
 		return NULL;
 
 	/* fails in cases, cant use this check but would like to :| */
-	/*
+#if 0
 	if (RNA_struct_py_type_get(srna)) {
 		PyErr_Format(PyExc_ValueError,
 		             "register_class(...): %.200s's parent class %.200s is already registered, this is not allowed",
 		             ((PyTypeObject *)py_class)->tp_name, RNA_struct_identifier(srna));
 		return NULL;
 	}
-	*/
+#endif
 
 	/* check that we have a register callback for this type */
 	reg = RNA_struct_register(srna);
@@ -7350,11 +7359,13 @@ static PyObject *pyrna_unregister_class(PyObject *UNUSED(self), PyObject *py_cla
 		return NULL;
 	}
 
-	/*if (PyDict_GetItem(((PyTypeObject *)py_class)->tp_dict, bpy_intern_str_bl_rna) == NULL) {
+#if 0
+	if (PyDict_GetItem(((PyTypeObject *)py_class)->tp_dict, bpy_intern_str_bl_rna) == NULL) {
 		PWM_cursor_wait(0);
 		PyErr_SetString(PyExc_ValueError, "unregister_class(): not a registered as a subclass");
 		return NULL;
-	}*/
+	}
+#endif
 
 	if (!pyrna_write_check()) {
 		PyErr_Format(PyExc_RuntimeError,

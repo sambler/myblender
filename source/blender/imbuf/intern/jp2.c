@@ -146,7 +146,7 @@ struct ImBuf *imb_jp2_decode(unsigned char *mem, size_t size, int flags)
 	/* decode the stream and fill the image structure */
 	image = opj_decode(dinfo, cio);
 	
-	if(!image) {
+	if (!image) {
 		fprintf(stderr, "ERROR -> j2k_to_image: failed to decode image!\n");
 		opj_destroy_decompress(dinfo);
 		opj_cio_close(cio);
@@ -157,8 +157,7 @@ struct ImBuf *imb_jp2_decode(unsigned char *mem, size_t size, int flags)
 	opj_cio_close(cio);
 
 
-	if((image->numcomps * image->x1 * image->y1) == 0)
-	{
+	if((image->numcomps * image->x1 * image->y1) == 0) {
 		fprintf(stderr,"\nError: invalid raw image parameters\n");
 		return NULL;
 	}
@@ -329,7 +328,7 @@ static int initialise_4K_poc(opj_poc_t *POC, int numres)
 
 static void cinema_parameters(opj_cparameters_t *parameters)
 {
-	parameters->tile_size_on = false;
+	parameters->tile_size_on = FALSE;
 	parameters->cp_tdx=1;
 	parameters->cp_tdy=1;
 	
@@ -403,7 +402,7 @@ static void cinema_setup_encoder(opj_cparameters_t *parameters,opj_image_t *imag
 	case CINEMA2K_24:
 	case CINEMA4K_24:
 		for(i=0 ; i<parameters->tcp_numlayers ; i++){
-			temp_rate = 0 ;
+			temp_rate = 0;
 			if (img_fol->rates[i]== 0){
 				parameters->tcp_rates[0]= ((float) (image->numcomps * image->comps[0].w * image->comps[0].h * image->comps[0].prec))/ 
 					(CINEMA_24_CS * 8 * image->comps[0].dx * image->comps[0].dy);
@@ -423,7 +422,7 @@ static void cinema_setup_encoder(opj_cparameters_t *parameters,opj_image_t *imag
 		
 	case CINEMA2K_48:
 		for(i=0 ; i<parameters->tcp_numlayers ; i++){
-			temp_rate = 0 ;
+			temp_rate = 0;
 			if (img_fol->rates[i]== 0){
 				parameters->tcp_rates[0]= ((float) (image->numcomps * image->comps[0].w * image->comps[0].h * image->comps[0].prec))/ 
 					(CINEMA_48_CS * 8 * image->comps[0].dx * image->comps[0].dy);

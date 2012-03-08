@@ -135,19 +135,20 @@ static int vol_get_bounds(ShadeInput *shi, const float co[3], const float vec[3]
 		isect->skip = RE_SKIP_VLR_NEIGHBOUR;
 		isect->orig.face = (void*)shi->vlr;
 		isect->orig.ob = (void*)shi->obi;
-	} else { // if (intersect_type == VOL_BOUNDS_SS) {
+	}
+	else { // if (intersect_type == VOL_BOUNDS_SS) {
 		isect->skip= 0;
 		isect->orig.face= NULL;
 		isect->orig.ob = NULL;
 	}
 	
-	if(RE_rayobject_raycast(R.raytree, isect))
-	{
+	if(RE_rayobject_raycast(R.raytree, isect)) {
 		hitco[0] = isect->start[0] + isect->dist*isect->dir[0];
 		hitco[1] = isect->start[1] + isect->dist*isect->dir[1];
 		hitco[2] = isect->start[2] + isect->dist*isect->dir[2];
 		return 1;
-	} else {
+	}
+	else {
 		return 0;
 	}
 }
@@ -365,7 +366,7 @@ static float vol_get_phasefunc(ShadeInput *UNUSED(shi), float g, const float w[3
 	const float normalize = 0.25f; // = 1.f/4.f = M_PI/(4.f*M_PI)
 	
 	/* normalization constant is 1/4 rather than 1/4pi, since
-	 * Blender's shading system doesn't normalise for
+	 * Blender's shading system doesn't normalize for
 	 * energy conservation - eg. multiplying by pdf ( 1/pi for a lambert brdf ).
 	 * This means that lambert surfaces in Blender are pi times brighter than they 'should be'
 	 * and therefore, with correct energy conservation, volumes will darker than other solid objects,
@@ -492,8 +493,7 @@ static void vol_shade_one_lamp(struct ShadeInput *shi, const float co[3], const 
 	if (shi->mat->vol.shade_type == MA_VOL_SHADE_SHADOWED) {
 		mul_v3_fl(lacol, vol_get_shadow(shi, lar, co));
 	}
-	else if (ELEM3(shi->mat->vol.shade_type, MA_VOL_SHADE_SHADED, MA_VOL_SHADE_MULTIPLE, MA_VOL_SHADE_SHADEDPLUSMULTIPLE))
-	{
+	else if (ELEM3(shi->mat->vol.shade_type, MA_VOL_SHADE_SHADED, MA_VOL_SHADE_MULTIPLE, MA_VOL_SHADE_SHADEDPLUSMULTIPLE)) {
 		Isect is;
 		
 		if (shi->mat->vol.shadeflag & MA_VOL_RECV_EXT_SHADOW) {
@@ -686,8 +686,7 @@ static void volume_trace(struct ShadeInput *shi, struct ShadeResult *shr, int in
 	}
 	
 
-	if (inside_volume == VOL_SHADE_INSIDE)
-	{
+	if (inside_volume == VOL_SHADE_INSIDE) {
 		startco = shi->camera_co;
 		endco = shi->co;
 		
@@ -706,8 +705,7 @@ static void volume_trace(struct ShadeInput *shi, struct ShadeResult *shr, int in
 	}
 	/* trace to find a backface, the other side bounds of the volume */
 	/* (ray intersect ignores front faces here) */
-	else if (vol_get_bounds(shi, shi->co, shi->view, hitco, &is, VOL_BOUNDS_DEPTH))
-	{
+	else if (vol_get_bounds(shi, shi->co, shi->view, hitco, &is, VOL_BOUNDS_DEPTH)) {
 		VlakRen *vlr = (VlakRen *)is.hit.face;
 		
 		startco = shi->co;

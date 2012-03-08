@@ -366,7 +366,7 @@ class Mesh(bpy_types.ID):
         :type edges: iterable object
         :arg faces:
 
-           iterator of faces, each faces contains three or four indices to
+           iterator of faces, each faces contains three or more indices to
            the *vertices* argument. eg: [(5, 6, 8, 9), (1, 2, 3), ...]
 
         :type faces: iterable object
@@ -393,6 +393,10 @@ class Mesh(bpy_types.ID):
             p.loop_total = loop_len
             p.vertices = f
             loop_index += loop_len
+
+        # if no edges - calculae them
+        if faces and (not edges):
+            self.update(calc_edges=True)
 
     @property
     def edge_keys(self):
@@ -442,6 +446,7 @@ class MeshFace(StructRNA):
                     ord_ind(verts[3], verts[0]),
                     )
 
+
 class MeshPolygon(StructRNA):
     __slots__ = ()
 
@@ -449,13 +454,14 @@ class MeshPolygon(StructRNA):
     def edge_keys(self):
         verts = self.vertices[:]
         vlen = len(self.vertices)
-        return [ord_ind(verts[i], verts[(i+1) % vlen]) for i in range(vlen)]
+        return [ord_ind(verts[i], verts[(i + 1) % vlen]) for i in range(vlen)]
 
     @property
     def loops(self):
         start = self.loop_start
         end = start + self.loop_total
         return range(start, end)
+
 
 class Text(bpy_types.ID):
     __slots__ = ()

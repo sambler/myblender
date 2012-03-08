@@ -154,7 +154,7 @@ static int graphkeys_deselectall_exec(bContext *C, wmOperator *op)
 	if (ANIM_animdata_get_context(C, &ac) == 0)
 		return OPERATOR_CANCELLED;
 		
-	/* 'standard' behaviour - check if selected, then apply relevant selection */
+	/* 'standard' behavior - check if selected, then apply relevant selection */
 	if (RNA_boolean_get(op->ptr, "invert"))
 		deselect_graph_keys(&ac, 0, SELECT_INVERT, TRUE);
 	else
@@ -193,7 +193,7 @@ void GRAPH_OT_select_all_toggle (wmOperatorType *ot)
  */
 
 /* Borderselect only selects keyframes now, as overshooting handles often get caught too,
- * which means that they may be inadvertantly moved as well. However, incl_handles overrides
+ * which means that they may be inadvertently moved as well. However, incl_handles overrides
  * this, and allow handles to be considered independently too.
  * Also, for convenience, handles should get same status as keyframe (if it was within bounds).
  */
@@ -325,7 +325,7 @@ static int graphkeys_borderselect_exec(bContext *C, wmOperator *op)
 	if (RNA_boolean_get(op->ptr, "axis_range")) {
 		/* mode depends on which axis of the range is larger to determine which axis to use 
 		 *	- checking this in region-space is fine, as it's fundamentally still going to be a different rect size
-		 *	- the frame-range select option is favoured over the channel one (x over y), as frame-range one is often
+		 *	- the frame-range select option is favored over the channel one (x over y), as frame-range one is often
 		 *	  used for tweaking timing when "blocking", while channels is not that useful...
 		 */
 		if ((rect.xmax - rect.xmin) >= (rect.ymax - rect.ymin))
@@ -449,7 +449,7 @@ static void columnselect_graph_keys (bAnimContext *ac, short mode)
 	KeyframeEditFunc select_cb, ok_cb;
 	KeyframeEditData ked;
 	
-	/* initialise keyframe editing data */
+	/* initialize keyframe editing data */
 	memset(&ked, 0, sizeof(KeyframeEditData));
 	
 	/* build list of columns */
@@ -1006,14 +1006,12 @@ static void get_nearest_fcurve_verts_list (bAnimContext *ac, const int mval[2], 
 				/* handles - only do them if they're visible */
 				if (fcurve_handle_sel_check(sipo, bezt1) && (fcu->totvert > 1)) {
 					/* first handle only visible if previous segment had handles */
-					if ( (!prevbezt && (bezt1->ipo==BEZT_IPO_BEZ)) || (prevbezt && (prevbezt->ipo==BEZT_IPO_BEZ)) )
-					{
+					if ((!prevbezt && (bezt1->ipo==BEZT_IPO_BEZ)) || (prevbezt && (prevbezt->ipo==BEZT_IPO_BEZ))) {
 						nearest_fcurve_vert_store(matches, v2d, fcu, bezt1, NULL, NEAREST_HANDLE_LEFT, mval);
 					}
 					
 					/* second handle only visible if this segment is bezier */
-					if (bezt1->ipo == BEZT_IPO_BEZ) 
-					{
+					if (bezt1->ipo == BEZT_IPO_BEZ) {
 						nearest_fcurve_vert_store(matches, v2d, fcu, bezt1, NULL, NEAREST_HANDLE_RIGHT, mval);
 					}
 				}
@@ -1180,7 +1178,7 @@ static void mouse_graph_keys (bAnimContext *ac, const int mval[2], short select_
 		KeyframeEditFunc select_cb;
 		KeyframeEditData ked;
 		
-		/* initialise keyframe editing data */
+		/* initialize keyframe editing data */
 		memset(&ked, 0, sizeof(KeyframeEditData));
 		
 		/* set up BezTriple edit callbacks */
@@ -1262,7 +1260,7 @@ static void graphkeys_mselect_column (bAnimContext *ac, const int mval[2], short
 		deselect_graph_keys(ac, 0, SELECT_SUBTRACT, FALSE);
 	}
 	
-	/* initialise keyframe editing data */
+	/* initialize keyframe editing data */
 	memset(&ked, 0, sizeof(KeyframeEditData));
 	
 	/* set up BezTriple edit callbacks */

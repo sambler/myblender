@@ -132,7 +132,7 @@ static void draw_uvs_shadow(Object *obedit)
 	BMIter iter, liter;
 	MLoopUV *luv;
 	
-	em= ((Mesh*)obedit->data)->edit_btmesh;
+	em = BMEdit_FromObject(obedit);
 
 	/* draws the grey mesh when painting */
 	glColor3ub(112, 112, 112);
@@ -661,12 +661,14 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, Object *obedit)
 					}
 					glEnd();
 
-					/*glBegin(GL_LINE_STRIP);
+#if 0
+					glBegin(GL_LINE_STRIP);
 						luv = CustomData_bmesh_get(&em->bm->ldata, efa->lbase->head.data, CD_MLOOPUV);
 						glVertex2fv(luv->uv);
 						luv = CustomData_bmesh_get(&em->bm->ldata, efa->lbase->next->head.data, CD_MLOOPUV);
 						glVertex2fv(luv->uv);
-					glEnd();*/
+					glEnd();
+#endif
 
 					setlinestyle(0);
 				}
@@ -877,6 +879,7 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, Object *obedit)
 
 	/* finally draw stitch preview */
 	if(stitch_preview) {
+		int i, index = 0;
 		glPushClientAttrib(GL_CLIENT_VERTEX_ARRAY_BIT);
 		glEnableClientState(GL_VERTEX_ARRAY);
 
@@ -887,16 +890,22 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, Object *obedit)
 		glVertexPointer(2, GL_FLOAT, 0, stitch_preview->static_tris);
 		glDrawArrays(GL_TRIANGLES, 0, stitch_preview->num_static_tris*3);
 
-		glVertexPointer(2, GL_FLOAT, 0, stitch_preview->preview_tris);
-		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-		UI_ThemeColor4(TH_STITCH_PREVIEW_FACE);
-		glDrawArrays(GL_TRIANGLES, 0, stitch_preview->num_tris*3);
-		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-		UI_ThemeColor4(TH_STITCH_PREVIEW_EDGE);
-		glDrawArrays(GL_TRIANGLES, 0, stitch_preview->num_tris*3);
+		glVertexPointer(2, GL_FLOAT, 0, stitch_preview->preview_polys);
+		for(i = 0; i < stitch_preview->num_polys; i++){
+			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+			UI_ThemeColor4(TH_STITCH_PREVIEW_FACE);
+			glDrawArrays(GL_POLYGON, index, stitch_preview->uvs_per_polygon[i]);
+			glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+			UI_ThemeColor4(TH_STITCH_PREVIEW_EDGE);
+			glDrawArrays(GL_POLYGON, index, stitch_preview->uvs_per_polygon[i]);
+
+			index += stitch_preview->uvs_per_polygon[i];
+		}
 		glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
-		/*UI_ThemeColor4(TH_STITCH_PREVIEW_VERT);
-		glDrawArrays(GL_TRIANGLES, 0, stitch_preview->num_tris*3);*/
+#if 0
+		UI_ThemeColor4(TH_STITCH_PREVIEW_VERT);
+		glDrawArrays(GL_TRIANGLES, 0, stitch_preview->num_tris*3);
+#endif
 		glDisable(GL_BLEND);
 
 		/* draw vert preview */

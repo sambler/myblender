@@ -30,8 +30,8 @@
  *  \brief Sense if other objects are near
  */
 
-#ifndef KX_NEARSENSOR_H
-#define KX_NEARSENSOR_H
+#ifndef __KX_NEARSENSOR_H__
+#define __KX_NEARSENSOR_H__
 
 #include "KX_TouchSensor.h"
 #include "KX_ClientObjectInfo.h"
@@ -76,7 +76,7 @@ public:
 	virtual bool	NewHandleCollision(void* obj1,void* obj2,
 						 const PHY_CollData * coll_data); 
 	virtual bool	BroadPhaseFilterCollision(void*obj1,void*obj2);
-	virtual bool	BroadPhaseSensorFilterCollision(void*obj1,void*obj2) { return false; };
+	virtual bool	BroadPhaseSensorFilterCollision(void* obj1,void* obj2) { return false; }
 	virtual sensortype GetSensorType() { return ST_NEAR; }
 
 #ifdef WITH_PYTHON
@@ -104,5 +104,5 @@ public:
 
 };
 
-#endif //KX_NEARSENSOR_H
+#endif //__KX_NEARSENSOR_H__
 

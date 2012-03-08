@@ -631,8 +631,7 @@ static char *code_generate_vertex(ListBase *nodes)
 	for (node=nodes->first; node; node=node->next)
 		for (input=node->inputs.first; input; input=input->next)
 			if (input->source == GPU_SOURCE_ATTRIB && input->attribfirst) {
-				if(input->attribtype == CD_TANGENT) /* silly exception */
-				{
+				if(input->attribtype == CD_TANGENT) { /* silly exception */
 					BLI_dynstr_appendf(ds, "\tvar%d.xyz = normalize((gl_ModelViewMatrix * vec4(att%d.xyz, 0)).xyz);\n", input->attribid, input->attribid);
 					BLI_dynstr_appendf(ds, "\tvar%d.w = att%d.w;\n", input->attribid, input->attribid);
 				}
@@ -1251,31 +1250,6 @@ int GPU_stack_link(GPUMaterial *mat, const char *name, GPUNodeStack *in, GPUNode
 
 	gpu_material_add_node(mat, node);
 	
-	return 1;
-}
-
-int GPU_stack_link_mute(GPUMaterial *mat, const char *name, LinkInOutsMuteNode *mlnk)
-{
-	GPUNode *node;
-	GPUFunction *function;
-	int i;
-
-	function = GPU_lookup_function(name);
-	if(!function) {
-		fprintf(stderr, "GPU failed to find function %s\n", name);
-		return 0;
-	}
-
-	for(i = 0; i < mlnk->num_outs; i++) {
-		node = GPU_node_begin(name);
-		gpu_node_input_socket(node, (GPUNodeStack*)mlnk->in);
-		GPU_node_output(node, ((GPUNodeStack*)mlnk->outs+i)->type, ((GPUNodeStack*)mlnk->outs+i)->name,
-		                &((GPUNodeStack*)mlnk->outs+i)->link);
-		GPU_node_end(node);
-
-		gpu_material_add_node(mat, node);
-	}
-
 	return 1;
 }
 

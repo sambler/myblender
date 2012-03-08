@@ -133,8 +133,8 @@ static void ringsel_draw(const bContext *C, ARegion *UNUSED(ar), void *arg)
 	}
 }
 
-/*given two opposite edges in a face, finds the ordering of their vertices so
-  that cut preview lines won't cross each other*/
+/* given two opposite edges in a face, finds the ordering of their vertices so
+ * that cut preview lines won't cross each other*/
 static void edgering_find_order(BMEditMesh *em, BMEdge *lasteed, BMEdge *eed, 
                                 BMVert *lastv1, BMVert *v[2][2])
 {
@@ -161,7 +161,7 @@ static void edgering_find_order(BMEditMesh *em, BMEdge *lasteed, BMEdge *eed,
 		return;
 	}
 	
-	l2 = BM_face_other_loop(l->e, l->f, eed->v1);
+	l2 = BM_face_other_edge_loop(l->f, l->e, eed->v1);
 	rev = (l2 == l->prev);
 	while (l2->v != lasteed->v1 && l2->v != lasteed->v2) {
 		l2 = rev ? l2->prev : l2->next;
@@ -255,7 +255,7 @@ static void edgering_sel(tringselOpData *lcd, int previewlines, int select)
 		lasteed = eed;
 	}
 	
-	if (lasteed != startedge && BM_edge_share_faces(lasteed, startedge)) {
+	if (lasteed != startedge && BM_edge_share_face_count(lasteed, startedge)) {
 		v[1][0] = v[0][0];
 		v[1][1] = v[0][1];
 
@@ -289,9 +289,9 @@ static void ringsel_find_edge(tringselOpData *lcd, int cuts)
 {
 	if (lcd->eed) {
 		edgering_sel(lcd, cuts, 0);
-	} else if(lcd->edges) {
-		if (lcd->edges)
-			MEM_freeN(lcd->edges);
+	}
+	else if (lcd->edges) {
+		MEM_freeN(lcd->edges);
 		lcd->edges = NULL;
 		lcd->totedge = 0;
 	}
@@ -308,9 +308,9 @@ static void ringsel_finish(bContext *C, wmOperator *op)
 		edgering_sel(lcd, cuts, 1);
 		
 		if (lcd->do_cut) {
-			BM_mesh_esubdivideflag(lcd->ob, em->bm, BM_ELEM_SELECT, 0.0f, 
-			                  0.0f, 0, cuts, SUBDIV_SELECT_LOOPCUT, 
-			                  SUBD_PATH, 0, FALSE, 0);
+			BM_mesh_esubdivideflag(lcd->ob, em->bm, BM_ELEM_SELECT, 0.0f,
+			                       0.0f, 0, cuts, SUBDIV_SELECT_LOOPCUT,
+			                       SUBD_PATH, 0, FALSE, 0);
 			
 			/* force edge slide to edge select mode in in face select mode */
 			if (em->selectmode & SCE_SELECT_FACE) {
@@ -373,7 +373,7 @@ static int ringsel_init (bContext *C, wmOperator *op, int do_cut)
 	lcd->ar= CTX_wm_region(C);
 	lcd->draw_handle= ED_region_draw_cb_activate(lcd->ar->type, ringsel_draw, lcd, REGION_DRAW_POST_VIEW);
 	lcd->ob = CTX_data_edit_object(C);
-	lcd->em= ((Mesh *)lcd->ob->data)->edit_btmesh;
+	lcd->em = BMEdit_FromObject(lcd->ob);
 	lcd->extend = do_cut ? 0 : RNA_boolean_get(op->ptr, "extend");
 	lcd->do_cut = do_cut;
 	
@@ -394,56 +394,6 @@ static int ringcut_cancel (bContext *C, wmOperator *op)
 	ringsel_exit(C, op);
 	return OPERATOR_CANCELLED;
 }
-
-/* for bmesh this tool is in bmesh_select.c */
-#if 0
-
-static int ringsel_invoke (bContext *C, wmOperator *op, wmEvent *evt)
-{
-	tringselOpData *lcd;
-	EditEdge *edge;
-	int dist = 75;
-	
-	view3d_operator_needs_opengl(C);
-
-	if (!ringsel_init(C, op, 0))
-		return OPERATOR_CANCELLED;
-	
-	lcd = op->customdata;
-	
-	if (lcd->em->selectmode == SCE_SELECT_FACE) {
-		PointerRNA props_ptr;
-		int extend = RNA_boolean_get(op->ptr, "extend");
-
-		ringsel_exit(op);
-
-		WM_operator_properties_create(&props_ptr, "MESH_OT_loop_select");
-		RNA_boolean_set(&props_ptr, "extend", extend);
-		WM_operator_name_call(C, "MESH_OT_loop_select", WM_OP_INVOKE_REGION_WIN, &props_ptr);
-		WM_operator_properties_free(&props_ptr);
-
-		return OPERATOR_CANCELLED;
-	}
-
-	lcd->vc.mval[0] = evt->mval[0];
-	lcd->vc.mval[1] = evt->mval[1];
-	
-	edge = findnearestedge(&lcd->vc, &dist);
-	if(!edge) {
-		ringsel_exit(op);
-		return OPERATOR_CANCELLED;
-	}
-
-	lcd->eed = edge;
-	ringsel_find_edge(lcd, 1);
-
-	ringsel_finish(C, op);
-	ringsel_exit(op);
-
-	return OPERATOR_FINISHED;
-}
-
-#endif
 
 static int ringcut_invoke (bContext *C, wmOperator *op, wmEvent *evt)
 {
@@ -481,6 +431,7 @@ static int loopcut_modal (bContext *C, wmOperator *op, wmEvent *event)
 {
 	int cuts= RNA_int_get(op->ptr,"number_cuts");
 	tringselOpData *lcd= op->customdata;
+	int show_cuts = 0;
 
 	view3d_operator_needs_opengl(C);
 
@@ -527,6 +478,7 @@ static int loopcut_modal (bContext *C, wmOperator *op, wmEvent *event)
 			cuts++;
 			RNA_int_set(op->ptr,"number_cuts",cuts);
 			ringsel_find_edge(lcd, cuts);
+			show_cuts = TRUE;
 			
 			ED_region_tag_redraw(lcd->ar);
 			break;
@@ -539,6 +491,7 @@ static int loopcut_modal (bContext *C, wmOperator *op, wmEvent *event)
 			cuts=MAX2(cuts-1,1);
 			RNA_int_set(op->ptr,"number_cuts",cuts);
 			ringsel_find_edge(lcd, cuts);
+			show_cuts = TRUE;
 			
 			ED_region_tag_redraw(lcd->ar);
 			break;
@@ -564,17 +517,23 @@ static int loopcut_modal (bContext *C, wmOperator *op, wmEvent *event)
 	if (event->val==KM_PRESS) {
 		float value;
 		
-		if (handleNumInput(&lcd->num, event))
-		{
+		if (handleNumInput(&lcd->num, event)) {
 			applyNumInput(&lcd->num, &value);
 			
-			cuts= CLAMPIS(value, 1, 32);
+			cuts= CLAMPIS(value, 1, 130);
 			
 			RNA_int_set(op->ptr,"number_cuts",cuts);
 			ringsel_find_edge(lcd, cuts);
+			show_cuts = TRUE;
 			
 			ED_region_tag_redraw(lcd->ar);
 		}
+	}
+	
+	if (show_cuts) {
+		char buf[64];
+		BLI_snprintf(buf, sizeof(buf), "Number of Cuts: %d", cuts);
+		ED_area_headerprint(CTX_wm_area(C), buf);
 	}
 	
 	/* keep going until the user confirms */

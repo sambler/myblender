@@ -127,7 +127,7 @@ static PyObject *idprop_py_from_idp_idparray(ID *id, IDProperty *prop)
 /* -------------------------------------------------------------------------- */
 
 /* use for both array and group */
-static long BPy_IDGroup_hash(BPy_IDProperty *self)
+static Py_hash_t BPy_IDGroup_hash(BPy_IDProperty *self)
 {
 	return _Py_HashPointer(self->prop);
 }
@@ -399,9 +399,9 @@ const char *BPy_IDProperty_Map_ValidateAndCreate(PyObject *name_obj, IDProperty 
 		if ((val.array.type= idp_sequence_type(ob)) == -1)
 			return "only floats, ints and dicts are allowed in ID property arrays";
 
-		/*validate sequence and derive type.
-		we assume IDP_INT unless we hit a float
-		number; then we assume it's */
+		/* validate sequence and derive type.
+		 * we assume IDP_INT unless we hit a float
+		 * number; then we assume it's */
 
 		val.array.len = PySequence_Size(ob);
 
@@ -443,8 +443,8 @@ const char *BPy_IDProperty_Map_ValidateAndCreate(PyObject *name_obj, IDProperty 
 		keys = PyMapping_Keys(ob);
 		vals = PyMapping_Values(ob);
 
-		/*we allocate the group first; if we hit any invalid data,
-		  we can delete it easily enough.*/
+		/* we allocate the group first; if we hit any invalid data,
+		 * we can delete it easily enough.*/
 		prop = IDP_New(IDP_GROUP, &val, name);
 		len = PyMapping_Length(ob);
 		for (i=0; i<len; i++) {
@@ -666,9 +666,9 @@ static PyObject *BPy_IDGroup_Pop(BPy_IDProperty *self, PyObject *value)
 		pyform = BPy_IDGroup_MapDataToPy(idprop);
 
 		if (!pyform) {
-			/*ok something bad happened with the pyobject,
-			  so don't remove the prop from the group.  if pyform is
-			  NULL, then it already should have raised an exception.*/
+			/* ok something bad happened with the pyobject,
+			 * so don't remove the prop from the group.  if pyform is
+			 * NULL, then it already should have raised an exception.*/
 			return NULL;
 		}
 

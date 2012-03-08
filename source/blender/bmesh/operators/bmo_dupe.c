@@ -316,7 +316,7 @@ static void copy_mesh(BMOperator *op, BMesh *source, BMesh *target)
  *
  */
 
-void dupeop_exec(BMesh *bm, BMOperator *op)
+void bmo_dupe_exec(BMesh *bm, BMOperator *op)
 {
 	BMOperator *dupeop = op;
 	BMesh *bm2 = BMO_slot_ptr_get(op, "dest");
@@ -335,7 +335,7 @@ void dupeop_exec(BMesh *bm, BMOperator *op)
 	BMO_slot_copy(dupeop, dupeop, "geom", "origout");
 
 	/* Now alloc the new output buffer */
-	BMO_slot_from_flag(bm, dupeop, "newout", DUPE_NEW, BM_ALL);
+	BMO_slot_buffer_from_flag(bm, dupeop, "newout", DUPE_NEW, BM_ALL);
 }
 
 #if 0 /* UNUSED */
@@ -348,7 +348,7 @@ void BMO_dupe_from_flag(BMesh *bm, int etypeflag, const char hflag)
 	BMOperator dupeop;
 
 	BMO_op_init(bm, &dupeop, "dupe");
-	BMO_slot_from_hflag(bm, &dupeop, "geom", hflag, etypeflag);
+	BMO_slot_buffer_from_hflag(bm, &dupeop, "geom", hflag, etypeflag);
 
 	BMO_op_exec(bm, &dupeop);
 	BMO_op_finish(bm, &dupeop);
@@ -374,16 +374,12 @@ void BMO_dupe_from_flag(BMesh *bm, int etypeflag, const char hflag)
  */
 
 #define SPLIT_INPUT	1
-void splitop_exec(BMesh *bm, BMOperator *op)
+void bmo_split_exec(BMesh *bm, BMOperator *op)
 {
 	BMOperator *splitop = op;
 	BMOperator dupeop;
 	BMOperator delop;
-	BMVert *v;
-	BMEdge *e;
-	BMFace *f;
-	BMIter iter, iter2;
-	int found;
+	const short use_only_faces = BMO_slot_bool_get(op, "use_only_faces");
 
 	/* initialize our sub-operator */
 	BMO_op_init(bm, &dupeop, "dupe");
@@ -394,35 +390,46 @@ void splitop_exec(BMesh *bm, BMOperator *op)
 	
 	BMO_slot_buffer_flag_enable(bm, splitop, "geom", SPLIT_INPUT, BM_ALL);
 
-	/* make sure to remove edges and verts we don't need */
-	for (e = BM_iter_new(&iter, bm, BM_EDGES_OF_MESH, NULL); e; e = BM_iter_step(&iter)) {
-		found = 0;
-		f = BM_iter_new(&iter2, bm, BM_FACES_OF_EDGE, e);
-		for ( ; f; f = BM_iter_step(&iter2)) {
-			if (!BMO_elem_flag_test(bm, f, SPLIT_INPUT)) {
-				found = 1;
-				break;
-			}
-		}
-		if (!found) BMO_elem_flag_enable(bm, e, SPLIT_INPUT);
-	}
-	
-	for (v = BM_iter_new(&iter, bm, BM_VERTS_OF_MESH, NULL); v; v = BM_iter_step(&iter)) {
-		found = 0;
-		e = BM_iter_new(&iter2, bm, BM_EDGES_OF_VERT, v);
-		for ( ; e; e = BM_iter_step(&iter2)) {
-			if (!BMO_elem_flag_test(bm, e, SPLIT_INPUT)) {
-				found = 1;
-				break;
-			}
-		}
-		if (!found) BMO_elem_flag_enable(bm, v, SPLIT_INPUT);
+	if (use_only_faces) {
+		BMVert *v;
+		BMEdge *e;
+		BMFace *f;
+		BMIter iter, iter2;
+		int found;
 
+		/* make sure to remove edges and verts we don't need */
+		for (e = BM_iter_new(&iter, bm, BM_EDGES_OF_MESH, NULL); e; e = BM_iter_step(&iter)) {
+			found = 0;
+			f = BM_iter_new(&iter2, bm, BM_FACES_OF_EDGE, e);
+			for ( ; f; f = BM_iter_step(&iter2)) {
+				if (!BMO_elem_flag_test(bm, f, SPLIT_INPUT)) {
+					found = 1;
+					break;
+				}
+			}
+			if (!found) {
+				BMO_elem_flag_enable(bm, e, SPLIT_INPUT);
+			}
+		}
+
+		for (v = BM_iter_new(&iter, bm, BM_VERTS_OF_MESH, NULL); v; v = BM_iter_step(&iter)) {
+			found = 0;
+			e = BM_iter_new(&iter2, bm, BM_EDGES_OF_VERT, v);
+			for ( ; e; e = BM_iter_step(&iter2)) {
+				if (!BMO_elem_flag_test(bm, e, SPLIT_INPUT)) {
+					found = 1;
+					break;
+				}
+			}
+			if (!found) {
+				BMO_elem_flag_enable(bm, v, SPLIT_INPUT);
+			}
+		}
 	}
 
 	/* connect outputs of dupe to delete, exluding keep geometr */
 	BMO_slot_int_set(&delop, "context", DEL_FACES);
-	BMO_slot_from_flag(bm, &delop, "geom", SPLIT_INPUT, BM_ALL);
+	BMO_slot_buffer_from_flag(bm, &delop, "geom", SPLIT_INPUT, BM_ALL);
 	
 	BMO_op_exec(bm, &delop);
 
@@ -433,13 +440,13 @@ void splitop_exec(BMesh *bm, BMOperator *op)
 	BMO_slot_copy(&dupeop, splitop, "isovertmap",
 	              "isovertmap");
 	
-	/* cleanu */
+	/* cleanup */
 	BMO_op_finish(bm, &delop);
 	BMO_op_finish(bm, &dupeop);
 }
 
 
-void delop_exec(BMesh *bm, BMOperator *op)
+void bmo_del_exec(BMesh *bm, BMOperator *op)
 {
 #define DEL_INPUT 1
 
@@ -460,7 +467,7 @@ void delop_exec(BMesh *bm, BMOperator *op)
  * rotating and possibly translating after each step
  */
 
-void spinop_exec(BMesh *bm, BMOperator *op)
+void bmo_spin_exec(BMesh *bm, BMOperator *op)
 {
 	BMOperator dupop, extop;
 	float cent[3], dvec[3];
@@ -497,7 +504,7 @@ void spinop_exec(BMesh *bm, BMOperator *op)
 			BMO_op_finish(bm, &dupop);
 		}
 		else {
-			BMO_op_initf(bm, &extop, "extrudefaceregion edgefacein=%s",
+			BMO_op_initf(bm, &extop, "extrude_face_region edgefacein=%s",
 			             op, "lastout");
 			BMO_op_exec(bm, &extop);
 			BMO_op_callf(bm, "rotate cent=%v mat=%m3 verts=%s",

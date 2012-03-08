@@ -153,7 +153,8 @@ int quicktime_get_num_videocodecs()
 	return qtVideoCodecCount;
 }
 
-QuicktimeCodecTypeDesc* quicktime_get_videocodecType_desc(int indexValue) {
+QuicktimeCodecTypeDesc* quicktime_get_videocodecType_desc(int indexValue)
+{
 	if ((indexValue>=0) && (indexValue < qtVideoCodecCount))
 		return &qtVideoCodecList[indexValue];
 	else
@@ -674,7 +675,7 @@ static void check_renderbutton_framerate(RenderData *rd, ReportList *reports)
 	else {
 		if (rd->frs_sec_base > 0)
 			qtdata->gTemporalSettings.frameRate = 
-			((float)(rd->frs_sec << 16) / rd->frs_sec_base) ;
+			((float)(rd->frs_sec << 16) / rd->frs_sec_base);
 	}
 	
 	err = SCSetInfo(qtdata->theComponent, scTemporalSettingsType,	&qtdata->gTemporalSettings);

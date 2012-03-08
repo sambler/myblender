@@ -284,7 +284,7 @@ static inline int lc_to_ms_I(int x, int y, int z, int *n)
 
 /* *** multiple scattering approximation *** */
 
-/* get the total amount of light energy in the light cache. used to normalise after multiple scattering */
+/* get the total amount of light energy in the light cache. used to normalize after multiple scattering */
 static float total_ss_energy(Render *re, int do_test_break, VolumePrecache *vp)
 {
 	int x, y, z;
@@ -775,8 +775,7 @@ static void vol_precache_objectinstance_threads(Render *re, ObjectInstanceRen *o
 		//tree= NULL;
 	}
 	
-	if (ELEM(ma->vol.shade_type, MA_VOL_SHADE_MULTIPLE, MA_VOL_SHADE_SHADEDPLUSMULTIPLE))
-	{
+	if (ELEM(ma->vol.shade_type, MA_VOL_SHADE_MULTIPLE, MA_VOL_SHADE_SHADEDPLUSMULTIPLE)) {
 		/* this should be before the filtering */
 		multiple_scattering_diffusion(re, obi->volume_precache, ma);
 	}

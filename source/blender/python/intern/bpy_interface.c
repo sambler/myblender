@@ -72,6 +72,7 @@
 /* inittab initialization functions */
 #include "../generic/bgl.h"
 #include "../generic/blf_py_api.h"
+#include "../bmesh/bmesh_py_api.h"
 #include "../mathutils/mathutils.h"
 
 /* for internal use, when starting and ending python scripts */
@@ -192,6 +193,9 @@ static struct _inittab bpy_internal_modules[] = {
 //	{(char *)"mathutils.noise", PyInit_mathutils_noise},
 	{(char *)"bgl", BPyInit_bgl},
 	{(char *)"blf", BPyInit_blf},
+	{(char *)"bmesh", BPyInit_bmesh},
+    // {(char *)"bmesh.types", BPyInit_bmesh_types},
+    // {(char *)"bmesh.utils", BPyInit_bmesh_utils},
 #ifdef WITH_AUDASPACE
 	{(char *)"aud", AUD_initPython},
 #endif
@@ -667,11 +671,11 @@ int BPY_context_member_get(bContext *C, const char *member, bContextDataResult *
 				PyObject *list_item = PySequence_Fast_GET_ITEM(seq_fast, i);
 
 				if (BPy_StructRNA_Check(list_item)) {
-					/*
+#if 0
 					CollectionPointerLink *link = MEM_callocN(sizeof(CollectionPointerLink), "bpy_context_get");
 					link->ptr = ((BPy_StructRNA *)item)->ptr;
 					BLI_addtail(&result->list, link);
-					*/
+#endif
 					ptr = &(((BPy_StructRNA *)list_item)->ptr);
 					CTX_data_list_add(result, ptr->id.data, ptr->type, ptr->data);
 				}
@@ -698,7 +702,6 @@ int BPY_context_member_get(bContext *C, const char *member, bContextDataResult *
 
 	return done;
 }
-
 
 #ifdef WITH_PYTHON_MODULE
 #include "BLI_fileops.h"

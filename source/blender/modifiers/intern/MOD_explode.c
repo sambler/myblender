@@ -183,7 +183,7 @@ static void createFacepa(ExplodeModifierData *emd,
 	BLI_kdtree_free(tree);
 }
 
-static int edgecut_get(EdgeHash *edgehash, int v1, int v2)
+static int edgecut_get(EdgeHash *edgehash, unsigned int v1, unsigned int v2)
 {
 	return GET_INT_FROM_POINTER(BLI_edgehash_lookup(edgehash, v1, v2));
 }
@@ -818,13 +818,13 @@ static DerivedMesh * explodeMesh(ExplodeModifierData *emd,
 	vertpahash= BLI_edgehash_new();
 
 	for (i=0; i<totface; i++) {
-		if(facepa[i]!=totpart)
-		{
-			pa=pars+facepa[i];
+		if (facepa[i] != totpart) {
+			pa = pars + facepa[i];
 
-			if((pa->alive==PARS_UNBORN && (emd->flag&eExplodeFlag_Unborn)==0)
-				|| (pa->alive==PARS_ALIVE && (emd->flag&eExplodeFlag_Alive)==0)
-				|| (pa->alive==PARS_DEAD && (emd->flag&eExplodeFlag_Dead)==0)) {
+			if ((pa->alive == PARS_UNBORN && (emd->flag & eExplodeFlag_Unborn) == 0) ||
+			    (pa->alive == PARS_ALIVE && (emd->flag & eExplodeFlag_Alive) == 0) ||
+			    (pa->alive == PARS_DEAD && (emd->flag & eExplodeFlag_Dead) == 0))
+			{
 				delface++;
 				continue;
 			}
@@ -915,8 +915,7 @@ static DerivedMesh * explodeMesh(ExplodeModifierData *emd,
 		MFace source;
 		int orig_v4;
 
-		if(facepa[i]!=totpart)
-		{
+		if (facepa[i]!=totpart) {
 			pa=pars+facepa[i];
 
 			if(pa->alive==PARS_UNBORN && (emd->flag&eExplodeFlag_Unborn)==0) continue;

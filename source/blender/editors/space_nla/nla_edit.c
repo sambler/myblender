@@ -1282,8 +1282,7 @@ static int nlaedit_swap_exec (bContext *C, wmOperator *op)
 		if ((nlt->strips.first == nlt->strips.last) && (nlt->strips.first != NULL)) {
 			NlaStrip *mstrip = (NlaStrip *)nlt->strips.first;
 			
-			if ((mstrip->flag & NLASTRIP_FLAG_TEMP_META) && (BLI_countlist(&mstrip->strips) == 2)) 
-			{
+			if ((mstrip->flag & NLASTRIP_FLAG_TEMP_META) && (BLI_countlist(&mstrip->strips) == 2)) {
 				/* remove this temp meta, so that we can see the strips inside */
 				BKE_nlastrips_clear_metas(&nlt->strips, 0, 1);
 			}
@@ -1619,7 +1618,7 @@ void NLA_OT_action_sync_length (wmOperatorType *ot)
 	/* identifiers */
 	ot->name= "Sync Action Length";
 	ot->idname= "NLA_OT_action_sync_length";
-	ot->description= "Synchronise the length of the referenced Action with the length used in the strip";
+	ot->description= "Synchronize the length of the referenced Action with the length used in the strip";
 	
 	/* api callbacks */
 	ot->exec= nlaedit_sync_actlen_exec;

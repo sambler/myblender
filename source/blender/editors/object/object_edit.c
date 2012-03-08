@@ -140,7 +140,7 @@ static int object_hide_view_clear_exec(bContext *C, wmOperator *UNUSED(op))
 	int changed = 0;
 	
 	/* XXX need a context loop to handle such cases */
-	for(base = FIRSTBASE; base; base=base->next){
+	for(base = FIRSTBASE; base; base=base->next) {
 		if((base->lay & v3d->lay) && base->object->restrictflag & OB_RESTRICT_VIEW) {
 			base->flag |= SELECT;
 			base->object->flag = base->flag;
@@ -182,7 +182,7 @@ static int object_hide_view_set_exec(bContext *C, wmOperator *op)
 	
 	CTX_DATA_BEGIN(C, Base*, base, visible_bases) {
 		if(!unselected) {
-			if (base->flag & SELECT){
+			if (base->flag & SELECT) {
 				base->flag &= ~SELECT;
 				base->object->flag = base->flag;
 				base->object->restrictflag |= OB_RESTRICT_VIEW;
@@ -193,7 +193,7 @@ static int object_hide_view_set_exec(bContext *C, wmOperator *op)
 			}
 		}
 		else {
-			if (!(base->flag & SELECT)){
+			if (!(base->flag & SELECT)) {
 				base->object->restrictflag |= OB_RESTRICT_VIEW;
 				changed = 1;
 			}
@@ -272,12 +272,12 @@ static int object_hide_render_set_exec(bContext *C, wmOperator *op)
 
 	CTX_DATA_BEGIN(C, Base*, base, visible_bases) {
 		if(!unselected) {
-			if (base->flag & SELECT){
+			if (base->flag & SELECT) {
 				base->object->restrictflag |= OB_RESTRICT_RENDER;
 			}
 		}
 		else {
-			if (!(base->flag & SELECT)){
+			if (!(base->flag & SELECT)) {
 				base->object->restrictflag |= OB_RESTRICT_RENDER;
 			}
 		}
@@ -447,13 +447,13 @@ void ED_object_enter_editmode(bContext *C, int flag)
 
 		WM_event_add_notifier(C, NC_SCENE|ND_MODE|NS_EDITMODE_MESH, scene);
 	}
-	else if (ob->type==OB_ARMATURE){
+	else if (ob->type==OB_ARMATURE) {
 		bArmature *arm= base->object->data;
 		if (!arm) return;
 		/*
 		 * The function object_data_is_libdata make a problem here, the
 		 * check for ob->proxy return 0 and let blender enter to edit mode
-		 * this causa a crash when you try leave the edit mode.
+		 * this causes a crash when you try leave the edit mode.
 		 * The problem is that i can't remove the ob->proxy check from
 		 * object_data_is_libdata that prevent the bugfix #6614, so
 		 * i add this little hack here.
@@ -729,9 +729,15 @@ static void copy_texture_space(Object *to, Object *ob)
 	
 	memcpy(poin1, poin2, 9*sizeof(float));	/* this was noted in DNA_mesh, curve, mball */
 	
-	if(to->type==OB_MESH) ;
-	else if(to->type==OB_MBALL) tex_space_mball(to);
-	else tex_space_curve(to->data);
+	if(to->type==OB_MESH) {
+		/* pass */
+	}
+	else if (to->type == OB_MBALL) {
+		tex_space_mball(to);
+	}
+	else {
+		tex_space_curve(to->data);
+	}
 	
 }
 
@@ -906,7 +912,7 @@ static void copy_attr(Main *bmain, Scene *scene, View3D *v3d, short event)
 						base->object->recalc |= OB_RECALC_DATA;
 					}
 				}
-				else if(event==21){
+				else if(event==21) {
 					if (base->object->type==OB_MESH) {
 						ModifierData *md = modifiers_findByType(ob, eModifierType_Subsurf);
 
@@ -1024,7 +1030,7 @@ static void UNUSED_FUNCTION(copy_attr_menu)(Main *bmain, Scene *scene, View3D *v
 			strcat(str, "|Curve Resolution%x25");
 	}
 
-	if(ob->type==OB_MESH){
+	if(ob->type==OB_MESH) {
 		strcat(str, "|Subsurf Settings%x21|AutoSmooth%x27");
 	}
 
@@ -1032,7 +1038,7 @@ static void UNUSED_FUNCTION(copy_attr_menu)(Main *bmain, Scene *scene, View3D *v
 	
 	strcat(str, "|Pass Index%x30");
 	
-	if(ob->type==OB_MESH || ob->type==OB_CURVE || ob->type==OB_LATTICE || ob->type==OB_SURF){
+	if(ob->type==OB_MESH || ob->type==OB_CURVE || ob->type==OB_LATTICE || ob->type==OB_SURF) {
 		strcat(str, "|Modifiers ...%x24");
 	}
 
@@ -1748,7 +1754,7 @@ static int game_physics_copy_exec(bContext *C, wmOperator *UNUSED(op))
 			ob_iter->gameflag = ob->gameflag;
 			ob_iter->gameflag2 = ob->gameflag2;
 			ob_iter->inertia = ob->inertia;
-			ob_iter->formfactor = ob->formfactor;;
+			ob_iter->formfactor = ob->formfactor;
 			ob_iter->damping = ob->damping;
 			ob_iter->rdamping = ob->rdamping;
 			ob_iter->min_vel = ob->min_vel;

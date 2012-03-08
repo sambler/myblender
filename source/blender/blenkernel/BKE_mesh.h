@@ -65,19 +65,19 @@ extern "C" {
 struct BMesh *BKE_mesh_to_bmesh(struct Mesh *me, struct Object *ob);
 
 /*
- * this function recreates a tesselation.
- * returns number of tesselation faces.
+ * this function recreates a tessellation.
+ * returns number of tessellation faces.
  *
- * use_poly_origindex sets whether or not the tesselation faces' origindex
+ * use_poly_origindex sets whether or not the tessellation faces' origindex
  * layer should point to original poly indices or real poly indices.
  *
- * use_face_origindex sets the tesselation faces' origindex layer
- * to point to the tesselation faces themselves, not the polys.
+ * use_face_origindex sets the tessellation faces' origindex layer
+ * to point to the tessellation faces themselves, not the polys.
  *
  * if both of the above are 0, it'll use the indices of the mpolys of the MPoly
  * data in pdata, and ignore the origindex layer altogether.
  */
-int mesh_recalcTesselation(struct CustomData *fdata, struct CustomData *ldata, struct CustomData *pdata,
+int mesh_recalcTessellation(struct CustomData *fdata, struct CustomData *ldata, struct CustomData *pdata,
                            struct MVert *mvert,
                            int totface, int totloop, int totpoly,
                            const int do_face_normals);
@@ -99,6 +99,18 @@ void mesh_calc_poly_center(struct MPoly *mpoly, struct MLoop *loopstart,
 
 float mesh_calc_poly_area(struct MPoly *mpoly, struct MLoop *loopstart,
                           struct MVert *mvarray, float polynormal[3]);
+
+/* Find the index of the loop in 'poly' which references vertex,
+ * returns -1 if not found */
+int poly_find_loop_from_vert(const struct MPoly *poly,
+							 const struct MLoop *loopstart,
+							 unsigned vert);
+
+/* Fill 'adj_r' with the loop indices in 'poly' adjacent to the
+ * vertex. Returns the index of the loop matching vertex, or -1 if the
+ * vertex is not in 'poly' */
+int poly_get_adj_loops_from_vert(unsigned adj_r[3], const struct MPoly *poly,
+								 const struct MLoop *mloop, unsigned vert);
 
 void unlink_mesh(struct Mesh *me);
 void free_mesh(struct Mesh *me, int unlink);
@@ -130,14 +142,14 @@ void mesh_set_smooth_flag(struct Object *meshOb, int enableSmooth);
 void convert_mfaces_to_mpolys(struct Mesh *mesh);
 void mesh_calc_normals_tessface(struct MVert *mverts, int numVerts,struct  MFace *mfaces, int numFaces, float (*faceNors_r)[3]);
 
-/*used for unit testing; compares two meshes, checking only
-  differences we care about.  should be usable with leaf's
-  testing framework I get RNA work done, will use hackish
-  testing code for now.*/
+/* used for unit testing; compares two meshes, checking only
+ * differences we care about.  should be usable with leaf's
+ * testing framework I get RNA work done, will use hackish
+ * testing code for now.*/
 const char *mesh_cmp(struct Mesh *me1, struct Mesh *me2, float thresh);
 
 struct BoundBox *mesh_get_bb(struct Object *ob);
-void mesh_get_texspace(struct Mesh *me, float *loc_r, float *rot_r, float *size_r);
+void mesh_get_texspace(struct Mesh *me, float r_loc[3], float r_rot[3], float r_size[3]);
 
 /* if old, it converts mface->edcode to edge drawflags */
 void make_edges(struct Mesh *me, int old);
@@ -187,14 +199,16 @@ typedef struct UvMapVert {
 
 /* UvElement stores per uv information so that we can quickly access information for a uv.
  * it is actually an improved UvMapVert, including an island and a direct pointer to the face
- * to avoid initialising face arrays */
+ * to avoid initializing face arrays */
 typedef struct UvElement {
 	/* Next UvElement corresponding to same vertex */
 	struct UvElement *next;
 	/* Face the element belongs to */
 	struct BMFace *face;
 	/* Index in the editFace of the uv */
-	unsigned char tfindex;
+	struct BMLoop *l;
+	/* index in loop. */
+	unsigned short tfindex;
 	/* Whether this element is the first of coincident elements */
 	unsigned char separate;
 	/* general use flag */
@@ -237,15 +251,8 @@ typedef struct IndexNode {
 void create_vert_poly_map(struct ListBase **map, IndexNode **mem,
                           struct MPoly *mface, struct MLoop *mloop,
                           const int totvert, const int totface, const int totloop);
-void create_vert_face_map(struct ListBase **map, IndexNode **mem, const struct MFace *mface,
-                          const int totvert, const int totface);
 void create_vert_edge_map(struct ListBase **map, IndexNode **mem, const struct MEdge *medge,
                           const int totvert, const int totedge);
-
-/* functions for making menu's from customdata layers */
-int mesh_layers_menu_charlen(struct CustomData *data, int type); /* use this to work out how many chars to allocate */
-void mesh_layers_menu_concat(struct CustomData *data, int type, char *str);
-int mesh_layers_menu(struct CustomData *data, int type);
 
 /* vertex level transformations & checks (no derived mesh) */
 

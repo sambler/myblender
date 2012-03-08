@@ -39,10 +39,6 @@ extern "C" {
 struct ID;
 struct View3D;
 struct ARegion;
-struct EditMesh;
-struct EditVert;
-struct EditEdge;
-struct EditFace;
 struct bContext;
 struct wmOperator;
 struct wmWindowManager;
@@ -101,30 +97,30 @@ int         mesh_mirrtopo_table(struct Object *ob, char mode);
 
 /* bmeshutils.c */
 
-/*
- [note: I've decided to use ideasman's code for non-editmode stuff, but since
-  it has a big "not for editmode!" disclaimer, I'm going to keep what I have here
-  - joeedh]
-  
- x-mirror editing api.  usage:
-  
-  EDBM_CacheMirrorVerts(em);
-  ...
-  ...
-  BM_ITER(v, &iter, em->bm, BM_VERTS_OF_MESH, NULL) {
-     mirrorv = EDBM_GetMirrorVert(em, v);
-  }
-  ...
-  ...
-  EDBM_EndMirrorCache(em);
- 
-  note: why do we only allow x axis mirror editing?
-  */
+/**
+ * [note: I've decided to use ideasman's code for non-editmode stuff, but since
+ *  it has a big "not for editmode!" disclaimer, I'm going to keep what I have here
+ *  - joeedh]
+ *  
+ * x-mirror editing api.  usage:
+ *  
+ *  EDBM_CacheMirrorVerts(em);
+ *  ...
+ *  ...
+ *  BM_ITER(v, &iter, em->bm, BM_VERTS_OF_MESH, NULL) {
+ *     mirrorv = EDBM_GetMirrorVert(em, v);
+ *  }
+ *  ...
+ *  ...
+ *  EDBM_EndMirrorCache(em);
+ *
+ * \note why do we only allow x axis mirror editing?
+ */
 void EDBM_CacheMirrorVerts(struct BMEditMesh *em, const short use_select); /* note, replaces EM_cache_x_mirror_vert in trunk */
 
-/*retrieves mirrored cache vert, or NULL if there isn't one.
-  note: calling this without ensuring the mirror cache state
-  is bad.*/
+/* retrieves mirrored cache vert, or NULL if there isn't one.
+ * note: calling this without ensuring the mirror cache state
+ * is bad.*/
 struct BMVert *EDBM_GetMirrorVert(struct BMEditMesh *em, struct BMVert *v);
 void           EDBM_ClearMirrorVert(struct BMEditMesh *em, struct BMVert *v);
 void EDBM_EndMirrorCache(struct BMEditMesh *em);
@@ -186,13 +182,10 @@ int EDBM_select_interior_faces(struct BMEditMesh *em);
 struct UvElementMap *EDBM_make_uv_element_map(struct BMEditMesh *em, int selected, int doIslands);
 void		EDBM_free_uv_element_map(struct UvElementMap *vmap);
 
-void		EDBM_add_data_layer(struct BMEditMesh *em, struct CustomData *data, int type, const char *name);
-void		EDBM_free_data_layer(struct BMEditMesh *em, struct CustomData *data, int type);
-
 void EDBM_select_swap(struct BMEditMesh *em); /* exported for UV */
 
 int EDBM_texFaceCheck(struct BMEditMesh *em);
-struct MTexPoly *EDBM_get_active_mtexpoly(struct BMEditMesh *em, struct BMFace **act_efa, int sloppy);
+struct MTexPoly *EDBM_get_active_mtexpoly(struct BMEditMesh *em, struct BMFace **r_act_efa, int sloppy);
 
 void EDBM_free_uv_vert_map(struct UvVertMap *vmap);
 struct UvMapVert *EDBM_get_uv_map_vert(struct UvVertMap *vmap, unsigned int v);
@@ -237,7 +230,6 @@ void EMBM_project_snap_verts(struct bContext *C, struct ARegion *ar, struct Obje
 
 /* editface.c */
 void paintface_flush_flags(struct Object *ob);
-struct MTexPoly	*EM_get_active_mtexpoly(struct BMEditMesh *em, struct BMFace **act_efa, struct MLoopCol **col, int sloppy);
 int paintface_mouse_select(struct bContext *C, struct Object *ob, const int mval[2], int extend);
 int do_paintface_box_select(struct ViewContext *vc, struct rcti *rect, int select, int extend);
 void paintface_deselect_all_visible(struct Object *ob, int action, short flush_flags);
@@ -272,16 +264,6 @@ void		ED_vgroup_vert_add(struct Object *ob, struct bDeformGroup *dg, int vertnum
 void		ED_vgroup_vert_remove(struct Object *ob, struct bDeformGroup *dg, int vertnum);
 float		ED_vgroup_vert_weight(struct Object *ob, struct bDeformGroup *dg, int vertnum);
 
-/**
- * findnearestvert
- * 
- * dist (in/out): minimal distance to the nearest and at the end, actual distance
- * sel: selection bias
- * 		if SELECT, selected vertice are given a 5 pixel bias to make them farter than unselect verts
- * 		if 0, unselected vertice are given the bias
- * strict: if 1, the vertice corresponding to the sel parameter are ignored and not just biased 
- */
-
 struct BMVert *EDBM_findnearestvert(struct ViewContext *vc, int *dist, short sel, short strict);
 struct BMEdge *EDBM_findnearestedge(struct ViewContext *vc, int *dist);
 struct BMFace *EDBM_findnearestface(struct ViewContext *vc, int *dist);
@@ -301,7 +283,7 @@ void ED_mesh_vertices_remove(struct Mesh *mesh, struct ReportList *reports, int 
 void ED_mesh_transform(struct Mesh *me, float *mat);
 void ED_mesh_calc_normals(struct Mesh *me);
 void ED_mesh_material_link(struct Mesh *me, struct Material *ma);
-void ED_mesh_update(struct Mesh *mesh, struct bContext *C, int calc_edges);
+void ED_mesh_update(struct Mesh *mesh, struct bContext *C, int calc_edges, int calc_tessface);
 
 int ED_mesh_uv_texture_add(struct bContext *C, struct Mesh *me, const char *name, int active_set);
 int ED_mesh_uv_texture_remove(struct bContext *C, struct Object *ob, struct Mesh *me);

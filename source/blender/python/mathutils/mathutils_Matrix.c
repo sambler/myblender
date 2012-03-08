@@ -1218,8 +1218,6 @@ static PyObject *Matrix_invert(MatrixObject *self)
 				z++;
 			}
 		}
-		/*transpose
-		Matrix_transpose(self);*/
 	}
 	else {
 		PyErr_SetString(PyExc_ValueError,
@@ -1631,15 +1629,15 @@ static PyObject *Matrix_richcmpr(PyObject *a, PyObject *b, int op)
 }
 
 /*---------------------SEQUENCE PROTOCOLS------------------------
-  ----------------------------len(object)------------------------
-  sequence length */
+ * ----------------------------len(object)------------------------
+ * sequence length */
 static int Matrix_len(MatrixObject *self)
 {
 	return (self->num_row);
 }
 /*----------------------------object[]---------------------------
-  sequence accessor (get)
-  the wrapped vector gives direct access to the matrix data */
+ * sequence accessor (get)
+ * the wrapped vector gives direct access to the matrix data */
 static PyObject *Matrix_item_row(MatrixObject *self, int row)
 {
 	if (BaseMath_ReadCallback(self) == -1)
@@ -1669,7 +1667,7 @@ static PyObject *Matrix_item_col(MatrixObject *self, int col)
 }
 
 /*----------------------------object[]-------------------------
-  sequence accessor (set) */
+ * sequence accessor (set) */
 
 static int Matrix_ass_item_row(MatrixObject *self, int row, PyObject *value)
 {
@@ -1724,7 +1722,7 @@ static int Matrix_ass_item_col(MatrixObject *self, int col, PyObject *value)
 
 
 /*----------------------------object[z:y]------------------------
-  sequence slice (get)*/
+ * sequence slice (get)*/
 static PyObject *Matrix_slice(MatrixObject *self, int begin, int end)
 {
 
@@ -1748,7 +1746,7 @@ static PyObject *Matrix_slice(MatrixObject *self, int begin, int end)
 	return tuple;
 }
 /*----------------------------object[z:y]------------------------
-  sequence slice (set)*/
+ * sequence slice (set)*/
 static int Matrix_ass_slice(MatrixObject *self, int begin, int end, PyObject *value)
 {
 	PyObject *value_fast = NULL;
@@ -1807,7 +1805,7 @@ static int Matrix_ass_slice(MatrixObject *self, int begin, int end, PyObject *va
 	}
 }
 /*------------------------NUMERIC PROTOCOLS----------------------
-  ------------------------obj + obj------------------------------*/
+ *------------------------obj + obj------------------------------*/
 static PyObject *Matrix_add(PyObject *m1, PyObject *m2)
 {
 	float mat[16];
@@ -1839,7 +1837,7 @@ static PyObject *Matrix_add(PyObject *m1, PyObject *m2)
 	return Matrix_CreatePyObject(mat, mat1->num_col, mat1->num_row, Py_NEW, Py_TYPE(mat1));
 }
 /*------------------------obj - obj------------------------------
-  subtraction*/
+ * subtraction */
 static PyObject *Matrix_sub(PyObject *m1, PyObject *m2)
 {
 	float mat[16];
@@ -1872,7 +1870,7 @@ static PyObject *Matrix_sub(PyObject *m1, PyObject *m2)
 	return Matrix_CreatePyObject(mat, mat1->num_col, mat1->num_row, Py_NEW, Py_TYPE(mat1));
 }
 /*------------------------obj * obj------------------------------
-  mulplication*/
+ * mulplication */
 static PyObject *matrix_mul_float(MatrixObject *mat, const float scalar)
 {
 	float tmat[16];
@@ -2146,7 +2144,7 @@ static int Matrix_translation_set(MatrixObject *self, PyObject *value, void *UNU
 }
 
 PyDoc_STRVAR(Matrix_row_doc,
-"Access the matix by rows (default), (readonly).\n\n:type: Matrix Access"
+"Access the matix by rows (default), (read-only).\n\n:type: Matrix Access"
 );
 static PyObject *Matrix_row_get(MatrixObject *self, void *UNUSED(closure))
 {
@@ -2154,7 +2152,7 @@ static PyObject *Matrix_row_get(MatrixObject *self, void *UNUSED(closure))
 }
 
 PyDoc_STRVAR(Matrix_col_doc,
-"Access the matix by colums, 3x3 and 4x4 only, (readonly).\n\n:type: Matrix Access"
+"Access the matix by colums, 3x3 and 4x4 only, (read-only).\n\n:type: Matrix Access"
 );
 static PyObject *Matrix_col_get(MatrixObject *self, void *UNUSED(closure))
 {
@@ -2162,7 +2160,7 @@ static PyObject *Matrix_col_get(MatrixObject *self, void *UNUSED(closure))
 }
 
 PyDoc_STRVAR(Matrix_median_scale_doc,
-"The average scale applied to each axis (readonly).\n\n:type: float"
+"The average scale applied to each axis (read-only).\n\n:type: float"
 );
 static PyObject *Matrix_median_scale_get(MatrixObject *self, void *UNUSED(closure))
 {
@@ -2185,7 +2183,7 @@ static PyObject *Matrix_median_scale_get(MatrixObject *self, void *UNUSED(closur
 }
 
 PyDoc_STRVAR(Matrix_is_negative_doc,
-"True if this matrix results in a negative scale, 3x3 and 4x4 only, (readonly).\n\n:type: bool"
+"True if this matrix results in a negative scale, 3x3 and 4x4 only, (read-only).\n\n:type: bool"
 );
 static PyObject *Matrix_is_negative_get(MatrixObject *self, void *UNUSED(closure))
 {
@@ -2206,7 +2204,7 @@ static PyObject *Matrix_is_negative_get(MatrixObject *self, void *UNUSED(closure
 }
 
 PyDoc_STRVAR(Matrix_is_orthogonal_doc,
-"True if this matrix is orthogonal, 3x3 and 4x4 only, (readonly).\n\n:type: bool"
+"True if this matrix is orthogonal, 3x3 and 4x4 only, (read-only).\n\n:type: bool"
 );
 static PyObject *Matrix_is_orthogonal_get(MatrixObject *self, void *UNUSED(closure))
 {

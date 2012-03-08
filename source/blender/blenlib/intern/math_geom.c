@@ -331,8 +331,9 @@ int isect_line_line_v2(const float v1[2], const float v2[2], const float v3[2], 
 }
 
 /* get intersection point of two 2D segments and return intersection type:
-    -1: colliniar
-     1: intersection */
+ *  -1: colliniar
+ *   1: intersection
+ */
 int isect_seg_seg_v2_point(const float v1[2], const float v2[2], const float v3[2], const float v4[2], float vi[2])
 {
 	float a1, a2, b1, b2, c1, c2, d;
@@ -381,7 +382,7 @@ int isect_seg_seg_v2_point(const float v1[2], const float v2[2], const float v3[
 			if(u>u2) SWAP(float, u, u2);
 
 			if(u>1.0f+eps || u2<-eps) return -1; /* non-ovlerlapping segments */
-			else if(maxf(0.0f, u) == minf(1.0f, u2)){ /* one common point: can return result */
+			else if(maxf(0.0f, u) == minf(1.0f, u2)) { /* one common point: can return result */
 				interp_v2_v2v2(vi, v1, v2, maxf(0, u));
 				return 1;
 			}
@@ -531,29 +532,28 @@ int isect_line_sphere_v2(const float l1[2], const float l2[2],
 }
 
 /*
--1: colliniar
- 1: intersection
-
-*/
+ * -1: colliniar
+ *  1: intersection
+ */
 static short IsectLLPt2Df(const float x0, const float y0, const float x1, const float y1,
 					 const float x2, const float y2, const float x3, const float y3, float *xi,float *yi)
 
 {
 	/*
-	this function computes the intersection of the sent lines
-	and returns the intersection point, note that the function assumes
-	the lines intersect. the function can handle vertical as well
-	as horizontal lines. note the function isn't very clever, it simply
-	applies the math, but we don't need speed since this is a
-	pre-processing step
-	*/
+	 * this function computes the intersection of the sent lines
+	 * and returns the intersection point, note that the function assumes
+	 * the lines intersect. the function can handle vertical as well
+	 * as horizontal lines. note the function isn't very clever, it simply
+	 * applies the math, but we don't need speed since this is a
+	 * pre-processing step
+	 */
 	float c1,c2, // constants of linear equations
 	det_inv,  // the inverse of the determinant of the coefficient
 	m1,m2;    // the slopes of each line
 	/*
-	compute slopes, note the cludge for infinity, however, this will
-	be close enough
-	*/
+	 * compute slopes, note the cludge for infinity, however, this will
+	 * be close enough
+	 */
 	if (fabs(x1-x0) > 0.000001)
 		m1 = (y1-y0) / (x1-x0);
 	else
@@ -629,9 +629,9 @@ int isect_point_quad_v2(const float pt[2], const float v1[2], const float v2[2],
 }
 
 /* moved from effect.c
-   test if the line starting at p1 ending at p2 intersects the triangle v0..v2
-   return non zero if it does 
-*/
+ * test if the line starting at p1 ending at p2 intersects the triangle v0..v2
+ * return non zero if it does 
+ */
 int isect_line_tri_v3(const float p1[3], const float p2[3],
                       const float v0[3], const float v1[3], const float v2[3],
                       float *r_lambda, float r_uv[2])
@@ -670,9 +670,9 @@ int isect_line_tri_v3(const float p1[3], const float p2[3],
 	return 1;
 }
 /* moved from effect.c
-   test if the ray starting at p1 going in d direction intersects the triangle v0..v2
-   return non zero if it does 
-*/
+ * test if the ray starting at p1 going in d direction intersects the triangle v0..v2
+ * return non zero if it does 
+ */
 int isect_ray_tri_v3(const float p1[3], const float d[3],
                      const float v0[3], const float v1[3], const float v2[3],
                      float *r_lambda, float r_uv[2])
@@ -808,8 +808,7 @@ int isect_ray_tri_threshold_v3(const float p1[3], const float d[3],
 	if (u > 1) du = u - 1;
 	if (v < 0) dv = v;
 	if (v > 1) dv = v - 1;
-	if (u > 0 && v > 0 && u + v > 1)
-	{
+	if (u > 0 && v > 0 && u + v > 1) {
 		float t = u + v - 1;
 		du = u - t/2;
 		dv = v - t/2;
@@ -818,8 +817,7 @@ int isect_ray_tri_threshold_v3(const float p1[3], const float d[3],
 	mul_v3_fl(e1, du);
 	mul_v3_fl(e2, dv);
 	
-	if (dot_v3v3(e1, e1) + dot_v3v3(e2, e2) > threshold * threshold)
-	{
+	if (dot_v3v3(e1, e1) + dot_v3v3(e2, e2) > threshold * threshold) {
 		return 0;
 	}
 
@@ -850,7 +848,7 @@ int isect_line_plane_v3(float out[3], const float l1[3], const float l2[3], cons
 		float l1_plane[3]; /* line point aligned with the plane */
 		float dist; /* 'plane_no' aligned distance to the 'plane_co' */
 
-		/* for pradictable flipping since the plane is only used to
+		/* for predictable flipping since the plane is only used to
 		 * define a direction, ignore its flipping and aligned with 'l_vec' */
 		if(dot < 0.0f) {
 			dot= -dot;
@@ -895,8 +893,7 @@ static int getLowestRoot(const float a, const float b, const float c, const floa
 	float determinant = b*b - 4.0f*a*c;
 
 	// If determinant is negative it means no solutions.
-	if (determinant >= 0.0f)
-	{
+	if (determinant >= 0.0f) {
 		// calculate the two roots: (if determinant == 0 then
 		// x1==x2 but lets disregard that slight optimization)
 		float sqrtD = (float)sqrt(determinant);
@@ -908,16 +905,14 @@ static int getLowestRoot(const float a, const float b, const float c, const floa
 			SWAP(float, r1, r2);
 
 		// Get lowest root:
-		if (r1 > 0.0f && r1 < maxR)
-		{
+		if (r1 > 0.0f && r1 < maxR) {
 			*root = r1;
 			return 1;
 		}
 
 		// It is possible that we want x2 - this can happen
 		// if x1 < 0
-		if (r2 > 0.0f && r2 < maxR)
-		{
+		if (r2 > 0.0f && r2 < maxR) {
 			*root = r2;
 			return 1;
 		}
@@ -951,14 +946,12 @@ int isect_sweeping_sphere_tri_v3(
 	a=dot_v3v3(p1,nor)-dot_v3v3(v0,nor);
 	nordotv=dot_v3v3(nor,vel);
 
-	if (fabsf(nordotv) < 0.000001f)
-	{
+	if (fabsf(nordotv) < 0.000001f) {
 		if(fabsf(a) >= radius) {
 			return 0;
 		}
 	}
-	else
-	{
+	else {
 		float t0=(-a+radius)/nordotv;
 		float t1=(-a-radius)/nordotv;
 
@@ -993,9 +986,8 @@ int isect_sweeping_sphere_tri_v3(
 		z=x+y-(a*c-b*b);
 
 
-		if(z <= 0.0f && (x >= 0.0f && y >= 0.0f))
-		{
-		//(((unsigned int)z)& ~(((unsigned int)x)|((unsigned int)y))) & 0x80000000){
+		if (z <= 0.0f && (x >= 0.0f && y >= 0.0f)) {
+		//(((unsigned int)z)& ~(((unsigned int)x)|((unsigned int)y))) & 0x80000000) {
 			*r_lambda=t0;
 			copy_v3_v3(ipoint,point);
 			return 1;
@@ -1013,8 +1005,7 @@ int isect_sweeping_sphere_tri_v3(
 	b=2.0f*dot_v3v3(vel,temp);
 	c=dot_v3v3(temp,temp)-radius2;
 
-	if(getLowestRoot(a, b, c, *r_lambda, r_lambda))
-	{
+	if(getLowestRoot(a, b, c, *r_lambda, r_lambda)) {
 		copy_v3_v3(ipoint,v0);
 		found_by_sweep=1;
 	}
@@ -1024,8 +1015,7 @@ int isect_sweeping_sphere_tri_v3(
 	b=2.0f*dot_v3v3(vel,temp);
 	c=dot_v3v3(temp,temp)-radius2;
 
-	if(getLowestRoot(a, b, c, *r_lambda, r_lambda))
-	{
+	if (getLowestRoot(a, b, c, *r_lambda, r_lambda)) {
 		copy_v3_v3(ipoint,v1);
 		found_by_sweep=1;
 	}
@@ -1035,8 +1025,7 @@ int isect_sweeping_sphere_tri_v3(
 	b=2.0f*dot_v3v3(vel,temp);
 	c=dot_v3v3(temp,temp)-radius2;
 
-	if(getLowestRoot(a, b, c, *r_lambda, r_lambda))
-	{
+	if(getLowestRoot(a, b, c, *r_lambda, r_lambda)) {
 		copy_v3_v3(ipoint,v2);
 		found_by_sweep=1;
 	}
@@ -1056,12 +1045,10 @@ int isect_sweeping_sphere_tri_v3(
 	b=2.0f*(elen2*dot_v3v3(vel,bv)-edotv*edotbv);
 	c=elen2*(radius2-dot_v3v3(bv,bv))+edotbv*edotbv;
 
-	if(getLowestRoot(a, b, c, *r_lambda, &newLambda))
-	{
+	if (getLowestRoot(a, b, c, *r_lambda, &newLambda)) {
 		e=(edotv*newLambda-edotbv)/elen2;
 
-		if(e >= 0.0f && e <= 1.0f)
-		{
+		if (e >= 0.0f && e <= 1.0f) {
 			*r_lambda = newLambda;
 			copy_v3_v3(ipoint,e1);
 			mul_v3_fl(ipoint,e);
@@ -1080,12 +1067,10 @@ int isect_sweeping_sphere_tri_v3(
 	b=2.0f*(elen2*dot_v3v3(vel,bv)-edotv*edotbv);
 	c=elen2*(radius2-dot_v3v3(bv,bv))+edotbv*edotbv;
 
-	if(getLowestRoot(a, b, c, *r_lambda, &newLambda))
-	{
+	if (getLowestRoot(a, b, c, *r_lambda, &newLambda)) {
 		e=(edotv*newLambda-edotbv)/elen2;
 
-		if(e >= 0.0f && e <= 1.0f)
-		{
+		if (e >= 0.0f && e <= 1.0f) {
 			*r_lambda = newLambda;
 			copy_v3_v3(ipoint,e2);
 			mul_v3_fl(ipoint,e);
@@ -1109,12 +1094,10 @@ int isect_sweeping_sphere_tri_v3(
 	b=2.0f*(elen2*dot_v3v3(vel,bv)-edotv*edotbv);
 	c=elen2*(radius2-dot_v3v3(bv,bv))+edotbv*edotbv;
 
-	if(getLowestRoot(a, b, c, *r_lambda, &newLambda))
-	{
+	if (getLowestRoot(a, b, c, *r_lambda, &newLambda)) {
 		e=(edotv*newLambda-edotbv)/elen2;
 
-		if(e >= 0.0f && e <= 1.0f)
-		{
+		if (e >= 0.0f && e <= 1.0f) {
 			*r_lambda = newLambda;
 			copy_v3_v3(ipoint,e3);
 			mul_v3_fl(ipoint,e);
@@ -1154,7 +1137,7 @@ int isect_axial_line_tri_v3(const int axis, const float p1[3], const float p2[3]
 	if ((v < 0.0f)||(v > 1.0f)) return 0;
 	
 	f= e1[a1];
-	if((f > -0.000001f) && (f < 0.000001f)){
+	if((f > -0.000001f) && (f < 0.000001f)) {
 		f= e1[a2];
 		if((f > -0.000001f) && (f < 0.000001f)) return 0;
 		u= (-p[a2]-v*e2[a2])/f;
@@ -1279,13 +1262,11 @@ int isect_line_line_strict_v3(const float v1[3], const float v2[3], const float 
 
 			return 1; /* intersection found */
 		}
-		else
-		{
+		else {
 			return 0;
 		}
 	}
-	else
-	{
+	else {
 		return 0;
 	}
 } 
@@ -1304,7 +1285,7 @@ float closest_to_line_v3(float cp[3], const float p[3], const float l1[3], const
 	float h[3],u[3],lambda;
 	sub_v3_v3v3(u, l2, l1);
 	sub_v3_v3v3(h, p, l1);
-	lambda =dot_v3v3(u,h)/dot_v3v3(u,u);
+	lambda = dot_v3v3(u,h)/dot_v3v3(u,u);
 	cp[0] = l1[0] + u[0] * lambda;
 	cp[1] = l1[1] + u[1] * lambda;
 	cp[2] = l1[2] + u[2] * lambda;
@@ -1316,7 +1297,7 @@ float closest_to_line_v2(float cp[2],const float p[2], const float l1[2], const 
 	float h[2],u[2],lambda;
 	sub_v2_v2v2(u, l2, l1);
 	sub_v2_v2v2(h, p, l1);
-	lambda =dot_v2v2(u,h)/dot_v2v2(u,u);
+	lambda = dot_v2v2(u,h)/dot_v2v2(u,u);
 	cp[0] = l1[0] + u[0] * lambda;
 	cp[1] = l1[1] + u[1] * lambda;
 	return lambda;
@@ -1512,14 +1493,12 @@ int isect_point_tri_v2(float v0[2], float v1[2], float v2[2], float pt[2])
 #endif
 
 /*
-
-	x1,y2
-	|  \
-	|   \     .(a,b)
-	|    \
-	x1,y1-- x2,y1
-
-*/
+ *     x1,y2
+ *     |  \
+ *     |   \     .(a,b)
+ *     |    \
+ *     x1,y1-- x2,y1
+ */
 int isect_point_tri_v2_int(const int x1, const int y1, const int x2, const int y2, const int a, const int b)
 {
 	float v1[2], v2[2], v3[2], p[2];
@@ -1541,18 +1520,18 @@ int isect_point_tri_v2_int(const int x1, const int y1, const int x2, const int y
 
 static int point_in_slice(const float p[3], const float v1[3], const float l1[3], const float l2[3])
 {
-/* 
-what is a slice ?
-some maths:
-a line including l1,l2 and a point not on the line 
-define a subset of R3 delimeted by planes parallel to the line and orthogonal 
-to the (point --> line) distance vector,one plane on the line one on the point, 
-the room inside usually is rather small compared to R3 though still infinte
-useful for restricting (speeding up) searches 
-e.g. all points of triangular prism are within the intersection of 3 'slices'
-onother trivial case : cube 
-but see a 'spat' which is a deformed cube with paired parallel planes needs only 3 slices too
-*/
+	/*
+	 * what is a slice ?
+	 * some maths:
+	 * a line including l1,l2 and a point not on the line 
+	 * define a subset of R3 delimited by planes parallel to the line and orthogonal
+	 * to the (point --> line) distance vector,one plane on the line one on the point, 
+	 * the room inside usually is rather small compared to R3 though still infinte
+	 * useful for restricting (speeding up) searches 
+	 * e.g. all points of triangular prism are within the intersection of 3 'slices'
+	 * onother trivial case : cube 
+	 * but see a 'spat' which is a deformed cube with paired parallel planes needs only 3 slices too
+	 */
 	float h,rp[3],cp[3],q[3];
 
 	closest_to_line_v3(cp,v1,l1,l2);
@@ -1565,8 +1544,8 @@ but see a 'spat' which is a deformed cube with paired parallel planes needs only
 }
 
 #if 0
-/*adult sister defining the slice planes by the origin and the normal  
-NOTE |normal| may not be 1 but defining the thickness of the slice*/
+/* adult sister defining the slice planes by the origin and the normal
+ * NOTE |normal| may not be 1 but defining the thickness of the slice */
 static int point_in_slice_as(float p[3],float origin[3],float normal[3])
 {
 	float h,rp[3];
@@ -1680,8 +1659,8 @@ void plot_line_v2v2i(const int p1[2], const int p2[2], int (*callback)(int, int,
 			x1 += ix;
 			error += delta_y;
 
-			if(callback(x1, y1, userData) == 0) {
-				return ;
+			if (callback(x1, y1, userData) == 0) {
+				return;
 			}
 		}
 	}
@@ -1791,7 +1770,7 @@ void interp_weights_face_v3(float w[4], const float v1[3], const float v2[3], co
 
 			if(degenerate || (w[0] < 0.0f)) {
 				/* if w[1] is negative, co is on the other side of the v1-v3 edge,
-				   so we interpolate using the other triangle */
+				 * so we interpolate using the other triangle */
 				degenerate= barycentric_weights(v2, v3, v4, co, n, w2);
 
 				if(!degenerate) {
@@ -2035,8 +2014,8 @@ void interp_cubic_v3(float x[3], float v[3], const float x1[3], const float v1[3
 void resolve_tri_uv(float r_uv[2], const float st[2], const float st0[2], const float st1[2], const float st2[2])
 {
 	/* find UV such that
-	   t= u*t0 + v*t1 + (1-u-v)*t2
-	   u*(t0-t2) + v*(t1-t2)= t-t2 */
+	 * t= u*t0 + v*t1 + (1-u-v)*t2
+	 * u*(t0-t2) + v*(t1-t2)= t-t2 */
 	const double a= st0[0]-st2[0], b= st1[0]-st2[0];
 	const double c= st0[1]-st2[1], d= st1[1]-st2[1];
 	const double det= a*d - c*b;
@@ -2056,7 +2035,7 @@ void resolve_quad_uv(float r_uv[2], const float st[2], const float st0[2], const
 	                          (st2[0]*st3[1] - st2[1]*st3[0]) + (st3[0]*st0[1] - st3[1]*st0[0]);
 
 	/* X is 2D cross product (determinant)
-	   A= (p0-p) X (p0-p3)*/
+	 * A= (p0-p) X (p0-p3)*/
 	const double a= (st0[0]-st[0])*(st0[1]-st3[1]) - (st0[1]-st[1])*(st0[0]-st3[0]);
 
 	/* B= ( (p0-p) X (p1-p2) + (p1-p) X (p0-p3) ) / 2 */
@@ -2083,7 +2062,7 @@ void resolve_quad_uv(float r_uv[2], const float st[2], const float st0[2], const
 	}
 
 	/* find UV such that
-	  fST = (1-u)(1-v)*ST0 + u*(1-v)*ST1 + u*v*ST2 + (1-u)*v*ST3 */
+	 * fST = (1-u)(1-v)*ST0 + u*(1-v)*ST1 + u*v*ST2 + (1-u)*v*ST3 */
 	{
 		const double denom_s= (1-r_uv[0])*(st0[0]-st3[0]) + r_uv[0]*(st1[0]-st2[0]);
 		const double denom_t= (1-r_uv[0])*(st0[1]-st3[1]) + r_uv[0]*(st1[1]-st2[1]);
@@ -2311,31 +2290,34 @@ void box_minmax_bounds_m4(float min[3], float max[3], float boundbox[2][3], floa
 
 /********************************** Mapping **********************************/
 
-void map_to_tube(float *u, float *v, const float x, const float y, const float z)
+void map_to_tube(float *r_u, float *r_v, const float x, const float y, const float z)
 {
 	float len;
 	
-	*v = (z + 1.0f) / 2.0f;
+	*r_v = (z + 1.0f) / 2.0f;
 	
-	len= (float)sqrt(x*x+y*y);
-	if(len > 0.0f)
-		*u = (float)((1.0 - (atan2(x/len,y/len) / M_PI)) / 2.0);
-	else
-		*v = *u = 0.0f; /* to avoid un-initialized variables */
+	len = sqrtf(x * x + y * y);
+	if(len > 0.0f) {
+		*r_u = (float)((1.0 - (atan2(x/len,y/len) / M_PI)) / 2.0);
+	}
+	else {
+		*r_v = *r_u = 0.0f; /* to avoid un-initialized variables */
+	}
 }
 
-void map_to_sphere(float *u, float *v, const float x, const float y, const float z)
+void map_to_sphere(float *r_u, float *r_v, const float x, const float y, const float z)
 {
 	float len;
 	
-	len= (float)sqrt(x*x+y*y+z*z);
+	len = sqrtf(x * x + y * y + z * z);
 	if(len > 0.0f) {
-		if(x==0.0f && y==0.0f) *u= 0.0f;	/* othwise domain error */
-		else *u = (1.0f - atan2f(x,y) / (float)M_PI) / 2.0f;
+		if(x==0.0f && y==0.0f) *r_u= 0.0f;	/* othwise domain error */
+		else *r_u = (1.0f - atan2f(x,y) / (float)M_PI) / 2.0f;
 
-		*v = 1.0f - (float)saacos(z/len)/(float)M_PI;
-	} else {
-		*v = *u = 0.0f; /* to avoid un-initialized variables */
+		*r_v = 1.0f - (float)saacos(z/len)/(float)M_PI;
+	}
+	else {
+		*r_v = *r_u = 0.0f; /* to avoid un-initialized variables */
 	}
 }
 
@@ -2383,7 +2365,7 @@ void accumulate_vertex_normals(float n1[3], float n2[3], float n3[3],
 }
 
 /* Add weighted face normal component into normals of the face vertices.
-   Caller must pass pre-allocated vdiffs of nverts length. */
+ * Caller must pass pre-allocated vdiffs of nverts length. */
 void accumulate_vertex_normals_poly(float **vertnos, float polyno[3],
 	float **vertcos, float vdiffs[][3], int nverts)
 {
@@ -2402,9 +2384,9 @@ void accumulate_vertex_normals_poly(float **vertnos, float polyno[3],
 
 		for(i=0; i<nverts; i++) {
 			const float *cur_edge = vdiffs[i];
-			
+
 			/* calculate angle between the two poly edges incident on
-			   this vertex */
+			 * this vertex */
 			const float fac= saacos(-dot_v3v3(cur_edge, prev_edge));
 
 			/* accumulate */
@@ -2498,32 +2480,32 @@ void tangent_from_uv(float uv1[2], float uv2[2], float uv3[3], float co1[3], flo
 
 /* vector clouds */
 /* void vcloud_estimate_transform(int list_size, float (*pos)[3], float *weight,float (*rpos)[3], float *rweight,
-								 float lloc[3],float rloc[3],float lrot[3][3],float lscale[3][3])
+ *                                float lloc[3],float rloc[3],float lrot[3][3],float lscale[3][3])
+ *
+ * input
+ * (
+ * int list_size
+ * 4 lists as pointer to array[list_size]
+ * 1. current pos array of 'new' positions 
+ * 2. current weight array of 'new'weights (may be NULL pointer if you have no weights )
+ * 3. reference rpos array of 'old' positions
+ * 4. reference rweight array of 'old'weights (may be NULL pointer if you have no weights )
+ * )
+ * output
+ * (
+ * float lloc[3] center of mass pos
+ * float rloc[3] center of mass rpos
+ * float lrot[3][3] rotation matrix
+ * float lscale[3][3] scale matrix
+ * pointers may be NULL if not needed
+ * )
+ */
 
-input
-(
-int list_size
-4 lists as pointer to array[list_size]
-1. current pos array of 'new' positions 
-2. current weight array of 'new'weights (may be NULL pointer if you have no weights )
-3. reference rpos array of 'old' positions
-4. reference rweight array of 'old'weights (may be NULL pointer if you have no weights )
-)
-output  
-(
-float lloc[3] center of mass pos
-float rloc[3] center of mass rpos
-float lrot[3][3] rotation matrix
-float lscale[3][3] scale matrix
-pointers may be NULL if not needed
-)
-
-*/
 /* can't believe there is none in math utils */
 static float _det_m3(float m2[3][3])
 {
 	float det = 0.f;
-	if (m2){
+	if (m2) {
 	det= m2[0][0]* (m2[1][1]*m2[2][2] - m2[1][2]*m2[2][1])
 		-m2[1][0]* (m2[0][1]*m2[2][2] - m2[0][2]*m2[2][1])
 		+m2[2][0]* (m2[0][1]*m2[1][2] - m2[0][2]*m2[1][1]);
@@ -2545,11 +2527,10 @@ void vcloud_estimate_transform(int list_size, float (*pos)[3], float *weight,flo
 	if (lrot) unit_m3(lrot);
 	if (lscale) unit_m3(lscale);
 	/* do com for both clouds */
-	if (pos && rpos && (list_size > 0)) /* paranoya check */
-	{
+	if (pos && rpos && (list_size > 0)) { /* paranoya check */
 		/* do com for both clouds */
-		for(a=0; a<list_size; a++){
-			if (weight){
+		for(a=0; a<list_size; a++) {
+			if (weight) {
 				float v[3];
 				copy_v3_v3(v,pos[a]);
 				mul_v3_fl(v,weight[a]);
@@ -2558,7 +2539,7 @@ void vcloud_estimate_transform(int list_size, float (*pos)[3], float *weight,flo
 			}
 			else add_v3_v3(accu_com, pos[a]);
 
-			if (rweight){
+			if (rweight) {
 				float v[3];
 				copy_v3_v3(v,rpos[a]);
 				mul_v3_fl(v,rweight[a]);
@@ -2568,7 +2549,7 @@ void vcloud_estimate_transform(int list_size, float (*pos)[3], float *weight,flo
 			else add_v3_v3(accu_rcom, rpos[a]);
 
 		}
-		if (!weight || !rweight){
+		if (!weight || !rweight) {
 			accu_weight = accu_rweight = list_size;
 		}
 
@@ -2576,7 +2557,7 @@ void vcloud_estimate_transform(int list_size, float (*pos)[3], float *weight,flo
 		mul_v3_fl(accu_rcom,1.0f/accu_rweight);
 		if (lloc) copy_v3_v3(lloc,accu_com);
 		if (rloc) copy_v3_v3(rloc,accu_rcom);
-		if (lrot || lscale){ /* caller does not want rot nor scale, strange but legal */
+		if (lrot || lscale) { /* caller does not want rot nor scale, strange but legal */
 			/*so now do some reverse engeneering and see if we can split rotation from scale ->Polardecompose*/
 			/* build 'projection' matrix */
 			float m[3][3],mr[3][3],q[3][3],qi[3][3];
@@ -2587,7 +2568,7 @@ void vcloud_estimate_transform(int list_size, float (*pos)[3], float *weight,flo
 			zero_m3(mr);
 
 			/* build 'projection' matrix */
-			for(a=0; a<list_size; a++){
+			for(a=0; a<list_size; a++) {
 				sub_v3_v3v3(va,rpos[a],accu_rcom);
 				/* mul_v3_fl(va,bp->mass);  mass needs renormalzation here ?? */
 				sub_v3_v3v3(vb,pos[a],accu_com);
@@ -2605,7 +2586,7 @@ void vcloud_estimate_transform(int list_size, float (*pos)[3], float *weight,flo
 				m[2][2] += va[2] * vb[2];
 
 				/* building the referenc matrix on the fly
-				needed to scale properly later*/
+				 * needed to scale properly later */
 
 				mr[0][0] += va[0] * va[0];
 				mr[0][1] += va[0] * va[1];
@@ -2628,17 +2609,17 @@ void vcloud_estimate_transform(int list_size, float (*pos)[3], float *weight,flo
 			/* without the far case ... but seems to work here pretty neat                   */
 			odet = 0.f;
 			ndet = _det_m3(q);
-			while((odet-ndet)*(odet-ndet) > eps && i<imax){
+			while((odet-ndet)*(odet-ndet) > eps && i<imax) {
 				invert_m3_m3(qi,q);
 				transpose_m3(qi);
 				add_m3_m3m3(q,q,qi);
 				mul_m3_fl(q,0.5f);
-				odet =ndet;
-				ndet =_det_m3(q);
+				odet = ndet;
+				ndet = _det_m3(q);
 				i++;
 			}
 
-			if (i){
+			if (i) {
 				float scale[3][3];
 				float irot[3][3];
 				if(lrot) copy_m3_m3(lrot,q);
@@ -2883,20 +2864,20 @@ typedef union {
 
 static vFloat vec_splat_float(float val)
 {
-	return (vFloat){val, val, val, val};
+	return (vFloat) {val, val, val, val};
 }
 
 static float ff_quad_form_factor(float *p, float *n, float *q0, float *q1, float *q2, float *q3)
 {
 	vFloat vcos, rlen, vrx, vry, vrz, vsrx, vsry, vsrz, gx, gy, gz, vangle;
-	vUInt8 rotate = (vUInt8){4,5,6,7,8,9,10,11,12,13,14,15,0,1,2,3};
+	vUInt8 rotate = (vUInt8) {4,5,6,7,8,9,10,11,12,13,14,15,0,1,2,3};
 	vFloatResult vresult;
 	float result;
 
 	/* compute r* */
-	vrx = (vFloat){q0[0], q1[0], q2[0], q3[0]} - vec_splat_float(p[0]);
-	vry = (vFloat){q0[1], q1[1], q2[1], q3[1]} - vec_splat_float(p[1]);
-	vrz = (vFloat){q0[2], q1[2], q2[2], q3[2]} - vec_splat_float(p[2]);
+	vrx = (vFloat) {q0[0], q1[0], q2[0], q3[0]} - vec_splat_float(p[0]);
+	vry = (vFloat) {q0[1], q1[1], q2[1], q3[1]} - vec_splat_float(p[1]);
+	vrz = (vFloat) {q0[2], q1[2], q2[2], q3[2]} - vec_splat_float(p[2]);
 
 	/* normalize r* */
 	rlen = vec_rsqrte(vrx*vrx + vry*vry + vrz*vrz + vec_splat_float(1e-16f));
@@ -3060,7 +3041,7 @@ static float ff_quad_form_factor(const float p[3], const float n[3], const float
 float form_factor_hemi_poly(float p[3], float n[3], float v1[3], float v2[3], float v3[3], float v4[3])
 {
 	/* computes how much hemisphere defined by point and normal is
-	   covered by a quad or triangle, cosine weighted */
+	 * covered by a quad or triangle, cosine weighted */
 	float q0[3], q1[3], q2[3], q3[3], contrib= 0.0f;
 
 	if(ff_visible_quad(p, n, v1, v2, v3, q0, q1, q2, q3))

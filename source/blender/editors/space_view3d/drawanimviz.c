@@ -116,7 +116,7 @@ void draw_motion_path_instance(Scene *scene,
 		mpv_start= mpath->points;
 	}
 
-	if(len <= 0) {
+	if (len <= 0) {
 		return;
 	}
 
@@ -179,7 +179,7 @@ void draw_motion_path_instance(Scene *scene,
 	glPointSize(1.0);
 	
 	/* draw little black point at each frame
-	 * NOTE: this is not really visible/noticable
+	 * NOTE: this is not really visible/noticeable
 	 */
 	glBegin(GL_POINTS);
 	for (i=0, mpv=mpv_start; i < len; i++, mpv++) 
@@ -195,7 +195,9 @@ void draw_motion_path_instance(Scene *scene,
 	
 	/* Draw big green dot where the current frame is */
 	// NOTE: only do this when drawing keyframes for now... 
-	if (avs->path_viewflag & MOTIONPATH_VIEW_KFRAS) {
+	if ((avs->path_viewflag & MOTIONPATH_VIEW_KFRAS) &&
+		(sfra < CFRA) && (CFRA <= efra))
+	{
 		UI_ThemeColor(TH_CFRAME);
 		glPointSize(6.0f);
 		

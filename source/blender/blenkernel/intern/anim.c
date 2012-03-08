@@ -81,7 +81,7 @@ static void object_duplilist_recursive(ID *id, Scene *scene, Object *ob, ListBas
 /* ******************************************************************** */
 /* Animation Visualisation */
 
-/* Initialise the default settings for animation visualisation */
+/* Initialize the default settings for animation visualisation */
 void animviz_settings_init(bAnimVizSettings *avs)
 {
 	/* sanity check */
@@ -234,7 +234,7 @@ typedef struct MPathTarget {
 /* get list of motion paths to be baked for the given object
  * 	- assumes the given list is ready to be used
  */
-// TODO: it would be nice in future to be able to update objects dependant on these bones too?
+// TODO: it would be nice in future to be able to update objects dependent on these bones too?
 void animviz_get_object_motionpaths(Object *ob, ListBase *targets)
 {
 	MPathTarget *mpt;
@@ -318,7 +318,7 @@ static void motionpaths_calc_update_scene(Scene *scene)
 	/* find the last object with the tag 
 	 *	- all those afterwards are assumed to not be relevant for our calculations
 	 */
-	// optimise further by moving out...
+	// optimize further by moving out...
 	for (base=scene->base.first; base; base=base->next) {
 		if (base->object->flag & BA_TEMP_TAG)
 			last = base;
@@ -416,7 +416,7 @@ void animviz_calc_motionpaths(Scene *scene, ListBase *targets)
 	}
 	if (efra <= sfra) return;
 	
-	/* optimise the depsgraph for faster updates */
+	/* optimize the depsgraph for faster updates */
 	// TODO: whether this is used should depend on some setting for the level of optimisations used
 	motionpaths_calc_optimise_depsgraph(scene, targets);
 	
@@ -453,7 +453,7 @@ void animviz_calc_motionpaths(Scene *scene, ListBase *targets)
 
 /* free curve path data 
  * NOTE: frees the path itself!
- * NOTE: this is increasingly innacurate with non-uniform BevPoint subdivisions [#24633]
+ * NOTE: this is increasingly inaccurate with non-uniform BevPoint subdivisions [#24633]
  */
 void free_path(Path *path)
 {
@@ -955,8 +955,8 @@ static void vertex_duplilist(ListBase *lb, ID *id, Scene *scene, Object *par, fl
 					
 					
 					/* par_space_mat - only used for groups so we can modify the space dupli's are in
-					   when par_space_mat is NULL ob->obmat can be used instead of ob__obmat
-					*/
+					 * when par_space_mat is NULL ob->obmat can be used instead of ob__obmat
+					 */
 					if(par_space_mat)
 						mult_m4_m4m4(vdd.obmat, par_space_mat, ob->obmat);
 					else
@@ -1085,8 +1085,8 @@ static void face_duplilist(ListBase *lb, ID *id, Scene *scene, Object *par, floa
 	/* End Scene/Group object loop, below is generic */
 					
 					/* par_space_mat - only used for groups so we can modify the space dupli's are in
-					   when par_space_mat is NULL ob->obmat can be used instead of ob__obmat
-					*/
+					 * when par_space_mat is NULL ob->obmat can be used instead of ob__obmat
+					 */
 					if(par_space_mat)
 						mult_m4_m4m4(ob__obmat, par_space_mat, ob->obmat);
 					else
@@ -1117,11 +1117,11 @@ static void face_duplilist(ListBase *lb, ID *id, Scene *scene, Object *par, floa
 							v1= mvert[(mv1= loopstart[0].v)].co;
 							v2= mvert[(mv2= loopstart[1].v)].co;
 							v3= mvert[(mv3= loopstart[2].v)].co;
-							/*
+#if 0
 							if (mp->totloop > 3) {
 								v4= mvert[(mv4= loopstart[3].v)].co;
 							}
-							*/
+#endif
 						}
 
 						/* translation */
@@ -1626,8 +1626,8 @@ void free_object_duplilist(ListBase *lb)
 	DupliObject *dob;
 	
 	/* loop in reverse order, if object is instanced multiple times
-	   the original layer may not really be original otherwise, proper
-	   solution is more complicated */
+	 * the original layer may not really be original otherwise, proper
+	 * solution is more complicated */
 	for(dob= lb->last; dob; dob= dob->prev) {
 		dob->ob->lay= dob->origlay;
 		copy_m4_m4(dob->ob->obmat, dob->omat);
@@ -1649,7 +1649,7 @@ int count_duplilist(Object *ob)
 					for(; psys; psys=psys->next)
 						pdup += psys->totpart;
 
-					if(pdup==0){
+					if(pdup==0) {
 						Mesh *me= ob->data;
 						return me->totvert;
 					}

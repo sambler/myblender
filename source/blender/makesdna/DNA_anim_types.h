@@ -529,7 +529,7 @@ typedef struct AnimMapPair {
 
 /* Retargetting Information for Actions 
  *
- * This should only be used if it is strictly necessary (i.e. user will need to explictly 
+ * This should only be used if it is strictly necessary (i.e. user will need to explicitly 
  * add this when they find that some channels do not match, or motion is not going to right 
  * places). When executing an action, this will be checked to see if it provides any useful
  * remaps for the given paths.
@@ -560,7 +560,7 @@ typedef struct NlaStrip {
 	
 	ListBase strips;			/* 'Child' strips (used for 'meta' strips) */
 	bAction *act;				/* Action that is referenced by this strip (strip is 'user' of the action) */
-	AnimMapper *remap;			/* Remapping info this strip (for tweaking correspondance of action with context) */
+	AnimMapper *remap;			/* Remapping info this strip (for tweaking correspondence of action with context) */
 	
 	ListBase fcurves;			/* F-Curves for controlling this strip's influence and timing */	// TODO: move out?
 	ListBase modifiers;			/* F-Curve modifiers to be applied to the entire strip's referenced F-Curves */
@@ -662,7 +662,7 @@ typedef enum eNlaStrip_Type {
 
 /* NLA Track (nlt)
  *
- * A track groups a bunch of 'strips', which should form a continous set of 
+ * A track groups a bunch of 'strips', which should form a continuous set of 
  * motion, on top of which other such groups can be layered. This should allow
  * for animators to work in a non-destructive manner, layering tweaks, etc. over
  * 'rough' blocks of their work.
@@ -753,7 +753,7 @@ typedef enum eKSP_Grouping {
  * be keyframed together, providing a convenient way for animators
  * to insert keyframes without resorting to Auto-Keyframing.
  *
- * A few 'generic' (non-absolute and dependant on templates) KeyingSets 
+ * A few 'generic' (non-absolute and dependent on templates) KeyingSets 
  * are defined 'built-in' to facilitate easy animating for the casual
  * animator without the need to add extra steps to the rigging process.
  */

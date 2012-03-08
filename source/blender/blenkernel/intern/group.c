@@ -123,7 +123,7 @@ void unlink_group(Group *group)
 #endif
 		}
 		
-		for(psys=ob->particlesystem.first; psys; psys=psys->next){
+		for(psys=ob->particlesystem.first; psys; psys=psys->next) {
 			if(psys->part->dup_group==group)
 				psys->part->dup_group= NULL;
 #if 0		/* not used anymore, only keps for readfile.c, no need to account for this */
@@ -337,7 +337,7 @@ static void group_replaces_nla(Object *parent, Object *target, char mode)
 #endif
 
 /* puts all group members in local timing system, after this call
-you can draw everything, leaves tags in objects to signal it needs further updating */
+ * you can draw everything, leaves tags in objects to signal it needs further updating */
 
 /* note: does not work for derivedmesh and render... it recreates all again in convertblender.c */
 void group_handle_recalc_and_update(Scene *scene, Object *UNUSED(parent), Group *group)

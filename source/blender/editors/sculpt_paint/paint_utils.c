@@ -68,8 +68,8 @@
 #include "paint_intern.h"
 
 /* Convert the object-space axis-aligned bounding box (expressed as
-   its minimum and maximum corners) into a screen-space rectangle,
-   returns zero if the result is empty */
+ * its minimum and maximum corners) into a screen-space rectangle,
+ * returns zero if the result is empty */
 int paint_convert_bb_to_rect(rcti *rect,
 							 const float bb_min[3],
 							 const float bb_max[3],
@@ -97,8 +97,7 @@ int paint_convert_bb_to_rect(rcti *rect,
 				vec[1] = j ? bb_min[1] : bb_max[1];
 				vec[2] = k ? bb_min[2] : bb_max[2];
 				/* convert corner to screen space */
-				ED_view3d_project_float(ar, vec, proj,
-										projection_mat);
+				ED_view3d_project_float_v2(ar, vec, proj, projection_mat);
 				/* expand 2D rectangle */
 				rect->xmin = MIN2(rect->xmin, proj[0]);
 				rect->xmax = MAX2(rect->xmax, proj[0]);
@@ -113,8 +112,8 @@ int paint_convert_bb_to_rect(rcti *rect,
 }
 
 /* Get four planes in object-space that describe the projection of
-   screen_rect from screen into object-space (essentially converting a
-   2D screens-space bounding box into four 3D planes) */
+ * screen_rect from screen into object-space (essentially converting a
+ * 2D screens-space bounding box into four 3D planes) */
 void paint_calc_redraw_planes(float planes[4][4],
 							  const ARegion *ar,
 							  RegionView3D *rv3d,
@@ -141,7 +140,7 @@ void paint_calc_redraw_planes(float planes[4][4],
 
 /* convert a point in model coordinates to 2D screen coordinates */
 /* TODO: can be deleted once all calls are replaced with
-   view3d_project_float() */
+ * view3d_project_float() */
 void projectf(bglMats *mats, const float v[3], float p[2])
 {
 	double ux, uy, uz;
@@ -194,28 +193,30 @@ float paint_get_tex_pixel(Brush* br, float u, float v)
 
 /* 3D Paint */
 
-static void imapaint_project(Object *ob, float *model, float *proj, float *co, float *pco)
+static void imapaint_project(Object *ob, float model[][4], float proj[][4], const float co[3], float pco[4])
 {
 	copy_v3_v3(pco, co);
 	pco[3]= 1.0f;
 
 	mul_m4_v3(ob->obmat, pco);
-	mul_m4_v3((float(*)[4])model, pco);
-	mul_m4_v4((float(*)[4])proj, pco);
+	mul_m4_v3(model, pco);
+	mul_m4_v4(proj, pco);
 }
 
-static void imapaint_tri_weights(Object *ob, float *v1, float *v2, float *v3, float *co, float *w)
+static void imapaint_tri_weights(Object *ob,
+                                 const float v1[3], const float v2[3], const float v3[3],
+                                 const float co[3], float w[3])
 {
 	float pv1[4], pv2[4], pv3[4], h[3], divw;
-	float model[16], proj[16], wmat[3][3], invwmat[3][3];
+	float model[4][4], proj[4][4], wmat[3][3], invwmat[3][3];
 	GLint view[4];
 
 	/* compute barycentric coordinates */
 
 	/* get the needed opengl matrices */
 	glGetIntegerv(GL_VIEWPORT, view);
-	glGetFloatv(GL_MODELVIEW_MATRIX, model);
-	glGetFloatv(GL_PROJECTION_MATRIX, proj);
+	glGetFloatv(GL_MODELVIEW_MATRIX,  (float *)model);
+	glGetFloatv(GL_PROJECTION_MATRIX, (float *)proj);
 	view[0] = view[1] = 0;
 
 	/* project the verts */
@@ -229,7 +230,7 @@ static void imapaint_tri_weights(Object *ob, float *v1, float *v2, float *v3, fl
 	h[2]= 1.0f;
 
 	/* solve for(w1,w2,w3)/perspdiv in:
-	   h*perspdiv = Project*Model*(w1*v1 + w2*v2 + w3*v3) */
+	 * h * perspdiv = Project * Model * (w1 * v1 + w2 * v2 + w3 * v3) */
 
 	wmat[0][0]= pv1[0];  wmat[1][0]= pv2[0];  wmat[2][0]= pv3[0];
 	wmat[0][1]= pv1[1];  wmat[1][1]= pv2[1];  wmat[2][1]= pv3[1];
@@ -242,8 +243,9 @@ static void imapaint_tri_weights(Object *ob, float *v1, float *v2, float *v3, fl
 
 	/* w is still divided by perspdiv, make it sum to one */
 	divw= w[0] + w[1] + w[2];
-	if(divw != 0.0f)
+	if(divw != 0.0f) {
 		mul_v3_fl(w, 1.0f/divw);
+	}
 }
 
 /* compute uv coordinates of mouse in face */
@@ -280,7 +282,7 @@ void imapaint_pick_uv(Scene *scene, Object *ob, unsigned int faceindex, const in
 
 			if(mf.v4) {
 				/* the triangle with the largest absolute values is the one
-				   with the most negative weights */
+				 * with the most negative weights */
 				imapaint_tri_weights(ob, mv[0].co, mv[1].co, mv[3].co, p, w);
 				absw= fabs(w[0]) + fabs(w[1]) + fabs(w[2]);
 				if(absw < minabsw) {

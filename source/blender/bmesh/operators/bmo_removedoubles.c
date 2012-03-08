@@ -28,9 +28,9 @@
 #include "BKE_customdata.h"
 
 #include "bmesh.h"
-#include "bmesh_private.h"
+#include "intern/bmesh_private.h"
 
-#include "bmesh_operators_private.h" /* own include */
+#include "intern/bmesh_operators_private.h" /* own include */
 
 static void remdoubles_splitface(BMFace *f, BMesh *bm, BMOperator *op)
 {
@@ -55,7 +55,7 @@ static void remdoubles_splitface(BMFace *f, BMesh *bm, BMOperator *op)
 
 	if (split && doub != v2) {
 		BMLoop *nl;
-		BMFace *f2 = BM_face_split(bm, f, doub, v2, &nl, NULL);
+		BMFace *f2 = BM_face_split(bm, f, doub, v2, &nl, NULL, FALSE);
 
 		remdoubles_splitface(f, bm, op);
 		remdoubles_splitface(f2, bm, op);
@@ -92,7 +92,7 @@ int remdoubles_face_overlaps(BMesh *bm, BMVert **varr,
 }
 #endif
 
-void bmesh_weldverts_exec(BMesh *bm, BMOperator *op)
+void bmo_weldverts_exec(BMesh *bm, BMOperator *op)
 {
 	BMIter iter, liter;
 	BMVert *v, *v2;
@@ -124,10 +124,12 @@ void bmesh_weldverts_exec(BMesh *bm, BMOperator *op)
 			if (!v) v = e->v1;
 			if (!v2) v2 = e->v2;
 
-			if (v == v2)
+			if (v == v2) {
 				BMO_elem_flag_enable(bm, e, EDGE_COL);
-			else if (!BM_edge_exists(v, v2))
+			}
+			else if (!BM_edge_exists(v, v2)) {
 				BM_edge_create(bm, v, v2, e, TRUE);
+			}
 
 			BMO_elem_flag_enable(bm, e, ELE_DEL);
 		}
@@ -242,7 +244,7 @@ static int vergaverco(const void *e1, const void *e2)
 
 #define EDGE_MARK	1
 
-void bmesh_pointmerge_facedata_exec(BMesh *bm, BMOperator *op)
+void bmo_pointmerge_facedata_exec(BMesh *bm, BMOperator *op)
 {
 	BMOIter siter;
 	BMIter iter;
@@ -290,7 +292,7 @@ void bmesh_pointmerge_facedata_exec(BMesh *bm, BMOperator *op)
 	}
 }
 
-void bmesh_vert_average_facedata_exec(BMesh *bm, BMOperator *op)
+void bmo_vert_average_facedata_exec(BMesh *bm, BMOperator *op)
 {
 	BMOIter siter;
 	BMIter iter;
@@ -327,7 +329,7 @@ void bmesh_vert_average_facedata_exec(BMesh *bm, BMOperator *op)
 	}
 }
 
-void bmesh_pointmerge_exec(BMesh *bm, BMOperator *op)
+void bmo_pointmerge_exec(BMesh *bm, BMOperator *op)
 {
 	BMOperator weldop;
 	BMOIter siter;
@@ -353,7 +355,7 @@ void bmesh_pointmerge_exec(BMesh *bm, BMOperator *op)
 	BMO_op_finish(bm, &weldop);
 }
 
-void bmesh_collapse_exec(BMesh *bm, BMOperator *op)
+void bmo_collapse_exec(BMesh *bm, BMOperator *op)
 {
 	BMOperator weldop;
 	BMWalker walker;
@@ -411,7 +413,7 @@ void bmesh_collapse_exec(BMesh *bm, BMOperator *op)
 }
 
 /* uv collapse functio */
-static void bmesh_collapsecon_do_layer(BMesh *bm, BMOperator *op, int layer)
+static void bmo_collapsecon_do_layer(BMesh *bm, BMOperator *op, int layer)
 {
 	BMIter iter, liter;
 	BMFace *f;
@@ -464,13 +466,13 @@ static void bmesh_collapsecon_do_layer(BMesh *bm, BMOperator *op, int layer)
 	BLI_array_free(blocks);
 }
 
-void bmesh_collapsecon_exec(BMesh *bm, BMOperator *op)
+void bmo_collapse_uvs_exec(BMesh *bm, BMOperator *op)
 {
 	int i;
 
 	for (i = 0; i < bm->ldata.totlayer; i++) {
 		if (CustomData_layer_has_math(&bm->ldata, i))
-			bmesh_collapsecon_do_layer(bm, op, i);
+			bmo_collapsecon_do_layer(bm, op, i);
 	}
 }
 
@@ -508,15 +510,17 @@ void bmesh_finddoubles_common(BMesh *bm, BMOperator *op, BMOperator *optarget, c
 	len = BLI_array_count(verts);
 	for (i = 0; i < len; i++) {
 		v = verts[i];
-		if (BMO_elem_flag_test(bm, v, VERT_DOUBLE)) continue;
-		
+		if (BMO_elem_flag_test(bm, v, VERT_DOUBLE)) {
+			continue;
+		}
+
 		for (j = i + 1; j < len; j++) {
 			v2 = verts[j];
 
 			/* Compare sort values of the verts using 3x tolerance (allowing for the tolerance
 			 * on each of the three axes). This avoids the more expensive length comparison
 			 * for most vertex pairs. */
-			if ((v2->co[0]+v2->co[1]+v2->co[2])-(v->co[0]+v->co[1]+v->co[2]) > dist3)
+			if ((v2->co[0] + v2->co[1] + v2->co[2]) - (v->co[0] + v->co[1] + v->co[2]) > dist3)
 				break;
 
 			if (keepvert) {
@@ -542,7 +546,7 @@ void bmesh_finddoubles_common(BMesh *bm, BMOperator *op, BMOperator *optarget, c
 	BLI_array_free(verts);
 }
 
-void bmesh_removedoubles_exec(BMesh *bm, BMOperator *op)
+void bmo_removedoubles_exec(BMesh *bm, BMOperator *op)
 {
 	BMOperator weldop;
 
@@ -553,12 +557,12 @@ void bmesh_removedoubles_exec(BMesh *bm, BMOperator *op)
 }
 
 
-void bmesh_finddoubles_exec(BMesh *bm, BMOperator *op)
+void bmo_finddoubles_exec(BMesh *bm, BMOperator *op)
 {
 	bmesh_finddoubles_common(bm, op, op, "targetmapout");
 }
 
-void bmesh_automerge_exec(BMesh *bm, BMOperator *op)
+void bmo_automerge_exec(BMesh *bm, BMOperator *op)
 {
 	BMOperator findop, weldop;
 	BMIter viter;

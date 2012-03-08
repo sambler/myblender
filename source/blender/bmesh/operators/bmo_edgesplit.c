@@ -20,13 +20,15 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+#include <string.h> /* for memcpy */
+
 #include "MEM_guardedalloc.h"
 
 #include "BLI_array.h"
 
 #include "bmesh.h"
 
-#include "bmesh_operators_private.h" /* own include */
+#include "intern/bmesh_operators_private.h" /* own include */
 
 typedef struct EdgeTag {
 	BMVert *newv1, *newv2;
@@ -44,7 +46,7 @@ typedef struct EdgeTag {
 #define FACE_DEL	1
 #define FACE_NEW	2
 
-static BMFace *remake_face(BMesh *bm, EdgeTag *etags, BMFace *f, BMVert **verts, BMEdge **edges_tmp)
+static BMFace *remake_face(BMesh *bm, EdgeTag *etags, BMFace *f, BMVert **f_verts, BMEdge **edges_tmp)
 {
 	BMIter liter1, liter2;
 	EdgeTag *et;
@@ -55,12 +57,12 @@ static BMFace *remake_face(BMesh *bm, EdgeTag *etags, BMFace *f, BMVert **verts,
 	int i;
 
 	/* we do final edge last */
-	lastv1 = verts[f->len - 1];
-	lastv2 = verts[0];
-	/* v1 = verts[0]; */ /* UNUSED */
-	/* v2 = verts[1]; */ /* UNUSED */
+	lastv1 = f_verts[f->len - 1];
+	lastv2 = f_verts[0];
+	/* v1 = f_verts[0]; */ /* UNUSED */
+	/* v2 = f_verts[1]; */ /* UNUSED */
 	for (i = 0; i < f->len - 1; i++) {
-		e = BM_edge_create(bm, verts[i], verts[i + 1], NULL, TRUE);
+		e = BM_edge_create(bm, f_verts[i], f_verts[i + 1], NULL, TRUE);
 		if (!e) {
 			return NULL;
 		}
@@ -69,7 +71,7 @@ static BMFace *remake_face(BMesh *bm, EdgeTag *etags, BMFace *f, BMVert **verts,
 
 	edges_tmp[i] = BM_edge_create(bm, lastv1, lastv2, NULL, TRUE);
 
-	f2 = BM_face_create(bm, verts, edges_tmp, f->len, FALSE);
+	f2 = BM_face_create(bm, f_verts, edges_tmp, f->len, FALSE);
 	if (!f2) {
 		return NULL;
 	}
@@ -120,7 +122,7 @@ static void tag_out_edges(BMesh *bm, EdgeTag *etags, BMOperator *UNUSED(op))
 {
 	EdgeTag *et;
 	BMIter iter;
-	BMLoop *l, *startl;
+	BMLoop *l, *l_start, *l_prev;
 	BMEdge *e;
 	BMVert *v;
 	int i, ok;
@@ -175,17 +177,19 @@ static void tag_out_edges(BMesh *bm, EdgeTag *etags, BMOperator *UNUSED(op))
 				 * possible l->e is not et->newe1 or et->newe2. So always clear
 				 * the flag on l->e as well, to prevent infinite looping. */
 				BMO_elem_flag_disable(bm, l->e, EDGE_SEAM);
+				l_start = l;
 
-				startl = l;
 				do {
-					l = BM_face_other_loop(l->e, l->f, v);
-					if (l == startl || BM_edge_face_count(l->e) != 2) {
+					/* l_prev checks stops us from looping over the same edge forever [#30459] */
+					l_prev = l;
+					l = BM_face_other_edge_loop(l->f, l->e, v);
+					if (l == l_start || BM_edge_face_count(l->e) != 2) {
 						break;
 					}
 					l = l->radial_next;
-				} while (l != startl && !BMO_elem_flag_test(bm, l->e, EDGE_SEAM));
+				} while (l != l_start && l != l_prev && !BMO_elem_flag_test(bm, l->e, EDGE_SEAM));
 				
-				if (l == startl || !BMO_elem_flag_test(bm, l->e, EDGE_SEAM)) {
+				if (l == l_start || !BMO_elem_flag_test(bm, l->e, EDGE_SEAM)) {
 					break;
 				}
 
@@ -195,54 +199,83 @@ static void tag_out_edges(BMesh *bm, EdgeTag *etags, BMOperator *UNUSED(op))
 	}
 }
 
-void bmesh_edgesplitop_exec(BMesh *bm, BMOperator *op)
+/* helper functions for edge tag's */
+BM_INLINE BMVert *bm_edge_tag_vert_get(EdgeTag *et, BMVert *v, BMLoop *l)
 {
-	EdgeTag *etags, *et;
+	return (l->e->v1 == v) ? et->newv1 : et->newv2;
+}
+
+BM_INLINE void bm_edge_tag_vert_set(EdgeTag *et, BMVert *v, BMLoop *l, BMVert *vset)
+{
+	if (l->e->v1 == v) {
+		et->newv1 = vset;
+	}
+	else {
+		et->newv2 = vset;
+	}
+}
+
+void bmo_edgesplit_exec(BMesh *bm, BMOperator *op)
+{
+	EdgeTag *etags, *et; /* edge aligned array of tags */
 	BMIter iter, liter;
 	BMOIter siter;
 	BMFace *f, *f2;
-	BMLoop *l, *nextl, *prevl, *l2, *l3;
-	BMEdge *e, *e2;
-	BMVert *v, *v2, **verts = NULL;
-	BLI_array_declare(verts);
+	BMLoop *l, *l2, *l3;
+	BMLoop *l_next, *l_prev;
+	BMEdge *e;
+	BMVert *v, *v2;
+
+	/* face/vert aligned vert array */
+	BMVert **f_verts = NULL;
+	BLI_array_declare(f_verts);
+
 	BMEdge **edges_tmp = NULL;
 	BLI_array_declare(edges_tmp);
 	int i, j;
 
 	BMO_slot_buffer_flag_enable(bm, op, "edges", EDGE_SEAM, BM_EDGE);
-	
-	/* single marked edges unconnected to any other marked edges
-	 * are illegal, go through and unmark them */
-	BMO_ITER(e, &siter, bm, op, "edges", BM_EDGE) {
-		for (i = 0; i < 2; i++) {
-			BM_ITER(e2, &iter, bm, BM_EDGES_OF_VERT, i ? e->v2 : e->v1) {
-				if (e != e2 && BMO_elem_flag_test(bm, e2, EDGE_SEAM)) {
-					break;
-				}
-			}
-			if (e2) {
-				break;
+
+	/* untag edges not connected to other tagged edges */
+	{
+		unsigned char *vtouch;
+		unsigned char *vt;
+
+		BM_mesh_elem_index_ensure(bm, BM_VERT);
+
+		vtouch = MEM_callocN(sizeof(char) * bm->totvert, __func__);
+
+		/* tag all boundry verts so as not to untag an edge which is inbetween only 2 faces [] */
+		BM_ITER(e, &iter, bm, BM_EDGES_OF_MESH, NULL) {
+			if (BM_edge_is_boundary(e)) {
+				vt = &vtouch[BM_elem_index_get(e->v1)]; if (*vt < 2) (*vt)++;
+				vt = &vtouch[BM_elem_index_get(e->v2)]; if (*vt < 2) (*vt)++;
 			}
 		}
 
-		if (!e2) {
-			BMO_elem_flag_disable(bm, e, EDGE_SEAM);
+		/* single marked edges unconnected to any other marked edges
+		 * are illegal, go through and unmark them */
+		BMO_ITER(e, &siter, bm, op, "edges", BM_EDGE) {
+			/* lame, but we dont want the count to exceed 255,
+			 * so just count to 2, its all we need */
+			unsigned char *vt;
+			vt = &vtouch[BM_elem_index_get(e->v1)]; if (*vt < 2) (*vt)++;
+			vt = &vtouch[BM_elem_index_get(e->v2)]; if (*vt < 2) (*vt)++;
 		}
+		BMO_ITER(e, &siter, bm, op, "edges", BM_EDGE) {
+			if (vtouch[BM_elem_index_get(e->v1)] == 1 &&
+			    vtouch[BM_elem_index_get(e->v2)] == 1)
+			{
+				BMO_elem_flag_disable(bm, e, EDGE_SEAM);
+			}
+		}
+
+		MEM_freeN(vtouch);
 	}
 
-	etags = MEM_callocN(sizeof(EdgeTag)*bm->totedge, "EdgeTag");
+	etags = MEM_callocN(sizeof(EdgeTag) * bm->totedge, "EdgeTag");
 
 	BM_mesh_elem_index_ensure(bm, BM_EDGE);
-
-#ifdef ETV
-#  undef ETV
-#endif
-#ifdef SETETV
-#  undef SETETV
-#endif
-
-#define ETV(et, v, l) (l->e->v1 == v ? et->newv1 : et->newv2)
-#define SETETV(et, v, l, vs) l->e->v1 == v ? (et->newv1 = vs) : (et->newv2 = vs)
 
 	BM_ITER(f, &iter, bm, BM_FACES_OF_MESH, NULL) {
 
@@ -250,9 +283,9 @@ void bmesh_edgesplitop_exec(BMesh *bm, BMOperator *op)
 			continue;
 		}
 
-		BLI_array_empty(verts);
-		BLI_array_growitems(verts, f->len);
-		memset(verts, 0, sizeof(BMVert *) * f->len);
+		BLI_array_empty(f_verts);
+		BLI_array_growitems(f_verts, f->len);
+		memset(f_verts, 0, sizeof(BMVert *) * f->len);
 
 		/* this is passed onto remake_face() so it doesnt need to allocate
 		 * a new array on each call. */
@@ -262,43 +295,42 @@ void bmesh_edgesplitop_exec(BMesh *bm, BMOperator *op)
 		i = 0;
 		BM_ITER(l, &liter, bm, BM_LOOPS_OF_FACE, f) {
 			if (!BMO_elem_flag_test(bm, l->e, EDGE_SEAM)) {
-				if (!verts[i]) {
+				if (!f_verts[i]) {
 
 					et = &etags[BM_elem_index_get(l->e)];
-					if (ETV(et, l->v, l)) {
-						verts[i] = ETV(et, l->v, l);
+					if (bm_edge_tag_vert_get(et, l->v, l)) {
+						f_verts[i] = bm_edge_tag_vert_get(et, l->v, l);
 					}
-					else
-					{
-						verts[i] = l->v;
+					else {
+						f_verts[i] = l->v;
 					}
 				}
 				i++;
 				continue;
 			}
 
-			nextl = l->next;
-			prevl = l->prev;
+			l_next = l->next;
+			l_prev = l->prev;
 			
 			for (j = 0; j < 2; j++) {
 				/* correct as long as i & j dont change during the loop */
 				const int fv_index = j ? (i + 1) % f->len : i; /* face vert index */
-				l2 = j ? nextl : prevl;
+				l2 = j ? l_next : l_prev;
 				v = j ? l2->v : l->v;
 
 				if (BMO_elem_flag_test(bm, l2->e, EDGE_SEAM)) {
-					if (verts[fv_index] == NULL) {
+					if (f_verts[fv_index] == NULL) {
 						/* make unique vert here for this face only */
 						v2 = BM_vert_create(bm, v->co, v);
-						verts[fv_index] = v2;
+						f_verts[fv_index] = v2;
 					}
 					else {
-						v2 = verts[fv_index];
+						v2 = f_verts[fv_index];
 					}
 				}
 				else {
 					/* generate unique vert for non-seam edge(s)
-					 * around the manifold vert fan if necassary */
+					 * around the manifold vert fan if necessary */
 
 					/* first check that we have two seam edges
 					 * somewhere within this fa */
@@ -315,35 +347,35 @@ void bmesh_edgesplitop_exec(BMesh *bm, BMOperator *op)
 						}
 
 						l3 = l3->radial_next;
-						l3 = BM_face_other_loop(l3->e, l3->f, v);
+						l3 = BM_face_other_edge_loop(l3->f, l3->e, v);
 					} while (l3 != l2 && !BMO_elem_flag_test(bm, l3->e, EDGE_SEAM));
 
 					if (l3 == NULL || (BMO_elem_flag_test(bm, l3->e, EDGE_SEAM) && l3->e != l->e)) {
 						et = &etags[BM_elem_index_get(l2->e)];
-						if (ETV(et, v, l2) == NULL) {
+						if (bm_edge_tag_vert_get(et, v, l2) == NULL) {
 							v2 = BM_vert_create(bm, v->co, v);
 							
 							l3 = l2;
 							do {
-								SETETV(et, v, l3, v2);
+								bm_edge_tag_vert_set(et, v, l3, v2);
 								if (BM_edge_face_count(l3->e) != 2) {
 									break;
 								}
 
 								l3 = l3->radial_next;
-								l3 = BM_face_other_loop(l3->e, l3->f, v);
+								l3 = BM_face_other_edge_loop(l3->f, l3->e, v);
 								
 								et = &etags[BM_elem_index_get(l3->e)];
 							} while (l3 != l2 && !BMO_elem_flag_test(bm, l3->e, EDGE_SEAM));
 						}
 						else {
-							v2 = ETV(et, v, l2);
+							v2 = bm_edge_tag_vert_get(et, v, l2);
 						}
 
-						verts[fv_index] = v2;
+						f_verts[fv_index] = v2;
 					}
 					else {
-						verts[fv_index] = v;
+						f_verts[fv_index] = v;
 					}
 				}
 			}
@@ -359,14 +391,14 @@ void bmesh_edgesplitop_exec(BMesh *bm, BMOperator *op)
 			float no2[3];
 			float angle_error;
 			printf(" ** found QUAD\n");
-			normal_tri_v3(no1, verts[0]->co, verts[1]->co, verts[2]->co);
-			normal_tri_v3(no2, verts[0]->co, verts[2]->co, verts[3]->co);
+			normal_tri_v3(no1, f_verts[0]->co, f_verts[1]->co, f_verts[2]->co);
+			normal_tri_v3(no2, f_verts[0]->co, f_verts[2]->co, f_verts[3]->co);
 			if ((angle_error = angle_v3v3(no1, no2)) > 0.05) {
 				printf("     ERROR %.4f\n", angle_error);
-				print_v3("0", verts[0]->co);
-				print_v3("1", verts[1]->co);
-				print_v3("2", verts[2]->co);
-				print_v3("3", verts[3]->co);
+				print_v3("0", f_verts[0]->co);
+				print_v3("1", f_verts[1]->co);
+				print_v3("2", f_verts[2]->co);
+				print_v3("3", f_verts[3]->co);
 
 			}
 		}
@@ -375,16 +407,15 @@ void bmesh_edgesplitop_exec(BMesh *bm, BMOperator *op)
 		}
 #endif
 
-		f2 = remake_face(bm, etags, f, verts, edges_tmp);
-		if (!f2) {
-			continue;
+		f2 = remake_face(bm, etags, f, f_verts, edges_tmp);
+		if (f2) {
+			BMO_elem_flag_enable(bm, f, FACE_DEL);
+			BMO_elem_flag_enable(bm, f2, FACE_NEW);
 		}
-
-		BMO_elem_flag_enable(bm, f, FACE_DEL);
-		BMO_elem_flag_enable(bm, f2, FACE_NEW);
+		/* else { ... should we raise an error here, or an assert? - campbell */
 	}
 	
-	/* remake_face() sets invalid indecies,
+	/* remake_face() sets invalid indices,
 	 * likely these will be corrected on operator exit anyway */
 	bm->elem_index_dirty &= ~BM_EDGE;
 
@@ -414,13 +445,10 @@ void bmesh_edgesplitop_exec(BMesh *bm, BMOperator *op)
 #endif
 	
 	tag_out_edges(bm, etags, op);
-	BMO_slot_from_flag(bm, op, "edgeout1", EDGE_RET1, BM_EDGE);
-	BMO_slot_from_flag(bm, op, "edgeout2", EDGE_RET2, BM_EDGE);
+	BMO_slot_buffer_from_flag(bm, op, "edgeout1", EDGE_RET1, BM_EDGE);
+	BMO_slot_buffer_from_flag(bm, op, "edgeout2", EDGE_RET2, BM_EDGE);
 
-	BLI_array_free(verts);
+	BLI_array_free(f_verts);
 	BLI_array_free(edges_tmp);
 	if (etags) MEM_freeN(etags);
 }
-
-#undef ETV
-#undef SETETV

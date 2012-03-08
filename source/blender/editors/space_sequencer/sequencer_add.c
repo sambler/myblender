@@ -92,11 +92,11 @@ static void sequencer_generic_props__internal(wmOperatorType *ot, int flag)
 		RNA_def_int(ot->srna, "frame_start", 0, INT_MIN, INT_MAX, "Start Frame", "Start frame of the sequence strip", INT_MIN, INT_MAX);
 	
 	if(flag & SEQPROP_ENDFRAME)
-		RNA_def_int(ot->srna, "frame_end", 0, INT_MIN, INT_MAX, "End Frame", "End frame for the color strip", INT_MIN, INT_MAX); /* not useual since most strips have a fixed length */
+		RNA_def_int(ot->srna, "frame_end", 0, INT_MIN, INT_MAX, "End Frame", "End frame for the color strip", INT_MIN, INT_MAX); /* not usual since most strips have a fixed length */
 	
 	RNA_def_int(ot->srna, "channel", 1, 1, MAXSEQ, "Channel", "Channel to place this strip into", 1, MAXSEQ);
 	
-	RNA_def_boolean(ot->srna, "replace_sel", 1, "Replace Selection", "replace the current selection");
+	RNA_def_boolean(ot->srna, "replace_sel", 1, "Replace Selection", "Replace the current selection");
 
 	RNA_def_boolean(ot->srna, "overlap", 0, "Allow Overlap", "Don't correct overlap on new sequence strips");
 }
@@ -592,7 +592,7 @@ static int sequencer_add_effect_strip_exec(bContext *C, wmOperator *op)
 		return OPERATOR_CANCELLED;
 	}
 
-	/* If seq1 is NULL and no error was rasied it means the seq is standalone
+	/* If seq1 is NULL and no error was raised it means the seq is standalone
 	 * (like color strips) and we need to check its start and end frames are valid */
 	if (seq1==NULL && end_frame <= start_frame) {
 		BKE_report(op->reports, RPT_ERROR, "Start and end frame are not set");
@@ -701,7 +701,7 @@ static int sequencer_add_effect_strip_invoke(bContext *C, wmOperator *op, wmEven
 		type= RNA_enum_get(op->ptr, "type");
 
 		/* when invoking an effect strip which uses inputs,
-		 * skip initialzing the channel from the mouse.
+		 * skip initializing the channel from the mouse.
 		 * Instead leave the property unset so exec() initializes it to be
 		 * above the strips its applied to. */
 		if(get_sequence_effect_num_inputs(type) != 0) {

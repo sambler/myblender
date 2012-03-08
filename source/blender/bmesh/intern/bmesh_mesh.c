@@ -30,62 +30,48 @@
 
 #include "DNA_listBase.h"
 #include "DNA_object_types.h"
-#include "DNA_meshdata_types.h"
-#include "DNA_mesh_types.h"
 
 #include "BLI_listbase.h"
 #include "BLI_math.h"
 #include "BLI_utildefines.h"
 
-#include "BKE_utildefines.h"
 #include "BKE_cdderivedmesh.h"
 #include "BKE_tessmesh.h"
-#include "BKE_customdata.h"
 #include "BKE_multires.h"
 
 #include "ED_mesh.h"
 
-#include "bmesh_private.h"
+#include "intern/bmesh_private.h"
 
 /* used as an extern, defined in bmesh.h */
-int bm_mesh_allocsize_default[4] = {512, 512, 2048, 512};
+BMAllocTemplate bm_mesh_allocsize_default = {512, 1024, 2048, 512};
+BMAllocTemplate bm_mesh_chunksize_default = {512, 1024, 2048, 512};
 
-/* bmesh_error stub */
-void bmesh_error(void)
+static void bm_mempool_init(BMesh *bm, const BMAllocTemplate *allocsize)
 {
-	printf("BM modelling error!\n");
-
-	/* This placeholder assert makes modelling errors easier to catch
-	 * in the debugger, until bmesh_error is replaced with something
-	 * better. */
-	BLI_assert(0);
-}
-
-static void bmesh_mempool_init(BMesh *bm, const int allocsize[4])
-{
-	bm->vpool =        BLI_mempool_create(sizeof(BMVert),     allocsize[0], allocsize[0], FALSE, TRUE);
-	bm->epool =        BLI_mempool_create(sizeof(BMEdge),     allocsize[1], allocsize[1], FALSE, TRUE);
-	bm->lpool =        BLI_mempool_create(sizeof(BMLoop),     allocsize[2], allocsize[2], FALSE, FALSE);
-	bm->fpool =        BLI_mempool_create(sizeof(BMFace),     allocsize[3], allocsize[3], FALSE, TRUE);
+	bm->vpool = BLI_mempool_create(sizeof(BMVert), allocsize->totvert, bm_mesh_chunksize_default.totvert, BLI_MEMPOOL_ALLOW_ITER);
+	bm->epool = BLI_mempool_create(sizeof(BMEdge), allocsize->totedge, bm_mesh_chunksize_default.totedge, BLI_MEMPOOL_ALLOW_ITER);
+	bm->lpool = BLI_mempool_create(sizeof(BMLoop), allocsize->totloop, bm_mesh_chunksize_default.totloop, 0);
+	bm->fpool = BLI_mempool_create(sizeof(BMFace), allocsize->totface, bm_mesh_chunksize_default.totface, BLI_MEMPOOL_ALLOW_ITER);
 
 #ifdef USE_BMESH_HOLES
 	bm->looplistpool = BLI_mempool_create(sizeof(BMLoopList), allocsize[3], allocsize[3], FALSE, FALSE);
 #endif
 
 	/* allocate one flag pool that we dont get rid of. */
-	bm->toolflagpool = BLI_mempool_create(sizeof(BMFlagLayer), 512, 512, FALSE, FALSE);
+	bm->toolflagpool = BLI_mempool_create(sizeof(BMFlagLayer), 512, 512, 0);
 }
 
-/*
- *	BMESH MAKE MESH
+/**
+ * \brief BMesh Make Mesh
  *
- *  Allocates a new BMesh structure.
- *  Returns -
- *  Pointer to a BM
+ * Allocates a new BMesh structure.
  *
+ * \return The New bmesh
+ *
+ * \note ob is needed by multires
  */
-
-BMesh *BM_mesh_create(struct Object *ob, const int allocsize[4])
+BMesh *BM_mesh_create(struct Object *ob, BMAllocTemplate *allocsize)
 {
 	/* allocate the structure */
 	BMesh *bm = MEM_callocN(sizeof(BMesh), __func__);
@@ -93,7 +79,7 @@ BMesh *BM_mesh_create(struct Object *ob, const int allocsize[4])
 	bm->ob = ob;
 	
 	/* allocate the memory pools for the mesh elements */
-	bmesh_mempool_init(bm, allocsize);
+	bm_mempool_init(bm, allocsize);
 
 	/* allocate one flag pool that we dont get rid of. */
 	bm->stackdepth = 1;
@@ -102,12 +88,13 @@ BMesh *BM_mesh_create(struct Object *ob, const int allocsize[4])
 	return bm;
 }
 
-/*
- *	BMESH FREE MESH
+/**
+ * \brief BMesh Free Mesh Data
  *
  *	Frees a BMesh structure.
+ *
+ * \note frees mesh, but not actual BMesh struct
  */
-
 void BM_mesh_data_free(BMesh *bm)
 {
 	BMVert *v;
@@ -159,7 +146,7 @@ void BM_mesh_data_free(BMesh *bm)
 	BLI_mempool_destroy(bm->looplistpool);
 #endif
 
-	/* These tables aren't used yet, so it's not stricly necessary
+	/* These tables aren't used yet, so it's not strictly necessary
 	 * to 'end' them (with 'e' param) but if someone tries to start
 	 * using them, having these in place will save a lot of pain */
 	mesh_octree_table(NULL, NULL, NULL, 'e');
@@ -167,9 +154,21 @@ void BM_mesh_data_free(BMesh *bm)
 
 	BLI_freelistN(&bm->selected);
 
+	if (bm->py_handle) {
+		extern void bpy_bm_generic_invalidate(void *self);
+
+		bpy_bm_generic_invalidate(bm->py_handle);
+		bm->py_handle = NULL;
+	}
+
 	BMO_error_clear(bm);
 }
 
+/**
+ * \brief BMesh Clear Mesh
+ *
+ * Clear all data in bm
+ */
 void BM_mesh_clear(BMesh *bm)
 {
 	Object *ob = bm->ob;
@@ -182,33 +181,29 @@ void BM_mesh_clear(BMesh *bm)
 	bm->ob = ob;
 	
 	/* allocate the memory pools for the mesh elements */
-	bmesh_mempool_init(bm, bm_mesh_allocsize_default);
+	bm_mempool_init(bm, &bm_mesh_allocsize_default);
 
 	bm->stackdepth = 1;
 	bm->totflags = 1;
 }
 
-/*
- *	BMESH FREE MESH
+/**
+ * \brief BMesh Free Mesh
  *
- *	Frees a BMesh structure.
+ *	Frees a BMesh data and its structure.
  */
-
 void BM_mesh_free(BMesh *bm)
 {
 	BM_mesh_data_free(bm);
 	MEM_freeN(bm);
 }
 
-/*
- *  BMESH COMPUTE NORMALS
+/**
+ * \brief BMesh Compute Normals
  *
- *  Updates the normals of a mesh.
- *  Note that this can only be called
- *
+ * Updates the normals of a mesh.
  */
-
-void BM_mesh_normals_update(BMesh *bm)
+void BM_mesh_normals_update(BMesh *bm, const short skip_hidden)
 {
 	BMVert *v;
 	BMFace *f;
@@ -225,7 +220,7 @@ void BM_mesh_normals_update(BMesh *bm)
 
 	/* first, find out the largest face in mesh */
 	BM_ITER(f, &faces, bm, BM_FACES_OF_MESH, NULL) {
-		if (BM_elem_flag_test(f, BM_ELEM_HIDDEN))
+		if (skip_hidden && BM_elem_flag_test(f, BM_ELEM_HIDDEN))
 			continue;
 
 		if (f->len > maxlength) maxlength = f->len;
@@ -239,19 +234,19 @@ void BM_mesh_normals_update(BMesh *bm)
 	
 	/* calculate all face normals */
 	BM_ITER(f, &faces, bm, BM_FACES_OF_MESH, NULL) {
-		if (BM_elem_flag_test(f, BM_ELEM_HIDDEN))
+		if (skip_hidden && BM_elem_flag_test(f, BM_ELEM_HIDDEN))
 			continue;
 #if 0	/* UNUSED */
 		if (f->head.flag & BM_NONORMCALC)
 			continue;
 #endif
 
-		bmesh_update_face_normal(bm, f, f->no, projectverts);
+		bmesh_face_normal_update(bm, f, f->no, projectverts);
 	}
 	
 	/* Zero out vertex normals */
 	BM_ITER(v, &verts, bm, BM_VERTS_OF_MESH, NULL) {
-		if (BM_elem_flag_test(v, BM_ELEM_HIDDEN))
+		if (skip_hidden && BM_elem_flag_test(v, BM_ELEM_HIDDEN))
 			continue;
 
 		zero_v3(v->no);
@@ -280,7 +275,7 @@ void BM_mesh_normals_update(BMesh *bm)
 	/* add weighted face normals to vertices */
 	BM_ITER(f, &faces, bm, BM_FACES_OF_MESH, NULL) {
 
-		if (BM_elem_flag_test(f, BM_ELEM_HIDDEN))
+		if (skip_hidden && BM_elem_flag_test(f, BM_ELEM_HIDDEN))
 			continue;
 
 		BM_ITER(l, &loops, bm, BM_LOOPS_OF_FACE, f) {
@@ -310,7 +305,7 @@ void BM_mesh_normals_update(BMesh *bm)
 	
 	/* normalize the accumulated vertex normals */
 	BM_ITER(v, &verts, bm, BM_VERTS_OF_MESH, NULL) {
-		if (BM_elem_flag_test(v, BM_ELEM_HIDDEN))
+		if (skip_hidden && BM_elem_flag_test(v, BM_ELEM_HIDDEN))
 			continue;
 
 		if (normalize_v3(v->no) == 0.0f) {
@@ -323,16 +318,17 @@ void BM_mesh_normals_update(BMesh *bm)
 }
 
 /*
- This function ensures correct normals for the mesh, but
- sets the flag BM_ELEM_TAG in flipped faces, to allow restoration
- of original normals.
- 
- if undo is 0: calculate right normals
- if undo is 1: restore original normals
+ * This function ensures correct normals for the mesh, but
+ * sets the flag BM_ELEM_TAG in flipped faces, to allow restoration
+ * of original normals.
+ *
+ * if undo is 0: calculate right normals
+ * if undo is 1: restore original normals
  */
+
 //keep in sycn with utils.c!
 #define FACE_FLIP	8
-static void bmesh_rationalize_normals(BMesh *bm, int undo)
+static void bm_rationalize_normals(BMesh *bm, int undo)
 {
 	BMOperator bmop;
 	BMFace *f;
@@ -352,19 +348,17 @@ static void bmesh_rationalize_normals(BMesh *bm, int undo)
 	BMO_op_initf(bm, &bmop, "righthandfaces faces=%af do_flip=%b", FALSE);
 	
 	BMO_push(bm, &bmop);
-	bmesh_righthandfaces_exec(bm, &bmop);
+	bmo_righthandfaces_exec(bm, &bmop);
 	
 	BM_ITER(f, &iter, bm, BM_FACES_OF_MESH, NULL) {
-		if (BMO_elem_flag_test(bm, f, FACE_FLIP))
-			BM_elem_flag_enable(f, BM_ELEM_TAG);
-		else BM_elem_flag_disable(f, BM_ELEM_TAG);
+		BM_elem_flag_set(f, BM_ELEM_TAG, BMO_elem_flag_test(bm, f, FACE_FLIP));
 	}
 
 	BMO_pop(bm);
 	BMO_op_finish(bm, &bmop);
 }
 
-static void bmesh_set_mdisps_space(BMesh *bm, int from, int to)
+static void UNUSED_FUNCTION(bm_mdisps_space_set)(BMesh *bm, int from, int to)
 {
 	/* switch multires data out of tangent space */
 	if (CustomData_has_layer(&bm->ldata, CD_MDISPS)) {
@@ -416,14 +410,14 @@ static void bmesh_set_mdisps_space(BMesh *bm, int from, int to)
 	}
 }
 
-/*
- *	BMESH BEGIN/END EDIT
+/**
+ * \brief BMesh Begin Edit
  *
- *	Functions for setting up a mesh for editing and cleaning up after
- *  the editing operations are done. These are called by the tools/operator
- *  API for each time a tool is executed.
+ * Functions for setting up a mesh for editing and cleaning up after
+ * the editing operations are done. These are called by the tools/operator
+ * API for each time a tool is executed.
  */
-void bmesh_begin_edit(BMesh *bm, int flag)
+void bmesh_edit_begin(BMesh *bm, int flag)
 {
 	bm->opflag = flag;
 	
@@ -435,7 +429,7 @@ void bmesh_begin_edit(BMesh *bm, int flag)
 #if BMOP_UNTAN_MULTIRES_ENABLED
 	/* switch multires data out of tangent space */
 	if ((flag & BMO_OP_FLAG_UNTAN_MULTIRES) && CustomData_has_layer(&bm->ldata, CD_MDISPS)) {
-		bmesh_set_mdisps_space(bm, MULTIRES_SPACE_TANGENT, MULTIRES_SPACE_ABSOLUTE);
+		bmesh_mdisps_space_set(bm, MULTIRES_SPACE_TANGENT, MULTIRES_SPACE_ABSOLUTE);
 
 		/* ensure correct normals, if possible */
 		bmesh_rationalize_normals(bm, 0);
@@ -446,41 +440,44 @@ void bmesh_begin_edit(BMesh *bm, int flag)
 	}
 #else
 	if (flag & BMO_OP_FLAG_RATIONALIZE_NORMALS) {
-		bmesh_rationalize_normals(bm, 0);
+		bm_rationalize_normals(bm, 0);
 	}
 #endif
 }
 
-void bmesh_end_edit(BMesh *bm, int flag)
+/**
+ * \brief BMesh End Edit
+ */
+void bmesh_edit_end(BMesh *bm, int flag)
 {
-	/* BMO_OP_FLAG_UNTAN_MULTIRES disabled for now, see comment above in bmesh_begin_edit. */
+	/* BMO_OP_FLAG_UNTAN_MULTIRES disabled for now, see comment above in bmesh_edit_begin. */
 #if BMOP_UNTAN_MULTIRES_ENABLED
 	/* switch multires data into tangent space */
 	if ((flag & BMO_OP_FLAG_UNTAN_MULTIRES) && CustomData_has_layer(&bm->ldata, CD_MDISPS)) {
 		/* set normals to their previous winding */
 		bmesh_rationalize_normals(bm, 1);
-		bmesh_set_mdisps_space(bm, MULTIRES_SPACE_ABSOLUTE, MULTIRES_SPACE_TANGENT);
+		bmesh_mdisps_space_set(bm, MULTIRES_SPACE_ABSOLUTE, MULTIRES_SPACE_TANGENT);
 	}
 	else if (flag & BMO_OP_FLAG_RATIONALIZE_NORMALS) {
 		bmesh_rationalize_normals(bm, 1);
 	}
 #else
 	if (flag & BMO_OP_FLAG_RATIONALIZE_NORMALS) {
-		bmesh_rationalize_normals(bm, 1);
+		bm_rationalize_normals(bm, 1);
 	}
 #endif
 
 	bm->opflag = 0;
 
 	/* compute normals, clear temp flags and flush selections */
-	BM_mesh_normals_update(bm);
+	BM_mesh_normals_update(bm, TRUE);
 	BM_mesh_select_mode_flush(bm);
 }
 
 void BM_mesh_elem_index_ensure(BMesh *bm, const char hflag)
 {
 	BMIter iter;
-	BMHeader *ele;
+	BMElem *ele;
 
 #ifdef DEBUG
 	BM_ELEM_INDEX_VALIDATE(bm, "Should Never Fail!", __func__);
@@ -533,14 +530,15 @@ void BM_mesh_elem_index_ensure(BMesh *bm, const char hflag)
 }
 
 
-/* array checking/setting macros */
-/* currently vert/edge/loop/face index data is being abused, but we should
- * eventually be able to rely on it being valid. To this end, there are macros
- * that validate them (so blender doesnt crash), but also print errors so we can
- * fix the offending parts of the code, this way after some months we can
- * confine this code for debug mode.
+/**
+ * Array checking/setting macros
  *
+ * Currently vert/edge/loop/face index data is being abused, in a few areas of the code.
  *
+ * To avoid correcting them afterwards, set 'bm->elem_index_dirty' however its possible
+ * this flag is set incorrectly which could crash blender.
+ *
+ * These functions ensure its correct and are called more often in debug mode.
  */
 
 void BM_mesh_elem_index_validate(BMesh *bm, const char *location, const char *func,
@@ -554,7 +552,7 @@ void BM_mesh_elem_index_validate(BMesh *bm, const char *location, const char *fu
 	const char *type_names[3] = {"vert", "edge", "face"};
 
 	BMIter iter;
-	BMHeader *ele;
+	BMElem *ele;
 	int i;
 	int is_any_error = 0;
 

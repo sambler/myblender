@@ -366,7 +366,7 @@ class Mesh(bpy_types.ID):
         :type edges: iterable object
         :arg faces:
 
-           iterator of faces, each faces contains three or four indices to
+           iterator of faces, each faces contains three or more indices to
            the *vertices* argument. eg: [(5, 6, 8, 9), (1, 2, 3), ...]
 
         :type faces: iterable object
@@ -393,6 +393,10 @@ class Mesh(bpy_types.ID):
             p.loop_total = loop_len
             p.vertices = f
             loop_index += loop_len
+
+        # if no edges - calculae them
+        if faces and (not edges):
+            self.update(calc_edges=True)
 
     @property
     def edge_keys(self):
@@ -442,6 +446,7 @@ class MeshFace(StructRNA):
                     ord_ind(verts[3], verts[0]),
                     )
 
+
 class MeshPolygon(StructRNA):
     __slots__ = ()
 
@@ -449,7 +454,7 @@ class MeshPolygon(StructRNA):
     def edge_keys(self):
         verts = self.vertices[:]
         vlen = len(self.vertices)
-        return [ord_ind(verts[i], verts[(i+1) % vlen]) for i in range(vlen)]
+        return [ord_ind(verts[i], verts[(i + 1) % vlen]) for i in range(vlen)]
 
     @property
     def loops(self):
@@ -457,43 +462,6 @@ class MeshPolygon(StructRNA):
         end = start + self.loop_total
         return range(start, end)
 
-class SequenceEffect(bpy_types.ID):
-    __slots__ = ()
-
-    @property
-    def pixmap_result(self):
-        ''' the frame that has our finished effect for this frame '''
-        return 0
-
-    @property
-    def pixmap_source(self):
-        ''' the frame that the effect is removing '''
-        return 0
-
-    @property
-    def pixmap_dest(self):
-        ''' the frame that is replacing previous image '''
-        return 0
-
-    @property
-    def progress(self):
-        ''' float representing the progress of the effect '''
-        return 0.5
-
-    @property
-    def blur_width(self):
-        ''' blur width '''
-        return 0
-
-    @property
-    def direction(self):
-        ''' forward or reverse '''
-        return 1
-
-    @property
-    def angle(self):
-        ''' the angle setting - rotate effect clockwise by x degrees '''
-        return 90
 
 class Text(bpy_types.ID):
     __slots__ = ()

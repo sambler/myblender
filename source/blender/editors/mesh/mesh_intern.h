@@ -51,22 +51,22 @@ struct EnumPropertyItem;
 /* ******************** bmeshutils.c */
 
 /*
-ok: the EDBM module is for editmode bmesh stuff.  in contrast, the 
-    BMEdit module is for code shared with blenkernel that concerns
-    the BMEditMesh structure.
-*/
+ * ok: the EDBM module is for editmode bmesh stuff.  in contrast, the 
+ * BMEdit module is for code shared with blenkernel that concerns
+ * the BMEditMesh structure.
+ */
 
 /*calls a bmesh op, reporting errors to the user, etc*/
 int EDBM_CallOpf(struct BMEditMesh *em, struct wmOperator *op, const char *fmt, ...);
 
-/*same as above, but doesn't report errors.*/
+/* same as above, but doesn't report errors.*/
 int EDBM_CallOpfSilent(struct BMEditMesh *em, const char *fmt, ...);
 
-/*these next two functions are the split version of EDBM_CallOpf, so you can
-  do stuff with a bmesh operator, after initializing it but before executing
-  it.
-  
-  execute the operator with BM_Exec_Op*/
+/* these next two functions are the split version of EDBM_CallOpf, so you can
+ * do stuff with a bmesh operator, after initializing it but before executing
+ * it.
+ *
+ * execute the operator with BM_Exec_Op */
 int EDBM_InitOpf(struct BMEditMesh *em, struct BMOperator *bmop,
                  struct wmOperator *op, const char *fmt, ...);
 /*cleans up after a bmesh operator*/
@@ -103,9 +103,6 @@ void MESH_OT_edge_face_add(struct wmOperatorType *ot);
 void MESH_OT_dupli_extrude_cursor(struct wmOperatorType *ot);
 void MESH_OT_duplicate(struct wmOperatorType *ot);
 
-void MESH_OT_fgon_make(struct wmOperatorType *ot);
-void MESH_OT_fgon_clear(struct wmOperatorType *ot);
-
 extern int EM_view3d_poll(struct bContext *C);
 
 struct wmKeyMap* knifetool_modal_keymap(struct wmKeyConfig *keyconf);
@@ -118,7 +115,6 @@ void MESH_OT_knife_cut(struct wmOperatorType *ot);
 void MESH_OT_loop_select(struct wmOperatorType *ot);
 void MESH_OT_select_all(struct wmOperatorType *ot);
 void MESH_OT_select_interior_faces(struct wmOperatorType *ot);
-void MESH_OT_bmesh_test(struct wmOperatorType *ot);
 void MESH_OT_select_more(struct wmOperatorType *ot);
 void MESH_OT_select_less(struct wmOperatorType *ot);
 void MESH_OT_select_non_manifold(struct wmOperatorType *ot);
@@ -140,7 +136,6 @@ void MESH_OT_mark_seam(struct wmOperatorType *ot);
 void MESH_OT_mark_sharp(struct wmOperatorType *ot);
 void MESH_OT_vertices_smooth(struct wmOperatorType *ot);
 void MESH_OT_noise(struct wmOperatorType *ot);
-void EXPORT_MESH_OT_wavefront(struct wmOperatorType *ot);
 void MESH_OT_flip_normals(struct wmOperatorType *ot);
 void MESH_OT_solidify(struct wmOperatorType *ot);
 void MESH_OT_select_nth(struct wmOperatorType *ot);
@@ -148,21 +143,11 @@ void MESH_OT_select_next_loop(struct wmOperatorType *ot);
 
 extern struct EnumPropertyItem *corner_type_items;
 
-#if 0 /* REMOVE AFTER BMESH MERGE */
-
-void join_triangles(EditMesh *em);
-int removedoublesflag(EditMesh *em, short flag, short automerge, float limit);		/* return amount */
-void esubdivideflag(Object *obedit, EditMesh *em, int flag, float smooth, float fractal, int beautify, int numcuts, int corner_pattern, int seltype);
-int EdgeSlide(EditMesh *em, struct wmOperator *op, short immediate, float imperc);
-
-#endif
-
 void MESH_OT_merge(struct wmOperatorType *ot);
 void MESH_OT_subdivide(struct wmOperatorType *ot);
 void MESH_OT_remove_doubles(struct wmOperatorType *ot);
 void MESH_OT_vertices_randomize(struct wmOperatorType *ot);
 void MESH_OT_vertices_sort(struct wmOperatorType *ot);
-void MESH_OT_extrude(struct wmOperatorType *ot);
 void MESH_OT_spin(struct wmOperatorType *ot);
 void MESH_OT_screw(struct wmOperatorType *ot);
 
@@ -171,7 +156,6 @@ void MESH_OT_beautify_fill(struct wmOperatorType *ot);
 void MESH_OT_quads_convert_to_tris(struct wmOperatorType *ot);
 void MESH_OT_tris_convert_to_quads(struct wmOperatorType *ot);
 void MESH_OT_dissolve_limited(struct wmOperatorType *ot);
-void MESH_OT_edge_flip(struct wmOperatorType *ot);
 void MESH_OT_faces_shade_smooth(struct wmOperatorType *ot);
 void MESH_OT_faces_shade_flat(struct wmOperatorType *ot);
 void MESH_OT_split(struct wmOperatorType *ot);

@@ -1025,7 +1025,7 @@ typedef struct UnitSettings {
 	/* Display/Editing unit options for each scene */
 	float scale_length; /* maybe have other unit conversions? */
 	char system; /* imperial, metric etc */
-	char system_rotation; /* not implimented as a propper unit system yet */
+	char system_rotation; /* not implemented as a propper unit system yet */
 	short flag;
 } UnitSettings;
 
@@ -1087,7 +1087,7 @@ typedef struct Scene {
 	
 	void *fps_info;					/* (runtime) info/cache used for presenting playback framerate info to the user */
 	
-	/* none of the dependancy graph  vars is mean to be saved */
+	/* none of the dependency graph  vars is mean to be saved */
 	struct  DagForest *theDag;
 	short dagisvalid, dagflags;
 	short recalc;				/* recalc = counterpart of ob->recalc */

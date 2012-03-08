@@ -61,7 +61,7 @@ class KX_MouseFocusSensor : public SCA_MouseSensor
 						KX_KetsjiEngine* kxengine,
 						SCA_IObject* gameobj);
 
-	virtual ~KX_MouseFocusSensor() { ; };
+	virtual ~KX_MouseFocusSensor() { }
 	virtual CValue* GetReplica() {
 		CValue* replica = new KX_MouseFocusSensor(*this);
 		// this will copy properties and so on...
@@ -76,7 +76,7 @@ class KX_MouseFocusSensor : public SCA_MouseSensor
 
 
 	/**
-	 * @attention Overrides default evaluate. 
+	 * \attention Overrides default evaluate. 
 	 */
 	virtual bool Evaluate();
 	virtual void Init();

@@ -26,40 +26,11 @@
 
 set(INC 
 	.
-	intern
-	operators
-	../avi
-	../blenfont
 	../blenkernel
 	../blenlib
-	../blenloader
 	../editors/include
-	../editors/mesh
-	../gpu
-	../ikplugin
-	../imbuf
 	../makesdna
-	../makesrna
-	../modifiers
-	../nodes
-	../render/extern/include
-	../../../extern/glew/include
-	../../../intern/audaspace/intern
-	../../../intern/bsp/extern
-	../../../intern/decimation/extern
-	../../../intern/elbeem/extern
 	../../../intern/guardedalloc
-	../../../intern/iksolver/extern
-	../../../intern/memutil
-	../../../intern/mikktspace
-	../../../intern/opennl/extern
-	../../../intern/smoke/extern
-	# XXX - BAD LEVEL CALL WM_api.h
-	../../../source/blender/windowmanager
-)
-
-set(INC_SYS
-	${ZLIB_INCLUDE_DIRS}
 )
 
 set(SRC
@@ -81,23 +52,35 @@ set(SRC
 	operators/bmo_utils.c
 
 	intern/bmesh_construct.c
+	intern/bmesh_construct.h
+	intern/bmesh_core.c
+	intern/bmesh_core.h
 	intern/bmesh_inline.c
 	intern/bmesh_interp.c
+	intern/bmesh_interp.h
 	intern/bmesh_iterators.c
+	intern/bmesh_iterators.h
 	intern/bmesh_iterators_inline.c
 	intern/bmesh_marking.c
+	intern/bmesh_marking.h
 	intern/bmesh_mesh.c
+	intern/bmesh_mesh.h
 	intern/bmesh_mods.c
-	intern/bmesh_newcore.c
+	intern/bmesh_mods.h
 	intern/bmesh_opdefines.c
+	intern/bmesh_operator_api_inline.c
 	intern/bmesh_operators.c
+	intern/bmesh_operators.h
 	intern/bmesh_operators_private.h
 	intern/bmesh_polygon.c
+	intern/bmesh_polygon.h
 	intern/bmesh_private.h
 	intern/bmesh_queries.c
+	intern/bmesh_queries.h
 	intern/bmesh_structure.c
 	intern/bmesh_structure.h
 	intern/bmesh_walkers.c
+	intern/bmesh_walkers.h
 	intern/bmesh_walkers_impl.c
 	intern/bmesh_walkers_private.h
 
@@ -106,29 +89,8 @@ set(SRC
 	bmesh.h
 	bmesh_class.h
 	bmesh_error.h
-	bmesh_iterators.h
-	bmesh_marking.h
 	bmesh_operator_api.h
-	bmesh_operators.h
-	bmesh_queries.h
-	bmesh_walkers.h
 )
-
-add_definitions(-DGLEW_STATIC)
-
-if(WITH_LZO)
-	add_definitions(-DWITH_LZO)
-	list(APPEND INC_SYS
-		../../../extern/lzo/minilzo
-	)
-endif()
-
-if(WITH_LZMA)
-	add_definitions(-DWITH_LZMA)
-	list(APPEND INC_SYS
-		../../../extern/lzma
-	)
-endif()
 
 if(MSVC)
 	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /WX")

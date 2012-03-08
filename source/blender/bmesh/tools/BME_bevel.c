@@ -39,9 +39,27 @@
 #include "BLI_math.h"
 #include "BLI_blenlib.h"
 #include "BLI_ghash.h"
+#include "BLI_memarena.h"
 
 #include "bmesh.h"
-#include "bmesh_private.h"
+#include "intern/bmesh_private.h"
+
+/* BMESH_TODO
+ *
+ * Date: 2011-11-24 06:25
+ * Sender: Andrew Wiggin
+ * Status update: I have code changes to actually make basic bevel modifier work. The things that still need to be done:
+ * - clean up the changes
+ * - get bevel by weight and bevel by angles working
+ * - the code uses adaptations of a couple of bmesh APIs,
+ * that work a little differently. for example, a join faces that doesn't just create a new face and then delete the
+ * original two faces and all associated loops, it extends one of the original faces to cover all the original loops
+ * (except for the loop on the join edge which is of course deleted). the bevel code currently requires this because it
+ * expects to be able to continue walking loop lists and doesn't like for loops to be deleted out from under it
+ * while working...
+ * but bmesh APIs don't do it this way because it makes it trickier to manage the interp during these operations,
+ * so I need to decide what to do in these cases.
+ */
 
 /* ------- Bevel code starts here -------- */
 
@@ -152,8 +170,11 @@ static int BME_Bevel_Dissolve_Disk(BMesh *bm, BMVert *v)
 		}
 
 		e = v->e;
-		elast = bmesh_disk_nextedge(e, v);
-		bmesh_jekv(bm, e, v);
+		elast = bmesh_disk_edge_next(e, v);
+
+		/* BMESH_TODO, figure out if its possible we had a double edge here and need to splice it,
+		 * last bool arg */
+		bmesh_jekv(bm, e, v, FALSE);
 
 		l1 = elast->l;
 		l2 = l1->radial_next;
@@ -169,7 +190,7 @@ static int BME_bevel_is_split_vert(BMesh *bm, BMLoop *l)
 	 * beveling other polys; this can be determined by testing the
 	 * vert and the edges around it for originality
 	 */
-	if ( !BMO_elem_flag_test(bm, l->v, BME_BEVEL_ORIG) &&
+	if (!BMO_elem_flag_test(bm, l->v, BME_BEVEL_ORIG) &&
 	     BMO_elem_flag_test(bm, l->e, BME_BEVEL_ORIG) &&
 	     BMO_elem_flag_test(bm, l->prev->e, BME_BEVEL_ORIG))
 	{
@@ -271,7 +292,7 @@ static BMVert *BME_bevel_split_edge(BMesh *bm, BMVert *v, BMVert *v1, BMLoop *l,
 			return NULL;
 		}
 		e1 = v->e; /* we just use the first two edges */
-		e2 = bmesh_disk_nextedge(v->e, v);
+		e2 = bmesh_disk_edge_next(v->e, v);
 		if (e1 == e2) {
 			//printf("You need at least two edges to use BME_bevel_split_edge()\n");
 			return NULL;
@@ -456,7 +477,7 @@ static BMVert *BME_bevel_wire(BMesh *bm, BMVert *v, float value, int res, int UN
 	BMVert *ov1, *ov2, *v1, *v2;
 
 	ov1 = BM_edge_other_vert(v->e, v);
-	ov2 = BM_edge_other_vert(bmesh_disk_nextedge(v->e, v), v);
+	ov2 = BM_edge_other_vert(bmesh_disk_edge_next(v->e, v), v);
 
 	/* split the edges */
 	v1 = BME_bevel_split_edge(bm, v, ov1, NULL, NULL, value, td);
@@ -493,16 +514,16 @@ static BMLoop *BME_bevel_edge(BMesh *bm, BMLoop *l, float value, int UNUSED(opti
 	e = l->e;
 
 	/* sanity check */
-	if ( !BMO_elem_flag_test(bm, l->e, BME_BEVEL_BEVEL) &&
-	     (BMO_elem_flag_test(bm, l->v, BME_BEVEL_BEVEL) || BMO_elem_flag_test(bm, l->next->v, BME_BEVEL_BEVEL)))
+	if (!BMO_elem_flag_test(bm, l->e, BME_BEVEL_BEVEL) &&
+	    (BMO_elem_flag_test(bm, l->v, BME_BEVEL_BEVEL) || BMO_elem_flag_test(bm, l->next->v, BME_BEVEL_BEVEL)))
 	{
 		return l;
 	}
 
 	/* checks and operations for prev edge */
 	/* first, check to see if this edge was inset previously */
-	if ( !BMO_elem_flag_test(bm, l->prev->e, BME_BEVEL_ORIG) &&
-	     !BMO_elem_flag_test(bm, l->v, BME_BEVEL_NONMAN))
+	if (!BMO_elem_flag_test(bm, l->prev->e, BME_BEVEL_ORIG) &&
+	    !BMO_elem_flag_test(bm, l->v, BME_BEVEL_NONMAN))
 	{
 		kl = l->prev->radial_next;
 		kl = (kl->v == l->v) ? kl->prev : kl->next;
@@ -523,23 +544,23 @@ static BMLoop *BME_bevel_edge(BMesh *bm, BMLoop *l, float value, int UNUSED(opti
 		se = l->next->e;
 		jf = NULL;
 		if (kl->v == kv) {
-			BM_face_split(bm, kl->f, kl->prev->v, kl->next->v, &nl, kl->prev->e);
+			BM_face_split(bm, kl->f, kl->prev->v, kl->next->v, &nl, kl->prev->e, FALSE);
 			ke = kl->e;
 			/* BMESH-TODO: jfke doesn't handle customdata */
 			jf = bmesh_jfke(bm, kl->prev->radial_next->f, kl->f, kl->prev->e);
-			BM_vert_collapse_edge(bm, ke, kv);
+			BM_vert_collapse_edge(bm, ke, kv, FALSE);
 		}
 		else {
-			BM_face_split(bm, kl->f, kl->next->next->v, kl->v, &nl, kl->next->e);
+			BM_face_split(bm, kl->f, kl->next->next->v, kl->v, &nl, kl->next->e, FALSE);
 			ke = kl->e;
 			/* BMESH-TODO: jfke doesn't handle customdata */
 			jf = bmesh_jfke(bm, kl->next->radial_next->f, kl->f, kl->next->e);
-			BM_vert_collapse_edge(bm, ke, kv);
+			BM_vert_collapse_edge(bm, ke, kv, FALSE);
 		}
 		/* find saved loop pointer */
 		l = se->l;
 		while (l->f != jf) {
-			l = bmesh_radial_nextloop(l);
+			l = l->radial_next;
 			BLI_assert(l != se->l);
 		}
 		l = l->prev;
@@ -547,8 +568,8 @@ static BMLoop *BME_bevel_edge(BMesh *bm, BMLoop *l, float value, int UNUSED(opti
 
 	/* checks and operations for the next edge */
 	/* first, check to see if this edge was inset previously  */
-	if ( !BMO_elem_flag_test(bm, l->next->e, BME_BEVEL_ORIG) &&
-	     !BMO_elem_flag_test(bm, l->next->v, BME_BEVEL_NONMAN))
+	if (!BMO_elem_flag_test(bm, l->next->e, BME_BEVEL_ORIG) &&
+	    !BMO_elem_flag_test(bm, l->next->v, BME_BEVEL_NONMAN))
 	{
 		kl = l->next->radial_next;
 		kl = (kl->v == l->next->v) ? kl->prev : kl->next;
@@ -569,29 +590,29 @@ static BMLoop *BME_bevel_edge(BMesh *bm, BMLoop *l, float value, int UNUSED(opti
 		se = l->e;
 		jf = NULL;
 		if (kl->v == kv) {
-			BM_face_split(bm, kl->f, kl->prev->v, kl->next->v, &nl, kl->prev->e);
+			BM_face_split(bm, kl->f, kl->prev->v, kl->next->v, &nl, kl->prev->e, FALSE);
 			ke = kl->e;
 			/* BMESH-TODO: jfke doesn't handle customdata */
 			jf = bmesh_jfke(bm, kl->prev->radial_next->f, kl->f, kl->prev->e);
-			BM_vert_collapse_edge(bm, ke, kv);
+			BM_vert_collapse_edge(bm, ke, kv, FALSE);
 		}
 		else {
-			BM_face_split(bm, kl->f, kl->next->next->v, kl->v, &nl, kl->next->e);
+			BM_face_split(bm, kl->f, kl->next->next->v, kl->v, &nl, kl->next->e, FALSE);
 			ke = kl->e;
 			/* BMESH-TODO: jfke doesn't handle customdata */
 			jf = bmesh_jfke(bm, kl->next->radial_next->f, kl->f, kl->next->e);
-			BM_vert_collapse_edge(bm, ke, kv);
+			BM_vert_collapse_edge(bm, ke, kv, FALSE);
 		}
 		/* find saved loop pointer */
 		l = se->l;
 		while (l->f != jf) {
-			l = bmesh_radial_nextloop(l);
+			l = l->radial_next;
 			BLI_assert(l != se->l);
 		}
 	}
 
 	if (!BMO_elem_flag_test(bm, v1, BME_BEVEL_NONMAN) || !BMO_elem_flag_test(bm, v2, BME_BEVEL_NONMAN)) {
-		BM_face_split(bm, f, v2, v1, &l, e);
+		BM_face_split(bm, f, v2, v1, &l, e, FALSE);
 		BMO_elem_flag_enable(bm, l->e, BME_BEVEL_BEVEL);
 		l = l->radial_next;
 	}
@@ -619,7 +640,7 @@ static BMLoop *BME_bevel_vert(BMesh *bm, BMLoop *l, float value, int UNUSED(opti
 	l = l->next->next;
 
 	/* "cut off" this corner */
-	f = BM_face_split(bm, l->f, v2, v1, NULL, l->e);
+	f = BM_face_split(bm, l->f, v2, v1, NULL, l->e, FALSE);
 
 	return l;
 }
@@ -663,9 +684,9 @@ static BMFace *BME_bevel_poly(BMesh *bm, BMFace *f, float value, int options, BM
 			max = 1.0f;
 			l = BME_bevel_edge(bm, l, value, options, up_vec, td);
 		}
-		else if ( BMO_elem_flag_test(bm, l->v, BME_BEVEL_BEVEL) &&
-		          BMO_elem_flag_test(bm, l->v, BME_BEVEL_ORIG) &&
-		          !BMO_elem_flag_test(bm, l->prev->e, BME_BEVEL_BEVEL))
+		else if (BMO_elem_flag_test(bm, l->v, BME_BEVEL_BEVEL) &&
+		         BMO_elem_flag_test(bm, l->v, BME_BEVEL_ORIG) &&
+		        !BMO_elem_flag_test(bm, l->prev->e, BME_BEVEL_BEVEL))
 		{
 			max = 1.0f;
 			l = BME_bevel_vert(bm, l, value, options, up_vec, td);
@@ -731,7 +752,10 @@ static void BME_bevel_add_vweight(BME_TransData_Head *td, BMesh *bm, BMVert *v, 
 {
 	BME_TransData *vtd;
 
-	if (BMO_elem_flag_test(bm, v, BME_BEVEL_NONMAN)) return;
+	if (BMO_elem_flag_test(bm, v, BME_BEVEL_NONMAN)) {
+		return;
+	}
+
 	BMO_elem_flag_enable(bm, v, BME_BEVEL_BEVEL);
 	if ((vtd = BME_get_transdata(td, v))) {
 		if (options & BME_BEVEL_EMIN) {
@@ -767,18 +791,23 @@ static void bevel_init_verts(BMesh *bm, int options, BME_TransData_Head *td)
 	BMIter iter;
 	float weight;
 	BM_ITER(v, &iter, bm, BM_VERTS_OF_MESH, NULL) {
-		weight = 0.0;
+		weight = 0.0f;
 		if (!BMO_elem_flag_test(bm, v, BME_BEVEL_NONMAN)) {
 			/* modifiers should not use selection */
 			if (options & BME_BEVEL_SELECT) {
-				if(BM_elem_flag_test(v, BM_ELEM_SELECT)) weight = 1.0;
+				if (BM_elem_flag_test(v, BM_ELEM_SELECT)) {
+					weight = 1.0f;
+				}
 			}
 			/* bevel weight NYI */
-			else if(options & BME_BEVEL_WEIGHT)
+			else if (options & BME_BEVEL_WEIGHT) {
 				weight = BM_elem_float_data_get(&bm->vdata, v, CD_BWEIGHT);
-			else
-				weight = 1.0;
-			if(weight > 0.0) {
+			}
+			else {
+				weight = 1.0f;
+			}
+
+			if (weight > 0.0f) {
 				BMO_elem_flag_enable(bm, v, BME_BEVEL_BEVEL);
 				BME_assign_transdata(td, bm, v, v->co, v->co, NULL, NULL, 1.0, weight, -1, NULL);
 			}
@@ -804,6 +833,7 @@ static void bevel_init_edges(BMesh *bm, int options, BME_TransData_Head *td)
 			else {
 				weight = 1.0;
 			}
+
 			if(weight > 0.0) {
 				BMO_elem_flag_enable(bm, e, BME_BEVEL_BEVEL);
 				BMO_elem_flag_enable(bm, e->v1, BME_BEVEL_BEVEL);
@@ -817,7 +847,7 @@ static void bevel_init_edges(BMesh *bm, int options, BME_TransData_Head *td)
 	/* clean up edges with 2 faces that share more than one edg */
 	BM_ITER(e, &iter, bm, BM_EDGES_OF_MESH, NULL) {
 		if(BMO_elem_flag_test(bm, e, BME_BEVEL_BEVEL)) {
-			count = BM_face_share_edges(e->l->f, e->l->radial_next->f);
+			count = BM_face_share_edge_count(e->l->f, e->l->radial_next->f);
 			if(count > 1) BMO_elem_flag_disable(bm, e, BME_BEVEL_BEVEL);
 		}
 	}
@@ -836,15 +866,18 @@ static BMesh *BME_bevel_initialize(BMesh *bm, int options, int UNUSED(defgrp_ind
 		BMO_elem_flag_enable(bm, v, BME_BEVEL_ORIG);
 		if(v->e) {
 			BME_assign_transdata(td, bm, v, v->co, v->co, NULL, NULL, 0, -1, -1, NULL);
-			if (!BM_vert_is_manifold(bm, v))
+			if (!BM_vert_is_manifold(bm, v)) {
 				BMO_elem_flag_enable(bm, v, BME_BEVEL_NONMAN);
+			}
+
 			/* test wire ver */
 			len = BM_vert_edge_count(v);
 			if (len == 2 && BM_vert_is_wire(bm, v))
 				BMO_elem_flag_disable(bm, v, BME_BEVEL_NONMAN);
 		}
-		else
+		else {
 			BMO_elem_flag_enable(bm, v, BME_BEVEL_NONMAN);
+		}
 	}
 
 	BM_ITER(e, &iter, bm, BM_EDGES_OF_MESH, NULL) {
@@ -854,13 +887,22 @@ static BMesh *BME_bevel_initialize(BMesh *bm, int options, int UNUSED(defgrp_ind
 			BMO_elem_flag_enable(bm, e->v2, BME_BEVEL_NONMAN);
 			BMO_elem_flag_enable(bm, e, BME_BEVEL_NONMAN);
 		}
-		if(BMO_elem_flag_test(bm, e->v1, BME_BEVEL_NONMAN) || BMO_elem_flag_test(bm, e->v2, BME_BEVEL_NONMAN)) BMO_elem_flag_enable(bm, e, BME_BEVEL_NONMAN);
+		if(BMO_elem_flag_test(bm, e->v1, BME_BEVEL_NONMAN) || BMO_elem_flag_test(bm, e->v2, BME_BEVEL_NONMAN)) {
+			BMO_elem_flag_enable(bm, e, BME_BEVEL_NONMAN);
+		}
 	}
 
-	BM_ITER(f, &iter, bm, BM_FACES_OF_MESH, NULL)
+	BM_ITER(f, &iter, bm, BM_FACES_OF_MESH, NULL) {
 		BMO_elem_flag_enable(bm, f, BME_BEVEL_ORIG);
-	if(options & BME_BEVEL_VERT) bevel_init_verts(bm, options, td);
-	else bevel_init_edges(bm, options, td);
+	}
+
+	if(options & BME_BEVEL_VERT) {
+		bevel_init_verts(bm, options, td);
+	}
+	else {
+		bevel_init_edges(bm, options, td);
+	}
+
 	return bm;
 
 }
@@ -937,10 +979,10 @@ static BMesh *BME_bevel_mesh(BMesh *bm, float value, int UNUSED(res), int option
 				if(l->v != v) l = l->next;
 				if(l2->v != v) l2 = l2->next;
 				if(l->f->len > 3)
-					BM_face_split(bm, l->f, l->next->v, l->prev->v, &l, l->e); /* clip this corner off */
+					BM_face_split(bm, l->f, l->next->v, l->prev->v, &l, l->e, FALSE); /* clip this corner off */
 				if(l2->f->len > 3)
-					BM_face_split(bm, l2->f, l2->next->v, l2->prev->v, &l, l2->e); /* clip this corner off */
-				curedge = bmesh_disk_nextedge(curedge, v);
+					BM_face_split(bm, l2->f, l2->next->v, l2->prev->v, &l, l2->e, FALSE); /* clip this corner off */
+				curedge = bmesh_disk_edge_next(curedge, v);
 			} while(curedge != v->e);
 			BME_Bevel_Dissolve_Disk(bm, v);
 		}
@@ -978,14 +1020,14 @@ BMesh *BME_bevel(BMEditMesh *em, float value, int res, int options, int defgrp_i
 		BMO_push(bm, NULL);
 		BME_bevel_initialize(bm, options, defgrp_index, angle, td);
 		//if (i != 0) BME_bevel_reinitialize(bm);
-		bmesh_begin_edit(bm, 0);
+		bmesh_edit_begin(bm, 0);
 		BME_bevel_mesh(bm, (float)d, res, options, defgrp_index, td);
-		bmesh_end_edit(bm, 0);
+		bmesh_edit_end(bm, 0);
 		d /= (i == 0) ? 3.0 : 2.0;
 		BMO_pop(bm);
 	}
 
-	BMEdit_RecalcTesselation(em);
+	BMEdit_RecalcTessellation(em);
 
 	/* interactive preview? */
 	if (rtd) {
@@ -995,7 +1037,7 @@ BMesh *BME_bevel(BMEditMesh *em, float value, int res, int options, int defgrp_i
 
 	/* otherwise apply transforms */
 	BM_ITER(v, &iter, bm, BM_VERTS_OF_MESH, NULL) {
-		if ( (vtd = BME_get_transdata(td, v)) ) {
+		if ((vtd = BME_get_transdata(td, v))) {
 			if (vtd->max && (*vtd->max > 0 && value > *vtd->max)) {
 				d = *vtd->max;
 			}

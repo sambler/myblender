@@ -82,6 +82,7 @@ set(SRC
 	intern/smallhash.c
 	intern/storage.c
 	intern/string.c
+	intern/string_cursor_utf8.c
 	intern/string_utf8.c
 	intern/threads.c
 	intern/time.c
@@ -92,7 +93,6 @@ set(SRC
 	BLI_array.h
 	BLI_bitmap.h
 	BLI_smallhash.h
-	BLI_sparsemap.h
 	BLI_args.h
 	BLI_blenlib.h
 	BLI_boxpack2d.h
@@ -103,6 +103,7 @@ set(SRC
 	BLI_dynlib.h
 	BLI_dynstr.h
 	BLI_edgehash.h
+	BLI_editVert.h
 	BLI_fileops.h
 	BLI_fileops_types.h
 	BLI_fnmatch.h
@@ -133,6 +134,7 @@ set(SRC
 	BLI_rect.h
 	BLI_scanfill.h
 	BLI_string.h
+	BLI_string_cursor_utf8.h
 	BLI_string_utf8.h
 	BLI_threads.h
 	BLI_utildefines.h

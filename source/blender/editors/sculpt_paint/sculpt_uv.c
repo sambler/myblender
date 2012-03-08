@@ -156,7 +156,9 @@ typedef struct Temp_UvData{
 
 
 
-void HC_relaxation_iteration_uv(BMEditMesh *em, UvSculptData *sculptdata, float mouse_coord[2], float alpha, float radius, float aspectRatio) {
+void HC_relaxation_iteration_uv(BMEditMesh *em, UvSculptData *sculptdata, float mouse_coord[2],
+                                float alpha, float radius, float aspectRatio)
+{
 	Temp_UVData *tmp_uvdata;
 	float diff[2];
 	int i;
@@ -297,7 +299,7 @@ static void uv_sculpt_stroke_apply(bContext *C, wmOperator *op, wmEvent *event, 
 	float co[2], radius, radius_root;
 	Scene *scene = CTX_data_scene(C);
 	ARegion *ar = CTX_wm_region(C);
-	BMEditMesh *em = ((Mesh *)obedit->data)->edit_btmesh;
+	BMEditMesh *em = BMEdit_FromObject(obedit);
 	unsigned int tool;
 	UvSculptData *sculptdata = (UvSculptData *)op->customdata;
 	SpaceImage *sima;
@@ -412,8 +414,7 @@ static void uv_sculpt_stroke_exit(bContext *C, wmOperator *op)
 	if (data->timer) {
 		WM_event_remove_timer(CTX_wm_manager(C), CTX_wm_window(C), data->timer);
 	}
-	if (data->elementMap)
-	{
+	if (data->elementMap) {
 		EDBM_free_uv_element_map(data->elementMap);
 	}
 	if (data->uv) {
@@ -433,7 +434,8 @@ static void uv_sculpt_stroke_exit(bContext *C, wmOperator *op)
 	op->customdata = NULL;
 }
 
-static int get_uv_element_offset_from_face(UvElementMap *map, BMFace *efa, BMLoop *l, int island_index, int doIslands) {
+static int get_uv_element_offset_from_face(UvElementMap *map, BMFace *efa, BMLoop *l, int island_index, int doIslands)
+{
 	UvElement *element = ED_get_uv_element(map, efa, l);
 	if (!element || (doIslands && element->island != island_index)) {
 		return -1;
@@ -442,14 +444,16 @@ static int get_uv_element_offset_from_face(UvElementMap *map, BMFace *efa, BMLoo
 }
 
 
-static unsigned int	uv_edge_hash(const void *key) {
+static unsigned int	uv_edge_hash(const void *key)
+{
 	UvEdge *edge = (UvEdge *)key;
 	return 
 		BLI_ghashutil_inthash(SET_INT_IN_POINTER(edge->uv2)) +
 		BLI_ghashutil_inthash(SET_INT_IN_POINTER(edge->uv1));
 }
 
-static int uv_edge_compare(const void *a, const void *b) {
+static int uv_edge_compare(const void *a, const void *b)
+{
 	UvEdge *edge1 = (UvEdge *)a;
 	UvEdge *edge2 = (UvEdge *)b;
 
@@ -466,7 +470,7 @@ static UvSculptData *uv_sculpt_stroke_init(bContext *C, wmOperator *op, wmEvent 
 	Object *obedit = CTX_data_edit_object(C);
 	ToolSettings *ts = scene->toolsettings;
 	UvSculptData *data = MEM_callocN(sizeof(*data), "UV Smooth Brush Data");
-	BMEditMesh *em = ((Mesh *)obedit->data)->edit_btmesh;
+	BMEditMesh *em = BMEdit_FromObject(obedit);
 	BMesh *bm = em->bm;
 
 	op->customdata = data;

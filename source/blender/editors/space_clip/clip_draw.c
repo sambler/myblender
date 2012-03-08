@@ -586,7 +586,7 @@ static void draw_marker_areas(SpaceClip *sc, MovieTrackingTrack *track, MovieTra
 	}
 
 	/* pyramid */
-	if(sel && TRACK_SELECTED(track) && (track->tracker==TRACKER_KLT) && (marker->flag&MARKER_DISABLED)==0) {
+	if(sel && TRACK_VIEW_SELECTED(sc, track) && (track->tracker==TRACKER_KLT) && (marker->flag&MARKER_DISABLED)==0) {
 		if(track->flag&TRACK_LOCKED) {
 			if(act) UI_ThemeColor(TH_ACT_MARKER);
 			else if(track->pat_flag&SELECT) UI_ThemeColorShade(TH_LOCK_MARKER, 64);
@@ -686,7 +686,7 @@ static void draw_marker_slide_zones(SpaceClip *sc, MovieTrackingTrack *track, Mo
 			glVertex3f(x-tdx, y-tdy, 0);
 		glEnd();
 
-		/* search resizing triangle */
+		/* search re-sizing triangle */
 		x= track->search_max[0];
 		y= track->search_min[1];
 
@@ -730,7 +730,7 @@ static void draw_marker_slide_zones(SpaceClip *sc, MovieTrackingTrack *track, Mo
 			glVertex3f(x-tdx, y-tdy, 0);
 		glEnd();
 
-		/* pattern resizing triangle */
+		/* pattern re-sizing triangle */
 		x= track->pat_max[0];
 		y= track->pat_min[1];
 
@@ -849,9 +849,9 @@ static void draw_tracking_tracks(SpaceClip *sc, ARegion *ar, MovieClip *clip,
 	/* ** find window pixel coordinates of origin ** */
 
 	/* UI_view2d_to_region_no_clip return integer values, this could
-	   lead to 1px flickering when view is locked to selection during playbeck.
-	   to avoid this flickering, calclate base point in the same way as it happens
-	   in UI_view2d_to_region_no_clip, but do it in floats here */
+	 * lead to 1px flickering when view is locked to selection during playbeck.
+	 * to avoid this flickering, calculate base point in the same way as it happens
+	 * in UI_view2d_to_region_no_clip, but do it in floats here */
 
 	view2d_to_region_float(&ar->v2d, 0.0f, 0.0f, &x, &y);
 
@@ -940,7 +940,7 @@ static void draw_tracking_tracks(SpaceClip *sc, ARegion *ar, MovieClip *clip,
 	}
 
 	/* selected areas only, so selection wouldn't be overlapped by
-	   non-selected areas */
+	 * non-selected areas */
 	track= tracksbase->first;
 	fp= marker_pos;
 	while(track) {
@@ -1317,8 +1317,8 @@ void clip_draw_grease_pencil(bContext *C, int onlyv2d)
 		return;
 
 	if(onlyv2d) {
-		/* if manual calibration is used then grase pencil data is already
-		    drawed in draw_distortion */
+		/* if manual calibration is used then grease pencil data is already
+		 * drawed in draw_distortion */
 		if((sc->flag&SC_MANUAL_CALIBRATION)==0 || sc->mode!=SC_MODE_DISTORTION) {
 			ibuf= ED_space_clip_get_buffer(sc);
 

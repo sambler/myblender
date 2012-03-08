@@ -191,7 +191,7 @@ ParticleEditSettings *PE_settings(Scene *scene)
 	return scene->toolsettings ? &scene->toolsettings->particle : NULL;
 }
 
-/* always gets atleast the first particlesystem even if PSYS_CURRENT flag is not set
+/* always gets at least the first particlesystem even if PSYS_CURRENT flag is not set
  *
  * note: this function runs on poll, therefor it can runs many times a second
  * keep it fast! */
@@ -252,9 +252,8 @@ static PTCacheEdit *pe_get_current(Scene *scene, Object *ob, int create)
 				break;
 			}
 		}
-		else if(pset->edittype == PE_TYPE_SOFTBODY && pid->type == PTCACHE_TYPE_SOFTBODY) {
-			if(create && pid->cache->flag & PTCACHE_BAKED && !pid->cache->edit)
-			{
+		else if (pset->edittype == PE_TYPE_SOFTBODY && pid->type == PTCACHE_TYPE_SOFTBODY) {
+			if (create && pid->cache->flag & PTCACHE_BAKED && !pid->cache->edit) {
 				pset->flag |= PE_FADE_TIME;
 				// NICE TO HAVE but doesn't work: pset->brushtype = PE_BRUSH_COMB;
 				PE_create_particle_edit(scene, ob, pid->cache, NULL);
@@ -262,9 +261,8 @@ static PTCacheEdit *pe_get_current(Scene *scene, Object *ob, int create)
 			edit = pid->cache->edit;
 			break;
 		}
-		else if(pset->edittype == PE_TYPE_CLOTH && pid->type == PTCACHE_TYPE_CLOTH) {
-			if(create && pid->cache->flag & PTCACHE_BAKED && !pid->cache->edit)
-			{
+		else if (pset->edittype == PE_TYPE_CLOTH && pid->type == PTCACHE_TYPE_CLOTH) {
+			if (create && pid->cache->flag & PTCACHE_BAKED && !pid->cache->edit) {
 				pset->flag |= PE_FADE_TIME;
 				// NICE TO HAVE but doesn't work: pset->brushtype = PE_BRUSH_COMB;
 				PE_create_particle_edit(scene, ob, pid->cache, NULL);
@@ -952,7 +950,7 @@ static void pe_deflect_emitter(Scene *scene, Object *ob, PTCacheEdit *edit)
 		}
 	}
 }
-/* force set distances between neighbouring keys */
+/* force set distances between neighboring keys */
 static void PE_apply_lengths(Scene *scene, PTCacheEdit *edit)
 {
 	
@@ -977,7 +975,7 @@ static void PE_apply_lengths(Scene *scene, PTCacheEdit *edit)
 		}
 	}
 }
-/* try to find a nice solution to keep distances between neighbouring keys */
+/* try to find a nice solution to keep distances between neighboring keys */
 static void pe_iterate_lengths(Scene *scene, PTCacheEdit *edit)
 {
 	ParticleEditSettings *pset=PE_settings(scene);
@@ -1218,7 +1216,7 @@ static void update_velocities(PTCacheEdit *edit)
 void PE_update_object(Scene *scene, Object *ob, int useflag)
 {
 	/* use this to do partial particle updates, not usable when adding or
-	   removing, then a full redo is necessary and calling this may crash */
+	 * removing, then a full redo is necessary and calling this may crash */
 	ParticleEditSettings *pset= PE_settings(scene);
 	PTCacheEdit *edit = PE_get_current(scene, ob);
 	POINT_P;
@@ -2196,7 +2194,7 @@ static void remove_tagged_keys(Object *ob, ParticleSystem *psys)
 
 /************************ subdivide opertor *********************/
 
-/* works like normal edit mode subdivide, inserts keys between neighbouring selected keys */
+/* works like normal edit mode subdivide, inserts keys between neighboring selected keys */
 static void subdivide_particle(PEData *data, int pa_index)
 {
 	PTCacheEdit *edit= data->edit;
@@ -3632,10 +3630,10 @@ static void brush_edit_apply(bContext *C, wmOperator *op, PointerRNA *itemptr)
 				PE_update_object(scene, ob, 1);
 		}
 
-		if(edit->psys)
+		if (edit->psys) {
 			WM_event_add_notifier(C, NC_OBJECT|ND_PARTICLE|NA_EDITED, ob);
-		else
-		{
+		}
+		else {
 			DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 			WM_event_add_notifier(C, NC_OBJECT|ND_MODIFIER, ob);
 		}

@@ -244,7 +244,6 @@ static void clip_listener(ScrArea *sa, wmNotifier *wmn)
 					/* no break! */
 
 				case ND_FRAME_RANGE:
-					ED_area_tag_refresh(sa);
 					ED_area_tag_redraw(sa);
 					break;
 			}
@@ -348,7 +347,7 @@ static void clip_operatortypes(void)
 
 	/* orientation */
 	WM_operatortype_append(CLIP_OT_set_origin);
-	WM_operatortype_append(CLIP_OT_set_floor);
+	WM_operatortype_append(CLIP_OT_set_plane);
 	WM_operatortype_append(CLIP_OT_set_axis);
 	WM_operatortype_append(CLIP_OT_set_scale);
 	WM_operatortype_append(CLIP_OT_set_solution_scale);
@@ -371,6 +370,7 @@ static void clip_operatortypes(void)
 
 	/* graph editing */
 	WM_operatortype_append(CLIP_OT_graph_select);
+	WM_operatortype_append(CLIP_OT_graph_select_border);
 	WM_operatortype_append(CLIP_OT_graph_delete_curve);
 	WM_operatortype_append(CLIP_OT_graph_delete_knot);
 	WM_operatortype_append(CLIP_OT_graph_view_all);
@@ -410,6 +410,14 @@ static void clip_keymap(struct wmKeyConfig *keyconf)
 	kmi= WM_keymap_add_item(keymap, "CLIP_OT_track_markers", TKEY, KM_PRESS, KM_SHIFT|KM_CTRL, 0);
 	RNA_boolean_set(kmi->ptr, "backwards", TRUE);
 	RNA_boolean_set(kmi->ptr, "sequence", TRUE);
+
+	/* clean-up */
+	kmi= WM_keymap_add_item(keymap, "CLIP_OT_clear_track_path", TKEY, KM_PRESS, KM_ALT, 0);
+	RNA_enum_set(kmi->ptr, "action", TRACK_CLEAR_REMAINED);
+	kmi= WM_keymap_add_item(keymap, "CLIP_OT_clear_track_path", TKEY, KM_PRESS, KM_SHIFT, 0);
+	RNA_enum_set(kmi->ptr, "action", TRACK_CLEAR_UPTO);
+	kmi= WM_keymap_add_item(keymap, "CLIP_OT_clear_track_path", TKEY, KM_PRESS, KM_ALT|KM_SHIFT, 0);
+	RNA_enum_set(kmi->ptr, "action", TRACK_CLEAR_ALL);
 
 	/* mode */
 	kmi= WM_keymap_add_item(keymap, "CLIP_OT_mode_set", TABKEY, KM_PRESS, 0, 0);
@@ -453,6 +461,10 @@ static void clip_keymap(struct wmKeyConfig *keyconf)
 	RNA_float_set(WM_keymap_add_item(keymap, "CLIP_OT_view_zoom_ratio", PAD8, KM_PRESS, 0, 0)->ptr, "ratio", 0.125f);
 
 	WM_keymap_add_item(keymap, "CLIP_OT_view_all", HOMEKEY, KM_PRESS, 0, 0);
+
+	kmi = WM_keymap_add_item(keymap, "CLIP_OT_view_all", FKEY, KM_PRESS, 0, 0);
+	RNA_boolean_set(kmi->ptr, "fit_view", TRUE);
+
 	WM_keymap_add_item(keymap, "CLIP_OT_view_selected", PADPERIOD, KM_PRESS, 0, 0);
 
 	/* jump to special frame */
@@ -514,13 +526,6 @@ static void clip_keymap(struct wmKeyConfig *keyconf)
 	WM_keymap_add_item(keymap, "CLIP_OT_hide_tracks_clear", HKEY, KM_PRESS, KM_ALT, 0);
 
 	/* clean-up */
-	kmi= WM_keymap_add_item(keymap, "CLIP_OT_clear_track_path", TKEY, KM_PRESS, KM_ALT, 0);
-	RNA_enum_set(kmi->ptr, "action", TRACK_CLEAR_REMAINED);
-	kmi= WM_keymap_add_item(keymap, "CLIP_OT_clear_track_path", TKEY, KM_PRESS, KM_SHIFT, 0);
-	RNA_enum_set(kmi->ptr, "action", TRACK_CLEAR_UPTO);
-	kmi= WM_keymap_add_item(keymap, "CLIP_OT_clear_track_path", TKEY, KM_PRESS, KM_ALT|KM_SHIFT, 0);
-	RNA_enum_set(kmi->ptr, "action", TRACK_CLEAR_ALL);
-
 	WM_keymap_add_item(keymap, "CLIP_OT_join_tracks", JKEY, KM_PRESS, KM_CTRL, 0);
 
 	/* menus */
@@ -553,6 +558,8 @@ static void clip_keymap(struct wmKeyConfig *keyconf)
 	RNA_boolean_set(kmi->ptr, "extend", FALSE);
 	kmi = WM_keymap_add_item(keymap, "CLIP_OT_graph_select", SELECTMOUSE, KM_PRESS, KM_SHIFT, 0);
 	RNA_boolean_set(kmi->ptr, "extend", TRUE);
+
+	WM_keymap_add_item(keymap, "CLIP_OT_graph_select_border", BKEY, KM_PRESS, 0, 0);
 
 	/* delete */
 	WM_keymap_add_item(keymap, "CLIP_OT_graph_delete_curve", DELKEY, KM_PRESS, 0, 0);
@@ -611,6 +618,16 @@ static void clip_refresh(const bContext *C, ScrArea *sa)
 				ar_main->alignment= RGN_ALIGN_NONE;
 				view_changed= 1;
 			}
+			if (ar_preview && ar_preview->alignment != RGN_ALIGN_NONE) {
+				/* store graph region align */
+				if (ar_preview->alignment == RGN_ALIGN_TOP)
+					sc->runtime_flag &= ~SC_GRAPH_BOTTOM;
+				else
+					sc->runtime_flag |= SC_GRAPH_BOTTOM;
+
+				ar_preview->alignment= RGN_ALIGN_NONE;
+				view_changed= 1;
+			}
 			break;
 		case SC_VIEW_GRAPH:
 			if (ar_preview && (ar_preview->flag & RGN_FLAG_HIDDEN)) {
@@ -624,7 +641,11 @@ static void clip_refresh(const bContext *C, ScrArea *sa)
 				view_changed= 1;
 			}
 			if (ar_preview && !ELEM(ar_preview->alignment, RGN_ALIGN_TOP,  RGN_ALIGN_BOTTOM)) {
-				ar_preview->alignment= RGN_ALIGN_TOP;
+				if (sc->runtime_flag & SC_GRAPH_BOTTOM)
+					ar_preview->alignment= RGN_ALIGN_BOTTOM;
+				else
+					ar_preview->alignment= RGN_ALIGN_TOP;
+
 				view_changed= 1;
 			}
 			break;
@@ -711,8 +732,8 @@ static void clip_main_area_draw(const bContext *C, ARegion *ar)
 	Scene *scene= CTX_data_scene(C);
 	MovieClip *clip= ED_space_clip(sc);
 
-	/* if trcking is in progress, we should sunchronize framenr from clipuser
-	   so latest tracked frame would be shown */
+	/* if tracking is in progress, we should synchronize framenr from clipuser
+	 * so latest tracked frame would be shown */
 	if(clip && clip->tracking_context)
 		BKE_tracking_sync_user(&sc->user, clip->tracking_context);
 

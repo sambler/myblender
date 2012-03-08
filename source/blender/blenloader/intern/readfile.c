@@ -4360,16 +4360,14 @@ static void direct_link_modifiers(FileData *fd, ListBase *lb)
 					smd->domain->point_cache[1] = NULL;
 				}
 			}
-			else if(smd->type==MOD_SMOKE_TYPE_FLOW)
-			{
+			else if (smd->type==MOD_SMOKE_TYPE_FLOW) {
 				smd->domain = NULL;
 				smd->coll = NULL;
 				smd->flow = newdataadr(fd, smd->flow);
 				smd->flow->smd = smd;
 				smd->flow->psys = newdataadr(fd, smd->flow->psys);
 			}
-			else if(smd->type==MOD_SMOKE_TYPE_COLL)
-			{
+			else if (smd->type==MOD_SMOKE_TYPE_COLL) {
 				smd->flow = NULL;
 				smd->domain = NULL;
 				smd->coll = newdataadr(fd, smd->coll);
@@ -6857,7 +6855,7 @@ static void area_add_header_region(ScrArea *sa, ListBase *lb)
 	else
 		ar->alignment= RGN_ALIGN_TOP;
 	
-	/* initialise view2d data for header region, to allow panning */
+	/* initialize view2d data for header region, to allow panning */
 	/* is copy from ui_view2d.c */
 	ar->v2d.keepzoom = (V2D_LOCKZOOM_X|V2D_LOCKZOOM_Y|V2D_LIMITZOOM|V2D_KEEPASPECT);
 	ar->v2d.keepofs = V2D_LOCKOFS_Y;
@@ -7685,6 +7683,77 @@ static void do_versions_nodetree_socket_auto_hidden_flags_2_62(bNodeTree *ntree)
 	}
 }
 
+static void do_versions_nodetree_multi_file_output_format_2_62_1(Scene *sce, bNodeTree *ntree)
+{
+	bNode *node;
+	bNodeSocket *sock;
+	
+	for (node=ntree->nodes.first; node; node=node->next) {
+		if (node->type==CMP_NODE_OUTPUT_FILE) {
+			/* previous CMP_NODE_OUTPUT_FILE nodes get converted to multi-file outputs */
+			NodeImageFile *old_data = node->storage;
+			NodeImageMultiFile *nimf= MEM_callocN(sizeof(NodeImageMultiFile), "node image multi file");
+			bNodeSocket *old_image = BLI_findlink(&node->inputs, 0);
+			bNodeSocket *old_z = BLI_findlink(&node->inputs, 1);
+			bNodeSocket *sock;
+			
+			node->storage= nimf;
+			
+			BLI_strncpy(nimf->base_path, old_data->name, sizeof(nimf->base_path));
+			nimf->format = old_data->im_format;
+			
+			/* if z buffer is saved, change the image type to multilayer exr.
+			 * XXX this is slightly messy, Z buffer was ignored before for anything but EXR and IRIS ...
+			 * i'm just assuming here that IRIZ means IRIS with z buffer ...
+			 */
+			if (ELEM(old_data->im_format.imtype, R_IMF_IMTYPE_IRIZ, R_IMF_IMTYPE_OPENEXR)) {
+				nimf->format.imtype = R_IMF_IMTYPE_MULTILAYER;
+				sock = ntreeCompositOutputFileAddSocket(ntree, node, old_image->name, &nimf->format);
+				if (old_image->link) {
+					old_image->link->tosock = sock;
+					sock->link = old_image->link;
+				}
+				sock = ntreeCompositOutputFileAddSocket(ntree, node, old_z->name, &nimf->format);
+				if (old_z->link) {
+					old_z->link->tosock = sock;
+					sock->link = old_z->link;
+				}
+			}
+			else {
+				/* saves directly to base path, which is the old image output path */
+				sock = ntreeCompositOutputFileAddSocket(ntree, node, "", &nimf->format);
+				if (old_image->link) {
+					old_image->link->tosock = sock;
+					sock->link = old_image->link;
+				}
+			}
+			
+			nodeRemoveSocket(ntree, node, old_image);
+			nodeRemoveSocket(ntree, node, old_z);
+			MEM_freeN(old_data);
+		}
+		else if (node->type==CMP_NODE_OUTPUT_MULTI_FILE__DEPRECATED) {
+			NodeImageMultiFile *nimf = node->storage;
+			
+			/* CMP_NODE_OUTPUT_MULTI_FILE has been redeclared as CMP_NODE_OUTPUT_FILE */
+			node->type = CMP_NODE_OUTPUT_FILE;
+			
+			/* initialize the node-wide image format from render data, if available */
+			if (sce)
+				nimf->format = sce->r.im_format;
+			
+			/* transfer render format toggle to node format toggle */
+			for (sock=node->inputs.first; sock; sock=sock->next) {
+				NodeImageMultiFileSocket *simf = sock->storage;
+				simf->use_node_format = simf->use_render_format;
+			}
+			
+			/* we do have preview now */
+			node->flag |= NODE_PREVIEW;
+		}
+	}
+}
+
 static void do_versions(FileData *fd, Library *lib, Main *main)
 {
 	/* WATCH IT!!!: pointers from libdata have not been converted */
@@ -8301,7 +8370,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 		ob = main->object.first;
 
 		/* adapt form factor in order to get the 'old' physics
-		 * behaviour back...*/
+		 * behavior back...*/
 
 		while (ob) {
 			/* in future, distinguish between different
@@ -9797,7 +9866,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 					}
 				}
 				
-				/* correctly initialise constinv matrix */
+				/* correctly initialize constinv matrix */
 				unit_m4(ob->constinv);
 				
 				if (ob->type == OB_ARMATURE) {
@@ -9827,7 +9896,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 								}
 							}
 							
-							/* correctly initialise constinv matrix */
+							/* correctly initialize constinv matrix */
 							unit_m4(pchan->constinv);
 						}
 					}
@@ -10018,7 +10087,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 	}
 
 	if ((main->versionfile < 245) || (main->versionfile == 245 && main->subversionfile < 5)) {
-		/* foreground color needs to be somthing other then black */
+		/* foreground color needs to be something other then black */
 		Scene *sce;
 		for(sce= main->scene.first; sce; sce=sce->id.next) {
 			sce->r.fg_stamp[0] = sce->r.fg_stamp[1] = sce->r.fg_stamp[2] = 0.8f;
@@ -10653,7 +10722,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 			ob->m_contactProcessingThreshold = 1.; //pad3 is used for m_contactProcessingThreshold
 			if(ob->parent) {
 				/* check if top parent has compound shape set and if yes, set this object
-				   to compound shaper as well (was the behaviour before, now it's optional) */
+				   to compound shaper as well (was the behavior before, now it's optional) */
 				Object *parent= newlibadr(fd, lib, ob->parent);
 				while (parent && parent != ob &&  parent->parent != NULL) {
 					parent = newlibadr(fd, lib, parent->parent);
@@ -10747,8 +10816,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 						sAct->sound3D.min_gain = sound->min_gain;
 						sAct->sound3D.rolloff_factor = sound->attenuation;
 					}
-					else
-					{
+					else {
 						sAct->sound3D.reference_distance = 1.0f;
 						sAct->volume = 1.0f;
 						sAct->sound3D.max_gain = 1.0f;
@@ -10794,7 +10862,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 			do_versions_gpencil_2_50(main, screen);
 		}
 		
-		/* shader, composit and texture node trees have id.name empty, put something in
+		/* shader, composite and texture node trees have id.name empty, put something in
 		 * to have them show in RNA viewer and accessible otherwise.
 		 */
 		for(ma= main->mat.first; ma; ma= ma->id.next) {
@@ -10810,7 +10878,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 				}
 			}
 		}
-		/* and composit trees */
+		/* and composite trees */
 		for(sce= main->scene.first; sce; sce= sce->id.next) {
 			if(sce->nodetree && sce->nodetree->id.name[0] == '\0')
 				strcpy(sce->nodetree->id.name, "NTCompositing Nodetree");
@@ -11203,7 +11271,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 		Object *ob;
 		Lamp *la;
 		
-		/* New variables for axis-angle rotations and/or quaternion rotations were added, and need proper initialisation */
+		/* New variables for axis-angle rotations and/or quaternion rotations were added, and need proper initialization */
 		for (ob= main->object.first; ob; ob= ob->id.next) {
 			/* new variables for all objects */
 			ob->quat[0]= 1.0f;
@@ -11439,7 +11507,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 	{
 		Object *ob;
 
-		/* properly initialise hair clothsim data on old files */
+		/* properly initialize hair clothsim data on old files */
 		for(ob = main->object.first; ob; ob = ob->id.next) {
 			ModifierData *md;
 			for(md= ob->modifiers.first; md; md= md->next) {
@@ -11548,11 +11616,11 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 		
 		/* anim viz changes */
 		for (ob= main->object.first; ob; ob= ob->id.next) {
-			/* initialise object defaults */
+			/* initialize object defaults */
 			animviz_settings_init(&ob->avs);
 			
 			/* if armature, copy settings for pose from armature data 
-			 * performing initialisation where appropriate 
+			 * performing initialization where appropriate
 			 */
 			if (ob->pose && ob->data) {
 				bArmature *arm= newlibadr(fd, lib, ob->data);
@@ -11824,7 +11892,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 			if (brush->curve) brush->curve->preset = CURVE_PRESET_SMOOTH;
 		}
 		
-		/* properly initialise active flag for fluidsim modifiers */
+		/* properly initialize active flag for fluidsim modifiers */
 		for(ob = main->object.first; ob; ob = ob->id.next) {
 			ModifierData *md;
 			for(md= ob->modifiers.first; md; md= md->next) {
@@ -11981,7 +12049,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 			}
 		}
 		
-		/* initialise scene active layer */
+		/* initialize scene active layer */
 		for (scene= main->scene.first; scene; scene=scene->id.next) {
 			int i;
 			for(i=0; i<20; i++) {
@@ -12147,8 +12215,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 							}
 
 						}
-						else if((smd->type & MOD_SMOKE_TYPE_FLOW) && smd->flow)
-						{
+						else if ((smd->type & MOD_SMOKE_TYPE_FLOW) && smd->flow) {
 							smd->flow->vel_multi = 1.0f;
 						}
 
@@ -12311,7 +12378,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 		bNodeTree *ntree;
 		
 		/* node sockets are not exposed automatically any more,
-		 * this mimics the old behaviour by adding all unlinked sockets to groups.
+		 * this mimics the old behavior by adding all unlinked sockets to groups.
 		 */
 		for (ntree=main->nodetree.first; ntree; ntree=ntree->id.next) {
 			/* XXX Only setting a flag here. Actual adding of group sockets
@@ -12351,7 +12418,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 		/* redraws flag in SpaceTime has been moved to Screen level */
 		for (sc = main->screen.first; sc; sc= sc->id.next) {
 			if (sc->redraws_flag == 0) {
-				/* just initialise to default? */
+				/* just initialize to default? */
 				// XXX: we could also have iterated through areas, and taken them from the first timeline available...
 				sc->redraws_flag = TIME_ALL_3D_WIN|TIME_ALL_ANIM_WIN;
 			}
@@ -12590,7 +12657,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 						act->type= act->otype= ACT_ACTION;
 						
 					}
-					else if (act->type == ACT_SHAPEACTION)  {
+					else if (act->type == ACT_SHAPEACTION) {
 						act->type = act->otype = ACT_ACTION;
 					}
 				}
@@ -12898,10 +12965,9 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 	/* sigh, this dscale vs dsize version patching was not done right, fix for fix,
 	 * this intentionally checks an exact subversion, also note this was never in a release,
 	 * at some point this could be removed. */
-	else if (main->versionfile == 260 && main->subversionfile == 6)
-	{
+	else if (main->versionfile == 260 && main->subversionfile == 6) {
 		Object *ob;
-		for (ob= main->object.first; ob; ob= ob->id.next) {
+		for (ob = main->object.first; ob; ob= ob->id.next) {
 			if (is_zero_v3(ob->dscale)) {
 				fill_vn_fl(ob->dscale, 3, 1.0f);
 			}
@@ -13130,23 +13196,6 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 		}
 	}
 	
-	if (main->versionfile < 261 || (main->versionfile == 261 && main->subversionfile < 4))
-	{
-		{
-			/* set fluidsim rate */
-			Object *ob;
-			for (ob = main->object.first; ob; ob = ob->id.next) {
-				ModifierData *md;
-				for (md = ob->modifiers.first; md; md = md->next) {
-					if (md->type == eModifierType_Fluidsim) {
-						FluidsimSettings *fss = (FluidsimSettings *)md;
-						fss->animRate = 1.0f;
-					}
-				}
-			}
-		}
-	}
-
 	if (main->versionfile < 262)
 	{
 		Object *ob;
@@ -13162,6 +13211,40 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 			}
 		}
 	}
+
+	if (main->versionfile < 263)
+	{
+		/* set fluidsim rate. the version patch for this in 2.62 was wrong, so
+		   try to correct it, if rate is 0.0 that's likely not intentional */
+		Object *ob;
+
+		for (ob = main->object.first; ob; ob = ob->id.next) {
+			ModifierData *md;
+			for (md = ob->modifiers.first; md; md = md->next) {
+				if (md->type == eModifierType_Fluidsim) {
+					FluidsimModifierData *fmd = (FluidsimModifierData *)md;
+					if(fmd->fss->animRate == 0.0f)
+						fmd->fss->animRate = 1.0f;
+				}
+			}
+		}
+	}
+
+	if (main->versionfile < 262 || (main->versionfile == 262 && main->subversionfile < 1))
+	{
+		/* update use flags for node sockets (was only temporary before) */
+		Scene *sce;
+		bNodeTree *ntree;
+		
+		for (sce=main->scene.first; sce; sce=sce->id.next)
+			if (sce->nodetree)
+				do_versions_nodetree_multi_file_output_format_2_62_1(sce, sce->nodetree);
+		
+		/* XXX can't associate with scene for group nodes, image format will stay uninitialized */
+		for (ntree=main->nodetree.first; ntree; ntree=ntree->id.next)
+			do_versions_nodetree_multi_file_output_format_2_62_1(NULL, ntree);
+	}
+
 
 	/* WATCH IT!!!: pointers from libdata have not been converted yet here! */
 	/* WATCH IT 2!: Userdef struct init has to be in editors/interface/resources.c! */

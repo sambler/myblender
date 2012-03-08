@@ -179,12 +179,16 @@ void GPU_extensions_init(void)
 			GG.npotdisabled = 1;
 	}
 
-	GG.os = GPU_OS_UNIX;
+	/* make sure double side isn't used by default and only getting enabled in places where it's
+	 * really needed to prevent different unexpected behaviors like with intel gme965 card (sergey) */
+	glLightModeli(GL_LIGHT_MODEL_TWO_SIDE, GL_FALSE);
+
 #ifdef _WIN32
 	GG.os = GPU_OS_WIN;
-#endif
-#ifdef __APPLE__
+#elif defined(__APPLE__)
 	GG.os = GPU_OS_MAC;
+#else
+	GG.os = GPU_OS_UNIX;
 #endif
 }
 

@@ -233,13 +233,13 @@ int BKE_mesh_validate_arrays( Mesh *me,
 		if(remove == FALSE) {
 			if(mf->v4) {
 				if(mf->v1 == mf->v2) { PRINT("    face %u: verts invalid, v1/v2 both %u\n", i, mf->v1); remove= do_fixes; }
-				if(mf->v1 == mf->v3) { PRINT("    face %u: verts invalid, v1/v3 both %u\n", i, mf->v1); remove= do_fixes;  }
-				if(mf->v1 == mf->v4) { PRINT("    face %u: verts invalid, v1/v4 both %u\n", i, mf->v1); remove= do_fixes;  }
+				if(mf->v1 == mf->v3) { PRINT("    face %u: verts invalid, v1/v3 both %u\n", i, mf->v1); remove= do_fixes; }
+				if(mf->v1 == mf->v4) { PRINT("    face %u: verts invalid, v1/v4 both %u\n", i, mf->v1); remove= do_fixes; }
 
-				if(mf->v2 == mf->v3) { PRINT("    face %u: verts invalid, v2/v3 both %u\n", i, mf->v2); remove= do_fixes;  }
-				if(mf->v2 == mf->v4) { PRINT("    face %u: verts invalid, v2/v4 both %u\n", i, mf->v2); remove= do_fixes;  }
+				if(mf->v2 == mf->v3) { PRINT("    face %u: verts invalid, v2/v3 both %u\n", i, mf->v2); remove= do_fixes; }
+				if(mf->v2 == mf->v4) { PRINT("    face %u: verts invalid, v2/v4 both %u\n", i, mf->v2); remove= do_fixes; }
 
-				if(mf->v3 == mf->v4) { PRINT("    face %u: verts invalid, v3/v4 both %u\n", i, mf->v3); remove= do_fixes;  }
+				if(mf->v3 == mf->v4) { PRINT("    face %u: verts invalid, v3/v4 both %u\n", i, mf->v3); remove= do_fixes; }
 			}
 			else {
 				if(mf->v1 == mf->v2) { PRINT("    faceT %u: verts invalid, v1/v2 both %u\n", i, mf->v1); remove= do_fixes; }
@@ -538,7 +538,7 @@ void BKE_mesh_calc_edges(Mesh *mesh, int update)
 
 	if (mesh->totpoly) {
 		/* second pass, iterate through all loops again and assign
-		   the newly created edges to them. */
+		 * the newly created edges to them. */
 		MPoly *mp= mesh->mpoly;
 		for(i=0; i < mesh->totpoly; i++, mp++) {
 			MLoop *l= &mesh->mloop[mp->loopstart];

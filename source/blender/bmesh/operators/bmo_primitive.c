@@ -27,7 +27,7 @@
 #include "ED_mesh.h"
 
 #include "bmesh.h"
-#include "bmesh_private.h"
+#include "intern/bmesh_private.h"
 
 
 
@@ -223,7 +223,7 @@ static signed char monkeyf[250][4] = {
 #define FACE_MARK	1
 #define FACE_NEW	2
 
-void bmesh_create_grid_exec(BMesh *bm, BMOperator *op)
+void bmo_create_grid_exec(BMesh *bm, BMOperator *op)
 {
 	BMOperator bmop, prevop;
 	BMVert *eve, *preveve;
@@ -248,7 +248,7 @@ void bmesh_create_grid_exec(BMesh *bm, BMOperator *op)
 		eve = BM_vert_create(bm, vec, NULL);
 		BMO_elem_flag_enable(bm, eve, VERT_MARK);
 
-		if (a) {
+		if (a != 0) {
 			e = BM_edge_create(bm, preveve, eve, NULL, TRUE);
 			BMO_elem_flag_enable(bm, e, EDGE_ORIG);
 		}
@@ -283,10 +283,10 @@ void bmesh_create_grid_exec(BMesh *bm, BMOperator *op)
 	if (a)
 		BMO_op_finish(bm, &bmop);
 
-	BMO_slot_from_flag(bm, op, "vertout", VERT_MARK, BM_VERT);
+	BMO_slot_buffer_from_flag(bm, op, "vertout", VERT_MARK, BM_VERT);
 }
 
-void bmesh_create_uvsphere_exec(BMesh *bm, BMOperator *op)
+void bmo_create_uvsphere_exec(BMesh *bm, BMOperator *op)
 {
 	BMOperator bmop, prevop;
 	BMVert *eve, *preveve;
@@ -299,7 +299,7 @@ void bmesh_create_uvsphere_exec(BMesh *bm, BMOperator *op)
 	BMO_slot_mat4_get(op, "mat", mat);
 
 	phid = 2.0f * (float)M_PI / tot;
-	phi = 0.25f * (float)M_PI;
+	/* phi = 0.25f * (float)M_PI; */ /* UNUSED */
 
 	/* one segment first */
 	phi = 0;
@@ -317,7 +317,7 @@ void bmesh_create_uvsphere_exec(BMesh *bm, BMOperator *op)
 			BMO_elem_flag_enable(bm, e, EDGE_ORIG);
 		}
 
-		phi+= phid;
+		phi += phid;
 		preveve = eve;
 	}
 
@@ -351,15 +351,15 @@ void bmesh_create_uvsphere_exec(BMesh *bm, BMOperator *op)
 	{
 		float len, len2, vec2[3];
 
-		len= 2*dia*sinf(phid / 2.0f);
+		len = 2 * dia * sinf(phid / 2.0f);
 
 		/* length of one segment in shortest parallen */
-		vec[0]= dia*sinf(phid);
-		vec[1]= 0.0;
-		vec[2]= dia*cosf(phid);
+		vec[0] = dia * sinf(phid);
+		vec[1] = 0.0f;
+		vec[2] = dia * cosf(phid);
 
 		mul_v3_m3v3(vec2, cmat, vec);
-		len2= len_v3v3(vec, vec2);
+		len2 = len_v3v3(vec, vec2);
 
 		/* use shortest segment length divided by 3 as merge threshold */
 		BMO_op_callf(bm, "removedoubles verts=%fv dist=%f", VERT_MARK, MIN2(len, len2) / 3.0f);
@@ -372,10 +372,10 @@ void bmesh_create_uvsphere_exec(BMesh *bm, BMOperator *op)
 		}
 	}
 
-	BMO_slot_from_flag(bm, op, "vertout", VERT_MARK, BM_VERT);
+	BMO_slot_buffer_from_flag(bm, op, "vertout", VERT_MARK, BM_VERT);
 }
 
-void bmesh_create_icosphere_exec(BMesh *bm, BMOperator *op)
+void bmo_create_icosphere_exec(BMesh *bm, BMOperator *op)
 {
 	BMVert *eva[12];
 	BMVert *v;
@@ -424,8 +424,8 @@ void bmesh_create_icosphere_exec(BMesh *bm, BMOperator *op)
 		BMOperator bmop;
 
 		BMO_op_initf(bm, &bmop,
-		             "esubd edges=%fe smooth=%f numcuts=%i gridfill=%i beauty=%i",
-		             EDGE_MARK, dia, 1, 1, B_SPHERE);
+		             "esubd edges=%fe smooth=%f numcuts=%i gridfill=%b beauty=%i",
+		             EDGE_MARK, dia, 1, TRUE, B_SPHERE);
 		BMO_op_exec(bm, &bmop);
 		BMO_slot_buffer_flag_enable(bm, &bmop, "geomout", VERT_MARK, BM_VERT);
 		BMO_slot_buffer_flag_enable(bm, &bmop, "geomout", EDGE_MARK, BM_EDGE);
@@ -439,10 +439,10 @@ void bmesh_create_icosphere_exec(BMesh *bm, BMOperator *op)
 		}
 	}
 
-	BMO_slot_from_flag(bm, op, "vertout", VERT_MARK, BM_VERT);
+	BMO_slot_buffer_from_flag(bm, op, "vertout", VERT_MARK, BM_VERT);
 }
 
-void bmesh_create_monkey_exec(BMesh *bm, BMOperator *op)
+void bmo_create_monkey_exec(BMesh *bm, BMOperator *op)
 {
 	BMVert *eve;
 	BMVert **tv = MEM_mallocN(sizeof(*tv)*monkeynv * 2, "tv");
@@ -486,11 +486,11 @@ void bmesh_create_monkey_exec(BMesh *bm, BMOperator *op)
 
 	MEM_freeN(tv);
 
-	BMO_slot_from_flag(bm, op, "vertout", VERT_MARK, BM_VERT);
+	BMO_slot_buffer_from_flag(bm, op, "vertout", VERT_MARK, BM_VERT);
 }
 
 
-void bmesh_create_circle_exec(BMesh *bm, BMOperator *op)
+void bmo_create_circle_exec(BMesh *bm, BMOperator *op)
 {
 	BMVert *v1, *lastv1 = NULL, *cent1, *firstv1 = NULL;
 	float vec[3], mat[4][4], phi, phid;
@@ -555,13 +555,13 @@ void bmesh_create_circle_exec(BMesh *bm, BMOperator *op)
 	}
 	
 	if (!cap_tris) {
-		BMO_op_callf(bm, "dissolvefaces faces=%ff", FACE_NEW);
+		BMO_op_callf(bm, "dissolve_faces faces=%ff", FACE_NEW);
 	}
 	
-	BMO_slot_from_flag(bm, op, "vertout", VERT_MARK, BM_VERT);
+	BMO_slot_buffer_from_flag(bm, op, "vertout", VERT_MARK, BM_VERT);
 }
 
-void bmesh_create_cone_exec(BMesh *bm, BMOperator *op)
+void bmo_create_cone_exec(BMesh *bm, BMOperator *op)
 {
 	BMVert *v1, *v2, *lastv1 = NULL, *lastv2 = NULL, *cent1, *cent2, *firstv1, *firstv2;
 	float vec[3], mat[4][4], phi, phid;
@@ -648,16 +648,16 @@ void bmesh_create_cone_exec(BMesh *bm, BMOperator *op)
 	}
 	
 	if (!cap_tris) {
-		BMO_op_callf(bm, "dissolvefaces faces=%ff", FACE_NEW);
+		BMO_op_callf(bm, "dissolve_faces faces=%ff", FACE_NEW);
 	}
 	
 	BM_face_create_quad_tri(bm, v1, v2, firstv2, firstv1, NULL, FALSE);
 
 	BMO_op_callf(bm, "removedoubles verts=%fv dist=%f", VERT_MARK, 0.000001);
-	BMO_slot_from_flag(bm, op, "vertout", VERT_MARK, BM_VERT);
+	BMO_slot_buffer_from_flag(bm, op, "vertout", VERT_MARK, BM_VERT);
 }
 
-void bmesh_create_cube_exec(BMesh *bm, BMOperator *op)
+void bmo_create_cube_exec(BMesh *bm, BMOperator *op)
 {
 	BMVert *v1, *v2, *v3, *v4, *v5, *v6, *v7, *v8;
 	float vec[3], mat[4][4], off = BMO_slot_float_get(op, "size") / 2.0f;
@@ -732,5 +732,5 @@ void bmesh_create_cube_exec(BMesh *bm, BMOperator *op)
 	BM_face_create_quad_tri(bm, v1, v2, v3, v4, NULL, FALSE);
 	BM_face_create_quad_tri(bm, v8, v7, v6, v5, NULL, FALSE);
 
-	BMO_slot_from_flag(bm, op, "vertout", VERT_MARK, BM_VERT);
+	BMO_slot_buffer_from_flag(bm, op, "vertout", VERT_MARK, BM_VERT);
 }

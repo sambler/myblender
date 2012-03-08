@@ -90,7 +90,7 @@ typedef struct v2dViewPanData {
 	short in_scroller;		/* for MMB in scrollers (old feature in past, but now not that useful) */
 } v2dViewPanData;
  
-/* initialise panning customdata */
+/* initialize panning customdata */
 static int view_pan_init(bContext *C, wmOperator *op)
 {
 	ARegion *ar= CTX_wm_region(C);
@@ -249,7 +249,8 @@ static int view_pan_modal(bContext *C, wmOperator *op, wmEvent *event)
 		}
 			break;
 		/* XXX - Mode switching isn't implemented. See comments in 36818.
-		 * switch to zoom *
+		 * switch to zoom */
+#if 0
 		case LEFTMOUSE:
 			if (event->val==KM_PRESS) {
 				* calculate overall delta mouse-movement for redo *
@@ -260,8 +261,8 @@ static int view_pan_modal(bContext *C, wmOperator *op, wmEvent *event)
 				WM_cursor_restore(CTX_wm_window(C));
 				WM_operator_name_call(C, "VIEW2D_OT_zoom", WM_OP_INVOKE_DEFAULT, NULL);
 				return OPERATOR_FINISHED;
-			}*/
-			
+			}
+#endif
 		default:
 			if (event->type == vpd->invoke_event || event->type==ESCKEY) {
 				if (event->val==KM_RELEASE) {
@@ -315,7 +316,7 @@ static int view_scrollright_exec(bContext *C, wmOperator *op)
 {
 	v2dViewPanData *vpd;
 	
-	/* initialise default settings (and validate if ok to run) */
+	/* initialize default settings (and validate if ok to run) */
 	if (!view_pan_init(C, op))
 		return OPERATOR_PASS_THROUGH;
 		
@@ -359,7 +360,7 @@ static int view_scrollleft_exec(bContext *C, wmOperator *op)
 {
 	v2dViewPanData *vpd;
 	
-	/* initialise default settings (and validate if ok to run) */
+	/* initialize default settings (and validate if ok to run) */
 	if (!view_pan_init(C, op))
 		return OPERATOR_PASS_THROUGH;
 		
@@ -402,7 +403,7 @@ static int view_scrolldown_exec(bContext *C, wmOperator *op)
 {
 	v2dViewPanData *vpd;
 	
-	/* initialise default settings (and validate if ok to run) */
+	/* initialize default settings (and validate if ok to run) */
 	if (!view_pan_init(C, op))
 		return OPERATOR_PASS_THROUGH;
 		
@@ -452,7 +453,7 @@ static int view_scrollup_exec(bContext *C, wmOperator *op)
 {
 	v2dViewPanData *vpd;
 	
-	/* initialise default settings (and validate if ok to run) */
+	/* initialize default settings (and validate if ok to run) */
 	if (!view_pan_init(C, op))
 		return OPERATOR_PASS_THROUGH;
 		
@@ -527,7 +528,7 @@ typedef struct v2dViewZoomData {
 } v2dViewZoomData;
 
 
-/* initialise panning customdata */
+/* initialize panning customdata */
 static int view_zoomdrag_init(bContext *C, wmOperator *op)
 {
 	ARegion *ar= CTX_wm_region(C);
@@ -801,7 +802,7 @@ static void view_zoomdrag_apply(bContext *C, wmOperator *op)
 	dx= RNA_float_get(op->ptr, "deltax");
 	dy= RNA_float_get(op->ptr, "deltay");
 
-	/* continous zoom shouldn't move that fast... */
+	/* continuous zoom shouldn't move that fast... */
 	if (U.viewzoom == USER_ZOOM_CONT) { // XXX store this setting as RNA prop?
 		double time= PIL_check_seconds_timer();
 		float time_step= (float)(time - vzd->timer_lastdraw);
@@ -1004,7 +1005,7 @@ static int view_zoomdrag_modal(bContext *C, wmOperator *op, wmEvent *event)
 			fac= 0.01f * (event->y - vzd->lasty);
 			dy= fac * (v2d->cur.ymax - v2d->cur.ymin);
 #if 0
-			/* continous zoom shouldn't move that fast... */
+			/* continuous zoom shouldn't move that fast... */
 			if (U.viewzoom == USER_ZOOM_CONT) { // XXX store this setting as RNA prop?
 				double time= PIL_check_seconds_timer();
 				float time_step= (float)(time - vzd->timer_lastdraw);
@@ -1125,7 +1126,7 @@ static int view_borderzoom_exec(bContext *C, wmOperator *op)
 	}
 	else /* if (gesture_mode == GESTURE_MODAL_OUT) */ {
 		/* zoom out:
-		 *	- the current 'cur' rect coordinates are going to end upwhere the 'rect' ones are, 
+		 *	- the current 'cur' rect coordinates are going to end up where the 'rect' ones are,
 		 *	  but the 'cur' rect coordinates will need to be adjusted to take in more of the view
 		 *	- calculate zoom factor, and adjust using center-point
 		 */
@@ -1286,7 +1287,7 @@ static short mouse_in_scroller_handle(int mouse, int sc_min, int sc_max, int sh_
 	return SCROLLHANDLE_BAR;
 } 
 
-/* initialise customdata for scroller manipulation operator */
+/* initialize customdata for scroller manipulation operator */
 static void scroller_activate_init(bContext *C, wmOperator *op, wmEvent *event, short in_scroller)
 {
 	v2dScrollerMove *vsm;
@@ -1510,7 +1511,7 @@ static int scroller_activate_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	if (in_scroller) {
 		v2dScrollerMove *vsm;
 		
-		/* initialise customdata */
+		/* initialize customdata */
 		scroller_activate_init(C, op, event, in_scroller);
 		vsm= (v2dScrollerMove *)op->customdata;
 		

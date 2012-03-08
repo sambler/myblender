@@ -341,8 +341,8 @@ int ED_fileselect_layout_offset(FileLayout* layout, int x, int y)
 	offsetx = (x)/(layout->tile_w + 2*layout->tile_border_x);
 	offsety = (y)/(layout->tile_h + 2*layout->tile_border_y);
 	
-	if (offsetx > layout->columns-1) return -1 ;
-	if (offsety > layout->rows-1) return -1 ;
+	if (offsetx > layout->columns - 1) return -1;
+	if (offsety > layout->rows - 1) return -1;
 	
 	if (layout->flag & FILE_LAYOUT_HOR) 
 		active_file = layout->rows*offsetx + offsety;
@@ -363,8 +363,8 @@ void ED_fileselect_layout_tilepos(FileLayout* layout, int tile, int *x, int *y)
 }
 
 /* Shorten a string to a given width w. 
-   If front is set, shorten from the front,
-   otherwise shorten from the end. */
+ * If front is set, shorten from the front,
+ * otherwise shorten from the end. */
 float file_shorten_string(char* string, float w, int front)
 {	
 	char temp[FILE_MAX];

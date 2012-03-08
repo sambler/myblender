@@ -453,7 +453,7 @@ void ED_object_enter_editmode(bContext *C, int flag)
 		/*
 		 * The function object_data_is_libdata make a problem here, the
 		 * check for ob->proxy return 0 and let blender enter to edit mode
-		 * this causa a crash when you try leave the edit mode.
+		 * this causes a crash when you try leave the edit mode.
 		 * The problem is that i can't remove the ob->proxy check from
 		 * object_data_is_libdata that prevent the bugfix #6614, so
 		 * i add this little hack here.
@@ -729,9 +729,15 @@ static void copy_texture_space(Object *to, Object *ob)
 	
 	memcpy(poin1, poin2, 9*sizeof(float));	/* this was noted in DNA_mesh, curve, mball */
 	
-	if(to->type==OB_MESH) ;
-	else if(to->type==OB_MBALL) tex_space_mball(to);
-	else tex_space_curve(to->data);
+	if(to->type==OB_MESH) {
+		/* pass */
+	}
+	else if (to->type == OB_MBALL) {
+		tex_space_mball(to);
+	}
+	else {
+		tex_space_curve(to->data);
+	}
 	
 }
 
@@ -1748,7 +1754,7 @@ static int game_physics_copy_exec(bContext *C, wmOperator *UNUSED(op))
 			ob_iter->gameflag = ob->gameflag;
 			ob_iter->gameflag2 = ob->gameflag2;
 			ob_iter->inertia = ob->inertia;
-			ob_iter->formfactor = ob->formfactor;;
+			ob_iter->formfactor = ob->formfactor;
 			ob_iter->damping = ob->damping;
 			ob_iter->rdamping = ob->rdamping;
 			ob_iter->min_vel = ob->min_vel;

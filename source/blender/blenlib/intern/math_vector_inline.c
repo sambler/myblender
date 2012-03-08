@@ -30,8 +30,8 @@
 
 #include "BLI_math.h"
 
-#ifndef BLI_MATH_VECTOR_INLINE_H
-#define BLI_MATH_VECTOR_INLINE_H
+#ifndef __MATH_VECTOR_INLINE_C__
+#define __MATH_VECTOR_INLINE_C__
 
 /********************************** Init *************************************/
 
@@ -75,6 +75,27 @@ MINLINE void copy_v4_v4(float r[4], const float a[4])
 	r[1]= a[1];
 	r[2]= a[2];
 	r[3]= a[3];
+}
+
+MINLINE void copy_v2_fl(float r[2], float f)
+{
+	r[0]= f;
+	r[1]= f;
+}
+
+MINLINE void copy_v3_fl(float r[3], float f)
+{
+	r[0]= f;
+	r[1]= f;
+	r[2]= f;
+}
+
+MINLINE void copy_v4_fl(float r[4], float f)
+{
+	r[0]= f;
+	r[1]= f;
+	r[2]= f;
+	r[3]= f;
 }
 
 /* short */
@@ -502,7 +523,7 @@ MINLINE float normalize_v3_v3(float r[3], const float a[3])
 	float d= dot_v3v3(a, a);
 
 	/* a larger value causes normalize errors in a
-	   scaled down models with camera xtreme close */
+	 * scaled down models with camera xtreme close */
 	if(d > 1.0e-35f) {
 		d= sqrtf(d);
 		mul_v3_v3fl(r, a, 1.0f/d);
@@ -520,7 +541,7 @@ MINLINE double normalize_v3_d(double n[3])
 	double d= n[0]*n[0] + n[1]*n[1] + n[2]*n[2];
 
 	/* a larger value causes normalize errors in a
-	   scaled down models with camera xtreme close */
+	 * scaled down models with camera xtreme close */
 	if(d > 1.0e-35) {
 		double mul;
 
@@ -627,5 +648,4 @@ MINLINE float line_point_side_v2(const float l1[2], const float l2[2], const flo
 			((l2[0]-pt[0]) * (l1[1]-pt[1]));
 }
 
-#endif /* BLI_MATH_VECTOR_INLINE_H */
-
+#endif /* __MATH_VECTOR_INLINE_C__ */

@@ -172,7 +172,7 @@ static void calc_corner_co(BMesh *bm, BMLoop *l, const float fac, float r_co[3],
 		(etags[BM_elem_index_get((e))].newv2)                                 \
 	)
 
-void bmesh_bevel_exec(BMesh *bm, BMOperator *op)
+void bmo_bevel_exec(BMesh *bm, BMOperator *op)
 {
 	BMOIter siter;
 	BMIter iter;
@@ -362,8 +362,7 @@ void bmesh_bevel_exec(BMesh *bm, BMOperator *op)
 			float co[3];
 
 			if (BMO_elem_flag_test(bm, l->e, BEVEL_FLAG)) {
-				if (BMO_elem_flag_test(bm, l->prev->e, BEVEL_FLAG))
-				{
+				if (BMO_elem_flag_test(bm, l->prev->e, BEVEL_FLAG)) {
 					tag = tags + BM_elem_index_get(l);
 					calc_corner_co(bm, l, fac, co, do_dist, do_even);
 					tag->newv = BM_vert_create(bm, co, l->v);
@@ -522,10 +521,12 @@ void bmesh_bevel_exec(BMesh *bm, BMOperator *op)
 							if (!vv || BMO_elem_flag_test(bm, vv, BEVEL_FLAG))
 								continue;
 							
-							if (j)
+							if (j) {
 								v1 = vv;
-							else
+							}
+							else {
 								v2 = vv;
+							}
 							break;
 						}
 					}
@@ -876,6 +877,6 @@ void bmesh_bevel_exec(BMesh *bm, BMOperator *op)
 	BLI_array_free(edges);
 	BLI_array_free(faces);
 	
-	BMO_slot_from_flag(bm, op, "face_spans", FACE_SPAN, BM_FACE);
-	BMO_slot_from_flag(bm, op, "face_holes", FACE_HOLE, BM_FACE);
+	BMO_slot_buffer_from_flag(bm, op, "face_spans", FACE_SPAN, BM_FACE);
+	BMO_slot_buffer_from_flag(bm, op, "face_holes", FACE_HOLE, BM_FACE);
 }

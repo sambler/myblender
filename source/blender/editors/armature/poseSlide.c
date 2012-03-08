@@ -159,7 +159,7 @@ static int pose_slide_init (bContext *C, wmOperator *op, short mode)
 	pso->ob->pose->flag |= POSE_LOCKED;
 	pso->ob->pose->flag &= ~POSE_DO_UNLOCK;
 	
-	/* do basic initialise of RB-BST used for finding keyframes, but leave the filling of it up 
+	/* do basic initialize of RB-BST used for finding keyframes, but leave the filling of it up 
 	 * to the caller of this (usually only invoke() will do it, to make things more efficient).
 	 */
 	BLI_dlrbTree_init(&pso->keys);
@@ -239,7 +239,7 @@ static void pose_slide_apply_val (tPoseSlideOp *pso, FCurve *fcu, float *val)
 	switch (pso->mode) {
 		case POSESLIDE_PUSH: /* make the current pose more pronounced */
 		{
-			/* perform a weighted average here, favouring the middle pose 
+			/* perform a weighted average here, favoring the middle pose
 			 *	- numerator should be larger than denominator to 'expand' the result
 			 *	- perform this weighting a number of times given by the percentage...
 			 */
@@ -253,7 +253,7 @@ static void pose_slide_apply_val (tPoseSlideOp *pso, FCurve *fcu, float *val)
 			
 		case POSESLIDE_RELAX: /* make the current pose more like its surrounding ones */
 		{
-			/* perform a weighted average here, favouring the middle pose 
+			/* perform a weighted average here, favoring the middle pose
 			 *	- numerator should be smaller than denominator to 'relax' the result
 			 *	- perform this weighting a number of times given by the percentage...
 			 */
@@ -660,14 +660,14 @@ static int pose_slide_modal (bContext *C, wmOperator *op, wmEvent *evt)
 			/* clean up temp data */
 			pose_slide_exit(op);
 			
-			/* cancelled! */
+			/* canceled! */
 			return OPERATOR_CANCELLED;
 		}
 			
 		case MOUSEMOVE: /* calculate new position */
 		{
 			/* calculate percentage based on position of mouse (we only use x-axis for now.
-			 * since this is more conveninent for users to do), and store new percentage value 
+			 * since this is more convenient for users to do), and store new percentage value
 			 */
 			pso->percentage= (evt->x - pso->ar->winrct.xmin) / ((float)pso->ar->winx);
 			RNA_float_set(op->ptr, "percentage", pso->percentage);
@@ -730,7 +730,7 @@ static int pose_slide_push_invoke (bContext *C, wmOperator *op, wmEvent *UNUSED(
 {
 	tPoseSlideOp *pso;
 	
-	/* initialise data  */
+	/* initialize data  */
 	if (pose_slide_init(C, op, POSESLIDE_PUSH) == 0) {
 		pose_slide_exit(op);
 		return OPERATOR_CANCELLED;
@@ -747,7 +747,7 @@ static int pose_slide_push_exec (bContext *C, wmOperator *op)
 {
 	tPoseSlideOp *pso;
 	
-	/* initialise data (from RNA-props) */
+	/* initialize data (from RNA-props) */
 	if (pose_slide_init(C, op, POSESLIDE_PUSH) == 0) {
 		pose_slide_exit(op);
 		return OPERATOR_CANCELLED;
@@ -787,7 +787,7 @@ static int pose_slide_relax_invoke (bContext *C, wmOperator *op, wmEvent *UNUSED
 {
 	tPoseSlideOp *pso;
 	
-	/* initialise data  */
+	/* initialize data  */
 	if (pose_slide_init(C, op, POSESLIDE_RELAX) == 0) {
 		pose_slide_exit(op);
 		return OPERATOR_CANCELLED;
@@ -804,7 +804,7 @@ static int pose_slide_relax_exec (bContext *C, wmOperator *op)
 {
 	tPoseSlideOp *pso;
 	
-	/* initialise data (from RNA-props) */
+	/* initialize data (from RNA-props) */
 	if (pose_slide_init(C, op, POSESLIDE_RELAX) == 0) {
 		pose_slide_exit(op);
 		return OPERATOR_CANCELLED;
@@ -844,7 +844,7 @@ static int pose_slide_breakdown_invoke (bContext *C, wmOperator *op, wmEvent *UN
 {
 	tPoseSlideOp *pso;
 	
-	/* initialise data  */
+	/* initialize data  */
 	if (pose_slide_init(C, op, POSESLIDE_BREAKDOWN) == 0) {
 		pose_slide_exit(op);
 		return OPERATOR_CANCELLED;
@@ -861,7 +861,7 @@ static int pose_slide_breakdown_exec (bContext *C, wmOperator *op)
 {
 	tPoseSlideOp *pso;
 	
-	/* initialise data (from RNA-props) */
+	/* initialize data (from RNA-props) */
 	if (pose_slide_init(C, op, POSESLIDE_BREAKDOWN) == 0) {
 		pose_slide_exit(op);
 		return OPERATOR_CANCELLED;
@@ -939,7 +939,7 @@ static float pose_propagate_get_boneHoldEndFrame (Object *ob, tPChanFCurveLink *
 	LinkData *ld;
 	float endFrame = startFrame;
 	
-	/* set up optimised data-structures for searching for relevant keyframes + holds */
+	/* set up optimized data-structures for searching for relevant keyframes + holds */
 	BLI_dlrbTree_init(&keys);
 	BLI_dlrbTree_init(&blocks);
 	
@@ -1231,7 +1231,7 @@ static int pose_propagate_exec (bContext *C, wmOperator *op)
 void POSE_OT_propagate (wmOperatorType *ot)
 {
 	static EnumPropertyItem terminate_items[]= {
-		{POSE_PROPAGATE_SMART_HOLDS, "WHILE_HELD", 0, "While Held", "Propagate pose to all keyframes after current frame that don't change (Default behaviour)"},
+		{POSE_PROPAGATE_SMART_HOLDS, "WHILE_HELD", 0, "While Held", "Propagate pose to all keyframes after current frame that don't change (Default behavior)"},
 		{POSE_PROPAGATE_NEXT_KEY, "NEXT_KEY", 0, "To Next Keyframe", "Propagate pose to first keyframe following the current frame only"},
 		{POSE_PROPAGATE_LAST_KEY, "LAST_KEY", 0, "To Last Keyframe", "Propagate pose to the last keyframe only (i.e. making action cyclic)"},
 		{POSE_PROPAGATE_BEFORE_FRAME, "BEFORE_FRAME", 0, "Before Frame", "Propagate pose to all keyframes between current frame and 'Frame' property"},

@@ -360,7 +360,7 @@ void DM_ensure_tessface(DerivedMesh *dm)
 	const int numPolys =     dm->getNumPolys(dm);
 
 	if ( (numTessFaces == 0) && (numPolys != 0)) {
-		dm->recalcTesselation(dm);
+		dm->recalcTessellation(dm);
 
 		if (dm->getNumTessFaces(dm) != 0) {
 			/* printf("info %s: polys -> ngons calculated\n", __func__); */
@@ -1091,9 +1091,9 @@ void DM_update_weight_mcol(Object *ob, DerivedMesh *dm, int const draw_flag,
 			wtcol_v = calc_weightpaint_vert_array(ob, dm, draw_flag, coba);
 
 		/* Now copy colors in all face verts. */
-		/*first add colors to the tesselation faces*/
+		/*first add colors to the tessellation faces*/
 		/* XXX Why update that layer? We have to update WEIGHT_MLOOPCOL anyway, 
-		 *     and tesselation recreates mface layers from mloop/mpoly ones, so no
+		 *     and tessellation recreates mface layers from mloop/mpoly ones, so no
 		 *     need to fill WEIGHT_MCOL here. */
 #if 0
 		for (i = 0; i < numFaces; i++, mf++, wtcol_f_step += (4 * 4)) {
@@ -1359,7 +1359,7 @@ static void mesh_calc_modifiers(Scene *scene, Object *ob, float (*inputVertexCos
 			}
 		}
 	} else {
-		/* default behaviour for meshes */
+		/* default behavior for meshes */
 		if(inputVertexCos)
 			deformedVerts = inputVertexCos;
 		else
@@ -1661,7 +1661,7 @@ static void mesh_calc_modifiers(Scene *scene, Object *ob, float (*inputVertexCos
 		/* calculating normals can re-calculate tessfaces in some cases */
 		int num_tessface = finaldm->getNumTessFaces(finaldm);
 		/* --------------------------------------------------------------------- */
-		/* First calculate the polygon and vertex normals, re-tesselation
+		/* First calculate the polygon and vertex normals, re-tessellation
 		 * copies these into the tessface's normal layer */
 
 
@@ -1673,13 +1673,13 @@ static void mesh_calc_modifiers(Scene *scene, Object *ob, float (*inputVertexCos
 		finaldm->calcNormals(finaldm);
 #endif
 
-		/* Re-tesselation is necessary to push render data (uvs, textures, colors)
+		/* Re-tessellation is necessary to push render data (uvs, textures, colors)
 		 * from loops and polys onto the tessfaces. This may be currently be
-		 * redundantin cases where the render mode doesn't use these inputs, but
-		 * ideally eventually tesselation would happen on-demand, and this is one
+		 * redundant in cases where the render mode doesn't use these inputs, but
+		 * ideally eventually tessellation would happen on-demand, and this is one
 		 * of the primary places it would be needed. */
 		if (num_tessface == 0 && finaldm->getNumTessFaces(finaldm) == 0) {
-			finaldm->recalcTesselation(finaldm);
+			finaldm->recalcTessellation(finaldm);
 		}
 		/* Need to watch this, it can cause issues, see bug [#29338]             */
 		/* take care with this block, we really need testing frameworks          */
@@ -1900,23 +1900,37 @@ static void editbmesh_calc_modifiers(Scene *scene, Object *ob, BMEditMesh *em, D
 
 		CDDM_apply_vert_coords(*final_r, deformedVerts);
 		CDDM_calc_normals(*final_r); /* was CDDM_calc_normals_mapping - campbell */
-	} else if (dm) {
+	}
+	else if (dm) {
 		*final_r = dm;
 		(*final_r)->calcNormals(*final_r); /* BMESH_ONLY - BMESH_TODO. check if this is needed */
-	} else if (!deformedVerts && cage_r && *cage_r) {
+	}
+	else if (!deformedVerts && cage_r && *cage_r) {
+		/* cage should already have up to date normals */
 		*final_r = *cage_r;
 		(*final_r)->calcNormals(*final_r); /* BMESH_ONLY - BMESH_TODO. check if this is needed */
-	} else {
+	}
+	else {
+		/* this is just a copy of the editmesh, no need to calc normals */
 		*final_r = getEditDerivedBMesh(em, ob, deformedVerts);
 		deformedVerts = NULL;
-		(*final_r)->calcNormals(*final_r); /* BMESH_ONLY - BMESH_TODO. check if this is needed */
 	}
 
 	/* --- */
 	/* BMESH_ONLY, ensure tessface's used for drawing,
-	 * but dont recalculate if the last modifier in the stack gives us tessfaces  */
-	DM_ensure_tessface(*final_r);
-	if (cage_r && (*cage_r != *final_r)) DM_ensure_tessface(*cage_r);
+	 * but dont recalculate if the last modifier in the stack gives us tessfaces
+	 * check if the derived meshes are DM_TYPE_EDITBMESH before calling, this isnt essential
+	 * but quiets annoying error messages since tessfaces wont be created. */
+	if ((*final_r)->type != DM_TYPE_EDITBMESH) {
+		DM_ensure_tessface(*final_r);
+	}
+	if (cage_r) {
+		if ((*cage_r)->type != DM_TYPE_EDITBMESH) {
+			if (*cage_r != *final_r) {
+				DM_ensure_tessface(*cage_r);
+			}
+		}
+	}
 	/* --- */
 
 	/* add an orco layer if needed */
@@ -2446,14 +2460,12 @@ void DM_calc_auto_bump_scale(DerivedMesh *dm)
 	MFace * mface = dm->getTessFaceArray(dm);
 	MTFace * mtface = dm->getTessFaceDataArray(dm, CD_MTFACE);
 
-	if(mtface)
-	{
+	if(mtface) {
 		double dsum = 0.0;
 		int nr_accumulated = 0;
 		int f;
 
-		for ( f=0; f<totface; f++ )
-		{
+		for ( f=0; f < totface; f++ ) {
 			{
 				float * verts[4], * tex_coords[4];
 				const int nr_verts = mface[f].v4!=0 ? 4 : 3;
@@ -2461,8 +2473,7 @@ void DM_calc_auto_bump_scale(DerivedMesh *dm)
 
 				verts[0]=mvert[mface[f].v1].co; verts[1]=mvert[mface[f].v2].co; verts[2]=mvert[mface[f].v3].co;
 				tex_coords[0]=mtface[f].uv[0]; tex_coords[1]=mtface[f].uv[1]; tex_coords[2]=mtface[f].uv[2];
-				if(nr_verts==4)
-				{
+				if (nr_verts==4) {
 					verts[3]=mvert[mface[f].v4].co;
 					tex_coords[3]=mtface[f].uv[3];
 				}
@@ -2476,32 +2487,33 @@ void DM_calc_auto_bump_scale(DerivedMesh *dm)
 				}
 
 				// verify last vertex as well if this is a quad
-				if ( is_degenerate==0 && nr_verts==4 )
-				{
-					if(	equals_v3v3(verts[3], verts[0]) || equals_v3v3(verts[3], verts[1]) || equals_v3v3(verts[3], verts[2]) ||
-						equals_v2v2(tex_coords[3], tex_coords[0]) || equals_v2v2(tex_coords[3], tex_coords[1]) || equals_v2v2(tex_coords[3], tex_coords[2]) )
+				if (is_degenerate == 0 && nr_verts == 4) {
+					if (equals_v3v3(verts[3], verts[0]) || equals_v3v3(verts[3], verts[1]) || equals_v3v3(verts[3], verts[2]) ||
+					    equals_v2v2(tex_coords[3], tex_coords[0]) || equals_v2v2(tex_coords[3], tex_coords[1]) || equals_v2v2(tex_coords[3], tex_coords[2]) )
 					{
 						is_degenerate = 1;
 					}
 
 					// verify the winding is consistent
-					if ( is_degenerate==0 )
-					{
+					if (is_degenerate == 0) {
 						float prev_edge[2];
 						int is_signed = 0;
 						sub_v2_v2v2(prev_edge, tex_coords[0], tex_coords[3]);
 
 						i = 0;
-						while ( is_degenerate==0 && i<4 )
-						{
+						while (is_degenerate == 0 && i < 4) {
 							float cur_edge[2], signed_area;
 							sub_v2_v2v2(cur_edge, tex_coords[(i+1)&0x3], tex_coords[i]);
 							signed_area = prev_edge[0]*cur_edge[1] - prev_edge[1]*cur_edge[0];
-							if ( i==0 ) is_signed = signed_area<0.0f ? 1 : 0;
-							else if((is_signed!=0)!=(signed_area<0.0f)) is_degenerate=1;
 
-							if ( is_degenerate==0 )
-							{
+							if (i == 0 ) {
+								is_signed = (signed_area < 0.0f) ? 1 : 0;
+							}
+							else if((is_signed != 0) != (signed_area < 0.0f)) {
+								is_degenerate = 1;
+							}
+
+							if (is_degenerate == 0) {
 								copy_v2_v2(prev_edge, cur_edge);
 								++i;
 							}
@@ -2510,13 +2522,11 @@ void DM_calc_auto_bump_scale(DerivedMesh *dm)
 				}
 
 				// proceed if not a degenerate face
-				if ( is_degenerate==0 )
-				{
+				if (is_degenerate == 0) {
 					int nr_tris_to_pile=0;
 					// quads split at shortest diagonal
 					int offs = 0;		// initial triangulation is 0,1,2 and 0, 2, 3
-					if ( nr_verts==4 )
-					{
+					if (nr_verts == 4) {
 						float pos_len_diag0, pos_len_diag1;
 						float vtmp[3];
 						sub_v3_v3v3(vtmp, verts[2], verts[0]);
@@ -2524,10 +2534,10 @@ void DM_calc_auto_bump_scale(DerivedMesh *dm)
 						sub_v3_v3v3(vtmp, verts[3], verts[1]);
 						pos_len_diag1 = dot_v3v3(vtmp, vtmp);
 
-						if(pos_len_diag1<pos_len_diag0)
+						if(pos_len_diag1<pos_len_diag0) {
 							offs=1;		// alter split
-						else if(pos_len_diag0==pos_len_diag1)		// do UV check instead
-						{
+						}
+						else if(pos_len_diag0==pos_len_diag1) { /* do UV check instead */
 							float tex_len_diag0, tex_len_diag1;
 
 							sub_v2_v2v2(vtmp, tex_coords[2], tex_coords[0]);
@@ -2535,15 +2545,13 @@ void DM_calc_auto_bump_scale(DerivedMesh *dm)
 							sub_v2_v2v2(vtmp, tex_coords[3], tex_coords[1]);
 							tex_len_diag1 = dot_v2v2(vtmp, vtmp);
 
-							if(tex_len_diag1<tex_len_diag0)
-							{
-								offs=1;		// alter split
+							if (tex_len_diag1<tex_len_diag0) {
+								offs=1; /* alter split */
 							}
 						}
 					}
-					nr_tris_to_pile = nr_verts-2 ;
-					if ( nr_tris_to_pile==1 || nr_tris_to_pile==2 )
-					{
+					nr_tris_to_pile = nr_verts - 2;
+					if (nr_tris_to_pile==1 || nr_tris_to_pile==2) {
 						const int indices[] = {offs+0, offs+1, offs+2, offs+0, offs+2, (offs+3)&0x3 };
 						int t;
 						for ( t=0; t<nr_tris_to_pile; t++ )
@@ -2558,8 +2566,7 @@ void DM_calc_auto_bump_scale(DerivedMesh *dm)
 							sub_v2_v2v2(edge_t1, tex_coords[indices[t*3+2]], tex_coords[indices[t*3+0]]);
 
 							f2x_area_uv = fabsf(edge_t0[0]*edge_t1[1] - edge_t0[1]*edge_t1[0]);
-							if ( f2x_area_uv>FLT_EPSILON )
-							{
+							if (f2x_area_uv>FLT_EPSILON) {
 								float norm[3], v0[3], v1[3], f2x_surf_area, fsurf_ratio;
 								sub_v3_v3v3(v0, p1, p0);
 								sub_v3_v3v3(v1, p2, p0);
@@ -2584,8 +2591,7 @@ void DM_calc_auto_bump_scale(DerivedMesh *dm)
 			dm->auto_bump_scale = use_as_render_bump_scale;
 		}
 	}
-	else
-	{
+	else {
 		dm->auto_bump_scale = 1.0f;
 	}
 }
@@ -2791,8 +2797,8 @@ static void navmesh_drawColored(DerivedMesh *dm)
 }
 
 static void navmesh_DM_drawFacesTex(DerivedMesh *dm,
-			int (*setDrawOptions)(MTFace *tface, int has_mcol, int matnr),
-			int (*compareDrawOptions)(void *userData, int cur_index, int next_index),
+			DMSetDrawOptionsTex setDrawOptions,
+			DMCompareDrawOptions compareDrawOptions,
 			void *userData)
 {
 	(void) setDrawOptions;
@@ -2804,7 +2810,7 @@ static void navmesh_DM_drawFacesTex(DerivedMesh *dm,
 
 static void navmesh_DM_drawFacesSolid(DerivedMesh *dm,
                                       float (*partial_redraw_planes)[4],
-                                      int UNUSED(fast), int (*setMaterial)(int, void *attribs))
+                                      int UNUSED(fast), DMSetMaterial setMaterial)
 {
 	(void) partial_redraw_planes;
 	(void) setMaterial;

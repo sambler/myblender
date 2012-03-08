@@ -36,6 +36,7 @@
 
 #include "BLI_array.h"
 
+#include "BKE_DerivedMesh.h"
 #include "BKE_bmesh.h"
 #include "BKE_tessmesh.h"
 
@@ -44,7 +45,7 @@ void DM_to_bmesh_ex(DerivedMesh *dm, BMesh *bm)
 {
 	MVert *mv, *mvert;
 	MEdge *me, *medge;
-	MPoly *mpoly, *mp;
+	MPoly /* *mpoly, */ /* UNUSED */ *mp;
 	MLoop *mloop, *ml;
 	BMVert *v, **vtable, **verts = NULL;
 	BMEdge *e, **etable, **edges = NULL;
@@ -52,7 +53,7 @@ void DM_to_bmesh_ex(DerivedMesh *dm, BMesh *bm)
 	BMIter liter;
 	BLI_array_declare(verts);
 	BLI_array_declare(edges);
-	int i, j, k, totvert, totedge, totface;
+	int i, j, k, totvert, totedge /* , totface */ /* UNUSED */ ;
 
 	/*merge custom data layout*/
 	CustomData_bmesh_merge(&dm->vertData, &bm->vdata, CD_MASK_DERIVEDMESH, CD_CALLOC, bm, BM_VERT);
@@ -62,7 +63,7 @@ void DM_to_bmesh_ex(DerivedMesh *dm, BMesh *bm)
 
 	totvert = dm->getNumVerts(dm);
 	totedge = dm->getNumEdges(dm);
-	totface = dm->getNumPolys(dm);
+	/* totface = dm->getNumPolys(dm); */ /* UNUSED */
 
 	vtable = MEM_callocN(sizeof(void**) * totvert, "vert table in BMDM_Copy");
 	etable = MEM_callocN(sizeof(void**) * totedge, "edge table in BMDM_Copy");
@@ -92,7 +93,7 @@ void DM_to_bmesh_ex(DerivedMesh *dm, BMesh *bm)
 	MEM_freeN(medge);
 
 	/*do faces*/
-	mpoly = mp = dm->getPolyArray(dm);
+	mp = dm->getPolyArray(dm);
 	mloop = dm->getLoopArray(dm);
 	for (i = 0; i < dm->numPolyData; i++, mp++) {
 		BMLoop *l;
@@ -142,8 +143,12 @@ BMEditMesh *DM_to_editbmesh(Object *ob, DerivedMesh *dm, BMEditMesh *existing, i
 	BMEditMesh *em = existing;
 	BMesh *bm;
 
-	if (em) bm = em->bm;
-	else bm = BM_mesh_create(ob, bm_mesh_allocsize_default);
+	if (em) {
+		bm = em->bm;
+	}
+	else {
+		bm = BM_mesh_create(ob, &bm_mesh_allocsize_default);
+	}
 
 	DM_to_bmesh_ex(dm, bm);
 
@@ -152,7 +157,7 @@ BMEditMesh *DM_to_editbmesh(Object *ob, DerivedMesh *dm, BMEditMesh *existing, i
 	}
 	else {
 		if (do_tesselate) {
-			BMEdit_RecalcTesselation(em);
+			BMEdit_RecalcTessellation(em);
 		}
 	}
 
@@ -163,7 +168,7 @@ BMesh *DM_to_bmesh(Object *ob, DerivedMesh *dm)
 {
 	BMesh *bm;
 
-	bm = BM_mesh_create(ob, bm_mesh_allocsize_default);
+	bm = BM_mesh_create(ob, &bm_mesh_allocsize_default);
 
 	DM_to_bmesh_ex(dm, bm);
 

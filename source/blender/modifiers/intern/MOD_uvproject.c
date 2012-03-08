@@ -244,10 +244,12 @@ static DerivedMesh *uvprojectModifier_do(UVProjectModifierData *umd,
 			if (aspx == aspy) { 
 				offsetmat[3][0] -= cam->shiftx;
 				offsetmat[3][1] -= cam->shifty;
-			} else if (aspx < aspy)  {
+			}
+			else if (aspx < aspy) {
 				offsetmat[3][0] -=(cam->shiftx * aspy/aspx);
 				offsetmat[3][1] -= cam->shifty;
-			} else {
+			}
+			else {
 				offsetmat[3][0] -= cam->shiftx;
 				offsetmat[3][1] -=(cam->shifty * aspx/aspy);
 			}
@@ -270,7 +272,7 @@ static DerivedMesh *uvprojectModifier_do(UVProjectModifierData *umd,
 			CD_MLOOPUV, uvname, numLoops);
 
 	/* can be NULL */
-	mtexpoly = CustomData_duplicate_referenced_layer_named(&dm->polyData,
+	mt = mtexpoly = CustomData_duplicate_referenced_layer_named(&dm->polyData,
 			CD_MTEXPOLY, uvname, numPolys);
 
 	numVerts = dm->getNumVerts(dm);

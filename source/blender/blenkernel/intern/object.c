@@ -1711,7 +1711,7 @@ static void ob_parbone(Object *ob, Object *par, float mat[][4])
 	add_v3_v3(mat[3], vec);
 }
 
-static void give_parvert(Object *par, int nr, float *vec)
+static void give_parvert(Object *par, int nr, float vec[3])
 {
 	BMEditMesh *em;
 	int a, count;
@@ -1950,9 +1950,9 @@ void where_is_object_time(Scene *scene, Object *ob, float ctime)
 }
 
 /* get object transformation matrix without recalculating dependencies and
-   constraints -- assume dependencies are already solved by depsgraph.
-   no changes to object and it's parent would be done.
-   used for bundles orientation in 3d space relative to parented blender camera */
+ * constraints -- assume dependencies are already solved by depsgraph.
+ * no changes to object and it's parent would be done.
+ * used for bundles orientation in 3d space relative to parented blender camera */
 void where_is_object_mat(Scene *scene, Object *ob, float obmat[4][4])
 {
 	float slowmat[4][4] = MAT4_UNITY;
@@ -2058,7 +2058,7 @@ void where_is_object(struct Scene *scene, Object *ob)
 void where_is_object_simul(Scene *scene, Object *ob)
 /* was written for the old game engine (until 2.04) */
 /* It seems that this function is only called
-for a lamp that is the child of another object */
+ * for a lamp that is the child of another object */
 {
 	Object *par;
 	float *fp1, *fp2;
@@ -2171,7 +2171,7 @@ void object_boundbox_flag(Object *ob, int flag, int set)
 	}
 }
 
-void object_get_dimensions(Object *ob, float *value)
+void object_get_dimensions(Object *ob, float vec[3])
 {
 	BoundBox *bb = NULL;
 	
@@ -2181,11 +2181,11 @@ void object_get_dimensions(Object *ob, float *value)
 		
 		mat4_to_size( scale,ob->obmat);
 		
-		value[0] = fabsf(scale[0]) * (bb->vec[4][0] - bb->vec[0][0]);
-		value[1] = fabsf(scale[1]) * (bb->vec[2][1] - bb->vec[0][1]);
-		value[2] = fabsf(scale[2]) * (bb->vec[1][2] - bb->vec[0][2]);
+		vec[0] = fabsf(scale[0]) * (bb->vec[4][0] - bb->vec[0][0]);
+		vec[1] = fabsf(scale[1]) * (bb->vec[2][1] - bb->vec[0][1]);
+		vec[2] = fabsf(scale[2]) * (bb->vec[1][2] - bb->vec[0][2]);
 	} else {
-		value[0] = value[1] = value[2] = 0.f;
+		vec[0] = vec[1] = vec[2] = 0.f;
 	}
 }
 
@@ -2292,7 +2292,7 @@ void minmax_object(Object *ob, float min[3], float max[3])
 	}
 }
 
-int minmax_object_duplis(Scene *scene, Object *ob, float *min, float *max)
+int minmax_object_duplis(Scene *scene, Object *ob, float min[3], float max[3])
 {
 	int ok= 0;
 	if ((ob->transflag & OB_DUPLI)==0) {
@@ -2472,16 +2472,16 @@ void object_handle_update(Scene *scene, Object *ob)
 		if (ob->recalc & OB_RECALC_DATA) {
 			if (ob->type==OB_ARMATURE) {
 				/* this happens for reading old files and to match library armatures
-				   with poses we do it ahead of where_is_object to ensure animation
-				   is evaluated on the rebuilt pose, otherwise we get incorrect poses
-				   on file load */
+				 * with poses we do it ahead of where_is_object to ensure animation
+				 * is evaluated on the rebuilt pose, otherwise we get incorrect poses
+				 * on file load */
 				if (ob->pose==NULL || (ob->pose->flag & POSE_RECALC))
 					armature_rebuild_pose(ob, ob->data);
 			}
 		}
 
 		/* XXX new animsys warning: depsgraph tag OB_RECALC_DATA should not skip drivers, 
-		   which is only in where_is_object now */
+		 * which is only in where_is_object now */
 		// XXX: should this case be OB_RECALC_OB instead?
 		if (ob->recalc & OB_RECALC_ALL) {
 			
@@ -2527,7 +2527,7 @@ void object_handle_update(Scene *scene, Object *ob)
 			case OB_MESH:
 				{
 #if 0				// XXX, comment for 2.56a release, background wont set 'scene->customdata_mask'
-					BMEditMesh *em = (ob == scene->obedit)? ((Mesh*)ob->data)->edit_btmesh : NULL;
+					BMEditMesh *em = (ob == scene->obedit) ? BMEdit_FromObject(ob) : NULL;
 					BLI_assert((scene->customdata_mask & CD_MASK_BAREMESH) == CD_MASK_BAREMESH);
 					if (em) {
 						makeDerivedMesh(scene, ob, em,  scene->customdata_mask, 0); /* was CD_MASK_BAREMESH */
@@ -2537,7 +2537,7 @@ void object_handle_update(Scene *scene, Object *ob)
 					}
 
 #else				/* ensure CD_MASK_BAREMESH for now */
-					BMEditMesh *em = (ob == scene->obedit)? ((Mesh*)ob->data)->edit_btmesh : NULL;
+					BMEditMesh *em = (ob == scene->obedit) ? BMEdit_FromObject(ob) : NULL;
 					uint64_t data_mask= scene->customdata_mask | ob->customdata_mask | CD_MASK_BAREMESH;
 					if (em) {
 						makeDerivedMesh(scene, ob, em,  data_mask, 0); /* was CD_MASK_BAREMESH */
@@ -2658,8 +2658,8 @@ void object_sculpt_modifiers_changed(Object *ob)
 
 	if (!ss->cache) {
 		/* we free pbvh on changes, except during sculpt since it can't deal with
-		   changing PVBH node organization, we hope topology does not change in
-		   the meantime .. weak */
+		 * changing PVBH node organization, we hope topology does not change in
+		 * the meantime .. weak */
 		if (ss->pbvh) {
 				BLI_pbvh_free(ss->pbvh);
 				ss->pbvh= NULL;

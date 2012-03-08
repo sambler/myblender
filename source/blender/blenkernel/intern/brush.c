@@ -201,7 +201,7 @@ void make_local_brush(Brush *brush)
 
 	if(brush->clone.image) {
 		/* special case: ima always local immediately. Clone image should only
-		   have one user anyway. */
+		 * have one user anyway. */
 		id_clear_lib_data(bmain, &brush->clone.image->id);
 		extern_local_brush(brush);
 	}
@@ -331,10 +331,8 @@ void brush_debug_print_state(Brush *br)
 void brush_reset_sculpt(Brush *br)
 {
 	/* enable this to see any non-default
-	   settings used by a brush:
-
-	brush_debug_print_state(br);
-	*/
+	 * settings used by a brush: */
+	// brush_debug_print_state(br);
 
 	brush_set_defaults(br);
 	brush_curve_preset(br, CURVE_PRESET_SMOOTH);
@@ -833,7 +831,9 @@ void brush_painter_free(BrushPainter *painter)
 	MEM_freeN(painter);
 }
 
-static void brush_painter_do_partial(BrushPainter *painter, ImBuf *oldtexibuf, int x, int y, int w, int h, int xt, int yt, float *pos)
+static void brush_painter_do_partial(BrushPainter *painter, ImBuf *oldtexibuf,
+                                     int x, int y, int w, int h, int xt, int yt,
+                                     const float pos[2])
 {
 	Scene *scene= painter->scene;
 	Brush *brush= painter->brush;
@@ -855,8 +855,8 @@ static void brush_painter_do_partial(BrushPainter *painter, ImBuf *oldtexibuf, i
 	dotexold = (oldtexibuf != NULL);
 
 	/* not sure if it's actually needed or it's a mistake in coords/sizes
-	   calculation in brush_painter_fixed_tex_partial_update(), but without this
-	   limitation memory gets corrupted at fast strokes with quite big spacing (sergey) */
+	 * calculation in brush_painter_fixed_tex_partial_update(), but without this
+	 * limitation memory gets corrupted at fast strokes with quite big spacing (sergey) */
 	w = MIN2(w, ibuf->x);
 	h = MIN2(h, ibuf->y);
 
@@ -923,7 +923,7 @@ static void brush_painter_do_partial(BrushPainter *painter, ImBuf *oldtexibuf, i
 	}
 }
 
-static void brush_painter_fixed_tex_partial_update(BrushPainter *painter, float *pos)
+static void brush_painter_fixed_tex_partial_update(BrushPainter *painter, const float pos[2])
 {
 	const Scene *scene= painter->scene;
 	Brush *brush= painter->brush;
@@ -978,7 +978,7 @@ static void brush_painter_fixed_tex_partial_update(BrushPainter *painter, float 
 		brush_painter_do_partial(painter, NULL, x1, y2, x2, ibuf->y, 0, 0, pos);
 }
 
-static void brush_painter_refresh_cache(BrushPainter *painter, float *pos, int use_color_correction)
+static void brush_painter_refresh_cache(BrushPainter *painter, const float pos[2], int use_color_correction)
 {
 	const Scene *scene= painter->scene;
 	Brush *brush= painter->brush;
@@ -1042,12 +1042,12 @@ static void brush_apply_pressure(BrushPainter *painter, Brush *brush, float pres
 		brush->spacing = MAX2(1.0f, painter->startspacing*(1.5f-pressure));
 }
 
-void brush_jitter_pos(const Scene *scene, Brush *brush, float pos[2], float jitterpos[2])
+void brush_jitter_pos(const Scene *scene, Brush *brush, const float pos[2], float jitterpos[2])
 {
 	int use_jitter= brush->jitter != 0;
 
 	/* jitter-ed brush gives weird and unpredictable result for this
-	   kinds of stroke, so manyally disable jitter usage (sergey) */
+	 * kinds of stroke, so manyally disable jitter usage (sergey) */
 	use_jitter &= (brush->flag & (BRUSH_RESTORE_MESH|BRUSH_ANCHORED)) == 0;
 
 	if (use_jitter) {
@@ -1069,7 +1069,8 @@ void brush_jitter_pos(const Scene *scene, Brush *brush, float pos[2], float jitt
 	}
 }
 
-int brush_painter_paint(BrushPainter *painter, BrushFunc func, float *pos, double time, float pressure, void *user, int use_color_correction)
+int brush_painter_paint(BrushPainter *painter, BrushFunc func, const float pos[2], double time, float pressure,
+                        void *user, int use_color_correction)
 {
 	Scene *scene= painter->scene;
 	Brush *brush= painter->brush;
@@ -1136,7 +1137,7 @@ int brush_painter_paint(BrushPainter *painter, BrushFunc func, float *pos, doubl
 		const int radius= brush_size(scene, brush);
 
 		/* compute brush spacing adapted to brush radius, spacing may depend
-		   on pressure, so update it */
+		 * on pressure, so update it */
 		brush_apply_pressure(painter, brush, painter->lastpressure);
 		spacing= MAX2(1.0f, radius)*brush->spacing*0.01f;
 
@@ -1185,8 +1186,8 @@ int brush_painter_paint(BrushPainter *painter, BrushFunc func, float *pos, doubl
 		}
 
 		/* do airbrush paint ops, based on the number of paint ops left over
-		   from regular painting. this is a temporary solution until we have
-		   accurate time stamps for mouse move events */
+		 * from regular painting. this is a temporary solution until we have
+		 * accurate time stamps for mouse move events */
 		if (brush->flag & BRUSH_AIRBRUSH) {
 			double curtime= time;
 			double painttime= brush->rate*totpaintops;

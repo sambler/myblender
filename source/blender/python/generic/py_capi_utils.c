@@ -50,11 +50,11 @@ int PyC_AsArray(void *array, PyObject *value, const Py_ssize_t length,
 	Py_ssize_t value_len;
 	Py_ssize_t i;
 
-	if (!(value_fast=PySequence_Fast(value, error_prefix))) {
+	if (!(value_fast = PySequence_Fast(value, error_prefix))) {
 		return -1;
 	}
 
-	value_len= PySequence_Fast_GET_SIZE(value_fast);
+	value_len = PySequence_Fast_GET_SIZE(value_fast);
 
 	if (value_len != length) {
 		Py_DECREF(value);
@@ -69,13 +69,13 @@ int PyC_AsArray(void *array, PyObject *value, const Py_ssize_t length,
 		if (is_double) {
 			double *array_double= array;
 			for (i=0; i<length; i++) {
-				array_double[i]= PyFloat_AsDouble(PySequence_Fast_GET_ITEM(value_fast, i));
+				array_double[i] = PyFloat_AsDouble(PySequence_Fast_GET_ITEM(value_fast, i));
 			}
 		}
 		else {
 			float *array_float= array;
 			for (i=0; i<length; i++) {
-				array_float[i]= PyFloat_AsDouble(PySequence_Fast_GET_ITEM(value_fast, i));
+				array_float[i] = PyFloat_AsDouble(PySequence_Fast_GET_ITEM(value_fast, i));
 			}
 		}
 	}
@@ -83,13 +83,13 @@ int PyC_AsArray(void *array, PyObject *value, const Py_ssize_t length,
 		/* could use is_double for 'long int' but no use now */
 		int *array_int= array;
 		for (i=0; i<length; i++) {
-			array_int[i]= PyLong_AsSsize_t(PySequence_Fast_GET_ITEM(value_fast, i));
+			array_int[i] = PyLong_AsSsize_t(PySequence_Fast_GET_ITEM(value_fast, i));
 		}
 	}
 	else if (type == &PyBool_Type) {
 		int *array_bool= array;
 		for (i=0; i<length; i++) {
-			array_bool[i]= (PyLong_AsSsize_t(PySequence_Fast_GET_ITEM(value_fast, i)) != 0);
+			array_bool[i] = (PyLong_AsSsize_t(PySequence_Fast_GET_ITEM(value_fast, i)) != 0);
 		}
 	}
 	else {
@@ -228,7 +228,7 @@ PyObject *PyC_Object_GetAttrStringArgs(PyObject *o, Py_ssize_t n, ...)
 
 /* similar to PyErr_Format(),
  *
- * implimentation - we cant actually preprend the existing exception,
+ * implementation - we cant actually preprend the existing exception,
  * because it could have _any_ argiments given to it, so instead we get its
  * __str__ output and raise our own exception including it.
  */
@@ -419,16 +419,16 @@ PyObject *PyC_UnicodeFromByte(const char *str)
 }
 
 /*****************************************************************************
-* Description: This function creates a new Python dictionary object.
-* note: dict is owned by sys.modules["__main__"] module, reference is borrowed
-* note: important we use the dict from __main__, this is what python expects
-  for 'pickle' to work as well as strings like this...
- >> foo = 10
- >> print(__import__("__main__").foo)
-*
-* note: this overwrites __main__ which gives problems with nested calles.
-* be sure to run PyC_MainModule_Backup & PyC_MainModule_Restore if there is
-* any chance that python is in the call stack.
+ * Description: This function creates a new Python dictionary object.
+ * note: dict is owned by sys.modules["__main__"] module, reference is borrowed
+ * note: important we use the dict from __main__, this is what python expects
+ *  for 'pickle' to work as well as strings like this...
+ * >> foo = 10
+ * >> print(__import__("__main__").foo)
+ *
+ * note: this overwrites __main__ which gives problems with nested calles.
+ * be sure to run PyC_MainModule_Backup & PyC_MainModule_Restore if there is
+ * any chance that python is in the call stack.
 *****************************************************************************/
 PyObject *PyC_DefaultNameSpace(const char *filename)
 {
@@ -475,7 +475,7 @@ void PyC_SetHomePath(const char *py_path_bundle)
 
 #ifdef __APPLE__
 	/* OSX allow file/directory names to contain : character (represented as / in the Finder)
-	 but current Python lib (release 3.1.1) doesn't handle these correctly */
+	 * but current Python lib (release 3.1.1) doesn't handle these correctly */
 	if (strchr(py_path_bundle, ':'))
 		printf("Warning : Blender application is located in a path containing : or / chars\
 			   \nThis may make python import function fail\n");
@@ -483,7 +483,7 @@ void PyC_SetHomePath(const char *py_path_bundle)
 
 #ifdef _WIN32
 	/* cmake/MSVC debug build crashes without this, why only
-	   in this case is unknown.. */
+	 * in this case is unknown.. */
 	{
 		BLI_setenv("PYTHONPATH", py_path_bundle);
 	}

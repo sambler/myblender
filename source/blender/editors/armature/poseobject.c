@@ -497,7 +497,7 @@ static short pose_select_same_group (bContext *C, Object *ob, short extend)
 	}
 	CTX_DATA_END;
 	
-	/* small optimisation: only loop through bones a second time if there are any groups tagged */
+	/* small optimization: only loop through bones a second time if there are any groups tagged */
 	if (tagged) {
 		/* only if group matches (and is not selected or current bone) */
 		CTX_DATA_BEGIN(C, bPoseChannel *, pchan, visible_pose_bones) 
@@ -755,7 +755,7 @@ static void pose_copy_menu(Scene *scene)
 	pchanact= pchan;
 	arm= ob->data;
 
-	/* if proxy-protected bones selected, some things (such as locks + displays) shouldn't be changable, 
+	/* if proxy-protected bones selected, some things (such as locks + displays) shouldn't be changeable,
 	 * but for constraints (just add local constraints)
 	 */
 	if (pose_has_protected_selected(ob, 0)) {
@@ -776,7 +776,7 @@ static void pose_copy_menu(Scene *scene)
 	if (nr <= 0) 
 		return;
 	
-	if (nr != 5)  {
+	if (nr != 5) {
 		for (pchan= ob->pose->chanbase.first; pchan; pchan= pchan->next) {
 			if ( (arm->layer & pchan->bone->layer) &&
 				 (pchan->bone->flag & BONE_SELECTED) &&
@@ -1164,7 +1164,7 @@ static int pose_paste_exec (bContext *C, wmOperator *op)
 	}
 	
 	/* if selOnly option is enabled, if user hasn't selected any bones, 
-	 * just go back to default behaviour to be more in line with other pose tools
+	 * just go back to default behavior to be more in line with other pose tools
 	 */
 	if (selOnly) {
 		if (CTX_DATA_COUNT(C, selected_pose_bones) == 0)

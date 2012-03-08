@@ -662,7 +662,7 @@ static void draw_sphere_bone_dist(float smat[][4], float imat[][4], bPoseChannel
 	dirvec[2]= 0.0f;
 
 	if (head != tail) {
-	/* correcyion when viewing along the bones axis
+	/* correction when viewing along the bones axis
 	 * it pops in and out but better then artifacts, [#23841] */
 		float view_dist= len_v2(dirvec);
 
@@ -1280,8 +1280,8 @@ static void draw_wire_bone(int dt, int armflag, int boneflag, short constflag, u
 static void draw_bone(int dt, int armflag, int boneflag, short constflag, unsigned int id, float length)
 {
 	
-	/*	Draw a 3d octahedral bone, we use normalized space based on length,
-		for glDisplayLists */
+	/* Draw a 3d octahedral bone, we use normalized space based on length,
+	 * for glDisplayLists */
 	
 	glScalef(length, length, length);
 

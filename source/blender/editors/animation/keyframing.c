@@ -105,8 +105,7 @@ short ANIM_get_keyframing_flags (Scene *scene, short incl_mode)
 	}
 		
 	/* only if including settings from the autokeying mode... */
-	if (incl_mode) 
-	{ 
+	if (incl_mode) { 
 		/* keyframing mode - only replace existing keyframes */
 		if (IS_AUTOKEY_MODE(scene, EDITKEYS)) 
 			flag |= INSERTKEY_REPLACE;
@@ -375,7 +374,7 @@ enum {
 
 /* This helper function determines whether a new keyframe is needed */
 /* Cases where keyframes should not be added:
- *	1. Keyframe to be added bewteen two keyframes with similar values
+ *	1. Keyframe to be added between two keyframes with similar values
  *	2. Keyframe to be added on frame where two keyframes are already situated
  *	3. Keyframe lies at point that intersects the linear line between two keyframes
  */
@@ -446,7 +445,7 @@ static short new_key_needed (FCurve *fcu, float cFrame, float nValue)
 		}
 		else {
 			/* just add a keyframe if there's only one keyframe 
-			 * and the new one occurs before the exisiting one does.
+			 * and the new one occurs before the existing one does.
 			 */
 			if ((cFrame < beztPosi) && (totCount==1))
 				return KEYNEEDED_JUSTADD;
@@ -755,7 +754,7 @@ static float visualkey_get_value (PointerRNA *ptr, PropertyRNA *prop, int array_
  * 	Use this when validation of necessary animation data is not necessary, since an RNA-pointer to the necessary
  *	data being keyframed, and a pointer to the F-Curve to use have both been provided.
  *
- *	The flag argument is used for special settings that alter the behaviour of
+ *	The flag argument is used for special settings that alter the behavior of
  *	the keyframe insertion. These include the 'visual' keyframing modes, quick refresh,
  *	and extra keyframe filtering.
  */
@@ -874,7 +873,7 @@ short insert_keyframe_direct (ReportList *reports, PointerRNA ptr, PropertyRNA *
 /* Main Keyframing API call:
  *	Use this when validation of necessary animation data is necessary, since it may not exist yet.
  *	
- *	The flag argument is used for special settings that alter the behaviour of
+ *	The flag argument is used for special settings that alter the behavior of
  *	the keyframe insertion. These include the 'visual' keyframing modes, quick refresh,
  *	and extra keyframe filtering.
  *
@@ -968,7 +967,7 @@ short insert_keyframe (ReportList *reports, ID *id, bAction *act, const char gro
  *	Use this when validation of necessary animation data isn't necessary as it
  *	already exists. It will delete a keyframe at the current frame.
  *	
- *	The flag argument is used for special settings that alter the behaviour of
+ *	The flag argument is used for special settings that alter the behavior of
  *	the keyframe deletion. These include the quick refresh options.
  */
 short delete_keyframe (ReportList *reports, ID *id, bAction *act, const char group[], const char rna_path[], int array_index, float cfra, short UNUSED(flag))
@@ -1194,7 +1193,7 @@ static int insert_key_menu_invoke (bContext *C, wmOperator *op, wmEvent *UNUSED(
 	
 	/* if prompting or no active Keying Set, show the menu */
 	if ((scene->active_keyingset == 0) || RNA_boolean_get(op->ptr, "always_prompt")) {
-		/* call the menu, which will call this operator again, hence the cancelled */
+		/* call the menu, which will call this operator again, hence the canceled */
 		ANIM_keying_sets_menu_setup(C, op->type->name, "ANIM_OT_keyframe_insert_menu");
 		return OPERATOR_CANCELLED;
 	}
@@ -1239,8 +1238,8 @@ void ANIM_OT_keyframe_insert_menu (wmOperatorType *ot)
 	RNA_def_property_flag(prop, PROP_HIDDEN);
 	
 	/* whether the menu should always be shown 
-	 *	- by default, the menu should only be shown when there is no active Keying Set (2.5 behaviour),
-	 *	  although in some cases it might be useful to always shown (pre 2.5 behaviour)
+	 *	- by default, the menu should only be shown when there is no active Keying Set (2.5 behavior),
+	 *	  although in some cases it might be useful to always shown (pre 2.5 behavior)
 	 */
 	prop= RNA_def_boolean(ot->srna, "always_prompt", 0, "Always Show Menu", "");
 	RNA_def_property_flag(prop, PROP_HIDDEN);
@@ -1449,9 +1448,9 @@ static int insert_key_button_exec (bContext *C, wmOperator *op)
 	else if (G.f & G_DEBUG) {
 		printf("ptr.data = %p, prop = %p,", (void *)ptr.data, (void *)prop);
 		if (prop)
-			printf("animateable = %d \n", RNA_property_animateable(&ptr, prop));
+			printf("animatable = %d \n", RNA_property_animateable(&ptr, prop));
 		else
-			printf("animateable = NULL \n");
+			printf("animatable = NULL \n");
 	}
 	
 	if (success) {
@@ -1711,7 +1710,7 @@ short id_frame_has_keyframe (ID *id, float frame, short filter)
 			break;
 			
 		case ID_SCE: /* scene */
-		// XXX TODO... for now, just use 'normal' behaviour
+		// XXX TODO... for now, just use 'normal' behavior
 		//	break;
 		
 		default: 	/* 'normal type' */

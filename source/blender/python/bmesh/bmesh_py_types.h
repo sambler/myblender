@@ -56,7 +56,7 @@ typedef struct BPy_BMGeneric {
 typedef struct BPy_BMElem {
 	PyObject_VAR_HEAD
 	struct BMesh *bm; /* keep first */
-	struct BMHeader *ele;
+	struct BMElem *ele;
 } BPy_BMElem;
 
 typedef struct BPy_BMesh {
@@ -132,7 +132,18 @@ PyObject *BPy_BMElem_CreatePyObject(BMesh *bm, BMHeader *ele); /* just checks ty
 int  bpy_bm_generic_valid_check(BPy_BMGeneric *self);
 void bpy_bm_generic_invalidate(BPy_BMGeneric *self);
 
-#define BPY_BM_CHECK_OBJ(obj) if (bpy_bm_generic_valid_check((BPy_BMGeneric *)obj) == -1) { return NULL; } (void)NULL
-#define BPY_BM_CHECK_INT(obj) if (bpy_bm_generic_valid_check((BPy_BMGeneric *)obj) == -1) { return -1; }   (void)NULL
+void *BPy_BMElem_PySeq_As_Array(BMesh **r_bm, PyObject *seq, Py_ssize_t min, Py_ssize_t max, Py_ssize_t *r_size,
+                                PyTypeObject *type,
+                                const char do_unique_check, const char do_bm_check,
+                                const char *error_prefix);
+
+#define BPY_BM_CHECK_OBJ(obj) if (UNLIKELY(bpy_bm_generic_valid_check((BPy_BMGeneric *)obj) == -1)) { return NULL; } (void)0
+#define BPY_BM_CHECK_INT(obj) if (UNLIKELY(bpy_bm_generic_valid_check((BPy_BMGeneric *)obj) == -1)) { return -1; }   (void)0
+
+#define BPY_BM_IS_VALID(obj) (LIKELY((obj)->bm != NULL))
+
+#define BM_ITER_BPY_BM_SEQ(ele, iter, bpy_bmelemseq)                \
+	BM_ITER(ele, iter, (bpy_bmelemseq)->bm, (bpy_bmelemseq)->itype, \
+	(bpy_bmelemseq)->py_ele ? ((BPy_BMElem *)(bpy_bmelemseq)->py_ele)->ele : NULL)
 
 #endif /* __BMESH_TYPES_H__ */

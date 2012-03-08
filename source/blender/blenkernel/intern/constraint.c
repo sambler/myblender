@@ -223,6 +223,7 @@ void constraints_clear_evalob (bConstraintOb *cob)
 
 /* -------------- Space-Conversion API -------------- */
 
+#if 0 /* XXX Old code, does the same as one in armature.c, will remove it later. */
 static void constraint_pchan_diff_mat(bPoseChannel *pchan, float diff_mat[4][4])
 {
 	if (pchan->parent) {
@@ -265,7 +266,7 @@ static void constraint_pchan_diff_mat(bPoseChannel *pchan, float diff_mat[4][4])
 		copy_m4_m4(diff_mat, pchan->bone->arm_mat);
 	}
 }
-
+#endif
 
 /* This function is responsible for the correct transformations/conversions 
  * of a matrix from one space to another for constraint evaluation.
@@ -273,13 +274,12 @@ static void constraint_pchan_diff_mat(bPoseChannel *pchan, float diff_mat[4][4])
  */
 void constraint_mat_convertspace (Object *ob, bPoseChannel *pchan, float mat[][4], short from, short to)
 {
-	float tempmat[4][4];
 	float diff_mat[4][4];
 	float imat[4][4];
 	
 	/* prevent crashes in these unlikely events  */
 	if (ob==NULL || mat==NULL) return;
-	/* optimise trick - check if need to do anything */
+	/* optimize trick - check if need to do anything */
 	if (from == to) return;
 	
 	/* are we dealing with pose-channels or objects */
@@ -290,8 +290,7 @@ void constraint_mat_convertspace (Object *ob, bPoseChannel *pchan, float mat[][4
 			{
 				/* world to pose */
 				invert_m4_m4(imat, ob->obmat);
-				copy_m4_m4(tempmat, mat);
-				mult_m4_m4m4(mat, imat, tempmat);
+				mult_m4_m4m4(mat, imat, mat);
 				
 				/* use pose-space as stepping stone for other spaces... */
 				if (ELEM(to, CONSTRAINT_SPACE_LOCAL, CONSTRAINT_SPACE_PARLOCAL)) {
@@ -304,32 +303,31 @@ void constraint_mat_convertspace (Object *ob, bPoseChannel *pchan, float mat[][4
 			{
 				/* pose to world */
 				if (to == CONSTRAINT_SPACE_WORLD) {
-					copy_m4_m4(tempmat, mat);
-					mult_m4_m4m4(mat, ob->obmat, tempmat);
+					mult_m4_m4m4(mat, ob->obmat, mat);
 				}
 				/* pose to local */
 				else if (to == CONSTRAINT_SPACE_LOCAL) {
 					if (pchan->bone) {
+						armature_mat_pose_to_bone(pchan, mat, mat);
+#if 0  /* XXX Old code, will remove it later. */
 						constraint_pchan_diff_mat(pchan, diff_mat);
 
 						invert_m4_m4(imat, diff_mat);
-
-						copy_m4_m4(tempmat, mat);
-						mult_m4_m4m4(mat, imat, tempmat);
+						mult_m4_m4m4(mat, imat, mat);
 
 						/* override with local location */
 						if ((pchan->parent) && (pchan->bone->flag & BONE_NO_LOCAL_LOCATION)) {
 							armature_mat_pose_to_bone_ex(ob, pchan, pchan->pose_mat, tempmat);
 							copy_v3_v3(mat[3], tempmat[3]);
 						}
+#endif
 					}
 				}
 				/* pose to local with parent */
 				else if (to == CONSTRAINT_SPACE_PARLOCAL) {
 					if (pchan->bone) {
 						invert_m4_m4(imat, pchan->bone->arm_mat);
-						copy_m4_m4(tempmat, mat);
-						mult_m4_m4m4(mat, imat, tempmat);
+						mult_m4_m4m4(mat, imat, mat);
 					}
 				}
 			}
@@ -339,10 +337,12 @@ void constraint_mat_convertspace (Object *ob, bPoseChannel *pchan, float mat[][4
 				/* local to pose - do inverse procedure that was done for pose to local */
 				if (pchan->bone) {
 					/* we need the posespace_matrix = local_matrix + (parent_posespace_matrix + restpos) */
+					armature_mat_bone_to_pose(pchan, mat, mat);
+#if 0
 					constraint_pchan_diff_mat(pchan, diff_mat);
 
-					copy_m4_m4(tempmat, mat);
-					mult_m4_m4m4(mat, diff_mat, tempmat);
+					mult_m4_m4m4(mat, diff_mat, mat);
+#endif
 				}
 				
 				/* use pose-space as stepping stone for other spaces */
@@ -357,8 +357,7 @@ void constraint_mat_convertspace (Object *ob, bPoseChannel *pchan, float mat[][4
 				/* local + parent to pose */
 				if (pchan->bone) {					
 					copy_m4_m4(diff_mat, pchan->bone->arm_mat);
-					copy_m4_m4(tempmat, mat);
-					mult_m4_m4m4(mat, tempmat, diff_mat);
+					mult_m4_m4m4(mat, mat, diff_mat);
 				}
 				
 				/* use pose-space as stepping stone for other spaces */
@@ -378,8 +377,7 @@ void constraint_mat_convertspace (Object *ob, bPoseChannel *pchan, float mat[][4
 				/* 'subtract' parent's effects from owner */
 				mult_m4_m4m4(diff_mat, ob->parent->obmat, ob->parentinv);
 				invert_m4_m4(imat, diff_mat);
-				copy_m4_m4(tempmat, mat);
-				mult_m4_m4m4(mat, imat, tempmat);
+				mult_m4_m4m4(mat, imat, mat);
 			}
 			else {
 				/* Local space in this case will have to be defined as local to the owner's 
@@ -390,17 +388,15 @@ void constraint_mat_convertspace (Object *ob, bPoseChannel *pchan, float mat[][4
 				zero_v3(diff_mat[3]);
 				
 				invert_m4_m4(imat, diff_mat);
-				copy_m4_m4(tempmat, mat);
-				mult_m4_m4m4(mat, imat, tempmat);
+				mult_m4_m4m4(mat, imat, mat);
 			}
 		}
 		else if (from==CONSTRAINT_SPACE_LOCAL && to==CONSTRAINT_SPACE_WORLD) {
 			/* check that object has a parent - otherwise this won't work */
 			if (ob->parent) {
 				/* 'add' parent's effect back to owner */
-				copy_m4_m4(tempmat, mat);
 				mult_m4_m4m4(diff_mat, ob->parent->obmat, ob->parentinv);
-				mult_m4_m4m4(mat, diff_mat, tempmat);
+				mult_m4_m4m4(mat, diff_mat, mat);
 			}
 			else {
 				/* Local space in this case will have to be defined as local to the owner's 
@@ -410,8 +406,7 @@ void constraint_mat_convertspace (Object *ob, bPoseChannel *pchan, float mat[][4
 				normalize_m4(diff_mat);
 				zero_v3(diff_mat[3]);
 				
-				copy_m4_m4(tempmat, mat);
-				mult_m4_m4m4(mat, diff_mat, tempmat);
+				mult_m4_m4m4(mat, diff_mat, mat);
 			}
 		}
 	}
@@ -676,7 +671,7 @@ static void default_get_tarmat (bConstraint *con, bConstraintOb *UNUSED(cob), bC
 }
 
 /* This following macro should be used for all standard single-target *_get_tars functions 
- * to save typing and reduce maintainance woes.
+ * to save typing and reduce maintenance woes.
  * (Hopefully all compilers will be happy with the lines with just a space on them. Those are
  *  really just to help this code easier to read)
  */
@@ -710,7 +705,7 @@ static void default_get_tarmat (bConstraint *con, bConstraintOb *UNUSED(cob), bC
 	}
 	
 /* This following macro should be used for all standard single-target *_get_tars functions 
- * to save typing and reduce maintainance woes. It does not do the subtarget related operations
+ * to save typing and reduce maintenance woes. It does not do the subtarget related operations
  * (Hopefully all compilers will be happy with the lines with just a space on them. Those are
  *  really just to help this code easier to read)
  */
@@ -729,7 +724,7 @@ static void default_get_tarmat (bConstraint *con, bConstraintOb *UNUSED(cob), bC
 	}
 
 /* This following macro should be used for all standard single-target *_flush_tars functions
- * to save typing and reduce maintainance woes.
+ * to save typing and reduce maintenance woes.
  * Note: the pointer to ct will be changed to point to the next in the list (as it gets removed)
  * (Hopefully all compilers will be happy with the lines with just a space on them. Those are
  *  really just to help this code easier to read)
@@ -750,7 +745,7 @@ static void default_get_tarmat (bConstraint *con, bConstraintOb *UNUSED(cob), bC
 	}
 	
 /* This following macro should be used for all standard single-target *_flush_tars functions
- * to save typing and reduce maintainance woes. It does not do the subtarget related operations.
+ * to save typing and reduce maintenance woes. It does not do the subtarget related operations.
  * Note: the pointer to ct will be changed to point to the next in the list (as it gets removed)
  * (Hopefully all compilers will be happy with the lines with just a space on them. Those are
  *  really just to help this code easier to read)
@@ -1915,7 +1910,7 @@ static void samevolume_evaluate (bConstraint *con, bConstraintOb *cob, ListBase 
 
 	mat4_to_size(obsize, cob->matrix);
 	
-	/* calculate normalising scale factor for non-essential values */
+	/* calculate normalizing scale factor for non-essential values */
 	if (obsize[data->flag] != 0) 
 		fac = sqrtf(volume / obsize[data->flag]) / obsize[data->flag];
 	
@@ -2153,7 +2148,7 @@ static void actcon_get_tarmat (bConstraint *con, bConstraintOb *cob, bConstraint
 		float s, t;
 		short axis;
 		
-		/* initialise return matrix */
+		/* initialize return matrix */
 		unit_m4(ct->matrix);
 		
 		/* get the transform matrix of the target */
@@ -2226,7 +2221,7 @@ static void actcon_get_tarmat (bConstraint *con, bConstraintOb *cob, bConstraint
 			object_to_mat4(&workob, ct->matrix);
 		}
 		else {
-			/* behaviour undefined... */
+			/* behavior undefined... */
 			puts("Error: unknown owner type for Action Constraint");
 		}
 	}
@@ -2322,7 +2317,7 @@ static void locktrack_evaluate (bConstraint *con, bConstraintOb *cob, ListBase *
 		
 		/* Vector object -> target */
 		sub_v3_v3v3(vec, ct->matrix[3], cob->matrix[3]);
-		switch (data->lockflag){
+		switch (data->lockflag) {
 		case LOCK_X: /* LOCK X */
 		{
 			switch (data->trackflag) {
@@ -3925,7 +3920,7 @@ static bConstraintTypeInfo CTI_PIVOT = {
 	NULL, /* relink data */
 	pivotcon_id_looper, /* id looper */
 	NULL, /* copy data */
-	NULL, /* new data */ // XXX: might be needed to get 'normal' pivot behaviour...
+	NULL, /* new data */ // XXX: might be needed to get 'normal' pivot behavior...
 	pivotcon_get_tars, /* get constraint targets */
 	pivotcon_flush_tars, /* flush constraint targets */
 	default_get_tarmat, /* get target matrix */
@@ -4299,7 +4294,7 @@ static void constraints_init_typeinfo (void)
  */
 bConstraintTypeInfo *get_constraint_typeinfo (int type)
 {
-	/* initialise the type-info list? */
+	/* initialize the type-info list? */
 	if (CTI_INIT) {
 		constraints_init_typeinfo();
 		CTI_INIT = 0;
@@ -4417,7 +4412,7 @@ static bConstraint *add_new_constraint_internal (const char *name, short type)
 
 	/* Determine a basic name, and info */
 	if (cti) {
-		/* initialise constraint data */
+		/* initialize constraint data */
 		con->data = MEM_callocN(cti->size, cti->structName);
 		
 		/* only constraints that change any settings need this */
@@ -4762,7 +4757,7 @@ void get_constraint_targets_for_solving (bConstraint *con, bConstraintOb *cob, L
 		cti->get_constraint_targets(con, targets);
 		
 		/* set matrices 
-		 * 	- calculate if possible, otherwise just initialise as identity matrix 
+		 * 	- calculate if possible, otherwise just initialize as identity matrix 
 		 */
 		if (cti->get_target_matrix) {
 			for (ct= targets->first; ct; ct= ct->next) 

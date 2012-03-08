@@ -705,7 +705,7 @@ void SEQUENCER_OT_select_linked_pick(wmOperatorType *ot)
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 	
 	/* properties */
-	RNA_def_boolean(ot->srna, "extend", 0, "Extend", "extend the selection");
+	RNA_def_boolean(ot->srna, "extend", 0, "Extend", "Extend the selection");
 }
 
 
@@ -1094,7 +1094,7 @@ static short select_grouped_effect_link(Editing *ed, Sequence *actseq)
 			seq->flag |= SELECT;
 			changed = TRUE;
 
-			/* Unfortunately, we must restart checks from the begining. */
+			/* Unfortunately, we must restart checks from the beginning. */
 			seq_end(&iter);
 			seq_begin(ed, &iter, 1);
 		}

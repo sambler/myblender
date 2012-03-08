@@ -173,7 +173,7 @@ void BKE_tracking_clamp_track(MovieTrackingTrack *track, int event)
 			}
 		}
 	}
-	else if(event==CLAMP_PYRAMID_LEVELS || (event==CLAMP_SEARCH_DIM && track->tracker == TRACKER_KLT))  {
+	else if(event==CLAMP_PYRAMID_LEVELS || (event==CLAMP_SEARCH_DIM && track->tracker == TRACKER_KLT)) {
 		float dim[2];
 		sub_v2_v2v2(dim, track->pat_max, track->pat_min);
 		{
@@ -626,7 +626,7 @@ void BKE_tracking_clipboard_copy_tracks(MovieTracking *tracking, MovieTrackingOb
 	MovieTrackingTrack *track = tracksbase->first;
 
 	while (track) {
-		if (TRACK_SELECTED(track)) {
+		if (TRACK_SELECTED(track) && (track->flag & TRACK_HIDDEN) == 0) {
 			MovieTrackingTrack *new_track = duplicate_track(track);
 
 			BLI_addtail(&tracking_clipboard.tracks, new_track);
@@ -745,8 +745,8 @@ static void tracks_map_merge(TracksMap *map, MovieTracking *tracking)
 	}
 
 	/* duplicate currently operating tracks to temporary list.
-	   this is needed to keep names in unique state and it's faster to change names
-	   of currently operating tracks (if needed) */
+	 * this is needed to keep names in unique state and it's faster to change names
+	 * of currently operating tracks (if needed) */
 	for(a= 0; a<map->num_tracks; a++) {
 		int replace_sel= 0, replace_rot= 0;
 		MovieTrackingTrack *new_track, *old;
@@ -896,7 +896,7 @@ MovieTrackingContext *BKE_tracking_context_new(MovieClip *clip, MovieClipUser *u
 	/* count */
 	track= tracksbase->first;
 	while(track) {
-		if(TRACK_SELECTED(track) && (track->flag&TRACK_LOCKED)==0) {
+		if(TRACK_SELECTED(track) && (track->flag & (TRACK_LOCKED | TRACK_HIDDEN))==0) {
 			MovieTrackingMarker *marker= BKE_tracking_get_marker(track, user->framenr);
 
 			if((marker->flag&MARKER_DISABLED)==0)
@@ -917,7 +917,7 @@ MovieTrackingContext *BKE_tracking_context_new(MovieClip *clip, MovieClipUser *u
 		/* create tracking data */
 		track= tracksbase->first;
 		while(track) {
-			if(TRACK_SELECTED(track) && (track->flag&TRACK_LOCKED)==0) {
+			if(TRACK_SELECTED(track) && (track->flag & (TRACK_HIDDEN | TRACK_LOCKED))==0) {
 				MovieTrackingMarker *marker= BKE_tracking_get_marker(track, user->framenr);
 
 				if((marker->flag&MARKER_DISABLED)==0) {
@@ -944,7 +944,7 @@ MovieTrackingContext *BKE_tracking_context_new(MovieClip *clip, MovieClipUser *u
 							float log2_search_to_pattern_ratio = log(floor(search_to_pattern_ratio)) / M_LN2;
 							int max_pyramid_levels= floor(log2_search_to_pattern_ratio + 1);
 
-							/* try to accomodate the user's choice of pyramid level in a way
+							/* try to accommodate the user's choice of pyramid level in a way
 							 * that doesn't cause the coarsest pyramid pattern to be larger
 							 * than the search size */
 							int level= MIN2(track->pyramid_levels, max_pyramid_levels);
@@ -1100,13 +1100,13 @@ static ImBuf *get_area_imbuf(ImBuf *ibuf, MovieTrackingTrack *track, MovieTracki
 	w= (max[0]-min[0])*ibuf->x;
 	h= (max[1]-min[1])*ibuf->y;
 
+	/* dimensions should be odd */
 	w= w|1;
 	h= h|1;
 
-	x1= x-(int)(w/2.0f);
-	y1= y-(int)(h/2.0f);
+	x1= x-(int)(w * (-min[0] / (max[0] - min[0])));
+	y1= y-(int)(h * (-min[1] / (max[1] - min[1])));
 
-	/* dimensions should be odd */
 	tmpibuf= IMB_allocImBuf(w+margin*2, h+margin*2, 32, IB_rect);
 	IMB_rectcpy(tmpibuf, ibuf, 0, 0, x1-margin, y1-margin, w+margin*2, h+margin*2);
 
@@ -1480,7 +1480,7 @@ int BKE_tracking_next(MovieTrackingContext *context)
 					#pragma omp critical
 					{
 						/* check if there's no keyframe/tracked markers before tracking marker.
-						   if so -- create disabled marker before currently tracking "segment" */
+						 * if so -- create disabled marker before currently tracking "segment" */
 						put_disabled_marker(track, marker, !context->backwards, 0);
 					}
 				}
@@ -2684,7 +2684,7 @@ ImBuf *BKE_tracking_stabilize(MovieTracking *tracking, int framenr, ImBuf *ibuf,
 
 	if(tangle==0.0f) {
 		/* if angle is zero, then it's much faster to use rect copy
-		   but could be issues with subpixel precisions */
+		 * but could be issues with subpixel precisions */
 		IMB_rectcpy(tmpibuf, ibuf, tloc[0]-(tscale-1.0f)*width/2.0f, tloc[1]-(tscale-1.0f)*height/2.0f, 0, 0, ibuf->x, ibuf->y);
 	} else {
 		float mat[4][4];
@@ -2883,12 +2883,14 @@ void BKE_tracking_select_track(ListBase *tracksbase, MovieTrackingTrack *track, 
 		MovieTrackingTrack *cur= tracksbase->first;
 
 		while(cur) {
-			if(cur==track) {
-				BKE_tracking_track_flag(cur, TRACK_AREA_ALL, SELECT, 1);
-				BKE_tracking_track_flag(cur, area, SELECT, 0);
-			}
-			else {
-				BKE_tracking_track_flag(cur, TRACK_AREA_ALL, SELECT, 1);
+			if ((cur->flag & TRACK_HIDDEN) == 0) {
+				if(cur==track) {
+					BKE_tracking_track_flag(cur, TRACK_AREA_ALL, SELECT, 1);
+					BKE_tracking_track_flag(cur, area, SELECT, 0);
+				}
+				else {
+					BKE_tracking_track_flag(cur, TRACK_AREA_ALL, SELECT, 1);
+				}
 			}
 
 			cur= cur->next;

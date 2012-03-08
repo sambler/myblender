@@ -27,8 +27,8 @@
  */
 
  /** \file blender/blenlib/intern/string_utf8.c
- *  \ingroup bli
- */
+  *  \ingroup bli
+  */
 
 #include <string.h>
 #include <wchar.h>
@@ -41,9 +41,9 @@
  * http://svn.swish-e.org/libswish3/trunk/src/libswish3/utf8.c r3044 - campbell */
 
 /* based on the valid_utf8 routine from the PCRE library by Philip Hazel
-
-   length is in bytes, since without knowing whether the string is valid
-   it's hard to know how many characters there are! */
+ *
+ * length is in bytes, since without knowing whether the string is valid
+ * it's hard to know how many characters there are! */
 
 static const char trailingBytesForUTF8[256] = {
 	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -101,7 +101,7 @@ int BLI_utf8_invalid_byte(const char *str, int length)
 			break;
 
 			/* Check for leading 0xfe or 0xff,
-			   and then for 1111 1100, xx00 00xx */
+			 * and then for 1111 1100, xx00 00xx */
 		case 5:
 			if (c == 0xfe || c == 0xff ||
 				(c == 0xfc && (*p & 0x3c) == 0)) goto utf8_error;
@@ -345,7 +345,7 @@ int BLI_str_utf8_size(const char *p)
 /* was g_utf8_get_char */
 /**
  * BLI_str_utf8_as_unicode:
- * @p: a pointer to Unicode character encoded as UTF-8
+ * @p a pointer to Unicode character encoded as UTF-8
  *
  * Converts a sequence of bytes encoded as UTF-8 to a Unicode character.
  * If @p does not point to a valid UTF-8 encoded character, results are
@@ -369,7 +369,7 @@ unsigned int BLI_str_utf8_as_unicode(const char *p)
   return result;
 }
 
-/* varient that increments the length */
+/* variant that increments the length */
 unsigned int BLI_str_utf8_as_unicode_and_size(const char *p, size_t *index)
 {
 	int i, mask = 0, len;
@@ -384,7 +384,7 @@ unsigned int BLI_str_utf8_as_unicode_and_size(const char *p, size_t *index)
 	return result;
 }
 
-/* another varient that steps over the index,
+/* another variant that steps over the index,
  * note, currently this also falls back to latin1 for text drawing. */
 unsigned int BLI_str_utf8_as_unicode_step(const char *p, size_t *index)
 {
@@ -432,10 +432,10 @@ unsigned int BLI_str_utf8_as_unicode_step(const char *p, size_t *index)
 /* was g_unichar_to_utf8 */
 /**
  * BLI_str_utf8_from_unicode:
- * @c: a Unicode character code
- * @outbuf: output buffer, must have at least 6 bytes of space.
+ * @c a Unicode character code
+ * \param outbuf output buffer, must have at least 6 bytes of space.
  *       If %NULL, the length will be computed and returned
- *       and nothing will be written to @outbuf.
+ *       and nothing will be written to outbuf.
  *
  * Converts a single character to UTF-8.
  *
@@ -488,11 +488,11 @@ size_t BLI_str_utf8_from_unicode(unsigned int c, char *outbuf)
 /**
  * BLI_str_find_prev_char_utf8:
  * @str: pointer to the beginning of a UTF-8 encoded string
- * @p: pointer to some position within @str
+ * @p pointer to some position within @str
  *
  * Given a position @p with a UTF-8 encoded string @str, find the start
- * of the previous UTF-8 character starting before @p. Returns %NULL if no
- * UTF-8 characters are present in @str before @p.
+ * of the previous UTF-8 character starting before. @p Returns %NULL if no
+ * UTF-8 characters are present in @str before @p
  *
  * @p does not have to be at the beginning of a UTF-8 character. No check
  * is made to see if the character found is actually valid other than
@@ -513,11 +513,11 @@ char * BLI_str_find_prev_char_utf8(const char *str, const char *p)
 /* was g_utf8_find_next_char */
 /**
  * BLI_str_find_next_char_utf8:
- * @p: a pointer to a position within a UTF-8 encoded string
- * @end: a pointer to the byte following the end of the string,
+ * @p a pointer to a position within a UTF-8 encoded string
+ * @end a pointer to the byte following the end of the string,
  * or %NULL to indicate that the string is nul-terminated.
  *
- * Finds the start of the next UTF-8 character in the string after @p.
+ * Finds the start of the next UTF-8 character in the string after @p
  *
  * @p does not have to be at the beginning of a UTF-8 character. No check
  * is made to see if the character found is actually valid other than
@@ -545,9 +545,9 @@ char *BLI_str_find_next_char_utf8(const char *p, const char *end)
 /* was g_utf8_prev_char */
 /**
  * BLI_str_prev_char_utf8:
- * @p: a pointer to a position within a UTF-8 encoded string
+ * @p a pointer to a position within a UTF-8 encoded string
  *
- * Finds the previous UTF-8 character in the string before @p.
+ * Finds the previous UTF-8 character in the string before @p
  *
  * @p does not have to be at the beginning of a UTF-8 character. No check
  * is made to see if the character found is actually valid other than

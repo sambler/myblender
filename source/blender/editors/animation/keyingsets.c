@@ -468,7 +468,7 @@ void ANIM_OT_keyingset_button_remove (wmOperatorType *ot)
 
 static int keyingset_active_menu_invoke (bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 {
-	/* call the menu, which will call this operator again, hence the cancelled */
+	/* call the menu, which will call this operator again, hence the canceled */
 	ANIM_keying_sets_menu_setup(C, op->type->name, "ANIM_OT_keying_set_active_set");
 	return OPERATOR_CANCELLED;
 }
@@ -839,7 +839,7 @@ typedef struct tRKS_DSource {
 } tRKS_DSource;
 
 
-/* Iterator used for overriding the behaviour of iterators defined for 
+/* Iterator used for overriding the behavior of iterators defined for 
  * relative Keying Sets, with the main usage of this being operators 
  * requiring Auto Keyframing. Internal Use Only!
  */

@@ -83,10 +83,10 @@ static ListBase *context_get_markers(Scene *scene, ScrArea *sa)
 			/* local markers can only be shown when there's only a single active action to grab them from 
 			 * 	- flag only takes effect when there's an action, otherwise it can get too confusing?
 			 */
-			if (ELEM(saction->mode, SACTCONT_ACTION, SACTCONT_SHAPEKEY) && (saction->action)) 
-			{
-				if (saction->flag & SACTION_POSEMARKERS_SHOW)
+			if (ELEM(saction->mode, SACTCONT_ACTION, SACTCONT_SHAPEKEY) && (saction->action)) {
+				if (saction->flag & SACTION_POSEMARKERS_SHOW) {
 					return &saction->action->markers;
+				}
 			}
 		}
 	}
@@ -232,7 +232,7 @@ void ED_markers_get_minmax (ListBase *markers, short sel, float *first, float *l
 		selcount= BLI_countlist(markers);
 	
 	/* if only selected are to be considered, only consider the selected ones
-	 * (optimisation for not searching list) 
+	 * (optimization for not searching list)
 	 */
 	if (selcount > 1) {
 		for (marker= markers->first; marker; marker= marker->next) {
@@ -323,7 +323,7 @@ TimeMarker *ED_markers_get_first_selected(ListBase *markers)
 /* --------------------------------- */
 
 /* Print debugging prints of list of markers 
- * BSI's: do NOT make static or put in if-defs as "unused code". That's too much trouble when we need to use for quick debuggging!
+ * BSI's: do NOT make static or put in if-defs as "unused code". That's too much trouble when we need to use for quick debugging!
  */
 void debug_markers_print_list(ListBase *markers)
 {
@@ -597,29 +597,28 @@ static void MARKER_OT_add(wmOperatorType *ot)
 
 /* ************************** transform markers *************************** */
 
-
 /* operator state vars used:  
-	frs: delta movement
-
-functions:
-
-	init()   check selection, add customdata with old values and some lookups
-
-	apply()  do the actual movement
-
-	exit()	cleanup, send notifier
-
-	cancel() to escape from modal
-
-callbacks:
-
-	exec()	calls init, apply, exit 
-
-	invoke() calls init, adds modal handler
-
-	modal()	accept modal events while doing it, ends with apply and exit, or cancel
-
-*/
+ *     frs: delta movement
+ * 
+ * functions:
+ * 
+ *     init()   check selection, add customdata with old values and some lookups
+ * 
+ *     apply()  do the actual movement
+ * 
+ *     exit()    cleanup, send notifier
+ * 
+ *     cancel() to escape from modal
+ * 
+ * callbacks:
+ * 
+ *     exec()    calls init, apply, exit 
+ * 
+ *     invoke() calls init, adds modal handler
+ * 
+ *     modal()    accept modal events while doing it, ends with apply and exit, or cancel
+ * 
+ */
 
 typedef struct MarkerMove {
 	SpaceLink *slink;
@@ -752,7 +751,7 @@ static int ed_marker_move_modal(bContext *C, wmOperator *op, wmEvent *evt)
 			return OPERATOR_CANCELLED;
 		
 		case RIGHTMOUSE:
-			/* press = user manually demands transform to be cancelled */
+			/* press = user manually demands transform to be canceled */
 			if (evt->val == KM_PRESS) {
 				ed_marker_move_cancel(C, op);
 				return OPERATOR_CANCELLED;
@@ -852,8 +851,7 @@ static int ed_marker_move_modal(bContext *C, wmOperator *op, wmEvent *evt)
 		float vec[3];
 		char str_tx[256];
 		
-		if (handleNumInput(&mm->num, evt))
-		{
+		if (handleNumInput(&mm->num, evt)) {
 			applyNumInput(&mm->num, vec);
 			outputNumInput(&mm->num, str_tx);
 			
@@ -905,23 +903,21 @@ static void MARKER_OT_move(wmOperatorType *ot)
 
 /* ************************** duplicate markers *************************** */
 
-/* operator state vars used:  
-	frs: delta movement
-
-functions:
-
-	apply()  do the actual duplicate
-
-callbacks:
-
-	exec()	calls apply, move_exec
-
-	invoke() calls apply, move_invoke
-
-	modal()	uses move_modal
-
-*/
-
+/* operator state vars used:
+ *     frs: delta movement
+ *
+ * functions:
+ *
+ *     apply()  do the actual duplicate
+ *
+ * callbacks:
+ *
+ *     exec()    calls apply, move_exec
+ *
+ *     invoke() calls apply, move_invoke
+ *
+ *     modal()    uses move_modal
+ */
 
 /* duplicate selected TimeMarkers */
 static void ed_marker_duplicate_apply(bContext *C)
@@ -933,7 +929,7 @@ static void ed_marker_duplicate_apply(bContext *C)
 		return;
 
 	/* go through the list of markers, duplicate selected markers and add duplicated copies
-	 * to the begining of the list (unselect original markers) 
+	 * to the beginning of the list (unselect original markers)
 	 */
 	for (marker= markers->first; marker; marker= marker->next) {
 		if (marker->flag & SELECT) {
@@ -950,7 +946,7 @@ static void ed_marker_duplicate_apply(bContext *C)
 			newmarker->camera= marker->camera;
 #endif
 
-			/* new marker is added to the begining of list */
+			/* new marker is added to the beginning of list */
 			// FIXME: bad ordering!
 			BLI_addhead(markers, newmarker);
 		}
@@ -1116,7 +1112,7 @@ static void MARKER_OT_select(wmOperatorType *ot)
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 
-	RNA_def_boolean(ot->srna, "extend", 0, "Extend", "extend the selection");
+	RNA_def_boolean(ot->srna, "extend", 0, "Extend", "Extend the selection");
 #ifdef DURIAN_CAMERA_SWITCH
 	RNA_def_boolean(ot->srna, "camera", 0, "Camera", "Select the camera");
 #endif
@@ -1125,23 +1121,23 @@ static void MARKER_OT_select(wmOperatorType *ot)
 /* *************************** border select markers **************** */
 
 /* operator state vars used: (added by default WM callbacks)   
-	xmin, ymin     
-	xmax, ymax     
-
-customdata: the wmGesture pointer, with subwindow
-
-callbacks:
-
-	exec()	has to be filled in by user
-
-	invoke() default WM function
-			adds modal handler
-
-	modal()	default WM function 
-			accept modal events while doing it, calls exec(), handles ESC and border drawing
-
-	poll()	has to be filled in by user for context
-*/
+ * xmin, ymin
+ * xmax, ymax
+ *
+ * customdata: the wmGesture pointer, with subwindow
+ *
+ * callbacks:
+ *
+ * 	exec()	has to be filled in by user
+ *
+ * 	invoke() default WM function
+ * 			adds modal handler
+ *
+ * 	modal()	default WM function 
+ * 			accept modal events while doing it, calls exec(), handles ESC and border drawing
+ *
+ * 	poll()	has to be filled in by user for context
+ */
 
 static int ed_marker_border_select_exec(bContext *C, wmOperator *op)
 {
@@ -1339,7 +1335,7 @@ static int ed_marker_rename_exec(bContext *C, wmOperator *op)
 
 static int ed_marker_rename_invoke_wrapper(bContext *C, wmOperator *op, wmEvent *evt)
 {
-	/* must initialise the marker name first if there is a marker selected */
+	/* must initialize the marker name first if there is a marker selected */
 	TimeMarker *marker = ED_markers_get_first_selected(ED_context_get_markers(C));
 	if (marker)
 		RNA_string_set(op->ptr, "name", marker->name);

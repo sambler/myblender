@@ -128,7 +128,6 @@ void RNA_def_armature(struct BlenderRNA *brna);
 void RNA_def_actuator(struct BlenderRNA *brna);
 void RNA_def_boid(struct BlenderRNA *brna);
 void RNA_def_brush(struct BlenderRNA *brna);
-void RNA_def_brushclone(struct BlenderRNA *brna);
 void RNA_def_camera(struct BlenderRNA *brna);
 void RNA_def_cloth(struct BlenderRNA *brna);
 void RNA_def_color(struct BlenderRNA *brna);
@@ -247,7 +246,6 @@ void RNA_api_keymap(struct StructRNA *srna);
 void RNA_api_keymaps(struct StructRNA *srna);
 void RNA_api_keymapitem(struct StructRNA *srna);
 void RNA_api_keymapitems(struct StructRNA *srna);
-void RNA_api_area(struct StructRNA *srna);
 void RNA_api_main(struct StructRNA *srna);
 void RNA_api_material(StructRNA *srna);
 void RNA_api_mesh(struct StructRNA *srna);
@@ -379,7 +377,7 @@ PointerRNA rna_pointer_inherit_refine(struct PointerRNA *ptr, struct StructRNA *
 int rna_parameter_size(struct PropertyRNA *parm);
 int rna_parameter_size_alloc(struct PropertyRNA *parm);
 
-// XXX, these should not need to be defined here~!
+/* XXX, these should not need to be defined here~! */
 struct MTex *rna_mtex_texture_slots_add(struct ID *self, struct bContext *C, struct ReportList *reports);
 struct MTex *rna_mtex_texture_slots_create(struct ID *self, struct bContext *C, struct ReportList *reports, int index);
 void rna_mtex_texture_slots_clear(struct ID *self, struct bContext *C, struct ReportList *reports, int index);

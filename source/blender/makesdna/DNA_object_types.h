@@ -137,7 +137,7 @@ typedef struct Object {
 
 	/* materials */
 	struct Material **mat;	/* material slots */
-	char *matbits;			/* a boolean field, with each byte 1 if corrusponding material is linked to object */
+	char *matbits;			/* a boolean field, with each byte 1 if corresponding material is linked to object */
 	int totcol;				/* copy of mesh or curve or meta */
 	int actcol;				/* currently selected material in the UI */
 	
@@ -354,7 +354,7 @@ typedef struct DupliObject {
 #define OB_NO_CONSTRAINTS	8192 /* runtime constraints disable */
 
 /* (short) ipoflag */
-/* XXX: many old flags for features removed due to incompatability 
+/* XXX: many old flags for features removed due to incompatibility
  * with new system and/or other design issues were here 
  */
 	/* for stride/path editing (XXX: NEEDS REVIEW) */

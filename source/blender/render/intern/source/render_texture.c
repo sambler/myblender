@@ -2030,10 +2030,10 @@ static int ntap_bump_compute(NTapBump *ntap_bump, ShadeInput *shi, MTex *mtex, T
 		texco_mapping(shi, tex, mtex, co, dx, dy, texvec, dxt, dyt);
 		rgbnor = multitex_mtex(shi, mtex, texvec, dxt, dyt, texres);
 
-		if(shi->obr->ob->derivedFinal)
-		{
+		if(shi->obr->ob->derivedFinal) {
 			auto_bump = shi->obr->ob->derivedFinal->auto_bump_scale;
 		}
+
 		{
 			float fVirtDim = sqrtf(fabsf((float) (dimx*dimy)*mtex->size[0]*mtex->size[1]));
 			auto_bump /= MAX2(fVirtDim, FLT_EPSILON);
@@ -3621,6 +3621,8 @@ Material *RE_init_sample_material(Material *orig_mat, Scene *scene)
 		if(mat->mtex[tex_nr]) {
 			MTex *mtex = mat->mtex[tex_nr];
 
+			if(!mtex->tex) continue;
+
 			/* only keep compatible texflags */
 			mtex->texflag = mtex->texflag & (MTEX_RGBTOINT | MTEX_STENCIL | MTEX_NEGATIVE | MTEX_ALPHAMIX);
 
@@ -3694,9 +3696,12 @@ void RE_free_sample_material(Material *mat)
 		if(mat->septex & (1<<tex_nr)) continue;
 		if(mat->mtex[tex_nr]) {
 			MTex *mtex= mat->mtex[tex_nr];
-			free_texture(mtex->tex);
-			MEM_freeN(mtex->tex);
-			mtex->tex = NULL;
+	
+			if(mtex->tex) {
+				free_texture(mtex->tex);
+				MEM_freeN(mtex->tex);
+				mtex->tex = NULL;
+			}
 		}
 	}
 

@@ -39,25 +39,24 @@
 
 #include "DNA_defs.h" /* USE_BMESH_FORWARD_COMPAT */
 
+struct AnimData;
 struct DerivedMesh;
 struct Ipo;
 struct Key;
-struct Material;
-struct MVert;
+struct MCol;
 struct MEdge;
 struct MFace;
-struct MCol;
-struct MSticky;
-struct Mesh;
-struct OcInfo;
-struct MPoly;
-struct MTexPoly;
 struct MLoop;
-struct MLoopUV;
 struct MLoopCol;
+struct MLoopUV;
+struct MPoly;
+struct MSticky;
+struct MTexPoly;
+struct MVert;
+struct Material;
+struct Mesh;
 struct Multires;
-struct EditMesh;
-struct AnimData;
+struct OcInfo;
 
 typedef struct Mesh {
 	ID id;
@@ -78,10 +77,10 @@ typedef struct Mesh {
 	struct MLoopCol *mloopcol;
 /* END BMESH ONLY */
 
-	/*mface stores the tesselation (triangulation) of the mesh,
+	/*mface stores the tessellation (triangulation) of the mesh,
 	  real faces are now stored in nface.*/
-	struct MFace *mface;	/* array of mesh object mode faces for tesselation */
-	struct MTFace *mtface;	/* store tesselation face UV's and texture here */
+	struct MFace *mface;	/* array of mesh object mode faces for tessellation */
+	struct MTFace *mtface;	/* store tessellation face UV's and texture here */
 	struct TFace *tface;	/* depecrated, use mtface */
 	struct MVert *mvert;	/* array of verts */
 	struct MEdge *medge;	/* array of edges */
@@ -228,6 +227,8 @@ typedef struct TFace {
 #define USE_BMESH_SAVE_AS_COMPAT
 #define USE_BMESH_SAVE_WITHOUT_MFACE
 
+/* enable this to calculate mpoly normal layer and face origindex mapping */
+// #define USE_BMESH_MPOLY_NORMALS
 
 /* enable this so meshes get tessfaces calculated by default */
 // #define USE_TESSFACE_DEFAULT

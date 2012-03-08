@@ -52,7 +52,7 @@
 #include "MOD_weightvg_util.h"
 #include "RE_shader_ext.h"        /* Texture masking. */
 
-/* Maps new_w weights in place, using either one of the predifined functions, or a custom curve.
+/* Maps new_w weights in place, using either one of the predefined functions, or a custom curve.
  * Return values are in new_w.
  * If indices is not NULL, it must be a table of same length as org_w and new_w, mapping to the real
  * vertex index (in case the weight tables do not cover the whole vertices...).
@@ -225,7 +225,7 @@ void weightvg_do_mask(int num, const int *indices, float *org_w, const float *ne
 
 
 
-/* Applies weights to given vgroup (defgroup), and optionnaly add/remove vertices from the group.
+/* Applies weights to given vgroup (defgroup), and optionally add/remove vertices from the group.
  * If dws is not NULL, it must be an array of MDeformWeight pointers of same length as weights (and
  * defgrp_idx can then have any value).
  * If indices is not NULL, it must be an array of same length as weights, mapping to the real

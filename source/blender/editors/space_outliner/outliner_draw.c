@@ -127,11 +127,13 @@ static void outliner_rna_width(SpaceOops *soops, ListBase *lb, int *w, int start
 	TreeElement *te= lb->first;
 	while(te) {
 		TreeStoreElem *tselem= TREESTORE(te);
-			// XXX fixme... (currently, we're using a fixed length of 100)!
-		/*if(te->xend) {
+		// XXX fixme... (currently, we're using a fixed length of 100)!
+#if 0
+		if(te->xend) {
 			if(te->xend > *w)
 				*w = te->xend;
-		}*/
+		}
+#endif
 		if(startx+100 > *w)
 			*w = startx+100;
 
@@ -483,7 +485,7 @@ static void outliner_draw_restrictbuts(uiBlock *block, Scene *scene, ARegion *ar
 				
 				uiBlockSetEmboss(block, UI_EMBOSS);
 			}
-			else if(tselem->type==TSE_MODIFIER)  {
+			else if(tselem->type==TSE_MODIFIER) {
 				ModifierData *md= (ModifierData *)te->directdata;
 				ob = (Object *)tselem->id;
 				
@@ -496,7 +498,7 @@ static void outliner_draw_restrictbuts(uiBlock *block, Scene *scene, ARegion *ar
 						(int)ar->v2d.cur.xmax-OL_TOG_RESTRICT_RENDERX, (int)te->ys, UI_UNIT_X-1, UI_UNIT_Y-1, &(md->mode), 0, 0, 0, 0, "Restrict/Allow renderability");
 				uiButSetFunc(bt, restrictbutton_modifier_cb, scene, ob);
 			}
-			else if(tselem->type==TSE_POSE_CHANNEL)  {
+			else if(tselem->type==TSE_POSE_CHANNEL) {
 				bPoseChannel *pchan= (bPoseChannel *)te->directdata;
 				Bone *bone = pchan->bone;
 				
@@ -509,7 +511,7 @@ static void outliner_draw_restrictbuts(uiBlock *block, Scene *scene, ARegion *ar
 						(int)ar->v2d.cur.xmax-OL_TOG_RESTRICT_SELECTX, (int)te->ys, UI_UNIT_X-1, UI_UNIT_Y-1, &(bone->flag), 0, 0, 0, 0, "Restrict/Allow selection in the 3D View");
 				uiButSetFunc(bt, restrictbutton_bone_cb, NULL, NULL);
 			}
-			else if(tselem->type==TSE_EBONE)  {
+			else if(tselem->type==TSE_EBONE) {
 				EditBone *ebone= (EditBone *)te->directdata;
 				
 				uiBlockSetEmboss(block, UI_EMBOSSN);
@@ -892,7 +894,7 @@ struct DrawIconArg {
 
 static void tselem_draw_icon_uibut(struct DrawIconArg *arg, int icon)
 {
-	/* restrict collumn clip... it has been coded by simply overdrawing, doesnt work for buttons */
+	/* restrict column clip... it has been coded by simply overdrawing, doesnt work for buttons */
 	if(arg->x >= arg->xmax) {
 		glEnable(GL_BLEND);
 		UI_icon_draw_aspect(arg->x, arg->y, icon, 1.0f, arg->alpha);

@@ -165,8 +165,7 @@ static VFontData *vfont_get_data(Main *bmain, VFont *vfont)
 				pf= vfont->packedfile;
 				
 				// We need to copy a tmp font to memory unless it is already there
-				if(!tmpfnt)
-				{
+				if(!tmpfnt) {
 					tpf= MEM_callocN(sizeof(*tpf), "PackedFile");
 					tpf->data= MEM_mallocN(pf->size, "packFile");
 					tpf->size= pf->size;
@@ -178,11 +177,11 @@ static VFontData *vfont_get_data(Main *bmain, VFont *vfont)
 					tmpfnt->vfont= vfont;
 					BLI_addtail(&ttfdata, tmpfnt);
 				}
-			} else {
+			}
+			else {
 				pf= newPackedFile(NULL, vfont->name, ID_BLEND_PATH(bmain, &vfont->id));
-				
-				if(!tmpfnt)
-				{
+
+				if (!tmpfnt) {
 					tpf= newPackedFile(NULL, vfont->name, ID_BLEND_PATH(bmain, &vfont->id));
 					
 					// Add temporary packed file to globals
@@ -257,8 +256,7 @@ VFont *load_vfont(Main *bmain, const char *name)
 			}
 			
 			// Do not add FO_BUILTIN_NAME to temporary listbase
-			if(strcmp(filename, FO_BUILTIN_NAME))
-			{
+			if (strcmp(filename, FO_BUILTIN_NAME)) {
 				tmpfnt= (struct TmpFont *) MEM_callocN(sizeof(struct TmpFont), "temp_font");
 				tmpfnt->pf= tpf;
 				tmpfnt->vfont= vfont;
@@ -333,7 +331,7 @@ static void build_underline(Curve *cu, float x1, float y1, float x2, float y2, i
 	nu2->flagu = CU_NURB_CYCLIC;
 
 	bp = (BPoint*)MEM_callocN(4 * sizeof(BPoint),"underline_bp"); 
-	if (bp == NULL){
+	if (bp == NULL) {
 		MEM_freeN(nu2);
 		return;
 	}
@@ -372,7 +370,7 @@ static void buildchar(Main *bmain, Curve *cu, unsigned long character, CharInfo 
 	vfd= vfont_get_data(bmain, which_vfont(cu, info));
 	if (!vfd) return;
 
-	/*
+#if 0
 	if (cu->selend < cu->selstart) {
 		if ((charidx >= (cu->selend)) && (charidx <= (cu->selstart-2)))
 			sel= 1;
@@ -381,7 +379,7 @@ static void buildchar(Main *bmain, Curve *cu, unsigned long character, CharInfo 
 		if ((charidx >= (cu->selstart-1)) && (charidx <= (cu->selend-1)))
 			sel= 1;
 	}
-	*/
+#endif
 
 	/* make a copy at distance ofsx,ofsy with shear*/
 	fsize= cu->fsize;
@@ -399,7 +397,7 @@ static void buildchar(Main *bmain, Curve *cu, unsigned long character, CharInfo 
 	while(nu1)
 	{
 		bezt1 = nu1->bezt;
-		if (bezt1){
+		if (bezt1) {
 			nu2 =(Nurb*) MEM_mallocN(sizeof(Nurb),"duplichar_nurb");
 			if (nu2 == NULL) break;
 			memcpy(nu2, nu1, sizeof(struct Nurb));
@@ -419,7 +417,7 @@ static void buildchar(Main *bmain, Curve *cu, unsigned long character, CharInfo 
 			i = nu2->pntsu;
 
 			bezt2 = (BezTriple*)MEM_mallocN(i * sizeof(BezTriple),"duplichar_bezt2"); 
-			if (bezt2 == NULL){
+			if (bezt2 == NULL) {
 				MEM_freeN(nu2);
 				break;
 			}
@@ -541,7 +539,7 @@ struct chartrans *BKE_text_to_curve(Main *bmain, Scene *scene, Object *ob, int m
 	wchar_t *mem, *tmp, ascii;
 
 	/* renark: do calculations including the trailing '\0' of a string
-	   because the cursor can be at that location */
+	 * because the cursor can be at that location */
 
 	if(ob->type!=OB_FONT) return NULL;
 
@@ -808,8 +806,10 @@ struct chartrans *BKE_text_to_curve(Main *bmain, Scene *scene, Object *ob, int m
 				if(linedata2[i]>1)
 					linedata[i]= (linedata3[i]-linedata[i])/(linedata2[i]-1);
 			for (i=0; i<=slen; i++) {
-				for (j=i; (mem[j]) && (mem[j]!='\n') && 
-						  (mem[j]!='\r') && (chartransdata[j].dobreak==0) && (j<slen); j++);
+				for (j=i; (!ELEM3(mem[j], '\0', '\n', '\r')) && (chartransdata[j].dobreak == 0) && (j < slen); j++) {
+					/* do nothing */
+				}
+
 //				if ((mem[j]!='\r') && (mem[j]!='\n') && (mem[j])) {
 					ct->xof+= ct->charnr*linedata[ct->linenr];
 //				}
@@ -939,7 +939,7 @@ struct chartrans *BKE_text_to_curve(Main *bmain, Scene *scene, Object *ob, int m
 
 	if(mode==FO_CURSUP || mode==FO_CURSDOWN || mode==FO_PAGEUP || mode==FO_PAGEDOWN) {
 		/* 2: curs up
-		   3: curs down */
+		 * 3: curs down */
 		ct= chartransdata+cu->pos;
 		
 		if((mode==FO_CURSUP || mode==FO_PAGEUP) && ct->linenr==0);

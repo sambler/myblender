@@ -178,11 +178,11 @@ typedef struct uiLayout uiLayout;
 #define UI_DPI_ICON_SIZE ((float)16 * UI_DPI_ICON_FAC)
 
 /* Button types, bits stored in 1 value... and a short even!
-- bits 0-4:  bitnr (0-31)
-- bits 5-7:  pointer type
-- bit  8:    for 'bit'
-- bit  9-15: button type (now 6 bits, 64 types)
-*/
+ * - bits 0-4:  bitnr (0-31)
+ * - bits 5-7:  pointer type
+ * - bit  8:    for 'bit'
+ * - bit  9-15: button type (now 6 bits, 64 types)
+ * */
 
 #define CHA	32
 #define SHO	64
@@ -268,7 +268,6 @@ void uiRoundBox(float minx, float miny, float maxx, float maxy, float rad);
 void uiSetRoundBox(int type);
 int uiGetRoundBox(void);
 void uiRoundRect(float minx, float miny, float maxx, float maxy, float rad);
-void uiDrawMenuBox(float minx, float miny, float maxx, float maxy, short flag, short direction);
 void uiDrawBoxShadow(unsigned char alpha, float minx, float miny, float maxx, float maxy);
 void uiDrawBox(int mode, float minx, float miny, float maxx, float maxy, float rad);
 void uiDrawBoxShade(int mode, float minx, float miny, float maxx, float maxy, float rad, float shadetop, float shadedown);
@@ -498,7 +497,7 @@ int uiButGetUnitType(uiBut *but);
 
 /* Special Buttons
  *
- * Butons with a more specific purpose:
+ * Buttons with a more specific purpose:
  * - IDPoinBut: for creating buttons that work on a pointer to an ID block.
  * - MenuBut: buttons that popup a menu (in headers usually).
  * - PulldownBut: like MenuBut, but creating a uiBlock (for compatibility).
@@ -612,7 +611,6 @@ void uiEndPanel(uiBlock *block, int width, int height);
  * as screen/ if ED_KEYMAP_UI is set, or internally in popup functions. */
 
 void UI_add_region_handlers(struct ListBase *handlers);
-void UI_add_area_handlers(struct ListBase *handlers);
 void UI_add_popup_handlers(struct bContext *C, struct ListBase *handlers, uiPopupBlockHandle *popup);
 void UI_remove_popup_handlers(struct ListBase *handlers, uiPopupBlockHandle *popup);
 

@@ -692,7 +692,7 @@ int WM_menu_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 		return retval;
 	}
 	else {
-		pup= uiPupMenuBegin(C, op->type->name, ICON_NONE);
+		pup= uiPupMenuBegin(C, IFACE_(op->type->name), ICON_NONE);
 		layout= uiPupMenuLayout(pup);
 		uiItemsFullEnumO(layout, op->type->idname, RNA_property_identifier(prop), op->ptr->data, WM_OP_EXEC_REGION_WIN, 0);
 		uiPupMenuEnd(C, pup);
@@ -1653,15 +1653,17 @@ static void WM_OT_open_mainfile(wmOperatorType *ot)
 	ot->name= "Open Blender File";
 	ot->idname= "WM_OT_open_mainfile";
 	ot->description="Open a Blender file";
-	
+
 	ot->invoke= wm_open_mainfile_invoke;
 	ot->exec= wm_open_mainfile_exec;
 	/* ommit window poll so this can work in background mode */
-	
-	WM_operator_properties_filesel(ot, FOLDERFILE|BLENDERFILE, FILE_BLENDER, FILE_OPENFILE, WM_FILESEL_FILEPATH, FILE_DEFAULTDISPLAY);
+
+	WM_operator_properties_filesel(ot, FOLDERFILE|BLENDERFILE, FILE_BLENDER, FILE_OPENFILE,
+	                               WM_FILESEL_FILEPATH, FILE_DEFAULTDISPLAY);
 
 	RNA_def_boolean(ot->srna, "load_ui", 1, "Load UI", "Load user interface setup in the .blend file");
-	RNA_def_boolean(ot->srna, "use_scripts", 1, "Trusted Source", "Allow blend file execute scripts automatically, default available from system preferences");
+	RNA_def_boolean(ot->srna, "use_scripts", 1, "Trusted Source",
+	                "Allow .blend file to execute scripts automatically, default available from system preferences");
 }
 
 /* **************** link/append *************** */
@@ -2008,8 +2010,14 @@ static int wm_save_as_mainfile_exec(bContext *C, wmOperator *op)
 	if(RNA_boolean_get(op->ptr, "relative_remap"))	fileflags |=  G_FILE_RELATIVE_REMAP;
 	else											fileflags &= ~G_FILE_RELATIVE_REMAP;
 #ifdef USE_BMESH_SAVE_AS_COMPAT
-	if(RNA_boolean_get(op->ptr, "use_mesh_compat"))	fileflags |=  G_FILE_MESH_COMPAT;
-	else											fileflags &= ~G_FILE_MESH_COMPAT;
+	/* property only exists for 'Save As' */
+	if (RNA_struct_find_property(op->ptr, "use_mesh_compat")) {
+		if(RNA_boolean_get(op->ptr, "use_mesh_compat"))	fileflags |=  G_FILE_MESH_COMPAT;
+		else											fileflags &= ~G_FILE_MESH_COMPAT;
+	}
+	else {
+		fileflags &= ~G_FILE_MESH_COMPAT;
+	}
 #endif
 
 	if ( WM_write_file(C, path, fileflags, op->reports, copy) != 0)
@@ -3379,7 +3387,7 @@ static int radial_control_modal(bContext *C, wmOperator *op, wmEvent *event)
 
 	case ESCKEY:
 	case RIGHTMOUSE:
-		/* cancelled; restore original value */
+		/* canceled; restore original value */
 		radial_control_set_value(rc, rc->initial_value);
 		ret = OPERATOR_CANCELLED;
 		break;
@@ -3827,6 +3835,7 @@ static void gesture_border_modal_keymap(wmKeyConfig *keyconf)
 	WM_modalkeymap_assign(keymap, "SEQUENCER_OT_view_ghost_border");
 	WM_modalkeymap_assign(keymap, "UV_OT_select_border");
 	WM_modalkeymap_assign(keymap, "CLIP_OT_select_border");
+	WM_modalkeymap_assign(keymap, "CLIP_OT_graph_select_border");
 	WM_modalkeymap_assign(keymap, "VIEW2D_OT_zoom_border");
 	WM_modalkeymap_assign(keymap, "VIEW3D_OT_clip_border");
 	WM_modalkeymap_assign(keymap, "VIEW3D_OT_render_border");

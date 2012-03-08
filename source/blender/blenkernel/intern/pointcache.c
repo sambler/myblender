@@ -275,7 +275,7 @@ static void ptcache_particle_read(int index, void *psys_v, void **data, float cf
 	if(cfra > pa->state.time)
 		memcpy(&pa->prev_state, &pa->state, sizeof(ParticleKey));
 
-	if(old_data){
+	if(old_data) {
 		/* old format cache */
 		memcpy(&pa->state, old_data, sizeof(ParticleKey));
 		return;
@@ -1026,11 +1026,11 @@ void BKE_ptcache_ids_from_object(ListBase *lb, Object *ob, Scene *scene, int dup
 
 /* File handling */
 
-/*	Takes an Object ID and returns a unique name
-	- id: object id
-	- cfra: frame for the cache, can be negative
-	- stack_index: index in the modifier stack. we can have cache for more then one stack_index
-*/
+/* Takes an Object ID and returns a unique name
+ * - id: object id
+ * - cfra: frame for the cache, can be negative
+ * - stack_index: index in the modifier stack. we can have cache for more then one stack_index
+ */
 
 #define MAX_PTCACHE_PATH FILE_MAX
 #define MAX_PTCACHE_FILE ((FILE_MAX)*2)
@@ -2107,8 +2107,8 @@ int BKE_ptcache_write(PTCacheID *pid, unsigned int cfra)
 }
 /* youll need to close yourself after!
  * mode - PTCACHE_CLEAR_ALL, 
+ */
 
-*/
 /* Clears & resets */
 void BKE_ptcache_id_clear(PTCacheID *pid, int mode, unsigned int cfra)
 {
@@ -2687,7 +2687,7 @@ void BKE_ptcache_quick_cache_all(Main *bmain, Scene *scene)
 }
 
 /* Simulation thread, no need for interlocks as data written in both threads
- are only unitary integers (I/O assumed to be atomic for them) */
+ * are only unitary integers (I/O assumed to be atomic for them) */
 typedef struct {
 	int break_operation;
 	int thread_ended;
@@ -3015,7 +3015,7 @@ void BKE_ptcache_toggle_disk_cache(PTCacheID *pid)
 	PointCache *cache = pid->cache;
 	int last_exact = cache->last_exact;
 
-	if (!G.relbase_valid){
+	if (!G.relbase_valid) {
 		cache->flag &= ~PTCACHE_DISK_CACHE;
 		if (G.f & G_DEBUG) 
 			printf("File must be saved before using disk cache!\n");

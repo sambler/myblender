@@ -542,6 +542,55 @@ void nodeRemSocketLinks(bNodeTree *ntree, bNodeSocket *sock)
 	ntree->update |= NTREE_UPDATE_LINKS;
 }
 
+void nodeInternalRelink(bNodeTree *ntree, bNode *node)
+{
+	bNodeLink *link, *link_next;
+	ListBase intlinks;
+	
+	if (!node->typeinfo->internal_connect)
+		return;
+	
+	intlinks = node->typeinfo->internal_connect(ntree, node);
+	
+	/* store link pointers in output sockets, for efficient lookup */
+	for (link=intlinks.first; link; link=link->next)
+		link->tosock->link = link;
+	
+	/* redirect downstream links */
+	for (link=ntree->links.first; link; link=link_next) {
+		link_next = link->next;
+		
+		/* do we have internal link? */
+		if (link->fromnode==node) {
+			if (link->fromsock->link) {
+				/* get the upstream input link */
+				bNodeLink *fromlink = link->fromsock->link->fromsock->link;
+				/* skip the node */
+				if (fromlink) {
+					link->fromnode = fromlink->fromnode;
+					link->fromsock = fromlink->fromsock;
+					
+					ntree->update |= NTREE_UPDATE_LINKS;
+				}
+				else
+					nodeRemLink(ntree, link);
+			}
+			else
+				nodeRemLink(ntree, link);
+		}
+	}
+	
+	/* remove remaining upstream links */
+	for (link=ntree->links.first; link; link=link_next) {
+		link_next = link->next;
+		
+		if (link->tonode==node)
+			nodeRemLink(ntree, link);
+	}
+	
+	BLI_freelistN(&intlinks);
+}
+
 /* transforms node location to area coords */
 void nodeSpaceCoords(bNode *node, float *locx, float *locy)
 {
@@ -778,8 +827,8 @@ void ntreeClearPreview(bNodeTree *ntree)
 }
 
 /* hack warning! this function is only used for shader previews, and 
-since it gets called multiple times per pixel for Ztransp we only
-add the color once. Preview gets cleared before it starts render though */
+ * since it gets called multiple times per pixel for Ztransp we only
+ * add the color once. Preview gets cleared before it starts render though */
 void nodeAddToPreview(bNode *node, float *col, int x, int y, int do_manage)
 {
 	bNodePreview *preview= node->preview;
@@ -854,11 +903,14 @@ void nodeFreeNode(bNodeTree *ntree, bNode *node)
 	node_unlink_attached(ntree, node);
 	
 	BLI_remlink(&ntree->nodes, node);
-
+	
 	/* since it is called while free database, node->id is undefined */
 	
 	if (treetype->free_node_cache)
 		treetype->free_node_cache(ntree, node);
+	
+	if(node->typeinfo && node->typeinfo->freestoragefunc)
+		node->typeinfo->freestoragefunc(node);
 	
 	for (sock=node->inputs.first; sock; sock = nextsock) {
 		nextsock = sock->next;
@@ -872,10 +924,6 @@ void nodeFreeNode(bNodeTree *ntree, bNode *node)
 	}
 
 	nodeFreePreview(node);
-
-	if(node->typeinfo && node->typeinfo->freestoragefunc) {
-		node->typeinfo->freestoragefunc(node);
-	}
 
 	MEM_freeN(node);
 	
@@ -943,7 +991,7 @@ void ntreeSetOutput(bNodeTree *ntree)
 {
 	bNode *node;
 
-	/* find the active outputs, might become tree type dependant handler */
+	/* find the active outputs, might become tree type dependent handler */
 	for(node= ntree->nodes.first; node; node= node->next) {
 		if(node->typeinfo->nclass==NODE_CLASS_OUTPUT) {
 			bNode *tnode;
@@ -988,7 +1036,7 @@ void ntreeSetOutput(bNodeTree *ntree)
 	}
 	
 	/* here we could recursively set which nodes have to be done,
-		might be different for editor or for "real" use... */
+	 * might be different for editor or for "real" use... */
 }
 
 typedef struct MakeLocalCallData {
@@ -1035,9 +1083,9 @@ void ntreeMakeLocal(bNodeTree *ntree)
 	MakeLocalCallData cd;
 	
 	/* - only lib users: do nothing
-		* - only local users: set flag
-		* - mixed: make copy
-		*/
+	 * - only local users: set flag
+	 * - mixed: make copy
+	 */
 	
 	if(ntree->id.lib==NULL) return;
 	if(ntree->id.us==1) {
@@ -1320,6 +1368,19 @@ int nodeSocketIsHidden(bNodeSocket *sock)
 	return ((sock->flag & (SOCK_HIDDEN | SOCK_AUTO_HIDDEN | SOCK_UNAVAIL)) != 0);
 }
 
+void nodeSocketSetType(bNodeSocket *sock, int type)
+{
+	int old_type = sock->type;
+	void *old_default_value = sock->default_value;
+	
+	sock->type = type;
+	
+	sock->default_value = node_socket_make_default_value(sock->type);
+	node_socket_init_default_value(type, sock->default_value);
+	node_socket_convert_default_value(sock->type, sock->default_value, old_type, old_default_value);
+	node_socket_free_default_value(old_type, old_default_value);
+}
+
 /* ************** dependency stuff *********** */
 
 /* node is guaranteed to be not checked before */
@@ -1382,6 +1443,24 @@ void ntreeGetDependencyList(struct bNodeTree *ntree, struct bNode ***deplist, in
 	for(node= ntree->nodes.first; node; node= node->next) {
 		if(node->done==0) {
 			node->level= node_get_deplist_recurs(node, &nsort);
+		}
+	}
+}
+
+/* only updates node->level for detecting cycles links */
+static void ntree_update_node_level(bNodeTree *ntree)
+{
+	bNode *node;
+	
+	/* first clear tag */
+	for(node= ntree->nodes.first; node; node= node->next) {
+		node->done= 0;
+	}
+	
+	/* recursive check */
+	for(node= ntree->nodes.first; node; node= node->next) {
+		if(node->done==0) {
+			node->level= node_get_deplist_recurs(node, NULL);
 		}
 	}
 }
@@ -1463,39 +1542,33 @@ void ntreeUpdateTree(bNodeTree *ntree)
 {
 	bNodeTreeType *ntreetype= ntreeGetType(ntree->type);
 	bNode *node;
-	bNode **deplist;
-	int totnodes, n;
 	
-	ntree_update_link_pointers(ntree);
+	/* set the bNodeSocket->link pointers */
+	if (ntree->update & NTREE_UPDATE_LINKS)
+		ntree_update_link_pointers(ntree);
 	
-	/* also updates the node level! */
-	ntreeGetDependencyList(ntree, &deplist, &totnodes);
+	/* update the node level from link dependencies */
+	if (ntree->update & (NTREE_UPDATE_LINKS|NTREE_UPDATE_NODES))
+		ntree_update_node_level(ntree);
 	
-	if (deplist) {
-		/* update individual nodes */
-		for (n=0; n < totnodes; ++n) {
-			node = deplist[n];
-			
-			/* node tree update tags override individual node update flags */
-			if ((node->update & NODE_UPDATE) || (ntree->update & NTREE_UPDATE)) {
-				if (ntreetype->update_node)
-					ntreetype->update_node(ntree, node);
-				else if (node->typeinfo->updatefunc)
-					node->typeinfo->updatefunc(ntree, node);
-			}
-			/* clear update flag */
-			node->update = 0;
+	/* update individual nodes */
+	for (node=ntree->nodes.first; node; node=node->next) {
+		/* node tree update tags override individual node update flags */
+		if ((node->update & NODE_UPDATE) || (ntree->update & NTREE_UPDATE)) {
+			if (ntreetype->update_node)
+				ntreetype->update_node(ntree, node);
+			else if (node->typeinfo->updatefunc)
+				node->typeinfo->updatefunc(ntree, node);
 		}
-		
-		MEM_freeN(deplist);
+		/* clear update flag */
+		node->update = 0;
 	}
 	
-	/* general tree updates */
-	if (ntree->update & (NTREE_UPDATE_LINKS|NTREE_UPDATE_NODES)) {
+	/* check link validity */
+	if (ntree->update & (NTREE_UPDATE_LINKS|NTREE_UPDATE_NODES))
 		ntree_validate_links(ntree);
-	}
 	
-	/* update tree */
+	/* generic tree update callback */
 	if (ntreetype->update)
 		ntreetype->update(ntree);
 	else {
@@ -1633,11 +1706,8 @@ void node_type_base(bNodeTreeType *ttype, bNodeType *ntype, int type, const char
 	ntype->flag = flag;
 
 	/* Default muting stuff. */
-	if(ttype) {
-		ntype->mutefunc      = ttype->mutefunc;
-		ntype->mutelinksfunc = ttype->mutelinksfunc;
-		ntype->gpumutefunc   = ttype->gpumutefunc;
-	}
+	if(ttype)
+		ntype->internal_connect = ttype->internal_connect;
 
 	/* default size values */
 	ntype->width = 140;
@@ -1733,14 +1803,9 @@ void node_type_exec_new(struct bNodeType *ntype,
 	ntype->newexecfunc = newexecfunc;
 }
 
-void node_type_mute(struct bNodeType *ntype,
-                    void (*mutefunc)(void *data, int thread, struct bNode *, void *nodedata,
-                                     struct bNodeStack **, struct bNodeStack **),
-                    ListBase (*mutelinksfunc)(struct bNodeTree *, struct bNode *, struct bNodeStack **, struct bNodeStack **,
-                                              struct GPUNodeStack *, struct GPUNodeStack *))
+void node_type_internal_connect(bNodeType *ntype, ListBase (*internal_connect)(bNodeTree *, bNode *))
 {
-	ntype->mutefunc = mutefunc;
-	ntype->mutelinksfunc = mutelinksfunc;
+	ntype->internal_connect = internal_connect;
 }
 
 void node_type_gpu(struct bNodeType *ntype, int (*gpufunc)(struct GPUMaterial *mat, struct bNode *node, struct GPUNodeStack *in, struct GPUNodeStack *out))
@@ -1751,12 +1816,6 @@ void node_type_gpu(struct bNodeType *ntype, int (*gpufunc)(struct GPUMaterial *m
 void node_type_gpu_ext(struct bNodeType *ntype, int (*gpuextfunc)(struct GPUMaterial *mat, struct bNode *node, void *nodedata, struct GPUNodeStack *in, struct GPUNodeStack *out))
 {
 	ntype->gpuextfunc = gpuextfunc;
-}
-
-void node_type_gpu_mute(struct bNodeType *ntype, int (*gpumutefunc)(struct GPUMaterial *, struct bNode *, void *,
-                                                                    struct GPUNodeStack *, struct GPUNodeStack *))
-{
-	ntype->gpumutefunc = gpumutefunc;
 }
 
 void node_type_compatibility(struct bNodeType *ntype, short compatibility)

@@ -30,32 +30,44 @@
 /* bmesh data structures */
 
 /* dissable holes for now, these are ifdef'd because they use more memory and cant be saved in DNA currently */
-// define USE_BMESH_HOLES
+// #define USE_BMESH_HOLES
 
 struct BMesh;
 struct BMVert;
 struct BMEdge;
 struct BMLoop;
 struct BMFace;
-struct BMFlagLayer;
-struct BMLayerType;
-struct BMSubClassLayer;
 
 struct BLI_mempool;
 struct Object;
 
-/*note: it is very important for BMHeader to start with two
-  pointers. this is a requirement of mempool's method of
-  iteration.
-*/
+/* note: it is very important for BMHeader to start with two
+ * pointers. this is a requirement of mempool's method of
+ * iteration.
+ *
+ * hrm. it doesnt but stull works ok, remove the comment above? - campbell.
+ */
+
+/**
+ * BMHeader
+ *
+ * All mesh elements begin with a BMHeader. This structure
+ * hold several types of data
+ *
+ * 1: The type of the element (vert, edge, loop or face)
+ * 2: Persistant "header" flags/markings (smooth, seam, select, hidden, ect)
+ *     note that this is different from the "tool" flags.
+ * 3: Unique ID in the bmesh.
+ * 4: some elements for internal record keeping.
+ */
 typedef struct BMHeader {
 	void *data; /* customdata layers */
 	int index; /* notes:
-	            * - Use BM_elem_index_get/SetIndex macros for index
+	            * - Use BM_elem_index_get/set macros for index
 	            * - Unitialized to -1 so we can easily tell its not set.
 	            * - Used for edge/vert/face, check BMesh.elem_index_dirty for valid index values,
 	            *   this is abused by various tools which set it dirty.
-	            * - For loops this is used for sorting during tesselation. */
+	            * - For loops this is used for sorting during tessellation. */
 
 	char htype; /* element geometric type (verts/edges/loops/faces) */
 	char hflag; /* this would be a CD layer, see below */
@@ -95,14 +107,14 @@ typedef struct BMLoop {
 	/* notice no flags layer */
 
 	struct BMVert *v;
-	struct BMEdge *e;
+	struct BMEdge *e; /* edge, using verts (v, next->v) */
 	struct BMFace *f;
 
 	struct BMLoop *radial_next, *radial_prev;
-	
+
 	/* these were originally commented as private but are used all over the code */
 	/* can't use ListBase API, due to head */
-	struct BMLoop *next, *prev;
+	struct BMLoop *next, *prev; /* next/prev verts around the face */
 } BMLoop;
 
 /* can cast BMFace/BMEdge/BMVert, but NOT BMLoop, since these dont have a flag layer */
@@ -110,6 +122,11 @@ typedef struct BMElemF {
 	BMHeader head;
 	struct BMFlagLayer *oflags; /* keep after header, an array of flags, mostly used by the operator stack */
 } BMElemF;
+
+/* can cast anything to this, including BMLoop */
+typedef struct BMElem {
+	BMHeader head;
+} BMElem;
 
 #ifdef USE_BMESH_HOLES
 /* eventually, this structure will be used for supporting holes in faces */
@@ -179,12 +196,42 @@ typedef struct BMesh {
 	ListBase errorstack;
 	struct Object *ob; /* owner object */
 	
+	void *py_handle;
+
 	int opflag; /* current operator flag */
 } BMesh;
 
-#define BM_VERT		1
-#define BM_EDGE		2
-#define BM_LOOP		4
-#define BM_FACE		8
+/* BMHeader->htype (char) */
+enum {
+	BM_VERT = 1,
+	BM_EDGE = 2,
+	BM_LOOP = 4,
+	BM_FACE = 8
+};
+
+#define BM_ALL (BM_VERT | BM_EDGE | BM_LOOP | BM_FACE)
+
+/* BMHeader->hflag (char) */
+enum {
+	BM_ELEM_SELECT  = (1 << 0),
+	BM_ELEM_HIDDEN  = (1 << 1),
+	BM_ELEM_SEAM    = (1 << 2),
+	BM_ELEM_SMOOTH  = (1 << 3), /* used for faces and edges, note from the user POV,
+                                  * this is a sharp edge when disabled */
+
+	BM_ELEM_TAG     = (1 << 4), /* internal flag, used for ensuring correct normals
+                                 * during multires interpolation, and any other time
+                                 * when temp tagging is handy.
+                                 * always assume dirty & clear before use. */
+
+	/* we have 2 spare flags which is awesome but since we're limited to 8
+	 * only add new flags with care! - campbell */
+	/* BM_ELEM_SPARE  = (1 << 5), */
+	/* BM_ELEM_SPARE  = (1 << 6), */
+
+	BM_ELEM_INTERNAL_TAG = (1 << 7) /* for low level internal API tagging,
+                                     * since tools may want to tag verts and
+                                     * not have functions clobber them */
+};
 
 #endif /* __BMESH_CLASS_H__ */

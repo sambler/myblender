@@ -326,7 +326,7 @@ typedef struct SoftBody {
 		choke,
 		solver_ID,
 		plastic,springpreload
-		;   
+		;
 
 	struct SBScratch *scratch;	/* scratch pad/cache on live time not saved in file */
 	float shearstiff;

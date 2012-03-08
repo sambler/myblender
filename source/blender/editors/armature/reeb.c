@@ -3383,7 +3383,7 @@ ReebGraph *BIF_ReebGraphMultiFromEditMesh(bContext *C)
 #if 0
 	Scene *scene = CTX_data_scene(C);
 	Object *obedit = CTX_data_edit_object(C);
-	EditMesh *em =BKE_mesh_get_editmesh(((Mesh*)obedit->data));
+	EditMesh *em = BKE_mesh_get_editmesh(((Mesh*)obedit->data));
 	EdgeIndex indexed_edges;
 	VertexData *data;
 	ReebGraph *rg = NULL;
@@ -3479,9 +3479,8 @@ ReebGraph *BIF_ReebGraphMultiFromEditMesh(bContext *C)
 	
 	MEM_freeN(data);
 
-	/*no need to load the editmesh back into the object, just
-	  free it (avoids ngon conversion issues too going back the
-	           other way)*/
+	/* no need to load the editmesh back into the object, just
+	 * free it (avoids ngon conversion issues too going back the other way) */
 	free_editMesh(em);
 	MEM_freeN(em);
 	
@@ -3599,13 +3598,13 @@ void REEB_draw()
 	
 	if (GLOBAL_RG->link_up && G.scene->toolsettings->skgen_options & SKGEN_DISP_ORIG)
 	{
-		for (rg = GLOBAL_RG; rg->link_up; rg = rg->link_up) ;
+		for (rg = GLOBAL_RG; rg->link_up; rg = rg->link_up);
 	}
 	else
 	{
 		i = G.scene->toolsettings->skgen_multi_level;
 		
-		for (rg = GLOBAL_RG; rg->multi_level != i && rg->link_up; rg = rg->link_up) ;
+		for (rg = GLOBAL_RG; rg->multi_level != i && rg->link_up; rg = rg->link_up);
 	}
 	
 	glPointSize(BIF_GetThemeValuef(TH_VERTEX_SIZE));

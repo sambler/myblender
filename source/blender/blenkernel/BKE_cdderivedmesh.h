@@ -50,9 +50,9 @@ struct DerivedMesh *CDDM_new(int numVerts, int numEdges, int numFaces,
 int CDDM_Check(struct DerivedMesh *dm);
 
 /* creates a CDDerivedMesh from the given Mesh, this will reference the
-   original data in Mesh, but it is safe to apply vertex coordinates or
-   calculate normals as those functions will automtically create new
-   data to not overwrite the original */
+ * original data in Mesh, but it is safe to apply vertex coordinates or
+ * calculate normals as those functions will automtically create new
+ * data to not overwrite the original */
 struct DerivedMesh *CDDM_from_mesh(struct Mesh *mesh, struct Object *ob);
 
 /* creates a CDDerivedMesh from the given BMEditMesh */
@@ -106,13 +106,13 @@ void CDDM_calc_normals_tessface(struct DerivedMesh *dm);
  */
 void CDDM_calc_edges_tessface(struct DerivedMesh *dm);
 
-/* same as CDDM_calc_edges_tessface only makes edges from ngon faces instead of tesselation
-   faces*/
+/* same as CDDM_calc_edges_tessface only makes edges from ngon faces instead of tessellation
+ * faces*/
 void CDDM_calc_edges(struct DerivedMesh *dm);
 
 /* reconstitute face triangulation */
-void CDDM_recalc_tesselation(struct DerivedMesh *dm);
-void CDDM_recalc_tesselation_ex(struct DerivedMesh *dm, const int do_face_nor_cpy);
+void CDDM_recalc_tessellation(struct DerivedMesh *dm);
+void CDDM_recalc_tessellation_ex(struct DerivedMesh *dm, const int do_face_nor_cpy);
 
 /* lowers the number of vertices/edges/faces in a CDDerivedMesh
  * the layer data stays the same size
@@ -143,9 +143,9 @@ struct MFace *CDDM_get_tessfaces(struct DerivedMesh *dm);
 struct MLoop *CDDM_get_loops(struct DerivedMesh *dm);
 struct MPoly *CDDM_get_polys(struct DerivedMesh *dm);
 
-/*Assigns news m*** layers to the cddm.  Note that you must handle
-  freeing the old ones yourself.  Also you must ensure dm->num****Data
-  is correct.*/
+/* Assigns news m*** layers to the cddm.  Note that you must handle
+ * freeing the old ones yourself.  Also you must ensure dm->num****Data
+ * is correct.*/
 void CDDM_set_mvert(struct DerivedMesh *dm, struct MVert *mvert);
 void CDDM_set_medge(struct DerivedMesh *dm, struct MEdge *medge);
 void CDDM_set_mface(struct DerivedMesh *dm, struct MFace *mface);

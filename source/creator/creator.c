@@ -569,8 +569,7 @@ static int set_engine(int argc, const char **argv, void *data)
 
 		return 1;
 	}
-	else
-	{
+	else {
 		printf("\nEngine not specified, give 'help' for a list of available engines.\n");
 		return 0;
 	}
@@ -649,31 +648,28 @@ static int set_ge_parameters(int argc, const char **argv, void *data)
 	(void)data;
 #endif
 
-/**
-gameengine parameters are automaticly put into system
--g [paramname = value]
--g [boolparamname]
-example:
--g novertexarrays
--g maxvertexarraysize = 512
-*/
+	/**
+	 * gameengine parameters are automatically put into system
+	 * -g [paramname = value]
+	 * -g [boolparamname]
+	 * example:
+	 * -g novertexarrays
+	 * -g maxvertexarraysize = 512
+	 */
 
-	if(argc >= 1)
-	{
+	if (argc >= 1) {
 		const char *paramname = argv[a];
 		/* check for single value versus assignment */
-		if (a+1 < argc && (*(argv[a+1]) == '='))
-		{
+		if (a+1 < argc && (*(argv[a+1]) == '=')) {
 			a++;
-			if (a+1 < argc)
-			{
+			if (a+1 < argc) {
 				a++;
 				/* assignment */
 #ifdef WITH_GAMEENGINE
 				SYS_WriteCommandLineString(syshandle,paramname,argv[a]);
 #endif
-			}  else
-			{
+			}
+			else {
 				printf("error: argument assignment (%s) without value.\n",paramname);
 				return 0;
 			}
@@ -684,13 +680,11 @@ example:
 			SYS_WriteCommandLineInt(syshandle,argv[a],1);
 #endif
 			/* doMipMap */
-			if (!strcmp(argv[a],"nomipmap"))
-			{
+			if (!strcmp(argv[a],"nomipmap")) {
 				GPU_set_mipmap(0); //doMipMap = 0;
 			}
 			/* linearMipMap */
-			if (!strcmp(argv[a],"linearmipmap"))
-			{
+			if (!strcmp(argv[a],"linearmipmap")) {
 				GPU_set_linear_mipmap(1); //linearMipMap = 1;
 			}
 
@@ -755,7 +749,8 @@ static int render_animation(int UNUSED(argc), const char **UNUSED(argv), void *d
 		RE_SetReports(re, &reports);
 		RE_BlenderAnim(re, bmain, scene, NULL, scene->lay, scene->r.sfra, scene->r.efra, scene->r.frame_step);
 		RE_SetReports(re, NULL);
-	} else {
+	}
+	else {
 		printf("\nError: no blend loaded. cannot use '-a'.\n");
 	}
 	return 0;
@@ -1236,10 +1231,8 @@ int main(int argc, const char **argv)
 	/**
 	 * NOTE: the U.pythondir string is NULL until WM_init() is executed,
 	 * so we provide the BPY_ function below to append the user defined
-	 * pythondir to Python's sys.path at this point.  Simply putting
-	 * WM_init() before BPY_python_start() crashes Blender at startup.
-	 * Update: now this function also inits the bpymenus, which also depend
-	 * on U.pythondir.
+	 * python-dir to Python's sys.path at this point.  Simply putting
+	 * WM_init() before #BPY_python_start() crashes Blender at startup.
 	 */
 
 	// TODO - U.pythondir
@@ -1259,19 +1252,18 @@ int main(int argc, const char **argv)
 	return 0; /* keep blender in background mode running */
 #endif
 
-	if(G.background) {
+	if (G.background) {
 		/* actually incorrect, but works for now (ton) */
 		WM_exit(C);
 	}
-
 	else {
-		if((G.fileflags & G_FILE_AUTOPLAY) && (G.f & G_SCRIPT_AUTOEXEC))
-		{
+		if((G.fileflags & G_FILE_AUTOPLAY) && (G.f & G_SCRIPT_AUTOEXEC)) {
 			if(WM_init_game(C))
 				return 0;
 		}
-		else if(!G.file_loaded)
+		else if(!G.file_loaded) {
 			WM_init_splash(C);
+		}
 	}
 
 	WM_main(C);

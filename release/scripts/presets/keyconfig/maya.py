@@ -333,7 +333,7 @@ kmi = km.keymap_items.new('mesh.fill', 'F', 'PRESS', alt=True)
 kmi = km.keymap_items.new('mesh.beautify_fill', 'F', 'PRESS', shift=True, alt=True)
 kmi = km.keymap_items.new('mesh.quads_convert_to_tris', 'T', 'PRESS', ctrl=True)
 kmi = km.keymap_items.new('mesh.tris_convert_to_quads', 'J', 'PRESS', alt=True)
-kmi = km.keymap_items.new('mesh.edge_flip', 'F', 'PRESS', shift=True, ctrl=True)
+# kmi = km.keymap_items.new('mesh.edge_flip', 'F', 'PRESS', shift=True, ctrl=True) # removed since bmesh, can be made into something else?
 kmi = km.keymap_items.new('mesh.rip_move', 'V', 'PRESS')
 kmi = km.keymap_items.new('mesh.merge', 'M', 'PRESS', alt=True)
 kmi = km.keymap_items.new('transform.shrink_fatten', 'S', 'PRESS', ctrl=True, alt=True)
@@ -346,9 +346,10 @@ kmi = km.keymap_items.new('mesh.split', 'Y', 'PRESS')
 kmi = km.keymap_items.new('mesh.dupli_extrude_cursor', 'ACTIONMOUSE', 'CLICK', ctrl=True)
 kmi = km.keymap_items.new('mesh.delete', 'X', 'PRESS')
 kmi = km.keymap_items.new('mesh.delete', 'DEL', 'PRESS')
-kmi = km.keymap_items.new('mesh.knife_cut', 'LEFTMOUSE', 'PRESS', key_modifier='K')
-kmi = km.keymap_items.new('mesh.knife_cut', 'LEFTMOUSE', 'PRESS', shift=True, key_modifier='K')
-kmi.properties.type = 'MIDPOINTS'
+kmi = km.keymap_items.new('mesh.knifetool', 'LEFTMOUSE', 'PRESS', key_modifier='K')
+# BMESH_TODO: midpoints for knife were moved to modal keymap
+#kmi = km.keymap_items.new('mesh.knifetool', 'LEFTMOUSE', 'PRESS', shift=True, key_modifier='K')
+#kmi.properties.type = 'MIDPOINTS'
 kmi = km.keymap_items.new('object.vertex_parent_set', 'P', 'PRESS', ctrl=True)
 kmi = km.keymap_items.new('wm.call_menu', 'W', 'PRESS', ctrl=True)
 kmi.properties.name = 'VIEW3D_MT_edit_mesh_specials'
@@ -376,5 +377,17 @@ kmi.properties.value_1 = 'DISABLED'
 kmi.properties.value_2 = 'CONNECTED'
 kmi = km.keymap_items.new('mesh.select_all', 'SELECTMOUSE', 'CLICK')
 kmi.properties.action = 'DESELECT'
+kmi = km.keymap_items.new('object.subdivision_set', 'ZERO', 'PRESS', ctrl=True)
+kmi.properties.level = 0
+kmi = km.keymap_items.new('object.subdivision_set', 'ONE', 'PRESS', ctrl=True)
+kmi.properties.level = 1
+kmi = km.keymap_items.new('object.subdivision_set', 'TWO', 'PRESS', ctrl=True)
+kmi.properties.level = 2
+kmi = km.keymap_items.new('object.subdivision_set', 'THREE', 'PRESS', ctrl=True)
+kmi.properties.level = 3
+kmi = km.keymap_items.new('object.subdivision_set', 'FOUR', 'PRESS', ctrl=True)
+kmi.properties.level = 4
+kmi = km.keymap_items.new('object.subdivision_set', 'FIVE', 'PRESS', ctrl=True)
+kmi.properties.level = 5
 
 wm.keyconfigs.active = kc

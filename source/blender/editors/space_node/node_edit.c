@@ -139,7 +139,7 @@ static void compo_freejob(void *cjv)
 }
 
 /* only now we copy the nodetree, so adding many jobs while
-   sliding buttons doesn't frustrate */
+ * sliding buttons doesn't frustrate */
 static void compo_initjob(void *cjv)
 {
 	CompoJob *cj= cjv;
@@ -1639,15 +1639,18 @@ void node_set_hidden_sockets(SpaceNode *snode, bNode *node, short flag, int set)
 	}
 }
 
-static void node_link_viewer(SpaceNode *snode, bNode *tonode)
+static int node_link_viewer(const bContext *C, bNode *tonode)
 {
+	SpaceNode *snode = CTX_wm_space_node(C);
 	bNode *node;
+	bNodeLink *link;
+	bNodeSocket *sock;
 
 	/* context check */
 	if(tonode==NULL || tonode->outputs.first==NULL)
-		return;
+		return OPERATOR_CANCELLED;
 	if( ELEM(tonode->type, CMP_NODE_VIEWER, CMP_NODE_SPLITVIEWER)) 
-		return;
+		return OPERATOR_CANCELLED;
 	
 	/* get viewer */
 	for(node= snode->edittree->nodes.first; node; node= node->next)
@@ -1663,52 +1666,69 @@ static void node_link_viewer(SpaceNode *snode, bNode *tonode)
 			}
 		}
 	}
-		
-	if(node) {
-		bNodeLink *link;
-		bNodeSocket *sock= NULL;
-
-		/* try to find an already connected socket to cycle to the next */
+	
+	sock = NULL;
+	
+	/* try to find an already connected socket to cycle to the next */
+	if (node) {
+		link = NULL;
 		for(link= snode->edittree->links.first; link; link= link->next)
 			if(link->tonode==node && link->fromnode==tonode)
 				if(link->tosock==node->inputs.first)
 					break;
-
 		if(link) {
 			/* unlink existing connection */
 			sock= link->fromsock;
 			nodeRemLink(snode->edittree, link);
-
+			
 			/* find a socket after the previously connected socket */
 			for(sock=sock->next; sock; sock= sock->next)
 				if(!nodeSocketIsHidden(sock))
 					break;
 		}
-
-		/* find a socket starting from the first socket */
-		if(!sock) {
-			for(sock= tonode->outputs.first; sock; sock= sock->next)
-				if(!nodeSocketIsHidden(sock))
-					break;
+	}
+	
+	/* find a socket starting from the first socket */
+	if(!sock) {
+		for(sock= tonode->outputs.first; sock; sock= sock->next)
+			if(!nodeSocketIsHidden(sock))
+				break;
+	}
+	
+	if(sock) {
+		/* add a new viewer if none exists yet */
+		if(!node) {
+			Main *bmain = CTX_data_main(C);
+			Scene *scene = CTX_data_scene(C);
+			bNodeTemplate ntemp;
+			
+			ntemp.type = CMP_NODE_VIEWER;
+			/* XXX location is a quick hack, just place it next to the linked socket */
+			node = node_add_node(snode, bmain, scene, &ntemp, sock->locx + 100, sock->locy);
+			if (!node)
+				return OPERATOR_CANCELLED;
+			
+			link = NULL;
 		}
-		
-		if(sock) {
+		else {
 			/* get link to viewer */
 			for(link= snode->edittree->links.first; link; link= link->next)
 				if(link->tonode==node && link->tosock==node->inputs.first)
 					break;
-			
-			if(link==NULL) {
-				nodeAddLink(snode->edittree, tonode, sock, node, node->inputs.first);
-			}
-			else {
-				link->fromnode= tonode;
-				link->fromsock= sock;
-			}
-			ntreeUpdateTree(snode->edittree);
-			snode_update(snode, node);
 		}
+		
+		if(link==NULL) {
+			nodeAddLink(snode->edittree, tonode, sock, node, node->inputs.first);
+		}
+		else {
+			link->fromnode= tonode;
+			link->fromsock= sock;
+		}
+		ntreeUpdateTree(snode->edittree);
+		snode_update(snode, node);
 	}
+	
+	return OPERATOR_FINISHED;
 }
 
 
@@ -1724,7 +1744,9 @@ static int node_active_link_viewer(bContext *C, wmOperator *UNUSED(op))
 
 	ED_preview_kill_jobs(C);
 
-	node_link_viewer(snode, node);
+	if (node_link_viewer(C, node) == OPERATOR_CANCELLED)
+		return OPERATOR_CANCELLED;
+
 	snode_notify(C, snode);
 
 	return OPERATOR_FINISHED;
@@ -1741,7 +1763,7 @@ void NODE_OT_link_viewer(wmOperatorType *ot)
 	
 	/* api callbacks */
 	ot->exec= node_active_link_viewer;
-	ot->poll= ED_operator_node_active;
+	ot->poll= composite_node_active;
 	
 	/* flags */
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
@@ -1972,7 +1994,7 @@ static bNodeSocket *best_socket_output(bNodeTree *ntree, bNode *node, bNodeSocke
 	return NULL;
 }
 
-/* this is a bit complicated, but designed to prioritise finding 
+/* this is a bit complicated, but designed to prioritize finding
  * sockets of higher types, such as image, first */
 static bNodeSocket *best_socket_input(bNodeTree *ntree, bNode *node, int num, int replace)
 {
@@ -2254,6 +2276,8 @@ static void node_remove_extra_links(SpaceNode *snode, bNodeSocket *tsock, bNodeL
 			}
 			else
 				nodeRemLink(snode->edittree, tlink);
+			
+			snode->edittree->update |= NTREE_UPDATE_LINKS;
 		}
 	}
 }
@@ -2635,37 +2659,74 @@ void NODE_OT_links_cut(wmOperatorType *ot)
 	RNA_def_int(ot->srna, "cursor", BC_KNIFECURSOR, 0, INT_MAX, "Cursor", "", 0, INT_MAX);
 }
 
-/* *********************  automatic node insert on dragging ******************* */
+/* ********************** Detach links operator ***************** */
 
-/* assumes sockets in list */
-static bNodeSocket *socket_best_match(ListBase *sockets, int type)
+static int detach_links_exec(bContext *C, wmOperator *UNUSED(op))
 {
-	bNodeSocket *sock;
+	SpaceNode *snode= CTX_wm_space_node(C);
+	bNodeTree *ntree= snode->edittree;
+	bNode *node;
 	
-	/* first, match type */
-	for(sock= sockets->first; sock; sock= sock->next)
-		if(!nodeSocketIsHidden(sock))
-			if(type == sock->type)
-				return sock;
+	ED_preview_kill_jobs(C);
 	
-	/* then just use first unhidden socket */
-	for(sock= sockets->first; sock; sock= sock->next)
-		if(!nodeSocketIsHidden(sock))
-			return sock;
-
-	/* OK, let's unhide proper one */
-	for(sock= sockets->first; sock; sock= sock->next) {
-		if(type == sock->type) {
-			sock->flag &= ~(SOCK_HIDDEN|SOCK_AUTO_HIDDEN);
-			return sock;
+	for(node= ntree->nodes.first; node; node= node->next) {
+		if(node->flag & SELECT) {
+			nodeInternalRelink(ntree, node);
 		}
 	}
 	
-	/* just the first */
-	sock= sockets->first;
-	sock->flag &= ~(SOCK_HIDDEN|SOCK_AUTO_HIDDEN);
+	ntreeUpdateTree(ntree);
 	
-	return sockets->first;
+	snode_notify(C, snode);
+	snode_dag_update(C, snode);
+
+	return OPERATOR_FINISHED;
+}
+
+void NODE_OT_links_detach(wmOperatorType *ot)
+{
+	ot->name= "Detach Links";
+	ot->idname= "NODE_OT_links_detach";
+	
+	ot->exec= detach_links_exec;
+	ot->poll= ED_operator_node_active;
+	
+	/* flags */
+	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+}
+
+/* *********************  automatic node insert on dragging ******************* */
+
+/* assumes sockets in list */
+static bNodeSocket *socket_best_match(ListBase *sockets)
+{
+	bNodeSocket *sock;
+	int type, maxtype=0;
+	
+	/* find type range */
+	for (sock=sockets->first; sock; sock=sock->next)
+		maxtype = MAX2(sock->type, maxtype);
+	
+	/* try all types, starting from 'highest' (i.e. colors, vectors, values) */
+	for (type=maxtype; type >= 0; --type) {
+		for(sock= sockets->first; sock; sock= sock->next) {
+			if(!nodeSocketIsHidden(sock) && type==sock->type) {
+				return sock;
+			}
+		}
+	}
+	
+	/* no visible sockets, unhide first of highest type */
+	for (type=maxtype; type >= 0; --type) {
+		for(sock= sockets->first; sock; sock= sock->next) {
+			if(type==sock->type) {
+				sock->flag &= ~(SOCK_HIDDEN|SOCK_AUTO_HIDDEN);
+				return sock;
+			}
+		}
+	}
+	
+	return NULL;
 }
 
 /* prevent duplicate testing code below */
@@ -2723,10 +2784,10 @@ void ED_node_link_insert(ScrArea *sa)
 		sockto= link->tosock;
 		
 		link->tonode= select;
-		link->tosock= socket_best_match(&select->inputs, link->fromsock->type);
+		link->tosock= socket_best_match(&select->inputs);
 		link->flag &= ~NODE_LINKFLAG_HILITE;
 		
-		nodeAddLink(snode->edittree, select, socket_best_match(&select->outputs, sockto->type), node, sockto);
+		nodeAddLink(snode->edittree, select, socket_best_match(&select->outputs), node, sockto);
 		ntreeUpdateTree(snode->edittree);	/* needed for pointers */
 		snode_update(snode, select);
 		ED_node_changed_update(snode->id, select);
@@ -2841,7 +2902,7 @@ static int node_read_fullsamplelayers_exec(bContext *C, wmOperator *UNUSED(op))
 	WM_cursor_wait(0);
 
 	/* note we are careful to send the right notifier, as otherwise the
-	   compositor would reexecute and overwrite the full sample result */
+	 * compositor would reexecute and overwrite the full sample result */
 	WM_event_add_notifier(C, NC_SCENE|ND_COMPO_RESULT, NULL);
 
 	return OPERATOR_FINISHED;
@@ -3175,11 +3236,9 @@ static int node_mute_exec(bContext *C, wmOperator *UNUSED(op))
 
 	for(node= snode->edittree->nodes.first; node; node= node->next) {
 		/* Only allow muting of nodes having a mute func! */
-		if((node->flag & SELECT) && node->typeinfo->mutefunc) {
-			/* Be able to mute in-/output nodes as well.  - DingTo
-			if(node->inputs.first && node->outputs.first) { */
-				node->flag ^= NODE_MUTED;
-				snode_update(snode, node);
+		if ((node->flag & SELECT) && node->typeinfo->internal_connect) {
+			node->flag ^= NODE_MUTED;
+			snode_update(snode, node);
 		}
 	}
 	
@@ -3247,118 +3306,6 @@ void NODE_OT_delete(wmOperatorType *ot)
 }
 
 /* ****************** Delete with reconnect ******************* */
-static int is_connected_to_input_socket(bNode* node, bNodeLink* link)
-{
-	bNodeSocket *sock;
-	if (link->tonode == node) {
-		for(sock= node->inputs.first; sock; sock= sock->next) {
-			if (link->tosock == sock) {
-				return sock->type;
-			}
-		}		
-	}
-	return -1;
-}
-
-static void node_delete_reconnect(bNodeTree* tree, bNode* node) 
-{
-	bNodeLink *link, *next, *first = NULL;
-	bNodeSocket *valsocket= NULL, *colsocket= NULL, *vecsocket= NULL;
-	bNodeSocket *deliveringvalsocket= NULL, *deliveringcolsocket= NULL, *deliveringvecsocket= NULL;
-	bNode *deliveringvalnode= NULL, *deliveringcolnode= NULL, *deliveringvecnode= NULL;
-	bNodeSocket *sock;
-	int type;
-	int numberOfConnectedOutputSockets = 0;
-	int numberOfReconnections = 0;
-	int numberOfConnectedInputSockets = 0;
-
-	/* 
-		test the inputs, not really correct when a node has multiple input sockets of the same type
-		the first link evaluated will be used to determine the possible connection.
-	*/
-	for(link= tree->links.first; link; link=link->next) {
-		if (link->tonode == node)  { numberOfConnectedInputSockets++; }
-		type = is_connected_to_input_socket(node, link);
-		switch (type) {
-		case SOCK_RGBA:
-			if (colsocket == NULL) {
-				colsocket = link->tosock;
-				deliveringcolnode = link->fromnode;
-				deliveringcolsocket = link->fromsock;
-			}
-			break;
-		case SOCK_VECTOR:
-			if (vecsocket == NULL) {
-				vecsocket = link->tosock;
-				deliveringvecnode = link->fromnode;
-				deliveringvecsocket = link->fromsock;
-			}
-			break;
-		case SOCK_FLOAT:
-			if (valsocket == NULL) {
-				valsocket = link->tosock;
-				deliveringvalnode = link->fromnode;
-				deliveringvalsocket = link->fromsock;
-			}
-			break;
-		default:
-			break;
-		}
-	}
-	
-	// we now have the sockets+nodes that fill the inputsockets be aware for group nodes these can be NULL
-	// now make the links for all outputlinks of the node to be reconnected
-	for(link= tree->links.first; link; link=next) {
-		next= link->next;
-		if (link->fromnode == node) {
-			sock = link->fromsock;
-			numberOfConnectedOutputSockets ++;
-			if (!first) first = link;
-			switch(sock->type) {
-			case SOCK_FLOAT:
-				if (deliveringvalsocket) {
-					link->fromnode = deliveringvalnode;
-					link->fromsock = deliveringvalsocket;
-					numberOfReconnections++;
-				}
-				break;
-			case SOCK_VECTOR:
-				if (deliveringvecsocket) {
-					link->fromnode = deliveringvecnode;
-					link->fromsock = deliveringvecsocket;
-					numberOfReconnections++;
-				}
-				break;
-			case SOCK_RGBA:
-				if (deliveringcolsocket) {
-					link->fromnode = deliveringcolnode;
-					link->fromsock = deliveringcolsocket;
-					numberOfReconnections++;
-				}
-				break;
-			}
-		}
-	}
-
-	/* when no connections have been made, and if only one delivering input socket type and one output socket we will connect those two */
-	if (numberOfConnectedOutputSockets == 1 && numberOfReconnections == 0 && numberOfConnectedInputSockets == 1) {
-		if (deliveringcolsocket) {
-			first->fromnode = deliveringcolnode;
-			first->fromsock = deliveringcolsocket;
-		} else if (deliveringvecsocket) {
-			first->fromnode = deliveringvecnode;
-			first->fromsock = deliveringvecsocket;
-		} else if (deliveringvalsocket) {
-			first->fromnode = deliveringvalnode;
-			first->fromsock = deliveringvalsocket;
-		}
-	}
-
-	if(node->id)
-		node->id->us--;
-	nodeFreeNode(tree, node);
-}
-
 static int node_delete_reconnect_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	SpaceNode *snode= CTX_wm_space_node(C);
@@ -3369,7 +3316,12 @@ static int node_delete_reconnect_exec(bContext *C, wmOperator *UNUSED(op))
 	for(node= snode->edittree->nodes.first; node; node= next) {
 		next= node->next;
 		if(node->flag & SELECT) {
-			node_delete_reconnect(snode->edittree, node);
+			nodeInternalRelink(snode->edittree, node);
+			
+			/* check id user here, nodeFreeNode is called for free dbase too */
+			if(node->id)
+				node->id->us--;
+			nodeFreeNode(snode->edittree, node);
 		}
 	}
 
@@ -3438,8 +3390,7 @@ static int node_add_file_exec(bContext *C, wmOperator *op)
 	ntemp.type = -1;
 
 	/* check input variables */
-	if (RNA_struct_property_is_set(op->ptr, "filepath"))
-	{
+	if (RNA_struct_property_is_set(op->ptr, "filepath")) {
 		char path[FILE_MAX];
 		RNA_string_get(op->ptr, "filepath", path);
 
@@ -3452,8 +3403,7 @@ static int node_add_file_exec(bContext *C, wmOperator *op)
 			return OPERATOR_CANCELLED;
 		}
 	}
-	else if(RNA_struct_property_is_set(op->ptr, "name"))
-	{
+	else if(RNA_struct_property_is_set(op->ptr, "name")) {
 		char name[MAX_ID_NAME-2];
 		RNA_string_get(op->ptr, "name", name);
 		ima= (Image *)find_id("IM", name);
@@ -3586,4 +3536,76 @@ void NODE_OT_new_node_tree(wmOperatorType *ot)
 	
 	RNA_def_enum(ot->srna, "type", nodetree_type_items, NTREE_COMPOSIT, "Tree Type", "");
 	RNA_def_string(ot->srna, "name", "NodeTree", MAX_ID_NAME-2, "Name", "");
+}
+
+/* ****************** File Output Add Socket  ******************* */
+
+static int node_output_file_add_socket_exec(bContext *C, wmOperator *op)
+{
+	Scene *scene= CTX_data_scene(C);
+	SpaceNode *snode= CTX_wm_space_node(C);
+	bNodeTree *ntree = snode->edittree;
+	bNode *node = nodeGetActive(ntree);
+	char file_path[MAX_NAME];
+	
+	if (!node)
+		return OPERATOR_CANCELLED;
+	
+	RNA_string_get(op->ptr, "file_path", file_path);
+	ntreeCompositOutputFileAddSocket(ntree, node, file_path, &scene->r.im_format);
+	
+	snode_notify(C, snode);
+	
+	return OPERATOR_FINISHED;
+}
+
+void NODE_OT_output_file_add_socket(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name= "Add File Node Socket";
+	ot->description= "Add a new input to a file output node";
+	ot->idname= "NODE_OT_output_file_add_socket";
+	
+	/* callbacks */
+	ot->exec= node_output_file_add_socket_exec;
+	ot->poll= composite_node_active;
+	
+	/* flags */
+	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	
+	RNA_def_string(ot->srna, "file_path", "Image", MAX_NAME, "File Path", "Sub-path of the output file");
+}
+
+/* ****************** Multi File Output Remove Socket  ******************* */
+
+static int node_output_file_remove_active_socket_exec(bContext *C, wmOperator *UNUSED(op))
+{
+	SpaceNode *snode= CTX_wm_space_node(C);
+	bNodeTree *ntree = snode->edittree;
+	bNode *node = nodeGetActive(ntree);
+	
+	if (!node)
+		return OPERATOR_CANCELLED;
+	
+	if (!ntreeCompositOutputFileRemoveActiveSocket(ntree, node))
+		return OPERATOR_CANCELLED;
+	
+	snode_notify(C, snode);
+	
+	return OPERATOR_FINISHED;
+}
+
+void NODE_OT_output_file_remove_active_socket(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name= "Remove File Node Socket";
+	ot->description= "Remove active input from a file output node";
+	ot->idname= "NODE_OT_output_file_remove_active_socket";
+	
+	/* callbacks */
+	ot->exec= node_output_file_remove_active_socket_exec;
+	ot->poll= composite_node_active;
+	
+	/* flags */
+	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 }

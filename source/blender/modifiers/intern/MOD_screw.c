@@ -132,23 +132,6 @@ static void copyData(ModifierData *md, ModifierData *target)
 	tltmd->iter= sltmd->iter;
 }
 
-#if 0
-static int findEd(MEdge *medge_new, int toted, int v1, int v2)
-{
-	int i;
-
-	for (i = 0; i < toted; i++) {
-		if ( (medge_new[i].v1 == v1 && medge_new[i].v2 == v2) ||
-		     (medge_new[i].v1 == v2 && medge_new[i].v2 == v1) )
-		{
-			return i;
-		}
-	}
-
-	return -1;
-}
-#endif
-
 static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 						DerivedMesh *derivedData,
 						int useRenderParams,
@@ -362,7 +345,7 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 		/* Notice!
 		 *
 		 * Since we are only ordering the edges here it can avoid mallocing the
-		 * extra space by abusing the vert array berfore its filled with new verts.
+		 * extra space by abusing the vert array before its filled with new verts.
 		 * The new array for vert_connect must be at least sizeof(ScrewVertConnect) * totvert
 		 * and the size of our resulting meshes array is sizeof(MVert) * totvert * 3
 		 * so its safe to use the second 2 thrids of MVert the array for vert_connect,
@@ -628,7 +611,7 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 				 * we know the surrounding edges are ordered correctly now
 				 * so its safe to create vertex normals.
 				 *
-				 * calculate vertex normals that can be propodated on lathing
+				 * calculate vertex normals that can be propagated on lathing
 				 * use edge connectivity work this out */
 				if (vc->v[0] >= 0) {
 					if (vc->v[1] >= 0) {

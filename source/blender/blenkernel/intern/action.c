@@ -65,17 +65,17 @@
 #include "RNA_access.h"
 
 /* *********************** NOTE ON POSE AND ACTION **********************
-
-  - Pose is the local (object level) component of armature. The current
-	object pose is saved in files, and (will be) is presorted for dependency
-  - Actions have fewer (or other) channels, and write data to a Pose
-  - Currently ob->pose data is controlled in where_is_pose only. The (recalc)
-	event system takes care of calling that
-  - The NLA system (here too) uses Poses as interpolation format for Actions
-  - Therefore we assume poses to be static, and duplicates of poses have channels in
-	same order, for quick interpolation reasons
-
-  ****************************** (ton) ************************************ */
+ *
+ * - Pose is the local (object level) component of armature. The current
+ *   object pose is saved in files, and (will be) is presorted for dependency
+ * - Actions have fewer (or other) channels, and write data to a Pose
+ * - Currently ob->pose data is controlled in where_is_pose only. The (recalc)
+ *   event system takes care of calling that
+ * - The NLA system (here too) uses Poses as interpolation format for Actions
+ * - Therefore we assume poses to be static, and duplicates of poses have channels in
+ *   same order, for quick interpolation reasons
+ *
+ * ****************************** (ton) ************************************ */
 
 /* ***************** Library data level operations on action ************** */
 
@@ -1199,7 +1199,7 @@ static void blend_pose_strides(bPose *dst, bPose *src, float srcweight, short mo
 {
 	float dstweight;
 	
-	switch (mode){
+	switch (mode) {
 		case ACTSTRIPMODE_BLEND:
 			dstweight = 1.0F - srcweight;
 			break;
@@ -1214,23 +1214,22 @@ static void blend_pose_strides(bPose *dst, bPose *src, float srcweight, short mo
 }
 
 
-/* 
-
-bone matching diagram, strips A and B
-
-				 .------------------------.
-				 |         A              |
-				 '------------------------'
-				 .          .             b2
-				 .          .-------------v----------.
-				 .      	|         B   .          |
-				 .          '------------------------'
-				 .          .             .
-				 .          .             .
-offset:          .    0     .    A-B      .  A-b2+B     
-				 .          .             .
-
-*/
+/*
+ * bone matching diagram, strips A and B
+ * 
+ *                  .------------------------.
+ *                  |         A              |
+ *                  '------------------------'
+ *                  .          .             b2
+ *                  .          .-------------v----------.
+ *                  .          |         B   .          |
+ *                  .          '------------------------'
+ *                  .          .             .
+ *                  .          .             .
+ * offset:          .    0     .    A-B      .  A-b2+B
+ *                  .          .             .
+ *
+ * */
 
 
 static void blend_pose_offset_bone(bActionStrip *strip, bPose *dst, bPose *src, float srcweight, short mode)
@@ -1294,8 +1293,8 @@ static void blend_pose_offset_bone(bActionStrip *strip, bPose *dst, bPose *src, 
 }
 
 /* added "sizecorr" here, to allow armatures to be scaled and still have striding.
-   Only works for uniform scaling. In general I'd advise against scaling armatures ever though! (ton)
-*/
+ * Only works for uniform scaling. In general I'd advise against scaling armatures ever though! (ton)
+ */
 static float stridechannel_frame(Object *ob, float sizecorr, bActionStrip *strip, Path *path, float pathdist, float *stride_offset)
 {
 	bAction *act= strip->act;
@@ -1489,7 +1488,7 @@ static void do_nla(Scene *scene, Object *ob, int blocktype)
 	}
 	
 	/* and now go over all strips */
-	for (strip=ob->nlastrips.first; strip; strip=strip->next){
+	for (strip=ob->nlastrips.first; strip; strip=strip->next) {
 		doit=dostride= 0;
 		
 		if (strip->act && !(strip->flag & ACTSTRIP_MUTE)) {	/* so theres an action */
@@ -1497,10 +1496,10 @@ static void do_nla(Scene *scene, Object *ob, int blocktype)
 			/* Determine if the current frame is within the strip's range */
 			length = strip->end-strip->start;
 			actlength = strip->actend-strip->actstart;
-			striptime = (scene_cfra-(strip->start)) / length;
-			stripframe = (scene_cfra-(strip->start)) ;
+			striptime = (scene_cfra - strip->start) / length;
+			stripframe = (scene_cfra - strip->start);
 
-			if (striptime>=0.0){
+			if (striptime>=0.0) {
 				
 				if(blocktype==ID_AR) 
 					rest_pose(tpose);
@@ -1509,14 +1508,14 @@ static void do_nla(Scene *scene, Object *ob, int blocktype)
 				if (striptime < 1.0f + 0.1f/length) {
 					
 					/* Handle path */
-					if ((strip->flag & ACTSTRIP_USESTRIDE) && (blocktype==ID_AR) && (ob->ipoflag & OB_DISABLE_PATH)==0){
+					if ((strip->flag & ACTSTRIP_USESTRIDE) && (blocktype==ID_AR) && (ob->ipoflag & OB_DISABLE_PATH)==0) {
 						Object *parent= get_parent_path(ob);
 						
 						if (parent) {
 							Curve *cu = parent->data;
 							float ctime, pdist;
 							
-							if (cu->flag & CU_PATH){
+							if (cu->flag & CU_PATH) {
 								/* Ensure we have a valid path */
 								if(cu->path==NULL || cu->path->data==NULL) makeDispListCurveTypes(scene, parent, 0);
 								if(cu->path) {
@@ -1590,7 +1589,7 @@ static void do_nla(Scene *scene, Object *ob, int blocktype)
 				}
 				/* Handle extend */
 				else {
-					if (strip->flag & ACTSTRIP_HOLDLASTFRAME){
+					if (strip->flag & ACTSTRIP_HOLDLASTFRAME) {
 						/* we want the strip to hold on the exact fraction of the repeat value */
 						
 						frametime = actlength * (strip->repeat-(int)strip->repeat);
@@ -1616,13 +1615,13 @@ static void do_nla(Scene *scene, Object *ob, int blocktype)
 				}
 				
 				/* Handle blendin & blendout */
-				if (doit){
+				if (doit) {
 					/* Handle blendin */
 					
-					if (strip->blendin>0.0 && stripframe<=strip->blendin && scene_cfra>=strip->start){
+					if (strip->blendin>0.0 && stripframe<=strip->blendin && scene_cfra>=strip->start) {
 						blendfac = stripframe/strip->blendin;
 					}
-					else if (strip->blendout>0.0 && stripframe>=(length-strip->blendout) && scene_cfra<=strip->end){
+					else if (strip->blendout>0.0 && stripframe>=(length-strip->blendout) && scene_cfra<=strip->end) {
 						blendfac = (length-stripframe)/(strip->blendout);
 					}
 					else

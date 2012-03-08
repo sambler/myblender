@@ -79,9 +79,9 @@ extern const CustomDataMask CD_MASK_FACECORNERS;
  */
 int CustomData_layer_has_math(struct CustomData *data, int layern);
 
-/*copies the "value" (e.g. mloopuv uv or mloopcol colors) from one block to
-  another, while not overwriting anything else (e.g. flags).  probably only
-  implemented for mloopuv/mloopcol, for now.*/
+/* copies the "value" (e.g. mloopuv uv or mloopcol colors) from one block to
+ * another, while not overwriting anything else (e.g. flags).  probably only
+ * implemented for mloopuv/mloopcol, for now.*/
 void CustomData_data_copy_value(int type, void *source, void *dest);
 
 /* compares if data1 is equal to data2.  type is a valid CustomData type
@@ -107,11 +107,11 @@ void CustomData_update_typemap(struct CustomData *data);
 void CustomData_merge(const struct CustomData *source, struct CustomData *dest,
 					  CustomDataMask mask, int alloctype, int totelem);
 
-/*bmesh version of CustomData_merge; merges the layouts of source and dest,
-  then goes through the mesh and makes sure all the customdata blocks are
-  consistent with the new layout.*/
+/* bmesh version of CustomData_merge; merges the layouts of source and dest,
+ * then goes through the mesh and makes sure all the customdata blocks are
+ * consistent with the new layout.*/
 void CustomData_bmesh_merge(struct CustomData *source, struct CustomData *dest, 
-                            int mask, int alloctype, struct BMesh *bm, int type);
+                            int mask, int alloctype, struct BMesh *bm, const char htype);
 
 /* frees data associated with a CustomData object (doesn't free the object
  * itself, though)
@@ -211,8 +211,8 @@ void CustomData_bmesh_interp(struct CustomData *data, void **src_blocks,
 
 
 /* swaps the data in the element corners, to new corners with indices as
-   specified in corner_indices. for edges this is an array of length 2, for
-   faces an array of length 4 */
+ * specified in corner_indices. for edges this is an array of length 2, for
+ * faces an array of length 4 */
 void CustomData_swap(struct CustomData *data, int index, const int *corner_indices);
 
 /* gets a pointer to the data element at index from the first layer of type
@@ -292,11 +292,7 @@ void CustomData_bmesh_set_default(struct CustomData *data, void **block);
 void CustomData_bmesh_free_block(struct CustomData *data, void **block);
 
 /* copy custom data to/from layers as in mesh/derivedmesh, to editmesh
-   blocks of data. the CustomData's must not be compatible  */
-void CustomData_to_em_block(const struct CustomData *source,
-							struct CustomData *dest, int index, void **block);
-void CustomData_from_em_block(const struct CustomData *source,
-							  struct CustomData *dest, void *block, int index);
+ * blocks of data. the CustomData's must not be compatible */
 void CustomData_to_bmesh_block(const struct CustomData *source, 
 							struct CustomData *dest, int src_index, void **dest_block);
 void CustomData_from_bmesh_block(const struct CustomData *source, 
@@ -316,7 +312,7 @@ void CustomData_set_layer_unique_name(struct CustomData *data, int index);
 void CustomData_validate_layer_name(const struct CustomData *data, int type, char *name, char *outname);
 
 /* for file reading compatibility, returns false if the layer was freed,
-   only after this test passes, layer->data should be assigned */
+ * only after this test passes, layer->data should be assigned */
 int CustomData_verify_versions(struct CustomData *data, int index);
 
 /*BMesh specific customdata stuff*/
@@ -324,7 +320,7 @@ void CustomData_to_bmeshpoly(struct CustomData *fdata, struct CustomData *pdata,
                              struct CustomData *ldata, int totloop, int totpoly);
 void CustomData_from_bmeshpoly(struct CustomData *fdata, struct CustomData *pdata, struct CustomData *ldata, int total);
 void CustomData_bmesh_update_active_layers(struct CustomData *fdata, struct CustomData *pdata, struct CustomData *ldata);
-void CustomData_bmesh_init_pool(struct CustomData *data, int allocsize);
+void CustomData_bmesh_init_pool(struct CustomData *data, int totelem, const char htype);
 
 /* External file storage */
 

@@ -34,11 +34,12 @@
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
 
-#include "BKE_context.h"
-#include "BKE_library.h"
-#include "BKE_key.h"
-#include "BKE_mesh.h"
+#include "BKE_DerivedMesh.h"
 #include "BKE_bmesh.h"
+#include "BKE_context.h"
+#include "BKE_key.h"
+#include "BKE_library.h"
+#include "BKE_mesh.h"
 #include "BKE_report.h"
 #include "BKE_tessmesh.h"
 
@@ -48,9 +49,11 @@
 #include "ED_mesh.h"
 #include "ED_util.h"
 
+#include "bmesh.h"
+
 void EDBM_RecalcNormals(BMEditMesh *em)
 {
-	BM_mesh_normals_update(em->bm);
+	BM_mesh_normals_update(em->bm, TRUE);
 }
 
 void EDBM_ClearMesh(BMEditMesh *em)
@@ -70,7 +73,7 @@ void EDBM_ClearMesh(BMEditMesh *em)
 	
 	em->derivedCage = em->derivedFinal = NULL;
 	
-	/* free tesselation data */
+	/* free tessellation data */
 	em->tottri = 0;
 	if (em->looptris) 
 		MEM_freeN(em->looptris);
@@ -83,7 +86,7 @@ void EDBM_stats_update(BMEditMesh *em)
 	                            BM_FACES_OF_MESH};
 
 	BMIter iter;
-	BMHeader *ele;
+	BMElem *ele;
 	int *tots[3];
 	int i;
 
@@ -140,7 +143,7 @@ int EDBM_FinishOp(BMEditMesh *em, BMOperator *bmop, wmOperator *op, const int re
 
 		BMEdit_Free(em);
 		*em = *emcopy;
-		BMEdit_RecalcTesselation(em);
+		BMEdit_RecalcTessellation(em);
 
 		MEM_freeN(emcopy);
 		em->emcopyusers = 0;
@@ -209,7 +212,7 @@ int EDBM_CallAndSelectOpf(BMEditMesh *em, wmOperator *op, const char *selectslot
 
 	BM_mesh_elem_flag_disable_all(em->bm, BM_VERT|BM_EDGE|BM_FACE, BM_ELEM_SELECT);
 
-	BMO_slot_buffer_hflag_enable(em->bm, &bmop, selectslot, BM_ELEM_SELECT, BM_ALL);
+	BMO_slot_buffer_hflag_enable(em->bm, &bmop, selectslot, BM_ELEM_SELECT, BM_ALL, TRUE);
 
 	va_end(list);
 	return EDBM_FinishOp(em, &bmop, op, TRUE);
@@ -242,7 +245,7 @@ void EDBM_selectmode_to_scene(bContext *C)
 {
 	Scene *scene = CTX_data_scene(C);
 	Object *obedit = CTX_data_edit_object(C);
-	BMEditMesh *em = ((Mesh *)obedit->data)->edit_btmesh;
+	BMEditMesh *em = BMEdit_FromObject(obedit);
 
 	if (!em)
 		return;
@@ -274,7 +277,7 @@ void EDBM_MakeEditBMesh(ToolSettings *ts, Scene *UNUSED(scene), Object *ob)
 		MEM_freeN(me->edit_btmesh);
 	}
 
-	/* currently executing operators re-tesselates, so we can avoid doing here
+	/* currently executing operators re-tessellates, so we can avoid doing here
 	 * but at some point it may need to be added back. */
 #if 0
 	me->edit_btmesh = BMEdit_Create(bm, TRUE);
@@ -415,13 +418,14 @@ void EDBM_select_more(BMEditMesh *em)
 	int use_faces = em->selectmode > SCE_SELECT_EDGE;
 
 	BMO_op_initf(em->bm, &bmop,
-	             "regionextend geom=%hvef constrict=%i use_faces=%b",
+	             "regionextend geom=%hvef constrict=%b use_faces=%b",
 	             BM_ELEM_SELECT, FALSE, use_faces);
 	BMO_op_exec(em->bm, &bmop);
-	BMO_slot_buffer_hflag_enable(em->bm, &bmop, "geomout", BM_ELEM_SELECT, BM_ALL);
+	/* dont flush selection in edge/vertex mode  */
+	BMO_slot_buffer_hflag_enable(em->bm, &bmop, "geomout", BM_ELEM_SELECT, BM_ALL, use_faces ? TRUE : FALSE);
 	BMO_op_finish(em->bm, &bmop);
 
-	EDBM_selectmode_flush(em);
+	EDBM_select_flush(em);
 }
 
 void EDBM_select_less(BMEditMesh *em)
@@ -430,10 +434,11 @@ void EDBM_select_less(BMEditMesh *em)
 	int use_faces = em->selectmode > SCE_SELECT_EDGE;
 
 	BMO_op_initf(em->bm, &bmop,
-	             "regionextend geom=%hvef constrict=%i use_faces=%b",
-	             BM_ELEM_SELECT, FALSE, use_faces);
+	             "regionextend geom=%hvef constrict=%b use_faces=%b",
+	             BM_ELEM_SELECT, TRUE, use_faces);
 	BMO_op_exec(em->bm, &bmop);
-	BMO_slot_buffer_hflag_enable(em->bm, &bmop, "geomout", BM_ELEM_SELECT, BM_ALL);
+	/* dont flush selection in edge/vertex mode  */
+	BMO_slot_buffer_hflag_disable(em->bm, &bmop, "geomout", BM_ELEM_SELECT, BM_ALL, use_faces ? TRUE : FALSE);
 	BMO_op_finish(em->bm, &bmop);
 
 	EDBM_selectmode_flush(em);
@@ -449,24 +454,24 @@ int EDBM_get_actSelection(BMEditMesh *em, BMEditSelection *ese)
 	if (ese_last) {
 		if (ese_last->htype == BM_FACE) { /* if there is an active face, use it over the last selected face */
 			if (efa) {
-				ese->data = (void *)efa;
+				ese->ele = (BMElem *)efa;
 			}
 			else {
-				ese->data = ese_last->data;
+				ese->ele = ese_last->ele;
 			}
 			ese->htype = BM_FACE;
 		}
 		else {
-			ese->data = ese_last->data;
+			ese->ele =   ese_last->ele;
 			ese->htype = ese_last->htype;
 		}
 	}
 	else if (efa) { /* no */
-		ese->data = (void *)efa;
+		ese->ele   = (BMElem *)efa;
 		ese->htype = BM_FACE;
 	}
 	else {
-		ese->data = NULL;
+		ese->ele = NULL;
 		return 0;
 	}
 	return 1;
@@ -516,13 +521,13 @@ static void *editbtMesh_to_undoMesh(void *emv, void *obdata)
 
 #ifdef BMESH_EM_UNDO_RECALC_TESSFACE_WORKAROUND
 
-	/* we recalc the tesselation here, to avoid seeding calls to
-	 * BMEdit_RecalcTesselation throughout the code. */
-	BMEdit_RecalcTesselation(em);
+	/* we recalc the tessellation here, to avoid seeding calls to
+	 * BMEdit_RecalcTessellation throughout the code. */
+	BMEdit_RecalcTessellation(em);
 
 #endif
 
-	BMO_op_callf(em->bm, "bmesh_to_mesh mesh=%p notesselation=%b", &um->me, TRUE);
+	BMO_op_callf(em->bm, "bmesh_to_mesh mesh=%p notessellation=%b", &um->me, TRUE);
 	um->selectmode = em->selectmode;
 
 	return um;
@@ -541,7 +546,7 @@ static void undoMesh_to_editbtMesh(void *umv, void *emv, void *UNUSED(obdata))
 
 	BMEdit_Free(em);
 
-	bm = BM_mesh_create(ob, bm_mesh_allocsize_default);
+	bm = BM_mesh_create(ob, &bm_mesh_allocsize_default);
 	BMO_op_callf(bm, "mesh_to_bmesh mesh=%p object=%p set_shapekey=%b", &um->me, ob, FALSE);
 
 	em2 = BMEdit_Create(bm, TRUE);
@@ -681,8 +686,9 @@ UvVertMap *EDBM_make_uv_vert_map(BMEditMesh *em, int selected, int do_face_idx_a
 					iterv->next = newvlist;
 					newvlist = iterv;
 				}
-				else
+				else {
 					lastv = iterv;
+				}
 
 				iterv = next;
 			}
@@ -769,18 +775,17 @@ UvElementMap *EDBM_make_uv_element_map(BMEditMesh *em, int selected, int do_isla
 	BM_ITER(efa, &iter, em->bm, BM_FACES_OF_MESH, NULL) {
 		island_number[j++] = INVALID_ISLAND;
 		if (!selected || ((!BM_elem_flag_test(efa, BM_ELEM_HIDDEN)) && BM_elem_flag_test(efa, BM_ELEM_SELECT))) {
-			i = 0;
-			BM_ITER(l, &liter, em->bm, BM_LOOPS_OF_FACE, efa) {
-				buf->tfindex = i;
+			BM_ITER_INDEX(l, &liter, em->bm, BM_LOOPS_OF_FACE, efa, i) {
+				buf->l = l;
 				buf->face = efa;
 				buf->separate = 0;
 				buf->island = INVALID_ISLAND;
+				buf->tfindex = i;
 
 				buf->next = element_map->vert[BM_elem_index_get(l->v)];
 				element_map->vert[BM_elem_index_get(l->v)] = buf;
 
 				buf++;
-				i++;
 			}
 		}
 	}
@@ -798,10 +803,7 @@ UvElementMap *EDBM_make_uv_element_map(BMEditMesh *em, int selected, int do_isla
 			v->next = newvlist;
 			newvlist = v;
 
-			efa = v->face;
-			/* tf = CustomData_bmesh_get(&em->bm->pdata, efa->head.data, CD_MTEXPOLY); */ /* UNUSED */
-
-			l = BM_iter_at_index(em->bm, BM_LOOPS_OF_FACE, efa, v->tfindex);
+			l = v->l;
 			luv = CustomData_bmesh_get(&em->bm->ldata, l->head.data, CD_MLOOPUV);
 			uv = luv->uv;
 
@@ -810,10 +812,8 @@ UvElementMap *EDBM_make_uv_element_map(BMEditMesh *em, int selected, int do_isla
 
 			while (iterv) {
 				next = iterv->next;
-				efa = iterv->face;
-				/* tf = CustomData_bmesh_get(&em->bm->pdata, efa->head.data, CD_MTEXPOLY); */ /* UNUSED */
 
-				l = BM_iter_at_index(em->bm, BM_LOOPS_OF_FACE, efa, iterv->tfindex);
+				l = iterv->l;
 				luv = CustomData_bmesh_get(&em->bm->ldata, l->head.data, CD_MLOOPUV);
 				uv2 = luv->uv;
 
@@ -867,9 +867,10 @@ UvElementMap *EDBM_make_uv_element_map(BMEditMesh *em, int selected, int do_isla
 								/* found the uv corresponding to our face and vertex. Now fill it to the buffer */
 								element->island = nislands;
 								map[element - element_map->buf] = islandbufsize;
-								islandbuf[islandbufsize].tfindex = element->tfindex;
+								islandbuf[islandbufsize].l = element->l;
 								islandbuf[islandbufsize].face = element->face;
 								islandbuf[islandbufsize].separate = element->separate;
+								islandbuf[islandbufsize].tfindex = element->tfindex;
 								islandbuf[islandbufsize].island =  nislands;
 								islandbufsize++;
 
@@ -960,8 +961,8 @@ void EDBM_free_uv_element_map(UvElementMap *element_map)
 }
 
 /* last_sel, use em->act_face otherwise get the last selected face in the editselections
- * at the moment, last_sel is mainly useful for gaking sure the space image dosnt flicker */
-MTexPoly *EDBM_get_active_mtexpoly(BMEditMesh *em, BMFace **act_efa, int sloppy)
+ * at the moment, last_sel is mainly useful for making sure the space image dosnt flicker */
+MTexPoly *EDBM_get_active_mtexpoly(BMEditMesh *em, BMFace **r_act_efa, int sloppy)
 {
 	BMFace *efa = NULL;
 	
@@ -971,11 +972,11 @@ MTexPoly *EDBM_get_active_mtexpoly(BMEditMesh *em, BMFace **act_efa, int sloppy)
 	efa = BM_active_face_get(em->bm, sloppy);
 	
 	if (efa) {
-		if (act_efa) *act_efa = efa;
+		if (r_act_efa) *r_act_efa = efa;
 		return CustomData_bmesh_get(&em->bm->pdata, efa->head.data, CD_MTEXPOLY);
 	}
 
-	if (act_efa) *act_efa = NULL;
+	if (r_act_efa) *r_act_efa = NULL;
 	return NULL;
 }
 

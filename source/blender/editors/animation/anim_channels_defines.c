@@ -817,7 +817,7 @@ static int acf_group_setting_flag(bAnimContext *ac, int setting, short *neg)
 			return AGRP_MUTED;
 			
 		case ACHANNEL_SETTING_PROTECT: /* protected */
-			//*neg= 1; - if we change this to edtiability
+			// *neg= 1; - if we change this to edtiability
 			return AGRP_PROTECTED;
 			
 		case ACHANNEL_SETTING_VISIBLE: /* visiblity - graph editor */
@@ -905,7 +905,7 @@ static int acf_fcurve_setting_flag(bAnimContext *UNUSED(ac), int setting, short 
 			return FCURVE_MUTED;
 			
 		case ACHANNEL_SETTING_PROTECT: /* protected */
-			//*neg= 1; - if we change this to edtiability
+			// *neg= 1; - if we change this to edtiability
 			return FCURVE_PROTECTED;
 			
 		case ACHANNEL_SETTING_VISIBLE: /* visiblity - graph editor */
@@ -2399,7 +2399,7 @@ static bAnimChannelType ACF_GPD =
 
 /* GPencil Layer ------------------------------------------- */
 
-/* name for grase pencil layer entries */
+/* name for grease pencil layer entries */
 static void acf_gpl_name(bAnimListElem *ale, char *name)
 {
 	bGPDlayer *gpl = (bGPDlayer *)ale->data;
@@ -2450,7 +2450,7 @@ static int acf_gpl_setting_flag(bAnimContext *UNUSED(ac), int setting, short *ne
 			return GP_LAYER_HIDE;
 			
 		case ACHANNEL_SETTING_PROTECT: /* protected */
-			//*neg= 1; - if we change this to edtiability
+			// *neg= 1; - if we change this to edtiability
 			return GP_LAYER_LOCKED;
 			
 		default: /* unsupported */
@@ -2493,12 +2493,12 @@ static bAnimChannelType ACF_GPL =
 static bAnimChannelType *animchannelTypeInfo[ANIMTYPE_NUM_TYPES];
 static short ACF_INIT= 1; /* when non-zero, the list needs to be updated */
 
-/* Initialise type info definitions */
+/* Initialize type info definitions */
 static void ANIM_init_channel_typeinfo_data (void)
 {
 	int type= 0;
 	
-	/* start initialising if necessary... */
+	/* start initializing if necessary... */
 	if (ACF_INIT) {
 		ACF_INIT= 0;
 		
@@ -2600,8 +2600,7 @@ short ANIM_channel_setting_get (bAnimContext *ac, bAnimListElem *ale, int settin
 	bAnimChannelType *acf= ANIM_channel_get_typeinfo(ale);
 	
 	/* 1) check that the setting exists for the current context */
-	if ( (acf) && (!acf->has_setting || acf->has_setting(ac, ale, setting)) ) 
-	{
+	if ((acf) && (!acf->has_setting || acf->has_setting(ac, ale, setting))) {
 		/* 2) get pointer to check for flag in, and the flag to check for */
 		short negflag, ptrsize;
 		int flag;
@@ -2678,8 +2677,7 @@ void ANIM_channel_setting_set (bAnimContext *ac, bAnimListElem *ale, int setting
 	bAnimChannelType *acf= ANIM_channel_get_typeinfo(ale);
 	
 	/* 1) check that the setting exists for the current context */
-	if ( (acf) && (!acf->has_setting || acf->has_setting(ac, ale, setting)) ) 
-	{
+	if ((acf) && (!acf->has_setting || acf->has_setting(ac, ale, setting))) {
 		/* 2) get pointer to check for flag in, and the flag to check for */
 		short negflag, ptrsize;
 		int flag;
@@ -2831,8 +2829,7 @@ void ANIM_channel_draw (bAnimContext *ac, bAnimListElem *ale, float yminc, float
 		UI_DrawString(offset, ytext, name);
 		
 		/* draw red underline if channel is disabled */
-		if ((ale->type == ANIMTYPE_FCURVE) && (ale->flag & FCURVE_DISABLED)) 
-		{
+		if ((ale->type == ANIMTYPE_FCURVE) && (ale->flag & FCURVE_DISABLED)) {
 			// FIXME: replace hardcoded color here, and check on extents!
 			glColor3f(1.0f, 0.0f, 0.0f);
 			glLineWidth(2.0);
@@ -3282,7 +3279,7 @@ void ANIM_channel_draw_widgets (bContext *C, bAnimContext *ac, bAnimListElem *al
 		 *	- even if we can draw sliders for this view, we must also check that the channel-type supports them
 		 *	  (only only F-Curves really can support them for now)
 		 *	- to make things easier, we use RNA-autobuts for this so that changes are reflected immediately, 
-		 *	  whereever they occurred. BUT, we don't use the layout engine, otherwise we'd get wrong alignment,
+		 *	  wherever they occurred. BUT, we don't use the layout engine, otherwise we'd get wrong alignment,
 		 *	  and wouldn't be able to auto-keyframe...
 		 *	- slider should start before the toggles (if they're visible) to keep a clean line down the side
 		 */

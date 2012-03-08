@@ -48,7 +48,6 @@
 #include "RNA_define.h"
 #include "RNA_enum_types.h"
 
-/* Platform independend time	*/
 #include "PIL_time.h"
 
 #include "WM_types.h"
@@ -169,7 +168,7 @@ static int type_toggle_exec(bContext *C, wmOperator *op)
 			return OPERATOR_CANCELLED;
 	}
 	
-	/* update dependancy */
+	/* update dependency */
 	DAG_id_tag_update(&cObject->id, OB_RECALC_DATA);
 	WM_event_add_notifier(C, NC_OBJECT|ND_MODIFIER, cObject);
 	DAG_scene_sort(CTX_data_main(C), scene);
@@ -269,9 +268,9 @@ void DPAINT_OT_output_toggle(wmOperatorType *ot)
 /***************************** Image Sequence Baking ******************************/
 
 /*
-*	Do actual bake operation. Loop through to-be-baked frames.
-*	Returns 0 on failture.
-*/
+ * Do actual bake operation. Loop through to-be-baked frames.
+ * Returns 0 on failure.
+ */
 static int dynamicPaint_bakeImageSequence(bContext *C, DynamicPaintSurface *surface, Object *cObject)
 {
 	DynamicPaintCanvasSettings *canvas = surface->canvas;
@@ -309,8 +308,8 @@ static int dynamicPaint_bakeImageSequence(bContext *C, DynamicPaintSurface *surf
 		if (!dynamicPaint_calculateFrame(surface, scene, cObject, frame)) return 0;
 
 		/*
-		*	Save output images
-		*/
+		 * Save output images
+		 */
 		{
 			char filename[FILE_MAX];
 
@@ -352,8 +351,8 @@ static int dynamicPaint_initBake(struct bContext *C, struct wmOperator *op)
 	DynamicPaintSurface *surface;
 
 	/*
-	*	Get modifier data
-	*/
+	 * Get modifier data
+	 */
 	pmd = (DynamicPaintModifierData *)modifiers_findByType(ob, eModifierType_DynamicPaint);
 	if (!pmd) {
 		BKE_report(op->reports, RPT_ERROR, "Bake Failed: No Dynamic Paint modifier found.");
@@ -381,7 +380,7 @@ static int dynamicPaint_initBake(struct bContext *C, struct wmOperator *op)
 	dynamicPaint_freeSurfaceData(surface);
 
 	/* Bake was successful:
-	*  Report for ended bake and how long it took */
+	 *  Report for ended bake and how long it took */
 	if (status) {
 		/* Format time string	*/
 		char time_str[30];
@@ -397,7 +396,7 @@ static int dynamicPaint_initBake(struct bContext *C, struct wmOperator *op)
 			BLI_snprintf(result_str, sizeof(result_str), "Bake Failed: %s", canvas->error);
 			BKE_report(op->reports, RPT_ERROR, result_str);
 		}
-		else {	/* User cancelled the bake */
+		else {	/* User canceled the bake */
 			BLI_strncpy(result_str, "Baking Cancelled!", sizeof(result_str));
 			BKE_report(op->reports, RPT_WARNING, result_str);
 		}

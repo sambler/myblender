@@ -426,16 +426,14 @@ static float eff_calc_visibility(ListBase *colliders, EffectorCache *eff, Effect
 		if(col->ob == eff->ob)
 			continue;
 		
-		if(collmd->bvhtree)
-		{
+		if (collmd->bvhtree) {
 			BVHTreeRayHit hit;
 			
 			hit.index = -1;
 			hit.dist = len + FLT_EPSILON;
 			
 			// check if the way is blocked
-			if(BLI_bvhtree_ray_cast(collmd->bvhtree, point->loc, norm, 0.0f, &hit, eff_tri_ray_hit, NULL)>=0)
-			{
+			if (BLI_bvhtree_ray_cast(collmd->bvhtree, point->loc, norm, 0.0f, &hit, eff_tri_ray_hit, NULL)>=0) {
 				absorption= col->ob->pd->absorption;
 
 				// visibility is only between 0 and 1, calculated from 1-absorption
@@ -508,7 +506,7 @@ float effector_falloff(EffectorCache *eff, EffectorData *efd, EffectedPoint *UNU
 		falloff=0.0f;
 	else if(eff->pd->zdir == PFIELD_Z_NEG && fac > 0.0f)
 		falloff=0.0f;
-	else switch(eff->pd->falloff){
+	else switch(eff->pd->falloff) {
 		case PFIELD_FALL_SPHERE:
 			falloff*= falloff_func_dist(eff->pd, efd->distance);
 			break;
@@ -610,8 +608,9 @@ int get_effector_data(EffectorCache *eff, EffectorData *efd, EffectedPoint *poin
 		ParticleKey state;
 
 		/* exclude the particle itself for self effecting particles */
-		if(eff->psys == point->psys && *efd->index == point->index)
-			;
+		if(eff->psys == point->psys && *efd->index == point->index) {
+			/* pass */
+		}
 		else {
 			ParticleSimulationData sim= {NULL};
 			sim.scene= eff->scene;
@@ -716,11 +715,11 @@ static void get_effector_tot(EffectorCache *eff, EffectorData *efd, EffectedPoin
 		
 		if(eff->pd->forcefield == PFIELD_CHARGE) {
 			/* Only the charge of the effected particle is used for 
-			interaction, not fall-offs. If the fall-offs aren't the	
-			same this will be unphysical, but for animation this		
-			could be the wanted behavior. If you want physical
-			correctness the fall-off should be spherical 2.0 anyways.
-			*/
+			 * interaction, not fall-offs. If the fall-offs aren't the	
+			 * same this will be unphysical, but for animation this		
+			 * could be the wanted behavior. If you want physical
+			 * correctness the fall-off should be spherical 2.0 anyways.
+			 */
 			efd->charge = eff->pd->f_strength;
 		}
 		else if(eff->pd->forcefield == PFIELD_HARMONIC && (eff->pd->flag & PFIELD_MULTIPLE_SPRINGS)==0) {
@@ -809,7 +808,7 @@ static void do_texture_effector(EffectorCache *eff, EffectorData *efd, EffectedP
 		}
 	}
 
-	if(eff->pd->flag & PFIELD_TEX_2D){
+	if(eff->pd->flag & PFIELD_TEX_2D) {
 		float fac = -dot_v3v3(force, efd->nor);
 		madd_v3_v3fl(force, efd->nor, fac);
 	}
@@ -836,7 +835,7 @@ static void do_physical_effector(EffectorCache *eff, EffectorData *efd, Effected
 
 	copy_v3_v3(force, efd->vec_to_point);
 
-	switch(pd->forcefield){
+	switch(pd->forcefield) {
 		case PFIELD_WIND:
 			copy_v3_v3(force, efd->nor);
 			mul_v3_fl(force, strength * efd->falloff);
@@ -942,34 +941,33 @@ static void do_physical_effector(EffectorCache *eff, EffectorData *efd, Effected
 }
 
 /*  -------- pdDoEffectors() --------
-	generic force/speed system, now used for particles and softbodies
-	scene       = scene where it runs in, for time and stuff
-	lb			= listbase with objects that take part in effecting
-	opco		= global coord, as input
-	force		= force accumulator
-	speed		= actual current speed which can be altered
-	cur_time	= "external" time in frames, is constant for static particles
-	loc_time	= "local" time in frames, range <0-1> for the lifetime of particle
-	par_layer	= layer the caller is in
-	flags		= only used for softbody wind now
-	guide		= old speed of particle
-
-*/
+ * generic force/speed system, now used for particles and softbodies
+ * scene       = scene where it runs in, for time and stuff
+ * lb			= listbase with objects that take part in effecting
+ * opco		= global coord, as input
+ * force		= force accumulator
+ * speed		= actual current speed which can be altered
+ * cur_time	= "external" time in frames, is constant for static particles
+ * loc_time	= "local" time in frames, range <0-1> for the lifetime of particle
+ * par_layer	= layer the caller is in
+ * flags		= only used for softbody wind now
+ * guide		= old speed of particle
+ */
 void pdDoEffectors(ListBase *effectors, ListBase *colliders, EffectorWeights *weights, EffectedPoint *point, float *force, float *impulse)
 {
 /*
-	Modifies the force on a particle according to its
-	relation with the effector object
-	Different kind of effectors include:
-		Forcefields: Gravity-like attractor
-		(force power is related to the inverse of distance to the power of a falloff value)
-		Vortex fields: swirling effectors
-		(particles rotate around Z-axis of the object. otherwise, same relation as)
-		(Forcefields, but this is not done through a force/acceleration)
-		Guide: particles on a path
-		(particles are guided along a curve bezier or old nurbs)
-		(is independent of other effectors)
-*/
+ * Modifies the force on a particle according to its
+ * relation with the effector object
+ * Different kind of effectors include:
+ *     Forcefields: Gravity-like attractor
+ *     (force power is related to the inverse of distance to the power of a falloff value)
+ *     Vortex fields: swirling effectors
+ *     (particles rotate around Z-axis of the object. otherwise, same relation as)
+ *     (Forcefields, but this is not done through a force/acceleration)
+ *     Guide: particles on a path
+ *     (particles are guided along a curve bezier or old nurbs)
+ *     (is independent of other effectors)
+ */
 	EffectorCache *eff;
 	EffectorData efd;
 	int p=0, tot = 1, step = 1;
@@ -1000,7 +998,7 @@ void pdDoEffectors(ListBase *effectors, ListBase *colliders, EffectorWeights *we
 					do_physical_effector(eff, &efd, point, force);
 					
 					// for softbody backward compatibility
-					if(point->flag & PE_WIND_AS_SPEED && impulse){
+					if(point->flag & PE_WIND_AS_SPEED && impulse) {
 						sub_v3_v3v3(temp2, force, temp1);
 						sub_v3_v3v3(impulse, impulse, temp2);
 					}

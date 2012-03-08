@@ -29,8 +29,8 @@
  *  \ingroup expressions
  */
 
-#ifndef _PY_OBJECT_PLUS_H
-#define _PY_OBJECT_PLUS_H
+#ifndef __PYOBJECTPLUS_H__
+#define __PYOBJECTPLUS_H__
 
 /* for now keep weakrefs optional */
 #define USE_WEAKREFS
@@ -55,13 +55,6 @@ extern "C" {
 #endif
 
 #define MAX_PROP_NAME 64
-
-static inline void Py_Fatal(const char *M)
-{
-	fprintf(stderr, "%s\n", M);
-	exit(-1);
-};
-
 
 /* Use with ShowDeprecationWarning macro */
 typedef struct {
@@ -193,7 +186,7 @@ public:                                                                       \
 #define PY_SET_ATTR_SUCCESS		 0
 
 /**
- * These macros are helpfull when embedding Python routines. The second
+ * These macros are helpful when embedding Python routines. The second
  * macro is one that also requires a documentation string
  */
 #define KX_PYMETHOD(class_name, method_name)                                   \
@@ -647,9 +640,7 @@ public:
 };
 
 #ifdef WITH_PYTHON
-PyObject *py_getattr_dict(PyObject *pydict, PyObject *tp_dict);
-
 PyObject *PyUnicode_From_STR_String(const STR_String& str);
 #endif
 
-#endif //  _PY_OBJECT_PLUS_H
+#endif //  __PYOBJECTPLUS_H__

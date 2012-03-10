@@ -1996,7 +1996,7 @@ static void rna_def_space_sequencer(BlenderRNA *brna)
 	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_SEQUENCER, NULL);
 	
 	prop = RNA_def_property(srna, "show_separate_color", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "flag", SEQ_DRAW_COLOR_SEPERATED);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", SEQ_DRAW_COLOR_SEPARATED);
 	RNA_def_property_ui_text(prop, "Separate Colors", "Separate color channels in preview");
 	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_SEQUENCER, NULL);
 
@@ -2644,7 +2644,7 @@ static void rna_def_space_filebrowser(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Active Operator", "");
 
 	/* keep this for compatibility with existing presets,
-	   not exposed in c++ api because of keyword conflict */
+	 * not exposed in c++ api because of keyword conflict */
 	prop = RNA_def_property(srna, "operator", PROP_POINTER, PROP_NONE);
 	RNA_def_property_pointer_sdna(prop, NULL, "op");
 	RNA_def_property_ui_text(prop, "Active Operator", "");

@@ -1170,7 +1170,7 @@ void CLIP_OT_select_grouped(wmOperatorType *ot)
 
 	/* identifiers */
 	ot->name= "Select Grouped";
-	ot->description= "Joint Selected Tracks";
+	ot->description= "Select all tracks from specified group";
 	ot->idname= "CLIP_OT_select_grouped";
 
 	/* api callbacks */
@@ -1824,13 +1824,20 @@ static int clear_track_path_exec(bContext *C, wmOperator *op)
 	MovieTrackingTrack *track;
 	ListBase *tracksbase= BKE_tracking_get_tracks(&clip->tracking);
 	int action= RNA_enum_get(op->ptr, "action");
+	int clear_active= RNA_boolean_get(op->ptr, "clear_active");
 
-	track= tracksbase->first;
-	while(track) {
-		if(TRACK_VIEW_SELECTED(sc, track))
-			BKE_tracking_clear_path(track, sc->user.framenr, action);
+	if (clear_active) {
+		track= BKE_tracking_active_track(&clip->tracking);
+		BKE_tracking_clear_path(track, sc->user.framenr, action);
+	}
+	else {
+		track= tracksbase->first;
+		while(track) {
+			if(TRACK_VIEW_SELECTED(sc, track))
+				BKE_tracking_clear_path(track, sc->user.framenr, action);
 
-		track= track->next;
+			track= track->next;
+		}
 	}
 
 	WM_event_add_notifier(C, NC_MOVIECLIP|NA_EVALUATED, clip);
@@ -1861,6 +1868,7 @@ void CLIP_OT_clear_track_path(wmOperatorType *ot)
 
 	/* proeprties */
 	RNA_def_enum(ot->srna, "action", clear_path_actions, TRACK_CLEAR_REMAINED, "Action", "Clear action to execute");
+	RNA_def_boolean(ot->srna, "clear_active", 0, "Clear Active", "Clear active track only instead of all selected tracks");
 }
 
 /********************** disable markers operator *********************/
@@ -2965,6 +2973,9 @@ static int join_tracks_exec(bContext *C, wmOperator *op)
 
 		if(TRACK_VIEW_SELECTED(sc, track) && track!=act_track) {
 			BKE_tracking_join_tracks(act_track, track);
+
+			if(tracking->stabilization.rot_track == track)
+				tracking->stabilization.rot_track= act_track;
 
 			BKE_tracking_free_track(track);
 			BLI_freelinkN(tracksbase, track);

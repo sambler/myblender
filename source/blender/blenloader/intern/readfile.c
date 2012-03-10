@@ -952,7 +952,7 @@ static FileData *filedata_new(void)
 	fd->gzfiledes = NULL;
 
 		/* XXX, this doesn't need to be done all the time,
-		 * but it keeps us reentrant,  remove once we have
+		 * but it keeps us re-entrant,  remove once we have
 		 * a lib that provides a nice lock. - zr
 		 */
 	fd->memsdna = DNA_sdna_from_data(DNAstr,  DNAlen,  0);
@@ -3750,18 +3750,7 @@ static void direct_link_mdisps(FileData *fd, int count, MDisps *mdisps, int exte
 
 		for(i = 0; i < count; ++i) {
 			mdisps[i].disps = newdataadr(fd, mdisps[i].disps);
-			
-			/*put .disps into cellalloc system*/
-			if (mdisps[i].disps) {
-				float *disp2;
-				
-				disp2 = MEM_mallocN(MEM_allocN_len(mdisps[i].disps), "cellalloc .disps copy");
-				memcpy(disp2, mdisps[i].disps, MEM_allocN_len(mdisps[i].disps));
-				
-				MEM_freeN(mdisps[i].disps);
-				mdisps[i].disps = (float (*)[3])disp2;
-			}
-			
+
 			if( (fd->flags & FD_FLAGS_SWITCH_ENDIAN) && (mdisps[i].disps) ) {
 				/* DNA_struct_switch_endian doesn't do endian swap for (*disps)[] */
 				/* this does swap for data written at write_mdisps() - readfile.c */
@@ -4257,7 +4246,7 @@ static void direct_link_pose(FileData *fd, bPose *pose)
 		pchan->iktree.first= pchan->iktree.last= NULL;
 		pchan->siktree.first= pchan->siktree.last= NULL;
 		
-		/* incase this value changes in future, clamp else we get undefined behavior */
+		/* in case this value changes in future, clamp else we get undefined behavior */
 		CLAMP(pchan->rotmode, ROT_MODE_MIN, ROT_MODE_MAX);
 	}
 	pose->ikdata = NULL;
@@ -4711,7 +4700,7 @@ static void direct_link_object(FileData *fd, Object *ob)
 
 			/* Do conversion here because if we have loaded
 			 * a hook we need to make sure it gets converted
-			 * and free'd, regardless of version.
+			 * and freed, regardless of version.
 			 */
 		copy_v3_v3(hmd->cent, hook->cent);
 		hmd->falloff = hook->falloff;
@@ -4736,7 +4725,7 @@ static void direct_link_object(FileData *fd, Object *ob)
 	ob->gpulamp.first= ob->gpulamp.last= NULL;
 	link_list(fd, &ob->pc_ids);
 
-	/* incase this value changes in future, clamp else we get undefined behavior */
+	/* in case this value changes in future, clamp else we get undefined behavior */
 	CLAMP(ob->rotmode, ROT_MODE_MIN, ROT_MODE_MAX);
 
 	if(ob->sculpt) {
@@ -13245,6 +13234,20 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 			do_versions_nodetree_multi_file_output_format_2_62_1(NULL, ntree);
 	}
 
+	/* put compatibility code here until next subversion bump */
+	{
+		{
+			/* Set new idname of keyingsets from their now "label-only" name. */
+			Scene *scene;
+			for (scene = main->scene.first; scene; scene = scene->id.next) {
+				KeyingSet *ks;
+				for (ks = scene->keyingsets.first; ks; ks = ks->next) {
+					if (!ks->idname[0])
+						BLI_strncpy(ks->idname, ks->name, sizeof(ks->idname));
+				}
+			}
+		}
+	}
 
 	/* WATCH IT!!!: pointers from libdata have not been converted yet here! */
 	/* WATCH IT 2!: Userdef struct init has to be in editors/interface/resources.c! */

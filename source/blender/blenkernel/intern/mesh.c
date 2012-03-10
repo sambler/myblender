@@ -1900,7 +1900,7 @@ void convert_mfaces_to_mpolys(Mesh *mesh)
 	int numTex, numCol;
 	int i, j, totloop;
 
-	/* just incase some of these layers are filled in (can happen with python created meshes) */
+	/* just in case some of these layers are filled in (can happen with python created meshes) */
 	CustomData_free(&mesh->ldata, mesh->totloop);
 	CustomData_free(&mesh->pdata, mesh->totpoly);
 	memset(&mesh->ldata, 0, sizeof(mesh->ldata));
@@ -2303,17 +2303,14 @@ int mesh_recalcTessellation(CustomData *fdata,
 
 
 		else if (mp->totloop == 3) {
-			ml = mloop + mp->loopstart;
 			ML_TO_MF(0, 1, 2)
 			mface_index++;
 		}
 		else if (mp->totloop == 4) {
 #ifdef USE_TESSFACE_QUADS
-			ml = mloop + mp->loopstart;
 			ML_TO_MF_QUAD()
 			mface_index++;
 #else
-			ml = mloop + mp->loopstart;
 			ML_TO_MF(0, 1, 2)
 			mface_index++;
 			ML_TO_MF(0, 2, 3)
@@ -2622,9 +2619,9 @@ static void mesh_calc_ngon_normal(MPoly *mpoly, MLoop *loopstart,
 		v2 = mvert + loopstart[(i+1)%mpoly->totloop].v;
 		v3 = mvert + loopstart[(i+2)%mpoly->totloop].v;
 		
-		VECCOPY(u, v1->co);
-		VECCOPY(v, v2->co);
-		VECCOPY(w, v3->co);
+		copy_v3db_v3fl(u, v1->co);
+		copy_v3db_v3fl(v, v2->co);
+		copy_v3db_v3fl(w, v3->co);
 
 		/*this fixes some weird numerical error*/
 		if (i==0) {
@@ -2712,9 +2709,9 @@ static void mesh_calc_ngon_normal_coords(MPoly *mpoly, MLoop *loopstart,
 		v2 = (const float *)(vertex_coords + loopstart[(i+1)%mpoly->totloop].v);
 		v3 = (const float *)(vertex_coords + loopstart[(i+2)%mpoly->totloop].v);
 
-		VECCOPY(u, v1);
-		VECCOPY(v, v2);
-		VECCOPY(w, v3);
+		copy_v3db_v3fl(u, v1);
+		copy_v3db_v3fl(v, v2);
+		copy_v3db_v3fl(w, v3);
 
 		/*this fixes some weird numerical error*/
 		if (i==0) {

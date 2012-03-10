@@ -1421,7 +1421,7 @@ static TransDataCurveHandleFlags *initTransDataCurveHandles(TransData *td, struc
 	hdata = td->hdata = MEM_mallocN(sizeof(TransDataCurveHandleFlags), "CuHandle Data");
 	hdata->ih1 = bezt->h1;
 	hdata->h1 = &bezt->h1;
-	hdata->ih2 = bezt->h2; /* incase the second is not selected */
+	hdata->ih2 = bezt->h2; /* in case the second is not selected */
 	hdata->h2 = &bezt->h2;
 	return hdata;
 }
@@ -2484,7 +2484,6 @@ static void createTransUVs(bContext *C, TransInfo *t)
 		if (!BM_elem_flag_test(efa, BM_ELEM_TAG))
 			continue;
 
-		tf= CustomData_bmesh_get(&em->bm->pdata, efa->head.data, CD_MTEXPOLY);
 		BM_ITER(l, &liter, em->bm, BM_LOOPS_OF_FACE, efa) {
 			if (!propmode && !uvedit_uv_selected(em, scene, l))
 				continue;
@@ -5481,8 +5480,8 @@ static void markerToTransDataInit(TransData *td, TransData2D *td2d,
 
 	td->flag = 0;
 	td->loc = td2d->loc;
-	VECCOPY(td->center, td->loc);
-	VECCOPY(td->iloc, td->loc);
+	copy_v3_v3(td->center, td->loc);
+	copy_v3_v3(td->iloc, td->loc);
 
 	memset(td->axismtx, 0, sizeof(td->axismtx));
 	td->axismtx[2][2] = 1.0f;
@@ -5627,8 +5626,8 @@ static void markerToTransCurveDataInit(TransData *td, TransData2D *td2d, TransDa
 
 	td->flag = 0;
 	td->loc = td2d->loc;
-	VECCOPY(td->center, td->loc);
-	VECCOPY(td->iloc, td->loc);
+	copy_v3_v3(td->center, td->loc);
+	copy_v3_v3(td->iloc, td->loc);
 
 	memset(td->axismtx, 0, sizeof(td->axismtx));
 	td->axismtx[2][2] = 1.0f;

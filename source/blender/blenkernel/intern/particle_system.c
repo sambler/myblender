@@ -398,7 +398,7 @@ void psys_calc_dmcache(Object *ob, DerivedMesh *dm, ParticleSystem *psys)
 	else {
 		/* TODO PARTICLE, make the following line unnecessary, each function
 		 * should know to use the num or num_dmcache, set the num_dmcache to
-		 * an invalid value, just incase */
+		 * an invalid value, just in case */
 		
 		LOOP_PARTICLES
 			pa->num_dmcache = -1;
@@ -2343,7 +2343,7 @@ typedef struct SPHData {
 	float mass;
 	EdgeHash *eh;
 	float *gravity;
-	/* Average distance to neighbours (other particles in the support domain),
+	/* Average distance to neighbors (other particles in the support domain),
 	 * for calculating the Courant number (adaptive time step). */
 	int pass;
 	float element_size;
@@ -2411,7 +2411,7 @@ static void sph_particle_courant(SPHData *sphdata, SPHRangeData *pfr)
 		mul_v3_v3fl(sphdata->flow, flow, 1.0f / pfr->tot_neighbors);
 	} else {
 		sphdata->element_size = MAXFLOAT;
-		VECCOPY(sphdata->flow, flow);
+		copy_v3_v3(sphdata->flow, flow);
 	}
 }
 static void sph_force_cb(void *sphdata_v, ParticleKey *state, float *force, float *UNUSED(impulse))
@@ -3701,7 +3701,7 @@ static void save_hair(ParticleSimulationData *sim, float UNUSED(cfra))
 /* Code for an adaptive time step based on the Courant-Friedrichs-Lewy
  * condition. */
 #define MIN_TIMESTEP 1.0f / 101.0f
-/* Tolerance of 1.5 means the last subframe neither favours growing nor
+/* Tolerance of 1.5 means the last subframe neither favors growing nor
  * shrinking (e.g if it were 1.3, the last subframe would tend to be too
  * small). */
 #define TIMESTEP_EXPANSION_TOLERANCE 1.5f

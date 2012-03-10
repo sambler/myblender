@@ -974,7 +974,7 @@ static void free_softbody_intern(SoftBody *sb)
 ** Q: why not use 'simple' collision here like bouncing back a particle
 **   --> reverting is velocity on the face normal
 ** A: because our particles are not alone here
-**    and need to tell their neighbours exactly what happens via spring forces
+**    and need to tell their neighbors exactly what happens via spring forces
 ** unless sbObjectStep( .. ) is called on sub frame timing level
 ** BTW that also questions the use of a 'implicit' solvers on softbodies
 ** since that would only valid for 'slow' moving collision targets and dito particles
@@ -2756,7 +2756,7 @@ static void softbody_calc_forces(Scene *scene, Object *ob, float forcetime, floa
 								/*bjornmose:  uugh.. what an evil hack
 								violation of the 'don't touch bp->pos in here' rule
 								but works nice, like this-->
-								we predict the solution beeing out of the collider
+								we predict the solution being out of the collider
 								in heun step No1 and leave the heun step No2 adapt to it
 								so we kind of introduced a implicit solver for this case
 								*/
@@ -3800,18 +3800,18 @@ static void softbody_update_positions(Object *ob, SoftBody *sb, float (*vertexCo
 
 /* void SB_estimate_transform */
 /* input   Object *ob out (says any object that can do SB like mesh,lattice,curve )
-   output  float lloc[3],float lrot[3][3],float lscale[3][3]
-   that is:
-   a precise position vector denoting the motion of the center of mass
-   give a rotation/scale matrix using averaging method, that's why estimate and not calculate
-   see: this is kind of reverse engeneering: having to states of a point cloud and recover what happend
-   our advantage here we know the identity of the vertex
-   there are others methods giving other results.
-   lloc,lrot,lscale are allowed to be NULL, just in case you don't need it.
-   should be pretty useful for pythoneers :)
-   not! velocity .. 2nd order stuff
-   vcloud_estimate_transform see
-   */
+ * output  float lloc[3],float lrot[3][3],float lscale[3][3]
+ * that is:
+ * a precise position vector denoting the motion of the center of mass
+ * give a rotation/scale matrix using averaging method, that's why estimate and not calculate
+ * see: this is kind of reverse engeneering: having to states of a point cloud and recover what happend
+ * our advantage here we know the identity of the vertex
+ * there are others methods giving other results.
+ * lloc,lrot,lscale are allowed to be NULL, just in case you don't need it.
+ * should be pretty useful for pythoneers :)
+ * not! velocity .. 2nd order stuff
+ * vcloud_estimate_transform see
+ */
 
 void SB_estimate_transform(Object *ob,float lloc[3],float lrot[3][3],float lscale[3][3])
 {
@@ -3861,11 +3861,11 @@ static void softbody_reset(Object *ob, SoftBody *sb, float (*vertexCos)[3], int 
 
 		/* the bp->prev*'s are for rolling back from a canceled try to propagate in time
 		 * adaptive step size algo in a nutshell:
-		 * 1.  set sheduled time step to new dtime
-		 * 2.  try to advance the sheduled time step, beeing optimistic execute it
+		 * 1.  set scheduled time step to new dtime
+		 * 2.  try to advance the scheduled time step, being optimistic execute it
 		 * 3.  check for success
-		 * 3.a we 're fine continue, may be we can increase sheduled time again ?? if so, do so!
-		 * 3.b we did exceed error limit --> roll back, shorten the sheduled time and try again at 2.
+		 * 3.a we 're fine continue, may be we can increase scheduled time again ?? if so, do so!
+		 * 3.b we did exceed error limit --> roll back, shorten the scheduled time and try again at 2.
 		 * 4.  check if we did reach dtime
 		 * 4.a nope we need to do some more at 2.
 		 * 4.b yup we're done

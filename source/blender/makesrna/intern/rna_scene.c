@@ -362,7 +362,7 @@ static void rna_Scene_object_unlink(Scene *scene, ReportList *reports, Object *o
 
 	ob->id.us--;
 
-	/* needed otherwise the depgraph will contain free'd objects which can crash, see [#20958] */
+	/* needed otherwise the depgraph will contain freed objects which can crash, see [#20958] */
 	DAG_scene_sort(G.main, scene);
 	DAG_ids_flush_update(G.main, 0);
 
@@ -412,6 +412,13 @@ static void rna_Scene_layer_set(PointerRNA *ptr, const int *values)
 	Scene *scene = (Scene*)ptr->data;
 
 	scene->lay = ED_view3d_scene_layer_set(scene->lay, values, &scene->layact);
+}
+
+static int rna_Scene_active_layer_get(PointerRNA *ptr)
+{
+	Scene *scene = (Scene*)ptr->data;
+
+	return (int)(log(scene->layact)/M_LN2);
 }
 
 static void rna_Scene_view3d_update(Main *bmain, Scene *UNUSED(scene_unused), PointerRNA *ptr)
@@ -1321,12 +1328,12 @@ static void rna_TimeLine_clear(Scene *scene)
 	WM_main_add_notifier(NC_ANIMATION|ND_MARKERS, NULL);
 }
 
-static KeyingSet *rna_Scene_keying_set_new(Scene *sce, ReportList *reports, const char name[])
+static KeyingSet *rna_Scene_keying_set_new(Scene *sce, ReportList *reports, const char idname[], const char name[])
 {
 	KeyingSet *ks = NULL;
 
 	/* call the API func, and set the active keyingset index */
-	ks = BKE_keyingset_add(&sce->keyingsets, name, KEYINGSET_ABSOLUTE, 0);
+	ks = BKE_keyingset_add(&sce->keyingsets, idname, name, KEYINGSET_ABSOLUTE, 0);
 	
 	if (ks) {
 		sce->active_keyingset = BLI_countlist(&sce->keyingsets);
@@ -3948,7 +3955,8 @@ static void rna_def_scene_keying_sets(BlenderRNA *brna, PropertyRNA *cprop)
 	RNA_def_function_ui_description(func, "Add a new Keying Set to Scene");
 	RNA_def_function_flag(func, FUNC_USE_REPORTS);
 	/* name */
-	RNA_def_string(func, "name", "KeyingSet", 64, "Name", "Name of Keying Set");
+	RNA_def_string(func, "idname", "KeyingSet", 64, "IDName", "Internal identifier of Keying Set");
+	RNA_def_string(func, "name", "KeyingSet", 64, "Name", "User visible name of Keying Set");
 
 	/* returns the new KeyingSet */
 	parm = RNA_def_pointer(func, "keyingset", "KeyingSet", "", "Newly created Keying Set");
@@ -4096,7 +4104,13 @@ void RNA_def_scene(BlenderRNA *brna)
 	RNA_def_property_boolean_funcs(prop, NULL, "rna_Scene_layer_set");
 	RNA_def_property_ui_text(prop, "Layers", "Layers visible when rendering the scene");
 	RNA_def_property_update(prop, NC_SCENE|ND_LAYER, "rna_Scene_layer_update");
-	
+
+	/* active layer */
+	prop = RNA_def_property(srna, "active_layer", PROP_INT, PROP_NONE);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE|PROP_EDITABLE);
+	RNA_def_property_int_funcs(prop, "rna_Scene_active_layer_get", NULL, NULL);
+	RNA_def_property_ui_text(prop, "Active Layer", "Active scene layer index");
+
 	/* Frame Range Stuff */
 	prop = RNA_def_property(srna, "frame_current", PROP_INT, PROP_TIME);
 	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);

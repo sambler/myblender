@@ -41,8 +41,6 @@
  * TESTING ONLY! */
 // #define USE_DEBUG_INDEX_MEMCHECK
 
-int BM_edge_splice(BMesh *bm, BMEdge *e, BMEdge *etarget);
-
 #ifdef USE_DEBUG_INDEX_MEMCHECK
 #define DEBUG_MEMCHECK_INDEX_INVALIDATE(ele)               \
 	{                                                      \
@@ -1739,14 +1737,16 @@ static int bm_vert_splice(BMesh *bm, BMVert *v, BMVert *vtarget)
 }
 
 /**
- * \brief Cut Vert
+ * \brief Separate Vert
  *
- * Cut all disjoint fans that meet at a vertex, making a unique
+ * Separates all disjoint fans that meet at a vertex, making a unique
  * vertex for each region. returns an array of all resulting vertices.
+ *
+ * \note this is a low level function, bm_edge_separate needs to run on edges first
  *
  * \return Success
  */
-static int bm_vert_cut(BMesh *bm, BMVert *v, BMVert ***vout, int *len)
+int bmesh_vert_separate(BMesh *bm, BMVert *v, BMVert ***r_vout, int *r_vout_len)
 {
 	BMEdge **stack = NULL;
 	BLI_array_declare(stack);
@@ -1758,7 +1758,7 @@ static int bm_vert_cut(BMesh *bm, BMVert *v, BMVert ***vout, int *len)
 	int i, maxindex;
 	BMLoop *nl;
 
-	visithash = BLI_ghash_new(BLI_ghashutil_ptrhash, BLI_ghashutil_ptrcmp, "bmesh_vert_cut visithash");
+	visithash = BLI_ghash_new(BLI_ghashutil_ptrhash, BLI_ghashutil_ptrcmp, __func__);
 
 	maxindex = 0;
 	BM_ITER(e, &eiter, bm, BM_EDGES_OF_VERT, v) {
@@ -1786,7 +1786,7 @@ static int bm_vert_cut(BMesh *bm, BMVert *v, BMVert ***vout, int *len)
 	}
 
 	/* Make enough verts to split v for each group */
-	verts = MEM_callocN(sizeof(BMVert *) * maxindex, "bmesh_vert_cut");
+	verts = MEM_callocN(sizeof(BMVert *) * maxindex, __func__);
 	verts[0] = v;
 	for (i = 1; i < maxindex; i++) {
 		verts[i] = BM_vert_create(bm, v->co, v);
@@ -1829,18 +1829,36 @@ static int bm_vert_cut(BMesh *bm, BMVert *v, BMVert ***vout, int *len)
 		BM_CHECK_ELEMENT(bm, verts[i]);
 	}
 
-	if (len != NULL) {
-		*len = maxindex;
+	if (r_vout_len != NULL) {
+		*r_vout_len = maxindex;
 	}
 
-	if (vout != NULL) {
-		*vout = verts;
+	if (r_vout != NULL) {
+		*r_vout = verts;
 	}
 	else {
 		MEM_freeN(verts);
 	}
 
 	return TRUE;
+}
+
+/**
+ * High level function which wraps both #bm_vert_separate and #bm_edge_separate
+ */
+int BM_vert_separate(BMesh *bm, BMVert *v, BMVert ***r_vout, int *r_vout_len,
+                     BMEdge **e_in, int e_in_len)
+{
+	int i;
+
+	for (i = 0; i < e_in_len; i++) {
+		BMEdge *e = e_in[i];
+		if (e->l && BM_vert_in_edge(e, v)) {
+			bmesh_edge_separate(bm, e, e->l);
+		}
+	}
+
+	return bmesh_vert_separate(bm, v, r_vout, r_vout_len);
 }
 
 /**
@@ -1881,22 +1899,22 @@ int BM_edge_splice(BMesh *bm, BMEdge *e, BMEdge *etarget)
 }
 
 /**
- * \brief Cut Edge
+ * \brief Separate Edge
  *
- * Cuts a single edge into two edge: the original edge and
- * a new edge that has only \a cutl in its radial.
+ * Separates a single edge into two edge: the original edge and
+ * a new edge that has only \a l_sep in its radial.
  *
  * \return Success
  *
- * \note Does nothing if \a cutl is already the only loop in the
+ * \note Does nothing if \a l_sep is already the only loop in the
  * edge radial.
  */
-static int bm_edge_cut(BMesh *bm, BMEdge *e, BMLoop *cutl)
+int bmesh_edge_separate(BMesh *bm, BMEdge *e, BMLoop *l_sep)
 {
 	BMEdge *ne;
 	int radlen;
 
-	BLI_assert(cutl->e == e);
+	BLI_assert(l_sep->e == e);
 	BLI_assert(e->l);
 	
 	radlen = bmesh_radial_length(e->l);
@@ -1905,14 +1923,14 @@ static int bm_edge_cut(BMesh *bm, BMEdge *e, BMLoop *cutl)
 		return TRUE;
 	}
 
-	if (cutl == e->l) {
-		e->l = cutl->radial_next;
+	if (l_sep == e->l) {
+		e->l = l_sep->radial_next;
 	}
 
 	ne = BM_edge_create(bm, e->v1, e->v2, e, FALSE);
-	bmesh_radial_loop_remove(cutl, e);
-	bmesh_radial_append(ne, cutl);
-	cutl->e = ne;
+	bmesh_radial_loop_remove(l_sep, e);
+	bmesh_radial_append(ne, l_sep);
+	l_sep->e = ne;
 
 	BLI_assert(bmesh_radial_length(e->l) == radlen - 1);
 	BLI_assert(bmesh_radial_length(ne->l) == 1);
@@ -1930,7 +1948,7 @@ static int bm_edge_cut(BMesh *bm, BMEdge *e, BMLoop *cutl)
  *
  * \return The newly created BMVert
  */
-static BMVert *bm_urmv_loop(BMesh *bm, BMLoop *sl)
+BMVert *bmesh_urmv_loop(BMesh *bm, BMLoop *sl)
 {
 	BMVert **vtar;
 	int len, i;
@@ -1939,8 +1957,8 @@ static BMVert *bm_urmv_loop(BMesh *bm, BMLoop *sl)
 
 	/* peel the face from the edge radials on both sides of the
 	 * loop vert, disconnecting the face from its fan */
-	bm_edge_cut(bm, sl->e, sl);
-	bm_edge_cut(bm, sl->prev->e, sl->prev);
+	bmesh_edge_separate(bm, sl->e, sl);
+	bmesh_edge_separate(bm, sl->prev->e, sl->prev);
 
 	if (bmesh_disk_count(sv) == 2) {
 		/* If there are still only two edges out of sv, then
@@ -1949,7 +1967,7 @@ static BMVert *bm_urmv_loop(BMesh *bm, BMLoop *sl)
 	}
 
 	/* Update the disk start, so that v->e points to an edge
-	 * not touching the split loop. This is so that bmesh_vert_cut
+	 * not touching the split loop. This is so that BM_vert_split
 	 * will leave the original sv on some *other* fan (not the
 	 * one-face fan that holds the unglue face). */
 	while (sv->e == sl->e || sv->e == sl->prev->e) {
@@ -1958,7 +1976,7 @@ static BMVert *bm_urmv_loop(BMesh *bm, BMLoop *sl)
 
 	/* Split all fans connected to the vert, duplicating it for
 	 * each fans. */
-	bm_vert_cut(bm, sv, &vtar, &len);
+	bmesh_vert_separate(bm, sv, &vtar, &len);
 
 	/* There should have been at least two fans cut apart here,
 	 * otherwise the early exit would have kicked in. */
@@ -2007,20 +2025,6 @@ static BMVert *bm_urmv_loop(BMesh *bm, BMLoop *sl)
  */
 BMVert *bmesh_urmv(BMesh *bm, BMFace *sf, BMVert *sv)
 {
-	BMLoop *l_first;
-	BMLoop *l_iter;
-
-	l_iter = l_first = BM_FACE_FIRST_LOOP(sf);
-	do {
-		if (l_iter->v == sv) {
-			break;
-		}
-	} while ((l_iter = l_iter->next) != l_first);
-
-	if (l_iter->v != sv) {
-		/* sv is not part of sf */
-		return NULL;
-	}
-
-	return bm_urmv_loop(bm, l_iter);
+	BMLoop *l = BM_face_vert_share_loop(sf, sv);
+	return bmesh_urmv_loop(bm, l);
 }

@@ -961,7 +961,7 @@ static PyObject *bpy_bmedge_other_vert(BPy_BMEdge *self, BPy_BMVert *value)
 	BPY_BM_CHECK_OBJ(value);
 
 	if (self->bm != value->bm) {
-		PyErr_SetString(PyExc_TypeError,
+		PyErr_SetString(PyExc_ValueError,
 		                "BMEdge.other_vert(vert): vert is from another mesh");
 		return NULL;
 	}
@@ -2309,6 +2309,7 @@ void BPy_BM_init_types(void)
 
 	/* only 1 iteratir so far */
 	BPy_BMIter_Type.tp_iternext = (iternextfunc)bpy_bmiter_next;
+	BPy_BMIter_Type.tp_iter     = PyObject_SelfIter;
 
 	BPy_BMesh_Type.tp_dealloc     = (destructor)bpy_bmesh_dealloc;
 	BPy_BMVert_Type.tp_dealloc    = (destructor)bpy_bmvert_dealloc;
@@ -2625,7 +2626,7 @@ void *BPy_BMElem_PySeq_As_Array(BMesh **r_bm, PyObject *seq, Py_ssize_t min, Py_
 			/* trick so we can ensure all items have the same mesh,
 			 * and allows us to pass the 'bm' as NULL. */
 			else if (do_bm_check && (bm  && bm != item->bm)) {
-				PyErr_Format(PyExc_TypeError,
+				PyErr_Format(PyExc_ValueError,
 				             "%s: %d %s is from another mesh",
 				             error_prefix, i, type->tp_name);
 				goto err_cleanup;
@@ -2672,4 +2673,16 @@ err_cleanup:
 		PyMem_FREE(alloc);
 		return NULL;
 	}
+}
+
+
+PyObject *BPy_BMElem_Array_As_Tuple(BMesh *bm, BMHeader **elem, Py_ssize_t elem_len)
+{
+	Py_ssize_t i;
+	PyObject *ret = PyTuple_New(elem_len);
+	for (i = 0; i < elem_len; i++) {
+		PyTuple_SET_ITEM(ret, i, BPy_BMElem_CreatePyObject(bm, elem[i]));
+	}
+
+	return ret;
 }

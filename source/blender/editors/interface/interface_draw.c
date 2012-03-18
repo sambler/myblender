@@ -1052,7 +1052,7 @@ void ui_draw_but_COLORBAND(uiBut *but, uiWidgetColors *UNUSED(wcol), rcti *rect)
 	float x1, y1, sizex, sizey;
 	float v3[2], v1[2], v2[2], v1a[2], v2a[2];
 	int a;
-	float pos, colf[4]= {0,0,0,0}; /* initialize in case the colorband isnt valid */
+	float pos, colf[4]= {0,0,0,0}; /* initialize in case the colorband isn't valid */
 		
 	coba= (ColorBand *)(but->editcoba? but->editcoba: but->poin);
 	if(coba==NULL) return;
@@ -1088,7 +1088,7 @@ void ui_draw_but_COLORBAND(uiBut *but, uiWidgetColors *UNUSED(wcol), rcti *rect)
 	
 	for( a = 1; a <= sizex; a++ ) {
 		pos = ((float)a) / (sizex-1);
-		do_colorband( coba, pos, colf );
+		do_colorband(coba, pos, colf);
 		if (but->block->color_profile != BLI_PR_NONE)
 			linearrgb_to_srgb_v3_v3(colf, colf);
 		

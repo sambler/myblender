@@ -484,11 +484,14 @@ static void layerCopy_mdisps(const void *source, void *dest, int count)
 	for(i = 0; i < count; ++i) {
 		if(s[i].disps) {
 			d[i].disps = MEM_dupallocN(s[i].disps);
+			d[i].hidden = MEM_dupallocN(s[i].hidden);
 			d[i].totdisp = s[i].totdisp;
+			d[i].level = s[i].level;
 		}
 		else {
 			d[i].disps = NULL;
 			d[i].totdisp = 0;
+			d[i].level = 0;
 		}
 		
 	}
@@ -502,8 +505,12 @@ static void layerFree_mdisps(void *data, int count, int UNUSED(size))
 	for(i = 0; i < count; ++i) {
 		if(d[i].disps)
 			MEM_freeN(d[i].disps);
+		if(d[i].hidden)
+			MEM_freeN(d[i].hidden);
 		d[i].disps = NULL;
+		d[i].hidden = NULL;
 		d[i].totdisp = 0;
+		d[i].level = 0;
 	}
 }
 
@@ -656,17 +663,17 @@ static void layerInterp_mloopcol(void **sources, float *weights,
 		float weight = weights ? weights[i] : 1;
 		MLoopCol *src = sources[i];
 		if (sub_weights) {
-			col.a += src->a * (*sub_weight) * weight;
 			col.r += src->r * (*sub_weight) * weight;
 			col.g += src->g * (*sub_weight) * weight;
 			col.b += src->b * (*sub_weight) * weight;
+			col.a += src->a * (*sub_weight) * weight;
 			sub_weight++;
 		}
 		else {
-			col.a += src->a * weight;
 			col.r += src->r * weight;
 			col.g += src->g * weight;
 			col.b += src->b * weight;
+			col.a += src->a * weight;
 		}
 	}
 	
@@ -677,10 +684,10 @@ static void layerInterp_mloopcol(void **sources, float *weights,
 	CLAMP(col.g, 0.0f, 255.0f);
 	CLAMP(col.b, 0.0f, 255.0f);
 	
-	mc->a = (int)col.a;
 	mc->r = (int)col.r;
 	mc->g = (int)col.g;
 	mc->b = (int)col.b;
+	mc->a = (int)col.a;
 }
 
 static void layerCopyValue_mloopuv(void *source, void *dest)
@@ -2306,9 +2313,9 @@ void *CustomData_bmesh_get_layer_n(const CustomData *data, void *block, int n)
 	return (char *)block + data->layers[n].offset;
 }
 
-int CustomData_layer_has_math(struct CustomData *data, int layern)
+int CustomData_layer_has_math(struct CustomData *data, int layer_n)
 {
-	const LayerTypeInfo *typeInfo = layerType_getInfo(data->layers[layern].type);
+	const LayerTypeInfo *typeInfo = layerType_getInfo(data->layers[layer_n].type);
 	
 	if (typeInfo->equal && typeInfo->add && typeInfo->multiply && 
 	    typeInfo->initminmax && typeInfo->dominmax) return 1;

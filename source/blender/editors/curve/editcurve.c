@@ -2256,13 +2256,13 @@ static int smooth_radius_exec(bContext *C, wmOperator *UNUSED(op))
 						/* if endpoints selected, then use them */
 						if (start_sel==0) {
 							start_rad = (nu->bezt+start_sel)->radius;
-							start_sel++; /* we dont want to edit the selected endpoint */
+							start_sel++; /* we don't want to edit the selected endpoint */
 						} else {
 							start_rad = (nu->bezt+start_sel-1)->radius;
 						}
 						if (end_sel==nu->pntsu-1) {
 							end_rad = (nu->bezt+end_sel)->radius;
-							end_sel--; /* we dont want to edit the selected endpoint */
+							end_sel--; /* we don't want to edit the selected endpoint */
 						} else {
 							end_rad = (nu->bezt+end_sel+1)->radius;
 						}
@@ -2318,13 +2318,13 @@ static int smooth_radius_exec(bContext *C, wmOperator *UNUSED(op))
 						/* if endpoints selected, then use them */
 						if (start_sel==0) {
 							start_rad = (nu->bp+start_sel)->radius;
-							start_sel++; /* we dont want to edit the selected endpoint */
+							start_sel++; /* we don't want to edit the selected endpoint */
 						} else {
 							start_rad = (nu->bp+start_sel-1)->radius;
 						}
 						if (end_sel==nu->pntsu-1) {
 							end_rad = (nu->bp+end_sel)->radius;
-							end_sel--; /* we dont want to edit the selected endpoint */
+							end_sel--; /* we don't want to edit the selected endpoint */
 						} else {
 							end_rad = (nu->bp+end_sel+1)->radius;
 						}
@@ -2502,7 +2502,7 @@ static int de_select_first_exec(bContext *C, wmOperator *UNUSED(op))
 void CURVE_OT_de_select_first(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Select or Deselect First";
+	ot->name= "(De)select First";
 	ot->idname= "CURVE_OT_de_select_first";
 	
 	/* api cfirstbacks */
@@ -2526,7 +2526,7 @@ static int de_select_last_exec(bContext *C, wmOperator *UNUSED(op))
 void CURVE_OT_de_select_last(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Select or Deselect Last";
+	ot->name= "(De)select Last";
 	ot->idname= "CURVE_OT_de_select_last";
 	
 	/* api clastbacks */
@@ -2604,7 +2604,7 @@ static int de_select_all_exec(bContext *C, wmOperator *op)
 void CURVE_OT_select_all(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Select or Deselect All";
+	ot->name= "(De)select All";
 	ot->idname= "CURVE_OT_select_all";
 	
 	/* api callbacks */

@@ -600,7 +600,7 @@ void clear_text(Text *text) /* called directly from rna */
 	txt_set_undostate( 1 );
 	txt_sel_all( text );
 	txt_delete_sel(text);
-	txt_set_undostate( oldstate );
+	txt_set_undostate(oldstate);
 
 	txt_make_dirty(text);
 }
@@ -609,10 +609,10 @@ void write_text(Text *text, const char *str) /* called directly from rna */
 {
 	int oldstate;
 
-	oldstate = txt_get_undostate(  );
-	txt_insert_buf( text, str );
-	txt_move_eof( text, 0 );
-	txt_set_undostate( oldstate );
+	oldstate = txt_get_undostate();
+	txt_insert_buf(text, str);
+	txt_move_eof(text, 0);
+	txt_set_undostate(oldstate);
 
 	txt_make_dirty(text);
 }
@@ -1674,7 +1674,7 @@ void txt_print_undo(Text *text)
 					uc= uc+(text->undo_buf[i]<<24); i++;
 					c_len= BLI_str_utf8_from_unicode(uc, c);
 					c[c_len]= '\0';
-					printf ("%s", c);
+					puts(c);
 				}
 			}
 		} else if (op==UNDO_STO || op==UNDO_CTO) {

@@ -242,7 +242,7 @@ BM_INLINE void _bm_elem_flag_merge(BMHeader *head_a, BMHeader *head_b);
  *                    valid value inline.
  *
  * - 'set_dirty!'  -- intentionally sets the index to an invalid value,
- *                    flagging 'bm->elem_index_dirty' so we dont use it.
+ *                    flagging 'bm->elem_index_dirty' so we don't use it.
  *
  * - 'set_ok'      -- this is valid use since the part of the code is low level.
  *
@@ -271,7 +271,7 @@ BM_INLINE void _bm_elem_index_set(BMHeader *ele, const int index);
  * this value is rather arbitrary */
 #define BM_NGON_STACK_SIZE 32
 
-/* avoid inf loop, this value is arbtrary
+/* avoid inf loop, this value is arbitrary
  * but should not error on valid cases */
 #define BM_LOOP_RADIAL_MAX 10000
 #define BM_NGON_MAX 100000
@@ -286,6 +286,7 @@ BM_INLINE void _bm_elem_index_set(BMHeader *ele, const int index);
 #include "intern/bmesh_iterators.h"
 #include "intern/bmesh_marking.h"
 #include "intern/bmesh_mesh.h"
+#include "intern/bmesh_mesh_conv.h"
 #include "intern/bmesh_mods.h"
 #include "intern/bmesh_operators.h"
 #include "intern/bmesh_polygon.h"

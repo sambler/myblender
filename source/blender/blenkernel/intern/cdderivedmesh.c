@@ -91,11 +91,8 @@ typedef struct {
 	int pbvh_draw;
 
 	/* Mesh connectivity */
-	struct ListBase *fmap;
-	struct IndexNode *fmap_mem;
-
-	struct ListBase *pmap;
-	struct IndexNode *pmap_mem;
+	MeshElemMap *pmap;
+	int *pmap_mem;
 } CDDerivedMesh;
 
 /**************** DerivedMesh interface functions ****************/
@@ -215,7 +212,7 @@ static void cdDM_getVertNo(DerivedMesh *dm, int index, float no_r[3])
 	normal_short_to_float_v3(no_r, cddm->mvert[index].no);
 }
 
-static ListBase *cdDM_getPolyMap(Object *ob, DerivedMesh *dm)
+static const MeshElemMap *cdDM_getPolyMap(Object *ob, DerivedMesh *dm)
 {
 	CDDerivedMesh *cddm = (CDDerivedMesh*) dm;
 
@@ -276,7 +273,9 @@ static struct PBVH *cdDM_getPBVH(Object *ob, DerivedMesh *dm)
 		Mesh *me= ob->data;
 		cddm->pbvh = BLI_pbvh_new();
 		cddm->pbvh_draw = can_pbvh_draw(ob, dm);
-		BLI_assert(!(me->mface == NULL && me->mpoly != NULL)); /* BMESH ONLY complain if mpoly is valid but not mface */
+
+		BKE_mesh_tessface_ensure(me);
+		
 		BLI_pbvh_build_mesh(cddm->pbvh, me->mface, me->mvert,
 		                    me->totface, me->totvert);
 
@@ -441,14 +440,14 @@ static void cdDM_drawEdges(DerivedMesh *dm, int drawLooseEdges, int drawAllEdges
 				}
 				if( prevdraw != draw ) {
 					if( prevdraw > 0 && (i-prevstart) > 0 ) {
-						GPU_buffer_draw_elements( dm->drawObject->edges, GL_LINES, prevstart*2, (i-prevstart)*2  );
+						GPU_buffer_draw_elements(dm->drawObject->edges, GL_LINES, prevstart * 2, (i - prevstart) * 2);
 					}
 					prevstart = i;
 				}
 				prevdraw = draw;
 			}
 			if( prevdraw > 0 && (i-prevstart) > 0 ) {
-				GPU_buffer_draw_elements( dm->drawObject->edges, GL_LINES, prevstart*2, (i-prevstart)*2  );
+				GPU_buffer_draw_elements(dm->drawObject->edges, GL_LINES, prevstart * 2, (i-prevstart) * 2);
 			}
 		}
 		GPU_buffer_unbind();
@@ -489,14 +488,14 @@ static void cdDM_drawLooseEdges(DerivedMesh *dm)
 				}
 				if( prevdraw != draw ) {
 					if( prevdraw > 0 && (i-prevstart) > 0) {
-						GPU_buffer_draw_elements( dm->drawObject->edges, GL_LINES, prevstart*2, (i-prevstart)*2  );
+						GPU_buffer_draw_elements(dm->drawObject->edges, GL_LINES, prevstart * 2, (i - prevstart) * 2);
 					}
 					prevstart = i;
 				}
 				prevdraw = draw;
 			}
 			if( prevdraw > 0 && (i-prevstart) > 0 ) {
-				GPU_buffer_draw_elements( dm->drawObject->edges, GL_LINES, prevstart*2, (i-prevstart)*2  );
+				GPU_buffer_draw_elements(dm->drawObject->edges, GL_LINES, prevstart * 2, (i - prevstart) * 2);
 			}
 		}
 		GPU_buffer_unbind();
@@ -1194,7 +1193,7 @@ static void cdDM_drawMappedFacesGLSL(DerivedMesh *dm,
 							}
 						}
 						else {
-							/* if the buffer was set, dont use it again.
+							/* if the buffer was set, don't use it again.
 							 * prevdraw was assumed true but didnt run so set to false - [#21036] */
 							/* prevdraw= 0; */ /* UNUSED */
 							buffer= NULL;
@@ -1528,9 +1527,6 @@ void CDDM_recalc_tessellation(DerivedMesh *dm)
 
 static void cdDM_free_internal(CDDerivedMesh *cddm)
 {
-	if(cddm->fmap) MEM_freeN(cddm->fmap);
-	if(cddm->fmap_mem) MEM_freeN(cddm->fmap_mem);
-
 	if(cddm->pmap) MEM_freeN(cddm->pmap);
 	if(cddm->pmap_mem) MEM_freeN(cddm->pmap_mem);
 }
@@ -1767,10 +1763,7 @@ static void loops_to_customdata_corners(BMesh *bm, CustomData *facedata,
 		for (j=0; j<3; j++) {
 			l = l3[j];
 			mloopcol = CustomData_bmesh_get_n(&bm->ldata, l->head.data, CD_MLOOPCOL, i);
-			mcol[j].r = mloopcol->r;
-			mcol[j].g = mloopcol->g;
-			mcol[j].b = mloopcol->b;
-			mcol[j].a = mloopcol->a;
+			MESH_MLOOPCOL_TO_MCOL(mloopcol, &mcol[j]);
 		}
 	}
 
@@ -1780,10 +1773,7 @@ static void loops_to_customdata_corners(BMesh *bm, CustomData *facedata,
 		for (j=0; j<3; j++) {
 			l = l3[j];
 			mloopcol = CustomData_bmesh_get(&bm->ldata, l->head.data, CD_WEIGHT_MLOOPCOL);
-			mcol[j].r = mloopcol->r;
-			mcol[j].g = mloopcol->g;
-			mcol[j].b = mloopcol->b;
-			mcol[j].a = mloopcol->a;
+			MESH_MLOOPCOL_TO_MCOL(mloopcol, &mcol[j]);
 		}
 	}
 }
@@ -2079,24 +2069,21 @@ void CDDM_apply_vert_normals(DerivedMesh *dm, short (*vertNormals)[3])
 		copy_v3_v3_short(vert->no, vertNormals[i]);
 }
 
-void CDDM_calc_normals_mapping(DerivedMesh *dm)
+void CDDM_calc_normals_mapping_ex(DerivedMesh *dm, const short only_face_normals)
 {
 	CDDerivedMesh *cddm = (CDDerivedMesh*)dm;
 	float (*face_nors)[3] = NULL;
 
-	/* use this to skip calculating normals on original vert's, this may need to be changed */
-	const short only_face_normals = CustomData_is_referenced_layer(&dm->vertData, CD_MVERT);
-	
 	if(dm->numVertData == 0) return;
 
 	/* now we skip calculating vertex normals for referenced layer,
 	 * no need to duplicate verts.
 	 * WATCH THIS, bmesh only change!,
 	 * need to take care of the side effects here - campbell */
-#if 0
+	#if 0
 	/* we don't want to overwrite any referenced layers */
 	cddm->mvert = CustomData_duplicate_referenced_layer(&dm->vertData, CD_MVERT, dm->numVertData);
-#endif
+	#endif
 
 
 	if (dm->numTessFaceData == 0) {
@@ -2115,17 +2102,24 @@ void CDDM_calc_normals_mapping(DerivedMesh *dm)
 
 
 	face_nors = MEM_mallocN(sizeof(float)*3*dm->numTessFaceData, "face_nors");
-	
+
 	/* calculate face normals */
 	mesh_calc_normals_mapping_ex(cddm->mvert, dm->numVertData, CDDM_get_loops(dm), CDDM_get_polys(dm),
-	                             dm->numLoopData, dm->numPolyData, NULL, cddm->mface, dm->numTessFaceData,
-	                             CustomData_get_layer(&dm->faceData, CD_POLYINDEX), face_nors,
-	                             only_face_normals);
-	
-	CustomData_add_layer(&dm->faceData, CD_NORMAL, CD_ASSIGN, 
-	                     face_nors, dm->numTessFaceData);
+								 dm->numLoopData, dm->numPolyData, NULL, cddm->mface, dm->numTessFaceData,
+								 CustomData_get_layer(&dm->faceData, CD_POLYINDEX), face_nors,
+								 only_face_normals);
+
+	CustomData_add_layer(&dm->faceData, CD_NORMAL, CD_ASSIGN,
+						 face_nors, dm->numTessFaceData);
+}
 
 
+void CDDM_calc_normals_mapping(DerivedMesh *dm)
+{
+	/* use this to skip calculating normals on original vert's, this may need to be changed */
+	const short only_face_normals = CustomData_is_referenced_layer(&dm->vertData, CD_MVERT);
+
+	CDDM_calc_normals_mapping_ex(dm, only_face_normals);
 }
 
 /* bmesh note: this matches what we have in trunk */

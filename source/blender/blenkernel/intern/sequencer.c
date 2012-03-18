@@ -658,14 +658,14 @@ void reload_sequence_new_file(Scene *scene, Sequence * seq, int lock_range)
 {
 	char str[FILE_MAX];
 	int prev_startdisp=0, prev_enddisp=0;
-	/* note: dont rename the strip, will break animation curves */
+	/* note: don't rename the strip, will break animation curves */
 
 	if (ELEM5(seq->type, SEQ_MOVIE, SEQ_IMAGE, SEQ_SOUND, SEQ_SCENE, SEQ_META)==0) {
 		return;
 	}
 
 	if(lock_range) {
-		/* keep so we dont have to move the actual start and end points (only the data) */
+		/* keep so we don't have to move the actual start and end points (only the data) */
 		calc_sequence_disp(scene, seq);
 		prev_startdisp= seq->startdisp;
 		prev_enddisp= seq->enddisp;
@@ -1169,6 +1169,20 @@ static IMB_Proxy_Size seq_rendersize_to_proxysize(int size)
 		return IMB_PROXY_50;
 	}
 	return IMB_PROXY_25;
+}
+
+static double seq_rendersize_to_scale_factor(int size)
+{
+	if (size >= 99) {
+		return 1.0;
+	}
+	if (size >= 75) {
+		return 0.75;
+	}
+	if (size >= 50) {
+		return 0.50;
+	}
+	return 0.25;
 }
 
 static void seq_open_anim_file(Sequence * seq)
@@ -1688,6 +1702,13 @@ static ImBuf * input_preprocess(
 		StripTransform t= {0};
 		int sx,sy,dx,dy;
 
+		double f = seq_rendersize_to_scale_factor(
+			context.preview_render_size);
+
+		if (f != 1.0) {
+			IMB_scalefastImBuf(ibuf, ibuf->x / f, ibuf->y / f);
+		}
+
 		if(seq->flag & SEQ_USE_CROP && seq->strip->crop) {
 			c = *seq->strip->crop;
 		}
@@ -1728,29 +1749,7 @@ static ImBuf * input_preprocess(
 	}
 
 	if(seq->sat != 1.0f) {
-		/* inline for now, could become an imbuf function */
-		int i;
-		unsigned char *rct= (unsigned char *)ibuf->rect;
-		float *rctf= ibuf->rect_float;
-		const float sat= seq->sat;
-		float hsv[3];
-
-		if(rct) {
-			float rgb[3];
-			for (i = ibuf->x * ibuf->y; i > 0; i--, rct+=4) {
-				rgb_uchar_to_float(rgb, rct);
-				rgb_to_hsv(rgb[0], rgb[1], rgb[2], hsv, hsv+1, hsv+2);
-				hsv_to_rgb(hsv[0], hsv[1] * sat, hsv[2], rgb, rgb+1, rgb+2);
-				rgb_float_to_uchar(rct, rgb);
-			}
-		}
-
-		if(rctf) {
-			for (i = ibuf->x * ibuf->y; i > 0; i--, rctf+=4) {
-				rgb_to_hsv(rctf[0], rctf[1], rctf[2], hsv, hsv+1, hsv+2);
-				hsv_to_rgb(hsv[0], hsv[1] * sat, hsv[2], rctf, rctf+1, rctf+2);
-			}
-		}
+		IMB_saturation(ibuf, seq->sat);
 	}
 
 	mul = seq->mul;
@@ -1999,7 +1998,7 @@ static ImBuf * seq_render_scene_strip_impl(
 	int have_seq= FALSE;
 	Scene *scene;
 
-	/* dont refer to seq->scene above this point!, it can be NULL */
+	/* don't refer to seq->scene above this point!, it can be NULL */
 	if(seq->scene == NULL) {
 		return NULL;
 	}
@@ -3009,7 +3008,7 @@ int seqbase_isolated_sel_check(ListBase *seqbase)
 	return TRUE;
 }
 
-/* use to impose limits when dragging/extending - so impossible situations dont happen
+/* use to impose limits when dragging/extending - so impossible situations don't happen
  * Cant use the SEQ_LEFTSEL and SEQ_LEFTSEL directly because the strip may be in a metastrip */
 void seq_tx_handle_xlimits(Sequence *seq, int leftflag, int rightflag)
 {
@@ -3164,7 +3163,7 @@ int shuffle_seq(ListBase * seqbasep, Sequence *test, Scene *evil_scene)
 			break;
 		}
 		test->machine++;
-		calc_sequence(evil_scene, test); // XXX - I dont think this is needed since were only moving vertically, Campbell.
+		calc_sequence(evil_scene, test); // XXX - I don't think this is needed since were only moving vertically, Campbell.
 	}
 
 	
@@ -3414,7 +3413,7 @@ int seq_swap(Sequence *seq_a, Sequence *seq_b, const char **error_str)
 
 	SWAP(Sequence, *seq_a, *seq_b);
 
-	/* swap back names so animation fcurves dont get swapped */
+	/* swap back names so animation fcurves don't get swapped */
 	BLI_strncpy(name, seq_a->name+2, sizeof(name));
 	BLI_strncpy(seq_a->name+2, seq_b->name+2, sizeof(seq_b->name)-2);
 	BLI_strncpy(seq_b->name+2, name, sizeof(seq_b->name)-2);
@@ -3755,7 +3754,7 @@ Sequence *sequencer_add_movie_strip(bContext *C, ListBase *seqbasep, SeqLoadInfo
 
 	/* basic defaults */
 	seq->strip= strip= MEM_callocN(sizeof(Strip), "strip");
-	strip->len = seq->len = IMB_anim_get_duration( an, IMB_TC_RECORD_RUN );
+	strip->len = seq->len = IMB_anim_get_duration(an, IMB_TC_RECORD_RUN);
 	strip->us= 1;
 
 	/* we only need 1 element for MOVIE strips */

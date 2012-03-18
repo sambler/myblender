@@ -1509,7 +1509,7 @@ static void IDP_DirectLinkIDPArray(IDProperty *prop, int switch_endian, FileData
 	array= (IDProperty*) prop->data.pointer;
 	
 	/* note!, idp-arrays didn't exist in 2.4x, so the pointer will be cleared
-	 * theres not really anything we can do to correct this, at least dont crash */
+	 * theres not really anything we can do to correct this, at least don't crash */
 	if(array==NULL) {
 		prop->len= 0;
 		prop->totallen= 0;
@@ -3750,6 +3750,16 @@ static void direct_link_mdisps(FileData *fd, int count, MDisps *mdisps, int exte
 
 		for(i = 0; i < count; ++i) {
 			mdisps[i].disps = newdataadr(fd, mdisps[i].disps);
+			mdisps[i].hidden = newdataadr(fd, mdisps[i].hidden);
+
+			if (mdisps[i].totdisp && !mdisps[i].level) {
+				/* this calculation is only correct for loop mdisps;
+				   if loading pre-BMesh face mdisps this will be
+				   overwritten with the correct value in
+				   bm_corners_to_loops() */
+				float gridsize = sqrtf(mdisps[i].totdisp);
+				mdisps[i].level = (int)(logf(gridsize - 1.0f) / M_LN2) + 1;
+			}
 
 			if( (fd->flags & FD_FLAGS_SWITCH_ENDIAN) && (mdisps[i].disps) ) {
 				/* DNA_struct_switch_endian doesn't do endian swap for (*disps)[] */
@@ -7743,6 +7753,26 @@ static void do_versions_nodetree_multi_file_output_format_2_62_1(Scene *sce, bNo
 	}
 }
 
+/* blue and red are swapped pre 2.62.1, be sane (red == red) now! */
+static void do_versions_mesh_mloopcol_swap_2_62_1(Mesh *me)
+{
+	CustomDataLayer *layer;
+	MLoopCol *mloopcol;
+	int a;
+	int i;
+
+	for(a = 0; a < me->ldata.totlayer; a++) {
+		layer = &me->ldata.layers[a];
+
+		if(layer->type == CD_MLOOPCOL) {
+			mloopcol = (MLoopCol *)layer->data;
+			for(i = 0; i < me->totloop; i++, mloopcol++) {
+				SWAP(char, mloopcol->r, mloopcol->b);
+			}
+		}
+	}
+}
+
 static void do_versions(FileData *fd, Library *lib, Main *main)
 {
 	/* WATCH IT!!!: pointers from libdata have not been converted */
@@ -10080,7 +10110,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 		Scene *sce;
 		for(sce= main->scene.first; sce; sce=sce->id.next) {
 			sce->r.fg_stamp[0] = sce->r.fg_stamp[1] = sce->r.fg_stamp[2] = 0.8f;
-			sce->r.fg_stamp[3] = 1.0f; /* dont use text alpha yet */
+			sce->r.fg_stamp[3] = 1.0f; /* don't use text alpha yet */
 			sce->r.bg_stamp[3] = 0.25f; /* make sure the background has full alpha */
 		}
 	}
@@ -10574,8 +10604,9 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 					bMessageActuator *msgAct = (bMessageActuator *) act->data;
 					if (BLI_strnlen(msgAct->toPropName, 3) > 2) {
 						/* strip first 2 chars, would have only worked if these were OB anyway */
-						memmove( msgAct->toPropName, msgAct->toPropName+2, sizeof(msgAct->toPropName)-2 );
-					} else {
+						memmove(msgAct->toPropName, msgAct->toPropName + 2, sizeof(msgAct->toPropName) - 2);
+					}
+					else {
 						msgAct->toPropName[0] = '\0';
 					}
 				}
@@ -13234,7 +13265,19 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 			do_versions_nodetree_multi_file_output_format_2_62_1(NULL, ntree);
 	}
 
-	/* put compatibility code here until next subversion bump */
+	/* only swap for pre-release bmesh merge which had MLoopCol red/blue swap */
+	if (main->versionfile == 262 && main->subversionfile == 1)
+	{
+		{
+			Mesh *me;
+			for (me = main->mesh.first; me; me = me->id.next) {
+				do_versions_mesh_mloopcol_swap_2_62_1(me);
+			}
+		}
+
+	}
+
+	if (main->versionfile < 262 || (main->versionfile == 262 && main->subversionfile < 2))
 	{
 		{
 			/* Set new idname of keyingsets from their now "label-only" name. */
@@ -13247,6 +13290,11 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 				}
 			}
 		}
+	}
+
+	/* put compatibility code here until next subversion bump */
+	{
+
 	}
 
 	/* WATCH IT!!!: pointers from libdata have not been converted yet here! */
@@ -14631,7 +14679,7 @@ static void library_append_end(const bContext *C, Main *mainl, FileData **fd, in
 		if(scene) {
 			const short is_link= (flag & FILE_LINK) != 0;
 			if(idcode==ID_SCE) {
-				/* dont instance anything when linking in scenes, assume the scene its self instances the data */
+				/* don't instance anything when linking in scenes, assume the scene its self instances the data */
 			}
 			else {
 				give_base_to_objects(mainvar, scene, curlib, idcode, is_link);

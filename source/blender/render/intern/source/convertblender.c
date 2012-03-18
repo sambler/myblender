@@ -2340,7 +2340,7 @@ static void displace_render_face(Render *re, ObjectRen *obr, VlakRen *vlr, float
 	
 	/* set up shadeinput struct for multitex() */
 	
-	/* memset above means we dont need this */
+	/* memset above means we don't need this */
 	/*shi.osatex= 0;*/		/* signal not to use dx[] and dy[] texture AA vectors */
 
 	shi.obr= obr;
@@ -3362,8 +3362,7 @@ static void init_render_mesh(Render *re, ObjectRen *obr, int timeoffset)
 			}
 			if(ms) {
 				float *sticky= RE_vertren_get_sticky(obr, ver, 1);
-				sticky[0]= ms->co[0];
-				sticky[1]= ms->co[1];
+				copy_v2_v2(sticky, ms->co);
 				ms++;
 			}
 		}
@@ -4857,7 +4856,7 @@ static void database_init_objects(Render *re, unsigned int renderlay, int nolamp
 	set_dupli_tex_mat(NULL, NULL, NULL);
 
 	/* loop over all objects rather then using SETLOOPER because we may
-	 * reference an mtex-mapped object which isnt rendered or is an
+	 * reference an mtex-mapped object which isn't rendered or is an
 	 * empty in a dupli group. We could scan all render material/lamp/world
 	 * mtex's for mapto objects but its easier just to set the
 	 * 'imat' / 'imat_ren' on all and unlikely to be a performance hit
@@ -5054,7 +5053,7 @@ void RE_Database_FromScene(Render *re, Main *bmain, Scene *scene, unsigned int l
 	if(use_camera_view && camera) {
 		/* called before but need to call again in case of lens animation from the
 		 * above call to scene_update_for_newframe, fixes bug. [#22702].
-		 * following calls dont depend on 'RE_SetCamera' */
+		 * following calls don't depend on 'RE_SetCamera' */
 		RE_SetCamera(re, camera);
 
 		normalize_m4(camera->obmat);

@@ -465,7 +465,7 @@ static int EDBM_Extrude_Mesh(Scene *scene, Object *obedit, BMEditMesh *em, wmOpe
 
 	if (nr < 1) return 'g';
 
-	if (nr == 1 && em->selectmode & SCE_SELECT_VERTEX)
+	if (nr == 1 && (em->selectmode & SCE_SELECT_VERTEX))
 		transmode = EDBM_Extrude_vert(obedit, em, BM_ELEM_SELECT, nor);
 	else if (nr == 1) transmode = EDBM_Extrude_edge(obedit, em, BM_ELEM_SELECT, nor);
 	else if (nr == 4) transmode = EDBM_Extrude_verts_indiv(em, op, BM_ELEM_SELECT, nor);
@@ -671,7 +671,7 @@ static int mesh_select_all_exec(bContext *C, wmOperator *op)
 void MESH_OT_select_all(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name = "Select/Deselect All";
+	ot->name = "(De)select All";
 	ot->idname = "MESH_OT_select_all";
 	ot->description = "(De)select all vertices, edges or faces";
 	
@@ -1380,8 +1380,15 @@ static int edge_rotate_selected(bContext *C, wmOperator *op)
 	
 	EDBM_InitOpf(em, &bmop, op, "edgerotate edges=%he ccw=%b", BM_ELEM_TAG, do_ccw);
 
+	/* avoids leaving old verts selected which can be a problem running multiple times,
+	 * since this means the edges become selected around the face which then attempt to rotate */
+	BMO_slot_buffer_hflag_disable(em->bm, &bmop, "edges", BM_ELEM_SELECT, BM_EDGE, TRUE);
+
 	BMO_op_exec(em->bm, &bmop);
+	/* edges may rotate into hidden vertices, if this does _not_ run we get an ilogical state */
+	BMO_slot_buffer_hflag_disable(em->bm, &bmop, "edgeout", BM_ELEM_HIDDEN, BM_EDGE, TRUE);
 	BMO_slot_buffer_hflag_enable(em->bm, &bmop, "edgeout", BM_ELEM_SELECT, BM_EDGE, TRUE);
+	EDBM_selectmode_flush(em);
 
 	if (!EDBM_FinishOp(em, &bmop, op, TRUE)) {
 		return OPERATOR_CANCELLED;
@@ -1809,12 +1816,6 @@ void MESH_OT_faces_shade_flat(wmOperatorType *ot)
 
 
 /********************** UV/Color Operators *************************/
-
-
-static const EnumPropertyItem axis_items[] = {
-	{OPUVC_AXIS_X, "X", 0, "X", ""},
-	{OPUVC_AXIS_Y, "Y", 0, "Y", ""},
-	{0, NULL, 0, NULL, NULL}};
 
 static int mesh_rotate_uvs(bContext *C, wmOperator *op)
 {
@@ -3228,7 +3229,7 @@ static int mesh_separate_selected(Main *bmain, Scene *scene, Base *editbase, wmO
 	if (!em)
 		return OPERATOR_CANCELLED;
 		
-	bm_new = BM_mesh_create(obedit, &bm_mesh_allocsize_default);
+	bm_new = BM_mesh_create(&bm_mesh_allocsize_default);
 	CustomData_copy(&em->bm->vdata, &bm_new->vdata, CD_MASK_BMESH, CD_CALLOC, 0);
 	CustomData_copy(&em->bm->edata, &bm_new->edata, CD_MASK_BMESH, CD_CALLOC, 0);
 	CustomData_copy(&em->bm->ldata, &bm_new->ldata, CD_MASK_BMESH, CD_CALLOC, 0);
@@ -4453,7 +4454,7 @@ static int mesh_bevel_exec(bContext *C, wmOperator *op)
 	BMIter iter;
 	BMEdge *eed;
 	BMOperator bmop;
-	float factor = RNA_float_get(op->ptr, "percent"), fac = factor /*, dfac */ /* UNUSED */, df, s;
+	float factor = RNA_float_get(op->ptr, "percent") /*, dfac */ /* UNUSED */, df, s;
 	int i, recursion = RNA_int_get(op->ptr, "recursion");
 	const int use_even = RNA_boolean_get(op->ptr, "use_even");
 	const int use_dist = RNA_boolean_get(op->ptr, "use_dist");
@@ -4490,9 +4491,8 @@ static int mesh_bevel_exec(bContext *C, wmOperator *op)
 
 	mul_vn_fl(w, recursion, 1.0f / (float)ftot);
 
-	fac = factor;
 	for (i = 0; i < recursion; i++) {
-		fac = w[recursion - i - 1] * factor;
+		float fac = w[recursion - i - 1] * factor;
 
 		if (!EDBM_InitOpf(em, &bmop, op,
 		                  "bevel geom=%hev percent=%f lengthlayer=%i use_lengths=%b use_even=%b use_dist=%b",

@@ -49,6 +49,8 @@
 #include "BLI_threads.h"
 #include "BLI_utildefines.h"
 
+#include "BLF_translation.h"
+
 #include "BKE_context.h"
 #include "BKE_depsgraph.h"
 #include "BKE_main.h"
@@ -671,7 +673,7 @@ static void node_draw_basis(const bContext *C, ARegion *ar, SpaceNode *snode, bN
 	BLI_strncpy(showname, nodeLabel(node), sizeof(showname));
 	
 	//if(node->flag & NODE_MUTED)
-	//	BLI_snprintf(showname, sizeof(showname), "[%s]", showname); // XXX - dont print into self!
+	//	BLI_snprintf(showname, sizeof(showname), "[%s]", showname); // XXX - don't print into self!
 	
 	uiDefBut(node->block, LABEL, 0, showname, (short)(rct->xmin+15), (short)(rct->ymax-NODE_DY), 
 			 (int)(iconofs - rct->xmin-18.0f), NODE_DY,  NULL, 0, 0, 0, 0, "");
@@ -717,14 +719,12 @@ static void node_draw_basis(const bContext *C, ARegion *ar, SpaceNode *snode, bN
 		node_socket_circle_draw(ntree, sock, NODE_SOCKSIZE);
 		
 		if (stype->buttonfunc)
-			stype->buttonfunc(C, node->block, ntree, node, sock, sock->name, sock->locx+NODE_DYS, sock->locy-NODE_DYS, node->width-NODE_DY);
+			stype->buttonfunc(C, node->block, ntree, node, sock, IFACE_(sock->name), sock->locx+NODE_DYS, sock->locy-NODE_DYS, node->width-NODE_DY);
 	}
 	
 	/* socket outputs */
 	for(sock= node->outputs.first; sock; sock= sock->next) {
 		PointerRNA sockptr;
-		float slen;
-		int ofs;
 		
 		RNA_pointer_create((ID*)ntree, &RNA_NodeSocket, sock, &sockptr);
 		
@@ -733,15 +733,19 @@ static void node_draw_basis(const bContext *C, ARegion *ar, SpaceNode *snode, bN
 		
 		node_socket_circle_draw(ntree, sock, NODE_SOCKSIZE);
 		
-		ofs= 0;
-		UI_ThemeColor(TH_TEXT);
-		slen= snode->aspect*UI_GetStringWidth(sock->name);
-		while(slen > node->width) {
-			ofs++;
-			slen= snode->aspect*UI_GetStringWidth(sock->name+ofs);
+		{
+			const char *name = IFACE_(sock->name);
+			float slen;
+			int ofs = 0;
+			UI_ThemeColor(TH_TEXT);
+			slen= snode->aspect*UI_GetStringWidth(name);
+			while(slen > node->width) {
+				ofs++;
+				slen= snode->aspect*UI_GetStringWidth(name+ofs);
+			}
+			uiDefBut(node->block, LABEL, 0, name+ofs, (short)(sock->locx-15.0f-slen), (short)(sock->locy-9.0f), 
+					 (short)(node->width-NODE_DY), NODE_DY,  NULL, 0, 0, 0, 0, "");
 		}
-		uiDefBut(node->block, LABEL, 0, sock->name+ofs, (short)(sock->locx-15.0f-slen), (short)(sock->locy-9.0f), 
-				 (short)(node->width-NODE_DY), NODE_DY,  NULL, 0, 0, 0, 0, "");
 	}
 	
 	/* preview */
@@ -827,7 +831,7 @@ static void node_draw_hidden(const bContext *C, ARegion *ar, SpaceNode *snode, b
 		BLI_strncpy(showname, nodeLabel(node), sizeof(showname));
 		
 		//if(node->flag & NODE_MUTED)
-		//	BLI_snprintf(showname, sizeof(showname), "[%s]", showname); // XXX - dont print into self!
+		//	BLI_snprintf(showname, sizeof(showname), "[%s]", showname); // XXX - don't print into self!
 
 		uiDefBut(node->block, LABEL, 0, showname, (short)(rct->xmin+15), (short)(centy-10), 
 				 (int)(rct->xmax - rct->xmin-18.0f -12.0f), NODE_DY,  NULL, 0, 0, 0, 0, "");

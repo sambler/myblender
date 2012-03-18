@@ -553,7 +553,7 @@ static int modifier_apply_obdata(ReportList *reports, Scene *scene, Object *ob, 
 		}
 
 		cu = ob->data;
-		BKE_report(reports, RPT_INFO, "Applied modifier only changed CV points, not tesselated/bevel vertices");
+		BKE_report(reports, RPT_INFO, "Applied modifier only changed CV points, not tessellated/bevel vertices");
 
 		vertexCos = curve_getVertexCos(cu, &cu->nurb, &numVerts);
 		mti->deformVerts(md, ob, NULL, vertexCos, numVerts, 0, 0);
@@ -670,8 +670,7 @@ static EnumPropertyItem *modifier_add_itemf(bContext *C, PointerRNA *UNUSED(ptr)
 			if(mti->flags & eModifierTypeFlag_NoUserAdd)
 				continue;
 
-			if(!((mti->flags & eModifierTypeFlag_AcceptsCVs) ||
-			   (ob->type==OB_MESH && (mti->flags & eModifierTypeFlag_AcceptsMesh))))
+			if(!object_support_modifier_type(ob, md_item->value))
 				continue;
 		}
 		else {

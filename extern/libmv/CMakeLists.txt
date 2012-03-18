@@ -37,6 +37,9 @@ set(INC
 set(INC_SYS
 	${PNG_INCLUDE_DIR}
 	${ZLIB_INCLUDE_DIRS}
+	if(${CMAKE_OSX_DEPLOYMENT_TARGET} STREQUAL "10.6") # this is a momentary hack to find unwind.h in 10.6.sdk
+		${CMAKE_OSX_SYSROOT}/Developer/usr/llvm-gcc-4.2/lib/gcc/i686-apple-darwin10/4.2.1/include
+	endif()
 )
 
 set(SRC
@@ -129,9 +132,11 @@ set(SRC
 
 	third_party/fast/fast.h
 	third_party/gflags/config.h
-	third_party/gflags/gflags_completions.h
-	third_party/gflags/gflags.h
+	third_party/gflags/gflags/gflags_completions.h
+	third_party/gflags/gflags/gflags_declare.h
+	third_party/gflags/gflags/gflags.h
 	third_party/gflags/mutex.h
+	third_party/gflags/util.h
 	third_party/ldl/Include/ldl.h
 	third_party/msinttypes/inttypes.h
 	third_party/msinttypes/stdint.h

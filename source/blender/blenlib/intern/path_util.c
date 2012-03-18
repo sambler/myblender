@@ -331,7 +331,7 @@ void BLI_cleanup_path(const char *relabase, char *dir)
 	}
 	
 	/* Note
-	 *   memmove( start, eind, strlen(eind)+1 );
+	 *   memmove(start, eind, strlen(eind) + 1);
 	 * is the same as
 	 *   strcpy( start, eind ); 
 	 * except strcpy should not be used because there is overlap,
@@ -357,18 +357,18 @@ void BLI_cleanup_path(const char *relabase, char *dir)
 		if (a<0) {
 			break;
 		} else {
-			memmove( dir+a, eind, strlen(eind)+1 );
+			memmove(dir + a, eind, strlen(eind) + 1);
 		}
 	}
 
 	while ( (start = strstr(dir,"\\.\\")) ) {
 		eind = start + strlen("\\.\\") - 1;
-		memmove( start, eind, strlen(eind)+1 );
+		memmove(start, eind, strlen(eind) + 1);
 	}
 
 	while ( (start = strstr(dir,"\\\\" )) ) {
 		eind = start + strlen("\\\\") - 1;
-		memmove( start, eind, strlen(eind)+1 );
+		memmove(start, eind, strlen(eind) + 1);
 	}
 #else
 	if(dir[0]=='.') {	/* happens, for example in FILE_MAIN */
@@ -381,7 +381,7 @@ void BLI_cleanup_path(const char *relabase, char *dir)
 	 * this is a valid path in blender but we cant handle this the usual way below
 	 * simply strip this prefix then evaluate the path as usual. pythons os.path.normpath() does this */
 	while((strncmp(dir, "/../", 4)==0)) {
-		memmove( dir, dir + 4, strlen(dir + 4) + 1 );
+		memmove(dir, dir + 4, strlen(dir + 4) + 1);
 	}
 
 	while ( (start = strstr(dir, "/../")) ) {
@@ -393,19 +393,20 @@ void BLI_cleanup_path(const char *relabase, char *dir)
 		}
 		if (a<0) {
 			break;
-		} else {
-			memmove( dir+a, eind, strlen(eind)+1 );
+		}
+		else {
+			memmove(dir+a, eind, strlen(eind) + 1);
 		}
 	}
 
 	while ( (start = strstr(dir,"/./")) ) {
 		eind = start + (3 - 1) /* strlen("/./") - 1 */;
-		memmove( start, eind, strlen(eind)+1 );
+		memmove(start, eind, strlen(eind) + 1);
 	}
 
 	while ( (start = strstr(dir,"//" )) ) {
 		eind = start + (2 - 1) /* strlen("//") - 1 */;
-		memmove( start, eind, strlen(eind)+1 );
+		memmove(start, eind, strlen(eind) + 1);
 	}
 #endif
 }
@@ -481,7 +482,7 @@ void BLI_path_rel(char *file, const char *relfile)
 #endif
 		{
 			++p; ++q;
-			/* dont search beyond the end of the string
+			/* don't search beyond the end of the string
 			 * in the rare case they match */
 			if ((*p=='\0') || (*q=='\0')) {
 				break;
@@ -559,7 +560,7 @@ static int stringframe_chars(char *path, int *char_start, int *char_end)
 	ch_sta = ch_end = 0;
 	for (i = 0; path[i] != '\0'; i++) {
 		if (path[i] == '\\' || path[i] == '/') {
-			ch_end = 0; /* this is a directory name, dont use any hashes we found */
+			ch_end = 0; /* this is a directory name, don't use any hashes we found */
 		} else if (path[i] == '#') {
 			ch_sta = i;
 			ch_end = ch_sta+1;
@@ -568,7 +569,7 @@ static int stringframe_chars(char *path, int *char_start, int *char_end)
 			}
 			i = ch_end-1; /* keep searching */
 			
-			/* dont break, there may be a slash after this that invalidates the previous #'s */
+			/* don't break, there may be a slash after this that invalidates the previous #'s */
 		}
 	}
 
@@ -680,7 +681,7 @@ int BLI_path_abs(char *path, const char *basepath)
 
 	BLI_strncpy(base, basepath, sizeof(base));
 
-	/* file component is ignored, so dont bother with the trailing slash */
+	/* file component is ignored, so don't bother with the trailing slash */
 	BLI_cleanup_path(NULL, base);
 	
 	/* push slashes into unix mode - strings entering this part are
@@ -693,7 +694,7 @@ int BLI_path_abs(char *path, const char *basepath)
 	BLI_char_switch(base, '\\', '/');	
 
 	/* Paths starting with // will get the blend file as their base,
-	 * this isnt standard in any os but is used in blender all over the place */
+	 * this isn't standard in any os but is used in blender all over the place */
 	if (wasrelative) {
 		char *lslash= BLI_last_slash(base);
 		if (lslash) {
@@ -746,7 +747,7 @@ int BLI_path_cwd(char *path)
 	
 	if (wasrelative==1) {
 		char cwd[FILE_MAX]= "";
-		BLI_current_working_dir(cwd, sizeof(cwd)); /* in case the full path to the blend isnt used */
+		BLI_current_working_dir(cwd, sizeof(cwd)); /* in case the full path to the blend isn't used */
 		
 		if (cwd[0] == '\0') {
 			printf( "Could not get the current working directory - $PWD for an unknown reason.");
@@ -755,7 +756,7 @@ int BLI_path_cwd(char *path)
 			 *
 			 * cwd should contain c:\ etc on win32 so the relbase can be NULL
 			 * relbase being NULL also prevents // being misunderstood as relative to the current
-			 * blend file which isnt a feature we want to use in this case since were dealing
+			 * blend file which isn't a feature we want to use in this case since were dealing
 			 * with a path from the command line, rather than from inside Blender */
 
 			char origpath[FILE_MAX];
@@ -1479,7 +1480,7 @@ void BLI_split_dirfile(const char *string, char *dir, char *file, const size_t d
 
 	if (dir) {
 		if (lslash) {
-			BLI_strncpy( dir, string, MIN2(dirlen, lslash + 1)); /* +1 to include the slash and the last char */
+			BLI_strncpy(dir, string, MIN2(dirlen, lslash + 1)); /* +1 to include the slash and the last char */
 		}
 		else {
 			dir[0] = '\0';
@@ -1522,9 +1523,9 @@ void BLI_join_dirfile(char *dst, const size_t maxlen, const char *dir, const cha
 	}
 
 	/* inline BLI_add_slash */
-	if (dst[dirlen - 1] != SEP) {
-		dst[dirlen++]= SEP;
-		dst[dirlen  ]= '\0';
+	if ((dirlen > 0) && (dst[dirlen - 1] != SEP)) {
+		dst[dirlen++] = SEP;
+		dst[dirlen  ] = '\0';
 	}
 
 	if (dirlen >= maxlen) {
@@ -1671,7 +1672,7 @@ char *BLI_last_slash(const char *string)
 	else return lfslash;
 }
 
-/* adds a slash if there isnt one there already */
+/* adds a slash if there isn't one there already */
 int BLI_add_slash(char *string)
 {
 	int len = strlen(string);

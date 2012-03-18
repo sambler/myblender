@@ -1374,7 +1374,7 @@ void KX_GameObject::Relink(CTR_Map<CTR_HashedPtr, void*> *map_parameter)
 #define MATHUTILS_VEC_CB_ANGVEL_LOCAL 9
 #define MATHUTILS_VEC_CB_ANGVEL_GLOBAL 10
 
-static int mathutils_kxgameob_vector_cb_index= -1; /* index for our callbacks */
+static unsigned char mathutils_kxgameob_vector_cb_index= -1; /* index for our callbacks */
 
 static int mathutils_kxgameob_generic_check(BaseMathObject *bmo)
 {
@@ -1514,7 +1514,7 @@ Mathutils_Callback mathutils_kxgameob_vector_cb = {
 #define MATHUTILS_MAT_CB_ORI_LOCAL 1
 #define MATHUTILS_MAT_CB_ORI_GLOBAL 2
 
-static int mathutils_kxgameob_matrix_cb_index= -1; /* index for our callbacks */
+static unsigned char mathutils_kxgameob_matrix_cb_index= -1; /* index for our callbacks */
 
 static int mathutils_kxgameob_matrix_get(BaseMathObject *bmo, int subtype)
 {
@@ -1662,7 +1662,7 @@ PyAttributeDef KX_GameObject::Attributes[] = {
 	KX_PYATTRIBUTE_RO_FUNCTION("attrDict",	KX_GameObject, pyattr_get_attrDict),
 	KX_PYATTRIBUTE_RW_FUNCTION("color", KX_GameObject, pyattr_get_obcolor, pyattr_set_obcolor),
 	
-	/* Experemental, dont rely on these yet */
+	/* experimental, don't rely on these yet */
 	KX_PYATTRIBUTE_RO_FUNCTION("sensors",		KX_GameObject, pyattr_get_sensors),
 	KX_PYATTRIBUTE_RO_FUNCTION("controllers",	KX_GameObject, pyattr_get_controllers),
 	KX_PYATTRIBUTE_RO_FUNCTION("actuators",		KX_GameObject, pyattr_get_actuators),
@@ -1788,7 +1788,7 @@ static int Map_SetItem(PyObject *self_v, PyObject *key, PyObject *val)
 		int set= 0;
 		
 		/* as CValue */
-		if(attr_str && PyObject_TypeCheck(val, &PyObjectPlus::Type)==0) /* dont allow GameObjects for eg to be assigned to CValue props */
+		if(attr_str && PyObject_TypeCheck(val, &PyObjectPlus::Type)==0) /* don't allow GameObjects for eg to be assigned to CValue props */
 		{
 			CValue* vallie = self->ConvertPythonToValue(val, ""); /* error unused */
 			

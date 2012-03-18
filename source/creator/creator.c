@@ -319,9 +319,6 @@ static int print_help(int UNUSED(argc), const char **UNUSED(argv), void *data)
 	return 0;
 }
 
-
-double PIL_check_seconds_timer(void);
-
 static int end_arguments(int UNUSED(argc), const char **UNUSED(argv), void *UNUSED(data))
 {
 	return -1;
@@ -1199,7 +1196,7 @@ int main(int argc, const char **argv)
 	/* background render uses this font too */
 	BKE_font_register_builtin(datatoc_Bfont, datatoc_Bfont_size);
 
-	/* Initialiaze ffmpeg if built in, also needed for bg mode if videos are
+	/* Initialize ffmpeg if built in, also needed for bg mode if videos are
 	 * rendered via ffmpeg */
 	sound_init_once();
 	

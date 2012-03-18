@@ -476,7 +476,7 @@ static void viewops_data_create(bContext *C, wmOperator *op, wmEvent *event)
 		ED_view3d_win_to_vector(vod->ar, mval_f, vod->mousevec);
 	}
 
-	/* lookup, we dont pass on v3d to prevent confusement */
+	/* lookup, we don't pass on v3d to prevent confusement */
 	vod->grid= vod->v3d->grid;
 	vod->far= vod->v3d->far;
 
@@ -516,8 +516,6 @@ static void viewops_data_free(bContext *C, wmOperator *op)
 }
 
 /* ************************** viewrotate **********************************/
-
-static const float thres = 0.93f; //cos(20 deg);
 
 #define COS45 0.7071068
 #define SIN45 COS45
@@ -2135,8 +2133,8 @@ static int viewselected_exec(bContext *C, wmOperator *UNUSED(op))
 
 	INIT_MINMAX(min, max);
 
-	if (ob && ob->mode & OB_MODE_WEIGHT_PAINT) {
-		/* hardcoded exception, we look for the one selected armature */
+	if (ob && (ob->mode & OB_MODE_WEIGHT_PAINT)) {
+		/* hard-coded exception, we look for the one selected armature */
 		/* this is weak code this way, we should make a generic active/selection callback interface once... */
 		Base *base;
 		for (base=scene->base.first; base; base= base->next) {
@@ -2204,7 +2202,7 @@ static int viewselected_exec(bContext *C, wmOperator *UNUSED(op))
 	size= MAX3(afm[0], afm[1], afm[2]);
 
 	if (!rv3d->is_persp) {
-		if (size < 0.0001f) { /* if its a sinble point. dont even re-scale */
+		if (size < 0.0001f) { /* if its a sinble point. don't even re-scale */
 			ok_dist= 0;
 		}
 		else {
@@ -2681,16 +2679,20 @@ static void axis_set_view(bContext *C, View3D *v3d, ARegion *ar,
 		/* normal operation */
 		if (rv3d->viewlock) {
 			/* only pass on if */
-			if (rv3d->view==RV3D_VIEW_FRONT && view==RV3D_VIEW_BACK);
-			else if (rv3d->view==RV3D_VIEW_BACK && view==RV3D_VIEW_FRONT);
-			else if (rv3d->view==RV3D_VIEW_RIGHT && view==RV3D_VIEW_LEFT);
-			else if (rv3d->view==RV3D_VIEW_LEFT && view==RV3D_VIEW_RIGHT);
-			else if (rv3d->view==RV3D_VIEW_BOTTOM && view==RV3D_VIEW_TOP);
-			else if (rv3d->view==RV3D_VIEW_TOP && view==RV3D_VIEW_BOTTOM);
-			else return;
+
+			/* nice confusing if-block */
+			if (!((rv3d->view == RV3D_VIEW_FRONT  && view == RV3D_VIEW_BACK)  ||
+			      (rv3d->view == RV3D_VIEW_BACK   && view == RV3D_VIEW_FRONT) ||
+			      (rv3d->view == RV3D_VIEW_RIGHT  && view == RV3D_VIEW_LEFT)  ||
+			      (rv3d->view == RV3D_VIEW_LEFT   && view == RV3D_VIEW_RIGHT) ||
+			      (rv3d->view == RV3D_VIEW_BOTTOM && view == RV3D_VIEW_TOP)   ||
+			      (rv3d->view == RV3D_VIEW_TOP    && view == RV3D_VIEW_BOTTOM)))
+			{
+				return;
+			}
 		}
 
-		rv3d->view= view;
+		rv3d->view = view;
 	}
 
 	if (rv3d->viewlock) {
@@ -2811,7 +2813,7 @@ static int viewnumpad_exec(bContext *C, wmOperator *op)
 						}
 					}
 
-					/* if the camera isnt found, check a number of options */
+					/* if the camera isn't found, check a number of options */
 					if (v3d->camera==NULL && ob && ob->type==OB_CAMERA)
 						v3d->camera= ob;
 					
@@ -2822,7 +2824,7 @@ static int viewnumpad_exec(bContext *C, wmOperator *op)
 					if (v3d->camera==NULL)
 						return OPERATOR_CANCELLED;
 					
-					/* important these dont get out of sync for locked scenes */
+					/* important these don't get out of sync for locked scenes */
 					if (v3d->scenelock)
 						scene->camera= v3d->camera;
 

@@ -472,7 +472,7 @@ static int subframe_updateObject(Scene *scene, Object *ob, int flags, float fram
 	DynamicPaintModifierData *pmd = (DynamicPaintModifierData *)modifiers_findByType(ob, eModifierType_DynamicPaint);
 	bConstraint *con;
 
-	/* if other is dynamic paint canvas, dont update */
+	/* if other is dynamic paint canvas, don't update */
 	if (pmd && pmd->canvas)
 		return 1;
 
@@ -1506,7 +1506,7 @@ int dynamicPaint_resetSurface(DynamicPaintSurface *surface)
 	/* free existing data */
 	if (surface->data) dynamicPaint_freeSurfaceData(surface);
 
-	/* dont reallocate for image sequence types. they get handled only on bake */
+	/* don't reallocate for image sequence types. they get handled only on bake */
 	if (surface->format == MOD_DPAINT_SURFACE_F_IMAGESEQ) return 1;
 	if (numOfPoints < 1) return 0;
 
@@ -1653,15 +1653,13 @@ static struct DerivedMesh *dynamicPaint_Modifier_apply(DynamicPaintModifierData 
 											/* mix surface color */
 											interp_v3_v3v3(c, c, &fcolor[v_index], fcolor[v_index+3]);
 
-											col[l_index].r = FTOCHAR(c[2]);
-											col[l_index].g = FTOCHAR(c[1]);
-											col[l_index].b = FTOCHAR(c[0]);
+											rgb_float_to_uchar((unsigned char *)&col[l_index].r, c);
 										}
 										else {
-											col[l_index].a = 255;
 											col[l_index].r =
 											col[l_index].g =
 											col[l_index].b = FTOCHAR(pPoint[v_index].wetness);
+											col[l_index].a = 255;
 										}
 									}
 								}
@@ -1681,10 +1679,8 @@ static struct DerivedMesh *dynamicPaint_Modifier_apply(DynamicPaintModifierData 
 							#pragma omp parallel for schedule(static)
 							for (i=0; i<totloop; i++) {
 								int index = mloop[i].v*4;
-								col[i].a = FTOCHAR(fcolor[index+3]);
-								col[i].r = FTOCHAR(fcolor[index+2]);
-								col[i].g = FTOCHAR(fcolor[index+1]);
-								col[i].b = FTOCHAR(fcolor[index]);
+								rgb_float_to_uchar((unsigned char *)&col[i].r, &fcolor[index]);
+								col[i].a = FTOCHAR(fcolor[index+3]); /* IS THIS NEEDED? */
 							}
 						}
 						
@@ -1700,10 +1696,10 @@ static struct DerivedMesh *dynamicPaint_Modifier_apply(DynamicPaintModifierData 
 							#pragma omp parallel for schedule(static)
 							for (i=0; i<totloop; i++) {
 								int index = mloop[i].v;
-								col[i].a = 255;
 								col[i].r =
 								col[i].g =
 								col[i].b = FTOCHAR(pPoint[index].wetness);
+								col[i].a = 255;
 							}
 						}
 					}
@@ -2335,7 +2331,7 @@ int dynamicPaint_createUVSurface(DynamicPaintSurface *surface)
 				int index = tx+w*ty;
 				PaintUVPoint *tPoint = (&tempPoints[index]);
 
-				/* If point isnt't on canvas mesh	*/
+				/* If point isn't't on canvas mesh	*/
 				if (tPoint->face_index == -1) {
 					int u_min, u_max, v_min, v_max;
 					int u,v, ind;
@@ -2639,7 +2635,7 @@ void dynamicPaint_outputSurfaceImage(DynamicPaintSurface *surface, char* filenam
 		}
 	}
 
-	/* Set output format, png in case exr isnt supported */
+	/* Set output format, png in case exr isn't supported */
 	ibuf->ftype= PNG|95;
 #ifdef WITH_OPENEXR
 	if (format == R_IMF_IMTYPE_OPENEXR) {	/* OpenEXR 32-bit float */
@@ -4935,7 +4931,7 @@ int dynamicPaint_calculateFrame(DynamicPaintSurface *surface, Scene *scene, Obje
 	/* update bake data */
 	dynamicPaint_generateBakeData(surface, scene, cObject); 
 	
-	/* dont do substeps for first frame */
+	/* don't do substeps for first frame */
 	if (surface->substeps && (frame != surface->start_frame)) {
 		int st;
 		timescale = 1.0f / (surface->substeps+1);

@@ -146,16 +146,17 @@ void WM_operatortype_append(void (*opfunc)(wmOperatorType*))
 	
 	ot= MEM_callocN(sizeof(wmOperatorType), "operatortype");
 	ot->srna= RNA_def_struct(&BLENDER_RNA, "", "OperatorProperties");
+	/* Set the default i18n context now, so that opfunc can redefine it if needed! */
+	RNA_def_struct_translation_context(ot->srna, WM_OPERATOR_DEFAULT_I18NCONTEXT);
 	opfunc(ot);
 
 	if(ot->name==NULL) {
 		fprintf(stderr, "ERROR: Operator %s has no name property!\n", ot->idname);
-		ot->name= IFACE_("Dummy Name");
+		ot->name= N_("Dummy Name");
 	}
 
 	// XXX All ops should have a description but for now allow them not to.
-	RNA_def_struct_ui_text(ot->srna, ot->name, ot->description ? ot->description:IFACE_("(undocumented operator)"));
-
+	RNA_def_struct_ui_text(ot->srna, ot->name, ot->description ? ot->description:N_("(undocumented operator)"));
 	RNA_def_struct_identifier(ot->srna, ot->idname);
 
 	BLI_ghash_insert(global_ops_hash, (void *)ot->idname, ot);
@@ -167,8 +168,10 @@ void WM_operatortype_append_ptr(void (*opfunc)(wmOperatorType*, void*), void *us
 
 	ot= MEM_callocN(sizeof(wmOperatorType), "operatortype");
 	ot->srna= RNA_def_struct(&BLENDER_RNA, "", "OperatorProperties");
+	/* Set the default i18n context now, so that opfunc can redefine it if needed! */
+	RNA_def_struct_translation_context(ot->srna, WM_OPERATOR_DEFAULT_I18NCONTEXT);
 	opfunc(ot, userdata);
-	RNA_def_struct_ui_text(ot->srna, ot->name, ot->description ? ot->description:IFACE_("(undocumented operator)"));
+	RNA_def_struct_ui_text(ot->srna, ot->name, ot->description ? ot->description:N_("(undocumented operator)"));
 	RNA_def_struct_identifier(ot->srna, ot->idname);
 
 	BLI_ghash_insert(global_ops_hash, (void *)ot->idname, ot);
@@ -361,11 +364,12 @@ wmOperatorType *WM_operatortype_append_macro(const char *idname, const char *nam
 	ot->cancel= wm_macro_cancel;
 	ot->poll= NULL;
 
-	if(!ot->description)
-		ot->description= IFACE_("(undocumented operator)");
+	if(!ot->description) /* XXX All ops should have a description but for now allow them not to. */
+		ot->description= N_("(undocumented operator)");
 	
-	RNA_def_struct_ui_text(ot->srna, ot->name, ot->description); // XXX All ops should have a description but for now allow them not to.
+	RNA_def_struct_ui_text(ot->srna, ot->name, ot->description);
 	RNA_def_struct_identifier(ot->srna, ot->idname);
+	RNA_def_struct_translation_context(ot->srna, WM_OPERATOR_DEFAULT_I18NCONTEXT);
 
 	BLI_ghash_insert(global_ops_hash, (void *)ot->idname, ot);
 
@@ -387,8 +391,10 @@ void WM_operatortype_append_macro_ptr(void (*opfunc)(wmOperatorType*, void*), vo
 	ot->poll= NULL;
 
 	if(!ot->description)
-		ot->description= IFACE_("(undocumented operator)");
+		ot->description= N_("(undocumented operator)");
 
+	/* Set the default i18n context now, so that opfunc can redefine it if needed! */
+	RNA_def_struct_translation_context(ot->srna, WM_OPERATOR_DEFAULT_I18NCONTEXT);
 	opfunc(ot, userdata);
 
 	RNA_def_struct_ui_text(ot->srna, ot->name, ot->description);
@@ -410,7 +416,7 @@ wmOperatorTypeMacro *WM_operatortype_macro_define(wmOperatorType *ot, const char
 	BLI_addtail(&ot->macro, otmacro);
 
 	{
-		/* operator should always be found but in the event its not. dont segfault */
+		/* operator should always be found but in the event its not. don't segfault */
 		wmOperatorType *otsub = WM_operatortype_find(idname, 0);
 		if(otsub) {
 			RNA_def_pointer_runtime(ot->srna, otsub->idname, otsub->srna,
@@ -553,7 +559,7 @@ char *WM_operator_pystring(bContext *C, wmOperatorType *ot, PointerRNA *opptr, i
 				buf_default= RNA_property_as_string(C, &opptr_default, prop_default);
 
 				if(strcmp(buf, buf_default)==0)
-					ok= 0; /* values match, dont bother printing */
+					ok= 0; /* values match, don't bother printing */
 
 				MEM_freeN(buf_default);
 			}
@@ -767,7 +773,7 @@ static uiBlock *wm_enum_search_menu(bContext *C, ARegion *ar, void *arg_op)
 	block= uiBeginBlock(C, ar, "_popup", UI_EMBOSS);
 	uiBlockSetFlag(block, UI_BLOCK_LOOP|UI_BLOCK_RET_1|UI_BLOCK_MOVEMOUSE_QUIT);
 
-	//uiDefBut(block, LABEL, 0, op->type->name, 10, 10, 180, UI_UNIT_Y, NULL, 0.0, 0.0, 0, 0, ""); // ok, this isnt so easy...
+	//uiDefBut(block, LABEL, 0, op->type->name, 10, 10, 180, UI_UNIT_Y, NULL, 0.0, 0.0, 0, 0, ""); // ok, this isn't so easy...
 	but= uiDefSearchBut(block, search, 0, ICON_VIEWZOOM, sizeof(search), 10, 10, 9*UI_UNIT_X, UI_UNIT_Y, 0, 0, "");
 	uiButSetSearchFunc(but, operator_enum_search_cb, op->type, operator_enum_call_cb, NULL);
 
@@ -1244,7 +1250,7 @@ static int wm_resource_check_prev(void)
 
 #if 0 /* ignore the local folder */
 	if(res == NULL) {
-		/* with a local dir, copying old files isnt useful since local dir get priority for config */
+		/* with a local dir, copying old files isn't useful since local dir get priority for config */
 		res= BLI_get_folder_version(BLENDER_RESOURCE_PATH_LOCAL, BLENDER_VERSION, TRUE);
 	}
 #endif
@@ -2524,7 +2530,7 @@ int WM_gesture_circle_modal(bContext *C, wmOperator *op, wmEvent *event)
 		case GESTURE_MODAL_CANCEL:
 		case GESTURE_MODAL_CONFIRM:
 			wm_gesture_end(C, op);
-			return OPERATOR_FINISHED; /* use finish or we dont get an undo */
+			return OPERATOR_FINISHED; /* use finish or we don't get an undo */
 		}
 	}
 //	// Allow view navigation???
@@ -2683,6 +2689,7 @@ static void gesture_lasso_apply(bContext *C, wmOperator *op)
 	
 	/* operator storage as path. */
 
+	RNA_collection_clear(op->ptr, "path");
 	for(i=0; i<gesture->points; i++, lasso+=2) {
 		loc[0]= lasso[0];
 		loc[1]= lasso[1];
@@ -3830,6 +3837,7 @@ static void gesture_border_modal_keymap(wmKeyConfig *keyconf)
 	WM_modalkeymap_assign(keymap, "MARKER_OT_select_border");
 	WM_modalkeymap_assign(keymap, "NLA_OT_select_border");
 	WM_modalkeymap_assign(keymap, "NODE_OT_select_border");
+	WM_modalkeymap_assign(keymap, "PAINT_OT_hide_show");
 	WM_modalkeymap_assign(keymap, "OUTLINER_OT_select_border");
 //	WM_modalkeymap_assign(keymap, "SCREEN_OT_border_select"); // template
 	WM_modalkeymap_assign(keymap, "SEQUENCER_OT_select_border");

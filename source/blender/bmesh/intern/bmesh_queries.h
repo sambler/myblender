@@ -42,6 +42,7 @@ BMVert *BM_edge_other_vert(BMEdge *e, BMVert *v);
 BMLoop *BM_face_other_edge_loop(BMFace *f, BMEdge *e, BMVert *v);
 BMLoop *BM_face_other_vert_loop(BMFace *f, BMVert *v_prev, BMVert *v);
 
+int     BM_vert_edge_count_nonwire(BMVert *v);
 int     BM_vert_edge_count(BMVert *v);
 int     BM_edge_face_count(BMEdge *e);
 int     BM_vert_face_count(BMVert *v);
@@ -54,6 +55,8 @@ int     BM_edge_is_manifold(BMesh *bm, BMEdge *e);
 int     BM_edge_is_boundary(BMEdge *e);
 
 float   BM_loop_face_angle(BMesh *bm, BMLoop *l);
+void    BM_loop_face_normal(BMesh *bm, BMLoop *l, float r_normal[3]);
+void    BM_loop_face_tangent(BMesh *bm, BMLoop *l, float r_tangent[3]);
 
 float   BM_edge_face_angle(BMesh *bm, BMEdge *e);
 float   BM_vert_edge_angle(BMesh *bm, BMVert *v);

@@ -1080,7 +1080,7 @@ static int select_all_exec(bContext *C, wmOperator *op)
 void CLIP_OT_select_all(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Select or Deselect All";
+	ot->name= "(De)select All";
 	ot->description= "Change selection of all tracking markers";
 	ot->idname= "CLIP_OT_select_all";
 
@@ -2935,7 +2935,7 @@ void CLIP_OT_frame_jump(wmOperatorType *ot)
 	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
 
 	/* properties */
-	RNA_def_enum(ot->srna, "position", position_items, 0, "Position", "Position to jumo to");
+	RNA_def_enum(ot->srna, "position", position_items, 0, "Position", "Position to jump to");
 }
 
 /********************** join tracks operator *********************/
@@ -2953,18 +2953,6 @@ static int join_tracks_exec(bContext *C, wmOperator *op)
 	if(!act_track) {
 		BKE_report(op->reports, RPT_ERROR, "No active track to join to");
 		return OPERATOR_CANCELLED;
-	}
-
-	track= tracksbase->first;
-	while(track) {
-		if(TRACK_VIEW_SELECTED(sc, track) && track!=act_track) {
-			if(!BKE_tracking_test_join_tracks(act_track, track)) {
-				BKE_report(op->reports, RPT_ERROR, "Some selected tracks have got keyframed markers to the same frame");
-				return OPERATOR_CANCELLED;
-			}
-		}
-
-		track= track->next;
 	}
 
 	track= tracksbase->first;

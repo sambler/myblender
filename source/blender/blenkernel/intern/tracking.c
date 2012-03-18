@@ -476,49 +476,14 @@ void BKE_tracking_clear_path(MovieTrackingTrack *track, int ref_frame, int actio
 	}
 }
 
-int BKE_tracking_test_join_tracks(MovieTrackingTrack *dst_track, MovieTrackingTrack *src_track)
-{
-	int a= 0, b= 0;
-	int count= 0;
-
-	while(a<src_track->markersnr || b<dst_track->markersnr) {
-		if(b>=dst_track->markersnr) {
-			a++;
-			count++;
-		}
-		else if(a>=src_track->markersnr) {
-			b++;
-			count++;
-		}
-		else if(src_track->markers[a].framenr<dst_track->markers[b].framenr) {
-			a++;
-			count++;
-		} else if(src_track->markers[a].framenr>dst_track->markers[b].framenr) {
-			b++;
-			count++;
-		} else {
-			if((src_track->markers[a].flag&MARKER_DISABLED)==0 && (dst_track->markers[b].flag&MARKER_DISABLED)==0)
-				return 0;
-
-			a++;
-			b++;
-			count++;
-		}
-	}
-
-	return count;
-}
-
 void BKE_tracking_join_tracks(MovieTrackingTrack *dst_track, MovieTrackingTrack *src_track)
 {
-	int i, a= 0, b= 0, tot;
+	int i= 0, a= 0, b= 0;
 	MovieTrackingMarker *markers;
 
-	tot= BKE_tracking_test_join_tracks(dst_track, src_track);
+	markers= MEM_callocN((dst_track->markersnr+src_track->markersnr)*sizeof(MovieTrackingMarker), "tmp tracking joined tracks");
 
-	markers= MEM_callocN(tot*sizeof(MovieTrackingMarker), "tracking joined tracks");
-
-	for(i= 0; i<tot; i++) {
+	while (a < src_track->markersnr || b < dst_track->markersnr) {
 		if(b>=dst_track->markersnr) {
 			markers[i]= src_track->markers[a++];
 		}
@@ -530,18 +495,34 @@ void BKE_tracking_join_tracks(MovieTrackingTrack *dst_track, MovieTrackingTrack 
 		} else if(src_track->markers[a].framenr>dst_track->markers[b].framenr) {
 			markers[i]= dst_track->markers[b++];
 		} else {
-			if((src_track->markers[a].flag&MARKER_DISABLED)) markers[i]= dst_track->markers[b];
-			else markers[i]= src_track->markers[a++];
+			if((src_track->markers[a].flag&MARKER_DISABLED)==0) {
+				if((dst_track->markers[b].flag&MARKER_DISABLED)==0) {
+					/* both tracks are enabled on this frame, use their average position
+					 * can be improved further if tracks will be storing tracking score */
+
+					markers[i]= dst_track->markers[b];
+					add_v2_v2(markers[i].pos, src_track->markers[a].pos);
+					mul_v2_fl(markers[i].pos, 0.5f);
+				}
+				else markers[i]= src_track->markers[a];
+			}
+			else markers[i]= dst_track->markers[b];
 
 			a++;
 			b++;
 		}
+
+		i++;
 	}
 
 	MEM_freeN(dst_track->markers);
 
-	dst_track->markers= markers;
-	dst_track->markersnr= tot;
+	dst_track->markers= MEM_callocN(i*sizeof(MovieTrackingMarker), "tracking joined tracks");
+	memcpy(dst_track->markers, markers, i*sizeof(MovieTrackingMarker));
+
+	dst_track->markersnr= i;
+
+	MEM_freeN(markers);
 }
 
 static void tracking_tracks_free(ListBase *tracks)
@@ -2492,7 +2473,7 @@ static float stabilization_auto_scale_factor(MovieTracking *tracking, int width,
 
 	if(stabilization_median_point(tracking, 1, firstmedian)) {
 		int sfra= INT_MAX, efra= INT_MIN, cfra;
-		float scalex= 1.0f, scaley= 1.0f;
+		float scale= 1.0f;
 		MovieTrackingTrack *track;
 
 		stab->scale= 1.0f;
@@ -2510,17 +2491,20 @@ static float stabilization_auto_scale_factor(MovieTracking *tracking, int width,
 
 		for(cfra=sfra; cfra<=efra; cfra++) {
 			float median[2];
-			float loc[2], scale, angle;
+			float loc[2], angle, tmp_scale;
 			int i;
 			float mat[4][4];
 			float points[4][2]={{0.0f, 0.0f}, {0.0f, height}, {width, height}, {width, 0.0f}};
+			float si, co;
 
 			stabilization_median_point(tracking, cfra, median);
 
-			calculate_stabdata(tracking, cfra, width, height, firstmedian, median,
-						loc, &scale, &angle);
+			calculate_stabdata(tracking, cfra, width, height, firstmedian, median, loc, &tmp_scale, &angle);
 
-			BKE_tracking_stabdata_to_mat4(width, height, aspect, loc, scale, angle, mat);
+			BKE_tracking_stabdata_to_mat4(width, height, aspect, loc, 1.0f, angle, mat);
+
+			si = sin(angle);
+			co = cos(angle);
 
 			for(i= 0; i<4; i++) {
 				int j;
@@ -2540,21 +2524,48 @@ static float stabilization_auto_scale_factor(MovieTracking *tracking, int width,
 					sub_v3_v3v3(v2, point, a);
 
 					if(cross_v2v2(v1, v2) >= 0.0f) {
-						float dist= dist_to_line_v2(point, a, b), cur_scale;
+						const float rotDx[4][2] = {{1.0f, 0.0f}, {0.0f, -1.0f}, {-1.0f, 0.0f}, {0.0f, 1.0f}};
+						const float rotDy[4][2] = {{0.0f, 1.0f}, {1.0f, 0.0f}, {0.0f, -1.0f}, {-1.0f, 0.0f}};
 
-						if(i%2==0) {
-							cur_scale= 0.5f * (float)width / (0.5f * (float)width - dist);
-							scalex= MAX2(scalex, cur_scale);
-						} else {
-							cur_scale= 0.5f * (float)height / (0.5f * (float)height - dist);
-							scaley= MAX2(scaley, cur_scale);
+						float dx = loc[0] * rotDx[j][0] + loc[1] * rotDx[j][1],
+						      dy = loc[0] * rotDy[j][0] + loc[1] * rotDy[j][1];
+
+						float w, h, E, F, G, H, I, J, K, S;
+
+						if(j % 2) {
+							w = (float)height / 2.0f;
+							h = (float)width / 2.0f;
 						}
+						else {
+							w = (float)width / 2.0f;
+							h = (float)height / 2.0f;
+						}
+
+						E = -w*co + h*si;
+						F = -h*co - w*si;
+
+						if ((i % 2) == (j % 2)) {
+							G = -w*co - h*si;
+							H = h*co - w*si;
+						}
+						else {
+							G = w*co + h*si;
+							H = -h*co + w*si;
+						}
+
+						I = F - H;
+						J = G - E;
+						K = G*F - E*H;
+
+						S = (-w*I - h*J) / (dx*I + dy*J + K);
+
+						scale = MAX2(scale, S);
 					}
 				}
 			}
 		}
 
-		stab->scale= MAX2(scalex, scaley);
+		stab->scale= scale;
 
 		if(stab->maxscale>0.0f)
 			stab->scale= MIN2(stab->scale, stab->maxscale);
@@ -2686,6 +2697,9 @@ ImBuf *BKE_tracking_stabilize(MovieTracking *tracking, int framenr, ImBuf *ibuf,
 			interpolation = bilinear_interpolation;
 		else if(filter == TRACKING_FILTER_BICUBIC)
 			interpolation = bicubic_interpolation;
+		else
+			/* fallback to default interpolation method */
+			interpolation = neareast_interpolation;
 
 		for(j=0; j<tmpibuf->y; j++) {
 			for(i=0; i<tmpibuf->x;i++) {

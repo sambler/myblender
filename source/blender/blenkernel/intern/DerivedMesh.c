@@ -51,6 +51,8 @@
 #include "BLI_utildefines.h"
 #include "BLI_linklist.h"
 
+#include "BLF_translation.h"
+
 #include "BKE_cdderivedmesh.h"
 #include "BKE_displist.h"
 #include "BKE_key.h"
@@ -79,8 +81,6 @@ static DerivedMesh *navmesh_dm_createNavMeshForVisualization(DerivedMesh *dm);
 #include "GPU_draw.h"
 #include "GPU_extensions.h"
 #include "GPU_material.h"
-
-extern GLubyte stipple_quarttone[128]; /* glutil.c, bad level data */
 
 static void add_shapekey_layers(DerivedMesh *dm, Mesh *me, Object *ob);
 static void shapekey_layers_to_keyblocks(DerivedMesh *dm, Mesh *me, int actshape_uid);
@@ -121,8 +121,17 @@ static MFace *dm_getTessFaceArray(DerivedMesh *dm)
 	MFace *mface = CustomData_get_layer(&dm->faceData, CD_MFACE);
 
 	if (!mface) {
-		mface = CustomData_add_layer(&dm->faceData, CD_MFACE, CD_CALLOC, NULL,
-			dm->getNumTessFaces(dm));
+		int numTessFaces = dm->getNumTessFaces(dm);
+		
+		if (!numTessFaces) {
+			/* Do not add layer if there's no elements in it, this leads to issues later when
+			 * this layer is needed with non-zero size, but currently CD stuff does not check
+			 * for requested layer size on creation and just returns layer which was previously
+			 * added (sergey) */
+			return NULL;
+		}
+		
+		mface = CustomData_add_layer(&dm->faceData, CD_MFACE, CD_CALLOC, NULL, numTessFaces);
 		CustomData_set_layer_flag(&dm->faceData, CD_MFACE, CD_FLAG_TEMPORARY);
 		dm->copyTessFaceArray(dm, mface);
 	}
@@ -908,13 +917,19 @@ static void weightpaint_color(unsigned char r_col[4], ColorBand *coba, const flo
 {
 	float colf[4];
 
-	if(coba) do_colorband(coba, input, colf);
-	else     weight_to_rgb(colf, input);
+	if(coba) {
+		do_colorband(coba, input, colf);
+	}
+	else {
+		weight_to_rgb(colf, input);
+	}
 
-	r_col[3] = (unsigned char)(colf[0] * 255.0f);
-	r_col[2] = (unsigned char)(colf[1] * 255.0f);
-	r_col[1] = (unsigned char)(colf[2] * 255.0f);
-	r_col[0] = 255;
+	/* don't use rgb_float_to_uchar() here because
+	 * the resulting float doesn't need 0-1 clamp check */
+	r_col[0] = (unsigned char)(colf[0] * 255.0f);
+	r_col[1] = (unsigned char)(colf[1] * 255.0f);
+	r_col[2] = (unsigned char)(colf[2] * 255.0f);
+	r_col[3] = 255;
 }
 
 
@@ -1382,7 +1397,7 @@ static void mesh_calc_modifiers(Scene *scene, Object *ob, float (*inputVertexCos
 		if(!modifier_isEnabled(scene, md, required_mode)) continue;
 		if(mti->type == eModifierTypeType_OnlyDeform && !useDeform) continue;
 		if((mti->flags & eModifierTypeFlag_RequiresOriginalData) && dm) {
-			modifier_setError(md, "Modifier requires original data, bad stack position.");
+			modifier_setError(md, TIP_("Modifier requires original data, bad stack position."));
 			continue;
 		}
 		if(sculpt_mode && (!has_multires || multires_applied)) {
@@ -1395,7 +1410,7 @@ static void mesh_calc_modifiers(Scene *scene, Object *ob, float (*inputVertexCos
 			unsupported|= multires_applied;
 
 			if(unsupported) {
-				modifier_setError(md, "Not supported in sculpt mode.");
+				modifier_setError(md, TIP_("Not supported in sculpt mode."));
 				continue;
 			}
 		}
@@ -1684,6 +1699,19 @@ static void mesh_calc_modifiers(Scene *scene, Object *ob, float (*inputVertexCos
 		/* Need to watch this, it can cause issues, see bug [#29338]             */
 		/* take care with this block, we really need testing frameworks          */
 		/* --------------------------------------------------------------------- */
+
+
+		/* without this, drawing ngon tri's faces will show ugly tessellated face
+		 * normals and will also have to calculate normals on the fly, try avoid
+		 * this where possible since calculating polygon normals isn't fast,
+		 * note that this isn't a problem for subsurf (only quads) or editmode
+		 * which deals with drawing differently.
+		 *
+		 * Never calc vertex normals because other code ensures these are up to date.
+		 */
+		if ((finaldm->type == DM_TYPE_CDDM) && (CustomData_has_layer(&finaldm->faceData, CD_NORMAL) == FALSE)) {
+			CDDM_calc_normals_mapping_ex(finaldm, TRUE);
+		}
 	}
 
 
@@ -1724,7 +1752,7 @@ int editbmesh_modifier_is_enabled(Scene *scene, ModifierData *md, DerivedMesh *d
 
 	if(!modifier_isEnabled(scene, md, required_mode)) return 0;
 	if((mti->flags & eModifierTypeFlag_RequiresOriginalData) && dm) {
-		modifier_setError(md, "Modifier requires original data, bad stack position.");
+		modifier_setError(md, TIP_("Modifier requires original data, bad stack position."));
 		return 0;
 	}
 	
@@ -1918,8 +1946,8 @@ static void editbmesh_calc_modifiers(Scene *scene, Object *ob, BMEditMesh *em, D
 
 	/* --- */
 	/* BMESH_ONLY, ensure tessface's used for drawing,
-	 * but dont recalculate if the last modifier in the stack gives us tessfaces
-	 * check if the derived meshes are DM_TYPE_EDITBMESH before calling, this isnt essential
+	 * but don't recalculate if the last modifier in the stack gives us tessfaces
+	 * check if the derived meshes are DM_TYPE_EDITBMESH before calling, this isn't essential
 	 * but quiets annoying error messages since tessfaces wont be created. */
 	if ((*final_r)->type != DM_TYPE_EDITBMESH) {
 		DM_ensure_tessface(*final_r);
@@ -1995,6 +2023,12 @@ static void mesh_build_data(Scene *scene, Object *ob, CustomDataMask dataMask,
 	ob->derivedFinal->needsFree = 0;
 	ob->derivedDeform->needsFree = 0;
 	ob->lastDataMask = dataMask;
+
+	if((ob->mode & OB_MODE_SCULPT) && ob->sculpt) {
+		/* create PBVH immediately (would be created on the fly too,
+		   but this avoids waiting on first stroke) */
+		ob->sculpt->pbvh= ob->derivedFinal->getPBVH(ob, ob->derivedFinal);
+	}
 }
 
 static void editbmesh_build_data(Scene *scene, Object *obedit, BMEditMesh *em, CustomDataMask dataMask)
@@ -3003,7 +3037,7 @@ char *DM_debug_info(DerivedMesh *dm)
 void DM_debug_print(DerivedMesh *dm)
 {
 	char *str = DM_debug_info(dm);
-	printf("%s", str);
+	puts(str);
 	fflush(stdout);
 	MEM_freeN(str);
 }

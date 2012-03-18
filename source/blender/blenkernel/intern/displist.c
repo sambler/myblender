@@ -62,8 +62,6 @@
 
 #include "BLO_sys_types.h" // for intptr_t support
 
-extern Material defmaterial;	/* material.c */
-
 static void boundbox_displist(Object *ob);
 
 void free_disp_elem(DispList *dl)
@@ -710,7 +708,7 @@ static ModifierData *curve_get_tesselate_point(Scene *scene, Object *ob, int for
 			preTesselatePoint = md;
 
 			/* this modifiers are moving point of tessellation automatically
-			 * (some of them even can't be applied on tesselated curve), set flag
+			 * (some of them even can't be applied on tessellated curve), set flag
 			 * for incformation button in modifier's header */
 			md->mode |= eModifierMode_ApplyOnSpline;
 		} else if(md->mode&eModifierMode_ApplyOnSpline) {
@@ -751,6 +749,7 @@ static void curve_calc_modifiers_pre(Scene *scene, Object *ob, int forRender, fl
 			 * shape key modifier yet. */
 			deformedVerts= curve_getKeyVertexCos(cu, nurb, keyVerts);
 			originalVerts= MEM_dupallocN(deformedVerts);
+			numVerts = count_curveverts_without_handles(nurb);
 		}
 	}
 	

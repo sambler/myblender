@@ -58,7 +58,7 @@ numberoffilters(0), need_tex_update(true)
 	isshadersupported = GLEW_ARB_shader_objects &&
 		GLEW_ARB_fragment_shader && GLEW_ARB_multitexture;
 
-	/* used to return before 2.49 but need to initialize values so dont */
+	/* used to return before 2.49 but need to initialize values so don't */
 	if(!isshadersupported)
 		std::cout<<"shaders not supported!" << std::endl;
 
@@ -103,9 +103,10 @@ void RAS_2DFilterManager::PrintShaderErrors(unsigned int shader, const char *tas
 		c = pos+1;
 		line++;
 	}
-	printf("%s", c);
 
-	printf("%s\n", log);
+	puts(c);
+	puts(log);
+	puts("\n");
 }
 
 unsigned int RAS_2DFilterManager::CreateShaderProgram(const char* shadersource)

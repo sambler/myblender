@@ -78,9 +78,20 @@
 /* the global to talk to ghost */
 static GHOST_SystemHandle g_system= NULL;
 
+typedef enum WinOverrideFlag {
+	WIN_OVERRIDE_GEOM     = (1 << 0),
+	WIN_OVERRIDE_WINSTATE = (1 << 1)
+} WinOverrideFlag;
+
 /* set by commandline */
-static int prefsizx= 0, prefsizy= 0, prefstax= 0, prefstay= 0, initialstate= GHOST_kWindowStateNormal;
-static unsigned short useprefsize= 0;
+static struct WMInitStruct {
+	/* window geometry */
+	int size_x, size_y;
+	int start_x, start_y;
+
+	int windowstate;
+	WinOverrideFlag override_flag;
+} wm_init_state = {0, 0, 0, 0, GHOST_kWindowStateNormal, 0};
 
 /* ******** win open & close ************ */
 
@@ -199,7 +210,7 @@ static int find_free_winid(wmWindowManager *wm)
 	return id;
 }
 
-/* dont change context itself */
+/* don't change context itself */
 wmWindow *wm_window_new(bContext *C)
 {
 	wmWindowManager *wm= CTX_wm_manager(C);
@@ -239,8 +250,25 @@ wmWindow *wm_window_copy(bContext *C, wmWindow *winorig)
 /* this is event from ghost, or exit-blender op */
 void wm_window_close(bContext *C, wmWindowManager *wm, wmWindow *win)
 {
+	wmWindow *tmpwin;
 	bScreen *screen= win->screen;
 	
+	/* first check if we have any non-temp remaining windows */
+	if((U.uiflag & USER_QUIT_PROMPT) && !wm->file_saved){
+		if(wm->windows.first) {
+			for(tmpwin = wm->windows.first; tmpwin; tmpwin = tmpwin->next){
+				if(tmpwin == win)
+					continue;
+				if(tmpwin->screen->temp == 0)
+					break;
+			}
+			if(tmpwin == NULL){
+				if(!GHOST_confirmQuit(win->ghostwin))
+					return;
+			}
+		}
+	}
+
 	BLI_remlink(&wm->windows, win);
 	
 	wm_draw_window_clear(win);
@@ -304,17 +332,10 @@ void wm_window_title(wmWindowManager *wm, wmWindow *win)
 }
 
 /* belongs to below */
-static void wm_window_add_ghostwindow(bContext *C, const char *title, wmWindow *win)
+static void wm_window_add_ghostwindow(const char *title, wmWindow *win)
 {
 	GHOST_WindowHandle ghostwin;
 	int scr_w, scr_h, posy;
-	GHOST_TWindowState initial_state;
-
-	/* when there is no window open uses the initial state */
-	if(!CTX_wm_window(C))
-		initial_state= initialstate;
-	else
-		initial_state= GHOST_kWindowStateNormal;
 	
 	wm_get_screensize(&scr_w, &scr_h);
 	posy= (scr_h - win->posy - win->sizey);
@@ -329,7 +350,7 @@ static void wm_window_add_ghostwindow(bContext *C, const char *title, wmWindow *
 	 * doesn't work well when AA is initialized, even if not used. */
 	ghostwin= GHOST_CreateWindow(g_system, title, 
 								 win->posx, posy, win->sizex, win->sizey, 
-								 initial_state, 
+								 (GHOST_TWindowState)win->windowstate, 
 								 GHOST_kDrawingContextTypeOpenGL,
 								 0 /* no stereo */,
 								 0 /* no AA */);
@@ -339,7 +360,7 @@ static void wm_window_add_ghostwindow(bContext *C, const char *title, wmWindow *
 		GPU_extensions_init();
 		
 		/* set the state*/
-		GHOST_SetWindowState(ghostwin, initial_state);
+		GHOST_SetWindowState(ghostwin, (GHOST_TWindowState)win->windowstate);
 
 		win->ghostwin= ghostwin;
 		GHOST_SetWindowUserData(ghostwin, win);	/* pointer back */
@@ -368,7 +389,7 @@ static void wm_window_add_ghostwindow(bContext *C, const char *title, wmWindow *
 /* for wmWindows without ghostwin, open these and clear */
 /* window size is read from window, if 0 it uses prefsize */
 /* called in WM_check, also inits stuff after file read */
-void wm_window_add_ghostwindows(bContext* C, wmWindowManager *wm)
+void wm_window_add_ghostwindows(wmWindowManager *wm)
 {
 	wmKeyMap *keymap;
 	wmWindow *win;
@@ -377,34 +398,38 @@ void wm_window_add_ghostwindows(bContext* C, wmWindowManager *wm)
 	 * Note that these values will be used only
 	 * when there is no startup.blend yet.
 	 */
-	if (!prefsizx) {
-		wm_get_screensize(&prefsizx, &prefsizy);
+	if (wm_init_state.size_x == 0) {
+		wm_get_screensize(&wm_init_state.size_x, &wm_init_state.size_y);
 		
 #if defined(__APPLE__) && !defined(GHOST_COCOA)
 //Cocoa provides functions to get correct max window size
 		{
 			extern void wm_set_apple_prefsize(int, int);	/* wm_apple.c */
 			
-			wm_set_apple_prefsize(prefsizx, prefsizy);
+			wm_set_apple_prefsize(wm_init_state.size_x, wm_init_state.size_y);
 		}
 #else
-		prefstax= 0;
-		prefstay= 0;
+		wm_init_state.start_x = 0;
+		wm_init_state.start_y = 0;
 		
 #endif
 	}
 	
-	for(win= wm->windows.first; win; win= win->next) {
-		if(win->ghostwin==NULL) {
-			if(win->sizex==0 || useprefsize) {
-				win->posx= prefstax;
-				win->posy= prefstay;
-				win->sizex= prefsizx;
-				win->sizey= prefsizy;
-				win->windowstate= initialstate;
-				useprefsize= 0;
+	for (win= wm->windows.first; win; win= win->next) {
+		if (win->ghostwin==NULL) {
+			if ((win->sizex == 0) || (wm_init_state.override_flag & WIN_OVERRIDE_GEOM)) {
+				win->posx = wm_init_state.start_x;
+				win->posy = wm_init_state.start_y;
+				win->sizex = wm_init_state.size_x;
+				win->sizey = wm_init_state.size_y;
+				wm_init_state.override_flag &= ~WIN_OVERRIDE_GEOM;
 			}
-			wm_window_add_ghostwindow(C, "Blender", win);
+
+			if (wm_init_state.override_flag & WIN_OVERRIDE_WINSTATE) {
+				win->windowstate = wm_init_state.windowstate;
+			}
+
+			wm_window_add_ghostwindow("Blender", win);
 		}
 		/* happens after fileread */
 		if(win->eventstate==NULL)
@@ -698,6 +723,7 @@ static int ghost_event_proc(GHOST_EventHandle evt, GHOST_TUserDataPtr private)
 			case GHOST_kEventWindowMove: {
 				GHOST_TWindowState state;
 				state = GHOST_GetWindowState(win->ghostwin);
+				win->windowstate = state;
 
 				 /* win32: gives undefined window size when minimized */
 				if(state!=GHOST_kWindowStateMinimized) {
@@ -1100,7 +1126,7 @@ void wm_window_get_size(wmWindow *win, int *width_r, int *height_r)
 }
 
 /* exceptional case: - splash is called before events are processed
- * this means we dont actually know the window size so get this from GHOST */
+ * this means we don't actually know the window size so get this from GHOST */
 void wm_window_get_size_ghost(wmWindow *win, int *width_r, int *height_r)
 {
 	GHOST_RectangleHandle bounds= GHOST_GetClientBounds(win->ghostwin);
@@ -1150,22 +1176,24 @@ void wm_get_cursor_position(wmWindow *win, int *x, int *y)
 /* called whem no ghost system was initialized */
 void WM_setprefsize(int stax, int stay, int sizx, int sizy)
 {
-	prefstax= stax;
-	prefstay= stay;
-	prefsizx= sizx;
-	prefsizy= sizy;
-	useprefsize= 1;
+	wm_init_state.start_x = stax; /* left hand pos */
+	wm_init_state.start_y = stay; /* bottom pos */
+	wm_init_state.size_x = sizx;
+	wm_init_state.size_y = sizy;
+	wm_init_state.override_flag |= WIN_OVERRIDE_GEOM;
 }
 
 /* for borderless and border windows set from command-line */
 void WM_setinitialstate_fullscreen(void)
 {
-	initialstate= GHOST_kWindowStateFullScreen;
+	wm_init_state.windowstate = GHOST_kWindowStateFullScreen;
+	wm_init_state.override_flag |= WIN_OVERRIDE_WINSTATE;
 }
 
 void WM_setinitialstate_normal(void)
 {
-	initialstate= GHOST_kWindowStateNormal;
+	wm_init_state.windowstate = GHOST_kWindowStateNormal;
+	wm_init_state.override_flag |= WIN_OVERRIDE_WINSTATE;
 }
 
 /* This function requires access to the GHOST_SystemHandle (g_system) */

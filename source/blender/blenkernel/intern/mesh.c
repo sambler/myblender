@@ -332,7 +332,7 @@ static void mesh_ensure_tessellation_customdata(Mesh *me)
  * mloopcol and mcol) have the same relative active/render/clone/mask indices.
  *
  * note that for undo mesh data we want to skip 'ensure_tess_cd' call since
- * we dont want to store memory for tessface when its only used for older
+ * we don't want to store memory for tessface when its only used for older
  * versions of the mesh. - campbell*/
 static void mesh_update_linked_customdata(Mesh *me, const short do_ensure_tess_cd)
 {
@@ -546,7 +546,7 @@ BMesh *BKE_mesh_to_bmesh(Mesh *me, Object *ob)
 {
 	BMesh *bm;
 
-	bm = BM_mesh_create(ob, &bm_mesh_allocsize_default);
+	bm = BM_mesh_create(&bm_mesh_allocsize_default);
 
 	BMO_op_callf(bm, "mesh_to_bmesh mesh=%p object=%p set_shapekey=%b", me, ob, TRUE);
 
@@ -1016,38 +1016,131 @@ void make_edges(Mesh *me, int old)
 	mesh_strip_loose_faces(me);
 }
 
+/* We need to keep this for edge creation (for now?), and some old readfile code... */
 void mesh_strip_loose_faces(Mesh *me)
 {
-	int a,b;
+	MFace *f;
+	int a, b;
 
-	for (a=b=0; a<me->totface; a++) {
-		if (me->mface[a].v3) {
-			if (a!=b) {
-				memcpy(&me->mface[b],&me->mface[a],sizeof(me->mface[b]));
+	for (a = b = 0, f = me->mface; a < me->totface; a++, f++) {
+		if (f->v3) {
+			if (a != b) {
+				memcpy(&me->mface[b], f, sizeof(me->mface[b]));
 				CustomData_copy_data(&me->fdata, &me->fdata, a, b, 1);
-				CustomData_free_elem(&me->fdata, a, 1);
 			}
 			b++;
 		}
 	}
-	me->totface = b;
+	if (a != b) {
+		CustomData_free_elem(&me->fdata, b, a - b);
+		me->totface = b;
+	}
+}
+
+/* Works on both loops and polys! */
+/* Note: It won't try to guess which loops of an invalid poly to remove!
+ *       this is the work of the caller, to mark those loops...
+ *       See e.g. BKE_mesh_validate_arrays(). */
+void mesh_strip_loose_polysloops(Mesh *me)
+{
+	MPoly *p;
+	MLoop *l;
+	int a, b;
+	/* New loops idx! */
+	int *new_idx = MEM_mallocN(sizeof(int) * me->totloop, "strip_loose_polysloops old2new idx mapping for polys.");
+
+	for (a = b = 0, p = me->mpoly; a < me->totpoly; a++, p++) {
+		int invalid = FALSE;
+		int i = p->loopstart;
+		int stop = i + p->totloop;
+
+		if (stop > me->totloop || stop < i) {
+			invalid = TRUE;
+		}
+		else {
+			l = &me->mloop[i];
+			i = stop - i;
+			/* If one of the poly's loops is invalid, the whole poly is invalid! */
+			for (; i--; l++) {
+				if (l->e == INVALID_LOOP_EDGE_MARKER) {
+					invalid = TRUE;
+					break;
+				}
+			}
+		}
+
+		if (p->totloop >= 3 && !invalid) {
+			if (a != b) {
+				memcpy(&me->mpoly[b], p, sizeof(me->mpoly[b]));
+				CustomData_copy_data(&me->pdata, &me->pdata, a, b, 1);
+			}
+			b++;
+		}
+	}
+	if (a != b) {
+		CustomData_free_elem(&me->pdata, b, a - b);
+		me->totpoly = b;
+	}
+
+	/* And now, get rid of invalid loops. */
+	for (a = b = 0, l = me->mloop; a < me->totloop; a++, l++) {
+		if (l->e != INVALID_LOOP_EDGE_MARKER) {
+			if (a != b) {
+				memcpy(&me->mloop[b], l, sizeof(me->mloop[b]));
+				CustomData_copy_data(&me->ldata, &me->ldata, a, b, 1);
+			}
+			new_idx[a] = b;
+			b++;
+		}
+		else {
+			/* XXX Theorically, we should be able to not do this, as no remaining poly
+			 *     should use any stripped loop. But for security's sake... */
+			new_idx[a] = -a;
+		}
+	}
+	if (a != b) {
+		CustomData_free_elem(&me->ldata, b, a - b);
+		me->totloop = b;
+	}
+
+	/* And now, update polys' start loop index. */
+	/* Note: At this point, there should never be any poly using a striped loop! */
+	for (a = 0, p = me->mpoly; a < me->totpoly; a++, p++) {
+		p->loopstart = new_idx[p->loopstart];
+	}
 }
 
 void mesh_strip_loose_edges(Mesh *me)
 {
-	int a,b;
+	MEdge *e;
+	MLoop *l;
+	int a, b;
+	unsigned int *new_idx = MEM_mallocN(sizeof(int) * me->totedge, "strip_loose_edges old2new idx mapping for loops.");
 
-	for (a=b=0; a<me->totedge; a++) {
-		if (me->medge[a].v1!=me->medge[a].v2) {
-			if (a!=b) {
-				memcpy(&me->medge[b],&me->medge[a],sizeof(me->medge[b]));
+	for (a = b = 0, e = me->medge; a < me->totedge; a++, e++) {
+		if (e->v1 != e->v2) {
+			if (a != b) {
+				memcpy(&me->medge[b], e, sizeof(me->medge[b]));
 				CustomData_copy_data(&me->edata, &me->edata, a, b, 1);
-				CustomData_free_elem(&me->edata, a, 1);
 			}
+			new_idx[a] = b;
 			b++;
 		}
+		else {
+			new_idx[a] = INVALID_LOOP_EDGE_MARKER;
+		}
 	}
-	me->totedge = b;
+	if (a != b) {
+		CustomData_free_elem(&me->edata, b, a - b);
+		me->totedge = b;
+	}
+
+	/* And now, update loops' edge indices. */
+	/* XXX We hope no loop was pointing to a striped edge!
+	 *     Else, its e will be set to INVALID_LOOP_EDGE_MARKER :/ */
+	for (a = 0, l = me->mloop; a < me->totloop; a++, l++) {
+		l->e = new_idx[l->e];
+	}
 }
 
 void mball_to_mesh(ListBase *lb, Mesh *me)
@@ -1849,11 +1942,11 @@ static void bm_corners_to_loops(Mesh *me, int findex, int loopstart, int numTex,
 		mloopcol = CustomData_get_n(&me->ldata, CD_MLOOPCOL, loopstart, i);
 		mcol = CustomData_get_n(&me->fdata, CD_MCOL, findex, i);
 
-		mloopcol->r = mcol[0].r; mloopcol->g = mcol[0].g; mloopcol->b = mcol[0].b; mloopcol->a = mcol[0].a; mloopcol++;
-		mloopcol->r = mcol[1].r; mloopcol->g = mcol[1].g; mloopcol->b = mcol[1].b; mloopcol->a = mcol[1].a; mloopcol++;
-		mloopcol->r = mcol[2].r; mloopcol->g = mcol[2].g; mloopcol->b = mcol[2].b; mloopcol->a = mcol[2].a; mloopcol++;
+		MESH_MLOOPCOL_FROM_MCOL(mloopcol, &mcol[0]); mloopcol++;
+		MESH_MLOOPCOL_FROM_MCOL(mloopcol, &mcol[1]); mloopcol++;
+		MESH_MLOOPCOL_FROM_MCOL(mloopcol, &mcol[2]); mloopcol++;
 		if (mf->v4) {
-			mloopcol->r = mcol[3].r; mloopcol->g = mcol[3].g; mloopcol->b = mcol[3].b; mloopcol->a = mcol[3].a; mloopcol++;
+			MESH_MLOOPCOL_FROM_MCOL(mloopcol, &mcol[3]); mloopcol++;
 		}
 	}
 	
@@ -1877,6 +1970,7 @@ static void bm_corners_to_loops(Mesh *me, int findex, int loopstart, int numTex,
 		
 			for (i=0; i<tot; i++, disps += side*side, ld++) {
 				ld->totdisp = side*side;
+				ld->level = (int)(logf(side - 1.0f) / M_LN2) + 1;
 			
 				if (ld->disps)
 					MEM_freeN(ld->disps);
@@ -1962,7 +2056,7 @@ void convert_mfaces_to_mpolys(Mesh *mesh)
 		bm_corners_to_loops(mesh, i, mp->loopstart, numTex, numCol);
 	}
 
-	/* note, we dont convert FGons at all, these are not even real ngons,
+	/* note, we don't convert FGons at all, these are not even real ngons,
 	 * they have their own UV's, colors etc - its more an editing feature. */
 
 	mesh_update_customdata_pointers(mesh, TRUE);
@@ -2095,25 +2189,49 @@ void free_uv_vert_map(UvVertMap *vmap)
 /* Generates a map where the key is the vertex and the value is a list
  * of polys that use that vertex as a corner. The lists are allocated
  * from one memory pool. */
-void create_vert_poly_map(ListBase **map, IndexNode **mem,
-                          MPoly *mpoly, MLoop *mloop,
-                          const int totvert, const int totpoly, const int totloop)
+void create_vert_poly_map(MeshElemMap **map, int **mem,
+                          const MPoly *mpoly, const MLoop *mloop,
+                          int totvert, int totpoly, int totloop)
 {
-	int i,j;
-	IndexNode *node = NULL;
-	MPoly *mp;
-	MLoop *ml;
+	int i, j;
+	int *indices;
 
-	(*map) = MEM_callocN(sizeof(ListBase) * totvert, "vert face map");
-	(*mem) = MEM_callocN(sizeof(IndexNode) * totloop, "vert poly map mem");
-	node = *mem;
+	(*map) = MEM_callocN(sizeof(MeshElemMap) * totvert, "vert poly map");
+	(*mem) = MEM_mallocN(sizeof(int) * totloop, "vert poly map mem");
 
+	printf("pmap old=%f, new=%f\n",
+		   (sizeof(ListBase) * totvert +
+			sizeof(IndexNode) * totloop) / 1024.0f / 1024.0f,
+		   (sizeof(MeshElemMap) * totvert +
+			sizeof(int) * totloop) / 1024.0f / 1024.0f);
+
+	/* Count number of polys for each vertex */
+	for (i = 0; i < totpoly; i++) {
+		const MPoly *p = &mpoly[i];
+		
+		for (j = 0; j < p->totloop; j++)
+			(*map)[mloop[p->loopstart + j].v].count++;
+	}
+
+	/* Assign indices mem */
+	indices = (*mem);
+	for (i = 0; i < totvert; i++) {
+		(*map)[i].indices = indices;
+		indices += (*map)[i].count;
+
+		/* Reset 'count' for use as index in last loop */
+		(*map)[i].count = 0;
+	}
+		
 	/* Find the users */
-	for (i = 0, mp = mpoly; i < totpoly; ++i, ++mp) {
-		ml = &mloop[mp->loopstart];
-		for (j = 0; j < mp->totloop; ++j, ++node, ++ml) {
-			node->index = i;
-			BLI_addtail(&(*map)[ml->v], node);
+	for (i = 0; i < totpoly; i++) {
+		const MPoly *p = &mpoly[i];
+		
+		for (j = 0; j < p->totloop; j++) {
+			int v = mloop[p->loopstart + j].v;
+			
+			(*map)[v].indices[(*map)[v].count] = i;
+			(*map)[v].count++;
 		}
 	}
 }
@@ -2175,10 +2293,7 @@ void mesh_loops_to_mface_corners(CustomData *fdata, CustomData *ldata,
 
 		for (j=0; j < mf_len; j++) {
 			mloopcol = CustomData_get_n(ldata, CD_MLOOPCOL, lindex[j], i);
-			mcol[j].r = mloopcol->r;
-			mcol[j].g = mloopcol->g;
-			mcol[j].b = mloopcol->b;
-			mcol[j].a = mloopcol->a;
+			MESH_MLOOPCOL_TO_MCOL(mloopcol, &mcol[j]);
 		}
 	}
 
@@ -2187,10 +2302,7 @@ void mesh_loops_to_mface_corners(CustomData *fdata, CustomData *ldata,
 
 		for (j=0; j < mf_len; j++) {
 			mloopcol = CustomData_get(ldata, lindex[j], CD_WEIGHT_MLOOPCOL);
-			mcol[j].r = mloopcol->r;
-			mcol[j].g = mloopcol->g;
-			mcol[j].b = mloopcol->b;
-			mcol[j].a = mloopcol->a;
+			MESH_MLOOPCOL_TO_MCOL(mloopcol, &mcol[j]);
 		}
 	}
 
@@ -2200,8 +2312,7 @@ void mesh_loops_to_mface_corners(CustomData *fdata, CustomData *ldata,
 
 		for (j=0; j < mf_len; j++) {
 			lof = CustomData_get(ldata, lindex[j], CD_ORIGSPACE_MLOOP);
-			of->uv[j][0] = lof->uv[0];
-			of->uv[j][1] = lof->uv[1];
+			copy_v2_v2(of->uv[j], lof->uv);
 		}
 	}
 }
@@ -2214,7 +2325,7 @@ int mesh_recalcTessellation(CustomData *fdata,
                            CustomData *ldata, CustomData *pdata,
                            MVert *mvert, int totface, int UNUSED(totloop),
                            int totpoly,
-                           /* when tessellating to recalcilate normals after
+                           /* when tessellating to recalculate normals after
                             * we can skip copying here */
                            const int do_face_nor_cpy)
 {
@@ -2394,12 +2505,12 @@ int mesh_recalcTessellation(CustomData *fdata,
 	CustomData_add_layer(fdata, CD_MFACE, CD_ASSIGN, mface, totface);
 
 	/* CD_POLYINDEX will contain an array of indices from tessfaces to the polygons
-	 * they are directly tesselated from */
+	 * they are directly tessellated from */
 	CustomData_add_layer(fdata, CD_POLYINDEX, CD_ASSIGN, mface_to_poly_map, totface);
 	if (mface_orig_index) {
-		/* If polys had a CD_ORIGINDEX layer, then the tesselated faces will get this
+		/* If polys had a CD_ORIGINDEX layer, then the tessellated faces will get this
 		 * layer as well, pointing to polys from the original mesh (not the polys
-		 * that just got tesselated) */
+		 * that just got tessellated) */
 		CustomData_add_layer(fdata, CD_ORIGINDEX, CD_ASSIGN, mface_orig_index, totface);
 	}
 
@@ -2888,6 +2999,33 @@ int poly_get_adj_loops_from_vert(unsigned adj_r[3], const MPoly *poly,
 	return corner;
 }
 
+/* update the hide flag for edges and faces from the corresponding
+   flag in verts */
+void mesh_flush_hidden_from_verts(const MVert *mvert,
+								  const MLoop *mloop,
+								  MEdge *medge, int totedge,
+								  MPoly *mpoly, int totpoly)
+{
+	int i, j;
+	
+	for(i = 0; i < totedge; i++) {
+		MEdge *e = &medge[i];
+		if(mvert[e->v1].flag & ME_HIDE ||
+		   mvert[e->v2].flag & ME_HIDE)
+			e->flag |= ME_HIDE;
+		else
+			e->flag &= ~ME_HIDE;
+	}
+	for(i = 0; i < totpoly; i++) {
+		MPoly *p = &mpoly[i];
+		p->flag &= ~ME_HIDE;
+		for(j = 0; j < p->totloop; j++) {
+			if(mvert[mloop[p->loopstart + j].v].flag & ME_HIDE)
+				p->flag |= ME_HIDE;
+		}
+	}
+}
+
 /* basic vertex data functions */
 int minmax_mesh(Mesh *me, float min[3], float max[3])
 {
@@ -2968,7 +3106,7 @@ void BKE_mesh_tessface_calc(Mesh *mesh)
 	mesh->totface = mesh_recalcTessellation(&mesh->fdata, &mesh->ldata, &mesh->pdata,
 	                                       mesh->mvert,
 	                                       mesh->totface, mesh->totloop, mesh->totpoly,
-	                                       /* calc normals right after, dont copy from polys here */
+	                                       /* calc normals right after, don't copy from polys here */
 	                                       FALSE);
 
 	mesh_update_customdata_pointers(mesh, TRUE);

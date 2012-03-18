@@ -1965,7 +1965,7 @@ float ED_rollBoneToVector(EditBone *bone, const float align_axis[3], const short
 	sub_v3_v3v3(nor, bone->tail, bone->head);
 	vec_roll_to_mat3(nor, 0.0f, mat);
 
-	/* check the bone isnt aligned with the axis */
+	/* check the bone isn't aligned with the axis */
 	if(!is_zero_v3(align_axis) && angle_v3v3(align_axis, mat[2]) > FLT_EPSILON) {
 		float vec[3], align_axis_proj[3], roll;
 
@@ -2153,7 +2153,7 @@ static void undoBones_to_editBones(void *uarmv, void *armv, void *UNUSED(data))
 	for(newebo= arm->edbo->first; newebo; newebo= newebo->next) {
 		if(newebo->parent) newebo->parent= newebo->parent->temp;
 	}
-	/* be sure they dont hang ever */
+	/* be sure they don't hang ever */
 	for(newebo= arm->edbo->first; newebo; newebo= newebo->next) {
 		newebo->temp= NULL;
 	}
@@ -3386,7 +3386,7 @@ static int armature_extrude_exec(bContext *C, wmOperator *op)
 					newbone->zwidth= ebone->zwidth;
 					newbone->ease1= ebone->ease1;
 					newbone->ease2= ebone->ease2;
-					newbone->rad_head= ebone->rad_tail;	// dont copy entire bone...
+					newbone->rad_head= ebone->rad_tail;	// don't copy entire bone...
 					newbone->rad_tail= ebone->rad_tail;
 					newbone->segments= 1;
 					newbone->layer= ebone->layer;
@@ -4013,7 +4013,7 @@ static int armature_de_select_all_exec(bContext *C, wmOperator *op)
 void ARMATURE_OT_select_all(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Select or Deselect All";
+	ot->name= "(De)select All";
 	ot->idname= "ARMATURE_OT_select_all";
 	ot->description= "Toggle selection status of all bones";
 	
@@ -5077,7 +5077,7 @@ static int pose_de_select_all_exec(bContext *C, wmOperator *op)
 void POSE_OT_select_all(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Select or Deselect All";
+	ot->name= "(De)select All";
 	ot->idname= "POSE_OT_select_all";
 	ot->description= "Toggle selection status of all bones";
 	

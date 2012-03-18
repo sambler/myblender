@@ -186,11 +186,11 @@ static void bm_merge_dm_transform(BMesh* bm, DerivedMesh *dm, float mat[4][4])
 }
 
 static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
-					  Scene *scene, Object *ob, DerivedMesh *dm,
-										  int UNUSED(initFlags))
+                                          Scene *scene, Object *ob, DerivedMesh *dm,
+                                          int UNUSED(initFlags))
 {
 	DerivedMesh *result;
-	BMEditMesh *em = DM_to_editbmesh(ob, dm, NULL, FALSE);
+	BMEditMesh *em = DM_to_editbmesh(dm, NULL, FALSE);
 	BMOperator op, oldop, weldop;
 	int i, j, indexLen;
 	/* offset matrix */
@@ -349,7 +349,7 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 			BMO_op_finish(em->bm, &findop);
 		}
 
-		/* generate merge mappping using index map.  we do this by using the
+		/* generate merge mapping using index map.  we do this by using the
 		 * operator slots as lookup arrays.*/
 		#define E(i) (i) < s1->len ? _E(s1, i) : _E(s2, (i)-s1->len)
 
@@ -377,7 +377,7 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 	if ((start_cap || end_cap) &&
 
 	    /* BMESH_TODO - theres a bug in DM_to_bmesh_ex() when in editmode!
-		 * this needs investigation, but for now at least dont crash */
+		 * this needs investigation, but for now at least don't crash */
 	    ob->mode != OB_MODE_EDIT
 
 	    )

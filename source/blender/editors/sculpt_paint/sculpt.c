@@ -563,7 +563,7 @@ static float brush_strength(Sculpt *sd, StrokeCache *cache, float feather)
 
 	switch(brush->sculpt_tool){
 		case SCULPT_TOOL_CLAY:
-		case SCULPT_TOOL_CLAY_TUBES:
+		case SCULPT_TOOL_CLAY_STRIPS:
 		case SCULPT_TOOL_DRAW:
 		case SCULPT_TOOL_LAYER:
 			return alpha * flip * pressure * overlap * feather;
@@ -2026,7 +2026,7 @@ static void do_clay_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int totnode)
 	}
 }
 
-static void do_clay_tubes_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int totnode)
+static void do_clay_strips_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, int totnode)
 {
 	SculptSession *ss = ob->sculpt;
 	Brush *brush = paint_brush(&sd->paint);
@@ -2370,8 +2370,8 @@ static void do_brush_action(Sculpt *sd, Object *ob, Brush *brush)
 		case SCULPT_TOOL_CLAY:
 			do_clay_brush(sd, ob, nodes, totnode);
 			break;
-		case SCULPT_TOOL_CLAY_TUBES:
-			do_clay_tubes_brush(sd, ob, nodes, totnode);
+		case SCULPT_TOOL_CLAY_STRIPS:
+			do_clay_strips_brush(sd, ob, nodes, totnode);
 			break;
 		case SCULPT_TOOL_FILL:
 			do_fill_brush(sd, ob, nodes, totnode);
@@ -2763,8 +2763,8 @@ static const char *sculpt_tool_name(Sculpt *sd)
 		return "Flatten Brush"; break;
 	case SCULPT_TOOL_CLAY:
 		return "Clay Brush"; break;
-	case SCULPT_TOOL_CLAY_TUBES:
-		return "Clay Tubes Brush"; break;
+	case SCULPT_TOOL_CLAY_STRIPS:
+		return "Clay Strips Brush"; break;
 	case SCULPT_TOOL_FILL:
 		return "Fill Brush"; break;
 	case SCULPT_TOOL_SCRAPE:
@@ -2916,7 +2916,7 @@ static void sculpt_update_cache_invariants(bContext* C, Sculpt *sd, SculptSessio
 	if(ELEM8(brush->sculpt_tool,
 			 SCULPT_TOOL_DRAW, SCULPT_TOOL_CREASE, SCULPT_TOOL_BLOB,
 			 SCULPT_TOOL_LAYER, SCULPT_TOOL_INFLATE, SCULPT_TOOL_CLAY,
-			 SCULPT_TOOL_CLAY_TUBES, SCULPT_TOOL_ROTATE))
+			 SCULPT_TOOL_CLAY_STRIPS, SCULPT_TOOL_ROTATE))
 		if(!(brush->flag & BRUSH_ACCUMULATE))
 			cache->original = 1;
 
@@ -2931,11 +2931,15 @@ static void sculpt_update_brush_delta(Sculpt *sd, Object *ob, Brush *brush)
 {
 	SculptSession *ss = ob->sculpt;
 	StrokeCache *cache = ss->cache;
+	float mouse[2] = {
+		cache->mouse[0] - cache->vc->ar->winrct.xmin,
+		cache->mouse[1] - cache->vc->ar->winrct.ymin
+	};
 	int tool = brush->sculpt_tool;
 
 	if(ELEM5(tool,
 		 SCULPT_TOOL_GRAB, SCULPT_TOOL_NUDGE,
-		 SCULPT_TOOL_CLAY_TUBES, SCULPT_TOOL_SNAKE_HOOK,
+		 SCULPT_TOOL_CLAY_STRIPS, SCULPT_TOOL_SNAKE_HOOK,
 		 SCULPT_TOOL_THUMB)) {
 		float grab_location[3], imat[4][4], delta[3], loc[3];
 
@@ -2948,9 +2952,9 @@ static void sculpt_update_brush_delta(Sculpt *sd, Object *ob, Brush *brush)
 
 		/* compute 3d coordinate at same z from original location + mouse */
 		mul_v3_m4v3(loc, ob->obmat, cache->orig_grab_location);
-		initgrabz(cache->vc->rv3d, loc[0], loc[1], loc[2]);
+ 		initgrabz(cache->vc->rv3d, loc[0], loc[1], loc[2]);
 
-		ED_view3d_win_to_delta(cache->vc->ar, cache->mouse, grab_location);
+		ED_view3d_win_to_3d(cache->vc->ar, loc, mouse, grab_location);
 
 		/* compute delta to move verts by */
 		if(!cache->first_time) {
@@ -2962,14 +2966,19 @@ static void sculpt_update_brush_delta(Sculpt *sd, Object *ob, Brush *brush)
 				mul_mat3_m4_v3(imat, delta);
 				add_v3_v3(cache->grab_delta, delta);
 				break;
-			case SCULPT_TOOL_CLAY_TUBES:
+			case SCULPT_TOOL_CLAY_STRIPS:
 			case SCULPT_TOOL_NUDGE:
-				sub_v3_v3v3(cache->grab_delta, grab_location, cache->old_grab_location);
-				invert_m4_m4(imat, ob->obmat);
-				mul_mat3_m4_v3(imat, cache->grab_delta);
-				break;
 			case SCULPT_TOOL_SNAKE_HOOK:
-				sub_v3_v3v3(cache->grab_delta, grab_location, cache->old_grab_location);
+				if(brush->flag & BRUSH_ANCHORED) {
+					float orig[3];
+					mul_v3_m4v3(orig, ob->obmat, cache->orig_grab_location);
+					sub_v3_v3v3(cache->grab_delta, grab_location, orig);
+				}
+				else {
+					sub_v3_v3v3(cache->grab_delta, grab_location,
+								cache->old_grab_location);
+				}
+				
 				invert_m4_m4(imat, ob->obmat);
 				mul_mat3_m4_v3(imat, cache->grab_delta);
 				break;

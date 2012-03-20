@@ -139,7 +139,7 @@ void MESH_OT_subdivide(wmOperatorType *ot)
 
 	RNA_def_boolean(ot->srna, "quadtri", 0, "Quad/Tri Mode", "Tries to prevent ngons");
 	RNA_def_enum(ot->srna, "quadcorner", prop_mesh_cornervert_types, SUBD_STRAIGHT_CUT,
-	             "Quad Corner Type", "How to subdivide quad corners (anything other then Straight Cut will prevent ngons)");
+	             "Quad Corner Type", "How to subdivide quad corners (anything other than Straight Cut will prevent ngons)");
 
 	RNA_def_float(ot->srna, "fractal", 0.0f, 0.0f, FLT_MAX, "Fractal", "Fractal randomness factor", 0.0f, 1000.0f);
 	RNA_def_int(ot->srna, "seed", 0, 0, 10000, "Random Seed", "Seed for the random number generator", 0, 50);
@@ -209,7 +209,7 @@ static short EDBM_Extrude_edges_indiv(BMEditMesh *em, wmOperator *op, const char
 	EDBM_flag_disable_all(em, BM_ELEM_SELECT);
 
 	BMO_op_exec(em->bm, &bmop);
-	BMO_slot_buffer_hflag_enable(em->bm, &bmop, "geomout", BM_ELEM_SELECT, BM_VERT|BM_EDGE, TRUE);
+	BMO_slot_buffer_hflag_enable(em->bm, &bmop, "geomout", BM_VERT|BM_EDGE, BM_ELEM_SELECT, TRUE);
 
 	if (!EDBM_FinishOp(em, &bmop, op, TRUE)) {
 		return 0;
@@ -226,10 +226,10 @@ static short EDBM_Extrude_verts_indiv(BMEditMesh *em, wmOperator *op, const char
 	EDBM_InitOpf(em, &bmop, op, "extrude_vert_indiv verts=%hv", hflag);
 
 	/* deselect original verts */
-	BMO_slot_buffer_hflag_disable(em->bm, &bmop, "verts", BM_ELEM_SELECT, BM_VERT, TRUE);
+	BMO_slot_buffer_hflag_disable(em->bm, &bmop, "verts", BM_VERT, BM_ELEM_SELECT, TRUE);
 
 	BMO_op_exec(em->bm, &bmop);
-	BMO_slot_buffer_hflag_enable(em->bm, &bmop, "vertout", BM_ELEM_SELECT, BM_VERT, TRUE);
+	BMO_slot_buffer_hflag_enable(em->bm, &bmop, "vertout", BM_VERT, BM_ELEM_SELECT, TRUE);
 
 	if (!EDBM_FinishOp(em, &bmop, op, TRUE)) {
 		return 0;
@@ -250,7 +250,7 @@ static short EDBM_Extrude_edge(Object *obedit, BMEditMesh *em, const char hflag,
 	BMElem *ele;
 	
 	BMO_op_init(bm, &extop, "extrude_face_region");
-	BMO_slot_buffer_from_hflag(bm, &extop, "edgefacein", hflag, BM_VERT|BM_EDGE|BM_FACE);
+	BMO_slot_buffer_from_hflag(bm, &extop, "edgefacein", BM_VERT|BM_EDGE|BM_FACE, hflag);
 
 	/* If a mirror modifier with clipping is on, we need to adjust some 
 	 * of the cases above to handle edges on the line of symmetry.
@@ -1036,7 +1036,7 @@ static int addedgeface_mesh_exec(bContext *C, wmOperator *op)
 		return OPERATOR_CANCELLED;
 	
 	BMO_op_exec(em->bm, &bmop);
-	BMO_slot_buffer_hflag_enable(em->bm, &bmop, "faceout", BM_ELEM_SELECT, BM_FACE, TRUE);
+	BMO_slot_buffer_hflag_enable(em->bm, &bmop, "faceout", BM_FACE, BM_ELEM_SELECT, TRUE);
 
 	if (!EDBM_FinishOp(em, &bmop, op, TRUE)) {
 		return OPERATOR_CANCELLED;
@@ -1267,7 +1267,7 @@ static int mesh_duplicate_exec(bContext *C, wmOperator *op)
 	BMO_op_exec(em->bm, &bmop);
 	EDBM_flag_disable_all(em, BM_ELEM_SELECT);
 
-	BMO_slot_buffer_hflag_enable(em->bm, &bmop, "newout", BM_ELEM_SELECT, BM_ALL, TRUE);
+	BMO_slot_buffer_hflag_enable(em->bm, &bmop, "newout", BM_ALL, BM_ELEM_SELECT, TRUE);
 
 	if (!EDBM_FinishOp(em, &bmop, op, TRUE)) {
 		return OPERATOR_CANCELLED;
@@ -1382,12 +1382,12 @@ static int edge_rotate_selected(bContext *C, wmOperator *op)
 
 	/* avoids leaving old verts selected which can be a problem running multiple times,
 	 * since this means the edges become selected around the face which then attempt to rotate */
-	BMO_slot_buffer_hflag_disable(em->bm, &bmop, "edges", BM_ELEM_SELECT, BM_EDGE, TRUE);
+	BMO_slot_buffer_hflag_disable(em->bm, &bmop, "edges", BM_EDGE, BM_ELEM_SELECT, TRUE);
 
 	BMO_op_exec(em->bm, &bmop);
 	/* edges may rotate into hidden vertices, if this does _not_ run we get an ilogical state */
-	BMO_slot_buffer_hflag_disable(em->bm, &bmop, "edgeout", BM_ELEM_HIDDEN, BM_EDGE, TRUE);
-	BMO_slot_buffer_hflag_enable(em->bm, &bmop, "edgeout", BM_ELEM_SELECT, BM_EDGE, TRUE);
+	BMO_slot_buffer_hflag_disable(em->bm, &bmop, "edgeout", BM_EDGE, BM_ELEM_HIDDEN, TRUE);
+	BMO_slot_buffer_hflag_enable(em->bm, &bmop, "edgeout", BM_EDGE, BM_ELEM_SELECT, TRUE);
 	EDBM_selectmode_flush(em);
 
 	if (!EDBM_FinishOp(em, &bmop, op, TRUE)) {
@@ -2271,7 +2271,7 @@ static int select_vertex_path_exec(bContext *C, wmOperator *op)
 	/* EDBM_flag_disable_all(em, BM_ELEM_SELECT); */
 
 	/* select the output */
-	BMO_slot_buffer_hflag_enable(em->bm, &bmop, "vertout", BM_ELEM_SELECT, BM_ALL, TRUE);
+	BMO_slot_buffer_hflag_enable(em->bm, &bmop, "vertout", BM_ALL, BM_ELEM_SELECT, TRUE);
 
 	/* finish the operator */
 	if (!EDBM_FinishOp(em, &bmop, op, TRUE)) {
@@ -2848,13 +2848,13 @@ static int solidify_exec(bContext *C, wmOperator *op)
 	/* deselect only the faces in the region to be solidified (leave wire
 	 * edges and loose verts selected, as there will be no corresponding
 	 * geometry selected below) */
-	BMO_slot_buffer_hflag_disable(bm, &bmop, "geom", BM_ELEM_SELECT, BM_FACE, TRUE);
+	BMO_slot_buffer_hflag_disable(bm, &bmop, "geom", BM_FACE, BM_ELEM_SELECT, TRUE);
 
 	/* run the solidify operator */
 	BMO_op_exec(bm, &bmop);
 
 	/* select the newly generated faces */
-	BMO_slot_buffer_hflag_enable(bm, &bmop, "geomout", BM_ELEM_SELECT, BM_FACE, TRUE);
+	BMO_slot_buffer_hflag_enable(bm, &bmop, "geomout", BM_FACE, BM_ELEM_SELECT, TRUE);
 
 	if (!EDBM_FinishOp(em, &bmop, op, TRUE)) {
 		return OPERATOR_CANCELLED;
@@ -2943,7 +2943,7 @@ static float bm_edge_seg_isect(BMEdge *e, CutCurve *c, int len, char mode,
 	int  i;
 	
 	//threshold = 0.000001; /* tolerance for vertex intersection */
-	// XXX	threshold = scene->toolsettings->select_thresh / 100;
+	// XXX threshold = scene->toolsettings->select_thresh / 100;
 	
 	/* Get screen coords of verts */
 	scr = BLI_ghash_lookup(gh, e->v1);
@@ -3165,7 +3165,7 @@ static int knife_cut_exec(bContext *C, wmOperator *op)
 		}
 	}
 	
-	BMO_slot_buffer_from_flag(bm, &bmop, "edges", 1, BM_EDGE);
+	BMO_slot_buffer_from_flag(bm, &bmop, "edges", BM_EDGE, 1);
 
 	if (mode == KNIFE_MIDPOINT) numcuts = 1;
 	BMO_slot_int_set(&bmop, "numcuts", numcuts);
@@ -3425,7 +3425,7 @@ static int fill_mesh_exec(bContext *C, wmOperator *op)
 	BMO_op_exec(em->bm, &bmop);
 	
 	/* select new geometry */
-	BMO_slot_buffer_hflag_enable(em->bm, &bmop, "geomout", BM_ELEM_SELECT, BM_FACE|BM_EDGE, TRUE);
+	BMO_slot_buffer_hflag_enable(em->bm, &bmop, "geomout", BM_FACE|BM_EDGE, BM_ELEM_SELECT, TRUE);
 	
 	if (!EDBM_FinishOp(em, &bmop, op, TRUE)) {
 		return OPERATOR_CANCELLED;
@@ -3612,7 +3612,7 @@ static int split_mesh_exec(bContext *C, wmOperator *op)
 	EDBM_InitOpf(em, &bmop, op, "split geom=%hvef use_only_faces=%b", BM_ELEM_SELECT, FALSE);
 	BMO_op_exec(em->bm, &bmop);
 	BM_mesh_elem_flag_disable_all(em->bm, BM_VERT | BM_EDGE | BM_FACE, BM_ELEM_SELECT);
-	BMO_slot_buffer_hflag_enable(em->bm, &bmop, "geomout", BM_ELEM_SELECT, BM_ALL, TRUE);
+	BMO_slot_buffer_hflag_enable(em->bm, &bmop, "geomout", BM_ALL, BM_ELEM_SELECT, TRUE);
 	if (!EDBM_FinishOp(em, &bmop, op, TRUE)) {
 		return OPERATOR_CANCELLED;
 	}
@@ -3675,7 +3675,7 @@ static int spin_mesh_exec(bContext *C, wmOperator *op)
 	}
 	BMO_op_exec(bm, &spinop);
 	EDBM_flag_disable_all(em, BM_ELEM_SELECT);
-	BMO_slot_buffer_hflag_enable(bm, &spinop, "lastout", BM_ELEM_SELECT, BM_ALL, TRUE);
+	BMO_slot_buffer_hflag_enable(bm, &spinop, "lastout", BM_ALL, BM_ELEM_SELECT, TRUE);
 	if (!EDBM_FinishOp(em, &spinop, op, TRUE)) {
 		return OPERATOR_CANCELLED;
 	}
@@ -3801,7 +3801,7 @@ static int screw_mesh_exec(bContext *C, wmOperator *op)
 	}
 	BMO_op_exec(bm, &spinop);
 	EDBM_flag_disable_all(em, BM_ELEM_SELECT);
-	BMO_slot_buffer_hflag_enable(bm, &spinop, "lastout", BM_ELEM_SELECT, BM_ALL, TRUE);
+	BMO_slot_buffer_hflag_enable(bm, &spinop, "lastout", BM_ALL, BM_ELEM_SELECT, TRUE);
 	if (!EDBM_FinishOp(em, &spinop, op, TRUE)) {
 		return OPERATOR_CANCELLED;
 	}
@@ -4569,4 +4569,67 @@ void MESH_OT_bridge_edge_loops(wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 	
 	RNA_def_boolean(ot->srna, "inside", 0, "Inside", "");
+}
+
+
+
+static int mesh_inset_exec(bContext *C, wmOperator *op)
+{
+	Object *obedit = CTX_data_edit_object(C);
+	BMEditMesh *em = BMEdit_FromObject(obedit);
+	BMOperator bmop;
+	const int use_boundary        = RNA_boolean_get(op->ptr, "use_boundary");
+	const int use_even_offset     = RNA_boolean_get(op->ptr, "use_even_offset");
+	const int use_relative_offset = RNA_boolean_get(op->ptr, "use_relative_offset");
+	const float thickness         = RNA_float_get(op->ptr, "thickness");
+	const int use_outset          = RNA_boolean_get(op->ptr, "use_outset");
+
+	EDBM_InitOpf(em, &bmop, op,
+	             "inset faces=%hf use_boundary=%b use_even_offset=%b use_relative_offset=%b thickness=%f use_outset=%b",
+	             BM_ELEM_SELECT, use_boundary, use_even_offset, use_relative_offset, thickness, use_outset);
+
+	BMO_op_exec(em->bm, &bmop);
+
+	/* deselect original verts */
+	EDBM_flag_disable_all(em, BM_ELEM_SELECT);
+
+	BMO_slot_buffer_hflag_enable(em->bm, &bmop, "faceout", BM_FACE, BM_ELEM_SELECT, TRUE);
+
+	if (!EDBM_FinishOp(em, &bmop, op, TRUE)) {
+		return OPERATOR_CANCELLED;
+	}
+	else {
+		DAG_id_tag_update(obedit->data, 0);
+		WM_event_add_notifier(C, NC_GEOM|ND_DATA, obedit->data);
+
+		return OPERATOR_FINISHED;
+	}
+}
+
+void MESH_OT_inset(wmOperatorType *ot)
+{
+	PropertyRNA *prop;
+
+	/* identifiers */
+	ot->name = "Inset Faces";
+	ot->idname = "MESH_OT_inset";
+
+	/* api callbacks */
+	ot->exec = mesh_inset_exec;
+	ot->poll = ED_operator_editmesh;
+	ot->description = "";
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
+
+	/* properties */
+	RNA_def_boolean(ot->srna, "use_boundary",        TRUE, "Boundary",  "Inset face boundries");
+	RNA_def_boolean(ot->srna, "use_even_offset",     TRUE, "Offset Even",      "Scale the offset to give more even thickness");
+	RNA_def_boolean(ot->srna, "use_relative_offset", FALSE, "Offset Relative", "Scale the offset by surrounding geometry");
+
+	prop = RNA_def_float(ot->srna, "thickness", 0.01f, 0.0f, FLT_MAX, "thickness", "", 0.0f, 10.0f);
+	/* use 1 rather then 10 for max else dragging the button moves too far */
+	RNA_def_property_ui_range(prop, 0.0, 1.0, 0.01, 4);
+
+	RNA_def_boolean(ot->srna, "use_outset", FALSE, "Outset",  "outset rather then inset");
 }

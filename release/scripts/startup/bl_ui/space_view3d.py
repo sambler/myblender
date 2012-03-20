@@ -491,7 +491,7 @@ class VIEW3D_MT_select_particle(Menu):
 
         layout.operator("particle.select_all").action = 'TOGGLE'
         layout.operator("particle.select_linked")
-        layout.operator("particle.select_all").action = 'INVERT'
+        layout.operator("particle.select_all", text="Inverse").action = 'INVERT'
 
         layout.separator()
 
@@ -621,7 +621,7 @@ class VIEW3D_MT_select_edit_metaball(Menu):
         layout.separator()
 
         layout.operator("mball.select_all").action = 'TOGGLE'
-        layout.operator("mball.select_all").action = 'INVERT'
+        layout.operator("mball.select_all", text="Inverse").action = 'INVERT'
 
         layout.separator()
 
@@ -638,7 +638,7 @@ class VIEW3D_MT_select_edit_lattice(Menu):
 
         layout.separator()
 
-        layout.operator("lattice.select_all")
+        layout.operator("lattice.select_all").action = 'TOGGLE'
         layout.operator("lattice.select_all", text="Inverse").action = 'INVERT'
 
 
@@ -1757,11 +1757,11 @@ class VIEW3D_MT_edit_mesh_faces(Menu):
         layout.operator_context = 'INVOKE_REGION_WIN'
 
         layout.operator("mesh.flip_normals")
-        # layout.operator("mesh.bevel")
-        # layout.operator("mesh.bevel")
         layout.operator("mesh.edge_face_add")
         layout.operator("mesh.fill")
         layout.operator("mesh.beautify_fill")
+        layout.operator("mesh.inset")
+        layout.operator("mesh.bevel")
         layout.operator("mesh.solidify")
         layout.operator("mesh.sort_faces")
 

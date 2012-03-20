@@ -1570,6 +1570,45 @@ static void initialize_all_particles(ParticleSimulationData *sim)
 		}
 	}
 }
+
+static void get_angular_velocity_vector(short avemode, ParticleKey *state, float *vec)
+{
+	switch(avemode) {
+		case PART_AVE_VELOCITY:
+			copy_v3_v3(vec, state->vel);
+			break;	
+		case PART_AVE_HORIZONTAL:
+		{
+			float zvec[3];
+			zvec[0] = zvec[1] = 0;
+			zvec[2] = 1.f;
+			cross_v3_v3v3(vec, state->vel, zvec);
+			break;
+		}
+		case PART_AVE_VERTICAL:
+		{
+			float zvec[3], temp[3];
+			zvec[0] = zvec[1] = 0;
+			zvec[2] = 1.f;
+			cross_v3_v3v3(temp, state->vel, zvec);
+			cross_v3_v3v3(vec, temp, state->vel);
+			break;
+		}
+		case PART_AVE_GLOBAL_X:
+			vec[0] = 1.f;
+			vec[1] = vec[2] = 0;
+			break;
+		case PART_AVE_GLOBAL_Y:
+			vec[1] = 1.f;
+			vec[0] = vec[2] = 0;
+			break;
+		case PART_AVE_GLOBAL_Z:
+			vec[2] = 1.f;
+			vec[0] = vec[1] = 0;
+			break;
+	}
+}
+
 void psys_get_birth_coordinates(ParticleSimulationData *sim, ParticleData *pa, ParticleKey *state, float dtime, float cfra)
 {
 	Object *ob = sim->ob;
@@ -1782,14 +1821,11 @@ void psys_get_birth_coordinates(ParticleSimulationData *sim, ParticleData *pa, P
 		zero_v3(state->ave);
 
 		if(part->avemode) {
-			switch(part->avemode) {
-				case PART_AVE_SPIN:
-					copy_v3_v3(state->ave, vel);
-					break;
-				case PART_AVE_RAND:
-					copy_v3_v3(state->ave, r_ave);
-					break;
-			}
+			if(part->avemode == PART_AVE_RAND)
+				copy_v3_v3(state->ave, r_ave);
+			else
+				get_angular_velocity_vector(part->avemode, state, state->ave);
+
 			normalize_v3(state->ave);
 			mul_v3_fl(state->ave, part->avefac);
 		}
@@ -1814,6 +1850,8 @@ void reset_particle(ParticleSimulationData *sim, ParticleData *pa, float dtime, 
 		}
 		ob = sim->ob;
 		where_is_object_time(sim->scene, ob, pa->time);
+
+		psys->flag |= PSYS_OB_ANIM_RESTORE;
 	}
 
 	psys_get_birth_coordinates(sim, pa, &pa->state, dtime, cfra);
@@ -2684,26 +2722,32 @@ static void basic_rotate(ParticleSettings *part, ParticleData *pa, float dfra, f
 {
 	float rotfac, rot1[4], rot2[4]={1.0,0.0,0.0,0.0}, dtime=dfra*timestep;
 
-	if((part->flag & PART_ROT_DYN)==0) {
-		if(part->avemode==PART_AVE_SPIN) {
-			float angle;
-			float len1 = len_v3(pa->prev_state.vel);
-			float len2 = len_v3(pa->state.vel);
-
-			if(len1==0.0f || len2==0.0f)
-				pa->state.ave[0]=pa->state.ave[1]=pa->state.ave[2]=0.0f;
-			else{
-				cross_v3_v3v3(pa->state.ave,pa->prev_state.vel,pa->state.vel);
-				normalize_v3(pa->state.ave);
-				angle=dot_v3v3(pa->prev_state.vel,pa->state.vel)/(len1*len2);
-				mul_v3_fl(pa->state.ave,saacos(angle)/dtime);
-			}
-
-			axis_angle_to_quat(rot2,pa->state.vel,dtime*part->avefac);
-		}
+	if((part->flag & PART_ROTATIONS)==0) {
+		pa->state.rot[0]=1.0f;
+		pa->state.rot[1]=pa->state.rot[2]=pa->state.rot[3]=0;
+		return;
 	}
 
-	rotfac=len_v3(pa->state.ave);
+	if((part->flag & PART_ROT_DYN)==0 && ELEM3(part->avemode, PART_AVE_VELOCITY, PART_AVE_HORIZONTAL, PART_AVE_VERTICAL)) {
+		float angle;
+		float len1 = len_v3(pa->prev_state.vel);
+		float len2 = len_v3(pa->state.vel);
+		float vec[3];
+
+		if(len1==0.0f || len2==0.0f)
+			pa->state.ave[0] = pa->state.ave[1] = pa->state.ave[2] = 0.0f;
+		else{
+			cross_v3_v3v3(pa->state.ave, pa->prev_state.vel, pa->state.vel);
+			normalize_v3(pa->state.ave);
+			angle = dot_v3v3(pa->prev_state.vel, pa->state.vel) / (len1 * len2);
+			mul_v3_fl(pa->state.ave, saacos(angle) / dtime);
+		}
+
+		get_angular_velocity_vector(part->avemode, &pa->state, vec);
+		axis_angle_to_quat(rot2, vec, dtime*part->avefac);
+	}
+
+	rotfac = len_v3(pa->state.ave);
 	if(rotfac == 0.0f) { /* unit_qt(in VecRotToQuat) doesn't give unit quat [1,0,0,0]?? */
 		rot1[0]=1.0f;
 		rot1[1]=rot1[2]=rot1[3]=0;
@@ -4029,7 +4073,7 @@ static void particles_fluid_step(ParticleSimulationData *sim, int UNUSED(cfra))
 
 			BLI_path_frame(filename, curFrame, 0); // fixed #frame-no 
 
-			gzf = gzopen(filename, "rb");
+			gzf = BLI_gzopen(filename, "rb");
 			if (!gzf) {
 				BLI_snprintf(debugStrBuffer, sizeof(debugStrBuffer),"readFsPartData::error - Unable to open file for reading '%s' \n", filename); 
 				// XXX bad level call elbeemDebugOut(debugStrBuffer);
@@ -4432,6 +4476,9 @@ void particle_system_update(Scene *scene, Object *ob, ParticleSystem *psys)
 	/* execute drivers only, as animation has already been done */
 	BKE_animsys_evaluate_animdata(scene, &part->id, part->adt, cfra, ADT_RECALC_DRIVERS);
 
+	/* to verify if we need to restore object afterwards */
+	psys->flag &= ~PSYS_OB_ANIM_RESTORE;
+
 	if(psys->recalc & PSYS_RECALC_TYPE)
 		psys_changed_type(&sim);
 
@@ -4544,14 +4591,16 @@ void particle_system_update(Scene *scene, Object *ob, ParticleSystem *psys)
 		}
 	}
 
-	if(psys->cfra < cfra) {
-		/* make sure emitter is left at correct time (particle emission can change this) */
+	/* make sure emitter is left at correct time (particle emission can change this) */
+	if(psys->flag & PSYS_OB_ANIM_RESTORE) {
 		while(ob) {
 			BKE_animsys_evaluate_animdata(scene, &ob->id, ob->adt, cfra, ADT_RECALC_ANIM);
 			ob = ob->parent;
 		}
 		ob = sim.ob;
 		where_is_object_time(scene, ob, cfra);
+
+		psys->flag &= ~PSYS_OB_ANIM_RESTORE;
 	}
 
 	psys->cfra = cfra;

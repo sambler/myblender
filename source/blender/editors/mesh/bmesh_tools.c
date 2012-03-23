@@ -80,9 +80,9 @@ static int subdivide_exec(bContext *C, wmOperator *op)
 	ToolSettings *ts = CTX_data_tool_settings(C);
 	Object *obedit = CTX_data_edit_object(C);
 	BMEditMesh *em = BMEdit_FromObject(obedit);
-	int cuts = RNA_int_get(op->ptr,"number_cuts");
+	int cuts = RNA_int_get(op->ptr, "number_cuts");
 	float smooth = 0.292f * RNA_float_get(op->ptr, "smoothness");
-	float fractal = RNA_float_get(op->ptr, "fractal")/2.5;
+	float fractal = RNA_float_get(op->ptr, "fractal") / 2.5f;
 	int flag = 0;
 
 	if (smooth != 0.0f)
@@ -120,6 +120,8 @@ static EnumPropertyItem prop_mesh_cornervert_types[] = {
 
 void MESH_OT_subdivide(wmOperatorType *ot)
 {
+	PropertyRNA *prop;
+
 	/* identifiers */
 	ot->name = "Subdivide";
 	ot->description = "Subdivide selected edges";
@@ -133,7 +135,10 @@ void MESH_OT_subdivide(wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 
 	/* properties */
-	RNA_def_int(ot->srna, "number_cuts", 1, 1, INT_MAX, "Number of Cuts", "", 1, 10);
+	prop = RNA_def_int(ot->srna, "number_cuts", 1, 1, INT_MAX, "Number of Cuts", "", 1, 10);
+	/* avoid re-using last var because it can cause _very_ high poly meshes and annoy users (or worse crash) */
+	RNA_def_property_flag(prop, PROP_SKIP_SAVE);
+
 	/* BMESH_TODO, this currently does nothing, just add to stop UI from erroring out! */
 	RNA_def_float(ot->srna, "smoothness", 0.0f, 0.0f, FLT_MAX, "Smoothness", "Smoothness factor (BMESH TODO)", 0.0f, 1.0f);
 
@@ -373,9 +378,9 @@ static int extrude_repeat_mesh(bContext *C, wmOperator *op)
 	BMEditMesh *em = BMEdit_FromObject(obedit);
 	RegionView3D *rv3d = CTX_wm_region_view3d(C);
 		
-	int steps = RNA_int_get(op->ptr,"steps");
+	int steps = RNA_int_get(op->ptr, "steps");
 	
-	float offs = RNA_float_get(op->ptr,"offset");
+	float offs = RNA_float_get(op->ptr, "offset");
 	float dvec[3], tmat[3][3], bmat[3][3], nor[3] = {0.0, 0.0, 0.0};
 	short a;
 
@@ -967,14 +972,14 @@ static int delete_mesh(bContext *C, Object *obedit, wmOperator *op, int event, S
 
 /* Note, these values must match delete_mesh() event values */
 static EnumPropertyItem prop_mesh_delete_types[] = {
-	{7, "DISSOLVE",         0, "Dissolve", ""},
-	{12, "COLLAPSE", 0, "Collapse", ""},
-	{10,"VERT",		0, "Vertices", ""},
-	{1, "EDGE",		0, "Edges", ""},
-	{2, "FACE",		0, "Faces", ""},
+	{7,  "DISSOLVE",  0, "Dissolve", ""},
+	{12, "COLLAPSE",  0, "Collapse", ""},
+	{10, "VERT",      0, "Vertices", ""},
+	{1,  "EDGE",      0, "Edges", ""},
+	{2,  "FACE",      0, "Faces", ""},
 	{11, "EDGE_LOOP", 0, "Edge Loop", ""},
-	{4, "EDGE_FACE", 0, "Edges & Faces", ""},
-	{5, "ONLY_FACE", 0, "Only Faces", ""},
+	{4,  "EDGE_FACE", 0, "Edges & Faces", ""},
+	{5,  "ONLY_FACE", 0, "Only Faces", ""},
 	{0, NULL, 0, NULL, NULL}
 };
 
@@ -1213,7 +1218,7 @@ void MESH_OT_vert_connect(wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 }
 
-static int editbmesh_edge_split(bContext *C, wmOperator *op)
+static int editbmesh_edge_split_exec(bContext *C, wmOperator *op)
 {
 	Object *obedit = CTX_data_edit_object(C);
 	BMEditMesh *em = BMEdit_FromObject(obedit);
@@ -1221,13 +1226,13 @@ static int editbmesh_edge_split(bContext *C, wmOperator *op)
 	BMOperator bmop;
 	int len = 0;
 	
-	if (!EDBM_InitOpf(em, &bmop, op, "edgesplit edges=%he numcuts=%i",
-	                  BM_ELEM_SELECT, RNA_int_get(op->ptr,"number_cuts")))
+	if (!EDBM_InitOpf(em, &bmop, op, "edgesplit edges=%he",
+	                  BM_ELEM_SELECT))
 	{
 		return OPERATOR_CANCELLED;
 	}
 	BMO_op_exec(bm, &bmop);
-	len = BMO_slot_get(&bmop, "outsplit")->len;
+	len = BMO_slot_get(&bmop, "edgeout")->len;
 	if (!EDBM_FinishOp(em, &bmop, op, TRUE)) {
 		return OPERATOR_CANCELLED;
 	}
@@ -1245,13 +1250,11 @@ void MESH_OT_edge_split(wmOperatorType *ot)
 	ot->idname = "MESH_OT_edge_split";
 	
 	/* api callbacks */
-	ot->exec = editbmesh_edge_split;
+	ot->exec = editbmesh_edge_split_exec;
 	ot->poll = ED_operator_editmesh;
 	
 	/* flags */
 	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
-
-	RNA_def_int(ot->srna, "number_cuts", 1, 1, 10, "Number of Cuts", "", 1, INT_MAX);
 }
 
 /****************** add duplicate operator ***************/
@@ -1625,7 +1628,7 @@ static int do_smooth_vertex(bContext *C, wmOperator *op)
 		}
 	}
 
-	repeat = RNA_int_get(op->ptr,"repeat");
+	repeat = RNA_int_get(op->ptr, "repeat");
 	if (!repeat)
 		repeat = 1;
 	
@@ -4051,7 +4054,7 @@ static void xsortvert_flag(bContext *UNUSED(C), int UNUSED(flag))
 	em = vc.em;
 
 	amount = em->bm->totvert;
-	sortblock = MEM_callocN(sizeof(xvertsort) * amount,"xsort");
+	sortblock = MEM_callocN(sizeof(xvertsort) * amount, "xsort");
 	BM_ITER(eve, &iter, em->bm, BM_VERTS_OF_MESH, NULL) {
 		if (BM_elem_flag_test(eve, BM_ELEM_SELECT))
 			sortblock[i].v1 = eve;
@@ -4211,7 +4214,7 @@ static int sort_faces_exec(bContext *C, wmOperator *op)
 
 		for (i = 0; i < me->totpoly; i++, mp++) {
 			if (event == 3) {
-				face_sort_floats[i] = ((float)mp->mat_nr)*reverse;
+				face_sort_floats[i] = ((float)mp->mat_nr) * reverse;
 			}
 			else if (event == 4) {
 				/* selected first */
@@ -4304,7 +4307,7 @@ static void hashvert_flag(EditMesh *em, int flag)
 	if (amount == 0) return;
 
 	/* allocate memory */
-	sb = sortblock = (struct xvertsort *)MEM_mallocN(sizeof(struct xvertsort)*amount,"sortremovedoub");
+	sb = sortblock = (struct xvertsort *)MEM_mallocN(sizeof(struct xvertsort) * amount, "sortremovedoub");
 	eve = em->verts.first;
 	while (eve) {
 		if (eve->f & flag) {
@@ -4557,7 +4560,7 @@ static int bridge_edge_loops(bContext *C, wmOperator *op)
 void MESH_OT_bridge_edge_loops(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name = "Bridge edge loops";
+	ot->name = "Bridge Two Edge Loops";
 	ot->description = "Make faces between two edge loops";
 	ot->idname = "MESH_OT_bridge_edge_loops";
 	
@@ -4578,7 +4581,7 @@ static int mesh_inset_exec(bContext *C, wmOperator *op)
 	Object *obedit = CTX_data_edit_object(C);
 	BMEditMesh *em = BMEdit_FromObject(obedit);
 	BMOperator bmop;
-	const int use_boundary        = RNA_boolean_get(op->ptr, "use_boundary");
+	const int use_boundary        = FALSE; //RNA_boolean_get(op->ptr, "use_boundary");
 	const int use_even_offset     = RNA_boolean_get(op->ptr, "use_even_offset");
 	const int use_relative_offset = RNA_boolean_get(op->ptr, "use_relative_offset");
 	const float thickness         = RNA_float_get(op->ptr, "thickness");
@@ -4623,7 +4626,7 @@ void MESH_OT_inset(wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 
 	/* properties */
-	RNA_def_boolean(ot->srna, "use_boundary",        TRUE, "Boundary",  "Inset face boundries");
+	// RNA_def_boolean(ot->srna, "use_boundary",        TRUE, "Boundary",  "Inset face boundries");
 	RNA_def_boolean(ot->srna, "use_even_offset",     TRUE, "Offset Even",      "Scale the offset to give more even thickness");
 	RNA_def_boolean(ot->srna, "use_relative_offset", FALSE, "Offset Relative", "Scale the offset by surrounding geometry");
 

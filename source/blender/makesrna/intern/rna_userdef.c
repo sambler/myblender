@@ -1724,6 +1724,12 @@ static void rna_def_userdef_theme_space_seq(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Movie Strip", "");
 	RNA_def_property_update(prop, 0, "rna_userdef_update");
 
+	prop = RNA_def_property(srna, "movieclip_strip", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_float_sdna(prop, NULL, "movieclip");
+	RNA_def_property_array(prop, 3);
+	RNA_def_property_ui_text(prop, "Clip Strip", "");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+
 	prop = RNA_def_property(srna, "image_strip", PROP_FLOAT, PROP_COLOR_GAMMA);
 	RNA_def_property_float_sdna(prop, NULL, "image");
 	RNA_def_property_array(prop, 3);
@@ -2638,6 +2644,14 @@ static void rna_def_userdef_edit(BlenderRNA *brna)
 	RNA_def_property_boolean_negative_sdna(prop, NULL, "flag", USER_NONEGFRAMES);
 	RNA_def_property_ui_text(prop, "Allow Negative Frames",
 	                         "Current frame number can be manually set to a negative value");
+							 
+	/* fcurve opacity */
+	prop = RNA_def_property(srna, "fcurve_unselected_alpha", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_float_sdna(prop, NULL, "fcu_inactive_alpha");
+	RNA_def_property_range(prop, 0.001f, 1.0f);
+	RNA_def_property_ui_text(prop, "Unselected F-Curve Visibility", 
+	                         "Amount that unselected F-Curves stand out from the background (Graph Editor)");
+	RNA_def_property_update(prop, NC_SPACE|ND_SPACE_GRAPH, NULL);
 	
 	/* grease pencil */
 	prop = RNA_def_property(srna, "grease_pencil_manhattan_distance", PROP_INT, PROP_NONE);

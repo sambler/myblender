@@ -189,7 +189,7 @@ int EDBM_init_backbuf_border(ViewContext *vc, short xmin, short ymin, short xmax
 	/* build selection lookup */
 	selbuf = MEM_callocN(bm_vertoffs + 1, "selbuf");
 	
-	a = (xmax - xmin + 1) * (ymax-ymin + 1);
+	a = (xmax - xmin + 1) * (ymax - ymin + 1);
 	while (a--) {
 		if (*dr > 0 && *dr <= bm_vertoffs)
 			selbuf[*dr] = 1;
@@ -499,7 +499,7 @@ BMEdge *EDBM_findnearestedge(ViewContext *vc, int *dist)
 		
 		view3d_validate_backbuf(vc);
 		
-		index = view3d_sample_backbuf_rect(vc, vc->mval, 50, bm_solidoffs, bm_wireoffs, &distance,0, NULL, NULL);
+		index = view3d_sample_backbuf_rect(vc, vc->mval, 50, bm_solidoffs, bm_wireoffs, &distance, 0, NULL, NULL);
 		eed = BM_edge_at_index(vc->em->bm, index - 1);
 		
 		if (eed && distance < *dist) {
@@ -649,7 +649,7 @@ static int unified_findnearest(ViewContext *vc, BMVert **r_eve, BMEdge **r_eed, 
 	if (em->selectmode & SCE_SELECT_FACE)
 		*r_efa = EDBM_findnearestface(vc, &dist);
 
-	dist-= 20;	/* since edges select lines, we give dots advantage of 20 pix */
+	dist -= 20;	/* since edges select lines, we give dots advantage of 20 pix */
 	if (em->selectmode & SCE_SELECT_EDGE)
 		*r_eed = EDBM_findnearestedge(vc, &dist);
 
@@ -699,8 +699,7 @@ static int similar_face_select_exec(bContext *C, wmOperator *op)
 
 	/* get the type from RNA */
 	int type = RNA_enum_get(op->ptr, "type");
-
-	float thresh = CTX_data_tool_settings(C)->select_thresh;
+	float thresh = RNA_float_get(op->ptr, "threshold");
 
 	/* initialize the bmop using EDBM api, which does various ui error reporting and other stuff */
 	EDBM_InitOpf(em, &bmop, op, "similarfaces faces=%hf type=%i thresh=%f", BM_ELEM_SELECT, type, thresh);
@@ -740,8 +739,7 @@ static int similar_edge_select_exec(bContext *C, wmOperator *op)
 
 	/* get the type from RNA */
 	int type = RNA_enum_get(op->ptr, "type");
-
-	float thresh = CTX_data_tool_settings(C)->select_thresh;
+	float thresh = RNA_float_get(op->ptr, "threshold");
 
 	/* initialize the bmop using EDBM api, which does various ui error reporting and other stuff */
 	EDBM_InitOpf(em, &bmop, op, "similaredges edges=%he type=%i thresh=%f", BM_ELEM_SELECT, type, thresh);
@@ -784,7 +782,7 @@ static int similar_vert_select_exec(bContext *C, wmOperator *op)
 	BMOperator bmop;
 	/* get the type from RNA */
 	int type = RNA_enum_get(op->ptr, "type");
-	float thresh = CTX_data_tool_settings(C)->select_thresh;
+	float thresh = RNA_float_get(op->ptr, "threshold");
 
 	/* initialize the bmop using EDBM api, which does various ui error reporting and other stuff */
 	EDBM_InitOpf(em, &bmop, op, "similarverts verts=%hv type=%i thresh=%f", BM_ELEM_SELECT, type, thresh);
@@ -815,14 +813,21 @@ static int similar_vert_select_exec(bContext *C, wmOperator *op)
 
 static int select_similar_exec(bContext *C, wmOperator *op)
 {
+	ToolSettings *ts = CTX_data_tool_settings(C);
+	PropertyRNA *prop = RNA_struct_find_property(op->ptr, "threshold");
+
 	int type = RNA_enum_get(op->ptr, "type");
 
-	if (type < 100)
-		return similar_vert_select_exec(C, op);
-	else if (type < 200)
-		return similar_edge_select_exec(C, op);
-	else
-		return similar_face_select_exec(C, op);
+	if (!RNA_property_is_set(op->ptr, prop)) {
+		RNA_property_float_set(op->ptr, prop, ts->select_thresh);
+	}
+	else {
+		ts->select_thresh = RNA_property_float_get(op->ptr, prop);
+	}
+
+	if      (type < 100) return similar_vert_select_exec(C, op);
+	else if (type < 200) return similar_edge_select_exec(C, op);
+	else                 return similar_face_select_exec(C, op);
 }
 
 static EnumPropertyItem *select_similar_type_itemf(bContext *C, PointerRNA *UNUSED(ptr), PropertyRNA *UNUSED(prop),
@@ -880,6 +885,8 @@ void MESH_OT_select_similar(wmOperatorType *ot)
 	/* properties */
 	prop = ot->prop = RNA_def_enum(ot->srna, "type", prop_similar_types, SIMVERT_NORMAL, "Type", "");
 	RNA_def_enum_funcs(prop, select_similar_type_itemf);
+
+	RNA_def_float(ot->srna, "threshold", 0.0, 0.0, 1.0, "Threshold", "", 0.01, 1.0);
 }
 
 /* ***************************************************** */
@@ -926,7 +933,7 @@ static int loop_multiselect(bContext *C, wmOperator *op)
 	}
 
 	
-	edarray = MEM_mallocN(sizeof(BMEdge *)*totedgesel,"edge array");
+	edarray = MEM_mallocN(sizeof(BMEdge *) * totedgesel, "edge array");
 	edindex = 0;
 	
 	for (eed = BM_iter_new(&iter, em->bm, BM_EDGES_OF_MESH, NULL);
@@ -2352,7 +2359,7 @@ static int select_non_manifold_exec(bContext *C, wmOperator *op)
 	}
 	
 	BM_ITER(v, &iter, em->bm, BM_VERTS_OF_MESH, NULL) {
-		if (!BM_elem_flag_test(v, BM_ELEM_HIDDEN) && !BM_vert_is_manifold(em->bm, v)) {
+		if (!BM_elem_flag_test(v, BM_ELEM_HIDDEN) && !BM_vert_is_manifold(v)) {
 			BM_elem_select_set(em->bm, v, TRUE);
 		}
 	}
@@ -2391,7 +2398,7 @@ static int mesh_select_random_exec(bContext *C, wmOperator *op)
 	BMEdge *eed;
 	BMFace *efa;
 	BMIter iter;
-	float randfac =  RNA_float_get(op->ptr, "percent")/100.0f;
+	float randfac =  RNA_float_get(op->ptr, "percent") / 100.0f;
 
 	BLI_srand(BLI_rand()); /* random seed */
 	

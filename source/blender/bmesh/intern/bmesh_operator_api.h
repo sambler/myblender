@@ -43,7 +43,7 @@ extern "C" {
  * when it's executed.  tool flags are allocated in layers, one per operator
  * execution, and are used for all internal flagging a tool needs to do.
  *
- * each operator has a series of "slots," which can be of the following types:
+ * each operator has a series of "slots" which can be of the following types:
  * - simple numerical types
  * - arrays of elements (e.g. arrays of faces).
  * - hash mappings.
@@ -81,11 +81,11 @@ struct GHashIterator;
 #define BMO_elem_flag_set(    bm, ele, oflag, val) _bmo_elem_flag_set     (bm, (ele)->oflags, oflag, val)
 #define BMO_elem_flag_toggle( bm, ele, oflag)      _bmo_elem_flag_toggle  (bm, (ele)->oflags, oflag)
 
-BM_INLINE short _bmo_elem_flag_test(BMesh *bm, BMFlagLayer *oflags, const short oflag);
-BM_INLINE void  _bmo_elem_flag_enable(BMesh *bm, BMFlagLayer *oflags, const short oflag);
-BM_INLINE void  _bmo_elem_flag_disable(BMesh *bm, BMFlagLayer *oflags, const short oflag);
-BM_INLINE void  _bmo_elem_flag_set(BMesh *bm, BMFlagLayer *oflags, const short oflag, int val);
-BM_INLINE void  _bmo_elem_flag_toggle(BMesh *bm, BMFlagLayer *oflags, const short oflag);
+BLI_INLINE short _bmo_elem_flag_test(BMesh *bm, BMFlagLayer *oflags, const short oflag);
+BLI_INLINE void  _bmo_elem_flag_enable(BMesh *bm, BMFlagLayer *oflags, const short oflag);
+BLI_INLINE void  _bmo_elem_flag_disable(BMesh *bm, BMFlagLayer *oflags, const short oflag);
+BLI_INLINE void  _bmo_elem_flag_set(BMesh *bm, BMFlagLayer *oflags, const short oflag, int val);
+BLI_INLINE void  _bmo_elem_flag_toggle(BMesh *bm, BMFlagLayer *oflags, const short oflag);
 
 /* slot type arrays are terminated by the last member
  * having a slot type of 0.*/
@@ -339,7 +339,7 @@ void BMO_slot_map_to_flag(BMesh *bm, BMOperator *op, const char *slotname,
  *    BMFace *f;
  *
  *    f = BMO_iter_new(&oiter, bm, some_operator, "slotname", BM_FACE);
- *    for (; f; f=BMO_iter_step(&oiter)) {
+ *    for (; f; f = BMO_iter_step(&oiter)) {
  *        /do something with the face
  *    }
  *
@@ -349,7 +349,7 @@ void BMO_slot_map_to_flag(BMesh *bm, BMOperator *op, const char *slotname,
  *    void *val;
  *
  *    key = BMO_iter_new(&oiter, bm, some_operator, "slotname", 0);
- *    for (; key; key=BMO_iter_step(&oiter)) {
+ *    for (; key; key = BMO_iter_step(&oiter)) {
  *        val = BMO_iter_map_value(&oiter);
  *        //do something with the key/val pair
  *        //note that val is a pointer to the val data,
@@ -389,7 +389,7 @@ float BMO_iter_map_value_f(BMOIter *iter);
 
 #define BMO_ITER(ele, iter, bm, op, slotname, restrict)   \
 	ele = BMO_iter_new(iter, bm, op, slotname, restrict); \
-	for ( ; ele; ele=BMO_iter_step(iter))
+	for ( ; ele; ele = BMO_iter_step(iter))
 
 /******************* Inlined Functions********************/
 typedef void (*opexec)(BMesh *bm, BMOperator *op);

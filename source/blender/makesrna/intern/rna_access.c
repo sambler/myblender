@@ -4507,6 +4507,118 @@ char *RNA_pointer_as_string(bContext *C, PointerRNA *ptr)
 	return cstring;
 }
 
+
+/* context and ptr_default can be NULL */
+char *RNA_pointer_as_string_keywords_ex(bContext *C, PointerRNA *ptr, PointerRNA *ptr_default,
+                                        const short as_function, const short all_args,
+                                        PropertyRNA *iterprop)
+{
+	const char *arg_name = NULL;
+
+	PropertyRNA *prop;
+
+	DynStr *dynstr= BLI_dynstr_new();
+	char *cstring, *buf;
+	int first_iter = TRUE, ok = TRUE;
+	int flag;
+
+	/* only to get the orginal props for comparisons */
+	PropertyRNA *prop_default;
+	char *buf_default;
+
+	RNA_PROP_BEGIN(ptr, propptr, iterprop) {
+		prop = propptr.data;
+
+		flag = RNA_property_flag(prop);
+
+		if (as_function && (flag & PROP_OUTPUT)) {
+			continue;
+		}
+
+		arg_name = RNA_property_identifier(prop);
+
+		if (strcmp(arg_name, "rna_type") == 0) {
+			continue;
+		}
+
+		if (as_function && (flag & PROP_REQUIRED)) {
+			/* required args don't have useful defaults */
+			BLI_dynstr_appendf(dynstr, first_iter ? "%s":", %s", arg_name);
+			first_iter = FALSE;
+		}
+		else {
+			if (as_function && RNA_property_type(prop) == PROP_POINTER) {
+				/* don't expand pointers for functions */
+				if (flag & PROP_NEVER_NULL) {
+					/* we cant really do the right thing here. arg=arg?, hrmf! */
+					buf = BLI_strdup(arg_name);
+				}
+				else {
+					buf = BLI_strdup("None");
+				}
+			}
+			else {
+				buf = RNA_property_as_string(C, ptr, prop);
+			}
+
+			ok = TRUE;
+
+			if (all_args == FALSE && ptr_default) {
+				/* not verbose, so only add in attributes that use non-default values
+				 * slow but good for tooltips */
+				prop_default= RNA_struct_find_property(ptr_default, arg_name);
+
+				if (prop_default) {
+					buf_default= RNA_property_as_string(C, ptr_default, prop_default);
+
+					if (strcmp(buf, buf_default) == 0)
+						ok = FALSE; /* values match, don't bother printing */
+
+					MEM_freeN(buf_default);
+				}
+			}
+			if (ok) {
+				BLI_dynstr_appendf(dynstr, first_iter ? "%s=%s":", %s=%s", arg_name, buf);
+				first_iter = FALSE;
+			}
+
+			MEM_freeN(buf);
+		}
+	}
+	RNA_PROP_END;
+
+	cstring = BLI_dynstr_get_cstring(dynstr);
+	BLI_dynstr_free(dynstr);
+	return cstring;
+}
+
+char *RNA_pointer_as_string_keywords(bContext *C, PointerRNA *ptr, PointerRNA *ptr_default,
+                                     const short as_function, const short all_args)
+{
+	PropertyRNA *iterprop;
+
+	iterprop = RNA_struct_iterator_property(ptr->type);
+
+	return RNA_pointer_as_string_keywords_ex(C, ptr, ptr_default, as_function, all_args,
+	                                         iterprop);
+}
+
+char *RNA_function_as_string_keywords(bContext *C, FunctionRNA *func, PointerRNA *ptr_default,
+                                     const short as_function, const short all_args)
+{
+	PointerRNA funcptr;
+	PropertyRNA *iterprop;
+
+	RNA_pointer_create(NULL, &RNA_Function, func, &funcptr);
+
+	iterprop = RNA_struct_find_property(&funcptr, "parameters");
+
+	RNA_struct_iterator_property(funcptr.type);
+
+	return RNA_pointer_as_string_keywords_ex(C, &funcptr, ptr_default, as_function, all_args,
+	                                         iterprop);
+}
+
 char *RNA_property_as_string(bContext *C, PointerRNA *ptr, PropertyRNA *prop)
 {
 	int type = RNA_property_type(prop);
@@ -4586,27 +4698,33 @@ char *RNA_property_as_string(bContext *C, PointerRNA *ptr, PropertyRNA *prop)
 
 		if (RNA_property_flag(prop) & PROP_ENUM_FLAG) {
 			/* represent as a python set */
-			EnumPropertyItem *item = NULL;
-			int free;
+			if (val) {
+				EnumPropertyItem *item = NULL;
+				int free;
 
-			BLI_dynstr_append(dynstr, "{");
+				BLI_dynstr_append(dynstr, "{");
 
-			RNA_property_enum_items(C, ptr, prop, &item, NULL, &free);
-			if (item) {
-				short is_first = TRUE;
-				for (; item->identifier; item++) {
-					if (item->identifier[0] && item->value & val) {
-						BLI_dynstr_appendf(dynstr, is_first ? "'%s'" : ", '%s'", item->identifier);
-						is_first = FALSE;
+				RNA_property_enum_items(C, ptr, prop, &item, NULL, &free);
+				if (item) {
+					short is_first = TRUE;
+					for (; item->identifier; item++) {
+						if (item->identifier[0] && item->value & val) {
+							BLI_dynstr_appendf(dynstr, is_first ? "'%s'" : ", '%s'", item->identifier);
+							is_first = FALSE;
+						}
+					}
+
+					if (free) {
+						MEM_freeN(item);
 					}
 				}
 
-				if (free) {
-					MEM_freeN(item);
-				}
+				BLI_dynstr_append(dynstr, "}");
 			}
-
-			BLI_dynstr_append(dynstr, "}");
+			else {
+				/* annoying exception, don't confuse with dictionary syntax above: {} */
+				BLI_dynstr_append(dynstr, "set()");
+			}
 		}
 		else if (RNA_property_enum_identifier(C, ptr, prop, val, &identifier)) {
 			BLI_dynstr_appendf(dynstr, "'%s'", identifier);

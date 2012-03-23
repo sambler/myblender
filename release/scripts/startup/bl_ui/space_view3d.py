@@ -1605,7 +1605,7 @@ class VIEW3D_MT_edit_mesh_specials(Menu):
         layout.operator("mesh.dissolve_limited")
         layout.operator("mesh.hide", text="Hide")
         layout.operator("mesh.reveal", text="Reveal")
-        layout.operator("mesh.select_all").action = 'INVERT'
+        layout.operator("mesh.select_all", text="Select Inverse").action = 'INVERT'
         layout.operator("mesh.flip_normals")
         layout.operator("mesh.vertices_smooth", text="Smooth")
         layout.operator("mesh.bevel", text="Bevel")
@@ -1731,7 +1731,8 @@ class VIEW3D_MT_edit_mesh_edges(Menu):
 
         layout.separator()
 
-        layout.operator("mesh.bridge_edge_loops", text="Bridge Two Edge Loops")
+        layout.operator("mesh.edge_split")
+        layout.operator("mesh.bridge_edge_loops")
 
         layout.separator()
 

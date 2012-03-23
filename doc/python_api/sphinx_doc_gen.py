@@ -32,10 +32,10 @@ API dump in RST files
   providing ./blender.bin is or links to the blender executable
 
   To choose sphinx-in directory:
-    ./blender.bin --background --python doc/python_api/sphinx_doc_gen.py -- -o ../python_api
+    ./blender.bin --background --python doc/python_api/sphinx_doc_gen.py -- --output ../python_api
 
   For quick builds:
-    ./blender.bin --background --python doc/python_api/sphinx_doc_gen.py -- -p
+    ./blender.bin --background --python doc/python_api/sphinx_doc_gen.py -- --partial
 
 
 Sphinx: HTML generation
@@ -270,6 +270,9 @@ else:
     import fnmatch
     m = None
     EXCLUDE_MODULES = tuple([m for m in EXCLUDE_MODULES if not fnmatch.fnmatchcase(m, ARGS.partial)])
+
+    EXCLUDE_INFO_DOCS = (not fnmatch.fnmatchcase("info", ARGS.partial))
+
     del m
     del fnmatch
 
@@ -312,6 +315,36 @@ RNA_BLACKLIST = {
     "UserPreferencesSystem": {"language", }
     }
 
+MODULE_GROUPING = {
+    "bmesh.types": (
+                    ("Base Mesh Type", '-'),
+                    "BMesh",
+                    ("Mesh Elements", '-'),
+                    "BMVert",
+                    "BMEdge",
+                    "BMFace",
+                    "BMLoop",
+                    ("Sequence Accessors", '-'),
+                    "BMElemSeq",
+                    "BMVertSeq",
+                    "BMEdgeSeq",
+                    "BMFaceSeq",
+                    "BMLoopSeq",
+                    "BMIter",
+                    ("Selection History", '-'),
+                    "BMEditSelSeq",
+                    "BMEditSelIter",
+                    ("Custom-Data Layer Access", '-'),
+                    "BMLayerAccessVert",
+                    "BMLayerAccessEdge",
+                    "BMLayerAccessFace",
+                    "BMLayerAccessLoop",
+                    "BMLayerCollection",
+                    "BMLayerItem",
+                    ("Custom-Data Layer Types", '-'),
+                    "BMLoopUV"
+                    )
+    }
 
 # --------------------configure compile time options----------------------------
 
@@ -415,7 +448,6 @@ else:
 def is_struct_seq(value):
     return isinstance(value, tuple) and type(tuple) != tuple and hasattr(value, "n_fields")
 
-
 def undocumented_message(module_name, type_name, identifier):
     if str(type_name).startswith('<module'):
         preloadtitle = '%s.%s' % (module_name, identifier)
@@ -469,8 +501,13 @@ def example_extract_docstring(filepath):
     return "\n".join(text), line_no
 
 
-def write_title(fw, text, heading_char):
-    fw("%s\n%s\n\n" % (text, len(text) * heading_char))
+def title_string(text, heading_char, double=False):
+    filler = len(text) * heading_char
+    
+    if double:
+        return "%s\n%s\n%s\n\n" % (filler, text, filler)
+    else:
+        return "%s\n%s\n\n" % (text, filler)
 
 
 def write_example_ref(ident, fw, example_id, ext="py"):
@@ -652,11 +689,34 @@ def pymodule2sphinx(basepath, module_name, module, title):
     if module_all:
         module_dir = module_all
 
+    # TODO - currently only used for classes
+    # grouping support
+    module_grouping = MODULE_GROUPING.get(module_name)
+    def module_grouping_index(name):
+        if module_grouping is not None:
+            try:
+                return module_grouping.index(name)
+            except ValueError:
+                pass
+        return -1
+
+    def module_grouping_heading(name):
+        if module_grouping is not None:
+            i = module_grouping_index(name) - 1
+            if i >= 0 and type(module_grouping[i]) == tuple:
+                return module_grouping[i]
+        return None, None
+        
+    def module_grouping_sort_key(name):
+        return module_grouping_index(name)
+    # done grouping support
+    
+
     file = open(filepath, "w", encoding="utf-8")
 
     fw = file.write
 
-    write_title(fw, "%s (%s)" % (title, module_name), "=")
+    fw(title_string("%s (%s)" % (title, module_name), "="))
 
     fw(".. module:: %s\n\n" % module_name)
 
@@ -801,8 +861,17 @@ def pymodule2sphinx(basepath, module_name, module, title):
         fw("\n")
     '''
 
+    if module_grouping is not None:
+        classes.sort(key=lambda pair: module_grouping_sort_key(pair[0]))
+
     # write collected classes now
     for (type_name, value) in classes:
+        
+        if module_grouping is not None:
+            heading, heading_char = module_grouping_heading(type_name)
+            if heading:
+                fw(title_string(heading, heading_char))
+
         # May need to be its own function
         fw(".. class:: %s\n\n" % type_name)
         if value.__doc__:
@@ -835,8 +904,7 @@ def pycontext2sphinx(basepath):
     filepath = os.path.join(basepath, "bpy.context.rst")
     file = open(filepath, "w", encoding="utf-8")
     fw = file.write
-    fw("Context Access (bpy.context)\n")
-    fw("============================\n\n")
+    fw(title_string("Context Access (bpy.context)", "="))
     fw(".. module:: bpy.context\n")
     fw("\n")
     fw("The context members available depend on the area of blender which is currently being accessed.\n")
@@ -1039,7 +1107,7 @@ def pyrna2sphinx(basepath):
         else:
             title = struct_id
 
-        write_title(fw, title, "=")
+        fw(title_string(title, "="))
 
         fw(".. module:: bpy.types\n\n")
 
@@ -1250,7 +1318,7 @@ def pyrna2sphinx(basepath):
             file = open(filepath, "w", encoding="utf-8")
             fw = file.write
 
-            write_title(fw, class_name, "=")
+            fw(title_string(class_name, "="))
 
             fw(".. module:: bpy.types\n")
             fw("\n")
@@ -1303,7 +1371,7 @@ def pyrna2sphinx(basepath):
 
             title = "%s Operators" % op_module_name.replace("_", " ").title()
 
-            write_title(fw, title, "=")
+            fw(title_string(title, "="))
 
             fw(".. module:: bpy.ops.%s\n\n" % op_module_name)
 
@@ -1386,9 +1454,7 @@ def write_rst_contents(basepath):
     file = open(filepath, "w", encoding="utf-8")
     fw = file.write
 
-    fw("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n")
-    fw(" Blender Documentation contents\n")
-    fw("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n")
+    fw(title_string("Blender Documentation Contents", "%", double=True))
     fw("\n")
     fw("Welcome, this document is an API reference for Blender %s, built %s.\n" % (BLENDER_VERSION_DOTS, BLENDER_DATE))
     fw("\n")
@@ -1399,25 +1465,19 @@ def write_rst_contents(basepath):
     fw("\n")
 
     if not EXCLUDE_INFO_DOCS:
-        fw("============================\n")
-        fw("Blender/Python Documentation\n")
-        fw("============================\n")
-        fw("\n")
-        fw("\n")
+        fw(title_string("Blender/Python Documentation", "=", double=True))
+
         fw(".. toctree::\n")
         fw("   :maxdepth: 1\n\n")
         for info, info_desc in INFO_DOCS:
             fw("   %s <%s>\n\n" % (info_desc, info))
         fw("\n")
 
-    fw("===================\n")
-    fw("Application Modules\n")
-    fw("===================\n")
-    fw("\n")
+    fw(title_string("Application Modules", "=", double=True))
     fw(".. toctree::\n")
     fw("   :maxdepth: 1\n\n")
 
-    app_modules = [
+    app_modules = (
         "bpy.context",  # note: not actually a module
         "bpy.data",     # note: not actually a module
         "bpy.ops",
@@ -1430,37 +1490,33 @@ def write_rst_contents(basepath):
         "bpy.app.handlers",
 
         # C modules
-        "bpy.props"
-    ]
+        "bpy.props",
+        )
+
     for mod in app_modules:
         if mod not in EXCLUDE_MODULES:
             fw("   %s\n\n" % mod)
 
-    fw("==================\n")
-    fw("Standalone Modules\n")
-    fw("==================\n")
-    fw("\n")
+    fw(title_string("Standalone Modules", "=", double=True))
     fw(".. toctree::\n")
     fw("   :maxdepth: 1\n\n")
 
-    standalone_modules = [
+    standalone_modules = (
         # mathutils
         "mathutils", "mathutils.geometry", "mathutils.noise",
         # misc
         "bgl", "blf", "gpu", "aud", "bpy_extras",
         # bmesh
-        "bmesh", "bmesh.types", "bmesh.utils"
-    ]
+        "bmesh", "bmesh.types", "bmesh.utils",
+        )
+
     for mod in standalone_modules:
         if mod not in EXCLUDE_MODULES:
             fw("   %s\n\n" % mod)
 
     # game engine
     if "bge" not in EXCLUDE_MODULES:
-        fw("===================\n")
-        fw("Game Engine Modules\n")
-        fw("===================\n")
-        fw("\n")
+        fw(title_string("Game Engine Modules", "=", double=True))
         fw(".. toctree::\n")
         fw("   :maxdepth: 1\n\n")
         fw("   bge.types.rst\n\n")
@@ -1471,10 +1527,7 @@ def write_rst_contents(basepath):
         fw("   bge.constraints.rst\n\n")
 
     # rna generated change log
-    fw("========\n")
-    fw("API Info\n")
-    fw("========\n")
-    fw("\n")
+    fw(title_string("API Info", "=", double=True))
     fw(".. toctree::\n")
     fw("   :maxdepth: 1\n\n")
     fw("   change_log.rst\n\n")
@@ -1510,7 +1563,7 @@ def write_rst_bpy(basepath):
 
         title = ":mod:`bpy` --- Blender Python Module"
 
-        write_title(fw, title, "=")
+        fw(title_string(title, "="))
 
         fw(".. module:: bpy.types\n\n")
         file.close()
@@ -1524,8 +1577,7 @@ def write_rst_types_index(basepath):
         filepath = os.path.join(basepath, "bpy.types.rst")
         file = open(filepath, "w", encoding="utf-8")
         fw = file.write
-        fw("Types (bpy.types)\n")
-        fw("=================\n\n")
+        fw(title_string("Types (bpy.types)", "="))
         fw(".. toctree::\n")
         fw("   :glob:\n\n")
         fw("   bpy.types.*\n\n")
@@ -1540,8 +1592,7 @@ def write_rst_ops_index(basepath):
         filepath = os.path.join(basepath, "bpy.ops.rst")
         file = open(filepath, "w", encoding="utf-8")
         fw = file.write
-        fw("Operators (bpy.ops)\n")
-        fw("===================\n\n")
+        fw(title_string("Operators (bpy.ops)", "="))
         write_example_ref("", fw, "bpy.ops")
         fw(".. toctree::\n")
         fw("   :glob:\n\n")
@@ -1559,8 +1610,7 @@ def write_rst_data(basepath):
         filepath = os.path.join(basepath, "bpy.data.rst")
         file = open(filepath, "w", encoding="utf-8")
         fw = file.write
-        fw("Data Access (bpy.data)\n")
-        fw("======================\n\n")
+        fw(title_string("Data Access (bpy.data)", "="))
         fw(".. module:: bpy\n")
         fw("\n")
         fw("This module is used for all blender/python access.\n")

@@ -374,7 +374,7 @@ static BMVert **bm_to_mesh_vertex_map(BMesh *bm, int ototvert)
 	/* caller needs to ensure this */
 	BLI_assert(ototvert > 0);
 
-	vertMap = MEM_callocN(sizeof(*vertMap)*ototvert, "vertMap");
+	vertMap = MEM_callocN(sizeof(*vertMap) * ototvert, "vertMap");
 	if (CustomData_has_layer(&bm->vdata, CD_SHAPE_KEYINDEX)) {
 		int *keyi;
 		BM_ITER(eve, &iter, bm, BM_VERTS_OF_MESH, NULL) {
@@ -407,7 +407,7 @@ static BMVert **bm_to_mesh_vertex_map(BMesh *bm, int ototvert)
 	return vertMap;
 }
 
-BM_INLINE void bmesh_quick_edgedraw_flag(MEdge *med, BMEdge *e)
+BLI_INLINE void bmesh_quick_edgedraw_flag(MEdge *med, BMEdge *e)
 {
 	/* this is a cheap way to set the edge draw, its not precise and will
 	 * pick the first 2 faces an edge uses */

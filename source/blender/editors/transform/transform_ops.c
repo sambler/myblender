@@ -155,21 +155,21 @@ static int snap_type_exec(bContext *C, wmOperator *op)
 static void TRANSFORM_OT_snap_type(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Snap Type";
-	ot->description= "Set the snap element type";
-	ot->idname= "TRANSFORM_OT_snap_type";
+	ot->name = "Snap Type";
+	ot->description = "Set the snap element type";
+	ot->idname = "TRANSFORM_OT_snap_type";
 
 	/* api callbacks */
-	ot->invoke= WM_menu_invoke;
-	ot->exec= snap_type_exec;
+	ot->invoke = WM_menu_invoke;
+	ot->exec = snap_type_exec;
 
-	ot->poll= ED_operator_areaactive;
+	ot->poll = ED_operator_areaactive;
 
 	/* flags */
-	ot->flag= OPTYPE_UNDO;
+	ot->flag = OPTYPE_UNDO;
 
 	/* props */
-	ot->prop= RNA_def_enum(ot->srna, "type", snap_element_items, 0, "Type", "Set the snap element type");
+	ot->prop = RNA_def_enum(ot->srna, "type", snap_element_items, 0, "Type", "Set the snap element type");
 
 }
 
@@ -203,7 +203,7 @@ static void TRANSFORM_OT_select_orientation(struct wmOperatorType *ot)
 
 	/* identifiers */
 	ot->name   = "Select Orientation";
-	ot->description= "Select transformation orientation";
+	ot->description = "Select transformation orientation";
 	ot->idname = "TRANSFORM_OT_select_orientation";
 	ot->flag   = OPTYPE_UNDO;
 
@@ -256,7 +256,7 @@ static void TRANSFORM_OT_delete_orientation(struct wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name   = "Delete Orientation";
-	ot->description= "Delete transformation orientation";
+	ot->description = "Delete transformation orientation";
 	ot->idname = "TRANSFORM_OT_delete_orientation";
 	ot->flag   = OPTYPE_UNDO;
 
@@ -291,7 +291,7 @@ static void TRANSFORM_OT_create_orientation(struct wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name   = "Create Orientation";
-	ot->description= "Create transformation orientation from selection";
+	ot->description = "Create transformation orientation from selection";
 	ot->idname = "TRANSFORM_OT_create_orientation";
 	ot->flag   = OPTYPE_REGISTER|OPTYPE_UNDO;
 
@@ -518,7 +518,7 @@ void TRANSFORM_OT_translate(struct wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name   = "Translate";
-	ot->description= "Translate selected items";
+	ot->description = "Translate selected items";
 	ot->idname = OP_TRANSLATION;
 	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO|OPTYPE_BLOCKING;
 
@@ -526,7 +526,7 @@ void TRANSFORM_OT_translate(struct wmOperatorType *ot)
 	ot->invoke = transform_invoke;
 	ot->exec   = transform_exec;
 	ot->modal  = transform_modal;
-	ot->cancel  = transform_cancel;
+	ot->cancel = transform_cancel;
 	ot->poll   = ED_operator_screenactive;
 
 	RNA_def_float_vector_xyz(ot->srna, "value", 3, NULL, -FLT_MAX, FLT_MAX, "Vector", "", -FLT_MAX, FLT_MAX);
@@ -538,7 +538,7 @@ void TRANSFORM_OT_resize(struct wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name   = "Resize";
-	ot->description= "Resize selected items"; 
+	ot->description = "Resize selected items"; 
 	ot->idname = OP_RESIZE;
 	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO|OPTYPE_BLOCKING;
 
@@ -546,7 +546,7 @@ void TRANSFORM_OT_resize(struct wmOperatorType *ot)
 	ot->invoke = transform_invoke;
 	ot->exec   = transform_exec;
 	ot->modal  = transform_modal;
-	ot->cancel  = transform_cancel;
+	ot->cancel = transform_cancel;
 	ot->poll   = ED_operator_screenactive;
 
 	RNA_def_float_vector(ot->srna, "value", 3, VecOne, -FLT_MAX, FLT_MAX, "Vector", "", -FLT_MAX, FLT_MAX);
@@ -559,7 +559,7 @@ void TRANSFORM_OT_trackball(struct wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name   = "Trackball";
-	ot->description= "Trackball style rotation of selected items";
+	ot->description = "Trackball style rotation of selected items";
 	ot->idname = OP_TRACKBALL;
 	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO|OPTYPE_BLOCKING;
 
@@ -567,7 +567,7 @@ void TRANSFORM_OT_trackball(struct wmOperatorType *ot)
 	ot->invoke = transform_invoke;
 	ot->exec   = transform_exec;
 	ot->modal  = transform_modal;
-	ot->cancel  = transform_cancel;
+	ot->cancel = transform_cancel;
 	ot->poll   = ED_operator_screenactive;
 
 	RNA_def_float_vector(ot->srna, "value", 2, VecOne, -FLT_MAX, FLT_MAX, "Angle", "", -FLT_MAX, FLT_MAX);
@@ -579,7 +579,7 @@ void TRANSFORM_OT_rotate(struct wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name   = "Rotate";
-	ot->description= "Rotate selected items";
+	ot->description = "Rotate selected items";
 	ot->idname = OP_ROTATION;
 	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO|OPTYPE_BLOCKING;
 
@@ -587,7 +587,7 @@ void TRANSFORM_OT_rotate(struct wmOperatorType *ot)
 	ot->invoke = transform_invoke;
 	ot->exec   = transform_exec;
 	ot->modal  = transform_modal;
-	ot->cancel  = transform_cancel;
+	ot->cancel = transform_cancel;
 	ot->poll   = ED_operator_screenactive;
 
 	RNA_def_float_rotation(ot->srna, "value", 1, NULL, -FLT_MAX, FLT_MAX, "Angle", "", -M_PI*2, M_PI*2);
@@ -602,7 +602,7 @@ void TRANSFORM_OT_tilt(struct wmOperatorType *ot)
 	/* optionals - 
 	 * "Tilt selected vertices"
 	 * "Specify an extra axis rotation for selected vertices of 3d curve" */
-	ot->description= "Tilt selected control vertices of 3d curve"; 
+	ot->description = "Tilt selected control vertices of 3d curve"; 
 	ot->idname = OP_TILT;
 	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO|OPTYPE_BLOCKING;
 
@@ -610,7 +610,7 @@ void TRANSFORM_OT_tilt(struct wmOperatorType *ot)
 	ot->invoke = transform_invoke;
 	ot->exec   = transform_exec;
 	ot->modal  = transform_modal;
-	ot->cancel  = transform_cancel;
+	ot->cancel = transform_cancel;
 	ot->poll   = ED_operator_editcurve_3d;
 
 	RNA_def_float_rotation(ot->srna, "value", 1, NULL, -FLT_MAX, FLT_MAX, "Angle", "", -M_PI*2, M_PI*2);
@@ -622,7 +622,7 @@ void TRANSFORM_OT_warp(struct wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name   = "Warp";
-	ot->description= "Warp selected items around the cursor";
+	ot->description = "Warp selected items around the cursor";
 	ot->idname = OP_WARP;
 	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO|OPTYPE_BLOCKING;
 
@@ -630,7 +630,7 @@ void TRANSFORM_OT_warp(struct wmOperatorType *ot)
 	ot->invoke = transform_invoke;
 	ot->exec   = transform_exec;
 	ot->modal  = transform_modal;
-	ot->cancel  = transform_cancel;
+	ot->cancel = transform_cancel;
 	ot->poll   = ED_operator_screenactive;
 
 	RNA_def_float_rotation(ot->srna, "value", 1, NULL, -FLT_MAX, FLT_MAX, "Angle", "", -M_PI*2, M_PI*2);
@@ -643,7 +643,7 @@ void TRANSFORM_OT_shear(struct wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name   = "Shear";
-	ot->description= "Shear selected items along the horizontal screen axis";
+	ot->description = "Shear selected items along the horizontal screen axis";
 	ot->idname = OP_SHEAR;
 	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO|OPTYPE_BLOCKING;
 
@@ -651,7 +651,7 @@ void TRANSFORM_OT_shear(struct wmOperatorType *ot)
 	ot->invoke = transform_invoke;
 	ot->exec   = transform_exec;
 	ot->modal  = transform_modal;
-	ot->cancel  = transform_cancel;
+	ot->cancel = transform_cancel;
 	ot->poll   = ED_operator_screenactive;
 
 	RNA_def_float(ot->srna, "value", 0, -FLT_MAX, FLT_MAX, "Offset", "", -FLT_MAX, FLT_MAX);
@@ -664,7 +664,7 @@ void TRANSFORM_OT_push_pull(struct wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name   = "Push/Pull";
-	ot->description= "Push/Pull selected items";
+	ot->description = "Push/Pull selected items";
 	ot->idname = OP_PUSH_PULL;
 	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO|OPTYPE_BLOCKING;
 
@@ -672,7 +672,7 @@ void TRANSFORM_OT_push_pull(struct wmOperatorType *ot)
 	ot->invoke = transform_invoke;
 	ot->exec   = transform_exec;
 	ot->modal  = transform_modal;
-	ot->cancel  = transform_cancel;
+	ot->cancel = transform_cancel;
 	ot->poll   = ED_operator_screenactive;
 
 	RNA_def_float(ot->srna, "value", 0, -FLT_MAX, FLT_MAX, "Distance", "", -FLT_MAX, FLT_MAX);
@@ -684,7 +684,7 @@ void TRANSFORM_OT_shrink_fatten(struct wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name   = "Shrink/Fatten";
-	ot->description= "Shrink/fatten selected vertices along normals";
+	ot->description = "Shrink/fatten selected vertices along normals";
 	ot->idname = OP_SHRINK_FATTEN;
 	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO|OPTYPE_BLOCKING;
 
@@ -692,7 +692,7 @@ void TRANSFORM_OT_shrink_fatten(struct wmOperatorType *ot)
 	ot->invoke = transform_invoke;
 	ot->exec   = transform_exec;
 	ot->modal  = transform_modal;
-	ot->cancel  = transform_cancel;
+	ot->cancel = transform_cancel;
 	ot->poll   = ED_operator_editmesh;
 
 	RNA_def_float(ot->srna, "value", 0, -FLT_MAX, FLT_MAX, "Offset", "", -FLT_MAX, FLT_MAX);
@@ -705,7 +705,7 @@ void TRANSFORM_OT_tosphere(struct wmOperatorType *ot)
 	/* identifiers */
 	ot->name   = "To Sphere";
 	//added "around mesh center" to differentiate between "MESH_OT_vertices_to_sphere()" 
-	ot->description= "Move selected vertices outward in a spherical shape around mesh center";
+	ot->description = "Move selected vertices outward in a spherical shape around mesh center";
 	ot->idname = OP_TOSPHERE;
 	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO|OPTYPE_BLOCKING;
 
@@ -713,7 +713,7 @@ void TRANSFORM_OT_tosphere(struct wmOperatorType *ot)
 	ot->invoke = transform_invoke;
 	ot->exec   = transform_exec;
 	ot->modal  = transform_modal;
-	ot->cancel  = transform_cancel;
+	ot->cancel = transform_cancel;
 	ot->poll   = ED_operator_screenactive;
 
 	RNA_def_float_factor(ot->srna, "value", 0, 0, 1, "Factor", "", 0, 1);
@@ -725,7 +725,7 @@ void TRANSFORM_OT_mirror(struct wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name   = "Mirror";
-	ot->description= "Mirror selected vertices around one or more axes";
+	ot->description = "Mirror selected vertices around one or more axes";
 	ot->idname = OP_MIRROR;
 	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO|OPTYPE_BLOCKING;
 
@@ -733,7 +733,7 @@ void TRANSFORM_OT_mirror(struct wmOperatorType *ot)
 	ot->invoke = transform_invoke;
 	ot->exec   = transform_exec;
 	ot->modal  = transform_modal;
-	ot->cancel  = transform_cancel;
+	ot->cancel = transform_cancel;
 	ot->poll   = ED_operator_screenactive;
 
 	Transform_Properties(ot, P_CONSTRAINT|P_PROPORTIONAL);
@@ -743,7 +743,7 @@ void TRANSFORM_OT_edge_slide(struct wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name   = "Edge Slide";
-	ot->description= "Slide an edge loop along a mesh"; 
+	ot->description = "Slide an edge loop along a mesh"; 
 	ot->idname = OP_EDGE_SLIDE;
 	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO|OPTYPE_BLOCKING;
 
@@ -751,7 +751,7 @@ void TRANSFORM_OT_edge_slide(struct wmOperatorType *ot)
 	ot->invoke = transform_invoke;
 	ot->exec   = transform_exec;
 	ot->modal  = transform_modal;
-	ot->cancel  = transform_cancel;
+	ot->cancel = transform_cancel;
 	ot->poll   = ED_operator_editmesh;
 
 	RNA_def_float_factor(ot->srna, "value", 0, -1.0f, 1.0f, "Factor", "", -1.0f, 1.0f);
@@ -763,7 +763,7 @@ void TRANSFORM_OT_edge_crease(struct wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name   = "Edge Crease";
-	ot->description= "Change the crease of edges";
+	ot->description = "Change the crease of edges";
 	ot->idname = OP_EDGE_CREASE;
 	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO|OPTYPE_BLOCKING;
 
@@ -771,7 +771,7 @@ void TRANSFORM_OT_edge_crease(struct wmOperatorType *ot)
 	ot->invoke = transform_invoke;
 	ot->exec   = transform_exec;
 	ot->modal  = transform_modal;
-	ot->cancel  = transform_cancel;
+	ot->cancel = transform_cancel;
 	ot->poll   = ED_operator_editmesh;
 
 	RNA_def_float_factor(ot->srna, "value", 0, -1.0f, 1.0f, "Factor", "", -1.0f, 1.0f);
@@ -783,7 +783,7 @@ void TRANSFORM_OT_seq_slide(struct wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name   = "Sequence Slide";
-	ot->description= "Slide a sequence strip in time";
+	ot->description = "Slide a sequence strip in time";
 	ot->idname = OP_SEQ_SLIDE;
 	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO|OPTYPE_BLOCKING;
 
@@ -791,7 +791,7 @@ void TRANSFORM_OT_seq_slide(struct wmOperatorType *ot)
 	ot->invoke = transform_invoke;
 	ot->exec   = transform_exec;
 	ot->modal  = transform_modal;
-	ot->cancel  = transform_cancel;
+	ot->cancel = transform_cancel;
 	ot->poll   = ED_operator_sequencer_active;
 
 	RNA_def_float_vector(ot->srna, "value", 2, VecOne, -FLT_MAX, FLT_MAX, "Angle", "", -FLT_MAX, FLT_MAX);
@@ -805,15 +805,15 @@ void TRANSFORM_OT_transform(struct wmOperatorType *ot)
 
 	/* identifiers */
 	ot->name   = "Transform";
-	ot->description= "Transform selected items by mode type";
+	ot->description = "Transform selected items by mode type";
 	ot->idname = "TRANSFORM_OT_transform";
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO|OPTYPE_BLOCKING;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO|OPTYPE_BLOCKING;
 
 	/* api callbacks */
 	ot->invoke = transform_invoke;
 	ot->exec   = transform_exec;
 	ot->modal  = transform_modal;
-	ot->cancel  = transform_cancel;
+	ot->cancel = transform_cancel;
 	ot->poll   = ED_operator_screenactive;
 
 	prop= RNA_def_enum(ot->srna, "mode", transform_mode_types, TFM_TRANSLATION, "Mode", "");

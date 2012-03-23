@@ -104,6 +104,7 @@ void sequencer_operatortypes(void)
 
 	/* sequencer_add.c */
 	WM_operatortype_append(SEQUENCER_OT_scene_strip_add);
+	WM_operatortype_append(SEQUENCER_OT_movieclip_strip_add);
 	WM_operatortype_append(SEQUENCER_OT_movie_strip_add);
 	WM_operatortype_append(SEQUENCER_OT_sound_strip_add);
 	WM_operatortype_append(SEQUENCER_OT_image_strip_add);
@@ -112,6 +113,8 @@ void sequencer_operatortypes(void)
 
 	WM_operatortype_append(SEQUENCER_OT_copy);
 	WM_operatortype_append(SEQUENCER_OT_paste);
+
+	WM_operatortype_append(SEQUENCER_OT_update_strip_length);
 }
 
 

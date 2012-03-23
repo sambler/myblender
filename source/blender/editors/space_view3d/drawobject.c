@@ -56,6 +56,7 @@
 #include "BLI_utildefines.h"
 
 #include "BKE_anim.h"			//for the where_on_path function
+#include "BKE_armature.h"
 #include "BKE_camera.h"
 #include "BKE_constraint.h" // for the get_constraint_target function
 #include "BKE_curve.h"
@@ -3227,7 +3228,7 @@ static void draw_mesh_fancy(Scene *scene, ARegion *ar, View3D *v3d, RegionView3D
 
 	/* Check to draw dynamic paint colors (or weights from WeightVG modifiers).
 	 * Note: Last "preview-active" modifier in stack will win! */
-	if (DM_get_tessface_data_layer(dm, CD_WEIGHT_MCOL) && modifiers_isPreview(ob))
+	if (DM_get_tessface_data_layer(dm, CD_PREVIEW_MCOL) && modifiers_isPreview(ob))
 		draw_flags |= DRAW_MODIFIERS_PREVIEW;
 
 	/* Unwanted combination */
@@ -4911,7 +4912,7 @@ static void draw_ptcache_edit(Scene *scene, View3D *v3d, PTCacheEdit *edit)
 			cd=cdata;
 			pd=pdata;
 			for (i=0, point=edit->points; i<totpoint; i++, point++) {
-				if (point->flag & PEP_HIDE)
+				if (point->flag & PEP_HIDE || point->totkey == 0)
 					continue;
 
 				if (point->keys->flag & PEK_USE_WCO)
@@ -4931,7 +4932,7 @@ static void draw_ptcache_edit(Scene *scene, View3D *v3d, PTCacheEdit *edit)
 		}
 		else if (pset->selectmode == SCE_SELECT_END) {
 			for (i=0, point=edit->points; i<totpoint; i++, point++) {
-				if ((point->flag & PEP_HIDE)==0) {
+				if ((point->flag & PEP_HIDE)==0 && point->totkey) {
 					key = point->keys + point->totkey - 1;
 					if (key->flag & PEK_SELECT)
 						glColor3fv(sel_col);
@@ -6134,6 +6135,9 @@ static void draw_bounding_volume(Scene *scene, Object *ob, char type)
 			}
 		}
 	}
+	else if (ob->type == OB_ARMATURE) {
+		bb = BKE_armature_get_bb(ob);
+	}
 	else {
 		drawcube();
 		return;
@@ -6715,10 +6719,20 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, int flag)
 			}
 			break;
 		case OB_ARMATURE:
-			if ((v3d->flag2 & V3D_RENDER_OVERRIDE)==0) {
-				if (dt>OB_WIRE) GPU_enable_material(0, NULL); // we use default material
-				empty_object= draw_armature(scene, v3d, ar, base, dt, flag, FALSE);
-				if (dt>OB_WIRE) GPU_disable_material();
+			if ((v3d->flag2 & V3D_RENDER_OVERRIDE) == 0) {
+				/* Do not allow boundbox in edit nor pose mode! */
+				if ((dt == OB_BOUNDBOX) && (ob->mode & (OB_MODE_EDIT | OB_MODE_POSE)))
+					dt = OB_WIRE;
+				if (dt == OB_BOUNDBOX) {
+					draw_bounding_volume(scene, ob, ob->boundtype);
+				}
+				else {
+					if (dt>OB_WIRE)
+						GPU_enable_material(0, NULL); /* we use default material */
+					empty_object = draw_armature(scene, v3d, ar, base, dt, flag, FALSE);
+					if (dt>OB_WIRE)
+						GPU_disable_material();
+				}
 			}
 			break;
 		default:

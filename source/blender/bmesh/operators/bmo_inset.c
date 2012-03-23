@@ -35,6 +35,7 @@ typedef struct SplitEdgeInfo {
 	float   length;
 	BMEdge *e_old;
 	BMEdge *e_new;
+	BMLoop *l;
 } SplitEdgeInfo;
 
 static void edge_loop_tangent(BMEdge *e, BMLoop *e_loop, float r_no[3])
@@ -47,6 +48,45 @@ static void edge_loop_tangent(BMEdge *e, BMLoop *e_loop, float r_no[3])
 	cross_v3_v3v3(r_no, tvec, e_loop->f->no);
 	normalize_v3(r_no);
 }
+
+/**
+ * return the tag loop where there is...
+ * - only 1 tagged face attached to this edge.
+ * - 1 or more untagged faces.
+ *
+ * \note this function looks to be expensive
+ * but in most cases it will only do 2 iterations.
+ */
+static BMLoop *bm_edge_is_mixed_face_tag(BMLoop *l)
+{
+	if (LIKELY(l != NULL)) {
+		int tot_tag = 0;
+		int tot_untag = 0;
+		BMLoop *l_iter;
+		BMLoop *l_tag = NULL;
+		l_iter = l;
+		do {
+			if (BM_elem_flag_test(l_iter->f, BM_ELEM_TAG)) {
+				/* more then one tagged face - bail out early! */
+				if (tot_tag == 1) {
+					return NULL;
+				}
+				l_tag = l_iter;
+				tot_tag++;
+			}
+			else {
+				tot_untag++;
+			}
+
+		} while ((l_iter = l_iter->radial_next) != l);
+
+		return ((tot_tag == 1) && (tot_untag >= 1)) ? l_tag : NULL;
+	}
+	else {
+		return NULL;
+	}
+}
+
 
 /**
  * implementation is as follows...
@@ -90,14 +130,12 @@ void bmo_inset_exec(BMesh *bm, BMOperator *op)
 	/* first count all inset edges we will split */
 	/* fill in array and initialize tagging */
 	BM_ITER(e, &iter, bm, BM_EDGES_OF_MESH, NULL) {
-		BMLoop *la, *lb;
-
 		if (
 		    /* tag if boundary is enabled */
 		    (use_boundary && BM_edge_is_boundary(e) && BM_elem_flag_test(e->l->f, BM_ELEM_TAG)) ||
 
 		    /* tag if edge is an interior edge inbetween a tagged and untagged face */
-		    ((BM_edge_loop_pair(e, &la, &lb)) && (BM_elem_flag_test(la->f, BM_ELEM_TAG) != BM_elem_flag_test(lb->f, BM_ELEM_TAG))))
+		    (bm_edge_is_mixed_face_tag(e->l)))
 		{
 			/* tag */
 			BM_elem_flag_enable(e->v1, BM_ELEM_TAG);
@@ -133,23 +171,20 @@ void bmo_inset_exec(BMesh *bm, BMOperator *op)
 	}
 
 	for (i = 0, es = edge_info; i < edge_info_len; i++, es++) {
-		BMLoop *l, *la, *lb;
-
-		if (BM_edge_loop_pair(es->e_old, &la, &lb)) {
-			l = BM_elem_flag_test(la->f, BM_ELEM_TAG) ? la : lb;
+		if ((es->l = bm_edge_is_mixed_face_tag(es->e_old->l))) {
+			/* do nothing */
 		}
 		else {
-			l = es->e_old->l; /* must be a boundary */
+			es->l = es->e_old->l; /* must be a boundary */
 		}
 
 
 		/* run the separate arg */
-		bmesh_edge_separate(bm, es->e_old, l);
+		bmesh_edge_separate(bm, es->e_old, es->l);
 
 		/* calc edge-split info */
-		es->e_new = l->e;
-		edge_loop_tangent(es->e_new, l, es->no);
-
+		es->e_new = es->l->e;
+		edge_loop_tangent(es->e_new, es->l, es->no);
 
 		if (es->e_new == es->e_old) { /* happens on boundary edges */
 			es->e_old = BM_edge_create(bm, es->e_new->v1, es->e_new->v2, es->e_new, FALSE);
@@ -186,8 +221,8 @@ void bmo_inset_exec(BMesh *bm, BMOperator *op)
 	for (i = 0, es = edge_info; i < edge_info_len; i++, es++) {
 		for (j = 0; j < 2; j++) {
 			v = (j == 0) ? es->e_new->v1 : es->e_new->v2;
-			/* end confusing part - just pretend this is a typical loop on verts */
 
+			/* end confusing part - just pretend this is a typical loop on verts */
 
 			/* only split of tagged verts - used by separated edges */
 
@@ -203,6 +238,12 @@ void bmo_inset_exec(BMesh *bm, BMOperator *op)
 				bmesh_vert_separate(bm, v, &vout, &r_vout_len);
 				v = NULL; /* don't use again */
 
+				/* in some cases the edge doesnt split off */
+				if (r_vout_len == 1) {
+					MEM_freeN(vout);
+					continue;
+				}
+
 				for (k = 0; k < r_vout_len; k++) {
 					BMVert *v_split = vout[k]; /* only to avoid vout[k] all over */
 
@@ -212,8 +253,7 @@ void bmo_inset_exec(BMesh *bm, BMOperator *op)
 
 					/* find adjacent */
 					BM_ITER(e, &iter, bm, BM_EDGES_OF_VERT, v_split) {
-						if (BM_edge_is_boundary(e) && /* this will be true because bmesh_edge_separate() has run */
-						    BM_elem_flag_test(e, BM_ELEM_TAG) &&
+						if (BM_elem_flag_test(e, BM_ELEM_TAG) &&
 						    BM_elem_flag_test(e->l->f, BM_ELEM_TAG))
 						{
 							if (vert_edge_tag_tot < 2) {
@@ -361,22 +401,39 @@ void bmo_inset_exec(BMesh *bm, BMOperator *op)
 
 	/* create faces */
 	for (i = 0, es = edge_info; i < edge_info_len; i++, es++) {
-		BMVert *v1, *v2, *v3, *v4;
-
+		BMVert *varr[4] = {NULL};
 		/* get the verts in the correct order */
-		BM_edge_ordered_verts(es->e_new, &v1, &v2);
-		if (v1 == es->e_new->v1) {
-			v3 = es->e_old->v2;
-			v4 = es->e_old->v1;
+		BM_edge_ordered_verts_ex(es->e_new, &varr[1], &varr[0], es->l);
+#if 0
+		if (varr[0] == es->e_new->v1) {
+			varr[2] = es->e_old->v2;
+			varr[3] = es->e_old->v1;
 		}
 		else {
-			v3 = es->e_old->v1;
-			v4 = es->e_old->v2;
+			varr[2] = es->e_old->v1;
+			varr[3] = es->e_old->v2;
+		}
+		j = 4;
+#else
+		/* slightly trickier check - since we can't assume the verts are split */
+		j = 2; /* 2 edges are set */
+		if (varr[0] == es->e_new->v1) {
+			if (es->e_old->v2 != es->e_new->v2) { varr[j++] = es->e_old->v2; }
+			if (es->e_old->v1 != es->e_new->v1) { varr[j++] = es->e_old->v1; }
+		}
+		else {
+			if (es->e_old->v1 != es->e_new->v1) { varr[j++] = es->e_old->v1; }
+			if (es->e_old->v2 != es->e_new->v2) { varr[j++] = es->e_old->v2; }
 		}
 
+		if (j == 2) {
+			/* can't make face! */
+			continue;
+		}
+#endif
 		/* no need to check doubles, we KNOW there won't be any */
 		/* yes - reverse face is correct in this case */
-		f = BM_face_create_quad_tri(bm, v4, v3, v2, v1, es->e_new->l->f, FALSE);
+		f = BM_face_create_quad_tri_v(bm, varr, j, es->l->f, FALSE);
 		BMO_elem_flag_enable(bm, f, ELE_NEW);
 	}
 

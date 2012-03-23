@@ -71,7 +71,7 @@ int BM_vert_dissolve(BMesh *bm, BMVert *v)
 		BM_vert_kill(bm, v); /* will kill edges too */
 		return TRUE;
 	}
-	else if (!BM_vert_is_manifold(bm, v)) {
+	else if (!BM_vert_is_manifold(v)) {
 		if (!v->e) {
 			BM_vert_kill(bm, v);
 			return TRUE;
@@ -108,7 +108,7 @@ int BM_disk_dissolve(BMesh *bm, BMVert *v)
 	BMEdge *e, *keepedge = NULL, *baseedge = NULL;
 	int len = 0;
 
-	if (!BM_vert_is_manifold(bm, v)) {
+	if (!BM_vert_is_manifold(v)) {
 		return FALSE;
 	}
 	
@@ -429,7 +429,7 @@ BMFace *BM_face_split_n(BMesh *bm, BMFace *f, BMVert *v1, BMVert *v2, float cos[
 
 			/* interpolate the loop data for the loops with v==newv, using orig face */
 			for (j = 0; j < 2; j++) {
-				BMEdge *e_iter = (j==0)? e : newe;
+				BMEdge *e_iter = (j == 0) ? e : newe;
 				BMLoop *l_iter = e_iter->l;
 				do {
 					if (l_iter->v == newv) {

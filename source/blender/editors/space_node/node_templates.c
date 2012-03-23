@@ -59,6 +59,7 @@
 #include "../interface/interface_intern.h"
 
 #include "ED_node.h"
+#include "ED_util.h"
 
 /************************* Node Socket Manipulation **************************/
 
@@ -199,6 +200,9 @@ static void node_socket_add_replace(Main *bmain, bNodeTree *ntree, bNode *node_t
 
 		for(sock_prev=node_prev->inputs.first; sock_prev; sock_prev=sock_prev->next) {
 			for(sock_from=node_from->inputs.first; sock_from; sock_from=sock_from->next) {
+				if (nodeCountSocketLinks(ntree, sock_from) >= sock_from->limit)
+					continue;
+				
 				if(strcmp(sock_prev->name, sock_from->name) == 0 && sock_prev->type == sock_from->type) {
 					bNodeLink *link = sock_prev->link;
 
@@ -250,7 +254,7 @@ typedef struct NodeLinkArg {
 	uiLayout *layout;
 } NodeLinkArg;
 
-static void ui_node_link(bContext *UNUSED(C), void *arg_p, void *event_p)
+static void ui_node_link(bContext *C, void *arg_p, void *event_p)
 {
 	NodeLinkArg *arg = (NodeLinkArg*)arg_p;
 	Main *bmain = arg->bmain;
@@ -269,6 +273,8 @@ static void ui_node_link(bContext *UNUSED(C), void *arg_p, void *event_p)
 		node_socket_remove(bmain, ntree, node_to, sock_to);
 	else
 		node_socket_add_replace(bmain, ntree, node_to, sock_to, &ntemp, arg->output);
+	
+	ED_undo_push(C, "Node input modify");
 }
 
 static void ui_node_sock_name(bNodeSocket *sock, char name[UI_MAX_NAME_STR])

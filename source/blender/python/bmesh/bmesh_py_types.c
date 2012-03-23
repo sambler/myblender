@@ -33,6 +33,7 @@
 
 #include "DNA_mesh_types.h"
 #include "DNA_object_types.h"
+#include "DNA_material_types.h"
 
 #include "BKE_depsgraph.h"
 #include "BKE_customdata.h"
@@ -180,7 +181,7 @@ static int bpy_bm_elem_index_set(BPy_BMElem *self, PyObject *value, void *UNUSED
 	}
 }
 
-/* type spesific get/sets
+/* type specific get/sets
  * ---------------------- */
 
 
@@ -384,7 +385,7 @@ PyDoc_STRVAR(bpy_bmvert_is_manifold_doc,
 static PyObject *bpy_bmvert_is_manifold_get(BPy_BMVert *self)
 {
 	BPY_BM_CHECK_OBJ(self);
-	return PyBool_FromLong(BM_vert_is_manifold(self->bm, self->v));
+	return PyBool_FromLong(BM_vert_is_manifold(self->v));
 }
 
 
@@ -394,7 +395,7 @@ PyDoc_STRVAR(bpy_bmvert_is_wire_doc,
 static PyObject *bpy_bmvert_is_wire_get(BPy_BMVert *self)
 {
 	BPY_BM_CHECK_OBJ(self);
-	return PyBool_FromLong(BM_vert_is_wire(self->bm, self->v));
+	return PyBool_FromLong(BM_vert_is_wire(self->v));
 }
 
 
@@ -407,7 +408,7 @@ PyDoc_STRVAR(bpy_bmedge_is_manifold_doc,
 static PyObject *bpy_bmedge_is_manifold_get(BPy_BMEdge *self)
 {
 	BPY_BM_CHECK_OBJ(self);
-	return PyBool_FromLong(BM_edge_is_manifold(self->bm, self->e));
+	return PyBool_FromLong(BM_edge_is_manifold(self->e));
 }
 
 
@@ -417,7 +418,7 @@ PyDoc_STRVAR(bpy_bmedge_is_wire_doc,
 static PyObject *bpy_bmedge_is_wire_get(BPy_BMEdge *self)
 {
 	BPY_BM_CHECK_OBJ(self);
-	return PyBool_FromLong(BM_edge_is_wire(self->bm, self->e));
+	return PyBool_FromLong(BM_edge_is_wire(self->e));
 }
 
 
@@ -452,6 +453,40 @@ static int bpy_bmface_normal_set(BPy_BMFace *self, PyObject *value)
 	}
 	else {
 		return -1;
+	}
+}
+
+PyDoc_STRVAR(bpy_bmface_material_index_doc,
+"The faces material index.\n\n:type: int"
+);
+static PyObject *bpy_bmface_material_index_get(BPy_BMFace *self)
+{
+	BPY_BM_CHECK_OBJ(self);
+	return PyLong_FromLong(self->f->mat_nr);
+}
+
+static int bpy_bmface_material_index_set(BPy_BMFace *self, PyObject *value)
+{
+	int param;
+
+	BPY_BM_CHECK_INT(self);
+
+	param = PyLong_AsLong(value);
+
+	if (param == -1 && PyErr_Occurred()) {
+		PyErr_SetString(PyExc_TypeError,
+		                "expected an int type");
+		return -1;
+	}
+	else if ((param < 0) || (param > MAXMAT)) {
+		/* normally we clamp but in this case raise an error */
+		PyErr_SetString(PyExc_ValueError,
+		                "material index outside of usable range (0 - 32766)");
+		return -1;
+	}
+	else {
+		self->f->mat_nr = (short)param;
+		return 0;
 	}
 }
 
@@ -593,6 +628,8 @@ static PyGetSetDef bpy_bmface_getseters[] = {
     {(char *)"smooth", (getter)bpy_bm_elem_hflag_get, (setter)bpy_bm_elem_hflag_set, (char *)bpy_bm_elem_smooth_doc, (void *)BM_ELEM_SMOOTH},
 
     {(char *)"normal", (getter)bpy_bmface_normal_get, (setter)bpy_bmface_normal_set, (char *)bpy_bmface_normal_doc, NULL},
+
+    {(char *)"material_index",  (getter)bpy_bmface_material_index_get, (setter)bpy_bmface_material_index_set, (char *)bpy_bmface_material_index_doc,  NULL},
 
     /* connectivity data */
     {(char *)"verts", (getter)bpy_bmelemseq_elem_get, (setter)NULL, (char *)bpy_bmface_verts_doc, (void *)BM_VERTS_OF_FACE},
@@ -1160,7 +1197,7 @@ PyDoc_STRVAR(bpy_bmvert_calc_edge_angle_doc,
 static PyObject *bpy_bmvert_calc_edge_angle(BPy_BMVert *self)
 {
 	BPY_BM_CHECK_OBJ(self);
-	return PyFloat_FromDouble(BM_vert_edge_angle(self->bm, self->v));
+	return PyFloat_FromDouble(BM_vert_edge_angle(self->v));
 }
 
 
@@ -1203,7 +1240,7 @@ PyDoc_STRVAR(bpy_bmedge_calc_face_angle_doc,
 static PyObject *bpy_bmedge_calc_face_angle(BPy_BMEdge *self)
 {
 	BPY_BM_CHECK_OBJ(self);
-	return PyFloat_FromDouble(BM_edge_face_angle(self->bm, self->e));
+	return PyFloat_FromDouble(BM_edge_face_angle(self->e));
 }
 
 
@@ -1473,7 +1510,7 @@ PyDoc_STRVAR(bpy_bmloop_calc_angle_doc,
 static PyObject *bpy_bmloop_calc_angle(BPy_BMLoop *self)
 {
 	BPY_BM_CHECK_OBJ(self);
-	return PyFloat_FromDouble(BM_loop_face_angle(self->bm, self->l));
+	return PyFloat_FromDouble(BM_loop_face_angle(self->l));
 }
 
 PyDoc_STRVAR(bpy_bmloop_calc_normal_doc,
@@ -1489,7 +1526,7 @@ static PyObject *bpy_bmloop_calc_normal(BPy_BMLoop *self)
 {
 	float vec[3];
 	BPY_BM_CHECK_OBJ(self);
-	BM_loop_face_normal(self->bm, self->l, vec);
+	BM_loop_face_normal(self->l, vec);
 	return Vector_CreatePyObject(vec, 3, Py_NEW, NULL);
 }
 
@@ -1506,7 +1543,7 @@ static PyObject *bpy_bmloop_calc_tangent(BPy_BMLoop *self)
 {
 	float vec[3];
 	BPY_BM_CHECK_OBJ(self);
-	BM_loop_face_tangent(self->bm, self->l, vec);
+	BM_loop_face_tangent(self->l, vec);
 	return Vector_CreatePyObject(vec, 3, Py_NEW, NULL);
 }
 

@@ -258,7 +258,7 @@ static void *bmw_IslandboundWalker_step(BMWalker *walker)
 
 	v = BM_edge_other_vert(e, iwalk->lastv);
 
-	if (!BM_vert_is_manifold(walker->bm, v)) {
+	if (!BM_vert_is_manifold(v)) {
 		BMW_reset(walker);
 		BMO_error_raise(walker->bm, NULL, BMERR_WALKER_FAILED,
 		                "Non-manifold vert "
@@ -412,9 +412,15 @@ static void bmw_LoopWalker_begin(BMWalker *walker, void *data)
 			}
 		}
 
-		/* only use hub selection for 5+ sides else this could
-		 * conflict with normal edge loop selection. */
-		lwalk->f_hub = f_best->len > 4 ? f_best : NULL;
+		if (f_best) {
+			/* only use hub selection for 5+ sides else this could
+			 * conflict with normal edge loop selection. */
+			lwalk->f_hub = f_best->len > 4 ? f_best : NULL;
+		}
+		else {
+			/* edge doesn't have any faces connected to it */
+			lwalk->f_hub = NULL;
+		}
 	}
 	else {
 		lwalk->f_hub = NULL;
@@ -588,7 +594,7 @@ static int bmw_FaceLoopWalker_include_face(BMWalker *walker, BMLoop *l)
 	}
 
 	/* the face must not have been already visite */
-	if (BLI_ghash_haskey(walker->visithash, l->f)) {
+	if (BLI_ghash_haskey(walker->visithash, l->f) && BLI_ghash_haskey(walker->secvisithash, l->e)) {
 		return FALSE;
 	}
 
@@ -598,10 +604,8 @@ static int bmw_FaceLoopWalker_include_face(BMWalker *walker, BMLoop *l)
 /* Check whether the face loop can start from the given edge */
 static int bmw_FaceLoopWalker_edge_begins_loop(BMWalker *walker, BMEdge *e)
 {
-	BMesh *bm = walker->bm;
-
 	/* There is no face loop starting from a wire edge */
-	if (BM_edge_is_wire(bm, e)) {
+	if (BM_edge_is_wire(e)) {
 		return FALSE;
 	}
 	
@@ -614,7 +618,7 @@ static int bmw_FaceLoopWalker_edge_begins_loop(BMWalker *walker, BMEdge *e)
 	}
 	
 	/* Don't start a face loop from non-manifold edges */
-	if (!BM_edge_is_manifold(bm, e)) {
+	if (!BM_edge_is_manifold(e)) {
 		return FALSE;
 	}
 
@@ -645,6 +649,10 @@ static void bmw_FaceLoopWalker_begin(BMWalker *walker, void *data)
 	lwalk = BMW_state_add(walker);
 	*lwalk = owalk;
 	lwalk->nocalc = 0;
+
+	BLI_ghash_free(walker->secvisithash, NULL, NULL);
+	walker->secvisithash = BLI_ghash_new(BLI_ghashutil_ptrhash, BLI_ghashutil_ptrcmp, "bmesh walkers 3");
+	BLI_ghash_insert(walker->visithash, lwalk->l->e, NULL);
 
 	BLI_ghash_free(walker->visithash, NULL, NULL);
 	walker->visithash = BLI_ghash_new(BLI_ghashutil_ptrhash, BLI_ghashutil_ptrcmp, "bmesh walkers 3");
@@ -697,6 +705,7 @@ static void *bmw_FaceLoopWalker_step(BMWalker *walker)
 			lwalk->nocalc = 0;
 		}
 
+		BLI_ghash_insert(walker->secvisithash, l->e, NULL);
 		BLI_ghash_insert(walker->visithash, l->f, NULL);
 	}
 
@@ -774,7 +783,6 @@ static void *bmw_EdgeringWalker_step(BMWalker *walker)
 	BMwEdgeringWalker *lwalk = BMW_current_state(walker);
 	BMEdge *e;
 	BMLoop *l = lwalk->l /* , *origl = lwalk->l */;
-	BMesh *bm = walker->bm;
 #ifdef BMW_EDGERING_NGON
 	int i, len;
 #endif
@@ -785,7 +793,7 @@ static void *bmw_EdgeringWalker_step(BMWalker *walker)
 		return lwalk->wireedge;
 
 	e = l->e;
-	if (!BM_edge_is_manifold(bm, e)) {
+	if (!BM_edge_is_manifold(e)) {
 		/* walker won't traverse to a non-manifold edge, but may
 		 * be started on one, and should not traverse *away* from
 		 * a non-manfold edge (non-manifold edges are never in an
@@ -802,7 +810,7 @@ static void *bmw_EdgeringWalker_step(BMWalker *walker)
 		i -= 2;
 	}
 
-	if ((len <= 0) || (len % 2 != 0) || !BM_edge_is_manifold(bm, l->e)) {
+	if ((len <= 0) || (len % 2 != 0) || !BM_edge_is_manifold(l->e)) {
 		l = lwalk->l;
 		i = len;
 		while (i > 0) {
@@ -811,7 +819,7 @@ static void *bmw_EdgeringWalker_step(BMWalker *walker)
 		}
 	}
 	/* only walk to manifold edge */
-	if ((l->f->len % 2 == 0) && BM_edge_is_manifold(bm, l->e) &&
+	if ((l->f->len % 2 == 0) && BM_edge_is_manifold(l->e) &&
 	    !BLI_ghash_haskey(walker->visithash, l->e)) 
 
 #else
@@ -819,11 +827,11 @@ static void *bmw_EdgeringWalker_step(BMWalker *walker)
 	l = l->radial_next;
 	l = l->next->next;
 	
-	if ((l->f->len != 4) || !BM_edge_is_manifold(bm, l->e)) {
+	if ((l->f->len != 4) || !BM_edge_is_manifold(l->e)) {
 		l = lwalk->l->next->next;
 	}
 	/* only walk to manifold edge */
-	if ((l->f->len == 4) && BM_edge_is_manifold(bm, l->e) &&
+	if ((l->f->len == 4) && BM_edge_is_manifold(l->e) &&
 	    !BLI_ghash_haskey(walker->visithash, l->e))
 #endif
 	{

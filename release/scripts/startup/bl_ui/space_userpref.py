@@ -304,6 +304,11 @@ class USERPREF_PT_edit(Panel):
         col.separator()
         col.label(text="Playback:")
         col.prop(edit, "use_negative_frames")
+        col.separator()
+        col.separator()
+        col.separator()
+        col.label(text="Animation Editors:")
+        col.prop(edit, "fcurve_unselected_alpha", text="F-Curve Visibility")
 
         row.separator()
         row.separator()
@@ -626,6 +631,10 @@ class USERPREF_PT_theme(Panel):
 
             ui = theme.user_interface.wcol_menu_back
             col.label(text="Menu Back:")
+            ui_items_general(col, ui)
+
+            ui = theme.user_interface.wcol_tooltip
+            col.label(text="Tooltip:")
             ui_items_general(col, ui)
 
             ui = theme.user_interface.wcol_tooltip

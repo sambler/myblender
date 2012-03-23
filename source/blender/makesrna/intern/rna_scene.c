@@ -487,7 +487,7 @@ static void rna_Scene_start_frame_set(PointerRNA *ptr, int value)
 	data->r.sfra = value;
 
 	if (data->r.sfra >= data->r.efra) {
-		data->r.efra = MIN2(data->r.sfra + 1, MAXFRAME);
+		data->r.efra = MIN2(data->r.sfra, MAXFRAME);
 	}
 }
 
@@ -498,7 +498,7 @@ static void rna_Scene_end_frame_set(PointerRNA *ptr, int value)
 	data->r.efra = value;
 
 	if (data->r.sfra >= data->r.efra) {
-		data->r.sfra = MAX2(data->r.efra - 1, MINFRAME);
+		data->r.sfra = MAX2(data->r.efra, MINFRAME);
 	}
 }
 
@@ -2785,7 +2785,7 @@ static void rna_def_scene_image_format_data(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Preview", "When rendering animations, save JPG preview images in same directory");
 	RNA_def_property_update(prop, NC_SCENE|ND_RENDER_OPTIONS, NULL);
 
-	/* format spesific */
+	/* format specific */
 
 #ifdef WITH_OPENEXR
 	/* OpenEXR */
@@ -4149,7 +4149,7 @@ void RNA_def_scene(BlenderRNA *brna)
 	RNA_def_property_boolean_sdna(prop, NULL, "lay", 1);
 	RNA_def_property_array(prop, 20);
 	RNA_def_property_boolean_funcs(prop, NULL, "rna_Scene_layer_set");
-	RNA_def_property_ui_text(prop, "Layers", "Layers visible when rendering the scene");
+	RNA_def_property_ui_text(prop, "Layers", "Visible layers - Shift-Click to select multiple layers");
 	RNA_def_property_update(prop, NC_SCENE|ND_LAYER, "rna_Scene_layer_update");
 
 	/* active layer */

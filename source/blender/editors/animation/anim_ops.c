@@ -65,7 +65,7 @@ static int change_frame_poll(bContext *C)
 	ScrArea *curarea= CTX_wm_area(C);
 	
 	/* XXX temp? prevent changes during render */
-	if(G.rendering) return 0;
+	if (G.rendering) return 0;
 	
 	/* as long as there is an active area, and it isn't a Graph Editor 
 	 * (since the Graph Editor has its own version which does extra stuff),
@@ -315,7 +315,7 @@ void ED_operatortypes_anim(void)
 
 void ED_keymap_anim(wmKeyConfig *keyconf)
 {
-	wmKeyMap *keymap= WM_keymap_find(keyconf, "Animation", 0, 0);
+	wmKeyMap *keymap = WM_keymap_find(keyconf, "Animation", 0, 0);
 	wmKeyMapItem *kmi;
 	
 	/* frame management */

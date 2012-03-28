@@ -22,12 +22,18 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "BLI_utildefines.h"
+
 #include "bmesh.h"
 
 #include "intern/bmesh_operators_private.h" /* own include */
 
 enum {
 	EDGE_SEAM  = 1
+};
+
+enum {
+	VERT_SEAM  = 2
 };
 
 /**
@@ -56,7 +62,10 @@ static void bm_edgesplit_validate_seams(BMesh *bm, BMOperator *op)
 		 * only place we loop over all edges, disable tag */
 		BM_elem_flag_disable(e, BM_ELEM_INTERNAL_TAG);
 
-		if (BM_edge_is_boundary(e)) {
+		if (e->l == NULL) {
+			BMO_elem_flag_disable(bm, e, EDGE_SEAM);
+		}
+		else if (BM_edge_is_boundary(e)) {
 			vt = &vtouch[BM_elem_index_get(e->v1)]; if (*vt < 2) (*vt)++;
 			vt = &vtouch[BM_elem_index_get(e->v2)]; if (*vt < 2) (*vt)++;
 
@@ -86,12 +95,34 @@ static void bm_edgesplit_validate_seams(BMesh *bm, BMOperator *op)
 	MEM_freeN(vtouch);
 }
 
+/* keep this operator fast, its used in a modifier */
 void bmo_edgesplit_exec(BMesh *bm, BMOperator *op)
 {
 	BMOIter siter;
 	BMEdge *e;
+	const int use_verts = BMO_slot_bool_get(op, "use_verts");
 
 	BMO_slot_buffer_flag_enable(bm, op, "edges", BM_EDGE, EDGE_SEAM);
+
+	if (use_verts) {
+		/* this slows down the operation but its ok because the modifier doesn't use */
+		BMO_slot_buffer_flag_enable(bm, op, "verts", BM_VERT, VERT_SEAM);
+
+		/* prevent one edge having both verts unflagged
+		 * we could alternately disable these edges, either way its a corner case.
+		 *
+		 * This is needed so we don't split off the edge but then none of its verts which
+		 * would leave a duplicate edge.
+		 */
+		BMO_ITER(e, &siter, bm, op, "edges", BM_EDGE) {
+			if (UNLIKELY((BMO_elem_flag_test(bm, e->v1, VERT_SEAM) == FALSE &&
+			              (BMO_elem_flag_test(bm, e->v2, VERT_SEAM) == FALSE))))
+			{
+				BMO_elem_flag_enable(bm, e->v1, VERT_SEAM);
+				BMO_elem_flag_enable(bm, e->v2, VERT_SEAM);
+			}
+		}
+	}
 
 	bm_edgesplit_validate_seams(bm, op);
 
@@ -103,6 +134,17 @@ void bmo_edgesplit_exec(BMesh *bm, BMOperator *op)
 			bmesh_edge_separate(bm, e, e->l);
 			BM_elem_flag_enable(e->v1, BM_ELEM_TAG);
 			BM_elem_flag_enable(e->v2, BM_ELEM_TAG);
+		}
+	}
+
+	if (use_verts) {
+		BMO_ITER(e, &siter, bm, op, "edges", BM_EDGE) {
+			if (BMO_elem_flag_test(bm, e->v1, VERT_SEAM) == FALSE) {
+				BM_elem_flag_disable(e->v1, BM_ELEM_TAG);
+			}
+			if (BMO_elem_flag_test(bm, e->v2, VERT_SEAM) == FALSE) {
+				BM_elem_flag_disable(e->v2, BM_ELEM_TAG);
+			}
 		}
 	}
 

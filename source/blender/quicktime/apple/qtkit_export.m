@@ -486,7 +486,8 @@ int start_qt(struct Scene *scene, struct RenderData *rd, int rectx, int recty, R
 						qtexport->audioFile = NULL;
 						[qtexport->audioFileName release];
 						qtexport->audioFileName = nil;
-					} else {
+					}
+					else {
 						UInt32 prop,propSize;
 						/* Set up codec properties */
 						if (rd->qtcodecsettings.audiocodecType == kAudioFormatMPEG4AAC) { /*Lossy compressed format*/
@@ -536,7 +537,8 @@ int start_qt(struct Scene *scene, struct RenderData *rd, int rectx, int recty, R
 					qtexport->movie = [[QTMovie alloc] initToWritableFile:qtexport->videoTempFileName error:&error];
 
 			}
-		} else
+		}
+		else
 			qtexport->movie = [[QTMovie alloc] initToWritableFile:qtexport->filename error:&error];
 			
 		if(qtexport->movie == nil) {
@@ -549,7 +551,8 @@ int start_qt(struct Scene *scene, struct RenderData *rd, int rectx, int recty, R
 			if (qtexport->videoTempFileName) [qtexport->videoTempFileName release];
 			qtexport->videoTempFileName = nil;
 			[QTMovie exitQTKitOnThread];
-		} else {
+		}
+		else {
 			[qtexport->movie retain];
 			[qtexport->movie setAttribute:[NSNumber numberWithBool:YES] forKey:QTMovieEditableAttribute];
 			[qtexport->movie setAttribute:@"Made with Blender" forKey:QTMovieCopyrightAttribute];
@@ -662,7 +665,8 @@ int append_qt(struct RenderData *rd, int start_frame, int frame, int *pixels, in
 				if (qtexport->audioOutputFormat.mFramesPerPacket) { 
 					// this is the common case: format has constant frames per packet
 					qtexport->audioTotalSavedFrames += (audioPacketsConverted * qtexport->audioOutputFormat.mFramesPerPacket);
-				} else {
+				}
+				else {
 					unsigned int i;
 					// if there are variable frames per packet, then we have to do this for each packeet
 					for (i = 0; i < audioPacketsConverted; ++i)

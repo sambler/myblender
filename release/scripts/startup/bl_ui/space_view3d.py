@@ -1050,7 +1050,7 @@ class VIEW3D_MT_brush(Menu):
         layout.prop(ups, "use_unified_size", text="Unified Size")
         layout.prop(ups, "use_unified_strength", text="Unified Strength")
         layout.separator()
-        
+
         # brush paint modes
         layout.menu("VIEW3D_MT_brush_paint_modes")
 
@@ -1087,6 +1087,7 @@ class VIEW3D_MT_brush(Menu):
                 if sculpt_tool == 'LAYER':
                     layout.prop(brush, "use_persistent")
                     layout.operator("sculpt.set_persistent_base")
+
 
 class VIEW3D_MT_brush_paint_modes(Menu):
     bl_label = "Enabled Modes"
@@ -1242,7 +1243,7 @@ class VIEW3D_MT_hide(Menu):
         op = layout.operator("paint.hide_show", text="Show Bounding Box")
         op.action = 'SHOW'
         op.area = 'INSIDE'
-    
+
 
 # ********** Particle menu **********
 
@@ -1566,9 +1567,9 @@ class VIEW3D_MT_edit_mesh(Menu):
 
         layout.operator("view3d.edit_mesh_extrude_move_normal", text="Extrude Region")
         layout.operator("view3d.edit_mesh_extrude_individual_move", text="Extrude Individual")
-        layout.operator("mesh.dissolve_limited")
         layout.operator("mesh.duplicate_move")
-        layout.operator("mesh.delete", text="Delete...")
+        layout.menu("VIEW3D_MT_edit_mesh_delete")
+        layout.menu("VIEW3D_MT_edit_mesh_dissolve")
 
         layout.separator()
 
@@ -1602,7 +1603,6 @@ class VIEW3D_MT_edit_mesh_specials(Menu):
         """
         layout.operator("mesh.merge", text="Merge...")
         layout.operator("mesh.remove_doubles")
-        layout.operator("mesh.dissolve_limited")
         layout.operator("mesh.hide", text="Hide")
         layout.operator("mesh.reveal", text="Reveal")
         layout.operator("mesh.select_all", text="Select Inverse").action = 'INVERT'
@@ -1803,6 +1803,44 @@ class VIEW3D_MT_edit_mesh_normals(Menu):
         layout.separator()
 
         layout.operator("mesh.flip_normals")
+
+
+class VIEW3D_MT_edit_mesh_delete(Menu):
+    bl_label = "Delete"
+
+    def draw(self, context):
+        layout = self.layout
+
+    def draw(self, context):
+        layout = self.layout
+
+        layout.operator_enum("mesh.delete", "type")
+
+        layout.separator()
+
+        layout.operator("mesh.dissolve")
+        layout.operator("mesh.edge_collapse")
+        layout.operator("mesh.delete_edgeloop")
+
+
+class VIEW3D_MT_edit_mesh_dissolve(Menu):
+    bl_label = "Dissolve"
+
+    def draw(self, context):
+        layout = self.layout
+
+    def draw(self, context):
+        layout = self.layout
+
+        layout.operator("mesh.dissolve")
+
+        layout.separator()
+
+        layout.operator_enum("mesh.dissolve", "type")
+
+        layout.separator()
+
+        layout.operator("mesh.dissolve_limited")
 
 
 class VIEW3D_MT_edit_mesh_showhide(ShowHideMenu, Menu):

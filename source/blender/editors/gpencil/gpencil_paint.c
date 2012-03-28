@@ -902,7 +902,7 @@ static void gp_stroke_eraser_dostroke (tGPsdata *p, int mval[], int mvalo[], sho
 			}
 #endif
 			else {
-				if(p->subrect == NULL) { /* normal 3D view */
+				if (p->subrect == NULL) { /* normal 3D view */
 					x0= (int)(pt1->x / 100 * p->ar->winx);
 					y0= (int)(pt1->y / 100 * p->ar->winy);
 					x1= (int)(pt2->x / 100 * p->ar->winx);
@@ -940,10 +940,10 @@ static void gp_stroke_doeraser (tGPsdata *p)
 	rcti rect;
 	
 	/* rect is rectangle of eraser */
-	rect.xmin= p->mval[0] - p->radius;
-	rect.ymin= p->mval[1] - p->radius;
-	rect.xmax= p->mval[0] + p->radius;
-	rect.ymax= p->mval[1] + p->radius;
+	rect.xmin = p->mval[0] - p->radius;
+	rect.ymin = p->mval[1] - p->radius;
+	rect.xmax = p->mval[0] + p->radius;
+	rect.ymax = p->mval[1] + p->radius;
 	
 	/* loop over strokes, checking segments for intersections */
 	for (gps= gpf->strokes.first; gps; gps= gpn) {
@@ -1204,7 +1204,7 @@ static void gp_paint_initstroke (tGPsdata *p, short paintmode)
 	if (p->gpl == NULL) {
 		p->gpl= gpencil_layer_addnew(p->gpd);
 
-		if(p->custom_color[3])
+		if (p->custom_color[3])
 			copy_v3_v3(p->gpl->color, p->custom_color);
 	}
 	if (p->gpl->flag & GP_LAYER_LOCKED) {
@@ -1313,7 +1313,7 @@ static void gp_paint_initstroke (tGPsdata *p, short paintmode)
 				 *
 				 * Admittedly, this is a bit hacky, but it works much nicer from an ergonomic standpoint!
 				 */
-				if ELEM(NULL, sima, sima->image) {
+				if (ELEM(NULL, sima, sima->image)) {
 					/* make strokes be drawn in screen space */
 					p->gpd->sbuffer_sflag &= ~GP_STROKE_2DSPACE;
 					p->gpd->flag &= ~GP_DATA_VIEWALIGN;
@@ -1611,8 +1611,7 @@ static int gpencil_draw_exec (bContext *C, wmOperator *op)
 	/* loop over the stroke RNA elements recorded (i.e. progress of mouse movement),
 	 * setting the relevant values in context at each step, then applying
 	 */
-	RNA_BEGIN(op->ptr, itemptr, "stroke") 
-	{
+	RNA_BEGIN(op->ptr, itemptr, "stroke") {
 		float mousef[2];
 		
 		//printf("\t\tGP - stroke elem \n");
@@ -1756,7 +1755,7 @@ static tGPsdata *gpencil_stroke_begin(bContext *C, wmOperator *op)
 	if (gp_session_initdata(C, p))
 		gp_paint_initstroke(p, p->paintmode);
 
-	if(p->status != GP_STATUS_ERROR)
+	if (p->status != GP_STATUS_ERROR)
 		p->status= GP_STATUS_PAINTING;
 
 	return op->customdata;

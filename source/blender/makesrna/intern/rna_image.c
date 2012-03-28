@@ -191,7 +191,7 @@ static void rna_Image_file_format_set(PointerRNA *ptr, int value)
 
 		/*
 		ibuf= BKE_image_get_ibuf(image, NULL);
-		if(ibuf)
+		if (ibuf)
 			ibuf->ftype= ftype;
 		*/
 
@@ -595,6 +595,11 @@ static void rna_def_image(BlenderRNA *brna)
 	RNA_def_property_int_sdna(prop, NULL, "bindcode");
 	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
 	RNA_def_property_ui_text(prop, "Bindcode", "OpenGL bindcode");
+	RNA_def_property_update(prop, NC_IMAGE|ND_DISPLAY, NULL);
+
+	prop = RNA_def_property(srna, "render_slot", PROP_INT, PROP_UNSIGNED);
+	RNA_def_property_range(prop, 0, IMA_MAX_RENDER_SLOT - 1);
+	RNA_def_property_ui_text(prop, "Render Slot", "The current render slot displayed, only for viewer type images");
 	RNA_def_property_update(prop, NC_IMAGE|ND_DISPLAY, NULL);
 
 	/*

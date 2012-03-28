@@ -484,11 +484,15 @@ static void layerCopy_mdisps(const void *source, void *dest, int count)
 	for(i = 0; i < count; ++i) {
 		if(s[i].disps) {
 			d[i].disps = MEM_dupallocN(s[i].disps);
+			d[i].hidden = MEM_dupallocN(s[i].hidden);
 			d[i].totdisp = s[i].totdisp;
+			d[i].level = s[i].level;
 		}
 		else {
 			d[i].disps = NULL;
+			d[i].hidden = NULL;
 			d[i].totdisp = 0;
+			d[i].level = 0;
 		}
 		
 	}
@@ -502,8 +506,12 @@ static void layerFree_mdisps(void *data, int count, int UNUSED(size))
 	for(i = 0; i < count; ++i) {
 		if(d[i].disps)
 			MEM_freeN(d[i].disps);
+		if(d[i].hidden)
+			MEM_freeN(d[i].hidden);
 		d[i].disps = NULL;
+		d[i].hidden = NULL;
 		d[i].totdisp = 0;
+		d[i].level = 0;
 	}
 }
 
@@ -656,17 +664,17 @@ static void layerInterp_mloopcol(void **sources, float *weights,
 		float weight = weights ? weights[i] : 1;
 		MLoopCol *src = sources[i];
 		if (sub_weights) {
-			col.a += src->a * (*sub_weight) * weight;
 			col.r += src->r * (*sub_weight) * weight;
 			col.g += src->g * (*sub_weight) * weight;
 			col.b += src->b * (*sub_weight) * weight;
+			col.a += src->a * (*sub_weight) * weight;
 			sub_weight++;
 		}
 		else {
-			col.a += src->a * weight;
 			col.r += src->r * weight;
 			col.g += src->g * weight;
 			col.b += src->b * weight;
+			col.a += src->a * weight;
 		}
 	}
 	
@@ -677,10 +685,10 @@ static void layerInterp_mloopcol(void **sources, float *weights,
 	CLAMP(col.g, 0.0f, 255.0f);
 	CLAMP(col.b, 0.0f, 255.0f);
 	
-	mc->a = (int)col.a;
 	mc->r = (int)col.r;
 	mc->g = (int)col.g;
 	mc->b = (int)col.b;
+	mc->a = (int)col.a;
 }
 
 static void layerCopyValue_mloopuv(void *source, void *dest)
@@ -1004,8 +1012,8 @@ static const LayerTypeInfo LAYERTYPEINFO[CD_NUMTYPES] = {
 	 layerFree_mdisps, NULL, layerSwap_mdisps, NULL,
 	 NULL, NULL, NULL, NULL, NULL, NULL, 
 	 layerRead_mdisps, layerWrite_mdisps, layerFilesize_mdisps},
-	/* 20: CD_WEIGHT_MCOL */
-	{sizeof(MCol)*4, "MCol", 4, "WeightCol", NULL, NULL, layerInterp_mcol,
+	/* 20: CD_PREVIEW_MCOL */
+	{sizeof(MCol)*4, "MCol", 4, "PreviewCol", NULL, NULL, layerInterp_mcol,
 	 layerSwap_mcol, layerDefault_mcol},
 	/* 21: CD_ID_MCOL */
 	{sizeof(MCol)*4, "MCol", 4, "IDCol", NULL, NULL, layerInterp_mcol,
@@ -1036,8 +1044,8 @@ static const LayerTypeInfo LAYERTYPEINFO[CD_NUMTYPES] = {
 	{sizeof(OrigSpaceLoop), "OrigSpaceLoop", 1, "OS Loop", NULL, NULL, layerInterp_mloop_origspace, NULL, NULL,
 	 layerEqual_mloop_origspace, layerMultiply_mloop_origspace, layerInitMinMax_mloop_origspace,
 	 layerAdd_mloop_origspace, layerDoMinMax_mloop_origspace, layerCopyValue_mloop_origspace},
-	/* 32: CD_WEIGHT_MLOOPCOL */
-	{sizeof(MLoopCol), "MLoopCol", 1, "WeightLoopCol", NULL, NULL, layerInterp_mloopcol, NULL,
+	/* 32: CD_PREVIEW_MLOOPCOL */
+	{sizeof(MLoopCol), "MLoopCol", 1, "PreviewLoopCol", NULL, NULL, layerInterp_mloopcol, NULL,
 	 layerDefault_mloopcol, layerEqual_mloopcol, layerMultiply_mloopcol, layerInitMinMax_mloopcol,
 	 layerAdd_mloopcol, layerDoMinMax_mloopcol, layerCopyValue_mloopcol},
 	/* 33: CD_BM_ELEM_PYPTR */
@@ -1056,12 +1064,12 @@ static const char *LAYERTYPENAMES[CD_NUMTYPES] = {
 	/*   5-9 */ "CDMTFace", "CDMCol", "CDOrigIndex", "CDNormal", "CDFlags",
 	/* 10-14 */ "CDMFloatProperty", "CDMIntProperty","CDMStringProperty", "CDOrigSpace", "CDOrco",
 	/* 15-19 */ "CDMTexPoly", "CDMLoopUV", "CDMloopCol", "CDTangent", "CDMDisps",
-	/* 20-24 */"CDWeightMCol", "CDIDMCol", "CDTextureMCol", "CDClothOrco", "CDMRecast"
+	/* 20-24 */"CDPreviewMCol", "CDIDMCol", "CDTextureMCol", "CDClothOrco", "CDMRecast"
 
 /* BMESH ONLY */
 	,
 	/* 25-29 */ "CDMPoly", "CDMLoop", "CDShapeKeyIndex", "CDShapeKey", "CDBevelWeight",
-	/* 30-32 */ "CDSubSurfCrease", "CDOrigSpaceLoop", "CDWeightLoopCol"
+	/* 30-32 */ "CDSubSurfCrease", "CDOrigSpaceLoop", "CDPreviewLoopCol"
 /* END BMESH ONLY */
 
 };
@@ -1083,9 +1091,9 @@ const CustomDataMask CD_MASK_EDITMESH =
 const CustomDataMask CD_MASK_DERIVEDMESH =
 	CD_MASK_MSTICKY | CD_MASK_MDEFORMVERT | CD_MASK_MTFACE |
 	CD_MASK_MCOL | CD_MASK_PROP_FLT | CD_MASK_PROP_INT | CD_MASK_CLOTH_ORCO |
-	CD_MASK_MLOOPUV | CD_MASK_MLOOPCOL | CD_MASK_MTEXPOLY | CD_MASK_WEIGHT_MLOOPCOL |
+	CD_MASK_MLOOPUV | CD_MASK_MLOOPCOL | CD_MASK_MTEXPOLY | CD_MASK_PREVIEW_MLOOPCOL |
 	CD_MASK_PROP_STR | CD_MASK_ORIGSPACE | CD_MASK_ORIGSPACE_MLOOP | CD_MASK_ORCO | CD_MASK_TANGENT |
-	CD_MASK_WEIGHT_MCOL | CD_MASK_NORMAL | CD_MASK_SHAPEKEY | CD_MASK_RECAST |
+	CD_MASK_PREVIEW_MCOL | CD_MASK_NORMAL | CD_MASK_SHAPEKEY | CD_MASK_RECAST |
 	CD_MASK_ORIGINDEX | CD_MASK_POLYINDEX;
 const CustomDataMask CD_MASK_BMESH = CD_MASK_MLOOPUV | CD_MASK_MLOOPCOL | CD_MASK_MTEXPOLY |
 	CD_MASK_MSTICKY | CD_MASK_MDEFORMVERT | CD_MASK_PROP_FLT | CD_MASK_PROP_INT | 
@@ -2074,8 +2082,8 @@ void CustomData_from_bmeshpoly(CustomData *fdata, CustomData *pdata, CustomData 
 		if (ldata->layers[i].type == CD_MLOOPCOL) {
 			CustomData_add_layer_named(fdata, CD_MCOL, CD_CALLOC, NULL, total, ldata->layers[i].name);
 		}
-		else if (ldata->layers[i].type == CD_WEIGHT_MLOOPCOL) {
-			CustomData_add_layer_named(fdata, CD_WEIGHT_MCOL, CD_CALLOC, NULL, total, ldata->layers[i].name);
+		else if (ldata->layers[i].type == CD_PREVIEW_MLOOPCOL) {
+			CustomData_add_layer_named(fdata, CD_PREVIEW_MCOL, CD_CALLOC, NULL, total, ldata->layers[i].name);
 		}
 		else if (ldata->layers[i].type == CD_ORIGSPACE_MLOOP) {
 			CustomData_add_layer_named(fdata, CD_ORIGSPACE, CD_CALLOC, NULL, total, ldata->layers[i].name);
@@ -2306,9 +2314,9 @@ void *CustomData_bmesh_get_layer_n(const CustomData *data, void *block, int n)
 	return (char *)block + data->layers[n].offset;
 }
 
-int CustomData_layer_has_math(struct CustomData *data, int layern)
+int CustomData_layer_has_math(struct CustomData *data, int layer_n)
 {
-	const LayerTypeInfo *typeInfo = layerType_getInfo(data->layers[layern].type);
+	const LayerTypeInfo *typeInfo = layerType_getInfo(data->layers[layer_n].type);
 	
 	if (typeInfo->equal && typeInfo->add && typeInfo->multiply && 
 	    typeInfo->initminmax && typeInfo->dominmax) return 1;

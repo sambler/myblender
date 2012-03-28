@@ -121,8 +121,10 @@ bool DocumentImporter::import()
 	
 	loader.registerExtraDataCallbackHandler(ehandler);
 
-	if (!root.loadDocument(mFilename))
+	if (!root.loadDocument(mFilename)) {
+		fprintf(stderr, "COLLADAFW::Root::loadDocument() returned false on 1st pass\n");
 		return false;
+	}
 	
 	if(errorHandler.hasError())
 		return false;
@@ -134,8 +136,10 @@ bool DocumentImporter::import()
 	COLLADASaxFWL::Loader loader2;
 	COLLADAFW::Root root2(&loader2, this);
 	
-	if (!root2.loadDocument(mFilename))
+	if (!root2.loadDocument(mFilename)) {
+		fprintf(stderr, "COLLADAFW::Root::loadDocument() returned false on 2nd pass\n");
 		return false;
+	}
 	
 	
 	delete ehandler;
@@ -235,7 +239,15 @@ void DocumentImporter::finish()
 
 void DocumentImporter::translate_anim_recursive(COLLADAFW::Node *node, COLLADAFW::Node *par = NULL, Object *parob = NULL)
 {
-	if (par && par->getType() == COLLADAFW::Node::JOINT) {
+
+	// The split in #29246, rootmap must point at actual root when
+	// calculating bones in apply_curves_as_matrix.
+	// This has to do with inverse bind poses being world space
+	// (the sources for skinned bones' restposes) and the way
+	// non-skinning nodes have their "restpose" recursively calculated.
+	// XXX TODO: design issue, how to support unrelated joints taking
+	// part in skinning.
+	if (par) { // && par->getType() == COLLADAFW::Node::JOINT) {
 		// par is root if there's no corresp. key in root_map
 		if (root_map.find(par->getUniqueId()) == root_map.end())
 			root_map[node->getUniqueId()] = par;
@@ -313,8 +325,10 @@ Object* DocumentImporter::create_lamp_object(COLLADAFW::InstanceLight *lamp, Sce
 	return ob;
 }
 
-Object* DocumentImporter::create_instance_node(Object *source_ob, COLLADAFW::Node *source_node, COLLADAFW::Node *instance_node, Scene *sce, Object *par_ob, bool is_library_node)
+Object* DocumentImporter::create_instance_node(Object *source_ob, COLLADAFW::Node *source_node, COLLADAFW::Node *instance_node, Scene *sce, bool is_library_node)
 {
+	fprintf(stderr, "create <instance_node> under node id=%s from node id=%s\n", instance_node ? instance_node->getOriginalId().c_str() : NULL, source_node ? source_node->getOriginalId().c_str() : NULL);
+
 	Object *obn = copy_object(source_ob);
 	obn->recalc |= OB_RECALC_OB|OB_RECALC_DATA|OB_RECALC_TIME;
 	scene_add_base(sce, obn);
@@ -357,10 +371,10 @@ Object* DocumentImporter::create_instance_node(Object *source_ob, COLLADAFW::Nod
 			Object *new_child = NULL;
 			if (inodes.getCount()) { // \todo loop through instance nodes
 				const COLLADAFW::UniqueId& id = inodes[0]->getInstanciatedObjectId();
-				new_child = create_instance_node(object_map[id], node_map[id], child_node, sce, NULL, is_library_node);
+				new_child = create_instance_node(object_map[id], node_map[id], child_node, sce, is_library_node);
 			}
 			else {
-				new_child = create_instance_node(object_map[child_id], child_node, NULL, sce, NULL, is_library_node);
+				new_child = create_instance_node(object_map[child_id], child_node, NULL, sce, is_library_node);
 			}
 			bc_set_parent(new_child, obn, mContext, true);
 
@@ -369,21 +383,14 @@ Object* DocumentImporter::create_instance_node(Object *source_ob, COLLADAFW::Nod
 		}
 	}
 
-	// when we have an instance_node, don't return the object, because otherwise
-	// its correct location gets overwritten in write_node(). Fixes bug #26012.
-	if(instance_node) {
-		if (par_ob && obn)
-			bc_set_parent(obn, par_ob, mContext);
-		return NULL;
-	}
-
-	else return obn;
+	return obn;
 }
 
 void DocumentImporter::write_node (COLLADAFW::Node *node, COLLADAFW::Node *parent_node, Scene *sce, Object *par, bool is_library_node)
 {
 	Object *ob = NULL;
 	bool is_joint = node->getType() == COLLADAFW::Node::JOINT;
+	bool read_transform = true;
 
 	if (is_joint) {
 		if ( par ) {
@@ -432,16 +439,18 @@ void DocumentImporter::write_node (COLLADAFW::Node *node, COLLADAFW::Node *paren
 		while (inst_done < inst_node.getCount()) {
 			const COLLADAFW::UniqueId& node_id = inst_node[inst_done]->getInstanciatedObjectId();
 			if (object_map.find(node_id) == object_map.end()) {
-				fprintf(stderr, "Cannot find node to instanciate.\n");
+				fprintf(stderr, "Cannot find object for node referenced by <instance_node name=\"%s\">.\n", inst_node[inst_done]->getName().c_str());
 				ob = NULL;
 			}
 			else {
 				Object *source_ob = object_map[node_id];
 				COLLADAFW::Node *source_node = node_map[node_id];
 
-				ob = create_instance_node(source_ob, source_node, node, sce, par, is_library_node);
+				ob = create_instance_node(source_ob, source_node, node, sce, is_library_node);
 			}
 			++inst_done;
+
+			read_transform = false;
 		}
 		// if node is empty - create empty object
 		// XXX empty node may not mean it is empty object, not sure about this
@@ -449,7 +458,8 @@ void DocumentImporter::write_node (COLLADAFW::Node *node, COLLADAFW::Node *paren
 			ob = add_object(sce, OB_EMPTY);
 		}
 		
-		// check if object is not NULL
+		// XXX: if there're multiple instances, only one is stored
+
 		if (!ob) return;
 		
 		std::string nodename = node->getName().size() ? node->getName() : node->getOriginalId();
@@ -462,7 +472,8 @@ void DocumentImporter::write_node (COLLADAFW::Node *node, COLLADAFW::Node *paren
 			libnode_ob.push_back(ob);
 	}
 
-	anim_importer.read_node_transform(node, ob); // overwrites location set earlier
+	if (read_transform)
+		anim_importer.read_node_transform(node, ob); // overwrites location set earlier
 
 	if (!is_joint) {
 		// if par was given make this object child of the previous 

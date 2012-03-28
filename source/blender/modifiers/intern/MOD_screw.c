@@ -175,7 +175,7 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 
 	ScrewVertConnect *vc, *vc_tmp, *vert_connect= NULL;
 
-	/* dont do anything? */
+	/* don't do anything? */
 	if (!totvert)
 		return CDDM_from_template(dm, 0, 0, 0, 0, 0);
 
@@ -388,7 +388,7 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 					vc->v[0]= vc->v[1]= -1;
 
 					mul_m4_v3(mtx_tx, vc->co);
-					/* length in 2d, dont sqrt because this is only for comparison */
+					/* length in 2d, don't sqrt because this is only for comparison */
 					vc->dist =	vc->co[other_axis_1]*vc->co[other_axis_1] +
 								vc->co[other_axis_2]*vc->co[other_axis_2];
 
@@ -405,7 +405,7 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 					vc->e[0]= vc->e[1]= NULL;
 					vc->v[0]= vc->v[1]= -1;
 
-					/* length in 2d, dont sqrt because this is only for comparison */
+					/* length in 2d, don't sqrt because this is only for comparison */
 					vc->dist =	vc->co[other_axis_1]*vc->co[other_axis_1] +
 								vc->co[other_axis_2]*vc->co[other_axis_2];
 
@@ -426,7 +426,7 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 					vc->e[1]= med_new;
 				}
 				else {
-					vc->v[0]= vc->v[1]= -2; /* erro value  - dont use, 3 edges on vert */
+					vc->v[0]= vc->v[1]= -2; /* erro value  - don't use, 3 edges on vert */
 				}
 
 				vc= &vert_connect[med_new->v2];
@@ -441,7 +441,7 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 					vc->e[1]= med_new;
 				}
 				else {
-					vc->v[0]= vc->v[1]= -2; /* erro value  - dont use, 3 edges on vert */
+					vc->v[0]= vc->v[1]= -2; /* erro value  - don't use, 3 edges on vert */
 				}
 			}
 
@@ -543,19 +543,22 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 								ed_loop_flip= 0;
 							}
 
-						}/* else {
+						}
+#if 0
+						else {
 							printf("No Connected ___\n");
-						}*/
+						}
+#endif
 
 						/*printf("flip direction %i\n", ed_loop_flip);*/
 
 
 						/* switch the flip option if set
 						 * note: flip is now done at face level so copying vgroup slizes is easier */
-						/*						
+#if 0
 						if (do_flip)
 							ed_loop_flip= !ed_loop_flip;
-						*/
+#endif
 
 						if (angle < 0.0f)
 							ed_loop_flip= !ed_loop_flip;
@@ -636,7 +639,7 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 					}
 					else {
 						/* only 1 edge connected - same as above except
-						 * dont need to average edge direction */
+						 * don't need to average edge direction */
 						if (vc->e && vc->e[0]->v2 == i) {
 							sub_v3_v3v3(tmp_vec1, mvert_new[i].co, mvert_new[vc->v[0]].co);
 						}

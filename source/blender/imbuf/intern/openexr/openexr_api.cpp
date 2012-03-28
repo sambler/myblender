@@ -1,8 +1,4 @@
-/** \file blender/imbuf/intern/openexr/openexr_api.cpp
- *  \ingroup openexr
- */
 /*
-*
  * ***** BEGIN GPLLICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -27,6 +23,10 @@
  * Contributor(s): Austin Benesh, Ton Roosendaal (float, half, speedup, cleanup...).
  *
  * ***** END GPL LICENSE BLOCK *****
+ */
+
+/** \file blender/imbuf/intern/openexr/openexr_api.cpp
+ *  \ingroup openexr
  */
 
 #include <stdlib.h>
@@ -333,7 +333,7 @@ static int imb_save_openexr_float(struct ImBuf *ibuf, const char *name, int flag
 		rect[0]= ibuf->rect_float + channels*(height-1)*width;
 		rect[1]= rect[0]+1;
 		rect[2]= rect[0]+2;
-		rect[3]= (channels >= 4)? rect[0]+3:rect[0]; /* red as alpha, is this needed since alpha isnt written? */
+		rect[3]= (channels >= 4)? rect[0]+3:rect[0]; /* red as alpha, is this needed since alpha isn't written? */
 
 		frameBuffer.insert ("R", Slice (FLOAT,  (char *)rect[0], xstride, ystride));
 		frameBuffer.insert ("G", Slice (FLOAT,  (char *)rect[1], xstride, ystride));
@@ -384,11 +384,11 @@ int imb_save_openexr(struct ImBuf *ibuf, const char *name, int flags)
 /* ********************* Nicer API, MultiLayer and with Tile file support ************************************ */
 
 /* naming rules:
-   - parse name from right to left
-   - last character is channel ID, 1 char like 'A' 'R' 'G' 'B' 'X' 'Y' 'Z' 'W' 'U' 'V'
-   - separated with a dot; the Pass name (like "Depth", "Color", "Diffuse" or "Combined")
-   - separated with a dot: the Layer name (like "Lamp1" or "Walls" or "Characters")
-*/
+ * - parse name from right to left
+ * - last character is channel ID, 1 char like 'A' 'R' 'G' 'B' 'X' 'Y' 'Z' 'W' 'U' 'V'
+ * - separated with a dot; the Pass name (like "Depth", "Color", "Diffuse" or "Combined")
+ * - separated with a dot: the Layer name (like "Lamp1" or "Walls" or "Characters")
+ */
 
 static ListBase exrhandles= {NULL, NULL};
 
@@ -488,7 +488,7 @@ int IMB_exr_begin_write(void *handle, const char *filename, int width, int heigh
 	
 	header.insert ("BlenderMultiChannel", StringAttribute ("Blender V2.55.1 and newer"));
 
-	/* avoid crash/abort when we dont have permission to write here */
+	/* avoid crash/abort when we don't have permission to write here */
 	try {
 		data->ofile = new OutputFile(filename, header);
 	}

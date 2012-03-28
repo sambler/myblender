@@ -162,7 +162,7 @@ void WM_init(bContext *C, int argc, const char **argv)
 
 	BPY_driver_reset();
 	BPY_app_handlers_reset(FALSE); /* causes addon callbacks to be freed [#28068],
-	                           * but this is actually what we want. */
+	                                * but this is actually what we want. */
 	BPY_modules_load_user(C);
 #else
 	(void)argc; /* unused */
@@ -192,10 +192,10 @@ void WM_init(bContext *C, int argc, const char **argv)
 	WM_read_history();
 
 	/* allow a path of "", this is what happens when making a new file */
-	/*
+#if 0
 	if(G.main->name[0] == 0)
 		BLI_make_file_string("/", G.main->name, BLI_getDefaultDocumentFolder(), "untitled.blend");
-	*/
+#endif
 
 	BLI_strncpy(G.lib, G.main->name, FILE_MAX);
 }
@@ -317,9 +317,6 @@ static void free_openrecent(void)
 
 /* bad stuff*/
 
-extern wchar_t *copybuf;
-extern wchar_t *copybufinfo;
-
 	// XXX copy/paste buffer stuff...
 extern void free_anim_copybuf(void); 
 extern void free_anim_drivers_copybuf(void); 
@@ -419,9 +416,7 @@ void WM_exit_ext(bContext *C, const short do_python)
 	GPU_global_buffer_pool_free();
 	GPU_free_unused_buffers();
 	GPU_extensions_exit();
-	
-//	if (copybuf) MEM_freeN(copybuf);
-//	if (copybufinfo) MEM_freeN(copybufinfo);
+
 	if (!G.background) {
 		BKE_undo_save_quit();	// saves quit.blend if global undo is on
 	}

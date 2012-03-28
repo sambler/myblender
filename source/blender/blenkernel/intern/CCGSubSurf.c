@@ -8,6 +8,7 @@
 #include <math.h>
 
 #include "CCGSubSurf.h"
+#include "BKE_subsurf.h"
 
 #include "MEM_guardedalloc.h"
 #include "BLO_sys_types.h" // for intptr_t support
@@ -227,12 +228,20 @@ static CCGAllocatorIFC *_getStandardAllocatorIFC(void)
 
 /***/
 
-static int ccg_gridsize(int level)
+int ccg_gridsize(int level)
 {
 	BLI_assert(level > 0);
 	BLI_assert(level <= 31);
          
 	return (1 << (level - 1)) + 1;
+}
+
+int ccg_factor(int low_level, int high_level)
+{
+	BLI_assert(low_level > 0 && high_level > 0);
+	BLI_assert(low_level <= high_level);
+
+	return 1 << (high_level - low_level);
 }
 
 static int ccg_edgesize(int level)
@@ -732,7 +741,7 @@ static void _face_calcIFNo(CCGFace *f, int lvl, int S, int x, int y, float *no, 
 	no[1] = b_dZ * a_cX - b_dX * a_cZ;
 	no[2] = b_dX * a_cY - b_dY * a_cX;
 
-	length = sqrt(no[0] * no[0] + no[1] * no[1] + no[2] * no[2]);
+	length = sqrtf(no[0] * no[0] + no[1] * no[1] + no[2] * no[2]);
 
 	if (length > EPSILON) {
 		float invLength = 1.f/length;
@@ -1419,7 +1428,7 @@ static void ccgSubSurf__calcVertNormals(CCGSubSurf *ss,
 			NormAdd(no, FACE_getIFNo(f, lvl, _face_getVertIndex(f,v), gridSize - 1, gridSize - 1));
 		}
 
-		length = sqrt(no[0] * no[0] + no[1] * no[1] + no[2] * no[2]);
+		length = sqrtf(no[0] * no[0] + no[1] * no[1] + no[2] * no[2]);
 
 		if (length > EPSILON) {
 			float invLength = 1.0f/length;
@@ -1477,7 +1486,7 @@ static void ccgSubSurf__calcVertNormals(CCGSubSurf *ss,
 			for (y = 0; y < gridSize; y++) {
 				for (x = 0; x < gridSize; x++) {
 					float *no = FACE_getIFNo(f, lvl, S, x, y);
-					float length = sqrt(no[0] * no[0] + no[1] * no[1] + no[2] * no[2]);
+					float length = sqrtf(no[0] * no[0] + no[1] * no[1] + no[2] * no[2]);
 
 					if (length > EPSILON) {
 						float invLength = 1.0f/length;

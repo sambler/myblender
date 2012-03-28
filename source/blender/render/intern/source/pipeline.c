@@ -86,31 +86,30 @@
 #include "pixelblending.h"
 #include "zbuf.h"
 
-
 /* render flow
-
-1) Initialize state
-- state data, tables
-- movie/image file init
-- everything that doesn't change during animation
-
-2) Initialize data
-- camera, world, matrices
-- make render verts, faces, halos, strands
-- everything can change per frame/field
-
-3) Render Processor
-- multiple layers
-- tiles, rect, baking
-- layers/tiles optionally to disk or directly in Render Result
-
-4) Composite Render Result
-- also read external files etc
-
-5) Image Files
-- save file or append in movie
-
-*/
+ *
+ * 1) Initialize state
+ * - state data, tables
+ * - movie/image file init
+ * - everything that doesn't change during animation
+ *
+ * 2) Initialize data
+ * - camera, world, matrices
+ * - make render verts, faces, halos, strands
+ * - everything can change per frame/field
+ *
+ * 3) Render Processor
+ * - multiple layers
+ * - tiles, rect, baking
+ * - layers/tiles optionally to disk or directly in Render Result
+ *
+ * 4) Composite Render Result
+ * - also read external files etc
+ *
+ * 5) Image Files
+ * - save file or append in movie
+ *
+ */
 
 
 /* ********* globals ******** */
@@ -371,7 +370,7 @@ Render *RE_NewRender(const char *name)
 }
 
 /* called for new renders and when finishing rendering so
- * we calways have valid callbacks on a render */
+ * we always have valid callbacks on a render */
 void RE_InitRenderCB(Render *re)
 {
 	/* set default empty callbacks */
@@ -1241,8 +1240,8 @@ static void do_render_fields_blur_3d(Render *re)
 
 
 /* within context of current Render *re, render another scene.
-   it uses current render image size and disprect, but doesn't execute composite
-*/
+ * it uses current render image size and disprect, but doesn't execute composite
+ */
 static void render_scene(Render *re, Scene *sce, int cfra)
 {
 	Render *resc= RE_NewRender(sce->id.name);
@@ -1638,7 +1637,7 @@ static void do_render_seq(Render * re)
 	re->i.cfra= cfra;
 
 	if(recurs_depth==0) {
-		/* otherwise sequencer animation isnt updated */
+		/* otherwise sequencer animation isn't updated */
 		BKE_animsys_evaluate_all_animation(re->main, re->scene, (float)cfra); // XXX, was BKE_curframe(re->scene)
 	}
 
@@ -1646,7 +1645,7 @@ static void do_render_seq(Render * re)
 
 	if((re->r.mode & R_BORDER) && (re->r.mode & R_CROP)==0) {
 		/* if border rendering is used and cropping is disabled, final buffer should
-		    be as large as the whole frame */
+		 * be as large as the whole frame */
 		context = seq_new_render_data(re->main, re->scene,
 					      re->winx, re->winy,
 					      100);
@@ -1921,7 +1920,7 @@ static int render_initialize_from_main(Render *re, Main *bmain, Scene *scene, Sc
 	rcti disprect;
 	
 	/* r.xsch and r.ysch has the actual view window size
-		r.border is the clipping rect */
+	 * r.border is the clipping rect */
 	
 	/* calculate actual render result and display size */
 	winx= (scene->r.size*scene->r.xsch)/100;
@@ -1959,7 +1958,7 @@ static int render_initialize_from_main(Render *re, Main *bmain, Scene *scene, Sc
 	 * Disabled completely for now,
 	 * can be later set as render profile option
 	 * and default for background render.
-	*/
+	 */
 	if(0) {
 		/* make sure dynamics are up to date */
 		update_physics_cache(re, scene, anim_init);
@@ -2008,7 +2007,7 @@ void RE_BlenderFrame(Render *re, Main *bmain, Scene *scene, SceneRenderLayer *sr
 
 		if(write_still && !G.afbreek) {
 			if(BKE_imtype_is_movie(scene->r.im_format.imtype)) {
-				/* operator checks this but incase its called from elsewhere */
+				/* operator checks this but in case its called from elsewhere */
 				printf("Error: cant write single images with a movie format!\n");
 			}
 			else {
@@ -2022,6 +2021,8 @@ void RE_BlenderFrame(Render *re, Main *bmain, Scene *scene, SceneRenderLayer *sr
 
 		BLI_exec_cb(re->main, (ID *)scene, BLI_CB_EVT_RENDER_POST); /* keep after file save */
 	}
+
+	BLI_exec_cb(re->main, (ID *)scene, G.afbreek ? BLI_CB_EVT_RENDER_CANCEL : BLI_CB_EVT_RENDER_COMPLETE);
 
 	/* UGLY WARNING */
 	G.rendering= 0;
@@ -2240,6 +2241,8 @@ void RE_BlenderAnim(Render *re, Main *bmain, Scene *scene, Object *camera_overri
 
 	re->flag &= ~R_ANIMATION;
 
+	BLI_exec_cb(re->main, (ID *)scene, G.afbreek ? BLI_CB_EVT_RENDER_CANCEL : BLI_CB_EVT_RENDER_COMPLETE);
+
 	/* UGLY WARNING */
 	G.rendering= 0;
 }
@@ -2329,7 +2332,7 @@ void RE_init_threadcount(Render *re)
 }
 
 /* loads in image into a result, size must match
- * x/y offsets are only used on a partial copy when dimensions dont match */
+ * x/y offsets are only used on a partial copy when dimensions don't match */
 void RE_layer_load_from_file(RenderLayer *layer, ReportList *reports, const char *filename, int x, int y)
 {
 	ImBuf *ibuf = IMB_loadiffname(filename, IB_rect);

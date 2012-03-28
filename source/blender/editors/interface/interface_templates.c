@@ -793,9 +793,9 @@ static uiLayout *draw_modifier(uiLayout *layout, Scene *scene, Object *ob,
 			}
 		} /* tessellation point for curve-typed objects */
 		else if (ELEM3(ob->type, OB_CURVE, OB_SURF, OB_FONT)) {
-			/* some modifiers could work with pre-tesselated curves only */
+			/* some modifiers could work with pre-tessellated curves only */
 			if (ELEM3(md->type, eModifierType_Hook, eModifierType_Softbody, eModifierType_MeshDeform)) {
-				/* add disabled pre-tesselated button, so users could have
+				/* add disabled pre-tessellated button, so users could have
 				 * message for this modifiers */
 				but = uiDefIconButBitI(block, TOG, eModifierMode_ApplyOnSpline, 0, ICON_SURFACE_DATA, 0, 0, UI_UNIT_X-2, UI_UNIT_Y, &md->mode, 0.0, 0.0, 0.0, 0.0,
 						TIP_("This modifier could be applied on splines' points only"));
@@ -1579,7 +1579,7 @@ static void curvemap_buttons_zoom_out(bContext *C, void *cumap_v, void *UNUSED(u
 	CurveMapping *cumap = cumap_v;
 	float d, d1;
 
-	/* we allow 20 times zoom, but dont view outside clip */
+	/* we allow 20 times zoom, but don't view outside clip */
 	if( (cumap->curr.xmax - cumap->curr.xmin) < 20.0f*(cumap->clipr.xmax - cumap->clipr.xmin) ) {
 		d= d1= 0.15f*(cumap->curr.xmax - cumap->curr.xmin);
 
@@ -1944,7 +1944,7 @@ void uiTemplateColorWheel(uiLayout *layout, PointerRNA *ptr, const char *propnam
 	}
 
 	if(lock_luminosity) {
-		float color[4]; /* incase of alpha */
+		float color[4]; /* in case of alpha */
 		but->flag |= UI_BUT_VEC_SIZE_LOCK;
 		RNA_property_float_get_array(ptr, prop, color);
 		but->a2= len_v3(color);
@@ -2246,11 +2246,11 @@ static void list_item_row(bContext *C, uiLayout *layout, PointerRNA *ptr, Pointe
 	 *     integer = IntProperty()
 	 *     string  = StringProperty()
 	 * 
-	 *     # A string of all identifiers (colon-separated) which property’s controls should be
+	 *     # A string of all identifiers (colon-separated) which property's controls should be
 	 *     # displayed in a template_list.
 	 *     template_list_controls = StringProperty(default="integer:bool:string", options={"HIDDEN"})
 	 *
-	 * … you’ll get a numfield for the integer prop, a check box for the bool prop, and a textfield
+	 * ... you'll get a numfield for the integer prop, a check box for the bool prop, and a textfield
 	 * for the string prop, after the name of each item of the collection.
 	 */
 	else if (prop_list_id) {
@@ -2259,9 +2259,9 @@ static void list_item_row(bContext *C, uiLayout *layout, PointerRNA *ptr, Pointe
 
 		/* XXX: Check, as sometimes we get an itemptr looking like
 		 *      {id = {data = 0x0}, type = 0x0, data = 0x0}
-		 *      which would obviously produce a sigsev… */
+		 *      which would obviously produce a sigsev... */
 		if (itemptr->type) {
-			/* If the special property is set for the item, and it is a collection… */
+			/* If the special property is set for the item, and it is a collection... */
 			PropertyRNA *prop_list= RNA_struct_find_property(itemptr, prop_list_id);
 
 			if(prop_list && RNA_property_type(prop_list) == PROP_STRING) {

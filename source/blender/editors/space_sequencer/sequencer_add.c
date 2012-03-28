@@ -52,8 +52,8 @@
 #include "BKE_global.h"
 #include "BKE_main.h"
 #include "BKE_sequencer.h"
+#include "BKE_movieclip.h"
 #include "BKE_report.h"
-
 
 #include "WM_api.h"
 #include "WM_types.h"
@@ -123,7 +123,7 @@ static void sequencer_generic_invoke_xy__internal(bContext *C, wmOperator *op, w
 	
 	UI_view2d_region_to_view(v2d, event->mval[0], event->mval[1], &mval_v2d[0], &mval_v2d[1]);
 
-	/* effect strips dont need a channel initialized from the mouse */
+	/* effect strips don't need a channel initialized from the mouse */
 	if(!(flag & SEQPROP_NOCHAN)) {
 		RNA_int_set(op->ptr, "channel", (int)mval_v2d[1]+0.5f);
 	}
@@ -149,7 +149,7 @@ static void seq_load_operator_info(SeqLoadInfo *seq_load, wmOperator *op)
 	seq_load->end_frame=	seq_load->start_frame; /* un-set */
 
 	seq_load->channel=		RNA_int_get(op->ptr, "channel");
-	seq_load->len=			1; // images only, if endframe isnt set!
+	seq_load->len=			1; // images only, if endframe isn't set!
 
 	if(RNA_struct_find_property(op->ptr, "filepath")) {
 		RNA_string_get(op->ptr, "filepath", seq_load->path); /* full path, file is set by the caller */
@@ -224,19 +224,16 @@ static int sequencer_add_scene_strip_exec(bContext *C, wmOperator *op)
 	seq->blend_mode= SEQ_CROSS; /* so alpha adjustment fade to the strip below */
 
 	seq->scene= sce_seq;
-	seq->sfra= sce_seq->r.sfra;
 	
 	/* basic defaults */
 	seq->strip= strip= MEM_callocN(sizeof(Strip), "strip");
-	strip->len = seq->len = sce_seq->r.efra - sce_seq->r.sfra + 1;
+	seq->len = sce_seq->r.efra - sce_seq->r.sfra + 1;
 	strip->us= 1;
-	
-	strip->stripdata= MEM_callocN(seq->len*sizeof(StripElem), "stripelem");
 	
 	BLI_strncpy(seq->name+2, sce_seq->id.name+2, sizeof(seq->name)-2);
 	seqbase_unique_name_recursive(&ed->seqbase, seq);
 
-	seq->scene_sound = sound_scene_add_scene_sound(scene, seq, start_frame, start_frame + strip->len, 0);
+	seq->scene_sound = sound_scene_add_scene_sound(scene, seq, start_frame, start_frame + seq->len, 0);
 
 	calc_sequence_disp(scene, seq);
 	sort_seq(scene);
@@ -279,24 +276,121 @@ void SEQUENCER_OT_scene_strip_add(struct wmOperatorType *ot)
 	PropertyRNA *prop;
 	
 	/* identifiers */
-	ot->name= "Add Scene Strip";
-	ot->idname= "SEQUENCER_OT_scene_strip_add";
-	ot->description= "Add a strip to the sequencer using a blender scene as a source";
+	ot->name = "Add Scene Strip";
+	ot->idname = "SEQUENCER_OT_scene_strip_add";
+	ot->description = "Add a strip to the sequencer using a blender scene as a source";
 
 	/* api callbacks */
-	ot->invoke= sequencer_add_scene_strip_invoke;
-	ot->exec= sequencer_add_scene_strip_exec;
+	ot->invoke = sequencer_add_scene_strip_invoke;
+	ot->exec = sequencer_add_scene_strip_exec;
 
-	ot->poll= ED_operator_scene_editable;
+	ot->poll = ED_operator_scene_editable;
 	
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 	
 	sequencer_generic_props__internal(ot, SEQPROP_STARTFRAME);
 	prop= RNA_def_enum(ot->srna, "scene", DummyRNA_NULL_items, 0, "Scene", "");
 	RNA_def_enum_funcs(prop, RNA_scene_itemf);
-	ot->prop= prop;
+	ot->prop = prop;
 }
+
+/* add movieclip operator */
+static int sequencer_add_movieclip_strip_exec(bContext *C, wmOperator *op)
+{
+	Scene *scene= CTX_data_scene(C);
+	Editing *ed= seq_give_editing(scene, TRUE);
+	
+	MovieClip *clip;
+
+	Sequence *seq;	/* generic strip vars */
+	Strip *strip;
+	
+	int start_frame, channel; /* operator props */
+	
+	start_frame= RNA_int_get(op->ptr, "frame_start");
+	channel= RNA_int_get(op->ptr, "channel");
+	
+	clip= BLI_findlink(&CTX_data_main(C)->movieclip, RNA_enum_get(op->ptr, "clip"));
+	
+	if (clip == NULL) {
+		BKE_report(op->reports, RPT_ERROR, "MovieClip not found");
+		return OPERATOR_CANCELLED;
+	}
+	
+	seq = alloc_sequence(ed->seqbasep, start_frame, channel);
+	seq->type= SEQ_MOVIECLIP;
+	seq->blend_mode= SEQ_CROSS; 
+	seq->clip = clip;
+	
+	/* basic defaults */
+	seq->strip= strip= MEM_callocN(sizeof(Strip), "strip");
+	seq->len =  BKE_movieclip_get_duration(clip);
+	strip->us= 1;
+	
+	BLI_strncpy(seq->name+2, clip->id.name+2, sizeof(seq->name)-2);
+	seqbase_unique_name_recursive(&ed->seqbase, seq);
+
+	calc_sequence_disp(scene, seq);
+	sort_seq(scene);
+	
+	if (RNA_boolean_get(op->ptr, "replace_sel")) {
+		deselect_all_seq(scene);
+		seq_active_set(scene, seq);
+		seq->flag |= SELECT;
+	}
+
+	if(RNA_boolean_get(op->ptr, "overlap") == FALSE) {
+		if(seq_test_overlap(ed->seqbasep, seq)) shuffle_seq(ed->seqbasep, seq, scene);
+	}
+
+	WM_event_add_notifier(C, NC_SCENE|ND_SEQUENCER, scene);
+	
+	return OPERATOR_FINISHED;
+}
+
+
+static int sequencer_add_movieclip_strip_invoke(bContext *C, wmOperator *op, wmEvent *event)
+{
+	if(!ED_operator_sequencer_active(C)) {
+		BKE_report(op->reports, RPT_ERROR, "Sequencer area not active");
+		return OPERATOR_CANCELLED;
+	}
+
+	if(!RNA_struct_property_is_set(op->ptr, "clip"))
+		return WM_enum_search_invoke(C, op, event);
+
+	sequencer_generic_invoke_xy__internal(C, op, event, 0);
+	return sequencer_add_movieclip_strip_exec(C, op);
+	// needs a menu
+	// return WM_menu_invoke(C, op, event);
+}
+
+
+void SEQUENCER_OT_movieclip_strip_add(struct wmOperatorType *ot)
+{
+	PropertyRNA *prop;
+	
+	/* identifiers */
+	ot->name = "Add MovieClip Strip";
+	ot->idname = "SEQUENCER_OT_movieclip_strip_add";
+	ot->description = "Add a movieclip strip to the sequencer";
+
+	/* api callbacks */
+	ot->invoke = sequencer_add_movieclip_strip_invoke;
+	ot->exec = sequencer_add_movieclip_strip_exec;
+
+	ot->poll = ED_operator_scene_editable;
+	
+	/* flags */
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
+	
+	sequencer_generic_props__internal(ot, SEQPROP_STARTFRAME);
+	prop= RNA_def_enum(ot->srna, "clip", DummyRNA_NULL_items, 0, "Clip", "");
+	RNA_def_enum_funcs(prop, RNA_movieclip_itemf);
+	ot->prop = prop;
+}
+
 
 static int sequencer_add_generic_strip_exec(bContext *C, wmOperator *op, SeqLoadFunc seq_load_func)
 {
@@ -373,7 +467,9 @@ static int sequencer_add_movie_strip_invoke(bContext *C, wmOperator *op, wmEvent
 	}
 
 	/* This is for drag and drop */
-	if(RNA_collection_length(op->ptr, "files") || RNA_struct_property_is_set(op->ptr, "filepath")) {
+	if((RNA_struct_property_is_set(op->ptr, "files") && RNA_collection_length(op->ptr, "files")) ||
+	    RNA_struct_property_is_set(op->ptr, "filepath"))
+	{
 		sequencer_generic_invoke_xy__internal(C, op, event, SEQPROP_NOPATHS);
 		return sequencer_add_movie_strip_exec(C, op);
 	}
@@ -391,18 +487,18 @@ void SEQUENCER_OT_movie_strip_add(struct wmOperatorType *ot)
 {
 	
 	/* identifiers */
-	ot->name= "Add Movie Strip";
-	ot->idname= "SEQUENCER_OT_movie_strip_add";
-	ot->description= "Add a movie strip to the sequencer";
+	ot->name = "Add Movie Strip";
+	ot->idname = "SEQUENCER_OT_movie_strip_add";
+	ot->description = "Add a movie strip to the sequencer";
 
 	/* api callbacks */
-	ot->invoke= sequencer_add_movie_strip_invoke;
-	ot->exec= sequencer_add_movie_strip_exec;
+	ot->invoke = sequencer_add_movie_strip_invoke;
+	ot->exec = sequencer_add_movie_strip_exec;
 
-	ot->poll= ED_operator_scene_editable;
+	ot->poll = ED_operator_scene_editable;
 	
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 	
 	WM_operator_properties_filesel(ot, FOLDERFILE|MOVIEFILE, FILE_SPECIAL, FILE_OPENFILE, WM_FILESEL_FILEPATH|WM_FILESEL_RELPATH|WM_FILESEL_FILES, FILE_DEFAULTDISPLAY);
 	sequencer_generic_props__internal(ot, SEQPROP_STARTFRAME);
@@ -425,7 +521,9 @@ static int sequencer_add_sound_strip_invoke(bContext *C, wmOperator *op, wmEvent
 	}
 	
 	/* This is for drag and drop */
-	if(RNA_collection_length(op->ptr, "files") || RNA_struct_property_is_set(op->ptr, "filepath")) {
+	if((RNA_struct_property_is_set(op->ptr, "files") && RNA_collection_length(op->ptr, "files")) ||
+	   RNA_struct_property_is_set(op->ptr, "filepath"))
+	{
 		sequencer_generic_invoke_xy__internal(C, op, event, SEQPROP_NOPATHS);
 		return sequencer_add_sound_strip_exec(C, op);
 	}
@@ -443,18 +541,18 @@ void SEQUENCER_OT_sound_strip_add(struct wmOperatorType *ot)
 {
 	
 	/* identifiers */
-	ot->name= "Add Sound Strip";
-	ot->idname= "SEQUENCER_OT_sound_strip_add";
-	ot->description= "Add a sound strip to the sequencer";
+	ot->name = "Add Sound Strip";
+	ot->idname = "SEQUENCER_OT_sound_strip_add";
+	ot->description = "Add a sound strip to the sequencer";
 
 	/* api callbacks */
-	ot->invoke= sequencer_add_sound_strip_invoke;
-	ot->exec= sequencer_add_sound_strip_exec;
+	ot->invoke = sequencer_add_sound_strip_invoke;
+	ot->exec = sequencer_add_sound_strip_exec;
 
-	ot->poll= ED_operator_scene_editable;
+	ot->poll = ED_operator_scene_editable;
 	
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 	
 	WM_operator_properties_filesel(ot, FOLDERFILE|SOUNDFILE, FILE_SPECIAL, FILE_OPENFILE, WM_FILESEL_FILEPATH|WM_FILESEL_RELPATH|WM_FILESEL_FILES, FILE_DEFAULTDISPLAY);
 	sequencer_generic_props__internal(ot, SEQPROP_STARTFRAME);
@@ -531,7 +629,7 @@ static int sequencer_add_image_strip_invoke(bContext *C, wmOperator *op, wmEvent
 
 
 	/* drag drop has set the names */
-	if(RNA_collection_length(op->ptr, "files")) {
+	if(RNA_struct_property_is_set(op->ptr, "files") && RNA_collection_length(op->ptr, "files")) {
 		sequencer_generic_invoke_xy__internal(C, op, event, SEQPROP_ENDFRAME|SEQPROP_NOPATHS);
 		return sequencer_add_image_strip_exec(C, op);
 	}
@@ -547,18 +645,18 @@ void SEQUENCER_OT_image_strip_add(struct wmOperatorType *ot)
 {
 	
 	/* identifiers */
-	ot->name= "Add Image Strip";
-	ot->idname= "SEQUENCER_OT_image_strip_add";
-	ot->description= "Add an image or image sequence to the sequencer";
+	ot->name = "Add Image Strip";
+	ot->idname = "SEQUENCER_OT_image_strip_add";
+	ot->description = "Add an image or image sequence to the sequencer";
 
 	/* api callbacks */
-	ot->invoke= sequencer_add_image_strip_invoke;
-	ot->exec= sequencer_add_image_strip_exec;
+	ot->invoke = sequencer_add_image_strip_invoke;
+	ot->exec = sequencer_add_image_strip_exec;
 
-	ot->poll= ED_operator_scene_editable;
+	ot->poll = ED_operator_scene_editable;
 	
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 	
 	WM_operator_properties_filesel(ot, FOLDERFILE|IMAGEFILE, FILE_SPECIAL, FILE_OPENFILE, WM_FILESEL_DIRECTORY|WM_FILESEL_RELPATH|WM_FILESEL_FILES, FILE_DEFAULTDISPLAY);
 	sequencer_generic_props__internal(ot, SEQPROP_STARTFRAME|SEQPROP_ENDFRAME);
@@ -624,10 +722,7 @@ static int sequencer_add_effect_strip_exec(bContext *C, wmOperator *op)
 	
 	/* basic defaults */
 	seq->strip= strip= MEM_callocN(sizeof(Strip), "strip");
-	strip->len = seq->len;
 	strip->us= 1;
-	if(seq->len>0)
-		strip->stripdata= MEM_callocN(seq->len*sizeof(StripElem), "stripelem");
 
 	if (seq->type==SEQ_PLUGIN) {
 		char path[FILE_MAX];
@@ -724,18 +819,18 @@ static int sequencer_add_effect_strip_invoke(bContext *C, wmOperator *op, wmEven
 void SEQUENCER_OT_effect_strip_add(struct wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Add Effect Strip";
-	ot->idname= "SEQUENCER_OT_effect_strip_add";
-	ot->description= "Add an effect to the sequencer, most are applied on top of existing strips";
+	ot->name = "Add Effect Strip";
+	ot->idname = "SEQUENCER_OT_effect_strip_add";
+	ot->description = "Add an effect to the sequencer, most are applied on top of existing strips";
 
 	/* api callbacks */
-	ot->invoke= sequencer_add_effect_strip_invoke;
-	ot->exec= sequencer_add_effect_strip_exec;
+	ot->invoke = sequencer_add_effect_strip_invoke;
+	ot->exec = sequencer_add_effect_strip_exec;
 
-	ot->poll= ED_operator_scene_editable;
+	ot->poll = ED_operator_scene_editable;
 	
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 	
 	WM_operator_properties_filesel(ot, 0, FILE_SPECIAL, FILE_OPENFILE, WM_FILESEL_FILEPATH|WM_FILESEL_RELPATH, FILE_DEFAULTDISPLAY);
 	sequencer_generic_props__internal(ot, SEQPROP_STARTFRAME|SEQPROP_ENDFRAME);

@@ -71,6 +71,7 @@
 #include "ED_screen.h"
 
 #include "UI_interface.h"
+#include "UI_resources.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
@@ -1115,7 +1116,7 @@ static int insert_key_exec (bContext *C, wmOperator *op)
 	if (type == 0) 
 		type= scene->active_keyingset;
 	if (type > 0)
-		ks= BLI_findlink(&scene->keyingsets, scene->active_keyingset-1);
+		ks= BLI_findlink(&scene->keyingsets, type-1);
 	else
 		ks= BLI_findlink(&builtin_keyingsets, -type-1);
 		
@@ -1157,22 +1158,22 @@ void ANIM_OT_keyframe_insert (wmOperatorType *ot)
 	PropertyRNA *prop;
 	
 	/* identifiers */
-	ot->name= "Insert Keyframe";
-	ot->idname= "ANIM_OT_keyframe_insert";
-	ot->description= "Insert keyframes on the current frame for all properties in the specified Keying Set";
+	ot->name = "Insert Keyframe";
+	ot->idname = "ANIM_OT_keyframe_insert";
+	ot->description = "Insert keyframes on the current frame for all properties in the specified Keying Set";
 	
 	/* callbacks */
-	ot->exec= insert_key_exec; 
-	ot->poll= modify_key_op_poll;
+	ot->exec = insert_key_exec; 
+	ot->poll = modify_key_op_poll;
 	
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 	
 	/* keyingset to use (dynamic enum) */
 	prop= RNA_def_enum(ot->srna, "type", DummyRNA_DEFAULT_items, 0, "Keying Set", "The Keying Set to use");
 	RNA_def_enum_funcs(prop, ANIM_keying_sets_enum_itemf);
 	RNA_def_property_flag(prop, PROP_HIDDEN);
-	ot->prop= prop;
+	ot->prop = prop;
 	
 	/* confirm whether a keyframe was added by showing a popup 
 	 *	- by default, this is enabled, since this operator is assumed to be called independently
@@ -1193,8 +1194,15 @@ static int insert_key_menu_invoke (bContext *C, wmOperator *op, wmEvent *UNUSED(
 	
 	/* if prompting or no active Keying Set, show the menu */
 	if ((scene->active_keyingset == 0) || RNA_boolean_get(op->ptr, "always_prompt")) {
+		uiPopupMenu *pup;
+		uiLayout *layout;
+		
 		/* call the menu, which will call this operator again, hence the canceled */
-		ANIM_keying_sets_menu_setup(C, op->type->name, "ANIM_OT_keyframe_insert_menu");
+		pup = uiPupMenuBegin(C, op->type->name, ICON_NONE);
+		layout = uiPupMenuLayout(pup);
+		uiItemsEnumO(layout, "ANIM_OT_keyframe_insert_menu", "type");
+		uiPupMenuEnd(C, pup);
+		
 		return OPERATOR_CANCELLED;
 	}
 	else {
@@ -1211,23 +1219,23 @@ void ANIM_OT_keyframe_insert_menu (wmOperatorType *ot)
 	PropertyRNA *prop;
 	
 	/* identifiers */
-	ot->name= "Insert Keyframe Menu";
-	ot->idname= "ANIM_OT_keyframe_insert_menu";
-	ot->description= "Insert Keyframes for specified Keying Set, with menu of available Keying Sets if undefined";
+	ot->name = "Insert Keyframe Menu";
+	ot->idname = "ANIM_OT_keyframe_insert_menu";
+	ot->description = "Insert Keyframes for specified Keying Set, with menu of available Keying Sets if undefined";
 	
 	/* callbacks */
-	ot->invoke= insert_key_menu_invoke;
-	ot->exec= insert_key_exec; 
-	ot->poll= ED_operator_areaactive;
+	ot->invoke = insert_key_menu_invoke;
+	ot->exec = insert_key_exec; 
+	ot->poll = ED_operator_areaactive;
 	
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 	
 	/* keyingset to use (dynamic enum) */
 	prop= RNA_def_enum(ot->srna, "type", DummyRNA_DEFAULT_items, 0, "Keying Set", "The Keying Set to use");
 	RNA_def_enum_funcs(prop, ANIM_keying_sets_enum_itemf);
 	RNA_def_property_flag(prop, PROP_HIDDEN);
-	ot->prop= prop;
+	ot->prop = prop;
 	
 	/* confirm whether a keyframe was added by showing a popup 
 	 *	- by default, this is disabled so that if a menu is shown, this doesn't come up too
@@ -1264,7 +1272,7 @@ static int delete_key_exec (bContext *C, wmOperator *op)
 	if (type == 0) 
 		type= scene->active_keyingset;
 	if (type > 0)
-		ks= BLI_findlink(&scene->keyingsets, scene->active_keyingset-1);
+		ks= BLI_findlink(&scene->keyingsets, type-1);
 	else
 		ks= BLI_findlink(&builtin_keyingsets, -type-1);
 	
@@ -1306,22 +1314,22 @@ void ANIM_OT_keyframe_delete (wmOperatorType *ot)
 	PropertyRNA *prop;
 	
 	/* identifiers */
-	ot->name= "Delete Keying-Set Keyframe";
-	ot->idname= "ANIM_OT_keyframe_delete";
-	ot->description= "Delete keyframes on the current frame for all properties in the specified Keying Set";
+	ot->name = "Delete Keying-Set Keyframe";
+	ot->idname = "ANIM_OT_keyframe_delete";
+	ot->description = "Delete keyframes on the current frame for all properties in the specified Keying Set";
 	
 	/* callbacks */
-	ot->exec= delete_key_exec; 
-	ot->poll= modify_key_op_poll;
+	ot->exec = delete_key_exec; 
+	ot->poll = modify_key_op_poll;
 	
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 	
 	/* keyingset to use (dynamic enum) */
 	prop= RNA_def_enum(ot->srna, "type", DummyRNA_DEFAULT_items, 0, "Keying Set", "The Keying Set to use");
 	RNA_def_enum_funcs(prop, ANIM_keying_sets_enum_itemf);
 	RNA_def_property_flag(prop, PROP_HIDDEN);
-	ot->prop= prop;
+	ot->prop = prop;
 	
 	/* confirm whether a keyframe was added by showing a popup 
 	 *	- by default, this is enabled, since this operator is assumed to be called independently
@@ -1379,18 +1387,18 @@ static int delete_key_v3d_exec (bContext *C, wmOperator *op)
 void ANIM_OT_keyframe_delete_v3d (wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Delete Keyframe";
-	ot->description= "Remove keyframes on current frame for selected object";
-	ot->idname= "ANIM_OT_keyframe_delete_v3d";
+	ot->name = "Delete Keyframe";
+	ot->description = "Remove keyframes on current frame for selected object";
+	ot->idname = "ANIM_OT_keyframe_delete_v3d";
 	
 	/* callbacks */
-	ot->invoke= WM_operator_confirm;
-	ot->exec= delete_key_v3d_exec; 
+	ot->invoke = WM_operator_confirm;
+	ot->exec = delete_key_v3d_exec; 
 	
-	ot->poll= ED_operator_areaactive;
+	ot->poll = ED_operator_areaactive;
 	
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 }
 
 
@@ -1469,15 +1477,15 @@ static int insert_key_button_exec (bContext *C, wmOperator *op)
 void ANIM_OT_keyframe_insert_button (wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Insert Keyframe (Buttons)";
-	ot->idname= "ANIM_OT_keyframe_insert_button";
+	ot->name = "Insert Keyframe (Buttons)";
+	ot->idname = "ANIM_OT_keyframe_insert_button";
 	
 	/* callbacks */
-	ot->exec= insert_key_button_exec; 
-	ot->poll= modify_key_op_poll;
+	ot->exec = insert_key_button_exec; 
+	ot->poll = modify_key_op_poll;
 	
 	/* flags */
-	ot->flag= OPTYPE_UNDO;
+	ot->flag = OPTYPE_UNDO;
 
 	/* properties */
 	RNA_def_boolean(ot->srna, "all", 1, "All", "Insert a keyframe for all element of the array");
@@ -1541,15 +1549,15 @@ static int delete_key_button_exec (bContext *C, wmOperator *op)
 void ANIM_OT_keyframe_delete_button (wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Delete Keyframe (Buttons)";
-	ot->idname= "ANIM_OT_keyframe_delete_button";
+	ot->name = "Delete Keyframe (Buttons)";
+	ot->idname = "ANIM_OT_keyframe_delete_button";
 	
 	/* callbacks */
-	ot->exec= delete_key_button_exec; 
-	ot->poll= modify_key_op_poll;
+	ot->exec = delete_key_button_exec; 
+	ot->poll = modify_key_op_poll;
 	
 	/* flags */
-	ot->flag= OPTYPE_UNDO;
+	ot->flag = OPTYPE_UNDO;
 
 	/* properties */
 	RNA_def_boolean(ot->srna, "all", 1, "All", "Delete keyfames from all elements of the array");

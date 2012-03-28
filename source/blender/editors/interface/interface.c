@@ -706,7 +706,7 @@ int uiButActiveOnly(const bContext *C, uiBlock *block, uiBut *but)
 	return 1;
 }
 
-/* use to check if we need to disable undo, but dont make any changes
+/* use to check if we need to disable undo, but don't make any changes
  * returns FALSE if undo needs to be disabled. */
 static int ui_but_is_rna_undo(uiBut *but)
 {
@@ -1880,7 +1880,7 @@ void ui_set_but_soft_range(uiBut *but, double value)
 {
 	/* ideally we would not limit this but practically, its more then
 	 * enough worst case is very long vectors wont use a smart soft-range
-	 * which isnt so bad. */
+	 * which isn't so bad. */
 
 	if(but->rnaprop) {
 		const PropertyType type= RNA_property_type(but->rnaprop);
@@ -2814,13 +2814,14 @@ static uiBut *ui_def_but_operator_ptr(uiBlock *block, int type, wmOperatorType *
 	uiBut *but;
 
 	if(!str) {
-		if(ot) str = ot->name;
+		if (ot && ot->srna)
+			str = RNA_struct_ui_name(ot->srna);
+		else
+			str = "";
 	}
-	
-	if ((!tip || tip[0]=='\0') && ot && ot->description) {
-		tip= ot->description;
 
-		tip = TIP_(tip);
+	if ((!tip || tip[0]=='\0') && ot && ot->srna) {
+		tip = RNA_struct_ui_description(ot->srna);
 	}
 
 	but= ui_def_but(block, type, -1, str, x1, y1, x2, y2, NULL, 0, 0, 0, 0, tip);
@@ -2836,12 +2837,15 @@ static uiBut *ui_def_but_operator_ptr(uiBlock *block, int type, wmOperatorType *
 
 	return but;
 }
+
+#if 0 /* UNUSED */
 static uiBut *UNUSED_FUNCTION(ui_def_but_operator)(uiBlock *block, int type, const char *opname, int opcontext, const char *str, int x1, int y1, short x2, short y2, const char *tip)
 {
 	wmOperatorType *ot = WM_operatortype_find(opname, 0);
 	if (str == NULL && ot == NULL) str = opname;
 	return ui_def_but_operator_ptr(block, type, ot, opcontext, str, x1, y1, x2, y2, tip);
 }
+#endif
 
 static uiBut *ui_def_but_operator_text(uiBlock *block, int type, const char *opname, int opcontext, const char *str, int x1, int y1, short x2, short y2, void *poin, float min, float max, float a1, float a2, const char *tip)
 {
@@ -2956,7 +2960,7 @@ void autocomplete_end(AutoComplete *autocpl, char *autoname)
 	if(autocpl->truncate[0])
 		BLI_strncpy(autoname, autocpl->truncate, autocpl->maxlen);
 	else {
-		if (autoname != autocpl->startname) /* dont copy a string over its self */
+		if (autoname != autocpl->startname) /* don't copy a string over its self */
 			BLI_strncpy(autoname, autocpl->startname, autocpl->maxlen);
 	}
 	MEM_freeN(autocpl->truncate);

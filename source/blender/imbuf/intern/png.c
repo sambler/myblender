@@ -195,7 +195,7 @@ int imb_savepng(struct ImBuf *ibuf, const char *name, int flags)
 		                 Flush);
 	}
 	else {
-		fp = fopen(name, "wb");
+		fp = BLI_fopen(name, "wb");
 		if (!fp) {
 			png_destroy_write_struct(&png_ptr, &info_ptr);
 			MEM_freeN(pixels);
@@ -205,15 +205,15 @@ int imb_savepng(struct ImBuf *ibuf, const char *name, int flags)
 		png_init_io(png_ptr, fp);
 	}
 
-	/*
+#if 0
 	png_set_filter(png_ptr, 0,
-		PNG_FILTER_NONE  | PNG_FILTER_VALUE_NONE |
-		PNG_FILTER_SUB   | PNG_FILTER_VALUE_SUB  |
-		PNG_FILTER_UP    | PNG_FILTER_VALUE_UP   |
-		PNG_FILTER_AVG   | PNG_FILTER_VALUE_AVG  |
-		PNG_FILTER_PAETH | PNG_FILTER_VALUE_PAETH|
-		PNG_ALL_FILTERS);
-	*/
+	               PNG_FILTER_NONE  | PNG_FILTER_VALUE_NONE |
+	               PNG_FILTER_SUB   | PNG_FILTER_VALUE_SUB  |
+	               PNG_FILTER_UP    | PNG_FILTER_VALUE_UP   |
+	               PNG_FILTER_AVG   | PNG_FILTER_VALUE_AVG  |
+	               PNG_FILTER_PAETH | PNG_FILTER_VALUE_PAETH|
+	               PNG_ALL_FILTERS);
+#endif
 
 	png_set_compression_level(png_ptr, compression);
 

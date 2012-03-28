@@ -79,7 +79,7 @@ typedef struct {
 	DerivedMesh dm;
 
 	/* these point to data in the DerivedMesh custom data layers,
-	   they are only here for efficiency and convenience **/
+	 * they are only here for efficiency and convenience **/
 	MVert *mvert;
 	MEdge *medge;
 	MFace *mface;
@@ -91,11 +91,8 @@ typedef struct {
 	int pbvh_draw;
 
 	/* Mesh connectivity */
-	struct ListBase *fmap;
-	struct IndexNode *fmap_mem;
-
-	struct ListBase *pmap;
-	struct IndexNode *pmap_mem;
+	MeshElemMap *pmap;
+	int *pmap_mem;
 } CDDerivedMesh;
 
 /**************** DerivedMesh interface functions ****************/
@@ -215,7 +212,7 @@ static void cdDM_getVertNo(DerivedMesh *dm, int index, float no_r[3])
 	normal_short_to_float_v3(no_r, cddm->mvert[index].no);
 }
 
-static ListBase *cdDM_getPolyMap(Object *ob, DerivedMesh *dm)
+static const MeshElemMap *cdDM_getPolyMap(Object *ob, DerivedMesh *dm)
 {
 	CDDerivedMesh *cddm = (CDDerivedMesh*) dm;
 
@@ -237,13 +234,13 @@ static int can_pbvh_draw(Object *ob, DerivedMesh *dm)
 	int deformed= 0;
 
 	/* active modifiers means extra deformation, which can't be handled correct
-	   on bith of PBVH and sculpt "layer" levels, so use PBVH only for internal brush
-	   stuff and show final DerivedMesh so user would see actual object shape */
+	 * on bith of PBVH and sculpt "layer" levels, so use PBVH only for internal brush
+	 * stuff and show final DerivedMesh so user would see actual object shape */
 	deformed|= ob->sculpt->modifiers_active;
 
 	/* as in case with modifiers, we can't synchronize deformation made against
-	   PBVH and non-locked keyblock, so also use PBVH only for brushes and
-	   final DM to give final result to user */
+	 * PBVH and non-locked keyblock, so also use PBVH only for brushes and
+	 * final DM to give final result to user */
 	deformed|= ob->sculpt->kb && (ob->shapeflag&OB_SHAPE_LOCK) == 0;
 
 	if(deformed)
@@ -269,14 +266,16 @@ static struct PBVH *cdDM_getPBVH(Object *ob, DerivedMesh *dm)
 	}
 
 	/* always build pbvh from original mesh, and only use it for drawing if
-	   this derivedmesh is just original mesh. it's the multires subsurf dm
-	   that this is actually for, to support a pbvh on a modified mesh */
+	 * this derivedmesh is just original mesh. it's the multires subsurf dm
+	 * that this is actually for, to support a pbvh on a modified mesh */
 	if(!cddm->pbvh && ob->type == OB_MESH) {
 		SculptSession *ss= ob->sculpt;
 		Mesh *me= ob->data;
 		cddm->pbvh = BLI_pbvh_new();
 		cddm->pbvh_draw = can_pbvh_draw(ob, dm);
-		BLI_assert(!(me->mface == NULL && me->mpoly != NULL)); /* BMESH ONLY complain if mpoly is valid but not mface */
+
+		BKE_mesh_tessface_ensure(me);
+		
 		BLI_pbvh_build_mesh(cddm->pbvh, me->mface, me->mvert,
 		                    me->totface, me->totvert);
 
@@ -297,7 +296,7 @@ static struct PBVH *cdDM_getPBVH(Object *ob, DerivedMesh *dm)
 }
 
 /* update vertex normals so that drawing smooth faces works during sculpt
-   TODO: proper fix is to support the pbvh in all drawing modes */
+ * TODO: proper fix is to support the pbvh in all drawing modes */
 static void cdDM_update_normals_from_pbvh(DerivedMesh *dm)
 {
 	CDDerivedMesh *cddm = (CDDerivedMesh*) dm;
@@ -441,14 +440,14 @@ static void cdDM_drawEdges(DerivedMesh *dm, int drawLooseEdges, int drawAllEdges
 				}
 				if( prevdraw != draw ) {
 					if( prevdraw > 0 && (i-prevstart) > 0 ) {
-						GPU_buffer_draw_elements( dm->drawObject->edges, GL_LINES, prevstart*2, (i-prevstart)*2  );
+						GPU_buffer_draw_elements(dm->drawObject->edges, GL_LINES, prevstart * 2, (i - prevstart) * 2);
 					}
 					prevstart = i;
 				}
 				prevdraw = draw;
 			}
 			if( prevdraw > 0 && (i-prevstart) > 0 ) {
-				GPU_buffer_draw_elements( dm->drawObject->edges, GL_LINES, prevstart*2, (i-prevstart)*2  );
+				GPU_buffer_draw_elements(dm->drawObject->edges, GL_LINES, prevstart * 2, (i-prevstart) * 2);
 			}
 		}
 		GPU_buffer_unbind();
@@ -489,14 +488,14 @@ static void cdDM_drawLooseEdges(DerivedMesh *dm)
 				}
 				if( prevdraw != draw ) {
 					if( prevdraw > 0 && (i-prevstart) > 0) {
-						GPU_buffer_draw_elements( dm->drawObject->edges, GL_LINES, prevstart*2, (i-prevstart)*2  );
+						GPU_buffer_draw_elements(dm->drawObject->edges, GL_LINES, prevstart * 2, (i - prevstart) * 2);
 					}
 					prevstart = i;
 				}
 				prevdraw = draw;
 			}
 			if( prevdraw > 0 && (i-prevstart) > 0 ) {
-				GPU_buffer_draw_elements( dm->drawObject->edges, GL_LINES, prevstart*2, (i-prevstart)*2  );
+				GPU_buffer_draw_elements(dm->drawObject->edges, GL_LINES, prevstart * 2, (i - prevstart) * 2);
 			}
 		}
 		GPU_buffer_unbind();
@@ -613,7 +612,7 @@ static void cdDM_drawFacesTex_common(DerivedMesh *dm,
 	MTFace *tf = DM_get_tessface_data_layer(dm, CD_MTFACE);
 	int i, j, orig, *index = DM_get_tessface_data_layer(dm, CD_ORIGINDEX);
 	int startFace = 0 /*, lastFlag = 0xdeadbeef */ /* UNUSED */;
-	MCol *mcol = dm->getTessFaceDataArray(dm, CD_WEIGHT_MCOL);
+	MCol *mcol = dm->getTessFaceDataArray(dm, CD_PREVIEW_MCOL);
 	if(!mcol)
 		mcol = dm->getTessFaceDataArray(dm, CD_MCOL);
 
@@ -760,7 +759,7 @@ static void cdDM_drawFacesTex_common(DerivedMesh *dm,
 
 				if(!flush && compareDrawOptions) {
 					/* also compare draw options and flush buffer if they're different
-					   need for face selection highlight in edit mode */
+					 * need for face selection highlight in edit mode */
 					flush|= compareDrawOptions(userData, actualFace, next_actualFace) == 0;
 				}
 
@@ -812,7 +811,7 @@ static void cdDM_drawMappedFaces(DerivedMesh *dm,
 
 	mc = DM_get_tessface_data_layer(dm, CD_ID_MCOL);
 	if(!mc)
-		mc = DM_get_tessface_data_layer(dm, CD_WEIGHT_MCOL);
+		mc = DM_get_tessface_data_layer(dm, CD_PREVIEW_MCOL);
 	if(!mc)
 		mc = DM_get_tessface_data_layer(dm, CD_MCOL);
 
@@ -840,7 +839,7 @@ static void cdDM_drawMappedFaces(DerivedMesh *dm,
 					cp = (unsigned char *)&mc[i * 4];
 
 				/* no need to set shading mode to flat because
-				*  normals are already used to change shading */
+				 *  normals are already used to change shading */
 				glShadeModel(GL_SMOOTH);
 				glBegin(mf->v4?GL_QUADS:GL_TRIANGLES);
 
@@ -931,8 +930,8 @@ static void cdDM_drawMappedFaces(DerivedMesh *dm,
 						draw_option= setDrawOptions(userData, orig);
 	
 					/* Goal is to draw as long of a contiguous triangle
-					   array as possible, so draw when we hit either an
-					   invisible triangle or at the end of the array */
+					 * array as possible, so draw when we hit either an
+					 * invisible triangle or at the end of the array */
 
 					/* flush buffer if current triangle isn't drawable or it's last triangle... */
 					flush= (draw_option == DM_DRAW_OPTION_SKIP) || (i == tottri - 1);
@@ -1194,7 +1193,7 @@ static void cdDM_drawMappedFacesGLSL(DerivedMesh *dm,
 							}
 						}
 						else {
-							/* if the buffer was set, dont use it again.
+							/* if the buffer was set, don't use it again.
 							 * prevdraw was assumed true but didnt run so set to false - [#21036] */
 							/* prevdraw= 0; */ /* UNUSED */
 							buffer= NULL;
@@ -1517,7 +1516,7 @@ void CDDM_recalc_tessellation_ex(DerivedMesh *dm, const int do_face_nor_cpy)
 	cddm->mface = CustomData_get_layer(&dm->faceData, CD_MFACE);
 
 	/* Tessellation recreated faceData, and the active layer indices need to get re-propagated
-	   from loops and polys to faces */
+	 * from loops and polys to faces */
 	CustomData_bmesh_update_active_layers(&dm->faceData, &dm->polyData, &dm->loopData);
 }
 
@@ -1528,9 +1527,6 @@ void CDDM_recalc_tessellation(DerivedMesh *dm)
 
 static void cdDM_free_internal(CDDerivedMesh *cddm)
 {
-	if(cddm->fmap) MEM_freeN(cddm->fmap);
-	if(cddm->fmap_mem) MEM_freeN(cddm->fmap_mem);
-
 	if(cddm->pmap) MEM_freeN(cddm->pmap);
 	if(cddm->pmap_mem) MEM_freeN(cddm->pmap_mem);
 }
@@ -1746,7 +1742,7 @@ static void loops_to_customdata_corners(BMesh *bm, CustomData *facedata,
 	MCol *mcol;
 	MLoopCol *mloopcol;
 	MLoopUV *mloopuv;
-	int i, j, hasWCol = CustomData_has_layer(&bm->ldata, CD_WEIGHT_MLOOPCOL);
+	int i, j, hasPCol = CustomData_has_layer(&bm->ldata, CD_PREVIEW_MLOOPCOL);
 
 	for (i=0; i < numTex; i++) {
 		texface = CustomData_get_n(facedata, CD_MTFACE, cdindex, i);
@@ -1767,23 +1763,17 @@ static void loops_to_customdata_corners(BMesh *bm, CustomData *facedata,
 		for (j=0; j<3; j++) {
 			l = l3[j];
 			mloopcol = CustomData_bmesh_get_n(&bm->ldata, l->head.data, CD_MLOOPCOL, i);
-			mcol[j].r = mloopcol->r;
-			mcol[j].g = mloopcol->g;
-			mcol[j].b = mloopcol->b;
-			mcol[j].a = mloopcol->a;
+			MESH_MLOOPCOL_TO_MCOL(mloopcol, &mcol[j]);
 		}
 	}
 
-	if (hasWCol) {
-		mcol = CustomData_get(facedata, cdindex, CD_WEIGHT_MCOL);
+	if (hasPCol) {
+		mcol = CustomData_get(facedata, cdindex, CD_PREVIEW_MCOL);
 
 		for (j=0; j<3; j++) {
 			l = l3[j];
-			mloopcol = CustomData_bmesh_get(&bm->ldata, l->head.data, CD_WEIGHT_MLOOPCOL);
-			mcol[j].r = mloopcol->r;
-			mcol[j].g = mloopcol->g;
-			mcol[j].b = mloopcol->b;
-			mcol[j].a = mloopcol->a;
+			mloopcol = CustomData_bmesh_get(&bm->ldata, l->head.data, CD_PREVIEW_MLOOPCOL);
+			MESH_MLOOPCOL_TO_MCOL(mloopcol, &mcol[j]);
 		}
 	}
 }
@@ -1826,8 +1816,8 @@ DerivedMesh *CDDM_from_BMEditMesh(BMEditMesh *em, Mesh *UNUSED(me), int use_mdis
 
 	mask = use_mdisps ? CD_MASK_DERIVEDMESH|CD_MASK_MDISPS : CD_MASK_DERIVEDMESH;
 	
-	/*don't process shapekeys, we only feed them through the modifier stack as needed,
-	  e.g. for applying modifiers or the like*/
+	/* don't process shapekeys, we only feed them through the modifier stack as needed,
+	 * e.g. for applying modifiers or the like*/
 	mask &= ~CD_MASK_SHAPEKEY;
 	CustomData_merge(&bm->vdata, &dm->vertData, mask,
 	                 CD_CALLOC, dm->numVertData);
@@ -1967,6 +1957,7 @@ static DerivedMesh *cddm_copy_ex(DerivedMesh *source, int faces_from_tessfaces)
 	DM_from_template(dm, source, DM_TYPE_CDDM, numVerts, numEdges, numTessFaces,
 		numLoops, numPolys);
 	dm->deformedOnly = source->deformedOnly;
+	dm->dirty = source->dirty;
 
 	CustomData_copy_data(&source->vertData, &dm->vertData, 0, 0, numVerts);
 	CustomData_copy_data(&source->edgeData, &dm->edgeData, 0, 0, numEdges);
@@ -1992,7 +1983,7 @@ static DerivedMesh *cddm_copy_ex(DerivedMesh *source, int faces_from_tessfaces)
 	/* any callers that need tessface data can calculate it - campbell */
 #if 0
 	/* BMESH_TODO: Find out why this is necessary (or else find a way to remove
-	   it). If it is necessary, add a comment explaining why. */
+	 * it). If it is necessary, add a comment explaining why. */
 	CDDM_recalc_tessellation((DerivedMesh *)cddm);
 #endif
 
@@ -2079,24 +2070,21 @@ void CDDM_apply_vert_normals(DerivedMesh *dm, short (*vertNormals)[3])
 		copy_v3_v3_short(vert->no, vertNormals[i]);
 }
 
-void CDDM_calc_normals_mapping(DerivedMesh *dm)
+void CDDM_calc_normals_mapping_ex(DerivedMesh *dm, const short only_face_normals)
 {
 	CDDerivedMesh *cddm = (CDDerivedMesh*)dm;
 	float (*face_nors)[3] = NULL;
 
-	/* use this to skip calculating normals on original vert's, this may need to be changed */
-	const short only_face_normals = CustomData_is_referenced_layer(&dm->vertData, CD_MVERT);
-	
 	if(dm->numVertData == 0) return;
 
 	/* now we skip calculating vertex normals for referenced layer,
 	 * no need to duplicate verts.
 	 * WATCH THIS, bmesh only change!,
 	 * need to take care of the side effects here - campbell */
-#if 0
+	#if 0
 	/* we don't want to overwrite any referenced layers */
 	cddm->mvert = CustomData_duplicate_referenced_layer(&dm->vertData, CD_MVERT, dm->numVertData);
-#endif
+	#endif
 
 
 	if (dm->numTessFaceData == 0) {
@@ -2115,17 +2103,24 @@ void CDDM_calc_normals_mapping(DerivedMesh *dm)
 
 
 	face_nors = MEM_mallocN(sizeof(float)*3*dm->numTessFaceData, "face_nors");
-	
+
 	/* calculate face normals */
 	mesh_calc_normals_mapping_ex(cddm->mvert, dm->numVertData, CDDM_get_loops(dm), CDDM_get_polys(dm),
-	                             dm->numLoopData, dm->numPolyData, NULL, cddm->mface, dm->numTessFaceData,
-	                             CustomData_get_layer(&dm->faceData, CD_POLYINDEX), face_nors,
-	                             only_face_normals);
-	
-	CustomData_add_layer(&dm->faceData, CD_NORMAL, CD_ASSIGN, 
-	                     face_nors, dm->numTessFaceData);
+								 dm->numLoopData, dm->numPolyData, NULL, cddm->mface, dm->numTessFaceData,
+								 CustomData_get_layer(&dm->faceData, CD_POLYINDEX), face_nors,
+								 only_face_normals);
+
+	CustomData_add_layer(&dm->faceData, CD_NORMAL, CD_ASSIGN,
+						 face_nors, dm->numTessFaceData);
+}
 
 
+void CDDM_calc_normals_mapping(DerivedMesh *dm)
+{
+	/* use this to skip calculating normals on original vert's, this may need to be changed */
+	const short only_face_normals = CustomData_is_referenced_layer(&dm->vertData, CD_MVERT);
+
+	CDDM_calc_normals_mapping_ex(dm, only_face_normals);
 }
 
 /* bmesh note: this matches what we have in trunk */
@@ -2581,9 +2576,21 @@ void CDDM_tessfaces_to_faces(DerivedMesh *dm)
 	MEdge *me;
 	EdgeHash *eh = BLI_edgehash_new();
 	int i, totloop;
-	
-	/*ensure we have all the edges we need*/
+
+	/* ... on second thaughts, better comment this and assume caller knows edge state. */
+#if 0
+	/* ensure we have all the edges we need */
 	CDDM_calc_edges_tessface(dm);
+#else
+#  ifndef NDEBUG
+	{
+		/* ensure we have correct edges on non release builds */
+		i = cddm->dm.numEdgeData;
+		CDDM_calc_edges_tessface(dm);
+		BLI_assert(cddm->dm.numEdgeData == i);
+	}
+#  endif
+#endif
 
 	/*build edge hash*/
 	me = cddm->medge;
@@ -2622,7 +2629,7 @@ void CDDM_tessfaces_to_faces(DerivedMesh *dm)
 		mp = cddm->mpoly;
 		ml = cddm->mloop;
 		l = 0;
-		for (i=0; i<cddm->dm.numTessFaceData; i++, mf++, mp++) {
+		for (i=0; i<cddm->dm.numTessFaceData; i++, mf++, mp++, polyindex++) {
 			mp->flag = mf->flag;
 			mp->loopstart = l;
 			mp->mat_nr = mf->mat_nr;

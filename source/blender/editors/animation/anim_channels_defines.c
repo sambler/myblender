@@ -2730,7 +2730,7 @@ void ANIM_channel_draw (bAnimContext *ac, bAnimListElem *ale, float yminc, float
 	float y, ymid, ytext;
 	
 	/* sanity checks - don't draw anything */
-	if ELEM(NULL, acf, ale)
+	if (ELEM(NULL, acf, ale))
 		return;
 	
 	/* get initial offset */
@@ -3115,17 +3115,17 @@ static void draw_setting_widget (bAnimContext *ac, bAnimListElem *ale, bAnimChan
 	if (ptr && flag) {
 		switch (ptrsize) {
 			case sizeof(int):	/* integer pointer for setting */
-				but= uiDefIconButBitI(block, butType, flag, 0, icon, 
+				but = uiDefIconButBitI(block, butType, flag, 0, icon, 
 						xpos, ypos, ICON_WIDTH, ICON_WIDTH, ptr, 0, 0, 0, 0, tooltip);
 				break;
 				
 			case sizeof(short):	/* short pointer for setting */
-				but= uiDefIconButBitS(block, butType, flag, 0, icon, 
+				but = uiDefIconButBitS(block, butType, flag, 0, icon, 
 						xpos, ypos, ICON_WIDTH, ICON_WIDTH, ptr, 0, 0, 0, 0, tooltip);
 				break;
 				
 			case sizeof(char):	/* char pointer for setting */
-				but= uiDefIconButBitC(block, butType, flag, 0, icon, 
+				but = uiDefIconButBitC(block, butType, flag, 0, icon, 
 						xpos, ypos, ICON_WIDTH, ICON_WIDTH, ptr, 0, 0, 0, 0, tooltip);
 				break;
 		}
@@ -3158,7 +3158,7 @@ void ANIM_channel_draw_widgets (bContext *C, bAnimContext *ac, bAnimListElem *al
 	short offset;
 	
 	/* sanity checks - don't draw anything */
-	if ELEM3(NULL, acf, ale, block)
+	if (ELEM3(NULL, acf, ale, block))
 		return;
 	
 	/* get initial offset */
@@ -3320,7 +3320,7 @@ void ANIM_channel_draw_widgets (bContext *C, bAnimContext *ac, bAnimListElem *al
 						uiBut *but;
 						
 						/* create the slider button, and assign relevant callback to ensure keyframes are inserted... */
-						but= uiDefAutoButR(block, &ptr, prop, array_index, "", ICON_NONE, (int)v2d->cur.xmax-offset, ymid, SLIDER_WIDTH, (int)ymaxc-yminc);
+						but = uiDefAutoButR(block, &ptr, prop, array_index, "", ICON_NONE, (int)v2d->cur.xmax-offset, ymid, SLIDER_WIDTH, (int)ymaxc-yminc);
 						
 						/* assign keyframing function according to slider type */
 						if (ale->type == ANIMTYPE_SHAPEKEY)

@@ -103,7 +103,7 @@ static int vertex_paint_use_fast_update_check(Object *ob)
 }
 
 /* if the polygons from the mesh and the 'derivedFinal' match
- * we can assume that no modifiers are applied and that its worth adding tesselated faces
+ * we can assume that no modifiers are applied and that its worth adding tessellated faces
  * so 'vertex_paint_use_fast_update_check()' returns TRUE */
 static int vertex_paint_use_tessface_check(Object *ob)
 {
@@ -184,39 +184,13 @@ static int *get_indexarray(Mesh *me)
 	return MEM_mallocN(sizeof(int)*(me->totpoly+1), "vertexpaint");
 }
 
-
-/* in contradiction to cpack drawing colors, the MCOL colors (vpaint colors) are per byte! 
- * so not endian sensitive. Mcol = ABGR!!! so be cautious with cpack calls */
-
-static unsigned int rgba_to_mcol(float r, float g, float b, float a)
-{
-	int ir, ig, ib, ia;
-	unsigned int col;
-	char *cp;
-	
-	ir= floor(255.0f * r);
-	if(ir<0) ir= 0; else if(ir>255) ir= 255;
-	ig= floor(255.0f * g);
-	if(ig<0) ig= 0; else if(ig>255) ig= 255;
-	ib= floor(255.0f * b);
-	if(ib<0) ib= 0; else if(ib>255) ib= 255;
-	ia= floor(255.0f * a);
-	if(ia<0) ia= 0; else if(ia>255) ia= 255;
-	
-	cp= (char *)&col;
-	cp[0]= ia;
-	cp[1]= ib;
-	cp[2]= ig;
-	cp[3]= ir;
-	
-	return col;
-	
-}
-
 unsigned int vpaint_get_current_col(VPaint *vp)
 {
 	Brush *brush = paint_brush(&vp->paint);
-	return rgba_to_mcol(brush->rgb[0], brush->rgb[1], brush->rgb[2], 1.0f);
+	unsigned char col[4];
+	rgb_float_to_uchar(col, brush->rgb);
+	col[3] = 255; /* alpha isn't used, could even be removed to speedup paint a little */
+	return *(unsigned int *)col;
 }
 
 static void do_shared_vertex_tesscol(Mesh *me)
@@ -477,7 +451,6 @@ void vpaint_fill(Object *ob, unsigned int paintcol)
 	selected= (me->editflag & ME_EDIT_PAINT_MASK);
 
 	mp = me->mpoly;
-	lcol = me->mloopcol;
 	for (i=0; i<me->totpoly; i++, mp++) {
 		if (!(!selected || mp->flag & ME_FACE_SEL))
 			continue;
@@ -616,151 +589,171 @@ void vpaint_dogamma(Scene *scene)
 }
 #endif
 
-BM_INLINE unsigned int mcol_blend(unsigned int col1, unsigned int col2, int fac)
+BLI_INLINE unsigned int mcol_blend(unsigned int col1, unsigned int col2, int fac)
 {
-	char *cp1, *cp2, *cp;
+	unsigned char *cp1, *cp2, *cp;
 	int mfac;
-	unsigned int col=0;
-	
-	if(fac==0) return col1;
-	if(fac>=255) return col2;
+	unsigned int col = 0;
 
-	mfac= 255-fac;
-	
-	cp1= (char *)&col1;
-	cp2= (char *)&col2;
-	cp=  (char *)&col;
-	
-	cp[0]= 255;
-	cp[1]= (mfac*cp1[1]+fac*cp2[1])/255;
-	cp[2]= (mfac*cp1[2]+fac*cp2[2])/255;
-	cp[3]= (mfac*cp1[3]+fac*cp2[3])/255;
-	
+	if (fac == 0) {
+		return col1;
+	}
+
+	if (fac >= 255) {
+		return col2;
+	}
+
+	mfac = 255 - fac;
+
+	cp1 = (unsigned char *)&col1;
+	cp2 = (unsigned char *)&col2;
+	cp  = (unsigned char *)&col;
+
+	cp[0] = (mfac * cp1[0] + fac * cp2[0]) / 255;
+	cp[1] = (mfac * cp1[1] + fac * cp2[1]) / 255;
+	cp[2] = (mfac * cp1[2] + fac * cp2[2]) / 255;
+	cp[3] = 255;
+
 	return col;
 }
 
-BM_INLINE unsigned int mcol_add(unsigned int col1, unsigned int col2, int fac)
+BLI_INLINE unsigned int mcol_add(unsigned int col1, unsigned int col2, int fac)
 {
-	char *cp1, *cp2, *cp;
+	unsigned char *cp1, *cp2, *cp;
 	int temp;
-	unsigned int col=0;
-	
-	if(fac==0) return col1;
-	
-	cp1= (char *)&col1;
-	cp2= (char *)&col2;
-	cp=  (char *)&col;
-	
-	cp[0]= 255;
-	temp= cp1[1] + ((fac*cp2[1])/255);
-	if(temp>254) cp[1]= 255; else cp[1]= temp;
-	temp= cp1[2] + ((fac*cp2[2])/255);
-	if(temp>254) cp[2]= 255; else cp[2]= temp;
-	temp= cp1[3] + ((fac*cp2[3])/255);
-	if(temp>254) cp[3]= 255; else cp[3]= temp;
+	unsigned int col = 0;
+
+	if (fac == 0) {
+		return col1;
+	}
+
+	cp1 = (unsigned char *)&col1;
+	cp2 = (unsigned char *)&col2;
+	cp  = (unsigned char *)&col;
+
+	temp = cp1[0] + ((fac * cp2[0]) / 255);
+	cp[0] = (temp > 254) ? 255 : temp;
+	temp = cp1[1] + ((fac * cp2[1]) / 255);
+	cp[1] = (temp > 254) ? 255 : temp;
+	temp = cp1[2] + ((fac * cp2[2]) / 255);
+	cp[2] = (temp > 254) ? 255 : temp;
+	cp[3] = 255;
 	
 	return col;
 }
 
-BM_INLINE unsigned int mcol_sub(unsigned int col1, unsigned int col2, int fac)
+BLI_INLINE unsigned int mcol_sub(unsigned int col1, unsigned int col2, int fac)
 {
-	char *cp1, *cp2, *cp;
+	unsigned char *cp1, *cp2, *cp;
 	int temp;
-	unsigned int col=0;
-	
-	if(fac==0) return col1;
-	
-	cp1= (char *)&col1;
-	cp2= (char *)&col2;
-	cp=  (char *)&col;
-	
-	cp[0]= 255;
-	temp= cp1[1] - ((fac*cp2[1])/255);
-	if(temp<0) cp[1]= 0; else cp[1]= temp;
-	temp= cp1[2] - ((fac*cp2[2])/255);
-	if(temp<0) cp[2]= 0; else cp[2]= temp;
-	temp= cp1[3] - ((fac*cp2[3])/255);
-	if(temp<0) cp[3]= 0; else cp[3]= temp;
-	
+	unsigned int col = 0;
+
+	if (fac == 0) {
+		return col1;
+	}
+
+	cp1 = (unsigned char *)&col1;
+	cp2 = (unsigned char *)&col2;
+	cp  = (unsigned char *)&col;
+
+	temp = cp1[0] - ((fac * cp2[0]) / 255);
+	cp1[0] = (temp < 0) ? 0 : temp;
+	temp = cp1[1] - ((fac * cp2[1]) / 255);
+	cp1[1] = (temp < 0) ? 0 : temp;
+	temp = cp1[2] - ((fac * cp2[2]) / 255);
+	cp1[2] = (temp < 0) ? 0 : temp;
+	cp[3] = 255;
+
 	return col;
 }
 
-BM_INLINE unsigned int mcol_mul(unsigned int col1, unsigned int col2, int fac)
+BLI_INLINE unsigned int mcol_mul(unsigned int col1, unsigned int col2, int fac)
 {
-	char *cp1, *cp2, *cp;
+	unsigned char *cp1, *cp2, *cp;
 	int mfac;
-	unsigned int col=0;
-	
-	if(fac==0) return col1;
+	unsigned int col = 0;
 
-	mfac= 255-fac;
-	
-	cp1= (char *)&col1;
-	cp2= (char *)&col2;
-	cp=  (char *)&col;
-	
+	if (fac == 0) {
+		return col1;
+	}
+
+	mfac = 255 - fac;
+
+	cp1 = (unsigned char *)&col1;
+	cp2 = (unsigned char *)&col2;
+	cp  = (unsigned char *)&col;
+
 	/* first mul, then blend the fac */
-	cp[0]= 255;
-	cp[1]= (mfac*cp1[1] + fac*((cp2[1]*cp1[1])/255)  )/255;
-	cp[2]= (mfac*cp1[2] + fac*((cp2[2]*cp1[2])/255)  )/255;
-	cp[3]= (mfac*cp1[3] + fac*((cp2[3]*cp1[3])/255)  )/255;
+	cp[0] = (mfac * cp1[0] + fac * ((cp2[0] * cp1[0]) / 255)) / 255;
+	cp[1] = (mfac * cp1[1] + fac * ((cp2[1] * cp1[1]) / 255)) / 255;
+	cp[2] = (mfac * cp1[2] + fac * ((cp2[2] * cp1[2]) / 255)) / 255;
+	cp[3] = 255;
 
-	
 	return col;
 }
 
-BM_INLINE unsigned int mcol_lighten(unsigned int col1, unsigned int col2, int fac)
+BLI_INLINE unsigned int mcol_lighten(unsigned int col1, unsigned int col2, int fac)
 {
-	char *cp1, *cp2, *cp;
+	unsigned char *cp1, *cp2, *cp;
 	int mfac;
-	unsigned int col=0;
-	
-	if(fac==0) return col1;
-	if(fac>=255) return col2;
+	unsigned int col = 0;
 
-	mfac= 255-fac;
-	
-	cp1= (char *)&col1;
-	cp2= (char *)&col2;
-	cp=  (char *)&col;
-	
-	/* See if are lighter, if so mix, else dont do anything.
+	if (fac == 0) {
+		return col1;
+	}
+	else if (fac >= 255) {
+		return col2;
+	}
+
+	mfac = 255 - fac;
+
+	cp1 = (unsigned char *)&col1;
+	cp2 = (unsigned char *)&col2;
+	cp  = (unsigned char *)&col;
+
+	/* See if are lighter, if so mix, else don't do anything.
 	 * if the paint col is darker then the original, then ignore */
-	if (cp1[1]+cp1[2]+cp1[3] > cp2[1]+cp2[2]+cp2[3])
+	if (rgb_to_grayscale_byte(cp1) > rgb_to_grayscale_byte(cp2)) {
 		return col1;
-	
-	cp[0]= 255;
-	cp[1]= (mfac*cp1[1]+fac*cp2[1])/255;
-	cp[2]= (mfac*cp1[2]+fac*cp2[2])/255;
-	cp[3]= (mfac*cp1[3]+fac*cp2[3])/255;
-	
+	}
+
+	cp[0] = (mfac * cp1[0] + fac * cp2[0]) / 255;
+	cp[1] = (mfac * cp1[1] + fac * cp2[1]) / 255;
+	cp[2] = (mfac * cp1[2] + fac * cp2[2]) / 255;
+	cp[3] = 255;
+
 	return col;
 }
 
-BM_INLINE unsigned int mcol_darken(unsigned int col1, unsigned int col2, int fac)
+BLI_INLINE unsigned int mcol_darken(unsigned int col1, unsigned int col2, int fac)
 {
-	char *cp1, *cp2, *cp;
+	unsigned char *cp1, *cp2, *cp;
 	int mfac;
-	unsigned int col=0;
-	
-	if(fac==0) return col1;
-	if(fac>=255) return col2;
+	unsigned int col = 0;
 
-	mfac= 255-fac;
-	
-	cp1= (char *)&col1;
-	cp2= (char *)&col2;
-	cp=  (char *)&col;
-	
-	/* See if were darker, if so mix, else dont do anything.
-	 * if the paint col is brighter then the original, then ignore */
-	if (cp1[1]+cp1[2]+cp1[3] < cp2[1]+cp2[2]+cp2[3])
+	if (fac == 0) {
 		return col1;
-	
-	cp[0]= 255;
-	cp[1]= (mfac*cp1[1]+fac*cp2[1])/255;
-	cp[2]= (mfac*cp1[2]+fac*cp2[2])/255;
-	cp[3]= (mfac*cp1[3]+fac*cp2[3])/255;
+	}
+	else if (fac >= 255) {
+		return col2;
+	}
+
+	mfac = 255 - fac;
+
+	cp1 = (unsigned char *)&col1;
+	cp2 = (unsigned char *)&col2;
+	cp  = (unsigned char *)&col;
+
+	/* See if were darker, if so mix, else don't do anything.
+	 * if the paint col is brighter then the original, then ignore */
+	if (rgb_to_grayscale_byte(cp1) < rgb_to_grayscale_byte(cp2)) {
+		return col1;
+	}
+
+	cp[0] = (mfac * cp1[0] + fac * cp2[0]) / 255;
+	cp[1] = (mfac * cp1[1] + fac * cp2[1]) / 255;
+	cp[2] = (mfac * cp1[2] + fac * cp2[2]) / 255;
+	cp[3] = 255;
 	return col;
 }
 
@@ -911,27 +904,27 @@ static float calc_vp_alpha_dl(VPaint *vp, ViewContext *vc,
 }
 
 
-BM_INLINE float wval_blend(const float weight, const float paintval, const float alpha)
+BLI_INLINE float wval_blend(const float weight, const float paintval, const float alpha)
 {
 	return (paintval * alpha) + (weight * (1.0f - alpha));
 }
-BM_INLINE float wval_add(const float weight, const float paintval, const float alpha)
+BLI_INLINE float wval_add(const float weight, const float paintval, const float alpha)
 {
 	return weight + (paintval * alpha);
 }
-BM_INLINE float wval_sub(const float weight, const float paintval, const float alpha)
+BLI_INLINE float wval_sub(const float weight, const float paintval, const float alpha)
 {
 	return weight - (paintval * alpha);
 }
-BM_INLINE float wval_mul(const float weight, const float paintval, const float alpha)
+BLI_INLINE float wval_mul(const float weight, const float paintval, const float alpha)
 {	/* first mul, then blend the fac */
 	return ((1.0f - alpha) + (alpha * paintval)) * weight;
 }
-BM_INLINE float wval_lighten(const float weight, const float paintval, const float alpha)
+BLI_INLINE float wval_lighten(const float weight, const float paintval, const float alpha)
 {
 	return (weight < paintval) ? wval_blend(weight, paintval, alpha) : weight;
 }
-BM_INLINE float wval_darken(const float weight, const float paintval, const float alpha)
+BLI_INLINE float wval_darken(const float weight, const float paintval, const float alpha)
 {
 	return (weight > paintval) ? wval_blend(weight, paintval, alpha) : weight;
 }
@@ -1084,15 +1077,15 @@ static int weight_sample_invoke(bContext *C, wmOperator *op, wmEvent *event)
 void PAINT_OT_weight_sample(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Weight Paint Sample Weight";
-	ot->idname= "PAINT_OT_weight_sample";
+	ot->name = "Weight Paint Sample Weight";
+	ot->idname = "PAINT_OT_weight_sample";
 
 	/* api callbacks */
-	ot->invoke= weight_sample_invoke;
-	ot->poll= weight_paint_mode_poll;
+	ot->invoke = weight_sample_invoke;
+	ot->poll = weight_paint_mode_poll;
 
 	/* flags */
-	ot->flag= OPTYPE_UNDO;
+	ot->flag = OPTYPE_UNDO;
 }
 
 /* samples cursor location, and gives menu with vertex groups to activate */
@@ -1185,21 +1178,21 @@ void PAINT_OT_weight_sample_group(wmOperatorType *ot)
 	PropertyRNA *prop= NULL;
 
 	/* identifiers */
-	ot->name= "Weight Paint Sample Group";
-	ot->idname= "PAINT_OT_weight_sample_group";
+	ot->name = "Weight Paint Sample Group";
+	ot->idname = "PAINT_OT_weight_sample_group";
 
 	/* api callbacks */
-	ot->exec= weight_sample_group_exec;
-	ot->invoke= WM_menu_invoke;
-	ot->poll= weight_paint_mode_poll;
+	ot->exec = weight_sample_group_exec;
+	ot->invoke = WM_menu_invoke;
+	ot->poll = weight_paint_mode_poll;
 
 	/* flags */
-	ot->flag= OPTYPE_UNDO;
+	ot->flag = OPTYPE_UNDO;
 
 	/* keyingset to use (dynamic enum) */
 	prop= RNA_def_enum(ot->srna, "group", DummyRNA_DEFAULT_items, 0, "Keying Set", "The Keying Set to use");
 	RNA_def_enum_funcs(prop, weight_paint_sample_enum_itemf);
-	ot->prop= prop;
+	ot->prop = prop;
 }
 
 static void do_weight_paint_normalize_all(MDeformVert *dvert, const int defbase_tot, const char *vgroup_validmap)
@@ -2046,15 +2039,15 @@ void PAINT_OT_weight_paint_toggle(wmOperatorType *ot)
 {
 	
 	/* identifiers */
-	ot->name= "Weight Paint Mode";
-	ot->idname= "PAINT_OT_weight_paint_toggle";
+	ot->name = "Weight Paint Mode";
+	ot->idname = "PAINT_OT_weight_paint_toggle";
 	
 	/* api callbacks */
-	ot->exec= set_wpaint;
-	ot->poll= paint_poll_test;
+	ot->exec = set_wpaint;
+	ot->poll = paint_poll_test;
 	
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 	
 }
 
@@ -2184,7 +2177,7 @@ static int wpaint_stroke_test_start(bContext *C, wmOperator *op, wmEvent *UNUSED
 		ED_vgroup_add(ob);
 	}
 
-	/* ensure we dont try paint onto an invalid group */
+	/* ensure we don't try paint onto an invalid group */
 	if (ob->actdef <= 0) {
 		BKE_report(op->reports, RPT_WARNING, "No active vertex group for painting, aborting");
 		return FALSE;
@@ -2258,7 +2251,7 @@ static void wpaint_stroke_update_step(bContext *C, struct PaintStroke *stroke, P
 	const float brush_alpha_value = brush_alpha(scene, brush);
 	const float brush_alpha_pressure = brush_alpha_value * (brush_use_alpha_pressure(scene, brush) ? pressure : 1.0f);
 
-	/* intentionally dont initialize as NULL, make sure we initialize all members below */
+	/* intentionally don't initialize as NULL, make sure we initialize all members below */
 	WeightPaintInfo wpi;
 
 	/* cannot paint if there is no stroke data */
@@ -2422,7 +2415,7 @@ static void wpaint_stroke_update_step(bContext *C, struct PaintStroke *stroke, P
 
 	/* *** free wpi members */
 	MEM_freeN((void *)wpi.defbase_sel);
-	/* *** dont freeing wpi members */
+	/* *** don't freeing wpi members */
 
 
 	swap_m4m4(vc->rv3d->persmat, mat);
@@ -2498,18 +2491,18 @@ void PAINT_OT_weight_paint(wmOperatorType *ot)
 {
 	
 	/* identifiers */
-	ot->name= "Weight Paint";
-	ot->idname= "PAINT_OT_weight_paint";
+	ot->name = "Weight Paint";
+	ot->idname = "PAINT_OT_weight_paint";
 	
 	/* api callbacks */
-	ot->invoke= wpaint_invoke;
-	ot->modal= paint_stroke_modal;
-	/* ot->exec= vpaint_exec; <-- needs stroke property */
-	ot->poll= weight_paint_poll;
-	ot->cancel= wpaint_cancel;
+	ot->invoke = wpaint_invoke;
+	ot->modal = paint_stroke_modal;
+	/* ot->exec = vpaint_exec; <-- needs stroke property */
+	ot->poll = weight_paint_poll;
+	ot->cancel = wpaint_cancel;
 	
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO|OPTYPE_BLOCKING;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO|OPTYPE_BLOCKING;
 
 	RNA_def_collection_runtime(ot->srna, "stroke", &RNA_OperatorStrokeElement, "Stroke", "");
 }
@@ -2527,15 +2520,15 @@ static int weight_paint_set_exec(bContext *C, wmOperator *UNUSED(op))
 void PAINT_OT_weight_set(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Set Weight";
-	ot->idname= "PAINT_OT_weight_set";
+	ot->name = "Set Weight";
+	ot->idname = "PAINT_OT_weight_set";
 
 	/* api callbacks */
-	ot->exec= weight_paint_set_exec;
-	ot->poll= mask_paint_poll; /* it was facemask_paint_poll */
+	ot->exec = weight_paint_set_exec;
+	ot->poll = mask_paint_poll; /* it was facemask_paint_poll */
 
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 }
 
 /* ************ set / clear vertex paint mode ********** */
@@ -2589,15 +2582,15 @@ void PAINT_OT_vertex_paint_toggle(wmOperatorType *ot)
 {
 	
 	/* identifiers */
-	ot->name= "Vertex Paint Mode";
-	ot->idname= "PAINT_OT_vertex_paint_toggle";
+	ot->name = "Vertex Paint Mode";
+	ot->idname = "PAINT_OT_vertex_paint_toggle";
 	
 	/* api callbacks */
-	ot->exec= set_vpaint;
-	ot->poll= paint_poll_test;
+	ot->exec = set_vpaint;
+	ot->poll = paint_poll_test;
 	
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 }
 
 
@@ -2999,18 +2992,18 @@ static int vpaint_cancel(bContext *C, wmOperator *op)
 void PAINT_OT_vertex_paint(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Vertex Paint";
-	ot->idname= "PAINT_OT_vertex_paint";
+	ot->name = "Vertex Paint";
+	ot->idname = "PAINT_OT_vertex_paint";
 	
 	/* api callbacks */
-	ot->invoke= vpaint_invoke;
-	ot->modal= paint_stroke_modal;
-	/* ot->exec= vpaint_exec; <-- needs stroke property */
-	ot->poll= vertex_paint_poll;
-	ot->cancel= vpaint_cancel;
+	ot->invoke = vpaint_invoke;
+	ot->modal = paint_stroke_modal;
+	/* ot->exec = vpaint_exec; <-- needs stroke property */
+	ot->poll = vertex_paint_poll;
+	ot->cancel = vpaint_cancel;
 	
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO|OPTYPE_BLOCKING;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO|OPTYPE_BLOCKING;
 
 	RNA_def_collection_runtime(ot->srna, "stroke", &RNA_OperatorStrokeElement, "Stroke", "");
 }
@@ -3048,18 +3041,17 @@ void PAINT_OT_weight_from_bones(wmOperatorType *ot)
 		{0, NULL, 0, NULL, NULL}};
 
 	/* identifiers */
-	ot->name= "Weight from Bones";
-	ot->idname= "PAINT_OT_weight_from_bones";
+	ot->name = "Weight from Bones";
+	ot->idname = "PAINT_OT_weight_from_bones";
 	
 	/* api callbacks */
-	ot->exec= weight_from_bones_exec;
-	ot->invoke= WM_menu_invoke;
-	ot->poll= weight_from_bones_poll;
+	ot->exec = weight_from_bones_exec;
+	ot->invoke = WM_menu_invoke;
+	ot->poll = weight_from_bones_poll;
 	
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 
 	/* properties */
-	ot->prop= RNA_def_enum(ot->srna, "type", type_items, 0, "Type", "Method to use for assigning weights");
+	ot->prop = RNA_def_enum(ot->srna, "type", type_items, 0, "Type", "Method to use for assigning weights");
 }
-

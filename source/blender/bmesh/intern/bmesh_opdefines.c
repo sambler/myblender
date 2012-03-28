@@ -75,7 +75,7 @@
  * """
  *
  * so the first line is the "title" of the bmop.
- * subsequent line blocks seperated by blank lines
+ * subsequent line blocks separated by blank lines
  * are paragraphs.  individual descriptions of slots
  * would be extracted from comments
  * next to them, e.g.
@@ -93,7 +93,7 @@
 /*
  * Vertex Smooth
  *
- * Smoothes vertices by using a basic vertex averaging scheme.
+ * Smooths vertices by using a basic vertex averaging scheme.
  */
 static BMOpDefine bmo_vertexsmooth_def = {
 	"vertexsmooth",
@@ -700,7 +700,7 @@ static BMOpDefine bmo_esubd_def = {
 
 	 {BMO_OP_SLOT_INT,  "quadcornertype"}, //quad corner type, see bmesh_operators.h
 	 {BMO_OP_SLOT_BOOL, "gridfill"}, //fill in fully-selected faces with a grid
-	 {BMO_OP_SLOT_BOOL, "singleedge"}, //tesselate the case of one edge selected in a quad or triangle
+	 {BMO_OP_SLOT_BOOL, "singleedge"}, //tessellate the case of one edge selected in a quad or triangle
 
 	 {0} /* null-terminating sentine */,
 	},
@@ -740,7 +740,7 @@ static BMOpDefine bmo_split_def = {
 	 {BMO_OP_SLOT_MAPPING, "boundarymap"},
 	 {BMO_OP_SLOT_MAPPING, "isovertmap"},
 	 {BMO_OP_SLOT_PNT, "dest"}, /* destination bmesh, if NULL will use current on */
-	 {BMO_OP_SLOT_BOOL, "use_only_faces"}, /* when enabled. dont duplicate loose verts/edges */
+	 {BMO_OP_SLOT_BOOL, "use_only_faces"}, /* when enabled. don't duplicate loose verts/edges */
 	 {0} /* null-terminating sentine */},
 	bmo_split_exec,
 	0
@@ -890,8 +890,7 @@ static BMOpDefine bmo_vertexshortestpath_def = {
 static BMOpDefine bmo_edgesplit_def = {
 	"edgesplit",
 	{{BMO_OP_SLOT_ELEMENT_BUF, "edges"}, /* input edges */
-	 {BMO_OP_SLOT_ELEMENT_BUF, "edgeout1"}, /* old output disconnected edges */
-	 {BMO_OP_SLOT_ELEMENT_BUF, "edgeout2"}, /* new output disconnected edges */
+	 {BMO_OP_SLOT_ELEMENT_BUF, "edgeout"}, /* old output disconnected edges */
 	 {0} /* null-terminating sentine */},
 	bmo_edgesplit_exec,
 	BMO_OP_FLAG_UNTAN_MULTIRES
@@ -1077,6 +1076,25 @@ static BMOpDefine bmo_solidify_def = {
 	0
 };
 
+/*
+ * Face Inset
+ *
+ * Extrudes faces individually.
+ */
+static BMOpDefine bmo_inset_def = {
+	"inset",
+	{{BMO_OP_SLOT_ELEMENT_BUF, "faces"},   /* input faces */
+	 {BMO_OP_SLOT_ELEMENT_BUF, "faceout"}, /* output faces */
+	 {BMO_OP_SLOT_BOOL, "use_boundary"},
+	 {BMO_OP_SLOT_BOOL, "use_even_offset"},
+	 {BMO_OP_SLOT_BOOL, "use_relative_offset"},
+	 {BMO_OP_SLOT_FLT, "thickness"},
+	 {BMO_OP_SLOT_BOOL, "use_outset"},
+	 {0} /* null-terminating sentine */},
+	bmo_inset_exec,
+	0
+};
+
 BMOpDefine *opdefines[] = {
 	&bmo_split_def,
 	&bmo_spin_def,
@@ -1143,6 +1161,7 @@ BMOpDefine *opdefines[] = {
 	&bmo_triangle_fill_def,
 	&bmo_bridge_loops_def,
 	&bmo_solidify_def,
+	&bmo_inset_def,
 };
 
 int bmesh_total_ops = (sizeof(opdefines) / sizeof(void *));

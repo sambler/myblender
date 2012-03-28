@@ -51,7 +51,7 @@ int CDDM_Check(struct DerivedMesh *dm);
 
 /* creates a CDDerivedMesh from the given Mesh, this will reference the
  * original data in Mesh, but it is safe to apply vertex coordinates or
- * calculate normals as those functions will automtically create new
+ * calculate normals as those functions will automatically create new
  * data to not overwrite the original */
 struct DerivedMesh *CDDM_from_mesh(struct Mesh *mesh, struct Object *ob);
 
@@ -76,7 +76,7 @@ struct DerivedMesh *CDDM_copy_from_tessface(struct DerivedMesh *dm);
 
 /* creates a CDDerivedMesh with the same layer stack configuration as the
  * given DerivedMesh and containing the requested numbers of elements.
- * elements are initialised to all zeros
+ * elements are initialized to all zeros
  */
 struct DerivedMesh *CDDM_from_template(struct DerivedMesh *source,
                                   int numVerts, int numEdges, int numFaces,
@@ -96,13 +96,14 @@ void CDDM_apply_vert_normals(struct DerivedMesh *cddm, short (*vertNormals)[3]);
 
 /* recalculates vertex and face normals for a CDDerivedMesh
  */
+void CDDM_calc_normals_mapping_ex(struct DerivedMesh *dm, const short only_face_normals);
 void CDDM_calc_normals_mapping(struct DerivedMesh *dm);
 void CDDM_calc_normals(struct DerivedMesh *dm);
 void CDDM_calc_normals_tessface(struct DerivedMesh *dm);
 
 /* calculates edges for a CDDerivedMesh (from face data)
  * this completely replaces the current edge data in the DerivedMesh
- * builds edges from the tesselated face data.
+ * builds edges from the tessellated face data.
  */
 void CDDM_calc_edges_tessface(struct DerivedMesh *dm);
 

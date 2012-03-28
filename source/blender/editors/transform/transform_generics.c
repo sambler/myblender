@@ -107,8 +107,6 @@
 
 #include "transform.h"
 
-extern ListBase editelems;
-
 /* ************************** Functions *************************** */
 
 void getViewVector(TransInfo *t, float coord[3], float vec[3])
@@ -512,7 +510,7 @@ static void recalcData_nla(TransInfo *t)
 			if ((pExceeded && nExceeded) || (iter == 4) ) {
 				/* both endpoints exceeded (or iteration ping-pong'd meaning that we need a compromise)
 				 *	- simply crop strip to fit within the bounds of the strips bounding it
-				 *	- if there were no neighbours, clear the transforms (make it default to the strip's current values)
+				 *	- if there were no neighbors, clear the transforms (make it default to the strip's current values)
 				 */
 				if (strip->prev && strip->next) {
 					tdn->h1[0]= strip->prev->end;
@@ -1247,7 +1245,7 @@ void postTrans (bContext *C, TransInfo *t)
 		/* Can take over freeing t->data and data2d etc... */
 		t->customFree(t);
 	}
-	else if (t->customData) {
+	else if ((t->customData != NULL) && (t->flag & T_FREE_CUSTOMDATA)) {
 		MEM_freeN(t->customData);
 	}
 

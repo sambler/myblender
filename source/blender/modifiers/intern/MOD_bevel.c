@@ -83,7 +83,7 @@ static CustomDataMask requiredDataMask(Object *UNUSED(ob), ModifierData *md)
 	CustomDataMask dataMask = 0;
 
 	/* ask for vertexgroups if we need them */
-	if(bmd->defgrp_name[0]) dataMask |= CD_MASK_MDEFORMVERT;
+	if (bmd->defgrp_name[0]) dataMask |= CD_MASK_MDEFORMVERT;
 
 	return dataMask;
 }
@@ -188,6 +188,10 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *UNUSED(ob),
 	result = CDDM_from_BMEditMesh(em, NULL, TRUE, FALSE);
 	BMEdit_Free(em);
 	MEM_freeN(em);
+
+	/* until we allow for dirty normal flag, always calc,
+	 * note: calculating on the CDDM is faster then the BMesh equivalent */
+	CDDM_calc_normals(result);
 
 	return result;
 }

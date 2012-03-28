@@ -22,11 +22,11 @@
 
 #include "MEM_guardedalloc.h"
 
-
-#include "bmesh.h"
-
 #include "BLI_math.h"
 #include "BLI_array.h"
+#include "BLI_utildefines.h"
+
+#include "bmesh.h"
 
 #define VERT_INPUT	1
 #define EDGE_OUT	1
@@ -141,7 +141,15 @@ static BMVert *get_outer_vert(BMesh *bm, BMEdge *e)
 /* Clamp x to the interval {0..len-1}, with wrap-around */
 static int clamp_index(const int x, const int len)
 {
-	return (x < 0) ? (len - (-x % len)) : (x % len);
+	if (x >= 0)
+		return x % len;
+	else {
+		int r = len - (-x % len);
+		if(r == len)
+			return len - 1;
+		else
+			return r;
+	}
 }
 
 /* There probably is a better way to swap BLI_arrays, or if there

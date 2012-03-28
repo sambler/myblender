@@ -309,8 +309,8 @@ static int nlaedit_viewall(bContext *C, const short onlySel)
 	v2d->cur.xmax += extra;
 	
 	/* set vertical range */
-	v2d->cur.ymax= 0.0f;
-	v2d->cur.ymin= (float)-(v2d->mask.ymax - v2d->mask.ymin);
+	v2d->cur.ymax = 0.0f;
+	v2d->cur.ymin = (float)-(v2d->mask.ymax - v2d->mask.ymin);
 	
 	/* do View2D syncing */
 	UI_view2d_sync(CTX_wm_screen(C), CTX_wm_area(C), v2d, V2D_LOCK_COPY);
@@ -520,7 +520,7 @@ static int nlaedit_add_transition_exec (bContext *C, wmOperator *op)
 		NlaStrip *s1, *s2;
 		
 		/* get initial pair of strips */
-		if ELEM(nlt->strips.first, NULL, nlt->strips.last)
+		if (ELEM(nlt->strips.first, NULL, nlt->strips.last))
 			continue;
 		s1= nlt->strips.first;
 		s2= s1->next;
@@ -530,7 +530,7 @@ static int nlaedit_add_transition_exec (bContext *C, wmOperator *op)
 			NlaStrip *strip;
 			
 			/* check if both are selected */
-			if ELEM(0, (s1->flag & NLASTRIP_FLAG_SELECT), (s2->flag & NLASTRIP_FLAG_SELECT))
+			if (ELEM(0, (s1->flag & NLASTRIP_FLAG_SELECT), (s2->flag & NLASTRIP_FLAG_SELECT)))
 				continue;
 			/* check if there's space between the two */
 			if (IS_EQF(s1->end, s2->start))

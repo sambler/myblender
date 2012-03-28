@@ -135,6 +135,7 @@ Any case: direct data is ALWAYS after the lib block
 #include "DNA_movieclip_types.h"
 
 #include "MEM_guardedalloc.h" // MEM_freeN
+#include "BLI_bitmap.h"
 #include "BLI_blenlib.h"
 #include "BLI_linklist.h"
 #include "BLI_bpath.h"
@@ -1638,11 +1639,15 @@ static void write_mdisps(WriteData *wd, int count, MDisps *mdlist, int external)
 		int i;
 		
 		writestruct(wd, DATA, "MDisps", count, mdlist);
-		if(!external) {
-			for(i = 0; i < count; ++i) {
-				if(mdlist[i].disps)
-					writedata(wd, DATA, sizeof(float)*3*mdlist[i].totdisp, mdlist[i].disps);
+		for(i = 0; i < count; ++i) {
+			MDisps *md = &mdlist[i];
+			if(md->disps) {
+				if(!external)
+					writedata(wd, DATA, sizeof(float)*3*md->totdisp, md->disps);
 			}
+			
+			if(md->hidden)
+				writedata(wd, DATA, BLI_BITMAP_SIZE(md->totdisp), md->hidden);
 		}
 	}
 }
@@ -1707,7 +1712,7 @@ static void write_meshs(WriteData *wd, ListBase *idbase)
 
 #ifdef USE_BMESH_SAVE_WITHOUT_MFACE
 				Mesh backup_mesh = {{0}};
-				/* cache only - dont write */
+				/* cache only - don't write */
 				backup_mesh.mface = mesh->mface;
 				mesh->mface = NULL;
 				/* -- */
@@ -1732,7 +1737,7 @@ static void write_meshs(WriteData *wd, ListBase *idbase)
 				write_customdata(wd, &mesh->id, mesh->totpoly, &mesh->pdata, -1, 0);
 
 #ifdef USE_BMESH_SAVE_WITHOUT_MFACE
-				/* cache only - dont write */
+				/* cache only - don't write */
 				mesh->mface = backup_mesh.mface;
 				/* -- */
 				mesh->totface = backup_mesh.totface;
@@ -2882,7 +2887,7 @@ int BLO_write_file(Main *mainvar, const char *filepath, int write_flags, ReportL
 	/* open temporary file, so we preserve the original in case we crash */
 	BLI_snprintf(tempname, sizeof(tempname), "%s@", filepath);
 
-	file = open(tempname,O_BINARY+O_WRONLY+O_CREAT+O_TRUNC, 0666);
+	file = BLI_open(tempname,O_BINARY+O_WRONLY+O_CREAT+O_TRUNC, 0666);
 	if(file == -1) {
 		BKE_reportf(reports, RPT_ERROR, "Can't open file %s for writing: %s.", tempname, strerror(errno));
 		return 0;
@@ -2895,7 +2900,7 @@ int BLO_write_file(Main *mainvar, const char *filepath, int write_flags, ReportL
 		BLI_split_dir_part(filepath, dir1, sizeof(dir1));
 		BLI_split_dir_part(mainvar->name, dir2, sizeof(dir2));
 
-		/* just incase there is some subtle difference */
+		/* just in case there is some subtle difference */
 		BLI_cleanup_dir(mainvar->name, dir1);
 		BLI_cleanup_dir(mainvar->name, dir2);
 
@@ -2907,7 +2912,7 @@ int BLO_write_file(Main *mainvar, const char *filepath, int write_flags, ReportL
 				/* blend may not have been saved before. Tn this case
 				 * we should not have any relative paths, but if there
 				 * is somehow, an invalid or empty G.main->name it will
-				 * print an error, dont try make the absolute in this case. */
+				 * print an error, don't try make the absolute in this case. */
 				makeFilesAbsolute(mainvar, G.main->name, NULL);
 			}
 		}

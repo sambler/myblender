@@ -455,7 +455,7 @@ static float clipy_rctf(rctf *rf, float y1, float y2)
 static void boxsampleclip(struct ImBuf *ibuf, rctf *rf, TexResult *texres)
 {
 	/* sample box, is clipped already, and minx etc. have been set at ibuf size.
-	   Enlarge with antialiased edges of the pixels */
+	 * Enlarge with antialiased edges of the pixels */
 
 	float muly, mulx, div, col[4];
 	int x, y, startx, endx, starty, endy;
@@ -542,7 +542,7 @@ static void boxsample(ImBuf *ibuf, float minx, float miny, float maxx, float max
 	 * If variable 'imaprepeat' has been set, the
 	 * clipped-away parts are sampled as well.
 	 */
-	/* note: actually minx etc isnt in the proper range... this due to filter size and offset vectors for bump */
+	/* note: actually minx etc isn't in the proper range... this due to filter size and offset vectors for bump */
 	/* note: talpha must be initialized */
 	/* note: even when 'imaprepeat' is set, this can only repeate once in any direction.
 	 * the point which min/max is derived from is assumed to be wrapped */

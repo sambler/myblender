@@ -41,6 +41,7 @@
 #include "BLI_listbase.h"
 #include "BLI_rect.h"
 #include "BLI_string.h"
+#include "BLI_string_utf8.h"
 #include "BLI_utildefines.h"
 
 #include "BKE_context.h"
@@ -933,6 +934,22 @@ static void widget_draw_icon(uiBut *but, BIFIconID icon, float alpha, rcti *rect
 	glDisable(GL_BLEND);
 }
 
+static void ui_text_clip_give_prev_off(uiBut *but)
+{
+	char *prev_utf8 = BLI_str_find_prev_char_utf8(but->drawstr, but->drawstr + but->ofs);
+	int bytes = but->drawstr + but->ofs - prev_utf8;
+
+	but->ofs -= bytes;
+}
+
+static void ui_text_clip_give_next_off(uiBut *but)
+{
+	char *next_utf8 = BLI_str_find_next_char_utf8(but->drawstr + but->ofs, NULL);
+	int bytes = next_utf8 - (but->drawstr + but->ofs);
+
+	but->ofs += bytes;
+}
+
 /* sets but->ofs to make sure text is correctly visible */
 static void ui_text_leftclip(uiFontStyle *fstyle, uiBut *but, rcti *rect)
 {
@@ -967,23 +984,26 @@ static void ui_text_leftclip(uiFontStyle *fstyle, uiBut *but, rcti *rect)
 			char buf[UI_MAX_DRAW_STR];
 			
 			/* copy draw string */
-			BLI_strncpy(buf, but->drawstr, sizeof(buf));
+			BLI_strncpy_utf8(buf, but->drawstr, sizeof(buf));
 			/* string position of cursor */
 			buf[but->pos]= 0;
 			width= BLF_width(fstyle->uifont_id, buf+but->ofs);
 			
 			/* if cursor is at 20 pixels of right side button we clip left */
 			if(width > okwidth-20)
-				but->ofs++;
+				ui_text_clip_give_next_off(but);
 			else {
+				int len, bytes;
 				/* shift string to the left */
 				if(width < 20 && but->ofs > 0)
-					but->ofs--;
-				but->drawstr[ strlen(but->drawstr)-1 ]= 0;
+					ui_text_clip_give_prev_off(but);
+				len= strlen(but->drawstr);
+				bytes= BLI_str_utf8_size(BLI_str_find_prev_char_utf8(but->drawstr, but->drawstr + len));
+				but->drawstr[ len-bytes ]= 0;
 			}
 		}
 		else
-			but->ofs++;
+			ui_text_clip_give_next_off(but);
 
 		but->strwidth= BLF_width(fstyle->uifont_id, but->drawstr+but->ofs);
 		
@@ -1018,9 +1038,13 @@ static void ui_text_label_rightclip(uiFontStyle *fstyle, uiBut *but, rcti *rect)
 		
 		/* chop off the leading text, starting from the right */
 		while (but->strwidth > okwidth && cp2 > but->drawstr) {
+			int bytes = BLI_str_utf8_size(cp2);
+			if (bytes < 0)
+				bytes = 1;
+
 			/* shift the text after and including cp2 back by 1 char, +1 to include null terminator */
-			memmove(cp2-1, cp2, strlen(cp2)+1);
-			cp2--;
+			memmove(cp2-bytes, cp2, strlen(cp2)+1);
+			cp2-=bytes;
 			
 			but->strwidth= BLF_width(fstyle->uifont_id, but->drawstr+but->ofs);
 			if(but->strwidth < 10) break;
@@ -1030,7 +1054,7 @@ static void ui_text_label_rightclip(uiFontStyle *fstyle, uiBut *but, rcti *rect)
 		/* after the leading text is gone, chop off the : and following space, with ofs */
 		while ((but->strwidth > okwidth) && (but->ofs < 2))
 		{
-			but->ofs++;
+			ui_text_clip_give_next_off(but);
 			but->strwidth= BLF_width(fstyle->uifont_id, but->drawstr+but->ofs);
 			if(but->strwidth < 10) break;
 		}
@@ -1039,10 +1063,12 @@ static void ui_text_label_rightclip(uiFontStyle *fstyle, uiBut *but, rcti *rect)
 
 	/* once the label's gone, chop off the least significant digits */
 	while(but->strwidth > okwidth ) {
-		int pos= strlen(but->drawstr);
-		
-		but->drawstr[ pos-1 ] = 0;
-		pos--;
+		int len= strlen(but->drawstr);
+		int bytes= BLI_str_utf8_size(BLI_str_find_prev_char_utf8(but->drawstr, but->drawstr + len));
+		if (bytes < 0)
+			bytes = 1;
+
+		but->drawstr[ len-bytes ]= 0;
 		
 		but->strwidth= BLF_width(fstyle->uifont_id, but->drawstr+but->ofs);
 		if(but->strwidth < 10) break;
@@ -1367,7 +1393,7 @@ static struct uiWidgetColors wcol_menu_item= {
 	{0, 0, 0, 255},
 	{0, 0, 0, 0},
 	{86, 128, 194, 255},
-	{255, 255, 255, 255},
+	{172, 172, 172, 128},
 	
 	{255, 255, 255, 255},
 	{0, 0, 0, 255},
@@ -1390,6 +1416,19 @@ static struct uiWidgetColors wcol_menu_back= {
 	25, -20
 };
 
+/* tooltip colour */
+static struct uiWidgetColors wcol_tooltip= {
+	{0, 0, 0, 255},
+	{25, 25, 25, 230},
+	{45, 45, 45, 230},
+	{100, 100, 100, 255},
+
+	{160, 160, 160, 255},
+	{255, 255, 255, 255},
+
+	0,
+	25, -20
+};
 
 static struct uiWidgetColors wcol_radio= {
 	{0, 0, 0, 255},
@@ -1524,6 +1563,7 @@ void ui_widget_color_init(ThemeUI *tui)
 	tui->wcol_menu= wcol_menu;
 	tui->wcol_pulldown= wcol_pulldown;
 	tui->wcol_menu_back= wcol_menu_back;
+	tui->wcol_tooltip = wcol_tooltip;
 	tui->wcol_menu_item= wcol_menu_item;
 	tui->wcol_box= wcol_box;
 	tui->wcol_scroll= wcol_scroll;
@@ -2838,6 +2878,11 @@ static uiWidgetType *widget_type(uiWidgetTypeEnum type)
 			wt.wcol_theme= &btheme->tui.wcol_tool;
 			wt.draw= widget_roundbut;
 			break;
+
+		case UI_WTYPE_TOOLTIP:
+			wt.wcol_theme = &btheme->tui.wcol_tooltip;
+			wt.draw = widget_menu_back;
+			break;
 			
 			
 			/* strings */
@@ -3207,6 +3252,19 @@ void ui_draw_menu_back(uiStyle *UNUSED(style), uiBlock *block, rcti *rect)
 	}	
 }
 
+uiWidgetColors* ui_tooltip_get_theme(void){
+	uiWidgetType *wt = widget_type(UI_WTYPE_TOOLTIP);
+	return wt->wcol_theme;
+}
+
+void ui_draw_tooltip_background(uiStyle *UNUSED(style), uiBlock *UNUSED(block), rcti *rect)
+{
+	uiWidgetType *wt = widget_type(UI_WTYPE_TOOLTIP);
+	wt->state(wt, 0);
+	/* wt->draw ends up using same function to draw the tooltip as menu_back */
+	wt->draw(&wt->wcol, rect, 0, 0);
+}
+
 void ui_draw_search_back(uiStyle *UNUSED(style), uiBlock *block, rcti *rect)
 {
 	uiWidgetType *wt= widget_type(UI_WTYPE_BOX);
@@ -3297,15 +3355,17 @@ void ui_draw_preview_item(uiFontStyle *fstyle, rcti *rect, const char *name, int
 	bg_rect = trect;
 	bg_rect.xmin = rect->xmin + PREVIEW_PAD;
 	bg_rect.ymin = rect->ymin + PREVIEW_PAD;
-	bg_rect.xmax += PREVIEW_PAD / 2;
+	bg_rect.xmax = rect->xmax - PREVIEW_PAD;
 	bg_rect.ymax += PREVIEW_PAD / 2;
 	
 	if(bg_rect.xmax > rect->xmax - PREVIEW_PAD)
 		bg_rect.xmax = rect->xmax - PREVIEW_PAD;
 
 	UI_GetThemeColor3ubv(TH_BUTBACK, bg_col);
-	glColor3ubv(bg_col);
+	glColor4ubv((unsigned char*)wt->wcol.item);
+	glEnable(GL_BLEND);
 	glRecti(bg_rect.xmin, bg_rect.ymin, bg_rect.xmax, bg_rect.ymax);
+	glDisable(GL_BLEND);
 	
 	if (state == UI_ACTIVE)
 		glColor3ubv((unsigned char*)wt->wcol.text);

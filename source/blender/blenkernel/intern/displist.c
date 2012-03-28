@@ -62,8 +62,6 @@
 
 #include "BLO_sys_types.h" // for intptr_t support
 
-extern Material defmaterial;	/* material.c */
-
 static void boundbox_displist(Object *ob);
 
 void free_disp_elem(DispList *dl)
@@ -613,10 +611,10 @@ static void curve_to_filledpoly(Curve *cu, ListBase *UNUSED(nurb), ListBase *dis
 }
 
 /* taper rules:
-  - only 1 curve
-  - first point left, last point right
-  - based on subdivided points in original curve, not on points in taper curve (still)
-*/
+ * - only 1 curve
+ * - first point left, last point right
+ * - based on subdivided points in original curve, not on points in taper curve (still)
+ */
 float calc_taper(Scene *scene, Object *taperobj, int cur, int tot)
 {
 	DispList *dl;
@@ -688,10 +686,10 @@ void makeDispListMBall_forRender(Scene *scene, Object *ob, ListBase *dispbase)
 	object_deform_mball(ob, dispbase);
 }
 
-static ModifierData *curve_get_tesselate_point(Scene *scene, Object *ob, int forRender, int editmode)
+static ModifierData *curve_get_tessellate_point(Scene *scene, Object *ob, int forRender, int editmode)
 {
 	ModifierData *md = modifiers_getVirtualModifierList(ob);
-	ModifierData *preTesselatePoint;
+	ModifierData *pretessellatePoint;
 	int required_mode;
 
 	if(forRender) required_mode = eModifierMode_Render;
@@ -699,32 +697,32 @@ static ModifierData *curve_get_tesselate_point(Scene *scene, Object *ob, int for
 
 	if(editmode) required_mode |= eModifierMode_Editmode;
 
-	preTesselatePoint = NULL;
+	pretessellatePoint = NULL;
 	for (; md; md=md->next) {
 		ModifierTypeInfo *mti = modifierType_getInfo(md->type);
 
 		if (!modifier_isEnabled(scene, md, required_mode)) continue;
-		if (mti->type == eModifierTypeType_Constructive) return preTesselatePoint;
+		if (mti->type == eModifierTypeType_Constructive) return pretessellatePoint;
 
 		if (ELEM3(md->type, eModifierType_Hook, eModifierType_Softbody, eModifierType_MeshDeform)) {
-			preTesselatePoint = md;
+			pretessellatePoint = md;
 
 			/* this modifiers are moving point of tessellation automatically
-			   (some of them even can't be applied on tesselated curve), set flag
-			   for incformation button in modifier's header */
+			 * (some of them even can't be applied on tessellated curve), set flag
+			 * for incformation button in modifier's header */
 			md->mode |= eModifierMode_ApplyOnSpline;
 		} else if(md->mode&eModifierMode_ApplyOnSpline) {
-			preTesselatePoint = md;
+			pretessellatePoint = md;
 		}
 	}
 
-	return preTesselatePoint;
+	return pretessellatePoint;
 }
 
 static void curve_calc_modifiers_pre(Scene *scene, Object *ob, int forRender, float (**originalVerts_r)[3], float (**deformedVerts_r)[3], int *numVerts_r)
 {
 	ModifierData *md = modifiers_getVirtualModifierList(ob);
-	ModifierData *preTesselatePoint;
+	ModifierData *pretessellatePoint;
 	Curve *cu= ob->data;
 	ListBase *nurb= BKE_curve_nurbs(cu);
 	int numVerts = 0;
@@ -737,7 +735,7 @@ static void curve_calc_modifiers_pre(Scene *scene, Object *ob, int forRender, fl
 	if(forRender) required_mode = eModifierMode_Render;
 	else required_mode = eModifierMode_Realtime;
 
-	preTesselatePoint = curve_get_tesselate_point(scene, ob, forRender, editmode);
+	pretessellatePoint = curve_get_tessellate_point(scene, ob, forRender, editmode);
 	
 	if(editmode) required_mode |= eModifierMode_Editmode;
 
@@ -746,15 +744,16 @@ static void curve_calc_modifiers_pre(Scene *scene, Object *ob, int forRender, fl
 
 		if(keyVerts) {
 			/* split coords from key data, the latter also includes
-			   tilts, which is passed through in the modifier stack.
-			   this is also the reason curves do not use a virtual
-			   shape key modifier yet. */
+			 * tilts, which is passed through in the modifier stack.
+			 * this is also the reason curves do not use a virtual
+			 * shape key modifier yet. */
 			deformedVerts= curve_getKeyVertexCos(cu, nurb, keyVerts);
 			originalVerts= MEM_dupallocN(deformedVerts);
+			numVerts = count_curveverts_without_handles(nurb);
 		}
 	}
 	
-	if (preTesselatePoint) {
+	if (pretessellatePoint) {
 		for (; md; md=md->next) {
 			ModifierTypeInfo *mti = modifierType_getInfo(md->type);
 
@@ -771,7 +770,7 @@ static void curve_calc_modifiers_pre(Scene *scene, Object *ob, int forRender, fl
 
 			mti->deformVerts(md, ob, NULL, deformedVerts, numVerts, forRender, editmode);
 
-			if (md==preTesselatePoint)
+			if (md==pretessellatePoint)
 				break;
 		}
 	}
@@ -827,7 +826,7 @@ static void curve_calc_modifiers_post(Scene *scene, Object *ob, ListBase *dispba
 	DerivedMesh **derivedFinal, int forRender, float (*originalVerts)[3], float (*deformedVerts)[3])
 {
 	ModifierData *md = modifiers_getVirtualModifierList(ob);
-	ModifierData *preTesselatePoint;
+	ModifierData *pretessellatePoint;
 	Curve *cu= ob->data;
 	ListBase *nurb= BKE_curve_nurbs(cu);
 	int required_mode = 0, totvert = 0;
@@ -839,12 +838,12 @@ static void curve_calc_modifiers_post(Scene *scene, Object *ob, ListBase *dispba
 	if(forRender) required_mode = eModifierMode_Render;
 	else required_mode = eModifierMode_Realtime;
 
-	preTesselatePoint = curve_get_tesselate_point(scene, ob, forRender, editmode);
+	pretessellatePoint = curve_get_tessellate_point(scene, ob, forRender, editmode);
 	
 	if(editmode) required_mode |= eModifierMode_Editmode;
 
-	if (preTesselatePoint) {
-		md = preTesselatePoint->next;
+	if (pretessellatePoint) {
+		md = pretessellatePoint->next;
 	}
 
 	if (derivedFinal && *derivedFinal) {
@@ -1038,7 +1037,7 @@ static void curve_calc_orcodm(Scene *scene, Object *ob, DerivedMesh *derivedFina
 	/* for displist-based objects */
 
 	ModifierData *md = modifiers_getVirtualModifierList(ob);
-	ModifierData *preTesselatePoint;
+	ModifierData *pretessellatePoint;
 	Curve *cu= ob->data;
 	int required_mode;
 	int editmode = (!forRender && cu->editnurb);
@@ -1047,12 +1046,12 @@ static void curve_calc_orcodm(Scene *scene, Object *ob, DerivedMesh *derivedFina
 	if(forRender) required_mode = eModifierMode_Render;
 	else required_mode = eModifierMode_Realtime;
 
-	preTesselatePoint = curve_get_tesselate_point(scene, ob, forRender, editmode);
+	pretessellatePoint = curve_get_tessellate_point(scene, ob, forRender, editmode);
 
 	if(editmode) required_mode |= eModifierMode_Editmode;
 
-	if (preTesselatePoint) {
-		md = preTesselatePoint->next;
+	if (pretessellatePoint) {
+		md = pretessellatePoint->next;
 	}
 
 	for (; md; md=md->next) {
@@ -1168,8 +1167,8 @@ void makeDispListSurf(Scene *scene, Object *ob, ListBase *dispbase,
 	}
 
 	/* make copy of 'undeformed" displist for texture space calculation
-	   actually, it's not totally undeformed -- pre-tessellation modifiers are
-	   already applied, thats how it worked for years, so keep for compatibility (sergey) */
+	 * actually, it's not totally undeformed -- pre-tessellation modifiers are
+	 * already applied, thats how it worked for years, so keep for compatibility (sergey) */
 	copy_displist(&cu->disp, dispbase);
 
 	if (!forRender) {
@@ -1394,8 +1393,8 @@ static void do_makeDispListCurveTypes(Scene *scene, Object *ob, ListBase *dispba
 		if(cu->flag & CU_PATH) calc_curvepath(ob);
 
 		/* make copy of 'undeformed" displist for texture space calculation
-		   actually, it's not totally undeformed -- pre-tessellation modifiers are
-		   already applied, thats how it worked for years, so keep for compatibility (sergey) */
+		 * actually, it's not totally undeformed -- pre-tessellation modifiers are
+		 * already applied, thats how it worked for years, so keep for compatibility (sergey) */
 		copy_displist(&cu->disp, dispbase);
 
 		if (!forRender) {
@@ -1416,8 +1415,8 @@ void makeDispListCurveTypes(Scene *scene, Object *ob, int forOrco)
 	ListBase *dispbase;
 
 	/* The same check for duplis as in do_makeDispListCurveTypes.
-	   Happens when curve used for constraint/bevel was converted to mesh.
-	   check there is still needed for render displist and orco displists. */
+	 * Happens when curve used for constraint/bevel was converted to mesh.
+	 * check there is still needed for render displist and orco displists. */
 	if(!ELEM3(ob->type, OB_SURF, OB_CURVE, OB_FONT)) return;
 
 	freedisplist(&(ob->disp));

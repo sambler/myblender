@@ -66,8 +66,8 @@ static void initData(ModifierData *md)
 	ArrayModifierData *amd = (ArrayModifierData*) md;
 
 	/* default to 2 duplicates distributed along the x-axis by an
-	offset of 1 object-width
-	*/
+	 * offset of 1 object-width
+	 */
 	amd->start_cap = amd->end_cap = amd->curve_ob = amd->offset_ob = NULL;
 	amd->count = 2;
 	amd->offset[0] = amd->offset[1] = amd->offset[2] = 0;
@@ -186,11 +186,11 @@ static void bm_merge_dm_transform(BMesh* bm, DerivedMesh *dm, float mat[4][4])
 }
 
 static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
-					  Scene *scene, Object *ob, DerivedMesh *dm,
-										  int UNUSED(initFlags))
+                                          Scene *scene, Object *ob, DerivedMesh *dm,
+                                          int UNUSED(initFlags))
 {
 	DerivedMesh *result;
-	BMEditMesh *em = DM_to_editbmesh(ob, dm, NULL, FALSE);
+	BMEditMesh *em = DM_to_editbmesh(dm, NULL, FALSE);
 	BMOperator op, oldop, weldop;
 	int i, j, indexLen;
 	/* offset matrix */
@@ -264,14 +264,14 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 	}
 
 	/* calculate the maximum number of copies which will fit within the
-	prescribed length */
+	 * prescribed length */
 	if(amd->fit_type == MOD_ARR_FITLENGTH
 		  || amd->fit_type == MOD_ARR_FITCURVE) {
 		float dist = sqrt(dot_v3v3(offset[3], offset[3]));
 
 		if(dist > 1e-6f)
 			/* this gives length = first copy start to last copy end
-			add a tiny offset for floating point rounding errors */
+			 * add a tiny offset for floating point rounding errors */
 			count = (length + 1e-6f) / dist;
 		else
 			/* if the offset has no translation, just make one copy */
@@ -282,11 +282,11 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 		count = 1;
 
 	/* BMESH_TODO: bumping up the stack level avoids computing the normals
-	   after every top-level operator execution (and this modifier has the
-	   potential to execute a *lot* of top-level BMOps. There should be a
-	   cleaner way to do this. One possibility: a "mirror" BMOp would
-	   certainly help by compressing it all into one top-level BMOp that
-	   executes a lot of second-level BMOps. */
+	 * after every top-level operator execution (and this modifier has the
+	 * potential to execute a *lot* of top-level BMOps. There should be a
+	 * cleaner way to do this. One possibility: a "mirror" BMOp would
+	 * certainly help by compressing it all into one top-level BMOp that
+	 * executes a lot of second-level BMOps. */
 	BMO_push(em->bm, NULL);
 	bmesh_edit_begin(em->bm, 0);
 
@@ -349,8 +349,8 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 			BMO_op_finish(em->bm, &findop);
 		}
 
-		/*generate merge mappping using index map.  we do this by using the
-		  operator slots as lookup arrays.*/
+		/* generate merge mapping using index map.  we do this by using the
+		 * operator slots as lookup arrays.*/
 		#define E(i) (i) < s1->len ? _E(s1, i) : _E(s2, (i)-s1->len)
 
 		for (i=0; i<indexLen; i++) {
@@ -377,7 +377,7 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 	if ((start_cap || end_cap) &&
 
 	    /* BMESH_TODO - theres a bug in DM_to_bmesh_ex() when in editmode!
-		 * this needs investigation, but for now at least dont crash */
+		 * this needs investigation, but for now at least don't crash */
 	    ob->mode != OB_MODE_EDIT
 
 	    )

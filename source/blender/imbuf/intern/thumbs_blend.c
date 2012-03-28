@@ -30,6 +30,7 @@
 #include "zlib.h"
 
 #include "BLI_utildefines.h"
+#include "BLI_fileops.h"
 
 #include "BKE_utildefines.h"
 #include "BKE_global.h"
@@ -41,7 +42,7 @@
 #include "MEM_guardedalloc.h"
 
 /* extracts the thumbnail from between the 'REND' and the 'GLOB'
- * chunks of the header, dont use typical blend loader because its too slow */
+ * chunks of the header, don't use typical blend loader because its too slow */
 
 static ImBuf *loadblend_thumb(gzFile gzfile)
 {
@@ -123,9 +124,8 @@ static ImBuf *loadblend_thumb(gzFile gzfile)
 ImBuf *IMB_loadblend_thumb(const char *path)
 {
 	gzFile gzfile;
-
 	/* not necessarily a gzip */
-	gzfile = gzopen(path, "rb");
+	gzfile = BLI_gzopen(path, "rb");
 
 	if (NULL == gzfile ) {
 		return NULL;

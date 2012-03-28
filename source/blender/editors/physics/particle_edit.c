@@ -4073,7 +4073,7 @@ static void PE_create_particle_edit(Scene *scene, Object *ob, PointCache *cache,
 	ParticleSystemModifierData *psmd= (psys)? psys_get_modifier(ob, psys): NULL;
 	POINT_P; KEY_K;
 	ParticleData *pa = NULL;
-	HairKey *myhkey;
+	HairKey *hkey;
 	int totpoint;
 
 	/* no psmd->dm happens in case particle system modifier is not enabled */
@@ -4108,17 +4108,17 @@ static void PE_create_particle_edit(Scene *scene, Object *ob, PointCache *cache,
 				point->keys= MEM_callocN(point->totkey*sizeof(PTCacheEditKey),"ParticleEditKeys");
 				point->flag |= PEP_EDIT_RECALC;
 
-				myhkey = pa->hair;
+				hkey = pa->hair;
 				LOOP_KEYS {
 					key->co= hkey->co;
 					key->time= &hkey->time;
 					key->flag= hkey->editflag;
 					if (!(psys->flag & PSYS_GLOBAL_HAIR)) {
 						key->flag |= PEK_USE_WCO;
-						myhkey->editflag |= PEK_USE_WCO;
+						hkey->editflag |= PEK_USE_WCO;
 					}
 
-					myhkey++;
+					hkey++;
 				}
 				pa++;
 			}

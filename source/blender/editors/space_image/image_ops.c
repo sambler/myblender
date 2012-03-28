@@ -2341,7 +2341,7 @@ static int image_cycle_render_slot_exec(bContext *C, wmOperator *op)
 	int a, slot, cur= ima->render_slot;
 	const short use_reverse= RNA_boolean_get(op->ptr, "reverse");
 
-	for(a=1; a<IMA_MAX_RENDER_SLOT; a++) {
+	for (a=1; a<IMA_MAX_RENDER_SLOT; a++) {
 		slot= (cur + (use_reverse ? -a:a))%IMA_MAX_RENDER_SLOT;
 		if (slot<0) slot+=IMA_MAX_RENDER_SLOT;
 
@@ -2378,8 +2378,8 @@ void IMAGE_OT_cycle_render_slot(wmOperatorType *ot)
 	ot->poll = image_cycle_render_slot_poll;
 
 	/* flags */
-	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
-
+	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	
 	RNA_def_boolean(ot->srna, "reverse", 0, "Cycle in Reverse", "");
 }
 

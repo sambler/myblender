@@ -37,7 +37,6 @@
 #include "BKE_report.h"
 #include "BKE_global.h" /* G.background only */
 
-
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
@@ -257,19 +256,31 @@ void BKE_reports_print(ReportList *reports, ReportType level)
 	if (cstring == NULL)
 		return;
 	
-	printf("%s", cstring);
+	puts(cstring);
 	fflush(stdout);
 	MEM_freeN(cstring);
 }
 
 Report *BKE_reports_last_displayable(ReportList *reports)
 {
-	Report *report=NULL;
+	Report *report;
 	
-	for (report= (Report *)reports->list.last; report; report=report->prev) {
+	for (report= reports->list.last; report; report=report->prev) {
 		if (ELEM3(report->type, RPT_ERROR, RPT_WARNING, RPT_INFO))
 			return report;
 	}
 	
 	return NULL;
 }
+
+int BKE_reports_contain(ReportList *reports, ReportType level)
+{
+	Report *report;
+	if (reports != NULL) {
+		for(report=reports->list.first; report; report=report->next)
+			if(report->type >= level)
+				return TRUE;
+	}
+	return FALSE;
+}
+

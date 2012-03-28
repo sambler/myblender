@@ -132,7 +132,7 @@ void nodeShaderSynchronizeID(bNode *node, int copyto)
 		Material *ma= (Material *)node->id;
 		int a;
 		
-		/* hrmf, case in loop isnt super fast, but we dont edit 100s of material at same time either! */
+		/* hrmf, case in loop isn't super fast, but we don't edit 100s of material at same time either! */
 		for(a=0, sock= node->inputs.first; sock; sock= sock->next, a++) {
 			if(!nodeSocketIsHidden(sock)) {
 				if(copyto) {
@@ -210,7 +210,7 @@ void node_gpu_stack_from_data(struct GPUNodeStack *gs, int type, bNodeStack *ns)
 	
 	gs->name = "";
 	gs->hasinput= ns->hasinput && ns->data;
-	/* XXX Commented out the ns->data check here, as it seems it’s not alwas set,
+	/* XXX Commented out the ns->data check here, as it seems it's not alwas set,
 	 *     even though there *is* a valid connection/output... But that might need
 	 *     further investigation.
 	 */

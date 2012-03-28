@@ -872,7 +872,7 @@ int isect_line_plane_v3(float out[3], const float l1[3], const float l2[3], cons
 	}
 }
 
-/* note: return normal isnt unit length */
+/* note: return normal isn't unit length */
 void isect_plane_plane_v3(float r_isect_co[3], float r_isect_no[3],
                           const float plane_a_co[3], const float plane_a_no[3],
                           const float plane_b_co[3], const float plane_b_no[3])
@@ -1320,6 +1320,25 @@ float line_point_factor_v2(const float p[2], const float l1[2], const float l2[2
 	return(dot_v2v2(u, h)/dot_v2v2(u, u));
 }
 
+/* ensyre the distance between these points is no greater then 'dist'
+ * if it is, scale then both into the center */
+void limit_dist_v3(float v1[3], float v2[3], const float dist)
+{
+	const float dist_old = len_v3v3(v1, v2);
+
+	if (dist_old > dist) {
+		float v1_old[3];
+		float v2_old[3];
+		float fac = (dist / dist_old) * 0.5f;
+
+		copy_v3_v3(v1_old, v1);
+		copy_v3_v3(v2_old, v2);
+
+		interp_v3_v3v3(v1, v1_old, v2_old, 0.5f - fac);
+		interp_v3_v3v3(v2, v1_old, v2_old, 0.5f + fac);
+	}
+}
+
 /* Similar to LineIntersectsTriangleUV, except it operates on a quad and in 2d, assumes point is in quad */
 void isect_point_quad_uv_v2(const float v0[2], const float v1[2], const float v2[2], const float v3[2], const float pt[2], float r_uv[2])
 {
@@ -1707,31 +1726,29 @@ static float tri_signed_area(const float v1[3], const float v2[3], const float v
 	return 0.5f*((v1[i]-v2[i])*(v2[j]-v3[j]) + (v1[j]-v2[j])*(v3[i]-v2[i]));
 }
 
+/* return 1 when degenerate */
 static int barycentric_weights(const float v1[3], const float v2[3], const float v3[3], const float co[3], const float n[3], float w[3])
 {
-	float a1, a2, a3, asum;
+	float wtot;
 	int i, j;
 
 	axis_dominant_v3(&i, &j, n);
 
-	a1= tri_signed_area(v2, v3, co, i, j);
-	a2= tri_signed_area(v3, v1, co, i, j);
-	a3= tri_signed_area(v1, v2, co, i, j);
+	w[0] = tri_signed_area(v2, v3, co, i, j);
+	w[1] = tri_signed_area(v3, v1, co, i, j);
+	w[2] = tri_signed_area(v1, v2, co, i, j);
 
-	asum= a1 + a2 + a3;
+	wtot = w[0] + w[1] + w[2];
 
-	if (fabsf(asum) < FLT_EPSILON) {
+	if (fabsf(wtot) > FLT_EPSILON) {
+		mul_v3_fl(w, 1.0f / wtot);
+		return 0;
+	}
+	else {
 		/* zero area triangle */
-		w[0]= w[1]= w[2]= 1.0f/3.0f;
+		copy_v3_fl(w, 1.0f / 3.0f);
 		return 1;
 	}
-
-	asum= 1.0f/asum;
-	w[0]= a1*asum;
-	w[1]= a2*asum;
-	w[2]= a3*asum;
-
-	return 0;
 }
 
 void interp_weights_face_v3(float w[4], const float v1[3], const float v2[3], const float v3[3], const float v4[3], const float co[3])
@@ -1790,22 +1807,19 @@ void interp_weights_face_v3(float w[4], const float v1[3], const float v2[3], co
  * note: using area_tri_signed_v2 means locations outside the triangle are correctly weighted */
 void barycentric_weights_v2(const float v1[2], const float v2[2], const float v3[2], const float co[2], float w[3])
 {
-	float wtot_inv, wtot;
+	float wtot;
 
 	w[0] = area_tri_signed_v2(v2, v3, co);
 	w[1] = area_tri_signed_v2(v3, v1, co);
 	w[2] = area_tri_signed_v2(v1, v2, co);
-	wtot = w[0]+w[1]+w[2];
+	wtot = w[0] + w[1] + w[2];
 
 	if (wtot != 0.0f) {
-		wtot_inv = 1.0f/wtot;
-
-		w[0] = w[0]*wtot_inv;
-		w[1] = w[1]*wtot_inv;
-		w[2] = w[2]*wtot_inv;
+		mul_v3_fl(w, 1.0f / wtot);
 	}
-	else /* dummy values for zero area face */
-		w[0] = w[1] = w[2] = 1.0f/3.0f;
+	else { /* dummy values for zero area face */
+		copy_v3_fl(w, 1.0f / 3.0f);
+	}
 }
 
 /* given 2 triangles in 3D space, and a point in relation to the first triangle.
@@ -2585,7 +2599,7 @@ void vcloud_estimate_transform(int list_size, float (*pos)[3], float *weight,flo
 				m[2][1] += va[2] * vb[1];
 				m[2][2] += va[2] * vb[2];
 
-				/* building the referenc matrix on the fly
+				/* building the reference matrix on the fly
 				 * needed to scale properly later */
 
 				mr[0][0] += va[0] * va[0];
@@ -3054,14 +3068,25 @@ float form_factor_hemi_poly(float p[3], float n[3], float v1[3], float v2[3], fl
 }
 
 /* evaluate if entire quad is a proper convex quad */
- int is_quad_convex_v3(const float *v1, const float *v2, const float *v3, const float *v4)
+ int is_quad_convex_v3(const float v1[3], const float v2[3], const float v3[3], const float v4[3])
  {
 	float nor[3], nor1[3], nor2[3], vec[4][2];
 	int axis_a, axis_b;
-	
+
 	/* define projection, do both trias apart, quad is undefined! */
+
 	normal_tri_v3(nor1, v1, v2, v3);
 	normal_tri_v3(nor2, v1, v3, v4);
+
+	/* when the face is folded over as 2 tris we probably don't want to create
+	 * a quad from it, but go ahead with the intersection test since this
+	 * isn't a function for degenerate faces */
+	if (UNLIKELY(dot_v3v3(nor1, nor2) < 0.0f)) {
+		/* flip so adding normals in the opposite direction
+		 * doesnt give a zero length vector */
+		negate_v3(nor2);
+	}
+
 	add_v3_v3v3(nor, nor1, nor2);
 
 	axis_dominant_v3(&axis_a, &axis_b, nor);
@@ -3071,7 +3096,7 @@ float form_factor_hemi_poly(float p[3], float n[3], float v1[3], float v2[3], fl
 
 	vec[2][0]= v3[axis_a]; vec[2][1]= v3[axis_b];
 	vec[3][0]= v4[axis_a]; vec[3][1]= v4[axis_b];
-	
+
 	/* linetests, the 2 diagonals have to instersect to be convex */
-	return (isect_line_line_v2(vec[0], vec[2], vec[1], vec[3]) > 0) ? 1 : 0;
+	return (isect_line_line_v2(vec[0], vec[2], vec[1], vec[3]) > 0) ? TRUE : FALSE;
 }

@@ -1742,7 +1742,14 @@ void ED_screen_animation_timer(bContext *C, int redraws, int refresh, int sync, 
 		screen->animtimer= WM_event_add_timer(wm, win, TIMER0, (1.0/FPS));
 		
 		sad->ar= CTX_wm_region(C);
-		sad->sfra = scene->r.cfra;
+		/* if startframe is larger than current frame, we put currentframe on startframe.
+		 * note: first frame then is not drawn! (ton) */
+		if(scene->r.sfra > scene->r.cfra) {
+			sad->sfra= scene->r.cfra;
+			scene->r.cfra= scene->r.sfra;
+		}
+		else
+			sad->sfra = scene->r.cfra;
 		sad->redraws= redraws;
 		sad->refresh= refresh;
 		sad->flag |= (enable < 0)? ANIMPLAY_FLAG_REVERSE: 0;
@@ -1812,7 +1819,7 @@ void ED_update_for_newframe(Main *bmain, Scene *scene, bScreen *screen, int UNUS
 	//extern void audiostream_scrub(unsigned int frame);	/* seqaudio.c */
 	
 	/* update animated image textures for gpu, etc,
-	 * call before scene_update_for_newframe so modifiers with textuers dont lag 1 frame */
+	 * call before scene_update_for_newframe so modifiers with textuers don't lag 1 frame */
 	ED_image_update_frame(bmain, scene->r.cfra);
 
 	ED_clip_update_frame(bmain, scene->r.cfra);
@@ -1838,8 +1845,8 @@ void ED_update_for_newframe(Main *bmain, Scene *scene, bScreen *screen, int UNUS
 	{
 		Tex *tex;
 		for(tex= bmain->tex.first; tex; tex= tex->id.next)
-			if( tex->use_nodes && tex->nodetree ) {
-				ntreeTexTagAnimated( tex->nodetree );
+			if (tex->use_nodes && tex->nodetree) {
+				ntreeTexTagAnimated(tex->nodetree);
 			}
 	}
 	

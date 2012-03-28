@@ -177,7 +177,7 @@ void ED_view3d_clipping_set(RegionView3D *rv3d)
 	unsigned int a;
 
 	for (a = 0; a < tot; a++) {
-		QUATCOPY(plane, rv3d->clip[a]);
+		copy_v4db_v4fl(plane, rv3d->clip[a]);
 		glClipPlane(GL_CLIP_PLANE0 + a, plane);
 		glEnable(GL_CLIP_PLANE0 + a);
 	}
@@ -541,7 +541,7 @@ static void drawcursor(Scene *scene, ARegion *ar, View3D *v3d)
 	int mx, my, co[2];
 	int flag;
 	
-	/* we dont want the clipping for cursor */
+	/* we don't want the clipping for cursor */
 	flag= v3d->flag;
 	v3d->flag= 0;
 	project_int(ar, give_cursor(scene, v3d), co);
@@ -1076,7 +1076,7 @@ static void drawviewborder(Scene *scene, ARegion *ar, View3D *v3d)
 	 * 0.0001 on the lower left the 2D border sometimes
 	 * obscures the 3D camera border */
 	/* note: with VIEW3D_CAMERA_BORDER_HACK defined this error isn't noticeable
-	 * but keep it here incase we need to remove the workaround */
+	 * but keep it here in case we need to remove the workaround */
 	x1i= (int)(x1 - 1.0001f);
 	y1i= (int)(y1 - 1.0001f);
 	x2i= (int)(x2 + (1.0f-0.0001f));
@@ -2097,7 +2097,7 @@ void draw_depth(Scene *scene, ARegion *ar, View3D *v3d, int (* func)(void *))
 		}
 	}
 	
-	/* this isnt that nice, draw xray objects as if they are normal */
+	/* this isn't that nice, draw xray objects as if they are normal */
 	if (	v3d->afterdraw_transp.first ||
 			v3d->afterdraw_xray.first || 
 			v3d->afterdraw_xraytransp.first
@@ -2301,7 +2301,7 @@ CustomDataMask ED_view3d_object_datamask(Scene *scene)
 		}
 
 		if (ob->mode & OB_MODE_WEIGHT_PAINT) {
-			mask |= CD_MASK_WEIGHT_MCOL;
+			mask |= CD_MASK_PREVIEW_MCOL;
 		}
 	}
 

@@ -134,7 +134,7 @@ static RayObject*  RE_rayobject_create(Render *re, int type, int size)
 	
 	
 	if(res)
-		RE_rayobject_config_control( res, re );
+		RE_rayobject_config_control(res, re);
 	
 	return res;
 }
@@ -435,7 +435,7 @@ void makeraytree(Render *re)
 	re->stats_draw(re->sdh, &re->i);
 
 	/* disable options not yet supported by octree,
-	   they might actually never be supported (unless people really need it) */
+	 * they might actually never be supported (unless people really need it) */
 	if(re->r.raytrace_structure == R_RAYSTRUCTURE_OCTREE)
 		re->r.raytrace_options &= ~( R_RAYTRACE_USE_INSTANCES | R_RAYTRACE_USE_LOCAL_COORDS);
 
@@ -741,13 +741,13 @@ static void traceray(ShadeInput *origshi, ShadeResult *origshr, short depth, con
 		shi.osatex= origshi->osatex;
 		shi.depth= origshi->depth + 1;					/* only used to indicate tracing */
 		shi.thread= origshi->thread;
-		//shi.sample= 0; // memset above, so dont need this
+		//shi.sample= 0; // memset above, so don't need this
 		shi.xs= origshi->xs;
 		shi.ys= origshi->ys;
 		shi.lay= origshi->lay;
 		shi.passflag= SCE_PASS_COMBINED; /* result of tracing needs no pass info */
 		shi.combinedflag= 0xFFFFFF;		 /* ray trace does all options */
-		//shi.do_preview= 0; // memset above, so dont need this
+		//shi.do_preview= 0; // memset above, so don't need this
 		shi.light_override= origshi->light_override;
 		shi.mat_override= origshi->mat_override;
 		
@@ -1604,7 +1604,7 @@ static void addAlphaLight(float shadfac[4], const float col[3], float alpha, flo
 static void ray_trace_shadow_tra(Isect *is, ShadeInput *origshi, int depth, int traflag, float col[4])
 {
 	/* ray to lamp, find first face that intersects, check alpha properties,
-	   if it has col[3]>0.0f  continue. so exit when alpha is full */
+	 * if it has col[3]>0.0f  continue. so exit when alpha is full */
 	const float initial_dist = is->dist;
 
 	if(RE_rayobject_raycast(R.raytree, is)) {
@@ -1709,7 +1709,7 @@ static int UNUSED_FUNCTION(ray_trace_shadow_rad)(ShadeInput *ship, ShadeResult *
 			float fac;
 			
 			/* Warning, This is not that nice, and possibly a bit slow for every ray,
-			however some variables were not initialized properly in, unless using shade_input_initialize(...), we need to do a memset */
+			 * however some variables were not initialized properly in, unless using shade_input_initialize(...), we need to do a memset */
 			memset(&shi, 0, sizeof(ShadeInput)); 
 			/* end warning! - Campbell */
 			
@@ -2075,7 +2075,7 @@ static void ray_ao_spheresamp(ShadeInput *shi, float ao[3], float env[3])
 	if(resol>32) resol= 32;
 
 	/* get sphere samples. for faces we get the same samples for sample x/y values,
-	   for strand render we always require a new sampler because x/y are not set */
+	 * for strand render we always require a new sampler because x/y are not set */
 	vec= sphere_sampler(R.wrld.aomode, resol, shi->thread, shi->xs, shi->ys, shi->strand != NULL);
 	
 	// warning: since we use full sphere now, and dotproduct is below, we do twice as much

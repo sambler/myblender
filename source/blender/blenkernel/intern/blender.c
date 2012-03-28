@@ -373,7 +373,7 @@ int BKE_read_file(bContext *C, const char *filepath, ReportList *reports)
 	BlendFileData *bfd;
 	int retval= BKE_READ_FILE_OK;
 
-	if(strstr(filepath, BLENDER_STARTUP_FILE)==NULL) /* dont print user-pref loading */
+	if(strstr(filepath, BLENDER_STARTUP_FILE)==NULL) /* don't print user-pref loading */
 		printf("read blend: %s\n", filepath);
 
 	bfd= BLO_read_from_file(filepath, reports);
@@ -717,7 +717,7 @@ void BKE_undo_save_quit(void)
 		
 	BLI_make_file_string("/", str, BLI_temporary_dir(), "quit.blend");
 
-	file = open(str,O_BINARY+O_WRONLY+O_CREAT+O_TRUNC, 0666);
+	file = BLI_open(str,O_BINARY+O_WRONLY+O_CREAT+O_TRUNC, 0666);
 	if(file == -1) {
 		//XXX error("Unable to save %s, check you have permissions", str);
 		return;

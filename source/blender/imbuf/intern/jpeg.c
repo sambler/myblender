@@ -69,11 +69,11 @@ static ImBuf * ibJpegImageFromCinfo(struct jpeg_decompress_struct * cinfo, int f
  *
  * 1. jpeg - standard printing, u & v at quarter of resulution
  * 2. jvid - standaard video, u & v half resolution, frame not interlaced
-
-type 3 is unsupported as of jul 05 2000 Frank.
-
+ *
+ * type 3 is unsupported as of jul 05 2000 Frank.
+ *
  * 3. jstr - as 2, but written in 2 separate fields
-
+ *
  * 4. jmax - no scaling in the components
  */
 
@@ -142,8 +142,8 @@ static boolean fill_input_buffer(j_decompress_ptr cinfo)
 	my_src_ptr src = (my_src_ptr) cinfo->src;
 
 	/* Since we have given all we have got already
-	* we simply fake an end of file
-	*/
+	 * we simply fake an end of file
+	 */
 
 	src->pub.next_input_byte = src->terminal;
 	src->pub.bytes_in_buffer = 2;
@@ -405,7 +405,7 @@ static ImBuf * ibJpegImageFromCinfo(struct jpeg_decompress_struct * cinfo, int f
 				/*
 				 * A little paranoid, but the file maybe
 				 * is broken... and a "extra" check is better
-				 * that a segfaul ;)
+				 * then segfault ;)
 				 */
 				if (!key) {
 					MEM_freeN(str);
@@ -608,7 +608,7 @@ static int save_stdjpeg(const char *name, struct ImBuf *ibuf)
 	struct jpeg_compress_struct _cinfo, *cinfo = &_cinfo;
 	struct my_error_mgr jerr;
 
-	if ((outfile = fopen(name, "wb")) == NULL) return 0;
+	if ((outfile = BLI_fopen(name, "wb")) == NULL) return 0;
 	jpeg_default_quality = 75;
 
 	cinfo->err = jpeg_std_error(&jerr.pub);
@@ -642,7 +642,7 @@ static int save_vidjpeg(const char *name, struct ImBuf *ibuf)
 	struct jpeg_compress_struct _cinfo, *cinfo = &_cinfo;
 	struct my_error_mgr jerr;
 
-	if ((outfile = fopen(name, "wb")) == NULL) return 0;
+	if ((outfile = BLI_fopen(name, "wb")) == NULL) return 0;
 	jpeg_default_quality = 90;
 
 	cinfo->err = jpeg_std_error(&jerr.pub);
@@ -712,7 +712,7 @@ static int save_maxjpeg(const char *name, struct ImBuf *ibuf)
 	struct jpeg_compress_struct _cinfo, *cinfo = &_cinfo;
 	struct my_error_mgr jerr;
 
-	if ((outfile = fopen(name, "wb")) == NULL) return 0;
+	if ((outfile = BLI_fopen(name, "wb")) == NULL) return 0;
 	jpeg_default_quality = 100;
 
 	cinfo->err = jpeg_std_error(&jerr.pub);

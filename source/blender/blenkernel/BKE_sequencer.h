@@ -179,21 +179,6 @@ void seq_stripelem_cache_put(
 	SeqRenderData context, struct Sequence * seq, 
 	float cfra, seq_stripelem_ibuf_t type, struct ImBuf * nval);
 
-/* **********************************************************************
- * seqeffects.c
- *
- * Sequencer effect strip managment functions
- *  **********************************************************************
- */
-
-/* intern */
-struct SeqEffectHandle get_sequence_blend(struct Sequence *seq);
-void sequence_effect_speed_rebuild_map(struct Scene *scene, struct Sequence *seq, int force);
-
-/* extern */
-struct SeqEffectHandle get_sequence_effect(struct Sequence *seq);
-int get_sequence_effect_num_inputs(int seq_type);
-
 
 /* **********************************************************************
  * Sequencer editing functions

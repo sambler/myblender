@@ -490,7 +490,7 @@ static void contarget_get_mesh_mat (Object *ob, const char *substring, float mat
 			copy_v3_v3(plane, tmat[1]);
 			
 			cross_v3_v3v3(mat[0], normal, plane);
-			if(len_v3(mat[0]) < 1e-3f) {
+			if (len_v3(mat[0]) < 1e-3f) {
 				copy_v3_v3(plane, tmat[0]);
 				cross_v3_v3v3(mat[0], normal, plane);
 			}
@@ -820,7 +820,7 @@ static void childof_evaluate (bConstraint *con, bConstraintOb *cob, ListBase *ta
 		float parmat[4][4];
 		
 		/* simple matrix parenting */
-		if(data->flag == CHILDOF_ALL) {
+		if (data->flag == CHILDOF_ALL) {
 			
 			/* multiply target (parent matrix) by offset (parent inverse) to get 
 			 * the effect of the parent that will be exherted on the owner
@@ -2878,7 +2878,7 @@ static void minmax_new_data (void *cdata)
 	
 	data->minmaxflag = TRACK_Z;
 	data->offset = 0.0f;
-	data->cache[0] = data->cache[1] = data->cache[2] = 0.0f;
+	zero_v3(data->cache);
 	data->flag = 0;
 }
 
@@ -3449,7 +3449,7 @@ static void shrinkwrap_get_tarmat (bConstraint *con, bConstraintOb *cob, bConstr
 {
 	bShrinkwrapConstraint *scon = (bShrinkwrapConstraint *) con->data;
 	
-	if( VALID_CONS_TARGET(ct) && (ct->tar->type == OB_MESH) )
+	if ( VALID_CONS_TARGET(ct) && (ct->tar->type == OB_MESH) )
 	{
 		int fail = FALSE;
 		float co[3] = {0.0f, 0.0f, 0.0f};
@@ -3471,7 +3471,7 @@ static void shrinkwrap_get_tarmat (bConstraint *con, bConstraintOb *cob, bConstr
 		
 		unit_m4(ct->matrix);
 		
-		if(target != NULL)
+		if (target != NULL)
 		{
 			space_transform_from_matrixs(&transform, cob->matrix, ct->tar->obmat);
 			
@@ -3480,12 +3480,12 @@ static void shrinkwrap_get_tarmat (bConstraint *con, bConstraintOb *cob, bConstr
 				case MOD_SHRINKWRAP_NEAREST_SURFACE:
 				case MOD_SHRINKWRAP_NEAREST_VERTEX:
 					
-					if(scon->shrinkType == MOD_SHRINKWRAP_NEAREST_VERTEX)
+					if (scon->shrinkType == MOD_SHRINKWRAP_NEAREST_VERTEX)
 						bvhtree_from_mesh_verts(&treeData, target, 0.0, 2, 6);
 					else
 						bvhtree_from_mesh_faces(&treeData, target, 0.0, 2, 6);
 					
-					if(treeData.tree == NULL)
+					if (treeData.tree == NULL)
 					{
 						fail = TRUE;
 						break;
@@ -3496,16 +3496,16 @@ static void shrinkwrap_get_tarmat (bConstraint *con, bConstraintOb *cob, bConstr
 					BLI_bvhtree_find_nearest(treeData.tree, co, &nearest, treeData.nearest_callback, &treeData);
 					
 					dist = len_v3v3(co, nearest.co);
-					if(dist != 0.0f) {
+					if (dist != 0.0f) {
 						interp_v3_v3v3(co, co, nearest.co, (dist - scon->dist)/dist);	/* linear interpolation */
 					}
 					space_transform_invert(&transform, co);
 				break;
 				
 				case MOD_SHRINKWRAP_PROJECT:
-					if(scon->projAxis & MOD_SHRINKWRAP_PROJECT_OVER_X_AXIS) no[0] = 1.0f;
-					if(scon->projAxis & MOD_SHRINKWRAP_PROJECT_OVER_Y_AXIS) no[1] = 1.0f;
-					if(scon->projAxis & MOD_SHRINKWRAP_PROJECT_OVER_Z_AXIS) no[2] = 1.0f;
+					if (scon->projAxis & MOD_SHRINKWRAP_PROJECT_OVER_X_AXIS) no[0] = 1.0f;
+					if (scon->projAxis & MOD_SHRINKWRAP_PROJECT_OVER_Y_AXIS) no[1] = 1.0f;
+					if (scon->projAxis & MOD_SHRINKWRAP_PROJECT_OVER_Z_AXIS) no[2] = 1.0f;
 					
 					if (dot_v3v3(no, no) < FLT_EPSILON) {
 						fail = TRUE;
@@ -3516,13 +3516,13 @@ static void shrinkwrap_get_tarmat (bConstraint *con, bConstraintOb *cob, bConstr
 					
 					
 					bvhtree_from_mesh_faces(&treeData, target, scon->dist, 4, 6);
-					if(treeData.tree == NULL)
+					if (treeData.tree == NULL)
 					{
 						fail = TRUE;
 						break;
 					}
 					
-					if(normal_projection_project_vertex(0, co, no, &transform, treeData.tree, &hit, treeData.raycast_callback, &treeData) == FALSE)
+					if (normal_projection_project_vertex(0, co, no, &transform, treeData.tree, &hit, treeData.raycast_callback, &treeData) == FALSE)
 					{
 						fail = TRUE;
 						break;
@@ -3535,10 +3535,9 @@ static void shrinkwrap_get_tarmat (bConstraint *con, bConstraintOb *cob, bConstr
 			
 			target->release(target);
 			
-			if(fail == TRUE)
-			{
+			if (fail == TRUE) {
 				/* Don't move the point */
-				co[0] = co[1] = co[2] = 0.0f;
+				zero_v3(co);
 			}
 			
 			/* co is in local object coordinates, change it to global and update target position */
@@ -3893,7 +3892,7 @@ static void pivotcon_evaluate (bConstraint *con, bConstraintOb *cob, ListBase *t
 
 	/* correct the pivot by the rotation axis otherwise the pivot translates when it shouldnt */
 	mat3_to_axis_angle(axis, &angle, rotMat);
-	if(angle) {
+	if (angle) {
 		float dvec[3];
 		sub_v3_v3v3(vec, pivot, cob->matrix[3]);
 		project_v3_v3v3(dvec, vec, axis);
@@ -3928,28 +3927,28 @@ static bConstraintTypeInfo CTI_PIVOT = {
 
 /* ----------- Follow Track ------------- */
 
-static void followtrack_new_data (void *cdata)
+static void followtrack_new_data(void *cdata)
 {
-	bFollowTrackConstraint *data= (bFollowTrackConstraint *)cdata;
-	
-	data->clip= NULL;
+	bFollowTrackConstraint *data = (bFollowTrackConstraint *)cdata;
+
+	data->clip = NULL;
 	data->flag |= FOLLOWTRACK_ACTIVECLIP;
 }
 
-static void followtrack_id_looper (bConstraint *con, ConstraintIDFunc func, void *userdata)
+static void followtrack_id_looper(bConstraint *con, ConstraintIDFunc func, void *userdata)
 {
-	bFollowTrackConstraint *data= con->data;
-	
+	bFollowTrackConstraint *data = con->data;
+
 	func(con, (ID**)&data->clip, userdata);
 	func(con, (ID**)&data->camera, userdata);
 	func(con, (ID**)&data->depth_ob, userdata);
 }
 
-static void followtrack_evaluate (bConstraint *con, bConstraintOb *cob, ListBase *UNUSED(targets))
+static void followtrack_evaluate(bConstraint *con, bConstraintOb *cob, ListBase *UNUSED(targets))
 {
-	Scene *scene= cob->scene;
-	bFollowTrackConstraint *data= con->data;
-	MovieClip *clip= data->clip;
+	Scene *scene = cob->scene;
+	bFollowTrackConstraint *data = con->data;
+	MovieClip *clip = data->clip;
 	MovieTracking *tracking;
 	MovieTrackingTrack *track;
 	MovieTrackingObject *tracking_object;
@@ -3961,17 +3960,17 @@ static void followtrack_evaluate (bConstraint *con, bConstraintOb *cob, ListBase
 	if (!clip || !data->track[0] || !camob)
 		return;
 
-	tracking= &clip->tracking;
+	tracking = &clip->tracking;
 
-	if(data->object[0])
-		tracking_object= BKE_tracking_named_object(tracking, data->object);
+	if (data->object[0])
+		tracking_object = BKE_tracking_named_object(tracking, data->object);
 	else
-		tracking_object= BKE_tracking_get_camera_object(tracking);
+		tracking_object = BKE_tracking_get_camera_object(tracking);
 
-	if(!tracking_object)
+	if (!tracking_object)
 		return;
 
-	track= BKE_tracking_named_track(tracking, tracking_object, data->track);
+	track = BKE_tracking_named_track(tracking, tracking_object, data->track);
 
 	if (!track)
 		return;
@@ -3982,7 +3981,7 @@ static void followtrack_evaluate (bConstraint *con, bConstraintOb *cob, ListBase
 
 			copy_m4_m4(obmat, cob->matrix);
 
-			if((tracking_object->flag&TRACKING_OBJECT_CAMERA)==0) {
+			if ((tracking_object->flag & TRACKING_OBJECT_CAMERA)==0) {
 				float imat[4][4];
 
 				copy_m4_m4(mat, camob->obmat);
@@ -4004,15 +4003,15 @@ static void followtrack_evaluate (bConstraint *con, bConstraintOb *cob, ListBase
 	else {
 		MovieTrackingMarker *marker;
 		float vec[3], disp[3], axis[3], mat[4][4];
-		float aspect= (scene->r.xsch*scene->r.xasp) / (scene->r.ysch*scene->r.yasp);
+		float aspect= (scene->r.xsch * scene->r.xasp) / (scene->r.ysch * scene->r.yasp);
 		float len, d;
 
 		where_is_object_mat(scene, camob, mat);
 
 		/* camera axis */
-		vec[0]= 0.0f;
-		vec[1]= 0.0f;
-		vec[2]= 1.0f;
+		vec[0] = 0.0f;
+		vec[1] = 0.0f;
+		vec[2] = 1.0f;
 		mul_v3_m4v3(axis, mat, vec);
 
 		/* distance to projection plane */
@@ -4020,13 +4019,13 @@ static void followtrack_evaluate (bConstraint *con, bConstraintOb *cob, ListBase
 		sub_v3_v3(vec, mat[3]);
 		project_v3_v3v3(disp, vec, axis);
 
-		len= len_v3(disp);
+		len = len_v3(disp);
 
 		if (len > FLT_EPSILON) {
 			CameraParams params;
 			float pos[2], rmat[4][4];
 
-			marker= BKE_tracking_get_marker(track, scene->r.cfra);
+			marker = BKE_tracking_get_marker(track, scene->r.cfra);
 
 			add_v2_v2v2(pos, marker->pos, track->offset);
 
@@ -4034,12 +4033,14 @@ static void followtrack_evaluate (bConstraint *con, bConstraintOb *cob, ListBase
 			camera_params_from_object(&params, camob);
 
 			if (params.is_ortho) {
-				vec[0]= params.ortho_scale * (pos[0]-0.5f+params.shiftx);
-				vec[1]= params.ortho_scale * (pos[1]-0.5f+params.shifty);
-				vec[2]= -len;
+				vec[0] = params.ortho_scale * (pos[0] - 0.5f + params.shiftx);
+				vec[1] = params.ortho_scale * (pos[1] - 0.5f + params.shifty);
+				vec[2] = -len;
 
-				if (aspect > 1.0f) vec[1] /= aspect;
-				else vec[0] *= aspect;
+				if (aspect > 1.0f)
+					vec[1] /= aspect;
+				else
+					vec[0] *= aspect;
 
 				mul_v3_m4v3(disp, camob->obmat, vec);
 
@@ -4050,14 +4051,16 @@ static void followtrack_evaluate (bConstraint *con, bConstraintOb *cob, ListBase
 				copy_v3_v3(cob->matrix[3], disp);
 			}
 			else {
-				d= (len*params.sensor_x) / (2.0f*params.lens);
+				d=  (len * params.sensor_x) / (2.0f * params.lens);
 
-				vec[0]= d*(2.0f*(pos[0]+params.shiftx)-1.0f);
-				vec[1]= d*(2.0f*(pos[1]+params.shifty)-1.0f);
-				vec[2]= -len;
+				vec[0] = d * (2.0f * (pos[0] + params.shiftx) - 1.0f);
+				vec[1] = d * (2.0f * (pos[1] + params.shifty) - 1.0f);
+				vec[2] = -len;
 
-				if (aspect > 1.0f) vec[1] /= aspect;
-				else vec[0] *= aspect;
+				if (aspect > 1.0f)
+					vec[1] /= aspect;
+				else
+					vec[0] *= aspect;
 
 				mul_v3_m4v3(disp, camob->obmat, vec);
 
@@ -4069,9 +4072,9 @@ static void followtrack_evaluate (bConstraint *con, bConstraintOb *cob, ListBase
 				copy_v3_v3(cob->matrix[3], disp);
 			}
 
-			if(data->depth_ob && data->depth_ob->derivedFinal) {
-				Object *depth_ob= data->depth_ob;
-				BVHTreeFromMesh treeData= NULL_BVHTreeFromMesh;
+			if (data->depth_ob && data->depth_ob->derivedFinal) {
+				Object *depth_ob = data->depth_ob;
+				BVHTreeFromMesh treeData = NULL_BVHTreeFromMesh;
 				BVHTreeRayHit hit;
 				float ray_start[3], ray_end[3], ray_nor[3], imat[4][4];
 				int result;
@@ -4085,12 +4088,12 @@ static void followtrack_evaluate (bConstraint *con, bConstraintOb *cob, ListBase
 
 				bvhtree_from_mesh_faces(&treeData, depth_ob->derivedFinal, 0.0f, 4, 6);
 
-				hit.dist= FLT_MAX;
-				hit.index= -1;
+				hit.dist = FLT_MAX;
+				hit.index = -1;
 
-				result= BLI_bvhtree_ray_cast(treeData.tree, ray_start, ray_nor, 0.0f, &hit, treeData.raycast_callback, &treeData);
+				result = BLI_bvhtree_ray_cast(treeData.tree, ray_start, ray_nor, 0.0f, &hit, treeData.raycast_callback, &treeData);
 
-				if(result != -1) {
+				if (result != -1) {
 					mul_v3_m4v3(cob->matrix[3], depth_ob->obmat, hit.co);
 				}
 
@@ -4118,34 +4121,34 @@ static bConstraintTypeInfo CTI_FOLLOWTRACK = {
 
 /* ----------- Camre Solver ------------- */
 
-static void camerasolver_new_data (void *cdata)
+static void camerasolver_new_data(void *cdata)
 {
-	bCameraSolverConstraint *data= (bCameraSolverConstraint *)cdata;
-	
+	bCameraSolverConstraint *data = (bCameraSolverConstraint *)cdata;
+
 	data->clip = NULL;
 	data->flag |= CAMERASOLVER_ACTIVECLIP;
 }
 
-static void camerasolver_id_looper (bConstraint *con, ConstraintIDFunc func, void *userdata)
+static void camerasolver_id_looper(bConstraint *con, ConstraintIDFunc func, void *userdata)
 {
-	bCameraSolverConstraint *data= con->data;
-	
+	bCameraSolverConstraint *data = con->data;
+
 	func(con, (ID**)&data->clip, userdata);
 }
 
-static void camerasolver_evaluate (bConstraint *con, bConstraintOb *cob, ListBase *UNUSED(targets))
+static void camerasolver_evaluate(bConstraint *con, bConstraintOb *cob, ListBase *UNUSED(targets))
 {
-	Scene *scene= cob->scene;
-	bCameraSolverConstraint *data= con->data;
-	MovieClip *clip= data->clip;
+	Scene *scene = cob->scene;
+	bCameraSolverConstraint *data = con->data;
+	MovieClip *clip = data->clip;
 
 	if (data->flag & CAMERASOLVER_ACTIVECLIP)
-		clip= scene->clip;
+		clip = scene->clip;
 
 	if (clip) {
 		float mat[4][4], obmat[4][4];
-		MovieTracking *tracking= &clip->tracking;
-		MovieTrackingObject *object= BKE_tracking_get_camera_object(tracking);
+		MovieTracking *tracking = &clip->tracking;
+		MovieTrackingObject *object = BKE_tracking_get_camera_object(tracking);
 
 		BKE_tracking_get_interpolated_camera(tracking, object, scene->r.cfra, mat);
 
@@ -4173,16 +4176,16 @@ static bConstraintTypeInfo CTI_CAMERASOLVER = {
 
 /* ----------- Object Solver ------------- */
 
-static void objectsolver_new_data (void *cdata)
+static void objectsolver_new_data(void *cdata)
 {
-	bObjectSolverConstraint *data= (bObjectSolverConstraint *)cdata;
+	bObjectSolverConstraint *data = (bObjectSolverConstraint *)cdata;
 
 	data->clip = NULL;
 	data->flag |= OBJECTSOLVER_ACTIVECLIP;
 	unit_m4(data->invmat);
 }
 
-static void objectsolver_id_looper (bConstraint *con, ConstraintIDFunc func, void *userdata)
+static void objectsolver_id_looper(bConstraint *con, ConstraintIDFunc func, void *userdata)
 {
 	bObjectSolverConstraint *data= con->data;
 
@@ -4190,26 +4193,26 @@ static void objectsolver_id_looper (bConstraint *con, ConstraintIDFunc func, voi
 	func(con, (ID**)&data->camera, userdata);
 }
 
-static void objectsolver_evaluate (bConstraint *con, bConstraintOb *cob, ListBase *UNUSED(targets))
+static void objectsolver_evaluate(bConstraint *con, bConstraintOb *cob, ListBase *UNUSED(targets))
 {
-	Scene *scene= cob->scene;
-	bObjectSolverConstraint *data= con->data;
-	MovieClip *clip= data->clip;
-	Object *camob= data->camera ? data->camera : scene->camera;
+	Scene *scene = cob->scene;
+	bObjectSolverConstraint *data = con->data;
+	MovieClip *clip = data->clip;
+	Object *camob = data->camera ? data->camera : scene->camera;
 
 	if (data->flag & OBJECTSOLVER_ACTIVECLIP)
 		clip= scene->clip;
 
-	if(!camob || !clip)
+	if (!camob || !clip)
 		return;
 
 	if (clip) {
-		MovieTracking *tracking= &clip->tracking;
+		MovieTracking *tracking = &clip->tracking;
 		MovieTrackingObject *object;
 
-		object= BKE_tracking_named_object(tracking, data->object);
+		object = BKE_tracking_named_object(tracking, data->object);
 
-		if(object) {
+		if (object) {
 			float mat[4][4], obmat[4][4], imat[4][4], cammat[4][4], camimat[4][4], parmat[4][4];
 
 			where_is_object_mat(scene, camob, cammat);
@@ -4721,7 +4724,7 @@ void get_constraint_target_matrix (struct Scene *scene, bConstraint *con, int n,
 		
 		/* only calculate the target matrix on the first target */
 		ct= (bConstraintTarget *)targets.first;
-		while(ct && n-- > 0)
+		while (ct && n-- > 0)
 			ct= ct->next;
 
 		if (ct) {

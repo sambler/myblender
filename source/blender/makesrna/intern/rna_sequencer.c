@@ -324,7 +324,8 @@ static void rna_Sequence_use_color_balance_set(PointerRNA *ptr, int value)
 				seq->strip->color_balance->gain[c] = 1.0f;
 			}
 		}
-	} else {
+	}
+	else {
 		seq->flag ^= SEQ_USE_COLOR_BALANCE;
 	}
 }
@@ -341,7 +342,8 @@ static void rna_Sequence_use_proxy_set(PointerRNA *ptr, int value)
 			seq->strip->proxy->build_size_flags
 				= SEQ_PROXY_IMAGE_SIZE_25;
 		}
-	} else {
+	}
+	else {
 		seq->flag ^= SEQ_USE_PROXY;
 	}
 }
@@ -354,7 +356,8 @@ static void rna_Sequence_use_translation_set(PointerRNA *ptr, int value)
 		if (seq->strip->transform == NULL) {
 			seq->strip->transform = MEM_callocN(sizeof(struct StripTransform), "StripTransform");
 		}
-	} else {
+	}
+	else {
 		seq->flag ^= SEQ_USE_TRANSFORM;
 	}
 }
@@ -367,7 +370,8 @@ static void rna_Sequence_use_crop_set(PointerRNA *ptr, int value)
 		if (seq->strip->crop == NULL) {
 			seq->strip->crop = MEM_callocN(sizeof(struct StripCrop), "StripCrop");
 		}
-	} else {
+	}
+	else {
 		seq->flag ^= SEQ_USE_CROP;
 	}
 }

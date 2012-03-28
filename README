@@ -1,9 +1,14 @@
 myblender is a copy of current blender development with branches for
 patches and additions that I have developed.
-Submodule myblenderaddons is also needed http://github.com/sambler/myblenderaddons
-
 Some of these are developed from ideas at http://blenderstorm.org
 
 See the wiki pages for more info about each branch
 http://wiki.github.com/sambler/myblender/
+
+Three submodules are required to get a runnable build that correspond
+to the three external modules used in the official blender svn checkout -
+
+myblenderaddons - http://github.com/sambler/myblenderaddons
+myblendercontrib - http://github.com/sambler/myblendercontrib
+myblendertranslations - http://github.com/sambler/myblendertranslations
 

@@ -590,7 +590,7 @@ static float fcm_cycles_time (FCurve *fcu, FModifier *fcm, float UNUSED(cvalue),
 			ofs= lastkey[0];
 		}
 	}
-	if ELEM(0, side, mode)
+	if ((ELEM(0, side, mode)))
 		return evaltime;
 		
 	/* find relative place within a cycle */
@@ -627,7 +627,7 @@ static float fcm_cycles_time (FCurve *fcu, FModifier *fcm, float UNUSED(cvalue),
 		
 		/* check if 'cyclic extrapolation', and thus calculate y-offset for this cycle */
 		if (mode == FCM_EXTRAPOLATE_CYCLIC_OFFSET) {
-			if(side < 0)
+			if (side < 0)
 				cycyofs = (float)floor((evaltime - ofs) / cycdx);
 			else
 				cycyofs = (float)ceil((evaltime - ofs) / cycdx);
@@ -635,10 +635,10 @@ static float fcm_cycles_time (FCurve *fcu, FModifier *fcm, float UNUSED(cvalue),
 		}
 		
 		/* special case for cycle start/end */
-		if(cyct == 0.0f) {
+		if (cyct == 0.0f) {
 			evaltime = (side == 1 ? lastkey[0] : prevkey[0]);
 			
-			if((mode == FCM_EXTRAPOLATE_MIRROR) && ((int)cycle % 2))
+			if ((mode == FCM_EXTRAPOLATE_MIRROR) && ((int)cycle % 2))
 				evaltime = (side == 1 ? prevkey[0] : lastkey[0]);
 		}
 		/* calculate where in the cycle we are (overwrite evaltime to reflect this) */
@@ -1000,7 +1000,7 @@ FModifier *add_fmodifier (ListBase *modifiers, int type)
 	FModifier *fcm;
 	
 	/* sanity checks */
-	if ELEM(NULL, modifiers, fmi)
+	if (ELEM(NULL, modifiers, fmi))
 		return NULL;
 	
 	/* special checks for whether modifier can be added */
@@ -1063,7 +1063,7 @@ void copy_fmodifiers (ListBase *dst, ListBase *src)
 {
 	FModifier *fcm, *srcfcm;
 	
-	if ELEM(NULL, dst, src)
+	if (ELEM(NULL, dst, src))
 		return;
 	
 	dst->first= dst->last= NULL;
@@ -1134,7 +1134,7 @@ FModifier *find_active_fmodifier (ListBase *modifiers)
 	FModifier *fcm;
 	
 	/* sanity checks */
-	if ELEM(NULL, modifiers, modifiers->first)
+	if (ELEM(NULL, modifiers, modifiers->first))
 		return NULL;
 	
 	/* loop over modifiers until 'active' one is found */
@@ -1153,7 +1153,7 @@ void set_active_fmodifier (ListBase *modifiers, FModifier *fcm)
 	FModifier *fm;
 	
 	/* sanity checks */
-	if ELEM(NULL, modifiers, modifiers->first)
+	if (ELEM(NULL, modifiers, modifiers->first))
 		return;
 	
 	/* deactivate all, and set current one active */
@@ -1178,7 +1178,7 @@ short list_has_suitable_fmodifier (ListBase *modifiers, int mtype, short acttype
 		return (modifiers && modifiers->first);
 		
 	/* sanity checks */
-	if ELEM(NULL, modifiers, modifiers->first)
+	if (ELEM(NULL, modifiers, modifiers->first))
 		return 0;
 		
 	/* find the first mdifier fitting these criteria */
@@ -1258,7 +1258,7 @@ float evaluate_time_fmodifiers (ListBase *modifiers, FCurve *fcu, float cvalue, 
 	FModifier *fcm;
 	
 	/* sanity checks */
-	if ELEM(NULL, modifiers, modifiers->last)
+	if (ELEM(NULL, modifiers, modifiers->last))
 		return evaltime;
 		
 	/* Starting from the end of the stack, calculate the time effects of various stacked modifiers 
@@ -1307,7 +1307,7 @@ void evaluate_value_fmodifiers (ListBase *modifiers, FCurve *fcu, float *cvalue,
 	FModifier *fcm;
 	
 	/* sanity checks */
-	if ELEM(NULL, modifiers, modifiers->first)
+	if (ELEM(NULL, modifiers, modifiers->first))
 		return;
 	
 	/* evaluate modifiers */
@@ -1345,7 +1345,7 @@ void fcurve_bake_modifiers (FCurve *fcu, int start, int end)
 	
 	/* sanity checks */
 	// TODO: make these tests report errors using reports not printf's
-	if ELEM(NULL, fcu, fcu->modifiers.first) {
+	if (ELEM(NULL, fcu, fcu->modifiers.first)) {
 		printf("Error: No F-Curve with F-Curve Modifiers to Bake\n");
 		return;
 	}

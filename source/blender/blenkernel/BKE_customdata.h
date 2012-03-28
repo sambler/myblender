@@ -60,7 +60,7 @@ extern const CustomDataMask CD_MASK_FACECORNERS;
 /* for ORIGINDEX layer type, indicates no original index for this element */
 #define ORIGINDEX_NONE -1
 
-/* initialises a CustomData object with the same layer setup as source and
+/* initializes a CustomData object with the same layer setup as source and
  * memory space for totelem elements. mask must be an array of length
  * CD_NUMTYPES elements, that indicate if a layer can be copied. */
 
@@ -70,14 +70,15 @@ extern const CustomDataMask CD_MASK_FACECORNERS;
 #define CD_DEFAULT   2  /* allocate and set to default */
 #define CD_REFERENCE 3  /* use data pointers, set layer flag NOFREE */
 #define CD_DUPLICATE 4  /* do a full copy of all layers, only allowed if source
-						   has same number of elements */
+                         * has same number of elements */
 
 #define CD_TYPE_AS_MASK(_type) (CustomDataMask)((CustomDataMask)1 << (CustomDataMask)(_type))
 
-/* Checks if the layer at physical offset layern (in data->layers) support math
+/**
+ * Checks if the layer at physical offset \a layer_n (in data->layers) support math
  * the below operations.
  */
-int CustomData_layer_has_math(struct CustomData *data, int layern);
+int CustomData_layer_has_math(struct CustomData *data, int layer_n);
 
 /* copies the "value" (e.g. mloopuv uv or mloopcol colors) from one block to
  * another, while not overwriting anything else (e.g. flags).  probably only
@@ -93,7 +94,7 @@ void CustomData_data_dominmax(int type, void *data, void *min, void *max);
 void CustomData_data_multiply(int type, void *data, float fac);
 void CustomData_data_add(int type, void *data1, void *data2);
 
-/* initialises a CustomData object with the same layer setup as source.
+/* initializes a CustomData object with the same layer setup as source.
  * mask is a bitfield where (mask & (1 << (layer type))) indicates
  * if a layer should be copied or not. alloctype must be one of the above. */
 void CustomData_copy(const struct CustomData *source, struct CustomData *dest,

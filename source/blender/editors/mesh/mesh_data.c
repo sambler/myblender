@@ -288,7 +288,7 @@ int ED_mesh_uv_loop_reset(struct bContext *C, struct Mesh *me)
 		fuvs += len;
 	}
 
-	/* BMESH_TODO: Copy poly UVs onto CD_MTFACE layer for tesselated faces */
+	/* BMESH_TODO: Copy poly UVs onto CD_MTFACE layer for tessellated faces */
 
 	BLI_array_free(uvs);
 	BLI_array_free(polylengths);
@@ -421,7 +421,7 @@ int ED_mesh_color_add(bContext *C, Scene *UNUSED(scene), Object *UNUSED(ob), Mes
 
 		if(me->mloopcol) {
 			CustomData_add_layer_named(&me->ldata, CD_MLOOPCOL, CD_DUPLICATE, me->mloopcol, me->totloop, name);
-			CustomData_add_layer_named(&me->fdata, CD_MCOL, CD_DUPLICATE, me->mloopcol, me->totface, name);
+			CustomData_add_layer_named(&me->fdata, CD_MCOL, CD_DUPLICATE, me->mcol, me->totface, name);
 		}
 		else {
 			CustomData_add_layer_named(&me->ldata, CD_MLOOPCOL, CD_DEFAULT, NULL, me->totloop, name);
@@ -501,16 +501,16 @@ static int uv_texture_add_exec(bContext *C, wmOperator *UNUSED(op))
 void MESH_OT_uv_texture_add(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Add UV Map";
-	ot->description= "Add UV Map";
-	ot->idname= "MESH_OT_uv_texture_add";
+	ot->name = "Add UV Map";
+	ot->description = "Add UV Map";
+	ot->idname = "MESH_OT_uv_texture_add";
 	
 	/* api callbacks */
-	ot->poll= layers_poll;
-	ot->exec= uv_texture_add_exec;
+	ot->poll = layers_poll;
+	ot->exec = uv_texture_add_exec;
 
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 }
 
 static int drop_named_image_invoke(bContext *C, wmOperator *op, wmEvent *event)
@@ -584,16 +584,16 @@ static int drop_named_image_invoke(bContext *C, wmOperator *op, wmEvent *event)
 void MESH_OT_drop_named_image(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Assign Image to UV Map";
-	ot->description= "Assign Image to active UV Map, or create an UV Map";
-	ot->idname= "MESH_OT_drop_named_image";
+	ot->name = "Assign Image to UV Map";
+	ot->description = "Assign Image to active UV Map, or create an UV Map";
+	ot->idname = "MESH_OT_drop_named_image";
 	
 	/* api callbacks */
-	ot->poll= layers_poll;
-	ot->invoke= drop_named_image_invoke;
+	ot->poll = layers_poll;
+	ot->invoke = drop_named_image_invoke;
 	
 	/* flags */
-	ot->flag= OPTYPE_UNDO;
+	ot->flag = OPTYPE_UNDO;
 	
 	/* properties */
 	RNA_def_string(ot->srna, "name", "Image", MAX_ID_NAME-2, "Name", "Image name to assign");
@@ -614,16 +614,16 @@ static int uv_texture_remove_exec(bContext *C, wmOperator *UNUSED(op))
 void MESH_OT_uv_texture_remove(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Remove UV Map";
-	ot->description= "Remove UV Map";
-	ot->idname= "MESH_OT_uv_texture_remove";
+	ot->name = "Remove UV Map";
+	ot->description = "Remove UV Map";
+	ot->idname = "MESH_OT_uv_texture_remove";
 	
 	/* api callbacks */
-	ot->poll= layers_poll;
-	ot->exec= uv_texture_remove_exec;
+	ot->poll = layers_poll;
+	ot->exec = uv_texture_remove_exec;
 
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 }
 
 /*********************** vertex color operators ************************/
@@ -643,16 +643,16 @@ static int vertex_color_add_exec(bContext *C, wmOperator *UNUSED(op))
 void MESH_OT_vertex_color_add(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Add Vertex Color";
-	ot->description= "Add vertex color layer";
-	ot->idname= "MESH_OT_vertex_color_add";
+	ot->name = "Add Vertex Color";
+	ot->description = "Add vertex color layer";
+	ot->idname = "MESH_OT_vertex_color_add";
 	
 	/* api callbacks */
-	ot->poll= layers_poll;
-	ot->exec= vertex_color_add_exec;
+	ot->poll = layers_poll;
+	ot->exec = vertex_color_add_exec;
 
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 }
 
 static int vertex_color_remove_exec(bContext *C, wmOperator *UNUSED(op))
@@ -669,16 +669,16 @@ static int vertex_color_remove_exec(bContext *C, wmOperator *UNUSED(op))
 void MESH_OT_vertex_color_remove(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Remove Vertex Color";
-	ot->description= "Remove vertex color layer";
-	ot->idname= "MESH_OT_vertex_color_remove";
+	ot->name = "Remove Vertex Color";
+	ot->description = "Remove vertex color layer";
+	ot->idname = "MESH_OT_vertex_color_remove";
 	
 	/* api callbacks */
-	ot->exec= vertex_color_remove_exec;
-	ot->poll= layers_poll;
+	ot->exec = vertex_color_remove_exec;
+	ot->poll = layers_poll;
 
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 }
 
 /*********************** sticky operators ************************/
@@ -707,16 +707,16 @@ static int sticky_add_exec(bContext *C, wmOperator *UNUSED(op))
 void MESH_OT_sticky_add(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Add Sticky";
-	ot->description= "Add sticky UV texture layer";
-	ot->idname= "MESH_OT_sticky_add";
+	ot->name = "Add Sticky";
+	ot->description = "Add sticky UV texture layer";
+	ot->idname = "MESH_OT_sticky_add";
 	
 	/* api callbacks */
-	ot->poll= layers_poll;
-	ot->exec= sticky_add_exec;
+	ot->poll = layers_poll;
+	ot->exec = sticky_add_exec;
 
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 }
 
 static int sticky_remove_exec(bContext *C, wmOperator *UNUSED(op))
@@ -739,16 +739,16 @@ static int sticky_remove_exec(bContext *C, wmOperator *UNUSED(op))
 void MESH_OT_sticky_remove(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Remove Sticky";
-	ot->description= "Remove sticky UV texture layer";
-	ot->idname= "MESH_OT_sticky_remove";
+	ot->name = "Remove Sticky";
+	ot->description = "Remove sticky UV texture layer";
+	ot->idname = "MESH_OT_sticky_remove";
 	
 	/* api callbacks */
-	ot->poll= layers_poll;
-	ot->exec= sticky_remove_exec;
+	ot->poll = layers_poll;
+	ot->exec = sticky_remove_exec;
 
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 }
 
 /************************** Add Geometry Layers *************************/
@@ -757,12 +757,13 @@ void ED_mesh_update(Mesh *mesh, bContext *C, int calc_edges, int calc_tessface)
 {
 	int *polyindex = NULL;
 	float (*face_nors)[3];
+	int tessface_input = FALSE;
 
 	if(mesh->totface > 0 && mesh->totpoly == 0) {
 		convert_mfaces_to_mpolys(mesh);
 
-		/* would only be converting back again, dont bother */
-		calc_tessface = FALSE;
+		/* would only be converting back again, don't bother */
+		tessface_input = TRUE;
 
 		/* it also happens that converting the faces calculates edges, skip this */
 		calc_edges = FALSE;
@@ -772,7 +773,9 @@ void ED_mesh_update(Mesh *mesh, bContext *C, int calc_edges, int calc_tessface)
 		BKE_mesh_calc_edges(mesh, calc_edges);
 
 	if (calc_tessface) {
-		BKE_mesh_tessface_calc(mesh);
+		if (tessface_input == FALSE) {
+			BKE_mesh_tessface_calc(mesh);
+		}
 	}
 	else {
 		/* default state is not to have tessface's so make sure this is the case */
@@ -784,8 +787,8 @@ void ED_mesh_update(Mesh *mesh, bContext *C, int calc_edges, int calc_tessface)
 	 * calculate normals only for the mvert's. - campbell */
 #ifdef USE_BMESH_MPOLY_NORMALS
 	polyindex = CustomData_get_layer(&mesh->fdata, CD_POLYINDEX);
-	/* add a normals layer for tesselated faces, a tessface normal will
-	 * contain the normal of the poly the face was tesselated from. */
+	/* add a normals layer for tessellated faces, a tessface normal will
+	 * contain the normal of the poly the face was tessellated from. */
 	face_nors = CustomData_add_layer(&mesh->fdata, CD_NORMAL, CD_CALLOC, NULL, mesh->totface);
 
 	mesh_calc_normals_mapping_ex(mesh->mvert, mesh->totvert,
@@ -867,7 +870,7 @@ static void mesh_add_edges(Mesh *mesh, int len)
 
 	CustomData_free(&mesh->edata, mesh->totedge);
 	mesh->edata= edata;
-	mesh_update_customdata_pointers(mesh, FALSE); /* new edges dont change tessellation */
+	mesh_update_customdata_pointers(mesh, FALSE); /* new edges don't change tessellation */
 
 	/* set default flags */
 	medge= &mesh->medge[mesh->totedge];

@@ -212,7 +212,7 @@ int EDBM_CallAndSelectOpf(BMEditMesh *em, wmOperator *op, const char *selectslot
 
 	BM_mesh_elem_flag_disable_all(em->bm, BM_VERT|BM_EDGE|BM_FACE, BM_ELEM_SELECT);
 
-	BMO_slot_buffer_hflag_enable(em->bm, &bmop, selectslot, BM_ELEM_SELECT, BM_ALL, TRUE);
+	BMO_slot_buffer_hflag_enable(em->bm, &bmop, selectslot, BM_ALL, BM_ELEM_SELECT, TRUE);
 
 	va_end(list);
 	return EDBM_FinishOp(em, &bmop, op, TRUE);
@@ -421,8 +421,8 @@ void EDBM_select_more(BMEditMesh *em)
 	             "regionextend geom=%hvef constrict=%b use_faces=%b",
 	             BM_ELEM_SELECT, FALSE, use_faces);
 	BMO_op_exec(em->bm, &bmop);
-	/* dont flush selection in edge/vertex mode  */
-	BMO_slot_buffer_hflag_enable(em->bm, &bmop, "geomout", BM_ELEM_SELECT, BM_ALL, use_faces ? TRUE : FALSE);
+	/* don't flush selection in edge/vertex mode  */
+	BMO_slot_buffer_hflag_enable(em->bm, &bmop, "geomout", BM_ALL, BM_ELEM_SELECT, use_faces ? TRUE : FALSE);
 	BMO_op_finish(em->bm, &bmop);
 
 	EDBM_select_flush(em);
@@ -437,8 +437,8 @@ void EDBM_select_less(BMEditMesh *em)
 	             "regionextend geom=%hvef constrict=%b use_faces=%b",
 	             BM_ELEM_SELECT, TRUE, use_faces);
 	BMO_op_exec(em->bm, &bmop);
-	/* dont flush selection in edge/vertex mode  */
-	BMO_slot_buffer_hflag_disable(em->bm, &bmop, "geomout", BM_ELEM_SELECT, BM_ALL, use_faces ? TRUE : FALSE);
+	/* don't flush selection in edge/vertex mode  */
+	BMO_slot_buffer_hflag_disable(em->bm, &bmop, "geomout", BM_ALL, BM_ELEM_SELECT, use_faces ? TRUE : FALSE);
 	BMO_op_finish(em->bm, &bmop);
 
 	EDBM_selectmode_flush(em);
@@ -514,7 +514,7 @@ static void *editbtMesh_to_undoMesh(void *emv, void *obdata)
 	Mesh *obme = obdata;
 	
 	undomesh *um = MEM_callocN(sizeof(undomesh), "undo Mesh");
-	BLI_strncpy(um->obname, em->bm->ob->id.name + 2, sizeof(um->obname));
+	BLI_strncpy(um->obname, em->ob->id.name + 2, sizeof(um->obname));
 	
 	/* make sure shape keys work */
 	um->me.key = obme->key ? copy_key_nolib(obme->key) : NULL;
@@ -526,6 +526,8 @@ static void *editbtMesh_to_undoMesh(void *emv, void *obdata)
 	BMEdit_RecalcTessellation(em);
 
 #endif
+
+	/* BM_mesh_validate(em->bm); */ /* for troubleshooting */
 
 	BMO_op_callf(em->bm, "bmesh_to_mesh mesh=%p notessellation=%b", &um->me, TRUE);
 	um->selectmode = em->selectmode;
@@ -546,7 +548,7 @@ static void undoMesh_to_editbtMesh(void *umv, void *emv, void *UNUSED(obdata))
 
 	BMEdit_Free(em);
 
-	bm = BM_mesh_create(ob, &bm_mesh_allocsize_default);
+	bm = BM_mesh_create(&bm_mesh_allocsize_default);
 	BMO_op_callf(bm, "mesh_to_bmesh mesh=%p object=%p set_shapekey=%b", &um->me, ob, FALSE);
 
 	em2 = BMEdit_Create(bm, TRUE);
@@ -560,7 +562,7 @@ static void undoMesh_to_editbtMesh(void *umv, void *emv, void *UNUSED(obdata))
 
 static void free_undo(void *umv)
 {
-	if (((Mesh *)umv)->key)	{
+	if (((Mesh *)umv)->key) {
 		free_key(((Mesh *)umv)->key);
 		MEM_freeN(((Mesh *)umv)->key);
 	}
@@ -572,6 +574,13 @@ static void free_undo(void *umv)
 /* and this is all the undo system needs to know */
 void undo_push_mesh(bContext *C, const char *name)
 {
+	/* em->ob gets out of date and crashes on mesh undo,
+	 * this is an easy way to ensure its OK
+	 * though we could investigate the matter further. */
+	Object *obedit = CTX_data_edit_object(C);
+	BMEditMesh *em = BMEdit_FromObject(obedit);
+	em->ob = obedit;
+
 	undo_editmode_push(C, name, getEditMesh, free_undo, undoMesh_to_editbtMesh, editbtMesh_to_undoMesh, NULL);
 }
 
@@ -616,8 +625,8 @@ UvVertMap *EDBM_make_uv_vert_map(BMEditMesh *em, int selected, int do_face_idx_a
 		return NULL;
 	}
 
-	vmap->vert = (UvMapVert **)MEM_callocN(sizeof(*vmap->vert)*totverts, "UvMapVert_pt");
-	buf = vmap->buf = (UvMapVert *)MEM_callocN(sizeof(*vmap->buf)*totuv, "UvMapVert");
+	vmap->vert = (UvMapVert **)MEM_callocN(sizeof(*vmap->vert) * totverts, "UvMapVert_pt");
+	buf = vmap->buf = (UvMapVert *)MEM_callocN(sizeof(*vmap->buf) * totuv, "UvMapVert");
 
 	if (!vmap->vert || !vmap->buf) {
 		free_uv_vert_map(vmap);
@@ -741,7 +750,7 @@ UvElementMap *EDBM_make_uv_element_map(BMEditMesh *em, int selected, int do_isla
 	totverts = em->bm->totvert;
 	totuv = 0;
 
-	island_number = MEM_mallocN(sizeof(*stack)*em->bm->totface, "uv_island_number_face");
+	island_number = MEM_mallocN(sizeof(*stack) * em->bm->totface, "uv_island_number_face");
 	if (!island_number) {
 		return NULL;
 	}
@@ -841,9 +850,9 @@ UvElementMap *EDBM_make_uv_element_map(BMEditMesh *em, int selected, int do_isla
 
 	if (do_islands) {
 		/* map holds the map from current vmap->buf to the new, sorted map */
-		map = MEM_mallocN(sizeof(*map)*totuv, "uvelement_remap");
-		stack = MEM_mallocN(sizeof(*stack)*em->bm->totface, "uv_island_face_stack");
-		islandbuf = MEM_callocN(sizeof(*islandbuf)*totuv, "uvelement_island_buffer");
+		map = MEM_mallocN(sizeof(*map) * totuv, "uvelement_remap");
+		stack = MEM_mallocN(sizeof(*stack) * em->bm->totface, "uv_island_face_stack");
+		islandbuf = MEM_callocN(sizeof(*islandbuf) * totuv, "uvelement_island_buffer");
 
 		/* at this point, every UvElement in vert points to a UvElement sharing the same vertex. Now we should sort uv's in islands. */
 		for (i = 0; i < totuv; i++) {
@@ -900,7 +909,7 @@ UvElementMap *EDBM_make_uv_element_map(BMEditMesh *em, int selected, int do_isla
 				element_map->vert[i] = &islandbuf[map[element_map->vert[i] - element_map->buf]];
 		}
 
-		element_map->islandIndices = MEM_callocN(sizeof(*element_map->islandIndices)*nislands,"UvElementMap_island_indices");
+		element_map->islandIndices = MEM_callocN(sizeof(*element_map->islandIndices) * nislands, "UvElementMap_island_indices");
 		if (!element_map->islandIndices) {
 			MEM_freeN(islandbuf);
 			MEM_freeN(stack);

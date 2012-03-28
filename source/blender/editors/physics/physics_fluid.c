@@ -654,6 +654,7 @@ static int fluid_validate_scene(ReportList *reports, Scene *scene, Object *fsDom
 
 
 #define FLUID_SUFFIX_CONFIG		"fluidsim.cfg"
+#define FLUID_SUFFIX_CONFIG_TMP	(FLUID_SUFFIX_CONFIG ".tmp")
 #define FLUID_SUFFIX_SURFACE	"fluidsurface"
 
 static int fluid_init_filepaths(Object *fsDomain, char *targetDir, char *targetFile, char *debugStrBuffer)
@@ -663,7 +664,7 @@ static int fluid_init_filepaths(Object *fsDomain, char *targetDir, char *targetF
 	FILE *fileCfg;
 	int dirExist = 0;
 	char newSurfdataPath[FILE_MAX]; // modified output settings
-	const char *suffixConfig = FLUID_SUFFIX_CONFIG;
+	const char *suffixConfigTmp = FLUID_SUFFIX_CONFIG_TMP;
 	int outStringsChanged = 0;
 
 	// prepare names...
@@ -673,9 +674,8 @@ static int fluid_init_filepaths(Object *fsDomain, char *targetDir, char *targetF
 	BLI_strncpy(newSurfdataPath, domainSettings->surfdataPath, FILE_MAXDIR); /* if 0'd out below, this value is never used! */
 	BLI_path_abs(targetDir, relbase); // fixed #frame-no
 
-	BLI_join_dirfile(targetFile, FILE_MAX, targetDir, suffixConfig);
-	/* .tmp: dont overwrite/delete original file */
-	strncat(targetFile, ".tmp", FILE_MAX);
+	/* .tmp: don't overwrite/delete original file */
+	BLI_join_dirfile(targetFile, FILE_MAX, targetDir, suffixConfigTmp);
 
 	// make sure all directories exist
 	// as the bobjs use the same dir, this only needs to be checked
@@ -684,7 +684,7 @@ static int fluid_init_filepaths(Object *fsDomain, char *targetDir, char *targetF
 	
 	// check selected directory
 	// simply try to open cfg file for writing to test validity of settings
-	fileCfg = fopen(targetFile, "w");
+	fileCfg = BLI_fopen(targetFile, "w");
 	if(fileCfg) { 
 		dirExist = 1; fclose(fileCfg); 
 		// remove cfg dummy from  directory test
@@ -881,7 +881,7 @@ static int fluidsimBake(bContext *C, ReportList *reports, Object *fsDomain, shor
 	int gridlevels = 0;
 	const char *relbase= modifier_path_relbase(fsDomain);
 	const char *strEnvName = "BLENDER_ELBEEMDEBUG"; // from blendercall.cpp
-	const char *suffixConfig = FLUID_SUFFIX_CONFIG;
+	const char *suffixConfigTmp = FLUID_SUFFIX_CONFIG_TMP;
 	const char *suffixSurface = FLUID_SUFFIX_SURFACE;
 
 	char targetDir[FILE_MAX];  // store & modify output settings
@@ -993,9 +993,8 @@ static int fluidsimBake(bContext *C, ReportList *reports, Object *fsDomain, shor
 	}
 
 	/* ********  start writing / exporting ******** */
-	// use .tmp, dont overwrite/delete original file
-	BLI_join_dirfile(targetFile, sizeof(targetFile), targetDir, suffixConfig);
-	strncat(targetFile, ".tmp", sizeof(targetFile));
+	// use .tmp, don't overwrite/delete original file
+	BLI_join_dirfile(targetFile, sizeof(targetFile), targetDir, suffixConfigTmp);
 	
 	// make sure these directories exist as well
 	if(outStringsChanged) {
@@ -1160,13 +1159,13 @@ static int fluid_bake_exec(bContext *C, wmOperator *op)
 void FLUID_OT_bake(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Fluid Simulation Bake";
-	ot->description= "Bake fluid simulation";
-	ot->idname= "FLUID_OT_bake";
+	ot->name = "Fluid Simulation Bake";
+	ot->description = "Bake fluid simulation";
+	ot->idname = "FLUID_OT_bake";
 	
 	/* api callbacks */
-	ot->invoke= fluid_bake_invoke;
-	ot->exec= fluid_bake_exec;
-	ot->poll= ED_operator_object_active_editable;
+	ot->invoke = fluid_bake_invoke;
+	ot->exec = fluid_bake_exec;
+	ot->poll = ED_operator_object_active_editable;
 }
 

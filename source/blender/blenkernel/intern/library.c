@@ -409,8 +409,8 @@ int id_single_user(bContext *C, ID *id, PointerRNA *ptr, PropertyRNA *prop)
 				/* copy animation actions too */
 				BKE_copy_animdata_id_action(id);
 				/* us is 1 by convention, but RNA_property_pointer_set
-				 * will also incremement it, so set it to zero */
-				newid->us= 0;
+				 * will also increment it, so set it to zero */
+				newid->us = 0;
 				
 				/* assign copy */
 				RNA_id_pointer_create(newid, &idptr);
@@ -1195,7 +1195,7 @@ static int check_for_dupid(ListBase *lb, ID *id, char *name)
 		/* If the original name has no numeric suffix, 
 		 * rather than just chopping and adding numbers, 
 		 * shave off the end chars until we have a unique name.
-		 * Check the null terminators match as well so we dont get Cube.000 -> Cube.00 */
+		 * Check the null terminators match as well so we don't get Cube.000 -> Cube.00 */
 		if (nr==0 && name[left_len]== '\0') {
 			int len = left_len-1;
 			idtest= is_dupid(lb, id, name);
@@ -1211,7 +1211,7 @@ static int check_for_dupid(ListBase *lb, ID *id, char *name)
 		if(nr > 999 && left_len > (MAX_ID_NAME - 8)) {
 			/* this would overflow name buffer */
 			left[MAX_ID_NAME - 8] = 0;
-			/* left_len = MAX_ID_NAME - 8; */ /* for now this isnt used again */
+			/* left_len = MAX_ID_NAME - 8; */ /* for now this isn't used again */
 			memcpy(name, left, sizeof(char) * (MAX_ID_NAME - 7));
 			continue;
 		}
@@ -1257,7 +1257,7 @@ int new_id(ListBase *lb, ID *id, const char *tname)
 	}
 	else {
 		/* disallow non utf8 chars,
-		 * the interface checks for this but new ID's based on file names dont */
+		 * the interface checks for this but new ID's based on file names don't */
 		BLI_utf8_invalid_strip(name, strlen(name));
 	}
 
@@ -1402,7 +1402,7 @@ void BKE_library_make_local(Main *bmain, Library *lib, int untagged_only)
 			idn= id->next;		/* id is possibly being inserted again */
 			
 			/* The check on the second line (LIB_PRE_EXISTING) is done so its
-			 * possible to tag data you dont want to be made local, used for
+			 * possible to tag data you don't want to be made local, used for
 			 * appending data, so any libdata already linked wont become local
 			 * (very nasty to discover all your links are lost after appending)  
 			 * */

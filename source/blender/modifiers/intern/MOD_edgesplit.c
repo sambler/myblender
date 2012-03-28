@@ -57,7 +57,7 @@
 
 #define EDGE_MARK	1
 
-static DerivedMesh *doEdgeSplit(DerivedMesh *dm, EdgeSplitModifierData *emd, Object *ob)
+static DerivedMesh *doEdgeSplit(DerivedMesh *dm, EdgeSplitModifierData *emd, Object *UNUSED(ob))
 {
 	DerivedMesh *result;
 	BMesh *bm;
@@ -66,7 +66,7 @@ static DerivedMesh *doEdgeSplit(DerivedMesh *dm, EdgeSplitModifierData *emd, Obj
 	BMEdge *e;
 	float threshold = cos((emd->split_angle + 0.00001) * M_PI / 180.0);
 
-	em = DM_to_editbmesh(ob, dm, NULL, FALSE);
+	em = DM_to_editbmesh(dm, NULL, FALSE);
 	bm = em->bm;
 
 	BM_mesh_normals_update(bm, FALSE);
@@ -103,6 +103,8 @@ static DerivedMesh *doEdgeSplit(DerivedMesh *dm, EdgeSplitModifierData *emd, Obj
 	
 	BMO_pop(bm);
 
+	/* BM_mesh_validate(bm); */ /* for troubleshooting */
+
 	BLI_assert(em->looptris == NULL);
 	result = CDDM_from_BMEditMesh(em, NULL, TRUE, FALSE);
 	BMEdit_Free(em);
@@ -115,8 +117,7 @@ static void initData(ModifierData *md)
 {
 	EdgeSplitModifierData *emd = (EdgeSplitModifierData*) md;
 
-	/* default to 30-degree split angle, sharpness from both angle & flag
-	*/
+	/* default to 30-degree split angle, sharpness from both angle & flag */
 	emd->split_angle = 30;
 	emd->flags = MOD_EDGESPLIT_FROMANGLE | MOD_EDGESPLIT_FROMFLAG;
 }

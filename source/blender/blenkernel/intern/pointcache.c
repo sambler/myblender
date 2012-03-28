@@ -315,9 +315,10 @@ static void ptcache_particle_read(int index, void *psys_v, void **data, float cf
 		}
 	}
 
-	/* determine rotation from velocity */
+	/* default to no rotation */
 	if(data[BPHYS_DATA_LOCATION] && !data[BPHYS_DATA_ROTATION]) {
-		vec_to_quat( pa->state.rot,pa->state.vel, OB_NEGX, OB_POSZ);
+		pa->state.rot[0]=1.0f;
+		pa->state.rot[1]=pa->state.rot[2]=pa->state.rot[3]=0;
 	}
 }
 static void ptcache_particle_interpolate(int index, void *psys_v, void **data, float cfra, float cfra1, float cfra2, float *old_data)
@@ -815,12 +816,13 @@ void BKE_ptcache_id_from_particles(PTCacheID *pid, Object *ob, ParticleSystem *p
 		pid->read_extra_data = ptcache_particle_extra_read;
 	}
 
-	if(psys->part->rotmode!=PART_ROT_VEL
-		|| psys->part->avemode!=PART_AVE_SPIN || psys->part->avefac!=0.0f)
-		pid->data_types|= (1<<BPHYS_DATA_AVELOCITY) | (1<<BPHYS_DATA_ROTATION);
-
-	if(psys->part->flag & PART_ROT_DYN)
+	if(psys->part->flag & PART_ROTATIONS) {
 		pid->data_types|= (1<<BPHYS_DATA_ROTATION);
+
+		if(psys->part->rotmode!=PART_ROT_VEL
+			|| psys->part->avemode==PART_AVE_RAND || psys->part->avefac!=0.0f)
+			pid->data_types|= (1<<BPHYS_DATA_AVELOCITY);
+	}
 
 	pid->info_types= (1<<BPHYS_DATA_TIMES);
 
@@ -1050,7 +1052,7 @@ static int ptcache_path(PTCacheID *pid, char *filename)
 		return BLI_add_slash(filename); /* new strlen() */
 	}
 	else if (G.relbase_valid || lib) {
-		char file[MAX_PTCACHE_PATH]; /* we dont want the dir, only the file */
+		char file[MAX_PTCACHE_PATH]; /* we don't want the dir, only the file */
 
 		BLI_split_file_part(blendfilename, file, sizeof(file));
 		i = strlen(file);
@@ -1142,13 +1144,13 @@ static PTCacheFile *ptcache_file_open(PTCacheID *pid, int mode, int cfra)
 		if (!BLI_exists(filename)) {
 			return NULL;
 		}
-		fp = fopen(filename, "rb");
+		fp = BLI_fopen(filename, "rb");
 	} else if (mode==PTCACHE_FILE_WRITE) {
 		BLI_make_existing_file(filename); /* will create the dir if needs be, same as //textures is created */
-		fp = fopen(filename, "wb");
+		fp = BLI_fopen(filename, "wb");
 	} else if (mode==PTCACHE_FILE_UPDATE) {
 		BLI_make_existing_file(filename);
-		fp = fopen(filename, "rb+");
+		fp = BLI_fopen(filename, "rb+");
 	}
 
 	if (!fp)
@@ -2546,7 +2548,7 @@ void BKE_ptcache_remove(void)
 				BLI_join_dirfile(path_full, sizeof(path_full), path, de->d_name);
 				BLI_delete(path_full, 0, 0);
 			} else {
-				rmdir = 0; /* unknown file, dont remove the dir */
+				rmdir = 0; /* unknown file, don't remove the dir */
 			}
 		}
 

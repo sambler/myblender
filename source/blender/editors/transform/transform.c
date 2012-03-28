@@ -136,28 +136,28 @@ static void convertViewVec2D(View2D *v2d, float vec[3], int dx, int dy)
 	vec[2]= 0.0f;
 }
 
-void convertViewVec(TransInfo *t, float vec[3], int dx, int dy)
+void convertViewVec(TransInfo *t, float r_vec[3], int dx, int dy)
 {
 	if ((t->spacetype == SPACE_VIEW3D) && (t->ar->regiontype == RGN_TYPE_WINDOW)) {
 		float mval_f[2];
 		mval_f[0] = dx;
 		mval_f[1] = dy;
-		ED_view3d_win_to_delta(t->ar, mval_f, vec);
+		ED_view3d_win_to_delta(t->ar, mval_f, r_vec);
 	}
 	else if(t->spacetype==SPACE_IMAGE) {
 		float aspx, aspy;
 
-		convertViewVec2D(t->view, vec, dx, dy);
+		convertViewVec2D(t->view, r_vec, dx, dy);
 
 		ED_space_image_uv_aspect(t->sa->spacedata.first, &aspx, &aspy);
-		vec[0]*= aspx;
-		vec[1]*= aspy;
+		r_vec[0] *= aspx;
+		r_vec[1] *= aspy;
 	}
 	else if(ELEM(t->spacetype, SPACE_IPO, SPACE_NLA)) {
-		convertViewVec2D(t->view, vec, dx, dy);
+		convertViewVec2D(t->view, r_vec, dx, dy);
 	}
 	else if(ELEM(t->spacetype, SPACE_NODE, SPACE_SEQ)) {
-		convertViewVec2D(&t->ar->v2d, vec, dx, dy);
+		convertViewVec2D(&t->ar->v2d, r_vec, dx, dy);
 	}
 	else if(t->spacetype==SPACE_CLIP) {
 		View2D *v2d = t->view;
@@ -166,17 +166,17 @@ void convertViewVec(TransInfo *t, float vec[3], int dx, int dy)
 		divx= v2d->mask.xmax-v2d->mask.xmin;
 		divy= v2d->mask.ymax-v2d->mask.ymin;
 
-		vec[0]= (v2d->cur.xmax-v2d->cur.xmin)*(dx)/divx;
-		vec[1]= (v2d->cur.ymax-v2d->cur.ymin)*(dy)/divy;
-		vec[2]= 0.0f;
+		r_vec[0] = (v2d->cur.xmax-v2d->cur.xmin)*(dx)/divx;
+		r_vec[1] = (v2d->cur.ymax-v2d->cur.ymin)*(dy)/divy;
+		r_vec[2] = 0.0f;
 	}
 	else {
 		printf("%s: called in an invalid context\n", __func__);
-		zero_v3(vec);
+		zero_v3(r_vec);
 	}
 }
 
-void projectIntView(TransInfo *t, float *vec, int *adr)
+void projectIntView(TransInfo *t, const float vec[3], int adr[2])
 {
 	if (t->spacetype==SPACE_VIEW3D) {
 		if(t->ar->regiontype == RGN_TYPE_WINDOW)
@@ -229,26 +229,31 @@ void projectIntView(TransInfo *t, float *vec, int *adr)
 	}
 }
 
-void projectFloatView(TransInfo *t, float *vec, float *adr)
+void projectFloatView(TransInfo *t, const float vec[3], float adr[2])
 {
-	if (t->spacetype==SPACE_VIEW3D) {
-		if(t->ar->regiontype == RGN_TYPE_WINDOW)
-			project_float_noclip(t->ar, vec, adr);
+	switch (t->spacetype) {
+		case SPACE_VIEW3D:
+		{
+			if (t->ar->regiontype == RGN_TYPE_WINDOW) {
+				project_float_noclip(t->ar, vec, adr);
+				return;
+			}
+			break;
+		}
+		case SPACE_IMAGE:
+		case SPACE_CLIP:
+		case SPACE_IPO:
+		case SPACE_NLA:
+		{
+			int a[2];
+			projectIntView(t, vec, a);
+			adr[0] = a[0];
+			adr[1] = a[1];
+			return;
+		}
 	}
-	else if(ELEM(t->spacetype, SPACE_IMAGE, SPACE_CLIP)) {
-		int a[2];
 
-		projectIntView(t, vec, a);
-		adr[0]= a[0];
-		adr[1]= a[1];
-	}
-	else if(ELEM(t->spacetype, SPACE_IPO, SPACE_NLA)) {
-		int a[2];
-
-		projectIntView(t, vec, a);
-		adr[0]= a[0];
-		adr[1]= a[1];
-	}
+	zero_v2(adr);
 }
 
 void applyAspectRatio(TransInfo *t, float *vec)
@@ -1549,6 +1554,7 @@ int initTransform(bContext *C, TransInfo *t, wmOperator *op, wmEvent *event, int
 		unit_m3(t->spacemtx);
 		t->draw_handle_view = ED_region_draw_cb_activate(t->ar->type, drawTransformView, t, REGION_DRAW_POST_VIEW);
 		//t->draw_handle_pixel = ED_region_draw_cb_activate(t->ar->type, drawTransformPixel, t, REGION_DRAW_POST_PIXEL);
+		t->draw_handle_cursor = WM_paint_cursor_activate(CTX_wm_manager(C), helpline_poll, drawHelpline, t);
 	}
 	else if(t->spacetype == SPACE_CLIP) {
 		unit_m3(t->spacemtx);
@@ -1715,7 +1721,7 @@ int initTransform(bContext *C, TransInfo *t, wmOperator *op, wmEvent *event, int
 	/* overwrite initial values if operator supplied a non-null vector */
 	if ( (prop = RNA_struct_find_property(op->ptr, "value")) && RNA_property_is_set(op->ptr, prop))
 	{
-		float values[4]= {0}; /* incase value isn't length 4, avoid uninitialized memory  */
+		float values[4]= {0}; /* in case value isn't length 4, avoid uninitialized memory  */
 
 		if(RNA_property_array_check(prop)) {
 			RNA_float_get_array(op->ptr, "value", values);
@@ -2449,7 +2455,7 @@ int handleEventShear(TransInfo *t, wmEvent *event)
 			initMouseInputMode(t, &t->mouse, INPUT_HORIZONTAL_ABSOLUTE);
 			t->customData = NULL;
 		}
-		
+
 		status = 1;
 	}
 	
@@ -4355,7 +4361,7 @@ static int createSlideVerts(TransInfo *t)
 	BMEditMesh *em = me->edit_btmesh;
 	BMesh *bm = em->bm;
 	BMIter iter, iter2;
-	BMEdge *e, *e1, *ee, *le;
+	BMEdge *e, *e1 /*, *ee, *le */ /* UNUSED */;
 	BMVert *v, *v2, *first;
 	BMLoop *l, *l1, *l2;
 	TransDataSlideVert *tempsv;
@@ -4367,7 +4373,7 @@ static int createSlideVerts(TransInfo *t)
 	ARegion *ar = t->ar;
 	float projectMat[4][4];
 	float start[3] = {0.0f, 0.0f, 0.0f}, dir[3], end[3] = {0.0f, 0.0f, 0.0f};
-	float vec[3], vec2[3], lastvec[3], size, dis=0.0, z;
+	float vec[3], vec2[3], lastvec[3] /*, size, dis=0.0, z */ /* UNUSED */;
 	int numsel, i, j;
 
 	if (!v3d) {
@@ -4541,10 +4547,10 @@ static int createSlideVerts(TransInfo *t)
 	sld->totsv = j;
 	
 	/*find mouse vector*/
-	dis = z = -1.0f;
-	size = 50.0;
+	/* dis = z = -1.0f; */ /* UNUSED */
+	/* size = 50.0; */ /* UNUSED */
 	zero_v3(lastvec); zero_v3(dir);
-	ee = le = NULL;
+	/* ee = le = NULL; */ /* UNUSED */
 	BM_ITER(e, &iter, em->bm, BM_EDGES_OF_MESH, NULL) {
 		if (BM_elem_flag_test(e, BM_ELEM_SELECT)) {
 			BMIter iter2;
@@ -4552,7 +4558,7 @@ static int createSlideVerts(TransInfo *t)
 			float vec1[3], dis2, mval[2] = {t->mval[0], t->mval[1]}, d;
 						
 			/* search cross edges for visible edge to the mouse cursor,
-             * then use the shared vertex to calculate screen vector*/
+			 * then use the shared vertex to calculate screen vector*/
 			dis2 = -1.0f;
 			for (i=0; i<2; i++) {
 				v = i?e->v1:e->v2;
@@ -4582,16 +4588,15 @@ static int createSlideVerts(TransInfo *t)
 					d = dist_to_line_segment_v2(mval, vec1, vec2);
 					if (dis2 == -1.0f || d < dis2) {
 						dis2 = d;
-						ee = e2;
-						size = len_v3v3(vec1, vec2);
+						/* ee = e2; */ /* UNUSED */
+						/* size = len_v3v3(vec1, vec2); */ /* UNUSED */
 						sub_v3_v3v3(dir, vec1, vec2);
 					}
 				}
 			}
 		}
 	}
-	
-	em->bm->ob = t->obedit;
+
 	bmesh_edit_begin(em->bm, BMO_OP_FLAG_UNTAN_MULTIRES);
 
 	/*create copies of faces for customdata projection*/
@@ -4661,7 +4666,7 @@ void projectSVData(TransInfo *t, int final)
 	
 	/* BMESH_TODO, (t->settings->uvcalc_flag & UVCALC_TRANSFORM_CORRECT)
 	 * currently all vertex data is interpolated which is nice mostly
-	 * except for shape keys where you dont want to modify UVs for eg.
+	 * except for shape keys where you don't want to modify UVs for eg.
 	 * current BMesh code doesnt make it easy to pick which data we interpolate
 	 * - campbell */
 
@@ -4675,7 +4680,7 @@ void projectSVData(TransInfo *t, int final)
 			BMIter liter2;
 			BMFace *copyf, *copyf2;
 			BMLoop *l2;
-			int sel, hide, do_vdata;
+			int sel, hide /*, do_vdata */ /* UNUSED */;
 			
 			if (BLI_smallhash_haskey(&visit, (uintptr_t)f))
 				continue;
@@ -4693,12 +4698,12 @@ void projectSVData(TransInfo *t, int final)
 			/*project onto copied projection face*/
 			BM_ITER(l2, &liter2, em->bm, BM_LOOPS_OF_FACE, f) {
 				copyf = copyf2;
-				do_vdata = l2->v==tempsv->v;
+				/* do_vdata = l2->v==tempsv->v; */ /* UNUSED */
 				
 				if (BM_elem_flag_test(l2->e, BM_ELEM_SELECT) || BM_elem_flag_test(l2->prev->e, BM_ELEM_SELECT)) {
 					BMLoop *l3 = l2;
 					
-					do_vdata = 1;
+					/* do_vdata = 1; */ /* UNUSED */
 					
 					if (!BM_elem_flag_test(l2->e, BM_ELEM_SELECT))
 						l3 = l3->prev;
@@ -4779,7 +4784,6 @@ void freeSlideVerts(TransInfo *t)
 	
 	freeSlideTempFaces(sld);
 
-	sld->em->bm->ob = t->obedit;
 	bmesh_edit_end(sld->em->bm, BMO_OP_FLAG_UNTAN_MULTIRES);
 
 	BLI_smallhash_release(&sld->vhash);

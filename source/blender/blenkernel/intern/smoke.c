@@ -309,6 +309,7 @@ static int smokeModifier_init (SmokeModifierData *smd, Object *ob, Scene *scene,
 			copy_m4_m4(scs->mat, ob->obmat);
 			copy_m4_m4(scs->mat_old, ob->obmat);
 
+			DM_ensure_tessface(dm);
 			fill_scs_points(ob, dm, scs);
 		}
 
@@ -817,7 +818,7 @@ void smokeModifier_copy(struct SmokeModifierData *smd, struct SmokeModifierData 
 		tsmd->flow->vel_multi = smd->flow->vel_multi;
 	} else if (tsmd->coll) {
 		;
-		/* leave it as initialised, collision settings is mostly caches */
+		/* leave it as initialized, collision settings is mostly caches */
 	}
 }
 

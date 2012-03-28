@@ -1629,7 +1629,7 @@ int psys_particle_dm_face_lookup(Object *ob, DerivedMesh *dm, int index, const f
 	totface = dm->getNumTessFaces(dm);
 	
 	if(osface==NULL || origindex==NULL) {
-		/* Assume we dont need osface data */
+		/* Assume we don't need osface data */
 		if (index <totface) {
 			//printf("\tNO CD_ORIGSPACE, assuming not needed\n");
 			return index;
@@ -2370,7 +2370,7 @@ void psys_find_parents(ParticleSimulationData *sim)
 	BLI_kdtree_free(tree);
 }
 
-static void get_strand_normal(Material *ma, float *surfnor, float surfdist, float *nor)
+static void get_strand_normal(Material *ma, const float surfnor[3], float surfdist, float nor[3])
 {
 	float cross[3], nstrand[3], vnor[3], blend;
 
@@ -2381,7 +2381,7 @@ static void get_strand_normal(Material *ma, float *surfnor, float surfdist, floa
 		cross_v3_v3v3(cross, surfnor, nor);
 		cross_v3_v3v3(nstrand, nor, cross);
 
-		blend= INPR(nstrand, surfnor);
+		blend = dot_v3v3(nstrand, surfnor);
 		CLAMP(blend, 0.0f, 1.0f);
 
 		interp_v3_v3v3(vnor, nstrand, surfnor, blend);
@@ -3557,7 +3557,7 @@ static void default_particle_settings(ParticleSettings *part)
 	part->childsize=1.0;
 
 	part->rotmode = PART_ROT_VEL;
-	part->avemode = PART_AVE_SPIN;
+	part->avemode = PART_AVE_VELOCITY;
 
 	part->child_nbr=10;
 	part->ren_child_nbr=100;
@@ -4069,7 +4069,7 @@ void psys_get_particle_on_path(ParticleSimulationData *sim, int p, ParticleKey *
 			pind.cache = cached ? psys->pointcache : NULL;
 			pind.epoint = NULL;
 			pind.bspline = (psys->part->flag & PART_HAIR_BSPLINE);
-			/* pind.dm disabled in editmode means we dont get effectors taken into
+			/* pind.dm disabled in editmode means we don't get effectors taken into
 			 * account when subdividing for instance */
 			pind.dm = psys_in_edit_mode(sim->scene, psys) ? NULL : psys->hair_out_dm;
 			init_particle_interpolation(sim->ob, psys, pa, &pind);

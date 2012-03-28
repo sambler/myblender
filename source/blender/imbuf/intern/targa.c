@@ -128,7 +128,7 @@ static short makebody_tga(ImBuf * ibuf, FILE * file, int (*out)(unsigned int, FI
 		copy = last^this;
 		while (bytes > 0){
 			if (copy){
-				do{
+				do {
 					last = this;
 					this = *rect++;
 					if (last == this){
@@ -137,7 +137,7 @@ static short makebody_tga(ImBuf * ibuf, FILE * file, int (*out)(unsigned int, FI
 							break;
 						}
 					}
-				}while (--bytes != 0);
+				} while (--bytes != 0);
 
 				copy = rect-rectstart;
 				copy --;
@@ -151,9 +151,9 @@ static short makebody_tga(ImBuf * ibuf, FILE * file, int (*out)(unsigned int, FI
 					if (copy>=128) last = 128;
 					copy -= last;
 					if (fputc(last-1,file) == EOF) return(0);
-					do{
+					do {
 						if (out(*rect++,file) == EOF) return(0);
-					}while(--last != 0);
+					} while(--last != 0);
 				}
 				rectstart = rect;
 				rect = temp;
@@ -268,7 +268,7 @@ int imb_savetarga(struct ImBuf * ibuf, const char *name, int flags)
 	if (ibuf->planes==32) {
 		buf[17] |= 0x08;
 	}
-	fildes = fopen(name,"wb");
+	fildes = BLI_fopen(name,"wb");
 		if (!fildes) return 0;
 
 	if (fwrite(buf, 1, 18,fildes) != 18) {

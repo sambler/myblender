@@ -718,7 +718,7 @@ static void split_leafs(BVHNode **leafs_array, int *nth, int partitions, int spl
  *
  * This function creates an implicit tree on branches_array, the leafs are given on the leafs_array.
  *
- * The tree is built per depth levels. First branchs at depth 1.. then branches at depth 2.. etc..
+ * The tree is built per depth levels. First branches at depth 1.. then branches at depth 2.. etc..
  * The reason is that we can build level N+1 from level N without any data dependencies.. thus it allows
  * to use multithread building.
  *
@@ -1687,7 +1687,7 @@ static void dfs_range_query(RangeQueryData *data, BVHNode *node)
 				if(node->children[i]->totnode == 0)
 				{
 					data->hits++;
-					data->callback( data->userdata, node->children[i]->index, dist );
+					data->callback(data->userdata, node->children[i]->index, dist);
 				}
 				else
 					dfs_range_query( data, node->children[i] );
@@ -1719,7 +1719,7 @@ int BLI_bvhtree_range_query(BVHTree *tree, const float co[3], float radius, BVHT
 			if(root->totnode == 0)
 			{
 				data.hits++;
-				data.callback( data.userdata, root->index, dist );
+				data.callback(data.userdata, root->index, dist);
 			}
 			else
 				dfs_range_query( &data, root );

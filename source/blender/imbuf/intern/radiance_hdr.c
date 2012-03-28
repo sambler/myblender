@@ -30,12 +30,12 @@
  */
 
 /* ----------------------------------------------------------------------
-  Radiance High Dynamic Range image file IO
-  For description and code for reading/writing of radiance hdr files 
-	by Greg Ward, refer to:
-  http://radsite.lbl.gov/radiance/refer/Notes/picture_format.html
-----------------------------------------------------------------------
-*/
+ * Radiance High Dynamic Range image file IO
+ * For description and code for reading/writing of radiance hdr files
+ * by Greg Ward, refer to:
+ * http://radsite.lbl.gov/radiance/refer/Notes/picture_format.html
+ * ----------------------------------------------------------------------
+ */
 
 #ifdef WIN32
 #  include <io.h>
@@ -332,7 +332,7 @@ static void writeHeader(FILE *file, int width, int height)
 
 int imb_savehdr(struct ImBuf *ibuf, const char *name, int flags)
 {
-	FILE* file = fopen(name, "wb");
+	FILE* file = BLI_fopen(name, "wb");
 	float *fp= NULL;
 	int y, width=ibuf->x, height=ibuf->y;
 	unsigned char *cp= NULL;

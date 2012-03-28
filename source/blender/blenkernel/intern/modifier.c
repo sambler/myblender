@@ -415,7 +415,7 @@ ModifierData *modifiers_getLastPreview(struct Scene *scene, ModifierData *md, in
 ModifierData *modifiers_getVirtualModifierList(Object *ob)
 {
 	/* Kinda hacky, but should be fine since we are never
-	 * reentrant and avoid free hassles.
+	 * re-entrant and avoid free hassles.
 	 */
 	static ArmatureModifierData amd;
 	static CurveModifierData cmd;
@@ -590,7 +590,7 @@ int modifiers_indexInObject(Object *ob, ModifierData *md_seek)
 	ModifierData *md;
 	
 	for (md=ob->modifiers.first; (md && md_seek!=md); md=md->next, i++);
-	if (!md) return -1; /* modifier isnt in the object */
+	if (!md) return -1; /* modifier isn't in the object */
 	return i;
 }
 
@@ -634,7 +634,7 @@ void test_object_modifiers(Object *ob)
  *
  * - if the ID is from a library, return library path
  * - else if the file has been saved return the blend file path.
- * - else if the file isn't saved and the ID isnt from a library, return the temp dir.
+ * - else if the file isn't saved and the ID isn't from a library, return the temp dir.
  */
 const char *modifier_path_relbase(Object *ob)
 {

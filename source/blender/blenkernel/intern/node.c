@@ -55,6 +55,8 @@
 #include "BLI_path_util.h"
 #include "BLI_utildefines.h"
 
+#include "BLF_translation.h"
+
 #include "BKE_animsys.h"
 #include "BKE_action.h"
 #include "BKE_fcurve.h"
@@ -65,8 +67,6 @@
 #include "BKE_node.h"
 #include "BKE_utildefines.h"
 #include "BKE_utildefines.h"
-
-#include "BLI_listbase.h"
 
 #include "RNA_access.h"
 
@@ -660,7 +660,7 @@ bNodeTree *ntreeAddTree(const char *name, int type, int nodetype)
 /* Warning: this function gets called during some rather unexpected times
  *	- this gets called when executing compositing updates (for threaded previews)
  *	- when the nodetree datablock needs to be copied (i.e. when users get copied)
- *	- for scene duplication use ntreeSwapID() after so we dont have stale pointers.
+ *	- for scene duplication use ntreeSwapID() after so we don't have stale pointers.
  */
 bNodeTree *ntreeCopyTree(bNodeTree *ntree)
 {
@@ -1146,7 +1146,7 @@ bNodeTree *ntreeLocalize(bNodeTree *ntree)
 	bAction *action_backup= NULL, *tmpact_backup= NULL;
 	
 	/* Workaround for copying an action on each render!
-	 * set action to NULL so animdata actions dont get copied */
+	 * set action to NULL so animdata actions don't get copied */
 	AnimData *adt= BKE_animdata_from_id(&ntree->id);
 
 	if(adt) {
@@ -1543,13 +1543,13 @@ void ntreeUpdateTree(bNodeTree *ntree)
 	bNodeTreeType *ntreetype= ntreeGetType(ntree->type);
 	bNode *node;
 	
-	/* set the bNodeSocket->link pointers */
-	if (ntree->update & NTREE_UPDATE_LINKS)
+	if (ntree->update & (NTREE_UPDATE_LINKS|NTREE_UPDATE_NODES)) {
+		/* set the bNodeSocket->link pointers */
 		ntree_update_link_pointers(ntree);
-	
-	/* update the node level from link dependencies */
-	if (ntree->update & (NTREE_UPDATE_LINKS|NTREE_UPDATE_NODES))
+		
+		/* update the node level from link dependencies */
 		ntree_update_node_level(ntree);
+	}
 	
 	/* update individual nodes */
 	for (node=ntree->nodes.first; node; node=node->next) {
@@ -1658,7 +1658,7 @@ const char* nodeLabel(bNode *node)
 	else if (node->typeinfo->labelfunc)
 		return node->typeinfo->labelfunc(node);
 	else
-		return node->typeinfo->name;
+		return IFACE_(node->typeinfo->name);
 }
 
 struct bNodeTree *nodeGroupEditGet(struct bNode *node)

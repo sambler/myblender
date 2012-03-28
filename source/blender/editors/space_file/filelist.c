@@ -677,7 +677,7 @@ int filelist_find(struct FileList* filelist, const char *filename)
 
 	
 	for (i = 0; i < filelist->numfiles; ++i) {
-		if ( strcmp(filelist->filelist[i].relname, filename) == 0) { /* not dealing with user input so dont need BLI_path_cmp */
+		if ( strcmp(filelist->filelist[i].relname, filename) == 0) { /* not dealing with user input so don't need BLI_path_cmp */
 			index = i;
 			break;
 		}
@@ -1011,7 +1011,7 @@ void filelist_from_library(struct FileList* filelist)
 	idcode= groupname_to_code(group);
 
 	/* memory for strings is passed into filelist[i].relname
-	 * and free'd in freefilelist */
+	 * and freed in freefilelist */
 	if (idcode) {
 		previews= BLO_blendhandle_get_previews(filelist->libfiledata, idcode, &nprevs);
 		names= BLO_blendhandle_get_datablock_names(filelist->libfiledata, idcode, &nnames);

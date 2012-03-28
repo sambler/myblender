@@ -61,6 +61,7 @@
 #include <process.h> /* getpid */
 #include <direct.h> /* chdir */
 #include "BLI_winstuff.h"
+#include "utfconv.h"
 #else
 #include <unistd.h>
 #endif
@@ -70,8 +71,12 @@
 static int get_thumb_dir( char* dir , ThumbSize size)
 {
 #ifdef WIN32
+	wchar_t dir_16 [MAX_PATH];
 	/* yes, applications shouldn't store data there, but so does GIMP :)*/
-	SHGetSpecialFolderPath(0, dir, CSIDL_PROFILE, 0);
+	SHGetSpecialFolderPathW(0, dir_16, CSIDL_PROFILE, 0);
+	conv_utf_16_to_8(dir_16,dir,FILE_MAX);
+
+
 #else
 	const char* home = getenv("HOME");
 	if (!home) return 0;
@@ -167,7 +172,7 @@ static void to_hex_char(char* hexbytes, const unsigned char* bytes, int len)
 
 /** ----- end of adapted code from glib --- */
 
-static int uri_from_filename( const char *path, char *uri )
+static int uri_from_filename(const char *path, char *uri)
 {
 	char orig_uri[URI_MAX];	
 	const char* dirstart = path;
@@ -251,8 +256,8 @@ ImBuf* IMB_thumb_create(const char* path, ThumbSize size, ThumbSource source, Im
 	char tpath[FILE_MAX];
 	char tdir[FILE_MAX];
 	char temp[FILE_MAX];
-	char mtime[40]= "0"; /* incase we can't stat the file */
-	char cwidth[40]= "0"; /* incase images have no data */
+	char mtime[40]= "0"; /* in case we can't stat the file */
+	char cwidth[40]= "0"; /* in case images have no data */
 	char cheight[40]= "0";
 	char thumb[40];
 	short tsize = 128;

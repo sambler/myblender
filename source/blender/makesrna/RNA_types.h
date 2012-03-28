@@ -192,7 +192,7 @@ typedef enum PropertyFlag {
 	 * this exposes the flag as multiple options in python and the UI.
 	 *
 	 * note: these can't be animated so use with care.
-	  */
+	 */
 	PROP_ENUM_FLAG = 1<<21,
 
 	/* need context for update function */

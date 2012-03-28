@@ -120,12 +120,12 @@
 
 static void write_history(void);
 
-/* To be able to read files without windows closing, opening, moving 
-   we try to prepare for worst case:
-   - active window gets active screen from file 
-   - restoring the screens from non-active windows 
-   Best case is all screens match, in that case they get assigned to proper window  
-*/
+/* To be able to read files without windows closing, opening, moving
+ * we try to prepare for worst case:
+ * - active window gets active screen from file
+ * - restoring the screens from non-active windows
+ * Best case is all screens match, in that case they get assigned to proper window
+ */
 static void wm_window_match_init(bContext *C, ListBase *wmlist)
 {
 	wmWindowManager *wm;
@@ -173,11 +173,11 @@ static void wm_window_match_init(bContext *C, ListBase *wmlist)
 }
 
 /* match old WM with new, 4 cases:
-  1- no current wm, no read wm: make new default
-  2- no current wm, but read wm: that's OK, do nothing
-  3- current wm, but not in file: try match screen names
-  4- current wm, and wm in file: try match ghostwin 
-*/
+ * 1- no current wm, no read wm: make new default
+ * 2- no current wm, but read wm: that's OK, do nothing
+ * 3- current wm, but not in file: try match screen names
+ * 4- current wm, and wm in file: try match ghostwin
+ */
 
 static void wm_window_match_do(bContext *C, ListBase *oldwmlist)
 {
@@ -304,6 +304,7 @@ static void wm_init_userdef(bContext *C)
 #define BKE_READ_EXOTIC_OK_BLEND		 0 /* .blend file */
 #define BKE_READ_EXOTIC_OK_OTHER		 1 /* other supported formats */
 
+
 /* intended to check for non-blender formats but for now it only reads blends */
 static int wm_read_exotic(Scene *UNUSED(scene), const char *name)
 {
@@ -319,8 +320,7 @@ static int wm_read_exotic(Scene *UNUSED(scene), const char *name)
 		retval= BKE_READ_EXOTIC_FAIL_PATH;
 	}
 	else {
-		gzfile = gzopen(name,"rb");
-
+		gzfile = BLI_gzopen(name,"rb");
 		if (gzfile == NULL) {
 			retval= BKE_READ_EXOTIC_FAIL_OPEN;
 		}
@@ -332,13 +332,13 @@ static int wm_read_exotic(Scene *UNUSED(scene), const char *name)
 			}
 			else {
 				//XXX waitcursor(1);
-				/*
+#if 0			/* historic stuff - no longer used */
 				if(is_foo_format(name)) {
 					read_foo(name);
 					retval= BKE_READ_EXOTIC_OK_OTHER;
 				}
 				else
-				 */
+#endif
 				{
 					retval= BKE_READ_EXOTIC_FAIL_FORMAT;
 				}
@@ -398,7 +398,7 @@ void WM_read_file(bContext *C, const char *filepath, ReportList *reports)
 		
 		if (retval != BKE_READ_FILE_FAIL) {
 			G.relbase_valid = 1;
-			if(!G.background) /* assume automated tasks with background, dont write recent file list */
+			if(!G.background) /* assume automated tasks with background, don't write recent file list */
 				write_history();
 		}
 
@@ -627,7 +627,7 @@ static void write_history(void)
 	recent = G.recent_files.first;
 	/* refresh recent-files.txt of recent opened files, when current file was changed */
 	if(!(recent) || (BLI_path_cmp(recent->filepath, G.main->name)!=0)) {
-		fp= fopen(name, "w");
+		fp= BLI_fopen(name, "w");
 		if (fp) {
 			/* add current file to the beginning of list */
 			recent = (RecentFile*)MEM_mallocN(sizeof(RecentFile),"RecentFile");
@@ -748,7 +748,7 @@ int WM_write_file(bContext *C, const char *target, int fileflags, ReportList *re
  
 	BLI_strncpy(filepath, target, FILE_MAX);
 	BLI_replace_extension(filepath, FILE_MAX, ".blend");
-	/* dont use 'target' anymore */
+	/* don't use 'target' anymore */
 	
 	/* send the OnSave event */
 	for (li= G.main->library.first; li; li= li->id.next) {

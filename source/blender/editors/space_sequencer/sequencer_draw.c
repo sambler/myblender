@@ -72,7 +72,7 @@
 #define SEQ_RIGHTHANDLE	2
 
 
-/* Note, Dont use SEQ_BEGIN/SEQ_END while drawing!
+/* Note, Don't use SEQ_BEGIN/SEQ_END while drawing!
  * it messes up transform, - Campbell */
 static void draw_shadedstrip(Sequence *seq, unsigned char col[3], float x1, float y1, float x2, float y2);
 
@@ -92,6 +92,10 @@ static void get_seq_color3ubv(Scene *curscene, Sequence *seq, unsigned char col[
 		
 	case SEQ_MOVIE:
 		UI_GetThemeColor3ubv(TH_SEQ_MOVIE, col);
+		break;
+
+	case SEQ_MOVIECLIP:
+		UI_GetThemeColor3ubv(TH_SEQ_MOVIECLIP, col);
 		break;
 		
 	case SEQ_SCENE:
@@ -534,6 +538,14 @@ static void draw_seq_text(View2D *v2d, Sequence *seq, float x1, float x2, float 
 			BLI_snprintf(str, sizeof(str), "%d | %s", seq->len, name);
 		}
 	}
+	else if(seq->type == SEQ_MOVIECLIP) {
+		if(seq->clip && strcmp(name, seq->clip->id.name+2) != 0) {
+			BLI_snprintf(str, sizeof(str), "%d | %s: %s", seq->len, name, seq->clip->id.name+2);
+		}
+		else {
+			BLI_snprintf(str, sizeof(str), "%d | %s", seq->len, name);
+		}
+	}
 	else if(seq->type == SEQ_MULTICAM) {
 		BLI_snprintf(str, sizeof(str), "Cam | %s: %d", name, seq->multicam_source);
 	}
@@ -830,7 +842,7 @@ void draw_image_seq(const bContext* C, Scene *scene, ARegion *ar, SpaceSeq *sseq
 		}
 		break;
 	case SEQ_DRAW_IMG_WAVEFORM:
-		if ((sseq->flag & SEQ_DRAW_COLOR_SEPERATED) != 0) {
+		if ((sseq->flag & SEQ_DRAW_COLOR_SEPARATED) != 0) {
 			scope = make_sep_waveform_view_from_ibuf(ibuf);
 		} else {
 			scope = make_waveform_view_from_ibuf(ibuf);

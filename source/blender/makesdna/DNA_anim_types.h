@@ -374,7 +374,7 @@ typedef struct ChannelDriver {
 	 * which relates the target 'variables' in some way to yield a single usable value
 	 */
 	char expression[256];	/* expression to compile for evaluation */
-	void *expr_comp; 		/* PyObject - compiled expression, dont save this */
+	void *expr_comp; 		/* PyObject - compiled expression, don't save this */
 	
 	float curval;		/* result of previous evaluation */
 	float influence;	/* influence of driver on result */ // XXX to be implemented... this is like the constraint influence setting
@@ -409,7 +409,7 @@ typedef enum eDriver_Flags {
 	//DRIVER_FLAG_LAYERING	= (1<<2),
 		/* use when the expression needs to be recompiled */
 	DRIVER_FLAG_RECOMPILE	= (1<<3),
-		/* the names are cached so they dont need have python unicode versions created each time */
+		/* the names are cached so they don't need have python unicode versions created each time */
 	DRIVER_FLAG_RENAMEVAR	= (1<<4),
 		/* intermediate values of driver should be shown in the UI for debugging purposes */
 	DRIVER_FLAG_SHOWDEBUG	= (1<<5)
@@ -762,7 +762,9 @@ typedef struct KeyingSet {
 	
 	ListBase paths;			/* (KS_Path) paths to keyframe to */
 	
+	char idname[64];		/* unique name (for search, etc.) */
 	char name[64];			/* user-viewable name for KeyingSet (for menus, etc.) */
+	char description[240];	/* (RNA_DYN_DESCR_MAX) short help text. */
 	char typeinfo[64];		/* name of the typeinfo data used for the relative paths */
 	
 	short flag;				/* settings for KeyingSet */

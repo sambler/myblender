@@ -225,7 +225,7 @@ static PyObject *pyop_call(PyObject *UNUSED(self), PyObject *args)
 			ReportList *reports;
 
 			reports = MEM_mallocN(sizeof(ReportList), "wmOperatorReportList");
-			BKE_reports_init(reports, RPT_STORE | RPT_OP_HOLD); /* own so these dont move into global reports */
+			BKE_reports_init(reports, RPT_STORE | RPT_OP_HOLD); /* own so these don't move into global reports */
 
 #ifdef BPY_RELEASE_GIL
 			/* release GIL, since a thread could be started from an operator
@@ -433,7 +433,7 @@ static PyObject *pyop_getinstance(PyObject *UNUSED(self), PyObject *value)
 	op = PyMem_MALLOC(sizeof(wmOperator));
 	memset(op, 0, sizeof(wmOperator));
 #endif
-	BLI_strncpy(op->idname, op->idname, sizeof(op->idname)); /* incase its needed */
+	BLI_strncpy(op->idname, op->idname, sizeof(op->idname)); /* in case its needed */
 	op->type = ot;
 
 	RNA_pointer_create(NULL, &RNA_Operator, op, &ptr);

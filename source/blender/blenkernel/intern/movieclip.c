@@ -411,7 +411,7 @@ MovieClip *BKE_add_movieclip_file(const char *name)
 	BLI_path_abs(str, G.main->name);
 
 	/* exists? */
-	file= open(str, O_BINARY|O_RDONLY);
+	file= BLI_open(str, O_BINARY|O_RDONLY,0);
 	if(file== -1) return NULL;
 	close(file);
 
@@ -859,6 +859,11 @@ void BKE_movieclip_get_size(MovieClip *clip, MovieClipUser *user, int *width, in
 		if(ibuf)
 			IMB_freeImBuf(ibuf);
 	}
+}
+
+int BKE_movieclip_get_duration(struct MovieClip *clip)
+{
+	return IMB_anim_get_duration(clip->anim, clip->proxy.tc);
 }
 
 void BKE_movieclip_aspect(MovieClip *clip, float *aspx, float *aspy)

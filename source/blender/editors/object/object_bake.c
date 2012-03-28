@@ -1001,7 +1001,7 @@ static DerivedMesh *multiresbake_create_loresdm(Scene *scene, Object *ob, int *l
 
 		tmp_mmd.lvl= *lvl;
 		tmp_mmd.sculptlvl= *lvl;
-		dm= multires_dm_create_from_derived(&tmp_mmd, 1, cddm, ob, 0, 0);
+		dm= multires_dm_create_from_derived(&tmp_mmd, 1, cddm, ob, 0);
 		cddm->release(cddm);
 	}
 
@@ -1021,7 +1021,7 @@ static DerivedMesh *multiresbake_create_hiresdm(Scene *scene, Object *ob, int *l
 
 	tmp_mmd.lvl= mmd->totlvl;
 	tmp_mmd.sculptlvl= mmd->totlvl;
-	dm= multires_dm_create_from_derived(&tmp_mmd, 1, cddm, ob, 0, 0);
+	dm= multires_dm_create_from_derived(&tmp_mmd, 1, cddm, ob, 0);
 	cddm->release(cddm);
 
 	return dm;
@@ -1384,7 +1384,7 @@ static void bake_update(void *bkv)
 {
 	BakeRender *bkr= bkv;
 
-	if(bkr->sa && bkr->sa->spacetype==SPACE_IMAGE) { /* incase the user changed while baking */
+	if(bkr->sa && bkr->sa->spacetype==SPACE_IMAGE) { /* in case the user changed while baking */
 		SpaceImage *sima= bkr->sa->spacedata.first;
 		if(sima)
 			sima->image= RE_bake_shade_get_image();
@@ -1536,12 +1536,12 @@ static int bake_image_exec(bContext *C, wmOperator *op)
 void OBJECT_OT_bake_image(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Bake";
-	ot->description= "Bake image textures of selected objects";
-	ot->idname= "OBJECT_OT_bake_image";
+	ot->name = "Bake";
+	ot->description = "Bake image textures of selected objects";
+	ot->idname = "OBJECT_OT_bake_image";
 
 	/* api callbacks */
-	ot->exec= bake_image_exec;
-	ot->invoke= objects_bake_render_invoke;
-	ot->modal= objects_bake_render_modal;
+	ot->exec = bake_image_exec;
+	ot->invoke = objects_bake_render_invoke;
+	ot->modal = objects_bake_render_modal;
 }

@@ -80,7 +80,7 @@ static void image_verify_buffer_float(Image *ima, ImBuf *ibuf, int color_manage)
 {
 	/* detect if we need to redo the curve map.
 	 * ibuf->rect is zero for compositor and render results after change 
-	 * convert to 32 bits always... drawing float rects isnt supported well (atis)
+	 * convert to 32 bits always... drawing float rects isn't supported well (atis)
 	 *
 	 * NOTE: if float buffer changes, we have to manually remove the rect
 	 */
@@ -265,6 +265,16 @@ void ED_image_draw_info(ARegion *ar, int color_manage, int channels, int x, int 
 	glVertex2f(dx+30, 17);
 	glVertex2f(dx+30, 3);
 	glEnd();
+
+	/* draw outline */
+	glColor3ub(128, 128, 128);
+	glBegin(GL_LINE_LOOP);
+	glVertex2f(dx, 3);
+	glVertex2f(dx, 17);
+	glVertex2f(dx+30, 17);
+	glVertex2f(dx+30, 3);
+	glEnd();
+
 	dx += 35;
 
 	glColor3ub(255, 255, 255);

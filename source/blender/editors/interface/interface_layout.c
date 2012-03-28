@@ -639,7 +639,10 @@ PointerRNA uiItemFullO_ptr(uiLayout *layout, wmOperatorType *ot, const char *nam
 	int w;
 
 	if(!name) {
-		name= IFACE_(ot->name);
+		if (ot && ot->srna)
+			name = RNA_struct_ui_name(ot->srna);
+		else
+			name = "";
 	}
 
 	if(layout->root->type == UI_LAYOUT_MENU && !icon)
@@ -1586,7 +1589,7 @@ void uiItemMenuF(uiLayout *layout, const char *name, int icon, uiMenuCreateFunc 
 
 typedef struct MenuItemLevel {
 	int opcontext;
-	/* dont use pointers to the strings because python can dynamically
+	/* don't use pointers to the strings because python can dynamically
 	 * allocate strings and free before the menu draws, see [#27304] */
 	char opname[OP_MAX_TYPENAME];
 	char propname[MAX_IDPROP_NAME];

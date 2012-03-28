@@ -334,7 +334,7 @@ static int screen_opengl_render_init(bContext *C, wmOperator *op)
 		oglrender->scene->customdata_mask_modal = (ED_view3d_datamask(oglrender->scene, oglrender->v3d) |
 		                                           ED_view3d_object_datamask(oglrender->scene) );
 
-		/* apply immediately incase we're rendering from a script,
+		/* apply immediately in case we're rendering from a script,
 		 * running notifiers again will overwrite */
 		oglrender->scene->customdata_mask |= oglrender->scene->customdata_mask_modal;
 
@@ -439,7 +439,7 @@ static int screen_opengl_render_anim_step(bContext *C, wmOperator *op)
 	Object *camera= NULL;
 
 	/* update animated image textures for gpu, etc,
-	 * call before scene_update_for_newframe so modifiers with textuers dont lag 1 frame */
+	 * call before scene_update_for_newframe so modifiers with textuers don't lag 1 frame */
 	ED_image_update_frame(bmain, scene->r.cfra);
 
 	/* go to next frame */
@@ -639,17 +639,17 @@ static int screen_opengl_render_exec(bContext *C, wmOperator *op)
 void RENDER_OT_opengl(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "OpenGL Render";
-	ot->description= "OpenGL render active viewport";
-	ot->idname= "RENDER_OT_opengl";
+	ot->name = "OpenGL Render";
+	ot->description = "OpenGL render active viewport";
+	ot->idname = "RENDER_OT_opengl";
 
 	/* api callbacks */
-	ot->invoke= screen_opengl_render_invoke;
-	ot->exec= screen_opengl_render_exec; /* blocking */
-	ot->modal= screen_opengl_render_modal;
-	ot->cancel= screen_opengl_render_cancel;
+	ot->invoke = screen_opengl_render_invoke;
+	ot->exec = screen_opengl_render_exec; /* blocking */
+	ot->modal = screen_opengl_render_modal;
+	ot->cancel = screen_opengl_render_cancel;
 
-	ot->poll= ED_operator_screenactive;
+	ot->poll = ED_operator_screenactive;
 
 	RNA_def_boolean(ot->srna, "animation", 0, "Animation", "Render files from the animation range of this scene");
 	RNA_def_boolean(ot->srna, "write_still", 0, "Write Image", "Save rendered the image to the output path (used only when animation is disabled)");

@@ -183,7 +183,7 @@ static float get_ob2ob_distance(const Object* ob, const Object* obr)
 }
 
 /**
- * Maps distances to weights, with an optionnal “smoothing” mapping.
+ * Maps distances to weights, with an optionnal "smoothing" mapping.
  */
 void do_map(float *weights, const int nidx, const float min_d, const float max_d, short mode)
 {
@@ -267,7 +267,7 @@ static CustomDataMask requiredDataMask(Object *UNUSED(ob), ModifierData *md)
 	if(wmd->mask_tex_mapping == MOD_DISP_MAP_UV)
 		dataMask |= CD_MASK_MTFACE;
 
-	/* No need to ask for CD_WEIGHT_MCOL... */
+	/* No need to ask for CD_PREVIEW_MLOOPCOL... */
 
 	return dataMask;
 }

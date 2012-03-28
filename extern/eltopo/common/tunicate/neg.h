@@ -7,10 +7,10 @@
 extern "C" {
 //} for code folding
 #endif
-
-double
-neg(double x);
-
+    
+    double
+    neg(double x);
+    
 #ifdef __cplusplus
 } // end of extern "C" block
 #endif

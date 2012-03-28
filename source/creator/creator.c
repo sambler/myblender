@@ -40,6 +40,11 @@
 #include <xmmintrin.h>
 #endif
 
+#ifdef WIN32
+#include <Windows.h>
+#include "utfconv.h"
+#endif
+
 #include <stdlib.h>
 #include <stddef.h>
 #include <string.h>
@@ -319,9 +324,6 @@ static int print_help(int UNUSED(argc), const char **UNUSED(argv), void *data)
 	return 0;
 }
 
-
-double PIL_check_seconds_timer(void);
-
 static int end_arguments(int UNUSED(argc), const char **UNUSED(argv), void *UNUSED(data))
 {
 	return -1;
@@ -491,9 +493,9 @@ static int no_joystick(int UNUSED(argc), const char **UNUSED(argv), void *data)
 	SYS_SystemHandle *syshandle = data;
 
 	/**
-		don't initialize joysticks if user doesn't want to use joysticks
-		failed joystick initialization delays over 5 seconds, before game engine start
-	*/
+	 * don't initialize joysticks if user doesn't want to use joysticks
+	 * failed joystick initialization delays over 5 seconds, before game engine start
+	 */
 	SYS_WriteCommandLineInt(*syshandle, "nojoystick",1);
 	if (G.f & G_DEBUG) printf("disabling nojoystick\n");
 #endif
@@ -932,8 +934,8 @@ static int load_file(int UNUSED(argc), const char **argv, void *data)
 	if (G.background) {
 		int retval = BKE_read_file(C, filename, NULL);
 
-		/*we successfully loaded a blend file, get sure that
-		pointcache works */
+		/* we successfully loaded a blend file, get sure that
+		 * pointcache works */
 		if (retval != BKE_READ_FILE_FAIL) {
 			wmWindowManager *wm= CTX_wm_manager(C);
 
@@ -971,7 +973,7 @@ static int load_file(int UNUSED(argc), const char **argv, void *data)
 	//				BKE_write_undo("original");	/* save current state */
 	} else {
 		/* we are not running in background mode here, but start blender in UI mode with
-		   a file - this should do everything a 'load file' does */
+		 * a file - this should do everything a 'load file' does */
 		ReportList reports;
 		BKE_reports_init(&reports, RPT_PRINT);
 		WM_read_file(C, filename, &reports);
@@ -1112,11 +1114,27 @@ char **environ = NULL;
 
 #endif
 
+
+#ifdef WIN32
+int main(int argc, const char **argv_c) /*Do not mess with const*/
+#else
 int main(int argc, const char **argv)
+#endif
 {
 	SYS_SystemHandle syshandle;
 	bContext *C= CTX_create();
 	bArgs *ba;
+
+#ifdef WIN32
+	wchar_t ** argv_16 = CommandLineToArgvW(GetCommandLineW(), &argc);
+	int argci = 0;
+	char ** argv = MEM_mallocN(argc * sizeof(char*),"argv array");
+	for(argci=0; argci<argc; argci++)
+	{
+		argv[argci] = alloc_utf_8_from_16(argv_16[argci],0);
+	}
+	LocalFree(argv_16);
+#endif	
 
 #ifdef WITH_PYTHON_MODULE
 #ifdef __APPLE__
@@ -1126,6 +1144,8 @@ int main(int argc, const char **argv)
 #undef main
 	evil_C= C;
 #endif
+
+
 
 #ifdef WITH_BINRELOC
 	br_init( NULL );
@@ -1199,8 +1219,8 @@ int main(int argc, const char **argv)
 	/* background render uses this font too */
 	BKE_font_register_builtin(datatoc_Bfont, datatoc_Bfont_size);
 
-	/* Initialiaze ffmpeg if built in, also needed for bg mode if videos are
-	   rendered via ffmpeg */
+	/* Initialize ffmpeg if built in, also needed for bg mode if videos are
+	 * rendered via ffmpeg */
 	sound_init_once();
 	
 	init_def_material();
@@ -1248,6 +1268,15 @@ int main(int argc, const char **argv)
 
 	BLI_argsFree(ba);
 
+#ifdef WIN32
+	while(argci)
+	{
+		free(argv[--argci]);
+	}
+	MEM_freeN(argv);
+	argv = NULL;
+#endif
+
 #ifdef WITH_PYTHON_MODULE
 	return 0; /* keep blender in background mode running */
 #endif
@@ -1267,13 +1296,6 @@ int main(int argc, const char **argv)
 	}
 
 	WM_main(C);
-
-
-	/*XXX if (scr_init==0) {
-		main_init_screen();
-	}
-	
-	screenmain();*/ /* main display loop */
 
 	return 0;
 } /* end of int main(argc,argv)	*/

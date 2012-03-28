@@ -162,7 +162,7 @@ static DerivedMesh *doMirrorOnAxis(MirrorModifierData *mmd,
 	}
 
 	/* copy customdata to new geometry,
-	 * copy from its self becayse this data may have been created in the checks above */
+	 * copy from its self because this data may have been created in the checks above */
 	DM_copy_vert_data(result, result, 0, maxVerts, maxVerts);
 	DM_copy_edge_data(result, result, 0, maxEdges, maxEdges);
 	/* loops are copied later */
@@ -272,8 +272,12 @@ static DerivedMesh *doMirrorOnAxis(MirrorModifierData *mmd,
 		flip_map= defgroup_flip_map(ob, &flip_map_len, FALSE);
 		
 		if (flip_map) {
-			for (i = maxVerts; i-- > 0; dvert++) {
-				defvert_flip(dvert, flip_map, flip_map_len);
+			for (i = 0; i < maxVerts; dvert++, i++) {
+				/* merged vertices get both groups, others get flipped */
+				if(do_vtargetmap && (vtargetmap[i] != -1))
+					defvert_flip_merged(dvert, flip_map, flip_map_len);
+				else
+					defvert_flip(dvert, flip_map, flip_map_len);
 			}
 
 			MEM_freeN(flip_map);

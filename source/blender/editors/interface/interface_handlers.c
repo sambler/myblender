@@ -349,7 +349,7 @@ static void ui_apply_autokey_undo(bContext *C, uiBut *but)
 		else if(but->drawstr[0]) str= but->drawstr;
 		else str= but->tip;
 
-		/* fallback, else we dont get an undo! */
+		/* fallback, else we don't get an undo! */
 		if(str == NULL || str[0] == '\0') {
 			str= "Unknown Action";
 		}
@@ -1229,7 +1229,7 @@ static int ui_textedit_delete_selection(uiBut *but, uiHandleButtonData *data)
 	int len= strlen(str);
 	int change= 0;
 	if(but->selsta != but->selend && len) {
-		memmove( str+but->selsta, str+but->selend, (len - but->selend) + 1 );
+		memmove(str + but->selsta, str + but->selend, (len - but->selend) + 1);
 		change= 1;
 	}
 	
@@ -1282,13 +1282,33 @@ static void ui_textedit_set_cursor_pos(uiBut *but, uiHandleButtonData *data, sho
 	}
 	/* mouse inside the widget */
 	else if (x >= startx) {
+		int pos_i;
+
+		/* keep track of previous distance from the cursor to the char */
+		float cdist, cdist_prev = 0.0f;
+		short pos_prev;
+
 		const float aspect_sqrt= sqrtf(but->block->aspect);
 		
-		but->pos= strlen(origstr)-but->ofs;
-		
-		/* XXX does not take zoom level into account */
-		while (startx + aspect_sqrt * BLF_width(fstyle->uifont_id, origstr+but->ofs) > x) {
-			int pos_i = but->pos;
+		but->pos = pos_prev = strlen(origstr) - but->ofs;
+
+		while (TRUE) {
+			/* XXX does not take zoom level into account */
+			cdist = startx + aspect_sqrt * BLF_width(fstyle->uifont_id, origstr + but->ofs);
+
+			/* check if position is found */
+			if (cdist < x) {
+				/* check is previous location was infact closer */
+				if (((float)x - cdist) > (cdist_prev - (float)x)) {
+					but->pos = pos_prev;
+				}
+				break;
+			}
+			cdist_prev = cdist;
+			pos_prev   = but->pos;
+			/* done with tricky distance checks */
+
+			pos_i = but->pos;
 			if (but->pos <= 0) break;
 			if (BLI_str_cursor_step_prev_utf8(origstr, but->ofs, &pos_i)) {
 				but->pos = pos_i;
@@ -1580,6 +1600,8 @@ static int ui_textedit_copypaste(uiBut *but, uiHandleButtonData *data, int paste
 
 static void ui_textedit_begin(bContext *C, uiBut *but, uiHandleButtonData *data)
 {
+	int len;
+
 	if(data->str) {
 		MEM_freeN(data->str);
 		data->str= NULL;
@@ -1594,15 +1616,18 @@ static void ui_textedit_begin(bContext *C, uiBut *but, uiHandleButtonData *data)
 		ui_convert_to_unit_alt_name(but, data->str, data->maxlen);
 	}
 
-	data->origstr= BLI_strdup(data->str);
-	data->selextend= 0;
-	data->selstartx= 0;
+	/* won't change from now on */
+	len = strlen(data->str);
+
+	data->origstr = BLI_strdupn(data->str, len);
+	data->selextend = 0;
+	data->selstartx = 0;
 
 	/* set cursor pos to the end of the text */
-	but->editstr= data->str;
-	but->pos= strlen(data->str);
-	but->selsta= 0;
-	but->selend= strlen(data->str);
+	but->editstr = data->str;
+	but->pos = len;
+	but->selsta = 0;
+	but->selend = len;
 
 	/* optional searchbox */
 	if(but->type==SEARCH_MENU) {
@@ -1622,7 +1647,7 @@ static void ui_textedit_end(bContext *C, uiBut *but, uiHandleButtonData *data)
 			int strip= BLI_utf8_invalid_strip(but->editstr, strlen(but->editstr));
 			/* not a file?, strip non utf-8 chars */
 			if(strip) {
-				/* wont happen often so isnt that annoying to keep it here for a while */
+				/* wont happen often so isn't that annoying to keep it here for a while */
 				printf("%s: invalid utf8 - stripped chars %d\n", __func__, strip);
 			}
 		}
@@ -3212,7 +3237,7 @@ static int ui_do_but_HSVCUBE(bContext *C, uiBlock *block, uiBut *but, uiHandleBu
 			return WM_UI_HANDLER_BREAK;
 		}
 		/* XXX hardcoded keymap check.... */
-		else if (event->type == DELKEY && event->val == KM_PRESS) {
+		else if (event->type == BACKSPACEKEY && event->val == KM_PRESS) {
 			if (but->a1==UI_GRAD_V_ALT){
 				int len;
 				
@@ -3395,7 +3420,7 @@ static int ui_do_but_HSVCIRCLE(bContext *C, uiBlock *block, uiBut *but, uiHandle
 			return WM_UI_HANDLER_BREAK;
 		}
 		/* XXX hardcoded keymap check.... */
-		else if (event->type == DELKEY && event->val == KM_PRESS) {
+		else if (event->type == BACKSPACEKEY && event->val == KM_PRESS) {
 			int len;
 			
 			/* reset only saturation */
@@ -3823,7 +3848,7 @@ static int ui_do_but_HISTOGRAM(bContext *C, uiBlock *block, uiBut *but, uiHandle
 			return WM_UI_HANDLER_BREAK;
 		}
 		/* XXX hardcoded keymap check.... */
-		else if (event->type == DELKEY && event->val == KM_PRESS) {
+		else if (event->type == BACKSPACEKEY && event->val == KM_PRESS) {
 			Histogram *hist = (Histogram *)but->poin;
 			hist->ymax = 1.f;
 			
@@ -3906,7 +3931,7 @@ static int ui_do_but_WAVEFORM(bContext *C, uiBlock *block, uiBut *but, uiHandleB
 			return WM_UI_HANDLER_BREAK;
 		}
 		/* XXX hardcoded keymap check.... */
-		else if (event->type == DELKEY && event->val == KM_PRESS) {
+		else if (event->type == BACKSPACEKEY && event->val == KM_PRESS) {
 			Scopes *scopes = (Scopes *)but->poin;
 			scopes->wavefrm_yfac = 1.f;
 

@@ -416,7 +416,7 @@ typedef enum eItasc_Solver {
 /* Groups -------------------------------------- */
 
 /* Action-Channel Group (agrp)
-
+ *
  * These are stored as a list per-Action, and are only used to 
  * group that Action's channels in an Animation Editor. 
  *
@@ -511,7 +511,7 @@ typedef enum eAction_Flags {
 /* Storage for Dopesheet/Grease-Pencil Editor data */
 typedef struct bDopeSheet {
 	ID 		*source;			/* currently ID_SCE (for Dopesheet), and ID_SC (for Grease Pencil) */
-	ListBase chanbase;			/* cache for channels (only initialised when pinned) */  // XXX not used!
+	ListBase chanbase;			/* cache for channels (only initialized when pinned) */  // XXX not used!
 	
 	struct Group *filter_grp;	/* object group for ADS_FILTER_ONLYOBGROUP filtering option */
 	char searchstr[64];			/* string to search for in displayed names of F-Curves for ADS_FILTER_BY_FCU_NAME filtering option */

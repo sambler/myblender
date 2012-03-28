@@ -368,14 +368,6 @@ static void clip_operatortypes(void)
 
 	WM_operatortype_append(CLIP_OT_clean_tracks);
 
-	/* graph editing */
-	WM_operatortype_append(CLIP_OT_graph_select);
-	WM_operatortype_append(CLIP_OT_graph_select_border);
-	WM_operatortype_append(CLIP_OT_graph_delete_curve);
-	WM_operatortype_append(CLIP_OT_graph_delete_knot);
-	WM_operatortype_append(CLIP_OT_graph_view_all);
-	WM_operatortype_append(CLIP_OT_graph_center_current_frame);
-
 	/* object tracking */
 	WM_operatortype_append(CLIP_OT_tracking_object_new);
 	WM_operatortype_append(CLIP_OT_tracking_object_remove);
@@ -383,6 +375,22 @@ static void clip_operatortypes(void)
 	/* clipboard */
 	WM_operatortype_append(CLIP_OT_copy_tracks);
 	WM_operatortype_append(CLIP_OT_paste_tracks);
+
+	/* ** clip_graph_ops.c  ** */
+
+	/* graph editing */
+
+	/* selection */
+	WM_operatortype_append(CLIP_OT_graph_select);
+	WM_operatortype_append(CLIP_OT_graph_select_border);
+	WM_operatortype_append(CLIP_OT_graph_select_all_markers);
+
+	WM_operatortype_append(CLIP_OT_graph_delete_curve);
+	WM_operatortype_append(CLIP_OT_graph_delete_knot);
+	WM_operatortype_append(CLIP_OT_graph_view_all);
+	WM_operatortype_append(CLIP_OT_graph_center_current_frame);
+
+	WM_operatortype_append(CLIP_OT_graph_disable_markers);
 }
 
 static void clip_keymap(struct wmKeyConfig *keyconf)
@@ -403,21 +411,15 @@ static void clip_keymap(struct wmKeyConfig *keyconf)
 	kmi= WM_keymap_add_item(keymap, "CLIP_OT_track_markers", LEFTARROWKEY, KM_PRESS, KM_ALT, 0);
 	RNA_boolean_set(kmi->ptr, "backwards", TRUE);
 	RNA_boolean_set(kmi->ptr, "sequence", FALSE);
-	WM_keymap_add_item(keymap, "CLIP_OT_track_markers", RIGHTARROWKEY, KM_PRESS, KM_ALT, 0);
+	kmi= WM_keymap_add_item(keymap, "CLIP_OT_track_markers", RIGHTARROWKEY, KM_PRESS, KM_ALT, 0);
+	RNA_boolean_set(kmi->ptr, "backwards", FALSE);
+	RNA_boolean_set(kmi->ptr, "sequence", FALSE);
 	kmi= WM_keymap_add_item(keymap, "CLIP_OT_track_markers", TKEY, KM_PRESS, KM_CTRL, 0);
 	RNA_boolean_set(kmi->ptr, "backwards", FALSE);
 	RNA_boolean_set(kmi->ptr, "sequence", TRUE);
 	kmi= WM_keymap_add_item(keymap, "CLIP_OT_track_markers", TKEY, KM_PRESS, KM_SHIFT|KM_CTRL, 0);
 	RNA_boolean_set(kmi->ptr, "backwards", TRUE);
 	RNA_boolean_set(kmi->ptr, "sequence", TRUE);
-
-	/* clean-up */
-	kmi= WM_keymap_add_item(keymap, "CLIP_OT_clear_track_path", TKEY, KM_PRESS, KM_ALT, 0);
-	RNA_enum_set(kmi->ptr, "action", TRACK_CLEAR_REMAINED);
-	kmi= WM_keymap_add_item(keymap, "CLIP_OT_clear_track_path", TKEY, KM_PRESS, KM_SHIFT, 0);
-	RNA_enum_set(kmi->ptr, "action", TRACK_CLEAR_UPTO);
-	kmi= WM_keymap_add_item(keymap, "CLIP_OT_clear_track_path", TKEY, KM_PRESS, KM_ALT|KM_SHIFT, 0);
-	RNA_enum_set(kmi->ptr, "action", TRACK_CLEAR_ALL);
 
 	/* mode */
 	kmi= WM_keymap_add_item(keymap, "CLIP_OT_mode_set", TABKEY, KM_PRESS, 0, 0);
@@ -546,6 +548,17 @@ static void clip_keymap(struct wmKeyConfig *keyconf)
 
 	transform_keymap_for_space(keyconf, keymap, SPACE_CLIP);
 
+	/* clean-up */
+	kmi= WM_keymap_add_item(keymap, "CLIP_OT_clear_track_path", TKEY, KM_PRESS, KM_ALT, 0);
+	RNA_enum_set(kmi->ptr, "action", TRACK_CLEAR_REMAINED);
+	RNA_boolean_set(kmi->ptr, "clear_active", FALSE);
+	kmi= WM_keymap_add_item(keymap, "CLIP_OT_clear_track_path", TKEY, KM_PRESS, KM_SHIFT, 0);
+	RNA_enum_set(kmi->ptr, "action", TRACK_CLEAR_UPTO);
+	RNA_boolean_set(kmi->ptr, "clear_active", FALSE);
+	kmi= WM_keymap_add_item(keymap, "CLIP_OT_clear_track_path", TKEY, KM_PRESS, KM_ALT|KM_SHIFT, 0);
+	RNA_enum_set(kmi->ptr, "action", TRACK_CLEAR_ALL);
+	RNA_boolean_set(kmi->ptr, "clear_active", FALSE);
+
 	/* ******** Hotkeys avalaible for preview region only ******** */
 
 	keymap= WM_keymap_find(keyconf, "Clip Graph Editor", SPACE_CLIP, 0);
@@ -558,6 +571,11 @@ static void clip_keymap(struct wmKeyConfig *keyconf)
 	RNA_boolean_set(kmi->ptr, "extend", FALSE);
 	kmi = WM_keymap_add_item(keymap, "CLIP_OT_graph_select", SELECTMOUSE, KM_PRESS, KM_SHIFT, 0);
 	RNA_boolean_set(kmi->ptr, "extend", TRUE);
+
+	kmi = WM_keymap_add_item(keymap, "CLIP_OT_graph_select_all_markers", AKEY, KM_PRESS, 0, 0);
+	RNA_enum_set(kmi->ptr, "action", SEL_TOGGLE);
+	kmi = WM_keymap_add_item(keymap, "CLIP_OT_graph_select_all_markers", IKEY, KM_PRESS, KM_CTRL, 0);
+	RNA_enum_set(kmi->ptr, "action", SEL_INVERT);
 
 	WM_keymap_add_item(keymap, "CLIP_OT_graph_select_border", BKEY, KM_PRESS, 0, 0);
 
@@ -574,6 +592,21 @@ static void clip_keymap(struct wmKeyConfig *keyconf)
 
 	kmi= WM_keymap_add_item(keymap, "WM_OT_context_toggle", LKEY, KM_PRESS, 0, 0);
 	RNA_string_set(kmi->ptr, "data_path", "space_data.lock_time_cursor");
+
+	/* clean-up */
+	kmi= WM_keymap_add_item(keymap, "CLIP_OT_clear_track_path", TKEY, KM_PRESS, KM_ALT, 0);
+	RNA_enum_set(kmi->ptr, "action", TRACK_CLEAR_REMAINED);
+	RNA_boolean_set(kmi->ptr, "clear_active", TRUE);
+	kmi= WM_keymap_add_item(keymap, "CLIP_OT_clear_track_path", TKEY, KM_PRESS, KM_SHIFT, 0);
+	RNA_enum_set(kmi->ptr, "action", TRACK_CLEAR_UPTO);
+	RNA_boolean_set(kmi->ptr, "clear_active", TRUE);
+	kmi= WM_keymap_add_item(keymap, "CLIP_OT_clear_track_path", TKEY, KM_PRESS, KM_ALT|KM_SHIFT, 0);
+	RNA_enum_set(kmi->ptr, "action", TRACK_CLEAR_ALL);
+	RNA_boolean_set(kmi->ptr, "clear_active", TRUE);
+
+	/* tracks */
+	kmi= WM_keymap_add_item(keymap, "CLIP_OT_graph_disable_markers", DKEY, KM_PRESS, KM_SHIFT, 0);
+	RNA_enum_set(kmi->ptr, "action", 2);	/* toggle */
 
 	transform_keymap_for_space(keyconf, keymap, SPACE_CLIP);
 }

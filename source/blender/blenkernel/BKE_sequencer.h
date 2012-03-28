@@ -103,10 +103,10 @@ unsigned int seq_hash_render_data(const SeqRenderData * a);
 /* ********************* prototypes *************** */
 
 /* **********************************************************************
-   * sequence.c
-
-   * sequencer render functions
-   ********************************************************************** */
+ * sequence.c
+ *
+ * sequencer render functions
+ * ********************************************************************** */
 
 struct ImBuf *give_ibuf_seq(SeqRenderData context, float cfra, int chanshown);
 struct ImBuf *give_ibuf_seq_threaded(SeqRenderData context, float cfra, int chanshown);
@@ -129,7 +129,6 @@ struct Editing *seq_give_editing(struct Scene *scene, int alloc);
 const char *give_seqname(struct Sequence *seq);
 void calc_sequence(struct Scene *scene, struct Sequence *seq);
 void calc_sequence_disp(struct Scene *scene, struct Sequence *seq);
-void new_tstripdata(struct Sequence *seq);
 void reload_sequence_new_file(struct Scene *scene, struct Sequence * seq, int lock_range);
 void sort_seq(struct Scene *scene);
 void build_seqar_cb(struct ListBase *seqbase, struct Sequence  ***seqar, int *totseq,
@@ -151,10 +150,10 @@ void seq_proxy_rebuild_finish(struct SeqIndexBuildContext *context, short stop);
 
 
 /* **********************************************************************
-   seqcache.c
-
-   Sequencer memory cache management functions
-   ********************************************************************** */
+ * seqcache.c
+ *
+ * Sequencer memory cache management functions
+ * ********************************************************************** */
 
 typedef enum {
 	SEQ_STRIPELEM_IBUF,
@@ -172,18 +171,34 @@ struct ImBuf * seq_stripelem_cache_get(
 	float cfra, seq_stripelem_ibuf_t type);
 
 /* passed ImBuf is properly refed, so ownership is *not* 
-   transfered to the cache.
-   you can pass the same ImBuf multiple times to the cache without problems.
-*/
+ * transfered to the cache.
+ * you can pass the same ImBuf multiple times to the cache without problems.
+ */
    
 void seq_stripelem_cache_put(
 	SeqRenderData context, struct Sequence * seq, 
 	float cfra, seq_stripelem_ibuf_t type, struct ImBuf * nval);
 
 /* **********************************************************************
-   Sequencer editing functions
-   **********************************************************************
-*/
+ * seqeffects.c
+ *
+ * Sequencer effect strip managment functions
+ *  **********************************************************************
+ */
+
+/* intern */
+struct SeqEffectHandle get_sequence_blend(struct Sequence *seq);
+void sequence_effect_speed_rebuild_map(struct Scene *scene, struct Sequence *seq, int force);
+
+/* extern */
+struct SeqEffectHandle get_sequence_effect(struct Sequence *seq);
+int get_sequence_effect_num_inputs(int seq_type);
+
+
+/* **********************************************************************
+ * Sequencer editing functions
+ * **********************************************************************
+ */
    
 /* for transform but also could use elsewhere */
 int seq_tx_get_start(struct Sequence *seq);

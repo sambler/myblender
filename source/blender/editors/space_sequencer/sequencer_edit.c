@@ -56,6 +56,7 @@
 #include "SEQ_effects.h"
 #include "BKE_report.h"
 #include "BKE_sound.h"
+#include "BKE_movieclip.h"
 
 #include "IMB_imbuf.h"
 
@@ -75,9 +76,6 @@
 
 /* own include */
 #include "sequencer_intern.h"
-
-static int okee(const char *UNUSED(dummy)) {return 0;}
-
 
 /* XXX */
 /* RNA Enums, used in multiple files */
@@ -413,7 +411,7 @@ Sequence *find_nearest_seq(Scene *scene, View2D *v2d, int *hand, const int mval[
 					handsize = seq->handsize;
 					displen = (float)abs(seq->startdisp - seq->enddisp);
 					
-					if (displen / pixelx > 16) { /* dont even try to grab the handles of small strips */
+					if (displen / pixelx > 16) { /* don't even try to grab the handles of small strips */
 						/* Set the max value to handle to 1/3 of the total len when its less then 28.
 						 * This is important because otherwise selecting handles happens even when you click in the middle */
 						
@@ -664,7 +662,6 @@ static Sequence *cut_seq_hard(Scene *scene, Sequence * seq, int cutframe)
 	
 	reload_sequence_new_file(scene, seq, FALSE);
 	calc_sequence(scene, seq);
-	new_tstripdata(seq); 
 
 	if (!skip_dup) {
 		/* Duplicate AFTER the first change */
@@ -705,7 +702,6 @@ static Sequence *cut_seq_hard(Scene *scene, Sequence * seq, int cutframe)
 		
 		reload_sequence_new_file(scene, seqn, FALSE);
 		calc_sequence(scene, seqn);
-		new_tstripdata(seqn);
 	}
 	return seqn;
 }
@@ -758,7 +754,6 @@ static Sequence *cut_seq_soft(Scene *scene, Sequence * seq, int cutframe)
 	}
 	
 	calc_sequence(scene, seq);
-	new_tstripdata(seq);
 
 	if (!skip_dup) {
 		/* Duplicate AFTER the first change */
@@ -794,7 +789,6 @@ static Sequence *cut_seq_soft(Scene *scene, Sequence * seq, int cutframe)
 		}
 		
 		calc_sequence(scene, seqn);
-		new_tstripdata(seqn);
 	}
 	return seqn;
 }
@@ -867,7 +861,7 @@ static void UNUSED_FUNCTION(touch_seq_files)(Scene *scene)
 	
 	if(ed==NULL) return;
 
-	if(okee("Touch and print selected movies")==0) return;
+	// XXX25 if(okee("Touch and print selected movies")==0) return;
 
 	WM_cursor_wait(1);
 
@@ -1055,7 +1049,7 @@ static int sequencer_snap_exec(bContext *C, wmOperator *op)
 	}
 
 	/* test for effects and overlap
-	 * dont use SEQP_BEGIN since that would be recursive */
+	 * don't use SEQP_BEGIN since that would be recursive */
 	for(seq= ed->seqbasep->first; seq; seq= seq->next) {
 		if(seq->flag & SELECT && !(seq->depth==0 && seq->flag & SEQ_LOCK)) {
 			seq->flag &= ~SEQ_OVERLAP;
@@ -1096,17 +1090,17 @@ static int sequencer_snap_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(ev
 void SEQUENCER_OT_snap(struct wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Snap strips";
-	ot->idname= "SEQUENCER_OT_snap";
-	ot->description="Frame where selected strips will be snapped";
+	ot->name = "Snap strips";
+	ot->idname = "SEQUENCER_OT_snap";
+	ot->description = "Frame where selected strips will be snapped";
 	
 	/* api callbacks */
-	ot->invoke= sequencer_snap_invoke;
-	ot->exec= sequencer_snap_exec;
-	ot->poll= sequencer_edit_poll;
+	ot->invoke = sequencer_snap_invoke;
+	ot->exec = sequencer_snap_exec;
+	ot->poll = sequencer_edit_poll;
 	
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 	
 	RNA_def_int(ot->srna, "frame", 0, INT_MIN, INT_MAX, "Frame", "Frame where selected strips will be snapped", INT_MIN, INT_MAX);
 }
@@ -1143,16 +1137,16 @@ static int sequencer_mute_exec(bContext *C, wmOperator *op)
 void SEQUENCER_OT_mute(struct wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Mute Strips";
-	ot->idname= "SEQUENCER_OT_mute";
-	ot->description="Mute selected strips";
+	ot->name = "Mute Strips";
+	ot->idname = "SEQUENCER_OT_mute";
+	ot->description = "Mute selected strips";
 	
 	/* api callbacks */
-	ot->exec= sequencer_mute_exec;
-	ot->poll= sequencer_edit_poll;
+	ot->exec = sequencer_mute_exec;
+	ot->poll = sequencer_edit_poll;
 	
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 	
 	RNA_def_boolean(ot->srna, "unselected", 0, "Unselected", "Mute unselected rather than selected strips");
 }
@@ -1190,16 +1184,16 @@ static int sequencer_unmute_exec(bContext *C, wmOperator *op)
 void SEQUENCER_OT_unmute(struct wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Un-Mute Strips";
-	ot->idname= "SEQUENCER_OT_unmute";
-	ot->description="Un-Mute unselected rather than selected strips";
+	ot->name = "Un-Mute Strips";
+	ot->idname = "SEQUENCER_OT_unmute";
+	ot->description = "Un-Mute unselected rather than selected strips";
 	
 	/* api callbacks */
-	ot->exec= sequencer_unmute_exec;
-	ot->poll= sequencer_edit_poll;
+	ot->exec = sequencer_unmute_exec;
+	ot->poll = sequencer_edit_poll;
 	
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 	
 	RNA_def_boolean(ot->srna, "unselected", 0, "Unselected", "UnMute unselected rather than selected strips");
 }
@@ -1226,16 +1220,16 @@ static int sequencer_lock_exec(bContext *C, wmOperator *UNUSED(op))
 void SEQUENCER_OT_lock(struct wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Lock Strips";
-	ot->idname= "SEQUENCER_OT_lock";
-	ot->description="Lock the active strip so that it can't be transformed";
+	ot->name = "Lock Strips";
+	ot->idname = "SEQUENCER_OT_lock";
+	ot->description = "Lock the active strip so that it can't be transformed";
 	
 	/* api callbacks */
-	ot->exec= sequencer_lock_exec;
-	ot->poll= sequencer_edit_poll;
+	ot->exec = sequencer_lock_exec;
+	ot->poll = sequencer_edit_poll;
 	
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 }
 
 /* unlock operator */
@@ -1259,16 +1253,16 @@ static int sequencer_unlock_exec(bContext *C, wmOperator *UNUSED(op))
 void SEQUENCER_OT_unlock(struct wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "UnLock Strips";
-	ot->idname= "SEQUENCER_OT_unlock";
-	ot->description="Unlock the active strip so that it can't be transformed";
+	ot->name = "UnLock Strips";
+	ot->idname = "SEQUENCER_OT_unlock";
+	ot->description = "Unlock the active strip so that it can't be transformed";
 	
 	/* api callbacks */
-	ot->exec= sequencer_unlock_exec;
-	ot->poll= sequencer_edit_poll;
+	ot->exec = sequencer_unlock_exec;
+	ot->poll = sequencer_edit_poll;
 	
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 }
 
 /* reload operator */
@@ -1292,16 +1286,16 @@ static int sequencer_reload_exec(bContext *C, wmOperator *UNUSED(op))
 void SEQUENCER_OT_reload(struct wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Reload Strips";
-	ot->idname= "SEQUENCER_OT_reload";
-	ot->description="Reload strips in the sequencer";
+	ot->name = "Reload Strips";
+	ot->idname = "SEQUENCER_OT_reload";
+	ot->description = "Reload strips in the sequencer";
 	
 	/* api callbacks */
-	ot->exec= sequencer_reload_exec;
-	ot->poll= sequencer_edit_poll;
+	ot->exec = sequencer_reload_exec;
+	ot->poll = sequencer_edit_poll;
 	
 	/* flags */
-	ot->flag= OPTYPE_REGISTER; /* no undo, the data changed is stored outside 'main' */
+	ot->flag = OPTYPE_REGISTER; /* no undo, the data changed is stored outside 'main' */
 }
 
 /* reload operator */
@@ -1320,13 +1314,13 @@ static int sequencer_refresh_all_exec(bContext *C, wmOperator *UNUSED(op))
 void SEQUENCER_OT_refresh_all(struct wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Refresh Sequencer";
-	ot->idname= "SEQUENCER_OT_refresh_all";
-	ot->description="Refresh the sequencer editor";
+	ot->name = "Refresh Sequencer";
+	ot->idname = "SEQUENCER_OT_refresh_all";
+	ot->description = "Refresh the sequencer editor";
 	
 	/* api callbacks */
-	ot->exec= sequencer_refresh_all_exec;
-	ot->poll= sequencer_edit_poll;
+	ot->exec = sequencer_refresh_all_exec;
+	ot->poll = sequencer_edit_poll;
 }
 
 static int sequencer_reassign_inputs_exec(bContext *C, wmOperator *op)
@@ -1377,16 +1371,16 @@ static int sequencer_effect_poll(bContext *C)
 void SEQUENCER_OT_reassign_inputs(struct wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Reassign Inputs";
-	ot->idname= "SEQUENCER_OT_reassign_inputs";
-	ot->description="Reassign the inputs for the effect strip";
+	ot->name = "Reassign Inputs";
+	ot->idname = "SEQUENCER_OT_reassign_inputs";
+	ot->description = "Reassign the inputs for the effect strip";
 
 	/* api callbacks */
-	ot->exec= sequencer_reassign_inputs_exec;
-	ot->poll= sequencer_effect_poll;
+	ot->exec = sequencer_reassign_inputs_exec;
+	ot->poll = sequencer_effect_poll;
 
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 }
 
 
@@ -1413,16 +1407,16 @@ static int sequencer_swap_inputs_exec(bContext *C, wmOperator *op)
 void SEQUENCER_OT_swap_inputs(struct wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Swap Inputs";
-	ot->idname= "SEQUENCER_OT_swap_inputs";
-	ot->description="Swap the first two inputs for the effect strip";
+	ot->name = "Swap Inputs";
+	ot->idname = "SEQUENCER_OT_swap_inputs";
+	ot->description = "Swap the first two inputs for the effect strip";
 
 	/* api callbacks */
-	ot->exec= sequencer_swap_inputs_exec;
-	ot->poll= sequencer_effect_poll;
+	ot->exec = sequencer_swap_inputs_exec;
+	ot->poll = sequencer_effect_poll;
 
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 }
 
 
@@ -1508,17 +1502,17 @@ static int sequencer_cut_invoke(bContext *C, wmOperator *op, wmEvent *event)
 void SEQUENCER_OT_cut(struct wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Cut Strips";
-	ot->idname= "SEQUENCER_OT_cut";
-	ot->description="Cut the selected strips";
+	ot->name = "Cut Strips";
+	ot->idname = "SEQUENCER_OT_cut";
+	ot->description = "Cut the selected strips";
 	
 	/* api callbacks */
-	ot->invoke= sequencer_cut_invoke;
-	ot->exec= sequencer_cut_exec;
-	ot->poll= sequencer_edit_poll;
+	ot->invoke = sequencer_cut_invoke;
+	ot->exec = sequencer_cut_exec;
+	ot->poll = sequencer_edit_poll;
 	
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 	
 	RNA_def_int(ot->srna, "frame", 0, INT_MIN, INT_MAX, "Frame", "Frame where selected strips will be cut", INT_MIN, INT_MAX);
 	RNA_def_enum(ot->srna, "type", prop_cut_types, SEQ_CUT_SOFT, "Type", "The type of cut operation to perform on strips");
@@ -1578,17 +1572,17 @@ static int sequencer_add_duplicate_invoke(bContext *C, wmOperator *op, wmEvent *
 void SEQUENCER_OT_duplicate(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Duplicate Strips";
-	ot->idname= "SEQUENCER_OT_duplicate";
-	ot->description="Duplicate the selected strips";
+	ot->name = "Duplicate Strips";
+	ot->idname = "SEQUENCER_OT_duplicate";
+	ot->description = "Duplicate the selected strips";
 	
 	/* api callbacks */
-	ot->invoke= sequencer_add_duplicate_invoke;
-	ot->exec= sequencer_add_duplicate_exec;
-	ot->poll= ED_operator_sequencer_active;
+	ot->invoke = sequencer_add_duplicate_invoke;
+	ot->exec = sequencer_add_duplicate_exec;
+	ot->poll = ED_operator_sequencer_active;
 	
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 	
 	/* to give to transform */
 	RNA_def_enum(ot->srna, "mode", transform_mode_types, TFM_TRANSLATION, "Mode", "");
@@ -1636,7 +1630,6 @@ static int sequencer_delete_exec(bContext *C, wmOperator *UNUSED(op))
 	/* free parent metas */
 	ms= ed->metastack.last;
 	while(ms) {
-		ms->parseq->strip->len= 0;		/* force new alloc */
 		calc_sequence(scene, ms->parseq);
 		ms= ms->prev;
 	}
@@ -1651,17 +1644,17 @@ void SEQUENCER_OT_delete(wmOperatorType *ot)
 {
 
 	/* identifiers */
-	ot->name= "Erase Strips";
-	ot->idname= "SEQUENCER_OT_delete";
-	ot->description="Erase selected strips from the sequencer";
+	ot->name = "Erase Strips";
+	ot->idname = "SEQUENCER_OT_delete";
+	ot->description = "Erase selected strips from the sequencer";
 	
 	/* api callbacks */
-	ot->invoke= WM_operator_confirm;
-	ot->exec= sequencer_delete_exec;
-	ot->poll= sequencer_edit_poll;
+	ot->invoke = WM_operator_confirm;
+	ot->exec = sequencer_delete_exec;
+	ot->poll = sequencer_edit_poll;
 	
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 }
 
 
@@ -1704,16 +1697,16 @@ void SEQUENCER_OT_offset_clear(wmOperatorType *ot)
 {
 
 	/* identifiers */
-	ot->name= "Clear Strip Offset";
-	ot->idname= "SEQUENCER_OT_offset_clear";
-	ot->description="Clear strip offsets from the start and end frames";
+	ot->name = "Clear Strip Offset";
+	ot->idname = "SEQUENCER_OT_offset_clear";
+	ot->description = "Clear strip offsets from the start and end frames";
 
 	/* api callbacks */
-	ot->exec= sequencer_offset_clear_exec;
-	ot->poll= sequencer_edit_poll;
+	ot->exec = sequencer_offset_clear_exec;
+	ot->poll = sequencer_edit_poll;
 
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 }
 
 
@@ -1733,7 +1726,7 @@ static int sequencer_separate_images_exec(bContext *C, wmOperator *op)
 
 	while (seq) {
 		if((seq->flag & SELECT) && (seq->type == SEQ_IMAGE) && (seq->len > 1)) {
-			/* remove seq so overlap tests dont conflict,
+			/* remove seq so overlap tests don't conflict,
 			 * see seq_free_sequence below for the real free'ing */
 			BLI_remlink(ed->seqbasep, seq);
 			/* if(seq->ipo) seq->ipo->id.us--; */
@@ -1756,7 +1749,6 @@ static int sequencer_separate_images_exec(bContext *C, wmOperator *op)
 
 				/* new strip */
 				strip_new= seq_new->strip;
-				strip_new->len= 1;
 				strip_new->us= 1;
 
 				/* new stripdata */
@@ -1796,16 +1788,16 @@ static int sequencer_separate_images_exec(bContext *C, wmOperator *op)
 void SEQUENCER_OT_images_separate(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Separate Images";
-	ot->idname= "SEQUENCER_OT_images_separate";
-	ot->description="On image sequence strips, it returns a strip for each image";
+	ot->name = "Separate Images";
+	ot->idname = "SEQUENCER_OT_images_separate";
+	ot->description = "On image sequence strips, it returns a strip for each image";
 	
 	/* api callbacks */
-	ot->exec= sequencer_separate_images_exec;
-	ot->poll= sequencer_edit_poll;
+	ot->exec = sequencer_separate_images_exec;
+	ot->poll = sequencer_edit_poll;
 	
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 
 	RNA_def_int(ot->srna, "length", 1, 1, 1000, "Length", "Length of each frame", 1, INT_MAX);
 }
@@ -1868,16 +1860,16 @@ static int sequencer_meta_toggle_exec(bContext *C, wmOperator *UNUSED(op))
 void SEQUENCER_OT_meta_toggle(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Toggle Meta Strip";
-	ot->idname= "SEQUENCER_OT_meta_toggle";
-	ot->description="Toggle a metastrip (to edit enclosed strips)";
+	ot->name = "Toggle Meta Strip";
+	ot->idname = "SEQUENCER_OT_meta_toggle";
+	ot->description = "Toggle a metastrip (to edit enclosed strips)";
 	
 	/* api callbacks */
-	ot->exec= sequencer_meta_toggle_exec;
-	ot->poll= sequencer_edit_poll;
+	ot->exec = sequencer_meta_toggle_exec;
+	ot->poll = sequencer_edit_poll;
 	
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 }
 
 
@@ -1916,7 +1908,6 @@ static int sequencer_meta_make_exec(bContext *C, wmOperator *op)
 	calc_sequence(scene, seqm);
 
 	seqm->strip= MEM_callocN(sizeof(Strip), "metastrip");
-	seqm->strip->len= seqm->len;
 	seqm->strip->us= 1;
 	
 	seq_active_set(scene, seqm);
@@ -1935,17 +1926,17 @@ static int sequencer_meta_make_exec(bContext *C, wmOperator *op)
 void SEQUENCER_OT_meta_make(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Make Meta Strip";
-	ot->idname= "SEQUENCER_OT_meta_make";
-	ot->description="Group selected strips into a metastrip";
+	ot->name = "Make Meta Strip";
+	ot->idname = "SEQUENCER_OT_meta_make";
+	ot->description = "Group selected strips into a metastrip";
 	
 	/* api callbacks */
-	ot->invoke= WM_operator_confirm;
-	ot->exec= sequencer_meta_make_exec;
-	ot->poll= sequencer_edit_poll;
+	ot->invoke = WM_operator_confirm;
+	ot->exec = sequencer_meta_make_exec;
+	ot->poll = sequencer_edit_poll;
 	
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 }
 
 
@@ -1985,7 +1976,7 @@ static int sequencer_meta_separate_exec(bContext *C, wmOperator *UNUSED(op))
 	recurs_del_seq_flag(scene, ed->seqbasep, SEQ_FLAG_DELETE, 0);
 
 	/* test for effects and overlap
-	 * dont use SEQP_BEGIN since that would be recursive */
+	 * don't use SEQP_BEGIN since that would be recursive */
 	for(seq= ed->seqbasep->first; seq; seq= seq->next) {
 		if(seq->flag & SELECT) {
 			seq->flag &= ~SEQ_OVERLAP;
@@ -2006,17 +1997,17 @@ static int sequencer_meta_separate_exec(bContext *C, wmOperator *UNUSED(op))
 void SEQUENCER_OT_meta_separate(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "UnMeta Strip";
-	ot->idname= "SEQUENCER_OT_meta_separate";
-	ot->description="Put the contents of a metastrip back in the sequencer";
+	ot->name = "UnMeta Strip";
+	ot->idname = "SEQUENCER_OT_meta_separate";
+	ot->description = "Put the contents of a metastrip back in the sequencer";
 	
 	/* api callbacks */
-	ot->invoke= WM_operator_confirm;
-	ot->exec= sequencer_meta_separate_exec;
-	ot->poll= sequencer_edit_poll;
+	ot->invoke = WM_operator_confirm;
+	ot->exec = sequencer_meta_separate_exec;
+	ot->poll = sequencer_edit_poll;
 	
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 }
 
 /* view_all operator */
@@ -2039,16 +2030,16 @@ static int sequencer_view_all_exec(bContext *C, wmOperator *UNUSED(op))
 void SEQUENCER_OT_view_all(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "View All";
-	ot->idname= "SEQUENCER_OT_view_all";
-	ot->description="View all the strips in the sequencer";
+	ot->name = "View All";
+	ot->idname = "SEQUENCER_OT_view_all";
+	ot->description = "View all the strips in the sequencer";
 	
 	/* api callbacks */
-	ot->exec= sequencer_view_all_exec;
-	ot->poll= ED_operator_sequencer_active;
+	ot->exec = sequencer_view_all_exec;
+	ot->poll = ED_operator_sequencer_active;
 	
 	/* flags */
-	ot->flag= OPTYPE_REGISTER;
+	ot->flag = OPTYPE_REGISTER;
 }
 
 /* view_all operator */
@@ -2105,16 +2096,16 @@ static int sequencer_view_all_preview_exec(bContext *C, wmOperator *UNUSED(op))
 void SEQUENCER_OT_view_all_preview(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "View All";
-	ot->idname= "SEQUENCER_OT_view_all_preview";
-	ot->description="Zoom preview to fit in the area";
+	ot->name = "View All";
+	ot->idname = "SEQUENCER_OT_view_all_preview";
+	ot->description = "Zoom preview to fit in the area";
 	
 	/* api callbacks */
-	ot->exec= sequencer_view_all_preview_exec;
-	ot->poll= ED_operator_sequencer_active;
+	ot->exec = sequencer_view_all_preview_exec;
+	ot->poll = ED_operator_sequencer_active;
 	
 	/* flags */
-	ot->flag= OPTYPE_REGISTER;
+	ot->flag = OPTYPE_REGISTER;
 }
 
 
@@ -2141,13 +2132,13 @@ static int sequencer_view_zoom_ratio_exec(bContext *C, wmOperator *op)
 void SEQUENCER_OT_view_zoom_ratio(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Sequencer View Zoom Ratio";
-	ot->idname= "SEQUENCER_OT_view_zoom_ratio";
+	ot->name = "Sequencer View Zoom Ratio";
+	ot->idname = "SEQUENCER_OT_view_zoom_ratio";
 	ot->description = "Change zoom ratio of sequencer preview";
 
 	/* api callbacks */
-	ot->exec= sequencer_view_zoom_ratio_exec;
-	ot->poll= ED_operator_sequencer_active;
+	ot->exec = sequencer_view_zoom_ratio_exec;
+	ot->poll = ED_operator_sequencer_active;
 
 	/* properties */
 	RNA_def_float(ot->srna, "ratio", 1.0f, 0.0f, FLT_MAX,
@@ -2179,16 +2170,16 @@ static int sequencer_view_toggle_exec(bContext *C, wmOperator *UNUSED(op))
 void SEQUENCER_OT_view_toggle(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "View Toggle";
-	ot->idname= "SEQUENCER_OT_view_toggle";
-	ot->description="Toggle between sequencer views (sequence, preview, both)";
+	ot->name = "View Toggle";
+	ot->idname = "SEQUENCER_OT_view_toggle";
+	ot->description = "Toggle between sequencer views (sequence, preview, both)";
 	
 	/* api callbacks */
-	ot->exec= sequencer_view_toggle_exec;
-	ot->poll= ED_operator_sequencer_active;
+	ot->exec = sequencer_view_toggle_exec;
+	ot->poll = ED_operator_sequencer_active;
 	
 	/* flags */
-	ot->flag= OPTYPE_REGISTER;
+	ot->flag = OPTYPE_REGISTER;
 }
 
 
@@ -2259,16 +2250,16 @@ static int sequencer_view_selected_exec(bContext *C, wmOperator *UNUSED(op))
 void SEQUENCER_OT_view_selected(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "View Selected";
-	ot->idname= "SEQUENCER_OT_view_selected";
-	ot->description="Zoom the sequencer on the selected strips";
+	ot->name = "View Selected";
+	ot->idname = "SEQUENCER_OT_view_selected";
+	ot->description = "Zoom the sequencer on the selected strips";
 	
 	/* api callbacks */
-	ot->exec= sequencer_view_selected_exec;
-	ot->poll= ED_operator_sequencer_active;
+	ot->exec = sequencer_view_selected_exec;
+	ot->poll = ED_operator_sequencer_active;
 	
 	/* flags */
-	ot->flag= OPTYPE_REGISTER;
+	ot->flag = OPTYPE_REGISTER;
 }
 
 
@@ -2344,16 +2335,16 @@ static int sequencer_next_edit_exec(bContext *C, wmOperator *UNUSED(op))
 void SEQUENCER_OT_next_edit(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Next Edit";
-	ot->idname= "SEQUENCER_OT_next_edit";
-	ot->description="Move frame to next edit point";
+	ot->name = "Next Edit";
+	ot->idname = "SEQUENCER_OT_next_edit";
+	ot->description = "Move frame to next edit point";
 	
 	/* api callbacks */
-	ot->exec= sequencer_next_edit_exec;
-	ot->poll= sequencer_edit_poll;
+	ot->exec = sequencer_next_edit_exec;
+	ot->poll = sequencer_edit_poll;
 	
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 	
 	/* properties */
 }
@@ -2374,16 +2365,16 @@ static int sequencer_previous_edit_exec(bContext *C, wmOperator *UNUSED(op))
 void SEQUENCER_OT_previous_edit(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Previous Edit";
-	ot->idname= "SEQUENCER_OT_previous_edit";
-	ot->description="Move frame to previous edit point";
+	ot->name = "Previous Edit";
+	ot->idname = "SEQUENCER_OT_previous_edit";
+	ot->description = "Move frame to previous edit point";
 	
 	/* api callbacks */
-	ot->exec= sequencer_previous_edit_exec;
-	ot->poll= sequencer_edit_poll;
+	ot->exec = sequencer_previous_edit_exec;
+	ot->poll = sequencer_edit_poll;
 	
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 	
 	/* properties */
 }
@@ -2478,16 +2469,16 @@ static int sequencer_swap_exec(bContext *C, wmOperator *op)
 void SEQUENCER_OT_swap(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Swap Strip";
-	ot->idname= "SEQUENCER_OT_swap";
-	ot->description="Swap active strip with strip to the right or left";
+	ot->name = "Swap Strip";
+	ot->idname = "SEQUENCER_OT_swap";
+	ot->description = "Swap active strip with strip to the right or left";
 	
 	/* api callbacks */
-	ot->exec= sequencer_swap_exec;
-	ot->poll= sequencer_edit_poll;
+	ot->exec = sequencer_swap_exec;
+	ot->poll = sequencer_edit_poll;
 	
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 	
 	/* properties */
 	RNA_def_enum(ot->srna, "side", prop_side_lr_types, SEQ_SIDE_RIGHT, "Side", "Side of the strip to swap");
@@ -2537,16 +2528,16 @@ static int sequencer_rendersize_exec(bContext *C, wmOperator *UNUSED(op))
 void SEQUENCER_OT_rendersize(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Set Render Size";
-	ot->idname= "SEQUENCER_OT_rendersize";
-	ot->description="Set render size and aspect from active sequence";
+	ot->name = "Set Render Size";
+	ot->idname = "SEQUENCER_OT_rendersize";
+	ot->description = "Set render size and aspect from active sequence";
 	
 	/* api callbacks */
-	ot->exec= sequencer_rendersize_exec;
-	ot->poll= sequencer_edit_poll;
+	ot->exec = sequencer_rendersize_exec;
+	ot->poll = sequencer_edit_poll;
 	
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 	
 	/* properties */
 }
@@ -2616,16 +2607,16 @@ static int sequencer_copy_exec(bContext *C, wmOperator *op)
 void SEQUENCER_OT_copy(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Copy";
-	ot->idname= "SEQUENCER_OT_copy";
-	ot->description="";
+	ot->name = "Copy";
+	ot->idname = "SEQUENCER_OT_copy";
+	ot->description = "";
 
 	/* api callbacks */
-	ot->exec= sequencer_copy_exec;
-	ot->poll= sequencer_edit_poll;
+	ot->exec = sequencer_copy_exec;
+	ot->poll = sequencer_edit_poll;
 
 	/* flags */
-	ot->flag= OPTYPE_REGISTER;
+	ot->flag = OPTYPE_REGISTER;
 
 	/* properties */
 }
@@ -2684,16 +2675,16 @@ static int sequencer_paste_exec(bContext *C, wmOperator *UNUSED(op))
 void SEQUENCER_OT_paste(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Paste";
-	ot->idname= "SEQUENCER_OT_paste";
-	ot->description="";
+	ot->name = "Paste";
+	ot->idname = "SEQUENCER_OT_paste";
+	ot->description = "";
 
 	/* api callbacks */
-	ot->exec= sequencer_paste_exec;
-	ot->poll= ED_operator_sequencer_active;
+	ot->exec = sequencer_paste_exec;
+	ot->poll = ED_operator_sequencer_active;
 
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 
 	/* properties */
 }
@@ -2735,16 +2726,16 @@ static int sequencer_swap_data_exec(bContext *C, wmOperator *op)
 void SEQUENCER_OT_swap_data(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Sequencer Swap Data";
-	ot->idname= "SEQUENCER_OT_swap_data";
-	ot->description="Swap 2 sequencer strips";
+	ot->name = "Sequencer Swap Data";
+	ot->idname = "SEQUENCER_OT_swap_data";
+	ot->description = "Swap 2 sequencer strips";
 
 	/* api callbacks */
-	ot->exec= sequencer_swap_data_exec;
-	ot->poll= ED_operator_sequencer_active;
+	ot->exec = sequencer_swap_data_exec;
+	ot->poll = ED_operator_sequencer_active;
 
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 
 	/* properties */
 }
@@ -2792,19 +2783,19 @@ static int view_ghost_border_exec(bContext *C, wmOperator *op)
 void SEQUENCER_OT_view_ghost_border(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Border Offset View";
-	ot->idname= "SEQUENCER_OT_view_ghost_border";
-	ot->description="Enable border select mode";
+	ot->name = "Border Offset View";
+	ot->idname = "SEQUENCER_OT_view_ghost_border";
+	ot->description = "Enable border select mode";
 
 	/* api callbacks */
-	ot->invoke= WM_border_select_invoke;
-	ot->exec= view_ghost_border_exec;
-	ot->modal= WM_border_select_modal;
-	ot->poll= sequencer_view_poll;
-	ot->cancel= WM_border_select_cancel;
+	ot->invoke = WM_border_select_invoke;
+	ot->exec = view_ghost_border_exec;
+	ot->modal = WM_border_select_modal;
+	ot->poll = sequencer_view_poll;
+	ot->cancel = WM_border_select_cancel;
 
 	/* flags */
-	ot->flag= 0;
+	ot->flag = 0;
 
 	/* rna */
 	WM_operator_properties_gesture_border(ot, FALSE);
@@ -2821,16 +2812,16 @@ static int sequencer_rebuild_proxy_exec(bContext *C, wmOperator *UNUSED(op))
 void SEQUENCER_OT_rebuild_proxy(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Rebuild Proxy and Timecode Indices";
-	ot->idname= "SEQUENCER_OT_rebuild_proxy";
-	ot->description="Rebuild all selected proxies and timecode indeces using the job system";
+	ot->name = "Rebuild Proxy and Timecode Indices";
+	ot->idname = "SEQUENCER_OT_rebuild_proxy";
+	ot->description = "Rebuild all selected proxies and timecode indeces using the job system";
 	
 	/* api callbacks */
-	ot->exec= sequencer_rebuild_proxy_exec;
-	ot->poll= ED_operator_sequencer_active;
+	ot->exec = sequencer_rebuild_proxy_exec;
+	ot->poll = ED_operator_sequencer_active;
 	
 	/* flags */
-	ot->flag= OPTYPE_REGISTER;
+	ot->flag = OPTYPE_REGISTER;
 }
 
 /* change ops */
@@ -2875,7 +2866,7 @@ static int sequencer_change_effect_input_exec(bContext *C, wmOperator *op)
 
 	update_changed_seq_and_deps(scene, seq, 0, 1);
 
-	/* important else we dont get the imbuf cache flushed */
+	/* important else we don't get the imbuf cache flushed */
 	free_imbuf_seq(scene, &ed->seqbase, FALSE, FALSE);
 
 	WM_event_add_notifier(C, NC_SCENE|ND_SEQUENCER, scene);
@@ -2886,18 +2877,18 @@ static int sequencer_change_effect_input_exec(bContext *C, wmOperator *op)
 void SEQUENCER_OT_change_effect_input(struct wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Change Effect Input";
-	ot->idname= "SEQUENCER_OT_change_effect_input";
-	ot->description="";
+	ot->name = "Change Effect Input";
+	ot->idname = "SEQUENCER_OT_change_effect_input";
+	ot->description = "";
 
 	/* api callbacks */
-	ot->exec= sequencer_change_effect_input_exec;
-	ot->poll= sequencer_effect_poll;
+	ot->exec = sequencer_change_effect_input_exec;
+	ot->poll = sequencer_effect_poll;
 
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 
-	ot->prop= RNA_def_enum(ot->srna, "swap", prop_change_effect_input_types, 0, "Swap", "The effect inputs to swap");
+	ot->prop = RNA_def_enum(ot->srna, "swap", prop_change_effect_input_types, 0, "Swap", "The effect inputs to swap");
 }
 
 static int sequencer_change_effect_type_exec(bContext *C, wmOperator *op)
@@ -2935,7 +2926,7 @@ static int sequencer_change_effect_type_exec(bContext *C, wmOperator *op)
 	/* update */
 	update_changed_seq_and_deps(scene, seq, 0, 1);
 
-	/* important else we dont get the imbuf cache flushed */
+	/* important else we don't get the imbuf cache flushed */
 	free_imbuf_seq(scene, &ed->seqbase, FALSE, FALSE);
 
 	WM_event_add_notifier(C, NC_SCENE|ND_SEQUENCER, scene);
@@ -2946,18 +2937,18 @@ static int sequencer_change_effect_type_exec(bContext *C, wmOperator *op)
 void SEQUENCER_OT_change_effect_type(struct wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Change Effect Type";
-	ot->idname= "SEQUENCER_OT_change_effect_type";
-	ot->description="";
+	ot->name = "Change Effect Type";
+	ot->idname = "SEQUENCER_OT_change_effect_type";
+	ot->description = "";
 
 	/* api callbacks */
-	ot->exec= sequencer_change_effect_type_exec;
-	ot->poll= sequencer_effect_poll;
+	ot->exec = sequencer_change_effect_type_exec;
+	ot->poll = sequencer_effect_poll;
 
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 
-	ot->prop= RNA_def_enum(ot->srna, "type", sequencer_prop_effect_types, SEQ_CROSS, "Type", "Sequencer effect type");
+	ot->prop = RNA_def_enum(ot->srna, "type", sequencer_prop_effect_types, SEQ_CROSS, "Type", "Sequencer effect type");
 }
 
 static int sequencer_change_path_exec(bContext *C, wmOperator *op)
@@ -3001,13 +2992,13 @@ static int sequencer_change_path_exec(bContext *C, wmOperator *op)
 		/* reset these else we wont see all the images */
 		seq->anim_startofs= seq->anim_endofs= 0;
 
-		/* correct start/end frames so we dont move
+		/* correct start/end frames so we don't move
 		 * important not to set seq->len= len; allow the function to handle it */
 		reload_sequence_new_file(scene, seq, TRUE);
 
 		calc_sequence(scene, seq);
 
-		/* important else we dont get the imbuf cache flushed */
+		/* important else we don't get the imbuf cache flushed */
 		free_imbuf_seq(scene, &ed->seqbase, FALSE, FALSE);
 	}
 	else {
@@ -3052,17 +3043,79 @@ static int sequencer_change_path_invoke(bContext *C, wmOperator *op, wmEvent *UN
 void SEQUENCER_OT_change_path(struct wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name= "Change Data/Files";
-	ot->idname= "SEQUENCER_OT_change_path";
-	ot->description="";
+	ot->name = "Change Data/Files";
+	ot->idname = "SEQUENCER_OT_change_path";
+	ot->description = "";
 
 	/* api callbacks */
-	ot->exec= sequencer_change_path_exec;
-	ot->invoke= sequencer_change_path_invoke;
-	ot->poll= sequencer_strip_has_path_poll;
+	ot->exec = sequencer_change_path_exec;
+	ot->invoke = sequencer_change_path_invoke;
+	ot->poll = sequencer_strip_has_path_poll;
 
 	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 
 	WM_operator_properties_filesel(ot, FOLDERFILE|IMAGEFILE|MOVIEFILE, FILE_SPECIAL, FILE_OPENFILE, WM_FILESEL_DIRECTORY|WM_FILESEL_RELPATH|WM_FILESEL_FILEPATH|WM_FILESEL_FILES, FILE_DEFAULTDISPLAY);
+}
+
+static int sequencer_update_strip_length_exec(bContext *C, wmOperator *UNUSED(op))
+{
+	Scene *scene = CTX_data_scene(C);
+	Editing *ed = seq_give_editing(scene, FALSE);
+	Sequence *seq;
+	int update = FALSE;
+
+	SEQP_BEGIN(ed, seq) {
+		if ((seq->flag & SELECT)) {
+			int changed = FALSE;
+
+			switch (seq->type) {
+				case SEQ_SCENE:
+					seq->len = seq->scene->r.efra - seq->scene->r.sfra + 1;
+					changed = TRUE;
+					break;
+				case SEQ_MOVIECLIP:
+					seq->len = BKE_movieclip_get_duration(seq->clip);
+					changed = TRUE;
+					break;
+				case SEQ_MOVIE:
+					seq->len = IMB_anim_get_duration(seq->anim, IMB_TC_RECORD_RUN);
+					changed = TRUE;
+					break;
+			}
+
+			if (changed) {
+				calc_sequence_disp(scene, seq);
+
+				if (seq_test_overlap(ed->seqbasep, seq))
+					shuffle_seq(ed->seqbasep, seq, scene);
+
+				update = TRUE;
+			}
+		}
+	}
+	SEQ_END
+
+	if (update) {
+		free_imbuf_seq(scene, &ed->seqbase, FALSE, FALSE);
+
+		WM_event_add_notifier(C, NC_SCENE|ND_SEQUENCER, scene);
+	}
+
+	return OPERATOR_FINISHED;
+}
+
+void SEQUENCER_OT_update_strip_length(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Update Strip Length";
+	ot->idname = "SEQUENCER_OT_update_strip_length";
+	ot->description = "Update actual content length for selected strips";
+
+	/* api callbacks */
+	ot->exec = sequencer_update_strip_length_exec;
+	ot->poll = ED_operator_sequencer_active;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 }

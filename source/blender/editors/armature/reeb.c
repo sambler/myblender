@@ -115,6 +115,7 @@ void flipArcBuckets(ReebArc *arc);
 
 /***************************************** UTILS **********************************************/
 
+#if 0 /* UNUSED */
 static VertexData *allocVertexData(EditMesh *em)
 {
 	VertexData *data;
@@ -159,6 +160,8 @@ static void nodeSetData(EditVert *eve, ReebNode *n)
 {
 	((VertexData*)eve->tmp.p)->n = n;
 }
+
+#endif
 
 void REEB_freeArc(BArc *barc)
 {
@@ -232,6 +235,7 @@ void BIF_flagMultiArcs(ReebGraph *rg, int flag)
 	}
 }
 
+#if 0 /* UNUSED */
 static ReebNode * addNode(ReebGraph *rg, EditVert *eve)
 {
 	float weight;
@@ -247,7 +251,7 @@ static ReebNode * addNode(ReebGraph *rg, EditVert *eve)
 	node->degree = 0;
 	node->weight = weight;
 	node->index = rg->totnodes;
-	VECCOPY(node->p, eve->co);	
+	copy_v3_v3(node->p, eve->co);
 	
 	BLI_addtail(&rg->nodes, node);
 	rg->totnodes++;
@@ -300,6 +304,7 @@ static void relinkNodes(ReebGraph *low_rg, ReebGraph *high_rg)
 		}
 	}
 }
+#endif 
 
 ReebNode *BIF_otherNodeFromIndex(ReebArc *arc, ReebNode *node)
 {
@@ -321,6 +326,7 @@ ReebNode *BIF_lowestLevelNode(ReebNode *node)
 	return node;
 }
 
+#if 0 /* UNUSED */
 static ReebArc * copyArc(ReebGraph *rg, ReebArc *arc)
 {
 	ReebArc *cp_arc;
@@ -395,6 +401,7 @@ static ReebGraph * copyReebGraph(ReebGraph *rg, int level)
 	
 	return cp_rg;
 }
+#endif
 
 ReebGraph *BIF_graphForMultiNode(ReebGraph *rg, ReebNode *node)
 {
@@ -408,6 +415,7 @@ ReebGraph *BIF_graphForMultiNode(ReebGraph *rg, ReebNode *node)
 	return multi_rg;
 }
 
+#if 0 /* UNUSED */
 static ReebEdge * copyEdge(ReebEdge *edge)
 {
 	ReebEdge *newEdge = NULL;
@@ -487,11 +495,11 @@ void repositionNodes(ReebGraph *rg)
 		{
 			float p[3];
 			
-			VECCOPY(p, ((ReebArc*)arc)->buckets[0].p);
+			copy_v3_v3(p, ((ReebArc*)arc)->buckets[0].p);
 			mul_v3_fl(p, 1.0f / arc->head->degree);
 			add_v3_v3(arc->head->p, p);
 			
-			VECCOPY(p, ((ReebArc*)arc)->buckets[((ReebArc*)arc)->bcount - 1].p);
+			copy_v3_v3(p, ((ReebArc*)arc)->buckets[((ReebArc*)arc)->bcount - 1].p);
 			mul_v3_fl(p, 1.0f / arc->tail->degree);
 			add_v3_v3(arc->tail->p, p);
 		}
@@ -647,7 +655,7 @@ static void mergeBuckets(EmbedBucket *bDst, EmbedBucket *bSrc)
 	else if (bSrc->nv > 0)
 	{
 		bDst->nv = bSrc->nv;
-		VECCOPY(bDst->p, bSrc->p);
+		copy_v3_v3(bDst->p, bSrc->p);
 	}
 }
 
@@ -954,6 +962,7 @@ static void calculateGraphLength(ReebGraph *rg)
 		calculateArcLength(arc);
 	}
 }
+#endif
 
 /**************************************** SYMMETRY HANDLING ******************************************/
 
@@ -963,7 +972,7 @@ void REEB_RadialSymmetry(BNode* root_node, RadialArc* ring, int count)
 	float axis[3];
 	int i;
 	
-	VECCOPY(axis, root_node->symmetry_axis);
+	copy_v3_v3(axis, root_node->symmetry_axis);
 	
 	/* first pass, merge incrementally */
 	for (i = 0; i < count - 1; i++)
@@ -1046,7 +1055,7 @@ void REEB_RadialSymmetry(BNode* root_node, RadialArc* ring, int count)
 		arc2 = (ReebArc*)ring[j].arc;
 
 		/* copy first node than mirror */
-		VECCOPY(node2->p, node1->p);
+		copy_v3_v3(node2->p, node1->p);
 		BLI_mirrorAlongAxis(node2->p, root_node->p, normal);
 		
 		/* Copy buckets
@@ -1081,7 +1090,7 @@ void REEB_RadialSymmetry(BNode* root_node, RadialArc* ring, int count)
 			{
 				/* copy and mirror back to bucket2 */			
 				bucket2->nv = bucket1->nv;
-				VECCOPY(bucket2->p, bucket1->p);
+				copy_v3_v3(bucket2->p, bucket1->p);
 				BLI_mirrorAlongAxis(bucket2->p, node->p, normal);
 			}
 		}
@@ -1096,10 +1105,10 @@ void REEB_AxialSymmetry(BNode* root_node, BNode* node1, BNode* node2, struct BAr
 	arc1 = (ReebArc*)barc1;
 	arc2 = (ReebArc*)barc2;
 
-	VECCOPY(nor, root_node->symmetry_axis);
+	copy_v3_v3(nor, root_node->symmetry_axis);
 	
 	/* mirror node2 along axis */
-	VECCOPY(p, node2->p);
+	copy_v3_v3(p, node2->p);
 	BLI_mirrorAlongAxis(p, root_node->p, nor);
 
 	/* average with node1 */
@@ -1107,7 +1116,7 @@ void REEB_AxialSymmetry(BNode* root_node, BNode* node1, BNode* node2, struct BAr
 	mul_v3_fl(node1->p, 0.5f);
 	
 	/* mirror back on node2 */
-	VECCOPY(node2->p, node1->p);
+	copy_v3_v3(node2->p, node1->p);
 	BLI_mirrorAlongAxis(node2->p, root_node->p, nor);
 	
 	/* Merge buckets
@@ -1149,7 +1158,7 @@ void REEB_AxialSymmetry(BNode* root_node, BNode* node1, BNode* node2, struct BAr
 
 			/* copy and mirror back to bucket2 */			
 			bucket2->nv = bucket1->nv;
-			VECCOPY(bucket2->p, bucket1->p);
+			copy_v3_v3(bucket2->p, bucket1->p);
 			BLI_mirrorAlongAxis(bucket2->p, root_node->p, nor);
 		}
 	}
@@ -1160,6 +1169,7 @@ void REEB_AxialSymmetry(BNode* root_node, BNode* node1, BNode* node2, struct BAr
 
 /****************************************** SMOOTHING **************************************************/
 
+#if 0 /* UNUSED */
 void postprocessGraph(ReebGraph *rg, char mode)
 {
 	ReebArc *arc;
@@ -1798,7 +1808,7 @@ int filterSmartReebGraph(ReebGraph *UNUSED(rg), float UNUSED(threshold))
 						vec0 = previous->p;
 					}
 					
-					VECCOPY(midpoint, vec1);
+					copy_v3_v3(midpoint, vec1);
 					
 					distance = len_v3v3(midpoint, efa->cent);
 					
@@ -2041,7 +2051,7 @@ void REEB_exportGraph(ReebGraph *rg, int count)
 	else {
 		sprintf(filename, "test%05i.txt", count);
 	}
-	f = fopen(filename, "w");
+	f = BLI_fopen(filename, "w");
 
 	for(arc = rg->arcs.first; arc; arc = arc->next)
 	{
@@ -3138,6 +3148,7 @@ int weightFromDistance(EditMesh *em, EdgeIndex *indexed_edges)
 	
 	return 1;
 }
+#endif
 
 /****************************************** BUCKET ITERATOR **************************************************/
 

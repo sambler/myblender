@@ -131,11 +131,11 @@ void fluidsim_init(FluidsimModifierData *fluidmd)
 		fss->cpsQuality = 10.0; // 1.0 / 10.0 => means 0.1 width
 		
 		/*
-		BAD TODO: this is done in buttons_object.c in the moment 
-		Mesh *mesh = ob->data;
-		// calculate bounding box
-		fluid_get_bb(mesh->mvert, mesh->totvert, ob->obmat, fss->bbStart, fss->bbSize);	
-		*/
+		 * BAD TODO: this is done in buttons_object.c in the moment
+		 * Mesh *mesh = ob->data;
+		 * // calculate bounding box
+		 * fluid_get_bb(mesh->mvert, mesh->totvert, ob->obmat, fss->bbStart, fss->bbSize);
+		 */
 		
 		fss->meshVelocities = NULL;
 		
@@ -184,7 +184,7 @@ static DerivedMesh *fluidsim_read_obj(const char *filename, const MPoly *mp_exam
 	// ------------------------------------------------
 	// get numverts + numfaces first
 	// ------------------------------------------------
-	gzf = gzopen(filename, "rb");
+	gzf = BLI_gzopen(filename, "rb");
 	if (!gzf)
 	{
 		return NULL;
@@ -210,13 +210,13 @@ static DerivedMesh *fluidsim_read_obj(const char *filename, const MPoly *mp_exam
 		gotBytes = gzread(gzf, &wri, sizeof(wri));
 	numfaces = wri;
 
-	gzclose( gzf );
+	gzclose(gzf);
 	// ------------------------------------------------
 
 	if(!numfaces || !numverts || !gotBytes)
 		return NULL;
 
-	gzf = gzopen(filename, "rb");
+	gzf = BLI_gzopen(filename, "rb");
 	if (!gzf)
 	{
 		return NULL;
@@ -226,7 +226,7 @@ static DerivedMesh *fluidsim_read_obj(const char *filename, const MPoly *mp_exam
 
 	if(!dm)
 	{
-		gzclose( gzf );
+		gzclose(gzf);
 		return NULL;
 	}
 
@@ -245,7 +245,7 @@ static DerivedMesh *fluidsim_read_obj(const char *filename, const MPoly *mp_exam
 	{
 		if(dm)
 			dm->release(dm);
-		gzclose( gzf );
+		gzclose(gzf);
 		return NULL;
 	}
 
@@ -254,7 +254,7 @@ static DerivedMesh *fluidsim_read_obj(const char *filename, const MPoly *mp_exam
 	{
 		if(dm)
 			dm->release(dm);
-		gzclose( gzf );
+		gzclose(gzf);
 		return NULL;
 	}
 
@@ -272,7 +272,7 @@ static DerivedMesh *fluidsim_read_obj(const char *filename, const MPoly *mp_exam
 		printf("Fluidsim: error in reading data from file.\n");
 		if(dm)
 			dm->release(dm);
-		gzclose( gzf );
+		gzclose(gzf);
 		MEM_freeN(normals);
 		return NULL;
 	}
@@ -299,7 +299,7 @@ static DerivedMesh *fluidsim_read_obj(const char *filename, const MPoly *mp_exam
 
 	}
 
-	gzclose( gzf );
+	gzclose(gzf);
 
 	CDDM_calc_edges(dm);
 
@@ -409,7 +409,7 @@ static void fluidsim_read_vel_cache(FluidsimModifierData *fluidmd, DerivedMesh *
 	filename[len-5] = 'e';
 	filename[len-4] = 'l';
 
-	gzf = gzopen(filename, "rb");
+	gzf = BLI_gzopen(filename, "rb");
 	if (!gzf)
 	{
 		MEM_freeN(fss->meshVelocities);

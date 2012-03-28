@@ -41,6 +41,7 @@ set(SRC
 	operators/bmo_dupe.c
 	operators/bmo_edgesplit.c
 	operators/bmo_extrude.c
+	operators/bmo_inset.c
 	operators/bmo_join_triangles.c
 	operators/bmo_mesh_conv.c
 	operators/bmo_mirror.c
@@ -65,6 +66,10 @@ set(SRC
 	intern/bmesh_marking.h
 	intern/bmesh_mesh.c
 	intern/bmesh_mesh.h
+	intern/bmesh_mesh_conv.c
+	intern/bmesh_mesh_conv.h
+	intern/bmesh_mesh_validate.c
+	intern/bmesh_mesh_validate.h
 	intern/bmesh_mods.c
 	intern/bmesh_mods.h
 	intern/bmesh_opdefines.c
@@ -84,12 +89,13 @@ set(SRC
 	intern/bmesh_walkers_impl.c
 	intern/bmesh_walkers_private.h
 
+	intern/bmesh_operator_api.h
+	intern/bmesh_error.h
+
 	tools/BME_bevel.c
 
 	bmesh.h
 	bmesh_class.h
-	bmesh_error.h
-	bmesh_operator_api.h
 )
 
 if(MSVC)

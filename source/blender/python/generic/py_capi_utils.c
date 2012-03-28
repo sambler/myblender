@@ -156,8 +156,8 @@ void PyC_FileAndNum(const char **filename, int *lineno)
 {
 	PyFrameObject *frame;
 	
-	if (filename)	*filename = NULL;
-	if (lineno)		*lineno = -1;
+	if (filename) *filename = NULL;
+	if (lineno)   *lineno = -1;
 
 	if (!(frame = PyThreadState_GET()->frame)) {
 		return;
@@ -399,7 +399,7 @@ const char *PyC_UnicodeAsByte(PyObject *py_str, PyObject **coerce)
 
 PyObject *PyC_UnicodeFromByteAndSize(const char *str, Py_ssize_t size)
 {
-    PyObject *result = PyUnicode_FromStringAndSize(str, size);
+	PyObject *result = PyUnicode_FromStringAndSize(str, size);
 	if (result) {
 		/* 99% of the time this is enough but we better support non unicode
 		 * chars since blender doesnt limit this */
@@ -538,7 +538,7 @@ void PyC_RunQuicky(const char *filepath, int n, ...)
 			ret = PyObject_CallFunction(calcsize, (char *)"s", format);
 
 			if (ret) {
-				sizes[i]= PyLong_AsSsize_t(ret);
+				sizes[i] = PyLong_AsSsize_t(ret);
 				Py_DECREF(ret);
 				ret = PyObject_CallFunction(unpack, (char *)"sy#", format, (char *)ptr, sizes[i]);
 			}
@@ -551,7 +551,7 @@ void PyC_RunQuicky(const char *filepath, int n, ...)
 				PyList_SET_ITEM(values, i, Py_None); /* hold user */
 				Py_INCREF(Py_None);
 
-				sizes[i]= 0;
+				sizes[i] = 0;
 			}
 			else {
 				if (PyTuple_GET_SIZE(ret) == 1) {
@@ -707,7 +707,7 @@ char *PyC_FlagSet_AsString(PyC_FlagSet *item)
 
 int PyC_FlagSet_ValueFromID_int(PyC_FlagSet *item, const char *identifier, int *value)
 {
-	for( ; item->identifier; item++) {
+	for ( ; item->identifier; item++) {
 		if (strcmp(item->identifier, identifier) == 0) {
 			*value = item->value;
 			return 1;

@@ -437,7 +437,8 @@ void dummy_exec(BMesh *bm, BMOperator *op)
 						BM_face_kill(bm, f);
 						BM_edge_kill(bm, fe);
 					}
-				} /* else if (f->len == 3) {
+				}
+				/* else if (f->len == 3) {
 					BMEdge *ed[3];
 					BMVert *vt[3];
 					BMLoop *lp[3];
@@ -511,7 +512,7 @@ void bmo_dissolve_limit_exec(BMesh *bm, BMOperator *op)
 
 		for (i = 0; i < tot_found; i++) {
 			BMEdge *e = (BMEdge *)weight_elems[i].ele;
-			/* check twice because cumulative effect could disolve over angle limit */
+			/* check twice because cumulative effect could dissolve over angle limit */
 			if (BM_edge_face_angle(e) < angle_limit) {
 				BMFace *nf = BM_faces_join_pair(bm, e->l->f,
 				                                e->l->radial_next->f,
@@ -546,7 +547,7 @@ void bmo_dissolve_limit_exec(BMesh *bm, BMOperator *op)
 
 		for (i = 0; i < tot_found; i++) {
 			BMVert *v = (BMVert *)weight_elems[i].ele;
-			/* check twice because cumulative effect could disolve over angle limit */
+			/* check twice because cumulative effect could dissolve over angle limit */
 			if (BM_vert_edge_angle(v) < angle_limit) {
 				BM_vert_collapse_edge(bm, v->e, v, TRUE); /* join edges */
 			}

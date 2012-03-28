@@ -156,7 +156,7 @@ FCurve *verify_fcurve (bAction *act, const char group[], const char rna_path[], 
 	FCurve *fcu;
 	
 	/* sanity checks */
-	if ELEM(NULL, act, rna_path)
+	if (ELEM(NULL, act, rna_path))
 		return NULL;
 		
 	/* try to find f-curve matching for this setting 
@@ -317,9 +317,9 @@ int insert_vert_fcurve (FCurve *fcu, float x, float y, short flag)
 	/* use default interpolation mode, with exceptions for int/discrete values */
 	beztr.ipo= U.ipo_new;
 
-	if(fcu->flag & FCURVE_DISCRETE_VALUES)
+	if (fcu->flag & FCURVE_DISCRETE_VALUES)
 		beztr.ipo = BEZT_IPO_CONST;
-	else if(beztr.ipo == BEZT_IPO_BEZ && (fcu->flag & FCURVE_INT_VALUES))
+	else if (beztr.ipo == BEZT_IPO_BEZ && (fcu->flag & FCURVE_INT_VALUES))
 		beztr.ipo = BEZT_IPO_LIN;
 	
 	/* add temp beztriple to keyframes */
@@ -573,7 +573,7 @@ static short visualkey_can_use (PointerRNA *ptr, PropertyRNA *prop)
 		return 0;
 		
 	/* location or rotation identifiers only... */
-	if(identifier == NULL) {
+	if (identifier == NULL) {
 		printf("%s failed: NULL identifier\n", __func__);
 		return 0;
 	}
@@ -980,7 +980,7 @@ short delete_keyframe (ReportList *reports, ID *id, bAction *act, const char gro
 	int ret= 0;
 	
 	/* sanity checks */
-	if ELEM(NULL, id, adt) {
+	if (ELEM(NULL, id, adt)) {
 		BKE_report(reports, RPT_ERROR, "No ID-Block and/Or AnimData to delete keyframe from");
 		return 0;
 	}
@@ -1429,7 +1429,7 @@ static int insert_key_button_exec (bContext *C, wmOperator *op)
 			if (all) {
 				length= RNA_property_array_length(&ptr, prop);
 				
-				if(length) index= 0;
+				if (length) index= 0;
 				else length= 1;
 			}
 			else

@@ -357,7 +357,7 @@ def buildinfo(lenv, build_type):
     build_time = time.strftime ("%H:%M:%S")
     build_rev = os.popen('svnversion').read()[:-1] # remove \n
     if build_rev == '': 
-        build_rev = '45241'
+        build_rev = '45256'
     if lenv['BF_DEBUG']:
         build_type = "Debug"
         build_cflags = ' '.join(lenv['CFLAGS'] + lenv['CCFLAGS'] + lenv['BF_DEBUG_CCFLAGS'] + lenv['CPPFLAGS'])
@@ -509,13 +509,12 @@ def WinPyBundle(target=None, source=None, env=None):
             print str(func) + ' failed on ' + str(path)
     print "Trying to remove existing py bundle."
     shutil.rmtree(py_target, False, printexception)
-    exclude_re=[re.compile('.*/test/.*'),
-                re.compile('^config/.*'),
-                re.compile('^config-*/.*'),
-                re.compile('^distutils/.*'),
-                re.compile('^idlelib/.*'),
-                re.compile('^lib2to3/.*'),
-                re.compile('^tkinter/.*'),
+    exclude_re=[re.compile('.*/test'),
+                re.compile('^test'),
+                re.compile('^distutils'),
+                re.compile('^idlelib'),
+                re.compile('^lib2to3'),
+                re.compile('^tkinter'),
                 re.compile('^_tkinter_d.pyd'),
                 re.compile('^turtledemo'),
                 re.compile('^turtle.py'),

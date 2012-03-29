@@ -327,7 +327,7 @@ void ED_object_exit_editmode(bContext *C, int flag)
 			return;
 		}
 		
-		EDBM_mesh_load(scene, obedit);
+		EDBM_mesh_load(obedit);
 		
 		if (freedata) {
 			EDBM_mesh_free(me->edit_btmesh);
@@ -448,6 +448,8 @@ void ED_object_enter_editmode(bContext *C, int flag)
 
 		em = BMEdit_FromObject(ob);
 		if (LIKELY(em)) {
+			/* order doesn't matter */
+			EDBM_mesh_normals_update(em);
 			BMEdit_RecalcTessellation(em);
 		}
 

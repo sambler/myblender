@@ -258,7 +258,7 @@ static short edbm_extrude_edge(Object *obedit, BMEditMesh *em, const char hflag,
 	BMElem *ele;
 	
 	BMO_op_init(bm, &extop, "extrude_face_region");
-	BMO_slot_buffer_from_hflag(bm, &extop, "edgefacein", BM_VERT | BM_EDGE | BM_FACE, hflag);
+	BMO_slot_buffer_from_enabled_hflag(bm, &extop, "edgefacein", BM_VERT | BM_EDGE | BM_FACE, hflag);
 
 	/* If a mirror modifier with clipping is on, we need to adjust some 
 	 * of the cases above to handle edges on the line of symmetry.
@@ -2977,7 +2977,7 @@ static int edbm_knife_cut_exec(bContext *C, wmOperator *op)
 		}
 	}
 	
-	BMO_slot_buffer_from_flag(bm, &bmop, "edges", BM_EDGE, 1);
+	BMO_slot_buffer_from_enabled_flag(bm, &bmop, "edges", BM_EDGE, 1);
 
 	if (mode == KNIFE_MIDPOINT) numcuts = 1;
 	BMO_slot_int_set(&bmop, "numcuts", numcuts);
@@ -3083,8 +3083,8 @@ static int mesh_separate_selected(Main *bmain, Scene *scene, Base *editbase, wmO
 	EDBM_op_callf(em, wmop, "del geom=%hvef context=%i", BM_ELEM_SELECT, DEL_VERTS);
 
 	BM_mesh_normals_update(bm_new, TRUE);
-	BMO_op_callf(bm_new, "bmesh_to_mesh mesh=%p object=%p notessellation=%b",
-	             basenew->object->data, basenew->object, TRUE);
+
+	BM_mesh_bm_to_me(bm_new, basenew->object->data, FALSE);
 		
 	BM_mesh_free(bm_new);
 	((Mesh *)basenew->object->data)->edit_btmesh = NULL;
@@ -3146,7 +3146,8 @@ static int mesh_separate_loose(Main *bmain, Scene *scene, Base *editbase, wmOper
 		/* Walk from the single vertex, selecting everything connected
 		 * to it */
 		BMW_init(&walker, bm, BMW_SHELL,
-		         BMW_MASK_NOP, BMW_MASK_NOP, BMW_MASK_NOP, BMW_MASK_NOP,
+		         BMW_MASK_NOP, BMW_MASK_NOP, BMW_MASK_NOP,
+		         BMW_FLAG_NOP, /* BMESH_TODO - should be BMW_FLAG_TEST_HIDDEN ? */
 		         BMW_NIL_LAY);
 
 		e = BMW_begin(&walker, v_seed);

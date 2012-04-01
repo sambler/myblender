@@ -2182,8 +2182,8 @@ static void actcon_get_tarmat (bConstraint *con, bConstraintOb *cob, bConstraint
 		CLAMP(s, 0, 1);
 		t = (s * (data->end-data->start)) + data->start;
 		
-		if (G.f & G_DEBUG)
-			printf("do Action Constraint %s - Ob %s Pchan %s \n", con->name, cob->ob->id.name+2, (cob->pchan)?cob->pchan->name:NULL);
+		if (G.debug & G_DEBUG)
+			printf("do Action Constraint %s - Ob %s Pchan %s\n", con->name, cob->ob->id.name+2, (cob->pchan)?cob->pchan->name:NULL);
 		
 		/* Get the appropriate information from the action */
 		if (cob->type == CONSTRAINT_OBTYPE_BONE) {
@@ -3188,25 +3188,15 @@ static void clampto_evaluate (bConstraint *con, bConstraintOb *cob, ListBase *ta
 					/* find bounding-box range where target is located */
 					if (ownLoc[clamp_axis] < curveMin[clamp_axis]) {
 						/* bounding-box range is before */
-						offset= curveMin[clamp_axis];
-						
-						while (ownLoc[clamp_axis] < offset)
-							offset -= len;
-						
+						offset = curveMin[clamp_axis] - ceil((curveMin[clamp_axis] - ownLoc[clamp_axis]) / len) * len;
+
 						/* now, we calculate as per normal, except using offset instead of curveMin[clamp_axis] */
 						curvetime = (ownLoc[clamp_axis] - offset) / (len);
 					}
 					else if (ownLoc[clamp_axis] > curveMax[clamp_axis]) {
 						/* bounding-box range is after */
-						offset= curveMax[clamp_axis];
-						
-						while (ownLoc[clamp_axis] > offset) {
-							if ((offset + len) > ownLoc[clamp_axis])
-								break;
-							else
-								offset += len;
-						}
-						
+						offset= curveMax[clamp_axis] + (int)((ownLoc[clamp_axis] - curveMax[clamp_axis]) / len) * len;
+
 						/* now, we calculate as per normal, except using offset instead of curveMax[clamp_axis] */
 						curvetime = (ownLoc[clamp_axis] - offset) / (len);
 					}
@@ -4310,7 +4300,7 @@ bConstraintTypeInfo *get_constraint_typeinfo (int type)
 		return constraintsTypeInfo[type];
 	}
 	else {
-		printf("No valid constraint type-info data available. Type = %i \n", type);
+		printf("No valid constraint type-info data available. Type = %i\n", type);
 	}
 	
 	return NULL;

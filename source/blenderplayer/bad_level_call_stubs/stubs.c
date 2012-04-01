@@ -116,7 +116,7 @@ struct wmWindowManager;
 
 /*new render funcs */
 void EDBM_selectmode_set(struct BMEditMesh *em) {}
-void EDBM_mesh_load(struct Scene *scene, struct Object *ob) {}
+void EDBM_mesh_load(struct Object *ob) {}
 void EDBM_mesh_make(struct ToolSettings *ts, struct Scene *scene, struct Object *ob) {}
 void *g_system;
 
@@ -484,8 +484,8 @@ float sculpt_get_brush_unprojected_radius(struct Brush *brush){return 0.0f;}
 void sculpt_set_brush_unprojected_radius(struct Brush *brush, float unprojected_radius){}
 float sculpt_get_brush_alpha(struct Brush *brush){return 0.0f;}
 void sculpt_set_brush_alpha(struct Brush *brush, float alpha){}
-void ED_sculpt_modifiers_changed(struct Object *ob){};
-
+void ED_sculpt_modifiers_changed(struct Object *ob){}
+void ED_mesh_calc_tessface(struct Mesh *mesh){}
 
 /* bpy/python internal api */
 void operator_wrapper(struct wmOperatorType *ot, void *userdata) {}

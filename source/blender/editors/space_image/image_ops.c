@@ -2384,55 +2384,6 @@ void IMAGE_OT_cycle_render_slot(wmOperatorType *ot)
 	RNA_def_boolean(ot->srna, "reverse", 0, "Cycle in Reverse", "");
 }
 
-/******************** goto specific render slot *********************/
-/*  make available image slots 10 and use keyoard 1 through 0 to select 
-    a specific slot similar to 3d layers */
-
-/*  I used a mixture of cycle_render_slot and view_zoom_ratio to do this */
-
-/*  select_render_slot_poll -
-    I don't think I need this to be any different from cycle_render_slot_poll
-    but have included a renamed version for completeness */
-static int select_render_slot_poll(bContext *C)
-{
-	Image *ima= CTX_data_edit_image(C);
-    
-	return (ima && ima->type == IMA_TYPE_R_RESULT);
-}
-
-static int select_render_slot_exec(bContext *C, wmOperator *op)
-{
-	Image *ima= CTX_data_edit_image(C);
-    
-    ima->render_slot =  RNA_int_get(op->ptr, "render_slot");
-    
-    if(ima->render_slot >= IMA_MAX_RENDER_SLOT )
-        ima->render_slot = 0;
-    
-	WM_event_add_notifier(C, NC_IMAGE|ND_DRAW, NULL);
-    
-	return OPERATOR_FINISHED;
-}
-
-void IMAGE_OT_select_render_slot(wmOperatorType *ot)
-{
-	/* identifiers */
-	ot->name= "Select Render Slot";
-	ot->idname= "IMAGE_OT_select_render_slot";
-    
-	/* api callbacks */
-	ot->exec= select_render_slot_exec;
-	ot->poll= select_render_slot_poll;
-    
-	/* flags */
-	ot->flag= OPTYPE_REGISTER|OPTYPE_UNDO;
-    
-	/* properties */
-	RNA_def_int(ot->srna, "render_slot", 0, 0, 9,
-                  "Render Slot", "Current render slot.", 0, 9);
-}
-
-
 /******************** TODO ********************/
 
 /* XXX notifier? */

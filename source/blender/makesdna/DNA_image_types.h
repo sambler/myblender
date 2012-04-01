@@ -78,7 +78,7 @@ typedef struct Image {
 	struct anim *anim;
 	struct RenderResult *rr;
 
-	struct RenderResult *renders[10]; /* IMA_MAX_RENDER_SLOT */
+	struct RenderResult *renders[8]; /* IMA_MAX_RENDER_SLOT */
 	short render_slot, last_render_slot;
 	
 	short ok, flag;
@@ -135,7 +135,7 @@ typedef struct Image {
 
 /* render */
 #define IMA_MAX_RENDER_TEXT		512
-#define IMA_MAX_RENDER_SLOT		10 /* shouldn't this be above the image struct and used in renders[]? */
+#define IMA_MAX_RENDER_SLOT		8
 
 /* gen_flag */
 #define IMA_GEN_FLOAT		1

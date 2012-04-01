@@ -482,7 +482,6 @@ static void image_operatortypes(void)
 	WM_operatortype_append(IMAGE_OT_invert);
 
 	WM_operatortype_append(IMAGE_OT_cycle_render_slot);
-    WM_operatortype_append(IMAGE_OT_select_render_slot);
 
 	WM_operatortype_append(IMAGE_OT_sample);
 	WM_operatortype_append(IMAGE_OT_sample_line);
@@ -507,20 +506,8 @@ static void image_keymap(struct wmKeyConfig *keyconf)
 	WM_keymap_add_item(keymap, "IMAGE_OT_properties", NKEY, KM_PRESS, 0, 0);
 	WM_keymap_add_item(keymap, "IMAGE_OT_scopes", TKEY, KM_PRESS, 0, 0);
 
-    RNA_int_set(WM_keymap_add_item(keymap, "IMAGE_OT_select_render_slot", ONEKEY, KM_PRESS, 0, 0)->ptr, "render_slot", 0);
-	RNA_int_set(WM_keymap_add_item(keymap, "IMAGE_OT_select_render_slot", TWOKEY, KM_PRESS, 0, 0)->ptr, "render_slot", 1);
-	RNA_int_set(WM_keymap_add_item(keymap, "IMAGE_OT_select_render_slot", THREEKEY, KM_PRESS, 0, 0)->ptr, "render_slot", 2);
-	RNA_int_set(WM_keymap_add_item(keymap, "IMAGE_OT_select_render_slot", FOURKEY, KM_PRESS, 0, 0)->ptr, "render_slot", 3);
-	RNA_int_set(WM_keymap_add_item(keymap, "IMAGE_OT_select_render_slot", FIVEKEY, KM_PRESS, 0, 0)->ptr, "render_slot", 4);
-	RNA_int_set(WM_keymap_add_item(keymap, "IMAGE_OT_select_render_slot", SIXKEY, KM_PRESS, 0, 0)->ptr, "render_slot", 5);
-	RNA_int_set(WM_keymap_add_item(keymap, "IMAGE_OT_select_render_slot", SEVENKEY, KM_PRESS, 0, 0)->ptr, "render_slot", 6);
-	RNA_int_set(WM_keymap_add_item(keymap, "IMAGE_OT_select_render_slot", EIGHTKEY, KM_PRESS, 0, 0)->ptr, "render_slot", 7);
-	RNA_int_set(WM_keymap_add_item(keymap, "IMAGE_OT_select_render_slot", NINEKEY, KM_PRESS, 0, 0)->ptr, "render_slot", 8);
-	RNA_int_set(WM_keymap_add_item(keymap, "IMAGE_OT_select_render_slot", ZEROKEY, KM_PRESS, 0, 0)->ptr, "render_slot", 9);
-
 	WM_keymap_add_item(keymap, "IMAGE_OT_cycle_render_slot", JKEY, KM_PRESS, 0, 0);
 	RNA_boolean_set(WM_keymap_add_item(keymap, "IMAGE_OT_cycle_render_slot", JKEY, KM_PRESS, KM_ALT, 0)->ptr, "reverse", TRUE);
-	RNA_boolean_set(WM_keymap_add_item(keymap, "IMAGE_OT_cycle_render_slot", HKEY, KM_PRESS, 0, 0)->ptr, "reverse", TRUE);
 	
 	keymap = WM_keymap_find(keyconf, "Image", SPACE_IMAGE, 0);
 	

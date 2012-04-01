@@ -2859,6 +2859,8 @@ static int viewnumpad_exec(bContext *C, wmOperator *op)
 
 void VIEW3D_OT_viewnumpad(wmOperatorType *ot)
 {
+	PropertyRNA *prop;
+
 	/* identifiers */
 	ot->name = "View numpad";
 	ot->description = "Set the view";
@@ -2871,8 +2873,10 @@ void VIEW3D_OT_viewnumpad(wmOperatorType *ot)
 	/* flags */
 	ot->flag = 0;
 
-	RNA_def_enum(ot->srna, "type", prop_view_items, 0, "View", "The Type of view");
-	RNA_def_boolean(ot->srna, "align_active", 0, "Align Active", "Align to the active object's axis");
+	prop = RNA_def_enum(ot->srna, "type", prop_view_items, 0, "View", "The Type of view");
+	RNA_def_property_flag(prop, PROP_SKIP_SAVE);
+	prop = RNA_def_boolean(ot->srna, "align_active", 0, "Align Active", "Align to the active object's axis");
+	RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 }
 
 static EnumPropertyItem prop_view_orbit_items[] = {
@@ -3395,6 +3399,8 @@ static int enable_manipulator_invoke(bContext *C, wmOperator *op, wmEvent *UNUSE
 
 void VIEW3D_OT_enable_manipulator(wmOperatorType *ot)
 {
+	PropertyRNA *prop;
+
 	/* identifiers */
 	ot->name = "Enable 3D Manipulator";
 	ot->description = "Enable the transform manipulator for use";
@@ -3405,9 +3411,12 @@ void VIEW3D_OT_enable_manipulator(wmOperatorType *ot)
 	ot->poll = ED_operator_view3d_active;
 	
 	/* rna later */
-	RNA_def_boolean(ot->srna, "translate", 0, "Translate", "Enable the translate manipulator");
-	RNA_def_boolean(ot->srna, "rotate", 0, "Rotate", "Enable the rotate manipulator");
-	RNA_def_boolean(ot->srna, "scale", 0, "Scale", "Enable the scale manipulator");
+	prop = RNA_def_boolean(ot->srna, "translate", 0, "Translate", "Enable the translate manipulator");
+	RNA_def_property_flag(prop, PROP_SKIP_SAVE);
+	prop = RNA_def_boolean(ot->srna, "rotate", 0, "Rotate", "Enable the rotate manipulator");
+	RNA_def_property_flag(prop, PROP_SKIP_SAVE);
+	prop = RNA_def_boolean(ot->srna, "scale", 0, "Scale", "Enable the scale manipulator");
+	RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 }
 
 /* ************************* below the line! *********************** */

@@ -247,6 +247,15 @@ static int print_help(int UNUSED(argc), const char **UNUSED(argv), void *data)
 	printf("Misc Options:\n");
 	BLI_argsPrintArgDoc(ba, "--debug");
 	BLI_argsPrintArgDoc(ba, "--debug-fpe");
+
+#ifdef WITH_FFMPEG
+	BLI_argsPrintArgDoc(ba, "--debug-ffmpeg");
+#endif
+
+#ifdef WITH_LIBMV
+	BLI_argsPrintArgDoc(ba, "--debug-libmv");
+#endif
+
 	printf("\n");
 	BLI_argsPrintArgDoc(ba, "--factory-startup");
 	printf("\n");
@@ -351,7 +360,7 @@ static int background_mode(int UNUSED(argc), const char **UNUSED(argv), void *UN
 
 static int debug_mode(int UNUSED(argc), const char **UNUSED(argv), void *data)
 {
-	G.f |= G_DEBUG;  /* std output printf's */
+	G.debug |= G_DEBUG;  /* std output printf's */
 	printf(BLEND_VERSION_STRING_FMT);
 	MEM_set_memory_debug();
 
@@ -359,13 +368,24 @@ static int debug_mode(int UNUSED(argc), const char **UNUSED(argv), void *data)
 	printf("Build: %s %s %s %s\n", build_date, build_time, build_platform, build_type);
 #endif // WITH_BUILDINFO
 
-#ifdef WITH_LIBMV
-	libmv_startDebugLogging();
-#endif
-
 	BLI_argsPrint(data);
 	return 0;
 }
+
+static int debug_mode_generic(int UNUSED(argc), const char **UNUSED(argv), void *data)
+{
+	G.debug |= GET_INT_FROM_POINTER(data);
+	return 0;
+}
+
+#ifdef WITH_LIBMV
+static int debug_mode_libmv(int UNUSED(argc), const char **UNUSED(argv), void *UNUSED(data))
+{
+	libmv_startDebugLogging();
+
+	return 0;
+}
+#endif
 
 static int set_fpe(int UNUSED(argc), const char **UNUSED(argv), void *UNUSED(data))
 {
@@ -497,7 +517,7 @@ static int no_joystick(int UNUSED(argc), const char **UNUSED(argv), void *data)
 	 * failed joystick initialization delays over 5 seconds, before game engine start
 	 */
 	SYS_WriteCommandLineInt(*syshandle, "nojoystick", 1);
-	if (G.f & G_DEBUG) printf("disabling nojoystick\n");
+	if (G.debug & G_DEBUG) printf("disabling nojoystick\n");
 #endif
 
 	return 0;
@@ -1077,7 +1097,19 @@ static void setupArguments(bContext *C, bArgs *ba, SYS_SystemHandle *syshandle)
 	BLI_argsAdd(ba, 1, "-a", NULL, playback_doc, playback_mode, NULL);
 
 	BLI_argsAdd(ba, 1, "-d", "--debug", debug_doc, debug_mode, ba);
+#ifdef WITH_FFMPEG
+	BLI_argsAdd(ba, 1, NULL, "--debug-ffmpeg", "\n\tEnable debug messages from FFmpeg library", debug_mode_generic, (void *)G_DEBUG_FFMPEG);
+#endif
+	BLI_argsAdd(ba, 1, NULL, "--debug-python", "\n\tEnable debug messages for python", debug_mode_generic, (void *)G_DEBUG_FFMPEG);
+	BLI_argsAdd(ba, 1, NULL, "--debug-events", "\n\tEnable debug messages for the event system", debug_mode_generic, (void *)G_DEBUG_EVENTS);
+	BLI_argsAdd(ba, 1, NULL, "--debug-wm",     "\n\tEnable debug messages for the window manager", debug_mode_generic, (void *)G_DEBUG_WM);
+	BLI_argsAdd(ba, 1, NULL, "--debug-all",    "\n\tEnable all debug messages (excludes libmv)", debug_mode_generic, (void *)G_DEBUG_ALL);
+
 	BLI_argsAdd(ba, 1, NULL, "--debug-fpe", "\n\tEnable floating point exceptions", set_fpe, NULL);
+
+#ifdef WITH_LIBMV
+	BLI_argsAdd(ba, 1, NULL, "--debug-libmv", "\n\tEnable debug messages from libmv library", debug_mode_libmv, NULL);
+#endif
 
 	BLI_argsAdd(ba, 1, NULL, "--factory-startup", "\n\tSkip reading the "STRINGIFY (BLENDER_STARTUP_FILE)" in the users home directory", set_factory_startup, NULL);
 

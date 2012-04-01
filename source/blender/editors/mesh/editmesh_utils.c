@@ -301,12 +301,12 @@ void EDBM_mesh_make(ToolSettings *ts, Scene *UNUSED(scene), Object *ob)
 	me->edit_btmesh->ob = ob;
 }
 
-void EDBM_mesh_load(Scene *scene, Object *ob)
+void EDBM_mesh_load(Object *ob)
 {
 	Mesh *me = ob->data;
 	BMesh *bm = me->edit_btmesh->bm;
 
-	BMO_op_callf(bm, "object_load_bmesh scene=%p object=%p", scene, ob);
+	BM_mesh_bm_to_me(bm, me, FALSE);
 
 #ifdef USE_TESSFACE_DEFAULT
 	BKE_mesh_tessface_calc(me);
@@ -512,11 +512,11 @@ static void *getEditMesh(bContext *C)
 	return NULL;
 }
 
-typedef struct undomesh {
+typedef struct UndoMesh {
 	Mesh me;
 	int selectmode;
 	char obname[MAX_ID_NAME - 2];
-} undomesh;
+} UndoMesh;
 
 /* undo simply makes copies of a bmesh */
 static void *editbtMesh_to_undoMesh(void *emv, void *obdata)
@@ -524,7 +524,7 @@ static void *editbtMesh_to_undoMesh(void *emv, void *obdata)
 	BMEditMesh *em = emv;
 	Mesh *obme = obdata;
 	
-	undomesh *um = MEM_callocN(sizeof(undomesh), "undo Mesh");
+	UndoMesh *um = MEM_callocN(sizeof(UndoMesh), "undo Mesh");
 	BLI_strncpy(um->obname, em->ob->id.name + 2, sizeof(um->obname));
 	
 	/* make sure shape keys work */
@@ -532,7 +532,8 @@ static void *editbtMesh_to_undoMesh(void *emv, void *obdata)
 
 	/* BM_mesh_validate(em->bm); */ /* for troubleshooting */
 
-	BMO_op_callf(em->bm, "bmesh_to_mesh mesh=%p notessellation=%b", &um->me, TRUE);
+	BM_mesh_bm_to_me(em->bm, &um->me, FALSE);
+
 	um->selectmode = em->selectmode;
 
 	return um;
@@ -542,7 +543,7 @@ static void undoMesh_to_editbtMesh(void *umv, void *em_v, void *UNUSED(obdata))
 {
 	BMEditMesh *em = em_v, *em_tmp;
 	Object *ob;
-	undomesh *um = umv;
+	UndoMesh *um = umv;
 	BMesh *bm;
 
 	/* BMESH_TODO - its possible the name wont be found right?, should fallback */
@@ -552,7 +553,11 @@ static void undoMesh_to_editbtMesh(void *umv, void *em_v, void *UNUSED(obdata))
 	BMEdit_Free(em);
 
 	bm = BM_mesh_create(&bm_mesh_allocsize_default);
-	BMO_op_callf(bm, "mesh_to_bmesh mesh=%p object=%p set_shapekey=%b", &um->me, ob, FALSE);
+
+	BM_mesh_bm_from_me(bm, &um->me, FALSE, ob->shapenr);
+
+	/* face normals need recalculation since we are not calling through an operator */
+	BM_mesh_normals_update(bm, TRUE);
 
 	em_tmp = BMEdit_Create(bm, TRUE);
 	*em = *em_tmp;
@@ -563,16 +568,16 @@ static void undoMesh_to_editbtMesh(void *umv, void *em_v, void *UNUSED(obdata))
 	MEM_freeN(em_tmp);
 }
 
-
-static void free_undo(void *umv)
+static void free_undo(void *me_v)
 {
-	if (((Mesh *)umv)->key) {
-		free_key(((Mesh *)umv)->key);
-		MEM_freeN(((Mesh *)umv)->key);
+	Mesh *me = me_v;
+	if (me->key) {
+		free_key(me->key);
+		MEM_freeN(me->key);
 	}
-	
-	free_mesh(umv, 0);
-	MEM_freeN(umv);
+
+	free_mesh(me, FALSE);
+	MEM_freeN(me);
 }
 
 /* and this is all the undo system needs to know */
@@ -1243,6 +1248,9 @@ void EDBM_mesh_reveal(BMEditMesh *em)
 	}
 
 	EDBM_selectmode_flush(em);
+
+	/* hidden faces can have invalid normals */
+	EDBM_mesh_normals_update(em);
 }
 
 /* so many tools call these that we better make it a generic function.

@@ -44,6 +44,7 @@ typedef enum eMatrixAccess_t {
 } eMatrixAccess_t;
 
 static PyObject *Matrix_copy(MatrixObject *self);
+static PyObject *Matrix_deepcopy(MatrixObject *self, PyObject *args);
 static int Matrix_ass_slice(MatrixObject *self, int begin, int end, PyObject *value);
 static PyObject *matrix__apply_to_copy(PyNoArgsFunction matrix_func, MatrixObject *self);
 static PyObject *MatrixAccess_CreatePyObject(MatrixObject *matrix, const eMatrixAccess_t type);
@@ -1519,6 +1520,12 @@ static PyObject *Matrix_copy(MatrixObject *self)
 
 	return Matrix_CreatePyObject((float (*))self->matrix, self->num_col, self->num_row, Py_NEW, Py_TYPE(self));
 }
+static PyObject *Matrix_deepcopy(MatrixObject *self, PyObject *args)
+{
+	if (!mathutils_deepcopy_args_check(args))
+		return NULL;
+	return Matrix_copy(self);
+}
 
 /*----------------------------print object (internal)-------------*/
 /* print the object to screen */
@@ -2223,6 +2230,27 @@ static PyObject *Matrix_is_orthogonal_get(MatrixObject *self, void *UNUSED(closu
 	}
 }
 
+PyDoc_STRVAR(Matrix_is_orthonormal_doc,
+"True if this matrix is orthonormal, 3x3 and 4x4 only, (read-only).\n\n:type: bool"
+);
+static PyObject *Matrix_is_orthonormal_get(MatrixObject *self, void *UNUSED(closure))
+{
+	if (BaseMath_ReadCallback(self) == -1)
+		return NULL;
+
+	/*must be 3-4 cols, 3-4 rows, square matrix*/
+	if (self->num_row == 4 && self->num_col == 4)
+		return PyBool_FromLong(is_orthonormal_m4((float (*)[4])self->matrix));
+	else if (self->num_row == 3 && self->num_col == 3)
+		return PyBool_FromLong(is_orthonormal_m3((float (*)[3])self->matrix));
+	else {
+		PyErr_SetString(PyExc_AttributeError,
+		                "Matrix.is_orthonormal: "
+		                "inappropriate matrix size - expects 3x3 or 4x4 matrix");
+		return NULL;
+	}
+}
+
 /*****************************************************************************/
 /* Python attributes get/set structure:                                      */
 /*****************************************************************************/
@@ -2233,6 +2261,7 @@ static PyGetSetDef Matrix_getseters[] = {
 	{(char *)"col", (getter)Matrix_col_get, (setter)NULL, Matrix_col_doc, NULL},
 	{(char *)"is_negative", (getter)Matrix_is_negative_get, (setter)NULL, Matrix_is_negative_doc, NULL},
 	{(char *)"is_orthogonal", (getter)Matrix_is_orthogonal_get, (setter)NULL, Matrix_is_orthogonal_doc, NULL},
+	{(char *)"is_orthonormal", (getter)Matrix_is_orthonormal_get, (setter)NULL, Matrix_is_orthonormal_doc, NULL},
 	{(char *)"is_wrapped", (getter)BaseMathObject_is_wrapped_get, (setter)NULL, BaseMathObject_is_wrapped_doc, NULL},
 	{(char *)"owner", (getter)BaseMathObject_owner_get, (setter)NULL, BaseMathObject_owner_doc, NULL},
 	{NULL, NULL, NULL, NULL, NULL}  /* Sentinel */
@@ -2269,6 +2298,7 @@ static struct PyMethodDef Matrix_methods[] = {
 	{"lerp", (PyCFunction) Matrix_lerp, METH_VARARGS, Matrix_lerp_doc},
 	{"copy", (PyCFunction) Matrix_copy, METH_NOARGS, Matrix_copy_doc},
 	{"__copy__", (PyCFunction) Matrix_copy, METH_NOARGS, Matrix_copy_doc},
+	{"__deepcopy__", (PyCFunction) Matrix_deepcopy, METH_VARARGS, Matrix_copy_doc},
 
 	/* class methods */
 	{"Identity", (PyCFunction) C_Matrix_Identity, METH_VARARGS | METH_CLASS, C_Matrix_Identity_doc},

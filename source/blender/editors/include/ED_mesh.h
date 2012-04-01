@@ -111,7 +111,7 @@ void EDBM_mesh_normals_update(struct BMEditMesh *em);
 
 void EDBM_mesh_make(struct ToolSettings *ts, struct Scene *scene, struct Object *ob);
 void EDBM_mesh_free(struct BMEditMesh *tm);
-void EDBM_mesh_load(struct Scene *scene, struct Object *ob);
+void EDBM_mesh_load(struct Object *ob);
 
 void           EDBM_index_arrays_init(struct BMEditMesh *em, int forvert, int foredge, int forface);
 void           EDBM_index_arrays_free(struct BMEditMesh *em);
@@ -262,6 +262,7 @@ void ED_mesh_vertices_remove(struct Mesh *mesh, struct ReportList *reports, int 
 
 void ED_mesh_transform(struct Mesh *me, float *mat);
 void ED_mesh_calc_normals(struct Mesh *me);
+void ED_mesh_calc_tessface(struct Mesh *mesh);
 void ED_mesh_material_link(struct Mesh *me, struct Material *ma);
 void ED_mesh_update(struct Mesh *mesh, struct bContext *C, int calc_edges, int calc_tessface);
 

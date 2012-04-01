@@ -45,6 +45,7 @@
 #include "DNA_anim_types.h"
 #include "DNA_lamp_types.h"
 #include "DNA_material_types.h"
+#include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_texture_types.h"
 #include "DNA_world_types.h"
@@ -398,7 +399,7 @@ void action_move_fcurves_by_basepath (bAction *srcAct, bAction *dstAct, const ch
 	
 	/* sanity checks */
 	if (ELEM3(NULL, srcAct, dstAct, basepath)) {
-		if (G.f & G_DEBUG) {
+		if (G.debug & G_DEBUG) {
 			printf("ERROR: action_partition_fcurves_by_basepath(%p, %p, %p) has insufficient info to work with\n",
 					(void *)srcAct, (void *)dstAct, (void *)basepath);
 		}
@@ -479,7 +480,7 @@ void BKE_animdata_separate_by_basepath (ID *srcID, ID *dstID, ListBase *basepath
 	
 	/* sanity checks */
 	if (ELEM(NULL, srcID, dstID)) {
-		if (G.f & G_DEBUG)
+		if (G.debug & G_DEBUG)
 			printf("ERROR: no source or destination ID to separate AnimData with\n");
 		return;
 	}
@@ -489,7 +490,7 @@ void BKE_animdata_separate_by_basepath (ID *srcID, ID *dstID, ListBase *basepath
 	dstAdt = BKE_id_add_animdata(dstID);
 	
 	if (ELEM(NULL, srcAdt, dstAdt)) {
-		if (G.f & G_DEBUG)
+		if (G.debug & G_DEBUG)
 			printf("ERROR: no AnimData for this pair of ID's\n");
 		return;
 	}
@@ -632,7 +633,8 @@ static void fcurves_path_rename_fix (ID *owner_id, const char *prefix, char *old
 }
 
 /* Check RNA-Paths for a list of Drivers */
-static void drivers_path_rename_fix (ID *owner_id, const char *prefix, const char *oldName, const char *newName, const char *oldKey, const char *newKey, ListBase *curves, int verify_paths)
+static void drivers_path_rename_fix(ID *owner_id, ID *ref_id, const char *prefix, const char *oldName, const char *newName,
+                                    const char *oldKey, const char *newKey, ListBase *curves, int verify_paths)
 {
 	FCurve *fcu;
 	
@@ -658,7 +660,7 @@ static void drivers_path_rename_fix (ID *owner_id, const char *prefix, const cha
 					
 					/* also fix the bone-name (if applicable) */
 					if (strstr(prefix, "bones")) {
-						if ( ((dtar->id) && (GS(dtar->id->name) == ID_OB)) &&
+						if ( ((dtar->id) && (GS(dtar->id->name) == ID_OB) && (!ref_id || ((Object*)(dtar->id))->data == ref_id)) &&
 							 (dtar->pchan_name[0]) && (strcmp(oldName, dtar->pchan_name)==0) )
 						{
 							BLI_strncpy(dtar->pchan_name, newName, sizeof(dtar->pchan_name));
@@ -692,7 +694,8 @@ static void nlastrips_path_rename_fix (ID *owner_id, const char *prefix, char *o
  * NOTE: it is assumed that the structure we're replacing is <prefix><["><name><"]>
  * 		i.e. pose.bones["Bone"]
  */
-void BKE_animdata_fix_paths_rename (ID *owner_id, AnimData *adt, const char *prefix, const char *oldName, const char *newName, int oldSubscript, int newSubscript, int verify_paths)
+void BKE_animdata_fix_paths_rename(ID *owner_id, AnimData *adt, ID *ref_id, const char *prefix, const char *oldName,
+                                   const char *newName, int oldSubscript, int newSubscript, int verify_paths)
 {
 	NlaTrack *nlt;
 	char *oldN, *newN;
@@ -718,7 +721,7 @@ void BKE_animdata_fix_paths_rename (ID *owner_id, AnimData *adt, const char *pre
 		fcurves_path_rename_fix(owner_id, prefix, oldN, newN, &adt->tmpact->curves, verify_paths);
 		
 	/* Drivers - Drivers are really F-Curves */
-	drivers_path_rename_fix(owner_id, prefix, oldName, newName, oldN, newN, &adt->drivers, verify_paths);
+	drivers_path_rename_fix(owner_id, ref_id, prefix, oldName, newName, oldN, newN, &adt->drivers, verify_paths);
 	
 	/* NLA Data - Animation Data for Strips */
 	for (nlt= adt->nla_tracks.first; nlt; nlt= nlt->next)
@@ -812,7 +815,7 @@ void BKE_animdata_main_cb (Main *mainptr, ID_AnimData_Edit_Callback func, void *
  * 		i.e. pose.bones["Bone"]
  */
 /* TODO: use BKE_animdata_main_cb for looping over all data  */
-void BKE_all_animdata_fix_paths_rename (const char *prefix, const char *oldName, const char *newName)
+void BKE_all_animdata_fix_paths_rename(ID *ref_id, const char *prefix, const char *oldName, const char *newName)
 {
 	Main *mainptr= G.main;
 	ID *id;
@@ -824,7 +827,7 @@ void BKE_all_animdata_fix_paths_rename (const char *prefix, const char *oldName,
 #define RENAMEFIX_ANIM_IDS(first) \
 	for (id= first; id; id= id->next) { \
 		AnimData *adt= BKE_animdata_from_id(id); \
-		BKE_animdata_fix_paths_rename(id, adt, prefix, oldName, newName, 0, 0, 1);\
+		BKE_animdata_fix_paths_rename(id, adt, ref_id, prefix, oldName, newName, 0, 0, 1);\
 	}
 	
 	/* another version of this macro for nodetrees */
@@ -834,9 +837,9 @@ void BKE_all_animdata_fix_paths_rename (const char *prefix, const char *oldName,
 		NtId_Type *ntp= (NtId_Type *)id; \
 		if (ntp->nodetree) { \
 			AnimData *adt2= BKE_animdata_from_id((ID *)ntp); \
-			BKE_animdata_fix_paths_rename((ID *)ntp, adt2, prefix, oldName, newName, 0, 0, 1);\
+			BKE_animdata_fix_paths_rename((ID *)ntp, adt2, ref_id, prefix, oldName, newName, 0, 0, 1);\
 		} \
-		BKE_animdata_fix_paths_rename(id, adt, prefix, oldName, newName, 0, 0, 1);\
+		BKE_animdata_fix_paths_rename(id, adt, ref_id, prefix, oldName, newName, 0, 0, 1);\
 	}
 	
 	/* nodes */
@@ -977,20 +980,20 @@ KS_Path *BKE_keyingset_add_path (KeyingSet *ks, ID *id, const char group_name[],
 	
 	/* sanity checks */
 	if (ELEM(NULL, ks, rna_path)) {
-		printf("ERROR: no Keying Set and/or RNA Path to add path with \n");
+		printf("ERROR: no Keying Set and/or RNA Path to add path with\n");
 		return NULL;
 	}
 	
 	/* ID is required for all types of KeyingSets */
 	if (id == NULL) {
-		printf("ERROR: No ID provided for Keying Set Path. \n");
+		printf("ERROR: No ID provided for Keying Set Path\n");
 		return NULL;
 	}
 	
 	/* don't add if there is already a matching KS_Path in the KeyingSet */
 	if (BKE_keyingset_find_path(ks, id, group_name, rna_path, array_index, groupmode)) {
-		if (G.f & G_DEBUG)
-			printf("ERROR: destination already exists in Keying Set \n");
+		if (G.debug & G_DEBUG)
+			printf("ERROR: destination already exists in Keying Set\n");
 		return NULL;
 	}
 	
@@ -1135,8 +1138,8 @@ static short animsys_write_rna_setting (PointerRNA *ptr, char *path, int array_i
 			int array_len= RNA_property_array_length(&new_ptr, prop);
 			
 			if (array_len && array_index >= array_len) {
-				if (G.f & G_DEBUG) {
-					printf("Animato: Invalid array index. ID = '%s',  '%s[%d]', array length is %d \n",
+				if (G.debug & G_DEBUG) {
+					printf("Animato: Invalid array index. ID = '%s',  '%s[%d]', array length is %d\n",
 						(ptr && ptr->id.data) ? (((ID *)ptr->id.data)->name+2) : "<No ID>",
 						path, array_index, array_len-1);
 				}
@@ -1208,8 +1211,8 @@ static short animsys_write_rna_setting (PointerRNA *ptr, char *path, int array_i
 		/* failed to get path */
 		// XXX don't tag as failed yet though, as there are some legit situations (Action Constraint) 
 		// where some channels will not exist, but shouldn't lock up Action
-		if (G.f & G_DEBUG) {
-			printf("Animato: Invalid path. ID = '%s',  '%s[%d]' \n",
+		if (G.debug & G_DEBUG) {
+			printf("Animato: Invalid path. ID = '%s',  '%s[%d]'\n",
 				(ptr && ptr->id.data) ? (((ID *)ptr->id.data)->name+2) : "<No ID>", 
 				path, array_index);
 		}
@@ -1323,7 +1326,7 @@ static void action_idcode_patch_check (ID *id, bAction *act)
 	}
 	else if (act->idroot != idcode) {
 		/* only report this error if debug mode is enabled (to save performance everywhere else) */
-		if (G.f & G_DEBUG) {
+		if (G.debug & G_DEBUG) {
 			printf("AnimSys Safety Check Failed: Action '%s' is not meant to be used from ID-Blocks of type %d such as '%s'\n",
 				act->id.name+2, idcode, id->name);
 		}
@@ -1589,12 +1592,12 @@ static NlaEvalChannel *nlaevalchan_verify (PointerRNA *ptr, ListBase *channels, 
 	
 		/* a valid property must be available, and it must be animatable */
 	if (RNA_path_resolve(ptr, path, &new_ptr, &prop) == 0) {
-		if (G.f & G_DEBUG) printf("NLA Strip Eval: Cannot resolve path \n");
+		if (G.debug & G_DEBUG) printf("NLA Strip Eval: Cannot resolve path\n");
 		return NULL;
 	}
 		/* only ok if animatable */
 	else if (RNA_property_animateable(&new_ptr, prop) == 0) {
-		if (G.f & G_DEBUG) printf("NLA Strip Eval: Property not animatable \n");
+		if (G.debug & G_DEBUG) printf("NLA Strip Eval: Property not animatable\n");
 		return NULL;
 	}
 	
@@ -2249,8 +2252,8 @@ void BKE_animsys_evaluate_all_animation (Main *main, Scene *scene, float ctime)
 {
 	ID *id;
 
-	if (G.f & G_DEBUG)
-		printf("Evaluate all animation - %f \n", ctime);
+	if (G.debug & G_DEBUG)
+		printf("Evaluate all animation - %f\n", ctime);
 	
 	/* macros for less typing 
 	 *	- only evaluate animation data for id if it has users (and not just fake ones)
@@ -2292,7 +2295,7 @@ void BKE_animsys_evaluate_all_animation (Main *main, Scene *scene, float ctime)
 	 * set correctly, so this optimization must be skipped in that case...
 	 */
 	if ((main->action.first == NULL) && (main->curve.first == NULL)) {
-		if (G.f & G_DEBUG)
+		if (G.debug & G_DEBUG)
 			printf("\tNo Actions, so no animation needs to be evaluated...\n");
 			
 		return;

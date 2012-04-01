@@ -614,7 +614,7 @@ static int drop_named_image_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	ED_uvedit_assign_image(bmain, scene, obedit, ima, NULL);
 
 	if (exitmode) {
-		EDBM_mesh_load(scene, obedit);
+		EDBM_mesh_load(obedit);
 		EDBM_mesh_free(me->edit_btmesh);
 		MEM_freeN(me->edit_btmesh);
 		me->edit_btmesh = NULL;
@@ -1181,4 +1181,14 @@ void ED_mesh_calc_normals(Mesh *mesh)
 	                  mesh->mloop, mesh->mpoly, mesh->totloop, mesh->totpoly,
 	                  NULL);
 #endif
+}
+
+void ED_mesh_calc_tessface(Mesh *mesh)
+{
+	if (mesh->edit_btmesh) {
+		BMEdit_RecalcTessellation(mesh->edit_btmesh);
+	}
+	else {
+		BKE_mesh_tessface_calc(mesh);
+	}
 }

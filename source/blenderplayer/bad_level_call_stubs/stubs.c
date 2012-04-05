@@ -120,7 +120,6 @@ void EDBM_mesh_load(struct Object *ob) {}
 void EDBM_mesh_make(struct ToolSettings *ts, struct Scene *scene, struct Object *ob) {}
 void EDBM_mesh_normals_update(struct BMEditMesh *em) {}
 void *g_system;
-void EDBM_mesh_normals_update(struct BMEditMesh *em) {}
 
 struct Heap* BLI_heap_new (void){return NULL;}
 void BLI_heap_free (struct Heap *heap, void *ptrfreefp) {}

@@ -1173,7 +1173,7 @@ static void def_sh_mapping(StructRNA *srna)
 	
 	RNA_def_struct_sdna_from(srna, "TexMapping", "storage");
 
-	prop = RNA_def_property(srna, "location", PROP_FLOAT, PROP_TRANSLATION);
+	prop = RNA_def_property(srna, "translation", PROP_FLOAT, PROP_TRANSLATION);
 	RNA_def_property_float_sdna(prop, NULL, "loc");
 	RNA_def_property_ui_text(prop, "Location", "");
 	RNA_def_property_update(prop, 0, "rna_Mapping_Node_update");
@@ -1671,7 +1671,8 @@ static void def_cmp_vector_blur(StructRNA *srna)
 	
 	prop = RNA_def_property(srna, "factor", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "fac");
-	RNA_def_property_range(prop, 0.0f, 2.0f);
+	RNA_def_property_range(prop, 0.0, 20.0);
+	RNA_def_property_ui_range(prop, 0.0, 2.0, 1.0, 2);
 	RNA_def_property_ui_text(prop, "Blur Factor",
 	                         "Scaling factor for motion vectors (actually, 'shutter speed', in frames)");
 	RNA_def_property_update(prop, NC_NODE|NA_EDITED, "rna_Node_update");

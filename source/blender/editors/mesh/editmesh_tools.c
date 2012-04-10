@@ -1022,7 +1022,7 @@ static int edbm_add_edge_face_exec(bContext *C, wmOperator *op)
 	Object *obedit = CTX_data_edit_object(C);
 	BMEditMesh *em = BMEdit_FromObject(obedit);
 	
-	if (!EDBM_op_init(em, &bmop, op, "contextual_create geom=%hfev", BM_ELEM_SELECT))
+	if (!EDBM_op_init(em, &bmop, op, "contextual_create geom=%hfev mat_nr=%i", BM_ELEM_SELECT, em->mat_nr))
 		return OPERATOR_CANCELLED;
 	
 	BMO_op_exec(em->bm, &bmop);
@@ -1949,10 +1949,10 @@ static EnumPropertyItem *merge_type_itemf(bContext *C, PointerRNA *UNUSED(ptr), 
 				RNA_enum_items_add_value(&item, &totitem, merge_type_items, 1);
 			}
 			else if (em->bm->selected.first && ((BMEditSelection *)em->bm->selected.first)->htype == BM_VERT) {
-				RNA_enum_items_add_value(&item, &totitem, merge_type_items, 1);
+				RNA_enum_items_add_value(&item, &totitem, merge_type_items, 6);
 			}
 			else if (em->bm->selected.last && ((BMEditSelection *)em->bm->selected.last)->htype == BM_VERT) {
-				RNA_enum_items_add_value(&item, &totitem, merge_type_items, 6);
+				RNA_enum_items_add_value(&item, &totitem, merge_type_items, 1);
 			}
 		}
 

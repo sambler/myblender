@@ -911,6 +911,13 @@ PropertyRNA *RNA_def_property(StructOrFunctionRNA *cont_, const char *identifier
 
 	switch (type) {
 		case PROP_BOOLEAN:
+			if (DefRNA.preprocess) {
+				if ((subtype & ~(PROP_LAYER_MEMBER)) != PROP_NONE) {
+					fprintf(stderr, "%s: subtype does not apply to 'PROP_BOOLEAN' \"%s.%s\"\n", __func__,
+					        CONTAINER_RNA_ID(cont), identifier);
+					DefRNA.error = 1;
+				}
+			}
 			break;
 		case PROP_INT: {
 			IntPropertyRNA *iprop = (IntPropertyRNA*)prop;
@@ -949,7 +956,6 @@ PropertyRNA *RNA_def_property(StructOrFunctionRNA *cont_, const char *identifier
 			StringPropertyRNA *sprop = (StringPropertyRNA*)prop;
 
 			sprop->defaultvalue = "";
-			sprop->maxlength = 0;
 			break;
 		}
 		case PROP_ENUM:
@@ -981,6 +987,12 @@ PropertyRNA *RNA_def_property(StructOrFunctionRNA *cont_, const char *identifier
 	
 		if (type != PROP_STRING)
 			prop->flag |= PROP_ANIMATABLE;
+	}
+
+	if (type == PROP_STRING) {
+		/* used so generated 'get/length/set' functions skip a NULL check
+		 * in some cases we want it */
+		RNA_def_property_flag(prop, PROP_NEVER_NULL);
 	}
 
 	if (DefRNA.preprocess) {

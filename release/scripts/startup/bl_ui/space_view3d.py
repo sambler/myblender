@@ -1599,9 +1599,7 @@ class VIEW3D_MT_edit_mesh_specials(Menu):
         layout.operator_context = 'INVOKE_REGION_WIN'
 
         layout.operator("mesh.subdivide", text="Subdivide").smoothness = 0.0
-        """
         layout.operator("mesh.subdivide", text="Subdivide Smooth").smoothness = 1.0
-        """
         layout.operator("mesh.merge", text="Merge...")
         layout.operator("mesh.remove_doubles")
         layout.operator("mesh.hide", text="Hide")
@@ -1813,9 +1811,6 @@ class VIEW3D_MT_edit_mesh_delete(Menu):
     def draw(self, context):
         layout = self.layout
 
-    def draw(self, context):
-        layout = self.layout
-
         layout.operator_enum("mesh.delete", "type")
 
         layout.separator()
@@ -1827,9 +1822,6 @@ class VIEW3D_MT_edit_mesh_delete(Menu):
 
 class VIEW3D_MT_edit_mesh_dissolve(Menu):
     bl_label = "Dissolve"
-
-    def draw(self, context):
-        layout = self.layout
 
     def draw(self, context):
         layout = self.layout

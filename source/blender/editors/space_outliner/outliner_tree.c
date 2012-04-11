@@ -1221,7 +1221,7 @@ static int treesort_alpha(const void *v1, const void *v2)
 	if (comp==1) return 1;
 	else if (comp==2) return -1;
 	else if (comp==3) {
-		comp= strcmp(x1->name, x2->name);
+		comp= BLI_strcasecmp(x1->name, x2->name);
 		
 		if ( comp>0 ) return 1;
 		else if ( comp<0) return -1;

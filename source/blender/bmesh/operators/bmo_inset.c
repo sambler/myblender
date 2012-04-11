@@ -20,6 +20,10 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/bmesh/operators/bmo_inset.c
+ *  \ingroup bmesh
+ */
+
 #include "MEM_guardedalloc.h"
 
 #include "BLI_math.h"
@@ -119,11 +123,11 @@ void bmo_inset_exec(BMesh *bm, BMOperator *op)
 	int i, j, k;
 
 	if (use_outset == FALSE) {
-		BM_mesh_elem_flag_disable_all(bm, BM_FACE, BM_ELEM_TAG);
+		BM_mesh_elem_flag_disable_all(bm, BM_FACE, BM_ELEM_TAG, FALSE);
 		BMO_slot_buffer_hflag_enable(bm, op, "faces", BM_FACE, BM_ELEM_TAG, FALSE);
 	}
 	else {
-		BM_mesh_elem_flag_enable_all(bm, BM_FACE, BM_ELEM_TAG);
+		BM_mesh_elem_flag_enable_all(bm, BM_FACE, BM_ELEM_TAG, FALSE);
 		BMO_slot_buffer_hflag_disable(bm, op, "faces", BM_FACE, BM_ELEM_TAG, FALSE);
 	}
 
@@ -187,6 +191,7 @@ void bmo_inset_exec(BMesh *bm, BMOperator *op)
 		edge_loop_tangent(es->e_new, es->l, es->no);
 
 		if (es->e_new == es->e_old) { /* happens on boundary edges */
+			/* take care here, we're creating this double edge which _must_ have its verts replaced later on */
 			es->e_old = BM_edge_create(bm, es->e_new->v1, es->e_new->v2, es->e_new, FALSE);
 		}
 
@@ -238,7 +243,7 @@ void bmo_inset_exec(BMesh *bm, BMOperator *op)
 				bmesh_vert_separate(bm, v, &vout, &r_vout_len);
 				v = NULL; /* don't use again */
 
-				/* in some cases the edge doesnt split off */
+				/* in some cases the edge doesn't split off */
 				if (r_vout_len == 1) {
 					MEM_freeN(vout);
 					continue;
@@ -254,7 +259,7 @@ void bmo_inset_exec(BMesh *bm, BMOperator *op)
 					/* find adjacent */
 					BM_ITER(e, &iter, bm, BM_EDGES_OF_VERT, v_split) {
 						if (BM_elem_flag_test(e, BM_ELEM_TAG) &&
-						    BM_elem_flag_test(e->l->f, BM_ELEM_TAG))
+						    e->l && BM_elem_flag_test(e->l->f, BM_ELEM_TAG))
 						{
 							if (vert_edge_tag_tot < 2) {
 								vecpair[vert_edge_tag_tot] = BM_elem_index_get(e);

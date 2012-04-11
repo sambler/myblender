@@ -31,7 +31,7 @@
 
 
 #include <string.h>
-#include "limits.h"
+#include <limits.h>
 
 #include "MEM_guardedalloc.h"
 
@@ -382,6 +382,13 @@ void DM_ensure_tessface(DerivedMesh *dm)
 			       __func__, numPolys, dm->type);
 		}
 	}
+
+	else if (dm->dirty && DM_DIRTY_TESS_CDLAYERS) {
+		BLI_assert(CustomData_has_layer(&dm->faceData, CD_POLYINDEX));
+		DM_update_tessface_data(dm);
+	}
+
+	dm->dirty &= ~DM_DIRTY_TESS_CDLAYERS;
 }
 
 /* Update tessface CD data from loop/poly ones. Needed when not retessellating after modstack evaluation. */
@@ -1629,7 +1636,7 @@ static void mesh_calc_modifiers(Scene *scene, Object *ob, float (*inputVertexCos
 
 					deformedVerts = NULL;
 				}
-			} 
+			}
 
 			/* create an orco derivedmesh in parallel */
 			if (nextmask & CD_MASK_ORCO) {
@@ -2299,7 +2306,8 @@ DerivedMesh *editbmesh_get_derived_base(Object *obedit, BMEditMesh *em)
 
 /* ********* For those who don't grasp derived stuff! (ton) :) *************** */
 
-static void make_vertexcosnos__mapFunc(void *userData, int index, float *co, float *no_f, short *no_s)
+static void make_vertexcosnos__mapFunc(void *userData, int index, const float co[3],
+                                       const float no_f[3], const short no_s[3])
 {
 	float *vec = userData;
 	
@@ -3061,6 +3069,8 @@ void DM_init_origspace(DerivedMesh *dm)
 			}
 		}
 	}
+
+	dm->dirty |= DM_DIRTY_TESS_CDLAYERS;
 }
 
 

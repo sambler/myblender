@@ -658,9 +658,10 @@ static int edbm_select_all_exec(bContext *C, wmOperator *op)
 			break;
 		case SEL_INVERT:
 			EDBM_select_swap(em);
+			EDBM_selectmode_flush(em);
 			break;
 	}
-	
+
 	WM_event_add_notifier(C, NC_GEOM | ND_SELECT, obedit);
 
 	return OPERATOR_FINISHED;
@@ -1021,7 +1022,7 @@ static int edbm_add_edge_face_exec(bContext *C, wmOperator *op)
 	Object *obedit = CTX_data_edit_object(C);
 	BMEditMesh *em = BMEdit_FromObject(obedit);
 	
-	if (!EDBM_op_init(em, &bmop, op, "contextual_create geom=%hfev", BM_ELEM_SELECT))
+	if (!EDBM_op_init(em, &bmop, op, "contextual_create geom=%hfev mat_nr=%i", BM_ELEM_SELECT, em->mat_nr))
 		return OPERATOR_CANCELLED;
 	
 	BMO_op_exec(em->bm, &bmop);
@@ -1188,6 +1189,7 @@ void MESH_OT_vert_connect(wmOperatorType *ot)
 	/* identifiers */
 	ot->name = "Vertex Connect";
 	ot->idname = "MESH_OT_vert_connect";
+	ot->description = "Connect 2 vertices in a face with by an edge, splitting the face in half";
 	
 	/* api callbacks */
 	ot->exec = edbm_vert_connect;
@@ -1947,10 +1949,10 @@ static EnumPropertyItem *merge_type_itemf(bContext *C, PointerRNA *UNUSED(ptr), 
 				RNA_enum_items_add_value(&item, &totitem, merge_type_items, 1);
 			}
 			else if (em->bm->selected.first && ((BMEditSelection *)em->bm->selected.first)->htype == BM_VERT) {
-				RNA_enum_items_add_value(&item, &totitem, merge_type_items, 1);
+				RNA_enum_items_add_value(&item, &totitem, merge_type_items, 6);
 			}
 			else if (em->bm->selected.last && ((BMEditSelection *)em->bm->selected.last)->htype == BM_VERT) {
-				RNA_enum_items_add_value(&item, &totitem, merge_type_items, 6);
+				RNA_enum_items_add_value(&item, &totitem, merge_type_items, 1);
 			}
 		}
 
@@ -2132,6 +2134,8 @@ static float mesh_rip_edgedist(ARegion *ar, float mat[][4], float *co1, float *c
 	return dist_to_line_segment_v2(mvalf, vec1, vec2);
 }
 
+
+
 /* based on mouse cursor position, it defines how is being ripped */
 static int edbm_rip_invoke(bContext *C, wmOperator *op, wmEvent *event)
 {
@@ -2174,6 +2178,7 @@ static int edbm_rip_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	 * then rip two adjacent edges in the vert fan. */
 	if (bm->totvertsel == 1 && bm->totedgesel == 0 && bm->totfacesel == 0) {
 		BMEditSelection ese;
+		int totboundary_edge = 0;
 		singlesel = TRUE;
 
 		/* find selected vert - same some time and check history first */
@@ -2196,15 +2201,91 @@ static int edbm_rip_invoke(bContext *C, wmOperator *op, wmEvent *event)
 		if (v->e) {
 			/* find closest edge to mouse cursor */
 			BM_ITER(e, &iter, bm, BM_EDGES_OF_VERT, v) {
-				if (!BM_elem_flag_test(e, BM_ELEM_HIDDEN) && BM_edge_face_count(e) == 2) {
-					d = mesh_rip_edgedist(ar, projectMat, e->v1->co, e->v2->co, fmval);
-					if (d < dist) {
-						dist = d;
-						e2 = e;
+				int is_boundary = BM_edge_is_boundary(e);
+				/* consider wire as boundary for this purpose,
+				 * otherwise we can't a face away from a wire edge */
+				totboundary_edge += (is_boundary != 0 || BM_edge_is_wire(e));
+				if (!BM_elem_flag_test(e, BM_ELEM_HIDDEN)) {
+					if (is_boundary == FALSE && BM_edge_face_count(e) == 2) {
+						d = mesh_rip_edgedist(ar, projectMat, e->v1->co, e->v2->co, fmval);
+						if (d < dist) {
+							dist = d;
+							e2 = e;
+						}
 					}
 				}
 			}
 
+		}
+
+		/* should we go ahead with edge rip or do we need to do special case, split off vertex?:
+		 * split off vertex if...
+		 * - we cant find an edge - this means we are ripping a faces vert that is connected to other
+		 *   geometry only at the vertex.
+		 * - the boundary edge total is greater then 2,
+		 *   in this case edge split _can_ work but we get far nicer results if we use this special case. */
+		if (totboundary_edge > 2) {
+			BMVert **vout;
+			int vout_len;
+
+			BM_elem_select_set(bm, v, FALSE);
+			bmesh_vert_separate(bm, v, &vout, &vout_len);
+
+			if (vout_len < 2) {
+				/* should never happen */
+				BKE_report(op->reports, RPT_ERROR, "Error ripping vertex from faces");
+				return OPERATOR_CANCELLED;
+			}
+			else {
+				int vi_best = 0;
+
+				dist = FLT_MAX;
+
+				for (i = 0; i < vout_len; i++) {
+					BM_ITER(l, &iter, bm, BM_LOOPS_OF_VERT, vout[i]) {
+						if (!BM_elem_flag_test(l->f, BM_ELEM_HIDDEN)) {
+							float l_mid_co[3];
+							BM_loop_face_tangent(l, l_mid_co);
+
+							/* scale to average of surrounding edge size, only needs to be approx */
+							mul_v3_fl(l_mid_co, (BM_edge_length_calc(l->e) + BM_edge_length_calc(l->prev->e)) / 2.0f);
+							add_v3_v3(l_mid_co, v->co);
+
+							d = mesh_rip_edgedist(ar, projectMat, v->co, l_mid_co, fmval);
+
+							if (d < dist) {
+								dist = d;
+								vi_best = i;
+							}
+						}
+					}
+				}
+
+				/* select the vert from the best region */
+				v = vout[vi_best];
+				BM_elem_select_set(bm, v, TRUE);
+
+				/* splice all others back together */
+				if (vout_len > 2) {
+
+					/* vout[0]  == best
+					 * vout[1]  == glue
+					 * vout[2+] == splice with glue
+					 */
+					if (vi_best != 0) {
+						SWAP(BMVert *, vout[0], vout[vi_best]);
+						vi_best = 0;
+					}
+
+					for (i = 2; i < vout_len; i++) {
+						BM_vert_splice(bm, vout[i], vout[1]);
+					}
+				}
+
+				MEM_freeN(vout);
+
+				return OPERATOR_FINISHED;
+			}
 		}
 
 		if (!e2) {
@@ -2384,6 +2465,7 @@ void MESH_OT_rip(wmOperatorType *ot)
 	/* identifiers */
 	ot->name = "Rip";
 	ot->idname = "MESH_OT_rip";
+	ot->description = "Disconnect vertex or edges from connected geometry";
 
 	/* api callbacks */
 	ot->invoke = edbm_rip_invoke;
@@ -3255,6 +3337,7 @@ void MESH_OT_fill(wmOperatorType *ot)
 	/* identifiers */
 	ot->name = "Fill";
 	ot->idname = "MESH_OT_fill";
+	ot->description = "Fill a selected edge loop with faces";
 
 	/* api callbacks */
 	ot->exec = edbm_fill_exec;
@@ -3310,8 +3393,9 @@ static int edbm_quads_convert_to_tris_exec(bContext *C, wmOperator *op)
 void MESH_OT_quads_convert_to_tris(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name = "Quads to Tris";
+	ot->name = "Triangulate Faces";
 	ot->idname = "MESH_OT_quads_convert_to_tris";
+	ot->description = "Triangulate selected faces";
 
 	/* api callbacks */
 	ot->exec = edbm_quads_convert_to_tris_exec;
@@ -3354,6 +3438,7 @@ void MESH_OT_tris_convert_to_quads(wmOperatorType *ot)
 	/* identifiers */
 	ot->name = "Tris to Quads";
 	ot->idname = "MESH_OT_tris_convert_to_quads";
+	ot->description = "Join triangles into quads";
 
 	/* api callbacks */
 	ot->exec = edbm_tris_convert_to_quads_exec;
@@ -3463,7 +3548,7 @@ static int edbm_split_exec(bContext *C, wmOperator *op)
 
 	EDBM_op_init(em, &bmop, op, "split geom=%hvef use_only_faces=%b", BM_ELEM_SELECT, FALSE);
 	BMO_op_exec(em->bm, &bmop);
-	BM_mesh_elem_flag_disable_all(em->bm, BM_VERT | BM_EDGE | BM_FACE, BM_ELEM_SELECT);
+	BM_mesh_elem_flag_disable_all(em->bm, BM_VERT | BM_EDGE | BM_FACE, BM_ELEM_SELECT, FALSE);
 	BMO_slot_buffer_hflag_enable(em->bm, &bmop, "geomout", BM_ALL, BM_ELEM_SELECT, TRUE);
 	if (!EDBM_op_finish(em, &bmop, op, TRUE)) {
 		return OPERATOR_CANCELLED;
@@ -3482,6 +3567,7 @@ void MESH_OT_split(wmOperatorType *ot)
 	/* identifiers */
 	ot->name = "Split";
 	ot->idname = "MESH_OT_split";
+	ot->description = "Split off selected geometry from connected unselected geometry";
 
 	/* api callbacks */
 	ot->exec = edbm_split_exec;
@@ -4426,11 +4512,12 @@ static int edbm_inset_exec(bContext *C, wmOperator *op)
 	Object *obedit = CTX_data_edit_object(C);
 	BMEditMesh *em = BMEdit_FromObject(obedit);
 	BMOperator bmop;
-	const int use_boundary        = FALSE; //RNA_boolean_get(op->ptr, "use_boundary");
+	const int use_boundary        = RNA_boolean_get(op->ptr, "use_boundary");
 	const int use_even_offset     = RNA_boolean_get(op->ptr, "use_even_offset");
 	const int use_relative_offset = RNA_boolean_get(op->ptr, "use_relative_offset");
 	const float thickness         = RNA_float_get(op->ptr, "thickness");
 	const int use_outset          = RNA_boolean_get(op->ptr, "use_outset");
+	const int use_select_inset    = RNA_boolean_get(op->ptr, "use_select_inset"); /* not passed onto the BMO */
 
 	EDBM_op_init(em, &bmop, op,
 	             "inset faces=%hf use_boundary=%b use_even_offset=%b use_relative_offset=%b thickness=%f use_outset=%b",
@@ -4438,10 +4525,14 @@ static int edbm_inset_exec(bContext *C, wmOperator *op)
 
 	BMO_op_exec(em->bm, &bmop);
 
-	/* deselect original verts */
-	EDBM_flag_disable_all(em, BM_ELEM_SELECT);
-
-	BMO_slot_buffer_hflag_enable(em->bm, &bmop, "faceout", BM_FACE, BM_ELEM_SELECT, TRUE);
+	if (use_select_inset) {
+		/* deselect original faces/verts */
+		EDBM_flag_disable_all(em, BM_ELEM_SELECT);
+		BMO_slot_buffer_hflag_enable(em->bm, &bmop, "faceout", BM_FACE, BM_ELEM_SELECT, TRUE);
+	}
+	else {
+		BMO_slot_buffer_hflag_disable(em->bm, &bmop, "faceout", BM_FACE, BM_ELEM_SELECT, TRUE);
+	}
 
 	if (!EDBM_op_finish(em, &bmop, op, TRUE)) {
 		return OPERATOR_CANCELLED;
@@ -4469,7 +4560,7 @@ void MESH_OT_inset(wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
 	/* properties */
-	// RNA_def_boolean(ot->srna, "use_boundary",        TRUE, "Boundary",  "Inset face boundries");
+	RNA_def_boolean(ot->srna, "use_boundary",        TRUE, "Boundary",  "Inset face boundries");
 	RNA_def_boolean(ot->srna, "use_even_offset",     TRUE, "Offset Even",      "Scale the offset to give more even thickness");
 	RNA_def_boolean(ot->srna, "use_relative_offset", FALSE, "Offset Relative", "Scale the offset by surrounding geometry");
 
@@ -4478,4 +4569,5 @@ void MESH_OT_inset(wmOperatorType *ot)
 	RNA_def_property_ui_range(prop, 0.0, 1.0, 0.01, 4);
 
 	RNA_def_boolean(ot->srna, "use_outset", FALSE, "Outset", "Outset rather than inset");
+	RNA_def_boolean(ot->srna, "use_select_inset", TRUE, "Select Outer", "Select the new inset faces");
 }

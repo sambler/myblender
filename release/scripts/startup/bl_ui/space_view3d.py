@@ -19,7 +19,7 @@
 # <pep8 compliant>
 import bpy
 from bpy.types import Header, Menu, Panel
-from .properties_paint_common import UnifiedPaintPanel
+from bl_ui.properties_paint_common import UnifiedPaintPanel
 
 
 class VIEW3D_HT_header(Header):
@@ -1188,6 +1188,7 @@ class VIEW3D_MT_paint_weight(Menu):
         layout.operator("object.vertex_group_invert", text="Invert")
         layout.operator("object.vertex_group_clean", text="Clean")
         layout.operator("object.vertex_group_levels", text="Levels")
+        layout.operator("object.vertex_group_blend", text="Blend")
         layout.operator("object.vertex_group_fix", text="Fix Deforms")
 
         layout.separator()
@@ -1598,9 +1599,7 @@ class VIEW3D_MT_edit_mesh_specials(Menu):
         layout.operator_context = 'INVOKE_REGION_WIN'
 
         layout.operator("mesh.subdivide", text="Subdivide").smoothness = 0.0
-        """
         layout.operator("mesh.subdivide", text="Subdivide Smooth").smoothness = 1.0
-        """
         layout.operator("mesh.merge", text="Merge...")
         layout.operator("mesh.remove_doubles")
         layout.operator("mesh.hide", text="Hide")
@@ -1683,6 +1682,7 @@ class VIEW3D_MT_edit_mesh_vertices(Menu):
         layout.operator("mesh.split")
         layout.operator("mesh.separate")
         layout.operator("mesh.vert_connect")
+        layout.operator("mesh.vert_slide")
 
         layout.separator()
 
@@ -1811,9 +1811,6 @@ class VIEW3D_MT_edit_mesh_delete(Menu):
     def draw(self, context):
         layout = self.layout
 
-    def draw(self, context):
-        layout = self.layout
-
         layout.operator_enum("mesh.delete", "type")
 
         layout.separator()
@@ -1825,9 +1822,6 @@ class VIEW3D_MT_edit_mesh_delete(Menu):
 
 class VIEW3D_MT_edit_mesh_dissolve(Menu):
     bl_label = "Dissolve"
-
-    def draw(self, context):
-        layout = self.layout
 
     def draw(self, context):
         layout = self.layout

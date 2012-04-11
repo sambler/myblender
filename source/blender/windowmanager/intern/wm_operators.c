@@ -1260,8 +1260,8 @@ static uiBlock *wm_block_create_splash(bContext *C, ARegion *ar, void *UNUSED(ar
 	extern char build_rev[];
 	
 	BLI_snprintf(version_buf, sizeof(version_buf),
-	             "Custom build %d.%02d.%d", BLENDER_VERSION / 100, BLENDER_VERSION % 100, BLENDER_SUBVERSION);
-	BLI_snprintf(revision_buf, sizeof(revision_buf), "by sambler r%s", build_rev);
+	             "Custom build   %d.%02d.%d", BLENDER_VERSION / 100, BLENDER_VERSION % 100, BLENDER_SUBVERSION);
+	BLI_snprintf(revision_buf, sizeof(revision_buf), "by sambler   r%s", build_rev);
 	
 	BLF_size(style->widgetlabel.uifont_id, style->widgetlabel.points, U.dpi);
 	ver_width = (int)BLF_width(style->widgetlabel.uifont_id, version_buf) + 5;
@@ -1302,8 +1302,8 @@ static uiBlock *wm_block_create_splash(bContext *C, ARegion *ar, void *UNUSED(ar
 	uiItemL(col, "Links", ICON_NONE);
 	uiItemStringO(col, IFACE_("Donations"), ICON_URL, "WM_OT_url_open", "url", "http://www.blender.org/blenderorg/blender-foundation/donation-payment");
 	uiItemStringO(col, IFACE_("Credits"), ICON_URL, "WM_OT_url_open", "url", "http://www.blender.org/development/credits");
-	uiItemStringO(col, IFACE_("Release Log"), ICON_URL, "WM_OT_url_open", "url", "http://www.blender.org/development/release-logs/blender-262");
-	uiItemStringO(col, IFACE_("Manual"), ICON_URL, "WM_OT_url_open", "url", "http://wiki.blender.org/index.php/Doc:2.5/Manual");
+	uiItemStringO(col, IFACE_("Release Log"), ICON_URL, "WM_OT_url_open", "url", "http://www.blender.org/development/release-logs/blender-263");
+	uiItemStringO(col, IFACE_("Manual"), ICON_URL, "WM_OT_url_open", "url", "http://wiki.blender.org/index.php/Doc:2.6/Manual");
 	uiItemStringO(col, IFACE_("Blender Website"), ICON_URL, "WM_OT_url_open", "url", "http://www.blender.org");
 	uiItemStringO(col, IFACE_("User Community"), ICON_URL, "WM_OT_url_open", "url", "http://www.blender.org/community/user-community");
 	if (strcmp(STRINGIFY(BLENDER_VERSION_CYCLE), "release") == 0) {

@@ -20,6 +20,10 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/bmesh/operators/bmo_extrude.c
+ *  \ingroup bmesh
+ */
+
 #include "MEM_guardedalloc.h"
 
 #include "BLI_math.h"
@@ -54,13 +58,14 @@ void bmo_extrude_face_indiv_exec(BMesh *bm, BMOperator *op)
 
 	BMO_ITER(f, &siter, bm, op, "faces", BM_FACE) {
 		BLI_array_empty(edges);
+		BLI_array_growitems(edges, f->len);
+
 		i = 0;
 		firstv = lastv = NULL;
 		BM_ITER(l, &liter, bm, BM_LOOPS_OF_FACE, f) {
-			BLI_array_growone(edges);
-
 			v = BM_vert_create(bm, l->v->co, l->v);
 
+			/* skip on the first iteration */
 			if (lastv) {
 				e = BM_edge_create(bm, lastv, v, l->e, FALSE);
 				edges[i++] = e;
@@ -71,7 +76,7 @@ void bmo_extrude_face_indiv_exec(BMesh *bm, BMOperator *op)
 			if (!firstv) firstv = v;
 		}
 
-		BLI_array_growone(edges);
+		/* this fits in the array because we skip one in the loop above */
 		e = BM_edge_create(bm, v, firstv, laste, FALSE);
 		edges[i++] = e;
 
@@ -116,46 +121,46 @@ void bmo_extrude_face_indiv_exec(BMesh *bm, BMOperator *op)
 static void bm_extrude_copy_face_loop_attributes(BMesh *bm, BMFace *f, BMEdge *e, BMEdge *newedge)
 {
 	BMIter iter;
-	BMLoop *l, *l2;
+	BMLoop *l, *l_other;
 
-	/* copy attribute */
-	l = BM_iter_new(&iter, bm, BM_LOOPS_OF_FACE, f);
-	for ( ; l; l = BM_iter_step(&iter)) {
-
+	/* copy attributes */
+	BM_ITER(l, &iter, bm, BM_LOOPS_OF_FACE, f) {
 		if (l->e != e && l->e != newedge) {
 			continue;
 		}
 
-		l2 = l->radial_next;
+		l_other = l->radial_next;
 		
-		if (l2 == l) {
-			l2 = newedge->l;
+		if (l_other == l) {
+			l_other = newedge->l;
 
-			if (l2 != l) {
-				BM_elem_attrs_copy(bm, bm, l2->f, l->f);
+			if (l_other != l) {
+				BM_elem_attrs_copy(bm, bm, l_other->f, f);
+				BM_elem_flag_disable(f, BM_ELEM_HIDDEN); /* possibly we copy from a hidden face */
 
-				BM_elem_attrs_copy(bm, bm, l2, l);
-				l2 = l2->next;
+				BM_elem_attrs_copy(bm, bm, l_other, l);
+				l_other = l_other->next;
 				l = l->next;
-				BM_elem_attrs_copy(bm, bm, l2, l);
+				BM_elem_attrs_copy(bm, bm, l_other, l);
 			}
 		}
 		else {
-			BM_elem_attrs_copy(bm, bm, l2->f, l->f);
+			BM_elem_attrs_copy(bm, bm, l_other->f, f);
+			BM_elem_flag_disable(f, BM_ELEM_HIDDEN); /* possibly we copy from a hidden face */
 
-			/* copy dat */
-			if (l2->v == l->v) {
-				BM_elem_attrs_copy(bm, bm, l2, l);
-				l2 = l2->next;
+			/* copy data */
+			if (l_other->v == l->v) {
+				BM_elem_attrs_copy(bm, bm, l_other, l);
+				l_other = l_other->next;
 				l = l->next;
-				BM_elem_attrs_copy(bm, bm, l2, l);
+				BM_elem_attrs_copy(bm, bm, l_other, l);
 			}
 			else {
-				l2 = l2->next;
-				BM_elem_attrs_copy(bm, bm, l2, l);
-				l2 = l2->prev;
+				l_other = l_other->next;
+				BM_elem_attrs_copy(bm, bm, l_other, l);
+				l_other = l_other->prev;
 				l = l->next;
-				BM_elem_attrs_copy(bm, bm, l2, l);
+				BM_elem_attrs_copy(bm, bm, l_other, l);
 			}
 		}
 	}

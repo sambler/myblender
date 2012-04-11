@@ -2433,7 +2433,7 @@ static int pyrna_prop_collection_type_check(BPy_PropertyRNA *self, PyObject *val
 		if (RNA_property_flag(self->prop) & PROP_NEVER_NULL) {
 			PyErr_Format(PyExc_TypeError,
 			             "bpy_prop_collection[key] = value: invalid, "
-			             "this collection doesnt support None assignment");
+			             "this collection doesn't support None assignment");
 			return -1;
 		}
 		else {
@@ -3869,6 +3869,13 @@ static PyObject *pyrna_prop_collection_idprop_remove(BPy_PropertyRNA *self, PyOb
 	Py_RETURN_NONE;
 }
 
+static PyObject *pyrna_prop_collection_idprop_clear(BPy_PropertyRNA *self)
+{
+	RNA_property_collection_clear(&self->ptr, self->prop);
+
+	Py_RETURN_NONE;
+}
+
 static PyObject *pyrna_prop_collection_idprop_move(BPy_PropertyRNA *self, PyObject *args)
 {
 	int key = 0, pos = 0;
@@ -4580,6 +4587,7 @@ static struct PyMethodDef pyrna_prop_collection_methods[] = {
 static struct PyMethodDef pyrna_prop_collection_idprop_methods[] = {
 	{"add", (PyCFunction)pyrna_prop_collection_idprop_add, METH_NOARGS, NULL},
 	{"remove", (PyCFunction)pyrna_prop_collection_idprop_remove, METH_O, NULL},
+    {"clear", (PyCFunction)pyrna_prop_collection_idprop_clear, METH_NOARGS, NULL},
 	{"move", (PyCFunction)pyrna_prop_collection_idprop_move, METH_VARARGS, NULL},
 	{NULL, NULL, 0, NULL}
 };

@@ -1731,6 +1731,7 @@ class VIEW3D_MT_edit_mesh_edges(Menu):
 
         layout.separator()
 
+        layout.operator("mesh.bevel")
         layout.operator("mesh.edge_split")
         layout.operator("mesh.bridge_edge_loops")
 
@@ -2371,9 +2372,10 @@ class VIEW3D_PT_view3d_meshdisplay(Panel):
 
         col.separator()
         col.label(text="Normals:")
-        col.prop(mesh, "show_normal_face", text="Face")
-        col.prop(mesh, "show_normal_vertex", text="Vertex")
-        col.prop(context.scene.tool_settings, "normal_size", text="Normal Size")
+        row = col.row(align=True)
+        row.prop(mesh, "show_normal_vertex", text="", icon='VERTEXSEL')
+        row.prop(mesh, "show_normal_face", text="", icon='FACESEL')
+        row.prop(context.scene.tool_settings, "normal_size", text="Size")
 
         col.separator()
         col.label(text="Numerics:")
@@ -2477,10 +2479,12 @@ class VIEW3D_PT_background_image(Panel):
                     column.prop(bg.clip_user, "use_render_undistorted")
 
                 if has_bg:
-                    box.prop(bg, "opacity", slider=True)
+                    col = box.column()
+                    col.prop(bg, "show_on_foreground")
+                    col.prop(bg, "opacity", slider=True)
                     if bg.view_axis != 'CAMERA':
-                        box.prop(bg, "size")
-                        row = box.row(align=True)
+                        col.prop(bg, "size")
+                        row = col.row(align=True)
                         row.prop(bg, "offset_x", text="X")
                         row.prop(bg, "offset_y", text="Y")
 

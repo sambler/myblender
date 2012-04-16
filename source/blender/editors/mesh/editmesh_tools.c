@@ -58,10 +58,11 @@
 #include "WM_types.h"
 
 #include "ED_mesh.h"
-#include "ED_view3d.h"
+#include "ED_object.h"
 #include "ED_screen.h"
 #include "ED_transform.h"
-#include "ED_object.h"
+#include "ED_uvedit.h"
+#include "ED_view3d.h"
 
 #include "RE_render_ext.h"
 
@@ -142,8 +143,7 @@ void MESH_OT_subdivide(wmOperatorType *ot)
 	/* avoid re-using last var because it can cause _very_ high poly meshes and annoy users (or worse crash) */
 	RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 
-	/* BMESH_TODO, this currently does nothing, just add to stop UI from erroring out! */
-	RNA_def_float(ot->srna, "smoothness", 0.0f, 0.0f, FLT_MAX, "Smoothness", "Smoothness factor (BMESH TODO)", 0.0f, 1.0f);
+	RNA_def_float(ot->srna, "smoothness", 0.0f, 0.0f, FLT_MAX, "Smoothness", "Smoothness factor", 0.0f, 1.0f);
 
 	RNA_def_boolean(ot->srna, "quadtri", 0, "Quad/Tri Mode", "Tries to prevent ngons");
 	RNA_def_enum(ot->srna, "quadcorner", prop_mesh_cornervert_types, SUBD_STRAIGHT_CUT,
@@ -537,6 +537,7 @@ void MESH_OT_extrude_region(wmOperatorType *ot)
 	/* identifiers */
 	ot->name = "Extrude Region";
 	ot->idname = "MESH_OT_extrude_region";
+	ot->description = "Extrude region of faces";
 	
 	/* api callbacks */
 	//ot->invoke = mesh_extrude_region_invoke;
@@ -567,6 +568,7 @@ void MESH_OT_extrude_verts_indiv(wmOperatorType *ot)
 	/* identifiers */
 	ot->name = "Extrude Only Vertices";
 	ot->idname = "MESH_OT_extrude_verts_indiv";
+	ot->description = "Extrude individual vertices only";
 	
 	/* api callbacks */
 	ot->exec = edbm_extrude_verts_exec;
@@ -597,6 +599,7 @@ void MESH_OT_extrude_edges_indiv(wmOperatorType *ot)
 	/* identifiers */
 	ot->name = "Extrude Only Edges";
 	ot->idname = "MESH_OT_extrude_edges_indiv";
+	ot->description = "Extrude individual edges only";
 	
 	/* api callbacks */
 	ot->exec = edbm_extrude_edges_exec;
@@ -627,6 +630,7 @@ void MESH_OT_extrude_faces_indiv(wmOperatorType *ot)
 	/* identifiers */
 	ot->name = "Extrude Individual Faces";
 	ot->idname = "MESH_OT_extrude_faces_indiv";
+	ot->description = "Extrude individual faces only";
 	
 	/* api callbacks */
 	ot->exec = edbm_extrude_faces_exec;
@@ -882,10 +886,10 @@ void MESH_OT_dupli_extrude_cursor(wmOperatorType *ot)
 	/* identifiers */
 	ot->name = "Duplicate or Extrude at 3D Cursor";
 	ot->idname = "MESH_OT_dupli_extrude_cursor";
+	ot->description = "Duplicate and extrude selected vertices, edges or faces towards the mouse cursor";
 	
 	/* api callbacks */
 	ot->invoke = edbm_dupli_extrude_cursor_invoke;
-	ot->description = "Duplicate and extrude selected vertices, edges or faces towards the mouse cursor";
 	ot->poll = ED_operator_editmesh;
 	
 	/* flags */
@@ -1056,6 +1060,7 @@ void MESH_OT_edge_face_add(wmOperatorType *ot)
 
 static int edbm_mark_seam(bContext *C, wmOperator *op)
 {
+	Scene *scene = CTX_data_scene(C);
 	Object *obedit = CTX_data_edit_object(C);
 	Mesh *me = ((Mesh *)obedit->data);
 	BMEditMesh *em = BMEdit_FromObject(obedit);
@@ -1085,6 +1090,7 @@ static int edbm_mark_seam(bContext *C, wmOperator *op)
 		}
 	}
 
+	ED_uvedit_live_unwrap(scene, obedit);
 	EDBM_update_generic(C, em, TRUE);
 
 	return OPERATOR_FINISHED;
@@ -1095,7 +1101,7 @@ void MESH_OT_mark_seam(wmOperatorType *ot)
 	/* identifiers */
 	ot->name = "Mark Seam";
 	ot->idname = "MESH_OT_mark_seam";
-	ot->description = "(un)mark selected edges as a seam";
+	ot->description = "(Un)mark selected edges as a seam";
 	
 	/* api callbacks */
 	ot->exec = edbm_mark_seam;
@@ -1149,7 +1155,7 @@ void MESH_OT_mark_sharp(wmOperatorType *ot)
 	/* identifiers */
 	ot->name = "Mark Sharp";
 	ot->idname = "MESH_OT_mark_sharp";
-	ot->description = "(un)mark selected edges as sharp";
+	ot->description = "(Un)mark selected edges as sharp";
 	
 	/* api callbacks */
 	ot->exec = edbm_mark_sharp;
@@ -1189,7 +1195,7 @@ void MESH_OT_vert_connect(wmOperatorType *ot)
 	/* identifiers */
 	ot->name = "Vertex Connect";
 	ot->idname = "MESH_OT_vert_connect";
-	ot->description = "Connect 2 vertices in a face with by an edge, splitting the face in half";
+	ot->description = "Connect 2 vertices of a face by an edge, splitting the face in two";
 	
 	/* api callbacks */
 	ot->exec = edbm_vert_connect;
@@ -1414,11 +1420,11 @@ void MESH_OT_hide(wmOperatorType *ot)
 	/* identifiers */
 	ot->name = "Hide Selection";
 	ot->idname = "MESH_OT_hide";
+	ot->description = "Hide (un)selected vertices, edges or faces";
 	
 	/* api callbacks */
 	ot->exec = edbm_hide_exec;
 	ot->poll = ED_operator_editmesh;
-	ot->description = "Hide (un)selected vertices, edges or faces";
 
 	/* flags */
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
@@ -1744,6 +1750,7 @@ void MESH_OT_uvs_rotate(wmOperatorType *ot)
 	/* identifiers */
 	ot->name = "Rotate UVs";
 	ot->idname = "MESH_OT_uvs_rotate";
+	ot->description = "Rotate UV coordinates inside faces";
 
 	/* api callbacks */
 	ot->exec = edbm_rotate_uvs_exec;
@@ -1762,6 +1769,7 @@ void MESH_OT_uvs_reverse(wmOperatorType *ot)
 	/* identifiers */
 	ot->name = "Reverse UVs";
 	ot->idname = "MESH_OT_uvs_reverse";
+	ot->description = "Flip direction of UV coordinates inside faces";
 
 	/* api callbacks */
 	ot->exec = edbm_reverse_uvs_exec;
@@ -1779,6 +1787,7 @@ void MESH_OT_colors_rotate(wmOperatorType *ot)
 	/* identifiers */
 	ot->name = "Rotate Colors";
 	ot->idname = "MESH_OT_colors_rotate";
+	ot->description = "Rotate vertex colors inside faces";
 
 	/* api callbacks */
 	ot->exec = edbm_rotate_colors_exec;
@@ -1796,6 +1805,7 @@ void MESH_OT_colors_reverse(wmOperatorType *ot)
 	/* identifiers */
 	ot->name = "Reverse Colors";
 	ot->idname = "MESH_OT_colors_reverse";
+	ot->description = "Flip direction of vertex colors inside faces";
 
 	/* api callbacks */
 	ot->exec = edbm_reverse_colors_exec;
@@ -2110,6 +2120,7 @@ void MESH_OT_select_vertex_path(wmOperatorType *ot)
 	/* identifiers */
 	ot->name = "Select Vertex Path";
 	ot->idname = "MESH_OT_select_vertex_path";
+	ot->description = "Selected vertex path between two vertices";
 
 	/* api callbacks */
 	ot->exec = edbm_select_vertex_path_exec;
@@ -3120,7 +3131,7 @@ static int mesh_separate_selected(Main *bmain, Scene *scene, Base *editbase, wmO
 	BMesh *bm_new;
 	
 	if (!em)
-		return OPERATOR_CANCELLED;
+		return FALSE;
 		
 	bm_new = BM_mesh_create(&bm_mesh_allocsize_default);
 	CustomData_copy(&em->bm->vdata, &bm_new->vdata, CD_MASK_BMESH, CD_CALLOC, 0);
@@ -3171,13 +3182,41 @@ static int mesh_separate_selected(Main *bmain, Scene *scene, Base *editbase, wmO
 	BM_mesh_free(bm_new);
 	((Mesh *)basenew->object->data)->edit_btmesh = NULL;
 	
-	return 1;
+	return TRUE;
 }
 
-//BMESH_TODO
-static int mesh_separate_material(Main *UNUSED(bmain), Scene *UNUSED(scene), Base *UNUSED(editbase), wmOperator *UNUSED(wmop))
+static int mesh_separate_material(Main *bmain, Scene *scene, Base *editbase, wmOperator *wmop)
 {
-	return 0;
+	BMFace *f_cmp, *f;
+	BMIter iter;
+	int result = FALSE;
+	Object *obedit = editbase->object;
+	BMEditMesh *em = BMEdit_FromObject(obedit);
+	BMesh *bm = em->bm;
+
+	EDBM_flag_disable_all(em, BM_ELEM_SELECT);
+
+	while ((f_cmp = BM_iter_at_index(bm, BM_FACES_OF_MESH, NULL, 0))) {
+		const short mat_nr = f_cmp->mat_nr;
+		int tot = 0;
+
+		BM_ITER(f, &iter, bm, BM_FACES_OF_MESH, NULL) {
+			if (f->mat_nr == mat_nr) {
+				BM_face_select_set(bm, f, TRUE);
+				tot++;
+			}
+		}
+
+		/* leave the current object with some materials */
+		if (tot == bm->totface) {
+			break;
+		}
+
+		/* Move selection into a separate object */
+		result |= mesh_separate_selected(bmain, scene, editbase, wmop);
+	}
+
+	return result;
 }
 
 static int mesh_separate_loose(Main *bmain, Scene *scene, Base *editbase, wmOperator *wmop)
@@ -3188,21 +3227,14 @@ static int mesh_separate_loose(Main *bmain, Scene *scene, Base *editbase, wmOper
 	BMVert *v_seed;
 	BMWalker walker;
 	BMIter iter;
-	int result = 0;
+	int result = FALSE;
 	Object *obedit = editbase->object;
-	Mesh *me = obedit->data;
-	BMEditMesh *em = me->edit_btmesh;
+	BMEditMesh *em = BMEdit_FromObject(obedit);
 	BMesh *bm = em->bm;
 	int max_iter = bm->totvert;
 
 	/* Clear all selected vertices */
-	BM_ITER(v, &iter, bm, BM_VERTS_OF_MESH, NULL) {
-		BM_elem_select_set(bm, v, FALSE);
-	}
-
-	/* Flush the selection to clear edge/face selections to match
-	 * selected vertices */
-	EDBM_selectmode_flush_ex(em, SCE_SELECT_VERTEX);
+	EDBM_flag_disable_all(em, BM_ELEM_SELECT);
 
 	/* A "while (true)" loop should work here as each iteration should
 	 * select and remove at least one vertex and when all vertices
@@ -4553,11 +4585,11 @@ void MESH_OT_inset(wmOperatorType *ot)
 	/* identifiers */
 	ot->name = "Inset Faces";
 	ot->idname = "MESH_OT_inset";
+	ot->description = "Inset new faces into selected faces";
 
 	/* api callbacks */
 	ot->exec = edbm_inset_exec;
 	ot->poll = ED_operator_editmesh;
-	ot->description = "";
 
 	/* flags */
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;

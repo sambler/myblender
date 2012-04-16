@@ -38,15 +38,16 @@
 #include "zlib.h" /* wm_read_exotic() */
 
 #ifdef WIN32
-#include <windows.h> /* need to include windows.h so _WIN32_IE is defined  */
-#ifndef _WIN32_IE
-#define _WIN32_IE 0x0400 /* minimal requirements for SHGetSpecialFolderPath on MINGW MSVC has this defined already */
-#endif
-#include <shlobj.h> /* for SHGetSpecialFolderPath, has to be done before BLI_winstuff because 'near' is disabled through BLI_windstuff */
-#include <process.h> /* getpid */
-#include "BLI_winstuff.h"
+#  include <windows.h> /* need to include windows.h so _WIN32_IE is defined  */
+#  ifndef _WIN32_IE
+#    define _WIN32_IE 0x0400 /* minimal requirements for SHGetSpecialFolderPath on MINGW MSVC has this defined already */
+#  endif
+#  include <shlobj.h>  /* for SHGetSpecialFolderPath, has to be done before BLI_winstuff
+                        * because 'near' is disabled through BLI_windstuff */
+#  include <process.h> /* getpid */
+#  include "BLI_winstuff.h"
 #else
-#include <unistd.h> /* getpid */
+#  include <unistd.h> /* getpid */
 #endif
 
 #include "MEM_guardedalloc.h"
@@ -804,6 +805,7 @@ int WM_write_file(bContext *C, const char *target, int fileflags, ReportList *re
 
 		/* run this function after because the file cant be written before the blend is */
 		if (ibuf_thumb) {
+			IMB_thumb_delete(filepath, THB_FAIL); /* without this a failed thumb overrides */
 			ibuf_thumb = IMB_thumb_create(filepath, THB_NORMAL, THB_SOURCE_BLEND, ibuf_thumb);
 			IMB_freeImBuf(ibuf_thumb);
 		}

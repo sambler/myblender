@@ -11231,9 +11231,9 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 
 		/* Add default gravity to scenes */
 		for (sce= main->scene.first; sce; sce= sce->id.next) {
-			if ((sce->physics_settings.flag & PHYS_GLOBAL_GRAVITY) == 0
-				&& len_v3(sce->physics_settings.gravity) == 0.0f) {
-
+			if ((sce->physics_settings.flag & PHYS_GLOBAL_GRAVITY) == 0 &&
+			    len_v3(sce->physics_settings.gravity) == 0.0f)
+			{
 				sce->physics_settings.gravity[0] = sce->physics_settings.gravity[1] = 0.0f;
 				sce->physics_settings.gravity[2] = -9.81f;
 				sce->physics_settings.flag = PHYS_GLOBAL_GRAVITY;
@@ -13255,9 +13255,9 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 		Object *ob;
 		ModifierData *md;
 	
-		for(ob = main->object.first; ob; ob = ob->id.next) {
-			for(md=ob->modifiers.first; md; md=md->next) {
-				if(md->type == eModifierType_Lattice) {
+		for (ob = main->object.first; ob; ob = ob->id.next) {
+			for (md=ob->modifiers.first; md; md=md->next) {
+				if (md->type == eModifierType_Lattice) {
 					LatticeModifierData *lmd = (LatticeModifierData *)md;
 					lmd->strength = 1.0f;
 				}
@@ -13275,11 +13275,11 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 			for (md = ob->modifiers.first; md; md = md->next) {
 				if (md->type == eModifierType_Fluidsim) {
 					FluidsimModifierData *fmd = (FluidsimModifierData *)md;
-					if(fmd->fss->viscosityMode == 3) {
+					if (fmd->fss->viscosityMode == 3) {
 						fmd->fss->viscosityValue = 5.0;
 						fmd->fss->viscosityExponent = 5;
 					}
-					else if(fmd->fss->viscosityMode == 4) {
+					else if (fmd->fss->viscosityMode == 4) {
 						fmd->fss->viscosityValue = 2.0;
 						fmd->fss->viscosityExponent = 3;
 					}

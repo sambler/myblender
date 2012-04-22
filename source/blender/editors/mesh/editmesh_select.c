@@ -1415,7 +1415,17 @@ static int edbm_shortest_path_select_invoke(bContext *C, wmOperator *UNUSED(op),
 	
 	return OPERATOR_FINISHED;
 }
-	
+
+static int edbm_shortest_path_select_poll(bContext *C)
+{
+	if (ED_operator_editmesh_region_view3d(C)) {
+		Object *obedit = CTX_data_edit_object(C);
+		BMEditMesh *em = BMEdit_FromObject(obedit);
+		return (em->selectmode & SCE_SELECT_EDGE) != 0;
+	}
+	return 0;
+}
+
 void MESH_OT_select_shortest_path(wmOperatorType *ot)
 {
 	/* identifiers */
@@ -1425,7 +1435,7 @@ void MESH_OT_select_shortest_path(wmOperatorType *ot)
 	
 	/* api callbacks */
 	ot->invoke = edbm_shortest_path_select_invoke;
-	ot->poll = ED_operator_editmesh;
+	ot->poll = edbm_shortest_path_select_poll;
 	
 	/* flags */
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
@@ -1897,7 +1907,7 @@ static int edbm_select_linked_exec(bContext *C, wmOperator *op)
 		}
 		BMW_end(&walker);
 	}
-	else  {
+	else {
 		BM_ITER_MESH (v, &iter, em->bm, BM_VERTS_OF_MESH) {
 			if (BM_elem_flag_test(v, BM_ELEM_SELECT)) {
 				BM_elem_flag_enable(v, BM_ELEM_TAG);

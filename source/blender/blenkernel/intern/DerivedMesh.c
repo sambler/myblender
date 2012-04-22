@@ -274,7 +274,7 @@ void DM_init_funcs(DerivedMesh *dm)
 }
 
 void DM_init(DerivedMesh *dm, DerivedMeshType type, int numVerts, int numEdges,
-	     int numTessFaces, int numLoops, int numPolys)
+             int numTessFaces, int numLoops, int numPolys)
 {
 	dm->type = type;
 	dm->numVertData = numVerts;
@@ -2769,7 +2769,7 @@ void DM_vertex_attributes_from_gpu(DerivedMesh *dm, GPUVertexAttribs *gattribs, 
 	for (b = 0; b < gattribs->totlayer; b++) {
 		if (gattribs->layer[b].type == CD_MTFACE) {
 			/* uv coordinates */
-			if(dm->type == DM_TYPE_EDITBMESH) {
+			if (dm->type == DM_TYPE_EDITBMESH) {
 				/* exception .. */
 				CustomData *ldata = dm->getLoopDataLayout(dm);
 
@@ -2806,7 +2806,7 @@ void DM_vertex_attributes_from_gpu(DerivedMesh *dm, GPUVertexAttribs *gattribs, 
 			}
 		}
 		else if (gattribs->layer[b].type == CD_MCOL) {
-			if(dm->type == DM_TYPE_EDITBMESH) {
+			if (dm->type == DM_TYPE_EDITBMESH) {
 				/* exception .. */
 				CustomData *ldata = dm->getLoopDataLayout(dm);
 

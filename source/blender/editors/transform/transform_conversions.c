@@ -1984,7 +1984,7 @@ static void get_edge_center(float cent_r[3], BMVert *eve)
 static void VertsToTransData(TransInfo *t, TransData *td, BMEditMesh *em, BMVert *eve, float *bweight)
 {
 	td->flag = 0;
-	//if(key)
+	//if (key)
 	//	td->loc = key->co;
 	//else
 	td->loc = eve->co;
@@ -6005,8 +6005,7 @@ void createTransData(bContext *C, TransInfo *t)
 			
 		}
 	}
-	else if (ob && (ob->mode & OB_MODE_PARTICLE_EDIT) 
-		&& PE_start_edit(PE_get_current(scene, ob))) {
+	else if (ob && (ob->mode & OB_MODE_PARTICLE_EDIT) && PE_start_edit(PE_get_current(scene, ob))) {
 		createTransParticleVerts(C, t);
 		t->flag |= T_POINTS;
 

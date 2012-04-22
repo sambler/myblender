@@ -1352,7 +1352,8 @@ static void seq_proxy_build_frame(SeqRenderData context,
 	IMB_freeImBuf(ibuf);
 }
 
-struct SeqIndexBuildContext *seq_proxy_rebuild_context(Main *bmain, Scene *scene, Sequence *seq){
+struct SeqIndexBuildContext *seq_proxy_rebuild_context(Main *bmain, Scene *scene, Sequence *seq)
+{
 	SeqIndexBuildContext *context;
 	Sequence *nseq;
 
@@ -3066,10 +3067,10 @@ void seq_tx_set_final_right(Sequence *seq, int val)
  * since they work a bit differently to normal image seq's (during transform) */
 int seq_single_check(Sequence *seq)
 {
-	return (seq->len == 1 && (
-	            seq->type == SEQ_IMAGE
-	            || ((seq->type & SEQ_EFFECT) &&
-	                get_sequence_effect_num_inputs(seq->type) == 0)));
+	return ((seq->len == 1) &&
+	        (seq->type == SEQ_IMAGE ||
+	         ((seq->type & SEQ_EFFECT) &&
+	          get_sequence_effect_num_inputs(seq->type) == 0)));
 }
 
 /* check if the selected seq's reference unselected seq's */
@@ -3778,7 +3779,7 @@ Sequence *sequencer_add_sound_strip(bContext *C, ListBase *seqbasep, SeqLoadInfo
 	sound = sound_new_file(CTX_data_main(C), seq_load->path); /* handles relative paths */
 
 	if (sound == NULL || sound->playback_handle == NULL) {
-		//if(op)
+		//if (op)
 		//	BKE_report(op->reports, RPT_ERROR, "Unsupported audio format");
 		return NULL;
 	}
@@ -3787,7 +3788,7 @@ Sequence *sequencer_add_sound_strip(bContext *C, ListBase *seqbasep, SeqLoadInfo
 
 	if (info.specs.channels == AUD_CHANNELS_INVALID) {
 		sound_delete(bmain, sound);
-		//if(op)
+		//if (op)
 		//	BKE_report(op->reports, RPT_ERROR, "Unsupported audio format");
 		return NULL;
 	}

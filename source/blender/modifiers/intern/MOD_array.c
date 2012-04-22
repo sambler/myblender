@@ -370,8 +370,7 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 
 	/* calculate the maximum number of copies which will fit within the
 	 * prescribed length */
-	if (amd->fit_type == MOD_ARR_FITLENGTH
-		  || amd->fit_type == MOD_ARR_FITCURVE) {
+	if (amd->fit_type == MOD_ARR_FITLENGTH || amd->fit_type == MOD_ARR_FITCURVE) {
 		float dist = sqrt(dot_v3v3(offset[3], offset[3]));
 
 		if (dist > 1e-6f)
@@ -453,9 +452,10 @@ static DerivedMesh *arrayModifier_doArray(ArrayModifierData *amd,
 				v2 = _E(geom_slot, indexMap[i]-1);
 
 				/* check in case the target vertex (v2) is already marked
-				   for merging */
-				while((v3 = BMO_slot_map_ptr_get(em->bm, &weld_op, "targetmap", v2)))
+				 * for merging */
+				while ((v3 = BMO_slot_map_ptr_get(em->bm, &weld_op, "targetmap", v2))) {
 					v2 = v3;
+				}
 
 				BMO_slot_map_ptr_insert(em->bm, &weld_op, "targetmap", v, v2);
 			}
@@ -551,7 +551,7 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 
 	result = arrayModifier_doArray(amd, md->scene, ob, dm, 0);
 
-	//if(result != dm)
+	//if (result != dm)
 	//	CDDM_calc_normals_mapping(result);
 
 	return result;

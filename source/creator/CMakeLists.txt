@@ -605,12 +605,14 @@ elseif(WIN32)
 	)	
 
 	if(WITH_OPENIMAGEIO)
-		set_lib_path(OIIOBIN "openimageio/bin")
-		install(
-			FILES
-				${OIIOBIN}/OpenImageIO.dll
-			DESTINATION ${TARGETDIR}
-		)
+		if(NOT MINGW)
+			set_lib_path(OIIOBIN "openimageio/bin")
+			install(
+				FILES
+					${OIIOBIN}/OpenImageIO.dll
+				DESTINATION ${TARGETDIR}
+			)
+		endif()
 	endif()
 
 elseif(APPLE)

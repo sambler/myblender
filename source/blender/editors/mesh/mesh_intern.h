@@ -106,7 +106,7 @@ void MESH_OT_duplicate(struct wmOperatorType *ot);
 
 extern int EM_view3d_poll(struct bContext *C);
 
-struct wmKeyMap* knifetool_modal_keymap(struct wmKeyConfig *keyconf);
+struct wmKeyMap *knifetool_modal_keymap(struct wmKeyConfig *keyconf);
 
 /* ******************* knifetool.c */
 
@@ -211,6 +211,7 @@ void MESH_OT_bevel(struct wmOperatorType *ot);
 
 void MESH_OT_bridge_edge_loops(struct wmOperatorType *ot);
 void MESH_OT_inset(struct wmOperatorType *ot);
+void MESH_OT_wireframe(struct wmOperatorType *ot);
 void MESH_OT_vert_slide(struct wmOperatorType *ot);
 
 /* ******************* mesh_navmesh.c */

@@ -273,12 +273,12 @@ static void action_header_area_draw(const bContext *C, ARegion *ar)
 static void action_channel_area_listener(ARegion *ar, wmNotifier *wmn)
 {
 	/* context changes */
-	switch(wmn->category) {
+	switch (wmn->category) {
 		case NC_ANIMATION:
 			ED_region_tag_redraw(ar);
 			break;
 		case NC_SCENE:
-			switch(wmn->data) {
+			switch (wmn->data) {
 				case ND_OB_ACTIVE:
 				case ND_FRAME:
 					ED_region_tag_redraw(ar);
@@ -286,7 +286,7 @@ static void action_channel_area_listener(ARegion *ar, wmNotifier *wmn)
 			}
 			break;
 		case NC_OBJECT:
-			switch(wmn->data) {
+			switch (wmn->data) {
 				case ND_BONE_ACTIVE:
 				case ND_BONE_SELECT:
 				case ND_KEYS:
@@ -311,12 +311,12 @@ static void action_channel_area_listener(ARegion *ar, wmNotifier *wmn)
 static void action_main_area_listener(ARegion *ar, wmNotifier *wmn)
 {
 	/* context changes */
-	switch(wmn->category) {
+	switch (wmn->category) {
 		case NC_ANIMATION:
 			ED_region_tag_redraw(ar);
 			break;
 		case NC_SCENE:
-			switch(wmn->data) {
+			switch (wmn->data) {
 				case ND_RENDER_OPTIONS:
 				case ND_OB_ACTIVE:
 				case ND_FRAME:
@@ -326,7 +326,7 @@ static void action_main_area_listener(ARegion *ar, wmNotifier *wmn)
 			}
 			break;
 		case NC_OBJECT:
-			switch(wmn->data) {
+			switch (wmn->data) {
 				case ND_TRANSFORM:
 					/* moving object shouldn't need to redraw action */
 					break;
@@ -338,7 +338,7 @@ static void action_main_area_listener(ARegion *ar, wmNotifier *wmn)
 			}
 			break;
 		case NC_NODE:
-			switch(wmn->action) {
+			switch (wmn->action) {
 				case NA_EDITED:
 					ED_region_tag_redraw(ar);
 					break;

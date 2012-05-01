@@ -56,6 +56,7 @@
 #include "DNA_space_types.h"
 #include "DNA_view3d_types.h"
 #include "DNA_world_types.h"
+#include "DNA_object_types.h"
 
 #include "BLI_blenlib.h"
 #include "BLI_bpath.h"
@@ -162,9 +163,9 @@ void object_free_particlesystems(Object *ob)
 	while (ob->particlesystem.first) {
 		ParticleSystem *psys = ob->particlesystem.first;
 		
-		BLI_remlink(&ob->particlesystem,psys);
+		BLI_remlink(&ob->particlesystem, psys);
 		
-		psys_free(ob,psys);
+		psys_free(ob, psys);
 	}
 }
 
@@ -541,7 +542,7 @@ void unlink_object(Object *ob)
 					BoidParticle *bpa;
 					int p;
 
-					for (p=0,pa=tpsys->particles; p<tpsys->totpart; p++,pa++) {
+					for (p=0, pa=tpsys->particles; p<tpsys->totpart; p++, pa++) {
 						bpa = pa->boid;
 						if (bpa->ground == ob)
 							bpa->ground = NULL;
@@ -625,7 +626,8 @@ void unlink_object(Object *ob)
 #endif
 			if (sce->ed) {
 				Sequence *seq;
-				SEQ_BEGIN (sce->ed, seq) {
+				SEQ_BEGIN (sce->ed, seq)
+				{
 					if (seq->scene_camera == ob) {
 						seq->scene_camera = NULL;
 					}
@@ -1326,7 +1328,7 @@ void object_copy_proxy_drivers(Object *ob, Object *target)
 						if ((Object *)dtar->id == target)
 							dtar->id= (ID *)ob;
 						else {
-							/* only on local objects because this causes indirect links a -> b -> c,blend to point directly to a.blend
+							/* only on local objects because this causes indirect links a -> b -> c, blend to point directly to a.blend
 							 * when a.blend has a proxy thats linked into c.blend  */
 							if (ob->id.lib==NULL)
 								id_lib_extern((ID *)dtar->id);
@@ -1445,7 +1447,7 @@ void object_scale_to_mat3(Object *ob, float mat[][3])
 {
 	float vec[3];
 	mul_v3_v3v3(vec, ob->size, ob->dscale);
-	size_to_mat3( mat,vec);
+	size_to_mat3(mat, vec);
 }
 
 void object_rot_to_mat3(Object *ob, float mat[][3])
@@ -1692,12 +1694,12 @@ static void ob_parcurve(Scene *scene, Object *ob, Object *par, float mat[][4])
 	
 	
 	/* vec: 4 items! */
-	if ( where_on_path(par, ctime, vec, dir, cu->flag & CU_FOLLOW ? quat:NULL, &radius, NULL) ) {
+	if (where_on_path(par, ctime, vec, dir, cu->flag & CU_FOLLOW ? quat:NULL, &radius, NULL)) {
 
 		if (cu->flag & CU_FOLLOW) {
 #if 0
 			float x1, q[4];
-			vec_to_quat( quat,dir, ob->trackflag, ob->upflag);
+			vec_to_quat(quat, dir, ob->trackflag, ob->upflag);
 			
 			/* the tilt */
 			normalize_v3(dir);
@@ -1801,7 +1803,7 @@ static void give_parvert(Object *par, int nr, float vec[3])
 			}
 
 			if (count==0) {
-				/* keep as 0,0,0 */
+				/* keep as 0, 0, 0 */
 			}
 			else if (count > 0) {
 				mul_v3_fl(vec, 1.0f / count);
@@ -1896,8 +1898,8 @@ static void ob_parvert3(Object *ob, Object *par, float mat[][4])
 		give_parvert(par, ob->par2, v2);
 		give_parvert(par, ob->par3, v3);
 				
-		tri_to_quat( q,v1, v2, v3);
-		quat_to_mat3( cmat,q);
+		tri_to_quat(q, v1, v2, v3);
+		quat_to_mat3(cmat, q);
 		copy_m4_m3(mat, cmat);
 		
 		if (ob->type==OB_CURVE) {
@@ -1918,7 +1920,7 @@ static int where_is_object_parslow(Object *ob, float obmat[4][4], float slowmat[
 	int a;
 
 	// include framerate
-	fac1= ( 1.0f / (1.0f + fabsf(ob->sf)) );
+	fac1= (1.0f / (1.0f + fabsf(ob->sf)) );
 	if (fac1 >= 1.0f) return 0;
 	fac2= 1.0f-fac1;
 
@@ -2030,7 +2032,7 @@ static void solve_parenting (Scene *scene, Object *ob, Object *par, float obmat[
 	case PAROBJECT:
 		ok= 0;
 		if (par->type==OB_CURVE) {
-			if ( ((Curve *)par->data)->flag & CU_PATH ) {
+			if (((Curve *)par->data)->flag & CU_PATH ) {
 				ob_parcurve(scene, ob, par, tmat);
 				ok= 1;
 			}
@@ -2083,7 +2085,7 @@ static void solve_parenting (Scene *scene, Object *ob, Object *par, float obmat[
 		copy_m3_m4(originmat, tmat);
 		
 		// origin, voor help line
-		if ( (ob->partype & PARTYPE)==PARSKEL ) {
+		if ((ob->partype & PARTYPE)==PARSKEL ) {
 			copy_v3_v3(ob->orig, par->obmat[3]);
 		}
 		else {
@@ -2169,7 +2171,7 @@ void what_does_parent(Scene *scene, Object *ob, Object *workob)
 BoundBox *unit_boundbox(void)
 {
 	BoundBox *bb;
-	float min[3] = {-1.0f,-1.0f,-1.0f}, max[3] = {-1.0f,-1.0f,-1.0f};
+	float min[3] = {-1.0f, -1.0f, -1.0f}, max[3] = {-1.0f, -1.0f, -1.0f};
 
 	bb= MEM_callocN(sizeof(BoundBox), "OB-BoundBox");
 	boundbox_set_from_min_max(bb, min, max);
@@ -2197,7 +2199,7 @@ BoundBox *object_get_boundbox(Object *ob)
 		bb = mesh_get_bb(ob);
 	}
 	else if (ELEM3(ob->type, OB_CURVE, OB_SURF, OB_FONT)) {
-		bb= ob->bb ? ob->bb : ( (Curve *)ob->data )->bb;
+		bb= ob->bb ? ob->bb : ((Curve *)ob->data )->bb;
 	}
 	else if (ob->type==OB_MBALL) {
 		bb= ob->bb;
@@ -2223,7 +2225,7 @@ void object_get_dimensions(Object *ob, float vec[3])
 	if (bb) {
 		float scale[3];
 		
-		mat4_to_size( scale,ob->obmat);
+		mat4_to_size(scale, ob->obmat);
 		
 		vec[0] = fabsf(scale[0]) * (bb->vec[4][0] - bb->vec[0][0]);
 		vec[1] = fabsf(scale[1]) * (bb->vec[2][1] - bb->vec[0][1]);
@@ -2242,7 +2244,7 @@ void object_set_dimensions(Object *ob, const float *value)
 	if (bb) {
 		float scale[3], len[3];
 		
-		mat4_to_size( scale,ob->obmat);
+		mat4_to_size(scale, ob->obmat);
 		
 		len[0] = bb->vec[4][0] - bb->vec[0][0];
 		len[1] = bb->vec[2][1] - bb->vec[0][1];
@@ -2644,7 +2646,7 @@ void object_handle_update(Scene *scene, Object *ob)
 					else if (psys->flag & PSYS_DELETE) {
 						tpsys=psys->next;
 						BLI_remlink(&ob->particlesystem, psys);
-						psys_free(ob,psys);
+						psys_free(ob, psys);
 						psys= tpsys;
 					}
 					else
@@ -2896,7 +2898,7 @@ static KeyBlock *insert_lattkey(Scene *scene, Object *ob, const char *name, int 
 	int newkey= 0;
 
 	if (key==NULL) {
-		key= lt->key= add_key( (ID *)lt);
+		key= lt->key= add_key((ID *)lt);
 		key->type= KEY_RELATIVE;
 		newkey= 1;
 	}
@@ -2934,7 +2936,7 @@ static KeyBlock *insert_curvekey(Scene *scene, Object *ob, const char *name, int
 	int newkey= 0;
 
 	if (key==NULL) {
-		key= cu->key= add_key( (ID *)cu);
+		key= cu->key= add_key((ID *)cu);
 		key->type = KEY_RELATIVE;
 		newkey= 1;
 	}
@@ -2981,8 +2983,7 @@ KeyBlock *object_insert_shape_key(Scene *scene, Object *ob, const char *name, in
 }
 
 /* most important if this is modified it should _always_ return True, in certain
- * cases false positives are hard to avoid (shape keys for eg)
- */
+ * cases false positives are hard to avoid (shape keys for example) */
 int object_is_modified(Scene *scene, Object *ob)
 {
 	int flag= 0;
@@ -2997,13 +2998,38 @@ int object_is_modified(Scene *scene, Object *ob)
 		     md && (flag != (eModifierMode_Render | eModifierMode_Realtime));
 		     md=md->next)
 		{
-			if ((flag & eModifierMode_Render) == 0	&& modifier_isEnabled(scene, md, eModifierMode_Render)) {
+			if ((flag & eModifierMode_Render) == 0 && modifier_isEnabled(scene, md, eModifierMode_Render))
 				flag |= eModifierMode_Render;
-			}
 
-			if ((flag & eModifierMode_Realtime) == 0	&& modifier_isEnabled(scene, md, eModifierMode_Realtime)) {
+			if ((flag & eModifierMode_Realtime) == 0 && modifier_isEnabled(scene, md, eModifierMode_Realtime))
 				flag |= eModifierMode_Realtime;
-			}
+		}
+	}
+
+	return flag;
+}
+
+/* test if object is affected by deforming modifiers (for motion blur). again
+ * most important is to avoid false positives, this is to skip computations
+ * and we can still if there was actual deformation afterwards */
+int object_is_deform_modified(Scene *scene, Object *ob)
+{
+	ModifierData *md;
+	int flag= 0;
+
+	/* cloth */
+	for (md=modifiers_getVirtualModifierList(ob);
+		 md && (flag != (eModifierMode_Render | eModifierMode_Realtime));
+		 md=md->next)
+	{
+		ModifierTypeInfo *mti = modifierType_getInfo(md->type);
+
+		if (mti->type == eModifierTypeType_OnlyDeform) {
+			if (!(flag & eModifierMode_Render) && modifier_isEnabled(scene, md, eModifierMode_Render))
+				flag |= eModifierMode_Render;
+
+			if (!(flag & eModifierMode_Realtime) && modifier_isEnabled(scene, md, eModifierMode_Realtime))
+				flag |= eModifierMode_Realtime;
 		}
 	}
 

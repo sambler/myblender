@@ -453,7 +453,7 @@ static MovieClip *movieclip_alloc(const char *name)
 MovieClip *BKE_movieclip_file_add(const char *name)
 {
 	MovieClip *clip;
-	MovieClipUser user;
+	MovieClipUser user = {0};
 	int file, len, width, height;
 	const char *libname;
 	char str[FILE_MAX], strtest[FILE_MAX];
@@ -462,7 +462,7 @@ MovieClip *BKE_movieclip_file_add(const char *name)
 	BLI_path_abs(str, G.main->name);
 
 	/* exists? */
-	file = BLI_open(str, O_BINARY|O_RDONLY,0);
+	file = BLI_open(str, O_BINARY | O_RDONLY, 0);
 	if (file == -1)
 		return NULL;
 	close(file);

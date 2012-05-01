@@ -2102,7 +2102,7 @@ static int vertex_group_poll_edit_or_wpaint_vert_select(bContext *C)
 		return 0;
 
 	return (vgroup_object_in_edit_mode(ob) ||
-	        vgroup_object_in_wpaint_vert_select(ob) );
+	        vgroup_object_in_wpaint_vert_select(ob));
 }
 
 static int vertex_group_add_exec(bContext *C, wmOperator *UNUSED(op))
@@ -2713,7 +2713,8 @@ static int vertex_group_copy_to_selected_exec(bContext *C, wmOperator *op)
 	int change = 0;
 	int fail = 0;
 
-	CTX_DATA_BEGIN (C, Object *, ob, selected_editable_objects) {
+	CTX_DATA_BEGIN (C, Object *, ob, selected_editable_objects)
+	{
 		if (obact != ob) {
 			if (ED_vgroup_copy_array(ob, obact)) change++;
 			else fail++;

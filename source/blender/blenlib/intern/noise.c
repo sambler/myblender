@@ -1,6 +1,4 @@
 /*
- *
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -375,7 +373,7 @@ float BLI_turbulence1(float noisesize, float x, float y, float z, int nr)
 {
 	float s, d= 0.5, div=1.0;
 
-	s= fabsf( (-1.0f+2.0f*BLI_hnoise(noisesize, x, y, z)));
+	s= fabsf((-1.0f + 2.0f * BLI_hnoise(noisesize, x, y, z)));
 	
 	while (nr>0) {
 	

@@ -32,7 +32,7 @@
 #include "BLI_utildefines.h"
 
 /* XXX: using 128 for totelem and pchunk of mempool, no idea what good
-   values would be though */
+ * values would be though */
 #include "BLI_mempool.h"
 
 #include "bmesh.h"
@@ -77,7 +77,7 @@ static int edge_match(BMVert *e1_0, BMVert *e1_1, BMVert *e2[2])
 }
 
 /* Returns true if the edge (e1, e2) is already in edges; that edge is
-   deleted here as well. if not found just returns 0 */
+ * deleted here as well. if not found just returns 0 */
 static int check_for_dup(ListBase *edges, BLI_mempool *pool,
                          BMVert *e1, BMVert *e2)
 {
@@ -414,6 +414,7 @@ static int hull_find_large_tetrahedron(BMesh *bm, BMOperator *op,
 	float widest_axis_len, largest_dist, plane_normal[3];
 	int i, j, widest_axis;
 	
+	tetra[0] = tetra[1] = tetra[2] = tetra[3] = NULL;
 	hull_get_min_max(bm, op, min, max);
 
 	/* Check for flat axis */
@@ -442,7 +443,6 @@ static int hull_find_large_tetrahedron(BMesh *bm, BMOperator *op,
 
 	/* Choose third vertex farthest from existing line segment */
 	largest_dist = 0;
-	tetra[2] = NULL;
 	for (i = 0; i < 3; i++) {
 		BMVert *v;
 		float dist;

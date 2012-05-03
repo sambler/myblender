@@ -845,7 +845,6 @@ MTFace *MeshImporter::assign_material_to_geom(COLLADAFW::MaterialBinding cmateri
 				prim.mface++;
 				// bind texture images to faces
 				if (texture_face && (*color_texture)) {
-					texture_face->mode = TF_TEX;
 					texture_face->tpage = (Image*)(*color_texture)->tex->ima;
 					texture_face++;
 				}
@@ -922,7 +921,7 @@ Object *MeshImporter::create_mesh_object(COLLADAFW::Node *node, COLLADAFW::Insta
 			fprintf(stderr, "invalid referenced material for %s\n", mat_array[i].getName().c_str());
 		}
 	}
-		
+
 	return ob;
 }
 
@@ -949,6 +948,7 @@ bool MeshImporter::write_geometry(const COLLADAFW::Geometry* geom)
 	
 	const std::string& str_geom_id = mesh->getName().size() ? mesh->getName() : mesh->getOriginalId();
 	Mesh *me = add_mesh((char*)str_geom_id.c_str());
+	me->id.us--; // is already 1 here, but will be set later in set_mesh
 
 	// store the Mesh pointer to link it later with an Object
 	this->uid_mesh_map[mesh->getUniqueId()] = me;
@@ -963,8 +963,10 @@ bool MeshImporter::write_geometry(const COLLADAFW::Geometry* geom)
 
 	make_edges(me, 0);
 
+	BKE_mesh_convert_mfaces_to_mpolys(me);
+	BKE_mesh_tessface_clear(me);
+
 	mesh_calc_normals_mapping(me->mvert, me->totvert, me->mloop, me->mpoly, me->totloop, me->totpoly, NULL, NULL, 0, NULL, NULL);
 
-	BKE_mesh_convert_mfaces_to_mpolys(me);
 	return true;
 }

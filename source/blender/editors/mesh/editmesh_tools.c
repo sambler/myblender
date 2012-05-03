@@ -87,6 +87,7 @@ static int edbm_subdivide_exec(bContext *C, wmOperator *op)
 	int cuts = RNA_int_get(op->ptr, "number_cuts");
 	float smooth = 0.292f * RNA_float_get(op->ptr, "smoothness");
 	float fractal = RNA_float_get(op->ptr, "fractal") / 2.5f;
+	float along_normal = RNA_float_get(op->ptr, "fractal_along_normal");
 
 	if (RNA_boolean_get(op->ptr, "quadtri") && 
 	    RNA_enum_get(op->ptr, "quadcorner") == SUBD_STRAIGHT_CUT)
@@ -95,7 +96,7 @@ static int edbm_subdivide_exec(bContext *C, wmOperator *op)
 	}
 	
 	BM_mesh_esubdivide(em->bm, BM_ELEM_SELECT,
-	                   smooth, fractal,
+	                   smooth, fractal, along_normal,
 	                   cuts,
 	                   SUBDIV_SELECT_ORIG, RNA_enum_get(op->ptr, "quadcorner"),
 	                   RNA_boolean_get(op->ptr, "quadtri"), TRUE,
@@ -143,6 +144,7 @@ void MESH_OT_subdivide(wmOperatorType *ot)
 	             "Quad Corner Type", "How to subdivide quad corners (anything other than Straight Cut will prevent ngons)");
 
 	RNA_def_float(ot->srna, "fractal", 0.0f, 0.0f, FLT_MAX, "Fractal", "Fractal randomness factor", 0.0f, 1000.0f);
+	RNA_def_float(ot->srna, "fractal_along_normal", 0.0f, 0.0f, 1.0f, "Along Normal", "Apply fractal displacement along normal only", 0.0f, 1.0f);
 	RNA_def_int(ot->srna, "seed", 0, 0, 10000, "Random Seed", "Seed for the random number generator", 0, 50);
 }
 
@@ -896,7 +898,7 @@ static EnumPropertyItem prop_mesh_delete_types[] = {
 	{0, "VERT",      0, "Vertices", ""},
 	{1,  "EDGE",      0, "Edges", ""},
 	{2,  "FACE",      0, "Faces", ""},
-	{3,  "EDGE_FACE", 0, "Edges & Faces", ""},
+	{3,  "EDGE_FACE", 0, "Only Edges & Faces", ""},
 	{4,  "ONLY_FACE", 0, "Only Faces", ""},
 	{0, NULL, 0, NULL, NULL}
 };
@@ -3683,8 +3685,11 @@ static void xsortvert_flag(bContext *C, int flag)
 		}
 	}
 /*	printf("%d verts: %d to be sorted, %d unchanged…\n", totvert, sorted, unchanged);*/
-	if (sorted == 0)
+	if (sorted == 0) {
+		MEM_freeN(sortblock);
+		MEM_freeN(unchangedblock);
 		return;
+	}
 
 	ED_view3d_init_mats_rv3d(vc.obedit, vc.rv3d);
 	mesh_foreachScreenVert(&vc, xsortvert_flag__doSetX, sortblock, V3D_CLIP_TEST_OFF);
@@ -3942,8 +3947,11 @@ static void hashvert_flag(BMEditMesh *em, int flag, unsigned int seed)
 	}
 /*	protected = totvert - randomized;*/
 /*	printf("%d verts: %d to be randomized, %d protected…\n", totvert, randomized, protected);*/
-	if (randomized == 0)
+	if (randomized == 0) {
+		MEM_freeN(block);
+		MEM_freeN(randblock);
 		return;
+	}
 
 	
 	/* Randomize non-protected vertices indices, and create an array mapping old idx to new
@@ -4362,8 +4370,9 @@ static int edbm_convex_hull_exec(bContext *C, wmOperator *op)
 	
 	/* Delete unused vertices, edges, and faces */
 	if (RNA_boolean_get(op->ptr, "delete_unused")) {
-		if(!EDBM_op_callf(em, op, "del geom=%s context=%i",
-						  &bmop, "unused_geom", DEL_ONLYTAGGED)) {
+		if (!EDBM_op_callf(em, op, "del geom=%s context=%i",
+		                   &bmop, "unused_geom", DEL_ONLYTAGGED))
+		{
 			EDBM_op_finish(em, &bmop, op, TRUE);
 			return OPERATOR_CANCELLED;
 		}
@@ -4371,8 +4380,9 @@ static int edbm_convex_hull_exec(bContext *C, wmOperator *op)
 
 	/* Delete hole edges/faces */
 	if (RNA_boolean_get(op->ptr, "make_holes")) {
-		if(!EDBM_op_callf(em, op, "del geom=%s context=%i",
-						  &bmop, "holes_geom", DEL_ONLYTAGGED)) {
+		if (!EDBM_op_callf(em, op, "del geom=%s context=%i",
+		                   &bmop, "holes_geom", DEL_ONLYTAGGED))
+		{
 			EDBM_op_finish(em, &bmop, op, TRUE);
 			return OPERATOR_CANCELLED;
 		}
@@ -4380,9 +4390,10 @@ static int edbm_convex_hull_exec(bContext *C, wmOperator *op)
 
 	/* Merge adjacent triangles */
 	if (RNA_boolean_get(op->ptr, "join_triangles")) {
-		if(!EDBM_op_callf(em, op, "join_triangles faces=%s limit=%f",
-						  &bmop, "geomout",
-						  RNA_float_get(op->ptr, "limit"))) {
+		if (!EDBM_op_callf(em, op, "join_triangles faces=%s limit=%f",
+		                   &bmop, "geomout",
+		                   RNA_float_get(op->ptr, "limit")))
+		{
 			EDBM_op_finish(em, &bmop, op, TRUE);
 			return OPERATOR_CANCELLED;
 		}

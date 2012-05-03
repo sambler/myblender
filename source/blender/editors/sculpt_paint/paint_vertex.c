@@ -1025,7 +1025,9 @@ static int weight_sample_invoke(bContext *C, wmOperator *op, wmEvent *event)
 			else {
 				MPoly *mp = ((MPoly *)me->mpoly) + (index - 1);
 				const int vgroup_active = vc.obact->actdef - 1;
+				Scene *scene = vc.scene;
 				ToolSettings *ts = vc.scene->toolsettings;
+				Brush *brush = paint_brush(&ts->wpaint->paint);
 				float mval_f[2];
 				int v_idx_best = -1;
 				int fidx;
@@ -1048,7 +1050,8 @@ static int weight_sample_invoke(bContext *C, wmOperator *op, wmEvent *event)
 				} while (fidx--);
 
 				if (v_idx_best != -1) { /* should always be valid */
-					ts->vgroup_weight = defvert_find_weight(&me->dvert[v_idx_best], vgroup_active);
+					float vgroup_weight = defvert_find_weight(&me->dvert[v_idx_best], vgroup_active);
+					brush_set_weight(scene, brush, vgroup_weight);
 					change = TRUE;
 				}
 			}
@@ -2418,7 +2421,7 @@ static void wpaint_stroke_update_step(bContext *C, struct PaintStroke *stroke, P
 	ED_region_tag_redraw(vc->ar);
 }
 
-static void wpaint_stroke_done(bContext *C, struct PaintStroke *stroke)
+static void wpaint_stroke_done(const bContext *C, struct PaintStroke *stroke)
 {
 	ToolSettings *ts = CTX_data_tool_settings(C);
 	Object *ob = CTX_data_active_object(C);
@@ -2505,8 +2508,11 @@ static int weight_paint_set_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	struct Scene *scene = CTX_data_scene(C);
 	Object *obact = CTX_data_active_object(C);
+	ToolSettings *ts = CTX_data_tool_settings(C);
+	Brush *brush = paint_brush(&ts->wpaint->paint);
+	float vgroup_weight = brush_weight(scene, brush);
 
-	wpaint_fill(scene->toolsettings->wpaint, obact, scene->toolsettings->vgroup_weight);
+	wpaint_fill(scene->toolsettings->wpaint, obact, vgroup_weight);
 	ED_region_tag_redraw(CTX_wm_region(C)); /* XXX - should redraw all 3D views */
 	return OPERATOR_FINISHED;
 }
@@ -2939,7 +2945,7 @@ static void vpaint_stroke_update_step(bContext *C, struct PaintStroke *stroke, P
 	}
 }
 
-static void vpaint_stroke_done(bContext *C, struct PaintStroke *stroke)
+static void vpaint_stroke_done(const bContext *C, struct PaintStroke *stroke)
 {
 	ToolSettings *ts = CTX_data_tool_settings(C);
 	struct VPaintData *vpd = paint_stroke_mode_data(stroke);

@@ -984,11 +984,11 @@ static void movieclip_main_area_set_view2d(SpaceClip *sc, ARegion *ar)
 	ar->v2d.mask.ymax = winy;
 
 	/* which part of the image space do we see? */
-	x1= ar->winrct.xmin + (winx-sc->zoom * w) / 2.0f;
-	y1= ar->winrct.ymin + (winy-sc->zoom * h) / 2.0f;
+	x1 = ar->winrct.xmin + (winx-sc->zoom * w) / 2.0f;
+	y1 = ar->winrct.ymin + (winy-sc->zoom * h) / 2.0f;
 
-	x1-= sc->zoom * sc->xof;
-	y1-= sc->zoom * sc->yof;
+	x1 -= sc->zoom * sc->xof;
+	y1 -= sc->zoom * sc->yof;
 
 	/* relative display right */
 	ar->v2d.cur.xmin = (ar->winrct.xmin - (float)x1) / sc->zoom;
@@ -1129,10 +1129,13 @@ static void dopesheet_area_draw(const bContext *C, ARegion *ar)
 {
 	Scene *scene = CTX_data_scene(C);
 	SpaceClip *sc = CTX_wm_space_clip(C);
+	MovieClip *clip = ED_space_clip(sc);
 	View2D *v2d = &ar->v2d;
 	View2DGrid *grid;
 	View2DScrollers *scrollers;
 	short unit = 0;
+
+	BKE_tracking_dopesheet_update(&clip->tracking, sc->dope_sort, sc->dope_flag & SC_DOPE_SORT_INVERSE);
 
 	/* clear and setup matrix */
 	UI_ThemeClearColor(TH_BACK);
@@ -1153,7 +1156,7 @@ static void dopesheet_area_draw(const bContext *C, ARegion *ar)
 	UI_view2d_view_restore(C);
 
 	/* scrollers */
-	scrollers= UI_view2d_scrollers_calc(C, v2d, unit, V2D_GRID_CLAMP, V2D_ARG_DUMMY, V2D_ARG_DUMMY);
+	scrollers = UI_view2d_scrollers_calc(C, v2d, unit, V2D_GRID_CLAMP, V2D_ARG_DUMMY, V2D_ARG_DUMMY);
 	UI_view2d_scrollers_draw(C, v2d, scrollers);
 	UI_view2d_scrollers_free(scrollers);
 }
@@ -1186,8 +1189,12 @@ static void clip_channels_area_init(wmWindowManager *wm, ARegion *ar)
 
 static void clip_channels_area_draw(const bContext *C, ARegion *ar)
 {
+	SpaceClip *sc = CTX_wm_space_clip(C);
+	MovieClip *clip = ED_space_clip(sc);
 	View2D *v2d = &ar->v2d;
 	View2DScrollers *scrollers;
+
+	BKE_tracking_dopesheet_update(&clip->tracking, sc->dope_sort, sc->dope_flag & SC_DOPE_SORT_INVERSE);
 
 	/* clear and setup matrix */
 	UI_ThemeClearColor(TH_BACK);

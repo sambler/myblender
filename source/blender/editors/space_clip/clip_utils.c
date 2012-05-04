@@ -174,7 +174,7 @@ void clip_delete_track(bContext *C, MovieClip *clip, ListBase *tracksbase, Movie
 
 	int has_bundle = FALSE, update_stab = FALSE;
 
-	if (track==act_track)
+	if (track == act_track)
 		tracking->act_track = NULL;
 
 	if (track == stab->rot_track) {
@@ -194,10 +194,10 @@ void clip_delete_track(bContext *C, MovieClip *clip, ListBase *tracksbase, Movie
 
 	if (update_stab) {
 		tracking->stabilization.ok = FALSE;
-
-		DAG_id_tag_update(&clip->id, 0);
 		WM_event_add_notifier(C, NC_MOVIECLIP|ND_DISPLAY, clip);
 	}
+
+	DAG_id_tag_update(&clip->id, 0);
 
 	if (has_bundle)
 		WM_event_add_notifier(C, NC_SPACE|ND_SPACE_VIEW3D, NULL);

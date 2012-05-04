@@ -2679,18 +2679,6 @@ static void write_movieTracks(WriteData *wd, ListBase *tracks)
 	}
 }
 
-static void write_movieDopesheet(WriteData *wd, MovieTrackingDopesheet *dopesheet)
-{
-	MovieTrackingDopesheetChannel *channel;
-
-	channel = dopesheet->channels.first;
-	while (channel) {
-		writestruct(wd, DATA, "MovieTrackingDopesheetChannel", 1, channel);
-
-		channel = channel->next;
-	}
-}
-
 static void write_movieReconstruction(WriteData *wd, MovieTrackingReconstruction *reconstruction)
 {
 	if (reconstruction->camnr)
@@ -2723,8 +2711,6 @@ static void write_movieclips(WriteData *wd, ListBase *idbase)
 
 				object= object->next;
 			}
-
-			write_movieDopesheet(wd, &tracking->dopesheet);
 		}
 
 		clip= clip->id.next;

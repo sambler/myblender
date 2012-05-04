@@ -275,6 +275,10 @@ static void paint_mesh_restore_co(Sculpt *sd, SculptSession *ss)
 	PBVHNode **nodes;
 	int n, totnode;
 
+#ifndef _OPENMP
+	(void)sd; /* quied unused warning */
+#endif
+
 	BLI_pbvh_search_gather(ss->pbvh, NULL, NULL, &nodes, &totnode);
 
 	#pragma omp parallel for schedule(guided) if (sd->flags & SCULPT_USE_OPENMP)
@@ -421,11 +425,11 @@ static int sculpt_brush_test_cube(SculptBrushTest *test, float co[3], float loca
 	local_co[2] = fabs(local_co[2]);
 
 	if (local_co[0] <= side && local_co[1] <= side && local_co[2] <= side) {
-		float p = 4;
+		float p = 4.0f;
 		
 		test->dist = ((powf(local_co[0], p) +
 		               powf(local_co[1], p) +
-		               powf(local_co[2], p)) / pow(side, p));
+		               powf(local_co[2], p)) / powf(side, p));
 
 		return 1;
 	}
@@ -3483,7 +3487,7 @@ static void sculpt_brush_exit_tex(Sculpt *sd)
 		ntreeTexEndExecTree(mtex->tex->nodetree->execdata, 1);
 }
 
-static void sculpt_stroke_done(bContext *C, struct PaintStroke *UNUSED(stroke))
+static void sculpt_stroke_done(const bContext *C, struct PaintStroke *UNUSED(stroke))
 {
 	Object *ob = CTX_data_active_object(C);
 	SculptSession *ss = ob->sculpt;

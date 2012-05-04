@@ -95,8 +95,6 @@ static void add_marker(SpaceClip *sc, float x, float y)
 	BKE_tracking_select_track(tracksbase, track, TRACK_AREA_ALL, 0);
 
 	clip->tracking.act_track = track;
-
-	ED_space_clip_update_dopesheet(sc);
 }
 
 static int add_marker_exec(bContext *C, wmOperator *op)
@@ -176,8 +174,6 @@ static int delete_track_exec(bContext *C, wmOperator *UNUSED(op))
 	/* nothing selected now, unlock view so it can be scrolled nice again */
 	sc->flag &= ~SC_LOCK_SELECTION;
 
-	ED_space_clip_update_dopesheet(sc);
-
 	return OPERATOR_FINISHED;
 }
 
@@ -228,8 +224,6 @@ static int delete_marker_exec(bContext *C, wmOperator *UNUSED(op))
 		/* nothing selected now, unlock view so it can be scrolled nice again */
 		sc->flag &= ~SC_LOCK_SELECTION;
 	}
-
-	ED_space_clip_update_dopesheet(sc);
 
 	return OPERATOR_FINISHED;
 }
@@ -729,19 +723,19 @@ static MovieTrackingTrack *find_nearest_track(SpaceClip *sc, ListBase *tracksbas
 	while (cur) {
 		MovieTrackingMarker *marker = BKE_tracking_get_marker(cur, sc->user.framenr);
 
-		if (((cur->flag & TRACK_HIDDEN) == 0) && MARKER_VISIBLE(sc, marker)) {
+		if (((cur->flag & TRACK_HIDDEN) == 0) && MARKER_VISIBLE(sc, cur, marker)) {
 			float dist, d1, d2 = FLT_MAX, d3 = FLT_MAX;
 
-			d1= sqrtf((co[0]-marker->pos[0]-cur->offset[0])*(co[0]-marker->pos[0]-cur->offset[0])+
+			d1 = sqrtf((co[0]-marker->pos[0]-cur->offset[0])*(co[0]-marker->pos[0]-cur->offset[0])+
 					  (co[1]-marker->pos[1]-cur->offset[1])*(co[1]-marker->pos[1]-cur->offset[1])); /* distance to marker point */
 
 			/* distance to pattern boundbox */
 			if (sc->flag & SC_SHOW_MARKER_PATTERN)
-				d2= dist_to_rect(co, marker->pos, cur->pat_min, cur->pat_max);
+				d2 = dist_to_rect(co, marker->pos, cur->pat_min, cur->pat_max);
 
 			/* distance to search boundbox */
 			if (sc->flag & SC_SHOW_MARKER_SEARCH && TRACK_VIEW_SELECTED(sc, cur))
-				d3= dist_to_rect(co, marker->pos, cur->search_min, cur->search_max);
+				d3 = dist_to_rect(co, marker->pos, cur->search_min, cur->search_max);
 
 			/* choose minimal distance. useful for cases of overlapped markers. */
 			dist = MIN3(d1, d2, d3);
@@ -795,8 +789,9 @@ static int mouse_select(bContext *C, float co[2], int extend)
 		sc->ylockof = 0.0f;
 	}
 
+	BKE_tracking_dopesheet_tag_update(tracking);
+
 	WM_event_add_notifier(C, NC_GEOM|ND_SELECT, NULL);
-	ED_space_clip_update_dopesheet(sc);
 
 	return OPERATOR_FINISHED;
 }
@@ -868,8 +863,9 @@ static int border_select_exec(bContext *C, wmOperator *op)
 {
 	SpaceClip *sc = CTX_wm_space_clip(C);
 	MovieClip *clip = ED_space_clip(sc);
+	MovieTracking *tracking = &clip->tracking;
 	MovieTrackingTrack *track;
-	ListBase *tracksbase = BKE_tracking_get_tracks(&clip->tracking);
+	ListBase *tracksbase = BKE_tracking_get_tracks(tracking);
 	rcti rect;
 	rctf rectf;
 	int change = FALSE, mode, extend;
@@ -892,7 +888,7 @@ static int border_select_exec(bContext *C, wmOperator *op)
 		if ((track->flag & TRACK_HIDDEN) == 0) {
 			MovieTrackingMarker *marker = BKE_tracking_get_marker(track, sc->user.framenr);
 
-			if (MARKER_VISIBLE(sc, marker)) {
+			if (MARKER_VISIBLE(sc, track, marker)) {
 				if (BLI_in_rctf(&rectf, marker->pos[0], marker->pos[1])) {
 					BKE_tracking_track_flag(track, TRACK_AREA_ALL, SELECT, mode!=GESTURE_MODAL_SELECT);
 				}
@@ -908,7 +904,7 @@ static int border_select_exec(bContext *C, wmOperator *op)
 	}
 
 	if (change) {
-		ED_space_clip_update_dopesheet(sc);
+		BKE_tracking_dopesheet_tag_update(tracking);
 
 		WM_event_add_notifier(C, NC_GEOM|ND_SELECT, NULL);
 
@@ -956,8 +952,9 @@ static int circle_select_exec(bContext *C, wmOperator *op)
 	SpaceClip *sc = CTX_wm_space_clip(C);
 	MovieClip *clip = ED_space_clip(sc);
 	ARegion *ar = CTX_wm_region(C);
+	MovieTracking *tracking = &clip->tracking;
 	MovieTrackingTrack *track;
-	ListBase *tracksbase = BKE_tracking_get_tracks(&clip->tracking);
+	ListBase *tracksbase = BKE_tracking_get_tracks(tracking);
 	int x, y, radius, width, height, mode, change = FALSE;
 	float zoomx, zoomy, offset[2], ellipse[2];
 
@@ -983,7 +980,7 @@ static int circle_select_exec(bContext *C, wmOperator *op)
 		if ((track->flag & TRACK_HIDDEN) == 0) {
 			MovieTrackingMarker *marker = BKE_tracking_get_marker(track, sc->user.framenr);
 
-			if (MARKER_VISIBLE(sc, marker) && marker_inside_ellipse(marker, offset, ellipse)) {
+			if (MARKER_VISIBLE(sc, track, marker) && marker_inside_ellipse(marker, offset, ellipse)) {
 				BKE_tracking_track_flag(track, TRACK_AREA_ALL, SELECT, mode!=GESTURE_MODAL_SELECT);
 
 				change = TRUE;
@@ -994,7 +991,7 @@ static int circle_select_exec(bContext *C, wmOperator *op)
 	}
 
 	if (change) {
-		ED_space_clip_update_dopesheet(sc);
+		BKE_tracking_dopesheet_tag_update(tracking);
 
 		WM_event_add_notifier(C, NC_GEOM|ND_SELECT, NULL);
 
@@ -1033,9 +1030,10 @@ static int select_all_exec(bContext *C, wmOperator *op)
 {
 	SpaceClip *sc = CTX_wm_space_clip(C);
 	MovieClip *clip = ED_space_clip(sc);
+	MovieTracking *tracking = &clip->tracking;
 	MovieTrackingTrack *track = NULL;	/* selected track */
 	MovieTrackingMarker *marker;
-	ListBase *tracksbase = BKE_tracking_get_tracks(&clip->tracking);
+	ListBase *tracksbase = BKE_tracking_get_tracks(tracking);
 	int action = RNA_enum_get(op->ptr, "action");
 	int framenr = sc->user.framenr;
 	int has_selection = FALSE;
@@ -1047,7 +1045,7 @@ static int select_all_exec(bContext *C, wmOperator *op)
 			if (TRACK_VIEW_SELECTED(sc, track)) {
 				marker = BKE_tracking_get_marker(track, framenr);
 
-				if (MARKER_VISIBLE(sc, marker)) {
+				if (MARKER_VISIBLE(sc, track, marker)) {
 					action = SEL_DESELECT;
 					break;
 				}
@@ -1062,7 +1060,7 @@ static int select_all_exec(bContext *C, wmOperator *op)
 		if ((track->flag & TRACK_HIDDEN)==0) {
 			marker = BKE_tracking_get_marker(track, framenr);
 
-			if (MARKER_VISIBLE(sc, marker)) {
+			if (MARKER_VISIBLE(sc, track, marker)) {
 				switch (action) {
 					case SEL_SELECT:
 						track->flag |= SELECT;
@@ -1092,7 +1090,7 @@ static int select_all_exec(bContext *C, wmOperator *op)
 	if (!has_selection)
 		sc->flag &= ~SC_LOCK_SELECTION;
 
-	ED_space_clip_update_dopesheet(sc);
+	BKE_tracking_dopesheet_tag_update(tracking);
 
 	WM_event_add_notifier(C, NC_GEOM|ND_SELECT, NULL);
 
@@ -1174,7 +1172,7 @@ static int select_groped_exec(bContext *C, wmOperator *op)
 		track = track->next;
 	}
 
-	ED_space_clip_update_dopesheet(sc);
+	BKE_tracking_dopesheet_tag_update(tracking);
 
 	WM_event_add_notifier(C, NC_MOVIECLIP|ND_DISPLAY, clip);
 
@@ -1555,7 +1553,7 @@ static int track_markers_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(eve
 static int track_markers_modal(bContext *C, wmOperator *UNUSED(op), wmEvent *event)
 {
 	/* no running tracking, remove handler and pass through */
-	if (0==WM_jobs_test(CTX_wm_manager(C), CTX_wm_area(C)))
+	if (0 == WM_jobs_test(CTX_wm_manager(C), CTX_wm_area(C)))
 		return OPERATOR_FINISHED|OPERATOR_PASS_THROUGH;
 
 	/* running tracking */
@@ -2745,7 +2743,7 @@ static int hide_tracks_exec(bContext *C, wmOperator *op)
 		sc->flag &= ~SC_LOCK_SELECTION;
 	}
 
-	BKE_tracking_update_dopesheet(tracking);
+	BKE_tracking_dopesheet_tag_update(tracking);
 
 	WM_event_add_notifier(C, NC_MOVIECLIP|ND_DISPLAY, NULL);
 
@@ -2776,7 +2774,8 @@ static int hide_tracks_clear_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	SpaceClip *sc = CTX_wm_space_clip(C);
 	MovieClip *clip = ED_space_clip(sc);
-	ListBase *tracksbase = BKE_tracking_get_tracks(&clip->tracking);
+	MovieTracking *tracking = &clip->tracking;
+	ListBase *tracksbase = BKE_tracking_get_tracks(tracking);
 	MovieTrackingTrack *track;
 
 	track = tracksbase->first;
@@ -2785,6 +2784,8 @@ static int hide_tracks_clear_exec(bContext *C, wmOperator *UNUSED(op))
 
 		track = track->next;
 	}
+
+	BKE_tracking_dopesheet_tag_update(tracking);
 
 	WM_event_add_notifier(C, NC_MOVIECLIP|ND_DISPLAY, NULL);
 

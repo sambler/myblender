@@ -1762,7 +1762,7 @@ static void drawcamera(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *base
 	scale[1] = 1.0f / len_v3(ob->obmat[1]);
 	scale[2] = 1.0f / len_v3(ob->obmat[2]);
 
-	camera_view_frame_ex(scene, cam, cam->drawsize, is_view, scale,
+	BKE_camera_view_frame_ex(scene, cam, cam->drawsize, is_view, scale,
 	                     asp, shift, &drawsize, vec);
 
 	glDisable(GL_LIGHTING);
@@ -1834,7 +1834,7 @@ static void drawcamera(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *base
 			if (cam->flag & CAM_SHOWLIMITS) {
 				draw_limit_line(cam->clipsta, cam->clipend, 0x77FFFF);
 				/* qdn: was yafray only, now also enabled for Blender to be used with defocus composite node */
-				draw_focus_cross(object_camera_dof_distance(ob), cam->drawsize);
+				draw_focus_cross(BKE_camera_object_dof_distance(ob), cam->drawsize);
 			}
 
 			wrld = scene->world;
@@ -2902,9 +2902,10 @@ static void draw_em_measure_stats(View3D *v3d, Object *ob, BMEditMesh *em, UnitS
 
 #define DRAW_EM_MEASURE_STATS_FACEAREA()                                      \
 	if (BM_elem_flag_test(f, BM_ELEM_SELECT)) {                               \
-		mul_v3_fl(vmid, 1.0 / n);                                             \
+		mul_v3_fl(vmid, 1.0f / (float)n);                                     \
 		if (unit->system)                                                     \
-			bUnit_AsString(numstr, sizeof(numstr), area * unit->scale_length, \
+			bUnit_AsString(numstr, sizeof(numstr),                            \
+		                   (double)(area * unit->scale_length),               \
 			               3, unit->system, B_UNIT_LENGTH, do_split, FALSE);  \
 		else                                                                  \
 			BLI_snprintf(numstr, sizeof(numstr), conv_float, area);           \
@@ -6990,7 +6991,7 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, int flag)
 				drawtexspace(ob);
 			}
 			if (dtx & OB_DRAWNAME) {
-				/* patch for several 3d cards (IBM mostly) that crash on glSelect with text drawing */
+				/* patch for several 3d cards (IBM mostly) that crash on GL_SELECT with text drawing */
 				/* but, we also don't draw names for sets or duplicators */
 				if (flag == 0) {
 					float zero[3] = {0, 0, 0};

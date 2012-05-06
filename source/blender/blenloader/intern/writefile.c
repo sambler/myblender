@@ -1271,7 +1271,7 @@ static void write_pose(WriteData *wd, bPose *pose)
 
 	/* write IK param */
 	if (pose->ikparam) {
-		char *structname = (char *)get_ikparam_name(pose);
+		char *structname = (char *)BKE_pose_ikparam_get_name(pose);
 		if (structname)
 			writestruct(wd, DATA, structname, 1, pose->ikparam);
 	}
@@ -1784,8 +1784,8 @@ static void write_meshs(WriteData *wd, ListBase *idbase)
 
 
 				/* now fill in polys to mfaces*/
-				mesh->totface= mesh_mpoly_to_mface(&mesh->fdata, &backup_mesh.ldata, &backup_mesh.pdata,
-				                                   mesh->totface, backup_mesh.totloop, backup_mesh.totpoly);
+				mesh->totface = BKE_mesh_mpoly_to_mface(&mesh->fdata, &backup_mesh.ldata, &backup_mesh.pdata,
+				                                        mesh->totface, backup_mesh.totloop, backup_mesh.totpoly);
 
 				mesh_update_customdata_pointers(mesh, FALSE);
 

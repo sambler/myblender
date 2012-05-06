@@ -381,7 +381,7 @@ void multires_force_update(Object *ob)
 
 void multires_force_external_reload(Object *ob)
 {
-	Mesh *me = get_mesh(ob);
+	Mesh *me = BKE_mesh_from_object(ob);
 
 	CustomData_external_reload(&me->ldata, &me->id, CD_MASK_MDISPS, me->totloop);
 	multires_force_update(ob);
@@ -650,7 +650,7 @@ static void multires_del_higher(MultiresModifierData *mmd, Object *ob, int lvl)
 /* direction=1 for delete higher, direction=0 for lower (not implemented yet) */
 void multiresModifier_del_levels(MultiresModifierData *mmd, Object *ob, int direction)
 {
-	Mesh *me = get_mesh(ob);
+	Mesh *me = BKE_mesh_from_object(ob);
 	int lvl = multires_get_level(ob, mmd, 0);
 	int levels = mmd->totlvl - lvl;
 	MDisps *mdisps;
@@ -717,7 +717,7 @@ void multiresModifier_base_apply(MultiresModifierData *mmd, Object *ob)
 
 	multires_force_update(ob);
 
-	me = get_mesh(ob);
+	me = BKE_mesh_from_object(ob);
 	totlvl = mmd->totlvl;
 
 	/* nothing to do */
@@ -779,7 +779,7 @@ void multiresModifier_base_apply(MultiresModifierData *mmd, Object *ob)
 			float no[3];
 
 			/* set up poly, loops, and coords in order to call
-			 * mesh_calc_poly_normal_coords() */
+			 * BKE_mesh_calc_poly_normal_coords() */
 			fake_poly.totloop = p->totloop;
 			fake_poly.loopstart = 0;
 			fake_loops = MEM_mallocN(sizeof(MLoop) * p->totloop, "fake_loops");
@@ -796,8 +796,8 @@ void multiresModifier_base_apply(MultiresModifierData *mmd, Object *ob)
 					copy_v3_v3(fake_co[k], origco[vndx]);
 			}
 			
-			mesh_calc_poly_normal_coords(&fake_poly, fake_loops,
-										 (const float(*)[3])fake_co, no);
+			BKE_mesh_calc_poly_normal_coords(&fake_poly, fake_loops,
+			                                 (const float(*)[3])fake_co, no);
 			MEM_freeN(fake_loops);
 			MEM_freeN(fake_co);
 
@@ -2146,7 +2146,7 @@ void multiresModifier_scale_disp(Scene *scene, Object *ob)
 	float smat[3][3];
 
 	/* object's scale matrix */
-	object_scale_to_mat3(ob, smat);
+	BKE_object_scale_to_mat3(ob, smat);
 
 	multires_apply_smat(scene, ob, smat);
 }
@@ -2157,9 +2157,9 @@ void multiresModifier_prepare_join(Scene *scene, Object *ob, Object *to_ob)
 	multires_sync_levels(scene, ob, to_ob);
 
 	/* construct scale matrix for displacement */
-	object_scale_to_mat3(to_ob, tmat);
+	BKE_object_scale_to_mat3(to_ob, tmat);
 	invert_m3(tmat);
-	object_scale_to_mat3(ob, smat);
+	BKE_object_scale_to_mat3(ob, smat);
 	mul_m3_m3m3(mat, smat, tmat);
 
 	multires_apply_smat(scene, ob, mat);

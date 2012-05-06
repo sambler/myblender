@@ -190,7 +190,7 @@ static int check_object_draw_texture(Scene *scene, View3D *v3d, int drawtype)
 		return TRUE;
 
 	/* textured solid */
-	if (v3d->drawtype == OB_SOLID && (v3d->flag2 & V3D_SOLID_TEX) && !scene_use_new_shading_nodes(scene))
+	if (v3d->drawtype == OB_SOLID && (v3d->flag2 & V3D_SOLID_TEX) && !BKE_scene_use_new_shading_nodes(scene))
 		return TRUE;
 	
 	return FALSE;
@@ -332,7 +332,7 @@ int draw_glsl_material(Scene *scene, Object *ob, View3D *v3d, int dt)
 		return 0;
 	if (ob == OBACT && (ob && ob->mode & OB_MODE_WEIGHT_PAINT))
 		return 0;
-	if (scene_use_new_shading_nodes(scene))
+	if (BKE_scene_use_new_shading_nodes(scene))
 		return 0;
 	
 	return (scene->gm.matmode == GAME_MAT_GLSL) && (dt > OB_SOLID);
@@ -1740,7 +1740,7 @@ static void drawcamera(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *base
 	int i;
 	float drawsize;
 	const short is_view = (rv3d->persp == RV3D_CAMOB && ob == v3d->camera);
-	MovieClip *clip = object_get_movieclip(scene, base->object, 0);
+	MovieClip *clip = BKE_object_movieclip_get(scene, base->object, 0);
 
 	/* draw data for movie clip set as active for scene */
 	if (clip) {
@@ -1971,7 +1971,7 @@ static void drawlattice(Scene *scene, View3D *v3d, Object *ob)
 
 	/* now we default make displist, this will modifiers work for non animated case */
 	if (ob->disp.first == NULL)
-		lattice_calc_modifiers(scene, ob);
+		BKE_lattice_modifiers_calc(scene, ob);
 	dl = find_displist(&ob->disp, DL_VERTS);
 	
 	if (is_edit) {
@@ -3599,7 +3599,7 @@ static int draw_mesh_object(Scene *scene, ARegion *ar, View3D *v3d, RegionView3D
 			finalDM->release(finalDM);
 	}
 	else {
-		/* don't create boundbox here with mesh_get_bb(), the derived system will make it, puts deformed bb's OK */
+		/* don't create boundbox here with BKE_mesh_boundbox_get(), the derived system will make it, puts deformed bb's OK */
 		if (me->totpoly <= 4 || ED_view3d_boundbox_clip(rv3d, ob->obmat, (ob->bb) ? ob->bb : me->bb)) {
 			glsl = draw_glsl_material(scene, ob, v3d, dt);
 			check_alpha = check_alpha_pass(base);
@@ -4285,7 +4285,7 @@ static void draw_new_particle_system(Scene *scene, View3D *v3d, RegionView3D *rv
 
 	totpart = psys->totpart;
 
-	cfra = BKE_curframe(scene);
+	cfra = BKE_scene_frame_get(scene);
 
 	if (draw_as == PART_DRAW_PATH && psys->pathcache == NULL && psys->childcache == NULL)
 		draw_as = PART_DRAW_DOT;
@@ -6092,7 +6092,7 @@ static void draw_box(float vec[8][3])
 #if 0
 static void get_local_bounds(Object *ob, float center[3], float size[3])
 {
-	BoundBox *bb = object_get_boundbox(ob);
+	BoundBox *bb = BKE_object_boundbox_get(ob);
 	
 	if (bb == NULL) {
 		zero_v3(center);
@@ -6153,7 +6153,7 @@ static void draw_bounding_volume(Scene *scene, Object *ob, char type)
 	BoundBox *bb = NULL;
 	
 	if (ob->type == OB_MESH) {
-		bb = mesh_get_bb(ob);
+		bb = BKE_mesh_boundbox_get(ob);
 	}
 	else if (ELEM3(ob->type, OB_CURVE, OB_SURF, OB_FONT)) {
 		bb = ob->bb ? ob->bb : ( (Curve *)ob->data)->bb;
@@ -6168,7 +6168,7 @@ static void draw_bounding_volume(Scene *scene, Object *ob, char type)
 		}
 	}
 	else if (ob->type == OB_ARMATURE) {
-		bb = BKE_armature_get_bb(ob);
+		bb = BKE_armature_boundbox_get(ob);
 	}
 	else {
 		drawcube();
@@ -6187,7 +6187,7 @@ static void drawtexspace(Object *ob)
 	float vec[8][3], loc[3], size[3];
 	
 	if (ob->type == OB_MESH) {
-		mesh_get_texspace(ob->data, loc, NULL, size);
+		BKE_mesh_texspace_get(ob->data, loc, NULL, size);
 	}
 	else if (ELEM3(ob->type, OB_CURVE, OB_SURF, OB_FONT)) {
 		Curve *cu = ob->data;
@@ -6435,7 +6435,7 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, int flag)
 	view3d_cached_text_draw_begin();
 	
 	/* patch? children objects with a timeoffs change the parents. How to solve! */
-	/* if ( ((int)ob->ctime) != F_(scene->r.cfra)) where_is_object(scene, ob); */
+	/* if ( ((int)ob->ctime) != F_(scene->r.cfra)) BKE_object_where_is_calc(scene, ob); */
 	
 	/* draw motion paths (in view space) */
 	if (ob->mpath && (v3d->flag2 & V3D_RENDER_OVERRIDE) == 0) {
@@ -6647,7 +6647,7 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, int flag)
 				setlinestyle(0);
 
 
-				if (BKE_font_getselection(ob, &selstart, &selend) && cu->selboxes) {
+				if (BKE_vfont_select_get(ob, &selstart, &selend) && cu->selboxes) {
 					float selboxw;
 
 					cpack(0xffffff);
@@ -7141,7 +7141,7 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, int flag)
 					for (ct = targets.first; ct; ct = ct->next) {
 						/* calculate target's matrix */
 						if (cti->get_target_matrix)
-							cti->get_target_matrix(curcon, cob, ct, BKE_curframe(scene));
+							cti->get_target_matrix(curcon, cob, ct, BKE_scene_frame_get(scene));
 						else
 							unit_m4(ct->matrix);
 						

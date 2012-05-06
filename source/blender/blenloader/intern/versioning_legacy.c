@@ -33,13 +33,6 @@
 #include "zlib.h"
 
 #include <limits.h>
-//#include <stdio.h> // for printf fopen fwrite fclose sprintf FILE
-//#include <stdlib.h> // for getenv atoi
-//#include <stddef.h> // for offsetof
-//#include <fcntl.h> // for open
-//#include <string.h> // for strrchr strncmp strstr
-//#include <math.h> // for fabs
-//#include <stdarg.h> /* for va_start/end */
 
 #ifndef WIN32
 #  include <unistd.h> // for read close
@@ -554,9 +547,6 @@ void blo_do_versions_pre250(FileData *fd, Library *lib, Main *main)
 {
 	/* WATCH IT!!!: pointers from libdata have not been converted */
 
-	if (G.debug & G_DEBUG)
-		printf("read file %s\n  Version %d sub %d svn r%d\n", fd->relabase, main->versionfile, main->subversionfile, main->revision);
-	
 	if (main->versionfile == 100) {
 		/* tex->extend and tex->imageflag have changed: */
 		Tex *tex = main->tex.first;
@@ -1854,7 +1844,7 @@ void blo_do_versions_pre250(FileData *fd, Library *lib, Main *main)
 		
 		// armature recode checks 
 		for (arm= main->armature.first; arm; arm= arm->id.next) {
-			where_is_armature(arm);
+			BKE_armature_where_is(arm);
 
 			for (bone= arm->bonebase.first; bone; bone= bone->next)
 				do_version_bone_head_tail_237(bone);
@@ -1866,7 +1856,7 @@ void blo_do_versions_pre250(FileData *fd, Library *lib, Main *main)
 					ob->partype = PARSKEL;
 			}
 
-			// btw. armature_rebuild_pose is further only called on leave editmode
+			// btw. BKE_pose_rebuild is further only called on leave editmode
 			if (ob->type==OB_ARMATURE) {
 				if (ob->pose)
 					ob->pose->flag |= POSE_RECALC;
@@ -2021,10 +2011,10 @@ void blo_do_versions_pre250(FileData *fd, Library *lib, Main *main)
 
 		for (me=main->mesh.first; me; me= me->id.next) {
 			if (!me->medge) {
-				make_edges(me, 1);	/* 1 = use mface->edcode */
+				BKE_mesh_make_edges(me, 1);	/* 1 = use mface->edcode */
 			}
 			else {
-				mesh_strip_loose_faces(me);
+				BKE_mesh_strip_loose_faces(me);
 			}
 		}
 		
@@ -2144,7 +2134,7 @@ void blo_do_versions_pre250(FileData *fd, Library *lib, Main *main)
 			if (sce->r.yparts<2) sce->r.yparts= 4;
 			/* adds default layer */
 			if (sce->r.layers.first==NULL)
-				scene_add_render_layer(sce, NULL);
+				BKE_scene_add_render_layer(sce, NULL);
 			else {
 				SceneRenderLayer *srl;
 				/* new layer flag for sky, was default for solid */

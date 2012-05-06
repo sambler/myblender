@@ -1657,6 +1657,7 @@ if(WITH_PYTHON)
 			  PATH_SUFFIXES
 			    site-packages
 			    dist-packages
+			   NO_DEFAULT_PATH
 			)
 
 			if(NOT EXISTS "${PYTHON_NUMPY_PATH}")

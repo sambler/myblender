@@ -446,10 +446,10 @@ void DM_update_tessface_data(DerivedMesh *dm)
 				not_done--;
 			}
 		}
-		mesh_loops_to_mface_corners(fdata, ldata, pdata,
-		                            ml_idx, mf_idx, polyindex[mf_idx],
-		                            mf_len,
-		                            numTex, numCol, hasPCol, hasOrigSpace);
+		BKE_mesh_loops_to_mface_corners(fdata, ldata, pdata,
+		                                ml_idx, mf_idx, polyindex[mf_idx],
+		                                mf_len,
+		                                numTex, numCol, hasPCol, hasOrigSpace);
 	}
 
 	if (G.debug & G_DEBUG)
@@ -870,7 +870,7 @@ static void *get_orco_coords_dm(Object *ob, BMEditMesh *em, int layer, int *free
 		if (em)
 			return (float(*)[3])get_editbmesh_orco_verts(em);
 		else
-			return (float(*)[3])get_mesh_orco_verts(ob);
+			return (float(*)[3])BKE_mesh_orco_verts_get(ob);
 	}
 	else if (layer == CD_CLOTH_ORCO) {
 		/* apply shape key for cloth, this should really be solved
@@ -932,7 +932,7 @@ static void add_orco_dm(Object *ob, BMEditMesh *em, DerivedMesh *dm,
 
 	if (orco) {
 		if (layer == CD_ORCO)
-			transform_mesh_orco_verts(ob->data, orco, totvert, 0);
+			BKE_mesh_orco_verts_transform(ob->data, orco, totvert, 0);
 
 		if (!(layerorco = DM_get_vert_data_layer(dm, layer))) {
 			DM_add_vert_layer(dm, layer, CD_CALLOC, NULL);
@@ -2111,7 +2111,7 @@ static void clear_mesh_caches(Object *ob)
 	}
 
 	if (ob->sculpt) {
-		object_sculpt_modifiers_changed(ob);
+		BKE_object_sculpt_modifiers_changed(ob);
 	}
 }
 
@@ -2884,7 +2884,7 @@ void DM_set_object_boundbox(Object *ob, DerivedMesh *dm)
 	if (!ob->bb)
 		ob->bb= MEM_callocN(sizeof(BoundBox), "DM-BoundBox");
 
-	boundbox_set_from_min_max(ob->bb, min, max);
+	BKE_boundbox_init_from_minmax(ob->bb, min, max);
 }
 
 /* --- NAVMESH (begin) --- */

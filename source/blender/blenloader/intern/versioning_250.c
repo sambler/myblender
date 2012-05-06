@@ -690,9 +690,6 @@ void blo_do_versions_250(FileData *fd, Library *lib, Main *main)
 {
 	/* WATCH IT!!!: pointers from libdata have not been converted */
 
-	if (G.debug & G_DEBUG)
-		printf("read file %s\n  Version %d sub %d svn r%d\n", fd->relabase, main->versionfile, main->subversionfile, main->revision);
-
 	if (main->versionfile < 250) {
 		bScreen *screen;
 		Scene *scene;
@@ -2363,8 +2360,8 @@ void blo_do_versions_250(FileData *fd, Library *lib, Main *main)
 	if (main->versionfile < 256 || (main->versionfile == 256 && main->subversionfile < 6)) {
 		Mesh *me;
 
-		for (me= main->mesh.first; me; me= me->id.next)
-			mesh_calc_normals_tessface(me->mvert, me->totvert, me->mface, me->totface, NULL);
+		for (me = main->mesh.first; me; me = me->id.next)
+			BKE_mesh_calc_normals_tessface(me->mvert, me->totvert, me->mface, me->totface, NULL);
 	}
 
 	if (main->versionfile < 256 || (main->versionfile == 256 && main->subversionfile < 2)) {

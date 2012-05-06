@@ -558,7 +558,7 @@ static Main *blo_find_main(FileData *fd, ListBase *mainlist, const char *filepat
 	m= MEM_callocN(sizeof(Main), "find_main");
 	BLI_addtail(mainlist, m);
 
-	lib= alloc_libblock(&m->library, ID_LI, "lib");
+	lib= BKE_libblock_alloc(&m->library, ID_LI, "lib");
 	BLI_strncpy(lib->name, filepath, sizeof(lib->name));
 	BLI_strncpy(lib->filepath, name1, sizeof(lib->filepath));
 	
@@ -2473,10 +2473,19 @@ typedef struct tConstraintLinkData {
 	ID *id;
 } tConstraintLinkData;
 /* callback function used to relink constraint ID-links */
-static void lib_link_constraint_cb(bConstraint *UNUSED(con), ID **idpoin, void *userdata)
+static void lib_link_constraint_cb(bConstraint *UNUSED(con), ID **idpoin, short isReference, void *userdata)
 {
 	tConstraintLinkData *cld= (tConstraintLinkData *)userdata;
-	*idpoin = newlibadr(cld->fd, cld->id->lib, *idpoin);
+	
+	/* for reference types, we need to increment the usercounts on load... */
+	if (isReference) {
+		/* reference type - with usercount */
+		*idpoin = newlibadr_us(cld->fd, cld->id->lib, *idpoin);
+	}
+	else {
+		/* target type - no usercount needed */
+		*idpoin = newlibadr(cld->fd, cld->id->lib, *idpoin);
+	}
 }
 
 static void lib_link_constraints(FileData *fd, ID *id, ListBase *conlist)
@@ -2565,7 +2574,7 @@ static void lib_link_pose(FileData *fd, Object *ob, bPose *pose)
 		
 		/* sync proxy active bone */
 		if (pose->proxy_act_bone[0]) {
-			Bone *bone = get_named_bone(arm, pose->proxy_act_bone);
+			Bone *bone = BKE_armature_find_bone_name(arm, pose->proxy_act_bone);
 			if (bone)
 				arm->act_bone = bone;
 		}
@@ -2575,7 +2584,7 @@ static void lib_link_pose(FileData *fd, Object *ob, bPose *pose)
 		lib_link_constraints(fd, (ID *)ob, &pchan->constraints);
 		
 		/* hurms... loop in a loop, but yah... later... (ton) */
-		pchan->bone= get_named_bone(arm, pchan->name);
+		pchan->bone= BKE_armature_find_bone_name(arm, pchan->name);
 		
 		pchan->custom= newlibadr_us(fd, arm->id.lib, pchan->custom);
 		if (pchan->bone==NULL)
@@ -2955,7 +2964,7 @@ static void direct_link_text(FileData *fd, Text *text)
 
 #if 0
 	if (text->flags & TXT_ISEXT) {
-		reopen_text(text);
+		BKE_text_reload(text);
 		}
 		else {
 #endif
@@ -3800,7 +3809,7 @@ static void direct_link_mdisps(FileData *fd, int count, MDisps *mdisps, int exte
 				 * overwritten with the correct value in
 				 * bm_corners_to_loops() */
 				float gridsize = sqrtf(mdisps[i].totdisp);
-				mdisps[i].level = (int)(logf(gridsize - 1.0f) / M_LN2) + 1;
+				mdisps[i].level = (int)(logf(gridsize - 1.0f) / (float)M_LN2) + 1;
 			}
 
 			if ( (fd->flags & FD_FLAGS_SWITCH_ENDIAN) && (mdisps[i].disps) ) {
@@ -3899,7 +3908,7 @@ static void direct_link_mesh(FileData *fd, Mesh *mesh)
 	if (mesh->mpoly) {
 		/* be clever and load polygons as mfaces */
 
-		mesh->totface= mesh_mpoly_to_mface(&mesh->fdata, &mesh->ldata, &mesh->pdata,
+		mesh->totface= BKE_mesh_mpoly_to_mface(&mesh->fdata, &mesh->ldata, &mesh->pdata,
 		                                   mesh->totface, mesh->totloop, mesh->totpoly);
 
 		CustomData_free(&mesh->pdata, mesh->totpoly);
@@ -4087,7 +4096,7 @@ static void lib_link_object(FileData *fd, Main *main)
 				warn= 1;
 
 				if (ob->pose) {
-					free_pose(ob->pose);
+					BKE_pose_free(ob->pose);
 					ob->pose= NULL;
 					ob->mode &= ~OB_MODE_POSE;
 				}
@@ -7397,7 +7406,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 		Curve *cu;
 
 		for (la= main->lamp.first; la; la= la->id.next) {
-			if (la->shadow_frustum_size == 0.0)
+			if (la->shadow_frustum_size == 0.0f)
 				la->shadow_frustum_size= 10.0f;
 		}
 
@@ -8115,7 +8124,7 @@ typedef struct tConstraintExpandData {
 	Main *mainvar;
 } tConstraintExpandData;
 /* callback function used to expand constraint ID-links */
-static void expand_constraint_cb(bConstraint *UNUSED(con), ID **idpoin, void *userdata)
+static void expand_constraint_cb(bConstraint *UNUSED(con), ID **idpoin, short UNUSED(isReference), void *userdata)
 {
 	tConstraintExpandData *ced= (tConstraintExpandData *)userdata;
 	expand_doit(ced->fd, ced->mainvar, *idpoin);
@@ -8529,7 +8538,7 @@ static int object_in_any_scene(Main *mainvar, Object *ob)
 	Scene *sce;
 	
 	for (sce= mainvar->scene.first; sce; sce= sce->id.next)
-		if (object_in_scene(ob, sce))
+		if (BKE_scene_base_find(sce, ob))
 			return 1;
 	return 0;
 }
@@ -8605,13 +8614,13 @@ static void give_base_to_groups(Main *mainvar, Scene *scene)
 		if (((group->id.flag & LIB_INDIRECT)==0 && (group->id.flag & LIB_PRE_EXISTING)==0)) {
 			Base *base;
 
-			/* add_object(...) messes with the selection */
-			Object *ob= add_only_object(OB_EMPTY, group->id.name+2);
+			/* BKE_object_add(...) messes with the selection */
+			Object *ob= BKE_object_add_only_object(OB_EMPTY, group->id.name+2);
 			ob->type= OB_EMPTY;
 			ob->lay= scene->lay;
 
 			/* assign the base */
-			base= scene_add_base(scene, ob);
+			base= BKE_scene_base_add(scene, ob);
 			base->flag |= SELECT;
 			base->object->flag= base->flag;
 			ob->recalc |= OB_RECALC_OB|OB_RECALC_DATA|OB_RECALC_TIME;

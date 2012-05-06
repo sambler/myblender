@@ -66,7 +66,7 @@ void modifier_init_texture(Scene *scene, Tex *tex)
 		return;
 
 	if (tex->ima && ELEM(tex->ima->source, IMA_SRC_MOVIE, IMA_SRC_SEQUENCE))
-		BKE_image_user_calc_frame(&tex->iuser, scene->r.cfra, 0);
+		BKE_image_user_frame_calc(&tex->iuser, scene->r.cfra, 0);
 }
 
 void get_texture_value(Tex *texture, float *tex_co, TexResult *texres)
@@ -207,7 +207,7 @@ DerivedMesh *get_dm(Object *ob, struct BMEditMesh *em, DerivedMesh *dm, float (*
 		}
 		
 		if (orco)
-			DM_add_vert_layer(dm, CD_ORCO, CD_ASSIGN, get_mesh_orco_verts(ob));
+			DM_add_vert_layer(dm, CD_ORCO, CD_ASSIGN, BKE_mesh_orco_verts_get(ob));
 	}
 	else if (ELEM3(ob->type, OB_FONT, OB_CURVE, OB_SURF)) {
 		dm= CDDM_from_curve(ob);
@@ -223,7 +223,7 @@ void modifier_get_vgroup(Object *ob, DerivedMesh *dm, const char *name, MDeformV
 
 	if (*defgrp_index >= 0) {
 		if (ob->type == OB_LATTICE)
-			*dvert = lattice_get_deform_verts(ob);
+			*dvert = BKE_lattice_deform_verts_get(ob);
 		else if (dm)
 			*dvert = dm->getVertDataArray(dm, CD_MDEFORMVERT);
 	}

@@ -346,41 +346,72 @@ static void UI_OT_reset_default_button(wmOperatorType *ot)
 
 /* Copy To Selected Operator ------------------------ */
 
-static int copy_to_selected_list(bContext *C, PointerRNA *ptr, ListBase *lb)
+static int copy_to_selected_list(bContext *C, PointerRNA *ptr, ListBase *lb, int *use_path)
 {
-	if (RNA_struct_is_a(ptr->type, &RNA_Object))
-		*lb = CTX_data_collection_get(C, "selected_editable_objects");
-	else if (RNA_struct_is_a(ptr->type, &RNA_EditBone))
+	*use_path = 0;
+
+	if (RNA_struct_is_a(ptr->type, &RNA_EditBone))
 		*lb = CTX_data_collection_get(C, "selected_editable_bones");
 	else if (RNA_struct_is_a(ptr->type, &RNA_PoseBone))
 		*lb = CTX_data_collection_get(C, "selected_pose_bones");
 	else if (RNA_struct_is_a(ptr->type, &RNA_Sequence))
 		*lb = CTX_data_collection_get(C, "selected_editable_sequences");
-	else
-		return 0;
+	else {
+		ID *id = ptr->id.data;
+
+		if (id && GS(id->name) == ID_OB) {
+			*lb = CTX_data_collection_get(C, "selected_editable_objects");
+			*use_path = 1;
+		}
+		else
+			return 0;
+	}
 	
 	return 1;
 }
 
 static int copy_to_selected_button_poll(bContext *C)
 {
-	PointerRNA ptr;
-	PropertyRNA *prop;
+	PointerRNA ptr, lptr, idptr;
+	PropertyRNA *prop, *lprop;
 	int index, success = 0;
 
 	uiContextActiveProperty(C, &ptr, &prop, &index);
 
 	if (ptr.data && prop) {
+		char *path = NULL;
+		int use_path;
 		CollectionPointerLink *link;
 		ListBase lb;
 
-		if (copy_to_selected_list(C, &ptr, &lb)) {
-			for (link = lb.first; link; link = link->next)
-				if (link->ptr.data != ptr.data && RNA_property_editable(&link->ptr, prop))
-					success = 1;
+		if (!copy_to_selected_list(C, &ptr, &lb, &use_path))
+			return success;
 
-			BLI_freelistN(&lb);
+		if (!use_path || (path = RNA_path_from_ID_to_property(&ptr, prop))) {
+			for (link = lb.first; link; link = link->next) {
+				if (link->ptr.data != ptr.data) {
+					if (use_path) {
+						lprop = NULL;
+						RNA_id_pointer_create(link->ptr.id.data, &idptr);
+						RNA_path_resolve(&idptr, path, &lptr, &lprop);
+					}
+					else {
+						lptr = link->ptr;
+						lprop = prop;
+					}
+
+					if (lprop == prop) {
+						if (RNA_property_editable(&lptr, prop))
+							success = 1;
+					}
+				}
+			}
+
+			if (path)
+				MEM_freeN(path);
 		}
+
+		BLI_freelistN(&lb);
 	}
 
 	return success;
@@ -388,8 +419,8 @@ static int copy_to_selected_button_poll(bContext *C)
 
 static int copy_to_selected_button_exec(bContext *C, wmOperator *op)
 {
-	PointerRNA ptr;
-	PropertyRNA *prop;
+	PointerRNA ptr, lptr, idptr;
+	PropertyRNA *prop, *lprop;
 	int success = 0;
 	int index, all = RNA_boolean_get(op->ptr, "all");
 
@@ -398,21 +429,43 @@ static int copy_to_selected_button_exec(bContext *C, wmOperator *op)
 	
 	/* if there is a valid property that is editable... */
 	if (ptr.data && prop) {
+		char *path = NULL;
+		int use_path;
 		CollectionPointerLink *link;
 		ListBase lb;
 
-		if (copy_to_selected_list(C, &ptr, &lb)) {
+		if (!copy_to_selected_list(C, &ptr, &lb, &use_path))
+			return success;
+
+		if (!use_path || (path = RNA_path_from_ID_to_property(&ptr, prop))) {
 			for (link = lb.first; link; link = link->next) {
-				if (link->ptr.data != ptr.data && RNA_property_editable(&link->ptr, prop)) {
-					if (RNA_property_copy(&link->ptr, &ptr, prop, (all) ? -1 : index)) {
-						RNA_property_update(C, &link->ptr, prop);
-						success = 1;
+				if (link->ptr.data != ptr.data) {
+					if (use_path) {
+						lprop = NULL;
+						RNA_id_pointer_create(link->ptr.id.data, &idptr);
+						RNA_path_resolve(&idptr, path, &lptr, &lprop);
+					}
+					else {
+						lptr = link->ptr;
+						lprop = prop;
+					}
+
+					if (lprop == prop) {
+						if (RNA_property_editable(&lptr, lprop)) {
+							if (RNA_property_copy(&lptr, &ptr, prop, (all) ? -1 : index)) {
+								RNA_property_update(C, &lptr, prop);
+								success = 1;
+							}
+						}
 					}
 				}
 			}
 
-			BLI_freelistN(&lb);
+			if (path)
+				MEM_freeN(path);
 		}
+
+		BLI_freelistN(&lb);
 	}
 	
 	return (success) ? OPERATOR_FINISHED : OPERATOR_CANCELLED;
@@ -454,7 +507,7 @@ static int reports_to_text_exec(bContext *C, wmOperator *UNUSED(op))
 	char *str;
 	
 	/* create new text-block to write to */
-	txt = add_empty_text("Recent Reports");
+	txt = BKE_text_add("Recent Reports");
 	
 	/* convert entire list to a display string, and add this to the text-block
 	 *	- if commandline debug option enabled, show debug reports too
@@ -463,7 +516,7 @@ static int reports_to_text_exec(bContext *C, wmOperator *UNUSED(op))
 	str = BKE_reports_string(reports, (G.debug & G_DEBUG) ? RPT_DEBUG : RPT_INFO);
 
 	if (str) {
-		write_text(txt, str);
+		BKE_text_write(txt, str);
 		MEM_freeN(str);
 
 		return OPERATOR_FINISHED;
@@ -599,7 +652,7 @@ static int editsource_text_edit(bContext *C, wmOperator *op,
 	}
 
 	if (text == NULL) {
-		text = add_text(filepath, bmain->name);
+		text = BKE_text_load(filepath, bmain->name);
 	}
 
 	if (text == NULL) {

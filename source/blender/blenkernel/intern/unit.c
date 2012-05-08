@@ -34,7 +34,10 @@
 #include "BLI_math.h"
 #include "BLI_string.h"
 #include "BLI_string_utf8.h"
-#include "BLI_winstuff.h"
+
+#ifdef WIN32
+#  include "BLI_winstuff.h"
+#endif
 
 #define TEMP_STR_SIZE 256
 
@@ -128,7 +131,7 @@ static struct bUnitDef buImperialLenDef[] = {
 	{"mile", "miles",		"mi", "m", "Miles",		UN_SC_MI, 0.0,	B_UNIT_DEF_NONE},
 	{"furlong", "furlongs",	"fur", NULL, "Furlongs",UN_SC_FUR, 0.0,	B_UNIT_DEF_SUPPRESS},
 	{"chain", "chains",		"ch", NULL, "Chains",	UN_SC_CH, 0.0,	B_UNIT_DEF_SUPPRESS},
-	{"yard", "yards",		"yd", NULL, "Yards",	UN_SC_YD, 0.0,	B_UNIT_DEF_NONE},
+	{"yard", "yards",		"yd", NULL, "Yards",	UN_SC_YD, 0.0,	B_UNIT_DEF_SUPPRESS},
 	{"foot", "feet",		"'", "ft", "Feet",		UN_SC_FT, 0.0,	B_UNIT_DEF_NONE}, /* base unit */
 	{"inch", "inches",		"\"", "in", "Inches",	UN_SC_IN, 0.0,	B_UNIT_DEF_NONE},
 	{"thou", "thou",		"thou", "mil", "Thou",	UN_SC_MIL, 0.0,	B_UNIT_DEF_NONE}, /* plural for thou has no 's' */
@@ -248,7 +251,7 @@ static struct bUnitDef buNaturalTimeDef[] = {
 	{"hour", "hours",				"hr", "h",	"Hours",		3600.0, 0.0,	B_UNIT_DEF_NONE},
 	{"minute", "minutes",			"min", "m",	"Minutes",		60.0, 0.0,		B_UNIT_DEF_NONE},
 	{"second", "seconds",			"sec", "s",	"Seconds",		1.0, 0.0,		B_UNIT_DEF_NONE}, /* base unit */
-	{"millisecond", "milliseconds",	"ms", NULL,	"Milliseconds",	0.001, 0.0	,	B_UNIT_DEF_NONE},
+	{"millisecond", "milliseconds",	"ms", NULL,	"Milliseconds",	0.001, 0.0,		B_UNIT_DEF_NONE},
 	{"microsecond", "microseconds",	"µs", "us",	"Microseconds",	0.000001, 0.0,	B_UNIT_DEF_NONE},
 	{NULL, NULL, NULL, NULL, NULL, 0.0, 0.0}
 };

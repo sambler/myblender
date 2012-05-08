@@ -1,6 +1,4 @@
 /*
- *
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -115,7 +113,6 @@ static pthread_mutex_t _rcache_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t _opengl_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t _nodes_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t _movieclip_lock = PTHREAD_MUTEX_INITIALIZER;
-static pthread_mutex_t _scanfill_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_t mainid;
 static int thread_levels= 0;	/* threads can be invoked inside threads */
 
@@ -305,7 +302,7 @@ void BLI_end_threads(ListBase *threadbase)
 /* System Information */
 
 /* how many threads are native on this system? */
-int BLI_system_thread_count( void )
+int BLI_system_thread_count(void)
 {
 	int t;
 #ifdef WIN32
@@ -354,8 +351,6 @@ void BLI_lock_thread(int type)
 		pthread_mutex_lock(&_nodes_lock);
 	else if (type==LOCK_MOVIECLIP)
 		pthread_mutex_lock(&_movieclip_lock);
-	else if (type == LOCK_SCANFILL)
-		pthread_mutex_lock(&_scanfill_lock);
 }
 
 void BLI_unlock_thread(int type)
@@ -376,8 +371,6 @@ void BLI_unlock_thread(int type)
 		pthread_mutex_unlock(&_nodes_lock);
 	else if (type==LOCK_MOVIECLIP)
 		pthread_mutex_unlock(&_movieclip_lock);
-	else if (type == LOCK_SCANFILL)
-		pthread_mutex_unlock(&_scanfill_lock);
 }
 
 /* Mutex Locks */

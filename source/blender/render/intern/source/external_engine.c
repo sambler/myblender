@@ -1,5 +1,4 @@
-/*  
- *
+/*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -311,9 +310,10 @@ int RE_engine_render(Render *re, int do_all)
 		engine->flag |= RE_ENGINE_ANIMATION;
 	if (re->r.scemode & R_PREVIEWBUTS)
 		engine->flag |= RE_ENGINE_PREVIEW;
+	engine->camera_override = re->camera_override;
 
 	if ((re->r.scemode & (R_NO_FRAME_UPDATE|R_PREVIEWBUTS))==0)
-		scene_update_for_newframe(re->main, re->scene, re->lay);
+		BKE_scene_update_for_newframe(re->main, re->scene, re->lay);
 
 	if (type->update)
 		type->update(engine, re->main, re->scene);

@@ -1,5 +1,4 @@
-/* 
- *
+/*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -358,7 +357,7 @@ static Scene *preview_prepare_scene(Scene *scene, ID *id, int id_type, ShaderPre
 					if (OB_TYPE_SUPPORT_MATERIAL(base->object->type)) {
 						/* don't use assign_material, it changed mat->id.us, which shows in the UI */
 						Material ***matar = give_matarar(base->object);
-						int actcol = MAX2(base->object->actcol > 0, 1) - 1;
+						int actcol = MAX2(base->object->actcol - 1, 0);
 
 						if (matar && actcol < base->object->totcol)
 							(*matar)[actcol] = mat;
@@ -706,7 +705,7 @@ static void shader_preview_render(ShaderPreview *sp, ID *id, int split, int firs
 	}
 	else {
 		/* validate owner */
-		//if(ri->rect==NULL)
+		//if (ri->rect==NULL)
 		//	ri->rect= MEM_mallocN(sizeof(int)*ri->pr_rectx*ri->pr_recty, "BIF_previewrender");
 		//RE_ResultGet32(re, ri->rect);
 	}
@@ -755,13 +754,13 @@ static void shader_preview_free(void *customdata)
 		/* get rid of copied material */
 		BLI_remlink(&pr_main->mat, sp->matcopy);
 		
-		/* free_material decrements texture, prevent this. hack alert! */
+		/* BKE_material_free decrements texture, prevent this. hack alert! */
 		for (a = 0; a < MAX_MTEX; a++) {
 			MTex *mtex = sp->matcopy->mtex[a];
 			if (mtex && mtex->tex) mtex->tex = NULL;
 		}
 		
-		free_material(sp->matcopy);
+		BKE_material_free(sp->matcopy);
 
 		properties = IDP_GetProperties((ID *)sp->matcopy, FALSE);
 		if (properties) {
@@ -777,7 +776,7 @@ static void shader_preview_free(void *customdata)
 		
 		/* get rid of copied texture */
 		BLI_remlink(&pr_main->tex, sp->texcopy);
-		free_texture(sp->texcopy);
+		BKE_texture_free(sp->texcopy);
 		
 		properties = IDP_GetProperties((ID *)sp->texcopy, FALSE);
 		if (properties) {
@@ -793,7 +792,7 @@ static void shader_preview_free(void *customdata)
 		
 		/* get rid of copied world */
 		BLI_remlink(&pr_main->world, sp->worldcopy);
-		free_world(sp->worldcopy);
+		BKE_world_free(sp->worldcopy);
 		
 		properties = IDP_GetProperties((ID *)sp->worldcopy, FALSE);
 		if (properties) {
@@ -809,7 +808,7 @@ static void shader_preview_free(void *customdata)
 		
 		/* get rid of copied lamp */
 		BLI_remlink(&pr_main->lamp, sp->lampcopy);
-		free_lamp(sp->lampcopy);
+		BKE_lamp_free(sp->lampcopy);
 		
 		properties = IDP_GetProperties((ID *)sp->lampcopy, FALSE);
 		if (properties) {
@@ -987,20 +986,19 @@ static void icon_preview_startjob_all_sizes(void *customdata, short *stop, short
 	IconPreviewSize *cur_size = ip->sizes.first;
 
 	while (cur_size) {
-		ShaderPreview sp;
-
-		memset(&sp, 0, sizeof(ShaderPreview));
+		ShaderPreview *sp = MEM_callocN(sizeof(ShaderPreview), "Icon ShaderPreview");
 
 		/* construct shader preview from image size and previewcustomdata */
-		sp.scene = ip->scene;
-		sp.owner = ip->owner;
-		sp.sizex = cur_size->sizex;
-		sp.sizey = cur_size->sizey;
-		sp.pr_method = PR_ICON_RENDER;
-		sp.pr_rect = cur_size->rect;
-		sp.id = ip->id;
+		sp->scene = ip->scene;
+		sp->owner = ip->owner;
+		sp->sizex = cur_size->sizex;
+		sp->sizey = cur_size->sizey;
+		sp->pr_method = PR_ICON_RENDER;
+		sp->pr_rect = cur_size->rect;
+		sp->id = ip->id;
 
-		common_preview_startjob(&sp, stop, do_update, progress);
+		common_preview_startjob(sp, stop, do_update, progress);
+		shader_preview_free(sp);
 
 		cur_size = cur_size->next;
 	}

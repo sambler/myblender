@@ -38,15 +38,16 @@
 #include "zlib.h" /* wm_read_exotic() */
 
 #ifdef WIN32
-#include <windows.h> /* need to include windows.h so _WIN32_IE is defined  */
-#ifndef _WIN32_IE
-#define _WIN32_IE 0x0400 /* minimal requirements for SHGetSpecialFolderPath on MINGW MSVC has this defined already */
-#endif
-#include <shlobj.h> /* for SHGetSpecialFolderPath, has to be done before BLI_winstuff because 'near' is disabled through BLI_windstuff */
-#include <process.h> /* getpid */
-#include "BLI_winstuff.h"
+#  include <windows.h> /* need to include windows.h so _WIN32_IE is defined  */
+#  ifndef _WIN32_IE
+#    define _WIN32_IE 0x0400 /* minimal requirements for SHGetSpecialFolderPath on MINGW MSVC has this defined already */
+#  endif
+#  include <shlobj.h>  /* for SHGetSpecialFolderPath, has to be done before BLI_winstuff
+                        * because 'near' is disabled through BLI_windstuff */
+#  include <process.h> /* getpid */
+#  include "BLI_winstuff.h"
 #else
-#include <unistd.h> /* getpid */
+#  include <unistd.h> /* getpid */
 #endif
 
 #include "MEM_guardedalloc.h"
@@ -79,6 +80,7 @@
 #include "BKE_packedFile.h"
 #include "BKE_report.h"
 #include "BKE_sound.h"
+#include "BKE_screen.h"
 #include "BKE_texture.h"
 
 
@@ -359,7 +361,7 @@ void WM_read_file(bContext *C, const char *filepath, ReportList *reports)
 
 	WM_cursor_wait(1);
 
-	BLI_exec_cb(CTX_data_main(C), NULL, BLI_CB_EVT_LOAD_PRE);
+	BLI_callback_exec(CTX_data_main(C), NULL, BLI_CB_EVT_LOAD_PRE);
 
 	/* first try to append data from exotic file formats... */
 	/* it throws error box when file doesn't exist and returns -1 */
@@ -419,7 +421,7 @@ void WM_read_file(bContext *C, const char *filepath, ReportList *reports)
 #endif
 
 		/* important to do before NULL'ing the context */
-		BLI_exec_cb(CTX_data_main(C), NULL, BLI_CB_EVT_LOAD_POST);
+		BLI_callback_exec(CTX_data_main(C), NULL, BLI_CB_EVT_LOAD_POST);
 
 		if (!G.background) {
 			/* in background mode this makes it hard to load
@@ -482,7 +484,7 @@ int WM_read_homefile(bContext *C, ReportList *UNUSED(reports), short from_memory
 	char tstr[FILE_MAX];
 	int success = 0;
 	
-	free_ttfont(); /* still weird... what does it here? */
+	BKE_vfont_free_global_ttf(); /* still weird... what does it here? */
 		
 	G.relbase_valid = 0;
 	if (!from_memory) {
@@ -661,23 +663,47 @@ static void write_history(void)
 	}
 }
 
-static ImBuf *blend_file_thumb(Scene *scene, int **thumb_pt)
+/* screen can be NULL */
+static ImBuf *blend_file_thumb(Scene *scene, bScreen *screen, int **thumb_pt)
 {
 	/* will be scaled down, but gives some nice oversampling */
 	ImBuf *ibuf;
 	int *thumb;
 	char err_out[256] = "unknown";
 
+	/* screen if no camera found */
+	ScrArea *sa = NULL;
+	ARegion *ar = NULL;
+	View3D *v3d = NULL;
+
 	*thumb_pt = NULL;
 
 	/* scene can be NULL if running a script at startup and calling the save operator */
-	if (G.background || scene == NULL || scene->camera == NULL)
+	if (G.background || scene == NULL)
 		return NULL;
 
+	if ((scene->camera == NULL) && (screen != NULL)) {
+		sa = BKE_screen_find_big_area(screen, SPACE_VIEW3D, 0);
+		ar = BKE_area_find_region_type(sa, RGN_TYPE_WINDOW);
+		if (ar) {
+			v3d = sa->spacedata.first;
+		}
+	}
+
+	if (scene->camera == NULL && v3d == NULL) {
+		return NULL;
+	}
+
 	/* gets scaled to BLEN_THUMB_SIZE */
-	ibuf = ED_view3d_draw_offscreen_imbuf_simple(scene, scene->camera,
-	                                             BLEN_THUMB_SIZE * 2, BLEN_THUMB_SIZE * 2,
-	                                             IB_rect, OB_SOLID, FALSE, err_out);
+	if (scene->camera) {
+		ibuf = ED_view3d_draw_offscreen_imbuf_simple(scene, scene->camera,
+		                                             BLEN_THUMB_SIZE * 2, BLEN_THUMB_SIZE * 2,
+		                                             IB_rect, OB_SOLID, FALSE, err_out);
+	}
+	else {
+		ibuf = ED_view3d_draw_offscreen_imbuf(scene, v3d, ar, BLEN_THUMB_SIZE * 2, BLEN_THUMB_SIZE * 2,
+		                                      IB_rect, FALSE, err_out);
+	}
 
 	if (ibuf) {		
 		float aspect = (scene->r.xsch * scene->r.xasp) / (scene->r.ysch * scene->r.yasp);
@@ -762,10 +788,10 @@ int WM_write_file(bContext *C, const char *target, int fileflags, ReportList *re
 	/* blend file thumbnail */
 	/* save before exit_editmode, otherwise derivedmeshes for shared data corrupt #27765) */
 	if (U.flag & USER_SAVE_PREVIEWS) {
-		ibuf_thumb = blend_file_thumb(CTX_data_scene(C), &thumb);
+		ibuf_thumb = blend_file_thumb(CTX_data_scene(C), CTX_wm_screen(C), &thumb);
 	}
 
-	BLI_exec_cb(G.main, NULL, BLI_CB_EVT_SAVE_PRE);
+	BLI_callback_exec(G.main, NULL, BLI_CB_EVT_SAVE_PRE);
 
 	/* operator now handles overwrite checks */
 
@@ -800,10 +826,11 @@ int WM_write_file(bContext *C, const char *target, int fileflags, ReportList *re
 			write_history();
 		}
 
-		BLI_exec_cb(G.main, NULL, BLI_CB_EVT_SAVE_POST);
+		BLI_callback_exec(G.main, NULL, BLI_CB_EVT_SAVE_POST);
 
 		/* run this function after because the file cant be written before the blend is */
 		if (ibuf_thumb) {
+			IMB_thumb_delete(filepath, THB_FAIL); /* without this a failed thumb overrides */
 			ibuf_thumb = IMB_thumb_create(filepath, THB_NORMAL, THB_SOURCE_BLEND, ibuf_thumb);
 			IMB_freeImBuf(ibuf_thumb);
 		}

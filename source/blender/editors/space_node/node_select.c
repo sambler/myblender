@@ -441,8 +441,8 @@ static int node_mouse_select(Main *bmain, SpaceNode *snode, ARegion *ar, const i
 			}
 			else {
 				/* only allow one selected output per node, for sensible linking.
-				* allows selecting outputs from different nodes though.
-				*/
+				 * allows selecting outputs from different nodes though.
+				 */
 				if (node) {
 					for (tsock=node->outputs.first; tsock; tsock=tsock->next)
 						node_socket_deselect(node, tsock, 1);
@@ -517,7 +517,7 @@ static int node_select_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	RNA_int_set(op->ptr, "mouse_x", event->mval[0]);
 	RNA_int_set(op->ptr, "mouse_y", event->mval[1]);
 
-	return node_select_exec(C,op);
+	return node_select_exec(C, op);
 }
 
 

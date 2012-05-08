@@ -133,12 +133,12 @@ uint ShaderManager::get_attribute_id(ustring name)
 	if(it != unique_attribute_id.end())
 		return it->second;
 	
-	uint id = (uint)Attribute::STD_NUM + unique_attribute_id.size();
+	uint id = (uint)ATTR_STD_NUM + unique_attribute_id.size();
 	unique_attribute_id[name] = id;
 	return id;
 }
 
-uint ShaderManager::get_attribute_id(Attribute::Standard std)
+uint ShaderManager::get_attribute_id(AttributeStandard std)
 {
 	return (uint)std;
 }
@@ -271,6 +271,17 @@ void ShaderManager::add_default(Scene *scene)
 		shader->graph = graph;
 		scene->shaders.push_back(shader);
 		scene->default_holdout = scene->shaders.size() - 1;
+	}
+
+	/* default empty */
+	{
+		graph = new ShaderGraph();
+
+		shader = new Shader();
+		shader->name = "default_empty";
+		shader->graph = graph;
+		scene->shaders.push_back(shader);
+		scene->default_empty = scene->shaders.size() - 1;
 	}
 }
 

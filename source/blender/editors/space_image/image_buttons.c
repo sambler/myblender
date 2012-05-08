@@ -146,7 +146,7 @@ static void image_info(Scene *scene, ImageUser *iuser, Image *ima, ImBuf *ibuf, 
 	/* the frame number, even if we cant */
 	if (ima->source == IMA_SRC_SEQUENCE) {
 		/* don't use iuser->framenr directly because it may not be updated if auto-refresh is off */
-		const int framenr = BKE_image_user_get_frame(iuser, CFRA, 0);
+		const int framenr = BKE_image_user_frame_get(iuser, CFRA, 0);
 		ofs += sprintf(str + ofs, ", Frame: %d", framenr);
 	}
 
@@ -154,7 +154,8 @@ static void image_info(Scene *scene, ImageUser *iuser, Image *ima, ImBuf *ibuf, 
 }
 
 /* gets active viewer user */
-struct ImageUser *ntree_get_active_iuser(bNodeTree *ntree){
+struct ImageUser *ntree_get_active_iuser(bNodeTree *ntree)
+{
 	bNode *node;
 	
 	if (ntree)
@@ -429,7 +430,7 @@ static void set_frames_cb(bContext *C, void *ima_v, void *iuser_v)
 	
 	if (ima->anim) {
 		iuser->frames = IMB_anim_get_duration(ima->anim, IMB_TC_RECORD_RUN);
-		BKE_image_user_calc_frame(iuser, scene->r.cfra, 0);
+		BKE_image_user_frame_calc(iuser, scene->r.cfra, 0);
 	}
 }
 
@@ -601,7 +602,7 @@ static void rna_update_cb(bContext *C, void *arg_cb, void *UNUSED(arg))
 	RNAUpdateCb *cb = (RNAUpdateCb *)arg_cb;
 
 	/* ideally this would be done by RNA itself, but there we have
-	* no image user available, so we just update this flag here */
+	 * no image user available, so we just update this flag here */
 	cb->iuser->ok = 1;
 
 	/* we call update here on the pointer property, this way the

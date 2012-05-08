@@ -275,7 +275,7 @@ static void text_update_edited(bContext *C, Scene *scene, Object *obedit, int re
 	if (mode == FO_EDIT)
 		update_string(cu);
 
-	BKE_text_to_curve(bmain, scene, obedit, mode);
+	BKE_vfont_to_curve(bmain, scene, obedit, mode);
 
 	if (recalc)
 		DAG_id_tag_update(obedit->data, 0);
@@ -437,19 +437,19 @@ static void txt_add_object(bContext *C, TextLine *firstline, int totline, float 
 	int nchars = 0, a;
 	float rot[3] = {0.f, 0.f, 0.f};
 	
-	obedit= add_object(scene, OB_FONT);
+	obedit= BKE_object_add(scene, OB_FONT);
 	base= scene->basact;
 
 	
 	ED_object_base_init_transform(C, base, NULL, rot); /* seems to assume view align ? TODO - look into this, could be an operator option */
-	where_is_object(scene, obedit);
+	BKE_object_where_is_calc(scene, obedit);
 
 	obedit->loc[0] += offset[0];
 	obedit->loc[1] += offset[1];
 	obedit->loc[2] += offset[2];
 
 	cu= obedit->data;
-	cu->vfont= get_builtin_font();
+	cu->vfont= BKE_vfont_builtin_get();
 	cu->vfont->id.us++;
 
 	for (tmp=firstline, a=0; cu->len<MAXTEXT && a<totline; tmp=tmp->next, a++)
@@ -520,13 +520,17 @@ void ED_text_to_object(bContext *C, Text *text, int split_lines)
 }
 
 /********************** utilities ***************************/
-
 static short next_word(Curve *cu)
 {
 	short s;
-	for (s=cu->pos; (cu->str[s]) && (cu->str[s]!=' ') && (cu->str[s]!='\n') &&
-					(cu->str[s]!=1) && (cu->str[s]!='\r'); s++);
-	if (cu->str[s]) return(s+1); else return(s);
+	for (s=cu->pos; ((cu->str[s]) && (cu->str[s] != ' ') && (cu->str[s] != '\n') &&
+	                 (cu->str[s] != 1) && (cu->str[s] != '\r'));
+	     s++)
+	{
+		/* pass */
+	}
+
+	return cu->str[s] ? (s + 1) : s;
 }
 
 static short prev_word(Curve *cu)
@@ -534,9 +538,14 @@ static short prev_word(Curve *cu)
 	short s;
 	
 	if (cu->pos==0) return(0);
-	for (s=cu->pos-2; (cu->str[s]) && (cu->str[s]!=' ') && (cu->str[s]!='\n') &&
-					(cu->str[s]!=1) && (cu->str[s]!='\r'); s--);
-	if (cu->str[s]) return(s+1); else return(s);
+	for (s = cu->pos - 2; ((cu->str[s]) && (cu->str[s] != ' ') && (cu->str[s] != '\n') &&
+	                       (cu->str[s] != 1) && (cu->str[s] != '\r'));
+	     s--)
+	{
+		/* pass */
+	}
+
+	return cu->str[s] ? (s + 1) : s;
 }
 
 static int kill_selection(Object *obedit, int ins)	/* 1 == new character */
@@ -547,7 +556,7 @@ static int kill_selection(Object *obedit, int ins)	/* 1 == new character */
 	int offset = 0;
 	int getfrom;
 
-	direction = BKE_font_getselection(obedit, &selstart, &selend);
+	direction = BKE_vfont_select_get(obedit, &selstart, &selend);
 	if (direction) {
 		int size;
 		if (ins) offset = 1;
@@ -584,7 +593,7 @@ static int set_style(bContext *C, const int style, const int clear)
 	EditFont *ef= cu->editfont;
 	int i, selstart, selend;
 
-	if (!BKE_font_getselection(obedit, &selstart, &selend))
+	if (!BKE_vfont_select_get(obedit, &selstart, &selend))
 		return OPERATOR_CANCELLED;
 
 	for (i=selstart; i<=selend; i++) {
@@ -635,7 +644,7 @@ static int toggle_style_exec(bContext *C, wmOperator *op)
 	Curve *cu= obedit->data;
 	int style, clear, selstart, selend;
 
-	if (!BKE_font_getselection(obedit, &selstart, &selend))
+	if (!BKE_vfont_select_get(obedit, &selstart, &selend))
 		return OPERATOR_CANCELLED;
 	
 	style= RNA_enum_get(op->ptr, "style");
@@ -670,7 +679,7 @@ static void copy_selection(Object *obedit)
 {
 	int selstart, selend;
 	
-	if (BKE_font_getselection(obedit, &selstart, &selend)) {
+	if (BKE_vfont_select_get(obedit, &selstart, &selend)) {
 		Curve *cu= obedit->data;
 		EditFont *ef= cu->editfont;
 		
@@ -709,7 +718,7 @@ static int cut_text_exec(bContext *C, wmOperator *UNUSED(op))
 	Object *obedit= CTX_data_edit_object(C);
 	int selstart, selend;
 
-	if (!BKE_font_getselection(obedit, &selstart, &selend))
+	if (!BKE_vfont_select_get(obedit, &selstart, &selend))
 		return OPERATOR_CANCELLED;
 
 	copy_selection(obedit);
@@ -816,7 +825,7 @@ static int move_cursor(bContext *C, int type, int select)
 	EditFont *ef= cu->editfont;
 	int cursmove= -1;
 
-	switch(type) {
+	switch (type) {
 		case LINE_BEGIN:
 			if ((select) && (cu->selstart==0)) cu->selstart = cu->selend = cu->pos+1;
 			while (cu->pos>0) {
@@ -892,7 +901,7 @@ static int move_cursor(bContext *C, int type, int select)
 			struct Main *bmain= CTX_data_main(C);
 			cu->selstart = cu->selend = 0;
 			update_string(cu);
-			BKE_text_to_curve(bmain, scene, obedit, FO_SELCHANGE);
+			BKE_vfont_to_curve(bmain, scene, obedit, FO_SELCHANGE);
 		}
 	}
 
@@ -1112,7 +1121,7 @@ static int delete_exec(bContext *C, wmOperator *op)
 	if (cu->len == 0)
 		return OPERATOR_CANCELLED;
 
-	if (BKE_font_getselection(obedit, &selstart, &selend)) {
+	if (BKE_vfont_select_get(obedit, &selstart, &selend)) {
 		if (type == DEL_NEXT_SEL) type= DEL_SELECTION;
 		else if (type == DEL_PREV_SEL) type= DEL_SELECTION;
 	}
@@ -1121,7 +1130,7 @@ static int delete_exec(bContext *C, wmOperator *op)
 		else if (type == DEL_PREV_SEL) type= DEL_PREV_CHAR;
 	}
 
-	switch(type) {
+	switch (type) {
 		case DEL_ALL:
 			cu->len = cu->pos = 0;
 			ef->textbuf[0]= 0;
@@ -1491,7 +1500,7 @@ void load_editText(Object *obedit)
 
 void free_editText(Object *obedit)
 {
-	BKE_free_editfont((Curve *)obedit->data);
+	BKE_curve_editfont_free((Curve *)obedit->data);
 }
 
 /********************** set case operator *********************/
@@ -1625,7 +1634,7 @@ static int font_open_exec(bContext *C, wmOperator *op)
 	char filepath[FILE_MAX];
 	RNA_string_get(op->ptr, "filepath", filepath);
 
-	font= load_vfont(bmain, filepath);
+	font= BKE_vfont_load(bmain, filepath);
 
 	if (!font) {
 		if (op->customdata) MEM_freeN(op->customdata);
@@ -1687,6 +1696,7 @@ void FONT_OT_open(wmOperatorType *ot)
 	/* identifiers */
 	ot->name = "Open Font";
 	ot->idname = "FONT_OT_open";
+	ot->description = "Load a new font from a file";
 	
 	/* api callbacks */
 	ot->exec = font_open_exec;
@@ -1716,7 +1726,7 @@ static int font_unlink_exec(bContext *C, wmOperator *op)
 		return OPERATOR_CANCELLED;
 	}
 
-	builtin_font = get_builtin_font();
+	builtin_font = BKE_vfont_builtin_get();
 
 	RNA_id_pointer_create(&builtin_font->id, &idptr);
 	RNA_property_pointer_set(&pprop.ptr, pprop.prop, idptr);

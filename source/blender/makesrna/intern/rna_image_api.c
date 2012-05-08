@@ -1,5 +1,4 @@
 /*
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -86,7 +85,7 @@ static void rna_Image_save_render(Image *image, bContext *C, ReportList *reports
 			const float dither_back = ibuf->dither;
 			ibuf->planes = scene->r.im_format.planes;
 			ibuf->dither = scene->r.dither_intensity;
-			if (!BKE_write_ibuf(ibuf, path, &scene->r.im_format)) {
+			if (!BKE_imbuf_write(ibuf, path, &scene->r.im_format)) {
 				BKE_reportf(reports, RPT_ERROR, "Couldn't write image: %s", path);
 			}
 			ibuf->planes = imb_planes_back;
@@ -200,7 +199,7 @@ static int rna_Image_gl_load(Image *image, ReportList *reports, int filter, int 
 	glBindTexture(GL_TEXTURE_2D, *bind);
 
 	if (filter != GL_NEAREST && filter != GL_LINEAR)
-		error = (int)gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGBA, ibuf->x, ibuf->y, GL_RGBA, GL_UNSIGNED_INT, ibuf->rect);
+		error = (int)gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGBA, ibuf->x, ibuf->y, GL_RGBA, GL_UNSIGNED_BYTE, ibuf->rect);
 
 	if (!error) {
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, image->tpageflag & IMA_CLAMP_U ? GL_CLAMP : GL_REPEAT);

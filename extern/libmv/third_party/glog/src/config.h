@@ -12,5 +12,7 @@
  #include "config_linux.h"
 #elif defined(_MSC_VER)
  #include "windows/config.h"
+#elif defined(__GNU__)
+ #include "config_hurd.h"
 #endif
 

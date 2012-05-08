@@ -358,7 +358,7 @@ void paint_sample_color(Scene *scene, ARegion *ar, int x, int y)    /* frontbuf 
 static int brush_curve_preset_exec(bContext *C, wmOperator *op)
 {
 	Brush *br = paint_brush(paint_get_active(CTX_data_scene(C)));
-	brush_curve_preset(br, RNA_enum_get(op->ptr, "shape"));
+	BKE_brush_curve_preset(br, RNA_enum_get(op->ptr, "shape"));
 
 	return OPERATOR_FINISHED;
 }
@@ -387,8 +387,6 @@ void BRUSH_OT_curve_preset(wmOperatorType *ot)
 
 	ot->exec = brush_curve_preset_exec;
 	ot->poll = brush_curve_preset_poll;
-
-	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
 	RNA_def_enum(ot->srna, "shape", prop_shape_items, CURVE_PRESET_SMOOTH, "Mode", "");
 }

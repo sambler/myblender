@@ -187,7 +187,7 @@ static void rna_Cache_idname_change(Main *UNUSED(bmain), Scene *UNUSED(scene), P
 		for (pid = pidlist.first; pid; pid = pid->next) {
 			if (pid->cache == cache)
 				pid2 = pid;
-			else if (cache->name[0] != '\0' && strcmp(cache->name,pid->cache->name) == 0) {
+			else if (cache->name[0] != '\0' && strcmp(cache->name, pid->cache->name) == 0) {
 				/*TODO: report "name exists" to user */
 				BLI_strncpy(cache->name, cache->prev_name, sizeof(cache->name));
 				new_name = 0;
@@ -513,7 +513,7 @@ static void rna_FieldSettings_shape_update(Main *bmain, Scene *scene, PointerRNA
 
 		/* add/remove modifier as needed */
 		if (!md) {
-			if (pd && (pd->shape == PFIELD_SHAPE_SURFACE) && ELEM(pd->forcefield,PFIELD_GUIDE,PFIELD_TEXTURE) == 0)
+			if (pd && (pd->shape == PFIELD_SHAPE_SURFACE) && ELEM(pd->forcefield, PFIELD_GUIDE, PFIELD_TEXTURE) == 0)
 				if (ELEM4(ob->type, OB_MESH, OB_SURF, OB_FONT, OB_CURVE))
 					ED_object_modifier_add(NULL, bmain, scene, ob, NULL, eModifierType_Surface);
 		}
@@ -1650,7 +1650,7 @@ static void rna_def_softbody(BlenderRNA *brna)
 	RNA_def_property_float_sdna(prop, NULL, "colball");
 	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE); /* code is not ready for that yet */
 	RNA_def_property_range(prop, -10.0f, 10.0f);
-	RNA_def_property_ui_text(prop, "Ball Size", "Absolute ball size or factor if not manual adjusted");
+	RNA_def_property_ui_text(prop, "Ball Size", "Absolute ball size or factor if not manually adjusted");
 	RNA_def_property_update(prop, 0, "rna_softbody_update");
 	
 	prop = RNA_def_property(srna, "ball_stiff", PROP_FLOAT, PROP_NONE);

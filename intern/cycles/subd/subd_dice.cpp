@@ -39,7 +39,7 @@ EdgeDice::EdgeDice(Mesh *mesh_, int shader_, bool smooth_, float dicing_rate_)
 	smooth = smooth_;
 	camera = NULL;
 
-	mesh->attributes.add(Attribute::STD_VERTEX_NORMAL);
+	mesh->attributes.add(ATTR_STD_VERTEX_NORMAL);
 }
 
 void EdgeDice::reserve(int num_verts, int num_tris)
@@ -49,7 +49,7 @@ void EdgeDice::reserve(int num_verts, int num_tris)
 
 	mesh->reserve(vert_offset + num_verts, tri_offset + num_tris);
 
-	Attribute *attr_vN = mesh->attributes.add(Attribute::STD_VERTEX_NORMAL);
+	Attribute *attr_vN = mesh->attributes.add(ATTR_STD_VERTEX_NORMAL);
 
 	mesh_P = &mesh->verts[0];
 	mesh_N = attr_vN->data_float3();
@@ -141,7 +141,7 @@ float3 QuadDice::eval_projected(SubPatch& sub, float u, float v)
 
 	sub.patch->eval(&P, NULL, NULL, uv.x, uv.y);
 	if(camera)
-		P = transform(&camera->worldtoraster, P);
+		P = transform_perspective(&camera->worldtoraster, P);
 
 	return P;
 }

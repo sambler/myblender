@@ -550,7 +550,7 @@ static float spec(float inp, int hard)
 	return inp;
 }
 
-static float Phong_Spec( float *n, float *l, float *v, int hard, int tangent )
+static float Phong_Spec(float *n, float *l, float *v, int hard, int tangent )
 {
 	float h[3];
 	float rslt;
@@ -638,7 +638,7 @@ static float Blinn_Spec(float *n, float *l, float *v, float refrac, float spec_p
 	else if ( b < a && b < c ) g = b;
 	else if ( c < a && c < b ) g = c;
 
-	p = sqrt( (double)((refrac * refrac)+(vh*vh)-1.0f) );
+	p = sqrt((double)((refrac * refrac)+(vh * vh) - 1.0f));
 	f = (((p-vh)*(p-vh))/((p+vh)*(p+vh)))*(1+((((vh*(p+vh))-1.0f)*((vh*(p+vh))-1.0f))/(((vh*(p-vh))+1.0f)*((vh*(p-vh))+1.0f))));
 	ang = saacos(nh);
 
@@ -649,7 +649,7 @@ static float Blinn_Spec(float *n, float *l, float *v, float refrac, float spec_p
 }
 
 /* cartoon render spec */
-static float Toon_Spec( float *n, float *l, float *v, float size, float smooth, int tangent)
+static float Toon_Spec(float *n, float *l, float *v, float size, float smooth, int tangent)
 {
 	float h[3];
 	float ang;
@@ -673,7 +673,7 @@ static float Toon_Spec( float *n, float *l, float *v, float size, float smooth, 
 }
 
 /* Ward isotropic gaussian spec */
-static float WardIso_Spec( float *n, float *l, float *v, float rms, int tangent)
+static float WardIso_Spec(float *n, float *l, float *v, float rms, int tangent)
 {
 	float i, nh, nv, nl, h[3], angle, alpha;
 
@@ -705,7 +705,7 @@ static float WardIso_Spec( float *n, float *l, float *v, float rms, int tangent)
 }
 
 /* cartoon render diffuse */
-static float Toon_Diff( float *n, float *l, float *UNUSED(v), float size, float smooth )
+static float Toon_Diff(float *n, float *l, float *UNUSED(v), float size, float smooth)
 {
 	float rslt, ang;
 
@@ -754,12 +754,12 @@ static float OrenNayar_Diff(float nl, float *n, float *l, float *v, float rough 
 	Lit_B[0] = l[0] - (realnl * n[0]);
 	Lit_B[1] = l[1] - (realnl * n[1]);
 	Lit_B[2] = l[2] - (realnl * n[2]);
-	normalize_v3( Lit_B );
+	normalize_v3(Lit_B);
 	
 	View_B[0] = v[0] - (nv * n[0]);
 	View_B[1] = v[1] - (nv * n[1]);
 	View_B[2] = v[2] - (nv * n[2]);
-	normalize_v3( View_B );
+	normalize_v3(View_B);
 	
 	t = Lit_B[0]*View_B[0] + Lit_B[1]*View_B[1] + Lit_B[2]*View_B[2];
 	if ( t < 0 ) t = 0;
@@ -931,7 +931,7 @@ static void add_to_diffuse(float *diff, ShadeInput *shi, float is, float r, floa
 			float fac;
 
 			/* input */
-			switch(ma->rampin_col) {
+			switch (ma->rampin_col) {
 			case MA_RAMP_IN_ENERGY:
 				/* should use 'rgb_to_grayscale' but we only have a vector version */
 				fac= 0.3f*r + 0.58f*g + 0.12f*b;
@@ -1003,7 +1003,7 @@ static void do_specular_ramp(ShadeInput *shi, float is, float t, float spec[3])
 		float col[4];
 
 		/* input */
-		switch(ma->rampin_spec) {
+		switch (ma->rampin_spec) {
 		case MA_RAMP_IN_ENERGY:
 			fac= t;
 			break;
@@ -1152,14 +1152,13 @@ float lamp_get_visibility(LampRen *lar, const float co[3], float lv[3], float *d
 		/* area type has no quad or sphere option */
 		if (lar->type==LA_AREA) {
 			/* area is single sided */
-			//if(dot_v3v3(lv, lar->vec) > 0.0f)
+			//if (dot_v3v3(lv, lar->vec) > 0.0f)
 			//	visifac= 1.0f;
 			//else
 			//	visifac= 0.0f;
 		}
 		else {
-			switch(lar->falloff_type)
-			{
+			switch (lar->falloff_type) {
 				case LA_FALLOFF_CONSTANT:
 					visifac = 1.0f;
 					break;
@@ -1731,8 +1730,9 @@ void shade_lamp_loop(ShadeInput *shi, ShadeResult *shr)
 	
 	/* AO pass */
 	if (R.wrld.mode & (WO_AMB_OCC|WO_ENV_LIGHT|WO_INDIRECT_LIGHT)) {
-		if (((passflag & SCE_PASS_COMBINED) && (shi->combinedflag & (SCE_PASS_AO|SCE_PASS_ENVIRONMENT|SCE_PASS_INDIRECT)))
-			|| (passflag & (SCE_PASS_AO|SCE_PASS_ENVIRONMENT|SCE_PASS_INDIRECT))) {
+		if (((passflag & SCE_PASS_COMBINED) && (shi->combinedflag & (SCE_PASS_AO|SCE_PASS_ENVIRONMENT|SCE_PASS_INDIRECT))) ||
+		    (passflag & (SCE_PASS_AO|SCE_PASS_ENVIRONMENT|SCE_PASS_INDIRECT)))
+		{
 			if (R.r.mode & R_SHADOW) {
 				/* AO was calculated for scanline already */
 				if (shi->depth || shi->volume_depth)
@@ -1854,7 +1854,7 @@ void shade_lamp_loop(ShadeInput *shi, ShadeResult *shr)
 	}
 	shr->alpha= shi->alpha;
 	
-	/* from now stuff everything in shr->combined: ambient, AO, radio, ramps, exposure */
+	/* from now stuff everything in shr->combined: ambient, AO, ramps, exposure */
 	if (!(ma->sss_flag & MA_DIFF_SSS) || !sss_pass_done(&R, ma)) {
 		if (R.r.mode & R_SHADOW) {
 			/* add AO in combined? */

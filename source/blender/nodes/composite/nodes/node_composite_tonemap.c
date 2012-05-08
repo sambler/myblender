@@ -94,7 +94,7 @@ static void tonemap(NodeTonemap* ntm, CompBuf* dst, CompBuf* src)
 				I_l = sp[x][1] + ic*(L - sp[x][1]);
 				I_g = Cav[1] + ic*(Lav - Cav[1]);
 				I_a = I_l + ia*(I_g - I_l);
-				dp[x][1] /= (dp[x][1] + pow((double)f*I_a,(double)m));
+				dp[x][1] /= (dp[x][1] + pow((double)f*I_a, (double)m));
 				I_l = sp[x][2] + ic*(L - sp[x][2]);
 				I_g = Cav[2] + ic*(Lav - Cav[2]);
 				I_a = I_l + ia*(I_g - I_l);
@@ -118,9 +118,9 @@ static void tonemap(NodeTonemap* ntm, CompBuf* dst, CompBuf* src)
 			dp[x][1] /= ((dg == 0.f) ? 1.f : dg);
 			dp[x][2] /= ((db == 0.f) ? 1.f : db);
 			if (igm != 0.f) {
-				dp[x][0] = pow((double)MAX2(dp[x][0], 0.), igm);
-				dp[x][1] = pow((double)MAX2(dp[x][1], 0.), igm);
-				dp[x][2] = pow((double)MAX2(dp[x][2], 0.), igm);
+				dp[x][0] = pow((double)MAX2(dp[x][0], 0.0), igm);
+				dp[x][1] = pow((double)MAX2(dp[x][1], 0.0), igm);
+				dp[x][2] = pow((double)MAX2(dp[x][2], 0.0), igm);
 			}
 		}
 	}

@@ -188,7 +188,7 @@ extern "C" {
 #endif
 //XXX #include "BSE_headerbuttons.h"
 //XXX void update_for_newframe();
-//void scene_update_for_newframe(struct Scene *sce, unsigned int lay);
+//void BKE_scene_update_for_newframe(struct Scene *sce, unsigned int lay);
 //#include "BKE_ipo.h"
 //void do_all_data_ipos(void);
 #ifdef __cplusplus
@@ -892,7 +892,12 @@ bool ConvertMaterial(
 	if (validmat)
 		material->matname	=(mat->id.name);
 
-	material->tface		= tface;
+	if (tface) {
+		material->tface		= *tface;
+	}
+	else {
+		memset(&material->tface, 0, sizeof(material->tface));
+	}
 	material->material	= mat;
 	return true;
 }
@@ -995,9 +1000,9 @@ RAS_MeshObject* BL_ConvertMesh(Mesh* mesh, Object* blenderobj, KX_Scene* scene, 
 			float fno[3];
 
 			if (mface->v4)
-				normal_quad_v3( fno,mvert[mface->v1].co, mvert[mface->v2].co, mvert[mface->v3].co, mvert[mface->v4].co);
+				normal_quad_v3(fno,mvert[mface->v1].co, mvert[mface->v2].co, mvert[mface->v3].co, mvert[mface->v4].co);
 			else
-				normal_tri_v3( fno,mvert[mface->v1].co, mvert[mface->v2].co, mvert[mface->v3].co);
+				normal_tri_v3(fno,mvert[mface->v1].co, mvert[mface->v2].co, mvert[mface->v3].co);
 
 			no0 = no1 = no2 = no3 = MT_Vector3(fno);
 		}
@@ -1834,10 +1839,6 @@ void BL_CreatePhysicsObjectNew(KX_GameObject* gameobj,
 			break;
 
 #endif
-		case UseDynamo:
-			//KX_ConvertDynamoObject(gameobj,meshobj,kxscene,shapeprops,	smmaterial,	&objprop);
-			break;
-			
 		case UseNone:
 		default:
 			break;
@@ -2612,7 +2613,7 @@ void BL_ConvertBlenderObjects(struct Main* maggie,
 			case PARBONE:
 			{
 				// parent this to a bone
-				Bone *parent_bone = get_named_bone( (bArmature *)(blenderchild->parent)->data, blenderchild->parsubstr);
+				Bone *parent_bone = BKE_armature_find_bone_name( (bArmature *)(blenderchild->parent)->data, blenderchild->parsubstr);
 
 				if (parent_bone) {
 					KX_BoneParentRelation *bone_parent_relation = KX_BoneParentRelation::New(parent_bone);
@@ -2752,7 +2753,7 @@ void BL_ConvertBlenderObjects(struct Main* maggie,
 
 					bRigidBodyJointConstraint *dat=(bRigidBodyJointConstraint *)curcon->data;
 
-					if (!dat->child) {
+					if (!dat->child && !(curcon->flag & CONSTRAINT_OFF)) {
 
 						PHY_IPhysicsController* physctr2 = 0;
 

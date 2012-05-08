@@ -443,7 +443,28 @@ if(UNIX AND NOT APPLE)
 
 			# # doesnt work, todo
 			# install(CODE "execute_process(COMMAND find ${TARGETDIR}/${BLENDER_VERSION}/python/lib/ -name '*.so' -exec strip -s {} '\;')")
+			
+			if(WITH_PYTHON_INSTALL_NUMPY)
+				install(
+					DIRECTORY ${PYTHON_NUMPY_PATH}/numpy
+					DESTINATION ${TARGETDIR_VER}/python/${_target_LIB}/python${PYTHON_VERSION}/site-packages
+					PATTERN ".svn" EXCLUDE
+					PATTERN "__pycache__" EXCLUDE           # * any cache *
+					PATTERN "*.pyc" EXCLUDE                 # * any cache *
+					PATTERN "*.pyo" EXCLUDE                 # * any cache *
+					PATTERN "distutils" EXCLUDE             # ./distutils
+					PATTERN "oldnumeric" EXCLUDE            # ./oldnumeric
+					PATTERN "doc" EXCLUDE                   # ./doc
+					PATTERN "tests" EXCLUDE                 # ./tests
+					PATTERN "f2py" EXCLUDE                  # ./f2py - fortran/python interface code, not fun for blender devs.
+					PATTERN "include" EXCLUDE               # include dirs all over, we wont use NumPy/CAPI
+					PATTERN "*.h" EXCLUDE                   # some includes are not in include dirs
+					PATTERN "*.a" EXCLUDE                   # ./core/lib/libnpymath.a - for linking, we dont need.
+				)
+			endif()
+			
 			unset(_target_LIB)
+			
 		endif()
 	endif()
 elseif(WIN32)
@@ -453,7 +474,7 @@ elseif(WIN32)
 		DESTINATION ${TARGETDIR}
 	)
 
-	if(WITH_INTERNATIONAL)
+	if(WITH_INTERNATIONAL AND (NOT WITH_MINGW64))
 		install(
 			FILES ${LIBDIR}/gettext/lib/gnu_gettext.dll
 			DESTINATION ${TARGETDIR}
@@ -529,11 +550,14 @@ elseif(WIN32)
 			DESTINATION ${TARGETDIR}
 		)
 	else()
-		install(
-			FILES
-				${LIBDIR}/zlib/lib/zlib.dll
-			DESTINATION ${TARGETDIR}
-		)
+		#not needed since we link statically, maybe also unneeded for MinGW?
+		if(NOT WITH_MINGW64)
+			install(
+				FILES
+					${LIBDIR}/zlib/lib/zlib.dll
+				DESTINATION ${TARGETDIR}
+			)
+		endif()
 	endif()
 
 	if(MSVC)
@@ -542,10 +566,18 @@ elseif(WIN32)
 			DESTINATION ${TARGETDIR}
 		)
 	else()
-		install(
-			FILES ${LIBDIR}/pthreads/lib/pthreadGC2.dll
-			DESTINATION ${TARGETDIR}
-		)
+		#MinGW64 comes with own version. For portable builds it will probaly have to be copied to work
+		if(NOT WITH_MINGW64)
+			install(
+				FILES ${LIBDIR}/pthreads/lib/pthreadGC2.dll
+				DESTINATION ${TARGETDIR}
+			)
+		elseif(WITH_MINGW64)
+			install(
+				FILES ${LIBDIR}/binaries/pthreadGC2-w64.dll
+				DESTINATION ${TARGETDIR}
+			)
+		endif()
 	endif()
 
 	if(WITH_CODEC_FFMPEG)
@@ -599,12 +631,14 @@ elseif(WIN32)
 	)	
 
 	if(WITH_OPENIMAGEIO)
-		set_lib_path(OIIOBIN "openimageio/bin")
-		install(
-			FILES
-				${OIIOBIN}/OpenImageIO.dll
-			DESTINATION ${TARGETDIR}
-		)
+		if(NOT MINGW)
+			set_lib_path(OIIOBIN "openimageio/bin")
+			install(
+				FILES
+					${OIIOBIN}/OpenImageIO.dll
+				DESTINATION ${TARGETDIR}
+			)
+		endif()
 	endif()
 
 elseif(APPLE)

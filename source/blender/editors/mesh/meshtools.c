@@ -122,7 +122,8 @@ int join_mesh_exec(bContext *C, wmOperator *op)
 	}
 	
 	/* count & check */
-	CTX_DATA_BEGIN(C, Base *, base, selected_editable_bases) {
+	CTX_DATA_BEGIN (C, Base *, base, selected_editable_bases)
+	{
 		if (base->object->type == OB_MESH) {
 			me = base->object->data;
 
@@ -181,7 +182,7 @@ int join_mesh_exec(bContext *C, wmOperator *op)
 	 */
 	if (key) {
 		/* make a duplicate copy that will only be used here... (must remember to free it!) */
-		nkey = copy_key(key);
+		nkey = BKE_key_copy(key);
 		
 		/* for all keys in old block, clear data-arrays */
 		for (kb = key->block.first; kb; kb = kb->next) {
@@ -198,7 +199,7 @@ int join_mesh_exec(bContext *C, wmOperator *op)
 	}
 	
 	/* first pass over objects - copying materials and vertexgroups across */
-	CTX_DATA_BEGIN(C, Base *, base, selected_editable_bases)
+	CTX_DATA_BEGIN (C, Base *, base, selected_editable_bases)
 	{
 		/* only act if a mesh, and not the one we're joining to */
 		if ((ob != base->object) && (base->object->type == OB_MESH)) {
@@ -247,7 +248,7 @@ int join_mesh_exec(bContext *C, wmOperator *op)
 							kbn = MEM_dupallocN(kb);
 							kbn->prev = kbn->next = NULL;
 							
-							/* adjust adrcode and other settings to fit (allocate a new data-array) */
+							/* adjust settings to fit (allocate a new data-array) */
 							kbn->data = MEM_callocN(sizeof(float) * 3 * totvert, "joined_shapekey");
 							kbn->totelem = totvert;
 							kbn->weights = NULL;
@@ -260,7 +261,6 @@ int join_mesh_exec(bContext *C, wmOperator *op)
 								kbn->pos = curpos;
 							
 							BLI_addtail(&key->block, kbn);
-							kbn->adrcode = key->totkey;
 							key->totkey++;
 							if (key->totkey == 1) key->refkey = kbn;
 							
@@ -300,7 +300,7 @@ int join_mesh_exec(bContext *C, wmOperator *op)
 	/* inverse transform for all selected meshes in this object */
 	invert_m4_m4(imat, ob->obmat);
 	
-	CTX_DATA_BEGIN(C, Base *, base, selected_editable_bases)
+	CTX_DATA_BEGIN (C, Base *, base, selected_editable_bases)
 	{
 		/* only join if this is a mesh */
 		if (base->object->type == OB_MESH) {
@@ -524,13 +524,13 @@ int join_mesh_exec(bContext *C, wmOperator *op)
 #if 0
 		/* free it's ipo too - both are not actually freed from memory yet as ID-blocks */
 		if (nkey->ipo) {
-			free_ipo(nkey->ipo);
+			BKE_ipo_free(nkey->ipo);
 			BLI_remlink(&bmain->ipo, nkey->ipo);
 			MEM_freeN(nkey->ipo);
 		}
 #endif
 		
-		free_key(nkey);
+		BKE_key_free(nkey);
 		BLI_remlink(&bmain->key, nkey);
 		MEM_freeN(nkey);
 	}
@@ -570,7 +570,8 @@ int join_mesh_shapes_exec(bContext *C, wmOperator *op)
 	KeyBlock *kb;
 	int ok = 0, nonequal_verts = 0;
 	
-	CTX_DATA_BEGIN(C, Base *, base, selected_editable_bases) {
+	CTX_DATA_BEGIN (C, Base *, base, selected_editable_bases)
+	{
 		if (base->object == ob) continue;
 		
 		if (base->object->type == OB_MESH) {
@@ -602,7 +603,7 @@ int join_mesh_shapes_exec(bContext *C, wmOperator *op)
 	}
 	
 	/* now ready to add new keys from selected meshes */
-	CTX_DATA_BEGIN(C, Base *, base, selected_editable_bases)
+	CTX_DATA_BEGIN (C, Base *, base, selected_editable_bases)
 	{
 		if (base->object == ob) continue;
 		
@@ -642,13 +643,13 @@ typedef struct MocNode {
 	intptr_t index[MOC_NODE_RES];
 } MocNode;
 
-static int mesh_octree_get_base_offs(float *co, float *offs, float *div)
+static int mesh_octree_get_base_offs(const float co[3], const float offs[3], const float div[3])
 {
 	int vx, vy, vz;
 	
-	vx = floor( (co[0] - offs[0]) / div[0]);
-	vy = floor( (co[1] - offs[1]) / div[1]);
-	vz = floor( (co[2] - offs[2]) / div[2]);
+	vx = floor((co[0] - offs[0]) / div[0]);
+	vy = floor((co[1] - offs[1]) / div[1]);
+	vz = floor((co[2] - offs[2]) / div[2]);
 
 	CLAMP(vx, 0, MOC_RES - 1);
 	CLAMP(vy, 0, MOC_RES - 1);
@@ -737,7 +738,7 @@ static void mesh_octree_add_nodes(MocNode **basetable, float *co, float *offs, f
 
 }
 
-static intptr_t mesh_octree_find_index(MocNode **bt, MVert *mvert, float *co)
+static intptr_t mesh_octree_find_index(MocNode **bt, MVert *mvert, const float co[3])
 {
 	float *vec;
 	int a;
@@ -774,7 +775,7 @@ static struct {
 
 /* mode is 's' start, or 'e' end, or 'u' use */
 /* if end, ob can be NULL */
-intptr_t mesh_octree_table(Object *ob, BMEditMesh *em, float *co, char mode)
+intptr_t mesh_octree_table(Object *ob, BMEditMesh *em, const float co[3], char mode)
 {
 	MocNode **bt;
 	
@@ -804,8 +805,7 @@ intptr_t mesh_octree_table(Object *ob, BMEditMesh *em, float *co, char mode)
 			BMIter iter;
 			BMVert *eve;
 			
-			BM_ITER(eve, &iter, em->bm, BM_VERTS_OF_MESH, NULL)
-			{
+			BM_ITER_MESH (eve, &iter, em->bm, BM_VERTS_OF_MESH) {
 				DO_MINMAX(eve->co, min, max);
 			}
 		}
@@ -842,8 +842,7 @@ intptr_t mesh_octree_table(Object *ob, BMEditMesh *em, float *co, char mode)
 			BMVert *eve;
 			BMIter iter;
 
-			BM_ITER(eve, &iter, em->bm, BM_VERTS_OF_MESH, NULL)
-			{
+			BM_ITER_MESH (eve, &iter, em->bm, BM_VERTS_OF_MESH) {
 				mesh_octree_add_nodes(MeshOctree.table, eve->co, MeshOctree.offs, MeshOctree.div, (intptr_t)(eve));
 			}
 		}
@@ -923,7 +922,7 @@ int mesh_get_x_mirror_vert(Object *ob, int index)
 	return 0;
 }
 
-static BMVert *editbmesh_get_x_mirror_vert_spacial(Object *ob, BMEditMesh *em, float *co)
+static BMVert *editbmesh_get_x_mirror_vert_spacial(Object *ob, BMEditMesh *em, const float co[3])
 {
 	float vec[3];
 	intptr_t poinval;
@@ -931,9 +930,10 @@ static BMVert *editbmesh_get_x_mirror_vert_spacial(Object *ob, BMEditMesh *em, f
 	/* ignore nan verts */
 	if (!finite(co[0]) ||
 	    !finite(co[1]) ||
-	    !finite(co[2])
-	    )
+	    !finite(co[2]))
+	{
 		return NULL;
+	}
 	
 	vec[0] = -co[0];
 	vec[1] = co[1];
@@ -956,8 +956,7 @@ static BMVert *editbmesh_get_x_mirror_vert_topo(Object *ob, struct BMEditMesh *e
 		BMVert *v;
 		
 		index = 0;
-		BM_ITER(v, &iter, em->bm, BM_VERTS_OF_MESH, NULL)
-		{
+		BM_ITER_MESH (v, &iter, em->bm, BM_VERTS_OF_MESH) {
 			if (v == eve)
 				break;
 			index++;
@@ -975,7 +974,7 @@ static BMVert *editbmesh_get_x_mirror_vert_topo(Object *ob, struct BMEditMesh *e
 	return NULL;
 }	
 
-BMVert *editbmesh_get_x_mirror_vert(Object *ob, struct BMEditMesh *em, BMVert *eve, float *co, int index)
+BMVert *editbmesh_get_x_mirror_vert(Object *ob, struct BMEditMesh *em, BMVert *eve, const float co[3], int index)
 {
 	if (((Mesh *)ob->data)->editflag & ME_EDIT_MIRROR_TOPO) {
 		return editbmesh_get_x_mirror_vert_topo(ob, em, eve, index);
@@ -1019,16 +1018,14 @@ static float *editmesh_get_mirror_uv(BMEditMesh *em, int axis, float *uv, float 
 		BMIter iter;
 		BMFace *efa;
 		
-		BM_ITER(efa, &iter, em->bm, BM_FACES_OF_MESH, NULL)
-		{
-			poly_uv_center(em, efa, cent);
+		BM_ITER_MESH (efa, &iter, em->bm, BM_FACES_OF_MESH) {
+			uv_poly_center(em, efa, cent);
 			
 			if ( (fabs(cent[0] - cent_vec[0]) < 0.001) && (fabs(cent[1] - cent_vec[1]) < 0.001) ) {
 				BMIter liter;
 				BMLoop *l;
 				
-				BM_ITER(l, &liter, em->bm, BM_LOOPS_OF_FACE, efa)
-				{
+				BM_ITER_ELEM (l, &liter, efa, BM_LOOPS_OF_FACE) {
 					MLoopUV *luv = CustomData_bmesh_get(&em->bm->ldata, l->head.data, CD_MLOOPUV);
 					if ( (fabs(luv->uv[0] - vec[0]) < 0.001) && (fabs(luv->uv[1] - vec[1]) < 0.001) ) {
 						return luv->uv;

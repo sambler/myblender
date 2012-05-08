@@ -54,12 +54,11 @@
 #include "MEM_guardedalloc.h"
 
 #ifdef WIN32
-#include "BLI_winstuff.h"
+#  include "BLI_winstuff.h"
 #endif
 
 #include "BLI_args.h"
 #include "BLI_threads.h"
-#include "BLI_scanfill.h" /* for BLI_setErrorCallBack, TODO, move elsewhere */
 #include "BLI_utildefines.h"
 #include "BLI_callbacks.h"
 
@@ -102,6 +101,8 @@
 
 #include "GPU_draw.h"
 #include "GPU_extensions.h"
+
+#include "BLI_scanfill.h" /* for BLI_setErrorCallBack, TODO, move elsewhere */
 
 #ifdef WITH_BUILDINFO_HEADER
 #define BUILD_DATE
@@ -794,7 +795,7 @@ static int set_scene(int argc, const char **argv, void *data)
 {
 	if (argc > 1) {
 		bContext *C = data;
-		Scene *scene = set_scene_name(CTX_data_main(C), argv[1]);
+		Scene *scene = BKE_scene_set_name(CTX_data_main(C), argv[1]);
 		if (scene) {
 			CTX_data_scene_set(C, scene);
 		}
@@ -1100,7 +1101,7 @@ static void setupArguments(bContext *C, bArgs *ba, SYS_SystemHandle *syshandle)
 #ifdef WITH_FFMPEG
 	BLI_argsAdd(ba, 1, NULL, "--debug-ffmpeg", "\n\tEnable debug messages from FFmpeg library", debug_mode_generic, (void *)G_DEBUG_FFMPEG);
 #endif
-	BLI_argsAdd(ba, 1, NULL, "--debug-python", "\n\tEnable debug messages for python", debug_mode_generic, (void *)G_DEBUG_FFMPEG);
+	BLI_argsAdd(ba, 1, NULL, "--debug-python", "\n\tEnable debug messages for python", debug_mode_generic, (void *)G_DEBUG_PYTHON);
 	BLI_argsAdd(ba, 1, NULL, "--debug-events", "\n\tEnable debug messages for the event system", debug_mode_generic, (void *)G_DEBUG_EVENTS);
 	BLI_argsAdd(ba, 1, NULL, "--debug-wm",     "\n\tEnable debug messages for the window manager", debug_mode_generic, (void *)G_DEBUG_WM);
 	BLI_argsAdd(ba, 1, NULL, "--debug-all",    "\n\tEnable all debug messages (excludes libmv)", debug_mode_generic, (void *)G_DEBUG_ALL);
@@ -1169,7 +1170,7 @@ char **environ = NULL;
 
 
 #ifdef WIN32
-int main(int argc, const char **argv_c) /*Do not mess with const*/
+int main(int argc, const char **UNUSED(argv_c)) /* Do not mess with const */
 #else
 int main(int argc, const char **argv)
 #endif
@@ -1182,8 +1183,7 @@ int main(int argc, const char **argv)
 	wchar_t **argv_16 = CommandLineToArgvW(GetCommandLineW(), &argc);
 	int argci = 0;
 	char **argv = MEM_mallocN(argc * sizeof(char *), "argv array");
-	for (argci = 0; argci < argc; argci++)
-	{
+	for (argci = 0; argci < argc; argci++) {
 		argv[argci] = alloc_utf_8_from_16(argv_16[argci], 0);
 	}
 	LocalFree(argv_16);
@@ -1248,7 +1248,7 @@ int main(int argc, const char **argv)
 
 	IMB_init();
 
-	BLI_cb_init();
+	BLI_callback_global_init();
 
 #ifdef WITH_GAMEENGINE
 	syshandle = SYS_GetSystem();
@@ -1257,7 +1257,7 @@ int main(int argc, const char **argv)
 #endif
 
 	/* first test for background */
-	ba = BLI_argsInit(argc, argv); /* skip binary path */
+	ba = BLI_argsInit(argc, (const char **)argv); /* skip binary path */
 	setupArguments(C, ba, &syshandle);
 
 	BLI_argsParse(ba, 1, NULL, NULL);
@@ -1270,7 +1270,7 @@ int main(int argc, const char **argv)
 #endif
 
 	/* background render uses this font too */
-	BKE_font_register_builtin(datatoc_Bfont, datatoc_Bfont_size);
+	BKE_vfont_builtin_register(datatoc_Bfont, datatoc_Bfont_size);
 
 	/* Initialize ffmpeg if built in, also needed for bg mode if videos are
 	 * rendered via ffmpeg */
@@ -1282,7 +1282,7 @@ int main(int argc, const char **argv)
 		BLI_argsParse(ba, 2, NULL, NULL);
 		BLI_argsParse(ba, 3, NULL, NULL);
 
-		WM_init(C, argc, argv);
+		WM_init(C, argc, (const char **)argv);
 
 		/* this is properly initialized with user defs, but this is default */
 		/* call after loading the startup.blend so we can read U.tempdir */
@@ -1295,7 +1295,7 @@ int main(int argc, const char **argv)
 	else {
 		BLI_argsParse(ba, 3, NULL, NULL);
 
-		WM_init(C, argc, argv);
+		WM_init(C, argc, (const char **)argv);
 
 		/* don't use user preferences temp dir */
 		BLI_init_temporary_dir(NULL);
@@ -1322,8 +1322,7 @@ int main(int argc, const char **argv)
 	BLI_argsFree(ba);
 
 #ifdef WIN32
-	while (argci)
-	{
+	while (argci) {
 		free(argv[--argci]);
 	}
 	MEM_freeN(argv);

@@ -37,13 +37,13 @@ void bmo_split_exec(BMesh *bm, BMOperator *op);
 void bmo_spin_exec(BMesh *bm, BMOperator *op);
 void bmo_dupe_exec(BMesh *bm, BMOperator *op);
 void bmo_del_exec(BMesh *bm, BMOperator *op);
-void bmo_esubd_exec(BMesh *bmesh, BMOperator *op);
-void bmo_triangulate_exec(BMesh *bmesh, BMOperator *op);
-void bmo_dissolve_faces_exec(BMesh *bmesh, BMOperator *op);
-void bmo_dissolve_verts_exec(BMesh *bmesh, BMOperator *op);
-void bmo_dissolve_limit_exec(BMesh *bmesh, BMOperator *op);
+void bmo_esubd_exec(BMesh *bm, BMOperator *op);
+void bmo_triangulate_exec(BMesh *bm, BMOperator *op);
+void bmo_dissolve_faces_exec(BMesh *bm, BMOperator *op);
+void bmo_dissolve_verts_exec(BMesh *bm, BMOperator *op);
+void bmo_dissolve_limit_exec(BMesh *bm, BMOperator *op);
 void bmo_extrude_face_region_exec(BMesh *bm, BMOperator *op);
-void bmo_vert_slide_exec(BMesh *bm, BMOperator *op);
+void bmo_vertex_slide_exec(BMesh *bm, BMOperator *op);
 void bmo_connectverts_exec(BMesh *bm, BMOperator *op);
 void bmo_extrude_vert_indiv_exec(BMesh *bm, BMOperator *op);
 void bmo_mesh_to_bmesh_exec(BMesh *bm, BMOperator *op);
@@ -100,5 +100,7 @@ void bmo_create_circle_exec(BMesh *bm, BMOperator *op);
 void bmo_bridge_loops_exec(BMesh *bm, BMOperator *op);
 void bmo_solidify_face_region_exec(BMesh *bm, BMOperator *op);
 void bmo_inset_exec(BMesh *bm, BMOperator *op);
+void bmo_wireframe_exec(BMesh *bm, BMOperator *op);
+void bmo_convex_hull_exec(BMesh *bm, BMOperator *op);
 
 #endif /* __BMESH_OPERATORS_PRIVATE_H__ */

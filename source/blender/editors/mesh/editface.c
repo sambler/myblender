@@ -67,7 +67,7 @@
  * use in object mode when selecting faces (while painting) */
 void paintface_flush_flags(Object *ob)
 {
-	Mesh *me = get_mesh(ob);
+	Mesh *me = BKE_mesh_from_object(ob);
 	DerivedMesh *dm = ob->derivedFinal;
 	MPoly *polys, *mp_orig;
 	MFace *faces;
@@ -166,7 +166,7 @@ void paintface_hide(Object *ob, const int unselected)
 	MPoly *mpoly;
 	int a;
 	
-	me = get_mesh(ob);
+	me = BKE_mesh_from_object(ob);
 	if (me == NULL || me->totpoly == 0) return;
 
 	mpoly = me->mpoly;
@@ -195,7 +195,7 @@ void paintface_reveal(Object *ob)
 	MPoly *mpoly;
 	int a;
 
-	me = get_mesh(ob);
+	me = BKE_mesh_from_object(ob);
 	if (me == NULL || me->totpoly == 0) return;
 
 	mpoly = me->mpoly;
@@ -325,7 +325,7 @@ void paintface_select_linked(bContext *UNUSED(C), Object *ob, int UNUSED(mval[2]
 	Mesh *me;
 	unsigned int index = 0;
 
-	me = get_mesh(ob);
+	me = BKE_mesh_from_object(ob);
 	if (me == NULL || me->totpoly == 0) return;
 
 	if (mode == 0 || mode == 1) {
@@ -347,7 +347,7 @@ void paintface_deselect_all_visible(Object *ob, int action, short flush_flags)
 	MPoly *mpoly;
 	int a;
 
-	me = get_mesh(ob);
+	me = BKE_mesh_from_object(ob);
 	if (me == NULL) return;
 	
 	if (action == SEL_INVERT) {
@@ -400,17 +400,17 @@ void paintface_deselect_all_visible(Object *ob, int action, short flush_flags)
 	}
 }
 
-int paintface_minmax(Object *ob, float *min, float *max)
+int paintface_minmax(Object *ob, float r_min[3], float r_max[3])
 {
 	Mesh *me;
 	MPoly *mp;
 	MTexPoly *tf;
 	MLoop *ml;
 	MVert *mvert;
-	int a, b, ok = 0;
+	int a, b, ok = FALSE;
 	float vec[3], bmat[3][3];
 
-	me = get_mesh(ob);
+	me = BKE_mesh_from_object(ob);
 	if (!me || !me->mtpoly) return ok;
 	
 	copy_m3_m4(bmat, ob->obmat);
@@ -427,10 +427,10 @@ int paintface_minmax(Object *ob, float *min, float *max)
 			copy_v3_v3(vec, (mvert[ml->v].co));
 			mul_m3_v3(bmat, vec);
 			add_v3_v3v3(vec, vec, ob->obmat[3]);
-			DO_MINMAX(vec, min, max);		
+			DO_MINMAX(vec, r_min, r_max);
 		}
 
-		ok = 1;
+		ok = TRUE;
 	}
 
 	return ok;
@@ -459,7 +459,7 @@ void seam_mark_clear_tface(Scene *scene, short mode)
 	MEdge *med;
 	int a, b;
 	
-	me = get_mesh(OBACT);
+	me = BKE_mesh_from_object(OBACT);
 	if (me == 0 ||  me->totpoly == 0) return;
 
 	if (mode == 0)
@@ -516,7 +516,7 @@ int paintface_mouse_select(struct bContext *C, Object *ob, const int mval[2], in
 	unsigned int a, index;
 	
 	/* Get the face under the cursor */
-	me = get_mesh(ob);
+	me = BKE_mesh_from_object(ob);
 
 	if (!facesel_face_pick(C, me, ob, mval, &index, 1))
 		return 0;
@@ -567,7 +567,7 @@ int do_paintface_box_select(ViewContext *vc, rcti *rect, int select, int extend)
 	int sx = rect->xmax - rect->xmin + 1;
 	int sy = rect->ymax - rect->ymin + 1;
 	
-	me = get_mesh(ob);
+	me = BKE_mesh_from_object(ob);
 
 	if (me == NULL || me->totpoly == 0 || sx * sy <= 0)
 		return OPERATOR_CANCELLED;
@@ -629,7 +629,7 @@ int do_paintface_box_select(ViewContext *vc, rcti *rect, int select, int extend)
  * use in object mode when selecting vertices (while painting) */
 void paintvert_flush_flags(Object *ob)
 {
-	Mesh *me = get_mesh(ob);
+	Mesh *me = BKE_mesh_from_object(ob);
 	DerivedMesh *dm = ob->derivedFinal;
 	MVert *dm_mvert, *dm_mv;
 	int *index_array = NULL;
@@ -668,7 +668,7 @@ void paintvert_deselect_all_visible(Object *ob, int action, short flush_flags)
 	MVert *mvert;
 	int a;
 
-	me = get_mesh(ob);
+	me = BKE_mesh_from_object(ob);
 	if (me == NULL) return;
 	
 	if (action == SEL_INVERT) {
@@ -735,8 +735,8 @@ typedef struct MirrTopoVert_t {
 
 static int mirrtopo_hash_sort(const void *l1, const void *l2)
 {
-	if       ((MirrTopoHash_t)(intptr_t)l1 > (MirrTopoHash_t)(intptr_t)l2) return 1;
-	else if  ((MirrTopoHash_t)(intptr_t)l1 < (MirrTopoHash_t)(intptr_t)l2) return -1;
+	if      ((MirrTopoHash_t)(intptr_t)l1 > (MirrTopoHash_t)(intptr_t)l2) return 1;
+	else if ((MirrTopoHash_t)(intptr_t)l1 < (MirrTopoHash_t)(intptr_t)l2) return -1;
 	return 0;
 }
 
@@ -814,7 +814,7 @@ void ED_mesh_mirrtopo_init(Mesh *me, const int ob_mode, MirrTopoStore_t *mesh_to
 	if (em) {
 		totedge = me->edit_btmesh->bm->totedge;
 
-		BM_ITER(eed, &iter, em->bm, BM_EDGES_OF_MESH, NULL) {
+		BM_ITER_MESH (eed, &iter, em->bm, BM_EDGES_OF_MESH) {
 			topo_hash[BM_elem_index_get(eed->v1)]++;
 			topo_hash[BM_elem_index_get(eed->v2)]++;
 		}
@@ -835,7 +835,7 @@ void ED_mesh_mirrtopo_init(Mesh *me, const int ob_mode, MirrTopoStore_t *mesh_to
 		/* use the number of edges per vert to give verts unique topology IDs */
 
 		if (em) {
-			BM_ITER(eed, &iter, em->bm, BM_EDGES_OF_MESH, NULL) {
+			BM_ITER_MESH (eed, &iter, em->bm, BM_EDGES_OF_MESH) {
 				topo_hash[BM_elem_index_get(eed->v1)] += topo_hash_prev[BM_elem_index_get(eed->v2)];
 				topo_hash[BM_elem_index_get(eed->v2)] += topo_hash_prev[BM_elem_index_get(eed->v1)];
 			}

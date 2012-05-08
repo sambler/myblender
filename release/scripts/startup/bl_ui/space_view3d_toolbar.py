@@ -142,6 +142,14 @@ class VIEW3D_PT_tools_meshedit(View3DPanel, Panel):
         col.operator("mesh.spin")
         col.operator("mesh.screw")
 
+        row = col.row(align=True)
+        props = row.operator("mesh.knife_tool", text="Knife")
+        props.use_occlude_geometry = True
+        props.only_selected = False
+        props = row.operator("mesh.knife_tool", text="Select")
+        props.use_occlude_geometry = False
+        props.only_selected = True
+
         col = layout.column(align=True)
         col.label(text="Remove:")
         col.menu("VIEW3D_MT_edit_mesh_delete")
@@ -644,11 +652,13 @@ class VIEW3D_PT_tools_brush(Panel, View3DPaintPanel):
 
         # Weight Paint Mode #
         elif context.weight_paint_object and brush:
-            layout.prop(toolsettings, "vertex_group_weight", text="Weight", slider=True)
             layout.prop(toolsettings, "use_auto_normalize", text="Auto Normalize")
             layout.prop(toolsettings, "use_multipaint", text="Multi-Paint")
 
             col = layout.column()
+
+            row = col.row(align=True)
+            self.prop_unified_weight(row, context, brush, "weight", slider=True, text="Weight")
 
             row = col.row(align=True)
             self.prop_unified_size(row, context, brush, "size", slider=True, text="Radius")

@@ -56,6 +56,8 @@
 #include "BKE_report.h"
 #include "BKE_scene.h"
 #include "BKE_screen.h"
+#include "BKE_action.h"
+#include "BKE_armature.h"
 #include "BKE_depsgraph.h" /* for ED_view3d_camera_lock_sync */
 
 
@@ -68,11 +70,13 @@
 #include "RNA_access.h"
 #include "RNA_define.h"
 
+#include "ED_armature.h"
 #include "ED_particle.h"
 #include "ED_screen.h"
 #include "ED_transform.h"
 #include "ED_mesh.h"
 #include "ED_view3d.h"
+#include "ED_sculpt.h"
 
 
 #include "PIL_time.h" /* smoothview */
@@ -120,9 +124,9 @@ int ED_view3d_camera_lock_sync(View3D *v3d, RegionView3D *rv3d)
 
 			mult_m4_m4m4(parent_mat, diff_mat, root_parent->obmat);
 
-			object_tfm_protected_backup(root_parent, &obtfm);
-			object_apply_mat4(root_parent, parent_mat, TRUE, FALSE);
-			object_tfm_protected_restore(root_parent, &obtfm, root_parent->protectflag);
+			BKE_object_tfm_protected_backup(root_parent, &obtfm);
+			BKE_object_apply_mat4(root_parent, parent_mat, TRUE, FALSE);
+			BKE_object_tfm_protected_restore(root_parent, &obtfm, root_parent->protectflag);
 
 			ob_update = v3d->camera;
 			while (ob_update) {
@@ -132,9 +136,9 @@ int ED_view3d_camera_lock_sync(View3D *v3d, RegionView3D *rv3d)
 			}
 		}
 		else {
-			object_tfm_protected_backup(v3d->camera, &obtfm);
+			BKE_object_tfm_protected_backup(v3d->camera, &obtfm);
 			ED_view3d_to_object(v3d->camera, rv3d->ofs, rv3d->viewquat, rv3d->dist);
-			object_tfm_protected_restore(v3d->camera, &obtfm, v3d->camera->protectflag);
+			BKE_object_tfm_protected_restore(v3d->camera, &obtfm, v3d->camera->protectflag);
 
 			DAG_id_tag_update(&v3d->camera->id, OB_RECALC_OB);
 			WM_main_add_notifier(NC_OBJECT | ND_TRANSFORM, v3d->camera);
@@ -599,7 +603,7 @@ void viewrotate_modal_keymap(wmKeyConfig *keyconf)
 	wmKeyMap *keymap = WM_modalkeymap_get(keyconf, "View3D Rotate Modal");
 
 	/* this function is called for each spacetype, only needs to add map once */
-	if (keymap) return;
+	if (keymap && keymap->modal_items) return;
 
 	keymap = WM_modalkeymap_add(keyconf, "View3D Rotate Modal", modal_items);
 
@@ -671,28 +675,47 @@ static void viewrotate_apply(ViewOpsData *vod, int x, int y)
 	}
 	else {
 		/* New turntable view code by John Aughey */
-		float phi, q1[4];
+		float q1[4];
 		float m[3][3];
 		float m_inv[3][3];
-		float xvec[3] = {1.0f, 0.0f, 0.0f};
-		/* Sensitivity will control how fast the viewport rotates.  0.0035 was
+		const float zvec_global[3] = {0.0f, 0.0f, 1.0f};
+		float xaxis[3];
+
+		/* Sensitivity will control how fast the viewport rotates.  0.007 was
 		 * obtained experimentally by looking at viewport rotation sensitivities
 		 * on other modeling programs. */
 		/* Perhaps this should be a configurable user parameter. */
-		const float sensitivity = 0.0035f;
+		const float sensitivity = 0.007f;
 
 		/* Get the 3x3 matrix and its inverse from the quaternion */
 		quat_to_mat3(m, vod->viewquat);
 		invert_m3_m3(m_inv, m);
 
+		/* avoid gimble lock */
+#if 1
+		if (len_squared_v3v3(zvec_global, m_inv[2]) > 0.001f) {
+			float fac;
+			cross_v3_v3v3(xaxis, zvec_global, m_inv[2]);
+			if (dot_v3v3(xaxis, m_inv[0]) < 0) {
+				negate_v3(xaxis);
+			}
+			fac = angle_normalized_v3v3(zvec_global, m_inv[2]) / (float)M_PI;
+			fac = fabsf(fac - 0.5f) * 2;
+			fac = fac * fac;
+			interp_v3_v3v3(xaxis, xaxis, m_inv[0], fac);
+		}
+		else {
+			copy_v3_v3(xaxis, m_inv[0]);
+		}
+#else
+		copy_v3_v3(xaxis, m_inv[0]);
+#endif
+
 		/* Determine the direction of the x vector (for rotating up and down) */
 		/* This can likely be computed directly from the quaternion. */
-		mul_m3_v3(m_inv, xvec);
 
 		/* Perform the up/down rotation */
-		phi = sensitivity * -(y - vod->oldy);
-		q1[0] = cos(phi);
-		mul_v3_v3fl(q1 + 1, xvec, sin(phi));
+		axis_angle_to_quat(q1, xaxis, sensitivity * -(y - vod->oldy));
 		mul_qt_qtqt(vod->viewquat, vod->viewquat, q1);
 
 		if (vod->use_dyn_ofs) {
@@ -703,10 +726,7 @@ static void viewrotate_apply(ViewOpsData *vod, int x, int y)
 		}
 
 		/* Perform the orbital rotation */
-		phi = sensitivity * vod->reverse * (x - vod->oldx);
-		q1[0] = cos(phi);
-		q1[1] = q1[2] = 0.0;
-		q1[3] = sin(phi);
+		axis_angle_to_quat(q1, zvec_global, sensitivity * vod->reverse * (x - vod->oldx));
 		mul_qt_qtqt(vod->viewquat, vod->viewquat, q1);
 
 		if (vod->use_dyn_ofs) {
@@ -1247,7 +1267,7 @@ void viewmove_modal_keymap(wmKeyConfig *keyconf)
 	wmKeyMap *keymap = WM_modalkeymap_get(keyconf, "View3D Move Modal");
 
 	/* this function is called for each spacetype, only needs to add map once */
-	if (keymap) return;
+	if (keymap && keymap->modal_items) return;
 
 	keymap = WM_modalkeymap_add(keyconf, "View3D Move Modal", modal_items);
 
@@ -1408,7 +1428,7 @@ void viewzoom_modal_keymap(wmKeyConfig *keyconf)
 	wmKeyMap *keymap = WM_modalkeymap_get(keyconf, "View3D Zoom Modal");
 
 	/* this function is called for each spacetype, only needs to add map once */
-	if (keymap) return;
+	if (keymap && keymap->modal_items) return;
 
 	keymap = WM_modalkeymap_add(keyconf, "View3D Zoom Modal", modal_items);
 
@@ -1539,7 +1559,9 @@ static void viewzoom_apply(ViewOpsData *vod, int x, int y, const short viewzoom,
 	if (!use_cam_zoom) {
 		if (zfac != 1.0f && zfac * vod->rv3d->dist > 0.001f * vod->grid &&
 		    zfac * vod->rv3d->dist < 10.0f * vod->far)
+		{
 			view_zoom_mouseloc(vod->ar, zfac, vod->oldx, vod->oldy);
+		}
 	}
 
 	/* these limits were in old code too */
@@ -1680,7 +1702,7 @@ void viewdolly_modal_keymap(wmKeyConfig *keyconf)
 	wmKeyMap *keymap = WM_modalkeymap_get(keyconf, "View3D Dolly Modal");
 
 	/* this function is called for each spacetype, only needs to add map once */
-	if (keymap) return;
+	if (keymap && keymap->modal_items) return;
 
 	keymap = WM_modalkeymap_add(keyconf, "View3D Dolly Modal", modal_items);
 
@@ -2049,7 +2071,7 @@ static int view3d_all_exec(bContext *C, wmOperator *op) /* was view3d_home() in 
 				continue;
 			}
 
-			minmax_object(base->object, min, max);
+			BKE_object_minmax(base->object, min, max);
 		}
 	}
 	if (!onedone) {
@@ -2181,6 +2203,10 @@ static int viewselected_exec(bContext *C, wmOperator *UNUSED(op))
 	else if (ob && (ob->mode & OB_MODE_PARTICLE_EDIT)) {
 		ok = PE_minmax(scene, min, max);
 	}
+	else if (ob && (ob->mode & OB_MODE_SCULPT)) {
+		ok = ED_sculpt_minmax(C, min, max);
+		ok_dist = 0; /* don't zoom */
+	}
 	else {
 		Base *base;
 		for (base = FIRSTBASE; base; base = base->next) {
@@ -2191,8 +2217,8 @@ static int viewselected_exec(bContext *C, wmOperator *UNUSED(op))
 				}
 
 				/* account for duplis */
-				if (minmax_object_duplis(scene, base->object, min, max) == 0)
-					minmax_object(base->object, min, max);  /* use if duplis not found */
+				if (BKE_object_minmax_dupli(scene, base->object, min, max) == 0)
+					BKE_object_minmax(base->object, min, max);  /* use if duplis not found */
 
 				ok = 1;
 			}
@@ -2204,18 +2230,24 @@ static int viewselected_exec(bContext *C, wmOperator *UNUSED(op))
 	sub_v3_v3v3(afm, max, min);
 	size = MAX3(afm[0], afm[1], afm[2]);
 
-	if (!rv3d->is_persp) {
-		if (size < 0.0001f) { /* if its a sinble point. don't even re-scale */
-			ok_dist = 0;
+	if (ok_dist) {
+		/* fix up zoom distance if needed */
+
+		if (rv3d->is_persp) {
+			if (size <= v3d->near * 1.5f) {
+				/* do not zoom closer than the near clipping plane */
+				size = v3d->near * 1.5f;
+			}
 		}
-		else {
-			/* perspective should be a bit farther away to look nice */
-			size *= 0.7f;
-		}
-	}
-	else {
-		if (size <= v3d->near * 1.5f) {
-			size = v3d->near * 1.5f;
+		else /* ortho */ {
+			if (size < 0.0001f) {
+				/* bounding box was a single point so do not zoom */
+				ok_dist = 0;
+			}
+			else {
+				/* adjust zoom so it looks nicer */
+				size *= 0.7f;
+			}
 		}
 	}
 
@@ -2233,7 +2265,7 @@ static int viewselected_exec(bContext *C, wmOperator *UNUSED(op))
 
 	if (rv3d->persp == RV3D_CAMOB && !ED_view3d_camera_lock_check(v3d, rv3d)) {
 		rv3d->persp = RV3D_PERSP;
-		smooth_view(C, v3d, ar, v3d->camera, NULL, new_ofs, NULL, &new_dist, NULL);
+		smooth_view(C, v3d, ar, v3d->camera, NULL, new_ofs, NULL, ok_dist ? &new_dist : NULL, NULL);
 	}
 	else {
 		smooth_view(C, v3d, ar, NULL, NULL, new_ofs, NULL, ok_dist ? &new_dist : NULL, NULL);
@@ -2256,6 +2288,89 @@ void VIEW3D_OT_view_selected(wmOperatorType *ot)
 
 	/* api callbacks */
 	ot->exec = viewselected_exec;
+	ot->poll = ED_operator_region_view3d_active;
+
+	/* flags */
+	ot->flag = 0;
+}
+
+static int view_lock_clear_exec(bContext *C, wmOperator *UNUSED(op))
+{
+	View3D *v3d = CTX_wm_view3d(C);
+
+	if (v3d) {
+		ED_view3D_lock_clear(v3d);
+
+		WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D, v3d);
+
+		return OPERATOR_FINISHED;
+	}
+	else {
+		return OPERATOR_CANCELLED;
+	}
+}
+
+void VIEW3D_OT_view_lock_clear(wmOperatorType *ot)
+{
+
+	/* identifiers */
+	ot->name = "View Lock Clear";
+	ot->description = "Clear all view locking";
+	ot->idname = "VIEW3D_OT_view_lock_clear";
+
+	/* api callbacks */
+	ot->exec = view_lock_clear_exec;
+	ot->poll = ED_operator_region_view3d_active;
+
+	/* flags */
+	ot->flag = 0;
+}
+
+static int view_lock_to_active_exec(bContext *C, wmOperator *UNUSED(op))
+{
+	View3D *v3d = CTX_wm_view3d(C);
+	Object *obact = CTX_data_active_object(C);
+
+	if (v3d) {
+
+		ED_view3D_lock_clear(v3d);
+
+		v3d->ob_centre = obact; /* can be NULL */
+
+		if (obact && obact->type == OB_ARMATURE) {
+			if (obact->mode & OB_MODE_POSE) {
+				bPoseChannel *pcham_act = BKE_pose_channel_active(obact);
+				if (pcham_act) {
+					BLI_strncpy(v3d->ob_centre_bone, pcham_act->name, sizeof(v3d->ob_centre_bone));
+				}
+			}
+			else {
+				EditBone *ebone_act = ((bArmature *)obact->data)->act_edbone;
+				if (ebone_act) {
+					BLI_strncpy(v3d->ob_centre_bone, ebone_act->name, sizeof(v3d->ob_centre_bone));
+				}
+			}
+		}
+
+		WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D, v3d);
+
+		return OPERATOR_FINISHED;
+	}
+	else {
+		return OPERATOR_CANCELLED;
+	}
+}
+
+void VIEW3D_OT_view_lock_to_active(wmOperatorType *ot)
+{
+
+	/* identifiers */
+	ot->name = "View Lock to Active";
+	ot->description = "Lock the view to the active object/bone";
+	ot->idname = "VIEW3D_OT_view_lock_to_active";
+
+	/* api callbacks */
+	ot->exec = view_lock_to_active_exec;
 	ot->poll = ED_operator_region_view3d_active;
 
 	/* flags */
@@ -2822,7 +2937,7 @@ static int viewnumpad_exec(bContext *C, wmOperator *op)
 						v3d->camera = ob;
 					
 					if (v3d->camera == NULL)
-						v3d->camera = scene_find_camera(scene);
+						v3d->camera = BKE_scene_camera_find(scene);
 
 					/* couldnt find any useful camera, bail out */
 					if (v3d->camera == NULL)
@@ -2970,10 +3085,10 @@ static int viewpan_exec(bContext *C, wmOperator *op)
 	pandir = RNA_enum_get(op->ptr, "type");
 
 	initgrabz(rv3d, 0.0, 0.0, 0.0);
-	if (pandir == V3D_VIEW_PANRIGHT)        { mval_f[0] = -32.0f; ED_view3d_win_to_delta(ar, mval_f, vec); }
-	else if (pandir == V3D_VIEW_PANLEFT)    { mval_f[0] =  32.0f; ED_view3d_win_to_delta(ar, mval_f, vec); }
-	else if (pandir == V3D_VIEW_PANUP)  { mval_f[1] = -25.0f; ED_view3d_win_to_delta(ar, mval_f, vec); }
-	else if (pandir == V3D_VIEW_PANDOWN)    { mval_f[1] =  25.0f; ED_view3d_win_to_delta(ar, mval_f, vec); }
+	if      (pandir == V3D_VIEW_PANRIGHT)  { mval_f[0] = -32.0f; ED_view3d_win_to_delta(ar, mval_f, vec); }
+	else if (pandir == V3D_VIEW_PANLEFT)   { mval_f[0] =  32.0f; ED_view3d_win_to_delta(ar, mval_f, vec); }
+	else if (pandir == V3D_VIEW_PANUP)     { mval_f[1] = -25.0f; ED_view3d_win_to_delta(ar, mval_f, vec); }
+	else if (pandir == V3D_VIEW_PANDOWN)   { mval_f[1] =  25.0f; ED_view3d_win_to_delta(ar, mval_f, vec); }
 	add_v3_v3(rv3d->ofs, vec);
 
 	if (rv3d->viewlock & RV3D_BOXVIEW)
@@ -3065,11 +3180,11 @@ static int background_image_add_invoke(bContext *C, wmOperator *op, wmEvent *UNU
 		char path[FILE_MAX];
 		
 		RNA_string_get(op->ptr, "filepath", path);
-		ima = BKE_add_image_file(path);
+		ima = BKE_image_load_exists(path);
 	}
 	else if (RNA_struct_property_is_set(op->ptr, "name")) {
 		RNA_string_get(op->ptr, "name", name);
-		ima = (Image *)find_id("IM", name);
+		ima = (Image *)BKE_libblock_find_name(ID_IM, name);
 	}
 	
 	bgpic = background_image_add(C);
@@ -3631,8 +3746,8 @@ void ED_view3d_from_object(Object *ob, float ofs[3], float quat[4], float *dist,
 	if (lens) {
 		CameraParams params;
 
-		camera_params_init(&params);
-		camera_params_from_object(&params, ob);
+		BKE_camera_params_init(&params);
+		BKE_camera_params_from_object(&params, ob);
 		*lens = params.lens;
 	}
 }
@@ -3642,7 +3757,7 @@ void ED_view3d_to_object(Object *ob, const float ofs[3], const float quat[4], co
 {
 	float mat[4][4];
 	ED_view3d_to_m4(mat, ofs, quat, dist);
-	object_apply_mat4(ob, mat, TRUE, TRUE);
+	BKE_object_apply_mat4(ob, mat, TRUE, TRUE);
 }
 
 BGpic *ED_view3D_background_image_new(View3D *v3d)
@@ -3679,4 +3794,12 @@ void ED_view3D_background_image_clear(View3D *v3d)
 
 		bgpic = next_bgpic;
 	}
+}
+
+void ED_view3D_lock_clear(View3D *v3d)
+{
+	v3d->ob_centre = NULL;
+	v3d->ob_centre_bone[0] = '\0';
+	v3d->ob_centre_cursor = FALSE;
+	v3d->flag2 &= ~V3D_LOCK_CAMERA;
 }

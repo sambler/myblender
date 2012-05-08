@@ -167,6 +167,7 @@ int			WM_enum_search_invoke(struct bContext *C, struct wmOperator *op, struct wm
 int			WM_operator_confirm		(struct bContext *C, struct wmOperator *op, struct wmEvent *event);
 		/* invoke callback, file selector "filepath" unset + exec */
 int			WM_operator_filesel		(struct bContext *C, struct wmOperator *op, struct wmEvent *event);
+int         WM_operator_filesel_ensure_ext_imtype(wmOperator *op, const char imtype);
 			/* poll callback, context checks */
 int			WM_operator_winactive	(struct bContext *C);
 			/* invoke callback, exec + redo popup */
@@ -188,7 +189,7 @@ void		WM_operatortype_append_ptr	(void (*opfunc)(struct wmOperatorType*, void *)
 void		WM_operatortype_append_macro_ptr	(void (*opfunc)(struct wmOperatorType*, void *), void *userdata);
 int			WM_operatortype_remove(const char *idname);
 
-struct wmOperatorType *WM_operatortype_append_macro(const char *idname, const char *name, int flag);
+struct wmOperatorType *WM_operatortype_append_macro(const char *idname, const char *name, const char *description, int flag);
 struct wmOperatorTypeMacro *WM_operatortype_macro_define(struct wmOperatorType *ot, const char *idname);
 
 

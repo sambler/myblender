@@ -109,6 +109,12 @@ void mid_v3_v3v3(float v[3], const float v1[3], const float v2[3])
 	v[2] = 0.5f * (v1[2] + v2[2]);
 }
 
+void mid_v2_v2v2(float v[2], const float v1[2], const float v2[2])
+{
+	v[0] = 0.5f * (v1[0] + v2[0]);
+	v[1] = 0.5f * (v1[1] + v2[1]);
+}
+
 /********************************** Angles ***********************************/
 
 /* Return the angle in radians between vecs 1-2 and 2-3 in radians
@@ -209,6 +215,25 @@ float angle_normalized_v2v2(const float v1[2], const float v2[2])
 	}
 	else
 		return 2.0f * (float)saasin(len_v2v2(v2, v1) / 2.0f);
+}
+
+/**
+ * angle between 2 vectors defined by 3 coords, about an axis. */
+float angle_on_axis_v3v3v3_v3(const float v1[3], const float v2[3], const float v3[3], const float axis[3])
+{
+	float v1_proj[3], v2_proj[3], tproj[3];
+
+	sub_v3_v3v3(v1_proj, v1, v2);
+	sub_v3_v3v3(v2_proj, v3, v2);
+
+	/* project the vectors onto the axis */
+	project_v3_v3v3(tproj, v1_proj, axis);
+	sub_v3_v3(v1_proj, tproj);
+
+	project_v3_v3v3(tproj, v2_proj, axis);
+	sub_v3_v3(v2_proj, tproj);
+
+	return angle_v3v3(v1_proj, v2_proj);
 }
 
 void angle_tri_v3(float angles[3], const float v1[3], const float v2[3], const float v3[3])
@@ -549,6 +574,15 @@ void sub_vn_vnvn(float *array_tar, const float *array_src_a, const float *array_
 void fill_vn_i(int *array_tar, const int size, const int val)
 {
 	int *tar = array_tar + (size - 1);
+	int i = size;
+	while (i--) {
+		*(tar--) = val;
+	}
+}
+
+void fill_vn_ushort(unsigned short *array_tar, const int size, const unsigned short val)
+{
+	unsigned short *tar = array_tar + (size - 1);
 	int i = size;
 	while (i--) {
 		*(tar--) = val;

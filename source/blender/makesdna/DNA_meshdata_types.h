@@ -95,7 +95,7 @@ typedef struct MLoop {
 typedef struct MTexPoly {
 	struct Image *tpage;
 	char flag, transp;
-	short mode,tile,unwrap;
+	short mode, tile, unwrap;
 } MTexPoly;
 
 /* can copy from/to MTexPoly/MTFace */
@@ -257,7 +257,7 @@ typedef struct MRecast {
 /* medge->flag (1=SELECT)*/
 #define ME_EDGEDRAW			(1<<1)
 #define ME_SEAM				(1<<2)
-#define ME_FGON				(1<<3)
+#define ME_FGON				(1<<3) /* no longer used (now we have ngons), only defined so we can clear it */
 						/* reserve 16 for ME_HIDE */
 #define ME_EDGERENDER		(1<<5)
 #define ME_LOOSEEDGE		(1<<7)

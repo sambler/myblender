@@ -33,6 +33,8 @@
 
 #include "BLI_math.h"
 
+#include "BLF_translation.h"
+
 #include "DNA_action_types.h"
 #include "DNA_constraint_types.h"
 #include "DNA_modifier_types.h"
@@ -43,11 +45,11 @@
 #include "WM_types.h"
 
 EnumPropertyItem constraint_type_items[] = {
-	{0, "", 0, "Motion Tracking", ""},
+	{0, "", 0, N_("Motion Tracking"), ""},
 	{CONSTRAINT_TYPE_CAMERASOLVER, "CAMERA_SOLVER", ICON_CONSTRAINT_DATA, "Camera Solver", ""},
 	{CONSTRAINT_TYPE_OBJECTSOLVER, "OBJECT_SOLVER", ICON_CONSTRAINT_DATA, "Object Solver", ""},
 	{CONSTRAINT_TYPE_FOLLOWTRACK, "FOLLOW_TRACK", ICON_CONSTRAINT_DATA, "Follow Track", ""},
-	{0, "", 0, "Transform", ""},
+	{0, "", 0, N_("Transform"), ""},
 	{CONSTRAINT_TYPE_LOCLIKE, "COPY_LOCATION", ICON_CONSTRAINT_DATA, "Copy Location", ""},
 	{CONSTRAINT_TYPE_ROTLIKE, "COPY_ROTATION", ICON_CONSTRAINT_DATA, "Copy Rotation", ""},
 	{CONSTRAINT_TYPE_SIZELIKE, "COPY_SCALE", ICON_CONSTRAINT_DATA, "Copy Scale", ""},
@@ -58,7 +60,7 @@ EnumPropertyItem constraint_type_items[] = {
 	{CONSTRAINT_TYPE_SIZELIMIT, "LIMIT_SCALE", ICON_CONSTRAINT_DATA, "Limit Scale", ""},
 	{CONSTRAINT_TYPE_SAMEVOL, "MAINTAIN_VOLUME", ICON_CONSTRAINT_DATA, "Maintain Volume", ""},
 	{CONSTRAINT_TYPE_TRANSFORM, "TRANSFORM", ICON_CONSTRAINT_DATA, "Transformation", ""},
-	{0, "", 0, "Tracking", ""},
+	{0, "", 0, N_("Tracking"), ""},
 	{CONSTRAINT_TYPE_CLAMPTO, "CLAMP_TO", ICON_CONSTRAINT_DATA, "Clamp To", ""},
 	{CONSTRAINT_TYPE_DAMPTRACK, "DAMPED_TRACK", ICON_CONSTRAINT_DATA, "Damped Track",
 	                            "Tracking by taking the shortest path"},
@@ -66,10 +68,10 @@ EnumPropertyItem constraint_type_items[] = {
 	{CONSTRAINT_TYPE_LOCKTRACK, "LOCKED_TRACK", ICON_CONSTRAINT_DATA, "Locked Track",
 	                            "Tracking along a single axis"},
 	{CONSTRAINT_TYPE_SPLINEIK, "SPLINE_IK", ICON_CONSTRAINT_DATA, "Spline IK", ""},
-	{CONSTRAINT_TYPE_STRETCHTO, "STRETCH_TO",ICON_CONSTRAINT_DATA, "Stretch To", ""},
+	{CONSTRAINT_TYPE_STRETCHTO, "STRETCH_TO", ICON_CONSTRAINT_DATA, "Stretch To", ""},
 	{CONSTRAINT_TYPE_TRACKTO, "TRACK_TO", ICON_CONSTRAINT_DATA, "Track To",
 	                          "Legacy tracking constraint prone to twisting artifacts"},
-	{0, "", 0, "Relationship", ""},
+	{0, "", 0, N_("Relationship"), ""},
 	{CONSTRAINT_TYPE_ACTION, "ACTION", ICON_CONSTRAINT_DATA, "Action", ""},
 	{CONSTRAINT_TYPE_CHILDOF, "CHILD_OF", ICON_CONSTRAINT_DATA, "Child Of", ""},
 	{CONSTRAINT_TYPE_MINMAX, "FLOOR", ICON_CONSTRAINT_DATA, "Floor", ""},
@@ -560,7 +562,7 @@ static void rna_def_constraint_python(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "text", PROP_POINTER, PROP_NONE);
 	RNA_def_property_ui_text(prop, "Script", "The text object that contains the Python script");
-	RNA_def_property_flag(prop, PROP_EDITABLE);
+	RNA_def_property_flag(prop, PROP_EDITABLE|PROP_ID_REFCOUNT);
 	RNA_def_property_update(prop, NC_OBJECT|ND_CONSTRAINT, "rna_Constraint_update");
 
 	prop = RNA_def_property(srna, "use_targets", PROP_BOOLEAN, PROP_NONE);
@@ -1018,7 +1020,7 @@ static void rna_def_constraint_minmax(BlenderRNA *brna)
 
 	srna = RNA_def_struct(brna, "FloorConstraint", "Constraint");
 	RNA_def_struct_ui_text(srna, "Floor Constraint", "Use the target object for location limitation");
-	RNA_def_struct_sdna_from(srna, "bMinMaxConstraint","data");
+	RNA_def_struct_sdna_from(srna, "bMinMaxConstraint", "data");
 
 	prop = RNA_def_property(srna, "target", PROP_POINTER, PROP_NONE);
 	RNA_def_property_pointer_sdna(prop, NULL, "tar");
@@ -1095,7 +1097,7 @@ static void rna_def_constraint_action(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "action", PROP_POINTER, PROP_NONE);
 	RNA_def_property_pointer_sdna(prop, NULL, "act");
 	RNA_def_property_ui_text(prop, "Action", "The constraining action");
-	RNA_def_property_flag(prop, PROP_EDITABLE);
+	RNA_def_property_flag(prop, PROP_EDITABLE|PROP_ID_REFCOUNT);
 	RNA_def_property_update(prop, NC_OBJECT|ND_CONSTRAINT, "rna_Constraint_update");
 
 	prop = RNA_def_property(srna, "frame_start", PROP_INT, PROP_TIME);
@@ -1499,7 +1501,7 @@ static void rna_def_constraint_clamp_to(BlenderRNA *brna)
 
 	srna = RNA_def_struct(brna, "ClampToConstraint", "Constraint");
 	RNA_def_struct_ui_text(srna, "Clamp To Constraint",
-	                       "Constrains an object's location to the nearest point along the target path");
+	                       "Constrain an object's location to the nearest point along the target path");
 	RNA_def_struct_sdna_from(srna, "bClampToConstraint", "data");
 
 	prop = RNA_def_property(srna, "target", PROP_POINTER, PROP_NONE);
@@ -1539,7 +1541,7 @@ static void rna_def_constraint_transform(BlenderRNA *brna)
 		{0, NULL, 0, NULL, NULL}};
 
 	srna = RNA_def_struct(brna, "TransformConstraint", "Constraint");
-	RNA_def_struct_ui_text(srna, "Transformation Constraint", "Maps transformations of the target to the object");
+	RNA_def_struct_ui_text(srna, "Transformation Constraint", "Map transformations of the target to the object");
 	RNA_def_struct_sdna_from(srna, "bTransformConstraint", "data");
 
 	prop = RNA_def_property(srna, "target", PROP_POINTER, PROP_NONE);

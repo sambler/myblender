@@ -88,8 +88,8 @@ extern "C"
 #include "BKE_global.h"
 #include "BKE_animsys.h"
 #include "BKE_library.h"
-#include "BKE_material.h" // copy_material
-#include "BKE_mesh.h" // copy_mesh
+#include "BKE_material.h" // BKE_material_copy
+#include "BKE_mesh.h" // BKE_mesh_copy
 #include "DNA_space_types.h"
 #include "DNA_anim_types.h"
 #include "RNA_define.h"
@@ -308,25 +308,11 @@ void KX_BlenderSceneConverter::ConvertScene(class KX_Scene* destinationscene,
 				useDbvtCulling = (blenderscene->gm.mode & WO_DBVT_CULLING) != 0;
 				break;
 			}
-							
-			case WOPHY_ODE:
-			{
-				physics_engine = UseODE;
-				break;
-			}
-			case WOPHY_DYNAMO:
-			{
-				physics_engine = UseDynamo;
-				break;
-			}
-			case WOPHY_SUMO:
-			{
-				physics_engine = UseSumo; 
-				break;
-			}
+			default:
 			case WOPHY_NONE:
 			{
 				physics_engine = UseNone;
+				break;
 			}
 		}
 	}
@@ -352,11 +338,7 @@ void KX_BlenderSceneConverter::ConvertScene(class KX_Scene* destinationscene,
 				destinationscene->SetPhysicsEnvironment(ccdPhysEnv);
 				break;
 			}
-#endif	
-		case UseDynamo:
-		{
-		}
-		
+#endif
 		default:
 		case UseNone:
 			physics_engine = UseNone;
@@ -1427,7 +1409,7 @@ RAS_MeshObject *KX_BlenderSceneConverter::ConvertMeshSpecial(KX_Scene* kx_scene,
 	/* Watch this!, if its used in the original scene can cause big troubles */
 	if (me->us > 0) {
 		printf("Mesh has a user \"%s\"\n", name);
-		me = (ID*)copy_mesh((Mesh*)me);
+		me = (ID*)BKE_mesh_copy((Mesh*)me);
 		me->us--;
 	}
 	BLI_remlink(&m_maggie->mesh, me); /* even if we made the copy it needs to be removed */
@@ -1451,7 +1433,7 @@ RAS_MeshObject *KX_BlenderSceneConverter::ConvertMeshSpecial(KX_Scene* kx_scene,
 			if (mat_old && (mat_old->id.flag & LIB_DOIT)==0)
 			{
 				Material *mat_old= mesh->mat[i];
-				Material *mat_new= copy_material( mat_old );
+				Material *mat_new= BKE_material_copy( mat_old );
 				
 				mat_new->id.flag |= LIB_DOIT;
 				mat_old->id.us--;

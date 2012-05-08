@@ -48,12 +48,12 @@ extern "C" {
 //} for code folding
 #endif
 
-void free_key(struct Key *sc); 
+void BKE_key_free(struct Key *sc); 
 void free_key_nolib(struct Key *key);
 struct Key *add_key(struct ID *id);
-struct Key *copy_key(struct Key *key);
+struct Key *BKE_key_copy(struct Key *key);
 struct Key *copy_key_nolib(struct Key *key);
-void make_local_key(struct Key *key);
+void BKE_key_make_local(struct Key *key);
 void sort_keys(struct Key *key);
 
 void key_curve_position_weights(float t, float *data, int type);
@@ -64,6 +64,7 @@ float *do_ob_key(struct Scene *scene, struct Object *ob);
 
 struct Key *ob_get_key(struct Object *ob);
 struct KeyBlock *add_keyblock(struct Key *key, const char *name);
+struct KeyBlock *add_keyblock_ctime(struct Key *key, const char * name, const short do_force);
 struct KeyBlock *ob_get_keyblock(struct Object *ob);
 struct KeyBlock *ob_get_reference_keyblock(struct Object *ob);
 struct KeyBlock *key_get_keyblock(struct Key *key, int index);

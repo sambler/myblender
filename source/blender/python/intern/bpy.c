@@ -125,13 +125,13 @@ static PyObject *bpy_blend_paths(PyObject *UNUSED(self), PyObject *args, PyObjec
 		return NULL;
 	}
 
-	if (absolute) flag |= BPATH_TRAVERSE_ABS;
-	if (!packed)  flag |= BPATH_TRAVERSE_SKIP_PACKED;
-	if (local)    flag |= BPATH_TRAVERSE_SKIP_LIBRARY;
+	if (absolute) flag |= BLI_BPATH_TRAVERSE_ABS;
+	if (!packed)  flag |= BLI_BPATH_TRAVERSE_SKIP_PACKED;
+	if (local)    flag |= BLI_BPATH_TRAVERSE_SKIP_LIBRARY;
 
 	list = PyList_New(0);
 
-	bpath_traverse_main(G.main, bpy_blend_paths_visit_cb, flag, (void *)list);
+	BLI_bpath_traverse_main(G.main, bpy_blend_paths_visit_cb, flag, (void *)list);
 
 	return list;
 }
@@ -195,7 +195,7 @@ static PyObject *bpy_resource_path(PyObject *UNUSED(self), PyObject *args, PyObj
 		return NULL;
 
 	/* stupid string compare */
-	if     (!strcmp(type, "USER"))     folder_id = BLENDER_RESOURCE_PATH_USER;
+	if      (!strcmp(type, "USER"))    folder_id = BLENDER_RESOURCE_PATH_USER;
 	else if (!strcmp(type, "LOCAL"))   folder_id = BLENDER_RESOURCE_PATH_LOCAL;
 	else if (!strcmp(type, "SYSTEM"))  folder_id = BLENDER_RESOURCE_PATH_SYSTEM;
 	else {

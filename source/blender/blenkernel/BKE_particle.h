@@ -64,7 +64,7 @@ struct BVHTreeRayHit;
 #define LOOP_EXISTING_PARTICLES for(p=0, pa=psys->particles; p<psys->totpart; p++, pa++) if(!(pa->flag & PARS_UNEXIST))
 #define LOOP_SHOWN_PARTICLES for(p=0, pa=psys->particles; p<psys->totpart; p++, pa++) if(!(pa->flag & (PARS_UNEXIST|PARS_NO_DISP)))
 /* OpenMP: Can only advance one variable within loop definition. */
-#define LOOP_DYNAMIC_PARTICLES for(p=0; p<psys->totpart; p++ ) if((pa=psys->particles+p)->state.time > 0.f)
+#define LOOP_DYNAMIC_PARTICLES for(p=0; p<psys->totpart; p++ ) if((pa=psys->particles+p)->state.time > 0.0f)
 
 #define PSYS_FRAND_COUNT	1024
 #define PSYS_FRAND(seed)	psys->frand[(seed) % PSYS_FRAND_COUNT]
@@ -85,7 +85,7 @@ typedef struct ParticleSimulationData {
 	float courant_num;
 } ParticleSimulationData;
 
-typedef struct ParticleTexture{
+typedef struct ParticleTexture {
 	float ivel;							/* used in reset */
 	float time, life, exist, size;		/* used in init */
 	float damp, gravity, field;			/* used in physics */
@@ -93,13 +93,13 @@ typedef struct ParticleTexture{
 	float rough1, rough2, roughe;		/* used in path caching */
 } ParticleTexture;
 
-typedef struct ParticleSeam{
+typedef struct ParticleSeam {
 	float v0[3], v1[3];
 	float nor[3], dir[3], tan[3];
 	float length2;
 } ParticleSeam;
 
-typedef struct ParticleCacheKey{
+typedef struct ParticleCacheKey {
 	float co[3];
 	float vel[3];
 	float rot[4];
@@ -246,7 +246,7 @@ void psys_check_group_weights(struct ParticleSettings *part);
 int psys_uses_gravity(struct ParticleSimulationData *sim);
 
 /* free */
-void psys_free_settings(struct ParticleSettings *part);
+void BKE_particlesettings_free(struct ParticleSettings *part);
 void psys_free_path_cache(struct ParticleSystem *psys, struct PTCacheEdit *edit);
 void psys_free(struct Object * ob, struct ParticleSystem * psys);
 
@@ -266,8 +266,8 @@ struct ParticleSystemModifierData *psys_get_modifier(struct Object *ob, struct P
 struct ModifierData *object_add_particle_system(struct Scene *scene, struct Object *ob, const char *name);
 void object_remove_particle_system(struct Scene *scene, struct Object *ob);
 struct ParticleSettings *psys_new_settings(const char *name, struct Main *main);
-struct ParticleSettings *psys_copy_settings(struct ParticleSettings *part);
-void make_local_particlesettings(struct ParticleSettings *part);
+struct ParticleSettings *BKE_particlesettings_copy(struct ParticleSettings *part);
+void BKE_particlesettings_make_local(struct ParticleSettings *part);
 
 void psys_reset(struct ParticleSystem *psys, int mode);
 

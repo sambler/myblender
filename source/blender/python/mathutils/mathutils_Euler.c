@@ -1,5 +1,4 @@
 /*
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -650,7 +649,7 @@ PyDoc_STRVAR(euler_doc,
 );
 PyTypeObject euler_Type = {
 	PyVarObject_HEAD_INIT(NULL, 0)
-	"mathutils.Euler",              //tp_name
+	"Euler",                        //tp_name
 	sizeof(EulerObject),            //tp_basicsize
 	0,                              //tp_itemsize
 	(destructor)BaseMathObject_dealloc,     //tp_dealloc

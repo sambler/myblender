@@ -186,7 +186,7 @@ static void sequencer_free(SpaceLink *UNUSED(sl))
 {	
 //	SpaceSeq *sseq= (SpaceSequencer*) sl;
 	
-// XXX	if (sseq->gpd) free_gpencil_data(sseq->gpd);
+// XXX	if (sseq->gpd) BKE_gpencil_free(sseq->gpd);
 
 }
 
@@ -466,6 +466,7 @@ static void sequencer_preview_area_listener(ARegion *ar, wmNotifier *wmn)
 				case ND_FRAME:
 				case ND_MARKERS:
 				case ND_SEQUENCER:
+				case ND_RENDER_OPTIONS:
 					ED_region_tag_redraw(ar);
 					break;
 			}
@@ -570,10 +571,6 @@ void ED_spacetype_sequencer(void)
 	art->init = sequencer_buttons_area_init;
 	art->draw = sequencer_buttons_area_draw;
 	BLI_addhead(&st->regiontypes, art);
-	
-	/* Keep as python only for now
-	 * sequencer_buttons_register(art);
-	 */
 
 	/* regions: header */
 	art = MEM_callocN(sizeof(ARegionType), "spacetype sequencer region");

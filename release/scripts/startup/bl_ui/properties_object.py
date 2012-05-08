@@ -162,7 +162,6 @@ class OBJECT_PT_groups(ObjectButtonsPanel, Panel):
 
         # XXX, this is bad practice, yes, I wrote it :( - campbell
         index = 0
-        value = str(tuple(context.scene.cursor_location))
         for group in bpy.data.groups:
             if ob.name in group.objects:
                 col = layout.column(align=True)
@@ -181,9 +180,8 @@ class OBJECT_PT_groups(ObjectButtonsPanel, Panel):
                 col = split.column()
                 col.prop(group, "dupli_offset", text="")
 
-                props = col.operator("wm.context_set_value", text="From Cursor")
-                props.data_path = "object.users_group[%d].dupli_offset" % index
-                props.value = value
+                props = col.operator("object.dupli_offset_from_cursor", text="From Cursor")
+                props.group = index
                 index += 1
 
 
@@ -301,14 +299,10 @@ class OBJECT_PT_motion_paths(MotionPathButtonsPanel, Panel):
         layout = self.layout
 
         ob = context.object
-
-        self.draw_settings(context, ob.animation_visualisation)
-
-        layout.separator()
-
-        row = layout.row()
-        row.operator("object.paths_calculate", text="Calculate Paths")
-        row.operator("object.paths_clear", text="Clear Paths")
+        avs = ob.animation_visualisation
+        mpath = ob.motion_path
+        
+        self.draw_settings(context, avs, mpath)
 
 
 class OBJECT_PT_onion_skinning(OnionSkinButtonsPanel):  # , Panel): # inherit from panel when ready

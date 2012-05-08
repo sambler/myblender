@@ -43,16 +43,16 @@
 
 #ifdef WIN32
 #include <io.h>
-#include "BLI_winstuff.h"
-#include "BLI_callbacks.h"
-#include "utf_winfunc.h"
-#include "utfconv.h"
+#  include "BLI_winstuff.h"
+#  include "BLI_callbacks.h"
+#  include "utf_winfunc.h"
+#  include "utfconv.h"
 #else
-#include <unistd.h> // for read close
-#include <sys/param.h>
-#include <dirent.h>
-#include <unistd.h>
-#include <sys/stat.h>
+#  include <unistd.h> // for read close
+#  include <sys/param.h>
+#  include <dirent.h>
+#  include <unistd.h>
+#  include <sys/stat.h>
 #endif
 
 #include "MEM_guardedalloc.h"
@@ -82,7 +82,7 @@ int BLI_file_gzip(const char *from, const char *to)
 	gzfile = BLI_gzopen(to, "wb1");
 	if (gzfile == NULL)
 		return -1;
-	file = BLI_open(from, O_BINARY|O_RDONLY,0);
+	file = BLI_open(from, O_BINARY|O_RDONLY, 0);
 	if (file < 0)
 		return -2;
 
@@ -184,14 +184,14 @@ int BLI_file_is_writable(const char *filename)
 
 int BLI_file_touch(const char *file)
 {
-	FILE *f = BLI_fopen(file,"r+b");
+	FILE *f = BLI_fopen(file, "r+b");
 	if (f != NULL) {
 		char c = getc(f);
 		rewind(f);
-		putc(c,f);
+		putc(c, f);
 	}
 	else {
-		f = BLI_fopen(file,"wb");
+		f = BLI_fopen(file, "wb");
 	}
 	if (f) {
 		fclose(f);
@@ -202,43 +202,42 @@ int BLI_file_touch(const char *file)
 
 #ifdef WIN32
 
-static char str[MAXPATHLEN+12];
+static char str[MAXPATHLEN + 12];
 
 FILE *BLI_fopen(const char *filename, const char *mode)
 {
 	return ufopen(filename, mode);
 }
 
-gzFile BLI_gzopen(const char *filename, const char *mode)
+void *BLI_gzopen(const char *filename, const char *mode)
 {
 	gzFile gzfile;
-	int fi;
 
-	if (!filename || !mode) {return 0;}
-	else
-
-	{
-			
-		wchar_t short_name_16 [256];
-		char short_name [256];
-		int i=0;
+	if (!filename || !mode) {
+		return 0;
+	}
+	else {
+		wchar_t short_name_16[256];
+		char short_name[256];
+		int i = 0;
 
 		/* xxx Creates file before transcribing the path */
-		if(mode[0]=='w')
-			fclose(ufopen(filename,"a"));
+		if (mode[0] == 'w')
+			fclose(ufopen(filename, "a"));
 
 		UTF16_ENCODE(filename);
 
-		GetShortPathNameW(filename_16,short_name_16,256);
+		GetShortPathNameW(filename_16, short_name_16, 256);
 
-		for (i=0;i<256;i++) {short_name[i]=short_name_16[i];};
+		for (i = 0; i < 256; i++) {
+			short_name[i] = (char)short_name_16[i];
+		}
 
-
-		gzfile = gzopen(short_name,mode);
+		gzfile = gzopen(short_name, mode);
 
 		UTF16_UN_ENCODE(filename);
-
 	}
+
 	return gzfile;
 }
 
@@ -251,7 +250,7 @@ int BLI_delete(const char *file, int dir, int recursive)
 {
 	int err;
 	
-	UTF16_ENCODE(file)
+	UTF16_ENCODE(file);
 
 	if (recursive) {
 		callLocalErrorCallBack("Recursive delete is unsupported on Windows");
@@ -266,7 +265,7 @@ int BLI_delete(const char *file, int dir, int recursive)
 		if (err) callLocalErrorCallBack("Unable to delete file");
 	}
 
-	UTF16_UN_ENCODE(file)
+	UTF16_UN_ENCODE(file);
 
 	return err;
 }
@@ -287,11 +286,11 @@ int BLI_move(const char *file, const char *to)
 		}
 	}
 	
-	UTF16_ENCODE(file)
-	UTF16_ENCODE(str)
+	UTF16_ENCODE(file);
+	UTF16_ENCODE(str);
 	err= !MoveFileW(file_16, str_16);
-	UTF16_UN_ENCODE(str)
-	UTF16_UN_ENCODE(file)
+	UTF16_UN_ENCODE(str);
+	UTF16_UN_ENCODE(file);
 
 	if (err) {
 		callLocalErrorCallBack("Unable to move file");
@@ -318,11 +317,11 @@ int BLI_copy(const char *file, const char *to)
 		}
 	}
 
-	UTF16_ENCODE(file)
-	UTF16_ENCODE(str)
-	err= !CopyFileW(file_16,str_16,FALSE);
-	UTF16_UN_ENCODE(str)
-	UTF16_UN_ENCODE(file)
+	UTF16_ENCODE(file);
+	UTF16_ENCODE(str);
+	err = !CopyFileW(file_16, str_16, FALSE);
+	UTF16_UN_ENCODE(str);
+	UTF16_UN_ENCODE(file);
 
 	if (err) {
 		callLocalErrorCallBack("Unable to copy file!");
@@ -345,10 +344,10 @@ void BLI_dir_create_recursive(const char *dirname)
 	char *lslash;
 	char tmp[MAXPATHLEN];
 	
-	// First remove possible slash at the end of the dirname.
-	// This routine otherwise tries to create
-	// blah1/blah2/ (with slash) after creating
-	// blah1/blah2 (without slash)
+	/* First remove possible slash at the end of the dirname.
+	 * This routine otherwise tries to create
+	 * blah1/blah2/ (with slash) after creating
+	 * blah1/blah2 (without slash) */
 
 	BLI_strncpy(tmp, dirname, sizeof(tmp));
 	lslash= BLI_last_slash(tmp);
@@ -358,17 +357,17 @@ void BLI_dir_create_recursive(const char *dirname)
 	}
 	
 	if (BLI_exists(tmp)) return;
-		
+
 	lslash= BLI_last_slash(tmp);
 	if (lslash) {
-			/* Split about the last slash and recurse */	
+		/* Split about the last slash and recurse */
 		*lslash = 0;
 		BLI_dir_create_recursive(tmp);
 	}
 	
 	if (dirname[0]) /* patch, this recursive loop tries to create a nameless directory */
 		if (umkdir(dirname)==-1)
-			printf("Unable to create directory %s\n",dirname);
+			printf("Unable to create directory %s\n", dirname);
 }
 
 int BLI_rename(const char *from, const char *to)

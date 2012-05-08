@@ -170,7 +170,7 @@ static void screen_render_scene_layer_set(wmOperator *op, Main *mainp, Scene **s
 		if (scn) {
 			/* camera switch wont have updated */
 			scn->r.cfra = (*scene)->r.cfra;
-			scene_camera_switch_update(scn);
+			BKE_scene_camera_switch_update(scn);
 
 			*scene = scn;
 		}
@@ -221,9 +221,9 @@ static int screen_render_exec(bContext *C, wmOperator *op)
 	BKE_image_backup_render(scene, ima);
 
 	/* cleanup sequencer caches before starting user triggered render.
-	* otherwise, invalidated cache entries can make their way into
-	* the output rendering. We can't put that into RE_BlenderFrame,
-	* since sequence rendering can call that recursively... (peter) */
+	 * otherwise, invalidated cache entries can make their way into
+	 * the output rendering. We can't put that into RE_BlenderFrame,
+	 * since sequence rendering can call that recursively... (peter) */
 	seq_stripelem_cache_cleanup();
 
 	RE_SetReports(re, op->reports);
@@ -517,9 +517,9 @@ static int screen_render_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	multires_force_render_update(CTX_data_active_object(C));
 
 	/* cleanup sequencer caches before starting user triggered render.
-	* otherwise, invalidated cache entries can make their way into
-	* the output rendering. We can't put that into RE_BlenderFrame,
-	* since sequence rendering can call that recursively... (peter) */
+	 * otherwise, invalidated cache entries can make their way into
+	 * the output rendering. We can't put that into RE_BlenderFrame,
+	 * since sequence rendering can call that recursively... (peter) */
 	seq_stripelem_cache_cleanup();
 
 	/* get editmode results */

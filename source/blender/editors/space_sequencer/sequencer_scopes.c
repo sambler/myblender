@@ -87,7 +87,7 @@ static void wform_put_line(int w,
 }
 
 static void wform_put_line_single(
-    int w, unsigned char *last_pos, unsigned char *new_pos, int col)
+        int w, unsigned char *last_pos, unsigned char *new_pos, int col)
 {
 	if (last_pos > new_pos) {
 		unsigned char *temp = new_pos;
@@ -247,7 +247,8 @@ ImBuf *make_waveform_view_from_ibuf(ImBuf *ibuf)
 }
 
 
-static ImBuf *make_sep_waveform_view_from_ibuf_byte(ImBuf *ibuf){
+static ImBuf *make_sep_waveform_view_from_ibuf_byte(ImBuf *ibuf)
+{
 	ImBuf *rval = IMB_allocImBuf(
 	    ibuf->x + 3, 515, 32, IB_rect);
 	int x, y;

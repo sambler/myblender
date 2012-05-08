@@ -81,14 +81,14 @@ GLubyte stipple_halftone[128] = {
 
 
 GLubyte stipple_quarttone[128] = { 
-	136,136,136,136,0,0,0,0,34,34,34,34,0,0,0,0,
-	136,136,136,136,0,0,0,0,34,34,34,34,0,0,0,0,
-	136,136,136,136,0,0,0,0,34,34,34,34,0,0,0,0,
-	136,136,136,136,0,0,0,0,34,34,34,34,0,0,0,0,
-	136,136,136,136,0,0,0,0,34,34,34,34,0,0,0,0,
-	136,136,136,136,0,0,0,0,34,34,34,34,0,0,0,0,
-	136,136,136,136,0,0,0,0,34,34,34,34,0,0,0,0,
-	136,136,136,136,0,0,0,0,34,34,34,34,0,0,0,0};
+	136, 136, 136, 136, 0, 0, 0, 0, 34, 34, 34, 34, 0, 0, 0, 0,
+	136, 136, 136, 136, 0, 0, 0, 0, 34, 34, 34, 34, 0, 0, 0, 0,
+	136, 136, 136, 136, 0, 0, 0, 0, 34, 34, 34, 34, 0, 0, 0, 0,
+	136, 136, 136, 136, 0, 0, 0, 0, 34, 34, 34, 34, 0, 0, 0, 0,
+	136, 136, 136, 136, 0, 0, 0, 0, 34, 34, 34, 34, 0, 0, 0, 0,
+	136, 136, 136, 136, 0, 0, 0, 0, 34, 34, 34, 34, 0, 0, 0, 0,
+	136, 136, 136, 136, 0, 0, 0, 0, 34, 34, 34, 34, 0, 0, 0, 0,
+	136, 136, 136, 136, 0, 0, 0, 0, 34, 34, 34, 34, 0, 0, 0, 0};
 
 
 GLubyte stipple_diag_stripes_pos[128] = {
@@ -195,16 +195,15 @@ void fdrawcheckerboard(float x1, float y1, float x2, float y2)
 {
 	unsigned char col1[4]= {40, 40, 40}, col2[4]= {50, 50, 50};
 
-	GLubyte checker_stipple[32*32/8] = {
-		255,0,255,0,255,0,255,0,255,0,255,0,255,0,255,0,
-		255,0,255,0,255,0,255,0,255,0,255,0,255,0,255,0,
-		0,255,0,255,0,255,0,255,0,255,0,255,0,255,0,255,
-		0,255,0,255,0,255,0,255,0,255,0,255,0,255,0,255,
-		255,0,255,0,255,0,255,0,255,0,255,0,255,0,255,0,
-		255,0,255,0,255,0,255,0,255,0,255,0,255,0,255,0,
-		0,255,0,255,0,255,0,255,0,255,0,255,0,255,0,255,
-		0,255,0,255,0,255,0,255,0,255,0,255,0,255,0,255,
-	};
+	GLubyte checker_stipple[32 * 32 / 8] = {
+		255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0,
+		255,  0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0,
+		0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255,
+		0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255,
+		255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0,
+		255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0,
+		0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255,
+		0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255};
 	
 	glColor3ubv(col1);
 	glRectf(x1, y1, x2, y2);
@@ -298,13 +297,13 @@ void setlinestyle(int nr)
 
 	/* Invert line handling */
 	
-#define glToggle(mode, onoff)	(((onoff)?glEnable:glDisable)(mode))
+#define gl_toggle(mode, onoff)	(((onoff)?glEnable:glDisable)(mode))
 
 void set_inverted_drawing(int enable) 
 {
 	glLogicOp(enable?GL_INVERT:GL_COPY);
-	glToggle(GL_COLOR_LOGIC_OP, enable);
-	glToggle(GL_DITHER, !enable);
+	gl_toggle(GL_COLOR_LOGIC_OP, enable);
+	gl_toggle(GL_DITHER, !enable);
 }
 
 void sdrawXORline(int x0, int y0, int x1, int y1)
@@ -370,8 +369,8 @@ void fdrawXORellipse(float xofs, float yofs, float hw, float hh)
 	set_inverted_drawing(1);
 
 	glPushMatrix();
-	glTranslatef(xofs, yofs, 0.0);
-	glScalef(1,hh/hw,1);
+	glTranslatef(xofs, yofs, 0.0f);
+	glScalef(1.0f, hh / hw, 1.0f);
 	glutil_draw_lined_arc(0.0, M_PI*2.0, hw, 20);
 	glPopMatrix();
 
@@ -690,6 +689,8 @@ void glaDefine2DArea(rcti *screen_rect)
 	glLoadIdentity();
 }
 
+#if 0 /* UNUSED */
+
 struct gla2DDrawInfo {
 	int orig_vp[4], orig_sc[4];
 	float orig_projmat[16], orig_viewmat[16];
@@ -720,7 +721,6 @@ void gla2DSetMap(gla2DDrawInfo *di, rctf *rect)
 	di->wo_to_sc[0]= sc_w/wo_w;
 	di->wo_to_sc[1]= sc_h/wo_h;
 }
-
 
 gla2DDrawInfo *glaBegin2DDraw(rcti *screen_rect, rctf *world_rect) 
 {
@@ -779,15 +779,16 @@ void glaEnd2DDraw(gla2DDrawInfo *di)
 
 	MEM_freeN(di);
 }
+#endif
 
-/* **************** glPoint hack ************************ */
+/* **************** GL_POINT hack ************************ */
 
 static int curmode=0;
 static int pointhack=0;
-static GLubyte Squaredot[16] = { 0xff,0xff,0xff,0xff,
-								 0xff,0xff,0xff,0xff,
-								 0xff,0xff,0xff,0xff, 
-								 0xff,0xff,0xff,0xff};
+static GLubyte Squaredot[16] = {0xff, 0xff, 0xff, 0xff,
+                                0xff, 0xff, 0xff, 0xff,
+                                0xff, 0xff, 0xff, 0xff,
+                                0xff, 0xff, 0xff, 0xff};
 
 void bglBegin(int mode)
 {
@@ -805,6 +806,7 @@ void bglBegin(int mode)
 	}
 }
 
+#if 0 /* UNUSED */
 int bglPointHack(void)
 {
 	float value[4];
@@ -818,10 +820,11 @@ int bglPointHack(void)
 	}
 	return 0;
 }
+#endif
 
 void bglVertex3fv(const float vec[3])
 {
-	switch(curmode) {
+	switch (curmode) {
 	case GL_POINTS:
 		if (pointhack) {
 			glRasterPos3fv(vec);
@@ -834,7 +837,7 @@ void bglVertex3fv(const float vec[3])
 
 void bglVertex3f(float x, float y, float z)
 {
-	switch(curmode) {
+	switch (curmode) {
 	case GL_POINTS:
 		if (pointhack) {
 			glRasterPos3f(x, y, z);
@@ -847,7 +850,7 @@ void bglVertex3f(float x, float y, float z)
 
 void bglVertex2fv(const float vec[2])
 {
-	switch(curmode) {
+	switch (curmode) {
 	case GL_POINTS:
 		if (pointhack) {
 			glRasterPos2fv(vec);
@@ -878,11 +881,15 @@ void bgl_get_mats(bglMats *mats)
 	/* Very strange code here - it seems that certain bad values in the
 	 * modelview matrix can cause gluUnProject to give bad results. */
 	if (mats->modelview[0] < badvalue &&
-	   mats->modelview[0] > -badvalue)
-		mats->modelview[0]= 0;
+	    mats->modelview[0] > -badvalue)
+	{
+		mats->modelview[0] = 0;
+	}
 	if (mats->modelview[5] < badvalue &&
-	   mats->modelview[5] > -badvalue)
-		mats->modelview[5]= 0;
+	    mats->modelview[5] > -badvalue)
+	{
+		mats->modelview[5] = 0;
+	}
 	
 	/* Set up viewport so that gluUnProject will give correct values */
 	mats->viewport[0] = 0;
@@ -927,6 +934,7 @@ void bglPolygonOffset(float viewdist, float dist)
 	}
 }
 
+#if 0 /* UNUSED */
 void bglFlush(void) 
 {
 	glFlush();
@@ -935,4 +943,4 @@ void bglFlush(void)
 // XXX		myswapbuffers(); //hack to get mac intel graphics to show frontbuffer
 #endif
 }
-
+#endif

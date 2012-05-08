@@ -16,6 +16,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  * Contributor(s): Daniel Genrich
+ *                 Blender Foundation
  *
  * ***** END GPL LICENSE BLOCK *****
  */
@@ -147,6 +148,7 @@ static void rna_def_smoke_domain_settings(BlenderRNA *brna)
 	RNA_def_property_range(prop, 24, 512);
 	RNA_def_property_ui_range(prop, 24, 512, 2, 0);
 	RNA_def_property_ui_text(prop, "Max Res", "Maximal resolution used in the fluid domain");
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 	RNA_def_property_update(prop, NC_OBJECT|ND_MODIFIER, "rna_Smoke_reset");
 
 	prop = RNA_def_property(srna, "amplify", PROP_INT, PROP_NONE);
@@ -154,11 +156,13 @@ static void rna_def_smoke_domain_settings(BlenderRNA *brna)
 	RNA_def_property_range(prop, 1, 10);
 	RNA_def_property_ui_range(prop, 1, 10, 1, 0);
 	RNA_def_property_ui_text(prop, "Amplification", "Enhance the resolution of smoke by this factor using noise");
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 	RNA_def_property_update(prop, NC_OBJECT|ND_MODIFIER, "rna_Smoke_reset");
 
 	prop = RNA_def_property(srna, "use_high_resolution", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flags", MOD_SMOKE_HIGHRES);
 	RNA_def_property_ui_text(prop, "High res", "Enable high resolution (using amplification)");
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 	RNA_def_property_update(prop, NC_OBJECT|ND_MODIFIER, "rna_Smoke_reset");
 
 	prop = RNA_def_property(srna, "show_high_resolution", PROP_BOOLEAN, PROP_NONE);
@@ -170,6 +174,7 @@ static void rna_def_smoke_domain_settings(BlenderRNA *brna)
 	RNA_def_property_enum_sdna(prop, NULL, "noise");
 	RNA_def_property_enum_items(prop, prop_noise_type_items);
 	RNA_def_property_ui_text(prop, "Noise Method", "Noise method which is used for creating the high resolution");
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 	RNA_def_property_update(prop, NC_OBJECT|ND_MODIFIER, "rna_Smoke_reset");
 
 	prop = RNA_def_property(srna, "alpha", PROP_FLOAT, PROP_NONE);
@@ -332,12 +337,25 @@ static void rna_def_smoke_flow_settings(BlenderRNA *brna)
 
 static void rna_def_smoke_coll_settings(BlenderRNA *brna)
 {
+	static EnumPropertyItem smoke_coll_type_items[] = {
+		{SM_COLL_STATIC, "COLLSTATIC", 0, "Static", "Non moving obstacle"},
+		{SM_COLL_RIGID, "COLLRIGID", 0, "Rigid", "Rigid obstacle"},
+		{SM_COLL_ANIMATED, "COLLANIMATED", 0, "Animated", "Animated obstacle"},
+		{0, NULL, 0, NULL, NULL}};
+
 	StructRNA *srna;
+	PropertyRNA *prop;
 
 	srna = RNA_def_struct(brna, "SmokeCollSettings", NULL);
 	RNA_def_struct_ui_text(srna, "Collision Settings", "Smoke collision settings");
 	RNA_def_struct_sdna(srna, "SmokeCollSettings");
 	RNA_def_struct_path_func(srna, "rna_SmokeCollSettings_path");
+
+	prop = RNA_def_property(srna, "collision_type", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "type");
+	RNA_def_property_enum_items(prop, smoke_coll_type_items);
+	RNA_def_property_ui_text(prop, "Collision type", "Collision type");
+	RNA_def_property_update(prop, NC_OBJECT|ND_MODIFIER, "rna_Smoke_reset");
 }
 
 void RNA_def_smoke(BlenderRNA *brna)

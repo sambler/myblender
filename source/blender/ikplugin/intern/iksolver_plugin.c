@@ -229,7 +229,7 @@ static void where_is_ik_bone(bPoseChannel *pchan, float ik_mat[][3])   // nr = t
 }
 
 
-/* called from within the core where_is_pose loop, all animsystems and constraints
+/* called from within the core BKE_pose_where_is loop, all animsystems and constraints
  * were executed & assigned. Now as last we do an IK pass */
 static void execute_posetree(struct Scene *scene, Object *ob, PoseTree *tree)
 {
@@ -347,11 +347,15 @@ static void execute_posetree(struct Scene *scene, Object *ob, PoseTree *tree)
 
 	/* first set the goal inverse transform, assuming the root of tree was done ok! */
 	pchan= tree->pchan[0];
-	if (pchan->parent)
+	if (pchan->parent) {
 		/* transform goal by parent mat, so this rotation is not part of the
 		 * segment's basis. otherwise rotation limits do not work on the
 		 * local transform of the segment itself. */
 		copy_m4_m4(rootmat, pchan->parent->pose_mat);
+		/* However, we do not want to get (i.e. reverse) parent's scale, as it generates [#31008]
+		 * kind of nasty bugs... */
+		normalize_m4(rootmat);
+	}
 	else
 		unit_m4(rootmat);
 	copy_v3_v3(rootmat[3], pchan->pose_head);
@@ -421,10 +425,10 @@ static void execute_posetree(struct Scene *scene, Object *ob, PoseTree *tree)
 			goalpos[2]= fac*goalpos[2] + mfac*world_pose[3][2];
 			
 			/* blend rotation */
-			mat3_to_quat( q1,goalrot);
-			mat4_to_quat( q2,world_pose);
+			mat3_to_quat(q1, goalrot);
+			mat4_to_quat(q2, world_pose);
 			interp_qt_qtqt(q, q1, q2, mfac);
-			quat_to_mat3( goalrot,q);
+			quat_to_mat3(goalrot, q);
 		}
 		
 		iktarget= iktree[target->tip];
@@ -531,8 +535,8 @@ void iksolver_execute_tree(struct Scene *scene, struct Object *ob,  struct bPose
 		/* 4. walk over the tree for regular solving */
 		for (a=0; a<tree->totchannel; a++) {
 			if (!(tree->pchan[a]->flag & POSE_DONE))	// successive trees can set the flag
-				where_is_pose_bone(scene, ob, tree->pchan[a], ctime, 1);
-			// tell blender that this channel was controlled by IK, it's cleared on each where_is_pose()
+				BKE_pose_where_is_bone(scene, ob, tree->pchan[a], ctime, 1);
+			// tell blender that this channel was controlled by IK, it's cleared on each BKE_pose_where_is()
 			tree->pchan[a]->flag |= POSE_CHAIN;
 		}
 		/* 5. execute the IK solver */

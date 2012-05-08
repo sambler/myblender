@@ -520,9 +520,15 @@ typedef struct SpaceClip {
 	                                         * defined when drawing and used for mouse position calculation */
 
 	/* movie postprocessing */
-	int postproc_flag;
+	int postproc_flag, pad2;
 
-	int runtime_flag;			/* different runtime flags */
+	void *draw_context;
+
+	/* dopesheet */
+	short dope_sort;		/* sort order in dopesheet view */
+	short dope_flag;		/* dopsheet view flags */
+
+	int pad3;
 } SpaceClip;
 
 /* view3d  Now in DNA_view3d_types.h */
@@ -705,7 +711,7 @@ enum FileSortTypeE {
 #define SI_DRAWTOOL		(1<<3)
 #define SI_NO_DRAWFACES	(1<<4)
 #define SI_DRAWSHADOW   (1<<5)
-#define SI_SELACTFACE   (1<<6)	/* deprecated */
+/* #define SI_SELACTFACE   (1<<6) */ /* deprecated */
 #define SI_DEPRECATED2	(1<<7)
 #define SI_DEPRECATED3  (1<<8)	/* stick UV selection to mesh vertex (UVs wont always be touching) */
 #define SI_COORDFLOATS  (1<<9)
@@ -904,6 +910,7 @@ enum {
 #define SC_SHOW_GRAPH_TRACKS	(1<<15)
 /*#define SC_SHOW_PYRAMID_LEVELS	(1<<16) */	/* UNUSED */
 #define SC_LOCK_TIMECURSOR		(1<<17)
+#define SC_SHOW_SECONDS			(1<<18)
 
 /* SpaceClip->mode */
 #define SC_MODE_TRACKING		0
@@ -913,9 +920,15 @@ enum {
 /* SpaceClip->view */
 #define SC_VIEW_CLIP		0
 #define SC_VIEW_GRAPH		1
+#define SC_VIEW_DOPESHEET	2
 
-/* SpaceClip->runtime_flag */
-#define SC_GRAPH_BOTTOM		(1<<0)
+/* SpaceClip->dope_sort */
+#define SC_DOPE_SORT_NAME		0
+#define SC_DOPE_SORT_LONGEST		1
+#define SC_DOPE_SORT_TOTAL		2
+
+/* SpaceClip->dope_flag */
+#define SC_DOPE_SORT_INVERSE		1
 
 /* space types, moved from DNA_screen_types.h */
 /* Do NOT change order, append on end. types are hardcoded needed */

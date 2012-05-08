@@ -1,5 +1,4 @@
 /*
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -2316,7 +2315,7 @@ PyDoc_STRVAR(matrix_doc,
 );
 PyTypeObject matrix_Type = {
 	PyVarObject_HEAD_INIT(NULL, 0)
-	"mathutils.Matrix",                 /*tp_name*/
+	"Matrix",                           /*tp_name*/
 	sizeof(MatrixObject),               /*tp_basicsize*/
 	0,                                  /*tp_itemsize*/
 	(destructor)BaseMathObject_dealloc, /*tp_dealloc*/

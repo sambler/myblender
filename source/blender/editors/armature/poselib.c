@@ -174,7 +174,7 @@ static Object *get_poselib_object (bContext *C)
 	if (sa && (sa->spacetype == SPACE_BUTS)) 
 		return ED_object_context(C);
 	else
-		return object_pose_armature_get(CTX_data_active_object(C));
+		return BKE_object_pose_armature_get(CTX_data_active_object(C));
 }
 
 /* Poll callback for operators that require existing PoseLib data (with poses) to work */
@@ -232,7 +232,7 @@ static int poselib_new_exec (bContext *C, wmOperator *UNUSED(op))
 	return OPERATOR_FINISHED;
 }
 
-void POSELIB_OT_new (wmOperatorType *ot)
+void POSELIB_OT_new(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name = "New Pose Library";
@@ -267,7 +267,7 @@ static int poselib_unlink_exec (bContext *C, wmOperator *UNUSED(op))
 	return OPERATOR_FINISHED;
 }
 
-void POSELIB_OT_unlink (wmOperatorType *ot)
+void POSELIB_OT_unlink(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name = "Unlink Pose Library";
@@ -353,7 +353,7 @@ static int poselib_sanitise_exec (bContext *C, wmOperator *op)
 	return OPERATOR_FINISHED;
 }
 
-void POSELIB_OT_action_sanitise (wmOperatorType *ot)
+void POSELIB_OT_action_sanitise(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name = "Sanitise Pose Library Action";
@@ -472,7 +472,7 @@ static int poselib_add_exec (bContext *C, wmOperator *op)
 	BLI_uniquename(&act->markers, marker, "Pose", '.', offsetof(TimeMarker, name), sizeof(marker->name));
 	
 	/* use Keying Set to determine what to store for the pose */
-	// FIXME: in the past, the Keying Set respected selections (LocRotScale), but the current one doesn't (Whole Character)
+	// FIXME: in the past, the Keying Set respected selections (LocRotScale), but the current one doesn't (WholeCharacter)
 	// so perhaps we need either a new Keying Set, or just to add overrides here...
 	ANIM_apply_keyingset(C, NULL, act, ks, MODIFYKEY_MODE_INSERT, (float)frame);
 	
@@ -483,7 +483,7 @@ static int poselib_add_exec (bContext *C, wmOperator *op)
 	return OPERATOR_FINISHED;
 }
 
-void POSELIB_OT_pose_add (wmOperatorType *ot)
+void POSELIB_OT_pose_add(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name = "PoseLib Add Pose";
@@ -516,7 +516,7 @@ static EnumPropertyItem *poselib_stored_pose_itemf(bContext *C, PointerRNA *UNUS
 	int i= 0;
 
 	if (C == NULL) {
-		return DummyRNA_DEFAULT_items;
+		return DummyRNA_NULL_items;
 	}
 	
 	/* check that the action exists */
@@ -541,18 +541,28 @@ static int poselib_remove_exec (bContext *C, wmOperator *op)
 	Object *ob= get_poselib_object(C);
 	bAction *act= (ob) ? ob->poselib : NULL;
 	TimeMarker *marker;
+	int marker_index;
 	FCurve *fcu;
-	
+	PropertyRNA *prop;
+
 	/* check if valid poselib */
 	if (act == NULL) {
 		BKE_report(op->reports, RPT_ERROR, "Object doesn't have PoseLib data");
 		return OPERATOR_CANCELLED;
 	}
-	
+
+	prop = RNA_struct_find_property(op->ptr, "pose");
+	if (RNA_property_is_set(op->ptr, prop)) {
+		marker_index = RNA_property_enum_get(op->ptr, prop);
+	}
+	else {
+		marker_index = act->active_marker - 1;
+	}
+
 	/* get index (and pointer) of pose to remove */
-	marker= BLI_findlink(&act->markers, RNA_enum_get(op->ptr, "pose"));
+	marker = BLI_findlink(&act->markers, marker_index);
 	if (marker == NULL) {
-		BKE_reportf(op->reports, RPT_ERROR, "Invalid Pose specified %d", RNA_int_get(op->ptr, "pose"));
+		BKE_reportf(op->reports, RPT_ERROR, "Invalid Pose specified %d", marker_index);
 		return OPERATOR_CANCELLED;
 	}
 	
@@ -587,7 +597,7 @@ static int poselib_remove_exec (bContext *C, wmOperator *op)
 	return OPERATOR_FINISHED;
 }
 
-void POSELIB_OT_pose_remove (wmOperatorType *ot)
+void POSELIB_OT_pose_remove(wmOperatorType *ot)
 {
 	PropertyRNA *prop;
 	
@@ -605,8 +615,8 @@ void POSELIB_OT_pose_remove (wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
 	
 	/* properties */
-	prop= RNA_def_enum(ot->srna, "pose", DummyRNA_DEFAULT_items, 0, "Pose", "The pose to remove");
-		RNA_def_enum_funcs(prop, poselib_stored_pose_itemf);
+	prop = RNA_def_enum(ot->srna, "pose", DummyRNA_NULL_items, 0, "Pose", "The pose to remove");
+	RNA_def_enum_funcs(prop, poselib_stored_pose_itemf);
 	ot->prop = prop;
 }
 
@@ -640,7 +650,7 @@ static int poselib_rename_invoke (bContext *C, wmOperator *op, wmEvent *evt)
 
 static int poselib_rename_exec (bContext *C, wmOperator *op)
 {
-	Object *ob= object_pose_armature_get(CTX_data_active_object(C));
+	Object *ob= BKE_object_pose_armature_get(CTX_data_active_object(C));
 	bAction *act= (ob) ? ob->poselib : NULL;
 	TimeMarker *marker;
 	char newname[64];
@@ -674,7 +684,7 @@ static int poselib_rename_exec (bContext *C, wmOperator *op)
 	return OPERATOR_FINISHED;
 }
 
-void POSELIB_OT_pose_rename (wmOperatorType *ot)
+void POSELIB_OT_pose_rename(wmOperatorType *ot)
 {
 	PropertyRNA *prop;
 	static EnumPropertyItem prop_poses_dummy_types[] = {
@@ -776,7 +786,7 @@ static void poselib_backup_posecopy (tPoseLib_PreviewData *pld)
 	/* for each posechannel that has an actionchannel in */
 	for (agrp= pld->act->groups.first; agrp; agrp= agrp->next) {
 		/* try to find posechannel */
-		pchan= get_pose_channel(pld->pose, agrp->name);
+		pchan= BKE_pose_channel_find_name(pld->pose, agrp->name);
 		
 		/* backup data if available */
 		if (pchan) {
@@ -875,7 +885,7 @@ static void poselib_apply_pose (tPoseLib_PreviewData *pld)
 		/* check if group has any keyframes */
 		if (ANIM_animchanneldata_keyframes_loop(&ked, NULL, agrp, ALE_GROUP, NULL, group_ok_cb, NULL)) {
 			/* has keyframe on this frame, so try to get a PoseChannel with this name */
-			pchan= get_pose_channel(pose, agrp->name);
+			pchan= BKE_pose_channel_find_name(pose, agrp->name);
 			
 			if (pchan) {	
 				short ok= 0;
@@ -887,10 +897,12 @@ static void poselib_apply_pose (tPoseLib_PreviewData *pld)
 				}
 				else if (pchan->bone) {
 					/* only ok if bone is visible and selected */
-					if ( (pchan->bone->flag & BONE_SELECTED) &&
-						 (pchan->bone->flag & BONE_HIDDEN_P)==0 &&
-						 (pchan->bone->layer & arm->layer) )
+					if ((pchan->bone->flag & BONE_SELECTED) &&
+					    (pchan->bone->flag & BONE_HIDDEN_P) == 0 &&
+					    (pchan->bone->layer & arm->layer))
+					{
 						ok = 1;
+					}
 				}
 				
 				if (ok) 
@@ -915,7 +927,7 @@ static void poselib_keytag_pose (bContext *C, Scene *scene, tPoseLib_PreviewData
 	/* start tagging/keying */
 	for (agrp= act->groups.first; agrp; agrp= agrp->next) {
 		/* only for selected bones unless there aren't any selected, in which case all are included  */
-		pchan= get_pose_channel(pose, agrp->name);
+		pchan= BKE_pose_channel_find_name(pose, agrp->name);
 		
 		if (pchan) {
 			if ( (pld->selcount == 0) || ((pchan->bone) && (pchan->bone->flag & BONE_SELECTED)) ) {
@@ -975,7 +987,7 @@ static void poselib_preview_apply (bContext *C, wmOperator *op)
 		if ((pld->arm->flag & ARM_DELAYDEFORM)==0)
 			DAG_id_tag_update(&pld->ob->id, OB_RECALC_DATA);  /* sets recalc flags */
 		else
-			where_is_pose(pld->scene, pld->ob);
+			BKE_pose_where_is(pld->scene, pld->ob);
 	}
 	
 	/* do header print - if interactively previewing */
@@ -1483,7 +1495,7 @@ static void poselib_preview_cleanup (bContext *C, wmOperator *op)
 		if ((arm->flag & ARM_DELAYDEFORM)==0)
 			DAG_id_tag_update(&ob->id, OB_RECALC_DATA);  /* sets recalc flags */
 		else
-			where_is_pose(scene, ob);
+			BKE_pose_where_is(scene, ob);
 		
 	}
 	else if (pld->state == PL_PREVIEW_CONFIRM) {
@@ -1502,7 +1514,7 @@ static void poselib_preview_cleanup (bContext *C, wmOperator *op)
 			//remake_action_ipos(ob->action);
 		}
 		else
-			where_is_pose(scene, ob);
+			BKE_pose_where_is(scene, ob);
 	}
 	
 	/* free memory used for backups and searching */
@@ -1610,7 +1622,7 @@ static int poselib_preview_exec (bContext *C, wmOperator *op)
 	return poselib_preview_exit(C, op);
 }
 
-void POSELIB_OT_browse_interactive (wmOperatorType *ot)
+void POSELIB_OT_browse_interactive(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name = "PoseLib Browse Poses";
@@ -1636,7 +1648,7 @@ void POSELIB_OT_browse_interactive (wmOperatorType *ot)
 	/* RNA_def_float_factor(ot->srna, "blend_factor", 1.0f, 0.0f, 1.0f, "Blend Factor", "Amount that the pose is applied on top of the existing poses", 0.0f, 1.0f); */
 }
 
-void POSELIB_OT_apply_pose (wmOperatorType *ot)
+void POSELIB_OT_apply_pose(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name = "Apply Pose Library Pose";

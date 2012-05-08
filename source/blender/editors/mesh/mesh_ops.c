@@ -87,8 +87,6 @@ void ED_operatortypes_mesh(void)
 	WM_operatortype_append(MESH_OT_primitive_ico_sphere_add);
 	WM_operatortype_append(MESH_OT_duplicate);
 	WM_operatortype_append(MESH_OT_remove_doubles);
-	WM_operatortype_append(MESH_OT_vertices_sort);
-	WM_operatortype_append(MESH_OT_vertices_randomize);
 	WM_operatortype_append(MESH_OT_spin);
 	WM_operatortype_append(MESH_OT_screw);
 
@@ -118,7 +116,7 @@ void ED_operatortypes_mesh(void)
 	WM_operatortype_append(MESH_OT_dissolve_limited);
 	WM_operatortype_append(MESH_OT_faces_shade_smooth);
 	WM_operatortype_append(MESH_OT_faces_shade_flat);
-	WM_operatortype_append(MESH_OT_sort_faces);
+	WM_operatortype_append(MESH_OT_sort_elements);
 
 	WM_operatortype_append(MESH_OT_delete);
 	WM_operatortype_append(MESH_OT_edge_collapse);
@@ -353,11 +351,11 @@ void ED_keymap_mesh(wmKeyConfig *keyconf)
 	
 	kmi = WM_keymap_add_item(keymap, "MESH_OT_knife_tool", KKEY, KM_PRESS, 0, 0);
 	RNA_boolean_set(kmi->ptr, "use_occlude_geometry", TRUE);
-	RNA_boolean_set(kmi->ptr, "only_select",          FALSE);
+	RNA_boolean_set(kmi->ptr, "only_selected",          FALSE);
 
 	kmi = WM_keymap_add_item(keymap, "MESH_OT_knife_tool", KKEY, KM_PRESS, KM_SHIFT, 0);
 	RNA_boolean_set(kmi->ptr, "use_occlude_geometry", FALSE);
-	RNA_boolean_set(kmi->ptr, "only_select",          TRUE);
+	RNA_boolean_set(kmi->ptr, "only_selected",          TRUE);
 	
 	WM_keymap_add_item(keymap, "OBJECT_OT_vertex_parent_set", PKEY, KM_PRESS, KM_CTRL, 0);
 

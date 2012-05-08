@@ -45,6 +45,8 @@ from pygments.formatters import RawTokenFormatter
 
 from pygments.token import Token
 
+import argparse
+
 PRINT_QTC_TASKFORMAT = False
 
 TAB_SIZE = 4
@@ -297,7 +299,8 @@ def blender_check_operator(index_start, index_end, op_text):
         if op_text in {"+=", "-=", "*=", "/=", "&=", "|=", "^=",
                   "&&", "||",
                   "==", "!=", "<=", ">=",
-                  "<<", ">>"}:
+                  "<<", ">>",
+                  "%="}:
             if not _is_ws_pad(index_start, index_end):
                 warning("no space around operator '%s'" % op_text, index_start, index_end)
 
@@ -315,17 +318,17 @@ def blender_check_operator(index_start, index_end, op_text):
         elif op_text == "**":
             pass  # handle below
         else:
-            warning("unhadled operator A '%s'" % op_text, index_start, index_end)
+            warning("unhandled operator A '%s'" % op_text, index_start, index_end)
     else:
-        #warning("unhadled operator B '%s'" % op_text, index_start, index_end)
+        #warning("unhandled operator B '%s'" % op_text, index_start, index_end)
         pass
 
     if len(op_text) > 1:
         if op_text[0] == "*" and op_text[-1] == "*":
             if not tokens[index_start - 1].text.isspace():
-                warning("no space before poiter operator '%s'" % op_text, index_start, index_end)
+                warning("no space before pointer operator '%s'" % op_text, index_start, index_end)
             if tokens[index_end + 1].text.isspace():
-                warning("space before poiter operator '%s'" % op_text, index_start, index_end)
+                warning("space before pointer operator '%s'" % op_text, index_start, index_end)
 
 
 def blender_check_linelength(index_start, index_end, length):
@@ -337,7 +340,7 @@ def blender_check_linelength(index_start, index_end, length):
                 warning("line length %d > %d" % (len(l), LIN_SIZE), index_start, index_end)
 
 
-def scan_source(fp):
+def scan_source(fp, args):
     # print("scanning: %r" % fp)
 
     global filepath
@@ -376,7 +379,7 @@ def scan_source(fp):
                 blender_check_operator(i, index_kw_end, op)
 
         # ensure line length
-        if tok.type == Token.Text and tok.text == "\n":
+        if (not args.no_length_check) and tok.type == Token.Text and tok.text == "\n":
             # check line len
             blender_check_linelength(index_line_start, i - 1, col)
 
@@ -395,7 +398,7 @@ def scan_source(fp):
     #    #print(value, end="")
 
 
-def scan_source_recursive(dirpath):
+def scan_source_recursive(dirpath, args):
     import os
     from os.path import join, splitext
 
@@ -425,7 +428,7 @@ def scan_source_recursive(dirpath):
                 filepath.endswith("md5.c")):
             continue
 
-        scan_source(filepath)
+        scan_source(filepath, args)
 
 
 if __name__ == "__main__":
@@ -438,10 +441,17 @@ if __name__ == "__main__":
         scan_source_recursive(os.path.join(SOURCE_DIR, "source", "blender", "modifiers"))
         sys.exit(0)
 
-    for filepath in sys.argv[1:]:
+    desc = 'Check C/C++ code for conformance with blenders style guide:\nhttp://wiki.blender.org/index.php/Dev:Doc/CodeStyle)'
+    parser = argparse.ArgumentParser(description=desc)
+    parser.add_argument("paths", nargs='+', help="list of files or directories to check")
+    parser.add_argument("-l", "--no-length-check", action="store_true",
+                        help="skip warnings for long lines")
+    args = parser.parse_args()
+
+    for filepath in args.paths:
         if os.path.isdir(filepath):
             # recursive search
-            scan_source_recursive(filepath)
+            scan_source_recursive(filepath, args)
         else:
             # single file
-            scan_source(filepath)
+            scan_source(filepath, args)

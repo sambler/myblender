@@ -1538,6 +1538,24 @@ class VIEW3D_MT_pose_apply(Menu):
         layout.operator("pose.visual_transform_apply")
 
 
+class VIEW3D_MT_pose_specials(Menu):
+    bl_label = "Specials"
+
+    def draw(self, context):
+        layout = self.layout
+        layout.operator("pose.select_constraint_target")
+        layout.operator("pose.flip_names")
+        layout.operator("pose.paths_calculate")
+        layout.operator("pose.paths_clear")
+        layout.operator("pose.user_transforms_clear")
+        layout.operator("pose.user_transforms_clear", text="Clear User Transforms (All)").only_selected = False
+        layout.operator("pose.relax")
+
+        layout.separator()
+
+        layout.operator_menu_enum("pose.autoside_names", "axis")
+
+
 class BoneOptions:
     def draw(self, context):
         layout = self.layout
@@ -1657,6 +1675,7 @@ class VIEW3D_MT_edit_mesh_specials(Menu):
         layout.operator("mesh.blend_from_shape")
         layout.operator("mesh.shape_propagate_to_all")
         layout.operator("mesh.select_vertex_path")
+        layout.operator("mesh.sort_elements")
 
 
 class VIEW3D_MT_edit_mesh_select_mode(Menu):
@@ -1732,8 +1751,7 @@ class VIEW3D_MT_edit_mesh_vertices(Menu):
 
         layout.operator("mesh.vertices_smooth")
         layout.operator("mesh.remove_doubles")
-        layout.operator("mesh.vertices_sort")
-        layout.operator("mesh.vertices_randomize")
+        layout.operator("mesh.sort_elements", text="Sort Vertices").elements = {"VERT"}
 
         layout.operator("mesh.select_vertex_path")
 
@@ -1778,6 +1796,7 @@ class VIEW3D_MT_edit_mesh_edges(Menu):
         layout.operator("mesh.bevel")
         layout.operator("mesh.edge_split")
         layout.operator("mesh.bridge_edge_loops")
+        layout.operator("mesh.sort_elements", text="Sort Edges").elements = {"EDGE"}
 
         layout.separator()
 
@@ -1810,7 +1829,7 @@ class VIEW3D_MT_edit_mesh_faces(Menu):
         layout.operator("mesh.bevel")
         layout.operator("mesh.solidify")
         layout.operator("mesh.wireframe")
-        layout.operator("mesh.sort_faces")
+        layout.operator("mesh.sort_elements", text="Sort Faces").elements = {"FACE"}
 
         layout.separator()
 

@@ -667,9 +667,9 @@ static void region_azone_icon(ScrArea *sa, AZone *az, ARegion *ar)
 	
 	switch (az->edge) {
 		case AE_TOP_TO_BOTTOMRIGHT:
-			az->x1= ar->winrct.xmax - 2*AZONEPAD_ICON;
+			az->x1= ar->winrct.xmax - tot*2*AZONEPAD_ICON;
 			az->y1= ar->winrct.ymax + AZONEPAD_ICON;
-			az->x2= ar->winrct.xmax - AZONEPAD_ICON;
+			az->x2= ar->winrct.xmax - tot*AZONEPAD_ICON;
 			az->y2= ar->winrct.ymax + 2*AZONEPAD_ICON;
 			break;
 		case AE_BOTTOM_TO_TOPLEFT:
@@ -680,15 +680,15 @@ static void region_azone_icon(ScrArea *sa, AZone *az, ARegion *ar)
 			break;
 		case AE_LEFT_TO_TOPRIGHT:
 			az->x1= ar->winrct.xmin - 2*AZONEPAD_ICON;
-			az->y1= ar->winrct.ymax - 2*AZONEPAD_ICON;
+			az->y1= ar->winrct.ymax - tot*2*AZONEPAD_ICON;
 			az->x2= ar->winrct.xmin - AZONEPAD_ICON;
-			az->y2= ar->winrct.ymax - AZONEPAD_ICON;
+			az->y2= ar->winrct.ymax - tot*AZONEPAD_ICON;
 			break;
 		case AE_RIGHT_TO_TOPLEFT:
 			az->x1= ar->winrct.xmax + AZONEPAD_ICON;
-			az->y1= ar->winrct.ymax - 2*AZONEPAD_ICON;
+			az->y1= ar->winrct.ymax - tot*2*AZONEPAD_ICON;
 			az->x2= ar->winrct.xmax + 2*AZONEPAD_ICON;
-			az->y2= ar->winrct.ymax - AZONEPAD_ICON;
+			az->y2= ar->winrct.ymax - tot*AZONEPAD_ICON;
 			break;
 	}
 

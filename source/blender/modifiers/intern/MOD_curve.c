@@ -114,8 +114,7 @@ static void deformVerts(ModifierData *md, Object *ob,
                         DerivedMesh *derivedData,
                         float (*vertexCos)[3],
                         int numVerts,
-                        int UNUSED(useRenderParams),
-                        int UNUSED(isFinalCalc))
+                        ModifierApplyFlag UNUSED(flag))
 {
 	CurveModifierData *cmd = (CurveModifierData *) md;
 
@@ -133,35 +132,35 @@ static void deformVertsEM(
 
 	if (!derivedData) dm = CDDM_from_BMEditMesh(editData, ob->data, FALSE, FALSE);
 
-	deformVerts(md, ob, dm, vertexCos, numVerts, 0, 0);
+	deformVerts(md, ob, dm, vertexCos, numVerts, 0);
 
 	if (!derivedData) dm->release(dm);
 }
 
 
 ModifierTypeInfo modifierType_Curve = {
-	/* name */ "Curve",
-	/* structName */ "CurveModifierData",
-	/* structSize */ sizeof(CurveModifierData),
-	/* type */ eModifierTypeType_OnlyDeform,
-	/* flags */ eModifierTypeFlag_AcceptsCVs
-	| eModifierTypeFlag_SupportsEditmode,
+	/* name */              "Curve",
+	/* structName */        "CurveModifierData",
+	/* structSize */        sizeof(CurveModifierData),
+	/* type */              eModifierTypeType_OnlyDeform,
+	/* flags */             eModifierTypeFlag_AcceptsCVs |
+	                        eModifierTypeFlag_SupportsEditmode,
 
-	/* copyData */ copyData,
-	/* deformVerts */ deformVerts,
-	/* deformMatrices */ NULL,
-	/* deformVertsEM */ deformVertsEM,
-	/* deformMatricesEM */ NULL,
-	/* applyModifier */ NULL,
-	/* applyModifierEM */ NULL,
-	/* initData */ initData,
-	/* requiredDataMask */ requiredDataMask,
-	/* freeData */ NULL,
-	/* isDisabled */ isDisabled,
-	/* updateDepgraph */ updateDepgraph,
-	/* dependsOnTime */ NULL,
-	/* dependsOnNormals */ NULL,
+	/* copyData */          copyData,
+	/* deformVerts */       deformVerts,
+	/* deformMatrices */    NULL,
+	/* deformVertsEM */     deformVertsEM,
+	/* deformMatricesEM */  NULL,
+	/* applyModifier */     NULL,
+	/* applyModifierEM */   NULL,
+	/* initData */          initData,
+	/* requiredDataMask */  requiredDataMask,
+	/* freeData */          NULL,
+	/* isDisabled */        isDisabled,
+	/* updateDepgraph */    updateDepgraph,
+	/* dependsOnTime */     NULL,
+	/* dependsOnNormals */  NULL,
 	/* foreachObjectLink */ foreachObjectLink,
-	/* foreachIDLink */ NULL,
-	/* foreachTexLink */ NULL,
+	/* foreachIDLink */     NULL,
+	/* foreachTexLink */    NULL,
 };

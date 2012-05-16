@@ -311,7 +311,7 @@ static void init_editNurb_keyIndex(EditNurb *editnurb, ListBase *origBase)
 
 	if (editnurb->keyindex) return;
 
-	gh = BLI_ghash_new(BLI_ghashutil_ptrhash, BLI_ghashutil_ptrcmp, "editNurb keyIndex");
+	gh = BLI_ghash_ptr_new("editNurb keyIndex");
 
 	while (orignu) {
 		if (orignu->bezt) {
@@ -422,7 +422,7 @@ static void keyIndex_delNurb(EditNurb *editnurb, Nurb *nu)
 
 		while (a--) {
 			BLI_ghash_remove(editnurb->keyindex, bezt, NULL, (GHashValFreeFP)MEM_freeN);
-			++bezt;
+			bezt++;
 		}
 	}
 	else {
@@ -431,7 +431,7 @@ static void keyIndex_delNurb(EditNurb *editnurb, Nurb *nu)
 
 		while (a--) {
 			BLI_ghash_remove(editnurb->keyindex, bp, NULL, (GHashValFreeFP)MEM_freeN);
-			++bp;
+			bp++;
 		}
 	}
 }
@@ -667,7 +667,7 @@ static GHash *dupli_keyIndexHash(GHash *keyindex)
 	GHash *gh;
 	GHashIterator *hashIter;
 
-	gh = BLI_ghash_new(BLI_ghashutil_ptrhash, BLI_ghashutil_ptrcmp, "dupli_keyIndex gh");
+	gh = BLI_ghash_ptr_new("dupli_keyIndex gh");
 
 	for (hashIter = BLI_ghashIterator_new(keyindex);
 	     !BLI_ghashIterator_isDone(hashIter);
@@ -752,11 +752,11 @@ static void calc_keyHandles(ListBase *nurb, float *key)
 					}
 				}
 				else {
-					++nextp;
+					nextp++;
 					nextfp += 12;
 				}
 
-				++bezt;
+				bezt++;
 				fp += 12;
 			}
 		}
@@ -849,7 +849,7 @@ static void calc_shapeKeys(Object *obedit)
 								ofs[i + 1][0] = bp->alfa - oldbp->alfa;
 							}
 							i += 2;
-							++bp;
+							bp++;
 						}
 					}
 
@@ -894,7 +894,7 @@ static void calc_shapeKeys(Object *obedit)
 							}
 
 							fp += 3; ++i; /* alphas */
-							++bezt;
+							bezt++;
 						}
 					}
 					else {
@@ -913,7 +913,7 @@ static void calc_shapeKeys(Object *obedit)
 							}
 
 							fp += 4;
-							++bp;
+							bp++;
 							i += 2;
 						}
 					}
@@ -947,7 +947,7 @@ static void calc_shapeKeys(Object *obedit)
 									if (apply_offset) {
 										/* apply alfa offsets */
 										add_v3_v3(fp, ofs[i]);
-										++i;
+										i++;
 									}
 
 									fp += 3; /* alphas */
@@ -962,7 +962,7 @@ static void calc_shapeKeys(Object *obedit)
 
 									fp += 3; /* alphas */
 								}
-								++bezt;
+								bezt++;
 							}
 						}
 						else {
@@ -987,7 +987,7 @@ static void calc_shapeKeys(Object *obedit)
 								}
 
 								fp += 4;
-								++bp;
+								bp++;
 								i += 2;
 							}
 						}
@@ -4729,7 +4729,7 @@ void CURVE_OT_extrude(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name = "Extrude";
-	ot->description = "Extrude selected control point(s) and move";
+	ot->description = "Extrude selected control point(s)";
 	ot->idname = "CURVE_OT_extrude";
 	
 	/* api callbacks */

@@ -91,7 +91,7 @@ void end_render_materials(struct Main *);
 
 int material_in_material(struct Material *parmat, struct Material *mat);
 
-void	ramp_blend(int type, float r_col[3], const float fac, const float col[3]);
+void ramp_blend(int type, float r_col[3], const float fac, const float col[3]);
 
 /* copy/paste */
 void clear_matcopybuf(void);
@@ -107,4 +107,3 @@ int do_version_tface(struct Main *main, int fileload);
 #endif
 
 #endif
-

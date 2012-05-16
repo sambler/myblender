@@ -672,6 +672,7 @@ static int ghost_event_proc(GHOST_EventHandle evt, GHOST_TUserDataPtr private)
 			case GHOST_kEventWindowActivate: 
 			{
 				GHOST_TEventKeyData kdata;
+				wmEvent event;
 				int cx, cy, wx, wy;
 				
 				wm->winactive = win; /* no context change! c->wm->windrawable is drawable, or for area queues */
@@ -711,6 +712,23 @@ static int ghost_event_proc(GHOST_EventHandle evt, GHOST_TUserDataPtr private)
 				win->addmousemove = 1;   /* enables highlighted buttons */
 				
 				wm_window_make_drawable(C, win);
+
+				/* window might be focused by mouse click in configuration of window manager
+				 * when focus is not following mouse
+				 * click could have been done on a button and depending on window manager settings
+				 * click would be passed to blender or not, but in any case button under cursor
+				 * should be activated, so at max next click on button without moving mouse
+				 * would trigger it's handle function
+				 * currently it seems to be common practice to generate new event for, but probably
+				 * we'll need utility function for this? (sergey)
+				 */
+				event = *(win->eventstate);
+				event.type = MOUSEMOVE;
+				event.prevx = event.x;
+				event.prevy = event.y;
+
+				wm_event_add(win, &event);
+
 				break;
 			}
 			case GHOST_kEventWindowClose: {
@@ -914,7 +932,7 @@ static int wm_window_timer(const bContext *C)
 		wtnext = wt->next; /* in case timer gets removed */
 		win = wt->win;
 
-		if (wt->sleep== 0) {
+		if (wt->sleep == 0) {
 			if (time > wt->ntime) {
 				wt->delta = time - wt->ltime;
 				wt->duration += wt->delta;

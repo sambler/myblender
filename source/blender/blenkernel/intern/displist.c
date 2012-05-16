@@ -425,8 +425,8 @@ static void curve_to_displist(Curve *cu, ListBase *nubase, ListBase *dispbase, i
 void BKE_displist_fill(ListBase *dispbase, ListBase *to, int flipnormal)
 {
 	ScanFillContext sf_ctx;
-	ScanFillVert *eve, *v1, *vlast;
-	ScanFillFace *efa;
+	ScanFillVert *sf_vert, *sf_vert_new, *sf_vert_last;
+	ScanFillFace *sf_tri;
 	DispList *dlnew = NULL, *dl;
 	float *f1;
 	int colnr = 0, charidx = 0, cont = 1, tot, a, *index, nextcol = 0;
@@ -454,24 +454,24 @@ void BKE_displist_fill(ListBase *dispbase, ListBase *to, int flipnormal)
 						/* make editverts and edges */
 						f1 = dl->verts;
 						a = dl->nr;
-						eve = v1 = NULL;
+						sf_vert = sf_vert_new = NULL;
 
 						while (a--) {
-							vlast = eve;
+							sf_vert_last = sf_vert;
 
-							eve = BLI_scanfill_vert_add(&sf_ctx, f1);
+							sf_vert = BLI_scanfill_vert_add(&sf_ctx, f1);
 							totvert++;
 
-							if (vlast == NULL)
-								v1 = eve;
+							if (sf_vert_last == NULL)
+								sf_vert_new = sf_vert;
 							else {
-								BLI_scanfill_edge_add(&sf_ctx, vlast, eve);
+								BLI_scanfill_edge_add(&sf_ctx, sf_vert_last, sf_vert);
 							}
 							f1 += 3;
 						}
 
-						if (eve != NULL && v1 != NULL) {
-							BLI_scanfill_edge_add(&sf_ctx, eve, v1);
+						if (sf_vert != NULL && sf_vert_new != NULL) {
+							BLI_scanfill_edge_add(&sf_ctx, sf_vert, sf_vert_new);
 						}
 					}
 					else if (colnr < dl->col) {
@@ -499,31 +499,31 @@ void BKE_displist_fill(ListBase *dispbase, ListBase *to, int flipnormal)
 				/* vert data */
 				f1 = dlnew->verts;
 				totvert = 0;
-				eve = sf_ctx.fillvertbase.first;
-				while (eve) {
-					copy_v3_v3(f1, eve->co);
+				sf_vert = sf_ctx.fillvertbase.first;
+				while (sf_vert) {
+					copy_v3_v3(f1, sf_vert->co);
 					f1 += 3;
 
 					/* index number */
-					eve->tmp.l = totvert;
+					sf_vert->tmp.l = totvert;
 					totvert++;
 
-					eve = eve->next;
+					sf_vert = sf_vert->next;
 				}
 
 				/* index data */
-				efa = sf_ctx.fillfacebase.first;
+				sf_tri = sf_ctx.fillfacebase.first;
 				index = dlnew->index;
-				while (efa) {
-					index[0] = (intptr_t)efa->v1->tmp.l;
-					index[1] = (intptr_t)efa->v2->tmp.l;
-					index[2] = (intptr_t)efa->v3->tmp.l;
+				while (sf_tri) {
+					index[0] = (intptr_t)sf_tri->v1->tmp.l;
+					index[1] = (intptr_t)sf_tri->v2->tmp.l;
+					index[2] = (intptr_t)sf_tri->v3->tmp.l;
 
 					if (flipnormal)
 						SWAP(int, index[0], index[2]);
 
 					index += 3;
-					efa = efa->next;
+					sf_tri = sf_tri->next;
 				}
 			}
 
@@ -752,14 +752,19 @@ static void curve_calc_modifiers_pre(Scene *scene, Object *ob, int forRender, fl
 	Curve *cu = ob->data;
 	ListBase *nurb = BKE_curve_nurbs_get(cu);
 	int numVerts = 0;
-	int editmode = (!forRender && cu->editnurb);
+	const int editmode = (!forRender && cu->editnurb);
+	ModifierApplyFlag app_flag = 0;
 	float (*originalVerts)[3] = NULL;
 	float (*deformedVerts)[3] = NULL;
 	float *keyVerts = NULL;
 	int required_mode;
 
-	if (forRender)
+	if (editmode)
+		app_flag |= MOD_APPLY_USECACHE;
+	if (forRender) {
+		app_flag |= MOD_APPLY_RENDER;
 		required_mode = eModifierMode_Render;
+	}
 	else
 		required_mode = eModifierMode_Realtime;
 
@@ -778,7 +783,7 @@ static void curve_calc_modifiers_pre(Scene *scene, Object *ob, int forRender, fl
 			 * shape key modifier yet. */
 			deformedVerts = BKE_curve_keyVertexCos_get(cu, nurb, keyVerts);
 			originalVerts = MEM_dupallocN(deformedVerts);
-			numVerts = BKE_nurbList_verts_count_without_handles(nurb);
+			numVerts = BKE_nurbList_verts_count(nurb);
 		}
 	}
 
@@ -800,7 +805,7 @@ static void curve_calc_modifiers_pre(Scene *scene, Object *ob, int forRender, fl
 				originalVerts = MEM_dupallocN(deformedVerts);
 			}
 
-			mti->deformVerts(md, ob, NULL, deformedVerts, numVerts, forRender, editmode);
+			mti->deformVerts(md, ob, NULL, deformedVerts, numVerts, app_flag);
 
 			if (md == pretessellatePoint)
 				break;
@@ -866,9 +871,12 @@ static void curve_calc_modifiers_post(Scene *scene, Object *ob, ListBase *dispba
 	DerivedMesh *dm = NULL, *ndm;
 	float (*vertCos)[3] = NULL;
 	int useCache = !forRender;
+	ModifierApplyFlag app_flag = 0;
 
-	if (forRender)
+	if (forRender) {
+		app_flag |= MOD_APPLY_RENDER;
 		required_mode = eModifierMode_Render;
+	}
 	else
 		required_mode = eModifierMode_Realtime;
 
@@ -887,6 +895,7 @@ static void curve_calc_modifiers_post(Scene *scene, Object *ob, ListBase *dispba
 
 	for (; md; md = md->next) {
 		ModifierTypeInfo *mti = modifierType_getInfo(md->type);
+		ModifierApplyFlag appf = app_flag;
 
 		md->scene = scene;
 
@@ -897,6 +906,8 @@ static void curve_calc_modifiers_post(Scene *scene, Object *ob, ListBase *dispba
 
 		if (mti->type == eModifierTypeType_OnlyDeform ||
 		    (mti->type == eModifierTypeType_DeformOrConstruct && !dm)) {
+			if (editmode)
+				appf |= MOD_APPLY_USECACHE;
 			if (dm) {
 				if (!vertCos) {
 					totvert = dm->getNumVerts(dm);
@@ -904,14 +915,14 @@ static void curve_calc_modifiers_post(Scene *scene, Object *ob, ListBase *dispba
 					dm->getVertCos(dm, vertCos);
 				}
 
-				mti->deformVerts(md, ob, dm, vertCos, totvert, forRender, editmode);
+				mti->deformVerts(md, ob, dm, vertCos, totvert, appf);
 			}
 			else {
 				if (!vertCos) {
 					vertCos = displist_get_allverts(dispbase, &totvert);
 				}
 
-				mti->deformVerts(md, ob, NULL, vertCos, totvert, forRender, editmode);
+				mti->deformVerts(md, ob, NULL, vertCos, totvert, appf);
 			}
 		}
 		else {
@@ -953,7 +964,9 @@ static void curve_calc_modifiers_post(Scene *scene, Object *ob, ListBase *dispba
 				vertCos = NULL;
 			}
 
-			ndm = mti->applyModifier(md, ob, dm, forRender, useCache);
+			if (useCache)
+				appf |= MOD_APPLY_USECACHE;
+			ndm = mti->applyModifier(md, ob, dm, appf);
 
 			if (ndm) {
 				/* Modifier returned a new derived mesh */
@@ -1084,6 +1097,7 @@ static void curve_calc_orcodm(Scene *scene, Object *ob, DerivedMesh *derivedFina
 	int required_mode;
 	int editmode = (!forRender && cu->editnurb);
 	DerivedMesh *ndm, *orcodm = NULL;
+	const ModifierApplyFlag app_flag = forRender ? MOD_APPLY_RENDER : 0;
 
 	if (forRender)
 		required_mode = eModifierMode_Render;
@@ -1114,7 +1128,7 @@ static void curve_calc_orcodm(Scene *scene, Object *ob, DerivedMesh *derivedFina
 		if (!orcodm)
 			orcodm = create_orco_dm(scene, ob);
 
-		ndm = mti->applyModifier(md, ob, orcodm, forRender, 0);
+		ndm = mti->applyModifier(md, ob, orcodm, app_flag);
 
 		if (ndm) {
 			/* if the modifier returned a new dm, release the old one */
@@ -1592,19 +1606,13 @@ static void boundbox_displist(Object *ob)
 		if (cu->bb == NULL) cu->bb = MEM_callocN(sizeof(BoundBox), "boundbox");
 		bb = cu->bb;
 
-		dl = ob->disp.first;
-
-		while (dl) {
-			if (dl->type == DL_INDEX3) tot = dl->nr;
-			else tot = dl->nr * dl->parts;
-
+		for (dl = ob->disp.first; dl; dl = dl->next) {
+			tot = (dl->type == DL_INDEX3) ? dl->nr : dl->nr * dl->parts;
 			vert = dl->verts;
 			for (a = 0; a < tot; a++, vert += 3) {
-				doit = 1;
-				DO_MINMAX(vert, min, max);
+				minmax_v3v3_v3(min, max, vert);
 			}
-
-			dl = dl->next;
+			doit = (tot != 0);
 		}
 
 		if (!doit) {

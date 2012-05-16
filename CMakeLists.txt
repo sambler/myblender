@@ -195,7 +195,6 @@ option(WITH_IMAGE_FRAMESERVER   "Enable image FrameServer Support for rendering"
 
 # Audio/Video format support
 option(WITH_CODEC_FFMPEG        "Enable FFMPeg Support (http://ffmpeg.org)" OFF)
-unset(PLATFORM_DEFAULT)
 
 option(WITH_CODEC_SNDFILE       "Enable libsndfile Support (http://www.mega-nerd.com/libsndfile)" OFF)
 if(APPLE OR (WIN32 AND NOT UNIX))
@@ -370,10 +369,6 @@ if(MINGW)
 		message(FATAL_ERROR "MINGW requires WITH_CODEC_QUICKTIME to be OFF "
 		                    "because it is currently unsupported, remove this "
 		                    "line if youre a developer who wants to add support.")
-	endif()
-	
-	if((WITH_MINGW64) AND (WITH_OPENCOLLADA OR WITH_CODEC_FFMPEG))
-		message(FATAL_ERROR "MINGW64 still doesn't support: WITH_OPENCOLLADA/WITH_CODEC_FFMPEG")
 	endif()
 endif()
 
@@ -842,6 +837,15 @@ elseif(WIN32)
 			set(GETTEXT_LIBPATH ${GETTEXT}/lib)
 			set(GETTEXT_LIBRARIES gnu_gettext)
 		endif()
+		
+		set(LAPACK ${LIBDIR}/lapack)
+		# set(LAPACK_INCLUDE_DIR ${LAPACK}/include)
+		set_lib_path(LAPACK_LIBPATH ${LAPACK}/lib)	
+		set(LAPACK_LIBRARIES
+			${LIBDIR}/lapack/lib/libf2c.lib
+			${LIBDIR}/lapack/lib/clapack_nowrap.lib
+			${LIBDIR}/lapack/lib/BLAS_nowrap.lib
+		)
 
 		set(PNG_LIBRARIES libpng)
 		set(JPEG_LIBRARIES libjpeg)
@@ -1016,8 +1020,10 @@ elseif(WIN32)
 		set(PLATFORM_CFLAGS "-pipe -funsigned-char -fno-strict-aliasing")
 
 		if(WITH_MINGW64)
-			#Yes, the point for MinGW64 is moar optimization by default :)
-			set(PLATFORM_CFLAGS "${PLATFORM_CFLAGS} -mmmx -msse -msse2 -ftree-vectorize")
+			#We need to take care though not to have these on debug builds because they may play funky with gdb
+			if(CMAKE_BUILD_TYPE MATCHES "Release")
+				set(PLATFORM_CFLAGS "${PLATFORM_CFLAGS} -mmmx -ftree-vectorize")
+			endif()
 			set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fpermissive")
 			set(PLATFORM_LINKLIBS "${PLATFORM_LINKLIBS} -lpthread")
 			
@@ -1082,14 +1088,18 @@ elseif(WIN32)
 				${LIBDIR}/opencollada/include/GeneratedSaxParser/include
 			)
 			set(OPENCOLLADA_LIBPATH ${OPENCOLLADA}/lib ${OPENCOLLADA}/lib)
-			set(OPENCOLLADA_LIBRARIES OpenCOLLADAStreamWriter OpenCOLLADASaxFrameworkLoader OpenCOLLADAFramework OpenCOLLADABaseUtils GeneratedSaxParser UTF MathMLSolver expat pcre buffer ftoa)
+			set(OPENCOLLADA_LIBRARIES OpenCOLLADAStreamWriter OpenCOLLADASaxFrameworkLoader OpenCOLLADAFramework OpenCOLLADABaseUtils GeneratedSaxParser UTF MathMLSolver pcre buffer ftoa xml)
 			set(PCRE_LIBRARIES pcre)
 		endif()
 
 		if(WITH_CODEC_FFMPEG)
 			set(FFMPEG ${LIBDIR}/ffmpeg)
 			set(FFMPEG_INCLUDE_DIRS ${FFMPEG}/include ${FFMPEG}/include)
-			set(FFMPEG_LIBRARIES avcodec-53 avformat-53 avdevice-53 avutil-51 swscale-2)
+			if(WITH_MINGW64)
+				set(FFMPEG_LIBRARIES avcodec.dll avformat.dll avdevice.dll avutil.dll swscale.dll swresample.dll)
+			else()
+				set(FFMPEG_LIBRARIES avcodec-53 avformat-53 avdevice-53 avutil-51 swscale-2)
+			endif()
 			set(FFMPEG_LIBPATH ${FFMPEG}/lib)
 		endif()
 

@@ -701,7 +701,7 @@ void curve_deform_verts(Scene *scene, Object *cuOb, Object *target,
 					
 					if (defvert_find_weight(dvert, index) > 0.0f) {
 						mul_m4_v3(cd.curvespace, vertexCos[a]);
-						DO_MINMAX(vertexCos[a], cd.dmin, cd.dmax);
+						minmax_v3v3_v3(cd.dmin, cd.dmax, vertexCos[a]);
 					}
 				}
 	
@@ -736,7 +736,7 @@ void curve_deform_verts(Scene *scene, Object *cuOb, Object *target,
 				
 			for (a = 0; a < numVerts; a++) {
 				mul_m4_v3(cd.curvespace, vertexCos[a]);
-				DO_MINMAX(vertexCos[a], cd.dmin, cd.dmax);
+				minmax_v3v3_v3(cd.dmin, cd.dmax, vertexCos[a]);
 			}
 	
 			for (a = 0; a < numVerts; a++) {
@@ -976,7 +976,7 @@ void BKE_lattice_modifiers_calc(Scene *scene, Object *ob)
 		if (mti->type != eModifierTypeType_OnlyDeform) continue;
 
 		if (!vertexCos) vertexCos = BKE_lattice_vertexcos_get(ob, &numVerts);
-		mti->deformVerts(md, ob, NULL, vertexCos, numVerts, 0, 0);
+		mti->deformVerts(md, ob, NULL, vertexCos, numVerts, 0);
 	}
 
 	/* always displist to make this work like derivedmesh */

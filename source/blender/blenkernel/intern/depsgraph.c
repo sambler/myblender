@@ -867,7 +867,7 @@ DagNode *dag_add_node(DagForest *forest, void *fob)
 		}
 
 		if (!forest->nodeHash)
-			forest->nodeHash = BLI_ghash_new(BLI_ghashutil_ptrhash, BLI_ghashutil_ptrcmp, "dag_add_node gh");
+			forest->nodeHash = BLI_ghash_ptr_new("dag_add_node gh");
 		BLI_ghash_insert(forest->nodeHash, fob, node);
 	}
 
@@ -2385,7 +2385,7 @@ static void dag_current_scene_layers(Main *bmain, Scene **sce, unsigned int *lay
 		/* if we have a windowmanager, look into windows */
 		for (win = wm->windows.first; win; win = win->next) {
 			if (win->screen) {
-				if (!*sce) *sce = win->screen->scene;
+				if (*sce == NULL) *sce = win->screen->scene;
 				*lay |= BKE_screen_visible_layers(win->screen, win->screen->scene);
 			}
 		}

@@ -882,7 +882,7 @@ static short skip_fcurve_selected_data(bDopeSheet *ads, FCurve *fcu, ID *owner_i
 		
 		/* only consider if F-Curve involves sequence_editor.sequences */
 		if ((fcu->rna_path) && strstr(fcu->rna_path, "sequences_all")) {
-			Editing *ed = seq_give_editing(scene, FALSE);
+			Editing *ed = BKE_sequencer_editing_get(scene, FALSE);
 			Sequence *seq;
 			char *seq_name;
 			
@@ -2223,7 +2223,7 @@ static size_t animdata_filter_remove_duplis(ListBase *anim_data)
 	/* build new hashtable to efficiently store and retrieve which entries have been 
 	 * encountered already while searching
 	 */
-	gh = BLI_ghash_new(BLI_ghashutil_ptrhash, BLI_ghashutil_ptrcmp, "animdata_filter_duplis_remove gh");
+	gh = BLI_ghash_ptr_new("animdata_filter_duplis_remove gh");
 	
 	/* loop through items, removing them from the list if a similar item occurs already */
 	for (ale = anim_data->first; ale; ale = next) {

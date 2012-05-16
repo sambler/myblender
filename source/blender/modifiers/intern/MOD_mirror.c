@@ -258,7 +258,7 @@ static DerivedMesh *doMirrorOnAxis(MirrorModifierData *mmd,
 			MLoopUV *dmloopuv = CustomData_get_layer_n(&result->loopData, CD_MLOOPUV, a);
 			int j = maxLoops;
 			dmloopuv += j; /* second set of loops only */
-			for (; i-- > 0; dmloopuv++) {
+			for (; j-- > 0; dmloopuv++) {
 				if (do_mirr_u) dmloopuv->uv[0] = 1.0f - dmloopuv->uv[0];
 				if (do_mirr_v) dmloopuv->uv[1] = 1.0f - dmloopuv->uv[1];
 			}
@@ -322,8 +322,7 @@ static DerivedMesh *mirrorModifier__doMirror(MirrorModifierData *mmd,
 
 static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
                                   DerivedMesh *derivedData,
-                                  int UNUSED(useRenderParams),
-                                  int UNUSED(isFinalCalc))
+                                  ModifierApplyFlag UNUSED(flag))
 {
 	DerivedMesh *result;
 	MirrorModifierData *mmd = (MirrorModifierData *) md;
@@ -340,7 +339,7 @@ static DerivedMesh *applyModifierEM(ModifierData *md, Object *ob,
                                     struct BMEditMesh *UNUSED(editData),
                                     DerivedMesh *derivedData)
 {
-	return applyModifier(md, ob, derivedData, 0, 1);
+	return applyModifier(md, ob, derivedData, MOD_APPLY_USECACHE);
 }
 
 

@@ -204,8 +204,7 @@ static CustomDataMask requiredDataMask(Object *UNUSED(ob), ModifierData *md)
 
 static DerivedMesh *applyModifier(ModifierData *md, Object *ob, 
                                   DerivedMesh *dm,
-                                  int UNUSED(useRenderParams),
-                                  int UNUSED(isFinalCalc))
+                                  ModifierApplyFlag UNUSED(flag))
 {
 	int i;
 	DerivedMesh *result;
@@ -559,9 +558,7 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 	/* flip vertex normals for copied verts */
 	mv = mvert + numVerts;
 	for (i = 0; i < numVerts; i++, mv++) {
-		mv->no[0] = -mv->no[0];
-		mv->no[1] = -mv->no[1];
-		mv->no[2] = -mv->no[2];
+		negate_v3_short(mv->no);
 	}
 
 	if (smd->flag & MOD_SOLIDIFY_RIM) {
@@ -693,7 +690,8 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 			}
 			
 #ifdef SOLIDIFY_SIDE_NORMALS
-			normal_quad_v3(nor, mvert[ml[j - 4].v].co,
+			normal_quad_v3(nor,
+			               mvert[ml[j - 4].v].co,
 			               mvert[ml[j - 3].v].co,
 			               mvert[ml[j - 2].v].co,
 			               mvert[ml[j - 1].v].co);
@@ -753,7 +751,7 @@ static DerivedMesh *applyModifierEM(ModifierData *md,
                                     struct BMEditMesh *UNUSED(editData),
                                     DerivedMesh *derivedData)
 {
-	return applyModifier(md, ob, derivedData, 0, 1);
+	return applyModifier(md, ob, derivedData, MOD_APPLY_USECACHE);
 }
 
 

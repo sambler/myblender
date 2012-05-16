@@ -68,7 +68,7 @@ static void initData(ModifierData *md)
 }
 
 static void deformVerts(ModifierData *md, Object *ob, DerivedMesh *derivedData, float (*vertexCos)[3],
-                        int UNUSED(numVerts), int UNUSED(useRenderParams), int UNUSED(isFinalCalc))
+                        int UNUSED(numVerts), ModifierApplyFlag UNUSED(flag))
 {
 	DerivedMesh *dm;
 	ClothModifierData *clmd = (ClothModifierData *) md;
@@ -206,9 +206,9 @@ ModifierTypeInfo modifierType_Cloth = {
 	/* structName */        "ClothModifierData",
 	/* structSize */        sizeof(ClothModifierData),
 	/* type */              eModifierTypeType_OnlyDeform,
-	/* flags */             eModifierTypeFlag_AcceptsMesh
-							| eModifierTypeFlag_UsesPointCache
-							| eModifierTypeFlag_Single,
+	/* flags */             eModifierTypeFlag_AcceptsMesh |
+	                        eModifierTypeFlag_UsesPointCache |
+	                        eModifierTypeFlag_Single,
 
 	/* copyData */          copyData,
 	/* deformVerts */       deformVerts,

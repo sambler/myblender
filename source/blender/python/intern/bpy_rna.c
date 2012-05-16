@@ -176,13 +176,13 @@ static GHash *id_weakref_pool_get(ID *id)
 	}
 	else {
 		/* first time, allocate pool */
-		id_weakref_pool = BLI_ghash_new(BLI_ghashutil_ptrhash, BLI_ghashutil_ptrcmp, "rna_global_pool");
+		id_weakref_pool = BLI_ghash_ptr_new("rna_global_pool");
 		weakinfo_hash = NULL;
 	}
 
 	if (weakinfo_hash == NULL) {
 		/* we're using a ghash as a set, could use libHX's HXMAP_SINGULAR but would be an extra dep. */
-		weakinfo_hash = BLI_ghash_new(BLI_ghashutil_ptrhash, BLI_ghashutil_ptrcmp, "rna_id");
+		weakinfo_hash = BLI_ghash_ptr_new("rna_id");
 		BLI_ghash_insert(id_weakref_pool, (void *)id, weakinfo_hash);
 	}
 
@@ -1550,9 +1550,13 @@ static int pyrna_py_to_prop(PointerRNA *ptr, PropertyRNA *prop, void *data, PyOb
 				}
 				else {
 					int param_i = (int)param;
-					RNA_property_int_clamp(ptr, prop, &param_i);
-					if (data) *((int *)data) = param_i;
-					else RNA_property_int_set(ptr, prop, param_i);
+					if (data) {
+						RNA_property_int_clamp(ptr, prop, &param_i);
+						*((int *)data) = param_i;
+					}
+					else {
+						RNA_property_int_set(ptr, prop, param_i);
+					}
 				}
 				break;
 			}
@@ -1567,9 +1571,13 @@ static int pyrna_py_to_prop(PointerRNA *ptr, PropertyRNA *prop, void *data, PyOb
 					return -1;
 				}
 				else {
-					RNA_property_float_clamp(ptr, prop, (float *)&param);
-					if (data) *((float *)data) = param;
-					else RNA_property_float_set(ptr, prop, param);
+					if (data) {
+						RNA_property_float_clamp(ptr, prop, (float *)&param);
+						*((float *)data) = param;
+					}
+					else {
+						RNA_property_float_set(ptr, prop, param);
+					}
 				}
 				break;
 			}

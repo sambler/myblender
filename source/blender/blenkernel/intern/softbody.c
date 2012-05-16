@@ -3514,11 +3514,11 @@ static void lattice_to_softbody(Scene *scene, Object *ob)
 	totvert= lt->pntsu*lt->pntsv*lt->pntsw;
 
 	if (ob->softflag & OB_SB_EDGES) {
-		totspring = ((lt->pntsu -1) * lt->pntsv
-				  + (lt->pntsv -1) * lt->pntsu) * lt->pntsw
-				  +lt->pntsu*lt->pntsv*(lt->pntsw -1);
+		totspring = ((lt->pntsu - 1) * lt->pntsv +
+		             (lt->pntsv - 1) * lt->pntsu) * lt->pntsw +
+		            lt->pntsu*lt->pntsv * (lt->pntsw - 1);
 		if (ob->softflag & OB_SB_QUADS) {
-			totspring += 4*(lt->pntsu -1) *  (lt->pntsv -1)  * (lt->pntsw-1);
+			totspring += 4 * (lt->pntsu - 1) *  (lt->pntsv -1)  * (lt->pntsw - 1);
 		}
 	}
 
@@ -3669,7 +3669,7 @@ static void sb_new_scratch(SoftBody *sb)
 {
 	if (!sb) return;
 	sb->scratch = MEM_callocN(sizeof(SBScratch), "SBScratch");
-	sb->scratch->colliderhash = BLI_ghash_new(BLI_ghashutil_ptrhash, BLI_ghashutil_ptrcmp, "sb_new_scratch gh");
+	sb->scratch->colliderhash = BLI_ghash_ptr_new("sb_new_scratch gh");
 	sb->scratch->bodyface = NULL;
 	sb->scratch->totface = 0;
 	sb->scratch->aabbmax[0]=sb->scratch->aabbmax[1]=sb->scratch->aabbmax[2] = 1.0e30f;

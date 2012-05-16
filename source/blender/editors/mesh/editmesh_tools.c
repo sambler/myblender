@@ -734,7 +734,7 @@ static int edbm_dupli_extrude_cursor_invoke(bContext *C, wmOperator *op, wmEvent
 	
 	BM_ITER_MESH (v1, &iter, vc.em->bm, BM_VERTS_OF_MESH) {
 		if (BM_elem_flag_test(v1, BM_ELEM_SELECT)) {
-			DO_MINMAX(v1->co, min, max);
+			minmax_v3v3_v3(min, max, v1->co);
 			done = 1;
 		}
 	}
@@ -2700,7 +2700,7 @@ static int edbm_knife_cut_exec(bContext *C, wmOperator *op)
 	}
 
 	/* the floating point coordinates of verts in screen space will be stored in a hash table according to the vertices pointer */
-	gh = BLI_ghash_new(BLI_ghashutil_ptrhash, BLI_ghashutil_ptrcmp, "knife cut exec");
+	gh = BLI_ghash_ptr_new("knife cut exec");
 	for (bv = BM_iter_new(&iter, bm, BM_VERTS_OF_MESH, NULL); bv; bv = BM_iter_step(&iter)) {
 		scr = MEM_mallocN(sizeof(float) * 2, "Vertex Screen Coordinates");
 		copy_v3_v3(co, bv->co);

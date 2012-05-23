@@ -617,7 +617,7 @@ static void transform_event_xyz_constraint(TransInfo *t, short key_type, char cm
 		char axis;
 	
 		/* Initialize */
-		switch(key_type) {
+		switch (key_type) {
 			case XKEY:
 				axis = 'X';
 				constraint_axis = CON_AXIS0;
@@ -1141,9 +1141,11 @@ int calculateTransformCenter(bContext *C, int centerMode, float *cent3d, int *ce
 
 		calculateCenter(t);
 
-		if(cent2d)
+		if (cent2d) {
 			copy_v2_v2_int(cent2d, t->center2d);
-		if(cent3d) {
+		}
+
+		if (cent3d) {
 			// Copy center from constraint center. Transform center can be local
 			copy_v3_v3(cent3d, t->con.center);
 		}
@@ -5554,7 +5556,7 @@ static void doAnimEdit_SnapFrame(TransInfo *t, TransData *td, TransData2D *td2d,
 		else
 #endif
 		{
-			val= floorf(val+0.5f);
+			val = floor(val + 0.5);
 		}
 		
 		/* convert frame out of nla-action time */
@@ -5640,7 +5642,7 @@ static void headerTimeTranslate(TransInfo *t, char *str)
 		/* apply snapping + frame->seconds conversions */
 		if (autosnap == SACTSNAP_STEP) {
 			if (do_time)
-				val= floorf((double)val/secf + 0.5f);
+				val= floorf((double)val / secf + 0.5);
 			else
 				val= floorf(val + 0.5f);
 		}
@@ -5688,9 +5690,9 @@ static void applyTimeTranslate(TransInfo *t, float UNUSED(sval))
 
 			if (autosnap == SACTSNAP_STEP) {
 				if (do_time)
-					deltax= (float)(floor((deltax/secf) + 0.5f) * secf);
+					deltax = (float)(floor(((double)deltax / secf) + 0.5) * secf);
 				else
-					deltax= (float)(floor(deltax + 0.5f));
+					deltax = (float)(floor(deltax + 0.5f));
 			}
 
 			val = BKE_nla_tweakedit_remap(adt, td->ival, NLATIME_CONVERT_MAP);
@@ -5702,9 +5704,9 @@ static void applyTimeTranslate(TransInfo *t, float UNUSED(sval))
 
 			if (autosnap == SACTSNAP_STEP) {
 				if (do_time)
-					val= (float)(floor((deltax/secf) + 0.5f) * secf);
+					val = (float)(floor(((double)deltax / secf) + 0.5) * secf);
 				else
-					val= (float)(floor(val + 0.5f));
+					val = (float)(floor(val + 0.5f));
 			}
 
 			*(td->val) = td->ival + val;
@@ -5954,9 +5956,9 @@ static void applyTimeScale(TransInfo *t)
 
 		if (autosnap == SACTSNAP_STEP) {
 			if (do_time)
-				fac= (float)(floor(fac/secf + 0.5f) * secf);
+				fac = (float)(floor((double)fac / secf + 0.5) * secf);
 			else
-				fac= (float)(floor(fac + 0.5f));
+				fac = (float)(floor(fac + 0.5f));
 		}
 
 		/* check if any need to apply nla-mapping */
@@ -5964,9 +5966,7 @@ static void applyTimeScale(TransInfo *t)
 			startx= BKE_nla_tweakedit_remap(adt, startx, NLATIME_CONVERT_UNMAP);
 
 		/* now, calculate the new value */
-		*(td->val) = td->ival - startx;
-		*(td->val) *= fac;
-		*(td->val) += startx;
+		*(td->val) = ((td->ival - startx) * fac) + startx;
 
 		/* apply nearest snapping */
 		doAnimEdit_SnapFrame(t, td, td2d, adt, autosnap);

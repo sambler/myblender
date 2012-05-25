@@ -360,7 +360,7 @@ def buildinfo(lenv, build_type):
     build_time = time.strftime ("%H:%M:%S")
     build_rev = os.popen('svnversion').read()[:-1] # remove \n
     if build_rev == '': 
-        build_rev = '46911'
+        build_rev = '47001'
     if lenv['BF_DEBUG']:
         build_type = "Debug"
         build_cflags = ' '.join(lenv['CFLAGS'] + lenv['CCFLAGS'] + lenv['BF_DEBUG_CCFLAGS'] + lenv['CPPFLAGS'])
@@ -869,12 +869,17 @@ class BlenderEnvironment(SConsEnvironment):
             lenv.AddPostAction(prog,Action(AppIt,strfunction=my_appit_print))
         elif os.sep == '/' and lenv['OURPLATFORM'] != 'linuxcross': # any unix (except cross-compilation)
             if lenv['WITH_BF_PYTHON']:
-                if not lenv['WITHOUT_BF_INSTALL'] and not lenv['WITHOUT_BF_PYTHON_INSTALL'] and not BlenderEnvironment.PyBundleActionAdded:
+                if (not lenv['WITHOUT_BF_INSTALL'] and 
+                    not lenv['WITHOUT_BF_PYTHON_INSTALL'] and 
+                    not lenv['WITHOUT_BF_PYTHON_UNPACK'] and 
+                    not BlenderEnvironment.PyBundleActionAdded):
                     lenv.AddPostAction(prog,Action(UnixPyBundle,strfunction=my_unixpybundle_print))
                     BlenderEnvironment.PyBundleActionAdded = True
         elif lenv['OURPLATFORM'].startswith('win') or lenv['OURPLATFORM'] == 'linuxcross': # windows or cross-compilation
             if lenv['WITH_BF_PYTHON']:
-                if not lenv['WITHOUT_BF_PYTHON_INSTALL'] and not BlenderEnvironment.PyBundleActionAdded:
+                if (not lenv['WITHOUT_BF_PYTHON_INSTALL'] and 
+                    not lenv['WITHOUT_BF_PYTHON_UNPACK'] and 
+                    not BlenderEnvironment.PyBundleActionAdded):
                     lenv.AddPostAction(prog,Action(WinPyBundle,strfunction=my_winpybundle_print))
                     BlenderEnvironment.PyBundleActionAdded = True
         return prog

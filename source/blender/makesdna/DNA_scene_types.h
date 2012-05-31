@@ -626,6 +626,7 @@ typedef struct GameData {
 	short ticrate, maxlogicstep, physubstep, maxphystep;
 	short obstacleSimulation, pad1;
 	float levelHeight;
+	float deactivationtime, lineardeactthreshold, angulardeactthreshold,pad2;
 } GameData;
 
 #define STEREO_NOSTEREO		1

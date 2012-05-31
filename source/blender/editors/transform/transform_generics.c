@@ -93,6 +93,7 @@
 #include "ED_view3d.h"
 #include "ED_curve.h" /* for curve_editnurbs */
 #include "ED_clip.h"
+#include "ED_screen.h"
 
 //#include "BDR_unwrapper.h"
 
@@ -1038,9 +1039,10 @@ int initTransInfo(bContext *C, TransInfo *t, wmOperator *op, wmEvent *event)
 
 	if (t->spacetype == SPACE_VIEW3D) {
 		View3D *v3d = sa->spacedata.first;
+		bScreen *animscreen = ED_screen_animation_playing(CTX_wm_manager(C));
 		
 		t->view = v3d;
-		t->animtimer= CTX_wm_screen(C)->animtimer;
+		t->animtimer= (animscreen)? animscreen->animtimer: NULL;
 		
 		/* turn manipulator off during transform */
 		// FIXME: but don't do this when USING the manipulator...
@@ -1103,6 +1105,12 @@ int initTransInfo(bContext *C, TransInfo *t, wmOperator *op, wmEvent *event)
 		SpaceIpo *sipo= sa->spacedata.first;
 		t->view = &ar->v2d;
 		t->around = sipo->around;
+	}
+	else if (t->spacetype==SPACE_CLIP) {
+		SpaceClip *sclip = sa->spacedata.first;
+
+		if (ED_space_clip_show_trackedit(sclip))
+			t->options |= CTX_MOVIECLIP;
 	}
 	else {
 		if (ar) {

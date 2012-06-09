@@ -156,6 +156,10 @@ typedef struct bNodeType {
 	const char *(*labelfunc)(struct bNode *);
 	/// Optional custom resize handle polling.
 	int (*resize_area_func)(struct bNode *node, int x, int y);
+	/// Optional selection area polling.
+	int (*select_area_func)(struct bNode *node, int x, int y);
+	/// Optional tweak area polling (for grabbing).
+	int (*tweak_area_func)(struct bNode *node, int x, int y);
 	
 	/// Called when the node is updated in the editor.
 	void (*updatefunc)(struct bNodeTree *ntree, struct bNode *node);
@@ -262,8 +266,7 @@ struct bNodeTreeExec;
 
 typedef void (*bNodeTreeCallback)(void *calldata, struct ID *owner_id, struct bNodeTree *ntree);
 typedef void (*bNodeClassCallback)(void *calldata, int nclass, const char *name);
-typedef struct bNodeTreeType
-{
+typedef struct bNodeTreeType {
 	int type;						/* type identifier */
 	char idname[64];				/* id name for RNA identification */
 	
@@ -434,6 +437,7 @@ void			node_type_compatibility(struct bNodeType *ntype, short compatibility);
 #define NODE_FORLOOP	3
 #define NODE_WHILELOOP	4
 #define NODE_FRAME		5
+#define NODE_REROUTE	6
 
 /* look up a socket on a group node by the internal group socket */
 struct bNodeSocket *node_group_find_input(struct bNode *gnode, struct bNodeSocket *gsock);
@@ -449,6 +453,7 @@ int				node_group_ungroup(struct bNodeTree *ntree, struct bNode *gnode);
 
 /* in node_common.c */
 void register_node_type_frame(struct bNodeTreeType *ttype);
+void register_node_type_reroute(struct bNodeTreeType *ttype);
 
 /* ************** SHADER NODES *************** */
 
@@ -522,6 +527,7 @@ struct ShadeResult;
 #define SH_NODE_BRIGHTCONTRAST			165
 #define SH_NODE_LIGHT_FALLOFF			166
 #define SH_NODE_OBJECT_INFO				167
+#define SH_NODE_PARTICLE_INFO           168
 
 /* custom defines options for Material node */
 #define SH_NODE_MAT_DIFF   1
@@ -652,6 +658,7 @@ void			ntreeGPUMaterialNodes(struct bNodeTree *ntree, struct GPUMaterial *mat);
 #define CMP_NODE_MOVIEDISTORTION	265
 #define CMP_NODE_DOUBLEEDGEMASK    266
 #define CMP_NODE_OUTPUT_MULTI_FILE__DEPRECATED	267	/* DEPRECATED multi file node has been merged into regular CMP_NODE_OUTPUT_FILE */
+#define CMP_NODE_MASK		268
 
 #define CMP_NODE_GLARE		301
 #define CMP_NODE_TONEMAP	302

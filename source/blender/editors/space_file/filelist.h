@@ -54,8 +54,7 @@ typedef enum FileSelType {
 	FILE_SEL_TOGGLE	 = 2
 } FileSelType;
 
-typedef enum FileCheckType
-{
+typedef enum FileCheckType {
 	CHECK_DIRS = 1,
 	CHECK_FILES = 2,
 	CHECK_ALL = 3

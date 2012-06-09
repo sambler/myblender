@@ -31,7 +31,6 @@
 #include "COM_NodeBase.h"
 #include "COM_WorkScheduler.h"
 #include "COM_ReadBufferOperation.h"
-#include "COM_MemoryManager.h"
 #include "stdio.h"
 #include "COM_GroupNode.h"
 #include "COM_WriteBufferOperation.h"
@@ -114,8 +113,6 @@ void ExecutionSystem::execute()
 			order ++;
 		}
 	}
-
-	MemoryManager::initialize();
 	unsigned int index;
 
 	for (index = 0 ; index < this->operations.size() ; index ++) {
@@ -130,20 +127,9 @@ void ExecutionSystem::execute()
 
 	WorkScheduler::start(this->context);
 
-
-	vector<ExecutionGroup*> executionGroups;
-	this->findOutputExecutionGroup(&executionGroups);
-
-	/* start execution of the ExecutionGroups based on priority of their output node */
-	for (int priority = 9 ; priority>=0 ; priority--) {
-		for (index = 0 ; index < executionGroups.size(); index ++) {
-			ExecutionGroup *group = executionGroups[index];
-			NodeOperation *output = group->getOutputNodeOperation();
-			if (output->getRenderPriority() == priority) {
-				group->execute(this);
-			}
-		}
-	}
+	executeGroups(COM_PRIORITY_HIGH);
+	executeGroups(COM_PRIORITY_MEDIUM);
+	executeGroups(COM_PRIORITY_LOW);
 
 	WorkScheduler::finish();
 	WorkScheduler::stop();
@@ -156,7 +142,18 @@ void ExecutionSystem::execute()
 		ExecutionGroup * executionGroup = this->groups[index];
 		executionGroup->deinitExecution();
 	}
-	MemoryManager::clear();
+}
+
+void ExecutionSystem::executeGroups(CompositorPriority priority)
+{
+	int index;
+	vector<ExecutionGroup*> executionGroups;
+	this->findOutputExecutionGroup(&executionGroups, priority);
+
+	for (index = 0 ; index < executionGroups.size(); index ++) {
+		ExecutionGroup *group = executionGroups[index];
+		group->execute(this);
+	}
 }
 
 void ExecutionSystem::addOperation(NodeOperation *operation)
@@ -304,6 +301,17 @@ void ExecutionSystem::determineActualSocketDataTypes(vector<NodeBase*> &nodes)
 		NodeBase *node = nodes[index];
 		if (!node->isInputNode()) {
 			node->determineActualSocketDataTypes();
+		}
+	}
+}
+
+void ExecutionSystem::findOutputExecutionGroup(vector<ExecutionGroup*> *result, CompositorPriority priority) const
+{
+	unsigned int index;
+	for (index = 0 ; index < this->groups.size() ; index ++) {
+		ExecutionGroup *group = this->groups[index];
+		if (group->isOutputExecutionGroup() && group->getRenderPriotrity() == priority) {
+			result->push_back(group);
 		}
 	}
 }

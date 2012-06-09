@@ -1822,6 +1822,7 @@ void nodeRegisterType(bNodeTreeType *ttype, bNodeType *ntype)
 static void registerCompositNodes(bNodeTreeType *ttype)
 {
 	register_node_type_frame(ttype);
+	register_node_type_reroute(ttype);
 	
 	register_node_type_cmp_group(ttype);
 //	register_node_type_cmp_forloop(ttype);
@@ -1909,11 +1910,14 @@ static void registerCompositNodes(bNodeTreeType *ttype)
 	register_node_type_cmp_bokehimage(ttype);
 	register_node_type_cmp_bokehblur(ttype);
 	register_node_type_cmp_switch(ttype);
+
+	register_node_type_cmp_mask(ttype);
 }
 
 static void registerShaderNodes(bNodeTreeType *ttype) 
 {
 	register_node_type_frame(ttype);
+	register_node_type_reroute(ttype);
 	
 	register_node_type_sh_group(ttype);
 	//register_node_type_sh_forloop(ttype);
@@ -1952,6 +1956,7 @@ static void registerShaderNodes(bNodeTreeType *ttype)
 	register_node_type_sh_fresnel(ttype);
 	register_node_type_sh_layer_weight(ttype);
 	register_node_type_sh_tex_coord(ttype);
+	register_node_type_sh_particle_info(ttype);
 
 	register_node_type_sh_background(ttype);
 	register_node_type_sh_bsdf_diffuse(ttype);
@@ -1986,6 +1991,7 @@ static void registerShaderNodes(bNodeTreeType *ttype)
 static void registerTextureNodes(bNodeTreeType *ttype)
 {
 	register_node_type_frame(ttype);
+	register_node_type_reroute(ttype);
 	
 	register_node_type_tex_group(ttype);
 //	register_node_type_tex_forloop(ttype);

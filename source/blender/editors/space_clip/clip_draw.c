@@ -33,12 +33,14 @@
 #include "DNA_movieclip_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_object_types.h"	/* SELECT */
+#include "DNA_mask_types.h"
 
 #include "MEM_guardedalloc.h"
 
 #include "BKE_context.h"
 #include "BKE_movieclip.h"
 #include "BKE_tracking.h"
+#include "BKE_mask.h"
 
 #include "IMB_imbuf_types.h"
 #include "IMB_imbuf.h"
@@ -153,7 +155,7 @@ static void draw_movieclip_cache(SpaceClip *sc, ARegion *ar, MovieClip *clip, Sc
 				else
 					glColor4ub(255, 255, 0, 96);
 
-				glRecti((i - sfra) * framelen, 0, (i - sfra + 1)*framelen, 4);
+				glRecti((i - sfra + clip->start_frame - 1) * framelen, 0, (i - sfra + clip->start_frame) * framelen, 4);
 			}
 		}
 	}
@@ -181,7 +183,7 @@ static void draw_movieclip_cache(SpaceClip *sc, ARegion *ar, MovieClip *clip, Sc
 			}
 
 			if (!ok)
-				glRecti((i - sfra) * framelen, 0, (i - sfra + 1) * framelen, 8);
+				glRecti((i - sfra + clip->start_frame - 1) * framelen, 0, (i - sfra + clip->start_frame) * framelen, 8);
 		}
 	}
 
@@ -194,6 +196,32 @@ static void draw_movieclip_cache(SpaceClip *sc, ARegion *ar, MovieClip *clip, Sc
 	glRecti(x, 0, x + framelen, 8);
 
 	clip_draw_curfra_label(sc, x, 8.0f);
+
+	/* movie clip animation */
+	if ((sc->mode == SC_MODE_MASKEDIT) && sc->mask) {
+		MaskLayer *masklay = BKE_mask_layer_active(sc->mask);
+		if (masklay) {
+			MaskLayerShape *masklay_shape;
+
+			glColor4ub(255, 175, 0, 255);
+			glBegin(GL_LINES);
+
+			for (masklay_shape = masklay->splines_shapes.first;
+			     masklay_shape;
+			     masklay_shape = masklay_shape->next)
+			{
+				i = masklay_shape->frame;
+
+				/* glRecti((i - sfra) * framelen, 0, (i - sfra + 1) * framelen, 4); */
+
+				/* use a line so we always see the keyframes */
+				glVertex2i((i - sfra) * framelen, 0);
+				glVertex2i((i - sfra) * framelen, (i == CFRA) ? 22 : 10);
+			}
+
+			glEnd();
+		}
+	}
 }
 
 static void draw_movieclip_notes(SpaceClip *sc, ARegion *ar)
@@ -310,17 +338,17 @@ static void draw_track_path(SpaceClip *sc, MovieClip *UNUSED(clip), MovieTrackin
 	int count = sc->path_length;
 	int i, a, b, curindex = -1;
 	float path[102][2];
-	int tiny = sc->flag & SC_SHOW_TINY_MARKER, framenr;
+	int tiny = sc->flag & SC_SHOW_TINY_MARKER, framenr, start_frame;
 	MovieTrackingMarker *marker;
 
 	if (count == 0)
 		return;
 
-	marker = BKE_tracking_get_marker(track, sc->user.framenr);
-	if (marker->framenr != sc->user.framenr || marker->flag & MARKER_DISABLED)
-		return;
+	start_frame = framenr = ED_space_clip_clip_framenr(sc);
 
-	framenr = marker->framenr;
+	marker = BKE_tracking_get_marker(track, framenr);
+	if (marker->framenr != framenr || marker->flag & MARKER_DISABLED)
+		return;
 
 	a = count;
 	i = framenr - 1;
@@ -334,7 +362,7 @@ static void draw_track_path(SpaceClip *sc, MovieClip *UNUSED(clip), MovieTrackin
 			add_v2_v2v2(path[--a], marker->pos, track->offset);
 			ED_clip_point_undistorted_pos(sc, path[a], path[a]);
 
-			if (marker->framenr == sc->user.framenr)
+			if (marker->framenr == start_frame)
 				curindex = a;
 		}
 		else {
@@ -353,7 +381,7 @@ static void draw_track_path(SpaceClip *sc, MovieClip *UNUSED(clip), MovieTrackin
 			break;
 
 		if (marker->framenr == i) {
-			if (marker->framenr == sc->user.framenr)
+			if (marker->framenr == start_frame)
 				curindex = b;
 
 			add_v2_v2v2(path[b++], marker->pos, track->offset);
@@ -896,7 +924,7 @@ static void draw_marker_texts(SpaceClip *sc, MovieTrackingTrack *track, MovieTra
 
 	if (marker->flag & MARKER_DISABLED)
 		strcpy(state, "disabled");
-	else if (marker->framenr != sc->user.framenr)
+	else if (marker->framenr != ED_space_clip_clip_framenr(sc))
 		strcpy(state, "estimated");
 	else if (marker->flag & MARKER_TRACKED)
 		strcpy(state, "tracked");
@@ -944,7 +972,7 @@ static void draw_tracking_tracks(SpaceClip *sc, ARegion *ar, MovieClip *clip,
 	ListBase *tracksbase = BKE_tracking_get_tracks(tracking);
 	MovieTrackingTrack *track, *act_track;
 	MovieTrackingMarker *marker;
-	int framenr = sc->user.framenr;
+	int framenr = ED_space_clip_clip_framenr(sc);
 	int undistort = sc->user.render_flag & MCLIP_PROXY_RENDER_UNDISTORT;
 	float *marker_pos = NULL, *fp, *active_pos = NULL, cur_pos[2];
 
@@ -1429,7 +1457,6 @@ void clip_draw_grease_pencil(bContext *C, int onlyv2d)
 {
 	SpaceClip *sc = CTX_wm_space_clip(C);
 	MovieClip *clip = ED_space_clip(sc);
-	ImBuf *ibuf;
 
 	if (!clip)
 		return;
@@ -1438,16 +1465,11 @@ void clip_draw_grease_pencil(bContext *C, int onlyv2d)
 		/* if manual calibration is used then grease pencil data is already
 		 * drawed in draw_distortion */
 		if ((sc->flag & SC_MANUAL_CALIBRATION) == 0 || sc->mode != SC_MODE_DISTORTION) {
-			ibuf = ED_space_clip_get_buffer(sc);
+			glPushMatrix();
+			glMultMatrixf(sc->unistabmat);
+			draw_gpencil_2dimage(C);
 
-			if (ibuf) {
-				glPushMatrix();
-				glMultMatrixf(sc->unistabmat);
-				draw_gpencil_2dimage(C, ibuf);
-
-				IMB_freeImBuf(ibuf);
-				glPopMatrix();
-			}
+			glPopMatrix();
 		}
 	}
 	else {

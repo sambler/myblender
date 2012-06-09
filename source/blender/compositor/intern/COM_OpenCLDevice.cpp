@@ -53,13 +53,13 @@ void OpenCLDevice::execute(WorkPackage *work)
 	rcti rect;
 
 	executionGroup->determineChunkRect(&rect, chunkNumber);
-	MemoryBuffer ** inputBuffers = executionGroup->getInputBuffers(chunkNumber);
+	MemoryBuffer ** inputBuffers = executionGroup->getInputBuffersOpenCL(chunkNumber);
 	MemoryBuffer * outputBuffer = executionGroup->allocateOutputBuffer(chunkNumber, &rect);
 
-	executionGroup->getOutputNodeOperation()->executeOpenCLRegion(this->context, this->program, this->queue, &rect, chunkNumber, inputBuffers);
+	executionGroup->getOutputNodeOperation()->executeOpenCLRegion(this->context, this->program, this->queue, &rect, 
+	                                                              chunkNumber, inputBuffers, outputBuffer);
+
+	delete outputBuffer;
 	
 	executionGroup->finalizeChunkExecution(chunkNumber, inputBuffers);
-	if (outputBuffer != NULL) {
-		outputBuffer->setCreatedState();
-	}
 }

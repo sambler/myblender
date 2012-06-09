@@ -22,10 +22,8 @@
 
 #include "COM_WriteBufferOperation.h"
 #include "COM_defines.h"
-#include "COM_MemoryManager.h"
 #include <stdio.h>
 
-/// @TODO: writebuffers don't have an actual data type set.
 WriteBufferOperation::WriteBufferOperation() :NodeOperation()
 {
 	this->addInputSocket(COM_DT_COLOR);
@@ -46,20 +44,23 @@ void WriteBufferOperation::executePixel(float *color, float x, float y, PixelSam
 {
 	input->read(color, x, y, sampler, inputBuffers);
 }
+
 void WriteBufferOperation::initExecution()
 {
-		this->input = this->getInputOperation(0);
-	MemoryManager::addMemoryProxy(this->memoryProxy);
+	this->input = this->getInputOperation(0);
+	this->memoryProxy->allocate(this->width, this->height);
 }
+
 void WriteBufferOperation::deinitExecution()
 {
 	this->input = NULL;
+	this->memoryProxy->free();
 }
-
 
 void WriteBufferOperation::executeRegion(rcti *rect, unsigned int tileNumber, MemoryBuffer** memoryBuffers)
 {
-	MemoryBuffer *memoryBuffer = MemoryManager::getMemoryBuffer(this->getMemoryProxy(), tileNumber);
+	//MemoryBuffer *memoryBuffer = MemoryManager::getMemoryBuffer(this->getMemoryProxy(), tileNumber);
+	MemoryBuffer *memoryBuffer = this->memoryProxy->getBuffer();
 	float *buffer = memoryBuffer->getBuffer();
 	if (this->input->isComplex()) {
 		void *data = this->input->initializeTileData(rect, memoryBuffers);
@@ -67,14 +68,14 @@ void WriteBufferOperation::executeRegion(rcti *rect, unsigned int tileNumber, Me
 		int y1 = rect->ymin;
 		int x2 = rect->xmax;
 		int y2 = rect->ymax;
-		int offset4 = 0;
 		int x;
 		int y;
 		bool breaked = false;
 		for (y = y1 ; y < y2 && (!breaked) ; y++) {
+			int offset4 = (y*memoryBuffer->getWidth()+x1)*COM_NUMBER_OF_CHANNELS;
 			for (x = x1 ; x < x2; x++) {
 				input->read(&(buffer[offset4]), x, y, memoryBuffers, data);
-				offset4 +=4;
+				offset4 +=COM_NUMBER_OF_CHANNELS;
 
 			}
 			if (tree->test_break && tree->test_break(tree->tbh)) {
@@ -92,14 +93,15 @@ void WriteBufferOperation::executeRegion(rcti *rect, unsigned int tileNumber, Me
 		int y1 = rect->ymin;
 		int x2 = rect->xmax;
 		int y2 = rect->ymax;
-		int offset4 = 0;
+
 		int x;
 		int y;
 		bool breaked = false;
 		for (y = y1 ; y < y2 && (!breaked) ; y++) {
+			int offset4 = (y*memoryBuffer->getWidth()+x1)*COM_NUMBER_OF_CHANNELS;
 			for (x = x1 ; x < x2 ; x++) {
 				input->read(&(buffer[offset4]), x, y, COM_PS_NEAREST, memoryBuffers);
-				offset4 +=4;
+				offset4 +=COM_NUMBER_OF_CHANNELS;
 			}
 			if (tree->test_break && tree->test_break(tree->tbh)) {
 				breaked = true;
@@ -109,10 +111,9 @@ void WriteBufferOperation::executeRegion(rcti *rect, unsigned int tileNumber, Me
 	memoryBuffer->setCreatedState();
 }
 
-void WriteBufferOperation::executeOpenCLRegion(cl_context context, cl_program program, cl_command_queue queue, rcti *rect, unsigned int chunkNumber, MemoryBuffer** inputMemoryBuffers)
+void WriteBufferOperation::executeOpenCLRegion(cl_context context, cl_program program, cl_command_queue queue, rcti *rect, unsigned int chunkNumber, MemoryBuffer** inputMemoryBuffers, MemoryBuffer* outputBuffer)
 {
-	MemoryBuffer *outputMemoryBuffer = MemoryManager::getMemoryBuffer(this->getMemoryProxy(), chunkNumber);
-	float *outputFloatBuffer = outputMemoryBuffer->getBuffer();
+	float *outputFloatBuffer = outputBuffer->getBuffer();
 	cl_int error;
 	/*
 	 * 1. create cl_mem from outputbuffer
@@ -123,8 +124,8 @@ void WriteBufferOperation::executeOpenCLRegion(cl_context context, cl_program pr
 	 * note: list of cl_mem will be filled by 2, and needs to be cleaned up by 4
 	 */
 	// STEP 1
-	const unsigned int outputBufferWidth = outputMemoryBuffer->getWidth();
-	const unsigned int outputBufferHeight = outputMemoryBuffer->getHeight();
+	const unsigned int outputBufferWidth = outputBuffer->getWidth();
+	const unsigned int outputBufferHeight = outputBuffer->getHeight();
 
 	const cl_image_format imageFormat = {
 		CL_RGBA,
@@ -139,19 +140,26 @@ void WriteBufferOperation::executeOpenCLRegion(cl_context context, cl_program pr
 	clMemToCleanUp->push_back(clOutputBuffer);
 	list<cl_kernel> *clKernelsToCleanUp = new list<cl_kernel>();
 
-	this->input->executeOpenCL(context, program, queue, outputMemoryBuffer, clOutputBuffer, inputMemoryBuffers, clMemToCleanUp, clKernelsToCleanUp);
+	this->input->executeOpenCL(context, program, queue, outputBuffer, clOutputBuffer, inputMemoryBuffers, clMemToCleanUp, clKernelsToCleanUp);
 
 	// STEP 3
 
 	size_t origin[3] = {0,0,0};
 	size_t region[3] = {outputBufferWidth,outputBufferHeight,1};
 
+//	clFlush(queue);
+//	clFinish(queue);
+
 	error = clEnqueueBarrier(queue);
 	if (error != CL_SUCCESS) { printf("CLERROR[%d]: %s\n", error, clewErrorString(error));	}
 	error = clEnqueueReadImage(queue, clOutputBuffer, CL_TRUE, origin, region, 0, 0, outputFloatBuffer, 0, NULL, NULL);
 	if (error != CL_SUCCESS) { printf("CLERROR[%d]: %s\n", error, clewErrorString(error));	}
+	
+	this->getMemoryProxy()->getBuffer()->copyContentFrom(outputBuffer);
+	
 	// STEP 4
 
+	
 	while (clMemToCleanUp->size()>0) {
 		cl_mem mem = clMemToCleanUp->front();
 		error = clReleaseMemObject(mem);

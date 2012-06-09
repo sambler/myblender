@@ -828,6 +828,7 @@ endif()
 		bf_editor_sound
 		bf_editor_animation
 		bf_editor_datafiles
+		bf_editor_mask
 
 		bf_render
 		bf_intern_opennl
@@ -899,6 +900,7 @@ endif()
 		cycles_subd
 		bf_compositor #added for opencl compositor
 		bf_opencl #added for opencl compositor
+		bf_intern_raskter
 	)
 
 	if(WITH_LIBMV)

@@ -972,7 +972,8 @@ MovieTrackingContext *BKE_tracking_context_new(MovieClip *clip, MovieClipUser *u
 	track = tracksbase->first;
 	while (track) {
 		if (TRACK_SELECTED(track) && (track->flag & (TRACK_LOCKED | TRACK_HIDDEN)) == 0) {
-			MovieTrackingMarker *marker = BKE_tracking_get_marker(track, user->framenr);
+			int framenr = BKE_movieclip_remap_scene_to_clip_frame(clip, user->framenr);
+			MovieTrackingMarker *marker = BKE_tracking_get_marker(track, framenr);
 
 			if ((marker->flag & MARKER_DISABLED) == 0)
 				num_tracks++;
@@ -993,7 +994,8 @@ MovieTrackingContext *BKE_tracking_context_new(MovieClip *clip, MovieClipUser *u
 		track = tracksbase->first;
 		while (track) {
 			if (TRACK_SELECTED(track) && (track->flag & (TRACK_HIDDEN | TRACK_LOCKED)) == 0) {
-				MovieTrackingMarker *marker = BKE_tracking_get_marker(track, user->framenr);
+				int framenr = BKE_movieclip_remap_scene_to_clip_frame(clip, user->framenr);
+				MovieTrackingMarker *marker = BKE_tracking_get_marker(track, framenr);
 
 				if ((marker->flag & MARKER_DISABLED) == 0) {
 					TrackContext track_context;
@@ -1311,7 +1313,7 @@ static ImBuf *get_frame_ibuf(MovieTrackingContext *context, int framenr)
 	ImBuf *ibuf;
 	MovieClipUser user = context->user;
 
-	user.framenr = framenr;
+	user.framenr = BKE_movieclip_remap_clip_to_scene_frame(context->clip, framenr);
 
 	ibuf = BKE_movieclip_get_ibuf_flag(context->clip, &user, context->clip_flag, MOVIECLIP_CACHE_SKIP);
 
@@ -1399,7 +1401,7 @@ void BKE_tracking_sync_user(MovieClipUser *user, MovieTrackingContext *context)
 int BKE_tracking_next(MovieTrackingContext *context)
 {
 	ImBuf *ibuf_new;
-	int curfra = context->user.framenr;
+	int curfra =  BKE_movieclip_remap_scene_to_clip_frame(context->clip, context->user.framenr);
 	int a, ok = FALSE, map_size;
 
 	map_size = tracks_map_size(context->tracks_map);
@@ -1529,7 +1531,7 @@ int BKE_tracking_next(MovieTrackingContext *context)
 				marker_new.framenr = nextfra;
 				marker_new.flag |= MARKER_DISABLED;
 
-				#pragma omp critical
+				//#pragma omp critical
 				{
 					BKE_tracking_insert_marker(track, &marker_new);
 				}
@@ -3113,6 +3115,17 @@ static int channels_longest_segment_sort(void *a, void *b)
 		return 0;
 }
 
+static int channels_average_error_sort(void *a, void *b)
+{
+	MovieTrackingDopesheetChannel *channel_a = a;
+	MovieTrackingDopesheetChannel *channel_b = b;
+
+	if (channel_a->track->error > channel_b->track->error)
+		return 1;
+	else
+		return 0;
+}
+
 static int channels_alpha_inverse_sort(void *a, void *b)
 {
 	if (channels_alpha_sort(a, b))
@@ -3135,6 +3148,17 @@ static int channels_longest_segment_inverse_sort(void *a, void *b)
 		return 0;
 	else
 		return 1;
+}
+
+static int channels_average_error_inverse_sort(void *a, void *b)
+{
+	MovieTrackingDopesheetChannel *channel_a = a;
+	MovieTrackingDopesheetChannel *channel_b = b;
+
+	if (channel_a->track->error < channel_b->track->error)
+		return 1;
+	else
+		return 0;
 }
 
 static void channels_segments_calc(MovieTrackingDopesheetChannel *channel)
@@ -3232,6 +3256,9 @@ static void  tracking_dopesheet_sort(MovieTracking *tracking, int sort_method, i
 		else if (sort_method == TRACK_SORT_TOTAL) {
 			BLI_sortlist(&dopesheet->channels, channels_total_track_inverse_sort);
 		}
+		else if (sort_method == TRACK_SORT_AVERAGE_ERROR) {
+			BLI_sortlist(&dopesheet->channels, channels_average_error_inverse_sort);
+		}
 	}
 	else {
 		if (sort_method == TRACK_SORT_NAME) {
@@ -3242,6 +3269,9 @@ static void  tracking_dopesheet_sort(MovieTracking *tracking, int sort_method, i
 		}
 		else if (sort_method == TRACK_SORT_TOTAL) {
 			BLI_sortlist(&dopesheet->channels, channels_total_track_sort);
+		}
+		else if (sort_method == TRACK_SORT_AVERAGE_ERROR) {
+			BLI_sortlist(&dopesheet->channels, channels_average_error_sort);
 		}
 	}
 

@@ -24,9 +24,9 @@ __device float svm_gradient(float3 p, NodeGradientType type)
 {
 	float x, y, z;
 
-	x= p.x;
-	y= p.y;
-	z= p.z;
+	x = p.x;
+	y = p.y;
+	z = p.z;
 
 	if(type == NODE_BLEND_LINEAR) {
 		return x;
@@ -45,7 +45,7 @@ __device float svm_gradient(float3 p, NodeGradientType type)
 		return (x + y)/2.0f;
 	}
 	else if(type == NODE_BLEND_RADIAL) {
-		return atan2(y, x)/(2.0f*M_PI_F) + 0.5f;
+		return atan2f(y, x) / (2.0f * M_PI_F) + 0.5f;
 	}
 	else {
 		float r = fmaxf(1.0f - sqrtf(x*x + y*y + z*z), 0.0f);

@@ -141,7 +141,7 @@ static void blender_camera_from_object(BlenderCamera *bcam, BL::Object b_ob)
 		bcam->lens = b_camera.lens();
 
 		/* allow f/stop number to change aperture_size but still
-		   give manual control over aperture radius */
+		 * give manual control over aperture radius */
 		int aperture_type = RNA_enum_get(&ccamera, "aperture_type");
 
 		if(aperture_type == 1) {
@@ -179,8 +179,8 @@ static Transform blender_camera_matrix(const Transform& tfm, CameraType type)
 
 	if(type == CAMERA_PANORAMA) {
 		/* make it so environment camera needs to be pointed in the direction
-		   of the positive x-axis to match an environment texture, this way
-		   it is looking at the center of the texture */
+		 * of the positive x-axis to match an environment texture, this way
+		 * it is looking at the center of the texture */
 		result = tfm *
 			make_transform( 0.0f, -1.0f, 0.0f, 0.0f,
 			                0.0f,  0.0f, 1.0f, 0.0f,
@@ -222,14 +222,14 @@ static void blender_camera_viewplane(BlenderCamera *bcam, int width, int height,
 	}
 
 	if(horizontal_fit) {
-		*aspectratio= xratio/yratio;
-		xaspect= *aspectratio;
-		yaspect= 1.0f;
+		*aspectratio = xratio/yratio;
+		xaspect = *aspectratio;
+		yaspect = 1.0f;
 	}
 	else {
-		*aspectratio= yratio/xratio;
-		xaspect= 1.0f;
-		yaspect= *aspectratio;
+		*aspectratio = yratio/xratio;
+		xaspect = 1.0f;
+		yaspect = *aspectratio;
 	}
 
 	/* modify aspect for orthographic scale */
@@ -297,7 +297,7 @@ static void blender_camera_sync(Camera *cam, BlenderCamera *bcam, int width, int
 	cam->fisheye_lens = bcam->fisheye_lens;
 
 	/* perspective */
-	cam->fov = 2.0f*atan((0.5f*sensor_size)/bcam->lens/aspectratio);
+	cam->fov = 2.0f * atanf((0.5f * sensor_size) / bcam->lens / aspectratio);
 	cam->focaldistance = bcam->focaldistance;
 	cam->aperturesize = bcam->aperturesize;
 	cam->blades = bcam->apertureblades;
@@ -405,7 +405,7 @@ static void blender_camera_from_view(BlenderCamera *bcam, BL::Scene b_scene, BL:
 	}
 	else if(b_rv3d.view_perspective() == BL::RegionView3D::view_perspective_ORTHO) {
 		/* orthographic view */
-		bcam->farclip *= 0.5;
+		bcam->farclip *= 0.5f;
 		bcam->nearclip = -bcam->farclip;
 
 		bcam->type = CAMERA_ORTHOGRAPHIC;
@@ -485,10 +485,10 @@ static void blender_camera_border(BlenderCamera *bcam, BL::Scene b_scene, BL::Sp
 	bcam->border_top = tmp_bottom + bcam->border_top*(tmp_top - tmp_bottom);
 
 	/* clamp */
-	bcam->border_left = max(bcam->border_left, 0.0f);
-	bcam->border_right = min(bcam->border_right, 1.0f);
-	bcam->border_bottom = max(bcam->border_bottom, 0.0f);
-	bcam->border_top = min(bcam->border_top, 1.0f);
+	bcam->border_left = clamp(bcam->border_left, 0.0f, 1.0f);
+	bcam->border_right = clamp(bcam->border_right, 0.0f, 1.0f);
+	bcam->border_bottom = clamp(bcam->border_bottom, 0.0f, 1.0f);
+	bcam->border_top = clamp(bcam->border_top, 0.0f, 1.0f);
 }
 
 void BlenderSync::sync_view(BL::SpaceView3D b_v3d, BL::RegionView3D b_rv3d, int width, int height)
@@ -514,6 +514,10 @@ BufferParams BlenderSync::get_buffer_params(BL::Scene b_scene, Camera *cam, int 
 		params.full_y = cam->border_bottom*height;
 		params.width = (int)(cam->border_right*width) - params.full_x;
 		params.height = (int)(cam->border_top*height) - params.full_y;
+
+		/* survive in case border goes out of view or becomes too small */
+		params.width = max(params.width, 1);
+		params.height = max(params.height, 1);
 	}
 	else {
 		params.width = width;

@@ -77,7 +77,7 @@ void DilateErodeNode::convertToOperations(ExecutionSystem *graph, CompositorCont
 		CompositorQuality quality = context->getQuality();
 
 		/* initialize node data */
-		NodeBlurData *data = (NodeBlurData *)&this->alpha_blur;
+		NodeBlurData *data = (NodeBlurData *)&this->m_alpha_blur;
 		memset(data, 0, sizeof(*data));
 		data->filtertype = R_FILTER_GAUSS;
 
@@ -117,6 +117,12 @@ void DilateErodeNode::convertToOperations(ExecutionSystem *graph, CompositorCont
 #endif
 		operationx->setSubtract(editorNode->custom2 < 0);
 		operationy->setSubtract(editorNode->custom2 < 0);
+
+		if (editorNode->storage) {
+			NodeDilateErode *data_storage = (NodeDilateErode *)editorNode->storage;
+			operationx->setFalloff(data_storage->falloff);
+			operationy->setFalloff(data_storage->falloff);
+		}
 	}
 	else {
 		if (editorNode->custom2 > 0) {

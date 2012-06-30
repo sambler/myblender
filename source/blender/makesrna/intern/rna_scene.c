@@ -101,6 +101,16 @@ EnumPropertyItem proportional_falloff_items[] = {
 	{0, NULL, 0, NULL, NULL}
 };
 
+/* subset of the enum - only curves, missing random and const */
+EnumPropertyItem proportional_falloff_curve_only_items[] = {
+	{PROP_SMOOTH, "SMOOTH", ICON_SMOOTHCURVE, "Smooth", "Smooth falloff"},
+	{PROP_SPHERE, "SPHERE", ICON_SPHERECURVE, "Sphere", "Spherical falloff"},
+	{PROP_ROOT, "ROOT", ICON_ROOTCURVE, "Root", "Root falloff"},
+	{PROP_SHARP, "SHARP", ICON_SHARPCURVE, "Sharp", "Sharp falloff"},
+	{PROP_LIN, "LINEAR", ICON_LINCURVE, "Linear", "Linear falloff"},
+	{0, NULL, 0, NULL, NULL}
+};
+
 
 EnumPropertyItem proportional_editing_items[] = {
 	{PROP_EDIT_OFF, "DISABLED", ICON_PROP_OFF, "Disable", "Proportional Editing disabled"},
@@ -123,6 +133,14 @@ EnumPropertyItem snap_element_items[] = {
 	{SCE_SNAP_MODE_EDGE, "EDGE", ICON_SNAP_EDGE, "Edge", "Snap to edges"},
 	{SCE_SNAP_MODE_FACE, "FACE", ICON_SNAP_FACE, "Face", "Snap to faces"},
 	{SCE_SNAP_MODE_VOLUME, "VOLUME", ICON_SNAP_VOLUME, "Volume", "Snap to volume"},
+	{0, NULL, 0, NULL, NULL}
+};
+
+EnumPropertyItem snap_node_element_items[] = {
+	{SCE_SNAP_MODE_INCREMENT, "INCREMENT", ICON_SNAP_INCREMENT, "Increment", "Snap to increments of grid"},
+	{SCE_SNAP_MODE_NODE_X, "NODE_X", ICON_SNAP_EDGE, "Node X", "Snap to left/right node border"},
+	{SCE_SNAP_MODE_NODE_Y, "NODE_Y", ICON_SNAP_EDGE, "Node Y", "Snap to top/bottom node border"},
+	{SCE_SNAP_MODE_NODE_XY, "NODE_XY", ICON_SNAP_EDGE, "Node X / Y", "Snap to any node border"},
 	{0, NULL, 0, NULL, NULL}
 };
 
@@ -726,7 +744,7 @@ static void rna_ImageFormatSettings_file_format_set(PointerRNA *ptr, int value)
 }
 
 static EnumPropertyItem *rna_ImageFormatSettings_file_format_itemf(bContext *C, PointerRNA *ptr,
-                                                                   PropertyRNA *UNUSED(prop), int *free)
+                                                                   PropertyRNA *UNUSED(prop), int *UNUSED(free))
 {
 	ID *id = ptr->id.data;
 	if (id && GS(id->name) == ID_SCE) {
@@ -1616,6 +1634,13 @@ static void rna_def_tool_settings(BlenderRNA  *brna)
 	RNA_def_property_enum_items(prop, snap_element_items);
 	RNA_def_property_ui_text(prop, "Snap Element", "Type of element to snap to");
 	RNA_def_property_update(prop, NC_SCENE | ND_TOOLSETTINGS, NULL); /* header redraw */
+	
+	/* node editor uses own set of snap modes */
+	prop = RNA_def_property(srna, "snap_node_element", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "snap_node_mode");
+	RNA_def_property_enum_items(prop, snap_node_element_items);
+	RNA_def_property_ui_text(prop, "Snap Node Element", "Type of element to snap to");
+	RNA_def_property_update(prop, NC_SCENE | ND_TOOLSETTINGS, NULL); /* header redraw */
 
 	prop = RNA_def_property(srna, "snap_target", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "snap_target");
@@ -1641,7 +1666,7 @@ static void rna_def_tool_settings(BlenderRNA  *brna)
 	RNA_def_property_ui_text(prop, "Project to Self", "Snap onto itself (editmode)");
 	RNA_def_property_ui_icon(prop, ICON_ORTHO, 0);
 	RNA_def_property_update(prop, NC_SCENE | ND_TOOLSETTINGS, NULL); /* header redraw */
-	
+
 	/* Grease Pencil */
 	prop = RNA_def_property(srna, "use_grease_pencil_sessions", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "gpencil_flags", GP_TOOL_FLAG_PAINTSESSIONS_ON);

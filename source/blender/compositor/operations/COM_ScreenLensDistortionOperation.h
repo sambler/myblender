@@ -30,18 +30,19 @@ private:
 	/**
 	 * Cached reference to the inputProgram
 	 */
-	SocketReader *inputProgram;
+	SocketReader *m_inputProgram;
 	
-	NodeLensDist *data;
+	NodeLensDist *m_data;
 	
-	float dispersion;
-	float distortion;
-	float kr, kg, kb;
-	float kr4, kg4, kb4;
-	float maxk;
-	float drg;
-	float dgb;
-	float sc, cx, cy;
+	float m_dispersion;
+	float m_distortion;
+	bool m_valuesAvailable;
+	float m_kr, m_kg, m_kb;
+	float m_kr4, m_kg4, m_kb4;
+	float m_maxk;
+	float m_drg;
+	float m_dgb;
+	float m_sc, m_cx, m_cy;
 public:
 	ScreenLensDistortionOperation();
 	
@@ -61,14 +62,13 @@ public:
 	 */
 	void deinitExecution();
 	
-	void setData(NodeLensDist *data) { this->data = data; }
-	void setDispertion(float dispersion) { this->dispersion = dispersion; }
-	void setDistortion(float distortion) { this->distortion = distortion; }
+	void setData(NodeLensDist *data) { this->m_data = data; }
 	
 	bool determineDependingAreaOfInterest(rcti *input, ReadBufferOperation *readOperation, rcti *output);
 
 private:
 	void determineUV(float *result, float x, float y) const;
+	void updateDispersionAndDistortion(MemoryBuffer **inputBuffers);
 
 };
 #endif

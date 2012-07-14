@@ -80,6 +80,7 @@
 #include "intern/node_util.h"
 
 #include "node_intern.h"
+#include "COM_compositor.h"
 
 /* width of socket columns in group display */
 #define NODE_GROUP_FRAME  120
@@ -334,9 +335,6 @@ static void node_update_basis(const bContext *C, bNodeTree *ntree, bNode *node)
 
 	/* preview rect? */
 	if (node->flag & NODE_PREVIEW) {
-		/* only recalculate size when there's a preview actually, otherwise we use stored result */
-		BLI_lock_thread(LOCK_PREVIEW);
-
 		if (node->preview && node->preview->rect) {
 			float aspect = 1.0f;
 			
@@ -373,8 +371,6 @@ static void node_update_basis(const bContext *C, bNodeTree *ntree, bNode *node)
 			node->prvr.ymin = dy - oldh;
 			dy = node->prvr.ymin - NODE_DYS / 2;
 		}
-
-		BLI_unlock_thread(LOCK_PREVIEW);
 	}
 
 	/* buttons rect? */
@@ -726,9 +722,8 @@ static void node_draw_basis(const bContext *C, ARegion *ar, SpaceNode *snode, bN
 		UI_ThemeColorBlend(color_id, TH_REDALERT, 0.5f);
 
 	if (ntree->type == NTREE_COMPOSIT && (snode->flag & SNODE_SHOW_HIGHLIGHT)) {
-		if (node->highlight) {
+		if (COM_isHighlightedbNode(node)) {
 			UI_ThemeColorBlend(color_id, TH_ACTIVE, 0.5f);
-			node->highlight = 0;
 		}
 	}
 	uiSetRoundBox(UI_CNR_TOP_LEFT | UI_CNR_TOP_RIGHT);
@@ -861,10 +856,8 @@ static void node_draw_basis(const bContext *C, ARegion *ar, SpaceNode *snode, bN
 	
 	/* preview */
 	if (node->flag & NODE_PREVIEW) {
-		BLI_lock_thread(LOCK_PREVIEW);
 		if (node->preview && node->preview->rect && !BLI_rctf_is_empty(&node->prvr))
 			node_draw_preview(node->preview, &node->prvr);
-		BLI_unlock_thread(LOCK_PREVIEW);
 	}
 	
 	UI_ThemeClearColor(color_id);
@@ -893,9 +886,8 @@ static void node_draw_hidden(const bContext *C, ARegion *ar, SpaceNode *snode, b
 		UI_ThemeColorBlend(color_id, TH_REDALERT, 0.5f);
 
 	if (ntree->type == NTREE_COMPOSIT && (snode->flag & SNODE_SHOW_HIGHLIGHT)) {
-		if (node->highlight) {
+		if (COM_isHighlightedbNode(node)) {
 			UI_ThemeColorBlend(color_id, TH_ACTIVE, 0.5f);
-			node->highlight = 0;
 		}
 	}
 	
@@ -1133,6 +1125,7 @@ void drawnodespace(const bContext *C, ARegion *ar, View2D *v2d)
 	
 	if (snode->nodetree) {
 		bNode *node;
+		/* void** highlights = 0; */ /* UNUSED */
 		
 		node_uiblocks_init(C, snode->nodetree);
 		
@@ -1145,6 +1138,9 @@ void drawnodespace(const bContext *C, ARegion *ar, View2D *v2d)
 		}
 		
 		node_update_nodetree(C, snode->nodetree, 0.0f, 0.0f);
+		if (snode->nodetree->type == NTREE_COMPOSIT) {
+			COM_startReadHighlights();
+		} 
 		node_draw_nodetree(C, ar, snode, snode->nodetree);
 		
 		#if 0

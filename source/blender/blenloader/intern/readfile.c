@@ -3688,7 +3688,14 @@ static void lib_link_mesh(FileData *fd, Main *main)
 				
 				G.main = gmain;
 			}
-			
+		}
+	}
+
+	/* convert texface options to material */
+	convert_tface_mt(fd, main);
+
+	for (me = main->mesh.first; me; me = me->id.next) {
+		if (me->id.flag & LIB_NEEDLINK) {
 			/*
 			 * Re-tessellate, even if the polys were just created from tessfaces, this
 			 * is important because it:
@@ -3704,13 +3711,10 @@ static void lib_link_mesh(FileData *fd, Main *main)
 #else
 			BKE_mesh_tessface_clear(me);
 #endif
-			
+
 			me->id.flag -= LIB_NEEDLINK;
 		}
 	}
-	
-	/* convert texface options to material */
-	convert_tface_mt(fd, main);
 }
 
 static void direct_link_dverts(FileData *fd, int count, MDeformVert *mdverts)
@@ -7011,6 +7015,21 @@ static void do_version_ntree_dilateerode_264(void *UNUSED(data), ID *UNUSED(id),
 	}
 }
 
+static void do_version_ntree_keying_despill_balance(void *UNUSED(data), ID *UNUSED(id), bNodeTree *ntree)
+{
+	bNode *node;
+
+	for (node = ntree->nodes.first; node; node = node->next) {
+		if (node->type == CMP_NODE_KEYING) {
+			NodeKeyingData *data = node->storage;
+
+			if (data->despill_balance == 0.0f) {
+				data->despill_balance = 0.5f;
+			}
+		}
+	}
+}
+
 static void do_versions(FileData *fd, Library *lib, Main *main)
 {
 	/* WATCH IT!!!: pointers from libdata have not been converted */
@@ -7825,6 +7844,13 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 			ntreetype->foreach_nodetree(main, NULL, do_version_ntree_dilateerode_264);
 	}
 
+	if (main->versionfile < 263 || (main->versionfile == 263 && main->subversionfile < 14)) {
+		bNodeTreeType *ntreetype = ntreeGetType(NTREE_COMPOSIT);
+
+		if (ntreetype && ntreetype->foreach_nodetree)
+			ntreetype->foreach_nodetree(main, NULL, do_version_ntree_keying_despill_balance);
+	}
+
 	/* WATCH IT!!!: pointers from libdata have not been converted yet here! */
 	/* WATCH IT 2!: Userdef struct init has to be in editors/interface/resources.c! */
 
@@ -8497,7 +8523,6 @@ static void expand_curve(FileData *fd, Main *mainvar, Curve *cu)
 static void expand_mesh(FileData *fd, Main *mainvar, Mesh *me)
 {
 	CustomDataLayer *layer;
-	MTFace *mtf;
 	TFace *tf;
 	int a, i;
 	
@@ -8519,14 +8544,34 @@ static void expand_mesh(FileData *fd, Main *mainvar, Mesh *me)
 		}
 	}
 
-	for (a = 0; a < me->fdata.totlayer; a++) {
-		layer = &me->fdata.layers[a];
-		
-		if (layer->type == CD_MTFACE) {
-			mtf = (MTFace*)layer->data;
-			for (i = 0; i < me->totface; i++, mtf++) {
-				if (mtf->tpage)
-					expand_doit(fd, mainvar, mtf->tpage);
+	if (me->mface && !me->mpoly) {
+		MTFace *mtf;
+
+		for (a = 0; a < me->fdata.totlayer; a++) {
+			layer = &me->fdata.layers[a];
+
+			if (layer->type == CD_MTFACE) {
+				mtf = (MTFace *) layer->data;
+				for (i = 0; i < me->totface; i++, mtf++) {
+					if (mtf->tpage)
+						expand_doit(fd, mainvar, mtf->tpage);
+				}
+			}
+		}
+	}
+	else {
+		MTexPoly *mtp;
+
+		for (a = 0; a < me->pdata.totlayer; a++) {
+			layer = &me->pdata.layers[a];
+
+			if (layer->type == CD_MTEXPOLY) {
+				mtp = (MTexPoly *) layer->data;
+
+				for (i = 0; i < me->totpoly; i++, mtp++) {
+					if (mtp->tpage)
+						expand_doit(fd, mainvar, mtp->tpage);
+				}
 			}
 		}
 	}

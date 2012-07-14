@@ -52,6 +52,7 @@
 #include "BKE_library.h"
 #include "BKE_main.h"
 #include "BKE_node.h"
+#include "BKE_tracking.h"
 
 #include "BLF_api.h"
 #include "BLF_translation.h"
@@ -303,14 +304,17 @@ static void node_buts_rgb(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr
 
 static void node_buts_mix_rgb(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {	
-	uiLayout *row;
+	uiLayout *row, *col;
 
 	bNodeTree *ntree = (bNodeTree *)ptr->id.data;
 
-	row = uiLayoutRow(layout, TRUE);
+	col = uiLayoutColumn(layout, FALSE);
+	row = uiLayoutRow(col, TRUE);
 	uiItemR(row, ptr, "blend_type", 0, "", ICON_NONE);
 	if (ntree->type == NTREE_COMPOSIT)
 		uiItemR(row, ptr, "use_alpha", 0, "", ICON_IMAGE_RGB_ALPHA);
+
+	uiItemR(col, ptr, "use_clamp", 0, NULL, ICON_NONE);
 }
 
 static void node_buts_time(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
@@ -452,6 +456,7 @@ static void node_buts_texture(uiLayout *layout, bContext *UNUSED(C), PointerRNA 
 static void node_buts_math(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 { 
 	uiItemR(layout, ptr, "operation", 0, "", ICON_NONE);
+	uiItemR(layout, ptr, "use_clamp", 0, NULL, ICON_NONE);
 }
 
 static int node_resize_area_default(bNode *node, int x, int y)
@@ -964,17 +969,15 @@ static void node_update_frame(const bContext *UNUSED(C), bNodeTree *ntree, bNode
 static void node_draw_frame_label(bNode *node, const float aspect)
 {
 	/* XXX font id is crap design */
-	const int fontid = blf_mono_font;
+	const int fontid = UI_GetStyle()->widgetlabel.uifont_id;
 	NodeFrame *data = (NodeFrame *)node->storage;
 	rctf *rct = &node->totr;
 	int color_id = node_get_colorid(node);
-	char label[128];
+	const char *label = nodeLabel(node);
 	/* XXX a bit hacky, should use separate align values for x and y */
 	float width, ascender;
 	float x, y;
 	const int font_size = data->label_size / aspect;
-	
-	BLI_strncpy(label, nodeLabel(node), sizeof(label));
 
 	BLF_enable(fontid, BLF_ASPECT);
 	BLF_aspect(fontid, aspect, aspect, 1.0f);
@@ -988,8 +991,8 @@ static void node_draw_frame_label(bNode *node, const float aspect)
 	
 	/* 'x' doesn't need aspect correction */
 	x = 0.5f * (rct->xmin + rct->xmax) - 0.5f * width;
-	y = rct->ymax - NODE_DYS - (ascender * aspect);
-	
+	y = rct->ymax - (((NODE_DY / 4) / aspect) + (ascender * aspect));
+
 	BLF_position(fontid, x, y, 0);
 	BLF_draw(fontid, label, BLF_DRAW_STR_DUMMY_MAX);
 
@@ -1003,9 +1006,6 @@ static void node_draw_frame(const bContext *C, ARegion *ar, SpaceNode *snode, bN
 	unsigned char color[4];
 	float alpha;
 	
-	UI_GetThemeColor4ubv(TH_NODE_FRAME, color);
-	alpha = (float)(color[3]) / 255.0f;
-	
 	/* skip if out of view */
 	if (node->totr.xmax < ar->v2d.cur.xmin || node->totr.xmin > ar->v2d.cur.xmax ||
 	    node->totr.ymax < ar->v2d.cur.ymin || node->totr.ymin > ar->v2d.cur.ymax) {
@@ -1014,6 +1014,9 @@ static void node_draw_frame(const bContext *C, ARegion *ar, SpaceNode *snode, bN
 		node->block = NULL;
 		return;
 	}
+
+	UI_GetThemeColor4ubv(TH_NODE_FRAME, color);
+	alpha = (float)(color[3]) / 255.0f;
 	
 	/* shadow */
 	node_draw_shadow(snode, node, BASIS_RAD, alpha);
@@ -2511,6 +2514,7 @@ static void node_composit_buts_keying(uiLayout *layout, bContext *UNUSED(C), Poi
 	uiItemR(layout, ptr, "blur_pre", 0, NULL, ICON_NONE);
 	uiItemR(layout, ptr, "screen_balance", 0, NULL, ICON_NONE);
 	uiItemR(layout, ptr, "despill_factor", 0, NULL, ICON_NONE);
+	uiItemR(layout, ptr, "despill_balance", 0, NULL, ICON_NONE);
 	uiItemR(layout, ptr, "edge_kernel_radius", 0, NULL, ICON_NONE);
 	uiItemR(layout, ptr, "edge_kernel_tolerance", 0, NULL, ICON_NONE);
 	uiItemR(layout, ptr, "clip_black", 0, NULL, ICON_NONE);
@@ -2519,6 +2523,41 @@ static void node_composit_buts_keying(uiLayout *layout, bContext *UNUSED(C), Poi
 	uiItemR(layout, ptr, "feather_falloff", 0, NULL, ICON_NONE);
 	uiItemR(layout, ptr, "feather_distance", 0, NULL, ICON_NONE);
 	uiItemR(layout, ptr, "blur_post", 0, NULL, ICON_NONE);
+}
+
+static void node_composit_buts_trackpos(uiLayout *layout, bContext *C, PointerRNA *ptr)
+{
+	bNode *node= ptr->data;
+
+	uiTemplateID(layout, C, ptr, "clip", NULL, "CLIP_OT_open", NULL);
+
+	if (node->id) {
+		MovieClip *clip = (MovieClip *) node->id;
+		MovieTracking *tracking = &clip->tracking;
+		MovieTrackingObject *object;
+		uiLayout *col;
+		PointerRNA tracking_ptr;
+		NodeTrackPosData *data = node->storage;
+
+		RNA_pointer_create(&clip->id, &RNA_MovieTracking, tracking, &tracking_ptr);
+
+		col = uiLayoutColumn(layout, 0);
+		uiItemPointerR(col, ptr, "tracking_object", &tracking_ptr, "objects", "", ICON_OBJECT_DATA);
+
+		object = BKE_tracking_object_get_named(tracking, data->tracking_object);
+		if (object) {
+			PointerRNA object_ptr;
+
+			RNA_pointer_create(&clip->id, &RNA_MovieTrackingObject, object, &object_ptr);
+
+			uiItemPointerR(col, ptr, "track_name", &object_ptr, "tracks", "", ICON_ANIM_DATA);
+		}
+		else {
+			uiItemR(layout, ptr, "track_name", 0, "", ICON_ANIM_DATA);
+		}
+
+		uiItemR(layout, ptr, "use_relative", 0, NULL, ICON_NONE);
+	}
 }
 
 /* only once called */
@@ -2718,6 +2757,9 @@ static void node_composit_set_butfunc(bNodeType *ntype)
 			break;
 		case CMP_NODE_KEYING:
 			ntype->uifunc = node_composit_buts_keying;
+			break;
+		case CMP_NODE_TRACKPOS:
+			ntype->uifunc = node_composit_buts_trackpos;
 			break;
 		default:
 			ntype->uifunc = NULL;

@@ -56,6 +56,7 @@ float area_quad_v3(const float a[3], const float b[3], const float c[3], const f
 float area_poly_v3(int nr, float verts[][3], const float normal[3]);
 
 int is_quad_convex_v3(const float v1[3], const float v2[3], const float v3[3], const float v4[3]);
+int is_quad_convex_v2(const float v1[2], const float v2[2], const float v3[2], const float v4[2]);
 
 /********************************* Distance **********************************/
 
@@ -201,6 +202,8 @@ void barycentric_transform(float pt_tar[3], float const pt_src[3],
 
 void barycentric_weights_v2(const float v1[2], const float v2[2], const float v3[2],
                             const float co[2], float w[3]);
+void barycentric_weights_v2_quad(const float v1[2], const float v2[2], const float v3[2], const float v4[2],
+                                 const float co[2], float w[4]);
 
 int barycentric_coords_v2(const float v1[2], const float v2[2], const float v3[2], const float co[2], float w[3]);
 int barycentric_inside_triangle_v2(const float w[3]);

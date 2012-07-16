@@ -162,52 +162,57 @@ float area_poly_v3(int nr, float verts[][3], const float normal[3])
 
 /********************************* Distance **********************************/
 
-/* distance v1 to line v2-v3
+/* distance p to line v1-v2
  * using Hesse formula, NO LINE PIECE! */
-float dist_to_line_v2(const float v1[2], const float v2[2], const float v3[2])
+float dist_to_line_v2(const float p[2], const float l1[2], const float l2[2])
 {
 	float a[2], deler;
 
-	a[0] = v2[1] - v3[1];
-	a[1] = v3[0] - v2[0];
+	a[0] = l1[1] - l2[1];
+	a[1] = l2[0] - l1[0];
 	deler = (float)sqrt(a[0] * a[0] + a[1] * a[1]);
 	if (deler == 0.0f) return 0;
 
-	return fabsf((v1[0] - v2[0]) * a[0] + (v1[1] - v2[1]) * a[1]) / deler;
+	return fabsf((p[0] - l1[0]) * a[0] + (p[1] - l1[1]) * a[1]) / deler;
 
 }
 
-/* distance v1 to line-piece v2-v3 */
-float dist_to_line_segment_v2(const float v1[2], const float v2[2], const float v3[2])
+/* distance p to line-piece v1-v2 */
+float dist_squared_to_line_segment_v2(const float p[2], const float l1[2], const float l2[2])
 {
 	float labda, rc[2], pt[2], len;
 
-	rc[0] = v3[0] - v2[0];
-	rc[1] = v3[1] - v2[1];
+	rc[0] = l2[0] - l1[0];
+	rc[1] = l2[1] - l1[1];
 	len = rc[0] * rc[0] + rc[1] * rc[1];
 	if (len == 0.0f) {
-		rc[0] = v1[0] - v2[0];
-		rc[1] = v1[1] - v2[1];
+		rc[0] = p[0] - l1[0];
+		rc[1] = p[1] - l1[1];
 		return (float)(sqrt(rc[0] * rc[0] + rc[1] * rc[1]));
 	}
 
-	labda = (rc[0] * (v1[0] - v2[0]) + rc[1] * (v1[1] - v2[1])) / len;
+	labda = (rc[0] * (p[0] - l1[0]) + rc[1] * (p[1] - l1[1])) / len;
 	if (labda <= 0.0f) {
-		pt[0] = v2[0];
-		pt[1] = v2[1];
+		pt[0] = l1[0];
+		pt[1] = l1[1];
 	}
 	else if (labda >= 1.0f) {
-		pt[0] = v3[0];
-		pt[1] = v3[1];
+		pt[0] = l2[0];
+		pt[1] = l2[1];
 	}
 	else {
-		pt[0] = labda * rc[0] + v2[0];
-		pt[1] = labda * rc[1] + v2[1];
+		pt[0] = labda * rc[0] + l1[0];
+		pt[1] = labda * rc[1] + l1[1];
 	}
 
-	rc[0] = pt[0] - v1[0];
-	rc[1] = pt[1] - v1[1];
-	return sqrtf(rc[0] * rc[0] + rc[1] * rc[1]);
+	rc[0] = pt[0] - p[0];
+	rc[1] = pt[1] - p[1];
+	return (rc[0] * rc[0] + rc[1] * rc[1]);
+}
+
+float dist_to_line_segment_v2(const float p[2], const float l1[2], const float l2[2])
+{
+	return sqrtf(dist_squared_to_line_segment_v2(p, l1, l2));
 }
 
 /* point closest to v1 on line v2-v3 in 2D */
@@ -311,6 +316,21 @@ int isect_line_line_v2_int(const int v1[2], const int v2[2], const int v3[2], co
 	}
 	return ISECT_LINE_LINE_NONE;
 }
+
+/* intersect Line-Line, floats - gives intersection point */
+int isect_line_line_v2_point(const float v1[2], const float v2[2], const float v3[2], const float v4[2], float vi[2])
+{
+	float div;
+
+	div = (v2[0] - v1[0]) * (v4[1] - v3[1]) - (v2[1] - v1[1]) * (v4[0] - v3[0]);
+	if (div == 0.0f) return ISECT_LINE_LINE_COLINEAR;
+
+	vi[0] = ((v3[0] - v4[0]) * (v1[0] * v2[1] - v1[1] * v2[0]) - (v1[0] - v2[0]) * (v3[0] * v4[1] - v3[1] * v4[0])) / div;
+	vi[1] = ((v3[1] - v4[1]) * (v1[0] * v2[1] - v1[1] * v2[0]) - (v1[1] - v2[1]) * (v3[0] * v4[1] - v3[1] * v4[0])) / div;
+
+	return ISECT_LINE_LINE_CROSS;
+}
+
 
 /* intersect Line-Line, floats */
 int isect_line_line_v2(const float v1[2], const float v2[2], const float v3[2], const float v4[2])
@@ -585,6 +605,20 @@ static short IsectLLPt2Df(const float x0, const float y0, const float x1, const 
 }
 
 /* point in tri */
+
+/* only single direction */
+int isect_point_tri_v2_cw(const float pt[2], const float v1[2], const float v2[2], const float v3[2])
+{
+	if (line_point_side_v2(v1, v2, pt) >= 0.0f) {
+		if (line_point_side_v2(v2, v3, pt) >= 0.0f) {
+			if (line_point_side_v2(v3, v1, pt) >= 0.0f) {
+				return 1;
+			}
+		}
+	}
+
+	return 0;
+}
 
 int isect_point_tri_v2(const float pt[2], const float v1[2], const float v2[2], const float v3[2])
 {
@@ -1943,34 +1977,44 @@ void barycentric_weights_v2(const float v1[2], const float v2[2], const float v3
 }
 
 /* same as #barycentric_weights_v2 but works with a quad,
- * note: untested for values outside the quad's bounds.
- * note: there may be a more efficient method to do this, just figured it out - campbell */
+ * note: untested for values outside the quad's bounds
+ * this is #interp_weights_poly_v2 expanded for quads only */
 void barycentric_weights_v2_quad(const float v1[2], const float v2[2], const float v3[2], const float v4[2],
                                  const float co[2], float w[4])
 {
-	float wtot;
+#define MEAN_VALUE_HALF_TAN_V2(_area, i1, i2) ((_area = cross_v2v2(dirs[i1], dirs[i2])) != 0.0f ? \
+	                                           (((lens[i1] * lens[i2]) - dot_v2v2(dirs[i1], dirs[i2])) / _area) : 0.0f)
 
-	const float areas_co[4] = {
-	    area_tri_signed_v2(v1, v2, co),
-	    area_tri_signed_v2(v2, v3, co),
-	    area_tri_signed_v2(v3, v4, co),
-	    area_tri_signed_v2(v4, v1, co),
+	float wtot, area;
+
+	const float dirs[4][2] = {
+	    {v1[0] - co[0], v1[1] - co[1]},
+	    {v2[0] - co[0], v2[1] - co[1]},
+	    {v3[0] - co[0], v3[1] - co[1]},
+	    {v4[0] - co[0], v4[1] - co[1]},
 	};
 
-	const float areas_diag[4] = {
-	    area_tri_signed_v2(v4, v1, v2),
-	    area_tri_signed_v2(v1, v2, v3),
-	    area_tri_signed_v2(v2, v3, v4),
-	    area_tri_signed_v2(v3, v4, v1),
+	const float lens[4] = {
+	    len_v2(dirs[0]),
+	    len_v2(dirs[1]),
+	    len_v2(dirs[2]),
+	    len_v2(dirs[3]),
 	};
 
-	const float u = areas_co[3] / (areas_co[1] + areas_co[3]);
-	const float v = areas_co[0] / (areas_co[0] + areas_co[2]);
+	/* inline mean_value_half_tan four times here */
+	float t[4] = {
+	    MEAN_VALUE_HALF_TAN_V2(area, 0, 1),
+	    MEAN_VALUE_HALF_TAN_V2(area, 1, 2),
+	    MEAN_VALUE_HALF_TAN_V2(area, 2, 3),
+	    MEAN_VALUE_HALF_TAN_V2(area, 3, 0),
+	};
 
-	w[0] = ((1.0f - u) * (1.0f - v)) * sqrtf(areas_diag[0] / areas_diag[2]);
-	w[1] = ((       u) * (1.0f - v)) * sqrtf(areas_diag[1] / areas_diag[3]);
-	w[2] = ((       u) * (       v)) * sqrtf(areas_diag[2] / areas_diag[0]);
-	w[3] = ((1.0f - u) * (       v)) * sqrtf(areas_diag[3] / areas_diag[1]);
+#undef MEAN_VALUE_HALF_TAN_V2
+
+	w[0] = (t[3] + t[0]) / lens[0];
+	w[1] = (t[0] + t[1]) / lens[1];
+	w[2] = (t[1] + t[2]) / lens[2];
+	w[3] = (t[2] + t[3]) / lens[3];
 
 	wtot = w[0] + w[1] + w[2] + w[3];
 
@@ -2114,7 +2158,7 @@ int interp_sparse_array(float *array, int const list_size, const float skipval)
 
 /* Mean value weights - smooth interpolation weights for polygons with
  * more than 3 vertices */
-static float mean_value_half_tan(const float v1[3], const float v2[3], const float v3[3])
+static float mean_value_half_tan_v3(const float v1[3], const float v2[3], const float v3[3])
 {
 	float d2[3], d3[3], cross[3], area, dot, len;
 
@@ -2126,14 +2170,37 @@ static float mean_value_half_tan(const float v1[3], const float v2[3], const flo
 	dot = dot_v3v3(d2, d3);
 	len = len_v3(d2) * len_v3(d3);
 
-	if (area == 0.0f)
-		return 0.0f;
-	else
+	if (LIKELY(area != 0.0f)) {
 		return (len - dot) / area;
+	}
+	else {
+		return 0.0f;
+	}
+}
+static float mean_value_half_tan_v2(const float v1[2], const float v2[2], const float v3[2])
+{
+	float d2[2], d3[2], area, dot, len;
+
+	sub_v2_v2v2(d2, v2, v1);
+	sub_v2_v2v2(d3, v3, v1);
+
+	/* different from the 3d version but still correct */
+	area = cross_v2v2(d2, d3);
+
+	dot = dot_v2v2(d2, d3);
+	len = len_v2(d2) * len_v2(d3);
+
+	if (LIKELY(area != 0.0f)) {
+		return (len - dot) / area;
+	}
+	else {
+		return 0.0f;
+	}
 }
 
 void interp_weights_poly_v3(float *w, float v[][3], const int n, const float co[3])
 {
+	/* TODO: t1 and t2 overlap each iter, we could call this only once per iter and reuse previous value */
 	float totweight, t1, t2, len, *vmid, *vprev, *vnext;
 	int i;
 
@@ -2144,17 +2211,47 @@ void interp_weights_poly_v3(float *w, float v[][3], const int n, const float co[
 		vprev = (i == 0) ? v[n - 1] : v[i - 1];
 		vnext = (i == n - 1) ? v[0] : v[i + 1];
 
-		t1 = mean_value_half_tan(co, vprev, vmid);
-		t2 = mean_value_half_tan(co, vmid, vnext);
+		t1 = mean_value_half_tan_v3(co, vprev, vmid);
+		t2 = mean_value_half_tan_v3(co, vmid, vnext);
 
 		len = len_v3v3(co, vmid);
 		w[i] = (t1 + t2) / len;
 		totweight += w[i];
 	}
 
-	if (totweight != 0.0f)
-		for (i = 0; i < n; i++)
+	if (totweight != 0.0f) {
+		for (i = 0; i < n; i++) {
 			w[i] /= totweight;
+		}
+	}
+}
+
+void interp_weights_poly_v2(float *w, float v[][2], const int n, const float co[2])
+{
+	/* TODO: t1 and t2 overlap each iter, we could call this only once per iter and reuse previous value */
+	float totweight, t1, t2, len, *vmid, *vprev, *vnext;
+	int i;
+
+	totweight = 0.0f;
+
+	for (i = 0; i < n; i++) {
+		vmid = v[i];
+		vprev = (i == 0) ? v[n - 1] : v[i - 1];
+		vnext = (i == n - 1) ? v[0] : v[i + 1];
+
+		t1 = mean_value_half_tan_v2(co, vprev, vmid);
+		t2 = mean_value_half_tan_v2(co, vmid, vnext);
+
+		len = len_v2v2(co, vmid);
+		w[i] = (t1 + t2) / len;
+		totweight += w[i];
+	}
+
+	if (totweight != 0.0f) {
+		for (i = 0; i < n; i++) {
+			w[i] /= totweight;
+		}
+	}
 }
 
 /* (x1,v1)(t1=0)------(x2,v2)(t2=1), 0<t<1 --> (x,v)(t) */

@@ -47,9 +47,16 @@
 
 #ifndef USE_RASKTER
 
-#define SPLINE_RESOL_CAP 32
-#define SPLINE_RESOL 32
-#define BUCKET_PIXELS_PER_CELL 8
+/* this is rather and annoying hack, use define to isolate it.
+ * problem is caused by scanfill removing edges on us. */
+#define USE_SCANFILL_EDGE_WORKAROUND
+
+#define SPLINE_RESOL_CAP_PER_PIXEL 2
+#define SPLINE_RESOL_CAP_MIN 8
+#define SPLINE_RESOL_CAP_MAX 64
+
+/* found this gives best performance for high detail masks, values between 2 and 8 work best */
+#define BUCKET_PIXELS_PER_CELL 4
 
 #define SF_EDGE_IS_BOUNDARY 0xff
 #define SF_KEYINDEX_TEMP_ID ((unsigned int) -1)
@@ -57,13 +64,52 @@
 #define TRI_TERMINATOR_ID   ((unsigned int) -1)
 #define TRI_VERT            ((unsigned int) -1)
 
+/* for debugging add... */
+#ifndef NDEBUG
+/* 	printf("%u %u %u %u\n", _t[0], _t[1], _t[2], _t[3]); \ */
+#  define FACE_ASSERT(face, vert_max)                    \
+{                                                        \
+	unsigned int *_t = face;                             \
+	BLI_assert(_t[0] < vert_max);                        \
+	BLI_assert(_t[1] < vert_max);                        \
+	BLI_assert(_t[2] < vert_max);                        \
+	BLI_assert(_t[3] < vert_max || _t[3] == TRI_VERT);   \
+} (void)0
+#else
+   /* do nothing */
+#  define FACE_ASSERT(face, vert_max)
+#endif
+
+static void rotate_point_v2(float r_p[2], const float p[2], const float cent[2], const float angle, const float asp[2])
+{
+	const float s = sinf(angle);
+	const float c = cosf(angle);
+	float p_new[2];
+
+	/* translate point back to origin */
+	r_p[0] = (p[0] - cent[0]) / asp[0];
+	r_p[1] = (p[1] - cent[1]) / asp[1];
+
+	/* rotate point */
+	p_new[0] = ((r_p[0] * c) - (r_p[1] * s)) * asp[0];
+	p_new[1] = ((r_p[0] * s) + (r_p[1] * c)) * asp[1];
+
+	/* translate point back */
+	r_p[0] = p_new[0] + cent[0];
+	r_p[1] = p_new[1] + cent[1];
+}
+
+BLI_INLINE unsigned int clampis_uint(const unsigned int v, const unsigned int min, const unsigned int max)
+{
+	return v < min ? min : (v > max ? max : v);
+}
 
 /* --------------------------------------------------------------------- */
 /* local structs for mask rasterizeing                                   */
 /* --------------------------------------------------------------------- */
 
 /**
- * A single #MaskRasterHandle contains multile #MaskRasterLayer's,
+ * A single #MaskRasterHandle contains multiple #MaskRasterLayer's,
  * each #MaskRasterLayer does its own lookup which contributes to
  * the final pixel with its own blending mode and the final pixel
  * is blended between these.
@@ -99,8 +145,14 @@ typedef struct MaskRasterLayer {
 } MaskRasterLayer;
 
 typedef struct MaskRasterSplineInfo {
+	/* body of the spline */
 	unsigned int vertex_offset;
 	unsigned int vertex_total;
+
+	/* capping for non-filled, non cyclic splines */
+	unsigned int vertex_total_cap_head;
+	unsigned int vertex_total_cap_tail;
+
 	unsigned int is_cyclic;
 } MaskRasterSplineInfo;
 
@@ -134,7 +186,6 @@ void BKE_maskrasterize_handle_free(MaskRasterHandle *mr_handle)
 	unsigned int i;
 	MaskRasterLayer *layer = mr_handle->layers;
 
-	/* raycast vars */
 	for (i = 0; i < layers_tot; i++, layer++) {
 
 		if (layer->face_array) {
@@ -225,7 +276,7 @@ void maskrasterize_spline_differentiate_point_outset(float (*diff_feather_points
 	}
 }
 
-/* this function is not exact, sometimes it retuns false positives,
+/* this function is not exact, sometimes it returns false positives,
  * the main point of it is to clear out _almost_ all bucket/face non-intersections,
  * returning TRUE in corner cases is ok but missing an intersection is NOT.
  *
@@ -471,8 +522,9 @@ void BKE_maskrasterize_handle_init(MaskRasterHandle *mr_handle, struct Mask *mas
                                    const short do_feather)
 {
 	const rctf default_bounds = {0.0f, 1.0f, 0.0f, 1.0f};
-	const int resol = SPLINE_RESOL;  /* TODO: real size */
 	const float pixel_size = 1.0f / MIN2(width, height);
+	const float asp_xy[2] = {(do_aspect_correct && width > height) ? (float)height / (float)width  : 1.0f,
+	                         (do_aspect_correct && width < height) ? (float)width  / (float)height : 1.0f};
 
 	const float zvec[3] = {0.0f, 0.0f, 1.0f};
 	MaskLayer *masklay;
@@ -500,10 +552,15 @@ void BKE_maskrasterize_handle_init(MaskRasterHandle *mr_handle, struct Mask *mas
 		unsigned int sf_vert_tot = 0;
 		unsigned int tot_feather_quads = 0;
 
-		if (masklay->restrictflag & MASK_RESTRICT_RENDER || masklay->alpha == 0.0f) {
-			MaskRasterLayer *layer = &mr_handle->layers[masklay_index];
-			layer_bucket_init_dummy(layer);
-			layer->alpha = 0.0f; /* signal to skip this layer */
+#ifdef USE_SCANFILL_EDGE_WORKAROUND
+		unsigned int tot_boundary_used = 0;
+		unsigned int tot_boundary_found = 0;
+#endif
+
+		if (masklay->restrictflag & MASK_RESTRICT_RENDER) {
+			/* skip the layer */
+			mr_handle->layers_tot--;
+			masklay_index--;
 			continue;
 		}
 
@@ -522,12 +579,17 @@ void BKE_maskrasterize_handle_init(MaskRasterHandle *mr_handle, struct Mask *mas
 			float (*diff_feather_points)[2];
 			int tot_diff_feather_points;
 
+			const int resol_a = BKE_mask_spline_resolution(spline, width, height) / 4;
+			const int resol_b = BKE_mask_spline_feather_resolution(spline, width, height) / 4;
+			const int resol = CLAMPIS(MAX2(resol_a, resol_b), 4, 512);
+
 			diff_points = BKE_mask_spline_differentiate_with_resolution_ex(
-			                  spline, resol, &tot_diff_point);
+			                  spline, &tot_diff_point, resol);
 
 			if (do_feather) {
 				diff_feather_points = BKE_mask_spline_feather_differentiated_points_with_resolution_ex(
-				                          spline, resol, &tot_diff_feather_points);
+				                          spline, &tot_diff_feather_points, resol, TRUE);
+				BLI_assert(diff_feather_points);
 			}
 			else {
 				tot_diff_feather_points = 0;
@@ -609,8 +671,15 @@ void BKE_maskrasterize_handle_init(MaskRasterHandle *mr_handle, struct Mask *mas
 
 					for (j = 0; j < tot_diff_point; j++) {
 						ScanFillEdge *sf_edge = BLI_scanfill_edge_add(&sf_ctx, sf_vert_prev, sf_vert);
-						sf_edge->tmp.c = SF_EDGE_IS_BOUNDARY;
 
+#ifdef USE_SCANFILL_EDGE_WORKAROUND
+						if (diff_feather_points) {
+							sf_edge->tmp.c = SF_EDGE_IS_BOUNDARY;
+							tot_boundary_used++;
+						}
+#else
+						(void)sf_edge;
+#endif
 						sf_vert_prev = sf_vert;
 						sf_vert = sf_vert->next;
 					}
@@ -650,9 +719,6 @@ void BKE_maskrasterize_handle_init(MaskRasterHandle *mr_handle, struct Mask *mas
 
 						open_spline_ranges[open_spline_index].vertex_offset = sf_vert_tot;
 						open_spline_ranges[open_spline_index].vertex_total = tot_diff_point;
-						open_spline_ranges[open_spline_index].is_cyclic = is_cyclic;
-						open_spline_index++;
-
 
 						/* TODO, an alternate functions so we can avoid double vector copy! */
 						for (j = 0; j < tot_diff_point; j++) {
@@ -688,10 +754,69 @@ void BKE_maskrasterize_handle_init(MaskRasterHandle *mr_handle, struct Mask *mas
 							tot_feather_quads -= 2;
 						}
 
-						/* ack these are infact tris, but they are extra faces so no matter,
-						 * +1 becausing adding one vert results in 2 tris (joining the existing endpoints)
-						 */
-						// tot_feather_quads + ((SPLINE_RESOL_CAP + 1) * 2);
+						/* cap ends */
+
+						/* dummy init value */
+						open_spline_ranges[open_spline_index].vertex_total_cap_head = 0;
+						open_spline_ranges[open_spline_index].vertex_total_cap_tail = 0;
+
+						if (!is_cyclic) {
+							float *fp_cent;
+							float *fp_turn;
+
+							unsigned int k;
+
+							fp_cent = diff_points[0];
+							fp_turn = diff_feather_points[0];
+
+#define CALC_CAP_RESOL                                                                      \
+	clampis_uint((len_v2v2(fp_cent, fp_turn) / (pixel_size * SPLINE_RESOL_CAP_PER_PIXEL)),  \
+	             SPLINE_RESOL_CAP_MIN,                                                      \
+	             SPLINE_RESOL_CAP_MAX)
+
+							{
+								const unsigned int vertex_total_cap = CALC_CAP_RESOL;
+
+								for (k = 1; k < vertex_total_cap; k++) {
+									const float angle = (float)k * (1.0f / vertex_total_cap) * (float)M_PI;
+									rotate_point_v2(co_feather, fp_turn, fp_cent, angle, asp_xy);
+
+									sf_vert = BLI_scanfill_vert_add(&sf_ctx, co_feather);
+									sf_vert->tmp.u = sf_vert_tot;
+									sf_vert->keyindex = SF_KEYINDEX_TEMP_ID;
+									sf_vert_tot++;
+								}
+								tot_feather_quads += vertex_total_cap;
+
+								open_spline_ranges[open_spline_index].vertex_total_cap_head = vertex_total_cap;
+							}
+
+							fp_cent = diff_points[tot_diff_point - 1];
+							fp_turn = diff_feather_points[tot_diff_point - 1];
+
+							{
+								const unsigned int vertex_total_cap = CALC_CAP_RESOL;
+
+								for (k = 1; k < vertex_total_cap; k++) {
+									const float angle = (float)k * (1.0f / vertex_total_cap) * (float)M_PI;
+									rotate_point_v2(co_feather, fp_turn, fp_cent, -angle, asp_xy);
+
+									sf_vert = BLI_scanfill_vert_add(&sf_ctx, co_feather);
+									sf_vert->tmp.u = sf_vert_tot;
+									sf_vert->keyindex = SF_KEYINDEX_TEMP_ID;
+									sf_vert_tot++;
+								}
+								tot_feather_quads += vertex_total_cap;
+
+								open_spline_ranges[open_spline_index].vertex_total_cap_tail = vertex_total_cap;
+							}
+						}
+
+						open_spline_ranges[open_spline_index].is_cyclic = is_cyclic;
+						open_spline_index++;
+
+#undef CALC_CAP_RESOL
+						/* end capping */
 
 					}
 				}
@@ -725,7 +850,7 @@ void BKE_maskrasterize_handle_init(MaskRasterHandle *mr_handle, struct Mask *mas
 				sf_vert_next = sf_vert->next;
 				copy_v3_v3(cos, sf_vert->co);
 
-				/* remove so as not to interfear with fill (called after) */
+				/* remove so as not to interfere with fill (called after) */
 				if (sf_vert->keyindex == SF_KEYINDEX_TEMP_ID) {
 					BLI_remlink(&sf_ctx.fillvertbase, sf_vert);
 				}
@@ -736,18 +861,21 @@ void BKE_maskrasterize_handle_init(MaskRasterHandle *mr_handle, struct Mask *mas
 				cos += 3;
 			}
 
-			/* main scanfill */
+			/* main scan-fill */
 			sf_tri_tot = BLI_scanfill_calc_ex(&sf_ctx, FALSE, zvec);
 
 			face_array = MEM_mallocN(sizeof(*face_array) * (sf_tri_tot + tot_feather_quads), "maskrast_face_index");
+			face_index = 0;
 
-			/* tri's */
+			/* faces */
 			face = (unsigned int *)face_array;
-			for (sf_tri = sf_ctx.fillfacebase.first, face_index = 0; sf_tri; sf_tri = sf_tri->next, face_index++) {
+			for (sf_tri = sf_ctx.fillfacebase.first; sf_tri; sf_tri = sf_tri->next) {
 				*(face++) = sf_tri->v3->tmp.u;
 				*(face++) = sf_tri->v2->tmp.u;
 				*(face++) = sf_tri->v1->tmp.u;
 				*(face++) = TRI_VERT;
+				face_index++;
+				FACE_ASSERT(face - 4, sf_vert_tot);
 			}
 
 			/* start of feather faces... if we have this set,
@@ -764,68 +892,156 @@ void BKE_maskrasterize_handle_init(MaskRasterHandle *mr_handle, struct Mask *mas
 						*(face++) = sf_edge->v2->tmp.u;
 						*(face++) = sf_edge->v2->keyindex;
 						*(face++) = sf_edge->v1->keyindex;
-
 						face_index++;
+						FACE_ASSERT(face - 4, sf_vert_tot);
+
+#ifdef USE_SCANFILL_EDGE_WORKAROUND
+						tot_boundary_found++;
+#endif
 					}
 				}
 			}
 
+#ifdef USE_SCANFILL_EDGE_WORKAROUND
+			if (tot_boundary_found != tot_boundary_used) {
+				BLI_assert(tot_boundary_found < tot_boundary_used);
+			}
+#endif
+
 			/* feather only splines */
 			while (open_spline_index > 0) {
-				unsigned int start_vidx          = open_spline_ranges[--open_spline_index].vertex_offset;
-				unsigned int tot_diff_point_sub1 = open_spline_ranges[  open_spline_index].vertex_total - 1;
+				const unsigned int vertex_offset         = open_spline_ranges[--open_spline_index].vertex_offset;
+				unsigned int       vertex_total          = open_spline_ranges[  open_spline_index].vertex_total;
+				unsigned int       vertex_total_cap_head = open_spline_ranges[  open_spline_index].vertex_total_cap_head;
+				unsigned int       vertex_total_cap_tail = open_spline_ranges[  open_spline_index].vertex_total_cap_tail;
 				unsigned int k, j;
 
-				j = start_vidx;
+				j = vertex_offset;
 
 				/* subtract one since we reference next vertex triple */
-				for (k = 0; k < tot_diff_point_sub1; k++, j += 3) {
+				for (k = 0; k < vertex_total - 1; k++, j += 3) {
 
-					BLI_assert(j == start_vidx + (k * 3));
+					BLI_assert(j == vertex_offset + (k * 3));
 
 					*(face++) = j + 3; /* next span */ /* z 1 */
 					*(face++) = j + 0;                 /* z 1 */
 					*(face++) = j + 1;                 /* z 0 */
 					*(face++) = j + 4; /* next span */ /* z 0 */
-
 					face_index++;
+					FACE_ASSERT(face - 4, sf_vert_tot);
 
 					*(face++) = j + 0;                 /* z 1 */
 					*(face++) = j + 3; /* next span */ /* z 1 */
 					*(face++) = j + 5; /* next span */ /* z 0 */
 					*(face++) = j + 2;                 /* z 0 */
-
 					face_index++;
+					FACE_ASSERT(face - 4, sf_vert_tot);
 				}
 
 				if (open_spline_ranges[open_spline_index].is_cyclic) {
-					*(face++) = start_vidx + 0; /* next span */ /* z 1 */
-					*(face++) = j          + 0;                 /* z 1 */
-					*(face++) = j          + 1;                 /* z 0 */
-					*(face++) = start_vidx + 1; /* next span */ /* z 0 */
-
+					*(face++) = vertex_offset + 0; /* next span */ /* z 1 */
+					*(face++) = j             + 0;                 /* z 1 */
+					*(face++) = j             + 1;                 /* z 0 */
+					*(face++) = vertex_offset + 1; /* next span */ /* z 0 */
 					face_index++;
+					FACE_ASSERT(face - 4, sf_vert_tot);
 
-					*(face++) = j          + 0;                 /* z 1 */
-					*(face++) = start_vidx + 0; /* next span */ /* z 1 */
-					*(face++) = start_vidx + 2; /* next span */ /* z 0 */
-					*(face++) = j          + 2;                 /* z 0 */
-
+					*(face++) = j          + 0;                    /* z 1 */
+					*(face++) = vertex_offset + 0; /* next span */ /* z 1 */
+					*(face++) = vertex_offset + 2; /* next span */ /* z 0 */
+					*(face++) = j          + 2;                    /* z 0 */
 					face_index++;
+					FACE_ASSERT(face - 4, sf_vert_tot);
+				}
+				else {
+					unsigned int midvidx = vertex_offset;
+
+					/***************
+					 * cap end 'a' */
+					j = midvidx + (vertex_total * 3);
+
+					for (k = 0; k < vertex_total_cap_head - 2; k++, j++) {
+						*(face++) = midvidx + 0;  /* z 1 */
+						*(face++) = midvidx + 0;  /* z 1 */
+						*(face++) = j + 0;        /* z 0 */
+						*(face++) = j + 1;        /* z 0 */
+						face_index++;
+						FACE_ASSERT(face - 4, sf_vert_tot);
+					}
+
+					j = vertex_offset + (vertex_total * 3);
+
+					/* 2 tris that join the original */
+					*(face++) = midvidx + 0;  /* z 1 */
+					*(face++) = midvidx + 0;  /* z 1 */
+					*(face++) = midvidx + 1;  /* z 0 */
+					*(face++) = j + 0;        /* z 0 */
+					face_index++;
+					FACE_ASSERT(face - 4, sf_vert_tot);
+
+					*(face++) = midvidx + 0;                    /* z 1 */
+					*(face++) = midvidx + 0;                    /* z 1 */
+					*(face++) = j + vertex_total_cap_head - 2;  /* z 0 */
+					*(face++) = midvidx + 2;                    /* z 0 */
+					face_index++;
+					FACE_ASSERT(face - 4, sf_vert_tot);
+
+
+					/***************
+					 * cap end 'b' */
+					/* ... same as previous but v 2-3 flipped, and different initial offsets */
+
+					j = vertex_offset + (vertex_total * 3) + (vertex_total_cap_head - 1);
+
+					midvidx = vertex_offset + (vertex_total * 3) - 3;
+
+					for (k = 0; k < vertex_total_cap_tail - 2; k++, j++) {
+						*(face++) = midvidx;  /* z 1 */
+						*(face++) = midvidx;  /* z 1 */
+						*(face++) = j + 1;    /* z 0 */
+						*(face++) = j + 0;    /* z 0 */
+						face_index++;
+						FACE_ASSERT(face - 4, sf_vert_tot);
+					}
+
+					j = vertex_offset + (vertex_total * 3) + (vertex_total_cap_head - 1);
+
+					/* 2 tris that join the original */
+					*(face++) = midvidx + 0;  /* z 1 */
+					*(face++) = midvidx + 0;  /* z 1 */
+					*(face++) = j + 0;        /* z 0 */
+					*(face++) = midvidx + 1;  /* z 0 */
+					face_index++;
+					FACE_ASSERT(face - 4, sf_vert_tot);
+
+					*(face++) = midvidx + 0;                    /* z 1 */
+					*(face++) = midvidx + 0;                    /* z 1 */
+					*(face++) = midvidx + 2;                    /* z 0 */
+					*(face++) = j + vertex_total_cap_tail - 2;  /* z 0 */
+					face_index++;
+					FACE_ASSERT(face - 4, sf_vert_tot);
+
 				}
 			}
 
 			MEM_freeN(open_spline_ranges);
 
-			// fprintf(stderr, "%d %d\n", face_index, sf_face_tot + tot_feather_quads);
+//			fprintf(stderr, "%u %u (%u %u), %u\n", face_index, sf_tri_tot + tot_feather_quads, sf_tri_tot, tot_feather_quads, tot_boundary_used - tot_boundary_found);
 
+#ifdef USE_SCANFILL_EDGE_WORKAROUND
+			BLI_assert(face_index + (tot_boundary_used - tot_boundary_found) == sf_tri_tot + tot_feather_quads);
+#else
 			BLI_assert(face_index == sf_tri_tot + tot_feather_quads);
-
+#endif
 			{
 				MaskRasterLayer *layer = &mr_handle->layers[masklay_index];
 
 				if (BLI_rctf_isect(&default_bounds, &bounds, &bounds)) {
-					layer->face_tot = sf_tri_tot + tot_feather_quads;
+#ifdef USE_SCANFILL_EDGE_WORKAROUND
+					layer->face_tot = (sf_tri_tot + tot_feather_quads) - (tot_boundary_used - tot_boundary_found);
+#else
+					layer->face_tot = (sf_tri_tot + tot_feather_quads);
+#endif
 					layer->face_coords = face_coords;
 					layer->face_array  = face_array;
 					layer->bounds = bounds;
@@ -999,11 +1215,7 @@ float BKE_maskrasterize_handle_sample(MaskRasterHandle *mr_handle, const float x
 		float value_layer;
 
 		/* also used as signal for unused layer (when render is disabled) */
-		if (layer->alpha == 0.0f) {
-			continue;
-		}
-
-		if (BLI_in_rctf_v(&layer->bounds, xy)) {
+		if (layer->alpha != 0.0f && BLI_in_rctf_v(&layer->bounds, xy)) {
 			value_layer = 1.0f - layer_bucket_depth_from_xy(layer, xy);
 
 			switch (layer->falloff) {
@@ -1057,14 +1269,21 @@ float BKE_maskrasterize_handle_sample(MaskRasterHandle *mr_handle, const float x
 			case MASK_BLEND_REPLACE:
 				value = (value * (1.0f - layer->alpha)) + (value_layer * layer->alpha);
 				break;
+			case MASK_BLEND_DIFFERENCE:
+				value = fabsf(value - value_layer);
+				break;
 			default: /* same as add */
 				BLI_assert(0);
 				value += value_layer;
 				break;
 		}
+
+		/* clamp after applying each layer so we don't get
+		 * issues subtracting after accumulating over 1.0f */
+		CLAMP(value, 0.0f, 1.0f);
 	}
 
-	return CLAMPIS(value, 0.0f, 1.0f);
+	return value;
 }
 
 #endif /* USE_RASKTER */

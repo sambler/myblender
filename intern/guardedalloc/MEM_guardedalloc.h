@@ -104,7 +104,7 @@ extern "C" {
 	void *MEM_reallocN(void *vmemh, size_t len)
 #ifdef __GNUC__
 	__attribute__((warn_unused_result))
-	__attribute__((alloc_size(2)))
+//	__attribute__((alloc_size(2)))
 #endif
 	;
 
@@ -116,7 +116,7 @@ extern "C" {
 #ifdef __GNUC__
 	__attribute__((warn_unused_result))
 	__attribute__((nonnull(2)))
-	__attribute__((alloc_size(1)))
+//	__attribute__((alloc_size(1)))
 #endif
 	;
 
@@ -128,7 +128,7 @@ extern "C" {
 #ifdef __GNUC__
 	__attribute__((warn_unused_result))
 	__attribute__((nonnull(2)))
-	__attribute__((alloc_size(1)))
+//	__attribute__((alloc_size(1)))
 #endif
 	;
 
@@ -140,7 +140,7 @@ extern "C" {
 #ifdef __GNUC__
 	__attribute__((warn_unused_result))
 	__attribute__((nonnull(2)))
-	__attribute__((alloc_size(1)))
+//	__attribute__((alloc_size(1)))
 #endif
 	;
 

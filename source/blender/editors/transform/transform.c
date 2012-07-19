@@ -29,7 +29,6 @@
  *  \ingroup edtransform
  */
 
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -37,9 +36,9 @@
 #include <float.h>
 
 #ifndef WIN32
-#include <unistd.h>
+#  include <unistd.h>
 #else
-#include <io.h>
+#  include <io.h>
 #endif
 
 #include "MEM_guardedalloc.h"
@@ -89,10 +88,6 @@
 #include "BLI_array.h"
 
 #include "UI_resources.h"
-
-//#include "blendef.h"
-//
-//#include "mydevice.h"
 
 #include "transform.h"
 
@@ -174,8 +169,14 @@ void convertViewVec(TransInfo *t, float r_vec[3], int dx, int dy)
 
 		if (t->options & CTX_MASK) {
 			/* clamp w/h, mask only */
-			divx = divy = maxf(divx, divy);
-			mulx = muly = minf(mulx, muly);
+			if (mulx / divx < muly / divy) {
+				divx = divy = divx;
+				mulx = muly = mulx;
+			}
+			else {
+				divx = divy = divy;
+				mulx = muly = muly;
+			}
 		}
 
 		r_vec[0] = mulx * (dx) / divx;
@@ -4706,7 +4707,7 @@ static int createSlideVerts(TransInfo *t)
 	float projectMat[4][4];
 	float mval[2] = {(float)t->mval[0], (float)t->mval[1]};
 	float start[3] = {0.0f, 0.0f, 0.0f}, dir[3], end[3] = {0.0f, 0.0f, 0.0f};
-	float vec[3], vec2[3], lastvec[3] /*, size, dis=0.0, z */ /* UNUSED */;
+	float vec[3], vec2[3] /*, lastvec[3], size, dis=0.0, z */ /* UNUSED */;
 	int numsel, i, j;
 
 	if (t->spacetype == SPACE_VIEW3D) {
@@ -4894,7 +4895,7 @@ static int createSlideVerts(TransInfo *t)
 		} while (e != first->e && l1);
 	}
 
-	//EDBM_flag_disable_all(em, BM_ELEM_SELECT);
+	/* EDBM_flag_disable_all(em, BM_ELEM_SELECT); */
 
 	sld->sv = sv_array;
 	sld->totsv = j;
@@ -4902,14 +4903,15 @@ static int createSlideVerts(TransInfo *t)
 	/*find mouse vector*/
 	/* dis = z = -1.0f; */ /* UNUSED */
 	/* size = 50.0; */ /* UNUSED */
-	zero_v3(lastvec); zero_v3(dir);
+	/* zero_v3(lastvec); */ /* UNUSED */
+	zero_v3(dir);
 	/* ee = le = NULL; */ /* UNUSED */
 	BM_ITER_MESH (e, &iter, bm, BM_EDGES_OF_MESH) {
 		if (BM_elem_flag_test(e, BM_ELEM_SELECT)) {
 			BMIter iter2;
 			BMEdge *e2;
 			float vec1[3], dis2, mval[2] = {t->mval[0], t->mval[1]}, d;
-						
+
 			/* search cross edges for visible edge to the mouse cursor,
 			 * then use the shared vertex to calculate screen vector*/
 			dis2 = -1.0f;
@@ -4918,10 +4920,12 @@ static int createSlideVerts(TransInfo *t)
 				BM_ITER_ELEM (e2, &iter2, v, BM_EDGES_OF_VERT) {
 					if (BM_elem_flag_test(e2, BM_ELEM_SELECT))
 						continue;
-					
-					if (v3d && !BMBVH_EdgeVisible(btree, e2, ar, v3d, t->obedit))
+
+					/* This test is only relevant if object is not wire-drawn! See [#32068]. */
+					if (v3d && t->obedit->dt > OB_WIRE && v3d->drawtype > OB_WIRE &&
+					    !BMBVH_EdgeVisible(btree, e2, ar, v3d, t->obedit))
 						continue;
-					
+
 					j = GET_INT_FROM_POINTER(BLI_smallhash_lookup(&table, (uintptr_t)v));
 
 					if (sv_array[j].down) {

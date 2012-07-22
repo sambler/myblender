@@ -110,7 +110,7 @@ static BezTriple *mask_spline_point_prev_bezt(MaskSpline *spline, MaskSplinePoin
 		if (spline->flag & MASK_SPLINE_CYCLIC) {
 			return &(points_array[0].bezt);
 		}
-		else  {
+		else {
 			return NULL;
 		}
 	}
@@ -541,6 +541,8 @@ static void spline_feather_collapse_inner_loops(MaskSpline *spline, float (*feat
 		int next = i + 1;
 		float delta;
 
+		DO_MINMAX2(feather_points[i], min, max);
+
 		if (next == tot_feather_point) {
 			if (spline->flag & MASK_SPLINE_CYCLIC)
 				next = 0;
@@ -555,16 +557,27 @@ static void spline_feather_collapse_inner_loops(MaskSpline *spline, float (*feat
 		delta = fabsf(feather_points[i][1] - feather_points[next][1]);
 		if (delta > max_delta_y)
 			max_delta_y = delta;
+	}
 
-		DO_MINMAX2(feather_points[i], min, max);
+	/* prevent divisionsby zero by ensuring bounding box is not collapsed */
+	if (max[0] - min[0] < FLT_EPSILON) {
+		max[0] += 0.01f;
+		min[0] -= 0.01f;
+	}
+
+	if (max[1] - min[1] < FLT_EPSILON) {
+		max[1] += 0.01f;
+		min[1] -= 0.01f;
 	}
 
 	/* use dynamically calculated buckets per side, so we likely wouldn't
 	 * run into a situation when segment doesn't fit two buckets which is
 	 * pain collecting candidates for intersection
 	 */
+
 	max_delta_x /= max[0] - min[0];
 	max_delta_y /= max[1] - min[1];
+
 	max_delta = MAX2(max_delta_x, max_delta_y);
 
 	buckets_per_side = MIN2(512, 0.9f / max_delta);
@@ -2597,7 +2610,7 @@ void BKE_mask_rasterize_layers(ListBase *masklayers, int width, int height, floa
 			}
 		}
 
-		if(do_mask_aa){
+		if (do_mask_aa) {
 			//PLX_antialias_buffer(buffer,width,height);
 		}
 		/* clamp at the end */
@@ -2607,7 +2620,8 @@ void BKE_mask_rasterize_layers(ListBase *masklayers, int width, int height, floa
 }
 
 #ifdef __PLX_RASKTER_MT__
-void BKE_mask_init_layers(Mask *mask, struct layer_init_data *mlayer_data, int width, int height, const short do_aspect_correct){
+void BKE_mask_init_layers(Mask *mask, struct layer_init_data *mlayer_data, int width, int height, const short do_aspect_correct)
+{
 	MaskLayer *masklay;
 	int numLayers=0;
 	int currLayer=0;

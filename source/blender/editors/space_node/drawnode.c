@@ -217,16 +217,20 @@ static void node_draw_output_default(const bContext *C, uiBlock *block,
 	float slen;
 	int ofs = 0;
 	const char *ui_name = IFACE_(name);
+	int len = strlen(ui_name);
 	UI_ThemeColor(TH_TEXT);
 	slen = (UI_GetStringWidth(ui_name) + NODE_MARGIN_X) * snode->aspect_sqrt;
-	while (slen > node->width) {
+	while (slen > node->width && ofs < len) {
 		ofs++;
 		slen = (UI_GetStringWidth(ui_name + ofs) + NODE_MARGIN_X) * snode->aspect_sqrt;
 	}
-	uiDefBut(block, LABEL, 0, ui_name + ofs,
-	         (int)(sock->locx - slen), (int)(sock->locy - 9.0f),
-	         (short)(node->width - NODE_DY), (short)NODE_DY,
-	         NULL, 0, 0, 0, 0, "");
+
+	if (ofs < len) {
+		uiDefBut(block, LABEL, 0, ui_name + ofs,
+		         (int)(sock->locx - slen), (int)(sock->locy - 9.0f),
+		         (short)(node->width - NODE_DY), (short)NODE_DY,
+		         NULL, 0, 0, 0, 0, "");
+	}
 
 	(void)snode;
 }
@@ -2490,10 +2494,24 @@ static void node_composit_buts_viewer_but(uiLayout *layout, bContext *UNUSED(C),
 
 static void node_composit_buts_mask(uiLayout *layout, bContext *C, PointerRNA *ptr)
 {
+	bNode *node = ptr->data;
+
 	uiTemplateID(layout, C, ptr, "mask", NULL, NULL, NULL);
 	uiItemR(layout, ptr, "use_antialiasing", 0, NULL, ICON_NONE);
 	uiItemR(layout, ptr, "use_feather", 0, NULL, ICON_NONE);
 
+	uiItemR(layout, ptr, "size_source", 0, "", ICON_NONE);
+
+	if (node->custom1 & (CMP_NODEFLAG_MASK_FIXED | CMP_NODEFLAG_MASK_FIXED_SCENE)) {
+		uiItemR(layout, ptr, "size_x", 0, NULL, ICON_NONE);
+		uiItemR(layout, ptr, "size_y", 0, NULL, ICON_NONE);
+	}
+
+	uiItemR(layout, ptr, "use_motion_blur", 0, NULL, ICON_NONE);
+	if (node->custom1 & CMP_NODEFLAG_MASK_MOTION_BLUR) {
+		uiItemR(layout, ptr, "motion_blur_samples", 0, NULL, ICON_NONE);
+		uiItemR(layout, ptr, "motion_blur_shutter", 0, NULL, ICON_NONE);
+	}
 }
 
 static void node_composit_buts_keyingscreen(uiLayout *layout, bContext *C, PointerRNA *ptr)
@@ -2563,7 +2581,11 @@ static void node_composit_buts_trackpos(uiLayout *layout, bContext *C, PointerRN
 			uiItemR(layout, ptr, "track_name", 0, "", ICON_ANIM_DATA);
 		}
 
-		uiItemR(layout, ptr, "use_relative", 0, NULL, ICON_NONE);
+		uiItemR(layout, ptr, "position", 0, NULL, ICON_NONE);
+
+		if (node->custom1 == 2) {
+			uiItemR(layout, ptr, "relative_frame", 0, NULL, ICON_NONE);
+		}
 	}
 }
 

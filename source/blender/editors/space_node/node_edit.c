@@ -796,8 +796,15 @@ void snode_make_group_editable(SpaceNode *snode, bNode *gnode)
 	bNode *node;
 	
 	/* make sure nothing has group editing on */
-	for (node = snode->nodetree->nodes.first; node; node = node->next)
+	for (node = snode->nodetree->nodes.first; node; node = node->next) {
 		nodeGroupEditClear(node);
+
+		/* while we're here, clear texture active */
+		if (node->typeinfo->nclass == NODE_CLASS_TEXTURE) {
+			/* this is not 100% sure to be reliable, see comment on the flag */
+			node->flag &= ~NODE_ACTIVE_TEXTURE;
+		}
+	}
 	
 	if (gnode == NULL) {
 		/* with NULL argument we do a toggle */
@@ -809,8 +816,14 @@ void snode_make_group_editable(SpaceNode *snode, bNode *gnode)
 		snode->edittree = nodeGroupEditSet(gnode, 1);
 		
 		/* deselect all other nodes, so we can also do grabbing of entire subtree */
-		for (node = snode->nodetree->nodes.first; node; node = node->next)
+		for (node = snode->nodetree->nodes.first; node; node = node->next) {
 			node_deselect(node);
+
+			if (node->typeinfo->nclass == NODE_CLASS_TEXTURE) {
+				/* this is not 100% sure to be reliable, see comment on the flag */
+				node->flag &= ~NODE_ACTIVE_TEXTURE;
+			}
+		}
 		node_select(gnode);
 	}
 	else 
@@ -1562,8 +1575,6 @@ static int snode_bg_viewmove_modal(bContext *C, wmOperator *op, wmEvent *event)
 			
 			MEM_freeN(nvm);
 			op->customdata = NULL;
-
-			WM_event_add_notifier(C, NC_SPACE | ND_SPACE_NODE, NULL);
 			
 			return OPERATOR_FINISHED;
 	}
@@ -4300,7 +4311,7 @@ static int node_add_file_exec(bContext *C, wmOperator *op)
 		ima = BKE_image_load_exists(path);
 
 		if (!ima) {
-			BKE_reportf(op->reports, RPT_ERROR, "Can't read: \"%s\", %s", path, errno ? strerror(errno) : "Unsupported image format");
+			BKE_reportf(op->reports, RPT_ERROR, "Can't read image: \"%s\", %s", path, errno ? strerror(errno) : "Unsupported format");
 			return OPERATOR_CANCELLED;
 		}
 	}
@@ -4341,6 +4352,7 @@ static int node_add_file_exec(bContext *C, wmOperator *op)
 	}
 	
 	node->id = (ID *)ima;
+	id_us_plus(node->id);
 	
 	snode_notify(C, snode);
 	snode_dag_update(C, snode);

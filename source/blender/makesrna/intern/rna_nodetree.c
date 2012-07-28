@@ -206,6 +206,30 @@ EnumPropertyItem prop_wave_items[] = {
 #include "DNA_scene_types.h"
 #include "WM_api.h"
 
+static void rna_Node_custom3_set_as_int(PointerRNA *ptr, int value)
+{
+	bNode *node = (bNode *)ptr->data;
+	node->custom3 = value;
+}
+
+static int rna_Node_custom3_get_as_int(PointerRNA *ptr)
+{
+	bNode *node = (bNode *)ptr->data;
+	return (int)node->custom3;
+}
+
+static void rna_Node_custom4_set_as_int(PointerRNA *ptr, int value)
+{
+	bNode *node = (bNode *)ptr->data;
+	node->custom4 = value;
+}
+
+static int rna_Node_custom4_get_as_int(PointerRNA *ptr)
+{
+	bNode *node = (bNode *)ptr->data;
+	return (int)node->custom4;
+}
+
 static StructRNA *rna_Node_refine(struct PointerRNA *ptr)
 {
 	bNode *node = (bNode *)ptr->data;
@@ -3137,6 +3161,13 @@ static void def_cmp_mask(StructRNA *srna)
 {
 	PropertyRNA *prop;
 
+	static EnumPropertyItem aspect_type_items[] = {
+		{0, "SCENE",   0, "Scene Size",   ""},
+		{CMP_NODEFLAG_MASK_FIXED, "FIXED",   0, "Fixed",   "Use pixel size for the buffer"},
+		{CMP_NODEFLAG_MASK_FIXED_SCENE, "FIXED_SCENE",   0, "Fixed/Scene", "Pixel size scaled by scene percentage"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
 	prop = RNA_def_property(srna, "mask", PROP_POINTER, PROP_NONE);
 	RNA_def_property_pointer_sdna(prop, NULL, "id");
 	RNA_def_property_struct_type(prop, "Mask");
@@ -3151,6 +3182,43 @@ static void def_cmp_mask(StructRNA *srna)
 	prop = RNA_def_property(srna, "use_feather", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_negative_sdna(prop, NULL, "custom1", CMP_NODEFLAG_MASK_NO_FEATHER);
 	RNA_def_property_ui_text(prop, "Feather", "Use feather information from the mask");
+	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+
+	prop = RNA_def_property(srna, "use_motion_blur", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "custom1", CMP_NODEFLAG_MASK_MOTION_BLUR);
+	RNA_def_property_ui_text(prop, "Motion Blur", "Use feather information from the mask");
+	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+
+	prop = RNA_def_property(srna, "motion_blur_samples", PROP_INT, PROP_NONE);
+	RNA_def_property_int_sdna(prop, NULL, "custom2");
+	RNA_def_property_range(prop, 1, 32);
+	RNA_def_property_ui_text(prop, "Samples", "Number of motion blur samples");
+	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+
+	prop = RNA_def_property(srna, "motion_blur_shutter", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "custom3");
+	RNA_def_property_range(prop, 0.0, 1.0f);
+	RNA_def_property_ui_text(prop, "Shutter", "Exposure for motion blur as a factor of FPS");
+	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+
+
+	prop = RNA_def_property(srna, "size_source", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_bitflag_sdna(prop, NULL, "custom1");
+	RNA_def_property_enum_items(prop, aspect_type_items);
+	RNA_def_property_ui_text(prop, "Size Source", "Where to get the mask size from for aspect/size information");
+	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+
+
+	RNA_def_struct_sdna_from(srna, "NodeMask", "storage");
+
+	prop = RNA_def_property(srna, "size_x", PROP_INT, PROP_NONE);
+	RNA_def_property_range(prop, 1.0f, 10000.0f);
+	RNA_def_property_ui_text(prop, "X", "");
+	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+
+	prop = RNA_def_property(srna, "size_y", PROP_INT, PROP_NONE);
+	RNA_def_property_range(prop, 1.0f, 10000.0f);
+	RNA_def_property_ui_text(prop, "Y", "");
 	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 }
 
@@ -3662,6 +3730,13 @@ static void def_cmp_trackpos(StructRNA *srna)
 {
 	PropertyRNA *prop;
 
+	static EnumPropertyItem position_items[] = {
+		{0, "ABSOLUTE", 0, "Absolute",  "Output absolute position of a marker"},
+		{1, "RELATIVE_START", 0, "Relative Start",  "Output position of a marker relative to first marker of a track"},
+		{2, "RELATIVE_FRAME", 0, "Relative Frame",  "Output position of a marker relative to marker at given frame number"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
 	prop = RNA_def_property(srna, "clip", PROP_POINTER, PROP_NONE);
 	RNA_def_property_pointer_sdna(prop, NULL, "id");
 	RNA_def_property_struct_type(prop, "MovieClip");
@@ -3669,9 +3744,15 @@ static void def_cmp_trackpos(StructRNA *srna)
 	RNA_def_property_ui_text(prop, "Movie Clip", "");
 	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 
-	prop = RNA_def_property(srna, "use_relative", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "custom1", 1);
-	RNA_def_property_ui_text(prop, "Relative", "Return relative position to first track's marker");
+	prop = RNA_def_property(srna, "position", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "custom1");
+	RNA_def_property_enum_items(prop, position_items);
+	RNA_def_property_ui_text(prop, "Position", "Which marker position to use for output");
+	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+
+	prop = RNA_def_property(srna, "relative_frame", PROP_INT, PROP_NONE);
+	RNA_def_property_int_sdna(prop, NULL, "custom2");
+	RNA_def_property_ui_text(prop, "Frame", "Frame to be used for relative position");
 	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 
 	RNA_def_struct_sdna_from(srna, "NodeTrackPosData", "storage");

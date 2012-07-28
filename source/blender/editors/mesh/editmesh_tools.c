@@ -31,6 +31,7 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "DNA_key_types.h"
 #include "DNA_material_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_modifier_types.h"
@@ -1532,6 +1533,10 @@ static int edbm_do_smooth_vertex_exec(bContext *C, wmOperator *op)
 	int i, repeat;
 	float clipdist = 0.0f;
 
+	int xaxis = RNA_boolean_get(op->ptr, "xaxis");
+	int yaxis = RNA_boolean_get(op->ptr, "yaxis");
+	int zaxis = RNA_boolean_get(op->ptr, "zaxis");
+
 	/* mirror before smooth */
 	if (((Mesh *)obedit->data)->editflag & ME_EDIT_MIRROR_X) {
 		EDBM_verts_mirror_cache_begin(em, TRUE);
@@ -1563,8 +1568,9 @@ static int edbm_do_smooth_vertex_exec(bContext *C, wmOperator *op)
 	
 	for (i = 0; i < repeat; i++) {
 		if (!EDBM_op_callf(em, op,
-		                   "smooth_vert verts=%hv mirror_clip_x=%b mirror_clip_y=%b mirror_clip_z=%b clipdist=%f",
-		                   BM_ELEM_SELECT, mirrx, mirry, mirrz, clipdist))
+		                   "smooth_vert verts=%hv mirror_clip_x=%b mirror_clip_y=%b mirror_clip_z=%b clipdist=%f "
+		                   "use_axis_x=%b use_axis_y=%b use_axis_z=%b",
+		                   BM_ELEM_SELECT, mirrx, mirry, mirrz, clipdist, xaxis, yaxis, zaxis))
 		{
 			return OPERATOR_CANCELLED;
 		}
@@ -1596,6 +1602,9 @@ void MESH_OT_vertices_smooth(wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
 	RNA_def_int(ot->srna, "repeat", 1, 1, 100, "Number of times to smooth the mesh", "", 1, INT_MAX);
+	RNA_def_boolean(ot->srna, "xaxis", 1, "X-Axis", "Smooth along the X axis");
+	RNA_def_boolean(ot->srna, "yaxis", 1, "Y-Axis", "Smooth along the Y axis");
+	RNA_def_boolean(ot->srna, "zaxis", 1, "Z-Axis", "Smooth along the Z axis");
 }
 
 /********************** Smooth/Solid Operators *************************/
@@ -2231,6 +2240,8 @@ static int edbm_blend_from_shape_exec(bContext *C, wmOperator *op)
 {
 	Object *obedit = CTX_data_edit_object(C);
 	Mesh *me = obedit->data;
+	Key *key = me->key;
+	KeyBlock *kb = NULL;
 	BMEditMesh *em = me->edit_btmesh;
 	BMVert *eve;
 	BMIter iter;
@@ -2244,24 +2255,34 @@ static int edbm_blend_from_shape_exec(bContext *C, wmOperator *op)
 	totshape = CustomData_number_of_layers(&em->bm->vdata, CD_SHAPEKEY);
 	if (totshape == 0 || shape < 0 || shape >= totshape)
 		return OPERATOR_CANCELLED;
-
+	
+	/* get shape key - needed for finding reference shape (for add mode only) */
+	if (key) {
+		kb = BLI_findlink(&key->block, shape);
+	}
+	
+	/* perform blending on selected vertices*/
 	BM_ITER_MESH (eve, &iter, em->bm, BM_VERTS_OF_MESH) {
 		if (!BM_elem_flag_test(eve, BM_ELEM_SELECT) || BM_elem_flag_test(eve, BM_ELEM_HIDDEN))
 			continue;
-
+		
+		/* get coordinates of shapekey we're blending from */
 		sco = CustomData_bmesh_get_n(&em->bm->vdata, eve->head.data, CD_SHAPEKEY, shape);
 		copy_v3_v3(co, sco);
-
-
+		
 		if (add) {
-			mul_v3_fl(co, blend);
-			add_v3_v3v3(eve->co, eve->co, co);
+			/* in add mode, we add relative shape key offset */
+			if (kb) {
+				float *rco = CustomData_bmesh_get_n(&em->bm->vdata, eve->head.data, CD_SHAPEKEY, kb->relative);
+				sub_v3_v3v3(co, co, rco);
+			}
+			
+			madd_v3_v3fl(eve->co, co, blend);
 		}
 		else {
+			/* in blend mode, we interpolate to the shape key */
 			interp_v3_v3v3(eve->co, eve->co, co, blend);
 		}
-		
-		copy_v3_v3(sco, co);
 	}
 
 	EDBM_update_generic(C, em, TRUE);
@@ -2823,18 +2844,14 @@ static int mesh_separate_tagged(Main *bmain, Scene *scene, Base *base_old, BMesh
 	BMO_op_callf(bm_old, (BMO_FLAG_DEFAULTS & ~BMO_FLAG_RESPECT_HIDE),
 	             "delete geom=%hvef context=%i", BM_ELEM_TAG, DEL_FACES);
 
-	/* clean up any loose edges */
+	/* deselect loose data - this used to get deleted */
 	BM_ITER_MESH (e, &iter, bm_old, BM_EDGES_OF_MESH) {
-		if (BM_edge_is_wire(e)) {
-			BM_edge_kill(bm_old, e);
-		}
+		BM_edge_select_set(bm_old, e, FALSE);
 	}
 
 	/* clean up any loose verts */
 	BM_ITER_MESH (v, &iter, bm_old, BM_VERTS_OF_MESH) {
-		if (BM_vert_edge_count(v) == 0) {
-			BM_vert_kill(bm_old, v);
-		}
+		BM_vert_select_set(bm_old, v, FALSE);
 	}
 
 	BM_mesh_normals_update(bm_new, FALSE);
@@ -4637,6 +4654,7 @@ static int edbm_bevel_modal(bContext *C, wmOperator *op, wmEvent *event)
 			return OPERATOR_RUNNING_MODAL;
 		}
 	}
+
 	switch (event->type) {
 		case ESCKEY:
 		case RIGHTMOUSE:
@@ -4669,7 +4687,7 @@ static int edbm_bevel_modal(bContext *C, wmOperator *op, wmEvent *event)
 				edbm_bevel_calc(C, op);
 				edbm_bevel_update_header(op, C);
 			}
-			return OPERATOR_RUNNING_MODAL;
+			break;
 
 		case LEFTMOUSE:
 		case PADENTER:
@@ -4686,7 +4704,7 @@ static int edbm_bevel_modal(bContext *C, wmOperator *op, wmEvent *event)
 				edbm_bevel_calc(C, op);
 				edbm_bevel_update_header(op, C);
 			}
-			return OPERATOR_RUNNING_MODAL;
+			break;
 
 		case DKEY:
 			if (event->val == KM_PRESS) {
@@ -4696,7 +4714,7 @@ static int edbm_bevel_modal(bContext *C, wmOperator *op, wmEvent *event)
 				edbm_bevel_calc(C, op);
 				edbm_bevel_update_header(op, C);
 			}
-			return OPERATOR_RUNNING_MODAL;
+			break;
 	}
 
 	return OPERATOR_RUNNING_MODAL;
@@ -4776,7 +4794,12 @@ static void edbm_inset_update_header(wmOperator *op, bContext *C)
 {
 	InsetData *opdata = op->customdata;
 
-	static char str[] = "Confirm: Enter/LClick, Cancel: (Esc/RClick), thickness: %s, depth (Ctrl to tweak): %s (%s), Outset (O): (%s)";
+	static const char str[] = "Confirm: Enter/LClick, "
+	                          "Cancel: (Esc/RClick), "
+	                          "thickness: %s, "
+	                          "depth (Ctrl to tweak): %s (%s), "
+	                          "Outset (O): (%s), "
+	                          "Boundary (B): (%s)";
 
 	char msg[HEADER_LENGTH];
 	ScrArea *sa = CTX_wm_area(C);
@@ -4793,7 +4816,8 @@ static void edbm_inset_update_header(wmOperator *op, bContext *C)
 		             flts_str,
 		             flts_str + NUM_STR_REP_LEN,
 		             opdata->modify_depth ? "On" : "Off",
-		             RNA_boolean_get(op->ptr, "use_outset") ? "On" : "Off"
+		             RNA_boolean_get(op->ptr, "use_outset") ? "On" : "Off",
+		             RNA_boolean_get(op->ptr, "use_boundary") ? "On" : "Off"
 		            );
 
 		ED_area_headerprint(sa, msg);
@@ -4973,6 +4997,7 @@ static int edbm_inset_modal(bContext *C, wmOperator *op, wmEvent *event)
 			}
 		}
 	}
+
 	switch (event->type) {
 		case ESCKEY:
 		case RIGHTMOUSE:
@@ -5010,7 +5035,7 @@ static int edbm_inset_modal(bContext *C, wmOperator *op, wmEvent *event)
 					return OPERATOR_CANCELLED;
 				}
 			}
-			return OPERATOR_RUNNING_MODAL;
+			break;
 
 		case LEFTMOUSE:
 		case PADENTER:
@@ -5032,7 +5057,7 @@ static int edbm_inset_modal(bContext *C, wmOperator *op, wmEvent *event)
 				opdata->shift_amount = 0.0f;
 				opdata->shift = FALSE;
 			}
-			return OPERATOR_RUNNING_MODAL;
+			break;
 
 		case LEFTCTRLKEY:
 		case RIGHTCTRLKEY:
@@ -5057,7 +5082,7 @@ static int edbm_inset_modal(bContext *C, wmOperator *op, wmEvent *event)
 			opdata->initial_length = len_v2(mlen);
 
 			edbm_inset_update_header(op, C);
-			return OPERATOR_RUNNING_MODAL;
+			break;
 		}
 
 		case OKEY:
@@ -5066,13 +5091,26 @@ static int edbm_inset_modal(bContext *C, wmOperator *op, wmEvent *event)
 				RNA_boolean_set(op->ptr, "use_outset", !use_outset);
 				if (edbm_inset_calc(C, op)) {
 					edbm_inset_update_header(op, C);
-					return OPERATOR_RUNNING_MODAL;
 				}
 				else {
 					edbm_inset_cancel(C, op);
 					return OPERATOR_CANCELLED;
 				}
 			}
+			break;
+		case BKEY:
+			if (event->val == KM_PRESS) {
+				int use_boundary = RNA_boolean_get(op->ptr, "use_boundary");
+				RNA_boolean_set(op->ptr, "use_boundary", !use_boundary);
+				if (edbm_inset_calc(C, op)) {
+					edbm_inset_update_header(op, C);
+				}
+				else {
+					edbm_inset_cancel(C, op);
+					return OPERATOR_CANCELLED;
+				}
+			}
+			break;
 	}
 
 	return OPERATOR_RUNNING_MODAL;

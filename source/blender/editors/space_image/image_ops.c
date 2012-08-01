@@ -582,7 +582,7 @@ static int image_view_all_exec(bContext *C, wmOperator *UNUSED(op))
 		/* find the zoom value that will fit the image in the image space */
 		zoomx = width / w;
 		zoomy = height / h;
-		sima_zoom_set(sima, ar, 1.0f / power_of_2(1 / MIN2(zoomx, zoomy)), NULL);
+		sima_zoom_set(sima, ar, 1.0f / power_of_2(1.0f / minf(zoomx, zoomy)), NULL);
 	}
 	else
 		sima_zoom_set(sima, ar, 1.0f, NULL);
@@ -919,7 +919,7 @@ static int image_open_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event)
 			oldptr = RNA_property_pointer_get(&ptr, prop);
 			oldima = (Image *)oldptr.id.data;
 			/* unlikely to fail but better avoid strange crash */
-			if (oldima && GS(oldima->id.name) != ID_IM) {
+			if (oldima && GS(oldima->id.name) == ID_IM) {
 				ima = oldima;
 			}
 		}

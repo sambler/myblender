@@ -351,7 +351,7 @@ int ED_clip_view_selection(const bContext *C, ARegion *ar, int fit)
 		zoomx = (float)width / w / aspx;
 		zoomy = (float)height / h / aspy;
 
-		newzoom = 1.0f / power_of_2(1.0f / MIN2(zoomx, zoomy));
+		newzoom = 1.0f / power_of_2(1.0f / minf(zoomx, zoomy));
 
 		if (fit || sc->zoom > newzoom)
 			sc->zoom = newzoom;
@@ -518,7 +518,7 @@ void ED_space_clip_set_mask(bContext *C, SpaceClip *sc, Mask *mask)
 	sc->mask_info.mask = mask;
 
 	if (sc->mask_info.mask && sc->mask_info.mask->id.us == 0) {
-		sc->clip->id.us = 1;
+		sc->mask_info.mask->id.us = 1;
 	}
 
 	if (C) {

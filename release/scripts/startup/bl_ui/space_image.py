@@ -213,6 +213,7 @@ class IMAGE_MT_uvs_snap(Menu):
 
     def draw(self, context):
         layout = self.layout
+
         layout.operator_context = 'EXEC_REGION_WIN'
 
         layout.operator("uv.snap_selected", text="Selected to Pixels").target = 'PIXELS'
@@ -230,6 +231,7 @@ class IMAGE_MT_uvs_mirror(Menu):
 
     def draw(self, context):
         layout = self.layout
+
         layout.operator_context = 'EXEC_REGION_WIN'
 
         layout.operator("transform.mirror", text="X Axis").constraint_axis[0] = True
@@ -378,6 +380,8 @@ class IMAGE_HT_header(Header):
         if not show_render:
             layout.prop(sima, "use_image_pin", text="")
 
+        layout.prop(sima, "mode", text="")
+
         # uv editing
         if show_uvedit:
             uvedit = sima.uv_editor
@@ -403,9 +407,7 @@ class IMAGE_HT_header(Header):
             mesh = context.edit_object.data
             layout.prop_search(mesh.uv_textures, "active", mesh, "uv_textures", text="")
 
-        layout.prop(sima, "mode", text="")
-
-        if mode == 'MASK':
+        elif mode == 'MASK':
             row = layout.row()
             row.template_ID(sima, "mask", new="mask.new")
 
@@ -838,20 +840,13 @@ class IMAGE_UV_sculpt(Panel, ImagePaintPanel):
             self.prop_unified_strength(row, context, brush, "strength", slider=True, text="Strength")
             self.prop_unified_strength(row, context, brush, "use_pressure_strength")
 
-        split = layout.split()
-        col = split.column()
-
+        col = layout.column()
         col.prop(toolsettings, "uv_sculpt_lock_borders")
         col.prop(toolsettings, "uv_sculpt_all_islands")
-
-        split = layout.split()
-        col = split.column()
-
         col.prop(toolsettings, "uv_sculpt_tool")
 
         if toolsettings.uv_sculpt_tool == 'RELAX':
             col.prop(toolsettings, "uv_relax_method")
-
 
 
 # -----------------------------------------------------------------------------
@@ -889,6 +884,7 @@ class IMAGE_PT_active_mask_spline(MASK_PT_spline, Panel):
 class IMAGE_PT_active_mask_point(MASK_PT_point, Panel):
     bl_space_type = 'IMAGE_EDITOR'
     bl_region_type = 'PREVIEW'
+
 
 class IMAGE_PT_tools_mask(MASK_PT_tools, Panel):
     bl_space_type = 'IMAGE_EDITOR'

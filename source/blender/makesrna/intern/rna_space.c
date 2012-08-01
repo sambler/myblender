@@ -123,7 +123,7 @@ EnumPropertyItem clip_editor_mode_items[] = {
 	{SC_MODE_RECONSTRUCTION, "RECONSTRUCTION", ICON_SNAP_FACE, "Reconstruction",
 	                         "Show tracking/reconstruction tools"},
 	{SC_MODE_DISTORTION, "DISTORTION", ICON_GRID, "Distortion", "Show distortion tools"},
-	{SC_MODE_MASKEDIT, "MASK", ICON_MOD_MASK, "Mask editing", "Show mask editing tools"},
+	{SC_MODE_MASKEDIT, "MASK", ICON_MOD_MASK, "Mask", "Show mask editing tools"},
 	{0, NULL, 0, NULL, NULL}
 };
 
@@ -2988,6 +2988,11 @@ static void rna_def_space_node(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "show_highlight", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", SNODE_SHOW_HIGHLIGHT);
 	RNA_def_property_ui_text(prop, "Highlight", "Highlight nodes that are being calculated");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_NODE_VIEW, NULL);
+
+	prop = RNA_def_property(srna, "use_hidden_preview", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", SNODE_USE_HIDDEN_PREVIEW);
+	RNA_def_property_ui_text(prop, "Hide Preview", "Hide preview for newly creating nodes");
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_NODE_VIEW, NULL);
 }
 

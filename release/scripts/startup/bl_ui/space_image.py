@@ -356,6 +356,7 @@ class IMAGE_HT_header(Header):
         show_render = sima.show_render
         # show_paint = sima.show_paint
         show_uvedit = sima.show_uvedit
+        show_maskedit = sima.show_maskedit
 
         row = layout.row(align=True)
         row.template_header()
@@ -407,7 +408,7 @@ class IMAGE_HT_header(Header):
             mesh = context.edit_object.data
             layout.prop_search(mesh.uv_textures, "active", mesh, "uv_textures", text="")
 
-        elif mode == 'MASK':
+        if show_maskedit:
             row = layout.row()
             row.template_ID(sima, "mask", new="mask.new")
 
@@ -429,7 +430,7 @@ class IMAGE_HT_header(Header):
             if ima.type == 'COMPOSITE' and ima.source in {'MOVIE', 'SEQUENCE'}:
                 row.operator("image.play_composite", icon='PLAY')
 
-        if show_uvedit or mode == 'PAINT':
+        if show_uvedit or show_maskedit or mode == 'PAINT':
             layout.prop(sima, "use_realtime_update", text="", icon_only=True, icon='LOCKED')
 
 

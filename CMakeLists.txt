@@ -226,9 +226,6 @@ option(WITH_LZMA          "Enable best LZMA compression, (used for pointcache)" 
 # Camera/motion tracking
 option(WITH_LIBMV         "Enable libmv structure from motion library" ON)
 
-# Mesh boolean lib
-option(WITH_CARVE         "Enable Carve library to handle mesh boolean operations" ON)
-
 # Misc
 option(WITH_INPUT_NDOF "Enable NDOF input devices (SpaceNavigator and friends)" ON)
 option(WITH_RAYOPTIMIZATION	"Enable use of SIMD (SSE) optimizations for the raytracer" ON)
@@ -364,8 +361,8 @@ if(WITH_CYCLES)
 	set(WITH_OPENIMAGEIO ON)
 endif()
 
-# auto enable boost for cycles and carve
-if(WITH_CYCLES OR WITH_CARVE)
+# auto enable boost for cycles and booleans
+if(WITH_CYCLES OR WITH_MOD_BOOLEAN)
 	set(WITH_BOOST ON)
 endif()
 
@@ -942,24 +939,17 @@ elseif(WIN32)
 		endif()
 
 		if(WITH_IMAGE_OPENEXR)
-			set_lib_path(OPENEXR "openexr")
-			set_lib_path(OPENEXR_LIBPATH "openexr/lib")
-			set(OPENEXR_LIBRARIES
-				${OPENEXR_LIBPATH}/Iex.lib
-				${OPENEXR_LIBPATH}/Half.lib
-				${OPENEXR_LIBPATH}/IlmImf.lib
-				${OPENEXR_LIBPATH}/Imath.lib
-				${OPENEXR_LIBPATH}/IlmThread.lib
-			)
-			set_lib_path(OPENEXR_INCUDE "openexr/include")
-			set(OPENEXR_INCLUDE_DIRS
-				${OPENEXR_INCUDE}
-				${OPENEXR_INCUDE}/IlmImf
-				${OPENEXR_INCUDE}/Iex
-				${OPENEXR_INCUDE}/Imath
-			)
-			unset(OPENEXR_INCUDE)
-			unset(OPENEXR_LIBPATH)
+			if(MSVC10)
+				set(OPENEXR ${LIBDIR}/openexr)
+				set(OPENEXR_INCLUDE_DIRS ${OPENEXR}/vc2010/include)
+				set(OPENEXR_LIBRARIES Half IlmImf Imath IlmThread Iex)
+				set(OPENEXR_LIBPATH ${OPENEXR}/vc2010/lib)
+			else()
+				set(OPENEXR ${LIBDIR}/openexr)
+				set(OPENEXR_INCLUDE_DIRS ${OPENEXR}/include)
+				set(OPENEXR_LIBRARIES Half IlmImf Imath IlmThread Iex)
+				set(OPENEXR_LIBPATH ${OPENEXR}/lib)
+			endif()
 		endif()
 
 		if(WITH_IMAGE_TIFF)
@@ -1667,9 +1657,6 @@ endif()
 
 # MSVC2010 fails to links C++ libs right
 if(MSVC10)
-	if(WITH_IMAGE_OPENEXR)
-		message(WARNING "MSVC 2010 does not support OpenEXR, disabling WITH_IMAGE_OPENEXR. To enable support use Use MSVC 2008")
-	endif()
 	if(WITH_OPENCOLLADA)
 		message(WARNING "MSVC 2010 does not support OpenCollada, disabling WITH_OPENCOLLADA. To enable support use Use MSVC 2008")
 	endif()

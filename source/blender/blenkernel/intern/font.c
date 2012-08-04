@@ -63,26 +63,34 @@
 static ListBase ttfdata = {NULL, NULL};
 
 /* The vfont code */
-void BKE_vfont_free(struct VFont *vf)
-{
-	if (vf == NULL) return;
 
-	if (vf->data) {
-		while (vf->data->characters.first) {
-			VChar *che = vf->data->characters.first;
-			
+void BKE_vfont_free_data(struct VFont *vfont)
+{
+	if (vfont->data) {
+		while (vfont->data->characters.first) {
+			VChar *che = vfont->data->characters.first;
+
 			while (che->nurbsbase.first) {
 				Nurb *nu = che->nurbsbase.first;
 				if (nu->bezt) MEM_freeN(nu->bezt);
 				BLI_freelinkN(&che->nurbsbase, nu);
 			}
-	
-			BLI_freelinkN(&vf->data->characters, che);
+
+			BLI_freelinkN(&vfont->data->characters, che);
 		}
 
-		MEM_freeN(vf->data);
-		vf->data = NULL;
+		MEM_freeN(vfont->data);
+		vfont->data = NULL;
 	}
+
+	BKE_vfont_tmpfont_remove(vfont);
+}
+
+void BKE_vfont_free(struct VFont *vf)
+{
+	if (vf == NULL) return;
+
+	BKE_vfont_free_data(vf);
 	
 	if (vf->packedfile) {
 		freePackedFile(vf->packedfile);
@@ -92,6 +100,11 @@ void BKE_vfont_free(struct VFont *vf)
 
 static void *builtin_font_data = NULL;
 static int builtin_font_size = 0;
+
+int  BKE_vfont_is_builtin(struct VFont *vfont)
+{
+	return (strcmp(vfont->name, FO_BUILTIN_NAME) == 0);
+}
 
 void BKE_vfont_builtin_register(void *mem, int size)
 {
@@ -115,32 +128,52 @@ static PackedFile *get_builtin_packedfile(void)
 	}
 }
 
-void BKE_vfont_free_global_ttf(void)
+static void vfont_tmpfont_free(struct TmpFont *tf)
 {
-	struct TmpFont *tf;
-
-	for (tf = ttfdata.first; tf; tf = tf->next) {
-		if (tf->pf) freePackedFile(tf->pf);  /* NULL when the font file can't be found on disk */
-		tf->pf = NULL;
-		tf->vfont = NULL;
+	if (tf->pf) {
+		freePackedFile(tf->pf);  /* NULL when the font file can't be found on disk */
 	}
-	BLI_freelistN(&ttfdata);
+	MEM_freeN(tf);
 }
 
-struct TmpFont *BKE_vfont_find_tmpfont(VFont *vfont)
+void BKE_vfont_free_global_ttf(void)
+{
+	struct TmpFont *tf, *tf_next;
+
+	for (tf = ttfdata.first; tf; tf = tf_next) {
+		tf_next = tf->next;
+		vfont_tmpfont_free(tf);
+	}
+	ttfdata.first = ttfdata.last = NULL;
+}
+
+struct TmpFont *BKE_vfont_tmpfont_find(VFont *vfont)
 {
 	struct TmpFont *tmpfnt = NULL;
 	
 	if (vfont == NULL) return NULL;
 	
 	/* Try finding the font from font list */
-	tmpfnt = ttfdata.first;
-	while (tmpfnt) {
-		if (tmpfnt->vfont == vfont)
+	for (tmpfnt = ttfdata.first; tmpfnt; tmpfnt = tmpfnt->next) {
+		if (tmpfnt->vfont == vfont) {
 			break;
-		tmpfnt = tmpfnt->next;
+		}
 	}
+
 	return tmpfnt;
+}
+
+/* assumes a VFont's tmpfont can't be in the database more then once */
+void BKE_vfont_tmpfont_remove(VFont *vfont)
+{
+	struct TmpFont *tmpfnt;
+
+	tmpfnt = BKE_vfont_tmpfont_find(vfont);
+
+	if (tmpfnt) {
+		vfont_tmpfont_free(tmpfnt);
+		BLI_remlink(&ttfdata, tmpfnt);
+	}
 }
 
 static VFontData *vfont_get_data(Main *bmain, VFont *vfont)
@@ -151,13 +184,13 @@ static VFontData *vfont_get_data(Main *bmain, VFont *vfont)
 	if (vfont == NULL) return NULL;
 	
 	/* Try finding the font from font list */
-	tmpfnt = BKE_vfont_find_tmpfont(vfont);
+	tmpfnt = BKE_vfont_tmpfont_find(vfont);
 
 	/* And then set the data */
 	if (!vfont->data) {
 		PackedFile *pf;
 
-		if (strcmp(vfont->name, FO_BUILTIN_NAME) == 0) {
+		if (BKE_vfont_is_builtin(vfont)) {
 			pf = get_builtin_packedfile();
 		}
 		else {
@@ -194,7 +227,11 @@ static VFontData *vfont_get_data(Main *bmain, VFont *vfont)
 			if (!pf) {
 				printf("Font file doesn't exist: %s\n", vfont->name);
 
+				/* DON'T DO THIS
+				 * missing file shouldn't modifty path! - campbell */
+#if 0
 				strcpy(vfont->name, FO_BUILTIN_NAME);
+#endif
 				pf = get_builtin_packedfile();
 			}
 		}
@@ -292,11 +329,13 @@ static VFont *which_vfont(Curve *cu, CharInfo *info)
 
 VFont *BKE_vfont_builtin_get(void)
 {
-	VFont *vf;
+	VFont *vfont;
 	
-	for (vf = G.main->vfont.first; vf; vf = vf->id.next)
-		if (strcmp(vf->name, FO_BUILTIN_NAME) == 0)
-			return vf;
+	for (vfont = G.main->vfont.first; vfont; vfont = vfont->id.next) {
+		if (BKE_vfont_is_builtin(vfont)) {
+			return vfont;
+		}
+	}
 	
 	return BKE_vfont_load(G.main, FO_BUILTIN_NAME);
 }
@@ -520,7 +559,7 @@ static float char_width(Curve *cu, VChar *che, CharInfo *info)
 	}
 }
 
-struct chartrans *BKE_vfont_to_curve(Main *bmain, Scene *scene, Object *ob, int mode)
+struct CharTrans *BKE_vfont_to_curve(Main *bmain, Scene *scene, Object *ob, int mode)
 {
 	VFont *vfont, *oldvfont;
 	VFontData *vfd = NULL;
@@ -528,7 +567,7 @@ struct chartrans *BKE_vfont_to_curve(Main *bmain, Scene *scene, Object *ob, int 
 	CharInfo *info = NULL, *custrinfo;
 	TextBox *tb;
 	VChar *che;
-	struct chartrans *chartransdata = NULL, *ct;
+	struct CharTrans *chartransdata = NULL, *ct;
 	float *f, xof, yof, xtrax, linedist, *linedata, *linedata2, *linedata3, *linedata4;
 	float twidth, maxlen = 0;
 	int i, slen, j;
@@ -583,7 +622,7 @@ struct chartrans *BKE_vfont_to_curve(Main *bmain, Scene *scene, Object *ob, int 
 
 	/* calc offset and rotation of each char */
 	ct = chartransdata =
-	         (struct chartrans *)MEM_callocN((slen + 1) * sizeof(struct chartrans), "buildtext");
+	         (struct CharTrans *)MEM_callocN((slen + 1) * sizeof(struct CharTrans), "buildtext");
 
 	/* We assume the worst case: 1 character per line (is freed at end anyway) */
 
@@ -631,10 +670,10 @@ makebreak:
 
 		/*
 		 * The character wasn't in the current curve base so load it
-		 * But if the font is FO_BUILTIN_NAME then do not try loading since
+		 * But if the font is built-in then do not try loading since
 		 * whole font is in the memory already
 		 */
-		if (che == NULL && strcmp(vfont->name, FO_BUILTIN_NAME)) {
+		if (che == NULL && BKE_vfont_is_builtin(vfont) == FALSE) {
 			BLI_vfontchar_from_freetypefont(vfont, ascii);
 		}
 

@@ -30,26 +30,17 @@
  *  \brief lower level node drawing for nodes (boarders, headers etc), also node layout.
  */
 
-#include <math.h>
-#include <stdio.h>
-#include <string.h>
-
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
-#include "BLI_utildefines.h"
 
 #include "DNA_node_types.h"
-#include "DNA_material_types.h"
 #include "DNA_object_types.h"
-#include "DNA_scene_types.h"
 #include "DNA_space_types.h"
 #include "DNA_screen_types.h"
 
 #include "BKE_context.h"
 #include "BKE_curve.h"
-#include "BKE_global.h"
 #include "BKE_image.h"
-#include "BKE_library.h"
 #include "BKE_main.h"
 #include "BKE_node.h"
 #include "BKE_tracking.h"
@@ -57,16 +48,11 @@
 #include "BLF_api.h"
 #include "BLF_translation.h"
 
-#include "NOD_composite.h"
-#include "NOD_shader.h"
 
 #include "BIF_gl.h"
 #include "BIF_glutil.h"
 
-#include "BLF_api.h"
-
 #include "MEM_guardedalloc.h"
-
 
 #include "RNA_access.h"
 
@@ -75,13 +61,12 @@
 #include "WM_api.h"
 #include "WM_types.h"
 
-#include "UI_interface.h"
 #include "UI_resources.h"
 
 #include "IMB_imbuf.h"
 #include "IMB_imbuf_types.h"
 
-#include "node_intern.h"
+#include "node_intern.h"  /* own include */
 
 /* XXX interface.h */
 extern void ui_dropshadow(rctf *rct, float radius, float aspect, float alpha, int select);
@@ -1036,7 +1021,7 @@ static void node_draw_frame(const bContext *C, ARegion *ar, SpaceNode *snode, bN
 	glDisable(GL_BLEND);
 
 	/* outline active and selected emphasis */
-	if (node->flag & (NODE_ACTIVE | SELECT)) {
+	if (node->flag & SELECT) {
 		glEnable(GL_BLEND);
 		glEnable(GL_LINE_SMOOTH);
 		
@@ -1150,7 +1135,7 @@ static void node_draw_reroute(const bContext *C, ARegion *ar, SpaceNode *UNUSED(
 	glDisable(GL_BLEND);
 
 	/* outline active and selected emphasis */
-	if (node->flag & (NODE_ACTIVE | SELECT)) {
+	if (node->flag & SELECT) {
 		glEnable(GL_BLEND);
 		glEnable(GL_LINE_SMOOTH);
 		/* using different shades of TH_TEXT_HI for the empasis, like triangle */
@@ -2950,7 +2935,7 @@ static void node_texture_set_butfunc(bNodeType *ntype)
 
 /* ******* init draw callbacks for all tree types, only called in usiblender.c, once ************* */
 
-void ED_init_node_butfuncs(void)
+void ED_node_init_butfuncs(void)
 {
 	bNodeTreeType *treetype;
 	bNodeType *ntype;
@@ -3498,7 +3483,7 @@ void node_draw_link(View2D *v2d, SpaceNode *snode, bNodeLink *link)
 //	node_draw_link_straight(v2d, snode, link, th_col1, do_shaded, th_col2, do_triple, th_col3);
 }
 
-void drawnodesnap(View2D *v2d, const float cent[2], float size, NodeBorder border)
+void ED_node_draw_snap(View2D *v2d, const float cent[2], float size, NodeBorder border)
 {
 	glBegin(GL_LINES);
 	

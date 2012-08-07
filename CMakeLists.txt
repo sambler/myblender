@@ -853,7 +853,7 @@ elseif(WIN32)
 		if(WITH_MOD_CLOTH_ELTOPO)
 			set(LAPACK ${LIBDIR}/lapack)
 			# set(LAPACK_INCLUDE_DIR ${LAPACK}/include)
-			set_lib_path(LAPACK_LIBPATH ${LAPACK}/lib)	
+			set(LAPACK_LIBPATH ${LAPACK}/lib)	
 			set(LAPACK_LIBRARIES
 				${LIBDIR}/lapack/lib/libf2c.lib
 				${LIBDIR}/lapack/lib/clapack_nowrap.lib
@@ -893,6 +893,7 @@ elseif(WIN32)
 		endif()
 
 		if(WITH_OPENCOLLADA)
+			set(OPENCOLLADA ${LIBDIR}/opencollada)
 
 			set(OPENCOLLADA_INCLUDE_DIRS
 				${LIBDIR}/opencollada/include/COLLADAStreamWriter/include
@@ -901,23 +902,22 @@ elseif(WIN32)
 				${LIBDIR}/opencollada/include/COLLADASaxFrameworkLoader/include
 				${LIBDIR}/opencollada/include/GeneratedSaxParser/include
 			)
-			
-			set_lib_path(OPENCOLLADA_LIBPATH "opencollada/lib")
+			set_lib_path(OPENCOLLADA_LIBPATH "opencollada")
 
 			set(OPENCOLLADA_LIBRARIES
-				${OPENCOLLADA_LIBPATH}/OpenCOLLADASaxFrameworkLoader.lib
-				${OPENCOLLADA_LIBPATH}/OpenCOLLADAFramework.lib
-				${OPENCOLLADA_LIBPATH}/OpenCOLLADABaseUtils.lib
-				${OPENCOLLADA_LIBPATH}/OpenCOLLADAStreamWriter.lib
-				${OPENCOLLADA_LIBPATH}/MathMLSolver.lib
-				${OPENCOLLADA_LIBPATH}/GeneratedSaxParser.lib
-				${OPENCOLLADA_LIBPATH}/xml2.lib
-				${OPENCOLLADA_LIBPATH}/buffer.lib
-				${OPENCOLLADA_LIBPATH}/ftoa.lib
-				${OPENCOLLADA_LIBPATH}/UTF.lib
+				${OPENCOLLADA_LIBPATH}/lib/OpenCOLLADASaxFrameworkLoader.lib
+				${OPENCOLLADA_LIBPATH}/lib/OpenCOLLADAFramework.lib
+				${OPENCOLLADA_LIBPATH}/lib/OpenCOLLADABaseUtils.lib
+				${OPENCOLLADA_LIBPATH}/lib/OpenCOLLADAStreamWriter.lib
+				${OPENCOLLADA_LIBPATH}/lib/MathMLSolver.lib
+				${OPENCOLLADA_LIBPATH}/lib/GeneratedSaxParser.lib
+				${OPENCOLLADA_LIBPATH}/lib/xml2.lib
+				${OPENCOLLADA_LIBPATH}/lib/buffer.lib
+				${OPENCOLLADA_LIBPATH}/lib/ftoa.lib
+				${OPENCOLLADA_LIBPATH}/lib/UTF.lib
 			)
 			set(PCRE_LIBRARIES
-				${OPENCOLLADA_LIBPATH}/pcre.lib
+				${OPENCOLLADA_LIBPATH}/lib/pcre.lib
 			)
 			
 			unset(OPENCOLLADA_LIBPATH)
@@ -939,17 +939,22 @@ elseif(WIN32)
 		endif()
 
 		if(WITH_IMAGE_OPENEXR)
-			if(MSVC10)
-				set(OPENEXR ${LIBDIR}/openexr)
-				set(OPENEXR_INCLUDE_DIRS ${OPENEXR}/vc2010/include)
-				set(OPENEXR_LIBRARIES Half IlmImf Imath IlmThread Iex)
-				set(OPENEXR_LIBPATH ${OPENEXR}/vc2010/lib)
-			else()
-				set(OPENEXR ${LIBDIR}/openexr)
-				set(OPENEXR_INCLUDE_DIRS ${OPENEXR}/include)
-				set(OPENEXR_LIBRARIES Half IlmImf Imath IlmThread Iex)
-				set(OPENEXR_LIBPATH ${OPENEXR}/lib)
-			endif()
+			set_lib_path(OPENEXR "openexr")
+			set(OPENEXR_INCLUDE_DIR ${OPENEXR}/include)
+			set(OPENEXR_LIBPATH ${OPENEXR}/lib)
+			set(OPENEXR_LIBRARIES
+				${OPENEXR_LIBPATH}/Iex.lib
+				${OPENEXR_LIBPATH}/Half.lib
+				${OPENEXR_LIBPATH}/IlmImf.lib
+				${OPENEXR_LIBPATH}/Imath.lib
+				${OPENEXR_LIBPATH}/IlmThread.lib
+			)
+			set(OPENEXR_INCLUDE_DIRS
+				${OPENEXR_INCLUDE_DIR}
+				${OPENEXR_INCLUDE_DIR}/IlmImf
+				${OPENEXR_INCLUDE_DIR}/Iex
+				${OPENEXR_INCLUDE_DIR}/Imath
+			)
 		endif()
 
 		if(WITH_IMAGE_TIFF)
@@ -968,8 +973,9 @@ elseif(WIN32)
 		if(WITH_PYTHON)
 			# normally cached but not since we include them with blender
 			set(PYTHON_VERSION 3.2) # CACHE STRING)
-			set_lib_path(PYTHON_INCLUDE_DIR "python/include/python${PYTHON_VERSION}")
-			set_lib_path(PYTHON_LIBRARY "python/lib/python32.lib") #CACHE FILEPATH)
+			set_lib_path(PYTHON "python")
+			set(PYTHON_INCLUDE_DIR ${PYTHON}/include/python${PYTHON_VERSION})
+			set(PYTHON_LIBRARY ${PYTHON}/lib/python32.lib) #CACHE FILEPATH
 			
 			# uncached vars
 			set(PYTHON_INCLUDE_DIRS "${PYTHON_INCLUDE_DIR}")
@@ -1000,7 +1006,7 @@ elseif(WIN32)
 			set(OPENIMAGEIO ${LIBDIR}/openimageio)
 			set(OPENIMAGEIO_INCLUDE_DIRS ${OPENIMAGEIO}/include)
 			set(OPENIMAGEIO_LIBRARIES OpenImageIO)
-			set_lib_path(OPENIMAGEIO_LIBPATH "openimageio/lib")
+			set(OPENIMAGEIO_LIBPATH ${OPENIMAGEIO}/lib)
 			set(OPENIMAGEIO_DEFINITIONS)
 		endif()
 

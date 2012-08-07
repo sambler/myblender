@@ -165,6 +165,8 @@ void ED_object_assign_active_image(Main *bmain, Object *ob, int mat_nr, Image *i
 
 /************************* assign image ************************/
 
+//#define USE_SWITCH_ASPECT
+
 void ED_uvedit_assign_image(Main *bmain, Scene *scene, Object *obedit, Image *ima, Image *previma)
 {
 	BMEditMesh *em;
@@ -196,6 +198,7 @@ void ED_uvedit_assign_image(Main *bmain, Scene *scene, Object *obedit, Image *im
 	}
 	else {
 		/* old shading system, assign image to selected faces */
+#ifdef USE_SWITCH_ASPECT
 		float prev_aspect[2], fprev_aspect;
 		float aspect[2], faspect;
 
@@ -204,6 +207,7 @@ void ED_uvedit_assign_image(Main *bmain, Scene *scene, Object *obedit, Image *im
 
 		fprev_aspect = prev_aspect[0]/prev_aspect[1];
 		faspect = aspect[0]/aspect[1];
+#endif
 
 		/* ensure we have a uv map */
 		if (!CustomData_has_layer(&em->bm->pdata, CD_MTEXPOLY)) {
@@ -223,8 +227,12 @@ void ED_uvedit_assign_image(Main *bmain, Scene *scene, Object *obedit, Image *im
 					if (ima->id.us == 0) id_us_plus(&ima->id);
 					else id_lib_extern(&ima->id);
 
+#ifdef USE_SWITCH_ASPECT
 					/* we also need to correct the aspect of uvs */
-					if(tf->unwrap & TF_CORRECT_ASPECT) {
+					if (scene->toolsettings->uvcalc_flag & UVCALC_NO_ASPECT_CORRECT) {
+						/* do nothing */
+					}
+					else {
 						BMIter liter;
 						BMLoop *l;
 
@@ -235,6 +243,7 @@ void ED_uvedit_assign_image(Main *bmain, Scene *scene, Object *obedit, Image *im
 							luv->uv[0] /= faspect;
 						}
 					}
+#endif
 				}
 				else {
 					tf->tpage = NULL;
@@ -3787,19 +3796,6 @@ void ED_keymap_uvedit(wmKeyConfig *keyconf)
 	/* menus */
 	WM_keymap_add_menu(keymap, "IMAGE_MT_uvs_snap", SKEY, KM_PRESS, KM_SHIFT, 0);
 	WM_keymap_add_menu(keymap, "IMAGE_MT_uvs_select_mode", TABKEY, KM_PRESS, KM_CTRL, 0);
-
-	/* pivot */
-	kmi = WM_keymap_add_item(keymap, "WM_OT_context_set_enum", COMMAKEY, KM_PRESS, 0, 0);
-	RNA_string_set(kmi->ptr, "data_path", "space_data.uv_editor.pivot_point");
-	RNA_string_set(kmi->ptr, "value", "CENTER");
-
-	kmi = WM_keymap_add_item(keymap, "WM_OT_context_set_enum", COMMAKEY, KM_PRESS, KM_CTRL, 0);
-	RNA_string_set(kmi->ptr, "data_path", "space_data.uv_editor.pivot_point");
-	RNA_string_set(kmi->ptr, "value", "MEDIAN");
-
-	kmi = WM_keymap_add_item(keymap, "WM_OT_context_set_enum", PERIODKEY, KM_PRESS, 0, 0);
-	RNA_string_set(kmi->ptr, "data_path", "space_data.uv_editor.pivot_point");
-	RNA_string_set(kmi->ptr, "value", "CURSOR");
 
 	ED_keymap_proportional_cycle(keyconf, keymap);
 	ED_keymap_proportional_editmode(keyconf, keymap, FALSE);

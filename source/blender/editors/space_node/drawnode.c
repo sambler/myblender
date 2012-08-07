@@ -996,9 +996,7 @@ static void node_draw_frame(const bContext *C, ARegion *ar, SpaceNode *snode, bN
 	float alpha;
 	
 	/* skip if out of view */
-	if (node->totr.xmax < ar->v2d.cur.xmin || node->totr.xmin > ar->v2d.cur.xmax ||
-	    node->totr.ymax < ar->v2d.cur.ymin || node->totr.ymin > ar->v2d.cur.ymax) {
-		
+	if (BLI_rctf_isect(&node->totr, &ar->v2d.cur, NULL) == FALSE) {
 		uiEndBlock(C, node->block);
 		node->block = NULL;
 		return;
@@ -1809,6 +1807,11 @@ static void node_composit_buts_dilateerode(uiLayout *layout, bContext *UNUSED(C)
 	}
 }
 
+static void node_composit_buts_inpaint(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
+{
+	uiItemR(layout, ptr, "distance", 0, NULL, ICON_NONE);
+}
+
 static void node_composit_buts_diff_matte(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
 {
 	uiLayout *col;
@@ -2537,7 +2540,7 @@ static void node_composit_buts_keying(uiLayout *layout, bContext *UNUSED(C), Poi
 
 static void node_composit_buts_trackpos(uiLayout *layout, bContext *C, PointerRNA *ptr)
 {
-	bNode *node= ptr->data;
+	bNode *node = ptr->data;
 
 	uiTemplateID(layout, C, ptr, "clip", NULL, "CLIP_OT_open", NULL);
 
@@ -2660,6 +2663,9 @@ static void node_composit_set_butfunc(bNodeType *ntype)
 			break;
 		case CMP_NODE_DILATEERODE:
 			ntype->uifunc = node_composit_buts_dilateerode;
+			break;
+		case CMP_NODE_INPAINT:
+			ntype->uifunc = node_composit_buts_inpaint;
 			break;
 		case CMP_NODE_OUTPUT_FILE:
 			ntype->uifunc = node_composit_buts_file_output;
@@ -3025,7 +3031,7 @@ void draw_nodespace_back_pix(ARegion *ar, SpaceNode *snode, int color_manage)
 			
 			glaDefine2DArea(&ar->winrct);
 			/* ortho at pixel level curarea */
-			wmOrtho2(-0.375, ar->winx - 0.375, -0.375, ar->winy - 0.375);
+			wmOrtho2(-GLA_PIXEL_OFS, ar->winx - GLA_PIXEL_OFS, -GLA_PIXEL_OFS, ar->winy - GLA_PIXEL_OFS);
 			
 			x = (ar->winx - snode->zoom * ibuf->x) / 2 + snode->xof;
 			y = (ar->winy - snode->zoom * ibuf->y) / 2 + snode->yof;
@@ -3277,7 +3283,7 @@ void node_draw_link_bezier(View2D *v2d, SpaceNode *snode, bNodeLink *link,
 
 			sub_v2_v2v2(d_xy, coord_array[LINK_ARROW], coord_array[LINK_ARROW - 1]);
 			len = len_v2(d_xy);
-			mul_v2_fl(d_xy, 1.0f / (len * ARROW_SIZE));
+			mul_v2_fl(d_xy, ARROW_SIZE / len);
 			arrow1[0] = coord_array[LINK_ARROW][0] - d_xy[0] + d_xy[1];
 			arrow1[1] = coord_array[LINK_ARROW][1] - d_xy[1] - d_xy[0];
 			arrow2[0] = coord_array[LINK_ARROW][0] - d_xy[0] - d_xy[1];

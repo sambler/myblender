@@ -484,11 +484,10 @@ extern UserDef U; /* from blenkernel blender.c */
 #define USER_OPTION_TOOLTIPS	(1<<27)		/* this shows tooltips when holding option/alt if USER_TOOLTIPS is off */
 
 /* helper macro for checking frame clamping */
-#define FRAMENUMBER_MIN_CLAMP(cfra)                                           \
-	{                                                                         \
-		if ((U.flag & USER_NONEGFRAMES) && (cfra < 0))                        \
-			cfra = 0;                                                         \
-	}
+#define FRAMENUMBER_MIN_CLAMP(cfra)  {                                        \
+	if ((U.flag & USER_NONEGFRAMES) && (cfra < 0))                            \
+		cfra = 0;                                                             \
+	} (void)0
 
 /* viewzom */
 #define USER_ZOOM_CONT			0
@@ -523,7 +522,7 @@ extern UserDef U; /* from blenkernel blender.c */
 #define USER_MENUFIXEDORDER		(1 << 23)
 #define USER_CONTINUOUS_MOUSE	(1 << 24)
 #define USER_ZOOM_INVERT		(1 << 25)
-#define USER_ZOOM_HORIZ		(1 << 26) /* for CONTINUE and DOLLY zoom */
+#define USER_ZOOM_HORIZ			(1 << 26) /* for CONTINUE and DOLLY zoom */
 #define USER_SPLASH_DISABLE		(1 << 27)
 #define USER_HIDE_RECENT		(1 << 28)
 #define USER_SHOW_THUMBNAILS	(1 << 29)

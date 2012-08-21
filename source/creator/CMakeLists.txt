@@ -865,10 +865,8 @@ endif()
 		bf_imbuf_dds
 		bf_collada
 		bf_intern_bsp
-		bf_intern_bop
 		bf_intern_decimate
 		bf_intern_elbeem
-		bf_intern_ik
 		bf_intern_memutil
 		bf_intern_guardedalloc
 		bf_intern_ctr
@@ -938,6 +936,10 @@ endif()
 
 	if(WITH_CXX_GUARDEDALLOC)
 		list(APPEND BLENDER_SORTED_LIBS bf_intern_guardedalloc_cpp)
+	endif()
+
+	if(WITH_IK_SOLVER)
+		list_insert_after(BLENDER_SORTED_LIBS "bf_intern_elbeem" "bf_intern_iksolver")
 	endif()
 
 	if(WITH_IK_ITASC)

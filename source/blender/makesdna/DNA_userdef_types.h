@@ -415,6 +415,8 @@ typedef struct UserDef {
 	short use_16bit_textures, use_gpu_mipmap;
 
 	float ndof_sensitivity;	/* overall sensitivity of 3D mouse */
+	float ndof_orbit_sensitivity;
+	float pad4;
 	int ndof_flag;			/* flags for 3D mouse */
 
 	float glalphaclip;
@@ -504,13 +506,12 @@ extern UserDef U; /* from blenkernel blender.c */
 /*#define USER_FLIPFULLSCREEN		(1 << 7)*/ /* deprecated */
 #define USER_ALLWINCODECS		(1 << 8)
 #define USER_MENUOPENAUTO		(1 << 9)
-/*#define USER_PANELPINNED		(1 << 10)		deprecated */
+#define USER_ZBUF_CURSOR		(1 << 10)
 #define USER_AUTOPERSP     		(1 << 11)
 #define USER_LOCKAROUND     	(1 << 12)
 #define USER_GLOBALUNDO     	(1 << 13)
 #define USER_ORBIT_SELECTION	(1 << 14)
-// old flag for #define USER_KEYINSERTAVAI		(1 << 15)
-#define USER_ORBIT_ZBUF			(1 << 15)
+#define USER_ZBUF_ORBIT			(1 << 15)
 #define USER_HIDE_DOT			(1 << 16)
 #define USER_SHOW_ROTVIEWICON	(1 << 17)
 #define USER_SHOW_VIEWPORTNAME	(1 << 18)
@@ -651,6 +652,7 @@ extern UserDef U; /* from blenkernel blender.c */
 #define NDOF_PANX_INVERT_AXIS (1 << 12)
 #define NDOF_PANY_INVERT_AXIS (1 << 13)
 #define NDOF_PANZ_INVERT_AXIS (1 << 14)
+#define NDOF_TURNTABLE (1 << 15)
 
 /* compute_device_type */
 #define USER_COMPUTE_DEVICE_NONE	0

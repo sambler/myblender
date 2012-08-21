@@ -106,6 +106,10 @@ class IMAGE_MT_select(Menu):
         layout.operator("uv.select_pinned")
         layout.operator("uv.select_linked")
 
+        layout.separator()
+
+        layout.operator("uv.select_split")
+
 
 class IMAGE_MT_image(Menu):
     bl_label = "Image"
@@ -770,7 +774,7 @@ class IMAGE_PT_paint_curve(BrushButtonsPanel, Panel):
         toolsettings = context.tool_settings.image_paint
         brush = toolsettings.brush
 
-        layout.template_curve_mapping(brush, "curve")
+        layout.template_curve_mapping(brush, "curve", type='COLOR')
 
         row = layout.row(align=True)
         row.operator("brush.curve_preset", icon='SMOOTHCURVE', text="").shape = 'SMOOTH'

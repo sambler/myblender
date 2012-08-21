@@ -19,32 +19,37 @@
  *		Dalai Felinto
  */
 
-#include "COM_DistanceMatteOperation.h"
+#include "COM_DistanceRGBMatteOperation.h"
 #include "BLI_math.h"
 
-DistanceMatteOperation::DistanceMatteOperation() : NodeOperation()
+DistanceRGBMatteOperation::DistanceRGBMatteOperation() : NodeOperation()
 {
-	addInputSocket(COM_DT_COLOR);
-	addInputSocket(COM_DT_COLOR);
-	addOutputSocket(COM_DT_VALUE);
+	this->addInputSocket(COM_DT_COLOR);
+	this->addInputSocket(COM_DT_COLOR);
+	this->addOutputSocket(COM_DT_VALUE);
 
 	this->m_inputImageProgram = NULL;
 	this->m_inputKeyProgram = NULL;
 }
 
-void DistanceMatteOperation::initExecution()
+void DistanceRGBMatteOperation::initExecution()
 {
 	this->m_inputImageProgram = this->getInputSocketReader(0);
 	this->m_inputKeyProgram = this->getInputSocketReader(1);
 }
 
-void DistanceMatteOperation::deinitExecution()
+void DistanceRGBMatteOperation::deinitExecution()
 {
 	this->m_inputImageProgram = NULL;
 	this->m_inputKeyProgram = NULL;
 }
 
-void DistanceMatteOperation::executePixel(float *outputValue, float x, float y, PixelSampler sampler)
+float DistanceRGBMatteOperation::calculateDistance(float key[4], float image[4])
+{
+	return len_v3v3(key, image);
+}
+
+void DistanceRGBMatteOperation::executePixel(float output[4], float x, float y, PixelSampler sampler)
 {
 	float inKey[4];
 	float inImage[4];
@@ -58,9 +63,7 @@ void DistanceMatteOperation::executePixel(float *outputValue, float x, float y, 
 	this->m_inputKeyProgram->read(inKey, x, y, sampler);
 	this->m_inputImageProgram->read(inImage, x, y, sampler);
 	
-	distance = sqrt(pow((inKey[0] - inImage[0]), 2) +
-	                pow((inKey[1] - inImage[1]), 2) +
-	                pow((inKey[2] - inImage[2]), 2));
+	distance = this->calculateDistance(inKey, inImage);
 
 	/* store matte(alpha) value in [0] to go with
 	 * COM_SetAlphaOperation and the Value output
@@ -68,7 +71,7 @@ void DistanceMatteOperation::executePixel(float *outputValue, float x, float y, 
  
 	/*make 100% transparent */
 	if (distance < tolerance) {
-		outputValue[0] = 0.f;
+		output[0] = 0.f;
 	}
 	/*in the falloff region, make partially transparent */
 	else if (distance < falloff + tolerance) {
@@ -76,15 +79,14 @@ void DistanceMatteOperation::executePixel(float *outputValue, float x, float y, 
 		alpha = distance / falloff;
 		/*only change if more transparent than before */
 		if (alpha < inImage[3]) {
-			outputValue[0] = alpha;
+			output[0] = alpha;
 		}
 		else { /* leave as before */
-			outputValue[0] = inImage[3];
+			output[0] = inImage[3];
 		}
 	}
 	else {
 		/* leave as before */
-		outputValue[0] = inImage[3];
+		output[0] = inImage[3];
 	}
 }
-

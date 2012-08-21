@@ -2542,10 +2542,15 @@ static void rna_def_userdef_view(BlenderRNA *brna)
 	RNA_def_property_boolean_sdna(prop, NULL, "uiflag", USER_LOCKAROUND);
 	RNA_def_property_ui_text(prop, "Global Pivot", "Lock the same rotation/scaling pivot in all 3D Views");
 
-	prop = RNA_def_property(srna, "use_mouse_auto_depth", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "uiflag", USER_ORBIT_ZBUF);
+	prop = RNA_def_property(srna, "use_mouse_depth_navigate", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "uiflag", USER_ZBUF_ORBIT);
 	RNA_def_property_ui_text(prop, "Auto Depth",
 	                         "Use the depth under the mouse to improve view pan/rotate/zoom functionality");
+
+	prop = RNA_def_property(srna, "use_mouse_depth_cursor", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "uiflag", USER_ZBUF_CURSOR);
+	RNA_def_property_ui_text(prop, "Cursor Depth",
+	                         "Use the depth under the mouse when placing the cursor");
 
 	prop = RNA_def_property(srna, "use_camera_lock_parent", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_negative_sdna(prop, NULL, "uiflag", USER_CAM_LOCK_NO_PARENT);
@@ -3353,7 +3358,11 @@ static void rna_def_userdef_input(BlenderRNA *brna)
 	/* global options */
 	prop = RNA_def_property(srna, "ndof_sensitivity", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_range(prop, 0.25f, 4.0f);
-	RNA_def_property_ui_text(prop, "Sensitivity", "Overall sensitivity of the 3D Mouse");
+	RNA_def_property_ui_text(prop, "Sensitivity", "Overall sensitivity of the 3D Mouse for panning");
+	
+	prop = RNA_def_property(srna, "ndof_orbit_sensitivity", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_range(prop, 0.25f, 4.0f);
+	RNA_def_property_ui_text(prop, "Orbit Sensitivity", "Overall sensitivity of the 3D Mouse for orbiting");
 
 	prop = RNA_def_property(srna, "ndof_zoom_updown", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "ndof_flag", NDOF_ZOOM_UPDOWN);
@@ -3369,6 +3378,11 @@ static void rna_def_userdef_input(BlenderRNA *brna)
 	RNA_def_property_boolean_sdna(prop, NULL, "ndof_flag", NDOF_SHOW_GUIDE);
 	RNA_def_property_ui_text(prop, "Show Navigation Guide", "Display the center and axis during rotation");
 	/* TODO: update description when fly-mode visuals are in place  ("projected position in fly mode")*/
+
+	/* 3D view */
+	prop = RNA_def_property(srna, "ndof_turntable", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "ndof_flag", NDOF_TURNTABLE);
+	RNA_def_property_ui_text(prop, "Turntable", "Turntable for ndof rotation");
 
 	/* 3D view: roll */
 	prop = RNA_def_property(srna, "ndof_roll_invert_axis", PROP_BOOLEAN, PROP_NONE);

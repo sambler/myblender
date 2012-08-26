@@ -268,8 +268,8 @@ static void preview_cb(ScrArea *sa, struct uiBlock *block)
 	int mval[2];
 	
 	if (G.scene->r.mode & R_BORDER) {
-		winx *= (G.scene->r.border.xmax - G.scene->r.border.xmin);
-		winy *= (G.scene->r.border.ymax - G.scene->r.border.ymin);
+		winx *= BLI_RCT_SIZE_X(&G.scene->r.border);
+		winy *= BLI_RCT_SIZE_Y(&G.scene->r.border);
 	}
 	
 	/* while dragging we need to update the rects, otherwise it doesn't end with correct one */
@@ -681,10 +681,12 @@ void uiTemplateImage(uiLayout *layout, bContext *C, PointerRNA *ptr, const char 
 			}
 			else if (ima->type == IMA_TYPE_R_RESULT) {
 				/* browse layer/passes */
-				Render *re = RE_GetRender(scene->id.name);
-				RenderResult *rr = RE_AcquireResultRead(re);
+				RenderResult *rr;
+
+				/* use BKE_image_acquire_renderresult  so we get the correct slot in the menu */
+				rr = BKE_image_acquire_renderresult(scene, ima);
 				uiblock_layer_pass_arrow_buttons(layout, rr, iuser, &ima->render_slot);
-				RE_ReleaseResult(re);
+				BKE_image_release_renderresult(scene, ima);
 			}
 		}
 		else {
@@ -867,16 +869,16 @@ void uiTemplateImageSettings(uiLayout *layout, PointerRNA *imfptr)
 void uiTemplateImageLayers(uiLayout *layout, bContext *C, Image *ima, ImageUser *iuser)
 {
 	Scene *scene = CTX_data_scene(C);
-	Render *re;
-	RenderResult *rr;
 
 	/* render layers and passes */
 	if (ima && iuser) {
 		const float dpi_fac = UI_DPI_FAC;
-		re = RE_GetRender(scene->id.name);
-		rr = RE_AcquireResultRead(re);
+		RenderResult *rr;
+
+		/* use BKE_image_acquire_renderresult  so we get the correct slot in the menu */
+		rr = BKE_image_acquire_renderresult(scene, ima);
 		uiblock_layer_pass_buttons(layout, rr, iuser, 160 * dpi_fac, (ima->type == IMA_TYPE_R_RESULT) ? &ima->render_slot : NULL);
-		RE_ReleaseResult(re);
+		BKE_image_release_renderresult(scene, ima);
 	}
 }
 

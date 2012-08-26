@@ -140,7 +140,7 @@ static void node_composit_exec_alphaover(void *UNUSED(data), bNode *node, bNodeS
 
 #endif  /* WITH_COMPOSITOR_LEGACY */
 
-static void node_alphaover_init(bNodeTree *UNUSED(ntree), bNode* node, bNodeTemplate *UNUSED(ntemp))
+static void node_alphaover_init(bNodeTree *UNUSED(ntree), bNode *node, bNodeTemplate *UNUSED(ntemp))
 {
 	node->storage= MEM_callocN(sizeof(NodeTwoFloats), "NodeTwoFloats");
 }
@@ -157,5 +157,6 @@ void register_node_type_cmp_alphaover(bNodeTreeType *ttype)
 #ifdef WITH_COMPOSITOR_LEGACY
 	node_type_exec(&ntype, node_composit_exec_alphaover);
 #endif
+
 	nodeRegisterType(ttype, &ntype);
 }

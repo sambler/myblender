@@ -143,7 +143,7 @@ static void node_composit_exec_splitviewer(void *data, bNode *node, bNodeStack *
 
 #endif  /* WITH_COMPOSITOR_LEGACY */
 
-static void node_composit_init_splitviewer(bNodeTree *UNUSED(ntree), bNode* node, bNodeTemplate *UNUSED(ntemp))
+static void node_composit_init_splitviewer(bNodeTree *UNUSED(ntree), bNode *node, bNodeTemplate *UNUSED(ntemp))
 {
 	ImageUser *iuser= MEM_callocN(sizeof(ImageUser), "node image user");
 	node->storage= iuser;
@@ -165,6 +165,7 @@ void register_node_type_cmp_splitviewer(bNodeTreeType *ttype)
 #ifdef WITH_COMPOSITOR_LEGACY
 	node_type_exec(&ntype, node_composit_exec_splitviewer);
 #endif
+
 	/* Do not allow muting for this node. */
 	node_type_internal_connect(&ntype, NULL);
 

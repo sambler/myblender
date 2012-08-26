@@ -32,6 +32,10 @@
 #include <stdio.h> // printf
 #include <fstream>
 
+#if defined (WIN32) && !defined(FREE_WINDOWS)
+#include "utfconv.h"
+#endif
+
 extern "C" {
 //} for code folding
 
@@ -39,7 +43,6 @@ extern "C" {
 #include "IMB_imbuf_types.h"
 #include "IMB_imbuf.h"
 #include "IMB_allocimbuf.h"
-
 
 int imb_save_dds(struct ImBuf * ibuf, const char *name, int flags)
 {
@@ -50,7 +53,15 @@ int imb_save_dds(struct ImBuf * ibuf, const char *name, int flags)
 	if (ibuf->rect == 0) return (0);
 
 	/* open file for writing */
-	std::ofstream fildes(name);
+	std::ofstream fildes;
+
+#if defined (WIN32) && !defined(FREE_WINDOWS)
+	wchar_t *wname = alloc_utf16_from_8(name, 0);
+	fildes.open(wname);
+	free(wname);
+#else
+	fildes.open(name);
+#endif
 
 	/* write header */
 	fildes << "DDS ";

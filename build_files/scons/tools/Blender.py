@@ -366,7 +366,7 @@ def buildinfo(lenv, build_type):
     build_time = time.strftime ("%H:%M:%S")
     build_rev = os.popen('svnversion').read()[:-1] # remove \n
     if build_rev == '': 
-        build_rev = '50064'
+        build_rev = '50214'
     if lenv['BF_DEBUG']:
         build_type = "Debug"
         build_cflags = ' '.join(lenv['CFLAGS'] + lenv['CCFLAGS'] + lenv['BF_DEBUG_CCFLAGS'] + lenv['CPPFLAGS'])
@@ -845,6 +845,8 @@ class BlenderEnvironment(SConsEnvironment):
         print bc.HEADER+'Configuring program '+bc.ENDC+bc.OKGREEN+progname+bc.ENDC
         lenv = self.Clone()
         lenv.Append(LINKFLAGS = lenv['PLATFORM_LINKFLAGS'])
+        if lenv['OURPLATFORM'] in ('win32-mingw', 'win64-mingw', 'linuxcross', 'cygwin', 'linux'):
+            lenv.Replace(LINK = '$CXX')
         if lenv['OURPLATFORM'] in ('win32-vc', 'cygwin', 'win64-vc'):
             if lenv['BF_DEBUG']:
                 lenv.Prepend(LINKFLAGS = ['/DEBUG','/PDB:'+progname+'.pdb','/NODEFAULTLIB:libcmt'])

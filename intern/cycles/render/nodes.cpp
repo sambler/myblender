@@ -1971,6 +1971,8 @@ MixNode::MixNode()
 {
 	type = ustring("Mix");
 
+	use_clamp = false;
+
 	add_input("Fac", SHADER_SOCKET_FLOAT, 0.5f);
 	add_input("Color1", SHADER_SOCKET_COLOR);
 	add_input("Color2", SHADER_SOCKET_COLOR);
@@ -2019,11 +2021,17 @@ void MixNode::compile(SVMCompiler& compiler)
 
 	compiler.add_node(NODE_MIX, fac_in->stack_offset, color1_in->stack_offset, color2_in->stack_offset);
 	compiler.add_node(NODE_MIX, type_enum[type], color_out->stack_offset);
+
+	if(use_clamp) {
+		compiler.add_node(NODE_MIX, 0, color_out->stack_offset);
+		compiler.add_node(NODE_MIX, NODE_MIX_CLAMP, color_out->stack_offset);
+	}
 }
 
 void MixNode::compile(OSLCompiler& compiler)
 {
 	compiler.parameter("type", type);
+	compiler.parameter("Clamp", use_clamp);
 	compiler.add(this, "node_mix");
 }
 
@@ -2391,6 +2399,8 @@ MathNode::MathNode()
 {
 	type = ustring("Add");
 
+	use_clamp = false;
+
 	add_input("Value1", SHADER_SOCKET_FLOAT);
 	add_input("Value2", SHADER_SOCKET_FLOAT);
 	add_output("Value",  SHADER_SOCKET_FLOAT);
@@ -2435,11 +2445,17 @@ void MathNode::compile(SVMCompiler& compiler)
 
 	compiler.add_node(NODE_MATH, type_enum[type], value1_in->stack_offset, value2_in->stack_offset);
 	compiler.add_node(NODE_MATH, value_out->stack_offset);
+
+	if(use_clamp) {
+		compiler.add_node(NODE_MATH, NODE_MATH_CLAMP, value_out->stack_offset);
+		compiler.add_node(NODE_MATH, value_out->stack_offset);
+	}
 }
 
 void MathNode::compile(OSLCompiler& compiler)
 {
 	compiler.parameter("type", type);
+	compiler.parameter("Clamp", use_clamp);
 	compiler.add(this, "node_math");
 }
 

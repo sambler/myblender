@@ -32,6 +32,8 @@
  *  \ingroup bli
  */
 
+#include <stdarg.h>
+
 #ifdef __cplusplus
 extern "C" {
 //} for code folding
@@ -139,6 +141,11 @@ __attribute__ ((format(printf, 3, 4)))
 __attribute__((nonnull))
 #endif
 ;
+
+/*
+ * Replacement for vsnprintf
+ */
+size_t BLI_vsnprintf(char *buffer, size_t count, const char *format, va_list arg);
 
 /*
  * Print formatted string into a newly mallocN'd string

@@ -4990,7 +4990,7 @@ void autokeyframe_pose_cb_func(bContext *C, Scene *scene, View3D *v3d, Object *o
 
 static void special_aftertrans_update__mask(bContext *C, TransInfo *t)
 {
-	Mask *mask;
+	Mask *mask = NULL;
 
 	if (t->spacetype == SPACE_CLIP) {
 		SpaceClip *sc = t->sa->spacedata.first;
@@ -6239,7 +6239,7 @@ static void createTransMaskingData(bContext *C, TransInfo *t)
 
 	/* count */
 	for (masklay = mask->masklayers.first; masklay; masklay = masklay->next) {
-		MaskSpline *spline = masklay->splines.first;
+		MaskSpline *spline;
 
 		if (masklay->restrictflag & (MASK_RESTRICT_VIEW | MASK_RESTRICT_SELECT)) {
 			continue;
@@ -6282,7 +6282,7 @@ static void createTransMaskingData(bContext *C, TransInfo *t)
 
 	/* create data */
 	for (masklay = mask->masklayers.first; masklay; masklay = masklay->next) {
-		MaskSpline *spline = masklay->splines.first;
+		MaskSpline *spline;
 
 		if (masklay->restrictflag & (MASK_RESTRICT_VIEW | MASK_RESTRICT_SELECT)) {
 			continue;

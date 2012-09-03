@@ -18,12 +18,12 @@
 
 #include "stdosl.h"
 
-shader node_invert(
-	float Fac = 1.0,
-	color ColorIn = color(0.8, 0.8, 0.8),
-	output color ColorOut = color(0.8, 0.8, 0.8))
+shader node_combine_rgb(
+	float R = 0.0,
+	float G = 0.0,
+	float B = 0.0,
+	output color Image = color(0.8, 0.8, 0.8))
 {
-	color ColorInv = color(1.0) - ColorIn;
-	ColorOut = mix(ColorIn, ColorInv, Fac);
+	Image = color(R, G, B);
 }
 

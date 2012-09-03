@@ -8,6 +8,7 @@ set(SRC_OSL
 	node_bump.osl
 	node_camera.osl
 	node_checker_texture.osl
+	node_combine_rgb.osl
 	node_convert_from_color.osl
 	node_convert_from_float.osl
 	node_convert_from_normal.osl
@@ -34,12 +35,11 @@ set(SRC_OSL
 	node_mix_closure.osl
 	node_musgrave_texture.osl
 	node_normal.osl
-	node_blend_weight_texture.osl
 	node_noise_texture.osl
 	node_output_displacement.osl
 	node_output_surface.osl
 	node_output_volume.osl
-	node_sepcomb_rgb.osl
+	node_separate_rgb.osl
 	node_sky_texture.osl
 	node_texture_coordinate.osl
 	node_translucent_bsdf.osl
@@ -57,6 +57,7 @@ set(SRC_OSL_HEADERS
 	node_color.h
 	node_fresnel.h
 	stdosl.h
+	oslutil.h
 )
 
 set(SRC_OSO

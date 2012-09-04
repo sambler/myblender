@@ -24,6 +24,7 @@ set(SRC_OSL
 	node_geometry.osl
 	node_glass_bsdf.osl
 	node_glossy_bsdf.osl
+	node_holdout.osl
 	node_hsv.osl
 	node_image_texture.osl
 	node_invert.osl
@@ -83,4 +84,5 @@ endforeach()
 
 add_custom_target(shader ALL DEPENDS ${SRC_OSO} ${SRC_OSL_HEADERS})
 
-delayed_install(${CMAKE_CURRENT_SOURCE_DIR} "${SRC_OSO}" ${CYCLES_INSTALL_PATH}/shader)
+# CMAKE_CURRENT_SOURCE_DIR is already included in OSO paths
+delayed_install("" "${SRC_OSO}" ${CYCLES_INSTALL_PATH}/shader)

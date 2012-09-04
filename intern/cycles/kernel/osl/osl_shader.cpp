@@ -42,12 +42,11 @@ void OSLShader::thread_init(KernelGlobals *kg)
 
 	memset(&tdata->globals, 0, sizeof(OSL::ShaderGlobals));
 	tdata->thread_info = ss->create_thread_info();
+	tdata->ctx = ss->get_context(tdata->thread_info);
 
 	tls_set(kg->osl.thread_data, tdata);
 
-	//((OSLRenderServices *)ssi->renderer())->thread_init(kg);
-	/* XXX not sure here - dingto */
-	thread_init(kg);
+	kg->osl.services->thread_init(kg);
 }
 
 void OSLShader::thread_free(KernelGlobals *kg)
@@ -56,6 +55,7 @@ void OSLShader::thread_free(KernelGlobals *kg)
 
 	OSLGlobals::ThreadData *tdata = tls_get(OSLGlobals::ThreadData, kg->osl.thread_data);
 
+	ss->release_context(tdata->ctx);
 	ss->destroy_thread_info(tdata->thread_info);
 
 	delete tdata;
@@ -206,7 +206,7 @@ void OSLShader::eval_surface(KernelGlobals *kg, ShaderData *sd, float randb, int
 	OSL::ShadingSystem *ss = kg->osl.ss;
 	OSLGlobals::ThreadData *tdata = tls_get(OSLGlobals::ThreadData, kg->osl.thread_data);
 	OSL::ShaderGlobals *globals = &tdata->globals;
-	OSL::ShadingContext *ctx = ss->get_context(tdata->thread_info);
+	OSL::ShadingContext *ctx = tdata->ctx;
 
 	/* setup shader globals from shader data */
 	sd->osl_ctx = ctx;
@@ -264,7 +264,7 @@ float3 OSLShader::eval_background(KernelGlobals *kg, ShaderData *sd, int path_fl
 	OSL::ShadingSystem *ss = kg->osl.ss;
 	OSLGlobals::ThreadData *tdata = tls_get(OSLGlobals::ThreadData, kg->osl.thread_data);
 	OSL::ShaderGlobals *globals = &tdata->globals;
-	OSL::ShadingContext *ctx = ss->get_context(tdata->thread_info);
+	OSL::ShadingContext *ctx = tdata->ctx;
 
 	/* setup shader globals from shader data */
 	sd->osl_ctx = ctx;
@@ -341,7 +341,7 @@ void OSLShader::eval_volume(KernelGlobals *kg, ShaderData *sd, float randb, int 
 	OSL::ShadingSystem *ss = kg->osl.ss;
 	OSLGlobals::ThreadData *tdata = tls_get(OSLGlobals::ThreadData, kg->osl.thread_data);
 	OSL::ShaderGlobals *globals = &tdata->globals;
-	OSL::ShadingContext *ctx = ss->get_context(tdata->thread_info);
+	OSL::ShadingContext *ctx = tdata->ctx;
 
 	/* setup shader globals from shader data */
 	sd->osl_ctx = ctx;
@@ -365,7 +365,7 @@ void OSLShader::eval_displacement(KernelGlobals *kg, ShaderData *sd)
 	OSL::ShadingSystem *ss = kg->osl.ss;
 	OSLGlobals::ThreadData *tdata = tls_get(OSLGlobals::ThreadData, kg->osl.thread_data);
 	OSL::ShaderGlobals *globals = &tdata->globals;
-	OSL::ShadingContext *ctx = ss->get_context(tdata->thread_info);
+	OSL::ShadingContext *ctx = tdata->ctx;
 
 	/* setup shader globals from shader data */
 	sd->osl_ctx = ctx;
@@ -379,15 +379,6 @@ void OSLShader::eval_displacement(KernelGlobals *kg, ShaderData *sd)
 
 	/* get back position */
 	sd->P = TO_FLOAT3(globals->P);
-}
-
-void OSLShader::release(KernelGlobals *kg, const ShaderData *sd)
-{
-	OSL::ShadingSystem *ss = kg->osl.ss;
-	OSLGlobals::ThreadData *tdata = tls_get(OSLGlobals::ThreadData, kg->osl.thread_data);
-	OSL::ShadingContext *ctx = ss->get_context(tdata->thread_info);
-
-	ss->release_context(ctx);
 }
 
 /* BSDF Closure */

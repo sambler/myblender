@@ -15,27 +15,28 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
+ * Contributor(s): Campbell Barton
+ *
  * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file BKE_utildefines.h
- *  \ingroup bke
- *  \brief blender format specific macros
- *  \note generic defines should go in BLI_utildefines.h
+#ifndef __BLI_ENDIAN_SWITCH_H__
+#define __BLI_ENDIAN_SWITCH_H__
+
+/** \file BLI_endian_switch.h
+ *  \ingroup bli
  */
 
+#include "BLI_endian_switch_inline.h"
 
-#ifndef __BKE_UTILDEFINES_H__
-#define __BKE_UTILDEFINES_H__
+/* endian_switch.c */
+void BLI_endian_switch_int16_array(short *val, const int size);
+void BLI_endian_switch_uint16_array(unsigned short *val, const int size);
+void BLI_endian_switch_int32_array(int *val, const int size);
+void BLI_endian_switch_uint32_array(unsigned int *val, const int size);
+void BLI_endian_switch_float_array(float *val, const int size);
+void BLI_endian_switch_int64_array(int64_t *val, const int size);
+void BLI_endian_switch_uint64_array(uint64_t *val, const int size);
+void BLI_endian_switch_double_array(double *val, const int size);
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/* currently unused but we may want to add macros here for BKE later */
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif // __BKE_UTILDEFINES_H__
+#endif  /* __BLI_ENDIAN_SWITCH_H__ */

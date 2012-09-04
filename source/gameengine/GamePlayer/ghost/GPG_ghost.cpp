@@ -98,7 +98,6 @@ extern char datatoc_bfont_ttf[];
 #include "RAS_IRasterizer.h"
 
 #include "BKE_main.h"
-#include "BKE_utildefines.h"
 
 #include "RNA_define.h"
 
@@ -338,6 +337,7 @@ bool GPG_NextFrame(GHOST_ISystem* system, GPG_Application *app, int &exitcode, S
     bool run = true;
     system->processEvents(false);
     system->dispatchEvents();
+	app->EngineNextFrame();
     if ((exitcode = app->getExitRequested()))
     {
         run = false;

@@ -878,7 +878,7 @@ static ID **get_selected_and_linked_obs(bContext *C, short *count, short scavisf
 				}
 				
 				/* 4th case: select actuator when controller selected */
-				if ( (scavisflag & (BUTS_ACT_LINK|BUTS_ACT_STATE)) && (ob->scavisflag & OB_VIS_CONT)) {
+				if ((scavisflag & (BUTS_ACT_LINK|BUTS_ACT_STATE)) && (ob->scavisflag & OB_VIS_CONT)) {
 					cont= ob->controllers.first;
 					while (cont) {
 						for (a=0; a<cont->totlinks; a++) {
@@ -921,7 +921,7 @@ static ID **get_selected_and_linked_obs(bContext *C, short *count, short scavisf
 	}
 
 	while (ob) {
-		if ( (ob->scavisflag) && (ob != obact)) {
+		if ((ob->scavisflag) && (ob != obact)) {
 			idar[nr]= (ID *)ob;
 			nr++;
 		}
@@ -4352,38 +4352,38 @@ static void draw_actuator_steering(uiLayout *layout, PointerRNA *ptr)
 	uiLayout *row;
 	uiLayout *col;
 
-	uiItemR(layout, ptr, "mode", 0, NULL, 0);
-	uiItemR(layout, ptr, "target", 0, NULL, 0);
-	uiItemR(layout, ptr, "navmesh", 0, NULL, 0);	
+	uiItemR(layout, ptr, "mode", 0, NULL, ICON_NONE);
+	uiItemR(layout, ptr, "target", 0, NULL, ICON_NONE);
+	uiItemR(layout, ptr, "navmesh", 0, NULL, ICON_NONE);
 
 	row = uiLayoutRow(layout, FALSE);
-	uiItemR(row, ptr, "distance", 0, NULL, 0);
-	uiItemR(row, ptr, "velocity", 0, NULL, 0);
+	uiItemR(row, ptr, "distance", 0, NULL, ICON_NONE);
+	uiItemR(row, ptr, "velocity", 0, NULL, ICON_NONE);
 	row = uiLayoutRow(layout, FALSE);
-	uiItemR(row, ptr, "acceleration", 0, NULL, 0);
-	uiItemR(row, ptr, "turn_speed", 0, NULL, 0);
+	uiItemR(row, ptr, "acceleration", 0, NULL, ICON_NONE);
+	uiItemR(row, ptr, "turn_speed", 0, NULL, ICON_NONE);
 
 	row = uiLayoutRow(layout, FALSE);
 	col = uiLayoutColumn(row, FALSE);
-	uiItemR(col, ptr, "facing", 0, NULL, 0);
+	uiItemR(col, ptr, "facing", 0, NULL, ICON_NONE);
 	col = uiLayoutColumn(row, FALSE);
-	uiItemR(col, ptr, "facing_axis", 0, NULL, 0);
+	uiItemR(col, ptr, "facing_axis", 0, NULL, ICON_NONE);
 	if (!RNA_boolean_get(ptr, "facing")) {
 		uiLayoutSetActive(col, FALSE);
 	}
 	col = uiLayoutColumn(row, FALSE);
-	uiItemR(col, ptr, "normal_up", 0, NULL, 0);
+	uiItemR(col, ptr, "normal_up", 0, NULL, ICON_NONE);
 	if (!RNA_pointer_get(ptr, "navmesh").data) {
 		uiLayoutSetActive(col, FALSE);
 	}
 
 	row = uiLayoutRow(layout, FALSE);
-	uiItemR(row, ptr, "self_terminated", 0, NULL, 0);
+	uiItemR(row, ptr, "self_terminated", 0, NULL, ICON_NONE);
 	if (RNA_enum_get(ptr, "mode")==ACT_STEERING_PATHFOLLOWING) {
-		uiItemR(row, ptr, "update_period", 0, NULL, 0);	
+		uiItemR(row, ptr, "update_period", 0, NULL, ICON_NONE);
 		row = uiLayoutRow(layout, FALSE);
 	}
-	uiItemR(row, ptr, "show_visualization", 0, NULL, 0);	
+	uiItemR(row, ptr, "show_visualization", 0, NULL, ICON_NONE);
 }
 
 static void draw_brick_actuator(uiLayout *layout, PointerRNA *ptr, bContext *C)
@@ -4539,7 +4539,9 @@ static void logic_buttons_new(bContext *C, ARegion *ar)
 		ob= (Object *)idar[a];
 
 		/* only draw the controller common header if "use_visible" */
-		if ( (ob->scavisflag & OB_VIS_CONT) == 0) continue;
+		if ( (ob->scavisflag & OB_VIS_CONT) == 0) {
+			continue;
+		}
 	
 		/* Drawing the Controller Header common to all Selected Objects */
 
@@ -4707,7 +4709,9 @@ static void logic_buttons_new(bContext *C, ARegion *ar)
 		ob= (Object *)idar[a];
 
 		/* only draw the actuator common header if "use_visible" */
-		if ( (ob->scavisflag & OB_VIS_ACT) == 0) continue;
+		if ((ob->scavisflag & OB_VIS_ACT) == 0) {
+			continue;
+		}
 
 		row = uiLayoutRow(layout, TRUE);
 		uiDefButBitS(block, TOG, OB_SHOWACT, B_REDR, ob->id.name+2, (short)(xco-10), yco, (short)(width-30), UI_UNIT_Y, &ob->scaflag, 0, 31, 0, 0, "Object name, click to show/hide actuators");
@@ -4834,7 +4838,9 @@ void logic_buttons(bContext *C, ARegion *ar)
 		ob= (Object *)idar[a];
 //		uiClearButLock();
 //		uiSetButLock(BKE_object_is_libdata(ob), ERROR_LIBDATA_MESSAGE);
-		if ( (ob->scavisflag & OB_VIS_CONT) == 0) continue;
+		if ((ob->scavisflag & OB_VIS_CONT) == 0) {
+			continue;
+		}
 
 		/* presume it is only objects for now */
 		uiBlockBeginAlign(block);
@@ -4972,7 +4978,9 @@ void logic_buttons(bContext *C, ARegion *ar)
 //		uiClearButLock();
 //		uiSetButLock(BKE_object_is_libdata(ob), ERROR_LIBDATA_MESSAGE);
 		
-		if ( (ob->scavisflag & OB_VIS_SENS) == 0) continue;
+		if ((ob->scavisflag & OB_VIS_SENS) == 0) {
+			continue;
+		}
 		
 		/* presume it is only objects for now */
 		uiBlockBeginAlign(block);
@@ -5052,7 +5060,9 @@ void logic_buttons(bContext *C, ARegion *ar)
 		ob= (Object *)idar[a];
 //		uiClearButLock();
 //		uiSetButLock(BKE_object_is_libdata(ob), ERROR_LIBDATA_MESSAGE);
-		if ( (ob->scavisflag & OB_VIS_ACT) == 0) continue;
+		if ((ob->scavisflag & OB_VIS_ACT) == 0) {
+			continue;
+		}
 
 		/* presume it is only objects for now */
 		uiBlockBeginAlign(block);

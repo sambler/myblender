@@ -345,7 +345,6 @@ void EDBM_mesh_make(ToolSettings *ts, Scene *UNUSED(scene), Object *ob)
 	me->edit_btmesh->selectmode = me->edit_btmesh->bm->selectmode = ts->selectmode;
 	me->edit_btmesh->mat_nr = (ob->actcol > 0) ? ob->actcol - 1 : 0;
 
-	me->edit_btmesh->me = me;
 	me->edit_btmesh->ob = ob;
 }
 
@@ -1056,14 +1055,14 @@ static BMVert *cache_mirr_intptr_as_bmvert(intptr_t *index_lookup, int index)
 #define BM_CD_LAYER_ID "__mirror_index"
 void EDBM_verts_mirror_cache_begin(BMEditMesh *em, const short use_select)
 {
-	Mesh *me = em->me;
+	Mesh *me = (Mesh *)em->ob->data;
 	BMesh *bm = em->bm;
 	BMIter iter;
 	BMVert *v;
 	int li, topo = 0;
 
 	/* one or the other is used depending if topo is enabled */
-	BMBVHTree *tree = NULL;
+	struct BMBVHTree *tree = NULL;
 	MirrTopoStore_t mesh_topo_store = {NULL, -1, -1, -1};
 
 	if (me && (me->editflag & ME_EDIT_MIRROR_TOPO)) {

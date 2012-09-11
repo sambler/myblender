@@ -164,9 +164,7 @@ static void convertViewVec2D_mask(View2D *v2d, float r_vec[3], int dx, int dy)
 void convertViewVec(TransInfo *t, float r_vec[3], int dx, int dy)
 {
 	if ((t->spacetype == SPACE_VIEW3D) && (t->ar->regiontype == RGN_TYPE_WINDOW)) {
-		float mval_f[2];
-		mval_f[0] = dx;
-		mval_f[1] = dy;
+		const float mval_f[2] = {(float)dx, (float)dy};
 		ED_view3d_win_to_delta(t->ar, mval_f, r_vec);
 	}
 	else if (t->spacetype == SPACE_IMAGE) {
@@ -4755,8 +4753,7 @@ static void calcNonProportionalEdgeSlide(TransInfo *t, SlideData *sld, const flo
 
 static int createSlideVerts(TransInfo *t)
 {
-	Mesh *me = t->obedit->data;
-	BMEditMesh *em = me->edit_btmesh;
+	BMEditMesh *em = BMEdit_FromObject(t->obedit);
 	BMesh *bm = em->bm;
 	BMIter iter, iter2;
 	BMEdge *e, *e1;
@@ -5365,7 +5362,8 @@ int handleEventEdgeSlide(struct TransInfo *t, struct wmEvent *event)
 						return 1;
 					}
 					break;
-				case FKEY: {
+				case FKEY:
+				{
 					if (event->val == KM_PRESS) {
 						if (sld->is_proportional == FALSE) {
 							sld->flipped_vtx = !sld->flipped_vtx;
@@ -5374,13 +5372,16 @@ int handleEventEdgeSlide(struct TransInfo *t, struct wmEvent *event)
 					}
 					break;
 				}
-				case EVT_MODAL_MAP: {
+				case EVT_MODAL_MAP:
+				{
 					switch (event->val) {
-						case TFM_MODAL_EDGESLIDE_DOWN: {
+						case TFM_MODAL_EDGESLIDE_DOWN:
+						{
 							sld->curr_sv_index = ((sld->curr_sv_index - 1) + sld->totsv) % sld->totsv;
 							break;
 						}
-						case TFM_MODAL_EDGESLIDE_UP: {
+						case TFM_MODAL_EDGESLIDE_UP:
+						{
 							sld->curr_sv_index = (sld->curr_sv_index + 1) % sld->totsv;
 							break;
 						}

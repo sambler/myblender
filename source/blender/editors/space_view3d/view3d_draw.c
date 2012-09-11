@@ -1389,14 +1389,17 @@ unsigned int view3d_sample_backbuf(ViewContext *vc, int x, int y)
 {
 	unsigned int col;
 	
-	if (x >= vc->ar->winx || y >= vc->ar->winy) return 0;
+	if (x >= vc->ar->winx || y >= vc->ar->winy) {
+		return 0;
+	}
+
 	x += vc->ar->winrct.xmin;
 	y += vc->ar->winrct.ymin;
 	
 	view3d_validate_backbuf(vc);
 
-	glReadPixels(x,  y, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE,  &col);
-	glReadBuffer(GL_BACK);	
+	glReadPixels(x, y, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, &col);
+	glReadBuffer(GL_BACK);
 	
 	if (ENDIAN_ORDER == B_ENDIAN) {
 		BLI_endian_switch_uint32(&col);
@@ -2827,13 +2830,21 @@ static int view3d_main_area_draw_engine(const bContext *C, ARegion *ar, int draw
 
 	/* create render engine */
 	if (!rv3d->render_engine) {
+		RenderEngine *engine;
+
 		type = RE_engines_find(scene->r.engine);
 
 		if (!(type->view_update && type->view_draw))
 			return 0;
 
-		rv3d->render_engine = RE_engine_create(type);
-		type->view_update(rv3d->render_engine, C);
+		engine = RE_engine_create(type);
+
+		engine->tile_x = ceil(ar->winx/(float)scene->r.xparts);
+		engine->tile_y = ceil(ar->winy/(float)scene->r.yparts);
+
+		type->view_update(engine, C);
+
+		rv3d->render_engine = engine;
 	}
 
 	/* setup view matrices */

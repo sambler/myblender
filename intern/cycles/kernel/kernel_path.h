@@ -209,6 +209,8 @@ __device_inline bool shadow_blocked(KernelGlobals *kg, PathState *state, Ray *ra
 				if(ray->t != FLT_MAX)
 					ray->D = normalize_len(Pend - ray->P, &ray->t);
 
+				shader_release(kg, &sd);
+
 				bounce++;
 			}
 		}
@@ -294,8 +296,10 @@ __device float4 kernel_path_progressive(KernelGlobals *kg, RNG *rng, int sample,
 				L_transparent += average(holdout_weight*throughput);
 			}
 
-			if(sd.flag & SD_HOLDOUT_MASK)
+			if(sd.flag & SD_HOLDOUT_MASK) {
+				shader_release(kg, &sd);
 				break;
+			}
 		}
 #endif
 
@@ -313,8 +317,10 @@ __device float4 kernel_path_progressive(KernelGlobals *kg, RNG *rng, int sample,
 		float probability = path_state_terminate_probability(kg, &state, throughput);
 		float terminate = path_rng(kg, rng, sample, rng_offset + PRNG_TERMINATE);
 
-		if(terminate >= probability)
+		if(terminate >= probability) {
+			shader_release(kg, &sd);
 			break;
+		}
 
 		throughput /= probability;
 
@@ -380,8 +386,10 @@ __device float4 kernel_path_progressive(KernelGlobals *kg, RNG *rng, int sample,
 #endif
 
 		/* no BSDF? we can stop here */
-		if(!(sd.flag & SD_BSDF))
+		if(!(sd.flag & SD_BSDF)) {
+			shader_release(kg, &sd);
 			break;
+		}
 
 		/* sample BSDF */
 		float bsdf_pdf;
@@ -394,6 +402,8 @@ __device float4 kernel_path_progressive(KernelGlobals *kg, RNG *rng, int sample,
 
 		label = shader_bsdf_sample(kg, &sd, bsdf_u, bsdf_v, &bsdf_eval,
 			&bsdf_omega_in, &bsdf_domega_in, &bsdf_pdf);
+
+		shader_release(kg, &sd);
 
 		if(bsdf_pdf == 0.0f || bsdf_eval_is_zero(&bsdf_eval))
 			break;
@@ -484,8 +494,10 @@ __device void kernel_path_indirect(KernelGlobals *kg, RNG *rng, int sample, Ray 
 		float probability = path_state_terminate_probability(kg, &state, throughput);
 		float terminate = path_rng(kg, rng, sample, rng_offset + PRNG_TERMINATE);
 
-		if(terminate >= probability)
+		if(terminate >= probability) {
+			shader_release(kg, &sd);
 			break;
+		}
 
 		throughput /= probability;
 
@@ -552,8 +564,10 @@ __device void kernel_path_indirect(KernelGlobals *kg, RNG *rng, int sample, Ray 
 #endif
 
 		/* no BSDF? we can stop here */
-		if(!(sd.flag & SD_BSDF))
+		if(!(sd.flag & SD_BSDF)) {
+			shader_release(kg, &sd);
 			break;
+		}
 
 		/* sample BSDF */
 		float bsdf_pdf;
@@ -566,6 +580,8 @@ __device void kernel_path_indirect(KernelGlobals *kg, RNG *rng, int sample, Ray 
 
 		label = shader_bsdf_sample(kg, &sd, bsdf_u, bsdf_v, &bsdf_eval,
 			&bsdf_omega_in, &bsdf_domega_in, &bsdf_pdf);
+
+		shader_release(kg, &sd);
 
 		if(bsdf_pdf == 0.0f || bsdf_eval_is_zero(&bsdf_eval))
 			break;
@@ -657,8 +673,10 @@ __device float4 kernel_path_non_progressive(KernelGlobals *kg, RNG *rng, int sam
 				L_transparent += average(holdout_weight*throughput);
 			}
 
-			if(sd.flag & SD_HOLDOUT_MASK)
+			if(sd.flag & SD_HOLDOUT_MASK) {
+				shader_release(kg, &sd);
 				break;
+			}
 		}
 #endif
 
@@ -678,8 +696,10 @@ __device float4 kernel_path_non_progressive(KernelGlobals *kg, RNG *rng, int sam
 			float probability = path_state_terminate_probability(kg, &state, throughput);
 			float terminate = path_rng(kg, rng, sample, rng_offset + PRNG_TERMINATE);
 
-			if(terminate >= probability)
+			if(terminate >= probability) {
+				shader_release(kg, &sd);
 				break;
+			}
 
 			throughput /= probability;
 		}
@@ -689,7 +709,7 @@ __device float4 kernel_path_non_progressive(KernelGlobals *kg, RNG *rng, int sam
 		if(kernel_data.integrator.use_ambient_occlusion) {
 			int num_samples = kernel_data.integrator.ao_samples;
 			float num_samples_inv = 1.0f/num_samples;
-			float ao_factor = kernel_data.background.ao_factor/num_samples;
+			float ao_factor = kernel_data.background.ao_factor;
 
 			for(int j = 0; j < num_samples; j++) {
 				/* todo: solve correlation */
@@ -858,6 +878,7 @@ __device float4 kernel_path_non_progressive(KernelGlobals *kg, RNG *rng, int sam
 
 		/* continue in case of transparency */
 		throughput *= shader_bsdf_transparency(kg, &sd);
+		shader_release(kg, &sd);
 
 		if(is_zero(throughput))
 			break;

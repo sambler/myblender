@@ -268,11 +268,14 @@ int EDBM_backbuf_border_mask_init(ViewContext *vc, int mcords[][2], short tot, s
 	
 	/* grab mask */
 	bufmask = view3d_read_backbuf(vc, xmin, ymin, xmax, ymax);
-	drm = bufmask->rect;
+
 	if (bufmask == NULL) {
 		return 0; /* only when mem alloc fails, go crash somewhere else! */
 	}
-	
+	else {
+		drm = bufmask->rect;
+	}
+
 	/* build selection lookup */
 	selbuf = MEM_callocN(bm_vertoffs + 1, "selbuf");
 	
@@ -1494,7 +1497,7 @@ void MESH_OT_select_shortest_path(wmOperatorType *ot)
 /* ************************************************** */
 /* here actual select happens */
 /* gets called via generic mouse select operator */
-int mouse_mesh(bContext *C, const int mval[2], short extend, short deselect, short toggle)
+int EDBM_select_pick(bContext *C, const int mval[2], short extend, short deselect, short toggle)
 {
 	ViewContext vc;
 	BMVert *eve = NULL;
@@ -2296,8 +2299,7 @@ void em_setup_viewcontext(bContext *C, ViewContext *vc)
 	view3d_set_viewcontext(C, vc);
 	
 	if (vc->obedit) {
-		Mesh *me = vc->obedit->data;
-		vc->em = me->edit_btmesh;
+		vc->em = BMEdit_FromObject(vc->obedit);
 	}
 }
 

@@ -131,8 +131,9 @@ option(WITH_FFTW3         "Enable FFTW3 support (Used for smoke and audio effect
 option(WITH_BULLET        "Enable Bullet (Physics Engine)" ON)
 option(WITH_GAMEENGINE    "Enable Game Engine" ON)
 option(WITH_PLAYER        "Build Player" OFF)
+option(WITH_OPENCOLORIO   "Enable OpenColorIO color management" ON)
 option(WITH_COMPOSITOR    "Enable the tile based nodal compositor" ON)
-option(WITH_COMPOSITOR_LEGACY "Enable legacy compositor" ON)
+option(WITH_COMPOSITOR_LEGACY "Enable legacy compositor" OFF)
 
 # GHOST Windowing Library Options
 option(WITH_GHOST_DEBUG   "Enable debugging output for the GHOST library" OFF)
@@ -672,6 +673,24 @@ if(UNIX AND NOT APPLE)
 		endif()
 	endif()
 
+	if(WITH_OPENCOLORIO)
+		# use lib dir if available and nothing else specified
+		if(LIBDIR AND NOT OPENCOLORIO_ROOT_DIR)
+			set(OPENCOLORIO_ROOT_DIR ${LIBDIR}/ocio)
+		endif()
+
+		find_package(OpenColorIO)
+
+		set(OPENCOLORIO_LIBRARIES ${OPENCOLORIO_LIBRARIES})
+		set(OPENCOLORIO_LIBPATH)  # TODO, remove and reference the absolute path everywhere
+		set(OPENCOLORIO_DEFINITIONS)
+
+		if(NOT OPENCOLORIO_FOUND)
+			set(WITH_OPENCOLORIO OFF)
+			message(STATUS "OpenColorIO not found")
+		endif()
+	endif()
+
 	if(WITH_CYCLES_OSL)
 		set(CYCLES_OSL ${LIBDIR}/osl CACHE PATH "Path to OpenShadingLanguage installation")
 	
@@ -1065,6 +1084,14 @@ elseif(WIN32)
 			set(OPENIMAGEIO_DEFINITIONS)
 		endif()
 
+		if(WITH_OPENCOLORIO)
+			set(OPENCOLORIO ${LIBDIR}/opencolorio)
+			set(OPENCOLORIO_INCLUDE_DIRS ${OPENCOLORIO}/include)
+			set(OPENCOLORIO_LIBRARIES OpenColorIO)
+			set_lib_path(OPENCOLORIO_LIBPATH "opencolorio/lib")
+			set(OPENCOLORIO_DEFINITIONS)
+		endif()
+
 		set(PLATFORM_LINKFLAGS "/SUBSYSTEM:CONSOLE /STACK:2097152 /INCREMENTAL:NO /NODEFAULTLIB:msvcrt.lib /NODEFAULTLIB:msvcmrt.lib /NODEFAULTLIB:msvcurt.lib /NODEFAULTLIB:msvcrtd.lib")
 
 		# MSVC only, Mingw doesnt need
@@ -1236,6 +1263,14 @@ elseif(WIN32)
 			set(OPENIMAGEIO_DEFINITIONS)
 		endif()
 		
+		if(WITH_OPENCOLORIO)
+			set(OPENCOLORIO ${LIBDIR}/opencolorio)
+			set(OPENCOLORIO_INCLUDE_DIRS ${OPENCOLORIO}/include)
+			set(OPENCOLORIO_LIBRARIES OpenColorIO)
+			set(OPENCOLORIO_LIBPATH ${OPENCOLORIO}/lib)
+			set(OPENCOLORIO_DEFINITIONS)
+		endif()
+
 		set(PLATFORM_LINKFLAGS "-Xlinker --stack=2097152")
 
 		## DISABLE - causes linking errors 
@@ -1498,6 +1533,14 @@ elseif(APPLE)
 		set(OPENIMAGEIO_DEFINITIONS "-DOIIO_STATIC_BUILD")
 	endif()
 
+	if(WITH_OPENCOLORIO)
+		set(OPENCOLORIO ${LIBDIR}/opencolorio)
+		set(OPENCOLORIO_INCLUDE_DIRS ${OPENCOLORIO}/include)
+		set(OPENCOLORIO_LIBRARIES OpenColorIO tinyxml yaml-cpp)
+		set(OPENCOLORIO_LIBPATH ${OPENCOLORIO}/lib)
+		set(OPENCOLORIO_DEFINITIONS "-DOCIO_STATIC_BUILD")
+	endif()
+
 	if(WITH_CYCLES_OSL)
 		set(CYCLES_OSL ${LIBDIR}/osl CACHE PATH "Path to OpenShadingLanguage installation")
 	
@@ -1689,9 +1732,10 @@ if(CMAKE_COMPILER_IS_GNUCC)
 	ADD_CHECK_C_COMPILER_FLAG(C_WARNINGS C_WARN_CAST_ALIGN -Wcast-align)
 	ADD_CHECK_C_COMPILER_FLAG(C_WARNINGS C_WARN_ERROR_DECLARATION_AFTER_STATEMENT -Werror=declaration-after-statement)
 	ADD_CHECK_C_COMPILER_FLAG(C_WARNINGS C_WARN_ERROR_IMPLICIT_FUNCTION_DECLARATION -Werror=implicit-function-declaration)
-	ADD_CHECK_C_COMPILER_FLAG(C_WARNINGS C_WARN_ERROR_RETURN_TYPE -Werror=return-type)
+	ADD_CHECK_C_COMPILER_FLAG(C_WARNINGS C_WARN_ERROR_RETURN_TYPE  -Werror=return-type)
 	# system headers sometimes do this, disable for now, was: -Werror=strict-prototypes
-	ADD_CHECK_C_COMPILER_FLAG(C_WARNINGS C_WARN_STRICT_PROTOTYPES -Wstrict-prototypes)
+	ADD_CHECK_C_COMPILER_FLAG(C_WARNINGS C_WARN_STRICT_PROTOTYPES  -Wstrict-prototypes)
+	ADD_CHECK_C_COMPILER_FLAG(C_WARNINGS C_WARN_MISSING_PROTOTYPES -Wmissing-prototypes)
 	ADD_CHECK_C_COMPILER_FLAG(C_WARNINGS C_WARN_NO_CHAR_SUBSCRIPTS -Wno-char-subscripts)
 	ADD_CHECK_C_COMPILER_FLAG(C_WARNINGS C_WARN_NO_UNKNOWN_PRAGMAS -Wno-unknown-pragmas)
 	ADD_CHECK_C_COMPILER_FLAG(C_WARNINGS C_WARN_POINTER_ARITH -Wpointer-arith)
@@ -1725,10 +1769,13 @@ if(CMAKE_COMPILER_IS_GNUCC)
 
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 
+	# strange, clang complains these are not supported, but then yses them.
 	ADD_CHECK_C_COMPILER_FLAG(C_WARNINGS C_WARN_ALL -Wall)
 	ADD_CHECK_C_COMPILER_FLAG(C_WARNINGS C_WARN_NO_AUTOLOGICAL_COMPARE -Wno-tautological-compare)
 	ADD_CHECK_C_COMPILER_FLAG(C_WARNINGS C_WARN_NO_UNKNOWN_PRAGMAS -Wno-unknown-pragmas)
 	ADD_CHECK_C_COMPILER_FLAG(C_WARNINGS C_WARN_NO_CHAR_SUBSCRIPTS -Wno-char-subscripts)
+	ADD_CHECK_C_COMPILER_FLAG(C_WARNINGS C_WARN_STRICT_PROTOTYPES  -Wstrict-prototypes)
+	ADD_CHECK_C_COMPILER_FLAG(C_WARNINGS C_WARN_MISSING_PROTOTYPES -Wmissing-prototypes)
 
 	ADD_CHECK_C_COMPILER_FLAG(CXX_WARNINGS C_WARN_ALL -Wall)
 	ADD_CHECK_C_COMPILER_FLAG(CXX_WARNINGS CXX_WARN_NO_AUTOLOGICAL_COMPARE -Wno-tautological-compare)
@@ -1897,6 +1944,7 @@ if(FIRST_RUN)
 	info_cfg_option(WITH_INTERNATIONAL)
 	info_cfg_option(WITH_INPUT_NDOF)
 	info_cfg_option(WITH_CYCLES)
+	info_cfg_option(WITH_OPENCOLORIO)
 
 	info_cfg_text("Compiler Options:")
 	info_cfg_option(WITH_BUILDINFO)

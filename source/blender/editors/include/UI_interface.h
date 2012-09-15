@@ -187,16 +187,17 @@ typedef struct uiLayout uiLayout;
  * - bit  8:    for 'bit'
  * - bit  9-15: button type (now 6 bits, 64 types)
  * */
+typedef enum {
+	UI_BUT_POIN_CHAR = 32,
+	UI_BUT_POIN_SHORT = 64,
+	UI_BUT_POIN_INT = 96,
+	UI_BUT_POIN_FLOAT = 128,
+/*	UI_BUT_POIN_FUNCTION = 192, */ /*UNUSED*/
+	UI_BUT_POIN_BIT = 256  /* OR'd with a bit index*/
+} eButPointerType;
 
-#define CHA 32
-#define SHO 64
-#define INT 96
-#define FLO 128
-/*#define FUN	192*/ /*UNUSED*/
-#define BIT 256
-
-/* button reqyires a pointer */
-#define BUTPOIN (FLO | SHO | CHA)
+/* requires (but->poin != NULL) */
+#define UI_BUT_POIN_TYPES (UI_BUT_POIN_FLOAT | UI_BUT_POIN_SHORT | UI_BUT_POIN_CHAR)
 
 /* assigned to but->type, OR'd with the flags above when passing args */
 typedef enum {
@@ -214,7 +215,7 @@ typedef enum {
 	ICONROW       = (12 << 9),
 	ICONTOG       = (13 << 9),
 	NUMSLI        = (14 << 9),
-	COL           = (15 << 9),
+	COLOR         = (15 << 9),
 	IDPOIN        = (16 << 9),
 	HSVSLI        = (17 << 9),
 	SCROLL        = (18 << 9),
@@ -810,7 +811,7 @@ void uiTemplateColorWheel(uiLayout *layout, struct PointerRNA *ptr, const char *
 void uiTemplateLayers(uiLayout *layout, struct PointerRNA *ptr, const char *propname,
                       PointerRNA *used_ptr, const char *used_propname, int active_layer);
 void uiTemplateImage(uiLayout *layout, struct bContext *C, struct PointerRNA *ptr, const char *propname, struct PointerRNA *userptr, int compact);
-void uiTemplateImageSettings(uiLayout *layout, struct PointerRNA *imfptr);
+void uiTemplateImageSettings(uiLayout *layout, struct PointerRNA *imfptr, int color_management);
 void uiTemplateImageLayers(uiLayout *layout, struct bContext *C, struct Image *ima, struct ImageUser *iuser);
 void uiTemplateRunningJobs(uiLayout *layout, struct bContext *C);
 void uiTemplateOperatorSearch(uiLayout *layout);
@@ -829,6 +830,9 @@ void uiTemplateTextureShow(uiLayout *layout, struct bContext *C, struct PointerR
 void uiTemplateMovieClip(struct uiLayout *layout, struct bContext *C, struct PointerRNA *ptr, const char *propname, int compact);
 void uiTemplateTrack(struct uiLayout *layout, struct PointerRNA *ptr, const char *propname);
 void uiTemplateMarker(struct uiLayout *layout, struct PointerRNA *ptr, const char *propname, PointerRNA *userptr, PointerRNA *trackptr, int cmpact);
+
+void uiTemplateColorspaceSettings(struct uiLayout *layout, struct PointerRNA *ptr, const char *propname);
+void uiTemplateColormanagedViewSettings(struct uiLayout *layout, struct bContext *C, struct PointerRNA *ptr, const char *propname);
 
 /* items */
 void uiItemO(uiLayout *layout, const char *name, int icon, const char *opname);

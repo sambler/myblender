@@ -63,6 +63,7 @@
 
 #include "UI_resources.h"
 
+#include "IMB_colormanagement.h"
 #include "IMB_imbuf.h"
 #include "IMB_imbuf_types.h"
 
@@ -171,7 +172,7 @@ static void node_socket_button_color(const bContext *C, uiBlock *block,
 		int labelw = width - 40;
 		RNA_pointer_create(&ntree->id, &RNA_NodeSocket, sock, &ptr);
 		
-		bt = uiDefButR(block, COL, B_NODE_EXEC, "",
+		bt = uiDefButR(block, COLOR, B_NODE_EXEC, "",
 		               x, y + 2, (labelw > 0 ? 40 : width), NODE_DY - 2,
 		               &ptr, "default_value", 0, 0, 0, -1, -1, NULL);
 		if (node)
@@ -647,23 +648,22 @@ static void update_group_output_cb(bContext *UNUSED(C), void *UNUSED(snode_v), v
 static void draw_group_socket_name(SpaceNode *snode, bNode *gnode, bNodeSocket *sock,
                                    int in_out, float xoffset, float yoffset)
 {
-	bNodeTree *ngroup = (bNodeTree *)gnode->id;
-	uiBut *bt;
-	const char *ui_name = IFACE_(sock->name);
-	
 	if (sock->flag & SOCK_DYNAMIC) {
-		bt = uiDefBut(gnode->block, TEX, 0, "", 
-		              sock->locx + xoffset, sock->locy + 1 + yoffset, 72, NODE_DY,
-		              sock->name, 0, sizeof(sock->name), 0, 0, "");
+		bNodeTree *ngroup = (bNodeTree *)gnode->id;
+		uiBut *but;
+		but = uiDefBut(gnode->block, TEX, 0, "",
+		               sock->locx + xoffset, sock->locy + 1 + yoffset, 72, NODE_DY,
+		               sock->name, 0, sizeof(sock->name), 0, 0, "");
 		if (in_out == SOCK_IN)
-			uiButSetFunc(bt, update_group_input_cb, snode, ngroup);
+			uiButSetFunc(but, update_group_input_cb, snode, ngroup);
 		else
-			uiButSetFunc(bt, update_group_output_cb, snode, ngroup);
+			uiButSetFunc(but, update_group_output_cb, snode, ngroup);
 	}
 	else {
+		const char *ui_name = IFACE_(sock->name);
 		uiDefBut(gnode->block, LABEL, 0, ui_name,
 		         sock->locx + xoffset, sock->locy + 1 + yoffset, 72, NODE_DY,
-		         NULL, 0, sizeof(ui_name), 0, 0, "");
+		         NULL, 0, 0, 0, 0, "");
 	}
 }
 
@@ -893,7 +893,7 @@ static void node_draw_group(const bContext *C, ARegion *ar, SpaceNode *snode, bN
 	}
 }
 
-void node_uifunc_group(uiLayout *layout, bContext *C, PointerRNA *ptr)
+static void node_uifunc_group(uiLayout *layout, bContext *C, PointerRNA *ptr)
 {
 	uiTemplateIDBrowse(layout, C, ptr, "node_tree", NULL, NULL, NULL);
 }
@@ -2024,7 +2024,7 @@ static void node_composit_buts_file_output_details(uiLayout *layout, bContext *C
 	int multilayer = (RNA_enum_get(&imfptr, "file_format") == R_IMF_IMTYPE_MULTILAYER);
 	
 	node_composit_buts_file_output(layout, C, ptr);
-	uiTemplateImageSettings(layout, &imfptr);
+	uiTemplateImageSettings(layout, &imfptr, TRUE);
 	
 	uiItemS(layout);
 	
@@ -2083,7 +2083,7 @@ static void node_composit_buts_file_output_details(uiLayout *layout, bContext *C
 			
 			col = uiLayoutColumn(layout, FALSE);
 			uiLayoutSetActive(col, RNA_boolean_get(&active_input_ptr, "use_node_format") == FALSE);
-			uiTemplateImageSettings(col, &imfptr);
+			uiTemplateImageSettings(col, &imfptr, TRUE);
 		}
 	}
 }
@@ -2388,7 +2388,7 @@ static void node_composit_buts_bokehblur(uiLayout *layout, bContext *UNUSED(C), 
 	uiItemR(layout, ptr, "blur_max", 0, NULL, ICON_NONE);
 }
 
-void node_composit_backdrop_viewer(SpaceNode *snode, ImBuf *backdrop, bNode *node, int x, int y)
+static void node_composit_backdrop_viewer(SpaceNode *snode, ImBuf *backdrop, bNode *node, int x, int y)
 {
 //	node_composit_backdrop_canvas(snode, backdrop, node, x, y);
 	if (node->custom1 == 0) {
@@ -2408,7 +2408,7 @@ void node_composit_backdrop_viewer(SpaceNode *snode, ImBuf *backdrop, bNode *nod
 	}
 }
 
-void node_composit_backdrop_boxmask(SpaceNode *snode, ImBuf *backdrop, bNode *node, int x, int y)
+static void node_composit_backdrop_boxmask(SpaceNode *snode, ImBuf *backdrop, bNode *node, int x, int y)
 {
 	NodeBoxMask *boxmask = node->storage;
 	const float backdropWidth = backdrop->x;
@@ -2449,7 +2449,7 @@ void node_composit_backdrop_boxmask(SpaceNode *snode, ImBuf *backdrop, bNode *no
 	glEnd();
 }
 
-void node_composit_backdrop_ellipsemask(SpaceNode *snode, ImBuf *backdrop, bNode *node, int x, int y)
+static void node_composit_backdrop_ellipsemask(SpaceNode *snode, ImBuf *backdrop, bNode *node, int x, int y)
 {
 	NodeEllipseMask *ellipsemask = node->storage;
 	const float backdropWidth = backdrop->x;
@@ -3052,7 +3052,7 @@ void ED_node_init_butfuncs(void)
 
 /* ************** Generic drawing ************** */
 
-void draw_nodespace_back_pix(ARegion *ar, SpaceNode *snode, int color_manage)
+void draw_nodespace_back_pix(const bContext *C, ARegion *ar, SpaceNode *snode)
 {
 	
 	if ((snode->flag & SNODE_BACKDRAW) && snode->treetype == NTREE_COMPOSIT) {
@@ -3060,7 +3060,10 @@ void draw_nodespace_back_pix(ARegion *ar, SpaceNode *snode, int color_manage)
 		void *lock;
 		ImBuf *ibuf = BKE_image_acquire_ibuf(ima, NULL, &lock);
 		if (ibuf) {
+			SpaceNode *snode = CTX_wm_space_node(C);
 			float x, y; 
+			unsigned char *display_buffer;
+			void *cache_handle;
 			
 			glMatrixMode(GL_PROJECTION);
 			glPushMatrix();
@@ -3079,15 +3082,10 @@ void draw_nodespace_back_pix(ARegion *ar, SpaceNode *snode, int color_manage)
 			x = (ar->winx - snode->zoom * ibuf->x) / 2 + snode->xof;
 			y = (ar->winy - snode->zoom * ibuf->y) / 2 + snode->yof;
 			
-			if (!ibuf->rect) {
-				if (color_manage)
-					ibuf->profile = IB_PROFILE_LINEAR_RGB;
-				else
-					ibuf->profile = IB_PROFILE_NONE;
-				IMB_rect_from_float(ibuf);
-			}
 
-			if (ibuf->rect) {
+			display_buffer = IMB_display_buffer_acquire_ctx(C, ibuf, &cache_handle);
+
+			if (display_buffer) {
 				if (snode->flag & (SNODE_SHOW_R | SNODE_SHOW_G | SNODE_SHOW_B)) {
 					int ofs;
 
@@ -3115,7 +3113,7 @@ void draw_nodespace_back_pix(ARegion *ar, SpaceNode *snode, int color_manage)
 #ifdef __BIG_ENDIAN__
 					glPixelStorei(GL_UNPACK_SWAP_BYTES, 1);
 #endif
-					glaDrawPixelsSafe(x, y, ibuf->x, ibuf->y, ibuf->x, GL_LUMINANCE, GL_UNSIGNED_INT, ibuf->rect);
+					glaDrawPixelsSafe(x, y, ibuf->x, ibuf->y, ibuf->x, GL_LUMINANCE, GL_UNSIGNED_INT, display_buffer);
 
 #ifdef __BIG_ENDIAN__
 					glPixelStorei(GL_UNPACK_SWAP_BYTES, 0);
@@ -3127,7 +3125,7 @@ void draw_nodespace_back_pix(ARegion *ar, SpaceNode *snode, int color_manage)
 					glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 					glPixelZoom(snode->zoom, snode->zoom);
 					
-					glaDrawPixelsSafe(x, y, ibuf->x, ibuf->y, ibuf->x, GL_RGBA, GL_UNSIGNED_BYTE, ibuf->rect);
+					glaDrawPixelsSafe(x, y, ibuf->x, ibuf->y, ibuf->x, GL_RGBA, GL_UNSIGNED_BYTE, display_buffer);
 					
 					glPixelZoom(1.0f, 1.0f);
 					glDisable(GL_BLEND);
@@ -3135,11 +3133,13 @@ void draw_nodespace_back_pix(ARegion *ar, SpaceNode *snode, int color_manage)
 				else {
 					glPixelZoom(snode->zoom, snode->zoom);
 					
-					glaDrawPixelsSafe(x, y, ibuf->x, ibuf->y, ibuf->x, GL_RGBA, GL_UNSIGNED_BYTE, ibuf->rect);
+					glaDrawPixelsSafe(x, y, ibuf->x, ibuf->y, ibuf->x, GL_RGBA, GL_UNSIGNED_BYTE, display_buffer);
 					
 					glPixelZoom(1.0f, 1.0f);
 				}
 			}
+
+			IMB_display_buffer_release(cache_handle);
 
 			/** @note draw selected info on backdrop */
 			if (snode->edittree) {

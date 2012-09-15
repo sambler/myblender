@@ -179,7 +179,7 @@ static DMDrawOption draw_mesh_face_select__drawFaceOptsInv(void *userData, int i
 		return DM_DRAW_OPTION_SKIP;
 }
 
-void draw_mesh_face_select(RegionView3D *rv3d, Mesh *me, DerivedMesh *dm)
+static void draw_mesh_face_select(RegionView3D *rv3d, Mesh *me, DerivedMesh *dm)
 {
 	drawMeshFaceSelect_userData data;
 
@@ -372,7 +372,15 @@ static void draw_textured_begin(Scene *scene, View3D *v3d, RegionView3D *rv3d, O
 
 	Gtexdraw.ob = ob;
 	Gtexdraw.is_tex = is_tex;
-	Gtexdraw.color_profile = scene->r.color_mgt_flag & R_COLOR_MANAGEMENT;
+
+	/* OCIO_TODO: for now assume OpenGL is always doing color management and working in sRGB space
+	 *            supporting for real display conversion could be nice here, but it's a bit challenging
+	 *            since all the shaders should be aware of such a transform
+	 *            perhaps this flag could be completely removed before release in separated commit and
+	 *            be re-implemented if real display transform would be needed
+	 */
+	Gtexdraw.color_profile = TRUE;
+
 	memcpy(Gtexdraw.obcol, obcol, sizeof(obcol));
 	set_draw_settings_cached(1, NULL, NULL, Gtexdraw);
 	glShadeModel(GL_SMOOTH);
@@ -507,7 +515,7 @@ static void update_tface_color_layer(DerivedMesh *dm)
 					finalCol[i * 4 + j].r = 255;
 				}
 		}
-		else if (tface && mface && set_draw_settings_cached(0, tface, ma, Gtexdraw)) {
+		else if (tface && set_draw_settings_cached(0, tface, ma, Gtexdraw)) {
 			for (j = 0; j < 4; j++) {
 				finalCol[i * 4 + j].b = 255;
 				finalCol[i * 4 + j].g = 0;
@@ -772,8 +780,8 @@ static int compareDrawOptionsEm(void *userData, int cur_index, int next_index)
 	return 1;
 }
 
-void draw_mesh_textured_old(Scene *scene, View3D *v3d, RegionView3D *rv3d,
-                            Object *ob, DerivedMesh *dm, const int draw_flags)
+static void draw_mesh_textured_old(Scene *scene, View3D *v3d, RegionView3D *rv3d,
+                                   Object *ob, DerivedMesh *dm, const int draw_flags)
 {
 	Mesh *me = ob->data;
 	

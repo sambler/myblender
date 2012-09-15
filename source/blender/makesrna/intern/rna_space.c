@@ -658,20 +658,6 @@ static void rna_SpaceImageEditor_cursor_location_set(PointerRNA *ptr, const floa
 	}
 }
 
-static void rna_SpaceImageEditor_curves_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
-{
-	SpaceImage *sima = (SpaceImage *)ptr->data;
-	ImBuf *ibuf;
-	void *lock;
-
-	ibuf = ED_space_image_acquire_buffer(sima, &lock);
-	if (ibuf->rect_float)
-		curvemapping_do_ibuf(sima->cumap, ibuf);
-	ED_space_image_release_buffer(sima, lock);
-
-	WM_main_add_notifier(NC_IMAGE, sima->image);
-}
-
 static void rna_SpaceImageEditor_scopes_update(Main *UNUSED(bmain), Scene *scene, PointerRNA *ptr)
 {
 	SpaceImage *sima = (SpaceImage *)ptr->data;
@@ -680,7 +666,7 @@ static void rna_SpaceImageEditor_scopes_update(Main *UNUSED(bmain), Scene *scene
 	
 	ibuf = ED_space_image_acquire_buffer(sima, &lock);
 	if (ibuf) {
-		scopes_update(&sima->scopes, ibuf, scene->r.color_mgt_flag & R_COLOR_MANAGEMENT);
+		scopes_update(&sima->scopes, ibuf, &scene->view_settings, &scene->display_settings);
 		WM_main_add_notifier(NC_IMAGE, sima->image);
 	}
 	ED_space_image_release_buffer(sima, lock);
@@ -1555,7 +1541,7 @@ static void rna_def_space_view3d(BlenderRNA *brna)
 	RNA_def_property_float_sdna(prop, NULL, "near");
 	RNA_def_property_range(prop, 0.001f, FLT_MAX);
 	RNA_def_property_float_default(prop, 0.1f);
-	RNA_def_property_ui_text(prop, "Clip Start", "3D View near clipping distance");
+	RNA_def_property_ui_text(prop, "Clip Start", "3D View near clipping distance (perspective view only)");
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
 
 	prop = RNA_def_property(srna, "clip_end", PROP_FLOAT, PROP_DISTANCE);
@@ -1979,11 +1965,6 @@ static void rna_def_space_image(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Image User",
 	                         "Parameters defining which layer, pass and frame of the image is displayed");
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_IMAGE, NULL);
-
-	prop = RNA_def_property(srna, "curve", PROP_POINTER, PROP_NONE);
-	RNA_def_property_pointer_sdna(prop, NULL, "cumap");
-	RNA_def_property_ui_text(prop, "Curve", "Color curve mapping to use for displaying the image");
-	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_IMAGE, "rna_SpaceImageEditor_curves_update");
 
 	prop = RNA_def_property(srna, "scopes", PROP_POINTER, PROP_NONE);
 	RNA_def_property_pointer_sdna(prop, NULL, "scopes");

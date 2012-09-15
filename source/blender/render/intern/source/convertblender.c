@@ -117,6 +117,7 @@
 #include "zbuf.h"
 #include "sunsky.h"
 
+#include "RE_render_ext.h"
 
 /* 10 times larger than normal epsilon, test it on default nurbs sphere with ray_transp (for quad detection) */
 /* or for checking vertex normal flips */
@@ -246,32 +247,24 @@ void RE_make_stars(Render *re, Scene *scenev3d, void (*initfunc)(void),
 					done++;
 				}
 				else {
-					mul_m4_v3(re->viewmat, vec);
+					if (re)
+						mul_m4_v3(re->viewmat, vec);
 					
 					/* in vec are global coordinates
 					 * calculate distance to camera
 					 * and using that, define the alpha
 					 */
-					
-					{
-						float tx, ty, tz;
-						
-						tx = vec[0];
-						ty = vec[1];
-						tz = vec[2];
-						
-						alpha = sqrt(tx * tx + ty * ty + tz * tz);
-						
-						if (alpha >= clipend) alpha = 0.0;
-						else if (alpha <= starmindist) alpha = 0.0;
-						else if (alpha <= 2.0f * starmindist) {
-							alpha = (alpha - starmindist) / starmindist;
-						}
-						else {
-							alpha -= 2.0f * starmindist;
-							alpha /= (clipend - 2.0f * starmindist);
-							alpha = 1.0f - alpha;
-						}
+					alpha = len_v3(vec);
+
+					if (alpha >= clipend) alpha = 0.0;
+					else if (alpha <= starmindist) alpha = 0.0;
+					else if (alpha <= 2.0f * starmindist) {
+						alpha = (alpha - starmindist) / starmindist;
+					}
+					else {
+						alpha -= 2.0f * starmindist;
+						alpha /= (clipend - 2.0f * starmindist);
+						alpha = 1.0f - alpha;
 					}
 					
 					

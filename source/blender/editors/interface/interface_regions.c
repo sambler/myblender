@@ -66,6 +66,8 @@
 
 #include "ED_screen.h"
 
+#include "IMB_colormanagement.h"
+
 #include "interface_intern.h"
 
 #define MENU_SEPR_HEIGHT    6
@@ -1494,7 +1496,7 @@ static void ui_block_position(wmWindow *window, ARegion *butregion, uiBut *but, 
 	BLI_rctf_translate(&block->rect, xof, yof);
 
 	/* safety calculus */
-	if (but) {
+	{
 		const float midx = BLI_RCT_CENTER_X(&butrct);
 		const float midy = BLI_RCT_CENTER_Y(&butrct);
 		
@@ -1521,20 +1523,13 @@ static void ui_block_position(wmWindow *window, ARegion *butregion, uiBut *but, 
 		}
 		block->direction = dir1;
 	}
-	else {
-		block->safety.xmin = block->rect.xmin - 40;
-		block->safety.ymin = block->rect.ymin - 40;
-		block->safety.xmax = block->rect.xmax + 40;
-		block->safety.ymax = block->rect.ymax + 40;
-	}
 
 	/* keep a list of these, needed for pulldown menus */
 	saferct = MEM_callocN(sizeof(uiSafetyRct), "uiSafetyRct");
 	saferct->parent = butrct;
 	saferct->safety = block->safety;
 	BLI_freelistN(&block->saferct);
-	if (but)
-		BLI_duplicatelist(&block->saferct, &but->block->saferct);
+	BLI_duplicatelist(&block->saferct, &but->block->saferct);
 	BLI_addhead(&block->saferct, saferct);
 }
 
@@ -1806,11 +1801,11 @@ static void ui_block_func_MENUSTR(bContext *UNUSED(C), uiLayout *layout, void *a
 			bt->flag = UI_TEXT_LEFT;
 		}
 		else if (entry->icon) {
-			uiDefIconTextButF(block, BUTM | FLO, B_NOP, entry->icon, entry->str, 0, 0,
+			uiDefIconTextButF(block, BUTM, B_NOP, entry->icon, entry->str, 0, 0,
 			                  UI_UNIT_X * 5, UI_UNIT_Y, &handle->retvalue, (float) entry->retval, 0.0, 0, 0, "");
 		}
 		else {
-			uiDefButF(block, BUTM | FLO, B_NOP, entry->str, 0, 0,
+			uiDefButF(block, BUTM, B_NOP, entry->str, 0, 0,
 			          UI_UNIT_X * 5, UI_UNIT_X, &handle->retvalue, (float) entry->retval, 0.0, 0, 0, "");
 		}
 	}
@@ -1828,7 +1823,7 @@ void ui_block_func_ICONROW(bContext *UNUSED(C), uiLayout *layout, void *arg_but)
 	uiBlockSetFlag(block, UI_BLOCK_MOVEMOUSE_QUIT);
 	
 	for (a = (int)but->hardmin; a <= (int)but->hardmax; a++)
-		uiDefIconButF(block, BUTM | FLO, B_NOP, but->icon + (a - but->hardmin), 0, 0, UI_UNIT_X * 5, UI_UNIT_Y,
+		uiDefIconButF(block, BUTM, B_NOP, but->icon + (a - but->hardmin), 0, 0, UI_UNIT_X * 5, UI_UNIT_Y,
 		              &handle->retvalue, (float)a, 0.0, 0, 0, "");
 }
 
@@ -1858,7 +1853,7 @@ void ui_block_func_ICONTEXTROW(bContext *UNUSED(C), uiLayout *layout, void *arg_
 		if (entry->sepr)
 			uiItemS(layout);
 		else
-			uiDefIconTextButF(block, BUTM | FLO, B_NOP, (short)((but->icon) + (entry->retval - but->hardmin)), entry->str,
+			uiDefIconTextButF(block, BUTM, B_NOP, (short)((but->icon) + (entry->retval - but->hardmin)), entry->str,
 			                  0, 0, UI_UNIT_X * 5, UI_UNIT_Y, &handle->retvalue, (float) entry->retval, 0.0, 0, 0, "");
 	}
 
@@ -1900,11 +1895,15 @@ static void ui_update_block_buts_rgb(uiBlock *block, const float rgb[3])
 {
 	uiBut *bt;
 	float *hsv = ui_block_hsv_get(block);
+	struct ColorManagedDisplay *display = NULL;
 	
 	/* this is to keep the H and S value when V is equal to zero
 	 * and we are working in HSV mode, of course!
 	 */
 	rgb_to_hsv_compat_v(rgb, hsv);
+
+	if (block->color_profile)
+		display = ui_block_display_get(block);
 	
 	/* this updates button strings, is hackish... but button pointers are on stack of caller function */
 	for (bt = block->buttons.first; bt; bt = bt->next) {
@@ -1920,12 +1919,11 @@ static void ui_update_block_buts_rgb(uiBlock *block, const float rgb[3])
 			
 			/* Hex code is assumed to be in sRGB space (coming from other applications, web, etc) */
 			
-			if (block->color_profile == BLI_PR_NONE) {
-				copy_v3_v3(rgb_gamma, rgb);
-			}
-			else {
-				/* make an sRGB version, for Hex code */
-				linearrgb_to_srgb_v3_v3(rgb_gamma, rgb);
+			copy_v3_v3(rgb_gamma, rgb);
+
+			if (display) {
+				/* make a display version, for Hex code */
+				IMB_colormanagement_scene_linear_to_display_v3(rgb_gamma, display);
 			}
 			
 			if (rgb_gamma[0] > 1.0f) rgb_gamma[0] = modf(rgb_gamma[0], &intpart);
@@ -2004,9 +2002,9 @@ static void do_hex_rna_cb(bContext *UNUSED(C), void *bt1, void *hexcl)
 	hex_to_rgb(hexcol, rgb, rgb + 1, rgb + 2);
 	
 	/* Hex code is assumed to be in sRGB space (coming from other applications, web, etc) */
-	if (but->block->color_profile != BLI_PR_NONE) {
+	if (but->block->color_profile) {
 		/* so we need to linearise it for Blender */
-		srgb_to_linearrgb_v3_v3(rgb, rgb);
+		ui_block_to_scene_linear_v3(but->block, rgb);
 	}
 	
 	ui_update_block_buts_rgb(but->block, rgb);
@@ -2114,14 +2112,16 @@ static void uiBlockPicker(uiBlock *block, float rgba[4], PointerRNA *ptr, Proper
 	
 	/* existence of profile means storage is in linear color space, with display correction */
 	/* XXX That tip message is not use anywhere! */
-	if (block->color_profile == BLI_PR_NONE) {
+	if (!block->color_profile) {
 		BLI_strncpy(tip, N_("Value in Display Color Space"), sizeof(tip));
 		copy_v3_v3(rgb_gamma, rgba);
 	}
 	else {
 		BLI_strncpy(tip, N_("Value in Linear RGB Color Space"), sizeof(tip));
-		/* make an sRGB version, for Hex code */
-		linearrgb_to_srgb_v3_v3(rgb_gamma, rgba);
+
+		/* make a display version, for Hex code */
+		copy_v3_v3(rgb_gamma, rgba);
+		ui_block_to_display_space_v3(block, rgb_gamma);
 	}
 	
 	/* sneaky way to check for alpha */
@@ -2237,7 +2237,7 @@ static int ui_picker_small_wheel_cb(const bContext *UNUSED(C), uiBlock *block, w
 	return 0;
 }
 
-uiBlock *ui_block_func_COL(bContext *C, uiPopupBlockHandle *handle, void *arg_but)
+uiBlock *ui_block_func_COLOR(bContext *C, uiPopupBlockHandle *handle, void *arg_but)
 {
 	uiBut *but = arg_but;
 	uiBlock *block;
@@ -2246,7 +2246,7 @@ uiBlock *ui_block_func_COL(bContext *C, uiPopupBlockHandle *handle, void *arg_bu
 	
 	if (but->rnaprop) {
 		if (RNA_property_subtype(but->rnaprop) == PROP_COLOR_GAMMA) {
-			block->color_profile = BLI_PR_NONE;
+			block->color_profile = FALSE;
 		}
 	}
 	

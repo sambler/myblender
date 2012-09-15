@@ -3305,7 +3305,8 @@ static void draw_em_fancy(Scene *scene, View3D *v3d, RegionView3D *rv3d,
 
 		draw_em_fancy_edges(em, scene, v3d, me, cageDM, 0, eed_act);
 	}
-	if (em) {
+
+	{
 		draw_em_fancy_verts(scene, v3d, ob, em, cageDM, eve_act, rv3d);
 
 		if (me->drawflag & ME_DRAWNORMALS) {
@@ -7232,7 +7233,7 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short
 						setlinestyle(0);
 					}
 				}
-				else if ((curcon->flag & CONSTRAINT_EXPAND) && (cti) && (cti->get_constraint_targets)) {
+				else if ((curcon->flag & CONSTRAINT_EXPAND) && (cti->get_constraint_targets)) {
 					cti->get_constraint_targets(curcon, &targets);
 					
 					for (ct = targets.first; ct; ct = ct->next) {

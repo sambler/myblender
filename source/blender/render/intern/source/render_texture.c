@@ -50,6 +50,7 @@
 
 #include "IMB_imbuf_types.h"
 #include "IMB_imbuf.h"
+#include "IMB_colormanagement.h"
 
 #include "BKE_colortools.h"
 #include "BKE_image.h"
@@ -81,6 +82,8 @@
 #include "texture_ocean.h"
 
 #include "renderdatabase.h" /* needed for UV */
+
+#include "RE_render_ext.h"
 
 /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
 /* defined in pipeline.c, is hardcopy of active dynamic allocated Render */
@@ -1290,8 +1293,8 @@ int multitex_nodes(Tex *tex, float *texvec, float *dxt, float *dyt, int osatex, 
 				ImBuf *ibuf = BKE_image_get_ibuf(tex->ima, &tex->iuser);
 				
 				/* don't linearize float buffers, assumed to be linear */
-				if (ibuf && !(ibuf->rect_float) && R.r.color_mgt_flag & R_COLOR_MANAGEMENT)
-					srgb_to_linearrgb_v3_v3(&texres->tr, &texres->tr);
+				if (ibuf && !(ibuf->rect_float))
+					IMB_colormanagement_colorspace_to_scene_linear_v3(&texres->tr, ibuf->rect_colorspace);
 			}
 		}
 		else {
@@ -1325,18 +1328,19 @@ int multitex_nodes(Tex *tex, float *texvec, float *dxt, float *dyt, int osatex, 
 }
 
 /* this is called for surface shading */
-int multitex_mtex(ShadeInput *shi, MTex *mtex, float *texvec, float *dxt, float *dyt, TexResult *texres)
+static int multitex_mtex(ShadeInput *shi, MTex *mtex, float *texvec, float *dxt, float *dyt, TexResult *texres)
 {
-	Tex *tex= mtex->tex;
+	Tex *tex = mtex->tex;
 
 	if (tex->use_nodes && tex->nodetree) {
 		/* stupid exception here .. but we have to pass shi and mtex to
 		 * textures nodes for 2d mapping and color management for images */
 		return ntreeTexExecTree(tex->nodetree, texres, texvec, dxt, dyt, shi->osatex, shi->thread,
-			tex, mtex->which_output, R.r.cfra, (R.r.scemode & R_TEXNODE_PREVIEW) != 0, shi, mtex);
+		                        tex, mtex->which_output, R.r.cfra, (R.r.scemode & R_TEXNODE_PREVIEW) != 0, shi, mtex);
 	}
-	else
+	else {
 		return multitex(mtex->tex, texvec, dxt, dyt, shi->osatex, texres, shi->thread, mtex->which_output);
+	}
 }
 
 /* Warning, if the texres's values are not declared zero, check the return value to be sure
@@ -2442,8 +2446,8 @@ void do_material_tex(ShadeInput *shi, Render *re)
 					ImBuf *ibuf = BKE_image_get_ibuf(ima, &tex->iuser);
 					
 					/* don't linearize float buffers, assumed to be linear */
-					if (ibuf && !(ibuf->rect_float) && re->r.color_mgt_flag & R_COLOR_MANAGEMENT)
-						srgb_to_linearrgb_v3_v3(tcol, tcol);
+					if (ibuf && !(ibuf->rect_float))
+						IMB_colormanagement_colorspace_to_scene_linear_v3(tcol, ibuf->rect_colorspace);
 				}
 				
 				if (mtex->mapto & MAP_COL) {
@@ -2954,8 +2958,8 @@ void do_halo_tex(HaloRen *har, float xn, float yn, float col_r[4])
 			ImBuf *ibuf = BKE_image_get_ibuf(ima, &mtex->tex->iuser);
 			
 			/* don't linearize float buffers, assumed to be linear */
-			if (ibuf && !(ibuf->rect_float) && R.r.color_mgt_flag & R_COLOR_MANAGEMENT)
-				srgb_to_linearrgb_v3_v3(&texres.tr, &texres.tr);
+			if (ibuf && !(ibuf->rect_float))
+				IMB_colormanagement_colorspace_to_scene_linear_v3(&texres.tr, ibuf->rect_colorspace);
 		}
 
 		fact= texres.tin*mtex->colfac;
@@ -3169,8 +3173,8 @@ void do_sky_tex(const float rco[3], float lo[3], const float dxyview[2], float h
 					ImBuf *ibuf = BKE_image_get_ibuf(ima, &tex->iuser);
 					
 					/* don't linearize float buffers, assumed to be linear */
-					if (ibuf && !(ibuf->rect_float) && R.r.color_mgt_flag & R_COLOR_MANAGEMENT)
-						srgb_to_linearrgb_v3_v3(tcol, tcol);
+					if (ibuf && !(ibuf->rect_float))
+						IMB_colormanagement_colorspace_to_scene_linear_v3(tcol, ibuf->rect_colorspace);
 				}
 
 				if (mtex->mapto & WOMAP_HORIZ) {
@@ -3383,8 +3387,8 @@ void do_lamp_tex(LampRen *la, const float lavec[3], ShadeInput *shi, float col_r
 					ImBuf *ibuf = BKE_image_get_ibuf(ima, &tex->iuser);
 					
 					/* don't linearize float buffers, assumed to be linear */
-					if (ibuf && !(ibuf->rect_float) && R.r.color_mgt_flag & R_COLOR_MANAGEMENT)
-						srgb_to_linearrgb_v3_v3(&texres.tr, &texres.tr);
+					if (ibuf && !(ibuf->rect_float))
+						IMB_colormanagement_colorspace_to_scene_linear_v3(&texres.tr, ibuf->rect_colorspace);
 				}
 
 				/* lamp colors were premultiplied with this */

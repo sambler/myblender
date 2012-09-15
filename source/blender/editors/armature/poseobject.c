@@ -74,6 +74,7 @@
 #include "ED_mesh.h"
 #include "ED_screen.h"
 #include "ED_object.h"
+#include "ED_util.h"  /* clipboard */
 
 #include "UI_interface.h"
 #include "UI_resources.h"
@@ -727,7 +728,7 @@ static int pose_select_grouped_exec(bContext *C, wmOperator *op)
 	short changed = 0;
 	
 	/* sanity check */
-	if (ELEM(NULL, ob, ob->pose))
+	if (ob->pose == NULL)
 		return OPERATOR_CANCELLED;
 		
 	/* selection types 
@@ -1049,7 +1050,7 @@ static void pose_copy_menu(Scene *scene)
 /* Global copy/paste buffer for pose - cleared on start/end session + before every copy operation */
 static bPose *g_posebuf = NULL;
 
-void free_posebuf(void) 
+void ED_clipboard_posebuf_free(void)
 {
 	if (g_posebuf) {
 		bPoseChannel *pchan;
@@ -1225,7 +1226,7 @@ static int pose_copy_exec(bContext *C, wmOperator *op)
 	}
 
 	/* free existing pose buffer */
-	free_posebuf();
+	ED_clipboard_posebuf_free();
 	
 	/* sets chan->flag to POSE_KEY if bone selected, then copy those bones to the buffer */
 	set_pose_keys(ob);  
@@ -2468,20 +2469,18 @@ static int pose_clear_user_transforms_exec(bContext *C, wmOperator *op)
 		for (pchan = dummyPose->chanbase.first; pchan; pchan = pchan->next) {
 			pose_bone_do_paste(ob, pchan, only_select, 0);
 		}
-		
+
 		/* free temp data - free manually as was copied without constraints */
-		if (dummyPose) {
-			for (pchan = dummyPose->chanbase.first; pchan; pchan = pchan->next) {
-				if (pchan->prop) {
-					IDP_FreeProperty(pchan->prop);
-					MEM_freeN(pchan->prop);
-				}
+		for (pchan = dummyPose->chanbase.first; pchan; pchan = pchan->next) {
+			if (pchan->prop) {
+				IDP_FreeProperty(pchan->prop);
+				MEM_freeN(pchan->prop);
 			}
-			
-			/* was copied without constraints */
-			BLI_freelistN(&dummyPose->chanbase);
-			MEM_freeN(dummyPose);
 		}
+
+		/* was copied without constraints */
+		BLI_freelistN(&dummyPose->chanbase);
+		MEM_freeN(dummyPose);
 	}
 	else {
 		/* no animation, so just reset whole pose to rest pose 

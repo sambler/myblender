@@ -992,6 +992,9 @@ static void createTransPose(TransInfo *t, Object *ob)
 	t->flag |= T_POSE;
 	t->poseobj = ob; /* we also allow non-active objects to be transformed, in weightpaint */
 
+	/* disable PET, its not usable in pose mode yet [#32444] */
+	t->flag &= ~(T_PROP_EDIT | T_PROP_CONNECTED);
+
 	/* init trans data */
 	td = t->data = MEM_callocN(t->total * sizeof(TransData), "TransPoseBone");
 	tdx = t->ext = MEM_callocN(t->total * sizeof(TransDataExtension), "TransPoseBoneExt");
@@ -5605,6 +5608,9 @@ static void createTransNodeData(bContext *UNUSED(C), TransInfo *t)
 	if (!snode->edittree) {
 		return;
 	}
+
+	/* nodes dont support PET and probably never will */
+	t->flag &= ~(T_PROP_EDIT | T_PROP_CONNECTED);
 
 	/* set transform flags on nodes */
 	for (node = snode->edittree->nodes.first; node; node = node->next) {

@@ -617,7 +617,7 @@ static void rna_Sequence_update_reopen_files(Main *UNUSED(bmain), Scene *UNUSED(
 	Scene *scene = (Scene *) ptr->id.data;
 	Editing *ed = BKE_sequencer_editing_get(scene, FALSE);
 
-	BKE_sequencer_free_imbuf(scene, &ed->seqbase, FALSE, FALSE);
+	BKE_sequencer_free_imbuf(scene, &ed->seqbase, FALSE);
 
 	if (RNA_struct_is_a(ptr->type, &RNA_SoundSequence))
 		BKE_sequencer_update_sound_bounds(scene, ptr->data);
@@ -1431,6 +1431,11 @@ static void rna_def_sequence(BlenderRNA *brna)
 	RNA_def_property_range(prop, 0, MAXSEQ - 1);
 	RNA_def_property_ui_text(prop, "Channel", "Y position of the sequence strip");
 	RNA_def_property_int_funcs(prop, NULL, "rna_Sequence_channel_set", NULL); /* overlap test */
+	RNA_def_property_update(prop, NC_SCENE | ND_SEQUENCER, "rna_Sequence_update");
+
+	prop = RNA_def_property(srna, "use_linear_modifiers", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", SEQ_USE_LINEAR_MODIFIERS);
+	RNA_def_property_ui_text(prop, "Use Linear Modifiers", "Calculate modifiers in linear space instead of sequencer's space");
 	RNA_def_property_update(prop, NC_SCENE | ND_SEQUENCER, "rna_Sequence_update");
 
 	/* blending */

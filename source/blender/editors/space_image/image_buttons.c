@@ -71,28 +71,6 @@
 
 #include "image_intern.h"
 
-#define B_REDR                1
-#define B_IMAGECHANGED        2
-#define B_NOP                 0
-#define B_TWINANIM            5
-#define B_SIMAGETILE          6
-#define B_IDNAME             10
-#define B_FACESEL_PAINT_TEST 11
-#define B_SIMA_RECORD        12
-#define B_SIMA_PLAY          13
-
-#define B_SIMANOTHING        16
-#define B_SIMABRUSHCHANGE    17
-#define B_SIMABRUSHBROWSE    18
-#define B_SIMABRUSHLOCAL     19
-#define B_SIMABRUSHDELETE    20
-#define B_KEEPDATA           21
-#define B_SIMABTEXBROWSE     22
-#define B_SIMABTEXDELETE     23
-#define B_VPCOLSLI           24
-#define B_SIMACLONEBROWSE    25
-#define B_SIMACLONEDELETE    26
-
 /* proto */
 
 static void image_info(Scene *scene, ImageUser *iuser, Image *ima, ImBuf *ibuf, char *str)
@@ -228,13 +206,13 @@ static void preview_cb(ScrArea *sa, struct uiBlock *block)
 	int mval[2];
 	
 	if (G.scene->r.mode & R_BORDER) {
-		winx *= BLI_RCT_SIZE_X(&G.scene->r.border);
-		winy *= BLI_RCT_SIZE_Y(&G.scene->r.border);
+		winx *= BLI_rcti_size_x(&G.scene->r.border);
+		winy *= BLI_rctf_size_y(&G.scene->r.border);
 	}
 	
 	/* while dragging we need to update the rects, otherwise it doesn't end with correct one */
 
-	BLI_rctf_init(&dispf, 15.0f, BLI_RCT_SIZE_X(&block->rect) - 15.0f, 15.0f, (BLI_RCT_SIZE_Y(&block->rect)) - 15.0f);
+	BLI_rctf_init(&dispf, 15.0f, BLI_rcti_size_x(&block->rect) - 15.0f, 15.0f, (BLI_rctf_size_y(&block->rect)) - 15.0f);
 	ui_graphics_to_window_rct(sa->win, &dispf, disprect);
 	
 	/* correction for gla draw */

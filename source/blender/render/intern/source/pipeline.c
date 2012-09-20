@@ -203,9 +203,9 @@ RenderLayer *RE_GetRenderLayer(RenderResult *rr, const char *name)
 	}
 }
 
-RenderResult *RE_MultilayerConvert(void *exrhandle, int rectx, int recty)
+RenderResult *RE_MultilayerConvert(void *exrhandle, const char *colorspace, int predivide, int rectx, int recty)
 {
-	return render_result_new_from_exr(exrhandle, rectx, recty);
+	return render_result_new_from_exr(exrhandle, colorspace, predivide, rectx, recty);
 }
 
 RenderLayer *render_get_active_layer(Render *re, RenderResult *rr)
@@ -437,8 +437,8 @@ void RE_InitState(Render *re, Render *source, RenderData *rd, SceneRenderLayer *
 	re->winy = winy;
 	if (disprect) {
 		re->disprect = *disprect;
-		re->rectx = BLI_RCT_SIZE_X(disprect);
-		re->recty = BLI_RCT_SIZE_Y(disprect);
+		re->rectx = BLI_rcti_size_x(disprect);
+		re->recty = BLI_rcti_size_y(disprect);
 	}
 	else {
 		re->disprect.xmin = re->disprect.ymin = 0;
@@ -670,15 +670,15 @@ static void *do_part_thread(void *pa_v)
 float panorama_pixel_rot(Render *re)
 {
 	float psize, phi, xfac;
-	float borderfac = (float)BLI_RCT_SIZE_X(&re->disprect) / (float)re->winx;
+	float borderfac = (float)BLI_rcti_size_x(&re->disprect) / (float)re->winx;
 	
 	/* size of 1 pixel mapped to viewplane coords */
-	psize = BLI_RCT_SIZE_X(&re->viewplane) / (float)re->winx;
+	psize = BLI_rctf_size_x(&re->viewplane) / (float)re->winx;
 	/* angle of a pixel */
 	phi = atan(psize / re->clipsta);
 	
 	/* correction factor for viewplane shifting, first calculate how much the viewplane angle is */
-	xfac = borderfac * BLI_RCT_SIZE_X(&re->viewplane) / (float)re->xparts;
+	xfac = borderfac * BLI_rctf_size_x(&re->viewplane) / (float)re->xparts;
 	xfac = atan(0.5f * xfac / re->clipsta);
 	/* and how much the same viewplane angle is wrapped */
 	psize = 0.5f * phi * ((float)re->partx);
@@ -711,7 +711,7 @@ static RenderPart *find_next_pano_slice(Render *re, int *minx, rctf *viewplane)
 		float phi = panorama_pixel_rot(re);
 
 		R.panodxp = (re->winx - (best->disprect.xmin + best->disprect.xmax) ) / 2;
-		R.panodxv = (BLI_RCT_SIZE_X(viewplane) * R.panodxp) / (float)(re->winx);
+		R.panodxv = (BLI_rctf_size_x(viewplane) * R.panodxp) / (float)(re->winx);
 
 		/* shift viewplane */
 		R.viewplane.xmin = viewplane->xmin + R.panodxv;
@@ -738,8 +738,8 @@ static RenderPart *find_next_part(Render *re, int minx)
 	/* find center of rendered parts, image center counts for 1 too */
 	for (pa = re->parts.first; pa; pa = pa->next) {
 		if (pa->ready) {
-			centx += BLI_RCT_CENTER_X(&pa->disprect);
-			centy += BLI_RCT_CENTER_Y(&pa->disprect);
+			centx += BLI_rcti_cent_x(&pa->disprect);
+			centy += BLI_rcti_cent_y(&pa->disprect);
 			tot++;
 		}
 	}
@@ -749,8 +749,8 @@ static RenderPart *find_next_part(Render *re, int minx)
 	/* closest of the non-rendering parts */
 	for (pa = re->parts.first; pa; pa = pa->next) {
 		if (pa->ready == 0 && pa->nr == 0) {
-			long long int distx = centx - BLI_RCT_CENTER_X(&pa->disprect);
-			long long int disty = centy - BLI_RCT_CENTER_Y(&pa->disprect);
+			long long int distx = centx - BLI_rcti_cent_x(&pa->disprect);
+			long long int disty = centy - BLI_rcti_cent_y(&pa->disprect);
 			distx = (long long int)sqrt(distx * distx + disty * disty);
 			if (distx < mindist) {
 				if (re->r.mode & R_PANORAMA) {
@@ -1387,7 +1387,7 @@ static void render_composit_stats(void *UNUSED(arg), char *str)
 static void do_merge_fullsample(Render *re, bNodeTree *ntree)
 {
 	float *rectf, filt[3][3];
-	int sample;
+	int x, y, sample;
 	
 	/* interaction callbacks */
 	if (ntree) {
@@ -1408,7 +1408,7 @@ static void do_merge_fullsample(Render *re, bNodeTree *ntree)
 	for (sample = 0; sample < re->r.osa; sample++) {
 		Render *re1;
 		RenderResult rres;
-		int x, y, mask;
+		int mask;
 		
 		/* enable full sample print */
 		R.i.curfsa = sample + 1;
@@ -1470,6 +1470,18 @@ static void do_merge_fullsample(Render *re, bNodeTree *ntree)
 		
 		if (re->test_break(re->tbh))
 			break;
+	}
+
+	/* clamp alpha and RGB to 0..1 and 0..inf, can go outside due to filter */
+	for (y = 0; y < re->recty; y++) {
+		float *rf = rectf + 4 * y * re->rectx;
+			
+		for (x = 0; x < re->rectx; x++, rf += 4) {
+			rf[0] = MAX2(rf[0], 0.0f);
+			rf[1] = MAX2(rf[1], 0.0f);
+			rf[2] = MAX2(rf[2], 0.0f);
+			CLAMP(rf[3], 0.0f, 1.0f);
+		}
 	}
 	
 	/* clear interaction callbacks */
@@ -1677,9 +1689,14 @@ static void do_render_seq(Render *re)
 
 	out = BKE_sequencer_give_ibuf(context, cfra, 0);
 
-	ibuf = IMB_dupImBuf(out);
-	IMB_freeImBuf(out);
-	BKE_sequencer_imbuf_from_sequencer_space(re->scene, ibuf);
+	if (out) {
+		ibuf = IMB_dupImBuf(out);
+		IMB_freeImBuf(out);
+		BKE_sequencer_imbuf_from_sequencer_space(re->scene, ibuf);
+	}
+	else {
+		ibuf = NULL;
+	}
 
 	recurs_depth--;
 
@@ -1713,6 +1730,9 @@ static void do_render_seq(Render *re)
 		re->progress(re->prh, (float)(cfra - re->r.sfra) / (re->r.efra - re->r.sfra));
 	else
 		re->progress(re->prh, 1.0f);
+
+	/* would mark display buffers as invalid */
+	re->display_draw(re->ddh, re->result, NULL);
 }
 
 /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */

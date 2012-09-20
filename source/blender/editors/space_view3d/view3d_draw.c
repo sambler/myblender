@@ -559,7 +559,7 @@ static void drawcursor(Scene *scene, ARegion *ar, View3D *v3d)
 	/* we don't want the clipping for cursor */
 	flag = v3d->flag;
 	v3d->flag = 0;
-	project_int(ar, give_cursor(scene, v3d), co);
+	ED_view3d_project_int(ar, give_cursor(scene, v3d), co);
 	v3d->flag = flag;
 	
 	mx = co[0];
@@ -901,7 +901,7 @@ static void draw_selected_name(Scene *scene, Object *ob)
 			
 			/* try to display active shapekey too */
 			shapes[0] = '\0';
-			key = ob_get_key(ob);
+			key = BKE_key_from_object(ob);
 			if (key) {
 				kb = BLI_findlink(&key->block, ob->shapenr - 1);
 				if (kb) {
@@ -973,10 +973,10 @@ static void view3d_camera_border(Scene *scene, ARegion *ar, View3D *v3d, RegionV
 	rect_camera = params.viewplane;
 
 	/* get camera border within viewport */
-	viewborder_r->xmin = ((rect_camera.xmin - rect_view.xmin) / BLI_RCT_SIZE_X(&rect_view)) * ar->winx;
-	viewborder_r->xmax = ((rect_camera.xmax - rect_view.xmin) / BLI_RCT_SIZE_X(&rect_view)) * ar->winx;
-	viewborder_r->ymin = ((rect_camera.ymin - rect_view.ymin) / BLI_RCT_SIZE_Y(&rect_view)) * ar->winy;
-	viewborder_r->ymax = ((rect_camera.ymax - rect_view.ymin) / BLI_RCT_SIZE_Y(&rect_view)) * ar->winy;
+	viewborder_r->xmin = ((rect_camera.xmin - rect_view.xmin) / BLI_rctf_size_x(&rect_view)) * ar->winx;
+	viewborder_r->xmax = ((rect_camera.xmax - rect_view.xmin) / BLI_rctf_size_x(&rect_view)) * ar->winx;
+	viewborder_r->ymin = ((rect_camera.ymin - rect_view.ymin) / BLI_rctf_size_y(&rect_view)) * ar->winy;
+	viewborder_r->ymax = ((rect_camera.ymax - rect_view.ymin) / BLI_rctf_size_y(&rect_view)) * ar->winy;
 }
 
 void ED_view3d_calc_camera_border_size(Scene *scene, ARegion *ar, View3D *v3d, RegionView3D *rv3d, float size_r[2])
@@ -984,8 +984,8 @@ void ED_view3d_calc_camera_border_size(Scene *scene, ARegion *ar, View3D *v3d, R
 	rctf viewborder;
 
 	view3d_camera_border(scene, ar, v3d, rv3d, &viewborder, TRUE, TRUE);
-	size_r[0] = BLI_RCT_SIZE_X(&viewborder);
-	size_r[1] = BLI_RCT_SIZE_Y(&viewborder);
+	size_r[0] = BLI_rctf_size_x(&viewborder);
+	size_r[1] = BLI_rctf_size_y(&viewborder);
 }
 
 void ED_view3d_calc_camera_border(Scene *scene, ARegion *ar, View3D *v3d, RegionView3D *rv3d,
@@ -1341,7 +1341,7 @@ static void backdrawview3d(Scene *scene, ARegion *ar, View3D *v3d)
 		glDisable(GL_MULTISAMPLE_ARB);
 
 	region_scissor_winrct(ar, &winrct);
-	glScissor(winrct.xmin, winrct.ymin, BLI_RCT_SIZE_X(&winrct), BLI_RCT_SIZE_Y(&winrct));
+	glScissor(winrct.xmin, winrct.ymin, BLI_rcti_size_x(&winrct), BLI_rcti_size_y(&winrct));
 
 	glClearColor(0.0, 0.0, 0.0, 0.0); 
 	if (v3d->zbuf) {
@@ -1543,11 +1543,6 @@ static void view3d_draw_bgpic(Scene *scene, ARegion *ar, View3D *v3d,
 {
 	RegionView3D *rv3d = ar->regiondata;
 	BGpic *bgpic;
-	Image *ima;
-	MovieClip *clip;
-	ImBuf *ibuf = NULL, *freeibuf;
-	float vec[4], fac, asp, zoomx, zoomy;
-	float x1, y1, x2, y2, cx, cy;
 	int fg_flag = do_foreground ? V3D_BGPIC_FOREGROUND : 0;
 
 	for (bgpic = v3d->bgpicbase.first; bgpic; bgpic = bgpic->next) {
@@ -1560,6 +1555,13 @@ static void view3d_draw_bgpic(Scene *scene, ARegion *ar, View3D *v3d,
 		    (rv3d->persp == RV3D_CAMOB && bgpic->view == (1 << RV3D_VIEW_CAMERA)))
 		{
 			float image_aspect[2];
+			float fac, asp, zoomx, zoomy;
+			float x1, y1, x2, y2;
+
+			ImBuf *ibuf = NULL, *freeibuf;
+
+			Image *ima;
+			MovieClip *clip;
 
 			/* disable individual images */
 			if ((bgpic->flag & V3D_BGPIC_DISABLED))
@@ -1687,26 +1689,25 @@ static void view3d_draw_bgpic(Scene *scene, ARegion *ar, View3D *v3d,
 				}
 			}
 			else {
+				float tvec[3];
 				float sco[2];
 				const float mval_f[2] = {1.0f, 0.0f};
 
 				/* calc window coord */
 				initgrabz(rv3d, 0.0, 0.0, 0.0);
-				ED_view3d_win_to_delta(ar, mval_f, vec);
-				fac = maxf(fabsf(vec[0]), maxf(fabsf(vec[1]), fabsf(vec[2]))); /* largest abs axis */
+				ED_view3d_win_to_delta(ar, mval_f, tvec);
+				fac = maxf(fabsf(tvec[0]), maxf(fabsf(tvec[1]), fabsf(tvec[2]))); /* largest abs axis */
 				fac = 1.0f / fac;
 
-				asp = ( (float)ibuf->y) / (float)ibuf->x;
+				asp = (float)ibuf->y / (float)ibuf->x;
 
-				zero_v3(vec);
-				ED_view3d_project_float_v2(ar, vec, sco, rv3d->persmat);
-				cx = sco[0];
-				cy = sco[1];
+				zero_v3(tvec);
+				ED_view3d_project_float_v2_m4(ar, tvec, sco, rv3d->persmat);
 
-				x1 =  cx + fac * (bgpic->xof - bgpic->size);
-				y1 =  cy + asp * fac * (bgpic->yof - bgpic->size);
-				x2 =  cx + fac * (bgpic->xof + bgpic->size);
-				y2 =  cy + asp * fac * (bgpic->yof + bgpic->size);
+				x1 =  sco[0] + fac * (bgpic->xof - bgpic->size);
+				y1 =  sco[1] + asp * fac * (bgpic->yof - bgpic->size);
+				x2 =  sco[0] + fac * (bgpic->xof + bgpic->size);
+				y2 =  sco[1] + asp * fac * (bgpic->yof + bgpic->size);
 			}
 
 			/* complete clip? */
@@ -1772,8 +1773,9 @@ static void view3d_draw_bgpic(Scene *scene, ARegion *ar, View3D *v3d,
 			glDepthMask(1);
 			if (v3d->zbuf) glEnable(GL_DEPTH_TEST);
 
-			if (freeibuf)
+			if (freeibuf) {
 				IMB_freeImBuf(freeibuf);
+			}
 		}
 	}
 }
@@ -2045,8 +2047,8 @@ void view3d_update_depths_rect(ARegion *ar, ViewDepths *d, rcti *rect)
 	x = rect->xmin;
 	y = rect->ymin;
 
-	w = BLI_RCT_SIZE_X(rect);
-	h = BLI_RCT_SIZE_Y(rect);
+	w = BLI_rcti_size_x(rect);
+	h = BLI_rcti_size_y(rect);
 
 	if (w <= 0 || h <= 0) {
 		if (d->depths)
@@ -2879,10 +2881,10 @@ static int view3d_main_area_draw_engine(const bContext *C, ARegion *ar, int draw
 
 		ED_view3d_calc_camera_border(scene, ar, v3d, rv3d, &viewborder, FALSE);
 
-		cliprct.xmin = viewborder.xmin + scene->r.border.xmin * BLI_RCT_SIZE_X(&viewborder);
-		cliprct.ymin = viewborder.ymin + scene->r.border.ymin * BLI_RCT_SIZE_Y(&viewborder);
-		cliprct.xmax = viewborder.xmin + scene->r.border.xmax * BLI_RCT_SIZE_X(&viewborder);
-		cliprct.ymax = viewborder.ymin + scene->r.border.ymax * BLI_RCT_SIZE_Y(&viewborder);
+		cliprct.xmin = viewborder.xmin + scene->r.border.xmin * BLI_rctf_size_x(&viewborder);
+		cliprct.ymin = viewborder.ymin + scene->r.border.ymin * BLI_rctf_size_y(&viewborder);
+		cliprct.xmax = viewborder.xmin + scene->r.border.xmax * BLI_rctf_size_x(&viewborder);
+		cliprct.ymax = viewborder.ymin + scene->r.border.ymax * BLI_rctf_size_y(&viewborder);
 
 		cliprct.xmin += ar->winrct.xmin;
 		cliprct.xmax += ar->winrct.xmin;
@@ -2896,7 +2898,7 @@ static int view3d_main_area_draw_engine(const bContext *C, ARegion *ar, int draw
 
 		if (cliprct.xmax > cliprct.xmin && cliprct.ymax > cliprct.ymin) {
 			glGetIntegerv(GL_SCISSOR_BOX, scissor);
-			glScissor(cliprct.xmin, cliprct.ymin, BLI_RCT_SIZE_X(&cliprct), BLI_RCT_SIZE_Y(&cliprct));
+			glScissor(cliprct.xmin, cliprct.ymin, BLI_rcti_size_x(&cliprct), BLI_rcti_size_y(&cliprct));
 		}
 		else
 			return 0;
@@ -3180,17 +3182,6 @@ void view3d_main_area_draw(const bContext *C, ARegion *ar)
 	RegionView3D *rv3d = CTX_wm_region_view3d(C);
 	const char *grid_unit = NULL;
 	int draw_border = (rv3d->persp == RV3D_CAMOB && (scene->r.mode & R_BORDER));
-
-	/* --- until we get a clue and make viewport threadsafe (temp mango change for stability) */
-	if (G.is_rendering) {
-		ED_region_pixelspace(ar);
-		glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-		UI_ThemeClearColor(TH_BACK);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		BLF_draw_default(10,10,0, "do do da da.. da da.. da da.. can't touch this!   it's render time", 512);
-		return;
-	}
-	/* --- end temp mango change */
 
 	/* draw viewport using opengl */
 	if (v3d->drawtype != OB_RENDER || !view3d_main_area_do_render_draw(C) || draw_border) {

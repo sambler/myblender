@@ -109,10 +109,10 @@ void calc_view_vector(float *view, float x, float y)
 		
 		/* move x and y to real viewplane coords */
 		x = (x / (float)R.winx);
-		view[0] = R.viewplane.xmin + x * BLI_RCT_SIZE_X(&R.viewplane);
+		view[0] = R.viewplane.xmin + x * BLI_rctf_size_x(&R.viewplane);
 		
 		y = (y / (float)R.winy);
-		view[1] = R.viewplane.ymin + y * BLI_RCT_SIZE_Y(&R.viewplane);
+		view[1] = R.viewplane.ymin + y * BLI_rctf_size_y(&R.viewplane);
 		
 //		if (R.flag & R_SEC_FIELD) {
 //			if (R.r.mode & R_ODDFIELD) view[1]= (y+R.ystart)*R.ycor;
@@ -990,6 +990,30 @@ static void convert_to_key_alpha(RenderPart *pa, RenderLayer *rl)
 	}
 }
 
+/* clamp alpha and RGB to 0..1 and 0..inf, can go outside due to filter */
+static void clamp_alpha_rgb_range(RenderPart *pa, RenderLayer *rl)
+{
+	RenderLayer *rlpp[RE_MAX_OSA];
+	int y, sample, totsample;
+	
+	totsample= get_sample_layers(pa, rl, rlpp);
+
+	/* not for full sample, there we clamp after compositing */
+	if (totsample > 1)
+		return;
+	
+	for (sample= 0; sample<totsample; sample++) {
+		float *rectf= rlpp[sample]->rectf;
+		
+		for (y= pa->rectx*pa->recty; y>0; y--, rectf+=4) {
+			rectf[0] = MAX2(rectf[0], 0.0f);
+			rectf[1] = MAX2(rectf[1], 0.0f);
+			rectf[2] = MAX2(rectf[2], 0.0f);
+			CLAMP(rectf[3], 0.0f, 1.0f);
+		}
+	}
+}
+
 /* adds only alpha values */
 static void edge_enhance_tile(RenderPart *pa, float *rectf, int *rectz)
 {
@@ -1270,6 +1294,9 @@ void zbufshadeDA_tile(RenderPart *pa)
 		
 		if (rl->passflag & SCE_PASS_VECTOR)
 			reset_sky_speed(pa, rl);
+
+		/* clamp alpha to 0..1 range, can go outside due to filter */
+		clamp_alpha_rgb_range(pa, rl);
 		
 		/* de-premul alpha */
 		if (R.r.alphamode & R_ALPHAKEY)

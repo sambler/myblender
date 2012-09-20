@@ -47,13 +47,13 @@
 #endif
 
 #define MEM_NEW(type) new(MEM_mallocN(sizeof(type), __func__)) type()
-#define MEM_DELETE(what, type) { what->~type(); MEM_freeN(what); } (void)0
+#define MEM_DELETE(what, type) if(what) { what->~type(); MEM_freeN(what); } (void)0
 
 static void OCIO_reportError(const char *err)
 {
 	std::cerr << "OpenColorIO Error: " << err << std::endl;
 
-	OCIO_abort();
+	// OCIO_abort();
 }
 
 static void OCIO_reportException(Exception &exception)
@@ -75,6 +75,13 @@ ConstConfigRcPtr *OCIO_getCurrentConfig(void)
 		OCIO_reportException(exception);
 	}
 
+	MEM_DELETE(config, ConstConfigRcPtr);
+
+	return NULL;
+}
+
+ConstConfigRcPtr *OCIO_getDefaultConfig(void)
+{
 	return NULL;
 }
 
@@ -102,6 +109,8 @@ ConstConfigRcPtr *OCIO_configCreateFromEnv(void)
 		OCIO_reportException(exception);
 	}
 
+	MEM_DELETE(config, ConstConfigRcPtr);
+
 	return NULL;
 }
 
@@ -119,6 +128,8 @@ ConstConfigRcPtr *OCIO_configCreateFromFile(const char *filename)
 	catch (Exception &exception) {
 		OCIO_reportException(exception);
 	}
+
+	MEM_DELETE(config, ConstConfigRcPtr);
 
 	return NULL;
 }
@@ -164,8 +175,9 @@ ConstColorSpaceRcPtr *OCIO_configGetColorSpace(ConstConfigRcPtr *config, const c
 	}
 	catch (Exception &exception) {
 		OCIO_reportException(exception);
-		MEM_DELETE(cs, ConstColorSpaceRcPtr);
 	}
+
+	MEM_DELETE(cs, ConstColorSpaceRcPtr);
 
 	return NULL;
 }
@@ -290,6 +302,11 @@ int OCIO_colorSpaceIsInvertible(ConstColorSpaceRcPtr *cs)
 	return true;
 }
 
+int OCIO_colorSpaceIsData(ConstColorSpaceRcPtr *cs)
+{
+	return ((*cs)->isData());
+}
+
 void OCIO_colorSpaceRelease(ConstColorSpaceRcPtr *cs)
 {
 	MEM_DELETE(cs, ConstColorSpaceRcPtr);
@@ -309,6 +326,8 @@ ConstProcessorRcPtr *OCIO_configGetProcessorWithNames(ConstConfigRcPtr *config, 
 		OCIO_reportException(exception);
 	}
 
+	MEM_DELETE(p, ConstProcessorRcPtr);
+
 	return 0;
 }
 
@@ -325,6 +344,8 @@ ConstProcessorRcPtr *OCIO_configGetProcessor(ConstConfigRcPtr *config, ConstTran
 	catch (Exception &exception) {
 		OCIO_reportException(exception);
 	}
+
+	MEM_DELETE(p, ConstProcessorRcPtr);
 
 	return NULL;
 }

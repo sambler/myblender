@@ -643,6 +643,7 @@ Image *BKE_image_add_generated(unsigned int width, unsigned int height, const ch
 
 	if (ima) {
 		ImBuf *ibuf;
+		const char *colorspace;
 
 		/* BLI_strncpy(ima->name, name, FILE_MAX); */ /* don't do this, this writes in ain invalid filepath! */
 		ima->gen_x = width;
@@ -652,6 +653,14 @@ Image *BKE_image_add_generated(unsigned int width, unsigned int height, const ch
 
 		ibuf = add_ibuf_size(width, height, ima->name, depth, floatbuf, gen_type, color);
 		image_assign_ibuf(ima, ibuf, IMA_NO_INDEX, 0);
+
+		/* assign colorspaces */
+		if (floatbuf)
+			colorspace = IMB_colormanagement_role_colorspace_name_get(COLOR_ROLE_DEFAULT_FLOAT);
+		else
+			colorspace = IMB_colormanagement_role_colorspace_name_get(COLOR_ROLE_DEFAULT_BYTE);
+
+		BLI_strncpy(ima->colorspace_settings.name, colorspace, sizeof(ima->colorspace_settings.name));
 
 		ima->ok = IMA_OK_LOADED;
 	}
@@ -1227,6 +1236,9 @@ void BKE_imformat_defaults(ImageFormatData *im_format)
 	im_format->imtype = R_IMF_IMTYPE_PNG;
 	im_format->quality = 90;
 	im_format->compress = 90;
+
+	BKE_color_managed_display_settings_init(&im_format->display_settings);
+	BKE_color_managed_view_settings_init(&im_format->view_settings);
 }
 
 void BKE_imbuf_to_image_format(struct ImageFormatData *im_format, const ImBuf *imbuf)
@@ -2201,8 +2213,10 @@ void BKE_image_backup_render(Scene *scene, Image *ima)
 /* in that case we have to build a render-result */
 static void image_create_multilayer(Image *ima, ImBuf *ibuf, int framenr)
 {
+	const char *colorspace = ima->colorspace_settings.name;
+	int predivide = ima->flag & IMA_CM_PREDIVIDE;
 
-	ima->rr = RE_MultilayerConvert(ibuf->userdata, ibuf->x, ibuf->y);
+	ima->rr = RE_MultilayerConvert(ibuf->userdata, colorspace, predivide, ibuf->x, ibuf->y);
 
 #ifdef WITH_OPENEXR
 	IMB_exr_close(ibuf->userdata);
@@ -2585,7 +2599,8 @@ static ImBuf *image_get_render_result(Image *ima, ImageUser *iuser, void **lock_
 
 	/* invalidate color managed buffers if render result changed */
 	BLI_lock_thread(LOCK_COLORMANAGE);
-	if (ibuf->x != rres.rectx || ibuf->y != rres.recty || ibuf->rect_float != rectf) {
+	if (ibuf->x != rres.rectx || ibuf->y != rres.recty || ibuf->rect_float != rectf)
+	{
 		ibuf->userflags |= IB_DISPLAY_BUFFER_INVALID;
 	}
 
@@ -2994,5 +3009,8 @@ void BKE_image_get_aspect(Image *image, float *aspx, float *aspy)
 	*aspx = 1.0;
 
 	/* x is always 1 */
-	*aspy = image->aspy / image->aspx;
+	if (image)
+		*aspy = image->aspy / image->aspx;
+	else
+		*aspy = 1.0f;
 }

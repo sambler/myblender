@@ -240,8 +240,6 @@ typedef struct ImagePaintRegion {
 /* vert flags */
 #define PROJ_VERT_CULL 1
 
-#define PI_80_DEG ((M_PI_2 / 9) * 8)
-
 /* This is mainly a convenience struct used so we can keep an array of images we use
  * Thir imbufs, etc, in 1 array, When using threads this array is copied for each thread
  * because 'partRedrawRect' and 'touch' values would not be thread safe */
@@ -3138,7 +3136,7 @@ static void project_paint_begin(ProjPaintState *ps)
 				ps->is_ortho = params.is_ortho;
 			}
 
-			/* same as view3d_get_object_project_mat */
+			/* same as #ED_view3d_ob_project_mat_get */
 			mult_m4_m4m4(vmat, viewmat, ps->ob->obmat);
 			mult_m4_m4m4(ps->projectMat, winmat, vmat);
 		}
@@ -4265,7 +4263,7 @@ static void imapaint_image_update(Scene *scene, SpaceImage *sima, Image *image, 
 		int w = imapaintpartial.x2 - imapaintpartial.x1;
 		int h = imapaintpartial.y2 - imapaintpartial.y1;
 		/* Testing with partial update in uv editor too */
-		GPU_paint_update_image(image, imapaintpartial.x1, imapaintpartial.y1, w, h, 0); //!texpaint);
+		GPU_paint_update_image(image, imapaintpartial.x1, imapaintpartial.y1, w, h); //!texpaint);
 	}
 }
 
@@ -4596,9 +4594,12 @@ static int imapaint_paint_sub_stroke(ImagePaintState *s, BrushPainter *painter, 
 {
 	ImBuf *ibuf = BKE_image_get_ibuf(image, s->sima ? &s->sima->iuser : NULL);
 	float pos[2];
+	int is_data;
 
 	if (!ibuf)
 		return 0;
+
+	is_data = ibuf->colormanage_flag & IMB_COLORMANAGE_IS_DATA;
 
 	pos[0] = uv[0] * ibuf->x;
 	pos[1] = uv[1] * ibuf->y;
@@ -4608,7 +4609,7 @@ static int imapaint_paint_sub_stroke(ImagePaintState *s, BrushPainter *painter, 
 	/* OCIO_TODO: float buffers are now always linear, so always use color correction
 	 *            this should probably be changed when texture painting color space is supported
 	 */
-	if (BKE_brush_painter_paint(painter, imapaint_paint_op, pos, time, pressure, s, TRUE)) {
+	if (BKE_brush_painter_paint(painter, imapaint_paint_op, pos, time, pressure, s, is_data == FALSE)) {
 		if (update)
 			imapaint_image_update(s->scene, s->sima, image, ibuf, texpaint);
 		return 1;

@@ -133,7 +133,7 @@
 #include "BKE_paint.h"
 #include "BKE_particle.h"
 #include "BKE_pointcache.h"
-#include "BKE_property.h" // for get_ob_property
+#include "BKE_property.h" // for BKE_bproperty_object_get
 #include "BKE_report.h"
 #include "BKE_sca.h" // for init_actuator
 #include "BKE_scene.h"
@@ -248,6 +248,12 @@ static void convert_tface_mt(FileData *fd, Main *main);
  * bit kludge but better then doubling up on prints,
  * we could alternatively have a versions of a report function which forces printing - campbell
  */
+
+static void BKE_reportf_wrap(ReportList *reports, ReportType type, const char *format, ...)
+#ifdef __GNUC__
+__attribute__ ((format(printf, 3, 4)))
+#endif
+;
 static void BKE_reportf_wrap(ReportList *reports, ReportType type, const char *format, ...)
 {
 	char fixed_buf[1024]; /* should be long enough */
@@ -2711,6 +2717,16 @@ static void direct_link_lamp(FileData *fd, Lamp *la)
 
 /* ************ READ keys ***************** */
 
+static void do_versions_key_uidgen(Key *key)
+{
+	KeyBlock *block;
+
+	key->uidgen = 1;
+	for (block = key->block.first; block; block = block->next) {
+		block->uid = key->uidgen++;
+	}
+}
+
 static void lib_link_key(FileData *fd, Main *main)
 {
 	Key *key;
@@ -2718,12 +2734,7 @@ static void lib_link_key(FileData *fd, Main *main)
 	for (key = main->key.first; key; key = key->id.next) {
 		/*check if we need to generate unique ids for the shapekeys*/
 		if (!key->uidgen) {
-			KeyBlock *block;
-			
-			key->uidgen = 1;
-			for (block=key->block.first; block; block=block->next) {
-				block->uid = key->uidgen++;
-			}
+			do_versions_key_uidgen(key);
 		}
 		
 		if (key->id.flag & LIB_NEED_LINK) {
@@ -6283,6 +6294,14 @@ static void direct_link_mask(FileData *fd, Mask *mask)
 
 		for (masklay_shape = masklay->splines_shapes.first; masklay_shape; masklay_shape = masklay_shape->next) {
 			masklay_shape->data = newdataadr(fd, masklay_shape->data);
+
+			if (masklay_shape->tot_vert) {
+				if (fd->flags & FD_FLAGS_SWITCH_ENDIAN) {
+					BLI_endian_switch_float_array(masklay_shape->data,
+					                              masklay_shape->tot_vert * sizeof(float) * MASK_OBJECT_SHAPE_ELEM_SIZE);
+
+				}
+			}
 		}
 
 		masklay->act_spline = newdataadr(fd, masklay->act_spline);
@@ -7368,7 +7387,7 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 			
 			for (ob= main->object.first; ob; ob= ob->id.next) {
 				if (ob->type == OB_FONT) {
-					prop = get_ob_property(ob, "Text");
+					prop = BKE_bproperty_object_get(ob, "Text");
 					if (prop) {
 						BKE_reportf_wrap(fd->reports, RPT_WARNING,
 						                 "Game property name conflict in object: \"%s\".\nText objects reserve the "
@@ -7957,6 +7976,13 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 
 				BLI_strncpy(ima->colorspace_settings.name, "Raw", sizeof(ima->colorspace_settings.name));
 			}
+		}
+	}
+
+	if (main->versionfile < 263 || (main->versionfile == 263 && main->subversionfile < 20)) {
+		Key *key;
+		for (key = main->key.first; key; key = key->id.next) {
+			do_versions_key_uidgen(key);
 		}
 	}
 

@@ -56,6 +56,11 @@ ConstConfigRcPtr *OCIO_getCurrentConfig(void)
 	return CONFIG_DEFAULT;
 }
 
+ConstConfigRcPtr *OCIO_getDefaultConfig(void)
+{
+	return CONFIG_DEFAULT;
+}
+
 void OCIO_setCurrentConfig(const ConstConfigRcPtr *)
 {
 }
@@ -167,6 +172,11 @@ const char *OCIO_configGetDisplayColorSpaceName(ConstConfigRcPtr *, const char *
 int OCIO_colorSpaceIsInvertible(ConstColorSpaceRcPtr *cs)
 {
 	return 1;
+}
+
+int OCIO_colorSpaceIsData(ConstColorSpaceRcPtr *cs)
+{
+	return 0;
 }
 
 void OCIO_colorSpaceRelease(ConstColorSpaceRcPtr *cs)

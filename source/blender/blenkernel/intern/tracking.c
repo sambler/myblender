@@ -856,7 +856,7 @@ static void track_mask_gpencil_layer_rasterize(int frame_width, int frame_height
 				}
 
 				/* TODO: add an option to control whether AA is enabled or not */
-				PLX_raskterize((float (*)[2])mask_points, stroke->totpoints, mask, mask_width, mask_height, FALSE);
+				PLX_raskterize((float (*)[2])mask_points, stroke->totpoints, mask, mask_width, mask_height);
 
 				MEM_freeN(mask_points);
 			}
@@ -1041,14 +1041,6 @@ void BKE_tracking_marker_clamp(MovieTrackingMarker *marker, int event)
 				marker->search_max[a] = pat_max[a];
 				marker->search_min[a] = marker->search_max[a] - dim[a];
 			}
-		}
-	}
-	else if (event == CLAMP_SEARCH_DIM) {
-		float dim[2];
-		sub_v2_v2v2(dim, pat_max, pat_min);
-		for (a = 0; a < 2; a++) {
-			marker->search_min[a] = pat_min[a];
-			marker->search_max[a] = pat_max[a];
 		}
 	}
 }
@@ -2029,7 +2021,7 @@ static void track_context_free(void *customdata)
 {
 	TrackContext *track_context = (TrackContext *)customdata;
 
-#if WITH_LIBMV
+#ifdef WITH_LIBMV
 	if (track_context->search_area)
 		MEM_freeN(track_context->search_area);
 
@@ -2289,9 +2281,9 @@ static ImBuf *tracking_context_get_reference_ibuf(MovieTrackingContext *context,
 	return ibuf;
 }
 
-static void track_context_update_reference(MovieTrackingContext *context, TrackContext *track_context,
-                                           MovieTrackingTrack *track, MovieTrackingMarker *marker, int curfra,
-                                           int frame_width, int frame_height)
+static int track_context_update_reference(MovieTrackingContext *context, TrackContext *track_context,
+                                          MovieTrackingTrack *track, MovieTrackingMarker *marker, int curfra,
+                                          int frame_width, int frame_height)
 {
 	MovieTrackingMarker *marker_keyed = NULL;
 	ImBuf *reference_ibuf = NULL;
@@ -2299,6 +2291,10 @@ static void track_context_update_reference(MovieTrackingContext *context, TrackC
 
 	/* calculate patch for keyframed position */
 	reference_ibuf = tracking_context_get_reference_ibuf(context, track, marker, curfra, &marker_keyed);
+
+	if (!reference_ibuf)
+		return FALSE;
+
 	track_context->marker = *marker_keyed;
 
 	if (track_context->search_area) {
@@ -2317,6 +2313,8 @@ static void track_context_update_reference(MovieTrackingContext *context, TrackC
 	}
 
 	IMB_freeImBuf(reference_ibuf);
+
+	return TRUE;
 }
 
 static void tracking_configure_tracker(TrackContext *track_context, MovieTrackingTrack *track,
@@ -2481,8 +2479,12 @@ int BKE_tracking_context_step(MovieTrackingContext *context)
 				float *patch_new;
 
 				if (need_readjust) {
-					track_context_update_reference(context, track_context, track, marker,
-					                               curfra, frame_width, frame_height);
+					if (track_context_update_reference(context, track_context, track, marker,
+					                                   curfra, frame_width, frame_height) == FALSE)
+					{
+						/* happens when reference frame fails to be loaded */
+						continue;
+					}
 				}
 
 				/* for now track to the same search area dimension as marker has got for current frame
@@ -2776,7 +2778,7 @@ static int reconstruct_count_tracks_on_both_keyframes(MovieTracking *tracking, L
 
 int BKE_tracking_reconstruction_check(MovieTracking *tracking, MovieTrackingObject *object, char *error_msg, int error_size)
 {
-#if WITH_LIBMV
+#ifdef WITH_LIBMV
 	ListBase *tracksbase = BKE_tracking_object_get_tracks(tracking, object);
 
 	if (tracking->settings.motion_flag & TRACKING_MOTION_MODAL) {

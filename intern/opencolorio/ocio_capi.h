@@ -59,6 +59,7 @@ extern "C" {
 
 
 ConstConfigRcPtr *OCIO_getCurrentConfig(void);
+ConstConfigRcPtr *OCIO_getDefaultConfig(void);
 void OCIO_setCurrentConfig(const ConstConfigRcPtr *config);
 
 ConstConfigRcPtr *OCIO_configCreateFromEnv(void);
@@ -72,6 +73,7 @@ ConstColorSpaceRcPtr *OCIO_configGetColorSpace(ConstConfigRcPtr *config, const c
 int OCIO_configGetIndexForColorSpace(ConstConfigRcPtr *config, const char *name);
 
 int OCIO_colorSpaceIsInvertible(ConstColorSpaceRcPtr *cs);
+int OCIO_colorSpaceIsData(ConstColorSpaceRcPtr *cs);
 
 void OCIO_colorSpaceRelease(ConstColorSpaceRcPtr *cs);
 

@@ -80,7 +80,7 @@ void image_buffer_rect_update(Scene *scene, RenderResult *rr, ImBuf *ibuf, volat
 	float *rectf = NULL;
 	int ymin, ymax, xmin, xmax;
 	int rymin, rxmin;
-	unsigned char *rectc;
+	/* unsigned char *rectc; */  /* UNUSED */
 
 	/* if renrect argument, we only refresh scanlines */
 	if (renrect) {
@@ -124,8 +124,14 @@ void image_buffer_rect_update(Scene *scene, RenderResult *rr, ImBuf *ibuf, volat
 	if (rr->rectf)
 		rectf = rr->rectf;
 	else {
-		if (rr->rect32)
+		if (rr->rect32) {
+			/* special case, currently only happens with sequencer rendering,
+			 * which updates the whole frame, so we can only mark display buffer
+			 * as invalid here (sergey)
+			 */
+			ibuf->userflags |= IB_DISPLAY_BUFFER_INVALID;
 			return;
+		}
 		else {
 			if (rr->renlay == NULL || rr->renlay->rectf == NULL) return;
 			rectf = rr->renlay->rectf;
@@ -137,7 +143,7 @@ void image_buffer_rect_update(Scene *scene, RenderResult *rr, ImBuf *ibuf, volat
 		imb_addrectImBuf(ibuf);
 	
 	rectf += 4 * (rr->rectx * ymin + xmin);
-	rectc = (unsigned char *)(ibuf->rect + ibuf->x * rymin + rxmin);
+	/* rectc = (unsigned char *)(ibuf->rect + ibuf->x * rymin + rxmin); */  /* UNUSED */
 
 	IMB_partial_display_buffer_update(ibuf, rectf, NULL, rr->rectx, rxmin, rymin,
 	                                  &scene->view_settings, &scene->display_settings,

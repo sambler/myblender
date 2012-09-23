@@ -78,6 +78,9 @@
 #include "WM_api.h"
 #include "WM_types.h"
 
+/* place the mouse at the scaled down location when un-grabbing */
+#define USE_CONT_MOUSE_CORRECT
+
 /* proto */
 static void ui_add_smart_controller(bContext *C, uiBut *from, uiBut *to);
 static void ui_add_link(bContext *C, uiBut *from, uiBut *to);
@@ -151,6 +154,12 @@ typedef struct uiHandleButtonData {
 	int dragchange, draglock, dragsel;
 	float dragf, dragfstart;
 	CBData *dragcbd;
+
+#ifdef USE_CONT_MOUSE_CORRECT
+	/* when ungrabbing buttons which are #ui_is_a_warp_but(), we may want to position them
+	 * FLT_MAX signifies do-nothing, use #ui_block_to_window_fl() to get this into a usable space  */
+	float ungrab_mval[2];
+#endif
 
 	/* menu open (watch uiFreeActiveButtons) */
 	uiPopupBlockHandle *menu;
@@ -1605,6 +1614,7 @@ static int ui_textedit_copypaste(uiBut *but, uiHandleButtonData *data, int paste
 	
 	/* paste */
 	if (paste) {
+		/* TODO, ensure UTF8 ui_is_but_utf8() - campbell */
 		/* extract the first line from the clipboard */
 		p = pbuf = WM_clipboard_text_get(0);
 
@@ -3191,6 +3201,15 @@ static int ui_numedit_but_HSVCUBE(uiBut *but, uiHandleButtonData *data, int mx, 
 	
 	ui_mouse_scale_warp(data, mx, my, &mx_fl, &my_fl, shift);
 
+#ifdef USE_CONT_MOUSE_CORRECT
+	if (ui_is_a_warp_but(but)) {
+		/* OK but can go outside bounds */
+		data->ungrab_mval[0] = mx_fl;
+		data->ungrab_mval[1] = my_fl;
+		BLI_rctf_clamp_pt_v(&but->rect, data->ungrab_mval);
+	}
+#endif
+
 	if (but->rnaprop) {
 		if (RNA_property_subtype(but->rnaprop) == PROP_COLOR_GAMMA)
 			color_profile = FALSE;
@@ -3414,6 +3433,22 @@ static int ui_numedit_but_HSVCIRCLE(uiBut *but, uiHandleButtonData *data, float 
 	float hsv[3];
 	
 	ui_mouse_scale_warp(data, mx, my, &mx_fl, &my_fl, shift);
+
+#ifdef USE_CONT_MOUSE_CORRECT
+	if (ui_is_a_warp_but(but)) {
+		/* OK but can go outside bounds */
+		data->ungrab_mval[0] = mx_fl;
+		data->ungrab_mval[1] = my_fl;
+		{	/* clamp */
+			const float radius = minf(BLI_rctf_size_x(&but->rect), BLI_rctf_size_y(&but->rect)) / 2.0f;
+			const float cent[2] = {BLI_rctf_cent_x(&but->rect), BLI_rctf_cent_y(&but->rect)};
+			const float len = len_v2v2(cent, data->ungrab_mval);
+			if (len > radius) {
+				dist_ensure_v2_v2fl(data->ungrab_mval, cent, radius);
+			}
+		}
+	}
+#endif
 
 	BLI_rcti_rctf_copy(&rect, &but->rect);
 
@@ -3706,9 +3741,10 @@ static int ui_numedit_but_CURVE(uiBut *but, uiHandleButtonData *data, int snap,
 	}
 
 	if (data->dragsel != -1) {
+		CurveMapPoint *cmp_last = NULL;
 		const float mval_factor = ui_mouse_scale_warp_factor(shift);
 		int moved_point = 0;     /* for ctrl grid, can't use orig coords because of sorting */
-		
+
 		fx = (mx - data->draglastx) / zoomx;
 		fy = (my - data->draglasty) / zoomy;
 
@@ -3726,6 +3762,8 @@ static int ui_numedit_but_CURVE(uiBut *but, uiHandleButtonData *data, int snap,
 				}
 				if (cmp[a].x != origx || cmp[a].y != origy)
 					moved_point = 1;
+
+				cmp_last = &cmp[a];
 			}
 		}
 
@@ -3735,6 +3773,18 @@ static int ui_numedit_but_CURVE(uiBut *but, uiHandleButtonData *data, int snap,
 			data->draglastx = mx;
 			data->draglasty = my;
 			changed = 1;
+
+#ifdef USE_CONT_MOUSE_CORRECT
+			/* note: using 'cmp_last' is weak since there may be multiple points selected,
+			 * but in practice this isnt really an issue */
+			if (ui_is_a_warp_but(but)) {
+				/* OK but can go outside bounds */
+				data->ungrab_mval[0] = but->rect.xmin + ((cmp_last->x - cumap->curr.xmin) * zoomx);
+				data->ungrab_mval[1] = but->rect.ymin + ((cmp_last->y - cumap->curr.ymin) * zoomy);
+				BLI_rctf_clamp_pt_v(&but->rect, data->ungrab_mval);
+			}
+#endif
+
 		}
 
 		data->dragchange = 1; /* mark for selection */
@@ -5279,12 +5329,7 @@ static void button_activate_state(bContext *C, uiBut *but, uiHandleButtonState s
 
 		/* automatic open pulldown block timer */
 		if (ELEM3(but->type, BLOCK, PULLDOWN, ICONTEXTROW)) {
-			if ((data->used_mouse == TRUE) &&
-			    (data->autoopentimer == FALSE) &&
-			    /* don't popup the first time,
-			     * see description on this member for info */
-			    (but->block->auto_is_first_event == FALSE))
-			{
+			if (data->used_mouse && !data->autoopentimer) {
 				int time;
 
 				if (but->block->auto_open == TRUE) {  /* test for toolbox */
@@ -5304,8 +5349,6 @@ static void button_activate_state(bContext *C, uiBut *but, uiHandleButtonState s
 					data->autoopentimer = WM_event_add_timer(data->wm, data->window, TIMER, 0.02 * (double)time);
 				}
 			}
-
-			but->block->auto_is_first_event = FALSE;
 		}
 	}
 	else {
@@ -5329,8 +5372,24 @@ static void button_activate_state(bContext *C, uiBut *but, uiHandleButtonState s
 	}
 	else if (data->state == BUTTON_STATE_NUM_EDITING) {
 		ui_numedit_end(but, data);
-		if (ui_is_a_warp_but(but))
-			WM_cursor_grab_disable(CTX_wm_window(C));
+		if (ui_is_a_warp_but(but)) {
+
+#ifdef USE_CONT_MOUSE_CORRECT
+			if (data->ungrab_mval[0] != FLT_MAX) {
+				int mouse_ungrab_xy[2];
+				ui_block_to_window_fl(data->region, but->block, &data->ungrab_mval[0], &data->ungrab_mval[1]);
+				mouse_ungrab_xy[0] = data->ungrab_mval[0];
+				mouse_ungrab_xy[1] = data->ungrab_mval[1];
+
+				WM_cursor_grab_disable(data->window, mouse_ungrab_xy);
+			}
+			else {
+				WM_cursor_grab_disable(data->window, NULL);
+			}
+#else
+			WM_cursor_grab_disable(data->window, );
+#endif
+		}
 	}
 	/* menu open */
 	if (state == BUTTON_STATE_MENU_OPEN)
@@ -5392,6 +5451,10 @@ static void button_activate_init(bContext *C, ARegion *ar, uiBut *but, uiButtonA
 	data->wm = CTX_wm_manager(C);
 	data->window = CTX_wm_window(C);
 	data->region = ar;
+
+#ifdef USE_CONT_MOUSE_CORRECT
+	copy_v2_fl(data->ungrab_mval, FLT_MAX);
+#endif
 
 	if (ELEM(but->type, BUT_CURVE, SEARCH_MENU)) {
 		/* XXX curve is temp */
@@ -6226,7 +6289,7 @@ static int ui_menu_scroll(ARegion *ar, uiBlock *block, int my)
 	return 0;
 }
 
-static int ui_handle_menu_event(bContext *C, wmEvent *event, uiPopupBlockHandle *menu, int UNUSED(topmenu))
+static int ui_handle_menu_event(bContext *C, wmEvent *event, uiPopupBlockHandle *menu, int level)
 {
 	ARegion *ar;
 	uiBlock *block;
@@ -6271,10 +6334,22 @@ static int ui_handle_menu_event(bContext *C, wmEvent *event, uiPopupBlockHandle 
 		}
 		
 		/* first block own event func */
-		if (block->block_event_func && block->block_event_func(C, block, event)) ;
-		/* events not for active search menu button */
+		if (block->block_event_func && block->block_event_func(C, block, event)) {
+			/* pass */
+		}   /* events not for active search menu button */
 		else if (but == NULL || but->type != SEARCH_MENU) {
 			switch (event->type) {
+
+
+			/* let the parent menu get the event */
+#define     PASS_EVENT_TO_PARENT_IF_NONACTIVE                                 \
+				if ((level != 0) && (but == NULL)) {                          \
+					menu->menuretval = UI_RETURN_OUT | UI_RETURN_OUT_PARENT;  \
+					BLI_assert(retval == WM_UI_HANDLER_CONTINUE);             \
+					break;                                                    \
+				} (void)0
+
+
 				/* closing sublevels of pulldowns */
 				case LEFTARROWKEY:
 					if (event->val == KM_PRESS && (block->flag & UI_BLOCK_LOOP))
@@ -6287,6 +6362,9 @@ static int ui_handle_menu_event(bContext *C, wmEvent *event, uiPopupBlockHandle 
 				/* opening sublevels of pulldowns */
 				case RIGHTARROWKEY:	
 					if (event->val == KM_PRESS && (block->flag & UI_BLOCK_LOOP)) {
+
+						PASS_EVENT_TO_PARENT_IF_NONACTIVE;
+
 						but = ui_but_find_activated(ar);
 
 						if (!but) {
@@ -6312,6 +6390,9 @@ static int ui_handle_menu_event(bContext *C, wmEvent *event, uiPopupBlockHandle 
 					}
 					else if (inside || (block->flag & UI_BLOCK_LOOP)) {
 						if (event->val == KM_PRESS) {
+
+							PASS_EVENT_TO_PARENT_IF_NONACTIVE;
+
 							but = ui_but_find_activated(ar);
 							if (but) {
 								/* is there a situation where UI_LEFT or UI_RIGHT would also change navigation direction? */
@@ -6391,6 +6472,9 @@ static int ui_handle_menu_event(bContext *C, wmEvent *event, uiPopupBlockHandle 
 					if (act == 0) act = 10;
 
 					if ((block->flag & UI_BLOCK_NUMSELECT) && event->val == KM_PRESS) {
+
+						PASS_EVENT_TO_PARENT_IF_NONACTIVE;
+
 						if (event->alt) act += 10;
 
 						count = 0;
@@ -6468,6 +6552,8 @@ static int ui_handle_menu_event(bContext *C, wmEvent *event, uiPopupBlockHandle 
 					    (event->ctrl  == FALSE) &&
 					    (event->oskey == FALSE))
 					{
+						PASS_EVENT_TO_PARENT_IF_NONACTIVE;
+
 						for (but = block->buttons.first; but; but = but->next) {
 
 							if (but->menu_key == event->type) {
@@ -6557,6 +6643,10 @@ static int ui_handle_menu_event(bContext *C, wmEvent *event, uiPopupBlockHandle 
 						retval = WM_UI_HANDLER_BREAK;
 				}
 			}
+
+			/* end switch */
+#undef PASS_EVENT_TO_PARENT_IF_NONACTIVE
+
 		}
 	}
 
@@ -6645,7 +6735,7 @@ static int ui_handle_menu_return_submenu(bContext *C, wmEvent *event, uiPopupBlo
 		return WM_UI_HANDLER_BREAK;
 }
 
-static int ui_handle_menus_recursive(bContext *C, wmEvent *event, uiPopupBlockHandle *menu)
+static int ui_handle_menus_recursive(bContext *C, wmEvent *event, uiPopupBlockHandle *menu, int level)
 {
 	uiBut *but;
 	uiHandleButtonData *data;
@@ -6658,14 +6748,20 @@ static int ui_handle_menus_recursive(bContext *C, wmEvent *event, uiPopupBlockHa
 	submenu = (data) ? data->menu : NULL;
 
 	if (submenu)
-		retval = ui_handle_menus_recursive(C, event, submenu);
+		retval = ui_handle_menus_recursive(C, event, submenu, level + 1);
 
 	/* now handle events for our own menu */
 	if (retval == WM_UI_HANDLER_CONTINUE || event->type == TIMER) {
-		if (submenu && submenu->menuretval)
+		if (submenu && submenu->menuretval) {
 			retval = ui_handle_menu_return_submenu(C, event, menu);
-		else
-			retval = ui_handle_menu_event(C, event, menu, (submenu == NULL));
+			/* we may wan't to quit the submenu and handle the even in this menu */
+			if ((retval == WM_UI_HANDLER_BREAK) && (submenu->menuretval & UI_RETURN_OUT_PARENT)) {
+				retval = ui_handle_menu_event(C, event, menu, level);
+			}
+		}
+		else {
+			retval = ui_handle_menu_event(C, event, menu, level);  /* same as above */
+		}
 	}
 
 	return retval;
@@ -6753,7 +6849,7 @@ static int ui_handler_region_menu(bContext *C, wmEvent *event, void *UNUSED(user
 		if (data->state == BUTTON_STATE_MENU_OPEN) {
 			/* handle events for menus and their buttons recursively,
 			 * this will handle events from the top to the bottom menu */
-			retval = ui_handle_menus_recursive(C, event, data->menu);
+			retval = ui_handle_menus_recursive(C, event, data->menu, 0);
 
 			/* handle events for the activated button */
 			if (retval == WM_UI_HANDLER_CONTINUE || event->type == TIMER) {
@@ -6797,7 +6893,7 @@ static int ui_handler_popup(bContext *C, wmEvent *event, void *userdata)
 		retval = WM_UI_HANDLER_CONTINUE;
 	}
 
-	ui_handle_menus_recursive(C, event, menu);
+	ui_handle_menus_recursive(C, event, menu, 0);
 
 	/* free if done, does not free handle itself */
 	if (menu->menuretval) {

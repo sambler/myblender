@@ -313,7 +313,7 @@ void BKE_sequencer_editing_free(Scene *scene)
 
 static void sequencer_imbuf_assign_spaces(Scene *scene, ImBuf *ibuf)
 {
-	IMB_colormanagement_imbuf_assign_float_space(ibuf, &scene->sequencer_colorspace_settings);
+	IMB_colormanagement_assign_float_colorspace(ibuf, scene->sequencer_colorspace_settings.name);
 }
 
 void BKE_sequencer_imbuf_to_sequencer_space(Scene *scene, ImBuf *ibuf, int make_float)
@@ -2186,7 +2186,7 @@ static ImBuf *seq_render_movieclip_strip(SeqRenderData context, Sequence *seq, f
 
 	memset(&user, 0, sizeof(MovieClipUser));
 	
-	BKE_movieclip_user_set_frame(&user, nr + seq->anim_startofs);
+	BKE_movieclip_user_set_frame(&user, nr + seq->anim_startofs + seq->clip->start_frame);
 
 	user.render_size = MCLIP_PROXY_RENDER_SIZE_FULL;
 
@@ -2583,17 +2583,19 @@ static ImBuf *do_render_strip_uncached(SeqRenderData context, Sequence *seq, flo
 		case SEQ_TYPE_MOVIECLIP:
 		{
 			ibuf = seq_render_movieclip_strip(context, seq, nr);
-			sequencer_imbuf_assign_spaces(context.scene, ibuf);
 
-			if (ibuf && use_preprocess) {
+			if (ibuf) {
+				/* duplicate frame so movie cache wouldn't be confused by sequencer's stuff */
 				ImBuf *i = IMB_dupImBuf(ibuf);
-
 				IMB_freeImBuf(ibuf);
-
 				ibuf = i;
+
+				if (ibuf->rect_float)
+					BKE_sequencer_imbuf_to_sequencer_space(context.scene, ibuf, FALSE);
+
+				copy_to_ibuf_still(context, seq, nr, ibuf);
 			}
 
-			copy_to_ibuf_still(context, seq, nr, ibuf);
 			break;
 		}
 

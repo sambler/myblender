@@ -1028,8 +1028,7 @@ void IMB_colormanagement_validate_settings(ColorManagedDisplaySettings *display_
 
 	display = colormanage_display_get_named(display_settings->display_device);
 
-	if (display)
-		default_view = colormanage_view_get_default(display);
+	default_view = colormanage_view_get_default(display);
 
 	for (view_link = display->views.first; view_link; view_link = view_link->next) {
 		ColorManagedView *view = view_link->data;
@@ -1831,7 +1830,7 @@ unsigned char *IMB_display_buffer_acquire(ImBuf *ibuf, const ColorManagedViewSet
 			return display_buffer;
 		}
 
-		buffer_size = DISPLAY_BUFFER_CHANNELS * ibuf->x * ibuf->y * sizeof(float);
+		buffer_size = DISPLAY_BUFFER_CHANNELS * ibuf->x * ibuf->y * sizeof(char);
 		display_buffer = MEM_callocN(buffer_size, "imbuf display buffer");
 
 		colormanage_display_buffer_process(ibuf, display_buffer, applied_view_settings, display_settings);
@@ -1894,10 +1893,10 @@ void IMB_display_buffer_release(void *cache_handle)
 
 /*********************** Display functions *************************/
 
-ColorManagedDisplay *colormanage_display_get_default(void)
+const char *colormanage_display_get_default_name(void)
 {
 	ConstConfigRcPtr *config = OCIO_getCurrentConfig();
-	const char *display;
+	const char *display_name;
 
 	if (!config) {
 		/* no valid OCIO configuration, can't get default display */
@@ -1905,14 +1904,21 @@ ColorManagedDisplay *colormanage_display_get_default(void)
 		return NULL;
 	}
 
-	display = OCIO_configGetDefaultDisplay(config);
+	display_name = OCIO_configGetDefaultDisplay(config);
 
 	OCIO_configRelease(config);
 
-	if (display[0] == '\0')
+	return display_name;
+}
+
+ColorManagedDisplay *colormanage_display_get_default(void)
+{
+	const char *display_name = colormanage_display_get_default_name();
+
+	if (display_name[0] == '\0')
 		return NULL;
 
-	return colormanage_display_get_named(display);
+	return colormanage_display_get_named(display_name);
 }
 
 ColorManagedDisplay *colormanage_display_add(const char *name)
@@ -1992,6 +1998,14 @@ const char *IMB_colormanagement_display_get_default_name(void)
 ColorManagedDisplay *IMB_colormanagement_display_get_named(const char *name)
 {
 	return colormanage_display_get_named(name);
+}
+
+const char *IMB_colormanagement_display_get_none_name(void)
+{
+	if (colormanage_display_get_named("None") != NULL)
+		return "None";
+
+	return colormanage_display_get_default_name();
 }
 
 /*********************** View functions *************************/

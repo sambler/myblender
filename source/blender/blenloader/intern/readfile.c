@@ -206,7 +206,7 @@
  * - join all Mains
  * - link all LibBlocks and indirect pointers to libblocks
  * - initialize FileGlobal and copy pointers to Global
-*/
+ */
 
 /* also occurs in library.c */
 /* GS reads the memory pointed at in a specific ordering. There are,
@@ -999,7 +999,7 @@ FileData *blo_openblenderfile(const char *filepath, ReportList *reports)
 	gzfile = BLI_gzopen(filepath, "rb");
 	
 	if (gzfile == (gzFile)Z_NULL) {
-		BKE_reportf(reports, RPT_ERROR, "Unable to open \"%s\": %s.", filepath, errno ? strerror(errno) : "Unknown error reading file");
+		BKE_reportf(reports, RPT_WARNING, "Unable to open \"%s\": %s.", filepath, errno ? strerror(errno) : "Unknown error reading file");
 		return NULL;
 	}
 	else {
@@ -1017,7 +1017,7 @@ FileData *blo_openblenderfile(const char *filepath, ReportList *reports)
 FileData *blo_openblendermemory(void *mem, int memsize, ReportList *reports)
 {
 	if (!mem || memsize<SIZEOFBLENDERHEADER) {
-		BKE_report(reports, RPT_ERROR, (mem)? "Unable to read": "Unable to open");
+		BKE_report(reports, RPT_WARNING, (mem)? "Unable to read": "Unable to open");
 		return NULL;
 	}
 	else {
@@ -1034,7 +1034,7 @@ FileData *blo_openblendermemory(void *mem, int memsize, ReportList *reports)
 FileData *blo_openblendermemfile(MemFile *memfile, ReportList *reports)
 {
 	if (!memfile) {
-		BKE_report(reports, RPT_ERROR, "Unable to open blend <memory>");
+		BKE_report(reports, RPT_WARNING, "Unable to open blend <memory>");
 		return NULL;
 	}
 	else {
@@ -3665,7 +3665,14 @@ static void lib_link_mesh(FileData *fd, Main *main)
 			if (me->mr && me->mr->levels.first)
 				lib_link_customdata_mtface(fd, me, &me->mr->fdata,
 							   ((MultiresLevel*)me->mr->levels.first)->totface);
-			
+		}
+	}
+
+	/* convert texface options to material */
+	convert_tface_mt(fd, main);
+
+	for (me = main->mesh.first; me; me = me->id.next) {
+		if (me->id.flag & LIB_NEED_LINK) {
 			/*check if we need to convert mfaces to mpolys*/
 			if (me->totface && !me->totpoly) {
 				/* temporarily switch main so that reading from
@@ -3677,14 +3684,7 @@ static void lib_link_mesh(FileData *fd, Main *main)
 				
 				G.main = gmain;
 			}
-		}
-	}
 
-	/* convert texface options to material */
-	convert_tface_mt(fd, main);
-
-	for (me = main->mesh.first; me; me = me->id.next) {
-		if (me->id.flag & LIB_NEED_LINK) {
 			/*
 			 * Re-tessellate, even if the polys were just created from tessfaces, this
 			 * is important because it:
@@ -3840,35 +3840,6 @@ static void direct_link_mesh(FileData *fd, Mesh *mesh)
 	direct_link_customdata(fd, &mesh->fdata, mesh->totface);
 	direct_link_customdata(fd, &mesh->ldata, mesh->totloop);
 	direct_link_customdata(fd, &mesh->pdata, mesh->totpoly);
-	
-	
-#ifdef USE_BMESH_FORWARD_COMPAT
-	/* NEVER ENABLE THIS CODE INTO BMESH!
-	 * THIS IS FOR LOADING BMESH INTO OLDER FILES ONLY */
-	mesh->mpoly = newdataadr(fd, mesh->mpoly);
-	mesh->mloop = newdataadr(fd, mesh->mloop);
-
-	direct_link_customdata(fd, &mesh->pdata, mesh->totpoly);
-	direct_link_customdata(fd, &mesh->ldata, mesh->totloop);
-
-	if (mesh->mpoly) {
-		/* be clever and load polygons as mfaces */
-		mesh->totface= BKE_mesh_mpoly_to_mface(&mesh->fdata, &mesh->ldata, &mesh->pdata,
-		                                   mesh->totface, mesh->totloop, mesh->totpoly);
-		
-		CustomData_free(&mesh->pdata, mesh->totpoly);
-		memset(&mesh->pdata, 0, sizeof(CustomData));
-		mesh->totpoly = 0;
-		
-		CustomData_free(&mesh->ldata, mesh->totloop);
-		memset(&mesh->ldata, 0, sizeof(CustomData));
-		mesh->totloop = 0;
-		
-		mesh_update_customdata_pointers(mesh);
-	}
-
-#endif
-	
 	
 	mesh->bb = NULL;
 	mesh->edit_btmesh = NULL;
@@ -4368,13 +4339,14 @@ static void direct_link_modifiers(FileData *fd, ListBase *lb)
 				smd->flow = NULL;
 				smd->domain = NULL;
 				smd->coll = newdataadr(fd, smd->coll);
-				smd->coll->smd = smd;
 				if (smd->coll) {
+					smd->coll->smd = smd;
 					smd->coll->points = NULL;
 					smd->coll->numpoints = 0;
 				}
-				else
+				else {
 					smd->type = 0;
+				}
 			}
 		}
 		else if (md->type == eModifierType_DynamicPaint) {
@@ -4781,7 +4753,7 @@ static void lib_link_scene(FileData *fd, Main *main)
 				base->object = newlibadr_us(fd, sce->id.lib, base->object);
 				
 				if (base->object == NULL) {
-					BKE_reportf_wrap(fd->reports, RPT_ERROR,
+					BKE_reportf_wrap(fd->reports, RPT_WARNING,
 					                 "LIB ERROR: Object lost from scene:'%s\'",
 					                 sce->id.name + 2);
 					BLI_remlink(&sce->base, base);
@@ -8007,6 +7979,22 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 		}
 	}
 
+	/* correction for files saved in blender version when BKE_pose_copy_data
+	 * didn't copy animation visualization, which lead to deadlocks on motion
+	 * path calculation for proxied armatures, see [#32742]
+	 */
+	if (main->versionfile < 264) {
+		Object *ob;
+
+		for (ob = main->object.first; ob; ob = ob->id.next) {
+			if (ob->pose) {
+				if (ob->pose->avs.path_step == 0) {
+					animviz_settings_init(&ob->pose->avs);
+				}
+			}
+		}
+	}
+
 	/* WATCH IT!!!: pointers from libdata have not been converted yet here! */
 	/* WATCH IT 2!: Userdef struct init has to be in editors/interface/resources.c! */
 
@@ -9594,7 +9582,7 @@ static void read_libraries(FileData *basefd, ListBase *mainlist)
 					else mainptr->curlib->filedata = NULL;
 					
 					if (fd == NULL) {
-						BKE_reportf_wrap(basefd->reports, RPT_ERROR,
+						BKE_reportf_wrap(basefd->reports, RPT_WARNING,
 						                 "Can't find lib '%s'",
 						                 mainptr->curlib->filepath);
 					}
@@ -9613,7 +9601,7 @@ static void read_libraries(FileData *basefd, ListBase *mainlist)
 								
 								append_id_part(fd, mainptr, id, &realid);
 								if (!realid) {
-									BKE_reportf_wrap(fd->reports, RPT_ERROR,
+									BKE_reportf_wrap(fd->reports, RPT_WARNING,
 									                 "LIB ERROR: %s:'%s' missing from '%s'",
 									                 BKE_idcode_to_name(GS(id->name)),
 									                 id->name+2, mainptr->curlib->filepath);
@@ -9645,7 +9633,7 @@ static void read_libraries(FileData *basefd, ListBase *mainlist)
 				idn = id->next;
 				if (id->flag & LIB_READ) {
 					BLI_remlink(lbarray[a], id);
-					BKE_reportf_wrap(basefd->reports, RPT_ERROR,
+					BKE_reportf_wrap(basefd->reports, RPT_WARNING,
 					                 "LIB ERROR: %s:'%s' unread libblock missing from '%s'",
 					                 BKE_idcode_to_name(GS(id->name)), id->name + 2, mainptr->curlib->filepath);
 					change_idid_adr(mainlist, basefd, id, NULL);

@@ -223,13 +223,13 @@ bNodeTemplate node_group_template(bNode *node)
 {
 	bNodeTemplate ntemp;
 	ntemp.type = NODE_GROUP;
-	ntemp.ngroup = (bNodeTree*)node->id;
+	ntemp.ngroup = (bNodeTree *)node->id;
 	return ntemp;
 }
 
 void node_group_init(bNodeTree *ntree, bNode *node, bNodeTemplate *ntemp)
 {
-	node->id = (ID*)ntemp->ngroup;
+	node->id = (ID *)ntemp->ngroup;
 	
 	/* NB: group socket input/output roles are inverted internally!
 	 * Group "inputs" work as outputs in links and vice versa.
@@ -649,4 +649,16 @@ void ntree_update_reroute_nodes(bNodeTree *ntree)
 	for (node = ntree->nodes.first; node; node = node->next)
 		if (node->type == NODE_REROUTE && !node->done)
 			node_reroute_inherit_type_recursive(ntree, node);
+}
+
+void BKE_node_tree_unlink_id_cb(void *calldata, struct ID *UNUSED(owner_id), struct bNodeTree *ntree)
+{
+	ID *id = (ID *)calldata;
+	bNode *node;
+
+	for (node = ntree->nodes.first; node; node = node->next) {
+		if (node->id == id) {
+			node->id = NULL;
+		}
+	}
 }

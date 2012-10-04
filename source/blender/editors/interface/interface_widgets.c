@@ -1014,42 +1014,42 @@ static void ui_text_clip_cursor(uiFontStyle *fstyle, uiBut *but, rcti *rect)
 	if (fstyle->kerning == 1) /* for BLF_width */
 		BLF_enable(fstyle->uifont_id, BLF_KERNING_DEFAULT);
 
-	if ((but->strwidth = BLF_width(fstyle->uifont_id, but->drawstr)) <= okwidth) {
+	/* define ofs dynamically */
+	if (but->ofs > but->pos)
+		but->ofs = but->pos;
+
+	if (BLF_width(fstyle->uifont_id, but->drawstr) <= okwidth)
 		but->ofs = 0;
-	}
-	else {
-		/* define ofs dynamically */
-		if (but->ofs > but->pos)
-			but->ofs = but->pos;
 
-		while (but->strwidth > okwidth) {
-			float width;
-			char buf[UI_MAX_DRAW_STR];
+	but->strwidth = BLF_width(fstyle->uifont_id, but->drawstr + but->ofs);
 
-			/* copy draw string */
-			BLI_strncpy_utf8(buf, but->drawstr, sizeof(buf));
-			/* string position of cursor */
-			buf[but->pos] = 0;
-			width = BLF_width(fstyle->uifont_id, buf + but->ofs);
+	while (but->strwidth > okwidth) {
+		float width;
+		char buf[UI_MAX_DRAW_STR];
 
-			/* if cursor is at 20 pixels of right side button we clip left */
-			if (width > okwidth - 20) {
-				ui_text_clip_give_next_off(but);
-			}
-			else {
-				int len, bytes;
-				/* shift string to the left */
-				if (width < 20 && but->ofs > 0)
-					ui_text_clip_give_prev_off(but);
-				len = strlen(but->drawstr);
-				bytes = BLI_str_utf8_size(BLI_str_find_prev_char_utf8(but->drawstr, but->drawstr + len));
-				but->drawstr[len - bytes] = 0;
-			}
+		/* copy draw string */
+		BLI_strncpy_utf8(buf, but->drawstr, sizeof(buf));
+		/* string position of cursor */
+		buf[but->pos] = 0;
+		width = BLF_width(fstyle->uifont_id, buf + but->ofs);
 
-			but->strwidth = BLF_width(fstyle->uifont_id, but->drawstr + but->ofs);
-
-			if (but->strwidth < 10) break;
+		/* if cursor is at 20 pixels of right side button we clip left */
+		if (width > okwidth - 20) {
+			ui_text_clip_give_next_off(but);
 		}
+		else {
+			int len, bytes;
+			/* shift string to the left */
+			if (width < 20 && but->ofs > 0)
+				ui_text_clip_give_prev_off(but);
+			len = strlen(but->drawstr);
+			bytes = BLI_str_utf8_size(BLI_str_find_prev_char_utf8(but->drawstr, but->drawstr + len));
+			but->drawstr[len - bytes] = 0;
+		}
+
+		but->strwidth = BLF_width(fstyle->uifont_id, but->drawstr + but->ofs);
+
+		if (but->strwidth < 10) break;
 	}
 
 	if (fstyle->kerning == 1) {
@@ -1889,53 +1889,47 @@ static void ui_hsv_cursor(float x, float y)
 	
 }
 
-void ui_hsvcircle_vals_from_pos(float *valrad, float *valdist, rcti *rect, float mx, float my)
+void ui_hsvcircle_vals_from_pos(float *val_rad, float *val_dist, const rcti *rect,
+                                const float mx, const float my)
 {
 	/* duplication of code... well, simple is better now */
-	float centx = BLI_rcti_cent_x_fl(rect);
-	float centy = BLI_rcti_cent_y_fl(rect);
-	float radius, dist;
-	
-	if (BLI_rcti_size_x(rect) > BLI_rcti_size_y(rect))
-		radius = (float)BLI_rcti_size_y(rect) / 2;
-	else
-		radius = (float)BLI_rcti_size_x(rect) / 2;
+	const float centx = BLI_rcti_cent_x_fl(rect);
+	const float centy = BLI_rcti_cent_y_fl(rect);
+	const float radius = (float)mini(BLI_rcti_size_x(rect), BLI_rcti_size_y(rect)) / 2.0f;
+	const float m_delta[2] = {mx - centx, my - centy};
+	const float dist_squared = len_squared_v2(m_delta);
 
-	mx -= centx;
-	my -= centy;
-	dist = sqrt(mx * mx + my * my);
-	if (dist < radius)
-		*valdist = dist / radius;
-	else
-		*valdist = 1.0f;
-	
-	*valrad = atan2f(mx, my) / (2.0f * (float)M_PI) + 0.5f;
+	*val_dist = (dist_squared < (radius * radius)) ? sqrtf(dist_squared) / radius : 1.0f;
+	*val_rad = atan2f(m_delta[0], m_delta[1]) / (2.0f * (float)M_PI) + 0.5f;
 }
 
-static void ui_draw_but_HSVCIRCLE(uiBut *but, uiWidgetColors *wcol, rcti *rect)
+static void ui_draw_but_HSVCIRCLE(uiBut *but, uiWidgetColors *wcol, const rcti *rect)
 {
+	const int tot = 32;
+	const float radstep = 2.0f * (float)M_PI / (float)tot;
+
+	const float centx = BLI_rcti_cent_x_fl(rect);
+	const float centy = BLI_rcti_cent_y_fl(rect);
+	float radius = (float)mini(BLI_rcti_size_x(rect), BLI_rcti_size_y(rect)) / 2.0f;
+
 	/* gouraud triangle fan */
-	float radstep, ang = 0.0f;
-	float centx, centy, radius, cursor_radius;
+	const float *hsv_ptr = ui_block_hsv_get(but->block);
+	float ang = 0.0f;
+	float cursor_radius;
 	float rgb[3], hsvo[3], hsv[3], col[3], colcent[3];
-	int a, tot = 32;
+	int a;
 	int color_profile = but->block->color_profile;
 	
 	if (but->rnaprop && RNA_property_subtype(but->rnaprop) == PROP_COLOR_GAMMA)
 		color_profile = FALSE;
 	
-	radstep = 2.0f * (float)M_PI / (float)tot;
-	centx = BLI_rcti_cent_x_fl(rect);
-	centy = BLI_rcti_cent_y_fl(rect);
-	
-	if (BLI_rcti_size_x(rect) > BLI_rcti_size_y(rect))
-		radius = (float)BLI_rcti_size_y(rect) / 2;
-	else
-		radius = (float)BLI_rcti_size_x(rect) / 2;
-	
 	/* color */
 	ui_get_but_vectorf(but, rgb);
-	/* copy_v3_v3(hsv, ui_block_hsv_get(but->block)); */ /* UNUSED */
+
+	/* since we use compat functions on both 'hsv' and 'hsvo', they need to be initialized */
+	hsvo[0] = hsv[0] = hsv_ptr[0];
+	hsvo[1] = hsv[1] = hsv_ptr[1];
+	hsvo[2] = hsv[2] = hsv_ptr[2];
 
 	rgb_to_hsv_compat_v(rgb, hsvo);
 

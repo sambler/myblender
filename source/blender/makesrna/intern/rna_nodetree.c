@@ -1803,7 +1803,7 @@ static void def_cmp_blur(StructRNA *srna)
 	/* duplicated in def_cmp_bokehblur */
 	prop = RNA_def_property(srna, "use_variable_size", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "custom1", CMP_NODEFLAG_BLUR_VARIABLE_SIZE);
-	RNA_def_property_ui_text(prop, "Variable Size", "Support variable blue per-pixel when using an image for size input");
+	RNA_def_property_ui_text(prop, "Variable Size", "Support variable blur per-pixel when using an image for size input");
 	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 
 	RNA_def_struct_sdna_from(srna, "NodeBlurData", "storage");
@@ -2195,14 +2195,14 @@ static void def_cmp_inpaint(StructRNA *srna)
 {
 	PropertyRNA *prop;
 
-/*
+#if 0
 	prop = RNA_def_property(srna, "type", PROP_ENUM, PROP_NONE);
 
 	RNA_def_property_enum_sdna(prop, NULL, "custom1");
 	RNA_def_property_enum_items(prop, type_items);
 	RNA_def_property_ui_text(prop, "Type", "Type of inpaint algorithm");
 	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
-*/
+#endif
 	
 	prop = RNA_def_property(srna, "distance", PROP_INT, PROP_NONE);
 	RNA_def_property_int_sdna(prop, NULL, "custom2");
@@ -4315,7 +4315,7 @@ static void rna_def_node(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "label", PROP_STRING, PROP_NONE);
 	RNA_def_property_string_sdna(prop, NULL, "label");
 	RNA_def_property_ui_text(prop, "Label", "Optional custom node label");
-	RNA_def_property_update(prop, NC_NODE, "rna_Node_update");
+	RNA_def_property_update(prop, NC_NODE | ND_DISPLAY, NULL);
 	
 	prop = RNA_def_property(srna, "inputs", PROP_COLLECTION, PROP_NONE);
 	RNA_def_property_collection_sdna(prop, NULL, "inputs", NULL);

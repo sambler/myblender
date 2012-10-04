@@ -439,16 +439,17 @@ static int edbm_extrude_mesh(Scene *scene, Object *obedit, BMEditMesh *em, wmOpe
 
 	zero_v3(nor);
 
+	/* XXX If those popup menus were to be enabled again, please get rid of this "menu string" syntax! */
 	if (em->selectmode & SCE_SELECT_VERTEX) {
 		if (em->bm->totvertsel == 0) nr = 0;
 		else if (em->bm->totvertsel == 1) nr = 4;
 		else if (em->bm->totedgesel == 0) nr = 4;
 		else if (em->bm->totfacesel == 0)
-			nr = 3;  // pupmenu("Extrude %t|Only Edges%x3|Only Vertices%x4");
+			nr = 3;  /* pupmenu("Extrude %t|Only Edges %x3|Only Vertices %x4"); */
 		else if (em->bm->totfacesel == 1)
-			nr = 1;  // pupmenu("Extrude %t|Region %x1|Only Edges%x3|Only Vertices%x4");
+			nr = 1;  /* pupmenu("Extrude %t|Region %x1|Only Edges% x3|Only Vertices %x4"); */
 		else
-			nr = 1;  // pupmenu("Extrude %t|Region %x1||Individual Faces %x2|Only Edges%x3|Only Vertices%x4");
+			nr = 1;  /* pupmenu("Extrude %t|Region %x1|Individual Faces %x2|Only Edges %x3|Only Vertices %x4"); */
 	}
 	else if (em->selectmode & SCE_SELECT_EDGE) {
 		if (em->bm->totedgesel == 0) nr = 0;
@@ -458,16 +459,16 @@ static int edbm_extrude_mesh(Scene *scene, Object *obedit, BMEditMesh *em, wmOpe
 		else if (em->totedgesel == 1) nr = 3;
 		else if (em->totfacesel == 0) nr = 3;
 		else if (em->totfacesel == 1)
-			nr = 1;  // pupmenu("Extrude %t|Region %x1|Only Edges%x3");
+			nr = 1;  /* pupmenu("Extrude %t|Region %x1|Only Edges %x3"); */
 		else
-			nr = 1;  // pupmenu("Extrude %t|Region %x1||Individual Faces %x2|Only Edges%x3");
+			nr = 1;  /* pupmenu("Extrude %t|Region %x1|Individual Faces %x2|Only Edges %x3"); */
 #endif
 	}
 	else {
 		if (em->bm->totfacesel == 0) nr = 0;
 		else if (em->bm->totfacesel == 1) nr = 1;
 		else
-			nr = 1;  // pupmenu("Extrude %t|Region %x1||Individual Faces %x2");
+			nr = 1;  /* pupmenu("Extrude %t|Region %x1|Individual Faces %x2"); */
 	}
 
 	if (nr < 1) return 'g';
@@ -2140,7 +2141,7 @@ static int edbm_select_vertex_path_exec(bContext *C, wmOperator *op)
 	}
 
 	/* if those are not found, because vertices where selected by e.g.
-	   border or circle select, find two selected vertices */
+	 * border or circle select, find two selected vertices */
 	if (svert == NULL) {
 		BM_ITER_MESH (eve, &iter, em->bm, BM_VERTS_OF_MESH) {
 			if (!BM_elem_flag_test(eve, BM_ELEM_SELECT) || BM_elem_flag_test(eve, BM_ELEM_HIDDEN))
@@ -2150,7 +2151,7 @@ static int edbm_select_vertex_path_exec(bContext *C, wmOperator *op)
 			else if (evert == NULL) evert = eve;
 			else {
 				/* more than two vertices are selected,
-				   show warning message and cancel operator */
+				 * show warning message and cancel operator */
 				svert = evert = NULL;
 				break;
 			}
@@ -4776,7 +4777,7 @@ void MESH_OT_bevel(wmOperatorType *ot)
 	ot->poll = ED_operator_editmesh;
 
 	/* flags */
-	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_GRAB_POINTER | OPTYPE_BLOCKING;
 
 	RNA_def_float(ot->srna, "percent", 0.0f, -FLT_MAX, FLT_MAX, "Percentage", "", 0.0f, 1.0f);
 	/* XXX, disabled for 2.63 release, needs to work much better without overlap before we can give to users. */
@@ -5195,7 +5196,7 @@ void MESH_OT_inset(wmOperatorType *ot)
 	ot->poll = ED_operator_editmesh;
 
 	/* flags */
-	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_GRAB_POINTER | OPTYPE_BLOCKING;
 
 	/* properties */
 	RNA_def_boolean(ot->srna, "use_boundary",        TRUE, "Boundary",  "Inset face boundaries");

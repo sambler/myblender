@@ -446,8 +446,8 @@ static KnifeVert *knife_split_edge(KnifeTool_OpData *kcd, KnifeEdge *kfe, float 
 	}
 	else {
 		/* kfe cuts across an existing face.
-		   If v1 and v2 are in multiple faces together (e.g., if they
-		   are in doubled polys) then this arbitrarily chooses one of them */
+		 * If v1 and v2 are in multiple faces together (e.g., if they
+		 * are in doubled polys) then this arbitrarily chooses one of them */
 		f = knife_find_common_face(&kfe->v1->faces, &kfe->v2->faces);
 		if (f)
 			knife_append_list(kcd, &newkfe->v2->faces, f);
@@ -1158,7 +1158,7 @@ static BMEdgeHit *knife_edge_tri_isect(KnifeTool_OpData *kcd, BMBVHTree *bmtree,
 
 	/* for comparing distances, error of intersection depends on triangle scale.
 	 * need to scale down before squaring for accurate comparison */
-	const float depsilon = 50 *FLT_EPSILON *len_v3_tri_side_max(v1, v2, v3);
+	const float depsilon = 50 *FLT_EPSILON * len_v3_tri_side_max(v1, v2, v3);
 	const float depsilon_squared = depsilon * depsilon;
 
 	copy_v3_v3(cos + 0, v1);

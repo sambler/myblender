@@ -54,7 +54,7 @@ typedef enum eUIFont_ID {
 	UIFONT_DEFAULT	= 0,
 /*	UIFONT_BITMAP	= 1 */ /* UNUSED */
 	
-/* free slots */
+	/* free slots */
 	UIFONT_CUSTOM1	= 2,
 	UIFONT_CUSTOM2	= 3
 } eUIFont_ID;
@@ -349,8 +349,8 @@ typedef struct UserDef {
 	char pythondir[768];
 	char sounddir[768];
 	char i18ndir[768];
-	char image_editor[1024];	/* 1024 = FILE_MAX */
-	char anim_player[1024];	/* 1024 = FILE_MAX */
+	char image_editor[1024];    /* 1024 = FILE_MAX */
+	char anim_player[1024];	    /* 1024 = FILE_MAX */
 	int anim_player_preset;
 	
 	short v2d_min_gridsize;		/* minimum spacing between gridlines in View2D grids */
@@ -397,7 +397,7 @@ typedef struct UserDef {
 	int memcachelimit;
 	int prefetchframes;
 	short frameserverport;
-	short pad_rot_angle;	/*control the rotation step of the view when PAD2, PAD4, PAD6&PAD8 is use*/
+	short pad_rot_angle;	/* control the rotation step of the view when PAD2, PAD4, PAD6&PAD8 is use */
 	short obcenter_dia;
 	short rvisize;			/* rotating view icon size */
 	short rvibright;		/* rotating view icon brightness */
@@ -426,7 +426,7 @@ typedef struct UserDef {
 	short autokey_mode;		/* autokeying mode */
 	short autokey_flag;		/* flags for autokeying */
 	
-	short text_render, pad9;		/*options for text rendering*/
+	short text_render, pad9;		/* options for text rendering */
 
 	struct ColorBand coba_weight;	/* from texture.h */
 
@@ -467,7 +467,7 @@ typedef enum eUserPref_Flag {
 /*	USER_AUTOSIZEGRID		= (1 << 3),	deprecated */
 	USER_SCENEGLOBAL		= (1 << 4),
 	USER_TRACKBALL			= (1 << 5),
-/*	USER_DUPLILINK		= (1 << 6),	deprecated */
+/*	USER_DUPLILINK			= (1 << 6),	deprecated */
 /*	USER_FSCOLLUM			= (1 << 7),	deprecated */
 	USER_MAT_ON_OB			= (1 << 8),
 /*	USER_NO_CAPSLOCK		= (1 << 9), */  /* not used anywhere */
@@ -488,7 +488,7 @@ typedef enum eUserPref_Flag {
 	USER_NONEGFRAMES		= (1 << 24),
 	USER_TXT_TABSTOSPACES_DISABLE	= (1 << 25),
 	USER_TOOLTIPS_PYTHON    = (1 << 26),
-	USER_OPTION_TOOLTIPS	(1<<27)		/* this shows tooltips when holding option/alt if USER_TOOLTIPS is off */
+	USER_OPTION_TOOLTIPS	= (1 << 27)		/* this shows tooltips when holding option/alt if USER_TOOLTIPS is off */
 } eUserPref_Flag;
 
 /* helper macro for checking frame clamping */
@@ -556,8 +556,8 @@ typedef enum eAutokey_Flag {
 	AUTOKEY_FLAG_INSERTNEEDED	= (1 << 1),
 	AUTOKEY_FLAG_AUTOMATKEY		= (1 << 2),
 	AUTOKEY_FLAG_XYZ2RGB		= (1 << 3),
-
-/* toolsettings->autokey_flag */
+	
+	/* toolsettings->autokey_flag */
 	AUTOKEY_FLAG_ONLYKEYINGSET	= (1 << 6),
 	AUTOKEY_FLAG_NOWARNING		= (1 << 7),
 	ANIMRECORD_FLAG_WITHNLA		= (1 << 10),
@@ -610,7 +610,7 @@ typedef enum eWM_DrawMethod {
 	USER_DRAW_OVERLAP_FLIP	= 4,
 } eWM_DrawMethod;
 
-/* text draw options*/
+/* text draw options */
 typedef enum eText_Draw_Options {
 	USER_TEXT_DISABLE_AA	= (1 << 0),
 } eText_Draw_Options;
@@ -668,23 +668,23 @@ typedef enum eNdof_Flag {
 	NDOF_FLY_HELICOPTER = (1 << 1),
 	NDOF_LOCK_HORIZON   = (1 << 2),
 
-/* the following might not need to be saved between sessions,
- * but they do need to live somewhere accessible... */
+	/* the following might not need to be saved between sessions,
+	 * but they do need to live somewhere accessible... */
 	NDOF_SHOULD_PAN     = (1 << 3),
 	NDOF_SHOULD_ZOOM    = (1 << 4),
 	NDOF_SHOULD_ROTATE  = (1 << 5),
 
-/* orbit navigation modes
- * only two options, so it's sort of a hybrid bool/enum
- * if ((U.ndof_flag & NDOF_ORBIT_MODE) == NDOF_OM_OBJECT)... */
+	/* orbit navigation modes
+	 * only two options, so it's sort of a hybrid bool/enum
+	 * if ((U.ndof_flag & NDOF_ORBIT_MODE) == NDOF_OM_OBJECT)... */
 
 	// NDOF_ORBIT_MODE     = (1 << 6),
-// #define NDOF_OM_TARGETCAMERA 0
-// #define NDOF_OM_OBJECT      NDOF_ORBIT_MODE
+	// #define NDOF_OM_TARGETCAMERA 0
+	// #define NDOF_OM_OBJECT      NDOF_ORBIT_MODE
 
-/* actually... users probably don't care about what the mode
- * is called, just that it feels right */
-/* zoom is up/down if this flag is set (otherwise forward/backward) */
+	/* actually... users probably don't care about what the mode
+	 * is called, just that it feels right */
+	/* zoom is up/down if this flag is set (otherwise forward/backward) */
 	NDOF_ZOOM_UPDOWN        = (1 << 7),
 	NDOF_ZOOM_INVERT        = (1 << 8),
 	NDOF_ROTATE_INVERT_AXIS = (1 << 9),

@@ -5342,9 +5342,9 @@ static void button_tooltip_timer_reset(bContext *C, uiBut *but)
 	}
 
 	if(U.flag & (USER_TOOLTIPS|USER_OPTION_TOOLTIPS) )
-		if(!but->block->tooltipdisabled)
-			if(!wm->drags.first)
-				data->tooltiptimer= WM_event_add_timer(data->wm, data->window, TIMER, BUTTON_TOOLTIP_DELAY);
+		if (!but->block->tooltipdisabled)
+			if (!wm->drags.first)
+				data->tooltiptimer = WM_event_add_timer(data->wm, data->window, TIMER, BUTTON_TOOLTIP_DELAY);
 }
 
 static void button_activate_state(bContext *C, uiBut *but, uiHandleButtonState state)

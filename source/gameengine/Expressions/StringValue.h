@@ -25,11 +25,11 @@ class CStringValue : public CPropValue
 {
 
 	
-	//PLUGIN_DECLARE_SERIAL(CStringValue,CValue)		
+	//PLUGIN_DECLARE_SERIAL(CStringValue,CValue)
 public:
 	/// Construction / destruction
 	CStringValue();
-	CStringValue (const char *txt, const char *name , AllocationTYPE alloctype = CValue::HEAPVALUE);
+	CStringValue(const char *txt, const char *name, AllocationTYPE alloctype = CValue::HEAPVALUE);
 
 	virtual ~CStringValue() {}
 	/// CValue implementation
@@ -45,7 +45,7 @@ public:
 	virtual PyObject*	ConvertValueToPython() {
 		return PyUnicode_From_STR_String(m_strString);
 	}
-#endif // WITH_PYTHON
+#endif  /* WITH_PYTHON */
 
 private:
 	// data member
@@ -53,11 +53,8 @@ private:
 
 
 #ifdef WITH_CXX_GUARDEDALLOC
-public:
-	void *operator new(size_t num_bytes) { return MEM_mallocN(num_bytes, "GE:CStringValue"); }
-	void operator delete( void *mem ) { MEM_freeN(mem); }
+	MEM_CXX_CLASS_ALLOC_FUNCS("GE:CStringValue")
 #endif
 };
 
-#endif
-
+#endif  /* __STRINGVALUE_H__ */

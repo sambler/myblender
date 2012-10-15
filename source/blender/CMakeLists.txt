@@ -86,8 +86,10 @@ set(SRC_DNA_INC
 	${CMAKE_CURRENT_SOURCE_DIR}/makesdna/DNA_world_types.h
 	${CMAKE_CURRENT_SOURCE_DIR}/makesdna/DNA_movieclip_types.h
 	${CMAKE_CURRENT_SOURCE_DIR}/makesdna/DNA_tracking_types.h
+	${CMAKE_CURRENT_SOURCE_DIR}/makesdna/DNA_mask_types.h
 )
 
+add_subdirectory(datatoc)
 add_subdirectory(editors)
 add_subdirectory(windowmanager)
 add_subdirectory(blenkernel)
@@ -96,15 +98,18 @@ add_subdirectory(bmesh)
 add_subdirectory(render)
 add_subdirectory(blenfont)
 add_subdirectory(blenloader)
-add_subdirectory(blenpluginapi)
 add_subdirectory(ikplugin)
 add_subdirectory(gpu)
 add_subdirectory(imbuf)
-add_subdirectory(avi)
 add_subdirectory(nodes)
 add_subdirectory(modifiers)
 add_subdirectory(makesdna)
 add_subdirectory(makesrna)
+
+if(WITH_COMPOSITOR)
+	add_subdirectory(opencl)  # later on this may be used more generally
+	add_subdirectory(compositor)
+endif()
 
 if(WITH_IMAGE_OPENEXR)
 	add_subdirectory(imbuf/intern/openexr)
@@ -116,6 +121,10 @@ endif()
 
 if(WITH_IMAGE_CINEON)
 	add_subdirectory(imbuf/intern/cineon)
+endif()
+
+if(WITH_CODEC_AVI)
+	add_subdirectory(avi)
 endif()
 
 if(WITH_CODEC_QUICKTIME)

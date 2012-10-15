@@ -25,6 +25,10 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/editors/gpencil/gpencil_undo.c
+ *  \ingroup edgpencil
+ */
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -34,6 +38,7 @@
 #include "DNA_listBase.h"
 #include "DNA_windowmanager_types.h"
 
+#include "BKE_blender.h"
 #include "BKE_context.h"
 #include "BKE_gpencil.h"
 
@@ -46,12 +51,10 @@
 
 #include "gpencil_intern.h"
 
-#define MAXUNDONAME	64
-
 typedef struct bGPundonode {
 	struct bGPundonode *next, *prev;
 
-	char name[MAXUNDONAME];
+	char name[BKE_UNDO_STR_MAX];
 	struct bGPdata *gpd;
 } bGPundonode;
 
@@ -65,25 +68,25 @@ int ED_gpencil_session_active(void)
 
 int ED_undo_gpencil_step(bContext *C, int step, const char *name)
 {
-	bGPdata **gpd_ptr= NULL, *new_gpd= NULL;
+	bGPdata **gpd_ptr = NULL, *new_gpd = NULL;
 
-	gpd_ptr= gpencil_data_get_pointers(C, NULL);
+	gpd_ptr = gpencil_data_get_pointers(C, NULL);
 
-	if (step==1) {	/* undo */
+	if (step == 1) {  /* undo */
 		//printf("\t\tGP - undo step\n");
 		if (cur_node->prev) {
 			if (!name || strcmp(cur_node->name, name) == 0) {
-				cur_node= cur_node->prev;
-				new_gpd= cur_node->gpd;
+				cur_node = cur_node->prev;
+				new_gpd = cur_node->gpd;
 			}
 		}
 	}
-	else if (step==-1) {
+	else if (step == -1) {
 		//printf("\t\tGP - redo step\n");
 		if (cur_node->next) {
 			if (!name || strcmp(cur_node->name, name) == 0) {
-				cur_node= cur_node->next;
-				new_gpd= cur_node->gpd;
+				cur_node = cur_node->next;
+				new_gpd = cur_node->gpd;
 			}
 		}
 	}
@@ -91,24 +94,24 @@ int ED_undo_gpencil_step(bContext *C, int step, const char *name)
 	if (new_gpd) {
 		if (gpd_ptr) {
 			if (*gpd_ptr) {
-				bGPdata *gpd= *gpd_ptr;
+				bGPdata *gpd = *gpd_ptr;
 				bGPDlayer *gpl, *gpld;
 
 				free_gpencil_layers(&gpd->layers);
 
 				/* copy layers */
-				gpd->layers.first= gpd->layers.last= NULL;
+				gpd->layers.first = gpd->layers.last = NULL;
 
-				for (gpl= new_gpd->layers.first; gpl; gpl= gpl->next) {
+				for (gpl = new_gpd->layers.first; gpl; gpl = gpl->next) {
 					/* make a copy of source layer and its data */
-					gpld= gpencil_layer_duplicate(gpl);
+					gpld = gpencil_layer_duplicate(gpl);
 					BLI_addtail(&gpd->layers, gpld);
 				}
 			}
 		}
 	}
 
-	WM_event_add_notifier(C, NC_SCREEN|ND_GPENCIL|NA_EDITED, NULL);
+	WM_event_add_notifier(C, NC_GPENCIL | NA_EDITED, NULL);
 
 	return OPERATOR_FINISHED;
 }
@@ -126,41 +129,41 @@ void gpencil_undo_push(bGPdata *gpd)
 
 	if (cur_node) {
 		/* remove all un-done nodes from stack */
-		undo_node= cur_node->next;
+		undo_node = cur_node->next;
 
 		while (undo_node) {
-			bGPundonode *next_node= undo_node->next;
+			bGPundonode *next_node = undo_node->next;
 
-			free_gpencil_data(undo_node->gpd);
+			BKE_gpencil_free(undo_node->gpd);
 			MEM_freeN(undo_node->gpd);
 
 			BLI_freelinkN(&undo_nodes, undo_node);
 
-			undo_node= next_node;
+			undo_node = next_node;
 		}
 	}
 
 	/* create new undo node */
-	undo_node= MEM_callocN(sizeof(bGPundonode), "gpencil undo node");
-	undo_node->gpd= gpencil_data_duplicate(gpd);
+	undo_node = MEM_callocN(sizeof(bGPundonode), "gpencil undo node");
+	undo_node->gpd = gpencil_data_duplicate(gpd);
 
-	cur_node= undo_node;
+	cur_node = undo_node;
 
 	BLI_addtail(&undo_nodes, undo_node);
 }
 
 void gpencil_undo_finish(void)
 {
-	bGPundonode *undo_node= undo_nodes.first;
+	bGPundonode *undo_node = undo_nodes.first;
 
 	while (undo_node) {
-		free_gpencil_data(undo_node->gpd);
+		BKE_gpencil_free(undo_node->gpd);
 		MEM_freeN(undo_node->gpd);
 
-		undo_node= undo_node->next;
+		undo_node = undo_node->next;
 	}
 
 	BLI_freelistN(&undo_nodes);
 
-	cur_node= NULL;
+	cur_node = NULL;
 }

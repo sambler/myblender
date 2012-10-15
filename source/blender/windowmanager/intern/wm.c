@@ -183,7 +183,7 @@ void WM_menutype_freelink(MenuType *mt)
 /* called on initialize WM_init() */
 void WM_menutype_init(void)
 {
-	menutypes_hash = BLI_ghash_new(BLI_ghashutil_strhash, BLI_ghashutil_strcmp, "menutypes_hash gh");
+	menutypes_hash = BLI_ghash_str_new("menutypes_hash gh");
 }
 
 void WM_menutype_free(void)
@@ -291,7 +291,7 @@ void wm_clear_default_size(bContext *C)
 /* on startup, it adds all data, for matching */
 void wm_add_default(bContext *C)
 {
-	wmWindowManager *wm = alloc_libblock(&CTX_data_main(C)->wm, ID_WM, "WinMan");
+	wmWindowManager *wm = BKE_libblock_alloc(&CTX_data_main(C)->wm, ID_WM, "WinMan");
 	wmWindow *win;
 	bScreen *screen = CTX_wm_screen(C); /* XXX from file read hrmf */
 	

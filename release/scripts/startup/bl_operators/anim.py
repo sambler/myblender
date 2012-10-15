@@ -189,7 +189,7 @@ class BakeAction(Operator):
             name="Only Selected",
             default=True,
             )
-    clear_consraints = BoolProperty(
+    clear_constraints = BoolProperty(
             name="Clear Constraints",
             default=False,
             )
@@ -212,9 +212,9 @@ class BakeAction(Operator):
                                         self.only_selected,
                                         'POSE' in self.bake_types,
                                         'OBJECT' in self.bake_types,
-                                        self.clear_consraints,
+                                        self.clear_constraints,
                                         True,
-                                 )
+                                        )
 
         if action is None:
             self.report({'INFO'}, "Nothing to bake")
@@ -223,6 +223,11 @@ class BakeAction(Operator):
         return {'FINISHED'}
 
     def invoke(self, context, event):
+        scene = context.scene
+        self.frame_start = scene.frame_start
+        self.frame_end = scene.frame_end
+        self.bake_types = {'POSE'} if context.mode == 'POSE' else {'OBJECT'}
+
         wm = context.window_manager
         return wm.invoke_props_dialog(self)
 
@@ -247,8 +252,8 @@ class ClearUselessActions(Operator):
 
         for action in bpy.data.actions:
             # if only user is "fake" user...
-            if ((self.only_unused is False) or
-                (action.use_fake_user and action.users == 1)):
+            if     ((self.only_unused is False) or
+                    (action.use_fake_user and action.users == 1)):
 
                 # if it has F-Curves, then it's a "action library"
                 # (i.e. walk, wave, jump, etc.)

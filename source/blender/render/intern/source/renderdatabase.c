@@ -49,7 +49,7 @@
  * - If the entry has no block allocated for it yet, memory is
  * allocated.
  *
- * The pointer to the correct entry is returned. Memory is guarateed
+ * The pointer to the correct entry is returned. Memory is guaranteed
  * to exist (as long as the malloc does not break). Since guarded
  * allocation is used, memory _must_ be available. Otherwise, an
  * exit(0) would occur.
@@ -97,13 +97,10 @@
  * the index */
 
 /* NOTE! the hardcoded table size 256 is used still in code for going quickly over vertices/faces */
-
-#define RE_STICKY_ELEMS		2
 #define RE_STRESS_ELEMS		1
 #define RE_RAD_ELEMS		4
 #define RE_STRAND_ELEMS		1
 #define RE_TANGENT_ELEMS	3
-#define RE_STRESS_ELEMS		1
 #define RE_WINSPEED_ELEMS	4
 #define RE_MTFACE_ELEMS		1
 #define RE_MCOL_ELEMS		4
@@ -113,21 +110,6 @@
 #define RE_SIMPLIFY_ELEMS	2
 #define RE_FACE_ELEMS		1
 #define RE_NMAP_TANGENT_ELEMS	16
-
-float *RE_vertren_get_sticky(ObjectRen *obr, VertRen *ver, int verify)
-{
-	float *sticky;
-	int nr= ver->index>>8;
-	
-	sticky= obr->vertnodes[nr].sticky;
-	if (sticky==NULL) {
-		if (verify) 
-			sticky= obr->vertnodes[nr].sticky= MEM_mallocN(256*RE_STICKY_ELEMS*sizeof(float), "sticky table");
-		else
-			return NULL;
-	}
-	return sticky + (ver->index & 255)*RE_STICKY_ELEMS;
-}
 
 float *RE_vertren_get_stress(ObjectRen *obr, VertRen *ver, int verify)
 {
@@ -218,12 +200,7 @@ VertRen *RE_vertren_copy(ObjectRen *obr, VertRen *ver)
 	
 	*v1= *ver;
 	v1->index= index;
-	
-	fp1= RE_vertren_get_sticky(obr, ver, 0);
-	if (fp1) {
-		fp2= RE_vertren_get_sticky(obr, v1, 1);
-		memcpy(fp2, fp1, RE_STICKY_ELEMS*sizeof(float));
-	}
+
 	fp1= RE_vertren_get_stress(obr, ver, 0);
 	if (fp1) {
 		fp2= RE_vertren_get_stress(obr, v1, 1);
@@ -254,7 +231,7 @@ VertRen *RE_findOrAddVert(ObjectRen *obr, int nr)
 	int a;
 
 	if (nr<0) {
-		printf("error in findOrAddVert: %d\n",nr);
+		printf("error in findOrAddVert: %d\n", nr);
 		return NULL;
 	}
 	a= nr>>8;
@@ -262,7 +239,7 @@ VertRen *RE_findOrAddVert(ObjectRen *obr, int nr)
 	if (a>=obr->vertnodeslen-1) {  /* Need to allocate more columns..., and keep last element NULL for free loop */
 		temp= obr->vertnodes;
 		
-		obr->vertnodes= MEM_mallocN(sizeof(VertTableNode)*(obr->vertnodeslen+TABLEINITSIZE) , "vertnodes");
+		obr->vertnodes= MEM_mallocN(sizeof(VertTableNode)*(obr->vertnodeslen+TABLEINITSIZE), "vertnodes");
 		if (temp) memcpy(obr->vertnodes, temp, obr->vertnodeslen*sizeof(VertTableNode));
 		memset(obr->vertnodes+obr->vertnodeslen, 0, TABLEINITSIZE*sizeof(VertTableNode));
 		
@@ -274,7 +251,7 @@ VertRen *RE_findOrAddVert(ObjectRen *obr, int nr)
 	if (v==NULL) {
 		int i;
 		
-		v= (VertRen *)MEM_callocN(256*sizeof(VertRen),"findOrAddVert");
+		v= (VertRen *)MEM_callocN(256*sizeof(VertRen), "findOrAddVert");
 		obr->vertnodes[a].vert= v;
 		
 		for (i= (nr & 0xFFFFFF00), a=0; a<256; a++, i++) {
@@ -444,16 +421,16 @@ VlakRen *RE_vlakren_copy(ObjectRen *obr, VlakRen *vlr)
 	return vlr1;
 }
 
-void RE_vlakren_get_normal(Render *UNUSED(re), ObjectInstanceRen *obi, VlakRen *vlr, float *nor)
+void RE_vlakren_get_normal(Render *UNUSED(re), ObjectInstanceRen *obi, VlakRen *vlr, float r_nor[3])
 {
 	float (*nmat)[3]= obi->nmat;
 
 	if (obi->flag & R_TRANSFORMED) {
-		mul_v3_m3v3(nor, nmat, vlr->n);
-		normalize_v3(nor);
+		mul_v3_m3v3(r_nor, nmat, vlr->n);
+		normalize_v3(r_nor);
 	}
 	else {
-		copy_v3_v3(nor, vlr->n);
+		copy_v3_v3(r_nor, vlr->n);
 	}
 }
 
@@ -497,7 +474,7 @@ VlakRen *RE_findOrAddVlak(ObjectRen *obr, int nr)
 	int a;
 
 	if (nr<0) {
-		printf("error in findOrAddVlak: %d\n",nr);
+		printf("error in findOrAddVlak: %d\n", nr);
 		return obr->vlaknodes[0].vlak;
 	}
 	a= nr>>8;
@@ -505,7 +482,7 @@ VlakRen *RE_findOrAddVlak(ObjectRen *obr, int nr)
 	if (a>=obr->vlaknodeslen-1) {  /* Need to allocate more columns..., and keep last element NULL for free loop */
 		temp= obr->vlaknodes;
 		
-		obr->vlaknodes= MEM_mallocN(sizeof(VlakTableNode)*(obr->vlaknodeslen+TABLEINITSIZE) , "vlaknodes");
+		obr->vlaknodes= MEM_mallocN(sizeof(VlakTableNode)*(obr->vlaknodeslen+TABLEINITSIZE), "vlaknodes");
 		if (temp) memcpy(obr->vlaknodes, temp, obr->vlaknodeslen*sizeof(VlakTableNode));
 		memset(obr->vlaknodes+obr->vlaknodeslen, 0, TABLEINITSIZE*sizeof(VlakTableNode));
 
@@ -518,7 +495,7 @@ VlakRen *RE_findOrAddVlak(ObjectRen *obr, int nr)
 	if (v==NULL) {
 		int i;
 
-		v= (VlakRen *)MEM_callocN(256*sizeof(VlakRen),"findOrAddVlak");
+		v= (VlakRen *)MEM_callocN(256*sizeof(VlakRen), "findOrAddVlak");
 		obr->vlaknodes[a].vlak= v;
 
 		for (i= (nr & 0xFFFFFF00), a=0; a<256; a++, i++)
@@ -668,7 +645,7 @@ StrandRen *RE_findOrAddStrand(ObjectRen *obr, int nr)
 	int a;
 
 	if (nr<0) {
-		printf("error in findOrAddStrand: %d\n",nr);
+		printf("error in findOrAddStrand: %d\n", nr);
 		return obr->strandnodes[0].strand;
 	}
 	a= nr>>8;
@@ -676,7 +653,7 @@ StrandRen *RE_findOrAddStrand(ObjectRen *obr, int nr)
 	if (a>=obr->strandnodeslen-1) {  /* Need to allocate more columns..., and keep last element NULL for free loop */
 		temp= obr->strandnodes;
 		
-		obr->strandnodes= MEM_mallocN(sizeof(StrandTableNode)*(obr->strandnodeslen+TABLEINITSIZE) , "strandnodes");
+		obr->strandnodes= MEM_mallocN(sizeof(StrandTableNode)*(obr->strandnodeslen+TABLEINITSIZE), "strandnodes");
 		if (temp) memcpy(obr->strandnodes, temp, obr->strandnodeslen*sizeof(StrandTableNode));
 		memset(obr->strandnodes+obr->strandnodeslen, 0, TABLEINITSIZE*sizeof(StrandTableNode));
 
@@ -689,7 +666,7 @@ StrandRen *RE_findOrAddStrand(ObjectRen *obr, int nr)
 	if (v==NULL) {
 		int i;
 
-		v= (StrandRen *)MEM_callocN(256*sizeof(StrandRen),"findOrAddStrand");
+		v= (StrandRen *)MEM_callocN(256*sizeof(StrandRen), "findOrAddStrand");
 		obr->strandnodes[a].strand= v;
 
 		for (i= (nr & 0xFFFFFF00), a=0; a<256; a++, i++)
@@ -740,8 +717,6 @@ void free_renderdata_vertnodes(VertTableNode *vertnodes)
 		
 		if (vertnodes[a].rad)
 			MEM_freeN(vertnodes[a].rad);
-		if (vertnodes[a].sticky)
-			MEM_freeN(vertnodes[a].sticky);
 		if (vertnodes[a].strand)
 			MEM_freeN(vertnodes[a].strand);
 		if (vertnodes[a].tangent)
@@ -871,8 +846,7 @@ void free_renderdata_tables(Render *re)
 	}
 
 	if (re->objectinstance) {
-		for (obi=re->instancetable.first; obi; obi=obi->next)
-		{
+		for (obi=re->instancetable.first; obi; obi=obi->next) {
 			if (obi->vectors)
 				MEM_freeN(obi->vectors);
 
@@ -904,7 +878,7 @@ HaloRen *RE_findOrAddHalo(ObjectRen *obr, int nr)
 	int a;
 
 	if (nr<0) {
-		printf("error in findOrAddHalo: %d\n",nr);
+		printf("error in findOrAddHalo: %d\n", nr);
 		return NULL;
 	}
 	a= nr>>8;
@@ -914,7 +888,7 @@ HaloRen *RE_findOrAddHalo(ObjectRen *obr, int nr)
 		//	TABLEINITSIZE, obr->blohalen+TABLEINITSIZE );
 		temp=obr->bloha;
 		
-		obr->bloha=(HaloRen**)MEM_callocN(sizeof(void*)*(obr->blohalen+TABLEINITSIZE) , "Bloha");
+		obr->bloha=(HaloRen**)MEM_callocN(sizeof(void*)*(obr->blohalen+TABLEINITSIZE), "Bloha");
 		if (temp) memcpy(obr->bloha, temp, obr->blohalen*sizeof(void*));
 		memset(&(obr->bloha[obr->blohalen]), 0, TABLEINITSIZE*sizeof(void*));
 		obr->blohalen+=TABLEINITSIZE;  /*Does this really need to be power of 2?*/
@@ -923,7 +897,7 @@ HaloRen *RE_findOrAddHalo(ObjectRen *obr, int nr)
 	
 	h= obr->bloha[a];
 	if (h==NULL) {
-		h= (HaloRen *)MEM_callocN(256*sizeof(HaloRen),"findOrAdHalo");
+		h= (HaloRen *)MEM_callocN(256*sizeof(HaloRen), "findOrAdHalo");
 		obr->bloha[a]= h;
 	}
 	h+= (nr & 255);
@@ -932,8 +906,9 @@ HaloRen *RE_findOrAddHalo(ObjectRen *obr, int nr)
 
 /* ------------------------------------------------------------------------- */
 
-HaloRen *RE_inithalo(Render *re, ObjectRen *obr, Material *ma,   float *vec,   float *vec1, 
-				  float *orco,   float hasize,   float vectsize, int seed)
+HaloRen *RE_inithalo(Render *re, ObjectRen *obr, Material *ma,
+                     const float vec[3], const float vec1[3],
+                     const float *orco, float hasize, float vectsize, int seed)
 {
 	HaloRen *har;
 	MTex *mtex;
@@ -1001,10 +976,13 @@ HaloRen *RE_inithalo(Render *re, ObjectRen *obr, Material *ma,   float *vec,   f
 
 	if (ma->mtex[0]) {
 
-		if ( (ma->mode & MA_HALOTEX) ) har->tex= 1;
-		else if (har->mat->septex & (1<<0));	/* only 1 level textures */
+		if (ma->mode & MA_HALOTEX) {
+			har->tex = 1;
+		}
+		else if (har->mat->septex & (1 << 0)) {
+			/* only 1 level textures */
+		}
 		else {
-
 			mtex= ma->mtex[0];
 			copy_v3_v3(texvec, vec);
 
@@ -1045,13 +1023,14 @@ HaloRen *RE_inithalo(Render *re, ObjectRen *obr, Material *ma,   float *vec,   f
 	return har;
 }
 
-HaloRen *RE_inithalo_particle(Render *re, ObjectRen *obr, DerivedMesh *dm, Material *ma,   float *vec,   float *vec1, 
-				  float *orco, float *uvco, float hasize, float vectsize, int seed, float *pa_co)
+HaloRen *RE_inithalo_particle(Render *re, ObjectRen *obr, DerivedMesh *dm, Material *ma,
+                              const float vec[3], const float vec1[3],
+                              const float *orco, const float *uvco, float hasize, float vectsize, int seed, const float pa_co[3])
 {
 	HaloRen *har;
 	MTex *mtex;
 	float tin, tr, tg, tb, ta;
-	float xn, yn, zn, texvec[3], hoco[4], hoco1[4], in[3],tex[3],out[3];
+	float xn, yn, zn, texvec[3], hoco[4], hoco1[4], in[3], tex[3], out[3];
 	int i, hasrgb;
 
 	if (hasize==0.0f) return NULL;
@@ -1125,24 +1104,24 @@ HaloRen *RE_inithalo_particle(Render *re, ObjectRen *obr, DerivedMesh *dm, Mater
 			}
 			else if (mtex->texco & TEXCO_OBJECT) {
 				if (mtex->object)
-					mul_m4_v3(mtex->object->imat_ren,texvec);
+					mul_m4_v3(mtex->object->imat_ren, texvec);
 			}
 			else if (mtex->texco & TEXCO_GLOB) {
-				copy_v3_v3(texvec,vec);
+				copy_v3_v3(texvec, vec);
 			}
 			else if (mtex->texco & TEXCO_UV && uvco) {
-				int uv_index=CustomData_get_named_layer_index(&dm->faceData,CD_MTFACE,mtex->uvname);
+				int uv_index=CustomData_get_named_layer_index(&dm->faceData, CD_MTFACE, mtex->uvname);
 				if (uv_index<0)
-					uv_index=CustomData_get_active_layer_index(&dm->faceData,CD_MTFACE);
+					uv_index=CustomData_get_active_layer_index(&dm->faceData, CD_MTFACE);
 
-				uv_index-=CustomData_get_layer_index(&dm->faceData,CD_MTFACE);
+				uv_index-=CustomData_get_layer_index(&dm->faceData, CD_MTFACE);
 
 				texvec[0]=2.0f*uvco[2*uv_index]-1.0f;
 				texvec[1]=2.0f*uvco[2*uv_index+1]-1.0f;
 				texvec[2]=0.0f;
 			}
 			else if (mtex->texco & TEXCO_PARTICLE) {
-				/* particle coordinates in range [0,1] */
+				/* particle coordinates in range [0, 1] */
 				texvec[0] = 2.f * pa_co[0] - 1.f;
 				texvec[1] = 2.f * pa_co[1] - 1.f;
 				texvec[2] = pa_co[2];
@@ -1163,7 +1142,7 @@ HaloRen *RE_inithalo_particle(Render *re, ObjectRen *obr, DerivedMesh *dm, Mater
 				out[1]=har->g;
 				out[2]=har->b;
 
-				texture_rgb_blend(in,tex,out,tin,mtex->colfac,mtex->blendtype);
+				texture_rgb_blend(in, tex, out, tin, mtex->colfac, mtex->blendtype);
 			//	zn= 1.0-yn;
 				//har->r= (yn*tr+ zn*ma->r);
 				//har->g= (yn*tg+ zn*ma->g);
@@ -1178,18 +1157,18 @@ HaloRen *RE_inithalo_particle(Render *re, ObjectRen *obr, DerivedMesh *dm, Mater
 				tin = ta;
 
 			if (mtex->mapto & MAP_ALPHA)
-				har->alfa = texture_value_blend(mtex->def_var,har->alfa,tin,mtex->alphafac,mtex->blendtype);
+				har->alfa = texture_value_blend(mtex->def_var, har->alfa, tin, mtex->alphafac, mtex->blendtype);
 			if (mtex->mapto & MAP_HAR)
-				har->hard = 1.0f+126.0f*texture_value_blend(mtex->def_var,((float)har->hard)/127.0f,tin,mtex->hardfac,mtex->blendtype);
+				har->hard = 1.0f+126.0f*texture_value_blend(mtex->def_var, ((float)har->hard)/127.0f, tin, mtex->hardfac, mtex->blendtype);
 			if (mtex->mapto & MAP_RAYMIRR)
-				har->hasize = 100.0f*texture_value_blend(mtex->def_var,har->hasize/100.0f,tin,mtex->raymirrfac,mtex->blendtype);
+				har->hasize = 100.0f*texture_value_blend(mtex->def_var, har->hasize/100.0f, tin, mtex->raymirrfac, mtex->blendtype);
 			if (mtex->mapto & MAP_TRANSLU) {
-				float add = texture_value_blend(mtex->def_var,(float)har->add/255.0f,tin,mtex->translfac,mtex->blendtype);
+				float add = texture_value_blend(mtex->def_var, (float)har->add/255.0f, tin, mtex->translfac, mtex->blendtype);
 				CLAMP(add, 0.f, 1.f);
 				har->add = 255.0f*add;
 			}
 			/* now what on earth is this good for?? */
-			//if(mtex->texco & 16) {
+			//if (mtex->texco & 16) {
 			//	har->alfa= tin;
 			//}
 		}
@@ -1206,7 +1185,9 @@ static int panotestclip(Render *re, int do_pano, float *v)
 	float abs4;
 	short c=0;
 
-	if (do_pano==0) return testclip(v);
+	if (do_pano == FALSE) {
+		return testclip(v);
+	}
 
 	abs4= fabs(v[3]);
 
@@ -1274,8 +1255,7 @@ void project_renderdata(Render *re, void (*projectfunc)(const float *, float mat
 			else if (hoco[3]<0.0f) {
 				har->miny= har->maxy= -10000;	/* render clips it */
 			}
-			else /* do the projection...*/
-			{
+			else { /* do the projection...*/
 				/* bring back hocos */
 				hoco[0]*= 2.0f;
 				hoco[1]*= 2.0f;
@@ -1307,11 +1287,11 @@ void project_renderdata(Render *re, void (*projectfunc)(const float *, float mat
 			
 				/* the Zd value is still not really correct for pano */
 			
-				vec[2]-= har->hasize;	/* z negative, otherwise it's clipped */
+				vec[2] -= har->hasize;  /* z negative, otherwise it's clipped */
 				projectfunc(vec, re->winmat, hoco);
-				zn= hoco[3];
-				zn= fabs( (float)har->zs - 0x7FFFFF*(hoco[2]/zn));
-				har->zd= CLAMPIS(zn, 0, INT_MAX);
+				zn = hoco[3];
+				zn = fabsf((float)har->zs - 0x7FFFFF * (hoco[2] / zn));
+				har->zd = CLAMPIS(zn, 0, INT_MAX);
 			
 			}
 			

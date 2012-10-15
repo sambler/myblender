@@ -17,14 +17,12 @@
 # ##### END GPL LICENSE BLOCK #####
 
 # <pep8 compliant>
-
 import bpy
 from bpy.types import Panel
 
-from .properties_physics_common import (
-    point_cache_ui,
-    effector_weights_ui,
-    )
+from bl_ui.properties_physics_common import (point_cache_ui,
+                                             effector_weights_ui,
+                                             )
 
 
 class PhysicButtonsPanel():
@@ -121,7 +119,8 @@ class PHYSICS_PT_dp_advanced_canvas(PhysicButtonsPanel, Panel):
     @classmethod
     def poll(cls, context):
         md = context.dynamic_paint
-        return md and md.ui_type == 'CANVAS' and md.canvas_settings and md.canvas_settings.canvas_surfaces.active
+        rd = context.scene.render
+        return md and md.ui_type == 'CANVAS' and md.canvas_settings and md.canvas_settings.canvas_surfaces.active and (not rd.use_game_engine)
 
     def draw(self, context):
         layout = self.layout
@@ -195,10 +194,13 @@ class PHYSICS_PT_dp_canvas_output(PhysicButtonsPanel, Panel):
     @classmethod
     def poll(cls, context):
         md = context.dynamic_paint
+        rd = context.scene.render
         if not (md and md.ui_type == 'CANVAS' and md.canvas_settings):
             return 0
         surface = context.dynamic_paint.canvas_settings.canvas_surfaces.active
-        return surface and not (surface.surface_format == 'VERTEX' and (surface.surface_type in {'DISPLACE', 'WAVE'}))
+        return (surface and
+                (not (surface.surface_format == 'VERTEX' and (surface.surface_type in {'DISPLACE', 'WAVE'}))) and
+                (not rd.use_game_engine))
 
     def draw(self, context):
         layout = self.layout
@@ -285,10 +287,11 @@ class PHYSICS_PT_dp_canvas_initial_color(PhysicButtonsPanel, Panel):
     @classmethod
     def poll(cls, context):
         md = context.dynamic_paint
+        rd = context.scene.render
         if not (md and md.ui_type == 'CANVAS' and md.canvas_settings):
             return 0
         surface = context.dynamic_paint.canvas_settings.canvas_surfaces.active
-        return (surface and surface.surface_type == 'PAINT')
+        return (surface and surface.surface_type == 'PAINT') and (not rd.use_game_engine)
 
     def draw(self, context):
         layout = self.layout
@@ -319,10 +322,11 @@ class PHYSICS_PT_dp_effects(PhysicButtonsPanel, Panel):
     @classmethod
     def poll(cls, context):
         md = context.dynamic_paint
+        rd = context.scene.render
         if not (md and md.ui_type == 'CANVAS' and md.canvas_settings):
             return False
         surface = context.dynamic_paint.canvas_settings.canvas_surfaces.active
-        return (surface and surface.surface_type == 'PAINT')
+        return (surface and surface.surface_type == 'PAINT') and (not rd.use_game_engine)
 
     def draw(self, context):
         layout = self.layout
@@ -345,7 +349,7 @@ class PHYSICS_PT_dp_effects(PhysicButtonsPanel, Panel):
 
             col = layout.column()
             col.active = surface.use_drip
-            effector_weights_ui(self, context, surface.effector_weights)
+            effector_weights_ui(self, context, surface.effector_weights, 'DYNAMIC_PAINT')
 
             layout.label(text="Surface Movement:")
             row = layout.row()
@@ -367,11 +371,13 @@ class PHYSICS_PT_dp_cache(PhysicButtonsPanel, Panel):
     @classmethod
     def poll(cls, context):
         md = context.dynamic_paint
+        rd = context.scene.render
         return (md and
                 md.ui_type == 'CANVAS' and
                 md.canvas_settings and
                 md.canvas_settings.canvas_surfaces.active and
-                md.canvas_settings.canvas_surfaces.active.is_cache_user)
+                md.canvas_settings.canvas_surfaces.active.is_cache_user and
+                (not rd.use_game_engine))
 
     def draw(self, context):
         surface = context.dynamic_paint.canvas_settings.canvas_surfaces.active
@@ -386,7 +392,8 @@ class PHYSICS_PT_dp_brush_source(PhysicButtonsPanel, Panel):
     @classmethod
     def poll(cls, context):
         md = context.dynamic_paint
-        return md and md.ui_type == 'BRUSH' and md.brush_settings
+        rd = context.scene.render
+        return md and md.ui_type == 'BRUSH' and md.brush_settings and (not rd.use_game_engine)
 
     def draw(self, context):
         layout = self.layout
@@ -438,7 +445,8 @@ class PHYSICS_PT_dp_brush_velocity(PhysicButtonsPanel, Panel):
     @classmethod
     def poll(cls, context):
         md = context.dynamic_paint
-        return md and md.ui_type == 'BRUSH' and md.brush_settings
+        rd = context.scene.render
+        return md and md.ui_type == 'BRUSH' and md.brush_settings and (not rd.use_game_engine)
 
     def draw(self, context):
         layout = self.layout
@@ -473,7 +481,8 @@ class PHYSICS_PT_dp_brush_wave(PhysicButtonsPanel, Panel):
     @classmethod
     def poll(cls, context):
         md = context.dynamic_paint
-        return md and md.ui_type == 'BRUSH' and md.brush_settings
+        rd = context.scene.render
+        return md and md.ui_type == 'BRUSH' and md.brush_settings and (not rd.use_game_engine)
 
     def draw(self, context):
         layout = self.layout

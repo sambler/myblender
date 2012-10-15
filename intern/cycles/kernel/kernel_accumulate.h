@@ -266,13 +266,13 @@ __device_inline void path_radiance_accum_background(PathRadiance *L, float3 thro
 #endif
 }
 
-__device_inline float3 path_radiance_sum(PathRadiance *L)
+__device_inline float3 path_radiance_sum(KernelGlobals *kg, PathRadiance *L)
 {
 #ifdef __PASSES__
 	if(L->use_light_pass) {
 		/* this division is a bit ugly, but means we only have to keep track of
-		   only a single throughput further along the path, here we recover just
-		   the indirect parth that is not influenced by any particular BSDF type */
+		 * only a single throughput further along the path, here we recover just
+		 * the indirect parth that is not influenced by any particular BSDF type */
 		L->direct_emission = safe_divide_color(L->direct_emission, L->direct_throughput);
 		L->direct_diffuse += L->indirect_diffuse*L->direct_emission;
 		L->direct_glossy += L->indirect_glossy*L->direct_emission;
@@ -283,15 +283,68 @@ __device_inline float3 path_radiance_sum(PathRadiance *L)
 		L->indirect_glossy *= L->indirect;
 		L->indirect_transmission *= L->indirect;
 
-		return L->emission + L->background
+		float3 L_sum = L->emission
 			+ L->direct_diffuse + L->direct_glossy + L->direct_transmission
 			+ L->indirect_diffuse + L->indirect_glossy + L->indirect_transmission;
+
+		if(!kernel_data.background.transparent)
+			L_sum += L->background;
+
+		return L_sum;
 	}
 	else
 		return L->emission;
 #else
 	return *L;
 #endif
+}
+
+__device_inline void path_radiance_clamp(PathRadiance *L, float3 *L_sum, float clamp)
+{
+	#ifdef __OSL__
+	using std::isfinite;
+	#endif
+
+	float sum = fabsf((*L_sum).x) + fabsf((*L_sum).y) + fabsf((*L_sum).z);
+
+	if(!isfinite(sum)) {
+		/* invalid value, reject */
+		*L_sum = make_float3(0.0f, 0.0f, 0.0f);
+
+#ifdef __PASSES__
+		if(L->use_light_pass) {
+			L->direct_diffuse = make_float3(0.0f, 0.0f, 0.0f);
+			L->direct_glossy = make_float3(0.0f, 0.0f, 0.0f);
+			L->direct_transmission = make_float3(0.0f, 0.0f, 0.0f);
+
+			L->indirect_diffuse = make_float3(0.0f, 0.0f, 0.0f);
+			L->indirect_glossy = make_float3(0.0f, 0.0f, 0.0f);
+			L->indirect_transmission = make_float3(0.0f, 0.0f, 0.0f);
+
+			L->emission = make_float3(0.0f, 0.0f, 0.0f);
+		}
+#endif
+	}
+	else if(sum > clamp) {
+		/* value to high, scale down */
+		float scale = clamp/sum;
+
+		*L_sum *= scale;
+
+#ifdef __PASSES__
+		if(L->use_light_pass) {
+			L->direct_diffuse *= scale;
+			L->direct_glossy *= scale;
+			L->direct_transmission *= scale;
+
+			L->indirect_diffuse *= scale;
+			L->indirect_glossy *= scale;
+			L->indirect_transmission *= scale;
+
+			L->emission *= scale;
+		}
+#endif
+	}
 }
 
 CCL_NAMESPACE_END

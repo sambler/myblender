@@ -32,9 +32,9 @@
 #ifndef __BL_SKINDEFORMER_H__
 #define __BL_SKINDEFORMER_H__
 
-#if defined(WIN32) && !defined(FREE_WINDOWS)
-#pragma warning (disable:4786) // get rid of stupid stl-visual compiler debug warning
-#endif //WIN32
+#ifdef _MSC_VER
+#  pragma warning (disable:4786)  /* get rid of stupid stl-visual compiler debug warning */
+#endif  /* WIN32 */
 
 #include "CTR_HashedPtr.h"
 #include "BL_MeshDeformer.h"
@@ -56,18 +56,18 @@ public:
 	void SetArmature (class BL_ArmatureObject *armobj);
 
 	BL_SkinDeformer(BL_DeformableGameObject *gameobj,
-					struct Object *bmeshobj, 
-					class RAS_MeshObject *mesh,
-					BL_ArmatureObject* arma = NULL);
+	                struct Object *bmeshobj,
+	                class RAS_MeshObject *mesh,
+	                BL_ArmatureObject* arma = NULL);
 
 	/* this second constructor is needed for making a mesh deformable on the fly. */
 	BL_SkinDeformer(BL_DeformableGameObject *gameobj,
-					struct Object *bmeshobj_old,
-					struct Object *bmeshobj_new,
-					class RAS_MeshObject *mesh,
-					bool release_object,
-					bool recalc_normal,
-					BL_ArmatureObject* arma = NULL);
+	                struct Object *bmeshobj_old,
+	                struct Object *bmeshobj_new,
+	                class RAS_MeshObject *mesh,
+	                bool release_object,
+	                bool recalc_normal,
+	                BL_ArmatureObject* arma = NULL);
 
 	virtual RAS_Deformer *GetReplica();
 	virtual void ProcessReplica();
@@ -109,17 +109,15 @@ protected:
 	bool					m_recalcNormal;
 	bool					m_copyNormals; // dirty flag so we know if Apply() needs to copy normal information (used for BGEDeformVerts())
 	struct bPoseChannel**	m_dfnrToPC;
+	short					m_deformflags;
 
 	void BlenderDeformVerts();
 	void BGEDeformVerts();
 
 
 #ifdef WITH_CXX_GUARDEDALLOC
-public:
-	void *operator new(size_t num_bytes) { return MEM_mallocN(num_bytes, "GE:BL_SkinDeformer"); }
-	void operator delete( void *mem ) { MEM_freeN(mem); }
+	MEM_CXX_CLASS_ALLOC_FUNCS("GE:BL_SkinDeformer")
 #endif
 };
 
-#endif
-
+#endif  /* __BL_SKINDEFORMER_H__ */

@@ -39,9 +39,6 @@
 // #include "WTURBULENCE.h"
 #include "VEC3.h"
 
-// timestep default value for nice appearance
-#define DT_DEFAULT 0.1f;
-
 using namespace std;
 using namespace BasicVector;
 class WTURBULENCE;
@@ -49,11 +46,16 @@ class WTURBULENCE;
 class FLUID_3D  
 {
 	public:
-		FLUID_3D(int *res, /* int amplify, */ float *p0);
+		FLUID_3D(int *res, float dx, float dtdef, int init_heat, int init_fire, int init_colors);
 		FLUID_3D() {};
 		virtual ~FLUID_3D();
 
-		void initBlenderRNA(float *alpha, float *beta, float *dt_factor, float *vorticity, int *border_colli);
+		void initHeat();
+		void initFire();
+		void initColors(float init_r, float init_g, float init_b);
+
+		void initBlenderRNA(float *alpha, float *beta, float *dt_factor, float *vorticity, int *border_colli, float *burning_rate,
+							float *flame_smoke, float *flame_smoke_color, float *flame_vorticity, float *ignition_temp, float *max_temp);
 		
 		// create & allocate vector noise advection 
 		void initVectorNoise(int amplify);
@@ -61,7 +63,7 @@ class FLUID_3D
 		void addSmokeColumn();
 		static void addSmokeTestCase(float* field, Vec3Int res);
 
-		void step(float dt);
+		void step(float dt, float gravity[3]);
 		void addObstacle(OBSTACLE* obstacle);
 
 		const float* xVelocity() { return _xVelocity; }; 
@@ -72,7 +74,7 @@ class FLUID_3D
 		int yRes() const { return _yRes; };
 		int zRes() const { return _zRes; };
 
-	public:  
+	public:
 		// dimensions
 		int _xRes, _yRes, _zRes, _maxRes;
 		Vec3Int _res;
@@ -89,6 +91,8 @@ class FLUID_3D
 		void artificialDampingSL(int zBegin, int zEnd);
 		void artificialDampingExactSL(int pos);
 
+		void setBorderObstacles();
+
 		// fields
 		float* _density;
 		float* _densityOld;
@@ -97,13 +101,17 @@ class FLUID_3D
 		float* _xVelocity;
 		float* _yVelocity;
 		float* _zVelocity;
+		float* _xVelocityOb;
+		float* _yVelocityOb;
+		float* _zVelocityOb;
 		float* _xVelocityOld;
 		float* _yVelocityOld;
 		float* _zVelocityOld;
 		float* _xForce;
 		float* _yForce;
 		float* _zForce;
-		unsigned char*  _obstacles;
+		unsigned char*  _obstacles; /* only used (useful) for static obstacles like domain boundaries */
+		unsigned char*  _obstaclesAnim;
 
 		// Required for proper threading:
 		float* _xVelocityTemp;
@@ -111,6 +119,27 @@ class FLUID_3D
 		float* _zVelocityTemp;
 		float* _heatTemp;
 		float* _densityTemp;
+
+		// fire simulation
+		float *_flame;
+		float *_fuel;
+		float *_fuelTemp;
+		float *_fuelOld;
+		float *_react;
+		float *_reactTemp;
+		float *_reactOld;
+
+		// smoke color
+		float *_color_r;
+		float *_color_rOld;
+		float *_color_rTemp;
+		float *_color_g;
+		float *_color_gOld;
+		float *_color_gTemp;
+		float *_color_b;
+		float *_color_bOld;
+		float *_color_bTemp;
+
 
 		// CG fields
 		int _iterations;
@@ -137,6 +166,8 @@ class FLUID_3D
 							// have to recalibrate borders if nothing has changed
 		void setBorderCollisions();
 
+		void setObstacleVelocity(int zBegin, int zEnd);
+
 		// WTURBULENCE object, if active
 		// WTURBULENCE* _wTurbulence;
 
@@ -148,14 +179,16 @@ class FLUID_3D
 		void wipeBoundariesSL(int zBegin, int zEnd);
 		void addForce(int zBegin, int zEnd);
 		void addVorticity(int zBegin, int zEnd);
-		void addBuoyancy(float *heat, float *density, int zBegin, int zEnd);
+		void addBuoyancy(float *heat, float *density, float gravity[3], int zBegin, int zEnd);
 
 		// solver stuff
 		void project();
 		void diffuseHeat();
+		void diffuseColor();
 		void solvePressure(float* field, float* b, unsigned char* skip);
 		void solvePressurePre(float* field, float* b, unsigned char* skip);
 		void solveHeat(float* field, float* b, unsigned char* skip);
+		void solveDiffusion(float* field, float* b, float* factor);
 
 
 		// handle obstacle boundaries
@@ -168,6 +201,16 @@ class FLUID_3D
 		void advectMacCormackBegin(int zBegin, int zEnd);
 		void advectMacCormackEnd1(int zBegin, int zEnd);
 		void advectMacCormackEnd2(int zBegin, int zEnd);
+
+		/* burning */
+		float *_burning_rate; // RNA pointer
+		float *_flame_smoke; // RNA pointer
+		float *_flame_smoke_color; // RNA pointer
+		float *_flame_vorticity; // RNA pointer
+		float *_ignition_temp; // RNA pointer
+		float *_max_temp; // RNA pointer
+		void processBurn(float *fuel, float *smoke, float *react, float *flame, float *heat,
+						 float *r, float *g, float *b, int total_cells, float dt);
 
 		// boundary setting functions
 		static void copyBorderX(float* field, Vec3Int res, int zBegin, int zEnd);

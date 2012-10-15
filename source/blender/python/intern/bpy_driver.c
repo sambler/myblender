@@ -122,7 +122,7 @@ static void bpy_pydriver_update_dict(const float evaltime)
 void BPY_driver_reset(void)
 {
 	PyGILState_STATE gilstate;
-	int use_gil = 1; /* !PYC_INTERPRETER_ACTIVE; */
+	int use_gil = TRUE; /* !PYC_INTERPRETER_ACTIVE; */
 
 	if (use_gil)
 		gilstate = PyGILState_Ensure();
@@ -193,7 +193,7 @@ float BPY_driver_exec(ChannelDriver *driver, const float evaltime)
 		return 0.0f;
 	}
 
-	use_gil = 1; /* !PYC_INTERPRETER_ACTIVE; */
+	use_gil = TRUE; /* !PYC_INTERPRETER_ACTIVE; */
 
 	if (use_gil)
 		gilstate = PyGILState_Ensure();
@@ -280,7 +280,7 @@ float BPY_driver_exec(ChannelDriver *driver, const float evaltime)
 	}
 
 
-#if 0 // slow, with this can avoid all Py_CompileString above.
+#if 0  /* slow, with this can avoid all Py_CompileString above. */
 	/* execute expression to get a value */
 	retval = PyRun_String(expr, Py_eval_input, bpy_pydriver_Dict, driver_vars);
 #else

@@ -32,8 +32,8 @@
 #ifndef __RAS_IRASTERIZER_H__
 #define __RAS_IRASTERIZER_H__
 
-#if defined(WIN32) && !defined(FREE_WINDOWS)
-#pragma warning (disable:4786)
+#ifdef _MSC_VER
+#  pragma warning (disable:4786)
 #endif
 
 #include "STR_HashedString.h"
@@ -64,8 +64,8 @@ typedef vector< KX_IndexArray* > vecIndexArrays;
 class RAS_IRasterizer
 {
 public:
-	RAS_IRasterizer(RAS_ICanvas* canv){};
-	virtual ~RAS_IRasterizer(){};
+	RAS_IRasterizer(RAS_ICanvas* canv) {};
+	virtual ~RAS_IRasterizer() {};
 
 	/**
 	 * Drawing types
@@ -99,11 +99,11 @@ public:
 
 	/**
 	 */
-	enum    { 	 
-			RAS_RENDER_3DPOLYGON_TEXT = 64,	/* GEMAT_TEXT */
-			KX_BACKCULL = 16,		/* GEMAT_BACKCULL */
-			KX_TEX = 4096,			/* GEMAT_TEX */
-			KX_LINES = 32768 	 
+	enum {
+		RAS_RENDER_3DPOLYGON_TEXT = 64,	/* GEMAT_TEXT */
+		KX_BACKCULL = 16,		/* GEMAT_BACKCULL */
+		KX_TEX = 4096,			/* GEMAT_TEX */
+		KX_LINES = 32768
 	};
 
 	/**
@@ -301,7 +301,7 @@ public:
 	virtual int	GetDrawingMode()=0;
 	/**
 	 * Sets face culling
-	 */	
+	 */
 	virtual void	SetCullFace(bool enable)=0;
 	/**
 	 * Sets wireframe mode.
@@ -386,7 +386,7 @@ public:
 	 */
 	virtual void	SetPolygonOffset(float mult, float add) = 0;
 	
-	virtual	void	DrawDebugLine(const MT_Vector3& from,const MT_Vector3& to,const MT_Vector3& color)=0;
+	virtual	void	DrawDebugLine(const MT_Vector3& from, const MT_Vector3& to, const MT_Vector3& color)=0;
 	virtual	void	DrawDebugCircle(const MT_Vector3& center, const MT_Scalar radius, const MT_Vector3& color,
 									const MT_Vector3& normal, int nsector)=0;
 	virtual	void	FlushDebugShapes()=0;
@@ -401,8 +401,8 @@ public:
 	virtual const MT_Matrix4x4&	GetViewMatrix() const = 0;
 	virtual const MT_Matrix4x4&	GetViewInvMatrix() const = 0;
 
-	virtual bool	QueryLists(){return false;}
-	virtual bool	QueryArrays(){return false;}
+	virtual bool	QueryLists() { return false; }
+	virtual bool	QueryArrays() { return false; }
 	
 	virtual void	EnableMotionBlur(float motionblurvalue)=0;
 	virtual void	DisableMotionBlur()=0;
@@ -416,15 +416,11 @@ public:
 
 	virtual void	SetAnisotropicFiltering(short level)=0;
 	virtual short	GetAnisotropicFiltering()=0;
-	
-	
+
+
 #ifdef WITH_CXX_GUARDEDALLOC
-public:
-	void *operator new(size_t num_bytes) { return MEM_mallocN(num_bytes, "GE:RAS_IRasterizer"); }
-	void operator delete( void *mem ) { MEM_freeN(mem); }
+	MEM_CXX_CLASS_ALLOC_FUNCS("GE:RAS_IRasterizer")
 #endif
 };
 
-#endif //__RAS_IRASTERIZER_H__
-
-
+#endif  /* __RAS_IRASTERIZER_H__ */

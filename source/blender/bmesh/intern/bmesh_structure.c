@@ -83,7 +83,7 @@ int bmesh_edge_swapverts(BMEdge *e, BMVert *orig, BMVert *newv)
  * (this is somewhat outdate, though bits of its API are still used) - joeedh
  *
  * Cycles are circular doubly linked lists that form the basis of adjacency
- * information in the BME modeller. Full adjacency relations can be derived
+ * information in the BME modeler. Full adjacency relations can be derived
  * from examining these cycles very quickly. Although each cycle is a double
  * circular linked list, each one is considered to have a 'base' or 'head',
  * and care must be taken by Euler code when modifying the contents of a cycle.
@@ -100,7 +100,7 @@ int bmesh_edge_swapverts(BMEdge *e, BMVert *orig, BMVert *newv)
  * Base: vertex->edge pointer.
  *
  * This cycle is the most complicated in terms of its structure. Each bmesh_Edge contains
- * two bmesh_CycleNode structures to keep track of that edge's membership in the disk cycle
+ * two bmesh_CycleNode structures to keep track of that edges membership in the disk cycle
  * of each of its vertices. However for any given vertex it may be the first in some edges
  * in its disk cycle and the second for others. The bmesh_disk_XXX family of functions contain
  * some nice utilities for navigating disk cycles in a way that hides this detail from the
@@ -153,10 +153,22 @@ int bmesh_edge_swapverts(BMEdge *e, BMVert *orig, BMVert *newv)
  * advantage is that no intrinsic properties of the data structures are dependent upon the
  * cycle order and all non-manifold conditions are represented trivially.
  */
+
+BLI_INLINE BMDiskLink *bmesh_disk_edge_link_from_vert(BMEdge *e, BMVert *v)
+{
+	if (v == e->v1) {
+		return &e->v1_disk_link;
+	}
+	else {
+		BLI_assert(v == e->v2);
+		return &e->v2_disk_link;
+	}
+}
+
 int bmesh_disk_edge_append(BMEdge *e, BMVert *v)
 {
 	if (!v->e) {
-		BMDiskLink *dl1 = BM_DISK_EDGE_LINK_GET(e, v);
+		BMDiskLink *dl1 = bmesh_disk_edge_link_from_vert(e, v);
 
 		v->e = e;
 		dl1->next = dl1->prev = e;
@@ -164,9 +176,9 @@ int bmesh_disk_edge_append(BMEdge *e, BMVert *v)
 	else {
 		BMDiskLink *dl1, *dl2, *dl3;
 
-		dl1 = BM_DISK_EDGE_LINK_GET(e, v);
-		dl2 = BM_DISK_EDGE_LINK_GET(v->e, v);
-		dl3 = dl2->prev ? BM_DISK_EDGE_LINK_GET(dl2->prev, v) : NULL;
+		dl1 = bmesh_disk_edge_link_from_vert(e, v);
+		dl2 = bmesh_disk_edge_link_from_vert(v->e, v);
+		dl3 = dl2->prev ? bmesh_disk_edge_link_from_vert(dl2->prev, v) : NULL;
 
 		dl1->next = v->e;
 		dl1->prev = dl2->prev;
@@ -183,14 +195,14 @@ void bmesh_disk_edge_remove(BMEdge *e, BMVert *v)
 {
 	BMDiskLink *dl1, *dl2;
 
-	dl1 = BM_DISK_EDGE_LINK_GET(e, v);
+	dl1 = bmesh_disk_edge_link_from_vert(e, v);
 	if (dl1->prev) {
-		dl2 = BM_DISK_EDGE_LINK_GET(dl1->prev, v);
+		dl2 = bmesh_disk_edge_link_from_vert(dl1->prev, v);
 		dl2->next = dl1->next;
 	}
 
 	if (dl1->next) {
-		dl2 = BM_DISK_EDGE_LINK_GET(dl1->next, v);
+		dl2 = bmesh_disk_edge_link_from_vert(dl1->next, v);
 		dl2->prev = dl1->prev;
 	}
 
@@ -203,9 +215,9 @@ void bmesh_disk_edge_remove(BMEdge *e, BMVert *v)
 /**
  * \brief Next Disk Edge
  *
- *	Find the next edge in a disk cycle
+ * Find the next edge in a disk cycle
  *
- *	\return Pointer to the next edge in the disk cycle for the vertex v.
+ * \return Pointer to the next edge in the disk cycle for the vertex v.
  */
 BMEdge *bmesh_disk_edge_next(BMEdge *e, BMVert *v)
 {
@@ -547,8 +559,8 @@ int bmesh_loop_validate(BMFace *f)
 
 	/* Validate that the face loop cycle is the length specified by f->len */
 	for (i = 1, l_iter = l_first->next; i < len; i++, l_iter = l_iter->next) {
-		if ( (l_iter->f != f) ||
-		     (l_iter == l_first))
+		if ((l_iter->f != f) ||
+		    (l_iter == l_first))
 		{
 			return FALSE;
 		}

@@ -19,9 +19,9 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
-# This Makefile does an out-of-source CMake build in ../build/`OS`_`CPU`
+# This Makefile does an out-of-source CMake build in ../build_`OS`_`CPU`
 # eg:
-#   ../build/Linux_i386
+#   ../build_linux_i386
 # This is for users who like to configure & build blender with a single command.
 
 
@@ -40,7 +40,7 @@ ifndef BUILD_CMAKE_ARGS
 endif
 
 ifndef BUILD_DIR
-	BUILD_DIR:=$(shell dirname $(BLENDER_DIR))/build/$(OS_NCASE)
+	BUILD_DIR:=$(shell dirname $(BLENDER_DIR))/build_$(OS_NCASE)
 endif
 
 
@@ -109,9 +109,12 @@ all:
 	@echo
 	@echo Configuring Blender ...
 
-	if test ! -f $(BUILD_DIR)/CMakeCache.txt ; then \
-		$(CMAKE_CONFIG); \
-	fi
+	# if test ! -f $(BUILD_DIR)/CMakeCache.txt ; then \
+	# 	$(CMAKE_CONFIG); \
+	# fi
+	
+	# do this always incase of failed initial build, could be smarter here...
+	$(CMAKE_CONFIG)
 
 	@echo
 	@echo Building Blender ...
@@ -159,20 +162,27 @@ help:
 	@echo "  * package_pacman  - build an arch linux pacmanpackage"
 	@echo "  * package_archive - build an archive package"
 	@echo ""
-	@echo "Testing Targets (not assosiated with building blender)"
+	@echo "Testing Targets (not associated with building blender)"
 	@echo "  * test            - run ctest, currently tests import/export, operator execution and that python modules load"
 	@echo "  * test_cmake      - runs our own cmake file checker which detects errors in the cmake file list definitions"
 	@echo "  * test_pep8       - checks all python script are pep8 which are tagged to use the stricter formatting"
 	@echo "  * test_deprecated - checks for deprecation tags in our code which may need to be removed"
+	@echo "  * test_style      - checks C/C++ conforms with blenders style guide: http://wiki.blender.org/index.php/Dev:Doc/CodeStyle"
+	@echo "  * test_style_qtc  - same as test_style but outputs QtCreator tasks format"
 	@echo ""
-	@echo "Static Source Code Checking (not assosiated with building blender)"
+	@echo "Static Source Code Checking (not associated with building blender)"
 	@echo "  * check_cppcheck    - run blender source through cppcheck (C & C++)"
+	@echo "  * check_clang_array - run blender source through clang array checking script (C & C++)"
 	@echo "  * check_splint      - run blenders source through splint (C only)"
 	@echo "  * check_sparse      - run blenders source through sparse (C only)"
+	@echo "  * check_smatch      - run blenders source through smatch (C only)"
 	@echo "  * check_spelling_c  - check for spelling errors (C/C++ only)"
 	@echo "  * check_spelling_py - check for spelling errors (Python only)"
 	@echo ""
-	@echo "Documentation Targets (not assosiated with building blender)"
+	@echo "Utilities (not associated with building blender)"
+	@echo "  * tbz      - create a compressed svn export 'blender_archive.tar.bz2'"
+	@echo ""
+	@echo "Documentation Targets (not associated with building blender)"
 	@echo "  * doc_py   - generate sphinx python api docs"
 	@echo "  * doc_doxy - generate doxygen C/C++ docs"
 	@echo "  * doc_dna  - generate blender file format reference"
@@ -201,28 +211,39 @@ test:
 
 # run pep8 check check on scripts we distribute.
 test_pep8:
-	python3 source/tests/pep8.py > test_pep8.log 2>&1
+	python3.2 source/tests/pep8.py > test_pep8.log 2>&1
 	@echo "written: test_pep8.log"
 
 # run some checks on our cmakefiles.
 test_cmake:
-	python3 build_files/cmake/cmake_consistency_check.py > test_cmake_consistency.log 2>&1
+	python3.2 build_files/cmake/cmake_consistency_check.py > test_cmake_consistency.log 2>&1
 	@echo "written: test_cmake_consistency.log"
 
 # run deprecation tests, see if we have anything to remove.
 test_deprecated:
-	python3 source/tests/check_deprecated.py
+	python3.2 source/tests/check_deprecated.py
 
+test_style:
+	# run our own checks on C/C++ style
+	PYTHONIOENCODING=utf_8 python3.2 $(BLENDER_DIR)/source/tools/check_style_c.py $(BLENDER_DIR)/source/blender $(BLENDER_DIR)/source/creator --no-length-check
+
+test_style_qtc:
+	# run our own checks on C/C++ style
+	USE_QTC_TASK=1 \
+	PYTHONIOENCODING=utf_8 python3.2 $(BLENDER_DIR)/source/tools/check_style_c.py $(BLENDER_DIR)/source/blender $(BLENDER_DIR)/source/creator --no-length-check > \
+	test_style.tasks
+
+	@echo "written: test_style.tasks"
 
 # -----------------------------------------------------------------------------
 # Project Files
 #
 
 project_qtcreator:
-	python3 build_files/cmake/cmake_qtcreator_project.py $(BUILD_DIR)
+	python3.2 build_files/cmake/cmake_qtcreator_project.py $(BUILD_DIR)
 
 project_netbeans:
-	python3 build_files/cmake/cmake_netbeans_project.py $(BUILD_DIR)
+	python3.2 build_files/cmake/cmake_netbeans_project.py $(BUILD_DIR)
 
 project_eclipse:
 	cmake -G"Eclipse CDT4 - Unix Makefiles" -H$(BLENDER_DIR) -B$(BUILD_DIR)
@@ -234,21 +255,40 @@ project_eclipse:
 
 check_cppcheck:
 	$(CMAKE_CONFIG)
-	cd $(BUILD_DIR) ; python3 $(BLENDER_DIR)/build_files/cmake/cmake_static_check_cppcheck.py
+	cd $(BUILD_DIR) ; python3.2 $(BLENDER_DIR)/build_files/cmake/cmake_static_check_cppcheck.py
+
+check_clang_array:
+	$(CMAKE_CONFIG)
+	cd $(BUILD_DIR) ; python3.2 $(BLENDER_DIR)/build_files/cmake/cmake_static_check_clang_array.py
 
 check_splint:
 	$(CMAKE_CONFIG)
-	cd $(BUILD_DIR) ; python3 $(BLENDER_DIR)/build_files/cmake/cmake_static_check_splint.py
+	cd $(BUILD_DIR) ; python3.2 $(BLENDER_DIR)/build_files/cmake/cmake_static_check_splint.py
 
 check_sparse:
 	$(CMAKE_CONFIG)
-	cd $(BUILD_DIR) ; python3 $(BLENDER_DIR)/build_files/cmake/cmake_static_check_sparse.py
+	cd $(BUILD_DIR) ; python3.2 $(BLENDER_DIR)/build_files/cmake/cmake_static_check_sparse.py
+
+check_smatch:
+	$(CMAKE_CONFIG)
+	cd $(BUILD_DIR) ; python3.2 $(BLENDER_DIR)/build_files/cmake/cmake_static_check_smatch.py
 
 check_spelling_py:
-	cd $(BUILD_DIR) ; PYTHONIOENCODING=utf_8 python3 $(BLENDER_DIR)/source/tools/spell_check_source.py $(BLENDER_DIR)/release/scripts
+	cd $(BUILD_DIR) ; PYTHONIOENCODING=utf_8 python3.2 $(BLENDER_DIR)/source/tools/spell_check_source.py $(BLENDER_DIR)/release/scripts
 
 check_spelling_c:
-	cd $(BUILD_DIR) ; PYTHONIOENCODING=utf_8 python3 $(BLENDER_DIR)/source/tools/spell_check_source.py $(BLENDER_DIR)/source
+	cd $(BUILD_DIR) ; PYTHONIOENCODING=utf_8 python3.2 $(BLENDER_DIR)/source/tools/spell_check_source.py $(BLENDER_DIR)/source
+
+
+# -----------------------------------------------------------------------------
+# Utilities
+#
+
+tbz:
+	svn export . blender_archive
+	tar cjf blender_archive.tar.bz2 blender_archive/
+	rm -rf blender_archive/
+	@echo "blender_archive.tar.bz2 written"
 
 
 # -----------------------------------------------------------------------------
@@ -270,7 +310,7 @@ doc_dna:
 	@echo "docs written into: '$(BLENDER_DIR)/doc/blender_file_format/dna.html'"
 
 doc_man:
-	python3 doc/manpage/blender.1.py $(BUILD_DIR)/bin/blender
+	python3.2 doc/manpage/blender.1.py $(BUILD_DIR)/bin/blender
 
 
 clean:

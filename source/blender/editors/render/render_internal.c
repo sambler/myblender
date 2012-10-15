@@ -61,6 +61,7 @@
 #include "ED_object.h"
 
 #include "RE_pipeline.h"
+#include "IMB_colormanagement.h"
 #include "IMB_imbuf.h"
 #include "IMB_imbuf_types.h"
 
@@ -78,8 +79,7 @@ void image_buffer_rect_update(Scene *scene, RenderResult *rr, ImBuf *ibuf, volat
 {
 	float *rectf = NULL;
 	int ymin, ymax, xmin, xmax;
-	int rymin, rxmin, predivide, profile_from;
-	unsigned char *rectc;
+	int rymin, rxmin;
 
 	/* if renrect argument, we only refresh scanlines */
 	if (renrect) {
@@ -123,8 +123,14 @@ void image_buffer_rect_update(Scene *scene, RenderResult *rr, ImBuf *ibuf, volat
 	if (rr->rectf)
 		rectf = rr->rectf;
 	else {
-		if (rr->rect32)
+		if (rr->rect32) {
+			/* special case, currently only happens with sequencer rendering,
+			 * which updates the whole frame, so we can only mark display buffer
+			 * as invalid here (sergey)
+			 */
+			ibuf->userflags |= IB_DISPLAY_BUFFER_INVALID;
 			return;
+		}
 		else {
 			if (rr->renlay == NULL || rr->renlay->rectf == NULL) return;
 			rectf = rr->renlay->rectf;
@@ -136,20 +142,10 @@ void image_buffer_rect_update(Scene *scene, RenderResult *rr, ImBuf *ibuf, volat
 		imb_addrectImBuf(ibuf);
 	
 	rectf += 4 * (rr->rectx * ymin + xmin);
-	rectc = (unsigned char *)(ibuf->rect + ibuf->x * rymin + rxmin);
 
-	if (scene && (scene->r.color_mgt_flag & R_COLOR_MANAGEMENT)) {
-		profile_from = IB_PROFILE_LINEAR_RGB;
-		predivide = (scene->r.color_mgt_flag & R_COLOR_MANAGEMENT_PREDIVIDE);
-	}
-	else {
-		profile_from = IB_PROFILE_SRGB;
-		predivide = 0;
-	}
-
-	IMB_buffer_byte_from_float(rectc, rectf,
-	                           4, ibuf->dither, IB_PROFILE_SRGB, profile_from, predivide,
-	                           xmax, ymax, ibuf->x, rr->rectx);
+	IMB_partial_display_buffer_update(ibuf, rectf, NULL, rr->rectx, rxmin, rymin,
+	                                  &scene->view_settings, &scene->display_settings,
+	                                  rxmin, rymin, rxmin + xmax, rymin + ymax, TRUE);
 }
 
 /* ****************************** render invoking ***************** */
@@ -170,7 +166,7 @@ static void screen_render_scene_layer_set(wmOperator *op, Main *mainp, Scene **s
 		if (scn) {
 			/* camera switch wont have updated */
 			scn->r.cfra = (*scene)->r.cfra;
-			scene_camera_switch_update(scn);
+			BKE_scene_camera_switch_update(scn);
 
 			*scene = scn;
 		}
@@ -213,7 +209,7 @@ static int screen_render_exec(bContext *C, wmOperator *op)
 	re = RE_NewRender(scene->id.name);
 	lay = (v3d) ? v3d->lay : scene->lay;
 
-	G.afbreek = 0;
+	G.is_break = FALSE;
 	RE_test_break_cb(re, NULL, (int (*)(void *))blender_test_break);
 
 	ima = BKE_image_verify_viewer(IMA_TYPE_R_RESULT, "Render Result");
@@ -221,10 +217,10 @@ static int screen_render_exec(bContext *C, wmOperator *op)
 	BKE_image_backup_render(scene, ima);
 
 	/* cleanup sequencer caches before starting user triggered render.
-	* otherwise, invalidated cache entries can make their way into
-	* the output rendering. We can't put that into RE_BlenderFrame,
-	* since sequence rendering can call that recursively... (peter) */
-	seq_stripelem_cache_cleanup();
+	 * otherwise, invalidated cache entries can make their way into
+	 * the output rendering. We can't put that into RE_BlenderFrame,
+	 * since sequence rendering can call that recursively... (peter) */
+	BKE_sequencer_cache_cleanup();
 
 	RE_SetReports(re, op->reports);
 
@@ -236,7 +232,7 @@ static int screen_render_exec(bContext *C, wmOperator *op)
 	RE_SetReports(re, NULL);
 
 	// no redraw needed, we leave state as we entered it
-	ED_update_for_newframe(mainp, scene, CTX_wm_screen(C), 1);
+	ED_update_for_newframe(mainp, scene, 1);
 
 	WM_event_add_notifier(C, NC_SCENE | ND_RENDER_RESULT, scene);
 
@@ -288,11 +284,12 @@ static void make_renderinfo_string(RenderStats *rs, Scene *scene, char *str)
 	else if (scene->r.scemode & R_SINGLE_LAYER)
 		spos += sprintf(spos, "Single Layer | ");
 
+	spos += sprintf(spos, "Frame:%d ", (scene->r.cfra));
+
 	if (rs->statstr) {
-		spos += sprintf(spos, "%s ", rs->statstr);
+		spos += sprintf(spos, "| %s ", rs->statstr);
 	}
 	else {
-		spos += sprintf(spos, "Fra:%d  ", (scene->r.cfra));
 		if (rs->totvert) spos += sprintf(spos, "Ve:%d ", rs->totvert);
 		if (rs->totface) spos += sprintf(spos, "Fa:%d ", rs->totface);
 		if (rs->tothalo) spos += sprintf(spos, "Ha:%d ", rs->tothalo);
@@ -340,7 +337,7 @@ static void image_renderinfo_cb(void *rjv, RenderStats *rs)
 	RE_ReleaseResult(rj->re);
 
 	/* make jobs timer to send notifier */
-	*(rj->do_update) = 1;
+	*(rj->do_update) = TRUE;
 
 }
 
@@ -352,7 +349,7 @@ static void render_progress_update(void *rjv, float progress)
 		*rj->progress = progress;
 
 		/* make jobs timer to send notifier */
-		*(rj->do_update) = 1;
+		*(rj->do_update) = TRUE;
 	}
 }
 
@@ -372,7 +369,7 @@ static void image_rect_update(void *rjv, RenderResult *rr, volatile rcti *renrec
 		image_buffer_rect_update(rj->scene, rr, ibuf, renrect);
 
 		/* make jobs timer to send notifier */
-		*(rj->do_update) = 1;
+		*(rj->do_update) = TRUE;
 	}
 	BKE_image_release_ibuf(ima, lock);
 }
@@ -407,8 +404,12 @@ static void render_endjob(void *rjv)
 		free_main(rj->main);
 
 	/* else the frame will not update for the original value */
-	if (!(rj->scene->r.scemode & R_NO_FRAME_UPDATE))
-		ED_update_for_newframe(G.main, rj->scene, rj->win->screen, 1);
+	if (!(rj->scene->r.scemode & R_NO_FRAME_UPDATE)) {
+		/* possible this fails of loading new file while rendering */
+		if (G.main->wm.first) {
+			ED_update_for_newframe(G.main, rj->scene, 1);
+		}
+	}
 	
 	/* XXX above function sets all tags in nodes */
 	ntreeCompositClearTags(rj->scene->nodetree);
@@ -422,7 +423,7 @@ static void render_endjob(void *rjv)
 	}
 	
 	/* XXX render stability hack */
-	G.rendering = 0;
+	G.is_rendering = FALSE;
 	WM_main_add_notifier(NC_WINDOW, NULL);
 }
 
@@ -431,7 +432,7 @@ static int render_breakjob(void *rjv)
 {
 	RenderJob *rj = rjv;
 
-	if (G.afbreek)
+	if (G.is_break)
 		return 1;
 	if (rj->stop && *(rj->stop))
 		return 1;
@@ -447,10 +448,12 @@ static void render_drawlock(void *UNUSED(rjv), int lock)
 }
 
 /* catch esc */
-static int screen_render_modal(bContext *C, wmOperator *UNUSED(op), wmEvent *event)
+static int screen_render_modal(bContext *C, wmOperator *op, wmEvent *event)
 {
+	Scene *scene = (Scene *) op->customdata;
+
 	/* no running blender, remove handler and pass through */
-	if (0 == WM_jobs_test(CTX_wm_manager(C), CTX_data_scene(C))) {
+	if (0 == WM_jobs_test(CTX_wm_manager(C), scene, WM_JOB_TYPE_RENDER)) {
 		return OPERATOR_FINISHED | OPERATOR_PASS_THROUGH;
 	}
 
@@ -470,10 +473,9 @@ static int screen_render_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	Main *mainp;
 	Scene *scene = CTX_data_scene(C);
 	SceneRenderLayer *srl = NULL;
-	bScreen *screen = CTX_wm_screen(C);
 	View3D *v3d = CTX_wm_view3d(C);
 	Render *re;
-	wmJob *steve;
+	wmJob *wm_job;
 	RenderJob *rj;
 	Image *ima;
 	int jobflag;
@@ -483,7 +485,7 @@ static int screen_render_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	const char *name;
 	
 	/* only one render job at a time */
-	if (WM_jobs_test(CTX_wm_manager(C), scene))
+	if (WM_jobs_test(CTX_wm_manager(C), scene, WM_JOB_TYPE_RENDER))
 		return OPERATOR_CANCELLED;
 
 	if (!RE_is_rendering_allowed(scene, camera_override, op->reports)) {
@@ -499,7 +501,7 @@ static int screen_render_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	WM_jobs_stop_all(CTX_wm_manager(C));
 
 	/* get main */
-	if (G.rt == 101) {
+	if (G.debug_value == 101) {
 		/* thread-safety experiment, copy main from the undo buffer */
 		mainp = BKE_undo_get_main(&scene);
 	}
@@ -507,7 +509,7 @@ static int screen_render_invoke(bContext *C, wmOperator *op, wmEvent *event)
 		mainp = CTX_data_main(C);
 
 	/* cancel animation playback */
-	if (screen->animtimer)
+	if (ED_screen_animation_playing(CTX_wm_manager(C)))
 		ED_screen_animation_play(C, 0, 0);
 	
 	/* handle UI stuff */
@@ -517,10 +519,10 @@ static int screen_render_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	multires_force_render_update(CTX_data_active_object(C));
 
 	/* cleanup sequencer caches before starting user triggered render.
-	* otherwise, invalidated cache entries can make their way into
-	* the output rendering. We can't put that into RE_BlenderFrame,
-	* since sequence rendering can call that recursively... (peter) */
-	seq_stripelem_cache_cleanup();
+	 * otherwise, invalidated cache entries can make their way into
+	 * the output rendering. We can't put that into RE_BlenderFrame,
+	 * since sequence rendering can call that recursively... (peter) */
+	BKE_sequencer_cache_cleanup();
 
 	/* get editmode results */
 	ED_object_exit_editmode(C, 0);  /* 0 = does not exit editmode */
@@ -558,10 +560,10 @@ static int screen_render_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	if (RE_seq_render_active(scene, &scene->r)) name = "Sequence Render";
 	else name = "Render";
 
-	steve = WM_jobs_get(CTX_wm_manager(C), CTX_wm_window(C), scene, name, jobflag);
-	WM_jobs_customdata(steve, rj, render_freejob);
-	WM_jobs_timer(steve, 0.2, NC_SCENE | ND_RENDER_RESULT, 0);
-	WM_jobs_callbacks(steve, render_startjob, NULL, NULL, render_endjob);
+	wm_job = WM_jobs_get(CTX_wm_manager(C), CTX_wm_window(C), scene, name, jobflag, WM_JOB_TYPE_RENDER);
+	WM_jobs_customdata_set(wm_job, rj, render_freejob);
+	WM_jobs_timer(wm_job, 0.2, NC_SCENE | ND_RENDER_RESULT, 0);
+	WM_jobs_callbacks(wm_job, render_startjob, NULL, NULL, render_endjob);
 
 	/* get a render result image, and make sure it is empty */
 	ima = BKE_image_verify_viewer(IMA_TYPE_R_RESULT, "Render Result");
@@ -578,17 +580,23 @@ static int screen_render_invoke(bContext *C, wmOperator *op, wmEvent *event)
 	RE_progress_cb(re, rj, render_progress_update);
 
 	rj->re = re;
-	G.afbreek = 0;
+	G.is_break = FALSE;
 
-	WM_jobs_start(CTX_wm_manager(C), steve);
+	/* store actual owner of job, so modal operator could check for it,
+	 * the reason of this is that active scene could change when rendering
+	 * several layers from compositor [#31800]
+	 */
+	op->customdata = scene;
+
+	WM_jobs_start(CTX_wm_manager(C), wm_job);
 
 	WM_cursor_wait(0);
 	WM_event_add_notifier(C, NC_SCENE | ND_RENDER_RESULT, scene);
 
-	/* we set G.rendering here already instead of only in the job, this ensure
+	/* we set G.is_rendering here already instead of only in the job, this ensure
 	 * main loop or other scene updates are disabled in time, since they may
 	 * have started before the job thread */
-	G.rendering = 1;
+	G.is_rendering = TRUE;
 
 	/* add modal handler for ESC */
 	WM_event_add_modal_handler(C, op);

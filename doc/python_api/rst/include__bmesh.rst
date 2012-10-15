@@ -32,12 +32,11 @@ For an overview of BMesh data types and how they reference each other see:
 
 .. warning::
 
-   TODO Items Are
+   TODO items are...
 
    * add access to BMesh **walkers**
-   * add a way to re-tessellate an editmode bmesh.
-   * add deform vert custom-data access.
-
+   * add api for calling BMesh operators (unrelated to bpy.ops)
+   * add custom-data manipulation functions add/remove/rename.
 
 Example Script
 --------------
@@ -100,9 +99,11 @@ Here are some examples ...
    uv_lay = bm.loops.layers.uv.active
 
    for face in bm.faces:
-       for loop in f.loops:
-           uv = loop[uv_lay]
-           print("Loop UV: %f, %f" % (uv.x, uv.y))
+       for loop in face.loops:
+           uv = loop[uv_lay].uv
+           print("Loop UV: %f, %f" % uv[:])
+           vert = loop.vert
+           print("Loop Vert: (%f,%f,%f)" % vert.co[:])
 
 
 .. code-block:: python
@@ -110,8 +111,8 @@ Here are some examples ...
    shape_lay = bm.verts.layers.shape["Key.001"]
 
    for vert in bm.verts:
-		shape = vert[shape_lay]
-        print("Vert Shape: %f, %f, %f" % (shape.x, shape.y, shape.z))
+       shape = vert[shape_lay]
+       print("Vert Shape: %f, %f, %f" % (shape.x, shape.y, shape.z))
 
 
 .. code-block:: python
@@ -125,7 +126,7 @@ Here are some examples ...
 
    for vert in bm.verts:
        dvert = vert[dvert_lay]
-		
+
        if group_index in dvert:
            print("Weight %f" % dvert[group_index])
        else:

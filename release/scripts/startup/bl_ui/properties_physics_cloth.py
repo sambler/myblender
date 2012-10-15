@@ -20,10 +20,8 @@
 import bpy
 from bpy.types import Menu, Panel
 
-from .properties_physics_common import (
-    point_cache_ui,
-    effector_weights_ui,
-    )
+from bl_ui.properties_physics_common import (point_cache_ui,
+                                             effector_weights_ui)
 
 
 def cloth_panel_enabled(md):
@@ -31,9 +29,6 @@ def cloth_panel_enabled(md):
 
 
 class CLOTH_MT_presets(Menu):
-    '''
-    Creates the menu items by scanning scripts/templates
-    '''
     bl_label = "Cloth Presets"
     preset_subdir = "cloth"
     preset_operator = "script.execute_preset"
@@ -120,10 +115,6 @@ class PHYSICS_PT_cloth_cache(PhysicButtonsPanel, Panel):
     bl_label = "Cloth Cache"
     bl_options = {'DEFAULT_CLOSED'}
 
-    @classmethod
-    def poll(cls, context):
-        return context.cloth
-
     def draw(self, context):
         md = context.cloth
         point_cache_ui(self, context, md.point_cache, cloth_panel_enabled(md), 'CLOTH')
@@ -132,10 +123,6 @@ class PHYSICS_PT_cloth_cache(PhysicButtonsPanel, Panel):
 class PHYSICS_PT_cloth_collision(PhysicButtonsPanel, Panel):
     bl_label = "Cloth Collision"
     bl_options = {'DEFAULT_CLOSED'}
-
-    @classmethod
-    def poll(cls, context):
-        return context.cloth
 
     def draw_header(self, context):
         cloth = context.cloth.collision_settings
@@ -148,6 +135,7 @@ class PHYSICS_PT_cloth_collision(PhysicButtonsPanel, Panel):
 
         cloth = context.cloth.collision_settings
         md = context.cloth
+        ob = context.object
 
         layout.active = cloth.use_collision and cloth_panel_enabled(md)
 
@@ -166,6 +154,7 @@ class PHYSICS_PT_cloth_collision(PhysicButtonsPanel, Panel):
         sub.active = cloth.use_self_collision
         sub.prop(cloth, "self_collision_quality", slider=True, text="Quality")
         sub.prop(cloth, "self_distance_min", slider=True, text="Distance")
+        sub.prop_search(cloth, "vertex_group_self_collisions", ob, "vertex_groups", text="")
 
         layout.prop(cloth, "group")
 
@@ -173,10 +162,6 @@ class PHYSICS_PT_cloth_collision(PhysicButtonsPanel, Panel):
 class PHYSICS_PT_cloth_stiffness(PhysicButtonsPanel, Panel):
     bl_label = "Cloth Stiffness Scaling"
     bl_options = {'DEFAULT_CLOSED'}
-
-    @classmethod
-    def poll(cls, context):
-        return context.cloth
 
     def draw_header(self, context):
         cloth = context.cloth.settings
@@ -191,7 +176,7 @@ class PHYSICS_PT_cloth_stiffness(PhysicButtonsPanel, Panel):
         ob = context.object
         cloth = context.cloth.settings
 
-        layout.active = cloth.use_stiffness_scale	and cloth_panel_enabled(md)
+        layout.active = (cloth.use_stiffness_scale and cloth_panel_enabled(md))
 
         split = layout.split()
 
@@ -210,13 +195,9 @@ class PHYSICS_PT_cloth_field_weights(PhysicButtonsPanel, Panel):
     bl_label = "Cloth Field Weights"
     bl_options = {'DEFAULT_CLOSED'}
 
-    @classmethod
-    def poll(cls, context):
-        return (context.cloth)
-
     def draw(self, context):
         cloth = context.cloth.settings
-        effector_weights_ui(self, context, cloth.effector_weights)
+        effector_weights_ui(self, context, cloth.effector_weights, 'CLOTH')
 
 if __name__ == "__main__":  # only for live edit.
     bpy.utils.register_module(__name__)

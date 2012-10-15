@@ -61,6 +61,7 @@ private:
 	/** Rect that defines the area used for rendering,
 	    relative to the context */
 	RAS_Rect m_displayarea;
+	int m_viewport[4];
 
 public:
 	/* Construct a new canvas.
@@ -150,6 +151,8 @@ public:
 		int x1, int y1,
 		int x2, int y2
 	);
+		const int*
+	GetViewPort();
 
 		void 
 	SetMouseState(
@@ -189,16 +192,13 @@ private:
 	struct wmWindow* m_win;
 	RAS_Rect	m_frame_rect;
 	RAS_Rect 	m_area_rect;
-	short		m_area_left;
-	short		m_area_top;
+	int			m_area_left;
+	int			m_area_top;
 
 
 #ifdef WITH_CXX_GUARDEDALLOC
-public:
-	void *operator new(size_t num_bytes) { return MEM_mallocN(num_bytes, "GE:KX_BlenderCanvas"); }
-	void operator delete( void *mem ) { MEM_freeN(mem); }
+	MEM_CXX_CLASS_ALLOC_FUNCS("GE:KX_BlenderCanvas")
 #endif
 };
 
-#endif // __KX_BLENDERCANVAS_H__
-
+#endif  /* __KX_BLENDERCANVAS_H__ */

@@ -82,14 +82,17 @@ typedef enum BMIterType {
 /* the iterator htype for each iterator */
 extern const char bm_iter_itype_htype_map[BM_ITYPE_MAX];
 
+#define BM_ITER_MESH(ele, iter, bm, itype) \
+	for (ele = BM_iter_new(iter, bm, itype, NULL); ele; ele = BM_iter_step(iter))
 
-#define BM_ITER(ele, iter, bm, itype, data)                                   \
-	ele = BM_iter_new(iter, bm, itype, data);                                 \
-	for ( ; ele; ele = BM_iter_step(iter))
+#define BM_ITER_MESH_INDEX(ele, iter, bm, itype, indexvar) \
+	for (ele = BM_iter_new(iter, bm, itype, NULL), indexvar = 0; ele; ele = BM_iter_step(iter), (indexvar)++)
 
-#define BM_ITER_INDEX(ele, iter, bm, itype, data, indexvar)                   \
-	ele = BM_iter_new(iter, bm, itype, data);                                 \
-	for (indexvar = 0; ele; indexvar++, ele = BM_iter_step(iter))
+#define BM_ITER_ELEM(ele, iter, data, itype) \
+	for (ele = BM_iter_new(iter, NULL, itype, data); ele; ele = BM_iter_step(iter))
+
+#define BM_ITER_ELEM_INDEX(ele, iter, data, itype, indexvar) \
+	for (ele = BM_iter_new(iter, NULL, itype, data), indexvar = 0; ele; ele = BM_iter_step(iter), (indexvar)++)
 
 /* Iterator Structure */
 typedef struct BMIter {
@@ -112,8 +115,19 @@ typedef struct BMIter {
 	char itype;
 } BMIter;
 
-void *BM_iter_at_index(BMesh *bm, const char itype, void *data, int index);
-int   BM_iter_as_array(BMesh *bm, const char itype, void *data, void **array, const int len);
+void   *BM_iter_at_index(BMesh *bm, const char itype, void *data, int index)
+#ifdef __GNUC__
+__attribute__((warn_unused_result))
+#endif
+;
+int     BM_iter_as_array(BMesh *bm, const char itype, void *data, void **array, const int len);
+void   *BM_iter_as_arrayN(BMesh *bm, const char itype, void *data, int *r_len)
+#ifdef __GNUC__
+__attribute__((warn_unused_result))
+#endif
+;
+int     BM_iter_elem_count_flag(const char itype, void *data, const char hflag, const short value);
+int     BM_iter_mesh_count_flag(const char itype, BMesh *bm, const char hflag, const short value);
 
 /* private for bmesh_iterators_inline.c */
 void  bmiter__vert_of_mesh_begin(struct BMIter *iter);

@@ -116,39 +116,44 @@ void ED_render_scene_update(Main *bmain, Scene *scene, int updated)
 	CTX_free(C);
 }
 
+void ED_render_engine_area_exit(ScrArea *sa)
+{
+	/* clear all render engines in this area */
+	ARegion *ar;
+
+	if (sa->spacetype != SPACE_VIEW3D)
+		return;
+
+	for (ar = sa->regionbase.first; ar; ar = ar->next) {
+		RegionView3D *rv3d;
+
+		if (ar->regiontype != RGN_TYPE_WINDOW || !(ar->regiondata))
+			continue;
+		
+		rv3d = ar->regiondata;
+
+		if (rv3d->render_engine) {
+			RE_engine_free(rv3d->render_engine);
+			rv3d->render_engine = NULL;
+		}
+	}
+}
+
 void ED_render_engine_changed(Main *bmain)
 {
 	/* on changing the render engine type, clear all running render engines */
 	bScreen *sc;
 	ScrArea *sa;
-	ARegion *ar;
 
-	for (sc = bmain->screen.first; sc; sc = sc->id.next) {
-		for (sa = sc->areabase.first; sa; sa = sa->next) {
-			if (sa->spacetype != SPACE_VIEW3D)
-				continue;
-
-			for (ar = sa->regionbase.first; ar; ar = ar->next) {
-				RegionView3D *rv3d;
-
-				if (ar->regiontype != RGN_TYPE_WINDOW)
-					continue;
-				
-				rv3d = ar->regiondata;
-
-				if (rv3d->render_engine) {
-					RE_engine_free(rv3d->render_engine);
-					rv3d->render_engine = NULL;
-				}
-			}
-		}
-	}
+	for (sc = bmain->screen.first; sc; sc = sc->id.next)
+		for (sa = sc->areabase.first; sa; sa = sa->next)
+			ED_render_engine_area_exit(sa);
 }
 
 /***************************** Updates ***********************************
-* ED_render_id_flush_update gets called from DAG_id_tag_update, to do *
-* editor level updates when the ID changes. when these ID blocks are in *
-* the dependency graph, we can get rid of the manual dependency checks  */
+ * ED_render_id_flush_update gets called from DAG_id_tag_update, to do   *
+ * editor level updates when the ID changes. when these ID blocks are in *
+ * the dependency graph, we can get rid of the manual dependency checks  */
 
 static int mtex_use_tex(MTex **mtex, int tot, Tex *tex)
 {
@@ -219,8 +224,12 @@ static void material_changed(Main *bmain, Material *ma)
 
 	/* find node materials using this */
 	for (parent = bmain->mat.first; parent; parent = parent->id.next) {
-		if (parent->use_nodes && parent->nodetree && nodes_use_material(parent->nodetree, ma)) ;
-		else continue;
+		if (parent->use_nodes && parent->nodetree && nodes_use_material(parent->nodetree, ma)) {
+			/* pass */
+		}
+		else {
+			continue;
+		}
 
 		BKE_icon_changed(BKE_icon_getid(&parent->id));
 
@@ -242,9 +251,15 @@ static void texture_changed(Main *bmain, Tex *tex)
 
 	/* find materials */
 	for (ma = bmain->mat.first; ma; ma = ma->id.next) {
-		if (mtex_use_tex(ma->mtex, MAX_MTEX, tex)) ;
-		else if (ma->use_nodes && ma->nodetree && nodes_use_tex(ma->nodetree, tex)) ;
-		else continue;
+		if (mtex_use_tex(ma->mtex, MAX_MTEX, tex)) {
+			/* pass */
+		}
+		else if (ma->use_nodes && ma->nodetree && nodes_use_tex(ma->nodetree, tex)) {
+			/* pass */
+		}
+		else {
+			continue;
+		}
 
 		BKE_icon_changed(BKE_icon_getid(&ma->id));
 
@@ -254,18 +269,30 @@ static void texture_changed(Main *bmain, Tex *tex)
 
 	/* find lamps */
 	for (la = bmain->lamp.first; la; la = la->id.next) {
-		if (mtex_use_tex(la->mtex, MAX_MTEX, tex)) ;
-		else if (la->nodetree && nodes_use_tex(la->nodetree, tex)) ;
-		else continue;
+		if (mtex_use_tex(la->mtex, MAX_MTEX, tex)) {
+			/* pass */
+		}
+		else if (la->nodetree && nodes_use_tex(la->nodetree, tex)) {
+			/* pass */
+		}
+		else {
+			continue;
+		}
 
 		BKE_icon_changed(BKE_icon_getid(&la->id));
 	}
 
 	/* find worlds */
 	for (wo = bmain->world.first; wo; wo = wo->id.next) {
-		if (mtex_use_tex(wo->mtex, MAX_MTEX, tex)) ;
-		else if (wo->nodetree && nodes_use_tex(wo->nodetree, tex)) ;
-		else continue;
+		if (mtex_use_tex(wo->mtex, MAX_MTEX, tex)) {
+			/* pass */
+		}
+		else if (wo->nodetree && nodes_use_tex(wo->nodetree, tex)) {
+			/* pass */
+		}
+		else {
+			continue;
+		}
 
 		BKE_icon_changed(BKE_icon_getid(&wo->id));
 	}

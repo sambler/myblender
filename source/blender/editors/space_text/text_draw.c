@@ -39,6 +39,7 @@
 #include "BLF_api.h"
 
 #include "BLI_blenlib.h"
+#include "BLI_math.h"
 #include "BLI_utildefines.h"
 
 #include "DNA_text_types.h"
@@ -49,7 +50,6 @@
 #include "BKE_context.h"
 #include "BKE_suggestions.h"
 #include "BKE_text.h"
-
 
 #include "BIF_gl.h"
 
@@ -130,8 +130,7 @@ static void flatten_string_append(FlattenString *fs, const char *c, int accum, i
 		fs->accum = naccum;
 	}
 	
-	for (i = 0; i < len; i++)
-	{
+	for (i = 0; i < len; i++) {
 		fs->buf[fs->pos + i] = c[i];
 		fs->accum[fs->pos + i] = accum;
 	}
@@ -184,16 +183,23 @@ void flatten_string_free(FlattenString *fs)
  * a non-identifier (see text_check_identifier(char)) or null character.
  * 
  * If a built-in function is found, the length of the matching name is returned.
- * Otherwise, -1 is returned. */
+ * Otherwise, -1 is returned.
+ *
+ * See:
+ * http://docs.python.org/py3k/reference/lexical_analysis.html#keywords
+ */
 
 static int find_builtinfunc(char *string)
 {
 	int a, i;
-	char builtinfuncs[][9] = {"and", "as", "assert", "break", "class", "continue", "def",
-	                          "del", "elif", "else", "except", "exec", "finally",
-	                          "for", "from", "global", "if", "import", "in",
-	                          "is", "lambda", "not", "or", "pass", "print",
-	                          "raise", "return", "try", "while", "yield", "with"};
+	const char *builtinfuncs[] = {
+		/* "False", "None", "True", */ /* see find_bool() */
+		"and", "as", "assert", "break",
+		"class", "continue", "def", "del", "elif", "else", "except",
+		"finally", "for", "from", "global", "if", "import", "in",
+		"is", "lambda", "nonlocal", "not", "or", "pass", "raise",
+		"return", "try", "while", "with", "yield",
+	};
 
 	for (a = 0; a < sizeof(builtinfuncs) / sizeof(builtinfuncs[0]); a++) {
 		i = 0;
@@ -819,7 +825,7 @@ typedef struct DrawCache {
 
 static void text_drawcache_init(SpaceText *st)
 {
-	DrawCache *drawcache = MEM_callocN(sizeof (DrawCache), "text draw cache");
+	DrawCache *drawcache = MEM_callocN(sizeof(DrawCache), "text draw cache");
 
 	drawcache->winx = -1;
 	drawcache->nlines = BLI_countlist(&st->text->lines);
@@ -1168,7 +1174,7 @@ static void calc_text_rcts(SpaceText *st, ARegion *ar, rcti *scroll, rcti *back)
 				/* push hl start down */
 				hlstart = barstart + barheight;
 			}
-			else if (lhlend > st->top  && lhlstart < st->top && hlstart > barstart) {
+			else if (lhlend > st->top && lhlstart < st->top && hlstart > barstart) {
 				/*fill out start */
 				hlstart = barstart;
 			}
@@ -1226,7 +1232,7 @@ static void draw_textscroll(SpaceText *st, rcti *scroll, rcti *back)
 	uiWidgetScrollDraw(&wcol, scroll, &st->txtbar, (st->flags & ST_SCROLL_SELECT) ? UI_SCROLL_PRESSED : 0);
 
 	uiSetRoundBox(UI_CNR_ALL);
-	rad = 0.4f * MIN2(st->txtscroll.xmax - st->txtscroll.xmin, st->txtscroll.ymax - st->txtscroll.ymin);
+	rad = 0.4f * mini(BLI_rcti_size_x(&st->txtscroll), BLI_rcti_size_y(&st->txtscroll));
 	UI_GetThemeColor3ubv(TH_HILITE, col);
 	col[3] = 48;
 	glColor4ubv(col);
@@ -1735,6 +1741,7 @@ void draw_text_main(SpaceText *st, ARegion *ar)
 	char linenr[12];
 	int i, x, y, winx, linecount = 0, lineno = 0;
 	int wraplinecount = 0, wrap_skip = 0;
+	int margin_column_x;
 
 	if (st->lheight) st->viewlines = (int)ar->winy / st->lheight;
 	else st->viewlines = 0;
@@ -1839,16 +1846,20 @@ void draw_text_main(SpaceText *st, ARegion *ar)
 	if (st->flags & ST_SHOW_MARGIN) {
 		UI_ThemeColor(TH_HILITE);
 
-		glBegin(GL_LINES);
-		glVertex2i(x + st->cwidth * st->margin_column, 0);
-		glVertex2i(x + st->cwidth * st->margin_column, ar->winy - 2);
-		glEnd();
+		margin_column_x = x + st->cwidth * (st->margin_column - st->left);
+		
+		if (margin_column_x >= x) {
+			glBegin(GL_LINES);
+			glVertex2i(margin_column_x, 0);
+			glVertex2i(margin_column_x, ar->winy - 2);
+			glEnd();
+		}
 	}
 
 	/* draw other stuff */
 	draw_brackets(st, ar);
 	draw_markers(st, ar);
-	glTranslatef(0.375f, 0.375f, 0.0f); /* XXX scroll requires exact pixel space */
+	glTranslatef(GLA_PIXEL_OFS, GLA_PIXEL_OFS, 0.0f); /* XXX scroll requires exact pixel space */
 	draw_textscroll(st, &scroll, &back);
 	draw_documentation(st, ar);
 	draw_suggestion_list(st, ar);

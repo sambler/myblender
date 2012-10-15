@@ -64,7 +64,7 @@ public:
 	SetOption(
 		int option,
 		int value
-	){
+	) {
 		// intentionally empty
 	};
 
@@ -73,11 +73,8 @@ public:
 	
 	
 #ifdef WITH_CXX_GUARDEDALLOC
-public:
-	void *operator new(size_t num_bytes) { return MEM_mallocN(num_bytes, "GE:KX_ObColorIpoSGController"); }
-	void operator delete( void *mem ) { MEM_freeN(mem); }
+	MEM_CXX_CLASS_ALLOC_FUNCS("GE:KX_ObColorIpoSGController")
 #endif
 };
 
-#endif // __KX_OBCOLORIPOSGCONTROLLER_H__
-
+#endif  /* __KX_OBCOLORIPOSGCONTROLLER_H__ */

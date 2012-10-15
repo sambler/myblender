@@ -159,6 +159,10 @@ def setup_staticlibs(lenv):
         libincs += Split(lenv['BF_FFTW3_LIBPATH'])
         if lenv['WITH_BF_STATICFFTW3']:
             statlibs += Split(lenv['BF_FFTW3_LIB_STATIC'])
+    if lenv['WITH_BF_ELTOPO']:
+        libincs += Split(lenv['BF_LAPACK_LIBPATH'])
+        if lenv['WITH_BF_STATICLAPACK']:
+		    statlibs += Split(lenv['BF_LAPACK_LIB_STATIC'])        
     if lenv['WITH_BF_FFMPEG'] and lenv['WITH_BF_STATICFFMPEG']:
         statlibs += Split(lenv['BF_FFMPEG_LIB_STATIC'])
     if lenv['WITH_BF_INTERNATIONAL']:
@@ -182,12 +186,12 @@ def setup_staticlibs(lenv):
     if lenv['WITH_BF_SNDFILE'] and lenv['WITH_BF_STATICSNDFILE']:
         statlibs += Split(lenv['BF_SNDFILE_LIB_STATIC'])
 
-    if lenv['OURPLATFORM'] in ('win32-vc', 'win32-mingw', 'linuxcross', 'win64-vc'):
+    if lenv['OURPLATFORM'] in ('win32-vc', 'win32-mingw', 'linuxcross', 'win64-vc', 'win64-mingw'):
         libincs += Split(lenv['BF_PTHREADS_LIBPATH'])
 
     if lenv['WITH_BF_COLLADA']:
         libincs += Split(lenv['BF_OPENCOLLADA_LIBPATH'])
-        if lenv['OURPLATFORM'] not in ('win32-vc', 'win32-mingw', 'linuxcross', 'win64-vc'):
+        if lenv['OURPLATFORM'] not in ('win32-vc', 'win32-mingw', 'linuxcross', 'win64-vc', 'win64-mingw'):
             libincs += Split(lenv['BF_PCRE_LIBPATH'])
             libincs += Split(lenv['BF_EXPAT_LIBPATH'])
 
@@ -200,13 +204,18 @@ def setup_staticlibs(lenv):
         if lenv['WITH_BF_STATICOIIO']:
             statlibs += Split(lenv['BF_OIIO_LIB_STATIC'])
 
+    if lenv['WITH_BF_OCIO']:
+        libincs += Split(lenv['BF_OCIO_LIBPATH'])
+        if lenv['WITH_BF_STATICOCIO']:
+            statlibs += Split(lenv['BF_OCIO_LIB_STATIC'])
+
     if lenv['WITH_BF_BOOST']:
         libincs += Split(lenv['BF_BOOST_LIBPATH'])
         if lenv['WITH_BF_STATICBOOST']:
             statlibs += Split(lenv['BF_BOOST_LIB_STATIC'])
 
     # setting this last so any overriding of manually libs could be handled
-    if lenv['OURPLATFORM'] not in ('win32-vc', 'win32-mingw', 'win64-vc', 'linuxcross'):
+    if lenv['OURPLATFORM'] not in ('win32-vc', 'win32-mingw', 'win64-vc', 'linuxcross', 'win64-mingw'):
         libincs.append('/usr/lib')
 
     if lenv['WITH_BF_JEMALLOC']:
@@ -228,7 +237,7 @@ def setup_syslibs(lenv):
     if not lenv['WITH_BF_FREETYPE_STATIC']:
         syslibs += Split(lenv['BF_FREETYPE_LIB'])
     if lenv['WITH_BF_PYTHON'] and not lenv['WITH_BF_STATICPYTHON']:
-        if lenv['BF_DEBUG'] and lenv['OURPLATFORM'] in ('win32-vc', 'win64-vc', 'win32-mingw'):
+        if lenv['BF_DEBUG'] and lenv['OURPLATFORM'] in ('win32-vc', 'win64-vc', 'win32-mingw', 'win64-mingw'):
             syslibs.append(lenv['BF_PYTHON_LIB']+'_d')
         else:
             syslibs.append(lenv['BF_PYTHON_LIB'])
@@ -248,6 +257,10 @@ def setup_syslibs(lenv):
         if not lenv['WITH_BF_STATICOIIO']:
             syslibs += Split(lenv['BF_OIIO_LIB'])
 
+    if lenv['WITH_BF_OCIO']:
+        if not lenv['WITH_BF_STATICOCIO']:
+            syslibs += Split(lenv['BF_OCIO_LIB'])
+
     if lenv['WITH_BF_OPENEXR'] and not lenv['WITH_BF_STATICOPENEXR']:
         syslibs += Split(lenv['BF_OPENEXR_LIB'])
     if lenv['WITH_BF_TIFF'] and not lenv['WITH_BF_STATICTIFF']:
@@ -264,11 +277,13 @@ def setup_syslibs(lenv):
         syslibs += Split(lenv['BF_SNDFILE_LIB'])
     if lenv['WITH_BF_FFTW3'] and not lenv['WITH_BF_STATICFFTW3']:
         syslibs += Split(lenv['BF_FFTW3_LIB'])
+    if lenv['WITH_BF_ELTOPO']:
+        syslibs += Split(lenv['BF_LAPACK_LIB'])
     if lenv['WITH_BF_SDL']:
         syslibs += Split(lenv['BF_SDL_LIB'])
     if not lenv['WITH_BF_STATICOPENGL']:
         syslibs += Split(lenv['BF_OPENGL_LIB'])
-    if lenv['OURPLATFORM'] in ('win32-vc', 'win32-mingw','linuxcross', 'win64-vc'):
+    if lenv['OURPLATFORM'] in ('win32-vc', 'win32-mingw','linuxcross', 'win64-vc', 'win64-mingw'):
         syslibs += Split(lenv['BF_PTHREADS_LIB'])
     if lenv['WITH_BF_COLLADA']:
         syslibs.append(lenv['BF_PCRE_LIB'])
@@ -341,7 +356,7 @@ def creator(env):
         if env['BF_DEBUG']:
             defs.append('_DEBUG')
 
-    if env['OURPLATFORM'] in ('win32-vc', 'win32-mingw', 'linuxcross', 'win64-vc'):
+    if env['OURPLATFORM'] in ('win32-vc', 'win32-mingw', 'linuxcross', 'win64-vc', 'win64-mingw'):
         incs.append(env['BF_PTHREADS_INC'])
         incs.append('#/intern/utfconv')
 
@@ -360,7 +375,7 @@ def buildinfo(lenv, build_type):
     build_time = time.strftime ("%H:%M:%S")
     build_rev = os.popen('svnversion').read()[:-1] # remove \n
     if build_rev == '': 
-        build_rev = '45318'
+        build_rev = '51342'
     if lenv['BF_DEBUG']:
         build_type = "Debug"
         build_cflags = ' '.join(lenv['CFLAGS'] + lenv['CCFLAGS'] + lenv['BF_DEBUG_CCFLAGS'] + lenv['CPPFLAGS'])
@@ -578,6 +593,9 @@ def AppIt(target=None, source=None, env=None):
         commands.getoutput(cmd)
         cmd = 'cp -R %s/release/datafiles/fonts %s/%s.app/Contents/MacOS/%s/datafiles/'%(bldroot,installdir,binary,VERSION)
         commands.getoutput(cmd)
+        if env['WITH_BF_OCIO']:
+            cmd = 'cp -R %s/release/datafiles/colormanagement %s/%s.app/Contents/MacOS/%s/datafiles/'%(bldroot,installdir,binary,VERSION)
+            commands.getoutput(cmd)
         cmd = 'cp -R %s/release/scripts %s/%s.app/Contents/MacOS/%s/'%(bldroot,installdir,binary,VERSION)
         commands.getoutput(cmd)
 
@@ -693,11 +711,23 @@ def UnixPyBundle(target=None, source=None, env=None):
     run("rm -r '%s/turtle.py'" % py_target)
     run("rm -f '%s/lib-dynload/_tkinter.so'" % py_target)
 
+    if env['WITH_BF_PYTHON_INSTALL_NUMPY']:
+        numpy_src = py_src + "/site-packages/numpy"
+        numpy_target = py_target + "/site-packages/numpy"
+
+        if os.path.exists(numpy_src):
+            print 'Install numpy from:'
+            print '\t"%s" into...' % numpy_src
+            print '\t"%s"\n' % numpy_target
+
+            run("cp -R '%s' '%s'" % (numpy_src, os.path.dirname(numpy_target)))
+        else:
+            print 'Failed to find numpy at %s, skipping copying' % numpy_src
+
     run("find '%s' -type d -name 'test' -prune -exec rm -rf {} ';'" % py_target)
     run("find '%s' -type d -name '__pycache__' -exec rm -rf {} ';'" % py_target)
     run("find '%s' -name '*.py[co]' -exec rm -rf {} ';'" % py_target)
     run("find '%s' -name '*.so' -exec strip -s {} ';'" % py_target)
-    
 
 #### END ACTION STUFF #########
 
@@ -731,7 +761,7 @@ class BlenderEnvironment(SConsEnvironment):
         if not self or not libname or not source:
             print bc.FAIL+'Cannot continue.  Missing argument for BlenderRes '+libname+bc.ENDC
             self.Exit()
-        if self['OURPLATFORM'] not in ('win32-vc','win32-mingw','linuxcross', 'win64-vc'):
+        if self['OURPLATFORM'] not in ('win32-vc','win32-mingw','linuxcross', 'win64-vc', 'win64-mingw'):
             print bc.FAIL+'BlenderRes is for windows only!'+bc.END
             self.Exit()
         
@@ -827,6 +857,8 @@ class BlenderEnvironment(SConsEnvironment):
         print bc.HEADER+'Configuring program '+bc.ENDC+bc.OKGREEN+progname+bc.ENDC
         lenv = self.Clone()
         lenv.Append(LINKFLAGS = lenv['PLATFORM_LINKFLAGS'])
+        if lenv['OURPLATFORM'] in ('win32-mingw', 'win64-mingw', 'linuxcross', 'cygwin', 'linux'):
+            lenv.Replace(LINK = '$CXX')
         if lenv['OURPLATFORM'] in ('win32-vc', 'cygwin', 'win64-vc'):
             if lenv['BF_DEBUG']:
                 lenv.Prepend(LINKFLAGS = ['/DEBUG','/PDB:'+progname+'.pdb','/NODEFAULTLIB:libcmt'])
@@ -869,12 +901,17 @@ class BlenderEnvironment(SConsEnvironment):
             lenv.AddPostAction(prog,Action(AppIt,strfunction=my_appit_print))
         elif os.sep == '/' and lenv['OURPLATFORM'] != 'linuxcross': # any unix (except cross-compilation)
             if lenv['WITH_BF_PYTHON']:
-                if not lenv['WITHOUT_BF_INSTALL'] and not lenv['WITHOUT_BF_PYTHON_INSTALL'] and not BlenderEnvironment.PyBundleActionAdded:
+                if (not lenv['WITHOUT_BF_INSTALL'] and 
+                    not lenv['WITHOUT_BF_PYTHON_INSTALL'] and 
+                    not lenv['WITHOUT_BF_PYTHON_UNPACK'] and 
+                    not BlenderEnvironment.PyBundleActionAdded):
                     lenv.AddPostAction(prog,Action(UnixPyBundle,strfunction=my_unixpybundle_print))
                     BlenderEnvironment.PyBundleActionAdded = True
         elif lenv['OURPLATFORM'].startswith('win') or lenv['OURPLATFORM'] == 'linuxcross': # windows or cross-compilation
             if lenv['WITH_BF_PYTHON']:
-                if not lenv['WITHOUT_BF_PYTHON_INSTALL'] and not BlenderEnvironment.PyBundleActionAdded:
+                if (not lenv['WITHOUT_BF_PYTHON_INSTALL'] and 
+                    not lenv['WITHOUT_BF_PYTHON_UNPACK'] and 
+                    not BlenderEnvironment.PyBundleActionAdded):
                     lenv.AddPostAction(prog,Action(WinPyBundle,strfunction=my_winpybundle_print))
                     BlenderEnvironment.PyBundleActionAdded = True
         return prog

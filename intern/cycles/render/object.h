@@ -41,16 +41,25 @@ public:
 	Transform tfm;
 	BoundBox bounds;
 	ustring name;
+	uint random_id;
 	int pass_id;
 	vector<ParamValue> attributes;
 	uint visibility;
+	MotionTransform motion;
+	bool use_motion;
+	bool use_holdout;
+
+	float3 dupli_generated;
+	float2 dupli_uv;
+
+	int particle_id;
 
 	Object();
 	~Object();
 
 	void tag_update(Scene *scene);
 
-	void compute_bounds();
+	void compute_bounds(bool motion_blur);
 	void apply_transform();
 };
 

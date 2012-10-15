@@ -167,7 +167,7 @@ static int text_new_exec(bContext *C, wmOperator *UNUSED(op))
 	PointerRNA ptr, idptr;
 	PropertyRNA *prop;
 
-	text = add_empty_text("Text");
+	text = BKE_text_add("Text");
 
 	/* hook into UI */
 	uiIDContextProperty(C, &ptr, &prop);
@@ -236,7 +236,7 @@ static int text_open_exec(bContext *C, wmOperator *op)
 
 	RNA_string_get(op->ptr, "filepath", str);
 
-	text = add_text(str, G.main->name);
+	text = BKE_text_load(str, G.main->name);
 
 	if (!text) {
 		if (op->customdata) MEM_freeN(op->customdata);
@@ -310,7 +310,8 @@ void TEXT_OT_open(wmOperatorType *ot)
 	ot->flag = OPTYPE_UNDO;
 	
 	/* properties */
-	WM_operator_properties_filesel(ot, FOLDERFILE | TEXTFILE | PYSCRIPTFILE, FILE_SPECIAL, FILE_OPENFILE, WM_FILESEL_FILEPATH, FILE_DEFAULTDISPLAY);  //XXX TODO, relative_path
+	WM_operator_properties_filesel(ot, FOLDERFILE | TEXTFILE | PYSCRIPTFILE, FILE_SPECIAL, FILE_OPENFILE,
+	                               WM_FILESEL_FILEPATH, FILE_DEFAULTDISPLAY);  //XXX TODO, relative_path
 	RNA_def_boolean(ot->srna, "internal", 0, "Make internal", "Make text file internal after loading");
 }
 
@@ -320,7 +321,7 @@ static int text_reload_exec(bContext *C, wmOperator *op)
 {
 	Text *text = CTX_data_edit_text(C);
 
-	if (!reopen_text(text)) {
+	if (!BKE_text_reload(text)) {
 		BKE_report(op->reports, RPT_ERROR, "Could not reopen file");
 		return OPERATOR_CANCELLED;
 	}
@@ -379,8 +380,8 @@ static int text_unlink_exec(bContext *C, wmOperator *UNUSED(op))
 		}
 	}
 
-	unlink_text(bmain, text);
-	free_libblock(&bmain->text, text);
+	BKE_text_unlink(bmain, text);
+	BKE_libblock_free(&bmain->text, text);
 
 	text_drawcache_tag_update(st, 1);
 	WM_event_add_notifier(C, NC_TEXT | NA_REMOVED, NULL);
@@ -570,7 +571,8 @@ void TEXT_OT_save_as(wmOperatorType *ot)
 	ot->poll = text_edit_poll;
 
 	/* properties */
-	WM_operator_properties_filesel(ot, FOLDERFILE | TEXTFILE | PYSCRIPTFILE, FILE_SPECIAL, FILE_SAVE, WM_FILESEL_FILEPATH, FILE_DEFAULTDISPLAY);  //XXX TODO, relative_path
+	WM_operator_properties_filesel(ot, FOLDERFILE | TEXTFILE | PYSCRIPTFILE, FILE_SPECIAL, FILE_SAVE,
+	                               WM_FILESEL_FILEPATH, FILE_DEFAULTDISPLAY);  //XXX TODO, relative_path
 }
 
 /******************* run script operator *********************/
@@ -600,9 +602,12 @@ static int text_run_script(bContext *C, ReportList *reports)
 
 	/* Don't report error messages while live editing */
 	if (!is_live) {
-		if (text->curl != curl_prev || curc_prev != text->curc) {
-			text_update_cursor_moved(C);
-			WM_event_add_notifier(C, NC_TEXT | NA_EDITED, text);
+		/* text may have freed its self */
+		if (CTX_data_edit_text(C) == text) {
+			if (text->curl != curl_prev || curc_prev != text->curc) {
+				text_update_cursor_moved(C);
+				WM_event_add_notifier(C, NC_TEXT | NA_EDITED, text);
+			}
 		}
 
 		BKE_report(reports, RPT_ERROR, "Python script fail, look in the console for now...");
@@ -824,6 +829,36 @@ void TEXT_OT_paste(wmOperatorType *ot)
 	
 	/* properties */
 	RNA_def_boolean(ot->srna, "selection", 0, "Selection", "Paste text selected elsewhere rather than copied (X11 only)");
+}
+
+/**************** duplicate operator *******************/
+
+static int text_duplicate_line_exec(bContext *C, wmOperator *UNUSED(op))
+{
+	Text *text = CTX_data_edit_text(C);
+	
+	txt_duplicate_line(text);
+	
+	WM_event_add_notifier(C, NC_TEXT | NA_EDITED, text);
+
+	/* run the script while editing, evil but useful */
+	if (CTX_wm_space_text(C)->live_edit) {
+		text_run_script(C, NULL);
+	}
+
+	return OPERATOR_FINISHED;
+}
+
+void TEXT_OT_duplicate_line(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Duplicate Line";
+	ot->idname = "TEXT_OT_duplicate_line";
+	ot->description = "Duplicate the current line";
+	
+	/* api callbacks */
+	ot->exec = text_duplicate_line_exec;
+	ot->poll = text_edit_poll;
 }
 
 /******************* copy operator *********************/
@@ -1126,7 +1161,7 @@ static int text_convert_whitespace_exec(bContext *C, wmOperator *op)
 			}
 			else {
 				new_line[j] = text_check_line[a];
-				++j;
+				j++;
 			}
 		}
 		new_line[j] = '\0';
@@ -1178,12 +1213,12 @@ static int text_convert_whitespace_exec(bContext *C, wmOperator *op)
 					if (!number) { //found all number of space to equal a tab
 						new_line[extra] = '\t';
 						a = a + (st->tabnumber - 1);
-						++extra;
+						extra++;
 						
 					}
 					else { //not adding a tab
 						new_line[extra] = text_check_line[a];
-						++extra;
+						extra++;
 					}
 				}
 				new_line[extra] = '\0';
@@ -1299,6 +1334,46 @@ void TEXT_OT_select_word(wmOperatorType *ot)
 	/* api callbacks */
 	ot->exec = text_select_word_exec;
 	ot->poll = text_edit_poll;
+}
+
+/********************* move lines operators ***********************/
+
+static int move_lines_exec(bContext *C, wmOperator *op)
+{
+	Text *text = CTX_data_edit_text(C);
+	const int direction = RNA_enum_get(op->ptr, "direction");
+	
+	txt_move_lines(text, direction);
+	
+	text_update_cursor_moved(C);
+	WM_event_add_notifier(C, NC_TEXT | NA_EDITED, text);
+
+	/* run the script while editing, evil but useful */
+	if (CTX_wm_space_text(C)->live_edit)
+		text_run_script(C, NULL);
+	
+	return OPERATOR_FINISHED;
+}
+
+void TEXT_OT_move_lines(wmOperatorType *ot)
+{
+	static EnumPropertyItem direction_items[] = {
+		{TXT_MOVE_LINE_UP, "UP", 0, "Up", ""},
+		{TXT_MOVE_LINE_DOWN, "DOWN", 0, "Down", ""},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	/* identifiers */
+	ot->name = "Move Lines";
+	ot->idname = "TEXT_OT_move_lines";
+	ot->description = "Move the currently selected line(s) up/down";
+	
+	/* api callbacks */
+	ot->exec = move_lines_exec;
+	ot->poll = text_edit_poll;
+
+	/* properties */
+	RNA_def_enum(ot->srna, "direction", direction_items, 1, "Direction", "");
 }
 
 /******************* previous marker operator *********************/
@@ -2337,8 +2412,8 @@ static int text_scroll_bar_invoke(bContext *C, wmOperator *op, wmEvent *event)
 
 	/* jump scroll, works in v2d but needs to be added here too :S */
 	if (event->type == MIDDLEMOUSE) {
-		tsc->old[0] = ar->winrct.xmin + (st->txtbar.xmax + st->txtbar.xmin) / 2;
-		tsc->old[1] = ar->winrct.ymin + (st->txtbar.ymax + st->txtbar.ymin) / 2;
+		tsc->old[0] = ar->winrct.xmin + BLI_rcti_cent_x(&st->txtbar);
+		tsc->old[1] = ar->winrct.ymin + BLI_rcti_cent_y(&st->txtbar);
 
 		tsc->delta[0] = 0;
 		tsc->delta[1] = 0;
@@ -2818,7 +2893,7 @@ static int text_insert_exec(bContext *C, wmOperator *op)
 	SpaceText *st = CTX_wm_space_text(C);
 	Text *text = CTX_data_edit_text(C);
 	char *str;
-	int done = 0;
+	int done = FALSE;
 	size_t i = 0;
 	unsigned int code;
 
@@ -2858,8 +2933,11 @@ static int text_insert_invoke(bContext *C, wmOperator *op, wmEvent *event)
 
 	// if (!RNA_struct_property_is_set(op->ptr, "text")) { /* always set from keymap XXX */
 	if (!RNA_string_length(op->ptr, "text")) {
-		/* if alt/ctrl/super are pressed pass through */
-		if (event->ctrl || event->oskey) {
+		/* if alt/ctrl/super are pressed pass through except for utf8 character event
+		 * (when input method are used for utf8 inputs, the user may assign key event
+		 * including alt/ctrl/super like ctrl+m to commit utf8 string.  in such case,
+		 * the modifiers in the utf8 character event make no sense.) */
+		if ((event->ctrl || event->oskey) && !event->utf8_buf[0]) {
 			return OPERATOR_PASS_THROUGH;
 		}
 		else {
@@ -3274,7 +3352,7 @@ void TEXT_OT_to_3d_object(wmOperatorType *ot)
 	/* identifiers */
 	ot->name = "To 3D Object";
 	ot->idname = "TEXT_OT_to_3d_object";
-	ot->description = "Create 3d text object from active text data block";
+	ot->description = "Create 3D text object from active text data block";
 	
 	/* api callbacks */
 	ot->exec = text_to_3d_object_exec;

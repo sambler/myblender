@@ -48,7 +48,8 @@ def get_platform(filename):
     tokens = filename.split("-")
     platforms = ('osx', 'mac', 'bsd',
                  'win', 'linux', 'source',
-                 'solaris')
+                 'solaris',
+                 'mingw')
     platform_tokens = []
     found = False
 
@@ -111,7 +112,7 @@ branch = get_branch(packagename)
 
 if platform == '':
     sys.stderr.write('Failed to detect platform ' +
-        'from package: %r\n' % packagename)
+                     'from package: %r\n' % packagename)
     sys.exit(1)
 
 # extract

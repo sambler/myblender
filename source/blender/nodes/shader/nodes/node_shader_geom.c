@@ -38,15 +38,15 @@
 
 /* output socket type definition */
 static bNodeSocketTemplate sh_node_geom_out[]= {
-	{	SOCK_VECTOR, 0, "Global"},
-	{	SOCK_VECTOR, 0, "Local"},
-	{	SOCK_VECTOR, 0, "View"},
-	{	SOCK_VECTOR, 0, "Orco"},
-	{	SOCK_VECTOR, 0, "UV"},
-	{	SOCK_VECTOR, 0, "Normal"},
-	{	SOCK_RGBA,   0, "Vertex Color"},
-	{	SOCK_FLOAT,   0, "Vertex Alpha"},
-	{	SOCK_FLOAT,   0, "Front/Back"},
+	{	SOCK_VECTOR, 0, N_("Global")},
+	{	SOCK_VECTOR, 0, N_("Local")},
+	{	SOCK_VECTOR, 0, N_("View")},
+	{	SOCK_VECTOR, 0, N_("Orco")},
+	{	SOCK_VECTOR, 0, N_("UV")},
+	{	SOCK_VECTOR, 0, N_("Normal")},
+	{	SOCK_RGBA,   0, N_("Vertex Color")},
+	{	SOCK_FLOAT,   0, N_("Vertex Alpha")},
+	{	SOCK_FLOAT,   0, N_("Front/Back")},
 	{	-1, 0, ""	}
 };
 
@@ -95,7 +95,7 @@ static void node_shader_exec_geom(void *data, bNode *node, bNodeStack **UNUSED(i
 			out[GEOM_OUT_VCOL]->vec[3]= scol->col[3];
 			out[GEOM_OUT_VCOL_ALPHA]->vec[0]= scol->col[3];
 		}
-		else  {
+		else {
 			memcpy(out[GEOM_OUT_VCOL]->vec, defaultvcol, sizeof(defaultvcol));
 			out[GEOM_OUT_VCOL_ALPHA]->vec[0]= 1.0f;
 		}
@@ -120,7 +120,7 @@ static void node_shader_exec_geom(void *data, bNode *node, bNodeStack **UNUSED(i
 	}
 }
 
-static void node_shader_init_geometry(bNodeTree *UNUSED(ntree), bNode* node, bNodeTemplate *UNUSED(ntemp))
+static void node_shader_init_geometry(bNodeTree *UNUSED(ntree), bNode *node, bNodeTemplate *UNUSED(ntemp))
 {
 	node->storage= MEM_callocN(sizeof(NodeGeometry), "NodeGeometry");
 }

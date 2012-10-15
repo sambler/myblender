@@ -51,19 +51,32 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "BLI_winstuff.h"
+#ifdef WIN32
+#  include "BLI_winstuff.h"
+#endif
 
 /* Extensions support */
 
 /* extensions used:
  * - texture border clamp: 1.3 core
- * - fragement shader: 2.0 core
+ * - fragment shader: 2.0 core
  * - framebuffer object: ext specification
  * - multitexture 1.3 core
  * - arb non power of two: 2.0 core
  * - pixel buffer objects? 2.1 core
  * - arb draw buffers? 2.0 core
  */
+
+/* Non-generated shaders */
+extern char datatoc_gpu_shader_vsm_store_vert_glsl[];
+extern char datatoc_gpu_shader_vsm_store_frag_glsl[];
+extern char datatoc_gpu_shader_sep_gaussian_blur_vert_glsl[];
+extern char datatoc_gpu_shader_sep_gaussian_blur_frag_glsl[];
+
+typedef struct GPUShaders {
+	GPUShader *vsm_store;
+	GPUShader *sep_gaussian_blur;
+} GPUShaders;
 
 static struct GPUGlobal {
 	GLint maxtextures;
@@ -75,7 +88,8 @@ static struct GPUGlobal {
 	GPUDeviceType device;
 	GPUOSType os;
 	GPUDriverType driver;
-} GG = {1, 0, 0, 0, 0};
+	GPUShaders shaders;
+} GG = {1, 0};
 
 /* GPU Types */
 
@@ -169,14 +183,16 @@ void GPU_extensions_init(void)
 		 * New IDs from MESA's src/gallium/drivers/r300/r300_screen.c
 		 */
 		if (strstr(renderer, "R3") || strstr(renderer, "RV3") ||
-		   strstr(renderer, "R4") || strstr(renderer, "RV4") ||
-		   strstr(renderer, "RS4") || strstr(renderer, "RC4") ||
-		   strstr(renderer, "R5") || strstr(renderer, "RV5") ||
-		   strstr(renderer, "RS600") || strstr(renderer, "RS690") ||
-		   strstr(renderer, "RS740") || strstr(renderer, "X1") ||
-		   strstr(renderer, "X2") || strstr(renderer, "Radeon 9") ||
-		   strstr(renderer, "RADEON 9"))
+		    strstr(renderer, "R4") || strstr(renderer, "RV4") ||
+		    strstr(renderer, "RS4") || strstr(renderer, "RC4") ||
+		    strstr(renderer, "R5") || strstr(renderer, "RV5") ||
+		    strstr(renderer, "RS600") || strstr(renderer, "RS690") ||
+		    strstr(renderer, "RS740") || strstr(renderer, "X1") ||
+		    strstr(renderer, "X2") || strstr(renderer, "Radeon 9") ||
+		    strstr(renderer, "RADEON 9"))
+		{
 			GG.npotdisabled = 1;
+		}
 	}
 
 	/* make sure double side isn't used by default and only getting enabled in places where it's
@@ -234,7 +250,7 @@ static void GPU_print_framebuffer_error(GLenum status, char err_out[256])
 {
 	const char *err= "unknown";
 
-	switch(status) {
+	switch (status) {
 		case GL_FRAMEBUFFER_COMPLETE_EXT:
 			break;
 		case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT_EXT:
@@ -426,7 +442,7 @@ static GPUTexture *GPU_texture_create_nD(int w, int h, int n, float *fpixels, in
 }
 
 
-GPUTexture *GPU_texture_create_3D(int w, int h, int depth, float *fpixels)
+GPUTexture *GPU_texture_create_3D(int w, int h, int depth, int channels, float *fpixels)
 {
 	GPUTexture *tex;
 	GLenum type, format, internalformat;
@@ -464,9 +480,15 @@ GPUTexture *GPU_texture_create_3D(int w, int h, int depth, float *fpixels)
 
 	GPU_print_error("3D glBindTexture");
 
-	type = GL_FLOAT; // GL_UNSIGNED_BYTE
-	format = GL_RED;
-	internalformat = GL_INTENSITY;
+	type = GL_FLOAT;
+	if (channels == 4) {
+		format = GL_RGBA;
+		internalformat = GL_RGBA;
+	}
+	else {
+		format = GL_RED;
+		internalformat = GL_INTENSITY;
+	}
 
 	//if (fpixels)
 	//	pixels = GPU_texture_convert_pixels(w*h*depth, fpixels);
@@ -506,7 +528,7 @@ GPUTexture *GPU_texture_create_3D(int w, int h, int depth, float *fpixels)
 	return tex;
 }
 
-GPUTexture *GPU_texture_from_blender(Image *ima, ImageUser *iuser, double time, int mipmap)
+GPUTexture *GPU_texture_from_blender(Image *ima, ImageUser *iuser, int ncd, double time, int mipmap)
 {
 	GPUTexture *tex;
 	GLint w, h, border, lastbindcode, bindcode;
@@ -514,7 +536,7 @@ GPUTexture *GPU_texture_from_blender(Image *ima, ImageUser *iuser, double time, 
 	glGetIntegerv(GL_TEXTURE_BINDING_2D, &lastbindcode);
 
 	GPU_update_image_time(ima, time);
-	bindcode = GPU_verify_image(ima, iuser, 0, 0, mipmap);
+	bindcode = GPU_verify_image(ima, iuser, 0, 0, mipmap, ncd);
 
 	if (ima->gputexture) {
 		ima->gputexture->bindcode = bindcode;
@@ -581,6 +603,25 @@ GPUTexture *GPU_texture_create_depth(int w, int h, char err_out[256])
 	if (tex)
 		GPU_texture_unbind(tex);
 	
+	return tex;
+}
+
+/**
+ * A shadow map for VSM needs two components (depth and depth^2)
+ */
+GPUTexture *GPU_texture_create_vsm_shadow_map(int size, char err_out[256])
+{
+	GPUTexture *tex = GPU_texture_create_nD(size, size, 2, NULL, 0, err_out);
+
+	if (tex) {
+		/* Now we tweak some of the settings */
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RG32F, size, size, 0, GL_RG, GL_FLOAT, 0);
+
+		GPU_texture_unbind(tex);
+	}
+
 	return tex;
 }
 
@@ -842,6 +883,67 @@ void GPU_framebuffer_restore(void)
 	}
 }
 
+void GPU_framebuffer_blur(GPUFrameBuffer *fb, GPUTexture *tex, GPUFrameBuffer *blurfb, GPUTexture *blurtex)
+{
+	float scaleh[2] = {1.0f/GPU_texture_opengl_width(blurtex), 0.0f};
+	float scalev[2] = {0.0f, 1.0f/GPU_texture_opengl_height(tex)};
+
+	GPUShader *blur_shader = GPU_shader_get_builtin_shader(GPU_SHADER_SEP_GAUSSIAN_BLUR);
+	int scale_uniform, texture_source_uniform;
+
+	if (!blur_shader)
+		return;
+
+	scale_uniform = GPU_shader_get_uniform(blur_shader, "ScaleU");
+	texture_source_uniform = GPU_shader_get_uniform(blur_shader, "textureSource");
+		
+	/* Blurring horizontally */
+
+	/* We do the bind ourselves rather than using GPU_framebuffer_texture_bind() to avoid
+	 * pushing unnecessary matrices onto the OpenGL stack. */
+	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, blurfb->object);
+
+	GPU_shader_bind(blur_shader);
+	GPU_shader_uniform_vector(blur_shader, scale_uniform, 2, 1, (float*)scaleh);
+	GPU_shader_uniform_texture(blur_shader, texture_source_uniform, tex);
+	glViewport(0, 0, GPU_texture_opengl_width(blurtex), GPU_texture_opengl_height(blurtex));
+
+	/* Peparing to draw quad */
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+	glMatrixMode(GL_TEXTURE);
+	glLoadIdentity();
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+
+	GPU_texture_bind(tex, 0);
+
+	/* Drawing quad */
+	glBegin(GL_QUADS);
+	glTexCoord2d(0, 0); glVertex2f(1, 1);
+	glTexCoord2d(1, 0); glVertex2f(-1, 1);
+	glTexCoord2d(1, 1); glVertex2f(-1, -1);
+	glTexCoord2d(0, 1); glVertex2f(1, -1);
+	glEnd();
+		
+	/* Blurring vertically */
+
+	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fb->object);
+	glViewport(0, 0, GPU_texture_opengl_width(tex), GPU_texture_opengl_height(tex));
+	GPU_shader_uniform_vector(blur_shader, scale_uniform, 2, 1, (float*)scalev);
+	GPU_shader_uniform_texture(blur_shader, texture_source_uniform, blurtex);
+	GPU_texture_bind(blurtex, 0);
+
+	glBegin(GL_QUADS);
+	glTexCoord2d(0, 0); glVertex2f(1, 1);
+	glTexCoord2d(1, 0); glVertex2f(-1, 1);
+	glTexCoord2d(1, 1); glVertex2f(-1, -1);
+	glTexCoord2d(0, 1); glVertex2f(1, -1);
+	glEnd();
+
+	GPU_shader_unbind(blur_shader);
+}
+
 /* GPUOffScreen */
 
 struct GPUOffScreen {
@@ -978,8 +1080,9 @@ GPUShader *GPU_shader_create(const char *vertexcode, const char *fragcode, /*GPU
 	shader->object = glCreateProgramObjectARB();
 
 	if (!shader->object ||
-		(vertexcode && !shader->vertex) ||
-		(fragcode && !shader->fragment)) {
+	    (vertexcode && !shader->vertex) ||
+	    (fragcode && !shader->fragment))
+	{
 		fprintf(stderr, "GPUShader, object creation failed.\n");
 		GPU_shader_free(shader);
 		return NULL;
@@ -1167,6 +1270,42 @@ int GPU_shader_get_attribute(GPUShader *shader, const char *name)
 	GPU_print_error("Post Get Attribute");
 
 	return index;
+}
+
+GPUShader *GPU_shader_get_builtin_shader(GPUBuiltinShader shader)
+{
+	GPUShader *retval = NULL;
+
+	switch (shader) {
+		case GPU_SHADER_VSM_STORE:
+			if (!GG.shaders.vsm_store)
+				GG.shaders.vsm_store = GPU_shader_create(datatoc_gpu_shader_vsm_store_vert_glsl, datatoc_gpu_shader_vsm_store_frag_glsl, NULL);
+			retval = GG.shaders.vsm_store;
+			break;
+		case GPU_SHADER_SEP_GAUSSIAN_BLUR:
+			if (!GG.shaders.sep_gaussian_blur)
+				GG.shaders.sep_gaussian_blur = GPU_shader_create(datatoc_gpu_shader_sep_gaussian_blur_vert_glsl, datatoc_gpu_shader_sep_gaussian_blur_frag_glsl, NULL);
+			retval = GG.shaders.sep_gaussian_blur;
+			break;
+	}
+
+	if (retval == NULL)
+		printf("Unable to create a GPUShader for builtin shader: %d\n", shader);
+
+	return retval;
+}
+
+void GPU_shader_free_builtin_shaders()
+{
+	if (GG.shaders.vsm_store) {
+		MEM_freeN(GG.shaders.vsm_store);
+		GG.shaders.vsm_store = NULL;
+	}
+
+	if (GG.shaders.sep_gaussian_blur) {
+		MEM_freeN(GG.shaders.sep_gaussian_blur);
+		GG.shaders.sep_gaussian_blur = NULL;
+	}
 }
 
 #if 0

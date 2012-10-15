@@ -1,11 +1,14 @@
 
 set(INC
 	.
+)
+set(INC_SYS
 	${GLEW_INCLUDE_PATH}
 	${OPENGL_INCLUDE_DIR}
 )
 
 set(SRC
+	util_attribute.cpp
 	util_cache.cpp
 	util_cuda.cpp
 	util_dynlib.cpp
@@ -15,6 +18,7 @@ set(SRC
 	util_path.cpp
 	util_string.cpp
 	util_system.cpp
+	util_task.cpp
 	util_time.cpp
 	util_transform.cpp
 )
@@ -28,6 +32,7 @@ endif()
 set(SRC_HEADERS
 	util_algorithm.h
 	util_args.h
+	util_attribute.h
 	util_boundbox.h
 	util_cache.h
 	util_cuda.h
@@ -50,6 +55,7 @@ set(SRC_HEADERS
 	util_set.h
 	util_string.h
 	util_system.h
+	util_task.h
 	util_thread.h
 	util_time.h
 	util_transform.h
@@ -60,5 +66,6 @@ set(SRC_HEADERS
 )
 
 include_directories(${INC})
+include_directories(SYSTEM ${INC_SYS})
 
 add_library(cycles_util ${SRC} ${SRC_HEADERS})

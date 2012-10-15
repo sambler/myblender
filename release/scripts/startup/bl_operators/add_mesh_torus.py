@@ -24,7 +24,6 @@ import mathutils
 from bpy.props import (FloatProperty,
                        IntProperty,
                        BoolProperty,
-                       FloatVectorProperty,
                        )
 
 from bpy_extras import object_utils
@@ -50,9 +49,9 @@ def add_torus(major_rad, minor_rad, major_seg, minor_seg):
             angle = 2 * pi * minor_index / minor_seg
 
             vec = quat * Vector((major_rad + (cos(angle) * minor_rad),
-                                0.0,
-                                (sin(angle) * minor_rad),
-                                ))
+                                 0.0,
+                                 (sin(angle) * minor_rad),
+                                 ))
 
             verts.extend(vec[:])
 
@@ -85,7 +84,7 @@ def add_torus(major_rad, minor_rad, major_seg, minor_seg):
 
 
 class AddTorus(Operator, object_utils.AddObjectHelper):
-    '''Add a torus mesh'''
+    """Add a torus mesh"""
     bl_idname = "mesh.primitive_torus_add"
     bl_label = "Add Torus"
     bl_options = {'REGISTER', 'UNDO', 'PRESET'}
@@ -134,7 +133,7 @@ class AddTorus(Operator, object_utils.AddObjectHelper):
             )
 
     def execute(self, context):
-        if self.use_abso == True:
+        if self.use_abso is True:
             extra_helper = (self.abso_major_rad - self.abso_minor_rad) * 0.5
             self.major_radius = self.abso_minor_rad + extra_helper
             self.minor_radius = extra_helper

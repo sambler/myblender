@@ -67,7 +67,7 @@
  * use in object mode when selecting faces (while painting) */
 void paintface_flush_flags(Object *ob)
 {
-	Mesh *me = get_mesh(ob);
+	Mesh *me = BKE_mesh_from_object(ob);
 	DerivedMesh *dm = ob->derivedFinal;
 	MPoly *polys, *mp_orig;
 	MFace *faces;
@@ -123,66 +123,29 @@ void paintface_flush_flags(Object *ob)
 	}
 }
 
-/* returns 0 if not found, otherwise 1 */
-static int facesel_face_pick(struct bContext *C, Mesh *me, Object *ob, const int mval[2], unsigned int *index, short rect)
-{
-	Scene *scene = CTX_data_scene(C);
-	ViewContext vc;
-	view3d_set_viewcontext(C, &vc);
-
-	if (!me || me->totpoly == 0)
-		return 0;
-
-	makeDerivedMesh(scene, ob, NULL, CD_MASK_BAREMESH, 0);
-
-	// XXX  if (v3d->flag & V3D_INVALID_BACKBUF) {
-// XXX drawview.c!		check_backbuf();
-// XXX		persp(PERSP_VIEW);
-// XXX  }
-
-	if (rect) {
-		/* sample rect to increase changes of selecting, so that when clicking
-		 * on an edge in the backbuf, we can still select a face */
-
-		int dist;
-		*index = view3d_sample_backbuf_rect(&vc, mval, 3, 1, me->totpoly + 1, &dist, 0, NULL, NULL);
-	}
-	else {
-		/* sample only on the exact position */
-		*index = view3d_sample_backbuf(&vc, mval[0], mval[1]);
-	}
-
-	if ((*index) <= 0 || (*index) > (unsigned int)me->totpoly)
-		return 0;
-
-	(*index)--;
-	
-	return 1;
-}
-
 void paintface_hide(Object *ob, const int unselected)
 {
 	Mesh *me;
-	MPoly *mface;
+	MPoly *mpoly;
 	int a;
 	
-	me = get_mesh(ob);
+	me = BKE_mesh_from_object(ob);
 	if (me == NULL || me->totpoly == 0) return;
 
-	mface = me->mpoly;
+	mpoly = me->mpoly;
 	a = me->totpoly;
 	while (a--) {
-		if ((mface->flag & ME_HIDE) == 0) {
+		if ((mpoly->flag & ME_HIDE) == 0) {
 			if (unselected) {
-				if ( (mface->flag & ME_FACE_SEL) == 0) mface->flag |= ME_HIDE;
+				if ((mpoly->flag & ME_FACE_SEL) == 0) mpoly->flag |= ME_HIDE;
 			}
 			else {
-				if ( (mface->flag & ME_FACE_SEL)) mface->flag |= ME_HIDE;
+				if ((mpoly->flag & ME_FACE_SEL)) mpoly->flag |= ME_HIDE;
 			}
 		}
-		if (mface->flag & ME_HIDE) mface->flag &= ~ME_FACE_SEL;
+		if (mpoly->flag & ME_HIDE) mpoly->flag &= ~ME_FACE_SEL;
 		
-		mface++;
+		mpoly++;
 	}
 	
 	paintface_flush_flags(ob);
@@ -192,20 +155,20 @@ void paintface_hide(Object *ob, const int unselected)
 void paintface_reveal(Object *ob)
 {
 	Mesh *me;
-	MPoly *mface;
+	MPoly *mpoly;
 	int a;
 
-	me = get_mesh(ob);
+	me = BKE_mesh_from_object(ob);
 	if (me == NULL || me->totpoly == 0) return;
 
-	mface = me->mpoly;
+	mpoly = me->mpoly;
 	a = me->totpoly;
 	while (a--) {
-		if (mface->flag & ME_HIDE) {
-			mface->flag |= ME_FACE_SEL;
-			mface->flag -= ME_HIDE;
+		if (mpoly->flag & ME_HIDE) {
+			mpoly->flag |= ME_FACE_SEL;
+			mpoly->flag -= ME_HIDE;
 		}
-		mface++;
+		mpoly++;
 	}
 
 	paintface_flush_flags(ob);
@@ -227,11 +190,11 @@ static void hash_add_face(EdgeHash *ehash, MPoly *mp, MLoop *mloop)
 static void select_linked_tfaces_with_seams(int mode, Mesh *me, unsigned int index)
 {
 	EdgeHash *ehash, *seamhash;
-	MPoly *mf;
+	MPoly *mp;
 	MLoop *ml;
 	MEdge *med;
 	char *linkflag;
-	int a, b, doit = 1, mark = 0;
+	int a, b, do_it = TRUE, mark = 0;
 
 	ehash = BLI_edgehash_new();
 	seamhash = BLI_edgehash_new();
@@ -243,38 +206,40 @@ static void select_linked_tfaces_with_seams(int mode, Mesh *me, unsigned int ind
 
 	if (mode == 0 || mode == 1) {
 		/* only put face under cursor in array */
-		mf = ((MPoly *)me->mpoly) + index;
-		hash_add_face(ehash, mf, me->mloop + mf->loopstart);
+		mp = ((MPoly *)me->mpoly) + index;
+		hash_add_face(ehash, mp, me->mloop + mp->loopstart);
 		linkflag[index] = 1;
 	}
 	else {
 		/* fill array by selection */
-		mf = me->mpoly;
-		for (a = 0; a < me->totpoly; a++, mf++) {
-			if (mf->flag & ME_HIDE) ;
-			else if (mf->flag & ME_FACE_SEL) {
-				hash_add_face(ehash, mf, me->mloop + mf->loopstart);
+		mp = me->mpoly;
+		for (a = 0; a < me->totpoly; a++, mp++) {
+			if (mp->flag & ME_HIDE) {
+				/* pass */
+			}
+			else if (mp->flag & ME_FACE_SEL) {
+				hash_add_face(ehash, mp, me->mloop + mp->loopstart);
 				linkflag[a] = 1;
 			}
 		}
 	}
 
-	while (doit) {
-		doit = 0;
+	while (do_it) {
+		do_it = FALSE;
 
 		/* expand selection */
-		mf = me->mpoly;
-		for (a = 0; a < me->totpoly; a++, mf++) {
-			if (mf->flag & ME_HIDE)
+		mp = me->mpoly;
+		for (a = 0; a < me->totpoly; a++, mp++) {
+			if (mp->flag & ME_HIDE)
 				continue;
 
 			if (!linkflag[a]) {
 				MLoop *mnextl;
 				mark = 0;
 
-				ml = me->mloop + mf->loopstart;
-				for (b = 0; b < mf->totloop; b++, ml++) {
-					mnextl = b < mf->totloop - 1 ? ml - 1 : me->mloop + mf->loopstart;
+				ml = me->mloop + mp->loopstart;
+				for (b = 0; b < mp->totloop; b++, ml++) {
+					mnextl = b < mp->totloop - 1 ? ml - 1 : me->mloop + mp->loopstart;
 					if (!BLI_edgehash_haskey(seamhash, ml->v, mnextl->v))
 						if (!BLI_edgehash_haskey(ehash, ml->v, mnextl->v))
 							mark = 1;
@@ -282,8 +247,8 @@ static void select_linked_tfaces_with_seams(int mode, Mesh *me, unsigned int ind
 
 				if (mark) {
 					linkflag[a] = 1;
-					hash_add_face(ehash, mf, me->mloop + mf->loopstart);
-					doit = 1;
+					hash_add_face(ehash, mp, me->mloop + mp->loopstart);
+					do_it = TRUE;
 				}
 			}
 		}
@@ -294,26 +259,26 @@ static void select_linked_tfaces_with_seams(int mode, Mesh *me, unsigned int ind
 	BLI_edgehash_free(seamhash, NULL);
 
 	if (mode == 0 || mode == 2) {
-		for (a = 0, mf = me->mpoly; a < me->totpoly; a++, mf++)
+		for (a = 0, mp = me->mpoly; a < me->totpoly; a++, mp++)
 			if (linkflag[a])
-				mf->flag |= ME_FACE_SEL;
+				mp->flag |= ME_FACE_SEL;
 			else
-				mf->flag &= ~ME_FACE_SEL;
+				mp->flag &= ~ME_FACE_SEL;
 	}
 	else if (mode == 1) {
-		for (a = 0, mf = me->mpoly; a < me->totpoly; a++, mf++)
-			if (linkflag[a] && (mf->flag & ME_FACE_SEL))
+		for (a = 0, mp = me->mpoly; a < me->totpoly; a++, mp++)
+			if (linkflag[a] && (mp->flag & ME_FACE_SEL))
 				break;
 
 		if (a < me->totpoly) {
-			for (a = 0, mf = me->mpoly; a < me->totpoly; a++, mf++)
+			for (a = 0, mp = me->mpoly; a < me->totpoly; a++, mp++)
 				if (linkflag[a])
-					mf->flag &= ~ME_FACE_SEL;
+					mp->flag &= ~ME_FACE_SEL;
 		}
 		else {
-			for (a = 0, mf = me->mpoly; a < me->totpoly; a++, mf++)
+			for (a = 0, mp = me->mpoly; a < me->totpoly; a++, mp++)
 				if (linkflag[a])
-					mf->flag |= ME_FACE_SEL;
+					mp->flag |= ME_FACE_SEL;
 		}
 	}
 
@@ -325,13 +290,13 @@ void paintface_select_linked(bContext *UNUSED(C), Object *ob, int UNUSED(mval[2]
 	Mesh *me;
 	unsigned int index = 0;
 
-	me = get_mesh(ob);
+	me = BKE_mesh_from_object(ob);
 	if (me == NULL || me->totpoly == 0) return;
 
 	if (mode == 0 || mode == 1) {
-		// XXX - Causes glitches, not sure why
+		/* XXX - Causes glitches, not sure why */
 #if 0
-		if (!facesel_face_pick(C, me, mval, &index, 1))
+		if (!ED_mesh_pick_face(C, me, mval, &index, ED_MESH_PICK_DEFAULT_FACE_SIZE))
 			return;
 #endif
 	}
@@ -344,54 +309,54 @@ void paintface_select_linked(bContext *UNUSED(C), Object *ob, int UNUSED(mval[2]
 void paintface_deselect_all_visible(Object *ob, int action, short flush_flags)
 {
 	Mesh *me;
-	MPoly *mface;
+	MPoly *mpoly;
 	int a;
 
-	me = get_mesh(ob);
+	me = BKE_mesh_from_object(ob);
 	if (me == NULL) return;
 	
 	if (action == SEL_INVERT) {
-		mface = me->mpoly;
+		mpoly = me->mpoly;
 		a = me->totpoly;
 		while (a--) {
-			if ((mface->flag & ME_HIDE) == 0) {
-				mface->flag ^= ME_FACE_SEL;
+			if ((mpoly->flag & ME_HIDE) == 0) {
+				mpoly->flag ^= ME_FACE_SEL;
 			}
-			mface++;
+			mpoly++;
 		}
 	}
 	else {
 		if (action == SEL_TOGGLE) {
 			action = SEL_SELECT;
 
-			mface = me->mpoly;
+			mpoly = me->mpoly;
 			a = me->totpoly;
 			while (a--) {
-				if ((mface->flag & ME_HIDE) == 0 && mface->flag & ME_FACE_SEL) {
+				if ((mpoly->flag & ME_HIDE) == 0 && mpoly->flag & ME_FACE_SEL) {
 					action = SEL_DESELECT;
 					break;
 				}
-				mface++;
+				mpoly++;
 			}
 		}
 
-		mface = me->mpoly;
+		mpoly = me->mpoly;
 		a = me->totpoly;
 		while (a--) {
-			if ((mface->flag & ME_HIDE) == 0) {
+			if ((mpoly->flag & ME_HIDE) == 0) {
 				switch (action) {
 					case SEL_SELECT:
-						mface->flag |= ME_FACE_SEL;
+						mpoly->flag |= ME_FACE_SEL;
 						break;
 					case SEL_DESELECT:
-						mface->flag &= ~ME_FACE_SEL;
+						mpoly->flag &= ~ME_FACE_SEL;
 						break;
 					case SEL_INVERT:
-						mface->flag ^= ME_FACE_SEL;
+						mpoly->flag ^= ME_FACE_SEL;
 						break;
 				}
 			}
-			mface++;
+			mpoly++;
 		}
 	}
 
@@ -400,37 +365,37 @@ void paintface_deselect_all_visible(Object *ob, int action, short flush_flags)
 	}
 }
 
-int paintface_minmax(Object *ob, float *min, float *max)
+int paintface_minmax(Object *ob, float r_min[3], float r_max[3])
 {
 	Mesh *me;
-	MPoly *mf;
+	MPoly *mp;
 	MTexPoly *tf;
 	MLoop *ml;
 	MVert *mvert;
-	int a, b, ok = 0;
+	int a, b, ok = FALSE;
 	float vec[3], bmat[3][3];
 
-	me = get_mesh(ob);
+	me = BKE_mesh_from_object(ob);
 	if (!me || !me->mtpoly) return ok;
 	
 	copy_m3_m4(bmat, ob->obmat);
 
 	mvert = me->mvert;
-	mf = me->mpoly;
+	mp = me->mpoly;
 	tf = me->mtpoly;
-	for (a = me->totpoly; a > 0; a--, mf++, tf++) {
-		if (mf->flag & ME_HIDE || !(mf->flag & ME_FACE_SEL))
+	for (a = me->totpoly; a > 0; a--, mp++, tf++) {
+		if (mp->flag & ME_HIDE || !(mp->flag & ME_FACE_SEL))
 			continue;
 
-		ml = me->mloop + mf->totloop;
-		for (b = 0; b < mf->totloop; b++, ml++) {
+		ml = me->mloop + mp->totloop;
+		for (b = 0; b < mp->totloop; b++, ml++) {
 			copy_v3_v3(vec, (mvert[ml->v].co));
 			mul_m3_v3(bmat, vec);
 			add_v3_v3v3(vec, vec, ob->obmat[3]);
-			DO_MINMAX(vec, min, max);		
+			minmax_v3v3_v3(r_min, r_max, vec);
 		}
 
-		ok = 1;
+		ok = TRUE;
 	}
 
 	return ok;
@@ -438,14 +403,14 @@ int paintface_minmax(Object *ob, float *min, float *max)
 
 /* *************************************** */
 #if 0
-static void seam_edgehash_insert_face(EdgeHash *ehash, MPoly *mf, MLoop *loopstart)
+static void seam_edgehash_insert_face(EdgeHash *ehash, MPoly *mp, MLoop *loopstart)
 {
 	MLoop *ml1, *ml2;
 	int a;
 
-	for (a = 0; a < mf->totloop; a++) {
+	for (a = 0; a < mp->totloop; a++) {
 		ml1 = loopstart + a;
-		ml2 = loopstart + (a + 1) % mf->totloop;
+		ml2 = loopstart + (a + 1) % mp->totloop;
 
 		BLI_edgehash_insert(ehash, ml1->v, ml2->v, NULL);
 	}
@@ -454,16 +419,16 @@ static void seam_edgehash_insert_face(EdgeHash *ehash, MPoly *mf, MLoop *loopsta
 void seam_mark_clear_tface(Scene *scene, short mode)
 {
 	Mesh *me;
-	MPoly *mf;
+	MPoly *mp;
 	MLoop *ml1, *ml2;
 	MEdge *med;
 	int a, b;
 	
-	me = get_mesh(OBACT);
+	me = BKE_mesh_from_object(OBACT);
 	if (me == 0 ||  me->totpoly == 0) return;
 
 	if (mode == 0)
-		mode = pupmenu("Seams%t|Mark Border Seam %x1|Clear Seam %x2");
+		mode = pupmenu("Seams %t|Mark Border Seam %x1|Clear Seam %x2");
 
 	if (mode != 1 && mode != 2)
 		return;
@@ -471,9 +436,9 @@ void seam_mark_clear_tface(Scene *scene, short mode)
 	if (mode == 2) {
 		EdgeHash *ehash = BLI_edgehash_new();
 
-		for (a = 0, mf = me->mpoly; a < me->totpoly; a++, mf++)
-			if (!(mf->flag & ME_HIDE) && (mf->flag & ME_FACE_SEL))
-				seam_edgehash_insert_face(ehash, mf, me->mloop + mf->loopstart);
+		for (a = 0, mp = me->mpoly; a < me->totpoly; a++, mp++)
+			if (!(mp->flag & ME_HIDE) && (mp->flag & ME_FACE_SEL))
+				seam_edgehash_insert_face(ehash, mp, me->mloop + mp->loopstart);
 
 		for (a = 0, med = me->medge; a < me->totedge; a++, med++)
 			if (BLI_edgehash_haskey(ehash, med->v1, med->v2))
@@ -486,11 +451,11 @@ void seam_mark_clear_tface(Scene *scene, short mode)
 		EdgeHash *ehash1 = BLI_edgehash_new();
 		EdgeHash *ehash2 = BLI_edgehash_new();
 
-		for (a = 0, mf = me->mpoly; a < me->totpoly; a++, mf++) {
-			if ((mf->flag & ME_HIDE) || !(mf->flag & ME_FACE_SEL))
-				seam_edgehash_insert_face(ehash1, mf, me->mloop + mf->loopstart);
+		for (a = 0, mp = me->mpoly; a < me->totpoly; a++, mp++) {
+			if ((mp->flag & ME_HIDE) || !(mp->flag & ME_FACE_SEL))
+				seam_edgehash_insert_face(ehash1, mp, me->mloop + mp->loopstart);
 			else
-				seam_edgehash_insert_face(ehash2, mf, me->mloop + mf->loopstart);
+				seam_edgehash_insert_face(ehash2, mp, me->mloop + mp->loopstart);
 		}
 
 		for (a = 0, med = me->medge; a < me->totedge; a++, med++)
@@ -502,50 +467,56 @@ void seam_mark_clear_tface(Scene *scene, short mode)
 		BLI_edgehash_free(ehash2, NULL);
 	}
 
-// XXX	if (G.rt == 8)
+// XXX	if (G.debug_value == 8)
 //		unwrap_lscm(1);
 
 	me->drawflag |= ME_DRAWSEAMS;
 }
 #endif
 
-int paintface_mouse_select(struct bContext *C, Object *ob, const int mval[2], int extend)
+int paintface_mouse_select(struct bContext *C, Object *ob, const int mval[2], int extend, int deselect, int toggle)
 {
 	Mesh *me;
-	MPoly *mface, *msel;
+	MPoly *mpoly, *mpoly_sel;
 	unsigned int a, index;
 	
 	/* Get the face under the cursor */
-	me = get_mesh(ob);
+	me = BKE_mesh_from_object(ob);
 
-	if (!facesel_face_pick(C, me, ob, mval, &index, 1))
+	if (!ED_mesh_pick_face(C, me, mval, &index, ED_MESH_PICK_DEFAULT_FACE_SIZE))
 		return 0;
 	
-	if (index >= me->totpoly || index < 0)
+	if (index >= me->totpoly)
 		return 0;
 
-	msel = me->mpoly + index;
-	if (msel->flag & ME_HIDE) return 0;
+	mpoly_sel = me->mpoly + index;
+	if (mpoly_sel->flag & ME_HIDE) return 0;
 	
 	/* clear flags */
-	mface = me->mpoly;
+	mpoly = me->mpoly;
 	a = me->totpoly;
-	if (!extend) {
+	if (!extend && !deselect && !toggle) {
 		while (a--) {
-			mface->flag &= ~ME_FACE_SEL;
-			mface++;
+			mpoly->flag &= ~ME_FACE_SEL;
+			mpoly++;
 		}
 	}
 	
 	me->act_face = (int)index;
 
 	if (extend) {
-		if (msel->flag & ME_FACE_SEL)
-			msel->flag &= ~ME_FACE_SEL;
-		else
-			msel->flag |= ME_FACE_SEL;
+		mpoly_sel->flag |= ME_FACE_SEL;
 	}
-	else msel->flag |= ME_FACE_SEL;
+	else if (deselect) {
+		mpoly_sel->flag &= ~ME_FACE_SEL;
+	}
+	else if (toggle) {
+		if (mpoly_sel->flag & ME_FACE_SEL)
+			mpoly_sel->flag &= ~ME_FACE_SEL;
+		else
+			mpoly_sel->flag |= ME_FACE_SEL;
+	}
+	else mpoly_sel->flag |= ME_FACE_SEL;
 	
 	/* image window redraw */
 	
@@ -559,15 +530,15 @@ int do_paintface_box_select(ViewContext *vc, rcti *rect, int select, int extend)
 {
 	Object *ob = vc->obact;
 	Mesh *me;
-	MPoly *mface;
+	MPoly *mpoly;
 	struct ImBuf *ibuf;
 	unsigned int *rt;
 	char *selar;
 	int a, index;
-	int sx = rect->xmax - rect->xmin + 1;
-	int sy = rect->ymax - rect->ymin + 1;
+	int sx = BLI_rcti_size_x(rect) + 1;
+	int sy = BLI_rcti_size_y(rect) + 1;
 	
-	me = get_mesh(ob);
+	me = BKE_mesh_from_object(ob);
 
 	if (me == NULL || me->totpoly == 0 || sx * sy <= 0)
 		return OPERATOR_CANCELLED;
@@ -577,10 +548,10 @@ int do_paintface_box_select(ViewContext *vc, rcti *rect, int select, int extend)
 	if (extend == 0 && select) {
 		paintface_deselect_all_visible(vc->obact, SEL_DESELECT, FALSE);
 
-		mface = me->mpoly;
-		for (a = 1; a <= me->totpoly; a++, mface++) {
-			if ((mface->flag & ME_HIDE) == 0)
-				mface->flag &= ~ME_FACE_SEL;
+		mpoly = me->mpoly;
+		for (a = 1; a <= me->totpoly; a++, mpoly++) {
+			if ((mpoly->flag & ME_HIDE) == 0)
+				mpoly->flag &= ~ME_FACE_SEL;
 		}
 	}
 
@@ -600,13 +571,15 @@ int do_paintface_box_select(ViewContext *vc, rcti *rect, int select, int extend)
 		rt++;
 	}
 
-	mface = me->mpoly;
-	for (a = 1; a <= me->totpoly; a++, mface++) {
+	mpoly = me->mpoly;
+	for (a = 1; a <= me->totpoly; a++, mpoly++) {
 		if (selar[a]) {
-			if (mface->flag & ME_HIDE) ;
+			if (mpoly->flag & ME_HIDE) {
+				/* pass */
+			}
 			else {
-				if (select) mface->flag |= ME_FACE_SEL;
-				else mface->flag &= ~ME_FACE_SEL;
+				if (select) mpoly->flag |= ME_FACE_SEL;
+				else mpoly->flag &= ~ME_FACE_SEL;
 			}
 		}
 	}
@@ -629,7 +602,7 @@ int do_paintface_box_select(ViewContext *vc, rcti *rect, int select, int extend)
  * use in object mode when selecting vertices (while painting) */
 void paintvert_flush_flags(Object *ob)
 {
-	Mesh *me = get_mesh(ob);
+	Mesh *me = BKE_mesh_from_object(ob);
 	DerivedMesh *dm = ob->derivedFinal;
 	MVert *dm_mvert, *dm_mv;
 	int *index_array = NULL;
@@ -668,7 +641,7 @@ void paintvert_deselect_all_visible(Object *ob, int action, short flush_flags)
 	MVert *mvert;
 	int a;
 
-	me = get_mesh(ob);
+	me = BKE_mesh_from_object(ob);
 	if (me == NULL) return;
 	
 	if (action == SEL_INVERT) {
@@ -735,8 +708,8 @@ typedef struct MirrTopoVert_t {
 
 static int mirrtopo_hash_sort(const void *l1, const void *l2)
 {
-	if       ((MirrTopoHash_t)(intptr_t)l1 > (MirrTopoHash_t)(intptr_t)l2) return 1;
-	else if  ((MirrTopoHash_t)(intptr_t)l1 < (MirrTopoHash_t)(intptr_t)l2) return -1;
+	if      ((MirrTopoHash_t)(intptr_t)l1 > (MirrTopoHash_t)(intptr_t)l2) return 1;
+	else if ((MirrTopoHash_t)(intptr_t)l1 < (MirrTopoHash_t)(intptr_t)l2) return -1;
 	return 0;
 }
 
@@ -814,7 +787,7 @@ void ED_mesh_mirrtopo_init(Mesh *me, const int ob_mode, MirrTopoStore_t *mesh_to
 	if (em) {
 		totedge = me->edit_btmesh->bm->totedge;
 
-		BM_ITER(eed, &iter, em->bm, BM_EDGES_OF_MESH, NULL) {
+		BM_ITER_MESH (eed, &iter, em->bm, BM_EDGES_OF_MESH) {
 			topo_hash[BM_elem_index_get(eed->v1)]++;
 			topo_hash[BM_elem_index_get(eed->v2)]++;
 		}
@@ -835,7 +808,7 @@ void ED_mesh_mirrtopo_init(Mesh *me, const int ob_mode, MirrTopoStore_t *mesh_to
 		/* use the number of edges per vert to give verts unique topology IDs */
 
 		if (em) {
-			BM_ITER(eed, &iter, em->bm, BM_EDGES_OF_MESH, NULL) {
+			BM_ITER_MESH (eed, &iter, em->bm, BM_EDGES_OF_MESH) {
 				topo_hash[BM_elem_index_get(eed->v1)] += topo_hash_prev[BM_elem_index_get(eed->v2)];
 				topo_hash[BM_elem_index_get(eed->v2)] += topo_hash_prev[BM_elem_index_get(eed->v1)];
 			}
@@ -860,7 +833,7 @@ void ED_mesh_mirrtopo_init(Mesh *me, const int ob_mode, MirrTopoStore_t *mesh_to
 		}
 
 		if (tot_unique <= tot_unique_prev) {
-			/* Finish searching for unique valus when 1 loop dosnt give a
+			/* Finish searching for unique values when 1 loop dosnt give a
 			 * higher number of unique values compared to the previous loop */
 			break;
 		}

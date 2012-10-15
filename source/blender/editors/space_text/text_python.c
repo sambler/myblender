@@ -180,13 +180,9 @@ static void confirm_suggestion(Text *text, int skipleft)
 }
 
 // XXX
-#define L_MOUSE 0
-#define M_MOUSE 0
-#define R_MOUSE 0
 #define LR_SHIFTKEY 0
 #define LR_ALTKEY 0
 #define LR_CTRLKEY 0
-#define LR_OSKEY 0
 
 // XXX
 static int doc_scroll = 0;
@@ -363,19 +359,6 @@ static short UNUSED_FUNCTION(do_texttools) (SpaceText * st, char ascii, unsigned
 
 	return swallow;
 }
-
-#if 0
-#ifdef WITH_PYTHON	
-/* Run text plugin scripts if enabled */
-if (st->doplugins && event && val) {
-	if (BPY_menu_do_shortcut(PYMENU_TEXTPLUGIN, event, qual)) {
-		do_draw = 1;
-	}
-}
-#endif
-if (do_draw)
-	;     // XXX redraw_alltext();
-#endif
 
 static short UNUSED_FUNCTION(do_textmarkers) (SpaceText * st, char ascii, unsigned short evnt, short val)
 {

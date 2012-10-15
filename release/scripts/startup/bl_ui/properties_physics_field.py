@@ -20,10 +20,9 @@
 import bpy
 from bpy.types import Panel
 
-from .properties_physics_common import (
-    basic_force_field_settings_ui,
-    basic_force_field_falloff_ui,
-    )
+from bl_ui.properties_physics_common import (basic_force_field_settings_ui,
+                                             basic_force_field_falloff_ui,
+                                             )
 
 
 class PhysicButtonsPanel():
@@ -92,7 +91,7 @@ class PHYSICS_PT_field(PhysicButtonsPanel, Panel):
             layout.separator()
 
             layout.prop(field, "guide_kink_type")
-            if (field.guide_kink_type != 'NONE'):
+            if field.guide_kink_type != 'NONE':
                 layout.prop(field, "guide_kink_axis")
 
                 split = layout.split()
@@ -112,8 +111,15 @@ class PHYSICS_PT_field(PhysicButtonsPanel, Panel):
 
             col = split.column()
             col.prop(field, "use_object_coords")
-            col.prop(field, "use_root_coords")
             col.prop(field, "use_2d_force")
+        elif field.type == 'SMOKE_FLOW':
+            col = split.column()
+            col.prop(field, "strength")
+            col.prop(field, "flow")
+            col = split.column()
+            col.label(text="Domain Object:")
+            col.prop(field, "source_object", "")
+            col.prop(field, "use_smoke_density")
         else:
             basic_force_field_settings_ui(self, context, field)
 
@@ -169,7 +175,6 @@ class PHYSICS_PT_field(PhysicButtonsPanel, Panel):
 
 class PHYSICS_PT_collision(PhysicButtonsPanel, Panel):
     bl_label = "Collision"
-    #bl_options = {'DEFAULT_CLOSED'}
 
     @classmethod
     def poll(cls, context):
@@ -196,7 +201,7 @@ class PHYSICS_PT_collision(PhysicButtonsPanel, Panel):
             col = split.column()
             col.label(text="Particle:")
             col.prop(settings, "permeability", slider=True)
-            col.prop(settings, "stickness")
+            col.prop(settings, "stickiness")
             col.prop(settings, "use_particle_kill")
             col.label(text="Particle Damping:")
             sub = col.column(align=True)

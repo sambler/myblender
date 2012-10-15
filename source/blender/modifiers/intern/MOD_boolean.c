@@ -52,8 +52,8 @@
 
 static void copyData(ModifierData *md, ModifierData *target)
 {
-	BooleanModifierData *bmd = (BooleanModifierData*) md;
-	BooleanModifierData *tbmd = (BooleanModifierData*) target;
+	BooleanModifierData *bmd = (BooleanModifierData *) md;
+	BooleanModifierData *tbmd = (BooleanModifierData *) target;
 
 	tbmd->object = bmd->object;
 	tbmd->operation = bmd->operation;
@@ -61,27 +61,27 @@ static void copyData(ModifierData *md, ModifierData *target)
 
 static int isDisabled(ModifierData *md, int UNUSED(useRenderParams))
 {
-	BooleanModifierData *bmd = (BooleanModifierData*) md;
+	BooleanModifierData *bmd = (BooleanModifierData *) md;
 
 	return !bmd->object;
 }
 
 static void foreachObjectLink(
-						  ModifierData *md, Object *ob,
-	   void (*walk)(void *userData, Object *ob, Object **obpoin),
-		  void *userData)
+        ModifierData *md, Object *ob,
+        void (*walk)(void *userData, Object *ob, Object **obpoin),
+        void *userData)
 {
-	BooleanModifierData *bmd = (BooleanModifierData*) md;
+	BooleanModifierData *bmd = (BooleanModifierData *) md;
 
 	walk(userData, ob, &bmd->object);
 }
 
 static void updateDepgraph(ModifierData *md, DagForest *forest,
-						struct Scene *UNUSED(scene),
-						Object *UNUSED(ob),
-						DagNode *obNode)
+                           struct Scene *UNUSED(scene),
+                           Object *UNUSED(ob),
+                           DagNode *obNode)
 {
-	BooleanModifierData *bmd = (BooleanModifierData*) md;
+	BooleanModifierData *bmd = (BooleanModifierData *) md;
 
 	if (bmd->object) {
 		DagNode *curNode = dag_get_node(forest, bmd->object);
@@ -97,7 +97,7 @@ static DerivedMesh *get_quick_derivedMesh(DerivedMesh *derivedData, DerivedMesh 
 	DerivedMesh *result = NULL;
 
 	if (derivedData->getNumPolys(derivedData) == 0 || dm->getNumPolys(dm) == 0) {
-		switch(operation) {
+		switch (operation) {
 			case eBooleanModifierOp_Intersect:
 				result = CDDM_new(0, 0, 0, 0, 0);
 				break;
@@ -118,17 +118,28 @@ static DerivedMesh *get_quick_derivedMesh(DerivedMesh *derivedData, DerivedMesh 
 }
 
 static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
-						DerivedMesh *derivedData,
-						int UNUSED(useRenderParams),
-						int UNUSED(isFinalCalc))
+                                  DerivedMesh *derivedData,
+                                  ModifierApplyFlag UNUSED(flag))
 {
-	BooleanModifierData *bmd = (BooleanModifierData*) md;
+	BooleanModifierData *bmd = (BooleanModifierData *) md;
 	DerivedMesh *dm;
 
 	if (!bmd->object)
 		return derivedData;
 
-	dm = bmd->object->derivedFinal;
+
+	/* 2.63 used this... */
+	/* dm = bmd->object->derivedFinal; */
+
+	/* but we want to make sure we can get the object
+	 * in some cases the depsgraph fails us - especially for objects
+	 * in other scenes when compositing */
+	if (bmd->object != ob) {
+		dm = mesh_get_derived_final(md->scene, bmd->object, CD_MASK_MESH);
+	}
+	else {
+		dm = NULL;
+	}
 
 	if (dm) {
 		DerivedMesh *result;
@@ -146,7 +157,7 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 			// TIMEIT_START(NewBooleanDerivedMesh)
 
 			result = NewBooleanDerivedMesh(dm, bmd->object, derivedData, ob,
-					1 + bmd->operation);
+			                               1 + bmd->operation);
 
 			// TIMEIT_END(NewBooleanDerivedMesh)
 		}
@@ -163,9 +174,8 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 }
 #else // WITH_MOD_BOOLEAN
 static DerivedMesh *applyModifier(ModifierData *UNUSED(md), Object *UNUSED(ob),
-						DerivedMesh *derivedData,
-						int UNUSED(useRenderParams),
-						int UNUSED(isFinalCalc))
+                                  DerivedMesh *derivedData,
+                                  ModifierApplyFlag UNUSED(flag))
 {
 	return derivedData;
 }
@@ -182,28 +192,28 @@ static CustomDataMask requiredDataMask(Object *UNUSED(ob), ModifierData *UNUSED(
 
 
 ModifierTypeInfo modifierType_Boolean = {
-	/* name */              "Boolean",
-	/* structName */        "BooleanModifierData",
-	/* structSize */        sizeof(BooleanModifierData),
-	/* type */              eModifierTypeType_Nonconstructive,
-	/* flags */             eModifierTypeFlag_AcceptsMesh
-							| eModifierTypeFlag_UsesPointCache,
+	/* name */ "Boolean",
+	/* structName */ "BooleanModifierData",
+	/* structSize */ sizeof(BooleanModifierData),
+	/* type */ eModifierTypeType_Nonconstructive,
+	/* flags */ eModifierTypeFlag_AcceptsMesh |
+	eModifierTypeFlag_UsesPointCache,
 
-	/* copyData */          copyData,
-	/* deformVerts */       NULL,
-	/* deformMatrices */    NULL,
-	/* deformVertsEM */     NULL,
-	/* deformMatricesEM */  NULL,
-	/* applyModifier */     applyModifier,
-	/* applyModifierEM */   NULL,
-	/* initData */          NULL,
-	/* requiredDataMask */  requiredDataMask,
-	/* freeData */          NULL,
-	/* isDisabled */        isDisabled,
-	/* updateDepgraph */    updateDepgraph,
-	/* dependsOnTime */     NULL,
-	/* dependsOnNormals */	NULL,
+	/* copyData */ copyData,
+	/* deformVerts */ NULL,
+	/* deformMatrices */ NULL,
+	/* deformVertsEM */ NULL,
+	/* deformMatricesEM */ NULL,
+	/* applyModifier */ applyModifier,
+	/* applyModifierEM */ NULL,
+	/* initData */ NULL,
+	/* requiredDataMask */ requiredDataMask,
+	/* freeData */ NULL,
+	/* isDisabled */ isDisabled,
+	/* updateDepgraph */ updateDepgraph,
+	/* dependsOnTime */ NULL,
+	/* dependsOnNormals */ NULL,
 	/* foreachObjectLink */ foreachObjectLink,
-	/* foreachIDLink */     NULL,
-	/* foreachTexLink */    NULL,
+	/* foreachIDLink */ NULL,
+	/* foreachTexLink */ NULL,
 };

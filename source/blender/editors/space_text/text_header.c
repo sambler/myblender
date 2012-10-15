@@ -39,10 +39,10 @@
 #include <sys/stat.h>
 
 #ifndef _WIN32
-#include <unistd.h>
+#  include <unistd.h>
 #else
-#include <io.h>
-#include "BLI_winstuff.h"
+#  include <io.h>
+#  include "BLI_winstuff.h"
 #endif
 
 #include "DNA_windowmanager_types.h"
@@ -59,16 +59,11 @@
 
 #include "WM_types.h"
 
-
-
-
 #ifdef WITH_PYTHON
 // XXX #include "BPY_menus.h"
 #endif
 
 #include "text_intern.h"
-
-#define HEADER_PATH_MAX 260
 
 /* ************************ header area region *********************** */
 

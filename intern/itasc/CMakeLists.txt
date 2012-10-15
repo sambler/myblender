@@ -24,11 +24,11 @@
 # ***** END GPL LICENSE BLOCK *****
 
 set(INC
-	../../extern/Eigen3
+
 )
 
 set(INC_SYS
-	
+	../../extern/Eigen3
 )
 
 set(SRC
@@ -318,8 +318,5 @@ set(SRC
 	../../extern/Eigen3/Eigen/src/Cholesky/LLT.h
 )
 
-if(WIN32)
-	add_definitions(-DEIGEN_DONT_ALIGN_STATICALLY)
-endif()
 
 blender_add_lib(bf_intern_itasc "${SRC}" "${INC}" "${INC_SYS}")

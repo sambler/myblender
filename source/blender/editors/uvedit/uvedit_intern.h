@@ -46,22 +46,13 @@ struct BMLoop;
 struct BMEdge;
 struct BMVert;
 
-/* id can be from 0 to 3 */
-#define TF_PIN_MASK(id) (TF_PIN1 << id)
-#define TF_SEL_MASK(id) (TF_SEL1 << id)
-
 /* visibility and selection */
 int uvedit_face_visible_nolocal(struct Scene *scene, struct BMFace *efa);
 
 /* geometric utilities */
-
-void uv_center(float uv[][2], float cent[2], int quad);
-float uv_area(float uv[][2], int quad);
-void uv_copy_aspect(float uv_orig[][2], float uv[][2], float aspx, float aspy);
-
-float poly_uv_area(float uv[][2], int len);
-void poly_copy_aspect(float uv_orig[][2], float uv[][2], float aspx, float aspy, int len);
-void poly_uv_center(struct BMEditMesh *em, struct BMFace *f, float cent[2]);
+float uv_poly_area(float uv[][2], int len);
+void  uv_poly_copy_aspect(float uv_orig [][2], float uv[][2], float aspx, float aspy, int len);
+void  uv_poly_center(struct BMEditMesh *em, struct BMFace *f, float r_cent[2]);
 
 /* find nearest */
 
@@ -74,37 +65,15 @@ typedef struct NearestHit {
 	int vert1, vert2; //index in mesh of edge vertices
 } NearestHit;
 
-void uv_find_nearest_vert(struct Scene *scene, struct Image *ima, struct BMEditMesh *em, float co[2], float penalty[2], struct NearestHit *hit);
-void uv_find_nearest_edge(struct Scene *scene, struct Image *ima, struct BMEditMesh *em, float co[2], struct NearestHit *hit);
+void uv_find_nearest_vert(struct Scene *scene, struct Image *ima, struct BMEditMesh *em,
+                          const float co[2], const float penalty[2], struct NearestHit *hit);
+void uv_find_nearest_edge(struct Scene *scene, struct Image *ima, struct BMEditMesh *em,
+                          const float co[2], struct NearestHit *hit);
 
 /* utility tool functions */
 
 struct UvElement *ED_uv_element_get(struct UvElementMap *map, struct BMFace *efa, struct BMLoop *l);
 void uvedit_live_unwrap_update(struct SpaceImage *sima, struct Scene *scene, struct Object *obedit);
-
-/* smart stitch */
-
-/* object that stores display data for previewing before accepting stitching */
-typedef struct StitchPreviewer {
-	/* here we'll store the preview triangle indices of the mesh */
-	float *preview_polys;
-	/* uvs per polygon. */
-	unsigned int *uvs_per_polygon;
-	/*number of preview polygons */
-	unsigned int num_polys;
-	/* preview data. These will be either the previewed vertices or edges depending on stitch mode settings */
-	float *preview_stitchable;
-	float *preview_unstitchable;
-	/* here we'll store the number of elements to be drawn */
-	unsigned int num_stitchable;
-	unsigned int num_unstitchable;
-	unsigned int preview_uvs;
-	/* ...and here we'll store the triangles*/
-	float *static_tris;
-	unsigned int num_static_tris;
-} StitchPreviewer;
-
-StitchPreviewer *uv_get_stitch_previewer(void);
 
 /* operators */
 
@@ -120,4 +89,3 @@ void UV_OT_unwrap(struct wmOperatorType *ot);
 void UV_OT_stitch(struct wmOperatorType *ot);
 
 #endif /* __UVEDIT_INTERN_H__ */
-

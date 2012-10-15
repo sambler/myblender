@@ -26,7 +26,7 @@ class GRAPH_HT_header(Header):
     bl_space_type = 'GRAPH_EDITOR'
 
     def draw(self, context):
-        from .space_dopesheet import dopesheet_filter
+        from bl_ui.space_dopesheet import dopesheet_filter
 
         layout = self.layout
 
@@ -75,6 +75,7 @@ class GRAPH_MT_view(Menu):
         layout.prop(st, "show_frame_indicator")
         layout.prop(st, "show_cursor")
         layout.prop(st, "show_sliders")
+        layout.prop(st, "show_group_colors")
         layout.prop(st, "use_auto_merge_keyframes")
 
         layout.separator()
@@ -95,7 +96,6 @@ class GRAPH_MT_view(Menu):
         layout.operator("graph.previewrange_set")
 
         layout.separator()
-        layout.operator("graph.frame_jump")
         layout.operator("graph.view_all")
         layout.operator("graph.view_selected")
 
@@ -144,7 +144,7 @@ class GRAPH_MT_marker(Menu):
     def draw(self, context):
         layout = self.layout
 
-        from .space_time import marker_menu_generic
+        from bl_ui.space_time import marker_menu_generic
         marker_menu_generic(layout)
 
         # TODO: pose markers for action edit mode only?
@@ -196,6 +196,9 @@ class GRAPH_MT_key(Menu):
         layout.operator("graph.keyframe_insert")
         layout.operator("graph.fmodifier_add")
         layout.operator("graph.sound_bake")
+
+        layout.separator()
+        layout.operator("graph.frame_jump")
 
         layout.separator()
         layout.operator("graph.duplicate_move")

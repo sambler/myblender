@@ -29,9 +29,9 @@
 #include <stdio.h>
 #include <string.h>
 
-
 #include "RNA_define.h"
-#include "BKE_utildefines.h"
+
+#include "rna_internal.h"  /* own include */
 
 #ifdef RNA_RUNTIME
 
@@ -41,12 +41,12 @@
 #include "BKE_context.h"
 #include "BKE_object.h"
 
-void rna_camera_view_frame(struct Camera *camera, struct Scene *scene,
-                           float vec1_r[3], float vec2_r[3], float vec3_r[3], float vec4_r[3])
+static void rna_camera_view_frame(struct Camera *camera, struct Scene *scene,
+                                  float vec1_r[3], float vec2_r[3], float vec3_r[3], float vec4_r[3])
 {
 	float vec[4][3];
 
-	camera_view_frame(scene, camera, vec);
+	BKE_camera_view_frame(scene, camera, vec);
 
 	copy_v3_v3(vec1_r, vec[0]);
 	copy_v3_v3(vec2_r, vec[1]);

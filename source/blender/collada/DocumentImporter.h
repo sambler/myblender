@@ -78,8 +78,9 @@ public:
 	void write_profile_COMMON(COLLADAFW::EffectCommon*, Material*);
 	void translate_anim_recursive(COLLADAFW::Node*, COLLADAFW::Node*, Object*);
 
-	/** This method will be called if an error in the loading process occurred and the loader cannot
-	continue to load. The writer should undo all operations that have been performed.
+	/**
+	 * This method will be called if an error in the loading process occurred and the loader cannot
+	 * continue to load. The writer should undo all operations that have been performed.
 	\param errorMessage A message containing informations about the error that occurred.
 	*/
 	void cancel(const COLLADAFW::String& errorMessage);
@@ -151,7 +152,7 @@ private:
 	std::map<COLLADAFW::UniqueId, Camera*> uid_camera_map;
 	std::map<COLLADAFW::UniqueId, Lamp*> uid_lamp_map;
 	std::map<Material*, TexIndexTextureArrayMap> material_texture_mapping_map;
-	std::map<COLLADAFW::UniqueId, Object*> object_map;
+	std::multimap<COLLADAFW::UniqueId, Object*> object_map;
 	std::map<COLLADAFW::UniqueId, COLLADAFW::Node*> node_map;
 	std::vector<const COLLADAFW::VisualScene*> vscenes;
 	std::vector<Object*> libnode_ob;

@@ -31,7 +31,7 @@
 
 #include "DNA_movieclip_types.h"
 #include "DNA_scene_types.h"
-#include "DNA_object_types.h"	/* SELECT */
+#include "DNA_object_types.h"   /* SELECT */
 
 #include "MEM_guardedalloc.h"
 
@@ -57,11 +57,11 @@
 
 #include "BLF_api.h"
 
-#include "clip_intern.h"	// own include
+#include "clip_intern.h"    // own include
 
 static void draw_curve_knot(float x, float y, float xscale, float yscale, float hsize)
 {
-	static GLuint displist=0;
+	static GLuint displist = 0;
 
 	/* initialize round circle shape */
 	if (displist == 0) {
@@ -81,73 +81,20 @@ static void draw_curve_knot(float x, float y, float xscale, float yscale, float 
 	glPushMatrix();
 
 	glTranslatef(x, y, 0.0f);
-	glScalef(1.0f/xscale*hsize, 1.0f/yscale*hsize, 1.0f);
+	glScalef(1.0f / xscale * hsize, 1.0f / yscale * hsize, 1.0f);
 	glCallList(displist);
 
 	glPopMatrix();
 }
 
-static void draw_graph_cfra(SpaceClip *sc, ARegion *ar, Scene *scene)
-{
-	View2D *v2d = &ar->v2d;
-	float xscale, yscale;
-	float vec[2];
-
-	/* Draw a light green line to indicate current frame */
-	vec[0] = (float)(sc->user.framenr * scene->r.framelen);
-
-	UI_ThemeColor(TH_CFRAME);
-	glLineWidth(2.0);
-
-	glBegin(GL_LINE_STRIP);
-		vec[1] = v2d->cur.ymin;
-		glVertex2fv(vec);
-
-		vec[1] = v2d->cur.ymax;
-		glVertex2fv(vec);
-	glEnd();
-
-	glLineWidth(1.0);
-
-	UI_view2d_view_orthoSpecial(ar, v2d, 1);
-
-	/* because the frame number text is subject to the same scaling as the contents of the view */
-	UI_view2d_getscale(v2d, &xscale, &yscale);
-	glScalef(1.0f/xscale, 1.0f, 1.0f);
-
-	clip_draw_curfra_label(sc, (float)sc->user.framenr * xscale, 18);
-
-	/* restore view transform */
-	glScalef(xscale, 1.0, 1.0);
-}
-
-static void draw_graph_sfra_efra(Scene *scene, View2D *v2d)
-{
-	UI_view2d_view_ortho(v2d);
-
-	/* currently clip editor supposes that editing clip length is equal to scene frame range */
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	glEnable(GL_BLEND);
-		glColor4f(0.0f, 0.0f, 0.0f, 0.4f);
-
-		glRectf(v2d->cur.xmin, v2d->cur.ymin, (float)SFRA, v2d->cur.ymax);
-		glRectf((float)EFRA, v2d->cur.ymin, v2d->cur.xmax, v2d->cur.ymax);
-	glDisable(GL_BLEND);
-
-	UI_ThemeColorShade(TH_BACK, -60);
-
-	/* thin lines where the actual frames are */
-	fdrawline((float)SFRA, v2d->cur.ymin, (float)SFRA, v2d->cur.ymax);
-	fdrawline((float)EFRA, v2d->cur.ymin, (float)EFRA, v2d->cur.ymax);
-}
-
 static void tracking_segment_point_cb(void *UNUSED(userdata), MovieTrackingTrack *UNUSED(track),
-			MovieTrackingMarker *marker, int UNUSED(coord), float val)
+                                      MovieTrackingMarker *UNUSED(marker), int UNUSED(coord),
+                                      int scene_framenr, float val)
 {
-	glVertex2f(marker->framenr, val);
+	glVertex2f(scene_framenr, val);
 }
 
-void tracking_segment_start_cb(void *userdata, MovieTrackingTrack *track, int coord)
+static void tracking_segment_start_cb(void *userdata, MovieTrackingTrack *track, int coord)
 {
 	static float colors[2][3] = {{1.0f, 0.0f, 0.0f},
 	                             {0.0f, 1.0f, 0.0f}};
@@ -155,7 +102,7 @@ void tracking_segment_start_cb(void *userdata, MovieTrackingTrack *track, int co
 
 	copy_v3_v3(col, colors[coord]);
 
-	if (track==userdata) {
+	if (track == userdata) {
 		col[3] = 1.0f;
 		glLineWidth(2.0f);
 	}
@@ -169,7 +116,7 @@ void tracking_segment_start_cb(void *userdata, MovieTrackingTrack *track, int co
 	glBegin(GL_LINE_STRIP);
 }
 
-void tracking_segment_end_cb(void *UNUSED(userdata))
+static void tracking_segment_end_cb(void *UNUSED(userdata))
 {
 	glEnd();
 
@@ -177,10 +124,10 @@ void tracking_segment_end_cb(void *UNUSED(userdata))
 }
 
 static void tracking_segment_knot_cb(void *userdata, MovieTrackingTrack *track,
-			MovieTrackingMarker *marker, int coord, float val)
+                                     MovieTrackingMarker *marker, int coord, int scene_framenr, float val)
 {
 	struct { MovieTrackingTrack *act_track; int sel; float xscale, yscale, hsize; } *data = userdata;
-	int sel= 0, sel_flag;
+	int sel = 0, sel_flag;
 
 	if (track != data->act_track)
 		return;
@@ -194,15 +141,15 @@ static void tracking_segment_knot_cb(void *userdata, MovieTrackingTrack *track,
 		else
 			UI_ThemeColor(TH_HANDLE_VERTEX);
 
-		draw_curve_knot(marker->framenr, val, data->xscale, data->yscale, data->hsize);
+		draw_curve_knot(scene_framenr, val, data->xscale, data->yscale, data->hsize);
 	}
 }
 
 static void draw_tracks_curves(View2D *v2d, SpaceClip *sc)
 {
-	MovieClip *clip = ED_space_clip(sc);
+	MovieClip *clip = ED_space_clip_get_clip(sc);
 	MovieTracking *tracking = &clip->tracking;
-	MovieTrackingTrack *act_track = BKE_tracking_active_track(tracking);
+	MovieTrackingTrack *act_track = BKE_tracking_track_get_active(tracking);
 	int width, height;
 	struct { MovieTrackingTrack *act_track; int sel; float xscale, yscale, hsize; } userdata;
 
@@ -216,31 +163,36 @@ static void draw_tracks_curves(View2D *v2d, SpaceClip *sc)
 	userdata.sel = FALSE;
 	userdata.act_track = act_track;
 	UI_view2d_getscale(v2d, &userdata.xscale, &userdata.yscale);
-	clip_graph_tracking_values_iterate(sc, &userdata, tracking_segment_knot_cb, NULL, NULL);
+	clip_graph_tracking_values_iterate(sc, sc->flag & SC_SHOW_GRAPH_SEL_ONLY, sc->flag & SC_SHOW_GRAPH_HIDDEN,
+	                                   &userdata, tracking_segment_knot_cb, NULL, NULL);
 
 	/* draw graph lines */
 	glEnable(GL_BLEND);
-	clip_graph_tracking_values_iterate(sc, act_track, tracking_segment_point_cb, tracking_segment_start_cb, tracking_segment_end_cb);
+	clip_graph_tracking_values_iterate(sc, sc->flag & SC_SHOW_GRAPH_SEL_ONLY, sc->flag & SC_SHOW_GRAPH_HIDDEN,
+	                                   act_track, tracking_segment_point_cb, tracking_segment_start_cb,
+	                                   tracking_segment_end_cb);
 	glDisable(GL_BLEND);
 
 	/* selected knot handles on top of curves */
-	userdata.sel= TRUE;
-	clip_graph_tracking_values_iterate(sc, &userdata, tracking_segment_knot_cb, NULL, NULL);
+	userdata.sel = TRUE;
+	clip_graph_tracking_values_iterate(sc, sc->flag & SC_SHOW_GRAPH_SEL_ONLY, sc->flag & SC_SHOW_GRAPH_HIDDEN,
+	                                   &userdata, tracking_segment_knot_cb, NULL, NULL);
 }
 
 static void draw_frame_curves(SpaceClip *sc)
 {
-	MovieClip *clip = ED_space_clip(sc);
+	MovieClip *clip = ED_space_clip_get_clip(sc);
 	MovieTracking *tracking = &clip->tracking;
-	MovieTrackingReconstruction *reconstruction = BKE_tracking_get_reconstruction(tracking);
+	MovieTrackingReconstruction *reconstruction = BKE_tracking_get_active_reconstruction(tracking);
 	int i, lines = 0, prevfra = 0;
 
 	glColor3f(0.0f, 0.0f, 1.0f);
 
-	for (i = 0; i<reconstruction->camnr; i++) {
+	for (i = 0; i < reconstruction->camnr; i++) {
 		MovieReconstructedCamera *camera = &reconstruction->cameras[i];
+		int framenr;
 
-		if (lines && camera->framenr!=prevfra+1) {
+		if (lines && camera->framenr != prevfra + 1) {
 			glEnd();
 			lines = 0;
 		}
@@ -250,7 +202,8 @@ static void draw_frame_curves(SpaceClip *sc)
 			lines = 1;
 		}
 
-		glVertex2f(camera->framenr, camera->error);
+		framenr = BKE_movieclip_remap_clip_to_scene_frame(clip, camera->framenr);
+		glVertex2f(framenr, camera->error);
 
 		prevfra = camera->framenr;
 	}
@@ -261,7 +214,7 @@ static void draw_frame_curves(SpaceClip *sc)
 
 void clip_draw_graph(SpaceClip *sc, ARegion *ar, Scene *scene)
 {
-	MovieClip *clip = ED_space_clip(sc);
+	MovieClip *clip = ED_space_clip_get_clip(sc);
 	View2D *v2d = &ar->v2d;
 	View2DGrid *grid;
 	short unitx = V2D_UNIT_FRAMESCALE, unity = V2D_UNIT_VALUES;
@@ -280,8 +233,8 @@ void clip_draw_graph(SpaceClip *sc, ARegion *ar, Scene *scene)
 	}
 
 	/* frame range */
-	draw_graph_sfra_efra(scene, v2d);
+	clip_draw_sfra_efra(v2d, scene);
 
 	/* current frame */
-	draw_graph_cfra(sc, ar, scene);
+	clip_draw_cfra(sc, ar, scene);
 }

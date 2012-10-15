@@ -32,9 +32,9 @@
 #ifndef __KX_BLENDERRENDERTOOLS_H__
 #define __KX_BLENDERRENDERTOOLS_H__
 
-#if defined(WIN32) && !defined(FREE_WINDOWS)
-// don't show stl-warnings
-#pragma warning (disable:4786)
+#ifdef _MSC_VER
+   /* don't show stl-warnings */
+#  pragma warning (disable:4786)
 #endif
 
 #include "RAS_IRenderTools.h"
@@ -62,7 +62,7 @@ class KX_BlenderRenderTools  : public RAS_IRenderTools
 
 public:
 						KX_BlenderRenderTools();
-	virtual				~KX_BlenderRenderTools();	
+	virtual				~KX_BlenderRenderTools();
 
 	void				EndFrame(RAS_IRasterizer* rasty);
 	void				BeginFrame(RAS_IRasterizer* rasty);
@@ -108,13 +108,8 @@ public:
 	
 	
 #ifdef WITH_CXX_GUARDEDALLOC
-public:
-	void *operator new(size_t num_bytes) { return MEM_mallocN(num_bytes, "GE:KX_BlenderRenderTools"); }
-	void operator delete( void *mem ) { MEM_freeN(mem); }
+	MEM_CXX_CLASS_ALLOC_FUNCS("GE:KX_BlenderRenderTools")
 #endif
 };
 
-#endif //__KX_BLENDERRENDERTOOLS_H__
-
-
-
+#endif  /* __KX_BLENDERRENDERTOOLS_H__ */

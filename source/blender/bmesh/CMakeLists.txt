@@ -28,19 +28,24 @@ set(INC
 	.
 	../blenkernel
 	../blenlib
-	../editors/include
 	../makesdna
 	../../../intern/guardedalloc
+)
+
+set(INC_SYS
+
 )
 
 set(SRC
 	operators/bmo_bevel.c
 	operators/bmo_connect.c
+	operators/bmo_slide.c
 	operators/bmo_create.c
 	operators/bmo_dissolve.c
 	operators/bmo_dupe.c
 	operators/bmo_edgesplit.c
 	operators/bmo_extrude.c
+	operators/bmo_hull.c
 	operators/bmo_inset.c
 	operators/bmo_join_triangles.c
 	operators/bmo_mesh_conv.c
@@ -51,6 +56,7 @@ set(SRC
 	operators/bmo_subdivide.h
 	operators/bmo_triangulate.c
 	operators/bmo_utils.c
+	operators/bmo_wireframe.c
 
 	intern/bmesh_construct.c
 	intern/bmesh_construct.h

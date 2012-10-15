@@ -83,7 +83,7 @@ public:
 
 	bool SetActiveAction(class BL_ActionActuator *act, short priority, double curtime);
 	
-	struct bArmature * GetArmature() { return m_armature; }
+	struct bArmature *GetArmature() { return m_armature; }
 	const struct bArmature * GetArmature() const { return m_armature; }
 	const struct Scene * GetScene() const { return m_scene; }
 	
@@ -116,11 +116,11 @@ public:
 #ifdef WITH_PYTHON
 
 	// PYTHON
-	static PyObject* pyattr_get_constraints(void *self_v, const KX_PYATTRIBUTE_DEF *attrdef);
-	static PyObject* pyattr_get_channels(void *self_v, const KX_PYATTRIBUTE_DEF *attrdef);
+	static PyObject *pyattr_get_constraints(void *self_v, const KX_PYATTRIBUTE_DEF *attrdef);
+	static PyObject *pyattr_get_channels(void *self_v, const KX_PYATTRIBUTE_DEF *attrdef);
 	KX_PYMETHOD_DOC_NOARGS(BL_ArmatureObject, update);
 
-#endif // WITH_PYTHON
+#endif  /* WITH_PYTHON */
 
 protected:
 	/* list element: BL_ArmatureConstraint. Use SG_DListHead to have automatic list replication */
@@ -132,7 +132,7 @@ protected:
 	struct bPose		*m_pose;
 	struct bPose		*m_armpose;
 	struct bPose		*m_framePose;
-	struct Scene		*m_scene; // need for where_is_pose 
+	struct Scene		*m_scene; // need for BKE_pose_where_is 
 	double	m_lastframe;
 	double  m_timestep;		// delta since last pose evaluation.
 	class BL_ActionActuator *m_activeAct;
@@ -152,6 +152,4 @@ void game_blend_poses(struct bPose *dst, struct bPose *src, float srcweight/*, s
 void game_copy_pose(struct bPose **dst, struct bPose *src, int copy_con);
 void game_free_pose(struct bPose *pose);
 
-
-#endif
-
+#endif  /* __BL_ARMATUREOBJECT_H__ */

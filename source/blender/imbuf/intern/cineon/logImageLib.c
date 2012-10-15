@@ -1,6 +1,3 @@
-/** \file blender/imbuf/intern/cineon/logImageLib.c
- *  \ingroup imbcineon
- */
 /*
  *	 Cineon and DPX image file format library routines.
  *
@@ -20,6 +17,10 @@
  *	 along with this program; if not, write to the Free Software
  *	 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
+ */
+
+/** \file blender/imbuf/intern/cineon/logImageLib.c
+ *  \ingroup imbcineon
  */
 
 #include "cineonlib.h"
@@ -120,10 +121,11 @@ int
 logImageSetByteConversion(LogImageFile* logImage, const LogImageByteConversionParameters* params)
 {
 	if ((params->gamma >= MIN_GAMMA) &&
-			(params->gamma <= MAX_GAMMA) &&
-			(params->blackPoint >= 0) &&
-			(params->blackPoint < params->whitePoint) &&
-			(params->whitePoint <= 1023)) {
+	    (params->gamma <= MAX_GAMMA) &&
+	    (params->blackPoint >= 0) &&
+	    (params->blackPoint < params->whitePoint) &&
+	    (params->whitePoint <= 1023))
+	{
 		logImage->params.gamma = params->gamma;
 		logImage->params.blackPoint = params->blackPoint;
 		logImage->params.whitePoint = params->whitePoint;

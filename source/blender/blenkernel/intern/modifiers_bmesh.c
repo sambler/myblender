@@ -49,7 +49,7 @@ void DM_to_bmesh_ex(DerivedMesh *dm, BMesh *bm)
 	MLoop *mloop, *ml;
 	BMVert *v, **vtable, **verts = NULL;
 	BMEdge *e, **etable, **edges = NULL;
-	float has_face_normals;
+	float (*face_normals)[3];
 	BMFace *f;
 	BMIter liter;
 	BLI_array_declare(verts);
@@ -68,9 +68,12 @@ void DM_to_bmesh_ex(DerivedMesh *dm, BMesh *bm)
 
 	/* add crease layer */
 	BM_data_layer_add(bm, &bm->edata, CD_CREASE);
+	/* add bevel weight layers */
+	BM_data_layer_add(bm, &bm->edata, CD_BWEIGHT);
+	BM_data_layer_add(bm, &bm->vdata, CD_BWEIGHT);
 
-	vtable = MEM_callocN(sizeof(void**) * totvert, "vert table in BMDM_Copy");
-	etable = MEM_callocN(sizeof(void**) * totedge, "edge table in BMDM_Copy");
+	vtable = MEM_callocN(sizeof(void **) * totvert, __func__);
+	etable = MEM_callocN(sizeof(void **) * totedge, __func__);
 
 	/*do verts*/
 	mv = mvert = dm->dupVertArray(dm);
@@ -80,6 +83,9 @@ void DM_to_bmesh_ex(DerivedMesh *dm, BMesh *bm)
 		v->head.hflag = BM_vert_flag_from_mflag(mv->flag);
 
 		CustomData_to_bmesh_block(&dm->vertData, &bm->vdata, i, &v->head.data);
+
+		/* add bevel weight */
+		BM_elem_float_data_set(&bm->vdata, v, CD_BWEIGHT, (float)mv->bweight / 255.0f);
 		vtable[i] = v;
 	}
 	MEM_freeN(mvert);
@@ -96,21 +102,23 @@ void DM_to_bmesh_ex(DerivedMesh *dm, BMesh *bm)
 
 		/* add crease */
 		BM_elem_float_data_set(&bm->edata, e, CD_CREASE, (float)me->crease / 255.0f);
+		/* add bevel weight */
+		BM_elem_float_data_set(&bm->edata, e, CD_BWEIGHT, (float)me->bweight / 255.0f);
 	}
 	MEM_freeN(medge);
 
 	/*do faces*/
 	mp = dm->getPolyArray(dm);
 	mloop = dm->getLoopArray(dm);
-	has_face_normals = CustomData_has_layer(&dm->polyData, CD_NORMAL);
+	face_normals = CustomData_get_layer(&dm->polyData, CD_NORMAL);  /* can be NULL */
 	for (i = 0; i < dm->numPolyData; i++, mp++) {
 		BMLoop *l;
 
 		BLI_array_empty(verts);
 		BLI_array_empty(edges);
 
-		BLI_array_growitems(verts, mp->totloop);
-		BLI_array_growitems(edges, mp->totloop);
+		BLI_array_grow_items(verts, mp->totloop);
+		BLI_array_grow_items(edges, mp->totloop);
 
 		ml = mloop + mp->loopstart;
 		for (j = 0; j < mp->totloop; j++, ml++) {
@@ -121,8 +129,9 @@ void DM_to_bmesh_ex(DerivedMesh *dm, BMesh *bm)
 
 		f = BM_face_create_ngon(bm, verts[0], verts[1], edges, mp->totloop, FALSE);
 
-		if (!f)
+		if (UNLIKELY(f == NULL)) {
 			continue;
+		}
 
 		f->head.hflag = BM_face_flag_from_mflag(mp->flag);
 		f->mat_nr = mp->mat_nr;
@@ -135,11 +144,11 @@ void DM_to_bmesh_ex(DerivedMesh *dm, BMesh *bm)
 
 		CustomData_to_bmesh_block(&dm->polyData, &bm->pdata, i, &f->head.data);
 
-		if (has_face_normals) {
-			float *fno;
-
-			fno = CustomData_bmesh_get(&bm->pdata, &f->head.data, CD_NORMAL);
-			copy_v3_v3(f->no, fno);
+		if (face_normals) {
+			copy_v3_v3(f->no, face_normals[i]);
+		}
+		else {
+			BM_face_normal_update(f);
 		}
 	}
 

@@ -20,7 +20,6 @@
 import bpy
 from bpy.types import Header, Menu, Panel
 import os
-import addon_utils
 
 
 def ui_items_general(col, context):
@@ -79,6 +78,7 @@ class USERPREF_HT_header(Header):
 
     def draw(self, context):
         layout = self.layout
+
         layout.template_header(menus=False)
 
         userpref = context.user_preferences
@@ -92,10 +92,11 @@ class USERPREF_HT_header(Header):
             layout.operator("wm.keyconfig_import")
             layout.operator("wm.keyconfig_export")
         elif userpref.active_section == 'ADDONS':
-            layout.operator("wm.addon_install")
+            layout.operator("wm.addon_install", icon="FILESEL")
             layout.menu("USERPREF_MT_addons_dev_guides")
         elif userpref.active_section == 'THEMES':
             layout.operator("ui.reset_default_theme")
+            layout.operator("wm.theme_install")
 
 
 class USERPREF_PT_tabs(Panel):
@@ -136,6 +137,7 @@ class USERPREF_MT_splash(Menu):
 
     def draw(self, context):
         layout = self.layout
+
         split = layout.split()
         row = split.row()
         row.label("")
@@ -194,7 +196,8 @@ class USERPREF_PT_interface(Panel):
 
         col = row.column()
         col.label(text="View Manipulation:")
-        col.prop(view, "use_mouse_auto_depth")
+        col.prop(view, "use_mouse_depth_cursor")
+        col.prop(view, "use_mouse_depth_navigate")
         col.prop(view, "use_zoom_to_mouse")
         col.prop(view, "use_rotate_around_active")
         col.prop(view, "use_global_pivot")
@@ -244,7 +247,7 @@ class USERPREF_PT_interface(Panel):
 
         col.prop(view, "show_splash")
 
-        if os.name == 'nt':
+        if os.name == "nt":
             col.prop(view, "quit_dialog")
 
 
@@ -321,6 +324,7 @@ class USERPREF_PT_edit(Panel):
         col.separator()
 
         col.prop(edit, "use_auto_keying", text="Auto Keyframing:")
+        col.prop(edit, "use_auto_keying_warning")
 
         sub = col.column()
 
@@ -418,7 +422,7 @@ class USERPREF_PT_system(Panel):
         col.separator()
         col.separator()
 
-        if hasattr(system, 'compute_device'):
+        if hasattr(system, "compute_device"):
             col.label(text="Compute Device:")
             col.row().prop(system, "compute_device_type", expand=True)
             sub = col.row()
@@ -433,6 +437,7 @@ class USERPREF_PT_system(Panel):
         col.label(text="OpenGL:")
         col.prop(system, "gl_clip_alpha", slider=True)
         col.prop(system, "use_mipmaps")
+        col.prop(system, "use_gpu_mipmap")
         col.prop(system, "use_16bit_textures")
         col.label(text="Anisotropic Filtering")
         col.prop(system, "anisotropic_filter", text="")
@@ -452,7 +457,7 @@ class USERPREF_PT_system(Panel):
         col.separator()
         col.separator()
 
-        col.label(text="Sequencer:")
+        col.label(text="Sequencer / Clip Editor:")
         col.prop(system, "prefetch_frames")
         col.prop(system, "memory_cache_limit")
 
@@ -637,10 +642,6 @@ class USERPREF_PT_theme(Panel):
             col.label(text="Tooltip:")
             ui_items_general(col, ui)
 
-            ui = theme.user_interface.wcol_tooltip
-            col.label(text="Tooltip:")
-            ui_items_general(col, ui)
-
             ui = theme.user_interface.wcol_menu_item
             col.label(text="Menu Item:")
             ui_items_general(col, ui)
@@ -785,24 +786,22 @@ class USERPREF_PT_file(Panel):
         sub = col1.column()
         sub.label(text="Fonts:")
         sub.label(text="Textures:")
-        sub.label(text="Texture Plugins:")
-        sub.label(text="Sequence Plugins:")
         sub.label(text="Render Output:")
         sub.label(text="Scripts:")
         sub.label(text="Sounds:")
         sub.label(text="Temp:")
+        sub.label(text="I18n Branches:")
         sub.label(text="Image Editor:")
         sub.label(text="Animation Player:")
 
         sub = col1.column()
         sub.prop(paths, "font_directory", text="")
         sub.prop(paths, "texture_directory", text="")
-        sub.prop(paths, "texture_plugin_directory", text="")
-        sub.prop(paths, "sequence_plugin_directory", text="")
         sub.prop(paths, "render_output_directory", text="")
         sub.prop(paths, "script_directory", text="")
         sub.prop(paths, "sound_directory", text="")
         sub.prop(paths, "temporary_directory", text="")
+        sub.prop(paths, "i18n_branches_directory", text="")
         sub.prop(paths, "image_editor", text="")
         subsplit = sub.split(percentage=0.3)
         subsplit.prop(paths, "animation_player_preset", text="")
@@ -845,7 +844,7 @@ class USERPREF_PT_file(Panel):
         col.prop(system, "use_tabs_as_spaces")
 
 
-from .space_userpref_keymap import InputKeyMapPanel
+from bl_ui.space_userpref_keymap import InputKeyMapPanel
 
 
 class USERPREF_MT_ndof_settings(Menu):
@@ -854,10 +853,12 @@ class USERPREF_MT_ndof_settings(Menu):
 
     def draw(self, context):
         layout = self.layout
+
         input_prefs = context.user_preferences.inputs
 
         layout.separator()
         layout.prop(input_prefs, "ndof_sensitivity")
+        layout.prop(input_prefs, "ndof_orbit_sensitivity")
 
         if context.space_data.type == 'VIEW_3D':
             layout.separator()
@@ -865,11 +866,10 @@ class USERPREF_MT_ndof_settings(Menu):
 
             layout.separator()
             layout.label(text="Orbit options")
-            if input_prefs.view_rotate_method == 'TRACKBALL':
-                layout.prop(input_prefs, "ndof_roll_invert_axis")
+            layout.row().prop(input_prefs, "ndof_view_rotate_method", text="")
+            layout.prop(input_prefs, "ndof_roll_invert_axis")
             layout.prop(input_prefs, "ndof_tilt_invert_axis")
             layout.prop(input_prefs, "ndof_rotate_invert_axis")
-            layout.prop(input_prefs, "ndof_zoom_invert")
 
             layout.separator()
             layout.label(text="Pan options")
@@ -878,6 +878,7 @@ class USERPREF_MT_ndof_settings(Menu):
             layout.prop(input_prefs, "ndof_panz_invert_axis")
 
             layout.label(text="Zoom options")
+            layout.prop(input_prefs, "ndof_zoom_invert")
             layout.prop(input_prefs, "ndof_zoom_updown")
 
             layout.separator()
@@ -952,6 +953,8 @@ class USERPREF_PT_input(Panel, InputKeyMapPanel):
         sub = col.column()
         sub.label(text="NDOF Device:")
         sub.prop(inputs, "ndof_sensitivity", text="NDOF Sensitivity")
+        sub.prop(inputs, "ndof_orbit_sensitivity", text="NDOF Orbit Sensitivity")
+        sub.row().prop(inputs, "ndof_view_rotate_method", expand=True)
 
         row.separator()
 
@@ -983,6 +986,7 @@ class USERPREF_MT_addons_dev_guides(Menu):
     # menu to open web-pages with addons development guides
     def draw(self, context):
         layout = self.layout
+
         layout.operator("wm.url_open", text="API Concepts", icon='URL').url = "http://wiki.blender.org/index.php/Dev:2.5/Py/API/Intro"
         layout.operator("wm.url_open", text="Addon Guidelines", icon='URL').url = "http://wiki.blender.org/index.php/Dev:2.5/Py/Scripts/Guidelines/Addons"
         layout.operator("wm.url_open", text="How to share your addon", icon='URL').url = "http://wiki.blender.org/index.php/Dev:Py/Sharing"
@@ -1008,10 +1012,10 @@ class USERPREF_PT_addons(Panel):
     @staticmethod
     def is_user_addon(mod, user_addon_paths):
         if not user_addon_paths:
-            user_script_path = bpy.utils.user_script_path()
-            if user_script_path is not None:
-                user_addon_paths.append(os.path.join(user_script_path, "addons"))
-            user_addon_paths.append(os.path.join(bpy.utils.resource_path('USER'), "scripts", "addons"))
+            for path in (bpy.utils.script_path_user(),
+                         bpy.utils.script_path_pref()):
+                if path is not None:
+                    user_addon_paths.append(os.path.join(path, "addons"))
 
         for path in user_addon_paths:
             if bpy.path.is_subdir(mod.__file__, path):
@@ -1029,11 +1033,16 @@ class USERPREF_PT_addons(Panel):
             box.label(l)
 
     def draw(self, context):
+        import addon_utils
+
         layout = self.layout
 
         userpref = context.user_preferences
         used_ext = {ext.module for ext in userpref.addons}
 
+        userpref_addons_folder = os.path.join(userpref.filepaths.script_directory, "addons")
+        scripts_addons_folder  = bpy.utils.user_resource('SCRIPTS', "addons")
+        
         # collect the categories that can be filtered on
         addons = [(mod, addon_utils.module_bl_info(mod)) for mod in addon_utils.modules(addon_utils.addons_fake_modules)]
 
@@ -1079,10 +1088,12 @@ class USERPREF_PT_addons(Panel):
                 continue
 
             # check if addon should be visible with current filters
-            if ((filter == "All") or
-                (filter == info["category"]) or
-                (filter == "Enabled" and is_enabled) or
-                (filter == "Disabled" and not is_enabled)):
+            if     ((filter == "All") or
+                    (filter == info["category"]) or
+                    (filter == "Enabled" and is_enabled) or
+                    (filter == "Disabled" and not is_enabled) or
+                    (filter == "User" and (mod.__file__.startswith(scripts_addons_folder, userpref_addons_folder)))
+                   ):
 
                 if search and search not in info["name"].lower():
                     if info["author"]:
@@ -1100,7 +1111,7 @@ class USERPREF_PT_addons(Panel):
 
                 rowsub = row.row()
                 rowsub.active = is_enabled
-                rowsub.label(text='%s: %s' % (info['category'], info["name"]))
+                rowsub.label(text='%s: %s' % (info["category"], info["name"]))
                 if info["warning"]:
                     rowsub.label(icon='ERROR')
 
@@ -1122,6 +1133,10 @@ class USERPREF_PT_addons(Panel):
                         split = colsub.row().split(percentage=0.15)
                         split.label(text="Location:")
                         split.label(text=info["location"])
+                    if mod:
+                        split = colsub.row().split(percentage=0.15)
+                        split.label(text="File:")
+                        split.label(text=mod.__file__)
                     if info["author"]:
                         split = colsub.row().split(percentage=0.15)
                         split.label(text="Author:")

@@ -173,7 +173,7 @@ const STR_String& RAS_MeshObject::GetMaterialName(unsigned int matid)
 
 RAS_MeshMaterial* RAS_MeshObject::GetMeshMaterial(unsigned int matid)
 {
-	if (m_materials.size() > 0 && (matid < m_materials.size()))
+	if ((m_materials.empty() == false) && (matid < m_materials.size()))
 	{
 		list<RAS_MeshMaterial>::iterator it = m_materials.begin();
 		while (matid--) ++it;
@@ -536,18 +536,18 @@ void RAS_MeshObject::SortPolygons(RAS_MeshSlot& ms, const MT_Transform &transfor
 		const MT_Vector3 pnorm(transform.getBasis()[2]);
 		// unneeded: const MT_Scalar pval = transform.getOrigin()[2];
 
-		vector<polygonSlot> slots(totpoly);
+		vector<polygonSlot> poly_slots(totpoly);
 
 		/* get indices and z into temporary array */
 		for (j=0; j<totpoly; j++)
-			slots[j].get(it.vertex, it.index, j*nvert, nvert, pnorm);
+			poly_slots[j].get(it.vertex, it.index, j*nvert, nvert, pnorm);
 
 		/* sort (stable_sort might be better, if flickering happens?) */
-		std::sort(slots.begin(), slots.end(), backtofront());
+		std::sort(poly_slots.begin(), poly_slots.end(), backtofront());
 
 		/* get indices from temporary array again */
 		for (j=0; j<totpoly; j++)
-			slots[j].set(it.index, j*nvert, nvert);
+			poly_slots[j].set(it.index, j*nvert, nvert);
 	}
 }
 
@@ -584,7 +584,7 @@ void RAS_MeshObject::CheckWeightCache(Object* obj)
 	if (!m_mesh->key)
 		return;
 
-	for (kbindex=0, kb= (KeyBlock*)m_mesh->key->block.first; kb; kb= (KeyBlock*)kb->next, kbindex++)
+	for (kbindex = 0, kb = (KeyBlock *)m_mesh->key->block.first; kb; kb = kb->next, kbindex++)
 	{
 		// first check the cases where the weight must be cleared
 		if (kb->vgroup[0] == 0 ||

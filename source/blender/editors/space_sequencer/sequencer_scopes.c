@@ -60,16 +60,14 @@ static void scope_put_pixel(unsigned char *table, unsigned char *pos)
 	pos[3] = 255;
 }
 
-static void scope_put_pixel_single(unsigned char *table, unsigned char *pos,
-                                   int col)
+static void scope_put_pixel_single(unsigned char *table, unsigned char *pos, int col)
 {
 	char newval = table[pos[col]];
 	pos[col] = newval;
 	pos[3] = 255;
 }
 
-static void wform_put_line(int w,
-                           unsigned char *last_pos, unsigned char *new_pos)
+static void wform_put_line(int w, unsigned char *last_pos, unsigned char *new_pos)
 {
 	if (last_pos > new_pos) {
 		unsigned char *temp = new_pos;
@@ -86,8 +84,7 @@ static void wform_put_line(int w,
 	}
 }
 
-static void wform_put_line_single(
-    int w, unsigned char *last_pos, unsigned char *new_pos, int col)
+static void wform_put_line_single(int w, unsigned char *last_pos, unsigned char *new_pos, int col)
 {
 	if (last_pos > new_pos) {
 		unsigned char *temp = new_pos;
@@ -161,8 +158,7 @@ static ImBuf *make_waveform_view_from_ibuf_byte(ImBuf *ibuf)
 	wform_put_grid(tgt, w, h);
 
 	for (x = 0; x < 256; x++) {
-		wtable[x] = (unsigned char) (pow(((float) x + 1) / 256,
-		                                 waveform_gamma) * 255);
+		wtable[x] = (unsigned char) (pow(((float) x + 1) / 256, waveform_gamma) * 255);
 	}
 
 	for (y = 0; y < ibuf->y; y++) {
@@ -204,8 +200,7 @@ static ImBuf *make_waveform_view_from_ibuf_float(ImBuf *ibuf)
 	wform_put_grid(tgt, w, h);
 
 	for (x = 0; x < 256; x++) {
-		wtable[x] = (unsigned char) (pow(((float) x + 1) / 256,
-		                                 waveform_gamma) * 255);
+		wtable[x] = (unsigned char) (pow(((float) x + 1) / 256, waveform_gamma) * 255);
 	}
 
 	for (y = 0; y < ibuf->y; y++) {
@@ -247,9 +242,9 @@ ImBuf *make_waveform_view_from_ibuf(ImBuf *ibuf)
 }
 
 
-static ImBuf *make_sep_waveform_view_from_ibuf_byte(ImBuf *ibuf){
-	ImBuf *rval = IMB_allocImBuf(
-	    ibuf->x + 3, 515, 32, IB_rect);
+static ImBuf *make_sep_waveform_view_from_ibuf_byte(ImBuf *ibuf)
+{
+	ImBuf *rval = IMB_allocImBuf(ibuf->x + 3, 515, 32, IB_rect);
 	int x, y;
 	unsigned char *src = (unsigned char *) ibuf->rect;
 	unsigned char *tgt = (unsigned char *) rval->rect;
@@ -262,8 +257,7 @@ static ImBuf *make_sep_waveform_view_from_ibuf_byte(ImBuf *ibuf){
 	wform_put_grid(tgt, w, h);
 
 	for (x = 0; x < 256; x++) {
-		wtable[x] = (unsigned char) (pow(((float) x + 1) / 256,
-		                                 waveform_gamma) * 255);
+		wtable[x] = (unsigned char) (pow(((float) x + 1) / 256, waveform_gamma) * 255);
 	}
 
 	for (y = 0; y < ibuf->y; y++) {
@@ -274,16 +268,14 @@ static ImBuf *make_sep_waveform_view_from_ibuf_byte(ImBuf *ibuf){
 			unsigned char *rgb = src + 4 * (ibuf->x * y + x);
 			for (c = 0; c < 3; c++) {
 				unsigned char *p = tgt;
-				p += 4 * (w * ((rgb[c] * (h - 3)) / 255 + 1)
-				          + c * sw + x / 3 + 1);
+				p += 4 * (w * ((rgb[c] * (h - 3)) / 255 + 1) + c * sw + x / 3 + 1);
 
 				scope_put_pixel_single(wtable, p, c);
 				p += 4 * w;
 				scope_put_pixel_single(wtable, p, c);
 
 				if (last_p[c] != NULL) {
-					wform_put_line_single(
-					    w, last_p[c], p, c);
+					wform_put_line_single(w, last_p[c], p, c);
 				}
 				last_p[c] = p;
 			}
@@ -310,8 +302,7 @@ static ImBuf *make_sep_waveform_view_from_ibuf_float(ImBuf *ibuf)
 	wform_put_grid(tgt, w, h);
 
 	for (x = 0; x < 256; x++) {
-		wtable[x] = (unsigned char) (pow(((float) x + 1) / 256,
-		                                 waveform_gamma) * 255);
+		wtable[x] = (unsigned char) (pow(((float) x + 1) / 256, waveform_gamma) * 255);
 	}
 
 	for (y = 0; y < ibuf->y; y++) {
@@ -326,16 +317,14 @@ static ImBuf *make_sep_waveform_view_from_ibuf_float(ImBuf *ibuf)
 
 				CLAMP(v, 0.0f, 1.0f);
 
-				p += 4 * (w * ((int) (v * (h - 3)) + 1)
-				          + c * sw + x / 3 + 1);
+				p += 4 * (w * ((int) (v * (h - 3)) + 1) + c * sw + x / 3 + 1);
 
 				scope_put_pixel_single(wtable, p, c);
 				p += 4 * w;
 				scope_put_pixel_single(wtable, p, c);
 
 				if (last_p[c] != NULL) {
-					wform_put_line_single(
-					    w, last_p[c], p, c);
+					wform_put_line_single(w, last_p[c], p, c);
 				}
 				last_p[c] = p;
 			}
@@ -460,6 +449,8 @@ static void draw_histogram_bar(ImBuf *ibuf, int x, float val, int col)
 	}
 }
 
+#define HIS_STEPS 512
+
 static ImBuf *make_histogram_view_from_ibuf_byte(ImBuf *ibuf)
 {
 	ImBuf *rval = IMB_allocImBuf(515, 128, 32, IB_rect);
@@ -467,22 +458,38 @@ static ImBuf *make_histogram_view_from_ibuf_byte(ImBuf *ibuf)
 	unsigned int n;
 	unsigned char *src = (unsigned char *) ibuf->rect;
 
-	unsigned int bins[3][256];
+	unsigned int bins[3][HIS_STEPS];
 
-	memset(bins, 0, 3 * 256 * sizeof(unsigned int));
+	memset(bins, 0, sizeof(bins));
 
+	#pragma omp parallel for shared(bins, src, ibuf) private(x, y) if (ibuf->y >= 256)
 	for (y = 0; y < ibuf->y; y++) {
+		unsigned int cur_bins[3][HIS_STEPS];
+
+		memset(cur_bins, 0, sizeof(cur_bins));
+
 		for (x = 0; x < ibuf->x; x++) {
-			bins[0][*src++]++;
-			bins[1][*src++]++;
-			bins[2][*src++]++;
-			src++;
+			unsigned char *pixel = src + (y * ibuf->x + x) * 4;
+
+			cur_bins[0][pixel[0]]++;
+			cur_bins[1][pixel[1]]++;
+			cur_bins[2][pixel[2]]++;
+		}
+
+		#pragma omp critical
+		{
+			int i;
+			for (i = 0; i < HIS_STEPS; i++) {
+				bins[0][i] += cur_bins[0][i];
+				bins[1][i] += cur_bins[1][i];
+				bins[2][i] += cur_bins[2][i];
+			}
 		}
 	}
 
 	n = 0;
 	for (c = 0; c < 3; c++) {
-		for (x = 0; x < 256; x++) {
+		for (x = 0; x < HIS_STEPS; x++) {
 			if (bins[c][x] > n) {
 				n = bins[c][x];
 			}
@@ -490,11 +497,9 @@ static ImBuf *make_histogram_view_from_ibuf_byte(ImBuf *ibuf)
 	}
 
 	for (c = 0; c < 3; c++) {
-		for (x = 0; x < 256; x++) {
-			draw_histogram_bar(rval, x * 2 + 1,
-			                   ((float) bins[c][x]) / n, c);
-			draw_histogram_bar(rval, x * 2 + 2,
-			                   ((float) bins[c][x]) / n, c);
+		for (x = 0; x < HIS_STEPS; x++) {
+			draw_histogram_bar(rval, x * 2 + 1, ((float) bins[c][x]) / n, c);
+			draw_histogram_bar(rval, x * 2 + 2, ((float) bins[c][x]) / n, c);
 		}
 	}
 
@@ -503,13 +508,13 @@ static ImBuf *make_histogram_view_from_ibuf_byte(ImBuf *ibuf)
 	return rval;
 }
 
-static int get_bin_float(float f)
+BLI_INLINE int get_bin_float(float f)
 {
 	if (f < -0.25f) {
-		f = -0.25f;
+		return 0;
 	}
-	else if (f > 1.25f) {
-		f = 1.25f;
+	else if (f >= 1.25f) {
+		return 511;
 	}
 
 	return (int) (((f + 0.25f) / 1.5f) * 512);
@@ -521,16 +526,32 @@ static ImBuf *make_histogram_view_from_ibuf_float(ImBuf *ibuf)
 	int n, c, x, y;
 	float *src = ibuf->rect_float;
 
-	unsigned int bins[3][512];
+	unsigned int bins[3][HIS_STEPS];
 
-	memset(bins, 0, 3 * 256 * sizeof(unsigned int));
+	memset(bins, 0, sizeof(bins));
 
+	#pragma omp parallel for shared(bins, src, ibuf) private(x, y) if (ibuf->y >= 256)
 	for (y = 0; y < ibuf->y; y++) {
+		unsigned int cur_bins[3][HIS_STEPS];
+
+		memset(cur_bins, 0, sizeof(cur_bins));
+
 		for (x = 0; x < ibuf->x; x++) {
-			bins[0][get_bin_float(*src++)]++;
-			bins[1][get_bin_float(*src++)]++;
-			bins[2][get_bin_float(*src++)]++;
-			src++;
+			float *pixel = src + (y * ibuf->x + x) * 4;
+
+			cur_bins[0][get_bin_float(pixel[0])]++;
+			cur_bins[1][get_bin_float(pixel[1])]++;
+			cur_bins[2][get_bin_float(pixel[2])]++;
+		}
+
+		#pragma omp critical
+		{
+			int i;
+			for (i = 0; i < HIS_STEPS; i++) {
+				bins[0][i] += cur_bins[0][i];
+				bins[1][i] += cur_bins[1][i];
+				bins[2][i] += cur_bins[2][i];
+			}
 		}
 	}
 
@@ -539,14 +560,14 @@ static ImBuf *make_histogram_view_from_ibuf_float(ImBuf *ibuf)
 
 	n = 0;
 	for (c = 0; c < 3; c++) {
-		for (x = 0; x < 512; x++) {
+		for (x = 0; x < HIS_STEPS; x++) {
 			if (bins[c][x] > n) {
 				n = bins[c][x];
 			}
 		}
 	}
 	for (c = 0; c < 3; c++) {
-		for (x = 0; x < 512; x++) {
+		for (x = 0; x < HIS_STEPS; x++) {
 			draw_histogram_bar(rval, x + 1, (float) bins[c][x] / n, c);
 		}
 	}
@@ -555,6 +576,8 @@ static ImBuf *make_histogram_view_from_ibuf_float(ImBuf *ibuf)
 	
 	return rval;
 }
+
+#undef HIS_STEPS
 
 ImBuf *make_histogram_view_from_ibuf(ImBuf *ibuf)
 {
@@ -566,9 +589,7 @@ ImBuf *make_histogram_view_from_ibuf(ImBuf *ibuf)
 	}
 }
 
-static void vectorscope_put_cross(unsigned char r, unsigned char g, 
-                                  unsigned char b,
-                                  char *tgt, int w, int h, int size)
+static void vectorscope_put_cross(unsigned char r, unsigned char g,  unsigned char b, char *tgt, int w, int h, int size)
 {
 	float rgb[3], yuv[3];
 	char *p;
@@ -580,8 +601,8 @@ static void vectorscope_put_cross(unsigned char r, unsigned char g,
 	rgb[2] = (float)b / 255.0f;
 	rgb_to_yuv_normalized(rgb, yuv);
 			
-	p = tgt + 4 * (w * (int) ((yuv[2] * (h - 3) + 1)) 
-	               + (int) ((yuv[1] * (w - 3) + 1)));
+	p = tgt + 4 * (w * (int) ((yuv[2] * (h - 3) + 1)) +
+	                   (int) ((yuv[1] * (w - 3) + 1)));
 
 	if (r == 0 && g == 0 && b == 0) {
 		r = 255;
@@ -608,8 +629,7 @@ static ImBuf *make_vectorscope_view_from_ibuf_byte(ImBuf *ibuf)
 	unsigned char wtable[256];
 
 	for (x = 0; x < 256; x++) {
-		wtable[x] = (unsigned char) (pow(((float) x + 1) / 256,
-		                                 scope_gamma) * 255);
+		wtable[x] = (unsigned char) (pow(((float) x + 1) / 256, scope_gamma) * 255);
 	}
 
 	for (x = 0; x <= 255; x++) {
@@ -631,8 +651,8 @@ static ImBuf *make_vectorscope_view_from_ibuf_byte(ImBuf *ibuf)
 			rgb[2] = (float)src1[2] / 255.0f;
 			rgb_to_yuv_normalized(rgb, yuv);
 			
-			p = tgt + 4 * (w * (int) ((yuv[2] * (h - 3) + 1)) 
-			               + (int) ((yuv[1] * (w - 3) + 1)));
+			p = tgt + 4 * (w * (int) ((yuv[2] * (h - 3) + 1)) +
+			                   (int) ((yuv[1] * (w - 3) + 1)));
 			scope_put_pixel(wtable, (unsigned char *)p);
 		}
 	}
@@ -655,8 +675,7 @@ static ImBuf *make_vectorscope_view_from_ibuf_float(ImBuf *ibuf)
 	unsigned char wtable[256];
 
 	for (x = 0; x < 256; x++) {
-		wtable[x] = (unsigned char) (pow(((float) x + 1) / 256,
-		                                 scope_gamma) * 255);
+		wtable[x] = (unsigned char) (pow(((float) x + 1) / 256, scope_gamma) * 255);
 	}
 
 	for (x = 0; x <= 255; x++) {
@@ -681,8 +700,8 @@ static ImBuf *make_vectorscope_view_from_ibuf_float(ImBuf *ibuf)
 
 			rgb_to_yuv_normalized(rgb, yuv);
 			
-			p = tgt + 4 * (w * (int) ((yuv[2] * (h - 3) + 1)) 
-			               + (int) ((yuv[1] * (w - 3) + 1)));
+			p = tgt + 4 * (w * (int) ((yuv[2] * (h - 3) + 1)) +
+			                   (int) ((yuv[1] * (w - 3) + 1)));
 			scope_put_pixel(wtable, (unsigned char *)p);
 		}
 	}

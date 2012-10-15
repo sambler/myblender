@@ -72,6 +72,7 @@ struct KX_ObjectProperties
 	class KX_GameObject*	m_dynamic_parent;
 	bool	m_isactor;
 	bool	m_sensor;
+	bool	m_character;
 	bool	m_concave;
 	bool	m_isdeformable;
 	bool	m_disableSleeping;
@@ -158,4 +159,4 @@ void	KX_ClearBulletSharedShapes();
 bool KX_ReInstanceBulletShapeFromMesh(KX_GameObject *gameobj, KX_GameObject *from_gameobj, RAS_MeshObject* from_meshobj);
 
 #endif
-#endif //__KX_CONVERTPHYSICSOBJECT_H__
+#endif  /* __KX_CONVERTPHYSICSOBJECT_H__ */

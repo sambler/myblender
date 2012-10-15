@@ -16,12 +16,8 @@
  *  \ingroup expressions
  */
 
-#if !defined(AFX_IFEXPR_H__1F691841_C5C7_11D1_A863_0000B4542BD8__INCLUDED_)
-#define AFX_IFEXPR_H__1F691841_C5C7_11D1_A863_0000B4542BD8__INCLUDED_
-
-#if defined(_MSC_VER) && _MSC_VER >= 1000
-#pragma once
-#endif // _MSC_VER >= 1000
+#ifndef __IFEXPR_H__
+#define __IFEXPR_H__
 
 #include "Expression.h"
 
@@ -51,11 +47,8 @@ public:
 
 
 #ifdef WITH_CXX_GUARDEDALLOC
-public:
-	void *operator new(size_t num_bytes) { return MEM_mallocN(num_bytes, "GE:CIfExpr"); }
-	void operator delete( void *mem ) { MEM_freeN(mem); }
+	MEM_CXX_CLASS_ALLOC_FUNCS("GE:CIfExpr")
 #endif
 };
 
-#endif // !defined(AFX_IFEXPR_H__1F691841_C5C7_11D1_A863_0000B4542BD8__INCLUDED_)
-
+#endif  /* __IFEXPR_H__ */

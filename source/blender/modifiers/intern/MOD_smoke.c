@@ -57,7 +57,7 @@
 
 static void initData(ModifierData *md) 
 {
-	SmokeModifierData *smd = (SmokeModifierData*) md;
+	SmokeModifierData *smd = (SmokeModifierData *) md;
 	
 	smd->domain = NULL;
 	smd->flow = NULL;
@@ -68,33 +68,44 @@ static void initData(ModifierData *md)
 
 static void copyData(ModifierData *md, ModifierData *target)
 {
-	SmokeModifierData *smd  = (SmokeModifierData*)md;
-	SmokeModifierData *tsmd = (SmokeModifierData*)target;
+	SmokeModifierData *smd  = (SmokeModifierData *)md;
+	SmokeModifierData *tsmd = (SmokeModifierData *)target;
 	
 	smokeModifier_copy(smd, tsmd);
 }
 
 static void freeData(ModifierData *md)
 {
-	SmokeModifierData *smd = (SmokeModifierData*) md;
+	SmokeModifierData *smd = (SmokeModifierData *) md;
 	
-	smokeModifier_free (smd);
+	smokeModifier_free(smd);
 }
 
-static void deformVerts(ModifierData *md, Object *ob,
-						DerivedMesh *derivedData,
-						float (*vertexCos)[3],
-						int UNUSED(numVerts),
-						int UNUSED(useRenderParams),
-						int UNUSED(isFinalCalc))
+static CustomDataMask requiredDataMask(Object *UNUSED(ob), ModifierData *md)
 {
-	SmokeModifierData *smd = (SmokeModifierData*) md;
-	DerivedMesh *dm = get_cddm(ob, NULL, derivedData, vertexCos);
+	SmokeModifierData *smd  = (SmokeModifierData *)md;
+	CustomDataMask dataMask = 0;
 
-	smokeModifier_do(smd, md->scene, ob, dm);
+	if (smd && (smd->type & MOD_SMOKE_TYPE_FLOW) && smd->flow) {
+		if (smd->flow->source == MOD_SMOKE_FLOW_SOURCE_MESH) {
+			/* vertex groups */
+			if (smd->flow->vgroup_density)
+				dataMask |= CD_MASK_MDEFORMVERT;
+			/* uv layer */
+			if (smd->flow->texture_type == MOD_SMOKE_FLOW_TEXTURE_MAP_UV)
+				dataMask |= CD_MASK_MTFACE;
+		}
+	}
+	return dataMask;
+}
 
-	if (dm != derivedData)
-		dm->release(dm);
+static DerivedMesh *applyModifier(ModifierData *md, Object *ob, 
+                                  DerivedMesh *dm,
+                                  ModifierApplyFlag UNUSED(flag))
+{
+	SmokeModifierData *smd = (SmokeModifierData *) md;
+
+	return smokeModifier_do(smd, md->scene, ob, dm);
 }
 
 static int dependsOnTime(ModifierData *UNUSED(md))
@@ -103,11 +114,11 @@ static int dependsOnTime(ModifierData *UNUSED(md))
 }
 
 static void updateDepgraph(ModifierData *md, DagForest *forest,
-						struct Scene *scene,
-						Object *UNUSED(ob),
-						DagNode *obNode)
+                           struct Scene *scene, struct Object *ob,
+                           DagNode *obNode)
 {
 	SmokeModifierData *smd = (SmokeModifierData *) md;
+	Base *base;
 
 	if (smd && (smd->type & MOD_SMOKE_TYPE_DOMAIN) && smd->domain) {
 		if (smd->domain->fluid_group || smd->domain->coll_group) {
@@ -118,10 +129,10 @@ static void updateDepgraph(ModifierData *md, DagForest *forest,
 					if (go->ob) {
 						SmokeModifierData *smd2 = (SmokeModifierData *)modifiers_findByType(go->ob, eModifierType_Smoke);
 						
-						// check for initialized smoke object
+						/* check for initialized smoke object */
 						if (smd2 && (smd2->type & MOD_SMOKE_TYPE_FLOW) && smd2->flow) {
 							DagNode *curNode = dag_get_node(forest, go->ob);
-							dag_add_relation(forest, curNode, obNode, DAG_RL_DATA_DATA|DAG_RL_OB_DATA, "Smoke Flow");
+							dag_add_relation(forest, curNode, obNode, DAG_RL_DATA_DATA | DAG_RL_OB_DATA, "Smoke Flow");
 						}
 					}
 				}
@@ -131,35 +142,42 @@ static void updateDepgraph(ModifierData *md, DagForest *forest,
 					if (go->ob) {
 						SmokeModifierData *smd2 = (SmokeModifierData *)modifiers_findByType(go->ob, eModifierType_Smoke);
 						
-						// check for initialized smoke object
+						/* check for initialized smoke object */
 						if (smd2 && (smd2->type & MOD_SMOKE_TYPE_COLL) && smd2->coll) {
 							DagNode *curNode = dag_get_node(forest, go->ob);
-							dag_add_relation(forest, curNode, obNode, DAG_RL_DATA_DATA|DAG_RL_OB_DATA, "Smoke Coll");
+							dag_add_relation(forest, curNode, obNode, DAG_RL_DATA_DATA | DAG_RL_OB_DATA, "Smoke Coll");
 						}
 					}
 				}
 		}
 		else {
-			Base *base = scene->base.first;
-
-			for ( ; base; base = base->next) {
+			base = scene->base.first;
+			for (; base; base = base->next) {
 				SmokeModifierData *smd2 = (SmokeModifierData *)modifiers_findByType(base->object, eModifierType_Smoke);
 
 				if (smd2 && (((smd2->type & MOD_SMOKE_TYPE_FLOW) && smd2->flow) || ((smd2->type & MOD_SMOKE_TYPE_COLL) && smd2->coll))) {
 					DagNode *curNode = dag_get_node(forest, base->object);
-					dag_add_relation(forest, curNode, obNode, DAG_RL_DATA_DATA|DAG_RL_OB_DATA, "Smoke Flow/Coll");
+					dag_add_relation(forest, curNode, obNode, DAG_RL_DATA_DATA | DAG_RL_OB_DATA, "Smoke Flow/Coll");
 				}
+			}
+		}
+		/* add relation to all "smoke flow" force fields */
+		base = scene->base.first;
+		for (; base; base = base->next) {
+			if (base->object->pd && base->object->pd->forcefield == PFIELD_SMOKEFLOW && base->object->pd->f_source == ob) {
+				DagNode *node2 = dag_get_node(forest, base->object);
+				dag_add_relation(forest, obNode, node2, DAG_RL_DATA_DATA | DAG_RL_OB_DATA, "Field Source Object");
 			}
 		}
 	}
 }
 
 static void foreachIDLink(ModifierData *md, Object *ob,
-					   IDWalkFunc walk, void *userData)
+                          IDWalkFunc walk, void *userData)
 {
-	SmokeModifierData *smd = (SmokeModifierData*) md;
+	SmokeModifierData *smd = (SmokeModifierData *) md;
 
-	if (smd->type==MOD_SMOKE_TYPE_DOMAIN && smd->domain) {
+	if (smd->type == MOD_SMOKE_TYPE_DOMAIN && smd->domain) {
 		walk(userData, ob, (ID **)&smd->domain->coll_group);
 		walk(userData, ob, (ID **)&smd->domain->fluid_group);
 		walk(userData, ob, (ID **)&smd->domain->eff_group);
@@ -168,26 +186,30 @@ static void foreachIDLink(ModifierData *md, Object *ob,
 			walk(userData, ob, (ID **)&smd->domain->effector_weights->group);
 		}
 	}
+
+	if (smd->type == MOD_SMOKE_TYPE_FLOW && smd->flow) {
+		walk(userData, ob, (ID **)&smd->flow->noise_texture);
+	}
 }
 
 ModifierTypeInfo modifierType_Smoke = {
 	/* name */              "Smoke",
 	/* structName */        "SmokeModifierData",
 	/* structSize */        sizeof(SmokeModifierData),
-	/* type */              eModifierTypeType_OnlyDeform,
-	/* flags */             eModifierTypeFlag_AcceptsMesh
-							| eModifierTypeFlag_UsesPointCache
-							| eModifierTypeFlag_Single,
+	/* type */              eModifierTypeType_Constructive,
+	/* flags */             eModifierTypeFlag_AcceptsMesh |
+	                        eModifierTypeFlag_UsesPointCache |
+	                        eModifierTypeFlag_Single,
 
 	/* copyData */          copyData,
-	/* deformVerts */       deformVerts,
+	/* deformVerts */       NULL,
 	/* deformMatrices */    NULL,
 	/* deformVertsEM */     NULL,
 	/* deformMatricesEM */  NULL,
-	/* applyModifier */     NULL,
+	/* applyModifier */     applyModifier,
 	/* applyModifierEM */   NULL,
 	/* initData */          initData,
-	/* requiredDataMask */  NULL,
+	/* requiredDataMask */  requiredDataMask,
 	/* freeData */          freeData,
 	/* isDisabled */        NULL,
 	/* updateDepgraph */    updateDepgraph,

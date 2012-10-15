@@ -45,7 +45,7 @@ ANIM_KS_ROTATION_ID = "Rotation"
 ANIM_KS_SCALING_ID = "Scaling"
 ANIM_KS_LOC_ROT_SCALE_ID = "LocRotScale"
 ANIM_KS_AVAILABLE_ID = "Available"
-ANIM_KS_WHOLE_CHARACTER_ID = "Whole Character"
+ANIM_KS_WHOLE_CHARACTER_ID = "WholeCharacter"
 
 
 # Location
@@ -360,10 +360,10 @@ class BUILTIN_KSI_WholeCharacter(KeyingSetInfo):
         # add rotation properties if they will
         if bone.lock_rotations_4d:
             # can check individually
-            if (bone.lock_rotation == (False, False, False)) and (bone.lock_rotation_w == False):
+            if (bone.lock_rotation == (False, False, False)) and (bone.lock_rotation_w is False):
                 ksi.addProp(ks, bone, prop)
             else:
-                if bone.lock_rotation_w == False:
+                if bone.lock_rotation_w is False:
                     ksi.addProp(ks, bone, prop, 0)  # w = 0
 
                 for i in range(3):

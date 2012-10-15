@@ -43,8 +43,7 @@
 
 #include "BKE_sound.h"
 
-typedef struct KX_3DSoundSettings
-{
+typedef struct KX_3DSoundSettings {
 	float min_gain;
 	float max_gain;
 	float reference_distance;
@@ -116,16 +115,15 @@ public:
 	static int pyattr_set_type(void *self, const struct KX_PYATTRIBUTE_DEF *attrdef, PyObject *value);
 	static int pyattr_set_sound(void *self, const struct KX_PYATTRIBUTE_DEF *attrdef, PyObject *value);
 
-	static PyObject* pyattr_get_3d_property(void *self, const struct KX_PYATTRIBUTE_DEF *attrdef);
-	static PyObject* pyattr_get_audposition(void *self, const struct KX_PYATTRIBUTE_DEF *attrdef);
-	static PyObject* pyattr_get_gain(void *self, const struct KX_PYATTRIBUTE_DEF *attrdef);
-	static PyObject* pyattr_get_pitch(void *self, const struct KX_PYATTRIBUTE_DEF *attrdef);
-	static PyObject* pyattr_get_type(void *self, const struct KX_PYATTRIBUTE_DEF *attrdef);
-	static PyObject* pyattr_get_sound(void *self, const struct KX_PYATTRIBUTE_DEF *attrdef);
+	static PyObject *pyattr_get_3d_property(void *self, const struct KX_PYATTRIBUTE_DEF *attrdef);
+	static PyObject *pyattr_get_audposition(void *self, const struct KX_PYATTRIBUTE_DEF *attrdef);
+	static PyObject *pyattr_get_gain(void *self, const struct KX_PYATTRIBUTE_DEF *attrdef);
+	static PyObject *pyattr_get_pitch(void *self, const struct KX_PYATTRIBUTE_DEF *attrdef);
+	static PyObject *pyattr_get_type(void *self, const struct KX_PYATTRIBUTE_DEF *attrdef);
+	static PyObject *pyattr_get_sound(void *self, const struct KX_PYATTRIBUTE_DEF *attrdef);
 
-#endif // WITH_PYTHON
+#endif  /* WITH_PYTHON */
 
 };
 
-#endif //__KX_SOUNDACTUATOR_H__
-
+#endif  /* __KX_SOUNDACTUATOR_H__ */

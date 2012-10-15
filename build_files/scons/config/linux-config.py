@@ -105,13 +105,17 @@ BF_BULLET = '#extern/bullet2/src'
 BF_BULLET_INC = '${BF_BULLET}'
 BF_BULLET_LIB = 'extern_bullet'
 
-# enable freetype2 support for text objects
+WITH_BF_ELTOPO = False
+BF_LAPACK = '/usr'
+BF_LAPACK_LIB = 'lapack3gf blas clapack'
+BF_LAPACK_LIBPATH = '${BF_LAPACK}/lib'
+
 BF_FREETYPE = '/usr'
 BF_FREETYPE_INC = '${BF_FREETYPE}/include ${BF_FREETYPE}/include/freetype2'
 BF_FREETYPE_LIB = 'freetype'
 #BF_FREETYPE_LIB_STATIC = '${BF_FREETYPE}/lib/libfreetype.a'
 
-WITH_BF_QUICKTIME = False # -DWITH_QUICKTIME
+WITH_BF_QUICKTIME = False
 BF_QUICKTIME = '/usr/local'
 BF_QUICKTIME_INC = '${BF_QUICKTIME}/include'
 
@@ -124,7 +128,7 @@ BF_ICONV_LIBPATH = '${BF_ICONV}/lib'
 WITH_BF_BINRELOC = True
 
 # enable ffmpeg  support
-WITH_BF_FFMPEG = True  # -DWITH_FFMPEG
+WITH_BF_FFMPEG = True
 BF_FFMPEG = LIBDIR + '/ffmpeg'
 if os.path.exists(LCGDIR + '/ffmpeg'):
     WITH_BF_STATICFFMPEG = True
@@ -211,6 +215,16 @@ BF_OIIO_INC = BF_OIIO + '/include'
 BF_OIIO_LIB = 'OpenImageIO'
 BF_OIIO_LIBPATH = BF_OIIO + '/lib'
 
+WITH_BF_OCIO = True
+WITH_BF_STATICOCIO = False
+BF_OCIO = LIBDIR + '/ocio'
+if not os.path.exists(LCGDIR + '/ocio'):
+    WITH_BF_OCIO = False
+    BF_OCIO = '/usr'
+BF_OCIO_INC = BF_OCIO + '/include'
+BF_OCIO_LIB = 'OpenColorIO yaml-cpp tinyxml'
+BF_OCIO_LIBPATH = BF_OCIO + '/lib'
+
 WITH_BF_BOOST = True
 WITH_BF_STATICBOOST = False
 BF_BOOST = LIBDIR + '/boost'
@@ -225,7 +239,7 @@ WITH_BF_CYCLES = WITH_BF_OIIO and WITH_BF_BOOST
 
 WITH_BF_CYCLES_CUDA_BINARIES = False
 BF_CYCLES_CUDA_NVCC = '/usr/local/cuda/bin/nvcc'
-BF_CYCLES_CUDA_BINARIES_ARCH = ['sm_13', 'sm_20', 'sm_21']
+BF_CYCLES_CUDA_BINARIES_ARCH = ['sm_13', 'sm_20', 'sm_21', 'sm_30']
 
 WITH_BF_OPENMP = True
 

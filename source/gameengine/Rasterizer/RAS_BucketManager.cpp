@@ -29,10 +29,9 @@
  *  \ingroup bgerast
  */
 
-
-#if defined(WIN32) && !defined(FREE_WINDOWS)
-// don't show these anoying STL warnings
-#pragma warning (disable:4786)
+#ifdef _MSC_VER
+   /* don't show these anoying STL warnings */
+#  pragma warning (disable:4786)
 #endif
 
 #include "CTR_Map.h"
@@ -232,8 +231,8 @@ void RAS_BucketManager::Renderbuckets(
 	/* beginning each frame, clear (texture/material) caching information */
 	rasty->ClearCachingInfo();
 
-	RenderSolidBuckets(cameratrans, rasty, rendertools);	
-	RenderAlphaBuckets(cameratrans, rasty, rendertools);	
+	RenderSolidBuckets(cameratrans, rasty, rendertools);
+	RenderAlphaBuckets(cameratrans, rasty, rendertools);
 
 	rendertools->SetClientObject(rasty, NULL);
 }

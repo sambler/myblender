@@ -30,11 +30,10 @@
  *  \ingroup bgeconv
  */
 
-
-#if defined(WIN32) && !defined(FREE_WINDOWS)
-// This warning tells us about truncation of __long__ stl-generated names.
-// It can occasionally cause DevStudio to have internal compiler warnings.
-#pragma warning( disable : 4786 )     
+#ifdef _MSC_VER
+  /* This warning tells us about truncation of __long__ stl-generated names.
+   * It can occasionally cause DevStudio to have internal compiler warnings. */
+#  pragma warning( disable:4786 )
 #endif
 
 #include "RAS_IPolygonMaterial.h"
@@ -54,7 +53,8 @@ bool BL_MeshDeformer::Apply(RAS_IPolyMaterial*)
 
 	// only apply once per frame if the mesh is actually modified
 	if (m_pMeshObject->MeshModified() &&
-	   m_lastDeformUpdate != m_gameobj->GetLastFrame()) {
+	    m_lastDeformUpdate != m_gameobj->GetLastFrame())
+	{
 		// For each material
 		for (list<RAS_MeshMaterial>::iterator mit= m_pMeshObject->GetFirstMaterial();
 			mit != m_pMeshObject->GetLastMaterial(); ++ mit) {
@@ -83,7 +83,7 @@ bool BL_MeshDeformer::Apply(RAS_IPolyMaterial*)
 }
 
 BL_MeshDeformer::~BL_MeshDeformer()
-{	
+{
 	if (m_transverts)
 		delete [] m_transverts;
 	if (m_transnors)

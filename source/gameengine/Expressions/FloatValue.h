@@ -50,11 +50,8 @@ protected:
 
 
 #ifdef WITH_CXX_GUARDEDALLOC
-public:
-	void *operator new(size_t num_bytes) { return MEM_mallocN(num_bytes, "GE:CFloatValue"); }
-	void operator delete( void *mem ) { MEM_freeN(mem); }
+	MEM_CXX_CLASS_ALLOC_FUNCS("GE:CFloatValue")
 #endif
 };
 
-#endif // !defined __FLOATVALUE_H__
-
+#endif  /* __FLOATVALUE_H__ */

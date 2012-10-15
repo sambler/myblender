@@ -34,14 +34,16 @@
 
 /* **************** FILTER  ******************** */
 static bNodeSocketTemplate cmp_node_filter_in[]= {
-	{	SOCK_FLOAT, 1, "Fac",			1.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f, PROP_FACTOR},
-	{	SOCK_RGBA, 1, "Image",			1.0f, 1.0f, 1.0f, 1.0f},
+	{	SOCK_FLOAT, 1, N_("Fac"),			1.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f, PROP_FACTOR},
+	{	SOCK_RGBA, 1, N_("Image"),			1.0f, 1.0f, 1.0f, 1.0f},
 	{	-1, 0, ""	}
 };
 static bNodeSocketTemplate cmp_node_filter_out[]= {
-	{	SOCK_RGBA, 0, "Image"},
+	{	SOCK_RGBA, 0, N_("Image")},
 	{	-1, 0, ""	}
 };
+
+#ifdef WITH_COMPOSITOR_LEGACY
 
 static void do_filter_edge(CompBuf *out, CompBuf *in, float *filter, float fac)
 {
@@ -168,12 +170,12 @@ static void do_filter3(CompBuf *out, CompBuf *in, float *filter, float fac)
 static void node_composit_exec_filter(void *data, bNode *node, bNodeStack **in, bNodeStack **out)
 {
 	static float soft[9]= {1/16.0f, 2/16.0f, 1/16.0f, 2/16.0f, 4/16.0f, 2/16.0f, 1/16.0f, 2/16.0f, 1/16.0f};
-	float sharp[9]= {-1,-1,-1,-1,9,-1,-1,-1,-1};
+	float sharp[9]= {-1, -1, -1, -1, 9, -1, -1, -1, -1};
 	float laplace[9]= {-1/8.0f, -1/8.0f, -1/8.0f, -1/8.0f, 1.0f, -1/8.0f, -1/8.0f, -1/8.0f, -1/8.0f};
-	float sobel[9]= {1,2,1,0,0,0,-1,-2,-1};
-	float prewitt[9]= {1,1,1,0,0,0,-1,-1,-1};
-	float kirsch[9]= {5,5,5,-3,-3,-3,-2,-2,-2};
-	float shadow[9]= {1,2,1,0,1,0,-1,-2,-1};
+	float sobel[9]= {1, 2, 1, 0, 0, 0, -1, -2, -1};
+	float prewitt[9]= {1, 1, 1, 0, 0, 0, -1, -1, -1};
+	float kirsch[9]= {5, 5, 5, -3, -3, -3, -2, -2, -2};
+	float shadow[9]= {1, 2, 1, 0, 1, 0, -1, -2, -1};
 	
 	if (out[0]->hasoutput==0) return;
 	
@@ -189,7 +191,7 @@ static void node_composit_exec_filter(void *data, bNode *node, bNodeStack **in, 
 		stackbuf->xof= cbuf->xof;
 		stackbuf->yof= cbuf->yof;
 		
-		switch(node->custom1) {
+		switch (node->custom1) {
 			case CMP_FILT_SOFT:
 				do_filter3(stackbuf, cbuf, soft, in[0]->vec[0]);
 				break;
@@ -219,6 +221,7 @@ static void node_composit_exec_filter(void *data, bNode *node, bNodeStack **in, 
 	}
 }
 
+#endif  /* WITH_COMPOSITOR_LEGACY */
 
 void register_node_type_cmp_filter(bNodeTreeType *ttype)
 {
@@ -228,7 +231,9 @@ void register_node_type_cmp_filter(bNodeTreeType *ttype)
 	node_type_socket_templates(&ntype, cmp_node_filter_in, cmp_node_filter_out);
 	node_type_size(&ntype, 80, 40, 120);
 	node_type_label(&ntype, node_filter_label);
+#ifdef WITH_COMPOSITOR_LEGACY
 	node_type_exec(&ntype, node_composit_exec_filter);
+#endif
 
 	nodeRegisterType(ttype, &ntype);
 }

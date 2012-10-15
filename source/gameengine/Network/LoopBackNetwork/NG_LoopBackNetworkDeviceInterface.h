@@ -36,7 +36,7 @@
 #include "NG_NetworkDeviceInterface.h"
 
 class NG_LoopBackNetworkDeviceInterface : public NG_NetworkDeviceInterface
-{	
+{
 	std::deque<NG_NetworkMessage*> m_messages[2];
 	int		m_currentQueue;
 
@@ -50,13 +50,14 @@ public:
 	virtual void NextFrame();
 
 	bool Connect(char *address, unsigned int port, char *password,
-	             unsigned int localport, unsigned int timeout) {
-		return true;}
+	             unsigned int localport, unsigned int timeout)
+	{
+		return true;
+	}
 	bool Disconnect(void) {return true;}
 
 	virtual void SendNetworkMessage(class NG_NetworkMessage* msg);
 	virtual std::vector<NG_NetworkMessage*>		RetrieveNetworkMessages();
 };
 
-#endif //__NG_LOOPBACKNETWORKDEVICEINTERFACE_H__
-
+#endif  /* __NG_LOOPBACKNETWORKDEVICEINTERFACE_H__ */

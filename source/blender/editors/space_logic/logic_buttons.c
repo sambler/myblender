@@ -50,59 +50,6 @@
 #include "interface_intern.h"
 #include "logic_intern.h"
 
-#if 0
-static void do_logic_panel_events(bContext *C, void *arg, int event)
-{
-	
-	switch(event) {
-		
-	}
-}
-
-
-/* *** */
-
-static void logic_panel_properties(const bContext *C, Panel *pa)
-{
-//	SpaceLogic *slogic= CTX_wm_space_logic(C);
-	uiBlock *block;
-	
-	block= uiLayoutAbsoluteBlock(pa->layout);
-	uiBlockSetHandleFunc(block, do_logic_panel_events, NULL);
-
-}	
-
-static void logic_panel_view_properties(const bContext *C, Panel *pa)
-{
-	//	SpaceLogic *slogic= CTX_wm_space_logic(C);
-	uiBlock *block;
-	
-	block= uiLayoutAbsoluteBlock(pa->layout);
-	uiBlockSetHandleFunc(block, do_logic_panel_events, NULL);
-	
-}	
-#endif
-
-void logic_buttons_register(ARegionType *UNUSED(art))
-{
-#if 0
-	PanelType *pt;
-
-	pt= MEM_callocN(sizeof(PanelType), "spacetype logic panel properties");
-	strcpy(pt->idname, "LOGIC_PT_properties");
-	strcpy(pt->label, "Logic Properties");
-	pt->draw= logic_panel_properties;
-	BLI_addtail(&art->paneltypes, pt);
-
-	pt= MEM_callocN(sizeof(PanelType), "spacetype logic view properties");
-	strcpy(pt->idname, "LOGIC_PT_view_properties");
-	strcpy(pt->label, "View Properties");
-	pt->draw= logic_panel_view_properties;
-	BLI_addtail(&art->paneltypes, pt);
-#endif
-
-}
-
 static int logic_properties(bContext *C, wmOperator *UNUSED(op))
 {
 	ScrArea *sa= CTX_wm_area(C);
@@ -137,10 +84,10 @@ static int cut_links_intersect(uiLinkLine *line, float mcoords[][2], int tot)
 	int i, b;
 	rcti rectlink;
 
-	rectlink.xmin = (int) (line->from->x1 + line->from->x2) / 2;
-	rectlink.ymin = (int) (line->from->y1 + line->from->y2) / 2;
-	rectlink.xmax = (int) (line->to->x1 + line->to->x2) / 2;
-	rectlink.ymax = (int) (line->to->y1 + line->to->y2) / 2;
+	rectlink.xmin = (int)BLI_rctf_cent_x(&line->from->rect);
+	rectlink.ymin = (int)BLI_rctf_cent_y(&line->from->rect);
+	rectlink.xmax = (int)BLI_rctf_cent_x(&line->to->rect);
+	rectlink.ymax = (int)BLI_rctf_cent_y(&line->to->rect);
 
 	if (ui_link_bezier_points(&rectlink, coord_array, LINK_RESOL)) {
 		for (i=0; i<tot-1; i++)
@@ -157,12 +104,14 @@ static int cut_links_exec(bContext *C, wmOperator *op)
 	float mcoords[256][2];
 	int i= 0;
 	
-	RNA_BEGIN(op->ptr, itemptr, "path") {
+	RNA_BEGIN (op->ptr, itemptr, "path")
+	{
 		float loc[2];
 		
 		RNA_float_get_array(&itemptr, "loc", loc);
-		UI_view2d_region_to_view(&ar->v2d, (short)loc[0], (short)loc[1], 
-								 &mcoords[i][0], &mcoords[i][1]);
+		UI_view2d_region_to_view(&ar->v2d,
+		                         (int)loc[0], (int)loc[1],
+		                         &mcoords[i][0], &mcoords[i][1]);
 		i++;
 		if (i>= 256) break;
 	}
@@ -172,8 +121,7 @@ static int cut_links_exec(bContext *C, wmOperator *op)
 		uiBlock *block;
 		uiLinkLine *line, *nline;
 		uiBut *but;
-		for (block= ar->uiblocks.first; block; block= block->next)
-		{
+		for (block= ar->uiblocks.first; block; block= block->next) {
 			but= block->buttons.first;
 			while (but) {
 				if (but->type==LINK && but->link) {

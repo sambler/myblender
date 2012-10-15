@@ -131,12 +131,8 @@ class CyclesRender_PT_light_paths(CyclesButtonsPanel, Panel):
 
 
 class CyclesRender_PT_motion_blur(CyclesButtonsPanel, Panel):
-    bl_label = "Motion Blur"
+    bl_label = "Camera Motion Blur"
     bl_options = {'DEFAULT_CLOSED'}
-
-    @classmethod
-    def poll(cls, context):
-        return False
 
     def draw_header(self, context):
         rd = context.scene.render
@@ -201,6 +197,8 @@ class CyclesRender_PT_performance(CyclesButtonsPanel, Panel):
 
         sub.prop(rd, "parts_x", text="X")
         sub.prop(rd, "parts_y", text="Y")
+
+        sub.prop(cscene, "use_progressive_refine")
 
         subsub = sub.column()
         subsub.enabled = not rd.use_border
@@ -955,7 +953,7 @@ def draw_device(self, context):
         elif device_type == 'OPENCL' and cscene.feature_set == 'EXPERIMENTAL':
             layout.prop(cscene, "device")
 
-        if cscene.feature_set == 'EXPERIMENTAL' and cscene.device == 'CPU' and engine.with_osl():
+        if engine.with_osl() and (cscene.device == 'CPU' or device_type == 'None'):
             layout.prop(cscene, "shading_system")
 
 

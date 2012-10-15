@@ -661,7 +661,9 @@ static int apply_armature_pose2bones_exec(bContext *C, wmOperator *op)
 	/* helpful warnings... */
 	/* TODO: add warnings to be careful about actions, applying deforms first, etc. */
 	if (ob->adt && ob->adt->action)
-		BKE_report(op->reports, RPT_WARNING, "Actions on this armature will be destroyed by this new rest pose as the transforms stored are relative to the old rest pose");
+		BKE_report(op->reports, RPT_WARNING,
+		           "Actions on this armature will be destroyed by this new rest pose as the "
+		           "transforms stored are relative to the old rest pose");
 
 	/* Get editbones of active armature to alter */
 	ED_armature_to_edit(ob);	
@@ -1591,7 +1593,8 @@ void ARMATURE_OT_select_linked(wmOperatorType *ot)
 
 /* does bones and points */
 /* note that BONE ROOT only gets drawn for root bones (or without IK) */
-static EditBone *get_nearest_editbonepoint(ViewContext *vc, const int mval[2], ListBase *edbo, int findunsel, int *selmask)
+static EditBone *get_nearest_editbonepoint(ViewContext *vc, const int mval[2],
+                                           ListBase *edbo, int findunsel, int *selmask)
 {
 	EditBone *ebone;
 	rcti rect;
@@ -1831,7 +1834,7 @@ void ED_armature_deselect_all_visible(Object *obedit)
 
 	for (ebone = arm->edbo->first; ebone; ebone = ebone->next) {
 		/* first and foremost, bone must be visible and selected */
-		if (EBONE_VISIBLE(arm, ebone) && (ebone->flag & BONE_UNSELECTABLE) == 0) {
+		if (EBONE_SELECTABLE(arm, ebone)) {
 			ebone->flag &= ~(BONE_SELECTED | BONE_TIPSEL | BONE_ROOTSEL);
 		}
 	}
@@ -2556,7 +2559,8 @@ void updateDuplicateSubtarget(EditBone *dupBone, ListBase *editbones, Object *ob
 }
 
 
-EditBone *duplicateEditBoneObjects(EditBone *curBone, const char *name, ListBase *editbones, Object *src_ob, Object *dst_ob)
+EditBone *duplicateEditBoneObjects(EditBone *curBone, const char *name, ListBase *editbones,
+                                   Object *src_ob, Object *dst_ob)
 {
 	EditBone *eBone = MEM_mallocN(sizeof(EditBone), "addup_editbone");
 	
@@ -3036,7 +3040,8 @@ static void bones_merge(Object *obedit, EditBone *start, EditBone *end, EditBone
 	newbone->parent = start->parent;
 
 	/* TODO, copy more things to the new bone */
-	newbone->flag = start->flag & (BONE_HINGE | BONE_NO_DEFORM | BONE_NO_SCALE | BONE_NO_CYCLICOFFSET | BONE_NO_LOCAL_LOCATION | BONE_DONE);
+	newbone->flag = start->flag & (BONE_HINGE | BONE_NO_DEFORM | BONE_NO_SCALE |
+	                               BONE_NO_CYCLICOFFSET | BONE_NO_LOCAL_LOCATION | BONE_DONE);
 	
 	/* step 2a: reparent any side chains which may be parented to any bone in the chain of bones to merge 
 	 *	- potentially several tips for side chains leading to some tree exist...
@@ -3357,12 +3362,17 @@ static int armature_extrude_exec(bContext *C, wmOperator *op)
 		if (EBONE_VISIBLE(arm, ebone)) {
 			/* we extrude per definition the tip */
 			do_extrude = FALSE;
-			if (ebone->flag & (BONE_TIPSEL | BONE_SELECTED))
+			if (ebone->flag & (BONE_TIPSEL | BONE_SELECTED)) {
 				do_extrude = TRUE;
+			}
 			else if (ebone->flag & BONE_ROOTSEL) {
 				/* but, a bone with parent deselected we do the root... */
-				if (ebone->parent && (ebone->parent->flag & BONE_TIPSEL)) ;
-				else do_extrude = 2;
+				if (ebone->parent && (ebone->parent->flag & BONE_TIPSEL)) {
+					/* pass */
+				}
+				else {
+					do_extrude = 2;
+				}
 			}
 			
 			if (do_extrude) {
@@ -4106,7 +4116,7 @@ static void select_similar_length(bArmature *arm, EditBone *ebone_act, const flo
 	const float len_max = ebone_act->length * (1.0f + thresh);
 
 	for (ebone = arm->edbo->first; ebone; ebone = ebone->next) {
-		if (EBONE_VISIBLE(arm, ebone) && (ebone->flag & BONE_UNSELECTABLE) == 0) {
+		if (EBONE_SELECTABLE(arm, ebone)) {
 			if ((ebone->length >= len_min) &&
 			    (ebone->length <= len_max))
 			{
@@ -4123,7 +4133,7 @@ static void select_similar_direction(bArmature *arm, EditBone *ebone_act, const 
 	sub_v3_v3v3(dir_act, ebone_act->head, ebone_act->tail);
 
 	for (ebone = arm->edbo->first; ebone; ebone = ebone->next) {
-		if (EBONE_VISIBLE(arm, ebone) && (ebone->flag & BONE_UNSELECTABLE) == 0) {
+		if (EBONE_SELECTABLE(arm, ebone)) {
 			float dir[3];
 			sub_v3_v3v3(dir, ebone->head, ebone->tail);
 
@@ -4139,7 +4149,7 @@ static void select_similar_layer(bArmature *arm, EditBone *ebone_act)
 	EditBone *ebone;
 
 	for (ebone = arm->edbo->first; ebone; ebone = ebone->next) {
-		if (EBONE_VISIBLE(arm, ebone) && (ebone->flag & BONE_UNSELECTABLE) == 0) {
+		if (EBONE_SELECTABLE(arm, ebone)) {
 			if (ebone->layer & ebone_act->layer) {
 				ED_armature_edit_bone_select(ebone);
 			}
@@ -4161,7 +4171,7 @@ static void select_similar_prefix(bArmature *arm, EditBone *ebone_act)
 
 	/* Find matches */
 	for (ebone = arm->edbo->first; ebone; ebone = ebone->next) {
-		if (EBONE_VISIBLE(arm, ebone) && (ebone->flag & BONE_UNSELECTABLE) == 0) {
+		if (EBONE_SELECTABLE(arm, ebone)) {
 			char prefix_other[MAX_VGROUP_NAME];
 			BKE_deform_split_prefix(ebone->name, prefix_other, body_tmp);
 			if (!strcmp(prefix_act, prefix_other)) {
@@ -4185,7 +4195,7 @@ static void select_similar_suffix(bArmature *arm, EditBone *ebone_act)
 
 	/* Find matches */
 	for (ebone = arm->edbo->first; ebone; ebone = ebone->next) {
-		if (EBONE_VISIBLE(arm, ebone) && (ebone->flag & BONE_UNSELECTABLE) == 0) {
+		if (EBONE_SELECTABLE(arm, ebone)) {
 			char suffix_other[MAX_VGROUP_NAME];
 			BKE_deform_split_suffix(ebone->name, body_tmp, suffix_other);
 			if (!strcmp(suffix_act, suffix_other)) {
@@ -4270,7 +4280,7 @@ static int armature_select_hierarchy_exec(bContext *C, wmOperator *op)
 	
 	for (curbone = arm->edbo->first; curbone; curbone = curbone->next) {
 		/* only work on bone if it is visible and its selection can change */
-		if (EBONE_VISIBLE(arm, curbone) && (curbone->flag & BONE_UNSELECTABLE) == 0) {
+		if (EBONE_SELECTABLE(arm, curbone)) {
 			if (curbone == arm->act_edbone) {
 				if (direction == BONE_SELECT_PARENT) {
 					if (curbone->parent == NULL) continue;
@@ -4290,7 +4300,7 @@ static int armature_select_hierarchy_exec(bContext *C, wmOperator *op)
 					chbone = editbone_get_child(arm, curbone, 1);
 					if (chbone == NULL) continue;
 					
-					if (EBONE_VISIBLE(arm, chbone) && (chbone->flag & BONE_UNSELECTABLE) == 0) {
+					if (EBONE_SELECTABLE(arm, chbone)) {
 						chbone->flag |= (BONE_SELECTED | BONE_TIPSEL | BONE_ROOTSEL);
 						arm->act_edbone = chbone;
 						
@@ -4476,7 +4486,8 @@ void ARMATURE_OT_align(wmOperatorType *ot)
 
 /* ***************** Pose tools ********************* */
 
-// XXX bone_looper is only to be used when we want to access settings (i.e. editability/visibility/selected) that context doesn't offer 
+/* XXX bone_looper is only to be used when we want to access settings
+ * (i.e. editability/visibility/selected) that context doesn't offer */
 static int bone_looper(Object *ob, Bone *bone, void *data,
                        int (*bone_func)(Object *, Bone *, void *))
 {
@@ -4506,7 +4517,8 @@ static int bone_looper(Object *ob, Bone *bone, void *data,
 
 /* called from editview.c, for mode-less pose selection */
 /* assumes scene obact and basact is still on old situation */
-int ED_do_pose_selectbuffer(Scene *scene, Base *base, unsigned int *buffer, short hits, short extend, short deselect, short toggle)
+int ED_do_pose_selectbuffer(Scene *scene, Base *base, unsigned int *buffer, short hits,
+                            short extend, short deselect, short toggle)
 {
 	Object *ob = base->object;
 	Bone *nearBone;
@@ -4752,7 +4764,9 @@ static void add_vgroups__mapFunc(void *userData, int index, const float co[3],
 	copy_v3_v3(verts[index], co);
 }
 
-static void envelope_bone_weighting(Object *ob, Mesh *mesh, float (*verts)[3], int numbones, Bone **bonelist, bDeformGroup **dgrouplist, bDeformGroup **dgroupflip, float (*root)[3], float (*tip)[3], int *selected, float scale)
+static void envelope_bone_weighting(Object *ob, Mesh *mesh, float (*verts)[3], int numbones, Bone **bonelist,
+                                    bDeformGroup **dgrouplist, bDeformGroup **dgroupflip,
+                                    float (*root)[3], float (*tip)[3], int *selected, float scale)
 {
 	/* Create vertex group weights from envelopes */
 
@@ -5138,7 +5152,7 @@ static int pose_clear_transform_generic_exec(bContext *C, wmOperator *op,
 	
 	/* sanity checks */
 	if (ELEM(NULL, clear_func, default_ksName)) {
-		BKE_report(op->reports, RPT_ERROR, "Programming error: missing clear transform func or Keying Set Name");
+		BKE_report(op->reports, RPT_ERROR, "Programming error: missing clear transform function or Keying Set Name");
 		return OPERATOR_CANCELLED;
 	}
 	

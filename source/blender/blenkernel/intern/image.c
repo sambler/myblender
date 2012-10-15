@@ -2563,7 +2563,7 @@ static ImBuf *image_get_render_result(Image *ima, ImageUser *iuser, void **lock_
 		*lock_r = re;
 	}
 
-	/* this gives active layer, composite or seqence result */
+	/* this gives active layer, composite or sequence result */
 	rect = (unsigned int *)rres.rect32;
 	rectf = rres.rectf;
 	rectz = rres.rectz;
@@ -2617,11 +2617,21 @@ static ImBuf *image_get_render_result(Image *ima, ImageUser *iuser, void **lock_
 	/* free rect buffer if float buffer changes, so it can be recreated with
 	 * the updated result, and also in case we got byte buffer from sequencer,
 	 * so we don't keep reference to freed buffer */
-	if (ibuf->rect_float != rectf || rect || !rectf)
+	if (ibuf->rect_float != rectf || rect)
 		imb_freerectImBuf(ibuf);
 
-	if (rect)
+	if (rect) {
 		ibuf->rect = rect;
+	}
+	else {
+		/* byte buffer of render result has been freed, make sure image buffers
+		 * does not reference to this buffer anymore
+		 * need check for whether byte buffer was allocated and owned by image itself
+		 * or if it's reusing buffer from render result
+		 */
+		if ((ibuf->mall & IB_rect) == 0)
+			ibuf->rect = NULL;
+	}
 
 	if (rectf) {
 		ibuf->rect_float = rectf;

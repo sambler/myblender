@@ -257,9 +257,6 @@ static void rna_Smoke_set_type(Main *bmain, Scene *scene, PointerRNA *ptr)
 {
 	SmokeModifierData *smd = (SmokeModifierData *)ptr->data;
 	Object *ob = (Object *)ptr->id.data;
-	ParticleSystemModifierData *psmd = NULL;
-	ParticleSystem *psys = NULL;
-	ParticleSettings *part = NULL;
 
 	/* nothing changed */
 	if ((smd->type & MOD_SMOKE_TYPE_DOMAIN) && smd->domain)
@@ -273,28 +270,6 @@ static void rna_Smoke_set_type(Main *bmain, Scene *scene, PointerRNA *ptr)
 			ob->dt = OB_WIRE;
 			break;
 		case MOD_SMOKE_TYPE_FLOW:
-			for (psys = ob->particlesystem.first; psys; psys = psys->next)
-				if (psys->part->type == PART_EMITTER)
-					break;
-			if (ob->type == OB_MESH && !psys) {
-				/* add particle system */
-				psmd = (ParticleSystemModifierData *)object_add_particle_system(scene, ob, NULL);
-				if (psmd) {
-					psys = psmd->psys;
-					part = psys->part;
-					part->lifetime = 1.0f;
-					part->sta = 1.0f;
-					part->end = 250.0f;
-					part->ren_as = PART_DRAW_NOT;
-					part->flag |= PART_UNBORN;
-					part->draw_as = PART_DRAW_DOT;
-					BLI_strncpy(psys->name, "SmokeParticles", sizeof(psys->name));
-					psys->recalc |= (PSYS_RECALC_RESET | PSYS_RECALC_PHYS);
-					DAG_id_tag_update(ptr->id.data, OB_RECALC_DATA);
-				}
-			}
-			if (smd->flow)
-				smd->flow->psys = psys;
 		case MOD_SMOKE_TYPE_COLL:
 		case 0:
 		default:
@@ -3007,7 +2982,7 @@ static void rna_def_modifier_remesh(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "octree_depth", PROP_INT, PROP_NONE);
 	RNA_def_property_int_sdna(prop, NULL, "depth");
-	RNA_def_property_range(prop, 1, 10);
+	RNA_def_property_range(prop, 1, 12);
 	RNA_def_property_ui_text(prop, "Octree Depth", "Resolution of the octree; higher values give finer details");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 

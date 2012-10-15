@@ -35,7 +35,7 @@
 #ifdef __cplusplus
 extern "C" {
 //} for code folding
-#endif //__cplusplus
+#endif /* __cplusplus */
 
 struct wmWindow;
 struct ARegion;
@@ -59,7 +59,6 @@ void BL_print_gamedebug_line_padded(const char* text, int xco, int yco, int widt
 
 #ifdef __cplusplus
 }
-#endif //__cplusplus
+#endif  /* __cplusplus */
 
-#endif //__KX_BLENDERGL_H__
-
+#endif  /* __KX_BLENDERGL_H__ */

@@ -19,6 +19,9 @@
 set(INC
 	.
 	intern
+)
+
+set(INC_SYS
 	../../extern/Eigen3
 	../../source/blender/blenloader
 )
@@ -43,5 +46,5 @@ set(SRC
 	dualcon.h
 )
 
-blender_add_lib(bf_intern_dualcon "${SRC}" "${INC}" "")
+blender_add_lib(bf_intern_dualcon "${SRC}" "${INC}" "${INC_SYS}")
 

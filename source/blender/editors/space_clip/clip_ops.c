@@ -514,9 +514,14 @@ static int view_zoom_exec(bContext *C, wmOperator *op)
 static int view_zoom_invoke(bContext *C, wmOperator *op, wmEvent *event)
 {
 	if (event->type == MOUSEZOOM) {
-		float factor;
+		float delta, factor;
 
-		factor = 1.0f + (event->x - event->prevx + event->y - event->prevy) / 300.0f;
+		delta = event->x - event->prevx + event->y - event->prevy;
+
+		if (U.uiflag & USER_ZOOM_INVERT)
+			delta *= -1;
+
+		factor = 1.0f + delta / 300.0f;
 		RNA_float_set(op->ptr, "factor", factor);
 
 		sclip_zoom_set_factor_exec(C, event, factor);
@@ -533,11 +538,16 @@ static int view_zoom_invoke(bContext *C, wmOperator *op, wmEvent *event)
 static int view_zoom_modal(bContext *C, wmOperator *op, wmEvent *event)
 {
 	ViewZoomData *vpd = op->customdata;
-	float factor;
+	float delta, factor;
 
 	switch (event->type) {
 		case MOUSEMOVE:
-			factor = 1.0f + (vpd->x - event->x + vpd->y - event->y) / 300.0f;
+			delta = event->x - vpd->x + event->y - vpd->y;
+
+			if (U.uiflag & USER_ZOOM_INVERT)
+				delta *= -1;
+
+			factor = 1.0f + delta / 300.0f;
 			RNA_float_set(op->ptr, "factor", factor);
 			sclip_zoom_set(C, vpd->zoom * factor, vpd->location);
 			ED_region_tag_redraw(CTX_wm_region(C));
@@ -579,7 +589,7 @@ void CLIP_OT_view_zoom(wmOperatorType *ot)
 	ot->flag = OPTYPE_BLOCKING | OPTYPE_GRAB_POINTER;
 
 	/* properties */
-	RNA_def_float(ot->srna, "factor", 0.0f, 0.0f, FLT_MAX,
+	RNA_def_float(ot->srna, "factor", 0.0f, -FLT_MAX, FLT_MAX,
 	              "Factor", "Zoom factor, values higher than 1.0 zoom in, lower values zoom out", -FLT_MAX, FLT_MAX);
 }
 
@@ -700,7 +710,7 @@ void CLIP_OT_view_zoom_ratio(wmOperatorType *ot)
 	ot->poll = ED_space_clip_view_clip_poll;
 
 	/* properties */
-	RNA_def_float(ot->srna, "ratio", 0.0f, 0.0f, FLT_MAX,
+	RNA_def_float(ot->srna, "ratio", 0.0f, -FLT_MAX, FLT_MAX,
 	              "Ratio", "Zoom ratio, 1.0 is 1:1, higher is zoomed in, lower is zoomed out", -FLT_MAX, FLT_MAX);
 }
 

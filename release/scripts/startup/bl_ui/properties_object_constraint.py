@@ -212,6 +212,7 @@ class ConstraintButtonsPanel():
 
     def FOLLOW_PATH(self, context, layout, con):
         self.target_template(layout, con)
+        layout.operator("constraint.followpath_path_animate", text="Animate Path", icon='ANIM_DATA')
 
         split = layout.split()
 
@@ -483,6 +484,8 @@ class ConstraintButtonsPanel():
         row = layout.row()
         row.prop(con, "use_transform_limit")
         row.label()
+
+        self.space_template(layout, con)
 
     def STRETCH_TO(self, context, layout, con):
         self.target_template(layout, con)

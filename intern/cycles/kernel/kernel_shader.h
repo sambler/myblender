@@ -68,7 +68,7 @@ __device_inline void shader_setup_from_ray(KernelGlobals *kg, ShaderData *sd,
 #endif
 
 	/* matrices and time */
-#ifdef __MOTION__
+#ifdef __OBJECT_MOTION__
 	sd->ob_tfm = object_fetch_transform(kg, sd->object, ray->time, OBJECT_TRANSFORM);
 	sd->ob_itfm = object_fetch_transform(kg, sd->object, ray->time, OBJECT_INVERSE_TRANSFORM);
 
@@ -93,6 +93,7 @@ __device_inline void shader_setup_from_ray(KernelGlobals *kg, ShaderData *sd,
 #ifdef __DPDU__
 	/* dPdu/dPdv */
 	triangle_dPdudv(kg, &sd->dPdu, &sd->dPdv, sd->prim);
+	sd->T = make_float3(0.0f, 0.0f, 0.0f);
 #endif
 
 #ifdef __INSTANCING__
@@ -117,6 +118,7 @@ __device_inline void shader_setup_from_ray(KernelGlobals *kg, ShaderData *sd,
 #ifdef __DPDU__
 		sd->dPdu = -sd->dPdu;
 		sd->dPdv = -sd->dPdv;
+		sd->T = make_float3(0.0f, 0.0f, 0.0f);
 #endif
 	}
 
@@ -171,7 +173,7 @@ __device void shader_setup_from_sample(KernelGlobals *kg, ShaderData *sd,
 	}
 #endif
 
-#ifdef __MOTION__
+#ifdef __OBJECT_MOTION__
 	sd->time = time;
 
 	sd->ob_tfm = object_fetch_transform(kg, sd->object, time, OBJECT_TRANSFORM);
@@ -208,6 +210,8 @@ __device void shader_setup_from_sample(KernelGlobals *kg, ShaderData *sd,
 		}
 #endif
 	}
+
+   	sd->T = make_float3(0.0f, 0.0f, 0.0f);
 #endif
 
 	/* backfacing test */
@@ -275,7 +279,7 @@ __device_inline void shader_setup_from_background(KernelGlobals *kg, ShaderData 
 	sd->I = -sd->P;
 	sd->shader = kernel_data.background.shader;
 	sd->flag = kernel_tex_fetch(__shader_flag, (sd->shader & SHADER_MASK)*2);
-#ifdef __MOTION__
+#ifdef __OBJECT_MOTION__
 	sd->time = ray->time;
 #endif
 	sd->ray_length = 0.0f;
@@ -293,6 +297,7 @@ __device_inline void shader_setup_from_background(KernelGlobals *kg, ShaderData 
 	/* dPdu/dPdv */
 	sd->dPdu = make_float3(0.0f, 0.0f, 0.0f);
 	sd->dPdv = make_float3(0.0f, 0.0f, 0.0f);
+	sd->T = make_float3(0.0f, 0.0f, 0.0f);
 #endif
 
 #ifdef __RAY_DIFFERENTIALS__

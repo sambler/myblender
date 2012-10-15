@@ -298,6 +298,14 @@ int BM_edge_in_face(BMFace *f, BMEdge *e)
 }
 
 /**
+ * Returns whether or not a given edge is is part of a given loop.
+ */
+int BM_edge_in_loop(BMEdge *e, BMLoop *l)
+{
+	return (l->e == e || l->prev->e == e);
+}
+
+/**
  * Returns whether or not two vertices are in
  * a given edge
  */
@@ -313,6 +321,44 @@ int BM_verts_in_edge(BMVert *v1, BMVert *v2, BMEdge *e)
 BMVert *BM_edge_other_vert(BMEdge *e, BMVert *v)
 {
 	return bmesh_edge_other_vert_get(e, v);
+}
+
+/**
+ * Given a edge and a loop (assumes the edge is manifold). returns
+ * the other faces loop, sharing the same vertex.
+ *
+ * <pre>
+ * +-------------------+
+ * |                   |
+ * |                   |
+ * |l_other <-- return |
+ * +-------------------+ <-- A manifold edge between 2 faces
+ * |l    e  <-- edge   |
+ * |^ <-------- loop   |
+ * |                   |
+ * +-------------------+
+ * </pre>
+ */
+BMLoop *BM_edge_other_loop(BMEdge *e, BMLoop *l)
+{
+	BMLoop *l_other;
+
+	BLI_assert(BM_edge_is_manifold(e));
+	BLI_assert(BM_vert_in_edge(e, l->v));
+
+	l_other = (e->l == l) ? l->radial_next : l;
+
+	if (l_other->v == l->v) {
+		/* pass */
+	}
+	else if (l_other->next->v == l->v) {
+		l_other = l_other->next;
+	}
+	else {
+		BLI_assert(0);
+	}
+
+	return l_other;
 }
 
 /**

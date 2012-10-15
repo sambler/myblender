@@ -35,6 +35,7 @@
 
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
+#include "BLI_noise.h"
 #include "BLI_rand.h"
 #include "BLI_utildefines.h"
 
@@ -887,12 +888,12 @@ static void do_2d_mapping(MTex *mtex, float *t, VlakRen *vlr, const float n[3], 
 			fx = (t[0] + 1.0f) / 2.0f;
 			fy = (t[1] + 1.0f) / 2.0f;
 		}
-		else if (wrap==MTEX_TUBE) map_to_tube( &fx, &fy, t[0], t[1], t[2]);
-		else if (wrap==MTEX_SPHERE) map_to_sphere(&fx, &fy, t[0], t[1], t[2]);
+		else if (wrap == MTEX_TUBE)   map_to_tube( &fx, &fy, t[0], t[1], t[2]);
+		else if (wrap == MTEX_SPHERE) map_to_sphere(&fx, &fy, t[0], t[1], t[2]);
 		else {
-			if (texco==TEXCO_OBJECT) cubemap_ob(ob, n, t[0], t[1], t[2], &fx, &fy);
-			else if (texco==TEXCO_GLOB) cubemap_glob(n, t[0], t[1], t[2], &fx, &fy);
-			else cubemap(mtex, vlr, n, t[0], t[1], t[2], &fx, &fy);
+			if      (texco == TEXCO_OBJECT) cubemap_ob(ob, n, t[0], t[1], t[2], &fx, &fy);
+			else if (texco == TEXCO_GLOB)   cubemap_glob(n, t[0], t[1], t[2], &fx, &fy);
+			else                            cubemap(mtex, vlr, n, t[0], t[1], t[2], &fx, &fy);
 		}
 		
 		/* repeat */
@@ -953,10 +954,17 @@ static void do_2d_mapping(MTex *mtex, float *t, VlakRen *vlr, const float n[3], 
 			if (t[1]<=0.0f) {
 				fx= t[0]+dxt[0];
 				fy= t[0]+dyt[0];
-				if (fx>=0.0f && fy>=0.0f && t[0]>=0.0f);
-				else if (fx<=0.0f && fy<=0.0f && t[0]<=0.0f);
-				else ok= 0;
+				if (fx>=0.0f && fy>=0.0f && t[0]>=0.0f) {
+					/* pass */
+				}
+				else if (fx<=0.0f && fy<=0.0f && t[0]<=0.0f) {
+					/* pass */
+				}
+				else {
+					ok = 0;
+				}
 			}
+
 			if (ok) {
 				if (wrap==MTEX_TUBE) {
 					map_to_tube(area, area+1, t[0], t[1], t[2]);
@@ -1096,7 +1104,7 @@ static int multitex(Tex *tex, float *texvec, float *dxt, float *dyt, int osatex,
 	float tmpvec[3];
 	int retval=0; /* return value, int:0, col:1, nor:2, everything:3 */
 
-	texres->talpha= 0;	/* is set when image texture returns alpha (considered premul) */
+	texres->talpha = FALSE;  /* is set when image texture returns alpha (considered premul) */
 	
 	if (tex->use_nodes && tex->nodetree) {
 		retval = ntreeTexExecTree(tex->nodetree, texres, texvec, dxt, dyt, osatex, thread,
@@ -1193,7 +1201,7 @@ static int multitex(Tex *tex, float *texvec, float *dxt, float *dyt, int osatex,
 	if (tex->flag & TEX_COLORBAND) {
 		float col[4];
 		if (do_colorband(tex->coba, texres->tin, col)) {
-			texres->talpha= 1;
+			texres->talpha = TRUE;
 			texres->tr= col[0];
 			texres->tg= col[1];
 			texres->tb= col[2];
@@ -1227,7 +1235,7 @@ int multitex_nodes(Tex *tex, float *texvec, float *dxt, float *dyt, int osatex, 
 				ImBuf *ibuf = BKE_image_get_ibuf(tex->ima, &tex->iuser);
 				
 				/* don't linearize float buffers, assumed to be linear */
-				if (ibuf && !(ibuf->rect_float))
+				if (ibuf && !(ibuf->rect_float) && R.scene_color_manage)
 					IMB_colormanagement_colorspace_to_scene_linear_v3(&texres->tr, ibuf->rect_colorspace);
 			}
 		}
@@ -2377,7 +2385,7 @@ void do_material_tex(ShadeInput *shi, Render *re)
 					ImBuf *ibuf = BKE_image_get_ibuf(ima, &tex->iuser);
 					
 					/* don't linearize float buffers, assumed to be linear */
-					if (ibuf && !(ibuf->rect_float))
+					if (ibuf && !(ibuf->rect_float) && R.scene_color_manage)
 						IMB_colormanagement_colorspace_to_scene_linear_v3(tcol, ibuf->rect_colorspace);
 				}
 				
@@ -2445,7 +2453,9 @@ void do_material_tex(ShadeInput *shi, Render *re)
 
 							copy_v3_v3(nor, texres.nor);
 
-							if (mtex->normapspace == MTEX_NSPACE_CAMERA);
+							if (mtex->normapspace == MTEX_NSPACE_CAMERA) {
+								/* pass */
+							}
 							else if (mtex->normapspace == MTEX_NSPACE_WORLD) {
 								mul_mat3_m4_v3(re->viewmat, nor);
 							}
@@ -2651,6 +2661,13 @@ void do_volume_tex(ShadeInput *shi, const float *xyz, int mapto_flag, float col_
 							mul_m4_v3(shi->obi->duplitexmat, co);					
 					} 
 					mul_m4_v3(ob->imat_ren, co);
+
+					if (mtex->texflag & MTEX_MAPTO_BOUNDS && ob->bb) {
+						/* use bb vec[0] as min and bb vec[6] as max */
+						co[0] = (co[0] - ob->bb->vec[0][0]) / (ob->bb->vec[6][0]-ob->bb->vec[0][0]) * 2.0f - 1.0f;
+						co[1] = (co[1] - ob->bb->vec[0][1]) / (ob->bb->vec[6][1]-ob->bb->vec[0][1]) * 2.0f - 1.0f;
+						co[2] = (co[2] - ob->bb->vec[0][2]) / (ob->bb->vec[6][2]-ob->bb->vec[0][2]) * 2.0f - 1.0f;
+					}
 				}
 			}
 			/* not really orco, but 'local' */
@@ -2663,6 +2680,13 @@ void do_volume_tex(ShadeInput *shi, const float *xyz, int mapto_flag, float col_
 					Object *ob= shi->obi->ob;
 					copy_v3_v3(co, xyz);
 					mul_m4_v3(ob->imat_ren, co);
+
+					if (mtex->texflag & MTEX_MAPTO_BOUNDS && ob->bb) {
+						/* use bb vec[0] as min and bb vec[6] as max */
+						co[0] = (co[0] - ob->bb->vec[0][0]) / (ob->bb->vec[6][0]-ob->bb->vec[0][0]) * 2.0f - 1.0f;
+						co[1] = (co[1] - ob->bb->vec[0][1]) / (ob->bb->vec[6][1]-ob->bb->vec[0][1]) * 2.0f - 1.0f;
+						co[2] = (co[2] - ob->bb->vec[0][2]) / (ob->bb->vec[6][2]-ob->bb->vec[0][2]) * 2.0f - 1.0f;
+					}
 				}
 			}
 			else if (mtex->texco==TEXCO_GLOB) {
@@ -2728,6 +2752,12 @@ void do_volume_tex(ShadeInput *shi, const float *xyz, int mapto_flag, float col_
 				
 				if ((rgbnor & TEX_RGB) == 0) {
 					copy_v3_v3(tcol, &mtex->r);
+				}
+				else if (mtex->mapto & MAP_DENSITY) {
+					copy_v3_v3(tcol, &texres.tr);
+					if (texres.talpha) {
+						texres.tin = stencilTin;
+					}
 				}
 				else {
 					copy_v3_v3(tcol, &texres.tr);
@@ -2887,7 +2917,7 @@ void do_halo_tex(HaloRen *har, float xn, float yn, float col_r[4])
 			ImBuf *ibuf = BKE_image_get_ibuf(ima, &mtex->tex->iuser);
 			
 			/* don't linearize float buffers, assumed to be linear */
-			if (ibuf && !(ibuf->rect_float))
+			if (ibuf && !(ibuf->rect_float) && R.scene_color_manage)
 				IMB_colormanagement_colorspace_to_scene_linear_v3(&texres.tr, ibuf->rect_colorspace);
 		}
 
@@ -2922,10 +2952,14 @@ void do_halo_tex(HaloRen *har, float xn, float yn, float col_r[4])
 	}
 	if (mtex->mapto & MAP_ALPHA) {
 		if (rgb) {
-			if (texres.talpha) texres.tin= texres.ta;
-			else texres.tin = rgb_to_bw(&texres.tr);
+			if (texres.talpha) {
+				texres.tin = texres.ta;
+			}
+			else {
+				texres.tin = rgb_to_bw(&texres.tr);
+			}
 		}
-				
+
 		col_r[3]*= texres.tin;
 	}
 }
@@ -3102,7 +3136,7 @@ void do_sky_tex(const float rco[3], float lo[3], const float dxyview[2], float h
 					ImBuf *ibuf = BKE_image_get_ibuf(ima, &tex->iuser);
 					
 					/* don't linearize float buffers, assumed to be linear */
-					if (ibuf && !(ibuf->rect_float))
+					if (ibuf && !(ibuf->rect_float) && R.scene_color_manage)
 						IMB_colormanagement_colorspace_to_scene_linear_v3(tcol, ibuf->rect_colorspace);
 				}
 
@@ -3316,7 +3350,7 @@ void do_lamp_tex(LampRen *la, const float lavec[3], ShadeInput *shi, float col_r
 					ImBuf *ibuf = BKE_image_get_ibuf(ima, &tex->iuser);
 					
 					/* don't linearize float buffers, assumed to be linear */
-					if (ibuf && !(ibuf->rect_float))
+					if (ibuf && !(ibuf->rect_float) && R.scene_color_manage)
 						IMB_colormanagement_colorspace_to_scene_linear_v3(&texres.tr, ibuf->rect_colorspace);
 				}
 

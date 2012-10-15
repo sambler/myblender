@@ -3335,6 +3335,8 @@ static void lib_link_partdeflect(FileData *fd, ID *id, PartDeflect *pd)
 {
 	if (pd && pd->tex)
 		pd->tex = newlibadr_us(fd, id->lib, pd->tex);
+	if (pd && pd->f_source)
+		pd->f_source = newlibadr_us(fd, id->lib, pd->f_source);
 }
 
 static void lib_link_particlesettings(FileData *fd, Main *main)
@@ -3567,10 +3569,10 @@ static void direct_link_particlesystems(FileData *fd, ListBase *particles)
 			psys->clmd->clothObject = NULL;
 			
 			psys->clmd->sim_parms= newdataadr(fd, psys->clmd->sim_parms);
-			psys->clmd->sim_parms->effector_weights = NULL;
 			psys->clmd->coll_parms= newdataadr(fd, psys->clmd->coll_parms);
 			
 			if (psys->clmd->sim_parms) {
+				psys->clmd->sim_parms->effector_weights = NULL;
 				if (psys->clmd->sim_parms->presets > 10)
 					psys->clmd->sim_parms->presets = 0;
 			}
@@ -4317,10 +4319,12 @@ static void direct_link_modifiers(FileData *fd, ListBase *lb)
 				if (smd->domain->ptcaches[1].first || smd->domain->point_cache[1]) {
 					if (smd->domain->point_cache[1]) {
 						PointCache *cache = newdataadr(fd, smd->domain->point_cache[1]);
-						if (cache->flag & PTCACHE_FAKE_SMOKE)
-							; /* Smoke was already saved in "new format" and this cache is a fake one. */
-						else
+						if (cache->flag & PTCACHE_FAKE_SMOKE) {
+							/* Smoke was already saved in "new format" and this cache is a fake one. */
+						}
+						else {
 							printf("High resolution smoke cache not available due to pointcache update. Please reset the simulation.\n");
+						}
 						BKE_ptcache_free(cache);
 					}
 					smd->domain->ptcaches[1].first = NULL;
@@ -4333,6 +4337,9 @@ static void direct_link_modifiers(FileData *fd, ListBase *lb)
 				smd->coll = NULL;
 				smd->flow = newdataadr(fd, smd->flow);
 				smd->flow->smd = smd;
+				smd->flow->dm = NULL;
+				smd->flow->verts_old = NULL;
+				smd->flow->numverts = 0;
 				smd->flow->psys = newdataadr(fd, smd->flow->psys);
 			}
 			else if (smd->type == MOD_SMOKE_TYPE_COLL) {
@@ -4341,11 +4348,15 @@ static void direct_link_modifiers(FileData *fd, ListBase *lb)
 				smd->coll = newdataadr(fd, smd->coll);
 				if (smd->coll) {
 					smd->coll->smd = smd;
-					smd->coll->points = NULL;
-					smd->coll->numpoints = 0;
+					smd->coll->verts_old = NULL;
+					smd->coll->numverts = 0;
+					smd->coll->dm = NULL;
 				}
 				else {
 					smd->type = 0;
+					smd->flow = NULL;
+					smd->domain = NULL;
+					smd->coll = NULL;
 				}
 			}
 		}
@@ -6602,7 +6613,7 @@ void convert_tface_mt(FileData *fd, Main *main)
 		G.main = main;
 		
 		if (!(do_version_tface(main, 1))) {
-			BKE_report(fd->reports, RPT_WARNING, "Texface conversion problem. Error in console");
+			BKE_report(fd->reports, RPT_WARNING, "Texface conversion problem (error in console)");
 		}
 		
 		//XXX hack, material.c uses G.main allover the place, instead of main
@@ -7036,6 +7047,15 @@ static void do_version_ntree_keying_despill_balance(void *UNUSED(data), ID *UNUS
 			}
 		}
 	}
+}
+
+static void do_version_ntree_tex_coord_from_dupli_264(void *UNUSED(data), ID *UNUSED(id), bNodeTree *ntree)
+{
+	bNode *node;
+
+	for (node = ntree->nodes.first; node; node = node->next)
+		if (node->type == SH_NODE_TEX_COORD)
+			node->flag |= NODE_OPTIONS;
 }
 
 static void do_versions(FileData *fd, Library *lib, Main *main)
@@ -7995,8 +8015,77 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 		}
 	}
 
+	if (main->versionfile < 264 || (main->versionfile == 264 && main->subversionfile < 1)) {
+		bNodeTreeType *ntreetype = ntreeGetType(NTREE_SHADER);
+		bNodeTree *ntree;
+
+		if (ntreetype && ntreetype->foreach_nodetree)
+			ntreetype->foreach_nodetree(main, NULL, do_version_ntree_tex_coord_from_dupli_264);
+		
+		for (ntree=main->nodetree.first; ntree; ntree=ntree->id.next)
+			if (ntree->type==NTREE_SHADER)
+				do_version_ntree_tex_coord_from_dupli_264(NULL, NULL, ntree);
+	}
+
+	if (main->versionfile < 264 || (main->versionfile == 264 && main->subversionfile < 2)) {
+		MovieClip *clip;
+
+		for (clip = main->movieclip.first; clip; clip = clip->id.next) {
+			MovieTracking *tracking = &clip->tracking;
+			MovieTrackingObject *tracking_object;
+
+			for (tracking_object = tracking->objects.first;
+			     tracking_object;
+			     tracking_object = tracking_object->next)
+			{
+				if (tracking_object->keyframe1 == 0 && tracking_object->keyframe2 == 0) {
+					tracking_object->keyframe1 = tracking->settings.keyframe1;
+					tracking_object->keyframe2 = tracking->settings.keyframe2;
+				}
+			}
+		}
+	}
+
 	/* WATCH IT!!!: pointers from libdata have not been converted yet here! */
 	/* WATCH IT 2!: Userdef struct init has to be in editors/interface/resources.c! */
+
+	{
+		Object *ob;
+
+		for (ob = main->object.first; ob; ob = ob->id.next) {
+			ModifierData *md;
+			for (md = ob->modifiers.first; md; md = md->next) {
+				if (md->type == eModifierType_Smoke) {
+					SmokeModifierData *smd = (SmokeModifierData *)md;
+					if ((smd->type & MOD_SMOKE_TYPE_DOMAIN) && smd->domain) {
+						/* keep branch saves if possible */
+						if (!smd->domain->flame_max_temp) {
+							smd->domain->burning_rate = 0.75f;
+							smd->domain->flame_smoke = 1.0f;
+							smd->domain->flame_vorticity = 0.5f;
+							smd->domain->flame_ignition = 1.25f;
+							smd->domain->flame_max_temp = 1.75f;
+							smd->domain->adapt_threshold = 0.02f;
+							smd->domain->adapt_margin = 4;
+							smd->domain->flame_smoke_color[0] = 0.7f;
+							smd->domain->flame_smoke_color[1] = 0.7f;
+							smd->domain->flame_smoke_color[2] = 0.7f;
+						}
+					}
+					else if ((smd->type & MOD_SMOKE_TYPE_FLOW) && smd->flow) {
+						if (!smd->flow->texture_size) {
+							smd->flow->fuel_amount = 1.0;
+							smd->flow->surface_distance = 1.5;
+							smd->flow->color[0] = 0.7f;
+							smd->flow->color[1] = 0.7f;
+							smd->flow->color[2] = 0.7f;
+							smd->flow->texture_size = 1.0f;
+						}
+					}
+				}
+			}
+		}
+	}
 
 	/* don't forget to set version number in blender.c! */
 }

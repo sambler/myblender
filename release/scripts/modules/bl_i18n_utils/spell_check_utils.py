@@ -37,10 +37,12 @@ dict_uimsgs = {
     "aren",  # aren't
     "betweens",  # yuck! in-betweens!
     "boolean", "booleans",
+    "couldn",  #couldn't
     "decrement",
     "derivate",
     "doesn",  # doesn't
     "fader",
+    "hasn",  # hasn't
     "hoc",  # ad-hoc
     "indices",
     "iridas",
@@ -90,6 +92,7 @@ dict_uimsgs = {
     "gridline",
     "hemi",
     "inscatter", "inscattering",
+    "libdata",
     "lightless",
     "lookup", "lookups",
     "mathutils",
@@ -101,6 +104,7 @@ dict_uimsgs = {
     "multires", "multiresolution",
     "multisampling",
     "multitexture",
+    "multiuser",
     "namespace",
     "keyconfig",
     "playhead",
@@ -290,6 +294,7 @@ dict_uimsgs = {
     "crossfade",
     "deinterlace",
     "dropoff",
+    "dv",
     "eigenvectors",
     "equirectangular",
     "fisheye",
@@ -303,6 +308,7 @@ dict_uimsgs = {
     "midtones",
     "mipmap", "mipmaps", "mip",
     "ngon", "ngons",
+    "ntsc",
     "nurb", "nurbs",
     "perlin",
     "phong",
@@ -323,6 +329,7 @@ dict_uimsgs = {
     "ztransp",
 
     # Blender terms
+    "audaspace",
     "bbone",
     "breakdowner",
     "bspline",
@@ -347,6 +354,8 @@ dict_uimsgs = {
     "metaelement", "metaelements",
     "metastrip", "metastrips",
     "movieclip",
+    "mpoly",
+    "mtex",
     "nabla",
     "navmesh",
     "outliner",
@@ -362,6 +371,7 @@ dict_uimsgs = {
     "stucci",
     "sunsky",
     "subsurf",
+    "tessface", "tessfaces",
     "texface",
     "timeline", "timelines",
     "tosphere",
@@ -376,6 +386,7 @@ dict_uimsgs = {
     "catmull",
     "catrom",
     "chebychev",
+    "courant",
     "kutta",
     "lennard",
     "minkowski",
@@ -448,6 +459,7 @@ dict_uimsgs = {
     "dop",  # BLI K-Dop BVH
     "ik",
     "nla",
+    "py",
     "qbvh",
     "rna",
     "rvo",

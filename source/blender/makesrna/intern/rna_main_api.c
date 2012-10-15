@@ -71,6 +71,7 @@
 #include "BKE_speaker.h"
 #include "BKE_movieclip.h"
 #include "BKE_mask.h"
+#include "BKE_gpencil.h"
 
 #include "DNA_armature_types.h"
 #include "DNA_camera_types.h"
@@ -92,6 +93,7 @@
 #include "DNA_node_types.h"
 #include "DNA_movieclip_types.h"
 #include "DNA_mask_types.h"
+#include "DNA_gpencil_types.h"
 
 #include "ED_screen.h"
 
@@ -126,7 +128,7 @@ static void rna_Main_scenes_remove(Main *bmain, bContext *C, ReportList *reports
 	else if (scene->id.next)
 		newscene = scene->id.next;
 	else {
-		BKE_reportf(reports, RPT_ERROR, "Scene \"%s\" is the last, cant ve removed", scene->id.name + 2);
+		BKE_reportf(reports, RPT_ERROR, "Scene \"%s\" is the last, can't be removed", scene->id.name + 2);
 		return;
 	}
 
@@ -561,6 +563,19 @@ static void rna_Main_masks_remove(Main *bmain, Mask *mask)
 	/* XXX python now has invalid pointer? */
 }
 
+static void rna_Main_grease_pencil_remove(Main *bmain, ReportList *reports, bGPdata *gpd)
+{
+	if (ID_REAL_USERS(gpd) <= 0) {
+		BKE_gpencil_free(gpd);
+		BKE_libblock_free(&bmain->gpencil, gpd);
+	}
+	else
+		BKE_reportf(reports, RPT_ERROR, "Grease Pencil \"%s\" must have zero users to be removed, found %d",
+		            gpd->id.name + 2, ID_REAL_USERS(gpd));
+
+	/* XXX python now has invalid pointer? */
+}
+
 /* tag functions, all the same */
 static void rna_Main_cameras_tag(Main *bmain, int value) { tag_main_lb(&bmain->camera, value); }
 static void rna_Main_scenes_tag(Main *bmain, int value) { tag_main_lb(&bmain->scene, value); }
@@ -975,9 +990,9 @@ void RNA_def_main_images(BlenderRNA *brna, PropertyRNA *cprop)
 	RNA_def_function_ui_description(func, "Add a new image to the main database");
 	parm = RNA_def_string(func, "name", "Image", 0, "", "New name for the datablock");
 	RNA_def_property_flag(parm, PROP_REQUIRED);
-	parm = RNA_def_int(func, "width", 1024, 1, INT_MAX, "", "Width of the image", 0, INT_MAX);
+	parm = RNA_def_int(func, "width", 1024, 1, INT_MAX, "", "Width of the image", 1, INT_MAX);
 	RNA_def_property_flag(parm, PROP_REQUIRED);
-	parm = RNA_def_int(func, "height", 1024, 1, INT_MAX, "", "Height of the image", 0, INT_MAX);
+	parm = RNA_def_int(func, "height", 1024, 1, INT_MAX, "", "Height of the image", 1, INT_MAX);
 	RNA_def_property_flag(parm, PROP_REQUIRED);
 	RNA_def_boolean(func, "alpha", 0, "Alpha", "Use alpha channel");
 	RNA_def_boolean(func, "float_buffer", 0, "Float Buffer", "Create an image with floating point color");
@@ -1508,6 +1523,20 @@ void RNA_def_main_gpencil(BlenderRNA *brna, PropertyRNA *cprop)
 	func = RNA_def_function(srna, "tag", "rna_Main_gpencil_tag");
 	parm = RNA_def_boolean(func, "value", 0, "Value", "");
 	RNA_def_property_flag(parm, PROP_REQUIRED);
+
+	func = RNA_def_function(srna, "new", "gpencil_data_addnew");
+	RNA_def_function_flag(func, FUNC_NO_SELF);
+	parm = RNA_def_string(func, "name", "GreasePencil", 0, "", "New name for the datablock");
+	RNA_def_property_flag(parm, PROP_REQUIRED);
+	/* return type */
+	parm = RNA_def_pointer(func, "grease_pencil", "GreasePencil", "", "New grease pencil datablock");
+	RNA_def_function_return(func, parm);
+
+	func = RNA_def_function(srna, "remove", "rna_Main_grease_pencil_remove");
+	RNA_def_function_flag(func, FUNC_USE_REPORTS);
+	RNA_def_function_ui_description(func, "Remove a grease pencil instance from the current blendfile");
+	parm = RNA_def_pointer(func, "grease_pencil", "GreasePencil", "", "Grease Pencil to remove");
+	RNA_def_property_flag(parm, PROP_REQUIRED | PROP_NEVER_NULL);
 
 	prop = RNA_def_property(srna, "is_updated", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_clear_flag(prop, PROP_EDITABLE);

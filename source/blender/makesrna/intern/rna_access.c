@@ -996,7 +996,7 @@ void RNA_property_float_range(PointerRNA *ptr, PropertyRNA *prop, float *hardmin
 			IDProperty *item;
 
 			item = IDP_GetPropertyTypeFromGroup(idp_ui, "min", IDP_DOUBLE);
-			*hardmin = item ? (float)IDP_Double(item) : FLT_MIN;
+			*hardmin = item ? (float)IDP_Double(item) : -FLT_MAX;
 
 			item = IDP_GetPropertyTypeFromGroup(idp_ui, "max", IDP_DOUBLE);
 			*hardmax = item ? (float)IDP_Double(item) : FLT_MAX;
@@ -3606,7 +3606,7 @@ static char *rna_path_token(const char **path, char *fixedbuf, int fixedlen, int
 	/* copy string, taking into account escaped ] */
 	if (bracket) {
 		for (p = *path, i = 0, j = 0; i < len; i++, p++) {
-			if (*p == '\\' && *(p + 1) == quote) ;
+			if (*p == '\\' && *(p + 1) == quote) {}
 			else buf[j++] = *p;
 		}
 

@@ -17,6 +17,7 @@
  */
 
 #include "camera.h"
+#include "integrator.h"
 #include "graph.h"
 #include "light.h"
 #include "mesh.h"
@@ -194,8 +195,10 @@ void BlenderSync::sync_background_light()
 
 /* Object */
 
-void BlenderSync::sync_object(BL::Object b_parent, int b_index, BL::Object b_ob, Transform& tfm, uint layer_flag, int motion, int particle_id)
+void BlenderSync::sync_object(BL::Object b_parent, int b_index, BL::DupliObject b_dupli_ob, Transform& tfm, uint layer_flag, int motion, int particle_id)
 {
+	BL::Object b_ob = (b_dupli_ob ? b_dupli_ob.object() : b_parent);
+	
 	/* light is handled separately */
 	if(object_is_light(b_ob)) {
 		if(!motion)
@@ -225,7 +228,9 @@ void BlenderSync::sync_object(BL::Object b_parent, int b_index, BL::Object b_ob,
 				object->use_motion = true;
 			}
 
-			sync_mesh_motion(b_ob, object->mesh, motion);
+			/* mesh deformation blur not supported yet */
+			if(!scene->integrator->motion_blur)
+				sync_mesh_motion(b_ob, object->mesh, motion);
 		}
 
 		return;
@@ -272,6 +277,15 @@ void BlenderSync::sync_object(BL::Object b_parent, int b_index, BL::Object b_ob,
 		if(object->visibility & PATH_RAY_CAMERA) {
 			object->visibility |= layer_flag << PATH_RAY_LAYER_SHIFT;
 			object->visibility &= ~PATH_RAY_CAMERA;
+		}
+
+		if (b_dupli_ob) {
+			object->dupli_generated = get_float3(b_dupli_ob.orco());
+			object->dupli_uv = get_float2(b_dupli_ob.uv());
+		}
+		else {
+			object->dupli_generated = make_float3(0.0f, 0.0f, 0.0f);
+			object->dupli_uv = make_float2(0.0f, 0.0f);
 		}
 
 		object->particle_id = particle_id;
@@ -328,7 +342,7 @@ void BlenderSync::sync_objects(BL::SpaceView3D b_v3d, int motion)
 						bool dup_hide = (b_v3d)? b_dup_ob.hide(): b_dup_ob.hide_render();
 
 						if(!(b_dup->hide() || dup_hide)) {
-							sync_object(*b_ob, b_index, b_dup_ob, tfm, ob_layer, motion, b_dup->particle_index() + particle_offset);
+							sync_object(*b_ob, b_index, *b_dup, tfm, ob_layer, motion, b_dup->particle_index() + particle_offset);
 						}
 						
 						++b_index;
@@ -346,7 +360,7 @@ void BlenderSync::sync_objects(BL::SpaceView3D b_v3d, int motion)
 				if(!hide) {
 					/* object itself */
 					Transform tfm = get_transform(b_ob->matrix_world());
-					sync_object(*b_ob, 0, *b_ob, tfm, ob_layer, motion, 0);
+					sync_object(*b_ob, 0, PointerRNA_NULL, tfm, ob_layer, motion, 0);
 				}
 
 				particle_offset += num_particles;

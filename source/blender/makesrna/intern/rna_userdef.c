@@ -2745,6 +2745,11 @@ static void rna_def_userdef_edit(BlenderRNA *brna)
 	RNA_def_property_boolean_sdna(prop, NULL, "autokey_flag", AUTOKEY_FLAG_INSERTAVAIL);
 	RNA_def_property_ui_text(prop, "Auto Keyframe Insert Available",
 	                         "Automatic keyframe insertion in available F-Curves");
+							 
+	prop = RNA_def_property(srna, "use_auto_keying_warning", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_negative_sdna(prop, NULL, "autokey_flag", AUTOKEY_FLAG_NOWARNING);
+	RNA_def_property_ui_text(prop, "Show Auto Keying Warning",
+	                         "Show warning indicators when transforming Object and Bones if Auto Keying is enabled");
 	
 	/* keyframing settings */
 	prop = RNA_def_property(srna, "use_keyframe_insert_needed", PROP_BOOLEAN, PROP_NONE);
@@ -2982,7 +2987,7 @@ static void rna_def_userdef_system(BlenderRNA *brna)
 	/* locale according to http://www.roseindia.net/tutorials/I18N/locales-list.shtml */
 	/* if you edit here, please also edit the source/blender/blenfont/intern/blf_lang.c 's locales */
 	/* Note: As this list is in alphabetical order, and not defined order,
-	 *       here is the highest define currently in use: 33 (Hebrew). */
+	 *       here is the highest define currently in use: 34 (Estonian). */
 	static EnumPropertyItem language_items[] = {
 		{ 0, "", 0, N_("Nearly Done"), ""},
 		{ 0, "DEFAULT", 0, "Default (Default)", ""},
@@ -3005,6 +3010,7 @@ static void rna_def_userdef_system(BlenderRNA *brna)
 		{16, "CROATIAN", 0, "Croatian (Hrvatski)", "hr_HR"},
 		{11, "CZECH", 0, "Czech (Český)", "cs_CZ"},
 		{ 3, "DUTCH", 0, "Dutch (Nederlandse taal)", "nl_NL"},
+		{34, "ESTONIAN", 0, "Estonian (Eestlane)", "et_EE"},
 		{ 6, "FINNISH", 0, "Finnish (Suomi)", "fi_FI"},
 		{ 5, "GERMAN", 0, "German (Deutsch)", "de_DE"},
 		{23, "GREEK", 0, "Greek (Ελληνικά)", "el_GR"},

@@ -172,6 +172,9 @@ typedef struct VoxelData {
 	short flag;
 	short extend;
 	short smoked_type;
+	short data_type;
+	short pad;
+	int _pad;
 	
 	struct Object *object; /* for rendering smoke sims */
 	float int_multiplier;	
@@ -472,6 +475,7 @@ typedef struct ColorMapping {
 #define MTEX_BUMP_TEXTURESPACE	2048
 /* #define MTEX_BUMP_FLIPPED 	4096 */ /* UNUSED */
 #define MTEX_BICUBIC_BUMP		8192
+#define MTEX_MAPTO_BOUNDS		16384
 
 /* blendtype */
 #define MTEX_BLEND		0
@@ -579,6 +583,11 @@ typedef struct ColorMapping {
 #define TEX_VD_SMOKEDENSITY		0
 #define TEX_VD_SMOKEHEAT		1
 #define TEX_VD_SMOKEVEL			2
+#define TEX_VD_SMOKEFLAME		3
+
+/* data_type */
+#define TEX_VD_INTENSITY		0
+#define TEX_VD_RGBA_PREMUL		1
 
 /******************** Ocean *****************************/
 /* output */

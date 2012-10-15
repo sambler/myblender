@@ -48,6 +48,7 @@
 #include "DNA_dynamicpaint_types.h"
 
 #include "BLI_blenlib.h"
+#include "BLI_noise.h"
 #include "BLI_math.h"
 #include "BLI_utildefines.h"
 #include "BLI_kdtree.h"
@@ -97,8 +98,8 @@ int count_particles(ParticleSystem *psys)
 	int tot = 0;
 
 	LOOP_SHOWN_PARTICLES {
-		if (pa->alive == PARS_UNBORN && (part->flag & PART_UNBORN) == 0) ;
-		else if (pa->alive == PARS_DEAD && (part->flag & PART_DIED) == 0) ;
+		if (pa->alive == PARS_UNBORN && (part->flag & PART_UNBORN) == 0) {}
+		else if (pa->alive == PARS_DEAD && (part->flag & PART_DIED) == 0) {}
 		else tot++;
 	}
 	return tot;
@@ -110,8 +111,8 @@ int count_particles_mod(ParticleSystem *psys, int totgr, int cur)
 	int tot = 0;
 
 	LOOP_SHOWN_PARTICLES {
-		if (pa->alive == PARS_UNBORN && (part->flag & PART_UNBORN) == 0) ;
-		else if (pa->alive == PARS_DEAD && (part->flag & PART_DIED) == 0) ;
+		if (pa->alive == PARS_UNBORN && (part->flag & PART_UNBORN) == 0) {}
+		else if (pa->alive == PARS_DEAD && (part->flag & PART_DIED) == 0) {}
 		else if (p % totgr == cur) tot++;
 	}
 	return tot;

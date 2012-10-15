@@ -57,6 +57,8 @@
 #include "BIF_gl.h"
 #include "BIF_glutil.h"
 
+#include "BLF_api.h"
+
 #include "BKE_nla.h"
 #include "BKE_bmesh.h"
 #include "BKE_context.h"
@@ -89,11 +91,10 @@
 #include "BLI_smallhash.h"
 #include "BLI_array.h"
 
+#include "UI_interface_icons.h"
 #include "UI_resources.h"
 
 #include "transform.h"
-
-#include <stdio.h>
 
 static void drawTransformApply(const struct bContext *C, ARegion *ar, void *arg);
 static int doEdgeSlide(TransInfo *t, float perc);
@@ -225,8 +226,12 @@ void convertViewVec(TransInfo *t, float r_vec[3], int dx, int dy)
 void projectIntView(TransInfo *t, const float vec[3], int adr[2])
 {
 	if (t->spacetype == SPACE_VIEW3D) {
-		if (t->ar->regiontype == RGN_TYPE_WINDOW)
-			ED_view3d_project_int_noclip(t->ar, vec, adr);
+		if (t->ar->regiontype == RGN_TYPE_WINDOW) {
+			if (ED_view3d_project_int_global(t->ar, vec, adr, V3D_PROJ_TEST_NOP) != V3D_PROJ_RET_OK) {
+				adr[0] = (int)2140000000.0f;  /* this is what was done in 2.64, perhaps we can be smarter? */
+				adr[1] = (int)2140000000.0f;
+			}
+		}
 	}
 	else if (t->spacetype == SPACE_IMAGE) {
 		SpaceImage *sima = t->sa->spacedata.first;
@@ -347,7 +352,11 @@ void projectFloatView(TransInfo *t, const float vec[3], float adr[2])
 		case SPACE_VIEW3D:
 		{
 			if (t->ar->regiontype == RGN_TYPE_WINDOW) {
-				ED_view3d_project_float_noclip(t->ar, vec, adr);
+				if (ED_view3d_project_float_global(t->ar, vec, adr, V3D_PROJ_TEST_NOP) != V3D_PROJ_RET_OK) {
+					/* XXX, 2.64 and prior did this, weak! */
+					adr[0] = t->ar->winx / 2.0f;
+					adr[1] = t->ar->winy / 2.0f;
+				}
 				return;
 			}
 			break;
@@ -819,7 +828,7 @@ int transformEvent(TransInfo *t, wmEvent *event)
 	float mati[3][3] = MAT3_UNITY;
 	char cmode = constraintModeToChar(t);
 	int handled = 1;
-
+	
 	t->redraw |= handleMouseInput(t, &t->mouse, event);
 
 	if (event->type == MOUSEMOVE) {
@@ -1263,10 +1272,12 @@ int transformEvent(TransInfo *t, wmEvent *event)
 	if (t->handleEvent)
 		t->redraw |= t->handleEvent(t, event);
 
-	if (handled || t->redraw)
+	if (handled || t->redraw) {
 		return 0;
-	else
+	}
+	else {
 		return OPERATOR_PASS_THROUGH;
+	}
 }
 
 int calculateTransformCenter(bContext *C, int centerMode, float cent3d[3], int cent2d[2])
@@ -1549,14 +1560,53 @@ static void drawTransformView(const struct bContext *C, ARegion *UNUSED(ar), voi
 	drawNonPropEdge(C, t);
 }
 
-#if 0
-static void drawTransformPixel(const struct bContext *UNUSED(C), ARegion *UNUSED(ar), void *UNUSED(arg))
+/* just draw a little warning message in the top-right corner of the viewport to warn that autokeying is enabled */
+static void drawAutoKeyWarning(TransInfo *UNUSED(t), ARegion *ar)
 {
-//	TransInfo *t = arg;
-//
-//	drawHelpline(C, t->mval[0], t->mval[1], t);
+	const char printable[] = "Auto Keying On";
+	float      printable_size[2];
+	int xco, yco;
+
+	BLF_width_and_height_default(printable, &printable_size[0], &printable_size[1]);
+	
+	xco = ar->winx - (int)printable_size[0] - 10;
+	yco = ar->winy - (int)printable_size[1] - 10;
+	
+	/* warning text (to clarify meaning of overlays)
+	 * - original color was red to match the icon, but that clashes badly with a less nasty border
+	 */
+	UI_ThemeColorShade(TH_TEXT_HI, -50);
+	BLF_draw_default_ascii(xco, ar->winy - 17, 0.0f, printable, sizeof(printable));
+	
+	/* autokey recording icon... */
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glEnable(GL_BLEND);
+	
+	xco -= (ICON_DEFAULT_WIDTH + 2);
+	UI_icon_draw(xco, yco, ICON_REC);
+	
+	glDisable(GL_BLEND);
 }
-#endif
+
+static void drawTransformPixel(const struct bContext *UNUSED(C), ARegion *ar, void *arg)
+{	
+	TransInfo *t = arg;
+	Scene *scene = t->scene;
+	Object *ob = OBACT;
+	
+	/* draw autokeyframing hint in the corner 
+	 * - only draw if enabled (advanced users may be distracted/annoyed), 
+	 *   for objects that will be autokeyframed (no point ohterwise),
+	 *   AND only for the active region (as showing all is too overwhelming)
+	 */
+	if ((U.autokey_flag & AUTOKEY_FLAG_NOWARNING) == 0) {
+		if (ar == t->ar) {
+			if (ob && autokeyframe_cfra_can_key(scene, &ob->id)) {
+				drawAutoKeyWarning(t, ar);
+			}
+		}
+	}
+}
 
 void saveTransform(bContext *C, TransInfo *t, wmOperator *op)
 {
@@ -1726,7 +1776,7 @@ int initTransform(bContext *C, TransInfo *t, wmOperator *op, wmEvent *event, int
 
 		t->draw_handle_apply = ED_region_draw_cb_activate(t->ar->type, drawTransformApply, t, REGION_DRAW_PRE_VIEW);
 		t->draw_handle_view = ED_region_draw_cb_activate(t->ar->type, drawTransformView, t, REGION_DRAW_POST_VIEW);
-		//t->draw_handle_pixel = ED_region_draw_cb_activate(t->ar->type, drawTransformPixel, t, REGION_DRAW_POST_PIXEL);
+		t->draw_handle_pixel = ED_region_draw_cb_activate(t->ar->type, drawTransformPixel, t, REGION_DRAW_POST_PIXEL);
 		t->draw_handle_cursor = WM_paint_cursor_activate(CTX_wm_manager(C), helpline_poll, drawHelpline, t);
 	}
 	else if (t->spacetype == SPACE_IMAGE) {
@@ -3973,12 +4023,15 @@ int Tilt(TransInfo *t, const int UNUSED(mval[2]))
 
 		outputNumInput(&(t->num), c);
 
-		sprintf(str, "Tilt: %s %s", &c[0], t->proptext);
+		sprintf(str, "Tilt: %s° %s", &c[0], t->proptext);
 
 		final = DEG2RADF(final);
+
+		/* XXX For some reason, this seems needed for this op, else RNA prop is not updated... :/ */
+		t->values[0] = final;
 	}
 	else {
-		sprintf(str, "Tilt: %.2f %s", RAD2DEGF(final), t->proptext);
+		sprintf(str, "Tilt: %.2f° %s", RAD2DEGF(final), t->proptext);
 	}
 
 	for (i = 0; i < t->total; i++, td++) {
@@ -4789,12 +4842,12 @@ static void calcNonProportionalEdgeSlide(TransInfo *t, SlideData *sld, const flo
 			sv->edge_len = len_v3v3(dw_p, up_p);
 
 			mul_v3_m4v3(v_proj, t->obedit->obmat, sv->v->co);
-			ED_view3d_project_float_noclip(t->ar, v_proj, v_proj);
-
-			dist = len_squared_v2v2(mval, v_proj);
-			if (dist < min_dist) {
-				min_dist = dist;
-				sld->curr_sv_index = i;
+			if (ED_view3d_project_float_global(t->ar, v_proj, v_proj, V3D_PROJ_TEST_NOP) == V3D_PROJ_RET_OK) {
+				dist = len_squared_v2v2(mval, v_proj);
+				if (dist < min_dist) {
+					min_dist = dist;
+					sld->curr_sv_index = i;
+				}
 			}
 		}
 	}
@@ -4807,10 +4860,9 @@ static int createSlideVerts(TransInfo *t)
 {
 	BMEditMesh *em = BMEdit_FromObject(t->obedit);
 	BMesh *bm = em->bm;
-	BMIter iter, iter2;
+	BMIter iter;
 	BMEdge *e, *e1;
 	BMVert *v, *v2, *first;
-	BMLoop *l, *l1, *l2;
 	TransDataSlideVert *sv_array;
 	BMBVHTree *btree = BMBVH_NewBVH(em, BMBVH_RESPECT_HIDDEN, NULL, NULL);
 	SmallHash table;
@@ -4850,6 +4902,7 @@ static int createSlideVerts(TransInfo *t)
 	/*ensure valid selection*/
 	BM_ITER_MESH (v, &iter, bm, BM_VERTS_OF_MESH) {
 		if (BM_elem_flag_test(v, BM_ELEM_SELECT)) {
+			BMIter iter2;
 			numsel = 0;
 			BM_ITER_ELEM (e, &iter2, v, BM_EDGES_OF_VERT) {
 				if (BM_elem_flag_test(e, BM_ELEM_SELECT)) {
@@ -4902,6 +4955,8 @@ static int createSlideVerts(TransInfo *t)
 
 	j = 0;
 	while (1) {
+		BMLoop *l, *l1, *l2;
+
 		v = NULL;
 		BM_ITER_MESH (v, &iter, bm, BM_VERTS_OF_MESH) {
 			if (BM_elem_flag_test(v, BM_ELEM_TAG))
@@ -5035,7 +5090,7 @@ static int createSlideVerts(TransInfo *t)
 		if (BM_elem_flag_test(e, BM_ELEM_SELECT)) {
 			BMIter iter2;
 			BMEdge *e2;
-			float vec1[3], mval[2] = {t->mval[0], t->mval[1]}, d;
+			float vec1[3], d;
 
 			/* search cross edges for visible edge to the mouse cursor,
 			 * then use the shared vertex to calculate screen vector*/

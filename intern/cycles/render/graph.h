@@ -112,6 +112,7 @@ public:
 		INCOMING,
 		NORMAL,
 		POSITION,
+		TANGENT,
 		NONE
 	};
 
@@ -234,6 +235,7 @@ protected:
 	void break_cycles(ShaderNode *node, vector<bool>& visited, vector<bool>& on_stack);
 	void clean();
 	void bump_from_displacement();
+	void refine_bump_nodes();
 	void default_inputs(bool do_osl);
 };
 

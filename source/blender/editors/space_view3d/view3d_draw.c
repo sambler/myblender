@@ -355,7 +355,9 @@ static void drawgrid(UnitSettings *unit, ARegion *ar, View3D *v3d, const char **
 				if (dx < GRID_MIN_PX_D) {
 					rv3d->gridview *= sublines;
 					dx *= sublines;
-					if (dx < GRID_MIN_PX_D) ;
+					if (dx < GRID_MIN_PX_D) {
+						/* pass */
+					}
 					else {
 						UI_ThemeColor(TH_GRID);
 						drawgrid_draw(ar, wx, wy, x, y, dx);
@@ -553,32 +555,23 @@ static void drawfloor(Scene *scene, View3D *v3d, const char **grid_unit)
 
 static void drawcursor(Scene *scene, ARegion *ar, View3D *v3d)
 {
-	int mx, my, co[2];
-	int flag;
-	
+	int co[2];
+
 	/* we don't want the clipping for cursor */
-	flag = v3d->flag;
-	v3d->flag = 0;
-	ED_view3d_project_int(ar, give_cursor(scene, v3d), co);
-	v3d->flag = flag;
-	
-	mx = co[0];
-	my = co[1];
-	
-	if (mx != IS_CLIPPED) {
+	if (ED_view3d_project_int_global(ar, give_cursor(scene, v3d), co, V3D_PROJ_TEST_NOP) == V3D_PROJ_RET_OK) {
 		setlinestyle(0); 
 		cpack(0xFF);
-		circ((float)mx, (float)my, 10.0);
+		circ((float)co[0], (float)co[1], 10.0);
 		setlinestyle(4); 
 		cpack(0xFFFFFF);
-		circ((float)mx, (float)my, 10.0);
+		circ((float)co[0], (float)co[1], 10.0);
 		setlinestyle(0);
 		cpack(0x0);
 		
-		sdrawline(mx - 20, my, mx - 5, my);
-		sdrawline(mx + 5, my, mx + 20, my);
-		sdrawline(mx, my - 20, mx, my - 5);
-		sdrawline(mx, my + 5, mx, my + 20);
+		sdrawline(co[0] - 20, co[1], co[0] - 5, co[1]);
+		sdrawline(co[0] + 5, co[1], co[0] + 20, co[1]);
+		sdrawline(co[0], co[1] - 20, co[0], co[1] - 5);
+		sdrawline(co[0], co[1] + 5, co[0], co[1] + 20);
 	}
 }
 
@@ -1469,7 +1462,7 @@ ImBuf *view3d_read_backbuf(ViewContext *vc, short xmin, short ymin, short xmax, 
 
 /* smart function to sample a rect spiralling outside, nice for backbuf selection */
 unsigned int view3d_sample_backbuf_rect(ViewContext *vc, const int mval[2], int size,
-                                        unsigned int min, unsigned int max, int *dist, short strict,
+                                        unsigned int min, unsigned int max, float *r_dist, short strict,
                                         void *handle, unsigned int (*indextest)(void *handle, unsigned int index))
 {
 	struct ImBuf *buf;
@@ -1507,13 +1500,13 @@ unsigned int view3d_sample_backbuf_rect(ViewContext *vc, const int mval[2], int 
 					if (strict) {
 						indexok =  indextest(handle, *tbuf - min + 1);
 						if (indexok) {
-							*dist = (short) sqrt( (float)distance);
+							*r_dist = sqrtf((float)distance);
 							index = *tbuf - min + 1;
 							goto exit; 
 						}
 					}
 					else {
-						*dist = (short) sqrt( (float)distance);  /* XXX, this distance is wrong - */
+						*r_dist = sqrtf((float)distance);  /* XXX, this distance is wrong - */
 						index = *tbuf - min + 1;  /* messy yah, but indices start at 1 */
 						goto exit;
 					}
@@ -1927,7 +1920,7 @@ static void draw_dupli_objects_color(Scene *scene, ARegion *ar, View3D *v3d, Bas
 	if (base->object->restrictflag & OB_RESTRICT_VIEW) return;
 	
 	tbase.flag = OB_FROMDUPLI | base->flag;
-	lb = object_duplilist(scene, base->object);
+	lb = object_duplilist(scene, base->object, FALSE);
 	// BLI_sortlist(lb, dupli_ob_sort); /* might be nice to have if we have a dupli list with mixed objects. */
 
 	dob = dupli_step(lb->first);
@@ -2340,7 +2333,7 @@ static void gpu_update_lamps_shadows(Scene *scene, View3D *v3d)
 		
 		if (ob->transflag & OB_DUPLI) {
 			DupliObject *dob;
-			ListBase *lb = object_duplilist(scene, ob);
+			ListBase *lb = object_duplilist(scene, ob, FALSE);
 			
 			for (dob = lb->first; dob; dob = dob->next)
 				if (dob->ob->type == OB_LAMP)
@@ -2862,6 +2855,12 @@ static int view3d_main_area_draw_engine(const bContext *C, ARegion *ar, int draw
 
 		engine->tile_x = ceil(ar->winx / (float)scene->r.xparts);
 		engine->tile_y = ceil(ar->winy / (float)scene->r.yparts);
+
+		/* clamp small tile sizes to prevent inefficient threading utilization
+		 * the same happens for final renders as well
+		 */
+		engine->tile_x = MAX2(engine->tile_x, 64);
+		engine->tile_y = MAX2(engine->tile_x, 64);
 
 		type->view_update(engine, C);
 

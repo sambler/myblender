@@ -689,8 +689,8 @@ void BKE_object_unlink(Object *ob)
 
 					if (so->treestore) {
 						TreeStoreElem *tselem = so->treestore->data;
-						int a;
-						for (a = 0; a < so->treestore->usedelem; a++, tselem++) {
+						int i;
+						for (i = 0; i < so->treestore->usedelem; i++, tselem++) {
 							if (tselem->id == (ID *)ob) tselem->id = NULL;
 						}
 					}
@@ -2362,7 +2362,7 @@ int BKE_object_minmax_dupli(Scene *scene, Object *ob, float r_min[3], float r_ma
 		ListBase *lb;
 		DupliObject *dob;
 		
-		lb = object_duplilist(scene, ob);
+		lb = object_duplilist(scene, ob, FALSE);
 		for (dob = lb->first; dob; dob = dob->next) {
 			if ((use_hidden == FALSE) && (dob->no_draw != 0)) {
 				/* pass */
@@ -2439,7 +2439,7 @@ void BKE_scene_foreach_display_point(
 				ListBase *lb;
 				DupliObject *dob;
 
-				lb = object_duplilist(scene, ob);
+				lb = object_duplilist(scene, ob, FALSE);
 				for (dob = lb->first; dob; dob = dob->next) {
 					if (dob->no_draw == 0) {
 						BKE_object_foreach_display_point(dob->ob, dob->mat, func_cb, user_data);

@@ -780,7 +780,9 @@ static void shade_one_light(GPUShadeInput *shi, GPUShadeResult *shr, GPULamp *la
 		}
 	}
 
-	if (mat->scene->gm.flag & GAME_GLSL_NO_SHADERS);
+	if (mat->scene->gm.flag & GAME_GLSL_NO_SHADERS) {
+		/* pass */
+	}
 	else if (!(lamp->mode & LA_NO_SPEC) && !(lamp->mode & LA_ONLYSHADOW) &&
 	         (GPU_link_changed(shi->spec) || ma->spec != 0.0f))
 	{
@@ -841,7 +843,7 @@ static void material_lights(GPUShadeInput *shi, GPUShadeResult *shr)
 
 		if (ob->transflag & OB_DUPLI) {
 			DupliObject *dob;
-			ListBase *lb = object_duplilist(shi->gpumat->scene, ob);
+			ListBase *lb = object_duplilist(shi->gpumat->scene, ob, FALSE);
 			
 			for (dob=lb->first; dob; dob=dob->next) {
 				Object *ob_iter = dob->ob;

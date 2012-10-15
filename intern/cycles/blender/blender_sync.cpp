@@ -149,6 +149,9 @@ void BlenderSync::sync_data(BL::SpaceView3D b_v3d, BL::Object b_override, const 
 
 void BlenderSync::sync_integrator()
 {
+#ifdef __CAMERA_MOTION__
+	BL::RenderSettings r = b_scene.render();
+#endif
 	PointerRNA cscene = RNA_pointer_get(&b_scene.ptr, "cycles");
 
 	experimental = (RNA_enum_get(&cscene, "feature_set") != 0);
@@ -175,7 +178,7 @@ void BlenderSync::sync_integrator()
 	integrator->layer_flag = render_layer.layer;
 
 	integrator->sample_clamp = get_float(cscene, "sample_clamp");
-#ifdef __MOTION__
+#ifdef __CAMERA_MOTION__
 	integrator->motion_blur = (!preview && r.use_motion_blur());
 #endif
 
@@ -377,8 +380,14 @@ SessionParams BlenderSync::get_session_params(BL::RenderEngine b_engine, BL::Use
 	params.reset_timeout = get_float(cscene, "debug_reset_timeout");
 	params.text_timeout = get_float(cscene, "debug_text_timeout");
 
+	params.progressive_refine = get_boolean(cscene, "use_progressive_refine");
+
 	if(background) {
-		params.progressive = false;
+		if(params.progressive_refine)
+			params.progressive = true;
+		else
+			params.progressive = false;
+
 		params.start_resolution = INT_MAX;
 	}
 	else

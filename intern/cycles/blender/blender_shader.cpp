@@ -315,6 +315,10 @@ static ShaderNode *add_node(BL::BlendData b_data, BL::Scene b_scene, ShaderGraph
 			node = new HoldoutNode();
 			break;
 		}
+		case BL::ShaderNode::type_BSDF_ANISOTROPIC: {
+			node = new WardBsdfNode();
+			break;
+		}
 		case BL::ShaderNode::type_BSDF_DIFFUSE: {
 			node = new DiffuseBsdfNode();
 			break;
@@ -396,6 +400,10 @@ static ShaderNode *add_node(BL::BlendData b_data, BL::Scene b_scene, ShaderGraph
 		}
 		case BL::ShaderNode::type_PARTICLE_INFO: {
 			node = new ParticleInfoNode();
+			break;
+		}
+		case BL::ShaderNode::type_BUMP: {
+			node = new BumpNode();
 			break;
 		}
 		case BL::ShaderNode::type_TEX_IMAGE: {
@@ -490,7 +498,10 @@ static ShaderNode *add_node(BL::BlendData b_data, BL::Scene b_scene, ShaderGraph
 			break;
 		}
 		case BL::ShaderNode::type_TEX_COORD: {
-			node = new TextureCoordinateNode();
+			BL::ShaderNodeTexCoord b_tex_coord_node(b_node);
+			TextureCoordinateNode *tex_coord = new TextureCoordinateNode();
+			tex_coord->from_dupli = b_tex_coord_node.from_dupli();
+			node = tex_coord;
 			break;
 		}
 		case BL::ShaderNode::type_TEX_SKY: {

@@ -488,7 +488,7 @@ typedef enum eUserPref_Flag {
 	USER_NONEGFRAMES		= (1 << 24),
 	USER_TXT_TABSTOSPACES_DISABLE	= (1 << 25),
 	USER_TOOLTIPS_PYTHON    = (1 << 26),
-	USER_OPTION_TOOLTIPS	(1 << 27)		/* this shows tooltips when holding option/alt if USER_TOOLTIPS is off */
+	USER_OPTION_TOOLTIPS	= (1 << 27),		/* this shows tooltips when holding option/alt if USER_TOOLTIPS is off */
 } eUserPref_Flag;
 
 /* helper macro for checking frame clamping */

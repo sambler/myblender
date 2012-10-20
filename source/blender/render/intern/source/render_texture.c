@@ -1166,102 +1166,103 @@ static void do_2d_mapping(MTex *mtex, float texvec[3], VlakRen *vlr, const float
 static int multitex(Tex *tex, float texvec[3], float dxt[3], float dyt[3], int osatex, TexResult *texres, const short thread, short which_output)
 {
 	float tmpvec[3];
-	int retval=0; /* return value, int:0, col:1, nor:2, everything:3 */
+	int retval = 0; /* return value, int:0, col:1, nor:2, everything:3 */
 
 	texres->talpha = FALSE;  /* is set when image texture returns alpha (considered premul) */
 	
 	if (tex->use_nodes && tex->nodetree) {
 		retval = ntreeTexExecTree(tex->nodetree, texres, texvec, dxt, dyt, osatex, thread,
-			tex, which_output, R.r.cfra, (R.r.scemode & R_TEXNODE_PREVIEW) != 0, NULL, NULL);
+		                          tex, which_output, R.r.cfra, (R.r.scemode & R_TEXNODE_PREVIEW) != 0, NULL, NULL);
 	}
 	else {
-	switch (tex->type) {
-	case 0:
-		texres->tin= 0.0f;
-		return 0;
-	case TEX_CLOUDS:
-		retval= clouds(tex, texvec, texres);
-		break;
-	case TEX_WOOD:
-		retval= wood(tex, texvec, texres); 
-		break;
-	case TEX_MARBLE:
-		retval= marble(tex, texvec, texres); 
-		break;
-	case TEX_MAGIC:
-		retval= magic(tex, texvec, texres); 
-		break;
-	case TEX_BLEND:
-		retval= blend(tex, texvec, texres);
-		break;
-	case TEX_STUCCI:
-		retval= stucci(tex, texvec, texres); 
-		break;
-	case TEX_NOISE:
-		retval= texnoise(tex, texres); 
-		break;
-	case TEX_IMAGE:
-		if (osatex) retval= imagewraposa(tex, tex->ima, NULL, texvec, dxt, dyt, texres);
-		else retval= imagewrap(tex, tex->ima, NULL, texvec, texres); 
-		BKE_image_tag_time(tex->ima); /* tag image as having being used */
-		break;
-	case TEX_ENVMAP:
-		retval= envmaptex(tex, texvec, dxt, dyt, osatex, texres);
-		break;
-	case TEX_MUSGRAVE:
-		/* newnoise: musgrave types */
-		
-		/* ton: added this, for Blender convention reason. 
-		 * artificer: added the use of tmpvec to avoid scaling texvec
-		 */
-		copy_v3_v3(tmpvec, texvec);
-		mul_v3_fl(tmpvec, 1.0f/tex->noisesize);
-		
-		switch (tex->stype) {
-		case TEX_MFRACTAL:
-		case TEX_FBM:
-			retval= mg_mFractalOrfBmTex(tex, tmpvec, texres);
-			break;
-		case TEX_RIDGEDMF:
-		case TEX_HYBRIDMF:
-			retval= mg_ridgedOrHybridMFTex(tex, tmpvec, texres);
-			break;
-		case TEX_HTERRAIN:
-			retval= mg_HTerrainTex(tex, tmpvec, texres);
-			break;
+		switch (tex->type) {
+			case 0:
+				texres->tin= 0.0f;
+				return 0;
+			case TEX_CLOUDS:
+				retval = clouds(tex, texvec, texres);
+				break;
+			case TEX_WOOD:
+				retval = wood(tex, texvec, texres);
+				break;
+			case TEX_MARBLE:
+				retval = marble(tex, texvec, texres);
+				break;
+			case TEX_MAGIC:
+				retval = magic(tex, texvec, texres);
+				break;
+			case TEX_BLEND:
+				retval = blend(tex, texvec, texres);
+				break;
+			case TEX_STUCCI:
+				retval = stucci(tex, texvec, texres);
+				break;
+			case TEX_NOISE:
+				retval = texnoise(tex, texres);
+				break;
+			case TEX_IMAGE:
+				if (osatex) retval = imagewraposa(tex, tex->ima, NULL, texvec, dxt, dyt, texres);
+				else        retval = imagewrap(tex, tex->ima, NULL, texvec, texres);
+				BKE_image_tag_time(tex->ima); /* tag image as having being used */
+				break;
+			case TEX_ENVMAP:
+				retval = envmaptex(tex, texvec, dxt, dyt, osatex, texres);
+				break;
+			case TEX_MUSGRAVE:
+				/* newnoise: musgrave types */
+
+				/* ton: added this, for Blender convention reason.
+				 * artificer: added the use of tmpvec to avoid scaling texvec
+				 */
+				copy_v3_v3(tmpvec, texvec);
+				mul_v3_fl(tmpvec, 1.0f / tex->noisesize);
+
+				switch (tex->stype) {
+					case TEX_MFRACTAL:
+					case TEX_FBM:
+						retval = mg_mFractalOrfBmTex(tex, tmpvec, texres);
+						break;
+					case TEX_RIDGEDMF:
+					case TEX_HYBRIDMF:
+						retval = mg_ridgedOrHybridMFTex(tex, tmpvec, texres);
+						break;
+					case TEX_HTERRAIN:
+						retval = mg_HTerrainTex(tex, tmpvec, texres);
+						break;
+				}
+				break;
+				/* newnoise: voronoi type */
+			case TEX_VORONOI:
+				/* ton: added this, for Blender convention reason.
+				 * artificer: added the use of tmpvec to avoid scaling texvec
+				 */
+				copy_v3_v3(tmpvec, texvec);
+				mul_v3_fl(tmpvec, 1.0f / tex->noisesize);
+
+				retval = voronoiTex(tex, tmpvec, texres);
+				break;
+			case TEX_DISTNOISE:
+				/* ton: added this, for Blender convention reason.
+				 * artificer: added the use of tmpvec to avoid scaling texvec
+				 */
+				copy_v3_v3(tmpvec, texvec);
+				mul_v3_fl(tmpvec, 1.0f / tex->noisesize);
+
+				retval = mg_distNoiseTex(tex, tmpvec, texres);
+				break;
+			case TEX_POINTDENSITY:
+				retval = pointdensitytex(tex, texvec, texres);
+				break;
+			case TEX_VOXELDATA:
+				retval = voxeldatatex(tex, texvec, texres);
+				break;
+			case TEX_OCEAN:
+				retval = ocean_texture(tex, texvec, texres);
+				break;
+			case TEX_PLANET:
+				retval= planet(tex, texvec, texres);
+				break;
 		}
-		break;
-	/* newnoise: voronoi type */
-	case TEX_VORONOI:
-		/* ton: added this, for Blender convention reason.
-		 * artificer: added the use of tmpvec to avoid scaling texvec
-		 */
-		copy_v3_v3(tmpvec, texvec);
-		mul_v3_fl(tmpvec, 1.0f/tex->noisesize);
-		
-		retval= voronoiTex(tex, tmpvec, texres);
-		break;
-	case TEX_DISTNOISE:
-		/* ton: added this, for Blender convention reason.
-		 * artificer: added the use of tmpvec to avoid scaling texvec
-		 */
-		copy_v3_v3(tmpvec, texvec);
-		mul_v3_fl(tmpvec, 1.0f/tex->noisesize);
-		
-		retval= mg_distNoiseTex(tex, tmpvec, texres);
-		break;
-	case TEX_POINTDENSITY:
-		retval= pointdensitytex(tex, texvec, texres);
-		break;
-	case TEX_VOXELDATA:
-		retval= voxeldatatex(tex, texvec, texres);  
-		break;
-	case TEX_OCEAN:
-		retval= ocean_texture(tex, texvec, texres);  
-		break;
-	case TEX_PLANET:
-		retval= planet(tex, texvec, texres);
-	}
 	}
 
 	if (tex->flag & TEX_COLORBAND) {
@@ -1296,7 +1297,7 @@ int multitex_nodes(Tex *tex, float texvec[3], float dxt[3], float dyt[3], int os
 		if (mtex) {
 			/* we have mtex, use it for 2d mapping images only */
 			do_2d_mapping(mtex, texvec, shi->vlr, shi->facenor, dxt, dyt);
-			rgbnor= multitex(tex, texvec, dxt, dyt, osatex, texres, thread, which_output);
+			rgbnor = multitex(tex, texvec, dxt, dyt, osatex, texres, thread, which_output);
 
 			if (mtex->mapto & (MAP_COL+MAP_COLSPEC+MAP_COLMIR)) {
 				ImBuf *ibuf = BKE_image_get_ibuf(tex->ima, &tex->iuser);
@@ -1619,10 +1620,10 @@ static void texco_mapping(ShadeInput* shi, Tex* tex, MTex* mtex,
 		texvec[0] = mtex->size[0]*(texvec[0] - 0.5f) + mtex->ofs[0] + 0.5f;
 		texvec[1] = mtex->size[1]*(texvec[1] - 0.5f) + mtex->ofs[1] + 0.5f;
 		if (shi->osatex) {
-			dxt[0] = mtex->size[0]*dxt[0];
-			dxt[1] = mtex->size[1]*dxt[1];
-			dyt[0] = mtex->size[0]*dyt[0];
-			dyt[1] = mtex->size[1]*dyt[1];
+			dxt[0] = mtex->size[0] * dxt[0];
+			dxt[1] = mtex->size[1] * dxt[1];
+			dyt[0] = mtex->size[0] * dyt[0];
+			dyt[1] = mtex->size[1] * dyt[1];
 		}
 		
 		/* problem: repeat-mirror is not a 'repeat' but 'extend' in imagetexture.c */

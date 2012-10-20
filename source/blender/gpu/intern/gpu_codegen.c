@@ -232,7 +232,7 @@ static char *gpu_generate_function_prototyps(GHash *hash)
 GPUFunction *GPU_lookup_function(const char *name)
 {
 	if (!FUNCTION_HASH) {
-		FUNCTION_HASH = BLI_ghash_new(BLI_ghashutil_strhash, BLI_ghashutil_strcmp, "GPU_lookup_function gh");
+		FUNCTION_HASH = BLI_ghash_str_new("GPU_lookup_function gh");
 		gpu_parse_functions_string(FUNCTION_HASH, glsl_material_library);
 		/*FUNCTION_PROTOTYPES = gpu_generate_function_prototyps(FUNCTION_HASH);
 		FUNCTION_LIB = GPU_shader_create_lib(datatoc_gpu_shader_material_glsl);*/
@@ -258,16 +258,18 @@ void GPU_codegen_exit(void)
 		FUNCTION_HASH = NULL;
 	}
 
+	GPU_shader_free_builtin_shaders();
+
 	if (glsl_material_library) {
 		MEM_freeN(glsl_material_library);
 		glsl_material_library = NULL;
 	}
 
-	/*if(FUNCTION_PROTOTYPES) {
+	/*if (FUNCTION_PROTOTYPES) {
 		MEM_freeN(FUNCTION_PROTOTYPES);
 		FUNCTION_PROTOTYPES = NULL;
 	}*/
-	/*if(FUNCTION_LIB) {
+	/*if (FUNCTION_LIB) {
 		GPU_shader_free(FUNCTION_LIB);
 		FUNCTION_LIB = NULL;
 	}*/
@@ -373,8 +375,8 @@ static void codegen_set_unique_ids(ListBase *nodes)
 	GPUOutput *output;
 	int id = 1, texid = 0;
 
-	bindhash= BLI_ghash_new(BLI_ghashutil_ptrhash, BLI_ghashutil_ptrcmp, "codegen_set_unique_ids1 gh");
-	definehash= BLI_ghash_new(BLI_ghashutil_ptrhash, BLI_ghashutil_ptrcmp, "codegen_set_unique_ids2 gh");
+	bindhash= BLI_ghash_ptr_new("codegen_set_unique_ids1 gh");
+	definehash= BLI_ghash_ptr_new("codegen_set_unique_ids2 gh");
 
 	for (node=nodes->first; node; node=node->next) {
 		for (input=node->inputs.first; input; input=input->next) {
@@ -385,10 +387,11 @@ static void codegen_set_unique_ids(ListBase *nodes)
 
 			/* set texid used for settings texture slot with multitexture */
 			if (codegen_input_has_texture(input) &&
-				((input->source == GPU_SOURCE_TEX) || (input->source == GPU_SOURCE_TEX_PIXEL))) {
+			    ((input->source == GPU_SOURCE_TEX) || (input->source == GPU_SOURCE_TEX_PIXEL)))
+			{
 				if (input->link) {
 					/* input is texture from buffer, assign only one texid per
-					   buffer to avoid sampling the same texture twice */
+					 * buffer to avoid sampling the same texture twice */
 					if (!BLI_ghash_haskey(bindhash, input->link)) {
 						input->texid = texid++;
 						input->bindtex = 1;
@@ -399,7 +402,7 @@ static void codegen_set_unique_ids(ListBase *nodes)
 				}
 				else if (input->ima) {
 					/* input is texture from image, assign only one texid per
-					   buffer to avoid sampling the same texture twice */
+					 * buffer to avoid sampling the same texture twice */
 					if (!BLI_ghash_haskey(bindhash, input->ima)) {
 						input->texid = texid++;
 						input->bindtex = 1;
@@ -587,7 +590,7 @@ static char *code_generate_fragment(ListBase *nodes, GPUOutput *output, const ch
 	codegen_set_unique_ids(nodes);
 	codegen_print_uniforms_functions(ds, nodes);
 
-	//if(G.debug & G_DEBUG)
+	//if (G.debug & G_DEBUG)
 	//	BLI_dynstr_appendf(ds, "/* %s */\n", name);
 
 	BLI_dynstr_append(ds, "void main(void)\n");
@@ -602,7 +605,7 @@ static char *code_generate_fragment(ListBase *nodes, GPUOutput *output, const ch
 	code = BLI_dynstr_get_cstring(ds);
 	BLI_dynstr_free(ds);
 
-	//if(G.debug & G_DEBUG) printf("%s\n", code);
+	//if (G.debug & G_DEBUG) printf("%s\n", code);
 
 	return code;
 }
@@ -645,7 +648,7 @@ static char *code_generate_vertex(ListBase *nodes)
 
 	BLI_dynstr_free(ds);
 
-	//if(G.debug & G_DEBUG) printf("%s\n", code);
+	//if (G.debug & G_DEBUG) printf("%s\n", code);
 
 	return code;
 }
@@ -710,8 +713,10 @@ static void GPU_nodes_extract_dynamic_inputs(GPUPass *pass, ListBase *nodes)
 			/* attributes don't need to be bound, they already have
 			 * an id that the drawing functions will use */
 			if (input->source == GPU_SOURCE_ATTRIB ||
-			   input->source == GPU_SOURCE_BUILTIN)
+			    input->source == GPU_SOURCE_BUILTIN)
+			{
 				continue;
+			}
 
 			if (input->ima || input->tex)
 				BLI_snprintf(input->shadername, sizeof(input->shadername), "samp%d", input->texid);
@@ -756,7 +761,7 @@ void GPU_pass_bind(GPUPass *pass, double time, int mipmap)
 	/* now bind the textures */
 	for (input=inputs->first; input; input=input->next) {
 		if (input->ima)
-			input->tex = GPU_texture_from_blender(input->ima, input->iuser, time, mipmap);
+			input->tex = GPU_texture_from_blender(input->ima, input->iuser, input->imagencd, time, mipmap);
 
 		if (input->tex && input->bindtex) {
 			GPU_texture_bind(input->tex, input->texid);
@@ -912,6 +917,7 @@ static void gpu_node_input_link(GPUNode *node, GPUNodeLink *link, int type)
 
 		input->ima = link->ptr1;
 		input->iuser = link->ptr2;
+		input->imagencd = link->imagencd;
 		input->textarget = GL_TEXTURE_2D;
 		input->textype = GPU_TEX2D;
 		MEM_freeN(link);
@@ -968,8 +974,8 @@ static void GPU_node_output(GPUNode *node, int type, const char *UNUSED(name), G
 		output->link->output = output;
 
 		/* note: the caller owns the reference to the linkfer, GPUOutput
-		   merely points to it, and if the node is destroyed it will
-		   set that pointer to NULL */
+		 * merely points to it, and if the node is destroyed it will
+		 * set that pointer to NULL */
 	}
 
 	BLI_addtail(&node->outputs, output);
@@ -1034,8 +1040,10 @@ static void gpu_nodes_get_vertex_attributes(ListBase *nodes, GPUVertexAttribs *a
 			if (input->source == GPU_SOURCE_ATTRIB) {
 				for (a=0; a<attribs->totlayer; a++) {
 					if (attribs->layer[a].type == input->attribtype &&
-						strcmp(attribs->layer[a].name, input->attribname) == 0)
+					    strcmp(attribs->layer[a].name, input->attribname) == 0)
+					{
 						break;
+					}
 				}
 
 				if (a == attribs->totlayer && a < GPU_MAX_ATTRIB) {
@@ -1102,13 +1110,14 @@ GPUNodeLink *GPU_dynamic_uniform(float *num, int dynamictype, void *data)
 	return link;
 }
 
-GPUNodeLink *GPU_image(Image *ima, ImageUser *iuser)
+GPUNodeLink *GPU_image(Image *ima, ImageUser *iuser, int ncd)
 {
 	GPUNodeLink *link = GPU_node_link_create(0);
 
 	link->image= 1;
 	link->ptr1= ima;
 	link->ptr2= iuser;
+	link->imagencd= ncd;
 
 	return link;
 }
@@ -1319,7 +1328,7 @@ GPUPass *GPU_generate_pass(ListBase *nodes, GPUNodeLink *outlink, GPUVertexAttri
 	GPUPass *pass;
 	char *vertexcode, *fragmentcode;
 
-	/*if(!FUNCTION_LIB) {
+	/*if (!FUNCTION_LIB) {
 		GPU_nodes_free(nodes);
 		return NULL;
 	}*/

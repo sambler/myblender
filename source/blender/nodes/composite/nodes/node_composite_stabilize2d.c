@@ -36,35 +36,40 @@
 /* **************** Translate  ******************** */
 
 static bNodeSocketTemplate cmp_node_stabilize2d_in[]= {
-	{	SOCK_RGBA, 1, "Image",			0.8f, 0.8f, 0.8f, 1.0f, 0.0f, 1.0f},
+	{	SOCK_RGBA, 1, N_("Image"),			0.8f, 0.8f, 0.8f, 1.0f, 0.0f, 1.0f},
 	{	-1, 0, ""	}
 };
 
 static bNodeSocketTemplate cmp_node_stabilize2d_out[]= {
-	{	SOCK_RGBA, 0, "Image"},
+	{	SOCK_RGBA, 0, N_("Image")},
 	{	-1, 0, ""	}
 };
+
+#ifdef WITH_COMPOSITOR_LEGACY
 
 static void node_composit_exec_stabilize2d(void *data, bNode *node, bNodeStack **in, bNodeStack **out)
 {
 	if (in[0]->data && node->id) {
-		RenderData *rd= data;
-		MovieClip *clip= (MovieClip *)node->id;
-		CompBuf *cbuf= typecheck_compbuf(in[0]->data, CB_RGBA);
+		RenderData *rd = data;
+		MovieClip *clip = (MovieClip *)node->id;
+		CompBuf *cbuf = typecheck_compbuf(in[0]->data, CB_RGBA);
 		CompBuf *stackbuf;
 		float loc[2], scale, angle;
+		int clip_framenr = BKE_movieclip_remap_scene_to_clip_frame(clip, rd->cfra);
 
-		BKE_tracking_stabilization_data(&clip->tracking, rd->cfra, cbuf->x, cbuf->y, loc, &scale, &angle);
+		BKE_tracking_stabilization_data_get(&clip->tracking, clip_framenr, cbuf->x, cbuf->y, loc, &scale, &angle);
 
-		stackbuf= node_composit_transform(cbuf, loc[0], loc[1], angle, scale, node->custom1);
+		stackbuf = node_composit_transform(cbuf, loc[0], loc[1], angle, scale, node->custom1);
 
 		/* pass on output and free */
-		out[0]->data= stackbuf;
+		out[0]->data = stackbuf;
 
-		if (cbuf!=in[0]->data)
+		if (cbuf != in[0]->data)
 			free_compbuf(cbuf);
 	}
 }
+
+#endif  /* WITH_COMPOSITOR_LEGACY */
 
 void register_node_type_cmp_stabilize2d(bNodeTreeType *ttype)
 {
@@ -73,7 +78,9 @@ void register_node_type_cmp_stabilize2d(bNodeTreeType *ttype)
 	node_type_base(ttype, &ntype, CMP_NODE_STABILIZE2D, "Stabilize 2D", NODE_CLASS_DISTORT, NODE_OPTIONS);
 	node_type_socket_templates(&ntype, cmp_node_stabilize2d_in, cmp_node_stabilize2d_out);
 	node_type_size(&ntype, 140, 100, 320);
+#ifdef WITH_COMPOSITOR_LEGACY
 	node_type_exec(&ntype, node_composit_exec_stabilize2d);
+#endif
 
 	nodeRegisterType(ttype, &ntype);
 }

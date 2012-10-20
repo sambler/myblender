@@ -40,9 +40,9 @@ static bNodeSocketTemplate sh_node_texture_in[]= {
 	{	-1, 0, ""	}
 };
 static bNodeSocketTemplate sh_node_texture_out[]= {
-	{	SOCK_FLOAT, 0, "Value"},
-	{	SOCK_RGBA , 0, "Color"},
-	{	SOCK_VECTOR, 0, "Normal"},
+	{	SOCK_FLOAT, 0, N_("Value")},
+	{	SOCK_RGBA, 0, N_("Color")},
+	{	SOCK_VECTOR, 0, N_("Normal")},
 	{	-1, 0, ""	}
 };
 
@@ -100,17 +100,13 @@ static void node_shader_exec_texture(void *data, bNode *node, bNodeStack **in, b
 		else
 			out[0]->vec[0]= texres.tin;
 		
-		if ((retval & TEX_RGB)==0) {
-			out[1]->vec[0]= out[0]->vec[0];
-			out[1]->vec[1]= out[0]->vec[0];
-			out[1]->vec[2]= out[0]->vec[0];
-			out[1]->vec[3]= 1.0f;
+		if ((retval & TEX_RGB) == 0) {
+			copy_v3_fl(out[1]->vec, out[0]->vec[0]);
+			out[1]->vec[3] = 1.0f;
 		}
 		else {
-			out[1]->vec[0]= texres.tr;
-			out[1]->vec[1]= texres.tg;
-			out[1]->vec[2]= texres.tb;
-			out[1]->vec[3]= 1.0f;
+			copy_v3_v3(out[1]->vec, &texres.tr);
+			out[1]->vec[3] = 1.0f;
 		}
 		
 		copy_v3_v3(out[2]->vec, nor);
@@ -126,7 +122,7 @@ static int gpu_shader_texture(GPUMaterial *mat, bNode *node, GPUNodeStack *in, G
 	Tex *tex = (Tex*)node->id;
 
 	if (tex && tex->type == TEX_IMAGE && tex->ima) {
-		GPUNodeLink *texlink = GPU_image(tex->ima, NULL);
+		GPUNodeLink *texlink = GPU_image(tex->ima, NULL, FALSE);
 		return GPU_stack_link(mat, "texture_image", in, out, texlink);
 	}
 	else

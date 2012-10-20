@@ -72,6 +72,9 @@
 #  define ACOMP	3
 #endif
 
+#define RCT_SIZE_X(rct)       ((rct)->xmax - (rct)->xmin)
+#define RCT_SIZE_Y(rct)       ((rct)->ymax - (rct)->ymin)
+
 /* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
 /* defined in pipeline.c, is hardcopy of active dynamic allocated Render */
 /* only to be used here in this file, it's for speed */
@@ -108,13 +111,13 @@ static void copy_to_ztile(int *rectz, int size, int x1, int y1, int tile, char *
 #if 0
 static int sizeoflampbuf(ShadBuf *shb)
 {
-	int num,count=0;
+	int num, count=0;
 	char *cp;
 	
 	cp= shb->cbuf;
 	num= (shb->size*shb->size)/256;
 
-	while(num--) count+= *(cp++);
+	while (num--) count+= *(cp++);
 	
 	return 256*count;
 }
@@ -139,7 +142,7 @@ static float *give_jitter_tab(int samp)
 
 	if (ctab[samp]==0) {
 		ctab[samp]= 1;
-		BLI_initjit(jit[offset], samp*samp);
+		BLI_jitter_init(jit[offset], samp*samp);
 	}
 		
 	return jit[offset];
@@ -193,7 +196,7 @@ static int compress_deepsamples(DeepSample *dsample, int tot, float epsilon)
 #if 0
 	if (print) {
 		for (a=0, ds=dsample; a<tot; a++, ds++)
-			printf("%lf,%f ", ds->z/(double)0x7FFFFFFF, ds->v);
+			printf("%lf, %f ", ds->z/(double)0x7FFFFFFF, ds->v);
 		printf("\n");
 	}
 #endif
@@ -278,7 +281,7 @@ static int compress_deepsamples(DeepSample *dsample, int tot, float epsilon)
 #if 0
 	if (print) {
 		for (a=0, ds=dsample; a<newtot; a++, ds++)
-			printf("%lf,%f ", ds->z/(double)0x7FFFFFFF, ds->v);
+			printf("%lf, %f ", ds->z/(double)0x7FFFFFFF, ds->v);
 		printf("\n");
 	}
 #endif
@@ -319,11 +322,11 @@ static void compress_deepshadowbuf(Render *re, ShadBuf *shb, APixstr *apixbuf, A
 	int a, b, c, tot, minz, found, prevtot, newtot;
 	int sampletot[RE_MAX_OSA], totsample = 0, totsamplec = 0;
 	
-	shsample= MEM_callocN( sizeof(ShadSampleBuf), "shad sample buf");
+	shsample= MEM_callocN(sizeof(ShadSampleBuf), "shad sample buf");
 	BLI_addtail(&shb->buffers, shsample);
 
-	shsample->totbuf= MEM_callocN(sizeof(int)*size*size, "deeptotbuf");
-	shsample->deepbuf= MEM_callocN(sizeof(DeepSample*)*size*size, "deepbuf");
+	shsample->totbuf = MEM_callocN(sizeof(int) * size * size, "deeptotbuf");
+	shsample->deepbuf = MEM_callocN(sizeof(DeepSample *) * size * size, "deepbuf");
 
 	ap= apixbuf;
 	aps= apixbufstrand;
@@ -446,7 +449,7 @@ static void compress_deepshadowbuf(Render *re, ShadBuf *shb, APixstr *apixbuf, A
 
 		/* merge buffers */
 		dsb= shsample->deepbuf[a];
-		while(1) {
+		while (1) {
 			minz= 0;
 			found= 0;
 
@@ -511,11 +514,11 @@ static void compress_shadowbuf(ShadBuf *shb, int *rectz, int square)
 	int a, x, y, minx, miny, byt1, byt2;
 	char *rc, *rcline, *ctile, *zt;
 	
-	shsample= MEM_callocN( sizeof(ShadSampleBuf), "shad sample buf");
+	shsample= MEM_callocN(sizeof(ShadSampleBuf), "shad sample buf");
 	BLI_addtail(&shb->buffers, shsample);
 	
-	shsample->zbuf= MEM_mallocN( sizeof(uintptr_t)*(size*size)/256, "initshadbuf2");
-	shsample->cbuf= MEM_callocN( (size*size)/256, "initshadbuf3");
+	shsample->zbuf= MEM_mallocN(sizeof(uintptr_t)*(size*size)/256, "initshadbuf2");
+	shsample->cbuf= MEM_callocN((size*size)/256, "initshadbuf3");
 	
 	ztile= (uintptr_t *)shsample->zbuf;
 	ctile= shsample->cbuf;
@@ -546,7 +549,7 @@ static void compress_shadowbuf(ShadBuf *shb, int *rectz, int square)
 				
 				verg= (*rz1 & 0xFFFFFF00);
 				
-				for (a=0;a<256;a++,rz1++) {
+				for (a=0;a<256;a++, rz1++) {
 					if ( (*rz1 & 0xFFFFFF00) !=verg) break;
 				}
 			}
@@ -564,7 +567,7 @@ static void compress_shadowbuf(ShadBuf *shb, int *rectz, int square)
 				verg1= rc[BCOMP];
 				rc+= 4;
 				byt1= 1; byt2= 1;
-				for (a=1;a<256;a++,rc+=4) {
+				for (a=1;a<256;a++, rc+=4) {
 					byt1 &= (verg==rc[ACOMP]);
 					byt2 &= (verg1==rc[BCOMP]);
 					
@@ -582,7 +585,7 @@ static void compress_shadowbuf(ShadBuf *shb, int *rectz, int square)
 				}
 				else if (byt1) {		/* only store short */
 					*ctile= 2;
-					*ztile= (uintptr_t)MEM_mallocN(2*256+4,"Tile2");
+					*ztile= (uintptr_t)MEM_mallocN(2*256+4, "Tile2");
 					rz= (int *)*ztile;
 					*rz= *rz1;
 					
@@ -595,7 +598,7 @@ static void compress_shadowbuf(ShadBuf *shb, int *rectz, int square)
 				}
 				else {			/* store triple */
 					*ctile= 3;
-					*ztile= (uintptr_t)MEM_mallocN(3*256,"Tile3");
+					*ztile= (uintptr_t)MEM_mallocN(3*256, "Tile3");
 
 					zt= (char *)*ztile;
 					rc= rcline;
@@ -779,7 +782,7 @@ void makeshadowbuf(Render *re, LampRen *lar)
 	shb->pixsize= (shb->d)/temp;
 	wsize= shb->pixsize*(shb->size/2.0f);
 	
-	perspective_m4( shb->winmat,-wsize, wsize, -wsize, wsize, shb->d, shb->clipend);
+	perspective_m4(shb->winmat, -wsize, wsize, -wsize, wsize, shb->d, shb->clipend);
 	mult_m4_m4m4(shb->persmat, shb->winmat, shb->viewmat);
 
 	if (ELEM3(lar->buftype, LA_SHADBUF_REGULAR, LA_SHADBUF_HALFWAY, LA_SHADBUF_DEEP)) {
@@ -829,7 +832,7 @@ static void *do_shadow_thread(void *re_v)
 			lar->thread_ready= 1;
 			BLI_unlock_thread(LOCK_CUSTOM1);
 		}
-	} while(lar && !re->test_break(re->tbh));
+	} while (lar && !re->test_break(re->tbh));
 
 	return NULL;
 }
@@ -848,7 +851,7 @@ void threaded_makeshadowbufs(Render *re)
 	int (*test_break)(void *);
 
 	/* count number of threads to use */
-	if (G.rendering) {
+	if (G.is_rendering) {
 		for (lar=re->lampren.first; lar; lar= lar->next)
 			if (lar->shb)
 				totthread++;
@@ -894,7 +897,7 @@ void threaded_makeshadowbufs(Render *re)
 				if (lar->shb && !lar->thread_ready)
 					break;
 			BLI_unlock_thread(LOCK_CUSTOM1);
-		} while(lar);
+		} while (lar);
 	
 		BLI_end_threads(&threads);
 
@@ -1176,8 +1179,8 @@ float testshadowbuf(Render *re, ShadBuf *shb, const float co[3], const float dxc
 	dy[0]= xs1 - dy[0];
 	dy[1]= ys1 - dy[1];
 	
-	xres= fac*(fabs(dx[0]) + fabs(dy[0]));
-	yres= fac*(fabs(dx[1]) + fabs(dy[1]));
+	xres = fac * (fabsf(dx[0]) + fabsf(dy[0]));
+	yres = fac * (fabsf(dx[1]) + fabsf(dy[1]));
 	if (xres<1.0f) xres= 1.0f;
 	if (yres<1.0f) yres= 1.0f;
 	
@@ -1192,7 +1195,7 @@ float testshadowbuf(Render *re, ShadBuf *shb, const float co[3], const float dxc
 			if (firstreadshadbuf(shb, shsample, &rz, (int)(xs1+xres), (int)ys1, 1)) {
 				if (firstreadshadbuf(shb, shsample, &rz, (int)xs1, (int)(ys1+yres), 1)) {
 					if (firstreadshadbuf(shb, shsample, &rz, (int)(xs1+xres), (int)(ys1+yres), 1)) {
-						return readshadowbuf(shb, shsample, bias,(int)xs1, (int)ys1, zs);
+						return readshadowbuf(shb, shsample, bias, (int)xs1, (int)ys1, zs);
 					}
 				}
 			}
@@ -1371,7 +1374,7 @@ float shadow_halo(LampRen *lar, const float p1[3], const float p2[3])
 
 /* printf("start %x %x	\n", (int)(0x7FFFFFFF*zf1), (int)(0x7FFFFFFF*zf2)); */
 
-	while(1) {
+	while (1) {
 		labdao= labda;
 		
 		if (labdax==labday) {
@@ -1391,7 +1394,7 @@ float shadow_halo(LampRen *lar, const float p1[3], const float p2[3])
 			}
 		}
 		
-		labda= MIN2(labdax, labday);
+		labda = minf(labdax, labday);
 		if (labda==labdao || labda>=1.0f) break;
 		
 		zf= zf1 + labda*(zf2-zf1);
@@ -1449,7 +1452,7 @@ typedef struct ISBBranch {
 
 typedef struct BSPFace {
 	Boxf box;
-	float *v1, *v2, *v3, *v4;
+	const float *v1, *v2, *v3, *v4;
 	int obi;		/* object for face lookup */
 	int facenr;		/* index to retrieve VlakRen */
 	int type;		/* only for strand now */
@@ -1496,7 +1499,7 @@ static void bound_rectf(rctf *box, const float v1[2])
 static void isb_bsp_split_init(ISBBranch *root, MemArena *mem, int level)
 {
 	
-	/* if level > 0 we create new branches and go deeper*/
+	/* if level > 0 we create new branches and go deeper */
 	if (level > 0) {
 		ISBBranch *left, *right;
 		int i;
@@ -1506,10 +1509,10 @@ static void isb_bsp_split_init(ISBBranch *root, MemArena *mem, int level)
 		root->divider[1]= 0.5f*(root->box.ymin+root->box.ymax);
 		
 		/* find best splitpoint */
-		if (root->box.xmax-root->box.xmin > root->box.ymax-root->box.ymin)
-			i= root->index= 0;
+		if (RCT_SIZE_X(&root->box) > RCT_SIZE_Y(&root->box))
+			i = root->index = 0;
 		else
-			i= root->index= 1;
+			i = root->index = 1;
 		
 		left= root->left= BLI_memarena_alloc(mem, sizeof(ISBBranch));
 		right= root->right= BLI_memarena_alloc(mem, sizeof(ISBBranch));
@@ -1551,19 +1554,19 @@ static void isb_bsp_split(ISBBranch *root, MemArena *mem)
 	root->divider[1]/= BSPMAX_SAMPLE;
 	
 	/* find best splitpoint */
-	if (root->box.xmax-root->box.xmin > root->box.ymax-root->box.ymin)
-		i= root->index= 0;
+	if (RCT_SIZE_X(&root->box) > RCT_SIZE_Y(&root->box))
+		i = root->index = 0;
 	else
-		i= root->index= 1;
+		i = root->index = 1;
 	
 	/* new branches */
 	left= root->left= BLI_memarena_alloc(mem, sizeof(ISBBranch));
 	right= root->right= BLI_memarena_alloc(mem, sizeof(ISBBranch));
 
 	/* new sample array */
-	left->samples= BLI_memarena_alloc(mem, BSPMAX_SAMPLE*sizeof(void *));
-	right->samples= samples; // tmp
-	
+	left->samples = BLI_memarena_alloc(mem, BSPMAX_SAMPLE*sizeof(void *));
+	right->samples = samples;  /* tmp */
+
 	/* split samples */
 	for (a=BSPMAX_SAMPLE-1; a>=0; a--) {
 		int comp= 0;
@@ -1613,7 +1616,7 @@ static int isb_bsp_insert(ISBBranch *root, MemArena *memarena, ISBSample *sample
 	root->totsamp++;
 	
 	/* going over branches until last one found */
-	while(bspn->left) {
+	while (bspn->left) {
 		if (zco[bspn->index] <= bspn->divider[bspn->index])
 			bspn= bspn->left;
 		else
@@ -1815,7 +1818,7 @@ static void isb_bsp_face_inside(ISBBranch *bspn, BSPFace *face)
 			return;
 		
 		/* if face boundbox is outside of branch rect, give up */
-		if (0==BLI_isect_rctf((rctf *)&face->box, (rctf *)&bspn->box, NULL))
+		if (0==BLI_rctf_isect((rctf *)&face->box, (rctf *)&bspn->box, NULL))
 			return;
 		
 		/* test all points inside branch */
@@ -1824,7 +1827,7 @@ static void isb_bsp_face_inside(ISBBranch *bspn, BSPFace *face)
 			
 			if ((samp->facenr!=face->facenr || samp->obi!=face->obi) && samp->shadfac) {
 				if (face->box.zmin < samp->zco[2]) {
-					if (BLI_in_rctf((rctf *)&face->box, samp->zco[0], samp->zco[1])) {
+					if (BLI_rctf_isect_pt_v((rctf *)&face->box, samp->zco)) {
 						int inshadow= 0;
 						
 						if (face->type) {
@@ -1868,7 +1871,8 @@ static void isb_bsp_recalc_box(ISBBranch *root)
 }
 
 /* callback function for zbuf clip */
-static void isb_bsp_test_strand(ZSpan *zspan, int obi, int zvlnr, float *v1, float *v2, float *v3, float *v4)
+static void isb_bsp_test_strand(ZSpan *zspan, int obi, int zvlnr,
+                                const float *v1, const float *v2, const float *v3, const float *v4)
 {
 	BSPFace face;
 	
@@ -1902,7 +1906,8 @@ static void isb_bsp_test_strand(ZSpan *zspan, int obi, int zvlnr, float *v1, flo
 }
 
 /* callback function for zbuf clip */
-static void isb_bsp_test_face(ZSpan *zspan, int obi, int zvlnr, float *v1, float *v2, float *v3, float *v4) 
+static void isb_bsp_test_face(ZSpan *zspan, int obi, int zvlnr,
+                              const float *v1, const float *v2, const float *v3, const float *v4)
 {
 	BSPFace face;
 	
@@ -2074,7 +2079,7 @@ static int viewpixel_to_lampbuf(ShadBuf *shb, ObjectInstanceRen *obi, VlakRen *v
 	dface = dot_v3v3(v1, nor);
 	hoco[3]= 1.0f;
 	
-	/* ortho viewplane cannot intersect using view vector originating in (0,0,0) */
+	/* ortho viewplane cannot intersect using view vector originating in (0, 0, 0) */
 	if (R.r.mode & R_ORTHO) {
 		/* x and y 3d coordinate can be derived from pixel coord and winmat */
 		float fx= 2.0f/(R.winx*R.winmat[0][0]);
@@ -2160,8 +2165,8 @@ static int isb_add_samples(RenderPart *pa, ISBBranch *root, MemArena *memarena, 
 	int sample, bsp_err= 0;
 	
 	/* bsp split doesn't like to handle regular sequences */
-	xcos= MEM_mallocN( pa->rectx*sizeof(int), "xcos");
-	ycos= MEM_mallocN( pa->recty*sizeof(int), "ycos");
+	xcos= MEM_mallocN(pa->rectx*sizeof(int), "xcos");
+	ycos= MEM_mallocN(pa->recty*sizeof(int), "ycos");
 	for (xi=0; xi<pa->rectx; xi++)
 		xcos[xi]= xi;
 	for (yi=0; yi<pa->recty; yi++)
@@ -2244,7 +2249,7 @@ static void isb_make_buffer(RenderPart *pa, LampRen *lar)
 						PixStr *ps= (PixStr *)(*rd);
 						int mask= (1<<sample);
 						
-						while(ps) {
+						while (ps) {
 							if (ps->mask & mask)
 								break;
 							ps= ps->next;
@@ -2315,7 +2320,7 @@ static void isb_make_buffer(RenderPart *pa, LampRen *lar)
 					
 					if (*rd) {
 						PixStr *ps= (PixStr *)(*rd);
-						while(ps) {
+						while (ps) {
 							if (ps->shadfac)
 								isb_add_shadfac(isbsa, isbdata->memarena, ps->obi, ps->facenr, ps->shadfac, count_mask(ps->mask));
 							ps= ps->next;
@@ -2364,8 +2369,8 @@ static int isb_add_samples_transp(RenderPart *pa, ISBBranch *root, MemArena *mem
 	int sample, bsp_err= 0;
 	
 	/* bsp split doesn't like to handle regular sequences */
-	xcos= MEM_mallocN( pa->rectx*sizeof(int), "xcos");
-	ycos= MEM_mallocN( pa->recty*sizeof(int), "ycos");
+	xcos= MEM_mallocN(pa->rectx*sizeof(int), "xcos");
+	ycos= MEM_mallocN(pa->recty*sizeof(int), "ycos");
 	for (xi=0; xi<pa->rectx; xi++)
 		xcos[xi]= xi;
 	for (yi=0; yi<pa->recty; yi++)
@@ -2382,7 +2387,7 @@ static int isb_add_samples_transp(RenderPart *pa, ISBBranch *root, MemArena *mem
 				int x= xcos[xi];
 				
 				samp1= *(samp + y*pa->rectx + x);
-				while(samp1) {
+				while (samp1) {
 					bsp_err |= isb_bsp_insert(root, memarena, (ISBSample *)samp1);
 					samp1= samp1->next;
 				}
@@ -2572,7 +2577,7 @@ float ISB_getshadow(ShadeInput *shi, ShadBuf *shb)
 							int obi= shi->obi - R.objectinstance;
 							ISBShadfacA *isbsa= *(isbdata->shadfaca + sindex);
 							
-							while(isbsa) {
+							while (isbsa) {
 								if (isbsa->facenr==shi->facenr+1 && isbsa->obi==obi)
 									return isbsa->shadfac>=1.0f?0.0f:1.0f - isbsa->shadfac;
 								isbsa= isbsa->next;

@@ -51,8 +51,8 @@
 #import <Carbon/Carbon.h>
 #include <QuickTime/Movies.h>
 #endif
-#endif //__MOVIES__
-#endif //USE_QTKIT
+#endif  /* __MOVIES__ */
+#endif  /* USE_QTKIT */
 
 #ifdef _WIN32
 #ifndef __FIXMATH__
@@ -61,7 +61,7 @@
 #endif /* _WIN32 _ */
 
 
-char *get_valid_qtname(char *name);
+char *get_valid_qtname(const char *name);
 
 
 // quicktime movie import functions
@@ -76,4 +76,4 @@ ImBuf  *qtime_fetchibuf (struct anim *anim, int position);
 int		imb_is_a_quicktime (char *name);
 ImBuf  *imb_quicktime_decode(unsigned char *mem, int size, int flags);
 
-#endif  // __QUICKTIME_IMPORT_H__
+#endif  /* __QUICKTIME_IMPORT_H__ */

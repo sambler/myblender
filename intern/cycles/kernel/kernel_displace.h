@@ -47,6 +47,9 @@ __device void kernel_shader_evaluate(KernelGlobals *kg, uint4 *input, float4 *ou
 		ray.P = make_float3(0.0f, 0.0f, 0.0f);
 		ray.D = equirectangular_to_direction(u, v);
 		ray.t = 0.0f;
+#ifdef __CAMERA_MOTION__
+		ray.time = 0.5f;
+#endif
 
 #ifdef __RAY_DIFFERENTIALS__
 		ray.dD.dx = make_float3(0.0f, 0.0f, 0.0f);
@@ -62,6 +65,8 @@ __device void kernel_shader_evaluate(KernelGlobals *kg, uint4 *input, float4 *ou
 		int flag = 0; /* we can't know which type of BSDF this is for */
 		out = shader_eval_background(kg, &sd, flag);
 	}
+	
+	shader_release(kg, &sd);
 	
 	/* write output */
 	output[i] = make_float4(out.x, out.y, out.z, 0.0f);

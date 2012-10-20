@@ -30,10 +30,9 @@
  *  \ingroup bgeconv
  */
 
-
-#if defined(WIN32) && !defined(FREE_WINDOWS)
-#pragma warning (disable : 4786) 
-#endif //WIN32
+#ifdef _MSC_VER
+#  pragma warning (disable:4786)
+#endif
 
 #include <math.h>
 
@@ -82,8 +81,7 @@
 #include "BKE_text.h"
 #include "BLI_blenlib.h"
 #include "BLI_math_base.h"
-
-#define FILE_MAX 1024 // repeated here to avoid dependency from BKE_utildefines.h
+#include "BLI_path_util.h"
 
 #include "KX_NetworkMessageActuator.h"
 
@@ -106,22 +104,25 @@
 #include "BL_BlenderDataConversion.h"
 
 /** 
- * KX_BLENDERTRUNC needed to round 'almost' zero values to zero, else velocities etc. are incorrectly set
+ * KX_flt_trunc needed to round 'almost' zero values to zero, else velocities etc. are incorrectly set
  */
 
-#define KX_BLENDERTRUNC(x)  (( x < 0.0001 && x > -0.0001 )  ? 0.0 : x)
+BLI_INLINE float KX_flt_trunc(const float x)
+{
+	return ( x < 0.0001f && x > -0.0001f ) ? 0.0f : x;
+}
 
 void BL_ConvertActuators(const char* maggiename,
-						 struct Object* blenderobject,
-						 KX_GameObject* gameobj,
-						 SCA_LogicManager* logicmgr,
-						 KX_Scene* scene,
-						 KX_KetsjiEngine* ketsjiEngine,
-						 int activeLayerBitInfo,
-						 bool isInActiveLayer,
-						 RAS_IRenderTools* rendertools,
-						 KX_BlenderSceneConverter* converter
-						 )
+                         struct Object* blenderobject,
+                         KX_GameObject* gameobj,
+                         SCA_LogicManager* logicmgr,
+                         KX_Scene* scene,
+                         KX_KetsjiEngine* ketsjiEngine,
+                         int activeLayerBitInfo,
+                         bool isInActiveLayer,
+                         RAS_IRenderTools* rendertools,
+                         KX_BlenderSceneConverter* converter
+                         )
 {
 	
 	int uniqueint = 0;
@@ -147,22 +148,25 @@ void BL_ConvertActuators(const char* maggiename,
 			{
 				bObjectActuator* obact = (bObjectActuator*) bact->data;
 				KX_GameObject* obref = NULL;
-				MT_Vector3 forcevec(KX_BLENDERTRUNC(obact->forceloc[0]),
-					KX_BLENDERTRUNC(obact->forceloc[1]),
-					KX_BLENDERTRUNC(obact->forceloc[2]));
-				MT_Vector3 torquevec(obact->forcerot[0],obact->forcerot[1],obact->forcerot[2]);
-				MT_Vector3 dlocvec ( KX_BLENDERTRUNC(obact->dloc[0]),
-					KX_BLENDERTRUNC(obact->dloc[1]),
-					KX_BLENDERTRUNC(obact->dloc[2]));
-				MT_Vector3 drotvec ( KX_BLENDERTRUNC(obact->drot[0]),obact->drot[1],obact->drot[2]);
-				MT_Vector3 linvelvec ( KX_BLENDERTRUNC(obact->linearvelocity[0]),
-					KX_BLENDERTRUNC(obact->linearvelocity[1]),
-					KX_BLENDERTRUNC(obact->linearvelocity[2]));
-				MT_Vector3 angvelvec ( KX_BLENDERTRUNC(obact->angularvelocity[0]),
-					KX_BLENDERTRUNC(obact->angularvelocity[1]),
-					KX_BLENDERTRUNC(obact->angularvelocity[2]));
+				MT_Vector3 forcevec(KX_flt_trunc(obact->forceloc[0]),
+				                    KX_flt_trunc(obact->forceloc[1]),
+				                    KX_flt_trunc(obact->forceloc[2]));
+				MT_Vector3 torquevec(obact->forcerot[0],
+				                     obact->forcerot[1],
+				                     obact->forcerot[2]);
+				MT_Vector3 dlocvec(KX_flt_trunc(obact->dloc[0]),
+				                   KX_flt_trunc(obact->dloc[1]),
+				                   KX_flt_trunc(obact->dloc[2]));
+				MT_Vector3 drotvec(KX_flt_trunc(obact->drot[0]),
+				                   obact->drot[1],obact->drot[2]);
+				MT_Vector3 linvelvec(KX_flt_trunc(obact->linearvelocity[0]),
+				                     KX_flt_trunc(obact->linearvelocity[1]),
+				                     KX_flt_trunc(obact->linearvelocity[2]));
+				MT_Vector3 angvelvec(KX_flt_trunc(obact->angularvelocity[0]),
+				                     KX_flt_trunc(obact->angularvelocity[1]),
+				                     KX_flt_trunc(obact->angularvelocity[2]));
 				short damping = obact->damping;
-				
+
 				/* Blender uses a bit vector internally for the local-flags. In */
 				/* KX, we have four bools. The compiler should be smart enough  */
 				/* to do the right thing. We need to explicitly convert here!   */
@@ -182,17 +186,17 @@ void BL_ConvertActuators(const char* maggiename,
 					obref = converter->FindGameObject(obact->reference);
 				}
 				
-				KX_ObjectActuator* tmpbaseact = new KX_ObjectActuator(gameobj,
-					obref,
-					forcevec.getValue(),
-					torquevec.getValue(),
-					dlocvec.getValue(),
-					drotvec.getValue(),
-					linvelvec.getValue(),
-					angvelvec.getValue(),
-					damping,
-					bitLocalFlag
-					);
+				KX_ObjectActuator* tmpbaseact = new KX_ObjectActuator(
+				            gameobj,
+				            obref,
+				            forcevec.getValue(),
+				            torquevec.getValue(),
+				            dlocvec.getValue(),
+				            drotvec.getValue(),
+				            linvelvec.getValue(),
+				            angvelvec.getValue(),
+				            damping,
+				            bitLocalFlag);
 				baseact = tmpbaseact;
 				break;
 			}
@@ -211,22 +215,22 @@ void BL_ConvertActuators(const char* maggiename,
 				if (actact->flag & ACT_IPOCHILD) ipo_flags |= BL_Action::ACT_IPOFLAG_CHILD;
 					
 				BL_ActionActuator* tmpbaseact = new BL_ActionActuator(
-					gameobj,
-					propname,
-					propframe,
-					actact->sta,
-					actact->end,
-					actact->act,
-					actact->type, // + 1, because Blender starts to count at zero,
-					actact->blendin,
-					actact->priority,
-					actact->layer,
-					actact->layer_weight,
-					ipo_flags,
-					actact->end_reset,
-					actact->stridelength
-					// Ketsji at 1, because zero is reserved for "NoDef"
-					);
+				            gameobj,
+				            propname,
+				            propframe,
+				            actact->sta,
+				            actact->end,
+				            actact->act,
+				            actact->type, // + 1, because Blender starts to count at zero,
+				            actact->blendin,
+				            actact->priority,
+				            actact->layer,
+				            actact->layer_weight,
+				            ipo_flags,
+				            actact->end_reset,
+				            actact->stridelength
+				            // Ketsji at 1, because zero is reserved for "NoDef"
+				            );
 				baseact= tmpbaseact;
 				break;
 			}
@@ -238,18 +242,17 @@ void BL_ConvertActuators(const char* maggiename,
 					STR_String propframe = (actact->frameProp ? actact->frameProp : "");
 					
 					BL_ShapeActionActuator* tmpbaseact = new BL_ShapeActionActuator(
-						gameobj,
-						propname,
-						propframe,
-						actact->sta,
-						actact->end,
-						actact->act,
-						actact->type, // + 1, because Blender starts to count at zero,
-						actact->blendin,
-						actact->priority,
-						actact->stridelength
-						// Ketsji at 1, because zero is reserved for "NoDef"
-						);
+					            gameobj,
+					            propname,
+					            propframe,
+					            actact->sta,
+					            actact->end,
+					            actact->act,
+					            actact->type, // + 1, because Blender starts to count at zero,
+					            actact->blendin,
+					            actact->priority,
+					            actact->stridelength);
+					// Ketsji at 1, because zero is reserved for "NoDef"
 					baseact= tmpbaseact;
 					break;
 				}
@@ -268,17 +271,17 @@ void BL_ConvertActuators(const char* maggiename,
 				bool ipo_add = (ipoact->flag & ACT_IPOADD);
 				
 				KX_IpoActuator* tmpbaseact = new KX_IpoActuator(
-					gameobj,
-					propname ,
-					frameProp,
-					ipoact->sta,
-					ipoact->end,
-					ipochild,
-					ipoact->type + 1, // + 1, because Blender starts to count at zero,
-					// Ketsji at 1, because zero is reserved for "NoDef"
-					ipo_as_force,
-					ipo_add,
-					local);
+				            gameobj,
+				            propname ,
+				            frameProp,
+				            ipoact->sta,
+				            ipoact->end,
+				            ipochild,
+				            ipoact->type + 1, // + 1, because Blender starts to count at zero,
+				            // Ketsji at 1, because zero is reserved for "NoDef"
+				            ipo_as_force,
+				            ipo_add,
+				            local);
 				baseact = tmpbaseact;
 				break;
 			}
@@ -294,14 +297,14 @@ void BL_ConvertActuators(const char* maggiename,
 					
 					/* visifac, fac and axis are not copied from the struct...   */ 
 					/* that's some internal state...                             */
-					KX_CameraActuator *tmpcamact
-						= new KX_CameraActuator(gameobj,
-						tmpgob,
-						camact->height,
-						camact->min,
-						camact->max,
-						camact->axis,
-						camact->damping);
+					KX_CameraActuator *tmpcamact = new KX_CameraActuator(
+					            gameobj,
+					            tmpgob,
+					            camact->height,
+					            camact->min,
+					            camact->max,
+					            camact->axis,
+					            camact->damping);
 					baseact = tmpcamact;
 				}
 				break;
@@ -334,14 +337,13 @@ void BL_ConvertActuators(const char* maggiename,
 					? (char*) msgAct->body
 					: "");
 				
-				KX_NetworkMessageActuator *tmpmsgact = 
-					new KX_NetworkMessageActuator(
-					gameobj,					// actuator controlling object
-					scene->GetNetworkScene(),	// needed for replication
-					toPropName,
-					subject,
-					bodyType,
-					body);
+				KX_NetworkMessageActuator *tmpmsgact = new KX_NetworkMessageActuator(
+				            gameobj,					// actuator controlling object
+				            scene->GetNetworkScene(),	// needed for replication
+				            toPropName,
+				            subject,
+				            bodyType,
+				            body);
 				baseact = tmpmsgact;
 				break;
 			}
@@ -431,7 +433,7 @@ void BL_ConvertActuators(const char* maggiename,
 						new KX_SoundActuator(gameobj,
 						snd_sound,
 						soundact->volume,
-						(float)(exp((soundact->pitch / 12.0) * M_LN2)),
+						(float)(expf((soundact->pitch / 12.0f) * (float)M_LN2)),
 						is3d,
 						settings,
 						soundActuatorType);
@@ -458,11 +460,11 @@ void BL_ConvertActuators(const char* maggiename,
 					destinationObj = converter->FindGameObject(propact->ob);
 				
 				SCA_PropertyActuator* tmppropact = new SCA_PropertyActuator(
-					gameobj,
-					destinationObj,
-					propact->name,
-					propact->value,
-					propact->type+1); // + 1 because Ketsji Logic starts
+				            gameobj,
+				            destinationObj,
+				            propact->name,
+				            propact->value,
+				            propact->type + 1); // + 1 because Ketsji Logic starts
 				// with 0 for KX_ACT_PROP_NODEF
 				baseact = tmppropact;
 				break;
@@ -492,18 +494,16 @@ void BL_ConvertActuators(const char* maggiename,
 							}
 						}
 						
-						KX_SCA_AddObjectActuator* tmpaddact = 
-							new KX_SCA_AddObjectActuator(
-								gameobj, 
-								originalval,
-								editobact->time,
-								scene,
-								editobact->linVelocity,
-								(editobact->localflag & ACT_EDOB_LOCAL_LINV)!=0,
-								editobact->angVelocity,
-								(editobact->localflag & ACT_EDOB_LOCAL_ANGV)!=0
-								);
-								
+						KX_SCA_AddObjectActuator* tmpaddact = new KX_SCA_AddObjectActuator(
+						            gameobj,
+						            originalval,
+						            editobact->time,
+						            scene,
+						            editobact->linVelocity,
+						            (editobact->localflag & ACT_EDOB_LOCAL_LINV) != 0,
+						            editobact->angVelocity,
+						            (editobact->localflag & ACT_EDOB_LOCAL_ANGV) != 0);
+
 								//editobact->ob to gameobj
 								baseact = tmpaddact;
 					}
@@ -520,23 +520,20 @@ void BL_ConvertActuators(const char* maggiename,
 						RAS_MeshObject *tmpmesh = NULL;
 						if (editobact->me)
 							tmpmesh = BL_ConvertMesh(
-								editobact->me,
-								blenderobject,
-								scene,
-								converter
-								);
+							            editobact->me,
+							            blenderobject,
+							            scene,
+							            converter
+							            );
 
-						KX_SCA_ReplaceMeshActuator* tmpreplaceact
-							= new KX_SCA_ReplaceMeshActuator(
-								gameobj,
-								tmpmesh,
-								scene,
-								(editobact->flag & ACT_EDOB_REPLACE_MESH_NOGFX)==0,
-								(editobact->flag & ACT_EDOB_REPLACE_MESH_PHYS)!=0
-								
-								);
-							
-							baseact = tmpreplaceact;
+						KX_SCA_ReplaceMeshActuator* tmpreplaceact = new KX_SCA_ReplaceMeshActuator(
+						            gameobj,
+						            tmpmesh,
+						            scene,
+						            (editobact->flag & ACT_EDOB_REPLACE_MESH_NOGFX) == 0,
+						            (editobact->flag & ACT_EDOB_REPLACE_MESH_PHYS) != 0);
+
+						baseact = tmpreplaceact;
 					}
 					break;
 				case ACT_EDOB_TRACK_TO:
@@ -545,25 +542,23 @@ void BL_ConvertActuators(const char* maggiename,
 						if (editobact->ob)
 							originalval = converter->FindGameObject(editobact->ob);
 							
-						KX_TrackToActuator* tmptrackact 
-							= new KX_TrackToActuator(gameobj, 
-								originalval,
-								editobact->time,
-								editobact->flag,
-								blenderobject->trackflag,
-								blenderobject->upflag
-								);
-							baseact = tmptrackact;
+						KX_TrackToActuator* tmptrackact = new KX_TrackToActuator(
+						            gameobj,
+						            originalval,
+						            editobact->time,
+						            editobact->flag,
+						            blenderobject->trackflag,
+						            blenderobject->upflag);
+						baseact = tmptrackact;
 						break;
 					}
 				case ACT_EDOB_DYNAMICS:
 					{
-						KX_SCA_DynamicActuator* tmpdynact 
-							= new KX_SCA_DynamicActuator(gameobj, 
-								editobact->dyn_operation,
-								editobact->mass
-								);
-							baseact = tmpdynact;
+						KX_SCA_DynamicActuator* tmpdynact = new KX_SCA_DynamicActuator(
+						            gameobj,
+						            editobact->dyn_operation,
+						            editobact->mass);
+						baseact = tmpdynact;
 					}
 				}
 				break;
@@ -578,8 +573,8 @@ void BL_ConvertActuators(const char* maggiename,
 				/* convert settings... degrees in the ui become radians  */ 
 				/* internally                                            */ 
 				if (conact->type == ACT_CONST_TYPE_ORI) {
-					min = (float)((MT_2_PI * conact->minloc[0])/360.0);
-					max = (float)((MT_2_PI * conact->maxloc[0])/360.0);
+					min = (float)(((float)MT_2_PI * conact->minloc[0]) / 360.0f);
+					max = (float)(((float)MT_2_PI * conact->maxloc[0]) / 360.0f);
 					switch (conact->mode) {
 					case ACT_CONST_DIRPX:
 						locrot = KX_ConstraintActuator::KX_ACT_CONSTRAINT_ORIX;
@@ -695,17 +690,17 @@ void BL_ConvertActuators(const char* maggiename,
 						; /* error */ 
 					}
 				}
-				KX_ConstraintActuator *tmpconact 
-					= new KX_ConstraintActuator(gameobj,
-						conact->damp,
-						conact->rotdamp,
-						min,
-						max,
-						conact->maxrot,
-						locrot,
-						conact->time,
-						conact->flag,
-						prop);
+				KX_ConstraintActuator *tmpconact = new KX_ConstraintActuator(
+				            gameobj,
+				            conact->damp,
+				            conact->rotdamp,
+				            min,
+				            max,
+				            conact->maxrot,
+				            locrot,
+				            conact->time,
+				            conact->flag,
+				            prop);
 				baseact = tmpconact;
 				break;
 			}
@@ -778,13 +773,14 @@ void BL_ConvertActuators(const char* maggiename,
 				default:
 					; /* flag error */
 				}
-				tmpsceneact = new KX_SceneActuator(gameobj,
-						mode,
-						scene,
-						ketsjiEngine,
-						nextSceneName,
-						cam);
-					baseact = tmpsceneact;
+				tmpsceneact = new KX_SceneActuator(
+				            gameobj,
+				            mode,
+				            scene,
+				            ketsjiEngine,
+				            nextSceneName,
+				            cam);
+				baseact = tmpsceneact;
 				break;
 			}
 		case ACT_GAME:
@@ -833,13 +829,14 @@ void BL_ConvertActuators(const char* maggiename,
 				default:
 					; /* flag error */
 				}
-					tmpgameact = new KX_GameActuator(gameobj,
-						mode,
-						filename,
-						loadinganimationname,
-						scene,
-						ketsjiEngine);
-					baseact = tmpgameact;
+				tmpgameact = new KX_GameActuator(
+				            gameobj,
+				            mode,
+				            filename,
+				            loadinganimationname,
+				            scene,
+				            ketsjiEngine);
+				baseact = tmpgameact;
 
 				break;
 			}
@@ -860,7 +857,7 @@ void BL_ConvertActuators(const char* maggiename,
 				float paraArg1 = 0.0;
 				float paraArg2 = 0.0;
 				
-				switch  (randAct->distribution) {
+				switch (randAct->distribution) {
 				case ACT_RANDOM_BOOL_CONST:
 					modeArg = SCA_RandomActuator::KX_RANDOMACT_BOOL_CONST;
 					paraArg1 = (float) randAct->int_arg_1;
@@ -904,14 +901,15 @@ void BL_ConvertActuators(const char* maggiename,
 					modeArg = SCA_RandomActuator::KX_RANDOMACT_FLOAT_NEGATIVE_EXPONENTIAL;
 					break;
 				default:
-					; /* error */				
+					; /* error */
 				}
-				tmprandomact = new SCA_RandomActuator(gameobj,
-					seedArg,
-					modeArg, 
-					paraArg1,
-					paraArg2,
-					randAct->propname);
+				tmprandomact = new SCA_RandomActuator(
+				            gameobj,
+				            seedArg,
+				            modeArg,
+				            paraArg1,
+				            paraArg2,
+				            randAct->propname);
 				baseact = tmprandomact;
 			}
 			break;
@@ -1000,8 +998,9 @@ void BL_ConvertActuators(const char* maggiename,
 					break;
 			}
 
-			tmp = new SCA_2DFilterActuator(gameobj, filtermode, _2dfilter->flag,
-				_2dfilter->float_arg,_2dfilter->int_arg,ketsjiEngine->GetRasterizer(),scene);
+			tmp = new SCA_2DFilterActuator(gameobj, filtermode,  _2dfilter->flag,
+			                               _2dfilter->float_arg, _2dfilter->int_arg,
+			                               ketsjiEngine->GetRasterizer(), scene);
 
 			if (_2dfilter->text)
 			{
@@ -1056,7 +1055,15 @@ void BL_ConvertActuators(const char* maggiename,
 				bArmatureActuator* armAct = (bArmatureActuator*) bact->data;
 				KX_GameObject *tmpgob = converter->FindGameObject(armAct->target);
 				KX_GameObject *subgob = converter->FindGameObject(armAct->subtarget);
-				BL_ArmatureActuator* tmparmact = new BL_ArmatureActuator(gameobj, armAct->type, armAct->posechannel, armAct->constraint, tmpgob, subgob, armAct->weight, armAct->influence);
+				BL_ArmatureActuator* tmparmact = new BL_ArmatureActuator(
+				            gameobj,
+				            armAct->type,
+				            armAct->posechannel,
+				            armAct->constraint,
+				            tmpgob,
+				            subgob,
+				            armAct->weight,
+				            armAct->influence);
 				baseact = tmparmact;
 				break;
 			}

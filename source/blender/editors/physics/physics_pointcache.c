@@ -61,7 +61,7 @@
 
 static int cache_break_test(void *UNUSED(cbd))
 {
-	return G.afbreek==1;
+	return (G.is_break == TRUE);
 }
 static int ptcache_bake_all_poll(bContext *C)
 {
@@ -111,7 +111,7 @@ static int ptcache_bake_all_exec(bContext *C, wmOperator *op)
 	 * and pointcache baking will be reimplemented with
 	 * the job system soon anyways. */
 	if (win) {
-		baker.progressbar = (void (*)(void *, int))WM_timecursor;
+		baker.progressbar = (void (*)(void *, int))WM_cursor_time;
 		baker.progressend = (void (*)(void *))WM_cursor_restore;
 		baker.progresscontext = win;
 	}
@@ -173,6 +173,7 @@ void PTCACHE_OT_free_bake_all(wmOperatorType *ot)
 	/* identifiers */
 	ot->name = "Free All Physics Bakes";
 	ot->idname = "PTCACHE_OT_free_bake_all";
+	ot->description = "Free all baked caches of all objects in the current scene";
 	
 	/* api callbacks */
 	ot->exec = ptcache_free_bake_all_exec;
@@ -214,7 +215,7 @@ static int ptcache_bake_exec(bContext *C, wmOperator *op)
 	 * and pointcache baking will be reimplemented with
 	 * the job system soon anyways. */
 	if (win) {
-		baker.progressbar = (void (*)(void *, int))WM_timecursor;
+		baker.progressbar = (void (*)(void *, int))WM_cursor_time;
 		baker.progressend = (void (*)(void *))WM_cursor_restore;
 		baker.progresscontext = win;
 	}
@@ -324,9 +325,9 @@ static int ptcache_add_new_exec(bContext *C, wmOperator *UNUSED(op))
 	
 	for (pid=pidlist.first; pid; pid=pid->next) {
 		if (pid->cache == cache) {
-			PointCache *cache = BKE_ptcache_add(pid->ptcaches);
-			cache->step = pid->default_step;
-			*(pid->cache_ptr) = cache;
+			PointCache *cache_new = BKE_ptcache_add(pid->ptcaches);
+			cache_new->step = pid->default_step;
+			*(pid->cache_ptr) = cache_new;
 			break;
 		}
 	}

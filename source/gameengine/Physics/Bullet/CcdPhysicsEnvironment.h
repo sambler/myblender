@@ -83,8 +83,6 @@ protected:
 	int	m_profileTimings;
 	bool m_enableSatCollisionDetection;
 
-	btContactSolverInfo	m_solverInfo;
-	
 	void	processFhSprings(double curTime,float timeStep);
 
 	public:
@@ -116,6 +114,11 @@ protected:
 		virtual void		setSolverDamping(float damping);
 		virtual void		setLinearAirDamping(float damping);
 		virtual void		setUseEpa(bool epa);
+
+		int					getNumTimeSubSteps()
+		{
+			return m_numTimeSubSteps;
+		}
 
 		virtual	void		beginFrame();
 		virtual void		endFrame() {}
@@ -180,12 +183,12 @@ protected:
 		{
 			return 0;
 		}
-#endif //NEW_BULLET_VEHICLE_SUPPORT
+#endif  /* NEW_BULLET_VEHICLE_SUPPORT */
 
 		btTypedConstraint*	getConstraintById(int constraintId);
 
 		virtual PHY_IPhysicsController* rayTest(PHY_IRayCastFilterCallback &filterCallback, float fromX,float fromY,float fromZ, float toX,float toY,float toZ);
-		virtual bool cullingTest(PHY_CullingCallback callback, void* userData, PHY__Vector4* planes, int nplanes, int occlusionRes);
+		virtual bool cullingTest(PHY_CullingCallback callback, void* userData, PHY__Vector4* planes, int nplanes, int occlusionRes, const int *viewport, double modelview[16], double projection[16]);
 
 
 		//Methods for gamelogic collision/physics callbacks
@@ -280,6 +283,8 @@ protected:
 
 		class CcdOverlapFilterCallBack* m_filterCallback;
 
+		class btGhostPairCallback*	m_ghostPairCallback;
+
 		class btDispatcher* m_ownDispatcher;
 
 		bool	m_scalingPropagated;
@@ -288,10 +293,8 @@ protected:
 
 		
 #ifdef WITH_CXX_GUARDEDALLOC
-public:
-	void *operator new(size_t num_bytes) { return MEM_mallocN(num_bytes, "GE:CcdPhysicsEnvironment"); }
-	void operator delete( void *mem ) { MEM_freeN(mem); }
+	MEM_CXX_CLASS_ALLOC_FUNCS("GE:CcdPhysicsEnvironment")
 #endif
 };
 
-#endif //__CCDPHYSICSENVIRONMENT_H__
+#endif  /* __CCDPHYSICSENVIRONMENT_H__ */

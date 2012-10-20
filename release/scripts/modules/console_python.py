@@ -30,7 +30,7 @@ _BPY_MAIN_OWN = True
 def add_scrollback(text, text_type):
     for l in text.split("\n"):
         bpy.ops.console.scrollback_append(text=l.replace("\t", "    "),
-            type=text_type)
+                                          type=text_type)
 
 
 def replace_help(namespace):
@@ -48,14 +48,14 @@ def replace_help(namespace):
 
 
 def get_console(console_id):
-    '''
+    """
     helper function for console operators
     currently each text data block gets its own
     console - code.InteractiveConsole()
     ...which is stored in this function.
 
     console_id can be any hashable type
-    '''
+    """
     from code import InteractiveConsole
 
     consoles = getattr(get_console, "consoles", None)
@@ -96,7 +96,10 @@ def get_console(console_id):
 
         namespace["__builtins__"] = sys.modules["builtins"]
         namespace["bpy"] = bpy
+
+        # weak! - but highly convenient
         namespace["C"] = bpy.context
+        namespace["D"] = bpy.data
 
         replace_help(namespace)
 
@@ -192,7 +195,7 @@ def execute(context):
 
     # insert a new blank line
     bpy.ops.console.history_append(text="", current_character=0,
-        remove_duplicates=True)
+                                   remove_duplicates=True)
 
     # Insert the output into the editor
     # not quite correct because the order might have changed,
@@ -287,6 +290,40 @@ def autocomplete(context):
     return {'FINISHED'}
 
 
+def copy_as_script(context):
+    sc = context.space_data
+    lines = [
+        "import bpy",
+        "from bpy import data as D",
+        "from bpy import context as C",
+        "from mathutils import *",
+        "from math import *",
+        "",
+    ]
+
+    for line in sc.scrollback:
+        text = line.body
+        type = line.type
+
+        if type == 'INFO':  # ignore autocomp.
+            continue
+        if type == 'INPUT':
+            if text.startswith(PROMPT):
+                text = text[len(PROMPT):]
+            elif text.startswith(PROMPT_MULTI):
+                text = text[len(PROMPT_MULTI):]
+        elif type == 'OUTPUT':
+            text = "#~ " + text
+        elif type == 'ERROR':
+            text = "#! " + text
+
+        lines.append(text)
+
+    context.window_manager.clipboard = "\n".join(lines)
+
+    return {'FINISHED'}
+
+
 def banner(context):
     sc = context.space_data
     version_string = sys.version.strip().replace('\n', ' ')
@@ -305,10 +342,9 @@ def banner(context):
                    'OUTPUT')
     add_scrollback("Convenience Imports: from mathutils import *; "
                    "from math import *", 'OUTPUT')
+    add_scrollback("Convenience Variables: C = bpy.context, D = bpy.data",
+                   'OUTPUT')
     add_scrollback("", 'OUTPUT')
-    # add_scrollback("  WARNING!!! Blender 2.5 API is subject to change, "
-    #                "see API reference for more info", 'ERROR')
-    # add_scrollback("", 'OUTPUT')
     sc.prompt = PROMPT
 
     return {'FINISHED'}

@@ -94,11 +94,8 @@ public:
 	void Update(float);
 
 #ifdef WITH_CXX_GUARDEDALLOC
-public:
-	void *operator new(size_t num_bytes) { return MEM_mallocN(num_bytes, "GE:BL_ActionManager"); }
-	void operator delete( void *mem ) { MEM_freeN(mem); }
+	MEM_CXX_CLASS_ALLOC_FUNCS("GE:BL_ActionManager")
 #endif
 };
 
-#endif //BL_ACTIONMANAGER
-
+#endif  /* BL_ACTIONMANAGER */

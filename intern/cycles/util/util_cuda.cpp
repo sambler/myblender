@@ -17,6 +17,7 @@
  */
 
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "util_cuda.h"
 #include "util_debug.h"
@@ -326,8 +327,8 @@ bool cuLibraryInit()
 	CUDA_LIBRARY_FIND(cuCtxGetLimit);
 
 	/* functions which changed 3.1 -> 3.2 for 64 bit stuff, the cuda library
-	   has both the old ones for compatibility and new ones with _v2 postfix,
-	   we load the _v2 ones here. */
+	 * has both the old ones for compatibility and new ones with _v2 postfix,
+	 * we load the _v2 ones here. */
 	CUDA_LIBRARY_FIND_V2(cuDeviceTotalMem);
 	CUDA_LIBRARY_FIND_V2(cuCtxCreate);
 	CUDA_LIBRARY_FIND_V2(cuModuleGetGlobal);
@@ -413,8 +414,18 @@ string cuCompilerPath()
 		return nvcc;
 
 #ifndef _WIN32
-	if(system("which nvcc") == 0)
-		return "nvcc";
+	{
+		FILE *handle = popen("which nvcc", "r");
+		if(handle) {
+			char buffer[4096] = {0};
+			int len = fread(buffer, 1, sizeof(buffer) - 1, handle);
+			buffer[len] = '\0';
+			pclose(handle);
+
+			if(buffer[0])
+				return "nvcc";
+		}
+	}
 #endif
 
 	return "";

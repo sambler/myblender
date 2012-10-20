@@ -1,7 +1,4 @@
 /*
- * initrender_ext.h
- *
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -43,7 +40,7 @@ struct Object;
 void free_sample_tables(Render *re);
 void make_sample_tables(Render *re);
 
-void initparts(Render *re);
+void initparts(Render *re, int do_crop);
 void freeparts(Render *re);
 
 

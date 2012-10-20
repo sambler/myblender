@@ -174,12 +174,12 @@ BuildQuadrics(
 	vector<LOD_Edge>::iterator edge_it = edges.begin();
 	vector<LOD_Edge>::const_iterator edge_end = edges.end();
 
-	for (; edge_it != edge_end; ++edge_it)  {
+	for (; edge_it != edge_end; ++edge_it) {
 		
 		MT_Vector3 target = TargetVertex(*edge_it);
 
 		LOD_Edge &e = *edge_it;
-		LOD_Quadric q0 = quadrics[e.m_verts[0]];
+		const LOD_Quadric &q0 = quadrics[e.m_verts[0]];
 		const LOD_Quadric &q1 = quadrics[e.m_verts[1]];
 		
 		e.HeapKey() = -float(q0.Evaluate(target) + q1.Evaluate(target));
@@ -235,7 +235,7 @@ ComputeEdgeCosts(
 	vector<LOD_EdgeInd>::const_iterator edge_it = edges.begin();
 	vector<LOD_EdgeInd>::const_iterator edge_end = edges.end();
 
-	for (; edge_it != edge_end; ++edge_it)  {
+	for (; edge_it != edge_end; ++edge_it) {
 		
 		MT_Vector3 target = TargetVertex(edge_set[*edge_it]);
 

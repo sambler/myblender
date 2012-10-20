@@ -165,11 +165,11 @@ public:
 		printf("\t m_materials: %d\n", (int)m_materials.size());
 
 		printf("\nMappings...\n");
-		printf("\t m_map_blender_to_gameobject: %d\n", (int)m_map_blender_to_gameobject.size());
-		printf("\t m_map_mesh_to_gamemesh: %d\n", (int)m_map_mesh_to_gamemesh.size());
-		printf("\t m_map_blender_to_gameactuator: %d\n", (int)m_map_blender_to_gameactuator.size());
-		printf("\t m_map_blender_to_gamecontroller: %d\n", (int)m_map_blender_to_gamecontroller.size());
-		printf("\t m_map_blender_to_gameAdtList: %d\n", (int)m_map_blender_to_gameAdtList.size());
+		printf("\t m_map_blender_to_gameobject: %d\n", m_map_blender_to_gameobject.size());
+		printf("\t m_map_mesh_to_gamemesh: %d\n", m_map_mesh_to_gamemesh.size());
+		printf("\t m_map_blender_to_gameactuator: %d\n", m_map_blender_to_gameactuator.size());
+		printf("\t m_map_blender_to_gamecontroller: %d\n", m_map_blender_to_gamecontroller.size());
+		printf("\t m_map_blender_to_gameAdtList: %d\n", m_map_blender_to_gameAdtList.size());
 
 #ifdef WITH_CXX_GUARDEDALLOC
 		MEM_printmemlist_pydict();
@@ -182,6 +182,7 @@ public:
 	{
 		LIB_LOAD_LOAD_ACTIONS = 1,
 		LIB_LOAD_VERBOSE = 2,
+		LIB_LOAD_LOAD_SCRIPTS = 4,
 	};
 
 
@@ -191,11 +192,8 @@ public:
 #endif
 	
 #ifdef WITH_CXX_GUARDEDALLOC
-public:
-	void *operator new(size_t num_bytes) { return MEM_mallocN(num_bytes, "GE:KX_BlenderSceneConverter"); }
-	void operator delete( void *mem ) { MEM_freeN(mem); }
+	MEM_CXX_CLASS_ALLOC_FUNCS("GE:KX_BlenderSceneConverter")
 #endif
 };
 
-#endif //__KX_BLENDERSCENECONVERTER_H__
-
+#endif  /* __KX_BLENDERSCENECONVERTER_H__ */

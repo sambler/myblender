@@ -25,8 +25,6 @@
  *  \ingroup spseq
  */
 
-
-
 #include <string.h>
 #include <stdio.h>
 
@@ -36,10 +34,13 @@
 #include "BLI_blenlib.h"
 #include "BLI_utildefines.h"
 
+#include "BLF_translation.h"
+
 #include "BKE_context.h"
 #include "BKE_screen.h"
 
 #include "ED_screen.h"
+#include "ED_gpencil.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
@@ -48,48 +49,17 @@
 
 #include "sequencer_intern.h"
 
-
-static void do_sequencer_panel_events(bContext *UNUSED(C), void *UNUSED(arg), int UNUSED(event))
-{
-
-}
-
-
-static void sequencer_panel_view_properties(const bContext *UNUSED(C), Panel *pa)
-{
-	uiBlock *block;
-
-	block = uiLayoutAbsoluteBlock(pa->layout);
-	uiBlockSetHandleFunc(block, do_sequencer_panel_events, NULL);
-	
-}
-
-
-static void sequencer_panel_properties(const bContext *UNUSED(C), Panel *pa)
-{
-	uiBlock *block;
-	
-	block = uiLayoutAbsoluteBlock(pa->layout);
-	uiBlockSetHandleFunc(block, do_sequencer_panel_events, NULL);
-
-}	
+/* **************************** buttons ********************************* */
 
 void sequencer_buttons_register(ARegionType *art)
 {
 	PanelType *pt;
-
-	pt = MEM_callocN(sizeof(PanelType), "spacetype sequencer strip properties");
-	strcpy(pt->idname, "SEQUENCER_PT_properties");
-	strcpy(pt->label, "Strip Properties");
-	pt->draw = sequencer_panel_properties;
+	
+	pt = MEM_callocN(sizeof(PanelType), "spacetype sequencer panel gpencil");
+	strcpy(pt->idname, "SEQUENCER_PT_gpencil");
+	strcpy(pt->label, N_("Grease Pencil"));
+	pt->draw = gpencil_panel_standard;
 	BLI_addtail(&art->paneltypes, pt);
-
-	pt = MEM_callocN(sizeof(PanelType), "spacetype sequencer view properties");
-	strcpy(pt->idname, "SEQUENCER_PT_view_properties");
-	strcpy(pt->label, "View Properties");
-	pt->draw = sequencer_panel_view_properties;
-	BLI_addtail(&art->paneltypes, pt);
-
 }
 
 /* **************** operator to open/close properties view ************* */

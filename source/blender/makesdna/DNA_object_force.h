@@ -1,6 +1,4 @@
 /*
- *
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -43,20 +41,21 @@ extern "C" {
 
 /* pd->forcefield:  Effector Fields types */
 typedef enum PFieldType {
-	PFIELD_NULL = 0,	/* (this is used for general effector weight)							*/
-	PFIELD_FORCE,		/* Force away/towards a point depending on force strength				*/
-	PFIELD_VORTEX,		/* Force around the effector normal										*/
-	PFIELD_MAGNET,		/* Force from the cross product of effector normal and point velocity	*/
-	PFIELD_WIND,		/* Force away and towards a point depending which side of the effector 	*/
-						/*	 normal the point is												*/
-	PFIELD_GUIDE,		/* Force along curve for dynamics, a shaping curve for hair paths		*/
-	PFIELD_TEXTURE,		/* Force based on texture values calculated at point coordinates		*/
-	PFIELD_HARMONIC,	/* Force of a harmonic (damped) oscillator								*/
-	PFIELD_CHARGE,		/* Force away/towards a point depending on point charge					*/
-	PFIELD_LENNARDJ,	/* Force due to a Lennard-Jones potential								*/
-	PFIELD_BOID,		/* Defines predator / goal for boids									*/
-	PFIELD_TURBULENCE,	/* Force defined by BLI_gTurbulence										*/
-	PFIELD_DRAG,		/* Linear & quadratic drag												*/
+	PFIELD_NULL   = 0,	/* (this is used for general effector weight)							*/
+	PFIELD_FORCE  = 1,	/* Force away/towards a point depending on force strength				*/
+	PFIELD_VORTEX = 2,	/* Force around the effector normal										*/
+	PFIELD_MAGNET = 3,	/* Force from the cross product of effector normal and point velocity	*/
+	PFIELD_WIND   = 4,	/* Force away and towards a point depending which side of the effector 	*/
+				/*	 normal the point is												*/
+	PFIELD_GUIDE      = 5,	/* Force along curve for dynamics, a shaping curve for hair paths		*/
+	PFIELD_TEXTURE    = 6,	/* Force based on texture values calculated at point coordinates		*/
+	PFIELD_HARMONIC   = 7,	/* Force of a harmonic (damped) oscillator								*/
+	PFIELD_CHARGE     = 8,	/* Force away/towards a point depending on point charge					*/
+	PFIELD_LENNARDJ   = 9,	/* Force due to a Lennard-Jones potential								*/
+	PFIELD_BOID       = 10,	/* Defines predator / goal for boids									*/
+	PFIELD_TURBULENCE = 11,	/* Force defined by BLI_gTurbulence										*/
+	PFIELD_DRAG       = 12,	/* Linear & quadratic drag												*/
+	PFIELD_SMOKEFLOW  = 13,	/* Force based on smoke simulation air flow								*/
 	NUM_PFIELD_TYPES
 } PFieldType;
 	
@@ -92,7 +91,7 @@ typedef struct PartDeflect {
 	float pdef_perm;	/* Chance of particle passing through mesh      */
 	float pdef_frict;	/* Friction factor for particle deflection		*/
 	float pdef_rfrict;	/* Random element of friction for deflection	*/
-	float pdef_stickness;/* surface particle stickness					*/
+	float pdef_stickness;/* surface particle stickiness				*/
 
 	float absorption;	/* used for forces */
 	
@@ -113,14 +112,17 @@ typedef struct PartDeflect {
 	struct RNG *rng;	/* random noise generator for e.g. wind */
 	float f_noise;		/* noise of force						*/
 	int seed;			/* noise random seed					*/
+
+	struct Object *f_source; /* force source object */
 } PartDeflect;
 
 typedef struct EffectorWeights {
 	struct Group *group;		/* only use effectors from this group of objects */
 	
-	float weight[13];			/* effector type specific weights */
+	float weight[14];			/* effector type specific weights */
 	float global_gravity;
 	short flag, rt[3];
+	int pad;
 } EffectorWeights;
 
 /* EffectorWeights->flag */
@@ -328,7 +330,7 @@ typedef struct SoftBody {
 		maxloops,
 		choke,
 		solver_ID,
-		plastic,springpreload
+		plastic, springpreload
 		;
 
 	struct SBScratch *scratch;	/* scratch pad/cache on live time not saved in file */
@@ -368,6 +370,7 @@ typedef struct SoftBody {
 #define PFIELD_DO_LOCATION		(1<<14)
 #define PFIELD_DO_ROTATION		(1<<15)
 #define PFIELD_GUIDE_PATH_WEIGHT (1<<16)	/* apply curve weights */
+#define PFIELD_SMOKE_DENSITY    (1<<17)		/* multiply smoke force by density */
 
 /* pd->falloff */
 #define PFIELD_FALL_SPHERE		0

@@ -32,9 +32,9 @@
 #ifndef __KX_SOFTBODYDEFORMER_H__
 #define __KX_SOFTBODYDEFORMER_H__
 
-#if defined(WIN32) && !defined(FREE_WINDOWS)
-#pragma warning (disable:4786) // get rid of stupid stl-visual compiler debug warning
-#endif //WIN32
+#ifdef _MSC_VER
+#  pragma warning (disable:4786)  /* get rid of stupid stl-visual compiler debug warning */
+#endif
 
 #include "RAS_Deformer.h"
 #include "BL_DeformableGameObject.h"
@@ -93,9 +93,7 @@ protected:
 	//class RAS_MeshObject	*m_pMesh;
 
 #ifdef WITH_CXX_GUARDEDALLOC
-public:
-	void *operator new(size_t num_bytes) { return MEM_mallocN(num_bytes, "GE:BL_ShapeDeformer"); }
-	void operator delete( void *mem ) { MEM_freeN(mem); }
+	MEM_CXX_CLASS_ALLOC_FUNCS("GE:BL_ShapeDeformer")
 #endif
 };
 

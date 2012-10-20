@@ -56,6 +56,7 @@ int    BLI_rename(const char *from, const char *to);
 int    BLI_delete(const char *path, int dir, int recursive);
 int    BLI_move(const char *path, const char *to);
 int    BLI_create_symlink(const char *path, const char *to);
+int    BLI_stat(const char *path, struct stat *buffer);
 
 /* Directories */
 
@@ -65,7 +66,7 @@ int    BLI_is_dir(const char *path);
 int    BLI_is_file(const char *path);
 void   BLI_dir_create_recursive(const char *dir);
 double BLI_dir_free_space(const char *dir);
-char  *BLI_current_working_dir(char *dir, const int maxlen);
+char  *BLI_current_working_dir(char *dir, const size_t maxlen);
 
 unsigned int BLI_dir_contents(const char *dir, struct direntry **filelist);
 
@@ -84,12 +85,21 @@ char  *BLI_file_ungzip_to_mem(const char *from_file, int *size_r);
 size_t BLI_file_descriptor_size(int file);
 size_t BLI_file_size(const char *file);
 
-	/* compare if one was last modified before the other */
+/* compare if one was last modified before the other */
 int    BLI_file_older(const char *file1, const char *file2);
 
-	/* read ascii file as lines, empty list if reading fails */
+/* read ascii file as lines, empty list if reading fails */
 struct LinkNode *BLI_file_read_as_lines(const char *file);
 void   BLI_file_free_lines(struct LinkNode *lines);
+
+/* this weirdo pops up in two places ... */
+#if !defined(WIN32)
+#  ifndef O_BINARY
+#    define O_BINARY 0
+#  endif
+#else
+void BLI_get_short_name(char short_name[256], const char *filename);
+#endif
 
 #ifdef __cplusplus
 }

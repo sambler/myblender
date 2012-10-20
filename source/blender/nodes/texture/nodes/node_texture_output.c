@@ -35,8 +35,8 @@
 
 /* **************** COMPOSITE ******************** */
 static bNodeSocketTemplate inputs[]= {
-	{ SOCK_RGBA,   1, "Color",  0.0f, 0.0f, 0.0f, 1.0f},
-	{ SOCK_VECTOR, 1, "Normal", 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, PROP_DIRECTION},
+	{ SOCK_RGBA,   1, N_("Color"),  0.0f, 0.0f, 0.0f, 1.0f},
+	{ SOCK_VECTOR, 1, N_("Normal"), 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, PROP_DIRECTION},
 	{ -1, 0, ""	}
 };
 
@@ -65,7 +65,7 @@ static void exec(void *data, bNode *node, bNodeStack **in, bNodeStack **UNUSED(o
 			tex_input_rgba(&target->tr, in[0], &params, cdata->thread);
 		
 			target->tin = (target->tr + target->tg + target->tb) / 3.0f;
-			target->talpha = 1;
+			target->talpha = TRUE;
 		
 			if (target->nor) {
 				if (in[1] && in[1]->hasinput)
@@ -88,14 +88,14 @@ static void unique_name(bNode *node)
 	
 	i = node;
 	while (i->prev) i = i->prev;
-	for (; i; i=i->next) {
-		if (
-			i == node ||
-			i->type != TEX_NODE_OUTPUT ||
-			strcmp(name, ((TexNodeOutput*)(i->storage))->name)
-		)
+	for ( ; i; i = i->next) {
+		if (i == node ||
+		    i->type != TEX_NODE_OUTPUT ||
+		    strcmp(name, ((TexNodeOutput*)(i->storage))->name))
+		{
 			continue;
-		
+		}
+
 		if (!new_name) {
 			int len = strlen(name);
 			if (len >= 4 && sscanf(name + len - 4, ".%03d", &suffix) == 1) {
@@ -141,7 +141,7 @@ static void assign_index(struct bNode *node)
 	node->custom1 = index;
 }
 
-static void init(bNodeTree *UNUSED(ntree), bNode* node, bNodeTemplate *UNUSED(ntemp))
+static void init(bNodeTree *UNUSED(ntree), bNode *node, bNodeTemplate *UNUSED(ntemp))
 {
 	TexNodeOutput *tno = MEM_callocN(sizeof(TexNodeOutput), "TEX_output");
 	node->storage= tno;

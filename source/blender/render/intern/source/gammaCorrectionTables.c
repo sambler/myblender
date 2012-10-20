@@ -1,7 +1,4 @@
 /*
- * Jitter offset table
- *
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -41,7 +38,7 @@
 /* result remain identical (ton)                                            */   
 
 /* gamma is only used here for correcting adding colors or alpha */
-#define RE_DEFAULT_GAMMA 2.0
+// #define RE_DEFAULT_GAMMA 2.0 // UNUSED
 
 /* This 400 is sort of based on the number of intensity levels needed for    */
 /* the typical dynamic range of a medium, in this case CRTs. (Foley)         */
@@ -123,17 +120,15 @@ void makeGammaTables(float gamma)
 	/* rounding errors, we just set this explicitly. The last segment may    */
 	/* have a different length than the other segments, but our              */
 	/* interpolation is insensitive to that.                                 */
-	color_domain_table[RE_GAMMA_TABLE_SIZE]   = 1.0;
+	color_domain_table[RE_GAMMA_TABLE_SIZE]    = 1.0;
 	gamma_range_table[RE_GAMMA_TABLE_SIZE]     = 1.0;
 	inv_gamma_range_table[RE_GAMMA_TABLE_SIZE] = 1.0;
 
 	/* To speed up calculations, we make these calc factor tables. They are  */
 	/* multiplication factors used in scaling the interpolation.             */
 	for (i = 0; i < RE_GAMMA_TABLE_SIZE; i++ ) {
-		gamfactor_table[i] = inv_color_step
-			* (gamma_range_table[i + 1] - gamma_range_table[i]);
-		inv_gamfactor_table[i] = inv_color_step
-			* (inv_gamma_range_table[i + 1] - inv_gamma_range_table[i]);
+		gamfactor_table[i] = inv_color_step * (gamma_range_table[i + 1] - gamma_range_table[i]);
+		inv_gamfactor_table[i] = inv_color_step * (inv_gamma_range_table[i + 1] - inv_gamma_range_table[i]);
 	}
 
 } /* end of void makeGammaTables(float gamma) */

@@ -170,8 +170,7 @@ static int material_slot_assign_exec(bContext *C, wmOperator *UNUSED(op))
 			BMIter iter;
 
 			if (em) {
-				BM_ITER(efa, &iter, em->bm, BM_FACES_OF_MESH, NULL)
-				{
+				BM_ITER_MESH (efa, &iter, em->bm, BM_FACES_OF_MESH) {
 					if (BM_elem_flag_test(efa, BM_ELEM_SELECT))
 						efa->mat_nr = ob->actcol - 1;
 				}
@@ -179,7 +178,7 @@ static int material_slot_assign_exec(bContext *C, wmOperator *UNUSED(op))
 		}
 		else if (ELEM(ob->type, OB_CURVE, OB_SURF)) {
 			Nurb *nu;
-			ListBase *nurbs = curve_editnurbs((Curve *)ob->data);
+			ListBase *nurbs = BKE_curve_editNurbs_get((Curve *)ob->data);
 
 			if (nurbs) {
 				for (nu = nurbs->first; nu; nu = nu->next)
@@ -191,7 +190,7 @@ static int material_slot_assign_exec(bContext *C, wmOperator *UNUSED(op))
 			EditFont *ef = ((Curve *)ob->data)->editfont;
 			int i, selstart, selend;
 
-			if (ef && BKE_font_getselection(ob, &selstart, &selend)) {
+			if (ef && BKE_vfont_select_get(ob, &selstart, &selend)) {
 				for (i = selstart; i <= selend; i++)
 					ef->textbufinfo[i].mat_nr = ob->actcol;
 			}
@@ -209,7 +208,7 @@ void OBJECT_OT_material_slot_assign(wmOperatorType *ot)
 	/* identifiers */
 	ot->name = "Assign Material Slot";
 	ot->idname = "OBJECT_OT_material_slot_assign";
-	ot->description = "Assign the material in the selected material slot to the selected vertices";
+	ot->description = "Assign active material slot to selection";
 	
 	/* api callbacks */
 	ot->exec = material_slot_assign_exec;
@@ -234,7 +233,7 @@ static int material_slot_de_select(bContext *C, int select)
 		}
 	}
 	else if (ELEM(ob->type, OB_CURVE, OB_SURF)) {
-		ListBase *nurbs = curve_editnurbs((Curve *)ob->data);
+		ListBase *nurbs = BKE_curve_editNurbs_get((Curve *)ob->data);
 		Nurb *nu;
 		BPoint *bp;
 		BezTriple *bezt;
@@ -293,7 +292,7 @@ void OBJECT_OT_material_slot_select(wmOperatorType *ot)
 	/* identifiers */
 	ot->name = "Select Material Slot";
 	ot->idname = "OBJECT_OT_material_slot_select";
-	ot->description = "Select vertices assigned to the selected material slot";
+	ot->description = "Select by active material slot";
 	
 	/* api callbacks */
 	ot->exec = material_slot_select_exec;
@@ -312,7 +311,7 @@ void OBJECT_OT_material_slot_deselect(wmOperatorType *ot)
 	/* identifiers */
 	ot->name = "Deselect Material Slot";
 	ot->idname = "OBJECT_OT_material_slot_deselect";
-	ot->description = "Deselect vertices assigned to the selected material slot";
+	ot->description = "Deselect by active material slot";
 	
 	/* api callbacks */
 	ot->exec = material_slot_deselect_exec;
@@ -330,7 +329,8 @@ static int material_slot_copy_exec(bContext *C, wmOperator *UNUSED(op))
 	if (!ob || !(matar = give_matarar(ob)))
 		return OPERATOR_CANCELLED;
 
-	CTX_DATA_BEGIN(C, Object *, ob_iter, selected_editable_objects) {
+	CTX_DATA_BEGIN (C, Object *, ob_iter, selected_editable_objects)
+	{
 		if (ob != ob_iter && give_matarar(ob_iter)) {
 			if (ob->data != ob_iter->data)
 				assign_matarar(ob_iter, matar, ob->totcol);
@@ -372,14 +372,14 @@ static int new_material_exec(bContext *C, wmOperator *UNUSED(op))
 
 	/* add or copy material */
 	if (ma) {
-		ma = copy_material(ma);
+		ma = BKE_material_copy(ma);
 	}
 	else {
-		ma = add_material("Material");
+		ma = BKE_material_add("Material");
 
-		if (scene_use_new_shading_nodes(scene)) {
+		if (BKE_scene_use_new_shading_nodes(scene)) {
 			ED_node_shader_default(scene, &ma->id);
-			ma->use_nodes = 1;
+			ma->use_nodes = TRUE;
 		}
 	}
 
@@ -425,7 +425,7 @@ static int new_texture_exec(bContext *C, wmOperator *UNUSED(op))
 
 	/* add or copy texture */
 	if (tex)
-		tex = copy_texture(tex);
+		tex = BKE_texture_copy(tex);
 	else
 		tex = add_texture("Texture");
 
@@ -472,14 +472,14 @@ static int new_world_exec(bContext *C, wmOperator *UNUSED(op))
 
 	/* add or copy world */
 	if (wo) {
-		wo = copy_world(wo);
+		wo = BKE_world_copy(wo);
 	}
 	else {
 		wo = add_world("World");
 
-		if (scene_use_new_shading_nodes(scene)) {
+		if (BKE_scene_use_new_shading_nodes(scene)) {
 			ED_node_shader_default(scene, &wo->id);
-			wo->use_nodes = 1;
+			wo->use_nodes = TRUE;
 		}
 	}
 
@@ -521,7 +521,7 @@ static int render_layer_add_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	Scene *scene = CTX_data_scene(C);
 
-	scene_add_render_layer(scene, NULL);
+	BKE_scene_add_render_layer(scene, NULL);
 	scene->r.actlay = BLI_countlist(&scene->r.layers) - 1;
 
 	WM_event_add_notifier(C, NC_SCENE | ND_RENDER_OPTIONS, scene);
@@ -548,7 +548,7 @@ static int render_layer_remove_exec(bContext *C, wmOperator *UNUSED(op))
 	Scene *scene = CTX_data_scene(C);
 	SceneRenderLayer *rl = BLI_findlink(&scene->r.layers, scene->r.actlay);
 
-	if (!scene_remove_render_layer(CTX_data_main(C), scene, rl))
+	if (!BKE_scene_remove_render_layer(CTX_data_main(C), scene, rl))
 		return OPERATOR_CANCELLED;
 
 	WM_event_add_notifier(C, NC_SCENE | ND_RENDER_OPTIONS, scene);
@@ -747,10 +747,15 @@ void TEXTURE_OT_envmap_save(wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER; /* no undo since this doesnt modify the env-map */
 	
 	/* properties */
-	prop = RNA_def_float_array(ot->srna, "layout", 12, default_envmap_layout, 0.0f, 0.0f, "File layout", "Flat array describing the X,Y position of each cube face in the output image, where 1 is the size of a face - order is [+Z -Z +Y -X -Y +X] (use -1 to skip a face)", 0.0f, 0.0f);
+	prop = RNA_def_float_array(ot->srna, "layout", 12, default_envmap_layout, 0.0f, 0.0f,
+	                           "File layout",
+	                           "Flat array describing the X,Y position of each cube face in the output image, "
+	                           "where 1 is the size of a face - order is [+Z -Z +Y -X -Y +X] "
+	                           "(use -1 to skip a face)", 0.0f, 0.0f);
 	RNA_def_property_flag(prop, PROP_HIDDEN);
 
-	WM_operator_properties_filesel(ot, FOLDERFILE | IMAGEFILE | MOVIEFILE, FILE_SPECIAL, FILE_SAVE, WM_FILESEL_FILEPATH, FILE_DEFAULTDISPLAY);
+	WM_operator_properties_filesel(ot, FOLDERFILE | IMAGEFILE | MOVIEFILE, FILE_SPECIAL, FILE_SAVE,
+	                               WM_FILESEL_FILEPATH, FILE_DEFAULTDISPLAY);
 }
 
 static int envmap_clear_exec(bContext *C, wmOperator *UNUSED(op))

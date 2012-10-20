@@ -134,7 +134,8 @@ static Py_hash_t BPy_IDGroup_hash(BPy_IDProperty *self)
 
 static PyObject *BPy_IDGroup_repr(BPy_IDProperty *self)
 {
-	return PyUnicode_FromFormat("<bpy id property from \"%s\">", self->id->name);
+	return PyUnicode_FromFormat("<bpy id prop: owner=\"%s\", name=\"%s\", address=%p>",
+	                            self->id ? self->id->name : "<NONE>", self->prop->name, self->prop);
 }
 
 PyObject *BPy_IDGroup_WrapData(ID *id, IDProperty *prop, IDProperty *parent)
@@ -151,7 +152,7 @@ PyObject *BPy_IDGroup_WrapData(ID *id, IDProperty *prop, IDProperty *parent)
 	}
 }
 
-#if 0 /* UNUSED, currenly assignment overwrites into new properties, rather than setting in-place */
+#if 0 /* UNUSED, currently assignment overwrites into new properties, rather than setting in-place */
 static int BPy_IDGroup_SetData(BPy_IDProperty *self, IDProperty *prop, PyObject *value)
 {
 	switch (prop->type) {
@@ -276,7 +277,7 @@ static PyObject *BPy_IDGroup_Map_GetItem(BPy_IDProperty *self, PyObject *item)
 	IDProperty *idprop;
 	const char *name;
 
-	if (self->prop->type  != IDP_GROUP) {
+	if (self->prop->type != IDP_GROUP) {
 		PyErr_SetString(PyExc_TypeError, "unsubscriptable object");
 		return NULL;
 	}
@@ -299,40 +300,34 @@ static PyObject *BPy_IDGroup_Map_GetItem(BPy_IDProperty *self, PyObject *item)
 }
 
 /* returns NULL on success, error string on failure */
-static int idp_sequence_type(PyObject *seq)
+static int idp_sequence_type(PyObject *seq_fast)
 {
 	PyObject *item;
 	int type = IDP_INT;
 
-	Py_ssize_t i, len = PySequence_Size(seq);
+	Py_ssize_t i, len = PySequence_Fast_GET_SIZE(seq_fast);
 	for (i = 0; i < len; i++) {
-		item = PySequence_GetItem(seq, i);
+		item = PySequence_Fast_GET_ITEM(seq_fast, i);
 		if (PyFloat_Check(item)) {
 			if (type == IDP_IDPARRAY) { /* mixed dict/int */
-				Py_DECREF(item);
 				return -1;
 			}
 			type = IDP_DOUBLE;
 		}
 		else if (PyLong_Check(item)) {
 			if (type == IDP_IDPARRAY) { /* mixed dict/int */
-				Py_DECREF(item);
 				return -1;
 			}
 		}
 		else if (PyMapping_Check(item)) {
 			if (i != 0 && (type != IDP_IDPARRAY)) { /* mixed dict/int */
-				Py_DECREF(item);
 				return -1;
 			}
 			type = IDP_IDPARRAY;
 		}
 		else {
-			Py_XDECREF(item);
 			return -1;
 		}
-
-		Py_DECREF(item);
 	}
 
 	return type;
@@ -385,48 +380,61 @@ const char *BPy_IDProperty_Map_ValidateAndCreate(PyObject *name_obj, IDProperty 
 		//prop->subtype = IDP_STRING_SUB_BYTE;
 	}
 	else if (PySequence_Check(ob)) {
+		PyObject *ob_seq_fast = PySequence_Fast(ob, "py -> idprop");
 		PyObject *item;
 		int i;
 
-		if ((val.array.type = idp_sequence_type(ob)) == -1)
+		if (ob_seq_fast == NULL) {
+			PyErr_Print();
+			PyErr_Clear();
+			return "error converting the sequence";
+		}
+
+		if ((val.array.type = idp_sequence_type(ob_seq_fast)) == -1) {
+			Py_DECREF(ob_seq_fast);
 			return "only floats, ints and dicts are allowed in ID property arrays";
+		}
 
 		/* validate sequence and derive type.
 		 * we assume IDP_INT unless we hit a float
 		 * number; then we assume it's */
 
-		val.array.len = PySequence_Size(ob);
+		val.array.len = PySequence_Fast_GET_SIZE(ob_seq_fast);
 
 		switch (val.array.type) {
 			case IDP_DOUBLE:
 				prop = IDP_New(IDP_ARRAY, &val, name);
 				for (i = 0; i < val.array.len; i++) {
-					item = PySequence_GetItem(ob, i);
+					item = PySequence_Fast_GET_ITEM(ob_seq_fast, i);
 					((double *)IDP_Array(prop))[i] = (float)PyFloat_AsDouble(item);
-					Py_DECREF(item);
 				}
 				break;
 			case IDP_INT:
 				prop = IDP_New(IDP_ARRAY, &val, name);
 				for (i = 0; i < val.array.len; i++) {
-					item = PySequence_GetItem(ob, i);
+					item = PySequence_Fast_GET_ITEM(ob_seq_fast, i);
 					((int *)IDP_Array(prop))[i] = (int)PyLong_AsSsize_t(item);
-					Py_DECREF(item);
 				}
 				break;
 			case IDP_IDPARRAY:
 				prop = IDP_NewIDPArray(name);
 				for (i = 0; i < val.array.len; i++) {
 					const char *error;
-					item = PySequence_GetItem(ob, i);
+					item = PySequence_Fast_GET_ITEM(ob_seq_fast, i);
 					error = BPy_IDProperty_Map_ValidateAndCreate(NULL, prop, item);
-					Py_DECREF(item);
 
-					if (error)
+					if (error) {
+						Py_DECREF(ob_seq_fast);
 						return error;
+					}
 				}
 				break;
+			default:
+				Py_DECREF(ob_seq_fast);
+				return "internal error with idp array.type";
 		}
+
+		Py_DECREF(ob_seq_fast);
 	}
 	else if (PyMapping_Check(ob)) {
 		PyObject *keys, *vals, *key, *pval;
@@ -470,7 +478,7 @@ const char *BPy_IDProperty_Map_ValidateAndCreate(PyObject *name_obj, IDProperty 
 
 	if (group->type == IDP_IDPARRAY) {
 		IDP_AppendArray(group, prop);
-		// IDP_FreeProperty(item); // IDP_AppendArray does a shallow copy (memcpy), only free memory
+		// IDP_FreeProperty(item);  /* IDP_AppendArray does a shallow copy (memcpy), only free memory */
 		MEM_freeN(prop);
 	}
 	else {
@@ -482,7 +490,7 @@ const char *BPy_IDProperty_Map_ValidateAndCreate(PyObject *name_obj, IDProperty 
 
 int BPy_Wrap_SetMapItem(IDProperty *prop, PyObject *key, PyObject *val)
 {
-	if (prop->type  != IDP_GROUP) {
+	if (prop->type != IDP_GROUP) {
 		PyErr_SetString(PyExc_TypeError, "unsubscriptable object");
 		return -1;
 	}
@@ -885,7 +893,7 @@ static PyMappingMethods BPy_IDGroup_Mapping = {
 PyTypeObject BPy_IDGroup_Type = {
 	PyVarObject_HEAD_INIT(NULL, 0)
 	/*  For printing, in format "<module>.<name>" */
-	"Blender IDProperty",       /* char *tp_name; */
+	"IDPropertyGroup",       /* char *tp_name; */
 	sizeof(BPy_IDProperty),     /* int tp_basicsize; */
 	0,                          /* tp_itemsize;  For allocation */
 
@@ -1235,7 +1243,7 @@ static PyMappingMethods BPy_IDArray_AsMapping = {
 PyTypeObject BPy_IDArray_Type = {
 	PyVarObject_HEAD_INIT(NULL, 0)
 	/*  For printing, in format "<module>.<name>" */
-	"Blender IDArray",           /* char *tp_name; */
+	"IDPropertyArray",           /* char *tp_name; */
 	sizeof(BPy_IDArray),       /* int tp_basicsize; */
 	0,                          /* tp_itemsize;  For allocation */
 
@@ -1349,7 +1357,7 @@ static PyObject *BPy_Group_Iter_Next(BPy_IDGroup_Iter *self)
 PyTypeObject BPy_IDGroup_Iter_Type = {
 	PyVarObject_HEAD_INIT(NULL, 0)
 	/*  For printing, in format "<module>.<name>" */
-	"Blender IDGroup_Iter",           /* char *tp_name; */
+	"IDPropertyGroupIter",           /* char *tp_name; */
 	sizeof(BPy_IDGroup_Iter),       /* int tp_basicsize; */
 	0,                          /* tp_itemsize;  For allocation */
 
@@ -1408,4 +1416,77 @@ void IDProp_Init_Types(void)
 	PyType_Ready(&BPy_IDGroup_Type);
 	PyType_Ready(&BPy_IDGroup_Iter_Type);
 	PyType_Ready(&BPy_IDArray_Type);
+}
+
+/*----------------------------MODULE INIT-------------------------*/
+
+/* --- */
+
+static struct PyModuleDef IDProp_types_module_def = {
+    PyModuleDef_HEAD_INIT,
+    "idprop.types",  /* m_name */
+    NULL,  /* m_doc */
+    0,  /* m_size */
+    NULL,  /* m_methods */
+    NULL,  /* m_reload */
+    NULL,  /* m_traverse */
+    NULL,  /* m_clear */
+    NULL,  /* m_free */
+};
+
+static PyObject *BPyInit_idprop_types(void)
+{
+	PyObject *submodule;
+
+	submodule = PyModule_Create(&IDProp_types_module_def);
+
+#define MODULE_TYPE_ADD(s, t) \
+	PyModule_AddObject(s, t.tp_name, (PyObject *)&t); Py_INCREF((PyObject *)&t)
+
+	/* bmesh_py_types.c */
+	MODULE_TYPE_ADD(submodule, BPy_IDGroup_Type);
+	MODULE_TYPE_ADD(submodule, BPy_IDGroup_Iter_Type);
+	MODULE_TYPE_ADD(submodule, BPy_IDArray_Type);
+
+#undef MODULE_TYPE_ADD
+
+	return submodule;
+}
+
+/* --- */
+
+static PyMethodDef IDProp_methods[] = {
+	{NULL, NULL, 0, NULL}
+};
+
+
+PyDoc_STRVAR(IDProp_module_doc,
+"This module provides access id property types (currently mainly for docs)."
+);
+static struct PyModuleDef IDProp_module_def = {
+	PyModuleDef_HEAD_INIT,
+	"idprop",  /* m_name */
+	IDProp_module_doc,  /* m_doc */
+	0,  /* m_size */
+	IDProp_methods,  /* m_methods */
+	NULL,  /* m_reload */
+	NULL,  /* m_traverse */
+	NULL,  /* m_clear */
+	NULL,  /* m_free */
+};
+
+PyObject *BPyInit_idprop(void)
+{
+	PyObject *mod;
+	PyObject *submodule;
+	PyObject *sys_modules = PyThreadState_GET()->interp->modules;
+
+	mod = PyModule_Create(&IDProp_module_def);
+
+	/* bmesh.types */
+	PyModule_AddObject(mod, "types", (submodule = BPyInit_idprop_types()));
+	PyDict_SetItemString(sys_modules, PyModule_GetName(submodule), submodule);
+	Py_INCREF(submodule);
+
+	return mod;
 }

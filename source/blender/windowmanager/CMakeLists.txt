@@ -29,7 +29,9 @@ set(INC
 	../blenkernel
 	../blenlib
 	../blenloader
+	../compositor
 	../editors/include
+	../editors/io
 	../gpu
 	../imbuf
 	../makesdna
@@ -52,6 +54,7 @@ set(INC_SYS
 
 set(SRC
 	intern/wm.c
+	intern/wm_playanim.c
 	intern/wm_cursors.c
 	intern/wm_dragdrop.c
 	intern/wm_draw.c
@@ -140,6 +143,10 @@ if(WIN322)
 	list(APPEND INC
 		../../../intern/utfconv
 	)
+endif()
+
+if(WITH_COMPOSITOR)
+	add_definitions(-DWITH_COMPOSITOR)
 endif()
 
 blender_add_lib_nolist(bf_windowmanager "${SRC}" "${INC}" "${INC_SYS}")

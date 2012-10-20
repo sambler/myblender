@@ -55,6 +55,7 @@ ShaderNode::ShaderNode(const char *name_)
 	name = name_;
 	id = -1;
 	bump = SHADER_BUMP_NONE;
+	special_type = SHADER_SPECIAL_TYPE_NONE;
 }
 
 ShaderNode::~ShaderNode()
@@ -120,9 +121,9 @@ void ShaderNode::attributes(AttributeRequestSet *attributes)
 	foreach(ShaderInput *input, inputs) {
 		if(!input->link) {
 			if(input->default_value == ShaderInput::TEXTURE_GENERATED)
-				attributes->add(Attribute::STD_GENERATED);
+				attributes->add(ATTR_STD_GENERATED);
 			else if(input->default_value == ShaderInput::TEXTURE_UV)
-				attributes->add(Attribute::STD_UV);
+				attributes->add(ATTR_STD_UV);
 		}
 	}
 }
@@ -180,14 +181,17 @@ void ShaderGraph::connect(ShaderOutput *from, ShaderInput *to)
 	assert(from && to);
 
 	if(to->link) {
-		fprintf(stderr, "ShaderGraph connect: input already connected.\n");
+		fprintf(stderr, "Cycles shader graph connect: input already connected.\n");
 		return;
 	}
 
 	if(from->type != to->type) {
 		/* for closures we can't do automatic conversion */
 		if(from->type == SHADER_SOCKET_CLOSURE || to->type == SHADER_SOCKET_CLOSURE) {
-			fprintf(stderr, "ShaderGraph connect: can only connect closure to closure.\n");
+			fprintf(stderr, "Cycles shader graph connect: can only connect closure to closure "
+			        "(ShaderNode:%s, ShaderOutput:%s , type:%d -> to ShaderNode:%s, ShaderInput:%s, type:%d).\n",
+			        from->parent->name.c_str(), from->name, (int)from->type,
+			        to->parent->name.c_str(),   to->name,   (int)to->type);
 			return;
 		}
 
@@ -225,6 +229,8 @@ void ShaderGraph::finalize(bool do_bump, bool do_osl)
 	if(!finalized) {
 		clean();
 		default_inputs(do_osl);
+		refine_bump_nodes();
+
 		if(do_bump)
 			bump_from_displacement();
 
@@ -295,8 +301,8 @@ void ShaderGraph::copy_nodes(set<ShaderNode*>& nodes, map<ShaderNode*, ShaderNod
 void ShaderGraph::remove_proxy_nodes(vector<bool>& removed)
 {
 	foreach(ShaderNode *node, nodes) {
-		ProxyNode *proxy = dynamic_cast<ProxyNode*>(node);
-		if (proxy) {
+		if (node->special_type == SHADER_SPECIAL_TYPE_PROXY) {
+			ProxyNode *proxy = static_cast<ProxyNode*>(node);
 			ShaderInput *input = proxy->inputs[0];
 			ShaderOutput *output = proxy->outputs[0];
 			
@@ -325,6 +331,25 @@ void ShaderGraph::remove_proxy_nodes(vector<bool>& removed)
 			
 			removed[proxy->id] = true;
 		}
+
+		/* remove useless mix closures nodes */
+		if(node->special_type == SHADER_SPECIAL_TYPE_MIX_CLOSURE) {
+			MixClosureNode *mix = static_cast<MixClosureNode*>(node);
+			if(mix->outputs[0]->links.size() && mix->inputs[1]->link == mix->inputs[2]->link) {
+				ShaderOutput *output = mix->inputs[1]->link;
+				vector<ShaderInput*> inputs = mix->outputs[0]->links;
+
+				foreach(ShaderInput *sock, mix->inputs)
+					if(sock->link)
+						disconnect(sock);
+
+				foreach(ShaderInput *input, inputs) {
+					disconnect(input);
+					if (output)
+						connect(output, input);
+				}
+			}
+		}
 	}
 }
 
@@ -340,7 +365,7 @@ void ShaderGraph::break_cycles(ShaderNode *node, vector<bool>& visited, vector<b
 			if(on_stack[depnode->id]) {
 				/* break cycle */
 				disconnect(input);
-				fprintf(stderr, "ShaderGraph: detected cycle in graph, connection removed.\n");
+				fprintf(stderr, "Cycles shader graph: detected cycle in graph, connection removed.\n");
 			}
 			else if(!visited[depnode->id]) {
 				/* visit dependencies */
@@ -355,8 +380,8 @@ void ShaderGraph::break_cycles(ShaderNode *node, vector<bool>& visited, vector<b
 void ShaderGraph::clean()
 {
 	/* we do two things here: find cycles and break them, and remove unused
-	   nodes that don't feed into the output. how cycles are broken is
-	   undefined, they are invalid input, the important thing is to not crash */
+	 * nodes that don't feed into the output. how cycles are broken is
+	 * undefined, they are invalid input, the important thing is to not crash */
 
 	vector<bool> removed(nodes.size(), false);
 	vector<bool> visited(nodes.size(), false);
@@ -378,6 +403,20 @@ void ShaderGraph::clean()
 
 	/* break cycles */
 	break_cycles(output(), visited, on_stack);
+
+	/* disconnect unused nodes */
+	foreach(ShaderNode *node, nodes) {
+		if(!visited[node->id]) {
+			foreach(ShaderInput *to, node->inputs) {
+				ShaderOutput *from = to->link;
+
+				if (from) {
+					to->link = NULL;
+					from->links.erase(remove(from->links.begin(), from->links.end(), to), from->links.end());
+				}
+			}
+		}
+	}
 
 	/* remove unused nodes */
 	foreach(ShaderNode *node, nodes) {
@@ -431,6 +470,12 @@ void ShaderGraph::default_inputs(bool do_osl)
 
 					connect(geom->output("Position"), input);
 				}
+				else if(input->default_value == ShaderInput::TANGENT) {
+					if(!geom)
+						geom = new GeometryNode();
+
+					connect(geom->output("Tangent"), input);
+				}
 			}
 		}
 	}
@@ -439,6 +484,61 @@ void ShaderGraph::default_inputs(bool do_osl)
 		add(geom);
 	if(texco)
 		add(texco);
+}
+
+void ShaderGraph::refine_bump_nodes()
+{
+	/* we transverse the node graph looking for bump nodes, when we find them,
+	 * like in bump_from_displacement(), we copy the sub-graph defined from "bump"
+	 * input to the inputs "center","dx" and "dy" What is in "bump" input is moved
+	 * to "center" input. */
+
+	foreach(ShaderNode *node, nodes) {
+		if(node->name == ustring("bump") && node->input("Height")->link) {
+			ShaderInput *bump_input = node->input("Height");
+			set<ShaderNode*> nodes_bump;
+
+			/* make 2 extra copies of the subgraph defined in Bump input */
+			map<ShaderNode*, ShaderNode*> nodes_dx;
+			map<ShaderNode*, ShaderNode*> nodes_dy;
+
+			/* find dependencies for the given input */
+			find_dependencies(nodes_bump, bump_input );
+
+			copy_nodes(nodes_bump, nodes_dx);
+			copy_nodes(nodes_bump, nodes_dy);
+	
+			/* mark nodes to indicate they are use for bump computation, so
+			   that any texture coordinates are shifted by dx/dy when sampling */
+			foreach(ShaderNode *node, nodes_bump)
+				node->bump = SHADER_BUMP_CENTER;
+			foreach(NodePair& pair, nodes_dx)
+				pair.second->bump = SHADER_BUMP_DX;
+			foreach(NodePair& pair, nodes_dy)
+				pair.second->bump = SHADER_BUMP_DY;
+
+			ShaderOutput *out = bump_input->link;
+			ShaderOutput *out_dx = nodes_dx[out->parent]->output(out->name);
+			ShaderOutput *out_dy = nodes_dy[out->parent]->output(out->name);
+
+			connect(out_dx, node->input("SampleX"));
+			connect(out_dy, node->input("SampleY"));
+			
+			/* add generated nodes */
+			foreach(NodePair& pair, nodes_dx)
+				add(pair.second);
+			foreach(NodePair& pair, nodes_dy)
+				add(pair.second);
+			
+			/* connect what is conected is bump to samplecenter input*/
+			connect(out , node->input("SampleCenter"));
+
+			/* bump input is just for connectivity purpose for the graph input,
+			 * we reconected this input to samplecenter, so lets disconnect it
+			 * from bump input */
+			disconnect(bump_input);
+		}
+	}
 }
 
 void ShaderGraph::bump_from_displacement()
@@ -454,7 +554,7 @@ void ShaderGraph::bump_from_displacement()
 	 * different shifted coordinates.
 	 *
 	 * these 3 displacement values are then fed into the bump node, which will
-	 * modify the normal. */
+	 * output the the perturbed normal. */
 
 	ShaderInput *displacement_in = output()->input("Displacement");
 
@@ -475,7 +575,7 @@ void ShaderGraph::bump_from_displacement()
 	copy_nodes(nodes_displace, nodes_dy);
 
 	/* mark nodes to indicate they are use for bump computation, so
-	   that any texture coordinates are shifted by dx/dy when sampling */
+	 * that any texture coordinates are shifted by dx/dy when sampling */
 	foreach(NodePair& pair, nodes_center)
 		pair.second->bump = SHADER_BUMP_CENTER;
 	foreach(NodePair& pair, nodes_dx)
@@ -483,6 +583,12 @@ void ShaderGraph::bump_from_displacement()
 	foreach(NodePair& pair, nodes_dy)
 		pair.second->bump = SHADER_BUMP_DY;
 
+	/* add set normal node and connect the bump normal ouput to the set normal
+	 * output, so it can finally set the shader normal, note we are only doing
+	 * this for bump from displacement, this will be the only bump allowed to
+	 * overwrite the shader normal */
+	ShaderNode *set_normal = add(new SetNormalNode());
+	
 	/* add bump node and connect copied graphs to it */
 	ShaderNode *bump = add(new BumpNode());
 
@@ -494,17 +600,26 @@ void ShaderGraph::bump_from_displacement()
 	connect(out_center, bump->input("SampleCenter"));
 	connect(out_dx, bump->input("SampleX"));
 	connect(out_dy, bump->input("SampleY"));
+	
+	/* connect the bump out to the set normal in: */
+	connect(bump->output("Normal"), set_normal->input("Direction"));
 
 	/* connect bump output to normal input nodes that aren't set yet. actually
-	   this will only set the normal input to the geometry node that we created
-	   and connected to all other normal inputs already. */
+	 * this will only set the normal input to the geometry node that we created
+	 * and connected to all other normal inputs already. */
 	foreach(ShaderNode *node, nodes)
 		foreach(ShaderInput *input, node->inputs)
 			if(!input->link && input->default_value == ShaderInput::NORMAL)
-				connect(bump->output("Normal"), input);
-	
+				connect(set_normal->output("Normal"), input);
+
+	/* for displacement bump, clear the normal input in case the above loop
+	 * connected the setnormal out to the bump normalin */
+	ShaderInput *bump_normal_in = bump->input("NormalIn");
+	if(bump_normal_in)
+		bump_normal_in->link = NULL;
+
 	/* finally, add the copied nodes to the graph. we can't do this earlier
-	   because we would create dependency cycles in the above loop */
+	 * because we would create dependency cycles in the above loop */
 	foreach(NodePair& pair, nodes_center)
 		add(pair.second);
 	foreach(NodePair& pair, nodes_dx)

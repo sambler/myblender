@@ -35,20 +35,20 @@
 
 /* **************** SCALAR MATH ******************** */ 
 static bNodeSocketTemplate sh_node_math_in[]= { 
-	{ SOCK_FLOAT, 1, "Value", 0.5f, 0.5f, 0.5f, 1.0f, -10000.0f, 10000.0f, PROP_NONE}, 
-	{ SOCK_FLOAT, 1, "Value", 0.5f, 0.5f, 0.5f, 1.0f, -10000.0f, 10000.0f, PROP_NONE}, 
+	{ SOCK_FLOAT, 1, N_("Value"), 0.5f, 0.5f, 0.5f, 1.0f, -10000.0f, 10000.0f, PROP_NONE}, 
+	{ SOCK_FLOAT, 1, N_("Value"), 0.5f, 0.5f, 0.5f, 1.0f, -10000.0f, 10000.0f, PROP_NONE}, 
 	{ -1, 0, "" } 
 };
 
 static bNodeSocketTemplate sh_node_math_out[]= { 
-	{ SOCK_FLOAT, 0, "Value"}, 
+	{ SOCK_FLOAT, 0, N_("Value")}, 
 	{ -1, 0, "" } 
 };
 
 static void node_shader_exec_math(void *UNUSED(data), bNode *node, bNodeStack **in, 
 bNodeStack **out) 
 {
-	switch(node->custom1) { 
+	switch (node->custom1) { 
 	
 	case 0: /* Add */
 		out[0]->vec[0]= in[0]->vec[0] + in[1]->vec[0]; 

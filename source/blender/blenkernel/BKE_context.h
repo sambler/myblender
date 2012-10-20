@@ -73,7 +73,7 @@ struct bContextDataResult;
 typedef struct bContextDataResult bContextDataResult;
 
 typedef int (*bContextDataCallback)(const bContext *C,
-	const char *member, bContextDataResult *result);
+                                    const char *member, bContextDataResult *result);
 
 typedef struct bContextStoreEntry {
 	struct bContextStoreEntry *next, *prev;
@@ -89,7 +89,7 @@ typedef struct bContextStore {
 	int used;
 } bContextStore;
 
-/* for the conrtext's rna mode enum
+/* for the context's rna mode enum
  * keep aligned with data_mode_strings in context.c */
 enum {
 	CTX_MODE_EDIT_MESH = 0,
@@ -118,6 +118,7 @@ bContext *CTX_copy(const bContext *C);
 /* Stored Context */
 
 bContextStore *CTX_store_add(ListBase *contexts, const char *name, PointerRNA *ptr);
+bContextStore *CTX_store_add_all(ListBase *contexts, bContextStore *context);
 void CTX_store_set(bContext *C, bContextStore *store);
 bContextStore *CTX_store_copy(bContextStore *store);
 void CTX_store_free(bContextStore *store);
@@ -174,7 +175,7 @@ void CTX_wm_operator_poll_msg_set(struct bContext *C, const char *msg);
  *
  * - listbases consist of CollectionPointerLink items and must be
  *   freed with BLI_freelistN!
- * - the dir listbase consits of LinkData items */
+ * - the dir listbase consists of LinkData items */
 
 /* data type, needed so we can tell between a NULL pointer and an empty list */
 enum {
@@ -212,15 +213,18 @@ void CTX_data_list_add(bContextDataResult *result, void *data);
 		ListBase ctx_data_list;                                               \
 		CollectionPointerLink *ctx_link;                                      \
 		CTX_data_##member(C, &ctx_data_list);                                 \
-		for(ctx_link=ctx_data_list.first; ctx_link; ctx_link=ctx_link->next) {\
-			Type instance= ctx_link->ptr.data;
+		for (ctx_link = ctx_data_list.first;                                  \
+		     ctx_link;                                                        \
+		     ctx_link = ctx_link->next)                                       \
+		{                                                                     \
+			Type instance = ctx_link->ptr.data;
 
 #define CTX_DATA_END                                                          \
 		}                                                                     \
 		BLI_freelistN(&ctx_data_list);                                        \
-	}
+} (void)0
 
-int ctx_data_list_count(const bContext *C, int (*func)(const bContext*, ListBase*));
+int ctx_data_list_count(const bContext *C, int (*func)(const bContext *, ListBase *));
 
 #define CTX_DATA_COUNT(C, member) \
 	ctx_data_list_count(C, CTX_data_##member)
@@ -257,6 +261,7 @@ struct Image *CTX_data_edit_image(const bContext *C);
 
 struct Text *CTX_data_edit_text(const bContext *C);
 struct MovieClip *CTX_data_edit_movieclip(const bContext *C);
+struct Mask *CTX_data_edit_mask(const bContext *C);
 
 int CTX_data_selected_nodes(const bContext *C, ListBase *list);
 

@@ -49,16 +49,16 @@ set(INC
 	../../blender/makesdna
 	../../blender/makesrna
 	../../blender/windowmanager
-	../../../extern/bullet2/src
-	../../../extern/Eigen3
 	../../../intern/container
 	../../../intern/guardedalloc
 	../../../intern/moto/include
 	../../../intern/string
-	../../../extern/recastnavigation/Detour/Include
 )
 
 set(INC_SYS
+	../../../extern/recastnavigation/Detour/Include
+	../../../extern/Eigen3
+	${PTHREADS_INCLUDE_DIRS}
 
 )
 
@@ -109,6 +109,9 @@ set(SRC
 )
 
 if(WITH_BULLET)
+	list(APPEND INC_SYS
+		../../../extern/bullet2/src
+	)
 	add_definitions(-DUSE_BULLET)
 endif()
 

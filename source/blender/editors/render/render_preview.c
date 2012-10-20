@@ -1,5 +1,4 @@
-/* 
- *
+/*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -65,6 +64,7 @@
 
 #include "BKE_brush.h"
 #include "BKE_context.h"
+#include "BKE_colortools.h"
 #include "BKE_depsgraph.h"
 #include "BKE_global.h"
 #include "BKE_idprop.h"
@@ -76,11 +76,13 @@
 #include "BKE_material.h"
 #include "BKE_node.h"
 #include "BKE_object.h"
+#include "BKE_scene.h"
 #include "BKE_texture.h"
 #include "BKE_world.h"
 
 #include "IMB_imbuf.h"
 #include "IMB_imbuf_types.h"
+#include "IMB_colormanagement.h"
 
 #include "BIF_gl.h"
 #include "BIF_glutil.h"
@@ -116,7 +118,8 @@ ImBuf *get_brush_icon(Brush *brush)
 				BLI_strncpy(path, brush->icon_filepath, sizeof(brush->icon_filepath));
 				BLI_path_abs(path, G.main->name);
 
-				brush->icon_imbuf = IMB_loadiffname(path, flags);
+				/* use default colorspaces for brushes */
+				brush->icon_imbuf = IMB_loadiffname(path, flags, NULL);
 
 				// otherwise lets try to find it in other directories
 				if (!(brush->icon_imbuf)) {
@@ -124,8 +127,10 @@ ImBuf *get_brush_icon(Brush *brush)
 
 					BLI_make_file_string(G.main->name, path, folder, brush->icon_filepath);
 
-					if (path[0])
-						brush->icon_imbuf = IMB_loadiffname(path, flags);
+					if (path[0]) {
+						/* use fefault color spaces */
+						brush->icon_imbuf = IMB_loadiffname(path, flags, NULL);
+					}
 				}
 
 				if (brush->icon_imbuf)
@@ -255,6 +260,10 @@ static Scene *preview_prepare_scene(Scene *scene, ID *id, int id_type, ShaderPre
 		}
 		
 		sce->r.color_mgt_flag = scene->r.color_mgt_flag;
+		BKE_color_managed_display_settings_copy(&sce->display_settings, &scene->display_settings);
+
+		BKE_color_managed_view_settings_free(&sce->view_settings);
+		BKE_color_managed_view_settings_copy(&sce->view_settings, &scene->view_settings);
 		
 		/* prevent overhead for small renders and icons (32) */
 		if (id && sp->sizex < 40)
@@ -262,9 +271,10 @@ static Scene *preview_prepare_scene(Scene *scene, ID *id, int id_type, ShaderPre
 		else
 			sce->r.xparts = sce->r.yparts = 4;
 		
-		/* exception: don't color manage texture previews or icons */
-		if ((id && sp->pr_method == PR_ICON_RENDER) || id_type == ID_TE)
-			sce->r.color_mgt_flag &= ~R_COLOR_MANAGEMENT;
+		/* exception: don't apply render part of display transform for texture previews or icons */
+		if ((id && sp->pr_method == PR_ICON_RENDER) || id_type == ID_TE) {
+			BKE_scene_disable_color_management(sce);
+		}
 		
 		if ((id && sp->pr_method == PR_ICON_RENDER) && id_type != ID_WO)
 			sce->r.alphamode = R_ALPHAPREMUL;
@@ -358,7 +368,7 @@ static Scene *preview_prepare_scene(Scene *scene, ID *id, int id_type, ShaderPre
 					if (OB_TYPE_SUPPORT_MATERIAL(base->object->type)) {
 						/* don't use assign_material, it changed mat->id.us, which shows in the UI */
 						Material ***matar = give_matarar(base->object);
-						int actcol = MAX2(base->object->actcol > 0, 1) - 1;
+						int actcol = MAX2(base->object->actcol - 1, 0);
 
 						if (matar && actcol < base->object->totcol)
 							(*matar)[actcol] = mat;
@@ -474,13 +484,15 @@ static int ed_preview_draw_rect(ScrArea *sa, Scene *sce, ID *id, int split, int 
 	Render *re;
 	RenderResult rres;
 	char name[32];
-	int do_gamma_correct = 0, do_predivide = 0;
-	int offx = 0, newx = rect->xmax - rect->xmin, newy = rect->ymax - rect->ymin;
+	int do_gamma_correct = FALSE, do_predivide = FALSE;
+	int offx = 0;
+	int newx = BLI_rcti_size_x(rect);
+	int newy = BLI_rcti_size_y(rect);
 
 	if (id && GS(id->name) != ID_TE) {
 		/* exception: don't color manage texture previews - show the raw values */
 		if (sce) {
-			do_gamma_correct = sce->r.color_mgt_flag & R_COLOR_MANAGEMENT;
+			do_gamma_correct = TRUE;
 			do_predivide = sce->r.color_mgt_flag & R_COLOR_MANAGEMENT_PREDIVIDE;
 		}
 	}
@@ -513,15 +525,25 @@ static int ed_preview_draw_rect(ScrArea *sa, Scene *sce, ID *id, int split, int 
 				/* temporary conversion to byte for drawing */
 				float fx = rect->xmin + offx;
 				float fy = rect->ymin;
-				int profile_from = (do_gamma_correct) ? IB_PROFILE_LINEAR_RGB : IB_PROFILE_SRGB;
 				int dither = 0;
 				unsigned char *rect_byte;
 
 				rect_byte = MEM_mallocN(rres.rectx * rres.recty * sizeof(int), "ed_preview_draw_rect");
 
-				IMB_buffer_byte_from_float(rect_byte, rres.rectf,
-				                           4, dither, IB_PROFILE_SRGB, profile_from, do_predivide,
-				                           rres.rectx, rres.recty, rres.rectx, rres.rectx);
+				if (do_gamma_correct) {
+					IMB_display_buffer_transform_apply(rect_byte, rres.rectf, rres.rectx, rres.recty, 4,
+					                                   &sce->view_settings, &sce->display_settings, do_predivide);
+
+				}
+				else {
+					/* OCIO_TODO: currently seems an exception for textures (came fro mlegacish time),
+					 *            but is it indeed expected behavior, or textures should be
+					 *            color managed as well?
+					 */
+					IMB_buffer_byte_from_float(rect_byte, rres.rectf,
+					                           4, dither, IB_PROFILE_SRGB, IB_PROFILE_SRGB, do_predivide,
+					                           rres.rectx, rres.recty, rres.rectx, rres.rectx);
+				}
 
 				glaDrawPixelsSafe(fx, fy, rres.rectx, rres.recty, rres.rectx, GL_RGBA, GL_UNSIGNED_BYTE, rect_byte);
 
@@ -548,7 +570,8 @@ void ED_preview_draw(const bContext *C, void *idp, void *parentp, void *slotp, r
 		SpaceButs *sbuts = sa->spacedata.first;
 		rcti newrect;
 		int ok;
-		int newx = rect->xmax - rect->xmin, newy = rect->ymax - rect->ymin;
+		int newx = BLI_rcti_size_x(rect);
+		int newy = BLI_rcti_size_y(rect);
 
 		newrect.xmin = rect->xmin;
 		newrect.xmax = rect->xmin;
@@ -584,7 +607,7 @@ static void shader_preview_draw(void *spv, RenderResult *UNUSED(rr), volatile st
 {
 	ShaderPreview *sp = spv;
 	
-	*(sp->do_update) = 1;
+	*(sp->do_update) = TRUE;
 }
 
 /* called by renderer, checks job value */
@@ -684,7 +707,7 @@ static void shader_preview_render(ShaderPreview *sp, ID *id, int split, int firs
 	if (ELEM(sp->pr_method, PR_BUTS_RENDER, PR_NODE_RENDER)) {
 		RE_display_draw_cb(re, sp, shader_preview_draw);
 	}
-	/* set this for all previews, default is react to G.afbreek still */
+	/* set this for all previews, default is react to G.is_break still */
 	RE_test_break_cb(re, sp, shader_preview_break);
 	
 	/* lens adjust */
@@ -706,7 +729,7 @@ static void shader_preview_render(ShaderPreview *sp, ID *id, int split, int firs
 	}
 	else {
 		/* validate owner */
-		//if(ri->rect==NULL)
+		//if (ri->rect == NULL)
 		//	ri->rect= MEM_mallocN(sizeof(int)*ri->pr_rectx*ri->pr_recty, "BIF_previewrender");
 		//RE_ResultGet32(re, ri->rect);
 	}
@@ -738,7 +761,7 @@ static void shader_preview_startjob(void *customdata, short *stop, short *do_upd
 	else
 		shader_preview_render(sp, sp->id, 0, 0);
 
-	*do_update = 1;
+	*do_update = TRUE;
 }
 
 static void shader_preview_free(void *customdata)
@@ -747,7 +770,6 @@ static void shader_preview_free(void *customdata)
 	
 	if (sp->matcopy) {
 		struct IDProperty *properties;
-		int a;
 		
 		/* node previews */
 		shader_preview_updatejob(sp);
@@ -755,13 +777,7 @@ static void shader_preview_free(void *customdata)
 		/* get rid of copied material */
 		BLI_remlink(&pr_main->mat, sp->matcopy);
 		
-		/* free_material decrements texture, prevent this. hack alert! */
-		for (a = 0; a < MAX_MTEX; a++) {
-			MTex *mtex = sp->matcopy->mtex[a];
-			if (mtex && mtex->tex) mtex->tex = NULL;
-		}
-		
-		free_material(sp->matcopy);
+		BKE_material_free_ex(sp->matcopy, FALSE);
 
 		properties = IDP_GetProperties((ID *)sp->matcopy, FALSE);
 		if (properties) {
@@ -777,7 +793,7 @@ static void shader_preview_free(void *customdata)
 		
 		/* get rid of copied texture */
 		BLI_remlink(&pr_main->tex, sp->texcopy);
-		free_texture(sp->texcopy);
+		BKE_texture_free(sp->texcopy);
 		
 		properties = IDP_GetProperties((ID *)sp->texcopy, FALSE);
 		if (properties) {
@@ -793,7 +809,7 @@ static void shader_preview_free(void *customdata)
 		
 		/* get rid of copied world */
 		BLI_remlink(&pr_main->world, sp->worldcopy);
-		free_world(sp->worldcopy);
+		BKE_world_free_ex(sp->worldcopy, TRUE); /* [#32865] - we need to unlink the texture copies, unlike for materials */
 		
 		properties = IDP_GetProperties((ID *)sp->worldcopy, FALSE);
 		if (properties) {
@@ -809,7 +825,7 @@ static void shader_preview_free(void *customdata)
 		
 		/* get rid of copied lamp */
 		BLI_remlink(&pr_main->lamp, sp->lampcopy);
-		free_lamp(sp->lampcopy);
+		BKE_lamp_free(sp->lampcopy);
 		
 		properties = IDP_GetProperties((ID *)sp->lampcopy, FALSE);
 		if (properties) {
@@ -911,7 +927,7 @@ static void icon_preview_startjob(void *customdata, short *stop, short *do_updat
 		
 		icon_copy_rect(ibuf, sp->sizex, sp->sizey, sp->pr_rect);
 
-		*do_update = 1;
+		*do_update = TRUE;
 	}
 	else if (idtype == ID_BR) {
 		Brush *br = (Brush *)id;
@@ -925,7 +941,7 @@ static void icon_preview_startjob(void *customdata, short *stop, short *do_updat
 
 		icon_copy_rect(br->icon_imbuf, sp->sizex, sp->sizey, sp->pr_rect);
 
-		*do_update = 1;
+		*do_update = TRUE;
 	}
 	else {
 		/* re-use shader job */
@@ -987,20 +1003,19 @@ static void icon_preview_startjob_all_sizes(void *customdata, short *stop, short
 	IconPreviewSize *cur_size = ip->sizes.first;
 
 	while (cur_size) {
-		ShaderPreview sp;
-
-		memset(&sp, 0, sizeof(ShaderPreview));
+		ShaderPreview *sp = MEM_callocN(sizeof(ShaderPreview), "Icon ShaderPreview");
 
 		/* construct shader preview from image size and previewcustomdata */
-		sp.scene = ip->scene;
-		sp.owner = ip->owner;
-		sp.sizex = cur_size->sizex;
-		sp.sizey = cur_size->sizey;
-		sp.pr_method = PR_ICON_RENDER;
-		sp.pr_rect = cur_size->rect;
-		sp.id = ip->id;
+		sp->scene = ip->scene;
+		sp->owner = ip->owner;
+		sp->sizex = cur_size->sizex;
+		sp->sizey = cur_size->sizey;
+		sp->pr_method = PR_ICON_RENDER;
+		sp->pr_rect = cur_size->rect;
+		sp->id = ip->id;
 
-		common_preview_startjob(&sp, stop, do_update, progress);
+		common_preview_startjob(sp, stop, do_update, progress);
+		shader_preview_free(sp);
 
 		cur_size = cur_size->next;
 	}
@@ -1024,16 +1039,17 @@ static void icon_preview_free(void *customdata)
 
 void ED_preview_icon_job(const bContext *C, void *owner, ID *id, unsigned int *rect, int sizex, int sizey)
 {
-	wmJob *steve;
+	wmJob *wm_job;
 	IconPreview *ip, *old_ip;
 	
 	/* suspended start means it starts after 1 timer step, see WM_jobs_timer below */
-	steve = WM_jobs_get(CTX_wm_manager(C), CTX_wm_window(C), owner, "Icon Preview", WM_JOB_EXCL_RENDER | WM_JOB_SUSPEND);
+	wm_job = WM_jobs_get(CTX_wm_manager(C), CTX_wm_window(C), owner, "Icon Preview",
+	                     WM_JOB_EXCL_RENDER | WM_JOB_SUSPEND, WM_JOB_TYPE_RENDER_PREVIEW);
 
 	ip = MEM_callocN(sizeof(IconPreview), "icon preview");
 
 	/* render all resolutions from suspended job too */
-	old_ip = WM_jobs_get_customdata(steve);
+	old_ip = WM_jobs_customdata_get(wm_job);
 	if (old_ip)
 		BLI_movelisttolist(&ip->sizes, &old_ip->sizes);
 
@@ -1045,20 +1061,21 @@ void ED_preview_icon_job(const bContext *C, void *owner, ID *id, unsigned int *r
 	icon_preview_add_size(ip, rect, sizex, sizey);
 
 	/* setup job */
-	WM_jobs_customdata(steve, ip, icon_preview_free);
-	WM_jobs_timer(steve, 0.25, NC_MATERIAL, NC_MATERIAL);
-	WM_jobs_callbacks(steve, icon_preview_startjob_all_sizes, NULL, NULL, icon_preview_endjob);
+	WM_jobs_customdata_set(wm_job, ip, icon_preview_free);
+	WM_jobs_timer(wm_job, 0.25, NC_MATERIAL, NC_MATERIAL);
+	WM_jobs_callbacks(wm_job, icon_preview_startjob_all_sizes, NULL, NULL, icon_preview_endjob);
 
-	WM_jobs_start(CTX_wm_manager(C), steve);
+	WM_jobs_start(CTX_wm_manager(C), wm_job);
 }
 
 void ED_preview_shader_job(const bContext *C, void *owner, ID *id, ID *parent, MTex *slot, int sizex, int sizey, int method)
 {
 	Object *ob = CTX_data_active_object(C);
-	wmJob *steve;
+	wmJob *wm_job;
 	ShaderPreview *sp;
 
-	steve = WM_jobs_get(CTX_wm_manager(C), CTX_wm_window(C), owner, "Shader Preview", WM_JOB_EXCL_RENDER);
+	wm_job = WM_jobs_get(CTX_wm_manager(C), CTX_wm_window(C), owner, "Shader Preview",
+	                    WM_JOB_EXCL_RENDER, WM_JOB_TYPE_RENDER_PREVIEW);
 	sp = MEM_callocN(sizeof(ShaderPreview), "shader preview");
 
 	/* customdata for preview thread */
@@ -1074,11 +1091,11 @@ void ED_preview_shader_job(const bContext *C, void *owner, ID *id, ID *parent, M
 	else sp->col[0] = sp->col[1] = sp->col[2] = sp->col[3] = 1.0f;
 	
 	/* setup job */
-	WM_jobs_customdata(steve, sp, shader_preview_free);
-	WM_jobs_timer(steve, 0.1, NC_MATERIAL, NC_MATERIAL);
-	WM_jobs_callbacks(steve, common_preview_startjob, NULL, shader_preview_updatejob, NULL);
+	WM_jobs_customdata_set(wm_job, sp, shader_preview_free);
+	WM_jobs_timer(wm_job, 0.1, NC_MATERIAL, NC_MATERIAL);
+	WM_jobs_callbacks(wm_job, common_preview_startjob, NULL, shader_preview_updatejob, NULL);
 	
-	WM_jobs_start(CTX_wm_manager(C), steve);
+	WM_jobs_start(CTX_wm_manager(C), wm_job);
 }
 
 void ED_preview_kill_jobs(const struct bContext *C)

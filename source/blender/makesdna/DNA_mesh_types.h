@@ -37,8 +37,6 @@
 #include "DNA_ID.h"
 #include "DNA_customdata_types.h"
 
-#include "DNA_defs.h" /* USE_BMESH_FORWARD_COMPAT */
-
 struct AnimData;
 struct DerivedMesh;
 struct Ipo;
@@ -67,6 +65,7 @@ typedef struct Mesh {
 	struct Ipo *ipo  DNA_DEPRECATED;  /* old animation system, deprecated for 2.5 */
 	struct Key *key;
 	struct Material **mat;
+	struct MSelect *mselect;
 
 /* BMESH ONLY */
 	/*new face structures*/
@@ -88,11 +87,10 @@ typedef struct Mesh {
 
 	/* array of colors for the tessellated faces, must be number of tessellated
 	 * faces * 4 in length */
-	struct MCol *mcol;		
-	struct MSticky *msticky;
+	struct MCol *mcol;
 	struct Mesh *texcomesh;
-	struct MSelect *mselect;
-	
+
+	/* When the object is available, the preferred access method is: BMEdit_FromObject(ob) */
 	struct BMEditMesh *edit_btmesh;	/* not saved in file! */
 
 	struct CustomData vdata, edata, fdata;

@@ -38,15 +38,16 @@
 #include "zlib.h" /* wm_read_exotic() */
 
 #ifdef WIN32
-#include <windows.h> /* need to include windows.h so _WIN32_IE is defined  */
-#ifndef _WIN32_IE
-#define _WIN32_IE 0x0400 /* minimal requirements for SHGetSpecialFolderPath on MINGW MSVC has this defined already */
-#endif
-#include <shlobj.h> /* for SHGetSpecialFolderPath, has to be done before BLI_winstuff because 'near' is disabled through BLI_windstuff */
-#include <process.h> /* getpid */
-#include "BLI_winstuff.h"
+#  include <windows.h> /* need to include windows.h so _WIN32_IE is defined  */
+#  ifndef _WIN32_IE
+#    define _WIN32_IE 0x0400 /* minimal requirements for SHGetSpecialFolderPath on MINGW MSVC has this defined already */
+#  endif
+#  include <shlobj.h>  /* for SHGetSpecialFolderPath, has to be done before BLI_winstuff
+                        * because 'near' is disabled through BLI_windstuff */
+#  include <process.h> /* getpid */
+#  include "BLI_winstuff.h"
 #else
-#include <unistd.h> /* getpid */
+#  include <unistd.h> /* getpid */
 #endif
 
 #include "MEM_guardedalloc.h"
@@ -55,6 +56,7 @@
 #include "BLI_blenlib.h"
 #include "BLI_linklist.h"
 #include "BLI_utildefines.h"
+#include "BLI_threads.h"
 #include "BLI_callbacks.h"
 
 #include "BLF_translation.h"
@@ -76,9 +78,11 @@
 #include "BKE_global.h"
 #include "BKE_library.h"
 #include "BKE_main.h"
+#include "BKE_multires.h"
 #include "BKE_packedFile.h"
 #include "BKE_report.h"
 #include "BKE_sound.h"
+#include "BKE_screen.h"
 #include "BKE_texture.h"
 
 
@@ -186,9 +190,12 @@ static void wm_window_match_do(bContext *C, ListBase *oldwmlist)
 	
 	/* cases 1 and 2 */
 	if (oldwmlist->first == NULL) {
-		if (G.main->wm.first) ;  /* nothing todo */
-		else
+		if (G.main->wm.first) {
+			/* nothing todo */
+		}
+		else {
 			wm_add_default(C);
+		}
 	}
 	else {
 		/* cases 3 and 4 */
@@ -313,7 +320,7 @@ static int wm_read_exotic(Scene *UNUSED(scene), const char *name)
 	char header[7];
 	int retval;
 
-	// make sure we're not trying to read a directory....
+	/* make sure we're not trying to read a directory.... */
 
 	len = strlen(name);
 	if (ELEM(name[len - 1], '/', '\\')) {
@@ -331,8 +338,9 @@ static int wm_read_exotic(Scene *UNUSED(scene), const char *name)
 				retval = BKE_READ_EXOTIC_OK_BLEND;
 			}
 			else {
-				//XXX waitcursor(1);
 #if 0           /* historic stuff - no longer used */
+				WM_cursor_wait(TRUE);
+
 				if (is_foo_format(name)) {
 					read_foo(name);
 					retval = BKE_READ_EXOTIC_OK_OTHER;
@@ -342,7 +350,9 @@ static int wm_read_exotic(Scene *UNUSED(scene), const char *name)
 				{
 					retval = BKE_READ_EXOTIC_FAIL_FORMAT;
 				}
-				//XXX waitcursor(0);
+#if 0
+				WM_cursor_wait(FALSE);
+#endif
 			}
 		}
 	}
@@ -350,7 +360,7 @@ static int wm_read_exotic(Scene *UNUSED(scene), const char *name)
 	return retval;
 }
 
-void WM_read_file(bContext *C, const char *filepath, ReportList *reports)
+void WM_file_read(bContext *C, const char *filepath, ReportList *reports)
 {
 	int retval;
 
@@ -359,7 +369,7 @@ void WM_read_file(bContext *C, const char *filepath, ReportList *reports)
 
 	WM_cursor_wait(1);
 
-	BLI_exec_cb(CTX_data_main(C), NULL, BLI_CB_EVT_LOAD_PRE);
+	BLI_callback_exec(CTX_data_main(C), NULL, BLI_CB_EVT_LOAD_PRE);
 
 	/* first try to append data from exotic file formats... */
 	/* it throws error box when file doesn't exist and returns -1 */
@@ -370,6 +380,9 @@ void WM_read_file(bContext *C, const char *filepath, ReportList *reports)
 	if (retval == BKE_READ_EXOTIC_OK_BLEND) {
 		int G_f = G.f;
 		ListBase wmbase;
+
+		/* assume automated tasks with background, don't write recent file list */
+		const int do_history = (G.background == FALSE) && (CTX_wm_manager(C)->op_undo_depth == 0);
 
 		/* put aside screens to match with persistent windows later */
 		/* also exit screens and editors */
@@ -388,8 +401,6 @@ void WM_read_file(bContext *C, const char *filepath, ReportList *reports)
 		/* match the read WM with current WM */
 		wm_window_match_do(C, &wmbase);
 		WM_check(C); /* opens window(s), checks keymaps */
-		
-// XXX		mainwindow_set_filename_to_title(G.main->name);
 
 		if (retval == BKE_READ_FILE_OK_USERPREFS) {
 			/* in case a userdef is read from regular .blend */
@@ -398,8 +409,9 @@ void WM_read_file(bContext *C, const char *filepath, ReportList *reports)
 		
 		if (retval != BKE_READ_FILE_FAIL) {
 			G.relbase_valid = 1;
-			if (!G.background) /* assume automated tasks with background, don't write recent file list */
+			if (do_history) {
 				write_history();
+			}
 		}
 
 
@@ -419,7 +431,7 @@ void WM_read_file(bContext *C, const char *filepath, ReportList *reports)
 #endif
 
 		/* important to do before NULL'ing the context */
-		BLI_exec_cb(CTX_data_main(C), NULL, BLI_CB_EVT_LOAD_POST);
+		BLI_callback_exec(CTX_data_main(C), NULL, BLI_CB_EVT_LOAD_POST);
 
 		if (!G.background) {
 			/* in background mode this makes it hard to load
@@ -438,33 +450,31 @@ void WM_read_file(bContext *C, const char *filepath, ReportList *reports)
 				if (sce->r.engine[0] &&
 				    BLI_findstring(&R_engines, sce->r.engine, offsetof(RenderEngineType, idname)) == NULL)
 				{
-					BKE_reportf(reports, RPT_WARNING,
-					            "Engine not available: '%s' for scene: %s, "
-					            "an addon may need to be installed or enabled",
+					BKE_reportf(reports, RPT_ERROR, "Engine '%s' not available for scene '%s' "
+					            "(an addon may need to be installed or enabled)",
 					            sce->r.engine, sce->id.name + 2);
 				}
 			}
 		}
 #endif
 
-		// XXX		undo_editmode_clear();
 		BKE_reset_undo();
 		BKE_write_undo(C, "original");  /* save current state */
 	}
 	else if (retval == BKE_READ_EXOTIC_OK_OTHER)
 		BKE_write_undo(C, "Import file");
 	else if (retval == BKE_READ_EXOTIC_FAIL_OPEN) {
-		BKE_reportf(reports, RPT_ERROR, IFACE_("Can't read file: \"%s\", %s."), filepath,
-		            errno ? strerror(errno) : IFACE_("Unable to open the file"));
+		BKE_reportf(reports, RPT_ERROR, "Cannot read file '%s': %s", filepath,
+		            errno ? strerror(errno) : TIP_("unable to open the file"));
 	}
 	else if (retval == BKE_READ_EXOTIC_FAIL_FORMAT) {
-		BKE_reportf(reports, RPT_ERROR, IFACE_("File format is not supported in file: \"%s\"."), filepath);
+		BKE_reportf(reports, RPT_ERROR, "File format is not supported in file '%s'", filepath);
 	}
 	else if (retval == BKE_READ_EXOTIC_FAIL_PATH) {
-		BKE_reportf(reports, RPT_ERROR, IFACE_("File path invalid: \"%s\"."), filepath);
+		BKE_reportf(reports, RPT_ERROR, "File path '%s' invalid", filepath);
 	}
 	else {
-		BKE_reportf(reports, RPT_ERROR, IFACE_("Unknown error loading: \"%s\"."), filepath);
+		BKE_reportf(reports, RPT_ERROR, "Unknown error loading '%s'", filepath);
 		BLI_assert(!"invalid 'retval'");
 	}
 
@@ -476,14 +486,14 @@ void WM_read_file(bContext *C, const char *filepath, ReportList *reports)
 /* called on startup,  (context entirely filled with NULLs) */
 /* or called for 'New File' */
 /* op can be NULL */
-int WM_read_homefile(bContext *C, ReportList *UNUSED(reports), short from_memory)
+int WM_homefile_read(bContext *C, ReportList *UNUSED(reports), short from_memory)
 {
 	ListBase wmbase;
 	char tstr[FILE_MAX];
 	int success = 0;
-	
-	free_ttfont(); /* still weird... what does it here? */
-		
+
+	BLI_callback_exec(CTX_data_main(C), NULL, BLI_CB_EVT_LOAD_PRE);
+
 	G.relbase_valid = 0;
 	if (!from_memory) {
 		char *cfgdir = BLI_get_folder(BLENDER_USER_CONFIG, NULL);
@@ -540,8 +550,7 @@ int WM_read_homefile(bContext *C, ReportList *UNUSED(reports), short from_memory
 	/* XXX */
 	G.save_over = 0;    // start with save preference untitled.blend
 	G.fileflags &= ~G_FILE_AUTOPLAY;    /*  disable autoplay in startup.blend... */
-//	mainwindow_set_filename_to_title("");	// empty string re-initializes title to "Blender"
-	
+
 //	refresh_interface_font();
 	
 //	undo_editmode_clear();
@@ -562,6 +571,9 @@ int WM_read_homefile(bContext *C, ReportList *UNUSED(reports), short from_memory
 	}
 #endif
 
+	/* important to do before NULL'ing the context */
+	BLI_callback_exec(CTX_data_main(C), NULL, BLI_CB_EVT_LOAD_POST);
+
 	WM_event_add_notifier(C, NC_WM | ND_FILEREAD, NULL);
 
 	/* in background mode the scene will stay NULL */
@@ -572,10 +584,10 @@ int WM_read_homefile(bContext *C, ReportList *UNUSED(reports), short from_memory
 	return TRUE;
 }
 
-int WM_read_homefile_exec(bContext *C, wmOperator *op)
+int WM_homefile_read_exec(bContext *C, wmOperator *op)
 {
 	int from_memory = strcmp(op->type->idname, "WM_OT_read_factory_settings") == 0;
-	return WM_read_homefile(C, op->reports, from_memory) ? OPERATOR_FINISHED : OPERATOR_CANCELLED;
+	return WM_homefile_read(C, op->reports, from_memory) ? OPERATOR_FINISHED : OPERATOR_CANCELLED;
 }
 
 void WM_read_history(void)
@@ -661,23 +673,47 @@ static void write_history(void)
 	}
 }
 
-static ImBuf *blend_file_thumb(Scene *scene, int **thumb_pt)
+/* screen can be NULL */
+static ImBuf *blend_file_thumb(Scene *scene, bScreen *screen, int **thumb_pt)
 {
 	/* will be scaled down, but gives some nice oversampling */
 	ImBuf *ibuf;
 	int *thumb;
 	char err_out[256] = "unknown";
 
+	/* screen if no camera found */
+	ScrArea *sa = NULL;
+	ARegion *ar = NULL;
+	View3D *v3d = NULL;
+
 	*thumb_pt = NULL;
 
 	/* scene can be NULL if running a script at startup and calling the save operator */
-	if (G.background || scene == NULL || scene->camera == NULL)
+	if (G.background || scene == NULL)
 		return NULL;
 
+	if ((scene->camera == NULL) && (screen != NULL)) {
+		sa = BKE_screen_find_big_area(screen, SPACE_VIEW3D, 0);
+		ar = BKE_area_find_region_type(sa, RGN_TYPE_WINDOW);
+		if (ar) {
+			v3d = sa->spacedata.first;
+		}
+	}
+
+	if (scene->camera == NULL && v3d == NULL) {
+		return NULL;
+	}
+
 	/* gets scaled to BLEN_THUMB_SIZE */
-	ibuf = ED_view3d_draw_offscreen_imbuf_simple(scene, scene->camera,
-	                                             BLEN_THUMB_SIZE * 2, BLEN_THUMB_SIZE * 2,
-	                                             IB_rect, OB_SOLID, FALSE, err_out);
+	if (scene->camera) {
+		ibuf = ED_view3d_draw_offscreen_imbuf_simple(scene, scene->camera,
+		                                             BLEN_THUMB_SIZE * 2, BLEN_THUMB_SIZE * 2,
+		                                             IB_rect, OB_SOLID, FALSE, FALSE, err_out);
+	}
+	else {
+		ibuf = ED_view3d_draw_offscreen_imbuf(scene, v3d, ar, BLEN_THUMB_SIZE * 2, BLEN_THUMB_SIZE * 2,
+		                                      IB_rect, FALSE, FALSE, err_out);
+	}
 
 	if (ibuf) {		
 		float aspect = (scene->r.xsch * scene->r.xasp) / (scene->r.ysch * scene->r.yasp);
@@ -726,7 +762,7 @@ int write_crash_blend(void)
 	}
 }
 
-int WM_write_file(bContext *C, const char *target, int fileflags, ReportList *reports, int copy)
+int WM_file_write(bContext *C, const char *target, int fileflags, ReportList *reports, int copy)
 {
 	Library *li;
 	int len;
@@ -754,18 +790,18 @@ int WM_write_file(bContext *C, const char *target, int fileflags, ReportList *re
 	/* send the OnSave event */
 	for (li = G.main->library.first; li; li = li->id.next) {
 		if (BLI_path_cmp(li->filepath, filepath) == 0) {
-			BKE_reportf(reports, RPT_ERROR, "Can't overwrite used library '%.240s'", filepath);
+			BKE_reportf(reports, RPT_ERROR, "Cannot overwrite used library '%.240s'", filepath);
 			return -1;
 		}
 	}
 
 	/* blend file thumbnail */
 	/* save before exit_editmode, otherwise derivedmeshes for shared data corrupt #27765) */
-	if (U.flag & USER_SAVE_PREVIEWS) {
-		ibuf_thumb = blend_file_thumb(CTX_data_scene(C), &thumb);
+	if ((U.flag & USER_SAVE_PREVIEWS) && BLI_thread_is_main()) {
+		ibuf_thumb = blend_file_thumb(CTX_data_scene(C), CTX_wm_screen(C), &thumb);
 	}
 
-	BLI_exec_cb(G.main, NULL, BLI_CB_EVT_SAVE_PRE);
+	BLI_callback_exec(G.main, NULL, BLI_CB_EVT_SAVE_PRE);
 
 	/* operator now handles overwrite checks */
 
@@ -800,10 +836,11 @@ int WM_write_file(bContext *C, const char *target, int fileflags, ReportList *re
 			write_history();
 		}
 
-		BLI_exec_cb(G.main, NULL, BLI_CB_EVT_SAVE_POST);
+		BLI_callback_exec(G.main, NULL, BLI_CB_EVT_SAVE_POST);
 
 		/* run this function after because the file cant be written before the blend is */
 		if (ibuf_thumb) {
+			IMB_thumb_delete(filepath, THB_FAIL); /* without this a failed thumb overrides */
 			ibuf_thumb = IMB_thumb_create(filepath, THB_NORMAL, THB_SOURCE_BLEND, ibuf_thumb);
 			IMB_freeImBuf(ibuf_thumb);
 		}
@@ -824,7 +861,7 @@ int WM_write_file(bContext *C, const char *target, int fileflags, ReportList *re
 }
 
 /* operator entry */
-int WM_write_homefile(bContext *C, wmOperator *op)
+int WM_homefile_write_exec(bContext *C, wmOperator *op)
 {
 	wmWindowManager *wm = CTX_wm_manager(C);
 	wmWindow *win = CTX_wm_window(C);
@@ -900,6 +937,7 @@ void wm_autosave_timer(const bContext *C, wmWindowManager *wm, wmTimer *UNUSED(w
 	wmEventHandler *handler;
 	char filepath[FILE_MAX];
 	int fileflags;
+	Scene *scene = CTX_data_scene(C);
 
 	WM_event_remove_timer(wm, NULL, wm->autosavetimer);
 
@@ -912,7 +950,14 @@ void wm_autosave_timer(const bContext *C, wmWindowManager *wm, wmTimer *UNUSED(w
 			}
 		}
 	}
-	
+
+	if (scene) {
+		Object *ob = OBACT;
+
+		if (ob && ob->mode & OB_MODE_SCULPT)
+			multires_force_update(ob);
+	}
+
 	wm_autosave_location(filepath);
 
 	/*  force save as regular blend file */
@@ -954,6 +999,6 @@ void wm_autosave_read(bContext *C, ReportList *reports)
 	char filename[FILE_MAX];
 
 	wm_autosave_location(filename);
-	WM_read_file(C, filename, reports);
+	WM_file_read(C, filename, reports);
 }
 

@@ -23,6 +23,7 @@
 #ifndef __BKE_TESSMESH_H__
 #define __BKE_TESSMESH_H__
 
+#include "BKE_customdata.h"
 #include "bmesh.h"
 
 struct BMesh;
@@ -58,7 +59,7 @@ typedef struct BMEditMesh {
 
 	/*derivedmesh stuff*/
 	struct DerivedMesh *derivedFinal, *derivedCage;
-	int lastDataMask;
+	CustomDataMask lastDataMask;
 
 	/* index tables, to map indices to elements via
 	 * EDBM_index_arrays_init and associated functions.  don't
@@ -71,9 +72,11 @@ typedef struct BMEditMesh {
 	short selectmode;
 	short mat_nr;
 
-	/*Mesh structure this editmesh came from, if it came from one*/
-	struct Mesh *me;
+	/* Object this editmesh came from (if it came from one) */
 	struct Object *ob;
+
+	/* Unused for now, we could bring it back and assign in the same way 'ob' is */
+	// struct Mesh *me;
 
 	/*temp variables for x-mirror editing*/
 	int mirror_cdlayer; /* -1 is invalid */

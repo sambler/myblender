@@ -112,7 +112,7 @@ typedef struct ReportList {
 #
 typedef struct ReportTimerInfo {
 	float col[3];
-	float greyscale;
+	float grayscale;
 	float widthfac;
 } ReportTimerInfo;
 
@@ -222,6 +222,7 @@ typedef struct wmKeyMapItem {
 	IDProperty *properties;			/* operator properties, assigned to ptr->data and can be written to a file */
 	
 	/* modal */
+	char propvalue_str[64];			/* runtime temporary storage for loading */
 	short propvalue;				/* if used, the item is from modal map */
 
 	/* event */
@@ -333,7 +334,7 @@ typedef struct wmOperator {
 #define OPERATOR_FLAGS_ALL		((1<<5)-1)
 
 /* sanity checks for debug mode only */
-#define OPERATOR_RETVAL_CHECK(ret) BLI_assert(ret != 0 && (ret & OPERATOR_FLAGS_ALL) == ret)
+#define OPERATOR_RETVAL_CHECK(ret) (void)ret, BLI_assert(ret != 0 && (ret & OPERATOR_FLAGS_ALL) == ret)
 
 /* wmOperator flag */
 #define OP_GRAB_POINTER			1

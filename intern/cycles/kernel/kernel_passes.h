@@ -53,7 +53,7 @@ __device_inline void kernel_write_data_passes(KernelGlobals *kg, __global float 
 		if(sample == 0) {
 			if(flag & PASS_DEPTH) {
 				Transform tfm = kernel_data.cam.worldtocamera;
-				float depth = len(transform(&tfm, sd->P));
+				float depth = len(transform_point(&tfm, sd->P));
 
 				kernel_write_pass_float(buffer + kernel_data.film.pass_depth, sample, depth);
 			}
@@ -72,8 +72,13 @@ __device_inline void kernel_write_data_passes(KernelGlobals *kg, __global float 
 			kernel_write_pass_float3(buffer + kernel_data.film.pass_normal, sample, normal);
 		}
 		if(flag & PASS_UV) {
-			float3 uv = make_float3(0.0f, 0.0f, 0.0f); /* todo: request and lookup */
+			float3 uv = triangle_uv(kg, sd);
 			kernel_write_pass_float3(buffer + kernel_data.film.pass_uv, sample, uv);
+		}
+		if(flag & PASS_MOTION) {
+			float4 speed = triangle_motion_vector(kg, sd);
+			kernel_write_pass_float4(buffer + kernel_data.film.pass_motion, sample, speed);
+			kernel_write_pass_float(buffer + kernel_data.film.pass_motion_weight, sample, 1.0f);
 		}
 	}
 
@@ -120,8 +125,18 @@ __device_inline void kernel_write_light_passes(KernelGlobals *kg, __global float
 		kernel_write_pass_float3(buffer + kernel_data.film.pass_glossy_color, sample, L->color_glossy);
 	if(flag & PASS_TRANSMISSION_COLOR)
 		kernel_write_pass_float3(buffer + kernel_data.film.pass_transmission_color, sample, L->color_transmission);
-	if(flag & PASS_SHADOW)
-		kernel_write_pass_float4(buffer + kernel_data.film.pass_shadow, sample, L->shadow);
+	if(flag & PASS_SHADOW) {
+		float4 shadow = L->shadow;
+
+		/* bit of an ugly hack to compensate for emitting triangles influencing
+		 * amount of samples we get for this pass */
+		if(kernel_data.integrator.progressive && kernel_data.integrator.pdf_triangles != 0.0f)
+			shadow.w = 0.5f;
+		else
+			shadow.w = 1.0f;
+
+		kernel_write_pass_float4(buffer + kernel_data.film.pass_shadow, sample, shadow);
+	}
 #endif
 }
 

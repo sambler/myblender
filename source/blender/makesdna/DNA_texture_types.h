@@ -45,7 +45,6 @@ extern "C" {
 
 struct AnimData;
 struct Ipo;
-struct PluginTex;
 struct ColorBand;
 struct EnvMap;
 struct Object;
@@ -104,30 +103,6 @@ typedef struct MTex {
  */
 typedef unsigned short dna_ushort_fix;
 #endif
-
-typedef struct PluginTex {
-	char name[1024];
-	void *handle;
-	
-	char *pname;
-	char *stnames;
-
-	int stypes;
-	int vars;
-	void *varstr;
-	float *result;
-	float *cfra;
-	
-	float data[32];
-
-	int (*doit)(void);
-	void (*instance_init)(void *);
-
-	/* should be void (*)(unsigned short)... patched */	
-	void (*callback)(dna_ushort_fix);
-	
-	int version, pad;
-} PluginTex;
 
 typedef struct CBData {
 	float r, g, b, a, pos;
@@ -197,6 +172,9 @@ typedef struct VoxelData {
 	short flag;
 	short extend;
 	short smoked_type;
+	short data_type;
+	short pad;
+	int _pad;
 	
 	struct Object *object; /* for rendering smoke sims */
 	float int_multiplier;	
@@ -230,7 +208,7 @@ typedef struct Tex {
 	/* newnoise: musgrave parameters */
 	float mg_H, mg_lacunarity, mg_octaves, mg_offset, mg_gain;
 
-	/* newnoise: distorted noise amount, musgrave & voronoi ouput scale */
+	/* newnoise: distorted noise amount, musgrave & voronoi output scale */
 	float dist_amount, ns_outscale;
 
 	/* newnoise: voronoi nearest neighbor weights, minkovsky exponent, distance metric & color type */
@@ -268,10 +246,9 @@ typedef struct Tex {
 	struct bNodeTree *nodetree;
 	struct Ipo *ipo  DNA_DEPRECATED;  /* old animation system, deprecated for 2.5 */
 	struct Image *ima;
-	struct PluginTex *plugin;
 	struct ColorBand *coba;
 	struct EnvMap *env;
-	struct PreviewImage * preview;
+	struct PreviewImage *preview;
 	struct PointDensity *pd;
 	struct VoxelData *vd;
 	struct OceanTex *ot;
@@ -325,7 +302,7 @@ typedef struct ColorMapping {
 #define TEX_STUCCI		6
 #define TEX_NOISE		7
 #define TEX_IMAGE		8
-#define TEX_PLUGIN		9
+//#define TEX_PLUGIN		9 /* Deprecated */
 #define TEX_ENVMAP		10
 #define TEX_MUSGRAVE	11
 #define TEX_VORONOI		12
@@ -498,6 +475,7 @@ typedef struct ColorMapping {
 #define MTEX_BUMP_TEXTURESPACE	2048
 /* #define MTEX_BUMP_FLIPPED 	4096 */ /* UNUSED */
 #define MTEX_BICUBIC_BUMP		8192
+#define MTEX_MAPTO_BOUNDS		16384
 
 /* blendtype */
 #define MTEX_BLEND		0
@@ -519,9 +497,10 @@ typedef struct ColorMapping {
 #define MTEX_LIN_LIGHT      16
 
 /* brush_map_mode */
-#define MTEX_MAP_MODE_FIXED    0
+#define MTEX_MAP_MODE_VIEW     0
 #define MTEX_MAP_MODE_TILED    1
 #define MTEX_MAP_MODE_3D       2
+#define MTEX_MAP_MODE_AREA     3
 
 /* **************** EnvMap ********************* */
 
@@ -604,6 +583,11 @@ typedef struct ColorMapping {
 #define TEX_VD_SMOKEDENSITY		0
 #define TEX_VD_SMOKEHEAT		1
 #define TEX_VD_SMOKEVEL			2
+#define TEX_VD_SMOKEFLAME		3
+
+/* data_type */
+#define TEX_VD_INTENSITY		0
+#define TEX_VD_RGBA_PREMUL		1
 
 /******************** Ocean *****************************/
 /* output */

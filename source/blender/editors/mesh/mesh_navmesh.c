@@ -316,7 +316,8 @@ static Object *createRepresentation(bContext *C, struct recast_polyMesh *pmesh, 
 	}
 	else {
 		obedit = base->object;
-		scene_select_base(scene, base);
+		BKE_scene_base_deselect_all(scene);
+		BKE_scene_base_select(scene, base);
 		copy_v3_v3(obedit->loc, co);
 		copy_v3_v3(obedit->rot, rot);
 	}
@@ -345,6 +346,7 @@ static Object *createRepresentation(bContext *C, struct recast_polyMesh *pmesh, 
 
 	/* create custom data layer to save polygon idx */
 	CustomData_add_layer_named(&em->bm->pdata, CD_RECAST, CD_CALLOC, NULL, 0, "createRepresentation recastData");
+	CustomData_bmesh_init_pool(&em->bm->pdata, 0, BM_FACE);
 	
 	/* create verts and faces for detailed mesh */
 	meshes = recast_polyMeshDetailGetMeshes(dmesh, &nmeshes);
@@ -429,7 +431,8 @@ static int navmesh_create_exec(bContext *C, wmOperator *op)
 	LinkNode *obs = NULL;
 	Base *navmeshBase = NULL;
 
-	CTX_DATA_BEGIN(C, Base*, base, selected_editable_bases) {
+	CTX_DATA_BEGIN (C, Base *, base, selected_editable_bases)
+	{
 		if (base->object->type == OB_MESH) {
 			if (base->object->body_type == OB_BODY_TYPE_NAVMESH) {
 				if (!navmeshBase || base == scene->basact) {
@@ -488,7 +491,7 @@ static int navmesh_face_copy_exec(bContext *C, wmOperator *op)
 	BMEditMesh *em = BMEdit_FromObject(obedit);
 
 	/* do work here */
-	BMFace *efa_act = BM_active_face_get(em->bm, FALSE);
+	BMFace *efa_act = BM_active_face_get(em->bm, FALSE, FALSE);
 
 	if (efa_act) {
 		if (CustomData_has_layer(&em->bm->pdata, CD_RECAST)) {
@@ -499,7 +502,7 @@ static int navmesh_face_copy_exec(bContext *C, wmOperator *op)
 
 			if (targetPolyIdx > 0) {
 				/* set target poly idx to other selected faces */
-				BM_ITER(efa, &iter, em->bm, BM_FACES_OF_MESH, NULL) {
+				BM_ITER_MESH (efa, &iter, em->bm, BM_FACES_OF_MESH) {
 					if (BM_elem_flag_test(efa, BM_ELEM_SELECT) && efa != efa_act) {
 						int *recastDataBlock = (int *)CustomData_bmesh_get(&em->bm->pdata, efa->head.data, CD_RECAST);
 						*recastDataBlock = targetPolyIdx;
@@ -548,7 +551,7 @@ static int findFreeNavPolyIndex(BMEditMesh *em)
 	int i, idx = em->bm->totface - 1, freeIdx = 1;
 
 	/*XXX this originally went last to first, but that isn't possible anymore*/
-	BM_ITER(ef, &iter, em->bm, BM_FACES_OF_MESH, NULL) {
+	BM_ITER_MESH (ef, &iter, em->bm, BM_FACES_OF_MESH) {
 		int polyIdx = *(int *)CustomData_bmesh_get(&em->bm->pdata, ef->head.data, CD_RECAST);
 		indices[idx] = polyIdx;
 		idx--;
@@ -584,7 +587,7 @@ static int navmesh_face_add_exec(bContext *C, wmOperator *UNUSED(op))
 			/* set target poly idx to selected faces */
 			/*XXX this originally went last to first, but that isn't possible anymore*/
 			
-			BM_ITER(ef, &iter, em->bm, BM_FACES_OF_MESH, NULL) {
+			BM_ITER_MESH (ef, &iter, em->bm, BM_FACES_OF_MESH) {
 				if (BM_elem_flag_test(ef, BM_ELEM_SELECT)) {
 					int *recastDataBlock = (int *)CustomData_bmesh_get(&em->bm->pdata, ef->head.data, CD_RECAST);
 					*recastDataBlock = targetPolyIdx;

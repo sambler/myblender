@@ -28,6 +28,8 @@
  * See: bmesh_iterators_inlin.c too, some functions are here for speed reasons.
  */
 
+#include "MEM_guardedalloc.h"
+
 #include "BLI_utildefines.h"
 
 #include "bmesh.h"
@@ -83,18 +85,17 @@ void *BM_iter_at_index(BMesh *bm, const char itype, void *data, int index)
  * Sometimes its convenient to get the iterator as an array
  * to avoid multiple calls to #BM_iter_at_index.
  */
-int BM_iter_as_array(BMesh *bm, const char type, void *data, void **array, const int len)
+int BM_iter_as_array(BMesh *bm, const char itype, void *data, void **array, const int len)
 {
 	int i = 0;
 
 	/* sanity check */
 	if (len > 0) {
-
 		BMIter iter;
-		void *val;
+		void *ele;
 
-		BM_ITER(val, &iter, bm, type, data) {
-			array[i] = val;
+		for (ele = BM_iter_new(&iter, bm, itype, data); ele; ele = BM_iter_step(&iter)) {
+			array[i] = ele;
 			i++;
 			if (i == len) {
 				return len;
@@ -103,6 +104,97 @@ int BM_iter_as_array(BMesh *bm, const char type, void *data, void **array, const
 	}
 
 	return i;
+}
+
+/**
+ * \brief Iterator as Array
+ *
+ * Allocates a new array, has the advantage that you dont need to know the size ahead of time.
+ *
+ * Takes advantage of less common iterator usage to avoid counting twice,
+ * which you might end up doing when #BM_iter_as_array is used.
+ *
+ * Caller needs to free the array.
+ */
+void *BM_iter_as_arrayN(BMesh *bm, const char itype, void *data, int *r_len)
+{
+	BMIter iter;
+
+	/* we can't rely on coun't being set */
+	switch (itype) {
+		case BM_VERTS_OF_MESH:
+			iter.count = bm->totvert;
+			break;
+		case BM_EDGES_OF_MESH:
+			iter.count = bm->totedge;
+			break;
+		case BM_FACES_OF_MESH:
+			iter.count = bm->totface;
+			break;
+		default:
+			break;
+	}
+
+	if (BM_iter_init(&iter, bm, itype, data) && iter.count > 0) {
+		BMElem *ele;
+		BMElem **array = MEM_mallocN(sizeof(ele) * iter.count, __func__);
+		int i = 0;
+
+		*r_len = iter.count;  /* set before iterating */
+
+		while ((ele = BM_iter_step(&iter))) {
+			array[i++] = ele;
+		}
+		return array;
+	}
+	else {
+		*r_len = 0;
+		return NULL;
+	}
+}
+
+/**
+ * \brief Elem Iter Flag Count
+ *
+ * Counts how many flagged / unflagged items are found in this element.
+ */
+int BM_iter_elem_count_flag(const char itype, void *data, const char hflag, const short value)
+{
+	BMIter iter;
+	BMElem *ele;
+	int count = 0;
+
+	BLI_assert(ELEM(value, TRUE, FALSE));
+
+	for (ele = BM_iter_new(&iter, NULL, itype, data); ele; ele = BM_iter_step(&iter)) {
+		if (BM_elem_flag_test_bool(ele, hflag) == value) {
+			count++;
+		}
+	}
+
+	return count;
+}
+
+/**
+ * \brief Mesh Iter Flag Count
+ *
+ * Counts how many flagged / unflagged items are found in this mesh.
+ */
+int BM_iter_mesh_count_flag(const char itype, BMesh *bm, const char hflag, const short value)
+{
+	BMIter iter;
+	BMElem *ele;
+	int count = 0;
+
+	BLI_assert(ELEM(value, TRUE, FALSE));
+
+	for (ele = BM_iter_new(&iter, bm, itype, NULL); ele; ele = BM_iter_step(&iter)) {
+		if (BM_elem_flag_test_bool(ele, hflag) == value) {
+			count++;
+		}
+	}
+
+	return count;
 }
 
 
@@ -152,6 +244,7 @@ void  *bmiter__vert_of_mesh_step(BMIter *iter)
 void  bmiter__edge_of_mesh_begin(BMIter *iter)
 {
 	BLI_mempool_iternew(iter->bm->epool, &iter->pooliter);
+	iter->count = iter->bm->totedge;  /* */
 }
 
 void  *bmiter__edge_of_mesh_step(BMIter *iter)

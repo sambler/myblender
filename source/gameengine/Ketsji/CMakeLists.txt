@@ -55,6 +55,7 @@ set(INC
 )
 
 set(INC_SYS
+	${PTHREADS_INCLUDE_DIRS}
 	${GLEW_INCLUDE_PATH}
 	../../../extern/recastnavigation/Recast/Include
 	../../../extern/recastnavigation/Detour/Include
@@ -106,6 +107,7 @@ set(SRC
 	KX_PyMath.cpp
 	KX_PythonInit.cpp
 	KX_PythonInitTypes.cpp
+	KX_PythonMain.cpp
 	KX_PythonSeq.cpp
 	KX_RadarSensor.cpp
 	KX_RayCast.cpp
@@ -188,6 +190,7 @@ set(SRC
 	KX_PyMath.h
 	KX_PythonInit.h
 	KX_PythonInitTypes.h
+	KX_PythonMain.h
 	KX_PythonSeq.h
 	KX_RadarSensor.h
 	KX_RayCast.h
@@ -220,6 +223,10 @@ set(SRC
 
 add_definitions(-DGLEW_STATIC)
 
+if(WITH_IMAGE_DDS)
+	add_definitions(-DWITH_DDS)
+endif()
+
 if(WITH_SDL)
 	list(APPEND INC_SYS
 		${SDL_INCLUDE_DIR}
@@ -241,8 +248,10 @@ endif()
 
 if(WITH_BULLET)
 	list(APPEND INC
-		../../../extern/bullet2/src
 		../Physics/Bullet
+	)
+	list(APPEND INC
+		../../../extern/bullet2/src
 	)
 	add_definitions(-DUSE_BULLET)
 endif()

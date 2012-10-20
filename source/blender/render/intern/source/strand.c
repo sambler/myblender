@@ -61,11 +61,6 @@
 #include "strand.h"
 #include "zbuf.h"
 
-/* to be removed */
-void hoco_to_zco(ZSpan *zspan, float *zco, float *hoco);
-void zspan_scanconvert_strand(ZSpan *zspan, void *handle, float *v1, float *v2, float *v3, void (*func)(void *, int, int, float, float, float) );
-void zbufsinglewire(ZSpan *zspan, int obi, int zvlnr, float *ho1, float *ho2);
-
 /* *************** */
 
 static float strand_eval_width(Material *ma, float strandco)
@@ -323,13 +318,18 @@ struct StrandShadeCache {
 	MemArena *memarena;
 };
 
+typedef struct StrandCacheEntry {
+	GHashPair pair;
+	ShadeResult shr;
+} StrandCacheEntry;
+
 StrandShadeCache *strand_shade_cache_create(void)
 {
 	StrandShadeCache *cache;
 
 	cache= MEM_callocN(sizeof(StrandShadeCache), "StrandShadeCache");
-	cache->resulthash= BLI_ghash_new(BLI_ghashutil_ptrhash, BLI_ghashutil_ptrcmp, "strand_shade_cache_create1 gh");
-	cache->refcounthash= BLI_ghash_new(BLI_ghashutil_ptrhash, BLI_ghashutil_ptrcmp, "strand_shade_cache_create2 gh");
+	cache->resulthash= BLI_ghash_pair_new("strand_shade_cache_create1 gh");
+	cache->refcounthash= BLI_ghash_pair_new("strand_shade_cache_create2 gh");
 	cache->memarena= BLI_memarena_new(BLI_MEMARENA_STD_BUFSIZE, "strand shade cache arena");
 	
 	return cache;
@@ -338,39 +338,47 @@ StrandShadeCache *strand_shade_cache_create(void)
 void strand_shade_cache_free(StrandShadeCache *cache)
 {
 	BLI_ghash_free(cache->refcounthash, NULL, NULL);
-	BLI_ghash_free(cache->resulthash, NULL, (GHashValFreeFP)MEM_freeN);
+	BLI_ghash_free(cache->resulthash, (GHashKeyFreeFP)MEM_freeN, NULL);
 	BLI_memarena_free(cache->memarena);
 	MEM_freeN(cache);
 }
 
+static GHashPair strand_shade_hash_pair(ObjectInstanceRen *obi, StrandVert *svert)
+{
+	GHashPair pair = {obi, svert};
+	return pair;
+}
+
 static void strand_shade_get(Render *re, StrandShadeCache *cache, ShadeSample *ssamp, StrandSegment *sseg, StrandVert *svert)
 {
-	ShadeResult *hashshr;
+	StrandCacheEntry *entry;
 	StrandPoint p;
 	int *refcount;
+	GHashPair pair = strand_shade_hash_pair(sseg->obi, svert);
 
-	hashshr= BLI_ghash_lookup(cache->resulthash, svert);
-	refcount= BLI_ghash_lookup(cache->refcounthash, svert);
+	entry= BLI_ghash_lookup(cache->resulthash, &pair);
+	refcount= BLI_ghash_lookup(cache->refcounthash, &pair);
 
-	if (!hashshr) {
+	if (!entry) {
 		/* not shaded yet, shade and insert into hash */
 		p.t= (sseg->v[1] == svert)? 0.0f: 1.0f;
 		strand_eval_point(sseg, &p);
 		strand_shade_point(re, ssamp, sseg, svert, &p);
 
-		hashshr= MEM_callocN(sizeof(ShadeResult), "HashShadeResult");
-		*hashshr= ssamp->shr[0];
-		BLI_ghash_insert(cache->resulthash, svert, hashshr);
+		entry= MEM_callocN(sizeof(StrandCacheEntry), "StrandCacheEntry");
+		entry->pair = pair;
+		entry->shr = ssamp->shr[0];
+		BLI_ghash_insert(cache->resulthash, entry, entry);
 	}
 	else
 		/* already shaded, just copy previous result from hash */
-		ssamp->shr[0]= *hashshr;
+		ssamp->shr[0]= entry->shr;
 	
 	/* lower reference count and remove if not needed anymore by any samples */
 	(*refcount)--;
 	if (*refcount == 0) {
-		BLI_ghash_remove(cache->resulthash, svert, NULL, (GHashValFreeFP)MEM_freeN);
-		BLI_ghash_remove(cache->refcounthash, svert, NULL, NULL);
+		BLI_ghash_remove(cache->resulthash, &pair, (GHashKeyFreeFP)MEM_freeN, NULL);
+		BLI_ghash_remove(cache->refcounthash, &pair, NULL, NULL);
 	}
 }
 
@@ -387,35 +395,40 @@ void strand_shade_segment(Render *re, StrandShadeCache *cache, StrandSegment *ss
 	interpolate_shade_result(&shr1, &shr2, t, ssamp->shr, addpassflag);
 
 	/* apply alpha along width */
-	if (sseg->buffer->widthfade != 0.0f) {
-		s = 1.0f - pow(fabs(s), sseg->buffer->widthfade);
+	if (sseg->buffer->widthfade != -1.0f) {
+		s = 1.0f - powf(fabsf(s), sseg->buffer->widthfade);
 
 		strand_apply_shaderesult_alpha(ssamp->shr, s);
 	}
 }
 
-void strand_shade_unref(StrandShadeCache *cache, StrandVert *svert)
+void strand_shade_unref(StrandShadeCache *cache, ObjectInstanceRen *obi, StrandVert *svert)
 {
+	GHashPair pair = strand_shade_hash_pair(obi, svert);
 	int *refcount;
 
 	/* lower reference count and remove if not needed anymore by any samples */
-	refcount= BLI_ghash_lookup(cache->refcounthash, svert);
+	refcount= BLI_ghash_lookup(cache->refcounthash, &pair);
 
 	(*refcount)--;
 	if (*refcount == 0) {
-		BLI_ghash_remove(cache->resulthash, svert, NULL, (GHashValFreeFP)MEM_freeN);
-		BLI_ghash_remove(cache->refcounthash, svert, NULL, NULL);
+		BLI_ghash_remove(cache->resulthash, &pair, (GHashKeyFreeFP)MEM_freeN, NULL);
+		BLI_ghash_remove(cache->refcounthash, &pair, NULL, NULL);
 	}
 }
 
-static void strand_shade_refcount(StrandShadeCache *cache, StrandVert *svert)
+static void strand_shade_refcount(StrandShadeCache *cache, StrandSegment *sseg, StrandVert *svert)
 {
-	int *refcount= BLI_ghash_lookup(cache->refcounthash, svert);
+	GHashPair pair = strand_shade_hash_pair(sseg->obi, svert);
+	GHashPair *key;
+	int *refcount= BLI_ghash_lookup(cache->refcounthash, &pair);
 
 	if (!refcount) {
+		key= BLI_memarena_alloc(cache->memarena, sizeof(GHashPair));
+		*key = pair;
 		refcount= BLI_memarena_alloc(cache->memarena, sizeof(int));
 		*refcount= 1;
-		BLI_ghash_insert(cache->refcounthash, svert, refcount);
+		BLI_ghash_insert(cache->refcounthash, key, refcount);
 	}
 	else
 		(*refcount)++;
@@ -485,7 +498,7 @@ static APixstrand *addpsmainAstrand(ListBase *lb)
 
 	psm= MEM_mallocN(sizeof(APixstrMain), "addpsmainA");
 	BLI_addtail(lb, psm);
-	psm->ps= MEM_callocN(4096*sizeof(APixstrand),"pixstr");
+	psm->ps = MEM_callocN(4096 * sizeof(APixstrand), "pixstr");
 
 	return psm->ps;
 }
@@ -551,16 +564,16 @@ static void do_strand_fillac(void *handle, int x, int y, float u, float v, float
 
 #define CHECK_ADD(n) \
 	if (apn->p[n]==strnr && apn->obi[n]==obi && apn->seg[n]==seg) \
-	{ if (!(apn->mask[n] & mask)) { apn->mask[n] |= mask; apn->v[n] += t; apn->u[n] += s; } break; }
+	{ if (!(apn->mask[n] & mask)) { apn->mask[n] |= mask; apn->v[n] += t; apn->u[n] += s; } break; } (void)0
 #define CHECK_ASSIGN(n) \
 	if (apn->p[n]==0) \
-	{apn->obi[n]= obi; apn->p[n]= strnr; apn->z[n]= zverg; apn->mask[n]= mask; apn->v[n]= t; apn->u[n]= s; apn->seg[n]= seg; break; }
+	{apn->obi[n]= obi; apn->p[n]= strnr; apn->z[n]= zverg; apn->mask[n]= mask; apn->v[n]= t; apn->u[n]= s; apn->seg[n]= seg; break; } (void)0
 
 	/* add to pixel list */
 	if (zverg < bufferz && (spart->totapixbuf[offset] < MAX_ZROW)) {
 		if (!spart->rectmask || zverg > maskz) {
-			t = u*spart->t[0] + v*spart->t[1] + (1.0f-u-v)*spart->t[2];
-			s = fabs(u*spart->s[0] + v*spart->s[1] + (1.0f-u-v)*spart->s[2]);
+			t = u * spart->t[0] + v * spart->t[1] + (1.0f - u - v) * spart->t[2];
+			s = fabsf(u * spart->s[0] + v * spart->s[1] + (1.0f - u - v) * spart->s[2]);
 
 			apn= spart->apixbuf + offset;
 			while (apn) {
@@ -580,8 +593,8 @@ static void do_strand_fillac(void *handle, int x, int y, float u, float v, float
 			}
 
 			if (cache) {
-				strand_shade_refcount(cache, sseg->v[1]);
-				strand_shade_refcount(cache, sseg->v[2]);
+				strand_shade_refcount(cache, sseg, sseg->v[1]);
+				strand_shade_refcount(cache, sseg, sseg->v[2]);
 			}
 			spart->totapixbuf[offset]++;
 		}
@@ -976,10 +989,16 @@ StrandSurface *cache_strand_surface(Render *re, ObjectRen *obr, DerivedMesh *dm,
 	totvert= dm->getNumVerts(dm);
 	totface= dm->getNumTessFaces(dm);
 
-	for (mesh=re->strandsurface.first; mesh; mesh=mesh->next)
-		if (mesh->obr.ob == obr->ob && mesh->obr.par == obr->par
-			&& mesh->obr.index == obr->index && mesh->totvert==totvert && mesh->totface==totface)
+	for (mesh = re->strandsurface.first; mesh; mesh = mesh->next) {
+		if ((mesh->obr.ob    == obr->ob) &&
+		    (mesh->obr.par   == obr->par) &&
+		    (mesh->obr.index == obr->index) &&
+		    (mesh->totvert   == totvert) &&
+		    (mesh->totface   == totface))
+		{
 			break;
+		}
+	}
 
 	if (!mesh) {
 		mesh= MEM_callocN(sizeof(StrandSurface), "StrandSurface");
@@ -1036,21 +1055,22 @@ void free_strand_surface(Render *re)
 	BLI_freelistN(&re->strandsurface);
 }
 
-void strand_minmax(StrandRen *strand, float *min, float *max, float width)
+void strand_minmax(StrandRen *strand, float min[3], float max[3], const float width)
 {
 	StrandVert *svert;
-	float vec[3], width2= 2.0f*width;
+	const float width2 = width * 2.0f;
+	float vec[3];
 	int a;
 
 	for (a=0, svert=strand->vert; a<strand->totvert; a++, svert++) {
 		copy_v3_v3(vec, svert->co);
-		DO_MINMAX(vec, min, max);
+		minmax_v3v3_v3(min, max, vec);
 		
 		if (width!=0.0f) {
-			vec[0]+= width; vec[1]+= width; vec[2]+= width;
-			DO_MINMAX(vec, min, max);
-			vec[0]-= width2; vec[1]-= width2; vec[2]-= width2;
-			DO_MINMAX(vec, min, max);
+			add_v3_fl(vec, width);
+			minmax_v3v3_v3(min, max, vec);
+			add_v3_fl(vec, -width2);
+			minmax_v3v3_v3(min, max, vec);
 		}
 	}
 }

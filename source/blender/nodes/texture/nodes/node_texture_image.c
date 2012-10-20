@@ -34,7 +34,7 @@
 #include "NOD_texture.h"
 
 static bNodeSocketTemplate outputs[]= {
-	{ SOCK_RGBA, 0, "Image"},
+	{ SOCK_RGBA, 0, N_("Image")},
 	{ -1, 0, "" }
 };
 
@@ -76,7 +76,7 @@ static void colorfn(float *out, TexParams *p, bNode *node, bNodeStack **UNUSED(i
 			while ( py >= ibuf->y ) py -= ibuf->y;
 			
 			result = ibuf->rect_float + py*ibuf->x*4 + px*4;
-			copy_v4_v4( out, result );
+			copy_v4_v4(out, result);
 		}
 	}
 }
@@ -86,7 +86,7 @@ static void exec(void *data, bNode *node, bNodeStack **in, bNodeStack **out)
 	tex_output(node, in, out[0], &colorfn, data);
 }
 
-static void init(bNodeTree *UNUSED(ntree), bNode* node, bNodeTemplate *UNUSED(ntemp))
+static void init(bNodeTree *UNUSED(ntree), bNode *node, bNodeTemplate *UNUSED(ntemp))
 {
 	ImageUser *iuser= MEM_callocN(sizeof(ImageUser), "node image user");
 	node->storage= iuser;

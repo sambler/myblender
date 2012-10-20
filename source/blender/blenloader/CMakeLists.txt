@@ -25,6 +25,7 @@
 
 set(INC 
 	.
+	../blenfont
 	../blenkernel
 	../blenlib
 	../makesdna
@@ -44,8 +45,11 @@ set(SRC
 	intern/readfile.c
 	intern/runtime.c
 	intern/undofile.c
+	intern/versioning_250.c
+	intern/versioning_legacy.c
 	intern/writefile.c
 
+	BLO_blend_defs.h
 	BLO_readfile.h
 	BLO_runtime.h
 	BLO_soundfile.h
@@ -57,6 +61,10 @@ set(SRC
 
 if(WITH_BUILDINFO)
 	add_definitions(-DWITH_BUILDINFO)
+endif()
+
+if(WITH_INTERNATIONAL)
+	add_definitions(-DWITH_INTERNATIONAL)
 endif()
 
 blender_add_lib(bf_blenloader "${SRC}" "${INC}" "${INC_SYS}")

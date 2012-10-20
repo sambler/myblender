@@ -88,7 +88,7 @@ void ntreeShaderGetTexcoMode(bNodeTree *ntree, int r_mode, short *texco, int *mo
 		if (node->type==SH_NODE_TEXTURE) {
 			if ((r_mode & R_OSA) && node->id) {
 				Tex *tex= (Tex *)node->id;
-				if (ELEM3(tex->type, TEX_IMAGE, TEX_PLUGIN, TEX_ENVMAP)) {
+				if (ELEM(tex->type, TEX_IMAGE, TEX_ENVMAP)) {
 					*texco |= TEXCO_OSA|NEED_UV;
 				}
 			}
@@ -101,7 +101,7 @@ void ntreeShaderGetTexcoMode(bNodeTree *ntree, int r_mode, short *texco, int *mo
 			/* note; sockets always exist for the given type! */
 			for (a=0, sock= node->outputs.first; sock; sock= sock->next, a++) {
 				if (sock->flag & SOCK_IN_USE) {
-					switch(a) {
+					switch (a) {
 						case GEOM_OUT_GLOB: 
 							*texco |= TEXCO_GLOB|NEED_UV; break;
 						case GEOM_OUT_VIEW: 
@@ -137,7 +137,7 @@ void nodeShaderSynchronizeID(bNode *node, int copyto)
 		for (a=0, sock= node->inputs.first; sock; sock= sock->next, a++) {
 			if (!nodeSocketIsHidden(sock)) {
 				if (copyto) {
-					switch(a) {
+					switch (a) {
 						case MAT_IN_COLOR:
 							copy_v3_v3(&ma->r, ((bNodeSocketValueRGBA*)sock->default_value)->value); break;
 						case MAT_IN_SPEC:
@@ -161,7 +161,7 @@ void nodeShaderSynchronizeID(bNode *node, int copyto)
 					}
 				}
 				else {
-					switch(a) {
+					switch (a) {
 						case MAT_IN_COLOR:
 							copy_v3_v3(((bNodeSocketValueRGBA*)sock->default_value)->value, &ma->r); break;
 						case MAT_IN_SPEC:
@@ -211,7 +211,7 @@ void node_gpu_stack_from_data(struct GPUNodeStack *gs, int type, bNodeStack *ns)
 	
 	gs->name = "";
 	gs->hasinput= ns->hasinput && ns->data;
-	/* XXX Commented out the ns->data check here, as it seems it's not alwas set,
+	/* XXX Commented out the ns->data check here, as it seems it's not always set,
 	 *     even though there *is* a valid connection/output... But that might need
 	 *     further investigation.
 	 */
@@ -277,23 +277,23 @@ void ntreeExecGPUNodes(bNodeTreeExec *exec, GPUMaterial *mat, int do_outputs)
 	bNodeStack *nsin[MAX_SOCKET];	/* arbitrary... watch this */
 	bNodeStack *nsout[MAX_SOCKET];	/* arbitrary... watch this */
 	GPUNodeStack gpuin[MAX_SOCKET+1], gpuout[MAX_SOCKET+1];
-	int doit;
+	int do_it;
 
 	stack= exec->stack;
 
 	for (n=0, nodeexec= exec->nodeexec; n < exec->totnodes; ++n, ++nodeexec) {
 		node = nodeexec->node;
 		
-		doit = 0;
+		do_it = FALSE;
 		/* for groups, only execute outputs for edited group */
 		if (node->typeinfo->nclass==NODE_CLASS_OUTPUT) {
 			if (do_outputs && (node->flag & NODE_DO_OUTPUT))
-				doit = 1;
+				do_it = TRUE;
 		}
 		else
-			doit = 1;
+			do_it = TRUE;
 
-		if (doit) {
+		if (do_it) {
 			if (node->typeinfo->gpufunc) {
 				node_get_stack(node, stack, nsin, nsout);
 				gpu_stack_from_data_list(gpuin, &node->inputs, nsin);

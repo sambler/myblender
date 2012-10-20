@@ -47,11 +47,8 @@ private:
 
 
 #ifdef WITH_CXX_GUARDEDALLOC
-public:
-	void *operator new(size_t num_bytes) { return MEM_mallocN(num_bytes, "GE:CConstExpr"); }
-	void operator delete( void *mem ) { MEM_freeN(mem); }
+	MEM_CXX_CLASS_ALLOC_FUNCS("GE:CConstExpr")
 #endif
 };
 
-#endif // !defined(AFX_CONSTEXPR_H__061ECFC3_BE87_11D1_A51C_00A02472FC58__INCLUDED_)
-
+#endif  /* __CONSTEXPR_H__ */

@@ -55,12 +55,14 @@ set(SRC
 	intern/cpu.c
 	intern/dynlib.c
 	intern/edgehash.c
+	intern/endian_switch.c
 	intern/fileops.c
 	intern/fnmatch.c
 	intern/freetypefont.c
 	intern/graph.c
 	intern/gsqueue.c
 	intern/jitter.c
+	intern/lasso.c
 	intern/listbase.c
 	intern/math_base.c
 	intern/math_base_inline.c
@@ -76,10 +78,12 @@ set(SRC
 	intern/noise.c
 	intern/path_util.c
 	intern/pbvh.c
+	intern/quadric.c
 	intern/rand.c
 	intern/rct.c
 	intern/scanfill.c
 	intern/smallhash.c
+	intern/stack.c
 	intern/storage.c
 	intern/string.c
 	intern/string_cursor_utf8.c
@@ -87,13 +91,13 @@ set(SRC
 	intern/threads.c
 	intern/time.c
 	intern/uvproject.c
+	intern/voronoi.c
 	intern/voxel.c
 	intern/winstuff.c
 
+	BLI_args.h
 	BLI_array.h
 	BLI_bitmap.h
-	BLI_smallhash.h
-	BLI_args.h
 	BLI_blenlib.h
 	BLI_boxpack2d.h
 	BLI_bpath.h
@@ -103,7 +107,8 @@ set(SRC
 	BLI_dynlib.h
 	BLI_dynstr.h
 	BLI_edgehash.h
-	BLI_editVert.h
+	BLI_endian_switch.h
+	BLI_endian_switch_inline.h
 	BLI_fileops.h
 	BLI_fileops_types.h
 	BLI_fnmatch.h
@@ -114,6 +119,7 @@ set(SRC
 	BLI_jitter.h
 	BLI_kdopbvh.h
 	BLI_kdtree.h
+	BLI_lasso.h
 	BLI_linklist.h
 	BLI_listbase.h
 	BLI_math.h
@@ -130,9 +136,12 @@ set(SRC
 	BLI_noise.h
 	BLI_path_util.h
 	BLI_pbvh.h
+	BLI_quadric.h
 	BLI_rand.h
 	BLI_rect.h
 	BLI_scanfill.h
+	BLI_smallhash.h
+	BLI_stack.h
 	BLI_string.h
 	BLI_string_cursor_utf8.h
 	BLI_string_utf8.h
@@ -140,6 +149,7 @@ set(SRC
 	BLI_utildefines.h
 	BLI_uvproject.h
 	BLI_vfontdata.h
+	BLI_voronoi.h
 	BLI_voxel.h
 	BLI_winstuff.h
 	PIL_time.h
@@ -154,10 +164,6 @@ endif()
 
 if(WITH_OPENMP)
 	add_definitions(-DPARALLEL=1)
-endif()
-
-if(WITH_XDG_USER_DIRS)
-	add_definitions(-DWITH_XDG_USER_DIRS)
 endif()
 
 if(WIN32)

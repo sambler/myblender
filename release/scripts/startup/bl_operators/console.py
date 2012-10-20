@@ -23,15 +23,21 @@ from bpy.types import Operator
 from bpy.props import StringProperty
 
 
+def _lang_module_get(sc):
+    return __import__("console_" + sc.language,
+                      # for python 3.3, maybe a bug???
+                      level=0)
+
+
 class ConsoleExec(Operator):
-    '''Execute the current console line as a python expression'''
+    """Execute the current console line as a python expression"""
     bl_idname = "console.execute"
     bl_label = "Console Execute"
 
     def execute(self, context):
         sc = context.space_data
 
-        module = __import__("console_" + sc.language)
+        module = _lang_module_get(sc)
         execute = getattr(module, "execute", None)
 
         if execute:
@@ -50,7 +56,7 @@ class ConsoleAutocomplete(Operator):
 
     def execute(self, context):
         sc = context.space_data
-        module = __import__("console_" + sc.language)
+        module = _lang_module_get(sc)
         autocomplete = getattr(module, "autocomplete", None)
 
         if autocomplete:
@@ -61,8 +67,27 @@ class ConsoleAutocomplete(Operator):
             return {'FINISHED'}
 
 
+class ConsoleCopyAsScript(Operator):
+    """Copy the console contents for use in a script"""
+    bl_idname = "console.copy_as_script"
+    bl_label = "Copy to Clipboard (as script)"
+
+    def execute(self, context):
+        sc = context.space_data
+
+        module = _lang_module_get(sc)
+        copy_as_script = getattr(module, "copy_as_script", None)
+
+        if copy_as_script:
+            return copy_as_script(context)
+        else:
+            print("Error: copy_as_script - not found for %r" %
+                  sc.language)
+            return {'FINISHED'}
+
+
 class ConsoleBanner(Operator):
-    '''Print a message when the terminal initializes'''
+    """Print a message when the terminal initializes"""
     bl_idname = "console.banner"
     bl_label = "Console Banner"
 
@@ -71,9 +96,9 @@ class ConsoleBanner(Operator):
 
         # default to python
         if not sc.language:
-            sc.language = 'python'
+            sc.language = "python"
 
-        module = __import__("console_" + sc.language)
+        module = _lang_module_get(sc)
         banner = getattr(module, "banner", None)
 
         if banner:
@@ -85,7 +110,7 @@ class ConsoleBanner(Operator):
 
 
 class ConsoleLanguage(Operator):
-    '''Set the current language for this console'''
+    """Set the current language for this console"""
     bl_idname = "console.language"
     bl_label = "Console Language"
 
@@ -104,6 +129,6 @@ class ConsoleLanguage(Operator):
 
         # insert a new blank line
         bpy.ops.console.history_append(text="", current_character=0,
-            remove_duplicates=True)
+                                       remove_duplicates=True)
 
         return {'FINISHED'}

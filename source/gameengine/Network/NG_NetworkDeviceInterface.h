@@ -75,11 +75,8 @@ public:
 	
 	
 #ifdef WITH_CXX_GUARDEDALLOC
-public:
-	void *operator new(size_t num_bytes) { return MEM_mallocN(num_bytes, "GE:NG_NetworkDeviceInterface"); }
-	void operator delete( void *mem ) { MEM_freeN(mem); }
+	MEM_CXX_CLASS_ALLOC_FUNCS("GE:NG_NetworkDeviceInterface")
 #endif
 };
 
-#endif //__NG_NETWORKDEVICEINTERFACE_H__
-
+#endif  /* __NG_NETWORKDEVICEINTERFACE_H__ */

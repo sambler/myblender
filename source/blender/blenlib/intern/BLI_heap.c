@@ -58,23 +58,29 @@ struct Heap {
 #define HEAP_LEFT(i)   ((i << 1) + 1)
 #define HEAP_RIGHT(i)  ((i << 1) + 2)
 #define HEAP_COMPARE(a, b) (a->value < b->value)
-#define HEAP_EQUALS(a, b) (a->value == b->value)
+// #define HEAP_EQUALS(a, b) (a->value == b->value) // UNUSED
 #define HEAP_SWAP(heap, i, j) \
-{                                                                             \
-	SWAP(int, heap->tree[i]->index, heap->tree[j]->index);                    \
-	SWAP(HeapNode *, heap->tree[i], heap->tree[j]);                           \
-}
+	{                                                                            \
+		SWAP(int, heap->tree[i]->index, heap->tree[j]->index);                   \
+		SWAP(HeapNode *, heap->tree[i], heap->tree[j]);                          \
+	} (void)0
 
 /***/
 
-Heap *BLI_heap_new(void)
+/* use when the size of the heap is known in advance */
+Heap *BLI_heap_new_ex(unsigned int tot_reserve)
 {
 	Heap *heap = (Heap *)MEM_callocN(sizeof(Heap), __func__);
-	heap->bufsize = 1;
-	heap->tree = (HeapNode **)MEM_mallocN(sizeof(HeapNode *), "BLIHeapTree");
+	heap->bufsize = tot_reserve;
+	heap->tree = (HeapNode **)MEM_mallocN(tot_reserve * sizeof(HeapNode *), "BLIHeapTree");
 	heap->arena = BLI_memarena_new(1 << 16, "heap arena");
 
 	return heap;
+}
+
+Heap *BLI_heap_new(void)
+{
+	return BLI_heap_new_ex(1);
 }
 
 void BLI_heap_free(Heap *heap, HeapFreeFP ptrfreefp)
@@ -184,7 +190,7 @@ void *BLI_heap_popmin(Heap *heap)
 	if (heap->size == 1)
 		heap->size--;
 	else {
-		HEAP_SWAP(heap, 0, heap->size-1);
+		HEAP_SWAP(heap, 0, heap->size - 1);
 		heap->size--;
 
 		BLI_heap_down(heap, 0);

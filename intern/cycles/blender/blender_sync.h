@@ -49,26 +49,28 @@ class ShaderNode;
 
 class BlenderSync {
 public:
-	BlenderSync(BL::BlendData b_data, BL::Scene b_scene, Scene *scene_, bool preview_);
+	BlenderSync(BL::RenderEngine b_engine_, BL::BlendData b_data, BL::Scene b_scene, Scene *scene_, bool preview_, Progress &progress_);
 	~BlenderSync();
 
 	/* sync */
 	bool sync_recalc();
-	void sync_data(BL::SpaceView3D b_v3d, const char *layer = 0);
-	void sync_camera(int width, int height);
+	void sync_data(BL::SpaceView3D b_v3d, BL::Object b_override, const char *layer = 0);
+	void sync_camera(BL::Object b_override, int width, int height);
 	void sync_view(BL::SpaceView3D b_v3d, BL::RegionView3D b_rv3d, int width, int height);
+	int get_layer_samples() { return render_layer.samples; }
 
 	/* get parameters */
 	static SceneParams get_scene_params(BL::Scene b_scene, bool background);
-	static SessionParams get_session_params(BL::UserPreferences b_userpref, BL::Scene b_scene, bool background);
+	static SessionParams get_session_params(BL::RenderEngine b_engine, BL::UserPreferences b_userpref, BL::Scene b_scene, bool background);
 	static bool get_session_pause(BL::Scene b_scene, bool background);
-	static BufferParams get_buffer_params(BL::Scene b_scene, BL::RegionView3D b_rv3d, int width, int height);
+	static BufferParams get_buffer_params(BL::Scene b_scene, BL::SpaceView3D b_v3d, BL::RegionView3D b_rv3d, Camera *cam, int width, int height);
 
 private:
 	/* sync */
 	void sync_lamps();
 	void sync_materials();
-	void sync_objects(BL::SpaceView3D b_v3d);
+	void sync_objects(BL::SpaceView3D b_v3d, int motion = 0);
+	void sync_motion(BL::SpaceView3D b_v3d, BL::Object b_override);
 	void sync_film();
 	void sync_integrator();
 	void sync_view();
@@ -77,18 +79,24 @@ private:
 	void sync_shaders();
 
 	void sync_nodes(Shader *shader, BL::ShaderNodeTree b_ntree);
-	Mesh *sync_mesh(BL::Object b_ob, bool holdout, bool object_updated);
-	void sync_object(BL::Object b_parent, int b_index, BL::Object b_object, Transform& tfm, uint layer_flag);
+	Mesh *sync_mesh(BL::Object b_ob, bool object_updated);
+	void sync_object(BL::Object b_parent, int b_index, BL::DupliObject b_dupli_object, Transform& tfm, uint layer_flag, int motion, int particle_id);
 	void sync_light(BL::Object b_parent, int b_index, BL::Object b_ob, Transform& tfm);
 	void sync_background_light();
+	void sync_mesh_motion(BL::Object b_ob, Mesh *mesh, int motion);
+	void sync_camera_motion(BL::Object b_ob, int motion);
+	void sync_particles(BL::Object b_ob, BL::ParticleSystem b_psys);
 
 	/* util */
 	void find_shader(BL::ID id, vector<uint>& used_shaders, int default_shader);
-	bool object_is_modified(BL::Object b_ob);
+	bool BKE_object_is_modified(BL::Object b_ob);
 	bool object_is_mesh(BL::Object b_ob);
 	bool object_is_light(BL::Object b_ob);
+	bool psys_need_update(BL::ParticleSystem b_psys);
+	int object_count_particles(BL::Object b_ob);
 
 	/* variables */
+	BL::RenderEngine b_engine;
 	BL::BlendData b_data;
 	BL::Scene b_scene;
 
@@ -96,6 +104,7 @@ private:
 	id_map<ObjectKey, Object> object_map;
 	id_map<void*, Mesh> mesh_map;
 	id_map<ObjectKey, Light> light_map;
+	id_map<ParticleSystemKey, ParticleSystem> particle_system_map;
 	set<Mesh*> mesh_synced;
 	void *world_map;
 	bool world_recalc;
@@ -107,7 +116,10 @@ private:
 	struct RenderLayerInfo {
 		RenderLayerInfo()
 		: scene_layer(0), layer(0), holdout_layer(0),
-		  material_override(PointerRNA_NULL)
+		  material_override(PointerRNA_NULL),
+		  use_background(true),
+		  use_viewport_visibility(false),
+		  samples(0)
 		{}
 
 		string name;
@@ -115,7 +127,13 @@ private:
 		uint layer;
 		uint holdout_layer;
 		BL::Material material_override;
+		bool use_background;
+		bool use_viewport_visibility;
+		bool use_localview;
+		int samples;
 	} render_layer;
+
+	Progress &progress;
 };
 
 CCL_NAMESPACE_END

@@ -36,14 +36,14 @@
 
 /* **************** VECTOR MATH ******************** */ 
 static bNodeSocketTemplate sh_node_vect_math_in[]= { 
-        { SOCK_VECTOR, 1, "Vector", 0.5f, 0.5f, 0.5f, 1.0f, -10000.0f, 10000.0f, PROP_NONE},
-        { SOCK_VECTOR, 1, "Vector", 0.5f, 0.5f, 0.5f, 1.0f, -10000.0f, 10000.0f, PROP_NONE},
+        { SOCK_VECTOR, 1, N_("Vector"), 0.5f, 0.5f, 0.5f, 1.0f, -10000.0f, 10000.0f, PROP_NONE},
+        { SOCK_VECTOR, 1, N_("Vector"), 0.5f, 0.5f, 0.5f, 1.0f, -10000.0f, 10000.0f, PROP_NONE},
 	{ -1, 0, "" } 
 };
 
 static bNodeSocketTemplate sh_node_vect_math_out[]= {
-	{ SOCK_VECTOR, 0, "Vector"}, 
-	{ SOCK_FLOAT, 0, "Value"},
+	{ SOCK_VECTOR, 0, N_("Vector")}, 
+	{ SOCK_FLOAT, 0, N_("Value")},
 	{ -1, 0, "" } 
 };
 
@@ -73,7 +73,7 @@ static void node_shader_exec_vect_math(void *UNUSED(data), bNode *node, bNodeSta
 		out[0]->vec[1]= vec1[1] + vec2[1];
 		out[0]->vec[2]= vec1[2] + vec2[2];
 		
-		out[1]->vec[0] = normalize_v3( out[0]->vec );
+		out[1]->vec[0] = normalize_v3(out[0]->vec );
 	}
 	else if (node->custom1 == 3) {	/* Dot product */
 		out[1]->vec[0]= (vec1[0] * vec2[0]) + (vec1[1] * vec2[1]) + (vec1[2] * vec2[2]);
@@ -83,7 +83,7 @@ static void node_shader_exec_vect_math(void *UNUSED(data), bNode *node, bNodeSta
 		out[0]->vec[1]= (vec1[2] * vec2[0]) - (vec1[0] * vec2[2]);
 		out[0]->vec[2]= (vec1[0] * vec2[1]) - (vec1[1] * vec2[0]);
 		
-		out[1]->vec[0] = normalize_v3( out[0]->vec );
+		out[1]->vec[0] = normalize_v3(out[0]->vec );
 	}
 	else if (node->custom1 == 5) {	/* Normalize */
 		if (in[0]->hasinput || !in[1]->hasinput) {	/* This one only takes one input, so we've got to choose. */
@@ -97,7 +97,7 @@ static void node_shader_exec_vect_math(void *UNUSED(data), bNode *node, bNodeSta
 			out[0]->vec[2]= vec2[2];
 		}
 		
-		out[1]->vec[0] = normalize_v3( out[0]->vec );
+		out[1]->vec[0] = normalize_v3(out[0]->vec );
 	}
 	
 }

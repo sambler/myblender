@@ -58,11 +58,9 @@ private:
 
 
 #ifdef WITH_CXX_GUARDEDALLOC
-public:
-	void *operator new(size_t num_bytes) { return MEM_mallocN(num_bytes, "GE:COperator2Expr"); }
-	void operator delete( void *mem ) { MEM_freeN(mem); }
+	MEM_CXX_CLASS_ALLOC_FUNCS("GE:COperator2Expr")
 #endif
 };
 
-#endif // !defined __OPERATOR2EXPR_H__
+#endif  /* __OPERATOR2EXPR_H__ */
 

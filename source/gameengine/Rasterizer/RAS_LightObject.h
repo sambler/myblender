@@ -36,7 +36,7 @@
 
 struct RAS_LightObject
 {
-	enum LightType{
+	enum LightType {
 		LIGHT_SPOT,
 		LIGHT_SUN,
 		LIGHT_NORMAL
@@ -64,5 +64,4 @@ struct RAS_LightObject
 	bool	m_nospecular;
 };
 
-#endif //__RAS_LIGHTOBJECT_H__
-
+#endif  /* __RAS_LIGHTOBJECT_H__ */

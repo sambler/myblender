@@ -1,5 +1,4 @@
 /*
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -996,7 +995,7 @@ static PyObject *Matrix_to_euler(MatrixObject *self, PyObject *args)
 
 	if (eul_compat) {
 		if (order == 1) mat3_to_compatible_eul(eul, eul_compatf, mat);
-		else mat3_to_compatible_eulO(eul, eul_compatf, order, mat);
+		else            mat3_to_compatible_eulO(eul, eul_compatf, order, mat);
 	}
 	else {
 		if (order == 1) mat3_to_eul(eul, mat);
@@ -1641,7 +1640,7 @@ static PyObject *Matrix_richcmpr(PyObject *a, PyObject *b, int op)
  * sequence length */
 static int Matrix_len(MatrixObject *self)
 {
-	return (self->num_row);
+	return self->num_row;
 }
 /*----------------------------object[]---------------------------
  * sequence accessor (get)
@@ -1876,7 +1875,7 @@ static PyObject *Matrix_sub(PyObject *m1, PyObject *m2)
 	return Matrix_CreatePyObject(mat, mat1->num_col, mat1->num_row, Py_NEW, Py_TYPE(mat1));
 }
 /*------------------------obj * obj------------------------------
- * mulplication */
+ * multiplication */
 static PyObject *matrix_mul_float(MatrixObject *mat, const float scalar)
 {
 	float tmat[16];
@@ -2219,9 +2218,9 @@ static PyObject *Matrix_is_orthogonal_get(MatrixObject *self, void *UNUSED(closu
 
 	/*must be 3-4 cols, 3-4 rows, square matrix*/
 	if (self->num_row == 4 && self->num_col == 4)
-		return PyBool_FromLong(is_orthogonal_m4((float (*)[4])self->matrix));
+		return PyBool_FromLong(is_orthonormal_m4((float (*)[4])self->matrix));
 	else if (self->num_row == 3 && self->num_col == 3)
-		return PyBool_FromLong(is_orthogonal_m3((float (*)[3])self->matrix));
+		return PyBool_FromLong(is_orthonormal_m3((float (*)[3])self->matrix));
 	else {
 		PyErr_SetString(PyExc_AttributeError,
 		                "Matrix.is_orthogonal: "
@@ -2230,22 +2229,22 @@ static PyObject *Matrix_is_orthogonal_get(MatrixObject *self, void *UNUSED(closu
 	}
 }
 
-PyDoc_STRVAR(Matrix_is_orthonormal_doc,
-"True if this matrix is orthonormal, 3x3 and 4x4 only, (read-only).\n\n:type: bool"
+PyDoc_STRVAR(Matrix_is_orthogonal_axis_vectors_doc,
+"True if this matrix has got orthogonal axis vectors, 3x3 and 4x4 only, (read-only).\n\n:type: bool"
 );
-static PyObject *Matrix_is_orthonormal_get(MatrixObject *self, void *UNUSED(closure))
+static PyObject *Matrix_is_orthogonal_axis_vectors_get(MatrixObject *self, void *UNUSED(closure))
 {
 	if (BaseMath_ReadCallback(self) == -1)
 		return NULL;
 
 	/*must be 3-4 cols, 3-4 rows, square matrix*/
 	if (self->num_row == 4 && self->num_col == 4)
-		return PyBool_FromLong(is_orthonormal_m4((float (*)[4])self->matrix));
+		return PyBool_FromLong(is_orthogonal_m4((float (*)[4])self->matrix));
 	else if (self->num_row == 3 && self->num_col == 3)
-		return PyBool_FromLong(is_orthonormal_m3((float (*)[3])self->matrix));
+		return PyBool_FromLong(is_orthogonal_m3((float (*)[3])self->matrix));
 	else {
 		PyErr_SetString(PyExc_AttributeError,
-		                "Matrix.is_orthonormal: "
+		                "Matrix.is_orthogonal_axis_vectors: "
 		                "inappropriate matrix size - expects 3x3 or 4x4 matrix");
 		return NULL;
 	}
@@ -2261,7 +2260,7 @@ static PyGetSetDef Matrix_getseters[] = {
 	{(char *)"col", (getter)Matrix_col_get, (setter)NULL, Matrix_col_doc, NULL},
 	{(char *)"is_negative", (getter)Matrix_is_negative_get, (setter)NULL, Matrix_is_negative_doc, NULL},
 	{(char *)"is_orthogonal", (getter)Matrix_is_orthogonal_get, (setter)NULL, Matrix_is_orthogonal_doc, NULL},
-	{(char *)"is_orthonormal", (getter)Matrix_is_orthonormal_get, (setter)NULL, Matrix_is_orthonormal_doc, NULL},
+	{(char *)"is_orthogonal_axis_vectors", (getter)Matrix_is_orthogonal_axis_vectors_get, (setter)NULL, Matrix_is_orthogonal_axis_vectors_doc, NULL},
 	{(char *)"is_wrapped", (getter)BaseMathObject_is_wrapped_get, (setter)NULL, BaseMathObject_is_wrapped_doc, NULL},
 	{(char *)"owner", (getter)BaseMathObject_owner_get, (setter)NULL, BaseMathObject_owner_doc, NULL},
 	{NULL, NULL, NULL, NULL, NULL}  /* Sentinel */
@@ -2283,7 +2282,7 @@ static struct PyMethodDef Matrix_methods[] = {
 	{"invert", (PyCFunction) Matrix_invert, METH_NOARGS, Matrix_invert_doc},
 	{"inverted", (PyCFunction) Matrix_inverted, METH_NOARGS, Matrix_inverted_doc},
 	{"to_3x3", (PyCFunction) Matrix_to_3x3, METH_NOARGS, Matrix_to_3x3_doc},
-	// TODO. {"resize_3x3", (PyCFunction) Matrix_resize3x3, METH_NOARGS, Matrix_resize3x3_doc},
+	/* TODO. {"resize_3x3", (PyCFunction) Matrix_resize3x3, METH_NOARGS, Matrix_resize3x3_doc}, */
 	{"to_4x4", (PyCFunction) Matrix_to_4x4, METH_NOARGS, Matrix_to_4x4_doc},
 	{"resize_4x4", (PyCFunction) Matrix_resize_4x4, METH_NOARGS, Matrix_resize_4x4_doc},
 	{"rotate", (PyCFunction) Matrix_rotate, METH_O, Matrix_rotate_doc},
@@ -2316,7 +2315,7 @@ PyDoc_STRVAR(matrix_doc,
 );
 PyTypeObject matrix_Type = {
 	PyVarObject_HEAD_INIT(NULL, 0)
-	"mathutils.Matrix",                 /*tp_name*/
+	"Matrix",                           /*tp_name*/
 	sizeof(MatrixObject),               /*tp_basicsize*/
 	0,                                  /*tp_itemsize*/
 	(destructor)BaseMathObject_dealloc, /*tp_dealloc*/
@@ -2444,7 +2443,7 @@ PyObject *Matrix_CreatePyObject_cb(PyObject *cb_user,
 
 
 /* ----------------------------------------------------------------------------
- * special type for alaternate access */
+ * special type for alternate access */
 
 typedef struct {
 	PyObject_HEAD /* required python macro   */

@@ -25,6 +25,7 @@
 
 #include "util_progress.h"
 #include "util_thread.h"
+#include "util_vector.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -42,13 +43,14 @@ class SessionParams {
 public:
 	DeviceInfo device;
 	bool background;
+	bool progressive_refine;
 	string output_path;
 
 	bool progressive;
 	bool experimental;
 	int samples;
-	int tile_size;
-	int min_size;
+	int2 tile_size;
+	int start_resolution;
 	int threads;
 
 	double cancel_timeout;
@@ -58,13 +60,14 @@ public:
 	SessionParams()
 	{
 		background = false;
+		progressive_refine = false;
 		output_path = "";
 
 		progressive = false;
 		experimental = false;
 		samples = INT_MAX;
-		tile_size = 64;
-		min_size = 64;
+		tile_size = make_int2(64, 64);
+		start_resolution = INT_MAX;
 		threads = 0;
 
 		cancel_timeout = 0.1;
@@ -76,12 +79,13 @@ public:
 	{ return !(device.type == params.device.type
 		&& device.id == params.device.id
 		&& background == params.background
+		&& progressive_refine == params.progressive_refine
 		&& output_path == params.output_path
 		/* && samples == params.samples */
 		&& progressive == params.progressive
 		&& experimental == params.experimental
 		&& tile_size == params.tile_size
-		&& min_size == params.min_size
+		&& start_resolution == params.start_resolution
 		&& threads == params.threads
 		&& cancel_timeout == params.cancel_timeout
 		&& reset_timeout == params.reset_timeout
@@ -102,7 +106,10 @@ public:
 	DisplayBuffer *display;
 	Progress progress;
 	SessionParams params;
-	int sample;
+	TileManager tile_manager;
+
+	boost::function<void(RenderTile&)> write_render_tile_cb;
+	boost::function<void(RenderTile&)> update_render_tile_cb;
 
 	Session(const SessionParams& params);
 	~Session();
@@ -130,7 +137,7 @@ protected:
 	void update_status_time(bool show_pause = false, bool show_done = false);
 
 	void tonemap();
-	void path_trace(Tile& tile);
+	void path_trace();
 	void reset_(BufferParams& params, int samples);
 
 	void run_cpu();
@@ -141,7 +148,12 @@ protected:
 	bool draw_gpu(BufferParams& params);
 	void reset_gpu(BufferParams& params, int samples);
 
-	TileManager tile_manager;
+	bool acquire_tile(Device *tile_device, RenderTile& tile);
+	void update_tile_sample(RenderTile& tile);
+	void release_tile(RenderTile& tile);
+
+	void update_progress_sample();
+
 	bool device_use_gl;
 
 	thread *session_thread;
@@ -155,6 +167,9 @@ protected:
 	bool pause;
 	thread_condition_variable pause_cond;
 	thread_mutex pause_mutex;
+	thread_mutex tile_mutex;
+	thread_mutex buffers_mutex;
+	thread_mutex display_mutex;
 
 	bool kernels_loaded;
 
@@ -162,6 +177,11 @@ protected:
 	double reset_time;
 	double preview_time;
 	double paused_time;
+
+	/* progressive refine */
+	bool update_progressive_refine(bool cancel);
+
+	vector<RenderBuffers *> tile_buffers;
 };
 
 CCL_NAMESPACE_END

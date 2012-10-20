@@ -25,6 +25,10 @@
 
 set(INC 
 	.
+	composite
+	intern
+	shader
+	texture
 	../blenfont
 	../blenkernel
 	../blenlib
@@ -39,10 +43,6 @@ set(INC
 
 set(INC_SYS
 	${GLEW_INCLUDE_PATH}
-	intern
-	composite
-	shader
-	texture
 )
 
 set(SRC
@@ -59,6 +59,7 @@ set(SRC
 	composite/nodes/node_composite_composite.c
 	composite/nodes/node_composite_crop.c
 	composite/nodes/node_composite_curves.c
+	composite/nodes/node_composite_despeckle.c
 	composite/nodes/node_composite_doubleEdgeMask.c
 	composite/nodes/node_composite_defocus.c
 	composite/nodes/node_composite_diffMatte.c
@@ -74,13 +75,17 @@ set(SRC
 	composite/nodes/node_composite_huecorrect.c
 	composite/nodes/node_composite_idMask.c
 	composite/nodes/node_composite_image.c
+	composite/nodes/node_composite_inpaint.c
 	composite/nodes/node_composite_invert.c
+	composite/nodes/node_composite_keyingscreen.c
+	composite/nodes/node_composite_keying.c
 	composite/nodes/node_composite_lensdist.c
 	composite/nodes/node_composite_levels.c
 	composite/nodes/node_composite_lummaMatte.c
 	composite/nodes/node_composite_mapUV.c
 	composite/nodes/node_composite_mapValue.c
 	composite/nodes/node_composite_math.c
+	composite/nodes/node_composite_mask.c
 	composite/nodes/node_composite_mixrgb.c
 	composite/nodes/node_composite_movieclip.c
 	composite/nodes/node_composite_moviedistortion.c
@@ -100,6 +105,7 @@ set(SRC
 	composite/nodes/node_composite_stabilize2d.c
 	composite/nodes/node_composite_texture.c
 	composite/nodes/node_composite_tonemap.c
+	composite/nodes/node_composite_trackpos.c
 	composite/nodes/node_composite_transform.c
 	composite/nodes/node_composite_translate.c
 	composite/nodes/node_composite_valToRgb.c
@@ -107,13 +113,19 @@ set(SRC
 	composite/nodes/node_composite_vecBlur.c
 	composite/nodes/node_composite_viewer.c
 	composite/nodes/node_composite_zcombine.c
+	composite/nodes/node_composite_bokehblur.c
+	composite/nodes/node_composite_bokehimage.c
+	composite/nodes/node_composite_boxmask.c
+	composite/nodes/node_composite_ellipsemask.c
+	composite/nodes/node_composite_switch.c
+	composite/nodes/node_composite_colorcorrection.c
+	
 	composite/node_composite_tree.c
 	composite/node_composite_util.c
 
 	shader/nodes/node_shader_camera.c
 	shader/nodes/node_shader_common.c
 	shader/nodes/node_shader_curves.c
-	shader/nodes/node_shader_dynamic.c
 	shader/nodes/node_shader_gamma.c
 	shader/nodes/node_shader_brightness.c
 	shader/nodes/node_shader_geom.c
@@ -134,13 +146,14 @@ set(SRC
 	shader/nodes/node_shader_vectMath.c
 	shader/nodes/node_shader_attribute.c
 	shader/nodes/node_shader_background.c
-	# shader/nodes/node_shader_bsdf_anisotropic.c  # XXX, why not included?
+	shader/nodes/node_shader_bsdf_anisotropic.c
 	shader/nodes/node_shader_bsdf_diffuse.c
 	shader/nodes/node_shader_bsdf_glossy.c
 	shader/nodes/node_shader_bsdf_glass.c
 	shader/nodes/node_shader_bsdf_translucent.c
 	shader/nodes/node_shader_bsdf_transparent.c
 	shader/nodes/node_shader_bsdf_velvet.c
+	shader/nodes/node_shader_bump.c
 	shader/nodes/node_shader_emission.c
 	shader/nodes/node_shader_fresnel.c
 	shader/nodes/node_shader_layer_weight.c
@@ -149,6 +162,9 @@ set(SRC
 	shader/nodes/node_shader_volume_transparent.c
 	shader/nodes/node_shader_volume_isotropic.c
 	shader/nodes/node_shader_light_path.c
+	shader/nodes/node_shader_light_falloff.c
+	shader/nodes/node_shader_object_info.c
+	shader/nodes/node_shader_particle_info.c
 	shader/nodes/node_shader_mix_shader.c
 	shader/nodes/node_shader_add_shader.c
 	shader/nodes/node_shader_output_lamp.c
@@ -165,6 +181,7 @@ set(SRC
 	shader/nodes/node_shader_tex_voronoi.c
 	shader/nodes/node_shader_tex_wave.c
 	shader/nodes/node_shader_tex_checker.c
+	shader/nodes/node_shader_tex_brick.c
 	shader/node_shader_tree.c
 	shader/node_shader_util.c
 
@@ -228,6 +245,17 @@ endif()
 
 if(WITH_IMAGE_OPENEXR)
 	add_definitions(-DWITH_OPENEXR)
+endif()
+
+if(WITH_COMPOSITOR)
+	list(APPEND INC
+		../compositor
+	)
+	add_definitions(-DWITH_COMPOSITOR)
+endif()
+
+if(WITH_COMPOSITOR_LEGACY)
+	add_definitions(-DWITH_COMPOSITOR_LEGACY)
 endif()
 
 blender_add_lib(bf_nodes "${SRC}" "${INC}" "${INC_SYS}")

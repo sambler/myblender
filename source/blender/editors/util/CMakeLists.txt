@@ -20,6 +20,7 @@
 
 set(INC
 	../include
+	../../blenfont
 	../../blenkernel
 	../../blenlib
 	../../blenloader
@@ -61,6 +62,7 @@ set(SRC
 	../include/ED_lattice.h
 	../include/ED_logic.h
 	../include/ED_markers.h
+	../include/ED_mask.h
 	../include/ED_mball.h
 	../include/ED_mesh.h
 	../include/ED_node.h
@@ -87,5 +89,9 @@ set(SRC
 	../include/UI_resources.h
 	../include/UI_view2d.h
 )
+
+if(WITH_INTERNATIONAL)
+	add_definitions(-DWITH_INTERNATIONAL)
+endif()
 
 blender_add_lib(bf_editor_util "${SRC}" "${INC}" "${INC_SYS}")

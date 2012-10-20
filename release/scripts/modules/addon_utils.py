@@ -139,6 +139,8 @@ def modules(module_cache):
 
             return mod
         else:
+            print("fake_module: addon missing 'bl_info' "
+                  "gives bad performance!: %r" % mod_path)
             return None
 
     modules_stale = set(module_cache.keys())
@@ -146,7 +148,7 @@ def modules(module_cache):
     for path in path_list:
 
         # force all contrib addons to be 'TESTING'
-        if path.endswith("addons_contrib") or path.endswith("addons_extern"):
+        if path.endswith(("addons_contrib", "addons_extern")):
             force_support = 'TESTING'
         else:
             force_support = None
@@ -183,8 +185,8 @@ def modules(module_cache):
     del modules_stale
 
     mod_list = list(module_cache.values())
-    mod_list.sort(key=lambda mod: (mod.bl_info['category'],
-                                   mod.bl_info['name'],
+    mod_list.sort(key=lambda mod: (mod.bl_info["category"],
+                                   mod.bl_info["name"],
                                    ))
     return mod_list
 
@@ -212,10 +214,13 @@ def check(module_name):
 
         loaded_state = False
 
+    if mod and getattr(mod, "__addon_persistent__", False):
+        loaded_default = True
+
     return loaded_default, loaded_state
 
 
-def enable(module_name, default_set=True):
+def enable(module_name, default_set=True, persistent=False):
     """
     Enables an addon by name.
 
@@ -270,6 +275,8 @@ def enable(module_name, default_set=True):
     try:
         mod.register()
     except:
+        print("Exception in module register(): %r" %
+              getattr(mod, "__file__", module_name))
         handle_error()
         del sys.modules[module_name]
         return None
@@ -283,6 +290,7 @@ def enable(module_name, default_set=True):
             ext.module = module_name
 
     mod.__addon_enabled__ = True
+    mod.__addon_persistent__ = persistent
 
     if _bpy.app.debug_python:
         print("\taddon_utils.enable", mod.__name__)
@@ -303,16 +311,20 @@ def disable(module_name, default_set=True):
     # possible this addon is from a previous session and didn't load a
     # module this time. So even if the module is not found, still disable
     # the addon in the user prefs.
-    if mod:
+    if mod and getattr(mod, "__addon_enabled__", False) is not False:
         mod.__addon_enabled__ = False
+        mod.__addon_persistent = False
 
         try:
             mod.unregister()
         except:
+            print("Exception in module unregister(): %r" %
+                  getattr(mod, "__file__", module_name))
             import traceback
             traceback.print_exc()
     else:
-        print("addon_utils.disable", module_name, "not loaded")
+        print("addon_utils.disable: %s not %s." %
+              (module_name, "disabled" if mod is None else "loaded"))
 
     # could be in more then once, unlikely but better do this just in case.
     addons = _bpy.context.user_preferences.addons

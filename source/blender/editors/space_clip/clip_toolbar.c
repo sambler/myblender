@@ -56,7 +56,7 @@
 
 /************************** properties ******************************/
 
-static ARegion *clip_has_properties_region(ScrArea *sa)
+ARegion *ED_clip_has_properties_region(ScrArea *sa)
 {
 	ARegion *ar, *arnew;
 
@@ -90,9 +90,9 @@ static int properties_poll(bContext *C)
 static int properties_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	ScrArea *sa = CTX_wm_area(C);
-	ARegion *ar = clip_has_properties_region(sa);
+	ARegion *ar = ED_clip_has_properties_region(sa);
 
-	if (ar)
+	if (ar && ar->alignment != RGN_ALIGN_NONE)
 		ED_region_toggle_hidden(C, ar);
 
 	return OPERATOR_FINISHED;
@@ -151,7 +151,7 @@ static ARegion *clip_has_tools_region(ScrArea *sa)
 
 		BLI_insertlinkafter(&sa->regionbase, artool, arprops);
 		arprops->regiontype = RGN_TYPE_TOOL_PROPS;
-		arprops->alignment = RGN_ALIGN_BOTTOM|RGN_SPLIT_PREV;
+		arprops->alignment = RGN_ALIGN_BOTTOM | RGN_SPLIT_PREV;
 	}
 
 	return artool;
@@ -167,7 +167,7 @@ static int tools_exec(bContext *C, wmOperator *UNUSED(op))
 	ScrArea *sa = CTX_wm_area(C);
 	ARegion *ar = clip_has_tools_region(sa);
 
-	if (ar)
+	if (ar && ar->alignment != RGN_ALIGN_NONE)
 		ED_region_toggle_hidden(C, ar);
 
 	return OPERATOR_FINISHED;
@@ -224,13 +224,13 @@ static void clip_panel_operator_redo(const bContext *C, Panel *pa)
 	if (op == NULL)
 		return;
 
-	if (WM_operator_poll((bContext*)C, op->type) == 0)
+	if (WM_operator_poll((bContext *)C, op->type) == 0)
 		return;
 
 	block = uiLayoutGetBlock(pa->layout);
 
 	if (!WM_operator_check_ui_enabled(C, op->type->name))
-		uiLayoutSetEnabled(pa->layout, 0);
+		uiLayoutSetEnabled(pa->layout, FALSE);
 
 	/* note, blockfunc is a default but->func, use Handle func to allow button callbacks too */
 	uiBlockSetHandleFunc(block, ED_undo_operator_repeat_cb_evt, op);

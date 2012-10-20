@@ -20,6 +20,7 @@
 #include "device.h"
 #include "film.h"
 #include "integrator.h"
+#include "mesh.h"
 #include "scene.h"
 
 #include "util_algorithm.h"
@@ -66,6 +67,13 @@ void Pass::add(PassType type, vector<Pass>& passes)
 			break;
 		case PASS_UV:
 			pass.components = 4;
+			break;
+		case PASS_MOTION:
+			pass.components = 4;
+			pass.divide_type = PASS_MOTION_WEIGHT;
+			break;
+		case PASS_MOTION_WEIGHT:
+			pass.components = 1;
 			break;
 		case PASS_OBJECT_ID:
 			pass.components = 1;
@@ -125,7 +133,6 @@ void Pass::add(PassType type, vector<Pass>& passes)
 			break;
 		case PASS_AO:
 			pass.components = 4;
-			pass.exposure = true;
 			break;
 		case PASS_SHADOW:
 			pass.components = 4;
@@ -136,7 +143,7 @@ void Pass::add(PassType type, vector<Pass>& passes)
 	passes.push_back(pass);
 
 	/* order from by components, to ensure alignment so passes with size 4
-	   come first and then passes with size 1 */
+	 * come first and then passes with size 1 */
 	sort(passes.begin(), passes.end(), compare_pass_order);
 
 	if(pass.divide_type != PASS_NONE)
@@ -153,6 +160,15 @@ bool Pass::equals(const vector<Pass>& A, const vector<Pass>& B)
 			return false;
 	
 	return true;
+}
+
+bool Pass::contains(const vector<Pass>& passes, PassType type)
+{
+	foreach(const Pass& pass, passes)
+		if(pass.type == type)
+			return true;
+	
+	return false;
 }
 
 /* Film */
@@ -196,6 +212,12 @@ void Film::device_update(Device *device, DeviceScene *dscene)
 				break;
 			case PASS_UV:
 				kfilm->pass_uv = kfilm->pass_stride;
+				break;
+			case PASS_MOTION:
+				kfilm->pass_motion = kfilm->pass_stride;
+				break;
+			case PASS_MOTION_WEIGHT:
+				kfilm->pass_motion_weight = kfilm->pass_stride;
 				break;
 			case PASS_OBJECT_ID:
 				kfilm->pass_object_id = kfilm->pass_stride;
@@ -275,9 +297,18 @@ bool Film::modified(const Film& film)
 		&& Pass::equals(passes, film.passes));
 }
 
+void Film::tag_passes_update(Scene *scene, const vector<Pass>& passes_)
+{
+	if(Pass::contains(passes, PASS_UV) != Pass::contains(passes_, PASS_UV))
+		scene->mesh_manager->tag_update(scene);
+	else if(Pass::contains(passes, PASS_MOTION) != Pass::contains(passes_, PASS_MOTION))
+		scene->mesh_manager->tag_update(scene);
+
+	passes = passes_;
+}
+
 void Film::tag_update(Scene *scene)
 {
-	scene->integrator->tag_update(scene);
 	need_update = true;
 }
 

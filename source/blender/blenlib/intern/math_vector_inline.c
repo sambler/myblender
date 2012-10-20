@@ -121,6 +121,13 @@ MINLINE void copy_v4_v4_char(char r[4], const char a[4])
 }
 
 /* short */
+MINLINE void zero_v3_int(int r[3])
+{
+	r[0] = 0;
+	r[1] = 0;
+	r[2] = 0;
+}
+
 MINLINE void copy_v2_v2_short(short r[2], const short a[2])
 {
 	r[0] = a[0];
@@ -231,6 +238,13 @@ MINLINE void swap_v4_v4(float a[4], float b[4])
 
 /********************************* Arithmetic ********************************/
 
+MINLINE void add_v2_fl(float r[2], float f)
+{
+	r[0] += f;
+	r[1] += f;
+}
+
+
 MINLINE void add_v3_fl(float r[3], float f)
 {
 	r[0] += f;
@@ -270,6 +284,22 @@ MINLINE void add_v3_v3v3(float r[3], const float a[3], const float b[3])
 	r[0] = a[0] + b[0];
 	r[1] = a[1] + b[1];
 	r[2] = a[2] + b[2];
+}
+
+MINLINE void add_v4_v4(float r[4], const float a[4])
+{
+	r[0] += a[0];
+	r[1] += a[1];
+	r[2] += a[2];
+	r[3] += a[3];
+}
+
+MINLINE void add_v4_v4v4(float r[4], const float a[4], const float b[4])
+{
+	r[0] = a[0] + b[0];
+	r[1] = a[1] + b[1];
+	r[2] = a[2] + b[2];
+	r[3] = a[3] + b[3];
 }
 
 MINLINE void sub_v2_v2(float r[2], const float a[2])
@@ -361,6 +391,14 @@ MINLINE void mul_v4_fl(float r[4], float f)
 	r[3] *= f;
 }
 
+MINLINE void mul_v4_v4fl(float r[4], const float a[4], float f)
+{
+	r[0] = a[0] * f;
+	r[1] = a[1] * f;
+	r[2] = a[2] * f;
+	r[3] = a[3] * f;
+}
+
 MINLINE void madd_v2_v2fl(float r[2], const float a[2], float f)
 {
 	r[0] += a[0] * f;
@@ -407,6 +445,14 @@ MINLINE void madd_v4_v4fl(float r[4], const float a[4], float f)
 	r[1] += a[1] * f;
 	r[2] += a[2] * f;
 	r[3] += a[3] * f;
+}
+
+MINLINE void madd_v4_v4v4(float r[4], const float a[4], const float b[4])
+{
+	r[0] += a[0] * b[0];
+	r[1] += a[1] * b[1];
+	r[2] += a[2] * b[2];
+	r[3] += a[3] * b[3];
 }
 
 MINLINE void mul_v3_v3v3(float r[3], const float v1[3], const float v2[3])
@@ -458,6 +504,14 @@ MINLINE void negate_v4_v4(float r[4], const float a[4])
 	r[3] = -a[3];
 }
 
+/* could add more... */
+MINLINE void negate_v3_short(short r[3])
+{
+	r[0] = -r[0];
+	r[1] = -r[1];
+	r[2] = -r[2];
+}
+
 MINLINE float dot_v2v2(const float a[2], const float b[2])
 {
 	return a[0] * b[0] + a[1] * b[1];
@@ -478,6 +532,17 @@ MINLINE void cross_v3_v3v3(float r[3], const float a[3], const float b[3])
 	r[0] = a[1] * b[2] - a[2] * b[1];
 	r[1] = a[2] * b[0] - a[0] * b[2];
 	r[2] = a[0] * b[1] - a[1] * b[0];
+}
+
+/* Newell's Method */
+/* excuse this fairly specific function,
+ * its used for polygon normals all over the place
+ * could use a better name */
+MINLINE void add_newell_cross_v3_v3v3(float n[3], const float v_prev[3], const float v_curr[3])
+{
+	n[0] += (v_prev[1] - v_curr[1]) * (v_prev[2] + v_curr[2]);
+	n[1] += (v_prev[2] - v_curr[2]) * (v_prev[0] + v_curr[0]);
+	n[2] += (v_prev[0] - v_curr[0]) * (v_prev[1] + v_curr[1]);
 }
 
 MINLINE void star_m3_v3(float rmat[][3], float a[3])
@@ -503,9 +568,19 @@ MINLINE float len_squared_v3(const float v[3])
 	return v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
 }
 
+MINLINE float len_manhattan_v2(const float v[2])
+{
+	return fabsf(v[0]) + fabsf(v[1]);
+}
+
+MINLINE float len_manhattan_v3(const float v[3])
+{
+	return fabsf(v[0]) + fabsf(v[1]) + fabsf(v[2]);
+}
+
 MINLINE float len_v2(const float v[2])
 {
-	return (float)sqrtf(v[0] * v[0] + v[1] * v[1]);
+	return sqrtf(v[0] * v[0] + v[1] * v[1]);
 }
 
 MINLINE float len_v2v2(const float v1[2], const float v2[2])
@@ -514,7 +589,7 @@ MINLINE float len_v2v2(const float v1[2], const float v2[2])
 
 	x = v1[0] - v2[0];
 	y = v1[1] - v2[1];
-	return (float)sqrtf(x * x + y * y);
+	return sqrtf(x * x + y * y);
 }
 
 MINLINE float len_v3(const float a[3])
@@ -530,20 +605,36 @@ MINLINE float len_squared_v2v2(const float a[2], const float b[2])
 	return dot_v2v2(d, d);
 }
 
-MINLINE float len_v3v3(const float a[3], const float b[3])
-{
-	float d[3];
-
-	sub_v3_v3v3(d, b, a);
-	return len_v3(d);
-}
-
 MINLINE float len_squared_v3v3(const float a[3], const float b[3])
 {
 	float d[3];
 
 	sub_v3_v3v3(d, b, a);
 	return dot_v3v3(d, d);
+}
+
+MINLINE float len_manhattan_v2v2(const float a[2], const float b[2])
+{
+	float d[2];
+
+	sub_v2_v2v2(d, b, a);
+	return len_manhattan_v2(d);
+}
+
+MINLINE float len_manhattan_v3v3(const float a[3], const float b[3])
+{
+	float d[3];
+
+	sub_v3_v3v3(d, b, a);
+	return len_manhattan_v3(d);
+}
+
+MINLINE float len_v3v3(const float a[3], const float b[3])
+{
+	float d[3];
+
+	sub_v3_v3v3(d, b, a);
+	return len_v3(d);
 }
 
 MINLINE float normalize_v2_v2(float r[2], const float a[2])
@@ -631,7 +722,7 @@ MINLINE void normal_float_to_short_v3(short out[3], const float in[3])
 /********************************* Comparison ********************************/
 
 
-MINLINE int is_zero_v2(const float v[3])
+MINLINE int is_zero_v2(const float v[2])
 {
 	return (v[0] == 0 && v[1] == 0);
 }
@@ -664,6 +755,15 @@ MINLINE int equals_v3v3(const float v1[3], const float v2[3])
 MINLINE int equals_v4v4(const float v1[4], const float v2[4])
 {
 	return ((v1[0] == v2[0]) && (v1[1] == v2[1]) && (v1[2] == v2[2]) && (v1[3] == v2[3]));
+}
+
+MINLINE int compare_v2v2(const float v1[2], const float v2[2], const float limit)
+{
+	if (fabsf(v1[0] - v2[0]) < limit)
+		if (fabsf(v1[1] - v2[1]) < limit)
+			return 1;
+
+	return 0;
 }
 
 MINLINE int compare_v3v3(const float v1[3], const float v2[3], const float limit)

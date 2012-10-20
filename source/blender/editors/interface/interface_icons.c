@@ -33,12 +33,13 @@
 #include <string.h>
 
 #ifndef WIN32
-#include <unistd.h>
+#  include <unistd.h>
 #else
-#include <io.h>
-#include <direct.h>
-#include "BLI_winstuff.h"
-#endif   
+#  include <io.h>
+#  include <direct.h>
+#  include "BLI_winstuff.h"
+#endif
+
 #include "MEM_guardedalloc.h"
 
 #include "GPU_extensions.h"
@@ -58,7 +59,6 @@
 #include "BKE_context.h"
 #include "BKE_global.h"
 #include "BKE_icons.h"
-#include "BKE_utildefines.h"
 
 #include "IMB_imbuf.h"
 #include "IMB_imbuf_types.h"
@@ -346,7 +346,7 @@ static void vicon_editmode_dehlt_draw(int x, int y, int w, int h, float UNUSED(a
 	glColor4f(0.0f, 0.0f, 0.0f, 1);
 	viconutil_draw_lineloop_smooth(pts, 3);
 
-	glColor3f(.9f, .9f, .9f);
+	glColor3f(0.9f, 0.9f, 0.9f);
 	viconutil_draw_points(pts, 3, 1);
 }
 
@@ -466,7 +466,7 @@ static void init_brush_icons(void)
 	{                                                                         \
 		bbuf = IMB_ibImageFromMemory((unsigned char *)datatoc_ ##name## _png, \
 		                             datatoc_ ##name## _png_size,             \
-		                             IB_rect, "<brush icon>");                \
+		                             IB_rect, NULL, "<brush icon>");          \
 		def_internal_icon(bbuf, icon_id, 0, 0, w, ICON_TYPE_BUFFER);          \
 		IMB_freeImBuf(bbuf);                                                  \
 	} (void)0
@@ -490,6 +490,7 @@ static void init_brush_icons(void)
 	INIT_BRUSH_ICON(ICON_BRUSH_INFLATE, inflate);
 	INIT_BRUSH_ICON(ICON_BRUSH_LAYER, layer);
 	INIT_BRUSH_ICON(ICON_BRUSH_LIGHTEN, lighten);
+	INIT_BRUSH_ICON(ICON_BRUSH_MASK, mask);
 	INIT_BRUSH_ICON(ICON_BRUSH_MIX, mix);
 	INIT_BRUSH_ICON(ICON_BRUSH_MULTIPLY, multiply);
 	INIT_BRUSH_ICON(ICON_BRUSH_NUDGE, nudge);
@@ -519,7 +520,7 @@ static void init_internal_icons(void)
 		char *icondir = BLI_get_folder(BLENDER_DATAFILES, "icons");
 		if (icondir) {
 			BLI_join_dirfile(iconfilestr, sizeof(iconfilestr), icondir, btheme->tui.iconfile);
-			bbuf = IMB_loadiffname(iconfilestr, IB_rect); /* if the image is missing bbuf will just be NULL */
+			bbuf = IMB_loadiffname(iconfilestr, IB_rect, NULL); /* if the image is missing bbuf will just be NULL */
 			if (bbuf && (bbuf->x < ICON_IMAGE_W || bbuf->y < ICON_IMAGE_H)) {
 				printf("\n***WARNING***\nIcons file %s too small.\nUsing built-in Icons instead\n", iconfilestr);
 				IMB_freeImBuf(bbuf);
@@ -531,7 +532,8 @@ static void init_internal_icons(void)
 		}
 	}
 	if (bbuf == NULL)
-		bbuf = IMB_ibImageFromMemory((unsigned char *)datatoc_blender_icons_png, datatoc_blender_icons_png_size, IB_rect, "<blender icons>");
+		bbuf = IMB_ibImageFromMemory((unsigned char *)datatoc_blender_icons_png,
+		                             datatoc_blender_icons_png_size, IB_rect, NULL, "<blender icons>");
 
 	if (bbuf) {
 		/* free existing texture if any */
@@ -593,7 +595,7 @@ static void init_internal_icons(void)
 
 	IMB_freeImBuf(bbuf);
 }
-#endif // WITH_HEADLESS
+#endif  /* WITH_HEADLESS */
 
 static void init_iconfile_list(struct ListBase *list)
 {
@@ -618,7 +620,7 @@ static void init_iconfile_list(struct ListBase *list)
 	if (restoredir && !chdir(olddir)) {} /* fix warning about checking return value */
 
 	for (i = 0; i < totfile; i++) {
-		if ( (dir[i].type & S_IFREG) ) {
+		if ((dir[i].type & S_IFREG)) {
 			char *filename = dir[i].relname;
 			
 			if (BLI_testextensie(filename, ".png")) {
@@ -833,7 +835,7 @@ static void icon_create_rect(struct PreviewImage *prv_img, enum eIconSizes size)
 		if (G.debug & G_DEBUG)
 			printf("%s, error: requested preview image does not exist", __func__);
 	}
-	if (!prv_img->rect[size]) {
+	else if (!prv_img->rect[size]) {
 		prv_img->w[size] = render_size;
 		prv_img->h[size] = render_size;
 		prv_img->changed[size] = 1;
@@ -858,7 +860,8 @@ static void icon_set_image(bContext *C, ID *id, PreviewImage *prv_img, enum eIco
 	                    prv_img->w[size], prv_img->h[size]);
 }
 
-static void icon_draw_rect(float x, float y, int w, int h, float UNUSED(aspect), int rw, int rh, unsigned int *rect, float alpha, float *rgb, short is_preview)
+static void icon_draw_rect(float x, float y, int w, int h, float UNUSED(aspect), int rw, int rh,
+                           unsigned int *rect, float alpha, const float rgb[3], short is_preview)
 {
 	ImBuf *ima = NULL;
 
@@ -911,7 +914,8 @@ static void icon_draw_rect(float x, float y, int w, int h, float UNUSED(aspect),
 	}
 }
 
-static void icon_draw_texture(float x, float y, float w, float h, int ix, int iy, int UNUSED(iw), int ih, float alpha, float *rgb)
+static void icon_draw_texture(float x, float y, float w, float h, int ix, int iy,
+                              int UNUSED(iw), int ih, float alpha, const float rgb[3])
 {
 	float x1, x2, y1, y2;
 
@@ -954,7 +958,8 @@ static int get_draw_size(enum eIconSizes size)
 	return 0;
 }
 
-static void icon_draw_size(float x, float y, int icon_id, float aspect, float alpha, float *rgb, enum eIconSizes size, int draw_size, int UNUSED(nocreate), short is_preview)
+static void icon_draw_size(float x, float y, int icon_id, float aspect, float alpha, const float rgb[3],
+                           enum eIconSizes size, int draw_size, int UNUSED(nocreate), short is_preview)
 {
 	bTheme *btheme = UI_GetTheme();
 	Icon *icon = NULL;
@@ -1085,7 +1090,7 @@ static int ui_id_brush_get_icon(bContext *C, ID *id)
 				mode = OB_MODE_TEXTURE_PAINT;
 		}
 		else if ((sima = CTX_wm_space_image(C)) &&
-		         (sima->flag & SI_DRAWTOOL))
+		         (sima->mode == SI_MODE_PAINT))
 		{
 			mode = OB_MODE_TEXTURE_PAINT;
 		}
@@ -1147,7 +1152,7 @@ void UI_icon_draw_aspect(float x, float y, int icon_id, float aspect, float alph
 	icon_draw_at_size(x, y, icon_id, aspect, alpha, ICON_SIZE_ICON, 0);
 }
 
-void UI_icon_draw_aspect_color(float x, float y, int icon_id, float aspect, float *rgb)
+void UI_icon_draw_aspect_color(float x, float y, int icon_id, float aspect, const float rgb[3])
 {
 	int draw_size = get_draw_size(ICON_SIZE_ICON);
 	icon_draw_size(x, y, icon_id, aspect, 1.0f, rgb, ICON_SIZE_ICON, draw_size, FALSE, FALSE);

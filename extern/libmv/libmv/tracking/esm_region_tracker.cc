@@ -29,6 +29,7 @@
 #include "libmv/image/correlation.h"
 #include "libmv/image/sample.h"
 #include "libmv/numeric/numeric.h"
+#include "libmv/tracking/track_region.h"
 
 namespace libmv {
 
@@ -41,6 +42,7 @@ static bool RegionIsInBounds(const FloatImage &image1,
   int min_y = floor(y) - half_window_size - 1;
   if (min_x < 0.0 ||
       min_y < 0.0) {
+    LG << "Out of bounds; min_x: " << min_x << ", min_y: " << min_y;
     return false;
   }
 
@@ -49,29 +51,14 @@ static bool RegionIsInBounds(const FloatImage &image1,
   int max_y = ceil(y) + half_window_size + 1;
   if (max_x > image1.cols() ||
       max_y > image1.rows()) {
+    LG << "Out of bounds; max_x: " << max_x << ", max_y: " << max_y
+       << ", image1.cols(): " << image1.cols()
+       << ", image1.rows(): " << image1.rows();
     return false;
   }
 
   // Ok, we're good.
   return true;
-}
-
-// Estimate "reasonable" error by computing autocorrelation for a small shift.
-// TODO(keir): Add a facility for 
-static double EstimateReasonableError(const FloatImage &image,
-                               double x, double y,
-                               int half_width) {
-  double error = 0.0;
-  for (int r = -half_width; r <= half_width; ++r) {
-    for (int c = -half_width; c <= half_width; ++c) {
-      double s = SampleLinear(image, y + r, x + c, 0);
-      double e1 = SampleLinear(image, y + r + 0.5, x + c, 0) - s;
-      double e2 = SampleLinear(image, y + r, x + c + 0.5, 0) - s;
-      error += e1*e1 + e2*e2;
-    }
-  }
-  // XXX hack
-  return error / 2.0 * 16.0;
 }
 
 // This is implemented from "Lukas and Kanade 20 years on: Part 1. Page 42,
@@ -86,6 +73,44 @@ bool EsmRegionTracker::Track(const FloatImage &image1,
     return false;
   }
   
+  // XXX
+  // TODO(keir): Delete the block between the XXX's once the planar tracker is
+  // integrated into blender.
+  //
+  // For now, to test, replace the ESM tracker with the Ceres tracker in
+  // translation mode. In the future, this should get removed and alloed to
+  // co-exist, since Ceres is not as fast as the ESM implementation since it
+  // specializes for translation.
+  double xx1[4], yy1[4];
+  double xx2[4], yy2[4];
+  // Clockwise winding, starting from the "origin" (top-left).
+  xx1[0] = xx2[0] = x1 - half_window_size;
+  yy1[0] = yy2[0] = y1 - half_window_size;
+
+  xx1[1] = xx2[1] = x1 + half_window_size;
+  yy1[1] = yy2[1] = y1 - half_window_size;
+
+  xx1[2] = xx2[2] = x1 + half_window_size;
+  yy1[2] = yy2[2] = y1 + half_window_size;
+
+  xx1[3] = xx2[3] = x1 - half_window_size;
+  yy1[3] = yy2[3] = y1 + half_window_size;
+
+  TrackRegionOptions options;
+  options.mode = TrackRegionOptions::TRANSLATION;
+  options.max_iterations = 20;
+  options.sigma = sigma;
+  options.use_esm = true;
+  
+  TrackRegionResult result;
+  TrackRegion(image1, image2, xx1, yy1, options, xx2, yy2, &result);
+
+  *x2 = xx2[0] + half_window_size;
+  *y2 = yy2[0] + half_window_size;
+
+  return true;
+
+  // XXX
   int width = 2 * half_window_size + 1;
 
   // TODO(keir): Avoid recomputing gradients for e.g. the pyramid tracker.
@@ -106,9 +131,6 @@ bool EsmRegionTracker::Track(const FloatImage &image1,
   // Step 0: Initialize delta = 0.01.
   // 
   // Ignored for my "normal" LM loop.
-
-  double reasonable_error =
-      EstimateReasonableError(image1, x1, y1, half_window_size);
 
   // Step 1: Warp I with W(x, p) to compute I(W(x; p).
   //
@@ -228,7 +250,7 @@ bool EsmRegionTracker::Track(const FloatImage &image1,
         new_error += e*e;
       }
     }
-    //LG << "Old error: " << error << ", new error: " << new_error;
+    LG << "Old error: " << error << ", new error: " << new_error;
 
     double rho = (error - new_error) / (d.transpose() * (mu * d + z));
 
@@ -253,6 +275,7 @@ bool EsmRegionTracker::Track(const FloatImage &image1,
 
       mu *= std::max(1/3., 1 - pow(2*rho - 1, 3));
       nu = M_E;  // See above for why to use e.
+      LG << "Error decreased, so accept update.";
     }
 
     // If the step was accepted, then check for termination.
@@ -264,13 +287,15 @@ bool EsmRegionTracker::Track(const FloatImage &image1,
                                                            width);
       LG << "Final correlation: " << correlation;
 
-      if (correlation < minimum_correlation) {
-        LG << "Correlation " << correlation << " greater than "
-           << minimum_correlation << "; bailing.";
-        return false;
+      // Note: Do the comparison here to handle nan's correctly (since all
+      // comparisons with nan are false).
+      if (minimum_correlation < correlation) {
+        LG << "Successful track in " << (i + 1) << " iterations.";
+        return true;
       }
-      LG << "Successful track in " << (i + 1) << " iterations.";
-      return true;
+      LG << "Correlation " << correlation << " greater than "
+         << minimum_correlation << " or is nan; bailing.";
+      return false;
     }
   }
   // Getting here means we hit max iterations, so tracking failed.

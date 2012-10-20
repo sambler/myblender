@@ -67,7 +67,7 @@ void BL_ConvertProperties(Object* object,KX_GameObject* gameobj,SCA_TimeEventMan
 {
 	
 	bProperty* prop = (bProperty*)object->prop.first;
-	CValue* propval;	
+	CValue* propval;
 	bool show_debug_info;
 	while(prop)
 	{
@@ -177,7 +177,7 @@ void BL_ConvertTextProperty(Object* object, KX_FontObject* fontobj,SCA_TimeEvent
 {
 	CValue* tprop = fontobj->GetProperty("Text");
 	if (!tprop) return;
-	bProperty* prop = get_ob_property(object, "Text");
+	bProperty* prop = BKE_bproperty_object_get(object, "Text");
 	if (!prop) return;
 
 	Curve *curve = static_cast<Curve *>(object->data);
@@ -201,7 +201,7 @@ void BL_ConvertTextProperty(Object* object, KX_FontObject* fontobj,SCA_TimeEvent
 		}
 		case GPROP_FLOAT:
 		{
-			float floatprop = atof(str);
+			float floatprop = (float)atof(str);
 			propval = new CFloatValue(floatprop);
 			tprop->SetValue(propval);
 			break;
@@ -214,7 +214,7 @@ void BL_ConvertTextProperty(Object* object, KX_FontObject* fontobj,SCA_TimeEvent
 		}
 		case GPROP_TIME:
 		{
-			float floatprop = atof(str);
+			float floatprop = (float)atof(str);
 
 			CValue* timeval = new CFloatValue(floatprop);
 			// set a subproperty called 'timer' so that

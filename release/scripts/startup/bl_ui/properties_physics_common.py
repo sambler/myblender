@@ -94,18 +94,25 @@ def point_cache_ui(self, context, cache, enabled, cachetype):
     if cachetype in {'PSYS', 'HAIR', 'SMOKE'}:
         row.prop(cache, "use_external")
 
+        if cachetype == 'SMOKE':
+            row.prop(cache, "use_library_path", "Use Lib Path")
+
     if cache.use_external:
-        split = layout.split(percentage=0.80)
-        split.prop(cache, "name", text="File Name")
-        split.prop(cache, "index", text="")
+        split = layout.split(percentage=0.35)
+        col = split.column()
+        col.label(text="File Name:")
+        if cache.use_external:
+            col.label(text="File Path:")
 
-        row = layout.row()
-        row.label(text="File Path:")
-        row.prop(cache, "use_library_path", "Use Lib Path")
+        col = split.column()
+        sub = col.split(percentage=0.70, align=True)
+        sub.prop(cache, "name", text="")
+        sub.prop(cache, "index", text="")
+        col.prop(cache, "filepath", text="")
 
-        layout.prop(cache, "filepath", text="")
-
-        layout.label(text=cache.info)
+        cache_info = cache.info
+        if cache_info:
+            layout.label(text=cache_info)
     else:
         if cachetype in {'SMOKE', 'DYNAMIC_PAINT'}:
             if not bpy.data.is_saved:
@@ -117,6 +124,7 @@ def point_cache_ui(self, context, cache, enabled, cachetype):
         else:
             layout.prop(cache, "name", text="Cache Name")
 
+    if not cache.use_external or cachetype == 'SMOKE':
         row = layout.row(align=True)
 
         if cachetype not in {'PSYS', 'DYNAMIC_PAINT'}:
@@ -152,7 +160,7 @@ def point_cache_ui(self, context, cache, enabled, cachetype):
 
         col = split.column()
 
-        if cache.is_baked == True:
+        if cache.is_baked is True:
             col.operator("ptcache.free_bake", text="Free Bake")
         else:
             col.operator("ptcache.bake", text="Bake").bake = True
@@ -171,18 +179,15 @@ def point_cache_ui(self, context, cache, enabled, cachetype):
         col.operator("ptcache.bake_all", text="Update All To Frame").bake = False
 
 
-def effector_weights_ui(self, context, weights):
+def effector_weights_ui(self, context, weights, weight_type):
     layout = self.layout
 
     layout.prop(weights, "group")
 
     split = layout.split()
 
-    col = split.column()
-    col.prop(weights, "gravity", slider=True)
-
-    col = split.column()
-    col.prop(weights, "all", slider=True)
+    split.prop(weights, "gravity", slider=True)
+    split.prop(weights, "all", slider=True)
 
     layout.separator()
 
@@ -195,6 +200,8 @@ def effector_weights_ui(self, context, weights):
     col.prop(weights, "wind", slider=True)
     col.prop(weights, "curve_guide", slider=True)
     col.prop(weights, "texture", slider=True)
+    if weight_type != 'SMOKE':
+        col.prop(weights, "smokeflow", slider=True)
 
     col = split.column()
     col.prop(weights, "harmonic", slider=True)

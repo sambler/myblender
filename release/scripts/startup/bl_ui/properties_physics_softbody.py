@@ -20,10 +20,8 @@
 import bpy
 from bpy.types import Panel
 
-from .properties_physics_common import (
-    point_cache_ui,
-    effector_weights_ui,
-    )
+from bl_ui.properties_physics_common import (point_cache_ui,
+                                             effector_weights_ui)
 
 
 def softbody_panel_enabled(md):
@@ -72,10 +70,6 @@ class PHYSICS_PT_softbody_cache(PhysicButtonsPanel, Panel):
     bl_label = "Soft Body Cache"
     bl_options = {'DEFAULT_CLOSED'}
 
-    @classmethod
-    def poll(cls, context):
-        return context.soft_body
-
     def draw(self, context):
         md = context.soft_body
         point_cache_ui(self, context, md.point_cache, softbody_panel_enabled(md), 'SOFTBODY')
@@ -84,10 +78,6 @@ class PHYSICS_PT_softbody_cache(PhysicButtonsPanel, Panel):
 class PHYSICS_PT_softbody_goal(PhysicButtonsPanel, Panel):
     bl_label = "Soft Body Goal"
     bl_options = {'DEFAULT_CLOSED'}
-
-    @classmethod
-    def poll(cls, context):
-        return context.soft_body
 
     def draw_header(self, context):
         softbody = context.soft_body.settings
@@ -127,10 +117,6 @@ class PHYSICS_PT_softbody_goal(PhysicButtonsPanel, Panel):
 class PHYSICS_PT_softbody_edge(PhysicButtonsPanel, Panel):
     bl_label = "Soft Body Edges"
     bl_options = {'DEFAULT_CLOSED'}
-
-    @classmethod
-    def poll(cls, context):
-        return context.soft_body
 
     def draw_header(self, context):
         softbody = context.soft_body.settings
@@ -181,10 +167,6 @@ class PHYSICS_PT_softbody_collision(PhysicButtonsPanel, Panel):
     bl_label = "Soft Body Self Collision"
     bl_options = {'DEFAULT_CLOSED'}
 
-    @classmethod
-    def poll(cls, context):
-        return context.soft_body
-
     def draw_header(self, context):
         softbody = context.soft_body.settings
 
@@ -212,10 +194,6 @@ class PHYSICS_PT_softbody_collision(PhysicButtonsPanel, Panel):
 class PHYSICS_PT_softbody_solver(PhysicButtonsPanel, Panel):
     bl_label = "Soft Body Solver"
     bl_options = {'DEFAULT_CLOSED'}
-
-    @classmethod
-    def poll(cls, context):
-        return context.soft_body
 
     def draw(self, context):
         layout = self.layout
@@ -249,15 +227,11 @@ class PHYSICS_PT_softbody_field_weights(PhysicButtonsPanel, Panel):
     bl_label = "Soft Body Field Weights"
     bl_options = {'DEFAULT_CLOSED'}
 
-    @classmethod
-    def poll(cls, context):
-        return (context.soft_body)
-
     def draw(self, context):
         md = context.soft_body
         softbody = md.settings
 
-        effector_weights_ui(self, context, softbody.effector_weights)
+        effector_weights_ui(self, context, softbody.effector_weights, 'SOFTBODY')
 
 if __name__ == "__main__":  # only for live edit.
     bpy.utils.register_module(__name__)

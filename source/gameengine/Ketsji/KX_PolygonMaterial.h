@@ -37,6 +37,7 @@
 #include "RAS_MaterialBucket.h"
 #include "RAS_IRasterizer.h"
 #include "DNA_ID.h"
+#include "DNA_meshdata_types.h"
 
 #ifdef WITH_CXX_GUARDEDALLOC
 #include "MEM_guardedalloc.h"
@@ -58,9 +59,9 @@ class KX_PolygonMaterial : public PyObjectPlus, public RAS_IPolyMaterial
 	Py_Header
 private:
 	/** Blender texture face structure. */
-	MTFace*			m_tface;
-	unsigned int*	m_mcol;
-	Material*		m_material;
+	mutable MTFace       m_tface;
+	mutable unsigned int m_mcol;
+	Material*            m_material;
 
 #ifdef WITH_PYTHON
 	PyObject*		m_pymaterial;
@@ -119,12 +120,12 @@ public:
 	 */
 	MTFace* GetMTFace(void) const
 	{
-		return m_tface;
+		return &m_tface;
 	}
 
 	unsigned int* GetMCol(void) const
 	{
-		return m_mcol;
+		return &m_mcol;
 	}
 	virtual void GetMaterialRGBAColor(unsigned char *rgba) const;
 
@@ -136,7 +137,7 @@ public:
 	KX_PYMETHOD_DOC(KX_PolygonMaterial, setCustomMaterial);
 	KX_PYMETHOD_DOC(KX_PolygonMaterial, loadProgram);
 
-	virtual PyObject* py_repr(void) { return PyUnicode_FromString(m_material ? ((ID *)m_material)->name+2 : ""); }
+	virtual PyObject *py_repr(void) { return PyUnicode_FromString(m_material ? ((ID *)m_material)->name+2 : ""); }
 	
 	static PyObject*	pyattr_get_texture(void *self_v, const KX_PYATTRIBUTE_DEF *attrdef);
 	static PyObject*	pyattr_get_material(void *self_v, const KX_PYATTRIBUTE_DEF *attrdef);
@@ -144,13 +145,12 @@ public:
 	static PyObject*	pyattr_get_tface(void *self_v, const KX_PYATTRIBUTE_DEF *attrdef);
 	static PyObject*	pyattr_get_gl_texture(void *self_v, const KX_PYATTRIBUTE_DEF *attrdef);
 	
-	static PyObject*	pyattr_get_diffuse(void* self_v, const KX_PYATTRIBUTE_DEF *attrdef);	
+	static PyObject*	pyattr_get_diffuse(void* self_v, const KX_PYATTRIBUTE_DEF *attrdef);
 	static int			pyattr_set_diffuse(void *self_v, const KX_PYATTRIBUTE_DEF *attrdef, PyObject *value);
-	static PyObject*	pyattr_get_specular(void* self_v, const KX_PYATTRIBUTE_DEF *attrdef);	
+	static PyObject*	pyattr_get_specular(void* self_v, const KX_PYATTRIBUTE_DEF *attrdef);
 	static int			pyattr_set_specular(void *self_v, const KX_PYATTRIBUTE_DEF *attrdef, PyObject *value);
 #endif
 
 };
 
-#endif // __KX_POLYGONMATERIAL_H__
-
+#endif  /* __KX_POLYGONMATERIAL_H__ */

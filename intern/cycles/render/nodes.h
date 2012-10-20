@@ -41,7 +41,10 @@ public:
 	float3 rotation;
 	float3 scale;
 
-	enum Mapping { NONE=0, X=1, Y=2, Z=3 };
+	float3 min, max;
+	bool use_minmax;
+
+	enum Mapping { NONE = 0, X = 1, Y = 2, Z = 3 };
 	Mapping x_mapping, y_mapping, z_mapping;
 
 	enum Projection { FLAT, CUBE, TUBE, SPHERE };
@@ -52,7 +55,7 @@ public:
 
 class TextureNode : public ShaderNode {
 public:
-	TextureNode(const char *name) : ShaderNode(name) {}
+	TextureNode(const char *name_) : ShaderNode(name_) {}
 	TextureMapping tex_mapping;
 };
 
@@ -67,8 +70,11 @@ public:
 	bool is_float;
 	string filename;
 	ustring color_space;
+	ustring projection;
+	float projection_blend;
 
 	static ShaderEnum color_space_enum;
+	static ShaderEnum projection_enum;
 };
 
 class EnvironmentTextureNode : public TextureNode {
@@ -152,6 +158,14 @@ public:
 	SHADER_NODE_CLASS(CheckerTextureNode)
 };
 
+class BrickTextureNode : public TextureNode {
+public:
+	SHADER_NODE_CLASS(BrickTextureNode)
+	
+	float offset, squash;
+	int offset_frequency, squash_frequency;
+};
+
 class MappingNode : public ShaderNode {
 public:
 	SHADER_NODE_CLASS(MappingNode)
@@ -187,6 +201,7 @@ public:
 class WardBsdfNode : public BsdfNode {
 public:
 	SHADER_NODE_CLASS(WardBsdfNode)
+	void attributes(AttributeRequestSet *attributes);
 };
 
 class DiffuseBsdfNode : public BsdfNode {
@@ -264,17 +279,36 @@ public:
 class GeometryNode : public ShaderNode {
 public:
 	SHADER_NODE_CLASS(GeometryNode)
+	void attributes(AttributeRequestSet *attributes);
 };
 
 class TextureCoordinateNode : public ShaderNode {
 public:
 	SHADER_NODE_CLASS(TextureCoordinateNode)
 	void attributes(AttributeRequestSet *attributes);
+	
+	bool from_dupli;
 };
 
 class LightPathNode : public ShaderNode {
 public:
 	SHADER_NODE_CLASS(LightPathNode)
+};
+
+class LightFalloffNode : public ShaderNode {
+public:
+	SHADER_NODE_CLASS(LightFalloffNode)
+};
+
+class ObjectInfoNode : public ShaderNode {
+public:
+	SHADER_NODE_CLASS(ObjectInfoNode)
+};
+
+class ParticleInfoNode : public ShaderNode {
+public:
+	SHADER_NODE_CLASS(ParticleInfoNode)
+	void attributes(AttributeRequestSet *attributes);
 };
 
 class ValueNode : public ShaderNode {
@@ -309,6 +343,8 @@ public:
 class MixNode : public ShaderNode {
 public:
 	SHADER_NODE_CLASS(MixNode)
+
+	bool use_clamp;
 
 	ustring type;
 	static ShaderEnum type_enum;
@@ -366,6 +402,8 @@ class MathNode : public ShaderNode {
 public:
 	SHADER_NODE_CLASS(MathNode)
 
+	bool use_clamp;
+
 	ustring type;
 	static ShaderEnum type_enum;
 };
@@ -400,6 +438,11 @@ class RGBRampNode : public ShaderNode {
 public:
 	SHADER_NODE_CLASS(RGBRampNode)
 	float4 ramp[RAMP_TABLE_SIZE];
+};
+
+class SetNormalNode : public ShaderNode {
+public:
+	SHADER_NODE_CLASS(SetNormalNode)
 };
 
 CCL_NAMESPACE_END

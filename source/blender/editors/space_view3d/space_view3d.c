@@ -62,7 +62,7 @@
 
 #include "UI_resources.h"
 
-#include "view3d_intern.h"  // own include
+#include "view3d_intern.h"  /* own include */
 
 /* ******************** manage regions ********************* */
 
@@ -776,7 +776,6 @@ static void view3d_main_area_listener(ARegion *ar, wmNotifier *wmn)
 			break;
 		case NC_SCREEN:
 			switch (wmn->data) {
-				case ND_GPENCIL:
 				case ND_ANIMPLAY:
 				case ND_SKETCH:
 					ED_region_tag_redraw(ar);
@@ -792,6 +791,10 @@ static void view3d_main_area_listener(ARegion *ar, wmNotifier *wmn)
 					break;
 			}
 
+			break;
+		case NC_GPENCIL:
+			if (wmn->action == NA_EDITED)
+				ED_region_tag_redraw(ar);
 			break;
 	}
 }
@@ -941,8 +944,8 @@ static void view3d_buttons_area_listener(ARegion *ar, wmNotifier *wmn)
 			if (wmn->action == NA_RENAME)
 				ED_region_tag_redraw(ar);
 			break;
-		case NC_SCREEN: 
-			if (wmn->data == ND_GPENCIL)
+		case NC_GPENCIL:
+			if (wmn->data == ND_DATA)
 				ED_region_tag_redraw(ar);
 			break;
 	}
@@ -984,7 +987,7 @@ static void view3d_props_area_listener(ARegion *ar, wmNotifier *wmn)
 }
 
 /*area (not region) level listener*/
-static void space_view3d_listener(struct ScrArea *sa, struct wmNotifier *wmn)
+static void space_view3d_listener(ScrArea *sa, struct wmNotifier *wmn)
 {
 	View3D *v3d = sa->spacedata.first;
 
@@ -1016,7 +1019,7 @@ static void space_view3d_listener(struct ScrArea *sa, struct wmNotifier *wmn)
 			break;
 	}
 
-	// removed since BKE_image_user_calc_frame is now called in draw_bgpic because screen_ops doesnt call the notifier.
+	/* removed since BKE_image_user_frame_calc is now called in view3d_draw_bgpic because screen_ops doesnt call the notifier. */
 #if 0
 	if (wmn->category == NC_SCENE && wmn->data == ND_FRAME) {
 		View3D *v3d = area->spacedata.first;
@@ -1025,7 +1028,7 @@ static void space_view3d_listener(struct ScrArea *sa, struct wmNotifier *wmn)
 		for (; bgpic; bgpic = bgpic->next) {
 			if (bgpic->ima) {
 				Scene *scene = wmn->reference;
-				BKE_image_user_calc_frame(&bgpic->iuser, scene->r.cfra, 0);
+				BKE_image_user_frame_calc(&bgpic->iuser, scene->r.cfra, 0);
 			}
 		}
 	}
@@ -1071,7 +1074,7 @@ static int view3d_context(const bContext *C, const char *member, bContextDataRes
 		for (base = scene->base.first; base; base = base->next) {
 			if ((base->flag & SELECT) && (base->lay & lay)) {
 				if ((base->object->restrictflag & OB_RESTRICT_VIEW) == 0) {
-					if (0 == object_is_libdata(base->object)) {
+					if (0 == BKE_object_is_libdata(base->object)) {
 						if (selected_editable_objects)
 							CTX_data_id_list_add(result, &base->object->id);
 						else
@@ -1172,7 +1175,7 @@ void ED_spacetype_view3d(void)
 	/* regions: listview/buttons */
 	art = MEM_callocN(sizeof(ARegionType), "spacetype view3d buttons region");
 	art->regionid = RGN_TYPE_UI;
-	art->prefsizex = 180; // XXX
+	art->prefsizex = 180; /* XXX */
 	art->keymapflag = ED_KEYMAP_UI | ED_KEYMAP_FRAMES;
 	art->listener = view3d_buttons_area_listener;
 	art->init = view3d_buttons_area_init;
@@ -1184,8 +1187,8 @@ void ED_spacetype_view3d(void)
 	/* regions: tool(bar) */
 	art = MEM_callocN(sizeof(ARegionType), "spacetype view3d tools region");
 	art->regionid = RGN_TYPE_TOOLS;
-	art->prefsizex = 160; // XXX
-	art->prefsizey = 50; // XXX
+	art->prefsizex = 160; /* XXX */
+	art->prefsizey = 50; /* XXX */
 	art->keymapflag = ED_KEYMAP_UI | ED_KEYMAP_FRAMES;
 	art->listener = view3d_buttons_area_listener;
 	art->init = view3d_tools_area_init;

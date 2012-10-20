@@ -133,25 +133,25 @@ public:
 
 	virtual
 		int
-	GetMouseX( int x
+	GetMouseX(int x
 	)=0;
 
 	virtual
 		int
-	GetMouseY( int y
+	GetMouseY(int y
 	)= 0;
 
 	virtual
 		float
-	GetMouseNormalizedX( int x
+	GetMouseNormalizedX(int x
 	)=0;
 
 	virtual
 		float
-	GetMouseNormalizedY( int y
+	GetMouseNormalizedY(int y
 	)= 0;
 
-	virtual 
+	virtual
 		const RAS_Rect &
 	GetDisplayArea(
 	) const = 0;
@@ -179,6 +179,13 @@ public:
 		int x1, int y1,
 		int x2, int y2
 	) = 0; 
+
+	/**
+	 * Get the visible viewport
+	 */
+	virtual
+		const int*
+	GetViewPort() = 0;
 
 	virtual 
 		void 
@@ -217,13 +224,11 @@ public:
 	
 protected:
 	RAS_MouseState m_mousestate;
-	
+
+
 #ifdef WITH_CXX_GUARDEDALLOC
-public:
-	void *operator new(size_t num_bytes) { return MEM_mallocN(num_bytes, "GE:RAS_ICanvas"); }
-	void operator delete( void *mem ) { MEM_freeN(mem); }
+	MEM_CXX_CLASS_ALLOC_FUNCS("GE:RAS_ICanvas")
 #endif
 };
 
-#endif //__RAS_ICANVAS_H__
-
+#endif  /* __RAS_ICANVAS_H__ */

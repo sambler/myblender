@@ -36,13 +36,13 @@
 
 /* **************** SCALAR MATH ******************** */ 
 static bNodeSocketTemplate inputs[]= { 
-	{ SOCK_FLOAT, 1, "Value", 0.5f, 0.5f, 0.5f, 1.0f, -100.0f, 100.0f, PROP_NONE}, 
-	{ SOCK_FLOAT, 1, "Value", 0.5f, 0.5f, 0.5f, 1.0f, -100.0f, 100.0f, PROP_NONE}, 
+	{ SOCK_FLOAT, 1, N_("Value"), 0.5f, 0.5f, 0.5f, 1.0f, -100.0f, 100.0f, PROP_NONE}, 
+	{ SOCK_FLOAT, 1, N_("Value"), 0.5f, 0.5f, 0.5f, 1.0f, -100.0f, 100.0f, PROP_NONE}, 
 	{ -1, 0, "" } 
 };
 
 static bNodeSocketTemplate outputs[]= { 
-	{ SOCK_FLOAT, 0, "Value"}, 
+	{ SOCK_FLOAT, 0, N_("Value")}, 
 	{ -1, 0, "" } 
 };
 
@@ -51,7 +51,7 @@ static void valuefn(float *out, TexParams *p, bNode *node, bNodeStack **in, shor
 	float in0 = tex_input_value(in[0], p, thread);
 	float in1 = tex_input_value(in[1], p, thread);
 	
-	switch(node->custom1) {
+	switch (node->custom1) {
 	
 	case 0: /* Add */
 		*out= in0 + in1; 

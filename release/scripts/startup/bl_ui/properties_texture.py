@@ -23,11 +23,14 @@ from bpy.types import Menu, Panel
 from bpy.types import (Brush,
                        Lamp,
                        Material,
+                       Object,
                        ParticleSettings,
                        Texture,
                        World)
 
 from rna_prop_ui import PropertyPanel
+
+from bl_ui.properties_paint_common import sculpt_brush_texture_settings
 
 
 class TEXTURE_MT_specials(Menu):
@@ -52,7 +55,7 @@ class TEXTURE_MT_envmap_specials(Menu):
         layout.operator("texture.envmap_clear", icon='FILE_REFRESH')
         layout.operator("texture.envmap_clear_all", icon='FILE_REFRESH')
 
-from .properties_material import active_node_mat
+from bl_ui.properties_material import active_node_mat
 
 
 def context_tex_datablock(context):
@@ -78,6 +81,15 @@ def context_tex_datablock(context):
     return idblock
 
 
+def id_tex_datablock(bid):
+    if isinstance(bid, Object):
+        if bid.type == 'LAMP':
+            return bid.data
+        return bid.active_material
+
+    return bid
+
+
 class TextureButtonsPanel():
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
@@ -99,11 +111,18 @@ class TEXTURE_PT_context_texture(TextureButtonsPanel, Panel):
         engine = context.scene.render.engine
         if not (hasattr(context, "texture_slot") or hasattr(context, "texture_node")):
             return False
-        return ((context.material or context.world or context.lamp or context.brush or context.texture or context.particle_system or isinstance(context.space_data.pin_id, ParticleSettings))
-            and (engine in cls.COMPAT_ENGINES))
+        return ((context.material or
+                 context.world or
+                 context.lamp or
+                 context.brush or
+                 context.texture or
+                 context.particle_system or
+                 isinstance(context.space_data.pin_id, ParticleSettings)) and
+                (engine in cls.COMPAT_ENGINES))
 
     def draw(self, context):
         layout = self.layout
+
         slot = getattr(context, "texture_slot", None)
         node = getattr(context, "texture_node", None)
         space = context.space_data
@@ -112,7 +131,7 @@ class TEXTURE_PT_context_texture(TextureButtonsPanel, Panel):
         pin_id = space.pin_id
 
         if space.use_pin_id and not isinstance(pin_id, Texture):
-            idblock = pin_id
+            idblock = id_tex_datablock(pin_id)
             pin_id = None
 
         if not space.use_pin_id:
@@ -881,12 +900,7 @@ class TEXTURE_PT_mapping(TextureSlotPanel, Panel):
 
         if isinstance(idblock, Brush):
             if context.sculpt_object:
-                layout.label(text="Brush Mapping:")
-                layout.prop(tex, "map_mode", expand=True)
-
-                row = layout.row()
-                row.active = tex.map_mode in {'FIXED', 'TILED'}
-                row.prop(tex, "angle")
+                sculpt_brush_texture_settings(layout, idblock)
         else:
             if isinstance(idblock, Material):
                 split = layout.split(percentage=0.3)
@@ -898,8 +912,12 @@ class TEXTURE_PT_mapping(TextureSlotPanel, Panel):
                 col = split.column()
                 if tex.texture_coords in {'ORCO', 'UV'}:
                     col.prop(tex, "use_from_dupli")
+                    if (idblock.type == 'VOLUME' and tex.texture_coords == 'ORCO'):
+                        col.prop(tex, "use_map_to_bounds")
                 elif tex.texture_coords == 'OBJECT':
                     col.prop(tex, "use_from_original")
+                    if (idblock.type == 'VOLUME'):
+                        col.prop(tex, "use_map_to_bounds")
                 else:
                     col.label()
 
@@ -909,9 +927,9 @@ class TEXTURE_PT_mapping(TextureSlotPanel, Panel):
                 row.prop(tex, "mapping_y", text="")
                 row.prop(tex, "mapping_z", text="")
 
-        row = layout.row()
-        row.column().prop(tex, "offset")
-        row.column().prop(tex, "scale")
+            row = layout.row()
+            row.column().prop(tex, "offset")
+            row.column().prop(tex, "scale")
 
 
 class TEXTURE_PT_influence(TextureSlotPanel, Panel):

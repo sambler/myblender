@@ -45,7 +45,7 @@ class PHY_IPhysicsEnvironment;
 	controlled by the physics engine. This includes the physics objects
 	and the graphics object for view frustrum and occlusion culling.
 */
-class PHY_IController	
+class PHY_IController
 {
 	public:
 		virtual ~PHY_IController();
@@ -56,11 +56,8 @@ class PHY_IController
 
 	
 #ifdef WITH_CXX_GUARDEDALLOC
-public:
-	void *operator new(size_t num_bytes) { return MEM_mallocN(num_bytes, "GE:PHY_IController"); }
-	void operator delete( void *mem ) { MEM_freeN(mem); }
+	MEM_CXX_CLASS_ALLOC_FUNCS("GE:PHY_IController")
 #endif
 };
 
-#endif //__PHY_ICONTROLLER_H__
-
+#endif  /* __PHY_ICONTROLLER_H__ */

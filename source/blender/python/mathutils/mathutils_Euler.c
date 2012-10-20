@@ -1,5 +1,4 @@
 /*
- *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -650,7 +649,7 @@ PyDoc_STRVAR(euler_doc,
 );
 PyTypeObject euler_Type = {
 	PyVarObject_HEAD_INIT(NULL, 0)
-	"mathutils.Euler",              //tp_name
+	"Euler",                        //tp_name
 	sizeof(EulerObject),            //tp_basicsize
 	0,                              //tp_itemsize
 	(destructor)BaseMathObject_dealloc,     //tp_dealloc
@@ -702,7 +701,7 @@ PyTypeObject euler_Type = {
  * (i.e. it was allocated elsewhere by MEM_mallocN())
  * pass Py_NEW - if vector is not a WRAPPER and managed by PYTHON
  * (i.e. it must be created here with PyMEM_malloc())*/
-PyObject *Euler_CreatePyObject(float *eul, short order, int type, PyTypeObject *base_type)
+PyObject *Euler_CreatePyObject(float *eul, const short order, int type, PyTypeObject *base_type)
 {
 	EulerObject *self;
 
@@ -739,7 +738,7 @@ PyObject *Euler_CreatePyObject(float *eul, short order, int type, PyTypeObject *
 	return (PyObject *)self;
 }
 
-PyObject *Euler_CreatePyObject_cb(PyObject *cb_user, short order,
+PyObject *Euler_CreatePyObject_cb(PyObject *cb_user, const short order,
                                   unsigned char cb_type, unsigned char cb_subtype)
 {
 	EulerObject *self = (EulerObject *)Euler_CreatePyObject(NULL, order, Py_NEW, NULL);

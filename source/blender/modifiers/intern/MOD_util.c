@@ -32,11 +32,13 @@
 
 #include <string.h>
 
+#include "DNA_curve_types.h"
+#include "DNA_image_types.h"
 #include "DNA_lattice_types.h"
+#include "DNA_meshdata_types.h"
 #include "DNA_modifier_types.h"
 #include "DNA_object_types.h"
-#include "DNA_curve_types.h"
-#include "DNA_meshdata_types.h"
+#include "DNA_scene_types.h"
 
 #include "BLI_utildefines.h"
 #include "BLI_math_vector.h"
@@ -44,6 +46,7 @@
 
 #include "BKE_cdderivedmesh.h"
 #include "BKE_deform.h"
+#include "BKE_image.h"
 #include "BKE_lattice.h"
 #include "BKE_mesh.h"
 #include "BKE_displist.h"
@@ -57,6 +60,15 @@
 
 #include "RE_shader_ext.h"
 
+void modifier_init_texture(Scene *scene, Tex *tex)
+{
+	if (!tex)
+		return;
+
+	if (tex->ima && ELEM(tex->ima->source, IMA_SRC_MOVIE, IMA_SRC_SEQUENCE))
+		BKE_image_user_frame_calc(&tex->iuser, scene->r.cfra, 0);
+}
+
 void get_texture_value(Tex *texture, float *tex_co, TexResult *texres)
 {
 	int result_type;
@@ -65,14 +77,15 @@ void get_texture_value(Tex *texture, float *tex_co, TexResult *texres)
 	result_type = multitex_ext_safe(texture, tex_co, texres);
 
 	/* if the texture gave an RGB value, we assume it didn't give a valid
-	 * intensity, so calculate one (formula from do_material_tex).
+	 * intensity, since this is in the context of modifiers don't use perceptual color conversion.
 	 * if the texture didn't give an RGB value, copy the intensity across
 	 */
-	if (result_type & TEX_RGB)
-		texres->tin = (0.35f * texres->tr + 0.45f * texres->tg
-				+ 0.2f * texres->tb);
-	else
-		texres->tr = texres->tg = texres->tb = texres->tin;
+	if (result_type & TEX_RGB) {
+		texres->tin = (1.0f / 3.0f) * (texres->tr + texres->tg + texres->tb);
+	}
+	else {
+		copy_v3_fl(&texres->tr, texres->tin);
+	}
 }
 
 void get_texture_coords(MappingInfoModifierData *dmd, Object *ob,
@@ -108,11 +121,11 @@ void get_texture_coords(MappingInfoModifierData *dmd, Object *ob,
 
 			/* verts are given the UV from the first face that uses them */
 			for (i = 0, mp = mpoly; i < numPolys; ++i, ++mp) {
-				unsigned int fidx= mp->totloop - 1;
+				unsigned int fidx = mp->totloop - 1;
 
 				do {
-					unsigned int lidx= mp->loopstart + fidx;
-					unsigned int vidx= mloop[lidx].v;
+					unsigned int lidx = mp->loopstart + fidx;
+					unsigned int vidx = mloop[lidx].v;
 
 					if (done[vidx] == 0) {
 						/* remap UVs from [0, 1] to [-1, 1] */
@@ -132,27 +145,27 @@ void get_texture_coords(MappingInfoModifierData *dmd, Object *ob,
 	}
 
 	for (i = 0; i < numVerts; ++i, ++co, ++texco) {
-		switch(texmapping) {
-		case MOD_DISP_MAP_LOCAL:
-			copy_v3_v3(*texco, *co);
-			break;
-		case MOD_DISP_MAP_GLOBAL:
-			mul_v3_m4v3(*texco, ob->obmat, *co);
-			break;
-		case MOD_DISP_MAP_OBJECT:
-			mul_v3_m4v3(*texco, ob->obmat, *co);
-			mul_m4_v3(mapob_imat, *texco);
-			break;
+		switch (texmapping) {
+			case MOD_DISP_MAP_LOCAL:
+				copy_v3_v3(*texco, *co);
+				break;
+			case MOD_DISP_MAP_GLOBAL:
+				mul_v3_m4v3(*texco, ob->obmat, *co);
+				break;
+			case MOD_DISP_MAP_OBJECT:
+				mul_v3_m4v3(*texco, ob->obmat, *co);
+				mul_m4_v3(mapob_imat, *texco);
+				break;
 		}
 	}
 }
 
 void modifier_vgroup_cache(ModifierData *md, float (*vertexCos)[3])
 {
-	while ((md=md->next) && md->type==eModifierType_Armature) {
-		ArmatureModifierData *amd = (ArmatureModifierData*) md;
-		if (amd->multi && amd->prevCos==NULL)
-			amd->prevCos= MEM_dupallocN(vertexCos);
+	while ((md = md->next) && md->type == eModifierType_Armature) {
+		ArmatureModifierData *amd = (ArmatureModifierData *) md;
+		if (amd->multi && amd->prevCos == NULL)
+			amd->prevCos = MEM_dupallocN(vertexCos);
 		else
 			break;
 	}
@@ -166,10 +179,10 @@ DerivedMesh *get_cddm(Object *ob, struct BMEditMesh *em, DerivedMesh *dm, float 
 		return dm;
 
 	if (!dm) {
-		dm= get_dm(ob, em, dm, vertexCos, 0);
+		dm = get_dm(ob, em, dm, vertexCos, 0);
 	}
 	else {
-		dm= CDDM_copy(dm);
+		dm = CDDM_copy(dm);
 		CDDM_apply_vert_coords(dm, vertexCos);
 	}
 
@@ -185,8 +198,8 @@ DerivedMesh *get_dm(Object *ob, struct BMEditMesh *em, DerivedMesh *dm, float (*
 	if (dm)
 		return dm;
 
-	if (ob->type==OB_MESH) {
-		if (em) dm= CDDM_from_BMEditMesh(em, ob->data, FALSE, FALSE);
+	if (ob->type == OB_MESH) {
+		if (em) dm = CDDM_from_BMEditMesh(em, ob->data, FALSE, FALSE);
 		else dm = CDDM_from_mesh((struct Mesh *)(ob->data), ob);
 
 		if (vertexCos) {
@@ -195,10 +208,10 @@ DerivedMesh *get_dm(Object *ob, struct BMEditMesh *em, DerivedMesh *dm, float (*
 		}
 		
 		if (orco)
-			DM_add_vert_layer(dm, CD_ORCO, CD_ASSIGN, get_mesh_orco_verts(ob));
+			DM_add_vert_layer(dm, CD_ORCO, CD_ASSIGN, BKE_mesh_orco_verts_get(ob));
 	}
-	else if (ELEM3(ob->type,OB_FONT,OB_CURVE,OB_SURF)) {
-		dm= CDDM_from_curve(ob);
+	else if (ELEM3(ob->type, OB_FONT, OB_CURVE, OB_SURF)) {
+		dm = CDDM_from_curve(ob);
 	}
 
 	return dm;
@@ -211,7 +224,7 @@ void modifier_get_vgroup(Object *ob, DerivedMesh *dm, const char *name, MDeformV
 
 	if (*defgrp_index >= 0) {
 		if (ob->type == OB_LATTICE)
-			*dvert = lattice_get_deform_verts(ob);
+			*dvert = BKE_lattice_deform_verts_get(ob);
 		else if (dm)
 			*dvert = dm->getVertDataArray(dm, CD_MDEFORMVERT);
 	}
@@ -263,5 +276,6 @@ void modifier_type_init(ModifierTypeInfo *types[])
 	INIT_TYPE(WeightVGProximity);
 	INIT_TYPE(DynamicPaint);
 	INIT_TYPE(Remesh);
+	INIT_TYPE(Skin);
 #undef INIT_TYPE
 }

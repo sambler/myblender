@@ -30,12 +30,12 @@ set(INC
 	../../blenlib
 	../../blenloader
 	../../editors/include
+	../../gpu
 	../../makesdna
 	../../makesrna
 	../../windowmanager
-	../../gpu
-	../../../../intern/guardedalloc
 	../../../../intern/cycles/blender
+	../../../../intern/guardedalloc
 )
 
 set(INC_SYS
@@ -71,6 +71,7 @@ set(SRC
 	bpy_app_handlers.h
 	bpy_driver.h
 	bpy_intern_string.h
+	bpy_library.h
 	bpy_operator.h
 	bpy_operator_wrap.h
 	bpy_props.h

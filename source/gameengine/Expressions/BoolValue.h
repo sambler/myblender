@@ -29,7 +29,7 @@
 class CBoolValue : public CPropValue  
 {
 
-	//PLUGIN_DECLARE_SERIAL(CBoolValue,CValue)	
+	//PLUGIN_DECLARE_SERIAL(CBoolValue,CValue)
 
 public:
 	static const STR_String sTrueString;
@@ -56,13 +56,9 @@ public:
 private:
 	bool				m_bool;
 
-
 #ifdef WITH_CXX_GUARDEDALLOC
-public:
-	void *operator new(size_t num_bytes) { return MEM_mallocN(num_bytes, "GE:CBoolValue"); }
-	void operator delete( void *mem ) { MEM_freeN(mem); }
+	MEM_CXX_CLASS_ALLOC_FUNCS("GE:CBoolValue")
 #endif
 };
 
-#endif // !defined __BOOLVALUE_H__
-
+#endif  /* __BOOLVALUE_H__ */

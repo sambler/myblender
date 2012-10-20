@@ -34,8 +34,8 @@ CCL_NAMESPACE_BEGIN
 #define TRI_NODE_SIZE 3
 
 /* silly workaround for float extended precision that happens when compiling
-   without sse support on x86, it results in different results for float ops
-   that you would otherwise expect to compare correctly */
+ * without sse support on x86, it results in different results for float ops
+ * that you would otherwise expect to compare correctly */
 #if !defined(__i386__) || defined(__SSE__)
 #define NO_EXTENDED_PRECISION
 #else
@@ -59,7 +59,7 @@ __device_inline void bvh_instance_push(KernelGlobals *kg, int object, const Ray 
 {
 	Transform tfm = object_fetch_transform(kg, object, OBJECT_INVERSE_TRANSFORM);
 
-	*P = transform(&tfm, ray->P);
+	*P = transform_point(&tfm, ray->P);
 
 	float3 dir = transform_direction(&tfm, ray->D);
 
@@ -74,14 +74,43 @@ __device_inline void bvh_instance_push(KernelGlobals *kg, int object, const Ray 
 
 __device_inline void bvh_instance_pop(KernelGlobals *kg, int object, const Ray *ray, float3 *P, float3 *idir, float *t, const float tmax)
 {
-	Transform tfm = object_fetch_transform(kg, object, OBJECT_TRANSFORM);
-
-	if(*t != FLT_MAX)
+	if(*t != FLT_MAX) {
+		Transform tfm = object_fetch_transform(kg, object, OBJECT_TRANSFORM);
 		*t *= len(transform_direction(&tfm, 1.0f/(*idir)));
+	}
 
 	*P = ray->P;
 	*idir = bvh_inverse_direction(ray->D);
 }
+
+#ifdef __OBJECT_MOTION__
+__device_inline void bvh_instance_motion_push(KernelGlobals *kg, int object, const Ray *ray, float3 *P, float3 *idir, float *t, Transform *tfm, const float tmax)
+{
+	Transform itfm;
+	*tfm = object_fetch_transform_motion_test(kg, object, ray->time, &itfm);
+
+	*P = transform_point(&itfm, ray->P);
+
+	float3 dir = transform_direction(&itfm, ray->D);
+
+	float len;
+	dir = normalize_len(dir, &len);
+
+	*idir = bvh_inverse_direction(dir);
+
+	if(*t != FLT_MAX)
+		*t *= len;
+}
+
+__device_inline void bvh_instance_motion_pop(KernelGlobals *kg, int object, const Ray *ray, float3 *P, float3 *idir, float *t, Transform *tfm, const float tmax)
+{
+	if(*t != FLT_MAX)
+		*t *= len(transform_direction(tfm, 1.0f/(*idir)));
+
+	*P = ray->P;
+	*idir = bvh_inverse_direction(ray->D);
+}
+#endif
 
 /* intersect two bounding boxes */
 __device_inline void bvh_node_intersect(KernelGlobals *kg,
@@ -160,7 +189,7 @@ __device_inline void bvh_triangle_intersect(KernelGlobals *kg, Intersection *ise
 			if(v >= 0.0f && u + v <= 1.0f) {
 #ifdef __VISIBILITY_FLAG__
 				/* visibility flag test. we do it here under the assumption
-				   that most triangles are culled by node flags */
+				 * that most triangles are culled by node flags */
 				if(kernel_tex_fetch(__prim_visibility, triAddr) & visibility)
 #endif
 				{
@@ -176,7 +205,7 @@ __device_inline void bvh_triangle_intersect(KernelGlobals *kg, Intersection *ise
 	}
 }
 
-__device_inline bool scene_intersect(KernelGlobals *kg, const Ray *ray, const uint visibility, Intersection *isect)
+__device_inline bool bvh_intersect(KernelGlobals *kg, const Ray *ray, const uint visibility, Intersection *isect)
 {
 	/* traversal stack in CUDA thread-local memory */
 	int traversalStack[BVH_STACK_SIZE];
@@ -268,7 +297,6 @@ __device_inline bool scene_intersect(KernelGlobals *kg, const Ray *ray, const ui
 				else {
 					/* instance push */
 					object = kernel_tex_fetch(__prim_object, -primAddr-1);
-
 					bvh_instance_push(kg, object, ray, &P, &idir, &isect->t, tmax);
 
 					++stackPtr;
@@ -294,6 +322,140 @@ __device_inline bool scene_intersect(KernelGlobals *kg, const Ray *ray, const ui
 	} while(nodeAddr != ENTRYPOINT_SENTINEL);
 
 	return (isect->prim != ~0);
+}
+
+#ifdef __OBJECT_MOTION__
+__device_inline bool bvh_intersect_motion(KernelGlobals *kg, const Ray *ray, const uint visibility, Intersection *isect)
+{
+	/* traversal stack in CUDA thread-local memory */
+	int traversalStack[BVH_STACK_SIZE];
+	traversalStack[0] = ENTRYPOINT_SENTINEL;
+
+	/* traversal variables in registers */
+	int stackPtr = 0;
+	int nodeAddr = kernel_data.bvh.root;
+
+	/* ray parameters in registers */
+	const float tmax = ray->t;
+	float3 P = ray->P;
+	float3 idir = bvh_inverse_direction(ray->D);
+	int object = ~0;
+
+	Transform ob_tfm;
+
+	isect->t = tmax;
+	isect->object = ~0;
+	isect->prim = ~0;
+	isect->u = 0.0f;
+	isect->v = 0.0f;
+
+	/* traversal loop */
+	do {
+		do
+		{
+			/* traverse internal nodes */
+			while(nodeAddr >= 0 && nodeAddr != ENTRYPOINT_SENTINEL)
+			{
+				bool traverseChild0, traverseChild1, closestChild1;
+				int nodeAddrChild1;
+
+				bvh_node_intersect(kg, &traverseChild0, &traverseChild1,
+					&closestChild1, &nodeAddr, &nodeAddrChild1,
+					P, idir, isect->t, visibility, nodeAddr);
+
+				if(traverseChild0 != traverseChild1) {
+					/* one child was intersected */
+					if(traverseChild1) {
+						nodeAddr = nodeAddrChild1;
+					}
+				}
+				else {
+					if(!traverseChild0) {
+						/* neither child was intersected */
+						nodeAddr = traversalStack[stackPtr];
+						--stackPtr;
+					}
+					else {
+						/* both children were intersected, push the farther one */
+						if(closestChild1) {
+							int tmp = nodeAddr;
+							nodeAddr = nodeAddrChild1;
+							nodeAddrChild1 = tmp;
+						}
+
+						++stackPtr;
+						traversalStack[stackPtr] = nodeAddrChild1;
+					}
+				}
+			}
+
+			/* if node is leaf, fetch triangle list */
+			if(nodeAddr < 0) {
+				float4 leaf = kernel_tex_fetch(__bvh_nodes, (-nodeAddr-1)*BVH_NODE_SIZE+(BVH_NODE_SIZE-1));
+				int primAddr = __float_as_int(leaf.x);
+
+				if(primAddr >= 0) {
+					int primAddr2 = __float_as_int(leaf.y);
+
+					/* pop */
+					nodeAddr = traversalStack[stackPtr];
+					--stackPtr;
+
+					/* triangle intersection */
+					while(primAddr < primAddr2) {
+						/* intersect ray against triangle */
+						bvh_triangle_intersect(kg, isect, P, idir, visibility, object, primAddr);
+
+						/* shadow ray early termination */
+						if(visibility == PATH_RAY_SHADOW_OPAQUE && isect->prim != ~0)
+							return true;
+
+						primAddr++;
+					}
+				}
+				else {
+					/* instance push */
+					object = kernel_tex_fetch(__prim_object, -primAddr-1);
+					bvh_instance_motion_push(kg, object, ray, &P, &idir, &isect->t, &ob_tfm, tmax);
+
+					++stackPtr;
+					traversalStack[stackPtr] = ENTRYPOINT_SENTINEL;
+
+					nodeAddr = kernel_tex_fetch(__object_node, object);
+				}
+			}
+		} while(nodeAddr != ENTRYPOINT_SENTINEL);
+
+		if(stackPtr >= 0) {
+			kernel_assert(object != ~0);
+
+			/* instance pop */
+			bvh_instance_motion_pop(kg, object, ray, &P, &idir, &isect->t, &ob_tfm, tmax);
+			object = ~0;
+			nodeAddr = traversalStack[stackPtr];
+			--stackPtr;
+		}
+	} while(nodeAddr != ENTRYPOINT_SENTINEL);
+
+	return (isect->prim != ~0);
+}
+#endif
+
+__device_inline bool scene_intersect(KernelGlobals *kg, const Ray *ray, const uint visibility, Intersection *isect)
+{
+#ifdef __OBJECT_MOTION__
+#if !defined(__KERNEL_CUDA__) || (__CUDA_ARCH__ >= 210)
+	if(kernel_data.bvh.have_motion)
+		return bvh_intersect_motion(kg, ray, visibility, isect);
+	else
+		return bvh_intersect(kg, ray, visibility, isect);
+#else
+	/* todo: fix cuda sm 2.0 motion blur */
+	return bvh_intersect(kg, ray, visibility, isect);
+#endif
+#else
+	return bvh_intersect(kg, ray, visibility, isect);
+#endif
 }
 
 __device_inline float3 ray_offset(float3 P, float3 Ng)
@@ -341,7 +503,7 @@ __device_inline float3 ray_offset(float3 P, float3 Ng)
 #endif
 }
 
-__device_inline float3 bvh_triangle_refine(KernelGlobals *kg, const Intersection *isect, const Ray *ray)
+__device_inline float3 bvh_triangle_refine(KernelGlobals *kg, ShaderData *sd, const Intersection *isect, const Ray *ray)
 {
 	float3 P = ray->P;
 	float3 D = ray->D;
@@ -349,9 +511,13 @@ __device_inline float3 bvh_triangle_refine(KernelGlobals *kg, const Intersection
 
 #ifdef __INTERSECTION_REFINE__
 	if(isect->object != ~0) {
+#ifdef __OBJECT_MOTION__
+		Transform tfm = sd->ob_itfm;
+#else
 		Transform tfm = object_fetch_transform(kg, isect->object, OBJECT_INVERSE_TRANSFORM);
+#endif
 
-		P = transform(&tfm, P);
+		P = transform_point(&tfm, P);
 		D = transform_direction(&tfm, D*t);
 		D = normalize_len(D, &t);
 	}
@@ -366,8 +532,13 @@ __device_inline float3 bvh_triangle_refine(KernelGlobals *kg, const Intersection
 	P = P + D*rt;
 
 	if(isect->object != ~0) {
+#ifdef __OBJECT_MOTION__
+		Transform tfm = sd->ob_tfm;
+#else
 		Transform tfm = object_fetch_transform(kg, isect->object, OBJECT_TRANSFORM);
-		P = transform(&tfm, P);
+#endif
+
+		P = transform_point(&tfm, P);
 	}
 
 	return P;

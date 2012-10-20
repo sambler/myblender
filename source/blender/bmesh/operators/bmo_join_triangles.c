@@ -20,6 +20,10 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+/** \file blender/bmesh/operators/bmo_join_triangles.c
+ *  \ingroup bmesh
+ */
+
 #include "MEM_guardedalloc.h"
 
 #include "DNA_meshdata_types.h"
@@ -33,21 +37,8 @@
 
 #include "intern/bmesh_operators_private.h" /* own include */
 
-/*
- * JOIN_TRIANGLES.C
- *
- * utility bmesh operators, e.g. transform,
- * translate, rotate, scale, etc.
- *
- */
-
-/* Bitflags for edges */
-#define T2QDELETE	1
-#define T2QCOMPLEX	2
-#define T2QJOIN		4
-
 /* assumes edges are validated before reaching this poin */
-static float measure_facepair(BMesh *UNUSED(bm), BMVert *v1, BMVert *v2,
+static float measure_facepair(BMVert *v1, BMVert *v2,
                               BMVert *v3, BMVert *v4, float limit)
 {
 	/* gives a 'weight' to a pair of triangles that join an edge to decide how good a join they would make */
@@ -114,93 +105,73 @@ static float measure_facepair(BMesh *UNUSED(bm), BMVert *v1, BMVert *v2,
 #define T2QUV_LIMIT 0.005f
 #define T2QCOL_LIMIT 3
 
-static int compareFaceAttribs(BMesh *bm, BMEdge *e, int douvs, int dovcols)
+static int bm_edge_faces_cmp(BMesh *bm, BMEdge *e, const int do_uv, const int do_tf, const int do_vcol)
 {
-	MTexPoly *tp1, *tp2;
-	MLoopCol *lcol1, *lcol2, *lcol3, *lcol4;
-	MLoopUV *luv1, *luv2, *luv3, *luv4;
-	BMLoop *l1, *l2, *l3, *l4;
-	int mergeok_uvs = !douvs, mergeok_vcols = !dovcols;
+	/* first get loops */
+	BMLoop *l[4];
+
+	l[0] = e->l;
+	l[2] = e->l->radial_next;
 	
-	l1 = e->l;
-	l3 = e->l->radial_next;
-	
-	/* match up loops on each side of an edge corresponding to each ver */
-	if (l1->v == l3->v) {
-		l2 = l1->next;
-		l4 = l2->next;
+	/* match up loops on each side of an edge corresponding to each vert */
+	if (l[0]->v == l[2]->v) {
+		l[1] = l[0]->next;
+		l[3] = l[1]->next;
 	}
 	else {
-		l2 = l1->next;
+		l[1] = l[0]->next;
 
-		l4 = l3;
-		l3 = l4->next;
+		l[3] = l[2];
+		l[2] = l[3]->next;
 	}
 
-	lcol1 = CustomData_bmesh_get(&bm->ldata, l1->head.data, CD_MLOOPCOL);
-	lcol2 = CustomData_bmesh_get(&bm->ldata, l1->head.data, CD_MLOOPCOL);
-	lcol3 = CustomData_bmesh_get(&bm->ldata, l1->head.data, CD_MLOOPCOL);
-	lcol4 = CustomData_bmesh_get(&bm->ldata, l1->head.data, CD_MLOOPCOL);
+	/* Test UV's */
+	if (do_uv) {
+		const MLoopUV *luv[4] = {
+		    CustomData_bmesh_get(&bm->ldata, l[0]->head.data, CD_MLOOPUV),
+		    CustomData_bmesh_get(&bm->ldata, l[1]->head.data, CD_MLOOPUV),
+		    CustomData_bmesh_get(&bm->ldata, l[2]->head.data, CD_MLOOPUV),
+		    CustomData_bmesh_get(&bm->ldata, l[3]->head.data, CD_MLOOPUV),
+		};
 
-	luv1 = CustomData_bmesh_get(&bm->ldata, l1->head.data, CD_MLOOPUV);
-	luv2 = CustomData_bmesh_get(&bm->ldata, l1->head.data, CD_MLOOPUV);
-	luv3 = CustomData_bmesh_get(&bm->ldata, l1->head.data, CD_MLOOPUV);
-	luv4 = CustomData_bmesh_get(&bm->ldata, l1->head.data, CD_MLOOPUV);
-
-	tp1 = CustomData_bmesh_get(&bm->pdata, l1->f->head.data, CD_MTEXPOLY);
-	tp2 = CustomData_bmesh_get(&bm->pdata, l2->f->head.data, CD_MTEXPOLY);
-
-	if (!lcol1)
-		mergeok_vcols = 1;
-
-	if (!luv1)
-		mergeok_uvs = 1;
-
-	/* compare faceedges for each face attribute. Additional per face attributes can be added late */
-
-	/* do VCOL */
-	if (lcol1 && dovcols) {
-		char *cols[4] = {(char *)lcol1, (char *)lcol2, (char *)lcol3, (char *)lcol4};
-		int i;
-
-		for (i = 0; i < 3; i++) {
-			if (cols[0][i] + T2QCOL_LIMIT < cols[2][i] - T2QCOL_LIMIT)
-				break;
-			if (cols[1][i] + T2QCOL_LIMIT < cols[3][i] - T2QCOL_LIMIT)
-				break;
+		/* do UV */
+		if (luv[0] && (!compare_v2v2(luv[0]->uv, luv[2]->uv, T2QUV_LIMIT) ||
+		               !compare_v2v2(luv[1]->uv, luv[3]->uv, T2QUV_LIMIT)))
+		{
+			return FALSE;
 		}
-
-		if (i == 3)
-			mergeok_vcols = 1;
 	}
 
-	/* do UV */
-	if (luv1 && douvs) {
-		if (tp1->tpage != tp2->tpage) {
-			/* do nothing */
-		}
-		else {
-			int i;
+	if (do_tf) {
+		const MTexPoly *tp[2] = {
+		    CustomData_bmesh_get(&bm->pdata, l[0]->f->head.data, CD_MTEXPOLY),
+		    CustomData_bmesh_get(&bm->pdata, l[1]->f->head.data, CD_MTEXPOLY),
+		};
 
-			for (i = 0; i < 2; i++) {
-				if (luv1->uv[0] + T2QUV_LIMIT > luv3->uv[0] && luv1->uv[0] - T2QUV_LIMIT < luv3->uv[0] &&
-				    luv1->uv[1] + T2QUV_LIMIT > luv3->uv[1] && luv1->uv[1] - T2QUV_LIMIT < luv3->uv[1])
-				{
-					if (luv2->uv[0] + T2QUV_LIMIT > luv4->uv[0] && luv2->uv[0] - T2QUV_LIMIT < luv4->uv[0] &&
-					    luv2->uv[1] + T2QUV_LIMIT > luv4->uv[1] && luv2->uv[1] - T2QUV_LIMIT < luv4->uv[1])
-					{
-						mergeok_uvs = 1;
-					}
-				}
+		if (tp[0] && (tp[0]->tpage != tp[1]->tpage)) {
+			return FALSE;
+		}
+	}
+
+	/* Test Vertex Colors */
+	if (do_vcol) {
+		const MLoopCol *lcol[4] = {
+		    CustomData_bmesh_get(&bm->ldata, l[0]->head.data, CD_MLOOPCOL),
+			CustomData_bmesh_get(&bm->ldata, l[1]->head.data, CD_MLOOPCOL),
+			CustomData_bmesh_get(&bm->ldata, l[2]->head.data, CD_MLOOPCOL),
+			CustomData_bmesh_get(&bm->ldata, l[3]->head.data, CD_MLOOPCOL),
+		};
+
+		if (lcol[0]) {
+			if (!compare_rgb_uchar((unsigned char *)&lcol[0]->r, (unsigned char *)&lcol[2]->r, T2QCOL_LIMIT) ||
+			    !compare_rgb_uchar((unsigned char *)&lcol[1]->r, (unsigned char *)&lcol[3]->r, T2QCOL_LIMIT))
+			{
+				return FALSE;
 			}
 		}
 	}
 
-	if (douvs == mergeok_uvs && dovcols == mergeok_vcols) {
-		return TRUE;
-	}
-
-	return FALSE;
+	return TRUE;
 }
 
 typedef struct JoinEdge {
@@ -233,23 +204,24 @@ void bmo_join_triangles_exec(BMesh *bm, BMOperator *op)
 	BMEdge *e;
 	BLI_array_declare(jedges);
 	JoinEdge *jedges = NULL;
-	int dosharp = BMO_slot_bool_get(op, "cmp_sharp");
-	int douvs =   BMO_slot_bool_get(op, "cmp_uvs");
-	int dovcols = BMO_slot_bool_get(op, "cmp_vcols");
-	int domat =   BMO_slot_bool_get(op, "cmp_materials");
-	float limit = BMO_slot_float_get(op, "limit");
+	int do_sharp = BMO_slot_bool_get(op, "cmp_sharp");
+	int do_uv    = BMO_slot_bool_get(op, "cmp_uvs");
+	int do_tf    = do_uv;  /* texture face, make make its own option eventually */
+	int do_vcol  = BMO_slot_bool_get(op, "cmp_vcols");
+	int do_mat   = BMO_slot_bool_get(op, "cmp_materials");
+	float limit  = BMO_slot_float_get(op, "limit");
 	int i, totedge;
 
 	/* flag all edges of all input face */
-	BMO_ITER(f1, &siter, bm, op, "faces", BM_FACE) {
+	BMO_ITER (f1, &siter, bm, op, "faces", BM_FACE) {
 		BMO_elem_flag_enable(bm, f1, FACE_INPUT);
-		BM_ITER(l, &liter, bm, BM_LOOPS_OF_FACE, f1) {
+		BM_ITER_ELEM (l, &liter, f1, BM_LOOPS_OF_FACE) {
 			BMO_elem_flag_enable(bm, l->e, EDGE_MARK);
 		}
 	}
 
 	/* unflag edges that are invalid; e.g. aren't surrounded by triangle */
-	BM_ITER(e, &iter, bm, BM_EDGES_OF_MESH, NULL) {
+	BM_ITER_MESH (e, &iter, bm, BM_EDGES_OF_MESH) {
 		if (!BMO_elem_flag_test(bm, e, EDGE_MARK))
 			continue;
 
@@ -270,7 +242,7 @@ void bmo_join_triangles_exec(BMesh *bm, BMOperator *op)
 	}
 	
 	i = 0;
-	BM_ITER(e, &iter, bm, BM_EDGES_OF_MESH, NULL) {
+	BM_ITER_MESH (e, &iter, bm, BM_EDGES_OF_MESH) {
 		BMVert *v1, *v2, *v3, *v4;
 		BMFace *f1, *f2;
 		float measure;
@@ -286,18 +258,18 @@ void bmo_join_triangles_exec(BMesh *bm, BMOperator *op)
 		v3 = e->l->next->v;
 		v4 = e->l->radial_next->prev->v;
 
-		if (dosharp && !BM_elem_flag_test(e, BM_ELEM_SMOOTH))
-			continue;
-		
-		if ((douvs || dovcols) && compareFaceAttribs(bm, e, douvs, dovcols))
+		if (do_sharp && !BM_elem_flag_test(e, BM_ELEM_SMOOTH))
 			continue;
 
-		if (domat && f1->mat_nr != f2->mat_nr)
+		if (do_mat && f1->mat_nr != f2->mat_nr)
 			continue;
 
-		measure = measure_facepair(bm, v1, v2, v3, v4, limit);
+		if ((do_uv || do_tf || do_vcol) && (bm_edge_faces_cmp(bm, e, do_uv, do_tf, do_vcol) == FALSE))
+			continue;
+
+		measure = measure_facepair(v1, v2, v3, v4, limit);
 		if (measure < limit) {
-			BLI_array_growone(jedges);
+			BLI_array_grow_one(jedges);
 
 			jedges[i].e = e;
 			jedges[i].weight = measure;
@@ -327,16 +299,16 @@ void bmo_join_triangles_exec(BMesh *bm, BMOperator *op)
 		BMO_elem_flag_enable(bm, e, EDGE_CHOSEN);
 	}
 
-	BM_ITER(e, &iter, bm, BM_EDGES_OF_MESH, NULL) {
+	BM_ITER_MESH (e, &iter, bm, BM_EDGES_OF_MESH) {
 		if (!BMO_elem_flag_test(bm, e, EDGE_CHOSEN))
 			continue;
 
 
 		BM_edge_face_pair(e, &f1, &f2); /* checked above */
-		BM_faces_join_pair(bm, f1, f2, e);
+		BM_faces_join_pair(bm, f1, f2, e, TRUE);
 	}
 
-	BM_ITER(e, &iter, bm, BM_EDGES_OF_MESH, NULL) {
+	BM_ITER_MESH (e, &iter, bm, BM_EDGES_OF_MESH) {
 		if (BMO_elem_flag_test(bm, e, EDGE_MARK)) {
 			/* ok, this edge wasn't merged, check if it's
 			 * in a 2-tri-pair island, and if so merg */
@@ -348,7 +320,7 @@ void bmo_join_triangles_exec(BMesh *bm, BMOperator *op)
 				continue;
 
 			for (i = 0; i < 2; i++) {
-				BM_ITER(l, &liter, bm, BM_LOOPS_OF_FACE, i ? f2 : f1) {
+				BM_ITER_ELEM (l, &liter, i ? f2 : f1, BM_LOOPS_OF_FACE) {
 					if (l->e != e && BMO_elem_flag_test(bm, l->e, EDGE_MARK)) {
 						break;
 					}
@@ -365,7 +337,7 @@ void bmo_join_triangles_exec(BMesh *bm, BMOperator *op)
 				continue;
 			}
 
-			BM_faces_join_pair(bm, f1, f2, e);
+			BM_faces_join_pair(bm, f1, f2, e, TRUE);
 		}
 	}
 

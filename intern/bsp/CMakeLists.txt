@@ -32,19 +32,38 @@ set(INC
 )
 
 set(INC_SYS
-
+	../../extern/carve/include
 )
 
 set(SRC
+	intern/BOP_CarveInterface.cpp
 	intern/BSP_CSGMesh.cpp
 	intern/BSP_MeshPrimitives.cpp
 	intern/CSG_BooleanOps.cpp
 
 	extern/CSG_BooleanOps.h
+	intern/BOP_Interface.h
 	intern/BSP_CSGException.h
 	intern/BSP_CSGMesh.h
 	intern/BSP_CSGMesh_CFIterator.h
 	intern/BSP_MeshPrimitives.h
 )
+
+if(WITH_BOOST)
+	if(NOT MSVC)
+		# Boost is setting as preferred collections library in the Carve code when using MSVC compiler
+		add_definitions(
+			-DHAVE_BOOST_UNORDERED_COLLECTIONS
+		)
+	endif()
+
+	add_definitions(
+		-DCARVE_SYSTEM_BOOST
+	)
+
+	list(APPEND INC_SYS
+		${BOOST_INCLUDE_DIR}
+	)
+endif()
 
 blender_add_lib(bf_intern_bsp "${SRC}" "${INC}" "${INC_SYS}")

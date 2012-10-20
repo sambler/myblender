@@ -39,6 +39,7 @@
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 
+#include "rna_internal.h"  /* own include */
 
 #ifdef RNA_RUNTIME
 
@@ -59,7 +60,7 @@ static void rna_KeyingSet_context_refresh(KeyingSet *ks, bContext *C, ReportList
 				break;
 				
 			case MODIFYKEY_MISSING_TYPEINFO:
-				BKE_report(reports, RPT_ERROR, "Incomplete built-in Keying Set. Appears to be missing type info");
+				BKE_report(reports, RPT_ERROR, "Incomplete built-in Keying Set, appears to be missing type info");
 				break;
 		}
 	}
@@ -77,7 +78,7 @@ void RNA_api_keyingset(StructRNA *srna)
 	RNA_def_function_ui_description(func,
 	                                "Refresh Keying Set to ensure that it is valid for the current context "
 	                                "(call before each use of one)");
-	RNA_def_function_flag(func, FUNC_USE_CONTEXT|FUNC_USE_REPORTS);
+	RNA_def_function_flag(func, FUNC_USE_CONTEXT | FUNC_USE_REPORTS);
 }
 
 #endif

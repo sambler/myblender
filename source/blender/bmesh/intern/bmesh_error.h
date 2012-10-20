@@ -23,7 +23,7 @@
 #ifndef __BMESH_ERROR_H__
 #define __BMESH_ERROR_H__
 
-/** \file blender/bmesh/bmesh_error.h
+/** \file blender/bmesh/intern/bmesh_error.h
  *  \ingroup bmesh
  */
 
@@ -69,6 +69,7 @@ void BMO_error_clear(BMesh *bm);
 #define BMERR_NONMANIFOLD				8
 #define BMERR_INVALID_SELECTION			9
 #define BMERR_MESH_ERROR				10
+#define BMERR_CONVEX_HULL_FAILED		11
 
 /* BMESH_ASSERT */
 #ifdef WITH_ASSERT_ABORT
@@ -83,8 +84,8 @@ void BMO_error_clear(BMesh *bm);
 	(void)((!(a)) ?  (                                                        \
 		(                                                                     \
 		fprintf(stderr,                                                       \
-			"BMESH_ASSERT failed: %s, %s(), %d at \'%s\'\n",                  \
-			__FILE__, __func__, __LINE__, STRINGIFY(a)),                      \
+		        "BMESH_ASSERT failed: %s, %s(), %d at \'%s\'\n",              \
+		        __FILE__, __func__, __LINE__, STRINGIFY(a)),                  \
 		_BMESH_DUMMY_ABORT(),                                                 \
 		NULL)) : NULL)
 

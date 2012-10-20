@@ -1218,49 +1218,50 @@ static int multitex(Tex *tex, float texvec[3], float dxt[3], float dyt[3], int o
 			mul_v3_fl(tmpvec, 1.0f/tex->noisesize);
 			
 			switch(tex->stype) {
-			case TEX_MFRACTAL:
-			case TEX_FBM:
-				retval= mg_mFractalOrfBmTex(tex, tmpvec, texres);
+				case TEX_MFRACTAL:
+				case TEX_FBM:
+					retval= mg_mFractalOrfBmTex(tex, tmpvec, texres);
+					break;
+				case TEX_RIDGEDMF:
+				case TEX_HYBRIDMF:
+					retval= mg_ridgedOrHybridMFTex(tex, tmpvec, texres);
+					break;
+				case TEX_HTERRAIN:
+					retval= mg_HTerrainTex(tex, tmpvec, texres);
+					break;
+				}
 				break;
-			case TEX_RIDGEDMF:
-			case TEX_HYBRIDMF:
-				retval= mg_ridgedOrHybridMFTex(tex, tmpvec, texres);
-				break;
-			case TEX_HTERRAIN:
-				retval= mg_HTerrainTex(tex, tmpvec, texres);
-				break;
-			}
-			break;
-		/* newnoise: voronoi type */
-		case TEX_VORONOI:
-			/* ton: added this, for Blender convention reason.
-			 * artificer: added the use of tmpvec to avoid scaling texvec
-			 */
-			copy_v3_v3(tmpvec, texvec);
-			mul_v3_fl(tmpvec, 1.0f/tex->noisesize);
+			/* newnoise: voronoi type */
+			case TEX_VORONOI:
+				/* ton: added this, for Blender convention reason.
+				 * artificer: added the use of tmpvec to avoid scaling texvec
+				 */
+				copy_v3_v3(tmpvec, texvec);
+				mul_v3_fl(tmpvec, 1.0f/tex->noisesize);
 			
-			retval= voronoiTex(tex, tmpvec, texres);
-			break;
-		case TEX_DISTNOISE:
-			/* ton: added this, for Blender convention reason.
-			 * artificer: added the use of tmpvec to avoid scaling texvec
-			 */
-			copy_v3_v3(tmpvec, texvec);
-			mul_v3_fl(tmpvec, 1.0f/tex->noisesize);
+				retval= voronoiTex(tex, tmpvec, texres);
+				break;
+			case TEX_DISTNOISE:
+				/* ton: added this, for Blender convention reason.
+				 * artificer: added the use of tmpvec to avoid scaling texvec
+				 */
+				copy_v3_v3(tmpvec, texvec);
+				mul_v3_fl(tmpvec, 1.0f/tex->noisesize);
 			
-			retval= mg_distNoiseTex(tex, tmpvec, texres);
-			break;
-		case TEX_POINTDENSITY:
-			retval= pointdensitytex(tex, texvec, texres);
-			break;
-		case TEX_VOXELDATA:
-			retval= voxeldatatex(tex, texvec, texres);  
-			break;
-		case TEX_OCEAN:
-			retval= ocean_texture(tex, texvec, texres);  
-			break;
-		case TEX_PLANET:
-			retval= planet(tex, texvec, texres);
+				retval= mg_distNoiseTex(tex, tmpvec, texres);
+				break;
+			case TEX_POINTDENSITY:
+				retval= pointdensitytex(tex, texvec, texres);
+				break;
+			case TEX_VOXELDATA:
+				retval= voxeldatatex(tex, texvec, texres);  
+				break;
+			case TEX_OCEAN:
+				retval= ocean_texture(tex, texvec, texres);  
+				break;
+			case TEX_PLANET:
+				retval= planet(tex, texvec, texres);
+				break;
 		}
 	}
 

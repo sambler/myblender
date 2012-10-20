@@ -105,6 +105,8 @@
 #include "BLI_math.h"
 #include "BLI_edgehash.h"
 
+#include "BLF_translation.h"
+
 #include "BKE_anim.h"
 #include "BKE_action.h"
 #include "BKE_armature.h"
@@ -976,13 +978,13 @@ static FileData *blo_decode_and_check(FileData *fd, ReportList *reports)
 	
 	if (fd->flags & FD_FLAGS_FILE_OK) {
 		if (!read_file_dna(fd)) {
-			BKE_reportf(reports, RPT_ERROR, "Failed to read blend file: \"%s\", incomplete", fd->relabase);
+			BKE_reportf(reports, RPT_ERROR, "Failed to read blend file '%s', incomplete", fd->relabase);
 			blo_freefiledata(fd);
 			fd = NULL;
 		}
 	} 
 	else {
-		BKE_reportf(reports, RPT_ERROR, "Failed to read blend file: \"%s\", not a blend file", fd->relabase);
+		BKE_reportf(reports, RPT_ERROR, "Failed to read blend file '%s', not a blend file", fd->relabase);
 		blo_freefiledata(fd);
 		fd = NULL;
 	}
@@ -999,7 +1001,8 @@ FileData *blo_openblenderfile(const char *filepath, ReportList *reports)
 	gzfile = BLI_gzopen(filepath, "rb");
 	
 	if (gzfile == (gzFile)Z_NULL) {
-		BKE_reportf(reports, RPT_WARNING, "Unable to open \"%s\": %s.", filepath, errno ? strerror(errno) : "Unknown error reading file");
+		BKE_reportf(reports, RPT_WARNING, "Unable to open '%s': %s",
+		            filepath, errno ? strerror(errno) : TIP_("Unknown error reading file"));
 		return NULL;
 	}
 	else {
@@ -1017,7 +1020,7 @@ FileData *blo_openblenderfile(const char *filepath, ReportList *reports)
 FileData *blo_openblendermemory(void *mem, int memsize, ReportList *reports)
 {
 	if (!mem || memsize<SIZEOFBLENDERHEADER) {
-		BKE_report(reports, RPT_WARNING, (mem)? "Unable to read": "Unable to open");
+		BKE_report(reports, RPT_WARNING, (mem) ? TIP_("Unable to read"): TIP_("Unable to open"));
 		return NULL;
 	}
 	else {
@@ -4764,8 +4767,7 @@ static void lib_link_scene(FileData *fd, Main *main)
 				base->object = newlibadr_us(fd, sce->id.lib, base->object);
 				
 				if (base->object == NULL) {
-					BKE_reportf_wrap(fd->reports, RPT_WARNING,
-					                 "LIB ERROR: Object lost from scene:'%s\'",
+					BKE_reportf_wrap(fd->reports, RPT_WARNING, "LIB ERROR: object lost from scene: '%s'",
 					                 sce->id.name + 2);
 					BLI_remlink(&sce->base, base);
 					if (base == sce->basact) sce->basact = NULL;
@@ -6613,7 +6615,7 @@ void convert_tface_mt(FileData *fd, Main *main)
 		G.main = main;
 		
 		if (!(do_version_tface(main, 1))) {
-			BKE_report(fd->reports, RPT_WARNING, "Texface conversion problem (error in console)");
+			BKE_report(fd->reports, RPT_WARNING, "Texface conversion problem (see error in console)");
 		}
 		
 		//XXX hack, material.c uses G.main allover the place, instead of main
@@ -7058,6 +7060,21 @@ static void do_version_ntree_tex_coord_from_dupli_264(void *UNUSED(data), ID *UN
 			node->flag |= NODE_OPTIONS;
 }
 
+static void do_version_node_cleanup_dynamic_sockets_264(void *UNUSED(data), ID *UNUSED(id), bNodeTree *ntree)
+{
+	bNode *node;
+	bNodeSocket *sock;
+	
+	for (node = ntree->nodes.first; node; node = node->next) {
+		if (!ELEM(node->type, NODE_GROUP, CMP_NODE_IMAGE)) {
+			for (sock = node->inputs.first; sock; sock = sock->next)
+				sock->flag &= ~SOCK_DYNAMIC;
+			for (sock = node->outputs.first; sock; sock = sock->next)
+				sock->flag &= ~SOCK_DYNAMIC;
+		}
+	}
+}
+
 static void do_versions(FileData *fd, Library *lib, Main *main)
 {
 	/* WATCH IT!!!: pointers from libdata have not been converted */
@@ -7381,8 +7398,8 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 					prop = BKE_bproperty_object_get(ob, "Text");
 					if (prop) {
 						BKE_reportf_wrap(fd->reports, RPT_WARNING,
-						                 "Game property name conflict in object: \"%s\".\nText objects reserve the "
-						                 "[\"Text\"] game property to change their content through Logic Bricks.",
+						                 "Game property name conflict in object '%s':\ntext objects reserve the "
+						                 "['Text'] game property to change their content through logic bricks",
 						                 ob->id.name + 2);
 					}
 				}
@@ -8046,46 +8063,94 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 		}
 	}
 
-	/* WATCH IT!!!: pointers from libdata have not been converted yet here! */
-	/* WATCH IT 2!: Userdef struct init has to be in editors/interface/resources.c! */
+	if (main->versionfile < 264 || (main->versionfile == 264 && main->subversionfile < 3)) {
+		/* smoke branch */
+		{
+			Object *ob;
 
-	{
-		Object *ob;
-
-		for (ob = main->object.first; ob; ob = ob->id.next) {
-			ModifierData *md;
-			for (md = ob->modifiers.first; md; md = md->next) {
-				if (md->type == eModifierType_Smoke) {
-					SmokeModifierData *smd = (SmokeModifierData *)md;
-					if ((smd->type & MOD_SMOKE_TYPE_DOMAIN) && smd->domain) {
-						/* keep branch saves if possible */
-						if (!smd->domain->flame_max_temp) {
-							smd->domain->burning_rate = 0.75f;
-							smd->domain->flame_smoke = 1.0f;
-							smd->domain->flame_vorticity = 0.5f;
-							smd->domain->flame_ignition = 1.25f;
-							smd->domain->flame_max_temp = 1.75f;
-							smd->domain->adapt_threshold = 0.02f;
-							smd->domain->adapt_margin = 4;
-							smd->domain->flame_smoke_color[0] = 0.7f;
-							smd->domain->flame_smoke_color[1] = 0.7f;
-							smd->domain->flame_smoke_color[2] = 0.7f;
+			for (ob = main->object.first; ob; ob = ob->id.next) {
+				ModifierData *md;
+				for (md = ob->modifiers.first; md; md = md->next) {
+					if (md->type == eModifierType_Smoke) {
+						SmokeModifierData *smd = (SmokeModifierData *)md;
+						if ((smd->type & MOD_SMOKE_TYPE_DOMAIN) && smd->domain) {
+							/* keep branch saves if possible */
+							if (!smd->domain->flame_max_temp) {
+								smd->domain->burning_rate = 0.75f;
+								smd->domain->flame_smoke = 1.0f;
+								smd->domain->flame_vorticity = 0.5f;
+								smd->domain->flame_ignition = 1.25f;
+								smd->domain->flame_max_temp = 1.75f;
+								smd->domain->adapt_threshold = 0.02f;
+								smd->domain->adapt_margin = 4;
+								smd->domain->flame_smoke_color[0] = 0.7f;
+								smd->domain->flame_smoke_color[1] = 0.7f;
+								smd->domain->flame_smoke_color[2] = 0.7f;
+							}
+						}
+						else if ((smd->type & MOD_SMOKE_TYPE_FLOW) && smd->flow) {
+							if (!smd->flow->texture_size) {
+								smd->flow->fuel_amount = 1.0;
+								smd->flow->surface_distance = 1.5;
+								smd->flow->color[0] = 0.7f;
+								smd->flow->color[1] = 0.7f;
+								smd->flow->color[2] = 0.7f;
+								smd->flow->texture_size = 1.0f;
+							}
 						}
 					}
-					else if ((smd->type & MOD_SMOKE_TYPE_FLOW) && smd->flow) {
-						if (!smd->flow->texture_size) {
-							smd->flow->fuel_amount = 1.0;
-							smd->flow->surface_distance = 1.5;
-							smd->flow->color[0] = 0.7f;
-							smd->flow->color[1] = 0.7f;
-							smd->flow->color[2] = 0.7f;
-							smd->flow->texture_size = 1.0f;
+				}
+			}
+		}
+
+		/* render border for viewport */
+		{
+			bScreen *sc;
+
+			for (sc = main->screen.first; sc; sc = sc->id.next) {
+				ScrArea *sa;
+				for (sa = sc->areabase.first; sa; sa = sa->next) {
+					SpaceLink *sl;
+					for (sl = sa->spacedata.first; sl; sl = sl->next) {
+						if (sl->spacetype == SPACE_VIEW3D) {
+							View3D *v3d = (View3D *)sl;
+							if (v3d->render_border.xmin == 0.0f && v3d->render_border.ymin == 0.0f &&
+							    v3d->render_border.xmax == 0.0f && v3d->render_border.ymax == 0.0f)
+							{
+								v3d->render_border.xmax = 1.0f;
+								v3d->render_border.ymax = 1.0f;
+							}
 						}
 					}
 				}
 			}
 		}
 	}
+
+	if (main->versionfile < 264 || (main->versionfile == 264 && main->subversionfile < 4)) {
+		/* Fix for old node flags: Apparently the SOCK_DYNAMIC flag has been in use for other
+		 * purposes before and then removed and later reused for SOCK_DYNAMIC. This socket should
+		 * only be used by certain node types which don't use template lists, cleaning this up here.
+		 */
+		bNodeTreeType *ntreetype;
+		bNodeTree *ntree;
+		
+		ntreetype = ntreeGetType(NTREE_COMPOSIT);
+		if (ntreetype && ntreetype->foreach_nodetree)
+			ntreetype->foreach_nodetree(main, NULL, do_version_node_cleanup_dynamic_sockets_264);
+		ntreetype = ntreeGetType(NTREE_SHADER);
+		if (ntreetype && ntreetype->foreach_nodetree)
+			ntreetype->foreach_nodetree(main, NULL, do_version_node_cleanup_dynamic_sockets_264);
+		ntreetype = ntreeGetType(NTREE_TEXTURE);
+		if (ntreetype && ntreetype->foreach_nodetree)
+			ntreetype->foreach_nodetree(main, NULL, do_version_node_cleanup_dynamic_sockets_264);
+		
+		for (ntree=main->nodetree.first; ntree; ntree=ntree->id.next)
+			do_version_node_cleanup_dynamic_sockets_264(NULL, NULL, ntree);
+	}
+
+	/* WATCH IT!!!: pointers from libdata have not been converted yet here! */
+	/* WATCH IT 2!: Userdef struct init has to be in editors/interface/resources.c! */
 
 	/* don't forget to set version number in blender.c! */
 }
@@ -9618,7 +9683,7 @@ static void read_libraries(FileData *basefd, ListBase *mainlist)
 				if (fd == NULL) {
 					/* printf and reports for now... its important users know this */
 					BKE_reportf_wrap(basefd->reports, RPT_INFO,
-					                 "read library:  '%s', '%s'",
+					                 "Read library:  '%s', '%s'",
 					                 mainptr->curlib->filepath, mainptr->curlib->name);
 					
 					fd = blo_openblenderfile(mainptr->curlib->filepath, basefd->reports);
@@ -9672,7 +9737,7 @@ static void read_libraries(FileData *basefd, ListBase *mainlist)
 					
 					if (fd == NULL) {
 						BKE_reportf_wrap(basefd->reports, RPT_WARNING,
-						                 "Can't find lib '%s'",
+						                 "Cannot find lib '%s'",
 						                 mainptr->curlib->filepath);
 					}
 				}
@@ -9691,7 +9756,7 @@ static void read_libraries(FileData *basefd, ListBase *mainlist)
 								append_id_part(fd, mainptr, id, &realid);
 								if (!realid) {
 									BKE_reportf_wrap(fd->reports, RPT_WARNING,
-									                 "LIB ERROR: %s:'%s' missing from '%s'",
+									                 "LIB ERROR: %s: '%s' missing from '%s'",
 									                 BKE_idcode_to_name(GS(id->name)),
 									                 id->name+2, mainptr->curlib->filepath);
 								}
@@ -9723,7 +9788,7 @@ static void read_libraries(FileData *basefd, ListBase *mainlist)
 				if (id->flag & LIB_READ) {
 					BLI_remlink(lbarray[a], id);
 					BKE_reportf_wrap(basefd->reports, RPT_WARNING,
-					                 "LIB ERROR: %s:'%s' unread libblock missing from '%s'",
+					                 "LIB ERROR: %s: '%s' unread libblock missing from '%s'",
 					                 BKE_idcode_to_name(GS(id->name)), id->name + 2, mainptr->curlib->filepath);
 					change_idid_adr(mainlist, basefd, id, NULL);
 					

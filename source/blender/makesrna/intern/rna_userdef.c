@@ -2510,7 +2510,7 @@ static void rna_def_userdef_view(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Sub Level Menu Open Delay",
 	                         "Time delay in 1/10 seconds before automatically opening sub level menus");
 
-	prop = RNA_def_property(srna, "quit_dialog", PROP_BOOLEAN, PROP_NONE);
+	prop = RNA_def_property(srna, "use_quit_dialog", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "uiflag", USER_QUIT_PROMPT);
 	RNA_def_property_ui_text(prop, "Prompt Quit",
 	                         "Asks for confirmation when quitting through the window close button");
@@ -2745,7 +2745,7 @@ static void rna_def_userdef_edit(BlenderRNA *brna)
 	RNA_def_property_boolean_sdna(prop, NULL, "autokey_flag", AUTOKEY_FLAG_INSERTAVAIL);
 	RNA_def_property_ui_text(prop, "Auto Keyframe Insert Available",
 	                         "Automatic keyframe insertion in available F-Curves");
-							 
+
 	prop = RNA_def_property(srna, "use_auto_keying_warning", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_negative_sdna(prop, NULL, "autokey_flag", AUTOKEY_FLAG_NOWARNING);
 	RNA_def_property_ui_text(prop, "Show Auto Keying Warning",
@@ -2783,7 +2783,7 @@ static void rna_def_userdef_edit(BlenderRNA *brna)
 	RNA_def_property_boolean_negative_sdna(prop, NULL, "flag", USER_NONEGFRAMES);
 	RNA_def_property_ui_text(prop, "Allow Negative Frames",
 	                         "Current frame number can be manually set to a negative value");
-							 
+
 	/* fcurve opacity */
 	prop = RNA_def_property(srna, "fcurve_unselected_alpha", PROP_FLOAT, PROP_FACTOR);
 	RNA_def_property_float_sdna(prop, NULL, "fcu_inactive_alpha");
@@ -2987,7 +2987,7 @@ static void rna_def_userdef_system(BlenderRNA *brna)
 	/* locale according to http://www.roseindia.net/tutorials/I18N/locales-list.shtml */
 	/* if you edit here, please also edit the source/blender/blenfont/intern/blf_lang.c 's locales */
 	/* Note: As this list is in alphabetical order, and not defined order,
-	 *       here is the highest define currently in use: 34 (Estonian). */
+	 *       here is the highest define currently in use: 35 (Esperanto). */
 	static EnumPropertyItem language_items[] = {
 		{ 0, "", 0, N_("Nearly Done"), ""},
 		{ 0, "DEFAULT", 0, "Default (Default)", ""},
@@ -3010,6 +3010,7 @@ static void rna_def_userdef_system(BlenderRNA *brna)
 		{16, "CROATIAN", 0, "Croatian (Hrvatski)", "hr_HR"},
 		{11, "CZECH", 0, "Czech (Český)", "cs_CZ"},
 		{ 3, "DUTCH", 0, "Dutch (Nederlandse taal)", "nl_NL"},
+		{35, "ESPERANTO", 0, "Esperanto (Esperanto)", "eo"},
 		{34, "ESTONIAN", 0, "Estonian (Eestlane)", "et_EE"},
 		{ 6, "FINNISH", 0, "Finnish (Suomi)", "fi_FI"},
 		{ 5, "GERMAN", 0, "German (Deutsch)", "de_DE"},

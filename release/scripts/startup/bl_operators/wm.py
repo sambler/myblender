@@ -1773,12 +1773,6 @@ class WM_OT_addon_install(Operator):
 
             try:  # extract the file to "addons"
                 file_to_extract.extractall(path_addons)
-
-                # zip files can create this dir with metadata, don't need it
-                macosx_dir = os.path.join(path_addons, '__MACOSX')
-                if os.path.isdir(macosx_dir):
-                    shutil.rmtree(macosx_dir)
-
             except:
                 traceback.print_exc()
                 return {'CANCELLED'}
@@ -1823,9 +1817,9 @@ class WM_OT_addon_install(Operator):
         bpy.utils.refresh_script_paths()
 
         # print message
-        msg = "File %r installed into %r\n" % (pyfile, path_dest)
-        self.report({'INFO'}, msg)
+        msg = "Modules Installed from %r into %r (%s)" % (pyfile, path_addons, ", ".join(sorted(addons_new)))
         print(msg)
+        self.report({'INFO'}, msg)
 
         return {'FINISHED'}
 

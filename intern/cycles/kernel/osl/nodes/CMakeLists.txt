@@ -29,7 +29,9 @@ set(SRC_OSL
 	node_hsv.osl
 	node_image_texture.osl
 	node_invert.osl
+	node_layer_weight.osl
 	node_light_path.osl
+	node_light_falloff.osl
 	node_magic_texture.osl
 	node_mapping.osl
 	node_math.osl

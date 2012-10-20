@@ -1054,7 +1054,7 @@ static void emit_from_particles(Object *flow_ob, SmokeDomainSettings *sds, Smoke
 	}
 }
 
-static void get_texture_value(Tex *texture, float *tex_co, TexResult *texres)
+static void get_texture_value(Tex *texture, float tex_co[3], TexResult *texres)
 {
 	int result_type;
 
@@ -2392,9 +2392,9 @@ static void smoke_calc_transparency(SmokeDomainSettings *sds, Scene *scene)
 
 	/* convert light pos to sim cell space */
 	mul_m4_v3(sds->imat, light);
-	light[0] = (light[0] - sds->p0[0]) / sds->cell_size[0] - 0.5f;
-	light[1] = (light[1] - sds->p0[1]) / sds->cell_size[1] - 0.5f;
-	light[2] = (light[2] - sds->p0[2]) / sds->cell_size[2] - 0.5f;
+	light[0] = (light[0] - sds->p0[0]) / sds->cell_size[0] - 0.5f - (float)sds->res_min[0];
+	light[1] = (light[1] - sds->p0[1]) / sds->cell_size[1] - 0.5f - (float)sds->res_min[1];
+	light[2] = (light[2] - sds->p0[2]) / sds->cell_size[2] - 0.5f - (float)sds->res_min[2];
 
 	for (a = 0; a < size; a++)
 		sds->shadow[a] = -1.0f;

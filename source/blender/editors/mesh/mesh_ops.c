@@ -74,6 +74,7 @@ void ED_operatortypes_mesh(void)
 	WM_operatortype_append(MESH_OT_normals_make_consistent);
 	WM_operatortype_append(MESH_OT_merge);
 	WM_operatortype_append(MESH_OT_subdivide);
+	WM_operatortype_append(MESH_OT_unsubdivide);
 	WM_operatortype_append(MESH_OT_faces_select_linked_flat);
 	WM_operatortype_append(MESH_OT_edges_select_sharp);
 	WM_operatortype_append(MESH_OT_primitive_plane_add);
@@ -165,6 +166,8 @@ void ED_operatortypes_mesh(void)
 	WM_operatortype_append(MESH_OT_edge_split);
 
 	WM_operatortype_append(MESH_OT_convex_hull);
+
+	WM_operatortype_append(MESH_OT_symmetrize);
 
 #ifdef WITH_GAMEENGINE
 	WM_operatortype_append(MESH_OT_navmesh_make);

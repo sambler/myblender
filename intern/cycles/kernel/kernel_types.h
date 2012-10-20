@@ -29,7 +29,7 @@
 CCL_NAMESPACE_BEGIN
 
 /* constants */
-#define OBJECT_SIZE 		18
+#define OBJECT_SIZE 		22
 #define LIGHT_SIZE			4
 #define FILTER_TABLE_SIZE	256
 #define RAMP_TABLE_SIZE		256
@@ -109,11 +109,10 @@ CCL_NAMESPACE_BEGIN
 #define __BACKGROUND_MIS__
 #define __AO__
 #define __CAMERA_MOTION__
-//#define __OBJECT_MOTION__
+#define __OBJECT_MOTION__
 #endif
 
 //#define __SOBOL_FULL_SCREEN__
-//#define __QBVH__
 
 /* Shader Evaluation */
 
@@ -370,7 +369,9 @@ typedef struct ShaderClosure {
 #endif
 	float data0;
 	float data1;
+
 	float3 N;
+	float3 T;
 
 } ShaderClosure;
 
@@ -428,13 +429,6 @@ typedef struct ShaderData {
 	/* length of the ray being shaded */
 	float ray_length;
 
-#ifdef __OBJECT_MOTION__
-	/* object <-> world space transformations, cached to avoid
-	 * re-interpolating them constantly for shading */
-	Transform ob_tfm;
-	Transform ob_itfm;
-#endif
-
 #ifdef __RAY_DIFFERENTIALS__
 	/* differential of P. these are orthogonal to Ng, not N */
 	differential3 dP;
@@ -448,9 +442,13 @@ typedef struct ShaderData {
 	/* differential of P w.r.t. parametric coordinates. note that dPdu is
 	 * not readily suitable as a tangent for shading on triangles. */
 	float3 dPdu, dPdv;
+#endif
 
-	/* tangent for shading */
-	float3 T;
+#ifdef __OBJECT_MOTION__
+	/* object <-> world space transformations, cached to avoid
+	 * re-interpolating them constantly for shading */
+	Transform ob_tfm;
+	Transform ob_itfm;
 #endif
 
 #ifdef __MULTI_CLOSURE__
@@ -516,7 +514,9 @@ typedef struct KernelCamera {
 	/* more matrices */
 	Transform screentoworld;
 	Transform rastertoworld;
-	Transform ndctoworld;
+	/* work around cuda sm 2.0 crash, this seems to
+	 * cross some limit in combination with motion 
+	 * Transform ndctoworld; */
 	Transform worldtoscreen;
 	Transform worldtoraster;
 	Transform worldtondc;
@@ -632,7 +632,8 @@ typedef struct KernelBVH {
 	/* root node */
 	int root;
 	int attributes_map_stride;
-	int pad1, pad2;
+	int have_motion;
+	int pad2;
 } KernelBVH;
 
 typedef struct KernelData {

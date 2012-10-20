@@ -24,6 +24,7 @@
 #include "object.h"
 #include "scene.h"
 #include "nodes.h"
+#include "particles.h"
 #include "shader.h"
 
 #include "blender_sync.h"
@@ -307,6 +308,7 @@ void BlenderSync::sync_objects(BL::SpaceView3D b_v3d, int motion)
 		mesh_map.pre_sync();
 		object_map.pre_sync();
 		mesh_synced.clear();
+		particle_system_map.pre_sync();
 	}
 
 	/* object loop */
@@ -340,8 +342,19 @@ void BlenderSync::sync_objects(BL::SpaceView3D b_v3d, int motion)
 						Transform tfm = get_transform(b_dup->matrix());
 						BL::Object b_dup_ob = b_dup->object();
 						bool dup_hide = (b_v3d)? b_dup_ob.hide(): b_dup_ob.hide_render();
+						bool emitter_hide = false;
 
-						if(!(b_dup->hide() || dup_hide)) {
+						if(b_dup_ob.is_duplicator()) {
+							emitter_hide = true;	/* duplicators hidden by default */
+							
+							/* check if we should render or hide particle emitter */
+							BL::Object::particle_systems_iterator b_psys;
+							for(b_dup_ob.particle_systems.begin(b_psys); b_psys != b_dup_ob.particle_systems.end(); ++b_psys)
+								if(b_psys->settings().use_render_emitter())
+									emitter_hide = false;
+						}
+
+						if(!(b_dup->hide() || dup_hide || emitter_hide)) {
 							sync_object(*b_ob, b_index, *b_dup, tfm, ob_layer, motion, b_dup->particle_index() + particle_offset);
 						}
 						
@@ -351,11 +364,16 @@ void BlenderSync::sync_objects(BL::SpaceView3D b_v3d, int motion)
 					object_free_duplilist(*b_ob);
 				}
 
-				/* check if we should render or hide particle emitter */
+
+				/* sync particles and check if we should render or hide particle emitter */
 				BL::Object::particle_systems_iterator b_psys;
-				for(b_ob->particle_systems.begin(b_psys); b_psys != b_ob->particle_systems.end(); ++b_psys)
+				for(b_ob->particle_systems.begin(b_psys); b_psys != b_ob->particle_systems.end(); ++b_psys) {
+					if(!motion)
+						sync_particles(*b_ob, *b_psys);
+
 					if(b_psys->settings().use_render_emitter())
 						hide = false;
+				}
 
 				if(!hide) {
 					/* object itself */
@@ -382,6 +400,8 @@ void BlenderSync::sync_objects(BL::SpaceView3D b_v3d, int motion)
 			scene->mesh_manager->tag_update(scene);
 		if(object_map.post_sync())
 			scene->object_manager->tag_update(scene);
+		if(particle_system_map.post_sync())
+			scene->particle_system_manager->tag_update(scene);
 		mesh_synced.clear();
 	}
 }
@@ -396,6 +416,8 @@ void BlenderSync::sync_motion(BL::SpaceView3D b_v3d, BL::Object b_override)
 	if(b_override)
 		b_cam = b_override;
 
+	Camera prevcam = *(scene->camera);
+	
 	/* go back and forth one frame */
 	int frame = b_scene.frame_current();
 
@@ -411,6 +433,10 @@ void BlenderSync::sync_motion(BL::SpaceView3D b_v3d, BL::Object b_override)
 	}
 
 	scene_frame_set(b_scene, frame);
+
+	/* tag camera for motion update */
+	if(scene->camera->motion_modified(prevcam))
+		scene->camera->tag_update();
 }
 
 CCL_NAMESPACE_END

@@ -17,6 +17,7 @@
  */
 
 #include "background.h"
+#include "camera.h"
 #include "film.h"
 #include "../render/filter.h"
 #include "graph.h"
@@ -141,7 +142,6 @@ void BlenderSync::sync_data(BL::SpaceView3D b_v3d, BL::Object b_override, const 
 	sync_film();
 	sync_shaders();
 	sync_objects(b_v3d);
-	sync_particle_systems();
 	sync_motion(b_v3d, b_override);
 }
 
@@ -179,6 +179,11 @@ void BlenderSync::sync_integrator()
 
 	integrator->sample_clamp = get_float(cscene, "sample_clamp");
 #ifdef __CAMERA_MOTION__
+	if(integrator->motion_blur != r.use_motion_blur()) {
+		scene->object_manager->tag_update(scene);
+		scene->camera->tag_update();
+	}
+
 	integrator->motion_blur = (!preview && r.use_motion_blur());
 #endif
 

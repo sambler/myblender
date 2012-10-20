@@ -59,6 +59,7 @@
 #include "BKE_main.h"
 #include "BKE_node.h"
 #include "BKE_texture.h"
+#include "BKE_scene.h"
 
 #include "IMB_imbuf_types.h"
 #include "IMB_imbuf.h"
@@ -2223,7 +2224,8 @@ static void bake_shade(void *handle, Object *ob, ShadeInput *shi, int UNUSED(qua
 			float rgb[3];
 
 			copy_v3_v3(rgb, shr.combined);
-			IMB_colormanagement_scene_linear_to_colorspace_v3(rgb, bs->rect_colorspace);
+			if (R.scene_color_manage)
+				IMB_colormanagement_scene_linear_to_colorspace_v3(rgb, bs->rect_colorspace);
 			rgb_float_to_uchar(col, rgb);
 		}
 		else {
@@ -2652,6 +2654,8 @@ int RE_bake_shade_all_selected(Render *re, int type, Object *actob, short *do_up
 	ListBase threads;
 	Image *ima;
 	int a, vdone = FALSE, use_mask = FALSE, result = BAKE_RESULT_OK;
+	
+	re->scene_color_manage = BKE_scene_check_color_management_enabled(re->scene);
 	
 	/* initialize render global */
 	R= *re;

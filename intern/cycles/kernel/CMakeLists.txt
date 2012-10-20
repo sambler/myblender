@@ -5,7 +5,9 @@ set(INC
 	osl
 	svm
 )
+
 set(INC_SYS
+
 )
 
 set(SRC
@@ -31,13 +33,11 @@ set(SRC_HEADERS
 	kernel_globals.h
 	kernel_light.h
 	kernel_math.h
-	kernel_mbvh.h
 	kernel_montecarlo.h
 	kernel_object.h
 	kernel_passes.h
 	kernel_path.h
 	kernel_projection.h
-	kernel_qbvh.h
 	kernel_random.h
 	kernel_shader.h
 	kernel_textures.h

@@ -1143,6 +1143,8 @@ static BMFace *bm_face_create__sfme(BMesh *bm, BMFace *UNUSED(example))
 /**
  * \brief Split Face Make Edge (SFME)
  *
+ * \warning this is a low level function, most likely you want to use #BM_face_split()
+ *
  * Takes as input two vertices in a single face. An edge is created which divides the original face
  * into two distinct regions. One of the regions is assigned to the original face and it is closed off.
  * The second region has a new face assigned to it.
@@ -1605,10 +1607,10 @@ BMEdge *bmesh_jekv(BMesh *bm, BMEdge *ke, BMVert *kv, const short check_edge_dou
 				BMESH_ASSERT(edok != FALSE);
 			}
 
-			/* deallocate edg */
+			/* deallocate edge */
 			bm_kill_only_edge(bm, ke);
 
-			/* deallocate verte */
+			/* deallocate vertex */
 			bm_kill_only_vert(bm, kv);
 
 			/* Validate disk cycle lengths of ov, tv are unchanged */
@@ -1617,7 +1619,7 @@ BMEdge *bmesh_jekv(BMesh *bm, BMEdge *ke, BMVert *kv, const short check_edge_dou
 			edok = bmesh_disk_validate(valence2, tv->e, tv);
 			BMESH_ASSERT(edok != FALSE);
 
-			/* Validate loop cycle of all faces attached to oe */
+			/* Validate loop cycle of all faces attached to 'oe' */
 			for (i = 0, l = oe->l; i < radlen; i++, l = l->radial_next) {
 				BMESH_ASSERT(l->e == oe);
 				edok = bmesh_verts_in_edge(l->v, l->next->v, oe);
@@ -1798,6 +1800,10 @@ BMFace *bmesh_jfke(BMesh *bm, BMFace *f1, BMFace *f2, BMEdge *e)
  * Merges two verts into one (\a v into \a vtarget).
  *
  * \return Success
+ *
+ * \warning This does't work for collapsing edges,
+ * where \a v and \a vtarget are connected by an edge
+ * (assert checks for this case).
  */
 int BM_vert_splice(BMesh *bm, BMVert *v, BMVert *vtarget)
 {
@@ -1813,16 +1819,19 @@ int BM_vert_splice(BMesh *bm, BMVert *v, BMVert *vtarget)
 
 	/* we can't modify the vert while iterating so first allocate an array of loops */
 	loops = BM_iter_as_arrayN(bm, BM_LOOPS_OF_VERT, v, &loops_tot);
-	for (i = 0; i < loops_tot; i++) {
-		loops[i]->v = vtarget;
+	if (loops) {
+		for (i = 0; i < loops_tot; i++) {
+			loops[i]->v = vtarget;
+		}
+		MEM_freeN(loops);
 	}
-	MEM_freeN(loops);
 
 	/* move all the edges from v's disk to vtarget's disk */
 	while ((e = v->e)) {
 		bmesh_disk_edge_remove(e, v);
 		bmesh_edge_swapverts(e, v, vtarget);
 		bmesh_disk_edge_append(e, vtarget);
+		BLI_assert(e->v1 != e->v2);
 	}
 
 	BM_CHECK_ELEMENT(v);

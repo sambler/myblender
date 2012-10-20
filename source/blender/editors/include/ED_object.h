@@ -135,7 +135,8 @@ void ED_object_location_from_view(struct bContext *C, float loc[3]);
 void ED_object_rotation_from_view(struct bContext *C, float rot[3]);
 void ED_object_base_init_transform(struct bContext *C, struct Base *base, const float loc[3], const float rot[3]);
 float ED_object_new_primitive_matrix(struct bContext *C, struct Object *editob,
-                                     const float loc[3], const float rot[3], float primmat[][4]);
+                                     const float loc[3], const float rot[3], float primmat[][4],
+                                     int apply_diameter);
 
 void ED_object_add_generic_props(struct wmOperatorType *ot, int do_editmode);
 int ED_object_add_generic_get_opts(struct bContext *C, struct wmOperator *op,  float loc[3], float rot[3],
@@ -197,50 +198,6 @@ int ED_object_multires_update_totlevels_cb(struct Object *ob, void *totlevel_v);
 
 /* object_select.c */
 void ED_object_select_linked_by_id(struct bContext *C, struct ID *id);
-
-
-/* object_iterators.c */
-
-#include "ED_view3d.h"  /* XXX, needed for eV3DProjTest */
-
-/* foreach iterators */
-void mesh_foreachScreenVert(
-        struct ViewContext *vc,
-        void (*func)(void *userData, struct BMVert *eve, const float screen_co[2], int index),
-        void *userData, const eV3DProjTest clip_flag);
-void mesh_foreachScreenEdge(
-        struct ViewContext *vc,
-        void (*func)(void *userData, struct BMEdge *eed, const float screen_co_a[2], const float screen_co_b[2],
-                     int index),
-        void *userData, const eV3DProjTest clip_flag);
-void mesh_foreachScreenFace(
-        struct ViewContext *vc,
-        void (*func)(void *userData, struct BMFace *efa, const float screen_co[2], int index),
-        void *userData, const eV3DProjTest clip_flag);
-void nurbs_foreachScreenVert(
-        struct ViewContext *vc,
-        void (*func)(void *userData, struct Nurb *nu, struct BPoint *bp, struct BezTriple *bezt,
-                     int beztindex, const float screen_co[2]),
-        void *userData, const eV3DProjTest clip_flag);
-void mball_foreachScreenElem(
-        struct ViewContext *vc,
-        void (*func)(void *userData, struct MetaElem *ml, const float screen_co[2]),
-        void *userData, const eV3DProjTest clip_flag);
-void lattice_foreachScreenVert(
-        struct ViewContext *vc,
-        void (*func)(void *userData, struct BPoint *bp,
-                     const float screen_co[2]),
-        void *userData, const eV3DProjTest clip_flag);
-void armature_foreachScreenBone(
-        struct ViewContext *vc,
-        void (*func)(void *userData, struct EditBone *ebone,
-                     const float screen_co_a[2], const float screen_co_b[2]),
-        void *userData, const eV3DProjTest clip_flag);
-void pose_foreachScreenBone(
-        struct ViewContext *vc,
-        void (*func)(void *userData, struct bPoseChannel *pchan,
-                     const float screen_co_a[2], const float screen_co_b[2]),
-        void *userData, const eV3DProjTest clip_flag);
 
 #ifdef __cplusplus
 }

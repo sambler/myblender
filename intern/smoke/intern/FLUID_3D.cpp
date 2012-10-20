@@ -1047,21 +1047,52 @@ void FLUID_3D::project()
 	setObstaclePressure(_pressure, 0, _zRes);
 
 	// project out solution
+	// New idea for code from NVIDIA graphic gems 3 - DG
 	float invDx = 1.0f / _dx;
 	index = _slabSize + _xRes + 1;
 	for (z = 1; z < _zRes - 1; z++, index += 2 * _xRes)
 		for (y = 1; y < _yRes - 1; y++, index += 2)
 			for (x = 1; x < _xRes - 1; x++, index++)
 			{
+				float vMask[3] = {1.0f, 1.0f, 1.0f}, vObst[3] = {0, 0, 0};
+				float vR = 0.0f, vL = 0.0f, vT = 0.0f, vB = 0.0f, vD = 0.0f, vU = 0.0f;
+
+				float pC = _pressure[index]; // center
+				float pR = _pressure[index + 1]; // right
+				float pL = _pressure[index - 1]; // left
+				float pU = _pressure[index + _xRes]; // Up
+				float pD = _pressure[index - _xRes]; // Down
+				float pT = _pressure[index + _slabSize]; // top
+				float pB = _pressure[index - _slabSize]; // bottom
+
 				if(!_obstacles[index])
 				{
-					_xVelocity[index] -= 0.5f * (_pressure[index + 1]     - _pressure[index - 1]) * invDx;
-					_yVelocity[index] -= 0.5f * (_pressure[index + _xRes]  - _pressure[index - _xRes]) * invDx;
-					_zVelocity[index] -= 0.5f * (_pressure[index + _slabSize] - _pressure[index - _slabSize]) * invDx;
+					// DG TODO: What if obstacle is left + right and one of them is moving?
+					if(_obstacles[index+1])			{ pR = pC; vObst[0] = _xVelocityOb[index + 1];			vMask[0] = 0; }
+					if(_obstacles[index-1])			{ pL = pC; vObst[0]	= _xVelocityOb[index - 1];			vMask[0] = 0; }
+					if(_obstacles[index+_xRes])		{ pU = pC; vObst[1]	= _yVelocityOb[index + _xRes];		vMask[1] = 0; }
+					if(_obstacles[index-_xRes])		{ pD = pC; vObst[1]	= _yVelocityOb[index - _xRes];		vMask[1] = 0; }
+					if(_obstacles[index+_slabSize]) { pT = pC; vObst[2] = _zVelocityOb[index + _slabSize];	vMask[2] = 0; }
+					if(_obstacles[index-_slabSize]) { pB = pC; vObst[2]	= _zVelocityOb[index - _slabSize];	vMask[2] = 0; }
+
+					_xVelocity[index] -= 0.5f * (pR - pL) * invDx;
+					_yVelocity[index] -= 0.5f * (pU - pD) * invDx;
+					_zVelocity[index] -= 0.5f * (pT - pB) * invDx;
+
+					_xVelocity[index] = (vMask[0] * _xVelocity[index]) + vObst[0];
+					_yVelocity[index] = (vMask[1] * _yVelocity[index]) + vObst[1];
+					_zVelocity[index] = (vMask[2] * _zVelocity[index]) + vObst[2];
+				}
+				else
+				{
+					_xVelocity[index] = _xVelocityOb[index];
+					_yVelocity[index] = _yVelocityOb[index];
+					_zVelocity[index] = _zVelocityOb[index];
 				}
 			}
 
-	setObstacleVelocity(0, _zRes);
+	// DG: was enabled in original code but now we do this later
+	// setObstacleVelocity(0, _zRes);
 
 	if (_pressure) delete[] _pressure;
 	if (_divergence) delete[] _divergence;
@@ -1326,9 +1357,13 @@ void FLUID_3D::addBuoyancy(float *heat, float *density, float gravity[3], int zB
 			}
 }
 
+
 //////////////////////////////////////////////////////////////////////
 // add vorticity to the force field
 //////////////////////////////////////////////////////////////////////
+#define VORT_VEL(i, j) \
+	((_obstacles[obpos[(i)]] & 8) ? ((abs(objvelocity[(j)][obpos[(i)]]) > FLT_EPSILON) ? objvelocity[(j)][obpos[(i)]] : velocity[(j)][index]) : velocity[(j)][obpos[(i)]])
+
 void FLUID_3D::addVorticity(int zBegin, int zEnd)
 {
 	// set flame vorticity from RNA value
@@ -1366,9 +1401,18 @@ void FLUID_3D::addVorticity(int zBegin, int zEnd)
 	float gridSize = 0.5f / _dx;
 	//index = _slabSize + _xRes + 1;
 
+	float *velocity[3];
+	float *objvelocity[3];
+
+	velocity[0] = _xVelocity;
+	velocity[1] = _yVelocity;
+	velocity[2] = _zVelocity;
+
+	objvelocity[0] = _xVelocityOb;
+	objvelocity[1] = _yVelocityOb;
+	objvelocity[2] = _zVelocityOb;
 
 	size_t vIndex=_xRes + 1;
-
 	for (int z = zBegin + bb1; z < (zEnd - bt1); z++)
 	{
 		size_t index = index_ +(z-1)*_slabSize;
@@ -1378,25 +1422,47 @@ void FLUID_3D::addVorticity(int zBegin, int zEnd)
 		{
 			for (int x = 1; x < _xRes - 1; x++, index++)
 			{
+				if (!_obstacles[index])
+				{
+					int obpos[6];
 
-				int up    = _obstacles[index + _xRes] ? index : index + _xRes;
-				int down  = _obstacles[index - _xRes] ? index : index - _xRes;
-				float dy  = (up == index || down == index) ? 1.0f / _dx : gridSize;
-				int out   = _obstacles[index + _slabSize] ? index : index + _slabSize;
-				int in    = _obstacles[index - _slabSize] ? index : index - _slabSize;
-				float dz  = (out == index || in == index) ? 1.0f / _dx : gridSize;
-				int right = _obstacles[index + 1] ? index : index + 1;
-				int left  = _obstacles[index - 1] ? index : index - 1;
-				float dx  = (right == index || left == index) ? 1.0f / _dx : gridSize;
+					obpos[0] = (_obstacles[index + _xRes] == 1) ? index : index + _xRes; // up
+					obpos[1] = (_obstacles[index - _xRes] == 1) ? index : index - _xRes; // down
+					float dy = (obpos[0] == index || obpos[1] == index) ? 1.0f / _dx : gridSize;
 
-				_xVorticity[vIndex] = (_zVelocity[up] - _zVelocity[down]) * dy + (-_yVelocity[out] + _yVelocity[in]) * dz;
-				_yVorticity[vIndex] = (_xVelocity[out] - _xVelocity[in]) * dz + (-_zVelocity[right] + _zVelocity[left]) * dx;
-				_zVorticity[vIndex] = (_yVelocity[right] - _yVelocity[left]) * dx + (-_xVelocity[up] + _xVelocity[down])* dy;
+					obpos[2]  = (_obstacles[index + _slabSize] == 1) ? index : index + _slabSize; // out
+					obpos[3]  = (_obstacles[index - _slabSize] == 1) ? index : index - _slabSize; // in
+					float dz  = (obpos[2] == index || obpos[3] == index) ? 1.0f / _dx : gridSize;
 
-				_vorticity[vIndex] = sqrtf(_xVorticity[vIndex] * _xVorticity[vIndex] +
+					obpos[4] = (_obstacles[index + 1] == 1) ? index : index + 1; // right
+					obpos[5] = (_obstacles[index - 1] == 1) ? index : index - 1; // left
+					float dx = (obpos[4] == index || obpos[5] == index) ? 1.0f / _dx : gridSize;
+
+					float xV[2], yV[2], zV[2];
+
+					zV[1] = VORT_VEL(0, 2);
+					zV[0] = VORT_VEL(1, 2);
+					yV[1] = VORT_VEL(2, 1);
+					yV[0] = VORT_VEL(3, 1);
+					_xVorticity[vIndex] = (zV[1] - zV[0]) * dy + (-yV[1] + yV[0]) * dz;
+
+					xV[1] = VORT_VEL(2, 0);
+					xV[0] = VORT_VEL(3, 0);
+					zV[1] = VORT_VEL(4, 2);
+					zV[0] = VORT_VEL(5, 2);
+					_yVorticity[vIndex] = (xV[1] - xV[0]) * dz + (-zV[1] + zV[0]) * dx;
+
+					yV[1] = VORT_VEL(4, 1);
+					yV[0] = VORT_VEL(5, 1);
+					xV[1] = VORT_VEL(0, 0);
+					xV[0] = VORT_VEL(1, 0);
+					_zVorticity[vIndex] = (yV[1] - yV[0]) * dx + (-xV[1] + xV[0])* dy;
+
+					_vorticity[vIndex] = sqrtf(_xVorticity[vIndex] * _xVorticity[vIndex] +
 						_yVorticity[vIndex] * _yVorticity[vIndex] +
 						_zVorticity[vIndex] * _zVorticity[vIndex]);
 
+				}
 				vIndex++;
 			}
 			vIndex+=2;
@@ -1425,15 +1491,18 @@ void FLUID_3D::addVorticity(int zBegin, int zEnd)
 				{
 					float N[3];
 
-					int up    = _obstacles[index + _xRes] ? vIndex : vIndex + _xRes;
-					int down  = _obstacles[index - _xRes] ? vIndex : vIndex - _xRes;
+					int up    = (_obstacles[index + _xRes] == 1) ? vIndex : vIndex + _xRes;
+					int down  = (_obstacles[index - _xRes] == 1) ? vIndex : vIndex - _xRes;
 					float dy  = (up == vIndex || down == vIndex) ? 1.0f / _dx : gridSize;
-					int out   = _obstacles[index + _slabSize] ? vIndex : vIndex + _slabSize;
-					int in    = _obstacles[index - _slabSize] ? vIndex : vIndex - _slabSize;
+
+					int out   = (_obstacles[index + _slabSize] == 1) ? vIndex : vIndex + _slabSize;
+					int in    = (_obstacles[index - _slabSize] == 1) ? vIndex : vIndex - _slabSize;
 					float dz  = (out == vIndex || in == vIndex) ? 1.0f / _dx : gridSize;
-					int right = _obstacles[index + 1] ? vIndex : vIndex + 1;
-					int left  = _obstacles[index - 1] ? vIndex : vIndex - 1;
+
+					int right = (_obstacles[index + 1] == 1) ? vIndex : vIndex + 1;
+					int left  = (_obstacles[index - 1] == 1) ? vIndex : vIndex - 1;
 					float dx  = (right == vIndex || left == vIndex) ? 1.0f / _dx : gridSize;
+
 					N[0] = (_vorticity[right] - _vorticity[left]) * dx;
 					N[1] = (_vorticity[up] - _vorticity[down]) * dy;
 					N[2] = (_vorticity[out] - _vorticity[in]) * dz;

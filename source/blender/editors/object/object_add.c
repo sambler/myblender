@@ -833,8 +833,6 @@ static int group_instance_add_exec(bContext *C, wmOperator *op)
 /* only used as menu */
 void OBJECT_OT_group_instance_add(wmOperatorType *ot)
 {
-	PropertyRNA *prop;
-
 	/* identifiers */
 	ot->name = "Add Group Instance";
 	ot->description = "Add a dupligroup instance";
@@ -849,9 +847,8 @@ void OBJECT_OT_group_instance_add(wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
 	/* properties */
-	prop = RNA_def_enum(ot->srna, "group", DummyRNA_NULL_items, 0, "Group", "");
-	RNA_def_enum_funcs(prop, RNA_group_itemf);
-	ot->prop = prop;
+	ot->prop = RNA_def_enum(ot->srna, "group", DummyRNA_NULL_items, 0, "Group", "");
+	RNA_def_enum_funcs(ot->prop, RNA_group_itemf);
 	ED_object_add_generic_props(ot, FALSE);
 }
 
@@ -1124,13 +1121,13 @@ static void make_object_duplilist_real(bContext *C, Scene *scene, Base *base,
 		basen->object = ob;
 
 		/* make sure apply works */
-		BKE_free_animdata(&ob->id);	
+		BKE_free_animdata(&ob->id);
 		ob->adt = NULL;
 
 		ob->parent = NULL;
 		ob->constraints.first = ob->constraints.last = NULL;
 		ob->disp.first = ob->disp.last = NULL;
-		ob->transflag &= ~OB_DUPLI;	
+		ob->transflag &= ~OB_DUPLI;
 		ob->lay = base->lay;
 
 		copy_m4_m4(ob->obmat, dob->mat);
@@ -1576,7 +1573,7 @@ static int convert_exec(bContext *C, wmOperator *op)
 		/* delete original if needed */
 		if (basedel) {
 			if (!keep_original)
-				ED_base_object_free_and_unlink(bmain, scene, basedel);	
+				ED_base_object_free_and_unlink(bmain, scene, basedel);
 
 			basedel = NULL;
 		}

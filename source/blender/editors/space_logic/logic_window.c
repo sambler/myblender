@@ -134,7 +134,7 @@ void make_unique_prop_names(bContext *C, char *str)
 		propcount+= BLI_countlist(&ob->sensors);
 		propcount+= BLI_countlist(&ob->controllers);
 		propcount+= BLI_countlist(&ob->actuators);
-	}	
+	}
 	if (propcount==0) {
 		if (idar) MEM_freeN(idar);
 		return;
@@ -149,22 +149,22 @@ void make_unique_prop_names(bContext *C, char *str)
 		ob= (Object *)idar[a];
 		prop= ob->prop.first;
 		while (prop) {
-			names[nr++]= prop->name;
+			names[nr++] = prop->name;
 			prop= prop->next;
 		}
 		sens= ob->sensors.first;
 		while (sens) {
-			names[nr++]= sens->name;
+			names[nr++] = sens->name;
 			sens= sens->next;
 		}
 		cont= ob->controllers.first;
 		while (cont) {
-			names[nr++]= cont->name;
+			names[nr++] = cont->name;
 			cont= cont->next;
 		}
 		act= ob->actuators.first;
 		while (act) {
-			names[nr++]= act->name;
+			names[nr++] = act->name;
 			act= act->next;
 		}
 	}
@@ -524,7 +524,7 @@ static const char *actuator_name(int type)
 	case ACT_ARMATURE:
 		return "Armature";
 	case ACT_STEERING:
-		return "Steering";		
+		return "Steering";
 	}
 	return "unknown";
 }
@@ -678,7 +678,7 @@ static ID **get_selected_and_linked_obs(bContext *C, short *count, short scavisf
 				ob= ob->id.next;
 			}
 		}
-	} 
+	}
 	
 	/* now we count */
 	ob= bmain->object.first;
@@ -697,13 +697,13 @@ static ID **get_selected_and_linked_obs(bContext *C, short *count, short scavisf
 
 	/* make the active object always the first one of the list */
 	if (obact) {
-		idar[0]= (ID *)obact;
+		idar[0] = (ID *)obact;
 		nr++;
 	}
 
 	while (ob) {
 		if ((ob->scavisflag) && (ob != obact)) {
-			idar[nr]= (ID *)ob;
+			idar[nr] = (ID *)ob;
 			nr++;
 		}
 		if (nr>=24) break;
@@ -1772,7 +1772,7 @@ static void draw_actuator_motion(uiLayout *layout, PointerRNA *ptr)
 	uiLayout *split, *row, *col, *sub;
 	int physics_type;
 
-	ob = (Object *)ptr->id.data;	
+	ob = (Object *)ptr->id.data;
 	RNA_pointer_create((ID *)ob, &RNA_GameObjectSettings, ob, &settings_ptr);
 	physics_type = RNA_enum_get(&settings_ptr, "physics_type");
 	
@@ -1790,7 +1790,7 @@ static void draw_actuator_motion(uiLayout *layout, PointerRNA *ptr)
 			uiItemR(row, ptr, "offset_rotation", 0, NULL, ICON_NONE);
 			uiItemR(split, ptr, "use_local_rotation", UI_ITEM_R_TOGGLE, NULL, ICON_NONE);
 			
-			if (ELEM3(physics_type, OB_BODY_TYPE_DYNAMIC, OB_BODY_TYPE_RIGID, OB_BODY_TYPE_SOFT)) {			
+			if (ELEM3(physics_type, OB_BODY_TYPE_DYNAMIC, OB_BODY_TYPE_RIGID, OB_BODY_TYPE_SOFT)) {
 				uiItemL(layout, "Dynamic Object Settings:", ICON_NONE);
 				split = uiLayoutSplit(layout, 0.9, FALSE);
 				row = uiLayoutRow(split, FALSE);

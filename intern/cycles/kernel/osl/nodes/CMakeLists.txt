@@ -12,6 +12,7 @@ set(SRC_OSL
 	node_combine_rgb.osl
 	node_convert_from_color.osl
 	node_convert_from_float.osl
+	node_convert_from_int.osl
 	node_convert_from_normal.osl
 	node_convert_from_point.osl
 	node_convert_from_vector.osl
@@ -47,6 +48,7 @@ set(SRC_OSL
 	node_particle_info.osl
 	node_rgb_ramp.osl
 	node_separate_rgb.osl
+	node_set_normal.osl
 	node_sky_texture.osl
 	node_texture_coordinate.osl
 	node_translucent_bsdf.osl
@@ -88,7 +90,7 @@ foreach(_file ${SRC_OSL})
 	unset(_OSO_FILE)
 endforeach()
 
-add_custom_target(shader ALL DEPENDS ${SRC_OSO} ${SRC_OSL_HEADERS})
+add_custom_target(cycles_osl_shaders ALL DEPENDS ${SRC_OSO} ${SRC_OSL_HEADERS})
 
 # CMAKE_CURRENT_SOURCE_DIR is already included in OSO paths
 delayed_install("" "${SRC_OSO}" ${CYCLES_INSTALL_PATH}/shader)

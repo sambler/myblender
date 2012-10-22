@@ -225,6 +225,8 @@ void ImageTextureNode::compile(OSLCompiler& compiler)
 		compiler.parameter("color_space", "Linear");
 	else
 		compiler.parameter("color_space", "sRGB");
+	compiler.parameter("projection", projection);
+	compiler.parameter("projection_blend", projection_blend);
 	compiler.add(this, "node_image_texture");
 }
 
@@ -1065,6 +1067,8 @@ ConvertNode::ConvertNode(ShaderSocketType from_, ShaderSocketType to_)
 
 	if(from == SHADER_SOCKET_FLOAT)
 		add_input("Val", SHADER_SOCKET_FLOAT);
+	else if(from == SHADER_SOCKET_INT)
+		add_input("ValInt", SHADER_SOCKET_INT);
 	else if(from == SHADER_SOCKET_COLOR)
 		add_input("Color", SHADER_SOCKET_COLOR);
 	else if(from == SHADER_SOCKET_VECTOR)
@@ -1078,6 +1082,8 @@ ConvertNode::ConvertNode(ShaderSocketType from_, ShaderSocketType to_)
 
 	if(to == SHADER_SOCKET_FLOAT)
 		add_output("Val", SHADER_SOCKET_FLOAT);
+	else if(to == SHADER_SOCKET_INT)
+		add_output("ValInt", SHADER_SOCKET_INT);
 	else if(to == SHADER_SOCKET_COLOR)
 		add_output("Color", SHADER_SOCKET_COLOR);
 	else if(to == SHADER_SOCKET_VECTOR)
@@ -1095,10 +1101,29 @@ void ConvertNode::compile(SVMCompiler& compiler)
 	ShaderInput *in = inputs[0];
 	ShaderOutput *out = outputs[0];
 
-	if(to == SHADER_SOCKET_FLOAT) {
+	if(from == SHADER_SOCKET_FLOAT) {
 		compiler.stack_assign(in);
 		compiler.stack_assign(out);
 
+		if(to == SHADER_SOCKET_INT)
+			/* float to int */
+			compiler.add_node(NODE_CONVERT, NODE_CONVERT_FI, in->stack_offset, out->stack_offset);
+		else
+			/* float to float3 */
+			compiler.add_node(NODE_CONVERT, NODE_CONVERT_FV, in->stack_offset, out->stack_offset);
+	}
+	else if(from == SHADER_SOCKET_INT) {
+		compiler.stack_assign(in);
+		compiler.stack_assign(out);
+
+		if(to == SHADER_SOCKET_FLOAT)
+			/* int to float */
+			compiler.add_node(NODE_CONVERT, NODE_CONVERT_IF, in->stack_offset, out->stack_offset);
+		else
+			/* int to vector/point/normal */
+			compiler.add_node(NODE_CONVERT, NODE_CONVERT_IV, in->stack_offset, out->stack_offset);
+	}
+	else if(to == SHADER_SOCKET_FLOAT) {
 		if(from == SHADER_SOCKET_COLOR)
 			/* color to float */
 			compiler.add_node(NODE_CONVERT, NODE_CONVERT_CF, in->stack_offset, out->stack_offset);
@@ -1106,12 +1131,13 @@ void ConvertNode::compile(SVMCompiler& compiler)
 			/* vector/point/normal to float */
 			compiler.add_node(NODE_CONVERT, NODE_CONVERT_VF, in->stack_offset, out->stack_offset);
 	}
-	else if(from == SHADER_SOCKET_FLOAT) {
-		compiler.stack_assign(in);
-		compiler.stack_assign(out);
-
-		/* float to float3 */
-		compiler.add_node(NODE_CONVERT, NODE_CONVERT_FV, in->stack_offset, out->stack_offset);
+	else if(to == SHADER_SOCKET_INT) {
+		if(from == SHADER_SOCKET_COLOR)
+			/* color to int */
+			compiler.add_node(NODE_CONVERT, NODE_CONVERT_CI, in->stack_offset, out->stack_offset);
+		else
+			/* vector/point/normal to int */
+			compiler.add_node(NODE_CONVERT, NODE_CONVERT_VI, in->stack_offset, out->stack_offset);
 	}
 	else {
 		/* float3 to float3 */
@@ -1134,6 +1160,8 @@ void ConvertNode::compile(OSLCompiler& compiler)
 {
 	if(from == SHADER_SOCKET_FLOAT)
 		compiler.add(this, "node_convert_from_float");
+	else if(from == SHADER_SOCKET_INT)
+		compiler.add(this, "node_convert_from_int");
 	else if(from == SHADER_SOCKET_COLOR)
 		compiler.add(this, "node_convert_from_color");
 	else if(from == SHADER_SOCKET_VECTOR)
@@ -1675,7 +1703,7 @@ void GeometryNode::compile(OSLCompiler& compiler)
 TextureCoordinateNode::TextureCoordinateNode()
 : ShaderNode("texture_coordinate")
 {
-	add_input("Normal", SHADER_SOCKET_NORMAL, ShaderInput::NORMAL, true);
+	add_input("NormalIn", SHADER_SOCKET_NORMAL, ShaderInput::NORMAL, true);
 	add_output("Generated", SHADER_SOCKET_POINT);
 	add_output("Normal", SHADER_SOCKET_NORMAL);
 	add_output("UV", SHADER_SOCKET_POINT);
@@ -1797,6 +1825,8 @@ void TextureCoordinateNode::compile(OSLCompiler& compiler)
 	
 	if(compiler.background)
 		compiler.parameter("is_background", true);
+	
+	compiler.parameter("from_dupli", from_dupli);
 
 	compiler.add(this, "node_texture_coordinate");
 }
@@ -2744,7 +2774,7 @@ BumpNode::BumpNode()
 {
 	/* this input is used by the user, but after graph transform it is no longer
 	 * used and moved to sampler center/x/y instead */
-	add_input("Height", SHADER_SOCKET_NORMAL);
+	add_input("Height", SHADER_SOCKET_FLOAT);
 
 	add_input("SampleCenter", SHADER_SOCKET_FLOAT);
 	add_input("SampleX", SHADER_SOCKET_FLOAT);
@@ -2883,7 +2913,7 @@ void SetNormalNode::compile(SVMCompiler& compiler)
 
 void SetNormalNode::compile(OSLCompiler& compiler)
 {
-	compiler.add(this, "set_normal"); 
+	compiler.add(this, "node_set_normal"); 
 }
 
 CCL_NAMESPACE_END

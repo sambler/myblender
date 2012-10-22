@@ -319,7 +319,7 @@ MTex *rna_mtex_texture_slots_add(ID *self_id, struct bContext *C, ReportList *re
 {
 	MTex *mtex = add_mtex_id(self_id, -1);
 	if (mtex == NULL) {
-		BKE_reportf(reports, RPT_ERROR, "maximum number of textures added %d", MAX_MTEX);
+		BKE_reportf(reports, RPT_ERROR, "Maximum number of textures added %d", MAX_MTEX);
 		return NULL;
 	}
 
@@ -334,7 +334,7 @@ MTex *rna_mtex_texture_slots_create(ID *self_id, struct bContext *C, ReportList 
 	MTex *mtex;
 
 	if (index < 0 || index >= MAX_MTEX) {
-		BKE_reportf(reports, RPT_ERROR, "index %d is invalid", index);
+		BKE_reportf(reports, RPT_ERROR, "Index %d is invalid", index);
 		return NULL;
 	}
 
@@ -354,12 +354,12 @@ void rna_mtex_texture_slots_clear(ID *self_id, struct bContext *C, ReportList *r
 	give_active_mtex(self_id, &mtex_ar, &act);
 
 	if (mtex_ar == NULL) {
-		BKE_report(reports, RPT_ERROR, "mtex not found for this type");
+		BKE_report(reports, RPT_ERROR, "Mtex not found for this type");
 		return;
 	}
 	
 	if (index < 0 || index >= MAX_MTEX) {
-		BKE_reportf(reports, RPT_ERROR, "index %d is invalid", index);
+		BKE_reportf(reports, RPT_ERROR, "Index %d is invalid", index);
 		return;
 	}
 
@@ -1826,7 +1826,7 @@ void RNA_def_material(BlenderRNA *brna)
 
     prop= RNA_def_property(srna, "use_light_group_local", PROP_BOOLEAN, PROP_NONE);
     RNA_def_property_boolean_sdna(prop, NULL, "shade_flag", MA_GROUP_LOCAL);
-    RNA_def_property_ui_text(prop, "Light Group Local", "When linked in, Material uses local light group with the same name");
+    RNA_def_property_ui_text(prop, "Light Group Local", "When linked in, material uses local light group with the same name");
     RNA_def_property_update(prop, 0, "rna_Material_update");
 
 	prop = RNA_def_property(srna, "use_raytrace", PROP_BOOLEAN, PROP_NONE);

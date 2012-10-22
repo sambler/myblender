@@ -27,7 +27,7 @@
 /* defines VIEW3D_OT_fly modal operator */
 
 //#define NDOF_FLY_DEBUG
-//#define NDOF_FLY_DRAW_TOOMUCH // is this needed for ndof? - commented so redraw doesnt thrash - campbell
+//#define NDOF_FLY_DRAW_TOOMUCH  /* is this needed for ndof? - commented so redraw doesnt thrash - campbell */
 #include "DNA_anim_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_object_types.h"
@@ -795,8 +795,8 @@ static int flyApply(bContext *C, FlyInfo *fly)
 	ymargin = ar->winy / 20.0f;
 
 	// UNUSED
-	// cent_orig[0]= ar->winrct.xmin + ar->winx/2;
-	// cent_orig[1]= ar->winrct.ymin + ar->winy/2;
+	// cent_orig[0] = ar->winrct.xmin + ar->winx / 2;
+	// cent_orig[1] = ar->winrct.ymin + ar->winy / 2;
 
 	{
 

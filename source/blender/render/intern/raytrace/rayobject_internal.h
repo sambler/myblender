@@ -51,7 +51,7 @@ typedef int  (*RE_rayobjectcontrol_test_break_callback)(void *data);
 
 typedef struct RayObjectControl {
 	void *data;
-	RE_rayobjectcontrol_test_break_callback test_break;	
+	RE_rayobjectcontrol_test_break_callback test_break;
 } RayObjectControl;
 
 /* Returns true if for some reason a heavy processing function should stop
@@ -125,9 +125,9 @@ typedef int  (*RE_rayobject_raycast_callback)(RayObject *, struct Isect *);
 typedef void (*RE_rayobject_add_callback)(RayObject *raytree, RayObject *rayobject);
 typedef void (*RE_rayobject_done_callback)(RayObject *);
 typedef void (*RE_rayobject_free_callback)(RayObject *);
-typedef void (*RE_rayobject_merge_bb_callback)(RayObject *, float *min, float *max);
+typedef void (*RE_rayobject_merge_bb_callback)(RayObject *, float min[3], float max[3]);
 typedef float (*RE_rayobject_cost_callback)(RayObject *);
-typedef void (*RE_rayobject_hint_bb_callback)(RayObject *, struct RayHint *, float *, float *);
+typedef void (*RE_rayobject_hint_bb_callback)(RayObject *, struct RayHint *, float min[3], float max[3]);
 
 typedef struct RayObjectAPI {
 	RE_rayobject_raycast_callback	raycast;
@@ -155,5 +155,4 @@ int RE_rayobject_intersect(RayObject *r, struct Isect *i);
 }
 #endif
 
-#endif
-
+#endif  /* __RAYOBJECT_INTERNAL_H__ */

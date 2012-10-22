@@ -3566,7 +3566,7 @@ void node_draw_link(View2D *v2d, SpaceNode *snode, bNodeLink *link)
 			}
 			do_shaded = TRUE;
 			do_triple = TRUE;
-		}				
+		}
 		else {
 			th_col1 = TH_REDALERT;
 		}

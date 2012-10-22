@@ -87,14 +87,14 @@ static const char *includefiles[] = {
 	"DNA_mesh_types.h",
 	"DNA_meshdata_types.h",
 	"DNA_modifier_types.h",
-	"DNA_lattice_types.h",	
+	"DNA_lattice_types.h",
 	"DNA_object_types.h",
 	"DNA_object_force.h",
 	"DNA_object_fluidsim.h",
 	"DNA_world_types.h",
 	"DNA_scene_types.h",
 	"DNA_view3d_types.h",
-	"DNA_view2d_types.h",	
+	"DNA_view2d_types.h",
 	"DNA_space_types.h",
 	"DNA_userdef_types.h",
 	"DNA_screen_types.h",
@@ -1174,7 +1174,7 @@ int main(int argc, char **argv)
 				strcpy(baseDirectory, BASE_HEADER);
 			}
 
-			fprintf(file, "unsigned char DNAstr[]= {\n");
+			fprintf(file, "const unsigned char DNAstr[] = {\n");
 			if (make_structDNA(baseDirectory, file)) {
 				/* error */
 				fclose(file);
@@ -1183,7 +1183,7 @@ int main(int argc, char **argv)
 			}
 			else {
 				fprintf(file, "};\n");
-				fprintf(file, "int DNAlen = sizeof(DNAstr);\n");
+				fprintf(file, "const int DNAlen = sizeof(DNAstr);\n");
 	
 				fclose(file);
 			}

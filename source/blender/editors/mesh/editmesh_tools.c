@@ -255,7 +255,7 @@ static short edbm_extrude_discrete_faces(BMEditMesh *em, wmOperator *op, const c
 		return 0;
 	}
 
-	return 's'; // s is shrink/fatten
+	return 's';  /* s is shrink/fatten */
 }
 
 /* extrudes individual edges */
@@ -275,7 +275,7 @@ static short edbm_extrude_edges_indiv(BMEditMesh *em, wmOperator *op, const char
 		return 0;
 	}
 
-	return 'n'; // n is normal grab
+	return 'n';  /* n is normal grab */
 }
 
 /* extrudes individual vertices */
@@ -295,7 +295,7 @@ static short edbm_extrude_verts_indiv(BMEditMesh *em, wmOperator *op, const char
 		return 0;
 	}
 
-	return 'g'; // g is grab
+	return 'g';  /* g is grab */
 }
 
 static short edbm_extrude_edge(Object *obedit, BMEditMesh *em, const char hflag, float nor[3])
@@ -2766,7 +2766,7 @@ static float bm_edge_seg_isect(const float sco_a[2], const float sco_b[2],
 				
 				break;
 			}
-		}	
+		}
 		lastdist = dist;
 	}
 	return perc;
@@ -5487,7 +5487,7 @@ static int mesh_symmetrize_exec(bContext *C, wmOperator *op)
 	BMOperator bmop;
 
 	EDBM_op_init(em, &bmop, op, "symmetrize input=%hvef direction=%i",
-				 BM_ELEM_SELECT, RNA_enum_get(op->ptr, "direction"));
+	             BM_ELEM_SELECT, RNA_enum_get(op->ptr, "direction"));
 	BMO_op_exec(em->bm, &bmop);
 
 	if (!EDBM_op_finish(em, &bmop, op, TRUE)) {
@@ -5502,7 +5502,7 @@ static int mesh_symmetrize_exec(bContext *C, wmOperator *op)
 
 void MESH_OT_symmetrize(struct wmOperatorType *ot)
 {
-	static EnumPropertyItem direction_items[] = {
+	static EnumPropertyItem axis_direction_items[] = {
 		{BMO_SYMMETRIZE_NEGATIVE_X, "NEGATIVE_X", 0, "-X to +X", ""},
 		{BMO_SYMMETRIZE_POSITIVE_X, "POSITIVE_X", 0, "+X to -X", ""},
 
@@ -5526,7 +5526,7 @@ void MESH_OT_symmetrize(struct wmOperatorType *ot)
 	/* flags */
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
-	ot->prop = RNA_def_enum(ot->srna, "direction", direction_items,
-							BMO_SYMMETRIZE_NEGATIVE_X,
-							"Direction", "Which sides to copy from and to");
+	ot->prop = RNA_def_enum(ot->srna, "direction", axis_direction_items,
+	                        BMO_SYMMETRIZE_NEGATIVE_X,
+	                        "Direction", "Which sides to copy from and to");
 }

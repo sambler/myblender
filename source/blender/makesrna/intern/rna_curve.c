@@ -62,7 +62,7 @@ EnumPropertyItem keyframe_handle_type_items[] = {
 };
 
 EnumPropertyItem beztriple_interpolation_mode_items[] = {
-	{BEZT_IPO_CONST, "CONSTANT", 0, "Constant", "No interpolation. Value of A gets held until B is encountered"},
+	{BEZT_IPO_CONST, "CONSTANT", 0, "Constant", "No interpolation, value of A gets held until B is encountered"},
 	{BEZT_IPO_LIN, "LINEAR", 0, "Linear", "Straight-line interpolation between A and B (i.e. no ease in/out)"},
 	{BEZT_IPO_BEZ, "BEZIER", 0, "Bezier", "Smooth interpolation between A and B, with some control over curve shape"},
 	{0, NULL, 0, NULL, NULL}
@@ -511,7 +511,7 @@ static void rna_Nurb_update_knot_v(Main *bmain, Scene *scene, PointerRNA *ptr)
 static void rna_Curve_spline_points_add(ID *id, Nurb *nu, ReportList *reports, int number)
 {
 	if (nu->type == CU_BEZIER) {
-		BKE_report(reports, RPT_ERROR, "Bezier spline can't have points added");
+		BKE_report(reports, RPT_ERROR, "Bezier spline cannot have points added");
 	}
 	else if (number == 0) {
 		/* do nothing */
@@ -581,7 +581,7 @@ static void rna_Curve_spline_remove(Curve *cu, ReportList *reports, Nurb *nu)
 	found = BLI_remlink_safe(nurbs, nu);
 
 	if (!found) {
-		BKE_reportf(reports, RPT_ERROR, "Curve \"%s\" does not contain spline given", cu->id.name + 2);
+		BKE_reportf(reports, RPT_ERROR, "Curve '%s' does not contain spline given", cu->id.name + 2);
 		return;
 	}
 

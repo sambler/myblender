@@ -44,6 +44,7 @@ BMLoop *BM_edge_other_loop(BMEdge *e, BMLoop *l);
 BMLoop *BM_face_other_edge_loop(BMFace *f, BMEdge *e, BMVert *v);
 BMLoop *BM_face_other_vert_loop(BMFace *f, BMVert *v_prev, BMVert *v);
 BMLoop *BM_loop_other_vert_loop(BMLoop *l, BMVert *v);
+BMLoop *BM_vert_step_fan_loop(BMLoop *l, BMEdge **e_step);
 BMLoop *BM_vert_find_first_loop(BMVert *v);
 
 int     BM_vert_edge_count_nonwire(BMVert *v);
@@ -74,6 +75,7 @@ BMLoop *BM_face_find_shortest_loop(BMFace *f);
 BMLoop *BM_face_find_longest_loop(BMFace *f);
 
 BMEdge *BM_edge_exists(BMVert *v1, BMVert *v2);
+BMEdge *BM_edge_find_double(BMEdge *e);
 
 int     BM_face_exists_overlap(BMesh *bm, BMVert **varr, int len, BMFace **r_existface);
 

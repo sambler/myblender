@@ -76,6 +76,7 @@
 #include "BKE_gpencil.h"
 #include "BKE_key.h"
 #include "BKE_main.h"
+#include "BKE_mesh.h"
 #include "BKE_modifier.h"
 #include "BKE_movieclip.h"
 #include "BKE_nla.h"
@@ -332,7 +333,7 @@ static void createTransEdge(TransInfo *t)
 	invert_m3_m3(smtx, mtx);
 
 	BM_ITER_MESH (eed, &iter, em->bm, BM_EDGES_OF_MESH) {
-		if (!BM_elem_flag_test(eed, BM_ELEM_HIDDEN) && (BM_elem_flag_test(eed, BM_ELEM_SELECT) || propmode)) { 
+		if (!BM_elem_flag_test(eed, BM_ELEM_HIDDEN) && (BM_elem_flag_test(eed, BM_ELEM_SELECT) || propmode)) {
 			float *bweight = CustomData_bmesh_get(&em->bm->edata, eed->head.data, CD_BWEIGHT);
 			float *crease = CustomData_bmesh_get(&em->bm->edata, eed->head.data, CD_CREASE);
 			
@@ -850,7 +851,7 @@ static short pose_grab_with_ik_add(bPoseChannel *pchan)
 	con = add_pose_constraint(NULL, pchan, "TempConstraint", CONSTRAINT_TYPE_KINEMATIC);
 	pchan->constflag |= (PCHAN_HAS_IK | PCHAN_HAS_TARGET);    /* for draw, but also for detecting while pose solving */
 	data = con->data;
-	if (targetless) { 
+	if (targetless) {
 		/* if exists, use values from last targetless (but disabled) IK-constraint as base */
 		*data = *targetless;
 	}
@@ -2359,6 +2360,7 @@ static void createTransUVs(bContext *C, TransInfo *t)
 	SpaceImage *sima = CTX_wm_space_image(C);
 	Image *ima = CTX_data_edit_image(C);
 	Scene *scene = t->scene;
+	ToolSettings *ts = CTX_data_tool_settings(C);
 	TransData *td = NULL;
 	TransData2D *td2d = NULL;
 	MTexPoly *tf;
@@ -2367,12 +2369,25 @@ static void createTransUVs(bContext *C, TransInfo *t)
 	BMFace *efa;
 	BMLoop *l;
 	BMIter iter, liter;
-	int count = 0, countsel = 0;
+	UvElementMap *elementmap;
+	char *island_enabled;
+	int count = 0, countsel = 0, count_rejected = 0;
 	int propmode = t->flag & T_PROP_EDIT;
+	int propconnected = t->flag & T_PROP_CONNECTED;
 
 	if (!ED_space_image_show_uvedit(sima, t->obedit)) return;
 
 	/* count */
+	if(propconnected) {
+		/* create element map with island information */
+		if (ts->uv_flag & UV_SYNC_SELECTION) {
+			elementmap = EDBM_uv_element_map_create (em, FALSE, TRUE);
+		} else {
+			elementmap = EDBM_uv_element_map_create (em, TRUE, TRUE);
+		}
+		island_enabled = MEM_callocN(sizeof(*island_enabled) * elementmap->totalIslands, "TransIslandData(UV Editing)");
+	}
+
 	BM_ITER_MESH (efa, &iter, em->bm, BM_FACES_OF_MESH) {
 		tf = CustomData_bmesh_get(&em->bm->pdata, efa->head.data, CD_MTEXPOLY);
 
@@ -2380,14 +2395,22 @@ static void createTransUVs(bContext *C, TransInfo *t)
 			BM_elem_flag_disable(efa, BM_ELEM_TAG);
 			continue;
 		}
-		
+
 		BM_elem_flag_enable(efa, BM_ELEM_TAG);
 		BM_ITER_ELEM (l, &liter, efa, BM_LOOPS_OF_FACE) {
-			if (uvedit_uv_select_test(em, scene, l)) 
+			if (uvedit_uv_select_test(em, scene, l)) {
 				countsel++;
 
-			if (propmode)
+				if(propconnected) {
+					UvElement *element = ED_uv_element_get(elementmap, efa, l);
+					island_enabled[element->island] = TRUE;
+				}
+
+			}
+
+			if (propmode) {
 				count++;
+			}
 		}
 	}
 
@@ -2413,10 +2436,24 @@ static void createTransUVs(bContext *C, TransInfo *t)
 		BM_ITER_ELEM (l, &liter, efa, BM_LOOPS_OF_FACE) {
 			if (!propmode && !uvedit_uv_select_test(em, scene, l))
 				continue;
+
+			if (propconnected) {
+				UvElement *element = ED_uv_element_get(elementmap, efa, l);
+				if (!island_enabled[element->island]) {
+					count_rejected++;
+					continue;
+				}
+			}
 			
 			luv = CustomData_bmesh_get(&em->bm->ldata, l->head.data, CD_MLOOPUV);
 			UVsToTransData(sima, td++, td2d++, luv->uv, uvedit_uv_select_test(em, scene, l));
 		}
+	}
+
+	if (propconnected) {
+		t->total -= count_rejected;
+		EDBM_uv_element_map_free(elementmap);
+		MEM_freeN(island_enabled);
 	}
 
 	if (sima->flag & SI_LIVE_UNWRAP)
@@ -3416,14 +3453,14 @@ static void bezt_to_transdata(TransData *td, TransData2D *td2d, AnimData *adt, B
 	if (td->flag & TD_MOVEHANDLE1) {
 		td2d->h1 = bezt->vec[0];
 		copy_v2_v2(td2d->ih1, td2d->h1);
-	} 
-	else 	
+	}
+	else
 		td2d->h1 = NULL;
 
 	if (td->flag & TD_MOVEHANDLE2) {
 		td2d->h2 = bezt->vec[2];
 		copy_v2_v2(td2d->ih2, td2d->h2);
-	} 
+	}
 	else 
 		td2d->h2 = NULL;
 
@@ -3527,7 +3564,7 @@ static void createTransGraphEditData(bContext *C, TransInfo *t)
 						if (sel1) count++;
 						if (sel3) count++;
 					}
-				} 
+				}
 				else if (sipo->around == V3D_LOCAL) {
 					/* for local-pivot we only need to count the number of selected handles only, so that centerpoints don't
 					 * don't get moved wrong
@@ -3622,7 +3659,7 @@ static void createTransGraphEditData(bContext *C, TransInfo *t)
 					if (sel1) {
 						hdata = initTransDataCurveHandles(td, bezt);
 						bezt_to_transdata(td++, td2d++, adt, bezt, 0, 1, 1, intvals, mtx, smtx);
-					} 
+					}
 					else {
 						/* h1= 0; */ /* UNUSED */
 					}
@@ -3631,7 +3668,7 @@ static void createTransGraphEditData(bContext *C, TransInfo *t)
 						if (hdata == NULL)
 							hdata = initTransDataCurveHandles(td, bezt);
 						bezt_to_transdata(td++, td2d++, adt, bezt, 2, 1, 1, intvals, mtx, smtx);
-					} 
+					}
 					else {
 						/* h2= 0; */ /* UNUSED */
 					}

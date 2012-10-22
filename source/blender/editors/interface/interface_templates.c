@@ -199,7 +199,7 @@ static uiBlock *id_search_menu(bContext *C, ARegion *ar, void *arg_litem)
 		
 	
 	uiBoundsBlock(block, 6);
-	uiBlockSetDirection(block, UI_DOWN);	
+	uiBlockSetDirection(block, UI_DOWN);
 	uiEndBlock(C, block);
 	
 	/* give search-field focus */
@@ -580,7 +580,7 @@ void uiTemplateAnyID(uiLayout *layout, PointerRNA *ptr, const char *propname, co
 		RNA_warning("pointer property not found: %s.%s", RNA_struct_identifier(ptr->type), propname);
 		return;
 	}
-	if (!propType || RNA_property_type(propType) != PROP_ENUM) { 
+	if (!propType || RNA_property_type(propType) != PROP_ENUM) {
 		RNA_warning("pointer-type property not found: %s.%s", RNA_struct_identifier(ptr->type), proptypename);
 		return;
 	}
@@ -1281,7 +1281,7 @@ static void colorband_add_cb(bContext *C, void *cb_v, void *coba_v)
 
 	if (colorband_element_add(coba, pos)) {
 		rna_update_cb(C, cb_v, NULL);
-		ED_undo_push(C, "Add colorband");	
+		ED_undo_push(C, "Add colorband");
 	}
 }
 
@@ -1405,7 +1405,7 @@ static void colorband_buttons_small(uiLayout *layout, uiBlock *block, ColorBand 
 		uiItemR(layout, &ptr, "color", 0, "", ICON_NONE);
 	}
 
-	bt = uiDefButS(block, MENU, 0, TIP_("Interpolation %t|Ease %x1|Cardinal %x3|Linear %x0|B-Spline %x2|Constant %x4"),
+	bt = uiDefButS(block, MENU, 0, IFACE_("Interpolation %t|Ease %x1|Cardinal %x3|Linear %x0|B-Spline %x2|Constant %x4"),
 	               xs + 10.0f * unit, butr->ymin + UI_UNIT_Y, unit * 4, UI_UNIT_Y,     &coba->ipotype, 0.0, 0.0, 0, 0,
 	               TIP_("Set interpolation between color stops"));
 	uiButSetNFunc(bt, rna_update_cb, MEM_dupallocN(cb), NULL);
@@ -2744,7 +2744,7 @@ void uiTemplateRunningJobs(uiLayout *layout, bContext *C)
 		uiDefIconTextBut(block, BUT, B_STOPCAST, ICON_CANCEL, IFACE_("Capture"), 0, 0, 85, UI_UNIT_Y, NULL, 0.0f, 0.0f, 0, 0,
 		                 TIP_("Stop screencast"));
 	if (screen->animtimer)
-		uiDefIconTextBut(block, BUT, B_STOPANIM, ICON_CANCEL, TIP_("Anim Player"), 0, 0, 100, UI_UNIT_Y, NULL, 0.0f, 0.0f, 0, 0,
+		uiDefIconTextBut(block, BUT, B_STOPANIM, ICON_CANCEL, IFACE_("Anim Player"), 0, 0, 100, UI_UNIT_Y, NULL, 0.0f, 0.0f, 0, 0,
 		                 TIP_("Stop animation playback"));
 }
 

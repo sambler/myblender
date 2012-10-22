@@ -244,7 +244,7 @@ VertRen *RE_findOrAddVert(ObjectRen *obr, int nr)
 		memset(obr->vertnodes+obr->vertnodeslen, 0, TABLEINITSIZE*sizeof(VertTableNode));
 		
 		obr->vertnodeslen+=TABLEINITSIZE; 
-		if (temp) MEM_freeN(temp);	
+		if (temp) MEM_freeN(temp);
 	}
 	
 	v= obr->vertnodes[a].vert;
@@ -487,7 +487,7 @@ VlakRen *RE_findOrAddVlak(ObjectRen *obr, int nr)
 		memset(obr->vlaknodes+obr->vlaknodeslen, 0, TABLEINITSIZE*sizeof(VlakTableNode));
 
 		obr->vlaknodeslen+=TABLEINITSIZE;  /*Does this really need to be power of 2?*/
-		if (temp) MEM_freeN(temp);	
+		if (temp) MEM_freeN(temp);
 	}
 
 	v= obr->vlaknodes[a].vlak;
@@ -658,7 +658,7 @@ StrandRen *RE_findOrAddStrand(ObjectRen *obr, int nr)
 		memset(obr->strandnodes+obr->strandnodeslen, 0, TABLEINITSIZE*sizeof(StrandTableNode));
 
 		obr->strandnodeslen+=TABLEINITSIZE;  /*Does this really need to be power of 2?*/
-		if (temp) MEM_freeN(temp);	
+		if (temp) MEM_freeN(temp);
 	}
 
 	v= obr->strandnodes[a].strand;
@@ -892,7 +892,7 @@ HaloRen *RE_findOrAddHalo(ObjectRen *obr, int nr)
 		if (temp) memcpy(obr->bloha, temp, obr->blohalen*sizeof(void*));
 		memset(&(obr->bloha[obr->blohalen]), 0, TABLEINITSIZE*sizeof(void*));
 		obr->blohalen+=TABLEINITSIZE;  /*Does this really need to be power of 2?*/
-		if (temp) MEM_freeN(temp);	
+		if (temp) MEM_freeN(temp);
 	}
 	
 	h= obr->bloha[a];
@@ -1356,40 +1356,42 @@ void RE_makeRenderInstances(Render *re)
 	re->instancetable= newlist;
 }
 
-int clip_render_object(float boundbox[][3], float *bounds, float winmat[][4])
+int clip_render_object(float boundbox[][3], float bounds[4], float winmat[][4])
 {
 	float mat[4][4], vec[4];
-	int a, fl, flag= -1;
+	int a, fl, flag = -1;
 
 	copy_m4_m4(mat, winmat);
 
-	for (a=0; a<8; a++) {
+	for (a=0; a < 8; a++) {
 		vec[0]= (a & 1)? boundbox[0][0]: boundbox[1][0];
 		vec[1]= (a & 2)? boundbox[0][1]: boundbox[1][1];
 		vec[2]= (a & 4)? boundbox[0][2]: boundbox[1][2];
 		vec[3]= 1.0;
 		mul_m4_v4(mat, vec);
 
-		fl= 0;
+		fl = 0;
 		if (bounds) {
-			if (vec[0] < bounds[0]*vec[3]) fl |= 1;
-			else if (vec[0] > bounds[1]*vec[3]) fl |= 2;
+			if      (vec[0] < bounds[0] * vec[3]) fl |= 1;
+			else if (vec[0] > bounds[1] * vec[3]) fl |= 2;
 			
-			if (vec[1] > bounds[3]*vec[3]) fl |= 4;
-			else if (vec[1]< bounds[2]*vec[3]) fl |= 8;
+			if      (vec[1] > bounds[3] * vec[3]) fl |= 4;
+			else if (vec[1] < bounds[2] * vec[3]) fl |= 8;
 		}
 		else {
-			if (vec[0] < -vec[3]) fl |= 1;
-			else if (vec[0] > vec[3]) fl |= 2;
+			if      (vec[0] < -vec[3]) fl |= 1;
+			else if (vec[0] >  vec[3]) fl |= 2;
 			
-			if (vec[1] > vec[3]) fl |= 4;
+			if      (vec[1] >  vec[3]) fl |= 4;
 			else if (vec[1] < -vec[3]) fl |= 8;
 		}
-		if (vec[2] < -vec[3]) fl |= 16;
-		else if (vec[2] > vec[3]) fl |= 32;
+		if      (vec[2] < -vec[3]) fl |= 16;
+		else if (vec[2] >  vec[3]) fl |= 32;
 
 		flag &= fl;
-		if (flag==0) return 0;
+		if (flag == 0) {
+			return 0;
+		}
 	}
 
 	return flag;

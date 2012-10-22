@@ -454,7 +454,7 @@ void BKE_object_unlink(Object *ob)
 				if (pchan->custom == ob)
 					pchan->custom = NULL;
 			}
-		} 
+		}
 		else if (ELEM(OB_MBALL, ob->type, obt->type)) {
 			if (BKE_mball_is_basis_for(obt, ob))
 				obt->recalc |= OB_RECALC_DATA;
@@ -2571,7 +2571,7 @@ void BKE_object_handle_update(Scene *scene, Object *ob)
 		if (ob->recalc & OB_RECALC_DATA) {
 			ID *data_id = (ID *)ob->data;
 			AnimData *adt = BKE_animdata_from_id(data_id);
-			float ctime = (float)scene->r.cfra; // XXX this is bad...
+			float ctime = (float)scene->r.cfra;  /* XXX this is bad... */
 			ListBase pidlist;
 			PTCacheID *pid;
 			

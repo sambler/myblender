@@ -527,7 +527,7 @@ static void ui_draw_links(uiBlock *block)
 					foundselectline = TRUE;
 			}
 		}
-	}	
+	}
 
 	/* Draw any active lines (lines with either button being hovered over).
 	 * Do this last so they appear on top of inactive lines. */
@@ -539,7 +539,7 @@ static void ui_draw_links(uiBlock *block)
 						ui_draw_linkline(line, !foundselectline);
 				}
 			}
-		}	
+		}
 	}
 }
 
@@ -581,7 +581,7 @@ static void ui_but_update_linklines(uiBlock *block, uiBut *oldbut, uiBut *newbut
 			if (line->from == newbut)
 				line->from = oldbut;
 		}
-	}		
+	}
 	
 	/* check all other button links */
 	for (but = block->buttons.first; but; but = but->next) {
@@ -628,8 +628,8 @@ static int ui_but_update_from_old_block(const bContext *C, uiBlock *block, uiBut
 //				but->selend= oldbut->selend;
 //				but->softmin= oldbut->softmin;
 //				but->softmax= oldbut->softmax;
-//				but->linkto[0]= oldbut->linkto[0];
-//				but->linkto[1]= oldbut->linkto[1];
+//				but->linkto[0] = oldbut->linkto[0];
+//				but->linkto[1] = oldbut->linkto[1];
 				found = 1;
 //				oldbut->active= NULL;
 			
@@ -1270,7 +1270,7 @@ void ui_delete_linkline(uiLinkLine *line, uiBut *but)
 					(*(link->ppoin))[b] = (*(link->ppoin))[a];
 					b++;
 				}
-			}	
+			}
 			(*(link->totlink))--;
 		}
 	}
@@ -1391,7 +1391,7 @@ int ui_is_but_unit(uiBut *but)
 		return 0;
 #endif
 	
-	/* for now disable time unit conversion */	
+	/* for now disable time unit conversion */
 	if (unit_type == PROP_UNIT_TIME)
 		return 0;
 
@@ -1464,16 +1464,16 @@ double ui_get_but_val(uiBut *but)
 			case 'S': value = hsv[1]; break;
 			case 'V': value = hsv[2]; break;
 		}
-	} 
+	}
 	else if (but->pointype == UI_BUT_POIN_CHAR) {
 		value = *(char *)but->poin;
 	}
 	else if (but->pointype == UI_BUT_POIN_SHORT) {
 		value = *(short *)but->poin;
-	} 
+	}
 	else if (but->pointype == UI_BUT_POIN_INT) {
 		value = *(int *)but->poin;
-	} 
+	}
 	else if (but->pointype == UI_BUT_POIN_FLOAT) {
 		value = *(float *)but->poin;
 	}
@@ -2006,7 +2006,7 @@ void ui_set_but_soft_range(uiBut *but, double value)
 
 static void ui_free_link(uiLink *link)
 {
-	if (link) {	
+	if (link) {
 		BLI_freelistN(&link->lines);
 		MEM_freeN(link);
 	}
@@ -2055,7 +2055,7 @@ void uiFreeBlock(const bContext *C, uiBlock *block)
 	uiBut *but;
 
 	while ( (but = block->buttons.first) ) {
-		BLI_remlink(&block->buttons, but);	
+		BLI_remlink(&block->buttons, but);
 		ui_free_but(C, but);
 	}
 
@@ -2398,7 +2398,7 @@ void uiBlockBeginAlign(uiBlock *block)
 	/* if other align was active, end it */
 	if (block->flag & UI_BUT_ALIGN) uiBlockEndAlign(block);
 
-	block->flag |= UI_BUT_ALIGN_DOWN;	
+	block->flag |= UI_BUT_ALIGN_DOWN;
 	block->alignnr++;
 
 	/* buttons declared after this call will get this align nr */ // XXX flag?

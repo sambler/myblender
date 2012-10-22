@@ -476,7 +476,7 @@ typedef struct RenderData {
 	int color_mgt_flag;
 	
 	/** post-production settings. deprecated, but here for upwards compat (initialized to 1) */
-	float postgamma, posthue, postsat;	 
+	float postgamma, posthue, postsat;
 	
 	 /* Dither noise intensity */
 	float dither_intensity;
@@ -1087,7 +1087,7 @@ typedef struct Scene {
 	
 	short use_nodes;
 	
-	struct bNodeTree *nodetree;	
+	struct bNodeTree *nodetree;
 	
 	struct Editing *ed;								/* sequence editor data is allocated here */
 	

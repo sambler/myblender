@@ -205,7 +205,7 @@ static void precalculate_effector(EffectorCache *eff)
 		float old_vel[3];
 
 		BKE_object_where_is_calc_time(eff->scene, eff->ob, cfra - 1.0f);
-		copy_v3_v3(old_vel, eff->ob->obmat[3]);	
+		copy_v3_v3(old_vel, eff->ob->obmat[3]);
 		BKE_object_where_is_calc_time(eff->scene, eff->ob, cfra);
 		sub_v3_v3v3(eff->velocity, eff->ob->obmat[3], old_vel);
 	}
@@ -718,8 +718,8 @@ static void get_effector_tot(EffectorCache *eff, EffectorData *efd, EffectedPoin
 		
 		if (eff->pd->forcefield == PFIELD_CHARGE) {
 			/* Only the charge of the effected particle is used for 
-			 * interaction, not fall-offs. If the fall-offs aren't the	
-			 * same this will be unphysical, but for animation this		
+			 * interaction, not fall-offs. If the fall-offs aren't the
+			 * same this will be unphysical, but for animation this
 			 * could be the wanted behavior. If you want physical
 			 * correctness the fall-off should be spherical 2.0 anyways.
 			 */
@@ -828,7 +828,7 @@ static void do_physical_effector(EffectorCache *eff, EffectorData *efd, Effected
 {
 	PartDeflect *pd = eff->pd;
 	RNG *rng = pd->rng;
-	float force[3]={0, 0, 0};
+	float force[3] = {0, 0, 0};
 	float temp[3];
 	float fac;
 	float strength = pd->f_strength;
@@ -1020,7 +1020,7 @@ void pdDoEffectors(ListBase *effectors, ListBase *colliders, EffectorWeights *we
 					do_texture_effector(eff, &efd, point, force);
 				}
 				else {
-					float temp1[3]={0, 0, 0}, temp2[3];
+					float temp1[3] = {0, 0, 0}, temp2[3];
 					copy_v3_v3(temp1, force);
 
 					do_physical_effector(eff, &efd, point, force);

@@ -42,10 +42,6 @@
 
 #include <locale.h>
 
-#if defined(_WIN32)
-#include <windows.h>
-#endif
-
 #include "libintl.h"
 
 #include "DNA_userdef_types.h"
@@ -171,7 +167,6 @@ void BLF_lang_set(const char *str)
 	char *locreturn;
 	const char *short_locale;
 	int ok = 1;
-	const char *long_locale = locales[2 * U.language];
 
 	if ((U.transopts & USER_DOTRANSLATE) == 0)
 		return;
@@ -182,25 +177,27 @@ void BLF_lang_set(const char *str)
 		short_locale = locales[2 * U.language + 1];
 
 #if defined(_WIN32) && !defined(FREE_WINDOWS)
-	if (short_locale) {
-		char *envStr;
+	{
+		if (short_locale) {
+			char *envStr;
 
-		if (U.language == 0) /* Use system setting. */
-			envStr = BLI_sprintfN("LANG=%s", getenv("LANG"));
-		else
-			envStr = BLI_sprintfN("LANG=%s", short_locale);
+			if (U.language == 0) /* Use system setting. */
+				envStr = BLI_sprintfN("LANG=%s", getenv("LANG"));
+			else
+				envStr = BLI_sprintfN("LANG=%s", short_locale);
 
-		gettext_putenv(envStr);
-		MEM_freeN(envStr);
-	}
+			gettext_putenv(envStr);
+			MEM_freeN(envStr);
+		}
 
-	locreturn = setlocale(LC_ALL, long_locale);
+		locreturn = setlocale(LC_ALL, short_locale);
 
-	if (locreturn == NULL) {
-		if (G.debug & G_DEBUG)
-			printf("Could not change locale to %s\n", long_locale);
+		if (locreturn == NULL) {
+			if (G.debug & G_DEBUG)
+				printf("Could not change locale to %s\n", short_locale);
 
-		ok = 0;
+			ok = 0;
+		}
 	}
 #else
 	{
@@ -257,7 +254,7 @@ void BLF_lang_set(const char *str)
 		if (locreturn == NULL) {
 			char language[65];
 
-			get_language(long_locale, default_lang, language, sizeof(language));
+			get_language(short_locale, default_lang, language, sizeof(language));
 
 			if (G.debug & G_DEBUG)
 				printf("Fallback to LANG=%s and LANGUAGE=%s\n", default_lang, language);

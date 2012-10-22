@@ -204,4 +204,3 @@ void ED_object_select_linked_by_id(struct bContext *C, struct ID *id);
 #endif
 
 #endif /* __ED_OBJECT_H__ */
-

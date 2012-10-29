@@ -414,6 +414,10 @@ void wm_window_add_ghostwindows(wmWindowManager *wm)
 				win->posy = wm_init_state.start_y;
 				win->sizex = wm_init_state.size_x;
 				win->sizey = wm_init_state.size_y;
+
+				/* we can't properly resize a maximized window */
+				win->windowstate = GHOST_kWindowStateNormal;
+
 				wm_init_state.override_flag &= ~WIN_OVERRIDE_GEOM;
 			}
 
@@ -1076,7 +1080,7 @@ char *WM_clipboard_text_get(int selection)
 		return NULL;
 	
 	/* always convert from \r\n to \n */
-	newbuf = MEM_callocN(strlen(buf) + 1, "WM_clipboard_text_get");
+	newbuf = MEM_callocN(strlen(buf) + 1, __func__);
 
 	for (p = buf, p2 = newbuf; *p; p++) {
 		if (*p != '\r')

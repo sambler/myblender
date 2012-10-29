@@ -951,7 +951,7 @@ static void em_freeData(EmissionMap *em) {
 
 static void emit_from_particles(Object *flow_ob, SmokeDomainSettings *sds, SmokeFlowSettings *sfs, EmissionMap *em, Scene *scene, float time, float dt)
 {
-	if (sfs && sfs->psys && sfs->psys->part && sfs->psys->part->type == PART_EMITTER) // is particle system selected
+	if (sfs && sfs->psys && sfs->psys->part && ELEM(sfs->psys->part->type, PART_EMITTER, PART_FLUID)) // is particle system selected
 	{
 		ParticleSimulationData sim;
 		ParticleSystem *psys = sfs->psys;
@@ -1238,7 +1238,7 @@ static void emit_from_derivedmesh(Object *flow_ob, SmokeDomainSettings *sds, Smo
 							}
 
 							/* apply vertex group influence if used */
-							if (defgrp_index >= 0 && dvert) {
+							if (defgrp_index != -1 && dvert) {
 								float weight_mask = defvert_find_weight(&dvert[v1], defgrp_index) * weights[0] +
 								                    defvert_find_weight(&dvert[v2], defgrp_index) * weights[1] +
 								                    defvert_find_weight(&dvert[v3], defgrp_index) * weights[2];

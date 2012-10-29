@@ -856,10 +856,10 @@ void threaded_makeshadowbufs(Render *re)
 			if (lar->shb)
 				totthread++;
 		
-		totthread= MIN2(totthread, re->r.threads);
+		totthread = min_ii(totthread, re->r.threads);
 	}
 	else
-		totthread= 1; /* preview render */
+		totthread = 1; /* preview render */
 
 	if (totthread <= 1) {
 		for (lar=re->lampren.first; lar; lar= lar->next) {
@@ -1394,7 +1394,7 @@ float shadow_halo(LampRen *lar, const float p1[3], const float p2[3])
 			}
 		}
 		
-		labda = minf(labdax, labday);
+		labda = min_ff(labdax, labday);
 		if (labda==labdao || labda>=1.0f) break;
 		
 		zf= zf1 + labda*(zf2-zf1);

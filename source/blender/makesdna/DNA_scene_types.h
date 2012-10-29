@@ -319,10 +319,11 @@ typedef struct ImageFormatData {
 /* return values from BKE_imtype_valid_depths, note this is depts per channel */
 #define R_IMF_CHAN_DEPTH_1  (1<<0) /* 1bits  (unused) */
 #define R_IMF_CHAN_DEPTH_8  (1<<1) /* 8bits  (default) */
-#define R_IMF_CHAN_DEPTH_12 (1<<2) /* 12bits (uncommon, jp2 supports) */
-#define R_IMF_CHAN_DEPTH_16 (1<<3) /* 16bits (tiff, halff float exr) */
-#define R_IMF_CHAN_DEPTH_24 (1<<4) /* 24bits (unused) */
-#define R_IMF_CHAN_DEPTH_32 (1<<5) /* 32bits (full float exr) */
+#define R_IMF_CHAN_DEPTH_10 (1<<2) /* 10bits (uncommon, Cineon/DPX support) */
+#define R_IMF_CHAN_DEPTH_12 (1<<3) /* 12bits (uncommon, jp2/DPX support) */
+#define R_IMF_CHAN_DEPTH_16 (1<<4) /* 16bits (tiff, halff float exr) */
+#define R_IMF_CHAN_DEPTH_24 (1<<5) /* 24bits (unused) */
+#define R_IMF_CHAN_DEPTH_32 (1<<6) /* 32bits (full float exr) */
 
 /* ImageFormatData.planes */
 #define R_IMF_PLANES_RGB   24
@@ -1188,7 +1189,7 @@ typedef struct Scene {
 
 /* seq_flag */
 #define R_SEQ_GL_PREV 1
-#define R_SEQ_GL_REND 2
+// #define R_SEQ_GL_REND 2  // UNUSED, opengl render has its own operator now.
 
 /* displaymode */
 
@@ -1302,6 +1303,7 @@ typedef struct Scene {
 /* sequencer seq_prev_type seq_rend_type */
 
 
+
 /* **************** SCENE ********************* */
 
 /* for general use */
@@ -1354,8 +1356,8 @@ typedef struct Scene {
 #define	SFRA			(scene->r.sfra)
 #define	EFRA			(scene->r.efra)
 #define PRVRANGEON		(scene->r.flag & SCER_PRV_RANGE)
-#define PSFRA			((PRVRANGEON)? (scene->r.psfra): (scene->r.sfra))
-#define PEFRA			((PRVRANGEON)? (scene->r.pefra): (scene->r.efra))
+#define PSFRA			((PRVRANGEON) ? (scene->r.psfra) : (scene->r.sfra))
+#define PEFRA			((PRVRANGEON) ? (scene->r.pefra) : (scene->r.efra))
 #define FRA2TIME(a)           ((((double) scene->r.frs_sec_base) * (double)(a)) / (double)scene->r.frs_sec)
 #define TIME2FRA(a)           ((((double) scene->r.frs_sec) * (double)(a)) / (double)scene->r.frs_sec_base)
 #define FPS                     (((double) scene->r.frs_sec) / (double)scene->r.frs_sec_base)
@@ -1453,6 +1455,7 @@ typedef enum SculptFlags {
 	SCULPT_SYMMETRY_FEATHER = (1<<6),
 	SCULPT_USE_OPENMP = (1<<7),
 	SCULPT_ONLY_DEFORM = (1<<8),
+	SCULPT_SHOW_DIFFUSE = (1<<9),
 } SculptFlags;
 
 /* ImagePaintSettings.flag */

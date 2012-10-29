@@ -125,62 +125,46 @@ static short constraints_list_needinv(TransInfo *t, ListBase *list);
 
 /* ************************** Functions *************************** */
 
-static void qsort_trans_data(TransInfo *t, TransData *head, TransData *tail, TransData *temp)
+static int trans_data_compare_dist(const void *A, const void *B)
 {
-	TransData *ihead = head;
-	TransData *itail = tail;
-	*temp = *head;
+	const TransData *td_A = (const TransData*)A;
+	const TransData *td_B = (const TransData*)B;
 
-	while (head < tail) {
-		if (t->flag & T_PROP_CONNECTED) {
-			while ((tail->dist >= temp->dist) && (head < tail))
-				tail--;
-		}
-		else {
-			while ((tail->rdist >= temp->rdist) && (head < tail))
-				tail--;
-		}
+	if(td_A->dist < td_B->dist)
+		return -1;
+	else if(td_A->dist > td_B->dist)
+		return 1;
+	
+	return 0;
+}
 
-		if (head != tail) {
-			*head = *tail;
-			head++;
-		}
+static int trans_data_compare_rdist(const void *A, const void *B)
+{
+	const TransData *td_A = (const TransData*)A;
+	const TransData *td_B = (const TransData*)B;
 
-		if (t->flag & T_PROP_CONNECTED) {
-			while ((head->dist <= temp->dist) && (head < tail))
-				head++;
-		}
-		else {
-			while ((head->rdist <= temp->rdist) && (head < tail))
-				head++;
-		}
-
-		if (head != tail) {
-			*tail = *head;
-			tail--;
-		}
-	}
-
-	*head = *temp;
-	if (ihead < head) {
-		qsort_trans_data(t, ihead, head - 1, temp);
-	}
-	if (itail > head) {
-		qsort_trans_data(t, head + 1, itail, temp);
-	}
+	if(td_A->rdist < td_B->rdist)
+		return -1;
+	else if(td_A->rdist > td_B->rdist)
+		return 1;
+	
+	return 0;
 }
 
 void sort_trans_data_dist(TransInfo *t)
 {
-	TransData temp;
 	TransData *start = t->data;
-	int i = 1;
+	int i;
 
-	while (i < t->total && start->flag & TD_SELECTED) {
+	for (i = 0; i < t->total && start->flag & TD_SELECTED; i++)
 		start++;
-		i++;
+	
+	if (i < t->total) {
+		if (t->flag & T_PROP_CONNECTED)
+			qsort(start, t->total - i, sizeof(TransData), trans_data_compare_dist);
+		else
+			qsort(start, t->total - i, sizeof(TransData), trans_data_compare_rdist);
 	}
-	qsort_trans_data(t, start, t->data + t->total - 1, &temp);
 }
 
 static void sort_trans_data(TransInfo *t)
@@ -420,7 +404,7 @@ static short apply_targetless_ik(Object *ob)
 				float rmat[4][4] /*, tmat[4][4], imat[4][4]*/;
 
 				/* pose_mat(b) = pose_mat(b-1) * offs_bone * channel * constraint * IK  */
-				/* we put in channel the entire result of rmat= (channel * constraint * IK) */
+				/* we put in channel the entire result of rmat = (channel * constraint * IK) */
 				/* pose_mat(b) = pose_mat(b-1) * offs_bone * rmat  */
 				/* rmat = pose_mat(b) * inv(pose_mat(b-1) * offs_bone ) */
 
@@ -974,7 +958,7 @@ static void createTransPose(TransInfo *t, Object *ob)
 	if (arm->flag & ARM_RESTPOS) {
 		if (ELEM(t->mode, TFM_DUMMY, TFM_BONESIZE) == 0) {
 			// XXX use transform operator reports
-			// BKE_report(op->reports, RPT_ERROR, "Can't select linked when sync selection is enabled");
+			// BKE_report(op->reports, RPT_ERROR, "Cannot select linked when sync selection is enabled");
 			return;
 		}
 	}
@@ -1831,7 +1815,7 @@ static void editmesh_set_connectivity_distance(BMEditMesh *em, float mtx[][3], f
 			d2 = d + len_v3(vec);
 			
 			if (dists[BM_elem_index_get(v3)] != FLT_MAX)
-				dists[BM_elem_index_get(v3)] = minf(d2, dists[BM_elem_index_get(v3)]);
+				dists[BM_elem_index_get(v3)] = min_ff(d2, dists[BM_elem_index_get(v3)]);
 			else
 				dists[BM_elem_index_get(v3)] = d2;
 			
@@ -2378,11 +2362,12 @@ static void createTransUVs(bContext *C, TransInfo *t)
 	if (!ED_space_image_show_uvedit(sima, t->obedit)) return;
 
 	/* count */
-	if(propconnected) {
+	if (propconnected) {
 		/* create element map with island information */
 		if (ts->uv_flag & UV_SYNC_SELECTION) {
 			elementmap = EDBM_uv_element_map_create (em, FALSE, TRUE);
-		} else {
+		}
+		else {
 			elementmap = EDBM_uv_element_map_create (em, TRUE, TRUE);
 		}
 		island_enabled = MEM_callocN(sizeof(*island_enabled) * elementmap->totalIslands, "TransIslandData(UV Editing)");
@@ -2401,7 +2386,7 @@ static void createTransUVs(bContext *C, TransInfo *t)
 			if (uvedit_uv_select_test(em, scene, l)) {
 				countsel++;
 
-				if(propconnected) {
+				if (propconnected) {
 					UvElement *element = ED_uv_element_get(elementmap, efa, l);
 					island_enabled[element->island] = TRUE;
 				}
@@ -2547,8 +2532,8 @@ void clipUVData(TransInfo *t)
 		if ((td->flag & TD_SKIP) || (!td->loc))
 			continue;
 
-		td->loc[0] = minf(maxf(0.0f, td->loc[0]), aspx);
-		td->loc[1] = minf(maxf(0.0f, td->loc[1]), aspy);
+		td->loc[0] = min_ff(max_ff(0.0f, td->loc[0]), aspx);
+		td->loc[1] = min_ff(max_ff(0.0f, td->loc[1]), aspy);
 	}
 }
 
@@ -3661,7 +3646,7 @@ static void createTransGraphEditData(bContext *C, TransInfo *t)
 						bezt_to_transdata(td++, td2d++, adt, bezt, 0, 1, 1, intvals, mtx, smtx);
 					}
 					else {
-						/* h1= 0; */ /* UNUSED */
+						/* h1 = 0; */ /* UNUSED */
 					}
 					
 					if (sel3) {
@@ -3670,7 +3655,7 @@ static void createTransGraphEditData(bContext *C, TransInfo *t)
 						bezt_to_transdata(td++, td2d++, adt, bezt, 2, 1, 1, intvals, mtx, smtx);
 					}
 					else {
-						/* h2= 0; */ /* UNUSED */
+						/* h2 = 0; */ /* UNUSED */
 					}
 				}
 				
@@ -4300,7 +4285,7 @@ static void freeSeqData(TransInfo *t)
 						for (a = 0; a < t->total; a++, td++) {
 							seq = ((TransDataSeq *)td->extra)->seq;
 							if ((seq != seq_prev)) {
-								minframe = mini(minframe, seq->startdisp);
+								minframe = min_ii(minframe, seq->startdisp);
 							}
 						}
 
@@ -4506,6 +4491,7 @@ static short constraints_list_needinv(TransInfo *t, ListBase *list)
 				if (con->type == CONSTRAINT_TYPE_FOLLOWPATH) return 1;
 				if (con->type == CONSTRAINT_TYPE_CLAMPTO) return 1;
 				if (con->type == CONSTRAINT_TYPE_OBJECTSOLVER) return 1;
+				if (con->type == CONSTRAINT_TYPE_FOLLOWTRACK) return 1;
 				
 				/* constraints that require this only under special conditions */
 				if (con->type == CONSTRAINT_TYPE_ROTLIKE) {
@@ -4582,7 +4568,7 @@ static void ObjectToTransData(TransInfo *t, TransData *td, Object *ob)
 		
 		td->ext->irotAngle = ob->rotAngle;
 		copy_v3_v3(td->ext->irotAxis, ob->rotAxis);
-		// td->ext->drotAngle= ob->drotAngle;			// XXX, not implemented
+		// td->ext->drotAngle = ob->drotAngle;			// XXX, not implemented
 		// copy_v3_v3(td->ext->drotAxis, ob->drotAxis);	// XXX, not implemented
 	}
 	else {
@@ -4640,7 +4626,7 @@ static void set_trans_object_base_flags(TransInfo *t)
 
 	/*
 	 * if Base selected and has parent selected:
-	 * base->flag= BA_WAS_SEL
+	 * base->flag = BA_WAS_SEL
 	 */
 	Base *base;
 

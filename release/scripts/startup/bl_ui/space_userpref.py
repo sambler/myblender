@@ -299,9 +299,9 @@ class USERPREF_PT_edit(Panel):
         col.label(text="Grease Pencil:")
         col.prop(edit, "grease_pencil_manhattan_distance", text="Manhattan Distance")
         col.prop(edit, "grease_pencil_euclidean_distance", text="Euclidean Distance")
-        #~ col.prop(edit, "use_grease_pencil_simplify_stroke", text="Simplify Stroke")
         col.prop(edit, "grease_pencil_eraser_radius", text="Eraser Radius")
         col.prop(edit, "use_grease_pencil_smooth_stroke", text="Smooth Stroke")
+        col.prop(edit, "use_grease_pencil_simplify_stroke", text="Simplify Stroke")
         col.separator()
         col.separator()
         col.separator()
@@ -1093,7 +1093,7 @@ class USERPREF_PT_addons(Panel):
                     (filter == info["category"]) or
                     (filter == "Enabled" and is_enabled) or
                     (filter == "Disabled" and not is_enabled) or
-                    (filter == "User" and (mod.__file__.startswith(scripts_addons_folder, userpref_addons_folder)))
+                    (filter == "User" and (mod.__file__.startswith((scripts_addons_folder, userpref_addons_folder))))
                    ):
 
                 if search and search not in info["name"].lower():

@@ -674,6 +674,8 @@ int WM_menu_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 	else {
 		pup = uiPupMenuBegin(C, RNA_struct_ui_name(op->type->srna), ICON_NONE);
 		layout = uiPupMenuLayout(pup);
+		/* set this so the default execution context is the same as submenus */
+		uiLayoutSetOperatorContext(layout, WM_OP_INVOKE_REGION_WIN);
 		uiItemsFullEnumO(layout, op->type->idname, RNA_property_identifier(prop), op->ptr->data, WM_OP_EXEC_REGION_WIN, 0);
 		uiPupMenuEnd(C, pup);
 	}
@@ -745,7 +747,7 @@ static uiBlock *wm_enum_search_menu(bContext *C, ARegion *ar, void *arg_op)
 	wmOperator *op = (wmOperator *)arg_op;
 
 	block = uiBeginBlock(C, ar, "_popup", UI_EMBOSS);
-	uiBlockSetFlag(block, UI_BLOCK_LOOP | UI_BLOCK_RET_1 | UI_BLOCK_MOVEMOUSE_QUIT);
+	uiBlockSetFlag(block, UI_BLOCK_LOOP | UI_BLOCK_MOVEMOUSE_QUIT | UI_BLOCK_SEARCH_MENU);
 
 #if 0 /* ok, this isn't so easy... */
 	uiDefBut(block, LABEL, 0, RNA_struct_ui_name(op->type->srna), 10, 10, 180, UI_UNIT_Y, NULL, 0.0, 0.0, 0, 0, "");
@@ -993,7 +995,7 @@ static uiBlock *wm_block_create_redo(bContext *C, ARegion *ar, void *arg_op)
 
 	block = uiBeginBlock(C, ar, __func__, UI_EMBOSS);
 	uiBlockClearFlag(block, UI_BLOCK_LOOP);
-	uiBlockSetFlag(block, UI_BLOCK_KEEP_OPEN | UI_BLOCK_RET_1 | UI_BLOCK_MOVEMOUSE_QUIT);
+	uiBlockSetFlag(block, UI_BLOCK_KEEP_OPEN | UI_BLOCK_MOVEMOUSE_QUIT);
 
 	/* if register is not enabled, the operator gets freed on OPERATOR_FINISHED
 	 * ui_apply_but_funcs_after calls ED_undo_operator_repeate_cb and crashes */
@@ -1071,7 +1073,7 @@ static uiBlock *wm_block_dialog_create(bContext *C, ARegion *ar, void *userData)
 
 	/* intentionally don't use 'UI_BLOCK_MOVEMOUSE_QUIT', some dialogs have many items
 	 * where quitting by accident is very annoying */
-	uiBlockSetFlag(block, UI_BLOCK_KEEP_OPEN | UI_BLOCK_RET_1);
+	uiBlockSetFlag(block, UI_BLOCK_KEEP_OPEN);
 
 	layout = uiBlockLayout(block, UI_LAYOUT_VERTICAL, UI_LAYOUT_PANEL, 0, 0, data->width, data->height, style);
 	
@@ -1112,7 +1114,7 @@ static uiBlock *wm_operator_ui_create(bContext *C, ARegion *ar, void *userData)
 
 	block = uiBeginBlock(C, ar, __func__, UI_EMBOSS);
 	uiBlockClearFlag(block, UI_BLOCK_LOOP);
-	uiBlockSetFlag(block, UI_BLOCK_KEEP_OPEN | UI_BLOCK_RET_1 | UI_BLOCK_MOVEMOUSE_QUIT);
+	uiBlockSetFlag(block, UI_BLOCK_KEEP_OPEN | UI_BLOCK_MOVEMOUSE_QUIT);
 
 	layout = uiBlockLayout(block, UI_LAYOUT_VERTICAL, UI_LAYOUT_PANEL, 0, 0, data->width, data->height, style);
 
@@ -1320,7 +1322,11 @@ static uiBlock *wm_block_create_splash(bContext *C, ARegion *ar, void *UNUSED(ar
 #endif  /* WITH_BUILDINFO */
 
 	block = uiBeginBlock(C, ar, "_popup", UI_EMBOSS);
-	uiBlockSetFlag(block, UI_BLOCK_KEEP_OPEN);
+
+	/* note on UI_BLOCK_NO_WIN_CLIP, the window size is not always synchronized
+	 * with the OS when the splash shows, window clipping in this case gives
+	 * ugly results and clipping the splash isn't useful anyway, just disable it [#32938] */
+	uiBlockSetFlag(block, UI_BLOCK_KEEP_OPEN | UI_BLOCK_NO_WIN_CLIP);
 	
 	but = uiDefBut(block, BUT_IMAGE, 0, "", 0, 10, 501, 282, ibuf, 0.0, 0.0, 0, 0, ""); /* button owns the imbuf now */
 	uiButSetFunc(but, wm_block_splash_close, block, NULL);
@@ -1459,7 +1465,7 @@ static uiBlock *wm_block_search_menu(bContext *C, ARegion *ar, void *UNUSED(arg_
 	uiBut *but;
 	
 	block = uiBeginBlock(C, ar, "_popup", UI_EMBOSS);
-	uiBlockSetFlag(block, UI_BLOCK_LOOP | UI_BLOCK_RET_1 | UI_BLOCK_MOVEMOUSE_QUIT);
+	uiBlockSetFlag(block, UI_BLOCK_LOOP | UI_BLOCK_MOVEMOUSE_QUIT | UI_BLOCK_SEARCH_MENU);
 	
 	but = uiDefSearchBut(block, search, 0, ICON_VIEWZOOM, sizeof(search), 10, 10, 9 * UI_UNIT_X, UI_UNIT_Y, 0, 0, "");
 	uiButSetSearchFunc(but, operator_search_cb, NULL, operator_call_cb, NULL);
@@ -2282,10 +2288,10 @@ static int border_apply_rect(wmOperator *op)
 
 	
 	/* operator arguments and storage. */
-	RNA_int_set(op->ptr, "xmin", MIN2(rect->xmin, rect->xmax));
-	RNA_int_set(op->ptr, "ymin", MIN2(rect->ymin, rect->ymax));
-	RNA_int_set(op->ptr, "xmax", MAX2(rect->xmin, rect->xmax));
-	RNA_int_set(op->ptr, "ymax", MAX2(rect->ymin, rect->ymax));
+	RNA_int_set(op->ptr, "xmin", min_ii(rect->xmin, rect->xmax));
+	RNA_int_set(op->ptr, "ymin", min_ii(rect->ymin, rect->ymax));
+	RNA_int_set(op->ptr, "xmax", max_ii(rect->xmin, rect->xmax));
+	RNA_int_set(op->ptr, "ymax", max_ii(rect->ymin, rect->ymax));
 
 	return 1;
 }

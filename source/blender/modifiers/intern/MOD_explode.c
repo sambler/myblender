@@ -813,7 +813,7 @@ static DerivedMesh *explodeMesh(ExplodeModifierData *emd,
 	sim.psys = psmd->psys;
 	sim.psmd = psmd;
 
-	/* timestep= psys_get_timestep(&sim); */
+	/* timestep = psys_get_timestep(&sim); */
 
 	cfra = BKE_scene_frame_get(scene);
 
@@ -861,7 +861,7 @@ static DerivedMesh *explodeMesh(ExplodeModifierData *emd,
 	/* the final duplicated vertices */
 	explode = CDDM_from_template(dm, totdup, 0, totface - delface, 0, 0);
 	mtface = CustomData_get_layer_named(&explode->faceData, CD_MTFACE, emd->uvname);
-	/*dupvert= CDDM_get_verts(explode);*/
+	/*dupvert = CDDM_get_verts(explode);*/
 
 	/* getting back to object space */
 	invert_m4_m4(imat, ob->obmat);
@@ -1039,26 +1039,26 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 
 
 ModifierTypeInfo modifierType_Explode = {
-	/* name */ "Explode",
-	/* structName */ "ExplodeModifierData",
-	/* structSize */ sizeof(ExplodeModifierData),
-	/* type */ eModifierTypeType_Constructive,
-	/* flags */ eModifierTypeFlag_AcceptsMesh,
-	/* copyData */ copyData,
-	/* deformVerts */ NULL,
-	/* deformMatrices */ NULL,
-	/* deformVertsEM */ NULL,
-	/* deformMatricesEM */ NULL,
-	/* applyModifier */ applyModifier,
-	/* applyModifierEM */ NULL,
-	/* initData */ initData,
-	/* requiredDataMask */ requiredDataMask,
-	/* freeData */ freeData,
-	/* isDisabled */ NULL,
-	/* updateDepgraph */ NULL,
-	/* dependsOnTime */ dependsOnTime,
-	/* dependsOnNormals */ NULL,
+	/* name */              "Explode",
+	/* structName */        "ExplodeModifierData",
+	/* structSize */        sizeof(ExplodeModifierData),
+	/* type */              eModifierTypeType_Constructive,
+	/* flags */             eModifierTypeFlag_AcceptsMesh,
+	/* copyData */          copyData,
+	/* deformVerts */       NULL,
+	/* deformMatrices */    NULL,
+	/* deformVertsEM */     NULL,
+	/* deformMatricesEM */  NULL,
+	/* applyModifier */     applyModifier,
+	/* applyModifierEM */   NULL,
+	/* initData */          initData,
+	/* requiredDataMask */  requiredDataMask,
+	/* freeData */          freeData,
+	/* isDisabled */        NULL,
+	/* updateDepgraph */    NULL,
+	/* dependsOnTime */     dependsOnTime,
+	/* dependsOnNormals */  NULL,
 	/* foreachObjectLink */ NULL,
-	/* foreachIDLink */ NULL,
-	/* foreachTexLink */ NULL,
+	/* foreachIDLink */     NULL,
+	/* foreachTexLink */    NULL,
 };

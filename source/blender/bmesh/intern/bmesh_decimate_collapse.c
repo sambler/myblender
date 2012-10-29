@@ -20,10 +20,10 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/bmesh/intern/bmesh_decimate.c
+/** \file blender/bmesh/intern/bmesh_decimate_collapse.c
  *  \ingroup bmesh
  *
- * BMesh decimator.
+ * BMesh decimator that uses an edge collapse method.
  */
 
 #include <stddef.h>
@@ -40,23 +40,16 @@
 
 #include "bmesh.h"
 #include "bmesh_structure.h"
-#include "bmesh_decimate.h"
+#include "bmesh_decimate.h"  /* own include */
 
 /* defines for testing */
 #define USE_CUSTOMDATA
 #define USE_TRIANGULATE
-// #define USE_PRESERVE_BOUNDARY  /* could disable but its nicer not to mix boundary/non-boundry verts */
 
 /* these checks are for rare cases that we can't avoid since they are valid meshes still */
 #define USE_SAFETY_CHECKS
 
 #define BOUNDARY_PRESERVE_WEIGHT 100.0f
-
-
-#ifdef USE_PRESERVE_BOUNDARY
-/* re-use smooth for tagging boundary edges, not totally great */
-#define BM_ELEM_IS_BOUNDARY _BM_ELEM_TAG_ALT
-#endif
 
 typedef enum CD_UseFlag {
 	CD_DO_VERT,
@@ -112,12 +105,6 @@ static void bm_decim_build_quadrics(BMesh *bm, Quadric *vquadrics)
 				BLI_quadric_add_qu_qu(&vquadrics[BM_elem_index_get(e->v2)], &q);
 			}
 		}
-#ifdef USE_PRESERVE_BOUNDARY
-		/* init: runs first! */
-		/* unrelated, but do on an edge loop before we start collapsing */
-		BM_elem_flag_disable(e->v1, BM_ELEM_IS_BOUNDARY);
-		BM_elem_flag_disable(e->v2, BM_ELEM_IS_BOUNDARY);
-#endif
 	}
 }
 
@@ -125,7 +112,7 @@ static void bm_decim_build_quadrics(BMesh *bm, Quadric *vquadrics)
 static void bm_decim_calc_target_co(BMEdge *e, float optimize_co[3],
                                     const Quadric *vquadrics)
 {
-	/* compute an edge contration target for edge ei
+	/* compute an edge contration target for edge 'e'
 	 * this is computed by summing it's vertices quadrics and
 	 * optimizing the result. */
 	Quadric q;
@@ -144,7 +131,7 @@ static void bm_decim_calc_target_co(BMEdge *e, float optimize_co[3],
 }
 
 static void bm_decim_build_edge_cost_single(BMEdge *e,
-                                            const Quadric *vquadrics,
+                                            const Quadric *vquadrics, const float *vweights,
                                             Heap *eheap, HeapNode **eheap_table)
 {
 	const Quadric *q1, *q2;
@@ -180,6 +167,16 @@ static void bm_decim_build_edge_cost_single(BMEdge *e,
 		eheap_table[BM_elem_index_get(e)] = NULL;
 		return;
 	}
+
+	if (vweights) {
+		if ((vweights[BM_elem_index_get(e->v1)] < FLT_EPSILON) &&
+		    (vweights[BM_elem_index_get(e->v2)] < FLT_EPSILON))
+		{
+			/* skip collapsing this edge */
+			eheap_table[BM_elem_index_get(e)] = NULL;
+			return;
+		}
+	}
 	/* end sanity check */
 
 
@@ -188,14 +185,21 @@ static void bm_decim_build_edge_cost_single(BMEdge *e,
 	q1 = &vquadrics[BM_elem_index_get(e->v1)];
 	q2 = &vquadrics[BM_elem_index_get(e->v2)];
 
-	cost = (BLI_quadric_evaluate(q1, optimize_co) + BLI_quadric_evaluate(q2, optimize_co));
+	if (vweights == NULL) {
+		cost = (BLI_quadric_evaluate(q1, optimize_co) +
+		        BLI_quadric_evaluate(q2, optimize_co));
+	}
+	else {
+		cost = ((BLI_quadric_evaluate(q1, optimize_co) * vweights[BM_elem_index_get(e->v1)]) +
+		        (BLI_quadric_evaluate(q2, optimize_co) * vweights[BM_elem_index_get(e->v2)]));
+	}
 	// print("COST %.12f\n");
 
 	eheap_table[BM_elem_index_get(e)] = BLI_heap_insert(eheap, cost, e);
 }
 
 static void bm_decim_build_edge_cost(BMesh *bm,
-                                     const Quadric *vquadrics,
+                                     const Quadric *vquadrics, const float *vweights,
                                      Heap *eheap, HeapNode **eheap_table)
 {
 	BMIter iter;
@@ -204,16 +208,7 @@ static void bm_decim_build_edge_cost(BMesh *bm,
 
 	BM_ITER_MESH_INDEX (e, &iter, bm, BM_EDGES_OF_MESH, i) {
 		eheap_table[i] = NULL;  /* keep sanity check happy */
-		bm_decim_build_edge_cost_single(e, vquadrics, eheap, eheap_table);
-
-#ifdef USE_PRESERVE_BOUNDARY
-		/* init: runs second! */
-		if (BM_edge_is_boundary(e)) {
-			/* unrelated, but do on an edge loop before we start collapsing */
-			BM_elem_flag_enable(e->v1, BM_ELEM_IS_BOUNDARY);
-			BM_elem_flag_enable(e->v2, BM_ELEM_IS_BOUNDARY);
-		}
-#endif
+		bm_decim_build_edge_cost_single(e, vquadrics, vweights, eheap, eheap_table);
 	}
 }
 
@@ -236,12 +231,6 @@ static void bm_decim_build_edge_cost(BMesh *bm,
 
 static int bm_decim_triangulate_begin(BMesh *bm)
 {
-#ifdef USE_SAFETY_CHECKS
-	const int check_double_edges = TRUE;
-#else
-	const int check_double_edges = FALSE;
-#endif
-
 	BMIter iter;
 	BMFace *f;
 	// int has_quad;  // could optimize this a little
@@ -268,15 +257,16 @@ static int bm_decim_triangulate_begin(BMesh *bm)
 	BM_ITER_MESH (f, &iter, bm, BM_FACES_OF_MESH) {
 		if (f->len == 4) {
 			BMLoop *f_l[4];
-			BMLoop *l_iter;
 			BMLoop *l_a, *l_b;
 
-			l_iter = BM_FACE_FIRST_LOOP(f);
+			{
+				BMLoop *l_iter = BM_FACE_FIRST_LOOP(f);
 
-			f_l[0] = l_iter; l_iter = l_iter->next;
-			f_l[1] = l_iter; l_iter = l_iter->next;
-			f_l[2] = l_iter; l_iter = l_iter->next;
-			f_l[3] = l_iter; l_iter = l_iter->next;
+				f_l[0] = l_iter; l_iter = l_iter->next;
+				f_l[1] = l_iter; l_iter = l_iter->next;
+				f_l[2] = l_iter; l_iter = l_iter->next;
+				f_l[3] = l_iter;
+			}
 
 			if (len_squared_v3v3(f_l[0]->v->co, f_l[2]->v->co) <
 			    len_squared_v3v3(f_l[1]->v->co, f_l[3]->v->co))
@@ -289,6 +279,9 @@ static int bm_decim_triangulate_begin(BMesh *bm)
 				l_b = f_l[3];
 			}
 
+#ifdef USE_SAFETY_CHECKS
+			if (BM_edge_exists(l_a->v, l_b->v) == FALSE)
+#endif
 			{
 				BMFace *f_new;
 				BMLoop *l_new;
@@ -297,7 +290,7 @@ static int bm_decim_triangulate_begin(BMesh *bm)
 				 * - if there is a quad that has a free standing edge joining it along
 				 * where we want to split the face, there isnt a good way we can handle this.
 				 * currently that edge will get removed when joining the tris back into a quad. */
-				f_new = BM_face_split(bm, f, l_a->v, l_b->v, &l_new, NULL, check_double_edges);
+				f_new = BM_face_split(bm, f, l_a->v, l_b->v, &l_new, NULL, FALSE);
 
 				if (f_new) {
 					/* the value of this doesn't matter, only that the 2 loops match and have unique values */
@@ -342,10 +335,27 @@ static void bm_decim_triangulate_end(BMesh *bm)
 			if (l_a_index != -1) {
 				const int l_b_index = BM_elem_index_get(l_b);
 				if (l_a_index == l_b_index) {
-					/* highly unlikely to fail, but prevents possible double-ups */
-					if (l_a->f->len == 3 && l_b->f->len == 3) {
-						BMFace *f[2] = {l_a->f, l_b->f};
-						BM_faces_join(bm, f, 2, TRUE);
+					if (LIKELY(l_a->f->len == 3 && l_b->f->len == 3)) {
+						if (l_a->v != l_b->v) {  /* if this is the case, faces have become flipped */
+							/* check we are not making a degenerate quad */
+							BMVert *vquad[4] = {
+								e->v1,
+								BM_vert_in_edge(e, l_a->next->v) ? l_a->prev->v : l_a->next->v,
+								e->v2,
+								BM_vert_in_edge(e, l_b->next->v) ? l_b->prev->v : l_b->next->v,
+							};
+
+							BLI_assert(ELEM3(vquad[0], vquad[1], vquad[2], vquad[3]) == FALSE);
+							BLI_assert(ELEM3(vquad[1], vquad[0], vquad[2], vquad[3]) == FALSE);
+							BLI_assert(ELEM3(vquad[2], vquad[1], vquad[0], vquad[3]) == FALSE);
+							BLI_assert(ELEM3(vquad[3], vquad[1], vquad[2], vquad[0]) == FALSE);
+
+							if (is_quad_convex_v3(vquad[0]->co, vquad[1]->co, vquad[2]->co, vquad[3]->co)) {
+								/* highly unlikely to fail, but prevents possible double-ups */
+								BMFace *f[2] = {l_a->f, l_b->f};
+								BM_faces_join(bm, f, 2, TRUE);
+							}
+						}
 					}
 				}
 			}
@@ -385,6 +395,7 @@ static void bm_edge_collapse_loop_customdata(BMesh *bm, BMLoop *l, BMVert *v_cle
 
 	BLI_assert(l_clear->v == v_clear);
 	BLI_assert(l_other->v == v_other);
+	(void)v_other;  /* quiet warnings for release */
 
 	/* now we have both corners of the face 'l->f' */
 	for (side = 0; side < 2; side++) {
@@ -500,6 +511,18 @@ static int bm_edge_tag_test(BMEdge *e)
 	        );
 }
 
+/* takes the edges loop */
+BLI_INLINE int bm_edge_is_manifold_or_boundary(BMLoop *l)
+{
+#if 0
+	/* less optimized version of check below */
+	return (BM_edge_is_manifold(l->e) || BM_edge_is_boundary(l->e);
+#else
+	/* if the edge is a boundary it points to its self, else this must be a manifold */
+	return LIKELY(l) && LIKELY(l->radial_next->radial_next == l);
+#endif
+}
+
 static int bm_edge_collapse_is_degenerate(BMEdge *e_first)
 {
 	/* simply check that there is no overlap between faces and edges of each vert,
@@ -507,33 +530,10 @@ static int bm_edge_collapse_is_degenerate(BMEdge *e_first)
 
 	BMEdge *e_iter;
 
-#ifdef USE_PRESERVE_BOUNDARY
-	const int is_boundary = BM_edge_is_boundary(e_first);
-
-	if (BM_elem_flag_test(e_first->v1, BM_ELEM_IS_BOUNDARY) !=
-	    BM_elem_flag_test(e_first->v2, BM_ELEM_IS_BOUNDARY))
-	{
-		return TRUE;
-	}
-	if ((is_boundary == FALSE) &&
-	    (BM_elem_flag_test(e_first->v1, BM_ELEM_IS_BOUNDARY) ||
-	     BM_elem_flag_test(e_first->v2, BM_ELEM_IS_BOUNDARY)))
-	{
-		return TRUE;
-	}
-
-	/* sanity */
-	if (is_boundary == TRUE) {
-		BLI_assert(BM_elem_flag_test(e_first->v1, BM_ELEM_IS_BOUNDARY) != FALSE);
-		BLI_assert(BM_elem_flag_test(e_first->v2, BM_ELEM_IS_BOUNDARY) != FALSE);
-	}
-
-#endif  /* USE_PRESERVE_BOUNDARY */
-
 	/* clear flags on both disks */
 	e_iter = e_first;
 	do {
-		if (!(BM_edge_is_manifold(e_iter) || BM_edge_is_boundary(e_iter))) {
+		if (!bm_edge_is_manifold_or_boundary(e_iter->l)) {
 			return TRUE;
 		}
 		bm_edge_tag_disable(e_iter);
@@ -541,7 +541,7 @@ static int bm_edge_collapse_is_degenerate(BMEdge *e_first)
 
 	e_iter = e_first;
 	do {
-		if (!(BM_edge_is_manifold(e_iter) || BM_edge_is_boundary(e_iter))) {
+		if (!bm_edge_is_manifold_or_boundary(e_iter->l)) {
 			return TRUE;
 		}
 		bm_edge_tag_disable(e_iter);
@@ -764,7 +764,7 @@ static int bm_edge_collapse(BMesh *bm, BMEdge *e_clear, BMVert *v_clear, int r_e
 
 /* collapse e the edge, removing e->v2 */
 static void bm_decim_edge_collapse(BMesh *bm, BMEdge *e,
-                                   Quadric *vquadrics,
+                                   Quadric *vquadrics, float *vweights,
                                    Heap *eheap, HeapNode **eheap_table,
                                    const CD_UseFlag customdata_flag)
 {
@@ -796,6 +796,12 @@ static void bm_decim_edge_collapse(BMesh *bm, BMEdge *e,
 		/* update collapse info */
 		int i;
 
+		if (vweights) {
+			const int fac = CLAMPIS(customdata_fac, 0.0f, 1.0f);
+			vweights[BM_elem_index_get(v_other)] = (vweights[v_clear_index]              * (1.0f - fac)) +
+			                                       (vweights[BM_elem_index_get(v_other)] * fac);
+		}
+
 		e = NULL;  /* paranoid safety check */
 
 		copy_v3_v3(v_other->co, optimize_co);
@@ -825,7 +831,7 @@ static void bm_decim_edge_collapse(BMesh *bm, BMEdge *e,
 			e_iter = e_first = v_other->e;
 			do {
 				BLI_assert(BM_edge_find_double(e_iter) == NULL);
-				bm_decim_build_edge_cost_single(e_iter, vquadrics, eheap, eheap_table);
+				bm_decim_build_edge_cost_single(e_iter, vquadrics, vweights, eheap, eheap_table);
 			} while ((e_iter = bmesh_disk_edge_next(e_iter, v_other)) != e_first);
 		}
 
@@ -857,7 +863,14 @@ static void bm_decim_edge_collapse(BMesh *bm, BMEdge *e,
 /* Main Decimate Function
  * ********************** */
 
-void BM_mesh_decimate(BMesh *bm, const float factor)
+/**
+ * \brief BM_mesh_decimate
+ * \param bm The mesh
+ * \param factor face count multiplier [0 - 1]
+ * \param vertex_weights Optional array of vertex  aligned weights [0 - 1],
+ *        a vertex group is the usual source for this.
+ */
+void BM_mesh_decimate_collapse(BMesh *bm, const float factor, float *vweights, const int do_triangulate)
 {
 	Heap *eheap;             /* edge heap */
 	HeapNode **eheap_table;  /* edge index aligned table pointing to the eheap */
@@ -885,7 +898,7 @@ void BM_mesh_decimate(BMesh *bm, const float factor)
 	/* build initial edge collapse cost data */
 	bm_decim_build_quadrics(bm, vquadrics);
 
-	bm_decim_build_edge_cost(bm, vquadrics, eheap, eheap_table);
+	bm_decim_build_edge_cost(bm, vquadrics, vweights, eheap, eheap_table);
 
 	face_tot_target = bm->totface * factor;
 	bm->elem_index_dirty |= BM_FACE | BM_EDGE | BM_VERT;
@@ -910,15 +923,17 @@ void BM_mesh_decimate(BMesh *bm, const float factor)
 		 * but NULL just incase so we don't use freed node */
 		eheap_table[BM_elem_index_get(e)] = NULL;
 
-		bm_decim_edge_collapse(bm, e, vquadrics, eheap, eheap_table, customdata_flag);
+		bm_decim_edge_collapse(bm, e, vquadrics, vweights, eheap, eheap_table, customdata_flag);
 	}
 
 
 #ifdef USE_TRIANGULATE
-	/* its possible we only had triangles, skip this step in that case */
-	if (LIKELY(use_triangulate)) {
-		/* temp convert quads to triangles */
-		bm_decim_triangulate_end(bm);
+	if (do_triangulate == FALSE) {
+		/* its possible we only had triangles, skip this step in that case */
+		if (LIKELY(use_triangulate)) {
+			/* temp convert quads to triangles */
+			bm_decim_triangulate_end(bm);
+		}
 	}
 #endif
 

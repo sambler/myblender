@@ -175,7 +175,7 @@ static uiBlock *id_search_menu(bContext *C, ARegion *ar, void *arg_litem)
 	idptr = RNA_property_pointer_get(&template.ptr, template.prop);
 
 	block = uiBeginBlock(C, ar, "_popup", UI_EMBOSS);
-	uiBlockSetFlag(block, UI_BLOCK_LOOP | UI_BLOCK_REDRAW | UI_BLOCK_RET_1);
+	uiBlockSetFlag(block, UI_BLOCK_LOOP | UI_BLOCK_REDRAW | UI_BLOCK_SEARCH_MENU);
 	
 	/* preview thumbnails */
 	if (template.prv_rows > 0 && template.prv_cols > 0) {
@@ -400,7 +400,7 @@ static void template_ID(bContext *C, uiLayout *layout, TemplateID *template, Str
 
 		//text_idbutton(id, name);
 		name[0] = '\0';
-		but = uiDefButR(block, TEX, 0, name, 0, 0, UI_UNIT_X * 6, UI_UNIT_Y, &idptr, "name", -1, 0, 0, -1, -1, NULL);
+		but = uiDefButR(block, TEX, 0, name, 0, 0, UI_UNIT_X * 6, UI_UNIT_Y, &idptr, "name", -1, 0, 0, -1, -1, RNA_struct_ui_description(type));
 		uiButSetNFunc(but, template_id_cb, MEM_dupallocN(template), SET_INT_IN_POINTER(UI_ID_RENAME));
 		if (user_alert) uiButSetFlag(but, UI_BUT_REDALERT);
 
@@ -1221,7 +1221,7 @@ void uiTemplatePreview(uiLayout *layout, ID *id, int show_buttons, ID *parent, M
 			else ma = (Material *)pparent;
 			
 			/* Create RNA Pointer */
-			RNA_pointer_create(id, &RNA_Material, ma, &material_ptr);
+			RNA_pointer_create(&ma->id, &RNA_Material, ma, &material_ptr);
 
 			col = uiLayoutColumn(row, TRUE);
 			uiLayoutSetScaleX(col, 1.5);
@@ -2774,8 +2774,8 @@ void uiTemplateReportsBanner(uiLayout *layout, bContext *C)
 	block = uiLayoutGetBlock(ui_abs);
 	
 	width = BLF_width(style->widget.uifont_id, report->message);
-	width = MIN2(rti->widthfac * width, width);
-	width = MAX2(width, 10);
+	width = min_ii((int)(rti->widthfac * width), width);
+	width = max_ii(width, 10);
 	
 	/* make a box around the report to make it stand out */
 	uiBlockBeginAlign(block);

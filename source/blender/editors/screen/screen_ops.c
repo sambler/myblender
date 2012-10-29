@@ -628,6 +628,7 @@ static void actionzone_apply(bContext *C, wmOperator *op, int type)
 		event.type = EVT_ACTIONZONE_AREA;
 	else
 		event.type = EVT_ACTIONZONE_REGION;
+	event.val = 0;
 	event.customdata = op->customdata;
 	event.customdatafree = TRUE;
 	op->customdata = NULL;
@@ -969,18 +970,18 @@ static void area_move_set_limits(bScreen *sc, int dir, int *bigger, int *smaller
 			
 			/* if top or down edge selected, test height */
 			if (sa->v1->flag && sa->v4->flag)
-				*bigger = MIN2(*bigger, y1);
+				*bigger = min_ii(*bigger, y1);
 			else if (sa->v2->flag && sa->v3->flag)
-				*smaller = MIN2(*smaller, y1);
+				*smaller = min_ii(*smaller, y1);
 		}
 		else {
 			int x1 = sa->v4->vec.x - sa->v1->vec.x - AREAMINX;
 			
 			/* if left or right edge selected, test width */
 			if (sa->v1->flag && sa->v2->flag)
-				*bigger = MIN2(*bigger, x1);
+				*bigger = min_ii(*bigger, x1);
 			else if (sa->v3->flag && sa->v4->flag)
-				*smaller = MIN2(*smaller, x1);
+				*smaller = min_ii(*smaller, x1);
 		}
 	}
 }
@@ -2071,15 +2072,23 @@ static void SCREEN_OT_keyframe_jump(wmOperatorType *ot)
 
 /* ************** switch screen operator ***************************** */
 
+static int screen_set_is_ok(bScreen *screen, bScreen *screen_prev)
+{
+	return ((screen->winid == 0)    &&
+	        (screen->full == 0)     &&
+	        (screen != screen_prev) &&
+	        (screen->id.name[2] != '.' || !(U.uiflag & USER_HIDE_DOT)));
+}
 
 /* function to be called outside UI context, or for redo */
 static int screen_set_exec(bContext *C, wmOperator *op)
 {
+	Main *bmain = CTX_data_main(C);
 	bScreen *screen = CTX_wm_screen(C);
 	bScreen *screen_prev = screen;
 	
 	ScrArea *sa = CTX_wm_area(C);
-	int tot = BLI_countlist(&CTX_data_main(C)->screen);
+	int tot = BLI_countlist(&bmain->screen);
 	int delta = RNA_int_get(op->ptr, "delta");
 	
 	/* temp screens are for userpref or render display */
@@ -2089,17 +2098,19 @@ static int screen_set_exec(bContext *C, wmOperator *op)
 	if (delta == 1) {
 		while (tot--) {
 			screen = screen->id.next;
-			if (screen == NULL) screen = CTX_data_main(C)->screen.first;
-			if (screen->winid == 0 && screen->full == 0 && screen != screen_prev)
+			if (screen == NULL) screen = bmain->screen.first;
+			if (screen_set_is_ok(screen, screen_prev)) {
 				break;
+			}
 		}
 	}
 	else if (delta == -1) {
 		while (tot--) {
 			screen = screen->id.prev;
-			if (screen == NULL) screen = CTX_data_main(C)->screen.last;
-			if (screen->winid == 0 && screen->full == 0 && screen != screen_prev)
+			if (screen == NULL) screen = bmain->screen.last;
+			if (screen_set_is_ok(screen, screen_prev)) {
 				break;
+			}
 		}
 	}
 	else {
@@ -2871,6 +2882,38 @@ static void SCREEN_OT_header_flip(wmOperatorType *ot)
 	ot->flag = 0;
 }
 
+
+
+/* ************** show menus operator ***************************** */
+
+/* show/hide header text menus */
+static int header_toggle_menus_exec(bContext *C, wmOperator *UNUSED(op))
+{
+	ScrArea *sa = CTX_wm_area(C);
+
+	sa->flag = sa->flag ^ HEADER_NO_PULLDOWN;
+
+	ED_area_tag_redraw(CTX_wm_area(C));
+	WM_event_add_notifier(C, NC_SCREEN | NA_EDITED, NULL);	
+
+	return OPERATOR_FINISHED;
+}
+
+
+static void SCREEN_OT_header_toggle_menus(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Show/Hide Header Menus";
+	ot->idname = "SCREEN_OT_header_toggle_menus";
+	ot->description = "Show or hide the header pulldown menus";
+	
+	/* api callbacks */
+	ot->exec = header_toggle_menus_exec;
+	ot->poll = ED_operator_areaactive;
+	ot->flag = 0;
+}
+
+
 /* ************** header tools operator ***************************** */
 void ED_screens_header_tools_menu_create(bContext *C, uiLayout *layout, void *UNUSED(arg))
 {
@@ -2882,6 +2925,11 @@ void ED_screens_header_tools_menu_create(bContext *C, uiLayout *layout, void *UN
 		uiItemO(layout, IFACE_("Flip to Bottom"), ICON_NONE, "SCREEN_OT_header_flip");
 	else
 		uiItemO(layout, IFACE_("Flip to Top"), ICON_NONE, "SCREEN_OT_header_flip");
+
+	if (sa->flag & HEADER_NO_PULLDOWN)
+		uiItemO(layout, IFACE_("Show Menus"), ICON_NONE, "SCREEN_OT_header_toggle_menus");
+	else
+		uiItemO(layout, IFACE_("Hide Menus"), ICON_NONE, "SCREEN_OT_header_toggle_menus");
 
 	uiItemS(layout);
 
@@ -3035,7 +3083,11 @@ static int screen_animation_step(bContext *C, wmOperator *UNUSED(op), wmEvent *e
 		}
 		else {
 			if (sync) {
-				int step = floor((wt->duration - sad->last_duration) * FPS);
+				/* note: this is very simplistic,
+				 * its has problem that it may skip too many frames.
+				 * however at least this gives a less jittery playback */
+				const int step = max_ii(1, floor((wt->duration - sad->last_duration) * FPS));
+
 				/* skip frames */
 				if (sad->flag & ANIMPLAY_FLAG_REVERSE)
 					scene->r.cfra -= step;
@@ -3547,6 +3599,7 @@ void ED_operatortypes_screen(void)
 	WM_operatortype_append(SCREEN_OT_region_scale);
 	WM_operatortype_append(SCREEN_OT_region_flip);
 	WM_operatortype_append(SCREEN_OT_header_flip);
+	WM_operatortype_append(SCREEN_OT_header_toggle_menus);
 	WM_operatortype_append(SCREEN_OT_header_toolbox);
 	WM_operatortype_append(SCREEN_OT_screen_set);
 	WM_operatortype_append(SCREEN_OT_screen_full_area);

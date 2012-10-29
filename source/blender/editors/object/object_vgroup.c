@@ -1062,7 +1062,7 @@ static void vgroup_normalize(Object *ob)
 
 			dw = defvert_find_index(dv, def_nr);
 			if (dw) {
-				weight_max = MAX2(dw->weight, weight_max);
+				weight_max = max_ff(dw->weight, weight_max);
 			}
 		}
 
@@ -1174,8 +1174,8 @@ static void getVerticalAndHorizontalChange(const float norm[3], float d, const f
                                            const float start[3], float distToStart,
                                            float *end, float (*changes)[2], float *dists, int index)
 {
-	// A=Q-((Q-P).N)N
-	// D = (a*x0 + b*y0 +c*z0 +d)
+	/* A = Q - ((Q - P).N)N
+	 * D = (a * x0 + b * y0 +c * z0 + d) */
 	float projA[3], projB[3];
 
 	closest_to_plane_v3(projA, coord, norm, start);
@@ -1651,11 +1651,11 @@ static void vgroup_blend(Object *ob, const float fac)
 					/* i1 is always the selected one */
 					if (sel1) {
 						i1 = BM_elem_index_get(eed->v1);
-						/* i2= BM_elem_index_get(eed->v2); */ /* UNUSED */
+						/* i2 = BM_elem_index_get(eed->v2); */ /* UNUSED */
 						eve = eed->v2;
 					}
 					else {
-						/* i2= BM_elem_index_get(eed->v1); */ /* UNUSED */
+						/* i2 = BM_elem_index_get(eed->v1); */ /* UNUSED */
 						i1 = BM_elem_index_get(eed->v2);
 						eve = eed->v1;
 					}
@@ -3470,7 +3470,7 @@ static int vgroup_do_remap(Object *ob, char *name_array, wmOperator *op)
 			}
 		}
 		else {
-			BKE_report(op->reports, RPT_ERROR, "Editmode lattice isn't supported yet");
+			BKE_report(op->reports, RPT_ERROR, "Editmode lattice is not supported yet");
 			MEM_freeN(sort_map_update);
 			return OPERATOR_CANCELLED;
 		}

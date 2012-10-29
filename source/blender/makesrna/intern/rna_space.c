@@ -1574,7 +1574,7 @@ static void rna_def_space_view3d(BlenderRNA *brna)
 	
 	prop = RNA_def_property(srna, "lens", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "lens");
-	RNA_def_property_ui_text(prop, "Lens", "Lens angle (mm) in perspective view");
+	RNA_def_property_ui_text(prop, "Lens", "Viewport lens angle (mm)");
 	RNA_def_property_range(prop, 1.0f, 250.0f);
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
 	
@@ -2824,6 +2824,12 @@ static void rna_def_fileselect_params(BlenderRNA *brna)
 	RNA_def_property_boolean_sdna(prop, NULL, "filter", BLENDERFILE);
 	RNA_def_property_ui_text(prop, "Filter Blender", "Show .blend files");
 	RNA_def_property_ui_icon(prop, ICON_FILE_BLEND, 0);
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_FILE_PARAMS, NULL);
+
+	prop = RNA_def_property(srna, "use_filter_backup", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "filter", BLENDERFILE_BACKUP);
+	RNA_def_property_ui_text(prop, "Filter BlenderBackup files", "Show .blend1, .blend2, etc. files");
+	RNA_def_property_ui_icon(prop, ICON_FILE_BACKUP, 0);
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_FILE_PARAMS, NULL);
 
 	prop = RNA_def_property(srna, "use_filter_movie", PROP_BOOLEAN, PROP_NONE);

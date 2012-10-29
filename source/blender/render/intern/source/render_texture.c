@@ -1262,6 +1262,14 @@ int multitex_nodes(Tex *tex, float texvec[3], float dxt[3], float dyt[3], int os
 			
 			do_2d_mapping(&localmtex, texvec_l, NULL, NULL, dxt_l, dyt_l);
 			rgbnor= multitex(tex, texvec_l, dxt_l, dyt_l, osatex, texres, thread, which_output);
+
+			{
+				ImBuf *ibuf = BKE_image_get_ibuf(tex->ima, &tex->iuser);
+
+				/* don't linearize float buffers, assumed to be linear */
+				if (ibuf && !(ibuf->rect_float) && R.scene_color_manage)
+					IMB_colormanagement_colorspace_to_scene_linear_v3(&texres->tr, ibuf->rect_colorspace);
+			}
 		}
 
 		return rgbnor;
@@ -1745,7 +1753,7 @@ static int compatible_bump_compute(CompatibleBump *compat_bump, ShadeInput *shi,
 	if (mtex->texco == TEXCO_UV) {
 		/* for the uv case, use the same value for both du/dv,
 		 * since individually scaling the normal derivatives makes them useless... */
-		du = minf(du, dv);
+		du = min_ff(du, dv);
 		idu = (du < 1e-5f) ? bf : (bf/du);
 
 		/* +u val */

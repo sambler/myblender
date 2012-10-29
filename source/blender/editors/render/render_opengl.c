@@ -171,11 +171,13 @@ static void screen_opengl_render_apply(OGLRender *oglrender)
 		}
 	}
 	else if (view_context) {
+		ED_view3d_draw_offscreen_init(scene, v3d);
+
 		GPU_offscreen_bind(oglrender->ofs); /* bind */
 
 		/* render 3d view */
 		if (rv3d->persp == RV3D_CAMOB && v3d->camera) {
-			/*int is_ortho= scene->r.mode & R_ORTHO;*/
+			/*int is_ortho = scene->r.mode & R_ORTHO;*/
 			camera = v3d->camera;
 			RE_GetCameraWindow(oglrender->re, camera, scene->r.cfra, winmat);
 			
@@ -306,7 +308,7 @@ static int screen_opengl_render_init(bContext *C, wmOperator *op)
 	char err_out[256] = "unknown";
 
 	if (G.background) {
-		BKE_report(op->reports, RPT_ERROR, "Can't use OpenGL render in background mode (no opengl context)");
+		BKE_report(op->reports, RPT_ERROR, "Cannot use OpenGL render in background mode (no opengl context)");
 		return 0;
 	}
 
@@ -327,7 +329,7 @@ static int screen_opengl_render_init(bContext *C, wmOperator *op)
 	}
 
 	if (!is_animation && is_write_still && BKE_imtype_is_movie(scene->r.im_format.imtype)) {
-		BKE_report(op->reports, RPT_ERROR, "Can't write a single file with an animation format selected");
+		BKE_report(op->reports, RPT_ERROR, "Cannot write a single file with an animation format selected");
 		return 0;
 	}
 

@@ -2031,18 +2031,16 @@ int BKE_ptcache_read(PTCacheID *pid, float cfra)
 		pid->cache->simframe = cfra2;
 	}
 
-	if ((pid->cache->flag & PTCACHE_QUICK_CACHE)==0) {
-		cfrai = (int)cfra;
-		/* clear invalid cache frames so that better stuff can be simulated */
-		if (pid->cache->flag & PTCACHE_OUTDATED) {
-			BKE_ptcache_id_clear(pid, PTCACHE_CLEAR_AFTER, cfrai);
-		}
-		else if (pid->cache->flag & PTCACHE_FRAMES_SKIPPED) {
-			if (cfra <= pid->cache->last_exact)
-				pid->cache->flag &= ~PTCACHE_FRAMES_SKIPPED;
+	cfrai = (int)cfra;
+	/* clear invalid cache frames so that better stuff can be simulated */
+	if (pid->cache->flag & PTCACHE_OUTDATED) {
+		BKE_ptcache_id_clear(pid, PTCACHE_CLEAR_AFTER, cfrai);
+	}
+	else if (pid->cache->flag & PTCACHE_FRAMES_SKIPPED) {
+		if (cfra <= pid->cache->last_exact)
+			pid->cache->flag &= ~PTCACHE_FRAMES_SKIPPED;
 
-			BKE_ptcache_id_clear(pid, PTCACHE_CLEAR_AFTER, MAX2(cfrai, pid->cache->last_exact));
-		}
+		BKE_ptcache_id_clear(pid, PTCACHE_CLEAR_AFTER, MAX2(cfrai, pid->cache->last_exact));
 	}
 
 	return ret;
@@ -2377,7 +2375,7 @@ void BKE_ptcache_id_clear(PTCacheID *pid, int mode, unsigned int cfra)
 				}
 			}
 		}
-		if (pid->cache->cached_frames && cfra>=sta && cfra<=end)
+		if (pid->cache->cached_frames && cfra >= sta && cfra <= end)
 			pid->cache->cached_frames[cfra-sta] = 0;
 		break;
 	}
@@ -2537,8 +2535,6 @@ int  BKE_ptcache_id_reset(Scene *scene, PTCacheID *pid, int mode)
 
 	if (mode == PTCACHE_RESET_DEPSGRAPH) {
 		if (!(cache->flag & PTCACHE_BAKED) && !BKE_ptcache_get_continue_physics()) {
-			if (cache->flag & PTCACHE_QUICK_CACHE)
-				clear= 1;
 
 			after= 1;
 		}
@@ -2826,6 +2822,8 @@ PointCache *BKE_ptcache_copy_list(ListBase *ptcaches_new, ListBase *ptcaches_old
 	return ptcaches_new->first;
 }
 
+/* Disabled this code; this is being called on scene_update_tagged, and that in turn gets called on 
+   every user action changing stuff, and then it runs a complete bake??? (ton) */
 
 /* Baking */
 void BKE_ptcache_quick_cache_all(Main *bmain, Scene *scene)
@@ -3009,7 +3007,7 @@ void BKE_ptcache_bake(PTCacheBaker* baker)
 					}
 
 					if ((cache->flag & PTCACHE_REDO_NEEDED || (cache->flag & PTCACHE_SIMULATION_VALID)==0) &&
-					    ((cache->flag & PTCACHE_QUICK_CACHE)==0 || render || bake))
+					    (render || bake))
 					{
 						BKE_ptcache_id_clear(pid, PTCACHE_CLEAR_ALL, 0);
 					}
@@ -3378,7 +3376,7 @@ void BKE_ptcache_update_info(PTCacheID *pid)
 	if (cache->flag & PTCACHE_EXTERNAL) {
 		int cfra = cache->startframe;
 
-		for (; cfra<=cache->endframe; cfra++) {
+		for (; cfra <= cache->endframe; cfra++) {
 			if (BKE_ptcache_id_exist(pid, cfra))
 				totframes++;
 		}
@@ -3405,7 +3403,7 @@ void BKE_ptcache_update_info(PTCacheID *pid)
 		else {
 			int cfra = cache->startframe;
 
-			for (; cfra<=cache->endframe; cfra++) {
+			for (; cfra <= cache->endframe; cfra++) {
 				if (BKE_ptcache_id_exist(pid, cfra))
 					totframes++;
 			}

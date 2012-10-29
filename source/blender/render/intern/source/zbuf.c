@@ -150,7 +150,7 @@ static void zbuf_add_to_span(ZSpan *zspan, const float *v1, const float *v2)
 	}
 	else {
 		dx0 = 0.0f;
-		xs0 = minf(minv[0], maxv[0]);
+		xs0 = min_ff(minv[0], maxv[0]);
 	}
 	
 	/* empty span */
@@ -3517,9 +3517,22 @@ static void add_transp_obindex(RenderLayer *rl, int offset, Object *ob)
 	RenderPass *rpass;
 	
 	for (rpass= rl->passes.first; rpass; rpass= rpass->next) {
-		if (rpass->passtype == SCE_PASS_INDEXOB||rpass->passtype == SCE_PASS_INDEXMA) {
+		if (rpass->passtype == SCE_PASS_INDEXOB) {
 			float *fp= rpass->rect + offset;
 			*fp= (float)ob->index;
+			break;
+		}
+	}
+}
+
+static void add_transp_material_index(RenderLayer *rl, int offset, Material *mat)
+{
+	RenderPass *rpass;
+	
+	for (rpass= rl->passes.first; rpass; rpass= rpass->next) {
+		if (rpass->passtype == SCE_PASS_INDEXMA) {
+			float *fp= rpass->rect + offset;
+			*fp= (float)mat->index;
 			break;
 		}
 	}
@@ -3876,7 +3889,7 @@ static int addtosamp_shr(ShadeResult *samp_shr, ShadeSample *ssamp, int addpassf
 				
 				addAlphaUnderFloat(samp_shr->combined, shr->combined);
 				
-				samp_shr->z = minf(samp_shr->z, shr->z);
+				samp_shr->z = min_ff(samp_shr->z, shr->z);
 
 				if (addpassflag & SCE_PASS_VECTOR) {
 					copy_v4_v4(samp_shr->winspeed, shr->winspeed);
@@ -4129,10 +4142,12 @@ unsigned short *zbuffer_transp_shade(RenderPart *pa, RenderLayer *rl, float *pas
 					}
 				}
 				if (addpassflag & SCE_PASS_INDEXMA) {
-					ObjectRen *obr= R.objectinstance[zrow[totface-1].obi].obr;
-					if (obr->ob) {
+					ObjectRen *obr = R.objectinstance[zrow[totface-1].obi].obr;
+					VlakRen *vr = obr->vlaknodes->vlak;
+					Material *mat = vr->mat;
+					if (mat) {
 						for (a= 0; a<totfullsample; a++)
-							add_transp_obindex(rlpp[a], od, obr->ob);
+							add_transp_material_index(rlpp[a], od, mat);
 					}
 				}
 

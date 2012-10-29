@@ -1232,7 +1232,7 @@ static void draw_textscroll(SpaceText *st, rcti *scroll, rcti *back)
 	uiWidgetScrollDraw(&wcol, scroll, &st->txtbar, (st->flags & ST_SCROLL_SELECT) ? UI_SCROLL_PRESSED : 0);
 
 	uiSetRoundBox(UI_CNR_ALL);
-	rad = 0.4f * mini(BLI_rcti_size_x(&st->txtscroll), BLI_rcti_size_y(&st->txtscroll));
+	rad = 0.4f * min_ii(BLI_rcti_size_x(&st->txtscroll), BLI_rcti_size_y(&st->txtscroll));
 	UI_GetThemeColor3ubv(TH_HILITE, col);
 	col[3] = 48;
 	glColor4ubv(col);
@@ -1355,7 +1355,7 @@ static void draw_documentation(SpaceText *st, ARegion *ar)
 		x += SUGG_LIST_WIDTH * st->cwidth + 50;
 	}
 
-	/* top= */ /* UNUSED */ y = ar->winy - st->lheight * l - 2;
+	/* top = */ /* UNUSED */ y = ar->winy - st->lheight * l - 2;
 	boxw = DOC_WIDTH * st->cwidth + 20;
 	boxh = (DOC_HEIGHT + 1) * st->lheight;
 
@@ -1789,7 +1789,7 @@ void draw_text_main(SpaceText *st, ARegion *ar)
 
 	text_font_begin(st);
 	st->cwidth = BLF_fixed_width(mono);
-	st->cwidth = MAX2(st->cwidth, 1);
+	st->cwidth = MAX2(st->cwidth, (char)1);
 
 	/* draw line numbers background */
 	if (st->showlinenrs) {
@@ -1873,7 +1873,7 @@ void text_update_character_width(SpaceText *st)
 {
 	text_font_begin(st);
 	st->cwidth = BLF_fixed_width(mono);
-	st->cwidth = MAX2(st->cwidth, 1);
+	st->cwidth = MAX2(st->cwidth, (char)1);
 	text_font_end(st);
 }
 

@@ -53,7 +53,6 @@
 #include "BKE_modifier.h"
 #include "BKE_mesh.h"
 
-
 #ifdef RIGID_DEFORM
 #include "BLI_polardecomp.h"
 #endif
@@ -563,7 +562,7 @@ static void heat_set_H(LaplacianSystem *sys, int vertex)
 
 	/* compute H entry */
 	if (numclosest > 0) {
-		mindist = maxf(mindist, 1e-4f);
+		mindist = max_ff(mindist, 1e-4f);
 		h = numclosest * C_WEIGHT / (mindist * mindist);
 	}
 	else
@@ -794,7 +793,7 @@ void heat_bone_weighting(Object *ob, Mesh *me, float (*verts)[3], int numsource,
 			}
 		}
 		else if (*err_str == NULL) {
-			*err_str = "Bone Heat Weighting: failed to find solution for one or more bones";
+			*err_str = N_("Bone Heat Weighting: failed to find solution for one or more bones");
 			break;
 		}
 
@@ -1722,7 +1721,7 @@ static void meshdeform_matrix_solve(MeshDeformModifierData *mmd, MeshDeformBind 
 			}
 		}
 		else {
-			modifier_setError(&mmd->modifier, "%s", TIP_("Failed to find bind solution (increase precision?)."));
+			modifier_setError(&mmd->modifier, "Failed to find bind solution (increase precision?)");
 			error("Mesh Deform: failed to find bind solution.");
 			break;
 		}

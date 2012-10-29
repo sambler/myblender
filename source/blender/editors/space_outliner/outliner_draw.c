@@ -36,6 +36,7 @@
 #include "DNA_scene_types.h"
 #include "DNA_sequence_types.h"
 
+#include "BLI_math.h"
 #include "BLI_blenlib.h"
 #include "BLI_utildefines.h"
 #include "BLI_ghash.h"
@@ -92,7 +93,7 @@ static void outliner_width(SpaceOops *soops, ListBase *lb, int *w)
 {
 	TreeElement *te = lb->first;
 	while (te) {
-//		TreeStoreElem *tselem= TREESTORE(te);
+//		TreeStoreElem *tselem = TREESTORE(te);
 		
 		// XXX fixme... te->xend is not set yet
 		if (!TSELEM_OPEN(tselem, soops)) {
@@ -627,7 +628,7 @@ static uiBlock *operator_search_menu(bContext *C, ARegion *ar, void *arg_kmi)
 	search[0] = 0;
 	
 	block = uiBeginBlock(C, ar, "_popup", UI_EMBOSS);
-	uiBlockSetFlag(block, UI_BLOCK_LOOP | UI_BLOCK_REDRAW | UI_BLOCK_RET_1);
+	uiBlockSetFlag(block, UI_BLOCK_LOOP | UI_BLOCK_REDRAW | UI_BLOCK_SEARCH_MENU);
 	
 	/* fake button, it holds space for search items */
 	uiDefBut(block, LABEL, 0, "", 10, 15, 150, uiSearchBoxhHeight(), NULL, 0, 0, 0, 0, NULL);
@@ -1000,6 +1001,7 @@ static void tselem_draw_icon(uiBlock *block, int xmax, float x, float y, TreeSto
 					case eModifierType_Bevel:
 						UI_icon_draw(x, y, ICON_MOD_BEVEL); break;
 					case eModifierType_Smooth:
+					case eModifierType_LaplacianSmooth:
 						UI_icon_draw(x, y, ICON_MOD_SMOOTH); break;
 					case eModifierType_SimpleDeform:
 						UI_icon_draw(x, y, ICON_MOD_SIMPLEDEFORM); break;
@@ -1648,7 +1650,7 @@ void draw_outliner(const bContext *C)
 		 
 		/* get actual width of column 1 */
 		outliner_rna_width(soops, &soops->tree, &sizex_rna, 0);
-		sizex_rna = MAX2(OL_RNA_COLX, sizex_rna + OL_RNA_COL_SPACEX);
+		sizex_rna = max_ii(OL_RNA_COLX, sizex_rna + OL_RNA_COL_SPACEX);
 		
 		/* get width of data (for setting 'tot' rect, this is column 1 + column 2 + a bit extra) */
 		if (soops->outlinevis == SO_KEYMAP) 

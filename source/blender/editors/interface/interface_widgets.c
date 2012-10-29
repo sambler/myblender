@@ -345,7 +345,7 @@ static void round_box__edges(uiWidgetBase *wt, int roundboxalign, rcti *rect, fl
 	const int vnum = ((roundboxalign & (UI_CNR_TOP_LEFT | UI_CNR_BOTTOM_LEFT)) == (UI_CNR_TOP_LEFT | UI_CNR_BOTTOM_LEFT) ||
 	                  (roundboxalign & (UI_CNR_TOP_RIGHT | UI_CNR_BOTTOM_RIGHT)) == (UI_CNR_TOP_RIGHT | UI_CNR_BOTTOM_RIGHT)) ? 1 : 2;
 
-	minsize = mini(BLI_rcti_size_x(rect) * hnum,
+	minsize = min_ii(BLI_rcti_size_x(rect) * hnum,
 	               BLI_rcti_size_y(rect) * vnum);
 	
 	if (2.0f * rad > minsize)
@@ -491,7 +491,7 @@ static void widget_num_tria(uiWidgetTrias *tria, rcti *rect, float triasize, cha
 	float centx, centy, sizex, sizey, minsize;
 	int a, i1 = 0, i2 = 1;
 	
-	minsize = mini(BLI_rcti_size_x(rect), BLI_rcti_size_y(rect));
+	minsize = min_ii(BLI_rcti_size_x(rect), BLI_rcti_size_y(rect));
 	
 	/* center position and size */
 	centx = (float)rect->xmin + 0.5f * minsize;
@@ -526,7 +526,7 @@ static void widget_scroll_circle(uiWidgetTrias *tria, rcti *rect, float triasize
 	float centx, centy, sizex, sizey, minsize;
 	int a, i1 = 0, i2 = 1;
 	
-	minsize = mini(BLI_rcti_size_x(rect), BLI_rcti_size_y(rect));
+	minsize = min_ii(BLI_rcti_size_x(rect), BLI_rcti_size_y(rect));
 	
 	/* center position and size */
 	centx = (float)rect->xmin + 0.5f * minsize;
@@ -572,12 +572,12 @@ static void widget_menu_trias(uiWidgetTrias *tria, rcti *rect)
 	/* center position and size */
 	centx = rect->xmax - 0.5f * BLI_rcti_size_y(rect);
 	centy = rect->ymin + 0.5f * BLI_rcti_size_y(rect);
-	size = 0.4f * BLI_rcti_size_y(rect);
+	size = 0.4f * (float)BLI_rcti_size_y(rect);
 	
 	/* XXX exception */
 	asp = ((float)BLI_rcti_size_x(rect)) / ((float)BLI_rcti_size_y(rect));
 	if (asp > 1.2f && asp < 2.6f)
-		centx = rect->xmax - 0.3f * BLI_rcti_size_y(rect);
+		centx = rect->xmax - 0.4f * (float)BLI_rcti_size_y(rect);
 	
 	for (a = 0; a < 6; a++) {
 		tria->vec[a][0] = size * menu_tria_vert[a][0] + centx;
@@ -1276,9 +1276,12 @@ static void widget_draw_text(uiFontStyle *fstyle, uiWidgetColors *wcol, uiBut *b
 /* draws text and icons for buttons */
 static void widget_draw_text_icon(uiFontStyle *fstyle, uiWidgetColors *wcol, uiBut *but, rcti *rect)
 {
-	if (but == NULL) {
+	char password_str[UI_MAX_DRAW_STR];
+
+	if (but == NULL)
 		return;
-	}
+
+	ui_button_text_password_hide(password_str, but, FALSE);
 
 	/* clip but->drawstr to fit in available space */
 	if (but->editstr && but->pos >= 0) {
@@ -1337,6 +1340,8 @@ static void widget_draw_text_icon(uiFontStyle *fstyle, uiWidgetColors *wcol, uiB
 		widget_draw_text(fstyle, wcol, but, rect);
 
 	}
+
+	ui_button_text_password_hide(password_str, but, TRUE);
 }
 
 
@@ -1895,7 +1900,7 @@ void ui_hsvcircle_vals_from_pos(float *val_rad, float *val_dist, const rcti *rec
 	/* duplication of code... well, simple is better now */
 	const float centx = BLI_rcti_cent_x_fl(rect);
 	const float centy = BLI_rcti_cent_y_fl(rect);
-	const float radius = (float)mini(BLI_rcti_size_x(rect), BLI_rcti_size_y(rect)) / 2.0f;
+	const float radius = (float)min_ii(BLI_rcti_size_x(rect), BLI_rcti_size_y(rect)) / 2.0f;
 	const float m_delta[2] = {mx - centx, my - centy};
 	const float dist_squared = len_squared_v2(m_delta);
 
@@ -1910,7 +1915,7 @@ static void ui_draw_but_HSVCIRCLE(uiBut *but, uiWidgetColors *wcol, const rcti *
 
 	const float centx = BLI_rcti_cent_x_fl(rect);
 	const float centy = BLI_rcti_cent_y_fl(rect);
-	float radius = (float)mini(BLI_rcti_size_x(rect), BLI_rcti_size_y(rect)) / 2.0f;
+	float radius = (float)min_ii(BLI_rcti_size_x(rect), BLI_rcti_size_y(rect)) / 2.0f;
 
 	/* gouraud triangle fan */
 	const float *hsv_ptr = ui_block_hsv_get(but->block);
@@ -2402,7 +2407,7 @@ static void widget_scroll(uiBut *but, uiWidgetColors *wcol, rcti *rect, int stat
 	value = ui_get_but_val(but);
 
 	size = (but->softmax + but->a1 - but->softmin);
-	size = MAX2(size, 2);
+	size = max_ff(size, 2.0f);
 	
 	/* position */
 	rect1 = *rect;
@@ -2423,7 +2428,7 @@ static void widget_scroll(uiBut *but, uiWidgetColors *wcol, rcti *rect, int stat
 
 			if (rect1.xmax > rect->xmax) {
 				rect1.xmax = rect->xmax;
-				rect1.xmin = maxi(rect1.xmax - min, rect->xmin);
+				rect1.xmin = max_ii(rect1.xmax - min, rect->xmin);
 			}
 		}
 	}
@@ -2440,7 +2445,7 @@ static void widget_scroll(uiBut *but, uiWidgetColors *wcol, rcti *rect, int stat
 
 			if (rect1.ymax > rect->ymax) {
 				rect1.ymax = rect->ymax;
-				rect1.ymin = MAX2(rect1.ymax - min, rect->ymin);
+				rect1.ymin = max_ii(rect1.ymax - min, rect->ymin);
 			}
 		}
 	}
@@ -2662,8 +2667,8 @@ static void widget_menubut(uiWidgetColors *wcol, rcti *rect, int UNUSED(state), 
 	
 	widgetbase_draw(&wtb, wcol);
 	
-	/* text space */
-	rect->xmax -= BLI_rcti_size_y(rect);
+	/* text space, arrows are about 0.6 height of button */
+	rect->xmax -= (6*BLI_rcti_size_y(rect))/10;
 }
 
 static void widget_menuiconbut(uiWidgetColors *wcol, rcti *rect, int UNUSED(state), int roundboxalign)

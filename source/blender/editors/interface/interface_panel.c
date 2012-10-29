@@ -814,8 +814,8 @@ static void ui_panels_size(ScrArea *sa, ARegion *ar, int *x, int *y)
 				pa_sizey = pa->ofsy + get_panel_size_y(pa);
 			}
 
-			sizex = MAX2(sizex, pa_sizex);
-			sizey = MIN2(sizey, pa_sizey);
+			sizex = max_ii(sizex, pa_sizex);
+			sizey = min_ii(sizey, pa_sizey);
 		}
 	}
 
@@ -831,7 +831,7 @@ static void ui_do_animate(const bContext *C, Panel *panel)
 	float fac;
 
 	fac = (PIL_check_seconds_timer() - data->starttime) / ANIMATION_TIME;
-	fac = minf(sqrt(fac), 1.0f);
+	fac = min_ff(sqrt(fac), 1.0f);
 
 	/* for max 1 second, interpolate positions */
 	if (uiAlignPanelStep(sa, ar, fac, 0)) {

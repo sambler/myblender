@@ -185,7 +185,8 @@ static void halo_pixelstruct(HaloRen *har, RenderLayer **rlpp, int totsample, in
 	
 	fullsample= (totsample > 1);
 	amount= 0;
-	accol[0]=accol[1]=accol[2]=accol[3]= 0.0f;
+	accol[0] = accol[1] = accol[2] = accol[3]= 0.0f;
+	col[0] = col[1] = col[2] = col[3]= 0.0f;
 	flarec= har->flarec;
 	
 	while (ps) {
@@ -294,11 +295,11 @@ static void halo_tile(RenderPart *pa, RenderLayer *rl)
 			}
 			else {
 				
-				minx= MAX2(minx, testrect.xmin);
-				maxx= MIN2(maxx, testrect.xmax);
+				minx = max_ii(minx, testrect.xmin);
+				maxx = min_ii(maxx, testrect.xmax);
 			
-				miny= MAX2(har->miny, testrect.ymin);
-				maxy= MIN2(har->maxy, testrect.ymax);
+				miny = max_ii(har->miny, testrect.ymin);
+				maxy = min_ii(har->maxy, testrect.ymax);
 			
 				for (y=miny; y<maxy; y++) {
 					int rectofs= (y-disprect.ymin)*pa->rectx + (minx - disprect.xmin);
@@ -1582,7 +1583,7 @@ static void shade_sample_sss(ShadeSample *ssamp, Material *mat, ObjectInstanceRe
 
 	copy_v3_v3(shi->facenor, nor);
 	shade_input_set_viewco(shi, x, y, sx, sy, z);
-	*area = minf(len_v3(shi->dxco) * len_v3(shi->dyco), 2.0f * orthoarea);
+	*area = min_ff(len_v3(shi->dxco) * len_v3(shi->dyco), 2.0f * orthoarea);
 
 	shade_input_set_uv(shi);
 	shade_input_set_normals(shi);
@@ -2516,12 +2517,12 @@ static int get_next_bake_face(BakeShade *bs)
 						if (R.r.bake_flag & R_BAKE_CLEAR)
 							IMB_rectfill(ibuf, (ibuf->planes == R_IMF_PLANES_RGBA) ? vec_alpha : vec_solid);
 
-						ibuf->userflags |= IB_DISPLAY_BUFFER_INVALID;
-
 						/* might be read by UI to set active image for display */
 						R.bakebuf= ima;
 					}
-					
+
+					ibuf->userflags |= IB_DISPLAY_BUFFER_INVALID;
+
 					bs->obi= obi;
 					bs->vlr= vlr;
 					

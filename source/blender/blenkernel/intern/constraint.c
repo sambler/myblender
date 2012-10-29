@@ -221,51 +221,6 @@ void constraints_clear_evalob(bConstraintOb *cob)
 
 /* -------------- Space-Conversion API -------------- */
 
-#if 0 /* XXX Old code, does the same as one in armature.c, will remove it later. */
-static void constraint_pchan_diff_mat(bPoseChannel *pchan, float diff_mat[4][4])
-{
-	if (pchan->parent) {
-		float offs_bone[4][4];
-
-		/* construct offs_bone the same way it is done in armature.c */
-		copy_m4_m3(offs_bone, pchan->bone->bone_mat);
-		copy_v3_v3(offs_bone[3], pchan->bone->head);
-		offs_bone[3][1] += pchan->bone->parent->length;
-
-		if (pchan->bone->flag & BONE_HINGE) {
-			/* pose_mat = par_pose-space_location * chan_mat */
-			float tmat[4][4];
-
-			/* the rotation of the parent restposition */
-			copy_m4_m4(tmat, pchan->bone->parent->arm_mat);
-
-			/* the location of actual parent transform */
-			copy_v3_v3(tmat[3], offs_bone[3]);
-			zero_v3(offs_bone[3]);
-			mul_m4_v3(pchan->parent->pose_mat, tmat[3]);
-
-			mult_m4_m4m4(diff_mat, tmat, offs_bone);
-		}
-		else {
-			/* pose_mat = par_pose_mat * bone_mat * chan_mat */
-			if (pchan->bone->flag & BONE_NO_SCALE) {
-				float tmat[4][4];
-				copy_m4_m4(tmat, pchan->parent->pose_mat);
-				normalize_m4(tmat);
-				mult_m4_m4m4(diff_mat, tmat, offs_bone);
-			}
-			else {
-				mult_m4_m4m4(diff_mat, pchan->parent->pose_mat, offs_bone);
-			}
-		}
-	}
-	else {
-		/* pose_mat = chan_mat * arm_mat */
-		copy_m4_m4(diff_mat, pchan->bone->arm_mat);
-	}
-}
-#endif
-
 /* This function is responsible for the correct transformations/conversions 
  * of a matrix from one space to another for constraint evaluation.
  * For now, this is only implemented for Objects and PoseChannels.
@@ -307,18 +262,6 @@ void constraint_mat_convertspace(Object *ob, bPoseChannel *pchan, float mat[][4]
 				else if (to == CONSTRAINT_SPACE_LOCAL) {
 					if (pchan->bone) {
 						BKE_armature_mat_pose_to_bone(pchan, mat, mat);
-#if 0  /* XXX Old code, will remove it later. */
-						constraint_pchan_diff_mat(pchan, diff_mat);
-
-						invert_m4_m4(imat, diff_mat);
-						mult_m4_m4m4(mat, imat, mat);
-
-						/* override with local location */
-						if ((pchan->parent) && (pchan->bone->flag & BONE_NO_LOCAL_LOCATION)) {
-							BKE_armature_mat_pose_to_bone_ex(ob, pchan, pchan->pose_mat, tempmat);
-							copy_v3_v3(mat[3], tempmat[3]);
-						}
-#endif
 					}
 				}
 				/* pose to local with parent */
@@ -336,11 +279,6 @@ void constraint_mat_convertspace(Object *ob, bPoseChannel *pchan, float mat[][4]
 				if (pchan->bone) {
 					/* we need the posespace_matrix = local_matrix + (parent_posespace_matrix + restpos) */
 					BKE_armature_mat_bone_to_pose(pchan, mat, mat);
-#if 0
-					constraint_pchan_diff_mat(pchan, diff_mat);
-
-					mult_m4_m4m4(mat, diff_mat, mat);
-#endif
 				}
 				
 				/* use pose-space as stepping stone for other spaces */
@@ -432,7 +370,7 @@ static void contarget_get_mesh_mat(Object *ob, const char *substring, float mat[
 	/* get DerivedMesh */
 	if (em) {
 		/* target is in editmode, so get a special derived mesh */
-		dm = CDDM_from_BMEditMesh(em, ob->data, FALSE, FALSE);
+		dm = CDDM_from_editbmesh(em, FALSE, FALSE);
 		freeDM = 1;
 	}
 	else {
@@ -2764,7 +2702,7 @@ static void stretchto_evaluate(bConstraint *con, bConstraintOb *cob, ListBase *t
 			default: /* should not happen, but in case*/
 				return;
 		} /* switch (data->volmode) */
-
+		
 		/* Clear the object's rotation and scale */
 		cob->matrix[0][0] = size[0] * scale[0];
 		cob->matrix[0][1] = 0;
@@ -2787,10 +2725,10 @@ static void stretchto_evaluate(bConstraint *con, bConstraintOb *cob, ListBase *t
 				/* othogonal to "new Y" "old X! plane */
 				cross_v3_v3v3(orth, vec, xx);
 				normalize_v3(orth);
-
+				
 				/* new Z*/
 				copy_v3_v3(totmat[2], orth);
-
+				
 				/* we decided to keep X plane*/
 				cross_v3_v3v3(xx, orth, vec);
 				normalize_v3_v3(totmat[0], xx);
@@ -2800,16 +2738,16 @@ static void stretchto_evaluate(bConstraint *con, bConstraintOb *cob, ListBase *t
 				/* othogonal to "new Y" "old Z! plane */
 				cross_v3_v3v3(orth, vec, zz);
 				normalize_v3(orth);
-
+				
 				/* new X */
 				negate_v3_v3(totmat[0], orth);
-
+				
 				/* we decided to keep Z */
 				cross_v3_v3v3(zz, orth, vec);
 				normalize_v3_v3(totmat[2], zz);
 				break;
 		} /* switch (data->plane) */
-
+		
 		mul_m4_m3m4(cob->matrix, totmat, cob->matrix);
 	}
 }
@@ -3615,7 +3553,7 @@ static void damptrack_evaluate(bConstraint *con, bConstraintOb *cob, ListBase *t
 		cross_v3_v3v3(raxis, obvec, tarvec);
 		
 		rangle = dot_v3v3(obvec, tarvec);
-		rangle = acos(maxf(-1.0f, minf(1.0f, rangle)));
+		rangle = acos(max_ff(-1.0f, min_ff(1.0f, rangle)));
 		
 		/* construct rotation matrix from the axis-angle rotation found above 
 		 *	- this call takes care to make sure that the axis provided is a unit vector first
@@ -4839,7 +4777,7 @@ void solve_constraints(ListBase *conlist, bConstraintOb *cob, float ctime)
 		 *    since some constraints may not convert the solution back to the input space before blending
 		 *    but all are guaranteed to end up in good "worldspace" result
 		 */
-		/* Note: all kind of stuff here before (caused trouble), much easier to just interpolate, or did I miss something? -jahka */
+		/* Note: all kind of stuff here before (caused trouble), much easier to just interpolate, or did I miss something? -jahka (r.32105) */
 		if (enf < 1.0f) {
 			float solution[4][4];
 			copy_m4_m4(solution, cob->matrix);

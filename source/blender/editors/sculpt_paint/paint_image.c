@@ -173,7 +173,7 @@ typedef struct ImagePaintState {
 } ImagePaintState;
 
 typedef struct ImagePaintPartialRedraw {
-	int x1, y1, x2, y2;
+	int x1, y1, x2, y2;  /* XXX, could use 'rcti' */
 	int enabled;
 } ImagePaintPartialRedraw;
 
@@ -783,7 +783,7 @@ static int project_paint_PickColor(const ProjPaintState *ps, float pt[2], float 
 	else {
 		//xi = (int)((uv[0]*ibuf->x) + 0.5f);
 		//yi = (int)((uv[1]*ibuf->y) + 0.5f);
-		//if (xi<0 || xi>=ibuf->x  ||  yi<0 || yi>=ibuf->y) return 0;
+		//if (xi < 0 || xi >= ibuf->x  ||  yi < 0 || yi >= ibuf->y) return 0;
 		
 		/* wrap */
 		xi = ((int)(uv[0] * ibuf->x)) % ibuf->x;
@@ -903,7 +903,7 @@ static int project_bucket_point_occluded(const ProjPaintState *ps, LinkNode *buc
 			else
 				isect_ret = project_paint_occlude_ptv(pixelScreenCo, ps->screenCoords[mf->v1], ps->screenCoords[mf->v2], ps->screenCoords[mf->v3], w, ps->is_ortho);
 
-			/* Note, if isect_ret==-1 then we don't want to test the other side of the quad */
+			/* Note, if (isect_ret == -1) then we don't want to test the other side of the quad */
 			if (isect_ret == 0 && mf->v4) {
 				if (do_clip)
 					isect_ret = project_paint_occlude_ptv_clip(ps, mf, pixelScreenCo, ps->screenCoords[mf->v1], ps->screenCoords[mf->v3], ps->screenCoords[mf->v4], 1);
@@ -3561,7 +3561,7 @@ static void project_paint_end(ProjPaintState *ps)
 		ps->dm->release(ps->dm);
 }
 
-/* 1= an undo, -1 is a redo. */
+/* 1 = an undo, -1 is a redo. */
 static void partial_redraw_array_init(ImagePaintPartialRedraw *pr)
 {
 	int tot = PROJ_BOUNDBOX_SQUARED;
@@ -3583,11 +3583,11 @@ static int partial_redraw_array_merge(ImagePaintPartialRedraw *pr, ImagePaintPar
 {
 	int touch = 0;
 	while (tot--) {
-		pr->x1 = MIN2(pr->x1, pr_other->x1);
-		pr->y1 = MIN2(pr->y1, pr_other->y1);
+		pr->x1 = min_ii(pr->x1, pr_other->x1);
+		pr->y1 = min_ii(pr->y1, pr_other->y1);
 		
-		pr->x2 = MAX2(pr->x2, pr_other->x2);
-		pr->y2 = MAX2(pr->y2, pr_other->y2);
+		pr->x2 = max_ii(pr->x2, pr_other->x2);
+		pr->y2 = max_ii(pr->y2, pr_other->y2);
 		
 		if (pr->x2 != -1)
 			touch = 1;
@@ -4032,11 +4032,11 @@ static void *do_projectpaint_thread(void *ph_v)
 							/* end copy */
 
 							last_partial_redraw_cell = last_projIma->partRedrawRect + projPixel->bb_cell_index;
-							last_partial_redraw_cell->x1 = MIN2(last_partial_redraw_cell->x1, projPixel->x_px);
-							last_partial_redraw_cell->y1 = MIN2(last_partial_redraw_cell->y1, projPixel->y_px);
+							last_partial_redraw_cell->x1 = min_ii(last_partial_redraw_cell->x1, (int)projPixel->x_px);
+							last_partial_redraw_cell->y1 = min_ii(last_partial_redraw_cell->y1, (int)projPixel->y_px);
 
-							last_partial_redraw_cell->x2 = MAX2(last_partial_redraw_cell->x2, projPixel->x_px + 1);
-							last_partial_redraw_cell->y2 = MAX2(last_partial_redraw_cell->y2, projPixel->y_px + 1);
+							last_partial_redraw_cell->x2 = max_ii(last_partial_redraw_cell->x2, (int)projPixel->x_px + 1);
+							last_partial_redraw_cell->y2 = max_ii(last_partial_redraw_cell->y2, (int)projPixel->y_px + 1);
 
 							
 							switch (tool) {
@@ -4222,10 +4222,10 @@ static void imapaint_dirty_region(Image *ima, ImBuf *ibuf, int x, int y, int w, 
 		imapaintpartial.enabled = 1;
 	}
 	else {
-		imapaintpartial.x1 = MIN2(imapaintpartial.x1, x);
-		imapaintpartial.y1 = MIN2(imapaintpartial.y1, y);
-		imapaintpartial.x2 = MAX2(imapaintpartial.x2, x + w);
-		imapaintpartial.y2 = MAX2(imapaintpartial.y2, y + h);
+		imapaintpartial.x1 = min_ii(imapaintpartial.x1, x);
+		imapaintpartial.y1 = min_ii(imapaintpartial.y1, y);
+		imapaintpartial.x2 = max_ii(imapaintpartial.x2, x + w);
+		imapaintpartial.y2 = max_ii(imapaintpartial.y2, y + h);
 	}
 
 	w = ((x + w - 1) >> IMAPAINT_TILE_BITS);
@@ -5285,7 +5285,7 @@ static void brush_drawcursor(bContext *C, int x, int y, void *UNUSED(customdata)
 #define PX_SIZE_FADE_MIN 4.0f
 
 	Scene *scene = CTX_data_scene(C);
-	//Brush *brush= image_paint_brush(C);
+	//Brush *brush = image_paint_brush(C);
 	Paint *paint = paint_get_active_from_context(C);
 	Brush *brush = paint_brush(paint);
 
@@ -5302,7 +5302,7 @@ static void brush_drawcursor(bContext *C, int x, int y, void *UNUSED(customdata)
 		           !(ts->use_uv_sculpt && (scene->basact->object->mode == OB_MODE_EDIT));
 
 		if (use_zoom) {
-			pixel_size = size * maxf(zoomx, zoomy);
+			pixel_size = size * max_ff(zoomx, zoomy);
 		}
 		else {
 			pixel_size = size;
@@ -5654,7 +5654,7 @@ static int texture_paint_toggle_exec(bContext *C, wmOperator *op)
 		return OPERATOR_CANCELLED;
 	
 	if (BKE_object_obdata_is_libdata(ob)) {
-		BKE_report(op->reports, RPT_ERROR, "Can't edit external libdata");
+		BKE_report(op->reports, RPT_ERROR, "Cannot edit external libdata");
 		return OPERATOR_CANCELLED;
 	}
 

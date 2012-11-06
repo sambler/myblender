@@ -8297,15 +8297,43 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 				}
 			}
 		}
-
 	}
-	
-	{
-		Object *ob;
-		for (ob = main->object.first; ob; ob = ob->id.next) {
-			if (ob->col_group == 0) {
-				ob->col_group = 0x01;
-				ob->col_mask = 0xff;
+
+	if (main->versionfile < 264 || (main->versionfile == 264 && main->subversionfile < 7)) {
+		/* convert tiles size from resolution and number of tiles */
+		{
+			Scene *scene;
+
+			for (scene = main->scene.first; scene; scene = scene->id.next) {
+				if (scene->r.tilex == 0 || scene->r.tiley == 1) {
+					/* scene could be set for panoramic rendering, so clamp with the
+					 * lowest possible tile size value
+					 */
+					scene->r.tilex = max_ii(scene->r.xsch * scene->r.size / scene->r.xparts / 100, 8);
+					scene->r.tiley = max_ii(scene->r.ysch * scene->r.size / scene->r.yparts / 100, 8);
+				}
+			}
+		}
+
+		/* collision masks */
+		{
+			Object *ob;
+			for (ob = main->object.first; ob; ob = ob->id.next) {
+				if (ob->col_group == 0) {
+					ob->col_group = 0x01;
+					ob->col_mask = 0xff;
+				}
+			}
+		}
+
+		/* fallbck resection method settings */
+		{
+			MovieClip *clip;
+
+			for (clip = main->movieclip.first; clip; clip = clip->id.next) {
+				if (clip->tracking.settings.reconstruction_success_threshold == 0.0f) {
+					clip->tracking.settings.reconstruction_success_threshold = 1e-3;
+				}
 			}
 		}
 	}

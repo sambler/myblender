@@ -1221,6 +1221,12 @@ int transformEvent(TransInfo *t, wmEvent *event)
 				else view_editmove(event->type);
 				t->redraw = 1;
 				break;
+			case LEFTALTKEY:
+			case RIGHTALTKEY:
+				if (t->spacetype == SPACE_SEQ)
+					t->flag |= T_ALT_TRANSFORM;
+
+				break;
 			default:
 				handled = 0;
 				break;
@@ -1254,6 +1260,12 @@ int transformEvent(TransInfo *t, wmEvent *event)
 ////			if (t->options & CTX_TWEAK)
 //				t->state = TRANS_CONFIRM;
 //			break;
+			case LEFTALTKEY:
+			case RIGHTALTKEY:
+				if (t->spacetype == SPACE_SEQ)
+					t->flag &= ~T_ALT_TRANSFORM;
+
+				break;
 			default:
 				handled = 0;
 				break;
@@ -5516,7 +5528,7 @@ void drawNonPropEdge(const struct bContext *C, TransInfo *t)
 			float v1[3], v2[3];
 			float interp_v;
 			TransDataSlideVert *curr_sv = &sld->sv[sld->curr_sv_index];
-			const float ctrl_size = UI_GetThemeValuef(TH_FACEDOT_SIZE) + 1.5;
+			const float ctrl_size = UI_GetThemeValuef(TH_FACEDOT_SIZE) + 1.5f;
 			const float guide_size = ctrl_size - 0.5f;
 			const float line_size = UI_GetThemeValuef(TH_OUTLINE_WIDTH) + 0.5f;
 			const int alpha_shade = -30;

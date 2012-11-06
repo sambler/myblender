@@ -1976,7 +1976,7 @@ static PyObject *Vector_subscript(VectorObject *self, PyObject *item)
 	else if (PySlice_Check(item)) {
 		Py_ssize_t start, stop, step, slicelength;
 
-		if (PySlice_GetIndicesEx((void *)item, self->size, &start, &stop, &step, &slicelength) < 0)
+		if (PySlice_GetIndicesEx(item, self->size, &start, &stop, &step, &slicelength) < 0)
 			return NULL;
 
 		if (slicelength <= 0) {
@@ -2012,7 +2012,7 @@ static int Vector_ass_subscript(VectorObject *self, PyObject *item, PyObject *va
 	else if (PySlice_Check(item)) {
 		Py_ssize_t start, stop, step, slicelength;
 
-		if (PySlice_GetIndicesEx((void *)item, self->size, &start, &stop, &step, &slicelength) < 0)
+		if (PySlice_GetIndicesEx(item, self->size, &start, &stop, &step, &slicelength) < 0)
 			return -1;
 
 		if (step == 1)
@@ -2713,7 +2713,7 @@ static int row_vector_multiplication(float r_vec[MAX_DIMENSIONS], VectorObject *
 	for (col = 0; col < mat->num_col; col++) {
 		double dot = 0.0;
 		for (row = 0; row < mat->num_row; row++) {
-			dot += MATRIX_ITEM(mat, row, col) * vec_cpy[row];
+			dot += (double)(MATRIX_ITEM(mat, row, col) * vec_cpy[row]);
 		}
 		r_vec[z++] = (float)dot;
 	}

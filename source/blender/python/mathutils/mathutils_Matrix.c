@@ -2008,7 +2008,7 @@ static PyObject *Matrix_mul(PyObject *m1, PyObject *m2)
 			for (row = 0; row < mat1->num_row; row++) {
 				double dot = 0.0f;
 				for (item = 0; item < mat1->num_col; item++) {
-					dot += MATRIX_ITEM(mat1, row, item) * MATRIX_ITEM(mat2, item, col);
+					dot += (double)(MATRIX_ITEM(mat1, row, item) * MATRIX_ITEM(mat2, item, col));
 				}
 				mat[(col * mat1->num_row) + row] = (float)dot;
 			}
@@ -2087,7 +2087,7 @@ static PyObject *Matrix_subscript(MatrixObject *self, PyObject *item)
 	else if (PySlice_Check(item)) {
 		Py_ssize_t start, stop, step, slicelength;
 
-		if (PySlice_GetIndicesEx((void *)item, self->num_row, &start, &stop, &step, &slicelength) < 0)
+		if (PySlice_GetIndicesEx(item, self->num_row, &start, &stop, &step, &slicelength) < 0)
 			return NULL;
 
 		if (slicelength <= 0) {
@@ -2123,7 +2123,7 @@ static int Matrix_ass_subscript(MatrixObject *self, PyObject *item, PyObject *va
 	else if (PySlice_Check(item)) {
 		Py_ssize_t start, stop, step, slicelength;
 
-		if (PySlice_GetIndicesEx((void *)item, self->num_row, &start, &stop, &step, &slicelength) < 0)
+		if (PySlice_GetIndicesEx(item, self->num_row, &start, &stop, &step, &slicelength) < 0)
 			return -1;
 
 		if (step == 1)
@@ -2626,7 +2626,7 @@ static PyObject *MatrixAccess_subscript(MatrixAccessObject *self, PyObject *item
 	else if (PySlice_Check(item)) {
 		Py_ssize_t start, stop, step, slicelength;
 
-		if (PySlice_GetIndicesEx((void *)item, MatrixAccess_len(self), &start, &stop, &step, &slicelength) < 0)
+		if (PySlice_GetIndicesEx(item, MatrixAccess_len(self), &start, &stop, &step, &slicelength) < 0)
 			return NULL;
 
 		if (slicelength <= 0) {

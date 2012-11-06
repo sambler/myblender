@@ -60,7 +60,7 @@ static bool isQuadPlanar(carve::geom3d::Vector &v1, carve::geom3d::Vector &v2,
 	float production = carve::geom::dot(cross, vec3);
 	float magnitude = 1e-5 * cross.length();
 
-	return fabs(production) < magnitude;
+	return fabsf(production) < magnitude;
 }
 
 static bool isFacePlanar(CSG_IFace &face, std::vector<carve::geom3d::Vector> &vertices)
@@ -559,8 +559,6 @@ static bool Carve_checkDegeneratedFace(std::map<MeshSet<3>::vertex_t*, uint> *ve
 
 		if (v1 == v2 || v2 == v3 || v1 == v3)
 			return true;
-
-		return triangleArea(face->edge->prev->vert->v, face->edge->vert->v, face->edge->next->vert->v) < DBL_EPSILON;
 	}
 	else if (face->n_edges == 4) {
 		uint v1, v2, v3, v4;
@@ -572,9 +570,6 @@ static bool Carve_checkDegeneratedFace(std::map<MeshSet<3>::vertex_t*, uint> *ve
 
 		if (v1 == v2 || v1 == v3 || v1 == v4 || v2 == v3 || v2 == v4 || v3 == v4)
 			return true;
-
-		return triangleArea(face->edge->vert->v, face->edge->next->vert->v, face->edge->next->next->vert->v) +
-		       triangleArea(face->edge->prev->vert->v, face->edge->vert->v, face->edge->next->next->vert->v) < DBL_EPSILON;
 	}
 
 	return false;

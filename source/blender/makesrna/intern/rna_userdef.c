@@ -395,7 +395,7 @@ static EnumPropertyItem *rna_userdef_compute_device_itemf(bContext *UNUSED(C), P
 		int a;
 
 		if (devices) {
-			for (a = 0; devices[a].name; a++) {
+			for (a = 0; devices[a].identifier[0]; a++) {
 				tmp.value = devices[a].value;
 				tmp.identifier = devices[a].identifier;
 				tmp.name = devices[a].name;
@@ -769,6 +769,25 @@ static void rna_def_userdef_theme_ui(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "icon_alpha", PROP_FLOAT, PROP_FACTOR);
 	RNA_def_property_ui_text(prop, "Icon Alpha", "Transparency of icons in the interface, to reduce contrast");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+	
+	/* axis */
+	prop = RNA_def_property(srna, "axis_x", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_float_sdna(prop, NULL, "xaxis");
+	RNA_def_property_array(prop, 3);
+	RNA_def_property_ui_text(prop, "X Axis", "");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+	
+	prop = RNA_def_property(srna, "axis_y", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_float_sdna(prop, NULL, "yaxis");
+	RNA_def_property_array(prop, 3);
+	RNA_def_property_ui_text(prop, "Y Axis", "");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+	
+	prop = RNA_def_property(srna, "axis_z", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_float_sdna(prop, NULL, "zaxis");
+	RNA_def_property_array(prop, 3);
+	RNA_def_property_ui_text(prop, "Z Axis", "");
 	RNA_def_property_update(prop, 0, "rna_userdef_update");
 }
 
@@ -3143,6 +3162,7 @@ static void rna_def_userdef_system(BlenderRNA *brna)
 	RNA_def_property_enum_items(prop, color_picker_types);
 	RNA_def_property_enum_sdna(prop, NULL, "color_picker_type");
 	RNA_def_property_ui_text(prop, "Color Picker Type", "Different styles of displaying the color picker widget");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
 	
 	prop = RNA_def_property(srna, "use_preview_images", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "uiflag", USER_ALLWINCODECS);
@@ -3424,7 +3444,7 @@ static void rna_def_userdef_input(BlenderRNA *brna)
 
 	/* 3D view */
 	prop = RNA_def_property(srna, "ndof_view_rotate_method", PROP_ENUM, PROP_NONE);
-	RNA_def_property_enum_bitflag_sdna(prop, NULL, "flag");
+	RNA_def_property_enum_bitflag_sdna(prop, NULL, "ndof_flag");
 	RNA_def_property_enum_items(prop, ndof_view_rotation_items);
 	RNA_def_property_ui_text(prop, "NDOF View Rotation", "Rotation style in the viewport");
 

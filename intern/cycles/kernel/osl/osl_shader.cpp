@@ -32,8 +32,31 @@
 CCL_NAMESPACE_BEGIN
 
 tls_ptr(OSLGlobals::ThreadData, OSLGlobals::thread_data);
+volatile int OSLGlobals::thread_data_users = 0;
+thread_mutex OSLGlobals::thread_data_mutex;
 
 /* Threads */
+
+void OSLGlobals::thread_data_init()
+{
+	thread_scoped_lock thread_data_lock(thread_data_mutex);
+
+	if(thread_data_users == 0)
+		tls_create(OSLGlobals::ThreadData, thread_data);
+
+	thread_data_users++;
+}
+
+void OSLGlobals::thread_data_free()
+{
+	/* thread local storage delete */
+	thread_scoped_lock thread_data_lock(thread_data_mutex);
+
+	thread_data_users--;
+
+	if(thread_data_users == 0)
+		tls_delete(OSLGlobals::ThreadData, thread_data);
+}
 
 void OSLShader::thread_init(KernelGlobals *kg)
 {
@@ -93,6 +116,7 @@ static void shaderdata_to_shaderglobals(KernelGlobals *kg, ShaderData *sd,
 	
 	/* shader data to be used in services callbacks */
 	globals->renderstate = sd; 
+	globals->tracedata = NULL;
 
 	/* hacky, we leave it to services to fetch actual object matrix */
 	globals->shader2common = sd;
@@ -159,6 +183,20 @@ static void flatten_surface_closure_tree(ShaderData *sd, bool no_glossy,
 					sd->closure[sd->num_closure++] = sc;
 					break;
 				}
+				case AmbientOcclusion: {
+					if (sd->num_closure == MAX_CLOSURE)
+						return;
+
+					/* sample weight */
+					float sample_weight = fabsf(average(weight));
+
+					sc.sample_weight = sample_weight;
+					sc.type = CLOSURE_AMBIENT_OCCLUSION_ID;
+
+					sd->closure[sd->num_closure++] = sc;
+					sd->flag |= SD_AO;
+					break;
+				}
 				case OSL::ClosurePrimitive::Holdout:
 					if (sd->num_closure == MAX_CLOSURE)
 						return;
@@ -204,6 +242,10 @@ void OSLShader::eval_surface(KernelGlobals *kg, ShaderData *sd, float randb, int
 
 	if (kg->osl.surface_state[shader])
 		ss->execute(*ctx, *(kg->osl.surface_state[shader]), *globals);
+
+	/* free trace data */
+	if(globals->tracedata)
+		delete (OSLRenderServices::TraceData*)globals->tracedata;
 
 	/* flatten closure tree */
 	sd->num_closure = 0;
@@ -259,6 +301,10 @@ float3 OSLShader::eval_background(KernelGlobals *kg, ShaderData *sd, int path_fl
 	/* execute shader for this point */
 	if (kg->osl.background_state)
 		ss->execute(*ctx, *(kg->osl.background_state), *globals);
+
+	/* free trace data */
+	if(globals->tracedata)
+		delete (OSLRenderServices::TraceData*)globals->tracedata;
 
 	/* return background color immediately */
 	if (globals->Ci)
@@ -338,6 +384,10 @@ void OSLShader::eval_volume(KernelGlobals *kg, ShaderData *sd, float randb, int 
 	if (kg->osl.volume_state[shader])
 		ss->execute(*ctx, *(kg->osl.volume_state[shader]), *globals);
 
+	/* free trace data */
+	if(globals->tracedata)
+		delete (OSLRenderServices::TraceData*)globals->tracedata;
+
 	if (globals->Ci)
 		flatten_volume_closure_tree(sd, globals->Ci);
 }
@@ -360,6 +410,10 @@ void OSLShader::eval_displacement(KernelGlobals *kg, ShaderData *sd)
 
 	if (kg->osl.displacement_state[shader])
 		ss->execute(*ctx, *(kg->osl.displacement_state[shader]), *globals);
+
+	/* free trace data */
+	if(globals->tracedata)
+		delete (OSLRenderServices::TraceData*)globals->tracedata;
 
 	/* get back position */
 	sd->P = TO_FLOAT3(globals->P);

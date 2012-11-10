@@ -1002,8 +1002,7 @@ static void rna_RenderSettings_active_layer_index_range(PointerRNA *ptr, int *mi
 	RenderData *rd = (RenderData *)ptr->data;
 
 	*min = 0;
-	*max = BLI_countlist(&rd->layers) - 1;
-	*max = MAX2(0, *max);
+	*max = max_ii(0, BLI_countlist(&rd->layers) - 1);
 }
 
 static PointerRNA rna_RenderSettings_active_layer_get(PointerRNA *ptr)
@@ -1253,6 +1252,12 @@ static void rna_Scene_simplify_update(Main *bmain, Scene *scene, PointerRNA *ptr
 {
 	if (scene->r.mode & R_SIMPLIFY)
 		rna_Scene_use_simplify_update(bmain, scene, ptr);
+}
+
+static void rna_Scene_use_persistent_data_update(Main *bmain, Scene *scene, PointerRNA *UNUSED(ptr))
+{
+	if (!(scene->r.mode & R_PERSISTENT_DATA))
+		RE_FreePersistentData();
 }
 
 static int rna_Scene_use_audio_get(PointerRNA *ptr)
@@ -4036,6 +4041,12 @@ static void rna_def_scene_render_data(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "use_simplify_triangulate", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "simplify_flag", R_SIMPLE_NO_TRIANGULATE);
 	RNA_def_property_ui_text(prop, "Skip Quad to Triangles", "Disable non-planar quads being triangulated");
+
+	/* persistent data */
+	prop = RNA_def_property(srna, "use_persistent_data", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "mode", R_PERSISTENT_DATA);
+	RNA_def_property_ui_text(prop, "Persistent Data", "Keep render data around for faster re-renders");
+	RNA_def_property_update(prop, 0, "rna_Scene_use_persistent_data_update");
 
 	/* Scene API */
 	RNA_api_scene_render(srna);

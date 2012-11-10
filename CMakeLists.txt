@@ -291,7 +291,7 @@ if(APPLE)
 	message(STATUS "Detected system-version: " ${OSX_SYSTEM})
 	
 	if(NOT CMAKE_OSX_DEPLOYMENT_TARGET)
-			set(CMAKE_OSX_DEPLOYMENT_TARGET "10.5" CACHE STRING "" FORCE) # 10.5 is our minimum target, if you have higher sdk, weak linking happens
+			set(CMAKE_OSX_DEPLOYMENT_TARGET "10.6" CACHE STRING "" FORCE) # 10.6 is our min. target, if you use higher sdk, weak linking happens - with 10.5 we have still not solved problems, build those with 10.5.sdk for now !!!
 	endif()
 
 	if(${CMAKE_GENERATOR} MATCHES "Xcode")
@@ -312,6 +312,10 @@ if(APPLE)
 		execute_process(COMMAND xcodebuild -version OUTPUT_VARIABLE XCODE_VERS_BUILD_NR)
 		string(SUBSTRING "${XCODE_VERS_BUILD_NR}" 6 3 XCODE_VERSION) # truncate away build-nr
 		unset(XCODE_VERS_BUILD_NR)
+		# force CMAKE_OSX_DEPLOYMENT_TARGET for makefiles, will not work else ( cmake bug ? )
+		set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mmacosx-version-min=${CMAKE_OSX_DEPLOYMENT_TARGET}")
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mmacosx-version-min=${CMAKE_OSX_DEPLOYMENT_TARGET}")
+		add_definitions ("-DMACOSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}")
 	endif()
 	
 	message(STATUS "Detected Xcode-version: " ${XCODE_VERSION})
@@ -336,8 +340,8 @@ if(NOT WITH_GAMEENGINE AND WITH_PLAYER)
 	message(FATAL_ERROR "WITH_PLAYER requires WITH_GAMEENGINE")
 endif()
 
-if(NOT WITH_AUDASPACE AND (WITH_OPENAL OR WITH_SDL OR WITH_JACK OR WITH_GAMEENGINE))
-	message(FATAL_ERROR "WITH_OPENAL/WITH_SDL/WITH_JACK/WITH_CODEC_FFMPEG/WITH_GAMEENGINE require WITH_AUDASPACE")
+if(NOT WITH_AUDASPACE AND (WITH_OPENAL OR WITH_JACK OR WITH_GAMEENGINE))
+	message(FATAL_ERROR "WITH_OPENAL/WITH_JACK/WITH_CODEC_FFMPEG/WITH_GAMEENGINE require WITH_AUDASPACE")
 endif()
 
 if(NOT WITH_SDL AND WITH_GHOST_SDL)
@@ -372,8 +376,8 @@ if(WITH_CYCLES)
 	set(WITH_OPENIMAGEIO ON)
 endif()
 
-# auto enable boost for cycles and booleans
-if(WITH_CYCLES OR WITH_MOD_BOOLEAN)
+# auto enable boost for cycles, booleans or audaspace
+if(WITH_CYCLES OR WITH_MOD_BOOLEAN OR WITH_AUDASPACE)
 	set(WITH_BOOST ON)
 endif()
 
@@ -715,7 +719,7 @@ if(UNIX AND NOT APPLE)
 		set(LLVM_DIRECTORY ${LIBDIR}/llvm CACHE PATH	"Path to the LLVM installation")
 		set(LLVM_VERSION "3.0" CACHE STRING	"Version of LLVM to use")
 		set(LLVM_STATIC YES)
-		if(LLVM_DIRECTORY)
+		if(EXISTS "${LLVM_DIRECTORY}/bin/llvm-config")
 			set(LLVM_CONFIG "${LLVM_DIRECTORY}/bin/llvm-config")
 		else()
 			set(LLVM_CONFIG llvm-config)
@@ -730,7 +734,7 @@ if(UNIX AND NOT APPLE)
 		                OUTPUT_VARIABLE LLVM_LIB_DIR
 		                OUTPUT_STRIP_TRAILING_WHITESPACE)
 		find_library(LLVM_LIBRARY
-		             NAMES libLLVMAnalysis.a # first of a whole bunch of libs to get
+		             NAMES LLVMAnalysis # first of a whole bunch of libs to get
 		             PATHS ${LLVM_LIB_DIR})
 		message(STATUS "LLVM version  = ${LLVM_VERSION}")
 		message(STATUS "LLVM dir      = ${LLVM_DIRECTORY}")
@@ -1395,7 +1399,7 @@ elseif(APPLE)
 	endif()
 
 	if(WITH_JACK)
-		set(JACK /usr)
+		set(JACK /usr/local)
 		set(JACK_INCLUDE_DIRS ${JACK}/include/jack)
 		set(JACK_LIBRARIES jack)
 		set(JACK_LIBPATH ${JACK}/lib)
@@ -1608,7 +1612,7 @@ elseif(APPLE)
 		set(LLVM_DIRECTORY ${LIBDIR}/llvm CACHE PATH	"Path to the LLVM installation")
 		set(LLVM_VERSION "3.1" CACHE STRING	"Version of LLVM to use")
 		set(LLVM_STATIC YES)
-		if(LLVM_DIRECTORY)
+		if(EXISTS "${LLVM_DIRECTORY}/bin/llvm-config")
 			set(LLVM_CONFIG "${LLVM_DIRECTORY}/bin/llvm-config")
 		else()
 			set(LLVM_CONFIG llvm-config)
@@ -1623,7 +1627,7 @@ elseif(APPLE)
 		                OUTPUT_VARIABLE LLVM_LIB_DIR
 		                OUTPUT_STRIP_TRAILING_WHITESPACE)
 		find_library(LLVM_LIBRARY
-		             NAMES libLLVMAnalysis.a # first of a whole bunch of libs to get
+		             NAMES LLVMAnalysis # first of a whole bunch of libs to get
 		             PATHS ${LLVM_LIB_DIR})
 		message(STATUS "LLVM version  = ${LLVM_VERSION}")
 		message(STATUS "LLVM dir      = ${LLVM_DIRECTORY}")

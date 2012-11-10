@@ -285,8 +285,8 @@ static void drawmeta_contents(Scene *scene, Sequence *seqm, float x1, float y1, 
 		drawmeta_stipple(1);
 
 	for (seq = seqm->seqbase.first; seq; seq = seq->next) {
-		chan_min = MIN2(chan_min, seq->machine);
-		chan_max = MAX2(chan_max, seq->machine);
+		chan_min = min_ii(chan_min, seq->machine);
+		chan_max = max_ii(chan_max, seq->machine);
 	}
 
 	chan_range = (chan_max - chan_min) + 1;
@@ -912,6 +912,13 @@ void draw_image_seq(const bContext *C, Scene *scene, ARegion *ar, SpaceSeq *sseq
 	GLuint last_texid;
 	unsigned char *display_buffer;
 	void *cache_handle = NULL;
+
+	if (G.is_rendering == FALSE) {
+		/* stop all running jobs, except screen one. currently previews frustrate Render
+		 * needed to make so sequencer's rendering doesn't conflict with compositor
+		 */
+		WM_jobs_kill_all_except(CTX_wm_manager(C), CTX_wm_screen(C));
+	}
 
 	render_size = sseq->render_size;
 	if (render_size == 0) {

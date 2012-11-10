@@ -58,6 +58,7 @@
 #include "GPU_material.h"
 
 #include "RE_engine.h"
+#include "RE_pipeline.h"
 
 #include "ED_node.h"
 #include "ED_render.h"
@@ -157,6 +158,8 @@ void ED_render_engine_changed(Main *bmain)
 	for (sc = bmain->screen.first; sc; sc = sc->id.next)
 		for (sa = sc->areabase.first; sa; sa = sa->next)
 			ED_render_engine_area_exit(sa);
+
+	RE_FreePersistentData();
 }
 
 /***************************** Updates ***********************************
@@ -378,6 +381,12 @@ static void scene_changed(Main *bmain, Scene *UNUSED(scene))
 
 void ED_render_id_flush_update(Main *bmain, ID *id)
 {
+	/* this can be called from render or baking thread when a python script makes
+	 * changes, in that case we don't want to do any editor updates, and making
+	 * GPU changes is not possible because OpenGL only works in the main thread */
+	if (!BLI_thread_is_main())
+		return;
+
 	switch (GS(id->name)) {
 		case ID_MA:
 			material_changed(bmain, (Material *)id);

@@ -828,8 +828,6 @@ static void cdDM_drawMappedFaces(DerivedMesh *dm,
 		mcol = DM_get_tessface_data_layer(dm, colType);
 	}
 
-	printf("%s: %p(%d/%d)\n", __func__, mcol, CD_ID_MCOL, colType);
-
 	cdDM_update_normals_from_pbvh(dm);
 
 	/* back-buffer always uses legacy since VBO's would need the
@@ -1956,12 +1954,11 @@ static DerivedMesh *cddm_from_bmesh_ex(struct BMesh *bm, int use_mdisps,
 
 	/* avoid this where possiblem, takes extra memory */
 	if (use_tessface) {
-		int *polyindex;
 
 		BM_mesh_elem_index_ensure(bm, BM_FACE);
 
 		index = dm->getTessFaceDataArray(dm, CD_ORIGINDEX);
-		for (i = 0; i < dm->numTessFaceData; i++, index++, polyindex++) {
+		for (i = 0; i < dm->numTessFaceData; i++, index++) {
 			MFace *mf = &mface[i];
 			const BMLoop **l = em_looptris[i];
 			efa = l[0]->f;

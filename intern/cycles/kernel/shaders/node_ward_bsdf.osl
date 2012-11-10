@@ -38,12 +38,12 @@ shader node_ward_bsdf(
 	float aniso = clamp(Anisotropy, -0.99, 0.99);
 
 	if(aniso < 0.0) {
-		RoughnessU = Roughness*(1.0 + aniso);
-		RoughnessV = Roughness/(1.0 + aniso);
+		RoughnessU = Roughness/(1.0 + aniso);
+		RoughnessV = Roughness*(1.0 + aniso);
 	}
 	else {
-		RoughnessU = Roughness/(1.0 - aniso);
-		RoughnessV = Roughness*(1.0 - aniso);
+		RoughnessU = Roughness*(1.0 - aniso);
+		RoughnessV = Roughness/(1.0 - aniso);
 	}
 
 	BSDF = Color * ward(Normal, T, RoughnessU, RoughnessV);

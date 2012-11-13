@@ -89,13 +89,6 @@ BF_ZLIB_LIB = 'z'
 
 WITH_BF_INTERNATIONAL = True
 
-BF_GETTEXT = '/usr'
-BF_GETTEXT_INC = '${BF_GETTEXT}/include'
-BF_GETTEXT_LIB = 'gettextlib'
-BF_GETTEXT_LIBPATH = '${BF_GETTEXT}/lib'
-#WITH_BF_GETTEXT_STATIC = True
-#BF_GETTEXT_LIB_STATIC = '${BF_GETTEXT}/lib/libgettextlib.a'
-
 WITH_BF_GAMEENGINE = True
 WITH_BF_PLAYER = True
 WITH_BF_OCEANSIM = True
@@ -233,6 +226,7 @@ if not os.path.exists(LCGDIR + '/boost'):
     BF_BOOST = '/usr'
 BF_BOOST_INC = BF_BOOST + '/include'
 BF_BOOST_LIB = 'boost_date_time boost_filesystem boost_regex boost_system boost_thread'
+BF_BOOST_LIB_INTERNATIONAL = 'boost_locale'
 BF_BOOST_LIBPATH = BF_BOOST + '/lib'
 
 WITH_BF_CYCLES = WITH_BF_OIIO and WITH_BF_BOOST

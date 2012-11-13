@@ -289,18 +289,14 @@ if(APPLE)
 		set(OSX_SYSTEM unsupported)
 	endif()
 	message(STATUS "Detected system-version: " ${OSX_SYSTEM})
-	
-	if(NOT CMAKE_OSX_DEPLOYMENT_TARGET)
-			set(CMAKE_OSX_DEPLOYMENT_TARGET "10.6" CACHE STRING "" FORCE) # 10.6 is our min. target, if you use higher sdk, weak linking happens - with 10.5 we have still not solved problems, build those with 10.5.sdk for now !!!
-	endif()
 
 	if(${CMAKE_GENERATOR} MATCHES "Xcode")
 	
-		##### workaround for actual official cmake incompatibility with xcode 4.3 #####
+		##### cmake incompatibility with xcode  4.3 and higher #####
 		if(${XCODE_VERSION} MATCHES '') # cmake fails due looking for xcode in the wrong path, thus will be empty var
-			message("Official cmake does not yet support Xcode 4.3, get a patched version here: http://www.jensverwiebe.de/Blender/CMake%202.8-7patched.zip")
+			message(FATAL_ERROR "Xcode 4.3 and higher must be used with cmake 2.8-8 or higher")
 		endif()
-		### end workaround for actual official cmake incompatibility with xcode 4.3 ###
+		### end cmake incompatibility with xcode 4.3 and higher ###
 		
 		if(${XCODE_VERSION} VERSION_EQUAL 4 OR ${XCODE_VERSION} VERSION_GREATER 4 AND ${XCODE_VERSION} VERSION_LESS 4.3)
 			# Xcode 4 defaults to the Apple LLVM Compiler.
@@ -312,14 +308,31 @@ if(APPLE)
 		execute_process(COMMAND xcodebuild -version OUTPUT_VARIABLE XCODE_VERS_BUILD_NR)
 		string(SUBSTRING "${XCODE_VERS_BUILD_NR}" 6 3 XCODE_VERSION) # truncate away build-nr
 		unset(XCODE_VERS_BUILD_NR)
+	endif()
+	
+	message(STATUS "Detected Xcode-version: " ${XCODE_VERSION})
+
+	if(${XCODE_VERSION} VERSION_LESS 4.3)
+		set(CMAKE_OSX_SYSROOT /Developer/SDKs/MacOSX${OSX_SYSTEM}.sdk CACHE PATH "" FORCE)  # use guaranteed existing sdk
+	else()
+		# note: i don't use xcode-select path on purpose, cause also /Applications/Xcode.app would be allowed
+		# absolute pathes are more foolproof here !
+		set(OSX_SYSROOT_PREFIX /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform)
+		set(OSX_DEVELOPER_PREFIX /Developer/SDKs/MacOSX${OSX_SYSTEM}.sdk) # use guaranteed existing sdk
+		set(CMAKE_OSX_SYSROOT ${OSX_SYSROOT_PREFIX}/${OSX_DEVELOPER_PREFIX} CACHE PATH "" FORCE)
+	endif()
+	
+	if(NOT CMAKE_OSX_DEPLOYMENT_TARGET)
+			set(CMAKE_OSX_DEPLOYMENT_TARGET "10.5" CACHE STRING "" FORCE) # 10.5 is our min. target, if you use higher sdk, weak linking happens
+	endif()
+	
+	if(NOT ${CMAKE_GENERATOR} MATCHES "Xcode")
 		# force CMAKE_OSX_DEPLOYMENT_TARGET for makefiles, will not work else ( cmake bug ? )
 		set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mmacosx-version-min=${CMAKE_OSX_DEPLOYMENT_TARGET}")
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mmacosx-version-min=${CMAKE_OSX_DEPLOYMENT_TARGET}")
 		add_definitions ("-DMACOSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}")
 	endif()
-	
-	message(STATUS "Detected Xcode-version: " ${XCODE_VERSION})
-	
+
 	option(WITH_COCOA	  "Use Cocoa framework instead of deprecated Carbon" ON)
 	option(USE_QTKIT	  "Use QtKit instead of Carbon quicktime (needed for having partial quicktime for 64bit)" OFF)
 	option(WITH_LIBS10.5  "Use 10.5 libs (needed for 64bit builds)" OFF)
@@ -340,12 +353,20 @@ if(NOT WITH_GAMEENGINE AND WITH_PLAYER)
 	message(FATAL_ERROR "WITH_PLAYER requires WITH_GAMEENGINE")
 endif()
 
-if(NOT WITH_AUDASPACE AND (WITH_OPENAL OR WITH_JACK OR WITH_GAMEENGINE))
-	message(FATAL_ERROR "WITH_OPENAL/WITH_JACK/WITH_CODEC_FFMPEG/WITH_GAMEENGINE require WITH_AUDASPACE")
+if(NOT WITH_AUDASPACE)
+	if(WITH_OPENAL)
+		message(FATAL_ERROR "WITH_OPENAL requires WITH_AUDASPACE")
+	endif()
+	if(WITH_JACK)
+		message(FATAL_ERROR "WITH_JACK requires WITH_AUDASPACE")
+	endif()
+	if(WITH_GAMEENGINE)
+		message(FATAL_ERROR "WITH_GAMEENGINE requires WITH_AUDASPACE")
+	endif()
 endif()
 
 if(NOT WITH_SDL AND WITH_GHOST_SDL)
-	message(FATAL_ERROR "WITH_GHOST_SDL requires WITH_SDL to be ON")
+	message(FATAL_ERROR "WITH_GHOST_SDL requires WITH_SDL")
 endif()
 
 if(WITH_IMAGE_REDCODE AND ((NOT WITH_IMAGE_OPENJPEG) OR (NOT WITH_CODEC_FFMPEG)))
@@ -376,8 +397,8 @@ if(WITH_CYCLES)
 	set(WITH_OPENIMAGEIO ON)
 endif()
 
-# auto enable boost for cycles, booleans or audaspace
-if(WITH_CYCLES OR WITH_MOD_BOOLEAN OR WITH_AUDASPACE)
+# auto enable boost for cycles, booleans, audaspace or i18n
+if(WITH_CYCLES OR WITH_MOD_BOOLEAN OR WITH_AUDASPACE OR WITH_INTERNATIONAL)
 	set(WITH_BOOST ON)
 endif()
 
@@ -593,28 +614,6 @@ if(UNIX AND NOT APPLE)
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D__STDC_CONSTANT_MACROS")
 	endif()
 
-	if(WITH_INTERNATIONAL)
-		find_library(INTL_LIBRARY
-			NAMES intl
-			PATHS
-			/sw/lib
-		)
-
-		find_library(ICONV_LIBRARY
-			NAMES iconv
-			PATHS
-			/sw/lib
-		)
-		mark_as_advanced(
-			ICONV_LIBRARY
-			INTL_LIBRARY
-		)
-
-		if(INTL_LIBRARY AND ICONV_LIBRARY)
-			set(GETTEXT_LIBRARIES ${INTL_LIBRARY} ${ICONV_LIBRARY})
-		endif()
-	endif()
-
 	if(WITH_FFTW3)
 		find_package(Fftw3)
 		if(NOT FFTW3_FOUND)
@@ -662,7 +661,11 @@ if(UNIX AND NOT APPLE)
 			else()
 				set(Boost_USE_MULTITHREADED ON)
 			endif()
-			find_package(Boost 1.34 COMPONENTS filesystem regex system thread)
+			set(__boost_packages filesystem regex system thread)
+			if (WITH_INTERNATIONAL)
+				list(APPEND __boost_packages locale)
+			endif()
+			find_package(Boost 1.34 COMPONENTS ${__boost_packages})
 			mark_as_advanced(Boost_DIR)  # why doesnt boost do this?
 		endif()
 
@@ -879,13 +882,6 @@ elseif(WIN32)
 		
 	add_definitions(-DWIN32)
 
-	if(WITH_INTERNATIONAL)
-		set(ICONV ${LIBDIR}/iconv)
-		set(ICONV_INCLUDE_DIRS ${ICONV}/include)
-		set(ICONV_LIBRARIES iconv)
-		set(ICONV_LIBPATH ${ICONV}/lib)
-	endif()
-
 	set(JPEG "${LIBDIR}/jpeg")
 	set(JPEG_INCLUDE_DIR "${JPEG}/include")
 	set(JPEG_LIBPATH ${JPEG}/lib) # not cmake defined
@@ -978,13 +974,6 @@ elseif(WIN32)
 		set(CXX_WARNINGS "${_WARNINGS}")
 		unset(_WARNINGS)
 
-		if(WITH_INTERNATIONAL)
-			set(GETTEXT ${LIBDIR}/gettext)
-			set(GETTEXT_INCLUDE_DIRS ${GETTEXT}/include)
-			set(GETTEXT_LIBPATH ${GETTEXT}/lib)
-			set(GETTEXT_LIBRARIES gnu_gettext)
-		endif()
-		
 		if(WITH_MOD_CLOTH_ELTOPO)
 			set(LAPACK ${LIBDIR}/lapack)
 			# set(LAPACK_INCLUDE_DIR ${LAPACK}/include)
@@ -1137,6 +1126,11 @@ elseif(WIN32)
 				debug libboost_date_time-${BOOST_DEBUG_POSTFIX} debug libboost_filesystem-${BOOST_DEBUG_POSTFIX}
 				debug libboost_regex-${BOOST_DEBUG_POSTFIX}
 				debug libboost_system-${BOOST_DEBUG_POSTFIX} debug libboost_thread-${BOOST_DEBUG_POSTFIX})
+			if(WITH_INTERNATIONAL)
+				set(BOOST_LIBRARIES ${BOOST_LIBRARIES}
+					optimized libboost_locale-${BOOST_POSTFIX}
+					debug libboost_locale-${BOOST_DEBUG_POSTFIX})
+			endif(WITH_INTERNATIONAL)
 			set(BOOST_DEFINITIONS "-DBOOST_ALL_NO_LIB")
 		endif()
 			
@@ -1190,16 +1184,8 @@ elseif(WIN32)
 
 		add_definitions(-D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE)
 
-
 		add_definitions(-DFREE_WINDOWS)
 
-		if(WITH_INTERNATIONAL)
-			set(GETTEXT ${LIBDIR}/gettext)
-			set(GETTEXT_INCLUDE_DIRS ${GETTEXT}/include)
-			set(GETTEXT_LIBPATH ${GETTEXT}/lib)
-			set(GETTEXT_LIBRARIES intl)
-		endif()
-		
 		set(PNG "${LIBDIR}/png")
 		set(PNG_INCLUDE_DIR "${PNG}/include")
 		set(PNG_LIBPATH ${PNG}/lib) # not cmake defined
@@ -1317,6 +1303,11 @@ elseif(WIN32)
 				debug boost_date_time-${BOOST_DEBUG_POSTFIX} boost_filesystem-${BOOST_DEBUG_POSTFIX}
 				boost_regex-${BOOST_DEBUG_POSTFIX}
 				boost_system-${BOOST_DEBUG_POSTFIX} boost_thread-${BOOST_DEBUG_POSTFIX})
+			if(WITH_INTERNATIONAL)
+				set(BOOST_LIBRARIES ${BOOST_LIBRARIES}
+					optimized boost_locale-${BOOST_POSTFIX}
+					debug boost_locale-${BOOST_DEBUG_POSTFIX}) 
+			endif()
 			set(BOOST_LIBPATH ${BOOST}/lib)
 			set(BOOST_DEFINITIONS "-DBOOST_ALL_NO_LIB -DBOOST_THREAD_USE_LIB ")
 		endif()
@@ -1367,16 +1358,6 @@ elseif(APPLE)
 		set(WITH_LIBS10.5 ON CACHE BOOL "Use 10.5 libs" FORCE) # valid also for 10.6/10.7
 	endif()
 
-	if(${XCODE_VERSION} VERSION_LESS 4.3)
-		set(CMAKE_OSX_SYSROOT /Developer/SDKs/MacOSX${OSX_SYSTEM}.sdk CACHE PATH "" FORCE)  # use guaranteed existing sdk
-	else()
-		# note: i don't use xcode-select path on purpose, cause also /Applications/Xcode.app would be allowed
-		# absolute pathes are more foolproof here !
-		set(OSX_SYSROOT_PREFIX /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform)
-		set(OSX_DEVELOPER_PREFIX /Developer/SDKs/MacOSX${OSX_SYSTEM}.sdk) # use guaranteed existing sdk
-		set(CMAKE_OSX_SYSROOT ${OSX_SYSROOT_PREFIX}/${OSX_DEVELOPER_PREFIX} CACHE PATH "" FORCE)
-	endif()
-	
 	if(WITH_LIBS10.5)
 		set(LIBDIR ${CMAKE_SOURCE_DIR}/../lib/darwin-9.x.universal)
 	else()
@@ -1399,10 +1380,13 @@ elseif(APPLE)
 	endif()
 
 	if(WITH_JACK)
-		set(JACK /usr/local)
-		set(JACK_INCLUDE_DIRS ${JACK}/include/jack)
-		set(JACK_LIBRARIES jack)
-		set(JACK_LIBPATH ${JACK}/lib)
+		find_library(JACK_FRAMEWORK
+			NAMES jackmp
+		)
+		set(JACK_INCLUDE_DIRS ${JACK_FRAMEWORK}/headers)
+		if(NOT JACK_FRAMEWORK)
+			set(WITH_JACK OFF)
+		endif()
 	endif()
 
 	if(WITH_CODEC_SNDFILE)
@@ -1438,13 +1422,6 @@ elseif(APPLE)
 		# uncached vars
 		set(PYTHON_INCLUDE_DIRS "${PYTHON_INCLUDE_DIR}")
 		set(PYTHON_LIBRARIES  "${PYTHON_LIBRARY}")
-	endif()
-
-	if(WITH_INTERNATIONAL)
-		set(GETTEXT ${LIBDIR}/gettext)
-		set(GETTEXT_INCLUDE_DIRS "${GETTEXT}/include")
-		set(GETTEXT_LIBRARIES intl iconv)
-		set(GETTEXT_LIBPATH ${GETTEXT}/lib)
 	endif()
 
 	if(WITH_FFTW3)
@@ -1513,10 +1490,10 @@ elseif(APPLE)
 		if(WITH_INPUT_NDOF)
 			# This thread it *should* work and check the framework - campbell
 			# http://www.cmake.org/pipermail/cmake/2005-December/007740.html
-			find_library(3D_CONNEXION_CLIENT_LIBRARY
+			find_library(3DCONNEXION_CLIENT_FRAMEWORK
 				NAMES 3DconnexionClient
 			)
-			if(NOT 3D_CONNEXION_CLIENT_LIBRARY)
+			if(NOT 3DCONNEXION_CLIENT_FRAMEWORK)
 				set(WITH_INPUT_NDOF OFF)
 			endif()
 
@@ -1524,6 +1501,10 @@ elseif(APPLE)
 				set(PLATFORM_LINKFLAGS "${PLATFORM_LINKFLAGS} -weak_framework 3DconnexionClient")
 			endif()
 		endif()
+
+	if(WITH_JACK)
+		set(PLATFORM_LINKFLAGS "${PLATFORM_LINKFLAGS} -weak_framework jackmp")
+	endif()
 
 	else()
 		set(PLATFORM_CFLAGS "-pipe -funsigned-char")
@@ -1588,6 +1569,10 @@ elseif(APPLE)
 		set(BOOST ${LIBDIR}/boost)
 		set(BOOST_INCLUDE_DIR ${BOOST}/include)
 		set(BOOST_LIBRARIES boost_date_time-mt boost_filesystem-mt boost_regex-mt boost_system-mt boost_thread-mt)
+		if (WITH_INTERNATIONAL)
+			list(APPEND BOOST_LIBRARIES boost_locale-mt)
+			set(PLATFORM_LINKFLAGS "${PLATFORM_LINKFLAGS} -liconv") # boost_locale needs it !
+		endif()
 		set(BOOST_LIBPATH ${BOOST}/lib)
 		set(BOOST_DEFINITIONS)
 	endif()
@@ -1713,6 +1698,11 @@ if(WITH_CYCLES)
 	endif()
 endif()
 
+if(WITH_INTERNATIONAL)
+	if(NOT WITH_BOOST)
+		message(FATAL_ERROR "Internationalization reqires WITH_BOOST, the library may not have been found. Configure BOOST or disable WITH_INTERNATIONAL")
+	endif()
+endif()
 
 # See TEST_SSE_SUPPORT() for how this is defined.
 

@@ -80,11 +80,13 @@ static IKPlugin ikplugin_tab[] = {
 		itasc_test_constraint,
 	},
 	#endif
+
+	{ NULL }
 };
 
 static IKPlugin *get_plugin(bPose *pose)
 {
-	if (!pose || pose->iksolver < 0 || pose->iksolver >= (sizeof(ikplugin_tab) / sizeof(IKPlugin)))
+	if (!pose || pose->iksolver < 0 || pose->iksolver > (sizeof(ikplugin_tab) / sizeof(IKPlugin)))
 		return NULL;
 
 	return &ikplugin_tab[pose->iksolver];

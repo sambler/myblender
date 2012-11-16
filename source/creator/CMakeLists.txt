@@ -622,18 +622,7 @@ elseif(WIN32)
 	install( # x86 builds can run on x64 Windows, so this is required at all times
 		FILES ${LIBDIR}/thumbhandler/lib/BlendThumb64.dll
 		DESTINATION ${TARGETDIR}
-	)	
-
-	if(WITH_OPENIMAGEIO)
-		if(NOT MINGW)
-			set(OIIOBIN ${LIBDIR}/openimageio/bin)
-			install(
-				FILES
-					${OIIOBIN}/OpenImageIO.dll
-				DESTINATION ${TARGETDIR}
-			)
-		endif()
-	endif()
+	)
 
 	if(WITH_OPENCOLORIO)
 		set(OCIOBIN ${LIBDIR}/opencolorio/bin)
@@ -651,20 +640,6 @@ elseif(WIN32)
 			)
 		endif()
 	endif()
-
-	if(WITH_CYCLES AND WITH_CYCLES_OSL)
-		if(NOT MINGW)
-			set(OSLBIN ${LIBDIR}/osl/bin)
-			install(
-				FILES
-					${OSLBIN}/oslexec.dll
-					${OSLBIN}/oslquery.dll
-					${OSLBIN}/oslcomp.dll
-				DESTINATION ${TARGETDIR}
-			)
-		endif()
-	endif()
-
 
 elseif(APPLE)
 

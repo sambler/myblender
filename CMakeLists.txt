@@ -403,7 +403,7 @@ if(WITH_CYCLES OR WITH_MOD_BOOLEAN OR WITH_AUDASPACE OR WITH_INTERNATIONAL)
 endif()
 
 # auto enable llvm for cycles_osl
-if(WITH_CYCLES_OSL AND NOT WIN32)
+if(WITH_CYCLES_OSL)
 	set(WITH_LLVM ON CACHE BOOL "ON" FORCE)
 endif()
 
@@ -661,7 +661,7 @@ if(UNIX AND NOT APPLE)
 			else()
 				set(Boost_USE_MULTITHREADED ON)
 			endif()
-			set(__boost_packages filesystem regex system thread)
+			set(__boost_packages filesystem regex system thread date_time)
 			if (WITH_INTERNATIONAL)
 				list(APPEND __boost_packages locale)
 			endif()
@@ -942,6 +942,13 @@ elseif(WIN32)
 		endif()
 	endif()
 
+	if(WITH_LLVM)
+		set(LLVM_DIRECTORY ${LIBDIR}/llvm CACHE PATH	"Path to the LLVM installation")
+		file(GLOB LLVM_LIBRARY ${LLVM_DIRECTORY}/lib/*.lib)
+		set(LLVM_STATIC YES)
+	endif()
+
+
 	if(MSVC)
 		set(PLATFORM_LINKLIBS ws2_32 vfw32 winmm kernel32 user32 gdi32 comdlg32 advapi32 shfolder shell32 ole32 oleaut32 uuid)
 
@@ -1112,23 +1119,23 @@ elseif(WIN32)
 			if(MSVC10)
 				set(BOOST_LIBPATH ${BOOST}/vc2010/lib)
 				set(BOOST_POSTFIX "vc100-mt-s-1_49.lib")
-				set(BOOST_DEBUG_POSTFIX "vc100-mt-sgd-1_49.lib")
+				#set(BOOST_DEBUG_POSTFIX "vc100-mt-sgd-1_49.lib")
 			else()
 				set(BOOST_LIBPATH ${BOOST}/lib)
 				set(BOOST_POSTFIX "vc90-mt-s-1_49.lib")
-				set(BOOST_DEBUG_POSTFIX "vc90-mt-sgd-1_49.lib")
+				#set(BOOST_DEBUG_POSTFIX "vc90-mt-sgd-1_49.lib")
 			endif()
 			set(BOOST_LIBRARIES
 				optimized libboost_date_time-${BOOST_POSTFIX} optimized libboost_filesystem-${BOOST_POSTFIX}
 				optimized libboost_regex-${BOOST_POSTFIX}
-				optimized libboost_system-${BOOST_POSTFIX} optimized libboost_thread-${BOOST_POSTFIX}
-				debug libboost_date_time-${BOOST_DEBUG_POSTFIX} debug libboost_filesystem-${BOOST_DEBUG_POSTFIX}
-				debug libboost_regex-${BOOST_DEBUG_POSTFIX}
-				debug libboost_system-${BOOST_DEBUG_POSTFIX} debug libboost_thread-${BOOST_DEBUG_POSTFIX})
+				optimized libboost_system-${BOOST_POSTFIX} optimized libboost_thread-${BOOST_POSTFIX})
+				#debug libboost_date_time-${BOOST_DEBUG_POSTFIX} debug libboost_filesystem-${BOOST_DEBUG_POSTFIX}
+				#debug libboost_regex-${BOOST_DEBUG_POSTFIX}
+				#debug libboost_system-${BOOST_DEBUG_POSTFIX} debug libboost_thread-${BOOST_DEBUG_POSTFIX}
 			if(WITH_INTERNATIONAL)
 				set(BOOST_LIBRARIES ${BOOST_LIBRARIES}
-					optimized libboost_locale-${BOOST_POSTFIX}
-					debug libboost_locale-${BOOST_DEBUG_POSTFIX})
+					optimized libboost_locale-${BOOST_POSTFIX})
+					#debug libboost_locale-${BOOST_DEBUG_POSTFIX}
 			endif(WITH_INTERNATIONAL)
 			set(BOOST_DEFINITIONS "-DBOOST_ALL_NO_LIB")
 		endif()
@@ -1691,7 +1698,7 @@ if(WITH_CYCLES)
 		message(FATAL_ERROR "Cycles reqires WITH_BOOST, the library may not have been found. Configure BOOST or disable WITH_CYCLES")
 	endif()
 
-	if(WITH_CYCLES_OSL AND NOT WIN32)
+	if(WITH_CYCLES_OSL)
 		if(NOT WITH_LLVM)
 			message(FATAL_ERROR "Cycles OSL reqires WITH_LLVM, the library may not have been found. Configure LLVM or disable WITH_CYCLES_OSL")
 		endif()

@@ -143,6 +143,8 @@ def cmake_advanced_info():
         else:
             if make_exe_basename.startswith("make"):
                 cmd = 'cmake "%s" -G"Eclipse CDT4 - Unix Makefiles"' % CMAKE_DIR
+            elif make_exe_basename.startswith("gmake"):
+                cmd = 'cmake "%s" -G"Eclipse CDT4 - Unix Makefiles"' % CMAKE_DIR
             elif make_exe_basename.startswith("ninja"):
                 cmd = 'cmake "%s" -G"Eclipse CDT4 - Ninja"' % CMAKE_DIR
             else:

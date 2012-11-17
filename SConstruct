@@ -308,8 +308,10 @@ if env['OURPLATFORM']=='darwin':
             env.Append(LINKFLAGS=['-Xlinker','-weak_framework','-Xlinker','Jackmp'])
 
     if env['WITH_BF_CYCLES_OSL'] == 1:
-        env.Append(LINKFLAGS=['-force_load','../lib/darwin-9.x.universal/osl/lib/liboslexec.a'])
-		
+        # this is kinda hardcoded atm due not understood path issues, also look that we need 2 variants of passing the oslexec with the force_load option, why ?
+        env.Append(LINKFLAGS=['-L../lib/darwin-9.x.universal/osl/lib','-loslcomp','-force_load ../lib/darwin-9.x.universal/osl/lib/liboslexec.a','-loslquery'])
+        env.Append(BF_PROGRAM_LINKFLAGS=['-loslcomp','-Xlinker','-force_load','-Xlinker','../lib/darwin-9.x.universal/osl/lib/liboslexec.a'])
+			
 if env['WITH_BF_OPENMP'] == 1:
         if env['OURPLATFORM'] in ('win32-vc', 'win64-vc'):
                 env['CCFLAGS'].append('/openmp')
@@ -581,11 +583,11 @@ B.init_lib_dict()
 
 Export('env')
 
-BuildDir(B.root_build_dir+'/source', 'source', duplicate=0)
+VariantDir(B.root_build_dir+'/source', 'source', duplicate=0)
 SConscript(B.root_build_dir+'/source/SConscript')
-BuildDir(B.root_build_dir+'/intern', 'intern', duplicate=0)
+VariantDir(B.root_build_dir+'/intern', 'intern', duplicate=0)
 SConscript(B.root_build_dir+'/intern/SConscript')
-BuildDir(B.root_build_dir+'/extern', 'extern', duplicate=0)
+VariantDir(B.root_build_dir+'/extern', 'extern', duplicate=0)
 SConscript(B.root_build_dir+'/extern/SConscript')
 
 # now that we have read all SConscripts, we know what

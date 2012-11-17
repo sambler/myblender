@@ -29,7 +29,7 @@ LLVM_VERSION_MIN="3.0"
 
 # OSL needs to be compiled for now!
 OSL_VERSION="1.2.0"
-OSL_SOURCE="https://github.com/DingTo/OpenShadingLanguage/archive/blender-fixes.zip"
+OSL_SOURCE="https://github.com/mont29/OpenShadingLanguage/archive/blender-fixes.tar.gz"
 
 FFMPEG_VERSION="1.0"
 FFMPEG_SOURCE="http://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.bz2"
@@ -143,28 +143,31 @@ compile_Python() {
   # To be changed each time we make edits that would modify the compiled result!
   py_magic=0
 
+  _src=$SRC/Python-$PYTHON_VERSION
+  _inst=$INST/python-$PYTHON_VERSION
+
   # Clean install if needed!
   magic_compile_check python-$PYTHON_VERSION $py_magic
   if [ $? -eq 1 ]; then
-    rm -rf $INST/python-$PYTHON_VERSION
+    rm -rf $_inst
   fi
 
-  if [ ! -d $INST/python-$PYTHON_VERSION ]; then
+  if [ ! -d $_inst ]; then
     INFO "Building Python-$PYTHON_VERSION"
 
     prepare_opt
 
-    if [ ! -d $SRC/Python-$PYTHON_VERSION ]; then
+    if [ ! -d $_src ]; then
       mkdir -p $SRC
-      wget -c $PYTHON_SOURCE -P $SRC
+      wget -c $PYTHON_SOURCE -O $_src.tar.bz2
 
       INFO "Unpacking Python-$PYTHON_VERSION"
-      tar -C $SRC -xf $SRC/Python-$PYTHON_VERSION.tar.bz2
+      tar -C $SRC -xf $_src.tar.bz2
     fi
 
-    cd $SRC/Python-$PYTHON_VERSION
+    cd $_src
 
-    ./configure --prefix=$INST/python-$PYTHON_VERSION --enable-ipv6 \
+    ./configure --prefix=$_inst --enable-ipv6 \
         --enable-loadable-sqlite-extensions --with-dbmliborder=bdb \
         --with-computed-gotos --with-pymalloc
 
@@ -180,6 +183,7 @@ compile_Python() {
     cd $CWD
   else
     INFO "Own Python-$PYTHON_VERSION is up to date, nothing to do!"
+    INFO "If you want to force rebuild of this lib, delete the '$_src' directory."
   fi
 }
 
@@ -187,30 +191,33 @@ compile_Boost() {
   # To be changed each time we make edits that would modify the compiled result!
   boost_magic=7
 
+  _src=$SRC/boost-$BOOST_VERSION
+  _inst=$INST/boost-$BOOST_VERSION
+
   # Clean install if needed!
   magic_compile_check boost-$BOOST_VERSION $boost_magic
   if [ $? -eq 1 ]; then
-    rm -rf $INST/boost-$BOOST_VERSION
+    rm -rf $_inst
   fi
 
-  if [ ! -d $INST/boost-$BOOST_VERSION ]; then
+  if [ ! -d $_inst ]; then
     INFO "Building Boost-$BOOST_VERSION"
 
     prepare_opt
 
-    if [ ! -d $SRC/boost-$BOOST_VERSION ]; then
+    if [ ! -d $_src ]; then
       INFO "Downloading Boost-$BOOST_VERSION"
       mkdir -p $SRC
-      wget -c $BOOST_SOURCE -O $SRC/boost-$BOOST_VERSION.tar.bz2
-      tar -C $SRC --transform "s,(.*/?)boost_1_[^/]+(.*),\1boost-$BOOST_VERSION\2,x" -xf $SRC/boost-$BOOST_VERSION.tar.bz2
+      wget -c $BOOST_SOURCE -O $_src.tar.bz2
+      tar -C $SRC --transform "s,(.*/?)boost_1_[^/]+(.*),\1boost-$BOOST_VERSION\2,x" -xf $_src.tar.bz2
     fi
 
-    cd $SRC/boost-$BOOST_VERSION
-    if [ ! -f $SRC/boost-$BOOST_VERSION/b2 ]; then
+    cd $_src
+    if [ ! -f $_src/b2 ]; then
       ./bootstrap.sh
     fi
-    ./b2 -j$THREADS -a --with-system --with_filesystem --with-thread --with-regex --with-locale --with-date_time \
-         --prefix=$INST/boost-$BOOST_VERSION --disable-icu boost.locale.icu=off install
+    ./b2 -j$THREADS -a --with-system --with-filesystem --with-thread --with-regex --with-locale --with-date_time \
+         --prefix=$_inst --disable-icu boost.locale.icu=off install
     ./b2 --clean
 
     rm -f $INST/boost
@@ -221,6 +228,7 @@ compile_Boost() {
     cd $CWD
   else
     INFO "Own Boost-$BOOST_VERSION is up to date, nothing to do!"
+    INFO "If you want to force rebuild of this lib, delete the '$_src' directory."
   fi
 }
 
@@ -228,28 +236,31 @@ compile_OCIO() {
   # To be changed each time we make edits that would modify the compiled result!
   ocio_magic=1
 
+  _src=$SRC/OpenColorIO-$OCIO_VERSION
+  _inst=$INST/ocio-$OCIO_VERSION
+
   # Clean install if needed!
   magic_compile_check ocio-$OCIO_VERSION $ocio_magic
   if [ $? -eq 1 ]; then
-    rm -rf $INST/ocio-$OCIO_VERSION
+    rm -rf $_inst
   fi
 
-  if [ ! -d $INST/ocio-$OCIO_VERSION ]; then
+  if [ ! -d $_inst ]; then
     INFO "Building OpenColorIO-$OCIO_VERSION"
 
     prepare_opt
 
-    if [ ! -d $SRC/OpenColorIO-$OCIO_VERSION ]; then
+    if [ ! -d $_src ]; then
       INFO "Downloading OpenColorIO-$OCIO_VERSION"
       mkdir -p $SRC
-      wget -c $OCIO_SOURCE -O $SRC/OpenColorIO-$OCIO_VERSION.tar.gz
+      wget -c $OCIO_SOURCE -O $_src.tar.gz
 
       INFO "Unpacking OpenColorIO-$OCIO_VERSION"
       tar -C $SRC --transform "s,(.*/?)imageworks-OpenColorIO[^/]*(.*),\1OpenColorIO-$OCIO_VERSION\2,x" \
-          -xf $SRC/OpenColorIO-$OCIO_VERSION.tar.gz
+          -xf $_src.tar.gz
     fi
 
-    cd $SRC/OpenColorIO-$OCIO_VERSION
+    cd $_src
     # Always refresh the whole build!
     if [ -d build ]; then
       rm -rf build
@@ -264,21 +275,21 @@ compile_OCIO() {
     fi
 
     cmake -D CMAKE_BUILD_TYPE=Release \
-        -D CMAKE_PREFIX_PATH=$INST/ocio-$OCIO_VERSION \
-        -D CMAKE_INSTALL_PREFIX=$INST/ocio-$OCIO_VERSION \
-        -D CMAKE_CXX_FLAGS="$cflags" \
-        -D CMAKE_EXE_LINKER_FLAGS="-lgcc_s -lgcc" \
-        ..
+          -D CMAKE_PREFIX_PATH=$_inst \
+          -D CMAKE_INSTALL_PREFIX=$_inst \
+          -D CMAKE_CXX_FLAGS="$cflags" \
+          -D CMAKE_EXE_LINKER_FLAGS="-lgcc_s -lgcc" \
+          ..
 
     make -j$THREADS
     make install
 
     # Force linking against static libs
-    rm -f $INST/ocio-$OCIO_VERSION/lib/*.so*
+    rm -f $_inst/lib/*.so*
 
     # Additional depencencies
-    cp ext/dist/lib/libtinyxml.a $INST/ocio-$OCIO_VERSION/lib
-    cp ext/dist/lib/libyaml-cpp.a $INST/ocio-$OCIO_VERSION/lib
+    cp ext/dist/lib/libtinyxml.a $_inst/lib
+    cp ext/dist/lib/libyaml-cpp.a $_inst/lib
 
     make clean
 
@@ -290,33 +301,37 @@ compile_OCIO() {
     cd $CWD
   else
     INFO "Own OpenColorIO-$OCIO_VERSION is up to date, nothing to do!"
+    INFO "If you want to force rebuild of this lib, delete the '$_src' directory."
   fi
 }
 
 compile_OIIO() {
   # To be changed each time we make edits that would modify the compiled result!
-  oiio_magic=1
+  oiio_magic=5
+
+  _src=$SRC/OpenImageIO-$OIIO_VERSION
+  _inst=$INST/oiio-$OIIO_VERSION
 
   # Clean install if needed!
   magic_compile_check oiio-$OIIO_VERSION $oiio_magic
   if [ $? -eq 1 ]; then
-    rm -rf $INST/oiio-$OIIO_VERSION
+    rm -rf $_inst
   fi
 
-  if [ ! -d $INST/oiio-$OIIO_VERSION ]; then
+  if [ ! -d $_inst ]; then
     INFO "Building OpenImageIO-$OIIO_VERSION"
 
     prepare_opt
 
-    if [ ! -d $SRC/OpenImageIO-$OIIO_VERSION ]; then
-      wget -c $OIIO_SOURCE -O "$SRC/OpenImageIO-$OIIO_VERSION.tar.gz"
+    if [ ! -d $_src ]; then
+      wget -c $OIIO_SOURCE -O "$_src.tar.gz"
 
       INFO "Unpacking OpenImageIO-$OIIO_VERSION"
       tar -C $SRC --transform "s,(.*/?)OpenImageIO-oiio[^/]*(.*),\1OpenImageIO-$OIIO_VERSION\2,x" \
-          -xf $SRC/OpenImageIO-$OIIO_VERSION.tar.gz
+          -xf $_src.tar.gz
     fi
 
-    cd $SRC/OpenImageIO-$OIIO_VERSION
+    cd $_src
     # Always refresh the whole build!
     if [ -d build ]; then
       rm -rf build
@@ -324,11 +339,19 @@ compile_OIIO() {
     mkdir build
     cd build
 
+    cmake_d="-D CMAKE_BUILD_TYPE=Release \
+             -D CMAKE_PREFIX_PATH=$_inst \
+             -D CMAKE_INSTALL_PREFIX=$_inst \
+             -D BUILDSTATIC=ON"
+
     if [ -d $INST/boost ]; then
-      boost_root="$INST/boost"
-    else
-      boost_root="/usr"
+      cmake_d="$cmake_d -D BOOST_ROOT=$INST/boost"
     fi
+
+    # Looks like we do not need ocio in oiio for now...
+#    if [ -d $INST/ocio ]; then
+#      cmake_d="$cmake_d -D OCIO_PATH=$INST/ocio"
+#    fi
 
     if file /bin/cp | grep -q '32-bit'; then
       cflags="-fPIC -m32 -march=i686"
@@ -336,14 +359,7 @@ compile_OIIO() {
       cflags="-fPIC"
     fi
 
-    cmake -D CMAKE_BUILD_TYPE=Release \
-          -D CMAKE_PREFIX_PATH=$INST/oiio-$OIIO_VERSION \
-          -D CMAKE_INSTALL_PREFIX=$INST/oiio-$OIIO_VERSION \
-          -D BUILDSTATIC=ON \
-          -D CMAKE_CXX_FLAGS="$cflags" \
-          -D CMAKE_EXE_LINKER_FLAGS="-lgcc_s -lgcc" \
-          -D BOOST_ROOT="$boost_root" \
-          ../src
+    cmake $cmake_d -D CMAKE_CXX_FLAGS="$cflags" -D CMAKE_EXE_LINKER_FLAGS="-lgcc_s -lgcc" ../src
 
     make -j$THREADS
     make install
@@ -357,6 +373,80 @@ compile_OIIO() {
     cd $CWD
   else
     INFO "Own OpenImageIO-$OIIO_VERSION is up to date, nothing to do!"
+    INFO "If you want to force rebuild of this lib, delete the '$_src' directory."
+  fi
+}
+
+compile_OSL() {
+  # To be changed each time we make edits that would modify the compiled result!
+  osl_magic=4
+
+  _src=$SRC/OpenShadingLanguage-$OSL_VERSION
+  _inst=$INST/osl-$OSL_VERSION
+
+  # Clean install if needed!
+  magic_compile_check osl-$OSL_VERSION $osl_magic
+  if [ $? -eq 1 ]; then
+    rm -rf $_inst
+  fi
+
+  if [ ! -d $_inst ]; then
+    INFO "Building OpenShadingLanguage-$OSL_VERSION"
+
+    prepare_opt
+
+    if [ ! -d $_src ]; then
+      # XXX Using git on my own repo for now, looks like archives are not updated immediately... :/
+#      wget -c $OSL_SOURCE -O "$_src.tar.gz"
+
+#      INFO "Unpacking OpenShadingLanguage-$OSL_VERSION"
+#      tar -C $SRC --transform "s,(.*/?)OpenShadingLanguage-[^/]*(.*),\1OpenShadingLanguage-$OSL_VERSION\2,x" \
+#          -xf $_src.tar.gz
+      git clone https://github.com/mont29/OpenShadingLanguage.git $_src
+      cd $_src
+      git checkout blender-fixes
+      cd $CWD
+    fi
+
+    cd $_src
+    # XXX For now, always update from latest repo...
+    git checkout .
+
+    # Always refresh the whole build!
+    if [ -d build ]; then
+      rm -rf build
+    fi    
+    mkdir build
+    cd build
+
+    cmake_d="-D CMAKE_BUILD_TYPE=Release \
+             -D CMAKE_INSTALL_PREFIX=$_inst
+             -D BUILDSTATIC=ON \
+             -D BUILD_TESTING=OFF"
+
+    if [ -d $INST/boost ]; then
+      cmake_d="$cmake_d -D BOOST_ROOT=$INST/boost"
+    fi
+
+    if [ -d $INST/oiio ]; then
+      cmake_d="$cmake_d -D OPENIMAGEIOHOME=$INST/oiio"
+    fi
+
+    cmake $cmake_d ../src
+
+    make -j$THREADS
+    make install
+    make clean
+
+    rm -f $INST/osl
+    ln -s osl-$OSL_VERSION $INST/osl
+
+    magic_compile_set osl-$OSL_VERSION $osl_magic
+
+    cd $CWD
+  else
+    INFO "Own OpenShadingLanguage-$OSL_VERSION is up to date, nothing to do!"
+    INFO "If you want to force rebuild of this lib, delete the '$_src' directory."
   fi
 }
 
@@ -364,26 +454,29 @@ compile_FFmpeg() {
   # To be changed each time we make edits that would modify the compiled result!
   ffmpeg_magic=0
 
+  _src=$SRC/ffmpeg-$FFMPEG_VERSION
+  _inst=$INST/ffmpeg-$FFMPEG_VERSION
+
   # Clean install if needed!
   magic_compile_check ffmpeg-$FFMPEG_VERSION $ffmpeg_magic
   if [ $? -eq 1 ]; then
-    rm -rf $INST/ffmpeg-$FFMPEG_VERSION
+    rm -rf $_inst
   fi
 
-  if [ ! -d $INST/ffmpeg-$FFMPEG_VERSION ]; then
+  if [ ! -d $_inst ]; then
     INFO "Building ffmpeg-$FFMPEG_VERSION"
 
     prepare_opt
 
-    if [ ! -d $SRC/ffmpeg-$FFMPEG_VERSION ]; then
+    if [ ! -d $_src ]; then
       INFO "Downloading ffmpeg-$FFMPEG_VERSION"
-      wget -c $FFMPEG_SOURCE -P $SRC
+      wget -c $FFMPEG_SOURCE -O "$_src.tar.bz2"
 
       INFO "Unpacking ffmpeg-$FFMPEG_VERSION"
-      tar -C $SRC -xf $SRC/ffmpeg-$FFMPEG_VERSION.tar.bz2
+      tar -C $SRC -xf $_src.tar.bz2
     fi
 
-    cd $SRC/ffmpeg-$FFMPEG_VERSION
+    cd $_src
 
     extra=""
 
@@ -420,7 +513,7 @@ compile_FFmpeg() {
     fi
 
     ./configure --cc="gcc -Wl,--as-needed" --extra-ldflags="-pthread -static-libgcc" \
-        --prefix=$INST/ffmpeg-$FFMPEG_VERSION --enable-static --enable-avfilter --disable-vdpau \
+        --prefix=$_inst --enable-static --enable-avfilter --disable-vdpau \
         --disable-bzlib --disable-libgsm --disable-libspeex \
         --enable-pthreads --enable-zlib --enable-stripping --enable-runtime-cpudetect \
         --disable-vaapi  --disable-libfaac --disable-nonfree --enable-gpl \
@@ -441,6 +534,7 @@ compile_FFmpeg() {
     cd $CWD
   else
     INFO "Own ffmpeg-$FFMPEG_VERSION is up to date, nothing to do!"
+    INFO "If you want to force rebuild of this lib, delete the '$_src' directory."
   fi
 }
 
@@ -500,7 +594,7 @@ install_DEB() {
     libfreetype6-dev libx11-dev libxi-dev wget libsqlite3-dev libbz2-dev libncurses5-dev \
     libssl-dev liblzma-dev libreadline-dev $OPENJPEG_DEV libopenexr-dev libopenal-dev \
     libglew-dev yasm $SCHRO_DEV $THEORA_DEV $VORBIS_DEV libsdl1.2-dev \
-    libfftw3-dev libjack-dev python-dev patch flex bison
+    libfftw3-dev libjack-dev python-dev patch flex bison llvm-dev clang libtbb-dev git
 
   OPENJPEG_USE=true
   SCHRO_USE=true
@@ -564,7 +658,8 @@ install_DEB() {
     check_package_DEB libboost-locale$boost_version-dev
     if [ $? -eq 0 ]; then
       sudo apt-get install -y libboost-locale$boost_version-dev libboost-filesystem$boost_version-dev \
-        libboost-regex$boost_version-dev libboost-system$boost_version-dev libboost-thread$boost_version-dev
+                              libboost-regex$boost_version-dev libboost-system$boost_version-dev \
+                              libboost-thread$boost_version-dev
     else
       compile_Boost
     fi
@@ -585,6 +680,9 @@ install_DEB() {
   else
     compile_OIIO
   fi
+
+  # No package currently!
+  compile_OSL
 
 #  XXX Debian features libav packages as ffmpeg, those are not really compatible with blender code currently :/
 #      So for now, always build our own ffmpeg.
@@ -846,6 +944,11 @@ print_info() {
   if [ -d $INST/boost ]; then
     INFO "  -D BOOST_ROOT=$INST/boost"
     INFO "  -D Boost_NO_SYSTEM_PATHS=ON"
+  fi
+
+  if [ -d $INST/osl ]; then
+    INFO "  -D CYCLES_OSL=$INST/osl"
+    INFO "  -D WITH_CYCLES_OSL=ON"
   fi
 
   if [ -d $INST/ffmpeg ]; then

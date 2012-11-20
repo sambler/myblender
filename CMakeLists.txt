@@ -234,6 +234,7 @@ option(WITH_INPUT_NDOF "Enable NDOF input devices (SpaceNavigator and friends)" 
 option(WITH_RAYOPTIMIZATION	"Enable use of SIMD (SSE) optimizations for the raytracer" ON)
 if(UNIX AND NOT APPLE)
 	option(WITH_INSTALL_PORTABLE "Install redistributeable runtime, otherwise install into CMAKE_INSTALL_PREFIX" ON)
+	option(WITH_STATIC_LIBS "Try to link with static libraries, as much as possible, to make blender more portable across distributions" OFF)
 endif()
 option(WITH_PYTHON_INSTALL       "Copy system python into the blender install folder" ON)
 option(WITH_PYTHON_INSTALL_NUMPY "Copy system numpy into the blender install folder"  ON)
@@ -502,24 +503,23 @@ set(PLATFORM_LINKFLAGS_DEBUG "")
 #Platform specifics
 
 if(UNIX AND NOT APPLE)
-
-	# set lib directory if it exists
-	if(CMAKE_SYSTEM_NAME MATCHES "Linux")
-		if("${CMAKE_SIZEOF_VOID_P}" EQUAL "8")
-			set(LIBDIR ${CMAKE_SOURCE_DIR}/../lib/linux64)
-		else()
-			set(LIBDIR ${CMAKE_SOURCE_DIR}/../lib/linux)
+	macro(find_package_wrapper)
+		STRING(TOUPPER ${ARGV0} _NAME_UPPER)
+		if(${WITH_STATIC_LIBS})
+			set(_cmake_find_library_suffixes_back ${CMAKE_FIND_LIBRARY_SUFFIXES})
+			set(CMAKE_FIND_LIBRARY_SUFFIXES .a ${CMAKE_FIND_LIBRARY_SUFFIXES})
 		endif()
-
-		if(NOT EXISTS ${LIBDIR})
-			unset(LIBDIR)
+		find_package(${ARGV})
+		if(${WITH_STATIC_LIBS})
+			set(CMAKE_FIND_LIBRARY_SUFFIXES ${_cmake_find_library_suffixes_back})
+			unset(_cmake_find_library_suffixes_back)
 		endif()
-	endif()
+	endmacro()
 
-	find_package(JPEG REQUIRED)
-	find_package(PNG REQUIRED)
-	find_package(ZLIB REQUIRED)
-	find_package(Freetype REQUIRED)
+	find_package_wrapper(JPEG REQUIRED)
+	find_package_wrapper(PNG REQUIRED)
+	find_package_wrapper(ZLIB REQUIRED)
+	find_package_wrapper(Freetype REQUIRED)
 
 	if(WITH_PYTHON)
 		# No way to set py32. remove for now.
@@ -527,25 +527,28 @@ if(UNIX AND NOT APPLE)
 
 		# Use our own instead, since wothout py is such a rare case,
 		# require this package
+		# XXX Linking errors with debian static python :/
+#		find_package_wrapper(PythonLibsUnix REQUIRED)
 		find_package(PythonLibsUnix REQUIRED)
 	endif()
 
-
 	if(WITH_IMAGE_OPENEXR)
-		find_package(OpenEXR)  # our own module
+		find_package_wrapper(OpenEXR)  # our own module
 		if(NOT OPENEXR_FOUND)
 			set(WITH_IMAGE_OPENEXR OFF)
 		endif()
 	endif()
 
 	if(WITH_IMAGE_OPENJPEG)
-		find_package(OpenJPEG)
+		find_package_wrapper(OpenJPEG)
 		if(NOT OPENJPEG_FOUND)
 			set(WITH_IMAGE_OPENJPEG OFF)
 		endif()
 	endif()
 
 	if(WITH_IMAGE_TIFF)
+		# XXX Linking errors with debian static tiff :/
+#		find_package_wrapper(TIFF)
 		find_package(TIFF)
 		if(NOT TIFF_FOUND)
 			set(WITH_IMAGE_TIFF OFF)
@@ -554,14 +557,14 @@ if(UNIX AND NOT APPLE)
 
 	# Audio IO
 	if(WITH_OPENAL)
-		find_package(OpenAL)
+		find_package_wrapper(OpenAL)
 		if(NOT OPENAL_FOUND)
 			set(WITH_OPENAL OFF)
 		endif()
 	endif()
 
 	if(WITH_SDL)
-		find_package(SDL)
+		find_package_wrapper(SDL)
 		mark_as_advanced(
 			SDLMAIN_LIBRARY
 			SDL_INCLUDE_DIR
@@ -575,7 +578,7 @@ if(UNIX AND NOT APPLE)
 	endif()
 
 	if(WITH_JACK)
-		find_package(Jack)
+		find_package_wrapper(Jack)
 		if(NOT JACK_FOUND)
 			set(WITH_JACK OFF)
 		endif()
@@ -583,22 +586,15 @@ if(UNIX AND NOT APPLE)
 
 	# Codecs
 	if(WITH_CODEC_SNDFILE)
-		find_package(SndFile)
+		find_package_wrapper(SndFile)
 		if(NOT SNDFILE_FOUND)
 			set(WITH_CODEC_SNDFILE OFF)
 		endif()
 	endif()
 
 	if(WITH_CODEC_FFMPEG)
-		# use lib dir if available and nothing else specified
-		if(LIBDIR AND NOT FFMPEG)
-			set(FFMPEG ${LIBDIR}/ffmpeg CACHE PATH "FFMPEG Directory")
-			# XXX, some distros might need 'theoraenc theoradec' too
-			set(FFMPEG_LIBRARIES avformat avcodec avutil avdevice swscale dirac_encoder mp3lame ogg orc-0.4 schroedinger-1.0 theora vorbis vorbisenc vpx x264 xvidcore faad asound CACHE STRING "FFMPEG Libraries")
-		else()
-			set(FFMPEG /usr CACHE PATH "FFMPEG Directory")
-			set(FFMPEG_LIBRARIES avformat avcodec avutil avdevice swscale CACHE STRING "FFMPEG Libraries")
-		endif()
+		set(FFMPEG /usr CACHE PATH "FFMPEG Directory")
+		set(FFMPEG_LIBRARIES avformat avcodec avutil avdevice swscale CACHE STRING "FFMPEG Libraries")
 
 		mark_as_advanced(FFMPEG)
 
@@ -615,31 +611,31 @@ if(UNIX AND NOT APPLE)
 	endif()
 
 	if(WITH_FFTW3)
-		find_package(Fftw3)
+		find_package_wrapper(Fftw3)
 		if(NOT FFTW3_FOUND)
 			set(WITH_FFTW3 OFF)
 		endif()
 	endif()
 
 	if(WITH_OPENCOLLADA)
-		find_package(OpenCOLLADA)
+		find_package_wrapper(OpenCOLLADA)
 		if(OPENCOLLADA_FOUND)
-			find_package(XML2)
-			find_package(PCRE)
+			find_package_wrapper(XML2)
+			find_package_wrapper(PCRE)
 		else()
 			set(WITH_OPENCOLLADA OFF)
 		endif()
 	endif()
 
 	if(WITH_MEM_JEMALLOC)
-		find_package(JeMalloc)
+		find_package_wrapper(JeMalloc)
 		if(NOT JEMALLOC_FOUND)
 			set(WITH_MEM_JEMALLOC OFF)
 		endif()
 	endif()
 
 	if (WITH_INPUT_NDOF)
-		find_package(Spacenav)
+		find_package_wrapper(Spacenav)
 		if(NOT SPACENAV_FOUND)
 			set(WITH_INPUT_NDOF OFF)
 		endif()
@@ -654,9 +650,11 @@ if(UNIX AND NOT APPLE)
 	if(WITH_BOOST)
 		# uses in build instructions to override include and library variables
 		if(NOT BOOST_CUSTOM)
-			# use lib dir if available and nothing else specified
-			if(LIBDIR AND NOT BOOST_ROOT)
-				set(BOOST_ROOT ${LIBDIR}/boost)
+			# XXX No more lib dir, is this multithread stuff still needed?
+			if(${WITH_STATIC_LIBS})
+				set(Boost_USE_STATIC_LIBS ON)
+			endif()
+			if(NOT BOOST_ROOT)
 				set(Boost_USE_MULTITHREADED OFF)
 			else()
 				set(Boost_USE_MULTITHREADED ON)
@@ -666,6 +664,9 @@ if(UNIX AND NOT APPLE)
 				list(APPEND __boost_packages locale)
 			endif()
 			find_package(Boost 1.34 COMPONENTS ${__boost_packages})
+			if(Boost_USE_STATIC_LIBS AND Boost_USE_ICU)
+				find_package(IcuLinux)
+			endif()
 			mark_as_advanced(Boost_DIR)  # why doesnt boost do this?
 		endif()
 
@@ -676,12 +677,7 @@ if(UNIX AND NOT APPLE)
 	endif()
 
 	if(WITH_OPENIMAGEIO)
-		# use lib dir if available and nothing else specified
-		if(LIBDIR AND NOT OPENIMAGEIO_ROOT_DIR)
-			set(OPENIMAGEIO_ROOT_DIR ${LIBDIR}/oiio)
-		endif()
-
-		find_package(OpenImageIO)
+		find_package_wrapper(OpenImageIO)
 
 		set(OPENIMAGEIO_LIBRARIES ${OPENIMAGEIO_LIBRARIES} ${PNG_LIBRARIES} ${JPEG_LIBRARIES} ${ZLIB_LIBRARIES} ${BOOST_LIBRARIES})
 		set(OPENIMAGEIO_LIBPATH)  # TODO, remove and reference the absolute path everywhere
@@ -701,12 +697,7 @@ if(UNIX AND NOT APPLE)
 	endif()
 
 	if(WITH_OPENCOLORIO)
-		# use lib dir if available and nothing else specified
-		if(LIBDIR AND NOT OPENCOLORIO_ROOT_DIR)
-			set(OPENCOLORIO_ROOT_DIR ${LIBDIR}/ocio)
-		endif()
-
-		find_package(OpenColorIO)
+		find_package_wrapper(OpenColorIO)
 
 		set(OPENCOLORIO_LIBRARIES ${OPENCOLORIO_LIBRARIES})
 		set(OPENCOLORIO_LIBPATH)  # TODO, remove and reference the absolute path everywhere
@@ -718,14 +709,16 @@ if(UNIX AND NOT APPLE)
 		endif()
 	endif()
 
+	# XXX Maybe most of this section should go into an llvm module?
 	if(WITH_LLVM)
-		set(LLVM_DIRECTORY ${LIBDIR}/llvm CACHE PATH	"Path to the LLVM installation")
-		set(LLVM_VERSION "3.0" CACHE STRING	"Version of LLVM to use")
+		# Set llvm version if not specified
+		if(NOT LLVM_VERSION)
+			set(LLVM_VERSION "3.0")
+		endif()
 		set(LLVM_STATIC YES)
-		if(EXISTS "${LLVM_DIRECTORY}/bin/llvm-config")
-			set(LLVM_CONFIG "${LLVM_DIRECTORY}/bin/llvm-config")
-		else()
-			set(LLVM_CONFIG llvm-config)
+		FIND_PROGRAM(LLVM_CONFIG llvm-config-${LLVM_VERSION} HINTS ${LLVM_DIRECTORY} ${LLVM_DIRECTORY}/bin)
+		if(NOT LLVM_CONFIG)
+			FIND_PROGRAM(LLVM_CONFIG llvm-config HINTS ${LLVM_DIRECTORY} ${LLVM_DIRECTORY}/bin)
 		endif()
 		execute_process(COMMAND ${LLVM_CONFIG} --version
 		                OUTPUT_VARIABLE LLVM_VERSION
@@ -742,6 +735,8 @@ if(UNIX AND NOT APPLE)
 		message(STATUS "LLVM version  = ${LLVM_VERSION}")
 		message(STATUS "LLVM dir      = ${LLVM_DIRECTORY}")
 		message(STATUS "LLVM lib dir  = ${LLVM_LIB_DIR}")
+		set(LLVM_VERSION ${LLVM_VERSION} CACHE STRING "Version of LLVM to use")
+		set(LLVM_DIRECTORY ${LLVM_DIRECTORY} CACHE PATH "Path to the LLVM installation")
 
 		if(LLVM_LIBRARY AND LLVM_DIRECTORY AND LLVM_LIB_DIR)
 			if(LLVM_STATIC)
@@ -950,7 +945,7 @@ elseif(WIN32)
 
 
 	if(MSVC)
-		set(PLATFORM_LINKLIBS ws2_32 vfw32 winmm kernel32 user32 gdi32 comdlg32 advapi32 shfolder shell32 ole32 oleaut32 uuid)
+		set(PLATFORM_LINKLIBS ws2_32 vfw32 winmm kernel32 user32 gdi32 comdlg32 advapi32 shfolder shell32 ole32 oleaut32 uuid psapi)
 
 		add_definitions(/D_CRT_NONSTDC_NO_DEPRECATE /D_CRT_SECURE_NO_DEPRECATE /D_SCL_SECURE_NO_DEPRECATE /D_CONSOLE /D_LIB)
 
@@ -1071,6 +1066,7 @@ elseif(WIN32)
 		if(WITH_IMAGE_OPENEXR)
 			set_lib_path(OPENEXR "openexr")
 			set(OPENEXR_INCLUDE_DIR ${OPENEXR}/include)
+			set(OPENEXR_INCLUDE_DIRS ${OPENEXR}/include/OpenEXR)
 			set(OPENEXR_LIBPATH ${OPENEXR}/lib)
 			set(OPENEXR_LIBRARIES
 				${OPENEXR_LIBPATH}/Iex.lib
@@ -1078,12 +1074,6 @@ elseif(WIN32)
 				${OPENEXR_LIBPATH}/IlmImf.lib
 				${OPENEXR_LIBPATH}/Imath.lib
 				${OPENEXR_LIBPATH}/IlmThread.lib
-			)
-			set(OPENEXR_INCLUDE_DIRS
-				${OPENEXR_INCLUDE_DIR}
-				${OPENEXR_INCLUDE_DIR}/IlmImf
-				${OPENEXR_INCLUDE_DIR}/Iex
-				${OPENEXR_INCLUDE_DIR}/Imath
 			)
 		endif()
 
@@ -1119,23 +1109,23 @@ elseif(WIN32)
 			if(MSVC10)
 				set(BOOST_LIBPATH ${BOOST}/vc2010/lib)
 				set(BOOST_POSTFIX "vc100-mt-s-1_49.lib")
-				#set(BOOST_DEBUG_POSTFIX "vc100-mt-sgd-1_49.lib")
+				set(BOOST_DEBUG_POSTFIX "vc100-mt-sgd-1_49.lib")
 			else()
 				set(BOOST_LIBPATH ${BOOST}/lib)
 				set(BOOST_POSTFIX "vc90-mt-s-1_49.lib")
-				#set(BOOST_DEBUG_POSTFIX "vc90-mt-sgd-1_49.lib")
+				set(BOOST_DEBUG_POSTFIX "vc90-mt-sgd-1_49.lib")
 			endif()
 			set(BOOST_LIBRARIES
 				optimized libboost_date_time-${BOOST_POSTFIX} optimized libboost_filesystem-${BOOST_POSTFIX}
 				optimized libboost_regex-${BOOST_POSTFIX}
-				optimized libboost_system-${BOOST_POSTFIX} optimized libboost_thread-${BOOST_POSTFIX})
-				#debug libboost_date_time-${BOOST_DEBUG_POSTFIX} debug libboost_filesystem-${BOOST_DEBUG_POSTFIX}
-				#debug libboost_regex-${BOOST_DEBUG_POSTFIX}
-				#debug libboost_system-${BOOST_DEBUG_POSTFIX} debug libboost_thread-${BOOST_DEBUG_POSTFIX}
+				optimized libboost_system-${BOOST_POSTFIX} optimized libboost_thread-${BOOST_POSTFIX}
+				debug libboost_date_time-${BOOST_DEBUG_POSTFIX} debug libboost_filesystem-${BOOST_DEBUG_POSTFIX}
+				debug libboost_regex-${BOOST_DEBUG_POSTFIX}
+				debug libboost_system-${BOOST_DEBUG_POSTFIX} debug libboost_thread-${BOOST_DEBUG_POSTFIX})
 			if(WITH_INTERNATIONAL)
 				set(BOOST_LIBRARIES ${BOOST_LIBRARIES}
-					optimized libboost_locale-${BOOST_POSTFIX})
-					#debug libboost_locale-${BOOST_DEBUG_POSTFIX}
+					optimized libboost_locale-${BOOST_POSTFIX}
+					debug libboost_locale-${BOOST_DEBUG_POSTFIX})
 			endif(WITH_INTERNATIONAL)
 			set(BOOST_DEFINITIONS "-DBOOST_ALL_NO_LIB")
 		endif()
@@ -1143,7 +1133,7 @@ elseif(WIN32)
 		if(WITH_OPENIMAGEIO)
 			set(OPENIMAGEIO ${LIBDIR}/openimageio)
 			set(OPENIMAGEIO_INCLUDE_DIRS ${OPENIMAGEIO}/include)
-			set(OPENIMAGEIO_LIBRARIES OpenImageIO)
+			set(OPENIMAGEIO_LIBRARIES optimized OpenImageIO debug OpenImageIO_d)
 			set(OPENIMAGEIO_LIBPATH ${OPENIMAGEIO}/lib)
 			set(OPENIMAGEIO_DEFINITIONS "-DUSE_TBB=0")
 		endif()
@@ -1405,13 +1395,13 @@ elseif(APPLE)
 
 	if(WITH_PYTHON)
 		if(NOT WITH_PYTHON_MODULE)
-			# we use precompiled libraries for py 3.2 and up by default
+			# we use precompiled libraries for py 3.3 and up by default
 
 			# normally cached but not since we include them with blender
-			set(PYTHON_VERSION 3.2)
-			set(PYTHON_INCLUDE_DIR "${LIBDIR}/python/include/python${PYTHON_VERSION}")
+			set(PYTHON_VERSION 3.3)
+			set(PYTHON_INCLUDE_DIR "${LIBDIR}/python/include/python${PYTHON_VERSION}m")
 			# set(PYTHON_BINARY "${LIBDIR}/python/bin/python${PYTHON_VERSION}") # not used yet
-			set(PYTHON_LIBRARY python${PYTHON_VERSION})
+			set(PYTHON_LIBRARY python${PYTHON_VERSION}m)
 			set(PYTHON_LIBPATH "${LIBDIR}/python/lib/python${PYTHON_VERSION}")
 			# set(PYTHON_LINKFLAGS "-u _PyMac_Error")  # won't  build with this enabled
 		else()
@@ -1575,7 +1565,7 @@ elseif(APPLE)
 	if(WITH_BOOST)
 		set(BOOST ${LIBDIR}/boost)
 		set(BOOST_INCLUDE_DIR ${BOOST}/include)
-		set(BOOST_LIBRARIES boost_date_time-mt boost_filesystem-mt boost_regex-mt boost_system-mt boost_thread-mt)
+		set(BOOST_LIBRARIES boost_date_time-mt boost_filesystem-mt boost_regex-mt boost_system-mt boost_thread-mt boost_wave-mt)
 		if (WITH_INTERNATIONAL)
 			list(APPEND BOOST_LIBRARIES boost_locale-mt)
 			set(PLATFORM_LINKFLAGS "${PLATFORM_LINKFLAGS} -liconv") # boost_locale needs it !

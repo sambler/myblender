@@ -403,7 +403,7 @@ def buildinfo(lenv, build_type):
     build_time = time.strftime ("%H:%M:%S")
     build_rev = os.popen('svnversion').read()[:-1] # remove \n
     if build_rev == '': 
-        build_rev = '52291'
+        build_rev = '52404'
     if lenv['BF_DEBUG']:
         build_type = "Debug"
         build_cflags = ' '.join(lenv['CFLAGS'] + lenv['CCFLAGS'] + lenv['BF_DEBUG_CCFLAGS'] + lenv['CPPFLAGS'])
@@ -596,8 +596,8 @@ def AppIt(target=None, source=None, env=None):
     bldroot = env.Dir('.').abspath
     binary = env['BINARYKIND']
      
-    sourcedir = bldroot + '/source/darwin/%s.app'%binary
-    sourceinfo = bldroot + "/source/darwin/%s.app/Contents/Info.plist"%binary
+    sourcedir = bldroot + '/release/darwin/%s.app' % binary
+    sourceinfo = bldroot + "/release/darwin/%s.app/Contents/Info.plist"%binary
     targetinfo = installdir +'/' + "%s.app/Contents/Info.plist"%binary
     cmd = installdir + '/' +'%s.app'%binary
     
@@ -686,7 +686,7 @@ def AppIt(target=None, source=None, env=None):
         commands.getoutput(cmd)
         cmd = 'rm -rf  %s/set_simulation_threads.app'%(installdir) # first clear omp_num_threads applescript
         commands.getoutput(cmd)
-        cmd = 'cp -R %s/source/darwin/set_simulation_threads.app %s/'%(bldroot, installdir) # copy the omp_num_threads applescript
+        cmd = 'cp -R %s/release/darwin/set_simulation_threads.app %s/'%(bldroot, installdir) # copy the omp_num_threads applescript
         commands.getoutput(cmd)
 
 # extract copy system python, be sure to update other build systems

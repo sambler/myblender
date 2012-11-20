@@ -12,52 +12,21 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software  Foundation,
+ * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * Copyright (c) 2006 The Zdeno Ash Miklas
- *
- * This source file is part of VideoTexture library
  *
  * Contributor(s):
  *
  * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file VideoTexture/Common.h
- *  \ingroup bgevideotex
+#ifndef __BMESH_BEVEL_H__
+#define __BMESH_BEVEL_H__
+
+/** \file blender/bmesh/tools/bmesh_bevel.h
+ *  \ingroup bmesh
  */
 
-#if defined WIN32
-#define WINDOWS_LEAN_AND_MEAN
-#endif
+void BM_mesh_bevel(BMesh *bm, const float offset, const float segments);
 
-#ifndef NULL
-#define NULL 0
-#endif
-
-#ifndef HRESULT
-#define HRESULT long
-#endif
-
-#ifndef DWORD
-#define DWORD unsigned long
-#endif
-
-#ifndef S_OK
-#define S_OK ((HRESULT)0L)
-#endif
-
-#ifndef BYTE
-#define BYTE unsigned char
-#endif
-
-#ifndef WIN32
-#define Sleep(time) sleep(time)
-#endif
-
-#ifndef FAILED
-#define FAILED(Status) ((HRESULT)(Status)<0)
-#endif
-
-#include <iostream>
+#endif /* __BMESH_BEVEL_H__ */

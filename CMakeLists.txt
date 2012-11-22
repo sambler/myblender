@@ -716,9 +716,16 @@ if(UNIX AND NOT APPLE)
 			set(LLVM_VERSION "3.0")
 		endif()
 		set(LLVM_STATIC YES)
-		FIND_PROGRAM(LLVM_CONFIG llvm-config-${LLVM_VERSION} HINTS ${LLVM_DIRECTORY} ${LLVM_DIRECTORY}/bin)
-		if(NOT LLVM_CONFIG)
-			FIND_PROGRAM(LLVM_CONFIG llvm-config HINTS ${LLVM_DIRECTORY} ${LLVM_DIRECTORY}/bin)
+		if(LLVM_DIRECTORY)
+			FIND_PROGRAM(LLVM_CONFIG llvm-config-${LLVM_VERSION} HINTS ${LLVM_DIRECTORY}/bin NO_CMAKE_PATH)
+			if(NOT LLVM_CONFIG)
+				FIND_PROGRAM(LLVM_CONFIG llvm-config HINTS ${LLVM_DIRECTORY}/bin NO_CMAKE_PATH)
+			endif()
+		else()
+			FIND_PROGRAM(LLVM_CONFIG llvm-config-${LLVM_VERSION})
+			if(NOT LLVM_CONFIG)
+				FIND_PROGRAM(LLVM_CONFIG llvm-config)
+			endif()
 		endif()
 		execute_process(COMMAND ${LLVM_CONFIG} --version
 		                OUTPUT_VARIABLE LLVM_VERSION
@@ -752,6 +759,9 @@ if(UNIX AND NOT APPLE)
 		else()
 			message(FATAL_ERROR "LLVM not found.")
 		endif()
+
+		# Fix for conflict with Mesa llvmpipe
+		set(PLATFORM_LINKFLAGS "${PLATFORM_LINKFLAGS} -Wl,--version-script=${CMAKE_SOURCE_DIR}/source/creator/blender.map")
 	endif()
 
 	if(WITH_CYCLES_OSL)
@@ -814,7 +824,7 @@ if(UNIX AND NOT APPLE)
 		endif()
 	endif()
 
-	set(PLATFORM_LINKFLAGS "-pthread")
+	set(PLATFORM_LINKFLAGS "${PLATFORM_LINKFLAGS} -pthread")
 
 	# lfs on glibc, all compilers should use
 	add_definitions(-D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE)

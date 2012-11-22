@@ -80,7 +80,7 @@ const int BMO_OPSLOT_TYPEINFO[BMO_OP_SLOT_TOTAL_TYPES] = {
 };
 
 /* Dummy slot so there is something to return when slot name lookup fails */
-static BMOpSlot BMOpEmptySlot = {0};
+// static BMOpSlot BMOpEmptySlot = {0};
 
 void BMO_op_flag_enable(BMesh *UNUSED(bm), BMOperator *op, const int op_flag)
 {
@@ -133,7 +133,7 @@ static void bmo_op_slots_init(BMOSlotType *slot_types, BMOpSlot *slot_args)
 	for (i = 0; slot_types[i].type; i++) {
 		slot_args[i].slot_name = slot_types[i].name;
 		slot_args[i].slot_type = slot_types[i].type;
-		slot_args[i].index = i;
+		// slot_args[i].index = i;  // UNUSED
 	}
 }
 
@@ -252,8 +252,10 @@ BMOpSlot *BMO_slot_get(BMOpSlot slot_args[BMO_OP_MAX_SLOTS], const char *identif
 {
 	int slot_code = bmo_name_to_slotcode_check(slot_args, identifier);
 
-	if (slot_code < 0) {
-		return &BMOpEmptySlot;
+	if (UNLIKELY(slot_code < 0)) {
+		//return &BMOpEmptySlot;
+		BLI_assert(0);
+		NULL;  /* better crash */
 	}
 
 	return &slot_args[slot_code];
@@ -592,13 +594,12 @@ int BMO_slot_map_count(BMOpSlot slot_args[BMO_OP_MAX_SLOTS], const char *slot_na
 /* inserts a key/value mapping into a mapping slot.  note that it copies the
  * value, it doesn't store a reference to it. */
 
-void BMO_slot_map_insert(BMOperator *op, BMOpSlot slot_args[BMO_OP_MAX_SLOTS], const char *slot_name,
-                         void *element, void *data, int len)
+void BMO_slot_map_insert(BMOperator *op, BMOpSlot *slot,
+                         const void *element, void *data, int len)
 {
 	BMOElemMapping *mapping;
-	BMOpSlot *slot = BMO_slot_get(slot_args, slot_name);
 	BLI_assert(slot->slot_type == BMO_OP_SLOT_MAPPING);
-	BLI_assert(op->slots_in == slot_args || op->slots_out == slot_args);
+	BMO_ASSERT_SLOT_IN_OP(slot, op);
 
 	mapping = (BMOElemMapping *) BLI_memarena_alloc(op->arena, sizeof(*mapping) + len);
 
@@ -610,7 +611,7 @@ void BMO_slot_map_insert(BMOperator *op, BMOpSlot slot_args[BMO_OP_MAX_SLOTS], c
 		slot->data.ghash = BLI_ghash_ptr_new("bmesh slot map hash");
 	}
 
-	BLI_ghash_insert(slot->data.ghash, element, mapping);
+	BLI_ghash_insert(slot->data.ghash, (void *)element, mapping);
 }
 
 #if 0

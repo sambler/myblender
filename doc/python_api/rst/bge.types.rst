@@ -636,10 +636,67 @@ Types
 
 .. class:: KX_SteeringActuator(SCA_IActuator)
 
-   SteeringActuator for navigation.
+   Steering Actuator for navigation.
 
-   TODO.
+   .. attribute:: behavior
 
+      The steering behavior to use.
+
+      :type: one of :ref:`these constants <logic-steering-actuator>`
+
+   .. attribute:: velocity
+
+      Velocity magnitude
+
+      :type: float
+
+   .. attribute:: acceleration
+
+      Max acceleration
+
+      :type: float
+
+   .. attribute:: turnspeed
+
+      Max turn speed
+
+      :type: float
+
+   .. attribute:: distance
+
+      Relax distance
+
+      :type: float
+
+   .. attribute:: target
+
+      Target object
+
+      :type: :class:`KX_GameObject`
+
+   .. attribute:: navmesh
+
+      Navigation mesh
+
+      :type: :class:`KX_GameObject`
+
+   .. attribute:: selfterminated
+
+      Terminate when target is reached
+
+      :type: boolean
+
+   .. attribute:: enableVisualization
+
+      Enable debug visualization
+
+      :type: boolean
+
+   .. attribute:: pathUpdatePeriod
+
+      Path update period
+
+      :type: int
 
 .. class:: CListValue(CPropValue)
 
@@ -1698,7 +1755,7 @@ Types
       :arg blendin: the amount of blending between this animation and the previous one on this layer
       :type blendin: float
       :arg play_mode: the play mode
-      :type play_mode: KX_ACTION_MODE_PLAY, KX_ACTION_MODE_LOOP, or KX_ACTION_MODE_PING_PONG
+      :type play_mode: one of :ref:`these constants <gameobject-playaction-mode>`
       :arg layer_weight: how much of the previous layer to use for blending (0 = add)
       :type layer_weight: float
       :arg ipo_flags: flags for the old IPO behaviors (force, etc)
@@ -3204,6 +3261,10 @@ Types
       Return the value matching key, or the default value if its not found.
       :return: The key value or a default.
 
+   .. method:: drawObstacleSimulation()
+
+      Draw debug visualization of obstacle simulation.
+
 .. class:: KX_SceneActuator(SCA_IActuator)
 
    Scene Actuator logic brick.
@@ -3258,6 +3319,12 @@ Types
 
       :type: float
 
+   .. attribute:: time
+
+      The current position in the audio stream (in seconds).
+
+      :type: float
+
    .. attribute:: pitch
 
       The pitch of the sound.
@@ -3269,6 +3336,84 @@ Types
       The operation mode of the actuator. Can be one of :ref:`these constants<logic-sound-actuator>`
 
       :type: integer
+
+   .. attribute:: sound
+
+      The sound the actuator should play.
+
+      :type: Audaspace factory
+
+   .. attribute:: is3D
+
+      Whether or not the actuator should be using 3D sound. (read-only)
+
+      :type: boolean
+
+   .. attribute:: volume_maximum
+
+      The maximum gain of the sound, no matter how near it is.
+
+      :type: float
+
+   .. attribute:: volume_minimum
+
+      The minimum gain of the sound, no matter how far it is away.
+
+      :type: float
+
+   .. attribute:: distance_reference
+
+      The distance where the sound has a gain of 1.0.
+
+      :type: float
+
+   .. attribute:: distance_maximum
+
+      The maximum distance at which you can hear the sound.
+
+      :type: float
+
+   .. attribute:: attenuation
+
+      The influence factor on volume depending on distance.
+
+      :type: float
+
+   .. attribute:: cone_angle_inner
+
+      The angle of the inner cone.
+
+      :type: float
+
+   .. attribute:: cone_angle_outer
+
+      The angle of the outer cone.
+
+      :type: float
+
+   .. attribute:: cone_volume_outer
+
+      The gain outside the outer cone (the gain in the outer cone will be interpolated between this value and the normal gain in the inner cone).
+
+      :type: float
+
+   .. method:: startSound()
+
+      Starts the sound.
+
+      :return: None
+
+   .. method:: pauseSound()
+
+      Pauses the sound.
+
+      :return: None
+
+   .. method:: stopSound()
+
+      Stops the sound.
+
+      :return: None
 
 .. class:: KX_StateActuator(SCA_IActuator)
 

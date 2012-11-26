@@ -94,7 +94,7 @@ EnumPropertyItem blend_type_items[] = {
 	{MTEX_BLEND_VAL, "VALUE", 0, "Value", ""},
 	{MTEX_BLEND_COLOR, "COLOR", 0, "Color", ""},
 	{MTEX_SOFT_LIGHT, "SOFT_LIGHT", 0, "Soft Light", ""},
-	{MTEX_LIN_LIGHT    , "LINEAR_LIGHT", 0, "Linear Light", ""},
+	{MTEX_LIN_LIGHT, "LINEAR_LIGHT", 0, "Linear Light", ""},
 	{0, NULL, 0, NULL, NULL}
 };
 
@@ -116,7 +116,7 @@ EnumPropertyItem blend_type_items[] = {
 
 static StructRNA *rna_Texture_refine(struct PointerRNA *ptr)
 {
-	Tex *tex = (Tex*)ptr->data;
+	Tex *tex = (Tex *)ptr->data;
 
 	switch (tex->type) {
 		case TEX_BLEND:
@@ -165,7 +165,7 @@ static void rna_Texture_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *pt
 
 		DAG_id_tag_update(&tex->id, 0);
 		WM_main_add_notifier(NC_TEXTURE, tex);
-		WM_main_add_notifier(NC_MATERIAL|ND_SHADING_DRAW, NULL);
+		WM_main_add_notifier(NC_MATERIAL | ND_SHADING_DRAW, NULL);
 	}
 	else if (GS(id->name) == ID_NT) {
 		bNodeTree *ntree = ptr->id.data;
@@ -210,12 +210,12 @@ static void rna_Texture_nodes_update(Main *UNUSED(bmain), Scene *UNUSED(scene), 
 	Tex *tex = ptr->id.data;
 
 	DAG_id_tag_update(&tex->id, 0);
-	WM_main_add_notifier(NC_TEXTURE|ND_NODES, tex);
+	WM_main_add_notifier(NC_TEXTURE | ND_NODES, tex);
 }
 
 static void rna_Texture_type_set(PointerRNA *ptr, int value)
 {
-	Tex *tex = (Tex*)ptr->data;
+	Tex *tex = (Tex *)ptr->data;
 	
 	tex_set_type(tex, value);
 }
@@ -228,14 +228,15 @@ void rna_TextureSlot_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRN
 
 	switch (GS(id->name)) {
 		case ID_MA:
-			WM_main_add_notifier(NC_MATERIAL|ND_SHADING, id);
-			WM_main_add_notifier(NC_MATERIAL|ND_SHADING_DRAW, id);
+			WM_main_add_notifier(NC_MATERIAL | ND_SHADING, id);
+			WM_main_add_notifier(NC_MATERIAL | ND_SHADING_DRAW, id);
 			break;
 		case ID_WO:
 			WM_main_add_notifier(NC_WORLD, id);
 			break;
 		case ID_LA:
-			WM_main_add_notifier(NC_LAMP|ND_LIGHTING, id);
+			WM_main_add_notifier(NC_LAMP | ND_LIGHTING, id);
+			WM_main_add_notifier(NC_LAMP | ND_LIGHTING_DRAW, id);
 			break;
 		case ID_BR:
 			WM_main_add_notifier(NC_BRUSH, id);
@@ -251,7 +252,7 @@ void rna_TextureSlot_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRN
 				recalc |= PSYS_RECALC_CHILD;
 
 			DAG_id_tag_update(id, recalc);
-			WM_main_add_notifier(NC_OBJECT|ND_PARTICLE|NA_EDITED, NULL);
+			WM_main_add_notifier(NC_OBJECT | ND_PARTICLE | NA_EDITED, NULL);
 			break;
 		}
 	}
@@ -284,7 +285,7 @@ char *rna_TextureSlot_path(PointerRNA *ptr)
 	
 	/* this is a compromise for the remaining cases... */
 	if (mtex->tex)
-		return BLI_sprintfN("texture_slots[\"%s\"]", mtex->tex->id.name+2);
+		return BLI_sprintfN("texture_slots[\"%s\"]", mtex->tex->id.name + 2);
 	else
 		return BLI_strdup("texture_slots[0]");
 }
@@ -294,7 +295,7 @@ static int rna_TextureSlot_name_length(PointerRNA *ptr)
 	MTex *mtex = ptr->data;
 
 	if (mtex->tex)
-		return strlen(mtex->tex->id.name+2);
+		return strlen(mtex->tex->id.name + 2);
 	
 	return 0;
 }
@@ -304,7 +305,7 @@ static void rna_TextureSlot_name_get(PointerRNA *ptr, char *str)
 	MTex *mtex = ptr->data;
 
 	if (mtex->tex)
-		strcpy(str, mtex->tex->id.name+2);
+		strcpy(str, mtex->tex->id.name + 2);
 	else
 		str[0] = '\0';
 }
@@ -355,7 +356,7 @@ static EnumPropertyItem *rna_TextureSlot_output_node_itemf(bContext *C, PointerR
 			for (node = ntree->nodes.first; node; node = node->next) {
 				if (node->type == TEX_NODE_OUTPUT) {
 					tmp.value = node->custom1;
-					tmp.name = ((TexNodeOutput*)node->storage)->name;
+					tmp.name = ((TexNodeOutput *)node->storage)->name;
 					tmp.identifier = tmp.name;
 					RNA_enum_item_add(&item, &totitem, &tmp);
 				}
@@ -371,7 +372,7 @@ static EnumPropertyItem *rna_TextureSlot_output_node_itemf(bContext *C, PointerR
 
 static void rna_Texture_use_color_ramp_set(PointerRNA *ptr, int value)
 {
-	Tex *tex = (Tex*)ptr->data;
+	Tex *tex = (Tex *)ptr->data;
 
 	if (value) tex->flag |= TEX_COLORBAND;
 	else tex->flag &= ~TEX_COLORBAND;
@@ -382,7 +383,7 @@ static void rna_Texture_use_color_ramp_set(PointerRNA *ptr, int value)
 
 static void rna_Texture_use_nodes_set(PointerRNA *ptr, int v)
 {
-	Tex *tex = (Tex*)ptr->data;
+	Tex *tex = (Tex *)ptr->data;
 	
 	tex->use_nodes = v;
 	tex->type = 0;
@@ -393,7 +394,7 @@ static void rna_Texture_use_nodes_set(PointerRNA *ptr, int v)
 
 static void rna_ImageTexture_mipmap_set(PointerRNA *ptr, int value)
 {
-	Tex *tex = (Tex*)ptr->data;
+	Tex *tex = (Tex *)ptr->data;
 
 	if (value) tex->imaflag |= TEX_MIPMAP;
 	else tex->imaflag &= ~TEX_MIPMAP;
@@ -417,7 +418,7 @@ static PointerRNA rna_PointDensity_psys_get(PointerRNA *ptr)
 	PointerRNA value;
 
 	if (ob && pd->psys)
-		psys = BLI_findlink(&ob->particlesystem, pd->psys-1);
+		psys = BLI_findlink(&ob->particlesystem, pd->psys - 1);
 
 	RNA_pointer_create(&ob->id, &RNA_ParticleSystem, psys, &value);
 	return value;
@@ -479,7 +480,7 @@ static void rna_def_texmapping(BlenderRNA *brna)
 	RNA_def_property_ui_range(prop, -FLT_MAX, FLT_MAX, 1, RNA_TRANSLATION_PREC_DEFAULT);
 	RNA_def_property_update(prop, 0, "rna_Texture_mapping_update");
 	
-		/* Not PROP_XYZ, this is now in radians, no more degrees */
+	/* Not PROP_XYZ, this is now in radians, no more degrees */
 	prop = RNA_def_property(srna, "rotation", PROP_FLOAT, PROP_EULER);
 	RNA_def_property_float_sdna(prop, NULL, "rot");
 	RNA_def_property_ui_text(prop, "Rotation", "");
@@ -845,7 +846,7 @@ static void rna_def_texture_clouds(BlenderRNA *brna)
 
 	static EnumPropertyItem prop_clouds_stype[] = {
 		{TEX_DEFAULT, "GRAYSCALE", 0, "Grayscale", ""},
-	{TEX_COLOR, "COLOR", 0, "Color", ""},
+		{TEX_COLOR, "COLOR", 0, "Color", ""},
 		{0, NULL, 0, NULL, NULL}
 	};
 
@@ -938,7 +939,7 @@ static void rna_def_texture_planet(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Color", "");
 	RNA_def_property_update(prop, 0, "rna_Texture_nodes_update");
 
-	prop= RNA_def_property(srna, "nabla", PROP_FLOAT, PROP_NONE);
+	prop = RNA_def_property(srna, "nabla", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_range(prop, 0.001, 0.1);
 	RNA_def_property_ui_range(prop, 0.001, 0.1, 1, 2);
 	RNA_def_property_ui_text(prop, "Nabla", "Size of derivative offset used for calculating normal");
@@ -951,17 +952,17 @@ static void rna_def_texture_wood(BlenderRNA *brna)
 	PropertyRNA *prop;
 
 	static EnumPropertyItem prop_wood_stype[] = {
-	{TEX_BAND, "BANDS", 0, "Bands", "Use standard wood texture in bands"},
-	{TEX_RING, "RINGS", 0, "Rings", "Use wood texture in rings"},
-	{TEX_BANDNOISE, "BANDNOISE", 0, "Band Noise", "Add noise to standard wood"},
-	{TEX_RINGNOISE, "RINGNOISE", 0, "Ring Noise", "Add noise to rings"},
+		{TEX_BAND, "BANDS", 0, "Bands", "Use standard wood texture in bands"},
+		{TEX_RING, "RINGS", 0, "Rings", "Use wood texture in rings"},
+		{TEX_BANDNOISE, "BANDNOISE", 0, "Band Noise", "Add noise to standard wood"},
+		{TEX_RINGNOISE, "RINGNOISE", 0, "Ring Noise", "Add noise to rings"},
 		{0, NULL, 0, NULL, NULL}
 	};
 
 	static EnumPropertyItem prop_wood_noisebasis2[] = {
-	{TEX_SIN, "SIN", 0, "Sine", "Use a sine wave to produce bands"},
-	{TEX_SAW, "SAW", 0, "Saw", "Use a saw wave to produce bands"},
-	{TEX_TRI, "TRI", 0, "Tri", "Use a triangle wave to produce bands"},
+		{TEX_SIN, "SIN", 0, "Sine", "Use a sine wave to produce bands"},
+		{TEX_SAW, "SAW", 0, "Saw", "Use a saw wave to produce bands"},
+		{TEX_TRI, "TRI", 0, "Tri", "Use a triangle wave to produce bands"},
 		{0, NULL, 0, NULL, NULL}
 	};
 
@@ -1021,16 +1022,16 @@ static void rna_def_texture_marble(BlenderRNA *brna)
 	PropertyRNA *prop;
 
 	static EnumPropertyItem prop_marble_stype[] = {
-	{TEX_SOFT, "SOFT", 0, "Soft", "Use soft marble"},
-	{TEX_SHARP, "SHARP", 0, "Sharp", "Use more clearly defined marble"},
-	{TEX_SHARPER, "SHARPER", 0, "Sharper", "Use very clearly defined marble"},
+		{TEX_SOFT, "SOFT", 0, "Soft", "Use soft marble"},
+		{TEX_SHARP, "SHARP", 0, "Sharp", "Use more clearly defined marble"},
+		{TEX_SHARPER, "SHARPER", 0, "Sharper", "Use very clearly defined marble"},
 		{0, NULL, 0, NULL, NULL}
 	};
 
 	static EnumPropertyItem prop_marble_noisebasis2[] = {
-	{TEX_SIN, "SIN", 0, "Sin", "Use a sine wave to produce bands"},
-	{TEX_SAW, "SAW", 0, "Saw", "Use a saw wave to produce bands"},
-	{TEX_TRI, "TRI", 0, "Tri", "Use a triangle wave to produce bands"},
+		{TEX_SIN, "SIN", 0, "Sin", "Use a sine wave to produce bands"},
+		{TEX_SAW, "SAW", 0, "Saw", "Use a saw wave to produce bands"},
+		{TEX_TRI, "TRI", 0, "Tri", "Use a triangle wave to produce bands"},
 		{0, NULL, 0, NULL, NULL}
 	};
 
@@ -1162,9 +1163,9 @@ static void rna_def_texture_stucci(BlenderRNA *brna)
 	PropertyRNA *prop;
 
 	static EnumPropertyItem prop_stucci_stype[] = {
-	{TEX_PLASTIC, "PLASTIC", 0, "Plastic", "Use standard stucci"},
-	{TEX_WALLIN, "WALL_IN", 0, "Wall in", "Create Dimples"},
-	{TEX_WALLOUT, "WALL_OUT", 0, "Wall out", "Create Ridges"},
+		{TEX_PLASTIC, "PLASTIC", 0, "Plastic", "Use standard stucci"},
+		{TEX_WALLIN, "WALL_IN", 0, "Wall in", "Create Dimples"},
+		{TEX_WALLOUT, "WALL_OUT", 0, "Wall out", "Create Ridges"},
 		{0, NULL, 0, NULL, NULL}
 	};
 
@@ -1635,21 +1636,21 @@ static void rna_def_texture_pointdensity(BlenderRNA *brna)
 	static EnumPropertyItem point_source_items[] = {
 		{TEX_PD_PSYS, "PARTICLE_SYSTEM", 0, "Particle System", "Generate point density from a particle system"},
 		{TEX_PD_OBJECT, "OBJECT", 0, "Object Vertices", "Generate point density from an object's vertices"},
-		/*{TEX_PD_FILE, "FILE", 0 , "File", ""}, */
+		/*{TEX_PD_FILE, "FILE", 0, "File", ""}, */
 		{0, NULL, 0, NULL, NULL}
 	};
 	
 	static EnumPropertyItem particle_cache_items[] = {
 		{TEX_PD_OBJECTLOC, "OBJECT_LOCATION", 0, "Emit Object Location", ""},
 		{TEX_PD_OBJECTSPACE, "OBJECT_SPACE", 0, "Emit Object Space", ""},
-		{TEX_PD_WORLDSPACE, "WORLD_SPACE", 0 , "Global Space", ""},
+		{TEX_PD_WORLDSPACE, "WORLD_SPACE", 0, "Global Space", ""},
 		{0, NULL, 0, NULL, NULL}
 	};
 		
 	static EnumPropertyItem vertice_cache_items[] = {
 		{TEX_PD_OBJECTLOC, "OBJECT_LOCATION", 0, "Object Location", ""},
 		{TEX_PD_OBJECTSPACE, "OBJECT_SPACE", 0, "Object Space", ""},
-		{TEX_PD_WORLDSPACE, "WORLD_SPACE", 0 , "Global Space", ""},
+		{TEX_PD_WORLDSPACE, "WORLD_SPACE", 0, "Global Space", ""},
 		{0, NULL, 0, NULL, NULL}
 	};
 

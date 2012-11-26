@@ -4150,11 +4150,14 @@ char *RNA_path_from_ID_to_property(PointerRNA *ptr, PropertyRNA *prop)
 		path = BLI_sprintfN(is_rna ? "%s.%s" : "%s[\"%s\"]", ptrpath, propname);
 		MEM_freeN(ptrpath);
 	}
-	else {
+	else if (RNA_struct_is_ID(ptr->type)) {
 		if (is_rna)
 			path = BLI_strdup(propname);
 		else
 			path = BLI_sprintfN("[\"%s\"]", propname);
+	}
+	else {
+		path = NULL;
 	}
 
 	return path;
@@ -5950,15 +5953,19 @@ int RNA_property_equals(PointerRNA *a, PointerRNA *b, PropertyRNA *prop)
 int RNA_struct_equals(PointerRNA *a, PointerRNA *b)
 {
 	CollectionPropertyIterator iter;
-	CollectionPropertyRNA *citerprop;
+//	CollectionPropertyRNA *citerprop;  /* UNUSED */
 	PropertyRNA *iterprop;
 	int equals = 1;
 
-	if (a->type != b->type)
+	if (a == NULL && b == NULL)
+		return 1;
+	else if (a == NULL || b == NULL)
+		return 0;
+	else if (a->type != b->type)
 		return 0;
 
 	iterprop = RNA_struct_iterator_property(a->type);
-	citerprop = (CollectionPropertyRNA *)rna_ensure_property(iterprop);
+//	citerprop = (CollectionPropertyRNA *)rna_ensure_property(iterprop);  /* UNUSED */
 
 	RNA_property_collection_begin(a, iterprop, &iter);
 	for (; iter.valid; RNA_property_collection_next(&iter)) {

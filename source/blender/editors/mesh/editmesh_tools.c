@@ -72,6 +72,7 @@
 #include "RE_render_ext.h"
 
 #include "UI_interface.h"
+#include "UI_resources.h"
 
 #include "mesh_intern.h"
 
@@ -108,7 +109,7 @@ static int edbm_subdivide_exec(bContext *C, wmOperator *op)
 	                   smooth, fractal, along_normal,
 	                   cuts,
 	                   SUBDIV_SELECT_ORIG, RNA_enum_get(op->ptr, "quadcorner"),
-	                   RNA_boolean_get(op->ptr, "quadtri"), TRUE,
+	                   RNA_boolean_get(op->ptr, "quadtri"), TRUE, FALSE,
 	                   RNA_int_get(op->ptr, "seed"));
 
 	EDBM_update_generic(C, em, TRUE);
@@ -353,21 +354,21 @@ static short edbm_extrude_edge(Object *obedit, BMEditMesh *em, const char hflag,
 							if ((fabsf(co1[0]) < mmd->tolerance) &&
 							    (fabsf(co2[0]) < mmd->tolerance))
 							{
-								BMO_slot_map_ptr_insert(&extop, slot_edges_exclude, edge, NULL);
+								BMO_slot_map_empty_insert(&extop, slot_edges_exclude, edge);
 							}
 						}
 						if (mmd->flag & MOD_MIR_AXIS_Y) {
 							if ((fabsf(co1[1]) < mmd->tolerance) &&
 							    (fabsf(co2[1]) < mmd->tolerance))
 							{
-								BMO_slot_map_ptr_insert(&extop, slot_edges_exclude, edge, NULL);
+								BMO_slot_map_empty_insert(&extop, slot_edges_exclude, edge);
 							}
 						}
 						if (mmd->flag & MOD_MIR_AXIS_Z) {
 							if ((fabsf(co1[2]) < mmd->tolerance) &&
 							    (fabsf(co2[2]) < mmd->tolerance))
 							{
-								BMO_slot_map_ptr_insert(&extop, slot_edges_exclude, edge, NULL);
+								BMO_slot_map_empty_insert(&extop, slot_edges_exclude, edge);
 							}
 						}
 					}
@@ -2177,7 +2178,7 @@ void MESH_OT_merge(wmOperatorType *ot)
 	/* properties */
 	ot->prop = RNA_def_enum(ot->srna, "type", merge_type_items, 3, "Type", "Merge method to use");
 	RNA_def_enum_funcs(ot->prop, merge_type_itemf);
-	RNA_def_boolean(ot->srna, "uvs", 1, "UVs", "Move UVs according to merge");
+	RNA_def_boolean(ot->srna, "uvs", 0, "UVs", "Move UVs according to merge");
 }
 
 
@@ -2508,6 +2509,22 @@ static EnumPropertyItem *shape_itemf(bContext *C, PointerRNA *UNUSED(ptr),  Prop
 	return item;
 }
 
+static void edbm_blend_from_shape_ui(bContext *C, wmOperator *op)
+{
+	uiLayout *layout = op->layout;
+	PointerRNA ptr;
+	Object *obedit = CTX_data_edit_object(C);
+	Mesh *me = obedit->data;
+	PointerRNA ptr_key;
+
+	RNA_pointer_create(NULL, op->type->srna, op->properties, &ptr);
+	RNA_id_pointer_create((ID *)me->key, &ptr_key);
+
+	uiItemPointerR(layout, &ptr, "shape", &ptr_key, "key_blocks", "", ICON_SHAPEKEY_DATA);
+	uiItemR(layout, &ptr, "blend", 0, NULL, ICON_NONE);
+	uiItemR(layout, &ptr, "add", 0, NULL, ICON_NONE);
+}
+
 void MESH_OT_blend_from_shape(wmOperatorType *ot)
 {
 	PropertyRNA *prop;
@@ -2520,7 +2537,8 @@ void MESH_OT_blend_from_shape(wmOperatorType *ot)
 
 	/* api callbacks */
 	ot->exec = edbm_blend_from_shape_exec;
-	ot->invoke = WM_operator_props_popup_call;
+//	ot->invoke = WM_operator_props_popup_call;  /* disable because search popup closes too easily */
+	ot->ui = edbm_blend_from_shape_ui;
 	ot->poll = ED_operator_editmesh;
 
 	/* flags */
@@ -4766,10 +4784,6 @@ static int edbm_bevel_calc(bContext *C, wmOperator *op)
 
 	BMO_op_exec(em->bm, &bmop);
 
-	/* no need to de-select existing geometry */
-	if (!EDBM_op_finish(em, &bmop, op, TRUE))
-		return 0;
-
 	if (offset != 0.0f) {
 		/* not essential, but we may have some loose geometry that
 		 * won't get bevel'd and better not leave it selected */
@@ -4777,6 +4791,9 @@ static int edbm_bevel_calc(bContext *C, wmOperator *op)
 		BMO_slot_buffer_hflag_enable(em->bm, bmop.slots_out, "faces.out", BM_FACE, BM_ELEM_SELECT, TRUE);
 	}
 
+	/* no need to de-select existing geometry */
+	if (!EDBM_op_finish(em, &bmop, op, TRUE))
+		return 0;
 #else
 	int i;
 
@@ -4956,9 +4973,9 @@ static int edbm_bevel_modal(bContext *C, wmOperator *op, wmEvent *event)
 	if (event->val == KM_PRESS) {
 		/* Try to handle numeric inputs... */
 #ifdef NEW_BEVEL
-		float value;
 
 		if (handleNumInput(&opdata->num_input, event)) {
+			float value = RNA_float_get(op->ptr, "offset");
 			applyNumInput(&opdata->num_input, &value);
 			RNA_float_set(op->ptr, "offset", value);
 			edbm_bevel_calc(C, op);
@@ -4966,9 +4983,8 @@ static int edbm_bevel_modal(bContext *C, wmOperator *op, wmEvent *event)
 			return OPERATOR_RUNNING_MODAL;
 		}
 #else
-		float factor;
-
 		if (handleNumInput(&opdata->num_input, event)) {
+			float factor = RNA_float_get(op->ptr, "percent");
 			applyNumInput(&opdata->num_input, &factor);
 			CLAMP(factor, 0.0f, 1.0f);
 			RNA_float_set(op->ptr, "percent", factor);
@@ -5009,6 +5025,7 @@ static int edbm_bevel_modal(bContext *C, wmOperator *op, wmEvent *event)
 
 #ifdef NEW_BEVEL
 		case WHEELUPMOUSE:  /* change number of segments */
+		case PAGEUPKEY:
 			if (event->val == KM_RELEASE)
 				break;
 
@@ -5019,6 +5036,7 @@ static int edbm_bevel_modal(bContext *C, wmOperator *op, wmEvent *event)
 			break;
 
 		case WHEELDOWNMOUSE:  /* change number of segments */
+		case PAGEDOWNKEY:
 			if (event->val == KM_RELEASE)
 				break;
 
@@ -5348,9 +5366,10 @@ static int edbm_inset_modal(bContext *C, wmOperator *op, wmEvent *event)
 
 	if (event->val == KM_PRESS) {
 		/* Try to handle numeric inputs... */
-		float amounts[2];
 
 		if (handleNumInput(&opdata->num_input, event)) {
+			float amounts[2] = {RNA_float_get(op->ptr, "thickness"),
+			                    RNA_float_get(op->ptr, "depth")};
 			applyNumInput(&opdata->num_input, amounts);
 			amounts[0] = max_ff(amounts[0], 0.0f);
 			RNA_float_set(op->ptr, "thickness", amounts[0]);

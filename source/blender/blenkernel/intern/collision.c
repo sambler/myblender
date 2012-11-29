@@ -66,7 +66,7 @@
 #include "BKE_collision.h"
 
 #ifdef WITH_ELTOPO
-#include "eltopo-capi.h"
+//#include "eltopo-capi.h"
 #endif
 
 

@@ -112,35 +112,43 @@ typedef enum eBMOpSlotType {
 } eBMOpSlotType;
 #define BMO_OP_SLOT_TOTAL_TYPES 11
 
-/* leave zero for invalid/unset */
-typedef enum eBMOpSlotSubType {
-	/* BMO_OP_SLOT_MAPPING */
-#define BMO_OP_SLOT_SUBTYPE_MAP__FIRST BMO_OP_SLOT_SUBTYPE_MAP_EMPTY
-	BMO_OP_SLOT_SUBTYPE_MAP_EMPTY    = 1,  /* use as a set(), unused value */
-	BMO_OP_SLOT_SUBTYPE_MAP_ELEM     = 2,
-	BMO_OP_SLOT_SUBTYPE_MAP_FLOAT    = 3,
-	BMO_OP_SLOT_SUBTYPE_MAP_INT      = 4,
-	BMO_OP_SLOT_SUBTYPE_MAP_BOOL     = 5,
-	BMO_OP_SLOT_SUBTYPE_MAP_INTERNAL = 6,  /* python can't convert these */
-#define BMO_OP_SLOT_SUBTYPE_MAP__LAST BMO_OP_SLOT_SUBTYPE_MAP_INTERNAL
+/* don't overlap values to avoid confusion */
+typedef enum eBMOpSlotSubType_Elem {
+	/* use as flags */
+	BMO_OP_SLOT_SUBTYPE_ELEM_VERT = BM_VERT,
+	BMO_OP_SLOT_SUBTYPE_ELEM_EDGE = BM_EDGE,
+	BMO_OP_SLOT_SUBTYPE_ELEM_FACE = BM_FACE,
+	BMO_OP_SLOT_SUBTYPE_ELEM_IS_SINGLE = (BM_FACE << 1),
+} eBMOpSlotSubType_Elem;
+typedef enum eBMOpSlotSubType_Map {
+	BMO_OP_SLOT_SUBTYPE_MAP_EMPTY    = 64,  /* use as a set(), unused value */
+	BMO_OP_SLOT_SUBTYPE_MAP_ELEM     = 65,
+	BMO_OP_SLOT_SUBTYPE_MAP_FLT      = 66,
+	BMO_OP_SLOT_SUBTYPE_MAP_INT      = 67,
+	BMO_OP_SLOT_SUBTYPE_MAP_BOOL     = 68,
+	BMO_OP_SLOT_SUBTYPE_MAP_INTERNAL = 69,  /* python can't convert these */
+} eBMOpSlotSubType_Map;
+typedef enum eBMOpSlotSubType_Ptr {
+	BMO_OP_SLOT_SUBTYPE_PTR_BMESH  = 100,
+	BMO_OP_SLOT_SUBTYPE_PTR_SCENE  = 101,
+	BMO_OP_SLOT_SUBTYPE_PTR_OBJECT = 102,
+	BMO_OP_SLOT_SUBTYPE_PTR_MESH   = 103,
+} eBMOpSlotSubType_Ptr;
 
-	/* BMO_OP_SLOT_PTR */
-#define BMO_OP_SLOT_SUBTYPE_PTR__FIRST BMO_OP_SLOT_SUBTYPE_PTR_BMESH
-	BMO_OP_SLOT_SUBTYPE_PTR_BMESH  = 10,
-	BMO_OP_SLOT_SUBTYPE_PTR_SCENE  = 11,
-	BMO_OP_SLOT_SUBTYPE_PTR_OBJECT = 12,
-	BMO_OP_SLOT_SUBTYPE_PTR_MESH   = 13,
-#define BMO_OP_SLOT_SUBTYPE_PTR__LAST BMO_OP_SLOT_SUBTYPE_PTR_MESH
-
-} eBMOpSlotSubType;
+typedef union eBMOpSlotSubType_Union {
+	eBMOpSlotSubType_Elem elem;
+	eBMOpSlotSubType_Ptr ptr;
+	eBMOpSlotSubType_Map map;
+} eBMOpSlotSubType_Union;
 
 /* please ignore all these structures, don't touch them in tool code, except
  * for when your defining an operator with BMOpDefine.*/
 
 typedef struct BMOpSlot {
 	const char *slot_name;  /* pointer to BMOpDefine.slot_args */
-	eBMOpSlotType    slot_type;
-	eBMOpSlotSubType slot_subtype;
+	eBMOpSlotType          slot_type;
+	eBMOpSlotSubType_Union slot_subtype;
+
 	int len;
 //	int flag;  /* UNUSED */
 //	int index; /* index within slot array */  /* UNUSED */
@@ -190,8 +198,8 @@ enum {
 
 typedef struct BMOSlotType {
 	char name[MAX_SLOTNAME];
-	eBMOpSlotType    type;
-	eBMOpSlotSubType subtype;
+	eBMOpSlotType          type;
+	eBMOpSlotSubType_Union subtype;
 } BMOSlotType;
 
 typedef struct BMOpDefine {
@@ -232,43 +240,6 @@ int BMO_mesh_enabled_flag_count(BMesh *bm, const char htype, const short oflag);
 int BMO_mesh_disabled_flag_count(BMesh *bm, const char htype, const short oflag);
 
 /*---------formatted operator initialization/execution-----------*/
-/*
- * this system is used to execute or initialize an operator,
- * using a formatted-string system.
- *
- * for example, BMO_op_callf(bm, BMO_FLAG_DEFAULTS, "delete geom=%hf context=%i", BM_ELEM_SELECT, DEL_FACES);
- * . . .will execute the delete operator, feeding in selected faces, deleting them.
- *
- * the basic format for the format string is:
- *   [operatorname] [slot_name]=%[code] [slot_name]=%[code]
- *
- * as in printf, you pass in one additional argument to the function
- * for every code.
- *
- * the formatting codes are:
- *    %d - put int in slot
- *    %f - put float in slot
- *    %p - put pointer in slot
- *    %h[f/e/v] - put elements with a header flag in slot.
- *                 the letters after %h define which element types to use,
- *             so e.g. %hf will do faces, %hfe will do faces and edges,
- *             %hv will do verts, etc.  must pass in at least one
- *             element type letter.
- *    %H[f/e/v] - same as %h, but tests if the flag is disabled
- *    %f[f/e/v] - same as %h, except it deals with tool flags instead of
- *                 header flags.
- *    %F[f/e/v] - same as %f, but tests if the flag is disabled
- *    %a[f/e/v] - pass all elements (of types specified by f/e/v) to the
- *                 slot.
- *    %e        - pass in a single element.
- *    %v - pointer to a float vector of length 3.
- *    %m[3/4] - matrix, 3/4 refers to the matrix size, 3 or 4.  the
- *              corresponding argument must be a pointer to
- *          a float matrix.
- *    %s - copy a slot from another op, instead of mapping to one
- *         argument, it maps to two, a pointer to an operator and
- *     a slot name.
- */
 void BMO_push(BMesh *bm, BMOperator *op);
 void BMO_pop(BMesh *bm);
 
@@ -409,12 +380,16 @@ void BMO_slot_buffer_from_disabled_hflag(BMesh *bm, BMOperator *op,
                                          BMOpSlot slot_args[BMO_OP_MAX_SLOTS], const char *slot_name,
                                          const char htype, const char hflag);
 
+void  BMO_slot_buffer_from_single(BMOperator *op, BMOpSlot *slot, BMHeader *ele);
+void *BMO_slot_buffer_get_single(BMOpSlot *slot);
+
+
 /* counts number of elements inside a slot array. */
 int BMO_slot_buffer_count(BMOpSlot slot_args[BMO_OP_MAX_SLOTS], const char *slot_name);
 int BMO_slot_map_count(BMOpSlot slot_args[BMO_OP_MAX_SLOTS], const char *slot_name);
 
 void BMO_slot_map_insert(BMOperator *op, BMOpSlot *slot,
-                         const void *element, void *data, int len);
+                         const void *element, const void *data, const int len);
 
 /* Counts the number of edges with tool flag toolflag around
  */
@@ -431,15 +406,18 @@ void *BMO_slot_buffer_alloc(BMOperator *op, BMOpSlot slot_args[BMO_OP_MAX_SLOTS]
 void BMO_slot_buffer_from_all(BMesh *bm, BMOperator *op, BMOpSlot slot_args[BMO_OP_MAX_SLOTS],
                               const char *slot_name, const char htype);
 
-/* this part of the API is used to iterate over element buffer or
+/**
+ * This part of the API is used to iterate over element buffer or
  * mapping slots.
  *
  * for example, iterating over the faces in a slot is:
  *
+ * \code{.c}
+ *
  *    BMOIter oiter;
  *    BMFace *f;
  *
- *    f = BMO_iter_new(&oiter, bm, some_operator, "slot_name", BM_FACE);
+ *    f = BMO_iter_new(&oiter, some_operator, "slot_name", BM_FACE);
  *    for (; f; f = BMO_iter_step(&oiter)) {
  *        /do something with the face
  *    }
@@ -460,6 +438,7 @@ void BMO_slot_buffer_from_all(BMesh *bm, BMOperator *op, BMOpSlot slot_args[BMO_
  *        //  *((void**)BMO_iter_map_value(&oiter));
  *        //or something like that.
  *    }
+ * \endcode
  */
 
 /* contents of this structure are private,
@@ -501,6 +480,9 @@ typedef struct BMOElemMapping {
 	BMHeader *element;
 	int len;
 } BMOElemMapping;
+
+/* pointer after BMOElemMapping */
+#define BMO_OP_SLOT_MAPPING_DATA(var) (void *)(((BMOElemMapping *)var) + 1)
 
 extern const int BMO_OPSLOT_TYPEINFO[BMO_OP_SLOT_TOTAL_TYPES];
 

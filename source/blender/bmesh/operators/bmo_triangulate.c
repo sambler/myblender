@@ -53,7 +53,7 @@ void bmo_triangulate_exec(BMesh *bm, BMOperator *op)
 	BLI_array_declare(projectverts);
 	int i;
 	const int use_beauty = BMO_slot_bool_get(op->slots_in, "use_beauty");
-	BMOpSlot *slot_facemap_out = BMO_slot_get(op->slots_out, "facemap.out");
+	BMOpSlot *slot_facemap_out = BMO_slot_get(op->slots_out, "face_map.out");
 
 	for (face = BMO_iter_new(&siter, op->slots_in, "faces", BM_FACE); face; face = BMO_iter_step(&siter)) {
 
@@ -190,7 +190,7 @@ void bmo_triangle_fill_exec(BMesh *bm, BMOperator *op)
 		/* sf_edge->tmp.p = e; */ /* UNUSED */
 	}
 	
-	BLI_scanfill_calc(&sf_ctx, FALSE);
+	BLI_scanfill_calc(&sf_ctx, 0);
 	
 	for (sf_tri = sf_ctx.fillfacebase.first; sf_tri; sf_tri = sf_tri->next) {
 		BMFace *f = BM_face_create_quad_tri(bm,

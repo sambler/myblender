@@ -17,30 +17,15 @@
  */
 
 #include "stdosl.h"
-#include "oslutil.h"
 
-shader node_rgb_ramp(
-	color ramp_color[RAMP_TABLE_SIZE] = {0.0},
-	float ramp_alpha[RAMP_TABLE_SIZE] = {0.0},
-
-	float Fac = 0.0,
+shader node_convert_from_string(
+	string String = "",
 	output color Color = color(0.0, 0.0, 0.0),
-	output float Alpha = 1.0)
+	output float Val = 0.0,
+	output int ValInt = 0,
+	output vector Vector = vector(0.0, 0.0, 0.0),
+	output point Point = point(0.0, 0.0, 0.0),
+	output normal Normal = normal(0.0, 0.0, 0.0))
 {
-	float f = clamp(Fac, 0.0, 1.0) * (RAMP_TABLE_SIZE - 1);
-
-	/* clamp int as well in case of NaN */
-	int i = (int)f;
-	if (i < 0) i = 0;
-	if (i >= RAMP_TABLE_SIZE) i = RAMP_TABLE_SIZE - 1;
-	float t = f - (float)i;
-
-	Color = ramp_color[i];
-	Alpha = ramp_alpha[i];
-
-	if (t > 0.0) {
-		Color = (1.0 - t) * Color + t * ramp_color[i + 1];
-		Alpha = (1.0 - t) * Alpha + t * ramp_alpha[i + 1];
-	}
 }
 

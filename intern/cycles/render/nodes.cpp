@@ -1124,6 +1124,8 @@ ConvertNode::ConvertNode(ShaderSocketType from_, ShaderSocketType to_)
 		add_input("Point", SHADER_SOCKET_POINT);
 	else if(from == SHADER_SOCKET_NORMAL)
 		add_input("Normal", SHADER_SOCKET_NORMAL);
+	else if(from == SHADER_SOCKET_STRING)
+		add_input("String", SHADER_SOCKET_STRING);
 	else
 		assert(0);
 
@@ -1139,6 +1141,8 @@ ConvertNode::ConvertNode(ShaderSocketType from_, ShaderSocketType to_)
 		add_output("Point", SHADER_SOCKET_POINT);
 	else if(to == SHADER_SOCKET_NORMAL)
 		add_output("Normal", SHADER_SOCKET_NORMAL);
+	else if(to == SHADER_SOCKET_STRING)
+		add_output("String", SHADER_SOCKET_STRING);
 	else
 		assert(0);
 }
@@ -1620,6 +1624,9 @@ HoldoutNode::HoldoutNode()
 
 void HoldoutNode::compile(SVMCompiler& compiler)
 {
+	float3 value = make_float3(1.0f, 1.0f, 1.0f);
+
+	compiler.add_node(NODE_CLOSURE_SET_WEIGHT, value);
 	compiler.add_node(NODE_CLOSURE_HOLDOUT, compiler.closure_mix_weight_offset());
 }
 

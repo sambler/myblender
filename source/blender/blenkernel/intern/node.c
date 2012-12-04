@@ -38,9 +38,13 @@
 
 #include "DNA_action_types.h"
 #include "DNA_anim_types.h"
+#include "DNA_lamp_types.h"
+#include "DNA_material_types.h"
 #include "DNA_node_types.h"
 #include "DNA_node_types.h"
 #include "DNA_scene_types.h"
+#include "DNA_texture_types.h"
+#include "DNA_world_types.h"
 
 #include "BLI_string.h"
 #include "BLI_math.h"
@@ -1154,6 +1158,18 @@ void ntreeSetOutput(bNodeTree *ntree)
 	 * might be different for editor or for "real" use... */
 }
 
+bNodeTree *ntreeFromID(ID *id)
+{
+	switch (GS(id->name)) {
+		case ID_MA: return ((Material*)id)->nodetree;
+		case ID_LA: return ((Lamp*)id)->nodetree;
+		case ID_WO: return ((World*)id)->nodetree;
+		case ID_TE: return ((Tex*)id)->nodetree;
+		case ID_SCE: return ((Scene*)id)->nodetree;
+		default: return NULL;
+	}
+}
+
 typedef struct MakeLocalCallData {
 	ID *group_id;
 	ID *new_id;
@@ -2154,8 +2170,6 @@ static void registerCompositNodes(bNodeTreeType *ttype)
 	register_node_type_reroute(ttype);
 	
 	register_node_type_cmp_group(ttype);
-//	register_node_type_cmp_forloop(ttype);
-//	register_node_type_cmp_whileloop(ttype);
 	
 	register_node_type_cmp_rlayers(ttype);
 	register_node_type_cmp_image(ttype);
@@ -2256,8 +2270,6 @@ static void registerShaderNodes(bNodeTreeType *ttype)
 	register_node_type_reroute(ttype);
 	
 	register_node_type_sh_group(ttype);
-	//register_node_type_sh_forloop(ttype);
-	//register_node_type_sh_whileloop(ttype);
 
 	register_node_type_sh_output(ttype);
 	register_node_type_sh_material(ttype);
@@ -2338,8 +2350,6 @@ static void registerTextureNodes(bNodeTreeType *ttype)
 	register_node_type_reroute(ttype);
 	
 	register_node_type_tex_group(ttype);
-//	register_node_type_tex_forloop(ttype);
-//	register_node_type_tex_whileloop(ttype);
 	
 	register_node_type_tex_math(ttype);
 	register_node_type_tex_mix_rgb(ttype);

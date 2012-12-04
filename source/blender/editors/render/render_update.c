@@ -65,6 +65,8 @@
 
 #include "render_intern.h"  // own include
 
+extern Material defmaterial;
+
 /***************************** Render Engines ********************************/
 
 void ED_render_scene_update(Main *bmain, Scene *scene, int updated)
@@ -154,12 +156,16 @@ void ED_render_engine_changed(Main *bmain)
 	/* on changing the render engine type, clear all running render engines */
 	bScreen *sc;
 	ScrArea *sa;
+	Scene *scene;
 
 	for (sc = bmain->screen.first; sc; sc = sc->id.next)
 		for (sa = sc->areabase.first; sa; sa = sa->next)
 			ED_render_engine_area_exit(sa);
 
 	RE_FreePersistentData();
+
+	for (scene = bmain->scene.first; scene; scene = scene->id.next)
+		ED_render_id_flush_update(bmain, &scene->id);
 }
 
 /***************************** Updates ***********************************
@@ -266,6 +272,9 @@ static void lamp_changed(Main *bmain, Lamp *la)
 	for (ma = bmain->mat.first; ma; ma = ma->id.next)
 		if (ma->gpumaterial.first)
 			GPU_material_free(ma);
+
+	if (defmaterial.gpumaterial.first)
+		GPU_material_free(&defmaterial);
 }
 
 static void texture_changed(Main *bmain, Tex *tex)
@@ -347,6 +356,9 @@ static void world_changed(Main *bmain, World *wo)
 	for (ma = bmain->mat.first; ma; ma = ma->id.next)
 		if (ma->gpumaterial.first)
 			GPU_material_free(ma);
+
+	if (defmaterial.gpumaterial.first)
+		GPU_material_free(&defmaterial);
 }
 
 static void image_changed(Main *bmain, Image *ima)
@@ -375,6 +387,9 @@ static void scene_changed(Main *bmain, Scene *UNUSED(scene))
 	for (ma = bmain->mat.first; ma; ma = ma->id.next)
 		if (ma->gpumaterial.first)
 			GPU_material_free(ma);
+
+	if (defmaterial.gpumaterial.first)
+		GPU_material_free(&defmaterial);
 }
 
 void ED_render_id_flush_update(Main *bmain, ID *id)

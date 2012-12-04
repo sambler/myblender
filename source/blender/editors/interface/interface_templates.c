@@ -2021,10 +2021,16 @@ static void curvemap_buttons_layout(uiLayout *layout, PointerRNA *ptr, char labe
 	}
 
 	if (cmp) {
+		const float range_clamp[2]   = {0.0f, 1.0f};
+		const float range_unclamp[2] = {-1000.0f, 1000.0f};  /* arbitrary limits here */
+		const float *range = (cumap->flag & CUMA_DO_CLIP) ? range_clamp : range_unclamp;
+
 		uiLayoutRow(layout, TRUE);
 		uiBlockSetNFunc(block, curvemap_buttons_update, MEM_dupallocN(cb), cumap);
-		bt = uiDefButF(block, NUM, 0, "X", 0, 2 * UI_UNIT_Y, UI_UNIT_X * 10, UI_UNIT_Y, &cmp->x, 0.0f, 1.0f, 1, 5, "");
-		bt = uiDefButF(block, NUM, 0, "Y", 0, 1 * UI_UNIT_Y, UI_UNIT_X * 10, UI_UNIT_Y, &cmp->y, 0.0f, 1.0f, 1, 5, "");
+		bt = uiDefButF(block, NUM, 0, "X", 0, 2 * UI_UNIT_Y, UI_UNIT_X * 10, UI_UNIT_Y,
+		               &cmp->x, range[0], range[1], 1, 5, "");
+		bt = uiDefButF(block, NUM, 0, "Y", 0, 1 * UI_UNIT_Y, UI_UNIT_X * 10, UI_UNIT_Y,
+		               &cmp->y, range[0], range[1], 1, 5, "");
 	}
 
 	/* black/white levels */
@@ -2084,19 +2090,19 @@ void uiTemplateColorPicker(uiLayout *layout, PointerRNA *ptr, const char *propna
 	PropertyRNA *prop = RNA_struct_find_property(ptr, propname);
 	uiBlock *block = uiLayoutGetBlock(layout);
 	uiLayout *col, *row;
-	uiBut *but;
+	uiBut *but = NULL;
 	float softmin, softmax, step, precision;
-	
+
 	if (!prop) {
 		RNA_warning("property not found: %s.%s", RNA_struct_identifier(ptr->type), propname);
 		return;
 	}
 
 	RNA_property_float_ui_range(ptr, prop, &softmin, &softmax, &step, &precision);
-	
+
 	col = uiLayoutColumn(layout, TRUE);
 	row = uiLayoutRow(col, TRUE);
-	
+
 	switch (U.color_picker_type) {
 		case USER_CP_CIRCLE:
 			but = uiDefButR_prop(block, HSVCIRCLE, 0, "", 0, 0, WHEEL_SIZE, WHEEL_SIZE, ptr, prop,
@@ -2115,7 +2121,6 @@ void uiTemplateColorPicker(uiLayout *layout, PointerRNA *ptr, const char *propna
 			                     -1, 0.0, 0.0, UI_GRAD_HV, 0, "");
 			break;
 	}
-	
 
 	if (lock) {
 		but->flag |= UI_BUT_COLOR_LOCK;
@@ -2133,7 +2138,6 @@ void uiTemplateColorPicker(uiLayout *layout, PointerRNA *ptr, const char *propna
 
 	
 	if (value_slider) {
-		
 		switch (U.color_picker_type) {
 			case USER_CP_CIRCLE:
 				uiItemS(row);
@@ -2156,7 +2160,6 @@ void uiTemplateColorPicker(uiLayout *layout, PointerRNA *ptr, const char *propna
 				               -1, softmin, softmax, UI_GRAD_HV + 3, 0, "");
 				break;
 		}
-		
 	}
 }
 

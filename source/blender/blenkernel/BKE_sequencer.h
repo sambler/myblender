@@ -248,7 +248,7 @@ void BKE_sequencer_cache_cleanup(void);
 struct ImBuf *BKE_sequencer_cache_get(SeqRenderData context, struct Sequence *seq, float cfra, seq_stripelem_ibuf_t type);
 
 /* passed ImBuf is properly refed, so ownership is *not* 
- * transfered to the cache.
+ * transferred to the cache.
  * you can pass the same ImBuf multiple times to the cache without problems.
  */
 
@@ -356,6 +356,7 @@ typedef struct SeqLoadInfo {
 typedef struct Sequence *(*SeqLoadFunc)(struct bContext *, ListBase *, struct SeqLoadInfo *);
 
 struct Sequence *BKE_sequence_alloc(ListBase *lb, int cfra, int machine);
+void BKE_sequence_init_colorspace(struct Sequence *seq);
 
 struct Sequence *BKE_sequencer_add_image_strip(struct bContext *C, ListBase *seqbasep, struct SeqLoadInfo *seq_load);
 struct Sequence *BKE_sequencer_add_sound_strip(struct bContext *C, ListBase *seqbasep, struct SeqLoadInfo *seq_load);

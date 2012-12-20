@@ -94,7 +94,7 @@ extern struct Render R;
 
 /* x and y are current pixels in rect to be rendered */
 /* do not normalize! */
-void calc_view_vector(float *view, float x, float y)
+void calc_view_vector(float view[3], float x, float y)
 {
 
 	view[2]= -ABS(R.clipsta);
@@ -185,7 +185,8 @@ static void halo_pixelstruct(HaloRen *har, RenderLayer **rlpp, int totsample, in
 	
 	fullsample= (totsample > 1);
 	amount= 0;
-	accol[0]=accol[1]=accol[2]=accol[3]= 0.0f;
+	accol[0] = accol[1] = accol[2] = accol[3]= 0.0f;
+	col[0] = col[1] = col[2] = col[3]= 0.0f;
 	flarec= har->flarec;
 	
 	while (ps) {
@@ -294,11 +295,11 @@ static void halo_tile(RenderPart *pa, RenderLayer *rl)
 			}
 			else {
 				
-				minx= MAX2(minx, testrect.xmin);
-				maxx= MIN2(maxx, testrect.xmax);
+				minx = max_ii(minx, testrect.xmin);
+				maxx = min_ii(maxx, testrect.xmax);
 			
-				miny= MAX2(har->miny, testrect.ymin);
-				maxy= MIN2(har->maxy, testrect.ymax);
+				miny = max_ii(har->miny, testrect.ymin);
+				maxy = min_ii(har->maxy, testrect.ymax);
 			
 				for (y=miny; y<maxy; y++) {
 					int rectofs= (y-disprect.ymin)*pa->rectx + (minx - disprect.xmin);
@@ -671,7 +672,7 @@ int get_sample_layers(RenderPart *pa, RenderLayer *rl, RenderLayer **rlpp)
 			RenderResult *rr= BLI_findlink(&pa->fullresult, sample);
 		
 			rlpp[sample]= BLI_findlink(&rr->layers, nr);
-		}		
+		}
 		return R.osa;
 	}
 	else {
@@ -714,7 +715,7 @@ static void sky_tile(RenderPart *pa, RenderLayer *rl)
 						addAlphaUnderFloat(pass, col);
 					}
 				}
-			}			
+			}
 		}
 		
 		if (y&1)
@@ -772,8 +773,8 @@ static void atm_tile(RenderPart *pa, RenderLayer *rl)
 						if (*zrect >= 9.9e10f || rgbrect[3]==0.0f) {
 							continue;
 						}
-												
-						if ((lar->sunsky->effect_type & LA_SUN_EFFECT_AP)) {	
+
+						if ((lar->sunsky->effect_type & LA_SUN_EFFECT_AP)) {
 							float tmp_rgb[3];
 							
 							/* skip if worldspace lamp vector is below horizon */
@@ -928,7 +929,7 @@ static void addps(ListBase *lb, intptr_t *rd, int obi, int facenr, int z, int ma
 	PixStrMain *psm;
 	PixStr *ps, *last= NULL;
 	
-	if (*rd) {	
+	if (*rd) {
 		ps= (PixStr *)(*rd);
 		
 		while (ps) {
@@ -1582,7 +1583,7 @@ static void shade_sample_sss(ShadeSample *ssamp, Material *mat, ObjectInstanceRe
 
 	copy_v3_v3(shi->facenor, nor);
 	shade_input_set_viewco(shi, x, y, sx, sy, z);
-	*area = minf(len_v3(shi->dxco) * len_v3(shi->dyco), 2.0f * orthoarea);
+	*area = min_ff(len_v3(shi->dxco) * len_v3(shi->dyco), 2.0f * orthoarea);
 
 	shade_input_set_uv(shi);
 	shade_input_set_normals(shi);
@@ -2012,7 +2013,7 @@ void add_halo_flare(Render *re)
 		re->display_draw(re->ddh, rr, NULL);
 	}
 	
-	R.r.mode= mode;	
+	R.r.mode= mode;
 }
 
 /* ************************* bake ************************ */
@@ -2375,10 +2376,28 @@ static void do_bake_shade(void *handle, int x, int y, float u, float v)
 		v2= vlr->v2->co;
 		v3= vlr->v3->co;
 	}
+
+	l= 1.0f-u-v;
+
+	/* shrink barycentric coordinates inwards slightly to avoid some issues
+	 * where baking selected to active might just miss the other face at the
+	 * near the edge of a face */
+	if (bs->actob) {
+		const float eps = 1.0f - 1e-4f;
+		float invsum;
+
+		u = (u - 0.5f)*eps + 0.5f;
+		v = (v - 0.5f)*eps + 0.5f;
+		l = (l - 0.5f)*eps + 0.5f;
+
+		invsum = 1.0f/(u + v + l);
+
+		u *= invsum;
+		v *= invsum;
+		l *= invsum;
+	}
 	
 	/* renderco */
-	l= 1.0f-u-v;
-	
 	shi->co[0]= l*v3[0]+u*v1[0]+v*v2[0];
 	shi->co[1]= l*v3[1]+u*v1[1]+v*v2[1];
 	shi->co[2]= l*v3[2]+u*v1[2]+v*v2[2];
@@ -2474,7 +2493,7 @@ static int get_next_bake_face(BakeShade *bs)
 		return 0;
 	}
 	
-	BLI_lock_thread(LOCK_CUSTOM1);	
+	BLI_lock_thread(LOCK_CUSTOM1);
 
 	for (; obi; obi=obi->next, v=0) {
 		obr= obi->obr;
@@ -2487,21 +2506,26 @@ static int get_next_bake_face(BakeShade *bs)
 
 				if (tface && tface->tpage) {
 					Image *ima= tface->tpage;
-					ImBuf *ibuf= BKE_image_get_ibuf(ima, NULL);
+					ImBuf *ibuf= BKE_image_acquire_ibuf(ima, NULL, NULL);
 					const float vec_alpha[4]= {0.0f, 0.0f, 0.0f, 0.0f};
 					const float vec_solid[4]= {0.0f, 0.0f, 0.0f, 1.0f};
 					
 					if (ibuf==NULL)
 						continue;
 					
-					if (ibuf->rect==NULL && ibuf->rect_float==NULL)
+					if (ibuf->rect==NULL && ibuf->rect_float==NULL) {
+						BKE_image_release_ibuf(ima, ibuf, NULL);
 						continue;
+					}
 					
-					if (ibuf->rect_float && !(ibuf->channels==0 || ibuf->channels==4))
+					if (ibuf->rect_float && !(ibuf->channels==0 || ibuf->channels==4)) {
+						BKE_image_release_ibuf(ima, ibuf, NULL);
 						continue;
+					}
 					
 					if (ima->flag & IMA_USED_FOR_RENDER) {
 						ima->id.flag &= ~LIB_DOIT;
+						BKE_image_release_ibuf(ima, ibuf, NULL);
 						continue;
 					}
 					
@@ -2516,12 +2540,12 @@ static int get_next_bake_face(BakeShade *bs)
 						if (R.r.bake_flag & R_BAKE_CLEAR)
 							IMB_rectfill(ibuf, (ibuf->planes == R_IMF_PLANES_RGBA) ? vec_alpha : vec_solid);
 
-						ibuf->userflags |= IB_DISPLAY_BUFFER_INVALID;
-
 						/* might be read by UI to set active image for display */
 						R.bakebuf= ima;
-					}				
-					
+					}
+
+					ibuf->userflags |= IB_DISPLAY_BUFFER_INVALID;
+
 					bs->obi= obi;
 					bs->vlr= vlr;
 					
@@ -2529,6 +2553,9 @@ static int get_next_bake_face(BakeShade *bs)
 					v++;
 					
 					BLI_unlock_thread(LOCK_CUSTOM1);
+
+					BKE_image_release_ibuf(ima, ibuf, NULL);
+
 					return 1;
 				}
 			}
@@ -2552,12 +2579,14 @@ static void shade_tface(BakeShade *bs)
 	
 	/* check valid zspan */
 	if (ima!=bs->ima) {
+		BKE_image_release_ibuf(bs->ima, bs->ibuf, NULL);
+
 		bs->ima= ima;
-		bs->ibuf= BKE_image_get_ibuf(ima, NULL);
+		bs->ibuf= BKE_image_acquire_ibuf(ima, NULL, NULL);
 		/* note, these calls only free/fill contents of zspan struct, not zspan itself */
 		zbuf_free_span(bs->zspan);
 		zbuf_alloc_span(bs->zspan, bs->ibuf->x, bs->ibuf->y, R.clipcrop);
-	}				
+	}
 	
 	bs->rectx= bs->ibuf->x;
 	bs->recty= bs->ibuf->y;
@@ -2619,7 +2648,9 @@ static void *do_bake_thread(void *bs_v)
 			*bs->do_update= TRUE;
 	}
 	bs->ready= 1;
-	
+
+	BKE_image_release_ibuf(bs->ima, bs->ibuf, NULL);
+
 	return NULL;
 }
 
@@ -2670,12 +2701,13 @@ int RE_bake_shade_all_selected(Render *re, int type, Object *actob, short *do_up
 	
 	/* baker uses this flag to detect if image was initialized */
 	for (ima= G.main->image.first; ima; ima= ima->id.next) {
-		ImBuf *ibuf= BKE_image_get_ibuf(ima, NULL);
+		ImBuf *ibuf= BKE_image_acquire_ibuf(ima, NULL, NULL);
 		ima->id.flag |= LIB_DOIT;
 		ima->flag&= ~IMA_USED_FOR_RENDER;
 		if (ibuf) {
 			ibuf->userdata = NULL; /* use for masking if needed */
 		}
+		BKE_image_release_ibuf(ima, ibuf, NULL);
 	}
 	
 	BLI_init_threads(&threads, do_bake_thread, re->r.threads);
@@ -2728,7 +2760,7 @@ int RE_bake_shade_all_selected(Render *re, int type, Object *actob, short *do_up
 	/* filter and refresh images */
 	for (ima= G.main->image.first; ima; ima= ima->id.next) {
 		if ((ima->id.flag & LIB_DOIT)==0) {
-			ImBuf *ibuf= BKE_image_get_ibuf(ima, NULL);
+			ImBuf *ibuf= BKE_image_acquire_ibuf(ima, NULL, NULL);
 
 			if (ima->flag & IMA_USED_FOR_RENDER)
 				result= BAKE_RESULT_FEEDBACK_LOOP;
@@ -2739,6 +2771,7 @@ int RE_bake_shade_all_selected(Render *re, int type, Object *actob, short *do_up
 			RE_bake_ibuf_filter(ibuf, (char *)ibuf->userdata, re->r.bake_filter);
 
 			ibuf->userflags |= IB_BITMAPDIRTY;
+			BKE_image_release_ibuf(ima, ibuf, NULL);
 		}
 	}
 	

@@ -284,15 +284,16 @@ typedef struct IndexNode {
 void create_vert_poly_map(MeshElemMap **map, int **mem,
                           const struct MPoly *mface, const struct MLoop *mloop,
                           int totvert, int totface, int totloop);
-	
+
 void create_vert_edge_map(MeshElemMap **map, int **mem,
-						  const struct MEdge *medge, int totvert, int totedge);
+                          const struct MEdge *medge, int totvert, int totedge);
 
 /* vertex level transformations & checks (no derived mesh) */
 
 int BKE_mesh_minmax(struct Mesh *me, float r_min[3], float r_max[3]);
 int BKE_mesh_center_median(struct Mesh *me, float cent[3]);
 int BKE_mesh_center_bounds(struct Mesh *me, float cent[3]);
+int BKE_mesh_center_centroid(struct Mesh *me, float cent[3]);
 void BKE_mesh_translate(struct Mesh *me, float offset[3], int do_keys);
 
 /* mesh_validate.c */

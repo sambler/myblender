@@ -118,7 +118,7 @@ int BM_disk_dissolve(BMesh *bm, BMVert *v)
 		e = v->e;
 		do {
 			e = bmesh_disk_edge_next(e, v);
-			if (!(BM_edge_share_face_count(e, v->e))) {
+			if (!(BM_edge_share_face_check(e, v->e))) {
 				keepedge = e;
 				baseedge = v->e;
 				break;
@@ -142,9 +142,10 @@ int BM_disk_dissolve(BMesh *bm, BMVert *v)
 			return FALSE;
 		}
 #else
-		BM_faces_join_pair(bm, e->l->f, e->l->radial_next->f, e, TRUE);
-
-		if (!BM_vert_collapse_faces(bm, v->e, v, 1.0, FALSE, TRUE)) {
+		if (UNLIKELY(!BM_faces_join_pair(bm, e->l->f, e->l->radial_next->f, e, TRUE))) {
+			return FALSE;
+		}
+		else if (UNLIKELY(!BM_vert_collapse_faces(bm, v->e, v, 1.0, FALSE, TRUE))) {
 			return FALSE;
 		}
 #endif
@@ -437,7 +438,7 @@ BMFace *BM_face_split_n(BMesh *bm, BMFace *f, BMVert *v1, BMVert *v2, float cos[
 			/* bmesh_semv returns in newe the edge going from newv to tv */
 			copy_v3_v3(newv->co, cos[i]);
 
-			/* interpolate the loop data for the loops with v==newv, using orig face */
+			/* interpolate the loop data for the loops with (v == newv), using orig face */
 			for (j = 0; j < 2; j++) {
 				BMEdge *e_iter = (j == 0) ? e : newe;
 				BMLoop *l_iter = e_iter->l;
@@ -469,9 +470,6 @@ BMFace *BM_face_split_n(BMesh *bm, BMFace *f, BMVert *v1, BMVert *v2, float cos[
  * \note this function is very close to #BM_vert_collapse_edge,
  * both collapse a vertex and return a new edge.
  * Except this takes a factor and merges custom data.
- *
- *  BMESH_TODO:
- *    Insert error checking for KV valance.
  *
  * \param bm The bmesh
  * \param ke The edge to collapse

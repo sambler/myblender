@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.2
+#!/usr/bin/env python3
 
 # ***** BEGIN GPL LICENSE BLOCK *****
 #
@@ -142,6 +142,8 @@ def cmake_advanced_info():
             cmd = 'cmake "%s" -G"Eclipse CDT4 - MinGW Makefiles"' % CMAKE_DIR
         else:
             if make_exe_basename.startswith("make"):
+                cmd = 'cmake "%s" -G"Eclipse CDT4 - Unix Makefiles"' % CMAKE_DIR
+            elif make_exe_basename.startswith("gmake"):
                 cmd = 'cmake "%s" -G"Eclipse CDT4 - Unix Makefiles"' % CMAKE_DIR
             elif make_exe_basename.startswith("ninja"):
                 cmd = 'cmake "%s" -G"Eclipse CDT4 - Ninja"' % CMAKE_DIR

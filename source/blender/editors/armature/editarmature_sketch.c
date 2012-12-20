@@ -440,7 +440,7 @@ static void sk_cancelStroke(SK_Sketch *sketch)
 
 static float sk_clampPointSize(SK_Point *pt, float size)
 {
-	return MAX2(size * pt->size, size / 2);
+	return max_ff(size * pt->size, size / 2);
 }
 
 static void sk_drawPoint(GLUquadric *quad, SK_Point *pt, float size)
@@ -2104,15 +2104,15 @@ static void sk_drawSketch(Scene *scene, View3D *UNUSED(v3d), SK_Sketch *sketch, 
 	if (sketch->depth_peels.first != NULL)
 	{
 		float colors[8][3] = {
-								{1, 0, 0},
-								{0, 1, 0},
-								{0, 0, 1},
-								{1, 1, 0},
-								{1, 0, 1},
-								{0, 1, 1},
-								{1, 1, 1},
-								{0, 0, 0}
-							};
+			{1, 0, 0},
+			{0, 1, 0},
+			{0, 0, 1},
+			{1, 1, 0},
+			{1, 0, 1},
+			{0, 1, 1},
+			{1, 1, 1},
+			{0, 0, 0}
+		};
 		DepthPeel *p;
 		GLUquadric *quad = gluNewQuadric();
 		gluQuadricNormals(quad, GLU_SMOOTH);

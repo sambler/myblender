@@ -136,7 +136,7 @@ void BL_ConvertActuators(const char* maggiename,
 	}
 	gameobj->ReserveActuator(actcount);
 	bact = (bActuator*) blenderobject->actuators.first;
-	while(bact)
+	while (bact)
 	{
 		STR_String uniquename = bact->name;
 		STR_String& objectname = gameobj->GetName();
@@ -358,7 +358,7 @@ void BL_ConvertActuators(const char* maggiename,
 				KX_SoundActuator::KX_SOUNDACT_TYPE
 					soundActuatorType = KX_SoundActuator::KX_SOUNDACT_NODEF;
 				
-				switch(soundact->type) {
+				switch (soundact->type) {
 				case ACT_SND_PLAY_STOP_SOUND:
 					soundActuatorType = KX_SoundActuator::KX_SOUNDACT_PLAYSTOP;
 					break;
@@ -387,7 +387,7 @@ void BL_ConvertActuators(const char* maggiename,
 				{
 					bSound* sound = soundact->sound;
 					bool is3d = soundact->flag & ACT_SND_3D_SOUND ? true : false;
-					AUD_Reference<AUD_IFactory> snd_sound;
+					boost::shared_ptr<AUD_IFactory> snd_sound;
 					KX_3DSoundSettings settings;
 					settings.cone_inner_angle = soundact->sound3D.cone_inner_angle;
 					settings.cone_outer_angle = soundact->sound3D.cone_outer_angle;
@@ -406,21 +406,21 @@ void BL_ConvertActuators(const char* maggiename,
 					}
 					else
 					{
-						snd_sound = *reinterpret_cast<AUD_Reference<AUD_IFactory>*>(sound->playback_handle);
+						snd_sound = *reinterpret_cast<boost::shared_ptr<AUD_IFactory>*>(sound->playback_handle);
 
 						// if sound shall be 3D but isn't mono, we have to make it mono!
 						if (is3d)
 						{
 							try
 							{
-								AUD_Reference<AUD_IReader> reader = snd_sound->createReader();
+								boost::shared_ptr<AUD_IReader> reader = snd_sound->createReader();
 								if (reader->getSpecs().channels != AUD_CHANNELS_MONO)
 								{
 									AUD_DeviceSpecs specs;
 									specs.channels = AUD_CHANNELS_MONO;
 									specs.rate = AUD_RATE_INVALID;
 									specs.format = AUD_FORMAT_INVALID;
-									snd_sound = new AUD_ChannelMapperFactory(snd_sound, specs);
+									snd_sound = boost::shared_ptr<AUD_IFactory>(new AUD_ChannelMapperFactory(snd_sound, specs));
 								}
 							}
 							catch(AUD_Exception&)
@@ -946,8 +946,7 @@ void BL_ConvertActuators(const char* maggiename,
 			SCA_2DFilterActuator *tmp = NULL;
 
 			RAS_2DFilterManager::RAS_2DFILTER_MODE filtermode;
-			switch(_2dfilter->type)
-			{
+			switch (_2dfilter->type) {
 				case ACT_2DFILTER_MOTIONBLUR:
 					filtermode = RAS_2DFilterManager::RAS_2DFILTER_MOTIONBLUR;
 					break;
@@ -1026,8 +1025,7 @@ void BL_ConvertActuators(const char* maggiename,
 				bool ghost = true;
 				KX_GameObject *tmpgob = NULL;
 
-				switch(parAct->type)
-				{
+				switch (parAct->type) {
 					case ACT_PARENT_SET:
 						mode = KX_ParentActuator::KX_PARENT_SET;
 						tmpgob = converter->FindGameObject(parAct->ob);
@@ -1081,8 +1079,7 @@ void BL_ConvertActuators(const char* maggiename,
 				KX_GameObject *targetob = converter->FindGameObject(stAct->target);
 
 				int mode = KX_SteeringActuator::KX_STEERING_NODEF;
-				switch(stAct->type)
-				{
+				switch (stAct->type) {
 				case ACT_STEERING_SEEK:
 					mode = KX_SteeringActuator::KX_STEERING_SEEK;
 					break;

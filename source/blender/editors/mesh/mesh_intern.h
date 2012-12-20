@@ -80,9 +80,6 @@ int EDBM_op_finish(struct BMEditMesh *em, struct BMOperator *bmop,
 void EDBM_flag_disable_all(struct BMEditMesh *em, const char hflag);
 void EDBM_stats_update(struct BMEditMesh *em);
 
-/* TODO, move to math_geometry.c */
-float labda_PdistVL2Dfl(const float v1[3], const float v2[3], const float v3[3]);
-
 /* ******************** editface.c */
 
 void MESH_OT_separate(struct wmOperatorType *ot);
@@ -121,7 +118,7 @@ void MESH_OT_select_linked(struct wmOperatorType *ot);
 void MESH_OT_select_linked_pick(struct wmOperatorType *ot);
 void MESH_OT_hide(struct wmOperatorType *ot);
 void MESH_OT_reveal(struct wmOperatorType *ot);
-void MESH_OT_select_by_number_vertices(struct wmOperatorType *ot);
+void MESH_OT_select_face_by_sides(struct wmOperatorType *ot);
 void MESH_OT_select_loose_verts(struct wmOperatorType *ot);
 void MESH_OT_select_mirror(struct wmOperatorType *ot);
 void MESH_OT_normals_make_consistent(struct wmOperatorType *ot);
@@ -129,11 +126,13 @@ void MESH_OT_faces_select_linked_flat(struct wmOperatorType *ot);
 void MESH_OT_edges_select_sharp(struct wmOperatorType *ot);
 void MESH_OT_select_shortest_path(struct wmOperatorType *ot);
 void MESH_OT_select_similar(struct wmOperatorType *ot);
+void MESH_OT_select_mode(struct wmOperatorType *ot);
 void MESH_OT_select_random(struct wmOperatorType *ot);
 void MESH_OT_loop_multi_select(struct wmOperatorType *ot);
 void MESH_OT_mark_seam(struct wmOperatorType *ot);
 void MESH_OT_mark_sharp(struct wmOperatorType *ot);
 void MESH_OT_vertices_smooth(struct wmOperatorType *ot);
+void MESH_OT_vertices_smooth_laplacian(struct wmOperatorType *ot);
 void MESH_OT_noise(struct wmOperatorType *ot);
 void MESH_OT_flip_normals(struct wmOperatorType *ot);
 void MESH_OT_solidify(struct wmOperatorType *ot);

@@ -37,6 +37,7 @@ subject to the following restrictions:
 
 
 #include "PHY_IMotionState.h"
+#include "PHY_ICharacter.h"
 #include "KX_GameObject.h"
 #include "RAS_MeshObject.h"
 #include "RAS_Polygon.h"
@@ -265,6 +266,36 @@ public:
 
 };
 #endif //NEW_BULLET_VEHICLE_SUPPORT
+
+class CharacterWrapper : public PHY_ICharacter
+{
+private:
+	btKinematicCharacterController* m_controller;
+
+public:
+	CharacterWrapper(btKinematicCharacterController* cont)
+		: m_controller(cont)
+	{}
+
+	virtual void Jump()
+	{
+		m_controller->jump();
+	}
+
+	virtual bool OnGround()
+	{
+		return m_controller->onGround();
+	}
+
+	virtual float GetGravity()
+	{
+		return m_controller->getGravity();
+	}
+	virtual void SetGravity(float gravity)
+	{
+		m_controller->setGravity(gravity);
+	}
+};
 
 class CcdOverlapFilterCallBack : public btOverlapFilterCallback
 {
@@ -1078,7 +1109,7 @@ static bool GetHitTriangle(btCollisionShape* shape, CcdShapeConstructionInfo* sh
 	const btVector3& meshScaling = shape->getLocalScaling();
 	for (int j=2;j>=0;j--)
 	{
-		int graphicsindex = indicestype==PHY_SHORT?((unsigned short*)gfxbase)[j]:gfxbase[j];
+		int graphicsindex = (indicestype == PHY_SHORT) ? ((unsigned short *)gfxbase)[j] : gfxbase[j];
 
 		btScalar* graphicsbase = (btScalar*)(vertexbase+graphicsindex*stride);
 
@@ -1517,8 +1548,8 @@ struct OcclusionBuffer
 						return(true);
 				}
 			}
-		} else if (width == 1) 
-		{
+		}
+		else if (width == 1)  {
 			// Degenerated in at least 2 vertical lines
 			// The algorithm below doesn't work when face has a single pixel width
 			// We cannot use general formulas because the plane is degenerated. 
@@ -1529,16 +1560,16 @@ struct OcclusionBuffer
 			if (y[0] > y[1]) { ytmp=y[1];y[1]=y[0];y[0]=ytmp;ztmp=z[1];z[1]=z[0];z[0]=ztmp; }
 			if (y[0] > y[2]) { ytmp=y[2];y[2]=y[0];y[0]=ytmp;ztmp=z[2];z[2]=z[0];z[0]=ztmp; }
 			if (y[1] > y[2]) { ytmp=y[2];y[2]=y[1];y[1]=ytmp;ztmp=z[2];z[2]=z[1];z[1]=ztmp; }
-			int	dy[]={	y[0]-y[1],
-						y[1]-y[2],
-						y[2]-y[0]};
+			int	dy[] = {y[0] - y[1],
+			            y[1] - y[2],
+			            y[2] - y[0]};
 			btScalar dzy[3];
-			dzy[0] = (dy[0]) ? (z[0]-z[1])/dy[0] : btScalar(0.f);
-			dzy[1] = (dy[1]) ? (z[1]-z[2])/dy[1] : btScalar(0.f);
-			dzy[2] = (dy[2]) ? (z[2]-z[0])/dy[2] : btScalar(0.f);
-			btScalar v[3] = {	dzy[0]*(miy-y[0])+z[0],
-								dzy[1]*(miy-y[1])+z[1],
-								dzy[2]*(miy-y[2])+z[2] };
+			dzy[0] = (dy[0]) ? (z[0] - z[1]) / dy[0] : btScalar(0.f);
+			dzy[1] = (dy[1]) ? (z[1] - z[2]) / dy[1] : btScalar(0.f);
+			dzy[2] = (dy[2]) ? (z[2] - z[0]) / dy[2] : btScalar(0.f);
+			btScalar v[3] = {dzy[0] * (miy - y[0]) + z[0],
+			                 dzy[1] * (miy - y[1]) + z[1],
+			                 dzy[2] * (miy - y[2]) + z[2]};
 			dy[0] = y[1]-y[0];
 			dy[1] = y[0]-y[1];
 			dy[2] = y[2]-y[0];
@@ -1566,16 +1597,16 @@ struct OcclusionBuffer
 			if (x[0] > x[1]) { xtmp=x[1];x[1]=x[0];x[0]=xtmp;ztmp=z[1];z[1]=z[0];z[0]=ztmp; }
 			if (x[0] > x[2]) { xtmp=x[2];x[2]=x[0];x[0]=xtmp;ztmp=z[2];z[2]=z[0];z[0]=ztmp; }
 			if (x[1] > x[2]) { xtmp=x[2];x[2]=x[1];x[1]=xtmp;ztmp=z[2];z[2]=z[1];z[1]=ztmp; }
-			int	dx[]={	x[0]-x[1],
-						x[1]-x[2],
-						x[2]-x[0]};
+			int dx[] = {x[0] - x[1],
+			            x[1] - x[2],
+			            x[2] - x[0]};
 			btScalar dzx[3];
 			dzx[0] = (dx[0]) ? (z[0]-z[1])/dx[0] : btScalar(0.f);
 			dzx[1] = (dx[1]) ? (z[1]-z[2])/dx[1] : btScalar(0.f);
 			dzx[2] = (dx[2]) ? (z[2]-z[0])/dx[2] : btScalar(0.f);
-			btScalar v[3] = { dzx[0]*(mix-x[0])+z[0],
-							  dzx[1]*(mix-x[1])+z[1],
-							  dzx[2]*(mix-x[2])+z[2] };
+			btScalar v[3] = {dzx[0] * (mix - x[0]) + z[0],
+			                 dzx[1] * (mix - x[1]) + z[1],
+			                 dzx[2] * (mix - x[2]) + z[2]};
 			dx[0] = x[1]-x[0];
 			dx[1] = x[0]-x[1];
 			dx[2] = x[2]-x[0];
@@ -1592,24 +1623,24 @@ struct OcclusionBuffer
 				v[0] += dzx[0]; v[1] += dzx[1]; v[2] += dzx[2];
 				dx[0]--; dx[1]++, dx[2]--;
 			}
-		} else
-		{
+		}
+		else {
 			// general case
-			const int		dx[]={	y[0]-y[1],
-									y[1]-y[2],
-									y[2]-y[0]};
-			const int		dy[]={	x[1]-x[0]-dx[0]*width,
-									x[2]-x[1]-dx[1]*width,
-									x[0]-x[2]-dx[2]*width};
-			const int		a=x[2]*y[0]+x[0]*y[1]-x[2]*y[1]-x[0]*y[2]+x[1]*y[2]-x[1]*y[0];
-			const btScalar	ia=1/(btScalar)a;
-			const btScalar	dzx=ia*(y[2]*(z[1]-z[0])+y[1]*(z[0]-z[2])+y[0]*(z[2]-z[1]));
-			const btScalar	dzy=ia*(x[2]*(z[0]-z[1])+x[0]*(z[1]-z[2])+x[1]*(z[2]-z[0]))-(dzx*width);
-			int				c[]={	miy*x[1]+mix*y[0]-x[1]*y[0]-mix*y[1]+x[0]*y[1]-miy*x[0],
-									miy*x[2]+mix*y[1]-x[2]*y[1]-mix*y[2]+x[1]*y[2]-miy*x[1],
-									miy*x[0]+mix*y[2]-x[0]*y[2]-mix*y[0]+x[2]*y[0]-miy*x[2]};
-			btScalar		v=ia*((z[2]*c[0])+(z[0]*c[1])+(z[1]*c[2]));
-			btScalar*		scan=&m_buffer[miy*m_sizes[0]];
+			const int       dx[] = {y[0] - y[1],
+			                        y[1] - y[2],
+			                        y[2] - y[0]};
+			const int       dy[] = {x[1] - x[0] - dx[0] * width,
+			                        x[2] - x[1] - dx[1] * width,
+			                        x[0] - x[2] - dx[2] * width};
+			const int       a = x[2] * y[0] + x[0] * y[1] - x[2] * y[1] - x[0] * y[2] + x[1] * y[2] - x[1] * y[0];
+			const btScalar  ia = 1 / (btScalar)a;
+			const btScalar  dzx = ia*(y[2]*(z[1]-z[0])+y[1]*(z[0]-z[2])+y[0]*(z[2]-z[1]));
+			const btScalar  dzy = ia*(x[2]*(z[0]-z[1])+x[0]*(z[1]-z[2])+x[1]*(z[2]-z[0]))-(dzx*width);
+			int             c[] = {miy*x[1]+mix*y[0]-x[1]*y[0]-mix*y[1]+x[0]*y[1]-miy*x[0],
+			                        miy*x[2]+mix*y[1]-x[2]*y[1]-mix*y[2]+x[1]*y[2]-miy*x[1],
+			                        miy*x[0]+mix*y[2]-x[0]*y[2]-mix*y[0]+x[2]*y[0]-miy*x[2]};
+			btScalar        v = ia*((z[2]*c[0])+(z[0]*c[1])+(z[1]*c[2]));
+			btScalar       *scan = &m_buffer[miy*m_sizes[0]];
 			for (int iy=miy;iy<mxy;++iy)
 			{
 				for (int ix=mix;ix<mxx;++ix)
@@ -1696,18 +1727,18 @@ struct OcclusionBuffer
 			// the box is clipped, it's probably a large box, don't waste our time to check
 			if ((x[i][2]+x[i][3])<=0) return(true);
 		}
-		static const int	d[]={	1,0,3,2,
-									4,5,6,7,
-									4,7,3,0,
-									6,5,1,2,
-									7,6,2,3,
-									5,4,0,1};
+		static const int d[] = {1,0,3,2,
+		                        4,5,6,7,
+		                        4,7,3,0,
+		                        6,5,1,2,
+		                        7,6,2,3,
+		                        5,4,0,1};
 		for (unsigned int i=0;i<(sizeof(d)/sizeof(d[0]));)
 		{
-			const btVector4	p[]={	x[d[i++]],
-									x[d[i++]],
-									x[d[i++]],
-									x[d[i++]]};
+			const btVector4 p[] = {x[d[i++]],
+			                       x[d[i++]],
+			                       x[d[i++]],
+			                       x[d[i++]]};
 			if (clipDraw<4,QueryOCL>(p,1.f,0.f)) 
 				return(true);
 		}
@@ -1966,8 +1997,8 @@ void	CcdPhysicsEnvironment::setConstraintParam(int constraintId,int param,float 
 					btGeneric6DofConstraint* genCons = (btGeneric6DofConstraint*)typedConstraint;
 					int transMotorIndex = param-6;
 					btTranslationalLimitMotor* transMotor = genCons->getTranslationalLimitMotor();
-					transMotor->m_targetVelocity[transMotorIndex]= value0;
-					transMotor->m_maxMotorForce[transMotorIndex]=value1;
+					transMotor->m_targetVelocity[transMotorIndex] = value0;
+					transMotor->m_maxMotorForce[transMotorIndex] = value1;
 					transMotor->m_enableMotor[transMotorIndex] = (value1>0.f);
 					break;
 				}
@@ -2208,10 +2239,29 @@ bool CcdOverlapFilterCallBack::needBroadphaseCollision(btBroadphaseProxy* proxy0
 {
 	btCollisionObject *colObj0, *colObj1;
 	CcdPhysicsController *sensorCtrl, *objCtrl;
+
+	KX_GameObject *kxObj0 = KX_GameObject::GetClientObject(
+			(KX_ClientObjectInfo*)
+			((CcdPhysicsController*)
+					(((btCollisionObject*)proxy0->m_clientObject)->getUserPointer()))
+			->getNewClientInfo());
+	KX_GameObject *kxObj1 = KX_GameObject::GetClientObject(
+			(KX_ClientObjectInfo*)
+			((CcdPhysicsController*)
+					(((btCollisionObject*)proxy1->m_clientObject)->getUserPointer()))
+			->getNewClientInfo());
+
+	// First check the filters. Note that this is called during scene
+	// conversion, so we can't assume the KX_GameObject instances exist. This
+	// may make some objects erroneously collide on the first frame, but the
+	// alternative is to have them erroneously miss.
 	bool collides;
-	// first check the filters
 	collides = (proxy0->m_collisionFilterGroup & proxy1->m_collisionFilterMask) != 0;
 	collides = collides && (proxy1->m_collisionFilterGroup & proxy0->m_collisionFilterMask);
+	if (kxObj0 && kxObj1) {
+		collides = collides && kxObj0->CheckCollision(kxObj1);
+		collides = collides && kxObj1->CheckCollision(kxObj0);
+	}
 	if (!collides)
 		return false;
 
@@ -2265,6 +2315,15 @@ PHY_IVehicle*	CcdPhysicsEnvironment::getVehicleConstraint(int constraintId)
 
 #endif //NEW_BULLET_VEHICLE_SUPPORT
 
+
+PHY_ICharacter* CcdPhysicsEnvironment::getCharacterController(KX_GameObject *ob)
+{
+	CcdPhysicsController* controller = (CcdPhysicsController*)ob->GetPhysicsController()->GetUserData();
+	if (controller->GetCharacterController())
+		return new CharacterWrapper(controller->GetCharacterController());
+
+	return NULL;
+}
 
 int currentController = 0;
 int numController = 0;

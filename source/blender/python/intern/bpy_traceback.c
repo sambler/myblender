@@ -39,18 +39,19 @@ static const char *traceback_filepath(PyTracebackObject *tb, PyObject **coerce)
 	return PyBytes_AS_STRING((*coerce = PyUnicode_EncodeFSDefault(tb->tb_frame->f_code->co_filename)));
 }
 
-/* copied from pythonrun.c, 3.2.0 */
 static int
 parse_syntax_error(PyObject *err, PyObject **message, const char **filename,
-                   int *lineno, int *offset, const char **text)
+					int *lineno, int *offset, const char **text)
 {
+#if PY_MAJOR_VERSION == 3 && PY_MINOR_VERSION == 2
+/* copied from pythonrun.c, 3.2.0 */
 	long hold;
 	PyObject *v;
 
 	/* old style errors */
 	if (PyTuple_Check(err))
 		return PyArg_ParseTuple(err, "O(ziiz)", message, filename,
-		                        lineno, offset, text);
+								lineno, offset, text);
 
 	/* new style errors.  `err' is an instance */
 
@@ -95,18 +96,90 @@ parse_syntax_error(PyObject *err, PyObject **message, const char **filename,
 		goto finally;
 	if (v == Py_None)
 		*text = NULL;
-	else if (!PyUnicode_Check(v) ||
-	         !(*text = _PyUnicode_AsString(v)))
-		goto finally;
+	else if (!PyUnicode_Check(v) || !(*text = _PyUnicode_AsString(v)))
+		 goto finally;
 	Py_DECREF(v);
 	return 1;
 
 finally:
 	Py_XDECREF(v);
 	return 0;
+#else /* if py3.3 */
+/* copied from pythonrun.c, 3.3.0 */
+	long hold;
+	PyObject *v;
+	_Py_IDENTIFIER(msg);
+	_Py_IDENTIFIER(filename);
+	_Py_IDENTIFIER(lineno);
+	_Py_IDENTIFIER(offset);
+	_Py_IDENTIFIER(text);
+
+	*message = NULL;
+
+	/* new style errors.  `err' is an instance */
+	*message = _PyObject_GetAttrId(err, &PyId_msg);
+	if (!*message)
+		goto finally;
+
+	v = _PyObject_GetAttrId(err, &PyId_filename);
+	if (!v)
+		goto finally;
+	if (v == Py_None) {
+		Py_DECREF(v);
+		*filename = NULL;
+	}
+	else {
+		*filename = _PyUnicode_AsString(v);
+		Py_DECREF(v);
+		if (!*filename)
+			goto finally;
+	}
+
+	v = _PyObject_GetAttrId(err, &PyId_lineno);
+	if (!v)
+		goto finally;
+	hold = PyLong_AsLong(v);
+	Py_DECREF(v);
+	if (hold < 0 && PyErr_Occurred())
+		goto finally;
+	*lineno = (int)hold;
+
+	v = _PyObject_GetAttrId(err, &PyId_offset);
+	if (!v)
+		goto finally;
+	if (v == Py_None) {
+		*offset = -1;
+		Py_DECREF(v);
+	} else {
+		hold = PyLong_AsLong(v);
+		Py_DECREF(v);
+		if (hold < 0 && PyErr_Occurred())
+			goto finally;
+		*offset = (int)hold;
+	}
+
+	v = _PyObject_GetAttrId(err, &PyId_text);
+	if (!v)
+		goto finally;
+	if (v == Py_None) {
+		Py_DECREF(v);
+		*text = NULL;
+	}
+	else {
+		*text = _PyUnicode_AsString(v);
+		Py_DECREF(v);
+		if (!*text)
+			goto finally;
+	}
+	return 1;
+
+finally:
+	Py_XDECREF(*message);
+	return 0;
+
+#endif /* python version */
 }
 /* end copied function! */
-
 
 void python_script_error_jump(const char *filepath, int *lineno, int *offset)
 {

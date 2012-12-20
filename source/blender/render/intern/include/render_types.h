@@ -59,6 +59,7 @@ struct RenderBuckets;
 struct ObjectInstanceRen;
 struct RayObject;
 struct RayFace;
+struct RenderEngine;
 struct ReportList;
 struct Main;
 
@@ -128,7 +129,7 @@ struct Render
 	/* if render with single-layer option, other rendered layers are stored here */
 	RenderResult *pushedresult;
 	/* a list of RenderResults, for fullsample */
-	ListBase fullresult;	
+	ListBase fullresult;
 	/* read/write mutex, all internal code that writes to re->result must use a
 	 * write lock, all external code must use a read lock. internal code is assumed
 	 * to not conflict with writes, so no lock used for that */
@@ -145,8 +146,6 @@ struct Render
 	/* final picture width and height (within disprect) */
 	int rectx, recty;
 	
-	/* real maximum amount of xparts/yparts after correction for minimum */
-	int xparts, yparts;
 	/* real maximum size of parts after correction for minimum 
 	 * partx*xparts can be larger than rectx, in that case last part is smaller */
 	int partx, party;
@@ -184,6 +183,9 @@ struct Render
 	unsigned int lay;
 	
 	ListBase parts;
+	
+	/* render engine */
+	struct RenderEngine *engine;
 	
 	/* octree tables and variables for raytrace */
 	struct RayObject *raytree;

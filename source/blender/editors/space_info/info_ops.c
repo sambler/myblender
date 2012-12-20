@@ -87,10 +87,14 @@ static int pack_all_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 	// first check for dirty images
 	for (ima = bmain->image.first; ima; ima = ima->id.next) {
 		if (ima->ibufs.first) { /* XXX FIX */
-			ibuf = BKE_image_get_ibuf(ima, NULL);
+			ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
 			
-			if (ibuf && (ibuf->userflags & IB_BITMAPDIRTY))
+			if (ibuf && (ibuf->userflags & IB_BITMAPDIRTY)) {
+				BKE_image_release_ibuf(ima, ibuf, NULL);
 				break;
+			}
+
+			BKE_image_release_ibuf(ima, ibuf, NULL);
 		}
 	}
 
@@ -196,7 +200,7 @@ static int make_paths_relative_exec(bContext *C, wmOperator *op)
 	Main *bmain = CTX_data_main(C);
 
 	if (!G.relbase_valid) {
-		BKE_report(op->reports, RPT_WARNING, "Can't set relative paths with an unsaved blend file");
+		BKE_report(op->reports, RPT_WARNING, "Cannot set relative paths with an unsaved blend file");
 		return OPERATOR_CANCELLED;
 	}
 
@@ -229,7 +233,7 @@ static int make_paths_absolute_exec(bContext *C, wmOperator *op)
 	Main *bmain = CTX_data_main(C);
 
 	if (!G.relbase_valid) {
-		BKE_report(op->reports, RPT_WARNING, "Can't set absolute paths with an unsaved blend file");
+		BKE_report(op->reports, RPT_WARNING, "Cannot set absolute paths with an unsaved blend file");
 		return OPERATOR_CANCELLED;
 	}
 

@@ -60,7 +60,6 @@ struct Image;
 struct ImageUser;
 struct KeyingSet;
 struct KeyingSetInfo;
-struct LOD_Decimation_Info;
 struct MCol;
 struct MTex;
 struct Main;
@@ -76,6 +75,7 @@ struct Nurb;
 struct Object;
 struct PBVHNode;
 struct PyObject;
+struct Quadric;
 struct Render;
 struct RenderEngine;
 struct RenderEngineType;
@@ -134,6 +134,13 @@ int BLI_smallhash_count(struct SmallHash *hash) { return 0; }
 void *BLI_smallhash_iternext(struct SmallHashIter *iter, uintptr_t *key) { return NULL; }
 void *BLI_smallhash_iternew(struct SmallHash *hash, struct SmallHashIter *iter, uintptr_t *key) { return NULL; }
 
+void  BLI_quadric_from_v3_dist(struct Quadric *q, const float v[3], const float offset) {}
+void  BLI_quadric_add_qu_qu(struct Quadric *a, const struct Quadric *b) {}
+void  BLI_quadric_add_qu_ququ(struct Quadric *r, const struct Quadric *a, const struct Quadric *b) {}
+void  BLI_quadric_mul(struct Quadric *a, const float scalar) {}
+float BLI_quadric_evaluate(const struct Quadric *q, const float v[3]) {return 0.0f;}
+int   BLI_quadric_optimize(const struct Quadric *q, float v[3]) {return 0;}
+
 float *RE_RenderLayerGetPass(struct RenderLayer *rl, int passtype) {return (float *) NULL;}
 float RE_filter_value(int type, float x) {return 0.0f;}
 struct RenderLayer *RE_GetRenderLayer(struct RenderResult *rr, const char *name) {return (struct RenderLayer *)NULL;}
@@ -191,7 +198,7 @@ struct MenuType *WM_menutype_find(const char *idname, int quiet) {return (struct
 void WM_operator_stack_clear(struct bContext *C) {}
 
 void WM_autosave_init(struct bContext *C) {}
-void WM_jobs_stop_all(struct wmWindowManager *wm) {}
+void WM_jobs_kill_all_except(struct wmWindowManager *wm) {}
 
 char *WM_clipboard_text_get(int selection) {return (char*)0;}
 void WM_clipboard_text_set(char *buf, int selection) {}
@@ -415,7 +422,7 @@ void uiTemplateEditModeSelection(struct uiLayout *layout, struct bContext *C) {}
 void uiTemplateTextureImage(struct uiLayout *layout, struct bContext *C, struct Tex *tex) {}
 void uiTemplateImage(struct uiLayout *layout, struct bContext *C, struct PointerRNA *ptr, char *propname, struct PointerRNA *userptr, int compact) {}
 void uiTemplateDopeSheetFilter(struct uiLayout *layout, struct bContext *C, struct PointerRNA *ptr) {}
-void uiTemplateColorWheel(struct uiLayout *layout, struct PointerRNA *ptr, char *propname, int value_slider) {}
+void uiTemplateColorPicker(struct uiLayout *layout, struct PointerRNA *ptr, char *propname, int value_slider) {}
 void uiTemplateHistogram(struct uiLayout *layout, struct PointerRNA *ptr, char *propname, int expand) {}
 void uiTemplateReportsBanner(struct uiLayout *layout, struct bContext *C, struct wmOperator *op) {}
 void uiTemplateWaveform(struct uiLayout *layout, struct PointerRNA *ptr, char *propname, int expand) {}
@@ -453,6 +460,9 @@ void RE_engine_report(struct RenderEngine *engine, int type, const char *msg) {}
 ListBase R_engines = {NULL, NULL};
 void RE_engine_free(struct RenderEngine *engine) {}
 struct RenderEngineType *RE_engines_find(const char *idname) { return NULL; }
+void RE_engine_update_memory_stats(struct RenderEngine *engine, float mem_used, float mem_peak) {};
+struct RenderEngine *RE_engine_create(struct RenderEngineType *type) { return NULL; };
+void RE_FreePersistentData(void) {}
 
 /* python */
 struct wmOperatorType *WM_operatortype_find(const char *idname, int quiet) {return (struct wmOperatorType *) NULL;}

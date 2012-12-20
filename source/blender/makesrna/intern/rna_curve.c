@@ -26,6 +26,7 @@
 
 #include <stdlib.h>
 
+#include "RNA_access.h"
 #include "RNA_define.h"
 
 #include "rna_internal.h"
@@ -62,7 +63,7 @@ EnumPropertyItem keyframe_handle_type_items[] = {
 };
 
 EnumPropertyItem beztriple_interpolation_mode_items[] = {
-	{BEZT_IPO_CONST, "CONSTANT", 0, "Constant", "No interpolation. Value of A gets held until B is encountered"},
+	{BEZT_IPO_CONST, "CONSTANT", 0, "Constant", "No interpolation, value of A gets held until B is encountered"},
 	{BEZT_IPO_LIN, "LINEAR", 0, "Linear", "Straight-line interpolation between A and B (i.e. no ease in/out)"},
 	{BEZT_IPO_BEZ, "BEZIER", 0, "Bezier", "Smooth interpolation between A and B, with some control over curve shape"},
 	{0, NULL, 0, NULL, NULL}
@@ -241,16 +242,14 @@ static void rna_Curve_material_index_range(PointerRNA *ptr, int *min, int *max, 
 {
 	Curve *cu = (Curve *)ptr->id.data;
 	*min = 0;
-	*max = cu->totcol - 1;
-	*max = MAX2(0, *max);
+	*max = max_ii(0, cu->totcol - 1);
 }
 
 static void rna_Curve_active_textbox_index_range(PointerRNA *ptr, int *min, int *max, int *softmin, int *softmax)
 {
 	Curve *cu = (Curve *)ptr->id.data;
 	*min = 0;
-	*max = cu->totbox - 1;
-	*max = MAX2(0, *max);
+	*max = max_ii(0, cu->totbox - 1);
 }
 
 
@@ -511,7 +510,7 @@ static void rna_Nurb_update_knot_v(Main *bmain, Scene *scene, PointerRNA *ptr)
 static void rna_Curve_spline_points_add(ID *id, Nurb *nu, ReportList *reports, int number)
 {
 	if (nu->type == CU_BEZIER) {
-		BKE_report(reports, RPT_ERROR, "Bezier spline can't have points added");
+		BKE_report(reports, RPT_ERROR, "Bezier spline cannot have points added");
 	}
 	else if (number == 0) {
 		/* do nothing */
@@ -573,20 +572,18 @@ static Nurb *rna_Curve_spline_new(Curve *cu, int type)
 	return nu;
 }
 
-static void rna_Curve_spline_remove(Curve *cu, ReportList *reports, Nurb *nu)
+static void rna_Curve_spline_remove(Curve *cu, ReportList *reports, PointerRNA *nu_ptr)
 {
-	int found = 0;
+	Nurb *nu = nu_ptr->data;
 	ListBase *nurbs = BKE_curve_nurbs_get(cu);
 
-	found = BLI_remlink_safe(nurbs, nu);
-
-	if (!found) {
-		BKE_reportf(reports, RPT_ERROR, "Curve \"%s\" does not contain spline given", cu->id.name + 2);
+	if (BLI_remlink_safe(nurbs, nu) == FALSE) {
+		BKE_reportf(reports, RPT_ERROR, "Curve '%s' does not contain spline given", cu->id.name + 2);
 		return;
 	}
 
 	BKE_nurb_free(nu);
-	/* invalidate pointer!, no can do */
+	RNA_POINTER_INVALIDATE(nu_ptr);
 
 	DAG_id_tag_update(&cu->id, OB_RECALC_DATA);
 	WM_main_add_notifier(NC_GEOM | ND_DATA, NULL);
@@ -1109,7 +1106,7 @@ static void rna_def_charinfo(BlenderRNA *brna)
 	
 	/* probably there is no reason to expose this */
 #if 0
-	prop= RNA_def_property(srna, "wrap", PROP_BOOLEAN, PROP_NONE);
+	prop = RNA_def_property(srna, "wrap", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", CU_CHINFO_WRAP);
 	RNA_def_property_ui_text(prop, "Wrap", "");
 	RNA_def_property_update(prop, 0, "rna_Curve_update_data"); */
@@ -1167,11 +1164,12 @@ static void rna_def_curve_spline_points(BlenderRNA *brna, PropertyRNA *cprop)
 	RNA_def_int(func, "count", 1, 0, INT_MAX, "Number", "Number of points to add to the spline", 0, INT_MAX);
 
 #if 0
-	func= RNA_def_function(srna, "remove", "rna_Curve_spline_remove");
+	func = RNA_def_function(srna, "remove", "rna_Curve_spline_remove");
 	RNA_def_function_ui_description(func, "Remove a spline from a curve");
 	RNA_def_function_flag(func, FUNC_USE_REPORTS);
-	parm= RNA_def_pointer(func, "spline", "Spline", "", "The spline to remove");
-	RNA_def_property_flag(parm, PROP_REQUIRED | PROP_NEVER_NULL);
+	parm = RNA_def_pointer(func, "spline", "Spline", "", "The spline to remove");
+	RNA_def_property_flag(parm, PROP_REQUIRED | PROP_NEVER_NULL | PROP_RNAPTR);
+	RNA_def_property_clear_flag(parm, PROP_THICK_WRAP);
 #endif
 }
 
@@ -1198,7 +1196,8 @@ static void rna_def_curve_spline_bezpoints(BlenderRNA *brna, PropertyRNA *cprop)
 	RNA_def_function_ui_description(func, "Remove a spline from a curve");
 	RNA_def_function_flag(func, FUNC_USE_REPORTS);
 	parm = RNA_def_pointer(func, "spline", "Spline", "", "The spline to remove");
-	RNA_def_property_flag(parm, PROP_REQUIRED | PROP_NEVER_NULL);
+	RNA_def_property_flag(parm, PROP_REQUIRED | PROP_NEVER_NULL | PROP_RNAPTR);
+	RNA_def_property_clear_flag(parm, PROP_THICK_WRAP);
 #endif
 }
 
@@ -1227,7 +1226,8 @@ static void rna_def_curve_splines(BlenderRNA *brna, PropertyRNA *cprop)
 	RNA_def_function_ui_description(func, "Remove a spline from a curve");
 	RNA_def_function_flag(func, FUNC_USE_REPORTS);
 	parm = RNA_def_pointer(func, "spline", "Spline", "", "The spline to remove");
-	RNA_def_property_flag(parm, PROP_REQUIRED | PROP_NEVER_NULL);
+	RNA_def_property_flag(parm, PROP_REQUIRED | PROP_NEVER_NULL | PROP_RNAPTR);
+	RNA_def_property_clear_flag(parm, PROP_THICK_WRAP);
 
 	func = RNA_def_function(srna, "clear", "rna_Curve_spline_clear");
 	RNA_def_function_ui_description(func, "Remove all spline from a curve");
@@ -1420,6 +1420,11 @@ static void rna_def_curve(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "use_fill_caps", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", CU_FILL_CAPS);
 	RNA_def_property_ui_text(prop, "Fill Caps", "Fill caps for beveled curves");
+	RNA_def_property_update(prop, 0, "rna_Curve_update_data");
+
+	prop = RNA_def_property(srna, "use_map_taper", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", CU_MAP_TAPER);
+	RNA_def_property_ui_text(prop, "Map Taper", "Map effect of taper object on actually beveled curve");
 	RNA_def_property_update(prop, 0, "rna_Curve_update_data");
 
 	/* texture space */

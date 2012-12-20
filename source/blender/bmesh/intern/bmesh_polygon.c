@@ -162,7 +162,7 @@ float BM_face_calc_area(BMFace *f)
 	float area;
 	int i;
 
-	BLI_array_fixedstack_declare(verts, BM_NGON_STACK_SIZE, f->len, __func__);
+	BLI_array_fixedstack_declare(verts, BM_DEFAULT_NGON_STACK_SIZE, f->len, __func__);
 
 	BM_ITER_ELEM_INDEX (l, &iter, f, BM_LOOPS_OF_FACE, i) {
 		copy_v3_v3(verts[i], l->v->co);
@@ -313,7 +313,7 @@ void poly_rotate_plane(const float normal[3], float (*verts)[3], const int nvert
 
 	float up[3] = {0.0f, 0.0f, 1.0f}, axis[3], q[4];
 	float mat[3][3];
-	double angle;
+	float angle;
 	int i;
 
 	cross_v3_v3v3(axis, normal, up);
@@ -329,7 +329,7 @@ void poly_rotate_plane(const float normal[3], float (*verts)[3], const int nvert
 		axis[2] = 0.0f;
 	}
 
-	axis_angle_to_quat(q, axis, (float)angle);
+	axis_angle_to_quat(q, axis, angle);
 	quat_to_mat3(mat, q);
 
 	for (i = 0; i < nverts; i++)
@@ -507,8 +507,8 @@ static int line_crosses_v2f(const float v1[2], const float v2[2], const float v3
 
 #define GETMIN2_AXIS(a, b, ma, mb, axis)   \
 	{                                      \
-		ma[axis] = minf(a[axis], b[axis]); \
-		mb[axis] = maxf(a[axis], b[axis]); \
+		ma[axis] = min_ff(a[axis], b[axis]); \
+		mb[axis] = max_ff(a[axis], b[axis]); \
 	} (void)0
 
 #define GETMIN2(a, b, ma, mb)          \
@@ -677,6 +677,7 @@ static BMLoop *find_ear(BMFace *f, float (*verts)[3], const int use_beauty, floa
 	BMLoop *l_first;
 
 	const float cos_threshold = 0.9f;
+	const float bias = 1.0f + 1e-6f;
 
 	if (f->len == 4) {
 		BMLoop *larr[4];
@@ -691,7 +692,7 @@ static BMLoop *find_ear(BMFace *f, float (*verts)[3], const int use_beauty, floa
 		/* pick 0/1 based on best lenth */
 		/* XXX Can't only rely on such test, also must check we do not get (too much) degenerated triangles!!! */
 		i = (((len_squared_v3v3(larr[0]->v->co, larr[2]->v->co) >
-		     len_squared_v3v3(larr[1]->v->co, larr[3]->v->co))) != use_beauty);
+		     len_squared_v3v3(larr[1]->v->co, larr[3]->v->co) * bias)) != use_beauty);
 		i4 = (i + 3) % 4;
 		/* Check produced tris aren’t too flat/narrow...
 		 * Probably not the best test, but is quite efficient and should at least avoid null-area faces! */
@@ -965,8 +966,8 @@ void BM_face_legal_splits(BMesh *bm, BMFace *f, BMLoop *(*loops)[2], int len)
 	float fac1 = 1.0000001f, fac2 = 0.9f; //9999f; //0.999f;
 	int i, j, a = 0, clen;
 
-	BLI_array_fixedstack_declare(projverts, BM_NGON_STACK_SIZE, f->len,      "projvertsb");
-	BLI_array_fixedstack_declare(edgeverts, BM_NGON_STACK_SIZE * 2, len * 2, "edgevertsb");
+	BLI_array_fixedstack_declare(projverts, BM_DEFAULT_NGON_STACK_SIZE, f->len,      "projvertsb");
+	BLI_array_fixedstack_declare(edgeverts, BM_DEFAULT_NGON_STACK_SIZE * 2, len * 2, "edgevertsb");
 	
 	i = 0;
 	l = BM_iter_new(&iter, bm, BM_LOOPS_OF_FACE, f);
@@ -994,8 +995,8 @@ void BM_face_legal_splits(BMesh *bm, BMFace *f, BMLoop *(*loops)[2], int len)
 
 	for (i = 0, l = BM_FACE_FIRST_LOOP(f); i < f->len; i++, l = l->next) {
 		p1 = projverts[i];
-		out[0] = maxf(out[0], p1[0]);
-		out[1] = maxf(out[1], p1[1]);
+		out[0] = max_ff(out[0], p1[0]);
+		out[1] = max_ff(out[1], p1[1]);
 		/* out[2] = 0.0f; */ /* keep at zero */
 
 		p1[2] = 0.0f;

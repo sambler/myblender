@@ -82,6 +82,25 @@ __device_inline void stack_store_float(float *stack, uint a, float f)
 	stack[a] = f;
 }
 
+__device_inline int stack_load_int(float *stack, uint a)
+{
+	kernel_assert(a < SVM_STACK_SIZE);
+
+	return __float_as_int(stack[a]);
+}
+
+__device_inline float stack_load_int_default(float *stack, uint a, uint value)
+{
+	return (a == (uint)SVM_STACK_INVALID)? (int)value: stack_load_int(stack, a);
+}
+
+__device_inline void stack_store_int(float *stack, uint a, int i)
+{
+	kernel_assert(a < SVM_STACK_SIZE);
+
+	stack[a] = __int_as_float(i);
+}
+
 __device_inline bool stack_valid(uint a)
 {
 	return a != (uint)SVM_STACK_INVALID;
@@ -195,6 +214,9 @@ __device_noinline void svm_eval_nodes(KernelGlobals *kg, ShaderData *sd, ShaderT
 				break;
 			case NODE_CLOSURE_HOLDOUT:
 				svm_node_closure_holdout(sd, stack, node);
+				break;
+			case NODE_CLOSURE_AMBIENT_OCCLUSION:
+				svm_node_closure_ambient_occlusion(sd, stack, node);
 				break;
 			case NODE_CLOSURE_VOLUME:
 				svm_node_closure_volume(kg, sd, stack, node, path_flag);
@@ -378,6 +400,16 @@ __device_noinline void svm_eval_nodes(KernelGlobals *kg, ShaderData *sd, ShaderT
 				break;
 			case NODE_LIGHT_FALLOFF:
 				svm_node_light_falloff(sd, stack, node);
+				break;
+#endif			
+#ifdef __ANISOTROPIC__
+			case NODE_TANGENT:
+				svm_node_tangent(kg, sd, stack, node);
+				break;
+#endif			
+#ifdef __NORMAL_MAP__
+			case NODE_NORMAL_MAP:
+				svm_node_normal_map(kg, sd, stack, node);
 				break;
 #endif			
 			case NODE_END:

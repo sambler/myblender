@@ -247,9 +247,14 @@ void ExecutionSystem::addReadWriteBufferOperations(NodeOperation *operation)
  */
 static void debug_check_node_connections(Node *node)
 {
+	/* note: connected inputs are not checked here,
+	 * it would break quite a lot and such inputs are ignored later anyway
+	 */
+#if 0
 	for (int i = 0; i < node->getNumberOfInputSockets(); ++i) {
 		BLI_assert(!node->getInputSocket(i)->isConnected());
 	}
+#endif
 	for (int i = 0; i < node->getNumberOfOutputSockets(); ++i) {
 		BLI_assert(!node->getOutputSocket(i)->isConnected());
 	}
@@ -334,6 +339,16 @@ void ExecutionSystem::groupOperations()
 void ExecutionSystem::addSocketConnection(SocketConnection *connection)
 {
 	this->m_connections.push_back(connection);
+}
+
+void ExecutionSystem::removeSocketConnection(SocketConnection *connection)
+{
+	for (vector<SocketConnection *>::iterator it = m_connections.begin(); it != m_connections.end(); ++it) {
+		if (*it == connection) {
+			this->m_connections.erase(it);
+			return;
+		}
+	}
 }
 
 

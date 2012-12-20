@@ -303,8 +303,7 @@ static void *bmw_IslandboundWalker_step(BMWalker *walker)
 	if (!BM_vert_is_manifold(v)) {
 		BMW_reset(walker);
 		BMO_error_raise(walker->bm, NULL, BMERR_WALKER_FAILED,
-		                "Non-manifold vert "
-		                "while searching region boundary");
+		                "Non-manifold vert while searching region boundary");
 		return NULL;
 	}
 	
@@ -599,7 +598,7 @@ static void *bmw_LoopWalker_step(BMWalker *walker)
 			}
 		}
 	}
-	else { 	/* WIRE EDGE */
+	else {  /* WIRE EDGE */
 		BMIter eiter;
 
 		/* match trunk: mark all connected wire edges */

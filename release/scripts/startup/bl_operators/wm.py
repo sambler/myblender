@@ -41,12 +41,17 @@ class MESH_OT_delete_edgeloop(Operator):
         return bpy.ops.transform.edge_slide.poll()
 
     def execute(self, context):
+        mesh = context.object.data
+        use_mirror_x = mesh.use_mirror_x
+        mesh.use_mirror_x = False
         if 'FINISHED' in bpy.ops.transform.edge_slide(value=1.0):
             bpy.ops.mesh.select_more()
             bpy.ops.mesh.remove_doubles()
-            return {'FINISHED'}
-
-        return {'CANCELLED'}
+            ret = {'FINISHED'}
+        else:
+            ret = {'CANCELLED'}
+        mesh.use_mirror_x = use_mirror_x
+        return ret
 
 rna_path_prop = StringProperty(
         name="Context Attributes",
@@ -1044,6 +1049,8 @@ class WM_OT_properties_edit(Operator):
 
         try:
             value_eval = eval(value)
+            # assert else None -> None, not "None", see [#33431]
+            assert(type(value_eval) in {str, float, int, bool, tuple, list})
         except:
             value_eval = value
 
@@ -1124,9 +1131,15 @@ class WM_OT_properties_add(Operator):
 
             return prop_new
 
-        property = unique_name(item.keys())
+        prop = unique_name(item.keys())
 
-        item[property] = 1.0
+        item[prop] = 1.0
+
+        # not essential, but without this we get [#31661]
+        prop_ui = rna_idprop_ui_prop_get(item, prop)
+        prop_ui["soft_min"] = prop_ui["min"] = 0.0
+        prop_ui["soft_max"] = prop_ui["max"] = 1.0
+
         return {'FINISHED'}
 
 
@@ -1284,7 +1297,7 @@ class WM_OT_blenderplayer_start(Operator):
             return {'CANCELLED'}
 
         filepath = os.path.join(bpy.app.tempdir, "game.blend")
-        bpy.ops.wm.save_as_mainfile(filepath=filepath, check_existing=False, copy=True)
+        bpy.ops.wm.save_as_mainfile('EXEC_DEFAULT', filepath=filepath, copy=True)
         subprocess.call([player_path, filepath])
         return {'FINISHED'}
 

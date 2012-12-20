@@ -157,10 +157,10 @@ static void load_frame_image_sequence(VoxelData *vd, Tex *tex)
 
 	/* find the first valid ibuf and use it to initialize the resolution of the data set */
 	/* need to do this in advance so we know how much memory to allocate */
-	ibuf = BKE_image_get_ibuf(ima, &iuser);
+	ibuf = BKE_image_acquire_ibuf(ima, &iuser, NULL);
 	while (!ibuf && (iuser.framenr < iuser.frames)) {
 		iuser.framenr++;
-		ibuf = BKE_image_get_ibuf(ima, &iuser);
+		ibuf = BKE_image_acquire_ibuf(ima, &iuser, NULL);
 	}
 	if (!ibuf) return;
 	if (!ibuf->rect_float) IMB_float_from_rect(ibuf);
@@ -175,7 +175,8 @@ static void load_frame_image_sequence(VoxelData *vd, Tex *tex)
 		/* get a new ibuf for each frame */
 		if (z > 0) {
 			iuser.framenr++;
-			ibuf = BKE_image_get_ibuf(ima, &iuser);
+			BKE_image_release_ibuf(ima, ibuf, NULL);
+			ibuf = BKE_image_acquire_ibuf(ima, &iuser, NULL);
 			if (!ibuf) break;
 			if (!ibuf->rect_float) IMB_float_from_rect(ibuf);
 		}
@@ -191,7 +192,9 @@ static void load_frame_image_sequence(VoxelData *vd, Tex *tex)
 		
 		BKE_image_free_anim_ibufs(ima, iuser.framenr);
 	}
-	
+
+	BKE_image_release_ibuf(ima, ibuf, NULL);
+
 	vd->ok = 1;
 	return;
 }
@@ -265,7 +268,7 @@ static void init_frame_smoke(VoxelData *vd, float cfra)
 
 				/* map velocities between 0 and 0.3f */
 				for (i = 0; i < totRes; i++) {
-					vd->dataset[i] = sqrt(xvel[i] * xvel[i] + yvel[i] * yvel[i] + zvel[i] * zvel[i]) * 3.0f;
+					vd->dataset[i] = sqrtf(xvel[i] * xvel[i] + yvel[i] * yvel[i] + zvel[i] * zvel[i]) * 3.0f;
 				}
 
 			}
@@ -285,7 +288,7 @@ static void init_frame_smoke(VoxelData *vd, float cfra)
 				}
 
 				/* always store copy, as smoke internal data can change */
-				totRes= vd_resol_size(vd);
+				totRes = vd_resol_size(vd);
 				vd->dataset = MEM_mapallocN(sizeof(float)*(totRes), "smoke data");
 				memcpy(vd->dataset, flame, sizeof(float)*totRes);
 			}
@@ -414,7 +417,7 @@ void make_voxeldata(struct Render *re)
 
 int voxeldatatex(struct Tex *tex, const float texvec[3], struct TexResult *texres)
 {	 
-	VoxelData *vd = tex->vd;	
+	VoxelData *vd = tex->vd;
 	float co[3], offset[3] = {0.5, 0.5, 0.5}, a;
 	int retval = (vd->data_type == TEX_VD_RGBA_PREMUL) ? TEX_RGB : TEX_INT;
 	int depth = (vd->data_type == TEX_VD_RGBA_PREMUL) ? 4 : 1;
@@ -482,7 +485,7 @@ int voxeldatatex(struct Tex *tex, const float texvec[3], struct TexResult *texre
 				break;  
 			case TEX_VD_LINEAR:
 				*result = BLI_voxel_sample_trilinear(dataset, vd->resol, co);
-				break;					
+				break;
 			case TEX_VD_QUADRATIC:
 				*result = BLI_voxel_sample_triquadratic(dataset, vd->resol, co);
 				break;
@@ -515,5 +518,5 @@ int voxeldatatex(struct Tex *tex, const float texvec[3], struct TexResult *texre
 	texres->ta = texres->tin;
 	BRICONTRGB;
 	
-	return retval;	
+	return retval;
 }

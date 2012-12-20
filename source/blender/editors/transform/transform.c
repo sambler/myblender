@@ -277,7 +277,7 @@ void projectIntView(TransInfo *t, const float vec[3], int adr[2])
 			//vec[0] = vec[0]/((t->scene->r.frs_sec / t->scene->r.frs_sec_base));
 			/* same as below */
 			UI_view2d_to_region_no_clip((View2D *)t->view, vec[0], vec[1], out, out + 1);
-		} 
+		}
 		else
 #endif
 		{
@@ -469,11 +469,11 @@ static void viewRedrawForce(const bContext *C, TransInfo *t)
 		
 	}
 	else if (t->spacetype == SPACE_ACTION) {
-		//SpaceAction *saction= (SpaceAction *)t->sa->spacedata.first;
+		//SpaceAction *saction = (SpaceAction *)t->sa->spacedata.first;
 		WM_event_add_notifier(C, NC_ANIMATION | ND_KEYFRAME | NA_EDITED, NULL);
 	}
 	else if (t->spacetype == SPACE_IPO) {
-		//SpaceIpo *sipo= (SpaceIpo *)t->sa->spacedata.first;
+		//SpaceIpo *sipo = (SpaceIpo *)t->sa->spacedata.first;
 		WM_event_add_notifier(C, NC_ANIMATION | ND_KEYFRAME | NA_EDITED, NULL);
 	}
 	else if (t->spacetype == SPACE_NLA) {
@@ -526,6 +526,10 @@ static void viewRedrawPost(bContext *C, TransInfo *t)
 		/* if autokeying is enabled, send notifiers that keyframes were added */
 		if (IS_AUTOKEY_ON(t->scene))
 			WM_main_add_notifier(NC_ANIMATION | ND_KEYFRAME | NA_EDITED, NULL);
+
+		/* redraw UV editor */
+		if (t->mode == TFM_EDGE_SLIDE && (t->settings->uvcalc_flag & UVCALC_TRANSFORM_CORRECT))
+			WM_event_add_notifier(C, NC_GEOM | ND_DATA, NULL);
 		
 		/* XXX temp, first hack to get auto-render in compositor work (ton) */
 		WM_event_add_notifier(C, NC_SCENE | ND_TRANSFORM_DONE, CTX_data_scene(C));
@@ -1023,7 +1027,7 @@ int transformEvent(TransInfo *t, wmEvent *event)
 				if (t->flag & T_PROP_EDIT) {
 					t->prop_size *= 1.1f;
 					if (t->spacetype == SPACE_VIEW3D && t->persp != RV3D_ORTHO)
-						t->prop_size = minf(t->prop_size, ((View3D *)t->view)->far);
+						t->prop_size = min_ff(t->prop_size, ((View3D *)t->view)->far);
 					calculatePropRatio(t);
 				}
 				t->redraw |= TREDRAW_HARD;
@@ -1193,7 +1197,7 @@ int transformEvent(TransInfo *t, wmEvent *event)
 				if (event->alt && t->flag & T_PROP_EDIT) {
 					t->prop_size *= 1.1f;
 					if (t->spacetype == SPACE_VIEW3D && t->persp != RV3D_ORTHO)
-						t->prop_size = minf(t->prop_size, ((View3D *)t->view)->far);
+						t->prop_size = min_ff(t->prop_size, ((View3D *)t->view)->far);
 					calculatePropRatio(t);
 				}
 				t->redraw = 1;
@@ -1220,6 +1224,14 @@ int transformEvent(TransInfo *t, wmEvent *event)
 				}
 				else view_editmove(event->type);
 				t->redraw = 1;
+				break;
+			case LEFTALTKEY:
+			case RIGHTALTKEY:
+				if (ELEM(t->spacetype, SPACE_SEQ, SPACE_VIEW3D)) {
+					t->flag |= T_ALT_TRANSFORM;
+					t->redraw |= TREDRAW_HARD;
+				}
+
 				break;
 			default:
 				handled = 0;
@@ -1254,6 +1266,14 @@ int transformEvent(TransInfo *t, wmEvent *event)
 ////			if (t->options & CTX_TWEAK)
 //				t->state = TRANS_CONFIRM;
 //			break;
+			case LEFTALTKEY:
+			case RIGHTALTKEY:
+				if (ELEM(t->spacetype, SPACE_SEQ, SPACE_VIEW3D)) {
+					t->flag &= ~T_ALT_TRANSFORM;
+					t->redraw |= TREDRAW_HARD;
+				}
+
+				break;
 			default:
 				handled = 0;
 				break;
@@ -1267,6 +1287,8 @@ int transformEvent(TransInfo *t, wmEvent *event)
 			}
 		}
 	}
+	else
+		handled = 0;
 
 	// Per transform event, if present
 	if (t->handleEvent)
@@ -1487,8 +1509,8 @@ static void drawHelpline(bContext *UNUSED(C), int x, int y, void *customdata)
 				float dx = t->mval[0] - cent[0], dy = t->mval[1] - cent[1];
 				float angle = atan2f(dy, dx);
 				float dist = sqrtf(dx * dx + dy * dy);
-				float delta_angle = minf(15.0f / dist, (float)M_PI / 4.0f);
-				float spacing_angle = minf(5.0f / dist, (float)M_PI / 12.0f);
+				float delta_angle = min_ff(15.0f / dist, (float)M_PI / 4.0f);
+				float spacing_angle = min_ff(5.0f / dist, (float)M_PI / 12.0f);
 				UI_ThemeColor(TH_WIRE);
 
 				setlinestyle(3);
@@ -1601,8 +1623,10 @@ static void drawTransformPixel(const struct bContext *UNUSED(C), ARegion *ar, vo
 	 */
 	if ((U.autokey_flag & AUTOKEY_FLAG_NOWARNING) == 0) {
 		if (ar == t->ar) {
-			if (ob && autokeyframe_cfra_can_key(scene, &ob->id)) {
-				drawAutoKeyWarning(t, ar);
+			if (t->flag & (T_OBJECT | T_POSE)) {
+				if (ob && autokeyframe_cfra_can_key(scene, &ob->id)) {
+					drawAutoKeyWarning(t, ar);
+				}
 			}
 		}
 	}
@@ -2403,6 +2427,8 @@ static void constraintSizeLim(TransInfo *t, TransData *td)
 		bConstraintTypeInfo *cti = get_constraint_typeinfo(CONSTRAINT_TYPE_SIZELIMIT);
 		bConstraintOb cob = {NULL};
 		bConstraint *con;
+		float size_sign[3], size_abs[3];
+		int i;
 		
 		/* Make a temporary bConstraintOb for using these limit constraints
 		 *  - they only care that cob->matrix is correctly set ;-)
@@ -2416,8 +2442,14 @@ static void constraintSizeLim(TransInfo *t, TransData *td)
 			/* Reset val if SINGLESIZE but using a constraint */
 			if (td->flag & TD_SINGLESIZE)
 				return;
+
+			/* separate out sign to apply back later */
+			for (i = 0; i < 3; i++) {
+				size_sign[i] = signf(td->ext->size[i]);
+				size_abs[i] = fabsf(td->ext->size[i]);
+			}
 			
-			size_to_mat4(cob.matrix, td->ext->size);
+			size_to_mat4(cob.matrix, size_abs);
 		}
 		
 		/* Evaluate valid constraints */
@@ -2465,7 +2497,9 @@ static void constraintSizeLim(TransInfo *t, TransData *td)
 			if (td->flag & TD_SINGLESIZE)
 				return;
 
+			/* extrace scale from matrix and apply back sign */
 			mat4_to_size(td->ext->size, cob.matrix);
+			mul_v3_v3(td->ext->size, size_sign);
 		}
 	}
 }
@@ -2836,11 +2870,21 @@ static void headerResize(TransInfo *t, float vec[3], char *str)
 	(void)spos;
 }
 
-#define SIGN(a)     (a<-FLT_EPSILON ? 1 : a>FLT_EPSILON ? 2 : 3)
-#define VECSIGNFLIP(a, b) ((SIGN(a[0]) & SIGN(b[0])) == 0 || (SIGN(a[1]) & SIGN(b[1])) == 0 || (SIGN(a[2]) & SIGN(b[2])) == 0)
+/* FLT_EPSILON is too small [#29633], 0.0000001f starts to flip */
+#define TX_FLIP_EPS 0.00001f
+BLI_INLINE int tx_sign(const float a)
+{
+	return (a < -TX_FLIP_EPS ? 1 : a > TX_FLIP_EPS ? 2 : 3);
+}
+BLI_INLINE int tx_vec_sign_flip(const float a[3], const float b[3])
+{
+	return ((tx_sign(a[0]) & tx_sign(b[0])) == 0 ||
+	        (tx_sign(a[1]) & tx_sign(b[1])) == 0 ||
+	        (tx_sign(a[2]) & tx_sign(b[2])) == 0);
+}
 
 /* smat is reference matrix, only scaled */
-static void TransMat3ToSize(float mat[][3], float smat[][3], float *size)
+static void TransMat3ToSize(float mat[][3], float smat[][3], float size[3])
 {
 	float vec[3];
 	
@@ -2852,9 +2896,9 @@ static void TransMat3ToSize(float mat[][3], float smat[][3], float *size)
 	size[2] = normalize_v3(vec);
 	
 	/* first tried with dotproduct... but the sign flip is crucial */
-	if (VECSIGNFLIP(mat[0], smat[0]) ) size[0] = -size[0];
-	if (VECSIGNFLIP(mat[1], smat[1]) ) size[1] = -size[1];
-	if (VECSIGNFLIP(mat[2], smat[2]) ) size[2] = -size[2];
+	if (tx_vec_sign_flip(mat[0], smat[0]) ) size[0] = -size[0];
+	if (tx_vec_sign_flip(mat[1], smat[1]) ) size[1] = -size[1];
+	if (tx_vec_sign_flip(mat[2], smat[2]) ) size[2] = -size[2];
 }
 
 
@@ -3383,7 +3427,7 @@ static void ElementRotation(TransInfo *t, TransData *td, float mat[3][3], short 
 				/* this function works on end result */
 				protectedAxisAngleBits(td->protectflag, td->ext->rotAxis, td->ext->rotAngle, td->ext->irotAxis, td->ext->irotAngle);
 			}
-			else { 
+			else {
 				float eulmat[3][3];
 				
 				mul_m3_m3m3(totmat, mat, td->ext->r_mtx);
@@ -3931,10 +3975,8 @@ void initShrinkFatten(TransInfo *t)
 }
 
 
-
 int ShrinkFatten(TransInfo *t, const int UNUSED(mval[2]))
 {
-	float vec[3];
 	float distance;
 	int i;
 	char str[64];
@@ -3962,17 +4004,20 @@ int ShrinkFatten(TransInfo *t, const int UNUSED(mval[2]))
 	t->values[0] = -distance;
 
 	for (i = 0; i < t->total; i++, td++) {
+		float tdistance;  /* temp dist */
 		if (td->flag & TD_NOACTION)
 			break;
 
 		if (td->flag & TD_SKIP)
 			continue;
 
-		copy_v3_v3(vec, td->axismtx[2]);
-		mul_v3_fl(vec, distance);
-		mul_v3_fl(vec, td->factor);
+		/* get the final offset */
+		tdistance = distance * td->factor;
+		if (td->ext && (t->flag & T_ALT_TRANSFORM)) {
+			tdistance *= td->ext->isize[0];  /* shell factor */
+		}
 
-		add_v3_v3v3(td->loc, td->iloc, vec);
+		madd_v3_v3v3fl(td->loc, td->iloc, td->axismtx[2], tdistance);
 	}
 
 	recalcData(t);
@@ -4789,8 +4834,7 @@ static BMLoop *get_next_loop(BMVert *v, BMLoop *l,
 				cross_v3_v3v3(a, f2, l->f->no);
 				mul_v3_fl(a, -1.0f);
 
-				add_v3_v3(a, f3);
-				mul_v3_fl(a, 0.5f);
+				mid_v3_v3v3(a, a, f3);
 			}
 			
 			copy_v3_v3(vec, a);
@@ -4811,7 +4855,7 @@ static BMLoop *get_next_loop(BMVert *v, BMLoop *l,
 		}
 		
 		l = l->radial_next;
-	} while (l != firstl); 
+	} while (l != firstl);
 
 	if (i)
 		mul_v3_fl(a, 1.0f / (float)i);
@@ -4832,14 +4876,9 @@ static void calcNonProportionalEdgeSlide(TransInfo *t, SlideData *sld, const flo
 		float dist = 0;
 		float min_dist = FLT_MAX;
 
-		float up_p[3];
-		float dw_p[3];
-
 		for (i = 0; i < sld->totsv; i++, sv++) {
 			/* Set length */
-			add_v3_v3v3(up_p, sv->origvert.co, sv->upvec);
-			add_v3_v3v3(dw_p, sv->origvert.co, sv->downvec);
-			sv->edge_len = len_v3v3(dw_p, up_p);
+			sv->edge_len = len_v3v3(sv->upvec, sv->downvec);
 
 			mul_v3_m4v3(v_proj, t->obedit->obmat, sv->v->co);
 			if (ED_view3d_project_float_global(t->ar, v_proj, v_proj, V3D_PROJ_TEST_NOP) == V3D_PROJ_RET_OK) {
@@ -5513,7 +5552,7 @@ void drawNonPropEdge(const struct bContext *C, TransInfo *t)
 			float v1[3], v2[3];
 			float interp_v;
 			TransDataSlideVert *curr_sv = &sld->sv[sld->curr_sv_index];
-			const float ctrl_size = UI_GetThemeValuef(TH_FACEDOT_SIZE) + 1.5;
+			const float ctrl_size = UI_GetThemeValuef(TH_FACEDOT_SIZE) + 1.5f;
 			const float guide_size = ctrl_size - 0.5f;
 			const float line_size = UI_GetThemeValuef(TH_OUTLINE_WIDTH) + 0.5f;
 			const int alpha_shade = -30;
@@ -5580,7 +5619,6 @@ static int doEdgeSlide(TransInfo *t, float perc)
 {
 	SlideData *sld = t->customData;
 	TransDataSlideVert *svlist = sld->sv, *sv;
-	float vec[3];
 	int i;
 
 	sld->perc = perc;
@@ -5588,6 +5626,7 @@ static int doEdgeSlide(TransInfo *t, float perc)
 
 	if (sld->is_proportional == TRUE) {
 		for (i = 0; i < sld->totsv; i++, sv++) {
+			float vec[3];
 			if (perc > 0.0f) {
 				copy_v3_v3(vec, sv->upvec);
 				mul_v3_fl(vec, perc);
@@ -5605,20 +5644,29 @@ static int doEdgeSlide(TransInfo *t, float perc)
 		 * Implementation note, non proportional mode ignores the starting positions and uses only the
 		 * up/down verts, this could be changed/improved so the distance is still met but the verts are moved along
 		 * their original path (which may not be straight), however how it works now is OK and matches 2.4x - Campbell
+		 *
+		 * \note len_v3v3(curr_sv->upvec, curr_sv->downvec)
+		 * is the same as the distance between the original vert locations, same goes for the lines below.
 		 */
 		TransDataSlideVert *curr_sv = &sld->sv[sld->curr_sv_index];
-		const float curr_length_perc = len_v3v3(curr_sv->up->co, curr_sv->down->co) *
-		                               (((sld->flipped_vtx ? perc : -perc) + 1.0f) / 2.0f);
+		const float curr_length_perc = curr_sv->edge_len * (((sld->flipped_vtx ? perc : -perc) + 1.0f) / 2.0f);
+
+		float down_co[3];
+		float up_co[3];
 
 		for (i = 0; i < sld->totsv; i++, sv++) {
-			const float sv_length = len_v3v3(sv->up->co, sv->down->co);
-			const float fac = minf(sv_length, curr_length_perc) / sv_length;
+			if (sv->edge_len > FLT_EPSILON) {
+				const float fac = min_ff(sv->edge_len, curr_length_perc) / sv->edge_len;
 
-			if (sld->flipped_vtx) {
-				interp_v3_v3v3(sv->v->co, sv->down->co, sv->up->co, fac);
-			}
-			else {
-				interp_v3_v3v3(sv->v->co, sv->up->co, sv->down->co, fac);
+				add_v3_v3v3(up_co, sv->origvert.co, sv->upvec);
+				add_v3_v3v3(down_co, sv->origvert.co, sv->downvec);
+
+				if (sld->flipped_vtx) {
+					interp_v3_v3v3(sv->v->co, down_co, up_co, fac);
+				}
+				else {
+					interp_v3_v3v3(sv->v->co, up_co, down_co, fac);
+				}
 			}
 		}
 	}
@@ -6108,7 +6156,7 @@ static short getAnimEdit_DrawTime(TransInfo *t)
 		SpaceIpo *sipo = (SpaceIpo *)t->sa->spacedata.first;
 		
 		drawtime = (sipo->flag & SIPO_DRAWTIME) ? 1 : 0;
-	}	
+	}
 	else {
 		drawtime = 0;
 	}
@@ -6589,5 +6637,5 @@ int TimeScale(TransInfo *t, const int UNUSED(mval[2]))
 void BIF_TransformSetUndo(const char *UNUSED(str))
 {
 	// TRANSFORM_FIX_ME
-	//Trans.undostr= str;
+	//Trans.undostr = str;
 }

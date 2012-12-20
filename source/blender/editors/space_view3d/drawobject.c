@@ -132,7 +132,8 @@ typedef struct drawDMFacesSel_userData {
 	BMEditMesh *em;  /* BMESH BRANCH ONLY */
 
 	BMFace *efa_act;
-	int *orig_index;
+	int *orig_index_mf_to_mpoly;
+	int *orig_index_mp_to_orig;
 } drawDMFacesSel_userData;
 
 typedef struct drawDMNormal_userData {
@@ -228,17 +229,21 @@ static int check_alpha_pass(Base *base)
 
 	if (G.f & G_PICKSEL)
 		return 0;
-	
+
+	if (base->object->mode & OB_MODE_ALL_PAINT)
+		return 0;
+
 	return (base->object->dtx & OB_DRAWTRANSP);
 }
 
 /***/
-static unsigned int colortab[24] =
-{0x0,       0xFF88FF, 0xFFBBFF,
- 0x403000,  0xFFFF88, 0xFFFFBB,
- 0x104040,  0x66CCCC, 0x77CCCC,
- 0x104010,  0x55BB55, 0x66FF66,
- 0xFFFFFF};
+static unsigned int colortab[24] = {
+	0x0,      0xFF88FF, 0xFFBBFF,
+	0x403000, 0xFFFF88, 0xFFFFBB,
+	0x104040, 0x66CCCC, 0x77CCCC,
+	0x104010, 0x55BB55, 0x66FF66,
+	0xFFFFFF
+};
 
 
 static float cube[8][3] = {
@@ -528,7 +533,7 @@ void drawaxes(float size, char drawtype)
 static void draw_empty_image(Object *ob, const short dflag, const unsigned char ob_wire_col[4])
 {
 	Image *ima = (Image *)ob->data;
-	ImBuf *ibuf = ima ? BKE_image_get_ibuf(ima, NULL) : NULL;
+	ImBuf *ibuf = ima ? BKE_image_acquire_ibuf(ima, NULL, NULL) : NULL;
 
 	float scale, ofs_x, ofs_y, sca_x, sca_y;
 	int ima_x, ima_y;
@@ -578,7 +583,7 @@ static void draw_empty_image(Object *ob, const short dflag, const unsigned char 
 	glTranslatef(0.0f,  0.0f,  0.0f);
 
 	/* Calculate Image scale */
-	scale = (ob->empty_drawsize / (float)MAX2(ima_x * sca_x, ima_y * sca_y));
+	scale = (ob->empty_drawsize / max_ff((float)ima_x * sca_x, (float)ima_y * sca_y));
 
 	/* Set the object scale */
 	glScalef(scale * sca_x, scale * sca_y, 1.0f);
@@ -613,6 +618,8 @@ static void draw_empty_image(Object *ob, const short dflag, const unsigned char 
 	/* Reset GL settings */
 	glMatrixMode(GL_MODELVIEW);
 	glPopMatrix();
+
+	BKE_image_release_ibuf(ima, ibuf, NULL);
 }
 
 static void circball_array_fill(float verts[CIRCLE_RESOL][3], const float cent[3], float rad, float tmat[][4])
@@ -2310,11 +2317,11 @@ static int draw_dm_faces_sel__compareDrawOptions(void *userData, int index, int 
 
 	unsigned char *col, *next_col;
 
-	if (!data->orig_index)
+	if (!data->orig_index_mf_to_mpoly)
 		return 0;
 
-	efa = EDBM_face_at_index(data->em, data->orig_index[index]);
-	next_efa = EDBM_face_at_index(data->em, data->orig_index[next_index]);
+	efa = EDBM_face_at_index(data->em, DM_origindex_mface_mpoly(data->orig_index_mf_to_mpoly, data->orig_index_mp_to_orig, index));
+	next_efa = EDBM_face_at_index(data->em, DM_origindex_mface_mpoly(data->orig_index_mf_to_mpoly, data->orig_index_mp_to_orig, next_index));
 
 	if (efa == next_efa)
 		return 1;
@@ -2342,7 +2349,12 @@ static void draw_dm_faces_sel(BMEditMesh *em, DerivedMesh *dm, unsigned char *ba
 	data.cols[1] = selCol;
 	data.cols[2] = actCol;
 	data.efa_act = efa_act;
-	data.orig_index = DM_get_tessface_data_layer(dm, CD_ORIGINDEX);
+	/* double lookup */
+	data.orig_index_mf_to_mpoly = DM_get_tessface_data_layer(dm, CD_ORIGINDEX);
+	data.orig_index_mp_to_orig  = DM_get_poly_data_layer(dm, CD_ORIGINDEX);
+	if ((data.orig_index_mf_to_mpoly && data.orig_index_mp_to_orig) == FALSE) {
+		data.orig_index_mf_to_mpoly = data.orig_index_mp_to_orig = NULL;
+	}
 
 	dm->drawMappedFaces(dm, draw_dm_faces_sel__setDrawOptions, GPU_enable_material, draw_dm_faces_sel__compareDrawOptions, &data, 0);
 }
@@ -2570,7 +2582,7 @@ static void draw_em_measure_stats(View3D *v3d, Object *ob, BMEditMesh *em, UnitS
 	BMIter iter;
 	int i;
 
-	/* make the precision of the pronted value proportionate to the gridsize */
+	/* make the precision of the display value proportionate to the gridsize */
 
 	if (grid < 0.01f) conv_float = "%.6g";
 	else if (grid < 0.1f) conv_float = "%.5g";
@@ -3593,9 +3605,12 @@ static int drawCurveDerivedMesh(Scene *scene, View3D *v3d, RegionView3D *rv3d, B
 	return 0;
 }
 
-/* returns 1 when nothing was drawn */
-static int drawDispList(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *base,
-                        const short dt, const short dflag, const unsigned char ob_wire_col[4])
+/**
+ * Only called by #drawDispList
+ * \return 1 when nothing was drawn
+ */
+static int drawDispList_nobackface(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *base,
+                                   const short dt, const short dflag, const unsigned char ob_wire_col[4])
 {
 	Object *ob = base->object;
 	ListBase *lb = NULL;
@@ -3603,20 +3618,9 @@ static int drawDispList(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *bas
 	Curve *cu;
 	const short render_only = (v3d->flag2 & V3D_RENDER_OVERRIDE);
 	const short solid = (dt > OB_WIRE);
-	int retval = 0;
-
-	/* backface culling */
-	if (v3d->flag2 & V3D_BACKFACE_CULLING) {
-		/* not all displists use same in/out normal direction convention */
-		glEnable(GL_CULL_FACE);
-		glCullFace((ob->type == OB_MBALL) ? GL_BACK : GL_FRONT);
-	}
 
 	if (drawCurveDerivedMesh(scene, v3d, rv3d, base, dt) == 0) {
-		if (v3d->flag2 & V3D_BACKFACE_CULLING)
-			glDisable(GL_CULL_FACE);
-
-		return 0;
+		return FALSE;
 	}
 
 	switch (ob->type) {
@@ -3628,7 +3632,9 @@ static int drawDispList(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *bas
 
 			if (solid) {
 				dl = lb->first;
-				if (dl == NULL) return 1;
+				if (dl == NULL) {
+					return TRUE;
+				}
 
 				if (dl->nors == NULL) BKE_displist_normals_add(lb);
 				index3_nors_incr = 0;
@@ -3662,9 +3668,11 @@ static int drawDispList(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *bas
 			}
 			else {
 				if (!render_only || (render_only && BKE_displist_has_faces(lb))) {
+					int retval;
 					draw_index_wire = 0;
 					retval = drawDispListwire(lb);
 					draw_index_wire = 1;
+					return retval;
 				}
 			}
 			break;
@@ -3674,7 +3682,9 @@ static int drawDispList(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *bas
 
 			if (solid) {
 				dl = lb->first;
-				if (dl == NULL) return 1;
+				if (dl == NULL) {
+					return TRUE;
+				}
 
 				if (dl->nors == NULL) BKE_displist_normals_add(lb);
 
@@ -3690,7 +3700,7 @@ static int drawDispList(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *bas
 				}
 			}
 			else {
-				retval = drawDispListwire(lb);
+				return drawDispListwire(lb);
 			}
 			break;
 		case OB_MBALL:
@@ -3698,7 +3708,9 @@ static int drawDispList(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *bas
 			if (BKE_mball_is_basis(ob)) {
 				lb = &ob->disp;
 				if (lb->first == NULL) BKE_displist_make_mball(scene, ob);
-				if (lb->first == NULL) return 1;
+				if (lb->first == NULL) {
+					return TRUE;
+				}
 
 				if (solid) {
 
@@ -3715,14 +3727,31 @@ static int drawDispList(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *bas
 				}
 				else {
 					/* MetaBalls use DL_INDEX4 type of DispList */
-					retval = drawDispListwire(lb);
+					return drawDispListwire(lb);
 				}
 			}
 			break;
 	}
-	
-	if (v3d->flag2 & V3D_BACKFACE_CULLING)
+
+	return FALSE;
+}
+static int drawDispList(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *base,
+                        const short dt, const short dflag, const unsigned char ob_wire_col[4])
+{
+	int retval;
+
+	/* backface culling */
+	if (v3d->flag2 & V3D_BACKFACE_CULLING) {
+		/* not all displists use same in/out normal direction convention */
+		glEnable(GL_CULL_FACE);
+		glCullFace((base->object->type == OB_MBALL) ? GL_BACK : GL_FRONT);
+	}
+
+	retval = drawDispList_nobackface(scene, v3d, rv3d, base, dt, dflag, ob_wire_col);
+
+	if (v3d->flag2 & V3D_BACKFACE_CULLING) {
 		glDisable(GL_CULL_FACE);
+	}
 
 	return retval;
 }
@@ -4427,7 +4456,7 @@ static void draw_new_particle_system(Scene *scene, View3D *v3d, RegionView3D *rv
 
 		if (cdata2)
 			MEM_freeN(cdata2);
-		/* cd2= */ /* UNUSED */ cdata2 = NULL;
+		/* cd2 = */ /* UNUSED */ cdata2 = NULL;
 
 		glLineWidth(1.0f);
 
@@ -5493,7 +5522,7 @@ static void drawcircle_size(float size)
 
 	glBegin(GL_LINE_LOOP);
 
-	/* coordinates are: cos(degrees*11.25)=x, sin(degrees*11.25)=y, 0.0f=z */
+	/* coordinates are: cos(degrees * 11.25) = x, sin(degrees*11.25) = y, 0.0f = z */
 	for (degrees = 0; degrees < CIRCLE_RESOL; degrees++) {
 		x = cosval[degrees];
 		y = sinval[degrees];
@@ -6540,7 +6569,6 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short
 	/* code for new particle system */
 	if ((warning_recursive == 0) &&
 	    (ob->particlesystem.first) &&
-	    (dflag & DRAW_PICKING) == 0 &&
 	    (ob != scene->obedit)
 	    )
 	{

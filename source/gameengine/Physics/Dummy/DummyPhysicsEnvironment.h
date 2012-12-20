@@ -56,6 +56,7 @@ public:
 	virtual	float		getFixedTimeStep();
 
 	virtual	void		setGravity(float x,float y,float z);
+	virtual	void		getGravity(PHY__Vector3& grav);
 
 	virtual int			createConstraint(class PHY_IPhysicsController* ctrl,class PHY_IPhysicsController* ctrl2,PHY_ConstraintType type,
 			float pivotX,float pivotY,float pivotZ,
@@ -68,6 +69,12 @@ public:
 
 		//complex constraint for vehicles
 	virtual PHY_IVehicle*	getVehicleConstraint(int constraintId)
+	{
+		return 0;
+	}
+
+		// Character physics wrapper
+	virtual PHY_ICharacter*	getCharacterController(class KX_GameObject* ob)
 	{
 		return 0;
 	}

@@ -42,6 +42,8 @@
 #include "BLI_listbase.h"
 #include "BLI_ghash.h"
 
+#include "BLF_translation.h"
+
 #include "RNA_define.h"
 
 #include "rna_internal.h"
@@ -898,7 +900,7 @@ void RNA_def_struct_translation_context(StructRNA *srna, const char *context)
 
 PropertyRNA *RNA_def_property(StructOrFunctionRNA *cont_, const char *identifier, int type, int subtype)
 {
-	/*StructRNA *srna= DefRNA.laststruct;*/ /* invalid for python defined props */
+	/*StructRNA *srna = DefRNA.laststruct;*/ /* invalid for python defined props */
 	ContainerRNA *cont = cont_;
 	ContainerDefRNA *dcont;
 	PropertyDefRNA *dprop = NULL;
@@ -979,8 +981,10 @@ PropertyRNA *RNA_def_property(StructOrFunctionRNA *cont_, const char *identifier
 			sprop->defaultvalue = "";
 			break;
 		}
-		case PROP_ENUM:
 		case PROP_POINTER:
+			prop->flag |= PROP_THICK_WRAP;  /* needed for default behavior when PROP_RNAPTR is set */
+			break;
+		case PROP_ENUM:
 		case PROP_COLLECTION:
 			break;
 		default:
@@ -2808,14 +2812,26 @@ int rna_parameter_size(PropertyRNA *parm)
 			{
 #ifdef RNA_RUNTIME
 				if (parm->flag & PROP_RNAPTR)
-					return sizeof(PointerRNA);
+					if (parm->flag & PROP_THICK_WRAP) {
+						return sizeof(PointerRNA);
+					}
+					else {
+						return sizeof(PointerRNA *);
+					}
 				else
 					return sizeof(void *);
 #else
-				if (parm->flag & PROP_RNAPTR)
-					return sizeof(PointerRNA);
-				else
+				if (parm->flag & PROP_RNAPTR) {
+					if (parm->flag & PROP_THICK_WRAP) {
+						return sizeof(PointerRNA);
+					}
+					else {
+						return sizeof(PointerRNA *);
+					}
+				}
+				else {
 					return sizeof(void *);
+				}
 #endif
 			}
 			case PROP_COLLECTION:

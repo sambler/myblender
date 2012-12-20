@@ -268,6 +268,23 @@ void BPY_python_start(int argc, const char **argv)
 
 	Py_Initialize();
 
+	/* THIS IS BAD: see http://bugs.python.org/issue16129 */
+#if 1
+	/* until python provides a reliable way to set the env var */
+	PyRun_SimpleString("import sys, io\n"
+	                   "sys.__backup_stdio__ = sys.__stdout__, sys.__stderr__\n"  /* else we loose the FD's [#32720] */
+	                   "sys.__stdout__ = sys.stdout = io.TextIOWrapper(io.open(sys.stdout.fileno(), 'wb', -1), "
+	                   "encoding='utf-8', errors='surrogateescape', newline='\\n', line_buffering=True)\n"
+	                   "sys.__stderr__ = sys.stderr = io.TextIOWrapper(io.open(sys.stderr.fileno(), 'wb', -1), "
+	                   "encoding='utf-8', errors='surrogateescape', newline='\\n', line_buffering=True)\n");
+	if (PyErr_Occurred()) {
+		PyErr_Print();
+		PyErr_Clear();
+	}
+#endif
+	/* end the baddness */
+
+
 	// PySys_SetArgv(argc, argv);  /* broken in py3, not a huge deal */
 	/* sigh, why do python guys not have a (char **) version anymore? */
 	{
@@ -510,6 +527,18 @@ void BPY_DECREF(void *pyob_ptr)
 	PyGILState_Release(gilstate);
 }
 
+void BPY_DECREF_RNA_INVALIDATE(void *pyob_ptr)
+{
+	PyGILState_STATE gilstate = PyGILState_Ensure();
+	const int do_invalidate = (Py_REFCNT((PyObject *)pyob_ptr) > 1);
+	Py_DECREF((PyObject *)pyob_ptr);
+	if (do_invalidate) {
+		pyrna_invalidate(pyob_ptr);
+	}
+	PyGILState_Release(gilstate);
+}
+
+
 /* return -1 on error, else 0 */
 int BPY_button_exec(bContext *C, const char *expr, double *value, const short verbose)
 {
@@ -589,7 +618,7 @@ int BPY_button_exec(bContext *C, const char *expr, double *value, const short ve
 		}
 	}
 
-	PyC_MainModule_Backup(&main_mod);
+	PyC_MainModule_Restore(main_mod);
 	
 	bpy_context_clear(C, &gilstate);
 	

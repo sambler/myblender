@@ -158,11 +158,16 @@ static void unlink_material_cb(bContext *UNUSED(C), Scene *UNUSED(scene), TreeEl
 		totcol = mb->totcol;
 		matar = mb->mat;
 	}
+	else {
+		BLI_assert(0);
+	}
 
-	for (a = 0; a < totcol; a++) {
-		if (a == te->index && matar[a]) {
-			matar[a]->id.us--;
-			matar[a] = NULL;
+	if (LIKELY(matar != NULL)) {
+		for (a = 0; a < totcol; a++) {
+			if (a == te->index && matar[a]) {
+				matar[a]->id.us--;
+				matar[a] = NULL;
+			}
 		}
 	}
 }
@@ -811,7 +816,7 @@ static int outliner_id_operation_exec(bContext *C, wmOperator *op)
 					ED_undo_push(C, "Unlink world");
 					break;
 				default:
-					BKE_report(op->reports, RPT_WARNING, "Not yet");
+					BKE_report(op->reports, RPT_WARNING, "Not yet implemented");
 					break;
 			}
 		}
@@ -844,7 +849,7 @@ static int outliner_id_operation_exec(bContext *C, wmOperator *op)
 					break;
 					
 				default:
-					BKE_report(op->reports, RPT_WARNING, "Not yet");
+					BKE_report(op->reports, RPT_WARNING, "Not yet implemented");
 					break;
 			}
 		}
@@ -974,7 +979,7 @@ static int outliner_action_set_exec(bContext *C, wmOperator *op)
 	act = BLI_findlink(&CTX_data_main(C)->action, RNA_enum_get(op->ptr, "action"));
 	
 	if (act == NULL) {
-		BKE_report(op->reports, RPT_ERROR, "No valid Action to add");
+		BKE_report(op->reports, RPT_ERROR, "No valid action to add");
 		return OPERATOR_CANCELLED;
 	}
 	else if (act->idroot == 0) {
@@ -982,7 +987,7 @@ static int outliner_action_set_exec(bContext *C, wmOperator *op)
 		BKE_reportf(op->reports, RPT_WARNING,
 		            "Action '%s' does not specify what datablocks it can be used on "
 		            "(try setting the 'ID Root Type' setting from the Datablocks Editor "
-		            "for this Action to avoid future problems)",
+		            "for this action to avoid future problems)",
 		            act->id.name + 2);
 	}
 	
@@ -1202,6 +1207,7 @@ static int outliner_data_operation_exec(bContext *C, wmOperator *op)
 			break;
 			
 		default:
+			BKE_report(op->reports, RPT_WARNING, "Not yet implemented");
 			break;
 	}
 	

@@ -299,9 +299,9 @@ class USERPREF_PT_edit(Panel):
         col.label(text="Grease Pencil:")
         col.prop(edit, "grease_pencil_manhattan_distance", text="Manhattan Distance")
         col.prop(edit, "grease_pencil_euclidean_distance", text="Euclidean Distance")
-        #~ col.prop(edit, "use_grease_pencil_simplify_stroke", text="Simplify Stroke")
         col.prop(edit, "grease_pencil_eraser_radius", text="Eraser Radius")
         col.prop(edit, "use_grease_pencil_smooth_stroke", text="Smooth Stroke")
+        col.prop(edit, "use_grease_pencil_simplify_stroke", text="Simplify Stroke")
         col.separator()
         col.separator()
         col.separator()
@@ -422,7 +422,7 @@ class USERPREF_PT_system(Panel):
         col.separator()
         col.separator()
 
-        if hasattr(system, "compute_device"):
+        if hasattr(system, "compute_device_type"):
             col.label(text="Compute Device:")
             col.row().prop(system, "compute_device_type", expand=True)
             sub = col.row()
@@ -442,10 +442,9 @@ class USERPREF_PT_system(Panel):
         col.label(text="Anisotropic Filtering")
         col.prop(system, "anisotropic_filter", text="")
         col.prop(system, "use_vertex_buffer_objects")
-        # Anti-aliasing is disabled as it breaks border/lasso select
-        #~ col.prop(system, "use_antialiasing")
         col.label(text="Window Draw Method:")
         col.prop(system, "window_draw_method", text="")
+        col.prop(system, "multi_sample", text="")
         col.label(text="Text Draw Options:")
         col.prop(system, "use_text_antialiasing")
         col.label(text="Textures:")
@@ -728,6 +727,29 @@ class USERPREF_PT_theme(Panel):
             colsub = padding.column()
             colsub.row().prop(ui, "header")
 
+            col.separator()
+            col.separator()
+
+            ui = theme.user_interface
+            col.label("Axis Colors:")
+
+            row = col.row()
+
+            subsplit = row.split(percentage=0.95)
+
+            padding = subsplit.split(percentage=0.15)
+            colsub = padding.column()
+            colsub = padding.column()
+            colsub.row().prop(ui, "axis_x")
+            colsub.row().prop(ui, "axis_y")
+            colsub.row().prop(ui, "axis_z")
+            
+            subsplit = row.split(percentage=0.85)
+
+            padding = subsplit.split(percentage=0.15)
+            colsub = padding.column()
+            colsub = padding.column()
+            
             layout.separator()
             layout.separator()
         elif theme.theme_area == 'BONE_COLOR_SETS':
@@ -823,6 +845,7 @@ class USERPREF_PT_file(Panel):
         col.prop(paths, "use_filter_files")
         col.prop(paths, "show_hidden_files_datablocks")
         col.prop(paths, "hide_recent_locations")
+        col.prop(paths, "hide_system_bookmarks")
         col.prop(paths, "show_thumbnails")
 
         col.separator()
@@ -1092,7 +1115,7 @@ class USERPREF_PT_addons(Panel):
                     (filter == info["category"]) or
                     (filter == "Enabled" and is_enabled) or
                     (filter == "Disabled" and not is_enabled) or
-                    (filter == "User" and (mod.__file__.startswith(scripts_addons_folder, userpref_addons_folder)))
+                    (filter == "User" and (mod.__file__.startswith((scripts_addons_folder, userpref_addons_folder))))
                    ):
 
                 if search and search not in info["name"].lower():

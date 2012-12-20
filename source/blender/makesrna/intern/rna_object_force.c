@@ -51,6 +51,9 @@ static EnumPropertyItem effector_shape_items[] = {
 
 #ifdef RNA_RUNTIME
 
+#include "BLI_math_base.h"
+
+
 /* type specific return values only used from functions */
 static EnumPropertyItem curve_shape_items[] = {
 	{PFIELD_SHAPE_POINT, "POINT", 0, "Point", ""},
@@ -239,8 +242,7 @@ static void rna_Cache_active_point_cache_index_range(PointerRNA *ptr, int *min, 
 
 	for (pid = pidlist.first; pid; pid = pid->next) {
 		if (pid->cache == cache) {
-			*max = BLI_countlist(pid->ptcaches) - 1;
-			*max = MAX2(0, *max);
+			*max = max_ii(0, BLI_countlist(pid->ptcaches) - 1);
 			break;
 		}
 	}
@@ -820,10 +822,13 @@ static void rna_def_pointcache(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "File Path", "Cache file path");
 	RNA_def_property_update(prop, NC_OBJECT, "rna_Cache_idname_change");
 
+	/* removed, see PTCACHE_QUICK_CACHE */
+#if 0
 	prop = RNA_def_property(srna, "use_quick_cache", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", PTCACHE_QUICK_CACHE);
 	RNA_def_property_ui_text(prop, "Quick Cache", "Update simulation with cache steps");
 	RNA_def_property_update(prop, NC_OBJECT, "rna_Cache_change");
+#endif
 
 	prop = RNA_def_property(srna, "info", PROP_STRING, PROP_NONE);
 	RNA_def_property_string_sdna(prop, NULL, "info");

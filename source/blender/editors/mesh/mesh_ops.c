@@ -68,7 +68,7 @@ void ED_operatortypes_mesh(void)
 	WM_operatortype_append(MESH_OT_select_random);
 	WM_operatortype_append(MESH_OT_hide);
 	WM_operatortype_append(MESH_OT_reveal);
-	WM_operatortype_append(MESH_OT_select_by_number_vertices);
+	WM_operatortype_append(MESH_OT_select_face_by_sides);
 	WM_operatortype_append(MESH_OT_select_loose_verts);
 	WM_operatortype_append(MESH_OT_select_mirror);
 	WM_operatortype_append(MESH_OT_normals_make_consistent);
@@ -129,10 +129,12 @@ void ED_operatortypes_mesh(void)
 	WM_operatortype_append(MESH_OT_edge_face_add);
 	WM_operatortype_append(MESH_OT_select_shortest_path);
 	WM_operatortype_append(MESH_OT_select_similar);
+	WM_operatortype_append(MESH_OT_select_mode);
 	WM_operatortype_append(MESH_OT_loop_multi_select);
 	WM_operatortype_append(MESH_OT_mark_seam);
 	WM_operatortype_append(MESH_OT_mark_sharp);
 	WM_operatortype_append(MESH_OT_vertices_smooth);
+	WM_operatortype_append(MESH_OT_vertices_smooth_laplacian);
 	WM_operatortype_append(MESH_OT_noise);
 	WM_operatortype_append(MESH_OT_flip_normals);
 	WM_operatortype_append(MESH_OT_rip);
@@ -165,7 +167,9 @@ void ED_operatortypes_mesh(void)
 	WM_operatortype_append(MESH_OT_wireframe);
 	WM_operatortype_append(MESH_OT_edge_split);
 
+#ifdef WITH_BULLET
 	WM_operatortype_append(MESH_OT_convex_hull);
+#endif
 
 	WM_operatortype_append(MESH_OT_symmetrize);
 
@@ -274,13 +278,21 @@ void ED_keymap_mesh(wmKeyConfig *keyconf)
 	/* standard mouse selection goes via space_view3d */
 	kmi = WM_keymap_add_item(keymap, "MESH_OT_loop_select", SELECTMOUSE, KM_PRESS, KM_ALT, 0);
 	RNA_boolean_set(kmi->ptr, "extend", FALSE);
+	RNA_boolean_set(kmi->ptr, "deselect", FALSE);
+	RNA_boolean_set(kmi->ptr, "toggle", FALSE);
 	kmi = WM_keymap_add_item(keymap, "MESH_OT_loop_select", SELECTMOUSE, KM_PRESS, KM_SHIFT | KM_ALT, 0);
-	RNA_boolean_set(kmi->ptr, "extend", TRUE);
+	RNA_boolean_set(kmi->ptr, "extend", FALSE);
+	RNA_boolean_set(kmi->ptr, "deselect", FALSE);
+	RNA_boolean_set(kmi->ptr, "toggle", TRUE);
 
 	kmi = WM_keymap_add_item(keymap, "MESH_OT_edgering_select", SELECTMOUSE, KM_PRESS, KM_ALT | KM_CTRL, 0);
 	RNA_boolean_set(kmi->ptr, "extend", FALSE);
+	RNA_boolean_set(kmi->ptr, "deselect", FALSE);
+	RNA_boolean_set(kmi->ptr, "toggle", FALSE);
 	kmi = WM_keymap_add_item(keymap, "MESH_OT_edgering_select", SELECTMOUSE, KM_PRESS, KM_SHIFT | KM_ALT | KM_CTRL, 0);
-	RNA_boolean_set(kmi->ptr, "extend", TRUE);
+	RNA_boolean_set(kmi->ptr, "extend", FALSE);
+	RNA_boolean_set(kmi->ptr, "deselect", FALSE);
+	RNA_boolean_set(kmi->ptr, "toggle", TRUE);
 
 	WM_keymap_add_item(keymap, "MESH_OT_select_shortest_path", SELECTMOUSE, KM_PRESS, KM_CTRL, 0);
 

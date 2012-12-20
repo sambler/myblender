@@ -98,6 +98,10 @@ protected:
 	bool								m_bIsNegativeScaling;
 	MT_Vector4							m_objectColor;
 
+	// Bit fields for user control over physics collisions
+	short								m_userCollisionGroup;
+	short								m_userCollisionMask;
+
 	// visible = user setting
 	// culled = while rendering, depending on camera
 	bool       							m_bVisible; 
@@ -221,11 +225,11 @@ public:
 	GetInstanceObjects(
 	);
 
-		void	
+		void
 	SetDupliGroupObject(KX_GameObject*
 	);
 
-		void				
+		void
 	AddInstanceObjects(KX_GameObject*
 	);
 		
@@ -493,6 +497,13 @@ public:
 	 * @add/remove the graphic controller to the physic system
 	 */
 	void ActivateGraphicController(bool recurse);
+
+	void SetUserCollisionGroup(short filter);
+	void SetUserCollisionMask(short mask);
+	/**
+	* Extra broadphase check for user controllable collisions
+	*/
+	bool CheckCollision(KX_GameObject *other);
 
 	/**
 	 * \section Coordinate system manipulation functions
@@ -978,8 +989,8 @@ public:
 	static PyObject*	pyattr_get_name(void* self_v, const KX_PYATTRIBUTE_DEF *attrdef);
 	static PyObject*	pyattr_get_parent(void *self_v, const KX_PYATTRIBUTE_DEF *attrdef);
 
-	static PyObject*	pyattr_get_group_parent(void *self_v, const KX_PYATTRIBUTE_DEF *attrdef);
-	static PyObject*	pyattr_get_group_children(void *self_v, const KX_PYATTRIBUTE_DEF *attrdef);
+	static PyObject*	pyattr_get_group_object(void *self_v, const KX_PYATTRIBUTE_DEF *attrdef);
+	static PyObject*	pyattr_get_group_members(void *self_v, const KX_PYATTRIBUTE_DEF *attrdef);
 	static PyObject*	pyattr_get_scene(void* self_v, const KX_PYATTRIBUTE_DEF *attrdef);
 
 	static PyObject*	pyattr_get_life(void *self_v, const KX_PYATTRIBUTE_DEF *attrdef);

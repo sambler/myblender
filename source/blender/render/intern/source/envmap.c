@@ -76,7 +76,7 @@ static void envmap_split_ima(EnvMap *env, ImBuf *ibuf)
 	BLI_lock_thread(LOCK_IMAGE);
 	if (env->cube[1] == NULL) {
 
-		BKE_free_envmapdata(env);	
+		BKE_free_envmapdata(env);
 	
 		dx = ibuf->y;
 		dx /= 2;
@@ -120,7 +120,7 @@ static void envmap_split_ima(EnvMap *env, ImBuf *ibuf)
 				IMB_float_from_rect(env->cube[1]);
 			}
 		}
-	}	
+	}
 	BLI_unlock_thread(LOCK_IMAGE);
 }
 
@@ -148,7 +148,8 @@ static Render *envmap_render_copy(Render *re, EnvMap *env)
 	envre->r.mode &= ~(R_BORDER | R_PANORAMA | R_ORTHO | R_MBLUR);
 	envre->r.layers.first = envre->r.layers.last = NULL;
 	envre->r.filtertype = 0;
-	envre->r.xparts = envre->r.yparts = 2;
+	envre->r.tilex = envre->r.xsch / 2;
+	envre->r.tiley = envre->r.ysch / 2;
 	envre->r.size = 100;
 	envre->r.yasp = envre->r.xasp = 1;
 	
@@ -216,7 +217,7 @@ static void envmap_transmatrix(float mat[][4], int part)
 	eul[0] = eul[1] = eul[2] = 0.0;
 	
 	if (part == 0) {          /* neg z */
-		;
+		/* pass */
 	}
 	else if (part == 1) { /* pos z */
 		eul[0] = M_PI;
@@ -576,7 +577,7 @@ void make_envmaps(Render *re)
 		re->display_init(re->dih, re->result);
 		re->display_clear(re->dch, re->result);
 		// re->flag |= R_REDRAW_PRV;
-	}	
+	}
 	/* restore */
 	re->r.mode |= trace;
 
@@ -686,11 +687,12 @@ int envmaptex(Tex *tex, const float texvec[3], float dxt[3], float dyt[3], int o
 		env->ima = tex->ima;
 		if (env->ima && env->ima->ok) {
 			if (env->cube[1] == NULL) {
-				ImBuf *ibuf_ima = BKE_image_get_ibuf(env->ima, NULL);
+				ImBuf *ibuf_ima = BKE_image_acquire_ibuf(env->ima, NULL, NULL);
 				if (ibuf_ima)
 					envmap_split_ima(env, ibuf_ima);
 				else
 					env->ok = 0;
+				BKE_image_release_ibuf(env->ima, ibuf_ima, NULL);
 			}
 		}
 	}

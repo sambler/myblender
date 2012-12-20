@@ -62,6 +62,7 @@ struct BMEditMesh;
 struct BMEditSelection;
 struct BMesh;
 struct BMVert;
+struct BMLoop;
 struct MLoopCol;
 struct BMEdge;
 struct BMFace;
@@ -119,6 +120,7 @@ void EDBM_update_generic(struct bContext *C, struct BMEditMesh *em, const short 
 
 struct UvElementMap *EDBM_uv_element_map_create(struct BMEditMesh *em, int selected, int doIslands);
 void                 EDBM_uv_element_map_free(struct UvElementMap *vmap);
+struct UvElement *ED_uv_element_get(struct UvElementMap *map, struct BMFace *efa, struct BMLoop *l);
 
 int              EDBM_mtexpoly_check(struct BMEditMesh *em);
 struct MTexPoly *EDBM_mtexpoly_active_get(struct BMEditMesh *em, struct BMFace **r_act_efa, int sloppy, int selected);
@@ -151,6 +153,11 @@ int  EDBM_select_pick(struct bContext *C, const int mval[2], short extend, short
 
 void EDBM_selectmode_set(struct BMEditMesh *em);
 void EDBM_selectmode_convert(struct BMEditMesh *em, const short selectmode_old, const short selectmode_new);
+
+/* user access this */
+int EDBM_selectmode_toggle(struct bContext *C, const short selectmode_new,
+                           const int action, const int use_extend, const int use_expand);
+
 
 void EDBM_deselect_by_material(struct BMEditMesh *em, const short index, const short select);
 
@@ -249,7 +256,7 @@ void ED_mesh_update(struct Mesh *mesh, struct bContext *C, int calc_edges, int c
 int ED_mesh_uv_texture_add(struct bContext *C, struct Mesh *me, const char *name, int active_set);
 int ED_mesh_uv_texture_remove(struct bContext *C, struct Object *ob, struct Mesh *me);
 int ED_mesh_uv_loop_reset(struct bContext *C, struct Mesh *me);
-int ED_mesh_uv_loop_reset_ex(struct bContext *C, struct Mesh *me, const int layernum);
+int ED_mesh_uv_loop_reset_ex(struct Mesh *me, const int layernum);
 int ED_mesh_color_add(struct bContext *C, struct Scene *scene, struct Object *ob, struct Mesh *me, const char *name, int active_set);
 int ED_mesh_color_remove(struct bContext *C, struct Object *ob, struct Mesh *me);
 int ED_mesh_color_remove_named(struct bContext *C, struct Object *ob, struct Mesh *me, const char *name);

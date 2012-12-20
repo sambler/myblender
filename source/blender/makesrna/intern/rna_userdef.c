@@ -24,9 +24,9 @@
  *  \ingroup RNA
  */
 
-
 #include <stdlib.h>
 
+#include "RNA_access.h"
 #include "RNA_define.h"
 #include "RNA_enum_types.h"
 
@@ -311,9 +311,16 @@ static bAddon *rna_userdef_addon_new(void)
 	return bext;
 }
 
-static void rna_userdef_addon_remove(bAddon *bext)
+static void rna_userdef_addon_remove(ReportList *reports, PointerRNA *bext_ptr)
 {
+	bAddon *bext = bext_ptr->data;
+	if (BLI_findindex(&U.addons, bext) == -1) {
+		BKE_report(reports, RPT_ERROR, "Addon is no longer valid");
+		return;
+	}
+
 	BLI_freelinkN(&U.addons, bext);
+	RNA_POINTER_INVALIDATE(bext_ptr);
 }
 
 static void rna_userdef_temp_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *UNUSED(ptr))
@@ -388,7 +395,7 @@ static EnumPropertyItem *rna_userdef_compute_device_itemf(bContext *UNUSED(C), P
 		int a;
 
 		if (devices) {
-			for (a = 0; devices[a].name; a++) {
+			for (a = 0; devices[a].identifier[0]; a++) {
 				tmp.value = devices[a].value;
 				tmp.identifier = devices[a].identifier;
 				tmp.name = devices[a].name;
@@ -407,6 +414,15 @@ static EnumPropertyItem *rna_userdef_compute_device_itemf(bContext *UNUSED(C), P
 	*free = 1;
 
 	return item;
+}
+#endif
+
+#ifdef WITH_INTERNATIONAL
+static EnumPropertyItem *rna_lang_enum_properties_itemf(bContext *UNUSED(C), PointerRNA *UNUSED(ptr),
+                                                        PropertyRNA *UNUSED(prop), int *free)
+{
+	*free = 0; /* These items are handled by BLF code! */
+	return BLF_RNA_lang_enum_properties();
 }
 #endif
 
@@ -481,7 +497,7 @@ static void rna_def_userdef_theme_ui_style(BlenderRNA *brna)
 	
 	/* (not used yet) */
 #if 0
-	prop= RNA_def_property(srna, "panelzoom", PROP_FLOAT, PROP_NONE);
+	prop = RNA_def_property(srna, "panelzoom", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_range(prop, 0.5, 2.0);
 	RNA_def_property_ui_text(prop, "Panel Zoom", "Default zoom level for panel areas");
 #endif
@@ -753,6 +769,25 @@ static void rna_def_userdef_theme_ui(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "icon_alpha", PROP_FLOAT, PROP_FACTOR);
 	RNA_def_property_ui_text(prop, "Icon Alpha", "Transparency of icons in the interface, to reduce contrast");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+	
+	/* axis */
+	prop = RNA_def_property(srna, "axis_x", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_float_sdna(prop, NULL, "xaxis");
+	RNA_def_property_array(prop, 3);
+	RNA_def_property_ui_text(prop, "X Axis", "");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+	
+	prop = RNA_def_property(srna, "axis_y", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_float_sdna(prop, NULL, "yaxis");
+	RNA_def_property_array(prop, 3);
+	RNA_def_property_ui_text(prop, "Y Axis", "");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+	
+	prop = RNA_def_property(srna, "axis_z", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_float_sdna(prop, NULL, "zaxis");
+	RNA_def_property_array(prop, 3);
+	RNA_def_property_ui_text(prop, "Z Axis", "");
 	RNA_def_property_update(prop, 0, "rna_userdef_update");
 }
 
@@ -2749,7 +2784,7 @@ static void rna_def_userdef_edit(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "use_auto_keying_warning", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_negative_sdna(prop, NULL, "autokey_flag", AUTOKEY_FLAG_NOWARNING);
 	RNA_def_property_ui_text(prop, "Show Auto Keying Warning",
-	                         "Show warning indicators when transforming Object and Bones if Auto Keying is enabled");
+	                         "Show warning indicators when transforming objects and bones if auto keying is enabled");
 	
 	/* keyframing settings */
 	prop = RNA_def_property(srna, "use_keyframe_insert_needed", PROP_BOOLEAN, PROP_NONE);
@@ -2983,6 +3018,16 @@ static void rna_def_userdef_system(BlenderRNA *brna)
 		{0, NULL, 0, NULL, NULL}
 	};
 	
+	static EnumPropertyItem multi_sample_levels[] = {
+		{USER_MULTISAMPLE_NONE, "NONE", 0, "No MultiSample", "Do not use OpenGL MultiSample"},
+		{USER_MULTISAMPLE_2, "2", 0, "MultiSample: 2", "Use 2x OpenGL MultiSample (requires restart)"},
+		{USER_MULTISAMPLE_4, "4", 0, "MultiSample: 4", "Use 4x OpenGL MultiSample (requires restart)"},
+		{USER_MULTISAMPLE_8, "8", 0, "MultiSample: 8", "Use 8x OpenGL MultiSample (requires restart)"},
+		{USER_MULTISAMPLE_16, "16", 0, "MultiSample: 16", "Use 16x OpenGL MultiSample (requires restart)"},
+		{0, NULL, 0, NULL, NULL}
+	};
+	
+#if 0
 	/* hardcoded here, could become dynamic somehow */
 	/* locale according to http://www.roseindia.net/tutorials/I18N/locales-list.shtml */
 	/* if you edit here, please also edit the source/blender/blenfont/intern/blf_lang.c 's locales */
@@ -3005,33 +3050,39 @@ static void rna_def_userdef_system(BlenderRNA *brna)
 		{14, "TRADITIONAL_CHINESE", 0, "Traditional Chinese (繁體中文)", "zh_TW"},
 		{18, "UKRAINIAN", 0, "Ukrainian (Український)", "uk_UA"},
 		{ 0, "", 0, N_("In Progress"), ""},
-		{22, "BULGARIAN", 0, "Bulgarian (Български)", "bg_BG"},
-		{10, "CATALAN", 0, "Catalan (Català)", "ca_AD"},
+/*		{22, "BULGARIAN", 0, "Bulgarian (Български)", "bg_BG"},*/ /* XXX Not active nor enough translated. */
+/*		{10, "CATALAN", 0, "Catalan (Català)", "ca_AD"},*/ /* XXX Not active nor enough translated. */
 		{16, "CROATIAN", 0, "Croatian (Hrvatski)", "hr_HR"},
 		{11, "CZECH", 0, "Czech (Český)", "cs_CZ"},
 		{ 3, "DUTCH", 0, "Dutch (Nederlandse taal)", "nl_NL"},
 		{35, "ESPERANTO", 0, "Esperanto (Esperanto)", "eo"},
 		{34, "ESTONIAN", 0, "Estonian (Eestlane)", "et_EE"},
-		{ 6, "FINNISH", 0, "Finnish (Suomi)", "fi_FI"},
+/*		{ 6, "FINNISH", 0, "Finnish (Suomi)", "fi_FI"},*/ /* XXX Not active nor enough translated. */
 		{ 5, "GERMAN", 0, "German (Deutsch)", "de_DE"},
-		{23, "GREEK", 0, "Greek (Ελληνικά)", "el_GR"},
+/*		{23, "GREEK", 0, "Greek (Ελληνικά)", "el_GR"},*/ /* XXX Not active nor enough translated. */
 		/* using the utf8 flipped form of Hebrew (עִבְרִית)) */
 		{33, "HEBREW", 0, "Hebrew (תירִבְעִ)", "he_IL"},
 		{31, "HUNGARIAN", 0, "Hungarian (Magyar)", "hu_HU"},
 		{27, "INDONESIAN", 0, "Indonesian (Bahasa indonesia)", "id_ID"},
 		{29, "KYRGYZ", 0, "Kyrgyz (Кыргыз тили)", "ky_KG"},
-/*		{24, "KOREAN", 0, "Korean (한국 언어)", "ko_KR"}, */ /* XXX No po's yet. */
-		{25, "NEPALI", 0, "Nepali (नेपाली)", "ne_NP"},
+/*		{24, "KOREAN", 0, "Korean (한국 언어)", "ko_KR"}, */ /* XXX Not active nor enough translated. */
+/*		{25, "NEPALI", 0, "Nepali (नेपाली)", "ne_NP"},*/ /* XXX Not active nor enough translated. */
 		/* using the utf8 flipped form of Persian (فارسی) */
 		{26, "PERSIAN", 0, "Persian (ﯽﺳﺭﺎﻓ)", "fa_IR"},
-		{19, "POLISH", 0, "Polish (Polski)", "pl_PL"},
-/*		{20, "ROMANIAN", 0, "Romanian (Român)", "ro_RO"}, */ /* XXX No po's yet. */
+/*		{19, "POLISH", 0, "Polish (Polski)", "pl_PL"},*/ /* XXX Not active nor enough translated. */
+/*		{20, "ROMANIAN", 0, "Romanian (Român)", "ro_RO"}, */ /* XXX Not active nor enough translated. */
 		{17, "SERBIAN", 0, "Serbian (Српски)", "sr_RS"},
 		{28, "SERBIAN_LATIN", 0, "Serbian Latin (Srpski latinica)", "sr_RS@latin"},
 		{ 7, "SWEDISH", 0, "Swedish (Svenska)", "sv_SE"},
 		{30, "TURKISH", 0, "Turkish (Türkçe)", "tr_TR"},
 		{ 0, NULL, 0, NULL, NULL}
 	};
+#else
+	static EnumPropertyItem language_items[] = {
+		{ 0, "DEFAULT", 0, "Default (Default)", ""},
+		{ 0, NULL, 0, NULL, NULL}
+	};
+#endif
 
 #ifdef WITH_CYCLES
 	static EnumPropertyItem compute_device_items[] = {
@@ -3074,6 +3125,9 @@ static void rna_def_userdef_system(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "language", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_items(prop, language_items);
+#ifdef WITH_INTERNATIONAL
+	RNA_def_property_enum_funcs(prop, NULL, NULL, "rna_lang_enum_properties_itemf");
+#endif
 	RNA_def_property_ui_text(prop, "Language", "Language used for translation");
 	RNA_def_property_update(prop, NC_WINDOW, "rna_userdef_language_update");
 
@@ -3117,6 +3171,7 @@ static void rna_def_userdef_system(BlenderRNA *brna)
 	RNA_def_property_enum_items(prop, color_picker_types);
 	RNA_def_property_enum_sdna(prop, NULL, "color_picker_type");
 	RNA_def_property_ui_text(prop, "Color Picker Type", "Different styles of displaying the color picker widget");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
 	
 	prop = RNA_def_property(srna, "use_preview_images", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "uiflag", USER_ALLWINCODECS);
@@ -3181,10 +3236,12 @@ static void rna_def_userdef_system(BlenderRNA *brna)
 	/* this isn't essential but nice to check if VBO draws any differently */
 	RNA_def_property_update(prop, NC_WINDOW, NULL);
 
+#if 0
 	prop = RNA_def_property(srna, "use_antialiasing", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_negative_sdna(prop, NULL, "gameflags", USER_DISABLE_AA);
 	RNA_def_property_ui_text(prop, "Anti-aliasing",
 	                         "Use anti-aliasing for the 3D view (may impact redraw performance)");
+#endif
 
 	prop = RNA_def_property(srna, "anisotropic_filter", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "anisotropic_filter");
@@ -3266,6 +3323,12 @@ static void rna_def_userdef_system(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Text Anti-aliasing", "Draw user interface text anti-aliased");
 	RNA_def_property_update(prop, 0, "rna_userdef_text_update");
 	
+	/* Full scene anti-aliasing */
+	prop = RNA_def_property(srna, "multi_sample", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_bitflag_sdna(prop, NULL, "ogl_multisamples");
+	RNA_def_property_enum_items(prop, multi_sample_levels);
+	RNA_def_property_ui_text(prop, "MultiSample", "Enable OpenGL multi-sampling, only for systems that support it, requires restart");
+
 #ifdef WITH_CYCLES
 	prop = RNA_def_property(srna, "compute_device_type", PROP_ENUM, PROP_NONE);
 	RNA_def_property_flag(prop, PROP_ENUM_NO_CONTEXT);
@@ -3395,10 +3458,10 @@ static void rna_def_userdef_input(BlenderRNA *brna)
 	RNA_def_property_boolean_sdna(prop, NULL, "ndof_flag", NDOF_SHOW_GUIDE);
 	RNA_def_property_ui_text(prop, "Show Navigation Guide", "Display the center and axis during rotation");
 	/* TODO: update description when fly-mode visuals are in place  ("projected position in fly mode")*/
-
+	
 	/* 3D view */
 	prop = RNA_def_property(srna, "ndof_view_rotate_method", PROP_ENUM, PROP_NONE);
-	RNA_def_property_enum_bitflag_sdna(prop, NULL, "flag");
+	RNA_def_property_enum_bitflag_sdna(prop, NULL, "ndof_flag");
 	RNA_def_property_enum_items(prop, ndof_view_rotation_items);
 	RNA_def_property_ui_text(prop, "NDOF View Rotation", "Rotation style in the viewport");
 
@@ -3510,6 +3573,10 @@ static void rna_def_userdef_filepaths(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "hide_recent_locations", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "uiflag", USER_HIDE_RECENT);
 	RNA_def_property_ui_text(prop, "Hide Recent Locations", "Hide recent locations in the file selector");
+
+	prop = RNA_def_property(srna, "hide_system_bookmarks", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "uiflag", USER_HIDE_SYSTEM_BOOKMARKS);
+	RNA_def_property_ui_text(prop, "Hide System Bookmarks", "Hide system bookmarks in the file selector");
 
 	prop = RNA_def_property(srna, "show_thumbnails", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "uiflag", USER_SHOW_THUMBNAILS);
@@ -3626,10 +3693,11 @@ static void rna_def_userdef_addon_collection(BlenderRNA *brna, PropertyRNA *cpro
 	RNA_def_function_return(func, parm);
 
 	func = RNA_def_function(srna, "remove", "rna_userdef_addon_remove");
-	RNA_def_function_flag(func, FUNC_NO_SELF);
+	RNA_def_function_flag(func, FUNC_NO_SELF | FUNC_USE_REPORTS);
 	RNA_def_function_ui_description(func, "Remove addon");
 	parm = RNA_def_pointer(func, "addon", "Addon", "", "Addon to remove");
-	RNA_def_property_flag(parm, PROP_REQUIRED | PROP_NEVER_NULL);
+	RNA_def_property_flag(parm, PROP_REQUIRED | PROP_NEVER_NULL | PROP_RNAPTR);
+	RNA_def_property_clear_flag(parm, PROP_THICK_WRAP);
 }
 
 void RNA_def_userdef(BlenderRNA *brna)

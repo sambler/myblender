@@ -646,7 +646,7 @@ MTex *add_mtex_id(ID *id, int slot)
 	
 	if (slot == -1) {
 		/* find first free */
-		int i;		
+		int i;
 		for (i = 0; i < MAX_MTEX; i++) {
 			if (!mtex_ar[i]) {
 				slot = i;
@@ -909,8 +909,7 @@ void autotexname(Tex *tex)
 		if (tex->use_nodes) {
 			new_id(&bmain->tex, (ID *)tex, "Noddy");
 		}
-		else
-		if (tex->type == TEX_IMAGE) {
+		else if (tex->type == TEX_IMAGE) {
 			ima = tex->ima;
 			if (ima) {
 				BLI_strncpy(di, ima->name, sizeof(di));

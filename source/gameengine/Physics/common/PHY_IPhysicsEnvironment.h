@@ -40,6 +40,7 @@
 #endif
 
 class PHY_IVehicle;
+class PHY_ICharacter;
 class RAS_MeshObject;
 class PHY_IPhysicsController;
 
@@ -142,6 +143,7 @@ class PHY_IPhysicsEnvironment
 		virtual void		setUseEpa(bool epa) {}
 
 		virtual	void		setGravity(float x,float y,float z)=0;
+		virtual	void		getGravity(PHY__Vector3& grav) = 0;
 
 		virtual int			createConstraint(class PHY_IPhysicsController* ctrl,class PHY_IPhysicsController* ctrl2,PHY_ConstraintType type,
 			float pivotX,float pivotY,float pivotZ,
@@ -155,6 +157,9 @@ class PHY_IPhysicsEnvironment
 
 		//complex constraint for vehicles
 		virtual PHY_IVehicle*	getVehicleConstraint(int constraintId) =0;
+
+		// Character physics wrapper
+		virtual PHY_ICharacter*	getCharacterController(class KX_GameObject* ob) =0;
 
 		virtual PHY_IPhysicsController* rayTest(PHY_IRayCastFilterCallback &filterCallback, float fromX,float fromY,float fromZ, float toX,float toY,float toZ)=0;
 

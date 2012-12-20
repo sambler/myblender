@@ -96,6 +96,7 @@ int ED_view3d_camera_lock_check(View3D *v3d, RegionView3D *rv3d)
 void ED_view3d_camera_lock_init(View3D *v3d, RegionView3D *rv3d)
 {
 	if (ED_view3d_camera_lock_check(v3d, rv3d)) {
+		rv3d->dist = ED_view3d_offset_distance(v3d->camera->obmat, rv3d->ofs);
 		ED_view3d_from_object(v3d->camera, rv3d->ofs, rv3d->viewquat, &rv3d->dist, NULL);
 	}
 }
@@ -894,6 +895,7 @@ static int viewrotate_invoke(bContext *C, wmOperator *op, wmEvent *event)
 
 			/* changed since 2.4x, use the camera view */
 			if (vod->v3d->camera) {
+				rv3d->dist = ED_view3d_offset_distance(vod->v3d->camera->obmat, rv3d->ofs);
 				ED_view3d_from_object(vod->v3d->camera, rv3d->ofs, rv3d->viewquat, &rv3d->dist, NULL);
 			}
 
@@ -921,7 +923,7 @@ static int viewrotate_invoke(bContext *C, wmOperator *op, wmEvent *event)
 		
 		return OPERATOR_FINISHED;
 	}
-	else {		
+	else {
 		/* add temp handler */
 		WM_event_add_modal_handler(C, op);
 
@@ -990,8 +992,10 @@ void ndof_to_quat(struct wmNDOFMotionData *ndof, float q[4])
  * -- zooming
  * -- panning in rotationally-locked views
  */
-static int ndof_orbit_invoke(bContext *C, wmOperator *UNUSED(op), wmEvent *event)
+static int ndof_orbit_invoke(bContext *C, wmOperator *op, wmEvent *event)
 {
+	ViewOpsData *vod = op->customdata;
+	
 	if (event->type != NDOF_MOTION)
 		return OPERATOR_CANCELLED;
 	else {
@@ -1072,6 +1076,7 @@ static int ndof_orbit_invoke(bContext *C, wmOperator *UNUSED(op), wmEvent *event
 					rot[1] = rot[2] = 0.0;
 					rot[3] = sin(angle);
 					mul_qt_qtqt(rv3d->viewquat, rv3d->viewquat, rot);
+					
 				}
 				else {
 					float rot[4];
@@ -1086,6 +1091,7 @@ static int ndof_orbit_invoke(bContext *C, wmOperator *UNUSED(op), wmEvent *event
 
 					if (U.ndof_flag & NDOF_ROTATE_INVERT_AXIS)
 						axis[1] = -axis[1];
+					
 
 					/* transform rotation axis from view to world coordinates */
 					mul_qt_v3(view_inv, axis);
@@ -1098,7 +1104,22 @@ static int ndof_orbit_invoke(bContext *C, wmOperator *UNUSED(op), wmEvent *event
 
 					/* apply rotation */
 					mul_qt_qtqt(rv3d->viewquat, rv3d->viewquat, rot);
-
+					
+				}
+				
+				/* rotate around custom center */
+				if (vod && vod->use_dyn_ofs) {
+					float q1[4];
+					
+					/* compute the post multiplication quat, to rotate the offset correctly */
+					conjugate_qt_qt(q1, vod->oldquat);
+					mul_qt_qtqt(q1, q1, rv3d->viewquat);
+					
+					conjugate_qt(q1); /* conj == inv for unit quat */
+					copy_v3_v3(rv3d->ofs, vod->ofs);
+					sub_v3_v3(rv3d->ofs, vod->dyn_ofs);
+					mul_qt_v3(q1, rv3d->ofs);
+					add_v3_v3(rv3d->ofs, vod->dyn_ofs);
 				}
 			}
 		}
@@ -1265,6 +1286,9 @@ static int ndof_all_invoke(bContext *C, wmOperator *op, wmEvent *event)
 			float axis[3];
 #endif
 
+			/* inverse view */
+			invert_qt_qt(view_inv, rv3d->viewquat);
+			
 			if (U.ndof_flag & NDOF_PANX_INVERT_AXIS)
 				pan_vec[0] = -lateral_sensitivity * ndof->tvec[0];
 			else
@@ -1283,12 +1307,11 @@ static int ndof_all_invoke(bContext *C, wmOperator *op, wmEvent *event)
 			mul_v3_fl(pan_vec, speed * dt);
 
 			/* transform motion from view to world coordinates */
-			invert_qt_qt(view_inv, rv3d->viewquat);
 			mul_qt_v3(view_inv, pan_vec);
 
 			/* move center of view opposite of hand motion (this is camera mode, not object mode) */
 			sub_v3_v3(rv3d->ofs, pan_vec);
-
+			
 			if (U.ndof_flag & NDOF_TURNTABLE) {
 				/* turntable view code by John Aughey, adapted for 3D mouse by [mce] */
 				float angle, rot[4];
@@ -1348,13 +1371,29 @@ static int ndof_all_invoke(bContext *C, wmOperator *op, wmEvent *event)
 
 				/* apply rotation */
 				mul_qt_qtqt(rv3d->viewquat, rv3d->viewquat, rot);
-
+				
 			}
+			
+			/* rotate around custom center */
+			if (vod && vod->use_dyn_ofs) {
+				float q1[4];
+				
+				/* compute the post multiplication quat, to rotate the offset correctly */
+				conjugate_qt_qt(q1, vod->oldquat);
+				mul_qt_qtqt(q1, q1, rv3d->viewquat);
+				
+				conjugate_qt(q1); /* conj == inv for unit quat */
+				copy_v3_v3(rv3d->ofs, vod->ofs);
+				sub_v3_v3(rv3d->ofs, vod->dyn_ofs);
+				mul_qt_v3(q1, rv3d->ofs);
+				add_v3_v3(rv3d->ofs, vod->dyn_ofs);
+			}
+
 		}
 		ED_view3d_camera_lock_sync(v3d, rv3d);
 
 		ED_region_tag_redraw(CTX_wm_region(C));
-		viewops_data_free(C, op);	
+		viewops_data_free(C, op);
 		return OPERATOR_FINISHED;
 	}
 }
@@ -1501,7 +1540,7 @@ static int viewmove_invoke(bContext *C, wmOperator *op, wmEvent *event)
 		viewmove_apply(vod, event->prevx, event->prevy);
 		ED_view3d_depth_tag_update(vod->rv3d);
 		
-		viewops_data_free(C, op);		
+		viewops_data_free(C, op);
 		
 		return OPERATOR_FINISHED;
 	}
@@ -1614,7 +1653,7 @@ static void view_zoom_mouseloc(ARegion *ar, float dfac, int mx, int my)
 }
 
 
-static void viewzoom_apply(ViewOpsData *vod, int x, int y, const short viewzoom, const short zoom_invert)
+static void viewzoom_apply(ViewOpsData *vod, const int x, const int y, const short viewzoom, const short zoom_invert)
 {
 	float zfac = 1.0;
 	short use_cam_zoom;
@@ -1635,10 +1674,10 @@ static void viewzoom_apply(ViewOpsData *vod, int x, int y, const short viewzoom,
 		float fac;
 
 		if (U.uiflag & USER_ZOOM_HORIZ) {
-			fac = (float)(x - vod->origx);
+			fac = (float)(vod->origx - x);
 		}
 		else {
-			fac = (float)(y - vod->origy);
+			fac = (float)(vod->origy - y);
 		}
 
 		if (zoom_invert) {
@@ -2039,7 +2078,7 @@ static int viewdolly_exec(bContext *C, wmOperator *op)
 		normalize_v3(mousevec);
 	}
 
-	/* v3d= sa->spacedata.first; */ /* UNUSED */
+	/* v3d = sa->spacedata.first; */ /* UNUSED */
 	rv3d = ar->regiondata;
 
 	/* overwrite the mouse vector with the view direction (zoom into the center) */
@@ -2185,10 +2224,24 @@ static void view3d_from_minmax(bContext *C, View3D *v3d, ARegion *ar,
 		/* fix up zoom distance if needed */
 
 		if (rv3d->is_persp) {
-			if (size <= v3d->near * 1.5f) {
-				/* do not zoom closer than the near clipping plane */
-				size = v3d->near * 1.5f;
+			float lens, sensor_size;
+			/* offset the view based on the lens */
+			if (rv3d->persp == RV3D_CAMOB && ED_view3d_camera_lock_check(v3d, rv3d)) {
+				CameraParams params;
+				BKE_camera_params_init(&params);
+				BKE_camera_params_from_object(&params, v3d->camera);
+
+				lens = params.lens;
+				sensor_size = BKE_camera_sensor_size(params.sensor_fit, params.sensor_x, params.sensor_y);
 			}
+			else {
+				lens = v3d->lens;
+				sensor_size = DEFAULT_SENSOR_WIDTH;
+			}
+			size = ED_view3d_radius_to_persp_dist(focallength_to_fov(lens, sensor_size), size / 2.0f) * VIEW3D_MARGIN;
+
+			/* do not zoom closer than the near clipping plane */
+			size = max_ff(size, v3d->near * 1.5f);
 		}
 		else { /* ortho */
 			if (size < 0.0001f) {
@@ -2197,13 +2250,13 @@ static void view3d_from_minmax(bContext *C, View3D *v3d, ARegion *ar,
 			}
 			else {
 				/* adjust zoom so it looks nicer */
-				size *= 0.7f;
+				size = ED_view3d_radius_to_ortho_dist(v3d->lens, size / 2.0f) * VIEW3D_MARGIN;
 			}
 		}
 	}
 
-	add_v3_v3v3(new_ofs, min, max);
-	mul_v3_fl(new_ofs, -0.5f);
+	mid_v3_v3v3(new_ofs, min, max);
+	negate_v3(new_ofs);
 
 	new_dist = size;
 
@@ -2591,7 +2644,7 @@ static int view3d_center_camera_exec(bContext *C, wmOperator *UNUSED(op)) /* was
 	xfac = (float)ar->winx / (float)(size[0] + 4);
 	yfac = (float)ar->winy / (float)(size[1] + 4);
 
-	rv3d->camzoom = BKE_screen_view3d_zoom_from_fac(minf(xfac, yfac));
+	rv3d->camzoom = BKE_screen_view3d_zoom_from_fac(min_ff(xfac, yfac));
 	CLAMP(rv3d->camzoom, RV3D_CAMZOOM_MIN, RV3D_CAMZOOM_MAX);
 
 	WM_event_add_notifier(C, NC_SPACE | ND_SPACE_VIEW3D, CTX_wm_view3d(C));
@@ -2695,7 +2748,7 @@ void VIEW3D_OT_render_border(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name = "Set Render Border";
-	ot->description = "Set the boundaries of the border render and enables border render";
+	ot->description = "Set the boundaries of the border render and enable border render";
 	ot->idname = "VIEW3D_OT_render_border";
 
 	/* api callbacks */
@@ -2715,7 +2768,7 @@ void VIEW3D_OT_render_border(wmOperatorType *ot)
 	RNA_def_boolean(ot->srna, "camera_only", 0, "Camera Only", "Set render border for camera view and final render only");
 }
 
-/* ********************* Set render border operator ****************** */
+/* ********************* Clear render border operator ****************** */
 
 static int clear_render_border_exec(bContext *C, wmOperator *UNUSED(op))
 {
@@ -2751,7 +2804,7 @@ void VIEW3D_OT_clear_render_border(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name = "Clear Render Border";
-	ot->description = "Clear the boundaries of the border render and enables border render";
+	ot->description = "Clear the boundaries of the border render and disable border render";
 	ot->idname = "VIEW3D_OT_clear_render_border";
 
 	/* api callbacks */
@@ -2879,7 +2932,7 @@ static int view3d_zoom_border_exec(bContext *C, wmOperator *op)
 		/* work out the ratios, so that everything selected fits when we zoom */
 		xscale = (BLI_rcti_size_x(&rect) / vb[0]);
 		yscale = (BLI_rcti_size_y(&rect) / vb[1]);
-		new_dist *= maxf(xscale, yscale);
+		new_dist *= max_ff(xscale, yscale);
 
 		/* zoom in as required, or as far as we can go */
 		dist_range_min = 0.001f * v3d->grid;
@@ -3922,6 +3975,18 @@ int ED_view3d_autodist_depth_seg(ARegion *ar, const int mval_sta[2], const int m
 	*depth = data.depth;
 
 	return (*depth == FLT_MAX) ? 0 : 1;
+}
+
+float ED_view3d_offset_distance(float mat[4][4], float ofs[3]) {
+	float pos[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+	float dir[4] = {0.0f, 0.0f, 1.0f, 0.0f};
+
+	mul_m4_v4(mat, pos);
+	add_v3_v3(pos, ofs);
+	mul_m4_v4(mat, dir);
+	normalize_v3(dir);
+
+	return dot_v3v3(pos, dir);
 }
 
 /**

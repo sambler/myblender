@@ -821,6 +821,14 @@ static int ffmpeg_decode_video_frame(struct anim *anim)
 	}
 	
 	if (rval == AVERROR_EOF) {
+		/* this sets size and data fields to zero,
+		   which is necessary to decode the remaining data
+		   in the decoder engine after EOF. It also prevents a memory
+		   leak, since av_read_frame spills out a full size packet even
+		   on EOF... (and: it's save to call on NULL packets) */
+
+		av_free_packet(&anim->next_packet);
+
 		anim->next_packet.size = 0;
 		anim->next_packet.data = 0;
 
@@ -1233,7 +1241,7 @@ static ImBuf *anim_getnew(struct anim *anim)
 
 
 	if (anim->curtype != 0) return (NULL);
-	anim->curtype = imb_get_anim_type(anim->name);	
+	anim->curtype = imb_get_anim_type(anim->name);
 
 	switch (anim->curtype) {
 		case ANIM_SEQUENCE:

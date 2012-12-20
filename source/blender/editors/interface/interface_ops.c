@@ -807,7 +807,7 @@ static int editsource_text_edit(bContext *C, wmOperator *op,
 	}
 
 	if (text == NULL) {
-		BKE_reportf(op->reports, RPT_WARNING, "File: '%s' can't be opened", filepath);
+		BKE_reportf(op->reports, RPT_WARNING, "File '%s' cannot be opened", filepath);
 		return OPERATOR_CANCELLED;
 	}
 	else {
@@ -870,12 +870,12 @@ static int editsource_exec(bContext *C, wmOperator *op)
 				                           but_store->py_dbg_ln);
 			}
 			else {
-				BKE_report(op->reports, RPT_ERROR, "Active button isn't from a script, cant edit source");
+				BKE_report(op->reports, RPT_ERROR, "Active button is not from a script, cannot edit source");
 				ret = OPERATOR_CANCELLED;
 			}
 		}
 		else {
-			BKE_report(op->reports, RPT_ERROR, "Active button match can't be found");
+			BKE_report(op->reports, RPT_ERROR, "Active button match cannot be found");
 			ret = OPERATOR_CANCELLED;
 		}
 
@@ -960,7 +960,6 @@ static int edittranslation_exec(bContext *C, wmOperator *op)
 		const char *root = U.i18ndir;
 		const char *uilng = BLF_lang_get();
 
-		const int bufs_nbr = 10;
 		uiStringInfo but_label = {BUT_GET_LABEL, NULL};
 		uiStringInfo rna_label = {BUT_GET_RNA_LABEL, NULL};
 		uiStringInfo enum_label = {BUT_GET_RNAENUM_LABEL, NULL};
@@ -973,12 +972,12 @@ static int edittranslation_exec(bContext *C, wmOperator *op)
 		uiStringInfo rna_ctxt = {BUT_GET_RNA_LABEL_CONTEXT, NULL};
 
 		if (!BLI_is_dir(root)) {
-			BKE_report(op->reports, RPT_ERROR, "Please set your User Preferences' \"Translation Branches "
-			                                   "Directory\" path to a valid directory");
+			BKE_report(op->reports, RPT_ERROR, "Please set your User Preferences' 'Translation Branches "
+			                                   "Directory' path to a valid directory");
 			return OPERATOR_CANCELLED;
 		}
 		if (!WM_operatortype_find(EDTSRC_I18N_OP_NAME, 0)) {
-			BKE_reportf(op->reports, RPT_ERROR, "Could not find operator \"%s\"! Please enable ui_translate addon "
+			BKE_reportf(op->reports, RPT_ERROR, "Could not find operator '%s'! Please enable ui_translate addon "
 			                                    "in the User Preferences", EDTSRC_I18N_OP_NAME);
 			return OPERATOR_CANCELLED;
 		}
@@ -990,8 +989,8 @@ static int edittranslation_exec(bContext *C, wmOperator *op)
 			return OPERATOR_CANCELLED;
 		}
 
-		uiButGetStrInfo(C, but, bufs_nbr, &but_label, &rna_label, &enum_label, &but_tip, &rna_tip, &enum_tip,
-		                &rna_struct, &rna_prop, &rna_enum, &rna_ctxt);
+		uiButGetStrInfo(C, but, &but_label, &rna_label, &enum_label, &but_tip, &rna_tip, &enum_tip,
+		                &rna_struct, &rna_prop, &rna_enum, &rna_ctxt, NULL);
 
 		WM_operator_properties_create(&ptr, EDTSRC_I18N_OP_NAME);
 		RNA_string_set(&ptr, "lang", uilng);

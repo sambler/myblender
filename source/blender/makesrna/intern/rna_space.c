@@ -598,7 +598,7 @@ static EnumPropertyItem *rna_SpaceImageEditor_draw_channels_itemf(bContext *UNUS
 	alpha = ibuf && (ibuf->channels == 4);
 	zbuf = ibuf && (ibuf->zbuf || ibuf->zbuf_float || (ibuf->channels == 1));
 
-	ED_space_image_release_buffer(sima, lock);
+	ED_space_image_release_buffer(sima, ibuf, lock);
 
 	if (alpha && zbuf)
 		return draw_channels_items;
@@ -678,7 +678,7 @@ static void rna_SpaceImageEditor_scopes_update(Main *UNUSED(bmain), Scene *scene
 		scopes_update(&sima->scopes, ibuf, &scene->view_settings, &scene->display_settings);
 		WM_main_add_notifier(NC_IMAGE, sima->image);
 	}
-	ED_space_image_release_buffer(sima, lock);
+	ED_space_image_release_buffer(sima, ibuf, lock);
 }
 
 /* Space Text Editor */
@@ -958,15 +958,17 @@ static BGpic *rna_BackgroundImage_new(View3D *v3d)
 	return bgpic;
 }
 
-static void rna_BackgroundImage_remove(View3D *v3d, ReportList *reports, BGpic *bgpic)
+static void rna_BackgroundImage_remove(View3D *v3d, ReportList *reports, PointerRNA *bgpic_ptr)
 {
+	BGpic *bgpic = bgpic_ptr->data;
 	if (BLI_findindex(&v3d->bgpicbase, bgpic) == -1) {
-		BKE_report(reports, RPT_ERROR, "BackgroundImage can't be removed");
+		BKE_report(reports, RPT_ERROR, "Background image cannot be removed");
 	}
-	else {
-		ED_view3D_background_image_remove(v3d, bgpic);
-		WM_main_add_notifier(NC_SPACE | ND_SPACE_VIEW3D, v3d);
-	}
+
+	ED_view3D_background_image_remove(v3d, bgpic);
+	RNA_POINTER_INVALIDATE(bgpic_ptr);
+
+	WM_main_add_notifier(NC_SPACE | ND_SPACE_VIEW3D, v3d);
 }
 
 static void rna_BackgroundImage_clear(View3D *v3d)
@@ -1451,7 +1453,8 @@ static void rna_def_backgroundImages(BlenderRNA *brna, PropertyRNA *cprop)
 	RNA_def_function_ui_description(func, "Remove background image");
 	RNA_def_function_flag(func, FUNC_USE_REPORTS);
 	parm = RNA_def_pointer(func, "image", "BackgroundImage", "", "Image displayed as viewport background");
-	RNA_def_property_flag(parm, PROP_REQUIRED | PROP_NEVER_NULL);
+	RNA_def_property_flag(parm, PROP_REQUIRED | PROP_NEVER_NULL | PROP_RNAPTR);
+	RNA_def_property_clear_flag(parm, PROP_THICK_WRAP);
 
 	func = RNA_def_function(srna, "clear", "rna_BackgroundImage_clear");
 	RNA_def_function_ui_description(func, "Remove all background images");
@@ -1509,7 +1512,7 @@ static void rna_def_space_view3d(BlenderRNA *brna)
 	RNA_def_property_boolean_sdna(prop, NULL, "flag2", V3D_RENDER_BORDER);
 	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 	RNA_def_property_ui_text(prop, "Render Border",
-	                         "use a user-defined border region within the frame size for rendered viewport");
+	                         "Use a user-defined border region within the frame size for rendered viewport");
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
 
 	prop = RNA_def_property(srna, "render_border_min_x", PROP_FLOAT, PROP_NONE);
@@ -1574,7 +1577,7 @@ static void rna_def_space_view3d(BlenderRNA *brna)
 	
 	prop = RNA_def_property(srna, "lens", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "lens");
-	RNA_def_property_ui_text(prop, "Lens", "Lens angle (mm) in perspective view");
+	RNA_def_property_ui_text(prop, "Lens", "Viewport lens angle (mm)");
 	RNA_def_property_range(prop, 1.0f, 250.0f);
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
 	
@@ -2826,6 +2829,12 @@ static void rna_def_fileselect_params(BlenderRNA *brna)
 	RNA_def_property_ui_icon(prop, ICON_FILE_BLEND, 0);
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_FILE_PARAMS, NULL);
 
+	prop = RNA_def_property(srna, "use_filter_backup", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "filter", BLENDERFILE_BACKUP);
+	RNA_def_property_ui_text(prop, "Filter BlenderBackup files", "Show .blend1, .blend2, etc. files");
+	RNA_def_property_ui_icon(prop, ICON_FILE_BACKUP, 0);
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_FILE_PARAMS, NULL);
+
 	prop = RNA_def_property(srna, "use_filter_movie", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "filter", MOVIEFILE);
 	RNA_def_property_ui_text(prop, "Filter Movies", "Show movie files");
@@ -2967,10 +2976,9 @@ static void rna_def_space_node(BlenderRNA *brna)
 		{SNODE_USE_ALPHA, "COLOR_ALPHA", ICON_IMAGE_RGB_ALPHA, "Color and Alpha",
 		                  "Draw image with RGB colors and alpha transparency"},
 		{SNODE_SHOW_ALPHA, "ALPHA", ICON_IMAGE_ALPHA, "Alpha", "Draw alpha transparency channel"},
-		                        /* XXX, we could use better icons here  */
-		{SNODE_SHOW_R, "RED",   ICON_COLOR, "Red", ""},
-		{SNODE_SHOW_G, "GREEN", ICON_COLOR, "Green", ""},
-		{SNODE_SHOW_B, "BLUE",  ICON_COLOR, "Blue", ""},
+		{SNODE_SHOW_R, "RED",   ICON_COLOR_RED, "Red", ""},
+		{SNODE_SHOW_G, "GREEN", ICON_COLOR_GREEN, "Green", ""},
+		{SNODE_SHOW_B, "BLUE",  ICON_COLOR_BLUE, "Blue", ""},
 		{0, NULL, 0, NULL, NULL}
 	};
 

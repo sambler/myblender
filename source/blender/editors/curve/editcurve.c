@@ -162,9 +162,9 @@ static short select_beztriple(BezTriple *bezt, short selstatus, short flag, shor
 				bezt->f1 |= flag;
 				bezt->f2 |= flag;
 				bezt->f3 |= flag;
-				return 1;			
+				return 1;
 			}
-			else { /* deselects */	
+			else { /* deselects */
 				bezt->f1 &= ~flag; 
 				bezt->f2 &= ~flag; 
 				bezt->f3 &= ~flag; 
@@ -1069,7 +1069,7 @@ static void curve_rename_fcurves(Curve *cu, ListBase *orig_curves)
 	Nurb *nu = editnurb->nurbs.first;
 	CVKeyIndex *keyIndex;
 	char rna_path[64], orig_rna_path[64];
-	AnimData *ad = BKE_animdata_from_id(&cu->id);
+	AnimData *adt = BKE_animdata_from_id(&cu->id);
 	ListBase curves = {NULL, NULL};
 	FCurve *fcu, *next;
 
@@ -1089,14 +1089,14 @@ static void curve_rename_fcurves(Curve *cu, ListBase *orig_curves)
 						char handle_path[64], orig_handle_path[64];
 						BLI_snprintf(orig_handle_path, sizeof(orig_rna_path), "%s.handle_left", orig_rna_path);
 						BLI_snprintf(handle_path, sizeof(rna_path), "%s.handle_right", rna_path);
-						fcurve_path_rename(ad, orig_handle_path, handle_path, orig_curves, &curves);
+						fcurve_path_rename(adt, orig_handle_path, handle_path, orig_curves, &curves);
 
 						BLI_snprintf(orig_handle_path, sizeof(orig_rna_path), "%s.handle_right", orig_rna_path);
 						BLI_snprintf(handle_path, sizeof(rna_path), "%s.handle_left", rna_path);
-						fcurve_path_rename(ad, orig_handle_path, handle_path, orig_curves, &curves);
+						fcurve_path_rename(adt, orig_handle_path, handle_path, orig_curves, &curves);
 					}
 
-					fcurve_path_rename(ad, orig_rna_path, rna_path, orig_curves, &curves);
+					fcurve_path_rename(adt, orig_rna_path, rna_path, orig_curves, &curves);
 
 					keyIndex->nu_index = nu_index;
 					keyIndex->pt_index = pt_index;
@@ -1116,7 +1116,7 @@ static void curve_rename_fcurves(Curve *cu, ListBase *orig_curves)
 				if (keyIndex) {
 					BLI_snprintf(rna_path, sizeof(rna_path), "splines[%d].points[%d]", nu_index, pt_index);
 					BLI_snprintf(orig_rna_path, sizeof(orig_rna_path), "splines[%d].points[%d]", keyIndex->nu_index, keyIndex->pt_index);
-					fcurve_path_rename(ad, orig_rna_path, rna_path, orig_curves, &curves);
+					fcurve_path_rename(adt, orig_rna_path, rna_path, orig_curves, &curves);
 
 					keyIndex->nu_index = nu_index;
 					keyIndex->pt_index = pt_index;
@@ -1140,7 +1140,7 @@ static void curve_rename_fcurves(Curve *cu, ListBase *orig_curves)
 			char *ch = strchr(fcu->rna_path, '.');
 
 			if (ch && (!strncmp(ch, ".bezier_points", 14) || !strncmp(ch, ".points", 7)))
-				fcurve_remove(ad, orig_curves, fcu);
+				fcurve_remove(adt, orig_curves, fcu);
 		}
 	}
 
@@ -1156,7 +1156,7 @@ static void curve_rename_fcurves(Curve *cu, ListBase *orig_curves)
 		if (keyIndex) {
 			BLI_snprintf(rna_path, sizeof(rna_path), "splines[%d]", nu_index);
 			BLI_snprintf(orig_rna_path, sizeof(orig_rna_path), "splines[%d]", keyIndex->nu_index);
-			fcurve_path_rename(ad, orig_rna_path, rna_path, orig_curves, &curves);
+			fcurve_path_rename(adt, orig_rna_path, rna_path, orig_curves, &curves);
 		}
 
 		nu_index++;
@@ -1168,7 +1168,7 @@ static void curve_rename_fcurves(Curve *cu, ListBase *orig_curves)
 	for (fcu = orig_curves->first; fcu; fcu = next) {
 		next = fcu->next;
 
-		if (!strncmp(fcu->rna_path, "splines", 7)) fcurve_remove(ad, orig_curves, fcu);
+		if (!strncmp(fcu->rna_path, "splines", 7)) fcurve_remove(adt, orig_curves, fcu);
 		else BLI_addtail(&curves, fcu);
 	}
 
@@ -1178,14 +1178,14 @@ static void curve_rename_fcurves(Curve *cu, ListBase *orig_curves)
 /* return 0 if animation data wasn't changed, 1 otherwise */
 int ED_curve_updateAnimPaths(Curve *cu)
 {
-	AnimData *ad = BKE_animdata_from_id(&cu->id);
+	AnimData *adt = BKE_animdata_from_id(&cu->id);
 
 	if (!curve_is_animated(cu)) return 0;
 
-	if (ad->action)
-		curve_rename_fcurves(cu, &ad->action->curves);
+	if (adt->action)
+		curve_rename_fcurves(cu, &adt->action->curves);
 
-	curve_rename_fcurves(cu, &ad->drivers);
+	curve_rename_fcurves(cu, &adt->drivers);
 
 	return 1;
 }
@@ -1361,7 +1361,7 @@ static int separate_exec(bContext *C, wmOperator *op)
 	oldedit = oldcu->editnurb;
 
 	if (oldcu->key) {
-		BKE_report(op->reports, RPT_ERROR, "Can't separate a curve with vertex keys");
+		BKE_report(op->reports, RPT_ERROR, "Cannot separate a curve with vertex keys");
 		return OPERATOR_CANCELLED;
 	}
 
@@ -2063,7 +2063,7 @@ static int set_goal_weight_exec(bContext *C, wmOperator *op)
 					bp->weight = weight;
 			}
 		}
-	}	
+	}
 
 	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM | ND_DATA, obedit->data);
@@ -2115,7 +2115,7 @@ static int set_radius_exec(bContext *C, wmOperator *op)
 					bp->radius = radius;
 			}
 		}
-	}	
+	}
 
 	WM_event_add_notifier(C, NC_GEOM | ND_DATA, obedit->data);
 	DAG_id_tag_update(obedit->data, 0);
@@ -2408,7 +2408,7 @@ static void select_adjacent_cp(ListBase *editnurb, short next, short cont, short
 	
 	for (nu = editnurb->first; nu; nu = nu->next) {
 		lastsel = 0;
-		if (nu->type == CU_BEZIER) {			
+		if (nu->type == CU_BEZIER) {
 			a = nu->pntsu;
 			bezt = nu->bezt;
 			if (next < 0) bezt = &nu->bezt[a - 1];
@@ -2425,7 +2425,7 @@ static void select_adjacent_cp(ListBase *editnurb, short next, short cont, short
 					bezt += next;
 					lastsel = 0;
 				}
-				/* move around in zigzag way so that we go through each */				
+				/* move around in zigzag way so that we go through each */
 				bezt -= (next - next / abs(next));
 			}
 		}
@@ -2440,7 +2440,7 @@ static void select_adjacent_cp(ListBase *editnurb, short next, short cont, short
 					if (!(bp->f1 & SELECT) || (selstatus == 0)) {
 						short sel = select_bpoint(bp, selstatus, 1, VISIBLE);
 						if ((sel == 1) && (cont == 0)) lastsel = 1;
-					}			
+					}
 				}
 				else {
 					bp += next;
@@ -2706,7 +2706,7 @@ static int hide_exec(bContext *C, wmOperator *op)
 	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM | ND_SELECT, obedit->data);
 
-	return OPERATOR_FINISHED;	
+	return OPERATOR_FINISHED;
 }
 
 void CURVE_OT_hide(wmOperatorType *ot)
@@ -2767,7 +2767,7 @@ static int reveal_exec(bContext *C, wmOperator *UNUSED(op))
 	DAG_id_tag_update(obedit->data, 0);
 	WM_event_add_notifier(C, NC_GEOM | ND_SELECT, obedit->data);
 
-	return OPERATOR_FINISHED;	
+	return OPERATOR_FINISHED;
 }
 
 void CURVE_OT_reveal(wmOperatorType *ot)
@@ -3091,7 +3091,7 @@ static void subdividenurb(Object *obedit, int number_cuts)
 				nu->pntsv = (number_cuts + 1) * nu->pntsv - number_cuts;
 				BKE_nurb_knot_calc_u(nu);
 				BKE_nurb_knot_calc_v(nu);
-			} /* End of 'if (sel == nu->pntsu*nu->pntsv)' (subdivide entire NURB) */
+			} /* End of 'if (sel == nu->pntsu * nu->pntsv)' (subdivide entire NURB) */
 			else {
 				/* subdivide in v direction? */
 				sel = 0;
@@ -3200,7 +3200,7 @@ static int subdivide_exec(bContext *C, wmOperator *op)
 	WM_event_add_notifier(C, NC_GEOM | ND_DATA, obedit->data);
 	DAG_id_tag_update(obedit->data, 0);
 
-	return OPERATOR_FINISHED;	
+	return OPERATOR_FINISHED;
 }
 
 void CURVE_OT_subdivide(wmOperatorType *ot)
@@ -3501,7 +3501,7 @@ static int set_spline_type_exec(bContext *C, wmOperator *op)
 	int changed = 0, type = RNA_enum_get(op->ptr, "type");
 
 	if (type == CU_CARDINAL || type == CU_BSPLINE) {
-		BKE_report(op->reports, RPT_ERROR, "Not implemented yet");
+		BKE_report(op->reports, RPT_ERROR, "Not yet implemented");
 		return OPERATOR_CANCELLED;
 	}
 	
@@ -3678,10 +3678,12 @@ static int is_u_selected(Nurb *nu, int u)
 	/* what about resolu == 2? */
 	bp = &nu->bp[u];
 	for (v = 0; v < nu->pntsv - 1; v++, bp += nu->pntsu) {
-		if (v) if (bp->f1 & SELECT) return 1;
+		if ((v != 0) && (bp->f1 & SELECT)) {
+			return TRUE;
+		}
 	}
 	
-	return 0;
+	return FALSE;
 }
 
 typedef struct NurbSort {
@@ -3833,7 +3835,7 @@ static void merge_2_nurb(wmOperator *op, ListBase *editnurb, Nurb *nu1, Nurb *nu
 	}
 	
 	if (nu1->pntsv != nu2->pntsv) {
-		BKE_report(op->reports, RPT_ERROR, "Resolution doesn't match");
+		BKE_report(op->reports, RPT_ERROR, "Resolution does not match");
 		return;
 	}
 	
@@ -3943,7 +3945,7 @@ static int merge_nurb(bContext *C, wmOperator *op)
 	}
 	
 	if (ok == 0) {
-		BKE_report(op->reports, RPT_ERROR, "Resolution doesn't match");
+		BKE_report(op->reports, RPT_ERROR, "Resolution does not match");
 		BLI_freelistN(&nsortbase);
 		return OPERATOR_CANCELLED;
 	}
@@ -4123,7 +4125,7 @@ static int make_segment_exec(bContext *C, wmOperator *op)
 	}
 
 	if (!ok) {
-		BKE_report(op->reports, RPT_ERROR, "Can't make segment");
+		BKE_report(op->reports, RPT_ERROR, "Cannot make segment");
 		return OPERATOR_CANCELLED;
 	}
 
@@ -4376,7 +4378,7 @@ static int spin_exec(bContext *C, wmOperator *op)
 		unit_m4(viewmat);
 	
 	if (!spin_nurb(viewmat, obedit, axis, cent)) {
-		BKE_report(op->reports, RPT_ERROR, "Can't spin");
+		BKE_report(op->reports, RPT_ERROR, "Cannot spin");
 		return OPERATOR_CANCELLED;
 	}
 
@@ -5252,10 +5254,10 @@ static int select_more_exec(bContext *C, wmOperator *UNUSED(op))
 						tempbp = bp + 1;
 						if (!(tempbp->f1 & SELECT)) sel = select_bpoint(tempbp, SELECT, 1, VISIBLE);
 						if (sel) {
-							bp++;	
+							bp++;
 							a--;
 						}
-					}				
+					}
 				}
 
 				bp++;
@@ -5313,8 +5315,8 @@ static int select_less_exec(bContext *C, wmOperator *UNUSED(op))
 				if ((bp->hide == 0) && (bp->f1 & SELECT)) {
 					sel = 0;
 									
-					/* check if neighbors have been selected */	
-					/* edges of surface are an exception */	
+					/* check if neighbors have been selected */
+					/* edges of surface are an exception */
 					if ((a + 1) % nu->pntsu == 0) sel++;
 					else {
 						bp--;
@@ -5346,7 +5348,7 @@ static int select_less_exec(bContext *C, wmOperator *UNUSED(op))
 					if (sel != 4) {
 						select_bpoint(bp, DESELECT, 1, VISIBLE); 
 						selbpoints[a] = 1;
-					}									
+					}
 				}
 				else lastsel = 0;
 					
@@ -5360,7 +5362,7 @@ static int select_less_exec(bContext *C, wmOperator *UNUSED(op))
 		for (nu = editnurb->first; nu; nu = nu->next) {
 			lastsel = 0;
 			/* check what type of curve/nurb it is */
-			if (nu->type == CU_BEZIER) {			
+			if (nu->type == CU_BEZIER) {
 				a = nu->pntsu;
 				bezt = nu->bezt;
 				while (a--) {
@@ -5368,10 +5370,10 @@ static int select_less_exec(bContext *C, wmOperator *UNUSED(op))
 						if (lastsel == 1) sel = 1;
 						else sel = 0;
 												
-						/* check if neighbors have been selected */						
-						/* first and last are exceptions */					
+						/* check if neighbors have been selected */
+						/* first and last are exceptions */
 						if (a == nu->pntsu - 1) sel++;
-						else { 
+						else {
 							bezt--;
 							if ((bezt->hide == 0) && (bezt->f2 & SELECT)) sel++;
 							bezt++;
@@ -5385,14 +5387,14 @@ static int select_less_exec(bContext *C, wmOperator *UNUSED(op))
 						}
 
 						if (sel != 2) {
-							select_beztriple(bezt, DESELECT, 1, VISIBLE);	
+							select_beztriple(bezt, DESELECT, 1, VISIBLE);
 							lastsel = 1;
 						}
 						else lastsel = 0;
 					}
 					else lastsel = 0;
 						
-					bezt++;	
+					bezt++;
 				}
 			}
 			else {
@@ -5403,9 +5405,9 @@ static int select_less_exec(bContext *C, wmOperator *UNUSED(op))
 						if (lastsel != 0) sel = 1;
 						else sel = 0;
 						
-						/* first and last are exceptions */					
+						/* first and last are exceptions */
 						if (a == nu->pntsu * nu->pntsv - 1) sel++;
-						else { 
+						else {
 							bp--;
 							if ((bp->hide == 0) && (bp->f1 & SELECT)) sel++;
 							bp++;
@@ -5419,9 +5421,9 @@ static int select_less_exec(bContext *C, wmOperator *UNUSED(op))
 						}
 											
 						if (sel != 2) {
-							select_bpoint(bp, DESELECT, 1, VISIBLE); 	
+							select_bpoint(bp, DESELECT, 1, VISIBLE);
 							lastsel = 1;
-						}				
+						}
 						else lastsel = 0;
 					}
 					else lastsel = 0;
@@ -5482,7 +5484,7 @@ static void selectrandom_curve(ListBase *editnurb, float randfac)
 					select_bpoint(bp, SELECT, 1, VISIBLE); 
 				bp++;
 			}
-		}		
+		}
 	}
 }
 
@@ -5624,10 +5626,10 @@ static int select_nth_exec(bContext *C, wmOperator *op)
 
 	if (!CU_select_nth(obedit, nth)) {
 		if (obedit->type == OB_SURF) {
-			BKE_report(op->reports, RPT_ERROR, "Surface hasn't got active point");
+			BKE_report(op->reports, RPT_ERROR, "Surface has not got active point");
 		}
 		else {
-			BKE_report(op->reports, RPT_ERROR, "Curve hasn't got active point");
+			BKE_report(op->reports, RPT_ERROR, "Curve has not got active point");
 		}
 
 		return OPERATOR_CANCELLED;
@@ -5641,8 +5643,8 @@ static int select_nth_exec(bContext *C, wmOperator *op)
 void CURVE_OT_select_nth(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name = "Select Nth";
-	ot->description = "";
+	ot->name = "Checker Deselect";
+	ot->description = "Deselect every other vertex";
 	ot->idname = "CURVE_OT_select_nth";
 
 	/* api callbacks */
@@ -6464,9 +6466,9 @@ Nurb *add_nurbs_primitive(bContext *C, Object *obedit, float mat[4][4], int type
 						bp->vec[0] += fac * grid;
 						fac = (float)b - 1.5f;
 						bp->vec[1] += fac * grid;
-						if (a == 1 || a == 2) if (b == 1 || b == 2) {
-								bp->vec[2] += grid;
-							}
+						if ((a == 1 || a == 2) && (b == 1 || b == 2)) {
+							bp->vec[2] += grid;
+						}
 						mul_m4_v3(mat, bp->vec);
 						bp->vec[3] = 1.0;
 						bp++;
@@ -6604,7 +6606,6 @@ static int curvesurf_prim_add(bContext *C, wmOperator *op, int type, int isSurf)
 	unsigned int layer;
 	float loc[3], rot[3];
 	float mat[4][4];
-	float dia;
 
 	if (!ED_object_add_generic_get_opts(C, op, loc, rot, &enter_editmode, &layer, &is_aligned))
 		return OPERATOR_CANCELLED;
@@ -6628,7 +6629,7 @@ static int curvesurf_prim_add(bContext *C, wmOperator *op, int type, int isSurf)
 		if (obedit == NULL || obedit->type != OB_SURF) {
 			obedit = ED_object_add_type(C, OB_SURF, loc, rot, TRUE, layer);
 			newob = 1;
-		} 
+		}
 		else DAG_id_tag_update(&obedit->id, OB_RECALC_DATA);
 	}
 
@@ -6648,7 +6649,7 @@ static int curvesurf_prim_add(bContext *C, wmOperator *op, int type, int isSurf)
 	if (newob && enter_editmode)
 		ED_undo_push(C, "Enter Editmode");
 
-	dia = ED_object_new_primitive_matrix(C, obedit, loc, rot, mat, TRUE);
+	ED_object_new_primitive_matrix(C, obedit, loc, rot, mat, TRUE);
 
 	nu = add_nurbs_primitive(C, obedit, mat, type, newob);
 	editnurb = object_editcurve_get(obedit);

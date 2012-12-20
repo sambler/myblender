@@ -84,7 +84,7 @@ typedef struct ConsoleDrawContext {
 #if 0 /* used by textview, may use later */
 	int *xy; // [2]
 	int *sel; // [2]
-	int *pos_pick; // bottom of view == 0, top of file == combine chars, end of line is lower then start. 
+	int *pos_pick;  /* bottom of view == 0, top of file == combine chars, end of line is lower then start. */
 	int *mval; // [2]
 	int draw;
 #endif
@@ -146,7 +146,8 @@ static int console_textview_line_get(struct TextViewContext *tvc, const char **l
 	ConsoleLine *cl = (ConsoleLine *)tvc->iter;
 	*line = cl->line;
 	*len = cl->len;
-
+	// printf("'%s' %d\n", *line, cl->len);
+	BLI_assert(cl->line[cl->len] == '\0' && (cl->len == 0 || cl->line[cl->len - 1] != '\0'));
 	return 1;
 }
 

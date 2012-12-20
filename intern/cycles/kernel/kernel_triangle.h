@@ -16,9 +16,6 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-#include "kernel_attribute.h"
-#include "kernel_projection.h"
-
 CCL_NAMESPACE_BEGIN
 
 /* Point on triangle for Moller-Trumbore triangles */
@@ -66,6 +63,17 @@ __device_inline float3 triangle_normal_MT(KernelGlobals *kg, int tri_index, int 
 	*shader = __float_as_int(Nm.w);
 	return make_float3(Nm.x, Nm.y, Nm.z);
 #endif
+}
+
+/* Return 3 triangle vertex locations */
+__device_inline void triangle_vertices(KernelGlobals *kg, int tri_index, float3 P[3])
+{
+	/* load triangle vertices */
+	float3 tri_vindex = float4_to_float3(kernel_tex_fetch(__tri_vindex, tri_index));
+
+	P[0] = float4_to_float3(kernel_tex_fetch(__tri_verts, __float_as_int(tri_vindex.x)));
+	P[1] = float4_to_float3(kernel_tex_fetch(__tri_verts, __float_as_int(tri_vindex.y)));
+	P[2] = float4_to_float3(kernel_tex_fetch(__tri_verts, __float_as_int(tri_vindex.z)));
 }
 
 __device_inline float3 triangle_smooth_normal(KernelGlobals *kg, int tri_index, float u, float v)

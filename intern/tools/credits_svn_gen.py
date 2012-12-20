@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.2
+#!/usr/bin/env python3
 
 # ##### BEGIN GPL LICENSE BLOCK #####
 #
@@ -51,14 +51,14 @@ Example execution commands:
 
    svn log https://svn.blender.org/svnroot/bf-blender/trunk/blender -v --xml > ~/svn_log_bfb.xml
    svn log https://svn.blender.org/svnroot/bf-extensions/trunk/py/scripts/addons -v --xml > ~/svn_log_ext.xml
-   python3.2 intern/tools/credits_svn_gen.py --svn_log_bfb=~/svn_log.xml --svn_log_ext=~/svn_log_ext.xml --tracker_csv=~/tracker_report-2012-10-03.csv
+   python3 intern/tools/credits_svn_gen.py --svn_log_bfb=~/svn_log.xml --svn_log_ext=~/svn_log_ext.xml --tracker_csv=~/tracker_report-2012-10-03.csv
 """
 
 # -----------------------------------------------------------------------------
 # Generic Class and parsing code, could be useful for all sorts of cases
 
 
-class SvnCommit(object):
+class SvnCommit:
     """Just data store really"""
     __slots__ = ("revision",
                  "author",
@@ -282,7 +282,7 @@ author_name_mapping = {
     
     # --------------------
     # Extension Developers
-    "aurel": "Aurel W",  # TODO, full name?
+    "aurel": "Aurel Wildfellner",
     "axon_d": "Dany Lebel",
     "bartekskorupa": "Bartek Skorupa",
     "bassamk": "Bassam Kurdali",
@@ -656,7 +656,7 @@ def main_credits(min_rev_bfb=0, min_rev_ext=0):
 
 def main():
     main_credits()
-    main_credits(min_rev_bfb=46461, min_rev_ext=3355)
+    main_credits(min_rev_bfb=51024, min_rev_ext=3808)
 
 if __name__ == "__main__":
     main()

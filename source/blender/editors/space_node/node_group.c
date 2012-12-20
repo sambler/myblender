@@ -29,13 +29,18 @@
  *  \ingroup spnode
  */
 
+#include <stdlib.h>
+
 #include "MEM_guardedalloc.h"
 
 #include "DNA_node_types.h"
 #include "DNA_object_types.h"
 #include "DNA_anim_types.h"
 
-#include "BLI_blenlib.h"
+#include "BLI_listbase.h"
+#include "BLI_string.h"
+#include "BLI_rect.h"
+#include "BLI_math.h"
 
 #include "BKE_action.h"
 #include "BKE_animsys.h"
@@ -865,7 +870,7 @@ static void node_get_selected_minmax(bNodeTree *ntree, bNode *gnode, float *min,
 		if (node == gnode)
 			continue;
 		if (node->flag & NODE_SELECT) {
-			DO_MINMAX2((&node->locx), min, max);
+			minmax_v2v2_v2(min, max, &node->locx);
 		}
 	}
 }
@@ -875,7 +880,7 @@ static int node_group_make_insert_selected(bNodeTree *ntree, bNode *gnode)
 	bNodeTree *ngroup = (bNodeTree *)gnode->id;
 	bNodeLink *link, *linkn;
 	bNode *node, *nextn;
-	bNodeSocket *gsock;
+	bNodeSocket *gsock, *sock;
 	ListBase anim_basepaths = {NULL, NULL};
 	float min[2], max[2];
 
@@ -982,8 +987,42 @@ static int node_group_make_insert_selected(bNodeTree *ntree, bNode *gnode)
 		}
 	}
 
+	/* auto-add interface for "solo" nodes */
+	node = ((bNodeTree *)gnode->id)->nodes.first;
+	if (node && !node->next) {
+		for (sock = node->inputs.first; sock; sock = sock->next) {
+			int skip = FALSE;
+			
+			for (link = ((bNodeTree *)gnode->id)->links.first; link; link = link->next)
+				if (link->tosock == sock)
+					skip = TRUE;
+
+			if (skip == TRUE)
+				continue;
+
+			gsock = node_group_expose_socket(ngroup, sock, SOCK_IN);
+			node_group_add_extern_socket(ntree, &gnode->inputs, SOCK_IN, gsock);
+			nodeAddLink(ngroup, NULL, gsock, node, sock);
+		}
+
+		for (sock = node->outputs.first; sock; sock = sock->next) {
+			int skip = FALSE;
+			
+			for (link = ((bNodeTree *)gnode->id)->links.first; link; link = link->next)
+				if (link->fromsock == sock)
+					skip = TRUE;
+
+			if (skip == TRUE)
+				continue;
+
+			gsock = node_group_expose_socket(ngroup, sock, SOCK_OUT);
+			node_group_add_extern_socket(ntree, &gnode->outputs, SOCK_OUT, gsock);
+			nodeAddLink(ngroup, NULL, gsock, node, sock);
+		}
+	}
+
 	/* update of the group tree */
-	ngroup->update |= NTREE_UPDATE;
+	ngroup->update |= NTREE_UPDATE | NTREE_UPDATE_LINKS;
 	/* update of the tree containing the group instance node */
 	ntree->update |= NTREE_UPDATE_NODES | NTREE_UPDATE_LINKS;
 

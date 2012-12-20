@@ -349,7 +349,7 @@ static int selected_boundbox(SpaceClip *sc, float min[2], float max[2])
 
 				mul_v3_m4v3(pos, sc->stabmat, pos);
 
-				DO_MINMAX2(pos, min, max);
+				minmax_v2v2_v2(min, max, pos);
 
 				ok = TRUE;
 			}
@@ -395,7 +395,7 @@ int ED_clip_view_selection(const bContext *C, ARegion *ar, int fit)
 		zoomx = (float)width / w / aspx;
 		zoomy = (float)height / h / aspy;
 
-		newzoom = 1.0f / power_of_2(1.0f / minf(zoomx, zoomy));
+		newzoom = 1.0f / power_of_2(1.0f / min_ff(zoomx, zoomy));
 
 		if (fit || sc->zoom > newzoom)
 			sc->zoom = newzoom;

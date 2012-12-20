@@ -138,21 +138,12 @@ bDeformGroup *ED_vgroup_add(Object *ob)
 
 void ED_vgroup_delete(Object *ob, bDeformGroup *defgroup) 
 {
-	bDeformGroup *dg = (bDeformGroup *)ob->defbase.first;
-
-	while (dg) {
-		if (dg == defgroup)
-			break;
-		dg = dg->next;
-	}
-
-	if (dg == NULL)
-		return;
+	BLI_assert(BLI_findindex(&ob->defbase, defgroup) != -1);
 
 	if (ED_vgroup_object_is_edit_mode(ob))
-		vgroup_delete_edit_mode(ob, dg);
+		vgroup_delete_edit_mode(ob, defgroup);
 	else
-		vgroup_delete_object_mode(ob, dg);
+		vgroup_delete_object_mode(ob, defgroup);
 }
 
 void ED_vgroup_clear(Object *ob)
@@ -405,27 +396,27 @@ typedef enum WT_Method {
 
 typedef enum WT_ReplaceMode {
 	WT_REPLACE_ALL_WEIGHTS = 1,
-	WT_REPLACE_EMPTY_WEIGHTS = 2,
+	WT_REPLACE_EMPTY_WEIGHTS = 2
 } WT_ReplaceMode;
 
 static EnumPropertyItem WT_vertex_group_mode_item[] = {
-    {WT_REPLACE_ACTIVE_VERTEX_GROUP, "WT_REPLACE_ACTIVE_VERTEX_GROUP", 1, "Active", "Transfer active vertex group from selected to active mesh."},
-    {WT_REPLACE_ALL_VERTEX_GROUPS, "WT_REPLACE_ALL_VERTEX_GROUPS", 1, "All", "Transfer all vertex groups from selected to active mesh."},
-    {0, NULL, 0, NULL, NULL}
+	{WT_REPLACE_ACTIVE_VERTEX_GROUP, "WT_REPLACE_ACTIVE_VERTEX_GROUP", 0, "Active", "Transfer active vertex group from selected to active mesh"},
+	{WT_REPLACE_ALL_VERTEX_GROUPS, "WT_REPLACE_ALL_VERTEX_GROUPS", 0, "All", "Transfer all vertex groups from selected to active mesh"},
+	{0, NULL, 0, NULL, NULL}
 };
 
 static EnumPropertyItem WT_method_item[] = {
-    {WT_BY_INDEX, "WT_BY_INDEX", 1, "Vertex index", "Copy for identical meshes."},
-    {WT_BY_NEAREST_VERTEX, "WT_BY_NEAREST_VERTEX", 1, "Nearest vertex", "Copy weight from closest vertex."},
-    {WT_BY_NEAREST_FACE, "WT_BY_NEAREST_FACE", 1, "Nearest face", "Barycentric interpolation from nearest face."},
-    {WT_BY_NEAREST_VERTEX_IN_FACE, "WT_BY_NEAREST_VERTEX_IN_FACE", 1, "Nearest vertex in face", "Copy weight from closest vertex in nearest face."},
-    {0, NULL, 0, NULL, NULL}
+	{WT_BY_INDEX, "WT_BY_INDEX", 0, "Vertex index", "Copy for identical meshes"},
+	{WT_BY_NEAREST_VERTEX, "WT_BY_NEAREST_VERTEX", 0, "Nearest vertex", "Copy weight from closest vertex"},
+	{WT_BY_NEAREST_FACE, "WT_BY_NEAREST_FACE", 0, "Nearest face", "Barycentric interpolation from nearest face"},
+	{WT_BY_NEAREST_VERTEX_IN_FACE, "WT_BY_NEAREST_VERTEX_IN_FACE", 0, "Nearest vertex in face", "Copy weight from closest vertex in nearest face"},
+	{0, NULL, 0, NULL, NULL}
 };
 
 static EnumPropertyItem WT_replace_mode_item[] = {
-    {WT_REPLACE_ALL_WEIGHTS, "WT_REPLACE_ALL_WEIGHTS", 1, "All", "Overwrites all weights."},
-    {WT_REPLACE_EMPTY_WEIGHTS, "WT_REPLACE_EMPTY_WEIGHTS", 1, "Empty", "Adds weights to vertices with no weight."},
-    {0, NULL, 0, NULL, NULL}
+	{WT_REPLACE_ALL_WEIGHTS, "WT_REPLACE_ALL_WEIGHTS", 0, "All", "Overwrite all weights"},
+	{WT_REPLACE_EMPTY_WEIGHTS, "WT_REPLACE_EMPTY_WEIGHTS", 0, "Empty", "Add weights to vertices with no weight"},
+	{0, NULL, 0, NULL, NULL}
 };
 
 /*copy weight*/
@@ -854,25 +845,26 @@ void ED_vgroup_vert_remove(Object *ob, bDeformGroup *dg, int vertnum)
 static float get_vert_def_nr(Object *ob, const int def_nr, const int vertnum)
 {
 	MDeformVert *dv = NULL;
-	BMVert *eve;
-	Mesh *me;
 
 	/* get the deform vertices corresponding to the vertnum */
 	if (ob->type == OB_MESH) {
-		me = ob->data;
+		Mesh *me = ob->data;
 
 		if (me->edit_btmesh) {
-			eve = BM_vert_at_index(me->edit_btmesh->bm, vertnum);
+			/* warning, this lookup is _not_ fast */
+			BMVert *eve = BM_vert_at_index(me->edit_btmesh->bm, vertnum);
 			if (!eve) {
 				return 0.0f;
 			}
 			dv = CustomData_bmesh_get(&me->edit_btmesh->bm->vdata, eve->head.data, CD_MDEFORMVERT);
 		}
 		else {
-			if (vertnum >= me->totvert) {
-				return 0.0f;
+			if (me->dvert) {
+				if (vertnum >= me->totvert) {
+					return 0.0f;
+				}
+				dv = &me->dvert[vertnum];
 			}
-			dv = &me->dvert[vertnum];
 		}
 	}
 	else if (ob->type == OB_LATTICE) {
@@ -941,7 +933,7 @@ static void vgroup_select_verts(Object *ob, int select)
 			}
 
 			/* this has to be called, because this function operates on vertices only */
-			if (select) EDBM_select_flush(em);  // vertices to edges/faces
+			if (select) EDBM_select_flush(em);  /* vertices to edges/faces */
 			else EDBM_deselect_flush(em);
 		}
 		else {
@@ -1062,7 +1054,7 @@ static void vgroup_normalize(Object *ob)
 
 			dw = defvert_find_index(dv, def_nr);
 			if (dw) {
-				weight_max = MAX2(dw->weight, weight_max);
+				weight_max = max_ff(dw->weight, weight_max);
 			}
 		}
 
@@ -1174,23 +1166,24 @@ static void getVerticalAndHorizontalChange(const float norm[3], float d, const f
                                            const float start[3], float distToStart,
                                            float *end, float (*changes)[2], float *dists, int index)
 {
-	// A=Q-((Q-P).N)N
-	// D = (a*x0 + b*y0 +c*z0 +d)
+	/* A = Q - ((Q - P).N)N
+	 * D = (a * x0 + b * y0 +c * z0 + d) */
 	float projA[3], projB[3];
 
 	closest_to_plane_v3(projA, coord, norm, start);
 	closest_to_plane_v3(projB, coord, norm, end);
-	// (vertical and horizontal refer to the plane's y and xz respectively)
-	// vertical distance
+	/* (vertical and horizontal refer to the plane's y and xz respectively)
+	 * vertical distance */
 	dists[index] = dot_v3v3(norm, end) + d;
-	// vertical change
+	/* vertical change */
 	changes[index][0] = dists[index] - distToStart;
 	//printf("vc %f %f\n", distance(end, projB, 3)-distance(start, projA, 3), changes[index][0]);
-	// horizontal change
+	/* horizontal change */
 	changes[index][1] = len_v3v3(projA, projB);
 }
 
-// I need the derived mesh to be forgotten so the positions are recalculated with weight changes (see dm_deform_recalc)
+/* I need the derived mesh to be forgotten so the positions are recalculated
+ * with weight changes (see dm_deform_recalc) */
 static void dm_deform_clear(DerivedMesh *dm, Object *ob)
 {
 	if (ob->derivedDeform && (ob->derivedDeform) == dm) {
@@ -1311,7 +1304,7 @@ static void moveCloserToDistanceFromPlane(Scene *scene, Object *ob, Mesh *me, in
 				}
 			}
 		}
-		// sort the changes by the vertical change
+		/* sort the changes by the vertical change */
 		for (k = 0; k < totweight; k++) {
 			float tf;
 			int ti;
@@ -1323,7 +1316,7 @@ static void moveCloserToDistanceFromPlane(Scene *scene, Object *ob, Mesh *me, in
 					bestIndex = i;
 				}
 			}
-			// switch with k
+			/* switch with k */
 			if (bestIndex != k) {
 				ti = upDown[k];
 				upDown[k] = upDown[bestIndex];
@@ -1650,11 +1643,11 @@ static void vgroup_blend(Object *ob, const float fac)
 					/* i1 is always the selected one */
 					if (sel1) {
 						i1 = BM_elem_index_get(eed->v1);
-						/* i2= BM_elem_index_get(eed->v2); */ /* UNUSED */
+						/* i2 = BM_elem_index_get(eed->v2); */ /* UNUSED */
 						eve = eed->v2;
 					}
 					else {
-						/* i2= BM_elem_index_get(eed->v1); */ /* UNUSED */
+						/* i2 = BM_elem_index_get(eed->v1); */ /* UNUSED */
 						i1 = BM_elem_index_get(eed->v2);
 						eve = eed->v1;
 					}
@@ -2581,7 +2574,7 @@ static int vertex_group_add_exec(bContext *C, wmOperator *UNUSED(op))
 
 	ED_vgroup_add(ob);
 	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
-	WM_event_add_notifier(C, NC_GEOM | ND_DATA, ob->data);
+	WM_event_add_notifier(C, NC_GEOM | ND_VERTEX_GROUP, ob->data);
 	WM_event_add_notifier(C, NC_OBJECT | ND_DRAW, ob);
 	
 	return OPERATOR_FINISHED;
@@ -2612,7 +2605,7 @@ static int vertex_group_remove_exec(bContext *C, wmOperator *op)
 		vgroup_delete(ob);
 
 	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
-	WM_event_add_notifier(C, NC_GEOM | ND_DATA, ob->data);
+	WM_event_add_notifier(C, NC_GEOM | ND_VERTEX_GROUP, ob->data);
 	WM_event_add_notifier(C, NC_OBJECT | ND_DRAW, ob);
 	
 	return OPERATOR_FINISHED;
@@ -2778,7 +2771,7 @@ static int vertex_group_copy_exec(bContext *C, wmOperator *UNUSED(op))
 	vgroup_duplicate(ob);
 	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	WM_event_add_notifier(C, NC_OBJECT | ND_DRAW, ob);
-	WM_event_add_notifier(C, NC_GEOM | ND_DATA, ob->data);
+	WM_event_add_notifier(C, NC_GEOM | ND_VERTEX_GROUP, ob->data);
 
 	return OPERATOR_FINISHED;
 }
@@ -3139,7 +3132,7 @@ void OBJECT_OT_vertex_group_limit_total(wmOperatorType *ot)
 	/* identifiers */
 	ot->name = "Limit Number of Weights per Vertex";
 	ot->idname = "OBJECT_OT_vertex_group_limit_total";
-	ot->description = "Limits deform weights associated with a vertex to a specified number by removing lowest weights";
+	ot->description = "Limit deform weights associated with a vertex to a specified number by removing lowest weights";
 
 	/* api callbacks */
 	ot->poll = vertex_group_poll;
@@ -3206,7 +3199,7 @@ static int vertex_group_copy_to_linked_exec(bContext *C, wmOperator *UNUSED(op))
 
 				DAG_id_tag_update(&base->object->id, OB_RECALC_DATA);
 				WM_event_add_notifier(C, NC_OBJECT | ND_DRAW, base->object);
-				WM_event_add_notifier(C, NC_GEOM | ND_DATA, base->object->data);
+				WM_event_add_notifier(C, NC_GEOM | ND_VERTEX_GROUP, base->object->data);
 
 				retval = OPERATOR_FINISHED;
 			}
@@ -3363,7 +3356,7 @@ static int set_active_group_exec(bContext *C, wmOperator *op)
 	ob->actdef = nr + 1;
 
 	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
-	WM_event_add_notifier(C, NC_GEOM | ND_DATA, ob);
+	WM_event_add_notifier(C, NC_GEOM | ND_VERTEX_GROUP, ob);
 
 	return OPERATOR_FINISHED;
 }
@@ -3469,7 +3462,7 @@ static int vgroup_do_remap(Object *ob, char *name_array, wmOperator *op)
 			}
 		}
 		else {
-			BKE_report(op->reports, RPT_ERROR, "Editmode lattice isn't supported yet");
+			BKE_report(op->reports, RPT_ERROR, "Editmode lattice is not supported yet");
 			MEM_freeN(sort_map_update);
 			return OPERATOR_CANCELLED;
 		}
@@ -3527,7 +3520,7 @@ static int vertex_group_sort_exec(bContext *C, wmOperator *op)
 
 	if (ret != OPERATOR_CANCELLED) {
 		DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
-		WM_event_add_notifier(C, NC_GEOM | ND_DATA, ob);
+		WM_event_add_notifier(C, NC_GEOM | ND_VERTEX_GROUP, ob);
 	}
 
 	if (name_array) MEM_freeN(name_array);
@@ -3582,7 +3575,7 @@ static int vgroup_move_exec(bContext *C, wmOperator *op)
 
 	if (ret != OPERATOR_CANCELLED) {
 		DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
-		WM_event_add_notifier(C, NC_GEOM | ND_DATA, ob);
+		WM_event_add_notifier(C, NC_GEOM | ND_VERTEX_GROUP, ob);
 	}
 
 	return ret;

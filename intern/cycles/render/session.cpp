@@ -34,16 +34,22 @@
 
 CCL_NAMESPACE_BEGIN
 
+/* Note about  preserve_tile_device option for tile manager:
+ * progressive refine and viewport rendering does requires tiles to
+ * always be allocated for the same device
+ */
 Session::Session(const SessionParams& params_)
 : params(params_),
   tile_manager(params.progressive, params.samples, params.tile_size, params.start_resolution,
-  	(params.background)? 1: max(params.device.multi_devices.size(), 1))
+       params.background == false || params.progressive_refine, params.background,
+       max(params.device.multi_devices.size(), 1)),
+  stats()
 {
 	device_use_gl = ((params.device.type != DEVICE_CPU) && !params.background);
 
 	TaskScheduler::init(params.threads);
 
-	device = Device::create(params.device, params.background, params.threads);
+	device = Device::create(params.device, stats, params.background);
 
 	if(params.background) {
 		buffers = NULL;
@@ -181,6 +187,7 @@ void Session::run_gpu()
 	start_time = time_dt();
 	reset_time = time_dt();
 	paused_time = 0.0;
+	last_update_time = time_dt();
 
 	if(!params.background)
 		progress.set_start_time(start_time + paused_time);
@@ -334,7 +341,7 @@ bool Session::acquire_tile(Device *tile_device, RenderTile& rtile)
 
 	/* get next tile from manager */
 	Tile tile;
-	int device_num = (params.background)? 0: device->device_number(tile_device);
+	int device_num = device->device_number(tile_device);
 
 	if(!tile_manager.next_tile(tile, device_num))
 		return false;
@@ -378,20 +385,15 @@ bool Session::acquire_tile(Device *tile_device, RenderTile& rtile)
 
 	/* allocate buffers */
 	if(params.progressive_refine) {
-		int tile_x = rtile.x / params.tile_size.x;
-		int tile_y = rtile.y / params.tile_size.y;
-
-		int tile_index = tile_y * tile_manager.state.tile_w + tile_x;
-
 		tile_lock.lock();
 
 		if(tile_buffers.size() == 0)
 			tile_buffers.resize(tile_manager.state.num_tiles, NULL);
 
-		tilebuffers = tile_buffers[tile_index];
+		tilebuffers = tile_buffers[tile.index];
 		if(tilebuffers == NULL) {
 			tilebuffers = new RenderBuffers(tile_device);
-			tile_buffers[tile_index] = tilebuffers;
+			tile_buffers[tile.index] = tilebuffers;
 
 			tilebuffers->reset(tile_device, buffer_params);
 		}
@@ -446,6 +448,8 @@ void Session::release_tile(RenderTile& rtile)
 void Session::run_cpu()
 {
 	bool tiles_written = false;
+
+	last_update_time = time_dt();
 
 	{
 		/* reset once to start */
@@ -633,6 +637,15 @@ void Session::reset(BufferParams& buffer_params, int samples)
 		reset_gpu(buffer_params, samples);
 	else
 		reset_cpu(buffer_params, samples);
+
+	if(params.progressive_refine) {
+		thread_scoped_lock buffers_lock(buffers_mutex);
+
+		foreach(RenderBuffers *buffers, tile_buffers)
+			delete buffers;
+
+		tile_buffers.clear();
+	}
 }
 
 void Session::set_samples(int samples)
@@ -708,10 +721,13 @@ void Session::update_status_time(bool show_pause, bool show_done)
 	string status, substatus;
 
 	if(!params.progressive) {
+		bool is_gpu = params.device.type == DEVICE_CUDA || params.device.type == DEVICE_OPENCL;
+		bool is_multidevice = params.device.multi_devices.size() > 1;
+		bool is_cpu = params.device.type == DEVICE_CPU;
+
 		substatus = string_printf("Path Tracing Tile %d/%d", tile, num_tiles);
 
-		if(params.device.type == DEVICE_CUDA || params.device.type == DEVICE_OPENCL ||
-			(params.device.type == DEVICE_CPU && num_tiles == 1)) {
+		if((is_gpu && !is_multidevice) || (is_cpu && num_tiles == 1)) {
 			/* when rendering on GPU multithreading happens within single tile, as in
 			 * tiles are handling sequentially and in this case we could display
 			 * currently rendering sample number
@@ -750,7 +766,7 @@ void Session::update_status_time(bool show_pause, bool show_done)
 	if(preview_time == 0.0 && resolution == 1)
 		preview_time = time_dt();
 	
-	double tile_time = (tile == 0)? 0.0: (time_dt() - preview_time - paused_time)/(sample);
+	double tile_time = (tile == 0 || sample == 0)? 0.0: (time_dt() - preview_time - paused_time) / sample;
 
 	/* negative can happen when we pause a bit before rendering, can discard that */
 	if(preview_time < 0.0) preview_time = 0.0;
@@ -807,6 +823,15 @@ void Session::tonemap()
 bool Session::update_progressive_refine(bool cancel)
 {
 	int sample = tile_manager.state.sample + 1;
+	bool write = sample == params.samples || cancel;
+
+	double current_time = time_dt();
+
+	if (current_time - last_update_time < 1.0) {
+		/* if last sample was processed, we need to write buffers anyway  */
+		if (!write)
+			return false;
+	}
 
 	if(params.progressive_refine) {
 		foreach(RenderBuffers *buffers, tile_buffers) {
@@ -814,14 +839,30 @@ bool Session::update_progressive_refine(bool cancel)
 			rtile.buffers = buffers;
 			rtile.sample = sample;
 
-			if(rtile.sample == params.samples || cancel)
+			if(write)
 				write_render_tile_cb(rtile);
 			else
 				update_render_tile_cb(rtile);
 		}
 	}
 
-	return sample == params.samples;
+	last_update_time = current_time;
+
+	return write;
+}
+
+void Session::device_free()
+{
+	scene->device_free();
+
+	foreach(RenderBuffers *buffers, tile_buffers)
+		delete buffers;
+
+	tile_buffers.clear();
+
+	/* used from background render only, so no need to
+	 * re-create render/display buffers here
+	 */
 }
 
 CCL_NAMESPACE_END

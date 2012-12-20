@@ -55,6 +55,8 @@
 #include "BLI_linklist.h"
 #include "BLI_string.h"
 
+#include "BLF_translation.h"
+
 #include "BKE_cloth.h"
 #include "BKE_key.h"
 #include "BKE_multires.h"
@@ -247,24 +249,25 @@ int modifier_couldBeCage(struct Scene *scene, ModifierData *md)
 	        modifier_supportsMapping(md));
 }
 
-int modifier_sameTopology(ModifierData *md)
+int modifier_isSameTopology(ModifierData *md)
 {
 	ModifierTypeInfo *mti = modifierType_getInfo(md->type);
 	return ELEM(mti->type, eModifierTypeType_OnlyDeform, eModifierTypeType_NonGeometrical);
 }
 
-int modifier_nonGeometrical(ModifierData *md)
+int modifier_isNonGeometrical(ModifierData *md)
 {
 	ModifierTypeInfo *mti = modifierType_getInfo(md->type);
 	return (mti->type == eModifierTypeType_NonGeometrical);
 }
 
-void modifier_setError(ModifierData *md, const char *format, ...)
+void modifier_setError(ModifierData *md, const char *_format, ...)
 {
 	char buffer[512];
 	va_list ap;
+	const char *format = TIP_(_format);
 
-	va_start(ap, format);
+	va_start(ap, _format);
 	vsnprintf(buffer, sizeof(buffer), format, ap);
 	va_end(ap);
 	buffer[sizeof(buffer) - 1] = '\0';

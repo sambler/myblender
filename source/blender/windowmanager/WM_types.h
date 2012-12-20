@@ -301,6 +301,7 @@ typedef struct wmNotifier {
 	/* NC_MATERIAL Material */
 #define	ND_SHADING			(30<<16)
 #define	ND_SHADING_DRAW		(31<<16)
+#define	ND_SHADING_LINKS	(32<<16)
 
 	/* NC_LAMP Lamp */
 #define	ND_LIGHTING			(40<<16)
@@ -327,6 +328,7 @@ typedef struct wmNotifier {
 	/* Mesh, Curve, MetaBall, Armature, .. */
 #define ND_SELECT			(90<<16)
 #define ND_DATA				(91<<16)
+#define ND_VERTEX_GROUP		(92<<16)
 
 	/* NC_NODE Nodes */
 
@@ -425,7 +427,7 @@ typedef struct wmEvent {
 	char ascii;			/* from ghost, fallback if utf8 isn't set */
 	char pad;
 
-	/* previous state */
+	/* previous state, used for double click and the 'click' */
 	short prevtype;
 	short prevval;
 	int prevx, prevy;
@@ -436,7 +438,8 @@ typedef struct wmEvent {
 	short shift, ctrl, alt, oskey;	/* oskey is apple or windowskey, value denotes order of pressed */
 	short keymodifier;				/* rawkey modifier */
 	
-	short pad1;
+	/* set in case a KM_PRESS went by unhandled */
+	short check_click;
 	
 	/* keymap item, set by handler (weak?) */
 	const char *keymap_idname;
@@ -555,8 +558,8 @@ typedef struct wmOperatorType {
 	/* previous settings - for initializing on re-use */
 	struct IDProperty *last_properties;
 
-	/* rna property to use for generic invoke functions.
-	 * menus, enum search... etc */
+	/* Default rna property to use for generic invoke functions.
+	 * menus, enum search... etc. Example: Enum 'type' for a Delete menu */
 	PropertyRNA *prop;
 
 	/* struct wmOperatorTypeMacro */

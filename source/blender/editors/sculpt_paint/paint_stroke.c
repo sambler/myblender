@@ -195,7 +195,7 @@ static void paint_brush_stroke_add_step(bContext *C, wmOperator *op, wmEvent *ev
 
 /* Returns zero if no sculpt changes should be made, non-zero otherwise */
 static int paint_smooth_stroke(PaintStroke *stroke, float output[2],
-							   const PaintSample *sample)
+                               const PaintSample *sample)
 {
 	output[0] = sample->mouse[0];
 	output[1] = sample->mouse[1];
@@ -255,7 +255,7 @@ static int paint_space_stroke(bContext *C, wmOperator *op, wmEvent *event, const
 			if (pressure > FLT_EPSILON) {
 				/* brushes can have a minimum size of 1.0 but with pressure it can be smaller then a pixel
 				 * causing very high step sizes, hanging blender [#32381] */
-				const float size_clamp = maxf(1.0f, BKE_brush_size_get(scene, stroke->brush) * pressure);
+				const float size_clamp = max_ff(1.0f, BKE_brush_size_get(scene, stroke->brush) * pressure);
 				scale = (size_clamp * stroke->brush->spacing / 50.0f) / length;
 				if (scale > FLT_EPSILON) {
 					mul_v2_fl(vec, scale);
@@ -406,10 +406,10 @@ int paint_stroke_modal(bContext *C, wmOperator *op, wmEvent *event)
 	paint_stroke_add_sample(p, stroke, event->x, event->y);
 	paint_stroke_sample_average(stroke, &sample_average);
 
-	// let NDOF motion pass through to the 3D view so we can paint and rotate simultaneously!
-	// this isn't perfect... even when an extra MOUSEMOVE is spoofed, the stroke discards it
-	// since the 2D deltas are zero -- code in this file needs to be updated to use the
-	// post-NDOF_MOTION MOUSEMOVE
+	/* let NDOF motion pass through to the 3D view so we can paint and rotate simultaneously!
+	 * this isn't perfect... even when an extra MOUSEMOVE is spoofed, the stroke discards it
+	 * since the 2D deltas are zero -- code in this file needs to be updated to use the
+	 * post-NDOF_MOTION MOUSEMOVE */
 	if (event->type == NDOF_MOTION)
 		return OPERATOR_PASS_THROUGH;
 

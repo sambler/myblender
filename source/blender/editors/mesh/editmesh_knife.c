@@ -38,14 +38,11 @@
 #include "BLI_blenlib.h"
 #include "BLI_array.h"
 #include "BLI_math.h"
-#include "BLI_rand.h"
 #include "BLI_smallhash.h"
-#include "BLI_scanfill.h"
 #include "BLI_memarena.h"
 
 #include "BKE_DerivedMesh.h"
 #include "BKE_context.h"
-#include "BKE_depsgraph.h"
 
 #include "BIF_gl.h"
 #include "BIF_glutil.h" /* for paint cursor */
@@ -59,7 +56,6 @@
 #include "WM_types.h"
 
 #include "DNA_scene_types.h"
-#include "DNA_mesh_types.h"
 #include "DNA_object_types.h"
 #include "BKE_tessmesh.h"
 #include "UI_resources.h"
@@ -720,7 +716,7 @@ static void knife_cut_through(KnifeTool_OpData *kcd)
 		for (r = firstfaces.first; r; r = r->next) {
 			f = r->ref;
 			found = 0;
-			for (j = 0, lh2 = kcd->linehits; j < kcd->totlinehit; j++, lh2++) {
+			for (j = 0, lh2 = kcd->linehits; j < kcd->totlinehit && !found; j++, lh2++) {
 				kfe2 = lh2->kfe;
 				for (r2 = kfe2->faces.first; r2; r2 = r2->next) {
 					if (r2->ref == f) {
@@ -750,7 +746,7 @@ static void knife_cut_through(KnifeTool_OpData *kcd)
 		for (r = kfe->faces.first; r; r = r->next) {
 			f = r->ref;
 			found = 0;
-			for (j = i + 1, lh2 = lh + 1; j < kcd->totlinehit; j++, lh2++) {
+			for (j = i + 1, lh2 = lh + 1; j < kcd->totlinehit && !found; j++, lh2++) {
 				kfe2 = lh2->kfe;
 				for (r2 = kfe2->faces.first; r2; r2 = r2->next) {
 					if (r2->ref == f) {
@@ -1150,7 +1146,7 @@ static float len_v3_tri_side_max(const float v1[3], const float v2[3], const flo
 	const float s2 = len_squared_v3v3(v2, v3);
 	const float s3 = len_squared_v3v3(v3, v1);
 
-	return sqrtf(MAX3(s1, s2, s3));
+	return sqrtf(max_fff(s1, s2, s3));
 }
 
 static BMEdgeHit *knife_edge_tri_isect(KnifeTool_OpData *kcd, BMBVHTree *bmtree,
@@ -1594,10 +1590,10 @@ static KnifeEdge *knife_find_closest_edge(KnifeTool_OpData *kcd, float p[3], flo
 			dis = dist_to_line_segment_v2(sco, kfe->v1->sco, kfe->v2->sco);
 			if (dis < curdis && dis < maxdist) {
 				if (kcd->vc.rv3d->rflag & RV3D_CLIPPING) {
-					float labda = line_point_factor_v2(sco, kfe->v1->sco, kfe->v2->sco);
+					float lambda = line_point_factor_v2(sco, kfe->v1->sco, kfe->v2->sco);
 					float vec[3];
 
-					interp_v3_v3v3(vec, kfe->v1->cageco, kfe->v2->cageco, labda);
+					interp_v3_v3v3(vec, kfe->v1->cageco, kfe->v2->cageco, lambda);
 
 					if (ED_view3d_clipping_test(kcd->vc.rv3d, vec, TRUE) == 0) {
 						cure = kfe;
@@ -2591,10 +2587,8 @@ static void knife_make_chain_cut(KnifeTool_OpData *kcd, BMFace *f, ListBase *cha
 	BMLoop *lnew, *l_iter;
 	int i;
 	int nco = BLI_countlist(chain) - 1;
-	float (*cos)[3] = NULL;
-	KnifeVert **kverts;
-	BLI_array_fixedstack_declare(cos, BM_DEFAULT_NGON_STACK_SIZE, nco, __func__);
-	BLI_array_fixedstack_declare(kverts, BM_DEFAULT_NGON_STACK_SIZE, nco, __func__);
+	float (*cos)[3] = BLI_array_alloca(cos, nco);
+	KnifeVert **kverts = BLI_array_alloca(kverts, nco);
 
 	kfe = ((Ref *)chain->first)->ref;
 	v1 = kfe->v1->v ? kfe->v1->v : kfe->v2->v;
@@ -2643,9 +2637,6 @@ static void knife_make_chain_cut(KnifeTool_OpData *kcd, BMFace *f, ListBase *cha
 			BM_edge_select_set(bm, lnew->e, TRUE);
 		}
 	}
-
-	BLI_array_fixedstack_free(cos);
-	BLI_array_fixedstack_free(kverts);
 }
 
 static void knife_make_face_cuts(KnifeTool_OpData *kcd, BMFace *f, ListBase *kfedges)
@@ -2835,7 +2826,7 @@ static void knife_make_cuts(KnifeTool_OpData *kcd)
 #endif
 
 /* called on tool confirmation */
-static void knifetool_finish(bContext *C, wmOperator *op)
+static void knifetool_finish(wmOperator *op)
 {
 	KnifeTool_OpData *kcd = op->customdata;
 
@@ -2846,7 +2837,7 @@ static void knifetool_finish(bContext *C, wmOperator *op)
 #endif
 
 	EDBM_mesh_normals_update(kcd->em);
-	EDBM_update_generic(C, kcd->em, TRUE);
+	EDBM_update_generic(kcd->em, TRUE, TRUE);
 }
 
 /* copied from paint_image.c */
@@ -3134,7 +3125,7 @@ static int knifetool_modal(bContext *C, wmOperator *op, wmEvent *event)
 				/* finish */
 				ED_region_tag_redraw(kcd->ar);
 
-				knifetool_finish(C, op);
+				knifetool_finish(op);
 				knifetool_exit(C, op);
 				ED_area_headerprint(CTX_wm_area(C), NULL);
 

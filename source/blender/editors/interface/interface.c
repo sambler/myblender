@@ -69,7 +69,6 @@
 #include "WM_api.h"
 #include "WM_types.h"
 #include "wm_subwindow.h"
-#include "wm_window.h"
 
 #include "RNA_access.h"
 
@@ -298,9 +297,9 @@ static void ui_centered_bounds_block(const bContext *C, uiBlock *block)
 	/* note: this is used for the splash where window bounds event has not been
 	 * updated by ghost, get the window bounds from ghost directly */
 
-	// wm_window_get_size(window, &xmax, &ymax);
-	wm_window_get_size_ghost(window, &xmax, &ymax);
-	
+	xmax = WM_window_pixels_x(window);
+	ymax = WM_window_pixels_y(window);
+
 	ui_bounds_block(block);
 	
 	width  = BLI_rctf_size_x(&block->rect);
@@ -326,7 +325,8 @@ static void ui_popup_bounds_block(const bContext *C, uiBlock *block, eBlockBound
 	/* compute mouse position with user defined offset */
 	ui_bounds_block(block);
 	
-	wm_window_get_size(window, &xmax, &ymax);
+	xmax = WM_window_pixels_x(window);
+	ymax = WM_window_pixels_y(window);
 
 	oldwidth  = BLI_rctf_size_x(&block->rect);
 	oldheight = BLI_rctf_size_y(&block->rect);
@@ -334,7 +334,7 @@ static void ui_popup_bounds_block(const bContext *C, uiBlock *block, eBlockBound
 	/* first we ensure wide enough text bounds */
 	if (bounds_calc == UI_BLOCK_BOUNDS_POPUP_MENU) {
 		if (block->flag & UI_BLOCK_LOOP) {
-			block->bounds = 50;
+			block->bounds = 2.5f * UI_UNIT_X;
 			ui_text_bounds_block(block, block->rect.xmin);
 		}
 	}
@@ -983,7 +983,8 @@ void ui_fontscale(short *points, float aspect)
 		float pointsf = *points;
 		
 		/* for some reason scaling fonts goes too fast compared to widget size */
-		aspect = sqrt(aspect);
+		/* XXX not true anymore? (ton) */
+		//aspect = sqrt(aspect);
 		pointsf /= aspect;
 		
 		if (aspect > 1.0f)
@@ -1000,7 +1001,7 @@ static void ui_but_to_pixelrect(rcti *rect, const ARegion *ar, uiBlock *block, u
 	
 	ui_block_to_window_fl(ar, block, &rectf.xmin, &rectf.ymin);
 	ui_block_to_window_fl(ar, block, &rectf.xmax, &rectf.ymax);
-
+	
 	rectf.xmin -= ar->winrct.xmin;
 	rectf.ymin -= ar->winrct.ymin;
 	rectf.xmax -= ar->winrct.xmin;
@@ -1015,7 +1016,7 @@ static void ui_but_to_pixelrect(rcti *rect, const ARegion *ar, uiBlock *block, u
 /* uses local copy of style, to scale things down, and allow widgets to change stuff */
 void uiDrawBlock(const bContext *C, uiBlock *block)
 {
-	uiStyle style = *UI_GetStyle();  /* XXX pass on as arg */
+	uiStyle style = *UI_GetStyleDraw();  /* XXX pass on as arg */
 	ARegion *ar;
 	uiBut *but;
 	rcti rect;
@@ -1290,7 +1291,7 @@ void ui_delete_linkline(uiLinkLine *line, uiBut *but)
 void ui_get_but_vectorf(uiBut *but, float vec[3])
 {
 	PropertyRNA *prop;
-	int a, tot;
+	int a;
 
 	if (but->editvec) {
 		copy_v3_v3(vec, but->editvec);
@@ -1299,18 +1300,25 @@ void ui_get_but_vectorf(uiBut *but, float vec[3])
 	if (but->rnaprop) {
 		prop = but->rnaprop;
 
-		vec[0] = vec[1] = vec[2] = 0.0f;
+		zero_v3(vec);
 
 		if (RNA_property_type(prop) == PROP_FLOAT) {
-			tot = RNA_property_array_length(&but->rnapoin, prop);
-			tot = min_ii(tot, 3);
-
-			for (a = 0; a < tot; a++)
-				vec[a] = RNA_property_float_get_index(&but->rnapoin, prop, a);
+			int tot = RNA_property_array_length(&but->rnapoin, prop);
+			BLI_assert(tot > 0);
+			if (tot == 3) {
+				RNA_property_float_get_array(&but->rnapoin, prop, vec);
+			}
+			else {
+				tot = min_ii(tot, 3);
+				for (a = 0; a < tot; a++) {
+					vec[a] = RNA_property_float_get_index(&but->rnapoin, prop, a);
+				}
+			}
 		}
 	}
 	else if (but->pointype == UI_BUT_POIN_CHAR) {
 		char *cp = (char *)but->poin;
+
 		vec[0] = ((float)cp[0]) / 255.0f;
 		vec[1] = ((float)cp[1]) / 255.0f;
 		vec[2] = ((float)cp[2]) / 255.0f;
@@ -1321,8 +1329,8 @@ void ui_get_but_vectorf(uiBut *but, float vec[3])
 	}
 	else {
 		if (but->editvec == NULL) {
-			fprintf(stderr, "ui_get_but_vectorf: can't get color, should never happen\n");
-			vec[0] = vec[1] = vec[2] = 0.0f;
+			fprintf(stderr, "%s: can't get color, should never happen\n", __func__);
+			zero_v3(vec);
 		}
 	}
 
@@ -1348,10 +1356,15 @@ void ui_set_but_vectorf(uiBut *but, const float vec[3])
 			int a;
 
 			tot = RNA_property_array_length(&but->rnapoin, prop);
-			tot = min_ii(tot, 3);
-
-			for (a = 0; a < tot; a++) {
-				RNA_property_float_set_index(&but->rnapoin, prop, a, vec[a]);
+			BLI_assert(tot > 0);
+			if (tot == 3) {
+				RNA_property_float_set_array(&but->rnapoin, prop, vec);
+			}
+			else {
+				tot = min_ii(tot, 3);
+				for (a = 0; a < tot; a++) {
+					RNA_property_float_set_index(&but->rnapoin, prop, a, vec[a]);
+				}
 			}
 		}
 	}
@@ -2650,9 +2663,11 @@ static uiBut *ui_def_but(uiBlock *block, int type, int retval, const char *str,
 
 	BLI_assert(width >= 0);
 	BLI_assert(height >= 0);
-
+	
 	/* we could do some more error checks here */
 	if ((type & BUTTYPE) == LABEL) {
+		if ((poin != NULL || min != 0.0f || max != 0.0f || (a1 == 0.0f && a2 != 0.0f) || (a1 != 0.0f && a1 != 1.0f)))
+			printf("blah\n");
 		BLI_assert((poin != NULL || min != 0.0f || max != 0.0f || (a1 == 0.0f && a2 != 0.0f) || (a1 != 0.0f && a1 != 1.0f)) == FALSE);
 	}
 
@@ -2786,6 +2801,10 @@ static uiBut *ui_def_but_rna(uiBlock *block, int type, int retval, const char *s
 	uiBut *but;
 	int freestr = 0, icon = 0;
 
+	if (ELEM3(type, COLOR, HSVCIRCLE, HSVCUBE)) {
+		BLI_assert(index == -1);
+	}
+
 	/* use rna values if parameters are not specified */
 	if (!str) {
 		if (type == MENU && proptype == PROP_ENUM) {
@@ -2826,12 +2845,13 @@ static uiBut *ui_def_but_rna(uiBlock *block, int type, int retval, const char *s
 			EnumPropertyItem *item;
 			int i, totitem, free;
 
-			/* TODO, translate after getting the item, saves many lookups */
-			RNA_property_enum_items_gettexted(block->evil_C, ptr, prop, &item, &totitem, &free);
+			/* get untranslated, then translate the single string we need */
+			RNA_property_enum_items(block->evil_C, ptr, prop, &item, &totitem, &free);
 			for (i = 0; i < totitem; i++) {
 				if (item[i].identifier[0] && item[i].value == (int)max) {
-					str = item[i].name;
+					str = CTX_IFACE_(RNA_property_translation_context(prop), item[i].name);
 					icon = item[i].icon;
+					break;
 				}
 			}
 

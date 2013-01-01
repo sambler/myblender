@@ -43,7 +43,6 @@
 #include "DNA_object_types.h"
 
 #include "BLI_blenlib.h"
-#include "BLI_bpath.h"
 #include "BLI_math.h"
 #include "BLI_utildefines.h"
 #include "BLI_ghash.h"
@@ -544,7 +543,7 @@ void BKE_pose_copy_data(bPose **dst, bPose *src, int copycon)
 	for (pchan = outPose->chanbase.first; pchan; pchan = pchan->next) {
 		/* TODO: rename this argument... */
 		if (copycon) {
-			copy_constraints(&listb, &pchan->constraints, TRUE);  // copy_constraints NULLs listb
+			BKE_copy_constraints(&listb, &pchan->constraints, TRUE);  // BKE_copy_constraints NULLs listb
 			pchan->constraints = listb;
 			pchan->mpath = NULL; /* motion paths should not get copied yet... */
 		}
@@ -622,7 +621,7 @@ void BKE_pose_channel_free(bPoseChannel *pchan)
 		pchan->mpath = NULL;
 	}
 
-	free_constraints(&pchan->constraints);
+	BKE_free_constraints(&pchan->constraints);
 	
 	if (pchan->prop) {
 		IDP_FreeProperty(pchan->prop);
@@ -712,7 +711,7 @@ void BKE_pose_channel_copy_data(bPoseChannel *pchan, const bPoseChannel *pchan_f
 	pchan->iklinweight = pchan_from->iklinweight;
 
 	/* constraints */
-	copy_constraints(&pchan->constraints, &pchan_from->constraints, TRUE);
+	BKE_copy_constraints(&pchan->constraints, &pchan_from->constraints, TRUE);
 
 	/* id-properties */
 	if (pchan->prop) {

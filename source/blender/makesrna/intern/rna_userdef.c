@@ -47,6 +47,7 @@
 #include "BLF_translation.h"
 
 #include "BKE_sound.h"
+#include "BKE_addon.h"
 
 #ifdef WITH_CYCLES
 static EnumPropertyItem compute_device_type_items[] = {
@@ -62,10 +63,12 @@ static EnumPropertyItem compute_device_type_items[] = {
 #include "DNA_object_types.h"
 #include "DNA_screen_types.h"
 
+#include "BKE_blender.h"
 #include "BKE_DerivedMesh.h"
 #include "BKE_depsgraph.h"
 #include "BKE_global.h"
 #include "BKE_main.h"
+#include "BKE_idprop.h"
 
 #include "GPU_draw.h"
 
@@ -78,14 +81,17 @@ static EnumPropertyItem compute_device_type_items[] = {
 
 #include "CCL_api.h"
 
+#include "BKE_addon.h"
+
 static void rna_userdef_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *UNUSED(ptr))
 {
 	WM_main_add_notifier(NC_WINDOW, NULL);
 }
 
+/* also used by buffer swap switching */
 static void rna_userdef_dpi_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *UNUSED(ptr))
 {
-	U.widget_unit = (U.dpi * 20 + 36) / 72;
+	BKE_userdef_state();
 	WM_main_add_notifier(NC_WINDOW, NULL);      /* full redraw */
 	WM_main_add_notifier(NC_SCREEN | NA_EDITED, NULL);    /* refresh region sizes */
 }
@@ -426,6 +432,103 @@ static EnumPropertyItem *rna_lang_enum_properties_itemf(bContext *UNUSED(C), Poi
 }
 #endif
 
+static IDProperty *rna_AddonPref_idprops(PointerRNA *ptr, int create)
+{
+	if (create && !ptr->data) {
+		IDPropertyTemplate val = {0};
+		ptr->data = IDP_New(IDP_GROUP, &val, "RNA_AddonPreferences group");
+	}
+
+	return ptr->data;
+}
+
+static PointerRNA rna_Addon_preferences_get(PointerRNA *ptr)
+{
+	bAddon *addon = (bAddon *)ptr->data;
+	bAddonPrefType *apt = BKE_addon_pref_type_find(addon->module, TRUE);
+	if (apt) {
+		if (addon->prop == NULL) {
+			IDPropertyTemplate val = {0};
+			addon->prop = IDP_New(IDP_GROUP, &val, addon->module); /* name is unimportant  */
+		}
+		return rna_pointer_inherit_refine(ptr, apt->ext.srna, addon->prop);
+	}
+	else {
+		return PointerRNA_NULL;
+	}
+}
+
+static void rna_AddonPref_unregister(Main *UNUSED(bmain), StructRNA *type)
+{
+	bAddonPrefType *apt = RNA_struct_blender_type_get(type);
+
+	if (!apt)
+		return;
+
+	RNA_struct_free_extension(type, &apt->ext);
+
+	BKE_addon_pref_type_remove(apt);
+	RNA_struct_free(&BLENDER_RNA, type);
+
+	/* update while blender is running */
+	WM_main_add_notifier(NC_SCREEN | NA_EDITED, NULL);
+}
+
+static StructRNA *rna_AddonPref_register(Main *bmain, ReportList *reports, void *data, const char *identifier,
+                                         StructValidateFunc validate, StructCallbackFunc call, StructFreeFunc free)
+{
+	bAddonPrefType *apt, dummyapt = {{'\0'}};
+	bAddon dummyaddon = {NULL};
+	PointerRNA dummyhtr;
+	// int have_function[1];
+
+	/* setup dummy header & header type to store static properties in */
+	RNA_pointer_create(NULL, &RNA_AddonPreferences, &dummyaddon, &dummyhtr);
+
+	/* validate the python class */
+	if (validate(&dummyhtr, data, NULL /* have_function */ ) != 0)
+		return NULL;
+
+	BLI_strncpy(dummyapt.idname, dummyaddon.module, sizeof(dummyapt.idname));
+	if (strlen(identifier) >= sizeof(dummyapt.idname)) {
+		BKE_reportf(reports, RPT_ERROR, "Registering addon-prefs class: '%s' is too long, maximum length is %d",
+		            identifier, (int)sizeof(dummyapt.idname));
+		return NULL;
+	}
+
+	/* check if we have registered this header type before, and remove it */
+	apt = BKE_addon_pref_type_find(dummyaddon.module, TRUE);
+	if (apt) {
+		if (apt->ext.srna) {
+			rna_AddonPref_unregister(bmain, apt->ext.srna);
+		}
+	}
+
+	/* create a new header type */
+	apt = MEM_mallocN(sizeof(bAddonPrefType), "addonpreftype");
+	memcpy(apt, &dummyapt, sizeof(dummyapt));
+	BKE_addon_pref_type_add(apt);
+
+	apt->ext.srna = RNA_def_struct(&BLENDER_RNA, identifier, "AddonPreferences");
+	apt->ext.data = data;
+	apt->ext.call = call;
+	apt->ext.free = free;
+	RNA_struct_blender_type_set(apt->ext.srna, apt);
+
+//	apt->draw = (have_function[0]) ? header_draw : NULL;
+
+	/* update while blender is running */
+	WM_main_add_notifier(NC_SCREEN | NA_EDITED, NULL);
+
+	return apt->ext.srna;
+}
+
+/* placeholder, doesn't do anything useful yet */
+static StructRNA *rna_AddonPref_refine(PointerRNA *ptr)
+{
+	return (ptr->type) ? ptr->type : &RNA_AddonPreferences;
+}
+
 #else
 
 static void rna_def_userdef_theme_ui_font_style(BlenderRNA *brna)
@@ -435,7 +538,7 @@ static void rna_def_userdef_theme_ui_font_style(BlenderRNA *brna)
 	
 	static EnumPropertyItem font_kerning_style[] = {
 		{0, "UNFITTED", 0, "Unfitted", "Use scaled but un-grid-fitted kerning distances"},
-		{1, "DEFAULT", 0, "Default", "Use scaled and grid-fitted kerning distances"},
+		{1, "FITTED", 0, "Fitted", "Use scaled and grid-fitted kerning distances"},
 		{0, NULL, 0, NULL, NULL}
 	};
 
@@ -501,13 +604,6 @@ static void rna_def_userdef_theme_ui_style(BlenderRNA *brna)
 	RNA_def_property_range(prop, 0.5, 2.0);
 	RNA_def_property_ui_text(prop, "Panel Zoom", "Default zoom level for panel areas");
 #endif
-
-	prop = RNA_def_property(srna, "panel_title", PROP_POINTER, PROP_NONE);
-	RNA_def_property_flag(prop, PROP_NEVER_NULL);
-	RNA_def_property_pointer_sdna(prop, NULL, "paneltitle");
-	RNA_def_property_struct_type(prop, "ThemeFontStyle");
-	RNA_def_property_ui_text(prop, "Panel Style", "");
-	RNA_def_property_update(prop, 0, "rna_userdef_update");
 
 	/*	(not used yet) */
 #if 0
@@ -648,9 +744,17 @@ static void rna_def_userdef_theme_ui_panel(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "header", PROP_FLOAT, PROP_COLOR_GAMMA);
 	RNA_def_property_ui_text(prop, "Header", "");
 	RNA_def_property_update(prop, 0, "rna_userdef_update");
-
+	
+	prop = RNA_def_property(srna, "back", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_ui_text(prop, "Background", "");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+	
 	prop = RNA_def_property(srna, "show_header", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_ui_text(prop, "Show Header", "");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+
+	prop = RNA_def_property(srna, "show_back", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_ui_text(prop, "Show Background", "");
 	RNA_def_property_update(prop, 0, "rna_userdef_update");
 }
 
@@ -757,9 +861,14 @@ static void rna_def_userdef_theme_ui(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "State Colors", "");
 	RNA_def_property_update(prop, 0, "rna_userdef_update");
 
-	prop = RNA_def_property(srna, "panel", PROP_POINTER, PROP_NONE);
-	RNA_def_property_flag(prop, PROP_NEVER_NULL);
-	RNA_def_property_ui_text(prop, "Panel Colors", "");
+	prop = RNA_def_property(srna, "menu_shadow_fac", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_ui_text(prop, "Menu Shadow Strength", "Blending factor for menu shadows");
+	RNA_def_property_range(prop, 0.01f, 1.0f);
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+	
+	prop = RNA_def_property(srna, "menu_shadow_width", PROP_INT, PROP_NONE);
+	RNA_def_property_ui_text(prop, "Menu Shadow Width", "Width of menu shadows in standard pixels, set to zero to disable it");
+	RNA_def_property_range(prop, 0.0f, 24.0f);
 	RNA_def_property_update(prop, 0, "rna_userdef_update");
 	
 	prop = RNA_def_property(srna, "icon_file", PROP_STRING, PROP_FILEPATH);
@@ -837,10 +946,16 @@ static void rna_def_userdef_theme_space_generic(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Header Text Highlight", "");
 	RNA_def_property_update(prop, 0, "rna_userdef_update");
 
+	/* panel settings */
+	prop = RNA_def_property(srna, "panelcolors", PROP_POINTER, PROP_NONE);
+	RNA_def_property_flag(prop, PROP_NEVER_NULL);
+	RNA_def_property_ui_text(prop, "Panel Colors", "");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+
 	/* buttons */
 /*	if (! ELEM(spacetype, SPACE_BUTS, SPACE_OUTLINER)) { */
 	prop = RNA_def_property(srna, "button", PROP_FLOAT, PROP_COLOR_GAMMA);
-	RNA_def_property_array(prop, 3);
+	RNA_def_property_array(prop, 4);
 	RNA_def_property_ui_text(prop, "Region Background", "");
 	RNA_def_property_update(prop, 0, "rna_userdef_update");
 
@@ -1114,11 +1229,6 @@ static void rna_def_userdef_theme_space_view3d(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Grid", "");
 	RNA_def_property_update(prop, 0, "rna_userdef_update");
 
-	prop = RNA_def_property(srna, "panel", PROP_FLOAT, PROP_COLOR_GAMMA);
-	RNA_def_property_array(prop, 4);
-	RNA_def_property_ui_text(prop, "Panel", "");
-	RNA_def_property_update(prop, 0, "rna_userdef_update");
-
 	prop = RNA_def_property(srna, "wire", PROP_FLOAT, PROP_COLOR_GAMMA);
 	RNA_def_property_array(prop, 3);
 	RNA_def_property_ui_text(prop, "Wire", "");
@@ -1273,11 +1383,6 @@ static void rna_def_userdef_theme_space_graph(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Grid", "");
 	RNA_def_property_update(prop, 0, "rna_userdef_update");
 
-	prop = RNA_def_property(srna, "panel", PROP_FLOAT, PROP_COLOR_GAMMA);
-	RNA_def_property_array(prop, 3);
-	RNA_def_property_ui_text(prop, "Panel", "");
-	RNA_def_property_update(prop, 0, "rna_userdef_update");
-
 	prop = RNA_def_property(srna, "window_sliders", PROP_FLOAT, PROP_COLOR_GAMMA);
 	RNA_def_property_float_sdna(prop, NULL, "shade1");
 	RNA_def_property_array(prop, 3);
@@ -1358,12 +1463,6 @@ static void rna_def_userdef_theme_space_file(BlenderRNA *brna)
 	RNA_def_property_float_sdna(prop, NULL, "hilite");
 	RNA_def_property_array(prop, 3);
 	RNA_def_property_ui_text(prop, "Selected File", "");
-	RNA_def_property_update(prop, 0, "rna_userdef_update");
-
-	prop = RNA_def_property(srna, "tiles", PROP_FLOAT, PROP_COLOR_GAMMA);
-	RNA_def_property_float_sdna(prop, NULL, "panel");
-	RNA_def_property_array(prop, 3);
-	RNA_def_property_ui_text(prop, "Tiles", "");
 	RNA_def_property_update(prop, 0, "rna_userdef_update");
 
 	prop = RNA_def_property(srna, "scrollbar", PROP_FLOAT, PROP_COLOR_GAMMA);
@@ -1537,10 +1636,28 @@ static void rna_def_userdef_theme_space_text(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Syntax Built-in", "");
 	RNA_def_property_update(prop, 0, "rna_userdef_update");
 	
+	prop = RNA_def_property(srna, "syntax_symbols", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_float_sdna(prop, NULL, "syntaxs");
+	RNA_def_property_array(prop, 3);
+	RNA_def_property_ui_text(prop, "Syntax Symbols", "");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+
 	prop = RNA_def_property(srna, "syntax_special", PROP_FLOAT, PROP_COLOR_GAMMA);
 	RNA_def_property_float_sdna(prop, NULL, "syntaxv");
 	RNA_def_property_array(prop, 3);
-	RNA_def_property_ui_text(prop, "Decorator", "");
+	RNA_def_property_ui_text(prop, "Syntax Special", "");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+
+	prop = RNA_def_property(srna, "syntax_preprocessor", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_float_sdna(prop, NULL, "syntaxd");
+	RNA_def_property_array(prop, 3);
+	RNA_def_property_ui_text(prop, "Syntax PreProcessor", "");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+
+	prop = RNA_def_property(srna, "syntax_reserved", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_float_sdna(prop, NULL, "syntaxr");
+	RNA_def_property_array(prop, 3);
+	RNA_def_property_ui_text(prop, "Syntax Reserved", "");
 	RNA_def_property_update(prop, 0, "rna_userdef_update");
 
 	prop = RNA_def_property(srna, "syntax_comment", PROP_FLOAT, PROP_COLOR_GAMMA);
@@ -1654,7 +1771,7 @@ static void rna_def_userdef_theme_space_node(BlenderRNA *brna)
 static void rna_def_userdef_theme_space_logic(BlenderRNA *brna)
 {
 	StructRNA *srna;
-	PropertyRNA *prop;
+//	PropertyRNA *prop;
 	
 	/* space_logic */
 	
@@ -1665,17 +1782,13 @@ static void rna_def_userdef_theme_space_logic(BlenderRNA *brna)
 	
 	rna_def_userdef_theme_spaces_main(srna);
 	
-	prop = RNA_def_property(srna, "panel", PROP_FLOAT, PROP_COLOR_GAMMA);
-	RNA_def_property_array(prop, 3);
-	RNA_def_property_ui_text(prop, "Panel", "");
-	RNA_def_property_update(prop, 0, "rna_userdef_update");
 }
 
 
 static void rna_def_userdef_theme_space_buts(BlenderRNA *brna)
 {
 	StructRNA *srna;
-	PropertyRNA *prop;
+//	PropertyRNA *prop;
 
 	/* space_buts */
 
@@ -1686,10 +1799,6 @@ static void rna_def_userdef_theme_space_buts(BlenderRNA *brna)
 
 	rna_def_userdef_theme_spaces_main(srna);
 
-	prop = RNA_def_property(srna, "panel", PROP_FLOAT, PROP_COLOR_GAMMA);
-	RNA_def_property_array(prop, 3);
-	RNA_def_property_ui_text(prop, "Panel", "");
-	RNA_def_property_update(prop, 0, "rna_userdef_update");
 }
 
 static void rna_def_userdef_theme_space_time(BlenderRNA *brna)
@@ -2224,6 +2333,7 @@ static void rna_def_userdef_themes(BlenderRNA *brna)
 	
 	static EnumPropertyItem active_theme_area[] = {
 		{0, "USER_INTERFACE", ICON_UI, "User Interface", ""},
+		{19, "STYLE", ICON_FONTPREVIEW, "Text Style", ""},
 		{18, "BONE_COLOR_SETS", ICON_COLOR, "Bone Color Sets", ""},
 		{1, "VIEW_3D", ICON_VIEW3D, "3D View", ""},
 		{2, "TIMELINE", ICON_TIME, "Timeline", ""},
@@ -2390,6 +2500,32 @@ static void rna_def_userdef_addon(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "module", PROP_STRING, PROP_NONE);
 	RNA_def_property_ui_text(prop, "Module", "Module name");
 	RNA_def_struct_name_property(srna, prop);
+
+	/* Collection active property */
+	prop = RNA_def_property(srna, "preferences", PROP_POINTER, PROP_NONE);
+	RNA_def_property_struct_type(prop, "AddonPreferences");
+	RNA_def_property_pointer_funcs(prop, "rna_Addon_preferences_get", NULL, NULL, NULL);
+}
+
+static void rna_def_userdef_addon_pref(BlenderRNA *brna)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+
+	srna = RNA_def_struct(brna, "AddonPreferences", NULL);
+	RNA_def_struct_ui_text(srna, "Addon Preferences", "");
+	RNA_def_struct_sdna(srna, "bAddon");  /* WARNING: only a bAddon during registration */
+
+	RNA_def_struct_refine_func(srna, "rna_AddonPref_refine");
+	RNA_def_struct_register_funcs(srna, "rna_AddonPref_register", "rna_AddonPref_unregister", NULL);
+	RNA_def_struct_idprops_func(srna, "rna_AddonPref_idprops");
+
+	/* registration */
+	RNA_define_verify_sdna(0);
+	prop = RNA_def_property(srna, "bl_idname", PROP_STRING, PROP_NONE);
+	RNA_def_property_string_sdna(prop, NULL, "module");
+	RNA_def_property_flag(prop, PROP_REGISTER | PROP_NEVER_CLAMP);
+	RNA_define_verify_sdna(1);
 }
 
 
@@ -3027,62 +3163,10 @@ static void rna_def_userdef_system(BlenderRNA *brna)
 		{0, NULL, 0, NULL, NULL}
 	};
 	
-#if 0
-	/* hardcoded here, could become dynamic somehow */
-	/* locale according to http://www.roseindia.net/tutorials/I18N/locales-list.shtml */
-	/* if you edit here, please also edit the source/blender/blenfont/intern/blf_lang.c 's locales */
-	/* Note: As this list is in alphabetical order, and not defined order,
-	 *       here is the highest define currently in use: 35 (Esperanto). */
 	static EnumPropertyItem language_items[] = {
-		{ 0, "", 0, N_("Nearly Done"), ""},
-		{ 0, "DEFAULT", 0, "Default (Default)", ""},
-		/* using the utf8 flipped form of Arabic (العربية) */
-		{21, "ARABIC", 0, "Arabic (ﺔﻴﺑﺮﻌﻟﺍ)", "ar_EG"},
-		{32, "BRAZILIANPORTUGUESE", 0, "Brazilian Portuguese (Português do Brasil)", "pt_BR"},
-		{ 1, "ENGLISH", 0, "English (English)", "en_US"},
-		{ 8, "FRENCH", 0, "French (Français)", "fr_FR"},
-		{ 4, "ITALIAN", 0, "Italian (Italiano)", "it_IT"},
-		{ 2, "JAPANESE", 0, "Japanese (日本語)", "ja_JP"},
-		{12, "PORTUGUESE", 0, "Portuguese (Português)", "pt"},
-		{15, "RUSSIAN", 0, "Russian (Русский)", "ru_RU"},
-		{13, "SIMPLIFIED_CHINESE", 0, "Simplified Chinese (简体中文)", "zh_CN"},
-		{ 9, "SPANISH", 0, "Spanish (Español)", "es"},
-		{14, "TRADITIONAL_CHINESE", 0, "Traditional Chinese (繁體中文)", "zh_TW"},
-		{18, "UKRAINIAN", 0, "Ukrainian (Український)", "uk_UA"},
-		{ 0, "", 0, N_("In Progress"), ""},
-/*		{22, "BULGARIAN", 0, "Bulgarian (Български)", "bg_BG"},*/ /* XXX Not active nor enough translated. */
-/*		{10, "CATALAN", 0, "Catalan (Català)", "ca_AD"},*/ /* XXX Not active nor enough translated. */
-		{16, "CROATIAN", 0, "Croatian (Hrvatski)", "hr_HR"},
-		{11, "CZECH", 0, "Czech (Český)", "cs_CZ"},
-		{ 3, "DUTCH", 0, "Dutch (Nederlandse taal)", "nl_NL"},
-		{35, "ESPERANTO", 0, "Esperanto (Esperanto)", "eo"},
-		{34, "ESTONIAN", 0, "Estonian (Eestlane)", "et_EE"},
-/*		{ 6, "FINNISH", 0, "Finnish (Suomi)", "fi_FI"},*/ /* XXX Not active nor enough translated. */
-		{ 5, "GERMAN", 0, "German (Deutsch)", "de_DE"},
-/*		{23, "GREEK", 0, "Greek (Ελληνικά)", "el_GR"},*/ /* XXX Not active nor enough translated. */
-		/* using the utf8 flipped form of Hebrew (עִבְרִית)) */
-		{33, "HEBREW", 0, "Hebrew (תירִבְעִ)", "he_IL"},
-		{31, "HUNGARIAN", 0, "Hungarian (Magyar)", "hu_HU"},
-		{27, "INDONESIAN", 0, "Indonesian (Bahasa indonesia)", "id_ID"},
-		{29, "KYRGYZ", 0, "Kyrgyz (Кыргыз тили)", "ky_KG"},
-/*		{24, "KOREAN", 0, "Korean (한국 언어)", "ko_KR"}, */ /* XXX Not active nor enough translated. */
-/*		{25, "NEPALI", 0, "Nepali (नेपाली)", "ne_NP"},*/ /* XXX Not active nor enough translated. */
-		/* using the utf8 flipped form of Persian (فارسی) */
-		{26, "PERSIAN", 0, "Persian (ﯽﺳﺭﺎﻓ)", "fa_IR"},
-/*		{19, "POLISH", 0, "Polish (Polski)", "pl_PL"},*/ /* XXX Not active nor enough translated. */
-/*		{20, "ROMANIAN", 0, "Romanian (Român)", "ro_RO"}, */ /* XXX Not active nor enough translated. */
-		{17, "SERBIAN", 0, "Serbian (Српски)", "sr_RS"},
-		{28, "SERBIAN_LATIN", 0, "Serbian Latin (Srpski latinica)", "sr_RS@latin"},
-		{ 7, "SWEDISH", 0, "Swedish (Svenska)", "sv_SE"},
-		{30, "TURKISH", 0, "Turkish (Türkçe)", "tr_TR"},
-		{ 0, NULL, 0, NULL, NULL}
+		{0, "DEFAULT", 0, "Default (Default)", ""},
+		{0, NULL, 0, NULL, NULL}
 	};
-#else
-	static EnumPropertyItem language_items[] = {
-		{ 0, "DEFAULT", 0, "Default (Default)", ""},
-		{ 0, NULL, 0, NULL, NULL}
-	};
-#endif
 
 #ifdef WITH_CYCLES
 	static EnumPropertyItem compute_device_items[] = {
@@ -3275,7 +3359,7 @@ static void rna_def_userdef_system(BlenderRNA *brna)
 	RNA_def_property_enum_sdna(prop, NULL, "wmdrawmethod");
 	RNA_def_property_enum_items(prop, draw_method_items);
 	RNA_def_property_ui_text(prop, "Window Draw Method", "Drawing method used by the window manager");
-	RNA_def_property_update(prop, 0, "rna_userdef_update");
+	RNA_def_property_update(prop, 0, "rna_userdef_dpi_update");
 
 	prop = RNA_def_property(srna, "audio_mixing_buffer", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "mixbufsize");
@@ -3328,6 +3412,13 @@ static void rna_def_userdef_system(BlenderRNA *brna)
 	RNA_def_property_enum_bitflag_sdna(prop, NULL, "ogl_multisamples");
 	RNA_def_property_enum_items(prop, multi_sample_levels);
 	RNA_def_property_ui_text(prop, "MultiSample", "Enable OpenGL multi-sampling, only for systems that support it, requires restart");
+
+	prop = RNA_def_property(srna, "use_region_overlap", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "uiflag2", USER_REGION_OVERLAP);
+	RNA_def_property_ui_text(prop, "Region Overlap",
+	                         "Draw tool/property regions over the main region, when using Triple Buffer");
+	RNA_def_property_update(prop, 0, "rna_userdef_dpi_update");
+	
 
 #ifdef WITH_CYCLES
 	prop = RNA_def_property(srna, "compute_device_type", PROP_ENUM, PROP_NONE);
@@ -3664,6 +3755,11 @@ static void rna_def_userdef_filepaths(BlenderRNA *brna)
 	                         "The time (in minutes) to wait between automatic temporary saves");
 	RNA_def_property_update(prop, 0, "rna_userdef_autosave_update");
 
+	prop = RNA_def_property(srna, "use_keep_session", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "uiflag2", USER_KEEP_SESSION);
+	RNA_def_property_ui_text(prop, "Keep Session",
+	                         "Always load session recovery and save it after quitting Blender");
+	
 	prop = RNA_def_property(srna, "recent_files", PROP_INT, PROP_NONE);
 	RNA_def_property_range(prop, 0, 30);
 	RNA_def_property_ui_text(prop, "Recent Files", "Maximum number of recently opened files to remember");
@@ -3785,6 +3881,7 @@ void RNA_def_userdef(BlenderRNA *brna)
 	rna_def_userdef_filepaths(brna);
 	rna_def_userdef_system(brna);
 	rna_def_userdef_addon(brna);
+	rna_def_userdef_addon_pref(brna);
 	
 }
 

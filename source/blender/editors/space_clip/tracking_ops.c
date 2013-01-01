@@ -1801,7 +1801,7 @@ static void object_solver_inverted_matrix(Scene *scene, Object *ob, float invmat
 	int found = FALSE;
 
 	for (con = ob->constraints.first; con; con = con->next) {
-		bConstraintTypeInfo *cti = constraint_get_typeinfo(con);
+		bConstraintTypeInfo *cti = BKE_constraint_get_typeinfo(con);
 
 		if (!cti)
 			continue;
@@ -1832,7 +1832,7 @@ static Object *object_solver_camera(Scene *scene, Object *ob)
 	bConstraint *con;
 
 	for (con = ob->constraints.first; con; con = con->next) {
-		bConstraintTypeInfo *cti = constraint_get_typeinfo(con);
+		bConstraintTypeInfo *cti = BKE_constraint_get_typeinfo(con);
 
 		if (!cti)
 			continue;
@@ -2025,7 +2025,7 @@ static void set_axis(Scene *scene,  Object *ob, MovieClip *clip, MovieTrackingOb
 		if (!flip) {
 			float lmat[4][4], ilmat[4][4], rmat[3][3];
 
-			BKE_object_rot_to_mat3(ob, rmat);
+			BKE_object_rot_to_mat3(ob, rmat, TRUE);
 			invert_m3(rmat);
 			mul_m4_m4m3(mat, mat, rmat);
 

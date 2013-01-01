@@ -1540,7 +1540,7 @@ void BKE_ptcache_mem_pointers_incr(PTCacheMem *pm)
 
 	for (i=0; i<BPHYS_TOT_DATA; i++) {
 		if (pm->cur[i])
-			pm->cur[i] = (char*)pm->cur[i] + ptcache_data_size[i];
+			pm->cur[i] = (char *)pm->cur[i] + ptcache_data_size[i];
 	}
 }
 int  BKE_ptcache_mem_pointers_seek(int point_index, PTCacheMem *pm)
@@ -1558,7 +1558,7 @@ int  BKE_ptcache_mem_pointers_seek(int point_index, PTCacheMem *pm)
 	}
 
 	for (i=0; i<BPHYS_TOT_DATA; i++)
-		pm->cur[i] = data_types & (1<<i) ? (char*)pm->data[i] + index * ptcache_data_size[i] : NULL;
+		pm->cur[i] = data_types & (1<<i) ? (char *)pm->data[i] + index * ptcache_data_size[i] : NULL;
 
 	return 1;
 }
@@ -2782,7 +2782,8 @@ static PointCache *ptcache_copy(PointCache *cache, int copy_data)
 		ncache->mem_cache.last = NULL;
 		ncache->cached_frames = NULL;
 
-		ncache->flag= 0;
+		/* flag is a mix of user settings and simulator/baking state */
+		ncache->flag= ncache->flag & (PTCACHE_DISK_CACHE|PTCACHE_EXTERNAL|PTCACHE_IGNORE_LIBPATH);
 		ncache->simframe= 0;
 	}
 	else {

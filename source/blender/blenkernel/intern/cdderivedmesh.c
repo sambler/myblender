@@ -40,12 +40,12 @@
 #include "BLI_blenlib.h"
 #include "BLI_edgehash.h"
 #include "BLI_math.h"
-#include "BLI_pbvh.h"
 #include "BLI_array.h"
 #include "BLI_smallhash.h"
 #include "BLI_utildefines.h"
 #include "BLI_scanfill.h"
 
+#include "BKE_pbvh.h"
 #include "BKE_cdderivedmesh.h"
 #include "BKE_global.h"
 #include "BKE_mesh.h"
@@ -262,6 +262,17 @@ static PBVH *cdDM_getPBVH(Object *ob, DerivedMesh *dm)
 		cddm->pbvh_draw = can_pbvh_draw(ob, dm);
 	}
 
+	/* Sculpting on a BMesh (dynamic-topology) gets a special PBVH */
+	if (!cddm->pbvh && ob->sculpt->bm) {
+		cddm->pbvh = BKE_pbvh_new();
+		cddm->pbvh_draw = TRUE;
+
+		BKE_pbvh_build_bmesh(cddm->pbvh, ob->sculpt->bm,
+							 ob->sculpt->bm_smooth_shading,
+							 ob->sculpt->bm_log);
+	}
+		
+
 	/* always build pbvh from original mesh, and only use it for drawing if
 	 * this derivedmesh is just original mesh. it's the multires subsurf dm
 	 * that this is actually for, to support a pbvh on a modified mesh */
@@ -270,14 +281,14 @@ static PBVH *cdDM_getPBVH(Object *ob, DerivedMesh *dm)
 		Mesh *me = ob->data;
 		int deformed = 0;
 
-		cddm->pbvh = BLI_pbvh_new();
+		cddm->pbvh = BKE_pbvh_new();
 		cddm->pbvh_draw = can_pbvh_draw(ob, dm);
 
 		pbvh_show_diffuse_color_set(cddm->pbvh, ob->sculpt->show_diffuse_color);
 
 		BKE_mesh_tessface_ensure(me);
 		
-		BLI_pbvh_build_mesh(cddm->pbvh, me->mface, me->mvert,
+		BKE_pbvh_build_mesh(cddm->pbvh, me->mface, me->mvert,
 		                    me->totface, me->totvert, &me->vdata);
 
 		deformed = ss->modifiers_active || me->key;
@@ -290,7 +301,7 @@ static PBVH *cdDM_getPBVH(Object *ob, DerivedMesh *dm)
 			totvert = deformdm->getNumVerts(deformdm);
 			vertCos = MEM_callocN(3 * totvert * sizeof(float), "cdDM_getPBVH vertCos");
 			deformdm->getVertCos(deformdm, vertCos);
-			BLI_pbvh_apply_vertCos(cddm->pbvh, vertCos);
+			BKE_pbvh_apply_vertCos(cddm->pbvh, vertCos);
 			MEM_freeN(vertCos);
 		}
 	}
@@ -310,7 +321,7 @@ static void cdDM_update_normals_from_pbvh(DerivedMesh *dm)
 
 	face_nors = CustomData_get_layer(&dm->faceData, CD_NORMAL);
 
-	BLI_pbvh_update(cddm->pbvh, PBVH_UpdateNormals, face_nors);
+	BKE_pbvh_update(cddm->pbvh, PBVH_UpdateNormals, face_nors);
 }
 
 static void cdDM_drawVerts(DerivedMesh *dm)
@@ -414,6 +425,14 @@ static void cdDM_drawEdges(DerivedMesh *dm, int drawLooseEdges, int drawAllEdges
 	MVert *mvert = cddm->mvert;
 	MEdge *medge = cddm->medge;
 	int i;
+
+	if (cddm->pbvh && cddm->pbvh_draw &&
+		BKE_pbvh_type(cddm->pbvh) == PBVH_BMESH)
+	{
+		BKE_pbvh_draw(cddm->pbvh, NULL, NULL, NULL, TRUE);
+
+		return;
+	}
 	
 	if (GPU_buffer_legacy(dm)) {
 		DEBUG_VBO("Using legacy code. cdDM_drawEdges\n");
@@ -530,7 +549,8 @@ static void cdDM_drawFacesSolid(DerivedMesh *dm,
 		if (dm->numTessFaceData) {
 			float (*face_nors)[3] = CustomData_get_layer(&dm->faceData, CD_NORMAL);
 
-			BLI_pbvh_draw(cddm->pbvh, partial_redraw_planes, face_nors, setMaterial);
+			BKE_pbvh_draw(cddm->pbvh, partial_redraw_planes, face_nors,
+						  setMaterial, FALSE);
 			glShadeModel(GL_FLAT);
 		}
 
@@ -1875,7 +1895,7 @@ static DerivedMesh *cddm_from_bmesh_ex(struct BMesh *bm, int use_mdisps,
 	                           bm->totface);
 
 	CDDerivedMesh *cddm = (CDDerivedMesh *)dm;
-	BMIter iter, liter;
+	BMIter iter;
 	BMVert *eve;
 	BMEdge *eed;
 	BMFace *efa;
@@ -1913,7 +1933,7 @@ static DerivedMesh *cddm_from_bmesh_ex(struct BMesh *bm, int use_mdisps,
 	                 CD_CALLOC, dm->numLoopData);
 	CustomData_merge(&bm->pdata, &dm->polyData, mask,
 	                 CD_CALLOC, dm->numPolyData);
-	
+
 	/* add tessellation mface layers */
 	if (use_tessface) {
 		CustomData_from_bmeshpoly(&dm->faceData, &dm->polyData, &dm->loopData, em_tottri);
@@ -2002,7 +2022,8 @@ static DerivedMesh *cddm_from_bmesh_ex(struct BMesh *bm, int use_mdisps,
 	j = 0;
 	efa = BM_iter_new(&iter, bm, BM_FACES_OF_MESH, NULL);
 	for (i = 0; efa; i++, efa = BM_iter_step(&iter), index++) {
-		BMLoop *l;
+		BMLoop *l_iter;
+		BMLoop *l_first;
 		MPoly *mp = &mpoly[i];
 
 		BM_elem_index_set(efa, i); /* set_inline */
@@ -2011,15 +2032,16 @@ static DerivedMesh *cddm_from_bmesh_ex(struct BMesh *bm, int use_mdisps,
 		mp->flag = BM_face_flag_to_mflag(efa);
 		mp->loopstart = j;
 		mp->mat_nr = efa->mat_nr;
-		
-		BM_ITER_ELEM (l, &liter, efa, BM_LOOPS_OF_FACE) {
-			mloop->v = BM_elem_index_get(l->v);
-			mloop->e = BM_elem_index_get(l->e);
-			CustomData_from_bmesh_block(&bm->ldata, &dm->loopData, l->head.data, j);
+
+		l_iter = l_first = BM_FACE_FIRST_LOOP(efa);
+		do {
+			mloop->v = BM_elem_index_get(l_iter->v);
+			mloop->e = BM_elem_index_get(l_iter->e);
+			CustomData_from_bmesh_block(&bm->ldata, &dm->loopData, l_iter->head.data, j);
 
 			j++;
 			mloop++;
-		}
+		} while ((l_iter = l_iter->next) != l_first);
 
 		CustomData_from_bmesh_block(&bm->pdata, &dm->polyData, efa->head.data, i);
 

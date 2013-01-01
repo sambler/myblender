@@ -919,6 +919,7 @@ endif()
 		cycles_subd
 		bf_intern_raskter
 		bf_intern_opencolorio
+		extern_rangetree
 	)
 
 	if(WITH_COMPOSITOR)

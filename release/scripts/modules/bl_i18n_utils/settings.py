@@ -80,6 +80,7 @@ LANGUAGES = (
     (34, "Estonian (Eestlane)", "et_EE"),
     (35, "Esperanto (Esperanto)", "eo"),
     (36, "Spanish from Spain (Español de España)", "es_ES"),
+    (37, "Amharic (አማርኛ)", "am_ET"),
 )
 
 # Name of language file used by Blender to generate translations' menu.
@@ -90,7 +91,7 @@ LANGUAGES_FILE = "languages"
 IMPORT_MIN_LEVEL = -1
 
 # Languages in /branches we do not want to import in /trunk currently...
-IMPORT_LANGUAGES_SKIP = {'bg', 'ca', 'fi', 'el', 'ko', 'ne', 'pl', 'ro'}
+IMPORT_LANGUAGES_SKIP = {'am', 'bg', 'fi', 'el', 'et', 'ko', 'ne', 'pl', 'ro'}
 
 # The comment prefix used in generated messages.txt file.
 COMMENT_PREFIX = "#~ "

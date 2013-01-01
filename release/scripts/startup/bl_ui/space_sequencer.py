@@ -602,6 +602,7 @@ class SEQUENCER_PT_input(SequencerButtonsPanel, Panel):
                 split.prop(elem, "filename", text="")  # strip.elements[0] could be a fallback
 
             layout.prop(strip.colorspace_settings, "name")
+            layout.prop(strip, "alpha_mode")
 
             layout.operator("sequencer.change_path")
 
@@ -797,7 +798,6 @@ class SEQUENCER_PT_filter(SequencerButtonsPanel, Panel):
         col.label(text="Colors:")
         col.prop(strip, "color_saturation", text="Saturation")
         col.prop(strip, "color_multiply", text="Multiply")
-        col.prop(strip, "use_premultiply")
         col.prop(strip, "use_float")
 
 
@@ -866,6 +866,10 @@ class SEQUENCER_PT_preview(SequencerButtonsPanel_Output, Panel):
         col = layout.column()
         #col.active = render.use_sequencer_gl_preview
         col.prop(render, "sequencer_gl_preview", text="")
+
+        row = col.row()
+        row.active = render.sequencer_gl_preview == 'SOLID'
+        row.prop(render, "use_sequencer_gl_textured_solid")
 
 
 class SEQUENCER_PT_view(SequencerButtonsPanel_Output, Panel):

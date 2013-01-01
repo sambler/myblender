@@ -31,7 +31,6 @@
 
 #include "MEM_guardedalloc.h"
 
-#include "DNA_scene_types.h"
 #include "DNA_object_types.h"
 
 #include "RNA_define.h"
@@ -41,11 +40,9 @@
 #include "BLI_array.h"
 
 #include "BKE_context.h"
-#include "BKE_object.h"
 #include "BKE_report.h"
 #include "BKE_tessmesh.h"
 
-#include "WM_api.h"
 #include "WM_types.h"
 
 #include "ED_mesh.h"
@@ -63,7 +60,7 @@
  * point and would result in the same distance.
  */
 #define INSET_DEFAULT 0.00001f
-static float edbm_rip_edgedist(ARegion *ar, float mat[][4],
+static float edbm_rip_edgedist(ARegion *ar, float mat[4][4],
                                const float co1[3], const float co2[3], const float mvalf[2],
                                const float inset)
 {
@@ -83,7 +80,7 @@ static float edbm_rip_edgedist(ARegion *ar, float mat[][4],
 }
 
 #if 0
-static float edbm_rip_linedist(ARegion *ar, float mat[][4],
+static float edbm_rip_linedist(ARegion *ar, float mat[4][4],
                                const float co1[3], const float co2[3], const float mvalf[2])
 {
 	float vec1[2], vec2[2];
@@ -1044,7 +1041,7 @@ static int edbm_rip_invoke(bContext *C, wmOperator *op, wmEvent *event)
 		return OPERATOR_CANCELLED;
 	}
 
-	EDBM_update_generic(C, em, TRUE);
+	EDBM_update_generic(em, TRUE, TRUE);
 
 	return OPERATOR_FINISHED;
 }

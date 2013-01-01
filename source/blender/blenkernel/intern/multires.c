@@ -43,9 +43,9 @@
 #include "BLI_bitmap.h"
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
-#include "BLI_pbvh.h"
 #include "BLI_utildefines.h"
 
+#include "BKE_pbvh.h"
 #include "BKE_ccg.h"
 #include "BKE_cdderivedmesh.h"
 #include "BKE_mesh.h"
@@ -379,7 +379,7 @@ void multires_force_update(Object *ob)
 			ob->derivedFinal = NULL;
 		}
 		if (ob->sculpt && ob->sculpt->pbvh) {
-			BLI_pbvh_free(ob->sculpt->pbvh);
+			BKE_pbvh_free(ob->sculpt->pbvh);
 			ob->sculpt->pbvh = NULL;
 		}
 	}
@@ -1407,7 +1407,7 @@ void multires_stitch_grids(Object *ob)
 		int totface;
 
 		if (ccgdm->pbvh) {
-			BLI_pbvh_get_grid_updates(ccgdm->pbvh, 0, (void ***)&faces, &totface);
+			BKE_pbvh_get_grid_updates(ccgdm->pbvh, 0, (void ***)&faces, &totface);
 
 			if (totface) {
 				ccgSubSurf_stitchFaces(ccgdm->ss, 0, faces, totface);

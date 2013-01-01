@@ -352,6 +352,7 @@ void projectFloatView(TransInfo *t, const float vec[3], float adr[2])
 		case SPACE_VIEW3D:
 		{
 			if (t->ar->regiontype == RGN_TYPE_WINDOW) {
+				/* allow points behind the view [#33643] */
 				if (ED_view3d_project_float_global(t->ar, vec, adr, V3D_PROJ_TEST_NOP) != V3D_PROJ_RET_OK) {
 					/* XXX, 2.64 and prior did this, weak! */
 					adr[0] = t->ar->winx / 2.0f;
@@ -1585,14 +1586,17 @@ static void drawTransformView(const struct bContext *C, ARegion *UNUSED(ar), voi
 /* just draw a little warning message in the top-right corner of the viewport to warn that autokeying is enabled */
 static void drawAutoKeyWarning(TransInfo *UNUSED(t), ARegion *ar)
 {
+	rcti rect;
 	const char printable[] = "Auto Keying On";
 	float      printable_size[2];
 	int xco, yco;
 
+	ED_region_visible_rect(ar, &rect);
+	
 	BLF_width_and_height_default(printable, &printable_size[0], &printable_size[1]);
 	
-	xco = ar->winx - (int)printable_size[0] - 10;
-	yco = ar->winy - (int)printable_size[1] - 10;
+	xco = rect.xmax - (int)printable_size[0] - 10;
+	yco = rect.ymax - (int)printable_size[1] - 10;
 	
 	/* warning text (to clarify meaning of overlays)
 	 * - original color was red to match the icon, but that clashes badly with a less nasty border
@@ -2254,8 +2258,8 @@ static void protectedQuaternionBits(short protectflag, float *quat, float *oldqu
 static void constraintTransLim(TransInfo *t, TransData *td)
 {
 	if (td->con) {
-		bConstraintTypeInfo *ctiLoc = get_constraint_typeinfo(CONSTRAINT_TYPE_LOCLIMIT);
-		bConstraintTypeInfo *ctiDist = get_constraint_typeinfo(CONSTRAINT_TYPE_DISTLIMIT);
+		bConstraintTypeInfo *ctiLoc = BKE_get_constraint_typeinfo(CONSTRAINT_TYPE_LOCLIMIT);
+		bConstraintTypeInfo *ctiDist = BKE_get_constraint_typeinfo(CONSTRAINT_TYPE_DISTLIMIT);
 		
 		bConstraintOb cob = {NULL};
 		bConstraint *con;
@@ -2305,7 +2309,7 @@ static void constraintTransLim(TransInfo *t, TransData *td)
 				}
 				
 				/* get constraint targets if needed */
-				get_constraint_targets_for_solving(con, &cob, &targets, ctime);
+				BKE_get_constraint_targets_for_solving(con, &cob, &targets, ctime);
 				
 				/* do constraint */
 				cti->evaluate_constraint(con, &cob, &targets);
@@ -2357,7 +2361,7 @@ static void constraintob_from_transdata(bConstraintOb *cob, TransData *td)
 static void constraintRotLim(TransInfo *UNUSED(t), TransData *td)
 {
 	if (td->con) {
-		bConstraintTypeInfo *cti = get_constraint_typeinfo(CONSTRAINT_TYPE_ROTLIMIT);
+		bConstraintTypeInfo *cti = BKE_get_constraint_typeinfo(CONSTRAINT_TYPE_ROTLIMIT);
 		bConstraintOb cob;
 		bConstraint *con;
 		int do_limit = FALSE;
@@ -2424,7 +2428,7 @@ static void constraintRotLim(TransInfo *UNUSED(t), TransData *td)
 static void constraintSizeLim(TransInfo *t, TransData *td)
 {
 	if (td->con && td->ext) {
-		bConstraintTypeInfo *cti = get_constraint_typeinfo(CONSTRAINT_TYPE_SIZELIMIT);
+		bConstraintTypeInfo *cti = BKE_get_constraint_typeinfo(CONSTRAINT_TYPE_SIZELIMIT);
 		bConstraintOb cob = {NULL};
 		bConstraint *con;
 		float size_sign[3], size_abs[3];
@@ -2579,7 +2583,8 @@ int handleEventWarp(TransInfo *t, wmEvent *event)
 int Warp(TransInfo *t, const int UNUSED(mval[2]))
 {
 	TransData *td = t->data;
-	float vec[3], circumfac, dist, phi0, co, si, *curs, cursor[3], gcursor[3];
+	float vec[3], circumfac, dist, phi0, co, si, cursor[3], gcursor[3];
+	const float *curs;
 	int i;
 	char str[50];
 	
@@ -2716,6 +2721,18 @@ int handleEventShear(TransInfo *t, wmEvent *event)
 
 		status = 1;
 	}
+	else if (event->type == XKEY && event->val == KM_PRESS) {
+		initMouseInputMode(t, &t->mouse, INPUT_HORIZONTAL_ABSOLUTE);
+		t->customData = NULL;
+		
+		status = 1;
+	}
+	else if (event->type == YKEY && event->val == KM_PRESS) {
+		initMouseInputMode(t, &t->mouse, INPUT_VERTICAL_ABSOLUTE);
+		t->customData = (void *)1;
+		
+		status = 1;
+	}
 	
 	return status;
 }
@@ -2749,7 +2766,7 @@ int Shear(TransInfo *t, const int UNUSED(mval[2]))
 	}
 	else {
 		/* default header print */
-		sprintf(str, "Shear: %.3f %s", value, t->proptext);
+		sprintf(str, "Shear: %.3f %s (Press X or Y to set shear axis)", value, t->proptext);
 	}
 	
 	t->values[0] = value;
@@ -2884,7 +2901,7 @@ BLI_INLINE int tx_vec_sign_flip(const float a[3], const float b[3])
 }
 
 /* smat is reference matrix, only scaled */
-static void TransMat3ToSize(float mat[][3], float smat[][3], float size[3])
+static void TransMat3ToSize(float mat[3][3], float smat[3][3], float size[3])
 {
 	float vec[3];
 	
@@ -4881,6 +4898,7 @@ static void calcNonProportionalEdgeSlide(TransInfo *t, SlideData *sld, const flo
 			sv->edge_len = len_v3v3(sv->upvec, sv->downvec);
 
 			mul_v3_m4v3(v_proj, t->obedit->obmat, sv->v->co);
+			/* allow points behind the view [#33643] */
 			if (ED_view3d_project_float_global(t->ar, v_proj, v_proj, V3D_PROJ_TEST_NOP) == V3D_PROJ_RET_OK) {
 				dist = len_squared_v2v2(mval, v_proj);
 				if (dist < min_dist) {
@@ -4903,7 +4921,7 @@ static int createSlideVerts(TransInfo *t)
 	BMEdge *e, *e1;
 	BMVert *v, *v2, *first;
 	TransDataSlideVert *sv_array;
-	BMBVHTree *btree = BMBVH_NewBVH(em, BMBVH_RESPECT_HIDDEN, NULL, NULL);
+	BMBVHTree *btree;
 	SmallHash table;
 	SlideData *sld = MEM_callocN(sizeof(*sld), "sld");
 	View3D *v3d = NULL;
@@ -4915,11 +4933,21 @@ static int createSlideVerts(TransInfo *t)
 	float vec[3], vec2[3] /*, lastvec[3], size, dis=0.0, z */ /* UNUSED */;
 	float dir[3], maxdist, (*loop_dir)[3], *loop_maxdist;
 	int numsel, i, j, loop_nr, l_nr;
+	int use_btree_disp;
 
 	if (t->spacetype == SPACE_VIEW3D) {
 		/* background mode support */
 		v3d = t->sa ? t->sa->spacedata.first : NULL;
 		rv3d = t->ar ? t->ar->regiondata : NULL;
+	}
+
+	use_btree_disp = (v3d && t->obedit->dt > OB_WIRE && v3d->drawtype > OB_WIRE);
+
+	if (use_btree_disp) {
+		btree = BMBVH_NewBVH(em, BMBVH_RESPECT_HIDDEN, NULL, NULL);
+	}
+	else {
+		btree = NULL;
 	}
 
 	sld->is_proportional = TRUE;
@@ -4955,7 +4983,8 @@ static int createSlideVerts(TransInfo *t)
 
 			if (numsel == 0 || numsel > 2) {
 				MEM_freeN(sld);
-				BMBVH_FreeBVH(btree);
+				if (btree)
+					BMBVH_FreeBVH(btree);
 				return 0; /* invalid edge selection */
 			}
 		}
@@ -4965,7 +4994,8 @@ static int createSlideVerts(TransInfo *t)
 		if (BM_elem_flag_test(e, BM_ELEM_SELECT)) {
 			if (!BM_edge_is_manifold(e)) {
 				MEM_freeN(sld);
-				BMBVH_FreeBVH(btree);
+				if (btree)
+					BMBVH_FreeBVH(btree);
 				return 0; /* can only handle exactly 2 faces around each edge */
 			}
 		}
@@ -4985,7 +5015,8 @@ static int createSlideVerts(TransInfo *t)
 
 	if (!j) {
 		MEM_freeN(sld);
-		BMBVH_FreeBVH(btree);
+		if (btree)
+			BMBVH_FreeBVH(btree);
 		return 0;
 	}
 
@@ -5140,9 +5171,7 @@ static int createSlideVerts(TransInfo *t)
 						continue;
 
 					/* This test is only relevant if object is not wire-drawn! See [#32068]. */
-					if (v3d && t->obedit->dt > OB_WIRE && v3d->drawtype > OB_WIRE &&
-					    !BMBVH_EdgeVisible(btree, e2, ar, v3d, t->obedit))
-					{
+					if (use_btree_disp && !BMBVH_EdgeVisible(btree, e2, ar, v3d, t->obedit)) {
 						continue;
 					}
 
@@ -5244,10 +5273,15 @@ static int createSlideVerts(TransInfo *t)
 	t->customData = sld;
 	
 	BLI_smallhash_release(&table);
-	BMBVH_FreeBVH(btree);
+	if (btree) {
+		BMBVH_FreeBVH(btree);
+	}
 	MEM_freeN(loop_dir);
 	MEM_freeN(loop_maxdist);
-	
+
+	/* arrays are dirty from copying faces: EDBM_index_arrays_free */
+	EDBM_update_generic(em, FALSE, TRUE);
+
 	return 1;
 }
 
@@ -5419,6 +5453,9 @@ void freeSlideTempFaces(SlideData *sld)
 		BLI_smallhash_release(&sld->origfaces);
 
 		sld->origfaces_init = FALSE;
+
+		/* arrays are dirty from removing faces: EDBM_index_arrays_free */
+		EDBM_update_generic(sld->em, FALSE, TRUE);
 	}
 }
 

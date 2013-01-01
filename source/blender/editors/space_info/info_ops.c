@@ -40,7 +40,7 @@
 
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
-#include "BLI_bpath.h"
+#include "BKE_bpath.h"
 #include "BLI_utildefines.h"
 
 #include "BKE_context.h"
@@ -66,15 +66,70 @@
 
 #include "info_intern.h"
 
+/********************* pack blend file libararies operator *********************/
+
+static int pack_libraries_exec(bContext *C, wmOperator *op)
+{
+	Main *bmain = CTX_data_main(C);
+
+	packLibraries(bmain, op->reports);
+
+	return OPERATOR_FINISHED;
+}
+
+void FILE_OT_pack_libraries(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Pack Blender Libraries";
+	ot->idname = "FILE_OT_pack_libraries";
+	ot->description = "Pack all used Blender library files into the current .blend";
+	
+	/* api callbacks */
+	ot->exec = pack_libraries_exec;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+}
+
+static int unpack_libraries_exec(bContext *C, wmOperator *op)
+{
+	Main *bmain = CTX_data_main(C);
+	
+	unpackLibraries(bmain, op->reports);
+	
+	return OPERATOR_FINISHED;
+}
+
+static int unpack_libraries_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
+{
+	return WM_operator_confirm_message(C, op, "Unpack Blender Libraries - creates directories, all new paths should work");
+}
+
+void FILE_OT_unpack_libraries(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Unpack Blender Libraries";
+	ot->idname = "FILE_OT_unpack_libraries";
+	ot->description = "Unpack all used Blender library files from this .blend file";
+	
+	/* api callbacks */
+	ot->invoke = unpack_libraries_invoke;
+	ot->exec = unpack_libraries_exec;
+	
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+}
+
+
 /********************* pack all operator *********************/
 
 static int pack_all_exec(bContext *C, wmOperator *op)
 {
 	Main *bmain = CTX_data_main(C);
-
+	
 	packAll(bmain, op->reports);
 	G.fileflags |= G_AUTOPACK;
-
+	
 	return OPERATOR_FINISHED;
 }
 
@@ -83,7 +138,7 @@ static int pack_all_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 	Main *bmain = CTX_data_main(C);
 	Image *ima;
 	ImBuf *ibuf;
-
+	
 	// first check for dirty images
 	for (ima = bmain->image.first; ima; ima = ima->id.next) {
 		if (ima->ibufs.first) { /* XXX FIX */
@@ -93,16 +148,16 @@ static int pack_all_invoke(bContext *C, wmOperator *op, wmEvent *UNUSED(event))
 				BKE_image_release_ibuf(ima, ibuf, NULL);
 				break;
 			}
-
+			
 			BKE_image_release_ibuf(ima, ibuf, NULL);
 		}
 	}
-
+	
 	if (ima) {
 		uiPupMenuOkee(C, "FILE_OT_pack_all", "Some images are painted on. These changes will be lost. Continue?");
 		return OPERATOR_CANCELLED;
 	}
-
+	
 	return pack_all_exec(C, op);
 }
 
@@ -116,10 +171,11 @@ void FILE_OT_pack_all(wmOperatorType *ot)
 	/* api callbacks */
 	ot->exec = pack_all_exec;
 	ot->invoke = pack_all_invoke;
-
+	
 	/* flags */
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 }
+
 
 /********************* unpack all operator *********************/
 
@@ -204,7 +260,7 @@ static int make_paths_relative_exec(bContext *C, wmOperator *op)
 		return OPERATOR_CANCELLED;
 	}
 
-	BLI_bpath_relative_convert(bmain, bmain->name, op->reports);
+	BKE_bpath_relative_convert(bmain, bmain->name, op->reports);
 
 	/* redraw everything so any changed paths register */
 	WM_main_add_notifier(NC_WINDOW, NULL);
@@ -237,7 +293,7 @@ static int make_paths_absolute_exec(bContext *C, wmOperator *op)
 		return OPERATOR_CANCELLED;
 	}
 
-	BLI_bpath_absolute_convert(bmain, bmain->name, op->reports);
+	BKE_bpath_absolute_convert(bmain, bmain->name, op->reports);
 
 	/* redraw everything so any changed paths register */
 	WM_main_add_notifier(NC_WINDOW, NULL);
@@ -266,7 +322,7 @@ static int report_missing_files_exec(bContext *C, wmOperator *op)
 	Main *bmain = CTX_data_main(C);
 
 	/* run the missing file check */
-	BLI_bpath_missing_files_check(bmain, op->reports);
+	BKE_bpath_missing_files_check(bmain, op->reports);
 	
 	return OPERATOR_FINISHED;
 }
@@ -291,7 +347,7 @@ static int find_missing_files_exec(bContext *C, wmOperator *op)
 {
 	Main *bmain = CTX_data_main(C);
 	const char *searchpath = RNA_string_get_alloc(op->ptr, "filepath", NULL, 0);
-	BLI_bpath_missing_files_find(bmain, searchpath, op->reports);
+	BKE_bpath_missing_files_find(bmain, searchpath, op->reports);
 	MEM_freeN((void *)searchpath);
 
 	return OPERATOR_FINISHED;

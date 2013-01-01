@@ -461,7 +461,7 @@ MINLINE void mul_v3_v3v3(float r[3], const float v1[3], const float v2[3])
 	r[2] = v1[2] * v2[2];
 }
 
-MINLINE void negate_v2(float r[3])
+MINLINE void negate_v2(float r[2])
 {
 	r[0] = -r[0];
 	r[1] = -r[1];
@@ -544,7 +544,7 @@ MINLINE void add_newell_cross_v3_v3v3(float n[3], const float v_prev[3], const f
 	n[2] += (v_prev[0] - v_curr[0]) * (v_prev[1] + v_curr[1]);
 }
 
-MINLINE void star_m3_v3(float rmat[][3], float a[3])
+MINLINE void star_m3_v3(float rmat[3][3], float a[3])
 {
 	rmat[0][0] = rmat[1][1] = rmat[2][2] = 0.0;
 	rmat[0][1] = -a[2];

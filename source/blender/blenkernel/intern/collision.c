@@ -528,7 +528,7 @@ static void add_collision_object(Object ***objs, unsigned int *numobj, unsigned 
 		/* extend array */
 		if (*numobj >= *maxobj) {
 			*maxobj *= 2;
-			*objs= MEM_reallocN(*objs, sizeof(Object*)*(*maxobj));
+			*objs= MEM_reallocN(*objs, sizeof(Object *)*(*maxobj));
 		}
 		
 		(*objs)[*numobj] = ob;
@@ -567,7 +567,9 @@ Object **get_collisionobjects(Scene *scene, Object *self, Group *group, unsigned
 		Scene *sce_iter;
 		/* add objects in same layer in scene */
 		for (SETLOOPER(scene, sce_iter, base)) {
-			if (base->lay & self->lay)
+			/* Need to check for active layers, too.
+			Otherwise this check fails if the objects are not on the same layer - DG */
+			if ((base->lay & self->lay) || (base->lay & scene->lay))
 				add_collision_object(&objs, &numobj, &maxobj, base->object, self, 0, modifier_type);
 
 		}
@@ -738,7 +740,7 @@ int cloth_bvh_objcollision(Object *ob, ClothModifierData * clmd, float step, flo
 	/* move object to position (step) in time */
 	for (i = 0; i < numcollobj; i++) {
 		Object *collob= collobjs[i];
-		CollisionModifierData *collmd = (CollisionModifierData*)modifiers_findByType(collob, eModifierType_Collision);
+		CollisionModifierData *collmd = (CollisionModifierData *)modifiers_findByType(collob, eModifierType_Collision);
 
 		if (!collmd->bvhtree)
 			continue;
@@ -758,7 +760,7 @@ int cloth_bvh_objcollision(Object *ob, ClothModifierData * clmd, float step, flo
 		// check all collision objects
 		for (i = 0; i < numcollobj; i++) {
 			Object *collob= collobjs[i];
-			CollisionModifierData *collmd = (CollisionModifierData*)modifiers_findByType(collob, eModifierType_Collision);
+			CollisionModifierData *collmd = (CollisionModifierData *)modifiers_findByType(collob, eModifierType_Collision);
 			BVHTreeOverlap *overlap = NULL;
 			unsigned int result = 0;
 			

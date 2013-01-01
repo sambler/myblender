@@ -161,7 +161,7 @@ void view3d_smooth_view(bContext *C, View3D *v3d, ARegion *ar, Object *oldcamera
 	if (lens) sms.new_lens = *lens;
 
 	if (camera) {
-		sms.new_dist = ED_view3d_offset_distance(camera->obmat, ofs);
+		sms.new_dist = ED_view3d_offset_distance(camera->obmat, ofs, VIEW3D_DIST_FALLBACK);
 		ED_view3d_from_object(camera, sms.new_ofs, sms.new_quat, &sms.new_dist, &sms.new_lens);
 		sms.to_camera = TRUE; /* restore view3d values in end */
 	}
@@ -186,7 +186,7 @@ void view3d_smooth_view(bContext *C, View3D *v3d, ARegion *ar, Object *oldcamera
 
 			/* original values */
 			if (oldcamera) {
-				sms.orig_dist = ED_view3d_offset_distance(oldcamera->obmat, rv3d->ofs);
+				sms.orig_dist = ED_view3d_offset_distance(oldcamera->obmat, rv3d->ofs, 0.0f);
 				ED_view3d_from_object(oldcamera, sms.orig_ofs, sms.orig_quat, &sms.orig_dist, &sms.orig_lens);
 			}
 			else {
@@ -579,7 +579,7 @@ void ED_view3d_clipping_calc(BoundBox *bb, float planes[4][4], bglMats *mats, co
 }
 
 
-int ED_view3d_boundbox_clip(RegionView3D *rv3d, float obmat[][4], BoundBox *bb)
+int ED_view3d_boundbox_clip(RegionView3D *rv3d, float obmat[4][4], BoundBox *bb)
 {
 	/* return 1: draw */
 
@@ -1070,11 +1070,9 @@ static int view3d_localview_init(Main *bmain, Scene *scene, ScrArea *sa, ReportL
 				}
 			}
 		}
-		
-		box[0] = (max[0] - min[0]);
-		box[1] = (max[1] - min[1]);
-		box[2] = (max[2] - min[2]);
-		size = MAX3(box[0], box[1], box[2]);
+
+		sub_v3_v3v3(box, max, min);
+		size = max_fff(box[0], box[1], box[2]);
 
 		/* do not zoom closer than the near clipping plane */
 		size = max_ff(size, v3d->near * 1.5f);
@@ -1530,7 +1528,7 @@ float ED_view3d_pixel_size(RegionView3D *rv3d, const float co[3])
 	            rv3d->persmat[0][3] * co[0] +
 	            rv3d->persmat[1][3] * co[1] +
 	            rv3d->persmat[2][3] * co[2])
-	        ) * rv3d->pixsize;
+	        ) * rv3d->pixsize * U.pixelsize;
 }
 
 float ED_view3d_radius_to_persp_dist(const float angle, const float radius)

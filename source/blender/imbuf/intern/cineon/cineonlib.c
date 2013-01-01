@@ -48,7 +48,8 @@
 
 static int verbose = 0;
 
-void cineonSetVerbose(int verbosity) {
+void cineonSetVerbose(int verbosity)
+{
 	verbose = verbosity;
 }
 

@@ -397,7 +397,7 @@ void dynamicPaintSurface_updateType(struct DynamicPaintSurface *surface)
 	}
 	else {
 		strcpy(surface->output_name, "dp_");
-		strcpy(surface->output_name2, surface->output_name);
+		BLI_strncpy(surface->output_name2, surface->output_name, sizeof(surface->output_name2));
 		surface->flags &= ~MOD_DPAINT_ANTIALIAS;
 		surface->depth_clamp = 0.0f;
 	}
@@ -529,7 +529,7 @@ static int subframe_updateObject(Scene *scene, Object *ob, int flags, float fram
 
 		/* also update constraint targets */
 		for (con = ob->constraints.first; con; con = con->next) {
-			bConstraintTypeInfo *cti = constraint_get_typeinfo(con);
+			bConstraintTypeInfo *cti = BKE_constraint_get_typeinfo(con);
 			ListBase targets = {NULL, NULL};
 
 			if (cti && cti->get_constraint_targets) {
@@ -687,7 +687,7 @@ static void boundInsert(Bounds3D *b, float point[3])
 static float getSurfaceDimension(PaintSurfaceData *sData)
 {
 	Bounds3D *mb = &sData->bData->mesh_bounds;
-	return MAX3((mb->max[0] - mb->min[0]), (mb->max[1] - mb->min[1]), (mb->max[2] - mb->min[2]));
+	return max_fff((mb->max[0] - mb->min[0]), (mb->max[1] - mb->min[1]), (mb->max[2] - mb->min[2]));
 }
 
 static void freeGrid(PaintSurfaceData *data)
@@ -754,14 +754,14 @@ static void surfaceGenerateGrid(struct DynamicPaintSurface *surface)
 		/* get dimensions */
 		sub_v3_v3v3(dim, grid->grid_bounds.max, grid->grid_bounds.min);
 		copy_v3_v3(td, dim);
-		min_dim = MAX3(td[0], td[1], td[2]) / 1000.f;
+		min_dim = max_fff(td[0], td[1], td[2]) / 1000.f;
 
 		/* deactivate zero axises */
 		for (i = 0; i < 3; i++) {
 			if (td[i] < min_dim) { td[i] = 1.0f; axis -= 1; }
 		}
 
-		if (axis == 0 || MAX3(td[0], td[1], td[2]) < 0.0001f) {
+		if (axis == 0 || max_fff(td[0], td[1], td[2]) < 0.0001f) {
 			MEM_freeN(grid_bounds);
 			MEM_freeN(bData->grid);
 			bData->grid = NULL;
@@ -1193,7 +1193,68 @@ void dynamicPaint_Modifier_copy(struct DynamicPaintModifierData *pmd, struct Dyn
 
 	/* Copy data	*/
 	if (tpmd->canvas) {
+		DynamicPaintSurface *surface;
 		tpmd->canvas->pmd = tpmd;
+		/* free default surface */
+		if (tpmd->canvas->surfaces.first)
+			dynamicPaint_freeSurface(tpmd->canvas->surfaces.first);
+
+		/* copy existing surfaces */
+		for (surface = pmd->canvas->surfaces.first; surface; surface = surface->next) {
+			DynamicPaintSurface *t_surface = dynamicPaint_createNewSurface(tpmd->canvas, NULL);
+
+			/* surface settings */
+			t_surface->brush_group = surface->brush_group;
+			MEM_freeN(t_surface->effector_weights);
+			t_surface->effector_weights = MEM_dupallocN(surface->effector_weights);
+
+			BLI_strncpy(t_surface->name, surface->name, sizeof(t_surface->name));
+			t_surface->format = surface->format;
+			t_surface->type = surface->type;
+			t_surface->disp_type = surface->disp_type;
+			t_surface->image_fileformat = surface->image_fileformat;
+			t_surface->effect_ui = surface->effect_ui;
+			t_surface->preview_id = surface->preview_id;
+			t_surface->init_color_type = surface->init_color_type;
+			t_surface->flags = surface->flags;
+			t_surface->effect = surface->effect;
+
+			t_surface->image_resolution = surface->image_resolution;
+			t_surface->substeps = surface->substeps;
+			t_surface->start_frame = surface->start_frame;
+			t_surface->end_frame = surface->end_frame;
+
+			copy_v4_v4(t_surface->init_color, surface->init_color);
+			t_surface->init_texture = surface->init_texture;
+			BLI_strncpy(t_surface->init_layername, surface->init_layername, sizeof(t_surface->init_layername));
+
+			t_surface->dry_speed = surface->dry_speed;
+			t_surface->diss_speed = surface->diss_speed;
+			t_surface->color_dry_threshold = surface->color_dry_threshold;
+			t_surface->depth_clamp = surface->depth_clamp;
+			t_surface->disp_factor = surface->disp_factor;
+
+
+			t_surface->spread_speed = surface->spread_speed;
+			t_surface->color_spread_speed = surface->color_spread_speed;
+			t_surface->shrink_speed = surface->shrink_speed;
+			t_surface->drip_vel = surface->drip_vel;
+			t_surface->drip_acc = surface->drip_acc;
+
+			t_surface->influence_scale = surface->influence_scale;
+			t_surface->radius_scale = surface->radius_scale;
+
+			t_surface->wave_damping = surface->wave_damping;
+			t_surface->wave_speed = surface->wave_speed;
+			t_surface->wave_timescale = surface->wave_timescale;
+			t_surface->wave_spring = surface->wave_spring;
+
+			BLI_strncpy(t_surface->uvlayer_name, surface->uvlayer_name, sizeof(t_surface->uvlayer_name));
+			BLI_strncpy(t_surface->image_output_path, surface->image_output_path, sizeof(t_surface->image_output_path));
+			BLI_strncpy(t_surface->output_name, surface->output_name, sizeof(t_surface->output_name));
+			BLI_strncpy(t_surface->output_name2, surface->output_name2, sizeof(t_surface->output_name2));
+		}
+		dynamicPaint_resetPreview(tpmd->canvas);
 	}
 	else if (tpmd->brush) {
 		DynamicPaintBrushSettings *brush = pmd->brush, *t_brush = tpmd->brush;
@@ -2628,7 +2689,7 @@ void dynamicPaint_outputSurfaceImage(DynamicPaintSurface *surface, char *filenam
 	if (format == R_IMF_IMTYPE_OPENEXR) format = R_IMF_IMTYPE_PNG;
 	#endif
 	BLI_strncpy(output_file, filename, sizeof(output_file));
-	BKE_add_image_extension(output_file, format);
+	BKE_add_image_extension_from_type(output_file, format);
 
 	/* Validate output file path	*/
 	BLI_path_abs(output_file, G.main->name);
@@ -2778,7 +2839,9 @@ static void dynamicPaint_freeBrushMaterials(BrushMaterials *bMats)
 /*
  *	Get material diffuse color and alpha (including linked textures) in given coordinates
  */
-static void dynamicPaint_doMaterialTex(BrushMaterials *bMats, float color[3], float *alpha, Object *brushOb, const float volume_co[3], const float surface_co[3], int faceIndex, short isQuad, DerivedMesh *orcoDm)
+static void dynamicPaint_doMaterialTex(BrushMaterials *bMats, float color[3], float *alpha, Object *brushOb,
+                                       const float volume_co[3], const float surface_co[3],
+                                       int faceIndex, short isQuad, DerivedMesh *orcoDm)
 {
 	Material *mat = bMats->mat;
 	MFace *mface = orcoDm->getTessFaceArray(orcoDm);
@@ -4199,7 +4262,7 @@ static int dynamicPaint_prepareEffectStep(DynamicPaintSurface *surface, Scene *s
 	if (surface->effect & MOD_DPAINT_EFFECT_DO_SHRINK)
 		shrink_speed = surface->shrink_speed;
 
-	fastest_effect = MAX3(spread_speed, shrink_speed, average_force);
+	fastest_effect = max_fff(spread_speed, shrink_speed, average_force);
 	avg_dist = bData->average_dist * CANVAS_REL_SIZE / getSurfaceDimension(sData);
 
 	steps = (int)ceil(1.5f * EFF_MOVEMENT_PER_FRAME * fastest_effect / avg_dist * timescale);
@@ -4383,8 +4446,7 @@ static void dynamicPaint_doWaveStep(DynamicPaintSurface *surface, float timescal
 	float dt, min_dist, damp_factor;
 	float wave_speed = surface->wave_speed;
 	double average_dist = 0.0f;
-	Bounds3D *mb = &sData->bData->mesh_bounds;
-	float canvas_size = MAX3((mb->max[0] - mb->min[0]), (mb->max[1] - mb->min[1]), (mb->max[2] - mb->min[2]));
+	const float canvas_size = getSurfaceDimension(sData);
 	float wave_scale = CANVAS_REL_SIZE / canvas_size;
 
 	/* allocate memory */

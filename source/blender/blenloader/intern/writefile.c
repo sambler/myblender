@@ -139,7 +139,7 @@
 #include "BLI_bitmap.h"
 #include "BLI_blenlib.h"
 #include "BLI_linklist.h"
-#include "BLI_bpath.h"
+#include "BKE_bpath.h"
 #include "BLI_math.h"
 #include "BLI_utildefines.h"
 
@@ -850,8 +850,12 @@ static void write_userdef(WriteData *wd)
 			write_keymapitem(wd, kmi);
 	}
 
-	for (bext= U.addons.first; bext; bext=bext->next)
+	for (bext= U.addons.first; bext; bext=bext->next) {
 		writestruct(wd, DATA, "bAddon", 1, bext);
+		if (bext->prop) {
+			IDP_WriteProperty(bext->prop, wd);
+		}
+	}
 	
 	for (style= U.uistyles.first; style; style= style->next) {
 		writestruct(wd, DATA, "uiStyle", 1, style);
@@ -1228,7 +1232,7 @@ static void write_constraints(WriteData *wd, ListBase *conlist)
 	bConstraint *con;
 
 	for (con=conlist->first; con; con=con->next) {
-		bConstraintTypeInfo *cti= constraint_get_typeinfo(con);
+		bConstraintTypeInfo *cti= BKE_constraint_get_typeinfo(con);
 		
 		/* Write the specific data */
 		if (cti && con->data) {
@@ -1508,7 +1512,7 @@ static void write_vfonts(WriteData *wd, ListBase *idbase)
 
 			/* direct data */
 
-			if (vf->packedfile) {
+			if (vf->packedfile && !wd->current) {
 				pf = vf->packedfile;
 				writestruct(wd, DATA, "PackedFile", 1, pf);
 				writedata(wd, DATA, pf->size, pf->data);
@@ -1958,7 +1962,7 @@ static void write_images(WriteData *wd, ListBase *idbase)
 			writestruct(wd, ID_IM, "Image", 1, ima);
 			if (ima->id.properties) IDP_WriteProperty(ima->id.properties, wd);
 
-			if (ima->packedfile) {
+			if (ima->packedfile && !wd->current) {
 				pf = ima->packedfile;
 				writestruct(wd, DATA, "PackedFile", 1, pf);
 				writedata(wd, DATA, pf->size, pf->data);
@@ -2395,6 +2399,7 @@ static void write_screens(WriteData *wd, ListBase *scrbase)
 		for (sa= sc->areabase.first; sa; sa= sa->next) {
 			SpaceLink *sl;
 			Panel *pa;
+			uiList *ui_list;
 			ARegion *ar;
 			
 			writestruct(wd, DATA, "ScrArea", 1, sa);
@@ -2404,6 +2409,9 @@ static void write_screens(WriteData *wd, ListBase *scrbase)
 				
 				for (pa= ar->panels.first; pa; pa= pa->next)
 					writestruct(wd, DATA, "Panel", 1, pa);
+				
+				for (ui_list = ar->ui_lists.first; ui_list; ui_list = ui_list->next)
+					writestruct(wd, DATA, "uiList", 1, ui_list);
 			}
 			
 			sl= sa->spacedata.first;
@@ -2515,6 +2523,9 @@ static void write_screens(WriteData *wd, ListBase *scrbase)
 
 		sc= sc->id.next;
 	}
+	
+	/* flush helps the compression for undo-save */
+	mywrite(wd, MYWRITE_FLUSH, 0);
 }
 
 static void write_libraries(WriteData *wd, Main *main)
@@ -2528,20 +2539,31 @@ static void write_libraries(WriteData *wd, Main *main)
 		a=tot= set_listbasepointers(main, lbarray);
 
 		/* test: is lib being used */
-		foundone = FALSE;
-		while (tot--) {
-			for (id= lbarray[tot]->first; id; id= id->next) {
-				if (id->us>0 && (id->flag & LIB_EXTERN)) {
-					foundone = TRUE;
-					break;
+		if (main->curlib && main->curlib->packedfile)
+			foundone = TRUE;
+		else {
+			foundone = FALSE;
+			while (tot--) {
+				for (id= lbarray[tot]->first; id; id= id->next) {
+					if (id->us>0 && (id->flag & LIB_EXTERN)) {
+						foundone = TRUE;
+						break;
+					}
 				}
+				if (foundone) break;
 			}
-			if (foundone) break;
 		}
-
+		
 		if (foundone) {
 			writestruct(wd, ID_LI, "Library", 1, main->curlib);
 
+			if (main->curlib->packedfile && !wd->current) {
+				PackedFile *pf = main->curlib->packedfile;
+				writestruct(wd, DATA, "PackedFile", 1, pf);
+				writedata(wd, DATA, pf->size, pf->data);
+				printf("write packed .blend: %s\n", main->curlib->name);
+			}
+			
 			while (a--) {
 				for (id= lbarray[a]->first; id; id= id->next) {
 					if (id->us>0 && (id->flag & LIB_EXTERN)) {
@@ -2670,7 +2692,7 @@ static void write_sounds(WriteData *wd, ListBase *idbase)
 			writestruct(wd, ID_SO, "bSound", 1, sound);
 			if (sound->id.properties) IDP_WriteProperty(sound->id.properties, wd);
 
-			if (sound->packedfile) {
+			if (sound->packedfile && !wd->current) {
 				pf = sound->packedfile;
 				writestruct(wd, DATA, "PackedFile", 1, pf);
 				writedata(wd, DATA, pf->size, pf->data);
@@ -2877,7 +2899,7 @@ static void write_global(WriteData *wd, int fileflags, Main *mainvar)
 
 	/* XXX still remap G */
 	fg.curscreen= screen;
-	fg.curscene= screen->scene;
+	fg.curscene= screen? screen->scene : NULL;
 	fg.displaymode= G.displaymode;
 	fg.winpos= G.winpos;
 
@@ -2886,7 +2908,6 @@ static void write_global(WriteData *wd, int fileflags, Main *mainvar)
 
 	fg.globalf= G.f;
 	BLI_strncpy(fg.filename, mainvar->name, sizeof(fg.filename));
-
 	sprintf(subvstr, "%4d", BLENDER_SUBVERSION);
 	memcpy(fg.subvstr, subvstr, 4);
 	
@@ -2938,11 +2959,8 @@ static int write_file_handle(Main *mainvar, int handle, MemFile *compare, MemFil
 	write_thumb(wd, thumb);
 	write_global(wd, write_flags, mainvar);
 
-	/* no UI save in undo */
-	if (current==NULL) {
-		write_windowmanagers(wd, &mainvar->wm);
-		write_screens  (wd, &mainvar->screen);
-	}
+	write_windowmanagers(wd, &mainvar->wm);
+	write_screens  (wd, &mainvar->screen);
 	write_movieclips (wd, &mainvar->movieclip);
 	write_masks    (wd, &mainvar->mask);
 	write_scenes   (wd, &mainvar->scene);
@@ -3027,13 +3045,12 @@ static int do_history(const char *name, ReportList *reports)
 /* return: success (1) */
 int BLO_write_file(Main *mainvar, const char *filepath, int write_flags, ReportList *reports, const int *thumb)
 {
-	char userfilename[FILE_MAX];
 	char tempname[FILE_MAX+1];
 	int file, err, write_user_block;
 
 	/* path backup/restore */
 	void     *path_list_backup = NULL;
-	const int path_list_flag = (BLI_BPATH_TRAVERSE_SKIP_LIBRARY | BLI_BPATH_TRAVERSE_SKIP_MULTIFILE);
+	const int path_list_flag = (BKE_BPATH_TRAVERSE_SKIP_LIBRARY | BKE_BPATH_TRAVERSE_SKIP_MULTIFILE);
 
 	/* open temporary file, so we preserve the original in case we crash */
 	BLI_snprintf(tempname, sizeof(tempname), "%s@", filepath);
@@ -3046,7 +3063,7 @@ int BLO_write_file(Main *mainvar, const char *filepath, int write_flags, ReportL
 
 	/* check if we need to backup and restore paths */
 	if (UNLIKELY((write_flags & G_FILE_RELATIVE_REMAP) && (G_FILE_SAVE_COPY & write_flags))) {
-		path_list_backup = BLI_bpath_list_backup(mainvar, path_list_flag);
+		path_list_backup = BKE_bpath_list_backup(mainvar, path_list_flag);
 	}
 
 	/* remapping of relative paths to new file location */
@@ -3069,24 +3086,23 @@ int BLO_write_file(Main *mainvar, const char *filepath, int write_flags, ReportL
 				 * we should not have any relative paths, but if there
 				 * is somehow, an invalid or empty G.main->name it will
 				 * print an error, don't try make the absolute in this case. */
-				BLI_bpath_absolute_convert(mainvar, G.main->name, NULL);
+				BKE_bpath_absolute_convert(mainvar, G.main->name, NULL);
 			}
 		}
 	}
 
-	BLI_make_file_string(G.main->name, userfilename, BLI_get_folder_create(BLENDER_USER_CONFIG, NULL), BLENDER_STARTUP_FILE);
-	write_user_block= (BLI_path_cmp(filepath, userfilename) == 0);
+	write_user_block= write_flags & G_FILE_USERPREFS;
 
 	if (write_flags & G_FILE_RELATIVE_REMAP)
-		BLI_bpath_relative_convert(mainvar, filepath, NULL); /* note, making relative to something OTHER then G.main->name */
+		BKE_bpath_relative_convert(mainvar, filepath, NULL); /* note, making relative to something OTHER then G.main->name */
 
 	/* actual file writing */
 	err= write_file_handle(mainvar, file, NULL, NULL, write_user_block, write_flags, thumb);
 	close(file);
 
 	if (UNLIKELY(path_list_backup)) {
-		BLI_bpath_list_restore(mainvar, path_list_flag, path_list_backup);
-		BLI_bpath_list_free(path_list_backup);
+		BKE_bpath_list_restore(mainvar, path_list_flag, path_list_backup);
+		BKE_bpath_list_free(path_list_backup);
 	}
 
 	if (err) {
@@ -3151,3 +3167,4 @@ int BLO_write_file_mem(Main *mainvar, MemFile *compare, MemFile *current, int wr
 	if (err==0) return 1;
 	return 0;
 }
+

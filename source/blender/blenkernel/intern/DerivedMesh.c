@@ -47,10 +47,10 @@
 #include "BLI_math.h"
 #include "BLI_memarena.h"
 #include "BLI_array.h"
-#include "BLI_pbvh.h"
 #include "BLI_utildefines.h"
 #include "BLI_linklist.h"
 
+#include "BKE_pbvh.h"
 #include "BKE_cdderivedmesh.h"
 #include "BKE_displist.h"
 #include "BKE_key.h"
@@ -857,30 +857,27 @@ DerivedMesh *mesh_create_derived_for_modifier(Scene *scene, Object *ob,
 	return dm;
 }
 
-static float *get_editbmesh_orco_verts(BMEditMesh *em)
+static float (*get_editbmesh_orco_verts(BMEditMesh *em))[3]
 {
 	BMIter iter;
 	BMVert *eve;
-	float *orco;
-	int a, totvert;
+	float (*orco)[3];
+	int i;
 
 	/* these may not really be the orco's, but it's only for preview.
 	 * could be solver better once, but isn't simple */
-
-	totvert = em->bm->totvert;
 	
-	orco = MEM_mallocN(sizeof(float) * 3 * totvert, "BMEditMesh Orco");
+	orco = MEM_mallocN(sizeof(float) * 3 * em->bm->totvert, "BMEditMesh Orco");
 
-	eve = BM_iter_new(&iter, em->bm, BM_VERTS_OF_MESH, NULL);
-	for (a = 0; eve; eve = BM_iter_step(&iter), a += 3) {
-		copy_v3_v3(orco + a, eve->co);
+	BM_ITER_MESH_INDEX (eve, &iter, em->bm, BM_VERTS_OF_MESH, i) {
+		copy_v3_v3(orco[i], eve->co);
 	}
 	
 	return orco;
 }
 
 /* orco custom data layer */
-static void *get_orco_coords_dm(Object *ob, BMEditMesh *em, int layer, int *free)
+static float (*get_orco_coords_dm(Object *ob, BMEditMesh *em, int layer, int *free))[3]
 {
 	*free = 0;
 
@@ -889,9 +886,9 @@ static void *get_orco_coords_dm(Object *ob, BMEditMesh *em, int layer, int *free
 		*free = 1;
 
 		if (em)
-			return (float(*)[3])get_editbmesh_orco_verts(em);
+			return get_editbmesh_orco_verts(em);
 		else
-			return (float(*)[3])BKE_mesh_orco_verts_get(ob);
+			return BKE_mesh_orco_verts_get(ob);
 	}
 	else if (layer == CD_CLOTH_ORCO) {
 		/* apply shape key for cloth, this should really be solved
@@ -1343,6 +1340,7 @@ static void mesh_calc_modifiers(Scene *scene, Object *ob, float (*inputVertexCos
 	MultiresModifierData *mmd = get_multires_modifier(scene, ob, 0);
 	int has_multires = mmd != NULL, multires_applied = 0;
 	int sculpt_mode = ob->mode & OB_MODE_SCULPT && ob->sculpt;
+	int sculpt_dyntopo = (sculpt_mode && ob->sculpt->bm);
 
 	const int draw_flag = ((scene->toolsettings->multipaint ? CALC_WP_MULTIPAINT : 0) |
 	                       (scene->toolsettings->auto_normalize ? CALC_WP_AUTO_NORMALIZE : 0));
@@ -1410,7 +1408,7 @@ static void mesh_calc_modifiers(Scene *scene, Object *ob, float (*inputVertexCos
 			if (!modifier_isEnabled(scene, md, required_mode)) continue;
 			if (useDeform < 0 && mti->dependsOnTime && mti->dependsOnTime(md)) continue;
 
-			if (mti->type == eModifierTypeType_OnlyDeform) {
+			if (mti->type == eModifierTypeType_OnlyDeform && !sculpt_dyntopo) {
 				if (!deformedVerts)
 					deformedVerts = mesh_getVertexCos(me, &numVerts);
 
@@ -1421,7 +1419,7 @@ static void mesh_calc_modifiers(Scene *scene, Object *ob, float (*inputVertexCos
 			}
 			
 			/* grab modifiers until index i */
-			if ((index >= 0) && (modifiers_indexInObject(ob, md) >= index))
+			if ((index >= 0) && (BLI_findindex(&ob->modifiers, md) >= index))
 				break;
 		}
 
@@ -1468,8 +1466,13 @@ static void mesh_calc_modifiers(Scene *scene, Object *ob, float (*inputVertexCos
 			modifier_setError(md, "Modifier requires original data, bad stack position");
 			continue;
 		}
-		if (sculpt_mode && (!has_multires || multires_applied)) {
+		if (sculpt_mode &&
+			(!has_multires || multires_applied || ob->sculpt->bm))
+		{
 			int unsupported = 0;
+
+			if (sculpt_dyntopo)
+				unsupported = TRUE;
 
 			if (scene->toolsettings->sculpt->flags & SCULPT_ONLY_DEFORM)
 				unsupported |= mti->type != eModifierTypeType_OnlyDeform;
@@ -1666,7 +1669,7 @@ static void mesh_calc_modifiers(Scene *scene, Object *ob, float (*inputVertexCos
 		isPrevDeform = (mti->type == eModifierTypeType_OnlyDeform);
 
 		/* grab modifiers until index i */
-		if ((index >= 0) && (modifiers_indexInObject(ob, md) >= index))
+		if ((index >= 0) && (BLI_findindex(&ob->modifiers, md) >= index))
 			break;
 
 		if (sculpt_mode && md->type == eModifierType_Multires)
@@ -1815,17 +1818,18 @@ static void mesh_calc_modifiers(Scene *scene, Object *ob, float (*inputVertexCos
 	BLI_linklist_free((LinkNode *)datamasks, NULL);
 }
 
-float (*editbmesh_get_vertex_cos(BMEditMesh * em, int *numVerts_r))[3]
+float (*editbmesh_get_vertex_cos(BMEditMesh *em, int *numVerts_r))[3]
 {
-	int i, numVerts = *numVerts_r = em->bm->totvert;
-	float (*cos)[3];
 	BMIter iter;
 	BMVert *eve;
+	float (*cos)[3];
+	int i;
 
-	cos = MEM_mallocN(sizeof(float) * 3 * numVerts, "vertexcos");
+	*numVerts_r = em->bm->totvert;
 
-	eve = BM_iter_new(&iter, em->bm, BM_VERTS_OF_MESH, NULL);
-	for (i = 0; eve; eve = BM_iter_step(&iter), i++) {
+	cos = MEM_mallocN(sizeof(float) * 3 * em->bm->totvert, "vertexcos");
+
+	BM_ITER_MESH_INDEX (eve, &iter, em->bm, BM_VERTS_OF_MESH, i) {
 		copy_v3_v3(cos[i], eve->co);
 	}
 
@@ -2312,20 +2316,19 @@ DerivedMesh *editbmesh_get_derived_base(Object *obedit, BMEditMesh *em)
 static void make_vertexcosnos__mapFunc(void *userData, int index, const float co[3],
                                        const float no_f[3], const short no_s[3])
 {
-	float *vec = userData;
-	
-	vec += 6 * index;
+	DMCoNo *co_no = &((DMCoNo *)userData)[index];
 
 	/* check if we've been here before (normal should not be 0) */
-	if (vec[3] || vec[4] || vec[5]) return;
+	if (!is_zero_v3(co_no->no)) {
+		return;
+	}
 
-	copy_v3_v3(vec, co);
-	vec += 3;
+	copy_v3_v3(co_no->co, co);
 	if (no_f) {
-		copy_v3_v3(vec, no_f);
+		copy_v3_v3(co_no->no, no_f);
 	}
 	else {
-		normal_short_to_float_v3(vec, no_s);
+		normal_short_to_float_v3(co_no->no, no_s);
 	}
 }
 
@@ -2334,29 +2337,29 @@ static void make_vertexcosnos__mapFunc(void *userData, int index, const float co
 /* it stores the normals as floats, but they can still be scaled as shorts (32767 = unit) */
 /* in use now by vertex/weight paint and particle generating */
 
-float *mesh_get_mapped_verts_nors(Scene *scene, Object *ob)
+DMCoNo *mesh_get_mapped_verts_nors(Scene *scene, Object *ob)
 {
 	Mesh *me = ob->data;
 	DerivedMesh *dm;
-	float *vertexcosnos;
+	DMCoNo *vertexcosnos;
 	
 	/* lets prevent crashing... */
 	if (ob->type != OB_MESH || me->totvert == 0)
 		return NULL;
 	
 	dm = mesh_get_derived_final(scene, ob, CD_MASK_BAREMESH | CD_MASK_ORIGINDEX);
-	vertexcosnos = MEM_callocN(6 * sizeof(float) * me->totvert, "vertexcosnos map");
+	vertexcosnos = MEM_callocN(sizeof(DMCoNo) * me->totvert, "vertexcosnos map");
 	
 	if (dm->foreachMappedVert) {
 		dm->foreachMappedVert(dm, make_vertexcosnos__mapFunc, vertexcosnos);
 	}
 	else {
-		float *fp = vertexcosnos;
+		DMCoNo *v_co_no = vertexcosnos;
 		int a;
 		
-		for (a = 0; a < me->totvert; a++, fp += 6) {
-			dm->getVertCo(dm, a, fp);
-			dm->getVertNo(dm, a, fp + 3);
+		for (a = 0; a < me->totvert; a++, v_co_no++) {
+			dm->getVertCo(dm, a, v_co_no->co);
+			dm->getVertNo(dm, a, v_co_no->no);
 		}
 	}
 	

@@ -1161,11 +1161,11 @@ void ntreeSetOutput(bNodeTree *ntree)
 bNodeTree *ntreeFromID(ID *id)
 {
 	switch (GS(id->name)) {
-		case ID_MA: return ((Material*)id)->nodetree;
-		case ID_LA: return ((Lamp*)id)->nodetree;
-		case ID_WO: return ((World*)id)->nodetree;
-		case ID_TE: return ((Tex*)id)->nodetree;
-		case ID_SCE: return ((Scene*)id)->nodetree;
+		case ID_MA:  return ((Material *)id)->nodetree;
+		case ID_LA:  return ((Lamp *)id)->nodetree;
+		case ID_WO:  return ((World *)id)->nodetree;
+		case ID_TE:  return ((Tex *)id)->nodetree;
+		case ID_SCE: return ((Scene *)id)->nodetree;
 		default: return NULL;
 	}
 }
@@ -2162,6 +2162,24 @@ void nodeRegisterType(bNodeTreeType *ttype, bNodeType *ntype)
 	
 	if (found == NULL)
 		BLI_addtail(typelist, ntype);
+	
+	/* Associate the RNA struct type with the bNodeType.
+	 * Dynamically registered nodes will create an RNA type at runtime
+	 * and call RNA_struct_blender_type_set, so this only needs to be done for old RNA types
+	 * created in makesrna, which can not be associated to a bNodeType immediately,
+	 * since bNodeTypes are registered afterward ...
+	 */
+	#define DefNode(Category, ID, DefFunc, EnumName, StructName, UIName, UIDesc) \
+	if (ID == ntype->type) { \
+		StructRNA *srna = RNA_struct_find(STRINGIFY_ARG(Category##StructName)); \
+		BLI_assert(srna != NULL); \
+		RNA_struct_blender_type_set(srna, ntype); \
+	}
+	
+	/* XXX hack, this file will be moved to the nodes folder in customnodes branch,
+	 * then this stupid include path is not needed any more.
+	 */
+	#include "intern/rna_nodetree_types.h"
 }
 
 static void registerCompositNodes(bNodeTreeType *ttype)
@@ -2305,6 +2323,7 @@ static void registerShaderNodes(bNodeTreeType *ttype)
 	register_node_type_sh_layer_weight(ttype);
 	register_node_type_sh_tex_coord(ttype);
 	register_node_type_sh_particle_info(ttype);
+	register_node_type_sh_hair_info(ttype);
 	register_node_type_sh_bump(ttype);
 	register_node_type_sh_script(ttype);
 	register_node_type_sh_tangent(ttype);

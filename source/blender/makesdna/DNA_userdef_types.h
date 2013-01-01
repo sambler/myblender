@@ -144,8 +144,10 @@ typedef struct uiWidgetStateColors {
 
 typedef struct uiPanelColors {
 	char header[4];
+	char back[4];
 	short show_header;
-	short pad;
+	short show_back;
+	int pad;
 } uiPanelColors;
 
 typedef struct ThemeUI {
@@ -158,8 +160,14 @@ typedef struct ThemeUI {
 	
 	uiWidgetStateColors wcol_state;
 
-	uiPanelColors panel;
+	uiPanelColors panel; /* depricated, but we keep it for do_versions (2.66.1) */
 
+	/* fac: 0 - 1 for blend factor, width in pixels */
+	float menu_shadow_fac;
+	short menu_shadow_width;
+	
+	short pad;
+	
 	char iconfile[256];	// FILE_MAXFILE length
 	float icon_alpha;
 
@@ -173,33 +181,36 @@ typedef struct ThemeUI {
 typedef struct ThemeSpace {
 	/* main window colors */
 	char back[4];
-	char title[4];
+	char title[4]; 	/* panel title */
 	char text[4];
 	char text_hi[4];
 	
 	/* header colors */
-	char header[4];
-	char header_title[4];
+	char header[4];			/* region background */
+	char header_title[4];	/* unused */
 	char header_text[4];
 	char header_text_hi[4];
 
 	/* button/tool regions */
-	char button[4];
-	char button_title[4];
+	char button[4];			/* region background */
+	char button_title[4];	/* panel title */
 	char button_text[4];
 	char button_text_hi[4];
 	
 	/* listview regions */
-	char list[4];
-	char list_title[4];
+	char list[4];			/* region background */
+	char list_title[4]; 	/* panel title */
 	char list_text[4];
 	char list_text_hi[4];
 	
 	/* float panel */
-	char panel[4];
-	char panel_title[4];
-	char panel_text[4];
-	char panel_text_hi[4];
+/*	char panel[4];			unused */
+/*	char panel_title[4];	unused */
+/*	char panel_text[4];		unused */
+/*	char panel_text_hi[4];	unused */
+	
+	/* note, cannot use name 'panel' because of DNA mapping old files */
+	uiPanelColors panelcolors;
 	
 	char shade1[4];
 	char shade2[4];
@@ -236,11 +247,14 @@ typedef struct ThemeSpace {
 	char vertex_size, outline_width, facedot_size;
 	char noodle_curving;
 
-	char syntaxl[4], syntaxn[4], syntaxb[4]; /* syntax for textwindow and nodes */
+	/* syntax for textwindow and nodes */
+	char syntaxl[4], syntaxs[4];
+	char syntaxb[4], syntaxn[4];
 	char syntaxv[4], syntaxc[4];
+	char syntaxd[4], syntaxr[4];
 	
 	char movie[4], movieclip[4], mask[4], image[4], scene[4], audio[4];		/* for sequence editor */
-	char effect[4], hpad0[4], transition[4], meta[4];
+	char effect[4], transition[4], meta[4];
 	char editmesh_active[4]; 
 
 	char handle_vertex[4];
@@ -333,6 +347,7 @@ typedef struct bTheme {
 typedef struct bAddon {
 	struct bAddon *next, *prev;
 	char module[64];
+	IDProperty *prop;  /* User-Defined Properties on this  Addon (for storing preferences) */
 } bAddon;
 
 typedef struct SolidLight {
@@ -360,9 +375,10 @@ typedef struct UserDef {
 	short versions;
 	short dbl_click_time;
 	
-	int gameflags;
-	int wheellinescroll;
-	int uiflag, language;
+	short gameflags;
+	short wheellinescroll;
+	int uiflag, uiflag2;
+	int language;
 	short userpref, viewzoom;
 	
 	int mixbufsize;
@@ -413,7 +429,7 @@ typedef struct UserDef {
 	short scrcastfps;		/* frame rate for screencast to be played back */
 	short scrcastwait;		/* milliseconds between screencast snapshots */
 	
-	short widget_unit;		/* defaults to 20 for 72 DPI setting */
+	short widget_unit;		/* private, defaults to 20 for 72 DPI setting */
 	short anisotropic_filter;
 	short use_16bit_textures, use_gpu_mipmap;
 
@@ -444,7 +460,7 @@ typedef struct UserDef {
 	int compute_device_id;
 	
 	float fcu_inactive_alpha;	/* opacity of inactive F-Curves in F-Curve Editor */
-	float pad;
+	float pixelsize;			/* private, set by GHOST, to multiply DPI with */
 } UserDef;
 
 extern UserDef U; /* from blenkernel blender.c */
@@ -540,6 +556,12 @@ typedef enum eUserpref_UI_Flag {
 	USER_HIDE_SYSTEM_BOOKMARKS = (1 << 31)
 } eUserpref_UI_Flag;
 
+/* uiflag2 */
+typedef enum eUserpref_UI_Flag2 {
+	USER_KEEP_SESSION		= (1 << 0),
+	USER_REGION_OVERLAP		= (1 << 1)
+} eUserpref_UI_Flag2;
+	
 /* Auto-Keying mode */
 typedef enum eAutokey_Mode {
 	/* AUTOKEY_ON is a bitflag */

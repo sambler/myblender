@@ -272,8 +272,9 @@ typedef struct ImageFormatData {
 
 	/* Jpeg2000 */
 	char  jp2_flag;
+	char jp2_codec;
 
-	char pad[7];
+	char pad[6];
 
 	/* color management */
 	ColorManagedViewSettings view_settings;
@@ -341,6 +342,10 @@ typedef struct ImageFormatData {
 #define R_IMF_JP2_FLAG_YCC          (1<<0)  /* when disabled use RGB */ /* was R_JPEG2K_YCC */
 #define R_IMF_JP2_FLAG_CINE_PRESET  (1<<1)  /* was R_JPEG2K_CINE_PRESET */
 #define R_IMF_JP2_FLAG_CINE_48      (1<<2)  /* was R_JPEG2K_CINE_48FPS */
+
+/* ImageFormatData.jp2_codec */
+#define R_IMF_JP2_CODEC_JP2  0
+#define R_IMF_JP2_CODEC_J2K  1
 
 /* ImageFormatData.cineon_flag */
 #define R_IMF_CINEON_FLAG_LOG (1<<0)  /* was R_CINEON_LOG */
@@ -492,7 +497,8 @@ typedef struct RenderData {
 	/* Bake Render options */
 	short bake_osa, bake_filter, bake_mode, bake_flag;
 	short bake_normal_space, bake_quad_split;
-	float bake_maxdist, bake_biasdist, bake_pad;
+	float bake_maxdist, bake_biasdist;
+	short bake_samples, bake_pad;
 
 	/* path to render output */
 	char pic[1024]; /* 1024 = FILE_MAX */
@@ -636,7 +642,8 @@ typedef struct GameData {
 	short physicsEngine;
 	short exitkey, pad;
 	short ticrate, maxlogicstep, physubstep, maxphystep;
-	short obstacleSimulation, pad1;
+	short obstacleSimulation;
+	short raster_storage;
 	float levelHeight;
 	float deactivationtime, lineardeactthreshold, angulardeactthreshold, pad2;
 } GameData;
@@ -663,6 +670,12 @@ typedef struct GameData {
 #define OBSTSIMULATION_TOI_rays		1
 #define OBSTSIMULATION_TOI_cells	2
 
+/* Raster storage */
+#define RAS_STORE_AUTO		0
+#define RAS_STORE_IMMEDIATE	1
+#define RAS_STORE_VA		2
+#define RAS_STORE_VBO		3
+
 /* GameData.flag */
 #define GAME_RESTRICT_ANIM_UPDATES			(1 << 0)
 #define GAME_ENABLE_ALL_FRAMES				(1 << 1)
@@ -681,6 +694,7 @@ typedef struct GameData {
 #define GAME_SHOW_MOUSE						(1 << 14)
 #define GAME_GLSL_NO_COLOR_MANAGEMENT		(1 << 15)
 #define GAME_SHOW_OBSTACLE_SIMULATION		(1 << 16)
+#define GAME_NO_MATERIAL_CACHING			(1 << 17)
 /* Note: GameData.flag is now an int (max 32 flags). A short could only take 16 flags */
 
 /* GameData.playerflag */
@@ -817,6 +831,12 @@ typedef struct Sculpt {
 
 	float special_rotation;
 
+	/* Maximum edge length for dynamic topology sculpting (in pixels) */
+	int detail_size;
+
+	/* Direction used for SCULPT_OT_symmetrize operator */
+	int symmetrize_direction;
+
 	int pad;
 } Sculpt;
 
@@ -946,7 +966,7 @@ typedef struct ToolSettings {
 	short uvcalc_mapalign;
 	short uvcalc_flag;
 	short uv_flag, uv_selectmode;
-	short uv_subsurf_level;
+	short pad2;
 	
 	/* Grease Pencil */
 	short gpencil_flags;
@@ -974,7 +994,7 @@ typedef struct ToolSettings {
 
 	/* Multires */
 	char multires_subdiv_type;
-	char pad2[5];
+	char pad3[5];
 
 	/* Skeleton generation */
 	short skgen_resolution;
@@ -1199,6 +1219,7 @@ typedef struct Scene {
 /* seq_flag */
 #define R_SEQ_GL_PREV 1
 // #define R_SEQ_GL_REND 2  // UNUSED, opengl render has its own operator now.
+#define R_SEQ_SOLID_TEX 4
 
 /* displaymode */
 
@@ -1272,11 +1293,11 @@ typedef struct Scene {
 /* alphamode */
 #define R_ADDSKY		0
 #define R_ALPHAPREMUL	1
-#define R_ALPHAKEY		2
+/*#define R_ALPHAKEY		2*/ /* deprecated, shouldn't be used */
 
 /* color_mgt_flag */
 #define R_COLOR_MANAGEMENT              (1 << 0)  /* deprecated, should only be used in versioning code only */
-#define R_COLOR_MANAGEMENT_PREDIVIDE    (1 << 1)
+/*#define R_COLOR_MANAGEMENT_PREDIVIDE    (1 << 1)*/  /* deprecated, shouldn't be used */
 
 /* subimtype, flag options for imtype */
 #define R_OPENEXR_HALF    1                                      /*deprecated*/
@@ -1465,6 +1486,14 @@ typedef enum SculptFlags {
 	SCULPT_USE_OPENMP = (1<<7),
 	SCULPT_ONLY_DEFORM = (1<<8),
 	SCULPT_SHOW_DIFFUSE = (1<<9),
+
+	/* If set, the mesh will be drawn with smooth-shading in
+	 * dynamic-topology mode */
+	SCULPT_DYNTOPO_SMOOTH_SHADING = (1<<10),
+
+	/* If set, dynamic-topology brushes will collapse short edges in
+	 * addition to subdividing long ones */
+	SCULPT_DYNTOPO_COLLAPSE = (1<<11)
 } SculptFlags;
 
 /* ImagePaintSettings.flag */

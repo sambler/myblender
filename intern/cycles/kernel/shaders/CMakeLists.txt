@@ -27,6 +27,7 @@ set(SRC_OSL
 	node_glass_bsdf.osl
 	node_glossy_bsdf.osl
 	node_gradient_texture.osl
+	node_hair_info.osl
 	node_holdout.osl
 	node_hsv.osl
 	node_image_texture.osl
@@ -49,6 +50,7 @@ set(SRC_OSL
 	node_output_volume.osl
 	node_particle_info.osl
 	node_refraction_bsdf.osl
+	node_rgb_curves.osl
 	node_rgb_ramp.osl
 	node_separate_rgb.osl
 	node_set_normal.osl
@@ -58,6 +60,7 @@ set(SRC_OSL
 	node_translucent_bsdf.osl
 	node_transparent_bsdf.osl
 	node_value.osl
+	node_vector_curves.osl
 	node_vector_math.osl
 	node_velvet_bsdf.osl
 	node_voronoi_texture.osl

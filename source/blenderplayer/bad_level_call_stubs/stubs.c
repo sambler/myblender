@@ -176,7 +176,7 @@ int RE_RenderInProgress(struct Render *re) {return 0;}
 struct Scene *RE_GetScene(struct Render *re) {return (struct Scene *) NULL;}
 void RE_Database_Free(struct Render *re) {}
 void RE_FreeRender(struct Render *re) {}
-void RE_DataBase_GetView(struct Render *re, float mat[][4]) {}
+void RE_DataBase_GetView(struct Render *re, float mat[4][4]) {}
 int externtex(struct MTex *mtex, float *vec, float *tin, float *tr, float *tg, float *tb, float *ta) {return 0;}
 float texture_value_blend(float tex, float out, float fact, float facg, int blendtype, int flip) {return 0.0f;}
 void texture_rgb_blend(float *in, float *tex, float *out, float fact, float facg, int blendtype) {}
@@ -200,8 +200,14 @@ void WM_operator_stack_clear(struct bContext *C) {}
 void WM_autosave_init(struct bContext *C) {}
 void WM_jobs_kill_all_except(struct wmWindowManager *wm) {}
 
-char *WM_clipboard_text_get(int selection) {return (char*)0;}
+char *WM_clipboard_text_get(int selection) {return (char *)0;}
 void WM_clipboard_text_set(char *buf, int selection) {}
+
+void                WM_uilisttype_init(void) {}
+struct uiListType  *WM_uilisttype_find(const char *idname, int quiet) {return (struct uiListType *)NULL;}
+int                 WM_uilisttype_add(struct uiListType *ult) {return 0;}
+void                WM_uilisttype_freelink(struct uiListType *ult) {}
+void                WM_uilisttype_free(void) {}
 
 struct wmKeyMapItem *WM_keymap_item_find_id(struct wmKeyMap *keymap, int id) {return (struct wmKeyMapItem *) NULL;}
 int WM_enum_search_invoke(struct bContext *C, struct wmOperator *op, struct wmEvent *event) {return 0;}
@@ -299,13 +305,13 @@ void ED_node_tree_update(struct SpaceNode *snode, struct Scene *scene) {}
 void ED_view3d_scene_layers_update(struct Main *bmain, struct Scene *scene) {}
 int ED_view3d_scene_layer_set(int lay, const int *values) {return 0;}
 void ED_view3d_quadview_update(struct ScrArea *sa, struct ARegion *ar) {}
-void ED_view3d_from_m4(float mat[][4], float ofs[3], float quat[4], float *dist) {}
+void ED_view3d_from_m4(float mat[4][4], float ofs[3], float quat[4], float *dist) {}
 struct BGpic *ED_view3D_background_image_new(struct View3D *v3d) {return (struct BGpic *) NULL;}
 void ED_view3D_background_image_remove(struct View3D *v3d, struct BGpic *bgpic) {}
 void ED_view3D_background_image_clear(struct View3D *v3d) {}
-void ED_view3d_update_viewmat(struct Scene *scene, struct View3D *v3d, struct ARegion *ar, float viewmat[][4], float winmat[][4]) {}
+void ED_view3d_update_viewmat(struct Scene *scene, struct View3D *v3d, struct ARegion *ar, float viewmat[4][4], float winmat[4][4]) {}
 float ED_view3d_grid_scale(struct Scene *scene, struct View3D *v3d, const char **grid_unit) {return 0.0f;}
-void view3d_apply_mat4(float mat[][4], float *ofs, float *quat, float *dist) {}
+void view3d_apply_mat4(float mat[4][4], float *ofs, float *quat, float *dist) {}
 int text_file_modified(struct Text *text) {return 0;}
 void ED_node_shader_default(struct Material *ma) {}
 void ED_screen_animation_timer_update(struct bContext *C, int redraws) {}
@@ -400,6 +406,7 @@ void uiItemFullR(struct uiLayout *layout, struct PointerRNA *ptr, struct Propert
 void uiLayoutSetContextPointer(struct uiLayout *layout, char *name, struct PointerRNA *ptr) {}
 char *uiLayoutIntrospect(struct uiLayout *layout) {return (char *)NULL;}
 void UI_reinit_font(void) {}
+int UI_rnaptr_icon_get(struct bContext *C, struct PointerRNA *ptr, int rnaicon, int big) {return 0;}
 
 /* rna template */
 void uiTemplateAnyID(struct uiLayout *layout, struct bContext *C, struct PointerRNA *ptr, char *propname, char *text) {}
@@ -414,7 +421,9 @@ void uiTemplateCurveMapping(struct uiLayout *layout, struct CurveMapping *cumap,
 void uiTemplateColorRamp(struct uiLayout *layout, struct ColorBand *coba, int expand) {}
 void uiTemplateLayers(struct uiLayout *layout, struct PointerRNA *ptr, char *propname) {}
 void uiTemplateImageLayers(struct uiLayout *layout, struct bContext *C, struct Image *ima, struct ImageUser *iuser) {}
-ListBase uiTemplateList(struct uiLayout *layout, struct bContext *C, struct PointerRNA *ptr, char *propname, struct PointerRNA *activeptr, char *activepropname, int rows, int listtype) {struct ListBase b = {0,0}; return b;}
+void uiTemplateList(struct uiLayout *layout, struct bContext *C, const char *listtype_name, const char *list_id,
+                    PointerRNA *dataptr, const char *propname, PointerRNA *active_dataptr,
+                    const char *active_propname, int rows, int maxrows, int layout_type) {}
 void uiTemplateRunningJobs(struct uiLayout *layout, struct bContext *C) {}
 void uiTemplateOperatorSearch(struct uiLayout *layout) {}
 void uiTemplateHeader3D(struct uiLayout *layout, struct bContext *C) {}

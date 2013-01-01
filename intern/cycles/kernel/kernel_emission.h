@@ -42,17 +42,23 @@ __device float3 direct_emissive_eval(KernelGlobals *kg, float rando,
 		ray.time = time;
 #endif
 		shader_setup_from_background(kg, &sd, &ray);
-		eval = shader_eval_background(kg, &sd, 0);
+		eval = shader_eval_background(kg, &sd, 0, SHADER_CONTEXT_EMISSION);
 	}
 	else
 #endif
 	{
-		shader_setup_from_sample(kg, &sd, ls->P, ls->Ng, I, ls->shader, ls->object, ls->prim, u, v, t, time);
+#ifdef __HAIR__
+		if(ls->type == LIGHT_STRAND)
+			shader_setup_from_sample(kg, &sd, ls->P, ls->Ng, I, ls->shader, ls->object, ls->prim, u, v, t, time, ls->prim);
+		else
+#endif
+			shader_setup_from_sample(kg, &sd, ls->P, ls->Ng, I, ls->shader, ls->object, ls->prim, u, v, t, time);
+
 		ls->Ng = sd.Ng;
 
 		/* no path flag, we're evaluating this for all closures. that's weak but
 		 * we'd have to do multiple evaluations otherwise */
-		shader_eval_surface(kg, &sd, rando, 0);
+		shader_eval_surface(kg, &sd, rando, 0, SHADER_CONTEXT_EMISSION);
 
 		/* evaluate emissive closure */
 		if(sd.flag & SD_EMISSION)
@@ -150,7 +156,11 @@ __device float3 indirect_emission(KernelGlobals *kg, ShaderData *sd, float t, in
 	/* evaluate emissive closure */
 	float3 L = shader_emissive_eval(kg, sd);
 
+#ifdef __HAIR__
+	if(!(path_flag & PATH_RAY_MIS_SKIP) && (sd->flag & SD_SAMPLE_AS_LIGHT) && (sd->curve_seg == ~0)) {
+#else
 	if(!(path_flag & PATH_RAY_MIS_SKIP) && (sd->flag & SD_SAMPLE_AS_LIGHT)) {
+#endif
 		/* multiple importance sampling, get triangle light pdf,
 		 * and compute weight with respect to BSDF pdf */
 		float pdf = triangle_light_pdf(kg, sd->Ng, sd->I, t);
@@ -170,7 +180,7 @@ __device float3 indirect_background(KernelGlobals *kg, Ray *ray, int path_flag, 
 	/* evaluate background closure */
 	ShaderData sd;
 	shader_setup_from_background(kg, &sd, ray);
-	float3 L = shader_eval_background(kg, &sd, path_flag);
+	float3 L = shader_eval_background(kg, &sd, path_flag, SHADER_CONTEXT_EMISSION);
 	shader_release(kg, &sd);
 
 #ifdef __BACKGROUND_MIS__

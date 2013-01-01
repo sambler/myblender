@@ -170,7 +170,7 @@ void smoke_reallocate_fluid(SmokeDomainSettings *sds, float dx, int res[3], int 
 
 	if (free_old && sds->fluid)
 		smoke_free(sds->fluid);
-	if (!MIN3(res[0], res[1], res[2])) {
+	if (!min_iii(res[0], res[1], res[2])) {
 		sds->fluid = NULL;
 		return;
 	}
@@ -191,7 +191,7 @@ void smoke_reallocate_highres_fluid(SmokeDomainSettings *sds, float dx, int res[
 
 	if (free_old && sds->wt)
 		smoke_turbulence_free(sds->wt);
-	if (!MIN3(res[0], res[1], res[2])) {
+	if (!min_iii(res[0], res[1], res[2])) {
 		sds->wt = NULL;
 		return;
 	}
@@ -924,7 +924,8 @@ static void clampBoundsInDomain(SmokeDomainSettings *sds, int min[3], int max[3]
 	}
 }
 
-static void em_allocateData(EmissionMap *em, int use_velocity) {
+static void em_allocateData(EmissionMap *em, int use_velocity)
+{
 	int i, res[3];
 
 	for (i = 0; i < 3; i++) {
@@ -941,7 +942,8 @@ static void em_allocateData(EmissionMap *em, int use_velocity) {
 		em->velocity = MEM_callocN(sizeof(float) * em->total_cells * 3, "smoke_flow_velocity");
 }
 
-static void em_freeData(EmissionMap *em) {
+static void em_freeData(EmissionMap *em)
+{
 	if (em->influence)
 		MEM_freeN(em->influence);
 	if (em->velocity)
@@ -2405,7 +2407,7 @@ static void smoke_calc_transparency(SmokeDomainSettings *sds, Scene *scene)
 	bv[3] = (float)sds->res[1]; // y
 	bv[5] = (float)sds->res[2]; // z
 
-// #pragma omp parallel for schedule(static,1)
+// #pragma omp parallel for schedule(static, 1)
 	for (z = 0; z < sds->res[2]; z++)
 	{
 		size_t index = z * slabsize;
@@ -2509,7 +2511,8 @@ float smoke_get_velocity_at(struct Object *ob, float position[3], float velocity
 	return -1.0f;
 }
 
-int smoke_get_data_flags(SmokeDomainSettings *sds) {
+int smoke_get_data_flags(SmokeDomainSettings *sds)
+{
 	int flags = 0;
 	if (smoke_has_heat(sds->fluid)) flags |= SM_ACTIVE_HEAT;
 	if (smoke_has_fuel(sds->fluid)) flags |= SM_ACTIVE_FIRE;

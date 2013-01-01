@@ -271,6 +271,23 @@ static char *rna_Node_path(PointerRNA *ptr)
 	return BLI_sprintfN("nodes[\"%s\"]", node->name);
 }
 
+static const char *rna_Node_get_node_type(StructRNA *type)
+{
+	bNodeType *nodetype = RNA_struct_blender_type_get(type);
+	if (nodetype) {
+		/* XXX hack: with customnodes branch, nodes will use an identifier string instead of integer ID.
+		 * Then this can be returned directly instead of doing this ugly include thingy ...
+		 */
+		#define DefNode(Category, ID, DefFunc, EnumName, StructName, UIName, UIDesc) \
+		if (ID == nodetype->type) { \
+			return EnumName; \
+		}
+		
+		#include "rna_nodetree_types.h"
+	}
+	return "";
+}
+
 static StructRNA *rna_NodeSocket_refine(PointerRNA *ptr)
 {
 	bNodeSocket *sock = (bNodeSocket *)ptr->data;
@@ -497,6 +514,20 @@ static void rna_Node_name_set(PointerRNA *ptr, const char *value)
 	
 	/* fix all the animation data which may link to this */
 	BKE_all_animdata_fix_paths_rename(NULL, "nodes", oldname, node->name);
+}
+
+static void rna_Node_width_range(PointerRNA *ptr, float *min, float *max, float *softmin, float *softmax)
+{
+	bNode *node = ptr->data;
+	*min = *softmin = node->typeinfo->minwidth;
+	*max = *softmax = node->typeinfo->maxwidth;
+}
+
+static void rna_Node_height_range(PointerRNA *ptr, float *min, float *max, float *softmin, float *softmax)
+{
+	bNode *node = ptr->data;
+	*min = *softmin = node->typeinfo->minheight;
+	*max = *softmax = node->typeinfo->maxheight;
 }
 
 static void rna_NodeSocket_update(Main *bmain, Scene *scene, PointerRNA *ptr)
@@ -1070,7 +1101,7 @@ static void rna_ShaderNodeScript_mode_set(PointerRNA *ptr, int value)
 
 		/* replace text datablock by filepath */
 		if (node->id) {
-			Text *text = (Text*)node->id;
+			Text *text = (Text *)node->id;
 
 			if (value == NODE_SCRIPT_EXTERNAL && text->name) {
 				BLI_strncpy(nss->filepath, text->name, sizeof(nss->filepath));
@@ -1251,11 +1282,19 @@ static void init(void)
 static StructRNA *def_node(BlenderRNA *brna, int node_id)
 {
 	StructRNA *srna;
+	FunctionRNA *func;
+	PropertyRNA *parm;
 	NodeInfo *node = nodes + node_id;
 	
 	srna = RNA_def_struct(brna, node->struct_name, node->base_name);
 	RNA_def_struct_ui_text(srna, node->ui_name, node->ui_desc);
 	RNA_def_struct_sdna(srna, "bNode");
+	
+	func = RNA_def_function(srna, "get_node_type", "rna_Node_get_node_type");
+	RNA_def_function_ui_description(func, "Get the identifier of the node type");
+	RNA_def_function_flag(func, FUNC_NO_SELF | FUNC_USE_SELF_TYPE);
+	parm = RNA_def_string(func, "result", "", 0, "Result", "");
+	RNA_def_function_return(func, parm);
 	
 	return srna;
 }
@@ -3178,8 +3217,8 @@ static void def_cmp_premul_key(StructRNA *srna)
 	PropertyRNA *prop;
 	
 	static EnumPropertyItem type_items[] = {
-		{0, "KEY_TO_PREMUL", 0, "Key to Premul", ""},
-		{1, "PREMUL_TO_KEY", 0, "Premul to Key", ""},
+		{0, "STRAIGHT_TO_PREMUL", 0, "Straight to Premul", ""},
+		{1, "PREMUL_TO_STRAIGHT", 0, "Premul to Straight", ""},
 		{0, NULL, 0, NULL, NULL}
 	};
 	
@@ -4605,9 +4644,27 @@ static void rna_def_node(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "location", PROP_FLOAT, PROP_XYZ);
 	RNA_def_property_float_sdna(prop, NULL, "locx");
 	RNA_def_property_array(prop, 2);
-	RNA_def_property_range(prop, -10000.0f, 10000.0f);
+	RNA_def_property_range(prop, -100000.0f, 100000.0f);
 	RNA_def_property_ui_text(prop, "Location", "");
 	RNA_def_property_update(prop, NC_NODE, "rna_Node_update");
+	
+	prop = RNA_def_property(srna, "width", PROP_FLOAT, PROP_XYZ);
+	RNA_def_property_float_sdna(prop, NULL, "width");
+	RNA_def_property_float_funcs(prop, NULL, NULL, "rna_Node_width_range");
+	RNA_def_property_ui_text(prop, "Width", "Width of the node");
+	RNA_def_property_update(prop, NC_NODE | ND_DISPLAY, NULL);
+	
+	prop = RNA_def_property(srna, "width_hidden", PROP_FLOAT, PROP_XYZ);
+	RNA_def_property_float_sdna(prop, NULL, "miniwidth");
+	RNA_def_property_float_funcs(prop, NULL, NULL, "rna_Node_width_range");
+	RNA_def_property_ui_text(prop, "Width Hidden", "Width of the node in hidden state");
+	RNA_def_property_update(prop, NC_NODE | ND_DISPLAY, NULL);
+	
+	prop = RNA_def_property(srna, "height", PROP_FLOAT, PROP_XYZ);
+	RNA_def_property_float_sdna(prop, NULL, "height");
+	RNA_def_property_float_funcs(prop, NULL, NULL, "rna_Node_height_range");
+	RNA_def_property_ui_text(prop, "Height", "Height of the node");
+	RNA_def_property_update(prop, NC_NODE | ND_DISPLAY, NULL);
 	
 	prop = RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
 	RNA_def_property_ui_text(prop, "Name", "Unique node identifier");
@@ -4874,12 +4931,12 @@ static void rna_def_texture_nodetree(BlenderRNA *brna)
 	rna_def_texture_nodetree_api(brna, prop);
 }
 
-static void define_specific_node(BlenderRNA *brna, int id, void (*func)(StructRNA *))
+static void define_specific_node(BlenderRNA *brna, int id, void (*def_func)(StructRNA *))
 {
 	StructRNA *srna = def_node(brna, id);
-
-	if (func)
-		func(srna);
+	
+	if (def_func)
+		def_func(srna);
 }
 
 void RNA_def_nodetree(BlenderRNA *brna)

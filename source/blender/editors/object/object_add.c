@@ -146,7 +146,7 @@ void ED_object_location_from_view(bContext *C, float loc[3])
 {
 	View3D *v3d = CTX_wm_view3d(C);
 	Scene *scene = CTX_data_scene(C);
-	float *cursor;
+	const float *cursor;
 
 	cursor = give_cursor(scene, v3d);
 
@@ -186,7 +186,7 @@ void ED_object_base_init_transform(bContext *C, Base *base, const float loc[3], 
 /* Uses context to figure out transform for primitive.
  * Returns standard diameter. */
 float ED_object_new_primitive_matrix(bContext *C, Object *obedit,
-                                     const float loc[3], const float rot[3], float primmat[][4],
+                                     const float loc[3], const float rot[3], float primmat[4][4],
                                      int apply_diameter)
 {
 	Scene *scene = CTX_data_scene(C);
@@ -802,10 +802,25 @@ void OBJECT_OT_lamp_add(wmOperatorType *ot)
 
 static int group_instance_add_exec(bContext *C, wmOperator *op)
 {
-	Group *group = BLI_findlink(&CTX_data_main(C)->group, RNA_enum_get(op->ptr, "group"));
-
+	Group *group;
 	unsigned int layer;
 	float loc[3], rot[3];
+	
+	if (RNA_struct_property_is_set(op->ptr, "name")) {
+		char name[MAX_ID_NAME - 2];
+		
+		RNA_string_get(op->ptr, "name", name);
+		group = (Group *)BKE_libblock_find_name(ID_GR, name);
+		
+		if (0 == RNA_struct_property_is_set(op->ptr, "location")) {
+			wmEvent *event = CTX_wm_window(C)->eventstate;
+			ED_object_location_from_view(C, loc);
+			ED_view3d_cursor3d_position(C, loc, event->x, event->y);
+			RNA_float_set_array(op->ptr, "location", loc);
+		}
+	}
+	else
+		group = BLI_findlink(&CTX_data_main(C)->group, RNA_enum_get(op->ptr, "group"));
 
 	if (!ED_object_add_generic_get_opts(C, op, loc, rot, NULL, &layer, NULL))
 		return OPERATOR_CANCELLED;
@@ -847,6 +862,7 @@ void OBJECT_OT_group_instance_add(wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
 	/* properties */
+	RNA_def_string(ot->srna, "name", "Group", MAX_ID_NAME - 2, "Name", "Group name to add");
 	ot->prop = RNA_def_enum(ot->srna, "group", DummyRNA_NULL_items, 0, "Group", "");
 	RNA_def_enum_funcs(ot->prop, RNA_group_itemf);
 	ED_object_add_generic_props(ot, FALSE);
@@ -936,6 +952,8 @@ static int object_delete_exec(bContext *C, wmOperator *op)
 {
 	Main *bmain = CTX_data_main(C);
 	Scene *scene = CTX_data_scene(C);
+	wmWindowManager *wm = CTX_wm_manager(C);
+	wmWindow *win;
 	const short use_global = RNA_boolean_get(op->ptr, "use_global");
 
 	if (CTX_data_edit_object(C)) 
@@ -967,11 +985,21 @@ static int object_delete_exec(bContext *C, wmOperator *op)
 	}
 	CTX_DATA_END;
 
-	DAG_scene_sort(bmain, scene);
-	DAG_ids_flush_update(bmain, 0);
+	/* delete has to handle all open scenes */
+	flag_listbase_ids(&bmain->scene, LIB_DOIT, 1);
+	for (win = wm->windows.first; win; win = win->next) {
+		scene = win->screen->scene;
+		
+		if (scene->id.flag & LIB_DOIT) {
+			scene->id.flag &= ~LIB_DOIT;
+			
+			DAG_scene_sort(bmain, scene);
 
-	WM_event_add_notifier(C, NC_SCENE | ND_OB_ACTIVE, scene);
-	WM_event_add_notifier(C, NC_SCENE | ND_LAYER_CONTENT, scene);
+			WM_event_add_notifier(C, NC_SCENE | ND_OB_ACTIVE, scene);
+			WM_event_add_notifier(C, NC_SCENE | ND_LAYER_CONTENT, scene);
+		}
+	}
+	DAG_ids_flush_update(bmain, 0);
 
 	return OPERATOR_FINISHED;
 }
@@ -1973,6 +2001,7 @@ void OBJECT_OT_duplicate(wmOperatorType *ot)
 
 static int add_named_exec(bContext *C, wmOperator *op)
 {
+	wmEvent *event = CTX_wm_window(C)->eventstate;
 	Main *bmain = CTX_data_main(C);
 	Scene *scene = CTX_data_scene(C);
 	Base *basen, *base;
@@ -2005,6 +2034,8 @@ static int add_named_exec(bContext *C, wmOperator *op)
 	basen->lay = basen->object->lay = scene->lay;
 
 	ED_object_location_from_view(C, basen->object->loc);
+	ED_view3d_cursor3d_position(C, basen->object->loc, event->x, event->y);
+	
 	ED_base_object_activate(C, basen);
 
 	copy_object_set_idnew(C, dupflag);

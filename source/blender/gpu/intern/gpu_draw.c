@@ -92,7 +92,7 @@ void GPU_render_text(MTFace *tface, int mode,
 	float *v1, float *v2, float *v3, float *v4, int glattrib)
 {
 	if ((mode & GEMAT_TEXT) && (textlen>0) && tface->tpage) {
-		Image* ima = (Image*)tface->tpage;
+		Image* ima = (Image *)tface->tpage;
 		int index, character;
 		float centerx, centery, sizex, sizey, transx, transy, movex, movey, advance;
 		float advance_tab;
@@ -101,9 +101,9 @@ void GPU_render_text(MTFace *tface, int mode,
 		float line_start= 0.0f, line_height;
 		
 		if (v4)
-			line_height= MAX4(v1[1], v2[1], v3[1], v4[2]) - MIN4(v1[1], v2[1], v3[1], v4[2]);
+			line_height = max_ffff(v1[1], v2[1], v3[1], v4[2]) - min_ffff(v1[1], v2[1], v3[1], v4[2]);
 		else
-			line_height= MAX3(v1[1], v2[1], v3[1]) - MIN3(v1[1], v2[1], v3[1]);
+			line_height = max_fff(v1[1], v2[1], v3[1]) - min_fff(v1[1], v2[1], v3[1]);
 		line_height *= 1.2f; /* could be an option? */
 		/* end multiline */
 
@@ -250,6 +250,25 @@ void GPU_set_gpu_mipmapping(int gpu_mipmap)
 	if (old_value != GTS.gpu_mipmap) {
 		GPU_free_images();
 	}
+}
+
+static void gpu_generate_mipmap(GLenum target)
+{
+	int is_ati = GPU_type_matches(GPU_DEVICE_ATI, GPU_OS_ANY, GPU_DRIVER_ANY);
+	int target_enabled = 0;
+
+	/* work around bug in ATI driver, need to have GL_TEXTURE_2D enabled
+	 * http://www.opengl.org/wiki/Common_Mistakes#Automatic_mipmap_generation */
+	if (is_ati) {
+		target_enabled = glIsEnabled(target);
+		if (!target_enabled)
+			glEnable(target);
+	}
+
+	glGenerateMipmapEXT(target);
+
+	if (is_ati && !target_enabled)
+		glDisable(target);
 }
 
 void GPU_set_mipmap(int mipmap)
@@ -537,8 +556,9 @@ int GPU_verify_image(Image *ima, ImageUser *iuser, int tftile, int compare, int 
 				if (do_color_management) {
 					srgb_frect = MEM_mallocN(ibuf->x*ibuf->y*sizeof(float)*4, "floar_buf_col_cor");
 					IMB_buffer_float_from_float(srgb_frect, ibuf->rect_float,
-						ibuf->channels, IB_PROFILE_SRGB, IB_PROFILE_LINEAR_RGB, 0,
+						ibuf->channels, IB_PROFILE_SRGB, IB_PROFILE_LINEAR_RGB, TRUE,
 						ibuf->x, ibuf->y, ibuf->x, ibuf->x);
+					IMB_buffer_float_unpremultiply(srgb_frect, ibuf->x, ibuf->y);
 					/* clamp buffer colors to 1.0 to avoid artifacts due to glu for hdr images */
 					IMB_buffer_float_clamp(srgb_frect, ibuf->x, ibuf->y);
 					frect= srgb_frect + texwinsy*ibuf->x + texwinsx;
@@ -562,8 +582,9 @@ int GPU_verify_image(Image *ima, ImageUser *iuser, int tftile, int compare, int 
 				if (do_color_management) {
 					frect = srgb_frect = MEM_mallocN(ibuf->x*ibuf->y*sizeof(*srgb_frect)*4, "floar_buf_col_cor");
 					IMB_buffer_float_from_float(srgb_frect, ibuf->rect_float,
-							ibuf->channels, IB_PROFILE_SRGB, IB_PROFILE_LINEAR_RGB, 0,
+							ibuf->channels, IB_PROFILE_SRGB, IB_PROFILE_LINEAR_RGB, TRUE,
 							ibuf->x, ibuf->y, ibuf->x, ibuf->x);
+					IMB_buffer_float_unpremultiply(srgb_frect, ibuf->x, ibuf->y);
 					/* clamp buffer colors to 1.0 to avoid artifacts due to glu for hdr images */
 					IMB_buffer_float_clamp(srgb_frect, ibuf->x, ibuf->y);
 				}
@@ -691,7 +712,7 @@ void GPU_create_gl_tex(unsigned int *bind, unsigned int *pix, float * frect, int
 			else
 				glTexImage2D(GL_TEXTURE_2D, 0,  GL_RGBA,  rectw, recth, 0, GL_RGBA, GL_UNSIGNED_BYTE, pix);
 
-			glGenerateMipmapEXT(GL_TEXTURE_2D);
+			gpu_generate_mipmap(GL_TEXTURE_2D);
 		}
 		else {
 			if (use_high_bit_depth)
@@ -749,10 +770,13 @@ int GPU_upload_dxt_texture(ImBuf *ibuf)
 		return FALSE;
 	}
 
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, gpu_get_mipmap_filter(0));
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, gpu_get_mipmap_filter(1));
 
 	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+
+	if (GLEW_EXT_texture_filter_anisotropic)
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, GPU_get_anisotropic());
 
 	blocksize = (ibuf->dds_data.fourcc == FOURCC_DXT1) ? 8 : 16;
 	for (i=0; i<ibuf->dds_data.nummipmaps && (width||height); ++i) {
@@ -791,7 +815,7 @@ void GPU_create_gl_tex_compressed(unsigned int *bind, unsigned int *pix, int x, 
 	glBindTexture(GL_TEXTURE_2D, *bind);
 
 	if (GPU_upload_dxt_texture(ibuf) == 0) {
-		glDeleteTextures(1, (GLuint*)bind);
+		glDeleteTextures(1, (GLuint *)bind);
 		GPU_create_gl_tex(bind, pix, NULL, x, y, mipmap, 0, ima);
 	}
 #endif
@@ -934,7 +958,7 @@ void GPU_paint_update_image(Image *ima, int x, int y, int w, int h)
 			/* we have already accounted for the case where GTS.gpu_mipmap is false
 			 * so we will be using GPU mipmap generation here */
 			if (GPU_get_mipmap()) {
-				glGenerateMipmapEXT(GL_TEXTURE_2D);
+				gpu_generate_mipmap(GL_TEXTURE_2D);
 			}
 			else {
 				ima->tpageflag &= ~IMA_MIPMAP_COMPLETE;
@@ -959,7 +983,7 @@ void GPU_paint_update_image(Image *ima, int x, int y, int w, int h)
 
 		/* see comment above as to why we are using gpu mipmap generation here */
 		if (GPU_get_mipmap()) {
-			glGenerateMipmapEXT(GL_TEXTURE_2D);
+			gpu_generate_mipmap(GL_TEXTURE_2D);
 		}
 		else {
 			ima->tpageflag &= ~IMA_MIPMAP_COMPLETE;
@@ -1593,7 +1617,7 @@ int GPU_default_lights(void)
 	return count;
 }
 
-int GPU_scene_object_lights(Scene *scene, Object *ob, int lay, float viewmat[][4], int ortho)
+int GPU_scene_object_lights(Scene *scene, Object *ob, int lay, float viewmat[4][4], int ortho)
 {
 	Base *base;
 	Lamp *la;

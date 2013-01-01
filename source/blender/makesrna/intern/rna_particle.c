@@ -238,7 +238,220 @@ static void rna_ParticleHairKey_location_object_set(PointerRNA *ptr, const float
 	}
 }
 
-/* property update functions */
+static void rna_ParticleHairKey_co_object(HairKey *hairkey, Object *object, ParticleSystemModifierData *modifier, ParticleData *particle,
+                                             float n_co[3])
+{
+
+	DerivedMesh *hairdm = (modifier->psys->flag & PSYS_HAIR_DYNAMICS) ? modifier->psys->hair_out_dm : NULL;
+	if (particle) {
+		if (hairdm) {
+			MVert *mvert = CDDM_get_vert(hairdm, particle->hair_index + (hairkey - particle->hair));
+			copy_v3_v3(n_co, mvert->co);
+		}
+		else {
+			float hairmat[4][4];
+			psys_mat_hair_to_object(object, modifier->dm, modifier->psys->part->from, particle, hairmat);
+			copy_v3_v3(n_co, hairkey->co);
+			mul_m4_v3(hairmat, n_co);
+		}
+	}
+	else {
+		zero_v3(n_co);
+	}
+}
+
+static void rna_Particle_uv_on_emitter(ParticleData *particle, ParticleSystemModifierData *modifier, float n_uv[2])
+{
+	/*psys_particle_on_emitter(psmd, part->from, pa->num, pa->num_dmcache, pa->fuv, pa->foffset, co, nor, 0, 0, sd.orco, 0);*/
+
+	/* get uvco & mcol */
+	int num = particle->num_dmcache;
+	int from = modifier->psys->part->from;
+
+	if (num == DMCACHE_NOTFOUND)
+		if (particle->num < modifier->dm->getNumTessFaces(modifier->dm))
+			num = particle->num;
+
+	/* get uvco */
+	if (n_uv && ELEM(from, PART_FROM_FACE, PART_FROM_VOLUME)) {
+		
+		if (num != DMCACHE_NOTFOUND) {
+			MFace *mface = modifier->dm->getTessFaceData(modifier->dm, num, CD_MFACE);
+			MTFace *mtface = (MTFace *)CustomData_get_layer_n(&modifier->dm->faceData, CD_MTFACE, 0);
+			mtface += num;
+			
+			psys_interpolate_uvs(mtface, mface->v4, particle->fuv, n_uv);
+		}
+		else {
+			n_uv[0] = 0.0f;
+			n_uv[1] = 0.0f;
+		}
+	}
+}
+
+static void rna_ParticleSystem_co_hair(ParticleSystem *particlesystem, Object *object, ParticleSystemModifierData *modifier, int particle_no, int step,
+                                       float n_co[3])
+{
+	ParticleSettings *part = 0;
+	ParticleData *pars = 0;
+	ParticleCacheKey *cache = 0;
+	int totchild = 0;
+	int path_nbr = 0;
+	int totpart;
+	int max_k = 0;
+
+	if (particlesystem == NULL)
+		return;
+
+	part = particlesystem->part;
+	pars = particlesystem->particles;
+
+	if (part == NULL || pars == NULL || !psys_check_enabled(object, particlesystem))
+		return;
+	
+	if (part->ren_as == PART_DRAW_OB || part->ren_as == PART_DRAW_GR || part->ren_as == PART_DRAW_NOT)
+		return;
+
+	totchild = particlesystem->totchild * part->disp / 100;
+
+	/* can happen for disconnected/global hair */
+	if (part->type == PART_HAIR && !particlesystem->childcache)
+		totchild = 0;
+
+	totpart = particlesystem->totpart;
+
+	if (particle_no >= totpart + totchild)
+		return;
+
+	if (part->ren_as == PART_DRAW_PATH && particlesystem->pathcache)
+		path_nbr = (int)pow(2.0, part->draw_step);
+
+	if (particle_no < totpart) {
+
+		if (path_nbr) {
+			cache = particlesystem->pathcache[particle_no];
+			max_k = (int)cache->steps;
+		}
+
+	}
+	else {
+
+		if (path_nbr) {
+			cache = particlesystem->childcache[particle_no - totpart];
+
+			if (cache->steps < 0)
+				max_k = 0;
+			else
+				max_k = (int)cache->steps;
+		}
+	}
+
+	/*strands key loop data stored in cache + step->co*/
+	if (path_nbr) {
+		if (step >= 0 && step <= path_nbr) {
+			if (step <= max_k)
+				copy_v3_v3(n_co, (cache + step)->co);
+		}
+	}
+
+}
+
+static void rna_ParticleSystem_uv_on_emitter(ParticleSystem *particlesystem, ParticleSystemModifierData *modifier, ParticleData *particle, int particle_no,
+                                             float n_uv[2])
+{
+	ParticleSettings *part = 0;
+	int totpart;
+	int totchild = 0;
+	int num;
+
+	/* 1. check that everything is ok & updated */
+	if (particlesystem == NULL)
+		return;
+
+	part = particlesystem->part;
+
+		totchild = particlesystem->totchild;
+
+	/* can happen for disconnected/global hair */
+	if (part->type == PART_HAIR && !particlesystem->childcache)
+		totchild = 0;
+
+	totpart = particlesystem->totpart;
+
+	if (particle_no >= totpart + totchild)
+		return;
+
+/* 3. start creating renderable things */
+	/* setup per particle individual stuff */
+	if (particle_no < totpart) {
+
+		/* get uvco & mcol */
+		num = particle->num_dmcache;
+
+		if (num == DMCACHE_NOTFOUND)
+			if (particle->num < modifier->dm->getNumTessFaces(modifier->dm))
+				num = particle->num;
+
+		if (n_uv && ELEM(part->from, PART_FROM_FACE, PART_FROM_VOLUME)) {
+			if (num != DMCACHE_NOTFOUND) {
+				MFace *mface = modifier->dm->getTessFaceData(modifier->dm, num, CD_MFACE);
+				MTFace *mtface = (MTFace *)CustomData_get_layer_n(&modifier->dm->faceData, CD_MTFACE, 0);
+				mtface += num;
+				
+				psys_interpolate_uvs(mtface, mface->v4, particle->fuv, n_uv);
+			}
+			else {
+				n_uv[0] = 0.0f;
+				n_uv[1] = 0.0f;
+			}
+		}
+	}
+	else {
+		ChildParticle *cpa = particlesystem->child + particle_no - totpart;
+
+		num = cpa->num;
+
+		/* get uvco & mcol */
+		if (part->childtype == PART_CHILD_FACES) {
+			if (n_uv && ELEM(PART_FROM_FACE, PART_FROM_FACE, PART_FROM_VOLUME)) {
+				if (cpa->num != DMCACHE_NOTFOUND) {
+					MFace *mface = modifier->dm->getTessFaceData(modifier->dm, cpa->num, CD_MFACE);
+					MTFace *mtface = (MTFace *)CustomData_get_layer_n(&modifier->dm->faceData, CD_MTFACE, 0);
+					mtface += cpa->num;
+					
+					psys_interpolate_uvs(mtface, mface->v4, cpa->fuv, n_uv);
+				}
+				else {
+					n_uv[0] = 0.0f;
+					n_uv[1] = 0.0f;
+				}
+			}
+		}
+		else {
+			ParticleData *parent = particlesystem->particles + cpa->parent;
+			num = parent->num_dmcache;
+
+			if (num == DMCACHE_NOTFOUND)
+				if (parent->num < modifier->dm->getNumTessFaces(modifier->dm))
+					num = parent->num;
+
+			if (n_uv && ELEM(part->from, PART_FROM_FACE, PART_FROM_VOLUME)) {
+				if (num != DMCACHE_NOTFOUND) {
+					MFace *mface = modifier->dm->getTessFaceData(modifier->dm, num, CD_MFACE);
+					MTFace *mtface = (MTFace *)CustomData_get_layer_n(&modifier->dm->faceData, CD_MTFACE, 0);
+					mtface += num;
+					
+					psys_interpolate_uvs(mtface, mface->v4, parent->fuv, n_uv);
+				}
+				else {
+					n_uv[0] = 0.0f;
+					n_uv[1] = 0.0f;
+				}
+			}
+		}
+	}
+}
+
 static void particle_recalc(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr, short flag)
 {
 	if (ptr->type == &RNA_ParticleSystem) {
@@ -905,6 +1118,7 @@ static void rna_def_particle_hair_key(BlenderRNA *brna)
 {
 	StructRNA *srna;
 	PropertyRNA *prop;
+	FunctionRNA *func;
 
 	srna = RNA_def_struct(brna, "ParticleHairKey", NULL);
 	RNA_def_struct_sdna(srna, "HairKey");
@@ -928,6 +1142,19 @@ static void rna_def_particle_hair_key(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Location",
 	                         "Location of the hair key in its internal coordinate system, "
 	                         "relative to the emitting face");
+
+	/* Aided co func */
+	func = RNA_def_function(srna, "co_object", "rna_ParticleHairKey_co_object");
+	RNA_def_function_ui_description(func, "Obtain hairkey location with particle and modifier data");
+
+	prop = RNA_def_pointer(func, "object", "Object", "", "Object");
+	prop = RNA_def_pointer(func, "modifier", "ParticleSystemModifier", "", "Particle modifier");
+	prop = RNA_def_pointer(func, "particle", "Particle", "", "hair particle");
+	
+	prop = RNA_def_float_vector(func, "co", 3, NULL, -FLT_MAX, FLT_MAX, "Co",
+	                            "Exported hairkey location", -1e4, 1e4);
+	RNA_def_property_flag(prop, PROP_THICK_WRAP);
+	RNA_def_function_output(func, prop);
 }
 
 static void rna_def_particle_key(BlenderRNA *brna)
@@ -979,6 +1206,7 @@ static void rna_def_particle(BlenderRNA *brna)
 {
 	StructRNA *srna;
 	PropertyRNA *prop;
+	FunctionRNA *func;
 
 	static EnumPropertyItem alive_items[] = {
 		/*{PARS_KILLED, "KILLED", 0, "Killed", ""}, */
@@ -1083,6 +1311,15 @@ static void rna_def_particle(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Alive State", "");
 
 /*	short rt2; */
+
+/* UVs */
+	func = RNA_def_function(srna, "uv_on_emitter", "rna_Particle_uv_on_emitter");
+	RNA_def_function_ui_description(func, "Obtain uv for particle on derived mesh");
+	prop = RNA_def_pointer(func, "modifier", "ParticleSystemModifier", "", "Particle modifier");
+	prop = RNA_def_property(func, "uv", PROP_FLOAT, PROP_COORDS);
+	RNA_def_property_array(prop, 2);
+	RNA_def_property_flag(prop, PROP_THICK_WRAP);
+	RNA_def_function_output(func, prop);
 }
 
 static void rna_def_particle_dupliweight(BlenderRNA *brna)
@@ -1112,12 +1349,25 @@ static void rna_def_fluid_settings(BlenderRNA *brna)
 {
 	StructRNA *srna;
 	PropertyRNA *prop;
-	
+
+	static EnumPropertyItem sph_solver_items[] = {
+		{SPH_SOLVER_DDR, "DDR", 0, "Double-Density", "An artistic solver with strong surface tension effects (original)"},
+		{SPH_SOLVER_CLASSICAL, "CLASSICAL", 0, "Classical", "A more physically-accurate solver"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
 	srna = RNA_def_struct(brna, "SPHFluidSettings", NULL);
 	RNA_def_struct_path_func(srna, "rna_SPHFluidSettings_path");
 	RNA_def_struct_ui_text(srna, "SPH Fluid Settings", "Settings for particle fluids physics");
-	
+
 	/* Fluid settings */
+	prop = RNA_def_property(srna, "solver", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "solver");
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_enum_items(prop, sph_solver_items);
+	RNA_def_property_ui_text(prop, "SPH Solver", "The code used to calculate internal forces on particles");
+	RNA_def_property_update(prop, 0, "rna_Particle_reset");
+
 	prop = RNA_def_property(srna, "spring_force", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "spring_k");
 	RNA_def_property_range(prop, 0.0f, 100.0f);
@@ -1186,7 +1436,7 @@ static void rna_def_fluid_settings(BlenderRNA *brna)
 	/* Double density relaxation */
 	prop = RNA_def_property(srna, "stiffness", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "stiffness_k");
-	RNA_def_property_range(prop, 0.0f, 100.0f);
+	RNA_def_property_range(prop, 0.0f, 100000.0f);
 	RNA_def_property_ui_range(prop, 0.0f, 10.0f, 1, 3);
 	RNA_def_property_ui_text(prop, "Stiffness", "How incompressible the fluid is");
 	RNA_def_property_update(prop, 0, "rna_Particle_reset");
@@ -1201,7 +1451,7 @@ static void rna_def_fluid_settings(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "rest_density", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "rest_density");
-	RNA_def_property_range(prop, 0.0f, 100.0f);
+	RNA_def_property_range(prop, 0.0f, 10000.0f);
 	RNA_def_property_ui_range(prop, 0.0f, 2.0f, 1, 3);
 	RNA_def_property_ui_text(prop, "Rest Density", "Fluid rest density");
 	RNA_def_property_update(prop, 0, "rna_Particle_reset");
@@ -2129,11 +2379,11 @@ static void rna_def_particle_settings(BlenderRNA *brna)
 	RNA_def_property_update(prop, 0, "rna_Particle_reset");
 
 	prop = RNA_def_property(srna, "courant_target", PROP_FLOAT, PROP_NONE);
-	RNA_def_property_range(prop, 0.01, 10);
-	RNA_def_property_float_default(prop, 0.2);
+	RNA_def_property_range(prop, 0.0001, 10);
+	RNA_def_property_float_default(prop, 0.1);
 	RNA_def_property_ui_text(prop, "Adaptive Subframe Threshold",
 	                         "The relative distance a particle can move before requiring more subframes "
-	                         "(target Courant number); 0.1-0.3 is the recommended range");
+	                         "(target Courant number); 0.01-0.3 is the recommended range");
 	RNA_def_property_update(prop, 0, "rna_Particle_reset");
 
 	prop = RNA_def_property(srna, "jitter_factor", PROP_FLOAT, PROP_NONE);
@@ -2281,7 +2531,7 @@ static void rna_def_particle_settings(BlenderRNA *brna)
 
 	/* physical properties */
 	prop = RNA_def_property(srna, "mass", PROP_FLOAT, PROP_NONE);
-	RNA_def_property_range(prop, 0.001f, 100000.0f);
+	RNA_def_property_range(prop, 0.00000001f, 100000.0f);
 	RNA_def_property_ui_range(prop, 0.01, 100, 1, 3);
 	RNA_def_property_ui_text(prop, "Mass", "Mass of the particles");
 	RNA_def_property_update(prop, 0, "rna_Particle_reset");
@@ -2683,6 +2933,7 @@ static void rna_def_particle_system(BlenderRNA *brna)
 {
 	StructRNA *srna;
 	PropertyRNA *prop;
+	FunctionRNA *func;
 
 	srna = RNA_def_struct(brna, "ParticleSystem", NULL);
 	RNA_def_struct_ui_text(srna, "Particle System", "Particle system in an object");
@@ -2779,7 +3030,6 @@ static void rna_def_particle_system(BlenderRNA *brna)
 	                           "rna_ParticleSystem_active_particle_target_index_set",
 	                           "rna_ParticleSystem_active_particle_target_index_range");
 	RNA_def_property_ui_text(prop, "Active Particle Target Index", "");
-
 
 	/* billboard */
 	prop = RNA_def_property(srna, "billboard_normal_uv", PROP_STRING, PROP_NONE);
@@ -2982,6 +3232,32 @@ static void rna_def_particle_system(BlenderRNA *brna)
 	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
 
 	RNA_def_struct_path_func(srna, "rna_ParticleSystem_path");
+
+	/* extract cached hair location data */
+	func = RNA_def_function(srna, "co_hair", "rna_ParticleSystem_co_hair");
+	RNA_def_function_ui_description(func, "Obtain cache hair data");
+
+	prop = RNA_def_pointer(func, "object", "Object", "", "Object");
+	prop = RNA_def_pointer(func, "modifier", "ParticleSystemModifier", "", "Particle modifier");
+	prop = RNA_def_int(func, "particle_no", 0, INT_MIN, INT_MAX, "Particle no", "", INT_MIN, INT_MAX);
+	prop = RNA_def_int(func, "step", 0, INT_MIN, INT_MAX, "step no", "", INT_MIN, INT_MAX);
+
+	prop = RNA_def_float_vector(func, "co", 3, NULL, -FLT_MAX, FLT_MAX, "Co",
+	                            "Exported hairkey location", -1e4, 1e4);
+	RNA_def_property_flag(prop, PROP_THICK_WRAP);
+	RNA_def_function_output(func, prop);
+
+	/* extract hair UVs */
+	func = RNA_def_function(srna, "uv_on_emitter", "rna_ParticleSystem_uv_on_emitter");
+	RNA_def_function_ui_description(func, "Obtain uv for all particles");
+	prop = RNA_def_pointer(func, "modifier", "ParticleSystemModifier", "", "Particle modifier");
+	prop = RNA_def_pointer(func, "particle", "Particle", "", "Particle");
+	prop = RNA_def_int(func, "particle_no", 0, INT_MIN, INT_MAX, "Particle no", "", INT_MIN, INT_MAX);
+	prop = RNA_def_property(func, "uv", PROP_FLOAT, PROP_COORDS);
+	RNA_def_property_array(prop, 2);
+	RNA_def_property_flag(prop, PROP_THICK_WRAP);
+	RNA_def_function_output(func, prop);
+
 }
 
 void RNA_def_particle(BlenderRNA *brna)

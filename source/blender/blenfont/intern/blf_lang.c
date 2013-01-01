@@ -30,6 +30,8 @@
 
 #include "BLF_translation.h" /* own include */
 
+#include "BLI_utildefines.h"
+
 #ifdef WITH_INTERNATIONAL
 
 #include <stdio.h>
@@ -50,7 +52,6 @@
 #include "BLI_linklist.h"
 #include "BLI_path_util.h"
 #include "BLI_string.h"
-#include "BLI_utildefines.h"
 
 /* Locale options. */
 static const char **locales = NULL;
@@ -99,7 +100,7 @@ static void fill_locales(void)
 	/* First loop to find highest locale ID */
 	while (line) {
 		int t;
-		str = (char*) line->link;
+		str = (char *)line->link;
 		if (str[0] == '#' || str[0] == '\0') {
 			line = line->next;
 			continue; /* Comment or void... */
@@ -117,12 +118,12 @@ static void fill_locales(void)
 	line = lines;
 	/* Do not allocate locales with zero-sized mem, as LOCALE macro uses NULL locales as invalid marker! */
 	if (num_locales > 0) {
-		locales = MEM_callocN(num_locales * sizeof(char*), __func__);
+		locales = MEM_callocN(num_locales * sizeof(char *), __func__);
 		while (line) {
 			int id;
 			char *loc, *sep1, *sep2, *sep3;
 
-			str = (char*) line->link;
+			str = (char *)line->link;
 			if (str[0] == '#' || str[0] == '\0') {
 				line = line->next;
 				continue;
@@ -229,7 +230,7 @@ void BLF_lang_set(const char *str)
 	bl_locale_set(short_locale_utf8);
 
 	if (short_locale[0]) {
-		MEM_freeN((void*)short_locale_utf8);
+		MEM_freeN((void *)short_locale_utf8);
 	}
 }
 
@@ -254,9 +255,8 @@ void BLF_lang_free(void)
 	return;
 }
 
-void BLF_lang_set(const char *str)
+void BLF_lang_set(const char *UNUSED(str))
 {
-	(void)str;
 	return;
 }
 

@@ -75,7 +75,7 @@ typedef struct InstanceRayObject {
 } InstanceRayObject;
 
 
-RayObject *RE_rayobject_instance_create(RayObject *target, float transform[][4], void *ob, void *target_ob)
+RayObject *RE_rayobject_instance_create(RayObject *target, float transform[4][4], void *ob, void *target_ob)
 {
 	InstanceRayObject *obj = (InstanceRayObject *)MEM_callocN(sizeof(InstanceRayObject), "InstanceRayObject");
 	assert(RE_rayobject_isAligned(obj) );  /* RayObject API assumes real data to be 4-byte aligned */
@@ -173,13 +173,13 @@ static int  RE_rayobject_instance_intersect(RayObject *o, Isect *isec)
 
 static void RE_rayobject_instance_free(RayObject *o)
 {
-	InstanceRayObject *obj = (InstanceRayObject*)o;
+	InstanceRayObject *obj = (InstanceRayObject *)o;
 	MEM_freeN(obj);
 }
 
 static float RE_rayobject_instance_cost(RayObject *o)
 {
-	InstanceRayObject *obj = (InstanceRayObject*)o;
+	InstanceRayObject *obj = (InstanceRayObject *)o;
 	return RE_rayobject_cost(obj->target) + RE_COST_INSTANCE;
 }
 

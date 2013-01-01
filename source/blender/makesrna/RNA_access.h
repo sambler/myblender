@@ -55,6 +55,7 @@ extern StructRNA RNA_ActionPoseMarkers;
 extern StructRNA RNA_Actuator;
 extern StructRNA RNA_ActuatorSensor;
 extern StructRNA RNA_Addon;
+extern StructRNA RNA_AddonPreferences;
 extern StructRNA RNA_AdjustmentSequence;
 extern StructRNA RNA_AlwaysSensor;
 extern StructRNA RNA_AndController;
@@ -105,7 +106,8 @@ extern StructRNA RNA_CollectionProperty;
 extern StructRNA RNA_CollisionModifier;
 extern StructRNA RNA_CollisionSensor;
 extern StructRNA RNA_CollisionSettings;
-extern StructRNA RNA_ColorManagedColorspaceSettings;
+extern StructRNA RNA_ColorManagedInputColorspaceSettings;
+extern StructRNA RNA_ColorManagedSequencerColorspaceSettings;
 extern StructRNA RNA_ColorManagedDisplaySettings;
 extern StructRNA RNA_ColorManagedViewSettings;
 extern StructRNA RNA_ColorRamp;
@@ -587,7 +589,8 @@ extern StructRNA RNA_TrackToConstraint;
 extern StructRNA RNA_TransformConstraint;
 extern StructRNA RNA_TransformSequence;
 extern StructRNA RNA_UILayout;
-extern StructRNA RNA_UIListItem;
+extern StructRNA RNA_UIList;
+extern StructRNA RNA_UVWarpModifier;
 extern StructRNA RNA_UVProjectModifier;
 extern StructRNA RNA_UVProjector;
 extern StructRNA RNA_UnitSettings;
@@ -863,7 +866,12 @@ int RNA_path_resolve_full(PointerRNA *ptr, const char *path,
 
 char *RNA_path_from_ID_to_struct(PointerRNA *ptr);
 char *RNA_path_from_ID_to_property(PointerRNA *ptr, PropertyRNA *prop);
-char *RNA_path_from_ID_python(struct ID *id);
+
+char *RNA_path_full_ID_py(struct ID *id);
+char *RNA_path_full_struct_py(struct PointerRNA *ptr);
+char *RNA_path_full_property_py(struct PointerRNA *ptr, struct PropertyRNA *prop, int index);
+char *RNA_path_struct_property_py(struct PointerRNA *ptr, struct PropertyRNA *prop, int index);
+char *RNA_path_property_py(struct PointerRNA *ptr, struct PropertyRNA *prop, int index);
 
 /* Quick name based property access
  *
@@ -971,8 +979,8 @@ int RNA_struct_property_is_set(PointerRNA *ptr, const char *identifier);
 int RNA_property_is_idprop(PropertyRNA *prop);
 
 /* python compatible string representation of this property, (must be freed!) */
-char *RNA_property_as_string(struct bContext *C, PointerRNA *ptr, PropertyRNA *prop);
-char *RNA_pointer_as_string(struct bContext *C, PointerRNA *ptr);
+char *RNA_property_as_string(struct bContext *C, PointerRNA *ptr, PropertyRNA *prop, int index);
+char *RNA_pointer_as_string(struct bContext *C, PointerRNA *ptr, PropertyRNA *prop_ptr, PointerRNA *ptr_prop);
 char *RNA_pointer_as_string_keywords_ex(struct bContext *C, PointerRNA *ptr, PointerRNA *ptr_default,
                                         const short skip_optional_value, const short all_args,
                                         PropertyRNA *iterprop);

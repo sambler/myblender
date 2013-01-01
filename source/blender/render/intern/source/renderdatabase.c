@@ -370,7 +370,7 @@ RadFace **RE_vlakren_get_radface(ObjectRen *obr, VlakRen *vlak, int verify)
 	radface= obr->vlaknodes[nr].radface;
 	if (radface==NULL) {
 		if (verify) 
-			radface= obr->vlaknodes[nr].radface= MEM_callocN(256*RE_RADFACE_ELEMS*sizeof(void*), "radface table");
+			radface = obr->vlaknodes[nr].radface= MEM_callocN(256 * RE_RADFACE_ELEMS * sizeof(void *), "radface table");
 		else
 			return NULL;
 	}
@@ -888,9 +888,9 @@ HaloRen *RE_findOrAddHalo(ObjectRen *obr, int nr)
 		//	TABLEINITSIZE, obr->blohalen+TABLEINITSIZE );
 		temp=obr->bloha;
 		
-		obr->bloha=(HaloRen**)MEM_callocN(sizeof(void*)*(obr->blohalen+TABLEINITSIZE), "Bloha");
-		if (temp) memcpy(obr->bloha, temp, obr->blohalen*sizeof(void*));
-		memset(&(obr->bloha[obr->blohalen]), 0, TABLEINITSIZE*sizeof(void*));
+		obr->bloha = (HaloRen**)MEM_callocN(sizeof(void *) * (obr->blohalen + TABLEINITSIZE), "Bloha");
+		if (temp) memcpy(obr->bloha, temp, obr->blohalen*sizeof(void *));
+		memset(&(obr->bloha[obr->blohalen]), 0, TABLEINITSIZE * sizeof(void *));
 		obr->blohalen+=TABLEINITSIZE;  /*Does this really need to be power of 2?*/
 		if (temp) MEM_freeN(temp);
 	}
@@ -1221,7 +1221,9 @@ static int panotestclip(Render *re, int do_pano, float v[4])
  * - shadow buffering (shadbuf.c)
  */
 
-void project_renderdata(Render *re, void (*projectfunc)(const float *, float mat[][4], float *),  int do_pano, float xoffs, int UNUSED(do_buckets))
+void project_renderdata(Render *re,
+                        void (*projectfunc)(const float *, float mat[4][4], float *),
+                        int do_pano, float xoffs, int UNUSED(do_buckets))
 {
 	ObjectRen *obr;
 	HaloRen *har = NULL;
@@ -1308,7 +1310,7 @@ void project_renderdata(Render *re, void (*projectfunc)(const float *, float mat
 
 /* ------------------------------------------------------------------------- */
 
-ObjectInstanceRen *RE_addRenderInstance(Render *re, ObjectRen *obr, Object *ob, Object *par, int index, int psysindex, float mat[][4], int lay)
+ObjectInstanceRen *RE_addRenderInstance(Render *re, ObjectRen *obr, Object *ob, Object *par, int index, int psysindex, float mat[4][4], int lay)
 {
 	ObjectInstanceRen *obi;
 	float mat3[3][3];
@@ -1363,7 +1365,7 @@ void RE_makeRenderInstances(Render *re)
 	re->instancetable= newlist;
 }
 
-int clip_render_object(float boundbox[][3], float bounds[4], float winmat[][4])
+int clip_render_object(float boundbox[2][3], float bounds[4], float winmat[4][4])
 {
 	float mat[4][4], vec[4];
 	int a, fl, flag = -1;

@@ -710,9 +710,11 @@ static void sky_tile(RenderPart *pa, RenderLayer *rl)
 					
 					if (pass[3]==0.0f) {
 						copy_v4_v4(pass, col);
+						pass[3] = 1.0f;
 					}
 					else {
 						addAlphaUnderFloat(pass, col);
+						pass[3] = 1.0f;
 					}
 				}
 			}
@@ -981,29 +983,6 @@ static void edge_enhance_add(RenderPart *pa, float *rectf, float *arect)
 	}
 }
 
-static void convert_to_key_alpha(RenderPart *pa, RenderLayer *rl)
-{
-	RenderLayer *rlpp[RE_MAX_OSA];
-	int y, sample, totsample;
-	
-	totsample= get_sample_layers(pa, rl, rlpp);
-	
-	for (sample= 0; sample<totsample; sample++) {
-		float *rectf= rlpp[sample]->rectf;
-		
-		for (y= pa->rectx*pa->recty; y>0; y--, rectf+=4) {
-			if (rectf[3] >= 1.0f) {
-				/* pass */
-			}
-			else if (rectf[3] > 0.0f) {
-				rectf[0] /= rectf[3];
-				rectf[1] /= rectf[3];
-				rectf[2] /= rectf[3];
-			}
-		}
-	}
-}
-
 /* clamp alpha and RGB to 0..1 and 0..inf, can go outside due to filter */
 static void clamp_alpha_rgb_range(RenderPart *pa, RenderLayer *rl)
 {
@@ -1172,7 +1151,7 @@ typedef struct ZbufSolidData {
 
 static void make_pixelstructs(RenderPart *pa, ZSpan *zspan, int sample, void *data)
 {
-	ZbufSolidData *sdata= (ZbufSolidData*)data;
+	ZbufSolidData *sdata = (ZbufSolidData *)data;
 	ListBase *lb= sdata->psmlist;
 	intptr_t *rd= pa->rectdaps;
 	int *ro= zspan->recto;
@@ -1311,10 +1290,6 @@ void zbufshadeDA_tile(RenderPart *pa)
 
 		/* clamp alpha to 0..1 range, can go outside due to filter */
 		clamp_alpha_rgb_range(pa, rl);
-		
-		/* de-premul alpha */
-		if (R.r.alphamode & R_ALPHAKEY)
-			convert_to_key_alpha(pa, rl);
 		
 		/* free stuff within loop! */
 		MEM_freeN(pa->rectdaps); pa->rectdaps= NULL;
@@ -1475,10 +1450,6 @@ void zbufshade_tile(RenderPart *pa)
 		
 		if (rl->passflag & SCE_PASS_VECTOR)
 			reset_sky_speed(pa, rl);
-		
-		/* de-premul alpha */
-		if (R.r.alphamode & R_ALPHAKEY)
-			convert_to_key_alpha(pa, rl);
 		
 		if (edgerect) MEM_freeN(edgerect);
 		edgerect= NULL;
@@ -1740,7 +1711,7 @@ void zbufshade_sss_tile(RenderPart *pa)
 #if 0
 			if (rs) {
 				/* for each sample in this pixel, shade it */
-				for (ps=(PixStr*)*rs; ps; ps=ps->next) {
+				for (ps = (PixStr *)(*rs); ps; ps=ps->next) {
 					ObjectInstanceRen *obi= &re->objectinstance[ps->obi];
 					ObjectRen *obr= obi->obr;
 					vlr= RE_findOrAddVlak(obr, (ps->facenr-1) & RE_QUAD_MASK);
@@ -2461,8 +2432,8 @@ static void do_bake_shade(void *handle, int x, int y, float u, float v)
 
 		/* if hit, we shade from the new point, otherwise from point one starting face */
 		if (hit) {
-			obi= (ObjectInstanceRen*)minisec.hit.ob;
-			vlr= (VlakRen*)minisec.hit.face;
+			obi = (ObjectInstanceRen *)minisec.hit.ob;
+			vlr = (VlakRen *)minisec.hit.face;
 			quad= (minisec.isect == 2);
 			copy_v3_v3(shi->co, minco);
 			
@@ -2795,4 +2766,3 @@ struct Image *RE_bake_shade_get_image(void)
 {
 	return R.bakebuf;
 }
-

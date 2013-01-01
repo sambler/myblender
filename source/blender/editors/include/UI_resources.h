@@ -64,10 +64,11 @@ enum {
 	TH_HEADER_TEXT,
 	TH_HEADER_TEXT_HI,
 	
-	/* float panels */
-	TH_PANEL,
-	TH_PANEL_TEXT,
-	TH_PANEL_TEXT_HI,
+	/* panels */
+	TH_PANEL_HEADER,
+	TH_PANEL_BACK,
+	TH_PANEL_SHOW_HEADER,
+	TH_PANEL_SHOW_BACK,
 	
 	TH_BUTBACK,
 	TH_BUTBACK_TEXT,
@@ -121,9 +122,12 @@ enum {
 
 	TH_SYNTAX_B,
 	TH_SYNTAX_V,
+	TH_SYNTAX_R,
 	TH_SYNTAX_C,
 	TH_SYNTAX_L,
+	TH_SYNTAX_D,
 	TH_SYNTAX_N,
+	TH_SYNTAX_S,
 	
 	TH_BONE_SOLID,
 	TH_BONE_POSE,
@@ -285,6 +289,9 @@ void    UI_SetTheme(int spacetype, int regionid);
 
 // get current theme
 struct bTheme *UI_GetTheme(void);
+
+// return shadow width outside menus and popups */
+int UI_ThemeMenuShadowWidth(void);
 
 /* only for buttons in theme editor! */
 const unsigned char *UI_ThemeGetColorPtr(struct bTheme *btheme, int spacetype, int colorid);

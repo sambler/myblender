@@ -2240,6 +2240,52 @@ void ParticleInfoNode::compile(OSLCompiler& compiler)
 	compiler.add(this, "node_particle_info");
 }
 
+/* Hair Info */
+
+HairInfoNode::HairInfoNode()
+: ShaderNode("hair_info")
+{
+	add_output("Is Strand", SHADER_SOCKET_FLOAT);
+	add_output("Intercept", SHADER_SOCKET_FLOAT);
+	add_output("Thickness", SHADER_SOCKET_FLOAT);
+	add_output("Tangent Normal", SHADER_SOCKET_NORMAL);
+}
+
+void HairInfoNode::compile(SVMCompiler& compiler)
+{
+	ShaderOutput *out;
+	
+	out = output("Is Strand");
+	if(!out->links.empty()) {
+		compiler.stack_assign(out);
+		compiler.add_node(NODE_HAIR_INFO, NODE_INFO_CURVE_IS_STRAND, out->stack_offset);
+	}
+
+	out = output("Intercept");
+	if(!out->links.empty()) {
+		compiler.stack_assign(out);
+		compiler.add_node(NODE_HAIR_INFO, NODE_INFO_CURVE_INTERCEPT, out->stack_offset);
+	}
+
+	out = output("Thickness");
+	if(!out->links.empty()) {
+		compiler.stack_assign(out);
+		compiler.add_node(NODE_HAIR_INFO, NODE_INFO_CURVE_THICKNESS, out->stack_offset);
+	}
+
+	out = output("Tangent Normal");
+	if(!out->links.empty()) {
+		compiler.stack_assign(out);
+		compiler.add_node(NODE_HAIR_INFO, NODE_INFO_CURVE_TANGENT_NORMAL, out->stack_offset);
+	}
+
+}
+
+void HairInfoNode::compile(OSLCompiler& compiler)
+{
+	compiler.add(this, "node_hair_info");
+}
+
 /* Value */
 
 ValueNode::ValueNode()
@@ -3018,7 +3064,54 @@ void RGBCurvesNode::compile(SVMCompiler& compiler)
 
 void RGBCurvesNode::compile(OSLCompiler& compiler)
 {
+	float ramp[RAMP_TABLE_SIZE][3];
+
+	for (int i = 0; i < RAMP_TABLE_SIZE; ++i) {
+		ramp[i][0] = curves[i].x;
+		ramp[i][1] = curves[i].y;
+		ramp[i][2] = curves[i].z;
+	}
+
+	compiler.parameter_color_array("ramp", ramp, RAMP_TABLE_SIZE);
 	compiler.add(this, "node_rgb_curves");
+}
+
+/* VectorCurvesNode */
+
+VectorCurvesNode::VectorCurvesNode()
+: ShaderNode("rgb_curves")
+{
+	add_input("Fac", SHADER_SOCKET_FLOAT);
+	add_input("Vector", SHADER_SOCKET_VECTOR);
+	add_output("Vector", SHADER_SOCKET_VECTOR);
+}
+
+void VectorCurvesNode::compile(SVMCompiler& compiler)
+{
+	ShaderInput *fac_in = input("Fac");
+	ShaderInput *vector_in = input("Vector");
+	ShaderOutput *vector_out = output("Vector");
+
+	compiler.stack_assign(fac_in);
+	compiler.stack_assign(vector_in);
+	compiler.stack_assign(vector_out);
+
+	compiler.add_node(NODE_VECTOR_CURVES, fac_in->stack_offset, vector_in->stack_offset, vector_out->stack_offset);
+	compiler.add_array(curves, RAMP_TABLE_SIZE);
+}
+
+void VectorCurvesNode::compile(OSLCompiler& compiler)
+{
+	float ramp[RAMP_TABLE_SIZE][3];
+
+	for (int i = 0; i < RAMP_TABLE_SIZE; ++i) {
+		ramp[i][0] = curves[i].x;
+		ramp[i][1] = curves[i].y;
+		ramp[i][2] = curves[i].z;
+	}
+
+	compiler.parameter_color_array("ramp", ramp, RAMP_TABLE_SIZE);
+	compiler.add(this, "node_vector_curves");
 }
 
 /* RGBRampNode */

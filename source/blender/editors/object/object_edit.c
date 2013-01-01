@@ -429,6 +429,10 @@ void ED_object_enter_editmode(bContext *C, int flag)
 
 	ob = base->object;
 
+	/* this checks actual object->data, for cases when other scenes have it in editmode context */
+	if ( BKE_object_is_in_editmode(ob) )
+		return;
+	
 	if (BKE_object_obdata_is_libdata(ob)) {
 		error_libdata();
 		return;
@@ -950,7 +954,7 @@ static void copy_attr(Main *bmain, Scene *scene, View3D *v3d, short event)
 				}
 				else if (event == 22) {
 					/* Copy the constraint channels over */
-					copy_constraints(&base->object->constraints, &ob->constraints, TRUE);
+					BKE_copy_constraints(&base->object->constraints, &ob->constraints, TRUE);
 					
 					do_scene_sort = TRUE;
 				}
@@ -1672,10 +1676,6 @@ static EnumPropertyItem game_properties_copy_operations[] = {
 	{0, NULL, 0, NULL, NULL}
 };
 
-static EnumPropertyItem gameprops_items[] = {
-	{0, NULL, 0, NULL, NULL}
-};
-
 static EnumPropertyItem *gameprops_itemf(bContext *C, PointerRNA *UNUSED(ptr), PropertyRNA *UNUSED(prop), int *free)
 {	
 	Object *ob = ED_object_active_context(C);
@@ -1685,7 +1685,7 @@ static EnumPropertyItem *gameprops_itemf(bContext *C, PointerRNA *UNUSED(ptr), P
 	int a, totitem = 0;
 	
 	if (!ob)
-		return gameprops_items;
+		return DummyRNA_NULL_items;
 
 	for (a = 1, prop = ob->prop.first; prop; prop = prop->next, a++) {
 		tmp.value = a;
@@ -1756,7 +1756,7 @@ void OBJECT_OT_game_property_copy(wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
 	RNA_def_enum(ot->srna, "operation", game_properties_copy_operations, 3, "Operation", "");
-	prop = RNA_def_enum(ot->srna, "property", gameprops_items, 0, "Property", "Properties to copy");
+	prop = RNA_def_enum(ot->srna, "property", DummyRNA_NULL_items, 0, "Property", "Properties to copy");
 	RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 	RNA_def_enum_funcs(prop, gameprops_itemf);
 	ot->prop = prop;

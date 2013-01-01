@@ -37,6 +37,7 @@ int     BM_vert_in_edge(BMEdge *e, BMVert *v);
 int     BM_verts_in_edge(BMVert *v1, BMVert *v2, BMEdge *e);
 
 float   BM_edge_calc_length(BMEdge *e);
+float   BM_edge_calc_length_squared(BMEdge *e);
 int     BM_edge_face_pair(BMEdge *e, BMFace **r_fa, BMFace **r_fb);
 int     BM_edge_loop_pair(BMEdge *e, BMLoop **r_la, BMLoop **r_lb);
 BMVert *BM_edge_other_vert(BMEdge *e, BMVert *v);
@@ -69,6 +70,7 @@ void    BM_edge_calc_face_tangent(BMEdge *e, BMLoop *e_loop, float r_tangent[3])
 
 float   BM_vert_calc_edge_angle(BMVert *v);
 float   BM_vert_calc_shell_factor(BMVert *v);
+float   BM_vert_calc_shell_factor_ex(BMVert *v, const char hflag);
 float   BM_vert_calc_mean_tagged_edge_length(BMVert *v);
 
 BMLoop *BM_face_find_shortest_loop(BMFace *f);

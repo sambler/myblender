@@ -102,11 +102,11 @@ enum {
 /* ------ Defines for Scrollers ----- */
 
 /* scroller area */
-#define V2D_SCROLL_HEIGHT   17
-#define V2D_SCROLL_WIDTH    17
+#define V2D_SCROLL_HEIGHT   (0.85f * U.widget_unit)
+#define V2D_SCROLL_WIDTH    (0.85f * U.widget_unit)
 
 /* scroller 'handles' hotspot radius for mouse */
-#define V2D_SCROLLER_HANDLE_SIZE    12
+#define V2D_SCROLLER_HANDLE_SIZE    (0.6f * U.widget_unit)
 
 /* ------ Define for UI_view2d_sync ----- */
 
@@ -132,6 +132,7 @@ struct View2DScrollers;
 
 struct wmKeyConfig;
 struct bScreen;
+struct Scene;
 struct ScrArea;
 struct ARegion;
 struct bContext;
@@ -147,7 +148,6 @@ typedef struct View2DScrollers View2DScrollers;
 void UI_view2d_region_reinit(struct View2D *v2d, short type, int winx, int winy);
 
 void UI_view2d_curRect_validate(struct View2D *v2d);
-void UI_view2d_curRect_validate_resize(struct View2D *v2d, int resize);
 void UI_view2d_curRect_reset(struct View2D *v2d);
 void UI_view2d_sync(struct bScreen *screen, struct ScrArea *sa, struct View2D *v2dcur, int flag);
 
@@ -198,6 +198,7 @@ struct View2D *UI_view2d_fromcontext(const struct bContext *C);
 struct View2D *UI_view2d_fromcontext_rwin(const struct bContext *C);
 
 void UI_view2d_getscale(struct View2D *v2d, float *x, float *y);
+void UI_view2d_getscale_inverse(struct View2D *v2d, float *x, float *y);
 
 short UI_view2d_mouse_in_scrollers(const struct bContext *C, struct View2D *v2d, int x, int y);
 

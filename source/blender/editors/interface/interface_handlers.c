@@ -44,6 +44,7 @@
 
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
+#include "DNA_screen_types.h"
 
 #include "BLI_math.h"
 #include "BLI_blenlib.h"
@@ -397,6 +398,17 @@ static void ui_apply_autokey_undo(bContext *C, uiBut *but)
 
 	/* try autokey */
 	ui_but_anim_autokey(C, but, scene, scene->r.cfra);
+
+	/* make a little report about what we've done! */
+	if (but->rnaprop) {
+		char *buf = WM_prop_pystring_assign(C, &but->rnapoin, but->rnaprop, but->rnaindex);
+		if (buf) {
+			BKE_report(CTX_wm_reports(C), RPT_PROPERTY, buf);
+			MEM_freeN(buf);
+
+			WM_event_add_notifier(C, NC_SPACE | ND_SPACE_INFO_REPORT, NULL);
+		}
+	}
 }
 
 static void ui_apply_but_funcs_after(bContext *C)
@@ -1197,30 +1209,37 @@ static void ui_but_copy_paste(bContext *C, uiBut *but, uiHandleButtonData *data,
 
 	/* RGB triple */
 	else if (but->type == COLOR) {
-		float rgb[3];
+		float rgba[4];
 		
 		if (but->poin == NULL && but->rnapoin.data == NULL) {
 			/* pass */
 		}
 		else if (mode == 'c') {
-
-			ui_get_but_vectorf(but, rgb);
+			if (RNA_property_array_length(&but->rnapoin, but->rnaprop) == 4)
+				rgba[3] = RNA_property_float_get_index(&but->rnapoin, but->rnaprop, 3);
+			else
+				rgba[3] = 1.0f;
+			
+			ui_get_but_vectorf(but, rgba);
 			/* convert to linear color to do compatible copy between gamma and non-gamma */
 			if (but->rnaprop && RNA_property_subtype(but->rnaprop) == PROP_COLOR_GAMMA)
-				srgb_to_linearrgb_v3_v3(rgb, rgb);
+				srgb_to_linearrgb_v3_v3(rgba, rgba);
 
-			BLI_snprintf(buf, sizeof(buf), "[%f, %f, %f]", rgb[0], rgb[1], rgb[2]);
+			BLI_snprintf(buf, sizeof(buf), "[%f, %f, %f, %f]", rgba[0], rgba[1], rgba[2], rgba[3]);
 			WM_clipboard_text_set(buf, 0);
 			
 		}
 		else {
-			if (sscanf(buf, "[%f, %f, %f]", &rgb[0], &rgb[1], &rgb[2]) == 3) {
+			if (sscanf(buf, "[%f, %f, %f, %f]", &rgba[0], &rgba[1], &rgba[2], &rgba[3]) == 4) {
 				/* assume linear colors in buffer */
 				if (but->rnaprop && RNA_property_subtype(but->rnaprop) == PROP_COLOR_GAMMA)
-					linearrgb_to_srgb_v3_v3(rgb, rgb);
+					linearrgb_to_srgb_v3_v3(rgba, rgba);
 
 				button_activate_state(C, but, BUTTON_STATE_NUM_EDITING);
-				ui_set_but_vectorf(but, rgb);
+				ui_set_but_vectorf(but, rgba);
+				if (RNA_property_array_length(&but->rnapoin, but->rnaprop) == 4)
+					RNA_property_float_set_index(&but->rnapoin, but->rnaprop, 3, rgba[3]);
+
 				button_activate_state(C, but, BUTTON_STATE_EXIT);
 			}
 		}
@@ -1674,10 +1693,11 @@ static int ui_textedit_copypaste(uiBut *but, uiHandleButtonData *data, int paste
 {
 	char buf[UI_MAX_DRAW_STR] = {0};
 	char *str, *p, *pbuf;
-	int len, x, i, changed = 0;
+	int x, changed = 0;
+	int str_len, buf_len;
 
 	str = data->str;
-	len = strlen(str);
+	str_len = strlen(str);
 	
 	/* paste */
 	if (paste) {
@@ -1687,28 +1707,28 @@ static int ui_textedit_copypaste(uiBut *but, uiHandleButtonData *data, int paste
 
 		if (p && p[0]) {
 			unsigned int y;
-			i = 0;
-			while (*p && *p != '\r' && *p != '\n' && i < UI_MAX_DRAW_STR - 1) {
-				buf[i++] = *p;
+			buf_len = 0;
+			while (*p && *p != '\r' && *p != '\n' && buf_len < UI_MAX_DRAW_STR - 1) {
+				buf[buf_len++] = *p;
 				p++;
 			}
-			buf[i] = 0;
+			buf[buf_len] = 0;
 
 			/* paste over the current selection */
 			if ((but->selend - but->selsta) > 0) {
 				ui_textedit_delete_selection(but, data);
-				len = strlen(str);
+				str_len = strlen(str);
 			}
 			
-			for (y = 0; y < strlen(buf); y++) {
+			for (y = 0; y < buf_len; y++) {
 				/* add contents of buffer */
-				if (len + 1 < data->maxlen) {
+				if (str_len + 1 < data->maxlen) {
 					for (x = data->maxlen; x > but->pos; x--)
 						str[x] = str[x - 1];
 					str[but->pos] = buf[y];
 					but->pos++; 
-					len++;
-					str[len] = '\0';
+					str_len++;
+					str[str_len] = '\0';
 				}
 			}
 
@@ -4530,7 +4550,7 @@ static uiBlock *menu_change_shortcut(bContext *C, ARegion *ar, void *arg)
 	wmKeyMapItem *kmi;
 	PointerRNA ptr;
 	uiLayout *layout;
-	uiStyle *style = UI_GetStyle();
+	uiStyle *style = UI_GetStyleDraw();
 	IDProperty *prop = (but->opptr) ? but->opptr->data : NULL;
 	int kmi_id = WM_key_event_operator_id(C, but->optype->idname, but->opcontext, prop, 1, &km);
 
@@ -4562,7 +4582,7 @@ static uiBlock *menu_add_shortcut(bContext *C, ARegion *ar, void *arg)
 	wmKeyMapItem *kmi;
 	PointerRNA ptr;
 	uiLayout *layout;
-	uiStyle *style = UI_GetStyle();
+	uiStyle *style = UI_GetStyleDraw();
 	IDProperty *prop = (but->opptr) ? but->opptr->data : NULL;
 	int kmi_id;
 	
@@ -4629,7 +4649,6 @@ static void popup_add_shortcut_func(bContext *C, void *arg1, void *UNUSED(arg2))
 
 static int ui_but_menu(bContext *C, uiBut *but)
 {
-	ARegion *ar = CTX_wm_region(C);
 	uiPopupMenu *pup;
 	uiLayout *layout;
 	int length;
@@ -4845,9 +4864,13 @@ static int ui_but_menu(bContext *C, uiBut *but)
 	}
 
 	/* Show header tools for header buttons. */
-	if (ar->regiontype == RGN_TYPE_HEADER) {
-		uiItemMenuF(layout, IFACE_("Header"), ICON_NONE, ED_screens_header_tools_menu_create, NULL);
-		uiItemS(layout);
+	if (CTX_wm_region(C)) {
+		ARegion *ar = CTX_wm_region(C);
+			if (ar->regiontype == RGN_TYPE_HEADER) {
+			
+				uiItemMenuF(layout, IFACE_("Header"), ICON_NONE, ED_screens_header_tools_menu_create, NULL);
+				uiItemS(layout);
+			}
 	}
 
 	{   /* Docs */
@@ -5226,32 +5249,15 @@ static int ui_mouse_inside_region(ARegion *ar, int x, int y)
 	 */
 	if (ar->v2d.mask.xmin != ar->v2d.mask.xmax) {
 		View2D *v2d = &ar->v2d;
-		rcti mask_rct;
 		int mx, my;
 		
 		/* convert window coordinates to region coordinates */
 		mx = x;
 		my = y;
 		ui_window_to_region(ar, &mx, &my);
-		
-		/* make a copy of the mask rect, and tweak accordingly for hidden scrollbars */
-		mask_rct = v2d->mask;
-		
-		if (v2d->scroll & (V2D_SCROLL_VERTICAL_HIDE | V2D_SCROLL_VERTICAL_FULLR)) {
-			if (v2d->scroll & V2D_SCROLL_LEFT)
-				mask_rct.xmin = v2d->vert.xmin;
-			else if (v2d->scroll & V2D_SCROLL_RIGHT)
-				mask_rct.xmax = v2d->vert.xmax;
-		}
-		if (v2d->scroll & (V2D_SCROLL_HORIZONTAL_HIDE | V2D_SCROLL_HORIZONTAL_FULLR)) {
-			if (v2d->scroll & (V2D_SCROLL_BOTTOM | V2D_SCROLL_BOTTOM_O))
-				mask_rct.ymin = v2d->hor.ymin;
-			else if (v2d->scroll & V2D_SCROLL_TOP)
-				mask_rct.ymax = v2d->hor.ymax;
-		}
-		
+
 		/* check if in the rect */
-		if (!BLI_rcti_isect_pt(&mask_rct, mx, my)) 
+		if (!BLI_rcti_isect_pt(&v2d->mask, mx, my))
 			return 0;
 	}
 	
@@ -6089,62 +6095,64 @@ static int ui_handle_list_event(bContext *C, wmEvent *event, ARegion *ar)
 	int value, min, max;
 
 	if (but && (event->val == KM_PRESS)) {
-		Panel *pa = but->block->panel;
+		uiList *ui_list = but->custom_data;
 
-		if (ELEM(event->type, UPARROWKEY, DOWNARROWKEY) ||
-		    ((ELEM(event->type, WHEELUPMOUSE, WHEELDOWNMOUSE) && event->alt)))
-		{
-			/* activate up/down the list */
-			value = RNA_property_int_get(&but->rnapoin, but->rnaprop);
+		if (ui_list) {
+			if (ELEM(event->type, UPARROWKEY, DOWNARROWKEY) ||
+				((ELEM(event->type, WHEELUPMOUSE, WHEELDOWNMOUSE) && event->alt)))
+			{
+				/* activate up/down the list */
+				value = RNA_property_int_get(&but->rnapoin, but->rnaprop);
 
-			if (ELEM(event->type, UPARROWKEY, WHEELUPMOUSE))
-				value--;
-			else
-				value++;
-
-			CLAMP(value, 0, pa->list_last_len - 1);
-
-			if (value < pa->list_scroll)
-				pa->list_scroll = value;
-			else if (value >= pa->list_scroll + pa->list_size)
-				pa->list_scroll = value - pa->list_size + 1;
-
-			RNA_property_int_range(&but->rnapoin, but->rnaprop, &min, &max);
-			value = CLAMPIS(value, min, max);
-
-			RNA_property_int_set(&but->rnapoin, but->rnaprop, value);
-			RNA_property_update(C, &but->rnapoin, but->rnaprop);
-			ED_region_tag_redraw(ar);
-
-			retval = WM_UI_HANDLER_BREAK;
-		}
-		else if (ELEM(event->type, WHEELUPMOUSE, WHEELDOWNMOUSE) && event->shift) {
-			/* silly replacement for proper grip */
-			if (pa->list_grip_size == 0)
-				pa->list_grip_size = pa->list_size;
-
-			if (event->type == WHEELUPMOUSE)
-				pa->list_grip_size--;
-			else
-				pa->list_grip_size++;
-
-			pa->list_grip_size = MAX2(pa->list_grip_size, 1);
-
-			ED_region_tag_redraw(ar);
-
-			retval = WM_UI_HANDLER_BREAK;
-		}
-		else if (ELEM(event->type, WHEELUPMOUSE, WHEELDOWNMOUSE)) {
-			if (pa->list_last_len > pa->list_size) {
-				/* list template will clamp */
-				if (event->type == WHEELUPMOUSE)
-					pa->list_scroll--;
+				if (ELEM(event->type, UPARROWKEY, WHEELUPMOUSE))
+					value--;
 				else
-					pa->list_scroll++;
+					value++;
+
+				CLAMP(value, 0, ui_list->list_last_len - 1);
+
+				if (value < ui_list->list_scroll)
+					ui_list->list_scroll = value;
+				else if (value >= ui_list->list_scroll + ui_list->list_size)
+					ui_list->list_scroll = value - ui_list->list_size + 1;
+
+				RNA_property_int_range(&but->rnapoin, but->rnaprop, &min, &max);
+				value = CLAMPIS(value, min, max);
+
+				RNA_property_int_set(&but->rnapoin, but->rnaprop, value);
+				RNA_property_update(C, &but->rnapoin, but->rnaprop);
+				ED_region_tag_redraw(ar);
+
+				retval = WM_UI_HANDLER_BREAK;
+			}
+			else if (ELEM(event->type, WHEELUPMOUSE, WHEELDOWNMOUSE) && event->shift) {
+				/* silly replacement for proper grip */
+				if (ui_list->list_grip_size == 0)
+					ui_list->list_grip_size = ui_list->list_size;
+
+				if (event->type == WHEELUPMOUSE)
+					ui_list->list_grip_size--;
+				else
+					ui_list->list_grip_size++;
+
+				ui_list->list_grip_size = MAX2(ui_list->list_grip_size, 1);
 
 				ED_region_tag_redraw(ar);
 
 				retval = WM_UI_HANDLER_BREAK;
+			}
+			else if (ELEM(event->type, WHEELUPMOUSE, WHEELDOWNMOUSE)) {
+				if (ui_list->list_last_len > ui_list->list_size) {
+					/* list template will clamp */
+					if (event->type == WHEELUPMOUSE)
+						ui_list->list_scroll--;
+					else
+						ui_list->list_scroll++;
+
+					ED_region_tag_redraw(ar);
+
+					retval = WM_UI_HANDLER_BREAK;
+				}
 			}
 		}
 	}
@@ -6906,8 +6914,6 @@ static int ui_handler_region_menu(bContext *C, wmEvent *event, void *UNUSED(user
 {
 	ARegion *ar;
 	uiBut *but;
-	uiHandleButtonData *data;
-	int retval;
 
 	/* here we handle buttons at the window level, modal, for example
 	 * while number sliding, text editing, or when a menu block is open */
@@ -6918,17 +6924,24 @@ static int ui_handler_region_menu(bContext *C, wmEvent *event, void *UNUSED(user
 	but = ui_but_find_activated(ar);
 
 	if (but) {
+		uiHandleButtonData *data;
+
 		/* handle activated button events */
 		data = but->active;
 
 		if (data->state == BUTTON_STATE_MENU_OPEN) {
+			int retval;
+
 			/* handle events for menus and their buttons recursively,
 			 * this will handle events from the top to the bottom menu */
-			retval = ui_handle_menus_recursive(C, event, data->menu, 0);
+			if (data->menu)
+				retval = ui_handle_menus_recursive(C, event, data->menu, 0);
 
 			/* handle events for the activated button */
-			if (retval == WM_UI_HANDLER_CONTINUE || event->type == TIMER) {
-				if (data->menu->menuretval)
+			if ((data->menu && (retval == WM_UI_HANDLER_CONTINUE)) ||
+			    (event->type == TIMER))
+			{
+				if (data->menu && data->menu->menuretval)
 					ui_handle_button_return_submenu(C, event, but);
 				else
 					ui_handle_button_event(C, event, but);

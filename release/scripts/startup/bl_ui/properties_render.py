@@ -1,4 +1,5 @@
 # ##### BEGIN GPL LICENSE BLOCK #####
+
 #
 #  This program is free software; you can redistribute it and/or
 #  modify it under the terms of the GNU General Public License
@@ -18,7 +19,7 @@
 
 # <pep8 compliant>
 import bpy
-from bpy.types import Menu, Panel
+from bpy.types import Menu, Panel, UIList
 
 
 class RENDER_MT_presets(Menu):
@@ -41,6 +42,23 @@ class RENDER_MT_framerate_presets(Menu):
     preset_operator = "script.execute_preset"
     draw = Menu.draw_preset
 
+
+class RENDER_UL_renderlayers(UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        # assert(isinstance(item, bpy.types.SceneRenderLayer)
+        layer = item
+        if self.layout_type in {'DEFAULT', 'COMPACT'}:
+            layout.label(layer.name, icon_value=icon)
+            layout.prop(layer, "use", text="", index=index)
+        elif self.layout_type in {'GRID'}:
+            layout.alignment = 'CENTER'
+            layout.label("", icon_value=icon)
+
+#	else if (RNA_struct_is_a(itemptr->type, &RNA_SceneRenderLayer)) {
+#		uiItemL(sub, name, icon);
+#		uiBlockSetEmboss(block, UI_EMBOSS);
+#		uiDefButR(block, OPTION, 0, "", 0, 0, UI_UNIT_X, UI_UNIT_Y, itemptr, "use", 0, 0, 0, 0, 0,  NULL);
+#	}
 
 class RenderButtonsPanel():
     bl_space_type = 'PROPERTIES'
@@ -83,7 +101,7 @@ class RENDER_PT_layers(RenderButtonsPanel, Panel):
         rd = scene.render
 
         row = layout.row()
-        row.template_list(rd, "layers", rd.layers, "active_index", rows=2)
+        row.template_list("RENDER_UL_renderlayers", "", rd, "layers", rd.layers, "active_index", rows=2)
 
         col = row.column(align=True)
         col.operator("scene.render_layer_add", icon='ZOOMIN', text="")
@@ -573,7 +591,7 @@ class RENDER_PT_bake(RenderButtonsPanel, Panel):
         layout.prop(rd, "bake_type")
 
         multires_bake = False
-        if rd.bake_type in ['NORMALS', 'DISPLACEMENT']:
+        if rd.bake_type in ['NORMALS', 'DISPLACEMENT', 'AO']:
             layout.prop(rd, "use_bake_multires")
             multires_bake = rd.use_bake_multires
 
@@ -602,11 +620,19 @@ class RENDER_PT_bake(RenderButtonsPanel, Panel):
             sub.prop(rd, "bake_distance")
             sub.prop(rd, "bake_bias")
         else:
-            if rd.bake_type == 'DISPLACEMENT':
-                layout.prop(rd, "use_bake_lores_mesh")
+            split = layout.split()
 
-            layout.prop(rd, "use_bake_clear")
-            layout.prop(rd, "bake_margin")
+            col = split.column()
+            col.prop(rd, "use_bake_clear")
+            col.prop(rd, "bake_margin")
+
+            if rd.bake_type == 'DISPLACEMENT':
+                col = split.column()
+                col.prop(rd, "use_bake_lores_mesh")
+            if rd.bake_type == 'AO':
+                col = split.column()
+                col.prop(rd, "bake_bias")
+                col.prop(rd, "bake_samples")
 
 
 if __name__ == "__main__":  # only for live edit.

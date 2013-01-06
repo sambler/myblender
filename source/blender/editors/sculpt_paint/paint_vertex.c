@@ -859,7 +859,7 @@ static float calc_vp_strength_dl(VPaint *vp, ViewContext *vc, const float co[3],
 {
 	float vertco[2];
 
-	if (ED_view3d_project_float_global(vc->ar,
+	if (ED_view3d_project_float_object(vc->ar,
 	                                   co, vertco,
 	                                   V3D_PROJ_TEST_CLIP_BB | V3D_PROJ_TEST_CLIP_NEAR) == V3D_PROJ_RET_OK)
 	{
@@ -2193,8 +2193,9 @@ static void wpaint_stroke_update_step(bContext *C, struct PaintStroke *stroke, P
 	unsigned int index, totindex;
 	float alpha;
 	float mval[2];
-	int use_vert_sel;
-	int use_zbuf;
+	bool use_vert_sel;
+	bool use_face_sel;
+	bool use_depth;
 
 	MDeformWeight *(*dw_func)(MDeformVert *, const int) =
 	        (brush->vertexpaint_tool == PAINT_BLEND_BLUR) ?
@@ -2217,7 +2218,7 @@ static void wpaint_stroke_update_step(bContext *C, struct PaintStroke *stroke, P
 		ED_region_tag_redraw(CTX_wm_region(C));
 		return;
 	}
-		
+
 	vc = &wpd->vc;
 	ob = vc->obact;
 	me = ob->data;
@@ -2258,10 +2259,11 @@ static void wpaint_stroke_update_step(bContext *C, struct PaintStroke *stroke, P
 	swap_m4m4(wpd->vc.rv3d->persmat, mat);
 
 	use_vert_sel = (me->editflag & ME_EDIT_PAINT_VERT_SEL) != 0;
-	use_zbuf = use_vert_sel && (vc->v3d->flag & V3D_ZBUF_SELECT);
+	use_face_sel = (me->editflag & ME_EDIT_PAINT_FACE_SEL) != 0;
+	use_depth = (vc->v3d->flag & V3D_ZBUF_SELECT);
 
 	/* which faces are involved */
-	if (use_zbuf) {
+	if (use_depth) {
 		if (wp->flag & VP_AREA) {
 			/* Ugly hack, to avoid drawing vertex index when getting the face index buffer - campbell */
 			me->editflag &= ~ME_EDIT_PAINT_VERT_SEL;
@@ -2274,7 +2276,7 @@ static void wpaint_stroke_update_step(bContext *C, struct PaintStroke *stroke, P
 			else totindex = 0;
 		}
 
-		if ((me->editflag & ME_EDIT_PAINT_FACE_SEL) && me->mpoly) {
+		if (use_face_sel && me->mpoly) {
 			for (index = 0; index < totindex; index++) {
 				if (indexar[index] && indexar[index] <= me->totpoly) {
 					MPoly *mpoly = ((MPoly *)me->mpoly) + (indexar[index] - 1);
@@ -2310,7 +2312,7 @@ static void wpaint_stroke_update_step(bContext *C, struct PaintStroke *stroke, P
 	} (void)0
 
 
-	if (use_zbuf) {
+	if (use_depth) {
 		for (index = 0; index < totindex; index++) {
 			if (indexar[index] && indexar[index] <= me->totpoly) {
 				MPoly *mpoly = me->mpoly + (indexar[index] - 1);
@@ -2341,8 +2343,16 @@ static void wpaint_stroke_update_step(bContext *C, struct PaintStroke *stroke, P
 		const unsigned int totvert = me->totvert;
 		unsigned int       i;
 
-		for (i = 0; i < totvert; i++) {
-			me->dvert[i].flag = (me->mvert[i].flag & SELECT);
+		/* in the case of face selection we need to flush */
+		if (use_vert_sel || use_face_sel) {
+			for (i = 0; i < totvert; i++) {
+				me->dvert[i].flag = me->mvert[i].flag & SELECT;
+			}
+		}
+		else {
+			for (i = 0; i < totvert; i++) {
+				me->dvert[i].flag = SELECT;
+			}
 		}
 
 		if (brush->vertexpaint_tool == PAINT_BLEND_BLUR) {
@@ -2372,7 +2382,7 @@ static void wpaint_stroke_update_step(bContext *C, struct PaintStroke *stroke, P
 		} \
 	} (void)0
 
-	if (use_zbuf) {
+	if (use_depth) {
 		for (index = 0; index < totindex; index++) {
 
 			if (indexar[index] && indexar[index] <= me->totpoly) {
@@ -3051,9 +3061,9 @@ static void gradientVert__mapFunc(void *userData, int index, const float co[3],
 		 * the screen coords of the verts need to be cached because
 		 * updating the mesh may move them about (entering feedback loop) */
 		if (grad_data->is_init) {
-			if (ED_view3d_project_float_global(grad_data->ar,
+			if (ED_view3d_project_float_object(grad_data->ar,
 			                                   co, vs->sco,
-			                                   V3D_PROJ_TEST_CLIP_BB | V3D_PROJ_TEST_CLIP_WIN | V3D_PROJ_TEST_CLIP_NEAR) == V3D_PROJ_RET_OK)
+			                                   V3D_PROJ_TEST_CLIP_BB | V3D_PROJ_TEST_CLIP_NEAR) == V3D_PROJ_RET_OK)
 			{
 				/* ok */
 				MDeformVert *dv = &me->dvert[index];
@@ -3081,11 +3091,9 @@ static void gradientVert__mapFunc(void *userData, int index, const float co[3],
 			if (grad_data->type == WPAINT_GRADIENT_TYPE_LINEAR) {
 				alpha = line_point_factor_v2(vs->sco, grad_data->sco_start, grad_data->sco_end);
 			}
-			else if (grad_data->type == WPAINT_GRADIENT_TYPE_RADIAL) {
-				alpha = len_v2v2(grad_data->sco_start, vs->sco) * grad_data->sco_line_div;
-			}
 			else {
-				BLI_assert(0);
+				BLI_assert(grad_data->type == WPAINT_GRADIENT_TYPE_RADIAL);
+				alpha = len_v2v2(grad_data->sco_start, vs->sco) * grad_data->sco_line_div;
 			}
 			/* no need to clamp 'alpha' yet */
 

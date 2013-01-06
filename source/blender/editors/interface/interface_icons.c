@@ -76,8 +76,8 @@
 #include "interface_intern.h"
 
 
-#define ICON_IMAGE_W        600
-#define ICON_IMAGE_H        640
+// #define ICON_IMAGE_W        600
+// #define ICON_IMAGE_H        640
 
 #define ICON_GRID_COLS      26
 #define ICON_GRID_ROWS      30
@@ -583,7 +583,7 @@ static void init_internal_icons(void)
 				}
 				
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 				
 				glBindTexture(GL_TEXTURE_2D, 0);
 				

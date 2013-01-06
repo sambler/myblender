@@ -574,13 +574,7 @@ GHOST_SystemCocoa::GHOST_SystemCocoa()
 	rstring = (char*)malloc( len );
 	sysctl( mib, 2, rstring, &len, NULL, 0 );
 	
-	//Hack on MacBook revision, as multitouch avail. function missing
-	//MacbookAir or MacBook version >= 5 (retina is MacBookPro10,1)
-	if (strstr(rstring,"MacBookAir") ||
-		(strstr(rstring,"MacBook") && (rstring[strlen(rstring)-3]>='5') && (rstring[strlen(rstring)-3]<='9')) ||
-		(strstr(rstring,"MacBook") && (rstring[strlen(rstring)-4]>='1') && (rstring[strlen(rstring)-4]<='9')))
-		m_hasMultiTouchTrackpad = true;
-	else m_hasMultiTouchTrackpad = false;
+	m_hasMultiTouchTrackpad = false;
 	
 	free( rstring );
 	rstring = NULL;
@@ -1577,14 +1571,19 @@ GHOST_TSuccess GHOST_SystemCocoa::handleMouseEvent(void *eventPtr)
 			}
 			break;
 			
+			/* these events only happen on swiping trackpads */
+		case NSEventTypeBeginGesture:
+			m_hasMultiTouchTrackpad = 1;
+			break;
+		case NSEventTypeEndGesture:
+			m_hasMultiTouchTrackpad = 0;
+			break;
+			
 		case NSScrollWheel:
 			{
-				int momentum = 0;
-#if MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
-				m_hasMultiTouchTrackpad = 0;
-				momentum = [event momentumPhase] || [event phase];
-#endif
-				/* standard scrollwheel case */
+				int momentum = [event momentumPhase];
+
+				/* standard scrollwheel case, if no swiping happened, and no momentum (kinetic scroll) works */
 				if (!m_hasMultiTouchTrackpad && momentum == 0) {
 					GHOST_TInt32 delta;
 					

@@ -207,22 +207,22 @@ __device_inline void bvh_triangle_intersect(KernelGlobals *kg, Intersection *ise
 
 #ifdef __HAIR__
 __device_inline void bvh_curve_intersect(KernelGlobals *kg, Intersection *isect,
-	float3 P, float3 idir, uint visibility, int object, int triAddr)
+	float3 P, float3 idir, uint visibility, int object, int curveAddr, int segment)
 {
 	/* curve Intersection check */
 	
 	int flags = kernel_data.curve_kernel_data.curveflags;
 
-	int prim = kernel_tex_fetch(__prim_index, triAddr);
-	float4 v00 = kernel_tex_fetch(__cur_segs, prim);
+	int prim = kernel_tex_fetch(__prim_index, curveAddr);
+	float4 v00 = kernel_tex_fetch(__curves, prim);
 
-	int v1 = __float_as_int(v00.x);
-	int v2 = __float_as_int(v00.y);
+	int k0 = __float_as_int(v00.x) + segment;
+	int k1 = k0 + 1;
 
-	float4 P1 = kernel_tex_fetch(__cur_keys, v1);
-	float4 P2 = kernel_tex_fetch(__cur_keys, v2);
+	float4 P1 = kernel_tex_fetch(__curve_keys, k0);
+	float4 P2 = kernel_tex_fetch(__curve_keys, k1);
 
-	float l = v00.w;
+	float l = len(P2 - P1);
 	float r1 = P1.w;
 	float r2 = P2.w;
 	float mr = max(r1,r2);
@@ -231,13 +231,14 @@ __device_inline void bvh_curve_intersect(KernelGlobals *kg, Intersection *isect,
 	float3 dif = P - p1;
 	float3 dir = 1.0f/idir;
 
-	/* test bounding sphere intersection (introduce circular artifacts)*/
-	/*float3 bvector = 0.5f * (p1 + p2) - P;
-	float bvectorl_sq = len_squared(bvector);
-	float dot_bv_dir = dot(bvector,dir);
-	float maxdist = l * 0.5f + mr;
-	if(bvectorl_sq - dot_bv_dir * dot_bv_dir > maxdist * maxdist)
-		return;*/
+	float sp_r = mr + 0.5f * l;
+	float3 sphere_dif = P - ((p1 + p2) * 0.5f);
+	float sphere_b = dot(dir,sphere_dif);
+	sphere_dif = sphere_dif - sphere_b * dir;
+	sphere_b = dot(dir,sphere_dif);
+	float sdisc = sphere_b * sphere_b - len_squared(sphere_dif) + sp_r * sp_r;
+	if(sdisc < 0.0f)
+		return;
 
 	/* obtain parameters and test midpoint distance for suitable modes*/
 	float3 tg = (p2 - p1) / l;
@@ -278,7 +279,7 @@ __device_inline void bvh_curve_intersect(KernelGlobals *kg, Intersection *isect,
 	float tc = dot(tdif,tdif) - tdifz * tdifz * (1 + gd*gd) - r1*r1 - 2*r1*tdifz*gd;
 	float td = tb*tb - 4*a*tc;
 
-	if (td<0)
+	if (td < 0.0f)
 		return;
 
 	float rootd = 0.0f;
@@ -321,22 +322,15 @@ __device_inline void bvh_curve_intersect(KernelGlobals *kg, Intersection *isect,
 				}
 			}
 
-			/*remove overlap - not functional yet*/
-			/*if (flags & CURVE_KN_CURVEDATA) {
-				float3 tg1 = float4_to_float3(kernel_tex_fetch(__tri_woop, triAddr*TRI_NODE_SIZE+0));
-				float3 tg2 = float4_to_float3(kernel_tex_fetch(__tri_woop, triAddr*TRI_NODE_SIZE+1));
-				if((dot(P + t * dir - p1, tg1) < 0.0f) || (dot(P + t * dir - p2, tg2) > 0.0f))
-					return;
-			}*/
-
-	#ifdef __VISIBILITY_FLAG__
+#ifdef __VISIBILITY_FLAG__
 			/* visibility flag test. we do it here under the assumption
 			 * that most triangles are culled by node flags */
-			if(kernel_tex_fetch(__prim_visibility, triAddr) & visibility)
-	#endif
+			if(kernel_tex_fetch(__prim_visibility, curveAddr) & visibility)
+#endif
 			{
 				/* record intersection */
-				isect->prim = triAddr;
+				isect->prim = curveAddr;
+				isect->segment = segment;
 				isect->object = object;
 				isect->u = z/l;
 				isect->v = td/(4*a*a);
@@ -430,8 +424,9 @@ __device_inline bool bvh_intersect(KernelGlobals *kg, const Ray *ray, const uint
 					while(primAddr < primAddr2) {
 						/* intersect ray against primitive */
 #ifdef __HAIR__
-						if(kernel_tex_fetch(__prim_type, primAddr))
-							bvh_curve_intersect(kg, isect, P, idir, visibility, object, primAddr);
+						uint segment = kernel_tex_fetch(__prim_segment, primAddr);
+						if(segment != ~0)
+							bvh_curve_intersect(kg, isect, P, idir, visibility, object, primAddr, segment);
 						else
 #endif
 							bvh_triangle_intersect(kg, isect, P, idir, visibility, object, primAddr);
@@ -555,8 +550,9 @@ __device_inline bool bvh_intersect_motion(KernelGlobals *kg, const Ray *ray, con
 					while(primAddr < primAddr2) {
 						/* intersect ray against primitive */
 #ifdef __HAIR__
-						if(kernel_tex_fetch(__prim_type, primAddr))
-							bvh_curve_intersect(kg, isect, P, idir, visibility, object, primAddr);
+						uint segment = kernel_tex_fetch(__prim_segment, primAddr);
+						if(segment != ~0)
+							bvh_curve_intersect(kg, isect, P, idir, visibility, object, primAddr, segment);
 						else
 #endif
 							bvh_triangle_intersect(kg, isect, P, idir, visibility, object, primAddr);
@@ -720,14 +716,14 @@ __device_inline float3 bvh_curve_refine(KernelGlobals *kg, ShaderData *sd, const
 	}
 
 	int prim = kernel_tex_fetch(__prim_index, isect->prim);
-	float4 v00 = kernel_tex_fetch(__cur_segs, prim);
+	float4 v00 = kernel_tex_fetch(__curves, prim);
 
-	int v1 = __float_as_int(v00.x);
-	int v2 = __float_as_int(v00.y);
+	int k0 = __float_as_int(v00.x) + isect->segment;
+	int k1 = k0 + 1;
 
-	float4 P1 = kernel_tex_fetch(__cur_keys, v1);
-	float4 P2 = kernel_tex_fetch(__cur_keys, v2);
-	float l = v00.w;
+	float4 P1 = kernel_tex_fetch(__curve_keys, k0);
+	float4 P2 = kernel_tex_fetch(__curve_keys, k1);
+	float l = len(P2 - P1);
 	float r1 = P1.w;
 	float r2 = P2.w;
 	float3 tg = float4_to_float3(P2 - P1) / l;

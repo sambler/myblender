@@ -633,7 +633,7 @@ void BKE_sequence_calc(Scene *scene, Sequence *seq)
 	}
 }
 
-/* note: caller should run calc_sequence(scene, seq) after */
+/* note: caller should run BKE_sequence_calc(scene, seq) after */
 void BKE_sequence_reload_new_file(Scene *scene, Sequence *seq, int lock_range)
 {
 	char str[FILE_MAX];
@@ -2391,7 +2391,7 @@ static ImBuf *seq_render_scene_strip(SeqRenderData context, Sequence *seq, float
 		BKE_scene_update_for_newframe(context.bmain, scene, scene->lay);
 		ibuf = sequencer_view3d_cb(scene, camera, context.rectx, context.recty, IB_rect,
 		                           context.scene->r.seq_prev_type, context.scene->r.seq_flag & R_SEQ_SOLID_TEX,
-		                           TRUE, FALSE, err_out);
+		                           TRUE, scene->r.alphamode, err_out);
 		if (ibuf == NULL) {
 			fprintf(stderr, "seq_render_scene_strip failed to get opengl buffer: %s\n", err_out);
 		}
@@ -3962,18 +3962,18 @@ void BKE_sequence_init_colorspace(Sequence *seq)
 
 		/* initialize input color space */
 		if (seq->type == SEQ_TYPE_IMAGE) {
-			ibuf = IMB_loadiffname(name, IB_rect, seq->strip->colorspace_settings.name);
+			ibuf = IMB_loadiffname(name, IB_test | IB_alphamode_detect, seq->strip->colorspace_settings.name);
 
 			/* byte images are default to straight alpha, however sequencer
 			 * works in premul space, so mark strip to be premultiplied first
 			 */
-			if (!ibuf->rect_float)
-				seq->alpha_mode = SEQ_ALPHA_STRAIGHT;
-			else
-				seq->alpha_mode = SEQ_ALPHA_PREMUL;
+			seq->alpha_mode = SEQ_ALPHA_STRAIGHT;
+			if (ibuf) {
+				if (ibuf->flags & IB_alphamode_premul)
+					seq->alpha_mode = IMA_ALPHA_PREMUL;
 
-			if (ibuf)
 				IMB_freeImBuf(ibuf);
+			}
 		}
 	}
 }

@@ -344,17 +344,43 @@ typedef struct Intersection {
 	float t, u, v;
 	int prim;
 	int object;
+	int segment;
 } Intersection;
 
 /* Attributes */
 
+#define ATTR_PRIM_TYPES		2
+#define ATTR_PRIM_CURVE		1
+
 typedef enum AttributeElement {
+	ATTR_ELEMENT_NONE,
+	ATTR_ELEMENT_VALUE,
 	ATTR_ELEMENT_FACE,
 	ATTR_ELEMENT_VERTEX,
 	ATTR_ELEMENT_CORNER,
-	ATTR_ELEMENT_VALUE,
-	ATTR_ELEMENT_NONE
+	ATTR_ELEMENT_CURVE,
+	ATTR_ELEMENT_CURVE_KEY
 } AttributeElement;
+
+typedef enum AttributeStandard {
+	ATTR_STD_NONE = 0,
+	ATTR_STD_VERTEX_NORMAL,
+	ATTR_STD_FACE_NORMAL,
+	ATTR_STD_UV,
+	ATTR_STD_UV_TANGENT,
+	ATTR_STD_UV_TANGENT_SIGN,
+	ATTR_STD_GENERATED,
+	ATTR_STD_POSITION_UNDEFORMED,
+	ATTR_STD_POSITION_UNDISPLACED,
+	ATTR_STD_MOTION_PRE,
+	ATTR_STD_MOTION_POST,
+	ATTR_STD_PARTICLE,
+	ATTR_STD_CURVE_TANGENT,
+	ATTR_STD_CURVE_INTERCEPT,
+	ATTR_STD_NUM,
+
+	ATTR_STD_NOT_FOUND = ~0
+} AttributeStandard;
 
 /* Closure data */
 
@@ -439,8 +465,8 @@ typedef struct ShaderData {
 	int prim;
 
 #ifdef __HAIR__
-	/* strand id if there is one, -1 otherwise */
-	int curve_seg;
+	/* for curves, segment number in curve, ~0 for triangles */
+	int segment;
 #endif
 	/* parametric coordinates
 	 * - barycentric weights for triangles */

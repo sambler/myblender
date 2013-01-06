@@ -2129,8 +2129,11 @@ void wm_recover_last_session(bContext *C, ReportList *reports)
 		/* XXX bad global... fixme */
 		if (G.main->name[0])
 			G.file_loaded = 1;	/* prevents splash to show */
-		else
+		else {
 			G.relbase_valid = 0;
+			G.save_over = 0;    /* start with save preference untitled.blend */
+		}
+
 	}
 }
 
@@ -2168,7 +2171,7 @@ static int wm_recover_auto_save_exec(bContext *C, wmOperator *op)
 	WM_file_read(C, path, op->reports);
 
 	G.fileflags &= ~G_FILE_RECOVER;
-
+	
 	return OPERATOR_FINISHED;
 }
 
@@ -2426,9 +2429,8 @@ static int wm_console_toggle_op(bContext *UNUSED(C), wmOperator *UNUSED(op))
 
 static void WM_OT_console_toggle(wmOperatorType *ot)
 {
-	/* XXX Have to mark these for xgettext, as under linux they do not exists...
-	 *     And even worth, have to give the context as text, as xgettext doesn't expand macros. :( */
-	ot->name = CTX_N_("Operator" /* BLF_I18NCONTEXT_OPERATOR_DEFAULT */, "Toggle System Console");
+	/* XXX Have to mark these for xgettext, as under linux they do not exists... */
+	ot->name = CTX_N_(BLF_I18NCONTEXT_OPERATOR_DEFAULT, "Toggle System Console");
 	ot->idname = "WM_OT_console_toggle";
 	ot->description = N_("Toggle System Console");
 	

@@ -25,7 +25,6 @@
 
 #include "kernel_types.h"
 
-#include "util_attribute.h"
 #include "util_param.h"
 #include "util_string.h"
 #include "util_thread.h"
@@ -63,7 +62,7 @@ public:
 	device_vector<float4> bvh_nodes;
 	device_vector<uint> object_node;
 	device_vector<float4> tri_woop;
-	device_vector<uint> prim_type;
+	device_vector<uint> prim_segment;
 	device_vector<uint> prim_visibility;
 	device_vector<uint> prim_index;
 	device_vector<uint> prim_object;
@@ -74,8 +73,8 @@ public:
 	device_vector<float4> tri_vindex;
 	device_vector<float4> tri_verts;
 
-	device_vector<float4> cur_segs;
-	device_vector<float4> cur_keys;
+	device_vector<float4> curves;
+	device_vector<float4> curve_keys;
 
 	/* objects */
 	device_vector<float4> objects;

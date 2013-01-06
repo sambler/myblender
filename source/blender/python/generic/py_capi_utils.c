@@ -112,6 +112,54 @@ int PyC_AsArray(void *array, PyObject *value, const Py_ssize_t length,
 	return 0;
 }
 
+/* array utility function */
+PyObject *PyC_FromArray(const void *array, int length, const PyTypeObject *type,
+                        const short is_double, const char *error_prefix)
+{
+	PyObject *tuple;
+	int i;
+
+	tuple = PyTuple_New(length);
+
+	/* for each type */
+	if (type == &PyFloat_Type) {
+		if (is_double) {
+			const double *array_double = array;
+			for (i = 0; i < length; ++i) {
+				PyTuple_SET_ITEM(tuple, i, PyFloat_FromDouble(array_double[i]));
+			}
+		}
+		else {
+			const float *array_float = array;
+			for (i = 0; i < length; ++i) {
+				PyTuple_SET_ITEM(tuple, i, PyFloat_FromDouble(array_float[i]));
+			}
+		}
+	}
+	else if (type == &PyLong_Type) {
+		/* could use is_double for 'long int' but no use now */
+		const int *array_int = array;
+		for (i = 0; i < length; ++i) {
+			PyTuple_SET_ITEM(tuple, i, PyLong_FromLong(array_int[i]));
+		}
+	}
+	else if (type == &PyBool_Type) {
+		const int *array_bool = array;
+		for (i = 0; i < length; ++i) {
+			PyTuple_SET_ITEM(tuple, i, PyBool_FromLong(array_bool[i]));
+		}
+	}
+	else {
+		Py_DECREF(tuple);
+		PyErr_Format(PyExc_TypeError,
+		             "%s: internal error %s is invalid",
+		             error_prefix, type->tp_name);
+		return NULL;
+	}
+
+	return tuple;
+}
+
 
 /* for debugging */
 void PyC_ObSpit(const char *name, PyObject *var)
@@ -240,6 +288,23 @@ PyObject *PyC_Object_GetAttrStringArgs(PyObject *o, Py_ssize_t n, ...)
 	Py_XINCREF(item); /* final value has is increfed, to match PyObject_GetAttrString */
 	return item;
 }
+
+PyObject *PyC_FrozenSetFromStrings(const char **strings)
+{
+	const char **str;
+	PyObject *ret;
+
+	ret = PyFrozenSet_New(NULL);
+
+	for (str = strings; *str; str++) {
+		PyObject *py_str = PyUnicode_FromString(*str);
+		PySet_Add(ret, py_str);
+		Py_DECREF(py_str);
+	}
+
+	return ret;
+}
+
 
 /* similar to PyErr_Format(),
  *

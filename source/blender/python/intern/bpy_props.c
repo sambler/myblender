@@ -33,11 +33,11 @@
 
 #include "RNA_types.h"
 
+#include "BLI_utildefines.h"
+
 #include "bpy_props.h"
 #include "bpy_rna.h"
 #include "bpy_util.h"
-
-#include "BLI_utildefines.h"
 
 #include "BKE_idprop.h"
 
@@ -199,7 +199,7 @@ static void bpy_prop_update_cb(struct bContext *C, struct PointerRNA *ptr, struc
 	BLI_assert(py_data != NULL);
 
 	if (!is_write_ok) {
-		pyrna_write_set(TRUE);
+		pyrna_write_set(true);
 	}
 
 	bpy_context_set(C, &gilstate);
@@ -232,7 +232,7 @@ static void bpy_prop_update_cb(struct bContext *C, struct PointerRNA *ptr, struc
 	bpy_context_clear(C, &gilstate);
 
 	if (!is_write_ok) {
-		pyrna_write_set(FALSE);
+		pyrna_write_set(false);
 	}
 }
 
@@ -243,14 +243,21 @@ static int bpy_prop_boolean_get_cb(struct PointerRNA *ptr, struct PropertyRNA *p
 	PyObject *args;
 	PyObject *self;
 	PyObject *ret;
+	PyGILState_STATE gilstate;
+	bool use_gil;
 	const int is_write_ok = pyrna_write_check();
 	int value;
 
 	BLI_assert(py_data != NULL);
 
 	if (!is_write_ok) {
-		pyrna_write_set(TRUE);
+		pyrna_write_set(true);
 	}
+
+	use_gil = true;  /* !PYC_INTERPRETER_ACTIVE; */
+
+	if (use_gil)
+		gilstate = PyGILState_Ensure();
 
 	py_func = py_data[BPY_DATA_CB_SLOT_GET];
 
@@ -264,21 +271,24 @@ static int bpy_prop_boolean_get_cb(struct PointerRNA *ptr, struct PropertyRNA *p
 
 	if (ret == NULL) {
 		printf_func_error(py_func);
-		value = FALSE;
+		value = false;
 	}
 	else {
 		value = PyLong_AsLong(ret);
 
 		if (value == -1 && PyErr_Occurred()) {
 			printf_func_error(py_func);
-			value = FALSE;
+			value = false;
 		}
 
 		Py_DECREF(ret);
 	}
 
+	if (use_gil)
+		PyGILState_Release(gilstate);
+
 	if (!is_write_ok) {
-		pyrna_write_set(FALSE);
+		pyrna_write_set(false);
 	}
 
 	return value;
@@ -291,13 +301,20 @@ static void bpy_prop_boolean_set_cb(struct PointerRNA *ptr, struct PropertyRNA *
 	PyObject *args;
 	PyObject *self;
 	PyObject *ret;
+	PyGILState_STATE gilstate;
+	bool use_gil;
 	const int is_write_ok = pyrna_write_check();
 
 	BLI_assert(py_data != NULL);
 
 	if (!is_write_ok) {
-		pyrna_write_set(TRUE);
+		pyrna_write_set(true);
 	}
+
+	use_gil = true;  /* !PYC_INTERPRETER_ACTIVE; */
+
+	if (use_gil)
+		gilstate = PyGILState_Ensure();
 
 	py_func = py_data[BPY_DATA_CB_SLOT_SET];
 
@@ -322,9 +339,12 @@ static void bpy_prop_boolean_set_cb(struct PointerRNA *ptr, struct PropertyRNA *
 
 		Py_DECREF(ret);
 	}
+	
+	if (use_gil)
+		PyGILState_Release(gilstate);
 
 	if (!is_write_ok) {
-		pyrna_write_set(FALSE);
+		pyrna_write_set(false);
 	}
 }
 
@@ -335,14 +355,21 @@ static void bpy_prop_boolean_array_get_cb(struct PointerRNA *ptr, struct Propert
 	PyObject *args;
 	PyObject *self;
 	PyObject *ret;
+	PyGILState_STATE gilstate;
+	bool use_gil;
 	const int is_write_ok = pyrna_write_check();
 	int i, len = RNA_property_array_length(ptr, prop);
 
 	BLI_assert(py_data != NULL);
 
 	if (!is_write_ok) {
-		pyrna_write_set(TRUE);
+		pyrna_write_set(true);
 	}
+
+	use_gil = true;  /* !PYC_INTERPRETER_ACTIVE; */
+
+	if (use_gil)
+		gilstate = PyGILState_Ensure();
 
 	py_func = py_data[BPY_DATA_CB_SLOT_GET];
 
@@ -358,21 +385,27 @@ static void bpy_prop_boolean_array_get_cb(struct PointerRNA *ptr, struct Propert
 		printf_func_error(py_func);
 
 		for (i = 0; i < len; ++i)
-			values[i] = FALSE;
+			values[i] = false;
 	}
 	else {
-		if (ret && PyC_AsArray(values, ret, len, &PyBool_Type, FALSE, "BoolVectorProperty get") < 0) {
+		if (PyC_AsArray(values, ret, len, &PyBool_Type, false, "BoolVectorProperty get") == -1) {
 			printf_func_error(py_func);
 
 			for (i = 0; i < len; ++i)
-				values[i] = FALSE;
-		}
+				values[i] = false;
 
-		Py_DECREF(ret);
+			/* PyC_AsArray decrements refcount internally on error */
+		}
+		else {
+			Py_DECREF(ret);
+		}
 	}
 
+	if (use_gil)
+		PyGILState_Release(gilstate);
+
 	if (!is_write_ok) {
-		pyrna_write_set(FALSE);
+		pyrna_write_set(false);
 	}
 }
 
@@ -384,14 +417,21 @@ static void bpy_prop_boolean_array_set_cb(struct PointerRNA *ptr, struct Propert
 	PyObject *self;
 	PyObject *ret;
 	PyObject *py_values;
+	PyGILState_STATE gilstate;
+	bool use_gil;
 	const int is_write_ok = pyrna_write_check();
 	int len = RNA_property_array_length(ptr, prop);
 
 	BLI_assert(py_data != NULL);
 
 	if (!is_write_ok) {
-		pyrna_write_set(TRUE);
+		pyrna_write_set(true);
 	}
+
+	use_gil = true;  /* !PYC_INTERPRETER_ACTIVE; */
+
+	if (use_gil)
+		gilstate = PyGILState_Ensure();
 
 	py_func = py_data[BPY_DATA_CB_SLOT_SET];
 
@@ -399,7 +439,7 @@ static void bpy_prop_boolean_array_set_cb(struct PointerRNA *ptr, struct Propert
 	self = pyrna_struct_as_instance(ptr);
 	PyTuple_SET_ITEM(args, 0, self);
 
-	py_values = PyC_FromArray(values, len, &PyBool_Type, FALSE, "BoolVectorProperty set");
+	py_values = PyC_FromArray(values, len, &PyBool_Type, false, "BoolVectorProperty set");
 	if (!py_values) {
 		printf_func_error(py_func);
 	}
@@ -422,8 +462,11 @@ static void bpy_prop_boolean_array_set_cb(struct PointerRNA *ptr, struct Propert
 		Py_DECREF(ret);
 	}
 
+	if (use_gil)
+		PyGILState_Release(gilstate);
+
 	if (!is_write_ok) {
-		pyrna_write_set(FALSE);
+		pyrna_write_set(false);
 	}
 }
 
@@ -434,14 +477,21 @@ static int bpy_prop_int_get_cb(struct PointerRNA *ptr, struct PropertyRNA *prop)
 	PyObject *args;
 	PyObject *self;
 	PyObject *ret;
+	PyGILState_STATE gilstate;
+	bool use_gil;
 	const int is_write_ok = pyrna_write_check();
 	int value;
 
 	BLI_assert(py_data != NULL);
 
 	if (!is_write_ok) {
-		pyrna_write_set(TRUE);
+		pyrna_write_set(true);
 	}
+
+	use_gil = true;  /* !PYC_INTERPRETER_ACTIVE; */
+
+	if (use_gil)
+		gilstate = PyGILState_Ensure();
 
 	py_func = py_data[BPY_DATA_CB_SLOT_GET];
 
@@ -468,8 +518,11 @@ static int bpy_prop_int_get_cb(struct PointerRNA *ptr, struct PropertyRNA *prop)
 		Py_DECREF(ret);
 	}
 
+	if (use_gil)
+		PyGILState_Release(gilstate);
+
 	if (!is_write_ok) {
-		pyrna_write_set(FALSE);
+		pyrna_write_set(false);
 	}
 
 	return value;
@@ -482,13 +535,20 @@ static void bpy_prop_int_set_cb(struct PointerRNA *ptr, struct PropertyRNA *prop
 	PyObject *args;
 	PyObject *self;
 	PyObject *ret;
+	PyGILState_STATE gilstate;
+	bool use_gil;
 	const int is_write_ok = pyrna_write_check();
 
 	BLI_assert(py_data != NULL);
 
 	if (!is_write_ok) {
-		pyrna_write_set(TRUE);
+		pyrna_write_set(true);
 	}
+
+	use_gil = true;  /* !PYC_INTERPRETER_ACTIVE; */
+
+	if (use_gil)
+		gilstate = PyGILState_Ensure();
 
 	py_func = py_data[BPY_DATA_CB_SLOT_SET];
 
@@ -514,8 +574,11 @@ static void bpy_prop_int_set_cb(struct PointerRNA *ptr, struct PropertyRNA *prop
 		Py_DECREF(ret);
 	}
 
+	if (use_gil)
+		PyGILState_Release(gilstate);
+
 	if (!is_write_ok) {
-		pyrna_write_set(FALSE);
+		pyrna_write_set(false);
 	}
 }
 
@@ -526,14 +589,21 @@ static void bpy_prop_int_array_get_cb(struct PointerRNA *ptr, struct PropertyRNA
 	PyObject *args;
 	PyObject *self;
 	PyObject *ret;
+	PyGILState_STATE gilstate;
+	bool use_gil;
 	const int is_write_ok = pyrna_write_check();
 	int i, len = RNA_property_array_length(ptr, prop);
 
 	BLI_assert(py_data != NULL);
 
 	if (!is_write_ok) {
-		pyrna_write_set(TRUE);
+		pyrna_write_set(true);
 	}
+
+	use_gil = true;  /* !PYC_INTERPRETER_ACTIVE; */
+
+	if (use_gil)
+		gilstate = PyGILState_Ensure();
 
 	py_func = py_data[BPY_DATA_CB_SLOT_GET];
 
@@ -552,18 +622,24 @@ static void bpy_prop_int_array_get_cb(struct PointerRNA *ptr, struct PropertyRNA
 			values[i] = 0;
 	}
 	else {
-		if (ret && PyC_AsArray(values, ret, len, &PyLong_Type, FALSE, "IntVectorProperty get") < 0) {
+		if (PyC_AsArray(values, ret, len, &PyLong_Type, false, "IntVectorProperty get") == -1) {
 			printf_func_error(py_func);
 
 			for (i = 0; i < len; ++i)
 				values[i] = 0;
-		}
 
-		Py_DECREF(ret);
+			/* PyC_AsArray decrements refcount internally on error */
+		}
+		else {
+			Py_DECREF(ret);
+		}
 	}
 
+	if (use_gil)
+		PyGILState_Release(gilstate);
+
 	if (!is_write_ok) {
-		pyrna_write_set(FALSE);
+		pyrna_write_set(false);
 	}
 }
 
@@ -575,14 +651,21 @@ static void bpy_prop_int_array_set_cb(struct PointerRNA *ptr, struct PropertyRNA
 	PyObject *self;
 	PyObject *ret;
 	PyObject *py_values;
+	PyGILState_STATE gilstate;
+	bool use_gil;
 	const int is_write_ok = pyrna_write_check();
 	int len = RNA_property_array_length(ptr, prop);
 
 	BLI_assert(py_data != NULL);
 
 	if (!is_write_ok) {
-		pyrna_write_set(TRUE);
+		pyrna_write_set(true);
 	}
+
+	use_gil = true;  /* !PYC_INTERPRETER_ACTIVE; */
+
+	if (use_gil)
+		gilstate = PyGILState_Ensure();
 
 	py_func = py_data[BPY_DATA_CB_SLOT_SET];
 
@@ -590,7 +673,7 @@ static void bpy_prop_int_array_set_cb(struct PointerRNA *ptr, struct PropertyRNA
 	self = pyrna_struct_as_instance(ptr);
 	PyTuple_SET_ITEM(args, 0, self);
 
-	py_values = PyC_FromArray(values, len, &PyLong_Type, FALSE, "IntVectorProperty set");
+	py_values = PyC_FromArray(values, len, &PyLong_Type, false, "IntVectorProperty set");
 	if (!py_values) {
 		printf_func_error(py_func);
 	}
@@ -613,8 +696,11 @@ static void bpy_prop_int_array_set_cb(struct PointerRNA *ptr, struct PropertyRNA
 		Py_DECREF(ret);
 	}
 
+	if (use_gil)
+		PyGILState_Release(gilstate);
+
 	if (!is_write_ok) {
-		pyrna_write_set(FALSE);
+		pyrna_write_set(false);
 	}
 }
 
@@ -625,14 +711,21 @@ static float bpy_prop_float_get_cb(struct PointerRNA *ptr, struct PropertyRNA *p
 	PyObject *args;
 	PyObject *self;
 	PyObject *ret;
+	PyGILState_STATE gilstate;
+	bool use_gil;
 	const int is_write_ok = pyrna_write_check();
 	float value;
 
 	BLI_assert(py_data != NULL);
 
 	if (!is_write_ok) {
-		pyrna_write_set(TRUE);
+		pyrna_write_set(true);
 	}
+
+	use_gil = true;  /* !PYC_INTERPRETER_ACTIVE; */
+
+	if (use_gil)
+		gilstate = PyGILState_Ensure();
 
 	py_func = py_data[BPY_DATA_CB_SLOT_GET];
 
@@ -659,8 +752,11 @@ static float bpy_prop_float_get_cb(struct PointerRNA *ptr, struct PropertyRNA *p
 		Py_DECREF(ret);
 	}
 
+	if (use_gil)
+		PyGILState_Release(gilstate);
+
 	if (!is_write_ok) {
-		pyrna_write_set(FALSE);
+		pyrna_write_set(false);
 	}
 
 	return value;
@@ -673,13 +769,20 @@ static void bpy_prop_float_set_cb(struct PointerRNA *ptr, struct PropertyRNA *pr
 	PyObject *args;
 	PyObject *self;
 	PyObject *ret;
+	PyGILState_STATE gilstate;
+	bool use_gil;
 	const int is_write_ok = pyrna_write_check();
 
 	BLI_assert(py_data != NULL);
 
 	if (!is_write_ok) {
-		pyrna_write_set(TRUE);
+		pyrna_write_set(true);
 	}
+
+	use_gil = true;  /* !PYC_INTERPRETER_ACTIVE; */
+
+	if (use_gil)
+		gilstate = PyGILState_Ensure();
 
 	py_func = py_data[BPY_DATA_CB_SLOT_SET];
 
@@ -705,8 +808,11 @@ static void bpy_prop_float_set_cb(struct PointerRNA *ptr, struct PropertyRNA *pr
 		Py_DECREF(ret);
 	}
 
+	if (use_gil)
+		PyGILState_Release(gilstate);
+
 	if (!is_write_ok) {
-		pyrna_write_set(FALSE);
+		pyrna_write_set(false);
 	}
 }
 
@@ -717,14 +823,21 @@ static void bpy_prop_float_array_get_cb(struct PointerRNA *ptr, struct PropertyR
 	PyObject *args;
 	PyObject *self;
 	PyObject *ret;
+	PyGILState_STATE gilstate;
+	bool use_gil;
 	const int is_write_ok = pyrna_write_check();
 	int i, len = RNA_property_array_length(ptr, prop);
 
 	BLI_assert(py_data != NULL);
 
 	if (!is_write_ok) {
-		pyrna_write_set(TRUE);
+		pyrna_write_set(true);
 	}
+
+	use_gil = true;  /* !PYC_INTERPRETER_ACTIVE; */
+
+	if (use_gil)
+		gilstate = PyGILState_Ensure();
 
 	py_func = py_data[BPY_DATA_CB_SLOT_GET];
 
@@ -743,18 +856,24 @@ static void bpy_prop_float_array_get_cb(struct PointerRNA *ptr, struct PropertyR
 			values[i] = 0.0f;
 	}
 	else {
-		if (ret && PyC_AsArray(values, ret, len, &PyFloat_Type, FALSE, "FloatVectorProperty get") < 0) {
+		if (PyC_AsArray(values, ret, len, &PyFloat_Type, false, "FloatVectorProperty get") == -1) {
 			printf_func_error(py_func);
 
 			for (i = 0; i < len; ++i)
 				values[i] = 0.0f;
-		}
 
-		Py_DECREF(ret);
+			/* PyC_AsArray decrements refcount internally on error */
+		}
+		else {
+			Py_DECREF(ret);
+		}
 	}
 
+	if (use_gil)
+		PyGILState_Release(gilstate);
+
 	if (!is_write_ok) {
-		pyrna_write_set(FALSE);
+		pyrna_write_set(false);
 	}
 }
 
@@ -766,14 +885,21 @@ static void bpy_prop_float_array_set_cb(struct PointerRNA *ptr, struct PropertyR
 	PyObject *self;
 	PyObject *ret;
 	PyObject *py_values;
+	PyGILState_STATE gilstate;
+	bool use_gil;
 	const int is_write_ok = pyrna_write_check();
 	int len = RNA_property_array_length(ptr, prop);
 
 	BLI_assert(py_data != NULL);
 
 	if (!is_write_ok) {
-		pyrna_write_set(TRUE);
+		pyrna_write_set(true);
 	}
+
+	use_gil = true;  /* !PYC_INTERPRETER_ACTIVE; */
+
+	if (use_gil)
+		gilstate = PyGILState_Ensure();
 
 	py_func = py_data[BPY_DATA_CB_SLOT_SET];
 
@@ -781,7 +907,7 @@ static void bpy_prop_float_array_set_cb(struct PointerRNA *ptr, struct PropertyR
 	self = pyrna_struct_as_instance(ptr);
 	PyTuple_SET_ITEM(args, 0, self);
 
-	py_values = PyC_FromArray(values, len, &PyFloat_Type, FALSE, "FloatVectorProperty set");
+	py_values = PyC_FromArray(values, len, &PyFloat_Type, false, "FloatVectorProperty set");
 	if (!py_values) {
 		printf_func_error(py_func);
 	}
@@ -804,8 +930,11 @@ static void bpy_prop_float_array_set_cb(struct PointerRNA *ptr, struct PropertyR
 		Py_DECREF(ret);
 	}
 
+	if (use_gil)
+		PyGILState_Release(gilstate);
+
 	if (!is_write_ok) {
-		pyrna_write_set(FALSE);
+		pyrna_write_set(false);
 	}
 }
 
@@ -816,13 +945,20 @@ static void bpy_prop_string_get_cb(struct PointerRNA *ptr, struct PropertyRNA *p
 	PyObject *args;
 	PyObject *self;
 	PyObject *ret;
+	PyGILState_STATE gilstate;
+	bool use_gil;
 	const int is_write_ok = pyrna_write_check();
 
 	BLI_assert(py_data != NULL);
 
 	if (!is_write_ok) {
-		pyrna_write_set(TRUE);
+		pyrna_write_set(true);
 	}
+
+	use_gil = true;  /* !PYC_INTERPRETER_ACTIVE; */
+
+	if (use_gil)
+		gilstate = PyGILState_Ensure();
 
 	py_func = py_data[BPY_DATA_CB_SLOT_GET];
 
@@ -840,21 +976,26 @@ static void bpy_prop_string_get_cb(struct PointerRNA *ptr, struct PropertyRNA *p
 	}
 	else {
 		Py_ssize_t length;
-		char *buffer = _PyUnicode_AsStringAndSize(ret, &length);
+		const char *buffer = _PyUnicode_AsStringAndSize(ret, &length);
 
-		if (!buffer && PyErr_Occurred()) {
-			printf_func_error(py_func);
+		if (!buffer) {
+			if (PyErr_Occurred()) {  /* should always be true */
+				printf_func_error(py_func);
+			}
 			value[0] = '\0';
 		}
 		else {
-			memcpy(value, buffer, length+1);
+			memcpy(value, buffer, length + 1);
 		}
 
 		Py_DECREF(ret);
 	}
 
+	if (use_gil)
+		PyGILState_Release(gilstate);
+
 	if (!is_write_ok) {
-		pyrna_write_set(FALSE);
+		pyrna_write_set(false);
 	}
 }
 
@@ -865,14 +1006,21 @@ static int bpy_prop_string_length_cb(struct PointerRNA *ptr, struct PropertyRNA 
 	PyObject *args;
 	PyObject *self;
 	PyObject *ret;
+	PyGILState_STATE gilstate;
+	bool use_gil;
 	const int is_write_ok = pyrna_write_check();
 	int length;
 
 	BLI_assert(py_data != NULL);
 
 	if (!is_write_ok) {
-		pyrna_write_set(TRUE);
+		pyrna_write_set(true);
 	}
+
+	use_gil = true;  /* !PYC_INTERPRETER_ACTIVE; */
+
+	if (use_gil)
+		gilstate = PyGILState_Ensure();
 
 	py_func = py_data[BPY_DATA_CB_SLOT_GET];
 
@@ -892,8 +1040,11 @@ static int bpy_prop_string_length_cb(struct PointerRNA *ptr, struct PropertyRNA 
 		Py_DECREF(ret);
 	}
 
+	if (use_gil)
+		PyGILState_Release(gilstate);
+
 	if (!is_write_ok) {
-		pyrna_write_set(FALSE);
+		pyrna_write_set(false);
 	}
 
 	return length;
@@ -906,14 +1057,21 @@ static void bpy_prop_string_set_cb(struct PointerRNA *ptr, struct PropertyRNA *p
 	PyObject *args;
 	PyObject *self;
 	PyObject *ret;
+	PyGILState_STATE gilstate;
+	bool use_gil;
 	const int is_write_ok = pyrna_write_check();
 	PyObject *py_value;
 
 	BLI_assert(py_data != NULL);
 
 	if (!is_write_ok) {
-		pyrna_write_set(TRUE);
+		pyrna_write_set(true);
 	}
+
+	use_gil = true;  /* !PYC_INTERPRETER_ACTIVE; */
+
+	if (use_gil)
+		gilstate = PyGILState_Ensure();
 
 	py_func = py_data[BPY_DATA_CB_SLOT_SET];
 
@@ -945,8 +1103,11 @@ static void bpy_prop_string_set_cb(struct PointerRNA *ptr, struct PropertyRNA *p
 		Py_DECREF(ret);
 	}
 
+	if (use_gil)
+		PyGILState_Release(gilstate);
+
 	if (!is_write_ok) {
-		pyrna_write_set(FALSE);
+		pyrna_write_set(false);
 	}
 }
 
@@ -957,14 +1118,21 @@ static int bpy_prop_enum_get_cb(struct PointerRNA *ptr, struct PropertyRNA *prop
 	PyObject *args;
 	PyObject *self;
 	PyObject *ret;
+	PyGILState_STATE gilstate;
+	bool use_gil;
 	const int is_write_ok = pyrna_write_check();
 	int value;
 
 	BLI_assert(py_data != NULL);
 
 	if (!is_write_ok) {
-		pyrna_write_set(TRUE);
+		pyrna_write_set(true);
 	}
+
+	use_gil = true;  /* !PYC_INTERPRETER_ACTIVE; */
+
+	if (use_gil)
+		gilstate = PyGILState_Ensure();
 
 	py_func = py_data[BPY_DATA_CB_SLOT_GET];
 
@@ -991,8 +1159,11 @@ static int bpy_prop_enum_get_cb(struct PointerRNA *ptr, struct PropertyRNA *prop
 		Py_DECREF(ret);
 	}
 
+	if (use_gil)
+		PyGILState_Release(gilstate);
+
 	if (!is_write_ok) {
-		pyrna_write_set(FALSE);
+		pyrna_write_set(false);
 	}
 
 	return value;
@@ -1005,13 +1176,20 @@ static void bpy_prop_enum_set_cb(struct PointerRNA *ptr, struct PropertyRNA *pro
 	PyObject *args;
 	PyObject *self;
 	PyObject *ret;
+	PyGILState_STATE gilstate;
+	bool use_gil;
 	const int is_write_ok = pyrna_write_check();
 
 	BLI_assert(py_data != NULL);
 
 	if (!is_write_ok) {
-		pyrna_write_set(TRUE);
+		pyrna_write_set(true);
 	}
+
+	use_gil = true;  /* !PYC_INTERPRETER_ACTIVE; */
+
+	if (use_gil)
+		gilstate = PyGILState_Ensure();
 
 	py_func = py_data[BPY_DATA_CB_SLOT_SET];
 
@@ -1037,8 +1215,11 @@ static void bpy_prop_enum_set_cb(struct PointerRNA *ptr, struct PropertyRNA *pro
 		Py_DECREF(ret);
 	}
 
+	if (use_gil)
+		PyGILState_Release(gilstate);
+
 	if (!is_write_ok) {
-		pyrna_write_set(FALSE);
+		pyrna_write_set(false);
 	}
 }
 
@@ -1760,7 +1941,7 @@ static PyObject *BPy_BoolVectorProperty(PyObject *self, PyObject *args, PyObject
 			return NULL;
 		}
 
-		if (pydef && PyC_AsArray(def, pydef, size, &PyBool_Type, FALSE, "BoolVectorProperty(default=sequence)") < 0)
+		if (pydef && PyC_AsArray(def, pydef, size, &PyBool_Type, false, "BoolVectorProperty(default=sequence)") == -1)
 			return NULL;
 
 		if (bpy_prop_callback_check(update_cb, "update", 2) == -1) {
@@ -1955,7 +2136,7 @@ static PyObject *BPy_IntVectorProperty(PyObject *self, PyObject *args, PyObject 
 			return NULL;
 		}
 
-		if (pydef && PyC_AsArray(def, pydef, size, &PyLong_Type, FALSE, "IntVectorProperty(default=sequence)") < 0)
+		if (pydef && PyC_AsArray(def, pydef, size, &PyLong_Type, false, "IntVectorProperty(default=sequence)") == -1)
 			return NULL;
 
 		if (bpy_prop_callback_check(update_cb, "update", 2) == -1) {
@@ -2175,7 +2356,7 @@ static PyObject *BPy_FloatVectorProperty(PyObject *self, PyObject *args, PyObjec
 			return NULL;
 		}
 
-		if (pydef && PyC_AsArray(def, pydef, size, &PyFloat_Type, FALSE, "FloatVectorProperty(default=sequence)") < 0)
+		if (pydef && PyC_AsArray(def, pydef, size, &PyFloat_Type, false, "FloatVectorProperty(default=sequence)") == -1)
 			return NULL;
 
 		if (bpy_prop_callback_check(update_cb, "update", 2) == -1) {
@@ -2340,7 +2521,7 @@ static PyObject *BPy_EnumProperty(PyObject *self, PyObject *args, PyObject *kw)
 		PropertyRNA *prop;
 		PyObject *pyopts = NULL;
 		int opts = 0;
-		short is_itemf = FALSE;
+		bool is_itemf = false;
 		PyObject *update_cb = NULL;
 		PyObject *get_cb = NULL;
 		PyObject *set_cb = NULL;
@@ -2384,7 +2565,7 @@ static PyObject *BPy_EnumProperty(PyObject *self, PyObject *args, PyObject *kw)
 				return NULL;
 			}
 
-			is_itemf = TRUE;
+			is_itemf = true;
 			eitems = DummyRNA_NULL_items;
 		}
 		else {
@@ -2416,7 +2597,7 @@ static PyObject *BPy_EnumProperty(PyObject *self, PyObject *args, PyObject *kw)
 		bpy_prop_callback_assign_enum(prop, get_cb, set_cb, (is_itemf ? items : NULL));
 		RNA_def_property_duplicate_pointers(srna, prop);
 
-		if (is_itemf == FALSE) {
+		if (is_itemf == false) {
 			/* note: this must be postponed until after #RNA_def_property_duplicate_pointers
 			 * otherwise if this is a generator it may free the strings before we copy them */
 			Py_DECREF(items_fast);

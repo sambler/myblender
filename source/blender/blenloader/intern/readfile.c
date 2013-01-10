@@ -3340,7 +3340,7 @@ static void direct_link_texture(FileData *fd, Tex *tex)
 	tex->env = newdataadr(fd, tex->env);
 	if (tex->env) {
 		tex->env->ima = NULL;
-		memset(tex->env->cube, 0, 6*sizeof(void *));
+		memset(tex->env->cube, 0, 6 * sizeof(void *));
 		tex->env->ok= 0;
 	}
 	tex->pd = newdataadr(fd, tex->pd);
@@ -5124,6 +5124,16 @@ static void direct_link_scene(FileData *fd, Scene *sce)
 		
 		sce->toolsettings->imapaint.paintcursor = NULL;
 		sce->toolsettings->particle.paintcursor = NULL;
+
+		/* in rare cases this is needed, see [#33806] */
+		if (sce->toolsettings->vpaint) {
+			sce->toolsettings->vpaint->vpaint_prev = NULL;
+			sce->toolsettings->vpaint->tot = 0;
+		}
+		if (sce->toolsettings->wpaint) {
+			sce->toolsettings->wpaint->wpaint_prev = NULL;
+			sce->toolsettings->wpaint->tot = 0;
+		}
 	}
 
 	if (sce->ed) {
@@ -6862,7 +6872,7 @@ static void do_versions_nodetree_convert_angle(bNodeTree *ntree)
 			/* Convert degrees to radians. */
 			NodeDefocus *nqd = node->storage;
 			/* XXX DNA char to float conversion seems to map the char value into the [0.0f, 1.0f] range... */
-			nqd->rotation = DEG2RADF(nqd->rotation*255.0f);
+			nqd->rotation = DEG2RADF(nqd->rotation * 255.0f);
 		}
 		else if (node->type == CMP_NODE_CHROMA_MATTE) {
 			/* Convert degrees to radians. */
@@ -6874,7 +6884,7 @@ static void do_versions_nodetree_convert_angle(bNodeTree *ntree)
 			/* Convert degrees to radians. */
 			NodeGlare *ndg = node->storage;
 			/* XXX DNA char to float conversion seems to map the char value into the [0.0f, 1.0f] range... */
-			ndg->angle_ofs = DEG2RADF(ndg->angle_ofs*255.0f);
+			ndg->angle_ofs = DEG2RADF(ndg->angle_ofs * 255.0f);
 		}
 		/* XXX TexMapping struct is used by other nodes too (at least node_composite_mapValue),
 		 *     but not the rot part...
@@ -8601,6 +8611,48 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 			}
 		}
 	}
+
+	if (main->versionfile < 265 || (main->versionfile == 265 && main->subversionfile < 7)) {
+		Curve *cu;
+
+		for (cu = main->curve.first; cu; cu = cu->id.next) {
+			if (cu->flag & (CU_FRONT | CU_BACK)) {
+				Nurb *nu;
+
+				for (nu = cu->nurb.first; nu; nu = nu->next) {
+					int a;
+
+					if (nu->bezt) {
+						BezTriple *bezt = nu->bezt;
+						a = nu->pntsu;
+
+						while (a--) {
+							bezt->radius = 1.0f;
+							bezt++;
+						}
+					}
+					else if (nu->bp) {
+						BPoint *bp = nu->bp;
+						a = nu->pntsu * nu->pntsv;
+
+						while (a--) {
+							bp->radius = 1.0f;
+							bp++;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if (!MAIN_VERSION_ATLEAST(main, 265, 8)) {
+		Mesh *me;
+		for (me = main->mesh.first; me; me = me->id.next) {
+			BKE_mesh_do_versions_cd_flag_init(me);
+		}
+	}
+
+	// if (main->versionfile < 265 || (main->versionfile == 265 && main->subversionfile < 7)) {
 
 	/* WATCH IT!!!: pointers from libdata have not been converted yet here! */
 	/* WATCH IT 2!: Userdef struct init has to be in editors/interface/resources.c! */

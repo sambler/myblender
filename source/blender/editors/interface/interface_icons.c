@@ -613,8 +613,8 @@ static void init_internal_icons(void)
 
 	def_internal_vicon(VICO_VIEW3D_VEC, vicon_view3d_draw);
 	def_internal_vicon(VICO_EDIT_VEC, vicon_edit_draw);
-	def_internal_vicon(VICO_EDITMODE_DEHLT, vicon_editmode_dehlt_draw);
-	def_internal_vicon(VICO_EDITMODE_HLT, vicon_editmode_hlt_draw);
+	def_internal_vicon(VICO_EDITMODE_VEC_DEHLT, vicon_editmode_dehlt_draw);
+	def_internal_vicon(VICO_EDITMODE_VEC_HLT, vicon_editmode_hlt_draw);
 	def_internal_vicon(VICO_DISCLOSURE_TRI_RIGHT_VEC, vicon_disclosure_tri_right_draw);
 	def_internal_vicon(VICO_DISCLOSURE_TRI_DOWN_VEC, vicon_disclosure_tri_down_draw);
 	def_internal_vicon(VICO_MOVE_UP_VEC, vicon_move_up_draw);
@@ -1029,7 +1029,7 @@ static void icon_draw_size(float x, float y, int icon_id, float aspect, float al
 	if (di->type == ICON_TYPE_VECTOR) {
 		/* vector icons use the uiBlock transformation, they are not drawn
 		 * with untransformed coordinates like the other icons */
-		di->data.vector.func((int)x, (int)y, ICON_DEFAULT_HEIGHT, ICON_DEFAULT_HEIGHT, 1.0f); 
+		di->data.vector.func((int)x, (int)y, w, h, 1.0f);
 	}
 	else if (di->type == ICON_TYPE_TEXTURE) {
 		/* texture image use premul alpha for correct scaling */

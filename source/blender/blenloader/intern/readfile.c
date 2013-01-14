@@ -1439,6 +1439,8 @@ void blo_end_movieclip_pointer_map(FileData *fd, Main *oldmain)
 	}
 }
 
+/* XXX disabled this feature - packed files also belong in temp saves and quit.blend, to make restore work */
+
 static void insert_packedmap(FileData *fd, PackedFile *pf)
 {
 	oldnewmap_insert(fd->packedmap, pf, pf, 0);
@@ -1863,6 +1865,7 @@ static PreviewImage *direct_link_preview_image(FileData *fd, PreviewImage *old_p
 				prv->rect[i] = newdataadr(fd, prv->rect[i]);
 			}
 		}
+//		prv->gputexture[0] = prv->gputexture[1] = NULL;
 	}
 	
 	return prv;
@@ -2723,14 +2726,15 @@ static void lib_link_pose(FileData *fd, Object *ob, bPose *pose)
 {
 	bPoseChannel *pchan;
 	bArmature *arm = ob->data;
-	int rebuild;
+	int rebuild = 0;
 	
 	if (!pose || !arm)
 		return;
 	
-	
-	/* always rebuild to match proxy or lib changes */
-	rebuild = ob->proxy || (ob->id.lib==NULL && arm->id.lib);
+	/* always rebuild to match proxy or lib changes, but on Undo */
+	if (fd->memfile == NULL)
+		if (ob->proxy || (ob->id.lib==NULL && arm->id.lib))
+			rebuild = 1;
 	
 	if (ob->proxy) {
 		/* sync proxy layer */
@@ -4175,8 +4179,6 @@ static void lib_link_object(FileData *fd, Main *main)
 				else {
 					/* this triggers object_update to always use a copy */
 					ob->proxy->proxy_from = ob;
-					/* force proxy updates after load/undo, a bit weak */
-					ob->recalc = ob->proxy->recalc = (OB_RECALC_OB | OB_RECALC_DATA | OB_RECALC_TIME);
 				}
 			}
 			ob->proxy_group = newlibadr(fd, ob->id.lib, ob->proxy_group);
@@ -8617,27 +8619,29 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 
 		for (cu = main->curve.first; cu; cu = cu->id.next) {
 			if (cu->flag & (CU_FRONT | CU_BACK)) {
-				Nurb *nu;
+				if ( cu->ext1 != 0.0f || cu->ext2 != 0.0f) {
+					Nurb *nu;
 
-				for (nu = cu->nurb.first; nu; nu = nu->next) {
-					int a;
+					for (nu = cu->nurb.first; nu; nu = nu->next) {
+						int a;
 
-					if (nu->bezt) {
-						BezTriple *bezt = nu->bezt;
-						a = nu->pntsu;
+						if (nu->bezt) {
+							BezTriple *bezt = nu->bezt;
+							a = nu->pntsu;
 
-						while (a--) {
-							bezt->radius = 1.0f;
-							bezt++;
+							while (a--) {
+								bezt->radius = 1.0f;
+								bezt++;
+							}
 						}
-					}
-					else if (nu->bp) {
-						BPoint *bp = nu->bp;
-						a = nu->pntsu * nu->pntsv;
+						else if (nu->bp) {
+							BPoint *bp = nu->bp;
+							a = nu->pntsu * nu->pntsv;
 
-						while (a--) {
-							bp->radius = 1.0f;
-							bp++;
+							while (a--) {
+								bp->radius = 1.0f;
+								bp++;
+							}
 						}
 					}
 				}

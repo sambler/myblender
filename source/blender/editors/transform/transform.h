@@ -188,7 +188,7 @@ typedef struct TransDataNla {
 struct LinkNode;
 struct GHash;
 
-typedef struct TransDataSlideVert {
+typedef struct TransDataEdgeSlideVert {
 	struct BMVert vup, vdown;
 	struct BMVert origvert;
 
@@ -201,10 +201,10 @@ typedef struct TransDataSlideVert {
 	float upvec[3], downvec[3];
 
 	int loop_nr;
-} TransDataSlideVert;
+} TransDataEdgeSlideVert;
 
-typedef struct SlideData {
-	TransDataSlideVert *sv;
+typedef struct EdgeSlideData {
+	TransDataEdgeSlideVert *sv;
 	int totsv;
 	
 	struct SmallHash vhash;
@@ -222,7 +222,32 @@ typedef struct SlideData {
 	int flipped_vtx;
 
 	int curr_sv_index;
-} SlideData;
+} EdgeSlideData;
+
+
+typedef struct TransDataVertSlideVert {
+	BMVert *v;
+	float   co_orig_3d[3];
+	float   co_orig_2d[2];
+	float (*co_link_orig_3d)[3];
+	float (*co_link_orig_2d)[2];
+	int     co_link_tot;
+	int     co_link_curr;
+} TransDataVertSlideVert;
+
+typedef struct VertSlideData {
+	TransDataVertSlideVert *sv;
+	int totsv;
+
+	struct BMEditMesh *em;
+
+	float perc;
+
+	int is_proportional;
+	int flipped_vtx;
+
+	int curr_sv_index;
+} VertSlideData;
 
 typedef struct TransData {
 	float  dist;         /* Distance needed to affect element (for Proportionnal Editing)                  */
@@ -530,6 +555,10 @@ void initEdgeSlide(TransInfo *t);
 int handleEventEdgeSlide(TransInfo *t, struct wmEvent *event);
 int EdgeSlide(TransInfo *t, const int mval[2]);
 
+void initVertSlide(TransInfo *t);
+int handleEventVertSlide(TransInfo *t, struct wmEvent *event);
+int VertSlide(TransInfo *t, const int mval[2]);
+
 void initTimeTranslate(TransInfo *t);
 int TimeTranslate(TransInfo *t, const int mval[2]);
 
@@ -672,8 +701,6 @@ void resetTransRestrictions(TransInfo *t);
 
 void drawLine(TransInfo *t, const float center[3], const float dir[3], char axis, short options);
 
-void drawNonPropEdge(const struct bContext *C, TransInfo *t);
-
 /* DRAWLINE options flags */
 #define DRAWLIGHT	1
 
@@ -715,8 +742,10 @@ void applyTransformOrientation(const struct bContext *C, float mat[3][3], char *
 
 int getTransformOrientation(const struct bContext *C, float normal[3], float plane[3], int activeOnly);
 
-void freeSlideTempFaces(SlideData *sld);
-void freeSlideVerts(TransInfo *t);
-void projectSVData(TransInfo *t, int final);
+void freeEdgeSlideTempFaces(EdgeSlideData *sld);
+void freeEdgeSlideVerts(TransInfo *t);
+void projectEdgeSlideData(TransInfo *t, bool is_final);
+
+void freeVertSlideVerts(TransInfo *t);
 
 #endif

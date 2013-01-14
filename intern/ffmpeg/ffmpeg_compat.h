@@ -113,7 +113,7 @@ int av_opt_set_double(void *obj, const char *name, double val, int search_flags)
 #define avformat_close_input(x) av_close_input_file(*(x))
 #endif
 
-#if ((LIBAVCODEC_VERSION_MAJOR < 53) || (LIBAVCODEC_VERSION_MAJOR == 53 && LIBAVCODEC_VERSION_MINOR < 35))
+#if ((LIBAVCODEC_VERSION_MAJOR < 52) || (LIBAVCODEC_VERSION_MAJOR == 53 && LIBAVCODEC_VERSION_MINOR < 42) || (LIBAVCODEC_VERSION_MAJOR == 52 && LIBAVCODEC_VERSION_MINOR < 123))
 static inline
 int avcodec_open2(AVCodecContext *avctx, AVCodec *codec, AVDictionary **options)
 {
@@ -129,7 +129,9 @@ AVStream *avformat_new_stream(AVFormatContext *s, AVCodec *c)
 	/* TODO: no codec is taking into account */
 	return av_new_stream(s, 0);
 }
-
+#endif
+ 
+#if ((LIBAVFORMAT_VERSION_MAJOR < 52) || (LIBAVFORMAT_VERSION_MAJOR == 53 && LIBAVFORMAT_VERSION_MINOR < 24) || (LIBAVFORMAT_VERSION_MAJOR == 52 && LIBAVFORMAT_VERSION_MINOR < 110))
 static inline
 int avformat_find_stream_info(AVFormatContext *ic, AVDictionary **options)
 {

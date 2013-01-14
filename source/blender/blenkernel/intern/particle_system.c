@@ -2697,7 +2697,8 @@ static void sphclassical_force_cb(void *sphdata_v, ParticleKey *state, float *fo
 	/* 4.77 is an experimentally determined density factor */
 	float rest_density = fluid->rest_density * (fluid->flag & SPH_FAC_DENSITY ? 4.77f : 1.0f);
 
-	float stiffness = fluid->stiffness_k;
+	// Use speed of sound squared
+	float stiffness = pow2(fluid->stiffness_k);
 
 	ParticleData *npa;
 	float vec[3];
@@ -4223,7 +4224,7 @@ static void dynamics_step(ParticleSimulationData *sim, float cfra)
 			ParticleSettings *part = sim->psys->part;
 			psys_sph_init(sim, &sphdata);
 
-			if (part->fluid->flag & SPH_SOLVER_DDR) {
+			if (part->fluid->solver == SPH_SOLVER_DDR) {
 				/* Apply SPH forces using double-density relaxation algorithm
 				 * (Clavat et. al.) */
 				#pragma omp parallel for firstprivate (sphdata) private (pa) schedule(dynamic,5)

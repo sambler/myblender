@@ -52,12 +52,7 @@ struct Object;
 struct View3D;
 struct ScrArea;
 struct Scene;
-struct bPose;
 struct bConstraint;
-struct BezTriple;
-struct wmOperatorType;
-struct wmOperator;
-struct wmWindowManager;
 struct wmKeyMap;
 struct wmKeyConfig;
 struct bContext;
@@ -65,7 +60,6 @@ struct wmEvent;
 struct wmTimer;
 struct ARegion;
 struct ReportList;
-struct SmallHash;
 
 typedef struct TransSnapPoint {
 	struct TransSnapPoint *next, *prev;
@@ -108,15 +102,15 @@ typedef struct TransCon {
 	int   imval[2];	     /* initial mouse value for visual calculation                                */
 	                     /* the one in TransInfo is not garanty to stay the same (Rotates change it)  */
 	int   mode;          /* Mode flags of the Constraint                                              */
-	void  (*drawExtra)(struct TransInfo *);
+	void  (*drawExtra)(struct TransInfo *t);
 	                     /* For constraints that needs to draw differently from the other
 	                      * uses this instead of the generic draw function                            */
-	void  (*applyVec)(struct TransInfo *, struct TransData *, float *, float *, float *);
+	void  (*applyVec)(struct TransInfo *t, struct TransData *td, const float in[3], float out[3], float pvec[3]);
 	                     /* Apply function pointer for linear vectorial transformation                */
 	                     /* The last three parameters are pointers to the in/out/printable vectors    */
-	void  (*applySize)(struct TransInfo *, struct TransData *, float [3][3]);
+	void  (*applySize)(struct TransInfo *t, struct TransData *td, float smat[3][3]);
 	                     /* Apply function pointer for size transformation */
-	void  (*applyRot)(struct TransInfo *, struct TransData *, float [3], float *);
+	void  (*applyRot)(struct TransInfo *t, struct TransData *td, float vec[3], float *angle);
 	                     /* Apply function pointer for rotation transformation */
 } TransCon;
 
@@ -271,8 +265,8 @@ typedef struct TransData {
 } TransData;
 
 typedef struct MouseInput {
-	void	(*apply)(struct TransInfo *, struct MouseInput *, const int [2], float [3]);
-	void	(*post)(struct TransInfo *, float [3]);
+	void	(*apply)(struct TransInfo *t, struct MouseInput *mi, const int mval[2], float output[3]);
+	void	(*post)(struct TransInfo *t, float values[3]);
 
 	int     imval[2];       	/* initial mouse position                */
 	char	precision;
@@ -685,13 +679,13 @@ typedef enum {
 	INPUT_CUSTOM_RATIO
 } MouseInputMode;
 
-void initMouseInput(TransInfo *t, MouseInput *mi, int center[2], int mval[2]);
+void initMouseInput(TransInfo *t, MouseInput *mi, const int center[2], const int mval[2]);
 void initMouseInputMode(TransInfo *t, MouseInput *mi, MouseInputMode mode);
 int handleMouseInput(struct TransInfo *t, struct MouseInput *mi, struct wmEvent *event);
 void applyMouseInput(struct TransInfo *t, struct MouseInput *mi, const int mval[2], float output[3]);
 
-void setCustomPoints(TransInfo *t, MouseInput *mi, int start[2], int end[2]);
-void setInputPostFct(MouseInput *mi, void	(*post)(struct TransInfo *, float [3]));
+void setCustomPoints(TransInfo *t, MouseInput *mi, const int start[2], const int end[2]);
+void setInputPostFct(MouseInput *mi, void	(*post)(struct TransInfo *t, float values[3]));
 
 /*********************** Generics ********************************/
 

@@ -24,7 +24,7 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/editors/space_text/text_format_py.c
+/** \file blender/editors/space_text/text_format_lua.c
  *  \ingroup sptext
  */
 
@@ -39,61 +39,41 @@
 
 #include "text_format.h"
 
-/* *** Local Functions (for format_line) *** */
+/* *** Lua Keywords (for format_line) *** */
 
-/* Checks the specified source string for a Python built-in function name. This
- * name must start at the beginning of the source string and must be followed by
- * a non-identifier (see text_check_identifier(char)) or null character.
+/* Checks the specified source string for a Lua keyword (minus boolean & 'nil'). 
+ * This name must start at the beginning of the source string and must be 
+ * followed by a non-identifier (see text_check_identifier(char)) or null char.
  *
- * If a built-in function is found, the length of the matching name is returned.
+ * If a keyword is found, the length of the matching word is returned.
  * Otherwise, -1 is returned.
  *
  * See:
- * http://docs.python.org/py3k/reference/lexical_analysis.html#keywords
+ * http://www.lua.org/manual/5.1/manual.html#2.1
  */
 
-static int txtfmt_py_find_builtinfunc(const char *string)
+static int txtfmt_lua_find_keyword(const char *string)
 {
 	int i, len;
-	/* list is from...
-	 * ", ".join(['"%s"' % kw
-	 *            for kw in  __import__("keyword").kwlist
-	 *            if kw not in {"False", "None", "True", "def", "class"}])
-	 *
-	 * ... and for this code:
-	 * print("\n".join(['else if (STR_LITERAL_STARTSWITH(string, "%s", len)) i = len;' % kw
-	 *                  for kw in  __import__("keyword").kwlist
-	 *                  if kw not in {"False", "None", "True", "def", "class"}]))
-	 */
 
 	if      (STR_LITERAL_STARTSWITH(string, "and",      len)) i = len;
-	else if (STR_LITERAL_STARTSWITH(string, "as",       len)) i = len;
-	else if (STR_LITERAL_STARTSWITH(string, "assert",   len)) i = len;
 	else if (STR_LITERAL_STARTSWITH(string, "break",    len)) i = len;
-	else if (STR_LITERAL_STARTSWITH(string, "continue", len)) i = len;
-	else if (STR_LITERAL_STARTSWITH(string, "del",      len)) i = len;
-	else if (STR_LITERAL_STARTSWITH(string, "elif",     len)) i = len;
+	else if (STR_LITERAL_STARTSWITH(string, "do",       len)) i = len;
 	else if (STR_LITERAL_STARTSWITH(string, "else",     len)) i = len;
-	else if (STR_LITERAL_STARTSWITH(string, "except",   len)) i = len;
-	else if (STR_LITERAL_STARTSWITH(string, "finally",  len)) i = len;
+	else if (STR_LITERAL_STARTSWITH(string, "elseif",   len)) i = len;
+	else if (STR_LITERAL_STARTSWITH(string, "end",      len)) i = len;
 	else if (STR_LITERAL_STARTSWITH(string, "for",      len)) i = len;
-	else if (STR_LITERAL_STARTSWITH(string, "from",     len)) i = len;
-	else if (STR_LITERAL_STARTSWITH(string, "global",   len)) i = len;
+	else if (STR_LITERAL_STARTSWITH(string, "function", len)) i = len;
 	else if (STR_LITERAL_STARTSWITH(string, "if",       len)) i = len;
-	else if (STR_LITERAL_STARTSWITH(string, "import",   len)) i = len;
 	else if (STR_LITERAL_STARTSWITH(string, "in",       len)) i = len;
-	else if (STR_LITERAL_STARTSWITH(string, "is",       len)) i = len;
-	else if (STR_LITERAL_STARTSWITH(string, "lambda",   len)) i = len;
-	else if (STR_LITERAL_STARTSWITH(string, "nonlocal", len)) i = len;
+	else if (STR_LITERAL_STARTSWITH(string, "local",    len)) i = len;
 	else if (STR_LITERAL_STARTSWITH(string, "not",      len)) i = len;
 	else if (STR_LITERAL_STARTSWITH(string, "or",       len)) i = len;
-	else if (STR_LITERAL_STARTSWITH(string, "pass",     len)) i = len;
-	else if (STR_LITERAL_STARTSWITH(string, "raise",    len)) i = len;
+	else if (STR_LITERAL_STARTSWITH(string, "repeat",   len)) i = len;
 	else if (STR_LITERAL_STARTSWITH(string, "return",   len)) i = len;
-	else if (STR_LITERAL_STARTSWITH(string, "try",      len)) i = len;
+	else if (STR_LITERAL_STARTSWITH(string, "then",     len)) i = len;
+	else if (STR_LITERAL_STARTSWITH(string, "until",    len)) i = len;
 	else if (STR_LITERAL_STARTSWITH(string, "while",    len)) i = len;
-	else if (STR_LITERAL_STARTSWITH(string, "with",     len)) i = len;
-	else if (STR_LITERAL_STARTSWITH(string, "yield",    len)) i = len;
 	else                                                      i = 0;
 
 	/* If next source char is an identifier (eg. 'i' in "definate") no match */
@@ -102,20 +82,50 @@ static int txtfmt_py_find_builtinfunc(const char *string)
 	return i;
 }
 
-/* Checks the specified source string for a Python special name. This name must
- * start at the beginning of the source string and must be followed by a non-
- * identifier (see text_check_identifier(char)) or null character.
+/* Checks the specified source string for a Lua special name/function. This 
+ * name must start at the beginning of the source string and must be followed 
+ * by a non-identifier (see text_check_identifier(char)) or null character.
  *
  * If a special name is found, the length of the matching name is returned.
- * Otherwise, -1 is returned. */
+ * Otherwise, -1 is returned. 
+ * 
+ * See:
+ * http://www.lua.org/manual/5.1/manual.html#5.1
+ */
 
-static int txtfmt_py_find_specialvar(const char *string)
+static int txtfmt_lua_find_specialvar(const char *string)
 {
 	int i, len;
 
-	if      (STR_LITERAL_STARTSWITH(string, "def", len))   i = len;
-	else if (STR_LITERAL_STARTSWITH(string, "class", len)) i = len;
-	else                                                   i = 0;
+	if      (STR_LITERAL_STARTSWITH(string, "assert",           len))   i = len;
+	else if (STR_LITERAL_STARTSWITH(string, "collectgarbage",   len))   i = len;
+	else if (STR_LITERAL_STARTSWITH(string, "dofile",           len))   i = len;
+	else if (STR_LITERAL_STARTSWITH(string, "error",            len))   i = len;
+	else if (STR_LITERAL_STARTSWITH(string, "_G",               len))   i = len;
+	else if (STR_LITERAL_STARTSWITH(string, "getfenv",          len))   i = len;
+	else if (STR_LITERAL_STARTSWITH(string, "getmetatable",     len))   i = len;
+	else if (STR_LITERAL_STARTSWITH(string, "__index",          len))   i = len;
+	else if (STR_LITERAL_STARTSWITH(string, "ipairs",           len))   i = len;
+	else if (STR_LITERAL_STARTSWITH(string, "load",             len))   i = len;
+	else if (STR_LITERAL_STARTSWITH(string, "loadfile",         len))   i = len;
+	else if (STR_LITERAL_STARTSWITH(string, "loadstring",       len))   i = len;
+	else if (STR_LITERAL_STARTSWITH(string, "next",             len))   i = len;
+	else if (STR_LITERAL_STARTSWITH(string, "pairs",            len))   i = len;
+	else if (STR_LITERAL_STARTSWITH(string, "pcall",            len))   i = len;
+	else if (STR_LITERAL_STARTSWITH(string, "print",            len))   i = len;
+	else if (STR_LITERAL_STARTSWITH(string, "rawequal",         len))   i = len;
+	else if (STR_LITERAL_STARTSWITH(string, "rawget",           len))   i = len;
+	else if (STR_LITERAL_STARTSWITH(string, "rawset",           len))   i = len;
+	else if (STR_LITERAL_STARTSWITH(string, "select",           len))   i = len;
+	else if (STR_LITERAL_STARTSWITH(string, "setfenv",          len))   i = len;
+	else if (STR_LITERAL_STARTSWITH(string, "setmetatable",     len))   i = len;
+	else if (STR_LITERAL_STARTSWITH(string, "tonumber",         len))   i = len;
+	else if (STR_LITERAL_STARTSWITH(string, "tostring",         len))   i = len;
+	else if (STR_LITERAL_STARTSWITH(string, "type",             len))   i = len;
+	else if (STR_LITERAL_STARTSWITH(string, "unpack",           len))   i = len;
+	else if (STR_LITERAL_STARTSWITH(string, "_VERSION",         len))   i = len;
+	else if (STR_LITERAL_STARTSWITH(string, "xpcall",           len))   i = len;
+	else                                                i = 0;
 
 	/* If next source char is an identifier (eg. 'i' in "definate") no match */
 	if (i == 0 || text_check_identifier(string[i]))
@@ -123,29 +133,13 @@ static int txtfmt_py_find_specialvar(const char *string)
 	return i;
 }
 
-static int txtfmt_py_find_decorator(const char *string)
-{
-	if (string[0] == '@') {
-		int i = 1;
-		/* Whitespace is ok '@  foo' */
-		while (text_check_whitespace(string[i])) {
-			i++;
-		}
-		while (text_check_identifier(string[i])) {
-			i++;
-		}
-		return i;
-	}
-	return -1;
-}
-
-static int txtfmt_py_find_bool(const char *string)
+static int txtfmt_lua_find_bool(const char *string)
 {
 	int i, len;
 
-	if      (STR_LITERAL_STARTSWITH(string, "None",  len))  i = len;
-	else if (STR_LITERAL_STARTSWITH(string, "True",  len))  i = len;
-	else if (STR_LITERAL_STARTSWITH(string, "False", len))  i = len;
+	if      (STR_LITERAL_STARTSWITH(string, "nil",   len))  i = len;
+	else if (STR_LITERAL_STARTSWITH(string, "true",  len))  i = len;
+	else if (STR_LITERAL_STARTSWITH(string, "false", len))  i = len;
 	else                                                    i = 0;
 
 	/* If next source char is an identifier (eg. 'i' in "Nonetheless") no match */
@@ -154,17 +148,16 @@ static int txtfmt_py_find_bool(const char *string)
 	return i;
 }
 
-static char txtfmt_py_format_identifier(const char *str)
+static char txtfmt_lua_format_identifier(const char *str)
 {
 	char fmt;
-	if      ((txtfmt_py_find_specialvar(str))   != -1) fmt = FMT_TYPE_SPECIAL;
-	else if ((txtfmt_py_find_builtinfunc(str))  != -1) fmt = FMT_TYPE_KEYWORD;
-	else if ((txtfmt_py_find_decorator(str))    != -1) fmt = FMT_TYPE_RESERVED;
+	if      ((txtfmt_lua_find_specialvar(str))  != -1) fmt = FMT_TYPE_SPECIAL;
+	else if ((txtfmt_lua_find_keyword(str))     != -1) fmt = FMT_TYPE_KEYWORD;
 	else                                               fmt = FMT_TYPE_DEFAULT;
 	return fmt;
 }
 
-static void txtfmt_py_format_line(SpaceText *st, TextLine *line, const int do_next)
+static void txtfmt_lua_format_line(SpaceText *st, TextLine *line, const int do_next)
 {
 	FlattenString fs;
 	const char *str;
@@ -210,40 +203,46 @@ static void txtfmt_py_format_line(SpaceText *st, TextLine *line, const int do_ne
 		}
 		/* Handle continuations */
 		else if (cont) {
-			/* Triple strings ("""...""" or '''...''') */
-			if (cont & FMT_CONT_TRIPLE) {
-				find = (cont & FMT_CONT_QUOTEDOUBLE) ? '"' : '\'';
-				if (*str == find && *(str + 1) == find && *(str + 2) == find) {
-					*fmt = FMT_TYPE_STRING; fmt++; str++;
-					*fmt = FMT_TYPE_STRING; fmt++; str++;
+			/* Multi-line comments */
+			if (cont & FMT_CONT_COMMENT_C) {
+				if (*str == ']' && *(str + 1) == ']') {
+					*fmt = FMT_TYPE_COMMENT; fmt++; str++;
+					*fmt = FMT_TYPE_COMMENT;
 					cont = FMT_CONT_NOP;
 				}
-				/* Handle other strings */
+				else {
+					*fmt = FMT_TYPE_COMMENT;
+				}
+				/* Handle other comments */
 			}
 			else {
 				find = (cont & FMT_CONT_QUOTEDOUBLE) ? '"' : '\'';
-				if (*str == find) cont = FMT_CONT_NOP;
+				if (*str == find) cont = 0;
+				*fmt = FMT_TYPE_STRING;
 			}
 
-			*fmt = FMT_TYPE_STRING;
 			str += BLI_str_utf8_size_safe(str) - 1;
 		}
 		/* Not in a string... */
 		else {
-			/* Deal with comments first */
-			if (*str == '#') {
-				/* fill the remaining line */
+			/* Multi-line comments */
+			if (*str == '-'       && *(str + 1) == '-' &&
+			    *(str + 2) == '[' && *(str + 3) == '[')
+			{
+				cont = FMT_CONT_COMMENT_C;
+				*fmt = FMT_TYPE_COMMENT; fmt++; str++;
+				*fmt = FMT_TYPE_COMMENT; fmt++; str++;
+				*fmt = FMT_TYPE_COMMENT; fmt++; str++;
+				*fmt = FMT_TYPE_COMMENT;
+			}
+			/* Single line comment */
+			else if (*str == '-' && *(str + 1) == '-') {
 				text_format_fill(&str, &fmt, FMT_TYPE_COMMENT, len - (int)(str - fs.buf));
 			}
 			else if (*str == '"' || *str == '\'') {
 				/* Strings */
 				find = *str;
 				cont = (*str == '"') ? FMT_CONT_QUOTEDOUBLE : FMT_CONT_QUOTESINGLE;
-				if (*(str + 1) == find && *(str + 2) == find) {
-					*fmt = FMT_TYPE_STRING; fmt++; str++;
-					*fmt = FMT_TYPE_STRING; fmt++; str++;
-					cont |= FMT_CONT_TRIPLE;
-				}
 				*fmt = FMT_TYPE_STRING;
 			}
 			/* Whitespace (all ws. has been converted to spaces) */
@@ -257,7 +256,7 @@ static void txtfmt_py_format_line(SpaceText *st, TextLine *line, const int do_ne
 				*fmt = FMT_TYPE_NUMERAL;
 			}
 			/* Booleans */
-			else if (prev != FMT_TYPE_DEFAULT && (i = txtfmt_py_find_bool(str)) != -1) {
+			else if (prev != FMT_TYPE_DEFAULT && (i = txtfmt_lua_find_bool(str)) != -1) {
 				if (i > 0) {
 					text_format_fill_ascii(&str, &fmt, FMT_TYPE_NUMERAL, i);
 				}
@@ -267,7 +266,7 @@ static void txtfmt_py_format_line(SpaceText *st, TextLine *line, const int do_ne
 				}
 			}
 			/* Punctuation */
-			else if ((*str != '@') && text_check_delim(*str)) {
+			else if ((*str != '#') && text_check_delim(*str)) {
 				*fmt = FMT_TYPE_SYMBOL;
 			}
 			/* Identifiers and other text (no previous ws. or delims. so text continues) */
@@ -278,18 +277,12 @@ static void txtfmt_py_format_line(SpaceText *st, TextLine *line, const int do_ne
 			/* Not ws, a digit, punct, or continuing text. Must be new, check for special words */
 			else {
 				/* Special vars(v) or built-in keywords(b) */
-				/* keep in sync with 'txtfmt_py_format_identifier()' */
-				if      ((i = txtfmt_py_find_specialvar(str))   != -1) prev = FMT_TYPE_SPECIAL;
-				else if ((i = txtfmt_py_find_builtinfunc(str))  != -1) prev = FMT_TYPE_KEYWORD;
-				else if ((i = txtfmt_py_find_decorator(str))    != -1) prev = FMT_TYPE_DIRECTIVE;
+				/* keep in sync with 'txtfmt_osl_format_identifier()' */
+				if      ((i = txtfmt_lua_find_specialvar(str))   != -1) prev = FMT_TYPE_SPECIAL;
+				else if ((i = txtfmt_lua_find_keyword(str))      != -1) prev = FMT_TYPE_KEYWORD;
 
 				if (i > 0) {
-					if (prev == FMT_TYPE_DIRECTIVE) {  /* can contain utf8 */
-						text_format_fill(&str, &fmt, prev, i);
-					}
-					else {
-						text_format_fill_ascii(&str, &fmt, prev, i);
-					}
+					text_format_fill_ascii(&str, &fmt, prev, i);
 				}
 				else {
 					str += BLI_str_utf8_size_safe(str) - 1;
@@ -306,19 +299,19 @@ static void txtfmt_py_format_line(SpaceText *st, TextLine *line, const int do_ne
 
 	/* If continuation has changed and we're allowed, process the next line */
 	if (cont != cont_orig && do_next && line->next) {
-		txtfmt_py_format_line(st, line->next, do_next);
+		txtfmt_lua_format_line(st, line->next, do_next);
 	}
 
 	flatten_string_free(&fs);
 }
 
-void ED_text_format_register_py(void)
+void ED_text_format_register_lua(void)
 {
 	static TextFormatType tft = {0};
-	static const char *ext[] = {"py", NULL};
+	static const char *ext[] = {"lua", NULL};
 
-	tft.format_identifier = txtfmt_py_format_identifier;
-	tft.format_line       = txtfmt_py_format_line;
+	tft.format_identifier = txtfmt_lua_format_identifier;
+	tft.format_line       = txtfmt_lua_format_line;
 	tft.ext = ext;
 
 	ED_text_format_register(&tft);

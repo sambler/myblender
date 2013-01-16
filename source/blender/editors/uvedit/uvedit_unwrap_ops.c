@@ -161,14 +161,14 @@ static int ED_uvedit_ensure_uvs(bContext *C, Scene *scene, Object *obedit)
 
 /****************** Parametrizer Conversion ***************/
 
-static bool uvedit_have_selection(Scene *scene, BMEditMesh *em, short implicit)
+static bool uvedit_have_selection(Scene *scene, BMEditMesh *em, bool implicit)
 {
 	BMFace *efa;
 	BMLoop *l;
 	BMIter iter, liter;
 	
 	if (!CustomData_has_layer(&em->bm->ldata, CD_MLOOPUV)) {
-		return false;
+		return (em->bm->totfacesel != 0);
 	}
 
 	/* verify if we have any selected uv's before unwrapping,
@@ -561,7 +561,7 @@ static bool minimize_stretch_init(bContext *C, wmOperator *op)
 	BMEditMesh *em = BMEdit_FromObject(obedit);
 	MinStretch *ms;
 	int fill_holes = RNA_boolean_get(op->ptr, "fill_holes");
-	short implicit = 1;
+	bool implicit = true;
 
 	if (!uvedit_have_selection(scene, em, implicit)) {
 		return false;
@@ -603,7 +603,7 @@ static void minimize_stretch_iteration(bContext *C, wmOperator *op, int interact
 		param_flush(ms->handle);
 
 		if (sa) {
-			BLI_snprintf(str, sizeof(str), "Minimize Stretch. Blend %.2f", ms->blend);
+			BLI_snprintf(str, sizeof(str), "Minimize Stretch. Blend %.2f (Press + and -, or scroll wheel to set)", ms->blend);
 			ED_area_headerprint(sa, str);
 		}
 
@@ -686,20 +686,24 @@ static int minimize_stretch_modal(bContext *C, wmOperator *op, wmEvent *event)
 			return OPERATOR_FINISHED;
 		case PADPLUSKEY:
 		case WHEELUPMOUSE:
-			if (ms->blend < 0.95f) {
-				ms->blend += 0.1f;
-				ms->lasttime = 0.0f;
-				RNA_float_set(op->ptr, "blend", ms->blend);
-				minimize_stretch_iteration(C, op, 1);
+			if (event->val == KM_PRESS) {
+				if (ms->blend < 0.95f) {
+					ms->blend += 0.1f;
+					ms->lasttime = 0.0f;
+					RNA_float_set(op->ptr, "blend", ms->blend);
+					minimize_stretch_iteration(C, op, 1);
+				}
 			}
 			break;
 		case PADMINUS:
 		case WHEELDOWNMOUSE:
-			if (ms->blend > 0.05f) {
-				ms->blend -= 0.1f;
-				ms->lasttime = 0.0f;
-				RNA_float_set(op->ptr, "blend", ms->blend);
-				minimize_stretch_iteration(C, op, 1);
+			if (event->val == KM_PRESS) {
+				if (ms->blend > 0.05f) {
+					ms->blend -= 0.1f;
+					ms->lasttime = 0.0f;
+					RNA_float_set(op->ptr, "blend", ms->blend);
+					minimize_stretch_iteration(C, op, 1);
+				}
 			}
 			break;
 		case TIMER:
@@ -757,7 +761,7 @@ static int pack_islands_exec(bContext *C, wmOperator *op)
 	Object *obedit = CTX_data_edit_object(C);
 	BMEditMesh *em = BMEdit_FromObject(obedit);
 	ParamHandle *handle;
-	short implicit = 1;
+	bool implicit = true;
 
 	if (!uvedit_have_selection(scene, em, implicit)) {
 		return OPERATOR_CANCELLED;
@@ -804,7 +808,7 @@ static int average_islands_scale_exec(bContext *C, wmOperator *UNUSED(op))
 	Object *obedit = CTX_data_edit_object(C);
 	BMEditMesh *em = BMEdit_FromObject(obedit);
 	ParamHandle *handle;
-	short implicit = 1;
+	bool implicit = true;
 
 	if (!uvedit_have_selection(scene, em, implicit)) {
 		return OPERATOR_CANCELLED;
@@ -1209,7 +1213,7 @@ static int unwrap_exec(bContext *C, wmOperator *op)
 	int use_subsurf = RNA_boolean_get(op->ptr, "use_subsurf_data");
 	short use_subsurf_final;
 	float obsize[3];
-	short implicit = 0;
+	bool implicit = false;
 
 	if (!uvedit_have_selection(scene, em, implicit)) {
 		return OPERATOR_CANCELLED;

@@ -1537,7 +1537,7 @@ class VIEW3D_MT_pose_group(Menu):
 
     def draw(self, context):
         layout = self.layout
-        
+
         pose = context.active_object.pose
 
         layout.operator_context = 'EXEC_AREA'
@@ -1789,7 +1789,7 @@ class VIEW3D_MT_edit_mesh_vertices(Menu):
         layout.operator("mesh.split")
         layout.operator_menu_enum("mesh.separate", "type")
         layout.operator("mesh.vert_connect")
-        layout.operator("mesh.vert_slide")
+        layout.operator("transform.vert_slide")
 
         layout.separator()
 

@@ -595,6 +595,14 @@ static void paint_draw_cursor(bContext *C, int x, int y, void *UNUSED(unused))
 
 	/* draw brush outline */
 	glTranslatef(translation[0], translation[1], 0);
+
+	/* draw an inner brush */
+	if (ups->draw_pressure && BKE_brush_use_size_pressure(scene, brush)) {
+		/* inner at full alpha */
+		glutil_draw_lined_arc(0.0, M_PI * 2.0, final_radius * ups->pressure_value, 40);
+		/* outer at half alpha */
+		glColor4f(outline_col[0], outline_col[1], outline_col[2], outline_alpha * 0.5f);
+	}
 	glutil_draw_lined_arc(0.0, M_PI * 2.0, final_radius, 40);
 	glTranslatef(-translation[0], -translation[1], 0);
 

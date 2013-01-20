@@ -316,7 +316,7 @@ typedef struct ProjPaintState {
 	float normal_angle_range;       /* difference between normal_angle and normal_angle_inner, for easy access */
 	
 	short is_ortho;
-	short is_airbrush;              /* only to avoid using (ps.brush->flag & BRUSH_AIRBRUSH) */
+	bool do_masking;              /* use masking during painting. Some operations such as airbrush may disable */
 	short is_texbrush;              /* only to avoid running  */
 #ifndef PROJ_DEBUG_NOSEAMBLEED
 	float seam_bleed_px;
@@ -3800,7 +3800,7 @@ static void blend_color_mix_accum_float(float cp[4], const float cp1[4], const u
 
 static void do_projectpaint_clone(ProjPaintState *ps, ProjPixel *projPixel, float alpha, float mask)
 {
-	if (ps->is_airbrush == 0 && mask < 1.0f) {
+	if (ps->do_masking && mask < 1.0f) {
 		projPixel->newColor.uint = IMB_blend_color(projPixel->newColor.uint, ((ProjPixelClone *)projPixel)->clonepx.uint, (int)(alpha * 255), ps->blend);
 		blend_color_mix(projPixel->pixel.ch_pt,  projPixel->origColor.ch, projPixel->newColor.ch, (int)(mask * 255));
 	}
@@ -3811,7 +3811,7 @@ static void do_projectpaint_clone(ProjPaintState *ps, ProjPixel *projPixel, floa
 
 static void do_projectpaint_clone_f(ProjPaintState *ps, ProjPixel *projPixel, float alpha, float mask)
 {
-	if (ps->is_airbrush == 0 && mask < 1.0f) {
+	if (ps->do_masking && mask < 1.0f) {
 		IMB_blend_color_float(projPixel->newColor.f, projPixel->newColor.f, ((ProjPixelClone *)projPixel)->clonepx.f, alpha, ps->blend);
 		blend_color_mix_float(projPixel->pixel.f_pt,  projPixel->origColor.f, projPixel->newColor.f, mask);
 	}
@@ -3946,7 +3946,7 @@ static void do_projectpaint_draw(ProjPaintState *ps, ProjPixel *projPixel, const
 		rgba_ub[3] = 255;
 	}
 	
-	if (ps->is_airbrush == 0 && mask < 1.0f) {
+	if (ps->do_masking && mask < 1.0f) {
 		projPixel->newColor.uint = IMB_blend_color(projPixel->newColor.uint, *((unsigned int *)rgba_ub), (int)(alpha * 255), ps->blend);
 		blend_color_mix(projPixel->pixel.ch_pt,  projPixel->origColor.ch, projPixel->newColor.ch, (int)(mask * 255));
 	}
@@ -3978,7 +3978,7 @@ static void do_projectpaint_draw_f(ProjPaintState *ps, ProjPixel *projPixel, flo
 		rgba[3] = 1.0;
 	}
 	
-	if (ps->is_airbrush == 0 && mask < 1.0f) {
+	if (ps->do_masking && mask < 1.0f) {
 		IMB_blend_color_float(projPixel->newColor.f, projPixel->newColor.f, rgba, alpha, ps->blend);
 		blend_color_mix_float(projPixel->pixel.f_pt,  projPixel->origColor.f, projPixel->newColor.f, mask);
 	}
@@ -4105,21 +4105,31 @@ static void *do_projectpaint_thread(void *ph_v)
 
 				/*if (dist < radius) {*/ /* correct but uses a sqrtf */
 				if (dist_nosqrt <= radius_squared) {
+					float samplecos[2];
 					dist = sqrtf(dist_nosqrt);
 
 					falloff = BKE_brush_curve_strength_clamp(ps->brush, dist, radius);
 
+					if (ps->is_texbrush) {
+						if (ps->brush->mtex.brush_map_mode == MTEX_MAP_MODE_VIEW) {
+							sub_v2_v2v2(samplecos, projPixel->projCoSS, pos);
+						}
+						else {
+							copy_v2_v2(samplecos, projPixel->projCoSS);
+						}
+					}
+
 					if (falloff > 0.0f) {
 						if (ps->is_texbrush) {
 							/* note, for clone and smear, we only use the alpha, could be a special function */
-							BKE_brush_sample_tex(ps->scene, ps->brush, projPixel->projCoSS, rgba, thread_index);
+							BKE_brush_sample_tex(ps->scene, ps->brush, samplecos, rgba, thread_index);
 							alpha = rgba[3];
 						}
 						else {
 							alpha = 1.0f;
 						}
 						
-						if (ps->is_airbrush) {
+						if (!ps->do_masking) {
 							/* for an aurbrush there is no real mask, so just multiply the alpha by it */
 							alpha *= falloff * BKE_brush_alpha_get(ps->scene, ps->brush);
 							mask = ((float)projPixel->mask) / 65535.0f;
@@ -4955,7 +4965,6 @@ typedef struct PaintOperation {
 
 	int first;
 	int prevmouse[2];
-	float prev_pressure; /* need this since we don't get tablet events for pressure change */
 	int orig_brush_size;
 	double starttime;
 
@@ -4998,7 +5007,7 @@ static void project_state_init(bContext *C, Object *ob, ProjPaintState *ps)
 	ps->pixel_sizeof = project_paint_pixel_sizeof(ps->tool);
 	BLI_assert(ps->pixel_sizeof >= sizeof(ProjPixel));
 
-	ps->is_airbrush = (brush->flag & BRUSH_AIRBRUSH) ? 1 : 0;
+	ps->do_masking = (brush->flag & BRUSH_AIRBRUSH || brush->mtex.brush_map_mode == MTEX_MAP_MODE_VIEW) ? false : true;
 	ps->is_texbrush = (brush->mtex.tex) ? 1 : 0;
 
 
@@ -5173,6 +5182,11 @@ static int texture_paint_init(bContext *C, wmOperator *op)
 	/* create painter */
 	pop->painter = BKE_brush_painter_new(scene, pop->s.brush);
 
+	{
+		UnifiedPaintSettings *ups = &settings->unified_paint_settings;
+		ups->draw_pressure = true;
+	}
+
 	return 1;
 }
 
@@ -5261,6 +5275,11 @@ static void paint_exit(bContext *C, wmOperator *op)
 		BKE_reportf(op->reports, RPT_WARNING, "Packed MultiLayer files cannot be painted: %s", pop->s.warnpackedfile);
 
 	MEM_freeN(pop);
+
+	{
+		UnifiedPaintSettings *ups = &scene->toolsettings->unified_paint_settings;
+		ups->draw_pressure = false;
+	}
 }
 
 static int paint_exec(bContext *C, wmOperator *op)
@@ -5285,7 +5304,6 @@ static void paint_apply_event(bContext *C, wmOperator *op, wmEvent *event)
 {
 	const Scene *scene = CTX_data_scene(C);
 	PaintOperation *pop = op->customdata;
-	wmTabletData *wmtab;
 	PointerRNA itemptr;
 	float pressure, mousef[2];
 	double time;
@@ -5296,16 +5314,17 @@ static void paint_apply_event(bContext *C, wmOperator *op, wmEvent *event)
 	tablet = 0;
 	pop->s.blend = pop->s.brush->blend;
 
-	if (event->custom == EVT_DATA_TABLET) {
-		wmtab = event->customdata;
+	if (event->tablet_data) {
+		wmTabletData *wmtab = event->tablet_data;
 
 		tablet = (wmtab->Active != EVT_TABLET_NONE);
 		pressure = wmtab->Pressure;
 		if (wmtab->Active == EVT_TABLET_ERASER)
 			pop->s.blend = IMB_BLEND_ERASE_ALPHA;
 	}
-	else { /* otherwise airbrush becomes 1.0 pressure instantly */
-		pressure = pop->prev_pressure ? pop->prev_pressure : 1.0f;
+	else {
+		BLI_assert(fabsf(WM_cursor_pressure(CTX_wm_window(C))) == 1.0f);
+		pressure = 1.0f;
 	}
 
 	if (pop->first) {
@@ -5338,7 +5357,10 @@ static void paint_apply_event(bContext *C, wmOperator *op, wmEvent *event)
 	/* apply */
 	paint_apply(C, op, &itemptr);
 
-	pop->prev_pressure = pressure;
+	{
+		UnifiedPaintSettings *ups = &scene->toolsettings->unified_paint_settings;
+		ups->pressure_value = pressure;
+	}
 }
 
 static int paint_invoke(bContext *C, wmOperator *op, wmEvent *event)
@@ -5349,7 +5371,7 @@ static int paint_invoke(bContext *C, wmOperator *op, wmEvent *event)
 		MEM_freeN(op->customdata);
 		return OPERATOR_CANCELLED;
 	}
-	
+
 	paint_apply_event(C, op, event);
 
 	pop = op->customdata;
@@ -5479,6 +5501,16 @@ static void brush_drawcursor(bContext *C, int x, int y, void *UNUSED(customdata)
 		glColor4f(brush->add_col[0], brush->add_col[1], brush->add_col[2], alpha);
 		glEnable(GL_LINE_SMOOTH);
 		glEnable(GL_BLEND);
+		{
+			UnifiedPaintSettings *ups = &scene->toolsettings->unified_paint_settings;
+			/* hrmf, duplicate paint_draw_cursor logic here */
+			if (ups->draw_pressure && BKE_brush_use_size_pressure(scene, brush)) {
+				/* inner at full alpha */
+				glutil_draw_lined_arc(0, (float)(M_PI * 2.0), size * ups->pressure_value, 40);
+				/* outer at half alpha */
+				glColor4f(brush->add_col[0], brush->add_col[1], brush->add_col[2], alpha * 0.5f);
+			}
+		}
 		glutil_draw_lined_arc(0, (float)(M_PI * 2.0), size, 40);
 		glDisable(GL_BLEND);
 		glDisable(GL_LINE_SMOOTH);
@@ -5953,7 +5985,7 @@ static int texture_paint_camera_project_exec(bContext *C, wmOperator *op)
 
 	/* override */
 	ps.is_texbrush = 0;
-	ps.is_airbrush = 1;
+	ps.do_masking = false;
 	orig_brush_size = BKE_brush_size_get(scene, ps.brush);
 	BKE_brush_size_set(scene, ps.brush, 32); /* cover the whole image */
 

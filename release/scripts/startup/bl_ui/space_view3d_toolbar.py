@@ -20,7 +20,7 @@
 import bpy
 from bpy.types import Menu, Panel
 from bl_ui.properties_paint_common import UnifiedPaintPanel
-from bl_ui.properties_paint_common import sculpt_brush_texture_settings
+from bl_ui.properties_paint_common import brush_texture_settings
 
 
 class View3DPanel():
@@ -720,12 +720,10 @@ class VIEW3D_PT_tools_brush_texture(Panel, View3DPaintPanel):
         col = layout.column()
 
         col.template_ID_preview(brush, "texture", new="texture.new", rows=3, cols=8)
-        if brush.use_paint_image:
-            col.prop(brush, "use_fixed_texture")
+
+        brush_texture_settings(col, brush, context.sculpt_object)
 
         if context.sculpt_object:
-            sculpt_brush_texture_settings(col, brush)
-
             # use_texture_overlay and texture_overlay_alpha
             col = layout.column(align=True)
             col.active = brush.sculpt_capabilities.has_overlay

@@ -430,7 +430,11 @@ static void paint_mesh_restore_co(Sculpt *sd, Object *ob)
 
 	BKE_pbvh_search_gather(ss->pbvh, NULL, NULL, &nodes, &totnode);
 
-	#pragma omp parallel for schedule(guided) if (sd->flags & SCULPT_USE_OPENMP)
+	/* Disable OpenMP when dynamic-topology is enabled. Otherwise, new
+	 * entries might be inserted by sculpt_undo_push_node() into the
+	 * GHash used internally by BM_log_original_vert_co() by a
+	 * different thread. [#33787] */
+	#pragma omp parallel for schedule(guided) if (sd->flags & SCULPT_USE_OPENMP && !ss->bm)
 	for (n = 0; n < totnode; n++) {
 		SculptUndoNode *unode;
 		SculptUndoType type = (brush->sculpt_tool == SCULPT_TOOL_MASK ?
@@ -3882,8 +3886,9 @@ static void sculpt_update_cache_variants(bContext *C, Sculpt *sd, Object *ob,
 	 *      brush coord/pressure/etc.
 	 *      It's more an events design issue, which doesn't split coordinate/pressure/angle
 	 *      changing events. We should avoid this after events system re-design */
-	if (paint_space_stroke_enabled(brush) || cache->first_time)
+	if (paint_supports_dynamic_size(brush) || cache->first_time) {
 		cache->pressure = RNA_float_get(ptr, "pressure");
+	}
 
 	/* Truly temporary data that isn't stored in properties */
 
@@ -3905,12 +3910,13 @@ static void sculpt_update_cache_variants(bContext *C, Sculpt *sd, Object *ob,
 		}
 	}
 
-	if (BKE_brush_use_size_pressure(scene, brush)) {
+	if (BKE_brush_use_size_pressure(scene, brush) && paint_supports_dynamic_size(brush)) {
 		cache->pixel_radius *= cache->pressure;
 		cache->radius = cache->initial_radius * cache->pressure;
 	}
-	else
+	else {
 		cache->radius = cache->initial_radius;
+	}
 
 	cache->radius_squared = cache->radius * cache->radius;
 
@@ -4174,6 +4180,17 @@ static void sculpt_restore_mesh(Sculpt *sd, Object *ob)
 	}
 }
 
+/* Copy the PBVH bounding box into the object's bounding box */
+static void sculpt_update_object_bounding_box(Object *ob)
+{
+	if (ob->bb) {
+		float bb_min[3], bb_max[3];
+
+		BKE_pbvh_bounding_box(ob->sculpt->pbvh, bb_min, bb_max);
+		BKE_boundbox_init_from_minmax(ob->bb, bb_min, bb_max);
+	}
+}
+
 static void sculpt_flush_update(bContext *C)
 {
 	Object *ob = CTX_data_active_object(C);
@@ -4194,6 +4211,11 @@ static void sculpt_flush_update(bContext *C)
 		rcti r;
 
 		BKE_pbvh_update(ss->pbvh, PBVH_UpdateBB, NULL);
+		/* Update the object's bounding box too so that the object
+		 * doesn't get incorrectly clipped during drawing in
+		 * draw_mesh_object(). [#33790] */
+		sculpt_update_object_bounding_box(ob);
+
 		if (sculpt_get_redraw_rect(ar, CTX_wm_region_view3d(C), ob, &r)) {
 			if (ss->cache)
 				ss->cache->previous_r = r;

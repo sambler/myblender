@@ -505,8 +505,11 @@ class WM_MT_context_menu_enum(Menu):
             return {'PASS_THROUGH'}
         base_path, prop_string = data_path.rsplit(".", 1)
         value_base = context_path_validate(context, base_path)
-        col = self.layout.column()
-        col.prop(value_base, prop_string, expand=True)
+        prop = value_base.bl_rna.properties[prop_string]
+
+        layout = self.layout
+        layout.label(prop.name, icon=prop.icon)
+        layout.prop(value_base, prop_string, expand=True)
 
 
 class WM_OT_context_menu_enum(Operator):

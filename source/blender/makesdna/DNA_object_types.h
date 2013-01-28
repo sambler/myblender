@@ -57,6 +57,7 @@ struct ParticleSystem;
 struct DerivedMesh;
 struct SculptSession;
 struct bGPdata;
+struct RigidBodyOb;
 
 
 /* Vertex Groups - Name Info */
@@ -171,7 +172,7 @@ typedef struct Object {
 	float sf; /* sf is time-offset */
 
 	short flag;			/* copy of Base */
-	short colbits DNA_DEPRECATED;		/* deprecated */
+	short colbits DNA_DEPRECATED;		/* deprecated, use 'matbits' */
 	
 	short transflag, protectflag;	/* transformation settings and transform locks  */
 	short trackflag, upflag;
@@ -271,6 +272,9 @@ typedef struct Object {
 	ListBase gpulamp;		/* runtime, for glsl lamp display only */
 	ListBase pc_ids;
 	ListBase *duplilist;	/* for temporary dupli list storage, only for use by RNA API */
+	
+	struct RigidBodyOb *rigidbody_object;		/* settings for Bullet rigid body */
+	struct RigidBodyCon *rigidbody_constraint;	/* settings for Bullet constraint */
 
 	float ima_ofs[2];		/* offset for image empties */
 } Object;
@@ -347,6 +351,9 @@ typedef struct DupliObject {
 /* is this ID type used as object data */
 #define OB_DATA_SUPPORT_ID(_id_type) \
 	(ELEM8(_id_type, ID_ME, ID_CU, ID_MB, ID_LA, ID_SPK, ID_CA, ID_LT, ID_AR))
+
+#define OB_DATA_SUPPORT_ID_CASE \
+	ID_ME: case ID_CU: case ID_MB: case ID_LA: case ID_SPK: case ID_CA: case ID_LT: case ID_AR
 
 /* partype: first 4 bits: type */
 #define PARTYPE			15

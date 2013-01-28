@@ -2444,7 +2444,6 @@ static const char *rna_property_subtypename(PropertySubType type)
 		case PROP_FILENAME: return "PROP_FILENAME";
 		case PROP_DIRPATH: return "PROP_DIRPATH";
 		case PROP_BYTESTRING: return "PROP_BYTESTRING";
-		case PROP_TRANSLATE: return "PROP_TRANSLATE";
 		case PROP_UNSIGNED: return "PROP_UNSIGNED";
 		case PROP_PERCENTAGE: return "PROP_PERCENTAGE";
 		case PROP_FACTOR: return "PROP_FACTOR";
@@ -3260,6 +3259,7 @@ static RNAProcessItem PROCESS_ITEMS[] = {
 	{"rna_pose.c", "rna_pose_api.c", RNA_def_pose},
 	{"rna_property.c", NULL, RNA_def_gameproperty},
 	{"rna_render.c", NULL, RNA_def_render},
+	{"rna_rigidbody.c", NULL, RNA_def_rigidbody},
 	{"rna_scene.c", "rna_scene_api.c", RNA_def_scene},
 	{"rna_screen.c", NULL, RNA_def_screen},
 	{"rna_sculpt_paint.c", NULL, RNA_def_sculpt_paint},

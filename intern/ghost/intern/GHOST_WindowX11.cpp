@@ -358,8 +358,8 @@ GHOST_WindowX11(
 	xsizehints->y = top;
 	xsizehints->width = width;
 	xsizehints->height = height;
-	xsizehints->min_width = 640;     /* size hints, could be made apart of the ghost api */
-	xsizehints->min_height = 480;    /* limits are also arbitrary, but should not allow 1x1 window */
+	xsizehints->min_width = 320;     /* size hints, could be made apart of the ghost api */
+	xsizehints->min_height = 240;    /* limits are also arbitrary, but should not allow 1x1 window */
 	xsizehints->max_width = 65535;
 	xsizehints->max_height = 65535;
 	XSetWMNormalHints(m_display, m_window, xsizehints);
@@ -1210,6 +1210,15 @@ installDrawingContext(
 	GHOST_TSuccess success;
 	switch (type) {
 		case GHOST_kDrawingContextTypeOpenGL:
+		{
+#ifdef WITH_X11_XINPUT
+			/* use our own event handlers to avoid exiting blender,
+			 * this would happen for eg:
+			 * if you open blender, unplug a tablet, then open a new window. */
+			XErrorHandler old_handler      = XSetErrorHandler(GHOST_X11_ApplicationErrorHandler);
+			XIOErrorHandler old_handler_io = XSetIOErrorHandler(GHOST_X11_ApplicationIOErrorHandler);
+#endif
+
 			m_context = glXCreateContext(m_display, m_visual, s_firstContext, True);
 			if (m_context != NULL) {
 				if (!s_firstContext) {
@@ -1224,12 +1233,18 @@ installDrawingContext(
 				success = GHOST_kFailure;
 			}
 
+#ifdef WITH_X11_XINPUT
+			/* Restore handler */
+			(void) XSetErrorHandler(old_handler);
+			(void) XSetIOErrorHandler(old_handler_io);
+#endif
 			break;
-
+		}
 		case GHOST_kDrawingContextTypeNone:
+		{
 			success = GHOST_kSuccess;
 			break;
-
+		}
 		default:
 			success = GHOST_kFailure;
 	}

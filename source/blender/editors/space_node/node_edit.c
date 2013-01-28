@@ -550,6 +550,12 @@ void snode_set_context(SpaceNode *snode, Scene *scene)
 	snode->id = snode->from = NULL;
 	
 	if (snode->treetype == NTREE_SHADER) {
+		/* we use this to signal warnings, when node shaders are drawn in wrong render engine */
+		if (BKE_scene_use_new_shading_nodes(scene))
+			snode->flag |= SNODE_NEW_SHADERS;
+		else
+			snode->flag &= ~SNODE_NEW_SHADERS;
+			
 		/* need active object, or we allow pinning... */
 		if (snode->shaderfrom == SNODE_SHADER_OBJECT) {
 			if (ob) {
@@ -1743,7 +1749,7 @@ static int node_delete_reconnect_exec(bContext *C, wmOperator *UNUSED(op))
 void NODE_OT_delete_reconnect(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name = "Delete with reconnect";
+	ot->name = "Delete with Reconnect";
 	ot->description = "Delete nodes; will reconnect nodes as if deletion was muted";
 	ot->idname = "NODE_OT_delete_reconnect";
 
@@ -2025,7 +2031,7 @@ static int node_clipboard_copy_exec(bContext *C, wmOperator *UNUSED(op))
 void NODE_OT_clipboard_copy(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name = "Copy to clipboard";
+	ot->name = "Copy to Clipboard";
 	ot->description = "Copies selected nodes to the clipboard";
 	ot->idname = "NODE_OT_clipboard_copy";
 
@@ -2146,7 +2152,7 @@ static int node_clipboard_paste_invoke(bContext *C, wmOperator *op, wmEvent *eve
 void NODE_OT_clipboard_paste(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name = "Paste from clipboard";
+	ot->name = "Paste from Clipboard";
 	ot->description = "Pastes nodes from the clipboard to the active node tree";
 	ot->idname = "NODE_OT_clipboard_paste";
 

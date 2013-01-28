@@ -79,12 +79,10 @@ void _bli_array_grow_func(void **arr_p, const void *arr_static,
 /* this returns the logical size of the array, not including buffering. */
 #define BLI_array_count(arr) _##arr##_count
 
-/* Grow the array by a fixed number of items. zeroes the new elements.
+/* Grow the array by a fixed number of items.
  *
  * Allow for a large 'num' value when the new size is more then double
  * to allocate the exact sized array. */
-
-/* grow an array by a specified number of items */
 #define BLI_array_grow_items(arr, num)  ((                                    \
 	(((void *)(arr) == NULL) &&                                               \
 	 ((void *)(_##arr##_static) != NULL) &&                                   \
@@ -96,10 +94,10 @@ void _bli_array_grow_func(void **arr_p, const void *arr_static,
 	/* use existing static array or allocate */                               \
 	(LIKELY(_bli_array_totalsize(arr) >= _##arr##_count + num) ?              \
 	 (void)0 /* do nothing */ :                                               \
-	 (_bli_array_grow_func((void **)&(arr), _##arr##_static,                  \
+	 _bli_array_grow_func((void **)&(arr), _##arr##_static,                   \
 	                       sizeof(*arr), _##arr##_count, num,                 \
 	                       "BLI_array." #arr),                                \
-	 (void)0)) /* msvc2008 needs this */                                      \
+	 (void)0)  /* msvc2008 needs this */                                      \
 	),                                                                        \
 	/* increment the array count, all conditions above are accounted for. */  \
 	(_##arr##_count += num))

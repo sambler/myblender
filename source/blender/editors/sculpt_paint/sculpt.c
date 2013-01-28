@@ -56,6 +56,7 @@
 #include "BKE_cdderivedmesh.h"
 #include "BKE_context.h"
 #include "BKE_depsgraph.h"
+#include "BKE_image.h"
 #include "BKE_key.h"
 #include "BKE_library.h"
 #include "BKE_mesh.h"
@@ -897,7 +898,7 @@ static float tex_strength(SculptSession *ss, Brush *br,
 		/* Get strength by feeding the vertex 
 		 * location directly into a texture */
 		externtex(mtex, point, &avg,
-		          &jnk, &jnk, &jnk, &jnk, 0);
+		          &jnk, &jnk, &jnk, &jnk, 0, ss->tex_pool);
 	}
 	else if (ss->texcache) {
 		float rotation = -mtex->rot;
@@ -983,7 +984,7 @@ static float tex_strength(SculptSession *ss, Brush *br,
 		x += br->mtex.ofs[0];
 		y += br->mtex.ofs[1];
 
-		avg = paint_get_tex_pixel(br, x, y);
+		avg = paint_get_tex_pixel(br, x, y, ss->tex_pool);
 	}
 
 	avg += br->texture_sample_bias;
@@ -3376,11 +3377,17 @@ static void sculpt_update_tex(const Scene *scene, Sculpt *sd, SculptSession *ss)
 		ss->texcache = NULL;
 	}
 
+	if (ss->tex_pool) {
+		BKE_image_pool_free(ss->tex_pool);
+		ss->tex_pool = NULL;
+	}
+
 	/* Need to allocate a bigger buffer for bigger brush size */
 	ss->texcache_side = 2 * radius;
 	if (!ss->texcache || ss->texcache_side > ss->texcache_actual) {
 		ss->texcache = BKE_brush_gen_texture_cache(brush, radius);
 		ss->texcache_actual = ss->texcache_side;
+		ss->tex_pool = BKE_image_pool_new();
 	}
 }
 
@@ -4893,6 +4900,12 @@ static int sculpt_toggle_mode(bContext *C, wmOperator *UNUSED(op))
 	else {
 		/* Enter sculptmode */
 		ob->mode |= OB_MODE_SCULPT;
+
+		/* Remove dynamic-topology flag; this will be enabled if the
+		 * file was saved with dynamic topology on, but we don't
+		 * automatically re-enter dynamic-topology mode when loading a
+		 * file. */
+		me->flag &= ~ME_SCULPT_DYNAMIC_TOPOLOGY;
 
 		if (flush_recalc)
 			DAG_id_tag_update(&ob->id, OB_RECALC_DATA);

@@ -141,7 +141,7 @@ def cmake_advanced_info():
         if sys.platform == "win32":
             cmd = 'cmake "%s" -G"Eclipse CDT4 - MinGW Makefiles"' % CMAKE_DIR
         else:
-            if make_exe_basename.startswith("make"):
+            if make_exe_basename.startswith(("make", "gmake")):
                 cmd = 'cmake "%s" -G"Eclipse CDT4 - Unix Makefiles"' % CMAKE_DIR
             elif make_exe_basename.startswith("gmake"):
                 cmd = 'cmake "%s" -G"Eclipse CDT4 - Unix Makefiles"' % CMAKE_DIR

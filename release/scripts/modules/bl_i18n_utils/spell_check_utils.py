@@ -246,6 +246,7 @@ dict_uimsgs = {
     "tri", "tris",
     "uv", "uvs", "uvw", "uw", "uvmap",
     "vec",
+    "vel",  # velocity!
     "vert", "verts",
     "vis",
     "xyz", "xzy", "yxz", "yzx", "zxy", "zyx",
@@ -311,6 +312,7 @@ dict_uimsgs = {
     "inpaint",
     "lightmap",
     "lossless", "lossy",
+    "matcap",
     "midtones",
     "mipmap", "mipmaps", "mip",
     "ngon", "ngons",
@@ -488,6 +490,7 @@ dict_uimsgs = {
     # Files types/formats
     "avi",
     "attrac",
+    "autocad",
     "autodesk",
     "bmp",
     "btx",

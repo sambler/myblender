@@ -1171,6 +1171,9 @@ typedef struct Scene {
 	ColorManagedViewSettings view_settings;
 	ColorManagedDisplaySettings display_settings;
 	ColorManagedColorspaceSettings sequencer_colorspace_settings;
+	
+	/* RigidBody simulation world+settings */
+	struct RigidBodyWorld *rigidbody_world;
 } Scene;
 
 

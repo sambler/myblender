@@ -165,13 +165,13 @@ static BMFace *bm_log_face_from_id(BMLog *log, unsigned int id)
  * Returns zero if no paint-mask layer is present */
 static float vert_mask_get(BMesh *bm, BMVert *v)
 {
-	CustomData *cd = &bm->vdata;
-	if (CustomData_has_layer(&bm->vdata, CD_PAINT_MASK)) {
-		float *mask = CustomData_bmesh_get(cd, v->head.data, CD_PAINT_MASK);
+	float *mask = CustomData_bmesh_get(&bm->vdata, v->head.data, CD_PAINT_MASK);
+	BLI_assert((CustomData_has_layer(&bm->vdata, CD_PAINT_MASK) == 0) == (mask == NULL));
+	if (mask) {
 		return *mask;
 	}
 	else {
-		return 0;
+		return 0.0f;
 	}
 }
 
@@ -180,10 +180,10 @@ static float vert_mask_get(BMesh *bm, BMVert *v)
  * Has no effect is no paint-mask layer is present */
 static void vert_mask_set(BMesh *bm, BMVert *v, float new_mask)
 {
-	CustomData *cd = &bm->vdata;
-	if (CustomData_has_layer(cd, CD_PAINT_MASK)) {
-		float *mask = CustomData_bmesh_get(cd, v->head.data, CD_PAINT_MASK);
-		(*mask) = new_mask;
+	float *mask = CustomData_bmesh_get(&bm->vdata, v->head.data, CD_PAINT_MASK);
+	BLI_assert((CustomData_has_layer(&bm->vdata, CD_PAINT_MASK) == 0) == (mask == NULL));
+	if (*mask) {
+		*mask = new_mask;
 	}
 }
 
@@ -277,8 +277,8 @@ static void bm_log_faces_restore(BMesh *bm, BMLog *log, GHash *faces)
 		void *key = BLI_ghashIterator_getKey(&gh_iter);
 		BMLogFace *lf = BLI_ghashIterator_getValue(&gh_iter);
 		BMVert *v[3] = {bm_log_vert_from_id(log, lf->v_ids[0]),
-						bm_log_vert_from_id(log, lf->v_ids[1]),
-						bm_log_vert_from_id(log, lf->v_ids[2])};
+		                bm_log_vert_from_id(log, lf->v_ids[1]),
+		                bm_log_vert_from_id(log, lf->v_ids[2])};
 		BMFace *f;
 
 		f = BM_face_create_quad_tri_v(bm, v, 3, NULL, false);
@@ -452,7 +452,8 @@ BMLog *BM_log_from_existing_entries_create(BMesh *bm, BMLogEntry *entry)
 
 	/* Let BMLog manage the entry list again */
 	log->entries.first = log->entries.last = entry;
-	if (entry) {
+
+	{
 		while (entry->prev) {
 			entry = entry->prev;
 			log->entries.first = entry;

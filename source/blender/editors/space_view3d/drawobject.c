@@ -88,6 +88,7 @@
 #include "ED_types.h"
 
 #include "UI_resources.h"
+#include "UI_interface_icons.h"
 
 #include "WM_api.h"
 #include "BLF_api.h"
@@ -168,17 +169,26 @@ static void ob_wire_color_blend_theme_id(const unsigned char ob_wire_col[4], con
 }
 
 /* this condition has been made more complex since editmode can draw textures */
-static int check_object_draw_texture(Scene *scene, View3D *v3d, int drawtype)
+static bool check_object_draw_texture(Scene *scene, View3D *v3d, int drawtype)
 {
 	/* texture and material draw modes */
-	if (ELEM(v3d->drawtype, OB_TEXTURE, OB_MATERIAL) && drawtype > OB_SOLID)
-		return TRUE;
+	if (ELEM(v3d->drawtype, OB_TEXTURE, OB_MATERIAL) && drawtype > OB_SOLID) {
+		return true;
+	}
 
 	/* textured solid */
-	if (v3d->drawtype == OB_SOLID && (v3d->flag2 & V3D_SOLID_TEX) && !BKE_scene_use_new_shading_nodes(scene))
-		return TRUE;
+	if ((v3d->drawtype == OB_SOLID) &&
+	    (v3d->flag2 & V3D_SOLID_TEX) &&
+	    (BKE_scene_use_new_shading_nodes(scene) == false))
+	{
+		return true;
+	}
 	
-	return FALSE;
+	if (v3d->flag2 & V3D_SHOW_SOLID_MATCAP) {
+		return true;
+	}
+	
+	return false;
 }
 
 static int check_ob_drawface_dot(Scene *sce, View3D *vd, char dt)
@@ -216,6 +226,10 @@ int draw_glsl_material(Scene *scene, Object *ob, View3D *v3d, const char dt)
 		return 0;
 	if (ob == OBACT && (ob && ob->mode & OB_MODE_WEIGHT_PAINT))
 		return 0;
+	
+	if (v3d->flag2 & V3D_SHOW_SOLID_MATCAP)
+		return 1;
+	
 	if (BKE_scene_use_new_shading_nodes(scene))
 		return 0;
 	
@@ -2639,16 +2653,21 @@ static void draw_em_measure_stats(View3D *v3d, Object *ob, BMEditMesh *em, UnitS
 		BMFace *f;
 		int n;
 
-#define DRAW_EM_MEASURE_STATS_FACEAREA()                                      \
-	if (BM_elem_flag_test(f, BM_ELEM_SELECT)) {                               \
-		mul_v3_fl(vmid, 1.0f / (float)n);                                     \
-		if (unit->system)                                                     \
-			bUnit_AsString(numstr, sizeof(numstr),                            \
-			               (double)(area * unit->scale_length),               \
-			               3, unit->system, B_UNIT_LENGTH, do_split, FALSE);  \
-		else                                                                  \
-			BLI_snprintf(numstr, sizeof(numstr), conv_float, area);           \
-		view3d_cached_text_draw_add(vmid, numstr, 0, txt_flag, col);          \
+#define DRAW_EM_MEASURE_STATS_FACEAREA()                                                 \
+	if (BM_elem_flag_test(f, BM_ELEM_SELECT)) {                                          \
+		mul_v3_fl(vmid, 1.0f / (float)n);                                                \
+		if (unit->system) {                                                              \
+			bUnit_AsString(numstr, sizeof(numstr),                                       \
+			               (double)(area * unit->scale_length * unit->scale_length),     \
+			               3, unit->system, B_UNIT_AREA, do_split, FALSE);               \
+			view3d_cached_text_draw_add(vmid, numstr, 0,                                 \
+			                            /* Metric system uses unicode "squared" sign! */ \
+			                            txt_flag ^ V3D_CACHE_TEXT_ASCII, col);           \
+		}                                                                                \
+		else {                                                                           \
+			BLI_snprintf(numstr, sizeof(numstr), conv_float, area);                      \
+			view3d_cached_text_draw_add(vmid, numstr, 0, txt_flag, col);                 \
+		}                                                                                \
 	} (void)0
 
 		UI_GetThemeColor3ubv(TH_DRAWEXTRA_FACEAREA, col);
@@ -4909,7 +4928,7 @@ static void ob_draw_RE_motion(float com[3], float rotscale[3][3], float itw, flo
 	glEnd();
 }
 
-/*place to add drawers */
+/* place to add drawers */
 
 static void drawhandlesN(Nurb *nu, short sel, short hide_handles)
 {
@@ -5410,39 +5429,6 @@ static void draw_empty_cone(float size)
 	gluDeleteQuadric(qobj);
 }
 
-/* draw points on curve speed handles */
-#if 0  /* XXX old animation system stuff */
-static void curve_draw_speed(Scene *scene, Object *ob)
-{
-	Curve *cu = ob->data;
-	IpoCurve *icu;
-	BezTriple *bezt;
-	float loc[4], dir[3];
-	int a;
-	
-	if (cu->ipo == NULL)
-		return;
-	
-	icu = cu->ipo->curve.first;
-	if (icu == NULL || icu->totvert < 2)
-		return;
-	
-	glPointSize(UI_GetThemeValuef(TH_VERTEX_SIZE));
-	bglBegin(GL_POINTS);
-
-	for (a = 0, bezt = icu->bezt; a < icu->totvert; a++, bezt++) {
-		if (where_on_path(ob, bezt->vec[1][1], loc, dir)) {
-			UI_ThemeColor((bezt->f2 & SELECT) && ob == OBACT ? TH_VERTEX_SELECT : TH_VERTEX);
-			bglVertex3fv(loc);
-		}
-	}
-
-	glPointSize(1.0);
-	bglEnd();
-}
-#endif  /* XXX old animation system stuff */
-
-
 static void draw_textcurs(RegionView3D *rv3d, float textcurs[4][2])
 {
 	cpack(0);
@@ -5546,7 +5532,7 @@ static void drawcircle_size(float size)
 
 }
 
-/* needs fixing if non-identity matrice used */
+/* needs fixing if non-identity matrix used */
 static void drawtube(const float vec[3], float radius, float height, float tmat[4][4])
 {
 	float cur[3];
@@ -5568,7 +5554,8 @@ static void drawtube(const float vec[3], float radius, float height, float tmat[
 	glVertex3f(cur[0], cur[1] - radius, cur[2]);
 	glEnd();
 }
-/* needs fixing if non-identity matrice used */
+
+/* needs fixing if non-identity matrix used */
 static void drawcone(const float vec[3], float radius, float height, float tmat[4][4])
 {
 	float cur[3];
@@ -5589,6 +5576,7 @@ static void drawcone(const float vec[3], float radius, float height, float tmat[
 	glVertex3f(cur[0], cur[1] - radius, cur[2]);
 	glEnd();
 }
+
 /* return TRUE if nothing was drawn */
 static int drawmball(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *base,
                      const char dt, const short dflag, const unsigned char ob_wire_col[4])
@@ -5637,7 +5625,6 @@ static int drawmball(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *base,
 	}
 	
 	while (ml) {
-
 		/* draw radius */
 		if (mb->editelems) {
 			if ((dflag & DRAW_CONSTCOLOR) == 0) {
@@ -6224,6 +6211,34 @@ static void draw_object_wire_color(Scene *scene, Base *base, unsigned char r_ob_
 	r_ob_wire_col[3] = 255;
 }
 
+static void draw_object_matcap_check(Scene *scene, View3D *v3d, Object *ob)
+{
+	/* fixed rule, active object draws as matcap */
+	if (ob == OBACT) {
+		if (ob->mode & (OB_MODE_VERTEX_PAINT | OB_MODE_WEIGHT_PAINT | OB_MODE_TEXTURE_PAINT))
+			return;
+			
+		if (v3d->defmaterial == NULL) {
+			extern Material defmaterial;
+			
+			v3d->defmaterial = MEM_mallocN(sizeof(Material), "matcap material");
+			*(v3d->defmaterial) = defmaterial;
+			v3d->defmaterial->gpumaterial.first = v3d->defmaterial->gpumaterial.last = NULL;
+			v3d->defmaterial->preview = NULL;
+		}
+		/* first time users */
+		if (v3d->matcap_icon == 0)
+			v3d->matcap_icon = ICON_MATCAP_01;
+		
+		if (v3d->defmaterial->preview == NULL)
+			v3d->defmaterial->preview = UI_icon_to_preview(v3d->matcap_icon);
+		
+		/* signal to all material checks, gets cleared below */
+		v3d->flag2 |= V3D_SHOW_SOLID_MATCAP;
+	}
+
+}
+
 /**
  * main object drawing function, draws in selection
  * \param dflag (draw flag) can be DRAW_PICKING and/or DRAW_CONSTCOLOR, DRAW_SCENESET
@@ -6313,6 +6328,10 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short
 	dt = MIN2(dt, ob->dt);
 	if (v3d->zbuf == 0 && dt > OB_WIRE) dt = OB_WIRE;
 	dtx = 0;
+	
+	/* matcap check */
+	if (dt == OB_SOLID && (v3d->flag2 & V3D_SOLID_MATCAP))
+		draw_object_matcap_check(scene, v3d, ob);
 
 	/* faceselect exception: also draw solid when (dt == wire), except in editmode */
 	if (is_obact && (ob->mode & (OB_MODE_VERTEX_PAINT | OB_MODE_WEIGHT_PAINT | OB_MODE_TEXTURE_PAINT))) {
@@ -6813,7 +6832,9 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short
 	/* return warning, this is cached text draw */
 	invert_m4_m4(ob->imat, ob->obmat);
 	view3d_cached_text_draw_end(v3d, ar, 1, NULL);
-
+	/* return warning, clear temp flag */
+	v3d->flag2 &= ~V3D_SHOW_SOLID_MATCAP;
+	
 	glLoadMatrixf(rv3d->viewmat);
 
 	if (zbufoff) {

@@ -1066,12 +1066,14 @@ class VIEW3D_MT_make_links(Menu):
 
     def draw(self, context):
         layout = self.layout
-
+        operator_context_default = layout.operator_context
         if(len(bpy.data.scenes) > 10):
-            layout.operator_context = 'INVOKE_DEFAULT'
+            layout.operator_context = 'INVOKE_REGION_WIN'
             layout.operator("object.make_links_scene", text="Objects to Scene...", icon='OUTLINER_OB_EMPTY')
         else:
+            layout.operator_context = 'EXEC_REGION_WIN'
             layout.operator_menu_enum("object.make_links_scene", "scene", text="Objects to Scene...")
+        layout.operator_context = operator_context_default
 
         layout.operator_enum("object.make_links_data", "type")  # inline
 
@@ -1710,19 +1712,37 @@ class VIEW3D_MT_edit_mesh_specials(Menu):
 
         layout.operator("mesh.subdivide", text="Subdivide").smoothness = 0.0
         layout.operator("mesh.subdivide", text="Subdivide Smooth").smoothness = 1.0
+
+        layout.separator()
+
         layout.operator("mesh.merge", text="Merge...")
         layout.operator("mesh.remove_doubles")
+
+        layout.separator()
+
         layout.operator("mesh.hide", text="Hide").unselected = False
         layout.operator("mesh.reveal", text="Reveal")
         layout.operator("mesh.select_all", text="Select Inverse").action = 'INVERT'
+
+        layout.separator()
+
         layout.operator("mesh.flip_normals")
         layout.operator("mesh.vertices_smooth", text="Smooth")
         layout.operator("mesh.vertices_smooth_laplacian", text="Laplacian Smooth")
+
+        layout.separator()
+
         layout.operator("mesh.inset")
         layout.operator("mesh.bevel", text="Bevel")
         layout.operator("mesh.bridge_edge_loops")
+
+        layout.separator()
+
         layout.operator("mesh.faces_shade_smooth")
         layout.operator("mesh.faces_shade_flat")
+
+        layout.separator()
+
         layout.operator("mesh.blend_from_shape")
         layout.operator("mesh.shape_propagate_to_all")
         layout.operator("mesh.select_vertex_path")
@@ -1793,6 +1813,7 @@ class VIEW3D_MT_edit_mesh_vertices(Menu):
 
         layout.separator()
 
+        layout.operator("mesh.bevel").vertex_only = True
         layout.operator("mesh.vertices_smooth")
         layout.operator("mesh.remove_doubles")
         layout.operator("mesh.sort_elements", text="Sort Vertices").elements = {'VERT'}
@@ -2406,7 +2427,10 @@ class VIEW3D_PT_view3d_display(Panel):
             col.label(text="Shading:")
             col.prop(gs, "material_mode", text="")
             col.prop(view, "show_textured_solid")
-
+        if view.viewport_shade == 'SOLID':
+            col.prop(view, "use_matcap")
+            if view.use_matcap:
+                col.template_icon_view(view, "matcap_icon")
         col.prop(view, "show_backface_culling")
 
         layout.separator()

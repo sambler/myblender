@@ -1009,9 +1009,7 @@ class CyclesRender_PT_CurveRendering(CyclesButtonsPanel, Panel):
                 row.prop(ccscene, "segments", text="Segments")
 
             row = layout.row()
-            row.prop(ccscene, "use_cache", text="Export cache with children")
-            if ccscene.use_cache:
-                row.prop(ccscene, "use_parents", text="Include parents")
+            row.prop(ccscene, "use_parents", text="Include parents")
 
 
 class CyclesParticle_PT_CurveSettings(CyclesButtonsPanel, Panel):
@@ -1166,6 +1164,9 @@ def get_panels():
         types.PARTICLE_PT_velocity,
         types.PARTICLE_PT_rotation,
         types.PARTICLE_PT_physics,
+        types.SCENE_PT_rigid_body_world,
+        types.SCENE_PT_rigid_body_cache,
+        types.SCENE_PT_rigid_body_field_weights,
         types.PARTICLE_PT_boidbrain,
         types.PARTICLE_PT_render,
         types.PARTICLE_PT_draw,

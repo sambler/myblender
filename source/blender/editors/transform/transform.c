@@ -896,7 +896,7 @@ int transformEvent(TransInfo *t, wmEvent *event)
 				}
 				else {
 					if (t->obedit && t->obedit->type == OB_MESH) {
-						if (t->mode == TFM_TRANSLATION) {
+						if ((t->mode == TFM_TRANSLATION) && (t->spacetype == SPACE_VIEW3D)) {
 							resetTransRestrictions(t);
 							restoreTransObjects(t);
 
@@ -906,6 +906,13 @@ int transformEvent(TransInfo *t, wmEvent *event)
 							if (t->state == TRANS_CANCEL) {
 								t->state = TRANS_STARTING;
 								initVertSlide(t);
+							}
+							/* vert slide can fail on unconnected vertices (rare but possible) */
+							if (t->state == TRANS_CANCEL) {
+								t->state = TRANS_STARTING;
+								resetTransRestrictions(t);
+								restoreTransObjects(t);
+								initTranslation(t);
 							}
 							initSnapping(t, NULL); // need to reinit after mode change
 							t->redraw |= TREDRAW_HARD;
@@ -2115,12 +2122,6 @@ void transformApply(bContext *C, TransInfo *t)
 	/* If auto confirm is on, break after one pass */
 	if (t->options & CTX_AUTOCONFIRM) {
 		t->state = TRANS_CONFIRM;
-	}
-
-	if (BKE_ptcache_get_continue_physics()) {
-		// TRANSFORM_FIX_ME
-		//do_screenhandlers(G.curscreen);
-		t->redraw |= TREDRAW_HARD;
 	}
 
 	t->context = NULL;
@@ -5984,7 +5985,7 @@ static int createVertSlideVerts(TransInfo *t)
 
 	j = 0;
 	BM_ITER_MESH (v, &iter, bm, BM_VERTS_OF_MESH) {
-		if (BM_elem_flag_test(v, BM_ELEM_SELECT)) {
+		if (BM_elem_flag_test(v, BM_ELEM_TAG)) {
 			int k;
 			sv_array[j].v = v;
 			copy_v3_v3(sv_array[j].co_orig_3d, v->co);

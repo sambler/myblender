@@ -701,6 +701,7 @@ static void node_draw_basis(const bContext *C, ARegion *ar, SpaceNode *snode, bN
 	
 	if (node->flag & NODE_MUTED)
 		UI_ThemeColorBlend(color_id, TH_REDALERT, 0.5f);
+	
 
 #ifdef WITH_COMPOSITOR
 	if (ntree->type == NTREE_COMPOSIT && (snode->flag & SNODE_SHOW_HIGHLIGHT)) {
@@ -795,6 +796,7 @@ static void node_draw_basis(const bContext *C, ARegion *ar, SpaceNode *snode, bN
 
 	/* outline active and selected emphasis */
 	if (node->flag & SELECT) {
+		
 		glEnable(GL_BLEND);
 		glEnable(GL_LINE_SMOOTH);
 		
@@ -802,6 +804,7 @@ static void node_draw_basis(const bContext *C, ARegion *ar, SpaceNode *snode, bN
 			UI_ThemeColorShadeAlpha(TH_ACTIVE, 0, -40);
 		else
 			UI_ThemeColorShadeAlpha(TH_SELECT, 0, -40);
+		
 		uiSetRoundBox(UI_CNR_ALL);
 		uiDrawBox(GL_LINE_LOOP, rct->xmin, rct->ymin, rct->xmax, rct->ymax, BASIS_RAD);
 		

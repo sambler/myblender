@@ -35,6 +35,7 @@ class MESH_OT_delete_edgeloop(Operator):
     """to a single face loop"""
     bl_idname = "mesh.delete_edgeloop"
     bl_label = "Delete Edge Loop"
+    bl_options = {'UNDO', 'REGISTER'}
 
     @classmethod
     def poll(cls, context):
@@ -1739,8 +1740,7 @@ class WM_OT_addon_install(Operator):
             return {'CANCELLED'}
 
         # create dir is if missing.
-        if not os.path.exists(path_addons):
-            os.makedirs(path_addons)
+        os.makedirs(path_addons, exist_ok=True)
 
         # Check if we are installing from a target path,
         # doing so causes 2+ addons of same name or when the same from/to

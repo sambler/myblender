@@ -135,7 +135,7 @@ typedef enum PropertySubType {
 	PROP_AXISANGLE = 28,
 	PROP_XYZ = 29,
 	PROP_XYZ_LENGTH = 29 | PROP_UNIT_LENGTH,
-	PROP_COLOR_GAMMA = 30,
+	PROP_COLOR_GAMMA = 30, /* used for colors which would be color managed before display */
 	PROP_COORDS = 31, /* generic array, no units applied, only that x/y/z/w are used (python vec) */
 
 	/* booleans */
@@ -343,8 +343,8 @@ typedef enum FunctionFlag {
 	FUNC_ALLOW_WRITE = 4096,
 
 	/* registering */
-	FUNC_REGISTER = 16,
-	FUNC_REGISTER_OPTIONAL = 16 | 32,
+	FUNC_REGISTER = 32,
+	FUNC_REGISTER_OPTIONAL = 32 | 64,
 
 	/* internal flags */
 	FUNC_BUILTIN = 128,

@@ -2110,7 +2110,7 @@ static void colormanage_description_strip(char *description)
 {
 	int i, n;
 
-	for (i = strlen(description) - 1; i >= 0; i--) {
+	for (i = (int)strlen(description) - 1; i >= 0; i--) {
 		if (ELEM(description[i], '\r', '\n')) {
 			description[i] = '\0';
 		}
@@ -2371,7 +2371,7 @@ static void partial_buffer_update_rect(ImBuf *ibuf, unsigned char *display_buffe
 		int display_index = (ymin * display_stride + xmin) * channels;
 
 		IMB_buffer_byte_from_float(display_buffer + display_index, display_buffer_float, channels, dither,
-		                           IB_PROFILE_SRGB, IB_PROFILE_SRGB, FALSE, width, height, display_stride, width);
+		                           IB_PROFILE_SRGB, IB_PROFILE_SRGB, TRUE, width, height, display_stride, width);
 
 		MEM_freeN(display_buffer_float);
 	}

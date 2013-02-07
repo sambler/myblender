@@ -2679,15 +2679,15 @@ static void direct_link_constraints(FileData *fd, ListBase *lb)
 				data->prop = newdataadr(fd, data->prop);
 				if (data->prop)
 					IDP_DirectLinkProperty(data->prop, (fd->flags & FD_FLAGS_SWITCH_ENDIAN), fd);
-			}
 				break;
+			}
 			case CONSTRAINT_TYPE_SPLINEIK:
 			{
 				bSplineIKConstraint *data= con->data;
-				
+
 				data->points= newdataadr(fd, data->points);
-			}
 				break;
+			}
 			case CONSTRAINT_TYPE_KINEMATIC:
 			{
 				bKinematicConstraint *data = con->data;
@@ -2697,14 +2697,15 @@ static void direct_link_constraints(FileData *fd, ListBase *lb)
 
 				/* version patch for runtime flag, was not cleared in some case */
 				data->flag &= ~CONSTRAINT_IK_AUTO;
+				break;
 			}
 			case CONSTRAINT_TYPE_CHILDOF:
 			{
 				/* XXX version patch, in older code this flag wasn't always set, and is inherent to type */
 				if (con->ownspace == CONSTRAINT_SPACE_POSE)
 					con->flag |= CONSTRAINT_SPACEONCE;
-			}
 				break;
+			}
 		}
 	}
 }
@@ -6005,6 +6006,7 @@ static void direct_link_screen(FileData *fd, bScreen *sc)
 		
 		sa->handlers.first = sa->handlers.last = NULL;
 		sa->type = NULL;	/* spacetype callbacks */
+		sa->region_active_win = -1;
 		
 		for (ar = sa->regionbase.first; ar; ar = ar->next)
 			direct_link_region(fd, ar, sa->spacetype);
@@ -7336,6 +7338,17 @@ static void do_version_node_cleanup_dynamic_sockets_264(void *UNUSED(data), ID *
 				sock->flag &= ~SOCK_DYNAMIC;
 			for (sock = node->outputs.first; sock; sock = sock->next)
 				sock->flag &= ~SOCK_DYNAMIC;
+		}
+	}
+}
+
+static void do_version_node_fix_translate_wrapping(void *UNUSED(data), ID *UNUSED(id), bNodeTree *ntree)
+{
+	bNode *node;
+
+	for (node = ntree->nodes.first; node; node = node->next) {
+		if (node->type == CMP_NODE_TRANSLATE && node->storage == NULL) {
+			node->storage = MEM_callocN(sizeof(NodeTranslateData), "node translate data");
 		}
 	}
 }
@@ -8714,6 +8727,17 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 		}
 	}
 
+	// add storage for compositor translate nodes when not existing
+	if (!MAIN_VERSION_ATLEAST(main, 265, 10)) {
+		bNodeTreeType *ntreetype;
+
+		ntreetype = ntreeGetType(NTREE_COMPOSIT);
+		if (ntreetype && ntreetype->foreach_nodetree)
+			ntreetype->foreach_nodetree(main, NULL, do_version_node_fix_translate_wrapping);
+	}
+
+
+
 	// if (main->versionfile < 265 || (main->versionfile == 265 && main->subversionfile < 7)) {
 
 	/* WATCH IT!!!: pointers from libdata have not been converted yet here! */
@@ -8955,7 +8979,7 @@ static void sort_bhead_old_map(FileData *fd)
 	fd->tot_bheadmap = tot;
 	if (tot == 0) return;
 	
-	bhs = fd->bheadmap = MEM_mallocN(tot*sizeof(struct BHeadSort), STRINGIFY(BHeadSort));
+	bhs = fd->bheadmap = MEM_mallocN(tot * sizeof(struct BHeadSort), "BHeadSort");
 	
 	for (bhead = blo_firstbhead(fd); bhead; bhead = blo_nextbhead(fd, bhead), bhs++) {
 		bhs->bhead = bhead;
@@ -10003,7 +10027,7 @@ static void give_base_to_groups(Main *mainvar, Scene *scene)
 			Base *base;
 			
 			/* BKE_object_add(...) messes with the selection */
-			Object *ob = BKE_object_add_only_object(OB_EMPTY, group->id.name+2);
+			Object *ob = BKE_object_add_only_object(mainvar, OB_EMPTY, group->id.name+2);
 			ob->type = OB_EMPTY;
 			ob->lay = scene->lay;
 			

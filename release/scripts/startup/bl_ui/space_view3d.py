@@ -1682,7 +1682,6 @@ class VIEW3D_MT_edit_mesh(Menu):
         layout.operator("view3d.edit_mesh_extrude_individual_move", text="Extrude Individual")
         layout.operator("mesh.duplicate_move")
         layout.menu("VIEW3D_MT_edit_mesh_delete")
-        layout.menu("VIEW3D_MT_edit_mesh_dissolve")
 
         layout.separator()
 
@@ -1945,21 +1944,12 @@ class VIEW3D_MT_edit_mesh_delete(Menu):
         layout.separator()
 
         layout.operator("mesh.dissolve")
-        layout.operator("mesh.edge_collapse")
-        layout.operator("mesh.delete_edgeloop", text="Edge Loop")
-
-
-class VIEW3D_MT_edit_mesh_dissolve(Menu):
-    bl_label = "Dissolve"
-
-    def draw(self, context):
-        layout = self.layout
-
-        layout.operator("mesh.dissolve")
+        layout.operator("mesh.dissolve_limited")
 
         layout.separator()
 
-        layout.operator("mesh.dissolve_limited")
+        layout.operator("mesh.edge_collapse")
+        layout.operator("mesh.delete_edgeloop", text="Edge Loop")
 
 
 class VIEW3D_MT_edit_mesh_showhide(ShowHideMenu, Menu):
@@ -2687,6 +2677,8 @@ class VIEW3D_PT_etch_a_ton(Panel):
         col.prop(toolsettings, "use_etch_quick")
         col.prop(toolsettings, "use_etch_overdraw")
 
+        col.separator()
+
         col.prop(toolsettings, "etch_convert_mode")
 
         if toolsettings.etch_convert_mode == 'LENGTH':
@@ -2698,11 +2690,20 @@ class VIEW3D_PT_etch_a_ton(Panel):
         elif toolsettings.etch_convert_mode == 'RETARGET':
             col.prop(toolsettings, "etch_template")
             col.prop(toolsettings, "etch_roll_mode")
-            col.prop(toolsettings, "use_etch_autoname")
-            col.prop(toolsettings, "etch_number")
-            col.prop(toolsettings, "etch_side")
 
-        col.operator("sketch.convert", text="Convert")
+            col.separator()
+
+            colsub = col.column(align=True)
+            colsub.prop(toolsettings, "use_etch_autoname")
+            sub = colsub.column() 
+            sub.enabled = not toolsettings.use_etch_autoname
+            sub.prop(toolsettings, "etch_number")
+            sub.prop(toolsettings, "etch_side")
+
+        col.separator()
+
+        col.operator("sketch.convert", text="Convert to Bones")
+        col.operator("sketch.delete", text="Delete Strokes")
 
 
 class VIEW3D_PT_context_properties(Panel):

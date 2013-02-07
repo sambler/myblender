@@ -43,6 +43,7 @@ if(WITH_BLENDER)
 
 		# blends
 		data_to_c_simple(../../../../release/datafiles/preview.blend SRC)
+		data_to_c_simple(../../../../release/datafiles/preview_cycles.blend SRC)
 
 		# images
 		data_to_c_simple(../../../../release/datafiles/splash.png SRC)
@@ -99,6 +100,14 @@ if(WITH_BLENDER)
 		data_to_c_simple(../../../../release/datafiles/matcaps/mc14.jpg SRC)
 		data_to_c_simple(../../../../release/datafiles/matcaps/mc15.jpg SRC)
 		data_to_c_simple(../../../../release/datafiles/matcaps/mc16.jpg SRC)
+		data_to_c_simple(../../../../release/datafiles/matcaps/mc17.jpg SRC)
+		data_to_c_simple(../../../../release/datafiles/matcaps/mc18.jpg SRC)
+		data_to_c_simple(../../../../release/datafiles/matcaps/mc19.jpg SRC)
+		data_to_c_simple(../../../../release/datafiles/matcaps/mc20.jpg SRC)
+		data_to_c_simple(../../../../release/datafiles/matcaps/mc21.jpg SRC)
+		data_to_c_simple(../../../../release/datafiles/matcaps/mc22.jpg SRC)
+		data_to_c_simple(../../../../release/datafiles/matcaps/mc23.jpg SRC)
+		data_to_c_simple(../../../../release/datafiles/matcaps/mc24.jpg SRC)
 
 	endif()
 

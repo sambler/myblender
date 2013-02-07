@@ -61,7 +61,7 @@
 
 /* Global used during defining */
 
-BlenderDefRNA DefRNA = {NULL, {NULL, NULL}, {NULL, NULL}, NULL, 0, 0, 0, 1};
+BlenderDefRNA DefRNA = {NULL, {NULL, NULL}, {NULL, NULL}, NULL, 0, 0, 0, 1, 1};
 
 /* Duplicated code since we can't link in blenkernel or blenlib */
 
@@ -505,6 +505,13 @@ void RNA_define_verify_sdna(int verify)
 {
 	DefRNA.verify = verify;
 }
+
+#ifndef RNA_RUNTIME
+void RNA_define_animate_sdna(int animate)
+{
+	DefRNA.animate = animate;
+}
+#endif
 
 void RNA_struct_free_extension(StructRNA *srna, ExtensionRNA *ext)
 {
@@ -1031,8 +1038,15 @@ PropertyRNA *RNA_def_property(StructOrFunctionRNA *cont_, const char *identifier
 	if (type != PROP_COLLECTION && type != PROP_POINTER) {
 		prop->flag = PROP_EDITABLE;
 	
-		if (type != PROP_STRING)
+		if (type != PROP_STRING) {
+#ifdef RNA_RUNTIME
 			prop->flag |= PROP_ANIMATABLE;
+#else
+			if (DefRNA.animate) {
+				prop->flag |= PROP_ANIMATABLE;
+			}
+#endif
+		}
 	}
 
 	if (type == PROP_STRING) {
@@ -2120,6 +2134,7 @@ void RNA_def_property_int_funcs_runtime(PropertyRNA *prop, IntPropertyGetFunc ge
 
 	if (getfunc) iprop->get_ex = getfunc;
 	if (setfunc) iprop->set_ex = setfunc;
+	if (rangefunc) iprop->range_ex = rangefunc;
 
 	if (getfunc || setfunc) {
 		/* don't save in id properties */
@@ -2136,6 +2151,7 @@ void RNA_def_property_int_array_funcs_runtime(PropertyRNA *prop, IntArrayPropert
 
 	if (getfunc) iprop->getarray_ex = getfunc;
 	if (setfunc) iprop->setarray_ex = setfunc;
+	if (rangefunc) iprop->range_ex = rangefunc;
 
 	if (getfunc || setfunc) {
 		/* don't save in id properties */

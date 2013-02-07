@@ -37,21 +37,21 @@ class CopyRigidbodySettings(Operator):
 
     def execute(self, context):
         obj = context.object
-        scn = context.scene
+        scene = context.scene
 
         # deselect all but mesh objects
         for o in context.selected_objects:
             if o.type != 'MESH':
                 o.select = False
 
-        sel = context.selected_objects
-        if sel:
+        objects = context.selected_objects
+        if objects:
             # add selected objects to active one groups and recalculate
             bpy.ops.group.objects_add_active()
-            scn.frame_set(scn.frame_current)
+            scene.frame_set(scene.frame_current)
 
             # copy settings
-            for o in sel:
+            for o in objects:
                 if o.rigid_body is None:
                     continue
                 
@@ -106,7 +106,7 @@ class BakeToKeyframes(Operator):
 
     def execute(self, context):
         bake = []
-        objs = []
+        objects = []
         scene = context.scene
         frame_orig = scene.frame_current
         frames = list(range(self.frame_start, self.frame_end + 1, self.step))
@@ -116,23 +116,23 @@ class BakeToKeyframes(Operator):
             if not obj.rigid_body or obj.rigid_body.type != 'ACTIVE':
                 obj.select = False
 
-        objs = context.selected_objects
+        objects = context.selected_objects
 
-        if objs:
+        if objects:
             # store transformation data
             for f in list(range(self.frame_start, self.frame_end + 1)):
                 scene.frame_set(f)
                 if f in frames:
                     mat = {}
-                    for i, obj in enumerate(objs):
+                    for i, obj in enumerate(objects):
                         mat[i] = obj.matrix_world.copy()
                     bake.append(mat)
 
             # apply transformations as keyframes
             for i, f in enumerate(frames):
                 scene.frame_set(f)
-                obj_prev = objs[0]
-                for j, obj in enumerate(objs):
+                obj_prev = objects[0]
+                for j, obj in enumerate(objects):
                     mat = bake[i][j]
 
                     obj.location = mat.to_translation()
@@ -156,7 +156,7 @@ class BakeToKeyframes(Operator):
             bpy.ops.rigidbody.objects_remove()
 
             # clean up keyframes
-            for obj in objs:
+            for obj in objects:
                 action = obj.animation_data.action
                 for fcu in action.fcurves:
                     keyframe_points = fcu.keyframe_points
@@ -190,7 +190,7 @@ class BakeToKeyframes(Operator):
 
 
 class ConnectRigidBodies(Operator):
-    '''Create rigid body constraint between two selected rigid bodies'''
+    '''Create rigid body constraints between selected and active rigid bodies'''
     bl_idname = "rigidbody.connect"
     bl_label = "Connect Rigid Bodies"
     bl_options = {'REGISTER', 'UNDO'}
@@ -214,15 +214,16 @@ class ConnectRigidBodies(Operator):
     @classmethod
     def poll(cls, context):
         obj = context.object
-        objs = context.selected_objects
-        return (obj and obj.rigid_body and (len(objs) > 1))
+        return (obj and obj.rigid_body)
 
     def execute(self, context):
 
-        objs = context.selected_objects
+        scene = context.scene
+        objects = context.selected_objects
         obj_act = context.active_object
+        change = False
 
-        for obj in objs:
+        for obj in objects:
             if obj == obj_act:
                 continue
             if self.pivot_type == 'ACTIVE':
@@ -233,13 +234,21 @@ class ConnectRigidBodies(Operator):
                 loc = (obj_act.location + obj.location) / 2.0
             bpy.ops.object.add(type='EMPTY', view_align=False, enter_editmode=False, location=loc)
             bpy.ops.rigidbody.constraint_add()
-            con = context.active_object.rigid_body_constraint
+            con_obj = context.active_object
+            con_obj.empty_draw_type = 'ARROWS'
+            con = con_obj.rigid_body_constraint
             con.type = self.con_type
             con.object1 = obj_act
             con.object2 = obj
-
-        return {'FINISHED'}
-
-    def invoke(self, context, event):
-        wm = context.window_manager
-        return wm.invoke_props_dialog(self)
+            change = True
+        
+        if change:
+            # restore selection
+            bpy.ops.object.select_all(action='DESELECT')
+            for obj in objects:
+                obj.select = True;
+            scene.objects.active = obj_act
+            return {'FINISHED'}
+        else:
+            self.report({'WARNING'}, "No other objects selected")
+            return {'CANCELLED'}

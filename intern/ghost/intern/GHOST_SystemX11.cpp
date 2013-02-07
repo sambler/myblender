@@ -50,6 +50,10 @@
 #  include "GHOST_DropTargetX11.h"
 #endif
 
+#ifdef WITH_X11_XINERAMA
+#  include "X11/extensions/Xinerama.h"
+#endif
+
 #include "GHOST_Debug.h"
 
 #include <X11/Xatom.h>
@@ -71,6 +75,9 @@
 
 /* for debugging - so we can breakpoint X11 errors */
 // #define USE_X11_ERROR_HANDLERS
+
+/* see [#34039] Fix Alt key glitch on Unity desktop */
+#define USE_UNITY_WORKAROUND
 
 static GHOST_TKey convertXKey(KeySym key);
 
@@ -230,6 +237,63 @@ getNumDisplays() const
 void
 GHOST_SystemX11::
 getMainDisplayDimensions(
+		GHOST_TUns32& width,
+		GHOST_TUns32& height) const
+{
+	if (m_display) {
+
+#ifdef WITH_X11_XINERAMA
+		GHOST_TInt32 m_x = 1, m_y = 1;
+		getCursorPosition(m_x, m_y);
+
+		/* NOTE, no way to select a primary monitor, uses the first */
+		bool success = false;
+		int dummy1, dummy2;
+		if (XineramaQueryExtension(m_display, &dummy1, &dummy2)) {
+			if (XineramaIsActive(m_display)) {
+				int heads = 0;
+				XineramaScreenInfo *p = XineramaQueryScreens(m_display, &heads);
+				/* with a single head, all dimensions is fine */
+				if (heads > 1) {
+					int i;
+					for (i = 0; i < heads; i++) {
+						if ((m_x >= p[i].x_org) && (m_x <= p[i].x_org + p[i].width) &&
+						    (m_y >= p[i].y_org) && (m_y <= p[i].y_org + p[i].height))
+						{
+							width = p[i].width;
+							height = p[i].height;
+							break;
+						}
+					}
+					/* highly unlikely! */
+					if (i == heads) {
+						width = p[0].width;
+						height = p[0].height;
+					}
+					success = true;
+				}
+				XFree(p);
+			}
+		}
+
+		if (success) {
+			return;
+		}
+#endif
+
+		/* fallback to all */
+		getAllDisplayDimensions(width, height);
+	}
+}
+
+
+/**
+ * Returns the dimensions of the main display on this system.
+ * \return The dimension of the main display.
+ */
+void
+GHOST_SystemX11::
+getAllDisplayDimensions(
 		GHOST_TUns32& width,
 		GHOST_TUns32& height) const
 {
@@ -496,6 +560,54 @@ processEvents(
 
 			processEvent(&xevent);
 			anyProcessed = true;
+
+
+#ifdef USE_UNITY_WORKAROUND
+			/* note: processEvent() can't include this code because
+			 * KeymapNotify event have no valid window information. */
+
+			/* the X server generates KeymapNotify event immediately after
+			 * every EnterNotify and FocusIn event.  we handle this event
+			 * to correct modifier states. */
+			if (xevent.type == FocusIn) {
+				/* use previous event's window, because KeymapNotify event
+				 * has no window information. */
+				GHOST_WindowX11 *window = findGhostWindow(xevent.xany.window);
+				if (window && XPending(m_display) >= 2) {
+					XNextEvent(m_display, &xevent);
+
+					if (xevent.type == KeymapNotify) {
+						XEvent xev_next;
+
+						/* check if KeyPress or KeyRelease event was generated
+						 * in order to confirm the window is active. */
+						XPeekEvent(m_display, &xev_next);
+
+						if (xev_next.type == KeyPress || xev_next.type == KeyRelease) {
+							/* XK_Hyper_L/R currently unused */
+							const static KeySym modifiers[8] = {XK_Shift_L, XK_Shift_R,
+							                                    XK_Control_L, XK_Control_R,
+							                                    XK_Alt_L, XK_Alt_R,
+							                                    XK_Super_L, XK_Super_R};
+
+							for (int i = 0; i < (sizeof(modifiers) / sizeof(*modifiers)); i++) {
+								KeyCode kc = XKeysymToKeycode(m_display, modifiers[i]);
+								if (((xevent.xkeymap.key_vector[kc >> 3] >> (kc & 7)) & 1) != 0) {
+									pushEvent(new GHOST_EventKey(
+									              getMilliSeconds(),
+									              GHOST_kEventKeyDown,
+									              window,
+									              convertXKey(modifiers[i]),
+									              '\0',
+									              NULL));
+								}
+							}
+						}
+					}
+				}
+			}
+#endif  /* USE_UNITY_WORKAROUND */
+
 		}
 		
 		if (generateWindowExposeEvents()) {

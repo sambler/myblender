@@ -49,6 +49,7 @@ extern "C" {
 #include "BKE_customdata.h"
 #include "BKE_depsgraph.h"
 #include "BKE_object.h"
+#include "BKE_global.h"
 #include "BKE_mesh.h"
 #include "BKE_scene.h"
 #include "BKE_DerivedMesh.h"
@@ -124,7 +125,7 @@ int bc_set_parent(Object *ob, Object *par, bContext *C, bool is_parent_space)
 
 Object *bc_add_object(Scene *scene, int type, const char *name)
 {
-	Object *ob = BKE_object_add_only_object(type, name);
+	Object *ob = BKE_object_add_only_object(G.main, type, name);
 
 	ob->data = BKE_object_obdata_add_from_type(type);
 	ob->lay = scene->lay;
@@ -151,7 +152,7 @@ Mesh *bc_to_mesh_apply_modifiers(Scene *scene, Object *ob, BC_export_mesh_type e
 		}
 	}
 
-	tmpmesh = BKE_mesh_add("ColladaMesh"); // name is not important here
+	tmpmesh = BKE_mesh_add(G.main, "ColladaMesh"); // name is not important here
 	DM_to_mesh(dm, tmpmesh, ob);
 	dm->release(dm);
 	return tmpmesh;

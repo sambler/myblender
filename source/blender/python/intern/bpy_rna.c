@@ -4527,7 +4527,7 @@ PyDoc_STRVAR(pyrna_prop_collection_foreach_get_doc,
 "\n"
 "   .. code-block:: python\n"
 "\n"
-"      collection.foreach_get(someseq, attr)\n"
+"      collection.foreach_get(attr, someseq)\n"
 "\n"
 "      # Python equivalent\n"
 "      for i in range(len(seq)): someseq[i] = getattr(collection, attr)\n"
@@ -4547,7 +4547,7 @@ PyDoc_STRVAR(pyrna_prop_collection_foreach_set_doc,
 "\n"
 "   .. code-block:: python\n"
 "\n"
-"      collection.foreach_set(seq, attr)\n"
+"      collection.foreach_set(attr, seq)\n"
 "\n"
 "      # Python equivalent\n"
 "      for i in range(len(seq)): setattr(collection[i], attr, seq[i])\n"
@@ -6542,6 +6542,9 @@ static PyObject *pyrna_basetype_dir(BPy_BaseTypeRNA *self)
 
 static PyTypeObject pyrna_basetype_Type = BLANK_PYTHON_TYPE;
 
+/**
+ * Accessed from Python as 'bpy.types'
+ */
 PyObject *BPY_rna_types(void)
 {
 	BPy_BaseTypeRNA *self;
@@ -6857,7 +6860,7 @@ static int bpy_class_validate_recursive(PointerRNA *dummyptr, StructRNA *srna, v
 		i++;
 
 		if (item == NULL) {
-			if ((flag & FUNC_REGISTER_OPTIONAL) == 0) {
+			if ((flag & (FUNC_REGISTER_OPTIONAL & ~FUNC_REGISTER)) == 0) {
 				PyErr_Format(PyExc_AttributeError,
 				             "expected %.200s, %.200s class to have an \"%.200s\" attribute",
 				             class_type, py_class_name,

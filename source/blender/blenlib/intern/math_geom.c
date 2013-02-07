@@ -304,6 +304,15 @@ float dist_to_line_segment_v3(const float v1[3], const float v2[3], const float 
 	return len_v3v3(closest, v1);
 }
 
+float dist_to_line_v3(const float v1[3], const float v2[3], const float v3[3])
+{
+	float closest[3];
+
+	closest_to_line_v3(closest, v1, v2, v3);
+
+	return len_v3v3(closest, v1);
+}
+
 /* Adapted from "Real-Time Collision Detection" by Christer Ericson,
  * published by Morgan Kaufmann Publishers, copyright 2005 Elsevier Inc.
  * 
@@ -2378,7 +2387,7 @@ void interp_weights_poly_v3(float *w, float v[][3], const int n, const float co[
 		t2 = mean_value_half_tan_v3(co, vmid, vnext);
 
 		len = len_v3v3(co, vmid);
-		w[i] = (len != 0.0f)? (t1 + t2) / len: 0.0f;
+		w[i] = (len != 0.0f) ? (t1 + t2) / len: 0.0f;
 		totweight += w[i];
 	}
 
@@ -2430,7 +2439,7 @@ void interp_weights_poly_v2(float *w, float v[][2], const int n, const float co[
 		t2 = mean_value_half_tan_v2(co, vmid, vnext);
 
 		len = len_v2v2(co, vmid);
-		w[i] = (len != 0.0f)? (t1 + t2) / len: 0.0f;
+		w[i] = (len != 0.0f) ? (t1 + t2) / len: 0.0f;
 		totweight += w[i];
 	}
 

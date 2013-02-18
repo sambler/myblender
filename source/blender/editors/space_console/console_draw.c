@@ -158,9 +158,9 @@ static int console_textview_line_color(struct TextViewContext *tvc, unsigned cha
 	if (tvc->iter_index == 0) {
 		const SpaceConsole *sc = (SpaceConsole *)tvc->arg1;
 		const ConsoleLine *cl = (ConsoleLine *)sc->history.last;
-		const int prompt_len = strlen(sc->prompt);
-		const int cursor_loc = cl->cursor + prompt_len;
-		const int line_len = cl->len + prompt_len;
+		const int prompt_len = BLI_strlen_utf8(sc->prompt);
+		const int cursor_loc = BLI_strnlen_utf8(cl->line, cl->cursor) + prompt_len;
+		const int line_len = BLI_strlen_utf8(cl->line) + prompt_len;
 		int xy[2] = {CONSOLE_DRAW_MARGIN, CONSOLE_DRAW_MARGIN};
 		int pen[2];
 		xy[1] += tvc->lheight / 6;
@@ -193,6 +193,10 @@ static int console_textview_line_color(struct TextViewContext *tvc, unsigned cha
 	return TVC_LINE_FG;
 }
 
+static void console_textview_const_colors(TextViewContext *UNUSED(tvc), unsigned char bg_sel[4])
+{
+	UI_GetThemeColor4ubv(TH_CONSOLE_SELECT, bg_sel);
+}
 
 static int console_textview_main__internal(struct SpaceConsole *sc, ARegion *ar, int draw,
                                            int mval[2], void **mouse_pick, int *pos_pick)
@@ -210,6 +214,7 @@ static int console_textview_main__internal(struct SpaceConsole *sc, ARegion *ar,
 	tvc.step = console_textview_step;
 	tvc.line_get = console_textview_line_get;
 	tvc.line_color = console_textview_line_color;
+	tvc.const_colors = console_textview_const_colors;
 
 	tvc.arg1 = sc;
 	tvc.arg2 = NULL;

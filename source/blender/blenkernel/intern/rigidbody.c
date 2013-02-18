@@ -203,8 +203,6 @@ RigidBodyCon *BKE_rigidbody_copy_constraint(Object *ob)
 		/* just duplicate the whole struct first (to catch all the settings) */
 		rbcN = MEM_dupallocN(ob->rigidbody_constraint);
 
-		// RB_TODO be more clever about copying constrained objects
-
 		/* tag object as needing to be verified */
 		rbcN->flag |= RBC_FLAG_NEEDS_VALIDATE;
 
@@ -214,6 +212,13 @@ RigidBodyCon *BKE_rigidbody_copy_constraint(Object *ob)
 
 	/* return new copy of settings */
 	return rbcN;
+}
+
+/* preserve relationships between constraints and rigid bodies after duplication */
+void BKE_rigidbody_relink_constraint(RigidBodyCon *rbc)
+{
+	ID_NEW(rbc->ob1);
+	ID_NEW(rbc->ob2);
 }
 
 /* ************************************** */
@@ -1125,11 +1130,9 @@ static void rigidbody_update_simulation_post_step(RigidBodyWorld *rbw)
 		}
 	}
 }
-
 /* Sync rigid body and object transformations */
-void BKE_rigidbody_sync_transforms(Scene *scene, Object *ob, float ctime)
+void BKE_rigidbody_sync_transforms(RigidBodyWorld *rbw, Object *ob, float ctime)
 {
-	RigidBodyWorld *rbw = scene->rigidbody_world;
 	RigidBodyOb *rbo = ob->rigidbody_object;
 
 	/* keep original transform for kinematic and passive objects */
@@ -1160,6 +1163,7 @@ void BKE_rigidbody_sync_transforms(Scene *scene, Object *ob, float ctime)
 	}
 }
 
+/* Used when cancelling transforms - return rigidbody and object to initial states */
 void BKE_rigidbody_aftertrans_update(Object *ob, float loc[3], float rot[3], float quat[4], float rotAxis[3], float rotAngle)
 {
 	RigidBodyOb *rbo = ob->rigidbody_object;
@@ -1210,6 +1214,8 @@ void BKE_rigidbody_do_simulation(Scene *scene, float ctime)
 	BKE_ptcache_id_from_rigidbody(&pid, NULL, rbw);
 	BKE_ptcache_id_time(&pid, scene, ctime, &startframe, &endframe, NULL);
 	cache = rbw->pointcache;
+
+	rbw->flag &= ~RBW_FLAG_FRAME_UPDATE;
 
 	/* flag cache as outdated if we don't have a world or number of objects in the simulation has changed */
 	if (rbw->physics_world == NULL || rbw->numbodies != BLI_countlist(&rbw->group->gobject)) {
@@ -1291,6 +1297,7 @@ void BKE_rigidbody_free_object(Object *ob) {}
 void BKE_rigidbody_free_constraint(Object *ob) {}
 struct RigidBodyOb *BKE_rigidbody_copy_object(Object *ob) { return NULL; }
 struct RigidBodyCon *BKE_rigidbody_copy_constraint(Object *ob) { return NULL; }
+void BKE_rigidbody_relink_constraint(RigidBodyCon *rbc) {}
 void BKE_rigidbody_validate_sim_shape(Object *ob, short rebuild) {}
 void BKE_rigidbody_validate_sim_object(RigidBodyWorld *rbw, Object *ob, short rebuild) {}
 void BKE_rigidbody_validate_sim_constraint(RigidBodyWorld *rbw, Object *ob, short rebuild) {}
@@ -1301,7 +1308,7 @@ struct RigidBodyCon *BKE_rigidbody_create_constraint(Scene *scene, Object *ob, s
 struct RigidBodyWorld *BKE_rigidbody_get_world(Scene *scene) { return NULL; }
 void BKE_rigidbody_remove_object(Scene *scene, Object *ob) {}
 void BKE_rigidbody_remove_constraint(Scene *scene, Object *ob) {}
-void BKE_rigidbody_sync_transforms(Scene *scene, Object *ob, float ctime) {}
+void BKE_rigidbody_sync_transforms(RigidBodyWorld *rbw, Object *ob, float ctime) {}
 void BKE_rigidbody_aftertrans_update(Object *ob, float loc[3], float rot[3], float quat[4], float rotAxis[3], float rotAngle) {}
 void BKE_rigidbody_cache_reset(RigidBodyWorld *rbw) {}
 void BKE_rigidbody_do_simulation(Scene *scene, float ctime) {}

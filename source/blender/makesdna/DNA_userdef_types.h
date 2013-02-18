@@ -251,7 +251,7 @@ typedef struct ThemeSpace {
 	char ds_channel[4], ds_subchannel[4]; /* dopesheet */
 	
 	char console_output[4], console_input[4], console_info[4], console_error[4];
-	char console_cursor[4];
+	char console_cursor[4], console_select[4], pad1[4];
 	
 	char vertex_size, outline_width, facedot_size;
 	char noodle_curving;
@@ -365,6 +365,9 @@ typedef struct SolidLight {
 } SolidLight;
 
 typedef struct UserDef {
+	/* UserDef has separate do-version handling, and can be read from other files */
+	int versionfile, subversionfile;
+	
 	int flag, dupflag;
 	int savetime;
 	char tempdir[768];	/* FILE_MAXDIR length */
@@ -570,7 +573,8 @@ typedef enum eUserpref_UI_Flag {
 /* uiflag2 */
 typedef enum eUserpref_UI_Flag2 {
 	USER_KEEP_SESSION		= (1 << 0),
-	USER_REGION_OVERLAP		= (1 << 1)
+	USER_REGION_OVERLAP		= (1 << 1),
+	USER_TRACKPAD_NATURAL	= (1 << 2)
 } eUserpref_UI_Flag2;
 	
 /* Auto-Keying mode */

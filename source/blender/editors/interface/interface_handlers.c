@@ -237,8 +237,14 @@ void ui_pan_to_scroll(const wmEvent *event, int *type, int *val)
 		lastdy += dy;
 		
 		if (ABS(lastdy) > (int)UI_UNIT_Y) {
+			int dy = event->prevy - event->y;
+			
+			if (U.uiflag2 & USER_TRACKPAD_NATURAL)
+				dy = -dy;
+			
 			*val = KM_PRESS;
-			if (event->prevy - event->y > 0)
+			
+			if (dy > 0)
 				*type = WHEELUPMOUSE;
 			else
 				*type = WHEELDOWNMOUSE;
@@ -1604,7 +1610,7 @@ static void ui_textedit_move(uiBut *but, uiHandleButtonData *data, strCursorJump
 	}
 	else {
 		int pos_i = but->pos;
-		BLI_str_cursor_step_utf8(str, len, &pos_i, direction, jump);
+		BLI_str_cursor_step_utf8(str, len, &pos_i, direction, jump, true);
 		but->pos = pos_i;
 
 		if (select) {
@@ -1673,7 +1679,7 @@ static int ui_textedit_delete(uiBut *but, uiHandleButtonData *data, int directio
 		else if (but->pos >= 0 && but->pos < len) {
 			int pos = but->pos;
 			int step;
-			BLI_str_cursor_step_utf8(str, len, &pos, direction, jump);
+			BLI_str_cursor_step_utf8(str, len, &pos, direction, jump, true);
 			step = pos - but->pos;
 			memmove(&str[but->pos], &str[but->pos + step], (len + 1) - but->pos);
 			changed = 1;
@@ -1688,7 +1694,7 @@ static int ui_textedit_delete(uiBut *but, uiHandleButtonData *data, int directio
 				int pos = but->pos;
 				int step;
 
-				BLI_str_cursor_step_utf8(str, len, &pos, direction, jump);
+				BLI_str_cursor_step_utf8(str, len, &pos, direction, jump, true);
 				step = but->pos - pos;
 				memmove(&str[but->pos - step], &str[but->pos], (len + 1) - but->pos);
 				but->pos -= step;

@@ -971,6 +971,14 @@ PropertyRNA *RNA_def_property(StructOrFunctionRNA *cont_, const char *identifier
 		{
 			IntPropertyRNA *iprop = (IntPropertyRNA *)prop;
 
+#ifndef RNA_RUNTIME
+			if (subtype == PROP_DISTANCE) {
+				fprintf(stderr, "%s: subtype does not apply to 'PROP_INT' \"%s.%s\"\n", __func__,
+				        CONTAINER_RNA_ID(cont), identifier);
+				DefRNA.error = 1;
+			}
+#endif
+
 			iprop->hardmin = (subtype == PROP_UNSIGNED) ? 0 : INT_MIN;
 			iprop->hardmax = INT_MAX;
 
@@ -2567,21 +2575,6 @@ PropertyRNA *RNA_def_string_file_name(StructOrFunctionRNA *cont_, const char *id
 	PropertyRNA *prop;
 	
 	prop = RNA_def_property(cont, identifier, PROP_STRING, PROP_FILENAME);
-	if (maxlen != 0) RNA_def_property_string_maxlength(prop, maxlen);
-	if (default_value) RNA_def_property_string_default(prop, default_value);
-	RNA_def_property_ui_text(prop, ui_name, ui_description);
-
-	return prop;
-}
-
-PropertyRNA *RNA_def_string_py_translate(StructOrFunctionRNA *cont_, const char *identifier, const char *default_value,
-                                         int maxlen, const char *ui_name, const char *ui_description)
-{
-	ContainerRNA *cont = cont_;
-	PropertyRNA *prop;
-
-	prop = RNA_def_property(cont, identifier, PROP_STRING, PROP_NONE);
-	RNA_def_property_flag(prop, PROP_STRING_PY_TRANSLATE);
 	if (maxlen != 0) RNA_def_property_string_maxlength(prop, maxlen);
 	if (default_value) RNA_def_property_string_default(prop, default_value);
 	RNA_def_property_ui_text(prop, ui_name, ui_description);

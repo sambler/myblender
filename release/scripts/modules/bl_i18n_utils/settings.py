@@ -83,6 +83,7 @@ LANGUAGES = (
     (37, "Amharic (አማርኛ)", "am_ET"),
     (38, "Uzbek (Oʻzbek)", "uz_UZ"),
     (39, "Uzbek Cyrillic (Ўзбек)", "uz_UZ@cyrillic"),
+    (40, "Hindi (मानक हिन्दी)", "hi_IN"),
 )
 
 # Name of language file used by Blender to generate translations' menu.
@@ -93,7 +94,7 @@ LANGUAGES_FILE = "languages"
 IMPORT_MIN_LEVEL = -1
 
 # Languages in /branches we do not want to import in /trunk currently...
-IMPORT_LANGUAGES_SKIP = {'am', 'bg', 'fi', 'el', 'et', 'ko', 'ne', 'pl', 'ro', 'uz', 'uz@cyrillic'}
+IMPORT_LANGUAGES_SKIP = {'am', 'bg', 'fi', 'el', 'et', 'ne', 'pl', 'ro', 'uz', 'uz@cyrillic'}
 
 # The comment prefix used in generated messages.txt file.
 MSG_COMMENT_PREFIX = "#~ "
@@ -228,7 +229,7 @@ PYGETTEXT_KEYWORDS = (() +
     tuple(("{}\\((?:[^\"',]+,){{1,2}}\\s*" + _msg_re + r"\s*(?:\)|,)").format(it)
           for it in ("BKE_report", "BKE_reportf", "BKE_reports_prepend", "BKE_reports_prependf")) +
 
-    tuple(("{}\\((?:[^\"',]+,){{3}}\\s*" + _msg_re + r"\s*,").format(it)
+    tuple(("{}\\((?:[^\"',]+,){{3}}\\s*" + _msg_re + r"\s*\)").format(it)
           for it in ("BMO_error_raise",)) +
 
     tuple(("{}\\((?:[^\"',]+,)\\s*" + _msg_re + r"\s*(?:\)|,)").format(it)
@@ -306,6 +307,10 @@ PYTHON3_EXEC = "python3"
 # The Blender executable!
 # This is just an example, you’ll most likely have to edit it in your user_settings.py!
 BLENDER_EXEC = os.path.abspath(os.path.join(TOOLS_DIR, "..", "..", "..", "..", "blender"))
+# check for blender.bin
+if not os.path.exists(BLENDER_EXEC):
+    if os.path.exists(BLENDER_EXEC + ".bin"):
+        BLENDER_EXEC = BLENDER_EXEC + ".bin"
 
 # The xgettext tool. You’ll likely have to edit it in your user_settings.py if you’re under Windows.
 GETTEXT_XGETTEXT_EXECUTABLE = "xgettext"
@@ -363,7 +368,10 @@ FILE_NAME_POT = os.path.join(TRUNK_PO_DIR, ".".join((DOMAIN, "pot")))
 
 # Other py files that should be searched for ui strings, relative to SOURCE_DIR.
 # Needed for Cycles, currently...
-CUSTOM_PY_UI_FILES = [os.path.join("intern", "cycles", "blender", "addon", "ui.py"),]
+CUSTOM_PY_UI_FILES = [
+    os.path.join("intern", "cycles", "blender", "addon", "ui.py"),
+    os.path.join("release", "scripts", "modules", "rna_prop_ui.py"),
+]
 
 
 # A cache storing validated msgids, to avoid re-spellchecking them.

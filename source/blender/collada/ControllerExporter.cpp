@@ -120,9 +120,10 @@ void ControllerExporter::operator()(Object *ob)
 	Object *ob_arm = bc_get_assigned_armature(ob);
 	Key *key = BKE_key_from_object(ob);
 
-	if (ob_arm)
+	if (ob_arm) {
 		export_skin_controller(ob, ob_arm);
-	if(key){
+	}
+	if (key) {
 		export_morph_controller(ob, key);
 	}
 }
@@ -246,10 +247,13 @@ void ControllerExporter::export_skin_controller(Object *ob, Object *ob_arm)
 			float sumw = 0.0f;
 
 			for (j = 0; j < vert->totweight; j++) {
-				int joint_index = joint_index_by_def_index[vert->dw[j].def_nr];
-				if (joint_index != -1 && vert->dw[j].weight > 0.0f) {
-					jw[joint_index] += vert->dw[j].weight;
-					sumw += vert->dw[j].weight;
+				int idx = vert->dw[j].def_nr;
+				if (idx >= 0) {
+					int joint_index = joint_index_by_def_index[idx];
+					if (joint_index != -1 && vert->dw[j].weight > 0.0f) {
+						jw[joint_index] += vert->dw[j].weight;
+						sumw += vert->dw[j].weight;
+					}
 				}
 			}
 
@@ -385,7 +389,8 @@ std::string ControllerExporter::add_morph_weights(Key *key, Object *ob)
 }
 
 //Added to implemente support for animations.
-void ControllerExporter::add_weight_extras(Key *key){
+void ControllerExporter::add_weight_extras(Key *key)
+{
 	// can also try the base element and param alternative
 	COLLADASW::BaseExtraTechnique extra;
 	

@@ -344,6 +344,15 @@ void mul_v3_m4v3(float in[3], float mat[4][4], const float vec[3])
 	in[2] = x * mat[0][2] + y * mat[1][2] + mat[2][2] * vec[2] + mat[3][2];
 }
 
+void mul_v2_m2v2(float r[2], float mat[2][2], const float vec[2])
+{
+	float x;
+
+	x = vec[0];
+	r[0] = mat[0][0] * x + mat[1][0] * vec[1];
+	r[1] = mat[0][1] * x + mat[1][1] * vec[1];
+}
+
 /* same as mul_m4_v3() but doesnt apply translation component */
 void mul_mat3_m4_v3(float mat[4][4], float vec[3])
 {
@@ -366,7 +375,7 @@ void mul_project_m4_v3(float mat[4][4], float vec[3])
 	vec[2] /= w;
 }
 
-void mul_v4_m4v4(float r[4], float mat[4][4], float v[4])
+void mul_v4_m4v4(float r[4], float mat[4][4], const float v[4])
 {
 	float x, y, z;
 
@@ -404,14 +413,14 @@ void mul_m4_v4d(float mat[4][4], double r[4])
 	mul_v4d_m4v4d(r, mat, r);
 }
 
-void mul_v3_m3v3(float r[3], float M[3][3], float a[3])
+void mul_v3_m3v3(float r[3], float M[3][3], const float a[3])
 {
 	r[0] = M[0][0] * a[0] + M[1][0] * a[1] + M[2][0] * a[2];
 	r[1] = M[0][1] * a[0] + M[1][1] * a[1] + M[2][1] * a[2];
 	r[2] = M[0][2] * a[0] + M[1][2] * a[1] + M[2][2] * a[2];
 }
 
-void mul_v2_m3v3(float r[2], float M[3][3], float a[3])
+void mul_v2_m3v3(float r[2], float M[3][3], const float a[3])
 {
 	r[0] = M[0][0] * a[0] + M[1][0] * a[1] + M[2][0] * a[2];
 	r[1] = M[0][1] * a[0] + M[1][1] * a[1] + M[2][1] * a[2];
@@ -1302,6 +1311,13 @@ void rotate_m4(float mat[4][4], const char axis, const float angle)
 			}
 			break;
 	}
+}
+
+void rotate_m2(float mat[2][2], const float angle)
+{
+	mat[0][0] = mat[1][1] = cosf(angle);
+	mat[0][1] = sinf(angle);
+	mat[1][0] = -mat[0][1];
 }
 
 void blend_m3_m3m3(float out[3][3], float dst[3][3], float src[3][3], const float srcweight)

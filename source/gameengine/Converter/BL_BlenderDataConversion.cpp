@@ -921,9 +921,6 @@ static RAS_MaterialBucket *material_from_mesh(Material *ma, MFace *mface, MTFace
 		/* do Texture Face materials */
 		Image* bima = (tface)? (Image*)tface->tpage: NULL;
 		STR_String imastr =  (tface)? (bima? (bima)->id.name : "" ) : "";
-
-		if (!converter->GetCacheMaterials())
-			polymat = NULL;
 		
 		char alpha_blend=0;
 		short tile=0;
@@ -1045,9 +1042,8 @@ static RAS_MaterialBucket *material_from_mesh(Material *ma, MFace *mface, MTFace
 				polymat->m_specular.setValue(0.0f,0.0f,0.0f);
 				polymat->m_shininess = 35.0;
 			}
-			
-			if (converter->GetCacheMaterials())
-				converter->CachePolyMaterial(ma, polymat);
+
+			converter->CachePolyMaterial(ma, polymat);
 		}
 	}
 	
@@ -1982,7 +1978,7 @@ static KX_GameObject *gameobject_from_blenderobject(
 		for (int i=0;i<mesh->totcol;i++) {
 			mat=mesh->mat[i];
 			if (!mat) break;
-			if ((mat->shade_flag &= MA_OBCOLOR)) {
+			if ((mat->shade_flag & MA_OBCOLOR)) {
 				bUseObjectColor = true;
 				break;
 			}

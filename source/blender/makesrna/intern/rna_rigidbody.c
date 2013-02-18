@@ -64,13 +64,13 @@ EnumPropertyItem rigidbody_ob_shape_items[] = {
 
 /* collision shapes of constraints in rigid body sim */
 EnumPropertyItem rigidbody_con_type_items[] = {
-	{RBC_TYPE_FIXED, "FIXED", ICON_FORCE_FORCE, "Fixed", "Glue rigid bodies together"},
-	{RBC_TYPE_POINT, "POINT", ICON_FORCE_FORCE, "Point", "Constrain rigid bodies to move around common pivot point"},
-	{RBC_TYPE_HINGE, "HINGE", ICON_FORCE_FORCE, "Hinge", "Restrict rigid body rotation to one axis"},
-	{RBC_TYPE_SLIDER, "SLIDER", ICON_FORCE_FORCE, "Slider", "Restrict rigid body translation to one axis"},
-	{RBC_TYPE_PISTON, "PISTON", ICON_FORCE_FORCE, "Piston", "Restrict rigid body translation and rotation to one axis"},
-	{RBC_TYPE_6DOF, "GENERIC", ICON_FORCE_FORCE, "Generic", "Restrict translation and rotation to specified axes"},
-	{RBC_TYPE_6DOF_SPRING, "GENERIC_SPRING", ICON_FORCE_FORCE, "Generic Spring",
+	{RBC_TYPE_FIXED, "FIXED", ICON_NONE, "Fixed", "Glue rigid bodies together"},
+	{RBC_TYPE_POINT, "POINT", ICON_NONE, "Point", "Constrain rigid bodies to move around common pivot point"},
+	{RBC_TYPE_HINGE, "HINGE", ICON_NONE, "Hinge", "Restrict rigid body rotation to one axis"},
+	{RBC_TYPE_SLIDER, "SLIDER", ICON_NONE, "Slider", "Restrict rigid body translation to one axis"},
+	{RBC_TYPE_PISTON, "PISTON", ICON_NONE, "Piston", "Restrict rigid body translation and rotation to one axis"},
+	{RBC_TYPE_6DOF, "GENERIC", ICON_NONE, "Generic", "Restrict translation and rotation to specified axes"},
+	{RBC_TYPE_6DOF_SPRING, "GENERIC_SPRING", ICON_NONE, "Generic Spring",
 	                       "Restrict translation and rotation to specified axes with springs"},
 	{0, NULL, 0, NULL, NULL}};
 
@@ -163,13 +163,6 @@ static void rna_RigidBodyOb_type_set(PointerRNA *ptr, int value)
 	
 	rbo->type = value;
 	rbo->flag |= RBO_FLAG_NEEDS_VALIDATE;
-	
-#ifdef WITH_BULLET
-	/* do physics sim updates */
-	if (rbo->physics_object) {
-		RB_body_set_mass(rbo->physics_object, RBO_GET_MASS(rbo));
-	}
-#endif
 }
 
 static void rna_RigidBodyOb_disabled_set(PointerRNA *ptr, int value)

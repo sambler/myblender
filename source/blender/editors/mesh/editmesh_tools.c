@@ -1744,9 +1744,9 @@ void MESH_OT_vertices_smooth_laplacian(wmOperatorType *ot)
 	              "Lambda factor", "", 0.0000001f, 1000.0f);
 	RNA_def_float(ot->srna, "lambda_border", 0.00005f, 0.0000001f, 1000.0f,
 	              "Lambda factor in border", "", 0.0000001f, 1000.0f);
-	RNA_def_boolean(ot->srna, "use_x", 1, "Smooth X Axis", "Smooth object along	X axis");
-	RNA_def_boolean(ot->srna, "use_y", 1, "Smooth Y Axis", "Smooth object along	Y axis");
-	RNA_def_boolean(ot->srna, "use_z", 1, "Smooth Z Axis", "Smooth object along	Z axis");
+	RNA_def_boolean(ot->srna, "use_x", 1, "Smooth X Axis", "Smooth object along X axis");
+	RNA_def_boolean(ot->srna, "use_y", 1, "Smooth Y Axis", "Smooth object along Y axis");
+	RNA_def_boolean(ot->srna, "use_z", 1, "Smooth Z Axis", "Smooth object along Z axis");
 	RNA_def_boolean(ot->srna, "preserve_volume", 1, "Preserve Volume", "Apply volume preservation after smooth");
 }
 
@@ -3314,9 +3314,12 @@ static int edbm_fill_exec(bContext *C, wmOperator *op)
 {
 	Object *obedit = CTX_data_edit_object(C);
 	BMEditMesh *em = BMEdit_FromObject(obedit);
+	int use_beauty = RNA_boolean_get(op->ptr, "use_beauty");
 	BMOperator bmop;
 	
-	if (!EDBM_op_init(em, &bmop, op, "triangle_fill edges=%he", BM_ELEM_SELECT)) {
+	if (!EDBM_op_init(em, &bmop, op,
+	                  "triangle_fill edges=%he use_beauty=%b",
+	                  BM_ELEM_SELECT, use_beauty)) {
 		return OPERATOR_CANCELLED;
 	}
 	
@@ -3348,6 +3351,8 @@ void MESH_OT_fill(wmOperatorType *ot)
 
 	/* flags */
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	RNA_def_boolean(ot->srna, "use_beauty", true, "Beauty", "Use best triangulation division");
 }
 
 static int edbm_beautify_fill_exec(bContext *C, wmOperator *op)
@@ -3420,7 +3425,7 @@ void MESH_OT_quads_convert_to_tris(wmOperatorType *ot)
 	/* flags */
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
-	RNA_def_boolean(ot->srna, "use_beauty", 1, "Beauty", "Use best triangulation division (currently quads only)");
+	RNA_def_boolean(ot->srna, "use_beauty", 1, "Beauty", "Use best triangulation division");
 }
 
 static int edbm_tris_convert_to_quads_exec(bContext *C, wmOperator *op)
@@ -4972,7 +4977,7 @@ static float edbm_bevel_mval_factor(wmOperator *op, wmEvent *event)
 	if (event->shift) {
 		if (opdata->shift_factor < 0.0f) {
 #ifdef NEW_BEVEL
-			opdata->shift_factor = RNA_float_get(op->ptr, "percent");
+			opdata->shift_factor = RNA_float_get(op->ptr, "offset");
 #else
 			opdata->shift_factor = RNA_float_get(op->ptr, "factor");
 #endif

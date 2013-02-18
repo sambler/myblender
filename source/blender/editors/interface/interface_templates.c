@@ -512,7 +512,8 @@ static void template_ID(bContext *C, uiLayout *layout, TemplateID *template, Str
 		                                 BLF_I18NCONTEXT_ID_CAMERA,
 		                                 BLF_I18NCONTEXT_ID_WORLD,
 		                                 BLF_I18NCONTEXT_ID_SCREEN,
-		                                 BLF_I18NCONTEXT_ID_TEXT);
+		                                 BLF_I18NCONTEXT_ID_TEXT,
+		);
 		BLF_I18N_MSGID_MULTI_CTXT("New", BLF_I18NCONTEXT_ID_SPEAKER,
 		                                 BLF_I18NCONTEXT_ID_SOUND,
 		                                 BLF_I18NCONTEXT_ID_ARMATURE,
@@ -520,7 +521,8 @@ static void template_ID(bContext *C, uiLayout *layout, TemplateID *template, Str
 		                                 BLF_I18NCONTEXT_ID_NODETREE,
 		                                 BLF_I18NCONTEXT_ID_BRUSH,
 		                                 BLF_I18NCONTEXT_ID_PARTICLESETTINGS,
-		                                 BLF_I18NCONTEXT_ID_GPENCIL);
+		                                 BLF_I18NCONTEXT_ID_GPENCIL,
+		);
 		
 		if (newop) {
 			but = uiDefIconTextButO(block, BUT, newop, WM_OP_INVOKE_DEFAULT, ICON_ZOOMIN,
@@ -1846,7 +1848,7 @@ static uiBlock *curvemap_clipping_func(bContext *C, ARegion *ar, void *cumap_v)
 	/* use this for a fake extra empy space around the buttons */
 	uiDefBut(block, LABEL, 0, "",           -4, 16, width + 8, 6 * UI_UNIT_Y, NULL, 0, 0, 0, 0, "");
 
-	bt = uiDefButBitI(block, TOG, CUMA_DO_CLIP, 1, "Use Clipping",
+	bt = uiDefButBitI(block, TOG, CUMA_DO_CLIP, 1, IFACE_("Use Clipping"),
 	                  0, 5 * UI_UNIT_Y, width, UI_UNIT_Y, &cumap->flag, 0.0, 0.0, 10, 0, "");
 	uiButSetFunc(bt, curvemap_buttons_setclip, cumap, NULL);
 
@@ -2999,7 +3001,7 @@ void uiTemplateColorspaceSettings(uiLayout *layout, PointerRNA *ptr, const char 
 
 	colorspace_settings_ptr = RNA_property_pointer_get(ptr, prop);
 
-	uiItemL(layout, "Input Color Space:", ICON_NONE);
+	uiItemL(layout, IFACE_("Input Color Space:"), ICON_NONE);
 	uiItemR(layout, &colorspace_settings_ptr, "name", 0, "", ICON_NONE);
 }
 

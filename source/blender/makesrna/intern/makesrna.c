@@ -1798,7 +1798,7 @@ static const char *rna_parameter_type_cpp_name(PropertyRNA *prop)
 	}
 }
 
-static void rna_def_struct_function_prototype_cpp(FILE *f, StructRNA *srna, FunctionDefRNA *dfunc,
+static void rna_def_struct_function_prototype_cpp(FILE *f, StructRNA *UNUSED(srna), FunctionDefRNA *dfunc,
                                                   const char *namespace, int close_prototype)
 {
 	PropertyDefRNA *dp;
@@ -3248,7 +3248,7 @@ static RNAProcessItem PROCESS_ITEMS[] = {
 	{"rna_main.c", "rna_main_api.c", RNA_def_main},
 	{"rna_material.c", "rna_material_api.c", RNA_def_material},
 	{"rna_mesh.c", "rna_mesh_api.c", RNA_def_mesh},
-	{"rna_meta.c", NULL, RNA_def_meta},
+	{"rna_meta.c", "rna_meta_api.c", RNA_def_meta},
 	{"rna_modifier.c", NULL, RNA_def_modifier},
 	{"rna_nla.c", NULL, RNA_def_nla},
 	{"rna_nodetree.c", NULL, RNA_def_nodetree},

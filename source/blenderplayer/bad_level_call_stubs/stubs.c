@@ -373,6 +373,8 @@ int ED_space_image_check_show_maskedit(struct Scene *scene, struct SpaceImage *s
 
 void ED_nurb_set_spline_type(struct Nurb *nu, int type) {}
 
+void ED_mball_transform(struct MetaBall *mb, float *mat) {}
+
 void make_editLatt(struct Object *obedit) {}
 void load_editLatt(struct Object *obedit) {}
 
@@ -383,6 +385,7 @@ void make_editNurb(struct Object *obedit) {}
 void uiItemR(struct uiLayout *layout, struct PointerRNA *ptr, char *propname, int flag, char *name, int icon) {}
 
 struct PointerRNA uiItemFullO(struct uiLayout *layout, char *idname, char *name, int icon, struct IDProperty *properties, int context, int flag) {struct PointerRNA a = {{0}}; return a;}
+PointerRNA uiItemFullO_ptr(struct uiLayout *layout, struct wmOperatorType *ot, const char *name, int icon, struct IDProperty *properties, int context, int flag) {struct PointerRNA a = {{0}}; return a;}
 struct uiLayout *uiLayoutRow(struct uiLayout *layout, int align) {return (struct uiLayout *) NULL;}
 struct uiLayout *uiLayoutColumn(struct uiLayout *layout, int align) {return (struct uiLayout *) NULL;}
 struct uiLayout *uiLayoutColumnFlow(struct uiLayout *layout, int number, int align) {return (struct uiLayout *) NULL;}

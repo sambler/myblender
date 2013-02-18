@@ -323,9 +323,9 @@ static void image_assign_ibuf(Image *ima, ImBuf *ibuf, int index, int frame)
 }
 
 /* empty image block, of similar type and filename */
-Image *BKE_image_copy(Image *ima)
+Image *BKE_image_copy(Main *bmain, Image *ima)
 {
-	Image *nima = image_alloc(G.main, ima->id.name + 2, ima->source, ima->type);
+	Image *nima = image_alloc(bmain, ima->id.name + 2, ima->source, ima->type);
 
 	BLI_strncpy(nima->name, ima->name, sizeof(ima->name));
 
@@ -342,6 +342,9 @@ Image *BKE_image_copy(Image *ima)
 	nima->aspy = ima->aspy;
 
 	BKE_color_managed_colorspace_settings_copy(&nima->colorspace_settings, &ima->colorspace_settings);
+
+	if (ima->packedfile)
+		nima->packedfile = dupPackedFile(ima->packedfile);
 
 	return nima;
 }
@@ -433,7 +436,7 @@ void BKE_image_make_local(struct Image *ima)
 		extern_local_image(ima);
 	}
 	else if (is_local && is_lib) {
-		Image *ima_new = BKE_image_copy(ima);
+		Image *ima_new = BKE_image_copy(bmain, ima);
 
 		ima_new->id.us = 0;
 
@@ -2733,6 +2736,14 @@ static ImBuf *image_get_render_result(Image *ima, ImageUser *iuser, void **lock_
 	/* combined layer gets added as first layer */
 	if (rres.have_combined && layer == 0) {
 		/* pass */
+	}
+	else if (rect && layer == 0) {
+		/* rect32 is set when there's a Sequence pass, this pass seems
+		 * to have layer=0 (this is from image_buttons.c)
+		 * in this case we ignore float buffer, because it could have
+		 * hung from previous pass which was float
+		 */
+		rectf = NULL;
 	}
 	else if (rres.layers.first) {
 		RenderLayer *rl = BLI_findlink(&rres.layers, layer - (rres.have_combined ? 1 : 0));

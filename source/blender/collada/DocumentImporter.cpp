@@ -54,6 +54,7 @@ extern "C" {
 #include "BLI_math.h"
 #include "BLI_string.h"
 #include "BLI_utildefines.h"
+#include "BLI_fileops.h"
 
 #include "BKE_camera.h"
 #include "BKE_main.h"
@@ -76,6 +77,9 @@ extern "C" {
 
 #include "MEM_guardedalloc.h"
 
+#include "WM_api.h"
+#include "WM_types.h"
+
 }
 
 #include "ExtraHandler.h"
@@ -96,9 +100,9 @@ extern "C" {
 // creates empties for each imported bone on layer 2, for debugging
 // #define ARMATURE_TEST
 
-DocumentImporter::DocumentImporter(bContext *C, const char *filename) :
+DocumentImporter::DocumentImporter(bContext *C, const ImportSettings *import_settings) :
+	import_settings(import_settings),
 	mImportStage(General),
-	mFilename(filename),
 	mContext(C),
 	armature_importer(&unit_converter, &mesh_importer, &anim_importer, CTX_data_scene(C)),
 	mesh_importer(&unit_converter, &armature_importer, CTX_data_scene(C)),
@@ -128,7 +132,9 @@ bool DocumentImporter::import()
 	// deselect all to select new objects
 	BKE_scene_base_deselect_all(CTX_data_scene(mContext));
 
-	if (!root.loadDocument(mFilename)) {
+	std::string mFilename = std::string(this->import_settings->filepath);
+	const std::string encodedFilename = bc_url_encode(mFilename);
+	if (!root.loadDocument(encodedFilename)) {
 		fprintf(stderr, "COLLADAFW::Root::loadDocument() returned false on 1st pass\n");
 		return false;
 	}
@@ -143,7 +149,7 @@ bool DocumentImporter::import()
 	COLLADASaxFWL::Loader loader2;
 	COLLADAFW::Root root2(&loader2, this);
 	
-	if (!root2.loadDocument(mFilename)) {
+	if (!root2.loadDocument(encodedFilename)) {
 		fprintf(stderr, "COLLADAFW::Root::loadDocument() returned false on 2nd pass\n");
 		return false;
 	}
@@ -174,39 +180,60 @@ void DocumentImporter::finish()
 {
 	if (mImportStage != General)
 		return;
-		
+
+	Main *bmain = CTX_data_main(mContext);
+	// TODO: create a new scene except the selected <visual_scene> - use current blender scene for it
+	Scene *sce = CTX_data_scene(mContext);
+
 	/** TODO Break up and put into 2-pass parsing of DAE */
 	std::vector<const COLLADAFW::VisualScene *>::iterator it;
 	for (it = vscenes.begin(); it != vscenes.end(); it++) {
 		PointerRNA sceneptr, unit_settings;
 		PropertyRNA *system, *scale;
-		// TODO: create a new scene except the selected <visual_scene> - use current blender scene for it
-		Scene *sce = CTX_data_scene(mContext);
 		
 		// for scene unit settings: system, scale_length
+
 		RNA_id_pointer_create(&sce->id, &sceneptr);
 		unit_settings = RNA_pointer_get(&sceneptr, "unit_settings");
 		system = RNA_struct_find_property(&unit_settings, "system");
 		scale = RNA_struct_find_property(&unit_settings, "scale_length");
-		
-		switch (unit_converter.isMetricSystem()) {
-			case UnitConverter::Metric:
-				RNA_property_enum_set(&unit_settings, system, USER_UNIT_METRIC);
-				break;
-			case UnitConverter::Imperial:
-				RNA_property_enum_set(&unit_settings, system, USER_UNIT_IMPERIAL);
-				break;
-			default:
-				RNA_property_enum_set(&unit_settings, system, USER_UNIT_NONE);
-				break;
-		}
-		RNA_property_float_set(&unit_settings, scale, unit_converter.getLinearMeter());
-		
-		const COLLADAFW::NodePointerArray& roots = (*it)->getRootNodes();
 
-		for (unsigned int i = 0; i < roots.getCount(); i++) {
-			write_node(roots[i], NULL, sce, NULL, false);
+		if (this->import_settings->import_units) {
+			
+			switch (unit_converter.isMetricSystem()) {
+				case UnitConverter::Metric:
+					RNA_property_enum_set(&unit_settings, system, USER_UNIT_METRIC);
+					break;
+				case UnitConverter::Imperial:
+					RNA_property_enum_set(&unit_settings, system, USER_UNIT_IMPERIAL);
+					break;
+				default:
+					RNA_property_enum_set(&unit_settings, system, USER_UNIT_NONE);
+					break;
+			}
+			float unit_factor = unit_converter.getLinearMeter();
+			RNA_property_float_set(&unit_settings, scale, unit_factor);
+			fprintf(stdout, "Collada: Adjusting Blender units to Importset units: %f.\n", unit_factor);
+
 		}
+
+		// Write nodes to scene
+		const COLLADAFW::NodePointerArray& roots = (*it)->getRootNodes();
+		for (unsigned int i = 0; i < roots.getCount(); i++) {
+			std::vector<Object *> *objects_done;
+			objects_done = write_node(roots[i], NULL, sce, NULL, false);
+			
+			if (!this->import_settings->import_units) {
+				// Match incoming scene with current unit settings
+				bc_match_scale(objects_done, *sce, unit_converter);
+			}
+		}
+
+		// update scene
+		DAG_scene_sort(bmain, sce);
+		DAG_ids_flush_update(bmain, 0);
+		WM_event_add_notifier(mContext, NC_OBJECT | ND_TRANSFORM, NULL);
+
 	}
 
 
@@ -215,6 +242,8 @@ void DocumentImporter::finish()
 	armature_importer.set_tags_map(this->uid_tags_map);
 	armature_importer.make_armatures(mContext);
 	armature_importer.make_shape_keys();
+	DAG_scene_sort(bmain, sce);
+	DAG_ids_flush_update(bmain, 0);
 
 #if 0
 	armature_importer.fix_animation();
@@ -247,8 +276,8 @@ void DocumentImporter::finish()
 		}
 		libnode_ob.clear();
 
-		DAG_scene_sort(CTX_data_main(mContext), sce);
-		DAG_ids_flush_update(CTX_data_main(mContext), 0);
+		DAG_scene_sort(bmain, sce);
+		DAG_ids_flush_update(bmain, 0);
 	}
 }
 
@@ -409,8 +438,9 @@ Object *DocumentImporter::create_instance_node(Object *source_ob, COLLADAFW::Nod
 
 // to create constraints off node <extra> tags. Assumes only constraint data in
 // current <extra> with blender profile.
-void DocumentImporter::create_constraints(ExtraTags *et, Object *ob){
-	if ( et && et->isProfile("blender")){
+void DocumentImporter::create_constraints(ExtraTags *et, Object *ob)
+{
+	if (et && et->isProfile("blender")) {
 		std::string name;
 		short* type = 0;
 		et->setData("type", type);
@@ -419,13 +449,20 @@ void DocumentImporter::create_constraints(ExtraTags *et, Object *ob){
 	}
 }
 
-void DocumentImporter::write_node(COLLADAFW::Node *node, COLLADAFW::Node *parent_node, Scene *sce, Object *par, bool is_library_node)
+std::vector<Object *> *DocumentImporter::write_node(COLLADAFW::Node *node, COLLADAFW::Node *parent_node, Scene *sce, Object *par, bool is_library_node)
 {
 	Object *ob = NULL;
 	bool is_joint = node->getType() == COLLADAFW::Node::JOINT;
 	bool read_transform = true;
+	std::string id   = node->getOriginalId();
+	std::string name = node->getName();
 
 	std::vector<Object *> *objects_done = new std::vector<Object *>();
+
+	fprintf(stderr,
+			"Writing node id='%s', name='%s'\n",
+			id.c_str(),
+			name.c_str());
 
 	if (is_joint) {
 		armature_importer.add_joint(node, parent_node == NULL || parent_node->getType() != COLLADAFW::Node::JOINT, par, sce);
@@ -448,13 +485,21 @@ void DocumentImporter::write_node(COLLADAFW::Node *node, COLLADAFW::Node *parent
 		while (geom_done < geom.getCount()) {
 			ob = mesh_importer.create_mesh_object(node, geom[geom_done], false, uid_material_map,
 			                                      material_texture_mapping_map);
-			objects_done->push_back(ob);
+			if (ob == NULL) {
+				fprintf(stderr,
+						"<node id=\"%s\", name=\"%s\" >...contains a reference to an unknown instance_mesh.\n",
+						id.c_str(),
+						name.c_str());
+			}
+			else {
+				objects_done->push_back(ob);
+			}
 			++geom_done;
 		}
 		while (camera_done < camera.getCount()) {
 			ob = create_camera_object(camera[camera_done], sce);
 			if (ob == NULL) {
-				std::string id = node->getOriginalId();
+				std::string id   = node->getOriginalId();
 				std::string name = node->getName();
 				fprintf(stderr, "<node id=\"%s\", name=\"%s\" >...contains a reference to an unknown instance_camera.\n", id.c_str(), name.c_str());
 			}
@@ -498,16 +543,20 @@ void DocumentImporter::write_node(COLLADAFW::Node *node, COLLADAFW::Node *parent
 		// XXX empty node may not mean it is empty object, not sure about this
 		if ( (geom_done + camera_done + lamp_done + controller_done + inst_done) < 1) {
 			//Check if Object is armature, by checking if immediate child is a JOINT node.
-			if(is_armature(node))
-				ob = bc_add_object(sce, OB_ARMATURE, NULL);
-			else ob = bc_add_object(sce, OB_EMPTY, NULL);
-
+			if (is_armature(node)) {
+				ob = bc_add_object(sce, OB_ARMATURE, name.c_str());
+			}
+			else {
+				ob = bc_add_object(sce, OB_EMPTY, NULL);
+			}
 			objects_done->push_back(ob);
+
 		}
 		
 		// XXX: if there're multiple instances, only one is stored
 
-		if (!ob) return;
+		if (!ob) return objects_done;
+
 		for (std::vector<Object *>::iterator it = objects_done->begin(); it != objects_done->end(); ++it) {
 			ob = *it;
 			std::string nodename = node->getName().size() ? node->getName() : node->getOriginalId();
@@ -518,6 +567,7 @@ void DocumentImporter::write_node(COLLADAFW::Node *node, COLLADAFW::Node *parent
 			if (is_library_node)
 				libnode_ob.push_back(ob);
 		}
+
 
 		//create_constraints(et,ob);
 
@@ -537,9 +587,19 @@ void DocumentImporter::write_node(COLLADAFW::Node *node, COLLADAFW::Node *parent
 	}
 	// if node has child nodes write them
 	COLLADAFW::NodePointerArray &child_nodes = node->getChildNodes();
+
+	if (objects_done->size() > 0) {
+		ob = *objects_done->begin();
+	}
+	else {
+		ob = NULL;
+	}
+
 	for (unsigned int i = 0; i < child_nodes.getCount(); i++) {
 		write_node(child_nodes[i], node, sce, ob, is_library_node);
 	}
+
+	return objects_done;
 }
 
 /** When this method is called, the writer must write the entire visual scene.
@@ -944,17 +1004,29 @@ bool DocumentImporter::writeImage(const COLLADAFW::Image *image)
 	if (mImportStage != General)
 		return true;
 		
-	// XXX maybe it is necessary to check if the path is absolute or relative
-	const std::string& filepath = image->getImageURI().toNativePath();
-	const char *filename = (const char *)mFilename.c_str();
+	const std::string& imagepath = image->getImageURI().toNativePath();
+
 	char dir[FILE_MAX];
-	char full_path[FILE_MAX];
-	
-	BLI_split_dir_part(filename, dir, sizeof(dir));
-	BLI_join_dirfile(full_path, sizeof(full_path), dir, filepath.c_str());
-	Image *ima = BKE_image_load_exists(full_path);
+	char absolute_path[FILE_MAX];
+	const char *workpath;
+
+	BLI_split_dir_part(this->import_settings->filepath, dir, sizeof(dir));
+	BLI_join_dirfile(absolute_path, sizeof(absolute_path), dir, imagepath.c_str());
+	if (BLI_exists(absolute_path)) {
+		workpath = absolute_path;
+	} 
+	else {
+		// Maybe imagepath was already absolute ?
+		if (!BLI_exists(imagepath.c_str())) {
+			fprintf(stderr, "Image not found: %s.\n", imagepath.c_str() );
+			return true;
+		}
+		workpath = imagepath.c_str();
+	}
+
+	Image *ima = BKE_image_load_exists(workpath);
 	if (!ima) {
-		fprintf(stderr, "Cannot create image.\n");
+		fprintf(stderr, "Cannot create image: %s\n", workpath);
 		return true;
 	}
 	this->uid_image_map[image->getUniqueId()] = ima;
@@ -1197,14 +1269,18 @@ bool DocumentImporter::addExtraTags(const COLLADAFW::UniqueId &uid, ExtraTags *e
 	return true;
 }
 
-bool DocumentImporter::is_armature(COLLADAFW::Node *node){
+bool DocumentImporter::is_armature(COLLADAFW::Node *node)
+{
 	COLLADAFW::NodePointerArray &child_nodes = node->getChildNodes();
-	for (unsigned int i = 0; i < child_nodes.getCount(); i++) {	
-		if(child_nodes[i]->getType() == COLLADAFW::Node::JOINT) return true;
-		else continue;
+	for (unsigned int i = 0; i < child_nodes.getCount(); i++) {
+		if (child_nodes[i]->getType() == COLLADAFW::Node::JOINT) {
+			return true;
+		}
+		else {
+			continue;
+		}
 	}
 
 	//no child is JOINT
 	return false;
-
 }

@@ -54,7 +54,7 @@ class CopyRigidbodySettings(Operator):
             for o in objects:
                 if o.rigid_body is None:
                     continue
-                
+
                 o.rigid_body.type = obj.rigid_body.type
                 o.rigid_body.kinematic = obj.rigid_body.kinematic
                 o.rigid_body.mass = obj.rigid_body.mass
@@ -120,7 +120,8 @@ class BakeToKeyframes(Operator):
 
         if objects:
             # store transformation data
-            for f in list(range(self.frame_start, self.frame_end + 1)):
+            # need to start at scene start frame so simulation is run from the beginning
+            for f in list(range(scene.frame_start, self.frame_end + 1)):
                 scene.frame_set(f)
                 if f in frames:
                     mat = {}
@@ -144,7 +145,7 @@ class BakeToKeyframes(Operator):
                         # this is a little roundabout but there's no better way right now
                         aa = mat.to_quaternion().to_axis_angle()
                         obj.rotation_axis_angle = (aa[1], ) + aa[0][:]
-                    else: # euler
+                    else:  # euler
                         # make sure euler rotation is compatible to previous frame
                         obj.rotation_euler = mat.to_euler(rot_mode, obj_prev.rotation_euler)
 
@@ -190,7 +191,8 @@ class BakeToKeyframes(Operator):
 
 
 class ConnectRigidBodies(Operator):
-    '''Create rigid body constraints between selected and active rigid bodies'''
+    """Create rigid body constraints between """ \
+    """selected and active rigid bodies"""
     bl_idname = "rigidbody.connect"
     bl_label = "Connect Rigid Bodies"
     bl_options = {'REGISTER', 'UNDO'}
@@ -232,7 +234,11 @@ class ConnectRigidBodies(Operator):
                 loc = obj.location
             else:
                 loc = (obj_act.location + obj.location) / 2.0
-            bpy.ops.object.add(type='EMPTY', view_align=False, enter_editmode=False, location=loc)
+            # TODO: use bpy.data.objects.new(...)
+            bpy.ops.object.add(type='EMPTY',
+                               view_align=False,
+                               enter_editmode=False,
+                               location=loc)
             bpy.ops.rigidbody.constraint_add()
             con_obj = context.active_object
             con_obj.empty_draw_type = 'ARROWS'
@@ -241,12 +247,12 @@ class ConnectRigidBodies(Operator):
             con.object1 = obj_act
             con.object2 = obj
             change = True
-        
+
         if change:
             # restore selection
             bpy.ops.object.select_all(action='DESELECT')
             for obj in objects:
-                obj.select = True;
+                obj.select = True
             scene.objects.active = obj_act
             return {'FINISHED'}
         else:

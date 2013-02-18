@@ -47,6 +47,7 @@
 #include "ArmatureImporter.h"
 #include "ControllerExporter.h"
 #include "MeshImporter.h"
+#include "ImportSettings.h"
 
 
 
@@ -63,7 +64,7 @@ public:
 		Controller,		//!< Second pass to collect controller data
 	};
 	/** Constructor */
-	DocumentImporter(bContext *C, const char *filename);
+	DocumentImporter(bContext *C, const ImportSettings *import_settings);
 
 	/** Destructor */
 	~DocumentImporter();
@@ -76,7 +77,7 @@ public:
 	Object* create_lamp_object(COLLADAFW::InstanceLight*, Scene*);
 	Object* create_instance_node(Object*, COLLADAFW::Node*, COLLADAFW::Node*, Scene*, bool);
 	void create_constraints(ExtraTags *et, Object *ob);
-	void write_node(COLLADAFW::Node*, COLLADAFW::Node*, Scene*, Object*, bool);
+	std::vector<Object *> *write_node(COLLADAFW::Node*, COLLADAFW::Node*, Scene*, Object*, bool);
 	MTex* create_texture(COLLADAFW::EffectCommon*, COLLADAFW::Texture&, Material*, int, TexIndexTextureArrayMap&);
 	void write_profile_COMMON(COLLADAFW::EffectCommon*, Material*);
 	
@@ -137,10 +138,10 @@ public:
 
 
 private:
+	const ImportSettings *import_settings;
 
 	/** Current import stage we're in. */
 	ImportStage mImportStage;
-	std::string mFilename;
 
 	bContext *mContext;
 

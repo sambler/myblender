@@ -3800,7 +3800,8 @@ static void def_cmp_bokehblur(StructRNA *srna)
 	/* duplicated in def_cmp_blur */
 	prop = RNA_def_property(srna, "use_variable_size", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "custom1", CMP_NODEFLAG_BLUR_VARIABLE_SIZE);
-	RNA_def_property_ui_text(prop, "Variable Size", "Support variable blue per-pixel when using an image for size input");
+	RNA_def_property_ui_text(prop, "Variable Size",
+	                         "Support variable blur per-pixel when using an image for size input");
 	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 
 #if 0
@@ -4082,6 +4083,21 @@ static void def_cmp_viewer(StructRNA *srna)
 	RNA_def_property_float_default(prop, 0.5f);
 	RNA_def_property_range(prop, 0.0f, 1.0f);
 	RNA_def_property_ui_text(prop, "Y", "");
+	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+
+	prop = RNA_def_property(srna, "use_alpha", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_negative_sdna(prop, NULL, "custom2", 1);
+	RNA_def_property_ui_text(prop, "Use Alpha", "Colors are treated alpha premultiplied, or colors output straight (alpha gets set to 1)");
+	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+}
+
+static void def_cmp_composite(StructRNA *srna)
+{
+	PropertyRNA *prop;
+
+	prop = RNA_def_property(srna, "use_alpha", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_negative_sdna(prop, NULL, "custom2", 1);
+	RNA_def_property_ui_text(prop, "Use Alpha", "Colors are treated alpha premultiplied, or colors output straight (alpha gets set to 1)");
 	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 }
 
@@ -4955,6 +4971,10 @@ static void rna_def_composite_nodetree(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "use_opencl", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", NTREE_COM_OPENCL);
 	RNA_def_property_ui_text(prop, "OpenCL", "Enable GPU calculations");
+
+	prop = RNA_def_property(srna, "use_groupnode_buffer", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", NTREE_COM_GROUPNODE_BUFFER);
+	RNA_def_property_ui_text(prop, "Buffer Groups", "Enable buffering of group nodes");
 
 	prop = RNA_def_property(srna, "two_pass", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", NTREE_TWO_PASS);

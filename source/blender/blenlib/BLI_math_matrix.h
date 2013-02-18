@@ -89,14 +89,15 @@ void mul_serie_m4(float R[4][4],
 
 void mul_m4_v3(float M[4][4], float r[3]);
 void mul_v3_m4v3(float r[3], float M[4][4], const float v[3]);
+void mul_v2_m2v2(float r[2], float M[2][2], const float v[2]);
 void mul_mat3_m4_v3(float M[4][4], float r[3]);
 void mul_m4_v4(float M[4][4], float r[4]);
-void mul_v4_m4v4(float r[4], float M[4][4], float v[4]);
+void mul_v4_m4v4(float r[4], float M[4][4], const float v[4]);
 void mul_project_m4_v3(float M[4][4], float vec[3]);
 
 void mul_m3_v3(float M[3][3], float r[3]);
-void mul_v3_m3v3(float r[3], float M[3][3], float a[3]);
-void mul_v2_m3v3(float r[2], float M[3][3], float a[3]);
+void mul_v3_m3v3(float r[3], float M[3][3], const float a[3]);
+void mul_v2_m3v3(float r[2], float M[3][3], const float a[3]);
 void mul_transposed_m3_v3(float M[3][3], float r[3]);
 void mul_m3_v3_double(float M[3][3], double r[3]);
 
@@ -171,6 +172,7 @@ void mat4_to_size(float r[3], float M[4][4]);
 
 void translate_m4(float mat[4][4], float tx, float ty, float tz);
 void rotate_m4(float mat[4][4], const char axis, const float angle);
+void rotate_m2(float mat[2][2], const float angle);
 
 
 void mat3_to_rot_size(float rot[3][3], float size[3], float mat3[3][3]);

@@ -1894,5 +1894,3 @@ void OBJECT_OT_game_physics_copy(struct wmOperatorType *ot)
 	/* flags */
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 }
-
-/* operators for wire and wire colour settings. */

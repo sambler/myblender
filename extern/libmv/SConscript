@@ -11,7 +11,6 @@ Import('env')
 
 defs = []
 
-defs.append('V3DLIB_ENABLE_SUITESPARSE')
 defs.append('GOOGLE_GLOG_DLL_DECL=')
 
 src = env.Glob("*.cpp")
@@ -37,8 +36,6 @@ if env['OURPLATFORM'] in ('win32-vc', 'win32-mingw', 'linuxcross', 'win64-vc', '
 else:
     src += env.Glob("third_party/glog/src/*.cc")
     incs += ' ./third_party/glog/src'
-
-incs += ' ./third_party/ssba ../colamd/Include'
 
 env.BlenderLib ( libname = 'extern_libmv', sources=src, includes=Split(incs), defines=defs, libtype=['extern', 'player'], priority=[20,137] )
 

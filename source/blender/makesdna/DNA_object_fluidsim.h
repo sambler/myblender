@@ -37,16 +37,15 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
-	
+
 struct Mesh;
 struct Ipo;
 
 typedef struct FluidVertexVelocity {
 	float vel[3];
 } FluidVertexVelocity;
-	
+
 typedef struct FluidsimSettings {
 	struct FluidsimModifierData *fmd; /* for fast RNA access */
 	/* domain, fluid or obstacle */
@@ -81,7 +80,7 @@ typedef struct FluidsimSettings {
 	float gstar;
 	/* activate refinement? */
 	int maxRefine;
-	
+
 	/* fluid object type settings */
 	/* gravity strength */
 	float iniVelx, iniVely, iniVelz;
@@ -130,19 +129,19 @@ typedef struct FluidsimSettings {
 	struct FluidVertexVelocity *meshVelocities;
 	/* number of vertices in simulated fluid mesh */
 	int totvert;
-	
+
 	/* Fluid control settings */
 	float cpsTimeStart;
 	float cpsTimeEnd;
 	float cpsQuality;
-	
+
 	float attractforceStrength;
 	float attractforceRadius;
 	float velocityforceStrength;
 	float velocityforceRadius;
 
 	int lastgoodframe;
-	
+
 	/* Simulation/flow rate control (i.e. old "Fac-Time") */
 	float animRate;
 } FluidsimSettings;

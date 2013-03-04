@@ -40,8 +40,8 @@
  *
  */
 
-/* 
-// DG: original BLO_sys_types.h is in source/blender/blenkernel 
+/*
+// DG: original BLO_sys_types.h is in source/blender/blenkernel
 // but is not allowed be accessed here because of bad-level-call
 // jesterKing: I've renamed this to MEM_sys_types.h, because otherwise
 // doxygen would get a conflict
@@ -52,9 +52,8 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
- 
+
 #if defined(_WIN32) && !defined(FREE_WINDOWS)
 
 /* The __intXX are built-in types of the visual complier! So we don't
@@ -132,7 +131,7 @@ unsigned long __attribute__((__stdcall__)) htonl(unsigned long);
 #define ntohl(x) correctByteOrder(x)
 #endif
 #endif
-#elif defined (__FreeBSD__) || defined (__OpenBSD__) 
+#elif defined (__FreeBSD__) || defined (__OpenBSD__)
 #include <sys/param.h>
 #elif defined (__APPLE__)
 #include <sys/types.h>

@@ -910,7 +910,6 @@
 #endif
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 #if (LZO_CC_BORLANDC && (__BORLANDC__ >= 0x0200))
    extern void __near __cdecl _AHSHIFT(void);
@@ -1845,8 +1844,8 @@ extern "C" {
 #  define __LZO_INFOSTR_CCVER       ""
 #endif
 #define LZO_INFO_STRING \
-    LZO_INFO_ARCH __LZO_INFOSTR_MM __LZO_INFOSTR_PM __LZO_INFOSTR_ENDIAN \
-    " " __LZO_INFOSTR_OSNAME __LZO_INFOSTR_LIBC " " LZO_INFO_CC __LZO_INFOSTR_CCVER
+	LZO_INFO_ARCH __LZO_INFOSTR_MM __LZO_INFOSTR_PM __LZO_INFOSTR_ENDIAN \
+	" " __LZO_INFOSTR_OSNAME __LZO_INFOSTR_LIBC " " LZO_INFO_CC __LZO_INFOSTR_CCVER
 
 #endif /* already included */
 

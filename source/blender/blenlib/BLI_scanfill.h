@@ -39,7 +39,6 @@ struct ScanFillVert;
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 typedef struct ScanFillContext {
@@ -112,7 +111,7 @@ enum {
 int BLI_scanfill_begin(ScanFillContext *sf_ctx);
 int BLI_scanfill_calc(ScanFillContext *sf_ctx, const int flag);
 int BLI_scanfill_calc_ex(ScanFillContext *sf_ctx, const int flag,
-                         const float nor_proj[3]);
+						 const float nor_proj[3]);
 void BLI_scanfill_end(ScanFillContext *sf_ctx);
 
 /* These callbacks are needed to make the lib finction properly */

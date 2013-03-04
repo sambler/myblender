@@ -4,7 +4,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version. 
+ * of the License, or (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -18,7 +18,7 @@
  * The Original Code is Copyright (C) 2008 Blender Foundation.
  * All rights reserved.
  *
- * 
+ *
  * Contributor(s): Blender Foundation
  *
  * ***** END GPL LICENSE BLOCK *****
@@ -33,7 +33,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 struct BMEdge;
@@ -99,7 +98,7 @@ extern struct EnumPropertyItem prop_make_parent_types[];
 #endif
 
 int ED_object_parent_set(struct ReportList *reports, struct Main *bmain, struct Scene *scene, struct Object *ob,
-                         struct Object *par, int partype, int xmirror, int keep_transform);
+						 struct Object *par, int partype, int xmirror, int keep_transform);
 void ED_object_parent_clear(struct Object *ob, int type);
 struct Base *ED_object_scene_link(struct Scene *scene, struct Object *ob);
 
@@ -107,7 +106,7 @@ void ED_keymap_proportional_cycle(struct wmKeyConfig *keyconf, struct wmKeyMap *
 void ED_keymap_proportional_obmode(struct wmKeyConfig *keyconf, struct wmKeyMap *keymap);
 void ED_keymap_proportional_maskmode(struct wmKeyConfig *keyconf, struct wmKeyMap *keymap);
 void ED_keymap_proportional_editmode(struct wmKeyConfig *keyconf, struct wmKeyMap *keymap,
-                                     const short do_connected);
+									 const short do_connected);
 
 /* send your own notifier for select! */
 void ED_base_object_select(struct Base *base, short mode);
@@ -136,15 +135,15 @@ void ED_object_location_from_view(struct bContext *C, float loc[3]);
 void ED_object_rotation_from_view(struct bContext *C, float rot[3]);
 void ED_object_base_init_transform(struct bContext *C, struct Base *base, const float loc[3], const float rot[3]);
 float ED_object_new_primitive_matrix(struct bContext *C, struct Object *editob,
-                                     const float loc[3], const float rot[3], float primmat[4][4],
-                                     int apply_diameter);
+									 const float loc[3], const float rot[3], float primmat[4][4],
+									 int apply_diameter);
 
 void ED_object_add_generic_props(struct wmOperatorType *ot, int do_editmode);
 int ED_object_add_generic_get_opts(struct bContext *C, struct wmOperator *op,  float loc[3], float rot[3],
-                                   int *enter_editmode, unsigned int *layer, int *is_view_aligned);
+								   int *enter_editmode, unsigned int *layer, int *is_view_aligned);
 
 struct Object *ED_object_add_type(struct bContext *C, int type, const float loc[3], const float rot[3],
-                                  int enter_editmode, unsigned int layer);
+								  int enter_editmode, unsigned int layer);
 
 void ED_object_single_users(struct Main *bmain, struct Scene *scene, int full);
 void ED_object_single_user(struct Scene *scene, struct Object *ob);
@@ -179,21 +178,21 @@ enum {
 };
 
 struct ModifierData *ED_object_modifier_add(struct ReportList *reports, struct Main *bmain, struct Scene *scene,
-                                            struct Object *ob, const char *name, int type);
+											struct Object *ob, const char *name, int type);
 int ED_object_modifier_remove(struct ReportList *reports, struct Main *bmain,
-                              struct Object *ob, struct ModifierData *md);
+							  struct Object *ob, struct ModifierData *md);
 void ED_object_modifier_clear(struct Main *bmain, struct Object *ob);
 int ED_object_modifier_move_down(struct ReportList *reports, struct Object *ob, struct ModifierData *md);
 int ED_object_modifier_move_up(struct ReportList *reports, struct Object *ob, struct ModifierData *md);
 int ED_object_modifier_convert(struct ReportList *reports, struct Main *bmain, struct Scene *scene,
-                               struct Object *ob, struct ModifierData *md);
+							   struct Object *ob, struct ModifierData *md);
 int ED_object_modifier_apply(struct ReportList *reports, struct Scene *scene,
-                             struct Object *ob, struct ModifierData *md, int mode);
+							 struct Object *ob, struct ModifierData *md, int mode);
 int ED_object_modifier_copy(struct ReportList *reports, struct Object *ob, struct ModifierData *md);
 
 int ED_object_iter_other(struct Main *bmain, struct Object *orig_ob, int include_orig,
-                         int (*callback)(struct Object *ob, void *callback_data),
-                         void *callback_data);
+						 int (*callback)(struct Object *ob, void *callback_data),
+						 void *callback_data);
 
 int ED_object_multires_update_totlevels_cb(struct Object *ob, void *totlevel_v);
 

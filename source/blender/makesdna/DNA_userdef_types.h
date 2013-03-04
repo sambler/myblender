@@ -39,7 +39,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 /* themes; defines in BIF_resource.h */
@@ -53,7 +52,7 @@ struct ColorBand;
 typedef enum eUIFont_ID {
 	UIFONT_DEFAULT	= 0,
 /*	UIFONT_BITMAP	= 1 */ /* UNUSED */
-	
+
 	/* free slots */
 	UIFONT_CUSTOM1	= 2,
 	UIFONT_CUSTOM2	= 3
@@ -96,16 +95,16 @@ typedef enum eFontStyle_Align {
 
 typedef struct uiStyle {
 	struct uiStyle *next, *prev;
-	
+
 	char name[64];			/* MAX_STYLE_NAME */
-	
+
 	uiFontStyle paneltitle;
 	uiFontStyle grouplabel;
 	uiFontStyle widgetlabel;
 	uiFontStyle widget;
-	
+
 	float panelzoom;
-	
+
 	short minlabelchars;	/* in characters */
 	short minwidgetchars;	/* in characters */
 
@@ -164,7 +163,7 @@ typedef struct ThemeUI {
 	uiWidgetColors wcol_num, wcol_numslider;
 	uiWidgetColors wcol_menu, wcol_pulldown, wcol_menu_back, wcol_menu_item, wcol_tooltip;
 	uiWidgetColors wcol_box, wcol_scroll, wcol_progress, wcol_list_item;
-	
+
 	uiWidgetStateColors wcol_state;
 
 	uiPanelColors panel; /* depricated, but we keep it for do_versions (2.66.1) */
@@ -172,9 +171,9 @@ typedef struct ThemeUI {
 	/* fac: 0 - 1 for blend factor, width in pixels */
 	float menu_shadow_fac;
 	short menu_shadow_width;
-	
+
 	short pad;
-	
+
 	char iconfile[256];	// FILE_MAXFILE length
 	float icon_alpha;
 
@@ -191,7 +190,7 @@ typedef struct ThemeSpace {
 	char title[4]; 	/* panel title */
 	char text[4];
 	char text_hi[4];
-	
+
 	/* header colors */
 	char header[4];			/* region background */
 	char header_title[4];	/* unused */
@@ -203,19 +202,19 @@ typedef struct ThemeSpace {
 	char button_title[4];	/* panel title */
 	char button_text[4];
 	char button_text_hi[4];
-	
+
 	/* listview regions */
 	char list[4];			/* region background */
 	char list_title[4]; 	/* panel title */
 	char list_text[4];
 	char list_text_hi[4];
-	
+
 	/* float panel */
 /*	char panel[4];			unused */
 /*	char panel_title[4];	unused */
 /*	char panel_text[4];		unused */
 /*	char panel_text_hi[4];	unused */
-	
+
 	/* note, cannot use name 'panel' because of DNA mapping old files */
 	uiPanelColors panelcolors;
 
@@ -223,10 +222,10 @@ typedef struct ThemeSpace {
 
 	char shade1[4];
 	char shade2[4];
-	
+
 	char hilite[4];
-	char grid[4]; 
-	
+	char grid[4];
+
 	char wire[4], select[4];
 	char lamp[4], speaker[4], empty[4], camera[4], pad[8];
 	char active[4], group[4], group_active[4], transform[4];
@@ -241,18 +240,18 @@ typedef struct ThemeSpace {
 	char bone_solid[4], bone_pose[4], bone_pose_active[4];
 	char strip[4], strip_select[4];
 	char cframe[4];
-	
+
 	char nurb_uline[4], nurb_vline[4];
 	char act_spline[4], nurb_sel_uline[4], nurb_sel_vline[4], lastsel_point[4];
-	
+
 	char handle_free[4], handle_auto[4], handle_vect[4], handle_align[4], handle_auto_clamped[4];
 	char handle_sel_free[4], handle_sel_auto[4], handle_sel_vect[4], handle_sel_align[4], handle_sel_auto_clamped[4];
-	
+
 	char ds_channel[4], ds_subchannel[4]; /* dopesheet */
-	
+
 	char console_output[4], console_input[4], console_info[4], console_error[4];
 	char console_cursor[4], console_select[4], pad1[4];
-	
+
 	char vertex_size, outline_width, facedot_size;
 	char noodle_curving;
 
@@ -261,22 +260,22 @@ typedef struct ThemeSpace {
 	char syntaxb[4], syntaxn[4];
 	char syntaxv[4], syntaxc[4];
 	char syntaxd[4], syntaxr[4];
-	
+
 	char movie[4], movieclip[4], mask[4], image[4], scene[4], audio[4];		/* for sequence editor */
 	char effect[4], transition[4], meta[4];
-	char editmesh_active[4]; 
+	char editmesh_active[4];
 
 	char handle_vertex[4];
 	char handle_vertex_select[4];
-	
+
 	char handle_vertex_size;
-	
+
 	char marker_outline[4], marker[4], act_marker[4], sel_marker[4], dis_marker[4], lock_marker[4];
 	char bundle_solid[4];
 	char path_before[4], path_after[4];
 	char camera_path[4];
 	char hpad[3];
-	
+
 	char preview_back[4];
 	char preview_stitch_face[4];
 	char preview_stitch_edge[4];
@@ -284,19 +283,19 @@ typedef struct ThemeSpace {
 	char preview_stitch_stitchable[4];
 	char preview_stitch_unstitchable[4];
 	char preview_stitch_active[4];
-	
+
 	char match[4];				/* outliner - filter match */
 	char selected_highlight[4];	/* outliner - selected item */
 
 	char skin_root[4]; /* Skin modifier root color */
-	
+
 	/* NLA */
 	char anim_active[4];	 /* Active Action + Summary Channel */
 	char anim_non_active[4]; /* Active Action = NULL */
-	
+
 	char nla_tweaking[4];   /* NLA 'Tweaking' action/strip */
 	char nla_tweakdupli[4]; /* NLA - warning color for duplicate instances of tweaking strip */
-	
+
 	char nla_transition[4], nla_transition_sel[4]; /* NLA "Transition" strips */
 	char nla_meta[4], nla_meta_sel[4];             /* NLA "Meta" strips */
 	char nla_sound[4], nla_sound_sel[4];           /* NLA "Sound" strips */
@@ -308,10 +307,10 @@ typedef struct ThemeWireColor {
 	char 	solid[4];
 	char	select[4];
 	char 	active[4];
-	
+
 	short 	flag;
 	short 	pad;
-} ThemeWireColor; 
+} ThemeWireColor;
 
 /* flags for ThemeWireColor */
 typedef enum eWireColor_Flags {
@@ -323,9 +322,9 @@ typedef enum eWireColor_Flags {
 typedef struct bTheme {
 	struct bTheme *next, *prev;
 	char name[32];
-	
+
 	ThemeUI tui;
-	
+
 	/* Individual Spacetypes */
 	ThemeSpace tbuts;
 	ThemeSpace tv3d;
@@ -344,11 +343,11 @@ typedef struct bTheme {
 	ThemeSpace tuserpref;
 	ThemeSpace tconsole;
 	ThemeSpace tclip;
-	
+
 	/* 20 sets of bone colors for this theme */
 	ThemeWireColor tarm[20];
 	/*ThemeWireColor tobj[20];*/
-	
+
 	int active_theme_area, pad;
 } bTheme;
 
@@ -367,7 +366,7 @@ typedef struct SolidLight {
 typedef struct UserDef {
 	/* UserDef has separate do-version handling, and can be read from other files */
 	int versionfile, subversionfile;
-	
+
 	int flag, dupflag;
 	int savetime;
 	char tempdir[768];	/* FILE_MAXDIR length */
@@ -380,19 +379,19 @@ typedef struct UserDef {
 	char image_editor[1024];    /* 1024 = FILE_MAX */
 	char anim_player[1024];	    /* 1024 = FILE_MAX */
 	int anim_player_preset;
-	
+
 	short v2d_min_gridsize;		/* minimum spacing between gridlines in View2D grids */
 	short timecode_style;		/* style of timecode display */
-	
+
 	short versions;
 	short dbl_click_time;
-	
+
 	short gameflags;
 	short wheellinescroll;
 	int uiflag, uiflag2;
 	int language;
 	short userpref, viewzoom;
-	
+
 	int mixbufsize;
 	int audiodevice;
 	int audiorate;
@@ -404,7 +403,7 @@ typedef struct UserDef {
 	short encoding;
 	short transopts;
 	short menuthreshold1, menuthreshold2;
-	
+
 	struct ListBase themes;
 	struct ListBase uifonts;
 	struct ListBase uistyles;
@@ -412,7 +411,7 @@ typedef struct UserDef {
 	struct ListBase user_keymaps;
 	struct ListBase addons;
 	char keyconfigstr[64];
-	
+
 	short undosteps;
 	short undomemory;
 	short gp_manhattendist, gp_euclideandist, gp_eraser;
@@ -440,7 +439,7 @@ typedef struct UserDef {
 
 	short scrcastfps;		/* frame rate for screencast to be played back */
 	short scrcastwait;		/* milliseconds between screencast snapshots */
-	
+
 	short widget_unit;		/* private, defaults to 20 for 72 DPI setting */
 	short anisotropic_filter;
 	short use_16bit_textures, use_gpu_mipmap;
@@ -452,12 +451,12 @@ typedef struct UserDef {
 	short ogl_multisamples;	/* amount of samples for OpenGL FSA, if zero no FSA */
 
 	short pad4;
-	
+
 	float glalphaclip;
-	
+
 	short autokey_mode;		/* autokeying mode */
 	short autokey_flag;		/* flags for autokeying */
-	
+
 	short text_render, pad9;		/* options for text rendering */
 
 	struct ColorBand coba_weight;	/* from texture.h */
@@ -471,7 +470,7 @@ typedef struct UserDef {
 
 	int compute_device_type;
 	int compute_device_id;
-	
+
 	float fcu_inactive_alpha;	/* opacity of inactive F-Curves in F-Curve Editor */
 	float pixelsize;			/* private, set by GHOST, to multiply DPI with */
 } UserDef;
@@ -521,7 +520,7 @@ typedef enum eUserPref_Flag {
 	USER_TXT_TABSTOSPACES_DISABLE	= (1 << 25),
 	USER_TOOLTIPS_PYTHON    = (1 << 26),
 } eUserPref_Flag;
-	
+
 /* helper macro for checking frame clamping */
 #define FRAMENUMBER_MIN_CLAMP(cfra)  {                                        \
 	if ((U.flag & USER_NONEGFRAMES) && (cfra < 0))                            \
@@ -575,12 +574,12 @@ typedef enum eUserpref_UI_Flag2 {
 	USER_REGION_OVERLAP		= (1 << 1),
 	USER_TRACKPAD_NATURAL	= (1 << 2)
 } eUserpref_UI_Flag2;
-	
+
 /* Auto-Keying mode */
 typedef enum eAutokey_Mode {
 	/* AUTOKEY_ON is a bitflag */
 	AUTOKEY_ON             = 1,
-	
+
 	/* AUTOKEY_ON + 2**n...  (i.e. AUTOKEY_MODE_NORMAL = AUTOKEY_ON + 2) to preserve setting, even when autokey turned off  */
 	AUTOKEY_MODE_NORMAL    = 3,
 	AUTOKEY_MODE_EDITKEYS  = 5
@@ -595,7 +594,7 @@ typedef enum eAutokey_Flag {
 	AUTOKEY_FLAG_INSERTNEEDED	= (1 << 1),
 	AUTOKEY_FLAG_AUTOMATKEY		= (1 << 2),
 	AUTOKEY_FLAG_XYZ2RGB		= (1 << 3),
-	
+
 	/* toolsettings->autokey_flag */
 	AUTOKEY_FLAG_ONLYKEYINGSET	= (1 << 6),
 	AUTOKEY_FLAG_NOWARNING		= (1 << 7),
@@ -634,7 +633,7 @@ typedef enum eDupli_ID_Flags {
 typedef enum eOpenGL_RenderingOptions {
 	/* USER_DEPRECATED_FLAG	= (1 << 0), */
 	/* USER_DISABLE_SOUND		= (1 << 1), */ /* deprecated, don't use without checking for */
-	                                     /* backwards compatibilty in do_versions! */
+										 /* backwards compatibilty in do_versions! */
 	USER_DISABLE_MIPMAP		= (1 << 2),
 	USER_DISABLE_VBO		= (1 << 3),
 	/* USER_DISABLE_AA			= (1 << 4), */ /* DEPRECATED */
@@ -673,20 +672,20 @@ typedef enum eColorPicker_Types {
 /* timecode display styles */
 typedef enum eTimecodeStyles {
 	/* as little info as is necessary to show relevant info
-	 * with '+' to denote the frames 
+	 * with '+' to denote the frames
 	 * i.e. HH:MM:SS+FF, MM:SS+FF, SS+FF, or MM:SS
 	 */
 	USER_TIMECODE_MINIMAL		= 0,
-	
+
 	/* reduced SMPTE - (HH:)MM:SS:FF */
 	USER_TIMECODE_SMPTE_MSF		= 1,
-	
+
 	/* full SMPTE - HH:MM:SS:FF */
 	USER_TIMECODE_SMPTE_FULL	= 2,
-	
+
 	/* milliseconds for sub-frames - HH:MM:SS.sss */
 	USER_TIMECODE_MILLISECONDS	= 3,
-	
+
 	/* seconds only */
 	USER_TIMECODE_SECONDS_ONLY	= 4,
 } eTimecodeStyles;
@@ -742,7 +741,7 @@ typedef enum eCompute_Device_Type {
 	USER_COMPUTE_DEVICE_CUDA	= 2,
 } eCompute_Device_Type;
 
-	
+
 typedef enum eMultiSample_Type {
 	USER_MULTISAMPLE_NONE	= 0,
 	USER_MULTISAMPLE_2	= 2,
@@ -750,8 +749,8 @@ typedef enum eMultiSample_Type {
 	USER_MULTISAMPLE_8	= 8,
 	USER_MULTISAMPLE_16	= 16,
 } eMultiSample_Type;
-	
-	
+
+
 
 #ifdef __cplusplus
 }

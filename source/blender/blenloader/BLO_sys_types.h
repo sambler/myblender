@@ -45,9 +45,8 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
- 
+
 #if defined(_WIN32) && !defined(FREE_WINDOWS)
 
 /* The __intXX are built-in types of the visual compiler! So we don't
@@ -132,7 +131,7 @@ unsigned long __attribute__((__stdcall__)) htonl(unsigned long);
 #include <netinet/in.h>
 #endif /* ifdef platform for htonl/ntohl */
 
-#ifdef __cplusplus 
+#ifdef __cplusplus
 }
 #endif
 

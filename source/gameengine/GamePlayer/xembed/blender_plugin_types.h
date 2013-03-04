@@ -38,7 +38,7 @@
 #elif defined(__APPLE__)
 /* Apple stuff goes here: */
 
-#else 
+#else
 /* Unix stuff goes here: */
 #include <GL/glx.h>
 #include <X11/Intrinsic.h>
@@ -49,11 +49,10 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for codefolding
 #endif
 
 	struct netscape_plugin_Plugin;
-	
+
 	typedef struct _BlenderPluginInstance {
 		/** reach back to the browser: needed for file
 		 * streaming */
@@ -88,7 +87,7 @@ extern "C" {
 		char* temp_mail_file_name;
 
 	} BlenderPluginInstance;
-	
+
 #ifdef __cplusplus
 }
 #endif

@@ -34,7 +34,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 struct bScreen;
@@ -67,10 +66,10 @@ typedef struct BlendFileData {
 	int displaymode;
 	int globalf;
 	char filename[1024];    /* 1024 = FILE_MAX */
-	
+
 	struct bScreen *curscreen;
 	struct Scene *curscene;
-	
+
 	BlenFileType type;
 } BlendFileData;
 
@@ -109,22 +108,22 @@ BlendFileData *BLO_read_from_memfile(struct Main *oldmain, const char *filename,
  * Free's a BlendFileData structure and _all_ the
  * data associated with it (the userdef data, and
  * the main libblock data).
- * 
+ *
  * \param bfd The structure to free.
  */
 void
 BLO_blendfiledata_free(BlendFileData *bfd);
-	
+
 /**
  * Open a blendhandle from a file path.
- * 
+ *
  * \param file The file path to open.
  * \param reports Report errors in opening the file (can be NULL).
  * \return A handle on success, or NULL on failure.
  */
 BlendHandle *
 BLO_blendhandle_from_file(char *file,
-                          struct ReportList *reports);
+						  struct ReportList *reports);
 
 /**
  * Open a blendhandle from memory.
@@ -136,13 +135,13 @@ BLO_blendhandle_from_file(char *file,
 
 BlendHandle *
 BLO_blendhandle_from_memory(void *mem,
-                            int memsize);
+							int memsize);
 
 /**
  * Gets the names of all the datablocks in a file
  * of a certain type (ie. All the scene names in
  * a file).
- * 
+ *
  * \param bh The blendhandle to access.
  * \param ofblocktype The type of names to get.
  * \param tot_names The length of the returned list.
@@ -151,14 +150,14 @@ BLO_blendhandle_from_memory(void *mem,
  */
 struct LinkNode *
 BLO_blendhandle_get_datablock_names(BlendHandle *bh,
-                                    int ofblocktype,
-                                    int *tot_names);
+									int ofblocktype,
+									int *tot_names);
 
 /**
  * Gets the previews of all the datablocks in a file
  * of a certain type (ie. All the scene names in
  * a file).
- * 
+ *
  * \param bh The blendhandle to access.
  * \param ofblocktype The type of names to get.
  * \param tot_prev The length of the returned list.
@@ -167,14 +166,14 @@ BLO_blendhandle_get_datablock_names(BlendHandle *bh,
  */
 struct LinkNode *
 BLO_blendhandle_get_previews(BlendHandle *bh,
-                             int ofblocktype,
-                             int *tot_prev);
+							 int ofblocktype,
+							 int *tot_prev);
 
 /**
  * Gets the names of all the datablock groups in a
  * file. (ie. file contains Scene, Mesh, and Lamp
  * datablocks).
- * 
+ *
  * \param bh The blendhandle to access.
  * \return A BLI_linklist of strings. The string links
  * should be freed with malloc.
@@ -190,7 +189,7 @@ BLO_blendhandle_get_linkable_groups(BlendHandle *bh);
  */
 void
 BLO_blendhandle_close(BlendHandle *bh);
-	
+
 /***/
 
 #define GROUP_MAX 32
@@ -246,7 +245,7 @@ void BLO_library_append_all(struct Main *mainl, BlendHandle *bh);
 void *BLO_library_read_struct(struct FileData *fd, struct BHead *bh, const char *blockname);
 
 BlendFileData *blo_read_blendafterruntime(int file, const char *name, int actualsize, struct ReportList *reports);
-	
+
 /* internal function but we need to expose it */
 void blo_lib_link_screen_restore(struct Main *newmain, struct bScreen *curscreen, struct Scene *curscene);
 
@@ -266,9 +265,9 @@ void BLO_main_expander(void (*expand_doit_func)(void *, struct Main *, void *));
  * \param mainvar the Main database to expand
  */
 void BLO_expand_main(void *fdhandle, struct Main *mainvar);
-	
+
 #ifdef __cplusplus
-} 
+}
 #endif
 
 #endif

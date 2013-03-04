@@ -38,7 +38,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 #include "BLI_fileops_types.h"

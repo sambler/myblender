@@ -24,7 +24,7 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
- 
+
 #ifndef __BLI_GHASH_H__
 #define __BLI_GHASH_H__
 
@@ -35,7 +35,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 typedef unsigned int  (*GHashHashFP)     (const void *key);
@@ -135,8 +134,8 @@ int             BLI_ghashIterator_isDone(GHashIterator *ghi);
 
 #define GHASH_ITER(gh_iter_, ghash_)                                          \
 	for (BLI_ghashIterator_init(&gh_iter_, ghash_);                           \
-	     !BLI_ghashIterator_isDone(&gh_iter_);                                \
-	     BLI_ghashIterator_step(&gh_iter_))
+		 !BLI_ghashIterator_isDone(&gh_iter_);                                \
+		 BLI_ghashIterator_step(&gh_iter_))
 
 /* *** */
 

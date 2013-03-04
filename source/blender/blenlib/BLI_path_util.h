@@ -33,7 +33,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 struct ListBase;
@@ -130,7 +129,7 @@ __attribute__((nonnull(1)))
 /**
  * dir can be any input, like from buttons, and this function
  * converts it to a regular full path.
- * Also removes garbage from directory paths, like /../ or double slashes etc 
+ * Also removes garbage from directory paths, like /../ or double slashes etc
  */
 void BLI_cleanup_file(const char *relabase, char *dir); /* removes trailing slash */
 void BLI_cleanup_dir(const char *relabase, char *dir); /* same as above but adds a trailing slash */
@@ -148,7 +147,7 @@ int BLI_has_parent(char *path);
  * directory \a basepath, and replaces instances of
  * '#' with the \a framenum. Results are written
  * back into \a path.
- * 
+ *
  * \a path The path to convert
  * \a basepath The directory to base relative paths with.
  * \a framenum The framenumber to replace the frame code with.

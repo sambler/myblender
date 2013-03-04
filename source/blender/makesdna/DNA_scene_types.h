@@ -39,7 +39,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 #include "DNA_color_types.h"  /* color management */
@@ -104,7 +103,7 @@ typedef struct QuicktimeCodecData {
 
 	char			qtcodecname[128];
 } QuicktimeCodecData;
-	
+
 typedef struct QuicktimeCodecSettings {
 	/* Codec settings detailed for 2.5 implementation*/
 	int codecType; /* Types defined in quicktime_export.h */
@@ -119,7 +118,7 @@ typedef struct QuicktimeCodecSettings {
 	int	minTemporalQuality; /* in 0-100 scale, to be translated in 0-1024 for qt use */
 	int	keyFrameRate;
 	int	bitRate;	/* bitrate in bps */
-	
+
 	/* Audio Codec settings */
 	int audiocodecType;
 	int audioSampleRate;
@@ -172,17 +171,17 @@ typedef struct AudioData {
 /* Render Layer */
 typedef struct SceneRenderLayer {
 	struct SceneRenderLayer *next, *prev;
-	
+
 	char name[64];	/* MAX_NAME */
-	
+
 	struct Material *mat_override;
 	struct Group *light_override;
-	
+
 	unsigned int lay;		  /* scene->lay itself has priority over this */
 	unsigned int lay_zmask;	  /* has to be after lay, this is for Z-masking */
 	unsigned int lay_exclude; /* not used by internal, exclude */
 	int layflag;
-	
+
 	int passflag;			/* pass_xor has to be after passflag */
 	int pass_xor;
 
@@ -248,10 +247,10 @@ typedef struct SceneRenderLayer {
  */
 typedef struct ImageFormatData {
 	char imtype;   /* R_IMF_IMTYPE_PNG, R_... */
-	               /* note, video types should only ever be set from this
-	                * structure when used from RenderData */
+				   /* note, video types should only ever be set from this
+					* structure when used from RenderData */
 	char depth;    /* bits per channel, R_IMF_CHAN_DEPTH_8 -> 32,
-	                * not a flag, only set 1 at a time */
+					* not a flag, only set 1 at a time */
 
 	char planes;   /* - R_IMF_PLANES_BW, R_IMF_PLANES_RGB, R_IMF_PLANES_RGBA */
 	char flag;     /* generic options for all image types, alpha zbuffer */
@@ -355,7 +354,7 @@ typedef struct ImageFormatData {
 
 typedef struct RenderData {
 	struct ImageFormatData im_format;
-	
+
 	struct AviCodecData *avicodecdata;
 	struct QuicktimeCodecData *qtcodecdata;
 	struct QuicktimeCodecSettings qtcodecsettings;
@@ -384,7 +383,7 @@ typedef struct RenderData {
 	int frame_step;		/* frames to jump during render/playback */
 
 	short stereomode  DNA_DEPRECATED;	/* standalone player stereo settings */  //  XXX deprecated since 2.5
-	
+
 	short dimensionspreset;		/* for the dimensions presets menu */
 
 	short filtertype;	/* filter is box, tent, gauss, mitch, etc */
@@ -418,7 +417,7 @@ typedef struct RenderData {
 	int tilex, tiley;
 
 	short planes  DNA_DEPRECATED, imtype  DNA_DEPRECATED, subimtype  DNA_DEPRECATED, quality  DNA_DEPRECATED; /*deprecated!*/
-	
+
 	/**
 	 * Render to image editor, fullscreen or to new window.
 	 */
@@ -439,7 +438,7 @@ typedef struct RenderData {
 	 * Flags for raytrace settings. Use bit-masking to access the settings.
 	 */
 	int raytrace_options;
-	
+
 	/**
 	 * Raytrace acceleration structure
 	 */
@@ -450,7 +449,7 @@ typedef struct RenderData {
 	/* octree resolution */
 	short ocres;
 	short pad4;
-	
+
 	/**
 	 * What to do with the sky/background. Picks sky/premul/key
 	 * blending for the background
@@ -464,39 +463,39 @@ typedef struct RenderData {
 
 	short frs_sec, edgeint;
 
-	
+
 	/* safety, border and display rect */
 	rctf safety, border;
 	rcti disprect;
-	
+
 	/* information on different layers to be rendered */
 	ListBase layers;
 	short actlay;
-	
+
 	/* number of mblur samples */
 	short mblur_samples;
-	
+
 	/**
 	 * Adjustment factors for the aspect ratio in the x direction, was a short in 2.45
 	 */
 	float xasp, yasp;
 
 	float frs_sec_base;
-	
+
 	/**
 	 * Value used to define filter size for all filter options  */
 	float gauss;
-	
-	
+
+
 	/* color management settings - color profiles, gamma correction, etc */
 	int color_mgt_flag;
-	
+
 	/** post-production settings. deprecated, but here for upwards compat (initialized to 1) */
 	float postgamma, posthue, postsat;
-	
+
 	 /* Dither noise intensity */
 	float dither_intensity;
-	
+
 	/* Bake Render options */
 	short bake_osa, bake_filter, bake_mode, bake_flag;
 	short bake_normal_space, bake_quad_split;
@@ -533,7 +532,7 @@ typedef struct RenderData {
 	/* cineon */
 	short cineonwhite  DNA_DEPRECATED, cineonblack  DNA_DEPRECATED;  /*deprecated*/
 	float cineongamma  DNA_DEPRECATED;  /*deprecated*/
-	
+
 	/* jpeg2000 */
 	short jp2_preset  DNA_DEPRECATED, jp2_depth  DNA_DEPRECATED;  /*deprecated*/
 	int rpad3;
@@ -556,14 +555,14 @@ typedef struct RenderData {
 typedef struct RenderProfile {
 	struct RenderProfile *next, *prev;
 	char name[32];
-	
+
 	short particle_perc;
 	short subsurf_max;
 	short shadbufsample_max;
 	short pad1;
-	
+
 	float ao_error, pad2;
-	
+
 } RenderProfile;
 
 /* *************************************************************** */
@@ -722,7 +721,7 @@ typedef struct GameData {
 
 /* Markers */
 
-typedef struct TimeMarker {	
+typedef struct TimeMarker {
 	struct TimeMarker *next, *prev;
 	int frame;
 	char name[64];
@@ -738,7 +737,7 @@ typedef struct TimeMarker {
 /* Paint Tool Base */
 typedef struct Paint {
 	struct Brush *brush;
-	
+
 	/* WM Paint cursor */
 	void *paint_cursor;
 	unsigned char paint_cursor_col[4];
@@ -749,7 +748,7 @@ typedef struct Paint {
 	/* Paint stroke can use up to PAINT_MAX_INPUT_SAMPLES inputs to
 	 * smooth the stroke */
 	int num_input_samples;
-	
+
 	int pad;
 } Paint;
 
@@ -761,7 +760,7 @@ typedef struct ImagePaintSettings {
 	Paint paint;
 
 	short flag, pad;
-	
+
 	/* for projection painting only */
 	short seam_bleed, normal_angle;
 	short screen_grab_size[2]; /* capture size for re-projection */
@@ -839,7 +838,7 @@ typedef struct VPaint {
 	int tot;							/* allocation size of prev buffers */
 	unsigned int *vpaint_prev;			/* previous mesh colors */
 	struct MDeformVert *wpaint_prev;	/* previous vertex weights */
-	
+
 	void *paintcursor;					/* wm handle */
 } VPaint;
 
@@ -928,7 +927,7 @@ typedef struct ToolSettings {
 	VPaint *wpaint;		/* weight paint */
 	Sculpt *sculpt;
 	UvSculpt *uvsculpt;	/* uv smooth */
-	
+
 	/* Vertex group weight - used only for editmode, not weight
 	 * paint */
 	float vgroup_weight;
@@ -939,10 +938,10 @@ typedef struct ToolSettings {
 	/*Triangle to Quad conversion threshold*/
 	float jointrilimit;
 	/* Editmode Tools */
-	float degr; 
+	float degr;
 	short step;
-	short turn; 
-	
+	short turn;
+
 	float extr_offs; 	/* extrude offset */
 	float doublimit;	/* remove doubles limit */
 	float normalsize;	/* size of normals */
@@ -955,7 +954,7 @@ typedef struct ToolSettings {
 	/* UV Sphere */
 	short segments;
 	short rings;
-	
+
 	/* Cylinder - Tube - Circle */
 	short vertices;
 
@@ -969,10 +968,10 @@ typedef struct ToolSettings {
 	short uvcalc_flag;
 	short uv_flag, uv_selectmode;
 	short pad2;
-	
+
 	/* Grease Pencil */
 	short gpencil_flags;
-	
+
 	/* Auto-IK */
 	short autoik_chainlen;
 
@@ -981,13 +980,13 @@ typedef struct ToolSettings {
 
 	/* Particle Editing */
 	struct ParticleEditSettings particle;
-	
+
 	/* Transform Proportional Area of Effect */
 	float proportional_size;
 
 	/* Select Group Threshold */
 	float select_thresh;
-	
+
 	/* Graph Editor */
 	float clean_thresh;
 
@@ -1025,7 +1024,7 @@ typedef struct ToolSettings {
 	char skgen_retarget_roll;
 	char skgen_side_string[8];
 	char skgen_num_string[8];
-	
+
 	/* Alt+RMB option */
 	char edge_mode;
 	char edge_mode_live_unwrap;
@@ -1095,33 +1094,33 @@ typedef struct PhysicsSettings {
 
 typedef struct Scene {
 	ID id;
-	struct AnimData *adt;	/* animation data (must be immediately after id for utilities to use it) */ 
-	
+	struct AnimData *adt;	/* animation data (must be immediately after id for utilities to use it) */
+
 	struct Object *camera;
 	struct World *world;
-	
+
 	struct Scene *set;
-	
+
 	ListBase base;
 	struct Base *basact;		/* active base */
 	struct Object *obedit;		/* name replaces old G.obedit */
-	
+
 	float cursor[3];			/* 3d cursor location */
 	float twcent[3];			/* center for transform widget */
 	float twmin[3], twmax[3];	/* boundbox of selection for transform widget */
-	
+
 	unsigned int lay;			/* bitflags for layer visibility */
 	int layact;		/* active layer */
 	unsigned int lay_updated;       /* runtime flag, has layer ever been updated since load? */
-	
+
 	short flag;								/* various settings */
-	
+
 	short use_nodes;
-	
+
 	struct bNodeTree *nodetree;
-	
+
 	struct Editing *ed;								/* sequence editor data is allocated here */
-	
+
 	struct ToolSettings *toolsettings;		/* default allocated now */
 	struct SceneStats *stats;				/* default allocated now */
 
@@ -1129,17 +1128,17 @@ typedef struct Scene {
 	/* no, is on the right place (ton) */
 	struct RenderData r;
 	struct AudioData audio;
-	
+
 	ListBase markers;
 	ListBase transform_spaces;
-	
+
 	void *sound_scene;
 	void *sound_scene_handle;
 	void *sound_scrub_handle;
 	void *speaker_handles;
-	
+
 	void *fps_info;					/* (runtime) info/cache used for presenting playback framerate info to the user */
-	
+
 	/* none of the dependency graph  vars is mean to be saved */
 	struct  DagForest *theDag;
 	short dagflags;
@@ -1148,14 +1147,14 @@ typedef struct Scene {
 	/* User-Defined KeyingSets */
 	int active_keyingset;			/* index of the active KeyingSet. first KeyingSet has index 1, 'none' active is 0, 'add new' is -1 */
 	ListBase keyingsets;			/* KeyingSets for this scene */
-	
+
 	/* Game Settings */
 	struct GameFraming framing  DNA_DEPRECATED; // XXX  deprecated since 2.5
 	struct GameData gm;
 
 	/* Units */
 	struct UnitSettings unit;
-	
+
 	/* Grease Pencil */
 	struct bGPdata *gpd;
 
@@ -1172,7 +1171,7 @@ typedef struct Scene {
 	ColorManagedViewSettings view_settings;
 	ColorManagedDisplaySettings display_settings;
 	ColorManagedColorspaceSettings sequencer_colorspace_settings;
-	
+
 	/* RigidBody simulation world+settings */
 	struct RigidBodyWorld *rigidbody_world;
 } Scene;
@@ -1209,7 +1208,7 @@ typedef struct Scene {
 		/* threads obsolete... is there for old files, now use for autodetect threads */
 #define R_THREADS		0x80000
 		/* Use the same flag for autothreads */
-#define R_FIXED_THREADS		0x80000 
+#define R_FIXED_THREADS		0x80000
 
 #define R_SPEED				0x100000
 #define R_SSS				0x200000
@@ -1290,8 +1289,8 @@ typedef struct Scene {
 #define R_STAMP_RENDERTIME	0x0400
 #define R_STAMP_CAMERALENS	0x0800
 #define R_STAMP_ALL (R_STAMP_TIME|R_STAMP_FRAME|R_STAMP_DATE|R_STAMP_CAMERA|R_STAMP_SCENE| \
-                     R_STAMP_NOTE|R_STAMP_MARKER|R_STAMP_FILENAME|R_STAMP_SEQSTRIP|        \
-                     R_STAMP_RENDERTIME|R_STAMP_CAMERALENS)
+					 R_STAMP_NOTE|R_STAMP_MARKER|R_STAMP_FILENAME|R_STAMP_SEQSTRIP|        \
+					 R_STAMP_RENDERTIME|R_STAMP_CAMERALENS)
 
 /* alphamode */
 #define R_ADDSKY		0

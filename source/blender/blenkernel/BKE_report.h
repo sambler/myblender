@@ -32,7 +32,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 #include <stdio.h>
@@ -83,6 +82,6 @@ bool BKE_report_write_file(const char *filepath, ReportList *reports, const char
 #ifdef __cplusplus
 }
 #endif
-	
+
 #endif
 

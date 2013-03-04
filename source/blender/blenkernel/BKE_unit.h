@@ -29,7 +29,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 /* in all cases the value is assumed to be scaled by the user preference */

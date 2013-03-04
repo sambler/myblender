@@ -4,7 +4,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version. 
+ * of the License, or (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -18,7 +18,7 @@
  * The Original Code is Copyright (C) 2008 Blender Foundation.
  * All rights reserved.
  *
- * 
+ *
  * Contributor(s): Blender Foundation
  *
  * ***** END GPL LICENSE BLOCK *****
@@ -33,7 +33,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 struct ID;
@@ -146,7 +145,7 @@ int  EDBM_backbuf_check(unsigned int index);
 void EDBM_backbuf_free(void);
 
 int  EDBM_backbuf_border_mask_init(struct ViewContext *vc, const int mcords[][2], short tot,
-                                   short xmin, short ymin, short xmax, short ymax);
+								   short xmin, short ymin, short xmax, short ymax);
 int  EDBM_backbuf_circle_init(struct ViewContext *vc, short xs, short ys, short rads);
 
 struct BMVert *EDBM_vert_find_nearest(struct ViewContext *vc, float *r_dist, const short sel, const short strict);
@@ -160,7 +159,7 @@ void EDBM_selectmode_convert(struct BMEditMesh *em, const short selectmode_old, 
 
 /* user access this */
 int EDBM_selectmode_toggle(struct bContext *C, const short selectmode_new,
-                           const int action, const int use_extend, const int use_expand);
+						   const int action, const int use_extend, const int use_expand);
 
 
 void EDBM_deselect_by_material(struct BMEditMesh *em, const short index, const short select);
@@ -213,7 +212,7 @@ typedef struct MirrTopoStore_t {
 
 int  ED_mesh_mirrtopo_recalc_check(struct Mesh *me, const int ob_mode, MirrTopoStore_t *mesh_topo_store);
 void ED_mesh_mirrtopo_init(struct Mesh *me, const int ob_mode, MirrTopoStore_t *mesh_topo_store,
-                           const short skip_em_vert_array_init);
+						   const short skip_em_vert_array_init);
 void ED_mesh_mirrtopo_free(MirrTopoStore_t *mesh_topo_store);
 
 

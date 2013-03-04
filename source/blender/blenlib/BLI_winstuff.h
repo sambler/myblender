@@ -24,7 +24,7 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
- 
+
 #ifndef __BLI_WINSTUFF_H__
 #define __BLI_WINSTUFF_H__
 
@@ -79,7 +79,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 #define _USE_MATH_DEFINES
@@ -135,7 +134,7 @@ typedef struct _DIR {
 	long dd_size;
 	char dd_buf[4096];
 	void *dd_direct;
-	
+
 	struct dirent direntry;
 } DIR;
 

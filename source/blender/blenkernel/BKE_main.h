@@ -44,7 +44,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 struct Library;
@@ -56,7 +55,7 @@ typedef struct Main {
 	short minversionfile, minsubversionfile;
 	int revision;		/* svn revision of binary that saved file */
 	short recovered;	/* indicate the main->name (file) is the recovered one */
-	
+
 	struct Library *curlib;
 	ListBase scene;
 	ListBase library;

@@ -40,7 +40,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 /* forwards */
@@ -52,7 +51,7 @@ typedef struct Global {
 
 	/* active pointers */
 	struct Main *main;
-	
+
 	/* strings: lastsaved */
 	char ima[1024], lib[1024]; /* 1024 = FILE_MAX */
 
@@ -211,5 +210,5 @@ extern Global G;
 #ifdef __cplusplus
 }
 #endif
-	
+
 #endif

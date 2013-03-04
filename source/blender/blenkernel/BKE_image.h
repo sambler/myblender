@@ -35,7 +35,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 struct Image;
@@ -170,7 +169,7 @@ struct Image *BKE_image_add_from_imbuf(struct ImBuf *ibuf);
 void BKE_image_signal(struct Image *ima, struct ImageUser *iuser, int signal);
 
 void BKE_image_walk_all_users(const struct Main *mainp, void *customdata,
-                              void callback(struct Image *ima, struct ImageUser *iuser, void *customdata));
+							  void callback(struct Image *ima, struct ImageUser *iuser, void *customdata));
 
 /* ensures an Image exists for viewing nodes or render */
 struct Image *BKE_image_verify_viewer(int type, const char *name);
@@ -182,7 +181,7 @@ void BKE_image_assign_ibuf(struct Image *ima, struct ImBuf *ibuf);
 void BKE_image_user_frame_calc(struct ImageUser *iuser, int cfra, int fieldnr);
 void BKE_image_user_check_frame_calc(struct ImageUser *iuser, int cfra, int fieldnr);
 int  BKE_image_user_frame_get(const struct ImageUser *iuser, int cfra, int fieldnr, short *r_is_in_range);
-void BKE_image_user_file_path(struct ImageUser *iuser, struct Image *ima, char *path); 
+void BKE_image_user_file_path(struct ImageUser *iuser, struct Image *ima, char *path);
 
 /* sets index offset for multilayer files */
 struct RenderPass *BKE_image_multilayer_index(struct RenderResult *rr, struct ImageUser *iuser);
@@ -193,7 +192,7 @@ void BKE_image_release_renderresult(struct Scene *scene, struct Image *ima);
 
 /* for multiple slot render, call this before render */
 void BKE_image_backup_render(struct Scene *scene, struct Image *ima);
-	
+
 /* goes over all textures that use images */
 void    BKE_image_free_all_textures(void);
 

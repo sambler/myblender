@@ -35,7 +35,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 struct bNode;
@@ -60,7 +59,7 @@ struct World;
 #define MAXCOLORBAND 32
 
 
-void BKE_texture_free(struct Tex *t); 
+void BKE_texture_free(struct Tex *t);
 
 void init_colorband(struct ColorBand *coba, int rangetype);
 struct ColorBand *add_colorband(int rangetype);
@@ -126,7 +125,7 @@ struct VoxelData *BKE_copy_voxeldata(struct VoxelData *vd);
 void BKE_free_oceantex(struct OceanTex *ot);
 struct OceanTex *BKE_add_oceantex(void);
 struct OceanTex *BKE_copy_oceantex(struct OceanTex *ot);
-	
+
 int     BKE_texture_dependsOnTime(const struct Tex *texture);
 
 #ifdef __cplusplus

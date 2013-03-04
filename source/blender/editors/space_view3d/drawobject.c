@@ -619,6 +619,7 @@ static void draw_empty_image(Object *ob, const short dflag, const unsigned char 
 
 	if ((dflag & DRAW_CONSTCOLOR) == 0) {
 		glColor3ubv(ob_wire_col);
+	}
 
 	/* Calculate the outline vertex positions */
 	glBegin(GL_LINE_LOOP);
@@ -627,7 +628,7 @@ static void draw_empty_image(Object *ob, const short dflag, const unsigned char 
 	glVertex2f(ofs_x + ima_x, ofs_y + ima_y);
 	glVertex2f(ofs_x, ofs_y + ima_y);
 	glEnd();
-	}
+
 
 	/* Reset GL settings */
 	glMatrixMode(GL_MODELVIEW);
@@ -1526,8 +1527,8 @@ static void draw_viewport_object_reconstruction(Scene *scene, Base *base, View3D
 			if ((dflag & DRAW_CONSTCOLOR) == 0) {
 				if (selected && (track->flag & TRACK_CUSTOMCOLOR) == 0) {
 					glColor3ubv(ob_wire_col);
-			}
-			else {
+				}
+				else {
 					glColor3fv(track->color);
 				}
 			}
@@ -1556,8 +1557,8 @@ static void draw_viewport_object_reconstruction(Scene *scene, Base *base, View3D
 				}
 
 				if ((dflag & DRAW_CONSTCOLOR) == 0) {
-				if (track->flag & TRACK_CUSTOMCOLOR) glColor3fv(track->color);
-				else UI_ThemeColor(TH_BUNDLE_SOLID);
+					if (track->flag & TRACK_CUSTOMCOLOR) glColor3fv(track->color);
+					else UI_ThemeColor(TH_BUNDLE_SOLID);
 				}
 
 				draw_bundle_sphere();
@@ -1566,13 +1567,13 @@ static void draw_viewport_object_reconstruction(Scene *scene, Base *base, View3D
 				glDisable(GL_LIGHTING);
 
 				if ((dflag & DRAW_CONSTCOLOR) == 0) {
-				if (selected) {
+					if (selected) {
 						glColor3ubv(ob_wire_col);
-				}
-				else {
-					if (track->flag & TRACK_CUSTOMCOLOR) glColor3fv(track->color);
-					else UI_ThemeColor(TH_WIRE);
-				}
+					}
+					else {
+						if (track->flag & TRACK_CUSTOMCOLOR) glColor3fv(track->color);
+						else UI_ThemeColor(TH_WIRE);
+					}
 				}
 
 				drawaxes(0.05f, v3d->bundle_drawtype);
@@ -1585,7 +1586,7 @@ static void draw_viewport_object_reconstruction(Scene *scene, Base *base, View3D
 
 		if ((dflag & DRAW_PICKING) == 0 && (v3d->flag2 & V3D_SHOW_BUNDLENAME)) {
 			float pos[3];
-			
+
 			mul_v3_m4v3(pos, mat, track->bundle_pos);
 			view3d_cached_text_draw_add(pos, track->name, 10, V3D_CACHE_TEXT_GLOBALSPACE, selected ? col_sel : col_unsel);
 		}
@@ -3211,10 +3212,10 @@ static void draw_mesh_fancy(Scene *scene, ARegion *ar, View3D *v3d, RegionView3D
 			if (!ob->sculpt && (v3d->flag2 & V3D_RENDER_OVERRIDE) == 0) {
 				if ((dflag & DRAW_CONSTCOLOR) == 0) {
 					glColor3ubv(ob_wire_col);
-			}
+				}
 				dm->drawLooseEdges(dm);
+			}
 		}
-	}
 	}
 	else if (dt == OB_PAINT) {
 		draw_mesh_paint(v3d, rv3d, ob, dm, draw_flags);
@@ -3222,7 +3223,7 @@ static void draw_mesh_fancy(Scene *scene, ARegion *ar, View3D *v3d, RegionView3D
 		/* since we already draw wire as wp guide, don't draw over the top */
 		draw_wire = OBDRAW_WIRE_OFF;
 	}
-	
+
 	if ((draw_wire != OBDRAW_WIRE_OFF) &&  /* draw extra wire */
 	    /* when overriding with render only, don't bother  */
 	    (((v3d->flag2 & V3D_RENDER_OVERRIDE) && v3d->drawtype >= OB_SOLID) == 0))
@@ -3232,7 +3233,7 @@ static void draw_mesh_fancy(Scene *scene, ARegion *ar, View3D *v3d, RegionView3D
 		 * with the background. */
 
 		if ((dflag & DRAW_CONSTCOLOR) == 0) {
-		if (is_obact && (ob->mode & OB_MODE_PARTICLE_EDIT)) {
+			if (is_obact && (ob->mode & OB_MODE_PARTICLE_EDIT)) {
 				ob_wire_color_blend_theme_id(ob_wire_col, TH_BACK, 0.15f);
 			}
 			else {
@@ -5617,7 +5618,7 @@ static int drawmball(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *base,
 	invert_m4_m4(imat, rv3d->viewmatob);
 	normalize_v3(imat[0]);
 	normalize_v3(imat[1]);
-	
+
 	if (mb->editelems == NULL) {
 		if ((dflag & DRAW_CONSTCOLOR) == 0) {
 			glColor3ubv(ob_wire_col);
@@ -5628,8 +5629,8 @@ static int drawmball(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *base,
 		/* draw radius */
 		if (mb->editelems) {
 			if ((dflag & DRAW_CONSTCOLOR) == 0) {
-			if ((ml->flag & SELECT) && (ml->flag & MB_SCALE_RAD)) cpack(0xA0A0F0);
-			else cpack(0x3030A0);
+				if ((ml->flag & SELECT) && (ml->flag & MB_SCALE_RAD)) cpack(0xA0A0F0);
+				else cpack(0x3030A0);
 			}
 			
 			if (G.f & G_PICKSEL) {
@@ -5642,8 +5643,8 @@ static int drawmball(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *base,
 		/* draw stiffness */
 		if (mb->editelems) {
 			if ((dflag & DRAW_CONSTCOLOR) == 0) {
-			if ((ml->flag & SELECT) && !(ml->flag & MB_SCALE_RAD)) cpack(0xA0F0A0);
-			else cpack(0x30A030);
+				if ((ml->flag & SELECT) && !(ml->flag & MB_SCALE_RAD)) cpack(0xA0F0A0);
+				else cpack(0x30A030);
 			}
 			
 			if (G.f & G_PICKSEL) {
@@ -5665,7 +5666,7 @@ static void draw_forcefield(Object *ob, RegionView3D *rv3d,
 	float imat[4][4], tmat[4][4];
 	float vec[3] = {0.0, 0.0, 0.0};
 	float size;
-
+	
 	/* scale size of circle etc with the empty drawsize */
 	if (ob->type == OB_EMPTY) size = ob->empty_drawsize;
 	else size = 1.0;
@@ -5677,11 +5678,11 @@ static void draw_forcefield(Object *ob, RegionView3D *rv3d,
 	
 	if (pd->forcefield == PFIELD_WIND) {
 		float force_val;
-		
+
 		if ((dflag & DRAW_CONSTCOLOR) == 0) {
 			ob_wire_color_blend_theme_id(ob_wire_col, TH_BACK, 0.5f);
 		}
-		
+
 		//if (has_ipo_code(ob->ipo, OB_PD_FSTR))
 		//	force_val = IPO_GetFloatValue(ob->ipo, OB_PD_FSTR, scene->r.cfra);
 		//else
@@ -6037,40 +6038,40 @@ static void draw_wire_extra(Scene *scene, RegionView3D *rv3d, Object *ob, unsign
 
 		if (scene->obedit == ob) {
 			UI_ThemeColor(TH_WIRE);
-	}
-	else {
+		}
+		else {
 			glColor3ubv(ob_wire_col);
-	}
-	
-	bglPolygonOffset(rv3d->dist, 1.0);
-	glDepthMask(0);  /* disable write in zbuffer, selected edge wires show better */
+		}
 
-	if (ELEM3(ob->type, OB_FONT, OB_CURVE, OB_SURF)) {
-		Curve *cu = ob->data;
-		if (ED_view3d_boundbox_clip(rv3d, ob->obmat, ob->bb ? ob->bb : cu->bb)) {
-			if (ob->type == OB_CURVE)
-				draw_index_wire = 0;
+		bglPolygonOffset(rv3d->dist, 1.0);
+		glDepthMask(0);  /* disable write in zbuffer, selected edge wires show better */
 
-			if (ob->derivedFinal) {
-				drawCurveDMWired(ob);
+		if (ELEM3(ob->type, OB_FONT, OB_CURVE, OB_SURF)) {
+			Curve *cu = ob->data;
+			if (ED_view3d_boundbox_clip(rv3d, ob->obmat, ob->bb ? ob->bb : cu->bb)) {
+				if (ob->type == OB_CURVE)
+					draw_index_wire = 0;
+
+				if (ob->derivedFinal) {
+					drawCurveDMWired(ob);
+				}
+				else {
+					drawDispListwire(&ob->disp);
+				}
+
+				if (ob->type == OB_CURVE)
+					draw_index_wire = 1;
 			}
-			else {
+		}
+		else if (ob->type == OB_MBALL) {
+			if (BKE_mball_is_basis(ob)) {
 				drawDispListwire(&ob->disp);
 			}
-
-			if (ob->type == OB_CURVE)
-				draw_index_wire = 1;
 		}
-	}
-	else if (ob->type == OB_MBALL) {
-		if (BKE_mball_is_basis(ob)) {
-			drawDispListwire(&ob->disp);
-		}
-	}
 
-	glDepthMask(1);
-	bglPolygonOffset(rv3d->dist, 0.0);
-}
+		glDepthMask(1);
+		bglPolygonOffset(rv3d->dist, 0.0);
+	}
 }
 
 /* should be called in view space */

@@ -991,6 +991,12 @@ void nodeFreeNode(bNodeTree *ntree, bNode *node)
 
 		if (treetype->free_node_cache)
 			treetype->free_node_cache(ntree, node);
+		
+		/* texture node has bad habit of keeping exec data around */
+		if (ntree->type == NTREE_TEXTURE && ntree->execdata) {
+			ntreeTexEndExecTree(ntree->execdata, 1);
+			ntree->execdata = NULL;
+		}
 	}
 	
 	/* since it is called while free database, node->id is undefined */
@@ -1040,6 +1046,7 @@ void ntreeFreeTree_ex(bNodeTree *ntree, const short do_id_user)
 				break;
 			case NTREE_TEXTURE:
 				ntreeTexEndExecTree(ntree->execdata, 1);
+				ntree->execdata = NULL;
 				break;
 		}
 	}
@@ -2028,9 +2035,8 @@ void node_type_base(bNodeTreeType *ttype, bNodeType *ntype, int type, const char
 		ntype->update_internal_links = ttype->update_internal_links;
 
 	/* default size values */
-	ntype->width = 140;
-	ntype->minwidth = 100;
-	ntype->maxwidth = 320;
+	node_type_size_preset(ntype, NODE_SIZE_DEFAULT);
+	
 	ntype->height = 100;
 	ntype->minheight = 30;
 	ntype->maxheight = FLT_MAX;
@@ -2060,6 +2066,21 @@ void node_type_size(struct bNodeType *ntype, int width, int minwidth, int maxwid
 		ntype->maxwidth = FLT_MAX;
 	else
 		ntype->maxwidth = maxwidth;
+}
+
+void node_type_size_preset(struct bNodeType *ntype, eNodeSizePreset size)
+{
+	switch (size) {
+		case NODE_SIZE_DEFAULT:
+			node_type_size(ntype, 140, 100, 320);
+			break;
+		case NODE_SIZE_SMALL:
+			node_type_size(ntype, 100, 80, 320);
+			break;
+		case NODE_SIZE_LARGE:
+			node_type_size(ntype, 140, 120, 500);
+			break;
+	}
 }
 
 void node_type_storage(bNodeType *ntype, const char *storagename, void (*freestoragefunc)(struct bNode *), void (*copystoragefunc)(struct bNode *, struct bNode *))

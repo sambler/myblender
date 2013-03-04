@@ -32,6 +32,7 @@
  *  \ingroup bli
  */
 
+#include "BLI_utildefines.h"
 #include "DNA_listBase.h"
 //struct ListBase;
 //struct LinkData;
@@ -41,7 +42,6 @@ extern "C" {
 //} for code folding
 #endif
 
-void BLI_insertlink(struct ListBase *listbase, void *vprevlink, void *vnewlink);
 int BLI_findindex(const struct ListBase *listbase, const void *vlink);
 int BLI_findstringindex(const struct ListBase *listbase, const char *id, const int offset);
 
@@ -60,7 +60,7 @@ void *BLI_rfindptr(const struct ListBase *listbase, const void *ptr, const int o
 void BLI_freelistN(struct ListBase *listbase);
 void BLI_addtail(struct ListBase *listbase, void *vlink);
 void BLI_remlink(struct ListBase *listbase, void *vlink);
-int BLI_remlink_safe(struct ListBase *listbase, void *vlink);
+bool BLI_remlink_safe(struct ListBase *listbase, void *vlink);
 
 void BLI_addhead(struct ListBase *listbase, void *vlink);
 void BLI_insertlinkbefore(struct ListBase *listbase, void *vnextlink, void *vnewlink);

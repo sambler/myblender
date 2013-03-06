@@ -345,14 +345,14 @@ static int sculpt_get_brush_geometry(bContext *C, ViewContext *vc,
 {
 	Scene *scene = CTX_data_scene(C);
 	Paint *paint = paint_get_active_from_context(C);
-	float window[2];
+	float mouse[2];
 	int hit;
 
-	window[0] = x + vc->ar->winrct.xmin;
-	window[1] = y + vc->ar->winrct.ymin;
+	mouse[0] = x;
+	mouse[1] = y;
 
 	if (vc->obact->sculpt && vc->obact->sculpt->pbvh &&
-	    sculpt_stroke_get_location(C, location, window))
+	    sculpt_stroke_get_location(C, location, mouse))
 	{
 		Brush *brush = paint_brush(paint);
 		*pixel_radius =
@@ -590,8 +590,8 @@ static void paint_draw_cursor(bContext *C, int x, int y, void *UNUSED(unused))
 
 		if (ups->draw_anchored) {
 			final_radius = ups->anchored_size;
-			translation[0] = ups->anchored_initial_mouse[0] - vc.ar->winrct.xmin;
-			translation[1] = ups->anchored_initial_mouse[1] - vc.ar->winrct.ymin;
+			translation[0] = ups->anchored_initial_mouse[0];
+			translation[1] = ups->anchored_initial_mouse[1];
 		}
 	}
 

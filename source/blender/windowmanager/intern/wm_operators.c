@@ -1598,14 +1598,14 @@ static void wm_block_splash_refreshmenu(bContext *UNUSED(C), void *UNUSED(arg_bl
 static int wm_resource_check_prev(void)
 {
 
-	char *res = BLI_get_folder_version(BLENDER_RESOURCE_PATH_USER, BLENDER_VERSION, TRUE);
+	const char *res = BLI_get_folder_version(BLENDER_RESOURCE_PATH_USER, BLENDER_VERSION, true);
 
 	// if (res) printf("USER: %s\n", res);
 
 #if 0 /* ignore the local folder */
 	if (res == NULL) {
 		/* with a local dir, copying old files isn't useful since local dir get priority for config */
-		res = BLI_get_folder_version(BLENDER_RESOURCE_PATH_LOCAL, BLENDER_VERSION, TRUE);
+		res = BLI_get_folder_version(BLENDER_RESOURCE_PATH_LOCAL, BLENDER_VERSION, true);
 	}
 #endif
 
@@ -1614,7 +1614,7 @@ static int wm_resource_check_prev(void)
 		return FALSE;
 	}
 	else {
-		return (BLI_get_folder_version(BLENDER_RESOURCE_PATH_USER, BLENDER_VERSION - 1, TRUE) != NULL);
+		return (BLI_get_folder_version(BLENDER_RESOURCE_PATH_USER, BLENDER_VERSION - 1, true) != NULL);
 	}
 }
 
@@ -2319,7 +2319,7 @@ static void WM_OT_recover_auto_save(wmOperatorType *ot)
 static void untitled(char *filepath)
 {
 	if (G.save_over == 0 && strlen(filepath) < FILE_MAX - 16) {
-		char *c = BLI_last_slash(filepath);
+		char *c = (char *)BLI_last_slash(filepath);
 		
 		if (c)
 			strcpy(&c[1], "untitled.blend");
@@ -2409,7 +2409,7 @@ static int blend_save_check(bContext *UNUSED(C), wmOperator *op)
 	RNA_string_get(op->ptr, "filepath", filepath);
 	if (!BLO_has_bfile_extension(filepath)) {
 		/* some users would prefer BLI_replace_extension(),
-		 * we keep getting knit-picking bug reports about this - campbell */
+		 * we keep getting nitpicking bug reports about this - campbell */
 		BLI_ensure_extension(filepath, FILE_MAX, ".blend");
 		RNA_string_set(op->ptr, "filepath", filepath);
 		return TRUE;
@@ -2787,7 +2787,18 @@ int WM_gesture_circle_modal(bContext *C, wmOperator *op, wmEvent *event)
 			gesture_circle_apply(C, op);
 	}
 	else if (event->type == EVT_MODAL_MAP) {
+		float fac;
+		
 		switch (event->val) {
+			case GESTURE_MODAL_CIRCLE_SIZE:
+				fac = 0.3f * (event->y - event->prevy);
+				if (fac > 0)
+					rect->xmax += ceil(fac);
+				else
+					rect->xmax += floor(fac);
+				if (rect->xmax < 1) rect->xmax = 1;
+				wm_gesture_tag_redraw(C);
+				break;
 			case GESTURE_MODAL_CIRCLE_ADD:
 				rect->xmax += 2 + rect->xmax / 10;
 				wm_gesture_tag_redraw(C);
@@ -4062,6 +4073,7 @@ static void gesture_circle_modal_keymap(wmKeyConfig *keyconf)
 		{GESTURE_MODAL_CONFIRM, "CONFIRM", 0, "Confirm", ""},
 		{GESTURE_MODAL_CIRCLE_ADD, "ADD", 0, "Add", ""},
 		{GESTURE_MODAL_CIRCLE_SUB, "SUBTRACT", 0, "Subtract", ""},
+		{GESTURE_MODAL_CIRCLE_SIZE, "SIZE", 0, "Size", ""},
 
 		{GESTURE_MODAL_SELECT,  "SELECT", 0, "Select", ""},
 		{GESTURE_MODAL_DESELECT, "DESELECT", 0, "DeSelect", ""},
@@ -4100,6 +4112,7 @@ static void gesture_circle_modal_keymap(wmKeyConfig *keyconf)
 	WM_modalkeymap_add_item(keymap, PADMINUS, KM_PRESS, 0, 0, GESTURE_MODAL_CIRCLE_SUB);
 	WM_modalkeymap_add_item(keymap, WHEELDOWNMOUSE, KM_PRESS, 0, 0, GESTURE_MODAL_CIRCLE_ADD);
 	WM_modalkeymap_add_item(keymap, PADPLUSKEY, KM_PRESS, 0, 0, GESTURE_MODAL_CIRCLE_ADD);
+	WM_modalkeymap_add_item(keymap, MOUSEPAN, 0, 0, 0, GESTURE_MODAL_CIRCLE_SIZE);
 
 	/* assign map to operators */
 	WM_modalkeymap_assign(keymap, "VIEW3D_OT_select_circle");

@@ -967,7 +967,20 @@ static void threaded_tile_processor(Render *re)
 		if ((g_break=re->test_break(re->tbh)))
 			break;
 	}
-	
+
+	if (g_break) {
+		/* review the done queue and handle all the render parts,
+		 * so no unfreed render result are lurking around
+		 */
+		BLI_thread_queue_nowait(donequeue);
+		while ((pa = BLI_thread_queue_pop(donequeue))) {
+			if (pa->result) {
+				render_result_free_list(&pa->fullresult, pa->result);
+				pa->result = NULL;
+			}
+		}
+	}
+
 	BLI_thread_queue_free(donequeue);
 	BLI_thread_queue_free(workqueue);
 	
@@ -1999,7 +2012,7 @@ int RE_is_rendering_allowed(Scene *scene, Object *camera_override, ReportList *r
 		
 		render_result_exr_file_path(scene, "", 0, str);
 		
-		if (BLI_file_is_writable(str) == 0) {
+		if (!BLI_file_is_writable(str)) {
 			BKE_report(reports, RPT_ERROR, "Cannot save render buffers, check the temp default path");
 			return 0;
 		}
@@ -2429,7 +2442,7 @@ void RE_BlenderAnim(Render *re, Main *bmain, Scene *scene, Object *camera_overri
 				/* remove touched file */
 				if (BKE_imtype_is_movie(scene->r.im_format.imtype) == 0) {
 					if (scene->r.mode & R_TOUCH && BLI_exists(name) && BLI_file_size(name) == 0) {
-						BLI_delete(name, 0, 0);
+						BLI_delete(name, false, false);
 					}
 				}
 				

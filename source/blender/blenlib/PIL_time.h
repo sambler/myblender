@@ -35,10 +35,9 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
-extern 
+extern
 /** Return an indication of time, expressed	as
  * seconds since some fixed point. Successive calls
  * are guaranteed to generate values greater than or

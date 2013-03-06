@@ -37,7 +37,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 GHOST_DECLARE_HANDLE(GHOST_SystemPathsHandle);

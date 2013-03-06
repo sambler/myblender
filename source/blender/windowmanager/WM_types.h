@@ -4,7 +4,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version. 
+ * of the License, or (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -18,7 +18,7 @@
  * The Original Code is Copyright (C) 2007 Blender Foundation.
  * All rights reserved.
  *
- * 
+ *
  * Contributor(s): Blender Foundation
  *
  * ***** END GPL LICENSE BLOCK *****
@@ -104,7 +104,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 struct bContext;
@@ -196,15 +195,15 @@ typedef void (*wmUIHandlerRemoveFunc)(struct bContext *C, void *userdata);
 
 typedef struct wmNotifier {
 	struct wmNotifier *next, *prev;
-	
+
 	struct wmWindowManager *wm;
 	struct wmWindow *window;
-	
+
 	int swinid;			/* can't rely on this, notifiers can be added without context, swinid of 0 */
 	unsigned int category, data, subtype, action;
-	
+
 	void *reference;
-	
+
 } wmNotifier;
 
 
@@ -315,7 +314,7 @@ typedef struct wmNotifier {
 	/* NC_TEXT Text */
 #define ND_CURSOR			(50<<16)
 #define ND_DISPLAY			(51<<16)
-	
+
 	/* NC_ANIMATION Animato */
 #define ND_KEYFRAME			(70<<16)
 #define ND_KEYFRAME_PROP	(71<<16)
@@ -402,7 +401,7 @@ typedef struct wmGesture {
 	int swinid;		/* initial subwindow id where it started */
 	int points;		/* optional, amount of points stored */
 	int size;		/* optional, maximum amount of points stored */
-	
+
 	void *customdata;
 	/* customdata for border is a recti */
 	/* customdata for circle is recti, (xmin, ymin) is center, xmax radius */
@@ -419,7 +418,7 @@ typedef struct wmGesture {
 /* event comes from eventmanager and from keymap */
 typedef struct wmEvent {
 	struct wmEvent *next, *prev;
-	
+
 	short type;			/* event code itself (short, is also in keymap) */
 	short val;			/* press, release, scrollvalue */
 	int x, y;			/* mouse pointer position, screen coord */
@@ -436,14 +435,14 @@ typedef struct wmEvent {
 	int prevx, prevy;
 	double prevclicktime;
 	int prevclickx, prevclicky;
-	
+
 	/* modifier states */
 	short shift, ctrl, alt, oskey;	/* oskey is apple or windowskey, value denotes order of pressed */
 	short keymodifier;				/* rawkey modifier */
-	
+
 	/* set in case a KM_PRESS went by unhandled */
 	short check_click;
-	
+
 	/* keymap item, set by handler (weak?) */
 	const char *keymap_idname;
 
@@ -455,7 +454,7 @@ typedef struct wmEvent {
 	short customdatafree;
 	int pad2;
 	void *customdata;	/* ascii, unicode, mouse coords, angles, vectors, dragdrop info */
-	
+
 } wmEvent;
 
 /* ************** custom wmEvent data ************** */
@@ -494,16 +493,16 @@ typedef struct wmNDOFMotionData {
 
 typedef struct wmTimer {
 	struct wmTimer *next, *prev;
-	
+
 	struct wmWindow *win;	/* window this timer is attached to (optional) */
 
 	double timestep;		/* set by timer user */
 	int event_type;			/* set by timer user, goes to event system */
 	void *customdata;		/* set by timer user, to allow custom values */
-	
+
 	double duration;		/* total running time in seconds */
 	double delta;			/* time since previous step in seconds */
-	
+
 	double ltime;			/* internal, last time timer was activated */
 	double ntime;			/* internal, next time we want to activate the timer */
 	double stime;			/* internal, when the timer started */
@@ -524,7 +523,7 @@ typedef struct wmOperatorType {
 	__attribute__((warn_unused_result))
 #endif
 	;
-	
+
 	/* this callback executes on a running operator whenever as property
 	 * is changed. It can correct its own properties or report errors for
 	 * invalid settings in exceptional cases.
@@ -627,16 +626,16 @@ typedef struct wmReport {
 
 typedef struct wmDrag {
 	struct wmDrag *next, *prev;
-	
+
 	int icon, type;					/* type, see WM_DRAG defines above */
 	void *poin;
 	char path[1024]; /* FILE_MAX */
 	double value;
-	
+
 	struct ImBuf *imb;						/* if no icon but imbuf should be drawn around cursor */
 	float scale;
 	int sx, sy;
-	
+
 	char opname[200]; /* if set, draws operator name*/
 } wmDrag;
 
@@ -644,13 +643,13 @@ typedef struct wmDrag {
 /* allocation and free is on startup and exit */
 typedef struct wmDropBox {
 	struct wmDropBox *next, *prev;
-	
+
 	/* test if the dropbox is active, then can print optype name */
 	int (*poll)(struct bContext *, struct wmDrag *, wmEvent *);
 
 	/* before exec, this copies drag info to wmDrop properties */
 	void (*copy)(struct wmDrag *, struct wmDropBox *);
-	
+
 	/* if poll survives, operator is called */
 	wmOperatorType *ot;				/* not saved in file, so can be pointer */
 

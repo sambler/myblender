@@ -4,7 +4,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version. 
+ * of the License, or (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -18,7 +18,7 @@
  * The Original Code is Copyright (C) 2007 Blender Foundation.
  * All rights reserved.
  *
- * 
+ *
  * Contributor(s): Blender Foundation
  *
  * ***** END GPL LICENSE BLOCK *****
@@ -43,7 +43,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 struct bContext;
@@ -105,7 +104,7 @@ int			WM_window_pixels_y		(struct wmWindow *win);
 #define WM_WINDOW_FILESEL		2
 
 void		WM_window_open_temp	(struct bContext *C, struct rcti *position, int type);
-			
+
 			/* returns true if draw method is triple buffer */
 int			WM_is_draw_triple(struct wmWindow *win);
 
@@ -125,9 +124,9 @@ void		WM_cursor_grab_disable(struct wmWindow *win, int mouse_ungrab_xy[2]);
 void		WM_cursor_time		(struct wmWindow *win, int nr);
 
 void		*WM_paint_cursor_activate(struct wmWindowManager *wm,
-                                      int (*poll)(struct bContext *C),
-                                      void (*draw)(struct bContext *C, int, int, void *customdata),
-                                      void *customdata);
+									  int (*poll)(struct bContext *C),
+									  void (*draw)(struct bContext *C, int, int, void *customdata),
+									  void *customdata);
 
 void		WM_paint_cursor_end(struct wmWindowManager *wm, void *handle);
 
@@ -153,9 +152,9 @@ struct wmEventHandler *WM_event_add_ui_handler(
 		void (*remove)(struct bContext *C, void *userdata), void *userdata);
 
 void		WM_event_remove_ui_handler(ListBase *handlers,
-                                       int (*func)(struct bContext *C, const struct wmEvent *event, void *userdata),
-                                       void (*remove)(struct bContext *C, void *userdata),
-                                       void *userdata, int postpone);
+									   int (*func)(struct bContext *C, const struct wmEvent *event, void *userdata),
+									   void (*remove)(struct bContext *C, void *userdata),
+									   void *userdata, int postpone);
 void		WM_event_remove_area_handler(struct ListBase *handlers, void *area);
 
 struct wmEventHandler *WM_event_add_modal_handler(struct bContext *C, struct wmOperator *op);
@@ -319,7 +318,7 @@ struct wmDrag		*WM_event_start_drag(struct bContext *C, int icon, int type, void
 void				WM_event_drag_image(struct wmDrag *, struct ImBuf *, float scale, int sx, int sy);
 
 struct wmDropBox	*WM_dropbox_add(ListBase *lb, const char *idname, int (*poll)(struct bContext *, struct wmDrag *, struct wmEvent *event),
-                                    void (*copy)(struct wmDrag *, struct wmDropBox *));
+									void (*copy)(struct wmDrag *, struct wmDropBox *));
 ListBase	*WM_dropboxmap_find(const char *idname, int spaceid, int regionid);
 
 			/* Set a subwindow active in pixelspace view, with optional scissor subset */
@@ -373,10 +372,10 @@ void       *WM_jobs_customdata_get(struct wmJob *);
 void        WM_jobs_customdata_set(struct wmJob *, void *customdata, void (*free)(void *));
 void        WM_jobs_timer(struct wmJob *, double timestep, unsigned int note, unsigned int endnote);
 void        WM_jobs_callbacks(struct wmJob *,
-                              void (*startjob)(void *, short *, short *, float *),
-                              void (*initjob)(void *),
-                              void (*update)(void *),
-                              void (*endjob)(void *));
+							  void (*startjob)(void *, short *, short *, float *),
+							  void (*initjob)(void *),
+							  void (*update)(void *),
+							  void (*endjob)(void *));
 
 void		WM_jobs_start(struct wmWindowManager *wm, struct wmJob *);
 void		WM_jobs_stop(struct wmWindowManager *wm, void *owner, void *startjob);

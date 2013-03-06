@@ -162,7 +162,7 @@ static int space_image_file_exists_poll(bContext *C)
 			if (BLI_exists(name) == FALSE) {
 				CTX_wm_operator_poll_msg_set(C, "image file not found");
 			}
-			else if (BLI_file_is_writable(name) == FALSE) {
+			else if (!BLI_file_is_writable(name)) {
 				CTX_wm_operator_poll_msg_set(C, "image path can't be written to");
 			}
 			else {
@@ -1603,7 +1603,7 @@ static int image_save_sequence_exec(bContext *C, wmOperator *op)
 	SpaceImage *sima = CTX_wm_space_image(C);
 	ImBuf *ibuf;
 	int tot = 0;
-	char di[FILE_MAX], fi[FILE_MAX];
+	char di[FILE_MAX];
 	
 	if (sima->image == NULL)
 		return OPERATOR_CANCELLED;
@@ -1632,10 +1632,8 @@ static int image_save_sequence_exec(bContext *C, wmOperator *op)
 	for (ibuf = sima->image->ibufs.first; ibuf; ibuf = ibuf->next)
 		if (ibuf->userflags & IB_BITMAPDIRTY)
 			break;
-	
-	BLI_strncpy(di, ibuf->name, FILE_MAX);
-	BLI_splitdirstring(di, fi);
-	
+
+	BLI_split_dir_part(ibuf->name, di, sizeof(di));
 	BKE_reportf(op->reports, RPT_INFO, "%d image(s) will be saved in %s", tot, di);
 
 	for (ibuf = sima->image->ibufs.first; ibuf; ibuf = ibuf->next) {

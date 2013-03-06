@@ -27,7 +27,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 /* Author: Morten S. Mikkelsen

@@ -36,7 +36,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 /** descriptor and storage for a custom data layer */
@@ -65,8 +64,8 @@ typedef struct CustomDataExternal {
 typedef struct CustomData {
 	CustomDataLayer *layers;      /* CustomDataLayers, ordered by type */
 	int typemap[37];              /* runtime only! - maps types to indices of first layer of that type,
-	                               * MUST be >= CD_NUMTYPES, but we cant use a define here.
-	                               * Correct size is ensured in CustomData_update_typemap assert() */
+								   * MUST be >= CD_NUMTYPES, but we cant use a define here.
+								   * Correct size is ensured in CustomData_update_typemap assert() */
 	int totlayer, maxlayer;       /* number of layers, size of layers array */
 	int totsize;                  /* in editmode, total size of all data layers */
 	void *pool;                   /* Bmesh: Memory pool for allocation of blocks */

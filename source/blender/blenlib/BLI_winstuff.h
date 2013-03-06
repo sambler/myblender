@@ -24,7 +24,7 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
- 
+
 #ifndef __BLI_WINSTUFF_H__
 #define __BLI_WINSTUFF_H__
 
@@ -79,7 +79,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 #define _USE_MATH_DEFINES
@@ -94,6 +93,14 @@ extern "C" {
 
 /* defines for using ISO C++ conformant names */
 #define snprintf _snprintf
+
+#ifdef _MSC_VER
+#  define	R_OK	4
+#  define	W_OK	2
+#  define	X_OK	1
+#  define	F_OK	0
+#  define	PATH_MAX 4096
+#endif
 
 #ifndef FREE_WINDOWS
 typedef unsigned int mode_t;
@@ -135,7 +142,7 @@ typedef struct _DIR {
 	long dd_size;
 	char dd_buf[4096];
 	void *dd_direct;
-	
+
 	struct dirent direntry;
 } DIR;
 

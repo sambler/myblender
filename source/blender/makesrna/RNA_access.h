@@ -33,7 +33,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 struct bContext;
@@ -860,14 +859,14 @@ int RNA_property_reset(PointerRNA *ptr, PropertyRNA *prop, int index);
  * UI code or Actions, though efficiency is a concern. */
 
 char *RNA_path_append(const char *path, PointerRNA *ptr, PropertyRNA *prop,
-                      int intkey, const char *strkey);
+					  int intkey, const char *strkey);
 char *RNA_path_back(const char *path);
 
 int RNA_path_resolve(PointerRNA *ptr, const char *path,
-                     PointerRNA *r_ptr, PropertyRNA **r_prop);
+					 PointerRNA *r_ptr, PropertyRNA **r_prop);
 
 int RNA_path_resolve_full(PointerRNA *ptr, const char *path,
-                          PointerRNA *r_ptr, PropertyRNA **r_prop, int *index);
+						  PointerRNA *r_ptr, PropertyRNA **r_prop, int *index);
 
 char *RNA_path_from_ID_to_struct(PointerRNA *ptr);
 char *RNA_path_from_ID_to_property(PointerRNA *ptr, PropertyRNA *prop);
@@ -884,7 +883,7 @@ char *RNA_path_property_py(struct PointerRNA *ptr, struct PropertyRNA *prop, int
  * call RNA_struct_find_property. The names have to exist as RNA properties
  * for the type in the pointer, if they do not exist an error will be printed.
  *
- * There is no support for pointers and collections here yet, these can be 
+ * There is no support for pointers and collections here yet, these can be
  * added when ID properties support them. */
 
 int RNA_boolean_get(PointerRNA *ptr, const char *name);
@@ -935,8 +934,8 @@ void RNA_collection_clear(PointerRNA *ptr, const char *name);
 	{                                                                         \
 		CollectionPropertyIterator rna_macro_iter;                            \
 		for (RNA_collection_begin(sptr, propname, &rna_macro_iter);           \
-		     rna_macro_iter.valid;                                            \
-		     RNA_property_collection_next(&rna_macro_iter))                   \
+			 rna_macro_iter.valid;                                            \
+			 RNA_property_collection_next(&rna_macro_iter))                   \
 		{                                                                     \
 			PointerRNA itemptr = rna_macro_iter.ptr;
 
@@ -949,8 +948,8 @@ void RNA_collection_clear(PointerRNA *ptr, const char *name);
 	{                                                                         \
 		CollectionPropertyIterator rna_macro_iter;                            \
 		for (RNA_property_collection_begin(sptr, prop, &rna_macro_iter);      \
-		     rna_macro_iter.valid;                                            \
-		     RNA_property_collection_next(&rna_macro_iter))                   \
+			 rna_macro_iter.valid;                                            \
+			 RNA_property_collection_next(&rna_macro_iter))                   \
 		{                                                                     \
 			PointerRNA itemptr = rna_macro_iter.ptr;
 
@@ -963,11 +962,11 @@ void RNA_collection_clear(PointerRNA *ptr, const char *name);
 	{                                                                         \
 		CollectionPropertyIterator rna_macro_iter;                            \
 		for (RNA_property_collection_begin(                                   \
-		             sptr,                                                    \
-		             RNA_struct_iterator_property(sptr->type),                \
-		             &rna_macro_iter);                                        \
-		     rna_macro_iter.valid;                                            \
-		     RNA_property_collection_next(&rna_macro_iter))                   \
+					 sptr,                                                    \
+					 RNA_struct_iterator_property(sptr->type),                \
+					 &rna_macro_iter);                                        \
+			 rna_macro_iter.valid;                                            \
+			 RNA_property_collection_next(&rna_macro_iter))                   \
 		{                                                                     \
 			PropertyRNA *prop = rna_macro_iter.ptr.data;
 
@@ -987,12 +986,12 @@ int RNA_property_is_idprop(PropertyRNA *prop);
 char *RNA_property_as_string(struct bContext *C, PointerRNA *ptr, PropertyRNA *prop, int index);
 char *RNA_pointer_as_string(struct bContext *C, PointerRNA *ptr, PropertyRNA *prop_ptr, PointerRNA *ptr_prop);
 char *RNA_pointer_as_string_keywords_ex(struct bContext *C, PointerRNA *ptr, PointerRNA *ptr_default,
-                                        const short skip_optional_value, const short all_args,
-                                        PropertyRNA *iterprop);
+										const short skip_optional_value, const short all_args,
+										PropertyRNA *iterprop);
 char *RNA_pointer_as_string_keywords(struct bContext *C, PointerRNA *ptr, PointerRNA *ptr_default,
-                                     const short skip_optional_value, const short all_args);
+									 const short skip_optional_value, const short all_args);
 char *RNA_function_as_string_keywords(struct bContext *C, FunctionRNA *func, PointerRNA *ptr_default,
-                                      const short as_function, const short all_args);
+									  const short as_function, const short all_args);
 
 /* Function */
 

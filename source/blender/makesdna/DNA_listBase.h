@@ -41,7 +41,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 /* generic - all structs which are put into linked lists begin with this */

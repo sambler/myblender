@@ -39,7 +39,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 int BLI_findindex(const struct ListBase *listbase, const void *vlink);

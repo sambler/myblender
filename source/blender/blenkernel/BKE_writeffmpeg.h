@@ -36,7 +36,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 #define FFMPEG_MPEG1    0
@@ -63,14 +62,14 @@ extern "C" {
 #define FFMPEG_PRESET_XVID      7
 
 struct IDProperty;
-struct RenderData;	
+struct RenderData;
 struct ReportList;
 struct Scene;
 
 int BKE_ffmpeg_start(struct Scene *scene, struct RenderData *rd, int rectx, int recty, struct ReportList *reports);
 void BKE_ffmpeg_end(void);
 int BKE_ffmpeg_append(struct RenderData *rd, int start_frame, int frame, int *pixels,
-                      int rectx, int recty, struct ReportList *reports);
+					  int rectx, int recty, struct ReportList *reports);
 void BKE_ffmpeg_filepath_get(char *string, struct RenderData *rd);
 
 void BKE_ffmpeg_preset_set(struct RenderData *rd, int preset);

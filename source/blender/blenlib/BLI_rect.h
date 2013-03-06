@@ -41,7 +41,6 @@ struct rcti;
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 int  BLI_rcti_is_empty(const struct rcti *rect);

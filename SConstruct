@@ -76,7 +76,6 @@ VERSION_RELEASE_CYCLE = btools.VERSION_RELEASE_CYCLE
 platform = sys.platform
 quickie = None
 quickdebug = None
-Decider('MD5-timestamp')
 
 ##### BEGIN SETUP #####
 

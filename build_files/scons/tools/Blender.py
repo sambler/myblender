@@ -410,7 +410,7 @@ def buildinfo(lenv, build_type):
     build_time = time.strftime ("%H:%M:%S")
     build_rev = os.popen('svnversion').read()[:-1] # remove \n
     if build_rev == '': 
-        build_rev = '55013'
+        build_rev = '55074'
     if lenv['BF_DEBUG']:
         build_type = "Debug"
         build_cflags = ' '.join(lenv['CFLAGS'] + lenv['CCFLAGS'] + lenv['BF_DEBUG_CCFLAGS'] + lenv['CPPFLAGS'])
@@ -455,22 +455,22 @@ def my_print_cmd_line(self, s, target, source, env):
 def my_compile_print(target, source, env):
     a = '%s' % (source[0])
     d, f = os.path.split(a)
-    return bc.OKBLUE+"Compiling"+bc.ENDC +" ==> '"+bc.OKGREEN+"%s" % (f) + "'"+bc.ENDC
+    return bc.OKBLUE + "Compiling" + bc.ENDC + " ==> '" + bc.OKGREEN + ("%s" % f) + bc.ENDC + "'"
 
 def my_moc_print(target, source, env):
     a = '%s' % (source[0])
     d, f = os.path.split(a)
-    return bc.OKBLUE+"Creating MOC"+bc.ENDC+ " ==> '"+bc.OKGREEN+"%s" %(f) + "'"+bc.ENDC
+    return bc.OKBLUE + "Creating MOC" + bc.ENDC + " ==> '" + bc.OKGREEN + ("%s" % f) + bc.ENDC + "'"
 
 def my_linking_print(target, source, env):
     t = '%s' % (target[0])
     d, f = os.path.split(t)
-    return bc.OKBLUE+"Linking library"+bc.ENDC +" ==> '"+bc.OKGREEN+"%s" % (f) + "'"+bc.ENDC
+    return bc.OKBLUE + "Linking library" + bc.ENDC + " ==> '" + bc.OKGREEN + ("%s" % f) + bc.ENDC + "'"
 
 def my_program_print(target, source, env):
     t = '%s' % (target[0])
     d, f = os.path.split(t)
-    return bc.OKBLUE+"Linking program"+bc.ENDC +" ==> '"+bc.OKGREEN+"%s" % (f) + "'"+bc.ENDC
+    return bc.OKBLUE + "Linking program" + bc.ENDC + " ==> '" + bc.OKGREEN + ("%s" % f) + bc.ENDC + "'"
 
 def msvc_hack(env):
     static_lib = SCons.Tool.createStaticLibBuilder(env)

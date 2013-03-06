@@ -34,7 +34,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 struct Image;
@@ -69,7 +68,7 @@ void GPU_state_print(void);
  *   GPU_enable_material returns 0 if drawing should be skipped
  * - after drawing, the material must be disabled again */
 
-void GPU_begin_object_materials(struct View3D *v3d, struct RegionView3D *rv3d, 
+void GPU_begin_object_materials(struct View3D *v3d, struct RegionView3D *rv3d,
 	struct Scene *scene, struct Object *ob, int glsl, int *do_alpha_after);
 void GPU_end_object_materials(void);
 

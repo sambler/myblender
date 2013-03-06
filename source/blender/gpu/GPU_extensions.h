@@ -36,13 +36,12 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 struct Image;
 struct ImageUser;
 struct PreviewImage;
-	
+
 struct GPUTexture;
 typedef struct GPUTexture GPUTexture;
 

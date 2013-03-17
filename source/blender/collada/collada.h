@@ -41,6 +41,12 @@ typedef enum BC_export_mesh_type {
 	BC_MESH_TYPE_RENDER
 } BC_export_mesh_type;
 
+typedef enum BC_export_transformation_type {
+	BC_TRANSFORMATION_TYPE_MATRIX,
+	BC_TRANSFORMATION_TYPE_TRANSROTLOC,
+	BC_TRANSFORMATION_TYPE_BOTH
+} BC_export_transformation_type;
+
 struct bContext;
 struct Scene;
 
@@ -52,25 +58,26 @@ int collada_import(bContext *C,
 				   int import_units);
 
 int collada_export(Scene *sce,
-				   const char *filepath,
-				   int apply_modifiers,
-				   BC_export_mesh_type export_mesh_type,
+                   const char *filepath,
+                   int apply_modifiers,
+                   BC_export_mesh_type export_mesh_type,
 
-				   int selected,
-				   int include_children,
-				   int include_armatures,
-				   int include_shapekeys,
-				   int deform_bones_only,
+                   int selected,
+                   int include_children,
+                   int include_armatures,
+                   int include_shapekeys,
+                   int deform_bones_only,
 
 				   int active_uv_only,
 				   int include_uv_textures,
 				   int include_material_textures,
 				   int use_texture_copies,
 
-				   int triangulate,
-				   int use_object_instantiation,
-				   int sort_by_name,
-				   int second_life);
+                   int triangulate,
+                   int use_object_instantiation,
+                   int sort_by_name,
+                   BC_export_transformation_type export_transformation_type,
+                   int second_life);
 
 
 

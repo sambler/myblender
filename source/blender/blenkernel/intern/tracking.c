@@ -261,7 +261,9 @@ void BKE_tracking_get_projection_matrix(MovieTracking *tracking, MovieTrackingOb
 		invert_m4_m4(imat, camera->mat);
 		mult_m4_m4m4(mat, winmat, imat);
 	}
-	else copy_m4_m4(mat, winmat);
+	else {
+		copy_m4_m4(mat, winmat);
+	}
 }
 
 /* **** space transformation functions  **** */
@@ -1189,6 +1191,7 @@ MovieTrackingObject *BKE_tracking_object_add(MovieTracking *tracking, const char
 	object->keyframe2 = 30;
 
 	BKE_tracking_object_unique_name(tracking, object);
+	BKE_tracking_dopesheet_tag_update(tracking);
 
 	return object;
 }
@@ -1223,6 +1226,9 @@ int BKE_tracking_object_delete(MovieTracking *tracking, MovieTrackingObject *obj
 		tracking->objectnr = index - 1;
 	else
 		tracking->objectnr = 0;
+
+	BKE_tracking_dopesheet_tag_update(tracking);
+
 	return TRUE;
 }
 
@@ -1456,6 +1462,10 @@ MovieDistortion *BKE_tracking_distortion_new(void)
 
 	distortion = MEM_callocN(sizeof(MovieDistortion), "BKE_tracking_distortion_create");
 
+#ifdef WITH_LIBMV
+	distortion->intrinsics = libmv_CameraIntrinsicsNewEmpty();
+#endif
+
 	return distortion;
 }
 
@@ -1468,17 +1478,22 @@ void BKE_tracking_distortion_update(MovieDistortion *distortion, MovieTracking *
 	cameraIntrinscisOptionsFromTracking(&camera_intrinsics_options, tracking,
 	                                    calibration_width, calibration_height);
 
-	if (!distortion->intrinsics) {
-		distortion->intrinsics = libmv_CameraIntrinsicsNew(&camera_intrinsics_options);
-	}
-	else {
-		libmv_CameraIntrinsicsUpdate(distortion->intrinsics, &camera_intrinsics_options);
-	}
+	libmv_CameraIntrinsicsUpdate(distortion->intrinsics, &camera_intrinsics_options);
 #else
 	(void) distortion;
 	(void) tracking;
 	(void) calibration_width;
 	(void) calibration_height;
+#endif
+}
+
+void BKE_tracking_distortion_set_threads(MovieDistortion *distortion, int threads)
+{
+#ifdef WITH_LIBMV
+	libmv_CameraIntrinsicsSetThreads(distortion->intrinsics, threads);
+#else
+	(void) distortion;
+	(void) threads;
 #endif
 }
 

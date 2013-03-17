@@ -24,7 +24,7 @@
  *
  * ***** END GPL LICENSE BLOCK *****
  */
-
+ 
 #ifndef __BLI_GHASH_H__
 #define __BLI_GHASH_H__
 
@@ -130,12 +130,12 @@ void            BLI_ghashIterator_step(GHashIterator *ghi);
  * \param ghi The iterator.
  * \return True if done, False otherwise.
  */
-int             BLI_ghashIterator_isDone(GHashIterator *ghi);
+bool            BLI_ghashIterator_notDone(GHashIterator *ghi);
 
 #define GHASH_ITER(gh_iter_, ghash_)                                          \
 	for (BLI_ghashIterator_init(&gh_iter_, ghash_);                           \
-		 !BLI_ghashIterator_isDone(&gh_iter_);                                \
-		 BLI_ghashIterator_step(&gh_iter_))
+	     BLI_ghashIterator_notDone(&gh_iter_);                                \
+	     BLI_ghashIterator_step(&gh_iter_))
 
 /* *** */
 

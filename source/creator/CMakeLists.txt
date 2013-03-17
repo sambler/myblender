@@ -917,6 +917,7 @@ endif()
 		bf_intern_raskter
 		bf_intern_opencolorio
 		extern_rangetree
+		extern_wcwidth
 	)
 
 	if(WITH_COMPOSITOR)

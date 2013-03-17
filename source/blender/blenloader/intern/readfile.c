@@ -3246,7 +3246,9 @@ static void direct_link_curve(FileData *fd, Curve *cu)
 	cu->strinfo= newdataadr(fd, cu->strinfo);
 	cu->tb = newdataadr(fd, cu->tb);
 
-	if (cu->vfont == NULL) link_list(fd, &(cu->nurb));
+	if (cu->vfont == NULL) {
+		link_list(fd, &(cu->nurb));
+	}
 	else {
 		cu->nurb.first=cu->nurb.last= NULL;
 		
@@ -3826,8 +3828,10 @@ static void lib_link_mesh(FileData *fd, Main *main)
 					me->mat[i] = newlibadr_us(fd, me->id.lib, me->mat[i]);
 				}
 			}
-			else me->totcol = 0;
-			
+			else {
+				me->totcol = 0;
+			}
+
 			me->ipo = newlibadr_us(fd, me->id.lib, me->ipo); // XXX: deprecated: old anim sys
 			me->key = newlibadr_us(fd, me->id.lib, me->key);
 			me->texcomesh = newlibadr_us(fd, me->id.lib, me->texcomesh);
@@ -5715,7 +5719,9 @@ void blo_lib_link_screen_restore(Main *newmain, bScreen *curscreen, Scene *cursc
 						}
 #endif
 					}
-					else if (v3d->scenelock) v3d->lay = sc->scene->lay;
+					else if (v3d->scenelock) {
+						v3d->lay = sc->scene->lay;
+					}
 					
 					/* not very nice, but could help */
 					if ((v3d->layact & v3d->lay) == 0) v3d->layact = v3d->lay;
@@ -5911,6 +5917,7 @@ static void direct_link_region(FileData *fd, ARegion *ar, int spacetype)
 			rv3d->clipbb = newdataadr(fd, rv3d->clipbb);
 			
 			rv3d->depths = NULL;
+			rv3d->gpuoffscreen = NULL;
 			rv3d->ri = NULL;
 			rv3d->render_engine = NULL;
 			rv3d->sms = NULL;
@@ -6076,7 +6083,7 @@ static void direct_link_screen(FileData *fd, bScreen *sc)
 					soops->treestore->totelem = soops->treestore->usedelem;
 					soops->storeflag |= SO_TREESTORE_CLEANUP;	// at first draw
 				}
-				 soops->tree.first = soops->tree.last= NULL;
+				soops->tree.first = soops->tree.last= NULL;
 			}
 			else if (sl->spacetype == SPACE_IMAGE) {
 				SpaceImage *sima = (SpaceImage *)sl;
@@ -10406,7 +10413,7 @@ static void read_libraries(FileData *basefd, ListBase *mainlist)
 						PackedFile *pf = mainptr->curlib->packedfile;
 						
 						BKE_reportf_wrap(basefd->reports, RPT_INFO, TIP_("Read packed library:  '%s'"),
-										 mainptr->curlib->name);
+						                 mainptr->curlib->name);
 						fd = blo_openblendermemory(pf->data, pf->size, basefd->reports);
 						
 						
@@ -10415,7 +10422,7 @@ static void read_libraries(FileData *basefd, ListBase *mainlist)
 					}
 					else {
 						BKE_reportf_wrap(basefd->reports, RPT_INFO, TIP_("Read library:  '%s', '%s'"),
-										 mainptr->curlib->filepath, mainptr->curlib->name);
+						                 mainptr->curlib->filepath, mainptr->curlib->name);
 						fd = blo_openblenderfile(mainptr->curlib->filepath, basefd->reports);
 					}
 					/* allow typing in a new lib path */
@@ -10463,7 +10470,9 @@ static void read_libraries(FileData *basefd, ListBase *mainlist)
 						/* subversion */
 						read_file_version(fd, mainptr);
 					}
-					else mainptr->curlib->filedata = NULL;
+					else {
+						mainptr->curlib->filedata = NULL;
+					}
 					
 					if (fd == NULL) {
 						BKE_reportf_wrap(basefd->reports, RPT_WARNING, TIP_("Cannot find lib '%s'"),

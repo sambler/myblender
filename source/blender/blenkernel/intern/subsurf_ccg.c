@@ -3103,7 +3103,6 @@ static CCGDerivedMesh *getCCGDerivedMesh(CCGSubSurf *ss,
 	int numTex, numCol;
 	int hasPCol, hasOrigSpace;
 	int gridInternalEdges;
-	float *w = NULL;
 	WeightTable wtable = {0};
 	/* MCol *mcol; */ /* UNUSED */
 	MEdge *medge = NULL;
@@ -3291,7 +3290,7 @@ static CCGDerivedMesh *getCCGDerivedMesh(CCGSubSurf *ss,
 		int numFinalEdges = numVerts * (gridSideEdges + gridInternalEdges);
 		int origIndex = GET_INT_FROM_POINTER(ccgSubSurf_getFaceFaceHandle(f));
 		int g2_wid = gridCuts + 2;
-		float *w2;
+		float *w, *w2;
 		int s, x, y;
 		
 		w = get_ss_weights(&wtable, gridCuts, numVerts);
@@ -3303,8 +3302,6 @@ static CCGDerivedMesh *getCCGDerivedMesh(CCGSubSurf *ss,
 		faceFlags->flag = mpoly ?  mpoly[origIndex].flag : 0;
 		faceFlags->mat_nr = mpoly ? mpoly[origIndex].mat_nr : 0;
 		faceFlags++;
-
-		origIndex = base_polyOrigIndex ? base_polyOrigIndex[origIndex] : origIndex;
 
 		/* set the face base vert */
 		*((int *)ccgSubSurf_getFaceUserData(ss, f)) = vertNum;
@@ -3413,7 +3410,7 @@ static CCGDerivedMesh *getCCGDerivedMesh(CCGSubSurf *ss,
 						faceOrigIndex++;
 					}
 					if (polyOrigIndex) {
-						*polyOrigIndex = origIndex;
+						*polyOrigIndex = base_polyOrigIndex ? base_polyOrigIndex[origIndex] : origIndex;
 						polyOrigIndex++;
 					}
 

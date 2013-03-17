@@ -235,14 +235,13 @@ void ui_pan_to_scroll(const wmEvent *event, int *type, int *val)
 	BLI_assert(*type == MOUSEPAN);
 
 	/* sign differs, reset */
-	if ((dy > 0 && lastdy < 0) || (dy < 0 && lastdy > 0))
+	if ((dy > 0 && lastdy < 0) || (dy < 0 && lastdy > 0)) {
 		lastdy = dy;
+	}
 	else {
 		lastdy += dy;
 		
 		if (ABS(lastdy) > (int)UI_UNIT_Y) {
-			int dy = event->prevy - event->y;
-			
 			if (U.uiflag2 & USER_TRACKPAD_NATURAL)
 				dy = -dy;
 			
@@ -804,8 +803,6 @@ static void ui_drag_toggle_set(bContext *C, uiDragToggleHandle *drag_info, const
 	 * button we mouse over is X or Y aligned, then lock the mouse to that axis after.
 	 */
 	if (drag_info->xy_lock[0] == false && drag_info->xy_lock[1] == false) {
-		ARegion *ar = CTX_wm_region(C);
-
 		/* first store the buttons original coords */
 		uiBut *but = ui_but_find_mouse_over(ar, xy_input[0], xy_input[1]);
 		if (but) {
@@ -2335,7 +2332,7 @@ static void ui_numedit_begin(uiBut *but, uiHandleButtonData *data)
 		data->coba = (ColorBand *)but->poin;
 		but->editcoba = data->coba;
 	}
-	else if (ELEM3(but->type, BUT_NORMAL, HSVCUBE, HSVCIRCLE)) {
+	else if (ELEM4(but->type, BUT_NORMAL, HSVCUBE, HSVCIRCLE, COLOR)) {
 		ui_get_but_vectorf(but, data->origvec);
 		copy_v3_v3(data->vec, data->origvec);
 		but->editvec = data->vec;
@@ -5021,7 +5018,7 @@ static int ui_but_menu(bContext *C, uiBut *but)
 	uiLayoutSetOperatorContext(layout, WM_OP_INVOKE_DEFAULT);
 
 	if (but->rnapoin.data && but->rnaprop) {
-		short is_anim = RNA_property_animateable(&but->rnapoin, but->rnaprop);
+		bool is_anim = RNA_property_animateable(&but->rnapoin, but->rnaprop);
 
 		/* second slower test, saved people finding keyframe items in menus when its not possible */
 		if (is_anim)
@@ -6302,7 +6299,7 @@ static void ui_handle_button_activate(bContext *C, ARegion *ar, uiBut *but, uiBu
 static int ui_handle_button_event(bContext *C, const wmEvent *event, uiBut *but)
 {
 	uiHandleButtonData *data = but->active;
-	const uiButtonActivateType state_orig = data->state;
+	const uiHandleButtonState state_orig = data->state;
 	uiBlock *block;
 	ARegion *ar;
 	int retval;
@@ -6474,9 +6471,9 @@ static int ui_handle_button_event(bContext *C, const wmEvent *event, uiBut *but)
 			 * This is needed to make sure if a button was active,
 			 * it stays active while the mouse is over it.
 			 * This avoids adding mousemoves, see: [#33466] */
-			if (ELEM(state_orig, BUTTON_ACTIVATE, BUTTON_ACTIVATE_OVER)) {
+			if (ELEM(state_orig, BUTTON_STATE_INIT, BUTTON_STATE_HIGHLIGHT)) {
 				if (ui_but_find_mouse_over(ar, event->x, event->y) == but) {
-					button_activate_init(C, ar, but, state_orig);
+					button_activate_init(C, ar, but, BUTTON_ACTIVATE_OVER);
 				}
 			}
 		}

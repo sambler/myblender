@@ -446,7 +446,7 @@ short ANIM_animdata_get_context(const bContext *C, bAnimContext *ac)
 					if (ANIMDATA_HAS_NLA(id)) { \
 						nlaOk \
 					} \
-					else if (!(ads->filterflag & ADS_FILTER_NLA_NOACT) && ANIMDATA_HAS_KEYS(id)) { \
+					else if (!(ads->filterflag & ADS_FILTER_NLA_NOACT) || ANIMDATA_HAS_KEYS(id)) { \
 						nlaOk \
 					} \
 				} \
@@ -1296,7 +1296,9 @@ static size_t animfilter_block_data(bAnimContext *ac, ListBase *anim_data, bDope
 		ANIMDATA_FILTER_CASES(iat,
 			{ /* AnimData */
 				/* specifically filter animdata block */
-				ANIMCHANNEL_NEW_CHANNEL(adt, ANIMTYPE_ANIMDATA, id);
+				if (ANIMCHANNEL_SELOK(SEL_ANIMDATA(adt)) ) {
+					ANIMCHANNEL_NEW_CHANNEL(adt, ANIMTYPE_ANIMDATA, id);
+				}
 			},
 			{ /* NLA */
 				items += animfilter_nla(ac, anim_data, ads, adt, filter_mode, id);
@@ -1346,7 +1348,9 @@ static size_t animdata_filter_shapekey(bAnimContext *ac, ListBase *anim_data, Ke
 		// TODO: somehow manage to pass dopesheet info down here too?
 		if (key->adt) {
 			if (filter_mode & ANIMFILTER_ANIMDATA) {
-				ANIMCHANNEL_NEW_CHANNEL(key->adt, ANIMTYPE_ANIMDATA, key);
+				if (ANIMCHANNEL_SELOK(SEL_ANIMDATA(key->adt)) ) {
+					ANIMCHANNEL_NEW_CHANNEL(key->adt, ANIMTYPE_ANIMDATA, key);
+				}
 			}
 			else if (key->adt->action) {
 				items = animfilter_action(ac, anim_data, NULL, key->adt->action, filter_mode, (ID *)key);

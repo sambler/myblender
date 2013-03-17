@@ -571,7 +571,7 @@ void MESH_OT_uv_texture_add(wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 }
 
-static int drop_named_image_invoke(bContext *C, wmOperator *op, wmEvent *event)
+static int drop_named_image_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
 	Main *bmain = CTX_data_main(C);
 	Scene *scene = CTX_data_scene(C);
@@ -885,7 +885,7 @@ void ED_mesh_update(Mesh *mesh, bContext *C, int calc_edges, int calc_tessface)
 	}
 
 	if (calc_edges || ((mesh->totpoly || mesh->totface) && mesh->totedge == 0))
-		BKE_mesh_calc_edges(mesh, calc_edges);
+		BKE_mesh_calc_edges(mesh, calc_edges, true);
 
 	if (calc_tessface) {
 		if (tessface_input == FALSE) {

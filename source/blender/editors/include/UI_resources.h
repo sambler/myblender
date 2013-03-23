@@ -144,6 +144,7 @@ enum {
 	
 	TH_NODE,
 	TH_NODE_IN_OUT,
+	TH_NODE_INTERFACE,
 	TH_NODE_OPERATOR,
 	TH_NODE_CONVERTOR,
 	TH_NODE_GROUP,
@@ -306,4 +307,4 @@ const unsigned char *UI_ThemeGetColorPtr(struct bTheme *btheme, int spacetype, i
 
 void UI_make_axis_color(const unsigned char *src_col, unsigned char *dst_col, const char axis);
 
-#endif /*  UI_ICONS_H */
+#endif /*  UI_RESOURCES_H */

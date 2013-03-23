@@ -192,7 +192,7 @@ static Main *G_pr_main = NULL;
 static Main *G_pr_main_cycles = NULL;
 
 #ifndef WITH_HEADLESS
-static Main *load_main_from_memory(char *blend, int blend_size)
+static Main *load_main_from_memory(const void *blend, int blend_size)
 {
 	const int fileflags = G.fileflags;
 	Main *bmain = NULL;
@@ -304,7 +304,17 @@ static Scene *preview_prepare_scene(Scene *scene, ID *id, int id_type, ShaderPre
 			sce->r.alphamode = R_ADDSKY;
 
 		sce->r.cfra = scene->r.cfra;
-		BLI_strncpy(sce->r.engine, scene->r.engine, sizeof(sce->r.engine));
+
+		if (id_type == ID_TE && sp->pr_method == PR_ICON_RENDER) {
+			/* force blender internal for texture icons render,
+			 * seems commonly used render engines does not support
+			 * such kind of rendering
+			 */
+			BLI_strncpy(sce->r.engine, "BLENDER_RENDER", sizeof(sce->r.engine));
+		}
+		else {
+			BLI_strncpy(sce->r.engine, scene->r.engine, sizeof(sce->r.engine));
+		}
 		
 		if (id_type == ID_MA) {
 			Material *mat = NULL, *origmat = (Material *)id;
@@ -378,8 +388,8 @@ static Scene *preview_prepare_scene(Scene *scene, ID *id, int id_type, ShaderPre
 					sce->lay = 1 << mat->pr_type;
 					if (mat->nodetree && sp->pr_method == PR_NODE_RENDER) {
 						/* two previews, they get copied by wmJob */
-						ntreeInitPreview(mat->nodetree, sp->sizex, sp->sizey);
-						ntreeInitPreview(origmat->nodetree, sp->sizex, sp->sizey);
+						BKE_node_preview_init_tree(mat->nodetree, sp->sizex, sp->sizey, TRUE);
+						BKE_node_preview_init_tree(origmat->nodetree, sp->sizex, sp->sizey, TRUE);
 					}
 				}
 			}
@@ -442,8 +452,8 @@ static Scene *preview_prepare_scene(Scene *scene, ID *id, int id_type, ShaderPre
 
 			if (tex && tex->nodetree && sp->pr_method == PR_NODE_RENDER) {
 				/* two previews, they get copied by wmJob */
-				ntreeInitPreview(origtex->nodetree, sp->sizex, sp->sizey);
-				ntreeInitPreview(tex->nodetree, sp->sizex, sp->sizey);
+				BKE_node_preview_init_tree(origtex->nodetree, sp->sizex, sp->sizey, TRUE);
+				BKE_node_preview_init_tree(tex->nodetree, sp->sizex, sp->sizey, TRUE);
 			}
 		}
 		else if (id_type == ID_LA) {
@@ -479,8 +489,8 @@ static Scene *preview_prepare_scene(Scene *scene, ID *id, int id_type, ShaderPre
 
 			if (la && la->nodetree && sp->pr_method == PR_NODE_RENDER) {
 				/* two previews, they get copied by wmJob */
-				ntreeInitPreview(origla->nodetree, sp->sizex, sp->sizey);
-				ntreeInitPreview(la->nodetree, sp->sizex, sp->sizey);
+				BKE_node_preview_init_tree(origla->nodetree, sp->sizex, sp->sizey, TRUE);
+				BKE_node_preview_init_tree(la->nodetree, sp->sizex, sp->sizey, TRUE);
 			}
 		}
 		else if (id_type == ID_WO) {
@@ -497,8 +507,8 @@ static Scene *preview_prepare_scene(Scene *scene, ID *id, int id_type, ShaderPre
 
 			if (wrld && wrld->nodetree && sp->pr_method == PR_NODE_RENDER) {
 				/* two previews, they get copied by wmJob */
-				ntreeInitPreview(wrld->nodetree, sp->sizex, sp->sizey);
-				ntreeInitPreview(origwrld->nodetree, sp->sizex, sp->sizey);
+				BKE_node_preview_init_tree(wrld->nodetree, sp->sizex, sp->sizey, TRUE);
+				BKE_node_preview_init_tree(origwrld->nodetree, sp->sizex, sp->sizey, TRUE);
 			}
 		}
 		

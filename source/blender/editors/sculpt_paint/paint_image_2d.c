@@ -235,7 +235,7 @@ static void brush_painter_2d_do_partial(BrushPainter *painter, ImBuf *oldtexibuf
 					xy[0] = x + xoff;
 					xy[1] = y + yoff;
 
-					BKE_brush_sample_tex_2D(scene, brush, xy, tf, NULL);
+					BKE_brush_sample_tex_2D(scene, brush, xy, tf);
 				}
 
 				bf[0] = tf[0] * mf[0];
@@ -266,7 +266,7 @@ static void brush_painter_2d_do_partial(BrushPainter *painter, ImBuf *oldtexibuf
 					xy[0] = x + xoff;
 					xy[1] = y + yoff;
 
-					BKE_brush_sample_tex_2D(scene, brush, xy, rgba, NULL);
+					BKE_brush_sample_tex_2D(scene, brush, xy, rgba);
 					rgba_float_to_uchar(t, rgba);
 				}
 
@@ -704,7 +704,7 @@ int paint_2d_stroke(void *ps, const int prev_mval[2], const int mval[2], int era
 	ImagePaintState *s = ps;
 	BrushPainter *painter = s->painter;
 	ImBuf *ibuf = BKE_image_acquire_ibuf(s->image, s->sima ? &s->sima->iuser : NULL, NULL);
-	int	is_data = ibuf->colormanage_flag & IMB_COLORMANAGE_IS_DATA;
+	const bool is_data = (ibuf && ibuf->colormanage_flag & IMB_COLORMANAGE_IS_DATA);
 
 	if (!ibuf)
 		return 0;
@@ -739,7 +739,7 @@ int paint_2d_stroke(void *ps, const int prev_mval[2], const int mval[2], int era
 	brush_painter_2d_require_imbuf(painter, ((ibuf->rect_float) ? 1 : 0), 0, 0);
 
 	if (painter->cache.enabled)
-		brush_painter_2d_refresh_cache(painter, newuv, is_data == FALSE);
+		brush_painter_2d_refresh_cache(painter, newuv, is_data == false);
 
 	if (paint_2d_op(s, painter->cache.ibuf, olduv, newuv)) {
 		imapaint_image_update(s->sima, s->image, ibuf, false);

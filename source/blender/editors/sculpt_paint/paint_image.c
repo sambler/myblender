@@ -398,7 +398,6 @@ typedef struct PaintOperation {
 	double starttime;
 
 	ViewContext vc;
-	wmTimer *timer;
 } PaintOperation;
 
 void paint_brush_init_tex(Brush *brush)
@@ -407,7 +406,7 @@ void paint_brush_init_tex(Brush *brush)
 	if (brush) {
 		MTex *mtex = &brush->mtex;
 		if (mtex->tex && mtex->tex->nodetree)
-			ntreeTexBeginExecTree(mtex->tex->nodetree, 1);  /* has internal flag to detect it only does it once */
+			ntreeTexBeginExecTree(mtex->tex->nodetree);  /* has internal flag to detect it only does it once */
 	}
 }
 
@@ -416,7 +415,7 @@ void paint_brush_exit_tex(Brush *brush)
 	if (brush) {
 		MTex *mtex = &brush->mtex;
 		if (mtex->tex && mtex->tex->nodetree)
-			ntreeTexEndExecTree(mtex->tex->nodetree->execdata, 1);
+			ntreeTexEndExecTree(mtex->tex->nodetree->execdata);
 	}
 }
 
@@ -529,8 +528,7 @@ static void paint_stroke_done(const bContext *C, struct PaintStroke *stroke)
 	ToolSettings *settings = scene->toolsettings;
 	PaintOperation *pop = paint_stroke_mode_data(stroke);
 
-	if (pop->timer)
-		WM_event_remove_timer(CTX_wm_manager(C), CTX_wm_window(C), pop->timer);
+	paint_redraw(C, pop, 1);
 
 	settings->imapaint.flag &= ~IMAGEPAINT_DRAWING;
 
@@ -541,7 +539,6 @@ static void paint_stroke_done(const bContext *C, struct PaintStroke *stroke)
 		paint_2d_stroke_done(pop->custom_paint);
 	}
 
-	paint_redraw(C, pop, 1);
 	undo_paint_push_end(UNDO_PAINT_IMAGE);
 
 	/* duplicate warning, see texpaint_init
@@ -613,8 +610,8 @@ void PAINT_OT_image_paint(wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_BLOCKING;
 
 	RNA_def_enum(ot->srna, "mode", stroke_mode_items, BRUSH_STROKE_NORMAL,
-				 "Paint Stroke Mode",
-				 "Action taken when a paint stroke is made");
+	             "Paint Stroke Mode",
+	             "Action taken when a paint stroke is made");
 
 	RNA_def_collection_runtime(ot->srna, "stroke", &RNA_OperatorStrokeElement, "Stroke", "");
 }

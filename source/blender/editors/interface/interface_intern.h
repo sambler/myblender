@@ -208,12 +208,6 @@ struct uiBut {
 
 	struct bContextStore *context;
 
-	/* not used yet, was used in 2.4x for ui_draw_pulldown_round & friends */
-#if 0
-	void (*embossfunc)(int, int, float, float, float, float, float, int);
-	void (*sliderfunc)(int, float, float, float, float, float, float, int);
-#endif
-
 	uiButCompleteFunc autocomplete_func;
 	void *autofunc_arg;
 	
@@ -510,6 +504,7 @@ void ui_draw_but_NORMAL(uiBut *but, struct uiWidgetColors *wcol, rcti *rect);
 void ui_draw_but_CURVE(ARegion *ar, uiBut *but, struct uiWidgetColors *wcol, rcti *rect);
 void ui_draw_but_IMAGE(ARegion *ar, uiBut *but, struct uiWidgetColors *wcol, rcti *rect);
 void ui_draw_but_TRACKPREVIEW(ARegion *ar, uiBut *but, struct uiWidgetColors *wcol, rcti *rect);
+void ui_draw_but_NODESOCKET(ARegion *ar, uiBut *but, struct uiWidgetColors *wcol, rcti *rect);
 
 /* interface_handlers.c */
 extern void ui_pan_to_scroll(const struct wmEvent *event, int *type, int *val);

@@ -137,7 +137,7 @@ static int objects_add_active_exec(bContext *C, wmOperator *op)
 				BKE_report(op->reports, RPT_WARNING, "Skipped some groups because of cycle detected");
 			}
 
-			DAG_scene_sort(bmain, scene);
+			DAG_relations_tag_update(bmain);
 			WM_event_add_notifier(C, NC_GROUP | NA_EDITED, NULL);
 
 			return OPERATOR_FINISHED;
@@ -197,7 +197,7 @@ static int objects_remove_active_exec(bContext *C, wmOperator *op)
 	
 	if (!ok) BKE_report(op->reports, RPT_ERROR, "Active object contains no groups");
 	
-	DAG_scene_sort(bmain, scene);
+	DAG_relations_tag_update(bmain);
 	WM_event_add_notifier(C, NC_GROUP | NA_EDITED, NULL);
 	
 	return OPERATOR_FINISHED;
@@ -229,7 +229,7 @@ static int group_objects_remove_all_exec(bContext *C, wmOperator *UNUSED(op))
 	}
 	CTX_DATA_END;
 
-	DAG_scene_sort(bmain, scene);
+	DAG_relations_tag_update(bmain);
 	WM_event_add_notifier(C, NC_GROUP | NA_EDITED, NULL);
 	
 	return OPERATOR_FINISHED;
@@ -269,7 +269,7 @@ static int group_objects_remove_exec(bContext *C, wmOperator *op)
 			}
 			CTX_DATA_END;
 
-			DAG_scene_sort(bmain, scene);
+			DAG_relations_tag_update(bmain);
 			WM_event_add_notifier(C, NC_GROUP | NA_EDITED, NULL);
 
 			return OPERATOR_FINISHED;
@@ -311,15 +311,15 @@ static int group_create_exec(bContext *C, wmOperator *op)
 	
 	RNA_string_get(op->ptr, "name", name);
 	
-	group = add_group(name);
+	group = add_group(bmain, name);
 		
-	CTX_DATA_BEGIN (C, Base *, base, selected_editable_bases)
+	CTX_DATA_BEGIN (C, Base *, base, selected_bases)
 	{
 		add_to_group(group, base->object, scene, base);
 	}
 	CTX_DATA_END;
 
-	DAG_scene_sort(bmain, scene);
+	DAG_relations_tag_update(bmain);
 	WM_event_add_notifier(C, NC_GROUP | NA_EDITED, NULL);
 	
 	return OPERATOR_FINISHED;
@@ -348,12 +348,13 @@ static int group_add_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	Scene *scene = CTX_data_scene(C);
 	Object *ob = ED_object_context(C);
+	Main *bmain = CTX_data_main(C);
 	Group *group;
 
 	if (ob == NULL)
 		return OPERATOR_CANCELLED;
 
-	group = add_group("Group");
+	group = add_group(bmain, "Group");
 	add_to_group(group, ob, scene, NULL);
 
 	WM_event_add_notifier(C, NC_OBJECT | ND_DRAW, ob);

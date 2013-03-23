@@ -59,12 +59,16 @@ typedef struct VertTableNode {
 	float *tangent;
 	float *stress;
 	float *winspeed;
+	/* Index of vertex in source mesh (before modifiers). */
+	int *origindex;
 } VertTableNode;
 
 typedef struct VlakTableNode {
 	struct VlakRen *vlak;
 	struct MTFace *mtface;
 	struct MCol *mcol;
+	/* Index of mpoly in source mesh (before tessellation). */
+	int *origindex;
 	int totmtface, totmcol;
 	float *surfnor;
 	float *tangent;
@@ -87,8 +91,8 @@ void free_renderdata_tables(struct Render *re);
 void free_renderdata_vertnodes(struct VertTableNode *vertnodes);
 void free_renderdata_vlaknodes(struct VlakTableNode *vlaknodes);
 
-void project_renderdata(struct Render *re, void (*projectfunc)(const float *, float mat[][4], float *),  int do_pano, float xoffs, int do_buckets);
-int clip_render_object(float boundbox[][3], float bounds[4], float mat[][4]);
+void project_renderdata(struct Render *re, void (*projectfunc)(const float *, float mat[4][4], float *),  int do_pano, float xoffs, int do_buckets);
+int clip_render_object(float boundbox[2][3], float bounds[4], float mat[4][4]);
 
 /* functions are not exported... so wrong names */
 
@@ -106,7 +110,7 @@ struct HaloRen *RE_inithalo_particle(struct Render *re, struct ObjectRen *obr, s
 struct StrandBuffer *RE_addStrandBuffer(struct ObjectRen *obr, int totvert);
 
 struct ObjectRen *RE_addRenderObject(struct Render *re, struct Object *ob, struct Object *par, int index, int psysindex, int lay);
-struct ObjectInstanceRen *RE_addRenderInstance(struct Render *re, struct ObjectRen *obr, struct Object *ob, struct Object *par, int index, int psysindex, float mat[][4], int lay);
+struct ObjectInstanceRen *RE_addRenderInstance(struct Render *re, struct ObjectRen *obr, struct Object *ob, struct Object *par, int index, int psysindex, float mat[4][4], int lay);
 void RE_makeRenderInstances(struct Render *re);
 
 float *RE_vertren_get_stress(struct ObjectRen *obr, struct VertRen *ver, int verify);
@@ -114,9 +118,11 @@ float *RE_vertren_get_rad(struct ObjectRen *obr, struct VertRen *ver, int verify
 float *RE_vertren_get_strand(struct ObjectRen *obr, struct VertRen *ver, int verify);
 float *RE_vertren_get_tangent(struct ObjectRen *obr, struct VertRen *ver, int verify);
 float *RE_vertren_get_winspeed(struct ObjectInstanceRen *obi, struct VertRen *ver, int verify);
+int *RE_vertren_get_origindex(struct ObjectRen *obr, VertRen *ver, int verify);
 
 struct MTFace *RE_vlakren_get_tface(struct ObjectRen *obr, VlakRen *ren, int n, char **name, int verify);
 struct MCol *RE_vlakren_get_mcol(struct ObjectRen *obr, VlakRen *ren, int n, char **name, int verify);
+int *RE_vlakren_get_origindex(struct ObjectRen *obr, VlakRen *vlak, int verify);
 float *RE_vlakren_get_surfnor(struct ObjectRen *obr, VlakRen *ren, int verify);
 float *RE_vlakren_get_nmap_tangent(struct ObjectRen *obr, VlakRen *ren, int verify);
 RadFace **RE_vlakren_get_radface(struct ObjectRen *obr, VlakRen *ren, int verify);

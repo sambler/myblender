@@ -30,18 +30,12 @@
  *  \ingroup edarmature
  */
 
-
-#include <math.h>
-#include <string.h>
-
 #include "MEM_guardedalloc.h"
 
 #include "DNA_object_types.h"
 #include "DNA_mesh_types.h"
-#include "DNA_meshdata_types.h"
 #include "DNA_scene_types.h"
 
-#include "BLI_utildefines.h"
 #include "BLI_math.h"
 #include "BLI_edgehash.h"
 #include "BLI_memarena.h"
@@ -58,8 +52,6 @@
 #endif
 
 #include "ONL_opennl.h"
-
-#include "BLO_sys_types.h" // for intptr_t support
 
 #include "ED_mesh.h"
 #include "ED_armature.h"
@@ -649,7 +641,9 @@ static float heat_limit_weight(float weight)
 		return weight;
 }
 
-void heat_bone_weighting(Object *ob, Mesh *me, float (*verts)[3], int numsource, bDeformGroup **dgrouplist, bDeformGroup **dgroupflip, float (*root)[3], float (*tip)[3], int *selected, const char **err_str)
+void heat_bone_weighting(Object *ob, Mesh *me, float (*verts)[3], int numsource,
+                         bDeformGroup **dgrouplist, bDeformGroup **dgroupflip,
+                         float (*root)[3], float (*tip)[3], int *selected, const char **err_str)
 {
 	LaplacianSystem *sys;
 	MPoly *mp;
@@ -666,8 +660,8 @@ void heat_bone_weighting(Object *ob, Mesh *me, float (*verts)[3], int numsource,
 	*err_str = NULL;
 
 	/* count triangles and create mask */
-	if ((use_face_sel = ((me->editflag & ME_EDIT_PAINT_MASK) != 0)) ||
-	    (use_vert_sel = ((me->editflag & ME_EDIT_VERT_SEL) != 0)))
+	if ((use_face_sel = ((me->editflag & ME_EDIT_PAINT_FACE_SEL) != 0)) ||
+	    (use_vert_sel = ((me->editflag & ME_EDIT_PAINT_VERT_SEL) != 0)))
 	{
 		mask = MEM_callocN(sizeof(int) * me->totvert, "heat_bone_weighting mask");
 
@@ -862,7 +856,7 @@ static void rigid_add_edge_to_R(LaplacianSystem *sys, EditVert *v1, EditVert *v2
 	rigid_add_half_edge_to_R(sys, v2, v1, w);
 }
 
-static void rigid_orthogonalize_R(float R[][3])
+static void rigid_orthogonalize_R(float R[3][3])
 {
 	HMatrix M, Q, S;
 
@@ -1120,7 +1114,7 @@ typedef struct MeshDeformBind {
 typedef struct MeshDeformIsect {
 	float start[3];
 	float vec[3];
-	float labda;
+	float lambda;
 
 	void *face;
 	int isect;
@@ -1227,7 +1221,7 @@ static void harmonic_ray_callback(void *userdata, int index, const BVHTreeRay *r
 		copy_v3_v3(hit->co, co);
 		
 		isec->isect = (dot_v3v3(no, ray->direction) <= 0.0f);
-		isec->labda = dist;
+		isec->lambda = dist;
 		isec->face = mf;
 	}
 }
@@ -1245,7 +1239,7 @@ static MDefBoundIsect *meshdeform_ray_tree_intersect(MeshDeformBind *mdb, float 
 
 	/* setup isec */
 	memset(&isect_mdef, 0, sizeof(isect_mdef));
-	isect_mdef.labda = 1e10f;
+	isect_mdef.lambda = 1e10f;
 
 	add_v3_v3v3(isect_mdef.start, co1, epsilon);
 	add_v3_v3v3(end, co2, epsilon);
@@ -1256,7 +1250,7 @@ static MDefBoundIsect *meshdeform_ray_tree_intersect(MeshDeformBind *mdb, float 
 	if (BLI_bvhtree_ray_cast(mdb->bvhtree, isect_mdef.start, isect_mdef.vec,
 	                         0.0, &hit, harmonic_ray_callback, data) != -1)
 	{
-		len = isect_mdef.labda;
+		len = isect_mdef.lambda;
 		isect_mdef.face = mface = mface1 + hit.index;
 
 		/* create MDefBoundIsect */
@@ -1767,7 +1761,7 @@ static void harmonic_coordinates_bind(Scene *UNUSED(scene), MeshDeformModifierDa
 	mdb->totalphi = MEM_callocN(sizeof(float) * mdb->size3, "MeshDeformBindTotalPhi");
 	mdb->boundisect = MEM_callocN(sizeof(*mdb->boundisect) * mdb->size3, "MDefBoundIsect");
 	mdb->semibound = MEM_callocN(sizeof(int) * mdb->size3, "MDefSemiBound");
-	mdb->bvhtree = bvhtree_from_mesh_faces(&mdb->bvhdata, mdb->cagedm, FLT_EPSILON*100, 4, 6);
+	mdb->bvhtree = bvhtree_from_mesh_faces(&mdb->bvhdata, mdb->cagedm, FLT_EPSILON * 100, 4, 6);
 	mdb->inside = MEM_callocN(sizeof(int) * mdb->totvert, "MDefInside");
 
 	if (mmd->flag & MOD_MDEF_DYNAMIC_BIND)
@@ -1956,7 +1950,7 @@ static void heat_weighting_bind(Scene *scene, DerivedMesh *dm, MeshDeformModifie
 }
 #endif
 
-void mesh_deform_bind(Scene *scene, MeshDeformModifierData *mmd, float *vertexcos, int totvert, float cagemat[][4])
+void mesh_deform_bind(Scene *scene, MeshDeformModifierData *mmd, float *vertexcos, int totvert, float cagemat[4][4])
 {
 	MeshDeformBind mdb;
 	MVert *mvert;

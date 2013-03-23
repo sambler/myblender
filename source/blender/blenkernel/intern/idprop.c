@@ -27,7 +27,6 @@
  *  \ingroup bke
  */
 
- 
 #include <stdio.h>
 #include <stdlib.h>
 #include <stddef.h>
@@ -452,10 +451,10 @@ void IDP_ReplaceGroupInGroup(IDProperty *dest, IDProperty *src)
 	IDProperty *loop, *prop;
 	for (prop = src->data.group.first; prop; prop = prop->next) {
 		for (loop = dest->data.group.first; loop; loop = loop->next) {
-			if (strcmp(loop->name, prop->name) == 0) {
+			if (STREQ(loop->name, prop->name)) {
 				IDProperty *copy = IDP_CopyProperty(prop);
 
-				BLI_insertlink(&dest->data.group, loop, copy);
+				BLI_insertlinkafter(&dest->data.group, loop, copy);
 
 				BLI_remlink(&dest->data.group, loop);
 				IDP_FreeProperty(loop);
@@ -480,7 +479,7 @@ void IDP_ReplaceInGroup(IDProperty *group, IDProperty *prop)
 {
 	IDProperty *loop;
 	if ((loop = IDP_GetPropertyFromGroup(group, prop->name))) {
-		BLI_insertlink(&group->data.group, loop, prop);
+		BLI_insertlinkafter(&group->data.group, loop, prop);
 		
 		BLI_remlink(&group->data.group, loop);
 		IDP_FreeProperty(loop);
@@ -533,7 +532,7 @@ int IDP_InsertToGroup(IDProperty *group, IDProperty *previous, IDProperty *pnew)
 {
 	if (IDP_GetPropertyFromGroup(group, pnew->name) == NULL) {
 		group->len++;
-		BLI_insertlink(&group->data.group, previous, pnew);
+		BLI_insertlinkafter(&group->data.group, previous, pnew);
 		return 1;
 	}
 
@@ -663,7 +662,7 @@ int IDP_EqualsProperties_ex(IDProperty *prop1, IDProperty *prop2, const int is_s
 		{
 			IDProperty *link1, *link2;
 
-			if (is_strict && BLI_countlist(&prop1->data.group) != BLI_countlist(&prop2->data.group))
+			if (is_strict && prop1->len != prop2->len)
 				return 0;
 
 			for (link1 = prop1->data.group.first; link1; link1 = link1->next) {
@@ -813,6 +812,13 @@ void IDP_FreeProperty(IDProperty *prop)
 			IDP_FreeIDPArray(prop);
 			break;
 	}
+}
+
+void IDP_ClearProperty(IDProperty *prop)
+{
+	IDP_FreeProperty(prop);
+	prop->data.pointer = NULL;
+	prop->len = prop->totallen = 0;
 }
 
 /* Unlinks any IDProperty<->ID linkage that might be going on.

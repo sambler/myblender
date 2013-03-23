@@ -39,6 +39,8 @@
 #include "BLI_math.h"
 #include "BLI_utildefines.h"
 
+#include "BLF_translation.h"
+
 #include "PIL_time.h"
 
 #include "BKE_gpencil.h"
@@ -208,7 +210,7 @@ static int gpencil_project_check(tGPsdata *p)
 static void gp_get_3d_reference(tGPsdata *p, float vec[3])
 {
 	View3D *v3d = p->sa->spacedata.first;
-	float *fp = give_cursor(p->scene, v3d);
+	const float *fp = give_cursor(p->scene, v3d);
 	
 	/* the reference point used depends on the owner... */
 #if 0 /* XXX: disabled for now, since we can't draw relative to the owner yet */
@@ -275,6 +277,7 @@ static void gp_stroke_convertcoords(tGPsdata *p, const int mval[2], float out[3]
 			int mval_prj[2];
 			float rvec[3], dvec[3];
 			float mval_f[2];
+			float zfac;
 			
 			/* Current method just converts each point in screen-coordinates to
 			 * 3D-coordinates using the 3D-cursor as reference. In general, this
@@ -286,12 +289,13 @@ static void gp_stroke_convertcoords(tGPsdata *p, const int mval[2], float out[3]
 			 */
 			
 			gp_get_3d_reference(p, rvec);
+			zfac = ED_view3d_calc_zfac(p->ar->regiondata, rvec, NULL);
 			
 			/* method taken from editview.c - mouse_cursor() */
 			/* TODO, use ED_view3d_project_float_global */
 			if (ED_view3d_project_int_global(p->ar, rvec, mval_prj, V3D_PROJ_TEST_NOP) == V3D_PROJ_RET_OK) {
 				VECSUB2D(mval_f, mval_prj, mval);
-				ED_view3d_win_to_delta(p->ar, mval_f, dvec);
+				ED_view3d_win_to_delta(p->ar, mval_f, dvec, zfac);
 				sub_v3_v3v3(out, rvec, dvec);
 			}
 			else {
@@ -929,7 +933,8 @@ static void gp_stroke_eraser_dostroke(tGPsdata *p,
 			
 			/* check that point segment of the boundbox of the eraser stroke */
 			if (((!ELEM(V2D_IS_CLIPPED, x0, y0)) && BLI_rcti_isect_pt(rect, x0, y0)) ||
-			    ((!ELEM(V2D_IS_CLIPPED, x1, y1)) && BLI_rcti_isect_pt(rect, x1, y1))) {
+			    ((!ELEM(V2D_IS_CLIPPED, x1, y1)) && BLI_rcti_isect_pt(rect, x1, y1)))
+			{
 				/* check if point segment of stroke had anything to do with
 				 * eraser region  (either within stroke painted, or on its lines)
 				 *  - this assumes that linewidth is irrelevant
@@ -1234,13 +1239,6 @@ static void gp_paint_initstroke(tGPsdata *p, short paintmode)
 		switch (p->sa->spacetype) {
 			case SPACE_VIEW3D:
 			{
-				RegionView3D *rv3d = p->ar->regiondata;
-				float rvec[3];
-				
-				/* get reference point for 3d space placement */
-				gp_get_3d_reference(p, rvec);
-				initgrabz(rv3d, rvec[0], rvec[1], rvec[2]);
-				
 				p->gpd->sbuffer_sflag |= GP_STROKE_3DSPACE;
 			}
 			break;
@@ -1457,28 +1455,27 @@ static void gpencil_draw_status_indicators(tGPsdata *p)
 		case GP_STATUS_PAINTING:
 			/* only print this for paint-sessions, otherwise it gets annoying */
 			if (GPENCIL_SKETCH_SESSIONS_ON(p->scene))
-				ED_area_headerprint(p->sa, "Grease Pencil: Drawing/erasing stroke... Release to end stroke");
+				ED_area_headerprint(p->sa, IFACE_("Grease Pencil: Drawing/erasing stroke... Release to end stroke"));
 			break;
 		
 		case GP_STATUS_IDLING:
 			/* print status info */
 			switch (p->paintmode) {
 				case GP_PAINTMODE_ERASER:
-					ED_area_headerprint(p->sa,
-					                    "Grease Pencil Erase Session: Hold and drag LMB or RMB to erase |"
-					                    " ESC/Enter to end");
+					ED_area_headerprint(p->sa, IFACE_("Grease Pencil Erase Session: Hold and drag LMB or RMB to erase |"
+					                                  " ESC/Enter to end"));
 					break;
 				case GP_PAINTMODE_DRAW_STRAIGHT:
-					ED_area_headerprint(p->sa, "Grease Pencil Line Session: Hold and drag LMB to draw | "
-					                    "ESC/Enter to end");
+					ED_area_headerprint(p->sa, IFACE_("Grease Pencil Line Session: Hold and drag LMB to draw | "
+					                                  "ESC/Enter to end"));
 					break;
 				case GP_PAINTMODE_DRAW:
-					ED_area_headerprint(p->sa, "Grease Pencil Freehand Session: Hold and drag LMB to draw | "
-					                    "ESC/Enter to end");
+					ED_area_headerprint(p->sa, IFACE_("Grease Pencil Freehand Session: Hold and drag LMB to draw | "
+					                                  "ESC/Enter to end"));
 					break;
 					
 				default: /* unhandled future cases */
-					ED_area_headerprint(p->sa, "Grease Pencil Session: ESC/Enter to end");
+					ED_area_headerprint(p->sa, IFACE_("Grease Pencil Session: ESC/Enter to end"));
 					break;
 			}
 			break;
@@ -1549,7 +1546,7 @@ static void gpencil_draw_apply(wmOperator *op, tGPsdata *p)
 }
 
 /* handle draw event */
-static void gpencil_draw_apply_event(wmOperator *op, wmEvent *event)
+static void gpencil_draw_apply_event(wmOperator *op, const wmEvent *event)
 {
 	tGPsdata *p = op->customdata;
 	PointerRNA itemptr;
@@ -1564,8 +1561,8 @@ static void gpencil_draw_apply_event(wmOperator *op, wmEvent *event)
 	p->curtime = PIL_check_seconds_timer();
 	
 	/* handle pressure sensitivity (which is supplied by tablets) */
-	if (event->custom == EVT_DATA_TABLET) {
-		wmTabletData *wmtab = event->customdata;
+	if (event->tablet_data) {
+		wmTabletData *wmtab = event->tablet_data;
 		
 		tablet = (wmtab->Active != EVT_TABLET_NONE);
 		p->pressure = wmtab->Pressure;
@@ -1687,7 +1684,7 @@ static int gpencil_draw_exec(bContext *C, wmOperator *op)
 /* ------------------------------- */
 
 /* start of interactive drawing part of operator */
-static int gpencil_draw_invoke(bContext *C, wmOperator *op, wmEvent *event)
+static int gpencil_draw_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
 	tGPsdata *p = NULL;
 	wmWindow *win = CTX_wm_window(C);
@@ -1798,7 +1795,7 @@ static void gpencil_stroke_end(wmOperator *op)
 }
 
 /* events handling during interactive drawing part of operator */
-static int gpencil_draw_modal(bContext *C, wmOperator *op, wmEvent *event)
+static int gpencil_draw_modal(bContext *C, wmOperator *op, const wmEvent *event)
 {
 	tGPsdata *p = op->customdata;
 	int estate = OPERATOR_PASS_THROUGH; /* default exit state - pass through to support MMB view nav, etc. */

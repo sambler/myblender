@@ -70,6 +70,7 @@ set(DEFSRC
 	rna_pose.c
 	rna_property.c
 	rna_render.c
+	rna_rigidbody.c
 	rna_rna.c
 	rna_scene.c
 	rna_screen.c
@@ -104,6 +105,7 @@ set(APISRC
 	rna_main_api.c
 	rna_material_api.c
 	rna_mesh_api.c
+	rna_meta_api.c
 	rna_texture_api.c
 	rna_object_api.c
 	rna_pose_api.c
@@ -237,6 +239,13 @@ if(WITH_INTERNATIONAL)
 	add_definitions(-DWITH_INTERNATIONAL)
 endif()
 
+if(WITH_BULLET)
+	list(APPEND INC
+		../../../../intern/rigidbody
+	)
+	add_definitions(-DWITH_BULLET)
+endif()
+
 # Build makesrna executable
 blender_include_dirs(
 	.
@@ -250,6 +259,7 @@ blender_include_dirs(
 	../../imbuf
 	../../ikplugin
 	../../makesdna
+	../../nodes/
 	../../windowmanager
 	../../editors/include
 	../../render/extern/include
@@ -268,6 +278,9 @@ add_executable(makesrna ${SRC} ${SRC_RNA_INC} ${SRC_DNA_INC})
 target_link_libraries(makesrna bf_dna)
 target_link_libraries(makesrna bf_dna_blenlib)
 
+# too many warnings with clang
+remove_cc_flag("-Wmissing-prototypes")
+
 # Output rna_*_gen.c
 # note (linux only): with crashes try add this after COMMAND: valgrind --leak-check=full --track-origins=yes
 add_custom_command(
@@ -284,7 +297,6 @@ set(SRC
 	${SRC_RNA_INC}
 	rna_internal.h
 	rna_internal_types.h
-	rna_nodetree_types.h
 	rna_mesh_utils.h
 )
 

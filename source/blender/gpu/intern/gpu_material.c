@@ -278,11 +278,12 @@ void GPU_material_bind(GPUMaterial *material, int oblay, int viewlay, double tim
 		}
 
 		GPU_pass_bind(material->pass, time, mipmap);
+		GPU_pass_update_uniforms(material->pass);
 		material->bound = 1;
 	}
 }
 
-void GPU_material_bind_uniforms(GPUMaterial *material, float obmat[][4], float viewmat[][4], float viewinv[][4], float obcol[4], float autobumpscale)
+void GPU_material_bind_uniforms(GPUMaterial *material, float obmat[4][4], float viewmat[4][4], float viewinv[4][4], float obcol[4], float autobumpscale)
 {
 	if (material->pass) {
 		GPUShader *shader = GPU_pass_shader(material->pass);
@@ -338,8 +339,6 @@ void GPU_material_bind_uniforms(GPUMaterial *material, float obmat[][4], float v
 				mult_m4_m4m4(lamp->dynpersmat, lamp->persmat, viewinv);
 			}
 		}
-
-		GPU_pass_update_uniforms(material->pass);
 	}
 }
 
@@ -1035,8 +1034,7 @@ static void do_material_tex(GPUShadeInput *shi)
 				GPU_link(mat, "mtex_image", texco, GPU_image(tex->ima, &tex->iuser, FALSE), &tin, &trgb);
 				rgbnor= TEX_RGB;
 
-				if (tex->imaflag & TEX_USEALPHA)
-					talpha= 1;
+				talpha = ((tex->imaflag & TEX_USEALPHA) && tex->ima && (tex->ima->flag & IMA_IGNORE_ALPHA) == 0);
 			}
 			else {
 				continue;
@@ -1507,6 +1505,52 @@ static GPUNodeLink *gpu_material_diffuse_bsdf(GPUMaterial *mat, Material *ma)
 	return outlink;
 }
 
+static GPUNodeLink *gpu_material_preview_matcap(GPUMaterial *mat, Material *ma)
+{
+	GPUNodeLink *outlink;
+	
+	GPU_link(mat, "material_preview_matcap", GPU_uniform(&ma->r), GPU_image_preview(ma->preview), GPU_builtin(GPU_VIEW_NORMAL), &outlink);
+	
+	return outlink;
+}
+
+/* new solid draw mode with glsl matcaps */
+GPUMaterial *GPU_material_matcap(Scene *scene, Material *ma)
+{
+	GPUMaterial *mat;
+	GPUNodeLink *outlink;
+	LinkData *link;
+	
+	for (link=ma->gpumaterial.first; link; link=link->next)
+		if (((GPUMaterial*)link->data)->scene == scene)
+			return link->data;
+	
+	/* allocate material */
+	mat = GPU_material_construct_begin(ma);
+	mat->scene = scene;
+	
+	if (ma->preview && ma->preview->rect[0]) {
+		outlink = gpu_material_preview_matcap(mat, ma);
+	}
+	else {
+		outlink = gpu_material_diffuse_bsdf(mat, ma);
+	}
+		
+	GPU_material_output_link(mat, outlink);
+
+	GPU_material_construct_end(mat);
+	
+	/* note that even if building the shader fails in some way, we still keep
+	 * it to avoid trying to compile again and again, and simple do not use
+	 * the actual shader on drawing */
+	
+	link = MEM_callocN(sizeof(LinkData), "GPUMaterialLink");
+	link->data = mat;
+	BLI_addtail(&ma->gpumaterial, link);
+	
+	return mat;
+}
+
 GPUMaterial *GPU_material_from_blender(Scene *scene, Material *ma)
 {
 	GPUMaterial *mat;
@@ -1526,7 +1570,7 @@ GPUMaterial *GPU_material_from_blender(Scene *scene, Material *ma)
 		ntreeGPUMaterialNodes(ma->nodetree, mat);
 	}
 	else {
-		if(BKE_scene_use_new_shading_nodes(scene)) {
+		if (BKE_scene_use_new_shading_nodes(scene)) {
 			/* create simple diffuse material instead of nodes */
 			outlink = gpu_material_diffuse_bsdf(mat, ma);
 		}
@@ -1572,7 +1616,7 @@ void GPU_materials_free(void)
 
 /* Lamps and shadow buffers */
 
-void GPU_lamp_update(GPULamp *lamp, int lay, int hide, float obmat[][4])
+void GPU_lamp_update(GPULamp *lamp, int lay, int hide, float obmat[4][4])
 {
 	float mat[4][4];
 
@@ -1854,7 +1898,7 @@ void GPU_lamp_update_buffer_mats(GPULamp *lamp)
 	mult_m4_m4m4(lamp->persmat, rangemat, persmat);
 }
 
-void GPU_lamp_shadow_buffer_bind(GPULamp *lamp, float viewmat[][4], int *winsize, float winmat[][4])
+void GPU_lamp_shadow_buffer_bind(GPULamp *lamp, float viewmat[4][4], int *winsize, float winmat[4][4])
 {
 	GPU_lamp_update_buffer_mats(lamp);
 
@@ -1874,13 +1918,18 @@ void GPU_lamp_shadow_buffer_bind(GPULamp *lamp, float viewmat[][4], int *winsize
 void GPU_lamp_shadow_buffer_unbind(GPULamp *lamp)
 {
 	if (lamp->la->shadowmap_type == LA_SHADMAP_VARIANCE) {
-		GPU_shader_unbind(GPU_shader_get_builtin_shader(GPU_SHADER_VSM_STORE));
+		GPU_shader_unbind();
 		GPU_framebuffer_blur(lamp->fb, lamp->tex, lamp->blurfb, lamp->blurtex);
 	}
 
 	GPU_framebuffer_texture_unbind(lamp->fb, lamp->tex);
 	GPU_framebuffer_restore();
 	glEnable(GL_SCISSOR_TEST);
+}
+
+int GPU_lamp_shadow_buffer_type(GPULamp *lamp)
+{
+	return lamp->la->shadowmap_type;
 }
 
 int GPU_lamp_shadow_layer(GPULamp *lamp)

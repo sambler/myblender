@@ -40,7 +40,6 @@ EXP_DECLARE_HANDLE(EXP_ExpressionHandle);
 
 #ifdef __cplusplus
 extern "C" {
-//} for codefolding
 #endif
 
 extern EXP_ValueHandle		EXP_CreateInt(int innie);

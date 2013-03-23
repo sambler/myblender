@@ -32,10 +32,12 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
+#include <stdio.h>
+
 #include "DNA_windowmanager_types.h"
+#include "BLI_utildefines.h"
 
 /* Reporting Information and Errors
  *
@@ -73,10 +75,13 @@ void BKE_reports_print(ReportList *reports, ReportType level);
 Report *BKE_reports_last_displayable(ReportList *reports);
 
 int BKE_reports_contain(ReportList *reports, ReportType level);
-	
+
+bool BKE_report_write_file_fp(FILE *fp, ReportList *reports, const char *header);
+bool BKE_report_write_file(const char *filepath, ReportList *reports, const char *header);
+
 #ifdef __cplusplus
 }
 #endif
-	
+
 #endif
 

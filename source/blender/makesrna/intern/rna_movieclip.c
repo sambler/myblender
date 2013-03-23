@@ -25,7 +25,6 @@
  *  \ingroup RNA
  */
 
-
 #include <stdlib.h>
 #include <limits.h>
 
@@ -34,12 +33,12 @@
 #include "BKE_movieclip.h"
 #include "BKE_tracking.h"
 
+#include "DNA_movieclip_types.h"
+#include "DNA_scene_types.h"
+
 #include "RNA_define.h"
 
 #include "rna_internal.h"
-
-#include "DNA_movieclip_types.h"
-#include "DNA_scene_types.h"
 
 #include "WM_types.h"
 
@@ -308,7 +307,7 @@ static void rna_def_movieclip(BlenderRNA *brna)
 	/* color management */
 	prop = RNA_def_property(srna, "colorspace_settings", PROP_POINTER, PROP_NONE);
 	RNA_def_property_pointer_sdna(prop, NULL, "colorspace_settings");
-	RNA_def_property_struct_type(prop, "ColorManagedColorspaceSettings");
+	RNA_def_property_struct_type(prop, "ColorManagedInputColorspaceSettings");
 	RNA_def_property_ui_text(prop, "Color Space Settings", "Input color space settings");
 }
 

@@ -30,9 +30,6 @@
 struct BMesh;
 struct BMOperator;
 
-void BMO_push(BMesh *bm, BMOperator *op);
-void BMO_pop(BMesh *bm);
-
 void bmo_automerge_exec(BMesh *bm, BMOperator *op);
 void bmo_average_vert_facedata_exec(BMesh *bm, BMOperator *op);
 void bmo_beautify_fill_exec(BMesh *bm, BMOperator *op);
@@ -89,7 +86,6 @@ void bmo_shortest_path_exec(BMesh *bm, BMOperator *op);
 void bmo_similar_edges_exec(BMesh *bm, BMOperator *op);
 void bmo_similar_faces_exec(BMesh *bm, BMOperator *op);
 void bmo_similar_verts_exec(BMesh *bm, BMOperator *op);
-void bmo_slide_vert_exec(BMesh *bm, BMOperator *op);
 void bmo_smooth_vert_exec(BMesh *bm, BMOperator *op);
 void bmo_smooth_laplacian_vert_exec(BMesh *bm, BMOperator *op);
 void bmo_solidify_face_region_exec(BMesh *bm, BMOperator *op);

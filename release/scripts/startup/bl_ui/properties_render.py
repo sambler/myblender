@@ -1,4 +1,5 @@
 # ##### BEGIN GPL LICENSE BLOCK #####
+
 #
 #  This program is free software; you can redistribute it and/or
 #  modify it under the terms of the GNU General Public License
@@ -18,7 +19,7 @@
 
 # <pep8 compliant>
 import bpy
-from bpy.types import Menu, Panel
+from bpy.types import Menu, Panel, UIList
 
 
 class RENDER_MT_presets(Menu):
@@ -40,6 +41,18 @@ class RENDER_MT_framerate_presets(Menu):
     preset_subdir = "framerate"
     preset_operator = "script.execute_preset"
     draw = Menu.draw_preset
+
+
+class RENDER_UL_renderlayers(UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        # assert(isinstance(item, bpy.types.SceneRenderLayer)
+        layer = item
+        if self.layout_type in {'DEFAULT', 'COMPACT'}:
+            layout.label(text=layer.name, translate=False, icon_value=icon)
+            layout.prop(layer, "use", text="", index=index)
+        elif self.layout_type in {'GRID'}:
+            layout.alignment = 'CENTER'
+            layout.label(text="", icon_value=icon)
 
 
 class RenderButtonsPanel():
@@ -83,7 +96,7 @@ class RENDER_PT_layers(RenderButtonsPanel, Panel):
         rd = scene.render
 
         row = layout.row()
-        row.template_list(rd, "layers", rd.layers, "active_index", rows=2)
+        row.template_list("RENDER_UL_renderlayers", "", rd, "layers", rd.layers, "active_index", rows=2)
 
         col = row.column(align=True)
         col.operator("scene.render_layer_add", icon='ZOOMIN', text="")
@@ -338,7 +351,7 @@ class RENDER_PT_performance(RenderButtonsPanel, Panel):
         subsub = sub.column()
         subsub.enabled = rd.threads_mode == 'FIXED'
         subsub.prop(rd, "threads")
-        
+
         sub = col.column(align=True)
         sub.label(text="Tile Size:")
         sub.prop(rd, "tile_x", text="X")
@@ -460,10 +473,14 @@ class RENDER_PT_output(RenderButtonsPanel, Panel):
 
         layout.prop(rd, "filepath", text="")
 
-        flow = layout.column_flow()
-        flow.prop(rd, "use_overwrite")
-        flow.prop(rd, "use_placeholder")
-        flow.prop(rd, "use_file_extension")
+        split = layout.split()
+        
+        col = split.column()
+        col.active = not rd.is_movie_format
+        col.prop(rd, "use_overwrite")
+        col.prop(rd, "use_placeholder")
+        
+        split.prop(rd, "use_file_extension")
 
         layout.template_image_settings(image_settings, color_management=False)
 
@@ -573,7 +590,7 @@ class RENDER_PT_bake(RenderButtonsPanel, Panel):
         layout.prop(rd, "bake_type")
 
         multires_bake = False
-        if rd.bake_type in ['NORMALS', 'DISPLACEMENT']:
+        if rd.bake_type in ['NORMALS', 'DISPLACEMENT', 'AO']:
             layout.prop(rd, "use_bake_multires")
             multires_bake = rd.use_bake_multires
 
@@ -591,9 +608,12 @@ class RENDER_PT_bake(RenderButtonsPanel, Panel):
             split = layout.split()
 
             col = split.column()
-            col.prop(rd, "use_bake_clear")
-            col.prop(rd, "bake_margin")
-            col.prop(rd, "bake_quad_split", text="Split")
+            col.prop(rd, "use_bake_to_vertex_color")
+            sub = col.column()
+            sub.active = not rd.use_bake_to_vertex_color
+            sub.prop(rd, "use_bake_clear")
+            sub.prop(rd, "bake_margin")
+            sub.prop(rd, "bake_quad_split", text="Split")
 
             col = split.column()
             col.prop(rd, "use_bake_selected_to_active")
@@ -602,11 +622,19 @@ class RENDER_PT_bake(RenderButtonsPanel, Panel):
             sub.prop(rd, "bake_distance")
             sub.prop(rd, "bake_bias")
         else:
-            if rd.bake_type == 'DISPLACEMENT':
-                layout.prop(rd, "use_bake_lores_mesh")
+            split = layout.split()
 
-            layout.prop(rd, "use_bake_clear")
-            layout.prop(rd, "bake_margin")
+            col = split.column()
+            col.prop(rd, "use_bake_clear")
+            col.prop(rd, "bake_margin")
+
+            if rd.bake_type == 'DISPLACEMENT':
+                col = split.column()
+                col.prop(rd, "use_bake_lores_mesh")
+            if rd.bake_type == 'AO':
+                col = split.column()
+                col.prop(rd, "bake_bias")
+                col.prop(rd, "bake_samples")
 
 
 if __name__ == "__main__":  # only for live edit.

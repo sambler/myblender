@@ -48,11 +48,11 @@
  *
  * There are currently no known issues with MEM. Note that there is a
  * second intern/ module with MEM_ prefix, for use in c++.
- * 
+ *
  * \subsection memdependencies Dependencies
  * - stdlib
  * - stdio
- * 
+ *
  * \subsection memdocs API Documentation
  * See \ref MEM_guardedalloc.h
  */
@@ -68,7 +68,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 	/** Returns the length of the allocated memory segment pointed at
@@ -81,7 +80,7 @@ extern "C" {
 	;
 
 	/**
-	 * Release memory previously allocatred by this module. 
+	 * Release memory previously allocatred by this module.
 	 */
 	short MEM_freeN(void *vmemh);
 
@@ -107,7 +106,7 @@ extern "C" {
 	void *MEM_reallocN(void *vmemh, size_t len)
 #if MEM_GNU_ATTRIBUTES
 	__attribute__((warn_unused_result))
-//	__attribute__((alloc_size(2)))
+	__attribute__((alloc_size(2)))
 #endif
 	;
 
@@ -129,7 +128,7 @@ extern "C" {
 #if MEM_GNU_ATTRIBUTES
 	__attribute__((warn_unused_result))
 	__attribute__((nonnull(2)))
-//	__attribute__((alloc_size(1)))
+	__attribute__((alloc_size(1)))
 #endif
 	;
 
@@ -141,7 +140,7 @@ extern "C" {
 #if MEM_GNU_ATTRIBUTES
 	__attribute__((warn_unused_result))
 	__attribute__((nonnull(2)))
-//	__attribute__((alloc_size(1)))
+	__attribute__((alloc_size(1)))
 #endif
 	;
 
@@ -153,24 +152,24 @@ extern "C" {
 #if MEM_GNU_ATTRIBUTES
 	__attribute__((warn_unused_result))
 	__attribute__((nonnull(2)))
-//	__attribute__((alloc_size(1)))
+	__attribute__((alloc_size(1)))
 #endif
 	;
 
 	/** Print a list of the names and sizes of all allocated memory
-	 * blocks. as a python dict for easy investigation */ 
+	 * blocks. as a python dict for easy investigation */
 	void MEM_printmemlist_pydict(void);
 
 	/** Print a list of the names and sizes of all allocated memory
-	 * blocks. */ 
+	 * blocks. */
 	void MEM_printmemlist(void);
 
 	/** calls the function on all allocated memory blocks. */
-	void MEM_callbackmemlist(void (*func)(void*));
+	void MEM_callbackmemlist(void (*func)(void *));
 
 	/** Print statistics about memory usage */
 	void MEM_printmemlist_stats(void);
-	
+
 	/** Set the callback function for error output. */
 	void MEM_set_error_callback(void (*func)(const char *));
 
@@ -183,7 +182,7 @@ extern "C" {
 	/** Set thread locking functions for safe memory allocation from multiple
 	 * threads, pass NULL pointers to disable thread locking again. */
 	void MEM_set_lock_callback(void (*lock)(void), void (*unlock)(void));
-	
+
 	/** Attempt to enforce OSX (or other OS's) to have malloc and stack nonzero */
 	void MEM_set_memory_debug(void);
 

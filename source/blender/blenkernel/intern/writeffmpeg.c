@@ -111,8 +111,9 @@ static void delete_picture(AVFrame *f)
 	}
 }
 
-static int use_float_audio_buffer(int codec_id)
+static int request_float_audio_buffer(int codec_id)
 {
+	/* If any of these codecs, we prefer the float sample format (if supported) */
 	return codec_id == CODEC_ID_AAC || codec_id == CODEC_ID_AC3 || codec_id == CODEC_ID_VORBIS;
 }
 
@@ -373,7 +374,7 @@ static void set_ffmpeg_property_option(AVCodecContext *c, IDProperty *prop)
 {
 	char name[128];
 	char *param;
-	const AVOption *rv = NULL;
+	int fail = TRUE;
 
 	PRINT("FFMPEG expert option: %s: ", prop->name);
 
@@ -388,30 +389,30 @@ static void set_ffmpeg_property_option(AVCodecContext *c, IDProperty *prop)
 	switch (prop->type) {
 		case IDP_STRING:
 			PRINT("%s.\n", IDP_String(prop));
-			av_set_string3(c, prop->name, IDP_String(prop), 1, &rv);
+			fail = av_opt_set(c, prop->name, IDP_String(prop), 0);
 			break;
 		case IDP_FLOAT:
 			PRINT("%g.\n", IDP_Float(prop));
-			rv = av_set_double(c, prop->name, IDP_Float(prop));
+			fail = av_opt_set_double(c, prop->name, IDP_Float(prop), 0);
 			break;
 		case IDP_INT:
 			PRINT("%d.\n", IDP_Int(prop));
 
 			if (param) {
 				if (IDP_Int(prop)) {
-					av_set_string3(c, name, param, 1, &rv);
+					fail = av_opt_set(c, name, param, 0);
 				}
 				else {
 					return;
 				}
 			}
 			else {
-				rv = av_set_int(c, prop->name, IDP_Int(prop));
+				fail = av_opt_set_int(c, prop->name, IDP_Int(prop), 0);
 			}
 			break;
 	}
 
-	if (!rv) {
+	if (fail) {
 		PRINT("ffmpeg-option not supported: %s! Skipping.\n", prop->name);
 	}
 }
@@ -464,8 +465,9 @@ static AVStream *alloc_video_stream(RenderData *rd, int codec_id, AVFormatContex
 
 	error[0] = '\0';
 
-	st = av_new_stream(of, 0);
+	st = avformat_new_stream(of, NULL);
 	if (!st) return NULL;
+	st->id = 0;
 
 	/* Set up the codec context */
 	
@@ -497,8 +499,15 @@ static AVStream *alloc_video_stream(RenderData *rd, int codec_id, AVFormatContex
 	c->rc_max_rate = rd->ffcodecdata.rc_max_rate * 1000;
 	c->rc_min_rate = rd->ffcodecdata.rc_min_rate * 1000;
 	c->rc_buffer_size = rd->ffcodecdata.rc_buffer_size * 1024;
+
+#if 0
+	/* this options are not set in ffmpeg.c and leads to artifacts with MPEG-4
+	 * see #33586: Encoding to mpeg4 makes first frame(s) blocky
+	 */
 	c->rc_initial_buffer_occupancy = rd->ffcodecdata.rc_buffer_size * 3 / 4;
 	c->rc_buffer_aggressivity = 1.0;
+#endif
+
 	c->me_method = ME_EPZS;
 	
 	codec = avcodec_find_encoder(c->codec_id);
@@ -534,19 +543,16 @@ static AVStream *alloc_video_stream(RenderData *rd, int codec_id, AVFormatContex
 	}
 
 	if (codec_id == CODEC_ID_FFV1) {
-#ifdef FFMPEG_FFV1_ALPHA_SUPPORTED
-		if (rd->im_format.planes == R_IMF_PLANES_RGBA) {
-			c->pix_fmt = PIX_FMT_RGB32;
-		}
-		else {
-			c->pix_fmt = PIX_FMT_BGR0;
-		}
-#else
 		c->pix_fmt = PIX_FMT_RGB32;
-#endif
 	}
 
 	if (codec_id == CODEC_ID_QTRLE) {
+		if (rd->im_format.planes == R_IMF_PLANES_RGBA) {
+			c->pix_fmt = PIX_FMT_ARGB;
+		}
+	}
+
+	if (codec_id == CODEC_ID_PNG) {
 		if (rd->im_format.planes == R_IMF_PLANES_RGBA) {
 			c->pix_fmt = PIX_FMT_ARGB;
 		}
@@ -575,7 +581,7 @@ static AVStream *alloc_video_stream(RenderData *rd, int codec_id, AVFormatContex
 
 	set_ffmpeg_properties(rd, c, "video");
 	
-	if (avcodec_open(c, codec) < 0) {
+	if (avcodec_open2(c, codec, NULL) < 0) {
 		BLI_strncpy(error, IMB_ffmpeg_last_error(), error_size);
 		return NULL;
 	}
@@ -612,8 +618,9 @@ static AVStream *alloc_audio_stream(RenderData *rd, int codec_id, AVFormatContex
 
 	error[0] = '\0';
 
-	st = av_new_stream(of, 1);
+	st = avformat_new_stream(of, NULL);
 	if (!st) return NULL;
+	st->id = 1;
 
 	c = st->codec;
 	c->codec_id = codec_id;
@@ -623,19 +630,58 @@ static AVStream *alloc_audio_stream(RenderData *rd, int codec_id, AVFormatContex
 	c->bit_rate = ffmpeg_audio_bitrate * 1000;
 	c->sample_fmt = AV_SAMPLE_FMT_S16;
 	c->channels = rd->ffcodecdata.audio_channels;
-	if (use_float_audio_buffer(codec_id)) {
+
+	if (request_float_audio_buffer(codec_id)) {
+		/* mainly for AAC codec which is experimental */
 		c->strict_std_compliance = FF_COMPLIANCE_EXPERIMENTAL;
 		c->sample_fmt = AV_SAMPLE_FMT_FLT;
 	}
+
 	codec = avcodec_find_encoder(c->codec_id);
 	if (!codec) {
 		//XXX error("Couldn't find a valid audio codec");
 		return NULL;
 	}
 
+	if (codec->sample_fmts) {
+		/* check if the prefered sample format for this codec is supported.
+		 * this is because, depending on the version of libav, and with the whole ffmpeg/libav fork situation,
+		 * you have various implementations around. float samples in particular are not always supported.
+		 */
+		const enum AVSampleFormat *p = codec->sample_fmts;
+		for (; *p!=-1; p++) {
+			if (*p == st->codec->sample_fmt)
+				break;
+		}
+		if (*p == -1) {
+			/* sample format incompatible with codec. Defaulting to a format known to work */
+			st->codec->sample_fmt = codec->sample_fmts[0];
+		}
+	}
+
+	if (c->sample_fmt == AV_SAMPLE_FMT_FLTP) {
+		BLI_strncpy(error, "Requested audio codec requires planar float sample format, which is not supported yet", error_size);
+		return NULL;
+	}
+
+	if (codec->supported_samplerates) {
+		const int *p = codec->supported_samplerates;
+		int best = 0;
+		int best_dist = INT_MAX;
+		for (; *p; p++) {
+			int dist = abs(st->codec->sample_rate - *p);
+			if (dist < best_dist) {
+				best_dist = dist;
+				best = *p;
+			}
+		}
+		/* best is the closest supported sample rate (same as selected if best_dist == 0) */
+		st->codec->sample_rate = best;
+	}
+
 	set_ffmpeg_properties(rd, c, "audio");
 
-	if (avcodec_open(c, codec) < 0) {
+	if (avcodec_open2(c, codec, NULL) < 0) {
 		//XXX error("Couldn't initialize audio codec");
 		BLI_strncpy(error, IMB_ffmpeg_last_error(), error_size);
 		return NULL;
@@ -658,7 +704,7 @@ static AVStream *alloc_audio_stream(RenderData *rd, int codec_id, AVFormatContex
 
 	audio_output_buffer = (uint8_t *) av_malloc(audio_outbuf_size);
 
-	if (use_float_audio_buffer(codec_id)) {
+	if (c->sample_fmt == AV_SAMPLE_FMT_FLT) {
 		audio_input_buffer = (uint8_t *) av_malloc(audio_input_samples * c->channels * sizeof(float));
 	}
 	else {
@@ -740,7 +786,7 @@ static int start_ffmpeg_impl(struct RenderData *rd, int rectx, int recty, Report
 
 	fmt->audio_codec = ffmpeg_audio_codec;
 
-	BLI_snprintf(of->filename, sizeof(of->filename), "%s", name);
+	BLI_strncpy(of->filename, name, sizeof(of->filename));
 	/* set the codec to the user's selection */
 	switch (ffmpeg_type) {
 		case FFMPEG_AVI:
@@ -837,7 +883,8 @@ static int start_ffmpeg_impl(struct RenderData *rd, int rectx, int recty, Report
 	}
 	if (avformat_write_header(of, NULL) < 0) {
 		BKE_report(reports, RPT_ERROR, "Could not initialize streams, probably unsupported codec combination");
-			av_dict_free(&opts);
+		av_dict_free(&opts);
+		avio_close(of->pb);
 		return 0;
 	}
 
@@ -963,7 +1010,7 @@ int BKE_ffmpeg_start(struct Scene *scene, RenderData *rd, int rectx, int recty, 
 		AVCodecContext *c = audio_stream->codec;
 		AUD_DeviceSpecs specs;
 		specs.channels = c->channels;
-		if (use_float_audio_buffer(c->codec_id)) {
+		if (c->sample_fmt == AV_SAMPLE_FMT_FLT) {
 			specs.format = AUD_FORMAT_FLOAT32;
 		}
 		else {
@@ -980,7 +1027,6 @@ int BKE_ffmpeg_start(struct Scene *scene, RenderData *rd, int rectx, int recty, 
 	return success;
 }
 
-void BKE_ffmpeg_end(void);
 static void end_ffmpeg_impl(int is_autosplit);
 
 #ifdef WITH_AUDASPACE
@@ -1144,7 +1190,7 @@ IDProperty *BKE_ffmpeg_property_add(RenderData *rd, const char *type, int opt_in
 	
 	val.i = 0;
 
-	avcodec_get_context_defaults(&c);
+	avcodec_get_context_defaults3(&c, NULL);
 
 	o = c.av_class->option + opt_index;
 	parent = c.av_class->option + parent_index;
@@ -1175,23 +1221,23 @@ IDProperty *BKE_ffmpeg_property_add(RenderData *rd, const char *type, int opt_in
 	}
 
 	switch (o->type) {
-		case FF_OPT_TYPE_INT:
-		case FF_OPT_TYPE_INT64:
+		case AV_OPT_TYPE_INT:
+		case AV_OPT_TYPE_INT64:
 			val.i = FFMPEG_DEF_OPT_VAL_INT(o);
 			idp_type = IDP_INT;
 			break;
-		case FF_OPT_TYPE_DOUBLE:
-		case FF_OPT_TYPE_FLOAT:
+		case AV_OPT_TYPE_DOUBLE:
+		case AV_OPT_TYPE_FLOAT:
 			val.f = FFMPEG_DEF_OPT_VAL_DOUBLE(o);
 			idp_type = IDP_FLOAT;
 			break;
-		case FF_OPT_TYPE_STRING:
+		case AV_OPT_TYPE_STRING:
 			val.string.str = (char *)"                                                                               ";
 			val.string.len = 80;
 /*		val.str = (char *)"                                                                               ";*/
 			idp_type = IDP_STRING;
 			break;
-		case FF_OPT_TYPE_CONST:
+		case AV_OPT_TYPE_CONST:
 			val.i = 1;
 			idp_type = IDP_INT;
 			break;
@@ -1231,7 +1277,7 @@ int BKE_ffmpeg_property_add_string(RenderData *rd, const char *type, const char 
 	char *param;
 	IDProperty *prop = NULL;
 	
-	avcodec_get_context_defaults(&c);
+	avcodec_get_context_defaults3(&c, NULL);
 
 	strncpy(name_, str, sizeof(name_));
 
@@ -1252,10 +1298,10 @@ int BKE_ffmpeg_property_add_string(RenderData *rd, const char *type, const char 
 	if (!o) {
 		return 0;
 	}
-	if (param && o->type == FF_OPT_TYPE_CONST) {
+	if (param && o->type == AV_OPT_TYPE_CONST) {
 		return 0;
 	}
-	if (param && o->type != FF_OPT_TYPE_CONST && o->unit) {
+	if (param && o->type != AV_OPT_TYPE_CONST && o->unit) {
 		p = my_av_find_opt(&c, param, o->unit, 0, 0);
 		if (p) {
 			prop = BKE_ffmpeg_property_add(rd, (char *) type, p - c.av_class->option, o - c.av_class->option);
@@ -1491,6 +1537,9 @@ int BKE_ffmpeg_alpha_channel_is_supported(RenderData *rd)
 	int codec = rd->ffcodecdata.codec;
 
 	if (codec == CODEC_ID_QTRLE)
+		return TRUE;
+
+	if (codec == CODEC_ID_PNG)
 		return TRUE;
 
 #ifdef FFMPEG_FFV1_ALPHA_SUPPORTED

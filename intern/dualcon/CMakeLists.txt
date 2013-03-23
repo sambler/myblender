@@ -23,7 +23,6 @@ set(INC
 
 set(INC_SYS
 	../../extern/Eigen3
-	../../source/blender/blenloader
 )
 
 set(SRC

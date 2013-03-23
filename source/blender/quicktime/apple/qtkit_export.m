@@ -61,11 +61,10 @@
 #import <QTKit/QTKit.h>
 #include <AudioToolbox/AudioToolbox.h>
 
-/* -- qtkit exists in 10.3 - 32bit isn't a valid reason to prevent qtkit from being used
-#if (MAC_OS_X_VERSION_MIN_REQUIRED <= MAC_OS_X_VERSION_10_4) || !__LP64__
-#error 64 bit build & OSX 10.5 minimum are needed for QTKit
+#if MAC_OS_X_VERSION_MIN_REQUIRED <= 1040
+#error OSX 10.5 minimum is needed for QTKit
 #endif
-*/
+
 #include "quicktime_import.h"
 #include "quicktime_export.h"
 
@@ -296,8 +295,8 @@ static OSStatus AudioConverterInputCallback(AudioConverterRef inAudioConverter,
 	
 	qtexport->audioTotalExportedFrames += *ioNumberDataPackets;
 	
-	AUD_readDevice(qtexport->audioInputDevice, (UInt8*)qtexport->audioInputBuffer, 
-				   qtexport->audioInputFormat.mFramesPerPacket * *ioNumberDataPackets);
+	AUD_readDevice(qtexport->audioInputDevice, (UInt8 *)qtexport->audioInputBuffer,
+	               qtexport->audioInputFormat.mFramesPerPacket * *ioNumberDataPackets);
 	
 	ioData->mBuffers[0].mDataByteSize = qtexport->audioInputFormat.mBytesPerPacket * *ioNumberDataPackets;
 	ioData->mBuffers[0].mData = qtexport->audioInputBuffer;
@@ -358,7 +357,7 @@ int start_qt(struct Scene *scene, struct RenderData *rd, int rectx, int recty, R
 
 			tmpnam(name);
 			strcat(name, extension);
-			outputFileURL = CFURLCreateFromFileSystemRepresentation(kCFAllocatorDefault,(UInt8*) name, strlen(name), false);
+			outputFileURL = CFURLCreateFromFileSystemRepresentation(kCFAllocatorDefault,(UInt8 *)name, strlen(name), false);
 			
 			if (outputFileURL) {
 				
@@ -558,7 +557,7 @@ int start_qt(struct Scene *scene, struct RenderData *rd, int rectx, int recty, R
 			[qtexport->movie setAttribute:[NSNumber numberWithBool:YES] forKey:QTMovieEditableAttribute];
 			[qtexport->movie setAttribute:@"Made with Blender" forKey:QTMovieCopyrightAttribute];
 			
-			qtexport->frameDuration = QTMakeTime(rd->frs_sec_base*1000, rd->frs_sec*1000);
+			qtexport->frameDuration = QTMakeTime(rd->frs_sec_base * 1000, rd->frs_sec * 1000);
 			
 			/* specifying the codec attributes : try to retrieve them from render data first*/
 			if (rd->qtcodecsettings.codecType) {

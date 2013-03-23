@@ -47,15 +47,25 @@ OSLShaderManager::OSLShaderManager()
 {
 	services = new OSLRenderServices();
 
-	shading_system_init();
 	texture_system_init();
+	shading_system_init();
 }
 
 OSLShaderManager::~OSLShaderManager()
 {
 	OSL::ShadingSystem::destroy(ss);
 	OSL::TextureSystem::destroy(ts);
+
 	delete services;
+}
+
+void OSLShaderManager::reset(Scene *scene)
+{
+	OSL::ShadingSystem::destroy(ss);
+	delete services;
+
+	services = new OSLRenderServices();
+	shading_system_init();
 }
 
 void OSLShaderManager::device_update(Device *device, DeviceScene *dscene, Scene *scene, Progress& progress)
@@ -76,18 +86,19 @@ void OSLShaderManager::device_update(Device *device, DeviceScene *dscene, Scene 
 
 		if(progress.get_cancel()) return;
 
-		if(shader->sample_as_light && shader->has_surface_emission)
-			scene->light_manager->need_update = true;
-
 		OSLCompiler compiler((void*)this, (void*)ss, scene->image_manager);
 		compiler.background = (shader == scene->shaders[scene->default_background]);
 		compiler.compile(og, shader);
+
+		if(shader->sample_as_light && shader->has_surface_emission)
+			scene->light_manager->need_update = true;
 	}
 
 	/* setup shader engine */
 	og->ss = ss;
 	og->ts = ts;
 	og->services = services;
+
 	int background_id = scene->shader_manager->get_shader_id(scene->default_background);
 	og->background_state = og->surface_state[background_id & SHADER_MASK];
 	og->use = true;
@@ -202,8 +213,14 @@ static string shader_filepath_hash(const string& filepath, uint64_t modified_tim
 
 const char *OSLShaderManager::shader_test_loaded(const string& hash)
 {
-	set<string>::iterator it = loaded_shaders.find(hash);
-	return (it == loaded_shaders.end())? NULL: it->c_str();
+	map<string, OSLShaderInfo>::iterator it = loaded_shaders.find(hash);
+	return (it == loaded_shaders.end())? NULL: it->first.c_str();
+}
+
+OSLShaderInfo *OSLShaderManager::shader_loaded_info(const string& hash)
+{
+	map<string, OSLShaderInfo>::iterator it = loaded_shaders.find(hash);
+	return (it == loaded_shaders.end())? NULL: &it->second;
 }
 
 const char *OSLShaderManager::shader_load_filepath(string filepath)
@@ -261,18 +278,59 @@ const char *OSLShaderManager::shader_load_filepath(string filepath)
 
 	if(!path_read_text(filepath, bytecode)) {
 		fprintf(stderr, "Cycles shader graph: failed to read file %s\n", filepath.c_str());
-		loaded_shaders.insert(bytecode_hash); /* to avoid repeat tries */
+		OSLShaderInfo info;
+		loaded_shaders[bytecode_hash] = info; /* to avoid repeat tries */
 		return NULL;
 	}
 
 	return shader_load_bytecode(bytecode_hash, bytecode);
 }
 
+/* don't try this at home .. this is a template trick to use either
+ * LoadMemoryShader or LoadMemoryCompiledShader which are the function
+ * names in our custom branch and the official repository. */
+
+template<bool C, typename T = void> struct enable_if { typedef T type; };
+template<typename T> struct enable_if<false, T> { };
+
+template<typename T, typename Sign>
+struct has_LoadMemoryCompiledShader {
+	typedef int yes;
+	typedef char no;
+	
+	template<typename U, U> struct type_check;
+	template<typename _1> static yes &chk(type_check<Sign, &_1::LoadMemoryCompiledShader>*);
+	template<typename   > static no  &chk(...);
+	static bool const value = sizeof(chk<T>(0)) == sizeof(yes);
+};
+
+template<typename T>
+typename enable_if<has_LoadMemoryCompiledShader<T, 
+	bool(T::*)(const char*, const char*)>::value, bool>::type
+load_memory_shader(T *ss, const char *name, const char *buffer)
+{
+	return ss->LoadMemoryCompiledShader(name, buffer);
+}
+
+template<typename T>
+typename enable_if<!has_LoadMemoryCompiledShader<T, 
+	bool(T::*)(const char*, const char*)>::value, bool>::type
+load_memory_shader(T *ss, const char *name, const char *buffer)
+{
+	return ss->LoadMemoryShader(name, buffer);
+}
+
 const char *OSLShaderManager::shader_load_bytecode(const string& hash, const string& bytecode)
 {
-	ss->LoadMemoryShader(hash.c_str(), bytecode.c_str());
+	load_memory_shader(ss, hash.c_str(), bytecode.c_str());
 
-	return loaded_shaders.insert(hash).first->c_str();
+	/* this is a bit weak, but works */
+	OSLShaderInfo info;
+	info.has_surface_emission = (bytecode.find("\"emission\"") != string::npos);
+	info.has_surface_transparent = (bytecode.find("\"transparent\"") != string::npos);
+	loaded_shaders[hash] = info;
+
+	return loaded_shaders.find(hash)->first.c_str();
 }
 
 /* Graph Compiler */
@@ -410,6 +468,7 @@ void OSLCompiler::add(ShaderNode *node, const char *name, bool isfilepath)
 					parameter(param_name.c_str(), input->value_string);
 					break;
 				case SHADER_SOCKET_CLOSURE:
+				case SHADER_SOCKET_UNDEFINED:
 					break;
 			}
 		}
@@ -442,6 +501,16 @@ void OSLCompiler::add(ShaderNode *node, const char *name, bool isfilepath)
 
 			ss->ConnectShaders(id_from.c_str(), param_from.c_str(), id_to.c_str(), param_to.c_str());
 		}
+	}
+
+	/* test if we shader contains specific closures */
+	OSLShaderInfo *info = ((OSLShaderManager*)manager)->shader_loaded_info(name);
+
+	if(info) {
+		if(info->has_surface_emission)
+			current_shader->has_surface_emission = true;
+		if(info->has_surface_transparent)
+			current_shader->has_surface_transparent = true;
 	}
 }
 
@@ -598,9 +667,9 @@ void OSLCompiler::generate_nodes(const set<ShaderNode*>& nodes)
 					node->compile(*this);
 					done.insert(node);
 
-					if(node->name == ustring("emission"))
+					if(node->has_surface_emission())
 						current_shader->has_surface_emission = true;
-					if(node->name == ustring("transparent"))
+					if(node->has_surface_transparent())
 						current_shader->has_surface_transparent = true;
 				}
 				else

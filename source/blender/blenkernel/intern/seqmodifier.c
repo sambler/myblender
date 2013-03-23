@@ -135,7 +135,7 @@ static void modifier_apply_threaded(ImBuf *ibuf, ImBuf *mask, modifier_apply_thr
 	init_data.apply_callback = apply_callback;
 
 	IMB_processor_apply_threaded(ibuf->y, sizeof(ModifierThread), &init_data,
-                                 modifier_init_handle, modifier_do_thread);
+	                             modifier_init_handle, modifier_do_thread);
 }
 
 /* **** Color Balance Modifier **** */
@@ -226,24 +226,28 @@ static void curves_apply_threaded(int width, int height, unsigned char *rect, fl
 			}
 			if (rect) {
 				unsigned char *pixel = rect + pixel_index;
-				unsigned char result[3];
+				float result[3], tempc[4];
 
-				curvemapping_evaluate_premulRGB(curve_mapping, result, pixel);
+				straight_uchar_to_premul_float(tempc, pixel);
+
+				curvemapping_evaluate_premulRGBF(curve_mapping, result, tempc);
 
 				if (mask_rect) {
 					float t[3];
 
 					rgb_uchar_to_float(t, mask_rect + pixel_index);
 
-					pixel[0] = pixel[0] * (1.0f - t[0]) + result[0] * t[0];
-					pixel[1] = pixel[1] * (1.0f - t[1]) + result[1] * t[1];
-					pixel[2] = pixel[2] * (1.0f - t[2]) + result[2] * t[2];
+					tempc[0] = tempc[0] * (1.0f - t[0]) + result[0] * t[0];
+					tempc[1] = tempc[1] * (1.0f - t[1]) + result[1] * t[1];
+					tempc[2] = tempc[2] * (1.0f - t[2]) + result[2] * t[2];
 				}
 				else {
-					pixel[0] = result[0];
-					pixel[1] = result[1];
-					pixel[2] = result[2];
+					tempc[0] = result[0];
+					tempc[1] = result[1];
+					tempc[2] = result[2];
 				}
+
+				premul_float_to_straight_uchar(pixel, tempc);
 			}
 		}
 	}
@@ -434,7 +438,7 @@ static void brightcontrast_apply_threaded(int width, int height, unsigned char *
 						unsigned char *m = mask_rect + pixel_index;
 						float t = (float) m[c] / 255.0f;
 
-						v = (float) pixel[c] * (1.0f - t) + v * t;
+						v = (float) pixel[c] / 255.0f * (1.0f - t) + v * t;
 					}
 
 					pixel[c] = FTOCHAR(v);

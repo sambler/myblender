@@ -30,7 +30,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 struct MEM_CacheLimiter_s;
@@ -50,7 +49,7 @@ typedef int (*MEM_CacheLimiter_ItemPriority_Func) (void*, int);
 
 #ifndef __MEM_CACHELIMITER_H__
 void MEM_CacheLimiter_set_maximum(size_t m);
-int MEM_CacheLimiter_get_maximum(void);
+size_t MEM_CacheLimiter_get_maximum(void);
 #endif /* __MEM_CACHELIMITER_H__ */
 
 /**
@@ -62,7 +61,7 @@ int MEM_CacheLimiter_get_maximum(void);
  */
 
 MEM_CacheLimiterC *new_MEM_CacheLimiter(MEM_CacheLimiter_Destruct_Func data_destructor,
-                                         MEM_CacheLimiter_DataSize_Func data_size);
+										 MEM_CacheLimiter_DataSize_Func data_size);
 
 /**
  * Delete MEM_CacheLimiter
@@ -144,7 +143,9 @@ int MEM_CacheLimiter_get_refcount(MEM_CacheLimiterHandleC *handle);
 void *MEM_CacheLimiter_get(MEM_CacheLimiterHandleC *handle);
 
 void MEM_CacheLimiter_ItemPriority_Func_set(MEM_CacheLimiterC *This,
-                                            MEM_CacheLimiter_ItemPriority_Func item_priority_func);
+											MEM_CacheLimiter_ItemPriority_Func item_priority_func);
+
+size_t MEM_CacheLimiter_get_memory_in_use(MEM_CacheLimiterC *This);
 
 #ifdef __cplusplus
 }

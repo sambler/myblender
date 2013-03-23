@@ -34,7 +34,6 @@
  */
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 struct Main;
@@ -48,12 +47,12 @@ struct Scene;
 /* materials */
 
 void init_def_material(void);
-void BKE_material_free(struct Material *sc); 
+void BKE_material_free(struct Material *sc);
 void BKE_material_free_ex(struct Material *ma, int do_id_user);
 void test_object_materials(struct ID *id);
 void resize_object_material(struct Object *ob, const short totcol);
 void init_material(struct Material *ma);
-struct Material *BKE_material_add(const char *name);
+struct Material *BKE_material_add(struct Main *bmain, const char *name);
 struct Material *BKE_material_copy(struct Material *ma);
 struct Material *localize_material(struct Material *ma);
 struct Material *give_node_material(struct Material *ma); /* returns node material or self */
@@ -110,7 +109,7 @@ void free_matcopybuf(void);
 void copy_matcopybuf(struct Material *ma);
 void paste_matcopybuf(struct Material *ma);
 
-/* handle backward compatibility for tface/materials called from doversion (fileload=1) or Help Menu (fileload=0) */	
+/* handle backward compatibility for tface/materials called from doversion (fileload=1) or Help Menu (fileload=0) */
 int do_version_tface(struct Main *main, int fileload);
 
 #ifdef __cplusplus

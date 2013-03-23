@@ -27,9 +27,9 @@
 #ifndef __BPY_UTIL_H__
 #define __BPY_UTIL_H__
 
-//#if PY_VERSION_HEX <  0x03030000
-//#  error "Python 3.3 or greater is required, you'll need to update your python."
-//#endif
+#if PY_VERSION_HEX <  0x03030000
+#  error "Python 3.3 or greater is required, you'll need to update your python."
+#endif
 
 struct EnumPropertyItem;
 struct ReportList;
@@ -39,7 +39,7 @@ char *BPy_enum_as_string(struct EnumPropertyItem *item);
 #define BLANK_PYTHON_TYPE {PyVarObject_HEAD_INIT(NULL, 0) NULL}
 
 /* error reporting */
-short BPy_reports_to_error(struct ReportList *reports, PyObject *exception, const short clear);
+short BPy_reports_to_error(struct ReportList *reports, PyObject *exception, const bool clear);
 short BPy_errors_to_report(struct ReportList *reports);
 
 /* TODO - find a better solution! */

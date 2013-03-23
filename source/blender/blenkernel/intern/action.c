@@ -43,7 +43,6 @@
 #include "DNA_object_types.h"
 
 #include "BLI_blenlib.h"
-#include "BLI_bpath.h"
 #include "BLI_math.h"
 #include "BLI_utildefines.h"
 #include "BLI_ghash.h"
@@ -79,11 +78,11 @@
 
 /* ***************** Library data level operations on action ************** */
 
-bAction *add_empty_action(const char name[])
+bAction *add_empty_action(Main *bmain, const char name[])
 {
 	bAction *act;
 	
-	act = BKE_libblock_alloc(&G.main->action, ID_AC, name);
+	act = BKE_libblock_alloc(&bmain->action, ID_AC, name);
 	
 	return act;
 }	
@@ -544,7 +543,7 @@ void BKE_pose_copy_data(bPose **dst, bPose *src, int copycon)
 	for (pchan = outPose->chanbase.first; pchan; pchan = pchan->next) {
 		/* TODO: rename this argument... */
 		if (copycon) {
-			copy_constraints(&listb, &pchan->constraints, TRUE);  // copy_constraints NULLs listb
+			BKE_copy_constraints(&listb, &pchan->constraints, TRUE);  // BKE_copy_constraints NULLs listb
 			pchan->constraints = listb;
 			pchan->mpath = NULL; /* motion paths should not get copied yet... */
 		}
@@ -622,7 +621,7 @@ void BKE_pose_channel_free(bPoseChannel *pchan)
 		pchan->mpath = NULL;
 	}
 
-	free_constraints(&pchan->constraints);
+	BKE_free_constraints(&pchan->constraints);
 	
 	if (pchan->prop) {
 		IDP_FreeProperty(pchan->prop);
@@ -712,7 +711,7 @@ void BKE_pose_channel_copy_data(bPoseChannel *pchan, const bPoseChannel *pchan_f
 	pchan->iklinweight = pchan_from->iklinweight;
 
 	/* constraints */
-	copy_constraints(&pchan->constraints, &pchan_from->constraints, TRUE);
+	BKE_copy_constraints(&pchan->constraints, &pchan_from->constraints, TRUE);
 
 	/* id-properties */
 	if (pchan->prop) {
@@ -1119,18 +1118,18 @@ void BKE_pose_rest(bPose *pose)
 }
 
 /* both poses should be in sync */
-void BKE_pose_copy_result(bPose *to, bPose *from)
+bool BKE_pose_copy_result(bPose *to, bPose *from)
 {
 	bPoseChannel *pchanto, *pchanfrom;
 	
 	if (to == NULL || from == NULL) {
-		printf("pose result copy error to:%p from:%p\n", (void *)to, (void *)from); /* debug temp */
-		return;
+		printf("Pose copy error, pose to:%p from:%p\n", (void *)to, (void *)from); /* debug temp */
+		return false;
 	}
 
 	if (to == from) {
 		printf("BKE_pose_copy_result source and target are the same\n");
-		return;
+		return false;
 	}
 
 
@@ -1154,6 +1153,7 @@ void BKE_pose_copy_result(bPose *to, bPose *from)
 			pchanto->protectflag = pchanfrom->protectflag;
 		}
 	}
+	return true;
 }
 
 /* For the calculation of the effects of an Action at the given frame on an object 

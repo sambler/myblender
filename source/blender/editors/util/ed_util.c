@@ -42,6 +42,8 @@
 
 #include "BLI_blenlib.h"
 
+#include "BLF_translation.h"
+
 #include "BKE_context.h"
 #include "BKE_global.h"
 #include "BKE_main.h"
@@ -174,10 +176,10 @@ void unpack_menu(bContext *C, const char *opname, const char *id_name, const cha
 	char line[FILE_MAX + 100];
 	wmOperatorType *ot = WM_operatortype_find(opname, 1);
 
-	pup = uiPupMenuBegin(C, "Unpack file", ICON_NONE);
+	pup = uiPupMenuBegin(C, IFACE_("Unpack File"), ICON_NONE);
 	layout = uiPupMenuLayout(pup);
 
-	strcpy(line, "Remove Pack");
+	strcpy(line, IFACE_("Remove Pack"));
 	props_ptr = uiItemFullO_ptr(layout, ot, line, ICON_NONE, NULL, WM_OP_EXEC_DEFAULT, UI_ITEM_O_RETURN_PROPS);
 	RNA_enum_set(&props_ptr, "method", PF_REMOVE);
 	RNA_string_set(&props_ptr, "id", id_name);
@@ -185,20 +187,19 @@ void unpack_menu(bContext *C, const char *opname, const char *id_name, const cha
 	if (G.relbase_valid) {
 		char local_name[FILE_MAXDIR + FILE_MAX], fi[FILE_MAX];
 
-		BLI_strncpy(local_name, abs_name, sizeof(local_name));
-		BLI_splitdirstring(local_name, fi);
+		BLI_split_file_part(abs_name, fi, sizeof(fi));
 		BLI_snprintf(local_name, sizeof(local_name), "//%s/%s", folder, fi);
 		if (strcmp(abs_name, local_name) != 0) {
 			switch (checkPackedFile(local_name, pf)) {
 				case PF_NOFILE:
-					BLI_snprintf(line, sizeof(line), "Create %s", local_name);
+					BLI_snprintf(line, sizeof(line), IFACE_("Create %s"), local_name);
 					props_ptr = uiItemFullO_ptr(layout, ot, line, ICON_NONE, NULL, WM_OP_EXEC_DEFAULT, UI_ITEM_O_RETURN_PROPS);
 					RNA_enum_set(&props_ptr, "method", PF_WRITE_LOCAL);
 					RNA_string_set(&props_ptr, "id", id_name);
 
 					break;
 				case PF_EQUAL:
-					BLI_snprintf(line, sizeof(line), "Use %s (identical)", local_name);
+					BLI_snprintf(line, sizeof(line), IFACE_("Use %s (identical)"), local_name);
 					//uiItemEnumO_ptr(layout, ot, line, 0, "method", PF_USE_LOCAL);
 					props_ptr = uiItemFullO_ptr(layout, ot, line, ICON_NONE, NULL, WM_OP_EXEC_DEFAULT, UI_ITEM_O_RETURN_PROPS);
 					RNA_enum_set(&props_ptr, "method", PF_USE_LOCAL);
@@ -206,13 +207,13 @@ void unpack_menu(bContext *C, const char *opname, const char *id_name, const cha
 
 					break;
 				case PF_DIFFERS:
-					BLI_snprintf(line, sizeof(line), "Use %s (differs)", local_name);
+					BLI_snprintf(line, sizeof(line), IFACE_("Use %s (differs)"), local_name);
 					//uiItemEnumO_ptr(layout, ot, line, 0, "method", PF_USE_LOCAL);
 					props_ptr = uiItemFullO_ptr(layout, ot, line, ICON_NONE, NULL, WM_OP_EXEC_DEFAULT, UI_ITEM_O_RETURN_PROPS);
 					RNA_enum_set(&props_ptr, "method", PF_USE_LOCAL);
 					RNA_string_set(&props_ptr, "id", id_name);
 
-					BLI_snprintf(line, sizeof(line), "Overwrite %s", local_name);
+					BLI_snprintf(line, sizeof(line), IFACE_("Overwrite %s"), local_name);
 					//uiItemEnumO_ptr(layout, ot, line, 0, "method", PF_WRITE_LOCAL);
 					props_ptr = uiItemFullO_ptr(layout, ot, line, ICON_NONE, NULL, WM_OP_EXEC_DEFAULT, UI_ITEM_O_RETURN_PROPS);
 					RNA_enum_set(&props_ptr, "method", PF_WRITE_LOCAL);
@@ -224,27 +225,27 @@ void unpack_menu(bContext *C, const char *opname, const char *id_name, const cha
 
 	switch (checkPackedFile(abs_name, pf)) {
 		case PF_NOFILE:
-			BLI_snprintf(line, sizeof(line), "Create %s", abs_name);
+			BLI_snprintf(line, sizeof(line), IFACE_("Create %s"), abs_name);
 			//uiItemEnumO_ptr(layout, ot, line, 0, "method", PF_WRITE_ORIGINAL);
 			props_ptr = uiItemFullO_ptr(layout, ot, line, ICON_NONE, NULL, WM_OP_EXEC_DEFAULT, UI_ITEM_O_RETURN_PROPS);
 			RNA_enum_set(&props_ptr, "method", PF_WRITE_ORIGINAL);
 			RNA_string_set(&props_ptr, "id", id_name);
 			break;
 		case PF_EQUAL:
-			BLI_snprintf(line, sizeof(line), "Use %s (identical)", abs_name);
+			BLI_snprintf(line, sizeof(line), IFACE_("Use %s (identical)"), abs_name);
 			//uiItemEnumO_ptr(layout, ot, line, 0, "method", PF_USE_ORIGINAL);
 			props_ptr = uiItemFullO_ptr(layout, ot, line, ICON_NONE, NULL, WM_OP_EXEC_DEFAULT, UI_ITEM_O_RETURN_PROPS);
 			RNA_enum_set(&props_ptr, "method", PF_USE_ORIGINAL);
 			RNA_string_set(&props_ptr, "id", id_name);
 			break;
 		case PF_DIFFERS:
-			BLI_snprintf(line, sizeof(line), "Use %s (differs)", abs_name);
+			BLI_snprintf(line, sizeof(line), IFACE_("Use %s (differs)"), abs_name);
 			//uiItemEnumO_ptr(layout, ot, line, 0, "method", PF_USE_ORIGINAL);
 			props_ptr = uiItemFullO_ptr(layout, ot, line, ICON_NONE, NULL, WM_OP_EXEC_DEFAULT, UI_ITEM_O_RETURN_PROPS);
 			RNA_enum_set(&props_ptr, "method", PF_USE_ORIGINAL);
 			RNA_string_set(&props_ptr, "id", id_name);
 
-			BLI_snprintf(line, sizeof(line), "Overwrite %s", abs_name);
+			BLI_snprintf(line, sizeof(line), IFACE_("Overwrite %s"), abs_name);
 			//uiItemEnumO_ptr(layout, ot, line, 0, "method", PF_WRITE_ORIGINAL);
 			props_ptr = uiItemFullO_ptr(layout, ot, line, ICON_NONE, NULL, WM_OP_EXEC_DEFAULT, UI_ITEM_O_RETURN_PROPS);
 			RNA_enum_set(&props_ptr, "method", PF_WRITE_ORIGINAL);

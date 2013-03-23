@@ -52,8 +52,6 @@
 #include "BLI_math.h"
 #include "BLI_utildefines.h"
 
-#include "BKE_font.h"
-
 #include "DNA_vfont_types.h"
 #include "DNA_packedFile_types.h"
 #include "DNA_curve_types.h"
@@ -451,7 +449,9 @@ static int check_freetypefont(PackedFile *pf)
 
 		glyph_index = FT_Get_Char_Index(face, 'A');
 		err = FT_Load_Glyph(face, glyph_index, FT_LOAD_NO_SCALE | FT_LOAD_NO_BITMAP);
-		if (err) success = 0;
+		if (err) {
+			success = 0;
+		}
 		else {
 			glyph = face->glyph;
 			if (glyph->format == ft_glyph_format_outline) {

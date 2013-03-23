@@ -476,7 +476,7 @@ elseif(WIN32)
 	if(WITH_PYTHON)
 		set_lib_path(PYLIB "python")
 
-		STRING(REPLACE "." "" _PYTHON_VERSION_NO_DOTS ${PYTHON_VERSION})
+		string(REPLACE "." "" _PYTHON_VERSION_NO_DOTS ${PYTHON_VERSION})
 
 		install(
 			FILES ${PYLIB}/lib/python${_PYTHON_VERSION_NO_DOTS}.dll
@@ -694,7 +694,7 @@ elseif(APPLE)
 	)
 
 	# python
-	if(WITH_PYTHON AND NOT WITH_PYTHON_MODULE)
+	if(WITH_PYTHON AND NOT WITH_PYTHON_MODULE AND NOT WITH_PYTHON_FRAMEWORK)
 		# the python zip is first extract as part of the build process,
 		# and then later installed as part of make install. this is much
 		# quicker, and means we can easily exclude files on copy
@@ -747,7 +747,7 @@ elseif(APPLE)
 		)
 
 		# python
-		if(WITH_PYTHON)
+		if(WITH_PYTHON AND NOT WITH_PYTHON_FRAMEWORK)
 			add_custom_command(
 				OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/python
 				COMMAND rm -rf ${CMAKE_CURRENT_BINARY_DIR}/python/
@@ -784,8 +784,7 @@ add_dependencies(blender makesdna)
 
 get_property(BLENDER_LINK_LIBS GLOBAL PROPERTY BLENDER_LINK_LIBS)
 
-set(BLENDER_LINK_LIBS
-	${BLENDER_LINK_LIBS}
+list(APPEND BLENDER_LINK_LIBS
 	bf_windowmanager
 	bf_render
 )
@@ -836,12 +835,12 @@ endif()
 		bf_editor_util
 		bf_editor_uvedit
 		bf_editor_curve
-		bf_editor_armature
 		bf_editor_gpencil
 		bf_editor_interface
 		bf_editor_mesh
 		bf_editor_metaball
 		bf_editor_object
+		bf_editor_armature
 		bf_editor_physics
 		bf_editor_render
 		bf_editor_screen
@@ -890,7 +889,6 @@ endif()
 		extern_colamd
 		ge_logic_ketsji
 		extern_recastnavigation
-		ge_phys_common
 		ge_logic
 		ge_rasterizer
 		ge_oglrasterizer
@@ -898,7 +896,6 @@ endif()
 		ge_scenegraph
 		ge_logic_network
 		ge_logic_ngnetwork
-		extern_bullet
 		ge_logic_loopbacknetwork
 		bf_intern_moto
 		extern_openjpeg
@@ -919,12 +916,14 @@ endif()
 		cycles_subd
 		bf_intern_raskter
 		bf_intern_opencolorio
+		extern_rangetree
+		extern_wcwidth
 	)
 
 	if(WITH_COMPOSITOR)
 		# added for opencl compositor
 		list_insert_before(BLENDER_SORTED_LIBS "bf_blenkernel" "bf_compositor")
-		list_insert_after(BLENDER_SORTED_LIBS "bf_compositor" "bf_opencl")
+		list_insert_after(BLENDER_SORTED_LIBS "bf_compositor" "bf_intern_opencl")
 	endif()
 
 	if(WITH_LIBMV)
@@ -974,6 +973,14 @@ endif()
 
 	if(WITH_INTERNATIONAL)
 		list(APPEND BLENDER_SORTED_LIBS bf_intern_locale)
+	endif()
+
+	if(WITH_BULLET)
+		list_insert_after(BLENDER_SORTED_LIBS "bf_blenkernel" "bf_intern_rigidbody")
+	endif()
+
+	if(WITH_BULLET AND NOT WITH_BULLET_SYSTEM)
+		list_insert_after(BLENDER_SORTED_LIBS "ge_logic_ngnetwork" "extern_bullet")
 	endif()
 
 	foreach(SORTLIB ${BLENDER_SORTED_LIBS})

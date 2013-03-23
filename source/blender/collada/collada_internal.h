@@ -39,7 +39,6 @@
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 #include "BLI_math.h"
-#include "BLI_math.h"
 #include "BLI_linklist.h"
 
 class UnitConverter
@@ -47,6 +46,10 @@ class UnitConverter
 private:
 	COLLADAFW::FileInfo::Unit unit;
 	COLLADAFW::FileInfo::UpAxisType up_axis;
+
+	float x_up_mat4[4][4];
+	float y_up_mat4[4][4];
+	float z_up_mat4[4][4];
 
 public:
 
@@ -69,22 +72,27 @@ public:
 		
 	// TODO need also for angle conversion, time conversion...
 
-	void dae_matrix_to_mat4_(float out[][4], const COLLADABU::Math::Matrix4& in);
+	void dae_matrix_to_mat4_(float out[4][4], const COLLADABU::Math::Matrix4& in);
 
-	void mat4_to_dae(float out[][4], float in[][4]);
+	void mat4_to_dae(float out[4][4], float in[4][4]);
 
-	void mat4_to_dae_double(double out[][4], float in[][4]);
+	void mat4_to_dae_double(double out[4][4], float in[4][4]);
+
+	float(&get_rotation())[4][4];
+
+
 };
 
 class TransformBase
 {
 public:
-	void decompose(float mat[][4], float *loc, float eul[3], float quat[4], float *size);
+	void decompose(float mat[4][4], float *loc, float eul[3], float quat[4], float *size);
 };
 
 extern void clear_global_id_map();
 /** Look at documentation of translate_map */
 extern std::string translate_id(const std::string &id);
+extern std::string translate_id(const char *idString);
 
 extern std::string id_name(void *id);
 
@@ -98,5 +106,7 @@ extern std::string get_joint_id(Bone *bone, Object *ob_arm);
 extern std::string get_camera_id(Object *ob);
 
 extern std::string get_material_id(Material *mat);
+
+extern std::string get_morph_id(Object *ob);
 
 #endif /* __COLLADA_INTERNAL_H__ */

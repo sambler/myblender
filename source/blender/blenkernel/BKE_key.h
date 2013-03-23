@@ -45,7 +45,6 @@ struct Mesh;
 /* Kernel prototypes */
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 void        BKE_key_free(struct Key *sc);
@@ -60,7 +59,7 @@ void key_curve_position_weights(float t, float data[4], int type);
 void key_curve_tangent_weights(float t, float data[4], int type);
 void key_curve_normal_weights(float t, float data[4], int type);
 
-float *do_ob_key(struct Scene *scene, struct Object *ob);
+float *BKE_key_evaluate_object(struct Scene *scene, struct Object *ob, int *r_totelem);
 
 struct Key      *BKE_key_from_object(struct Object *ob);
 struct KeyBlock *BKE_keyblock_from_object(struct Object *ob);

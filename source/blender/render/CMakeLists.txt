@@ -54,12 +54,14 @@ set(SRC
 	intern/raytrace/rayobject_qbvh.cpp
 	intern/raytrace/rayobject_rtbuild.cpp
 	intern/raytrace/rayobject_vbvh.cpp
+	intern/source/bake.c
 	intern/source/convertblender.c
 	intern/source/envmap.c
 	intern/source/external_engine.c
 	intern/source/gammaCorrectionTables.c
 	intern/source/imagetexture.c
 	intern/source/initrender.c
+	intern/source/multires_bake.c
 	intern/source/occlusion.c
 	intern/source/pipeline.c
 	intern/source/pixelblending.c
@@ -83,6 +85,7 @@ set(SRC
 	intern/source/zbuf.c
 
 	extern/include/RE_engine.h
+	extern/include/RE_multires_bake.h
 	extern/include/RE_pipeline.h
 	extern/include/RE_render_ext.h
 	extern/include/RE_shader_ext.h
@@ -155,8 +158,13 @@ if(WITH_GAMEENGINE)
 	add_definitions(-DWITH_GAMEENGINE)
 endif()
 
+if(WITH_INTERNATIONAL)
+	add_definitions(-DWITH_INTERNATIONAL)
+endif()
+
 if(APPLE)
-	if(CMAKE_OSX_ARCHITECTURES MATCHES "i386" OR CMAKE_OSX_ARCHITECTURES MATCHES "x86_64")
+	# SSE math is enabled by default on x86_64
+	if(CMAKE_OSX_ARCHITECTURES MATCHES "i386")
 		set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -mfpmath=sse")
 		set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -mfpmath=sse")
 	endif()

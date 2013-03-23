@@ -4,7 +4,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version. 
+ * of the License, or (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -35,7 +35,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 struct ImBuf;
@@ -59,7 +58,7 @@ typedef enum ThumbSource {
 } ThumbSource;
 
 /* don't generate thumbs for images bigger then this (100mb) */
-#define THUMB_SIZE_MAX (100 * 1024*1024)
+#define THUMB_SIZE_MAX (100 * 1024 * 1024)
 
 // IB_metadata
 

@@ -51,10 +51,10 @@ void fdrawcheckerboard(float x1, float y1, float x2, float y2);
 
 /* OpenGL stipple defines */
 /* OpenGL stipple defines */
-extern unsigned char stipple_halftone[128];
-extern unsigned char stipple_quarttone[128];
-extern unsigned char stipple_diag_stripes_pos[128];
-extern unsigned char stipple_diag_stripes_neg[128];
+extern const unsigned char stipple_halftone[128];
+extern const unsigned char stipple_quarttone[128];
+extern const unsigned char stipple_diag_stripes_pos[128];
+extern const unsigned char stipple_diag_stripes_neg[128];
 
 /**
  * Draw a lined (non-looping) arc with the given
@@ -129,7 +129,7 @@ void glaRasterPosSafe2f(float x, float y, float known_good_x, float known_good_y
 void glaDrawPixelsSafe(float x, float y, int img_w, int img_h, int row_w, int format, int type, void *rect);
 
 /**
- * Functions like a limited glDrawPixels, but actually draws the
+ * glaDrawPixelsTex - Functions like a limited glDrawPixels, but actually draws the
  * image using textures, which can be tremendously faster on low-end
  * cards, and also avoids problems with the raster position being
  * clipped when offscreen. The routine respects the glPixelZoom values,
@@ -141,9 +141,17 @@ void glaDrawPixelsSafe(float x, float y, int img_w, int img_h, int row_w, int fo
  * 1-to-1 mapping to screen space.
  */
 
-void glaDrawPixelsTex(float x, float y, int img_w, int img_h, int format, void *rect);
+void glaDrawPixelsTex(float x, float y, int img_w, int img_h, int format, int zoomfilter, void *rect);
 
-void glaDrawPixelsTexScaled(float x, float y, int img_w, int img_h, int format, void *rect, float scaleX, float scaleY);
+/**
+ * glaDrawPixelsAuto - Switches between texture or pixel drawing using UserDef.
+ * only RGBA
+ * needs glaDefine2DArea to be set.
+ */
+void glaDrawPixelsAuto(float x, float y, int img_w, int img_h, int format, int zoomfilter, void *rect);
+
+
+void glaDrawPixelsTexScaled(float x, float y, int img_w, int img_h, int format, int zoomfilter, void *rect, float scaleX, float scaleY);
 
 /* 2D Drawing Assistance */
 

@@ -39,26 +39,27 @@
 
 #include "MEM_guardedalloc.h"
 
-#include "RNA_types.h"
-
-#include "bpy.h"
-#include "gpu.h"
-#include "bpy_rna.h"
-#include "bpy_util.h"
-#include "bpy_traceback.h"
-#include "bpy_intern_string.h"
-
-#include "DNA_space_types.h"
-#include "DNA_text_types.h"
-
+#include "BLI_utildefines.h"
 #include "BLI_path_util.h"
 #include "BLI_fileops.h"
 #include "BLI_listbase.h"
 #include "BLI_math_base.h"
 #include "BLI_string.h"
 #include "BLI_string_utf8.h"
-#include "BLI_utildefines.h"
 #include "BLI_threads.h"
+
+#include "RNA_types.h"
+
+#include "bpy.h"
+#include "gpu.h"
+#include "bpy_rna.h"
+#include "bpy_path.h"
+#include "bpy_util.h"
+#include "bpy_traceback.h"
+#include "bpy_intern_string.h"
+
+#include "DNA_space_types.h"
+#include "DNA_text_types.h"
 
 #include "BKE_context.h"
 #include "BKE_text.h"
@@ -165,7 +166,7 @@ void BPY_text_free_code(Text *text)
 {
 	if (text->compiled) {
 		PyGILState_STATE gilstate;
-		int use_gil = !PYC_INTERPRETER_ACTIVE;
+		bool use_gil = !PYC_INTERPRETER_ACTIVE;
 
 		if (use_gil)
 			gilstate = PyGILState_Ensure();
@@ -212,6 +213,7 @@ static struct _inittab bpy_internal_modules[] = {
 	{(char *)"mathutils", PyInit_mathutils},
 //	{(char *)"mathutils.geometry", PyInit_mathutils_geometry},
 //	{(char *)"mathutils.noise", PyInit_mathutils_noise},
+	{(char *)"_bpy_path", BPyInit__bpy_path},
 	{(char *)"bgl", BPyInit_bgl},
 	{(char *)"blf", BPyInit_blf},
 	{(char *)"bmesh", BPyInit_bmesh},
@@ -269,7 +271,8 @@ void BPY_python_start(int argc, const char **argv)
 	Py_Initialize();
 
 	/* THIS IS BAD: see http://bugs.python.org/issue16129 */
-#if 1
+	/* this clobbers the stdout on exit (no 'MEM_printmemlist_stats') */
+#if 0
 	/* until python provides a reliable way to set the env var */
 	PyRun_SimpleString("import sys, io\n"
 	                   "sys.__backup_stdio__ = sys.__stdout__, sys.__stderr__\n"  /* else we loose the FD's [#32720] */
@@ -307,10 +310,32 @@ void BPY_python_start(int argc, const char **argv)
 	(void)argv;
 
 	/* must run before python initializes */
-	PyImport_ExtendInittab(bpy_internal_modules);
+	/* broken in py3.3, load explicitly below */
+	// PyImport_ExtendInittab(bpy_internal_modules);
 #endif
 
 	bpy_intern_string_init();
+
+
+#ifdef WITH_PYTHON_MODULE
+	{
+		/* Manually load all modules */
+		struct _inittab *inittab_item;
+		PyObject *sys_modules = PyImport_GetModuleDict();
+
+		for (inittab_item = bpy_internal_modules; inittab_item->name; inittab_item++) {
+			PyObject *mod = inittab_item->initfunc();
+			if (mod) {
+				PyDict_SetItemString(sys_modules, inittab_item->name, mod);
+			}
+			else {
+				PyErr_Print();
+				PyErr_Clear();
+			}
+			// Py_DECREF(mod); /* ideally would decref, but in this case we never want to free */
+		}
+	}
+#endif
 
 	/* bpy.* and lets us import it */
 	BPy_init_modules();
@@ -375,8 +400,8 @@ static void python_script_error_jump_text(struct Text *text)
 	python_script_error_jump(text->id.name + 2, &lineno, &offset);
 	if (lineno != -1) {
 		/* select the line with the error */
-		txt_move_to(text, lineno - 1, INT_MAX, FALSE);
-		txt_move_to(text, lineno - 1, offset, TRUE);
+		txt_move_to(text, lineno - 1, INT_MAX, false);
+		txt_move_to(text, lineno - 1, offset, true);
 	}
 }
 
@@ -394,7 +419,7 @@ typedef struct {
 #endif
 
 static int python_script_exec(bContext *C, const char *fn, struct Text *text,
-                              struct ReportList *reports, const short do_jump)
+                              struct ReportList *reports, const bool do_jump)
 {
 	Main *bmain_old = CTX_data_main(C);
 	PyObject *main_mod = NULL;
@@ -511,11 +536,11 @@ static int python_script_exec(bContext *C, const char *fn, struct Text *text,
 /* Can run a file or text block */
 int BPY_filepath_exec(bContext *C, const char *filepath, struct ReportList *reports)
 {
-	return python_script_exec(C, filepath, NULL, reports, FALSE);
+	return python_script_exec(C, filepath, NULL, reports, false);
 }
 
 
-int BPY_text_exec(bContext *C, struct Text *text, struct ReportList *reports, const short do_jump)
+int BPY_text_exec(bContext *C, struct Text *text, struct ReportList *reports, const bool do_jump)
 {
 	return python_script_exec(C, NULL, text, reports, do_jump);
 }
@@ -716,12 +741,12 @@ void BPY_modules_load_user(bContext *C)
 int BPY_context_member_get(bContext *C, const char *member, bContextDataResult *result)
 {
 	PyGILState_STATE gilstate;
-	int use_gil = !PYC_INTERPRETER_ACTIVE;
+	bool use_gil = !PYC_INTERPRETER_ACTIVE;
 
 	PyObject *pyctx;
 	PyObject *item;
 	PointerRNA *ptr = NULL;
-	int done = FALSE;
+	bool done = false;
 
 	if (use_gil)
 		gilstate = PyGILState_Ensure();
@@ -740,7 +765,8 @@ int BPY_context_member_get(bContext *C, const char *member, bContextDataResult *
 
 		//result->ptr = ((BPy_StructRNA *)item)->ptr;
 		CTX_data_pointer_set(result, ptr->id.data, ptr->type, ptr->data);
-		done = TRUE;
+		CTX_data_type_set(result, CTX_DATA_TYPE_POINTER);
+		done = true;
 	}
 	else if (PySequence_Check(item)) {
 		PyObject *seq_fast = PySequence_Fast(item, "bpy_context_get sequence conversion");
@@ -770,12 +796,12 @@ int BPY_context_member_get(bContext *C, const char *member, bContextDataResult *
 
 			}
 			Py_DECREF(seq_fast);
-
-			done = TRUE;
+			CTX_data_type_set(result, CTX_DATA_TYPE_COLLECTION);
+			done = true;
 		}
 	}
 
-	if (done == 0) {
+	if (done == false) {
 		if (item) printf("PyContext '%s' not a valid type\n", member);
 		else      printf("PyContext '%s' not found\n", member);
 	}
@@ -817,7 +843,7 @@ typedef struct {
 } dealloc_obj;
 
 /* call once __file__ is set */
-void bpy_module_delay_init(PyObject *bpy_proxy)
+static void bpy_module_delay_init(PyObject *bpy_proxy)
 {
 	const int argc = 1;
 	const char *argv[2];
@@ -854,6 +880,9 @@ static void dealloc_obj_dealloc(PyObject *self)
 	/* Note, for subclassed PyObjects we cant just call PyObject_DEL() directly or it will crash */
 	dealloc_obj_Type.tp_free(self);
 }
+
+PyMODINIT_FUNC
+PyInit_bpy(void);
 
 PyMODINIT_FUNC
 PyInit_bpy(void)
@@ -899,3 +928,16 @@ static void bpy_module_free(void *UNUSED(mod))
 }
 
 #endif
+
+
+/* EVIL, define text.c functions here... */
+/* BKE_text.h */
+int text_check_identifier_unicode(const unsigned int ch)
+{
+	return (ch < 255 && text_check_identifier((char)ch)) || Py_UNICODE_ISALNUM(ch);
+}
+
+int text_check_identifier_nodigit_unicode(const unsigned int ch)
+{
+	return (ch < 255 && text_check_identifier_nodigit((char)ch)) || Py_UNICODE_ISALPHA(ch);
+}

@@ -363,7 +363,9 @@ void WM_jobs_start(wmWindowManager *wm, wmJob *wm_job)
 			if (G.debug & G_DEBUG_JOBS)
 				wm_job->start_time = PIL_check_seconds_timer();
 		}
-		else printf("job fails, not initialized\n");
+		else {
+			printf("job fails, not initialized\n");
+		}
 	}
 }
 
@@ -583,6 +585,19 @@ int WM_jobs_has_running(wmWindowManager *wm)
 
 	for (wm_job = wm->jobs.first; wm_job; wm_job = wm_job->next) {
 		if (wm_job->running) {
+			return TRUE;
+		}
+	}
+
+	return FALSE;
+}
+
+int WM_jobs_has_running_except(wmWindowManager *wm, int job_type)
+{
+	wmJob *wm_job;
+
+	for (wm_job = wm->jobs.first; wm_job; wm_job = wm_job->next) {
+		if (wm_job->running && wm_job->job_type != job_type) {
 			return TRUE;
 		}
 	}

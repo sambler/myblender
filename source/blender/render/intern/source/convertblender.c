@@ -43,6 +43,8 @@
 #include "BLI_ghash.h"
 #include "BLI_linklist.h"
 
+#include "BLF_translation.h"
+
 #include "DNA_armature_types.h"
 #include "DNA_camera_types.h"
 #include "DNA_material_types.h"
@@ -150,6 +152,7 @@ static HaloRen *initstar(Render *re, ObjectRen *obr, const float vec[3], float h
 	har->hasize= hasize;
 	
 	har->zd= 0.0;
+	har->pool = re->pool;
 	
 	return har;
 }
@@ -161,7 +164,7 @@ static HaloRen *initstar(Render *re, ObjectRen *obr, const float vec[3], float h
  */
 
 void RE_make_stars(Render *re, Scene *scenev3d, void (*initfunc)(void),
-                   void (*vertexfunc)(float*),  void (*termfunc)(void))
+                   void (*vertexfunc)(float *),  void (*termfunc)(void))
 {
 	extern unsigned char hash[512];
 	ObjectRen *obr= NULL;
@@ -759,7 +762,7 @@ static VertRen *as_findvertex(VlakRen *vlr, VertRen *UNUSED(ver), ASvert *asv, f
 
 /* note; autosmooth happens in object space still, after applying autosmooth we rotate */
 /* note2; actually, when original mesh and displist are equal sized, face normals are from original mesh */
-static void autosmooth(Render *UNUSED(re), ObjectRen *obr, float mat[][4], int degr)
+static void autosmooth(Render *UNUSED(re), ObjectRen *obr, float mat[4][4], int degr)
 {
 	ASvert *asv, *asverts;
 	ASface *asf;
@@ -915,7 +918,7 @@ static void flag_render_node_material(Render *re, bNodeTree *ntree)
 {
 	bNode *node;
 
-	for (node=ntree->nodes.first; node; node= node->next) {
+	for (node = ntree->nodes.first; node; node = node->next) {
 		if (node->id) {
 			if (GS(node->id->name)==ID_MA) {
 				Material *ma= (Material *)node->id;
@@ -2186,7 +2189,7 @@ static short test_for_displace(Render *re, Object *ob)
 	return 0;
 }
 
-static void displace_render_vert(Render *re, ObjectRen *obr, ShadeInput *shi, VertRen *vr, int vindex, float *scale, float mat[][4], float imat[][3])
+static void displace_render_vert(Render *re, ObjectRen *obr, ShadeInput *shi, VertRen *vr, int vindex, float *scale, float mat[4][4], float imat[3][3])
 {
 	MTFace *tface;
 	short texco= shi->mat->texco;
@@ -2285,7 +2288,7 @@ static void displace_render_vert(Render *re, ObjectRen *obr, ShadeInput *shi, Ve
 	return;
 }
 
-static void displace_render_face(Render *re, ObjectRen *obr, VlakRen *vlr, float *scale, float mat[][4], float imat[][3])
+static void displace_render_face(Render *re, ObjectRen *obr, VlakRen *vlr, float *scale, float mat[4][4], float imat[3][3])
 {
 	ShadeInput shi;
 
@@ -2340,7 +2343,7 @@ static void displace_render_face(Render *re, ObjectRen *obr, VlakRen *vlr, float
 	}
 }
 
-static void do_displacement(Render *re, ObjectRen *obr, float mat[][4], float imat[][3])
+static void do_displacement(Render *re, ObjectRen *obr, float mat[4][4], float imat[3][3])
 {
 	VertRen *vr;
 	VlakRen *vlr;
@@ -2820,7 +2823,7 @@ static void init_render_curve(Render *re, ObjectRen *obr, int timeoffset)
 	ListBase disp={NULL, NULL};
 	Material **matar;
 	float *data, *fp, *orco=NULL;
-	float n[3], mat[4][4];
+	float n[3], mat[4][4], nmat[4][4];
 	int nr, startvert, a, b;
 	int need_orco=0, totmat;
 
@@ -2834,6 +2837,11 @@ static void init_render_curve(Render *re, ObjectRen *obr, int timeoffset)
 	
 	mult_m4_m4m4(mat, re->viewmat, ob->obmat);
 	invert_m4_m4(ob->imat, mat);
+
+	/* local object -> world space transform for normals */
+	copy_m4_m4(nmat, mat);
+	transpose_m4(nmat);
+	invert_m4(nmat);
 
 	/* material array */
 	totmat= ob->totcol+1;
@@ -2859,7 +2867,7 @@ static void init_render_curve(Render *re, ObjectRen *obr, int timeoffset)
 	}
 	else {
 		if (need_orco) {
-		  orco= get_object_orco(re, ob);
+			orco = get_object_orco(re, ob);
 		}
 
 		while (dl) {
@@ -2891,13 +2899,20 @@ static void init_render_curve(Render *re, ObjectRen *obr, int timeoffset)
 					zero_v3(n);
 					index= dl->index;
 					for (a=0; a<dl->parts; a++, index+=3) {
+						int v1 = index[0], v2 = index[1], v3 = index[2];
+						float *co1 = &dl->verts[v1 * 3],
+						      *co2 = &dl->verts[v2 * 3],
+						      *co3 = &dl->verts[v3 * 3];
+
 						vlr= RE_findOrAddVlak(obr, obr->totvlak++);
-						vlr->v1= RE_findOrAddVert(obr, startvert+index[0]);
-						vlr->v2= RE_findOrAddVert(obr, startvert+index[1]);
-						vlr->v3= RE_findOrAddVert(obr, startvert+index[2]);
+						vlr->v1= RE_findOrAddVert(obr, startvert + v1);
+						vlr->v2= RE_findOrAddVert(obr, startvert + v2);
+						vlr->v3= RE_findOrAddVert(obr, startvert + v3);
 						vlr->v4= NULL;
-						if (area_tri_v3(vlr->v3->co, vlr->v2->co, vlr->v1->co)>FLT_EPSILON10) {
-							normal_tri_v3(tmp, vlr->v3->co, vlr->v2->co, vlr->v1->co);
+
+						/* to prevent float accuracy issues, we calculate normal in local object space (not world) */
+						if (area_tri_v3(co3, co2, co1)>FLT_EPSILON10) {
+							normal_tri_v3(tmp, co3, co2, co1);
 							add_v3_v3(n, tmp);
 						}
 
@@ -2906,6 +2921,8 @@ static void init_render_curve(Render *re, ObjectRen *obr, int timeoffset)
 						vlr->ec= 0;
 					}
 
+					/* transform normal to world space */
+					mul_m4_v3(nmat, n);
 					normalize_v3(n);
 
 					/* vertex normals */
@@ -3158,7 +3175,12 @@ static void init_camera_inside_volumes(Render *re)
 {
 	ObjectInstanceRen *obi;
 	VolumeOb *vo;
-	float co[3] = {0.f, 0.f, 0.f};
+	/* coordinates are all in camera space, so camera coordinate is zero. we also
+	 * add an offset for the clip start, however note that with clip start it's
+	 * actually impossible to do a single 'inside' test, since there will not be
+	 * a single point where all camera rays start from, though for small clip start
+	 * they will be close together. */
+	float co[3] = {0.f, 0.f, -re->clipsta};
 
 	for (vo= re->volumes.first; vo; vo= vo->next) {
 		for (obi= re->instancetable.first; obi; obi= obi->next) {
@@ -3212,7 +3234,7 @@ static void init_render_mesh(Render *re, ObjectRen *obr, int timeoffset)
 	CustomDataMask mask;
 	float xn, yn, zn,  imat[3][3], mat[4][4];  //nor[3],
 	float *orco=0;
-	int need_orco=0, need_stress=0, need_nmap_tangent=0, need_tangent=0;
+	int need_orco=0, need_stress=0, need_nmap_tangent=0, need_tangent=0, need_origindex=0;
 	int a, a1, ok, vertofs;
 	int end, do_autosmooth = FALSE, totvert = 0;
 	int use_original_normals = FALSE;
@@ -3262,6 +3284,10 @@ static void init_render_mesh(Render *re, ObjectRen *obr, int timeoffset)
 		need_nmap_tangent= 1;
 	}
 	
+	/* origindex currently only used when baking to vertex colors */
+	if (re->flag & R_BAKING && re->r.bake_flag & R_BAKE_VCOL)
+		need_origindex= 1;
+
 	/* check autosmooth and displacement, we then have to skip only-verts optimize */
 	do_autosmooth |= (me->flag & ME_AUTOSMOOTH);
 	if (do_autosmooth)
@@ -3299,6 +3325,15 @@ static void init_render_mesh(Render *re, ObjectRen *obr, int timeoffset)
 		make_render_halos(re, obr, me, totvert, mvert, ma, orco);
 	}
 	else {
+		const int *index_vert_orig = NULL;
+		const int *index_mf_to_mpoly = NULL;
+		const int *index_mp_to_orig = NULL;
+		if (need_origindex) {
+			index_vert_orig = dm->getVertDataArray(dm, CD_ORIGINDEX);
+			/* double lookup for faces -> polys */
+			index_mf_to_mpoly = dm->getTessFaceDataArray(dm, CD_ORIGINDEX);
+			index_mp_to_orig = dm->getPolyDataArray(dm, CD_ORIGINDEX);
+		}
 
 		for (a=0; a<totvert; a++, mvert++) {
 			ver= RE_findOrAddVert(obr, obr->totvert++);
@@ -3314,6 +3349,18 @@ static void init_render_mesh(Render *re, ObjectRen *obr, int timeoffset)
 			if (orco) {
 				ver->orco= orco;
 				orco+=3;
+			}
+
+			if (need_origindex) {
+				int *origindex;
+				origindex = RE_vertren_get_origindex(obr, ver, 1);
+
+				/* Use orig index array if it's available (e.g. in the presence
+				 * of modifiers). */
+				if (index_vert_orig)
+					*origindex = index_vert_orig[a];
+				else
+					*origindex = a;
 			}
 		}
 		
@@ -3436,6 +3483,21 @@ static void init_render_mesh(Render *re, ObjectRen *obr, int timeoffset)
 										}
 									}
 								}
+
+								if (need_origindex) {
+									/* Find original index of mpoly for this tessface. Options:
+									 * - Modified mesh; two-step look up from tessface -> modified mpoly -> original mpoly
+									 * - OR Tesselated mesh; look up from tessface -> mpoly
+									 * - OR Failsafe; tessface == mpoly. Could probably assert(false) in this case? */
+									int *origindex;
+									origindex = RE_vlakren_get_origindex(obr, vlr, 1);
+									if (index_mf_to_mpoly && index_mp_to_orig)
+										*origindex = DM_origindex_mface_mpoly(index_mf_to_mpoly, index_mp_to_orig, a);
+									else if (index_mf_to_mpoly)
+										*origindex = index_mf_to_mpoly[a];
+									else
+										*origindex = a;
+								}
 							}
 						}
 					}
@@ -3520,7 +3582,7 @@ static void init_render_mesh(Render *re, ObjectRen *obr, int timeoffset)
 /* Lamps and Shadowbuffers													 */
 /* ------------------------------------------------------------------------- */
 
-static void initshadowbuf(Render *re, LampRen *lar, float mat[][4])
+static void initshadowbuf(Render *re, LampRen *lar, float mat[4][4])
 {
 	struct ShadBuf *shb;
 	float viewinv[4][4];
@@ -3955,18 +4017,10 @@ static void set_renderlayer_lightgroups(Render *re, Scene *sce)
 void init_render_world(Render *re)
 {
 	int a;
-	char *cp;
 	
 	if (re->scene && re->scene->world) {
 		re->wrld= *(re->scene->world);
-		
-		cp= (char *)&re->wrld.fastcol;
-		
-		cp[0]= 255.0f*re->wrld.horr;
-		cp[1]= 255.0f*re->wrld.horg;
-		cp[2]= 255.0f*re->wrld.horb;
-		cp[3]= 1;
-		
+
 		copy_v3_v3(re->grvec, re->viewmat[2]);
 		normalize_v3(re->grvec);
 		copy_m3_m4(re->imat, re->viewinv);
@@ -4710,7 +4764,7 @@ static int allow_render_dupli_instance(Render *UNUSED(re), DupliObject *dob, Obj
 
 	if (totmaterial) {
 		for (a= 0; a<*totmaterial; a++) {
-			ma= give_current_material(obd, a);
+			ma= give_current_material(obd, a + 1);
 			if (ma && (ma->material_type == MA_TYPE_HALO))
 				return 0;
 		}
@@ -5022,8 +5076,8 @@ void RE_Database_FromScene(Render *re, Main *bmain, Scene *scene, unsigned int l
 		 * following calls don't depend on 'RE_SetCamera' */
 		RE_SetCamera(re, camera);
 
-		normalize_m4(camera->obmat);
-		invert_m4_m4(mat, camera->obmat);
+		normalize_m4_m4(mat, camera->obmat);
+		invert_m4(mat);
 		RE_SetView(re, mat);
 		camera->recalc= OB_RECALC_OB; /* force correct matrix for scaled cameras */
 	}
@@ -5067,7 +5121,7 @@ void RE_Database_FromScene(Render *re, Main *bmain, Scene *scene, unsigned int l
 		tothalo= re->tothalo;
 		if (!re->test_break(re->tbh)) {
 			if (re->wrld.mode & WO_STARS) {
-				re->i.infostr= "Creating Starfield";
+				re->i.infostr = IFACE_("Creating Starfield");
 				re->stats_draw(re->sdh, &re->i);
 				RE_make_stars(re, NULL, NULL, NULL, NULL);
 			}
@@ -5076,7 +5130,7 @@ void RE_Database_FromScene(Render *re, Main *bmain, Scene *scene, unsigned int l
 		
 		init_camera_inside_volumes(re);
 		
-		re->i.infostr= "Creating Shadowbuffers";
+		re->i.infostr = IFACE_("Creating Shadowbuffers");
 		re->stats_draw(re->sdh, &re->i);
 
 		/* SHADOW BUFFER */
@@ -5126,7 +5180,7 @@ void RE_Database_FromScene(Render *re, Main *bmain, Scene *scene, unsigned int l
 	else
 		re->i.convertdone = TRUE;
 	
-	re->i.infostr= NULL;
+	re->i.infostr = NULL;
 	re->stats_draw(re->sdh, &re->i);
 }
 
@@ -5136,7 +5190,7 @@ void RE_DataBase_ApplyWindow(Render *re)
 	project_renderdata(re, projectverto, 0, 0, 0);
 }
 
-void RE_DataBase_GetView(Render *re, float mat[][4])
+void RE_DataBase_GetView(Render *re, float mat[4][4])
 {
 	copy_m4_m4(mat, re->viewmat);
 }
@@ -5172,8 +5226,8 @@ static void database_fromscene_vectors(Render *re, Scene *scene, unsigned int la
 	
 	/* if no camera, viewmat should have been set! */
 	if (camera) {
-		normalize_m4(camera->obmat);
-		invert_m4_m4(mat, camera->obmat);
+		normalize_m4_m4(mat, camera->obmat);
+		invert_m4(mat);
 		RE_SetView(re, mat);
 	}
 	
@@ -5539,7 +5593,7 @@ void RE_Database_FromScene_Vectors(Render *re, Main *bmain, Scene *sce, unsigned
 	ListBase strandsurface;
 	int step;
 	
-	re->i.infostr= "Calculating previous frame vectors";
+	re->i.infostr = IFACE_("Calculating previous frame vectors");
 	re->r.mode |= R_SPEED;
 	
 	speedvector_project(re, NULL, NULL, NULL);	/* initializes projection code */
@@ -5558,7 +5612,7 @@ void RE_Database_FromScene_Vectors(Render *re, Main *bmain, Scene *sce, unsigned
 	
 	if (!re->test_break(re->tbh)) {
 		/* creates entire dbase */
-		re->i.infostr= "Calculating next frame vectors";
+		re->i.infostr = IFACE_("Calculating next frame vectors");
 		
 		database_fromscene_vectors(re, sce, lay, +1);
 	}
@@ -5606,7 +5660,7 @@ void RE_Database_FromScene_Vectors(Render *re, Main *bmain, Scene *sce, unsigned
 						ok= 1;
 				}
 				if (ok==0) {
-					printf("speed table: missing object %s\n", obi->ob->id.name+2);
+					printf("speed table: missing object %s\n", obi->ob->id.name + 2);
 					continue;
 				}
 
@@ -5622,7 +5676,7 @@ void RE_Database_FromScene_Vectors(Render *re, Main *bmain, Scene *sce, unsigned
 					if (obi->totvector==oldobi->totvector)
 						calculate_speedvectors(re, obi, oldobi->vectors, step);
 					else
-						printf("Warning: object %s has different amount of vertices or strands on other frame\n", obi->ob->id.name+2);
+						printf("Warning: object %s has different amount of vertices or strands on other frame\n", obi->ob->id.name + 2);
 				}  /* not fluidsim */
 
 				oldobi= oldobi->next;
@@ -5644,7 +5698,7 @@ void RE_Database_FromScene_Vectors(Render *re, Main *bmain, Scene *sce, unsigned
 		}
 	}
 	
-	re->i.infostr= NULL;
+	re->i.infostr = NULL;
 	re->stats_draw(re->sdh, &re->i);
 }
 
@@ -5712,8 +5766,8 @@ void RE_Database_Baking(Render *re, Main *bmain, Scene *scene, unsigned int lay,
 	
 	/* if no camera, set unit */
 	if (camera) {
-		normalize_m4(camera->obmat);
-		invert_m4_m4(mat, camera->obmat);
+		normalize_m4_m4(mat, camera->obmat);
+		invert_m4(mat);
 		RE_SetView(re, mat);
 	}
 	else {

@@ -199,7 +199,9 @@ int curvemap_remove_point(CurveMap *cuma, CurveMapPoint *point)
 			cmp[b] = cuma->curve[a];
 			b++;
 		}
-		else removed++;
+		else {
+			removed++;
+		}
 	}
 	
 	MEM_freeN(cuma->curve);
@@ -221,7 +223,9 @@ void curvemap_remove(CurveMap *cuma, const short flag)
 			cmp[b] = cuma->curve[a];
 			b++;
 		}
-		else removed++;
+		else {
+			removed++;
+		}
 	}
 	cmp[b] = cuma->curve[a];
 	
@@ -895,7 +899,7 @@ void curvemapping_table_RGBA(const CurveMapping *cumap, float **array, int *size
 
 #define INV_255     (1.f / 255.f)
 
-DO_INLINE int get_bin_float(float f)
+BLI_INLINE int get_bin_float(float f)
 {
 	int bin = (int)((f * 255.0f) + 0.5f);  /* 0.5 to prevent quantisation differences */
 

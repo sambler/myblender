@@ -26,11 +26,6 @@
 
 #include <stdlib.h>
 
-#include "RNA_access.h"
-#include "RNA_define.h"
-
-#include "rna_internal.h"
-
 #include "DNA_curve_types.h"
 #include "DNA_key_types.h"
 #include "DNA_material_types.h"
@@ -39,6 +34,11 @@
 #include "BLI_utildefines.h"
 
 #include "BKE_font.h"
+
+#include "RNA_access.h"
+#include "RNA_define.h"
+
+#include "rna_internal.h"
 
 #include "WM_types.h"
 
@@ -281,7 +281,7 @@ static int rna_Nurb_length(PointerRNA *ptr)
 static void rna_Nurb_type_set(PointerRNA *ptr, int value)
 {
 	Nurb *nu = (Nurb *)ptr->data;
-	ED_nurb_set_spline_type(nu, value);
+	BKE_nurb_type_convert(nu, value, true);
 }
 
 static void rna_BPoint_array_begin(CollectionPropertyIterator *iter, PointerRNA *ptr)
@@ -304,7 +304,7 @@ static void rna_Curve_update_data(Main *bmain, Scene *scene, PointerRNA *ptr)
 
 static void rna_Curve_update_deps(Main *bmain, Scene *scene, PointerRNA *ptr)
 {
-	DAG_scene_sort(bmain, scene);
+	DAG_relations_tag_update(bmain);
 	rna_Curve_update_data(bmain, scene, ptr);
 }
 
@@ -460,7 +460,7 @@ static void rna_Curve_body_set(PointerRNA *ptr, const char *value)
 	/* don't know why this is +4, just duplicating load_editText() */
 	cu->strinfo = MEM_callocN((len + 4) * sizeof(CharInfo), "strinfo");
 
-	/*BLI_strncpy_wchar_as_utf8(cu->str, value, len+1);  *//* value is not wchar_t */
+	/*BLI_strncpy_wchar_as_utf8(cu->str, value, len + 1);  *//* value is not wchar_t */
 	BLI_strncpy(cu->str, value, len + 1);
 }
 

@@ -35,7 +35,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 struct bNode;
@@ -45,6 +44,7 @@ struct EnvMap;
 struct HaloRen;
 struct Lamp;
 struct LampRen;
+struct Main;
 struct Material;
 struct MTex;
 struct OceanTex;
@@ -59,10 +59,10 @@ struct World;
 #define MAXCOLORBAND 32
 
 
-void BKE_texture_free(struct Tex *t); 
+void BKE_texture_free(struct Tex *t);
 
-void init_colorband(struct ColorBand *coba, int rangetype);
-struct ColorBand *add_colorband(int rangetype);
+void init_colorband(struct ColorBand *coba, bool rangetype);
+struct ColorBand *add_colorband(bool rangetype);
 int do_colorband(const struct ColorBand *coba, float in, float out[4]);
 void colorband_table_RGBA(struct ColorBand *coba, float **array, int *size);
 struct CBData *colorband_element_add(struct ColorBand *coba, float position);
@@ -70,7 +70,7 @@ int colorband_element_remove(struct ColorBand *coba, int index);
 void colorband_update_sort(struct ColorBand *coba);
 
 void default_tex(struct Tex *tex);
-struct Tex *add_texture(const char *name);
+struct Tex *add_texture(struct Main *bmain, const char *name);
 void tex_set_type(struct Tex *tex, int type);
 void default_mtex(struct MTex *mtex);
 struct MTex *add_mtex(void);
@@ -125,7 +125,7 @@ struct VoxelData *BKE_copy_voxeldata(struct VoxelData *vd);
 void BKE_free_oceantex(struct OceanTex *ot);
 struct OceanTex *BKE_add_oceantex(void);
 struct OceanTex *BKE_copy_oceantex(struct OceanTex *ot);
-	
+
 int     BKE_texture_dependsOnTime(const struct Tex *texture);
 
 #ifdef __cplusplus

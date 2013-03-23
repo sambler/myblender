@@ -26,7 +26,7 @@
 CCL_NAMESPACE_BEGIN
 
 class ImageManager;
-class Shadr;
+class Shader;
 
 /* Texture Mapping */
 
@@ -69,7 +69,9 @@ public:
 	ImageManager *image_manager;
 	int slot;
 	int is_float;
+	bool is_linear;
 	string filename;
+	void *builtin_data;
 	ustring color_space;
 	ustring projection;
 	float projection_blend;
@@ -88,7 +90,9 @@ public:
 	ImageManager *image_manager;
 	int slot;
 	int is_float;
+	bool is_linear;
 	string filename;
+	void *builtin_data;
 	ustring color_space;
 	ustring projection;
 	bool animated;
@@ -186,10 +190,10 @@ public:
 
 class ProxyNode : public ShaderNode {
 public:
-	ProxyNode(ShaderSocketType from, ShaderSocketType to);
+	ProxyNode(ShaderSocketType type);
 	SHADER_NODE_BASE_CLASS(ProxyNode)
 
-	ShaderSocketType from, to;
+	ShaderSocketType type;
 };
 
 class BsdfNode : public ShaderNode {
@@ -220,6 +224,8 @@ public:
 class TransparentBsdfNode : public BsdfNode {
 public:
 	SHADER_NODE_CLASS(TransparentBsdfNode)
+
+	bool has_surface_transparent() { return true; }
 };
 
 class VelvetBsdfNode : public BsdfNode {
@@ -254,6 +260,8 @@ public:
 class EmissionNode : public ShaderNode {
 public:
 	SHADER_NODE_CLASS(EmissionNode)
+
+	bool has_surface_emission() { return true; }
 
 	bool total_power;
 };
@@ -324,6 +332,13 @@ public:
 class ParticleInfoNode : public ShaderNode {
 public:
 	SHADER_NODE_CLASS(ParticleInfoNode)
+	void attributes(AttributeRequestSet *attributes);
+};
+
+class HairInfoNode : public ShaderNode {
+public:
+	SHADER_NODE_CLASS(HairInfoNode)
+
 	void attributes(AttributeRequestSet *attributes);
 };
 
@@ -452,6 +467,12 @@ public:
 class RGBCurvesNode : public ShaderNode {
 public:
 	SHADER_NODE_CLASS(RGBCurvesNode)
+	float4 curves[RAMP_TABLE_SIZE];
+};
+
+class VectorCurvesNode : public ShaderNode {
+public:
+	SHADER_NODE_CLASS(VectorCurvesNode)
 	float4 curves[RAMP_TABLE_SIZE];
 };
 

@@ -24,15 +24,9 @@
  *  \ingroup RNA
  */
 
-
 #include <float.h>
 #include <stdio.h>
 #include <stdlib.h>
-
-#include "RNA_define.h"
-#include "RNA_enum_types.h"
-
-#include "rna_internal.h"
 
 #include "DNA_brush_types.h"
 #include "DNA_lamp_types.h"
@@ -44,7 +38,14 @@
 #include "DNA_particle_types.h"
 #include "DNA_scene_types.h" /* MAXFRAME only */
 
+#include "BLI_utildefines.h"
+
 #include "BKE_node.h"
+
+#include "RNA_define.h"
+#include "RNA_enum_types.h"
+
+#include "rna_internal.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
@@ -107,6 +108,7 @@ EnumPropertyItem blend_type_items[] = {
 
 #include "RNA_access.h"
 
+#include "BKE_context.h"
 #include "BKE_depsgraph.h"
 #include "BKE_image.h"
 #include "BKE_texture.h"
@@ -169,7 +171,7 @@ static void rna_Texture_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *pt
 	}
 	else if (GS(id->name) == ID_NT) {
 		bNodeTree *ntree = ptr->id.data;
-		ED_node_generic_update(bmain, ntree, NULL);
+		ED_node_tag_update_nodetree(bmain, ntree);
 	}
 }
 
@@ -273,15 +275,15 @@ char *rna_TextureSlot_path(PointerRNA *ptr)
 		else {
 			PointerRNA id_ptr;
 			PropertyRNA *prop;
-		
+
 			/* find the 'textures' property of the ID-struct */
 			RNA_id_pointer_create(ptr->id.data, &id_ptr);
 			prop = RNA_struct_find_property(&id_ptr, "texture_slots");
-		
+
 			/* get an iterator for this property, and try to find the relevant index */
 			if (prop) {
 				int index = RNA_property_collection_lookup_index(&id_ptr, prop, ptr);
-			
+
 				if (index >= 0)
 					return BLI_sprintfN("texture_slots[%d]", index);
 			}
@@ -383,18 +385,21 @@ static void rna_Texture_use_color_ramp_set(PointerRNA *ptr, int value)
 	else tex->flag &= ~TEX_COLORBAND;
 
 	if ((tex->flag & TEX_COLORBAND) && tex->coba == NULL)
-		tex->coba = add_colorband(0);
+		tex->coba = add_colorband(false);
 }
 
-static void rna_Texture_use_nodes_set(PointerRNA *ptr, int v)
+static void rna_Texture_use_nodes_update(bContext *C, PointerRNA *ptr)
 {
 	Tex *tex = (Tex *)ptr->data;
 	
-	tex->use_nodes = v;
+	if (tex->use_nodes) {
 	tex->type = 0;
 	
-	if (v && tex->nodetree == NULL)
-		ED_node_texture_default(tex);
+		if (tex->nodetree == NULL)
+			ED_node_texture_default(C, tex);
+	}
+	
+	rna_Texture_nodes_update(CTX_data_main(C), CTX_data_scene(C), ptr);
 }
 
 static void rna_ImageTexture_mipmap_set(PointerRNA *ptr, int value)
@@ -566,7 +571,7 @@ static void rna_def_colormapping(BlenderRNA *brna)
 	RNA_def_property_update(prop, 0, "rna_Color_mapping_update");
 
 	prop = RNA_def_property(srna, "contrast", PROP_FLOAT, PROP_NONE);
-	RNA_def_property_range(prop, 0.01, 5);
+	RNA_def_property_range(prop, 0.0, 5);
 	RNA_def_property_ui_text(prop, "Contrast", "Adjust the contrast of the texture");
 	RNA_def_property_update(prop, 0, "rna_Color_mapping_update");
 
@@ -2039,7 +2044,7 @@ static void rna_def_texture(BlenderRNA *brna)
 	RNA_def_property_update(prop, 0, "rna_Texture_update");
 
 	prop = RNA_def_property(srna, "contrast", PROP_FLOAT, PROP_NONE);
-	RNA_def_property_range(prop, 0.01, 5);
+	RNA_def_property_range(prop, 0.0, 5);
 	RNA_def_property_ui_text(prop, "Contrast", "Adjust the contrast of the texture");
 	RNA_def_property_update(prop, 0, "rna_Texture_update");
 
@@ -2076,9 +2081,9 @@ static void rna_def_texture(BlenderRNA *brna)
 	/* nodetree */
 	prop = RNA_def_property(srna, "use_nodes", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "use_nodes", 1);
-	RNA_def_property_boolean_funcs(prop, NULL, "rna_Texture_use_nodes_set");
+	RNA_def_property_flag(prop, PROP_CONTEXT_UPDATE);
 	RNA_def_property_ui_text(prop, "Use Nodes", "Make this a node-based texture");
-	RNA_def_property_update(prop, 0, "rna_Texture_nodes_update");
+	RNA_def_property_update(prop, 0, "rna_Texture_use_nodes_update");
 	
 	prop = RNA_def_property(srna, "node_tree", PROP_POINTER, PROP_NONE);
 	RNA_def_property_pointer_sdna(prop, NULL, "nodetree");

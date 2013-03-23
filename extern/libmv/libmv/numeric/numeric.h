@@ -38,7 +38,7 @@
     *sinx = sin(x);
     *cosx = cos(x);
   }
-#endif //_WIN32 || __APPLE__ || __FreeBSD__
+#endif //_WIN32 || __APPLE__
 
 #if (defined(WIN32) || defined(WIN64)) && !defined(__MINGW32__)
   inline long lround(double d) {

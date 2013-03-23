@@ -23,7 +23,7 @@
  * Contributor(s): none yet.
  *
  * ***** END GPL LICENSE BLOCK *****
- */ 
+ */
 
 /** \file BLI_memarena.h
  *  \ingroup bli
@@ -39,7 +39,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 /* A reasonable standard buffer size, big

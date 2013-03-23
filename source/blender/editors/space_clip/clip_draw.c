@@ -103,11 +103,11 @@ static void draw_keyframe(int frame, int cfra, int sfra, float framelen, int wid
 	if (width == 1) {
 		glBegin(GL_LINES);
 		glVertex2i(x, 0);
-		glVertex2i(x, height);
+		glVertex2i(x, height * UI_DPI_FAC);
 		glEnd();
 	}
 	else {
-		glRecti(x, 0, x + width, height);
+		glRecti(x, 0, x + width, height * UI_DPI_FAC);
 	}
 }
 
@@ -125,7 +125,7 @@ static void draw_movieclip_cache(SpaceClip *sc, ARegion *ar, MovieClip *clip, Sc
 
 	/* cache background */
 	glColor4ub(128, 128, 255, 64);
-	glRecti(0, 0, ar->winx, 8);
+	glRecti(0, 0, ar->winx, 8 * UI_DPI_FAC);
 
 	/* cached segments -- could be usefu lto debug caching strategies */
 	BKE_movieclip_get_cache_segments(clip, &sc->user, &totseg, &points);
@@ -138,7 +138,7 @@ static void draw_movieclip_cache(SpaceClip *sc, ARegion *ar, MovieClip *clip, Sc
 			x1 = (points[a * 2] - sfra) / (efra - sfra + 1) * ar->winx;
 			x2 = (points[a * 2 + 1] - sfra + 1) / (efra - sfra + 1) * ar->winx;
 
-			glRecti(x1, 0, x2, 8);
+			glRecti(x1, 0, x2, 8 * UI_DPI_FAC);
 		}
 	}
 
@@ -175,7 +175,7 @@ static void draw_movieclip_cache(SpaceClip *sc, ARegion *ar, MovieClip *clip, Sc
 				else
 					glColor4ub(255, 255, 0, 96);
 
-				glRecti((i - sfra + clip->start_frame - 1) * framelen, 0, (i - sfra + clip->start_frame) * framelen, 4);
+				glRecti((i - sfra + clip->start_frame - 1) * framelen, 0, (i - sfra + clip->start_frame) * framelen, 4 * UI_DPI_FAC);
 			}
 		}
 	}
@@ -203,7 +203,7 @@ static void draw_movieclip_cache(SpaceClip *sc, ARegion *ar, MovieClip *clip, Sc
 			}
 
 			if (!ok)
-				glRecti((i - sfra + clip->start_frame - 1) * framelen, 0, (i - sfra + clip->start_frame) * framelen, 8);
+				glRecti((i - sfra + clip->start_frame - 1) * framelen, 0, (i - sfra + clip->start_frame) * framelen, 8 * UI_DPI_FAC);
 		}
 	}
 
@@ -213,9 +213,9 @@ static void draw_movieclip_cache(SpaceClip *sc, ARegion *ar, MovieClip *clip, Sc
 	x = (sc->user.framenr - sfra) / (efra - sfra + 1) * ar->winx;
 
 	UI_ThemeColor(TH_CFRAME);
-	glRecti(x, 0, x + ceilf(framelen), 8);
+	glRecti(x, 0, x + ceilf(framelen), 8 * UI_DPI_FAC);
 
-	clip_draw_curfra_label(sc->user.framenr, x, 8.0f);
+	clip_draw_curfra_label(sc->user.framenr, x, 8.0f * UI_DPI_FAC);
 
 	/* solver keyframes */
 	glColor4ub(175, 255, 0, 255);
@@ -269,8 +269,18 @@ static void draw_movieclip_buffer(const bContext *C, SpaceClip *sc, ARegion *ar,
 		if (display_buffer) {
 			int need_fallback = 1;
 
+			/* checkerboard for case alpha */
+			if (ibuf->planes == 32) {
+				glEnable(GL_BLEND);
+				glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+				fdrawcheckerboard(x, y, x + zoomx * ibuf->x, y + zoomy * ibuf->y);
+			}
+
 			if (ED_space_clip_texture_buffer_supported(sc)) {
 				if (ED_space_clip_load_movieclip_buffer(sc, ibuf, display_buffer)) {
+					glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+
 					glPushMatrix();
 					glTranslatef(x, y, 0.0f);
 					glScalef(zoomx, zoomy, 1.0f);
@@ -296,11 +306,14 @@ static void draw_movieclip_buffer(const bContext *C, SpaceClip *sc, ARegion *ar,
 				/* set zoom */
 				glPixelZoom(zoomx * width / ibuf->x, zoomy * height / ibuf->y);
 
-				glaDrawPixelsSafe(x, y, ibuf->x, ibuf->y, ibuf->x, GL_RGBA, GL_UNSIGNED_BYTE, display_buffer);
+				glaDrawPixelsAuto(x, y, ibuf->x, ibuf->y, GL_UNSIGNED_BYTE, GL_NEAREST, display_buffer);
 
 				/* reset zoom */
 				glPixelZoom(1.0f, 1.0f);
 			}
+
+			if (ibuf->planes == 32)
+				glDisable(GL_BLEND);
 		}
 
 		IMB_display_buffer_release(cache_handle);
@@ -796,11 +809,11 @@ static void draw_marker_slide_zones(SpaceClip *sc, MovieTrackingTrack *track, Mo
 	dy = 6.0f / height / sc->zoom;
 
 	side = get_shortest_pattern_side(marker);
-	patdx = min_ff(dx * 2.0f / 3.0f, side / 6.0f);
-	patdy = min_ff(dy * 2.0f / 3.0f, side * width / height / 6.0f);
+	patdx = min_ff(dx * 2.0f / 3.0f, side / 6.0f) * UI_DPI_FAC;
+	patdy = min_ff(dy * 2.0f / 3.0f, side * width / height / 6.0f) * UI_DPI_FAC;
 
-	searchdx = min_ff(dx, (marker->search_max[0] - marker->search_min[0]) / 6.0f);
-	searchdy = min_ff(dy, (marker->search_max[1] - marker->search_min[1]) / 6.0f);
+	searchdx = min_ff(dx, (marker->search_max[0] - marker->search_min[0]) / 6.0f) * UI_DPI_FAC;
+	searchdy = min_ff(dy, (marker->search_max[1] - marker->search_min[1]) / 6.0f) * UI_DPI_FAC;
 
 	px[0] = 1.0f / sc->zoom / width / sc->scale;
 	px[1] = 1.0f / sc->zoom / height / sc->scale;
@@ -944,7 +957,7 @@ static void draw_marker_texts(SpaceClip *sc, MovieTrackingTrack *track, MovieTra
 	if (state[0])
 		BLI_snprintf(str, sizeof(str), "%s: %s", track->name, state);
 	else
-		BLI_snprintf(str, sizeof(str), "%s", track->name);
+		BLI_strncpy(str, track->name, sizeof(str));
 
 	BLF_position(fontid, pos[0], pos[1], 0.0f);
 	BLF_draw(fontid, str, sizeof(str));
@@ -1471,6 +1484,8 @@ void clip_draw_main(const bContext *C, SpaceClip *sc, ARegion *ar)
 	if (ibuf) {
 		draw_movieclip_buffer(C, sc, ar, ibuf, width, height, zoomx, zoomy);
 		IMB_freeImBuf(ibuf);
+
+		clip_start_prefetch_job(C);
 	}
 	else {
 		ED_region_grid_draw(ar, zoomx, zoomy);

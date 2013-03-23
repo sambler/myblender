@@ -32,7 +32,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 /* add platform/compiler checks here if it is not supported */
@@ -46,7 +45,7 @@ extern "C" {
 #  else
 #    define MINLINE static inline
 #    if (defined(__APPLE__) && defined(__ppc__))
-       /* static inline __attribute__ here breaks osx ppc gcc42 build */
+	   /* static inline __attribute__ here breaks osx ppc gcc42 build */
 #      define MALWAYS_INLINE static __attribute__((always_inline))
 #    else
 #      define MALWAYS_INLINE static inline __attribute__((always_inline))
@@ -55,6 +54,11 @@ extern "C" {
 #else
 #  define MINLINE
 #  define MALWAYS_INLINE
+#endif
+
+/* gcc 4.6 (supports push/pop) */
+#if (defined(__GNUC__) && ((__GNUC__ * 100 + __GNUC_MINOR__) >= 406))
+#  define BLI_MATH_GCC_WARN_PRAGMA 1
 #endif
 
 #ifdef __cplusplus

@@ -4,7 +4,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version. 
+ * of the License, or (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -35,7 +35,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 struct Isect;
@@ -57,7 +56,7 @@ int RE_rayobject_raycast(RayObject *r, struct Isect *i);
 /* Acceleration Structures */
 
 RayObject *RE_rayobject_octree_create(int ocres, int size);
-RayObject *RE_rayobject_instance_create(RayObject *target, float transform[][4], void *ob, void *target_ob);
+RayObject *RE_rayobject_instance_create(RayObject *target, float transform[4][4], void *ob, void *target_ob);
 RayObject *RE_rayobject_empty_create(void);
 
 RayObject *RE_rayobject_blibvh_create(int size);	/* BLI_kdopbvh.c   */
@@ -87,6 +86,8 @@ typedef struct RayFace {
 #define RE_rayface_isQuad(a) ((a)->quad)
 
 RayObject *RE_rayface_from_vlak(RayFace *face, struct ObjectInstanceRen *obi, struct VlakRen *vlr);
+
+RayObject *RE_rayface_from_coords(RayFace *rayface, void *ob, void *face, float *v1, float *v2, float *v3, float *v4);
 
 /* RayObject representing faces directly from a given VlakRen structure. Thus
  * allowing to save memory, but making code triangle intersection dependent on

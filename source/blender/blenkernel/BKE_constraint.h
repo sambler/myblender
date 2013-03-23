@@ -44,7 +44,6 @@ struct bPoseChannel;
 /* ---------------------------------------------------------------------------- */
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 /* special struct for use in constraint evaluation */
@@ -52,10 +51,10 @@ typedef struct bConstraintOb {
 	struct Scene *scene;        /* for system time, part of deglobalization, code nicer later with local time (ton) */
 	struct Object *ob;          /* if pchan, then armature that it comes from, otherwise constraint owner */
 	struct bPoseChannel *pchan; /* pose channel that owns the constraints being evaluated */
-	
+
 	float matrix[4][4];         /* matrix where constraints are accumulated + solved */
 	float startmat[4][4];       /* original matrix (before constraint solving) */
-	
+
 	short type;                 /* type of owner  */
 	short rotOrder;             /* rotation order for constraint owner (as defined in eEulerRotationOrders in BLI_math.h) */
 } bConstraintOb;
@@ -84,7 +83,7 @@ typedef struct bConstraintTypeInfo {
 	short size;             /* size in bytes of the struct */
 	char name[32];          /* name of constraint in interface */
 	char structName[32];    /* name of struct for SDNA */
-	
+
 	/* data management function pointers - special handling */
 	/* free any data that is allocated separately (optional) */
 	void (*free_data)(struct bConstraint *con);
@@ -94,13 +93,13 @@ typedef struct bConstraintTypeInfo {
 	void (*copy_data)(struct bConstraint *con, struct bConstraint *src);
 	/* set settings for data that will be used for bConstraint.data (memory already allocated using MEM_callocN) */
 	void (*new_data)(void *cdata);
-	
+
 	/* target handling function pointers */
 	/* for multi-target constraints: return that list; otherwise make a temporary list (returns number of targets) */
 	int (*get_constraint_targets)(struct bConstraint *con, struct ListBase *list);
 	/* for single-target constraints only: flush data back to source data, and the free memory used */
 	void (*flush_constraint_targets)(struct bConstraint *con, struct ListBase *list, short nocopy);
-	
+
 	/* evaluation */
 	/* set the ct->matrix for the given constraint target (at the given ctime) */
 	void (*get_target_matrix)(struct bConstraint *con, struct bConstraintOb *cob, struct bConstraintTarget *ct, float ctime);
@@ -109,8 +108,8 @@ typedef struct bConstraintTypeInfo {
 } bConstraintTypeInfo;
 
 /* Function Prototypes for bConstraintTypeInfo's */
-bConstraintTypeInfo *constraint_get_typeinfo(struct bConstraint *con);
-bConstraintTypeInfo *get_constraint_typeinfo(int type);
+bConstraintTypeInfo *BKE_constraint_get_typeinfo(struct bConstraint *con);
+bConstraintTypeInfo *BKE_get_constraint_typeinfo(int type);
 
 /* ---------------------------------------------------------------------------- */
 /* Useful macros for testing various common flag combinations */
@@ -121,38 +120,38 @@ bConstraintTypeInfo *get_constraint_typeinfo(int type);
 /* ---------------------------------------------------------------------------- */
 
 /* Constraint function prototypes */
-void unique_constraint_name(struct bConstraint *con, struct ListBase *list);
+void BKE_unique_constraint_name(struct bConstraint *con, struct ListBase *list);
 
-void free_constraints(struct ListBase *list);
-void copy_constraints(struct ListBase *dst, const struct ListBase *src, int do_extern);
-void relink_constraints(struct ListBase *list);
-void id_loop_constraints(struct ListBase *list, ConstraintIDFunc func, void *userdata);
-void free_constraint_data(struct bConstraint *con);
+void BKE_free_constraints(struct ListBase *list);
+void BKE_copy_constraints(struct ListBase *dst, const struct ListBase *src, int do_extern);
+void BKE_relink_constraints(struct ListBase *list);
+void BKE_id_loop_constraints(struct ListBase *list, ConstraintIDFunc func, void *userdata);
+void BKE_free_constraint_data(struct bConstraint *con);
 
 /* Constraint API function prototypes */
-struct bConstraint *constraints_get_active(struct ListBase *list);
-void constraints_set_active(ListBase *list, struct bConstraint *con);
-struct bConstraint *constraints_findByName(struct ListBase *list, const char *name);
-	
-struct bConstraint *add_ob_constraint(struct Object *ob, const char *name, short type);
-struct bConstraint *add_pose_constraint(struct Object *ob, struct bPoseChannel *pchan, const char *name, short type);
+struct bConstraint *BKE_constraints_get_active(struct ListBase *list);
+void BKE_constraints_set_active(ListBase *list, struct bConstraint *con);
+struct bConstraint *BKE_constraints_findByName(struct ListBase *list, const char *name);
 
-int remove_constraint(ListBase *list, struct bConstraint *con);
-void remove_constraints_type(ListBase *list, short type, short last_only);
+struct bConstraint *BKE_add_ob_constraint(struct Object *ob, const char *name, short type);
+struct bConstraint *BKE_add_pose_constraint(struct Object *ob, struct bPoseChannel *pchan, const char *name, short type);
+
+int BKE_remove_constraint(ListBase *list, struct bConstraint *con);
+void BKE_remove_constraints_type(ListBase *list, short type, short last_only);
 
 /* Constraints + Proxies function prototypes */
-void extract_proxylocal_constraints(struct ListBase *dst, struct ListBase *src);
-short proxylocked_constraints_owner(struct Object *ob, struct bPoseChannel *pchan);
+void BKE_extract_proxylocal_constraints(struct ListBase *dst, struct ListBase *src);
+short BKE_proxylocked_constraints_owner(struct Object *ob, struct bPoseChannel *pchan);
 
 /* Constraint Evaluation function prototypes */
-struct bConstraintOb *constraints_make_evalob(struct Scene *scene, struct Object *ob, void *subdata, short datatype);
-void constraints_clear_evalob(struct bConstraintOb *cob);
+struct bConstraintOb *BKE_constraints_make_evalob(struct Scene *scene, struct Object *ob, void *subdata, short datatype);
+void BKE_constraints_clear_evalob(struct bConstraintOb *cob);
 
-void constraint_mat_convertspace(struct Object *ob, struct bPoseChannel *pchan, float mat[][4], short from, short to);
+void BKE_constraint_mat_convertspace(struct Object *ob, struct bPoseChannel *pchan, float mat[4][4], short from, short to);
 
-void get_constraint_target_matrix(struct Scene *scene, struct bConstraint *con, int n, short ownertype, void *ownerdata, float mat[][4], float ctime);
-void get_constraint_targets_for_solving(struct bConstraint *con, struct bConstraintOb *ob, struct ListBase *targets, float ctime);
-void solve_constraints(struct ListBase *conlist, struct bConstraintOb *cob, float ctime);
+void BKE_get_constraint_target_matrix(struct Scene *scene, struct bConstraint *con, int n, short ownertype, void *ownerdata, float mat[4][4], float ctime);
+void BKE_get_constraint_targets_for_solving(struct bConstraint *con, struct bConstraintOb *ob, struct ListBase *targets, float ctime);
+void BKE_solve_constraints(struct ListBase *conlist, struct bConstraintOb *cob, float ctime);
 
 #ifdef __cplusplus
 }

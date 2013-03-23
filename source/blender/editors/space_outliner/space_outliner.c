@@ -67,6 +67,17 @@ static void outliner_main_area_init(wmWindowManager *wm, ARegion *ar)
 	ListBase *lb;
 	wmKeyMap *keymap;
 	
+	/* make sure we keep the hide flags */
+	ar->v2d.scroll |= (V2D_SCROLL_RIGHT | V2D_SCROLL_BOTTOM);
+	ar->v2d.scroll &= ~(V2D_SCROLL_LEFT | V2D_SCROLL_TOP);	/* prevent any noise of past */
+	ar->v2d.scroll |= V2D_SCROLL_HORIZONTAL_HIDE;
+	ar->v2d.scroll |= V2D_SCROLL_VERTICAL_HIDE;
+
+	ar->v2d.align = (V2D_ALIGN_NO_NEG_X | V2D_ALIGN_NO_POS_Y);
+	ar->v2d.keepzoom = (V2D_LOCKZOOM_X | V2D_LOCKZOOM_Y | V2D_LIMITZOOM | V2D_KEEPASPECT);
+	ar->v2d.keeptot = V2D_KEEPTOT_STRICT;
+	ar->v2d.minzoom = ar->v2d.maxzoom = 1.0f;
+
 	UI_view2d_region_reinit(&ar->v2d, V2D_COMMONVIEW_LIST, ar->winx, ar->winy);
 	
 	/* own keymap */
@@ -79,7 +90,7 @@ static void outliner_main_area_init(wmWindowManager *wm, ARegion *ar)
 	WM_event_add_dropbox_handler(&ar->handlers, lb);
 }
 
-static int outliner_parent_drop_poll(bContext *C, wmDrag *drag, wmEvent *event)
+static int outliner_parent_drop_poll(bContext *C, wmDrag *drag, const wmEvent *event)
 {
 	ARegion *ar = CTX_wm_region(C);
 	SpaceOops *soops = CTX_wm_space_outliner(C);
@@ -124,7 +135,7 @@ static void outliner_parent_drop_copy(wmDrag *drag, wmDropBox *drop)
 	RNA_string_set(drop->ptr, "child", id->name + 2);
 }
 
-static int outliner_parent_clear_poll(bContext *C, wmDrag *drag, wmEvent *event)
+static int outliner_parent_clear_poll(bContext *C, wmDrag *drag, const wmEvent *event)
 {
 	ARegion *ar = CTX_wm_region(C);
 	SpaceOops *soops = CTX_wm_space_outliner(C);
@@ -165,7 +176,7 @@ static void outliner_parent_clear_copy(wmDrag *drag, wmDropBox *drop)
 	RNA_enum_set(drop->ptr, "type", 0);
 }
 
-static int outliner_scene_drop_poll(bContext *C, wmDrag *drag, wmEvent *event)
+static int outliner_scene_drop_poll(bContext *C, wmDrag *drag, const wmEvent *event)
 {
 	ARegion *ar = CTX_wm_region(C);
 	SpaceOops *soops = CTX_wm_space_outliner(C);
@@ -194,7 +205,7 @@ static void outliner_scene_drop_copy(wmDrag *drag, wmDropBox *drop)
 	RNA_string_set(drop->ptr, "object", id->name + 2);
 }
 
-static int outliner_material_drop_poll(bContext *C, wmDrag *drag, wmEvent *event)
+static int outliner_material_drop_poll(bContext *C, wmDrag *drag, const wmEvent *event)
 {
 	ARegion *ar = CTX_wm_region(C);
 	SpaceOops *soops = CTX_wm_space_outliner(C);
@@ -305,6 +316,10 @@ static void outliner_main_area_listener(ARegion *ar, wmNotifier *wmn)
 					/* all modifier actions now */
 					ED_region_tag_redraw(ar);
 					break;
+				default:
+					/* Trigger update for NC_OBJECT itself */
+					ED_region_tag_redraw(ar);
+					break;
 			}
 			break;
 		case NC_GROUP:
@@ -409,12 +424,6 @@ static SpaceLink *outliner_new(const bContext *UNUSED(C))
 	
 	BLI_addtail(&soutliner->regionbase, ar);
 	ar->regiontype = RGN_TYPE_WINDOW;
-	
-	ar->v2d.scroll = (V2D_SCROLL_RIGHT | V2D_SCROLL_BOTTOM_O);
-	ar->v2d.align = (V2D_ALIGN_NO_NEG_X | V2D_ALIGN_NO_POS_Y);
-	ar->v2d.keepzoom = (V2D_LOCKZOOM_X | V2D_LOCKZOOM_Y | V2D_LIMITZOOM | V2D_KEEPASPECT);
-	ar->v2d.keeptot = V2D_KEEPTOT_STRICT;
-	ar->v2d.minzoom = ar->v2d.maxzoom = 1.0f;
 	
 	return (SpaceLink *)soutliner;
 }

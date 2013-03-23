@@ -24,14 +24,7 @@
  *  \ingroup RNA
  */
 
-
 #include <stdlib.h>
-
-#include "RNA_access.h"
-#include "RNA_define.h"
-#include "RNA_enum_types.h"
-
-#include "rna_internal.h"
 
 #include "DNA_anim_types.h"
 #include "DNA_action_types.h"
@@ -39,7 +32,15 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "BLI_utildefines.h"
+
 #include "BKE_action.h"
+
+#include "RNA_access.h"
+#include "RNA_define.h"
+#include "RNA_enum_types.h"
+
+#include "rna_internal.h"
 
 #include "WM_types.h"
 
@@ -157,7 +158,7 @@ static TimeMarker *rna_Action_pose_markers_new(bAction *act, const char name[])
 static void rna_Action_pose_markers_remove(bAction *act, ReportList *reports, PointerRNA *marker_ptr)
 {
 	TimeMarker *marker = marker_ptr->data;
-	if (BLI_remlink_safe(&act->markers, marker) == FALSE) {
+	if (!BLI_remlink_safe(&act->markers, marker)) {
 		BKE_reportf(reports, RPT_ERROR, "Timeline marker '%s' not found in action '%s'", marker->name, act->id.name + 2);
 		return;
 	}
@@ -596,7 +597,7 @@ static void rna_def_action_pose_markers(BlenderRNA *brna, PropertyRNA *cprop)
 	                               "rna_Action_active_pose_marker_set", NULL, NULL);
 	RNA_def_property_ui_text(prop, "Active Pose Marker", "Active pose marker for this action");
 	
-	prop = RNA_def_property(srna, "active_index", PROP_INT, PROP_NONE);
+	prop = RNA_def_property(srna, "active_index", PROP_INT, PROP_UNSIGNED);
 	RNA_def_property_int_sdna(prop, NULL, "active_marker");
 	RNA_def_property_int_funcs(prop, "rna_Action_active_pose_marker_index_get",
 	                           "rna_Action_active_pose_marker_index_set", "rna_Action_active_pose_marker_index_range");

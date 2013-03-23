@@ -242,7 +242,7 @@ void BKE_free_animdata(ID *id)
 /* Freeing -------------------------------------------- */
 
 /* Make a copy of the given AnimData - to be used when copying datablocks */
-AnimData *BKE_copy_animdata(AnimData *adt, const short do_action)
+AnimData *BKE_copy_animdata(AnimData *adt, const bool do_action)
 {
 	AnimData *dadt;
 	
@@ -274,7 +274,7 @@ AnimData *BKE_copy_animdata(AnimData *adt, const short do_action)
 	return dadt;
 }
 
-int BKE_copy_animdata_id(ID *id_to, ID *id_from, const short do_action)
+int BKE_copy_animdata_id(ID *id_to, ID *id_from, const bool do_action)
 {
 	AnimData *adt;
 
@@ -499,15 +499,15 @@ void BKE_animdata_separate_by_basepath(ID *srcID, ID *dstID, ListBase *basepaths
 	if (srcAdt->action) {
 		/* set up an action if necessary, and name it in a similar way so that it can be easily found again */
 		if (dstAdt->action == NULL) {
-			dstAdt->action = add_empty_action(srcAdt->action->id.name + 2);
+			dstAdt->action = add_empty_action(G.main, srcAdt->action->id.name + 2);
 		}
 		else if (dstAdt->action == srcAdt->action) {
 			printf("Argh! Source and Destination share animation! ('%s' and '%s' both use '%s') Making new empty action\n",
 			       srcID->name, dstID->name, srcAdt->action->id.name);
-
+			
 			/* TODO: review this... */
 			id_us_min(&dstAdt->action->id);
-			dstAdt->action = add_empty_action(dstAdt->action->id.name + 2);
+			dstAdt->action = add_empty_action(G.main, dstAdt->action->id.name + 2);
 		}
 			
 		/* loop over base paths, trying to fix for each one... */
@@ -533,9 +533,9 @@ void BKE_animdata_separate_by_basepath(ID *srcID, ID *dstID, ListBase *basepaths
 					/* just need to change lists */
 					BLI_remlink(&srcAdt->drivers, fcu);
 					BLI_addtail(&dstAdt->drivers, fcu);
-
+					
 					/* TODO: add depsgraph flushing calls? */
-
+					
 					/* can stop now, as moved already */
 					break;
 				}

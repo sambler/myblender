@@ -17,7 +17,7 @@
  *
  * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
  * All rights reserved.
- 
+
  * The Original Code is: some of this file.
  *
  * ***** END GPL LICENSE BLOCK *****
@@ -32,7 +32,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 /********************************* Init **************************************/
@@ -81,21 +80,23 @@ void mult_m4_m4m4(float R[4][4], float A[4][4], float B[4][4]);
 void mult_m3_m3m4(float R[3][3], float A[4][4], float B[3][3]);
 
 void mul_serie_m3(float R[3][3],
-                  float M1[3][3], float M2[3][3], float M3[3][3], float M4[3][3],
-                  float M5[3][3], float M6[3][3], float M7[3][3], float M8[3][3]);
+				  float M1[3][3], float M2[3][3], float M3[3][3], float M4[3][3],
+				  float M5[3][3], float M6[3][3], float M7[3][3], float M8[3][3]);
 void mul_serie_m4(float R[4][4],
-                  float M1[4][4], float M2[4][4], float M3[4][4], float M4[4][4],
-                  float M5[4][4], float M6[4][4], float M7[4][4], float M8[4][4]);
+				  float M1[4][4], float M2[4][4], float M3[4][4], float M4[4][4],
+				  float M5[4][4], float M6[4][4], float M7[4][4], float M8[4][4]);
 
 void mul_m4_v3(float M[4][4], float r[3]);
 void mul_v3_m4v3(float r[3], float M[4][4], const float v[3]);
+void mul_v2_m2v2(float r[2], float M[2][2], const float v[2]);
 void mul_mat3_m4_v3(float M[4][4], float r[3]);
 void mul_m4_v4(float M[4][4], float r[4]);
-void mul_v4_m4v4(float r[4], float M[4][4], float v[4]);
+void mul_v4_m4v4(float r[4], float M[4][4], const float v[4]);
 void mul_project_m4_v3(float M[4][4], float vec[3]);
 
 void mul_m3_v3(float M[3][3], float r[3]);
-void mul_v3_m3v3(float r[3], float M[3][3], float a[3]);
+void mul_v3_m3v3(float r[3], float M[3][3], const float a[3]);
+void mul_v2_m3v3(float r[2], float M[3][3], const float a[3]);
 void mul_transposed_m3_v3(float M[3][3], float r[3]);
 void mul_m3_v3_double(float M[3][3], double r[3]);
 
@@ -141,14 +142,18 @@ void adjoint_m3_m3(float R[3][3], float A[3][3]);
 void adjoint_m4_m4(float R[4][4], float A[4][4]);
 
 float determinant_m2(float a, float b,
-                     float c, float d);
+					 float c, float d);
 float determinant_m3(float a, float b, float c,
-                     float d, float e, float f,
-                     float g, float h, float i);
+					 float d, float e, float f,
+					 float g, float h, float i);
+float determinant_m3_array(float m[3][3]);
 float determinant_m4(float A[4][4]);
+
+#define PSEUDOINVERSE_EPSILON 1e-8f
 
 void svd_m4(float U[4][4], float s[4], float V[4][4], float A[4][4]);
 void pseudoinverse_m4_m4(float Ainv[4][4], float A[4][4], float epsilon);
+void pseudoinverse_m3_m3(float Ainv[3][3], float A[3][3], float epsilon);
 
 /****************************** Transformations ******************************/
 
@@ -166,19 +171,22 @@ void mat4_to_size(float r[3], float M[4][4]);
 
 void translate_m4(float mat[4][4], float tx, float ty, float tz);
 void rotate_m4(float mat[4][4], const char axis, const float angle);
+void rotate_m2(float mat[2][2], const float angle);
 
 
-void mat3_to_rot_size(float rot[3][3], float size[3], float mat3[][3]);
-void mat4_to_loc_rot_size(float loc[3], float rot[3][3], float size[3], float wmat[][4]);
+void mat3_to_rot_size(float rot[3][3], float size[3], float mat3[3][3]);
+void mat4_to_loc_rot_size(float loc[3], float rot[3][3], float size[3], float wmat[4][4]);
+void mat4_to_loc_quat(float loc[3], float quat[4], float wmat[4][4]);
+void mat4_decompose(float loc[3], float quat[4], float size[3], float wmat[4][4]);
 
 void loc_eul_size_to_mat4(float R[4][4],
-                          const float loc[3], const float eul[3], const float size[3]);
+						  const float loc[3], const float eul[3], const float size[3]);
 void loc_eulO_size_to_mat4(float R[4][4],
-                           const float loc[3], const float eul[3], const float size[3], const short order);
+						   const float loc[3], const float eul[3], const float size[3], const short order);
 void loc_quat_size_to_mat4(float R[4][4],
-                           const float loc[3], const float quat[4], const float size[3]);
+						   const float loc[3], const float quat[4], const float size[3]);
 void loc_axisangle_size_to_mat4(float R[4][4],
-                                const float loc[3], const float axis[4], const float angle, const float size[3]);
+								const float loc[3], const float axis[4], const float angle, const float size[3]);
 
 void blend_m3_m3m3(float R[3][3], float A[3][3], float B[3][3], const float t);
 void blend_m4_m4m4(float R[4][4], float A[4][4], float B[4][4], const float t);

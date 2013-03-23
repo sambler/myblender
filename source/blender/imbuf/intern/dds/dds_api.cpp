@@ -38,7 +38,6 @@
 #endif
 
 extern "C" {
-//} for code folding
 
 #include "imbuf.h"
 #include "IMB_imbuf_types.h"
@@ -97,7 +96,7 @@ struct ImBuf *imb_load_dds(unsigned char *mem, size_t size, int flags, char colo
 	Color32 pixel;
 	Color32 *pixels = 0;
 
-	/* OCIO_TODO: never was able to save DDS, so can'ttest loading
+	/* OCIO_TODO: never was able to save DDS, so can't test loading
 	 *            but profile used to be set to sRGB and can't see rect_float here, so
 	 *            default byte space should work fine
 	 */
@@ -137,10 +136,10 @@ struct ImBuf *imb_load_dds(unsigned char *mem, size_t size, int flags, char colo
 			if (pixel.a != 255) {
 				bits_per_pixel = 32;
 				break;
-			};
-		};
-	};
-	ibuf = IMB_allocImBuf(dds.width(), dds.height(), bits_per_pixel, 0); 
+			}
+		}
+	}
+	ibuf = IMB_allocImBuf(dds.width(), dds.height(), bits_per_pixel, 0);
 	if (ibuf == 0) return(0); /* memory allocation failed */
 
 	ibuf->ftype = DDS;
@@ -165,7 +164,7 @@ struct ImBuf *imb_load_dds(unsigned char *mem, size_t size, int flags, char colo
 		}
 
 		if (ibuf->dds_data.fourcc != FOURCC_DDS) {
-			ibuf->dds_data.data = (unsigned char*)dds.readData(ibuf->dds_data.size);
+			ibuf->dds_data.data = (unsigned char *)dds.readData(ibuf->dds_data.size);
 
 			/* flip compressed texture */
 			FlipDXTCImage(dds.width(), dds.height(), dds.mipmapCount(), dds.fourCC(), ibuf->dds_data.data);

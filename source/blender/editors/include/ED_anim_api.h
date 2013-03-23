@@ -292,42 +292,45 @@ typedef enum eAnimFilter_Flags {
 #define SEL_MASKLAY(masklay) (masklay->flag & SELECT)
 
 
-
 /* NLA only */
 #define SEL_NLT(nlt) (nlt->flag & NLATRACK_SELECTED)
 #define EDITABLE_NLT(nlt) ((nlt->flag & NLATRACK_PROTECTED) == 0)
 
+
+/* AnimData - NLA mostly... */
+#define SEL_ANIMDATA(adt) (adt->flag & ADT_UI_SELECTED)
+
 /* -------------- Channel Defines -------------- */
 
 /* channel heights */
-#define ACHANNEL_FIRST          -16
-#define ACHANNEL_HEIGHT         16
-#define ACHANNEL_HEIGHT_HALF    8
-#define ACHANNEL_SKIP           2
+#define ACHANNEL_FIRST          (-0.8f * U.widget_unit)
+#define ACHANNEL_HEIGHT         (0.8f * U.widget_unit)
+#define ACHANNEL_HEIGHT_HALF    (0.4f * U.widget_unit)
+#define ACHANNEL_SKIP           (0.1f * U.widget_unit)
 #define ACHANNEL_STEP           (ACHANNEL_HEIGHT + ACHANNEL_SKIP)
 
 /* channel widths */
-#define ACHANNEL_NAMEWIDTH      200
+#define ACHANNEL_NAMEWIDTH      (10 * U.widget_unit)
 
 /* channel toggle-buttons */
-#define ACHANNEL_BUTTON_WIDTH   16
+#define ACHANNEL_BUTTON_WIDTH   (0.8f * U.widget_unit)
 
 
 /* -------------- NLA Channel Defines -------------- */
 
 /* NLA channel heights */
 // XXX: NLACHANNEL_FIRST isn't used?
-#define NLACHANNEL_FIRST                -16
-#define NLACHANNEL_HEIGHT(snla)         ((snla && (snla->flag & SNLA_NOSTRIPCURVES)) ? 16 : 24)
-#define NLACHANNEL_HEIGHT_HALF(snla)    ((snla && (snla->flag & SNLA_NOSTRIPCURVES)) ?  8 : 12)
-#define NLACHANNEL_SKIP                 2
+#define NLACHANNEL_FIRST                (-0.8f * U.widget_unit)
+#define NLACHANNEL_HEIGHT(snla)         ((snla && (snla->flag & SNLA_NOSTRIPCURVES)) ? (0.8f * U.widget_unit) : (1.2f * U.widget_unit))
+#define NLACHANNEL_HEIGHT_HALF(snla)    ((snla && (snla->flag & SNLA_NOSTRIPCURVES)) ? (0.4f * U.widget_unit) : (0.6f * U.widget_unit))
+#define NLACHANNEL_SKIP                 (0.1f * U.widget_unit)
 #define NLACHANNEL_STEP(snla)           (NLACHANNEL_HEIGHT(snla) + NLACHANNEL_SKIP)
 
 /* channel widths */
-#define NLACHANNEL_NAMEWIDTH        200
+#define NLACHANNEL_NAMEWIDTH			(10 * U.widget_unit)
 
 /* channel toggle-buttons */
-#define NLACHANNEL_BUTTON_WIDTH 16
+#define NLACHANNEL_BUTTON_WIDTH			(0.8f * U.widget_unit)
 
 /* ---------------- API  -------------------- */
 
@@ -469,7 +472,7 @@ void ANIM_timecode_string_from_frame(char *str, struct Scene *scene, int power, 
 /* ---------- Current Frame Drawing ---------------- */
 
 /* flags for Current Frame Drawing */
-enum {
+enum eAnimEditDraw_CurrentFrame {
 	/* plain time indicator with no special indicators */
 	DRAWCFRA_PLAIN          = 0,
 	/* draw box indicating current frame number */
@@ -478,7 +481,7 @@ enum {
 	DRAWCFRA_UNIT_SECONDS   = (1 << 1),
 	/* draw indicator extra wide (for timeline) */
 	DRAWCFRA_WIDE           = (1 << 2)
-} eAnimEditDraw_CurrentFrame; 
+};
 
 /* main call to draw current-frame indicator in an Animation Editor */
 void ANIM_draw_cfra(const struct bContext *C, struct View2D *v2d, short flag);
@@ -552,7 +555,8 @@ typedef enum eAnimUnitConv_Flags {
 	/* only touch selected BezTriples */
 	ANIM_UNITCONV_ONLYSEL   = (1 << 2),
 	/* only touch selected vertices */
-	ANIM_UNITCONV_SELVERTS  = (1 << 3)
+	ANIM_UNITCONV_SELVERTS  = (1 << 3),
+	ANIM_UNITCONV_SKIPKNOTS  = (1 << 4),
 } eAnimUnitConv_Flags;
 
 /* Get unit conversion factor for given ID + F-Curve */

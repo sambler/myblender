@@ -70,6 +70,8 @@ void IMB_colormanagement_transform_threaded(float *buffer, int width, int height
 void IMB_colormanagement_transform_v4(float pixel[4], const char *from_colorspace, const char *to_colorspace);
 
 void IMB_colormanagement_colorspace_to_scene_linear_v3(float pixel[3], struct ColorSpace *colorspace);
+void IMB_colormanagement_colorspace_to_scene_linear_v4(float pixel[4], int predivide, struct ColorSpace *colorspace);
+
 void IMB_colormanagement_scene_linear_to_colorspace_v3(float pixel[3], struct ColorSpace *colorspace);
 
 void IMB_colormanagement_colorspace_to_scene_linear(float *buffer, int width, int height, int channels, struct ColorSpace *colorspace, int predivide);
@@ -133,11 +135,14 @@ void IMB_partial_display_buffer_update(struct ImBuf *ibuf, const float *linear_b
                                        int xmin, int ymin, int xmax, int ymax,
                                        int update_orig_byte_buffer);
 
+void IMB_partial_display_buffer_update_delayed(struct ImBuf *ibuf, int xmin, int ymin, int xmax, int ymax);
+
 /* ** Pixel processor functions ** */
 struct ColormanageProcessor *IMB_colormanagement_display_processor_new(const struct ColorManagedViewSettings *view_settings,
                                                                        const struct ColorManagedDisplaySettings *display_settings);
 struct ColormanageProcessor *IMB_colormanagement_colorspace_processor_new(const char *from_colorspace, const char *to_colorspace);
 void IMB_colormanagement_processor_apply_v4(struct ColormanageProcessor *cm_processor, float pixel[4]);
+void IMB_colormanagement_processor_apply_v4_predivide(struct ColormanageProcessor *cm_processor, float pixel[4]);
 void IMB_colormanagement_processor_apply_v3(struct ColormanageProcessor *cm_processor, float pixel[3]);
 void IMB_colormanagement_processor_apply(struct ColormanageProcessor *cm_processor, float *buffer, int width, int height,
                                          int channels, int predivide);

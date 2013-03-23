@@ -26,6 +26,7 @@ if "bpy" in locals():
         _reload(val)
 _modules = (
     "properties_animviz",
+    "properties_constraint",
     "properties_data_armature",
     "properties_data_bone",
     "properties_data_camera",
@@ -40,7 +41,6 @@ _modules = (
     "properties_game",
     "properties_mask_common",
     "properties_material",
-    "properties_object_constraint",
     "properties_object",
     "properties_particle",
     "properties_physics_cloth",
@@ -48,6 +48,8 @@ _modules = (
     "properties_physics_dynamicpaint",
     "properties_physics_field",
     "properties_physics_fluid",
+    "properties_physics_rigidbody",
+    "properties_physics_rigidbody_constraint",
     "properties_physics_smoke",
     "properties_physics_softbody",
     "properties_render",
@@ -132,3 +134,11 @@ def register():
 
 def unregister():
     bpy.utils.unregister_module(__name__)
+
+
+# Define a default UIList, when a list does not need any custom drawing...
+# Keep in sync with its #defined name in UI_interface.h
+class UI_UL_list(bpy.types.UIList):
+    pass
+
+bpy.utils.register_class(UI_UL_list)

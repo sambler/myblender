@@ -33,15 +33,16 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "DNA_userdef_types.h"
 #include "DNA_vec_types.h"
 
 #include "BLI_rect.h"
 #include "BLI_utildefines.h"
-
-#include "BKE_colortools.h"
-
 #include "BLI_math.h"
 #include "BLI_threads.h"
+
+#include "BKE_blender.h"
+#include "BKE_colortools.h"
 
 #include "BIF_gl.h"
 #include "BIF_glutil.h"
@@ -54,7 +55,7 @@
 /* ******************************************** */
 
 /* defined in BIF_gl.h */
-GLubyte stipple_halftone[128] = {
+const GLubyte stipple_halftone[128] = {
 	0xAA, 0xAA, 0xAA, 0xAA, 0x55, 0x55, 0x55, 0x55, 
 	0xAA, 0xAA, 0xAA, 0xAA, 0x55, 0x55, 0x55, 0x55, 
 	0xAA, 0xAA, 0xAA, 0xAA, 0x55, 0x55, 0x55, 0x55,
@@ -81,7 +82,7 @@ GLubyte stipple_halftone[128] = {
  *     00000000 */
 
 
-GLubyte stipple_quarttone[128] = { 
+const GLubyte stipple_quarttone[128] = {
 	136, 136, 136, 136, 0, 0, 0, 0, 34, 34, 34, 34, 0, 0, 0, 0,
 	136, 136, 136, 136, 0, 0, 0, 0, 34, 34, 34, 34, 0, 0, 0, 0,
 	136, 136, 136, 136, 0, 0, 0, 0, 34, 34, 34, 34, 0, 0, 0, 0,
@@ -92,7 +93,7 @@ GLubyte stipple_quarttone[128] = {
 	136, 136, 136, 136, 0, 0, 0, 0, 34, 34, 34, 34, 0, 0, 0, 0};
 
 
-GLubyte stipple_diag_stripes_pos[128] = {
+const GLubyte stipple_diag_stripes_pos[128] = {
 	0x00, 0xff, 0x00, 0xff, 0x01, 0xfe, 0x01, 0xfe,
 	0x03, 0xfc, 0x03, 0xfc, 0x07, 0xf8, 0x07, 0xf8,
 	0x0f, 0xf0, 0x0f, 0xf0, 0x1f, 0xe0, 0x1f, 0xe0,
@@ -111,7 +112,7 @@ GLubyte stipple_diag_stripes_pos[128] = {
 	0xc0, 0x3f, 0xc0, 0x3f, 0x80, 0x7f, 0x80, 0x7f};
 
 
-GLubyte stipple_diag_stripes_neg[128] = {
+const GLubyte stipple_diag_stripes_neg[128] = {
 	0xff, 0x00, 0xff, 0x00, 0xfe, 0x01, 0xfe, 0x01,
 	0xfc, 0x03, 0xfc, 0x03, 0xf8, 0x07, 0xf8, 0x07,
 	0xf0, 0x0f, 0xf0, 0x0f, 0xe0, 0x1f, 0xe0, 0x1f,
@@ -292,7 +293,10 @@ void setlinestyle(int nr)
 	else {
 		
 		glEnable(GL_LINE_STIPPLE);
-		glLineStipple(nr, 0xAAAA);
+		if (U.pixelsize > 1.0f)
+			glLineStipple(nr, 0xCCCC);
+		else
+			glLineStipple(nr, 0xAAAA);
 	}
 }
 
@@ -478,7 +482,7 @@ static int get_cached_work_texture(int *w_r, int *h_r)
 	return texid;
 }
 
-void glaDrawPixelsTexScaled(float x, float y, int img_w, int img_h, int format, void *rect, float scaleX, float scaleY)
+void glaDrawPixelsTexScaled(float x, float y, int img_w, int img_h, int format, int zoomfilter, void *rect, float scaleX, float scaleY)
 {
 	unsigned char *uc_rect = (unsigned char *) rect;
 	float *f_rect = (float *)rect;
@@ -499,6 +503,7 @@ void glaDrawPixelsTexScaled(float x, float y, int img_w, int img_h, int format, 
 	/* don't want nasty border artifacts */
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, zoomfilter);
 
 #ifdef __APPLE__
 	/* workaround for os x 10.5/10.6 driver bug: http://lists.apple.com/archives/Mac-opengl/2008/Jul/msg00117.html */
@@ -556,10 +561,10 @@ void glaDrawPixelsTexScaled(float x, float y, int img_w, int img_h, int format, 
 			glEnable(GL_TEXTURE_2D);
 			glBegin(GL_QUADS);
 			glTexCoord2f((float)(0 + offset_left) / tex_w, (float)(0 + offset_bot) / tex_h);
-			glVertex2f(rast_x + (float)offset_left * xzoom, rast_y + (float)offset_bot * xzoom);
+			glVertex2f(rast_x + (float)offset_left * xzoom, rast_y + (float)offset_bot * yzoom);
 
 			glTexCoord2f((float)(subpart_w - offset_right) / tex_w, (float)(0 + offset_bot) / tex_h);
-			glVertex2f(rast_x + (float)(subpart_w - offset_right) * xzoom * scaleX, rast_y + (float)offset_bot * xzoom);
+			glVertex2f(rast_x + (float)(subpart_w - offset_right) * xzoom * scaleX, rast_y + (float)offset_bot * yzoom);
 
 			glTexCoord2f((float)(subpart_w - offset_right) / tex_w, (float)(subpart_h - offset_top) / tex_h);
 			glVertex2f(rast_x + (float)(subpart_w - offset_right) * xzoom * scaleX, rast_y + (float)(subpart_h - offset_top) * yzoom * scaleY);
@@ -581,9 +586,9 @@ void glaDrawPixelsTexScaled(float x, float y, int img_w, int img_h, int format, 
 #endif
 }
 
-void glaDrawPixelsTex(float x, float y, int img_w, int img_h, int format, void *rect)
+void glaDrawPixelsTex(float x, float y, int img_w, int img_h, int format, int zoomfilter, void *rect)
 {
-	glaDrawPixelsTexScaled(x, y, img_w, img_h, format, rect, 1.0f, 1.0f);
+	glaDrawPixelsTexScaled(x, y, img_w, img_h, format, zoomfilter, rect, 1.0f, 1.0f);
 }
 
 void glaDrawPixelsSafe(float x, float y, int img_w, int img_h, int row_w, int format, int type, void *rect)
@@ -663,6 +668,22 @@ void glaDrawPixelsSafe(float x, float y, int img_w, int img_h, int row_w, int fo
 		
 		glPixelStorei(GL_UNPACK_ROW_LENGTH,  old_row_length);
 	}
+}
+
+/* uses either DrawPixelsSafe or DrawPixelsTex, based on user defined maximum */
+void glaDrawPixelsAuto(float x, float y, int img_w, int img_h, int format, int zoomfilter, void *rect)
+{
+	if (U.image_gpubuffer_limit) {
+		/* Megapixels, use float math to prevent overflow */
+		float img_size = ((float)img_w * (float)img_h) / (1024.0f * 1024.0f);
+		
+		if (U.image_gpubuffer_limit > (int)img_size) {
+			glColor4f(1.0, 1.0, 1.0, 1.0);
+			glaDrawPixelsTex(x, y, img_w, img_h, format, zoomfilter, rect);
+			return;
+		}
+	}
+	glaDrawPixelsSafe(x, y, img_w, img_h, img_w, GL_RGBA, format, rect);
 }
 
 /* 2D Drawing Assistance */
@@ -803,7 +824,9 @@ void bglBegin(int mode)
 			pointhack = floor(value[0] + 0.5f);
 			if (pointhack > 4) pointhack = 4;
 		}
-		else glBegin(mode);
+		else {
+			glBegin(mode);
+		}
 	}
 }
 
@@ -831,7 +854,9 @@ void bglVertex3fv(const float vec[3])
 				glRasterPos3fv(vec);
 				glBitmap(pointhack, pointhack, (float)pointhack / 2.0f, (float)pointhack / 2.0f, 0.0, 0.0, Squaredot);
 			}
-			else glVertex3fv(vec);
+			else {
+				glVertex3fv(vec);
+			}
 			break;
 	}
 }
@@ -844,7 +869,9 @@ void bglVertex3f(float x, float y, float z)
 				glRasterPos3f(x, y, z);
 				glBitmap(pointhack, pointhack, (float)pointhack / 2.0f, (float)pointhack / 2.0f, 0.0, 0.0, Squaredot);
 			}
-			else glVertex3f(x, y, z);
+			else {
+				glVertex3f(x, y, z);
+			}
 			break;
 	}
 }
@@ -857,7 +884,9 @@ void bglVertex2fv(const float vec[2])
 				glRasterPos2fv(vec);
 				glBitmap(pointhack, pointhack, (float)pointhack / 2, pointhack / 2, 0.0, 0.0, Squaredot);
 			}
-			else glVertex2fv(vec);
+			else {
+				glVertex2fv(vec);
+			}
 			break;
 	}
 }

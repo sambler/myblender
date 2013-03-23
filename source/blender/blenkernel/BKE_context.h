@@ -35,7 +35,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 struct ARegion;
@@ -73,7 +72,7 @@ struct bContextDataResult;
 typedef struct bContextDataResult bContextDataResult;
 
 typedef int (*bContextDataCallback)(const bContext *C,
-                                    const char *member, bContextDataResult *result);
+									const char *member, bContextDataResult *result);
 
 typedef struct bContextStoreEntry {
 	struct bContextStoreEntry *next, *prev;
@@ -186,6 +185,7 @@ enum {
 PointerRNA CTX_data_pointer_get(const bContext *C, const char *member);
 PointerRNA CTX_data_pointer_get_type(const bContext *C, const char *member, StructRNA *type);
 ListBase CTX_data_collection_get(const bContext *C, const char *member);
+ListBase CTX_data_dir_get_ex(const bContext *C, const short use_store, const short use_rna, const short use_all);
 ListBase CTX_data_dir_get(const bContext *C);
 int CTX_data_get(const bContext *C, const char *member, PointerRNA *r_ptr, ListBase *r_lb, short *r_type);
 
@@ -214,8 +214,8 @@ void CTX_data_list_add(bContextDataResult *result, void *data);
 		CollectionPointerLink *ctx_link;                                      \
 		CTX_data_##member(C, &ctx_data_list);                                 \
 		for (ctx_link = ctx_data_list.first;                                  \
-		     ctx_link;                                                        \
-		     ctx_link = ctx_link->next)                                       \
+			 ctx_link;                                                        \
+			 ctx_link = ctx_link->next)                                       \
 		{                                                                     \
 			Type instance = ctx_link->ptr.data;
 
@@ -278,6 +278,6 @@ int CTX_data_visible_pose_bones(const bContext *C, ListBase *list);
 #ifdef __cplusplus
 }
 #endif
-	
+
 #endif
 

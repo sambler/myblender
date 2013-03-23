@@ -36,7 +36,7 @@ class Device;
 class DeviceScene;
 class ImageManager;
 class OSLRenderServices;
-class OSLGlobals;
+struct OSLGlobals;
 class Scene;
 class ShaderGraph;
 class ShaderNode;
@@ -45,12 +45,26 @@ class ShaderOutput;
 
 #ifdef WITH_OSL
 
+/* OSL Shader Info
+ * to auto detect closures in the shader for MIS and transparent shadows */
+
+struct OSLShaderInfo {
+	OSLShaderInfo()
+	: has_surface_emission(false), has_surface_transparent(false)
+	{}
+
+	bool has_surface_emission;
+	bool has_surface_transparent;
+};
+
 /* Shader Manage */
 
 class OSLShaderManager : public ShaderManager {
 public:
 	OSLShaderManager();
 	~OSLShaderManager();
+
+	void reset(Scene *scene);
 
 	bool use_osl() { return true; }
 
@@ -65,6 +79,7 @@ public:
 	const char *shader_test_loaded(const string& hash);
 	const char *shader_load_bytecode(const string& hash, const string& bytecode);
 	const char *shader_load_filepath(string filepath);
+	OSLShaderInfo *shader_loaded_info(const string& hash);
 
 protected:
 	void texture_system_init();
@@ -74,7 +89,7 @@ protected:
 	OSL::TextureSystem *ts;
 	OSLRenderServices *services;
 	OSL::ErrorHandler errhandler;
-	set<string> loaded_shaders;
+	map<string, OSLShaderInfo> loaded_shaders;
 };
 
 #endif

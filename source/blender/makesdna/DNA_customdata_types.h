@@ -27,6 +27,8 @@
 
 /** \file DNA_customdata_types.h
  *  \ingroup DNA
+ *
+ * Used for custom mesh data types (stored per vert/edge/loop/face)
  */
 
 #ifndef __DNA_CUSTOMDATA_TYPES_H__
@@ -34,7 +36,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-//} for code folding
 #endif
 
 /** descriptor and storage for a custom data layer */
@@ -47,7 +48,7 @@ typedef struct CustomDataLayer {
 	int active_clone; /* number of the layer to render*/
 	int active_mask; /* number of the layer to render*/
 	int uid;        /* shape keyblock unique id reference*/
-	char name[64];  /* layer name, MAX_CUSTOMDATA_LAYER_AAME */
+	char name[64];  /* layer name, MAX_CUSTOMDATA_LAYER_NAME */
 	void *data;     /* layer data */
 } CustomDataLayer;
 
@@ -63,8 +64,8 @@ typedef struct CustomDataExternal {
 typedef struct CustomData {
 	CustomDataLayer *layers;      /* CustomDataLayers, ordered by type */
 	int typemap[37];              /* runtime only! - maps types to indices of first layer of that type,
-	                               * MUST be >= CD_NUMTYPES, but we cant use a define here.
-	                               * Correct size is ensured in CustomData_update_typemap assert() */
+								   * MUST be >= CD_NUMTYPES, but we cant use a define here.
+								   * Correct size is ensured in CustomData_update_typemap assert() */
 	int totlayer, maxlayer;       /* number of layers, size of layers array */
 	int totsize;                  /* in editmode, total size of all data layers */
 	void *pool;                   /* Bmesh: Memory pool for allocation of blocks */
@@ -178,4 +179,4 @@ typedef struct CustomData {
 }
 #endif
 
-#endif
+#endif  /* __DNA_CUSTOMDATA_TYPES_H__ */

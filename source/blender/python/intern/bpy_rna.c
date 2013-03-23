@@ -3119,6 +3119,33 @@ static PyObject *pyrna_struct_is_property_set(BPy_StructRNA *self, PyObject *arg
 	return PyBool_FromLong(RNA_property_is_set(&self->ptr, prop));
 }
 
+PyDoc_STRVAR(pyrna_struct_property_unset_doc,
+".. method:: property_unset(property)\n"
+"\n"
+"   Unset a property, will use default value afterward.\n"
+);
+static PyObject *pyrna_struct_property_unset(BPy_StructRNA *self, PyObject *args)
+{
+	PropertyRNA *prop;
+	const char *name;
+
+	PYRNA_STRUCT_CHECK_OBJ(self);
+
+	if (!PyArg_ParseTuple(args, "s:property_unset", &name))
+		return NULL;
+
+	if ((prop = RNA_struct_find_property(&self->ptr, name)) == NULL) {
+		PyErr_Format(PyExc_TypeError,
+		             "%.200s.property_unset(\"%.200s\") not found",
+		             RNA_struct_identifier(self->ptr.type), name);
+		return NULL;
+	}
+
+	RNA_property_unset(&self->ptr, prop);
+
+	Py_RETURN_NONE;
+}
+
 PyDoc_STRVAR(pyrna_struct_is_property_hidden_doc,
 ".. method:: is_property_hidden(property)\n"
 "\n"
@@ -4312,7 +4339,7 @@ static int foreach_parse_args(BPy_PropertyRNA *self, PyObject *args,
 	if (!PySequence_Check(*seq) && PyObject_CheckBuffer(*seq)) {
 		PyErr_Format(PyExc_TypeError,
 		             "foreach_get/set expected second argument to be a sequence or buffer, not a %.200s",
-		             Py_TYPE(seq)->tp_name);
+		             Py_TYPE(*seq)->tp_name);
 		return -1;
 	}
 
@@ -4633,6 +4660,7 @@ static struct PyMethodDef pyrna_struct_methods[] = {
 	{"driver_remove", (PyCFunction)pyrna_struct_driver_remove, METH_VARARGS, pyrna_struct_driver_remove_doc},
 
 	{"is_property_set", (PyCFunction)pyrna_struct_is_property_set, METH_VARARGS, pyrna_struct_is_property_set_doc},
+	{"property_unset", (PyCFunction)pyrna_struct_property_unset, METH_VARARGS, pyrna_struct_property_unset_doc},
 	{"is_property_hidden", (PyCFunction)pyrna_struct_is_property_hidden, METH_VARARGS, pyrna_struct_is_property_hidden_doc},
 	{"path_resolve", (PyCFunction)pyrna_struct_path_resolve, METH_VARARGS, pyrna_struct_path_resolve_doc},
 	{"path_from_id", (PyCFunction)pyrna_struct_path_from_id, METH_VARARGS, pyrna_struct_path_from_id_doc},
@@ -6118,7 +6146,7 @@ static PyObject *pyrna_srna_ExternalType(StructRNA *srna)
 	PyObject *newclass;
 
 	if (bpy_types_dict == NULL) {
-		PyObject *bpy_types = PyImport_ImportModuleLevel((char *)"bpy_types", NULL, NULL, NULL, 0);
+		PyObject *bpy_types = PyImport_ImportModuleLevel("bpy_types", NULL, NULL, NULL, 0);
 
 		if (bpy_types == NULL) {
 			PyErr_Print();
@@ -6795,14 +6823,14 @@ static int pyrna_deferred_register_class_recursive(StructRNA *srna, PyTypeObject
 	return pyrna_deferred_register_props(srna, py_class->tp_dict); /* getattr(..., "__dict__") returns a proxy */
 }
 
-int pyrna_deferred_register_class(StructRNA *srna, PyObject *py_class)
+int pyrna_deferred_register_class(StructRNA *srna, PyTypeObject *py_class)
 {
 	/* Panels and Menus don't need this
 	 * save some time and skip the checks here */
 	if (!RNA_struct_idprops_register_check(srna))
 		return 0;
 
-	return pyrna_deferred_register_class_recursive(srna, (PyTypeObject *)py_class);
+	return pyrna_deferred_register_class_recursive(srna, py_class);
 }
 
 /*-------------------- Type Registration ------------------------*/
@@ -7496,7 +7524,7 @@ static PyObject *pyrna_register_class(PyObject *UNUSED(self), PyObject *py_class
 	 *
 	 * item = PyObject_GetAttrString(py_class, "__dict__");
 	 */
-	if (pyrna_deferred_register_class(srna_new, py_class) != 0)
+	if (pyrna_deferred_register_class(srna_new, (PyTypeObject *)py_class) != 0)
 		return NULL;
 
 	/* call classed register method () */

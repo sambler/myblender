@@ -27,8 +27,6 @@
  * to access C defined builtin functions.
  * A script writer should never directly access this module.
  */
- 
-#define WITH_PYTHON /* for AUD_PyInit.h, possibly others */
 
 #include <Python.h>
 
@@ -222,7 +220,7 @@ static PyMethodDef meth_bpy_resource_path =
 
 static PyObject *bpy_import_test(const char *modname)
 {
-	PyObject *mod = PyImport_ImportModuleLevel((char *)modname, NULL, NULL, NULL, 0);
+	PyObject *mod = PyImport_ImportModuleLevel(modname, NULL, NULL, NULL, 0);
 	if (mod) {
 		Py_DECREF(mod);
 	}

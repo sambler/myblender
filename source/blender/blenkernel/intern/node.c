@@ -91,13 +91,13 @@ static void node_add_sockets_from_type(bNodeTree *ntree, bNode *node, bNodeType 
 			/* sock = */ node_add_socket_from_template(ntree, node, sockdef, SOCK_IN);
 			
 			sockdef++;
-	}
+		}
 	}
 	if (ntype->outputs) {
 		sockdef = ntype->outputs;
 		while (sockdef->type != -1) {
 			/* sock = */ node_add_socket_from_template(ntree, node, sockdef, SOCK_OUT);
-	
+			
 			sockdef++;
 		}
 	}
@@ -287,8 +287,8 @@ bNodeTreeType *ntreeTypeFind(const char *idname)
 			return nt;
 	}
 
-		return NULL;
-	}
+	return NULL;
+}
 
 void ntreeTypeAdd(bNodeTreeType *nt)
 {
@@ -330,7 +330,7 @@ bNodeType *nodeTypeFind(const char *idname)
 		if (nt)
 			return nt;
 	}
-	
+
 	return NULL;
 }
 
@@ -355,14 +355,14 @@ static void node_free_type(void *nodetype_v)
 	bNodeType *nodetype = nodetype_v;
 	/* XXX pass Main to unregister function? */
 	update_typeinfo(G.main, NULL, NULL, nodetype, NULL, true);
-
+	
 	/* XXX deprecated */
 	if (nodetype->type == NODE_DYNAMIC)
 		free_dynamic_typeinfo(nodetype);
 	
 	if (nodetype->needs_free)
 		MEM_freeN(nodetype);
-	}
+}
 
 void nodeRegisterType(bNodeType *nt)
 {
@@ -373,7 +373,7 @@ void nodeRegisterType(bNodeType *nt)
 	BLI_ghash_insert(nodetypes_hash, (void *)nt->idname, nt);
 	/* XXX pass Main to register function? */
 	update_typeinfo(G.main, NULL, NULL, nt, NULL, false);
-	}
+}
 
 void nodeUnregisterType(bNodeType *nt)
 {
@@ -400,8 +400,8 @@ bNodeSocketType *nodeSocketTypeFind(const char *idname)
 			return st;
 	}
 
-		return NULL;
-	}
+	return NULL;
+}
 
 /* callback for hash value free function */
 static void node_free_socket_type(void *socktype_v)
@@ -419,12 +419,12 @@ void nodeRegisterSocketType(bNodeSocketType *st)
 	/* XXX pass Main to register function? */
 	update_typeinfo(G.main, NULL, NULL, NULL, st, false);
 }
-	
+
 void nodeUnregisterSocketType(bNodeSocketType *st)
 {
 	BLI_ghash_remove(nodesockettypes_hash, st->idname, NULL, node_free_socket_type);
 }
-		
+
 bool nodeSocketIsRegistered(bNodeSocket *sock)
 {
 	return (sock->typeinfo != &NodeSocketTypeUndefined);
@@ -433,7 +433,7 @@ bool nodeSocketIsRegistered(bNodeSocket *sock)
 GHashIterator *nodeSocketTypeGetIterator(void)
 {
 	return BLI_ghashIterator_new(nodesockettypes_hash);
-		}
+}
 
 void nodeMakeDynamicType(bNode *UNUSED(node))
 {
@@ -445,7 +445,7 @@ void nodeMakeDynamicType(bNode *UNUSED(node))
 			break;
 		ntype = ntype->next;
 	}
-			
+
 	/* make own type struct to fill */
 	if (ntype) {
 		/*node->typeinfo= MEM_dupallocN(ntype);*/
@@ -772,7 +772,7 @@ int nodeFindNode(bNodeTree *ntree, bNodeSocket *sock, bNode **nodep, int *sockin
 		for (index = 0; tsock; tsock = tsock->next, index++) {
 			if (tsock == sock)
 				break;
-			}
+		}
 		if (tsock)
 			break;
 	}
@@ -869,7 +869,7 @@ bNode *nodeCopyNode(struct bNodeTree *ntree, struct bNode *node)
 	oldsock = node->outputs.first;
 	for (sock = nnode->outputs.first; sock; sock = sock->next, oldsock = oldsock->next)
 		node_socket_copy(sock, oldsock);
-		
+	
 	if (node->prop)
 		nnode->prop = IDP_CopyProperty(node->prop);
 	
@@ -908,7 +908,7 @@ bNodeLink *nodeAddLink(bNodeTree *ntree, bNode *fromnode, bNodeSocket *fromsock,
 {
 	bNodeLink *link = NULL;
 	
-		/* test valid input */
+	/* test valid input */
 	BLI_assert(fromnode);
 	BLI_assert(tonode);
 	
@@ -1341,7 +1341,7 @@ static void node_preview_init_tree_recursive(bNodeInstanceHash *previews, bNodeT
 	bNode *node;
 	for (node = ntree->nodes.first; node; node = node->next) {
 		bNodeInstanceKey key = BKE_node_instance_key(parent_key, ntree, node);
-	
+		
 		if (BKE_node_preview_used(node)) {
 			node->preview_xsize = xsize;
 			node->preview_ysize = ysize;
@@ -1621,9 +1621,9 @@ void nodeFreeNode(bNodeTree *ntree, bNode *node)
 		/* remove all references to this node */
 		nodeUnlinkNode(ntree, node);
 		node_unlink_attached(ntree, node);
-
+		
 		BLI_remlink(&ntree->nodes, node);
-
+		
 		if (ntree->typeinfo && ntree->typeinfo->free_node_cache)
 			ntree->typeinfo->free_node_cache(ntree, node);
 		
@@ -1727,7 +1727,7 @@ void ntreeFreeTree_ex(bNodeTree *ntree, const short do_id_user)
 
 		nodeFreeNode(ntree, node);
 	}
-	
+
 	/* free interface sockets */
 	for (sock = ntree->inputs.first; sock; sock = nextsock) {
 		nextsock = sock->next;
@@ -1928,53 +1928,53 @@ int ntreeOutputExists(bNode *node, bNodeSocket *testsock)
 bNodeTree *ntreeLocalize(bNodeTree *ntree)
 {
 	if (ntree) {
-	bNodeTree *ltree;
-	bNode *node;
+		bNodeTree *ltree;
+		bNode *node;
+		
+		bAction *action_backup = NULL, *tmpact_backup = NULL;
+		
+		/* Workaround for copying an action on each render!
+		 * set action to NULL so animdata actions don't get copied */
+		AnimData *adt = BKE_animdata_from_id(&ntree->id);
 	
-	bAction *action_backup = NULL, *tmpact_backup = NULL;
+		if (adt) {
+			action_backup = adt->action;
+			tmpact_backup = adt->tmpact;
 	
-	/* Workaround for copying an action on each render!
-	 * set action to NULL so animdata actions don't get copied */
-	AnimData *adt = BKE_animdata_from_id(&ntree->id);
-
-	if (adt) {
-		action_backup = adt->action;
-		tmpact_backup = adt->tmpact;
-
-		adt->action = NULL;
-		adt->tmpact = NULL;
-	}
-
+			adt->action = NULL;
+			adt->tmpact = NULL;
+		}
+	
 		/* Make full copy.
 		 * Note: previews are not copied here.
 		 */
 		ltree = ntreeCopyTree_internal(ntree, FALSE, FALSE, FALSE);
-
-	if (adt) {
-		AnimData *ladt = BKE_animdata_from_id(&ltree->id);
-
-		adt->action = ladt->action = action_backup;
-		adt->tmpact = ladt->tmpact = tmpact_backup;
-
-		if (action_backup) action_backup->id.us++;
-		if (tmpact_backup) tmpact_backup->id.us++;
-		
-	}
-	/* end animdata uglyness */
-
-	/* ensures only a single output node is enabled */
-	ntreeSetOutput(ntree);
-
-	for (node = ntree->nodes.first; node; node = node->next) {
-		/* store new_node pointer to original */
-		node->new_node->new_node = node;
-	}
-
+	
+		if (adt) {
+			AnimData *ladt = BKE_animdata_from_id(&ltree->id);
+	
+			adt->action = ladt->action = action_backup;
+			adt->tmpact = ladt->tmpact = tmpact_backup;
+	
+			if (action_backup) action_backup->id.us++;
+			if (tmpact_backup) tmpact_backup->id.us++;
+			
+		}
+		/* end animdata uglyness */
+	
+		/* ensures only a single output node is enabled */
+		ntreeSetOutput(ntree);
+	
+		for (node = ntree->nodes.first; node; node = node->next) {
+			/* store new_node pointer to original */
+			node->new_node->new_node = node;
+		}
+	
 		if (ntree->typeinfo->localize)
 			ntree->typeinfo->localize(ltree, ntree);
-
-	return ltree;
-}
+	
+		return ltree;
+	}
 	else
 		return NULL;
 }
@@ -1997,11 +1997,11 @@ void ntreeLocalMerge(bNodeTree *localtree, bNodeTree *ntree)
 	if (localtree && ntree) {
 		if (ntree->typeinfo->local_merge)
 			ntree->typeinfo->local_merge(localtree, ntree);
-	
+		
 		ntreeFreeTree_ex(localtree, FALSE);
 		MEM_freeN(localtree);
-			}
-		}
+	}
+}
 
 
 /* ************ NODE TREE INTERFACE *************** */
@@ -2017,13 +2017,13 @@ static bNodeSocket *make_socket_template(bNodeTree *ntree, int in_out,
 		printf("Error: node socket type '%s' undefined\n", idname);
 		return NULL;
 	}
-
+	
 	sock = MEM_callocN(sizeof(bNodeSocket), "socket template");
 	sock->typeinfo = stype;
 	BLI_strncpy(sock->idname, stype->idname, sizeof(sock->idname));
 	sock->in_out = in_out;
 	sock->type = SOCK_CUSTOM;	/* int type undefined by default */
-
+	
 	/* assign new unique index */
 	own_index = ntree->cur_index++;
 	/* use the own_index as socket identifier */
@@ -2311,7 +2311,7 @@ bNode *nodeGetActiveID(bNodeTree *ntree, short idtype)
 		if (node->id && GS(node->id->name) == idtype)
 			if (node->flag & NODE_ACTIVE_ID)
 				return node;
-
+	
 	/* no node with active ID in this tree, look inside groups */
 	for (node = ntree->nodes.first; node; node = node->next) {
 		if (node->type == NODE_GROUP) {
@@ -2319,8 +2319,8 @@ bNode *nodeGetActiveID(bNodeTree *ntree, short idtype)
 			if (tnode)
 				return tnode;
 		}
-}
-
+	}
+	
 	return NULL;
 }
 
@@ -2751,12 +2751,12 @@ static int node_get_deplist_recurs(bNodeTree *ntree, bNode *node, bNode ***nsort
 	for (link = ntree->links.first; link; link = link->next) {
 		if (link->tonode == node) {
 			fromnode = link->fromnode;
-				if (fromnode->done == 0)
-					fromnode->level = node_get_deplist_recurs(ntree, fromnode, nsort);
-				if (fromnode->level <= level)
-					level = fromnode->level - 1;
-			}
+			if (fromnode->done == 0)
+				fromnode->level = node_get_deplist_recurs(ntree, fromnode, nsort);
+			if (fromnode->level <= level)
+				level = fromnode->level - 1;
 		}
+	}
 	
 	/* check parent node */
 	if (node->parent) {
@@ -2861,11 +2861,11 @@ static void ntree_validate_links(bNodeTree *ntree)
 void ntreeVerifyNodes(struct Main *main, struct ID *id)
 {
 	FOREACH_NODETREE(main, ntree, owner_id) {
-	bNode *node;
-	
-	for (node = ntree->nodes.first; node; node = node->next)
-		if (node->typeinfo->verifyfunc)
-			node->typeinfo->verifyfunc(ntree, node, id);
+		bNode *node;
+		
+		for (node = ntree->nodes.first; node; node = node->next)
+			if (node->typeinfo->verifyfunc)
+				node->typeinfo->verifyfunc(ntree, node, id);
 	} FOREACH_NODETREE_END
 }
 
@@ -2902,7 +2902,7 @@ void ntreeUpdateTree(bNodeTree *ntree)
 		ntree->typeinfo->update(ntree);
 	/* XXX this should be moved into the tree type update callback for tree supporting node groups.
 	 * Currently the node tree interface is still a generic feature of the base NodeTree type.
-		 */
+	 */
 	if (ntree->update & NTREE_UPDATE_GROUP)
 		ntreeInterfaceTypeUpdate(ntree);
 	
@@ -2960,16 +2960,16 @@ int nodeUpdateID(bNodeTree *ntree, ID *id)
 		return change;
 	ntree->is_updating = TRUE;
 	
-		for (node = ntree->nodes.first; node; node = node->next) {
-			if (node->id == id) {
-				change = TRUE;
-				node->update |= NODE_UPDATE_ID;
-				if (node->typeinfo->updatefunc)
-					node->typeinfo->updatefunc(ntree, node);
-				/* clear update flag */
-				node->update = 0;
-			}
+	for (node = ntree->nodes.first; node; node = node->next) {
+		if (node->id == id) {
+			change = TRUE;
+			node->update |= NODE_UPDATE_ID;
+			if (node->typeinfo->updatefunc)
+				node->typeinfo->updatefunc(ntree, node);
+			/* clear update flag */
+			node->update = 0;
 		}
+	}
 	
 	for (node = ntree->nodes.first; node; node = node->next) {
 		nodeUpdateInternalLinks(ntree, node);
@@ -2992,7 +2992,7 @@ void nodeUpdateInternalLinks(bNodeTree *ntree, bNode *node)
 void nodeSynchronizeID(bNode *node, bool copy_to_id)
 {
 	if (node->id == NULL) return;
-
+	
 	if (ELEM(node->type, SH_NODE_MATERIAL, SH_NODE_MATERIAL_EXT)) {
 		bNodeSocket *sock;
 		Material *ma = (Material *)node->id;
@@ -3023,8 +3023,8 @@ void nodeSynchronizeID(bNode *node, bool copy_to_id)
 							ma->alpha = ((bNodeSocketValueFloat *)sock->default_value)->value; break;
 						case MAT_IN_TRANSLUCENCY:
 							ma->translucency = ((bNodeSocketValueFloat *)sock->default_value)->value; break;
-	}
-}
+					}
+				}
 				else {
 					switch (a) {
 						case MAT_IN_COLOR:
@@ -3107,11 +3107,11 @@ void node_type_base(bNodeType *ntype, int type, const char *name, short nclass, 
 	
 	switch (type) {
 	#include "NOD_static_types.h"
-}
-
+	}
+	
 	/* make sure we have a valid type (everything registered) */
 	BLI_assert(ntype->idname[0] != '\0');
-
+	
 	ntype->type = type;
 	BLI_strncpy(ntype->ui_name, name, sizeof(ntype->ui_name));
 	ntype->nclass = nclass;
@@ -3122,7 +3122,7 @@ void node_type_base(bNodeType *ntype, int type, const char *name, short nclass, 
 	ntype->poll = node_poll_default;
 	ntype->poll_instance = node_poll_instance_default;
 }
-	
+
 void node_type_base_custom(bNodeType *ntype, const char *idname, const char *name, short nclass, short flag)
 {
 	BLI_strncpy(ntype->idname, idname, sizeof(ntype->idname));
@@ -3175,13 +3175,13 @@ void node_type_socket_templates(struct bNodeType *ntype, struct bNodeSocketTempl
 		for (ntemp = inputs; ntemp->type >= 0; ++ntemp) {
 			BLI_strncpy(ntemp->identifier, ntemp->name, sizeof(ntemp->identifier));
 			unique_socket_template_identifier(inputs, ntemp, ntemp->identifier, '_');
-}
+		}
 	}
 	if (outputs) {
 		/* clear identifier strings (uninitialized memory) */
 		for (ntemp = outputs; ntemp->type >= 0; ++ntemp)
 			ntemp->identifier[0] = '\0';
-
+		
 		for (ntemp = outputs; ntemp->type >= 0; ++ntemp) {
 			BLI_strncpy(ntemp->identifier, ntemp->name, sizeof(ntemp->identifier));
 			unique_socket_template_identifier(outputs, ntemp, ntemp->identifier, '_');
@@ -3323,7 +3323,7 @@ static void registerCompositNodes(void)
 	register_node_type_cmp_zcombine();
 	register_node_type_cmp_colorbalance();
 	register_node_type_cmp_huecorrect();
-
+	
 	register_node_type_cmp_normal();
 	register_node_type_cmp_curve_vec();
 	register_node_type_cmp_map_value();
@@ -3365,7 +3365,7 @@ static void registerCompositNodes(void)
 	register_node_type_cmp_doubleedgemask();
 	register_node_type_cmp_keyingscreen();
 	register_node_type_cmp_keying();
-	
+
 	register_node_type_cmp_translate();
 	register_node_type_cmp_rotate();
 	register_node_type_cmp_scale();
@@ -3379,7 +3379,7 @@ static void registerCompositNodes(void)
 	register_node_type_cmp_transform();
 	register_node_type_cmp_stabilize2d();
 	register_node_type_cmp_moviedistortion();
-	
+
 	register_node_type_cmp_colorcorrection();
 	register_node_type_cmp_boxmask();
 	register_node_type_cmp_ellipsemask();
@@ -3387,15 +3387,15 @@ static void registerCompositNodes(void)
 	register_node_type_cmp_bokehblur();
 	register_node_type_cmp_switch();
 	register_node_type_cmp_pixelate();
-	
+
 	register_node_type_cmp_mask();
 	register_node_type_cmp_trackpos();
 }
-	
+
 static void registerShaderNodes(void) 
 {
 	register_node_type_sh_group();
-	
+
 	register_node_type_sh_output();
 	register_node_type_sh_material();
 	register_node_type_sh_camera();
@@ -3467,8 +3467,8 @@ static void registerShaderNodes(void)
 static void registerTextureNodes(void)
 {
 	register_node_type_tex_group();
-	
 
+	
 	register_node_type_tex_math();
 	register_node_type_tex_mix_rgb();
 	register_node_type_tex_valtorgb();
@@ -3482,26 +3482,26 @@ static void registerTextureNodes(void)
 	register_node_type_tex_distance();
 	register_node_type_tex_compose();
 	register_node_type_tex_decompose();
-
+	
 	register_node_type_tex_output();
 	register_node_type_tex_viewer();
 	register_node_type_sh_script();
 	register_node_type_sh_tangent();
 	register_node_type_sh_normal_map();
 	register_node_type_sh_hair_info();
-
+	
 	register_node_type_tex_checker();
 	register_node_type_tex_texture();
 	register_node_type_tex_bricks();
 	register_node_type_tex_image();
 	register_node_type_sh_bsdf_refraction();
 	register_node_type_sh_ambient_occlusion();
-
+	
 	register_node_type_tex_rotate();
 	register_node_type_tex_translate();
 	register_node_type_tex_scale();
 	register_node_type_tex_at();
-
+	
 	register_node_type_tex_proc_voronoi();
 	register_node_type_tex_proc_blend();
 	register_node_type_tex_proc_magic();
@@ -3512,7 +3512,7 @@ static void registerTextureNodes(void)
 	register_node_type_tex_proc_noise();
 	register_node_type_tex_proc_stucci();
 	register_node_type_tex_proc_distnoise();
-	register_node_type_tex_proc_planet();
+	//PLANETFIX: register_node_type_tex_proc_planet();
 }
 
 void init_nodesystem(void) 
@@ -3520,15 +3520,15 @@ void init_nodesystem(void)
 	nodetreetypes_hash = BLI_ghash_new(BLI_ghashutil_strhash, BLI_ghashutil_strcmp, "nodetreetypes_hash gh");
 	nodetypes_hash = BLI_ghash_new(BLI_ghashutil_strhash, BLI_ghashutil_strcmp, "nodetypes_hash gh");
 	nodesockettypes_hash = BLI_ghash_new(BLI_ghashutil_strhash, BLI_ghashutil_strcmp, "nodesockettypes_hash gh");
-	
+
 	register_undefined_types();
-	
+
 	register_standard_node_socket_types();
-	
+
 	register_node_tree_type_cmp();
 	register_node_tree_type_sh();
 	register_node_tree_type_tex();
-	
+
 	register_node_type_frame();
 	register_node_type_reroute();
 	register_node_type_group_input();
@@ -3544,9 +3544,9 @@ void free_nodesystem(void)
 	NODE_TYPES_BEGIN(nt)
 		if (nt->ext.free) {
 			nt->ext.free(nt->ext.data);
-	}
+		}
 	NODE_TYPES_END
-
+	
 	NODE_SOCKET_TYPES_BEGIN(st)
 		if (st->ext_socket.free)
 			st->ext_socket.free(st->ext_socket.data);
@@ -3557,9 +3557,9 @@ void free_nodesystem(void)
 	NODE_TREE_TYPES_BEGIN(nt)
 		if (nt->ext.free) {
 			nt->ext.free(nt->ext.data);
-}
+		}
 	NODE_TREE_TYPES_END
-
+	
 	BLI_ghash_free(nodetypes_hash, NULL, node_free_type);
 	nodetypes_hash = NULL;
 	

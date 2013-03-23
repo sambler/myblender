@@ -3512,7 +3512,7 @@ static void registerTextureNodes(void)
 	register_node_type_tex_proc_noise();
 	register_node_type_tex_proc_stucci();
 	register_node_type_tex_proc_distnoise();
-	register_node_type_tex_proc_planet();
+	//PLANETFIX: register_node_type_tex_proc_planet();
 }
 
 void init_nodesystem(void) 

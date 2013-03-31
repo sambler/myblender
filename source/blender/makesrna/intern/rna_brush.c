@@ -432,6 +432,8 @@ static void rna_def_brush_texture_slot(BlenderRNA *brna)
 		{MTEX_MAP_MODE_AREA, "AREA_PLANE", 0, "Area Plane", ""},
 		{MTEX_MAP_MODE_TILED, "TILED", 0, "Tiled", ""},
 		{MTEX_MAP_MODE_3D, "3D", 0, "3D", ""},
+		{MTEX_MAP_MODE_RANDOM, "RANDOM", 0, "Random", ""},
+		{MTEX_MAP_MODE_STENCIL, "STENCIL", 0, "Stencil", ""},
 		{0, NULL, 0, NULL, NULL}
 	};
 
@@ -439,6 +441,8 @@ static void rna_def_brush_texture_slot(BlenderRNA *brna)
 		{MTEX_MAP_MODE_VIEW, "VIEW_PLANE", 0, "View Plane", ""},
 		{MTEX_MAP_MODE_TILED, "TILED", 0, "Tiled", ""},
 		{MTEX_MAP_MODE_3D, "3D", 0, "3D", ""},
+		{MTEX_MAP_MODE_RANDOM, "RANDOM", 0, "Random", ""},
+		{MTEX_MAP_MODE_STENCIL, "STENCIL", 0, "Stencil", ""},
 		{0, NULL, 0, NULL, NULL}
 	};
 
@@ -549,11 +553,18 @@ static void rna_def_brush(BlenderRNA *brna)
 		{0, NULL, 0, NULL, NULL}
 	};
 	
-	static EnumPropertyItem brush_stroke_method_items[] = {
+	static EnumPropertyItem sculpt_stroke_method_items[] = {
 		{0, "DOTS", 0, "Dots", "Apply paint on each mouse move step"},
 		{BRUSH_RESTORE_MESH, "DRAG_DOT", 0, "Drag Dot", "Allows a single dot to be carefully positioned"},
 		{BRUSH_SPACE, "SPACE", 0, "Space", "Limit brush application to the distance specified by spacing"},
 		{BRUSH_ANCHORED, "ANCHORED", 0, "Anchored", "Keep the brush anchored to the initial location"},
+		{BRUSH_AIRBRUSH, "AIRBRUSH", 0, "Airbrush", "Keep applying paint effect while holding mouse (spray)"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	static EnumPropertyItem brush_stroke_method_items[] = {
+		{0, "DOTS", 0, "Dots", "Apply paint on each mouse move step"},
+		{BRUSH_SPACE, "SPACE", 0, "Space", "Limit brush application to the distance specified by spacing"},
 		{BRUSH_AIRBRUSH, "AIRBRUSH", 0, "Airbrush", "Keep applying paint effect while holding mouse (spray)"},
 		{0, NULL, 0, NULL, NULL}
 	};
@@ -623,6 +634,12 @@ static void rna_def_brush(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "stroke_method", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_bitflag_sdna(prop, NULL, "flag");
 	RNA_def_property_enum_items(prop, brush_stroke_method_items);
+	RNA_def_property_ui_text(prop, "Stroke Method", "");
+	RNA_def_property_update(prop, 0, "rna_Brush_update");
+
+	prop = RNA_def_property(srna, "sculpt_stroke_method", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_bitflag_sdna(prop, NULL, "flag");
+	RNA_def_property_enum_items(prop, sculpt_stroke_method_items);
 	RNA_def_property_ui_text(prop, "Stroke Method", "");
 	RNA_def_property_update(prop, 0, "rna_Brush_update");
 
@@ -911,6 +928,11 @@ static void rna_def_brush(BlenderRNA *brna)
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", BRUSH_RESTORE_MESH);
 	RNA_def_property_ui_text(prop, "Restore Mesh", "Allow a single dot to be carefully positioned");
 	RNA_def_property_update(prop, 0, "rna_Brush_update");
+
+	prop = RNA_def_property(srna, "use_mask", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", BRUSH_USE_MASK);
+	RNA_def_property_ui_text(prop, "Mask Texture", "Use a texture as mask for the brush");
+	RNA_def_property_update(prop, 0, "rna_Brush_update");
 	
 	/* only for projection paint, TODO, other paint modes */
 	prop = RNA_def_property(srna, "use_alpha", PROP_BOOLEAN, PROP_NONE);
@@ -951,6 +973,18 @@ static void rna_def_brush(BlenderRNA *brna)
 	RNA_def_property_pointer_sdna(prop, NULL, "mtex.tex");
 	RNA_def_property_flag(prop, PROP_EDITABLE);
 	RNA_def_property_ui_text(prop, "Texture", "");
+	RNA_def_property_update(prop, NC_TEXTURE, "rna_Brush_update");
+
+	prop = RNA_def_property(srna, "mask_texture_slot", PROP_POINTER, PROP_NONE);
+	RNA_def_property_struct_type(prop, "BrushTextureSlot");
+	RNA_def_property_pointer_sdna(prop, NULL, "mask_mtex");
+	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+	RNA_def_property_ui_text(prop, "Mask Texture Slot", "");
+
+	prop = RNA_def_property(srna, "mask_texture", PROP_POINTER, PROP_NONE);
+	RNA_def_property_pointer_sdna(prop, NULL, "mask_mtex.tex");
+	RNA_def_property_flag(prop, PROP_EDITABLE);
+	RNA_def_property_ui_text(prop, "Mask Texture", "");
 	RNA_def_property_update(prop, NC_TEXTURE, "rna_Brush_update");
 
 	prop = RNA_def_property(srna, "texture_overlay_alpha", PROP_INT, PROP_PERCENTAGE);

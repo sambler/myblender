@@ -223,7 +223,7 @@ typedef enum {
 	NUMSLI        = (14 << 9),
 	COLOR         = (15 << 9),
 	IDPOIN        = (16 << 9),
-	HSVSLI        = (17 << 9),  /* UNUSED, but code still references */
+	/* HSVSLI     = (17 << 9), */  /* UNUSED */
 	SCROLL        = (18 << 9),
 	BLOCK         = (19 << 9),
 	BUTM          = (20 << 9),
@@ -448,7 +448,7 @@ void    uiButSetDrawFlag(uiBut *but, int flag);
 void    uiButClearDrawFlag(uiBut *but, int flag);
 
 /* special button case, only draw it when used actively, for outliner etc */
-int     uiButActiveOnly(const struct bContext *C, uiBlock *block, uiBut *but);
+int     uiButActiveOnly(const struct bContext *C, struct ARegion *ar, uiBlock *block, uiBut *but);
 
 void    uiButExecute(const struct bContext *C, uiBut *but);
 
@@ -642,6 +642,9 @@ void    uiButSetCompleteFunc(uiBut *but,        uiButCompleteFunc func, void *ar
 void    uiBlockSetDrawExtraFunc(uiBlock *block,
                                 void (*func)(const struct bContext *C, void *, void *, void *, struct rcti *rect),
                                 void *arg1, void *arg2);
+
+bool UI_textbutton_activate_event(const struct bContext *C, struct ARegion *ar,
+                                  const void *rna_poin_data, const char *rna_prop_id);
 
 void uiButSetFocusOnEnter(struct wmWindow *win, uiBut *but);
 
@@ -922,5 +925,4 @@ void UI_template_fix_linking(void);
 int  UI_editsource_enable_check(void);
 void UI_editsource_active_but_test(uiBut *but);
 
-#endif /*  __UI_INTERFACE_H__ */
-
+#endif  /* __UI_INTERFACE_H__ */

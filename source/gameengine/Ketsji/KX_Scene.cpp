@@ -1172,9 +1172,8 @@ void KX_Scene::ReplaceMesh(class CValue* obj,void* meshobj, bool use_gfx, bool u
 					);
 				}
 				newobj->SetDeformer(modifierDeformer);
-			} 
-			else 	if (bHasShapeKey)
-			{
+			}
+			else if (bHasShapeKey) {
 				BL_ShapeDeformer* shapeDeformer;
 				if (bHasArmature) 
 				{
@@ -1469,7 +1468,7 @@ void KX_Scene::MarkVisible(RAS_IRasterizer* rasty, KX_GameObject* gameobj,KX_Cam
 	}
 }
 
-void KX_Scene::PhysicsCullingCallback(KX_ClientObjectInfo* objectInfo, void* cullingInfo)
+void KX_Scene::PhysicsCullingCallback(KX_ClientObjectInfo *objectInfo, void* cullingInfo)
 {
 	KX_GameObject* gameobj = objectInfo->m_gameobject;
 	if (!gameobj->GetVisible())

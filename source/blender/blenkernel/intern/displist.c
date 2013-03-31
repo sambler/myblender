@@ -850,7 +850,7 @@ static void curve_calc_modifiers_pre(Scene *scene, Object *ob, int forRender, fl
 	*numVerts_r = numVerts;
 }
 
-static float (*displist_get_allverts(ListBase * dispbase, int *totvert))[3]
+static float (*displist_get_allverts(ListBase *dispbase, int *totvert))[3]
 {
 	DispList *dl;
 	float (*allverts)[3], *fp;
@@ -1540,7 +1540,7 @@ static void do_makeDispListCurveTypes(Scene *scene, Object *ob, ListBase *dispba
 						}
 
 						if (bottom_capbase.first) {
-							BKE_displist_fill(&bottom_capbase, dispbase, 1);
+							BKE_displist_fill(&bottom_capbase, dispbase, 0);
 							BKE_displist_fill(&top_capbase, dispbase, 0);
 							BKE_displist_free(&bottom_capbase);
 							BKE_displist_free(&top_capbase);

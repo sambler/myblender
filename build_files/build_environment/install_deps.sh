@@ -1064,7 +1064,11 @@ compile_OpenCOLLADA() {
     cd $_src
 
     # XXX For now, always update from latest repo...
-    git pull origin
+    git pull origin master
+
+    # Stick to same rev as windows' libs...
+    git checkout e886e196673222f2f4bc32b936dc96419fff815f
+    git reset --hard
 
     # Always refresh the whole build!
     if [ -d build ]; then

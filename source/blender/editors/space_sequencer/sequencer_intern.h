@@ -97,7 +97,11 @@ void SEQUENCER_OT_images_separate(struct wmOperatorType *ot);
 void SEQUENCER_OT_meta_toggle(struct wmOperatorType *ot);
 void SEQUENCER_OT_meta_make(struct wmOperatorType *ot);
 void SEQUENCER_OT_meta_separate(struct wmOperatorType *ot);
+
+void SEQUENCER_OT_gap_remove(struct wmOperatorType *ot);
+void SEQUENCER_OT_gap_insert(struct wmOperatorType *ot);
 void SEQUENCER_OT_snap(struct wmOperatorType *ot);
+
 void SEQUENCER_OT_strip_jump(struct wmOperatorType *ot);
 void SEQUENCER_OT_swap(struct wmOperatorType *ot);
 void SEQUENCER_OT_swap_data(struct wmOperatorType *ot);
@@ -167,11 +171,11 @@ void sequencer_operatortypes(void);
 void sequencer_keymap(struct wmKeyConfig *keyconf);
 
 /* sequencer_scope.c */
-struct ImBuf *make_waveform_view_from_ibuf(struct ImBuf * ibuf);
-struct ImBuf *make_sep_waveform_view_from_ibuf(struct ImBuf * ibuf);
-struct ImBuf *make_vectorscope_view_from_ibuf(struct ImBuf * ibuf);
-struct ImBuf *make_zebra_view_from_ibuf(struct ImBuf * ibuf, float perc);
-struct ImBuf *make_histogram_view_from_ibuf(struct ImBuf * ibuf);
+struct ImBuf *make_waveform_view_from_ibuf(struct ImBuf *ibuf);
+struct ImBuf *make_sep_waveform_view_from_ibuf(struct ImBuf *ibuf);
+struct ImBuf *make_vectorscope_view_from_ibuf(struct ImBuf *ibuf);
+struct ImBuf *make_zebra_view_from_ibuf(struct ImBuf *ibuf, float perc);
+struct ImBuf *make_histogram_view_from_ibuf(struct ImBuf *ibuf);
 
 /* sequencer_buttons.c */
 void sequencer_buttons_register(struct ARegionType *art);

@@ -121,10 +121,11 @@ void NODE_OT_select_linked_from(struct wmOperatorType *ot);
 void NODE_OT_select_border(struct wmOperatorType *ot);
 void NODE_OT_select_lasso(struct wmOperatorType *ot);
 void NODE_OT_select_same_type(struct wmOperatorType *ot);
-void NODE_OT_select_same_type_next(struct wmOperatorType *ot);
-void NODE_OT_select_same_type_prev(struct wmOperatorType *ot);
+void NODE_OT_select_same_type_step(struct wmOperatorType *ot);
 
 /* node_view.c */
+int space_node_view_flag(struct bContext *C, SpaceNode *snode, ARegion *ar, const int node_flag);
+
 void NODE_OT_view_all(struct wmOperatorType *ot);
 void NODE_OT_view_selected(struct wmOperatorType *ot);
 
@@ -135,7 +136,7 @@ void NODE_OT_backimage_sample(struct wmOperatorType *ot);
 /* drawnode.c */
 void node_draw_link(struct View2D *v2d, struct SpaceNode *snode, struct bNodeLink *link);
 void node_draw_link_bezier(struct View2D *v2d, struct SpaceNode *snode, struct bNodeLink *link, int th_col1, int do_shaded, int th_col2, int do_triple, int th_col3);
-int node_link_bezier_points(struct View2D * v2d, struct SpaceNode * snode, struct bNodeLink * link, float coord_array[][2], int resol);
+int  node_link_bezier_points(struct View2D *v2d, struct SpaceNode *snode, struct bNodeLink *link, float coord_array[][2], int resol);
 // void node_draw_link_straight(View2D *v2d, SpaceNode *snode, bNodeLink *link, int th_col1, int do_shaded, int th_col2, int do_triple, int th_col3 );
 void draw_nodespace_back_pix(const struct bContext *C, struct ARegion *ar, struct SpaceNode *snode);
 

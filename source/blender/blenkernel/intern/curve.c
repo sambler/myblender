@@ -1653,7 +1653,7 @@ static int cu_isectLL(const float v1[3], const float v2[3], const float v3[3], c
 }
 
 
-static short bevelinside(BevList *bl1, BevList *bl2)
+static bool bevelinside(BevList *bl1, BevList *bl2)
 {
 	/* is bl2 INSIDE bl1 ? with left-right method and "lambda's" */
 	/* returns '1' if correct hole  */
@@ -1701,9 +1701,7 @@ static short bevelinside(BevList *bl1, BevList *bl2)
 		bevp++;
 	}
 
-	if ( (links & 1) && (rechts & 1) )
-		return 1;
-	return 0;
+	return (links & 1) && (rechts & 1);
 }
 
 
@@ -3204,7 +3202,7 @@ void BKE_nurb_direction_switch(Nurb *nu)
 }
 
 
-float (*BKE_curve_vertexCos_get(Curve * UNUSED(cu), ListBase * lb, int *numVerts_r))[3]
+float (*BKE_curve_vertexCos_get(Curve *UNUSED(cu), ListBase *lb, int *numVerts_r))[3]
 {
 	int i, numVerts = *numVerts_r = BKE_nurbList_verts_count(lb);
 	float *co, (*cos)[3] = MEM_mallocN(sizeof(*cos) * numVerts, "cu_vcos");
@@ -3261,7 +3259,7 @@ void BK_curve_vertexCos_apply(Curve *UNUSED(cu), ListBase *lb, float (*vertexCos
 	}
 }
 
-float (*BKE_curve_keyVertexCos_get(Curve * UNUSED(cu), ListBase * lb, float *key))[3]
+float (*BKE_curve_keyVertexCos_get(Curve *UNUSED(cu), ListBase *lb, float *key))[3]
 {
 	int i, numVerts = BKE_nurbList_verts_count(lb);
 	float *co, (*cos)[3] = MEM_mallocN(sizeof(*cos) * numVerts, "cu_vcos");

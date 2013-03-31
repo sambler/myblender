@@ -1270,8 +1270,6 @@ static void ui_apply_button(bContext *C, uiBlock *block, uiBut *but, uiHandleBut
 		case NUMSLI:
 			ui_apply_but_NUM(C, but, data);
 			break;
-		case HSVSLI:
-			break;
 		case TOG3:
 			ui_apply_but_TOG3(C, but, data);
 			break;
@@ -1393,7 +1391,7 @@ static void ui_but_copy_paste(bContext *C, uiBut *but, uiHandleButtonData *data,
 	}
 	
 	/* numeric value */
-	if (ELEM4(but->type, NUM, NUMABS, NUMSLI, HSVSLI)) {
+	if (ELEM3(but->type, NUM, NUMABS, NUMSLI)) {
 		
 		if (but->poin == NULL && but->rnapoin.data == NULL) {
 			/* pass */
@@ -2053,7 +2051,7 @@ static void ui_textedit_next_but(uiBlock *block, uiBut *actbut, uiHandleButtonDa
 		return;
 
 	for (but = actbut->next; but; but = but->next) {
-		if (ELEM8(but->type, TEX, NUM, NUMABS, NUMSLI, HSVSLI, IDPOIN, SEARCH_MENU, SEARCH_MENU_UNLINK)) {
+		if (ELEM7(but->type, TEX, NUM, NUMABS, NUMSLI, IDPOIN, SEARCH_MENU, SEARCH_MENU_UNLINK)) {
 			if (!(but->flag & UI_BUT_DISABLED)) {
 				data->postbut = but;
 				data->posttype = BUTTON_ACTIVATE_TEXT_EDITING;
@@ -2062,7 +2060,7 @@ static void ui_textedit_next_but(uiBlock *block, uiBut *actbut, uiHandleButtonDa
 		}
 	}
 	for (but = block->buttons.first; but != actbut; but = but->next) {
-		if (ELEM8(but->type, TEX, NUM, NUMABS, NUMSLI, HSVSLI, IDPOIN, SEARCH_MENU, SEARCH_MENU_UNLINK)) {
+		if (ELEM7(but->type, TEX, NUM, NUMABS, NUMSLI, IDPOIN, SEARCH_MENU, SEARCH_MENU_UNLINK)) {
 			if (!(but->flag & UI_BUT_DISABLED)) {
 				data->postbut = but;
 				data->posttype = BUTTON_ACTIVATE_TEXT_EDITING;
@@ -2081,7 +2079,7 @@ static void ui_textedit_prev_but(uiBlock *block, uiBut *actbut, uiHandleButtonDa
 		return;
 
 	for (but = actbut->prev; but; but = but->prev) {
-		if (ELEM8(but->type, TEX, NUM, NUMABS, NUMSLI, HSVSLI, IDPOIN, SEARCH_MENU, SEARCH_MENU_UNLINK)) {
+		if (ELEM7(but->type, TEX, NUM, NUMABS, NUMSLI, IDPOIN, SEARCH_MENU, SEARCH_MENU_UNLINK)) {
 			if (!(but->flag & UI_BUT_DISABLED)) {
 				data->postbut = but;
 				data->posttype = BUTTON_ACTIVATE_TEXT_EDITING;
@@ -2090,7 +2088,7 @@ static void ui_textedit_prev_but(uiBlock *block, uiBut *actbut, uiHandleButtonDa
 		}
 	}
 	for (but = block->buttons.last; but != actbut; but = but->prev) {
-		if (ELEM8(but->type, TEX, NUM, NUMABS, NUMSLI, HSVSLI, IDPOIN, SEARCH_MENU, SEARCH_MENU_UNLINK)) {
+		if (ELEM7(but->type, TEX, NUM, NUMABS, NUMSLI, IDPOIN, SEARCH_MENU, SEARCH_MENU_UNLINK)) {
 			if (!(but->flag & UI_BUT_DISABLED)) {
 				data->postbut = but;
 				data->posttype = BUTTON_ACTIVATE_TEXT_EDITING;
@@ -2999,7 +2997,7 @@ static int ui_do_but_NUM(bContext *C, uiBlock *block, uiBut *but, uiHandleButton
 		
 	}
 	else if (data->state == BUTTON_STATE_NUM_EDITING) {
-		if (event->type == ESCKEY) {
+		if (event->type == ESCKEY || event->type == RIGHTMOUSE) {
 			data->cancel = TRUE;
 			data->escapecancel = TRUE;
 			button_activate_state(C, but, BUTTON_STATE_EXIT);
@@ -3120,10 +3118,6 @@ static bool ui_numedit_but_SLI(uiBut *but, uiHandleButtonData *data,
 	if (but->type == NUMSLI) {
 		offs = (BLI_rctf_size_y(&but->rect) / 2.0f) * but->aspect;
 		deler = BLI_rctf_size_x(&but->rect) - offs;
-	}
-	else if (but->type == HSVSLI) {
-		offs = (BLI_rctf_size_y(&but->rect) / 2.0f) * but->aspect;
-		deler = (BLI_rctf_size_x(&but->rect) / 2.0f) - offs;
 	}
 	else if (but->type == SCROLL) {
 		const float size = (is_horizontal) ? BLI_rctf_size_x(&but->rect) : -BLI_rctf_size_y(&but->rect);
@@ -3267,7 +3261,7 @@ static int ui_do_but_SLI(bContext *C, uiBlock *block, uiBut *but, uiHandleButton
 		}
 	}
 	else if (data->state == BUTTON_STATE_NUM_EDITING) {
-		if (event->type == ESCKEY) {
+		if (event->type == ESCKEY || event->type == RIGHTMOUSE) {
 			data->cancel = TRUE;
 			data->escapecancel = TRUE;
 			button_activate_state(C, but, BUTTON_STATE_EXIT);
@@ -3845,7 +3839,7 @@ static int ui_do_but_HSVCUBE(bContext *C, uiBlock *block, uiBut *but, uiHandleBu
 		}
 	}
 	else if (data->state == BUTTON_STATE_NUM_EDITING) {
-		if (event->type == ESCKEY) {
+		if (event->type == ESCKEY || event->type == RIGHTMOUSE) {
 			data->cancel = TRUE;
 			data->escapecancel = TRUE;
 			button_activate_state(C, but, BUTTON_STATE_EXIT);
@@ -4042,7 +4036,7 @@ static int ui_do_but_HSVCIRCLE(bContext *C, uiBlock *block, uiBut *but, uiHandle
 		}
 	}
 	else if (data->state == BUTTON_STATE_NUM_EDITING) {
-		if (event->type == ESCKEY) {
+		if (event->type == ESCKEY || event->type == RIGHTMOUSE) {
 			data->cancel = TRUE;
 			data->escapecancel = TRUE;
 			button_activate_state(C, but, BUTTON_STATE_EXIT);
@@ -5423,7 +5417,6 @@ static int ui_do_button(bContext *C, uiBlock *block, uiBut *but, const wmEvent *
 			break;
 		case SLI:
 		case NUMSLI:
-		case HSVSLI:
 			retval = ui_do_but_SLI(C, block, but, data, event);
 			break;
 		case ROUNDBOX:
@@ -7463,4 +7456,32 @@ void UI_remove_popup_handlers(ListBase *handlers, uiPopupBlockHandle *popup)
 	WM_event_remove_ui_handler(handlers, ui_handler_popup, ui_handler_remove_popup, popup, FALSE);
 }
 
+bool UI_textbutton_activate_event(const bContext *C, ARegion *ar,
+                                  const void *rna_poin_data, const char *rna_prop_id)
+{
+	uiBlock *block;
+	uiBut *but = NULL;
+	
+	for (block = ar->uiblocks.first; block; block = block->next) {
+		for (but = block->buttons.first; but; but = but->next) {
+			if (but->type == TEX) {
+				if (but->rnaprop && but->rnapoin.data == rna_poin_data) {
+					if (STREQ(RNA_property_identifier(but->rnaprop), rna_prop_id)) {
+						break;
+					}
+				}
+			}
+		}
+		if (but)
+			break;
+	}
+	
+	if (but) {
+		uiButActiveOnly(C, ar, block, but);
+		return true;
+	}
+	else {
+		return false;
+	}
+}
 

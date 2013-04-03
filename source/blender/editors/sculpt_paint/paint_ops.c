@@ -62,7 +62,7 @@ static int brush_add_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	/*int type = RNA_enum_get(op->ptr, "type");*/
 	Paint *paint = paint_get_active_from_context(C);
-	struct Brush *br = paint_brush(paint);
+	Brush *br = paint_brush(paint);
 	Main *bmain = CTX_data_main(C);
 
 	if (br)
@@ -94,7 +94,7 @@ static int brush_scale_size_exec(bContext *C, wmOperator *op)
 {
 	Scene *scene = CTX_data_scene(C);
 	Paint  *paint =  paint_get_active_from_context(C);
-	struct Brush  *brush =  paint_brush(paint);
+	Brush  *brush =  paint_brush(paint);
 	// Object *ob = CTX_data_active_object(C);
 	float scalar = RNA_float_get(op->ptr, "scalar");
 
@@ -176,10 +176,10 @@ static void PAINT_OT_vertex_color_set(wmOperatorType *ot)
 static int brush_reset_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	Paint *paint = paint_get_active_from_context(C);
-	struct Brush *brush = paint_brush(paint);
+	Brush *brush = paint_brush(paint);
 	Object *ob = CTX_data_active_object(C);
 
-	if (!ob) return OPERATOR_CANCELLED;
+	if (!ob || !brush) return OPERATOR_CANCELLED;
 
 	if (ob->mode & OB_MODE_SCULPT)
 		BKE_brush_sculpt_reset(brush);
@@ -215,7 +215,7 @@ static void brush_tool_set(const Brush *brush, size_t tool_offset, int tool)
 /* generic functions for setting the active brush based on the tool */
 static Brush *brush_tool_cycle(Main *bmain, Brush *brush_orig, const int tool, const size_t tool_offset, const int ob_mode)
 {
-	struct Brush *brush;
+	Brush *brush;
 
 	if (!brush_orig && !(brush_orig = bmain->brush.first)) {
 		return NULL;
@@ -266,7 +266,7 @@ static int brush_generic_tool_set(Main *bmain, Paint *paint, const int tool,
                                   const char *tool_name, int create_missing,
                                   int toggle)
 {
-	struct Brush *brush, *brush_orig = paint_brush(paint);
+	Brush *brush, *brush_orig = paint_brush(paint);
 
 	if (toggle)
 		brush = brush_tool_toggle(bmain, brush_orig, tool, tool_offset, ob_mode);
@@ -467,7 +467,7 @@ typedef struct {
 static int stencil_control_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
 	Paint *paint = paint_get_active_from_context(C);
-	Brush *br = paint->brush;
+	Brush *br = paint_brush(paint);
 	int mdiff[2];
 
 	StencilControlData *scd = MEM_mallocN(sizeof(StencilControlData), "stencil_control");
@@ -520,7 +520,7 @@ static int stencil_control_modal(bContext *C, wmOperator *op, const wmEvent *eve
 						float len, factor;
 						sub_v2_v2v2_int(mdiff, event->mval, scd->br->stencil_pos);
 						len = sqrtf(mdiff[0] * mdiff[0] + mdiff[1] * mdiff[1]);
-						factor = len/scd->lenorig;
+						factor = len / scd->lenorig;
 						mdiff[0] = factor * scd->init_sdim[0];
 						mdiff[1] = factor * scd->init_sdim[1];
 						copy_v2_v2_int(scd->br->stencil_dimension, mdiff);
@@ -542,14 +542,18 @@ static int stencil_control_modal(bContext *C, wmOperator *op, const wmEvent *eve
 				}
 			}
 			break;
-		case LEFTMOUSE:
-			if (event->val == KM_PRESS) {
+		/* XXX hardcoded! */
+		case RIGHTMOUSE:
+			if (event->val == KM_RELEASE) {
 				MEM_freeN(op->customdata);
+				WM_event_add_notifier(C, NC_WINDOW, NULL);
 				return OPERATOR_FINISHED;
 			}
-		case RIGHTMOUSE:
+		case ESCKEY:
 			if (event->val == KM_PRESS) {
-				return stencil_control_cancel(C, op);
+				stencil_control_cancel(C, op);
+				WM_event_add_notifier(C, NC_WINDOW, NULL);
+				return OPERATOR_CANCELLED;
 			}
 		default:
 			break;
@@ -560,10 +564,18 @@ static int stencil_control_modal(bContext *C, wmOperator *op, const wmEvent *eve
 	return OPERATOR_RUNNING_MODAL;
 }
 
+static int stencil_control_poll(bContext *C)
+{
+	Paint *paint = paint_get_active_from_context(C);
+	Brush *br = paint_brush(paint);
+
+	return (br && br->mtex.brush_map_mode == MTEX_MAP_MODE_STENCIL);
+}
+
 static void BRUSH_OT_stencil_control(wmOperatorType *ot)
 {
 	static EnumPropertyItem stencil_control_items[] = {
-		{STENCIL_TRANSLATE, "TRANSLATION", 0, "Transation", ""},
+		{STENCIL_TRANSLATE, "TRANSLATION", 0, "Translation", ""},
 		{STENCIL_SCALE, "SCALE", 0, "Scale", ""},
 		{STENCIL_ROTATE, "ROTATION", 0, "Rotation", ""},
 		{0, NULL, 0, NULL, NULL}
@@ -577,6 +589,7 @@ static void BRUSH_OT_stencil_control(wmOperatorType *ot)
 	ot->invoke = stencil_control_invoke;
 	ot->modal = stencil_control_modal;
 	ot->cancel = stencil_control_cancel;
+	ot->poll = stencil_control_poll;
 
 	/* flags */
 	ot->flag = 0;
@@ -588,11 +601,11 @@ static void ed_keymap_stencil(wmKeyMap *keymap)
 {
 	wmKeyMapItem *kmi;
 
-	kmi = WM_keymap_add_item(keymap, "BRUSH_OT_stencil_control", QKEY, KM_PRESS, 0, 0);
+	kmi = WM_keymap_add_item(keymap, "BRUSH_OT_stencil_control", RIGHTMOUSE, KM_PRESS, 0, 0);
 	RNA_enum_set(kmi->ptr, "mode", STENCIL_TRANSLATE);
-	kmi = WM_keymap_add_item(keymap, "BRUSH_OT_stencil_control", QKEY, KM_PRESS, KM_SHIFT, 0);
+	kmi = WM_keymap_add_item(keymap, "BRUSH_OT_stencil_control", RIGHTMOUSE, KM_PRESS, KM_SHIFT, 0);
 	RNA_enum_set(kmi->ptr, "mode", STENCIL_SCALE);
-	kmi = WM_keymap_add_item(keymap, "BRUSH_OT_stencil_control", QKEY, KM_PRESS, KM_CTRL, 0);
+	kmi = WM_keymap_add_item(keymap, "BRUSH_OT_stencil_control", RIGHTMOUSE, KM_PRESS, KM_CTRL, 0);
 	RNA_enum_set(kmi->ptr, "mode", STENCIL_ROTATE);
 
 }
@@ -852,7 +865,7 @@ void ED_keymap_paint(wmKeyConfig *keyconf)
 	keymap->poll = vertex_paint_mode_poll;
 
 	WM_keymap_verify_item(keymap, "PAINT_OT_vertex_paint", LEFTMOUSE, KM_PRESS, 0, 0);
-	WM_keymap_add_item(keymap, "PAINT_OT_sample_color", RIGHTMOUSE, KM_PRESS, 0, 0);
+	WM_keymap_add_item(keymap, "PAINT_OT_sample_color", SKEY, KM_PRESS, 0, 0);
 
 	WM_keymap_add_item(keymap,
 	                   "PAINT_OT_vertex_color_set", KKEY, KM_PRESS, KM_SHIFT, 0);
@@ -932,7 +945,7 @@ void ED_keymap_paint(wmKeyConfig *keyconf)
 	RNA_enum_set(WM_keymap_add_item(keymap, "PAINT_OT_image_paint", LEFTMOUSE, KM_PRESS, 0,        0)->ptr, "mode", BRUSH_STROKE_NORMAL);
 	RNA_enum_set(WM_keymap_add_item(keymap, "PAINT_OT_image_paint", LEFTMOUSE, KM_PRESS, KM_CTRL,  0)->ptr, "mode", BRUSH_STROKE_INVERT);
 	WM_keymap_add_item(keymap, "PAINT_OT_grab_clone", RIGHTMOUSE, KM_PRESS, 0, 0);
-	WM_keymap_add_item(keymap, "PAINT_OT_sample_color", RIGHTMOUSE, KM_PRESS, 0, 0);
+	WM_keymap_add_item(keymap, "PAINT_OT_sample_color", SKEY, KM_PRESS, 0, 0);
 
 	ed_keymap_paint_brush_switch(keymap, "image_paint");
 	ed_keymap_paint_brush_size(keymap, "tool_settings.image_paint.brush.size");

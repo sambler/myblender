@@ -190,7 +190,10 @@ static void node_socket_set_typeinfo(bNodeTree *ntree, bNodeSocket *sock, bNodeS
 {
 	if (typeinfo) {
 		sock->typeinfo = typeinfo;
-	
+		
+		/* deprecated integer type */
+		sock->type = typeinfo->type;
+		
 		if (sock->default_value == NULL) {
 			/* initialize the default_value pointer used by standard socket types */
 			node_socket_init_default_value(sock);
@@ -3438,6 +3441,7 @@ static void registerShaderNodes(void)
 	register_node_type_sh_holdout();
 	//register_node_type_sh_volume_transparent();
 	//register_node_type_sh_volume_isotropic();
+	register_node_type_sh_subsurface_scattering();
 	register_node_type_sh_mix_shader();
 	register_node_type_sh_add_shader();
 

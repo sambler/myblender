@@ -2373,7 +2373,7 @@ static void lib_node_do_versions_group_indices(bNode *gnode)
 		int old_index = sock->to_index;
 		
 		for (link = ngroup->links.first; link; link = link->next) {
-			if (link->tonode->type == NODE_GROUP_OUTPUT && link->fromsock->own_index == old_index) {
+			if (link->tonode == NULL && link->fromsock->own_index == old_index) {
 				strcpy(sock->identifier, link->fromsock->identifier);
 				/* deprecated */
 				sock->own_index = link->fromsock->own_index;
@@ -2386,7 +2386,7 @@ static void lib_node_do_versions_group_indices(bNode *gnode)
 		int old_index = sock->to_index;
 		
 		for (link = ngroup->links.first; link; link = link->next) {
-			if (link->fromnode->type == NODE_GROUP_INPUT && link->tosock->own_index == old_index) {
+			if (link->fromnode == NULL && link->tosock->own_index == old_index) {
 				strcpy(sock->identifier, link->tosock->identifier);
 				/* deprecated */
 				sock->own_index = link->tosock->own_index;
@@ -6535,7 +6535,7 @@ static void lib_link_group(FileData *fd, Main *main)
 				}
 			}
 			if (add_us) group->id.us++;
-			rem_from_group(group, NULL, NULL, NULL);	/* removes NULL entries */
+			BKE_group_object_unlink(group, NULL, NULL, NULL);	/* removes NULL entries */
 		}
 	}
 }

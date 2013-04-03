@@ -779,11 +779,6 @@ class VIEW3D_PT_tools_mask_texture(View3DPanel, Panel):
         brush = context.tool_settings.image_paint.brush
         return (context.image_paint_object and brush and brush.image_tool != 'SOFTEN')
 
-    def draw_header(self, context):
-        brush = context.tool_settings.image_paint.brush
-        tex_slot_alpha = brush.mask_texture_slot
-        self.layout.prop(brush, 'use_mask', text="")
-
     def draw(self, context):
         layout = self.layout
 
@@ -842,17 +837,6 @@ class VIEW3D_PT_tools_brush_stroke(Panel, View3DPaintPanel):
             row.prop(brush, "use_pressure_spacing", toggle=True, text="")
 
         if context.sculpt_object:
-            if brush.sculpt_capabilities.has_smooth_stroke:
-                col = layout.column()
-                col.separator()
-
-                col.prop(brush, "use_smooth_stroke")
-
-                sub = col.column()
-                sub.active = brush.use_smooth_stroke
-                sub.prop(brush, "smooth_stroke_radius", text="Radius", slider=True)
-                sub.prop(brush, "smooth_stroke_factor", text="Factor", slider=True)
-
             if brush.sculpt_capabilities.has_jitter:
                 col.separator()
 
@@ -864,17 +848,17 @@ class VIEW3D_PT_tools_brush_stroke(Panel, View3DPaintPanel):
                     row.prop(brush, "use_relative_jitter", text="", icon='UNLOCKED')
                     row.prop(brush, "jitter_absolute")
                 row.prop(brush, "use_pressure_jitter", toggle=True, text="")
+            if brush.sculpt_capabilities.has_smooth_stroke:
+                col = layout.column()
+                col.separator()
+
+                col.prop(brush, "use_smooth_stroke")
+
+                sub = col.column()
+                sub.active = brush.use_smooth_stroke
+                sub.prop(brush, "smooth_stroke_radius", text="Radius", slider=True)
+                sub.prop(brush, "smooth_stroke_factor", text="Factor", slider=True)
         else:
-            col = layout.column()
-            col.separator()
-
-            col.prop(brush, "use_smooth_stroke")
-
-            sub = col.column()
-            sub.active = brush.use_smooth_stroke
-            sub.prop(brush, "smooth_stroke_radius", text="Radius", slider=True)
-            sub.prop(brush, "smooth_stroke_factor", text="Factor", slider=True)
-
             col.separator()
 
             row = col.row(align=True)
@@ -886,6 +870,15 @@ class VIEW3D_PT_tools_brush_stroke(Panel, View3DPaintPanel):
                 row.prop(brush, "jitter_absolute")
             row.prop(brush, "use_pressure_jitter", toggle=True, text="")
 
+            col = layout.column()
+            col.separator()
+
+            col.prop(brush, "use_smooth_stroke")
+
+            sub = col.column()
+            sub.active = brush.use_smooth_stroke
+            sub.prop(brush, "smooth_stroke_radius", text="Radius", slider=True)
+            sub.prop(brush, "smooth_stroke_factor", text="Factor", slider=True)
 
 class VIEW3D_PT_tools_brush_curve(Panel, View3DPaintPanel):
     bl_label = "Curve"

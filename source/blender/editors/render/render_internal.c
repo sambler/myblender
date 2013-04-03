@@ -143,7 +143,7 @@ void image_buffer_rect_update(Scene *scene, RenderResult *rr, ImBuf *ibuf, volat
 
 	if (ibuf->rect == NULL)
 		imb_addrectImBuf(ibuf);
-	
+
 	rectf += 4 * (rr->rectx * ymin + xmin);
 
 	IMB_partial_display_buffer_update(ibuf, rectf, NULL, rr->rectx, rxmin, rymin,

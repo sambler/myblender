@@ -316,10 +316,10 @@ static void image_keymap(struct wmKeyConfig *keyconf)
 	RNA_boolean_set(kmi->ptr, "toggle", TRUE);
 
 	/* fast switch to render slots */
-	for (i = 0; i < MAX2(IMA_MAX_RENDER_SLOT, 9); i++) {
-		kmi = WM_keymap_add_item(keymap, "WM_OT_context_set_int", ONEKEY + i, KM_PRESS, 0, 0);
+	for (i = 0; i < 10; i++) {
+		kmi = WM_keymap_add_item(keymap, "WM_OT_context_set_int", ZEROKEY + i, KM_PRESS, 0, 0);
 		RNA_string_set(kmi->ptr, "data_path", "space_data.image.render_slot");
-		RNA_int_set(kmi->ptr, "value", i);
+		RNA_int_set(kmi->ptr, "value", i==0?9:i-1);
 	}
 
 	/* pivot */

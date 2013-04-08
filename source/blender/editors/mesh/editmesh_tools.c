@@ -34,6 +34,7 @@
 #include "DNA_key_types.h"
 #include "DNA_material_types.h"
 #include "DNA_mesh_types.h"
+#include "DNA_meshdata_types.h"
 #include "DNA_modifier_types.h"
 #include "DNA_object_types.h"
 
@@ -2631,6 +2632,67 @@ void MESH_OT_beautify_fill(wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 }
 
+
+/********************** Poke Face **********************/
+
+static int edbm_poke_face_exec(bContext *C, wmOperator *op)
+{
+	Object *obedit = CTX_data_edit_object(C);
+	BMEditMesh *em = BMEdit_FromObject(obedit);
+	BMOperator bmop;
+
+	const float offset = RNA_float_get(op->ptr, "offset");
+	const bool use_relative_offset = RNA_boolean_get(op->ptr, "use_relative_offset");
+	const int center_mode = RNA_enum_get(op->ptr, "center_mode");
+
+	EDBM_op_init(em, &bmop, op, "poke faces=%hf offset=%f use_relative_offset=%b center_mode=%i",
+	             BM_ELEM_SELECT, offset, use_relative_offset, center_mode);
+	BMO_op_exec(em->bm, &bmop);
+
+	EDBM_flag_disable_all(em, BM_ELEM_SELECT);
+
+	BMO_slot_buffer_hflag_enable(em->bm, bmop.slots_out, "verts.out", BM_VERT, BM_ELEM_SELECT, true);
+	BMO_slot_buffer_hflag_enable(em->bm, bmop.slots_out, "faces.out", BM_FACE, BM_ELEM_SELECT, true);
+
+	if (!EDBM_op_finish(em, &bmop, op, true)) {
+		return OPERATOR_CANCELLED;
+	}
+
+	EDBM_mesh_normals_update(em);
+
+	EDBM_update_generic(em, true, true);
+
+	return OPERATOR_FINISHED;
+
+}
+
+void MESH_OT_poke(wmOperatorType *ot)
+{
+
+	static EnumPropertyItem poke_center_modes[] = {
+		{BMOP_POKE_MEAN_WEIGHTED, "MEAN_WEIGHTED", 0, "Weighted Mean", "Weighted Mean Face Center"},
+		{BMOP_POKE_MEAN, "MEAN", 0, "Mean", "Mean Face Center"},
+		{BMOP_POKE_BOUNDS, "BOUNDS", 0, "Bounds", "Face Bounds Center"},
+		{0, NULL, 0, NULL, NULL}};
+
+
+	/* identifiers */
+	ot->name = "Poke Faces";
+	ot->idname = "MESH_OT_poke";
+	ot->description = "Splits a face into a fan";
+
+	/* api callbacks */
+	ot->exec = edbm_poke_face_exec;
+	ot->poll = ED_operator_editmesh;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	RNA_def_float(ot->srna, "offset", 0.0f, -FLT_MAX, FLT_MAX, "Poke Offset", "Poke Offset", -1.0f, 1.0f);
+	RNA_def_boolean(ot->srna, "use_relative_offset", false, "Offset Relative", "Scale the offset by surrounding geometry");
+	RNA_def_enum(ot->srna, "center_mode", poke_center_modes, BMOP_POKE_MEAN_WEIGHTED, "Poke Center", "Poke Face Center Calculation");
+}
+
 /********************** Quad/Tri Operators *************************/
 
 static int edbm_quads_convert_to_tris_exec(bContext *C, wmOperator *op)
@@ -2658,6 +2720,7 @@ static int edbm_quads_convert_to_tris_exec(bContext *C, wmOperator *op)
 
 	return OPERATOR_FINISHED;
 }
+
 
 void MESH_OT_quads_convert_to_tris(wmOperatorType *ot)
 {
@@ -3795,3 +3858,130 @@ void MESH_OT_symmetrize(struct wmOperatorType *ot)
 	                        BMO_SYMMETRIZE_NEGATIVE_X,
 	                        "Direction", "Which sides to copy from and to");
 }
+
+#ifdef WITH_FREESTYLE
+
+static int edbm_mark_freestyle_edge(bContext *C, wmOperator *op)
+{
+	Object *obedit = CTX_data_edit_object(C);
+	Mesh *me = (Mesh *)obedit->data;
+	BMEditMesh *em = BMEdit_FromObject(obedit);
+	BMEdge *eed;
+	BMIter iter;
+	FreestyleEdge *fed;
+	int clear = RNA_boolean_get(op->ptr, "clear");
+
+	if (em == NULL)
+		return OPERATOR_FINISHED;
+
+	/* auto-enable Freestyle edge mark drawing */
+	if (clear == 0) {
+		me->drawflag |= ME_DRAW_FREESTYLE_EDGE;
+	}
+
+	if (!CustomData_has_layer(&em->bm->edata, CD_FREESTYLE_EDGE)) {
+		BM_data_layer_add(em->bm, &em->bm->edata, CD_FREESTYLE_EDGE);
+	}
+
+	if (clear) {
+		BM_ITER_MESH (eed, &iter, em->bm, BM_EDGES_OF_MESH) {
+			if (BM_elem_flag_test(eed, BM_ELEM_SELECT) && !BM_elem_flag_test(eed, BM_ELEM_HIDDEN)) {
+				fed = CustomData_bmesh_get(&em->bm->edata, eed->head.data, CD_FREESTYLE_EDGE);
+				fed->flag &= ~FREESTYLE_EDGE_MARK;
+			}
+		}
+	}
+	else {
+		BM_ITER_MESH (eed, &iter, em->bm, BM_EDGES_OF_MESH) {
+			if (BM_elem_flag_test(eed, BM_ELEM_SELECT) && !BM_elem_flag_test(eed, BM_ELEM_HIDDEN)) {
+				fed = CustomData_bmesh_get(&em->bm->edata, eed->head.data, CD_FREESTYLE_EDGE);
+				fed->flag |= FREESTYLE_EDGE_MARK;
+			}
+		}
+	}
+
+	DAG_id_tag_update(obedit->data, OB_RECALC_DATA);
+	WM_event_add_notifier(C, NC_GEOM | ND_DATA, obedit->data);
+
+	return OPERATOR_FINISHED;
+}
+
+void MESH_OT_mark_freestyle_edge(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Mark Freestyle Edge";
+	ot->description = "(un)mark selected edges as Freestyle feature edges";
+	ot->idname = "MESH_OT_mark_freestyle_edge";
+
+	/* api callbacks */
+	ot->exec = edbm_mark_freestyle_edge;
+	ot->poll = ED_operator_editmesh;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	RNA_def_boolean(ot->srna, "clear", 0, "Clear", "");
+}
+
+static int edbm_mark_freestyle_face_exec(bContext *C, wmOperator *op)
+{
+	Object *obedit = CTX_data_edit_object(C);
+	Mesh *me = (Mesh *)obedit->data;
+	BMEditMesh *em = BMEdit_FromObject(obedit);
+	BMFace *efa;
+	BMIter iter;
+	FreestyleFace *ffa;
+	int clear = RNA_boolean_get(op->ptr, "clear");
+
+	if (em == NULL) return OPERATOR_FINISHED;
+
+	/* auto-enable Freestyle face mark drawing */
+	if (!clear) {
+		me->drawflag |= ME_DRAW_FREESTYLE_FACE;
+	}
+
+	if (!CustomData_has_layer(&em->bm->pdata, CD_FREESTYLE_FACE)) {
+		BM_data_layer_add(em->bm, &em->bm->pdata, CD_FREESTYLE_FACE);
+	}
+
+	if (clear) {
+		BM_ITER_MESH (efa, &iter, em->bm, BM_FACES_OF_MESH) {
+			if (BM_elem_flag_test(efa, BM_ELEM_SELECT) && !BM_elem_flag_test(efa, BM_ELEM_HIDDEN)) {
+				ffa = CustomData_bmesh_get(&em->bm->pdata, efa->head.data, CD_FREESTYLE_FACE);
+				ffa->flag &= ~FREESTYLE_FACE_MARK;
+			}
+		}
+	}
+	else {
+		BM_ITER_MESH (efa, &iter, em->bm, BM_FACES_OF_MESH) {
+			if (BM_elem_flag_test(efa, BM_ELEM_SELECT) && !BM_elem_flag_test(efa, BM_ELEM_HIDDEN)) {
+				ffa = CustomData_bmesh_get(&em->bm->pdata, efa->head.data, CD_FREESTYLE_FACE);
+				ffa->flag |= FREESTYLE_FACE_MARK;
+			}
+		}
+	}
+
+	DAG_id_tag_update(obedit->data, OB_RECALC_DATA);
+	WM_event_add_notifier(C, NC_GEOM | ND_DATA, obedit->data);
+
+	return OPERATOR_FINISHED;
+}
+
+void MESH_OT_mark_freestyle_face(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Mark Freestyle Face";
+	ot->description = "(un)mark selected faces for exclusion from Freestyle feature edge detection";
+	ot->idname = "MESH_OT_mark_freestyle_face";
+
+	/* api callbacks */
+	ot->exec = edbm_mark_freestyle_face_exec;
+	ot->poll = ED_operator_editmesh;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	RNA_def_boolean(ot->srna, "clear", 0, "Clear", "");
+}
+
+#endif

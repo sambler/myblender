@@ -496,7 +496,7 @@ static int mathutils_obactu_vector_set_index(BaseMathObject *bmo, int subtype, i
 	return mathutils_obactu_vector_set(bmo, subtype);
 }
 
-Mathutils_Callback mathutils_obactu_vector_cb = {
+static Mathutils_Callback mathutils_obactu_vector_cb = {
 	mathutils_obactu_generic_check,
 	mathutils_obactu_vector_get,
 	mathutils_obactu_vector_set,
@@ -539,7 +539,7 @@ int KX_ObjectActuator::pyattr_set_angV(void *self_v, const KX_PYATTRIBUTE_DEF *a
 
 void KX_ObjectActuator_Mathutils_Callback_Init(void)
 {
-	// register mathutils callbacks, ok to run more then once.
+	// register mathutils callbacks, ok to run more than once.
 	mathutils_kxobactu_vector_cb_index = Mathutils_RegisterCallback(&mathutils_obactu_vector_cb);
 }
 

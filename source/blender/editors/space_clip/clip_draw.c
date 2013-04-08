@@ -37,11 +37,6 @@
 
 #include "MEM_guardedalloc.h"
 
-#include "BKE_context.h"
-#include "BKE_movieclip.h"
-#include "BKE_tracking.h"
-#include "BKE_mask.h"
-
 #include "IMB_colormanagement.h"
 #include "IMB_imbuf_types.h"
 #include "IMB_imbuf.h"
@@ -51,6 +46,11 @@
 #include "BLI_string.h"
 #include "BLI_rect.h"
 #include "BLI_math_base.h"
+
+#include "BKE_context.h"
+#include "BKE_movieclip.h"
+#include "BKE_tracking.h"
+#include "BKE_mask.h"
 
 #include "ED_screen.h"
 #include "ED_clip.h"
@@ -275,11 +275,17 @@ static void draw_movieclip_buffer(const bContext *C, SpaceClip *sc, ARegion *ar,
 		/* non-scaled proxy shouldn't use filtering */
 		if ((clip->flag & MCLIP_USE_PROXY) == 0 ||
 		    ELEM(sc->user.render_size, MCLIP_PROXY_RENDER_SIZE_FULL, MCLIP_PROXY_RENDER_SIZE_100))
-			{
-				filter = GL_NEAREST;
-			}
+		{
+			filter = GL_NEAREST;
+		}
 
-		glaDrawImBuf_glsl_ctx(C, ibuf, x, y, GL_NEAREST);
+		/* set zoom */
+		glPixelZoom(zoomx * width / ibuf->x, zoomy * height / ibuf->y);
+
+		glaDrawImBuf_glsl_ctx(C, ibuf, x, y, filter);
+
+		/* reset zoom */
+		glPixelZoom(1.0f, 1.0f);
 
 		if (ibuf->planes == 32)
 			glDisable(GL_BLEND);
@@ -1450,8 +1456,6 @@ void clip_draw_main(const bContext *C, SpaceClip *sc, ARegion *ar)
 	if (ibuf) {
 		draw_movieclip_buffer(C, sc, ar, ibuf, width, height, zoomx, zoomy);
 		IMB_freeImBuf(ibuf);
-
-		clip_start_prefetch_job(C);
 	}
 	else {
 		ED_region_grid_draw(ar, zoomx, zoomy);

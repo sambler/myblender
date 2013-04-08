@@ -62,6 +62,7 @@ void *aligned_malloc(int size, int alignment) {
   return malloc(size);
 #elif __FreeBSD__
   void *result;
+
   // test that alignment is power of 2 and > sizeof(void*)
   if ( ((alignment - 1) & alignment) != 0 || alignment < sizeof(void *)) {
     int talign, x;
@@ -314,7 +315,8 @@ bool BruteRegionTracker::Track(const FloatImage &image1,
   // Convert the search area directly to bytes without sampling.
   unsigned char *search_area;
   int search_area_stride;
-  FloatArrayToByteArrayWithPadding(image_and_gradient2, &search_area, &search_area_stride);
+  FloatArrayToByteArrayWithPadding(image_and_gradient2, &search_area,
+                                   &search_area_stride);
 
   // Try all possible locations inside the search area. Yes, everywhere.
   int best_i = -1, best_j = -1, best_sad = INT_MAX;
@@ -368,9 +370,11 @@ bool BruteRegionTracker::Track(const FloatImage &image1,
 
   // Compute the Pearson product-moment correlation coefficient to check
   // for sanity.
-  double correlation = PearsonProductMomentCorrelation(image_and_gradient1_sampled,
+  double correlation = PearsonProductMomentCorrelation(
+          image_and_gradient1_sampled,
                                                        image_and_gradient2_sampled,
                                                        pattern_width);
+
   LG << "Final correlation: " << correlation;
 
   if (correlation < minimum_correlation) {

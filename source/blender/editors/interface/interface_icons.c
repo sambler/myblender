@@ -76,12 +76,14 @@
 
 #include "interface_intern.h"
 
+#ifndef WITH_HEADLESS
 #define ICON_GRID_COLS      26
 #define ICON_GRID_ROWS      30
 
 #define ICON_GRID_MARGIN    10
 #define ICON_GRID_W         32
 #define ICON_GRID_H         32
+#endif  /* WITH_HEADLESS */
 
 typedef struct IconImage {
 	int w;
@@ -1164,7 +1166,7 @@ static void ui_id_preview_image_render_size(bContext *C, ID *id, PreviewImage *p
 	}
 }
 
-static void ui_id_icon_render(bContext *C, ID *id, int big)
+static void ui_id_icon_render(bContext *C, ID *id, const bool big)
 {
 	PreviewImage *pi = BKE_previewimg_get(id);
 
@@ -1248,7 +1250,7 @@ static int ui_id_brush_get_icon(bContext *C, ID *id)
 	return id->icon_id;
 }
 
-int ui_id_icon_get(bContext *C, ID *id, int big)
+int ui_id_icon_get(bContext *C, ID *id, const bool big)
 {
 	int iconid = 0;
 	
@@ -1273,7 +1275,7 @@ int ui_id_icon_get(bContext *C, ID *id, int big)
 	return iconid;
 }
 
-int UI_rnaptr_icon_get(bContext *C, PointerRNA *ptr, int rnaicon, int big)
+int UI_rnaptr_icon_get(bContext *C, PointerRNA *ptr, int rnaicon, const bool big)
 {
 	ID *id = NULL;
 

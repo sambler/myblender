@@ -202,7 +202,12 @@ void MESH_OT_edge_face_add(struct wmOperatorType *ot);
 void MESH_OT_duplicate(struct wmOperatorType *ot);
 void MESH_OT_merge(struct wmOperatorType *ot);
 void MESH_OT_remove_doubles(struct wmOperatorType *ot);
+void MESH_OT_poke(struct wmOperatorType *ot);
 
+#ifdef WITH_FREESTYLE
+void MESH_OT_mark_freestyle_edge(struct wmOperatorType *ot);
+void MESH_OT_mark_freestyle_face(struct wmOperatorType *ot);
+#endif
 
 /* *** mesh_data.c *** */
 void MESH_OT_uv_texture_add(struct wmOperatorType *ot);

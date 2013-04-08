@@ -1426,7 +1426,8 @@ static void converge(const float p1[3], const float p2[3], float v1, float v2,
 		while (1) {
 			if (i++ == RES) return;
 			p[0] = 0.5f * (pos[0] + neg[0]);
-			if ((function(p[0], p[1], p[2])) > 0.0f) pos[0] = p[0]; else neg[0] = p[0];
+			if ((function(p[0], p[1], p[2])) > 0.0f) pos[0] = p[0];
+			else                                     neg[0] = p[0];
 		}
 	}
 
@@ -1436,7 +1437,8 @@ static void converge(const float p1[3], const float p2[3], float v1, float v2,
 		while (1) {
 			if (i++ == RES) return;
 			p[1] = 0.5f * (pos[1] + neg[1]);
-			if ((function(p[0], p[1], p[2])) > 0.0f) pos[1] = p[1]; else neg[1] = p[1];
+			if ((function(p[0], p[1], p[2])) > 0.0f) pos[1] = p[1];
+			else                                     neg[1] = p[1];
 		}
 	}
 
@@ -1446,7 +1448,8 @@ static void converge(const float p1[3], const float p2[3], float v1, float v2,
 		while (1) {
 			if (i++ == RES) return;
 			p[2] = 0.5f * (pos[2] + neg[2]);
-			if ((function(p[0], p[1], p[2])) > 0.0f) pos[2] = p[2]; else neg[2] = p[2];
+			if ((function(p[0], p[1], p[2])) > 0.0f) pos[2] = p[2];
+			else                                     neg[2] = p[2];
 		}
 	}
 
@@ -2177,7 +2180,7 @@ static void free_metaball_octal_node(octal_node *node)
 	MEM_freeN(node);
 }
 
-/* If scene include more then one MetaElem, then octree is used */
+/* If scene include more than one MetaElem, then octree is used */
 static void init_metaball_octal_tree(int depth)
 {
 	struct octal_node *node;
@@ -2266,7 +2269,7 @@ void BKE_mball_polygonize(Scene *scene, Object *ob, ListBase *dispbase)
 		G_mb.metaball_tree = NULL;
 	}
 
-	/* if scene includes more then one MetaElem, then octal tree optimization is used */
+	/* if scene includes more than one MetaElem, then octal tree optimization is used */
 	if ((G_mb.totelem >    1) && (G_mb.totelem <=   64)) init_metaball_octal_tree(1);
 	if ((G_mb.totelem >   64) && (G_mb.totelem <=  128)) init_metaball_octal_tree(2);
 	if ((G_mb.totelem >  128) && (G_mb.totelem <=  512)) init_metaball_octal_tree(3);

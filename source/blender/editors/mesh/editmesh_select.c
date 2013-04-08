@@ -104,7 +104,7 @@ void EDBM_select_mirrored(Object *UNUSED(obedit), BMEditMesh *em, bool extend)
 	EDBM_verts_mirror_cache_end(em);
 }
 
-void EDBM_automerge(Scene *scene, Object *obedit, int update)
+void EDBM_automerge(Scene *scene, Object *obedit, bool update)
 {
 	
 	if ((scene->toolsettings->automerge) &&
@@ -377,13 +377,11 @@ static void findnearestvert__doClosest(void *userData, BMVert *eve, const float 
 
 
 
-static unsigned int findnearestvert__backbufIndextest(void *handle, unsigned int index)
+static bool findnearestvert__backbufIndextest(void *handle, unsigned int index)
 {
 	BMEditMesh *em = (BMEditMesh *)handle;
 	BMVert *eve = BM_vert_at_index(em->bm, index - 1);
-
-	if (eve && BM_elem_flag_test(eve, BM_ELEM_SELECT)) return 0;
-	return 1;
+	return !(eve && BM_elem_flag_test(eve, BM_ELEM_SELECT));
 }
 /**
  * findnearestvert
@@ -690,6 +688,9 @@ static EnumPropertyItem prop_similar_types[] = {
 	{SIMEDGE_BEVEL, "BEVEL", 0, "Bevel", ""},
 	{SIMEDGE_SEAM, "SEAM", 0, "Seam", ""},
 	{SIMEDGE_SHARP, "SHARP", 0, "Sharpness", ""},
+#ifdef WITH_FREESTYLE
+	{SIMEDGE_FREESTYLE, "FREESTYLE_EDGE", 0, "Freestyle Edge Marks", ""},
+#endif
 
 	{SIMFACE_MATERIAL, "MATERIAL", 0, "Material", ""},
 	{SIMFACE_IMAGE, "IMAGE", 0, "Image", ""},
@@ -698,6 +699,9 @@ static EnumPropertyItem prop_similar_types[] = {
 	{SIMFACE_PERIMETER, "PERIMETER", 0, "Perimeter", ""},
 	{SIMFACE_NORMAL, "NORMAL", 0, "Normal", ""},
 	{SIMFACE_COPLANAR, "COPLANAR", 0, "Co-planar", ""},
+#ifdef WITH_FREESTYLE
+	{SIMFACE_FREESTYLE, "FREESTYLE_FACE", 0, "Freestyle Face Marks", ""},
+#endif
 
 	{0, NULL, 0, NULL, NULL}
 };
@@ -869,7 +873,11 @@ static EnumPropertyItem *select_similar_type_itemf(bContext *C, PointerRNA *UNUS
 			}
 		}
 		else if (em->selectmode & SCE_SELECT_FACE) {
+#ifdef WITH_FREESTYLE
+			for (a = SIMFACE_MATERIAL; a <= SIMFACE_FREESTYLE; a++) {
+#else
 			for (a = SIMFACE_MATERIAL; a <= SIMFACE_COPLANAR; a++) {
+#endif
 				RNA_enum_items_add_value(&item, &totitem, prop_similar_types, a);
 			}
 		}
@@ -1406,6 +1414,23 @@ static void edgetag_context_set(BMesh *bm, Scene *scene, BMEdge *e, int val)
 		case EDGE_MODE_TAG_BEVEL:
 			BM_elem_float_data_set(&bm->edata, e, CD_BWEIGHT, (val) ? 1.0f : 0.0f);
 			break;
+#ifdef WITH_FREESTYLE
+		case EDGE_MODE_TAG_FREESTYLE:
+			{
+				FreestyleEdge *fed;
+
+				if (!CustomData_has_layer(&bm->pdata, CD_FREESTYLE_FACE)) {
+					BM_data_layer_add(bm, &bm->pdata, CD_FREESTYLE_FACE);
+				}
+
+				fed = CustomData_bmesh_get(&bm->edata, e->head.data, CD_FREESTYLE_EDGE);
+				if (!val)
+					fed->flag &= ~FREESTYLE_EDGE_MARK;
+				else
+					fed->flag |= FREESTYLE_EDGE_MARK;
+			}
+			break;
+#endif
 	}
 }
 
@@ -1422,6 +1447,14 @@ static int edgetag_context_check(Scene *scene, BMesh *bm, BMEdge *e)
 			return BM_elem_float_data_get(&bm->edata, e, CD_CREASE) ? true : false;
 		case EDGE_MODE_TAG_BEVEL:
 			return BM_elem_float_data_get(&bm->edata, e, CD_BWEIGHT) ? true : false;
+#ifdef WITH_FREESTYLE
+		case EDGE_MODE_TAG_FREESTYLE:
+			{
+				FreestyleEdge *fed = CustomData_bmesh_get(&bm->edata, e->head.data, CD_FREESTYLE_EDGE);
+				return (!fed) ? FALSE : (fed->flag & FREESTYLE_EDGE_MARK) ? TRUE : FALSE;
+			}
+			break;
+#endif
 	}
 	return 0;
 }
@@ -1591,6 +1624,11 @@ static int mouse_mesh_shortest_path_edge(ViewContext *vc)
 			case EDGE_MODE_TAG_BEVEL:
 				me->drawflag |= ME_DRAWBWEIGHTS;
 				break;
+#ifdef WITH_FREESTYLE
+			case EDGE_MODE_TAG_FREESTYLE:
+				me->drawflag |= ME_DRAW_FREESTYLE_EDGE;
+				break;
+#endif
 		}
 		
 		EDBM_update_generic(em, false, false);
@@ -2306,7 +2344,7 @@ void EDBM_select_swap(BMEditMesh *em) /* exported for UV */
 //	if (EM_texFaceCheck())
 }
 
-int EDBM_select_interior_faces(BMEditMesh *em)
+bool EDBM_select_interior_faces(BMEditMesh *em)
 {
 	BMesh *bm = em->bm;
 	BMIter iter;
@@ -2914,7 +2952,7 @@ static void deselect_nth_active(BMEditMesh *em, BMVert **r_eve, BMEdge **r_eed, 
 	}
 }
 
-static int edbm_deselect_nth(BMEditMesh *em, int nth, int offset)
+static bool edbm_deselect_nth(BMEditMesh *em, int nth, int offset)
 {
 	BMVert *v;
 	BMEdge *e;
@@ -2924,18 +2962,18 @@ static int edbm_deselect_nth(BMEditMesh *em, int nth, int offset)
 
 	if (v) {
 		walker_deselect_nth(em, nth, offset, &v->head);
-		return 1;
+		return true;
 	}
 	else if (e) {
 		walker_deselect_nth(em, nth, offset, &e->head);
-		return 1;
+		return true;
 	}
 	else if (f) {
 		walker_deselect_nth(em, nth, offset, &f->head);
-		return 1;
+		return true;
 	}
 
-	return 0;
+	return false;
 }
 
 static int edbm_select_nth_exec(bContext *C, wmOperator *op)
@@ -2948,7 +2986,7 @@ static int edbm_select_nth_exec(bContext *C, wmOperator *op)
 	/* so input of offset zero ends up being (nth - 1) */
 	offset = (offset + (nth - 1)) % nth;
 
-	if (edbm_deselect_nth(em, nth, offset) == 0) {
+	if (edbm_deselect_nth(em, nth, offset) == false) {
 		BKE_report(op->reports, RPT_ERROR, "Mesh has no active vert/edge/face");
 		return OPERATOR_CANCELLED;
 	}

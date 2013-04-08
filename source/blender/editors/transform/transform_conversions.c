@@ -125,7 +125,7 @@
 
 
 /* local function prototype - for Object/Bone Constraints */
-static short constraints_list_needinv(TransInfo *t, ListBase *list);
+static bool constraints_list_needinv(TransInfo *t, ListBase *list);
 
 /* ************************** Functions *************************** */
 
@@ -1236,6 +1236,8 @@ static void createTransMBallVerts(TransInfo *t)
 			copy_v3_v3(td->iloc, td->loc);
 			copy_v3_v3(td->center, td->loc);
 
+			quat_to_mat3(td->axismtx, ml->quat);
+
 			if (ml->flag & SELECT) td->flag = TD_SELECTED | TD_USEQUAT | TD_SINGLESIZE;
 			else td->flag = TD_USEQUAT;
 
@@ -1858,32 +1860,29 @@ static void editmesh_set_connectivity_distance(BMEditMesh *em, float mtx[3][3], 
 	MEM_freeN(tots);
 }
 
-/* loop-in-a-loop I know, but we need it! (ton) */
-static void get_face_center(float r_cent[3], BMVert *eve)
-
+static BMElem *bm_vert_single_select_face(BMVert *eve)
 {
-	BMFace *efa;
+	BMElem *ele;
 	BMIter iter;
 
-	BM_ITER_ELEM (efa, &iter, eve, BM_FACES_OF_VERT) {
-		if (BM_elem_flag_test(efa, BM_ELEM_SELECT)) {
-			BM_face_calc_center_mean(efa, r_cent);
-			break;
+	BM_ITER_ELEM (ele, &iter, eve, BM_FACES_OF_VERT) {
+		if (BM_elem_flag_test(ele, BM_ELEM_SELECT)) {
+			return ele;
 		}
 	}
+	return NULL;
 }
-
-static void get_edge_center(float r_cent[3], BMVert *eve)
+static BMElem *bm_vert_single_select_edge(BMVert *eve)
 {
-	BMEdge *eed;
+	BMElem *ele;
 	BMIter iter;
 
-	BM_ITER_ELEM (eed, &iter, eve, BM_EDGES_OF_VERT) {
-		if (BM_elem_flag_test(eed, BM_ELEM_SELECT)) {
-			mid_v3_v3v3(r_cent, eed->v1->co, eed->v2->co);
-			break;
+	BM_ITER_ELEM (ele, &iter, eve, BM_EDGES_OF_VERT) {
+		if (BM_elem_flag_test(ele, BM_ELEM_SELECT)) {
+			return ele;
 		}
 	}
+	return NULL;
 }
 
 /* way to overwrite what data is edited with transform */
@@ -1895,25 +1894,51 @@ static void VertsToTransData(TransInfo *t, TransData *td, TransDataExtension *tx
 	//	td->loc = key->co;
 	//else
 	td->loc = eve->co;
-
+	copy_v3_v3(td->iloc, td->loc);
 	copy_v3_v3(td->center, td->loc);
 
 	if (t->around == V3D_LOCAL) {
-		if (em->selectmode & SCE_SELECT_FACE)
-			get_face_center(td->center, eve);
-		else if (em->selectmode & SCE_SELECT_EDGE)
-			get_edge_center(td->center, eve);
-	}
-	copy_v3_v3(td->iloc, td->loc);
+		BMElem *ele;
+		bool is_axismat_set = false;
 
-	// Setting normals
-	copy_v3_v3(td->axismtx[2], eve->no);
-	td->axismtx[0][0]        =
-	    td->axismtx[0][1]    =
-	    td->axismtx[0][2]    =
-	    td->axismtx[1][0]    =
-	    td->axismtx[1][1]    =
-	    td->axismtx[1][2]    = 0.0f;
+		if (em->selectmode & (SCE_SELECT_FACE | SCE_SELECT_EDGE) &&
+		    (ele = ((em->selectmode & SCE_SELECT_FACE) ?
+		            bm_vert_single_select_face(eve) :
+		            bm_vert_single_select_edge(eve))))
+		{
+			float normal[3], tangent[3];
+
+			BMEditSelection ese;
+			ese.next = ese.prev = NULL;
+			ese.ele = ele;
+			ese.htype = ele->head.htype;
+
+			BM_editselection_center(&ese, td->center);
+			BM_editselection_normal(&ese, normal);
+			BM_editselection_plane(&ese, tangent);
+
+			if (createSpaceNormalTangent(td->axismtx, normal, tangent)) {
+				is_axismat_set = true;
+			}
+		}
+
+		/* for verts or fallback when createSpaceNormalTangent fails */
+		if (is_axismat_set == false) {
+			axis_dominant_v3_to_m3(td->axismtx, eve->no);
+			invert_m3(td->axismtx);
+		}
+	}
+	else {
+		/* Setting normals */
+		copy_v3_v3(td->axismtx[2], eve->no);
+		td->axismtx[0][0]        =
+		    td->axismtx[0][1]    =
+		    td->axismtx[0][2]    =
+		    td->axismtx[1][0]    =
+		    td->axismtx[1][1]    =
+		    td->axismtx[1][2]    = 0.0f;
+	}
+
 
 	td->ext = NULL;
 	td->val = NULL;
@@ -2503,7 +2528,7 @@ void flushTransUVs(TransInfo *t)
 	}
 }
 
-int clipUVTransform(TransInfo *t, float *vec, int resize)
+bool clipUVTransform(TransInfo *t, float vec[2], const bool resize)
 {
 	TransData *td;
 	int a, clipx = 1, clipy = 1;
@@ -2574,16 +2599,16 @@ void clipUVData(TransInfo *t)
 /* ********************* ANIMATION EDITORS (GENERAL) ************************* */
 
 /* This function tests if a point is on the "mouse" side of the cursor/frame-marking */
-static short FrameOnMouseSide(char side, float frame, float cframe)
+static bool FrameOnMouseSide(char side, float frame, float cframe)
 {
 	/* both sides, so it doesn't matter */
-	if (side == 'B') return 1;
+	if (side == 'B') return true;
 
 	/* only on the named side */
 	if (side == 'R')
-		return (frame >= cframe) ? 1 : 0;
+		return (frame >= cframe);
 	else
-		return (frame <= cframe) ? 1 : 0;
+		return (frame <= cframe);
 }
 
 /* ********************* NLA EDITOR ************************* */
@@ -4523,7 +4548,7 @@ static void createTransSeqData(bContext *C, TransInfo *t)
  * These particular constraints benefit from this, but others don't, hence
  * this semi-hack ;-)    - Aligorith
  */
-static short constraints_list_needinv(TransInfo *t, ListBase *list)
+static bool constraints_list_needinv(TransInfo *t, ListBase *list)
 {
 	bConstraint *con;
 
@@ -4536,55 +4561,63 @@ static short constraints_list_needinv(TransInfo *t, ListBase *list)
 			if ((con->flag & CONSTRAINT_DISABLE) == 0 && (con->enforce != 0.0f)) {
 				/* (affirmative) returns for specific constraints here... */
 				/* constraints that require this regardless  */
-				if (con->type == CONSTRAINT_TYPE_CHILDOF) return 1;
-				if (con->type == CONSTRAINT_TYPE_FOLLOWPATH) return 1;
-				if (con->type == CONSTRAINT_TYPE_CLAMPTO) return 1;
-				if (con->type == CONSTRAINT_TYPE_OBJECTSOLVER) return 1;
-				if (con->type == CONSTRAINT_TYPE_FOLLOWTRACK) return 1;
-				
+				if (ELEM5(con->type,
+				          CONSTRAINT_TYPE_CHILDOF,
+				          CONSTRAINT_TYPE_FOLLOWPATH,
+				          CONSTRAINT_TYPE_CLAMPTO,
+				          CONSTRAINT_TYPE_OBJECTSOLVER,
+				          CONSTRAINT_TYPE_FOLLOWTRACK))
+				{
+					return true;
+				}
+
 				/* constraints that require this only under special conditions */
 				if (con->type == CONSTRAINT_TYPE_ROTLIKE) {
 					/* CopyRot constraint only does this when rotating, and offset is on */
 					bRotateLikeConstraint *data = (bRotateLikeConstraint *)con->data;
 					
 					if ((data->flag & ROTLIKE_OFFSET) && (t->mode == TFM_ROTATION))
-						return 1;
+						return true;
 				}
 			}
 		}
 	}
 
 	/* no appropriate candidates found */
-	return 0;
+	return false;
 }
 
 /* transcribe given object into TransData for Transforming */
 static void ObjectToTransData(TransInfo *t, TransData *td, Object *ob)
 {
 	Scene *scene = t->scene;
-	float obmtx[3][3];
-	short constinv;
-	short skip_invert = 0;
+	bool constinv;
+	bool skip_invert = false;
 
 	if (t->mode != TFM_DUMMY && ob->rigidbody_object) {
 		float rot[3][3], scale[3];
+		float ctime = BKE_scene_frame_get(scene);
 
-		/* save original object transform */
-		copy_v3_v3(td->ext->oloc, ob->loc);
+		/* only use rigid body transform if simulation is running, avoids problems with initial setup of rigid bodies */
+		if (BKE_rigidbody_check_sim_running(scene->rigidbody_world, ctime)) {
 
-		if (ob->rotmode > 0) {
-			copy_v3_v3(td->ext->orot, ob->rot);
+			/* save original object transform */
+			copy_v3_v3(td->ext->oloc, ob->loc);
+
+			if (ob->rotmode > 0) {
+				copy_v3_v3(td->ext->orot, ob->rot);
+			}
+			else if (ob->rotmode == ROT_MODE_AXISANGLE) {
+				td->ext->orotAngle = ob->rotAngle;
+				copy_v3_v3(td->ext->orotAxis, ob->rotAxis);
+			}
+			else {
+				copy_qt_qt(td->ext->oquat, ob->quat);
+			}
+			/* update object's loc/rot to get current rigid body transform */
+			mat4_to_loc_rot_size(ob->loc, rot, scale, ob->obmat);
+			BKE_object_mat3_to_rot(ob, rot, FALSE);
 		}
-		else if (ob->rotmode == ROT_MODE_AXISANGLE) {
-			td->ext->orotAngle = ob->rotAngle;
-			copy_v3_v3(td->ext->orotAxis, ob->rotAxis);
-		}
-		else {
-			copy_qt_qt(td->ext->oquat, ob->quat);
-		}
-		/* update object's loc/rot to get current rigid body transform */
-		mat4_to_loc_rot_size(ob->loc, rot, scale, ob->obmat);
-		BKE_object_mat3_to_rot(ob, rot, FALSE);
 	}
 
 	/* axismtx has the real orientation */
@@ -4602,15 +4635,15 @@ static void ObjectToTransData(TransInfo *t, TransData *td, Object *ob)
 
 	/* disable constraints inversion for dummy pass */
 	if (t->mode == TFM_DUMMY)
-		skip_invert = 1;
+		skip_invert = true;
 
-	if (skip_invert == 0 && constinv == 0) {
-		if (constinv == 0)
+	if (skip_invert == false && constinv == false) {
+		if (constinv == false)
 			ob->transflag |= OB_NO_CONSTRAINTS;  /* BKE_object_where_is_calc_time checks this */
 		
 		BKE_object_where_is_calc(t->scene, ob);
 		
-		if (constinv == 0)
+		if (constinv == false)
 			ob->transflag &= ~OB_NO_CONSTRAINTS;
 	}
 	else
@@ -4662,7 +4695,7 @@ static void ObjectToTransData(TransInfo *t, TransData *td, Object *ob)
 
 	/* is there a need to set the global<->data space conversion matrices? */
 	if (ob->parent || constinv) {
-		float totmat[3][3], obinv[3][3];
+		float obmtx[3][3], totmat[3][3], obinv[3][3];
 
 		/* Get the effect of parenting, and/or certain constraints.
 		 * NOTE: some Constraints, and also Tracking should never get this
@@ -4762,19 +4795,19 @@ static void set_trans_object_base_flags(TransInfo *t)
 	}
 }
 
-static int mark_children(Object *ob)
+static bool mark_children(Object *ob)
 {
 	if (ob->flag & (SELECT | BA_TRANSFORM_CHILD))
-		return 1;
+		return true;
 
 	if (ob->parent) {
 		if (mark_children(ob->parent)) {
 			ob->flag |= BA_TRANSFORM_CHILD;
-			return 1;
+			return true;
 		}
 	}
 	
-	return 0;
+	return false;
 }
 
 static int count_proportional_objects(TransInfo *t)
@@ -5153,7 +5186,7 @@ void special_aftertrans_update(bContext *C, TransInfo *t)
 					 * during cleanup - psy-fi */
 					freeEdgeSlideTempFaces(sld);
 				}
-				EDBM_automerge(t->scene, t->obedit, TRUE);
+				EDBM_automerge(t->scene, t->obedit, true);
 			}
 			else {
 				if (t->mode == TFM_EDGE_SLIDE) {
@@ -5543,8 +5576,11 @@ void special_aftertrans_update(bContext *C, TransInfo *t)
 					recalcObPaths = 1;
 			}
 			/* restore rigid body transform */
-			if (ob->rigidbody_object && canceled)
-				BKE_rigidbody_aftertrans_update(ob, td->ext->oloc, td->ext->orot, td->ext->oquat, td->ext->orotAxis, td->ext->orotAngle);
+			if (ob->rigidbody_object && canceled) {
+				float ctime = BKE_scene_frame_get(t->scene);
+				if (BKE_rigidbody_check_sim_running(t->scene->rigidbody_world, ctime))
+					BKE_rigidbody_aftertrans_update(ob, td->ext->oloc, td->ext->orot, td->ext->oquat, td->ext->orotAxis, td->ext->orotAngle);
+			}
 		}
 		
 		/* recalculate motion paths for objects (if necessary) 

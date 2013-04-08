@@ -1113,7 +1113,7 @@ class VIEW3D_MT_make_links(Menu):
     def draw(self, context):
         layout = self.layout
         operator_context_default = layout.operator_context
-        if(len(bpy.data.scenes) > 10):
+        if len(bpy.data.scenes) > 10:
             layout.operator_context = 'INVOKE_REGION_WIN'
             layout.operator("object.make_links_scene", text="Objects to Scene...", icon='OUTLINER_OB_EMPTY')
         else:
@@ -1641,6 +1641,12 @@ class VIEW3D_MT_pose_specials(Menu):
 
     def draw(self, context):
         layout = self.layout
+
+        layout.operator("paint.weight_from_bones", text="Assign Automatic from Bones").type = 'AUTOMATIC'
+        layout.operator("paint.weight_from_bones", text="Assign from Bone Envelopes").type = 'ENVELOPES'
+
+        layout.separator()
+
         layout.operator("pose.select_constraint_target")
         layout.operator("pose.flip_names")
         layout.operator("pose.paths_calculate")
@@ -1906,6 +1912,12 @@ class VIEW3D_MT_edit_mesh_edges(Menu):
 
         layout.separator()
 
+        if context.scene and bpy.app.build_options.freestyle:
+            layout.operator("mesh.mark_freestyle_edge").clear = False
+            layout.operator("mesh.mark_freestyle_edge", text="Clear Freestyle Edge").clear = True
+
+        layout.separator()
+
         layout.operator("mesh.edge_rotate", text="Rotate Edge CW").use_ccw = False
         layout.operator("mesh.edge_rotate", text="Rotate Edge CCW").use_ccw = True
 
@@ -1946,6 +1958,13 @@ class VIEW3D_MT_edit_mesh_faces(Menu):
 
         layout.separator()
 
+        if context.scene and bpy.app.build_options.freestyle:
+            layout.operator("mesh.mark_freestyle_face").clear = False
+            layout.operator("mesh.mark_freestyle_face", text="Clear Freestyle Face").clear = True
+
+        layout.separator()
+
+        layout.operator("mesh.poke")
         layout.operator("mesh.quads_convert_to_tris")
         layout.operator("mesh.tris_convert_to_quads")
 
@@ -2534,17 +2553,25 @@ class VIEW3D_PT_view3d_meshdisplay(Panel):
 
         split = layout.split()
 
+        with_freestyle = context.scene and bpy.app.build_options.freestyle
+
         col = split.column()
         col.label(text="Overlays:")
         col.prop(mesh, "show_faces", text="Faces")
         col.prop(mesh, "show_edges", text="Edges")
         col.prop(mesh, "show_edge_crease", text="Creases")
+        if with_freestyle:
+            col.prop(mesh, "show_edge_seams", text="Seams")
 
         col = split.column()
         col.label()
-        col.prop(mesh, "show_edge_seams", text="Seams")
+        if not with_freestyle:
+            col.prop(mesh, "show_edge_seams", text="Seams")
         col.prop(mesh, "show_edge_sharp", text="Sharp", text_ctxt=i18n_contexts.plural)
         col.prop(mesh, "show_edge_bevel_weight", text="Weights")
+        if with_freestyle:
+            col.prop(mesh, "show_freestyle_edge_marks", text="Edge Marks")
+            col.prop(mesh, "show_freestyle_face_marks", text="Face Marks")
 
         col = layout.column()
 

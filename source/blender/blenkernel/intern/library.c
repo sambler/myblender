@@ -95,6 +95,7 @@
 #include "BKE_lamp.h"
 #include "BKE_lattice.h"
 #include "BKE_library.h"
+#include "BKE_linestyle.h"
 #include "BKE_mesh.h"
 #include "BKE_material.h"
 #include "BKE_main.h"
@@ -281,6 +282,8 @@ bool id_make_local(ID *id, bool test)
 			return false; /* can't be linked */
 		case ID_GD:
 			return false; /* not implemented */
+		case ID_LS:
+			return 0; /* not implemented */
 	}
 
 	return false;
@@ -379,6 +382,9 @@ bool id_copy(ID *id, ID **newid, bool test)
 		case ID_MSK:
 			if (!test) *newid = (ID *)BKE_mask_copy((Mask *)id);
 			return true;
+		case ID_LS:
+			if (!test) *newid = (ID *)BKE_copy_linestyle((FreestyleLineStyle *)id);
+			return 1;
 	}
 	
 	return false;
@@ -509,6 +515,8 @@ ListBase *which_libbase(Main *mainlib, short type)
 			return &(mainlib->movieclip);
 		case ID_MSK:
 			return &(mainlib->mask);
+		case ID_LS:
+			return &(mainlib->linestyle);
 	}
 	return NULL;
 }
@@ -594,6 +602,7 @@ int set_listbasepointers(Main *main, ListBase **lb)
 	lb[a++] = &(main->world);
 	lb[a++] = &(main->screen);
 	lb[a++] = &(main->object);
+	lb[a++] = &(main->linestyle); /* referenced by scenes */
 	lb[a++] = &(main->scene);
 	lb[a++] = &(main->library);
 	lb[a++] = &(main->wm);
@@ -716,6 +725,9 @@ static ID *alloc_libblock_notest(short type)
 			break;
 		case ID_MSK:
 			id = MEM_callocN(sizeof(Mask), "Mask");
+			break;
+		case ID_LS:
+			id = MEM_callocN(sizeof(FreestyleLineStyle), "Freestyle Line Style");
 			break;
 	}
 	return id;
@@ -952,6 +964,9 @@ void BKE_libblock_free(ListBase *lb, void *idv)
 		case ID_MSK:
 			BKE_mask_free(bmain, (Mask *)id);
 			break;
+		case ID_LS:
+			BKE_free_linestyle((FreestyleLineStyle *)id);
+			break;
 	}
 
 	BLI_remlink(lb, id);
@@ -1050,6 +1065,7 @@ ID *BKE_libblock_find_name(const short type, const char *name)      /* type: "OB
 	return BLI_findstring(lb, name, offsetof(ID, name) + 2);
 }
 
+#if 0 /* UNUSED */
 static void get_flags_for_id(ID *id, char *buf) 
 {
 	int isfake = id->flag & LIB_FAKEUSER;
@@ -1130,7 +1146,6 @@ static void IDnames_to_dyn_pupstring(DynStr *pupds, ListBase *lb, ID *link, shor
 	}
 }
 
-
 /* used by headerbuttons.c buttons.c editobject.c editseq.c */
 /* if (nr == NULL) no MAX_IDPUP, this for non-header browsing */
 void IDnames_to_pupstring(const char **str, const char *title, const char *extraops, ListBase *lb, ID *link, short *nr)
@@ -1155,7 +1170,6 @@ void IDnames_to_pupstring(const char **str, const char *title, const char *extra
 }
 
 /* skips viewer images */
-#if 0 /* unused */
 void IMAnames_to_pupstring(const char **str, const char *title, const char *extraops, ListBase *lb, ID *link, short *nr)
 {
 	DynStr *pupds = BLI_dynstr_new();

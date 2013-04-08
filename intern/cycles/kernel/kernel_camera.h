@@ -53,7 +53,7 @@ __device void camera_sample_perspective(KernelGlobals *kg, float raster_x, float
 
 		/* compute point on plane of focus */
 		float ft = kernel_data.cam.focaldistance/ray->D.z;
-		float3 Pfocus = ray->P + ray->D*ft;
+		float3 Pfocus = ray->D*ft;
 
 		/* update ray for effect of lens */
 		ray->P = make_float3(lensuv.x, lensuv.y, 0.0f);
@@ -100,7 +100,6 @@ __device void camera_sample_orthographic(KernelGlobals *kg, float raster_x, floa
 	Transform rastertocamera = kernel_data.cam.rastertocamera;
 	float3 Pcamera = transform_perspective(&rastertocamera, make_float3(raster_x, raster_y, 0.0f));
 
-	ray->P = Pcamera;
 	ray->D = make_float3(0.0f, 0.0f, 1.0f);
 
 	/* modify ray for depth of field */
@@ -112,13 +111,16 @@ __device void camera_sample_orthographic(KernelGlobals *kg, float raster_x, floa
 
 		/* compute point on plane of focus */
 		float ft = kernel_data.cam.focaldistance/ray->D.z;
-		float3 Pfocus = ray->P + ray->D*ft;
+		float3 Pfocus = ray->D*ft;
 
 		/* update ray for effect of lens */
-		ray->P = make_float3(lensuv.x, lensuv.y, 0.0f);
-		ray->D = normalize(Pfocus - ray->P);
+		float3 lensuvw = make_float3(lensuv.x, lensuv.y, 0.0f);
+		ray->P = Pcamera + lensuvw;
+		ray->D = normalize(Pfocus - lensuvw);
 	}
-
+	else {
+		ray->P = Pcamera;
+	}
 	/* transform ray from camera to world */
 	Transform cameratoworld = kernel_data.cam.cameratoworld;
 

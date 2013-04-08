@@ -106,7 +106,7 @@ typedef struct TemplateID {
 
 	ListBase *idlb;
 	int prv_rows, prv_cols;
-	int preview;
+	bool preview;
 } TemplateID;
 
 /* Search browse menu, assign  */
@@ -156,7 +156,7 @@ static void id_search_cb(const bContext *C, void *arg_template, const char *str,
 
 				iconid = ui_id_icon_get((bContext *)C, id, template->preview);
 
-				if (!uiSearchItemAdd(items, name_ui, id, iconid))
+				if (false == uiSearchItemAdd(items, name_ui, id, iconid))
 					break;
 			}
 		}
@@ -334,6 +334,7 @@ static const char *template_id_browse_tip(StructRNA *type)
 			case ID_MA:  return N_("Browse Material to be linked");
 			case ID_TE:  return N_("Browse Texture to be linked");
 			case ID_IM:  return N_("Browse Image to be linked");
+			case ID_LS:  return N_("Browse Line Style Data to be linked");
 			case ID_LT:  return N_("Browse Lattice Data to be linked");
 			case ID_LA:  return N_("Browse Lamp Data to be linked");
 			case ID_CA:  return N_("Browse Camera Data to be linked");
@@ -369,6 +370,7 @@ static const char *template_id_context(StructRNA *type)
 			case ID_MA:  return BLF_I18NCONTEXT_ID_MATERIAL;
 			case ID_TE:  return BLF_I18NCONTEXT_ID_TEXTURE;
 			case ID_IM:  return BLF_I18NCONTEXT_ID_IMAGE;
+			case ID_LS:  return BLF_I18NCONTEXT_ID_FREESTYLELINESTYLE;
 			case ID_LT:  return BLF_I18NCONTEXT_ID_LATTICE;
 			case ID_LA:  return BLF_I18NCONTEXT_ID_LAMP;
 			case ID_CA:  return BLF_I18NCONTEXT_ID_CAMERA;
@@ -411,13 +413,13 @@ static void template_ID(bContext *C, uiLayout *layout, TemplateID *template, Str
 		type = idptr.type;
 
 	if (flag & UI_ID_PREVIEWS) {
-		template->preview = TRUE;
+		template->preview = true;
 
 		but = uiDefBlockButN(block, id_search_menu, MEM_dupallocN(template), "", 0, 0, UI_UNIT_X * 6, UI_UNIT_Y * 6,
 		                     TIP_(template_id_browse_tip(type)));
 		if (type) {
 			but->icon = RNA_struct_ui_icon(type);
-			if (id) but->icon = ui_id_icon_get(C, id, 1);
+			if (id) but->icon = ui_id_icon_get(C, id, true);
 			uiButSetFlag(but, UI_HAS_ICON | UI_ICON_PREVIEW);
 		}
 		if ((idfrom && idfrom->lib) || !editable)
@@ -526,6 +528,7 @@ static void template_ID(bContext *C, uiLayout *layout, TemplateID *template, Str
 		                                 BLF_I18NCONTEXT_ID_BRUSH,
 		                                 BLF_I18NCONTEXT_ID_PARTICLESETTINGS,
 		                                 BLF_I18NCONTEXT_ID_GPENCIL,
+		                                 BLF_I18NCONTEXT_ID_FREESTYLELINESTYLE,
 		);
 		
 		if (newop) {
@@ -544,7 +547,7 @@ static void template_ID(bContext *C, uiLayout *layout, TemplateID *template, Str
 	}
 
 	/* Due to space limit in UI - skip the "open" icon for packed data, and allow to unpack.
-	   Only for images, sound and fonts */
+	 * Only for images, sound and fonts */
 	if (id && BKE_pack_check(id)) {
 		but = uiDefIconButO(block, BUT, "FILE_OT_unpack_item", WM_OP_INVOKE_REGION_WIN, ICON_PACKAGE, 0, 0,
 		                    UI_UNIT_X, UI_UNIT_Y, TIP_("Packed File, click to unpack"));
@@ -1214,7 +1217,7 @@ static uiLayout *draw_constraint(uiLayout *layout, Object *ob, bConstraint *con)
 
 	/* Set but-locks for protected settings (magic numbers are used here!) */
 	if (proxy_protected)
-		uiBlockSetButLock(block, 1, IFACE_("Cannot edit Proxy-Protected Constraint"));
+		uiBlockSetButLock(block, true, IFACE_("Cannot edit Proxy-Protected Constraint"));
 
 	/* Draw constraint data */
 	if ((con->flag & CONSTRAINT_EXPAND) == 0) {
@@ -2119,7 +2122,7 @@ static void curvemap_buttons_layout(uiLayout *layout, PointerRNA *ptr, char labe
 	/* curve itself */
 	size = uiLayoutGetWidth(layout);
 	row = uiLayoutRow(layout, FALSE);
-	uiDefBut(block, BUT_CURVE, 0, "", 0, 0, size, MIN2(size, 10.0f * UI_UNIT_X), cumap, 0.0f, 1.0f, bg, 0, "");
+	uiDefBut(block, BUT_CURVE, 0, "", 0, 0, size, 8.0f * UI_UNIT_X, cumap, 0.0f, 1.0f, bg, 0, "");
 
 	/* sliders for selected point */
 	for (i = 0; i < cm->totpoint; i++) {
@@ -2628,7 +2631,7 @@ void uiTemplateList(uiLayout *layout, bContext *C, const char *listtype_name, co
 
 					sub = uiLayoutRow(overlap, FALSE);
 
-					icon = UI_rnaptr_icon_get(C, &itemptr, rnaicon, FALSE);
+					icon = UI_rnaptr_icon_get(C, &itemptr, rnaicon, false);
 					if (icon == ICON_DOT)
 						icon = ICON_NONE;
 					draw_item(ui_list, C, sub, dataptr, &itemptr, icon, active_dataptr, active_propname, i);
@@ -2662,7 +2665,7 @@ void uiTemplateList(uiLayout *layout, bContext *C, const char *listtype_name, co
 				found = (activei == i);
 
 				if (found) {
-					icon = UI_rnaptr_icon_get(C, &itemptr, rnaicon, FALSE);
+					icon = UI_rnaptr_icon_get(C, &itemptr, rnaicon, false);
 					if (icon == ICON_DOT)
 						icon = ICON_NONE;
 					draw_item(ui_list, C, row, dataptr, &itemptr, icon, active_dataptr, active_propname, i);
@@ -2709,7 +2712,7 @@ void uiTemplateList(uiLayout *layout, bContext *C, const char *listtype_name, co
 
 				sub = uiLayoutRow(overlap, FALSE);
 
-				icon = UI_rnaptr_icon_get(C, &itemptr, rnaicon, FALSE);
+				icon = UI_rnaptr_icon_get(C, &itemptr, rnaicon, false);
 				draw_item(ui_list, C, sub, dataptr, &itemptr, icon, active_dataptr, active_propname, i);
 
 				i++;
@@ -2757,7 +2760,7 @@ static void operator_search_cb(const bContext *C, void *UNUSED(arg), const char 
 					}
 				}
 				
-				if (0 == uiSearchItemAdd(items, name, ot, 0))
+				if (false == uiSearchItemAdd(items, name, ot, 0))
 					break;
 			}
 		}

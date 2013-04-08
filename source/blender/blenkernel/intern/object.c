@@ -92,6 +92,7 @@
 #include "BKE_lamp.h"
 #include "BKE_lattice.h"
 #include "BKE_library.h"
+#include "BKE_linestyle.h"
 #include "BKE_mesh.h"
 #include "BKE_tessmesh.h"
 #include "BKE_mball.h"
@@ -425,6 +426,8 @@ void BKE_object_unlink(Object *ob)
 	World *wrld;
 	bScreen *sc;
 	Scene *sce;
+	SceneRenderLayer *srl;
+	FreestyleLineSet *lineset;
 	Curve *cu;
 	Tex *tex;
 	Group *group;
@@ -676,6 +679,14 @@ void BKE_object_unlink(Object *ob)
 					}
 				}
 				SEQ_END
+			}
+
+			for (srl = sce->r.layers.first; srl; srl = srl->next) {
+				for (lineset = (FreestyleLineSet *)srl->freestyleConfig.linesets.first;
+				     lineset; lineset = lineset->next)
+				{
+					BKE_unlink_linestyle_target_object(lineset->linestyle, ob);
+				}
 			}
 		}
 
@@ -1837,8 +1848,8 @@ static void ob_parcurve(Scene *scene, Object *ob, Object *par, float mat[4][4])
 			
 			/* the tilt */
 			normalize_v3(dir);
-			q[0] = (float)cos(0.5 * vec[3]);
-			si = (float)sin(0.5 * vec[3]);
+			q[0] = cosf(0.5 * vec[3]);
+			si = sinf(0.5 * vec[3]);
 			q[1] = -si * dir[0];
 			q[2] = -si * dir[1];
 			q[3] = -si * dir[2];

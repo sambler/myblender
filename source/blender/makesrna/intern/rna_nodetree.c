@@ -2008,6 +2008,12 @@ static void rna_NodeSocket_update(Main *bmain, Scene *UNUSED(scene), PointerRNA 
 	ED_node_tag_update_nodetree(bmain, ntree);
 }
 
+static void rna_NodeSocket_link_limit_set(PointerRNA *ptr, int value)
+{
+	bNodeSocket *sock = ptr->data;
+	sock->limit = (value == 0 ? 0xFFF : value);
+}
+
 static void rna_NodeSocket_hide_set(PointerRNA *ptr, int value)
 {
 	bNodeSocket *sock = (bNodeSocket *)ptr->data;
@@ -4012,7 +4018,7 @@ static void def_cmp_dilate_erode(StructRNA *srna)
 	prop = RNA_def_property(srna, "distance", PROP_INT, PROP_NONE);
 	RNA_def_property_int_sdna(prop, NULL, "custom2");
 	RNA_def_property_range(prop, -5000, 5000);
-	RNA_def_property_ui_range(prop, -100, 100, 0, 0);
+	RNA_def_property_ui_range(prop, -100, 100, 0, -1);
 	RNA_def_property_ui_text(prop, "Distance", "Distance to grow/shrink (number of iterations)");
 	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 
@@ -5892,6 +5898,13 @@ static void rna_def_node_socket(BlenderRNA *brna)
 	RNA_def_property_boolean_negative_sdna(prop, NULL, "flag", SOCK_UNAVAIL);
 	RNA_def_property_ui_text(prop, "Enabled", "Enable the socket");
 	RNA_def_property_update(prop, NC_NODE | ND_DISPLAY, NULL);
+
+	prop = RNA_def_property(srna, "link_limit", PROP_INT, PROP_NONE);
+	RNA_def_property_int_sdna(prop, NULL, "limit");
+	RNA_def_property_int_funcs(prop, NULL, "rna_NodeSocket_link_limit_set", NULL);
+	RNA_def_property_range(prop, 1, 0xFFF);
+	RNA_def_property_ui_text(prop, "Link Limit", "Max number of links allowed for this socket");
+	RNA_def_property_update(prop, NC_NODE | NA_EDITED, NULL);
 
 	prop = RNA_def_property(srna, "is_linked", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", SOCK_IN_USE);

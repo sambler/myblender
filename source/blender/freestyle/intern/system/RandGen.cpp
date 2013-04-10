@@ -27,6 +27,8 @@
 
 #include "RandGen.h"
 
+namespace Freestyle {
+
 //
 // Macro definitions
 //
@@ -41,7 +43,9 @@
 #define A1     0xDEEC
 #define A2     0x5
 #define C      0xB
+#if 0  // XXX Unused
 #define HI_BIT (1L << (2 * N - 1))
+#endif
 
 #define LOW(x)  ((unsigned)(x) & MASK)
 #define HIGH(x) LOW((x) >> N)
@@ -56,9 +60,12 @@
 #define CARRY(x, y)         ((unsigned long)((long)(x) + (long)(y)) > MASK)
 #define ADDEQU(x, y, z)     (z = CARRY(x, (y)), x = LOW(x + (y)))
 #define SET3(x, x0, x1, x2) ((x)[0] = (x0), (x)[1] = (x1), (x)[2] = (x2))
+#if 0 // XXX, unused
 #define SETLOW(x, y, n)     SET3(x, LOW((y)[n]), LOW((y)[(n)+1]), LOW((y)[(n)+2]))
+#endif
 #define SEED(x0, x1, x2)    (SET3(x, x0, x1, x2), SET3(a, A0, A1, A2), c = C)
 
+#if 0 // XXX, unused
 #define REST(v)               \
 	for (i = 0; i < 3; i++) { \
 		xsubi[i] = x[i];      \
@@ -79,6 +86,7 @@
 		v = F();                             \
 		REST(v);                             \
 	}
+#endif
 
 static unsigned x[3] = {
 	X0,
@@ -123,3 +131,5 @@ void RandGen::next()
 	x[1] = LOW(p[1] + r[0]);
 	x[0] = LOW(p[0]);
 }
+
+} /* namespace Freestyle */

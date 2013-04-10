@@ -101,6 +101,7 @@
 #include "ED_mesh.h"
 #include "ED_node.h"
 #include "ED_object.h"
+#include "ED_physics.h"
 #include "ED_render.h"
 #include "ED_screen.h"
 #include "ED_transform.h"
@@ -382,6 +383,12 @@ Object *ED_object_add_type(bContext *C, int type, const float loc[3], const floa
 
 	/* more editor stuff */
 	ED_object_base_init_transform(C, BASACT, loc, rot);
+
+	/* Ignore collisions by default for non-mesh objects */
+	if (type != OB_MESH) {
+		ob->body_type = OB_BODY_TYPE_NO_COLLISION;
+		ob->gameflag &= ~(OB_SENSOR | OB_RIGID_BODY | OB_SOFT_BODY | OB_COLLISION | OB_CHARACTER | OB_OCCLUDER | OB_DYNAMIC | OB_NAVMESH); /* copied from rna_object.c */
+	}
 
 	DAG_id_type_tag(bmain, ID_OB);
 	DAG_relations_tag_update(bmain);
@@ -1489,8 +1496,10 @@ static int convert_exec(bContext *C, wmOperator *op)
 
 			BKE_mesh_to_curve(scene, newob);
 
-			if (newob->type == OB_CURVE)
+			if (newob->type == OB_CURVE) {
 				BKE_object_free_modifiers(newob);   /* after derivedmesh calls! */
+				ED_rigidbody_object_remove(scene, newob);
+			}
 		}
 		else if (ob->type == OB_MESH && ob->modifiers.first) { /* converting a mesh with no modifiers causes a segfault */
 			ob->flag |= OB_DONE;

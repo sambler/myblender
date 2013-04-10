@@ -32,32 +32,30 @@
 
 #include "Noise.h"
 
-#define MINX -1000000
-#define MINY MINX
-#define MINZ MINX
+namespace Freestyle {
 
 #define SCURVE(a) ((a) * (a) * (3.0 - 2.0 * (a)))
 
+#if 0  // XXX Unused
 #define REALSCALE (2.0 / 65536.0)
 #define NREALSCALE (2.0 / 4096.0)
 
 #define HASH3D(a, b, c) hashTable[hashTable[hashTable[(a) & 0xfff] ^ ((b) & 0xfff)] ^ ((c) & 0xfff)]
 #define HASH(a, b, c) (xtab[(xtab[(xtab[(a) & 0xff] ^ (b)) & 0xff] ^ (c)) & 0xff] & 0xff)
-
 #define INCRSUM(m, s, x, y, z) \
 	((s) * (RTable[m] * 0.5 + RTable[m + 1] * (x) + RTable[m + 2] * (y) + RTable[m + 3] * (z)))
 
 #define MAXSIZE 500
-
-#if 0  // XXX Unused
 #define NRAND() ((float)rand() / (float)RAND_MAX)
 #endif
 #define SEEDNRAND(x) (srand(x * RAND_MAX))
 
 #define BM 0xff
 #define N  0x1000
+#if 0  // XXX Unused
 #define NP 12  /* 2^N */
 #define NM 0xfff
+#endif
 
 #define LERP(t, a, b) ((a) + (t) * ((b) - (a)))
 
@@ -276,3 +274,5 @@ Noise::Noise(long seed)
 			g3[_NOISE_B + i][j] = g3[i][j];
 	}
 }
+
+} /* namespace Freestyle */

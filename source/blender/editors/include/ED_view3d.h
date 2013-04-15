@@ -223,6 +223,8 @@ void ED_view3d_calc_camera_border(struct Scene *scene, struct ARegion *ar,
 void ED_view3d_calc_camera_border_size(struct Scene *scene, struct ARegion *ar,
                                        struct View3D *v3d, struct RegionView3D *rv3d,
                                        float r_size[2]);
+bool ED_view3d_calc_render_border(struct Scene *scene, struct View3D *v3d,
+                                  struct ARegion *ar, struct rcti *rect);
 
 void ED_view3d_clipping_calc(struct BoundBox *bb, float planes[4][4], struct bglMats *mats, const struct rcti *rect);
 void ED_view3d_clipping_local(struct RegionView3D *rv3d, float mat[4][4]);
@@ -281,7 +283,7 @@ int ED_view3d_scene_layer_set(int lay, const int *values, int *active);
 bool ED_view3d_context_activate(struct bContext *C);
 void ED_view3d_draw_offscreen_init(struct Scene *scene, struct View3D *v3d);
 void ED_view3d_draw_offscreen(struct Scene *scene, struct View3D *v3d, struct ARegion *ar,
-                              int winx, int winy, float viewmat[4][4], float winmat[4][4], bool do_bgpic);
+                              int winx, int winy, float viewmat[4][4], float winmat[4][4], bool do_bgpic, bool do_sky);
 
 struct ImBuf *ED_view3d_draw_offscreen_imbuf(struct Scene *scene, struct View3D *v3d, struct ARegion *ar, int sizex, int sizey, unsigned int flag,
                                              bool draw_background, int alpha_mode, char err_out[256]);

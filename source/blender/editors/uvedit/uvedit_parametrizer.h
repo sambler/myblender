@@ -30,7 +30,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
+	
 #include "BLO_sys_types.h" // for intptr_t support
 
 typedef void ParamHandle;	/* handle to a set of charts */
@@ -56,16 +56,17 @@ ParamHandle *param_construct_begin(void);
 void param_aspect_ratio(ParamHandle *handle, float aspx, float aspy);
 
 void param_face_add(ParamHandle *handle,
-					ParamKey key,
-					int nverts,
-					ParamKey *vkeys,
-					float **co,
-					float **uv,
-					ParamBool *pin,
-					ParamBool *select);
+                    ParamKey key,
+                    int nverts,
+                    ParamKey *vkeys,
+                    float **co,
+                    float **uv,
+                    ParamBool *pin,
+                    ParamBool *select,
+                    float face_normal[3]);
 
 void param_edge_set_seam(ParamHandle *handle,
-						 ParamKey *vkeys);
+                         ParamKey *vkeys);
 
 void param_construct_end(ParamHandle *handle, ParamBool fill, ParamBool impl);
 void param_delete(ParamHandle *chart);
@@ -76,7 +77,7 @@ void param_delete(ParamHandle *chart);
  * - lscm is divided in three steps:
  * - begin: compute matrix and it's factorization (expensive)
  * - solve using pinned coordinates (cheap)
- * - end: clean up
+ * - end: clean up 
  * - uv coordinates are allowed to change within begin/end, for
  *   quick re-solving
  */

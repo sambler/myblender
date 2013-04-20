@@ -75,6 +75,8 @@ set(SRC_OSL_HEADERS
 	node_fresnel.h
 	stdosl.h
 	oslutil.h
+	noises_osl.h
+	patterns_osl.h
 )
 
 set(SRC_OSO

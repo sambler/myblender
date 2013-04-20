@@ -5014,12 +5014,11 @@ static BMLoop *get_next_loop(BMVert *v, BMLoop *l,
 	int i = 0;
 
 	BLI_assert(BM_edge_share_vert(e_prev, e_next) == v);
+	BLI_assert(BM_vert_in_edge(l->e, v));
 
 	l_first = l;
 	do {
 		l = BM_loop_other_edge_loop(l, v);
-		if (l->radial_next == l)
-			return NULL;
 		
 		if (l->e == e_next) {
 			if (i) {
@@ -5085,10 +5084,9 @@ static BMLoop *get_next_loop(BMVert *v, BMLoop *l,
 			copy_v3_v3(r_slide_vec, vec_accum);
 			return BM_loop_other_edge_loop(l, v);
 		}
-		
-		BLI_assert(l != l->radial_next);
-		l = l->radial_next;
-	} while (l != l_first);
+
+	} while ((l != l->radial_next) &&
+	         ((l = l->radial_next) != l_first));
 
 	if (i) {
 		len_v3_ensure(vec_accum, vec_accum_len / (float)i);
@@ -5144,7 +5142,7 @@ static void calcNonProportionalEdgeSlide(TransInfo *t, EdgeSlideData *sld, const
 	}
 }
 
-static int createEdgeSlideVerts(TransInfo *t)
+static bool createEdgeSlideVerts(TransInfo *t)
 {
 	BMEditMesh *em = BKE_editmesh_from_object(t->obedit);
 	BMesh *bm = em->bm;
@@ -5154,6 +5152,7 @@ static int createEdgeSlideVerts(TransInfo *t)
 	TransDataEdgeSlideVert *sv_array;
 	int sv_tot;
 	BMBVHTree *btree;
+	/* BMVert -> sv_array index */
 	SmallHash table;
 	EdgeSlideData *sld = MEM_callocN(sizeof(*sld), "sld");
 	View3D *v3d = NULL;
@@ -5162,8 +5161,7 @@ static int createEdgeSlideVerts(TransInfo *t)
 	float projectMat[4][4];
 	float mval[2] = {(float)t->mval[0], (float)t->mval[1]};
 	float mval_start[2], mval_end[2];
-	float vec_a[3], vec_b[3];
-	float dir[3], maxdist, (*loop_dir)[3], *loop_maxdist;
+	float mval_dir[3], maxdist, (*loop_dir)[3], *loop_maxdist;
 	int numsel, i, j, loop_nr, l_nr;
 	int use_btree_disp;
 
@@ -5173,7 +5171,7 @@ static int createEdgeSlideVerts(TransInfo *t)
 		rv3d = t->ar ? t->ar->regiondata : NULL;
 	}
 
-	sld->is_proportional = TRUE;
+	sld->is_proportional = true;
 	sld->curr_sv_index = 0;
 	sld->flipped_vtx = FALSE;
 
@@ -5206,16 +5204,18 @@ static int createEdgeSlideVerts(TransInfo *t)
 
 			if (numsel == 0 || numsel > 2) {
 				MEM_freeN(sld);
-				return 0; /* invalid edge selection */
+				return false; /* invalid edge selection */
 			}
 		}
 	}
 
 	BM_ITER_MESH (e, &iter, bm, BM_EDGES_OF_MESH) {
 		if (BM_elem_flag_test(e, BM_ELEM_SELECT)) {
-			if (!BM_edge_is_manifold(e)) {
+			/* note, any edge with loops can work, but we won't get predictable results, so bail out */
+			if (!BM_edge_is_manifold(e) && !BM_edge_is_boundary(e)) {
+				/* can edges with at least once face user */
 				MEM_freeN(sld);
-				return 0; /* can only handle exactly 2 faces around each edge */
+				return false;
 			}
 		}
 	}
@@ -5234,7 +5234,7 @@ static int createEdgeSlideVerts(TransInfo *t)
 
 	if (!j) {
 		MEM_freeN(sld);
-		return 0;
+		return false;
 	}
 
 	sv_tot = j;
@@ -5242,7 +5242,8 @@ static int createEdgeSlideVerts(TransInfo *t)
 	loop_nr = 0;
 
 	while (1) {
-		BMLoop *l, *l_a, *l_b;
+		float vec_a[3], vec_b[3];
+		BMLoop *l_a, *l_b;
 		BMVert *v_first;
 
 		v = NULL;
@@ -5282,16 +5283,38 @@ static int createEdgeSlideVerts(TransInfo *t)
 
 		BM_elem_flag_disable(v, BM_ELEM_TAG);
 
-		l_a = l_b = l = NULL;
 		l_a = e->l;
 		l_b = e->l->radial_next;
 
-		l = BM_loop_other_edge_loop(l_a, v);
-		sub_v3_v3v3(vec_a, BM_edge_other_vert(l->e, v)->co, v->co);
+		/* regarding e_next, use get_next_loop()'s improved interpolation where possible */
+		{
+			BMEdge *e_next = get_other_edge(v, e);
+			if (e_next) {
+				get_next_loop(v, l_a, e, e_next, vec_a);
+			}
+			else {
+				BMLoop *l_tmp = BM_loop_other_edge_loop(l_a, v);
+				if (BM_vert_edge_count_nonwire(v) == 2)
+					get_next_loop(v, l_a, e, l_tmp->e, vec_a);
+				else
+					sub_v3_v3v3(vec_a, BM_edge_other_vert(l_tmp->e, v)->co, v->co);
+			}
+		}
 
+		/* !BM_edge_is_boundary(e); */
 		if (l_b != l_a) {
-			l = BM_loop_other_edge_loop(l_b, v);
-			sub_v3_v3v3(vec_b, BM_edge_other_vert(l->e, v)->co, v->co);
+			BMEdge *e_next = get_other_edge(v, e);
+			if (e_next) {
+				get_next_loop(v, l_b, e, e_next, vec_b);
+			}
+			else {
+				BMLoop *l_tmp = BM_loop_other_edge_loop(l_b, v);
+				if (BM_vert_edge_count_nonwire(v) == 2)
+					get_next_loop(v, l_b, e, l_tmp->e, vec_b);
+				else
+					sub_v3_v3v3(vec_b, BM_edge_other_vert(l_tmp->e, v)->co, v->co);
+
+			}
 		}
 		else {
 			l_b = NULL;
@@ -5300,27 +5323,30 @@ static int createEdgeSlideVerts(TransInfo *t)
 		/*iterate over the loop*/
 		v_first = v;
 		do {
+			bool l_a_ok_prev;
+			bool l_b_ok_prev;
 			TransDataEdgeSlideVert *sv;
 			BMVert *v_prev;
 			BMEdge *e_prev;
 
 			/* XXX, 'sv' will initialize multiple times, this is suspicious. see [#34024] */
 			BLI_assert(BLI_smallhash_haskey(&table, (uintptr_t)v) != false);
+			BLI_assert(v != NULL);
 			sv = sv_array + GET_INT_FROM_POINTER(BLI_smallhash_lookup(&table, (uintptr_t)v));
 			sv->v = v;
 			copy_v3_v3(sv->v_co_orig, v->co);
 			sv->loop_nr = loop_nr;
 
 			if (l_a) {
+				BMLoop *l_tmp = BM_loop_other_edge_loop(l_a, v);
+				sv->v_a = BM_edge_other_vert(l_tmp->e, v);
 				copy_v3_v3(sv->dir_a, vec_a);
-				l = BM_loop_other_edge_loop(l_a, v);
-				sv->v_a = BM_edge_other_vert(l->e, v);
 			}
 
 			if (l_b) {
+				BMLoop *l_tmp = BM_loop_other_edge_loop(l_b, v);
+				sv->v_b = BM_edge_other_vert(l_tmp->e, v);
 				copy_v3_v3(sv->dir_b, vec_b);
-				l = BM_loop_other_edge_loop(l_b, v);
-				sv->v_b = BM_edge_other_vert(l->e, v);
 			}
 
 			v_prev = v;
@@ -5331,21 +5357,32 @@ static int createEdgeSlideVerts(TransInfo *t)
 
 			if (!e) {
 				BLI_assert(BLI_smallhash_haskey(&table, (uintptr_t)v) != false);
+				BLI_assert(v != NULL);
 				sv = sv_array + GET_INT_FROM_POINTER(BLI_smallhash_lookup(&table, (uintptr_t)v));
 				sv->v = v;
 				copy_v3_v3(sv->v_co_orig, v->co);
 				sv->loop_nr = loop_nr;
 
 				if (l_a) {
-					l = BM_loop_other_edge_loop(l_a, v);
-					sv->v_a = BM_edge_other_vert(l->e, v);
-					sub_v3_v3v3(sv->dir_a, BM_edge_other_vert(l->e, v)->co, v->co);
+					BMLoop *l_tmp = BM_loop_other_edge_loop(l_a, v);
+					sv->v_a = BM_edge_other_vert(l_tmp->e, v);
+					if (BM_vert_edge_count_nonwire(v) == 2) {
+						get_next_loop(v, l_a, e_prev, l_tmp->e, sv->dir_a);
+					}
+					else {
+						sub_v3_v3v3(sv->dir_a, BM_edge_other_vert(l_tmp->e, v)->co, v->co);
+					}
 				}
 
 				if (l_b) {
-					l = BM_loop_other_edge_loop(l_b, v);
-					sv->v_b = BM_edge_other_vert(l->e, v);
-					sub_v3_v3v3(sv->dir_b, BM_edge_other_vert(l->e, v)->co, v->co);
+					BMLoop *l_tmp = BM_loop_other_edge_loop(l_b, v);
+					sv->v_b = BM_edge_other_vert(l_tmp->e, v);
+					if (BM_vert_edge_count_nonwire(v) == 2) {
+						get_next_loop(v, l_b, e_prev, l_tmp->e, sv->dir_b);
+					}
+					else {
+						sub_v3_v3v3(sv->dir_b, BM_edge_other_vert(l_tmp->e, v)->co, v->co);
+					}
 				}
 
 				BM_elem_flag_disable(v, BM_ELEM_TAG);
@@ -5353,6 +5390,8 @@ static int createEdgeSlideVerts(TransInfo *t)
 
 				break;
 			}
+			l_a_ok_prev = (l_a != NULL);
+			l_b_ok_prev = (l_b != NULL);
 
 			l_a = l_a ? get_next_loop(v, l_a, e_prev, e, vec_a) : NULL;
 			l_b = l_b ? get_next_loop(v, l_b, e_prev, e, vec_b) : NULL;
@@ -5360,6 +5399,24 @@ static int createEdgeSlideVerts(TransInfo *t)
 			/* find the opposite loop if it was missing previously */
 			if      (l_a == NULL && l_b && (l_b->radial_next != l_b)) l_a = l_b->radial_next;
 			else if (l_b == NULL && l_a && (l_a->radial_next != l_a)) l_b = l_a->radial_next;
+
+			/* if there are non-contiguous faces, we can still recover the loops of the new edges faces */
+			/* note!, the behavior in this case means edges may move in opposite directions,
+			 * this could be made to work more usefully. */
+			if (!(l_a && l_b) && (e->l != NULL)) {
+				if (l_a_ok_prev) {
+					l_a = e->l;
+					if (l_a->radial_next != l_a) {
+						l_b = l_a->radial_next;
+					}
+				}
+				else if (l_b_ok_prev) {
+					l_b = e->l;
+					if (l_b->radial_next != l_b) {
+						l_a = l_b->radial_next;
+					}
+				}
+			}
 
 			BM_elem_flag_disable(v, BM_ELEM_TAG);
 			BM_elem_flag_disable(v_prev, BM_ELEM_TAG);
@@ -5387,24 +5444,27 @@ static int createEdgeSlideVerts(TransInfo *t)
 	
 	/* find mouse vectors, the global one, and one per loop in case we have
 	 * multiple loops selected, in case they are oriented different */
-	zero_v3(dir);
+	zero_v3(mval_dir);
 	maxdist = -1.0f;
 
 	loop_dir = MEM_callocN(sizeof(float) * 3 * loop_nr, "sv loop_dir");
-	loop_maxdist = MEM_callocN(sizeof(float) * loop_nr, "sv loop_maxdist");
+	loop_maxdist = MEM_mallocN(sizeof(float) * loop_nr, "sv loop_maxdist");
 	fill_vn_fl(loop_maxdist, loop_nr, -1.0f);
 
 	BM_ITER_MESH (e, &iter, bm, BM_EDGES_OF_MESH) {
 		if (BM_elem_flag_test(e, BM_ELEM_SELECT)) {
 			BMIter iter2;
 			BMEdge *e2;
-			float vec1[3], d;
+			float d;
 
 			/* search cross edges for visible edge to the mouse cursor,
 			 * then use the shared vertex to calculate screen vector*/
 			for (i = 0; i < 2; i++) {
 				v = i ? e->v1 : e->v2;
 				BM_ITER_ELEM (e2, &iter2, v, BM_EDGES_OF_VERT) {
+					/* screen-space coords */
+					float sco_a[3], sco_b[3];
+
 					if (BM_elem_flag_test(e2, BM_ELEM_SELECT))
 						continue;
 
@@ -5417,37 +5477,46 @@ static int createEdgeSlideVerts(TransInfo *t)
 					j = GET_INT_FROM_POINTER(BLI_smallhash_lookup(&table, (uintptr_t)v));
 
 					if (sv_array[j].v_b) {
-						ED_view3d_project_float_v3_m4(ar, sv_array[j].v_b->co, vec1, projectMat);
+						ED_view3d_project_float_v3_m4(ar, sv_array[j].v_b->co, sco_b, projectMat);
 					}
 					else {
-						add_v3_v3v3(vec1, v->co, sv_array[j].dir_b);
-						ED_view3d_project_float_v3_m4(ar, vec1, vec1, projectMat);
+						add_v3_v3v3(sco_b, v->co, sv_array[j].dir_b);
+						ED_view3d_project_float_v3_m4(ar, sco_b, sco_b, projectMat);
 					}
 					
 					if (sv_array[j].v_a) {
-						ED_view3d_project_float_v3_m4(ar, sv_array[j].v_a->co, vec_b, projectMat);
+						ED_view3d_project_float_v3_m4(ar, sv_array[j].v_a->co, sco_a, projectMat);
 					}
 					else {
-						add_v3_v3v3(vec_b, v->co, sv_array[j].dir_a);
-						ED_view3d_project_float_v3_m4(ar, vec_b, vec_b, projectMat);
+						add_v3_v3v3(sco_a, v->co, sv_array[j].dir_a);
+						ED_view3d_project_float_v3_m4(ar, sco_a, sco_a, projectMat);
 					}
 					
 					/* global direction */
-					d = dist_to_line_segment_v2(mval, vec1, vec_b);
-					if (maxdist == -1.0f || d < maxdist) {
+					d = dist_to_line_segment_v2(mval, sco_b, sco_a);
+					if ((maxdist == -1.0f) ||
+					    /* intentionally use 2d size on 3d vector */
+					    (d < maxdist && (len_squared_v2v2(sco_b, sco_a) > 0.1f)))
+					{
 						maxdist = d;
-						sub_v3_v3v3(dir, vec1, vec_b);
+						sub_v3_v3v3(mval_dir, sco_b, sco_a);
 					}
 
 					/* per loop direction */
 					l_nr = sv_array[j].loop_nr;
 					if (loop_maxdist[l_nr] == -1.0f || d < loop_maxdist[l_nr]) {
 						loop_maxdist[l_nr] = d;
-						sub_v3_v3v3(loop_dir[l_nr], vec1, vec_b);
+						sub_v3_v3v3(loop_dir[l_nr], sco_b, sco_a);
 					}
 				}
 			}
 		}
+	}
+
+	/* possible all of the edge loops are pointing directly at the view */
+	if (UNLIKELY(len_squared_v2(mval_dir) < 0.1f)) {
+		mval_dir[0] = 0.0f;
+		mval_dir[1] = 100.0f;
 	}
 
 	bmesh_edit_begin(bm, BMO_OPTYPE_FLAG_UNTAN_MULTIRES);
@@ -5462,14 +5531,14 @@ static int createEdgeSlideVerts(TransInfo *t)
 		BM_ITER_ELEM (f, &fiter, sv_array->v, BM_FACES_OF_VERT) {
 			
 			if (!BLI_smallhash_haskey(&sld->origfaces, (uintptr_t)f)) {
-				BMFace *copyf = BM_face_copy(bm, f, TRUE, TRUE);
+				BMFace *copyf = BM_face_copy(bm, f, true, true);
 				
-				BM_face_select_set(bm, copyf, FALSE);
+				BM_face_select_set(bm, copyf, false);
 				BM_elem_flag_enable(copyf, BM_ELEM_HIDDEN);
 				BM_ITER_ELEM (l, &liter, copyf, BM_LOOPS_OF_FACE) {
-					BM_vert_select_set(bm, l->v, FALSE);
+					BM_vert_select_set(bm, l->v, false);
 					BM_elem_flag_enable(l->v, BM_ELEM_HIDDEN);
-					BM_edge_select_set(bm, l->e, FALSE);
+					BM_edge_select_set(bm, l->e, false);
 					BM_elem_flag_enable(l->e, BM_ELEM_HIDDEN);
 				}
 
@@ -5481,7 +5550,7 @@ static int createEdgeSlideVerts(TransInfo *t)
 
 		/* switch a/b if loop direction is different from global direction */
 		l_nr = sv_array->loop_nr;
-		if (dot_v3v3(loop_dir[l_nr], dir) < 0.0f) {
+		if (dot_v3v3(loop_dir[l_nr], mval_dir) < 0.0f) {
 			swap_v3_v3(sv_array->dir_a, sv_array->dir_b);
 			SWAP(BMVert *, sv_array->v_a, sv_array->v_b);
 		}
@@ -5497,7 +5566,7 @@ static int createEdgeSlideVerts(TransInfo *t)
 	zero_v2(mval_start);
 
 	/*dir holds a vector along edge loop*/
-	copy_v2_v2(mval_end, dir);
+	copy_v2_v2(mval_end, mval_dir);
 	mul_v2_fl(mval_end, 0.5f);
 	
 	sld->mval_start[0] = t->mval[0] + mval_start[0];
@@ -5518,9 +5587,9 @@ static int createEdgeSlideVerts(TransInfo *t)
 	MEM_freeN(loop_maxdist);
 
 	/* arrays are dirty from copying faces: EDBM_index_arrays_free */
-	EDBM_update_generic(em, FALSE, TRUE);
+	EDBM_update_generic(em, false, true);
 
-	return 1;
+	return true;
 }
 
 void projectEdgeSlideData(TransInfo *t, bool is_final)
@@ -5577,7 +5646,7 @@ void projectEdgeSlideData(TransInfo *t, bool is_final)
 			/* project onto copied projection face */
 			BM_ITER_ELEM (l, &liter, f, BM_LOOPS_OF_FACE) {
 				/* only affected verts will get interpolated */
-				char affected = FALSE;
+				bool affected = false;
 				f_copy_flip = f_copy;
 
 				if (BM_elem_flag_test(l->e, BM_ELEM_SELECT) || BM_elem_flag_test(l->prev->e, BM_ELEM_SELECT)) {
@@ -5603,7 +5672,7 @@ void projectEdgeSlideData(TransInfo *t, bool is_final)
 						continue;  /* shouldn't happen, but protection */
 					}
 
-					affected = TRUE;
+					affected = true;
 				}
 				else {
 					/* the loop is attached to only one vertex and not a selected edge,
@@ -5643,17 +5712,17 @@ void projectEdgeSlideData(TransInfo *t, bool is_final)
 							}
 						}
 
-						affected = TRUE;
+						affected = true;
 					}
 
 				}
 
-				if (!affected)
+				if (affected == false)
 					continue;
 
 				/* only loop data, no vertex data since that contains shape keys,
 				 * and we do not want to mess up other shape keys */
-				BM_loop_interp_from_face(em->bm, l, f_copy_flip, FALSE, FALSE);
+				BM_loop_interp_from_face(em->bm, l, f_copy_flip, false, false);
 
 				if (is_final) {
 					BM_loop_interp_multires(em->bm, l, f_copy_flip);
@@ -6088,7 +6157,7 @@ static void calcVertSlideMouseActiveEdges(struct TransInfo *t, const int mval[2]
 	}
 }
 
-static int createVertSlideVerts(TransInfo *t)
+static bool createVertSlideVerts(TransInfo *t)
 {
 	BMEditMesh *em = BKE_editmesh_from_object(t->obedit);
 	BMesh *bm = em->bm;
@@ -6145,7 +6214,7 @@ static int createVertSlideVerts(TransInfo *t)
 
 	if (!j) {
 		MEM_freeN(sld);
-		return 0;
+		return false;
 	}
 
 	sv_array = MEM_callocN(sizeof(TransDataVertSlideVert) * j, "sv_array");
@@ -6216,7 +6285,7 @@ static int createVertSlideVerts(TransInfo *t)
 		calcVertSlideMouseActiveEdges(t, t->mval);
 	}
 
-	return 1;
+	return true;
 }
 
 void freeVertSlideVerts(TransInfo *t)

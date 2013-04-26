@@ -463,6 +463,8 @@ void RE_FreePersistentData(void)
 /* disprect is optional, if NULL it assumes full window render */
 void RE_InitState(Render *re, Render *source, RenderData *rd, SceneRenderLayer *srl, int winx, int winy, rcti *disprect)
 {
+	bool had_freestyle = (re->r.mode & R_EDGE_FRS);
+
 	re->ok = TRUE;   /* maybe flag */
 	
 	re->i.starttime = PIL_check_seconds_timer();
@@ -570,9 +572,22 @@ void RE_InitState(Render *re, Render *source, RenderData *rd, SceneRenderLayer *
 	BLI_rw_mutex_lock(&re->resultmutex, THREAD_LOCK_WRITE);
 
 	if (re->r.scemode & R_PREVIEWBUTS) {
-		/* always fresh, freestyle layers need it */
-		render_result_free(re->result);
-		re->result = NULL;
+		if (had_freestyle || (re->r.mode & R_EDGE_FRS)) {
+			/* freestyle manipulates render layers so always have to free */
+			render_result_free(re->result);
+			re->result = NULL;
+		}
+		else if (re->result) {
+			if (re->result->rectx == re->rectx && re->result->recty == re->recty) {
+				/* keep render result, this avoids flickering black tiles
+				 * when the preview changes */
+			}
+			else {
+				/* free because resolution changed */
+				render_result_free(re->result);
+				re->result = NULL;
+			}
+		}
 	}
 	else {
 		
@@ -1529,6 +1544,11 @@ static void tag_scenes_for_render(Render *re)
 	for (sce = re->main->scene.first; sce; sce = sce->id.next)
 		sce->id.flag &= ~LIB_DOIT;
 	
+#ifdef WITH_FREESTYLE
+	for (sce = re->freestyle_bmain.scene.first; sce; sce = sce->id.next)
+		sce->id.flag &= ~LIB_DOIT;
+#endif
+
 	if (RE_GetCamera(re) && composite_needs_render(re->scene, 1))
 		re->scene->id.flag |= LIB_DOIT;
 	
@@ -1656,16 +1676,19 @@ static void composite_freestyle_renders(Render *re, int sample)
 static void free_all_freestyle_renders(void)
 {
 	Render *re1, *freestyle_render;
+	Scene *freestyle_scene;
 	LinkData *link;
 
 	for (re1= RenderGlobal.renderlist.first; re1; re1= re1->next) {
 		for (link = (LinkData *)re1->freestyle_renders.first; link; link = link->next) {
 			if (link->data) {
 				freestyle_render = (Render *)link->data;
+				freestyle_scene = freestyle_render->scene;
 				RE_FreeRender(freestyle_render);
+				BKE_scene_unlink(&re1->freestyle_bmain, freestyle_scene, NULL);
 			}
 		}
-		BLI_freelistN( &re1->freestyle_renders );
+		BLI_freelistN(&re1->freestyle_renders);
 	}
 }
 #endif
@@ -1711,7 +1734,7 @@ static void do_merge_fullsample(Render *re, bNodeTree *ntree)
 						BLI_rw_mutex_lock(&re->resultmutex, THREAD_LOCK_WRITE);
 						render_result_exr_file_read(re1, sample);
 #ifdef WITH_FREESTYLE
-						if( re1->r.mode & R_EDGE_FRS)
+						if (re1->r.mode & R_EDGE_FRS)
 							composite_freestyle_renders(re1, sample);
 #endif
 						BLI_rw_mutex_unlock(&re->resultmutex);
@@ -1726,7 +1749,7 @@ static void do_merge_fullsample(Render *re, bNodeTree *ntree)
 			ntreeCompositTagRender(re->scene);
 			ntreeCompositTagAnimated(ntree);
 			
-			ntreeCompositExecTree(ntree, &re->r, 1, G.background == 0, &re->scene->view_settings, &re->scene->display_settings);
+			ntreeCompositExecTree(ntree, &re->r, TRUE, G.background == 0, &re->scene->view_settings, &re->scene->display_settings);
 		}
 		
 		/* ensure we get either composited result or the active layer */
@@ -1903,7 +1926,7 @@ static void do_render_composite_fields_blur_3d(Render *re)
 				if (re->r.scemode & R_FULL_SAMPLE)
 					do_merge_fullsample(re, ntree);
 				else {
-					ntreeCompositExecTree(ntree, &re->r, 1, G.background == 0, &re->scene->view_settings, &re->scene->display_settings);
+					ntreeCompositExecTree(ntree, &re->r, TRUE, G.background == 0, &re->scene->view_settings, &re->scene->display_settings);
 				}
 				
 				ntree->stats_draw = NULL;

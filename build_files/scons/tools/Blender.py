@@ -412,7 +412,7 @@ def buildinfo(lenv, build_type):
     build_time = time.strftime ("%H:%M:%S")
     build_rev = os.popen('svnversion').read()[:-1] # remove \n
     if build_rev == '': 
-        build_rev = '56198'
+        build_rev = '56302'
     if lenv['BF_DEBUG']:
         build_type = "Debug"
         build_cflags = ' '.join(lenv['CFLAGS'] + lenv['CCFLAGS'] + lenv['BF_DEBUG_CCFLAGS'] + lenv['CPPFLAGS'])
@@ -762,6 +762,14 @@ def UnixPyBundle(target=None, source=None, env=None):
             print '\t"%s"\n' % numpy_target
 
             run("cp -R '%s' '%s'" % (numpy_src, os.path.dirname(numpy_target)))
+            run("rm -rf '%s/distutils'" % numpy_target)
+            run("rm -rf '%s/oldnumeric'" % numpy_target)
+            run("rm -rf '%s/doc'" % numpy_target)
+            run("rm -rf '%s/tests'" % numpy_target)
+            run("rm -rf '%s/f2py'" % numpy_target)
+            run("find '%s' -type d -name 'include' -prune -exec rm -rf {} ';'" % numpy_target)
+            run("find '%s' -type d -name '*.h' -prune -exec rm -rf {} ';'" % numpy_target)
+            run("find '%s' -type d -name '*.a' -prune -exec rm -rf {} ';'" % numpy_target)
         else:
             print 'Failed to find numpy at %s, skipping copying' % numpy_src
 

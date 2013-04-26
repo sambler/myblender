@@ -107,6 +107,7 @@
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
 #include "BLI_edgehash.h"
+#include "BLI_threads.h"
 
 #include "BLF_translation.h"
 
@@ -1315,6 +1316,8 @@ void blo_make_image_pointer_map(FileData *fd, Main *oldmain)
 			oldnewmap_insert(fd->imamap, ibuf, ibuf, 0);
 		if (ima->gputexture)
 			oldnewmap_insert(fd->imamap, ima->gputexture, ima->gputexture, 0);
+		if (ima->rr)
+			oldnewmap_insert(fd->imamap, ima->rr, ima->rr, 0);
 		for (a=0; a < IMA_MAX_RENDER_SLOT; a++)
 			if (ima->renders[a])
 				oldnewmap_insert(fd->imamap, ima->renders[a], ima->renders[a], 0);
@@ -1356,12 +1359,14 @@ void blo_end_image_pointer_map(FileData *fd, Main *oldmain)
 				ima->bindcode = 0;
 				ima->tpageflag &= ~IMA_GLBIND_IS_DATA;
 				ima->gputexture = NULL;
+				ima->rr = NULL;
 			}
 		}
 		for (i = 0; i < IMA_MAX_RENDER_SLOT; i++)
 			ima->renders[i] = newimaadr(fd, ima->renders[i]);
 		
 		ima->gputexture = newimaadr(fd, ima->gputexture);
+		ima->rr = newimaadr(fd, ima->rr);
 	}
 	for (; sce; sce = sce->id.next) {
 		if (sce->nodetree && sce->nodetree->previews) {
@@ -3278,10 +3283,10 @@ static void direct_link_image(FileData *fd, Image *ima)
 		ima->bindcode = 0;
 		ima->tpageflag &= ~IMA_GLBIND_IS_DATA;
 		ima->gputexture = NULL;
+		ima->rr = NULL;
 	}
 	
 	ima->anim = NULL;
-	ima->rr = NULL;
 	ima->repbind = NULL;
 	
 	/* undo system, try to restore render buffers */
@@ -4591,6 +4596,7 @@ static void direct_link_modifiers(FileData *fd, ListBase *lb)
 				smd->domain->smd = smd;
 				
 				smd->domain->fluid = NULL;
+				smd->domain->fluid_mutex = BLI_rw_mutex_alloc();
 				smd->domain->wt = NULL;
 				smd->domain->shadow = NULL;
 				smd->domain->tex = NULL;
@@ -9313,6 +9319,12 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 				brush->stencil_dimension[1] = 256;
 				brush->stencil_pos[0] = 256;
 				brush->stencil_pos[1] = 256;
+			}
+			if (brush->mask_stencil_dimension[0] == 0) {
+				brush->mask_stencil_dimension[0] = 256;
+				brush->mask_stencil_dimension[1] = 256;
+				brush->mask_stencil_pos[0] = 256;
+				brush->mask_stencil_pos[1] = 256;
 			}
 		}
 

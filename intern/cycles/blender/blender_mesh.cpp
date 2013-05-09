@@ -336,7 +336,7 @@ static void create_mesh(Scene *scene, Mesh *mesh, BL::Mesh b_mesh, const vector<
 		size_t i = 0;
 
 		for(b_mesh.vertices.begin(v); v != b_mesh.vertices.end(); ++v)
-			generated[i++] = get_float3(v->co())*size - loc;
+			generated[i++] = get_float3(v->undeformed_co())*size - loc;
 	}
 }
 
@@ -435,7 +435,8 @@ Mesh *BlenderSync::sync_mesh(BL::Object b_ob, bool object_updated, bool hide_tri
 	mesh_synced.insert(mesh);
 
 	/* create derived mesh */
-	BL::Mesh b_mesh = object_to_mesh(b_data, b_ob, b_scene, true, !preview);
+	bool need_undeformed = mesh->need_attribute(scene, ATTR_STD_GENERATED);
+	BL::Mesh b_mesh = object_to_mesh(b_data, b_ob, b_scene, true, !preview, need_undeformed);
 	PointerRNA cmesh = RNA_pointer_get(&b_ob_data.ptr, "cycles");
 
 	vector<Mesh::Triangle> oldtriangle = mesh->triangles;
@@ -448,14 +449,14 @@ Mesh *BlenderSync::sync_mesh(BL::Object b_ob, bool object_updated, bool hide_tri
 	mesh->name = ustring(b_ob_data.name().c_str());
 
 	if(b_mesh) {
-		if(!(hide_tris && experimental && is_cpu)) {
+		if(!(hide_tris && experimental)) {
 			if(cmesh.data && experimental && RNA_boolean_get(&cmesh, "use_subdivision"))
 				create_subd_mesh(mesh, b_mesh, &cmesh, used_shaders);
 			else
 				create_mesh(scene, mesh, b_mesh, used_shaders);
 		}
 
-		if(experimental && is_cpu)
+		if(experimental)
 			sync_curves(mesh, b_mesh, b_ob, object_updated);
 
 		/* free derived mesh */
@@ -507,7 +508,7 @@ void BlenderSync::sync_mesh_motion(BL::Object b_ob, Mesh *mesh, int motion)
 		return;
 
 	/* get derived mesh */
-	BL::Mesh b_mesh = object_to_mesh(b_data, b_ob, b_scene, true, !preview);
+	BL::Mesh b_mesh = object_to_mesh(b_data, b_ob, b_scene, true, !preview, false);
 
 	if(b_mesh) {
 		BL::Mesh::vertices_iterator v;

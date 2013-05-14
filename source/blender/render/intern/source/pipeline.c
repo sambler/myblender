@@ -348,6 +348,13 @@ void RE_ResultGet32(Render *re, unsigned int *rect)
 	RE_ReleaseResultImage(re);
 }
 
+/* caller is responsible for allocating rect in correct size! */
+/* Only for acquired results, for lock */
+void RE_AcquiredResultGet32(Render *re, RenderResult *result, unsigned int *rect)
+{
+	render_result_rect_get_pixels(result, rect, re->rectx, re->recty, &re->scene->view_settings, &re->scene->display_settings);
+}
+
 RenderStats *RE_GetStats(Render *re)
 {
 	return &re->i;
@@ -2158,7 +2165,7 @@ static int node_tree_has_composite_output(bNodeTree *ntree)
 	bNode *node;
 
 	for (node = ntree->nodes.first; node; node = node->next) {
-		if (node->type == CMP_NODE_COMPOSITE) {
+		if (ELEM(node->type, CMP_NODE_COMPOSITE, CMP_NODE_OUTPUT_FILE)) {
 			return TRUE;
 		}
 		else if (node->type == NODE_GROUP) {
@@ -2446,7 +2453,7 @@ static int do_write_image_or_movie(Render *re, Main *bmain, Scene *scene, bMovie
 		if (ibuf->rect == NULL) {
 			ibuf->rect = MEM_mapallocN(sizeof(int) * rres.rectx * rres.recty, "temp 32 bits rect");
 			ibuf->mall |= IB_rect;
-			RE_ResultGet32(re, ibuf->rect);
+			RE_AcquiredResultGet32(re, &rres, ibuf->rect);
 			do_free = TRUE;
 		}
 

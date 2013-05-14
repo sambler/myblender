@@ -937,6 +937,7 @@ endif()
 		bf_intern_opencolorio
 		extern_rangetree
 		extern_wcwidth
+		extern_libmv
 	)
 
 	if(WITH_COMPOSITOR)
@@ -946,7 +947,6 @@ endif()
 	endif()
 
 	if(WITH_LIBMV)
-		list(APPEND BLENDER_SORTED_LIBS extern_libmv)
 		list(APPEND BLENDER_SORTED_LIBS extern_ceres)
 	endif()
 
